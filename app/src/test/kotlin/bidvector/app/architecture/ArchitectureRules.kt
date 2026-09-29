@@ -164,7 +164,7 @@ class ArchitectureRules(
         }
 
     /**
-     * M6/6A-3+6F-3 D-6A3-9 — `bidvector.strategy.TextKt.assemble*`(감시 텍스트 조립 커널)를
+     * D-6A3-9 — `bidvector.strategy.TextKt.assemble*`(감시 텍스트 조립 커널)를
      * 부르는 production 클래스 집합은 [ArchitecturePolicy.allowedAssembleCallers] 뿐이다
      * (부재 쪽 — 존재 쪽은 `EvaluationAdapterDependencyTest`, adapters 모듈이 잠근다).
      * `noClasses().that(허용 밖)` 형태라 새 어댑터가 같은 텍스트를 다시 이어붙이면(우회
@@ -199,15 +199,15 @@ class ArchitectureRules(
         }
 
     /**
-     * M6/6A-3+6F-3 D-6A3-17(a) — HIGH-1 시정(검토 라운드 1). 이름 목록(`KNOWN_
+     * D-6A3-17(a) — 이름 목록(`KNOWN_
      * NOTIFICATION_REQUEST_PORT_IMPLS`)이 아니라 **구조**로 닫는다. ① [appRoot] 안의
      * 클래스가 [portTypeName] 을 스스로 구현하지 않는다(집합==∅ — app 안에 숨겨 심는
-     * 우회를 막는다, verifier M1). ② [appRoot] 가 참조하는 포트 구현 타입 집합(classpath
+     * 우회를 막는다). ② [appRoot] 가 참조하는 포트 구현 타입 집합(classpath
      * 전체에서 `isAssignableTo` 로 도출)은 [allowedImpls] 의 부분집합이다(다른 모듈에
      * 새 구현이 생겨 그것을 배선해도 걸린다). ③ [forbiddenOutboxTypes](outbox 쓰기 타입
      * 전수) 참조 집합은 ∅ 다(포트를 거치지 않고 직접 쓰는 우회를 막는다).
      *
-     * **①은 명명 구현만 본다(verifier r2 R2-M1).** [portTypeName]이 가리키는
+     * **①은 명명 구현만 본다.** [portTypeName]이 가리키는
      * `NotificationRequestPort`는 `fun interface`라 그 SAM 람다 구현은 바이트코드에
      * 별도 구현 **클래스**를 만들지 않는다(invokedynamic) — ①의 「구현체 집합==∅」
      * 판정은 이 형태에 닿지 않는다. 그 형태의 폐쇄는 이 구조 규칙이 아니라
@@ -240,8 +240,8 @@ class ArchitectureRules(
         )
 
     /**
-     * D-6A3-17(b) — HIGH-3 시정. `app.wiring` 만이 아니라 [appRoot] 전체(루트 패키지 포함
-     * — `@Bean` 을 아무 패키지에나 둘 수 있다, verifier M4)가 `adapters.ml`([mlPackage])
+     * D-6A3-17(b) — `app.wiring` 만이 아니라 [appRoot] 전체(루트 패키지 포함
+     * — `@Bean` 을 아무 패키지에나 둘 수 있다)가 `adapters.ml`([mlPackage])
      * 에서 참조하는 클래스 집합은 [allowedTypes] 의 부분집합이다.
      */
     fun appMustOnlyReferenceMlTypes(
@@ -258,10 +258,10 @@ class ArchitectureRules(
         )
 
     /**
-     * D-6A3-25 — 검토 라운드 2 HIGH 시정(우회 5). 이전 (c)(인터페이스 이름 등식 × `app.http`
-     * 패키지 하나)는 호출 지점 owner 가 구체 타입이면(verifier N6) 또는 헬퍼가 `app.http`
-     * 밖에 있으면(verifier N5) 보지 못했다 — 두 축을 각각 한 걸음씩 옮긴 변이가 둘 다
-     * 초록이었다. 이 규칙은 [appRoot] 전체(패키지 무관)에서 [ports] 의 메서드를 **호출**하는
+     * D-6A3-25(우회 5) — (c)(인터페이스 이름 등식 × `app.http`
+     * 패키지 하나)만으로는 호출 지점 owner 가 구체 타입인 경우(N6) 또는 헬퍼가 `app.http`
+     * 밖에 있는 경우(N5)를 보지 못한다 — 두 축을 각각 한 걸음씩 옮긴 변이가 둘 다
+     * 초록일 수 있다. 이 규칙은 [appRoot] 전체(패키지 무관)에서 [ports] 의 메서드를 **호출**하는
      * 모든 접근을 owner 의 `isAssignableTo`(구현 타입 전부 포함 — classpath 계층 해석,
      * 이름 목록이 아니다)로 판정하고, (호출자, 포트.메서드) 쌍이 [allowedPairs] 의 부분집합인지
      * 본다. 포트를 만들어 생성자로 **넘기기만** 하는 조립 코드(`EvaluationWiring`)는 메서드
@@ -387,7 +387,7 @@ class ArchitectureRules(
      * 인터페이스) 후보 가운데 [ports] 에 속하면서 [access] 의 메서드 이름을 **직접 선언**하는
      * 포트만 판정 키("포트FQCN.메서드명")를 낸다 — owner 가 구체 구현 타입이어도(예:
      * `JdbcCandidateSource.openCandidates()`) 그 타입이 포트의 그 메서드를 구현하는 한
-     * 걸린다(verifier N6).
+     * 걸린다(N6).
      */
     private fun JavaAccess<*>.matchedPortCalls(ports: Set<String>): List<String> {
         if (this !is JavaMethodCall) return emptyList()

@@ -28,7 +28,7 @@ private const val SOURCE_NAME_MARKER = "VALUE-MUST-NOT-APPEAR"
 /**
  * `spring.config.import` 가 URL 을 받으면 Boot 의 `StandardConfigDataLoader` 가 소스 이름을
  * `Config resource '<resource>' via location '<location>'` 으로 짓고, 그 두 조각에 **원문 URL 이
- * 그대로** 남는다(privacy-gate r3 L-6, 바이트코드 실독). userinfo 가 든 URL 이면 자격이 소스
+ * 그대로** 남는다(바이트코드 실독). userinfo 가 든 URL 이면 자격이 소스
  * 이름을 타고 기동 실패 로그로 나간다. 표지를 보간으로 넣어 이 파일에 실 자격 형태를 적지 않는다.
  */
 private val CONFIG_IMPORT_SOURCE_NAME =
@@ -39,15 +39,15 @@ private val CONFIG_IMPORT_SOURCE_NAME =
  * D-6A2a-10 「관리 표면은 **접두사 거부**로 닫는다(구성)」 — 잠금 밖의 어느 속성 소스에든
  * `management.` 이름공간 키가 있으면 기동을 거부한다. 허용은 `management.server.port` 하나다.
  *
- * **왜 이 판을 쓰는가(r1 세 레인이 같은 결함을 따로 실측했다).** 직전 판은 잠금이 **이름으로
- * 고정한 키**의 우선순위만 쟀다. 그 축은 실제로 빈틈이 없었으나, `management.*` 에는 **같은
- * 출력에 닿는 다른 키**가 있다 — 그룹별 `show-details`·`show-components`·`include`/`exclude`,
- * 새 그룹 이름, `status.http-mapping`, `probes.add-additional-paths`,
- * `validate-group-membership`. 환경변수 한두 줄이 그 키들로 우회 2·3·7 을 다시 열었고, 직전
- * 판의 단언은 **모집단이 잠금 자신**(`MANAGEMENT_SURFACE_LOCK.forEach`)이라 열거 밖 키를
- * 구조적으로 잴 수 없었다. 그래서 여기서는 ① 잠금 키 집합을 **리터럴**로 못박고(키를 지우면
- * 곧바로 붉다) ② 판정은 열거가 아니라 **이름공간 접두사**로 하고 ③ 값 축이 아니라 **기동
- * 거부**를 단언한다. 새 Boot 판이 새 `management.*` 키를 더해도 접두사에 걸린다.
+ * **왜 이 판단을 쓰는가.** 잠금이 이름으로 고정한 키의 우선순위만 재면 실제로 빈틈이 없어
+ * 보이지만, `management.*` 에는 **같은 출력에 닿는 다른 키**가 있다 — 그룹별
+ * `show-details`·`show-components`·`include`/`exclude`, 새 그룹 이름, `status.http-mapping`,
+ * `probes.add-additional-paths`, `validate-group-membership`. 환경변수 한두 줄이 그 키들로
+ * 우회 2·3·7 을 다시 열 수 있고, 모집단을 잠금 자신(`MANAGEMENT_SURFACE_LOCK.forEach`)으로
+ * 두면 열거 밖 키를 구조적으로 잴 수 없다. 그래서 여기서는 ① 잠금 키 집합을 **리터럴**로
+ * 못박고(키를 지우면 곧바로 붉다) ② 판정은 열거가 아니라 **이름공간 접두사**로 하고 ③ 값
+ * 축이 아니라 **기동 거부**를 단언한다. 새 Boot 판이 새 `management.*` 키를 더해도 접두사에
+ * 걸린다.
  *
  * 실행 단언(출하 조립을 실제로 부팅해 거부를 재는 축)은 [bidvector.app.management] 의
  * `ManagementSurfaceBootRefusalTest` 가 든다 — 이 파일은 순수 환경 판정이다.
@@ -76,10 +76,10 @@ class ManagementSurfaceLockTest {
         }
 
     /**
-     * 잠금이 고정하는 키 집합을 **손으로 적는다**(code-review r1 MEDIUM). 직전 판의 주 단언은
-     * `MANAGEMENT_SURFACE_LOCK` 을 순회했다 — 키를 **지우면** 루프가 짧아질 뿐 붉지 않았고,
-     * 지운 순간 그 키의 환경 축이 다시 열렸다(Boot 기본값이 같은 거동을 내는 다섯 키는 값
-     * 단언으로도 잡히지 않는다). 이제 집합이 바뀌면 여기가 먼저 붉다.
+     * 잠금이 고정하는 키 집합을 **손으로 적는다**. `MANAGEMENT_SURFACE_LOCK` 을 순회해서 재면
+     * 키를 **지웠을 때** 루프가 짧아질 뿐 붉어지지 않고, 지운 순간 그 키의 환경 축이 다시
+     * 열린다(Boot 기본값이 같은 거동을 내는 다섯 키는 값 단언으로도 잡히지 않는다). 집합을
+     * 리터럴로 적어 두면 집합이 바뀔 때 여기가 먼저 붉다.
      */
     @Test
     fun `잠금이 고정하는 키 집합은 리터럴이다`() {
@@ -218,7 +218,7 @@ class ManagementSurfaceLockTest {
     }
 
     /**
-     * 거부 문면의 **소스 이름**도 값 축이다(privacy-gate r3 L-6 · code-review r3 LOW-2).
+     * 거부 문면의 **소스 이름**도 값 축이다.
      * `spring.config.import` 가 URL 을 받으면 그 URL 의 userinfo 가 소스 이름에 그대로 남는다 —
      * 이름을 문면에 그대로 실으면 자격이 기동 실패 로그로 나간다. 그래서 상수 이름이 아닌 소스는
      * **분류 한 낱말**로만 실린다.
@@ -361,7 +361,7 @@ class ManagementSurfaceLockTest {
      * 뒤에 실체로 채워지는 source 가 그 키를 들고 와도 잠금이 이긴다. `addFirst` 를 `addLast`
      * 로 바꾸면 이 단언이 붉어진다.
      *
-     * **이 단언이 지키지 못하는 것**(code-review r2 LOW-2 · verifier r2 F-1r): 잠금이 이름
+     * **이 단언이 지키지 못하는 것**: 잠금이 이름
      * 대지 **않은** 형제 키다. `addFirst` 는 그 키에 대해 아무 것도 하지 않는다. 아래 test 가
      * 그 사실을 실측으로 적고, 그 축을 닫는 것은 [refuseManagementSurfaceKeysAfterRefresh]
      * (D-6A2a-14)의 **늦은 재검사**다 — 「닫혔다」와 「이 배포물에서는 도달 불가다」는 다른
@@ -375,8 +375,8 @@ class ManagementSurfaceLockTest {
     }
 
     /**
-     * D-6A2a-14 — **늦은 source 가 운반하는 잠금 밖 형제 키**. verifier r2 가 출하 이미지에서
-     * 환경변수 두 줄로 이 축을 재현했다(`server.servlet.context-parameters.*` 가 refresh 중에
+     * D-6A2a-14 — **늦은 source 가 운반하는 잠금 밖 형제 키**. 출하 이미지에서 환경변수 두
+     * 줄로 이 축이 재현된다(`server.servlet.context-parameters.*` 가 refresh 중에
      * 실체로 바뀌면서 그 안의 `management.endpoint.health.group.…` 키가 환경변수보다 높은
      * 우선순위로 들어온다). 그래서 **같은 술어를 모든 source 가 선 뒤에 한 번 더** 돌린다.
      * 여기서는 그 술어(판정 함수)가 형제 키를 실제로 잡는다는 사실만 잰다 — 부팅 축은

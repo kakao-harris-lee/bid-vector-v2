@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * M2/2D ⑥ — deadline·cancellation·retry(ADR 0010 D-2·D-4, 조사 노트 02 grpc/grpc#36193).
+ * deadline·cancellation·retry(ADR 0010 D-2·D-4, 조사 노트 02 grpc/grpc#36193).
  * fake servicer 는 in-process(grpc-testing 대역) 위에서 지연·취소·간헐 실패를 흉내낸다.
  * **취소 검증은 `cancelled()` 플래그 폴링이 아니라 `CancellationException` 을 실제로 받아
  * 계산을 중단했다는 카운터로 한다**(D-2D-7 — 조사 02 가 콜백 중 `cancelled()` False 버그를

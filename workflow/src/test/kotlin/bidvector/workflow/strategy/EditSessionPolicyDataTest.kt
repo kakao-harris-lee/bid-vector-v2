@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 
 /**
- * verifier M-2 — 우회 (4)(timeout 을 0/음수/무한으로)의 유일한 차단인 두 `require` 를
- * 직접 단언한다. `ExtractionPolicyDataTest`(M3/3C verifier r2 N-1)와 같은 계보 —
+ * 우회 (4)(timeout 을 0/음수/무한으로)의 유일한 차단인 두 `require` 를
+ * 직접 단언한다. `ExtractionPolicyDataTest`와 같은 계보 —
  * `beginSession`/`expireIfDue` 위 test 는 정상 범위 값만 써 이 불변식을 「간접 확인」
  * 한다고 적혔지만 실측상 간접 확인도 성립하지 않았다(두 `require` 를 `require(true)` 로
  * 바꿔도 `:workflow:test` exit 0).

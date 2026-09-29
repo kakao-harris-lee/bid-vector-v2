@@ -223,7 +223,7 @@ class GrpcBidPredictionGatewayTest {
         }
     }
 
-    // ---- verifier r1 F-1(high) — 백오프 미구현 회귀 방지(probe P2) ----
+    // ---- 백오프 미구현 회귀 방지(probe P2) ----
 
     @Test
     fun `재시도 사이에 정책 백오프만큼 실제로 지연한다(경과시간 probe)`() {
@@ -242,7 +242,7 @@ class GrpcBidPredictionGatewayTest {
             outcome.reason shouldBe MlUnavailableReason.RetryBudgetExhausted
             calls.get() shouldBe 3
             // 정책 배열 합(60+120=180ms) 이상 걸려야 한다 — 백오프가 지연 없이 즉시
-            // 다음 attempt 로 가면(수정 전 실측 6ms) 이 하한을 못 채운다.
+            // 다음 attempt 로 가면(실측 6ms) 이 하한을 못 채운다.
             (elapsedMillis >= 180) shouldBe true
         }
     }
@@ -266,7 +266,7 @@ class GrpcBidPredictionGatewayTest {
         }
     }
 
-    // ---- verifier r1 F-3(medium) — DEADLINE_EXCEEDED 재시도 예산 술어(F-1 과 같은 메커니즘) ----
+    // ---- DEADLINE_EXCEEDED 재시도 예산 술어(F-1 과 같은 메커니즘) ----
 
     @Test
     fun `DEADLINE_EXCEEDED 도 예산이 없으면 재시도 없이 1회 호출로 끝난다(gRPC 절대 deadline 부작용에 기대지 않는다)`() {
@@ -311,7 +311,7 @@ class GrpcBidPredictionGatewayTest {
         }
     }
 
-    // ---- verifier r2 G-1·G-2·G-4·G-5 의 실 gateway 경로 test는
+    // ---- 실 gateway 경로 test는
     // `GrpcBidPredictionGatewayVerifierR2Test.kt`로 갈라졌다(size ratchet §5). ----
 }
 

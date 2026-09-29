@@ -18,7 +18,7 @@ import java.time.Instant
  * **원시 필드만** 담고(도메인 불변식 0) 어댑터가 만드는 유일한 타입이다.
  * `EditSession`으로의 유일한 복원 경로는 [restoreEditSession]("internal", `workflow`
  * 밖에서 호출 자체가 컴파일되지 않는다) — 통로 타입(`AppliedStrategy`)이 쓰기 주체를
- * 가르듯, 이 타입은 읽기 주체가 얻는 것을 "원시 값"으로 한정한다(M4/4C-1
+ * 가르듯, 이 타입은 읽기 주체가 얻는 것을 "원시 값"으로 한정한다(
  * `OutboxPort.claim() -> ClaimedOutboxRow` 패턴, D-6B1-7 근거).
  */
 data class EditSessionSnapshot(
@@ -73,7 +73,7 @@ data class StrategyDraftSnapshot(
     val bidNowThreshold: BigDecimal? = null,
     val reviewThreshold: BigDecimal? = null,
     val candidateLimit: Int? = null,
-    /** M6/6A-3+6F-3 D-6A3-12 — [StrategyDraft.maxActiveBids] 왕복. 빠뜨리면 상한 있는 전략에서
+    /** D-6A3-12 — [StrategyDraft.maxActiveBids] 왕복. 빠뜨리면 상한 있는 전략에서
      * 시작한 세션이 영속·복원 뒤 조용히 상한을 잃는다(6B-1 왕복 안정성 계약 구멍). */
     val maxActiveBids: Int? = null,
 )

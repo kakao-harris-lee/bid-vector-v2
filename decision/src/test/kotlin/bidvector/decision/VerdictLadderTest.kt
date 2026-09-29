@@ -26,7 +26,7 @@ private fun legacyPolicy(): Resolution.Resolved<VerdictLadderPolicyData> =
 private fun score(value: String): UnitScore = UnitScore(BigDecimal(value))
 
 /**
- * 소진 `when`(else 없음, verifier r1 L-6 시정) — `④ ML 부재 — mlUnavailableReason 슬롯 값이
+ * 소진 `when`(else 없음) — `④ ML 부재 — mlUnavailableReason 슬롯 값이
  * 사다리까지 그대로 전달된다`의 `allReasons`는 손으로 나열한 11값이라, `MlUnavailableReason`
  * 에 12번째 값이 추가돼도 그 목록만으로는 test가 계속 통과한다(새 값이 목록에 없으니 안
  * 걸린다). 이 함수는 같은 11값을 소진 `when`으로 다시 세워 — 새 sealed 하위 타입이 추가되면
@@ -177,7 +177,7 @@ class VerdictLadderTest {
         verdict.reasons.single().shouldBeInstanceOf<BidNowReason.PriorityAboveBidNowThreshold>()
     }
 
-    // M4/4B-3 scope.md ② — LadderInput.mlUnavailableReason 슬롯이 priorityScore==null
+    // scope.md ② — LadderInput.mlUnavailableReason 슬롯이 priorityScore==null
     // 분기의 Review(MlUnavailable)에 그대로 실린다(사유가 ScoreNotProvided 로 접히지 않는다,
     // 설계 검토 (4) 우회 2). MlUnavailableReason 열 값 전부를 표로 확인한다.
     @Test

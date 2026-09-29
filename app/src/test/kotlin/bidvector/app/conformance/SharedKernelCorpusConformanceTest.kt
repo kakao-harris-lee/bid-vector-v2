@@ -14,7 +14,7 @@ import tools.jackson.databind.json.JsonMapper
 import java.io.File
 
 /**
- * M1/1B-c ④(`scope.md` 「이 slice 가 하는 일」④, decision 22 — D5(d)) — corpus 소비 테스트
+ * `scope.md` 「이 slice 가 하는 일」④(decision 22 — D5(d)) — corpus 소비 테스트
  * (conformance runner). `rate-unit`·`money-basis` 축의 `authoritative` case 를 실제 1B
  * 계약(`shared-kernel`) 위에서 실행해 `fixtures/manifest.yaml` 의 `verified_paths` 로
  * 대조한다. 지금까지 이 축을 지키는 것은 Python 스윕(계약 강건성 — 변이체가 통과하지
@@ -23,8 +23,8 @@ import java.io.File
  * **shared-kernel `internal` 을 읽지 않는다 — 공개 API 만 쓴다.** D5(b′)(testFixtures)는
  * 하네스 게이트 셋(`packageOwnershipGate`·`sourceSetLayoutGate`·`ArchitectureGateTest` 의
  * ArchUnit 프로덕션 스캔)이 `testFixtures` source set 을 인식하지 못해 실측 4 failures 로
- * 깨졌다(`checklist.md` 알려진 제한). `Rate` 가 `internal fraction` 만 나르는 문제
- * (verifier r1 L-4)는 `Rate` 가 `data class` 라는 사실로 우회한다(`assertRateFractionMatches`,
+ * 깨졌다(`checklist.md` 알려진 제한). `Rate` 가 `internal fraction` 만 나르는 문제는
+ * `Rate` 가 `data class` 라는 사실로 우회한다(`assertRateFractionMatches`,
  * `CorpusExecutors.kt`).
  *
  * **이 파일은 fixture/JSON 인프라와 test 진입점만 갖는다** — manifest 로딩(`ManifestCase`),
@@ -39,7 +39,7 @@ import java.io.File
  * authoritative case 가 있으면 실패한다**([`dispatch 표 밖의 authoritative case 가 없다`])
  * — 새 case 가 조용히 빠지지 못한다(위협 모델 우회 (4)).
  *
- * **verifier r1 수정 라운드(M-1~M-3, L-1)**:
+ * **닫힌 사각 넷(M-1~M-3, L-1)**:
  * - **M-1** — `money-basis-006` 은 입력의 `declaredVatTreatment`/`declaredProvenance`
  *   누락을 `UNKNOWN`/`Undeclared` 로 접지 않는다(`CorpusExecutors.kt`).
  * - **M-2** — `rate-unit-001`·`002`·`005` 는 입력 `$.rawRate.declaredUnit` 로 percent/
@@ -52,8 +52,8 @@ import java.io.File
  */
 class SharedKernelCorpusConformanceTest {
     /**
-     * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)는 team-lead 판정(v2-defect
-     * 7건, 2026-09-07)에 따른 production 수정 뒤 **빈 집합**이 됐다 — 이 `filterNot`은
+     * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)는 v2-defect 7건에 대한
+     * production 수정 뒤 **빈 집합**이 됐다 — 이 `filterNot`은
      * 이제 아무것도 걸러내지 않지만, 예외 자리가 다시 쓰일 때(새 능력 공백 발견) 같은
      * 배선을 재사용할 수 있도록 남겨 둔다. 완전성은 [`dispatch 표 밖의 authoritative case
      * 가 없다`]가 별도로 지킨다.
@@ -86,10 +86,9 @@ class SharedKernelCorpusConformanceTest {
     }
 
     /**
-     * M3/3A 잔여 일괄 ② → verifier r3 전 정정 — team-lead 가 002·003·004·016·018·023·026
-     * 7건 전부를 v2-defect 로 판정하고 production 수정을 지시했다(2026-09-07, 「계약 안
-     * 항목이라 verifier r3 전에 고친다... 값을 맞추려 runner 를 손대지 말고 production
-     * 을 고친 뒤 dispatch 예외 목록에서 빼라」). 6개 결함을 모두 고친 뒤
+     * 3A 잔여 일괄 ② — 002·003·004·016·018·023·026 7건 전부가 v2-defect 로 판정되어
+     * production 수정 대상이 됐다(계약 안 항목이라 값을 맞추려 runner 를 손대지 않고
+     * production 을 고친 뒤 dispatch 예외 목록에서 뺀다). 결함을 모두 고친 뒤
      * [KonepsCollectionDefectFixExecutors.kt]가 7건 전부를 dispatch 한다 — 이 test 는
      * 예외 목록이 **정확히 빈 집합**임을 잠가, 새 case 가 이 예외를 통해 조용히 빠지지
      * 못하게 한다.
@@ -100,7 +99,7 @@ class SharedKernelCorpusConformanceTest {
     }
 
     /**
-     * M1/1E ⑪ — `money-basis-003`가 curator 커밋(`c9022d9`, decision 29)으로 authoritative에
+     * `money-basis-003`가 curator 커밋(`c9022d9`, decision 29)으로 authoritative에
      * 되돌아가 이 축의 insufficient-evidence 이월이 0건이 됐다(`OPEN-1BC-STR16` 해소).
      * 「④가 넷을 닫는다」의 인계 경계가 이제 빈 목록이라는 것 자체가 그 해소의 증거다.
      */
@@ -115,7 +114,7 @@ class SharedKernelCorpusConformanceTest {
     }
 
     /**
-     * M1/1C — license-001(policyVersion 요구가 QUAL-03 acceptance 축 위반) · 008(파싱 실패
+     * license-001(policyVersion 요구가 QUAL-03 acceptance 축 위반) · 008(파싱 실패
      * 행 수 근거 부족) · 010(`requirementsBySourceField` 초과 주장) · 011(`OPEN-QUAL-11`
      * provisional 자체)은 인계 경계다(scope.md 「조사 결과」).
      */
@@ -159,23 +158,23 @@ internal val TARGET_DOMAINS =
         "rate-unit",
         "money-basis",
         "license",
-        // M1/1D — provenance first-match·floor shortfall 커널 둘(scope.md 「이 slice 가
+        // provenance first-match·floor shortfall 커널 둘(scope.md 「이 slice 가
         // 하는 일」⑩).
         "base-amount-provenance",
         "floor-shortfall",
         "floor-threshold",
-        // M1/1E ⑪ — 감시 predicate·전략 값 validation 커널 둘(scope.md 「이 slice 가
+        // 감시 predicate·전략 값 validation 커널 둘(scope.md 「이 slice 가
         // 하는 일」①·⑤). money-basis-003 은 이미 money-basis 축에 있어 여기 추가하지
         // 않는다 — curator 가 되돌린 authoritative case 가 위 목록으로 이미 대상이 된다.
         "strategy-watch",
         "strategy-validation",
-        // M3/3A 잔여 일괄 ② — koneps-collection 27 case 전건 authoritative(운영자 승인
-        // 2026-09-07). 21건은 `KONEPS_COLLECTION_EXECUTORS`가 dispatch 하고, 나머지 6건은
+        // 잔여 일괄 ② — koneps-collection 27 case 전건 authoritative.
+        // 21건은 `KONEPS_COLLECTION_EXECUTORS`가 dispatch 하고, 나머지 6건은
         // `KONEPS_COLLECTION_PENDING_CAPABILITY` 예외(아래 완전성 test 참고)로 명시 등재한다.
         "koneps-collection",
-        // M4/4A ⑧ — 편집 상태 기계(`bidvector.workflow.strategy`) fixture 다섯(D-4A-1 (a)).
+        // 편집 상태 기계(`bidvector.workflow.strategy`) fixture 다섯(D-4A-1 (a)).
         "strategy-edit",
-        // M4/4B-1 ⑧ — 투찰 판정 Verdict 커널(`bidvector.decision`). verdict-001~004 는
+        // 투찰 판정 Verdict 커널(`bidvector.decision`). verdict-001~004 는
         // insufficient-evidence 로 남아 이 필터에 걸리지 않는다(정합만 맞춘다, scope.md).
         "verdict",
     )
@@ -242,7 +241,7 @@ private fun readFixtureJson(manifestRelativePath: String): JsonNode {
 
 // ---- verified_paths 대조 — JSON 경로 walker + BigDecimal 인지 비교 ----
 
-/** M3/3A 잔여 일괄 ② — koneps-collection 이 이 corpus 최초로 배열 인덱스 표기(`name[n]`)를 쓴다. */
+/** 잔여 일괄 ② — koneps-collection 이 이 corpus 최초로 배열 인덱스 표기(`name[n]`)를 쓴다. */
 private val ARRAY_SEGMENT = Regex("(\\w+)\\[(\\d+)]")
 
 internal fun JsonNode.atDollarPath(path: String): JsonNode =
@@ -257,7 +256,7 @@ internal fun JsonNode.atDollarPath(path: String): JsonNode =
     }
 
 /**
- * M1/1C — `missingByGroup`(license-002·003·005)이 JSON object 다. 순서 무관 비교라
+ * `missingByGroup`(license-002·003·005)이 JSON object 다. 순서 무관 비교라
  * `LinkedHashMap`(Map.equals)에 맡긴다 — `atDollarPath` 가 세그먼트 이름으로만 내려가므로
  * object 는 오직 이 leaf 비교 경로에서만 나타난다(중첩 object 순회는 하지 않는다).
  */
@@ -295,7 +294,7 @@ private fun valuesMatch(
     }
 
 /**
- * verifier r1 M-3 — 존재하지 않는 경로가 missing==missing 으로 공허하게 통과하던 자리.
+ * M-3 — 존재하지 않는 경로가 missing==missing 으로 공허하게 통과하던 자리.
  * 값을 비교하기 전에 **두 쪽 다 경로가 실존함**을 먼저 단언한다(explicit `null` 은 통과 —
  * `isMissingNode` 만 본다, 그런 case 는 이 corpus 에 없지만 구분을 지운다).
  */
@@ -320,7 +319,7 @@ private fun assertPathEquals(
 }
 
 /**
- * verifier r1 L-1 — `COMPILE_DELEGATION_FIXTURES` 의 번호와 manifest
+ * L-1 — `COMPILE_DELEGATION_FIXTURES` 의 번호와 manifest
  * `contract_binding.type_path` 산문의 「fixture N」표기가 어긋나도 잡는 장치가 없었다
  * (runner 는 파일 접두만 본다 — 번호가 틀려도 다른 fixture 가족이 있으면 초록). 두 벌
  * 표기가 실제로 같은 숫자를 가리키는지 여기서 대조한다.
@@ -332,7 +331,7 @@ private fun assertFixtureNumberMatchesContractBinding(
 ) {
     val typePath = contractBindingTypePath ?: error("case $caseId 의 manifest 에 contract_binding.type_path 가 없다")
     withClue("case $caseId 의 contract_binding.type_path 가 'fixture $fixtureNumber' 를 언급해야 한다 — 실제: $typePath") {
-        // 1A-b ⑤(1B-c verifier r2 low ①) — `contains("fixture $n")`는 접두 오탐이 있다
+        // 1A-b ⑤(1B-c) — `contains("fixture $n")`는 접두 오탐이 있다
         // (`fixture 1`이 `fixture 11`·`fixture 12`에도 부분 문자열로 든다). 단어 경계로
         // 안전화한다 — 뒤에 숫자가 이어지지 않을 때만 대조된 것으로 본다.
         Regex("fixture $fixtureNumber(?!\\d)").containsMatchIn(typePath) shouldBe true

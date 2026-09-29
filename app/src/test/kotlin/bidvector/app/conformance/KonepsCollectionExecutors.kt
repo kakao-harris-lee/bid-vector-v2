@@ -27,13 +27,13 @@ import java.time.Instant
 import java.time.LocalDate
 
 /*
- * M3/3A 잔여 일괄 ② — `koneps-collection` corpus(27 case, 운영자 승인 2026-09-07 전건
+ * 잔여 일괄 ② — `koneps-collection` corpus(27 case, 전건
  * authoritative) 를 procurement 공개 API 위에 투영한다(1D `ProvenanceFloorExecutors.kt` 관례).
  * **runner 는 입력에 없는 값을 만들지 않는다**(1D 관례) — case 마다 fixture 가 주는 값만
  * procurement 타입으로 조립한다.
  *
- * **다른 모듈에서 `KonepsFieldContract`를 조립하지 않는다**(verifier r2 N-1이 닫은 경계 —
- * 이 runner 도 procurement 밖이다). 그래서 이 executor 는 어떤 case 도 ad hoc field
+ * **다른 모듈에서 `KonepsFieldContract`를 조립하지 않는다**(이 runner 도 procurement 밖이다).
+ * 그래서 이 executor 는 어떤 case 도 ad hoc field
  * contract 를 짓지 않고, **[REAL_POLICY](운영 승인 값)만** 읽는다 — case 의 raw 키가
  * 실제 승인 정책에 없으면 (`unknownKeysIn`이 미지로 세거나 `resolveAmount`가 건너뛰는 등)
  * 그 자체가 검증 대상이다.
@@ -43,8 +43,7 @@ import java.time.LocalDate
  * 회계·gate 계약군이 관심사가 다르다는 이유로 [KonepsCollectionAccountingExecutors.kt]
  * 에 둔다(`CorpusExecutors.kt`가 세 표를 합친다). **v2-defect 로 판정된 7건(002·003·004·
  * 016·018·023·026)은 production 수정 뒤 [KonepsCollectionDefectFixExecutors.kt]가 dispatch
- * 한다** — team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의, 계약 안 항목이라
- * verifier r3 전에 고친다」) 뒤 이 slice 배치의 두 번째 라운드에서 고쳤다.
+ * 한다.**
  * `KONEPS_COLLECTION_PENDING_CAPABILITY`는 이제 빈 집합이다 — 27 case 전건 dispatch.
  */
 
@@ -63,7 +62,7 @@ internal val REAL_POLICY: KonepsCollectionPolicyData =
 
 /**
  * case 의 판정이 procurement 능력 공백을 요구해 dispatch 하지 않는 집합 — v2-defect 7건이
- * production 수정(3A 잔여 일괄 verifier r3 전)으로 전부 닫혀 지금은 **빈 집합**이다.
+ * production 수정(3A 잔여 일괄)으로 전부 닫혀 지금은 **빈 집합**이다.
  * 자리를 지운다(타입을 없애지 않는다) — `SharedKernelCorpusConformanceTest`의 잠금 test 가
  * 이 빈 상태를 잠가, 새 case 가 조용히 이 예외를 통해 다시 빠지지 못하게 한다.
  */

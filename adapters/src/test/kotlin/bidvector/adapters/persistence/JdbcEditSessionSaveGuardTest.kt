@@ -24,14 +24,14 @@ private val OPERATOR = EDIT_SESSION_TEST_OPERATOR
 private val FIELD = EDIT_SESSION_TEST_FIELD
 
 /**
- * verifier r3 HIGH-3 재현·회귀 보호(D-6B1-10, v2-지침서.md §5 「파일 500줄 한도」로
+ * HIGH-3 재현·회귀 보호(D-6B1-10, v2-지침서.md §5 「파일 500줄 한도」로
  * [JdbcEditSessionRepositoryTest]에서 갈렸다 — 설계 변경 아님, 공용 fixture 는
  * [EditSessionWorkflowTestSupport]). 실 저장소 + 실 [bidvector.workflow.strategy.
- * EditStrategyWorkflow]로 다섯 경로(`R2 1`·`2b`·`3b`·`3c`·`4b`, verifier report)를 돌려
+ * EditStrategyWorkflow]로 다섯 경로(`R2 1`·`2b`·`3b`·`3c`·`4b`)를 돌려
  * 전부 예외 없이 문서화된 [CommandResult.Processed] 결과를 낸다는 것과, 저장소
  * `session_version`이 그 호출로 **바뀌지 않는다**(재저장이 일어나지 않았다)는 것을 함께
  * 잠근다. 고친 전(`EditStrategyWorkflow.process`가 무조건 `sessions.save`)에는 다섯 다
- * `EditSessionConflictException`으로 터졌다(verifier r3 재현).
+ * `EditSessionConflictException`으로 터졌다(재현).
  */
 class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
     @Test
@@ -163,7 +163,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * 경계 회귀 — 명령 처리 **중** 만료로 접히는 경로(verifier r3 「R2-FOLD」)는 위 다섯과
+     * 경계 회귀 — 명령 처리 **중** 만료로 접히는 경로(「R2-FOLD」)는 위 다섯과
      * 달리 `outcome.session`이 새 인스턴스(버전 +1)라 저장이 그대로 일어나야 한다. HIGH-3
      * 수정이 이 정당한 저장까지 막지 않는지를 실 저장소로 확인한다.
      */

@@ -183,7 +183,7 @@ def test_no_float_fields_in_candidate_or_uncertainty_or_diagnostics() -> None:
 
 
 def test_diagnostics_carries_agency_sample_fields() -> None:
-    """M5/5D-2 — golden `ml-kernel-011`(ML-04 ②)이 요구하는 구조화 필드 둘."""
+    """golden `ml-kernel-011`(ML-04 ②)이 요구하는 구조화 필드 둘."""
     diagnostics = Diagnostics(
         training_row_count=0,
         segment_support=SegmentSupport.DIRECT,

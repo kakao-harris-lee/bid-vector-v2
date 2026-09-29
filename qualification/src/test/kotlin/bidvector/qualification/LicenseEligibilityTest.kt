@@ -8,7 +8,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * M1/1C 예제 test — legacy 회귀 사례(`_workspace/m1-1c/01_scout_legacy-qualification.md` §4)를
+ * 예제 test — legacy 회귀 사례(`_workspace/m1-1c/01_scout_legacy-qualification.md` §4)를
  * V2 타입으로 옮긴다. 기대값의 정본은 `data-dictionary.md` §3.2 · `capability-map.md`
  * QUAL-01/03/05 다 — fixture JSON 은 여기서 읽지 않는다(그건 runner 몫).
  */
@@ -16,7 +16,7 @@ class LicenseEligibilityTest {
     private val version = PolicyVersion(EffectiveFrom.Initial, "test-policy")
     private val emptyPolicy = LicenseQualificationPolicyData(LicenseAliasTable(emptyList()), emptyList())
 
-    /** verifier r1 F-5 — `judge` 가 값과 version 을 하나로 묶은 `Resolution.Resolved` 하나만 받는다. */
+    /** `judge` 가 값과 version 을 하나로 묶은 `Resolution.Resolved` 하나만 받는다. */
     private val resolvedPolicy = Resolution.Resolved(emptyPolicy, version)
 
     private fun row(
@@ -151,8 +151,8 @@ class LicenseEligibilityTest {
     }
 
     /**
-     * verifier r1 F-4·PROBE F2 — legacy `_KEY_NOISE_RE` 는 전각 괄호 `（）`도 잡음으로
-     * 제거한다. 이전 판(반각 괄호만)은 이 문자를 품은 면허명을 거짓 `Ineligible` 로 냈다.
+     * PROBE F2 — legacy `_KEY_NOISE_RE` 는 전각 괄호 `（）`도 잡음으로
+     * 제거한다. 반각 괄호만 처리하면 이 문자를 품은 면허명에서 거짓 `Ineligible` 이 난다.
      */
     @Test
     fun `전각 괄호가 있어도 정규화 키가 같아지면 Eligible이다`() {
@@ -160,7 +160,7 @@ class LicenseEligibilityTest {
         result.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
     }
 
-    /** verifier r1 F-4·PROBE F3 — 나카구로 `・` 도 legacy 잡음 집합에 있다. */
+    /** PROBE F3 — 나카구로 `・` 도 legacy 잡음 집합에 있다. */
     @Test
     fun `나카구로가 있어도 정규화 키가 같아지면 Eligible이다`() {
         val result = judge(listOf(row("1", "1", "항만・해안공사업")), declared("항만해안공사업"))
@@ -212,9 +212,9 @@ class LicenseEligibilityTest {
     }
 
     /**
-     * verifier r1 F-1·PROBE A — 그룹의 행이 전부 `PermsnIndstrytyList` 면 보유가 전혀
-     * 없어도 예전엔 `restrictedRows` 가 비어 `containsAll(emptySet())` 가 공허하게 참이었다
-     * (공허한 충족). 이제 제한 면허 행이 아예 없는 그룹은 그 자체로 결합 규칙 미결이다 —
+     * PROBE A — 그룹의 행이 전부 `PermsnIndstrytyList` 면 보유가 전혀
+     * 없어도 `restrictedRows` 가 비면 `containsAll(emptySet())` 가 공허하게 참이 될 위험이 있다
+     * (공허한 충족). 제한 면허 행이 아예 없는 그룹은 그 자체로 결합 규칙 미결이다 —
      * 보유 여부와 무관하게 `Uncertain`, 「과추천」(`Eligible`)도 「과차단」(`Ineligible`도
      * 아니라는 확정)도 아니다.
      */
@@ -226,7 +226,7 @@ class LicenseEligibilityTest {
     }
 
     /**
-     * verifier r1 F-1·PROBE D — 그룹 간 OR 이라도 공허하게 충족된 그룹이 다른 그룹의 실제
+     * PROBE D — 그룹 간 OR 이라도 공허하게 충족된 그룹이 다른 그룹의 실제
      * 미충족을 덮어 공고 전체를 `Eligible` 로 만들면 안 된다. 그룹1(제한 면허, 미보유)·
      * 그룹2(허용업종 전용)에서 어느 쪽도 `Eligible` 을 내지 않고 전체가 `Uncertain` 이다.
      */
@@ -242,9 +242,9 @@ class LicenseEligibilityTest {
     }
 
     /**
-     * verifier r2 N-1·PROBE A3 — `foldGroups` 의 `when` 은 「실제 충족 그룹이 있으면 그쪽이
+     * PROBE A3 — `foldGroups` 의 `when` 은 「실제 충족 그룹이 있으면 그쪽이
      * 먼저 이긴다」는 §3.2.5 운영자 판정을 분기 **순서**로 구현한다. 그 순서를 잠그는 test가
-     * r1 라운드에 없었다(두 분기를 맞바꿔도 전건 초록이었다 — verifier r2 실측). 그룹1은
+     * 없으면 두 분기를 맞바꿔도 전건 초록일 수 있다. 그룹1은
      * 제한 면허로 실제 충족, 그룹2는 허용업종 전용(결합 미결)이 공존할 때 전체는 반드시
      * `Eligible(그룹1)`이어야 한다 — `ambiguous` 쪽이 먼저 걸리면 전체가 `Uncertain`으로
      * 샌다.
@@ -261,9 +261,9 @@ class LicenseEligibilityTest {
     }
 
     /**
-     * verifier r2 N-2·PROBE WS — legacy `\s`(Python 유니코드 공백)는 전각 공백(`U+3000`)·
-     * NBSP(`U+00A0`)도 잡음으로 제거한다. 이전 판(공백 리터럴 넷)은 이 문자들을 놓쳐 거짓
-     * `Ineligible` 을 냈다.
+     * PROBE WS — legacy `\s`(Python 유니코드 공백)는 전각 공백(`U+3000`)·
+     * NBSP(`U+00A0`)도 잡음으로 제거한다. 공백 리터럴 넷만으로는 이 문자들을 놓쳐 거짓
+     * `Ineligible` 을 낼 수 있다.
      */
     @Test
     fun `전각 공백이 있어도 정규화 키가 같아지면 Eligible이다 — PROBE WS 3000`() {
@@ -293,7 +293,7 @@ class LicenseEligibilityTest {
         formFeedResult.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("2"))))
     }
 
-    /** verifier r1 F-2 — 이름을 하나도 못 읽은 행은 `Unparsable` 이어야지 빈 목록 `Parsed` 가 아니다. */
+    /** 이름을 하나도 못 읽은 행은 `Unparsable` 이어야지 빈 목록 `Parsed` 가 아니다. */
     @Test
     fun `licenseNames가 빈 Parsed 행은 구성 시점에 거부된다`() {
         shouldThrow<IllegalArgumentException> {

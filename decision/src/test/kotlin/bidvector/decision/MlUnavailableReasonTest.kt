@@ -4,7 +4,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * M4/4D-1 — `MlUnavailableReason`(D-4D-6) 값이 늘 때 이 `when`이 컴파일을 깨뜨리는 것이
+ * `MlUnavailableReason`(D-4D-6) 값이 늘 때 이 `when`이 컴파일을 깨뜨리는 것이
  * 회귀 방지다(1C 관례, scope.md 「decision」 절). 값 자체의 의미는 KDoc(`ReviewReason.kt`)이
  * 진다 — 이 test는 소진성만 고정한다.
  */

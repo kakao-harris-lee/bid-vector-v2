@@ -70,7 +70,7 @@ class PublicApiTypesTest {
     }
 
     /**
-     * **verifier r18 F-2.** 접근자 본문만 있는 프로퍼티(초기화식도 위임도 없다)는 기존 조건
+     * 접근자 본문만 있는 프로퍼티(초기화식도 위임도 없다)는 기존 조건
      * (`hasInitializer() || hasDelegate()`)이 false 라 타입 미명시로 잡히지 않았다 — 넓힘 ④가
      * 막으려던 바로 그 우회로(`val rate = 0.5` 는 막히는데 `val rate get() = 0.5` 는 연다).
      */
@@ -210,7 +210,7 @@ class PublicApiTypesTest {
     }
 
     /**
-     * **Codex 14차 #2.** `where` 절(`typeConstraints`)은 `extendsBound` 와 다른 PSI 자리라
+     * `where` 절(`typeConstraints`)은 `extendsBound` 와 다른 PSI 자리라
      * 놓쳤다 — `class Numeric<T> where T : Number` 가 `uses=[]` 였다.
      */
     @Test

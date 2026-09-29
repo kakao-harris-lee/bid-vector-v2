@@ -249,7 +249,7 @@ def test_cancel_accepted_job_transitions_to_cancelled() -> None:
     runner.shutdown(wait=True)
 
 
-# ---- H-3 — GetTrainingJob·CancelTrainingJob envelope 검증(verifier r1) ----
+# ---- H-3 — GetTrainingJob·CancelTrainingJob envelope 검증 ----
 
 
 def test_get_training_job_empty_request_id_is_invalid_request_not_job_not_found() -> (
@@ -318,7 +318,7 @@ def test_cancel_training_job_empty_job_id_is_invalid_request_not_job_not_found()
     runner.shutdown(wait=True)
 
 
-# ---- H-2 — store 경합(양방향): 종료 상태가 역행하지 않는다(verifier r1, 실 servicer·
+# ---- H-2 — store 경합(양방향): 종료 상태가 역행하지 않는다(실 servicer·
 # 실 runner) ----
 
 
@@ -401,7 +401,7 @@ def test_cancel_committed_before_pipeline_finishes_state_never_regresses_to_succ
 
 
 def test_runner_finishes_before_cancel_request_returns_succeeded_idempotent() -> None:
-    """H-2 역방향(verifier r1 「다음 라운드에 확인할 것」 2) — 러너가 먼저 SUCCEEDED 를
+    """H-2 역방향 — 러너가 먼저 SUCCEEDED 를
     store 에 커밋한 뒤에야 CancelTrainingJob 이 도착하면, 종료 상태 멱등 no-op 규칙대로
     CancelTrainingJob 은 CANCELLED 를 강제하지 않고 **실제 최신 상태**(SUCCEEDED)를
     돌려준다 — stale read 로 계산한 CANCELLED 로 store 를 덮어쓰지 않는다."""
@@ -428,7 +428,7 @@ def test_runner_finishes_before_cancel_request_returns_succeeded_idempotent() ->
 def test_cancel_wins_race_before_runner_start_transition_start_training_does_not_crash() -> (
     None
 ):
-    """verifier r2 R2-1 — 새 우회. `_accept_or_reuse`가 `start_or_reuse`로 job 을
+    """R2-1 — 새 우회. `_accept_or_reuse`가 `start_or_reuse`로 job 을
     ACCEPTED 로 만든 뒤 `runner.submit`을 부르는데, `submit` 내부의 START 전이보다
     **먼저** CancelTrainingJob 의 CANCEL 전이가 커밋되면(경합에서 Cancel 이 이김)
     `submit`이 `ValueError`를 그대로 던져 그 StartTraining 호출 자체가 gRPC UNKNOWN

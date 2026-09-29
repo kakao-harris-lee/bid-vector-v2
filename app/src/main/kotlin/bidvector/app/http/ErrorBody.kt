@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
 
 /**
- * 편집 요청의 형식 오류(M6/6A-2b D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
+ * 편집 요청의 형식 오류(D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
  * 않는다(아래 [ErrorMapping] 이 고정 문구로만 옮긴다) — 진단용이다. 던지는 자리는
  * `StrategyEditRequests.kt` 의 파싱 함수들이고, 오류 어휘는 이 파일 하나가 갖는다.
  */
@@ -54,12 +54,12 @@ object ErrorCode {
     const val INVALID_STORED_STRATEGY = "INVALID_STORED_STRATEGY"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
 
-    // M6/6A-3+6F-3 D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
+    // D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
     const val INVALID_REQUEST = "INVALID_REQUEST"
 
-    // M6/6A-2b D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
+    // D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
     // 사유를 가른다(상태 코드가 아니라 본문이 구분한다). 나머지 넷은 세션 부재(404)·
     // 낙관적 동시성 충돌(409)·값 불변식 위반(400)·메서드/미디어 타입 불일치(405/415)다.
     const val SESSION_NOT_FOUND = "SESSION_NOT_FOUND"
@@ -90,7 +90,7 @@ object ErrorMapping {
      * [chain.doFilter]를 완전히 벗어난 예외의 최후 방어선([RequestAuditFilter])에서도 쓴다.
      *
      * **표는 하나다 — 아래 두 `when` 은 크기 게이트(함수 50줄) 때문에 기계적으로 나눈
-     * 같은 표의 앞뒤다**(M6/6A-2b). 갈래를 더할 자리가 둘이 됐지만 **기본값은 여전히 여기
+     * 같은 표의 앞뒤다.** 갈래를 더할 자리가 둘이 됐지만 **기본값은 여전히 여기
      * 한 곳**이고, 어느 갈래도 `throwable.message` 를 응답에 싣지 않는다 — 두 함수의
      * 반환 타입이 (코드, 고정 문구) 쌍이라 예외 값이 본문에 닿을 통로 자체가 없다.
      */
@@ -105,7 +105,7 @@ object ErrorMapping {
         return ErrorBody(code, message, correlationId)
     }
 
-    /** 6A-1·6A-3 이 낸 갈래(조회·dry-run). */
+    /** 조회·dry-run 이 내는 갈래. */
     private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
@@ -139,7 +139,7 @@ object ErrorMapping {
         }
 
     /**
-     * M6/6A-2b 가 낸 갈래(편집 쓰기) — 이 slice 가 본문을 받는 첫 쓰기 표면을 열었다.
+     * 편집 쓰기가 내는 갈래 — 본문을 받는 쓰기 표면이다.
      * 형식·상태 오류가 기본 분기(500)로 떨어지면 그것이 스택 노출의 문이 된다(D-6A2b-7).
      */
     private fun editPathCode(throwable: Throwable): Pair<String, String>? =
@@ -229,7 +229,7 @@ class GlobalErrorHandler {
     }
 
     /**
-     * **406 만 본문이 없다**(D-6A2b-29, verifier r2 F-r2-4 실측). 클라이언트가 「JSON 은 받지
+     * **406 만 본문이 없다**(D-6A2b-29, 실측). 클라이언트가 「JSON 은 받지
      * 않겠다」고 말한 요청에 JSON 오류 본문을 내는 것이 오히려 협상 위반이고, 실제로 Spring 도
      * 그 본문을 쓸 수 없다(`content-length: 0` 실측). 「모든 오류는 `ErrorBody`」의 유일한
      * 예외이며, 추적은 audit 행이 진다(406 도 행이 1 는다 — 실측).

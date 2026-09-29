@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 """확장 적대 집합 스윕 — **분류를 결정하는 스윕이다.**
 
-판정: **`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0**
-(운영자 결정 2026-09-02 「동결+강등」, Codex 재리뷰 B9 가 쓴 수).
+판정: **`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0**.
 통과가 하나라도 있으면 그 case 는 기계적으로 `insufficient-evidence` 로 내려간다 —
 **리뷰 압력 아래서 술어를 발명하지 않는다.** 어휘를 늘리는 것은 운영자 결정의 일이고,
-**2026-09-05 decision 18** 이 `is-present`·`differs-from-path`·`differs-from-case` 셋을
-더했다(2026-09-02 동결의 개정). 정의의 정본은 `manifest.yaml` `schema.extensions` 다.
+**decision 18** 이 `is-present`·`differs-from-path`·`differs-from-case` 셋을
+더했다(동결의 개정). 정의의 정본은 `manifest.yaml` `schema.extensions` 다.
 
 방법·갈래 정의의 정본은 `reports/evidence/m0/0e/commands.md` **C-15** 다.
 여기서 도는 갈래는 그 항목의 확장이다.
@@ -27,9 +26,9 @@
 못한다. 그래서 `ASSERTED` 의 각 줄이 **근거를 오른쪽 주석에 싣는다** — 이 파일에서
 사람 판단이 개입한 자리는 그 열이 전부다.
 
-**(a) 의 기준은 Codex 재리뷰 B10(high)이 조였다** — `verifies` **문면만이 아니라
+**(a) 의 기준은 다음을 포함하도록 좁힌다** — `verifies` **문면만이 아니라
 그것이 근거로 인용한 결정이 정하는 것**(사유 토큰 · 계약 형태 · 관계 주장의 축)**도
-주장에 든다.** 이 레인의 앞선 해석선(「사유를 괄호에 적은 case 만」)은 기각됐다.
+주장에 든다.**
 
 **실제 fixture 는 건드리지 않는다** — 변이는 기대값 JSON 의 격리된 메모리 사본에서만
 일어나고 이 스크립트는 아무 파일도 쓰지 않는다.
@@ -43,7 +42,7 @@
 `--manifest` 는 강등 **이전** manifest 를 물려 그날의 판정을 재현할 때 쓴다
 (기대값·입력 파일은 강등에서 바뀌지 않았으므로 옛 manifest + 현재 fixture 로 성립한다).
 
-종료 코드(2026-09-06, 1B-c 이월 — verifier r1 *"exit code 로 강제되지 않는다"*):
+종료 코드(*"exit code 로 강제되지 않는다"*):
 
     0  정상 — 위반 변이체 통과 0(강등 대상 0)
     1  위반 변이체 통과 ≥1 — 통과한 (case, 경로, 갈래) 를 stderr 에 한 줄씩 낸다
@@ -67,9 +66,9 @@ import manifest_contract as mc  # noqa: E402
 ASSERTED = {
     "license-006":                 ["$.uncertainReason"],                  # U-5 sealed enum 의 사유 토큰
     "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
-    # verifier r2 N-5 — bap 001·002·003 은 적대 스윕에서 변이체가 하나도 생성되지 않아
+    # N-5 — bap 001·002·003 은 적대 스윕에서 변이체가 하나도 생성되지 않아
     # (ASSERTED·NULL_ASSERTED·verified_projections 어디에도 없었다) 「강등 대상 0」이
-    # 공허했다(1D 이전부터의 이월 부채, r1 N-1). first-match 결과(`classification`)와
+    # 공허했다. first-match 결과(`classification`)와
     # 그 근거(`firstMatchedRule`/`evidence.firstMatchedRule`)·`policyVersion`은
     # `verifies`가 직접 주장하는 값이다.
     "base-amount-provenance-001": ["$.classification", "$.evidence.firstMatchedRule", "$.policyVersion"],
@@ -77,7 +76,7 @@ ASSERTED = {
     "base-amount-provenance-003": ["$.classification", "$.firstMatchedRule", "$.policyVersion"],
     "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
-    # curator 발견(2026-09-06) — 승격 case(decision 28)의 `verifies`가 **경계 등가 자체**를
+    # 승격 case(decision 28)의 `verifies`가 **경계 등가 자체**를
     # 주장하므로 `$.sampleIsShortfall`(그 경계 판정의 결과)도 여기 든다. 001·003과 달리 이
     # case는 방향이 아니라 등가를 겨눈다.
     "floor-threshold-002":         ["$.sampleIsShortfall", "$.criticalAssessmentRate.fraction"],
@@ -107,7 +106,7 @@ ASSERTED = {
     "rate-unit-001":               ["$.rate.fraction"],                    # "명시 변환된다" 의 결과
     "rate-unit-002":               ["$.rate.fraction"],                    # "배율 없이 그대로"
     "rate-unit-005":               ["$.rate.fraction"],                    # "선언이 개연성을 이긴다"
-    # M1/1E — curator 판단(2026-09-06). money-basis-003 은 decision 29 로 authoritative 로
+    # money-basis-003 은 decision 29 로 authoritative 로
     #   되돌아갔다 — "같은 쌍이 감시·검색 경로에서 같은 답을 낸다"가 verifies 의 주장이다.
     #   `$.perPath.*.outcome`(`Comparable`)은 여기 들지 않는다 — 미승인 토큰이라 값을
     #   잠글 자격이 없다(change_history, money-basis-006 의 `$.reasonCode` 와 같은 갈래).
@@ -136,7 +135,7 @@ ASSERTED = {
         "$.isConfigured",
         "$.watchRulesEmpty",
     ],  # "설정됐는가"≠"좁히는가"가 서로 다른 값
-    # M3/3A — curator 판단(2026-09-07). 신설 `koneps-collection-010`~`018` 은 근거가
+    # 신설 `koneps-collection-010`~`018` 은 근거가
     #   조달청 공식 문서의 **항목 명세 행**이라 `source.kind: official-doc` 으로 서고,
     #   `verifies` 가 주장하는 것은 **문서가 선언한 것**(단위·과세·필수성·형식·열거)과
     #   **선언하지 않은 것**(타임존·예산 키 과세·목록 단위)이다. 아래 경로가 그 주장이다.
@@ -213,7 +212,7 @@ ASSERTED = {
     # `-027` 은 다른 문서(활용가이드 `pps-openapi-guide`)를 인용한다. 주장은 **표가 무엇을
     #   담는가**와 **무엇을 담지 않는가** 둘이고, 뒤쪽 셋이 `false` 불리언이라 (a′) 뒤집기가
     #   「문서가 정하지 않는다」를 계약으로 세운다.
-    # 운영자 승인 2026-09-07(Q-2 B-1~B-10)으로 승격된 열일곱. 각 줄의 경로는 그 case 의
+    # (Q-2 B-1~B-10)으로 승격된 열일곱. 각 줄의 경로는 그 case 의
     #   `verified_paths` 부분집합이다 — 계약 밖 경로를 여기 넣으면 변이체가 통과해
     #   기계적으로 강등된다. 미승인 사유·상태 토큰은 두 목록 어디에도 없다.
     "koneps-collection-001": [
@@ -332,7 +331,7 @@ ASSERTED = {
         "$.codes[1].prescribedActionPresent",        # 08 — legacy 가 대상 서비스에서 관측한 코드
         "$.codes[2].prescribedActionPresent",        # 22 — quota 축이 resultCode 에도 있다
     ],
-    # M5/5D — curator 판단(2026-09-12). `ml-kernel-*` 은 **미승인 토큰을 한 글자도 담지 않는
+    # `ml-kernel-*` 은 **미승인 토큰을 한 글자도 담지 않는
     #   경로만** 든다 — M2 계약(`error.proto`·`prediction.proto`)과 `data-dictionary.md` §6.4 가
     #   문면으로 세운 이름, 그리고 불리언·셈·십진 문자열이다. 5D 착수 계약이 신설한
     #   `UnmeasurableDetail` 토큰은 여기 들지 않고 `verified_projections` 의 `differs-from-case` 가 진다.
@@ -391,15 +390,15 @@ ASSERTED = {
 OTHER_TOKEN = {"Inclusive": "Exclusive", "Clean": "DerivedVat", "Unmeasurable": "Computed"}
 
 # (a′) 갈래가 쓰는 **값 변이**. `ASSERTED` 의 경로에 삭제와 **별도로** 건다 —
-# 삭제만으로는 「경로는 있는데 값이 뒤집힌」 산출을 잡지 못한다(Codex B12 high 진단:
+# 삭제만으로는 「경로는 있는데 값이 뒤집힌」 산출을 잡지 못한다(
 # *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*).
 # 불리언은 반전하고, 문자열은 아래 표의 적대 토큰(없으면 `Other`)으로 바꾼다.
 ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      "Comparable": "Rejected", "Uncertain": "Eligible",
-                     # 1B 계약 어휘(운영자 결정 2026-09-05 decision 19). 상태 토큰의 적대값은
+                     # 계약 어휘(decision 19). 상태 토큰의 적대값은
                      # **반대 상태**다 — `Other` 같은 무의미 토큰보다 강한 변이다.
                      "Known": "Absent", "Absent": "Known",
-                     # M1/1E — `WatchVerdict`(decision 31) 상태 토큰. `NoGate`→`Passed`가
+                     # `WatchVerdict`(decision 31) 상태 토큰. `NoGate`→`Passed`가
                      # STR-01 acceptance 셋째가 막는 바로 그 접기다("게이트 없음"이 "모든
                      # 공고 통과"로 접히면 안 된다) — 역방향(`Passed`→`NoGate`)은 같은
                      # 위험을 겨누지 않아 넣지 않는다. `"Rejected"` 키는 이미 위에서
@@ -412,7 +411,7 @@ ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      "Passed": "Rejected", "NoGate": "Passed",
                      # `StrategyValidation`(decision 31) 상태 토큰.
                      "Valid": "Invalid", "Invalid": "Valid",
-                     # M5/5D — `Maturity` sealed(§6.4)와 `UnmeasurableReason`(M2 `error.proto`).
+                     # `Maturity` sealed(§6.4)와 `UnmeasurableReason`(`error.proto`).
                      # 둘 다 적대값이 **그 축의 반대 상태**라 `Other` 보다 강하다: 0/0 접힘과
                      # 「학습된 적 없음 ↔ 표본 얕음」 혼동이 정확히 이 corpus 가 막는 것이다.
                      "Observed": "NoObservation", "NoObservation": "Observed",
@@ -420,20 +419,20 @@ ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      "INSUFFICIENT_SAMPLES": "UNTRAINED_SEGMENT"}
 
 # (d) 기대값이 **`null`** 인데 `verifies` 가 그 **부재**를 주장하는 경로 — 사람의 판단이다.
-#     Codex B14 high 의 진단: 적대 집합이 null 기대값을 한 번도 변이하지 않아 「강등 대상 0」이
-#     건전성의 증거가 아니었다. 아래 다섯이 심판이 쓴 최소 집합이다.
+#     적대 집합이 null 기대값을 한 번도 변이하지 않으면 「강등 대상 0」이
+#     건전성의 증거가 아니다. 아래 다섯이 최소 집합이다.
 NULL_ASSERTED = {
     "floor-shortfall-005": ["$.frequency"],   # "판정 불가로 전이" — 값이 나오면 전이가 아니다
     "floor-shortfall-001": ["$.frequency"],   # "값이 아니라 사유 있는 측정 불가"
     "license-009":         ["$.requiredLicenses"],  # "수집 실패" — 요건이 있으면 수집된 것이다
     "license-007":         ["$.requiredLicenses"],  # "요건 원문이 없으면" — 없음이 주장이다
-    # `rate-unit-003`·`004` 의 `$.rate`(null)는 2026-09-05 정정으로 기대값에서 사라졌다 —
+    # `rate-unit-003`·`004` 의 `$.rate`(null)는 기대값에 없다 —
     #   기대값이 `{"representable": false}` 하나이고 그 자리는 `ASSERTED` 가 진다.
-    # M1/1E — STR-01 acceptance 셋째 "게이트 없음"이 결과 타입에서 구분된다는 것은
+    # STR-01 acceptance 셋째 "게이트 없음"이 결과 타입에서 구분된다는 것은
     #   `$.matched` 가 **부재**(`null`)라는 사실 자체가 주장이다(`Passed(emptySet())`와
     #   달리 `NoGate`는 matched 자리가 없다) — non-null 로 채워지면 그 구분이 사라진다.
     "strategy-watch-004": ["$.matched"],
-    # M5/5D — 「측정 불가가 아닌 응답은 사유를 나르지 않는다」(003)와 「개찰 0 인 주에는 비율이
+    # 「측정 불가가 아닌 응답은 사유를 나르지 않는다」(003)와 「개찰 0 인 주에는 비율이
     #   **없다**」(012)는 둘 다 **부재가 주장**이라 non-null 치환이 곧 위반이다.
     "ml-kernel-003": ["$.reason", "$.detail"],
     "ml-kernel-004": ["$.probes[1].reason"],
@@ -447,7 +446,7 @@ def projection_mutants(cid, case, entry, registry):
     """술어 하나가 잡아야 하는 변이체. **술어마다 갈래가 다르다.**
 
     정의의 정본은 `manifest.yaml` 의 `schema.extensions.verified_projections` 이고
-    갈래는 그 「잡는 것」 열의 기계 표현이다(운영자 결정 2026-09-05 decision 18).
+    갈래는 그 「잡는 것」 열의 기계 표현이다(decision 18).
     `not-equals` 의 갈래는 동결분 그대로다 — 늘리지도 줄이지도 않았다.
     """
     path, projection = entry["path"], entry["projection"]

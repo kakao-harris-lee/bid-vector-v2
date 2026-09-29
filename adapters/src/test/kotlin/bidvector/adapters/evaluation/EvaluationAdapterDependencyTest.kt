@@ -18,7 +18,7 @@ import java.io.File
  * 넓히지 않는다 — 이 test는 그 test들과 별개다). `bidvector.adapters.evaluation` 자신은
  * 이 패키지의 클래스끼리 서로 참조할 수 있어야 하므로 포함한다.
  *
- * **`bidvector.strategy`(M6/6F-4-w, D-6F4W-3 신설)** — [NoticeWatchSubjectPort]가
+ * **`bidvector.strategy`(D-6F4W-3 신설)** — [NoticeWatchSubjectPort]가
  * `assembleKeywordScopeText`·`assembleFullScopeText`(순수 커널)를 불러 감시 텍스트를
  * 조립한다(우회 3 — 어댑터가 이어붙이기를 복제하지 않고 커널을 부른다). `WatchSubject`·
  * `CategoryCode`(strategy 쪽) 타입도 이 축에서 함께 참조된다.
@@ -42,7 +42,7 @@ private fun isDisallowed(importedPackage: String): Boolean =
 /**
  * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 클래스 로드가 남기는 점 표기 좌표(`a.b.C`) 양쪽에서
  * `bidvector...` 부분을 뽑는다 — 상수 풀 전체를 훑는다(`StrategyAdapterDependencyTest`와 같은
- * 정규식·같은 근거 — verifier r3 MEDIUM-5).
+ * 정규식·같은 근거).
  */
 private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
 
@@ -88,7 +88,7 @@ class EvaluationAdapterDependencyTest {
     }
 
     /**
-     * D-6F2-9 ② 참조 단언(verifier r1 HIGH-1 수정) — ①(거동 등식, `JdbcCandidateSourceTest`)
+     * D-6F2-9 ② 참조 단언 — ①(거동 등식, `JdbcCandidateSourceTest`)
      * 은 SQL이 **낸 결과값**만 잰다. `biddableStatuses()`를 안 쓰고 우연히 같은 리터럴
      * (`"Open"`·`"Renoticed"`)을 SQL에 하드코딩해도 그 값은 통과하므로, 여기서는 컴파일된
      * `JdbcCandidateSource`의 상수 풀이 **실제로 `biddableStatuses`를 참조**하는지를 잰다 —
@@ -133,8 +133,8 @@ class EvaluationAdapterDependencyTest {
      * 부분집합인지를 잰다 — **금지 목록이 아니라 허용 목록**이라 목록 밖 참조는 이름이
      * 무엇이든(`String.join`·`String.format`·`concat`·`StringBuilder` 등) RED 가 된다.
      * 금지 목록(이름 3개 열거)이었을 때는 `java.lang.String.join` 복제가 그 열거를 전부
-     * 비켜가 부재 단언·참조 단언·거동 test 8건이 모두 통과했다(verifier r1 MEDIUM-2, m4b
-     * 재현). 술어가 실제로 걸리는지는 [허용_밖_참조를_갖는_표본은_이_술어에_걸린다] 양성
+     * 비켜가 부재 단언·참조 단언·거동 test 8건이 모두 통과했다. 술어가 실제로 걸리는지는
+     * [허용_밖_참조를_갖는_표본은_이_술어에_걸린다] 양성
      * 대조가 증명한다.
      */
     @Test
@@ -175,7 +175,7 @@ class EvaluationAdapterDependencyTest {
     }
 
     /**
-     * M6/6A-3+6F-3 D-6A3-17(a) — HIGH-1(verifier r1) 우회 2 시정. [EvaluationAdapterDependencyTest]
+     * D-6A3-17(a) — 우회 2 시정. [EvaluationAdapterDependencyTest]
      * 의 `ALLOWED_ROOTS`(패키지 단위 허용)는 `bidvector.adapters.persistence`를 이미 허용하므로
      * (다른 클래스 — `JdbcCandidateSource` 등 — 가 정당하게 그 패키지를 쓴다) `RecordingNotification
      * RequestPort` 를 DataSource 를 받아 영속하도록 바꿔도 그 패키지 단위 게이트는 초록으로
@@ -250,9 +250,9 @@ internal class PersistingNotificationPortFixture(
 /**
  * D-6F4W-14 — [EvaluationAdapterDependencyTest]의 허용 목록 술어가 쓰는 참조 집합.
  * `NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt` 두 class 를 `javap -p -v`로 실측해
- * 손으로 옮겼다(2026-09-23, commands.md 에 원 출력 대조 기록). `assemble*` 커널 둘·
- * `assembleWatchCategories` 커널(M6/6F-9 — 관심 업종 집합도 어댑터가 짓지 않고 커널을 부른다, 이전에 있던 `SetsKt`
- * `setOf`·`emptySet` 과 strategy `CategoryCode` 생성자는 이 허용 집합에서 **빠졌다** — 조여졌다)·`Notice`/값 객체
+ * 손으로 옮겼다(commands.md 에 원 출력 대조 기록). `assemble*` 커널 둘·
+ * `assembleWatchCategories` 커널(관심 업종 집합도 어댑터가 짓지 않고 커널을 부른다 — `SetsKt`
+ * `setOf`·`emptySet` 과 strategy `CategoryCode` 생성자는 이 허용 집합에 없다, 조여진 목록이다)·`Notice`/값 객체
  * getter·`WatchSubject`/`Fact` 생성자·`Intrinsics`(null 체크)·`Object.<init>`·
  * `noticeToWatchSubject`가 `private`이라 Kotlin이 내는 `access$` 합성 접근자(D-6F4W-16)
  * 뿐이다 — 이어붙이기 기계(`StringBuilder`·`makeConcatWithConstants`·`String.join`·

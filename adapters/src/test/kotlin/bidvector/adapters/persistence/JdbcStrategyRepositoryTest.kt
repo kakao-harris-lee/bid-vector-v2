@@ -88,7 +88,7 @@ private class StrategyFixedClock(
 }
 
 /**
- * [JdbcStrategyRepository]의 왕복·개정·정책 불일치·부재 test(M6/6F-1 S-50). `AppliedStrategy`
+ * [JdbcStrategyRepository]의 왕복·개정·정책 불일치·부재 test(S-50). `AppliedStrategy`
  * 는 `workflow` 모듈 밖에서 만들 수 없다(D-6F1-2와 같은 폐쇄) — 이 test는 실제
  * [EditStrategyWorkflow]를 `strategies`에 이 repository 를 꽂아 구동한다. 이것이 정당한
  * `AppliedStrategy`를 얻는 **유일한** 방법이다(workflow가 `strategies.save`를 내부에서 부른다,
@@ -155,8 +155,8 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         }
 
     /**
-     * 이력 표의 감시 규칙 다섯 컬럼(`TEXT[]`)을 [revision] 행에서 되읽는다(verifier r2
-     * MEDIUM-2 완결 — 스무 컬럼 전부를 되읽는 세 헬퍼 중 하나, [historyPayloadAt] 참고).
+     * 이력 표의 감시 규칙 다섯 컬럼(`TEXT[]`)을 [revision] 행에서 되읽는다(MEDIUM-2
+     * 완결 — 스무 컬럼 전부를 되읽는 세 헬퍼 중 하나, [historyPayloadAt] 참고).
      */
     private fun historyWatchRulesAt(revision: Int): List<Any?> =
         dataSource().connection.use { connection ->
@@ -234,7 +234,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
 
     /**
      * `operator_strategy_revision`의 payload **스무 컬럼 전부**를 [revision] 행에서 되읽는다
-     * (verifier r2 MEDIUM-2 완결 — 최초 수정은 넷만 덮어 나머지 열여섯이 무방비였다: 다른
+     * (MEDIUM-2 완결 — 최초 수정은 넷만 덮어 나머지 열여섯이 무방비였다: 다른
      * 두 컬럼 쌍을 바꾸는 변이에도 전건이 초록이었다). 다섯 컬럼씩 네 헬퍼로 나눠 각 함수를
      * sizeGate 한도 안에 둔다 — `Sql.STRATEGY_COLUMNS`(`INSERT_STRATEGY_REVISION`)와 같은
      * 순서로 이어 붙인다.
@@ -320,7 +320,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         // 이력 두 줄이 각각 다른 revision·값으로 실제로 쌓였다(D-6F1-1 ① 「개정 이력」).
         historyRevisions() shouldBe listOf(1, 2)
 
-        // verifier r2 MEDIUM-2 완결 — 이력 표의 payload 스무 컬럼 전부를 secondDraft 값과 대조한다.
+        // MEDIUM-2 완결 — 이력 표의 payload 스무 컬럼 전부를 secondDraft 값과 대조한다.
         historyPayloadAt(2) shouldBe
             listOf(
                 listOf("BC01", "BC02"),

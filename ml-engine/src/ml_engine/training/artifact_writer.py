@@ -25,7 +25,7 @@ sha256)과 **다르다** — 같은 이름·다른 정의(`OPEN-5C-ARTIFACT-CHEC
 통째로 embed 한다 — 표의 정렬 불변식(`FeatureManifest.__post_init__`)을 다시 구현하지
 않는다.
 
-verifier r1 H-1 — `write_artifact`는 **`trained` 하나만** 받는다. `release`(`release_id`·
+H-1 — `write_artifact`는 **`trained` 하나만** 받는다. `release`(`release_id`·
 `feature_schema_version`·`code_version`·`dataset_id`)는 전부 `trained`(호출자 인자가
 아니다)에서만 파생한다 — 우회 후보 (12)(`release.dataset_id` 를 요청과 다르게)가 시그니처
 차원에서 성립하지 않는다.

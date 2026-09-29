@@ -124,7 +124,7 @@ class EditSessionIdempotencyPropertyTest {
 
     @Test
     fun `판정 순서는 만료가 먼저다 — accepted 로 lastCommand 가 채워진 뒤에도 만료 시각을 넘기면 재전달은 Expired 다`() {
-        // verifier M-1 — 「만료 뒤 재전달」의 기존 test 는 첫 apply 가 거부돼 lastCommand 가
+        // 「만료 뒤 재전달」의 기존 test 는 첫 apply 가 거부돼 lastCommand 가
         // null 인 case 라 판정 순서(① 만료 → ② 중복)를 가르지 못했다(두 줄을 뒤집어도
         // exit 0). 이 case 는 첫 apply 를 accepted 로 만들어 lastCommand 를 채운 뒤, 그
         // 같은 command 를 만료 시각 이후 재전달한다 — 순서가 뒤집히면 ②(중복, lastCommand

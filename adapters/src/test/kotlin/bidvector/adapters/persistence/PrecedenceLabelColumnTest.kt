@@ -27,7 +27,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * P-1(verifier r3, medium) 재현 — 가드가 값·provenance kind·통화·과세(N-2)까지는 물지만
+ * P-1 재현 — 가드가 값·provenance kind·통화·과세(N-2)까지는 물지만
  * provenance의 **detail 절반**(`*_provenance_detail`)·`estimated_amount_source_key`·
  * `floor_rate_origin_kind`/`_detail`은 같은 observation_key로 자유롭게 위조할 수 있었다.
  * `PrecedenceMutationTest`에서 분리한 파일(sizeGate 500줄, v2-지침서.md §5).

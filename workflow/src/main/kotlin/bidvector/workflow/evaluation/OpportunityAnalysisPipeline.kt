@@ -93,7 +93,7 @@ internal fun deriveLoadRatioStep(snapshot: CapacitySnapshot): Step<UnitScore> =
         is DerivationOutcome.Absent -> halt(bridgeDerivationAbsence(outcome.reason))
     }
 
-/** M4/4D-4(D-4D4-2) — [evidence]는 `Composed` 가지에서만 쓰인다(`Unavailable`은 `NotPredicted` 상태가 없다). */
+/** (D-4D4-2) — [evidence]는 `Composed` 가지에서만 쓰인다(`Unavailable`은 `NotPredicted` 상태가 없다). */
 internal fun finalOutcomeOf(
     priorityOutcome: PriorityOutcome,
     matchScore: UnitScore,

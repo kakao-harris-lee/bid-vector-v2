@@ -118,7 +118,7 @@ def _admit_and_gate(
     `Missing`을 거부 사유로 보지 않으므로(구조적으로 유효한 fact), 이 게이트를 통과한
     행 수는 아직 실제 학습 행렬에 실릴 행 수가 아니다 — `build_row`(scope ⑤)가
     `base_amount`/`denominator_source` 결측 행을 추가로 떨어뜨린다. 그 뒤 재게이트는
-    `_build_oof_and_space`가 한다(code-reviewer PR #13 HIGH-1)."""
+    `_build_oof_and_space`가 한다(HIGH-1)."""
     admitted = admit_corpus(dataset.raw_rows)
     if isinstance(admitted, CorpusRejected):
         return TrainingRejected(
@@ -161,8 +161,8 @@ def _build_oof_and_space(
     policy: TrainingPolicy,
     trainer: TrainerLike,
 ) -> _OofAndSpace | TrainingRejected:
-    """out-of-fold 조립(④) + 전 구간 인코딩(④) + 최소 표본 **재게이트**(③, code-reviewer
-    PR #13 HIGH-1). `admit_corpus`를 통과한 행 수는 「구조적으로 유효한 행 수」일 뿐,
+    """out-of-fold 조립(④) + 전 구간 인코딩(④) + 최소 표본 **재게이트**(③, HIGH-1).
+    `admit_corpus`를 통과한 행 수는 「구조적으로 유효한 행 수」일 뿐,
     `build_row`가 `base_amount`/`denominator_source` 결측으로 추가로 떨어뜨린 행은
     `oof_outcome.admitted_rows`에 반영된다 — scope ③ 「승인 행이 하한 미만」의 「승인
     행」은 이 행렬에 실제로 실린 행이지 admission 직후 행이 아니다."""

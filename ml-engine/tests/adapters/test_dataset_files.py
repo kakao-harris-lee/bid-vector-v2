@@ -33,9 +33,9 @@ def test_read_dataset_files_rejects_unsupported_scheme() -> None:
 
 
 def test_read_dataset_files_rejects_host_in_uri(tmp_path: Path) -> None:
-    """code-reviewer PR #13 MEDIUM-2 — `file://<host>/path`(비표준, host 있음)는
-    이전에는 `parsed.netloc`을 검사하지 않고 host 를 조용히 무시한 채 `path`만 읽으려
-    했다. `file:///abs/path`(host 없음)만 허용한다."""
+    """`file://<host>/path`(비표준, host 있음)는 거부한다 — `parsed.netloc`을 검사하지
+    않으면 host 를 조용히 무시한 채 `path`만 읽게 된다. `file:///abs/path`(host 없음)만
+    허용한다."""
     _write_dataset(tmp_path)
     result = read_dataset_files(f"file://some-host{tmp_path}")
     assert isinstance(result, DatasetUnreadable)

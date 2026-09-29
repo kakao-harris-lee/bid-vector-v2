@@ -14,7 +14,7 @@ private val ITEM =
     )
 
 /**
- * M3/3C ⑦ — [ExtractedRequirements]는 「값을 못 읽었다」와 「없다고 확인했다」를
+ * [ExtractedRequirements]는 「값을 못 읽었다」와 「없다고 확인했다」를
  * 동시에 주장할 수 없다(위협 모델 방어 (a), fail-open 금지). `Eligible`류 값이 없어
  * 이 타입 자체로는 자격 통과를 표현할 수 없다.
  */

@@ -15,7 +15,7 @@ import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
- * 편집 쓰기 경로 조립(M6/6A-2b D-6A2b-3) — 이 조립이 없으면 편집 endpoint 자체가 뜨지
+ * 편집 쓰기 경로 조립(D-6A2b-3) — 이 조립이 없으면 편집 endpoint 자체가 뜨지
  * 않는다(scope.md 「비활성화 경로」: [strategyEditExecutor] 빈을 빼면 쓰기 경로 전체가
  * 사라지고 읽기·dry-run 은 남는다).
  *

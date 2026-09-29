@@ -45,11 +45,11 @@ private val RESERVE_PRICE_SEQUENCE_ORDER =
  * `provenance = Published(표본 공고 자기 회차)`(우회 (18) — 대상 공고 회차를 빌리지 않는다).
  * 행 하나라도 `baseReservePrice`가 없으면(D-4B7-2 ④) 전체를 실격시킨다.
  *
- * **[RESERVE_PRICE_SEQUENCE_ORDER]로 정렬한다(verifier r1 F-4 뒤).** 엔진은
+ * **[RESERVE_PRICE_SEQUENCE_ORDER]로 정렬한다.** 엔진은
  * `selected_numbers`를 결과 리스트의 1-기반 인덱스로 소비한다 — 그래서 출력 위치
- * i(0-기반)는 항상 순번 i+1의 예비가격이어야 한다. 이전 판은 `rows`의 입력 순서를 그대로
- * 썼는데(production 유일한 공급자인 `SELECT_OPENING_RESERVE_PRICES … ORDER BY
- * reserve_price_sequence`가 우연히 정렬해 주었을 뿐), 그 결합이 암묵적이고 무측정이었다.
+ * i(0-기반)는 항상 순번 i+1의 예비가격이어야 한다. `rows`의 입력 순서에 기대는 것은
+ * 암묵적이고 무측정인 결합이다(production 유일한 공급자인 `SELECT_OPENING_RESERVE_PRICES … ORDER BY
+ * reserve_price_sequence`가 우연히 정렬해 줄 뿐 계약이 아니다).
  * `SampleEligibility.judgeEligibility`의 `reservePriceSequenceCheck`가 이 함수를 부르기
  * 전에 순번 집합이 정확히 `1..expectedReservePriceCount`임을 이미 보증하므로, 여기서는
  * 그 정렬만 하면 된다(`toIntOrNull()`이 `null`을 낼 일은 그 검사를 통과한 입력에서는 없다).
@@ -85,7 +85,7 @@ internal fun drawNumberSet(observation: DrawNumberObservation): Set<Int>? =
  * `_BasisContext.budget_estimate` 주석). CLEAN 강제는 하지 않는다 — 라벨만 붙이고
  * 필터링은 엔진(`admit_clean`)이 진다(설계 검토 우회 (5)).
  *
- * M4/4B-8(D-4B8-1·2) — `opening`을 `OpeningResult?`로 일반화했다. 표본(`sampleOf`)은
+ * (D-4B8-1·2) — `opening`을 `OpeningResult?`로 일반화했다. 표본(`sampleOf`)은
  * 항상 있는 개찰 결과를 넘기고, 대상 공고(`predictionRequestFor`)는 개찰 전이라 `null`을
  * 넘긴다 — `winningAmount`·`winningRate`가 그대로 `null`이 되어 `ProvenanceRules.
  * isDerivedYega`(둘 다 non-null을 요구)가 구조적으로 `false`다. 대상용 별도 함수를 두지
@@ -123,7 +123,7 @@ internal fun provenanceLabelFor(
 
 /**
  * `SampleEligibility.judgeEligibility`의 guard 체인이 전부 통과한 뒤 값을 조립한다
- * (`SampleEligibility.kt`에서 갈라낸 함수 — detekt `TooManyFunctions`, verifier r1
+ * (`SampleEligibility.kt`에서 갈라낸 함수 — detekt `TooManyFunctions`,
  * 뒤 12개로 늘어나 한계를 넘었다). `internal` — 같은 패키지의 `judgeEligibility`만 쓴다.
  */
 @Suppress("LongParameterList")
@@ -143,7 +143,7 @@ internal fun sampleOf(
         baseAmountProvenanceLabel = provenanceLabelFor(notice, opening, baseAmount, provenancePolicy),
         openedOn = openedOn,
         awardRate = opening.winningRate,
-        // M3/3H-2(D-3H2-1) — 표본 공고의 수요기관 코드. `predictionRequestFor`와 같은 축·
+        // (D-3H2-1) — 표본 공고의 수요기관 코드. `predictionRequestFor`와 같은 축·
         // 같은 규칙(공고기관 폴백 없음, 이름 미사용) — `Agency.kt` 값을 두 자리가 공유한다.
         agencyId = notice.demandAgency?.code?.let { AgencyId(it.value) },
         categoryCode = notice.businessCategory?.code,

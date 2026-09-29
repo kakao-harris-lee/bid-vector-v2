@@ -15,8 +15,8 @@ import java.sql.SQLException
  * `NotificationRequestPort`의 production 구현(D-6F7-1, scope.md, **패키지 정정** —
  * 아래 참고) — `NotificationRequest`를 봉투에 실어 [outbox]에 등록한다.
  *
- * **이 클래스는 `workflow.event`가 아니라 `workflow.evaluation`에 있다(운영자 승인
- * 대상 정정 — `ArchitectureGateTest` 실측).** 착수 계약(D-6F7-1)은 "봉투 생성이
+ * **이 클래스는 `workflow.event`가 아니라 `workflow.evaluation`에 있다(`ArchitectureGateTest`
+ * 실측).** 착수 계약(D-6F7-1)은 "봉투 생성이
  * `workflow` 모듈에 `internal`이라 `workflow` 안 아무 패키지에나 둘 수 있다"까지만
  * 확인했고 **어느 패키지**가 안전한지는 실측하지 않았다 — `workflow.event`에 두면
  * 이 클래스가 `NotificationRequest`(`workflow.evaluation`)·`PredictionEvidence`의
@@ -117,7 +117,7 @@ private fun idempotencyKeyFor(notification: NotificationRequest): IdempotencyKey
  * 확률 수치를 잃기 때문이고, 그 정보는 D-6F7-2(판정 복원 가능성)가 요구한 것이다.
  * **착수 판이 적은 차단 사유 둘은 거짓으로 판명됐다** — 경계 게이트(`EventBoundaryTest`)는
  * `workflow.event`의 main 소스만 보고 이 sink(`workflow.evaluation`)를 덮지 않으며,
- * `BidNowReason` 하위 타입의 `internal` 생성자는 **읽기**를 막지 않는다(verifier 변이
+ * `BidNowReason` 하위 타입의 `internal` 생성자는 **읽기**를 막지 않는다(변이
  * 실측). 옛 사유를 여기 옮기지 않는다 — 진짜 종점은 `bidvector.decision`에 안정적
  * `code: String` 속성을 추가하는 별도 slice다.
  */

@@ -2,7 +2,7 @@
 `_estimate_distribution` 조립의 재현: 가용성 게이트 공유(D-5D2-7)·CLEAN 필터(ML-04 ①)·
 투찰율 축 환산(D-5D2-6)·진단.
 
-M5/5D-3(`OPEN-5D2-SAMPLE-SEGMENT` 해소) — 표본 축(agency/category)과 요청 축의 정규화
+`OPEN-5D2-SAMPLE-SEGMENT` 해소 — 표본 축(agency/category)과 요청 축의 정규화
 문자열 동일 매칭으로 3계층(D-5D3-1~5) + 우회 후보 (7)(8)(9)(10) 회귀.
 
 Reuse: bid-vector/app/ai/predictors/distribution.py@ed4b06c
@@ -188,7 +188,7 @@ class TestDistributionRequestFromProto:
     def test_sample_with_unspecified_or_unknown_enum_missing_reason_is_rejected(
         self, missing_reason: int
     ) -> None:
-        """verifier r1 F-5(low) — `UNSPECIFIED`는 5B `_resolve_missing_reason`이 먼저
+        """F-5(low) — `UNSPECIFIED`는 5B `_resolve_missing_reason`이 먼저
         `MALFORMED`로 걸러(`_resolve_segment`가 그 구체적 사유를
         `SEGMENT_REASON_NOT_ALLOWED` 하나로 접는다) 거부된다. enum 밖 정수(`99`,
         `Missing(raw)`로 판독되는 값)도 표본 축 허용 집합(`{NOT_COLLECTED_YET,
@@ -335,7 +335,7 @@ class TestPredictDistribution:
     def test_segment_axis_rejection_count_is_exact_not_double_counted(
         self, policy: InferencePolicy
     ) -> None:
-        """verifier r1 F-6 — 위 test는 표본 부족으로 `Unmeasurable`이 나와 `Diagnostics`
+        """F-6 — 위 test는 표본 부족으로 `Unmeasurable`이 나와 `Diagnostics`
         자체가 없다(계수를 실제로 재지 않는다). 이 test는 `Success`가 나오는 표본 수에서
         세그먼트 거부 1건이 `excluded_observations`에 정확히 1로 실리는지 잰다 — 관측
         게이트와 세그먼트 게이트가 같은 표본을 두 번 세면(회귀) 이 단언이 깨진다."""
@@ -384,7 +384,7 @@ class TestPredictDistribution:
     def test_sample_rejected_by_both_gates_is_counted_only_once(
         self, policy: InferencePolicy
     ) -> None:
-        """verifier r2 N-3 — `_observe_all` docstring이 주장하는 「이중 계수 금지」의
+        """N-3 — `_observe_all` docstring이 주장하는 「이중 계수 금지」의
         정작 그 갈래: 관측 게이트(`observe_sample`, 예비가 없음)와 세그먼트 게이트
         (`_resolve_segment`, 결측 사유 `99`) **둘 다**가 같은 표본 하나를 거부해도
         `excluded_observations`는 1이어야 한다(둘 다 거부해서 2가 되면 회귀)."""

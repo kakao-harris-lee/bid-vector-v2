@@ -12,7 +12,7 @@ package bidvector.buildlogic
  * 첫 세그먼트가 대문자면 단순 이름 참조라 건너뛴다 — import 나 같은 파일 선언이 이미 푼다.
  * 대문자 세그먼트가 아예 없으면 값 체인이라 건너뛴다.
  *
- * **뿌리 다음 세그먼트를 잇는 판별은 존재다**(verifier r19 M-1·M-3 — [nestedSegments] 참고).
+ * **뿌리 다음 세그먼트를 잇는 판별은 존재다**([nestedSegments] 참고).
  */
 internal fun candidateForms(segments: List<String>): List<String> {
     val typeIndex = segments.indexOfFirst { it.startsWithUpper() }
@@ -26,10 +26,10 @@ internal fun candidateForms(segments: List<String>): List<String> {
 }
 
 /**
- * 뿌리 다음 대문자 세그먼트를 얼마나 이어 붙이는지 — **글자 모양이 아니라 존재로 판별한다**
- * (verifier r19 M-1·M-3). 이전의 SCREAMING_CASE 규칙은 한 글자(`Math.E`)·혼합 대소문자
- * (`Double.NaN`) 상수를 멤버로 못 보고(M-1 오탐), 반대 방향으로 전대문자 이름의 **실재하는**
- * 중첩 클래스가 있다면 그것도 멤버로 오인했을 것이다(M-3).
+ * 뿌리 다음 대문자 세그먼트를 얼마나 이어 붙이는지 — **글자 모양이 아니라 존재로 판별한다**.
+ * SCREAMING_CASE 규칙만으로는 한 글자(`Math.E`)·혼합 대소문자
+ * (`Double.NaN`) 상수를 멤버로 못 보고, 반대 방향으로 전대문자 이름의 **실재하는**
+ * 중첩 클래스가 있다면 그것도 멤버로 오인한다.
  *
  * JDK 이름공간(`java.`·`javax.`·`jdk.`·`kotlin.`)은 후보 FQN 이 **실재하는 클래스일 때만**
  * 잇는다 — `Class.forName` 이 이 코드를 실은 Gradle JVM 의 JDK/stdlib 판을 기준으로 판정한다

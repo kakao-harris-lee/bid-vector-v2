@@ -100,7 +100,7 @@ class KonepsOperationDescriptorTest {
         }
     }
 
-    // M3/3F — §1.9.2 「13-15: inqryDiv 자체가 없다」. OPENING_COMPLETE 는 그 사실을
+    // §1.9.2 「13-15: inqryDiv 자체가 없다」. OPENING_COMPLETE 는 그 사실을
     // inquiryDivValue = null 로 나른다.
     @Test
     fun `OPENING_COMPLETE 는 inqryDiv 파라미터 자체를 내지 않는다`() {

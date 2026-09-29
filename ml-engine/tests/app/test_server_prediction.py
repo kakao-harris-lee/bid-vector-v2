@@ -3,8 +3,8 @@
 
   - 출하 정책(`policy/inference-v1.yaml` 그대로) → READY + `promoted` →
     `CalculateOptimalBid` Success → `promoted == success.release`(id·checksum),
-    후보율 전부 (0, 1] 안(M5/5F-1 값 변경 이후 — D-5F1-3 반전, 이전엔 `assessment.
-    agency_sample_threshold` 미선언으로 이 경로가 NOT_READY 였다, `OPEN-5D2-
+    후보율 전부 (0, 1] 안(D-5F1-3 반전 — `assessment.
+    agency_sample_threshold` 가 미선언이면 이 경로가 NOT_READY 다, `OPEN-5D2-
     POLICY-VALUES`).
   - (N-2) 정책 넷 중 하나만 깨져도 두 RPC 가 동시에 NOT_READY.
 
@@ -135,13 +135,13 @@ def _success_calc_request() -> prediction_pb2.CalculateOptimalBidRequest:
     return request
 
 
-# ---- (A/B 병합, M5/5F-1) 출하 정책 그대로 — READY, Success, promoted 일치 ----
+# ---- (A/B 병합) 출하 정책 그대로 — READY, Success, promoted 일치 ----
 #
-# D-5F1-3 반전 — 5F-1 이전엔 출하 `policy/inference-v1.yaml`에
-# `assessment.agency_sample_threshold`가 없어 이 경로가 영원히 NOT_READY 였다((B)
-# 옛 test 가 그 사실을 고정했다). 5F-1 이 그 키(잠정값 10)와 `scenario.clamp_max
-# 1.0`을 채운 뒤로는 **출하 정책 그대로 gate 가 READY 다** — 값 변경만으로 여기까지
-# 온 것이 이 slice 의 전제(scope.md ④)라, 이 test 가 반대 방향(값이 빠지면 다시
+# D-5F1-3 반전 — 출하 `policy/inference-v1.yaml`에
+# `assessment.agency_sample_threshold`(잠정값 10)와 `scenario.clamp_max`(1.0)가 채워져
+# 있어야 이 경로가 READY 다 — 값이 빠지면 이 경로는 영원히 NOT_READY 로 남는다((B)
+# 옛 test 가 그 사실을 고정했다). **출하 정책 그대로 gate 가 READY 다** — 값이 채워진
+# 상태로 여기까지 온 것이 이 slice 의 전제(scope.md ④)라, 이 test 가 반대 방향(값이 빠지면 다시
 # NOT_READY)으로 그 사실을 고정한다. (A)(완성 case 정책 — `_completed_case_
 # inference_policy_path`로 temp 사본을 읽던 test)는 이제 출하 정책과 결과가
 # 동일해져 중복이므로 이 test 하나로 합친다(판단 등재, `_completed_case_
@@ -183,7 +183,7 @@ def test_shipped_policy_serves_success_matching_promoted(tmp_path: Path) -> None
         running.close()
 
 
-# ---- (N-2, verifier r2) 정책 넷 중 하나만 깨져도 조립 근 가드가 gate 와 같이 떨어진다 ----
+# ---- (N-2) 정책 넷 중 하나만 깨져도 조립 근 가드가 gate 와 같이 떨어진다 ----
 
 
 class _ActiveContext:
@@ -200,8 +200,8 @@ _MALFORMED_YAML = "scenario.z: [unclosed\n"
 def test_single_broken_policy_makes_runtime_none_and_both_rpcs_not_ready(
     tmp_path: Path, broken_policy: str
 ) -> None:
-    """verifier r2 N-2 — `app/server.py::_prediction_runtime`의 `_preload_outcomes`
-    가드(R-H1) 자체는 r1 라운드에 test 가 없었다(변이로 가드를 지워도 930 전부
+    """N-2 — `app/server.py::_prediction_runtime`의 `_preload_outcomes`
+    가드(R-H1) 자체는 test 가 없었다(변이로 가드를 지워도 930 전부
     초록이었다 — `_validate`의 gate 확인이 사용자 가시 거동을 이미 가리기 때문).
     정책 넷을 하나씩만 깨뜨려 그 가드가 실제로 `None`을 내는지, 그리고 두 RPC
     (`GetModelMetadata`·`CalculateOptimalBid`)가 동시에 미준비로 답하는지 직접

@@ -11,7 +11,7 @@ import bidvector.workflow.strategy.EditableField
 import java.math.BigDecimal
 
 /**
- * 편집 값이 실리는 칸 넷(M6/6A-2b D-6A2b-1) — 요청 본문은 평탄하고(D-6A1-20 ⓑ) 값의
+ * 편집 값이 실리는 칸 넷(D-6A2b-1) — 요청 본문은 평탄하고(D-6A1-20 ⓑ) 값의
  * 모양이 필드 종류마다 다르므로, 한 칸짜리 다형 값 대신 **타입이 다른 칸 넷**을 두고
  * 필드가 어느 칸을 읽는지를 닫힌 표([valueSlot])가 정한다. 선언되지 않은 칸이 함께 오면
  * 형식 오류(400)다 — 조용히 무시하지 않는다.

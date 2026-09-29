@@ -180,7 +180,7 @@ class StrategyEditProductionE2ETest {
     }
 
     /**
-     * D-6A2b-18 회귀 — verifier r1 F-2 · code-review r1 HIGH-1 의 재현을 **출하 조립 + 실 DB**
+     * D-6A2b-18 회귀 — 경합 재현을 **출하 조립 + 실 DB**
      * 로 잠근다. 세션 둘이 같은 revision 에서 각자 전체 draft 를 뜨고, 뒤 세션은 확인 직전에
      * 조회한 **최신** revision 을 보낸다 — 그래도 기준이 낡았으므로 409 다.
      */

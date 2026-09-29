@@ -14,8 +14,7 @@ import org.springframework.context.annotation.Profile
 import java.math.BigDecimal
 
 /**
- * D-6A3-17(a) 거동 test 전용 배선(검토 라운드 1 HIGH-1 둘째 다리, code-reviewer MEDIUM ·
- * verifier M3 동시 해소) — `BidNow`를 내는 [MlAnalysisPort] fake 를 실 `EvaluationDryRunFactory`
+ * D-6A3-17(a) 거동 test 전용 배선 — `BidNow`를 내는 [MlAnalysisPort] fake 를 실 `EvaluationDryRunFactory`
  * 에 꽂아 `wouldNotifyNoticeIds`·`bidNowNoticeIds`가 실제로 채워지는 경로를 잰다.
  *
  * **production 배선에 새 주입 자리를 열지 않는다.** `@Profile("evaluation-bidnow-fake")`

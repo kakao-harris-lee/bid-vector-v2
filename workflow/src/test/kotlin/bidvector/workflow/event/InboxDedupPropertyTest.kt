@@ -34,7 +34,7 @@ class InboxDedupPropertyTest {
 
     @Test
     fun `duplicate·out-of-order 수신은 도착 순서와 무관하게 같은 최종 처리 집합·같은 처리 횟수로 수렴한다`() {
-        // verifier L-1 — 최종 집합만 비교하면 dedup 을 「항상 Process」로 바꿔도 초록이다
+        // 최종 집합만 비교하면 dedup 을 「항상 Process」로 바꿔도 초록이다
         // (같은 key 를 여러 번 처리해도 집합 자체는 안 바뀌므로). shuffledOnce 는
         // arrivals 의 모든 원소를 정의상 최소 두 번(reversed 절반 + 원본 절반) 반복시켜
         // 처리 횟수 비교가 그 변이를 실제로 가른다 — 아래 「자기 점검」이 그 실측이다.

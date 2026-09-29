@@ -33,7 +33,7 @@ import tools.jackson.databind.JsonNode
 import java.math.BigDecimal
 
 /*
- * M1/1E ⑪ — strategy-watch·strategy-validation·money-basis-003(D-2) case → executor
+ * strategy-watch·strategy-validation·money-basis-003(D-2) case → executor
  * dispatch. `CorpusExecutors.kt`(1B-c·1C)·`ProvenanceFloorExecutors.kt`(1D)와 같은 관심사
  * 분리 — `SharedKernelCorpusConformanceTest.kt` 의 dispatch 표(`VALUE_EXECUTORS`)가 이
  * 파일의 [STRATEGY_EXECUTORS] 를 합친다. 이 파일도 `strategy` 공개 API 만 부른다 — 이전

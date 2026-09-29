@@ -200,7 +200,7 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
 
     runner.submit(job_id, _DATASET_REF, _SlowSucceedingPipeline())
 
-    # verifier r2 R2-4 — InMemoryJobStore.replace 는 production 호출자가 없어
+    # R2-4 — InMemoryJobStore.replace 는 production 호출자가 없어
     # 제거됐다. 여기서도 두 단계(transition() 수동 계산 + replace())가 아니라
     # apply_transition 한 번으로 같은 결과(원자적 읽기·계산·쓰기)를 얻는다.
     cancelled = store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC))
@@ -215,7 +215,7 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
 
 
 def test_cancel_all_signals_every_in_flight_cancel_token() -> None:
-    """M-3(verifier r1) — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다."""
+    """M-3 — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다."""
     store = InMemoryJobStore()
     runner = JobRunner(store, max_workers=4)
     release_event = threading.Event()

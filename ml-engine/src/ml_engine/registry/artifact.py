@@ -10,7 +10,7 @@ legacy에는 checksum 검증이 없었다(digest §2 「checksum 대조 없음�
 축, 기본값을 주면 미학습 공종 가드가 조용히 열린다)와 같은 근거다 — 빈 문자열도
 `__post_init__`에서 거부한다(설계 검토 (15)).
 
-**verifier r1 M-1 반영**: `LoadedArtifact`는 `manifest`뿐 아니라 `_VerifiedBytes`(모듈
+**M-1**: `LoadedArtifact`는 `manifest`뿐 아니라 `_VerifiedBytes`(모듈
 private)도 **필수 인자**로 받는다 — `LoadedArtifact(manifest)` 한 인자만으로는 mypy strict
 가 인자 누락으로 거부한다. checksum 대조를 거치지 않은 manifest 로 `LoadedArtifact`를
 직접 조립하는 경로가 성립하지 않도록 타입 시그니처 자체가 막는다((2b) 「이 함수만
@@ -19,12 +19,12 @@ private)도 **필수 인자**로 받는다 — `LoadedArtifact(manifest)` 한 �
 **구현 노트(설계 래칫 + `warn_unreachable`)**: JSON 페이로드 필드를 검증하는 함수는
 `Any`/`dict[str, Any]`/`object` 매개변수(래칫이 막는 「약한 경계」)를 쓰지 않는다 — 값
 타입을 `JsonValue`(재귀적 JSON 값 유니온: 스칼라 + `list[JsonValue]` + `dict[str,
-JsonValue]`)로 표현해 `dict[str, JsonValue]`로 받는다. 이전 판(`JsonScalar`, 중첩 컨테이너
-배제)은 `feature_names`/`release`/`reproducibility` 같은 중첩 필드가 사실은 list/dict를
-담는데도 그 가능성을 타입에서 지워버려, `isinstance(x, list)` 분기가 mypy 관점에서
-**도달 불가**(값 타입이 애초에 list일 수 없다고 선언했으므로)가 됐다(verifier r1 M-4,
+JsonValue]`)로 표현해 `dict[str, JsonValue]`로 받는다. `JsonScalar`(중첩 컨테이너
+배제)로 좁히면 `feature_names`/`release`/`reproducibility` 같은 중첩 필드가 사실은 list/dict를
+담는데도 그 가능성을 타입에서 지워, `isinstance(x, list)` 분기가 mypy 관점에서
+**도달 불가**(값 타입이 애초에 list일 수 없다고 선언했으므로)가 된다(M-4,
 `--warn-unreachable` 실측 — `feature_names` 목록 검사·`verify_feature_names` 호출부가
-죽은 코드). `JsonValue`는 실제 JSON 값의 형태를 정직하게 나타내므로(진짜 JSON 값 전체
+죽은 코드가 된다). `JsonValue`는 실제 JSON 값의 형태를 정직하게 나타내므로(진짜 JSON 값 전체
 — `Any`처럼 아무 타입이나 넣을 수 있다는 뜻이 아니라 JSON 이 표현 가능한 값만이라는 뜻)
 이 문제가 없다. 래칫은 `dict`/`Mapping`의 **값** 타입 이름만 보므로(`JsonValue`는 그 이름
 목록에 없다) 약한 경계로도 잡히지 않는다.
@@ -124,7 +124,7 @@ class _VerifiedBytes:
 class LoadedArtifact:
     """`load_artifact`만 만든다 — 검증을 통과한 manifest 를 나른다. `verified`(checksum
     대조 증거)를 필수 인자로 받아 `LoadedArtifact(manifest)` 한 인자 생성을 mypy strict
-    가 거부하게 한다(verifier r1 M-1)."""
+    가 거부하게 한다(M-1)."""
 
     manifest: ArtifactManifestV1
     verified: _VerifiedBytes
@@ -227,7 +227,7 @@ def _parse_reproducibility(
 def _parse_scalars(
     payload: dict[str, JsonValue],
 ) -> tuple[str, float, int, str] | ArtifactRejected:
-    """`sample_scope`(빈 문자열도 거부)·`residual_std`(유한값만, verifier r1 L-3)·
+    """`sample_scope`(빈 문자열도 거부)·`residual_std`(유한값만, L-3)·
     `training_row_count`·`booster_model` — 통과하면 그 넷의 튜플."""
     sample_scope = payload.get("sample_scope")
     if not isinstance(sample_scope, str) or not sample_scope:
@@ -242,8 +242,8 @@ def _parse_scalars(
     if not isfinite(residual_std):
         # JSON 표준 리터럴 밖(`NaN`/`Infinity`) — Python `json.loads`는 기본으로 이를
         # 허용하지만(허용 확장), 망가진 artifact 를 결측 입력과 같은 사유로 접으면 안
-        # 된다(verifier r1 L-3 — 이전 판은 이 값이 그대로 `predict.py`까지 흘러
-        # `NON_FINITE_INPUT`으로 늦게 잡혔다. 여기서 즉시 거부한다).
+        # 된다(L-3 — 이 값을 그대로 흘려보내면 `predict.py`까지 가서
+        # `NON_FINITE_INPUT`으로 늦게 잡힌다. 여기서 즉시 거부한다).
         return ArtifactRejected(f"residual_std 는 유한해야 한다: {residual_std!r}")
     if not isinstance(training_row_count, int) or isinstance(training_row_count, bool):
         return ArtifactRejected("training_row_count 는 정수여야 한다")

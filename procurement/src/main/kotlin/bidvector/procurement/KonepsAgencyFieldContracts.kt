@@ -3,7 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.VatTreatment
 
 /**
- * M3/3H-1 D-3H-1 — 발주기관 넷 필드 계약 열(참고자료 응답 항목 표, P-14). `CollectionPolicy.kt`
+ * D-3H-1 — 발주기관 넷 필드 계약 열(참고자료 응답 항목 표, P-14). `CollectionPolicy.kt`
  * 에서 분리한 파일이다(sizeGate 500줄, v2-지침서 §5 — `KonepsOpeningCompleteFieldContracts.kt`
  * 분리와 같은 전례). 담당자 키(`ntceInsttOfclNm`·`…TelNo`·`…EmailAdrs`·`dminsttOfcl…`)는
  * 등재하지 않는다(개인정보, D-3H-7) — `FieldConcept`에 토큰 자체가 없어 소비 함수에 들어올

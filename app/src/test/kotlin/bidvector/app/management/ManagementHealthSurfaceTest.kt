@@ -62,7 +62,7 @@ class ManagementHealthSurfaceTest {
         private var managementContext: ConfigurableApplicationContext? = null
 
         /**
-         * **포트를 미리 고르지 않는다**(code-review r1 LOW). `ServerSocket(0)` 으로 번호를 얻어
+         * **포트를 미리 고르지 않는다**. `ServerSocket(0)` 으로 번호를 얻어
          * 닫은 뒤 Boot 가 bind 하기까지는 틈이 있어, 병렬 fork 나 이 호스트의 다른 프로세스가
          * 그 번호를 가져가면 `Address already in use` 로 붉는다. 둘 다 `0` 으로 주고 실제
          * 번호는 **이미 뜬 서버의 event** 에서 읽는다. 판별은 번호 비교가 아니라 Boot 자신의
@@ -134,7 +134,7 @@ class ManagementHealthSurfaceTest {
     }
 
     /**
-     * **실측(Boot 4.1.1, 2026-09-26)** — 집계 `GET /actuator/health` 는 `show-details=never`·
+     * **실측(Boot 4.1.1)** — 집계 `GET /actuator/health` 는 `show-details=never`·
      * `show-components=never` 아래에서도 `groups` 칸을 낸다(`SystemHealth.getGroups()` 가
      * `@JsonInclude(NON_EMPTY)` 라 그룹이 있으면 항상 실린다 — 세부 설정과 무관하다).
      * 그 값은 **우리가 지은 그룹 이름 둘**이고 구성 요소 이름·DB 주소·예외 메시지·버전은 없다
@@ -177,7 +177,7 @@ class ManagementHealthSurfaceTest {
             "/actuator/heapdump",
             "/actuator/mappings",
             "/actuator/shutdown",
-            // privacy-gate r1 L-1 — 구성 요소 경로다. `show-components=never` 아래에서는 404 이고,
+            // 구성 요소 경로다. `show-components=never` 아래에서는 404 이고,
             // 그 설정이 열리는 순간 **가장 먼저 세부를 내는 경로**다. 그래서 탐침에 넣는다.
             "/actuator/health/db",
         ).forEach { path ->
@@ -186,8 +186,7 @@ class ManagementHealthSurfaceTest {
     }
 
     /**
-     * D-6A2a-13 ② — 관리 포트의 **actuator 밖 표면**을 실측으로 못박는다(verifier r1 F-4 ·
-     * privacy-gate r1 L-1). 계약 (2b) 는 「관리 포트의 그 밖의 경로: 없어야 한다」였는데
+     * D-6A2a-13 ② — 관리 포트의 **actuator 밖 표면**을 실측으로 못박는다. 계약 (2b) 는 「관리 포트의 그 밖의 경로: 없어야 한다」였는데
      * `/error` 는 404 가 아니다 — Boot 의 오류 처리 경로가 관리 child context 에도 붙는다.
      *
      * 고치지 않고 **모양을 잠그는** 쪽을 고른 근거: 이 응답에 새는 값이 없다(우리가 만든 예외가
@@ -205,9 +204,7 @@ class ManagementHealthSurfaceTest {
     }
 
     /**
-     * D-6A2a-13 ② + **M6/6A-2b D-6A2b-7 — 이 자리도 닫혔다.** 6A-2a 는 관리 포트의 비 GET 을
-     * 500 으로 관측하고 `OPEN-API-WRONG-METHOD-500` 의 관리 포트 몫을 조건부로 남겼다. 이
-     * slice 가 API 포트를 닫으려고 더한 `HttpRequestMethodNotSupportedException` 핸들러는
+     * D-6A2a-13 ② + D-6A2b-7 — **이 자리도 닫혔다.** API 포트를 닫으려고 더한 `HttpRequestMethodNotSupportedException` 핸들러는
      * `@RestControllerAdvice` 라 **관리 child context 에도 함께 등록된다** — 관리 표면 잠금
      * (D-6A2a-10·14)을 **넓히지 않고** 405 가 됐다(새 endpoint·새 빈 없음, 기존 조언 하나가
      * 두 컨텍스트에 서는 것뿐이다). 본문이 일반 메시지뿐이라는 원래 단언은 그대로다.
@@ -232,7 +229,7 @@ class ManagementHealthSurfaceTest {
     }
 
     /**
-     * D-6A2b-21 둘째 절 · D-6A2b-31(verifier r2 F-r2-5) — **관리 포트의 미디어 타입 축**.
+     * D-6A2b-21 둘째 절 · D-6A2b-31 — **관리 포트의 미디어 타입 축**.
      * API 포트에 406 을 들이면서 관리 포트가 함께 흔들리지 않았는지 잰다: actuator 타입·json·
      * 「아무 타입이나」는 그대로 200 이고, 받아들일 수 없는 타입은 406 이며 **본문이 없다**.
      * 노출 집합은 불변이다 — 200 을 내는 경로가 health 둘뿐인 것을 같은 표에서 확인한다.

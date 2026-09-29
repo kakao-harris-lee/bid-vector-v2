@@ -26,11 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import contract.bidvector.ml.v1.EmbedTextRequest as ProtoEmbedTextRequest
 
 /**
- * scope.md ③, breaker open 축(리뷰 F-D 정정 — 이전엔 「우회 (7)」로 적었으나 이 slice의
- * 우회 목록에 (7)은 없다. 번호 대신 문구로 가리킨다) — breaker open 이면 호출 없이
+ * scope.md ③, breaker open 축(이 slice의 우회 목록에 (7) 같은 번호가 없어 번호 대신
+ * 문구로 가리킨다) — breaker open 이면 호출 없이
  * `Unavailable(CircuitOpen)`. permit
- * 결말 강제(`settlePermit`, verifier r3 H-1)는 `callResilient`가 예측·임베딩 공유로
- * 제네릭화됐으므로(D-4D2-4) 그 메커니즘 자체는 4D-1 `BreakerTest`가 이미 전건 증명한다 —
+ * 결말 강제(`settlePermit`)는 `callResilient`가 예측·임베딩 공유로
+ * 제네릭화됐으므로(D-4D2-4) 그 메커니즘 자체는 `BreakerTest`가 이미 전건 증명한다 —
  * 이 파일은 **임베딩 경로가 같은 공유 메커니즘에 올바르게 배선됐는지**만 최소로 확인한다
  * (H-1 의 15회 HALF_OPEN 반복까지 재현하지 않는다 — 로직이 아니라 배선의 재확인이라
  * 중복 커버리지를 피한다, cpdCheck 의도와도 같은 방향).
@@ -103,11 +103,11 @@ class EmbeddingBreakerTest {
 
     /**
      * 예산 소진(`MlCallOutcome.BudgetExhausted`)이 permit 을 반납하지 않으면 HALF_OPEN 에서
-     * breaker 가 영구히 막힌다(4D-1 verifier r3 H-1) — `settlePermit`은 공유 코드이므로 이
+     * breaker 가 영구히 막힌다(H-1) — `settlePermit`은 공유 코드이므로 이
      * test 는 **한 번**의 예산 소진 뒤 permit 이 반납돼 바로 다음 호출이 서버에 닿는지만
-     * 확인한다(전건 재현은 4D-1 `BreakerTest`가 진다).
+     * 확인한다(전건 재현은 `BreakerTest`가 진다).
      *
-     * **리뷰 F-A(high) 처방** — 이전 형태는 서버가 **성공**을 돌려주고 `BudgetExhausted`
+     * **처방** — 이전 형태는 서버가 **성공**을 돌려주고 `BudgetExhausted`
      * 자체는 **transport deadline 이 벽시계 안에 실제로 만료되는지**에 기댔다(cold JVM 에서
      * in-process RPC 가 50ms 안에 못 닿으면 `calls=1`로 끝나 단언이 깨졌다 — 통과하는
      * 분기에서는 반대로 예산 소진 경로 자체를 지나지 않았다). 처방은 **결과 내용으로**

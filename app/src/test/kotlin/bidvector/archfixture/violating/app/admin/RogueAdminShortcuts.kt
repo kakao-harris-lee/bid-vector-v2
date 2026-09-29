@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * D-6A2b-19 위반 표본 — **HTTP 층 밖 패키지의 진짜 핸들러**. verifier r1 이 이 형태(MU2b)를
- * 심고 전건 `check` 가 초록임을 실측했다: 이전 게이트는 대상이 패키지 이름 `app.http` 하나라
- * 다른 패키지의 `@RestController` 를 아예 보지 않았다.
+ * D-6A2b-19 위반 표본 — **HTTP 층 밖 패키지의 진짜 핸들러**. 이 형태(MU2b)를 심으면 전건
+ * `check` 가 초록이다: 게이트가 대상을 패키지 이름 `app.http` 하나로 잡으면
+ * 다른 패키지의 `@RestController` 를 아예 보지 못한다.
  *
  * production classpath 에는 오르지 않는다(test 소스). 실제 요청을 받지도 않는다 — 게이트가
  * **구조**(핸들러 애너테이션)로 대상을 고르는지만 잰다.

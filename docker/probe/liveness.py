@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M6/6C — liveness 프로브(scope.md ③, D-6C-3). **서버가 RPC 를 받는지**만 잰다 —
+"""liveness 프로브(scope.md ③, D-6C-3). **서버가 RPC 를 받는지**만 잰다 —
 `readiness`(정책 preload 상태)와 무관하다: `NOT_READY`(정책 preload 실패)여도 gRPC
 서버 자체가 요청을 받아 응답하면 살아 있는 것이다(readiness.py 와 반대 축).
 

@@ -34,7 +34,7 @@ private fun baseAmount(
 private val REV = StrategyRevision(1)
 
 /**
- * M1/1E ⑤⑥⑦⑧ — 전략 값 validation. STR-03 acceptance 셋을 `reports/evidence/m1/1e/scope.md`
+ * 전략 값 validation. STR-03 acceptance 셋을 `reports/evidence/m1/1e/scope.md`
  * D-3 승인(decision 30) 문면 그대로 옮긴다.
  */
 class StrategyValidationTest {

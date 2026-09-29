@@ -1,7 +1,7 @@
 """RED — `ml_engine.features.manifest`(D-5B-5). canonical 결정성·키 순서 무관·float repr
-민감·sha256 hex 64 소문자·`verify_manifest` 불일치·**입력 순서 무관 정렬 불변식**(verifier
-r1 M-1 — 같은 내용을 다른 배열 순서로 들고 온 두 manifest 는 같은 checksum 을 내야 한다)·
-**NaN/Infinity fail-closed**(PR #10 리뷰 MEDIUM — 비표준 JSON 리터럴로 조용히 새지 않고
+민감·sha256 hex 64 소문자·`verify_manifest` 불일치·**입력 순서 무관 정렬 불변식**(
+M-1 — 같은 내용을 다른 배열 순서로 들고 온 두 manifest 는 같은 checksum 을 내야 한다)·
+**NaN/Infinity fail-closed**(MEDIUM — 비표준 JSON 리터럴로 조용히 새지 않고
 `CanonicalizationRejected`)."""
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ def test_verify_manifest_rejects_mismatch() -> None:
 
 
 def test_manifest_sorts_agency_and_category_means_regardless_of_input_order() -> None:
-    """verifier r1 M-1 — 같은 내용을 뒤집은 순서로 넣어도 같은 checksum."""
+    """M-1 — 같은 내용을 뒤집은 순서로 넣어도 같은 checksum."""
     forward = _manifest()
     reversed_input = FeatureManifest(
         schema_version=forward.schema_version,
@@ -145,7 +145,7 @@ def test_manifest_different_content_still_yields_different_checksum() -> None:
 
 
 def test_canonical_json_rejects_nan_global_mean() -> None:
-    """PR #10 리뷰 MEDIUM — NaN 이 비표준 JSON 리터럴로 조용히 새지 않는다."""
+    """MEDIUM — NaN 이 비표준 JSON 리터럴로 조용히 새지 않는다."""
     manifest = _manifest(global_mean=math.nan)
     result = canonical_json(manifest)
     assert result == CanonicalizationRejected(NonFiniteValue("global_mean"))

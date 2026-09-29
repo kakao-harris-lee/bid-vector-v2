@@ -85,10 +85,10 @@ private class BaseRevisionEventSink : EventSink {
 /**
  * D-6A2b-18 — **draft 를 뜬 기준 revision** 이 confirm 의 둘째 신선도 축이다.
  *
- * verifier r1 F-2 · code-review r1 HIGH-1 의 재현을 그대로 회귀 test 로 고정한다: 세션 둘이
+ * 이 회귀를 test 로 고정한다: 세션 둘이
  * 같은 revision 에서 각자 전체 draft 를 뜨고, 앞 세션이 적용한 뒤 뒤 세션이 **확인 직전에
- * 조회한** 최신 revision 으로 확인하면 — 이전 판에서는 앞의 변경이 409 없이 사라졌다.
- * 이제 기준 대조가 그것을 `StaleRevision` 으로 막는다.
+ * 조회한** 최신 revision 으로 확인하면 앞의 변경이 409 없이 사라질 수 있다.
+ * 기준 대조가 그것을 `StaleRevision` 으로 막는다.
  */
 class EditSessionBaseRevisionTest {
     private val sessions = BaseRevisionSessionRepository()
@@ -268,7 +268,7 @@ class EditSessionBaseRevisionTest {
     }
 
     /**
-     * code-review r4 N-r4-10 · verifier r4 L-r4-2 — 앞 test 의 이름이 말하던 「값 제출만
+     * 앞 test 의 이름이 말하던 「값 제출만
      * 거부된다」를 여기서 잰다. 기준을 `null` 로 **실어 들어오는** command 는 저장소 전체에서
      * 이 test 에만 있다: `provideValueStaleness` 가 `null != current.revision`(항상 참)으로
      * 먼저 거부하므로 재전달 판별·actor·전이표를 **전부 건너뛴다**(거부 방향으로).

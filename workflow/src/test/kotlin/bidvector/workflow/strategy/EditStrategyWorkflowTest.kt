@@ -86,7 +86,7 @@ private class RecordingEventSink : EventSink {
     }
 }
 
-/** verifier M-3 — 저장 실패를 한 번 흉내내는 fake. */
+/** 저장 실패를 한 번 흉내내는 fake. */
 private class FlakyStrategyRepository(
     private val delegate: InMemoryStrategyRepository,
 ) : StrategyRepository {
@@ -103,7 +103,7 @@ private class FlakyStrategyRepository(
     }
 }
 
-/** verifier M-3 — 발행 실패를 한 번 흉내내는 fake. */
+/** 발행 실패를 한 번 흉내내는 fake. */
 private class FlakyEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
     var failNextPublish = false
@@ -120,7 +120,7 @@ private class FlakyEventSink : EventSink {
     }
 }
 
-/** `begin()`이 `Started`를 낼 것으로 기대하는 호출부의 공용 unwrap(verifier N-1 — begin 이 이제 `BeginOutcome`을 낸다). */
+/** `begin()`이 `Started`를 낼 것으로 기대하는 호출부의 공용 unwrap(`begin`이 `BeginOutcome`을 낸다). */
 private fun EditStrategyWorkflow.beginStarted(
     sessionId: EditSessionId,
     operator: OperatorId,
@@ -438,7 +438,7 @@ class EditStrategyWorkflowTest {
         // process() 가 outcome.session 을 저장했는지(만료 fold 가 실제로 영속됐는지)를 독립된
         // sessions 참조로 확인한다 — outcome.session 자체가 Expired 라는 것만으로는
         // process() 의 저장 호출 여부를 재지 못한다(변이: sessions.save 를 조건부로 감싸도
-        // outcome 필드는 그대로 Expired 라 통과했을 것이다, verifier L-5).
+        // outcome 필드는 그대로 Expired 라 통과했을 것이다).
         restoreEditSession(sessions.load(sessionId)!!).state shouldBe EditSessionState.Expired
     }
 }

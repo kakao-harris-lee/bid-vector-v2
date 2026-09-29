@@ -33,7 +33,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * verifier r1 F-1 — [predictedFacts]가 `MarginInputs.init`의 세 술어(recommendedRate·
+ * [predictedFacts]가 `MarginInputs.init`의 세 술어(recommendedRate·
  * predictedRate·floorRate 각 `fraction ≤ 1`)를 **호출 전에** 전부 판정하는지 직접 잰다.
  * `analyze()` 전체를 거치면 `MlAnalysisOutcome.Analyzed`가 budgetCapture·expectedMargin
  * 성분을 노출하지 않아 이 관문의 개별 성패를 볼 수 없다 — `internal` 함수를 같은 패키지
@@ -49,7 +49,7 @@ class PredictionFactsTest {
             opportunityVersion = version,
             derivation = Resolution.Resolved(DERIVATION_POLICY.entries.single().second, version),
             priority = PRIORITY_POLICY.entries.single().second,
-            // M4/4B-8(D-4B8-5) — 표본과 같은 SAMPLE_PROVENANCE_POLICY singleton.
+            // (D-4B8-5) — 표본과 같은 SAMPLE_PROVENANCE_POLICY singleton.
             provenancePolicy = Resolution.Resolved(SAMPLE_PROVENANCE_POLICY.entries.single().second, version),
         )
     }
@@ -83,7 +83,7 @@ class PredictionFactsTest {
             }
         over.budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
         over.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
-        // M4/4D-4(D-4D4-1) — 신뢰 못 할 응답은 NotPredicted다(진단이 있어도 Diagnosed가 아니다).
+        // (D-4D4-1) — 신뢰 못 할 응답은 NotPredicted다(진단이 있어도 Diagnosed가 아니다).
         over.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ContractViolation)
     }
 
@@ -113,7 +113,7 @@ class PredictionFactsTest {
         over.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
     }
 
-    // ---- M4/4D-3(scope.md D-4D3-3, 위협 모델 우회 (8)) — 진단은 사다리 점수를 바꾸지
+    // ---- (scope.md D-4D3-3, 위협 모델 우회 (8)) — 진단은 사다리 점수를 바꾸지
     // 않는다. 진단만 다른 두 Predicted 가 같은 ScoreFact 쌍을 낸다. ----
 
     @Test
@@ -150,14 +150,14 @@ class PredictionFactsTest {
         val fromHighShrinkage =
             predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
 
-        // M4/4D-4(D-4D4-2) — 진단은 사다리 점수(ScoreFact 쌍)를 바꾸지 않는다. evidence는
+        // (D-4D4-2) — 진단은 사다리 점수(ScoreFact 쌍)를 바꾸지 않는다. evidence는
         // 그 정의상 진단을 그대로 옮기므로 둘은 여기서 갈린다(아래가 그 사실을 직접 잰다).
         fromLowShrinkage.budgetCapture shouldBe fromHighShrinkage.budgetCapture
         fromLowShrinkage.expectedMargin shouldBe fromHighShrinkage.expectedMargin
         (fromLowShrinkage.evidence == fromHighShrinkage.evidence) shouldBe false
     }
 
-    // ---- M4/4D-4(D-4D4-1·7) — evidence 캐리어가 진단·release·표본 제외 계수를 그대로 옮긴다. ----
+    // ---- (D-4D4-1·7) — evidence 캐리어가 진단·release·표본 제외 계수를 그대로 옮긴다. ----
 
     @Test
     fun `predictedFacts 는 Predicted 의 diagnostics release 와 호출자의 excludedSamples 를 Diagnosed 로 옮긴다(D-4D4-1·7)`() {
@@ -184,7 +184,7 @@ class PredictionFactsTest {
     }
 
     /**
-     * verifier r2 N-2 — D-4B7-9는 표본 공급 실패 사유를 `ScoreNotProvided`로 뭉개지 않고
+     * D-4B7-9는 표본 공급 실패 사유를 `ScoreNotProvided`로 뭉개지 않고
      * `supply.reason`을 그대로 옮긴다고 못 박는다. `absentPairForUnavailableSupply`가
      * 그 배선의 유일한 지점이다.
      */
@@ -196,7 +196,7 @@ class PredictionFactsTest {
 
         components.budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
         components.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
-        // M4/4D-4(D-4D4-1) — 예측을 시도하지 않은 경로는 NotPredicted다.
+        // (D-4D4-1) — 예측을 시도하지 않은 경로는 NotPredicted다.
         components.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.TransportFailed)
     }
 
@@ -212,8 +212,8 @@ class PredictionFactsTest {
         (components.evidence == PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)) shouldBe false
     }
 
-    // ---- M4/4B-8(D-4B8-1·2, OPEN-4B7-TARGET-LABEL 닫힘) — 대상 공고 라벨 규칙표.
-    // `provenanceLabelFor`(SampleConversion.kt)를 `opening = null`로 직접 불러 잰다 — 4B-7
+    // ---- (D-4B8-1·2, OPEN-4B7-TARGET-LABEL 닫힘) — 대상 공고 라벨 규칙표.
+    // `provenanceLabelFor`(SampleConversion.kt)를 `opening = null`로 직접 불러 잰다 —
     // `SampleEligibilityTest`의 라벨 test와 같은 관례(같은 분류기, 다른 opening 인자). ----
 
     @Test
@@ -317,7 +317,7 @@ class PredictionFactsTest {
         (cleanRequest.baseAmountProvenanceLabel == BaseAmountProvenance.Unknown) shouldBe false
     }
 
-    // ---- M3/3H-2(D-3H2-1, scope.md 우회 (1)(4)) — 요청 축 agencyId 조립(`predictionRequestFor`). ----
+    // ---- (D-3H2-1, scope.md 우회 (1)(4)) — 요청 축 agencyId 조립(`predictionRequestFor`). ----
 
     @Test
     fun `수요기관 코드가 있으면 요청 agencyId 는 그 코드 값이다`() {

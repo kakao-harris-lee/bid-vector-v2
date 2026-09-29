@@ -37,9 +37,9 @@ open class PersistenceWiring {
         }
 
     /**
-     * **M6/6A-2b D-6A2b-23(code-review r1 MEDIUM-5) — 해소는 조립에서 한 번이다.** 이전에는
-     * 이 자리와 편집 배선이 각자 `resolve(LocalDate.now())` 를 불러, 같은 기동 안에서 서로
-     * 다른 정책 인스턴스(그리고 자정을 넘기면 다른 값)를 쥘 여지가 있었다. 정책 파일의
+     * **D-6A2b-23 — 해소는 조립에서 한 번이다.**
+     * 이 자리와 편집 배선이 각자 `resolve(LocalDate.now())` 를 부르면, 같은 기동 안에서 서로
+     * 다른 정책 인스턴스(그리고 자정을 넘기면 다른 값)를 쥘 여지가 생긴다. 정책 파일의
      * 독자를 하나로 둔다 — 해소되지 않으면 지어내지 않고 기동을 실패시킨다.
      */
     @Bean
@@ -51,7 +51,7 @@ open class PersistenceWiring {
 
     /**
      * 기동 시 1회 migrate 후 [JdbcStrategyRepository]를 만든다. **migration 이 이 빈 생성의
-     * 부수효과라는 것은 알려진 제한**이다(code-review r1 L-8) — 같은 컨텍스트의 싱글턴 생성
+     * 부수효과라는 것은 알려진 제한**이다 — 같은 컨텍스트의 싱글턴 생성
      * 순서에 기대고 있고, 선언된 의존이 아니다. 오늘은 `DataSource` 를 쓰는 다른 빈이 전부
      * 기동 시 생성돼 문제가 없다.
      */
@@ -76,14 +76,14 @@ open class PersistenceWiring {
 
 /**
  * DataSource 설정 키(D-6A1-19) — `…password`를 쓰지 않는다(`leak-patterns.txt` 자기참조,
- * 팀장 실측). 값은 환경변수 주입, 기본값 없음 — Spring의 relaxed binding이 누락 시
+ * 실측). 값은 환경변수 주입, 기본값 없음 — Spring의 relaxed binding이 누락 시
  * `BindException`으로 기동을 fail-fast 시킨다(직접 null 검사를 재구현하지 않는다).
  *
- * **D-6A2a-13 ①(privacy-gate r1 L-2) — `data class`가 아니다.** 컴파일러가 합성하는
+ * **D-6A2a-13 ① — `data class`가 아니다.** 컴파일러가 합성하는
  * `toString()`은 [credential] 원문을 그대로 낸다. Boot의 바인딩 실패 분석기는 실패한 속성의
  * 값을 문면에 내고, 기동 실패 문면은 CI job 로그로도 운영 배치의 **영구 로그**로도 간다 —
  * 지금 이 타입에 형식 검증이 없어 그 경로가 닫혀 있을 뿐이고, 뒤 slice 가 검증을 붙이는
- * 순간 열린다. [bidvector.app.OperatorCredentialProperties](6A-1 r4)와 같은 근거이며 같은
+ * 순간 열린다. [bidvector.app.OperatorCredentialProperties]와 같은 근거이며 같은
  * 처방이다: 재정의하지 않은 `Any.toString()`(클래스명@해시코드)을 쓴다.
  *
  * `equals`/`hashCode`/`copy`/구조 분해도 함께 사라진다 — 이 타입은 [PersistenceWiring.dataSource]

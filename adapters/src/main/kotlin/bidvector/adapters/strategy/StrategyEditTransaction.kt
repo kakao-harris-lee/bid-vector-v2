@@ -12,7 +12,7 @@ import bidvector.workflow.strategy.EditSessionPolicyData
 import bidvector.workflow.strategy.EditStrategyWorkflow
 
 /**
- * 편집 use case 를 **한 트랜잭션 안에서** 빌려주는 경계(M6/6A-2b D-6A2b-3) — 호출부는
+ * 편집 use case 를 **한 트랜잭션 안에서** 빌려주는 경계(D-6A2b-3) — 호출부는
  * [EditStrategyWorkflow] 하나만 받고, 그 use case 가 쥔 포트(전략 저장소·세션 저장소·
  * outbox sink)는 이 경계 밖으로 나가지 않는다.
  *

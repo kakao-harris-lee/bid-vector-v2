@@ -4,7 +4,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * D-6A2a-13 ①(privacy-gate r1 L-2) — [PersistenceProperties] 가 `data class` 였을 때
+ * D-6A2a-13 ① — [PersistenceProperties] 가 `data class` 였을 때
  * `toString()` 이 DB 자격 값을 그대로 냈다. Boot 의 바인딩 실패 분석기는 실패한 속성의 값을
  * 문면에 낸다 — 미래 변경이 이 타입에 형식 검증을 붙이면 그 값이 기동 실패 로그(운영 배치에서는
  * **영구 로그**)로 간다. [bidvector.app.OperatorCredentialProperties] 와 같은 규율로 잠근다.

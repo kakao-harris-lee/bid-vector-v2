@@ -188,7 +188,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * verifier r1 HIGH-1 재현·회귀 보호 — `Sql.UPSERT_EDIT_SESSION`을 원시 값으로 직접 몬다
+     * `Sql.UPSERT_EDIT_SESSION`을 원시 값으로 직접 몬다
      * (adapters 는 `EditSession`을 만들 수 없어 두 "경쟁하는 writer"를 도메인 API 로는
      * 구성할 수 없다 — `EditStrategyWorkflow`는 load-then-save 가 한 호출 안에서 원자적이라
      * 같은 사전 상태를 두 번 읽는 경합을 재현하지 못한다. 저장소 write 경로 자체의 계약을
@@ -251,7 +251,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * verifier r1 MEDIUM-3 시정 — 이 파일의 다른 test 는 전부 `dataSource()`(admin)로
+     * 이 파일의 다른 test 는 전부 `dataSource()`(admin)로
      * `JdbcEditSessionRepository`를 만든다. admin 은 GRANT 와 무관하게 항상 성공하므로
      * `bidvector_app`의 실제 부여가 틀려도(예: UPDATE 를 뺀 뒤 axis9 기대 행렬만 맞춰 고침,
      * MUT-G) 이 파일의 다른 test 는 못 잡는다. 이 test 는 형제 파일(`RawAppendOnlyTest` 등)과
@@ -282,7 +282,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * verifier r1 HIGH-2 재현·회귀 보호 — `EditSessionRow.toSnapshot`(디코드 층)을 직접
+     * `EditSessionRow.toSnapshot`(디코드 층)을 직접
      * 지나야 하므로 원시 SQL 로 행을 심는다. `EditSessionSnapshotTest`(workflow)의 24건은
      * 스냅숏을 Kotlin 에서 직접 만들어 넣어 이 디코드 층을 지나지 않는다 — 그래서 DB 행에서
      * 출발하는 이 셋이 필요하다.
@@ -375,7 +375,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * 과잉 거부 방지(팀장 요청) — 정수 표기의 정상 `won`은 여전히 통과하고 값도 보존된다.
+     * 과잉 거부 방지 — 정수 표기의 정상 `won`은 여전히 통과하고 값도 보존된다.
      * `revision`(Int) 축의 정상 통과는 기존 왕복 test 들(`Applied 까지 전이…` 등)이 이미
      * 잠근다 — 이 test 는 그 test 들이 안 덮는 `won`(Long, `readMoney`)을 DB 행에서
      * 출발해 잠근다.
@@ -396,10 +396,10 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * verifier r7 HIGH-5 재현·회귀 보호 — 인코더는 정확한 십진 노드로 쓰지만, 디코더의
+     * 인코더는 정확한 십진 노드로 쓰지만, 디코더의
      * 기본 `ObjectMapper`는 부동소수 토큰을 `DoubleNode`로 읽어 `.asText()`가 **그 double
-     * 의 최단 표기**를 돌려준다(척도·유효숫자가 예외·거부 없이 바뀐다 — HIGH-2/Codex 1
-     * 라운드가 막은 "값이 다른 값으로" 축과 같은 계열이지만 숫자가 아니라 **표기**가
+     * 의 최단 표기**를 돌려준다(척도·유효숫자가 예외·거부 없이 바뀐다 — HIGH-2 가 막은
+     * "값이 다른 값으로" 축과 같은 계열이지만 숫자가 아니라 **표기**가
      * 갈리는 자리). `0.70`(정확 왕복 기대)이 `0.7`로 오는 것과 double 정밀도를 넘는
      * 고정밀 값의 끝자리가 바뀌는 것, 둘 다 DB 행에서 출발해 직접 확인한다 — 기존 왕복
      * test 의 소수 리터럴(`0.7`)은 우연히 double 최단 표기와 같아 이 결함을 못 봤다.
@@ -432,7 +432,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     }
 
     /**
-     * verifier r7 HIGH-5 — 실제로 깨지는 계약(왕복 단언만으로는 안 보인다). `0.70`으로
+     * HIGH-5 — 실제로 깨지는 계약(왕복 단언만으로는 안 보인다). `0.70`으로
      * `provideValue`를 두 번(같은 command) 보내면, 척도가 온전히 왕복하지 않는 한 두
      * 번째 호출에서 `session.lastCommand`(DB 재로드·디코드된 값, 척도 1)와 재전달된
      * `command`(원본 척도 2)가 데이터 클래스 동등성에서 갈려 `IdempotencyConflict`로

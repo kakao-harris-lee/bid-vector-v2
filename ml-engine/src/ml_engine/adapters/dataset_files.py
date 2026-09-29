@@ -17,7 +17,7 @@ class DatasetFiles:
     manifest_bytes: bytes
     rows_bytes: bytes
     settlements_bytes: bytes | None = None
-    """M5/5E-1 D-5E-4 — `settlements.jsonl`(세 번째 파일, 선택적으로 읽는다: 있으면
+    """D-5E-4 — `settlements.jsonl`(세 번째 파일, 선택적으로 읽는다: 있으면
     채우고 없으면 `None`). **파일 부재를 여기서 거부하지 않는다** —
     `tests/adapters/test_dataset_files.py`(out_of_scope, 무편집)의 기존 round-trip
     test 가 이 파일 없이 성공을 기대한다. "정산 관측 없이는 job 실패"라는 요구는
@@ -47,7 +47,7 @@ def read_dataset_files(uri: str) -> DatasetFiles | DatasetUnreadable:
             DatasetUnreadableReason.UNSUPPORTED_SCHEME, parsed.scheme
         )
     if parsed.netloc:
-        # code-reviewer PR #13 MEDIUM-2 — `file://<host>/path`(비표준 file URI, host
+        # MEDIUM-2 — `file://<host>/path`(비표준 file URI, host
         # 부분이 있음)는 host 를 조용히 무시하고 `path`만 읽어버릴 위험이 있다.
         # `file:///abs/path`(host 없음)만 허용한다 — 이 slice 는 `file://` 지원을
         # 이 형태로 문서화했다(D-5C-8).

@@ -20,7 +20,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * 표본 자격 판정 정책 슬롯(M4/4B-7, D-4B7-2 ③) — 예비가격 정상 건수. 엔진
+ * 표본 자격 판정 정책 슬롯(D-4B7-2 ③) — 예비가격 정상 건수. 엔진
  * `reserve.expected_price_count`(`ml-engine/policy/inference-v1.yaml`)와 1:1이어야
  * 한다(어긋나면 엔진이 `PRICE_COUNT_MISMATCH`로 거부한다) — 착수 값 15는
  * `reports/evidence/m4/4b7/policy-values.md`가 정본이고 `OPEN-4B7-POLICY-VALUES`로
@@ -127,7 +127,7 @@ private inline fun <T, R> Check<T>.andThen(f: (T) -> Check<R>): Check<R> =
     }
 
 /**
- * 표본 자격 판정(M4/4B-7, D-4B7-2 ②~⑦, scope.md ③) — port를 읽지 않는 순수 함수다. 어댑터가
+ * 표본 자격 판정(D-4B7-2 ②~⑦, scope.md ③) — port를 읽지 않는 순수 함수다. 어댑터가
  * 조인·창·상한만 진 candidate 쌍(D-4B7-4)을 판정한다 — SQL에 자격 판정을 두지 않는다. 판정
  * 순서는 D-4B7-2의 번호 순서(②~⑦) 그대로다.
  */
@@ -188,7 +188,7 @@ private fun reservePriceCountCheck(
     }
 
 /**
- * D-4B7-2 ③ 확장(verifier r1 F-4) — 엔진이 `selected_numbers`를 wire `reserve_prices`
+ * D-4B7-2 ③ 확장 — 엔진이 `selected_numbers`를 wire `reserve_prices`
  * 리스트의 1-기반 인덱스로 소비하므로, 행 수가 맞아도 `sequenceNumber` 집합이 정확히
  * `1..expectedReservePriceCount`가 아니면(중복·결측·범위 밖) 위치가 번호와 어긋난다 —
  * `reservePriceCountCheck`(건수)와 다른 축이다.

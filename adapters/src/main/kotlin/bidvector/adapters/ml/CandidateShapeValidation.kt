@@ -3,10 +3,10 @@ package bidvector.adapters.ml
 import contract.bidvector.ml.v1.Success
 
 /**
- * verifier r2 G-1(high) — `BidRateCandidates.init`(conservative≤base≤aggressive, legacy
+ * `BidRateCandidates.init`(conservative≤base≤aggressive, legacy
  * `scenario_spec.py`의 `CANDIDATE_SCENARIOS` sign 순서에서 온 방향)이 구성 시점에 던지기
  * 전에, 구조 검증층(`ParsedSuccessFields.isAcceptableSuccessShape`)이 같은 조건을 먼저
- * 잰다 — F-2 의 `hasNonBlankRelease`와 동형 패턴이다. 이 검사가 없으면 정직하지 않은
+ * 잰다 — `hasNonBlankRelease`와 동형 패턴이다. 이 검사가 없으면 정직하지 않은
  * 순서의 응답이 `IllegalArgumentException`으로 `predict` 밖까지 샌다(scope.md ④ 위반).
  * `ParsedSuccessFields.kt`에서 갈라낸 파일이다(detekt `TooManyFunctions`).
  */

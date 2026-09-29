@@ -164,7 +164,7 @@ private fun ResultSet.toRequirementRowRecord(): RequirementRowRecord =
     )
 
 /**
- * **D-6F5-11(verifier r1 LOW-1, code-reviewer HIGH)** — [getTextList][bidvector.adapters
+ * **D-6F5-11** — [getTextList][bidvector.adapters
  * .persistence.getTextList]의 nullable 판. `NULL`(이 열 자체가 없음, 이 행이 UNPARSABLE)과
  * 「빈 배열」을 구분해야 하는 계약만 여기서 더하고, 배열 원소 검증(NULL 원소 거부)은
  * `getTextList`에 **형제 위임**한다 — `internal`(모듈 범위)이라 이 패키지가 파일 편집·scope

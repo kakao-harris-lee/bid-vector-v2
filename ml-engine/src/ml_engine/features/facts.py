@@ -6,7 +6,7 @@ legacy predictor는 `amount: float`·`category: str | None`·`denominator_source
 oneof 존재, `MissingReason.UNSPECIFIED`를 걸러낸 뒤에만 `FeatureFacts`를 낸다. 위반은 전부
 `FactRejected`(결과 타입) — 예외 없음.
 
-M5/5D-3(D-5D3-6, 계약 갱신 F-10) — 텍스트 fact 판독기(`resolve_text_fact`)를 공개
+D-5D3-6(계약 갱신 F-10) — 텍스트 fact 판독기(`resolve_text_fact`)를 공개
 승격했다. 결측 사유 판정을 **술어**(`is_allowed_missing_reason: Callable[[int], bool]`)로
 인자화해 요청 축(`FeatureFacts.from_proto`)과 표본 축(`ml_engine.inference.distribution`)이
 **같은 코드**로 정규화·거부한다 — 분포 엔진 안에 두 번째 판독기를 두지 않는다.
@@ -14,8 +14,7 @@ M5/5D-3(D-5D3-6, 계약 갱신 F-10) — 텍스트 fact 판독기(`resolve_text_
 **요청 축은 열린 집합이다** — `MISSING_REASON_UNSPECIFIED`만 거부하고 그 밖의 모든 정수
 (enum 밖 값 포함)는 `Missing(raw)`로 수용한다(base·이전 동작 그대로). 열거로 닫으면
 common.proto가 `MissingReason` 값을 늘릴 때마다 구버전 엔진이 신규 값을 담은 요청 전체를
-거부하는 전방 호환 위반이 생긴다(F-10, verifier r1 표적 11 HIGH — 팀장이 「기존 집합
-유지」 채택을 철회). **표본 축은 `{NOT_COLLECTED_YET, UNKNOWN}`(3H-2 D-3H2-3)**인 닫힌
+거부하는 전방 호환 위반이 생긴다(F-10, HIGH). **표본 축은 `{NOT_COLLECTED_YET, UNKNOWN}`(D-3H2-3)**인 닫힌
 집합이다 — 2F 계약(D-5D3-2)이 정한 값에 3H-2가 `UNKNOWN`(수집했으나 원천에 없음)을
 더했다.
 """

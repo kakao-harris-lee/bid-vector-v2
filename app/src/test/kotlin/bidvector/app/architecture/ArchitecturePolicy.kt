@@ -28,7 +28,7 @@ class ArchitecturePolicy private constructor(
     val allowedClasses: List<String> get() = allowedApiClasses + allowedRuntimeClasses
     val forbiddenPackageSegments: List<String> get() = list("package.segment.forbidden")
 
-    /** M6/6A-3+6F-3 D-6A3-9 — `assemble*`(bidvector.strategy.TextKt) 호출 허용 목록. */
+    /** D-6A3-9 — `assemble*`(bidvector.strategy.TextKt) 호출 허용 목록. */
     val allowedAssembleCallers: List<String> get() = list("app.allowed.assemble-callers")
 
     /** D-6A3-17(a) — `NotificationRequestPort` 포트 타입 FQCN. */
@@ -54,7 +54,7 @@ class ArchitecturePolicy private constructor(
         get() = pairs("app.port-call.allowed-pairs")
 
     /**
-     * M6/6A-2b D-6A2b-8 — `app.http` 의존 게이트. 포트 집합은 이 파일이 아니라 use case
+     * D-6A2b-8 — `app.http` 의존 게이트. 포트 집합은 이 파일이 아니라 use case
      * 생성자에서 **도출**한다 — [appHttpUseCasePorts] 는 그 도출 결과와 대조할 **관측 등식**
      * 이다(포트가 늘거나 줄면 RED 가 되어 분류를 다시 보게 한다).
      */
@@ -99,7 +99,7 @@ class ArchitecturePolicy private constructor(
     val appDomainPortRoots: List<String> get() = list("app.injection.domain-port-roots")
     val appInjectionCarrierExemptions: List<String> get() = list("app.injection.carrier-exemptions")
 
-    /** N-r5-5 — 제한 층이 허용 접두 안이라도 직접 받지 못하는 타입. */
+    /** 제한 층이 허용 접두 안이라도 직접 받지 못하는 타입. */
     val appHttpDeniedTypes: List<String> get() = list("app.http.denied-types")
 
     /** D-6A2b-34 — ① 층이 의존할 수 없는 HTTP 확장 API 접두와, 오늘 실제로 쓰는 예외 클래스. */
@@ -129,19 +129,19 @@ class ArchitecturePolicy private constructor(
     val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
     val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")
 
-    /** M6/6F-8 (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
+    /** (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
     val collectionPackage: String get() = value("workflow.collection.package")
     val collectionAllowedProcurementTypes: List<String> get() = list("workflow.collection.allowed-procurement-types")
 
-    /** M6/6F-8 (b) — 멤버 접근이 금지되는 통과 전용 타입, 결과 타입 필드로 금지되는 타입. */
+    /** (b) — 멤버 접근이 금지되는 통과 전용 타입, 결과 타입 필드로 금지되는 타입. */
     val collectionPassThroughTypes: List<String> get() = list("workflow.collection.pass-through-types")
     val collectionForbiddenFieldTypes: List<String> get() = list("workflow.collection.forbidden-field-types")
 
-    /** M6/6F-8 (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
+    /** (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
     val titleKeyAllowedClasses: List<String> get() = list("collection.title-key.allowed-classes")
 
     /**
-     * M6/6F-9 D-6F9-1(verifier r1 F-1 뒤 개정) — 대분류 값 획득 축 셋: 대상 타입 · 타입 멤버 접근 쌍 ·
+     * D-6F9-1 — 대분류 값 획득 축 셋: 대상 타입 · 타입 멤버 접근 쌍 ·
      * 값 획득 쌍(`Caller->Owner#member`) · 클래스 객체 참조자. 멤버 이름 목록은 없다(정책 파일 주석 `(c'')`).
      */
     val divisionValueType: String get() = value("collection.division-value.type")
@@ -155,11 +155,11 @@ class ArchitecturePolicy private constructor(
     val divisionClassObjectReferencers: List<String>
         get() = list("collection.division-value.class-object-referencers")
 
-    /** M6/6F-9 D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
+    /** D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
     val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")
 
-    /** M6/6F-8 (d)·(e)·(f) — 타입 → 그 타입을 참조해도 되는 app 클래스 집합. */
+    /** (d)·(e)·(f) — 타입 → 그 타입을 참조해도 되는 app 클래스 집합. */
     val runnerTypes: List<String> get() = list("app.runner.types")
     val runnerAllowedReferencers: List<String> get() = list("app.runner.allowed-referencers")
     val serviceKeyType: String get() = value("app.secret.service-key-type")
@@ -167,19 +167,19 @@ class ArchitecturePolicy private constructor(
     val loggingTypes: List<String> get() = list("app.logging.types")
     val loggingAllowedUsers: List<String> get() = list("app.logging.allowed-users")
 
-    /** M6/6F-8 D-6F8-6 (g) — 원문 값 획득 봉쇄의 모듈 root·접근 타입과 참조자·멤버 접근자 허용 집합. */
+    /** D-6F8-6 (g) — 원문 값 획득 봉쇄의 모듈 root·접근 타입과 참조자·멤버 접근자 허용 집합. */
     val rawAccessRoots: List<String> get() = list("collection.raw-access.roots")
     val rawAccessTypes: List<String> get() = list("collection.raw-access.types")
     val rawAccessAllowedReferencers: List<String> get() = list("collection.raw-access.allowed-referencers")
     val rawAccessAllowedMemberAccessors: List<String> get() = list("collection.raw-access.allowed-member-accessors")
 
-    /** M6/6F-8 D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
+    /** D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
     val reflectionPackages: List<String> get() = list("collection.reflection.packages")
     val reflectionAllowedReferencers: List<String> get() = list("collection.reflection.allowed-referencers")
     val reflectionClassType: String get() = value("collection.reflection.class-type")
     val reflectionClassAllowedMembers: List<String> get() = list("collection.reflection.class-allowed-members")
 
-    /** M6/6F-8 D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
+    /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")
     val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")
 

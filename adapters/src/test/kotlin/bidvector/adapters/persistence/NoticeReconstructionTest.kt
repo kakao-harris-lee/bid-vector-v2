@@ -12,7 +12,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * verifier r2 N-5 — F-8이 [NoticeReconstruction]에 넣은 「표 밖 상태 → 예외」 술어를 지키는
+ * F-8이 [NoticeReconstruction]에 넣은 「표 밖 상태 → 예외」 술어를 지키는
  * test가 없었다(변이로 `NoticeStatus.Cancelled` 항목을 표에서 지워도 persistence suite
  * 전건이 초록이었다). DB 없이 순수 Kotlin으로 [NoticeRow] → `reconstructNotice`만 잰다
  * (`PersistenceAdapterDependencyTest`와 같은 관례 — Testcontainers가 필요 없는 test는
@@ -94,7 +94,7 @@ class NoticeReconstructionTest {
     }
 
     /**
-     * code-review r2 LOW — 세부 분류 이름 두 열의 손상 정책(D-6F9-3, r1 의 L7 고침)을 잠근다. 세 열이 **같은** 정책을
+     * 세부 분류 이름 두 열의 손상 정책(D-6F9-3)을 잠근다. 세 열이 **같은** 정책을
      * 갖는 것이 요점이라 위 대분류 test 와 짝이다: 공백뿐인 값은 V17 CHECK 가 막으므로 도달했다면 CHECK 없이 만든
      * 열이라는 뜻이고, 조용히 `null` 로 접으면 감시 「관심 업종」이 아무것과도 맞지 않는 채 성립한다(D-6F4-8).
      * 이 잠금 없이는 다음 리팩터가 `?.let(ServiceDivision::of)` 로 되돌려도 전 test 가 초록이다.

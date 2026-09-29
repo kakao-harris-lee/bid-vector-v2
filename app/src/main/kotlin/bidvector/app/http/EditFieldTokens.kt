@@ -5,7 +5,7 @@ import bidvector.strategy.WatchRuleId
 import bidvector.workflow.strategy.EditableField
 
 /**
- * 편집 필드의 **wire 어휘**(M6/6A-2b D-6A2b-1) — 도메인 sealed 타입([EditableField])을
+ * 편집 필드의 **wire 어휘**(D-6A2b-1) — 도메인 sealed 타입([EditableField])을
  * HTTP 가 부를 수 있는 낱말 하나로 옮긴다. 저장 어휘(`edit_session.state_payload` 의
  * kind+detail 쌍, `EditSessionSnapshot`)와 **다른 축**이라 그 값을 재사용하지 않는다 —
  * 저장 형태를 wire 형태로 쓰면 저장 codec 을 바꿀 때 공개 API 가 함께 흔들린다.

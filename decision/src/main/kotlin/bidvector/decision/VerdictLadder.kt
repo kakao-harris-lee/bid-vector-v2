@@ -25,7 +25,7 @@ object VerdictLadder {
      * (조사 §7 사다리 입력 다섯 중 유일하게 세 분기가 공유하는 값). priority 만으로
      * `BidNow`가 이미 확정되면 `probability`·`matched` 부재는 묻지 않는다(불필요한
      * `MlUnavailable`을 내지 않는다 — 실제로 그 값을 쓰는 분기에 도달했을 때만 결측을
-     * 따진다). **M4/4B-3(scope.md ②)** — 이 분기만 `input.mlUnavailableReason` 슬롯을
+     * 따진다). **scope.md ②** — 이 분기만 `input.mlUnavailableReason` 슬롯을
      * 실어 낸다(호출자가 「왜 없는가」를 전달할 수 있는 유일한 자리 — force-bid 분기의
      * 결측은 다른 축이라 그대로 `ScoreNotProvided`다).
      */

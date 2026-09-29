@@ -49,7 +49,7 @@ private fun policyOf(
         version,
     )
 
-/** M1/1D ①②③ — provenance first-match 커널 회귀. */
+/** provenance first-match 커널 회귀. */
 class ProvenanceRulesTest {
     @Test
     fun `기대값 재현 — base-amount-provenance-001 hits 는 순서상 첫 매치 suspect-ratio 를 낸다`() {

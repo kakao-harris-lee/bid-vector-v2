@@ -11,7 +11,7 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
  * 통째로 빠지고, 그러면 업무 모듈 사이의 직접 참조 선언이 1 차 게이트를 그냥 지나간다
  * (ADR 0006 D-3·D-4 가 그 선언을 1 차 강제로 둔다).
  *
- * **`ProjectComponentIdentifier`는 "project 의존"과 동의어가 아니다**(M2/2A 리뷰 r3 ⓕ).
+ * **`ProjectComponentIdentifier`는 "project 의존"과 동의어가 아니다**.
  * composite 빌드(included build) 치환 의존 — 예: `adapters`의
  * `testImplementation("bidvector:ml-contract")` — 도 해석 후에는 `ProjectComponentIdentifier`로
  * 온다. `id`만 보고 전부 `projectPaths`에 접으면 다른 빌드의 project 가 이 모듈 **자신의**

@@ -155,7 +155,7 @@ def test_from_proto_category_and_agency_missing_are_independent() -> None:
     assert facts.agency_id == Missing(common_pb2.MISSING_REASON_NOT_APPLICABLE)
 
 
-# ---- M5/5D-3(D-5D3-6, 계약 갱신 F-10) — `resolve_text_fact` 공개 승격, 결측 사유 술어
+# ---- D-5D3-6, 계약 갱신 F-10 — `resolve_text_fact` 공개 승격, 결측 사유 술어
 # 인자화. 요청 축은 열린 집합(UNSPECIFIED만 거부), 표본 축만 닫힌 집합 ----
 
 

@@ -12,8 +12,7 @@ class NoticeIdTest {
         NoticeNumber.of("  20260101001-00  ") shouldBe NoticeNumber("20260101001-00")
     }
 
-    // v2-defect 023 수정(3A 잔여 일괄 verifier r3 전) — 대소문자·내부 공백 표기 차이를
-    // 같은 식별자로 정규화한다(팀리드 결정 「구분자 처리는 case 기대값대로」).
+    // 대소문자·내부 공백 표기 차이를 같은 식별자로 정규화한다(「구분자 처리는 case 기대값대로」).
     @Test
     fun `NoticeNumber 는 대소문자·내부 공백 표기가 달라도 같은 정규형으로 모인다`() {
         val fromLowercase = NoticeNumber.of(" syn-ntc-2301 ")

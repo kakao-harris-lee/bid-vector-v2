@@ -25,7 +25,7 @@ private fun requiredKeys(
 ): Set<LicenseName> = rows.flatMap { it.licenseNames }.map { licenseComparisonKey(it, aliasTable) }.toSet()
 
 /**
- * verifier r1 F-1 — `restrictedRows` 가 비면 `containsAll(emptySet())` 이 공허하게 참이 되어
+ * `restrictedRows` 가 비면 `containsAll(emptySet())` 이 공허하게 참이 되어
  * 허용업종 전용 그룹이 보유 0으로도 충족된 것처럼 보였다. **제한 면허 행이 실제로 있고 그
  * 요구를 전부 보유할 때만** 충족으로 센다.
  */
@@ -36,7 +36,7 @@ private fun restrictedSatisfied(
 ): Boolean = restrictedRows.isNotEmpty() && heldKeys.containsAll(requiredKeys(restrictedRows, aliasTable))
 
 /**
- * verifier r1 재라운드 지침 — 그룹의 행이 **전부** `PermsnIndstrytyList` 면(제한 면허 행이
+ * 그룹의 행이 **전부** `PermsnIndstrytyList` 면(제한 면허 행이
  * 하나도 없으면) 그 그룹의 운명 자체가 `OPEN-QUAL-11` (a)/(b) 그 질문이다. 보유 여부와
  * 무관하게 항상 결합 규칙 미결로 미룬다 — `Ineligible`(reading (b) 확정)·`Eligible`
  * (reading (a) 확정) 어느 쪽으로도 미결을 확정으로 쓰지 않는다. 제한 면허 행이 하나라도

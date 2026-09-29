@@ -18,7 +18,7 @@ sealed interface EffectiveFrom {
 /**
  * 정책 version은 날짜로 식별한다(`data-dictionary.md` §4.1, U-6b). 정책 식별 축은
  * `ruleVersion` 한 축이다 — `RoundingPolicy`처럼 입력 모집단과 무관한 정책은 `corpusScope`를
- * 걸지 않는다(운영자 결정 2026-09-04, A6).
+ * 걸지 않는다(A6).
  */
 data class PolicyVersion(
     val effectiveFrom: EffectiveFrom,
@@ -87,7 +87,7 @@ data class EffectiveDatedPolicy<T>(
  *
  * `scaleDigits`는 하한(0 이상)만 이 타입이 건다 — 상한(금액 축 밖 자리수)은 `OPEN-DIC-10`
  * 미결이라 여기서 지어내지 않는다. 음수는 검사 없이 방치하면 조용히 성공해 백 원 단위
- * 반올림 같은 값 오염이 통과한다(verifier r2 M-6) — `Rate.init`·`BaseAmount.init`이 이미
+ * 반올림 같은 값 오염이 통과한다 — `Rate.init`·`BaseAmount.init`이 이미
  * 쓰는 construction-time invariant 관례(`require`로 던진다)를 그대로 따른다.
  */
 data class RoundingPolicy(

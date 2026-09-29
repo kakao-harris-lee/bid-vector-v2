@@ -1,18 +1,17 @@
 package bidvector.procurement
 
 /**
- * raw 관측의 결정적 식별자(③, M3/3D 신설, ADR 0005 D-10.1 「domain이 의존하는 port는 domain
+ * raw 관측의 결정적 식별자(③, ADR 0005 D-10.1 「domain이 의존하는 port는 domain
  * 안에 선다」) — 재수집 재시도가 같은 [RawNoticeObservation]을 다시 보내면 같은 키를 낸다
  * (append 멱등의 유일한 근거). 이 타입 자체는 **값만** 나른다 — 유도(어떤 문자열을
- * `ObservationKey`로 만들지 결정하는 규칙)는 **어댑터(3D adapters) 소유**다
- * (verifier r1 F-2 뒤 정정).
+ * `ObservationKey`로 만들지 결정하는 규칙)는 **어댑터(3D adapters) 소유**다.
  *
  * **왜 procurement가 유도 규칙을 갖지 않는가**: 충돌에 강한 유도(암호학적 해시)는
  * `java.security.MessageDigest`가 필요한데 domain 모듈은 그 패키지를 볼 수 없다
  * (`architecture-policy.properties` T-C 허용 목록 밖). [RawNoticeObservation]이 계약 없는
  * 값 열람도 막으므로(위협 모델 우회 (1)(10)) procurement 안에서 만들 수 있는 유일한
  * 내용-기반 지문은 `Object.hashCode()`류(32비트, 충돌 가능 — 실측: `"Aa"`·`"BB"`가
- * `String.hashCode()`에서 같은 값을 낸다)뿐이었고, 그것이 F-2의 원인이었다. 어댑터는
+ * `String.hashCode()`에서 같은 값을 낸다)뿐이다. 어댑터는
  * `KonepsFieldContractRegistry`(계약 등재 필드 전체)에 접근할 수 있어 완전한 정본
  * 직렬화(`ObservationPayloadCodec.encode`)를 얻고, `MessageDigest`도 domain 제약 밖이라
  * SHA-256을 쓸 수 있다 — 실제 유도는 `bidvector.adapters.persistence
@@ -27,7 +26,7 @@ data class ObservationKey(
 }
 
 /**
- * raw 키 재료의 행 구별 축(M3/3E 신설, D-3E-1a (a)) — 한 응답(페이지) 안에 같은 raw 관측 재료
+ * raw 키 재료의 행 구별 축(D-3E-1a (a)) — 한 응답(페이지) 안에 같은 raw 관측 재료
  * (`sourceEndpoint`·`observedAt`·등재분 투영·`sourceText`)를 내는 복수 행이 있을 때(예: 복수예비가격
  * 15행 중 순번이 부재하는 행들) [ObservationKeyDerivation]이 키 충돌로 조용히 접는 것을 막는다
  * (`OPEN-3B2-STORAGE-ROW-KEY-COLLISION`). **값이 있으면 값이 우선이다** — [of]가 그 규칙을 강제한다.
@@ -107,7 +106,7 @@ sealed interface PersistOutcome {
  */
 interface RawObservationStore {
     /**
-     * `rowDiscriminator`(M3/3E 신설, 기본값 `null`) — 한 응답 안에 행이 복수인 오퍼레이션의
+     * `rowDiscriminator`(기본값 `null`) — 한 응답 안에 행이 복수인 오퍼레이션의
      * 호출부만 넘긴다(예: 복수예비가격 상세). 목록 오퍼레이션(한 행=한 공고)의 기존 호출부는
      * 이 인자를 몰라도 되고, 유도 재료가 그대로라 키도 그대로다(하위호환).
      */

@@ -181,7 +181,7 @@ class OpportunityAnalysisTest {
         analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)
     }
 
-    // verifier r1 V-2 — D-4D4-1 의 다섯 사유 매핑 중 Unavailable 가지: evidence 도 outcome.reason 을 그대로 옮긴다.
+    // D-4D4-1 의 다섯 사유 매핑 중 Unavailable 가지: evidence 도 outcome.reason 을 그대로 옮긴다.
     @Test
     fun `예측 Unavailable(DeadlineExceeded) 여도 Analyzed 유지 — 두 성분만 drop, evidence 는 그 사유의 NotPredicted`() {
         val prediction =
@@ -192,7 +192,7 @@ class OpportunityAnalysisTest {
         analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.DeadlineExceeded)
     }
 
-    // verifier r1 V-2 — Unmeasurable 가지: outcome 자체에 재사용할 MlUnavailableReason 이 없어
+    // Unmeasurable 가지: outcome 자체에 재사용할 MlUnavailableReason 이 없어
     // ScoreNotProvided 로 접는다(predictionFacts 의 absentPair(MlUnavailableReason.ScoreNotProvided) 배선).
     @Test
     fun `예측 Unmeasurable 이어도 Analyzed 유지 — evidence 는 NotPredicted(ScoreNotProvided)`() {
@@ -280,7 +280,7 @@ class OpportunityAnalysisTest {
         first shouldBe second
     }
 
-    // ---- M4/4B-7(D-4B7-9) — 경쟁 표본 조회·요청 축 ----
+    // ---- (D-4B7-9) — 경쟁 표본 조회·요청 축 ----
 
     @Test
     fun `businessCategory 있으면 categoryCode 를 실은 query 로 port 를 부른다`() {
@@ -344,7 +344,7 @@ class OpportunityAnalysisTest {
     }
 
     /**
-     * M3/3H-2(D-3H2-1) — `predictionRequestFor`가 `analyze()` 전체 경로를 거쳐도
+     * (D-3H2-1) — `predictionRequestFor`가 `analyze()` 전체 경로를 거쳐도
      * `notice.demandAgency`의 코드를 요청 `agencyId`에 그대로 싣는지 잰다(단위 test는
      * `PredictionFactsTest`가 같은 값을 직접 잰다 — 이 test는 배선 자체를 확인한다).
      * 표본 축(`CompetitionSample.agencyId`)은 이 test 층에서 관측 불가 — `FakeCompetitionSamplePort`가
@@ -386,7 +386,7 @@ class OpportunityAnalysisTest {
         analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.TransportFailed)
     }
 
-    // ---- M4/4D-4(D-4D4-7) — Analyzed.evidence 가 Predicted.diagnostics·release·Supplied.excluded 와 등가 ----
+    // ---- (D-4D4-7) — Analyzed.evidence 가 Predicted.diagnostics·release·Supplied.excluded 와 등가 ----
 
     @Test
     fun `Supplied 예측 성공 경로 Analyzed evidence 는 Predicted diagnostics release Supplied excluded 를 옮긴다(D-4D4-7)`() {

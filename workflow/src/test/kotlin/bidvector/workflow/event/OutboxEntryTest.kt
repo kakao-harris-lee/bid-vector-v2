@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 /**
- * verifier H-1 시정 — `OutboxPort.claim`이 완성된 [EventEnvelope]가 아니라 원시 행
+ * `OutboxPort.claim`이 완성된 [EventEnvelope]가 아니라 원시 행
  * ([ClaimedOutboxRow])을 돌려주고, `workflow` 안(internal)의 [OutboxEntry.restore]만
  * 그 행을 [OutboxEntry]로 되살린다. 어댑터(4C-2)는 [EventEnvelope]를 다루지 않는다 —
  * `EventEnvelope.restore`가 `internal`로 내려가면서 그 밖에서 임의 필드로 봉투를 지어

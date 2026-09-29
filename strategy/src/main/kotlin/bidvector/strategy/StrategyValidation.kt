@@ -39,7 +39,7 @@ data class StrategyDraft(
     val bidNowThreshold: BigDecimal? = null,
     val reviewThreshold: BigDecimal? = null,
     val candidateLimit: Int? = null,
-    /** 활성 투찰 여력 상한(M6/6A-3+6F-3, D-6A3-4) — 미설정은 `null`. */
+    /** 활성 투찰 여력 상한(D-6A3-4) — 미설정은 `null`. */
     val maxActiveBids: Int? = null,
 )
 

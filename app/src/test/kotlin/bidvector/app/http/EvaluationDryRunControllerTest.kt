@@ -129,7 +129,7 @@ class EvaluationDryRunControllerTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) — 요청 본문 입력 표.
+     * D-6A3-19 — 요청 본문 입력 표.
      * 조용한 강제 변환(`"3"`→3, `1.7`→1)도, 파싱 실패의 500 낙하(비JSON·빈 본문)도 없다 —
      * 전부 400 `INVALID_REQUEST`(예외 메시지 미포함)로 통일된다. `maxActiveBids` 미설정
      * 전략(`freshStrategy()`)에서도 이 판정이 먼저다(형식 검증이 `factory.forRequest()`

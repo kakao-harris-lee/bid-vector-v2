@@ -2,9 +2,9 @@ plugins {
     id("bidvector.kotlin-conventions")
 }
 
-// M1/1E — strategy 는 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
+// strategy 는 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
 // architecture-policy.properties layer.domain.shareable). qualification/decision의
-// build.gradle.kts 를 그대로 옮긴다(scout §7.1 — 배선은 1C·1D 복제로 충분하다).
+// build.gradle.kts 를 그대로 옮긴다(scout §7.1 — 배선은 복제로 충분하다).
 //
 // kotest-property 의 checkAll 은 suspend 함수이고 kotest-property-jvm 은 coroutines-core 를
 // runtime scope 로만 선언해 컴파일 classpath 에 전이되지 않으므로 이 모듈이 직접 건다

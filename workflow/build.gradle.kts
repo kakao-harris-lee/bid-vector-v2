@@ -13,18 +13,18 @@ dependencies {
     implementation(project(":strategy"))
     implementation(project(":decision"))
     implementation(project(":settlement"))
-    // M4/4A — kotest-property 의 checkAll 은 suspend 함수이고 kotest-property-jvm 은
+    // kotest-property 의 checkAll 은 suspend 함수이고 kotest-property-jvm 은
     // coroutines-core 를 runtime scope 로만 선언해 컴파일 classpath 에 전이되지 않으므로
     // 이 모듈이 직접 건다(strategy/qualification/decision 과 같은 이유).
     testImplementation(libs.kotlinx.coroutines.core)
 }
 
-// M4/4A — kotest-property 시드 고정(strategy 등 관례). 값은 임의 상수, 반복 실행 안정성만
+// kotest-property 시드 고정(strategy 등 관례). 값은 임의 상수, 반복 실행 안정성만
 // 목적이고 도메인 의미는 없다.
 tasks.withType<Test>().configureEach {
     systemProperty("kotest.proptest.default.seed", "20260908")
 
-    // M4/4B-6b verifier r1 F-2 — `WorkflowGateRegistrationTest`(gate.tests.workflow)는
+    // `WorkflowGateRegistrationTest`(gate.tests.workflow)는
     // 런타임에 `config/quality/gate-tests.properties`를 직접 읽지만, Gradle `Test` task는
     // 그 파일을 선언된 입력으로 모른다 — 파일만 바뀌면(등재 삭제·유령 추가 둘 다) task가
     // UP-TO-DATE로 건너뛰어 그 test가 실제로는 재실행되지 않은 채 이전 결과가 그대로

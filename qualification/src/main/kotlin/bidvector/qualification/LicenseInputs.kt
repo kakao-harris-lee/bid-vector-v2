@@ -26,13 +26,13 @@ enum class RequirementSourceField {
 }
 
 /**
- * 구조화 요건 행 — 요건 원문 파싱은 어댑터 소관이다(D-3, M3 3B). 커널은 이미 분해된 행만
+ * 구조화 요건 행 — 요건 원문 파싱은 어댑터 소관이다(D-3). 커널은 이미 분해된 행만
  * 받는다. `lmtGrpNo` 결측은 [Parsed.groupNo] `null` 로 표현하고, 결측 행 전부는 U-8 에 따라
  * 하나의 그룹으로 AND 폴딩된다([RequirementGroupId.Ungrouped]).
  */
 sealed interface RequirementRow {
     /**
-     * `licenseNames` 는 비어 있을 수 없다(verifier r1 F-2) — 이름을 하나도 못 읽었으면
+     * `licenseNames` 는 비어 있을 수 없다 — 이름을 하나도 못 읽었으면
      * [Unparsable] 을 쓴다(D-3). 빈 목록을 허용하면 그 행의 요구 키 집합이 공집합이 되어
      * `heldKeys.containsAll(emptySet())` 가 보유 0에서도 참이 되는 공허한 충족을 만든다.
      */

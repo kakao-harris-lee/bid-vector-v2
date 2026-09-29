@@ -51,10 +51,9 @@ enum class AppRuleId {
 private const val TIME_PACKAGE = "java.time"
 
 /**
- * M6/6A-2b — HTTP 로 닿는 층이 **무엇을 쥐고 무엇을 부를 수 있는가**를 의존 층에서 닫는다.
+ * HTTP 로 닿는 층이 **무엇을 쥐고 무엇을 부를 수 있는가**를 의존 층에서 닫는다.
  *
- * 규칙은 **여덟**이고 모양이 서로 다르다([AppRuleId]). 「전부 허용 목록 ⊆」가 아니다 —
- * 그렇게 적었던 앞 판의 KDoc 은 실제 술어와 어긋났다(code-review r4 N-r4-5).
+ * 규칙은 **여덟**이고 모양이 서로 다르다([AppRuleId]). 「전부 허용 목록 ⊆」가 아니다.
  *
  * - [AppRuleId.INJECTION_SURFACE] — HTTP 로 닿는 층이 **무엇을 받을 수 있는가**의 정확 목록이다.
  *   참조 축과 다른 축이다 — 허용 접두 안의 일반 타입(`() -> Int`)이 능력을 나른다.
@@ -74,8 +73,8 @@ private const val TIME_PACKAGE = "java.time"
  *   정확한 타입 목록이다 — 여기도 **금지 접두 + 정확 열거**이지 허용 목록 ⊆ 가 아니다.
  *
  * **대상**([targets]): `bidvector.app` **전체**에서 계약 파일이 이름으로 적은 면제 세 층을 뺀
- * 것이다(D-6A2b-26·32). 중첩·동반 객체는 **최상위 소유자**로 판정한다. r1 의 「핸들러 종류 ∪
- * HTTP 층」 술어는 F-r2-1 이 반증했다 — 그 목록 밖의 진입점 셋이 SQL 을 실행했다.
+ * 것이다(D-6A2b-26·32). 중첩·동반 객체는 **최상위 소유자**로 판정한다. 「핸들러 종류 ∪
+ * HTTP 층」 술어는 그 목록 밖의 진입점이 SQL 을 실행할 수 있어 반증된다.
  *
  * **경계 밖**(D-6A2b-19 ④): 트랜잭션 경계와 편집 트랜잭션은 app 컨텍스트 빈이라 조립 층에서
  * 주입받을 수 있다. 그 자리의 SQL 은 빌드 스크립트를 고치는 저자와 같은 층이고, **HTTP 로
@@ -142,7 +141,7 @@ class AppHttpDependencyRules(
             .map { it.topLevel().fullName }
             .toSet()
 
-    /** ② 층이 오늘 실제로 참조하는 `workflow` 타입 전수 — 목록 등식의 다른 한쪽(N-r5-2). */
+    /** ② 층이 오늘 실제로 참조하는 `workflow` 타입 전수 — 목록 등식의 다른 한쪽. */
     fun observedTier2WorkflowTypes(
         classes: JavaClasses,
         appRoot: String,
@@ -210,7 +209,7 @@ class AppHttpDependencyRules(
                     .should(conditions.injectOutsideContract(policy.appInjectionAllowedTypes.toSet()))
                     .because(
                         "D-6A2b-49 — HTTP 로 닿는 층이 **무엇을 받을 수 있는가**는 정확 목록이다. " +
-                            "참조 축이 아무리 좁아도 능력은 주입된 값으로 온다(verifier r5 F-r5-1)",
+                            "참조 축이 아무리 좁아도 능력은 주입된 값으로 온다",
                     ),
             AppRuleId.RESTRICTED_ALLOWLIST to
                 classes()
@@ -257,7 +256,7 @@ class AppHttpDependencyRules(
                     .because(
                         "D-6A2b-41 ① — 요청 스코프 층은 쓰기 능력 포트를 **쥐지 못한다**. 능력은 호출 지점이 " +
                             "아니라 **전달**에서 샌다: 쓰기 포트 하나를 쥐면 나머지는 메모리 구현으로 채워 " +
-                            "use case 를 스스로 조립할 수 있다(verifier r4 F-r4-1)",
+                            "use case 를 스스로 조립할 수 있다",
                     ),
             AppRuleId.USE_CASE_CONSTRUCTION to
                 classes()
@@ -309,13 +308,13 @@ class AppHttpDependencyRules(
         }
 
     /**
-     * **대상은 `bidvector.app` 전체다**(D-6A2b-26, verifier r2 F-r2-1 시정). r1 은 대상을
-     * 「핸들러 애너테이션 ∪ HTTP 층」으로 **열거**했고, 그 목록 밖의 진입점 셋
-     * (`RouterFunction` 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터)이 SQL 을 실행하며 전건
-     * 초록이었다. 종류를 하나 더 세는 처방은 같은 병을 다시 앓는다.
+     * **대상은 `bidvector.app` 전체다**(D-6A2b-26). 대상을
+     * 「핸들러 애너테이션 ∪ HTTP 층」으로 **열거**하면, 그 목록 밖의 진입점
+     * (`RouterFunction` 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터)이 SQL 을 실행해도 전건
+     * 초록일 수 있다. 종류를 하나 더 세는 처방은 같은 병을 다시 앓는다.
      *
      * **면제는 한 덩어리가 아니라 세 층이다**(D-6A2b-32). 한 덩어리로 두면 ② 층에 SQL 메서드
-     * 하나를 더하는 것만으로 컨트롤러 → HTTP 지름길이 열린다(6A-3 R3-M1 ⓑ 「어댑터 추가
+     * 하나를 더하는 것만으로 컨트롤러 → HTTP 지름길이 열린다(R3-M1 ⓑ 「어댑터 추가
      * 메서드」와 같은 형태).
      *
      * 중첩·익명·컴패니언은 **최상위 소유자**로 판정한다. 층 배정은 **평가 루트와 무관한 값**이다

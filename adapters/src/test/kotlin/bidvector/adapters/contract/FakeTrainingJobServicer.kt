@@ -16,7 +16,7 @@ import contract.bidvector.ml.v1.TrainingJobServiceGrpcKt
 import java.time.Instant
 
 /**
- * M2/2C — in-process fake servicer. **실제 상태 기계**를 갖는다(scope.md 「구현 순서」 3,
+ * in-process fake servicer. **실제 상태 기계**를 갖는다(scope.md 「구현 순서」 3,
  * `TrainingContractTest.kt`에서 분리 — v2-지침서.md §5 500줄 한도). job 저장소
  * (`recordsByJobId`)와 idempotency 대조(`jobIdByIdempotencyKey`)로 같은 키 두 번은 같은
  * `job_id`를, 다른 dataset 이면 `IDEMPOTENCY_CONFLICT`를 낸다(ADR 0010 D-4). 취소는

@@ -1,13 +1,13 @@
-"""M5/5D·5D-2 — golden 통합(scope.md ⑨, D-M5-7 (a), 팀장 통합 라운드 M-3). curator 가
+"""golden 통합(scope.md ⑨, D-M5-7 (a), M-3). curator 가
 승인 받아 병합한 `ml-kernel-001~014`(authoritative, `fixtures/manifest.yaml`)를
 production 타입으로 소비한다 — 대응 규칙은 `_adapter.py`에만 있다(production 코드에
 golden 전용 표면 없음).
 
 `ml-kernel-011`(계층 수축 가중치가 `Diagnostics.shrinkage_weight`로 응답에 실리는 것을
-요구)은 M5/5D-2 가 `OPEN-5D-DISTRIBUTION-ENGINE`을 닫으며 skip 을 해제한다 — K5
-(`resolve_assessment_posterior`) + 5D-2 조립기의 `distribution._resolve_diagnostics`를
+요구)은 `OPEN-5D-DISTRIBUTION-ENGINE`이 닫히며 skip 이 해제된다 — K5
+(`resolve_assessment_posterior`) + 조립기의 `distribution._resolve_diagnostics`를
 그대로 호출해 `verified_paths` 전체(진단·levelWeights·posteriorMean·
-effectiveSampleCount)를 한 test 안에서 잰다(부분 단언 금지, 팀장 지시).
+effectiveSampleCount)를 한 test 안에서 잰다(부분 단언 금지).
 """
 
 from __future__ import annotations
@@ -376,20 +376,20 @@ def test_ml_kernel_010_non_clean_provenance_never_reaches_aggregation() -> None:
 
 
 def test_ml_kernel_011_shrinkage_weight_carried_in_response() -> None:
-    """M5/5D-2 가 `OPEN-5D-DISTRIBUTION-ENGINE`을 닫는다 — `resolve_assessment_
-    posterior`(K5) + `distribution._resolve_diagnostics`(5D-2 조립기의 진단 조립 함수,
+    """`OPEN-5D-DISTRIBUTION-ENGINE`이 닫힌다 — `resolve_assessment_
+    posterior`(K5) + `distribution._resolve_diagnostics`(조립기의 진단 조립 함수,
     골든 전용 표면을 새로 만들지 않고 production 함수를 그대로 호출)로 `verified_paths`
-    전부를 검증한다. 부분 단언(예: posterior 만 확인) 금지 지시에 따라 diagnostics·
+    전부를 검증한다. 부분 단언(예: posterior 만 확인) 금지에 따라 diagnostics·
     levelWeights·posteriorMean·effectiveSampleCount 를 한 case 안에서 함께 잰다.
 
     **이 test 는 서빙 경로(`engine.serve_bid_rates`/`distribution.predict_distribution`)
     를 거치지 않는다** — `resolve_assessment_posterior`·`_resolve_diagnostics`를
     agency/category 를 채워 직접 호출한다(K5·조립기의 진단 조립 함수 단위 검증,
-    수치 대조는 이 갈래가 맡는다). M5/5D-3(D-5D3-7)이 `OPEN-5D2-SAMPLE-SEGMENT`를
+    수치 대조는 이 갈래가 맡는다). D-5D3-7 이 `OPEN-5D2-SAMPLE-SEGMENT`를
     서빙 경로에서 닫아 같은 갈래(`segment_support == DIRECT`)가 `tests/inference/
     test_engine.py::test_serve_bid_rates_wire_driven_direct_segment_support_matches_
     golden_011`로도 wire 요청만으로 재현된다(값이 아니라 계층 표본 **수**의 함수라
-    골든 corpus 편집 없이 재현 가능, 5D-2 알려진 제한 1·8 해소 — checklist.md)."""
+    골든 corpus 편집 없이 재현 가능, 알려진 제한 1·8 해소 — checklist.md)."""
     case = _CASES["ml-kernel-011"]
     inp, exp = case["input"], case["expected"]
     policy_cfg = inp["policy"]["assessment"]

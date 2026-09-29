@@ -1,4 +1,4 @@
-"""M5/5A 게이트 — `contracts/proto`의 파일 목록과 `ml_engine.contracts` 재수출 이름이 1:1
+"""게이트 — `contracts/proto`의 파일 목록과 `ml_engine.contracts` 재수출 이름이 1:1
 인지 확인(D-5A-0 (b))."""
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """`ml_engine.app.server` — 서버 진입점(D-5E-7). `python -m ml_engine.app.server`로
 띄운다(`[project.scripts]` 없음 — `-m` 진입으로 충분, pyproject.toml (b)). 환경 7 개를
-읽어 설정 객체를 만들고(기본값 없음 — 빈 env = 부팅 거부, verifier r1 L-3 — 이전 판은
-`code_version`을 빠뜨리고 6 개로 셌다), 정책 넷을 preload 해
+읽어 설정 객체를 만들고(기본값 없음 — 빈 env = 부팅 거부, L-3 — `code_version`을
+빠뜨리면 6 개로 잘못 센다), 정책 넷을 preload 해
 readiness 를 정하고, 세 servicer 를 등록한 뒤 serve 한다. `SIGTERM` 은 readiness
 `NOT_READY` → `server.stop(grace)` 순서로 종료한다(설계 검토 (1))."""
 
@@ -97,11 +97,11 @@ class _Preloaded:
 
 
 def _preload(config: ServerConfig) -> _Preloaded:
-    """M5/5E-3 D-5E3-2 — `_load_inference_policy_safe` 래퍼를 제거했다.
-    `load_inference_policy`가 부르는 5A `registry.policy.load_policy`가 이제
+    """D-5E3-2 — `_load_inference_policy_safe` 래퍼를 제거했다.
+    `load_inference_policy`가 부르는 `registry.policy.load_policy`가 이제
     뿌리에서 `yaml.YAMLError`를 `PolicyError`로 정규화하므로(D-5E3-1), 호출부의
-    별도 정규화가 더 필요 없다 — 「호출부 한 곳 정규화」는 임시 방편이었다(verifier
-    r3 등재: 다른 호출자가 생기면 재발). 문법이 깨진 inference 정책은 여전히
+    별도 정규화가 더 필요 없다. 「호출부 한 곳 정규화」는 임시 방편이었다 —
+    다른 호출자가 생기면 재발한다. 문법이 깨진 inference 정책은 여전히
     `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다."""
     return _Preloaded(
         inference=load_inference_policy(config.inference_policy_path),
@@ -180,16 +180,16 @@ def _training_pipeline_factory(
 def _prediction_runtime(
     preloaded: _Preloaded, config: ServerConfig
 ) -> PredictionRuntime | None:
-    """M5/5E-2(D-5E2-1) — `ReadinessGate.from_preload`가 READY 로 판정하는 조건(정책
+    """(D-5E2-1) — `ReadinessGate.from_preload`가 READY 로 판정하는 조건(정책
     넷 전부 preload 성공)과 **정확히 같은** 조건에서만 `PredictionRuntime`을 한 번
     만든다. 실패면 `None`(`BidPredictionServicer`가 `MODEL_NOT_READY`로 답한다) —
     `build_derived_release`를 요청마다 부르지 않는다(런타임 상수, 결정적).
 
-    code-reviewer HIGH(R-H1) 시정 — 이전 판은 `inference` 성공만 봤다. `training`·
+    R-H1 — `inference` 성공만 보면 `training`·
     `evaluation`·`serving` 중 하나가 깨져도 `runtime`이 만들어져, `GetModelMetadata`
     는 `NOT_READY`(+promoted 미설정)를 내는 동안 `CalculateOptimalBid`은 계산을
-    진행해 성공 응답을 냈다 — Kotlin `ReleaseCheck`가 `promoted` 부재로 그 정직한
-    응답을 폐기하는 반면 서버는 자신의 미준비를 드러내지 않았다. `_preload_outcomes`
+    진행해 성공 응답을 낸다 — Kotlin `ReleaseCheck`가 `promoted` 부재로 그 정직한
+    응답을 폐기하는 반면 서버는 자신의 미준비를 드러내지 않는다. `_preload_outcomes`
     가 이미 gate 와 같은 판정을 계산하므로 그 결과를 그대로 재사용한다(같은 기준을
     두 곳에서 각자 다시 구현하지 않는다 — 어긋날 여지 자체를 없앤다)."""
     if not isinstance(preloaded.inference, InferencePolicy):
@@ -242,8 +242,8 @@ def run(config: ServerConfig) -> None:
     부팅을 거부한다(`ConfigError`) — 그 밖 셋(inference·training·evaluation)의
     실패는 서버는 뜨되 `NOT_READY`로 반영된다(scope.md ②).
 
-    verifier r1 M-3 — SIGTERM 은 gRPC 서버만 멈추고 `JobRunner`를 종료하지 않아
-    진행 중 job 이 유예와 무관하게 계속 돌았다. 순서: readiness `NOT_READY` →
+    M-3 — SIGTERM 은 gRPC 서버만 멈추고 `JobRunner`를 종료하지 않으면
+    진행 중 job 이 유예와 무관하게 계속 돈다. 순서: readiness `NOT_READY` →
     `server.stop(grace)`(진행 중 RPC 가 끝나거나 취소될 시간) → **그 뒤에** 진행 중
     job 전부에 취소를 요청하고 `JobRunner`를 닫는다(완료를 기다리지 않는다 —
     `wait=False`, 스레드 강제 중단 API 는 없다: fork 없음과 같은 이유)."""

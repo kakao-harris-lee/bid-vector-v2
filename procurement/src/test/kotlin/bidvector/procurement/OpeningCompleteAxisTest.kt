@@ -13,14 +13,14 @@ import java.time.Instant
 private val OBSERVED_AT = Instant.parse("2026-09-09T00:00:00Z")
 
 /**
- * M3/3F D-3F-4 — 개찰완료 축 부모 슬롯 셋. D-3F-3 해소로 투찰자별 canonical 표를 만들지
+ * D-3F-4 — 개찰완료 축 부모 슬롯 셋. D-3F-3 해소로 투찰자별 canonical 표를 만들지
  * 않는다 — 부모는 ① 개찰 1위 축([OpeningRankOneOutcome]) ② 관측된 추첨번호 집합
  * ([DrawNumberObservation]) 만 는다(③ 개찰결과구분명은 기존 `progressDivision` 재사용,
  * 3E 슬롯 편집 없음).
  *
  * 「1위를 특정할 수 없으면(순위 1 부재·중복) 그 축을 비우고 명시적 회계 — 투찰금액으로
  * 순위를 재계산하지 않는다」(scope.md ②)와 「범위 검사와 검사 불가」(scope.md ④)를
- * 타입으로 고정한다. **verifier r1 F-2 뒤** — 두 sealed 타입 모두 `observedAt`(축 자신의
+ * 타입으로 고정한다. 두 sealed 타입 모두 `observedAt`(축 자신의
  * 관측 시각, `NotObserved`만 `null`)을 나른다. 저장 경로의 왕복·낡음 판정 test 는
  * `OpeningCompleteAxisRepositoryTest`(adapters/persistence) 소관이다.
  */
@@ -179,7 +179,7 @@ class OpeningCompleteAxisTest {
             DrawNumberObservation.OutOfRange(setOf(0), 1..15, OBSERVED_AT)
     }
 
-    // verifier r3 M-1 — validRange.first == 1 은 도메인 진실(예비가격 15행의 1-기반
+    // validRange.first == 1 은 도메인 진실(예비가격 15행의 1-기반
     // 인덱스)이고, of() 의 습관이 아니라 타입 자신이 그것을 강제해야 한다.
     @Test
     fun `OutOfRange — validRange 하한이 1 이 아니면 생성자가 거부한다`() {

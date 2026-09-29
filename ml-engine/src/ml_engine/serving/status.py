@@ -15,14 +15,13 @@ class ValidationDetailCode(StrEnum):
     """envelope·요청 필드 검증 실패의 닫힌 어휘(`ApplicationFailure.detail_code`) —
     자유 문자열 금지.
 
-    verifier r1 L-5 — `MODEL_RELEASE_SELECTOR_UNSPECIFIED`·
-    `FEATURE_SCHEMA_VERSION_UNSUPPORTED`는 5E-1 의 어느 servicer 도 내지 않아(선언만
-    되고 생산 경로가 없었다) 지웠었다. M5/5E-2 — `CalculateOptimalBid`가 채워지며
-    `model_release_selector`·`feature_schema_version` 검증이 실제로 필요해져 다시
-    넣는다(`serving/prediction.py::_validate`가 생산, scope.md ①). 같은 이유로
-    `RELEASE_MISMATCH`·`OBJECTIVE_UNSPECIFIED`·`OBJECTIVE_UNSUPPORTED`도 신설한다 —
+    L-5 — `MODEL_RELEASE_SELECTOR_UNSPECIFIED`·
+    `FEATURE_SCHEMA_VERSION_UNSUPPORTED`는 `CalculateOptimalBid`가 채워지며
+    `model_release_selector`·`feature_schema_version` 검증이 실제로 필요해져
+    들어간다(`serving/prediction.py::_validate`가 생산, scope.md ①). 같은 이유로
+    `RELEASE_MISMATCH`·`OBJECTIVE_UNSPECIFIED`·`OBJECTIVE_UNSUPPORTED`도 있다 —
     선언만 있고 호출자가 없는 어휘를 남기지 않는다는 규율은 그대로다(각 값의 생산
-    지점은 같은 커밋의 `prediction.py`)."""
+    지점은 `prediction.py`)."""
 
     REQUEST_ID_EMPTY = "REQUEST_ID_EMPTY"
     CORRELATION_ID_EMPTY = "CORRELATION_ID_EMPTY"
@@ -42,10 +41,10 @@ class ValidationDetailCode(StrEnum):
 
 
 class ReadinessDetailCode(StrEnum):
-    """`MODEL_NOT_READY` 응답의 닫힌 어휘. verifier r1 L-5 — `PREDICTION_UNIMPLEMENTED`는
-    어디서도 생산되지 않아(`GetModelMetadata`는 `readiness` enum 값만 채우고
-    `detail_code`를 나르는 자리가 없다, D-5E-3) 지웠었다. M5/5E-2 — `SERVER_NOT_READY`
-    신설(`CalculateOptimalBid`가 runtime 미가용일 때 생산, scope.md ①⑸) — 같은 값을
+    """`MODEL_NOT_READY` 응답의 닫힌 어휘. L-5 — `PREDICTION_UNIMPLEMENTED`는
+    어디서도 생산되지 않으므로 들지 않는다(`GetModelMetadata`는 `readiness` enum 값만 채우고
+    `detail_code`를 나르는 자리가 없다, D-5E-3). `SERVER_NOT_READY`는
+    `CalculateOptimalBid`가 runtime 미가용일 때 생산한다(scope.md ①⑸) — 같은 값을
     `training/jobs/servicer.py`가 자유 문자열 리터럴로도 내지만(그 모듈은 이 slice
     out_of_scope, 값만 우연히 같다) 이 enum 은 `prediction.py` 전용 정본이다."""
 

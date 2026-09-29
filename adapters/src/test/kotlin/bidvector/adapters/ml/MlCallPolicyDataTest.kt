@@ -78,7 +78,7 @@ class MlCallPolicyDataTest {
         ML_CALL_POLICY.entries.shouldNotBeEmpty()
     }
 
-    // ---- verifier r1 F-4(medium) — 출하 인스턴스 값 자체를 재는 단언(4E M-2 관례) ----
+    // ---- 출하 인스턴스 값 자체를 재는 단언(M-2 관례) ----
     // policy-values.md D-4D-7 착수 placeholder 값이 조용히 바뀌어도 이 test 가 잡는다.
 
     @Test

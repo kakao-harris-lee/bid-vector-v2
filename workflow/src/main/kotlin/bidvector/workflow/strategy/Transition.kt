@@ -11,7 +11,7 @@ import java.time.Instant
 
 /**
  * 새 편집 세션을 연다 — [apply]를 거치지 않는 유일한 생성 경로다(선행 세션이 없다).
- * `internal`이다(verifier H-3/M-4 수정) — `EditSession`·`TransitionOutcome`이 통로 타입
+ * `internal`이다 — `EditSession`·`TransitionOutcome`이 통로 타입
  * (`AppliedStrategy`)을 감싸더라도, 커널 함수 자체가 public 이면 `workflow` 밖에서 이
  * 함수를 직접 몰아 `EditStrategyWorkflow`(port 오케스트레이션)를 거치지 않고 정당한
  * `AppliedStrategy`를 얻을 수 있었다(실측: `app` test 에서 `beginSession`→`apply`→
@@ -36,7 +36,7 @@ internal fun beginSession(
         lastCommand = null,
     )
 
-/** `internal` — [EditStrategyWorkflow.begin]도 재사용한다(verifier N-1 수정). */
+/** `internal` — [EditStrategyWorkflow.begin]도 재사용한다. */
 internal fun isTerminal(state: EditSessionState): Boolean =
     when (state) {
         is EditSessionState.Applied, is EditSessionState.Cancelled, EditSessionState.Expired -> true
@@ -46,7 +46,7 @@ internal fun isTerminal(state: EditSessionState): Boolean =
 /**
  * 비종단 상태이고 [now]가 만료 시각을 넘겼으면 `Expired`로 접는다(판정 순서 ①). 이미
  * 종단 상태면 그대로 돌려준다 — 종단 뒤에는 시각과 무관하게 상태가 굳는다. `internal`이다
- * (verifier H-3/M-4 수정과 같은 이유 — `EditStrategyWorkflow.expire`/`begin`만 부른다).
+ * (같은 이유 — `EditStrategyWorkflow.expire`/`begin`만 부른다).
  */
 internal fun expireIfDue(
     session: EditSession,
@@ -66,14 +66,14 @@ internal fun expireIfDue(
  * [current]·[policy]는 매 호출마다 신선하게 주입된다(호출부가 fresh read 를 보장 — apply
  * 시점 재검증의 메커니즘).
  *
- * **①-b 는 actor·전이표보다 앞선다**(code-review r4 N-r4-8). 재전달 판별보다 앞서야 한다는
- * 것이 M-r3-6 의 요구였고, 그 자리는 actor 앞이기도 하다. 그래서 기준이 어긋난 `ProvideValue`
+ * **①-b 는 actor·전이표보다 앞선다.** 재전달 판별보다 앞서야 하고,
+ * 그 자리는 actor 앞이기도 하다. 그래서 기준이 어긋난 `ProvideValue`
  * 는 actor 가 달라도·세션이 값 대기 상태가 아니어도 `StaleRevision` 으로 거부된다 —
  * `ActorMismatch`·`SystemActorNotPermitted`·`InvalidTransition` 이 아니다. HTTP 로는 도달하지
  * 않는다(행위자가 상수이고 기준을 서버가 같은 트랜잭션에서 싣는다). 전이표 test 가 이
  * 상호작용을 행으로 덮는다.
  *
- * `internal`이다(verifier H-3/M-4 수정) — `current`·`policy`를 호출부가 원하는 값으로 골라
+ * `internal`이다 — `current`·`policy`를 호출부가 원하는 값으로 골라
  * 이 함수를 직접 부르면 `EditStrategyWorkflow`(port 로드·저장·발행을 함께 묶는 오케스트레이션)
  * 를 거치지 않고도 정당한 `TransitionOutcome.Applied`(따라서 `AppliedStrategy`)를 얻을 수
  * 있었다. `workflow` 밖에서 이 함수 자체를 부를 수 없게 해 그 획득 경로를 컴파일 층에서 닫는다.
@@ -102,9 +102,9 @@ private fun dispatch(
     val state = session.state
     return when {
         state is EditSessionState.WaitingForValue && command is EditCommand.ProvideValue -> {
-            // M6/6A-2b D-6A2b-25(code-review r1 L-1) — **세션이 기다리는 필드만 받는다.**
-            // 이전에는 command 의 필드를 그대로 받아, `begin` 이 연 필드가 아무것도 약속하지
-            // 않고 `RequestEdit` 의 존재 이유도 흐려졌다(필드를 바꾸려면 그 command 를 쓴다).
+            // D-6A2b-25 — **세션이 기다리는 필드만 받는다.**
+            // command 의 필드를 그대로 받으면 `begin` 이 연 필드가 아무것도 약속하지
+            // 못하고 `RequestEdit` 의 존재 이유도 흐려진다(필드를 바꾸려면 그 command 를 쓴다).
             // corpus 다섯 전건이 세션 필드와 같은 필드를 보내므로 이 조임에 걸리는 case 는 없다(실측).
             if (command.field == state.field) {
                 provideValueOutcome(session, state, command, current, policy)

@@ -2,8 +2,8 @@ package bidvector.sharedkernel
 
 /**
  * 임계 사정률 = 추천 투찰율 ÷ 낙찰하한율(`v2-지침서.md` §4.4 · `data-dictionary.md` §3.3
- * 「핵심 관계」, M1/1D D-1(a)). **파생값이다**(decision 17, `data-dictionary.md` §9·§11.1 —
- * verifier r1 F-1) — 형제 파생(`assessmentRateAgainst`·`awardRateAgainst`·`bidRateAgainst`)
+ * 「핵심 관계」, D-1(a)). **파생값이다**(decision 17, `data-dictionary.md` §9·§11.1) —
+ * 형제 파생(`assessmentRateAgainst`·`awardRateAgainst`·`bidRateAgainst`)
  * 과 같은 형태로 계산에 쓴 정책 version을 `DerivationRecord`에 실어 `Derived<AssessmentRate>`
  * 로 낸다. `MoneyArithmetic.kt`의 `Money ÷ Money` 파생과 형태가 다른 것은 전건뿐이다 — `Rate`는
  * VAT·provenance를 나르지 않으므로 `sameKnownVat`·`hasDeclaredProvenance` 전건이 없다.

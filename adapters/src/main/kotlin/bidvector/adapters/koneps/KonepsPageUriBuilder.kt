@@ -25,10 +25,10 @@ internal fun interface KonepsPageUriBuilder {
  * 재사용하면서도 축마다 다른 매핑(공고 축은 [mapRawItem] 전체 보존, 개찰 축은
  * [mapMaskedOpeningItem] allow-list 치환)을 꽂아 넣게 한다.
  *
- * **기본값이 없다(verifier r1 F-4 수정)** — 이전 판은 [walkKonepsNoticePages]의 `itemMapper`
- * 매개변수가 원문 보존 mapper 로 기본값이 있어, 개찰 축 walker 가
- * 이 인자를 잊으면 **누출이 조용한 폴백**이 됐다(설계 검토 게이트 ①이 막으려던 것과 반대
- * 방향 — 실수의 기본 결과가 누출). 세 호출부([KonepsOpenApiNoticeSource.fetchNotices]·
+ * **기본값이 없다** — [walkKonepsNoticePages]의 `itemMapper` 매개변수에 원문 보존 mapper 를
+ * 기본값으로 두면, 개찰 축 walker 가 이 인자를 잊었을 때 **누출이 조용한 폴백**이 된다(설계
+ * 검토 게이트 ①이 막으려는 것과 반대 방향 — 실수의 기본 결과가 누출). 세 호출부(
+ * [KonepsOpenApiNoticeSource.fetchNotices]·
  * [KonepsOpeningResultSource.fetchOpeningResults]·[fetchSingleKonepsNotice])가 모두 명시한다.
  */
 internal fun interface KonepsItemMapper {
@@ -41,7 +41,7 @@ internal fun interface KonepsItemMapper {
 
 /**
  * 공고 목록 항목 mapper(계약 여부와 무관하게 전 필드 보존) — 낙찰 목록군 오퍼레이션(한 행=한 공고)의 행 식별자는
- * 공고번호·차수뿐이라 `rowIdentifierRawKeys`는 `emptyList()`다. F-4 로 암묵 기본값 지위는 없어졌다 —
+ * 공고번호·차수뿐이라 `rowIdentifierRawKeys`는 `emptyList()`다. 암묵 기본값 지위는 없다 —
  * [KonepsOpenApiNoticeSource.fetchNotices]가 자기 오퍼레이션의 대분류와 함께 명시적으로 만든다.
  *
  * **[sourceDivision]은 필수 인자다(D-6F9-1)** — 업종별 인스턴스가 어느 오퍼레이션인지 알고, 이 mapper 는 그 값을 관측에
@@ -80,12 +80,11 @@ private class KonepsPageWalkAccumulator {
     var unknownFields = 0
         private set
 
-    // verifier r1 F-8 수정(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — masking 실패
-    // (opengCorpInfo 성분 배치 불일치, 값 전체 폐기)를 unknownFields 와 별도로 센다.
+    // masking 실패(opengCorpInfo 성분 배치 불일치, 값 전체 폐기)를 unknownFields 와 별도로 센다.
     var maskingFailures = 0
         private set
 
-    // verifier r2 G-1 수정 — 오퍼레이션이 행 식별자를 선언했는데 그 값이 이 항목에서 부재·공백
+    // 오퍼레이션이 행 식별자를 선언했는데 그 값이 이 항목에서 부재·공백
     // 이라 dedup 을 적용할 수 없었던 건수. 그런 항목은 identity=null 로 넘어와 항상 살아남고
     // (never duplicate), 이 축이 그 사실을 드러낸다 — 「모름」을 0/부재로 접지 않는다.
     var rowIdentifierIndeterminate = 0
@@ -134,7 +133,7 @@ private class KonepsPageWalkAccumulator {
             items += mapped.observation
             unknownFields += mapped.unknownFieldCount
             maskingFailures += mapped.maskingFailureCount
-            // G-1 — identity==null 은 「행 식별자가 선언됐는데 이 항목에서 못 얻었다」의 신호다
+            // identity==null 은 「행 식별자가 선언됐는데 이 항목에서 못 얻었다」의 신호다
             // (rowDiscriminatorOf 가 그 경우에만 identity 를 null 로 낸다, 목록 오퍼레이션의
             // 정상 emptyList() 경로는 여기 해당하지 않는다).
             if (mapped.identity == null) rowIdentifierIndeterminate++
@@ -152,7 +151,7 @@ private class KonepsPageWalkAccumulator {
     }
 
     /**
-     * L-8(verifier r1) — 반복 감지로 걷기를 멈추는 페이지도 HTTP 호출은 실제로 나갔으니
+     * 반복 감지로 걷기를 멈추는 페이지도 HTTP 호출은 실제로 나갔으니
      * `pagesFetched` 에 센다(항목은 이미 이전 페이지에서 셌으므로 다시 세지 않는다).
      */
     fun recordRepeatedPage(resumeAt: Int) {
@@ -160,7 +159,7 @@ private class KonepsPageWalkAccumulator {
         markTruncated(TruncationCause.RepeatedPage, resumeAt)
     }
 
-    /** M-3·H-3(verifier r1) — 사유와 재개 지점을 함께 남긴다. */
+    /** 사유와 재개 지점을 함께 남긴다. */
     fun markTruncated(
         cause: TruncationCause,
         resumeAt: Int,
@@ -176,8 +175,8 @@ private class KonepsPageWalkAccumulator {
     }
 
     /**
-     * M-3 — truncated 로 끝났으면 재개 지점을 실은 cursor, 아니면 null(완료를 거짓 진술하지
-     * 않는다). **N-4(verifier r2)** — 사유가 비재시도 축(`NotRetryable`·`Unclassified`·
+     * truncated 로 끝났으면 재개 지점을 실은 cursor, 아니면 null(완료를 거짓 진술하지
+     * 않는다). 사유가 비재시도 축(`NotRetryable`·`Unclassified`·
      * `InputError`)이면 `next` 를 안 낸다. 같은 cursor 로 다시 불러도 서버 응답·요청 형태가
      * 안 바뀌는 한 같은 실패가 재현될 뿐이라, `truncationCause` 를 안 보고 `next` 만 따라가는
      * 소비자가 같은 실패를 무한 재개하는 것을 막는다.
@@ -208,7 +207,7 @@ private class KonepsPageWalkAccumulator {
 }
 
 /**
- * N-4(verifier r2) — 사유가 「다시 시도하면 뚫릴 수 있는」 축(백스톱·전송·quota·rate limiter
+ * 사유가 「다시 시도하면 뚫릴 수 있는」 축(백스톱·전송·quota·rate limiter
  * 자체 거부)이면 재개 가능, 「입력·구성 자체가 틀렸다」 축(비재시도 resultCode·미지 코드·
  * 무효 cursor)이면 재개 불가로 둔다 — `when` 이 [TruncationCause] 전 분기를 소진해 새 사유가
  * 추가되면 컴파일이 깨진다(회귀 방지).
@@ -325,7 +324,7 @@ private fun nextWalkState(
         fetchNextPage(accumulator, context, pageNo)
     }
 
-/** M-5(verifier r1) — cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다. */
+/** cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다. */
 private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
     val accounting =
         CollectionAccounting(
@@ -343,7 +342,7 @@ private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
     return SourceBatch(emptyList(), accounting, next = null)
 }
 
-// N-5(verifier r2) — `toIntOrNull()` 단독은 "007"·"+4" 처럼 표기가 관대한 토큰도 받아준다
+// `toIntOrNull()` 단독은 "007"·"+4" 처럼 표기가 관대한 토큰도 받아준다
 // (선행 0·부호 기호). 이 어댑터가 스스로 내는 cursor(`resumePageNo.toString()`)는 항상 이
 // 형식(선행 0·부호 없는 순수 양의 정수)이므로 실질 위험은 낮지만, 「엄격 파싱」을 형태
 // 자체로 강제해 다른 발급자가 끼어들 여지를 남기지 않는다.
@@ -370,7 +369,7 @@ internal fun walkKonepsNoticePages(
     collectionPolicy: KonepsCollectionPolicyData,
     clock: Clock,
     cursor: PageCursor?,
-    // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. **기본값 없음(verifier r1 F-4)** — 공고 축
+    // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. **기본값 없음** — 공고 축
     // 호출부([KonepsOpenApiNoticeSource.fetchNotices])도 [noticeListItemMapper]를 명시한다.
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {

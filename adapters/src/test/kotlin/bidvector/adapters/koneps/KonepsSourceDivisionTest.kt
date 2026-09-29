@@ -40,7 +40,7 @@ private fun twoItems(extra: Map<String, String> = emptyMap()): String =
     )
 
 /**
- * D-6F9-1(M6/6F-9) — 업무 대분류는 응답 필드가 아니라 **수집 오퍼레이션**이 정한다. 어댑터는 호출부가 데이터(설정 표)에서
+ * D-6F9-1 — 업무 대분류는 응답 필드가 아니라 **수집 오퍼레이션**이 정한다. 어댑터는 호출부가 데이터(설정 표)에서
  * 넘긴 값을 관측에 **구조로** 싣고, URL 문자열이나 응답의 다른 필드에서 얻지 않는다(위협 모델 우회 1).
  */
 class KonepsSourceDivisionTest {

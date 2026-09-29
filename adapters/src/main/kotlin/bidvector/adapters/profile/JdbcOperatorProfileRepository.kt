@@ -6,7 +6,7 @@ import bidvector.workflow.evaluation.ProfileFacts
 import javax.sql.DataSource
 
 /**
- * [OperatorProfilePort]의 첫 production 구현(M6/6F-6, `OPEN-4B6-PROFILE-SOURCE` 종결) — 저장소에
+ * [OperatorProfilePort]의 첫 production 구현(`OPEN-4B6-PROFILE-SOURCE` 종결) — 저장소에
  * 이 port의 실 구현이 없어 `OpportunityAnalysis`가 프로필을 요구하는 판정 축은 조립될 수
  * 없었다(port KDoc이 「실 구현은 M6」이라 적어 뒀던 공백).
  *

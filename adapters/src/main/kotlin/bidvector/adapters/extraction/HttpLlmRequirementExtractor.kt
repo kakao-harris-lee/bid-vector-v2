@@ -241,9 +241,9 @@ internal class HttpLlmRequirementExtractor(
 }
 
 /**
- * 추출 엔진 조립 — **`internal`**이다(verifier r1 F-1). 이 함수가 이전에는 public 이라
- * `LlmRequirementExtractionPortAdapter`(당시 public)와 결합해 `WatchGatedExtractor` 없이도
- * adapters 밖(app test)에서 감시 게이트를 거치지 않고 실제 추출 엔진을 조립할 수 있었다
+ * 추출 엔진 조립 — **`internal`**이다. 이 함수가 public 이면
+ * `LlmRequirementExtractionPortAdapter`와 결합해 `WatchGatedExtractor` 없이도
+ * adapters 밖(app test)에서 감시 게이트를 거치지 않고 실제 추출 엔진을 조립할 수 있다
  * (probe A, 컴파일 성공 실측 — scope.md ②·설계 검토 (2) 우회 (8) 위반). 프로덕션 배선의
  * 유일한 공개 진입점은 [createWatchGatedExtractor](`WatchGatedExtractor.kt`)뿐이다.
  */
@@ -262,7 +262,7 @@ internal fun createRequirementExtractionEngine(
  * domain port(`RequirementExtractionPort`, ADR 0005 D-10.1) 구현 — [RequirementExtractionEngine]
  * 의 풍부한 [ExtractionAttempt]를 port 의 거친 이분법([ExtractionOutcome])으로 투영만
  * 한다(D-3C-3 — 세부 사유는 port 밖 [ExtractionFailure]에 남는다). 구현 인터페이스 하나뿐
- * (`typeShapeGate` 래칫). **`internal`**이다(verifier r1 F-1) — 이 port 구현은 `WatchVerdict`
+ * (`typeShapeGate` 래칫). **`internal`**이다 — 이 port 구현은 `WatchVerdict`
  * 를 인자로 받지 않으므로(ADR 0006 D-4, 도메인 port 시그니처 제약) public 이면 그 자체가
  * 게이트 없는 진입점이 된다. 이 slice 는 이 어댑터의 공개 factory 를 두지 않는다 — 이
  * 구체 구현으로 `RequirementExtractionPort` 가 필요해지면(4B) 그 배선을 만들 때 함께

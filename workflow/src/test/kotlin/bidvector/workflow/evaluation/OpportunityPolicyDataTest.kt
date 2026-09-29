@@ -165,7 +165,7 @@ class OpportunityPolicyDataTest {
         policy.recommendedAmountRounding shouldBe RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP)
     }
 
-    // ---- M4/4B-7(D-4B7-3) — sampleWindowDays·maxSamples ----
+    // ---- (D-4B7-3) — sampleWindowDays·maxSamples ----
 
     @Test
     fun `sampleWindowDays 가 0 이하면 생성 실패`() {

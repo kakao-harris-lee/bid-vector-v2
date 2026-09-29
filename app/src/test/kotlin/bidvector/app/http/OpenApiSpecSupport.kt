@@ -31,9 +31,9 @@ internal fun Map<String, Any?>.requiredKeys(schemaName: String): Set<String> =
     ((schema(schemaName)["required"] as? List<String>) ?: emptyList()).toSet()
 
 /**
- * D-6A3-20(검토 라운드 1 contract-keeper R1) — `paths.<path>.<method>.responses` 의 상태
- * 코드 **키 집합**. verifier M7a/M7b/M7d(409·401 선언 삭제)가 이 값을 쓰는 test 를 RED로
- * 만든다 — HTTP 호출 없이 문서 자신만 본다.
+ * D-6A3-20 — `paths.<path>.<method>.responses` 의 상태
+ * 코드 **키 집합**. 409·401 선언을 지우면 이 값을 쓰는 test 가 RED가
+ * 된다 — HTTP 호출 없이 문서 자신만 본다.
  */
 @Suppress("UNCHECKED_CAST")
 internal fun Map<String, Any?>.responseStatusCodes(

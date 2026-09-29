@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * Kotlin 바이트코드**에서 옳게 재는지 고정한다 — preflight §3의 미실측(`by` 위임)을 닫고,
  * `qualityBaseline`과 `typeShapeGate`가 같은 함수를 쓰므로 이 test 가 둘 모두를 검증한다.
  *
- * D-7(verifier r1 M-2) · verifier r2 H-1 — 상속 깊이는 **이 test 가 `importClasses`로 명시한
+ * D-7 — 상속 깊이는 **이 test 가 `importClasses`로 명시한
  * 집합이거나 루트 패키지(`bidvector.`) 아래** 안에서만 잰다. 둘 다 아닌 클래스
  * (`java.lang.Enum`·Gradle `DefaultTask`)를 만나면 멈춘다.
  */
@@ -33,7 +33,7 @@ class TypeShapeFixtureTest {
             DelegatingGreeter::class.java,
             FakeGradleTask::class.java,
             // `CrossModuleBase`는 일부러 넣지 않는다 — 다른 모듈의 소유 타입(스캔 밖이지만
-            // `bidvector.` 아래)을 흉내내야 한다(verifier r2 H-1).
+            // `bidvector.` 아래)을 흉내내야 한다.
             CrossModuleDerived::class.java,
         )
     private val ownedTypeNames = classes.map { it.name }.toSet()

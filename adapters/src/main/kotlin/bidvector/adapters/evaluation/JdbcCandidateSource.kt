@@ -42,7 +42,7 @@ class CandidateCapExceededException(
     )
 
 /**
- * [CandidateSourcePort] 첫 production 구현(M6/6F-2, D-6F2-1~6). `EvaluateCandidatesUseCase
+ * [CandidateSourcePort] 첫 production 구현(D-6F2-1~6). `EvaluateCandidatesUseCase
  * .evaluate()`의 둘째 줄(`candidateSource.openCandidates()`)이 지금까지 test fake뿐이었다
  * — 전략이 있어도 후보가 0이면 파이프라인은 여전히 빈 목록을 돈다. `notice`표(V1)의 기존
  * 행을 다건 스캔 질의로 읽는다(마이그레이션·인덱스 없음, D-6F2-7).
@@ -53,7 +53,7 @@ class CandidateCapExceededException(
  *
  * **`cap`은 생성자 주입이고 기본값이 없다(D-6F2-4).** 값과 초과 시 운영 처분은 조립 축의
  * 결정이다(`OPEN-6F2-CANDIDATE-BOUND`) — 이 클래스는 "조용히 자르지 않는다"만 고정한다.
- * `cap <= 0`은 생성자에서 거부한다(verifier r1 LOW-1) — 잘못된 배선이 도메인 실패가 아니라
+ * `cap <= 0`은 생성자에서 거부한다 — 잘못된 배선이 도메인 실패가 아니라
  * `LIMIT` 음수 등 DB 오류로 새지 않게 한다.
  */
 class JdbcCandidateSource(
@@ -66,8 +66,8 @@ class JdbcCandidateSource(
     }
 
     /**
-     * 상태 배열 바인딩은 [setTextArray](`adapters.persistence`, 6F-1 이 같은 목적으로 신설,
-     * verifier r1 code-reviewer MEDIUM)을 그대로 쓴다 — `connection.createArrayOf("text",
+     * 상태 배열 바인딩은 [setTextArray](`adapters.persistence`, 6F-1 이 같은 목적으로 신설)을
+     * 그대로 쓴다 — `connection.createArrayOf("text",
      * ...)`를 여기서 다시 적지 않는다(중복 금지, CLAUDE.md).
      */
     override fun openCandidates(): List<Notice> {

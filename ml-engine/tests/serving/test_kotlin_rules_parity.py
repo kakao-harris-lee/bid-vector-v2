@@ -46,9 +46,8 @@ _MIN_RESERVE_RECORDS_FOR_SUCCESS = 10
 
 
 def _completed_case_inference_policy() -> InferencePolicy:
-    """M5/5F-1 — 출하 `inference-v1.yaml`이 이제 `assessment.agency_sample_threshold`
-    (잠정값 10)를 포함해 "완성 case"다(`OPEN-5D2-POLICY-VALUES` 종결). 이전엔 그
-    키가 없어 placeholder(`1`)를 얹은 임시 사본을 읽었으나, 이제는 출하 파일을
+    """출하 `inference-v1.yaml`이 이제 `assessment.agency_sample_threshold`
+    (잠정값 10)를 포함해 "완성 case"다(`OPEN-5D2-POLICY-VALUES` 종결). 출하 파일을
     그대로 읽는다(호출부 시그니처 무변경 — 판단 등재, 이 파일 자체는 무편집이라
     직접 로드가 임시 사본보다 단순하다)."""
     policy = load_inference_policy(_SHIPPED_POLICY_PATH)
@@ -119,7 +118,7 @@ class _ActiveContext:
 def _is_normalized_fraction(value: str) -> bool:
     """`FractionRules.kt::isNormalizedFraction` 미러.
 
-    code-reviewer MEDIUM/verifier r1 L-1 — Kotlin `BigDecimal`에는 음수 0 개념이
+    L-1 — Kotlin `BigDecimal`에는 음수 0 개념이
     없어 `BigDecimal("-0").toPlainString() == "0"`(부호가 사라진다) — 왕복 검사가
     `"-0"`·`"-0.00"` 을 거부한다. Python `Decimal`은 부호를 보존해(`format(Decimal
     ("-0"), "f") == "-0"`) 왕복 자기동일성만으로는 이 값을 잘못 수용한다 — 명시
@@ -188,7 +187,7 @@ def _has_ordered_candidate_rates(success: prediction_pb2.Success) -> bool:
 
 def _is_acceptable_success_shape(success: prediction_pb2.Success) -> bool:
     """`ParsedSuccessFields.kt::isAcceptableSuccessShape` 미러 — 다섯 검사 전부.
-    verifier r1 H-1 — 이 함수 **하나만으로는 Kotlin 의 수용 게이트를 대표하지 않는다**
+    H-1 — 이 함수 **하나만으로는 Kotlin 의 수용 게이트를 대표하지 않는다**
     (아래 `_is_response_accepted_by_kotlin` 참고). `ResponseMapping.kt::mapSuccess`는
     `validatedSuccessFields = isAcceptableSuccessShape(success) && parsedSuccessFields(
     success) != null`(둘 다) 를 본다 — `isAcceptableSuccessShape`는 형태(개수·순서·
@@ -216,7 +215,7 @@ def _to_valid_decimal_or_none(value: str) -> Decimal | None:
 
 
 def _to_rate_or_none(value: str) -> Decimal | None:
-    """`ParsedSuccessFields.kt::String.toRateOrNull` 미러(verifier r1 H-1 이 지목한
+    """`ParsedSuccessFields.kt::String.toRateOrNull` 미러(H-1 이 지목한
     빠진 절반) — 정규형이면서 `signum() >= 0`이고 `<= 1`이어야 한다(Kotlin 원문:
     `value.signum() < 0 || value > BigDecimal.ONE` 이면 `null`)."""
     parsed = _to_valid_decimal_or_none(value)
@@ -238,7 +237,7 @@ _VALID_WIRE_INTERVAL_SOURCES = frozenset(
 
 def _is_recognized_interval_source(value: int) -> bool:
     """`ParsedSuccessFields.kt::ProtoIntervalSource.toDomainOrNull` 미러 —
-    verifier r2 N-3. `INTERVAL_SOURCE_UNSPECIFIED`(그리고 열거 밖 정수, Kotlin
+    N-3. `INTERVAL_SOURCE_UNSPECIFIED`(그리고 열거 밖 정수, Kotlin
     `UNRECOGNIZED`에 대응)는 `null`(거부)이다."""
     return value in _VALID_WIRE_INTERVAL_SOURCES
 
@@ -248,7 +247,7 @@ def _parsed_success_fields_or_none(
 ) -> tuple[Decimal, ...] | None:
     """`ParsedSuccessFields.kt::parsedSuccessFields` 미러 — 후보 3건의 `bid_rate`
     (범위 포함) + `fitness`·`dispersion`·`estimate_margin` + `intervalSource`
-    (verifier r2 N-3 — 이전엔 빠져 있었다) 전부가 파싱돼야 한다. 하나라도
+    (N-3) 전부가 파싱돼야 한다. 하나라도
     `None`이면 전체가 `None`(`allNotNull`, 부분 성공 불인정)."""
     if not _is_recognized_interval_source(success.uncertainty.interval_source):
         return None
@@ -275,7 +274,7 @@ def _parsed_success_fields_or_none(
 def _is_response_accepted_by_kotlin(success: prediction_pb2.Success) -> bool:
     """`ResponseMapping.kt::mapSuccess`가 성공으로 접수하는 실제 조건
     (`validatedSuccessFields`) — `isAcceptableSuccessShape` **그리고**
-    `parsedSuccessFields`. verifier r1 H-1 이 지목한 「미러가 앞쪽 다섯만 옮겨
+    `parsedSuccessFields`. H-1 이 지목한 「미러가 앞쪽 다섯만 옮겨
     Kotlin 과 반대 판정을 낸다」의 시정 — 이 함수가 완전한 대체 판정이다."""
     return (
         _is_acceptable_success_shape(success)
@@ -296,9 +295,9 @@ def test_real_response_is_success() -> None:
 
 @pytest.mark.parametrize("value", ["-0", "-0.0000"])
 def test_fraction_rules_reject_negative_zero(value: str) -> None:
-    """code-reviewer MEDIUM(R-M1)/verifier r1 L-1 — `BigDecimal`은 음수 0 이 없어
-    `toPlainString()`이 부호를 지운다. 이 미러가 이전에는 `format(Decimal(...), "f")`
-    왕복 자기동일성만으로 `"-0"` 류를 잘못 수용했었다."""
+    """L-1 — `BigDecimal`은 음수 0 이 없어
+    `toPlainString()`이 부호를 지운다. 왕복 자기동일성만으로는 `format(Decimal(...), "f")`
+    가 `"-0"` 류를 잘못 수용한다."""
     assert not _is_normalized_fraction(value)
 
 
@@ -345,7 +344,7 @@ def test_parsed_success_fields_shape_is_acceptable() -> None:
 
 
 def test_response_is_fully_accepted_by_kotlin() -> None:
-    """verifier r1 H-1 — `isAcceptableSuccessShape` 만이 아니라 `parsedSuccessFields`
+    """H-1 — `isAcceptableSuccessShape` 만이 아니라 `parsedSuccessFields`
     까지 통과해야 Kotlin 이 이 응답을 받아들인다(`_is_response_accepted_by_kotlin`)."""
     servicer, _runtime = _servicer_and_runtime()
     response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
@@ -353,10 +352,10 @@ def test_response_is_fully_accepted_by_kotlin() -> None:
 
 
 def test_unrecognized_interval_source_is_rejected_by_parsed_success_fields() -> None:
-    """verifier r2 N-3 — `parsedSuccessFields`의 `intervalSource` 성분이 미러에서
-    빠져 있었다(`ParsedSuccessFields.kt::ProtoIntervalSource.toDomainOrNull`이
-    `UNSPECIFIED`를 거부하는 것과 달리, 이전 미러는 그 필드를 아예 보지 않아
-    "완전한 대체 판정"이라는 docstring 이 과장이었다). 실 응답을 변조해 확인한다."""
+    """N-3 — `parsedSuccessFields`의 `intervalSource` 성분이 미러에서
+    빠지면(`ParsedSuccessFields.kt::ProtoIntervalSource.toDomainOrNull`이
+    `UNSPECIFIED`를 거부하는 것과 달리, 그 필드를 아예 보지 않으면)
+    "완전한 대체 판정"이라는 docstring 이 과장이 된다. 실 응답을 변조해 확인한다."""
     servicer, _runtime = _servicer_and_runtime()
     response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
     assert _is_response_accepted_by_kotlin(response.success)
@@ -367,7 +366,7 @@ def test_unrecognized_interval_source_is_rejected_by_parsed_success_fields() -> 
 
 
 def test_shipped_clamp_max_keeps_extreme_observation_within_contract_rate() -> None:
-    """M5/5F-1(scope.md ⑤) — 반전. 이전엔(출하 `scenario.clamp_max = 1.4`) 계약이
+    """(scope.md ⑤) — 반전. 이전엔(출하 `scenario.clamp_max = 1.4`) 계약이
     허용하는 축(`observed_bid_rate`, D-2F-4)에 1 을 넘는 관측값을 넣으면 엔진
     (`scenario.py`)이 clamp 상한까지 후보율을 낼 수 있어 `success` 가 그대로 나가
     Kotlin `ParsedSuccessFields.toRateOrNull`이 응답 전체를 `ContractViolation`으로

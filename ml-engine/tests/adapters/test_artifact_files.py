@@ -1,4 +1,4 @@
-"""RED — `ml_engine.adapters.artifact_files.write_artifact_files`(D-5E-5). verifier r1
+"""RED — `ml_engine.adapters.artifact_files.write_artifact_files`(D-5E-5).
 M-6 — 직접 단위 test 가 0건이었다: 덮어쓰기 금지 불변식과 「부분 산출물이 남지 않는다」
 주장(첫 파일 성공 뒤 둘째 파일 실패) 둘 다 변이로 보호되지 않았다."""
 
@@ -54,8 +54,8 @@ def test_second_file_write_failure_leaves_no_partial_artifact(
 ) -> None:
     """「부분 산출물이 남지 않는다」 실제 경로 — `artifact.json` 쓰기 성공 뒤
     `report.json` 쓰기가 실패하면(디스크가 가득 찬 것과 같은 상황을 흉내) 첫 파일도
-    포함해 디렉터리 전체를 지운다. verifier r1 M-6 이 지목한 미검증 경로(이전 판은
-    고아 `artifact.json`이 남을 수 있었다)."""
+    포함해 디렉터리 전체를 지운다. M-6 이 지목한 미검증 경로(고아 `artifact.json`이
+    남을 수 있다)."""
     job_dir = tmp_path / "job-1"
     original_write_bytes = Path.write_bytes
     call_count = {"n": 0}

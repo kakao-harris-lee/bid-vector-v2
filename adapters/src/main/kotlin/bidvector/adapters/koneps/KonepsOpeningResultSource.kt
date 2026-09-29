@@ -37,7 +37,7 @@ private fun openingDayWindow(referenceDate: CollectionReferenceDate): Pair<Strin
  * P-10 (a)) — 3B `walkKonepsNoticePages`의 HTTP·Resilience4j·envelope·pagination·회계는 그대로
  * 재사용하고 항목 매핑만 다른 전략을 꽂는다.
  *
- * `openingCompleteBaseUri`(M3/3F) — 개찰완료(`getOpengResultListInfoOpengCompt`) 전용 엔드포인트.
+ * `openingCompleteBaseUri` — 개찰완료(`getOpengResultListInfoOpengCompt`) 전용 엔드포인트.
  * [fetchOpeningCompleteResults]가 이 값을 쓴다 — 예비가격 상세와도 다른 오퍼레이션이라 baseUri
  * 가 셋이다.
  */
@@ -80,7 +80,7 @@ class KonepsOpeningResultSource(
             config.clock,
             cursor,
         ) { item, itemPolicy, observedAt ->
-            // F-1(verifier r1) — 낙찰 목록·개찰결과 목록은 한 행=한 공고라 listOperation
+            // 낙찰 목록·개찰결과 목록은 한 행=한 공고라 listOperation
             // 이 선언한 rowIdentifierRawKeys 를 그대로 쓴다(AWARD_LIST·OPENING_RESULT_LIST
             // 둘 다 emptyList()).
             mapMaskedOpeningItem(item, itemPolicy, listSourceEndpoint, observedAt, listOperation.rowIdentifierRawKeys)
@@ -103,7 +103,7 @@ class KonepsOpeningResultSource(
             KonepsOperationPolicy.RESERVE_PRICE_DETAIL,
             evidence.noticeId,
         ) { item, itemPolicy, observedAt ->
-            // F-1(verifier r1) — 예비가격 상세는 한 공고에 복수예가 15행까지 온다
+            // 예비가격 상세는 한 공고에 복수예가 15행까지 온다
             // (compnoRsrvtnPrceSno 마다 반복, §1.7.1). 그 순번을 행 식별자에 더하지
             // 않으면 14행이 duplicate 로 잘못 접힌다.
             mapMaskedOpeningItem(

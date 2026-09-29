@@ -5,17 +5,17 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
- * 타임존 없는 KONEPS 일시 문자열을 해석하는 형식의 id(D-3A-4 파급, 3A 잔여 일괄 verifier r3
- * 전 수정) — **선택**은 정책 데이터([KonepsCollectionPolicyData.dateTimePatterns]), 형식의
+ * 타임존 없는 KONEPS 일시 문자열을 해석하는 형식의 id(D-3A-4 파급) — **선택**은
+ * 정책 데이터([KonepsCollectionPolicyData.dateTimePatterns]), 형식의
  * **의미**(문자열을 실제로 어떻게 나누는가)는 이 파일의 고정 파서가 갖는다. [SourceZoneRuleId]
  * 와 같은 원칙이다 — 「규칙 선택은 정책 데이터, 규칙의 의미는 상수」(`ZoneId.of("Asia/Seoul")`
  * 리터럴과 같은 자리). `java.time.format.DateTimeFormatter`(패턴 문자열 해석기)는 domain
  * 허용 목록 밖(`config/quality/architecture-policy.properties` — `java.time`만 허용,
  * `java.time.format`은 아니다, 실측: `domainSourceReferenceGate` 실패)이라 쓰지 않는다.
  *
- * 이전 판은 `LocalDateTime.parse(raw)`(인자 없는 기본 ISO `T` 파서)를 직접 썼는데, KONEPS
- * 실제 wire 형식(공식 문서, `policy-values.md` §1.4 authoritative)은 **공백** 구분자라 실제
- * 응답에서 이 함수가 항상 `null`을 냈다(v2-defect, koneps-collection-026 이 발견).
+ * KONEPS 실제 wire 형식(공식 문서, `policy-values.md` §1.4 authoritative)은 **공백** 구분자다 —
+ * ISO `T` 구분자를 가정하는 `LocalDateTime.parse(raw)`(인자 없는 기본 파서)는 실제 응답에서
+ * 항상 `null`을 낸다.
  */
 enum class DateTimePatternId {
     /**
@@ -61,8 +61,8 @@ private fun parseWithPattern(
 
 /**
  * [parseSourceZonedInstant] 한 호출의 결과 — 필드 부재(`Absent`)와 파싱 실패(`ParseFailed`)를
- * 구분한다. 이전 판은 값이 없거나 파싱이 실패하거나 똑같이 `null`을 내 그 둘을 [canonicalize]
- * 가 구별할 수 없었다 — 파싱 실패를 조용한 `null`(COL-02 「미상 = 부재」 갈래)로 접지 않고
+ * 구분한다. 값이 없는 경우와 파싱 실패를 똑같이 `null`로 내면 [canonicalize]가 그 둘을
+ * 구별할 수 없다 — 파싱 실패를 조용한 `null`(COL-02 「미상 = 부재」 갈래)로 접지 않고
  * 관측 가능한 [CollectionDropReason.CollectionParseFailure]로 낸다.
  */
 sealed interface InstantResolutionOutcome {
@@ -94,7 +94,7 @@ fun parseSourceZonedInstant(
 }
 
 /**
- * 시각 축 배선(verifier r2 N-3, 3A 잔여 일괄로 [InstantResolutionOutcome] 반환하도록 정정) —
+ * 시각 축 배선([InstantResolutionOutcome] 반환) —
  * `DEADLINE_AT`·`OPENING_SCHEDULED_AT` 두 개념이 공유하는 진입점. 계약이 없거나
  * `DATETIME_NO_ZONE` 축이 아니거나 `sourceZone`이 없으면(구성상 있어야 하지만 방어적으로)
  * [InstantResolutionOutcome.Absent]다. **값이 있는데 정책의 모든 패턴으로 파싱에 실패하면

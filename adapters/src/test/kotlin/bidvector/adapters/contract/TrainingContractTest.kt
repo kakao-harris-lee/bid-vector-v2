@@ -24,13 +24,13 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 
 /**
- * M2/2C — `TrainingJobService` 계약 consumer test. Kotlin in-process fake servicer
+ * `TrainingJobService` 계약 consumer test. Kotlin in-process fake servicer
  * (`FakeTrainingJobServicer.kt`, 같은 패키지)가 **실제 상태 기계**(job 저장소 map,
  * idempotency 키 대조)를 갖고 canonical 바이트(`contracts/testdata/training/`)를 답으로
- * 낸다. 실제 socket 배선·폴링·취소 존중은 M4·5C 몫이다(scope.md 「만들지 않는 것」).
+ * 낸다. 실제 socket 배선·폴링·취소 존중은 범위 밖이다(scope.md 「만들지 않는 것」).
  * **모든 test는 블록 본문(`{ }`)이다** — `= runBlocking { ... shouldBe }`(식 본문)로 쓰면
  * kotest `shouldBe`가 수신자를 반환해 함수의 추론 반환 타입이 `Unit`이 아니게 되고 JUnit
- * Jupiter가 test로 discover하지 않는다(2B `PredictionContractTest`의 실측 버그,
+ * Jupiter가 test로 discover하지 않는다(`PredictionContractTest`의 실측 버그,
  * `OPEN-2B-TEST-DISCOVERY-GUARD`). 블록 본문은 항상 `Unit`이라 이 함정이 없다.
  *
  * **거부 규칙(전이표·조합 불변식·timestamp 순서·dataset_id 일치·fail-closed enum·checksum

@@ -3,7 +3,7 @@ package bidvector.adapters.ml
 import java.math.BigDecimal
 
 /**
- * M4/4D-1(D-4D-3) — M2/2A·2B `ContractFractionRules`(adapters/src/test/kotlin/bidvector/
+ * D-4D-3 — `ContractFractionRules`(adapters/src/test/kotlin/bidvector/
  * adapters/contract) 를 main 으로 승격한 실물. decimal string 정규형 규칙(scale 보존,
  * 지수 표기 거부) — `RequestMapping.kt`·`ResponseMapping.kt`가 `Rate.fraction`·
  * `Weight.fraction`·`PriceFitness.score`·`Uncertainty.dispersion`·`Uncertainty.estimate_margin`

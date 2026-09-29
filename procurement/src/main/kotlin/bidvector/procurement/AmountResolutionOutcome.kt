@@ -8,7 +8,7 @@ import java.math.BigDecimal
 /** [resolveAmount] 한 지점의 결과(⑤) — 매치 없음(`Unresolved`)과 계약 위반(`Rejected`)을 구분한다. */
 sealed interface AmountResolutionOutcome {
     /**
-     * `unit`·`vatTreatment`는 후보를 낸 계약에서 그대로 옮긴 것이다(verifier r1 F-2) —
+     * `unit`·`vatTreatment`는 후보를 낸 계약에서 그대로 옮긴 것이다 —
      * [canonicalize]가 통화·과세를 리터럴로 짓지 않고 이 값을 읽는다.
      */
     data class Resolved(

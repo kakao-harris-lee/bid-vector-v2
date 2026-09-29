@@ -151,7 +151,7 @@ def _run_stability(
                 seed=seed,
                 improvement_ratio=improvement_ratio(baselines.gate_rmse, trial_rmse),
                 paired_t=trial_statistic,
-                # verifier r1 H-2 — 판정식을 여기서 다시 쓰지 않는다. 유일 정의는
+                # H-2 — 판정식을 여기서 다시 쓰지 않는다. 유일 정의는
                 # `verdict.passes_gate`(gate_outcome 도 같은 함수를 쓴다).
                 passed=passes_gate(
                     baselines.gate_rmse, trial_rmse, trial_statistic, evaluation_policy

@@ -13,14 +13,14 @@ import java.sql.Types
 import java.time.Instant
 
 /**
- * M3/3F D-3F-4 — `OpeningRankOneOutcome` ↔ `opening_rank_one_*` 컬럼 왕복(왕복 안정성 — 저장한
+ * D-3F-4 — `OpeningRankOneOutcome` ↔ `opening_rank_one_*` 컬럼 왕복(왕복 안정성 — 저장한
  * 값을 그대로 복원한다, [ProvenanceCodec]과 같은 자리). `bind`/`read`를 한 object 에 묶어
  * [JdbcOpeningResultRepository]의 함수 수를 줄인다(detekt TooManyFunctions, CPD 중복 제거와
  * 같은 「분산시켜 재사용」 판단). kind 문자열은 이 파일이 정하는 내부 어휘이지 KONEPS 원문
  * 라벨이 아니다 — `V5__opening_complete_axis.sql` 의 `opening_rank_one_kind_enum` CHECK 와
  * 반드시 같은 값이어야 한다.
  *
- * **verifier r1 F-1 뒤** — `bind`가 이 축의 일곱 컬럼을 [OpeningRankOneOutcome.observedAt]과
+ * `bind`가 이 축의 일곱 컬럼을 [OpeningRankOneOutcome.observedAt]과
  * 함께 하나로 묶어 내보낸다. `Sql.kt`의 UPSERT 술어가 `EXCLUDED.opening_rank_one_kind`가
  * NULL 인지로 「이 축 전부 보존」 대 「이 축 전부 교체」를 가른다 — 컬럼별 갱신이 아니다.
  */
@@ -101,19 +101,19 @@ internal object OpeningRankOneKind {
 }
 
 /**
- * M3/3F D-3F-4 — `DrawNumberObservation` ↔ `draw_numbers_*` 컬럼 왕복.
+ * D-3F-4 — `DrawNumberObservation` ↔ `draw_numbers_*` 컬럼 왕복.
  *
- * **verifier r2 N-1 뒤 — `OutOfRange`의 `validRange` 는 이 축 자신의 컬럼
- * (`draw_numbers_valid_range_max`)에 싣는다.** 이전 판(r1 F-3)은 그 값을 부모의
+ * **`OutOfRange`의 `validRange` 는 이 축 자신의 컬럼
+ * (`draw_numbers_valid_range_max`)에 싣는다.** 부모의
  * `total_reserve_price_candidate_count`(3E 슬롯, 별도 COALESCE 축)에서 읽기 시점에
- * 재구성했는데, `INSERT ... ON CONFLICT` 의 CHECK 가 병합 뒤 행이 아니라 들어오는 제안
- * tuple 에 걸려(PostgreSQL 관용구) 부모가 이미 총예가건수를 가진 상태에서도 그 축을 안
- * 실은 정상 저장이 거부됐다. `validRange.first`(1-기반 인덱스라 항상 1 — `OutOfRange.init`
- * 의 `require` 가 verifier r3 M-1 뒤 그것을 타입으로 강제한다, `NoticeFacts.kt` 참고)는
+ * 재구성하면, `INSERT ... ON CONFLICT` 의 CHECK 가 병합 뒤 행이 아니라 들어오는 제안
+ * tuple 에 걸리므로(PostgreSQL 관용구) 부모가 이미 총예가건수를 가진 상태에서도 그 축을 안
+ * 실으면 정상 저장이 거부된다. `validRange.first`(1-기반 인덱스라 항상 1 — `OutOfRange.init`
+ * 의 `require` 가 그것을 타입으로 강제한다, `NoticeFacts.kt` 참고)는
  * 저장하지 않는다(중복 금지) — `validRange.last`(상한)만 싣는다. `read`가 재구성하는
  * `1..max`의 하한이 그 `require` 와 항상 일치한다.
  *
- * **verifier r1 F-1·F-2 뒤** — `bind`가 이 축의 네 컬럼(kind·번호 배열·관측 시각·범위 상한)
+ * `bind`가 이 축의 네 컬럼(kind·번호 배열·관측 시각·범위 상한)
  * 을 하나로 묶어 내보낸다. `Sql.kt`가 `EXCLUDED.draw_numbers_kind` NULL 여부로 축 전체를
  * 보존/교체한다.
  */

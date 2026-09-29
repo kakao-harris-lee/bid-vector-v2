@@ -119,7 +119,7 @@ internal fun embeddingFailureResponse(
         }.build()
 
 /**
- * PR #5 게이트 시정(D-2E ② 미구현) — `dimension` 기본값을 [testEmbeddingSuccess]의 기본
+ * 게이트 시정(D-2E ② 미구현) — `dimension` 기본값을 [testEmbeddingSuccess]의 기본
  * `values.size`(4, `testUnitVector(4)`)와 맞춘다. 이 함수를 쓰는 기존 test 는 release 대조만
  * 겨냥했고 dimension 을 세팅하지 않았다 — 새로 걸린 `embeddingDimensionMatchesMetadata`
  * 검사가 우연히 `0 != 4`로 그 test 들을 깨지 않도록 기본값을 실제 testdata 차원에 맞춘다.

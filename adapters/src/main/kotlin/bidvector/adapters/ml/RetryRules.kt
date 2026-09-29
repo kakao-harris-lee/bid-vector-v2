@@ -5,7 +5,7 @@ import io.grpc.StatusException
 import io.grpc.StatusRuntimeException
 
 /*
- * M4/4D-1(D-4D-3) — M2/2D `ContractRetryRules`(adapters/src/test/kotlin/bidvector/adapters/
+ * D-4D-3 — `ContractRetryRules`(adapters/src/test/kotlin/bidvector/adapters/
  * contract) 를 main 으로 승격한 실물. ADR 0010 D-4 「재시도는 멱등성과 상태로만 결정된다」의
  * 순수 판정 함수다. `adapters/src/test/kotlin/bidvector/adapters/contract/ContractRetryRules.kt`
  * 는 이제 이 파일을 위임만 한다(2D 소비자 test 는 그대로 통과해야 한다, scope.md S-3).
@@ -65,7 +65,7 @@ internal fun grpcStatusOf(error: Throwable): Status? =
     }
 
 /**
- * 리뷰 F-E(medium) 처방 — `GrpcBidPredictionGateway.mapTransportFailure`와
+ * `GrpcBidPredictionGateway.mapTransportFailure`와
  * `GrpcEmbeddingGateway.mapEmbedTransportFailure`가 같은 3분기 status 표를 각자
  * `MlUnavailableReason`·`EmbeddingUnavailableReason`(서로 다른 sealed 타입)으로 옮겨
  * 적던 16줄 중복(cpd 미검출)을 여기서 닫는다 — 분류 로직 자체는 이 함수 하나가 갖고,

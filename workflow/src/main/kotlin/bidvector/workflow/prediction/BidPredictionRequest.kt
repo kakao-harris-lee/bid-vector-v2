@@ -50,7 +50,7 @@ sealed interface ModelReleaseSelector {
 }
 
 /**
- * 예비가격 추첨 관측(M4/4B-7, D-4B7-5) — 표본 공고의 예비가격 원문 관측값(기초금액 축,
+ * 예비가격 추첨 관측(D-4B7-5) — 표본 공고의 예비가격 원문 관측값(기초금액 축,
  * D-4B7-1 (a))과 추첨된 번호 집합을 함께 나른다. `reservePrices`는 비어 있을 수 없다 —
  * 이 타입이 만들어지면 그 값이 있다는 뜻이다(`null`인 [CompetitionSample.reserveDraw]가
  * "이 축 자체가 관측되지 않았다"를 진다, 엔진이 `NO_RESERVE_DRAW`로 계수). `selectedNumbers`는
@@ -75,14 +75,14 @@ data class ReserveDrawObservation(
  * 값은 항상 관측(`BID_RATE_ORIGIN_OBSERVED`)이라 어댑터가 상수로 채운다(common.proto
  * D-2A-7).
  *
- * `agencyId`·`categoryCode`(M2/2F additive, D-2F-1) — 표본의 발주기관·업종 fact. **식별자가
+ * `agencyId`·`categoryCode`(D-2F-1) — 표본의 발주기관·업종 fact. **식별자가
  * 아니다**(D-2B-3 유지 — 표본 식별·중복 제거는 여전히 불가). 값의 정본은 [AgencyId]와
  * 같다(`OPEN-2B-AGENCY-ID`, 정본 M3). 어댑터가 `null`을 나르는 결측 사유는 두 축이
- * 다르다(M3/3H-2 D-3H2-2) — `agencyId`는 `MISSING_REASON_UNKNOWN`(수집했으나 원천에
+ * 다르다(D-3H2-2) — `agencyId`는 `MISSING_REASON_UNKNOWN`(수집했으나 원천에
  * 없음), `categoryCode`는 여전히 `MISSING_REASON_NOT_COLLECTED_YET` 하나뿐이다
  * (`RequestMapping.kt` — 사유를 지어내지 않는다).
  *
- * `reserveDraw`(M4/4B-7, D-4B7-5) — `null`이면 이 축이 관측되지 않았다. 4D-1 알려진
+ * `reserveDraw`(D-4B7-5) — `null`이면 이 축이 관측되지 않았다. 4D-1 알려진
  * 제한 2(distribution predictor 입력 부재)를 이 slice가 채운다.
  */
 data class CompetitionSample(

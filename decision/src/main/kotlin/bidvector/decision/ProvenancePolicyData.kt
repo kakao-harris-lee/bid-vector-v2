@@ -15,10 +15,10 @@ import java.math.RoundingMode
  * (D-5 — "first-match 에서 건너뛰지 않고 정책 부재 실패로") — 그 규칙이 활성인데 임계값이
  * 없는 상태를 값으로 만들 수 없게 한다.
  *
- * `integerRoundingMode`(verifier r2 N-1) — `isCleanInteger`·`isDerivedVat`가 정수 근접을
- * 재는 `setScale` 에 쓰는 반올림 모드. 이전 판은 그 술어 본문에 `RoundingMode.HALF_UP`을
- * 리터럴로 박아 뒀다 — `OPEN-DIC-10`이 아직 안 정한 모드 값을 main 이 지어낸 것과 같은
- * 이탈이라 슬롯으로 뺐다. 값은 test 정책·runner 에만 있다.
+ * `integerRoundingMode` — `isCleanInteger`·`isDerivedVat`가 정수 근접을
+ * 재는 `setScale` 에 쓰는 반올림 모드. 그 술어 본문에 `RoundingMode.HALF_UP`을 리터럴로
+ * 박으면 `OPEN-DIC-10`이 아직 안 정한 모드 값을 main 이 지어낸 것과 같은 이탈이라 슬롯으로
+ * 뺐다. 값은 test 정책·runner 에만 있다.
  */
 data class ProvenancePolicyData(
     val ruleOrder: List<ProvenanceRuleId>,

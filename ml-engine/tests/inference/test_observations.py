@@ -107,7 +107,7 @@ def test_price_count_mismatch_is_rejected(policy: InferencePolicy) -> None:
 
 
 def test_non_positive_price_is_rejected(policy: InferencePolicy) -> None:
-    """verifier r1 F-2 — `NON_POSITIVE_PRICE`(구판)는 `RESERVE_PRICE_INVALID`(4성분
+    """F-2 — `NON_POSITIVE_PRICE`(구판)는 `RESERVE_PRICE_INVALID`(4성분
     규칙, `amount_won>0` 을 포섭)로 대체됐다."""
     sample = _sample(reserve_price_overrides={0: 0})
     result = observe_sample(sample, policy)
@@ -115,7 +115,7 @@ def test_non_positive_price_is_rejected(policy: InferencePolicy) -> None:
 
 
 def test_reserve_price_wrong_basis_is_rejected(policy: InferencePolicy) -> None:
-    """verifier r1 F-2 재현 — `basis=BASIS_ESTIMATED`인 예비가 하나가 그대로 비율이
+    """F-2 재현 — `basis=BASIS_ESTIMATED`인 예비가 하나가 그대로 비율이
     되던 결함."""
     sample = _sample(
         reserve_price_money_overrides={0: {"basis": common_pb2.BASIS_ESTIMATED}}
@@ -169,9 +169,9 @@ def test_bid_rate_out_of_band_is_rejected(policy: InferencePolicy) -> None:
 def test_bid_rate_cleared_field_is_unparseable_not_exception(
     policy: InferencePolicy,
 ) -> None:
-    """verifier r1 F-1 재현 — `observed_bid_rate`는 `optional`이 아닌 메시지 필드라
-    송신측이 빼면 proto 기본값 `fraction=""`이 된다. 이전 판은 `decimal.InvalidOperation`
-    이 `observe_sample` 밖으로 샜다."""
+    """F-1 재현 — `observed_bid_rate`는 `optional`이 아닌 메시지 필드라
+    송신측이 빼면 proto 기본값 `fraction=""`이 된다. 관문 없이 파싱하면
+    `decimal.InvalidOperation`이 `observe_sample` 밖으로 샌다."""
     sample = _sample()
     sample.ClearField("observed_bid_rate")
     result = observe_sample(sample, policy)
@@ -181,7 +181,7 @@ def test_bid_rate_cleared_field_is_unparseable_not_exception(
 def test_bid_rate_non_numeric_string_is_unparseable_not_exception(
     policy: InferencePolicy,
 ) -> None:
-    """verifier r1 F-1 재현 — `"abc"`."""
+    """F-1 재현 — `"abc"`."""
     sample = _sample(observed_bid_rate="abc")
     result = observe_sample(sample, policy)
     assert result == SampleRejected(SampleRejectionReason.BID_RATE_UNPARSEABLE)
@@ -208,7 +208,7 @@ def test_bid_rate_negative_is_out_of_band_not_unparseable(
 
 def test_award_rate_non_numeric_is_unparseable(policy: InferencePolicy) -> None:
     """`award_rate`(optional)는 조립기가 소비하지 않지만, 있으면 같은 파싱 관문을
-    거친다(verifier r1 F-1 처방 — award_rate 도 같은 관문)."""
+    거친다(F-1 처방 — award_rate 도 같은 관문)."""
     sample = _sample(award_rate="not-a-number")
     result = observe_sample(sample, policy)
     assert result == SampleRejected(SampleRejectionReason.BID_RATE_UNPARSEABLE)
@@ -306,9 +306,9 @@ def test_observed_bid_rate_is_read_via_decimal_not_bare_float(
 
 
 def test_rejection_reasons_are_nine() -> None:
-    """설계 검토 (5) 구현 지시 3 「7 사유」 + verifier r1 F-1(`BID_RATE_UNPARSEABLE`
+    """설계 검토 (5) 구현 지시 3 「7 사유」 + F-1(`BID_RATE_UNPARSEABLE`
     신설)·F-2(`NON_POSITIVE_PRICE`→`RESERVE_PRICE_INVALID` 대체, 개수 불변) +
-    M5/5D-3(D-5D3-2) `SEGMENT_REASON_NOT_ALLOWED` 신설."""
+    D-5D3-2 `SEGMENT_REASON_NOT_ALLOWED` 신설."""
     assert len(list(SampleRejectionReason)) == 9
     assert SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED in list(
         SampleRejectionReason

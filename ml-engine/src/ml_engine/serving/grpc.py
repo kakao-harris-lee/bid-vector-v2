@@ -8,7 +8,7 @@ readiness `NOT_READY`가 `server.stop`보다 **먼저**(설계 검토 (1) 「종
 하지 않는다**(forbidden 계약 — `serving`은 `training`을 모른다). 실 인스턴스는 조립 근
 (`ml_engine.app`)이 만들어 넘긴다.
 
-verifier r1 M-8 — `is_deadline_active(context.is_active())`(ADR 0010 D-2 「긴 계산
+M-8 — `is_deadline_active(context.is_active())`(ADR 0010 D-2 「긴 계산
 앞에서 deadline 확인」)를 이 slice에서는 지웠다. 5E-1 의 세 servicer 는 이 확인이
 붙을 자리가 없다: `GetModelMetadata`·`GetEmbeddingMetadata`·`EmbedText`(검증 실패 또는
 `MODEL_NOT_READY`)는 O(1) 이고, `StartTraining`은 검증 뒤 즉시 `ACCEPTED`를 반환하며

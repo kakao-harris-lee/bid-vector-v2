@@ -18,7 +18,7 @@ data class KonepsHttpPolicyData(
     val rateLimiterPeriod: Duration,
     val rateLimiterWait: Duration,
     val maxPages: Int,
-    // verifier r1 M-4 — JSON 중첩 깊이 상한. 상한 없이는 악의적으로 깊은 envelope 가
+    // JSON 중첩 깊이 상한. 상한 없이는 악의적으로 깊은 envelope 가
     // `StackOverflowError`(Throwable, 예외가 아니다)를 던지고 `runCatching` 이 그것까지
     // 삼켜 StructureFailure 로 접는다(오늘도 봉쇄는 되지만 정공법이 아니다) — 명시 상한을
     // 두면 실제 JVM 스택 한계에 닿기 훨씬 전에 통제된 `JsonParseException` 으로 끝난다.

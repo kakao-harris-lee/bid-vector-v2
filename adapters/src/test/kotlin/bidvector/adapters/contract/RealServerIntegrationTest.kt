@@ -44,9 +44,9 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * M6/6C ④(scope.md, `OPEN-5E2-CROSSLANG-REAL-SERVER` 종결) — **실 Kotlin gateway**
+ * (scope.md, `OPEN-5E2-CROSSLANG-REAL-SERVER` 종결) — **실 Kotlin gateway**
  * (`GrpcBidPredictionGateway`, fake 아님)로 (1) `docker/ml-serving.Dockerfile`이 만든
- * 실 Python 서버 컨테이너에 붙는다. 2B/2D/4D-1 이 fake servicer 위에서 확인해 온 매핑·
+ * 실 Python 서버 컨테이너에 붙는다. fake servicer 위에서 확인해 온 매핑·
  * release 대조·재시도 규칙이 실 서버 응답에서도 성립함을 여기서 처음 증명한다.
  *
  * D-6C-4 — 기본 `check`에서 빠진다(`@EnabledIfSystemProperty`, JVM 이 이 조건을 평가하는
@@ -56,12 +56,12 @@ import java.util.UUID
  * `bidvector.realServer.enabled` system property 로 project property 를 그대로
  * 전달한다).
  *
- * **패키지가 `bidvector.adapters.contract`다(D-6C-8, 계약 갱신 2026-09-16 (2))** —
+ * **패키지가 `bidvector.adapters.contract`다(D-6C-8)** —
  * `bidvector.adapters.ml`에는 두지 않는다. 그 패키지에는 `MlGateRegistrationTest`
  * (디렉터리의 모든 `*Test.kt` 전수를 `gate-tests.properties` 등재와 대조)와
  * `gateExecutionGate`(등재된 클래스의 skip 0 요구)가 함께 있어, 환경 조건부로 항상
  * skip 될 수 있는 이 test 를 그 자리에 두면 두 게이트가 동시에 만족 불가능해진다
- * (등재하면 skip 위반, 빼면 등재 위반 — 구현 레인 실측, 정지·보고 뒤 팀장 결정).
+ * (등재하면 skip 위반, 빼면 등재 위반).
  * 같은 축의 기존 전례(`CrossLangSmokeTest` — 교차 언어 스모크, 컨테이너 없이 도는
  * Python 서버 대상)가 이미 이 패키지에 있다 — 이 test 는 그 컨테이너 판이다. 게이트
  * 술어(두 파일 모두 build-logic·기존 test)는 건드리지 않는다(`OPEN-6C-CONDITIONAL-
@@ -189,7 +189,7 @@ class RealServerIntegrationTest {
      * `bid_ratio.min_samples`(3) 미만이면 `Unmeasurable(InsufficientSamples)`로
      * 정직하게 거절한다(fake 는 응답을 고정으로 배선해 이 두 축을 재지 않는다) — **값
      * 계산 축이지 이 slice 가 잡는 소비자 규칙 축이 아니라서** 정책 하한을 채운 별도
-     * fixture 를 쓴다(2026-09-16 실 서버 첫 실행 두 차례에서 실측 — ① `reserveDraw`
+     * fixture 를 쓴다(실 서버 첫 실행 두 차례에서 실측 — ① `reserveDraw`
      * 없이 보내면 전 표본이 `NO_RESERVE_DRAW`로 제외돼 표본 수와 무관하게
      * `Unmeasurable` ② `reserveDraw`를 채우자 `Predicted`로 성립).
      */

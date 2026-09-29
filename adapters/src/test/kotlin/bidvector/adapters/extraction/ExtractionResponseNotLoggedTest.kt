@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 private const val SECRET_MARKER = "SECRET-LICENSE-HOLDER-DETAIL-9f21"
 
 /**
- * M3/3C ⑥ — LLM 응답 원문은 `toString()`·예외 메시지 어디에도 노출되지 않는다(위협
+ * LLM 응답 원문은 `toString()`·예외 메시지 어디에도 노출되지 않는다(위협
  * 모델 방어 (e), 우회 (5)).
  */
 class ExtractionResponseNotLoggedTest {

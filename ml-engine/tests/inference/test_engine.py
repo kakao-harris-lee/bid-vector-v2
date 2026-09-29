@@ -1,5 +1,5 @@
 """RED — `ml_engine.inference.engine`(scope.md ④, D-5D2-1 (b), 설계 검토 구현 지시 6).
-진입점 + GBM 미import test(우회 후보 (4)) + M5/5D-3(D-5D3-7) 서빙 경로 3계층 수축."""
+진입점 + GBM 미import test(우회 후보 (4)) + D-5D3-7 서빙 경로 3계층 수축."""
 
 from __future__ import annotations
 
@@ -121,11 +121,11 @@ def test_engine_module_does_not_have_predict_in_sys_modules_dependency() -> None
     assert not hasattr(engine_module, "segment_availability")
 
 
-# ---- M5/5D-3(D-5D3-7) — 서빙 경로 3계층 수축: golden ml-kernel-011 의 계층 표본 수
+# ---- D-5D3-7 — 서빙 경로 3계층 수축: golden ml-kernel-011 의 계층 표본 수
 # (5/10/500)·정책을 wire 요청으로 조립해 `serve_bid_rates` 경유 `diagnostics`를 011
 # expected(segmentSupport DIRECT·agencySampleCount 5·below true·shrinkageWeight 0.25)
 # 와 대조한다. golden corpus 자체는 편집하지 않는다 — 이 test 는 011 의 값을 **읽기만**
-# 한다(2026-09-12 승인 corpus 범위 유지). mean/variance 는 대조하지 않는다 — 수축
+# 한다(승인 corpus 범위 유지). mean/variance 는 대조하지 않는다 — 수축
 # 가중치는 계층 표본 **수**만의 함수(011 derivation `w = n/(n+k)`)라 값 일치 없이
 # 재현 가능하다(D-5D3-7 근거).
 

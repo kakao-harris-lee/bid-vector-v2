@@ -42,31 +42,31 @@ private fun isDisallowed(importedPackage: String): Boolean =
 private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
 
 /**
- * D-6F5-9(verifier r1 HIGH-1) — `LICENSE_QUALIFICATION_POLICY`는 `bidvector.qualification`에
+ * D-6F5-9 — `LICENSE_QUALIFICATION_POLICY`는 `bidvector.qualification`에
  * 있고 그 루트는 이 게이트의 **허용 루트**다(어댑터가 `LicenseEligibility`·`LicenseVerdict`를
  * 보려면 필연이라 좁힐 수 없다). 패키지 루트 단위 술어로는 「커널을 쓴다」와 「정책을 직접
  * 읽는다」를 가를 수 없어, 그 두 어휘(정책 로더가 컴파일된 클래스의 `getstatic`/`invoke`
  * 대상으로 남기는 이름)의 **부재**를 따로 건다.
  *
- * D-6F5-14(verifier r2 HIGH, 범위 정정) — 대상은 `StoredRequirementLicenseGate` 한 파일이
+ * D-6F5-14(범위 정정) — 대상은 `StoredRequirementLicenseGate` 한 파일이
  * 아니라 **`bidvector.adapters.qualification` 패키지 전체 class 파일**이다. 계약(위협 모델
  * ②③, D-6F5-9)이 방어하겠다고 선언한 대상은 **어댑터(패키지)**이지 클래스 하나가 아니다 —
  * 정책 읽기를 같은 패키지의 새 형제 파일로 옮기는 리팩터링은 클래스 단위 술어를 우회하지만
- * 패키지 단위 술어는 우회하지 못한다(verifier r2 실측).
+ * 패키지 단위 술어는 우회하지 못한다(실측).
  */
 private const val LICENSE_POLICY_LOADER_CLASS_MARKER = "LicensePolicyKt"
 private const val LICENSE_POLICY_LOADER_GETTER_MARKER = "getLICENSE_QUALIFICATION_POLICY"
 
 /**
- * D-6F5-10(verifier r1 HIGH-2) — 「`LicenseEligibility`·`judge` 어휘가 있는지」만 보는 참조
+ * D-6F5-10 — 「`LicenseEligibility`·`judge` 어휘가 있는지」만 보는 참조
  * 단언은 호출을 **남긴 채 결과만 갈아치우는** 우회를 못 잡는다. 어댑터는 `LicenseVerdict`를
  * 생성할 이유가 없다(반환만 한다) — 그 사실을 상수 풀에서 생성자 참조 부재로 건다.
  *
- * D-6F5-14(verifier r2 HIGH, 범위 정정) — 위와 같은 이유로 **패키지 전체**에 대해 돈다.
+ * D-6F5-14(범위 정정) — 위와 같은 이유로 **패키지 전체**에 대해 돈다.
  * `LicenseVerdict.Eligible(emptySet())` 조립을 새 형제 파일로 옮기면 클래스 단위 술어는
- * 우회되지만 패키지 단위 술어는 그 형제 파일의 class 를 같이 훑어 잡는다(verifier r2 실측 ②).
+ * 우회되지만 패키지 단위 술어는 그 형제 파일의 class 를 같이 훑어 잡는다(실측 ②).
  *
- * D-6F5-15(verifier r2 LOW-1, 문면 정정 — 넓히는 방향) — 이 마커는 **생성자 참조 부재**보다
+ * D-6F5-15(문면 정정 — 넓히는 방향) — 이 마커는 **생성자 참조 부재**보다
  * 넓다: `LicenseVerdict$`는 subtype 의 내부 이름 접두이므로 `is LicenseVerdict.Eligible` 같은
  * **읽기 전용 타입 검사 한 줄**도 컴파일이 `instanceof …LicenseVerdict$Eligible`을 상수 풀에
  * 남겨 같이 걸린다(실측). 그래서 어댑터는 verdict를 **통과시키기만 한다** — 상수 풀에 어떤
@@ -129,14 +129,14 @@ class QualificationAdapterDependencyTest {
     }
 
     /**
-     * D-6F5-9(verifier r1 HIGH-1) — 재현: `verdictFor` 첫 줄 앞에
+     * D-6F5-9 — 재현: `verdictFor` 첫 줄 앞에
      * `LICENSE_QUALIFICATION_POLICY.resolve(...)`를 전체 한정 좌표로 심으면 의존 게이트의
      * 허용 루트 판정(`isDisallowed`)도, 전건 `check`도 초록이었다(어댑터가 정책의 두 번째
      * 독자가 되는 것을 D-6F5-5가 막으려 했으나 실제로 막는 게이트가 없었다). 정책 로더
      * 좌표가 상수 풀에 남는지를 직접 잰다.
      *
-     * D-6F5-14(verifier r2 HIGH) — `StoredRequirementLicenseGate` 한 파일만 보면 정책 읽기를
-     * **같은 패키지의 새 형제 파일**로 옮기는 것만으로 우회된다(verifier r2 실측, 전건 `check`
+     * D-6F5-14 — `StoredRequirementLicenseGate` 한 파일만 보면 정책 읽기를
+     * **같은 패키지의 새 형제 파일**로 옮기는 것만으로 우회된다(실측, 전건 `check`
      * exit 0). **패키지 전체 class 파일**에 대해 돌려 그 우회를 막는다.
      */
     @Test
@@ -151,18 +151,18 @@ class QualificationAdapterDependencyTest {
     }
 
     /**
-     * D-6F5-10(verifier r1 HIGH-2) — 재현: `judge(...)` 호출은 남긴 채 `Collected(빈 rows)`
+     * D-6F5-10 — 재현: `judge(...)` 호출은 남긴 채 `Collected(빈 rows)`
      * 경로의 반환값만 `LicenseVerdict.Eligible(emptySet())`로 뒤집어도 전건 `check`가
      * 초록이었다(커널 참값은 `Uncertain(RequirementDataAbsent)` — 부적격을 적격으로 뒤집는
      * 가장 비싼 방향의 오판). 원판 상수 풀에는 `LicenseVerdict$` 항목이 0건이다 — 어댑터는
      * verdict를 생성할 이유가 없다.
      *
-     * D-6F5-14(verifier r2 HIGH) — 조립을 **같은 패키지의 새 형제 파일**로 옮기고 게이트
+     * D-6F5-14 — 조립을 **같은 패키지의 새 형제 파일**로 옮기고 게이트
      * test 가 덮지 않는 경로(`Unparsable` 행이 섞인 `Collected`)에서 반환하면, 게이트 클래스
-     * 하나만 보는 술어는 우회된다(verifier r2 실측 ②③). **패키지 전체 class 파일**에 대해
+     * 하나만 보는 술어는 우회된다(실측 ②③). **패키지 전체 class 파일**에 대해
      * 돌려 형제 파일의 조립도 함께 잡는다.
      *
-     * D-6F5-15(verifier r2 LOW-1) — 술어는 생성뿐 아니라 **읽기**(`is LicenseVerdict.Eligible`)
+     * D-6F5-15 — 술어는 생성뿐 아니라 **읽기**(`is LicenseVerdict.Eligible`)
      * 도 막는다. 이름·문서를 「통과만 한다 — subtype 좌표를 두지 않는다」로 넓혀 술어와 맞춘다.
      */
     @Test
@@ -212,7 +212,7 @@ private fun storedRequirementLicenseGateClassFile(): File {
 }
 
 /**
- * D-6F5-14(verifier r2 HIGH) — `bidvector.adapters.qualification` **패키지 전체**의 컴파일된
+ * D-6F5-14 — `bidvector.adapters.qualification` **패키지 전체**의 컴파일된
  * class 파일 목록. 허용 루트 판정(위 첫 test)이 이미 쓰던 `walkTopDown()` 목록을 부재 단언
  * 둘(정책 로더 좌표·`LicenseVerdict$`)과 공유해, 세 자리 모두 같은 대상(패키지)을 본다 — 대상이
  * 클래스 하나로 좁아지는 것을 막는다. 빈 디렉터리를 「위반 없음」으로 오판하지 않도록

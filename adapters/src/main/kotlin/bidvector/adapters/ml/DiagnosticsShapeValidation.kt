@@ -9,7 +9,7 @@ import bidvector.workflow.prediction.Weight as DomainWeight
 import contract.bidvector.ml.v1.SegmentSupport as ProtoSegmentSupport
 
 /**
- * M4/4D-3(scope.md D-4D3-2) — `Success.diagnostics` 형태 검증·파싱. `ReleaseShapeValidation.kt`
+ * scope.md D-4D3-2 — `Success.diagnostics` 형태 검증·파싱. `ReleaseShapeValidation.kt`
  * ·`CandidateShapeValidation.kt`와 같은 꼴(`ParsedSuccessFields.kt`에서 갈라낸 파일 —
  * detekt `TooManyFunctions`, 술어를 한 파일에 모아 table test 가 가리키게 한다).
  * `isAcceptableSuccessShape`(구조 검증층, `ParsedSuccessFields.kt`)가

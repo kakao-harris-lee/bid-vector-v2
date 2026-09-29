@@ -1,4 +1,4 @@
-"""M2/2A round-trip(Python) — 같은 `contracts/testdata/*.binpb` 로 Kotlin 쪽과 같은 바이트·같은
+"""round-trip(Python) — 같은 `contracts/testdata/*.binpb` 로 Kotlin 쪽과 같은 바이트·같은
 정규형 문자열을 낸다(⑦). S-6 — Gradle `check` 밖(CI 에 Python 툴체인 없음, 알려진 제한).
 
 거부 규칙(fail-closed, ⑥)은 Kotlin 쪽 `ContractRoundTripTest`와 대칭으로 여기서도 test 가

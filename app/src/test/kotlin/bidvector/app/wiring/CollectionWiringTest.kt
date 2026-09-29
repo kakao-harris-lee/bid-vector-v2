@@ -27,7 +27,7 @@ import java.util.function.Supplier
 import javax.sql.DataSource
 
 /**
- * D-6F8-3(M6/6F-8) — 수집 러너 배선의 켜짐 조건과 기동 실패. 러너는 `bidvector.collection.mode=once` 일 때만
+ * D-6F8-3 — 수집 러너 배선의 켜짐 조건과 기동 실패. 러너는 `bidvector.collection.mode=once` 일 때만
  * 빈이고(기본 꺼짐), 켜졌을 때의 설정 오류는 전부 기동 실패다. 꺼져 있으면 서비스 키가 없어도 뜬다.
  */
 class CollectionWiringTest {
@@ -250,7 +250,7 @@ class CollectionWiringTest {
     }
 
     /**
-     * D-6F9-1(verifier r1 F-1 요구) — 설정 표 한 행의 **대분류가 이긴다**. 경로와 대분류를 고의로 어긋나게 주고(공사
+     * D-6F9-1 — 설정 표 한 행의 **대분류가 이긴다**. 경로와 대분류를 고의로 어긋나게 주고(공사
      * 경로 + 용역 대분류, 그리고 그 반대) 배선이 조립한 소스가 실제로 낸 관측의 대분류를 본다. 게이트는 「경로에서
      * 대분류를 짓는 코드가 없다」를 구조로 잠그고 이 test 는 그 값이 관측까지 가는 것을 **행동으로** 잠근다 —
      * 기본 표는 경로와 대분류가 일치해서 어느 쪽에서 얻어도 답이 같아 이 축을 재지 못한다(mock loopback, 실호출 0).
@@ -293,7 +293,7 @@ class CollectionWiringTest {
                 "bidvector.koneps.operations.goods.path=getBidPblancListInfoThng",
                 "bidvector.koneps.operations.goods.division=basket",
             ),
-            // code-review r1 L9 — 빈·공백 경로는 `URI.create("$baseUri/")` 가 되어 HTTP 시점에 죽었다.
+            // 빈·공백 경로는 `URI.create("$baseUri/")` 가 되어 HTTP 시점에 죽는다.
             arrayOf(
                 "bidvector.koneps.operations.goods.path=",
                 "bidvector.koneps.operations.goods.division=goods",

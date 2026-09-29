@@ -21,8 +21,8 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 /**
- * M3/3F D-3F-1 (a) — `fetchOpeningCompleteResults`. `KonepsOpeningResultSourceTest.kt`에서
- * sizeGate(500줄, v2-지침서 §5)로 분리한 파일(3E `CleanMigrationCheckTest`와 같은 전례) — 위
+ * D-3F-1 (a) — `fetchOpeningCompleteResults`. `KonepsOpeningResultSourceTest.kt`에서
+ * sizeGate(500줄, v2-지침서 §5)로 분리한 파일(`CleanMigrationCheckTest`와 같은 전례) — 위
  * 상수·helper 는 그 파일의 `private` 선언과 이름이 같지만 각자 파일 스코프라 부딪히지
  * 않는다(Kotlin top-level `private` 는 파일 단위 — 패키지 단위로 올리면 다른 형제 test
  * 파일의 동명 선언과 충돌해 오히려 재사용이 안 된다, 실측). scope.md ⑦ 시나리오: 정상 다수

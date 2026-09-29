@@ -205,7 +205,7 @@ class ArchitectureGateCatchesViolationsTest {
 
     /**
      * D-6A3-17(a)① — [RogueNotificationPortImplementor]는 `bidvector.archfixture.violating.app`
-     * 안에서 `NotificationRequestPort`를 스스로 구현한다(verifier M1 재현 — app 이 새 구현을
+     * 안에서 `NotificationRequestPort`를 스스로 구현한다(app 이 새 구현을
      * 숨겨 심는 우회). fixture 루트를 `appRoot`에 그대로 넣어 production 을 지키는 같은
      * 규칙 값이 실제로 잡는지 확인한다.
      */
@@ -252,7 +252,7 @@ class ArchitectureGateCatchesViolationsTest {
 
     /**
      * D-6A3-17(b) — [RogueMlGatewayReferencer]는 허용 목록 밖의 `adapters.ml` 타입
-     * (`GrpcBidPredictionGateway`)을 참조한다(verifier M4 재현 — 루트 패키지에 실 gateway 를
+     * (`GrpcBidPredictionGateway`)을 참조한다(루트 패키지에 실 gateway 를
      * 끌어오는 우회).
      */
     @Test
@@ -266,9 +266,9 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * D-6A3-25(verifier r2 N6 재현) — [bidvector.archfixture.violating.app.http.
+     * D-6A3-25(N6) — [bidvector.archfixture.violating.app.http.
      * RogueConcreteAdapterCaller]는 구체 구현 타입을 직접 호출해 포트 메서드에 닿는다.
-     * 호출 지점의 owner 가 인터페이스가 아니라 구체 클래스라 이름 등식으로는 못 잡던 형태다.
+     * 호출 지점의 owner 가 인터페이스가 아니라 구체 클래스라 이름 등식으로는 못 잡는 형태다.
      */
     @Test
     fun `구체 어댑터를 경유한 포트 호출도 잡는다`() {
@@ -281,9 +281,9 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * D-6A3-25(verifier r2 N5 재현) — [bidvector.archfixture.violating.app.wiring.
+     * D-6A3-25(N5) — [bidvector.archfixture.violating.app.wiring.
      * RogueWiringPortCaller]는 `app.wiring` 에 놓인 헬퍼가 포트 인터페이스를 직접 호출한다.
-     * 이전 규칙은 `app.http` 패키지 하나만 봤지만 새 규칙은 app production 전체를 본다.
+     * 규칙은 `app.http` 패키지만이 아니라 app production 전체를 본다.
      */
     @Test
     fun `app wiring 헬퍼의 직접 호출도 잡는다`() {

@@ -70,7 +70,7 @@ class BootCompatibilitySmokeTest {
         ClassFileImporter().importPackages("bidvector.app") shouldNotBe null
     }
 
-    // M6/6A-1 D-6A1-16 — 여덟째 채택 좌표(spring-boot-starter-web). 서버를 띄우지 않고
+    // D-6A1-16 — 여덟째 채택 좌표(spring-boot-starter-web). 서버를 띄우지 않고
     // DispatcherServlet 타입만 로드한다(`PostgreSQLContainer` 항목과 같은 「로드만」 형태).
     @Test
     fun `spring-boot-starter-web 이 DispatcherServlet 타입을 로드한다 — 서버를 띄우지 않는다`() {

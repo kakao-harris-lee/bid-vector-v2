@@ -27,15 +27,15 @@ private val T1: Instant = Instant.parse("2026-09-09T00:00:00Z")
 private val T2: Instant = Instant.parse("2026-09-09T01:00:00Z")
 
 /**
- * M3/3F D-3F-4 — 개찰완료 축 부모 슬롯(`opening_rank_one_*`·`draw_numbers_*`, V5) 왕복 통합
- * test. 3E `OpeningReservePriceRepositoryTest` 옆의 신규 파일이다(3B·3B-2·3C·3D·3E 기존 test
+ * D-3F-4 — 개찰완료 축 부모 슬롯(`opening_rank_one_*`·`draw_numbers_*`, V5) 왕복 통합
+ * test. `OpeningReservePriceRepositoryTest` 옆의 신규 파일이다(다른 기존 test
  * 는 편집하지 않는다) — bypass #6(사업자등록번호·대표자명 컬럼 부재)은 그 파일의 기존 test
  * 가 이 표 전체 컬럼을 스캔해 이미 겸한다.
  *
- * **verifier r1 F-1·F-2·F-3 뒤** — 전이 test 여섯(F-1 회귀 방지, 재검증 명령 그대로) +
- * 낡음 신호 test 하나(F-2) + 저장 시점 거부 test 하나(F-3, r2 뒤 아래에서 대체됨)를 더한다.
+ * **F-1·F-2·F-3 뒤** — 전이 test 여섯(F-1 회귀 방지, 재검증 명령 그대로) +
+ * 낡음 신호 test 하나(F-2) + 저장 시점 거부 test 하나(F-3, 아래에서 대체됨)를 더한다.
  *
- * **verifier r2 N-1·N-2 뒤** — F-3 의 저장 시점 거부 test 는 그 CHECK 가 다른 축을 참조해
+ * **N-1·N-2 뒤** — F-3 의 저장 시점 거부 test 는 그 CHECK 가 다른 축을 참조해
  * 만든 오검출(N-1)이었음이 드러나 삭제하고, 자기 축 컬럼으로 여전히 성립하는 두 시나리오와
  * CHECK 자체의 음성 대조로 대체한다. F-1 라운드가 빠뜨린 전이 둘(RankMissing 시작점)도
  * 더한다(N-2).
@@ -139,7 +139,7 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * 범위 밖 — verifier r2 N-1 뒤 `validRange`는 `draw_numbers` 축 자신의 컬럼
+     * 범위 밖 — N-1 뒤 `validRange`는 `draw_numbers` 축 자신의 컬럼
      * (`draw_numbers_valid_range_max`)에 실려 그대로 왕복된다(다른 축을 빌리지 않는다).
      */
     @Test
@@ -182,8 +182,8 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * 축 단위 갱신(설계 검토 ④ + verifier r1 F-1) — 뒤 관측이 개찰 1위 축만 실으면 앞서
-     * 저장된 추첨번호 축을 지우지 않는다(부분 관측이 정상, 3E M-c 와 같은 관례를 이 축도 잇는다).
+     * 축 단위 갱신(설계 검토 ④ + F-1) — 뒤 관측이 개찰 1위 축만 실으면 앞서
+     * 저장된 추첨번호 축을 지우지 않는다(부분 관측이 정상, M-c 와 같은 관례를 이 축도 잇는다).
      */
     @Test
     fun `한 축만 싣는 뒤 관측은 다른 축을 지우지 않는다`() {
@@ -231,7 +231,7 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     // =========================================================================
-    // verifier r1 F-1 — 전이 여섯(회귀 방지, 재검증 명령 그대로). 컬럼별 COALESCE 는 kind 만
+    // F-1 — 전이 여섯(회귀 방지, 재검증 명령 그대로). 컬럼별 COALESCE 는 kind 만
     // 새 값으로 덮고 동반 컬럼을 옛 값으로 남겨 V5 페어 CHECK 를 위반했다(정상 persist 에서
     // PSQLException). 축 단위 CASE(Sql.kt)로 고친 뒤 여섯 전이 모두 정상 저장돼야 한다.
     // =========================================================================
@@ -277,7 +277,7 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
         requireNotNull(repository.find(id)).openingRankOne shouldBe OpeningRankOneOutcome.RankMissing(T2)
     }
 
-    // verifier r2 N-2 — F-1 라운드가 여섯 전이 중 RankMissing 을 시작점으로 하는 둘을 빠뜨렸다.
+    // N-2 — F-1 라운드가 여섯 전이 중 RankMissing 을 시작점으로 하는 둘을 빠뜨렸다.
     @Test
     fun `전이 — RankMissing 에서 Determined 로`() {
         val repository = JdbcOpeningResultRepository(dataSource())
@@ -352,7 +352,7 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     // =========================================================================
-    // verifier r2 N-1 — r1 F-3 의 저장 시점 거부(위 옛 test)는 부모의
+    // N-1 — F-3 의 저장 시점 거부(위 옛 test)는 부모의
     // `total_reserve_price_candidate_count`(다른 축)를 참조하는 CHECK 로 만들어졌는데,
     // `INSERT ... ON CONFLICT` 의 CHECK 는 병합 뒤 행이 아니라 들어오는 제안 tuple 에만
     // 걸려(PostgreSQL 관용구), 부모가 이미 총예가건수를 가진 상태에서도 그 값을 다시 안

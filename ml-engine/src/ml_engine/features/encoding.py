@@ -15,7 +15,7 @@
 키 자체를 만들 수 없어 전역 평균으로 직행해야 하는데, legacy는 이 경우를 `normalize_
 feature_key(None) == ""`로 접어 `category_means.get("", ...)`가 우연히 폴백되게
 했다(falsy→빈 문자열 접힘, V2에서 폐기 대상). `category=None`을 타입으로 받아 그 접힘
-없이 같은 폴백 결과를 낸다. (4) verifier r1 M-2 — `build_agency_target_encoding`은
+없이 같은 폴백 결과를 낸다. (4) M-2 — `build_agency_target_encoding`은
 관측이 비면 legacy처럼 `global_mean=0.0`인 `AgencyTargetEncoding`을 조용히 내지 않고
 **결과 타입 `EncodingOutcome = Built(encoding) | NoObservations`**를 낸다. 관측 0으로
 만든 표를 그대로 쓰면 「낙찰률 0%로 수축」과 「학습 데이터가 아예 없다」가 값(`0.0`)과
@@ -174,7 +174,7 @@ class Built:
 @dataclass(frozen=True)
 class NoObservations:
     """관측이 0건 — `global_mean=0.0`인 표를 조용히 내지 않는다(legacy 접힘 제거,
-    verifier r1 M-2). 호출부(5C)가 빈 코퍼스 가드로 이 상태를 명시적으로 거부해야 한다."""
+    M-2). 호출부(5C)가 빈 코퍼스 가드로 이 상태를 명시적으로 거부해야 한다."""
 
 
 type EncodingOutcome = Built | NoObservations

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
 /**
- * D-6F8-2(M6/6F-8) — 공고명은 **필드 계약 데이터**가 나른다(D-6F4-6). `canonicalize` 는 키 문자열을
+ * D-6F8-2 — 공고명은 **필드 계약 데이터**가 나른다(D-6F4-6). `canonicalize` 는 키 문자열을
  * 모르고 `FieldConcept.NOTICE_TITLE` 계약이 가리키는 키에서만 읽는다. 값이 없으면 `null` 이다
  * (D-6F4-8 — 센티넬 금지).
  */

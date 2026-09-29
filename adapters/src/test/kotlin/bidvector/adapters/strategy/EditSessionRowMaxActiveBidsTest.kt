@@ -36,7 +36,7 @@ class EditSessionRowMaxActiveBidsTest {
                 stateField = EditableFieldSnapshot("CANDIDATE_LIMIT", null),
                 stateDraft = draft,
                 stateRevision = null,
-                // M6/6A-2b D-6A2b-18 — 이 codec test 는 draft 축을 재므로 기준 revision 은 고정값이다.
+                // D-6A2b-18 — 이 codec test 는 draft 축을 재므로 기준 revision 은 고정값이다.
                 stateBaseRevision = 3,
                 stateCancelReasonKind = null,
                 stateCancelReasonNote = null,
@@ -72,7 +72,7 @@ class EditSessionRowMaxActiveBidsTest {
                 stateField = EditableFieldSnapshot("CANDIDATE_LIMIT", null),
                 stateDraft = draft,
                 stateRevision = null,
-                // M6/6A-2b D-6A2b-18 — 이 codec test 는 draft 축을 재므로 기준 revision 은 고정값이다.
+                // D-6A2b-18 — 이 codec test 는 draft 축을 재므로 기준 revision 은 고정값이다.
                 stateBaseRevision = 3,
                 stateCancelReasonKind = null,
                 stateCancelReasonNote = null,

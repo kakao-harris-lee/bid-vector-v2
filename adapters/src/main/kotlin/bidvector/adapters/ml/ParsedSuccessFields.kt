@@ -15,11 +15,11 @@ import bidvector.workflow.prediction.Weight as DomainWeight
 import contract.bidvector.ml.v1.IntervalSource as ProtoIntervalSource
 
 /**
- * M4/4D-1(scope.md ⑦, 우회 (3)(6)) — `Success`의 형태 검증·decimal string 파싱을
+ * scope.md ⑦, 우회 (3)(6) — `Success`의 형태 검증·decimal string 파싱을
  * `ResponseMapping.kt`에서 갈라낸 파일이다(detekt `TooManyFunctions`). 하나라도 무효면
  * [ParsedSuccessFields] 자체가 만들어지지 않는다 — 부분 성공을 인정하지 않는다.
  *
- * M4/4D-3(scope.md D-4D3-1~2) — 진단 여섯 성분(`trainingRowCount`·`segmentSupport`·
+ * scope.md D-4D3-1~2 — 진단 여섯 성분(`trainingRowCount`·`segmentSupport`·
  * `shrinkageWeight`·`excludedObservations`·`agencySampleCount`·
  * `agencySampleBelowThreshold`)이 더해졌다. 정수 셋·bool 은 `isAcceptableSuccessShape`
  * (`hasValidDiagnosticsShape`)가 이미 음수 아님을 걸렀으므로 여기서는 그대로 읽는다 —

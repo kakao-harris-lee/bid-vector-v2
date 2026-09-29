@@ -122,10 +122,10 @@ def load_serving_policy(path: Path) -> ServingPolicy | PolicyRejected:
     """`path`의 YAML 을 `ServingPolicy`로 검증한다. 미지 키·타입 오류·값 불변식 위반은
     전부 `PolicyRejected`(예외로 새지 않는다).
 
-    verifier r1 H-1 — `_load_raw_policy`(→ `yaml.safe_load`)는 문법이 깨진 YAML 에서
-    `yaml.YAMLError`(또는 하위 클래스)를 던진다. `training/policy.py`(PR #13 HIGH-2)·
-    `evaluation/policy.py`가 이미 같은 구멍을 `yaml.YAMLError`까지 잡아 막았는데, 이
-    slice 가 신설한 로더에서 같은 버그가 세 번째로 재발했었다 — 여기서도 잡는다."""
+    H-1 — `_load_raw_policy`(→ `yaml.safe_load`)는 문법이 깨진 YAML 에서
+    `yaml.YAMLError`(또는 하위 클래스)를 던진다. `training/policy.py`(HIGH-2)·
+    `evaluation/policy.py`가 이미 같은 구멍을 `yaml.YAMLError`까지 잡아 막았다 —
+    새 로더도 같은 구멍에 빠지기 쉬우므로 여기서도 잡는다."""
     try:
         raw = _load_raw_policy(path, known_keys=_KNOWN_KEYS)
     except (PolicyError, OSError, yaml.YAMLError) as exc:

@@ -26,9 +26,9 @@ private fun testStrategy(maxActiveBids: Int?) =
 
 /**
  * [PinnedStrategyRepository] — D-6A3-5 「전략은 요청당 정확히 한 번 읽는다」의 계수 test와
- * D-6A3-18(검토 라운드 1 verifier LOW)의 `save()` 시정. `load()`는 생성자가 받은 고정값을
+ * D-6A3-18의 `save()` 시정. `load()`는 생성자가 받은 고정값을
  * 그대로 돌려준다(더 이상 위임할 실 저장소 참조가 없다 — 구조 자체가 재호출을 만들 수
- * 없다, 이전 판의 「delegate 를 다시 안 부른다」감시견 fake는 더 이상 필요 없다).
+ * 없다).
  *
  * **`save()`가 `error()`를 던지는 것 자체는 이 모듈에서 실행으로 잴 수 없다(gate 밖).**
  * `AppliedStrategy`의 생성자가 `workflow` 모듈 `internal`이라 `adapters`(그리고 `app`도
