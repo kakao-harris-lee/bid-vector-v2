@@ -5,14 +5,19 @@
 
 ## acceptance (CI job 명령 그대로)
 
-| 명령 | 결과 |
-|---|---|
-| `./gradlew --no-daemon check` | BUILD SUCCESSFUL — 컴파일 · ktlint · detekt · sizeGate · 의존 방향 · architecture test · 계약 게이트 전부 |
-| `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
-| `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
-| `container` job 전 단계(S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-23 · S-23b · S-24 · S-25) | 전부 통과 — 이미지 둘 빌드 · 위생 게이트 둘 · 거부 스모크(D-6A2a-10 표지) · compose 셋 healthy 수렴 · 스모크 열 축 · 실 서버 교차 test. **실행 뒤 compose 를 내린다**(D-6G-55 — 띄워 둔 채로 두면 다음 사람이 그 job 을 못 돌린다) |
+| 명령 | exit | 결과 |
+|---|---|---|
+| `./gradlew --no-daemon clean` | 0 | — |
+| `./gradlew --no-daemon check --no-build-cache` | 0 | BUILD SUCCESSFUL — 컴파일 · ktlint · detekt · sizeGate · 의존 방향 · architecture test · 계약 게이트 전부 |
+| `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL(게이트가 아니라 측정) |
+| `./tools/one-command-check.sh` | 0 | 「Kotlin 전건 + Python 전건 통과」 |
+| `container` job 열둘(자격 값 둘 · S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-23 · S-23b · S-24 · S-25) | 전부 0 | 워크플로의 `run` 블록을 **그대로 뽑아** 순서대로 실행했다(러너 env·`$GITHUB_ENV` 만 흉내). 이미지 둘 빌드 · 위생 게이트 둘 · 거부 스모크(D-6A2a-10 표지) · compose 셋 healthy 수렴 · 스모크 열 축 · 실 서버 교차 test. **실행 뒤 `down -v`**(D-6G-64) |
 
-실측 HEAD: `5832baea`(이 레인의 마지막 산출물 커밋 시점의 트리).
+compose 프로젝트 이름은 `docker` 이고 호스트에 떠 있는 셋(`bid-vector`·`easy-doc`·`kis_paper`)과 겹치지
+않는다. 포트도 겹치지 않는다(50051 · 루프백 18080; postgres 는 publish 하지 않는다) — 남의 프로젝트는
+멈추지도 지우지도 않았다.
+
+실측 HEAD: `b02bfb9d`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
