@@ -23,7 +23,11 @@
 ## A-1 호출 상한 (승인 수치의 자리)
 
 일 **20,000** · 총 **80,000**. 코드에 **기본값이 없다** — 두 값 모두 설정이 주어야 예산 원장이 선다.
-원장이 「한 걸음 통째로 허가/거부」를 진다는 것과 일·총 두 한도가 서로 다른 사유로 무는 것은 test 가 잠근다.
+셈의 단위는 **호출 하나**다(D-6G-47·56) — 관문이 호출마다 원장에 묻는다. 일·총 두 한도가 서로 다른 사유로
+무는 것과, 나간 호출 수가 원장 HTTP 줄 수와 같다는 것을 test 가 잠근다(기준은 mock 서버가 받은 요청 수다).
+앞 문면 「한 걸음 통째로 허가/거부」는 참인 적이 없었다 — 상한이 어디서 끝나든 마지막 공고의 마지막 축은
+반쪽으로 남는다. 지금은 그 반쪽이 값으로 관측되고(`partialNotice`), 끝내 못 받은 공고는 `incomplete_axis`
+로 제외·계수된다(D-6G-29 ④ 개정).
 
 ## `OPEN-6F8-QUOTA-XML-ENVELOPE` — 닫았다
 
@@ -53,9 +57,13 @@
 | `OpeningResultSourcePort.fetchBidPriceFormulaA`·`fetchBaseAmount` | procurement — 포트 메서드 둘 |
 | `noticeIdIn` | procurement — 표본틀이 (공고번호,차수)만 얻는 자리(원문 키는 이 모듈 안에 남는다) |
 | `CollectOpeningResultsUseCase`·`OpeningCollectionSource`·`OpeningCollectionHalt`·`OpeningCollectionPlan`·`OpeningCollectionReport` | workflow/collection — 수집 갈래 |
-| `SnapshotWriter`·`SnapshotRow`·`SnapshotNotice`·`SnapshotOutcome`·`SnapshotBidderRow`·`orderedBidderRows`·`SNAPSHOT_SCHEMA_VERSION`(`snapshot-v2`) | adapters/snapshot — 스냅숏 바이트 |
-| `NoticeKeyHash` · `SamplingSeed` · `SampleStratum` · `SampleCandidate` · `StratumOutcome` · `SampleOutcome` · `StratifiedSampler` | workflow/collection |
-| `CollectionCallBudget` · `CallBudgetLedger` · `BudgetOutcome` · `BudgetLimit` | workflow/collection |
+| `SnapshotWriter`·`SnapshotRow`·`SnapshotNotice`·`SnapshotOutcome`·`SnapshotBidderRow`·`orderedBidderRows`·`SnapshotCounts`·`SNAPSHOT_SCHEMA_VERSION`(`snapshot-v5`) | adapters/snapshot — 스냅숏 바이트 |
+| `NoticeKeyHash` · `SamplingSeed` · `SampleStratum` · `SampleCandidate` · `StratumOutcome` · `SampleOutcome` · `StratifiedSampler` · `SampleScope` · `SampleListLedger` · `SampleConfirmation` | workflow/collection |
+| `CollectionCallBudget` · `CallBudgetLedger` · `BudgetOutcome` · `BudgetLimit` · `CallSpend` · `COLLECTION_BUDGET_ZONE` | **procurement**(앞 표는 workflow 라고 적었다 — 옮긴 뒤 갱신하지 않은 자리다, vr r4 L-2) |
+| `CollectionAttempt` · `AttemptKind` · `AttemptOutcome` · `AttemptHistory` · `AttemptLedger` · `attemptOutcomeOf` · `truncationCodeOf` · `dayStartOf` · `CollectedAxisStore` | procurement — 시도 원장(D-6G-45·49·58) |
+| `KonepsCallGate` | adapters/koneps — 타입만 public, `send`·`KonepsCallContext`·`KonepsGateOutcome` 은 `internal`(밖에서 호출을 낼 수 없다) |
+| `RunStateDirectory` · `RunStateLock` · `ConfirmedSampleList` · `SampleListFile` · `SampleScopeFile` | adapters/snapshot — 실행 상태 디렉터리(D-6G-45·48·57·60) |
+| `NOTICE_NUMBER_RAW_KEY` · `NOTICE_ROUND_RAW_KEY` | procurement(r5 신설) — 공고 식별자 원문 키의 **유일한 정의**. 밖에서 할 수 있는 것은 그 이름을 읽는 것뿐이고, 계약 행과 두 SQL 이 이 값을 함께 따른다 |
 
 `KonepsOperationPolicy.BID_PRICE_FORMULA_A`·`readGatewayErrorCode` 는 `internal` 이라 표면이 아니다.
 
@@ -66,15 +74,15 @@
 | D-6G-11 「일 한도 초과는 멈춤, 429 는 직렬 유지」 | `isRetryableStep` 의 봉투 분기 | 「즉시 멈춘다」·「429 는 재시도된다」 두 test |
 | D-6G-11 「공고 식별자 해시 + 정책 seed 로 결정적으로」 | `StratifiedSampler.select` | 같은 seed 재현 · 후보 순서 무관 · seed 다르면 다름 |
 | D-6G-11 「층 = 업무 대분류 × 공고 주」 | `SampleCandidate.stratum` | 업무 가름 · 주 가름 두 test |
-| D-6G-11 「표본 목록 sha256」 | `SampleOutcome.sampleListSha256` | 정렬 목록에서만 나온다는 test |
+| D-6G-11 「표본 목록 sha256」 | `ConfirmedSampleList.sha256` | 확정 **파일의** 해시다 — 행에서 역산한 값과 다르다는 test(앞 표가 가리키던 `SampleOutcome.sampleListSha256` 은 r4 에 삭제됐다, cr r4 M-5 #3) |
 | 우회 ⑦ 「결과를 보고 표본을 고른다」 | `SampleCandidate` 의 칸 | **타입**이 막는다 — 결과를 담을 칸이 없다 |
-| D-6G-11 「호출 상한 — 설정값, 기본값 없음, 초과 시 멈춤」 | `CollectionCallBudget`·`CallBudgetLedger` | 기본값 없음 · 일/총 두 사유 · 한 걸음 통째 거부 |
+| D-6G-11 「호출 상한 — 설정값, 기본값 없음, 초과 시 멈춤」 | `CollectionCallBudget`·`CallBudgetLedger` | 기본값 없음 · 일/총 두 사유 · **호출 하나 단위**로 묻는다(거부는 값이다) |
 | D-6G-12 「낙찰방법(`sucsfbidMthdCd`·`Nm`)」 | `AWARD_METHOD_CODE`·`AWARD_METHOD_NAME` | 관측까지 닿는 wire test(계약 표만 보는 test 는 이것을 못 잰다) |
 | D-6G-12 「A값 오퍼레이션 + 합산 여부 술어 + A 공개일시」 | `SourceEndpoint.BID_PRICE_FORMULA_A` 축 13행 | 관측 생존 · 요청 축 · allow-list 반전 · 두 일시 분리 |
 | D-6G-12 「예정가격 결정방법」 | `PLANNED_PRICE_DECISION_METHOD` | 계약 원장 test |
 | D-6G-13 제외 열다섯 | `snapshot-schema.md` §4 의 입력 대조표 | 판정은 Python 레인 모듈이, 입력은 이 레인이 |
 | D-6G-2 「스냅숏 · manifest」 | `SnapshotWriter` | 정렬·키 순서·이스케이프·순번·manifest 해시 · 기초금액 두 칸 분리 열한 test |
-| D-6G-23 「표준시장단가 적용 여부」 | `a_value.standard_market_price_applicable`(`snapshot-v2`) | A 묶음 셋 동반 · A 없으면 술어도 없음 |
+| D-6G-23 「표준시장단가 적용 여부」 | `a_value.standard_market_price_applicable`(`snapshot-v5`) | A 묶음 셋 동반 · A 없으면 술어도 없음 |
 | D-6G-1 「개찰결과 수집 갈래」 | `CollectOpeningResultsUseCase` | 표본만 상세 호출 · 표본 사전 확정 · 층 가름 둘 · 원문 적재 |
 | D-6G-19 「기초금액 조회 op 5·6·7」 | `SourceEndpoint.BASE_AMOUNT_DETAIL` 축 6행 + `BASE_AMOUNT_DETAIL` 서술자 | 모든 업무에서 부른다는 test |
 | D-6G-19 「provenance 분리」 | `SnapshotNotice.baseAmount` ↔ `SnapshotOutcome.openingBaseAmount` | 타입이 두 칸으로 가른다 |
@@ -87,19 +95,19 @@
 | D-6G-38 「추첨번호 = 예비가격 상세 `drwtYn=Y` 행 순번」 | `drawnSerialNumbersOf`(`DRAW_FLAG`·`RESERVE_PRICE_SEQUENCE`) | mock 의 투찰자 선택을 뽑힌 넷과 다르게 두어 출처가 틀리면 golden 이 붉어진다 |
 | D-6G-39 「첫 표본틀이 목록 파일을 쓰고 이후는 그 파일만」 | `SampleListLedger`·`FileSampleListLedger`·`SampleResolution` | 창이 넓어져도 표본 불변 · 확정 횟수 1 · 계획은 확정하지 않는다 |
 | D-6G-39 「표본인데 상세 못 받은 공고는 사유 계수, 표본 밖은 추출 제외」 | `SnapshotExtraction` 계수 셋 | Testcontainers 로 사유 갈래 넷(상세 없음·관측 없음·표본 밖·canonical 없음) |
-| D-6G-39 「manifest `sample_list_sha256` = 그 파일 해시」 | `ConfirmedSampleList.sha256`·`SnapshotCounts` | 행에서 역산한 값과 **다르다**는 test · 항등식이 생성 시점 불변식 |
+| D-6G-39 「manifest `sample_list_sha256` = 그 파일 해시」 | `ConfirmedSampleList.sha256` | 행에서 역산한 값과 **다르다**는 test. `SnapshotCounts` 의 항등식은 여기서 빼 둔다 — 구성상 참이라 방어가 아니라 표기다(cr r3 L-12, 아래 이탈) |
 | D-6G-40 「출하 경로 잠금」 | `OpeningCollectionLedgerTest`·`JdbcSnapshotSourceSampleTest` | 실 Postgres — KM1·KM2·KM4·KM7 변이가 각각 RED |
-| D-6G-42 M-3 「동시 실행 차단(마이그레이션 없이)」 | `JdbcCollectionRunLease`(advisory lock) | 두 번째는 Busy · 놓으면 다시 든다 · E2E 가 잠금을 밖에서 들고 기동 |
-| D-6G-42 M-4 「목록 갈래도 상한에서 멈춘다」 | `OpeningSampleFramer.framePage` 의 예산 질의 | 상한 1 이면 목록 호출도 하나만 나간다 |
+| D-6G-42 M-3 · D-6G-57 「동시 실행 차단(마이그레이션 없이)」 | `RunStateLock`(실행 상태 디렉터리의 `FileChannel.tryLock`) | E2E 가 잠금을 밖에서 들고 출하 조립을 기동 → **mock 요청 0** · `ALREADY_RUNNING`. DB advisory lock 은 r4 에 걷어냈다 — 갈래별 범위라 파일 범위 실행 상태를 지키지 못했다(vr r4 H-2) |
+| D-6G-42 M-4 「목록 갈래도 상한에서 멈춘다」 | `KonepsCallGate`(두 갈래가 같은 관문·같은 원장) | 출하 조립 E2E 가 **mock 이 받은 요청 수 == 원장 HTTP 줄 수**를 두 번 기동에서 단언. `framePage` 에는 예산 질의가 없다 — 앞 표가 가리킨 자리는 r4 에 관문으로 옮겼다(cr r4 M-5 #4) |
 | D-6G-42 M-6 「표본은 층별 비례」 | `SampleSize`·`proportionalAllocation`(최대 잔여법) | 90:10 층에 18:2 · 합이 정확히 목표 · 잔여 배분도 후보 순서 무관 |
 | D-6G-42 M-9 「차수 파싱 실패는 기본값 없이」 | `NoticeKey.round: NoticeRound` | 타입이 막는다 — 차수가 서지 않는 행은 키를 갖지 못한다 |
-| D-6G-43 「저장소 루트 탐지(cwd 아님) + 거부·허용」 | `repositoryRoot`·`requireOutsideRepository` | 표식 둘(`settings.gradle.kts`·`.git`) · 심링크 추적 · 하위 디렉터리에서 돌아도 안은 거부 |
-| D-6G-44 「K6 `notAttempted` 오계수」 | `OpeningCollectionHalt.partialNotice` | 쿼터 멈춤은 반쪽 · 예산 멈춤은 손대지 않음, 두 test |
+| D-6G-43 「저장소 루트 탐지(cwd 아님) + 거부·허용」 | `repositoryRoot`·`requireOutsideRepository` | 표식 둘(`settings.gradle.kts`·`.git`) · 심링크 추적 · `저장소 안은 거부된다 — 실행 위치와 무관하게`(앞 표는 r3 이전 이름을 적었다, cr r4 M-5 #6) |
+| D-6G-44 · D-6G-59 「K6 `notAttempted` 오계수」 | `OpeningCollectionHalt.partialNotice` | **관측이다** — 「이 공고의 축 중 하나라도 끝났는가」를 예산·쿼터가 같은 물음으로 읽는다. 첫 축에서 물면 반쪽이 아니고 둘째 축에서 물면 반쪽이다(쿼터·예산 각각 test). 앞 표의 「예산 멈춤은 손대지 않음」은 D-6G-47 이후 거짓이었다(cr r4 H-2) |
 | D-6G-44 「`@ConditionalOnMissingBean` 대체를 production 에서 닫는다」 | E2E 의 출하 조립 빈 타입 실측 | 실 DB 로 뜬 조립에서 JDBC 구현임을 잰다(단위 배선 test 로는 못 잰다 — 원장이 기동 시점에 접속한다) |
 | D-6G-44 「`BIDVECTOR_WRITE_GOLDEN` 는 CI 에서 거부」 | `writeGoldenRequested` | `CI` 가 있으면 무시가 아니라 **실패**(실측: `CI=true` 로 RED) |
 | D-6G-42 「golden 이 표본 결측 경로를 지난다」 | mock 의 상세 결측·canonical 결측 두 순번 | 표본 12 · 행 10 · 결측 계수 각 1, 진부분집합 단언 |
 | D-6G-45 「시도 원장 — 저장소 밖, append-only」 | `AttemptLedger`·`FileAttemptLedger`·`RunStateDirectory` | 결말 셋 왕복 · 형태 위반 거부 · 디렉터리 부재·표본 변조 거부 |
-| D-6G-45 「이어 돌기 = 시도 원장 ∪ 원문 관측」 | `alreadyCollectedAxes` | 빈 응답 축이 다음 기동에서 다시 불리지 않는다(E2E) |
+| D-6G-58 「축 완료는 **원장이** 정한다」 | `alreadyCollectedAxes`(원장이 이기고, raw 존재는 원장 이전 원문에만) | 원문이 있어도 원장이 미완이면 다시 부른다 · 원문이 없어도 원장이 끝났다면 안 부른다 · 빈 응답 축은 다시 불리지 않는다(E2E). D-6G-45 의 「시도 원장 ∪ raw」 문면은 이 결정이 **대체**한다 |
 | D-6G-45 「상한 seed = HTTP 시도 합(KST 일 경계)」 | `AttemptHistory.spend`·`openingCallBudget` | 두 번 기동하면 누적 · 재시도 호출도 실린다 · 원장 파일로 seed 실측 |
 | D-6G-47 「6G 의 모든 KONEPS 호출이 관문 하나를 지난다」 | `KonepsCallGate` · `collection.http-client.holders` 정확 집합 | 클라이언트를 쥔 자리 셋 등식(다른 클래스가 쥐면 RED) · 관문 계약 넷 |
 | D-6G-47 「상한의 하루는 KST」 | `COLLECTION_BUDGET_ZONE` | 시계를 **KST 자정 직후**에 두고 일 상한을 다 쓴 원장에서 시작(정오면 두 구역 날짜가 같아 못 잡는다) |
@@ -110,6 +118,19 @@
 | D-6G-54 「canonical 결합에 시각 조건 없음」 | `OBSERVATION_SQL` 의 축 예외 | **행의 값**으로 잰다 — 계수로는 이 회귀가 드러나지 않는다 |
 | cr L r2 「전건 적재」 | `groupObservations`(표본 밖은 payload 를 펴기 전에 버린다) · `NOTICE_SQL` 의 `= ANY (?)` | 표본 밖 계수가 **키 수**라는 test(행 수로 세면 RED) |
 | D-6G-46 「업무 구분 예제 어휘」 | 스키마 §2.1 TSV 예제 | 생산 바이트(`SERVICE`)와 같은 어휘 — 판독은 이 칸을 세기만 하므로 문면 정정이다 |
+| D-6G-56 「기준은 mock 서버가 받은 요청 수」 | E2E `출하 조립이 낸 요청 수가 원장의 HTTP 줄 수와 같다 — 두 번 기동해도` | 상한(97)을 원장 합과 **다른 값**으로 둔다. 의도 줄 수 == 결말 줄 수도 같은 test 가 잰다 |
+| D-6G-56 「상한의 하루는 KST — 오늘치를 다 쓴 상태로 00:30 기동」 | E2E `오늘치를 다 쓴 실행 상태로 KST 00시 30분에 기동하면 한 요청도 나가지 않는다` | mock 요청 **0** · 종료 코드 미완. 구역을 UTC 로 바꾸면 그 아홉 시간이 열린다 |
+| D-6G-57 「잠금은 실행 상태 디렉터리에」 | `RunStateLock`·E2E `이미 도는 실행이 있으면 아무것도 부르지 않고 끝난다` | 잠금을 밖에서 들고 출하 조립 기동 → 요청 0 · `ALREADY_RUNNING`. 출하 조립에서 `RunStateLock.Held` 임을 빈 타입으로 실측 |
+| D-6G-58 「쪽 중간에 끊긴 축은 미완」 | E2E 둘(5xx · **상한 거부**) | 5xx: 둘째 기동이 다시 걷고 마지막 걷기가 전 참가자. 상한 거부: mock 요청 == 상한(4) · 그 공고의 원문이 1쪽뿐 · 둘째 기동 뒤 마지막 걷기가 전 참가자 |
+| D-6G-58 ⓑ 「축 결말은 raw 적재 **뒤에**」 | `runAxes` 의 순서 | 그 축의 적재만 실패시키면 결말이 남지 않는다(`적재가 실패한 축은 원장에 결말이 남지 않는다`) |
+| D-6G-58 ⓒ 「받은 수 < 원천 총수면 `SHORT_WALK`」 | `attemptOutcomeOf` | 0/250·100/250 은 `Failed(SHORT_WALK)`, 250/250 은 `Succeeded`, 0/0 만 `Empty` |
+| D-6G-58 r4-d 「추출은 (공고, 축)마다 마지막 걷기만」 | `JdbcSnapshotSource` 의 걷기 선별 | 앞 걷기의 쪽은 raw 에 **남고**(append-only) 행 수에서는 빠진다 — E2E 가 두 수를 각각 단언 |
+| D-6G-59 「`partialNotice` 는 관측」 | `haltOf(cause, settledAny)` | 예산·쿼터가 같은 물음을 쓴다 — 갈래마다 다른 답을 쓰면 계수가 사유에 따라 달라진다 |
+| D-6G-60 「무결성 장부 = 디렉터리 파일 전부」 | `RunStateDirectory` 의 `state.json` | 장부 대상 집합 == 디렉터리 목록에서 도출한 집합(등식 test) · `sample-scope.json` 삭제·편집 각각 거부 |
+| D-6G-61 「선기록 · 뒤처진 장부는 재동기」 | `KonepsCallGate.sendAndRecord`·`RunStateDirectory` | 의도 줄이 호출 **전에** 남는다 · 마지막 append 뒤 죽은 흔적은 수락하고 상한이 줄지 않는다 · 앞부분 불일치·줄 감소는 여전히 거부 |
+| D-6G-62 「관문 우회 경로가 구조적으로 없다」 | `collection.http-client.roots=bidvector` 정확 집합 · `collection.transport-bypass.holders=`(빈 집합) | 뿌리가 production 전체다 — 이웃 패키지로 옮겨도 붉어진다. `URL`·`Socket`·`java.lang.reflect.Method` 까지 대상 |
+| D-6G-64 「원문 키 이름은 한 정의에서」 | `NOTICE_NUMBER_RAW_KEY`·`NOTICE_ROUND_RAW_KEY` | 계약 행과 두 SQL(`OBSERVATION_SQL`·`COLLECTED_SQL`)이 같은 값을 읽는다 — **구조**가 두 벌을 없앤다(대조 test 가 아니라) |
+| D-6G-66 「표본 업무 범위는 manifest 칸에서」 | `sample_scope_divisions`(확정 범위 파일 출처) | 한 업무가 행에서 통째로 빠져도 이 칸은 줄지 않는다 — 문턱이 결측을 따라 내려가지 않는다 |
 
 ## 손으로 쓴 fixture 가 못 보는 것 — 무엇이 그 자리를 덮는가
 
@@ -138,9 +159,12 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
    다만 값이 실제로 얼마나 차 있는지는 모른다: 문서 XML 예제에서 `bssAmtPurcnstcst` 가 빈 값이고
    `sucsfbidMthdAppStd` 는 예제 여덟이 전부 빈 값이다. 제외 ⑨가 전량에 걸릴 수 있다 — 실수집 뒤
    채움률을 판정문에 공시한다.
-2. **호출 예산은 걸음 단위 근사다.** 한 걸음(공고 하나의 상세 조회)이 여러 페이지를 걸으면 그 걸음의
-   실제 호출 수는 걸은 뒤에 알려진다 — 초과분은 최대 한 걸음의 페이지 수다. 어댑터 안쪽에 예산을
-   넣으면 정확해지지만 의존 방향이 뒤집힌다.
+2. **호출 예산의 단위는 호출 하나다 — 앞 문면(「걸음 단위 근사」)은 r4 에 사라졌다.** 이 라운드가
+   한 일이 정확히 그 문장이 「의존 방향이 뒤집힌다」며 물린 것이다: 예산을 어댑터 안쪽 관문
+   (`KonepsCallGate`)에 두었고, 방향은 뒤집히지 않았다 — 관문이 `procurement` 의 원장을 **받는다**
+   (어댑터가 도메인을 의존하는 정상 방향이다). 남은 근사는 없다. 남은 한계는 다른 것이다:
+   **상한 경계가 공고 한가운데·쪽 한가운데에 떨어진다.** 그 반쪽은 미완 축으로 남아 다음 실행이
+   받고, 총 상한으로 끝내 못 받은 공고는 `incomplete_axis` 로 제외·계수된다.
 3. **제외 ⑪(지자체 발주)을 판정하지 못한다.** 기관 코드에서 지자체를 가르려면 「행자부 코드 공간 ↔
    지자체」 대응이 필요한데 authoritative 하게 확보하지 못했다 — 지어내면 DEC-03(운영자 확정 범위)을
    코드가 조용히 재정의한다. `demand_agency_code` 를 입력으로 싣고 판정은 연다. 신설
@@ -154,9 +178,14 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
    줄이면 세 파일이 서로 일관돼, 「줄어든 채 일관된 표본」과 「원래 작았던 표본」이 구별되지 않는다
    (실측: 소비 레인 판독은 통과, 생산 쪽 test 둘이 RED). 원리상 그렇고 판독의 결함이 아니다 —
    막는 것은 수집 시점에 확정된 파일의 보존(D-6G-45 실행 상태)과 생산 쪽 왕복이다.
-7. **시도 원장은 저장소 밖 파일이다.** 디렉터리가 사라지면 상한과 이어 돌기가 함께 사라진다. 기동
-   거부로 「조용히 0 에서 시작」은 막았지만, 파일을 **지우는** 것까지는 막지 못한다(지우면 다음 기동이
-   0 에서 시작하고 거부도 없다 — 표본 목록까지 함께 지워졌을 때만 그렇다).
+7. **시도 원장은 저장소 밖 파일이다.** 디렉터리가 사라지면 상한과 이어 돌기가 함께 사라진다.
+   **지금 막는 범위**(D-6G-48·60·61): 무결성 장부가 디렉터리의 정본 파일 **전부**를 덮으므로 원장만
+   지워도, 절삭해도, 표본 목록이나 확정 범위 파일을 지워도 다음 기동이 거부된다 — 장부 자신을 지워도
+   거부다. 뒤처진 장부(원장 앞부분이 일치하고 뒤에 줄이 더 있음)만 크래시 흔적으로 보고 재동기한다.
+   **막지 못하는 것**: 디렉터리를 **통째로** 지우는 것. 그러면 대조할 장부도 없어 다음 기동은 새
+   디렉터리로 0 에서 시작한다(디렉터리 자동 생성은 막았으므로 사람이 다시 만들어야 한다). 통째 복사본도
+   `directory_id` 로 거부된다. 앞 라운드 문면(「원장만 지우면 거부도 없다」)은 **방어를 과소하게**
+   적었다(r3 문면은 반대로 과대였다 — cr r3 M-4 · cr r4 M-5 #2).
 8. **이어 돌기 조회가 축 하나를 전부 훑는다.** 정규화 규칙(COL-05)을 SQL 에 한 벌 더 쓰지 않으려고
    원문을 읽어 도메인 규칙으로 접는다. 돌려받는 행 수는 `DISTINCT` 와 「이 네 상세 축에 쓰는 것은 이
    갈래뿐이고 표본에만 나간다」로 표본 크기에 묶이지만, **스캔 범위**는 그 축의 전 행이다. 추출 쪽
@@ -186,7 +215,7 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
 | 층마다 같은 수를 뽑는다(M-6 이전 코드) | **RED** 3건 |
 | 차수를 `toIntOrNull() ?: 0` 으로 되돌린다(M-9 이전 코드) | **RED** 2건 |
 | `CI=true` 에서 golden 갱신 플래그를 켠다 | **RED** — 무시가 아니라 실패한다 |
-| 결측 계수를 상수 0 으로 적는다 | **RED** 6건 — 항등식이 생성 시점에 막아 추출이 아예 서지 않는다 |
+| 결측 계수를 상수 0 으로 적는다 | **RED** 6건 — 계수를 상수로 바꾸면 항등식이 깨진다. 항등식 자체는 구성상 참이라 이 변이 말고는 잡히는 것이 없다(cr r3 L-12, 아래 이탈) |
 | 행이 된 표본만 목록에 남긴다(사후 축소) | **RED** 2건 — 생산 쪽만 잡는다(아래 알려진 제한 10) |
 | 재시도를 상한에 계상하지 않는다(받은 페이지만) | **RED** 2건 |
 | 이어 돌기가 시도 원장을 보지 않는다 | **RED** 2건 |
@@ -204,6 +233,11 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
 | 확정 범위를 대조하지 않는다 | **RED** 2건 |
 | 루트를 cwd 에서 찾는다 | **RED** 3건 |
 | 창이 공고 목록 축까지 자른다 | **RED** 2건 |
+| **Ka** 상한 거부로 끊긴 걷기를 **완료**로 친다(`attemptOutcomeOf` 에 `BudgetExhausted -> Succeeded`) | **RED** 2건 — 새 쪽 단위 test 와 기존 상한 멈춤 test 가 함께 붉다 |
+| **Kb** 축의 결말을 raw 적재 **앞으로** 옮긴다 | **RED** — 적재가 실패한 축에도 결말이 남는다 |
+| **Kc1** `SHORT_WALK` 판정에 `received > 0` 을 더한다 | **RED** — 0/250 이 `Empty` 로 선다 |
+| **Kc2** `SHORT_WALK` 판정에 `received == 0` 을 더한다 | **RED** — 100/250 이 `Succeeded` 로 선다 |
+| 원문 키를 계약이 아니라 SQL 리터럴에서 짓는다 | **변이하지 않았다** — r5 가 그 두 벌을 없앴다. 지금 키를 바꾸려면 `NOTICE_NUMBER_RAW_KEY` 하나를 바꾸고 계약과 두 SQL 이 함께 따라간다(구조라 변이할 자리가 없다) |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
 뒤바뀜이 드러나지 않았다(Python 레인이 자기 쪽에서 같은 함정을 겪고 알려 왔다). 둘을 다르게 둔 test 를
@@ -237,6 +271,18 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 스키마 v4 재생성, 둘 다 파일 단위 스테이징).
 
 그 귀결로 이 문서의 「내 절」을 담은 커밋과 그 커밋의 메시지가 어긋난다. 이 절 자체가 그 대조표다.
+
+## 이탈 (이 레인 — 계약 항목을 이행하지 않은 자리와 사유)
+
+| 항목 | 처분 | 사유 |
+|---|---|---|
+| cr r3 L-9 `pg_advisory_unlock` 명시 | **해당 없음이 됐다** | 그 잠금 자체를 r4 에 걷어냈다(D-6G-57) — 갈래별 advisory lock 은 파일 범위 실행 상태를 지키지 못했다. 정본은 디렉터리의 `FileChannel.tryLock` 이고, 풀린 세션이 잠금을 쥔 채 남는 경로(`OPEN-6A1-CONNECTION-POOL` 전제)도 함께 사라졌다 |
+| cr r3 L-12 · cr r4 L-9 항진식 `require` | **문면만 고쳤다**(이탈) | 항등식을 진짜 대조로 만들려면 계수를 **독립된 두 출처**에서 세야 하는데 오늘 생산자는 하나다. 지우지 않는 이유는 두 번째 생산자가 생기는 날 그 자리가 여기서 멈추기 때문이고, 주석·대조표·변이표가 이제 「방어가 아니라 표기」라고 적는다. 깨질 수 있는 대조는 판독 쪽에 있다 |
+| cr r4 L-3 배선의 KST 구역 단언 | **구조로 닫혔다** | 관문에서 `zone` 인자를 없앴다(D-6G-56) — 배선이 구역을 넘기지 않으므로 「배선이 넘긴 구역」을 잴 대상이 없다. 남은 변이는 상수 자체를 바꾸는 것뿐이고 그것은 출하 조립 E2E(KST 00:30 기동)가 RED 로 잡는다 |
+| cr r4 L-4 `startPageOf` 앞 주석 | **주석이 사라졌다** | 「모든 소스 호출이 이 자리를 지난다」는 문장은 관문을 어댑터로 옮기며 없어졌다(D-6G-47). 잘못된 cursor 는 호출을 내지 않으므로 상한에도 원장에도 빚이 없다 |
+| cr r4 L-1 관문 우회 봉쇄 범위 | **이행**(D-6G-62) | 뿌리를 production 전체로, 술어를 `URL`·`Socket`·반사까지 넓혔다 |
+| cr r3 L-1 `notAttempted` 오계수(마지막 축) | **이행**(D-6G-59) | `partialNotice` 가 「이 공고의 축 중 하나라도 끝났는가」의 **관측**이 되어 마지막 축에서 물어도 반쪽으로 선다 |
+| 호스트 규율 「무거운 빌드 1개」 | **지켰다 · 한 조건은 완화했다**(사실 선언) | Gradle 은 호스트 전체에서 이 레인 하나만 돌았다(`GradleWrapperMain`·`GradleWorkerMain` 매 실행 전 확인). 다만 다른 프로젝트의 **경량 단위 pytest** 가 도는 동안 시작한 실행이 있다 — 가용 메모리 13GB(문턱 6GB)를 확인하고 진행했다 |
 
 ## 하지 않은 것 (이 레인의 몫 가운데)
 
@@ -278,7 +324,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 ## acceptance — CI `ml-engine` job 의 명령 그대로
 
 `.github/workflows/ci.yml` 의 `ml-engine` job 단계를 순서대로 돌렸다(작업 디렉터리 `ml-engine/`).
-결과는 핵심 한 줄만 적는다.
+결과는 핵심 한 줄만 적는다. 아래 값은 **r5 마지막 산출물 커밋**에서 다시 잰 것이다.
 
 | 단계 | 명령 | 결과 |
 |---|---|---|
@@ -372,6 +418,16 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-58 버전 경계 | `test_manifest_mismatch_is_rejected` | v4·v6 둘 다 거부 |
 | D-6G-9 보고에 식별자 없음 | `report.verdict_payload` | fixture 의 공고 키 해시가 판정 바이트에 없음 |
 | 재현(위협 모델 ③) | `app.backtest_job.run_backtest_job` | 두 번 돌려 바이트 동일 · 줄 순서 무관 · 정책 한 값으로 달라짐 |
+| D-6G-66 문턱의 출처는 **확정 범위** | `LoadedSnapshot.sample_scope_divisions` · `run._sampling_record` | 범위 셋 ↔ 목록 하나인 판에서 문턱이 범위 수로 정해진다 |
+| D-6G-66 표본의 업무 ⊆ 범위 | `snapshot._check_scope` | 범위 밖 업무면 `SAMPLE_SCOPE_MISMATCH` 로 전체 거부 |
+| D-6G-66 **행의** 업무 ⊆ 범위 | 같은 함수의 `unseen` | 범위 밖 행은 채점에 들어가면서 공시에서 사라진다 — 멈춘다 |
+| D-6G-66 범위 값의 어휘·정렬 | `snapshot._scope_divisions` | 어휘 밖 · 역순 · 중복 · 빈 값 각각 거부 |
+| D-6G-66 빈 업무는 UNDERPOWERED | `report._snapshot` 의 `division_coverage` · `DivisionCoverage` | 한 업무 행을 전부 지워도 문턱 불변 + 그 업무가 행 수 0 으로 공시 |
+| D-6G-66 manifest 키 등식 | `test_manifest_key_set_equals_the_schema_document` | 스키마 §2 예제의 키 집합 == 판독기 허용 키 |
+| D-6G-66 업무 대표 어휘 등식 | `test_division_coverage_vocabulary_matches_the_schema_document` | 어휘 ↔ 스키마 §2 문장 |
+| vr r4 L-14 해시 용도 구분자 | `strategies.S0_BAND_PURPOSE` · `notice_rng` | 스키마 §2.2 표의 **재료식**으로 지은 digest 와 대조(문서·코드 한쪽만 움직이면 RED) |
+| vr r4 L-14 스트림 이름 전수 | `test_kotlin_purpose_is_not_used_as_a_python_stream_name` | 호출 자리를 AST 로 모아 `sample-draw` 사용·중복·비상수 금지 |
+| D-6G-58 golden 이 넷째 항을 지난다 | `test_golden_actually_exercises_the_missing_sample_paths` | golden 의 `incomplete_axis > 0`(생산 쪽 0 이면 RED — 입력 변이 실측) |
 
 ## 변이 실측 (판정식·누출 가드·제외 동일성)
 
@@ -455,13 +511,48 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **W2·W3** | 생산 귀속 어휘를 문서 밖 이름으로 · 항목 제거 | **RED** |
 | **W4** | `snapshot-v5` 를 v4 로 되돌림 | **RED** |
 | **W5·W6** | 공시에서 항목 누락 · 계수를 상수 0 으로 | **RED** |
+| **H1** | 용도 구분자 상수를 다른 값으로(`s0-band-x`) | **RED**(2) — 문서 등식과 digest 둘 다 |
+| **H2** | 해시 재료에서 용도 구분자 제거 | **RED** |
+| **H3** | 해시 재료에서 구분자 문자 `|` 제거 | **RED** |
+| **H4** | **문서만** 고친다(§2.2 표의 S0 구분자) | **RED**(2) — 한쪽만 움직이면 붉어진다 |
+| **H5** | S4 스트림 이름을 `sample-draw` 로(영역 재충돌) | **처음엔 GREEN** — 아래 |
+| **S1** | 문턱을 다시 표본 목록의 distinct 로 | **RED** |
+| **S2** | 업무 대표를 범위가 아니라 **행에서만** 센다(빈 업무가 사라진다) | **RED** |
+| **S3** | 표본 ⊆ 범위 대조 제거 | **RED** |
+| **S3b** | **행의** 업무 ⊆ 범위 대조 제거 | **RED** |
+| **S4m** | UNDERPOWERED 공시 생략(행 0 인 업무를 뺀다) | **RED** |
+| **S5** | 범위의 닫힌 어휘 검사 제거 | **RED** |
+| **X1** | golden 항등식을 항 셋으로 되돌림 | **RED** |
+| **X2** | **입력 변이** — golden 을 `incomplete_axis: 0`(표본 11, 목록 한 줄 제거, 해시 재계산)으로 | **RED** — 검출 단언이 잡는다 |
+| **N1′·N4′** | (r5 재측정) 판정 alpha 를 밀수 상수로 — 허용 목록 산술 · f-string | 민감도 **RED** |
+| **N2′·N3′·N5′·N6′·N7′** | (r5 재측정) 판정 seed 를 코드가 짓게 — `len` · `int.from_bytes` · `math` · `enum` · 생성식 합 | 아래 |
 
-누계 **여든아홉**(앞 여든셋 · W1~W6 여섯).
+누계 **백둘**(앞 여든아홉 · H1~H5 다섯 · S1~S5·S3b 여섯 · X1·X2 둘).
+
+**H5 가 처음에 GREEN 이었다 — 측정이 잘못된 것을 잡았다.** 단언이 `reserved not in streams` 였는데
+`streams` 가 dict 라 `in` 이 값이 아니라 **키**(호출 자리 좌표)를 봤다. 값 집합으로 고친 뒤 같은
+변이가 RED 다. 스트림 이름이 곧 용도 구분자이므로 그 자리가 이 게이트의 요점이었다.
+
+**X2 는 코드가 아니라 입력을 변이시켰다.** 검출 단언(`incomplete_axis > 0`)을 코드에서 약화하는
+변이(`>= 0`)는 **그 단언 자신**이라 같은 test 가 잡을 수 없다 — 잡을 수 있는 것은 CI 의 diff 다.
+재는 대상은 「생산 쪽이 0 을 적으면 붉어지는가」이므로 버릴 clone 에서 golden 을 그렇게 만들어
+쟀다(추적되는 golden 은 만지지 않았다 — 공유 산출물이다). 항등식이 닫히도록 표본 11 · 목록 한 줄
+제거 · 해시 재계산까지 맞춘 판이라, 붉어진 것은 항등식이 아니라 **검출 단언**이다.
 
 **N1~N7 은 verifier r4 가 GREEN 으로 실측한 일곱**이다. 리터럴 게이트에 형태를 더하지 않고, 판정
 경로에 넣어 **민감도 test 가 RED 인지**로 잰다. 일곱 다 RED 이고, 그중 **다섯은 리터럴 게이트가
 여전히 GREEN** 이다(`1/(2*2*(2+2+1))` · f-string · `len` · `int.from_bytes` · 접기 밖 형태) —
 이 층이 받는 자리가 그만큼이다.
+
+**r5 재측정(판정 경로가 움직였으므로 다시 쟀다 — 업무 수의 출처가 확정 범위로 바뀌었다).**
+일곱 다 다시 RED 다. 그 과정에서 **변이 자체의 결함**이 하나 드러났다.
+
+**부분 밀수는 GREEN 이 옳다.** seed 계열 다섯의 첫 판은 `run.py` 의 seed 스윕 **한 줄**만 코드가
+짓게 바꿨는데 다섯 다 GREEN 이었다. 원인은 게이트가 아니라 변이다 — 정책 seed 가 적합도 검정
+(`check_institutional_fit(..., seed=stability_seeds[0])`)으로 **여전히 흘렀고**, 그래서 정책 값을
+흔들면 판정문이 실제로 움직였다. 「값이 판정에 닿는가」를 재는 test 가 「닿는다」고 답한 것이므로
+**옳은 GREEN** 이다. 로더 한 자리에서 seed 전량을 코드가 짓게 바꾸자(전 경로 밀수) 다섯 다 RED 다.
+**변이가 값을 완전히 밀수하지 못하면, 그 GREEN 은 게이트의 구멍이 아니라 측정의 구멍이다.**
 
 **첫 판의 민감도 test 는 일곱을 다 놓쳤다.** 판정문 **전체 바이트**를 맞댔기 때문이다: 정책 값
 다수가 판정문에 메아리로 실리므로, alpha 를 코드 상수로 바꿔도 `alpha_used` 가 움직여 초록이었다.
@@ -524,7 +615,10 @@ skip 으로 접으면 소비 test 여섯이 조용히 통과한다는 것을 보
 ## 레인 간 왕복 golden — 실제로 결함을 잡았다 (D-6G-27)
 
 생산 쪽(Kotlin `SnapshotWriter` 출하 추출 경로)이 낸 바이트를 소비 쪽 판독·제외에 통과시킨다.
-**현황**: 10행 · 승인 2 · 제외 8 = 값 결측 사유 넷이 각각 2건, 모두 제 이름으로. golden test 여덟 통과.
+**현황**(v5 재생성 뒤): 표본 12 = 행 9 + 상세 없음 1 + 공고 없음 1 + 축 미완 1. 행 9 중 승인 2 ·
+제외 7(`NOTICE_DATE_ABSENT` 2 · `BID_CLOSE_AT_ABSENT` 2 · `OPENING_DATE_ABSENT` 1 ·
+`PLANNED_PRICE_ABSENT` 2), 모두 제 이름으로. 확정 범위는 `CONSTRUCTION`·`SERVICE` 둘이고 행이
+각각 5·4 라 업무 대표는 둘 다 `COVERED` 다. golden test **열** 통과.
 
 왕복이 **소비 쪽 fixture 로는 영영 못 잡는 결함**을 하나 잡았다. 마감(`bid_close_at`)이 빠진 행이
 `BASE_AMOUNT_ABSENT_OR_LATE` 로 계수되고 있었다 — 생산 쪽이 `base_amount_disclosed_at < bid_close_at`
@@ -581,15 +675,30 @@ test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「�
 `float.fromhex("abc")` 처럼 자릿수 없는 문자열로 숨긴 수는 본다(cr r4 L-5 대가). 셋 다 **민감도 test 가
 받는다** — 숨긴 수가 쓰이는 순간 잡히므로 형태를 묻지 않는다.
 
-**왕복 golden 이 `incomplete_axis` 를 0 으로만 지나간다.** 지금 golden 은 manifest 만 v5 이고 그 항이
-0 이라, 생산 쪽이 그 계수를 상수 0 으로 적어도 왕복은 초록이다 — 10/10/0/0 이던 때와 같은 갈래다.
-합성 fixture 는 123/120/1/1/1 로 셋을 다 0 이 아니게 뒀고 변이 W1·W5·W6 로 RED 를 확인했지만 그것은
-이 레인의 fixture 다. 0 이 아닌 golden 이 오면 검출력 단언을 더한다(팀장이 생산 레인에 지시함).
+**둘은 이 라운드에 닫혔다**(앞 판의 제한 둘을 여기서 뺀다):
 
-**`sample_divisions` 는 설정 범위가 아니라 표본 목록 파일에서 온다**(vr r4 L-8). 설정에 든 업무가
-표본 0 이면 그 업무가 파일에 없고 distinct 수가 줄어 **최소 표본 문턱이 내려간다**. 어휘 밖 값(합쳐지는
-오타)은 닫았지만 **부재로 줄어드는 방향은 남아 있다**. 닫으려면 표본틀 확정 범위(`sample-scope.json`,
-D-6G-50·60 의 생산 쪽 파일)를 판독이 함께 읽어야 한다 — 이 라운드의 이 레인 몫이 아니다.
+- 「왕복 golden 이 `incomplete_axis` 를 0 으로만 지나간다」 — 생산 레인이 golden 을 12/9/1/1/1 로
+  재생성했고, 소비 쪽이 항등식을 항 넷으로 닫고 `incomplete_axis > 0` 검출 단언을 더했다. 생산 쪽이
+  그 계수를 0 으로 적으면 왕복이 붉어진다(입력 변이 X2 로 실측).
+- 「`sample_divisions` 가 설정 범위가 아니라 표본 목록에서 온다」(vr r4 L-8) — 문턱의 출처를 manifest
+  의 `sample_scope_divisions` 로 옮겼다(D-6G-66). 한 업무의 행이 전부 사라져도 문턱은 그대로이고 그
+  업무가 `division_coverage` 에 UNDERPOWERED 로 남는다(변이 S1·S2 로 실측).
+
+## 해시 형태 변경이 S0 값을 바꿨다 (vr r4 L-14)
+
+용도 구분자를 붙이면서 재료가 `f"{seed}:{키}:{스트림}"` 에서 `f"{스트림}|{seed}|{키}"` 로 바뀌었다 —
+**같은 공고·같은 seed 에서 S0 가 내는 금액이 달라진다**(S4 의 사정률 표본도 같다). 이것은 결과를 보고
+고친 것이 아니라 사전 등록 값의 **영역 분리**이고, 두 seed 가 같을 때 표본 추첨과 상관되던 것을 끊는다.
+
+기대값을 고칠 자리는 **없었다**. 이 레인의 S0·S4 test 는 값을 박아 두지 않고 성질로 단언한다 — 밴드
+`[r(1-h), r(1+h)]` 안인가 · 같은 seed 면 같은 값인가 · 다른 seed 면 다른 값인가 · 공고마다 다른가 ·
+원 단위 올림인가. 그래서 재료가 바뀌어도 이 단언들은 그대로 성립하고, 실제로 `tests/evaluation` 전량이
+형태 변경만으로는 붉어지지 않았다(재측정 통과). 재현 test 의 「두 번 돌려 바이트 동일」도 같은 재료를
+두 번 쓰므로 영향이 없다.
+
+**판정 JSON 의 바이트는 달라진다** — 같은 스냅숏·같은 정책이라도 S0 가 다른 금액을 내기 때문이다.
+재현(위협 모델 ③)이 요구하는 것은 「같은 입력·같은 코드면 같은 판정」이고, 코드가 바뀌었으므로 이전
+판정 바이트와 같을 이유가 없다. 실 데이터 판정은 아직 돌지 않았다.
 
 ## 알려진 제한 — 판독은 표본의 **사후 축소**를 잡지 못한다
 
