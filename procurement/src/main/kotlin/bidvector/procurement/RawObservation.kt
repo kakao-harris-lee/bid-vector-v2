@@ -16,6 +16,20 @@ data class RawKey(
 }
 
 /**
+ * 공고 식별자의 원문 키(vr r4 L-11) — **정의는 이 둘뿐이다.** 필드 계약 행([FieldConcept.NOTICE_NUMBER]·
+ * [FieldConcept.NOTICE_ROUND])과, 원문 관측을 공고로 잇는 어댑터 SQL 이 같은 자리에서 읽는다.
+ *
+ * 앞 판은 계약이 한 벌이고 SQL 리터럴이 또 한 벌이었다. 한 오퍼레이션이 다른 키 이름을 쓰면 계약만
+ * 고쳐지고 SQL 은 그대로 남아, 같은 공고를 두고 계약 쪽과 SQL 쪽의 공고 키 해시가 갈린다 — 이어
+ * 돌기는 「안 받았다」로 답해 승인 상한을 다시 태우고, 추출은 그 행을 찾지 못한다. 어느 쪽도
+ * 예외를 내지 않아 조용하다.
+ */
+val NOTICE_NUMBER_RAW_KEY: RawKey = RawKey("bidNtceNo")
+
+/** 차수 — [NOTICE_NUMBER_RAW_KEY] 와 한 벌이다. */
+val NOTICE_ROUND_RAW_KEY: RawKey = RawKey("bidNtceOrd")
+
+/**
  * 이 관측이 어느 KONEPS 엔드포인트에서 왔는가 — 필드 계약의 `presentIn`이 참조한다.
  *
  * **P-9 ④ 승인(3B-2, 2026-09-08)** — `OPENING_AWARD_LIST`(낙찰 목록)·`OPENING_RESULT_LIST`

@@ -5,6 +5,8 @@ import bidvector.adapters.koneps.KonepsJsonParser
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
+import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
+import bidvector.procurement.NOTICE_ROUND_RAW_KEY
 import bidvector.procurement.RawKey
 import java.math.BigDecimal
 import java.sql.ResultSet
@@ -15,6 +17,12 @@ import java.time.ZoneId
 
 /** 원문 일시의 해석 구역 — 계약이 `ASSUME_KST` 를 선언한다(`OPEN-3A-SOURCE-TZ` 는 열려 있다). */
 private val SOURCE_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+
+/**
+ * SQL 리터럴 자리에 놓을 수 있는 원문 키의 형태 — **아래 SQL 상수보다 먼저 서야 한다.** 최상위
+ * 프로퍼티는 파일 순서로 초기화되므로, SQL 뒤에 두면 그 초기화가 `null` 정규식을 만난다(실측).
+ */
+private val SQL_SAFE_RAW_KEY = Regex("[A-Za-z][A-Za-z0-9_]*")
 
 private const val PERCENT_DIVISOR = 100
 
@@ -104,19 +112,30 @@ internal fun canonicalNoticeOf(rows: ResultSet): CanonicalNotice? {
  * 이고, 목록 축은 그 행을 **설명하는** 값(공고일·낙찰방법·분류)을 나르는 곁 자료다. 목록 적재가
  * 창보다 앞서는 것은 정상인데(공고는 개찰보다 먼저다) 그것까지 자르면 전 행이 `NOTICE_DATE_ABSENT`
  * 가 된다. 축 어휘는 바인드로 넘긴다 — SQL 에 열거 이름을 박지 않는다.
+ *
+ * 공고 식별자 둘의 **키 이름은 여기서 짓지 않는다**(vr r4 L-11) — [NOTICE_NUMBER_RAW_KEY]·
+ * [NOTICE_ROUND_RAW_KEY] 가 필드 계약과 같은 정의를 준다. 리터럴로 적으면 계약이 바뀌어도 이 문은
+ * 옛 키를 읽고, 두 쪽의 공고 키가 조용히 갈린다.
  */
-internal const val OBSERVATION_SQL =
+internal val OBSERVATION_SQL =
     """
     SELECT source_endpoint,
-           payload_fields ->> 'bidNtceNo' AS notice_number,
-           payload_fields ->> 'bidNtceOrd' AS notice_round,
+           payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' AS notice_number,
+           payload_fields ->> '${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}' AS notice_round,
            payload_fields::text AS payload_fields,
            observed_at
       FROM raw_observation
      WHERE (source_endpoint = ? OR (observed_at >= ?::date AND observed_at < ?::date))
-       AND payload_fields ->> 'bidNtceNo' IS NOT NULL
+       AND payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' IS NOT NULL
      ORDER BY inserted_at
     """
+
+/**
+ * 원문 키를 SQL 리터럴 자리에 놓기 전에 형태를 요구한다 — 따옴표나 공백이 든 키는 문을 갈라 놓는다.
+ * 오늘 두 키는 상수라 이 검사는 기동 시 한 번 돌고, 새 키가 계약에 들어오는 날 그 자리에서 멈춘다.
+ */
+internal fun jsonbKeyOf(key: RawKey): String =
+    key.name.also { require(SQL_SAFE_RAW_KEY.matches(it)) { "SQL 에 놓을 수 없는 원문 키다" } }
 
 /**
  * canonical 축 — 대분류·하한율·마감. 낙찰방법·적용기준·분류·수요기관은 `notice` 표에 칸이 없어

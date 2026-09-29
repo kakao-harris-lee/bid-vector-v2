@@ -127,7 +127,7 @@ internal data class FieldContractRow(
 private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
     listOf(
         FieldContractRow(
-            RawKey("bidNtceNo"),
+            NOTICE_NUMBER_RAW_KEY,
             FieldConcept.NOTICE_NUMBER,
             null,
             FieldScale.IDENTIFIER,
@@ -137,7 +137,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             presentIn = NOTICE_IDENTIFIER_PRESENT_IN,
         ),
         FieldContractRow(
-            RawKey("bidNtceOrd"),
+            NOTICE_ROUND_RAW_KEY,
             FieldConcept.NOTICE_ROUND,
             null,
             FieldScale.IDENTIFIER,
