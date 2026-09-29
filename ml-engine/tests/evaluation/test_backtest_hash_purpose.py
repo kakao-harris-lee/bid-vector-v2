@@ -152,11 +152,12 @@ def test_kotlin_purpose_is_not_used_as_a_python_stream_name() -> None:
     reserved = _documented_purposes()["Kotlin"]
     streams = _stream_names()
     assert streams, "`notice_rng` 호출 자리를 하나도 찾지 못했다"
-    assert reserved not in streams, (
+    used = set(streams.values())
+    assert reserved not in used, (
         f"Python 스트림 이름이 Kotlin 구분자 {reserved!r} 와 같다 — 표본 추첨과 전략 "
-        "난수가 같은 digest 에서 나온다"
+        f"난수가 같은 digest 에서 나온다: {sorted(streams.items())}"
     )
-    assert len(set(streams.values())) == len(streams), (
+    assert len(used) == len(streams), (
         f"두 호출 자리가 같은 스트림 이름을 쓴다: {sorted(streams.items())}"
     )
 
