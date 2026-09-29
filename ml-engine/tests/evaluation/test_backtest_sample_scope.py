@@ -178,6 +178,15 @@ def test_sample_divisions_must_be_a_subset_of_the_scope() -> None:
     assert rejected.reason is SnapshotRejectionReason.SAMPLE_SCOPE_MISMATCH
 
 
+def test_rows_outside_the_scope_reject_the_snapshot() -> None:
+    """행의 업무가 범위 밖이면 그 행은 채점에 들어가면서 **업무 대표 공시에서는
+    보이지 않는다**(공시가 범위를 돌며 세기 때문이다). 조용한 결측이라 멈춘다."""
+    rows = _rows({"n-1": "SERVICE", "n-2": "CONSTRUCTION"})
+    rejected = _load(rows, listing_division="SERVICE", scope=("SERVICE",))
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_SCOPE_MISMATCH
+
+
 def test_threshold_comes_from_the_scope_not_from_the_sample_list() -> None:
     """**변이 표적**: 문턱을 다시 표본 목록에서 세면 여기가 붉어진다.
 

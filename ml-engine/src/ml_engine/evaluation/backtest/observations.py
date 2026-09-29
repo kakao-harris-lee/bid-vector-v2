@@ -182,8 +182,9 @@ class LoadedSnapshot:
 
         범위에서 세므로 행이 0 인 업무가 목록에서 사라지지 않는다 — 그 업무가 통째로
         빠진 사실이 판정문에 남고, 문턱은 그대로다. 0 인 업무를 판정이 따로 공시한다."""
+        # `Counter` 는 없는 키에 0 을 돌려준다 — 기본값 리터럴을 적지 않는다(D-6G-63
+        # 이 리터럴 게이트를 넓히지 말라고 정했으므로, 수를 안 쓰는 쪽으로 짓는다).
         counted = Counter(str(row.notice.category) for row in self.rows)
         return tuple(
-            (division, counted.get(division, 0))
-            for division in self.sample_scope_divisions
+            (division, counted[division]) for division in self.sample_scope_divisions
         )

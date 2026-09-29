@@ -257,7 +257,7 @@ def manifest_bytes(
         "sampled_without_notice": sampled_without_notice,
         "incomplete_axis": incomplete_axis,
         "sample_scope_divisions": (
-            sorted(_listing_divisions(listing))
+            sorted(_default_scope(listing, rows))
             if sample_scope_divisions is None
             else list(sample_scope_divisions)
         ),
@@ -265,12 +265,17 @@ def manifest_bytes(
     return json.dumps(payload, sort_keys=True).encode("utf-8")
 
 
-def _listing_divisions(listing: bytes) -> set[str]:
-    """표본 목록에서 **어휘에 맞는** 업무만 모은다.
+def _default_scope(listing: bytes, rows: bytes) -> set[str]:
+    """기본 확정 범위 — **표본 목록의 층 축과 행의 업무를 합친 집합**.
+
+    둘은 다른 축이지만(스키마 §2.1) 어휘가 같고, 판독은 **둘 다** 범위 안이기를
+    요구한다(범위 밖 행은 채점에 들어가면서 업무 대표 공시에서 사라진다). 그러니
+    기본값은 그 데이터를 실제로 덮는 집합이어야 한다 — 둘을 **다르게** 두는 것은
+    그것을 재는 test 의 몫이다.
 
     일부러 깨뜨린 목록(어휘 밖 값·칸 수 위반)을 쓰는 test 가 있다 — 그 값을 범위 칸에
-    옮겨 적으면 manifest 판독이 먼저 걸려 test 가 겨눈 자리를 못 본다. 기본값은 판이
-    서는 값이어야 한다."""
+    옮겨 적으면 manifest 판독이 먼저 걸려 test 가 겨눈 자리를 못 본다. 어휘에 맞는
+    값만 모으고, 하나도 없으면 판이 서는 기본값을 쓴다."""
     divisions = {
         columns[1]
         for columns in (
@@ -280,6 +285,15 @@ def _listing_divisions(listing: bytes) -> set[str]:
         if len(columns) == len(("key", "division", "week"))
         and columns[1] in BUSINESS_DIVISIONS
     }
+    for line in rows.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            category = json.loads(line)["notice"]["category"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+        if category in BUSINESS_DIVISIONS:
+            divisions.add(category)
     return divisions or {"SERVICE"}
 
 

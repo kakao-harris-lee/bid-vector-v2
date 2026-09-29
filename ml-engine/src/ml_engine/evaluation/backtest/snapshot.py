@@ -280,14 +280,28 @@ def _scope_divisions(fields: dict[str, JsonValue]) -> tuple[str, ...]:
     return values
 
 
-def _check_scope(scope: tuple[str, ...], listing: SampleList) -> None:
+def _check_scope(
+    scope: tuple[str, ...], listing: SampleList, rows: tuple[SnapshotRow, ...]
+) -> None:
     """표본의 업무 ⊆ 확정 범위(D-6G-66). 범위 밖 업무가 표본에 있으면 둘 중 하나는
-    거짓이다 — 문턱을 그 범위에서 정하는 이상 조용히 넘길 수 없다."""
-    stray = sorted(set(listing.divisions) - set(scope))
+    거짓이다 — 문턱을 그 범위에서 정하는 이상 조용히 넘길 수 없다.
+
+    **행의 업무도 본다.** 표본 목록의 층 축과 행의 `category` 는 다른 축이지만 어휘는
+    같고(스키마 §2.1), 업무 대표 공시는 범위를 돌며 센다 — 범위 밖 업무의 행이 있으면
+    그 행이 채점에는 들어가면서 공시에서는 **보이지 않는다**. 결측이 조용한 바로 그
+    모양이라 여기서 멈춘다."""
+    known = set(scope)
+    stray = sorted(set(listing.divisions) - known)
     if stray:
         raise RowReadError(
             SnapshotRejectionReason.SAMPLE_SCOPE_MISMATCH,
             f"확정 범위 밖의 표본 업무 {stray}",
+        )
+    unseen = sorted({str(row.notice.category) for row in rows} - known)
+    if unseen:
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_SCOPE_MISMATCH,
+            f"확정 범위 밖의 행 업무 {unseen}",
         )
 
 
@@ -432,7 +446,7 @@ def load_snapshot(
             sampled_without_notice=manifest.sampled_without_notice,
             incomplete_axis=manifest.incomplete_axis,
         )
-        _check_scope(manifest.sample_scope_divisions, listing)
+        _check_scope(manifest.sample_scope_divisions, listing, rows)
         return _assemble(manifest, rows, listing)
     except RowReadError as rejected:
         # `UnicodeDecodeError` 를 여기서 받지 않는다 — 파일마다 자기 판독기가 사유를
