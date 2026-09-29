@@ -35,12 +35,11 @@ import java.time.Instant
  * `Open`에서 각 종단(또는 중간) 상태로 가는 고정 경로 — [NoticeStatus] 전이표(`Canonicalize.kt`)와
  * 같은 표.
  *
- * **verifier r2 N-5 뒤 개정** — 이전 판은 이 표를 `Map<NoticeStatus, List<NoticeEvent>>`로
- * 두고 [applyStatusPath]가 `Map.getValue`(표에 없으면 `NoSuchElementException`)로 읽었다.
- * 표에서 항목 하나를 실수로 지워도(예: `Cancelled`) **컴파일은 그대로 성공했다** — 런타임에
- * 그 상태를 실제로 만나야만 예외가 드러나는데, `NoticeStatus`가 여섯 값뿐이고 표도 우연히
- * 여섯을 다 담고 있어 test suite가 그 결손을 잡지 못했다(F-8이 바꾼 술어를 지키는 test가
- * 없었다). `when`으로 바꾸면 [NoticeStatus]에 새 값이 추가되거나 이 함수의 분기가 하나
+ * 이 표를 `Map<NoticeStatus, List<NoticeEvent>>`로
+ * 두고 [applyStatusPath]가 `Map.getValue`(표에 없으면 `NoSuchElementException`)로 읽으면,
+ * 항목 하나를 실수로 지워도(예: `Cancelled`) **컴파일은 그대로 성공한다** — 런타임에
+ * 그 상태를 실제로 만나야만 예외가 드러난다. `when`으로 두면 [NoticeStatus]에 새 값이
+ * 추가되거나 이 함수의 분기가 하나
  * 빠지면 **컴파일 자체가 실패한다**(Kotlin의 exhaustive `when` — sealed/enum 소진 검사) —
  * 런타임 예외보다 훨씬 이른 지점에서, 그리고 무조건 잡히는 형태로 같은 결손을 막는다
  * (「회귀 구조적 방지」, CLAUDE.md).
@@ -73,7 +72,7 @@ private fun businessDivisionOf(label: String): BusinessDivision =
     BusinessDivision.fromLabel(label) ?: error("business_division 이 문서 열거 어휘 밖이다: '$label'")
 
 /**
- * D-6F9-3(code-review r1 L7) — 세부 분류 이름 두 열(`service_division`·`main_construction_type`)의 손상 정책을
+ * D-6F9-3 — 세부 분류 이름 두 열(`service_division`·`main_construction_type`)의 손상 정책을
  * [businessDivisionOf] 와 **같게** 맞춘다. 세 열 다 감시 「관심 업종」 집합의 입력이고, V17 이 공백 CHECK 를 건 이유가
  * 「빈 값이 조용히 성립하면 아무것과도 안 맞는다」(D-6F4-8)다. CHECK 가 1차 잠금이라 정상 DB 에서는 도달 불가이고,
  * 도달했다면 CHECK 없이 만든 열이라는 뜻이라 조용히 `null` 로 접지 않는다. (열 자체가 `NULL` 인 것은 손상이 아니다 —
@@ -100,9 +99,9 @@ private fun agencyOf(
 }
 
 /**
- * verifier r1 F-8 뒤 개정 — 이전 판(`EVENT_PATH_TO_STATUS[status] ?: return collected`)은
- * 표에 없는 상태를 만나면 예외 대신 **조용히 `Open`을 냈다**. [eventPathFor]의 exhaustive
- * `when`이 이제 그 결손 자체를 컴파일 시점에 막는다(verifier r2 N-5, 위 KDoc).
+ * `EVENT_PATH_TO_STATUS[status] ?: return collected` 형태로 두면
+ * 표에 없는 상태를 만났을 때 예외 대신 **조용히 `Open`을 낸다**. [eventPathFor]의 exhaustive
+ * `when`이 그 결손 자체를 컴파일 시점에 막는다(위 KDoc).
  */
 private fun applyStatusPath(
     collected: Notice,

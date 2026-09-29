@@ -1,5 +1,5 @@
-"""RED — verifier r1 H-2 게이트 보강. 설계 검토 (5)-10 이 계획한 「public 시그니처
-전수 test」는 낱개 인자 부재만 본다 — 이 test 는 5C-1
+"""RED — H-2 게이트 보강. 설계 검토 (5)-10 이 계획한 「public 시그니처
+전수 test」는 낱개 인자 부재만 본다 — 이 test 는
 `tests/training/test_no_stray_numeric_literals.py`와 같은 방식으로
 `evaluation/**` 소스에 숫자 리터럴이 산포하지 않는지 AST 로 직접 센다. 수정 전에는
 `evaluation/**`가 이 게이트의 스캔 대상이 아니어서 `verdict.py`의

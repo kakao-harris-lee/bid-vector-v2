@@ -1,14 +1,14 @@
-"""M5/5E-3 게이트 — D-5E3-1 의 회귀 방지, D-5E3-6(verifier r1 HIGH-1) 로 구조 강화.
+"""게이트 — D-5E3-1 의 회귀 방지, D-5E3-6(HIGH-1) 로 구조 강화.
 
 `ml_engine` 아래 모든 정책 로더(`*.policy` 서브모듈의 `load_*` 함수)를 **이름 규약
 하나만으로** 기계 수집해 문법이 깨진 YAML 에 결과 타입만 돌려주고 예외 0 임을
 확인한다. 손으로 로더 이름을 나열하지 않는다 — 새 정책 로더가 생기면 이 게이트가
 자동으로 수집 대상에 포함시킨다(우회 후보 (5)).
 
-D-5E3-6 이전 판은 반환 타입 **주석 문자열**에 `Rejected` 가 있는지로 걸렀는데,
-verifier r1 이 반환 주석을 타입 별칭으로 적은 다섯째 로더로 그 필터를 조용히
-피해갔다(수집에서 빠진 로더는 「예외 0」 확인 대상에서도 빠진다). 이번 판은 그
-필터를 없애고 **이름 규약(`load_` 접두, 모듈에 정의됨, 뿌리 함수는 이름으로
+반환 타입 **주석 문자열**에 `Rejected` 가 있는지로 거르면, 반환 주석을 타입
+별칭으로 적은 로더가 그 필터를 조용히 피해간다(수집에서 빠진 로더는 「예외 0」
+확인 대상에서도 빠진다). 그래서 그 필터를 없애고 **이름 규약(`load_` 접두,
+모듈에 정의됨, 뿌리 함수는 이름으로
 명시 제외)만** 쓴다 — `test_collected_loader_set_equals_independent_enumeration`
 이 서로 다른 내부 경로(inspect vs `vars()`+`callable`)로 두 번 계산해 같은
 집합이 나오는지 대조하므로, 이 파일에 다시 숨은 이차 필터가 끼어들면 그 즉시
@@ -18,7 +18,7 @@ verifier r1 이 반환 주석을 타입 별칭으로 적은 다섯째 로더로 
 텍스트 스캔이 아니라 `ml-engine/pyproject.toml` 의 import-linter `forbidden` 계약
 (S-4, `yaml 을 직접 import 하는 곳은 registry.policy 하나`)이 진다 — 그 계약은 AST
 의 모든 import 문을 대상으로 삼아 별칭 import·`from yaml import`·형제 진입점을
-전부 잡는다(verifier r1 이 텍스트 스캔에서 실측한 우회 넷 전부). 이 파일에 있던
+전부 잡는다(텍스트 스캔에서 실측한 우회 넷 전부). 이 파일에 있던
 정규식 기반 소스 스캔 test 는 **삭제**했다 — 같은 불변식을 검사 텍스트보다 훨씬
 튼튼하게 잡는 계약이 이미 있는데 정규식 스캔을 남겨 두면 두 겹이 서로 다른 말을
 할 뿐 값이 없다(둘 다 유지하지 않는다는 D-5E3-6 ③의 선택)."""
@@ -125,7 +125,7 @@ def test_every_non_root_policy_module_has_at_least_one_loader() -> None:
 def test_collected_loader_set_equals_independent_enumeration() -> None:
     """`_iter_fail_closed_loaders`의 수집 결과와, 다른 내부 경로로 다시 계산한
     집합이 정확히 같아야 한다 — 반환 타입 주석 같은 숨은 이차 필터가 조용히
-    끼어들면(verifier r1 HIGH-1) 이 test 가 그 차이를 드러낸다."""
+    끼어들면(HIGH-1) 이 test 가 그 차이를 드러낸다."""
     collected = {name for name, _ in _iter_fail_closed_loaders()}
     independent = {
         f"{module.__name__}.{name}"
@@ -208,7 +208,7 @@ def _yaml_reference_summary(module_name: str) -> tuple[set[str], set[str], bool]
     """모듈 소스를 AST 로 읽어 (1) `yaml.<attr>` 속성 접근 이름 집합 (2)
     `yaml.<attr>(...)` 형태로 **호출된** 속성 이름 집합 (3) `from yaml import ...`
     존재 여부를 낸다. 이름 규약(`load_` 접두)과 무관하게 모듈 전체를 훑으므로
-    verifier r2 MEDIUM-1(비-`load_` 이름의 새 로더)이 여기서는 통하지 않는다."""
+    MEDIUM-1(비-`load_` 이름의 새 로더)이 여기서는 통하지 않는다."""
     module = import_module(module_name)
     tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     attrs: set[str] = set()
@@ -234,7 +234,7 @@ def _yaml_reference_summary(module_name: str) -> tuple[set[str], set[str], bool]
 
 
 def test_exception_modules_reference_only_yaml_yamlerror() -> None:
-    """D-5E3-6 ④(verifier r2 MEDIUM-1) — `pyproject.toml`의 `ignore_imports` 예외
+    """D-5E3-6 ④(MEDIUM-1) — `pyproject.toml`의 `ignore_imports` 예외
     모듈(뿌리 제외) 은 `yaml.YAMLError` 타입 참조 **하나만** 허용한다. `yaml.
     safe_load` 같은 파싱 호출이나 `from yaml import ...` 는 이름이 `load_` 접두가
     아니어도(예: `read_training_policy_v2`) 이 test 가 이름 규약과 무관하게

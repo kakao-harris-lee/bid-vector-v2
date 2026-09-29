@@ -110,7 +110,7 @@ def _check_invariants(success: Success) -> MappingRejected | None:
             "training_row_count 는 DERIVED release 에서 0이어야 한다: "
             f"{success.diagnostics.training_row_count}"
         )
-    # code-reviewer HIGH/verifier r2 N-1 — 비유한 검사가 범위 검사보다 **앞**이어야
+    # HIGH/N-1 — 비유한 검사가 범위 검사보다 **앞**이어야
     # 한다. `Decimal(0) < candidate.bid_rate <= 1`(범위 검사)은 `bid_rate`가
     # `Decimal("NaN")`이면 순서 비교 자체가 `decimal.InvalidOperation`을 던진다 —
     # `MappingRejected`를 거치지 않고 그 예외가 그대로 `map_kernel_result` 밖으로
@@ -133,7 +133,7 @@ def _check_invariants(success: Success) -> MappingRejected | None:
 def _first_candidate_rate_out_of_range(
     candidates: Sequence[Candidate],
 ) -> Candidate | None:
-    """verifier r1 H-1 — `Candidate.bid_rate`는 대상 공고 후보율 축이다(D-2B-8·
+    """H-1 — `Candidate.bid_rate`는 대상 공고 후보율 축이다(D-2B-8·
     D-2F-4). `features.proto`의 `CompetitionSample.observed_bid_rate`(과거 표본
     관측값 축)와 달리 `> 1`을 허용하지 않는다 — proto 주석이 그 축 한정을 명시한다.
     엔진 `scenario.py::build_scenario_candidates`는 정책 `scenario.clamp_max`로

@@ -30,21 +30,21 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * 검증층을 통과하지 못한 `Success` 는 예외가 아니라 `Unavailable`로 접힌다 — 값 타입
  * `init`은 마지막 안전판이지 게이트가 아니다(`isAcceptableSuccessShape`가 게이트,
- * verifier r2 G-1·F-2 `hasNonBlankRelease`와 동형 패턴). `GrpcBidPredictionGatewayTest`
+ * G-1·F-2 `hasNonBlankRelease`와 동형 패턴). `GrpcBidPredictionGatewayTest`
  * 에서 size ratchet(v2-지침서 §5, 500줄)으로 갈라낸 파일이다(`CandidateShapeValidation.kt`
  * 를 `ParsedSuccessFields.kt`에서 가른 것과 같은 사유). 이 파일이 증명하는 것 넷:
  *
  * - 후보 순서(conservative≤base≤aggressive) 위반은 `BidRateCandidates.init`이 아니라
- *   구조 검증층이 먼저 잡아 `Unavailable(ContractViolation)`을 낸다(r2 G-1).
+ *   구조 검증층이 먼저 잡아 `Unavailable(ContractViolation)`을 낸다(G-1).
  * - `PriceFitness` 부호는 계약 근거가 없다(proto 주석 「값의 산식은 이 계약이 규정하지
- *   않는다」) — 정직한 음수 적합도가 값으로 접히지 않고 `Predicted`로 통과한다(r2 G-2).
+ *   않는다」) — 정직한 음수 적합도가 값으로 접히지 않고 `Predicted`로 통과한다(G-2).
  * - 호출부 예산 부족(합성 DeadlineExceeded)은 breaker 계수 밖이다 — 서버는 건강한데
  *   예산만 짧은 호출을 반복해도 breaker 가 열리지 않고, 뒤이은 넉넉한 예산 호출이
- *   서버에 닿는다(r2 G-4 — HALF_OPEN 의 permit 계수는 `BreakerTest`가 잰다).
+ *   서버에 닿는다(G-4 — HALF_OPEN 의 permit 계수는 `BreakerTest`가 잰다).
  * - release 불일치와 schema 불일치가 동시에 있으면 `releaseSatisfiesSelector`가
- *   `mapSuccess`보다 먼저 걸려 `ReleaseMismatch`가 이긴다(r2 G-5).
+ *   `mapSuccess`보다 먼저 걸려 `ReleaseMismatch`가 이긴다(G-5).
  * - 값 타입마다 `init`이 던지는 조건과 검증층 술어가 짝을 이룬다 — table-driven 으로
- *   전수 대조한다(r3 H-6, 짝 없는 조건이 생기면 이 test 가 떨어진다).
+ *   전수 대조한다(H-6, 짝 없는 조건이 생기면 이 test 가 떨어진다).
  */
 class SuccessShapeFailClosedTest {
     private var server: Server? = null
@@ -75,7 +75,7 @@ class SuccessShapeFailClosedTest {
 
     private val exactSelector = ModelReleaseSelector.Exact("release-2026-09-01", "sha256:test")
 
-    // ---- verifier r2 G-5(low) — release 불일치와 schema 불일치가 동시에 있으면
+    // ---- G-5 — release 불일치와 schema 불일치가 동시에 있으면
     // ReleaseMismatch 가 이긴다(handleSuccess 가 releaseSatisfiesSelector 를 mapSuccess 보다
     // 먼저 부르는 구조적 순서, 우회 후보 4/5 판정 실측 재확인). ----
 
@@ -102,7 +102,7 @@ class SuccessShapeFailClosedTest {
         }
     }
 
-    // ---- verifier r2 G-1(high) — 값 타입 init 위반이 실 gateway 경로에서 예외로 새면
+    // ---- G-1 — 값 타입 init 위반이 실 gateway 경로에서 예외로 새면
     // 안 된다. isAcceptableSuccessShape(구조 검증층)가 BidRateCandidates.init 조건
     // (conservative≤base≤aggressive)을 먼저 걸러야 한다(F-2 의 release 패턴과 동형). ----
 
@@ -172,7 +172,7 @@ class SuccessShapeFailClosedTest {
         }
     }
 
-    // ---- verifier r2 G-2(high) — PriceFitness 부호는 계약 근거가 없다. 정직한 음수
+    // ---- G-2 — PriceFitness 부호는 계약 근거가 없다. 정직한 음수
     // 적합도는 값으로 접지 않고 그대로 Predicted 로 통과해야 한다. ----
 
     @Test
@@ -196,7 +196,7 @@ class SuccessShapeFailClosedTest {
         }
     }
 
-    // ---- verifier r2 G-4(medium) — 호출부 예산 부족(합성 DeadlineExceeded)은 breaker 계수
+    // ---- G-4 — 호출부 예산 부족(합성 DeadlineExceeded)은 breaker 계수
     // 밖이어야 한다. 서버는 건강(1회 실패 뒤 재시도 성공)한데 예산만 짧은 호출을 반복해도
     // breaker 가 열리면 안 되고, 뒤이은 넉넉한 예산 호출이 서버에 닿아야 한다. ----
 
@@ -249,7 +249,7 @@ class SuccessShapeFailClosedTest {
         }
     }
 
-    // ---- verifier r3 H-6(low) — init 조건 ↔ 검증층 술어 짝을 손대조가 아니라 구조 test 로
+    // ---- H-6 — init 조건 ↔ 검증층 술어 짝을 손대조가 아니라 구조 test 로
     // 고정한다. 값 타입마다 init 이 던지는 조건을 표(입력 → 기대)로 열거하고, 같은 입력을
     // 실 gateway 경로에 넣어 예외 없이 기대한 Unavailable 사유로 접히는지 대조한다 — 새
     // init 조건이 검증층 술어 없이 추가되면(F-5→G-1 이 두 번째로 난 그 클래스) 이 test 가
@@ -344,7 +344,7 @@ private val shapeInvariantCases =
             { b -> b.releaseBuilder.datasetId = "" },
             MlUnavailableReason.ContractViolation,
         ),
-        // ---- M4/4D-3(scope.md D-4D3-2, 설계 검토 (5)③) — PredictionDiagnostics·Weight init
+        // ---- (scope.md D-4D3-2, 설계 검토 (5)③) — PredictionDiagnostics·Weight init
         // 짝. ----
         ShapeInvariantCase(
             "PredictionDiagnostics: shrinkage_weight fraction 1.0000001(상한 초과)",

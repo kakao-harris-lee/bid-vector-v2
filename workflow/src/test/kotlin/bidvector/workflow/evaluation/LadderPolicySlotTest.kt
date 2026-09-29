@@ -11,7 +11,7 @@ private fun validSlot(
 ): LadderPolicySlot = LadderPolicySlot(capacityHold, forceBidProbability, forceBidMatched)
 
 /**
- * 수정 라운드 3 L-2 — 형제 `VerdictLadderPolicyData`와 같은 `[0,1]` 범위 불변식을
+ * 형제 `VerdictLadderPolicyData`와 같은 `[0,1]` 범위 불변식을
  * 생성 시점에 강제한다. 강제하지 않으면 실패 지점이 조립부가 아니라 판정부(`VerdictLadder
  * .judge`)로 밀린다.
  */

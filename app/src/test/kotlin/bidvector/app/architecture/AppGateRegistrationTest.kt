@@ -9,13 +9,13 @@ import java.io.File
 import java.util.Properties
 
 /**
- * D-6A2b-38(L-r3-6)·46·48·50 — `app` 모듈의 게이트 등재 완전성. `workflow`·`adapters` 에는
- * 있고 `app` 에만 없던 자리다. 그 부재에서 H-r2-1(게이트 test 넷이 `gateExecutionGate` 밖)이 났다.
+ * D-6A2b-38·46·48·50 — `app` 모듈의 게이트 등재 완전성. `workflow`·`adapters` 에는
+ * 있고 `app` 에만 없던 자리다. 그 부재에서 게이트 test 넷이 `gateExecutionGate` 밖에 났다.
  *
- * **발견은 컴파일된 test 클래스 전수다**(D-6A2b-50, verifier r5 F-r5-2 · code-review r5 N-r5-10).
- * 앞 판은 파일 이름(`*Test.kt`)으로 찾았고, 그 술어를 세 형태가 지나갔다(실측): 파일 이름과 다른
- * 클래스 이름 · `*Tests` 접미 · 발견 루트 밖 경로. **JUnit 이 실제로 실행하는 것**은 파일이 아니라
- * **`@Test` 를 가진 클래스**이므로 그것을 모집단으로 둔다 — 이름 규약에 기대지 않는다.
+ * **발견은 컴파일된 test 클래스 전수다**(D-6A2b-50). 파일 이름(`*Test.kt`)으로 찾으면
+ * 그 술어를 세 형태가 지나간다(실측): 파일 이름과 다른 클래스 이름 · `*Tests` 접미 · 발견 루트
+ * 밖 경로. **JUnit 이 실제로 실행하는 것**은 파일이 아니라 **`@Test` 를 가진 클래스**이므로
+ * 그것을 모집단으로 둔다 — 이름 규약에 기대지 않는다.
  *
  * 양방향이다. 누락은 「게이트가 안 돌아도 조용하다」이고, 잉여는 장부와 소스가 어긋난 채 남는
  * 것이다(`GateExecutionGateTask` 의 「실행되지 않았다」는 이름이 처음부터 없던 경우와 구별되지
@@ -33,7 +33,7 @@ class AppGateRegistrationTest {
 
     /**
      * 양성 대조(누락) — 고정 문자열 집합 산술이 아니라 **읽는 함수의 결과**에서 한 이름을 빼서
-     * 잰다. 앞 판은 리터럴 둘의 차집합이라 술어가 무엇을 읽든 늘 참이었다(N-r4-6).
+     * 잰다. 리터럴 둘의 차집합으로 재면 술어가 무엇을 읽든 늘 참이 된다.
      */
     @Test
     fun `등재 집합에서 한 이름을 빼면 그 이름이 차집합에 나온다 — 양성 대조(누락)`() {
@@ -97,5 +97,5 @@ private fun registeredAppTests(): Set<String> {
         .toSet()
 }
 
-/** 읽는 좌표와 Gradle 이 선언한 입력 좌표를 하나로 묶는다(N-r5-11). */
+/** 읽는 좌표와 Gradle 이 선언한 입력 좌표를 하나로 묶는다. */
 private const val GATE_TESTS_PROPERTY = "bidvector.gate.tests"

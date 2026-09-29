@@ -82,8 +82,8 @@ class EvaluateCandidatesUseCaseTest {
         result.reason.shouldBeInstanceOf<EvaluationDropReason.NoticeNotBiddable>()
     }
 
-    // D-1 — 감시 규칙 미설정은 이제 통과가 아니다(수정 라운드 1 M-1, 운영자 결정
-    // 2026-09-10). legacy는 이 상태에서 스캔 자체를 하지 않았다 — 결과(후보 0)는
+    // D-1 — 감시 규칙 미설정은 이제 통과가 아니다.
+    // legacy는 이 상태에서 스캔 자체를 하지 않았다 — 결과(후보 0)는
     // legacy와 같고, 탈락이 값으로 남는다는 것만 다르다.
     @Test
     fun `감시 규칙이 미설정이면 WatchGate 에서 멈추고 NoGate 를 그대로 싣는다`() {
@@ -153,8 +153,8 @@ class EvaluateCandidatesUseCaseTest {
     }
 
     // 신설 — 임계 미설정 전략은 사다리를 돌릴 입력이 없다(감시 게이트는 통과시켜 이
-    // 단계 자체를 재도록 focusCategories 를 둔다 — NoGate 는 수정 라운드 1 M-1로
-    // 이제 통과가 아니라서, 감시까지 미설정이면 그 자리에서 먼저 멈춘다).
+    // 단계 자체를 재도록 focusCategories 를 둔다 — NoGate 는
+    // 통과가 아니라서, 감시까지 미설정이면 그 자리에서 먼저 멈춘다).
     @Test
     fun `사다리 임계가 미설정이면 ThresholdConfiguration 에서 멈춘다`() {
         val notice = testNotice()
@@ -225,7 +225,7 @@ class EvaluateCandidatesUseCaseTest {
         reason.actual shouldBe BigDecimal("0.2")
     }
 
-    // verifier r1 L-1 회귀 — LadderInput 조립(용량 불변식 require 포함)은 scoreThresholdDrop
+    // LadderInput 조립(용량 불변식 require 포함)은 scoreThresholdDrop
     // 판정 **뒤**에만 일어나야 한다. 음수 CapacitySnapshot(현재 CapacityPort 실 구현이 없어
     // 구조적으로 막히지 않는 값)에서도 최소치 미달 후보는 예외 없이 드롭돼야 한다 — 조립이
     // 드롭보다 앞서면 LadderInput.init의 require(currentActiveBids >= 0)이 이 후보에서 먼저
@@ -263,7 +263,7 @@ class EvaluateCandidatesUseCaseTest {
         result.stage shouldBe EvaluationStage.ScoreThreshold
     }
 
-    // M4/4B-3 scope.md ③, 설계 검토 (4) 우회 1·3 — Unavailable 은 scoreThresholdDrop 을
+    // scope.md ③, 설계 검토 (4) 우회 1·3 — Unavailable 은 scoreThresholdDrop 을
     // 거치지 않고 reach 로 직행한다(최소치가 설정돼 있어도 무관), 알림은 0건이다.
     @Test
     fun `ML 미가용이면 최소치 설정과 무관하게 Reached(Review(MlUnavailable)) 로 남고 알림은 0건이다`() {
@@ -313,7 +313,7 @@ class EvaluateCandidatesUseCaseTest {
         reason.reason shouldBe MlUnavailableReason.DeadlineExceeded
     }
 
-    // ---- M4/4D-4(scope.md 우회 (2)·(3)) ----
+    // ---- (scope.md 우회 (2)·(3)) ----
 
     // 우회 (3) — NotificationRequest.evidence 는 같은 reach 호출의 Analyzed.evidence 그대로다
     // (다른 호출·다른 공고의 근거가 실릴 통로가 없다).

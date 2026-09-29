@@ -36,12 +36,10 @@ internal fun maskOpengCorpInfo(raw: String): String? {
 private sealed interface FieldMaskOutcome {
     /**
      * allow-list 밖(계약 미등재)·blank 키·**계약이 이 엔드포인트를 선언하지 않은 키**
-     * (`presentIn` 불일치, verifier r1 F-6 재검토) — 담지 않는다. **verifier r1 F-3
-     * 수정**(운영자 승인 2026-09-08, 3A `Accounting.kt` 좁은 확장) — 이전 판은 여기서
-     * 회계를 남기지 않아 §5.3 규율 1(선언에 없는 키는 미지 필드로 리포트)이 개찰 축에서
-     * 사라졌다. 이제 [MaskedKonepsItem.excludedFieldCount]로 센다 — 3B `mapRawItem`의
+     * (`presentIn` 불일치) — 담지 않는다. §5.3 규율 1(선언에 없는 키는 미지 필드로 리포트)을
+     * [MaskedKonepsItem.excludedFieldCount]로 센다 — 3B `mapRawItem`의
      * `unknownKeysIn` 계수와 같은 목적, 다른 메커니즘(allow-list 는 필터링 자체가 계약
-     * 대조라 사후 재조회 대신 그 자리에서 센다). `presentIn` 대조(F-6)는 P-9 ④(오퍼레이션
+     * 대조라 사후 재조회 대신 그 자리에서 센다). `presentIn` 대조는 P-9 ④(오퍼레이션
      * 군 구별) 승인 취지가 실제로 하중을 지게 한다 — 대조 없이는 어느 오퍼레이션의 값인지
      * 계약이 서류로만 구별할 뿐이었다.
      */
@@ -70,7 +68,7 @@ private fun fieldOutcomeOf(
             FieldMaskOutcome.Excluded
         }
 
-        // F-6(verifier r1 재검토) — 계약은 있으나 이 엔드포인트를 선언하지 않은 키는 제외한다.
+        // 계약은 있으나 이 엔드포인트를 선언하지 않은 키는 제외한다.
         // P-9 ④(오퍼레이션 군 구별)의 승인 취지가 실제로 강제되는 자리다.
         !contract.presentIn.contains(sourceEndpoint) -> {
             FieldMaskOutcome.Excluded
@@ -102,9 +100,9 @@ private fun fieldOutcomeOf(
 internal class MaskedKonepsItem private constructor(
     val fields: Map<RawKey, RawValue>,
     val sourceText: String,
-    // verifier r1 F-3 수정 — allow-list 가 떨어뜨린 키(계약 미등재·blank)의 수. §5.3 규율 1
-    // (미지 필드 리포트)이 개찰 축에서도 서게 한다. `decompositionFailures`(F-8, 이름이
-    // 반대인 슬롯 문제)와 서로 다른 사유라 별도 필드로 센다 — 하나로 접지 않는다.
+    // allow-list 가 떨어뜨린 키(계약 미등재·blank)의 수. §5.3 규율 1
+    // (미지 필드 리포트)이 개찰 축에서도 서게 한다. `decompositionFailures`와 서로 다른
+    // 사유라 별도 필드로 센다 — 하나로 접지 않는다.
     val excludedFieldCount: Int,
     val decompositionFailures: Int,
 ) {
@@ -144,14 +142,14 @@ internal class MaskedKonepsItem private constructor(
  * 개찰 축 항목(⑥b, COL-02·03·04) → [RawNoticeObservation] — [mapRawItem](공고 축, 전체 원문
  * 보존)과 달리 [MaskedKonepsItem]을 거쳐 계약 등재 키만 담고 `sourceText`도 걸러진 값의
  * `render()`다(설계 검토 게이트 ① (2) — 원문 substring 을 나르지 않는다, 3D 감사 통로에도
- * 원문이 남지 않는다). 식별자(공고번호·차수) 부재는 공고 축과 같은 사유로 떨어진다(M-2 관례).
+ * 원문이 남지 않는다). 식별자(공고번호·차수) 부재는 공고 축과 같은 사유로 떨어진다.
  */
 internal fun mapMaskedOpeningItem(
     item: JsonValue.JsonObject,
     policy: KonepsCollectionPolicyData,
     sourceEndpoint: SourceEndpoint,
     observedAt: Instant,
-    // F-1(verifier r1) — 낙찰 목록·개찰결과 목록은 emptyList(), 예비가격 상세는
+    // 낙찰 목록·개찰결과 목록은 emptyList(), 예비가격 상세는
     // KonepsOperationPolicy.RESERVE_PRICE_DETAIL.rowIdentifierRawKeys(compnoRsrvtnPrceSno).
     // 기본값 없음 — 새 개찰 축 오퍼레이션이 이 값을 잊으면 컴파일이 깨진다.
     rowIdentifierRawKeys: List<String>,
@@ -163,7 +161,7 @@ internal fun mapMaskedOpeningItem(
     if (numberRaw.isNullOrBlank() || roundRaw.isNullOrBlank()) {
         return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
     }
-    // code-review r1 L5 — 개찰 축은 오퍼레이션이 업무 대분류를 정하지 않는다(공고 목록과 달리 한 오퍼레이션이
+    // 개찰 축은 오퍼레이션이 업무 대분류를 정하지 않는다(공고 목록과 달리 한 오퍼레이션이
     // 업종을 가리지 않는다). 기본값이 아니라 **명시** 값이다: 이 경로를 쓰는 새 공고 목록 계열 소스가 대분류를
     // 잊으면 컴파일이 깨진다(`RawNoticeObservation.ofRawValues` 의 필수 인자).
     val observation =
@@ -175,12 +173,11 @@ internal fun mapMaskedOpeningItem(
             sourceDivision = null,
         )
     val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(masked.fields, rowIdentifierRawKeys))
-    // verifier r1 F-3·F-8 수정 — unknownFieldCount 는 이름 그대로 계약 밖 키 수만(F-3),
-    // masking 실패는 별도 축(F-8, maskingFailureCount)으로 낸다. 이전 판은 이 둘을 하나로
-    // 접어(unknownFieldCount 자리에 decompositionFailures 를 실어) F-3 의 손실을 만들었다.
+    // unknownFieldCount 는 이름 그대로 계약 밖 키 수만,
+    // masking 실패는 별도 축(maskingFailureCount)으로 낸다.
     return RawItemOutcome.Mapped(observation, identity, masked.excludedFieldCount, masked.decompositionFailures)
 }
 
-// M3/3F — 개찰완료(13) 축도 [mapMaskedOpeningItem]을 그대로 쓴다(계약 레지스트리 경로,
+// 개찰완료(13) 축도 [mapMaskedOpeningItem]을 그대로 쓴다(계약 레지스트리 경로,
 // P-13 (a) 승인). `prcbdrBizno`·`prcbdrCeoNm`은 계약 미등재로 allow-list 반전에서 자동
 // 제외된다 — 이 축 전용 masking 함수를 새로 만들지 않는다(중복 금지).

@@ -155,7 +155,7 @@ class _ConcreteTrainingPipeline:
     def _run_holdout(
         self, dataset: LoadedDataset, cancel_token: CancelToken
     ) -> EvaluationReportV1 | PipelineFailed | PipelineCancelled:
-        """M5/5E-3 D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
+        """D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
         으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
         `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
         (4))."""
@@ -234,8 +234,8 @@ class _ConcreteTrainingPipeline:
         if isinstance(report, PipelineCancelled):
             return report
         if cancel_token.is_cancelled():
-            # M-2(verifier r1) — 모듈 docstring 이 넷(load 뒤·train 뒤·artifact 뒤·
-            # holdout 뒤)이라고 적었는데 코드는 셋뿐이었다. holdout 은 이미 완료된
+            # M-2 — 모듈 docstring 은 넷(load 뒤·train 뒤·artifact 뒤·
+            # holdout 뒤)을 약속하므로 코드도 셋이 아니라 넷을 막아야 한다. holdout 은 이미 완료된
             # 계산을 버리지 않지만(결과는 폐기해도 자원은 이미 다 썼다), 그 뒤
             # `write_artifact_files`가 디스크에 산출물을 남기는 것만은 막을 수 있다
             # (취소된 job 이 고아 디렉터리를 남기지 않는다).

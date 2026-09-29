@@ -3,8 +3,8 @@ package bidvector.sharedkernel
 import java.math.BigDecimal
 
 /**
- * 부가세율 — 운영자 결정 2026-08-28(U-1b), `authoritative`(`data-dictionary.md` §12.1).
- * 코퍼스 무관 정책이라 `ruleVersion` 한 축이다(운영자 결정 2026-09-04, A6).
+ * 부가세율(U-1b) — `authoritative`(`data-dictionary.md` §12.1).
+ * 코퍼스 무관 정책이라 `ruleVersion` 한 축이다(A6).
  */
 val VAT_RATE_POLICY: EffectiveDatedPolicy<BigDecimal> =
     EffectiveDatedPolicy(

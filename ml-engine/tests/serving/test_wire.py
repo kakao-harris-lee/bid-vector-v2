@@ -122,7 +122,7 @@ def test_release_is_copied_from_runtime_release_with_schema_echo() -> None:
 
 
 def test_schema_echo_overrides_runtime_template_value() -> None:
-    """verifier r1 L-3 — 지원 집합이 지금 하나뿐이라 요청 에코 값과 런타임 템플릿
+    """L-3 — 지원 집합이 지금 하나뿐이라 요청 에코 값과 런타임 템플릿
     값이 항상 같아서, 위 test 는 echo 대입 줄이 삭제돼도 붉어지지 않는다(변이
     검증으로 확인). 이 test 는 템플릿과 에코에 **서로 다른** 값을 줘 결정적으로
     가른다 — `map_kernel_result`는 schema 값을 검증하지 않는 순수 함수라 이 값들이
@@ -138,7 +138,7 @@ def test_schema_echo_overrides_runtime_template_value() -> None:
 
 
 def test_release_template_is_not_mutated_across_two_mappings() -> None:
-    """code-reviewer LOW/verifier r1 근거 — "공유 release 객체를 in-place 로 바꾸지
+    """LOW — "공유 release 객체를 in-place 로 바꾸지
     않는다"는 설계 불변식(runtime.py·wire.py 문서화)의 회귀 test. 같은 `release`
     객체를 서로 다른 `feature_schema_version` 에코로 두 번 매핑해도 원본 객체
     (런타임 템플릿)는 물들지 않아야 한다 — 향후 `CopyFrom` 대신 인자로 받은
@@ -208,10 +208,10 @@ def test_non_finite_decimal_is_mapping_rejected() -> None:
 
 
 def test_nan_candidate_rate_is_mapping_rejected_not_raised() -> None:
-    """code-reviewer HIGH/verifier r2 N-1 — `Decimal("NaN")`은 순서 비교에서
+    """N-1 — `Decimal("NaN")`은 순서 비교에서
     `decimal.InvalidOperation`을 던진다. 비유한 검사가 범위 검사보다 먼저 돌아야
     `map_kernel_result`가 그 예외를 그대로 흘리지 않고 통제된 `MappingRejected`를
-    낸다(D-5E2-6). 사유는 「비유한」이어야 한다(verifier r2 N-7 — 「(0,1] 구간」이
+    낸다(D-5E2-6). 사유는 「비유한」이어야 한다(N-7 — 「(0,1] 구간」이
     아니다, 비교 자체가 성립하지 않았으므로)."""
     success = _success()
     object.__setattr__(success.candidates[0], "bid_rate", Decimal("NaN"))
@@ -221,7 +221,7 @@ def test_nan_candidate_rate_is_mapping_rejected_not_raised() -> None:
 
 
 def test_infinite_candidate_rate_is_mapping_rejected_with_non_finite_reason() -> None:
-    """verifier r2 N-7 — `Infinity`는 순서 비교 자체는 성립하지만(범위 밖) 사유는
+    """N-7 — `Infinity`는 순서 비교 자체는 성립하지만(범위 밖) 사유는
     여전히 「비유한」이어야 한다(비유한 검사가 먼저 돈다)."""
     success = _success()
     object.__setattr__(success.candidates[0], "bid_rate", Decimal("Infinity"))
@@ -238,7 +238,7 @@ def test_candidate_count_not_three_is_mapping_rejected() -> None:
 
 
 def test_candidate_rate_above_one_is_mapping_rejected() -> None:
-    """verifier r1 H-1 — 대상 공고 후보율 축(D-2B-8·D-2F-4, `Candidate.bid_rate`)은
+    """H-1 — 대상 공고 후보율 축(D-2B-8·D-2F-4, `Candidate.bid_rate`)은
     1 을 넘을 수 없다. `features.proto` 의 `CompetitionSample.observed_bid_rate`(과거
     표본 관측값 축)와는 다른 축이라 `> 1`을 허용하지 않는다. 엔진 clamp 상한이 1 을
     넘는 정책 값(예: 출하 `scenario.clamp_max = 1.4`)과 만나면 발생할 수 있다 — 값을
@@ -269,7 +269,7 @@ def test_format_fraction_round_trips_kotlin_normalized_forms(value: str) -> None
 
 @pytest.mark.parametrize("value", ["-0", "-0.0000", "-0.00"])
 def test_format_fraction_normalizes_negative_zero(value: str) -> None:
-    """code-reviewer MEDIUM(R-M1)/verifier r1 L-1 — `BigDecimal`에는 음수 0 개념이
+    """L-1 — `BigDecimal`에는 음수 0 개념이
     없어 `toPlainString()`이 부호를 지운다. `_format_fraction`도 부호만 지워
     (scale·값은 불변) Kotlin 과 같은 형태를 낸다."""
     assert _format_fraction(Decimal(value)) == value.lstrip("-")

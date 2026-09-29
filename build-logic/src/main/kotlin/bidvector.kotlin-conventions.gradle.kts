@@ -30,9 +30,9 @@ plugins {
     id("de.aaschmid.cpd")
 }
 
-// M1/1A-b ④(a)(D-2) — `java-test-fixtures` 는 전 모듈에서 허용하지 않는다. 그 source set 을
+// D-2 — `java-test-fixtures` 는 전 모듈에서 허용하지 않는다. 그 source set 을
 // 순수성 규칙(도메인 게이트 면제 여부)이 어떻게 다룰지 ADR 로 먼저 정해야 하고 지금 그 요구가
-// 없다(1B-c 가 공개 API 로 해결했다) — `OPEN-1BC-TESTFIXTURES-GATE`. `plugins.withId`는 이
+// 없다(공개 API 로 해결했다) — `OPEN-1BC-TESTFIXTURES-GATE`. `plugins.withId`는 이
 // 편집(뒤) 이전에 적용됐든 이후에 적용됐든 같은 프로젝트 안에서는 반드시 한 번 불린다 —
 // 플러그인 선언 순서를 가리지 않는다. 나머지 세 게이트((b)(c)(d))는 이 constructive 차단을
 // 손으로 우회했을 때(예: `java-test-fixtures`와 이름만 같은 source set 을 직접 만드는 경로)
@@ -52,7 +52,7 @@ val declarableBuckets =
 val configDir = layout.settingsDirectory.dir("config")
 val sizePolicy = configDir.file("quality/size-policy.properties")
 
-// M1/1A-b ④(b)(D-2) — 모듈이 가질 수 있는 source set 집합. 정책 데이터 하나가 아래 두
+// D-2 — 모듈이 가질 수 있는 source set 집합. 정책 데이터 하나가 아래 두
 // 게이트의 리터럴을 대신한다(중복 금지) — `java-test-fixtures`가 추가하는 `testFixtures`는
 // 이 집합 밖이다.
 private val expectedModuleSourceSets =
@@ -60,7 +60,7 @@ private val expectedModuleSourceSets =
         .requireList("module.expected-source-sets")
         .toSet()
 
-// D-7·verifier r2 H-1 — 상속 깊이의 소유 판정을 넓히는 루트 패키지 접두. 하드코딩하지 않고
+// D-7 — 상속 깊이의 소유 판정을 넓히는 루트 패키지 접두. 하드코딩하지 않고
 // architecture-policy.properties 의 package.root(ADR 0006 D-3)를 그대로 읽는다 — 경계
 // 규칙이 쓰는 값과 다른 값을 이 축이 따로 정의하면 두 자리가 어긋날 수 있다.
 private val typeShapeRootPackagePrefix =
@@ -130,8 +130,8 @@ detekt {
     config.from(configDir.file("detekt/detekt.yml"))
 }
 
-// M1/1A-b ③(OPEN-ADR-16 (a)) — PMD CPD. 값은 전부 정책 데이터에서 온다
-// (`duplicate-policy.properties`, 매직 넘버 금지). 운영자 결정 2026-09-06 — `mode=fail`,
+// OPEN-ADR-16 (a) — PMD CPD. 값은 전부 정책 데이터에서 온다
+// (`duplicate-policy.properties`, 매직 넘버 금지). `mode=fail`,
 // 범위는 **main source set 한정**(D-6 `limit.type.members.source-sets` 와 같은 관례:
 // `fail.source-sets`). 나머지 source set(관례상 test)은 항상 관찰만 하는 별도 task 로
 // 낸다 — `mode`가 무엇이든 그 task 는 절대 실패시키지 않는다(관찰이 그 task 의 정체성이지
@@ -242,9 +242,9 @@ val moduleDependencyGate =
 
                     name == "testCompileClasspath" -> testGraphs.add(root)
 
-                    // M1/1A-b ④(c) — constructive 가드(④(a))를 우회해 `java-test-fixtures`
+                    // constructive 가드(위)를 우회해 `java-test-fixtures`
                     // 없이 같은 이름의 configuration 을 손으로 만드는 경로까지 1차 게이트가
-                    // 보게 한다(방어 심층). 실제로는 ④(a)가 이 configuration 이 생기기 전에
+                    // 보게 한다(방어 심층). 실제로는 위 가드가 이 configuration 이 생기기 전에
                     // project 평가를 끊으므로 이 분기가 정상 경로에서 값을 받는 일은 없다.
                     name == "testFixturesCompileClasspath" -> testGraphs.add(root)
                 }
@@ -411,8 +411,7 @@ val sizeGate =
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
         sources.from(conventionSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         // D-6 — 타입 멤버 축은 `main`만. **모듈 `build.gradle.kts` 도 이 축에 넣는다** —
-        // verifier r1 M-1 실측: 스크립트 안에 31개 멤버 클래스를 심으면 이 축이 놓쳤다
-        // (스크립트에 타입을 둘 수 없다는 이전 주석은 틀렸다). `scriptSizeGate`(루트·loose
+        // 실측: 스크립트 안에 31개 멤버 클래스를 심으면 이 축이 놓쳤다. `scriptSizeGate`(루트·loose
         // 스크립트 레인)는 이미 자신의 `typeSources`에 스크립트를 넣어 대칭이었다 — 이 모듈
         // 레인만 어긋나 있었다.
         typeSources.from(

@@ -1,6 +1,6 @@
-"""M5/5D golden 통합(M-3) — `fixtures/manifest.yaml`의 `ml-kernel-*` case 입력·기대값을
+"""golden 통합(M-3) — `fixtures/manifest.yaml`의 `ml-kernel-*` case 입력·기대값을
 production 타입으로 잇는 어댑터. **production 코드에 golden 전용 표면을 만들지 않는다**
-(팀장 통합 라운드 지시) — 대응 규칙은 전부 이 파일에 있다.
+— 대응 규칙은 전부 이 파일에 있다.
 
 정책 변환: case 마다 `InferencePolicy`의 일부 필드만 synthetic 값으로 선언한다(임계 24·
 κ 15/30·z 1.25·클램프 0.6/1.3 등 — legacy·출하 값과 의도적으로 다르다, `5d-golden/scope.md`
@@ -30,8 +30,8 @@ _SHIPPED_POLICY_PATH = _ML_ENGINE_ROOT / "policy" / "inference-v1.yaml"
 
 _SIGN_MARKERS: dict[str, int] = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
 
-# M5/5D-2 — `assessment.agency_sample_threshold`는 출하 `inference-v1.yaml`에 없다
-# (D-5D2-3, `OPEN-5D2-POLICY-VALUES` 값 미정, 운영자 결정 2026-09-13 (c)). `shipped_policy()`
+# `assessment.agency_sample_threshold`는 출하 `inference-v1.yaml`에 없다
+# (D-5D2-3, `OPEN-5D2-POLICY-VALUES` 값 미정 (c)). `shipped_policy()`
 # 는 그 값을 지어 출하 YAML 에 채우는 대신(편집 금지), 이 test 전용 placeholder(가장 관대한
 # 값 `1`이라 011 을 제외한 어떤 case 의 단언에도 영향을 주지 않는다)로 메운 임시 파일에서
 # 읽는다. `ml-kernel-011`만 자신의 synthetic 값(10)으로 `policy_with`가 덮어쓴다.

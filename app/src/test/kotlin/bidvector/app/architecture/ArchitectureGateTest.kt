@@ -23,7 +23,7 @@ class ArchitectureGateTest {
     private val production: JavaClasses =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
-            // M1/1A-b ④(d)(D-2, 방어 심층) — `testFixtures` 산출물이 있다면(constructive
+            // ④(d)(D-2, 방어 심층) — `testFixtures` 산출물이 있다면(constructive
             // 가드 ④(a)를 우회했을 때) 이 production 스캔에 섞여 들지 않게 한다.
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TEST_FIXTURES)
             .importPackages(policy.packageRoot)
@@ -89,7 +89,7 @@ class ArchitectureGateTest {
         rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers).checkAll()
     }
 
-    /** D-6A3-17(a) — HIGH-1 시정. app 이 다루는 NotificationRequestPort 구현체 집합이 구조로 닫힌다. */
+    /** D-6A3-17(a) — app 이 다루는 NotificationRequestPort 구현체 집합이 구조로 닫힌다. */
     @Test
     fun `app 이 다루는 NotificationRequestPort 구현은 허용 목록의 부분집합이고 outbox 쓰기 타입을 참조하지 않는다`() {
         rules
@@ -101,7 +101,7 @@ class ArchitectureGateTest {
             ).checkAll()
     }
 
-    /** D-6A3-17(b) — HIGH-3 시정. app production 전체가 참조하는 adapters.ml 타입 집합이 구조로 닫힌다. */
+    /** D-6A3-17(b) — app production 전체가 참조하는 adapters.ml 타입 집합이 구조로 닫힌다. */
     @Test
     fun `app production 이 참조하는 adapters ml 타입은 허용 목록의 부분집합이다`() {
         rules
@@ -112,7 +112,7 @@ class ArchitectureGateTest {
             ).checkAll()
     }
 
-    /** D-6A3-25 — 검토 라운드 2 HIGH 시정. app production 전체가 평가·전략 포트를 허용된 (호출자, 포트.메서드) 쌍으로만 호출한다. */
+    /** D-6A3-25 — app production 전체가 평가·전략 포트를 허용된 (호출자, 포트.메서드) 쌍으로만 호출한다. */
     @Test
     fun `app production 은 허용된 호출자 포트 메서드 쌍으로만 평가 전략 포트를 부른다`() {
         rules

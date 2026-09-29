@@ -2,7 +2,7 @@ plugins {
     id("bidvector.kotlin-conventions")
 }
 
-// M3/3A — procurement 는 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
+// procurement 는 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
 // architecture-policy.properties layer.domain.shareable). decision/qualification 과 같은
 // 배선이다.
 //

@@ -12,7 +12,7 @@ private const val EDIT_SESSIONS = "/api/strategy/edit-sessions"
  *
  * **HTTP 를 지나는 대조는 `ProductionHttpSurfaceTest` 로 옮겼다**(D-6A2b-19 ③) — 응답 키
  * 집합과 「문서의 경로·메서드 == 등록된 매핑」 등식은 모집단이 **출하 조립**이어야 의미가
- * 있고, test 전용 조립에서 재면 다른 패키지의 컨트롤러를 보지 못한다(verifier r1 F-1).
+ * 있고, test 전용 조립에서 재면 다른 패키지의 컨트롤러를 보지 못한다.
  *
  * 평탄성 순회(`OpenApiContractTest` 의 D-6A1-44)는 문서 전체를 훑으므로 이 slice 가 더한
  * 스키마도 그 test 가 이미 덮는다 — 여기서 다시 재지 않는다.

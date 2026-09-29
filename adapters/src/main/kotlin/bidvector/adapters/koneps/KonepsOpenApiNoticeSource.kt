@@ -56,7 +56,7 @@ private fun buildListUri(
  * 운영 경로가 맞는지는 실제 KONEPS 호출이 out_of_scope 라 이 slice 가 검증하지 않는다(알려진
  * 제한, checklist.md).
  *
- * **[businessDivision](D-6F9-1, M6/6F-9)은 필수 인자다** — 이 인스턴스가 부르는 오퍼레이션의 업무 대분류를 호출부가
+ * **[businessDivision](D-6F9-1)은 필수 인자다** — 이 인스턴스가 부르는 오퍼레이션의 업무 대분류를 호출부가
  * 데이터(수집 소스 설정 표)에서 넘기고, 이 클래스는 그 값을 관측에 **구조로** 싣는다. `baseUri`의 경로 문자열을 파싱해 대분류를
  * 얻지 않는다(경로와 대분류가 어긋나도 이 값이 이긴다 — 표류는 설정 표 한 행이 막는다).
  */
@@ -82,8 +82,8 @@ class KonepsOpenApiNoticeSource(
             KonepsPageUriBuilder { pageNo ->
                 buildListUri(baseUri, serviceKey, referenceDate, pageNo, numOfRowsPerPage)
             }
-        // F-4(verifier r1, 3B-2) — itemMapper 기본값이 없어졌다. 이 port 는 항상 공고 축
-        // 원문 보존 mapper 를 쓴다(동작 불변, 이전 판의 암묵 기본값과 같은 값을 명시할 뿐).
+        // itemMapper 기본값이 없다(3B-2). 이 port 는 항상 공고 축
+        // 원문 보존 mapper 를 쓴다(동작 불변 — 암묵 기본값이던 것과 같은 값을 명시할 뿐이다).
         // D-6G-47 H-1 — 공고 목록 갈래도 같은 관문을 지난다. 이 갈래가 상한 밖에 있던 것이
         // 세 라운드 동안 열려 있던 구멍이다(계약 D-6G-29 ⑥ 「A-1 은 6G 의 모든 호출을 덮는다」).
         val callContext = KonepsCallContext(SourceEndpoint.NOTICE_LIST)

@@ -66,7 +66,7 @@ class DomainApiTypeFixtureTest {
     }
 
     /**
-     * **verifier r18 F-2.** 접근자 본문만 있고 타입이 없는 프로퍼티(초기화식·위임 없음)도
+     * 접근자 본문만 있고 타입이 없는 프로퍼티(초기화식·위임 없음)도
      * 타입 미명시다 — `val rate = 0.5` 는 막히고 `val rate get() = 0.5` 는 열리던 우회로.
      */
     @Test
@@ -85,7 +85,7 @@ class DomainApiTypeFixtureTest {
     }
 
     /**
-     * **Codex 14차 #2.** `where` 절의 타입 제약(`typeConstraints`)이 `extendsBound` 와 같은
+     * `where` 절의 타입 제약(`typeConstraints`)이 `extendsBound` 와 같은
      * 축으로 잡혀야 한다 — `class`(`T : Number`)와 `fun`(`T : Comparable<Double>`, 중첩 타입
      * 인자) 두 형태를 함께 심는다.
      */

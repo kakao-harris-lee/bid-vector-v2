@@ -1,5 +1,5 @@
-"""M5/5A 게이트 — ADR 0009 D-6 재활용 출처 **양방향** 대조(S-7 을 pytest 안에서도 확인,
-verifier r1 F-3)."""
+"""게이트 — ADR 0009 D-6 재활용 출처 **양방향** 대조(S-7 을 pytest 안에서도 확인,
+F-3)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def test_reuse_provenance_check_fails_on_mismatched_evidence() -> None:
 
 
 def test_reuse_provenance_check_fails_when_evidence_claims_missing_pointer() -> None:
-    """verifier r1 F-3 — 역방향. `reuse.md` 행이 있는데 그 모듈 docstring 에 `Reuse:`
+    """F-3 — 역방향. `reuse.md` 행이 있는데 그 모듈 docstring 에 `Reuse:`
     포인터가 없으면(또는 지워지면) 실패해야 한다. `generate_contracts.py`는 신규 작성이라
     실제로 포인터가 없다 — 이 fixture 가 그 모듈에 가짜 evidence 행을 붙인다."""
     result = _run("--evidence", "tests/gates/fixtures/reuse-claims-fake-pointer.md")

@@ -17,11 +17,11 @@ import org.gradle.api.tasks.TaskAction
 import java.io.File
 
 /**
- * PR #5 게이트 시정(privacy-gate) — `config/quality/leak-patterns.txt`(M4/4E 신설)가 어느
+ * `config/quality/leak-patterns.txt`가 어느
  * gradle task 에도 배선되지 않아 slice 마다 손으로 돌리는 관행이었다. 이 task 가 `check` 에
  * 걸리는 실물이다.
  *
- * **스캔 대상은 `reports/evidence/`다**(소스가 아니다) — 이 패턴 파일을 만든 4E 의 실제
+ * **스캔 대상은 `reports/evidence/`다**(소스가 아니다) — 이 패턴 파일을 만든 실제
  * 관행(scope.md S-3c, 모든 slice 의 `commands.md` 가 손으로 반복해 온 「evidence 자기 스캔」)
  * 을 그대로 승격한 것이다. 소스 트리(Kotlin) 전수를 대상으로 하지 않는 이유는 실측 때문 —
  * `maxTokensPerCall`·`KtTokens.PRIVATE_KEYWORD`·`Authorization: Bearer`(정당한 헤더 생성

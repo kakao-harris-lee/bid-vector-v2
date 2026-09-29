@@ -31,12 +31,12 @@ import java.math.BigDecimal
 import java.nio.file.Path
 
 /**
- * M2/2B — `BidPredictionService` 계약 consumer test. Kotlin in-process fake servicer
+ * `BidPredictionService` 계약 consumer test. Kotlin in-process fake servicer
  * (`BidPredictionServiceCoroutineImplBase`) 위에서 `contracts/testdata/prediction/` 의
  * canonical 바이트(`buf convert`로 생성 — 재현 절차는 `reports/evidence/m2/2b/commands.md`)를
- * 답으로 낸다. 실제 socket 배선·client 매핑은 2D·M4 몫이다(scope.md 「구현 순서」 4).
+ * 답으로 낸다. 실제 socket 배선·client 매핑은 아직 이 파일 밖이다(scope.md 「구현 순서」 4).
  *
- * **거부 규칙은 이 test 안의 순수 함수다** — 2A `ContractRoundTripTest`와 같은 관례
+ * **거부 규칙은 이 test 안의 순수 함수다** — `ContractRoundTripTest`와 같은 관례
  * (Kotlin 쪽 실제 validation 구현은 M4 몫). 여기서는 계약이 요구하는 불변식을 test가
  * 문서화하고 고정한다.
  */
@@ -147,7 +147,7 @@ class PredictionContractTest {
         hasExactlyThreeOrderedCandidates(mutated.success) shouldBe false
     }
 
-    // ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④, verifier r1 F-2) ----
+    // ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④) ----
 
     @Test
     fun `testdata 의 모든 후보 origin 은 RECOMMENDED 다`() {
@@ -267,12 +267,12 @@ class PredictionContractTest {
         }
     }
 
-    // ---- decimal string 정규형(2A 술어 재사용, verifier r1 F-3) — Rate 셋 + decimal 넷 ----
+    // ---- decimal string 정규형(술어 재사용) — Rate 셋 + decimal 넷 ----
 
     @Test
     fun `지수 표기는 bid_rate 에서도 weight 에서도 거부된다(T7 재현)`() {
-        // verifier r1 변이 T7 — `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1]
-        // 안이라 범위 검사만으로는 통과했었다. 정규형 검사를 선행 조건으로 걸어 막는다.
+        // `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1]
+        // 안이라 범위 검사만으로는 통과한다. 정규형 검사를 선행 조건으로 걸어 막는다.
         isValidBidRateFraction("8.87E-1") shouldBe false
         isNormalizedFraction("5.2E-1") shouldBe false
         isNormalizedFraction("8.87E-1") shouldBe false
@@ -375,7 +375,7 @@ class PredictionContractTest {
         isAcceptableFeatureInputs(missing) shouldBe false
     }
 
-    // M2/2F additive 단언(diagnostics·POSTERIOR_PREDICTIVE·표본 축·release_kind)은
+    // additive 단언(diagnostics·POSTERIOR_PREDICTIVE·표본 축·release_kind)은
     // `PredictionAdditiveContractTest.kt`(같은 패키지)로 갈라냈다 — size ratchet(v2-지침서
     // §5, 파일당 500줄)이 이 파일을 500줄 초과로 밀었다(`EmbeddingTestdataCanonicalTest`를
     // `EmbeddingContractTest`에서 가른 것과 같은 사유).
@@ -414,7 +414,7 @@ class PredictionContractTest {
         canonicalBytes(GetModelMetadataResponse.parseFrom(metadataBytes)).toList() shouldBe metadataBytes.toList()
     }
 
-    // ---- 계약이 요구하는 거부 규칙 — 순수 함수. 실제 Kotlin validation 구현은 M4 몫이고,
+    // ---- 계약이 요구하는 거부 규칙 — 순수 함수. 실제 Kotlin validation 구현은 아직 없고,
     // 여기서는 test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4). ----
 
     private fun hasExactlyThreeOrderedCandidates(success: Success): Boolean {
@@ -427,8 +427,8 @@ class PredictionContractTest {
             )
     }
 
-    // `releaseSatisfiesSelector`는 M4/4D-1(D-4D-3)로 `bidvector.adapters.ml`(main)에
-    // 승격됐다 — 위 import 가 그 실 배선 함수를 그대로 쓴다(단언·case 무변경, scope.md S-3).
+    // `releaseSatisfiesSelector`는 `bidvector.adapters.ml`(main)에
+    // 승격됐다(D-4D-3) — 위 import 가 그 실 배선 함수를 그대로 쓴다(단언·case 무변경, scope.md S-3).
 
     private fun isAcceptableObjective(objective: OptimizationObjective): Boolean =
         objective != OptimizationObjective.OPTIMIZATION_OBJECTIVE_UNSPECIFIED &&
@@ -437,10 +437,10 @@ class PredictionContractTest {
     private fun isAcceptableCandidateLabel(label: CandidateLabel): Boolean =
         label != CandidateLabel.CANDIDATE_LABEL_UNSPECIFIED && label != CandidateLabel.UNRECOGNIZED
 
-    // `isNormalizedFraction`(scale 보존·지수 표기 거부)을 선행 조건으로 건다(verifier r1
-    // F-3) — 범위(`0..1`)만 보면 `"8.87E-1"`처럼 값은 범위 안이나 정규형이 아닌 입력을
-    // 놓친다(T7 재현, 위 test). 함수 자체는 `ContractFractionRules.kt`(같은 패키지, 2A와
-    // 공유)에 있다.
+    // `isNormalizedFraction`(scale 보존·지수 표기 거부)을 선행 조건으로 건다 —
+    // 범위(`0..1`)만 보면 `"8.87E-1"`처럼 값은 범위 안이나 정규형이 아닌 입력을
+    // 놓친다(T7 재현, 위 test). 함수 자체는 `ContractFractionRules.kt`(같은 패키지, 다른
+    // test 파일과 공유)에 있다.
     private fun isValidBidRateFraction(fraction: String): Boolean {
         if (!isNormalizedFraction(fraction)) return false
         val value = BigDecimal(fraction)
@@ -455,7 +455,7 @@ class PredictionContractTest {
             features.agencyId.factCase != AgencyIdFact.FactCase.FACT_NOT_SET &&
             features.baseAmountProvenanceLabel.factCase != BaseAmountProvenanceLabelFact.FactCase.FACT_NOT_SET
 
-    // ---- 후보 origin 은 항상 RECOMMENDED(verifier r1 F-2) ----
+    // ---- 후보 origin 은 항상 RECOMMENDED ----
 
     private fun candidatesHaveRecommendedOrigin(success: Success): Boolean =
         success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED }

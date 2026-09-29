@@ -14,7 +14,7 @@ import contract.bidvector.ml.v1.ReleaseKind as ProtoReleaseKind
 import contract.bidvector.ml.v1.UnmeasurableReason as ProtoUnmeasurableReason
 
 /**
- * M4/4D-1(scope.md ④~⑦) — 계약 DTO → 도메인 [BidPredictionOutcome]. **fail-closed** — 정의
+ * scope.md ④~⑦ — 계약 DTO → 도메인 [BidPredictionOutcome]. **fail-closed** — 정의
  * 밖 enum·후보 개수/순서/origin 위반·정규형 위반·`sample_size==0`은 전부
  * `Unavailable(ContractViolation)`(⑦, 우회 (5)(6)). `Unmeasurable`은 값·기본값으로 접지
  * 않는다(⑤, ADR 0010 D-3). `Success` 형태 검증·필드 파싱은 `ParsedSuccessFields.kt`에 있다
@@ -100,7 +100,7 @@ private fun ModelRelease.toDomain(): ModelReleaseRef =
     ModelReleaseRef(releaseId, artifactChecksum, featureSchemaVersion, codeVersion, datasetId, releaseKind.toDomain())
 
 /**
- * M2/2F(D-2F-2) — 이 함수 호출 시점에는 [hasValidReleaseShape]가 이미 `UNSPECIFIED`·
+ * D-2F-2 — 이 함수 호출 시점에는 [hasValidReleaseShape]가 이미 `UNSPECIFIED`·
  * `UNRECOGNIZED`를 거부했으므로(검증층이 먼저 걸린다, `ParsedSuccessFields.kt`) 그 두 값은
  * 여기 도달하지 않는다. `error()`는 그 불변식이 깨졌을 때만 실행되는 방어적 마지막 줄
  * (`ParsedSuccessFields.kt`의 `checkNotNull` 관례와 같다) — 정상 흐름의 예외가 아니다.

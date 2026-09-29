@@ -17,7 +17,7 @@ sealed interface CommandResult {
 }
 
 /**
- * [EditStrategyWorkflow.begin]의 결과(verifier N-1 수정) — `apply()`의 판정 순서 밖이라
+ * [EditStrategyWorkflow.begin]의 결과 — `apply()`의 판정 순서 밖이라
  * [TransitionOutcome] 을 재사용하지 않는다(그 타입은 [EditCommand] 를 요구하는데 `begin`
  * 에는 command 가 없다).
  */
@@ -37,8 +37,7 @@ sealed interface BeginOutcome {
  * 채널 독립 use case(scope.md ⑦, STR-11) — 4개 command 처리 + `begin`·`expire`. 어댑터
  * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다(⑥).
  *
- * **verifier H-3 수정 — 커널 자체가 `internal`이다.** `AppliedStrategy`(통로 타입, H-1/H-2
- * 수정)는 위조를 막았지만 **획득**은 막지 못했다 — `beginSession`·`apply`가 public top-level
+ * **커널 자체가 `internal`이다.** `AppliedStrategy`(통로 타입)는 위조를 막았지만 **획득**은 막지 못했다 — `beginSession`·`apply`가 public top-level
  * 함수였을 때는 `workflow` 밖에서 그 둘을 직접 몰아 호출부가 고른 `current`·`draft`로 정당한
  * `AppliedStrategy`를 얻고, 이 use case를 거치지 않고 [strategies]에 직접 넘겨 **이벤트 없는
  * 저장**을 실행할 수 있었다(실측: `revision=778`·`bidNowThreshold=0.99` 저장 + 발행 0). 지금은
@@ -57,17 +56,17 @@ class EditStrategyWorkflow(
     private val sessionPolicy: EditSessionPolicyData,
 ) {
     /**
-     * 같은 [EditSessionId]에 이미 비종단 세션이 있으면 덮어쓰지 않고 거부한다(verifier N-1 —
+     * 같은 [EditSessionId]에 이미 비종단 세션이 있으면 덮어쓰지 않고 거부한다(
      * `sessions.load` 가드가 없으면 `WaitingForConfirmation` 을 `apply()` 밖에서 조용히
      * `WaitingForValue` 로 되돌릴 수 있었다). 종단 세션(`Applied`/`Cancelled`/`Expired`)이
      * 있는 id 는 새로 열 수 있다(D-4A-4 — 재개는 새 세션).
      *
-     * **가드 전에 만료를 먼저 접는다(verifier M-5 수정)** — 저장된 state 만 보면, 시각상
+     * **가드 전에 만료를 먼저 접는다** — 저장된 state 만 보면, 시각상
      * 만료됐지만 아직 `Expired`로 fold 되지 않은 세션이 비종단으로 읽혀 `begin()`을 막는다.
      * sweep 배선 부재(선언된 알려진 제한)와 겹치면 그 `EditSessionId`의 새 편집이 **무기한**
      * 막힐 수 있었다. `expireIfDue`를 먼저 적용해 종단 판정한다.
      *
-     * **`sessions.save(folded)`의 정직한 효력 범위(verifier L-9)** — fold 가 일어나면
+     * **`sessions.save(folded)`의 정직한 효력 범위** — fold 가 일어나면
      * (`folded !== existing`) 아래에서 곧바로 같은 [sessionId]로 새 세션을 저장하므로, 이
      * id-upsert 계약의 [EditSessionRepository] 위에서는 이 호출의 값이 그 새 세션 저장에
      * **곧바로 덮인다**(죽은 쓰기 — 실측: 이 줄을 지워도 `:workflow:test` 전건 초록).
@@ -95,7 +94,7 @@ class EditStrategyWorkflow(
     }
 
     /**
-     * 지금 저장된 전략(M6/6A-2b D-6A2b-2) — 필드 하나짜리 편집을 **전체** draft 로 조립하는
+     * 지금 저장된 전략(D-6A2b-2) — 필드 하나짜리 편집을 **전체** draft 로 조립하는
      * 어댑터가 나머지 필드를 지어내지 않으려면 이 값이 필요하고, 그 읽기는 뒤따르는
      * command 와 **같은 트랜잭션** 안에서 일어나야 한다(D-6A2b-3). 그래서 어댑터가 포트를
      * 직접 쥐는 대신(우회 (1)) 이 use case 를 통해 읽는다 — 새 권한이 아니다: 같은 값이
@@ -115,7 +114,7 @@ class EditStrategyWorkflow(
     fun expire(sessionId: EditSessionId): EditSessionState? = view(sessionId)?.state
 
     /**
-     * 조회(M6/6A-2b D-6A2b-1) — 세션 전체를 돌려준다. `expire` 와 **같은 동작**이다:
+     * 조회(D-6A2b-1) — 세션 전체를 돌려준다. `expire` 와 **같은 동작**이다:
      * 접근 시점에 만료를 먼저 접고(D-6A2b-11 — 주기 sweep 을 두지 않는 대신 접근이 접는다.
      * 다시 접근하지 않는 세션은 접히지 않은 채 남는다 — `OPEN-6A2B-ABANDONED-SESSIONS`)
      * 접혔으면 그 사실을 영속한다. `expire` 가 상태만 돌려줘 HTTP 응답이 요구하는 버전·
@@ -130,8 +129,8 @@ class EditStrategyWorkflow(
     }
 
     /**
-     * `Applied` 는 `strategies.save` → `events.publish` → `sessions.save` 순이다(verifier
-     * M-3 수정) — 세션을 먼저 저장하면 전략 저장 실패 뒤에도 세션이 이미 `Applied` 로
+     * `Applied` 는 `strategies.save` → `events.publish` → `sessions.save` 순이다 —
+     * 세션을 먼저 저장하면 전략 저장 실패 뒤에도 세션이 이미 `Applied` 로
      * 굳어, 복구 뒤 같은 `Confirm` 재전달이 `Accepted`(중복)로 조용히 통과하며 전략은
      * revision 이 오르지 않고 발행도 없이 **편집이 영구 소실**됐다. 이 순서라면 전략 저장
      * 실패 시 세션이 전진하지 않아 재전달이 정상 재시도가 되고, 발행 실패(전략 저장은
@@ -142,7 +141,7 @@ class EditStrategyWorkflow(
      * 순서 자체는 심층 방어로 남긴다: 경계 없이 이 use case 를 직접 조립하는 호출자에게는
      * 여전히 이 순서가 유일한 방어다.
      *
-     * **verifier r3 HIGH-3 수정(D-6B1-10)** — `outcome.session`이 [session]과 **같은
+     * **(D-6B1-10)** — `outcome.session`이 [session]과 **같은
      * 인스턴스**(버전이 안 오른 `Rejected` 전부·중복 재전달의 `Accepted`)면 저장하지
      * 않는다. [EditSessionRepository] 구현(`JdbcEditSessionRepository`)은 낙관적 동시성
      * 전제조건(저장소 버전 = 새 값 − 1)을 요구하므로, 버전이 그대로인 저장은 구성상 항상

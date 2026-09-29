@@ -30,14 +30,14 @@ internal data class NoticeRow(
     val floorRateFraction: BigDecimal?,
     val floorRateOriginKind: String?,
     val floorRateOriginDetail: String?,
-    // M3/3H-1 D-3H-4 — 발주기관 넷. provenance 컬럼 없음(business_category_* 와 같은 축).
+    // D-3H-4 — 발주기관 넷. provenance 컬럼 없음(business_category_* 와 같은 축).
     val demandAgencyCode: String?,
     val demandAgencyName: String?,
     val noticeAgencyCode: String?,
     val noticeAgencyName: String?,
-    // M6/6F-4 D-6F4-9 — 공고명. provenance 컬럼 없음(business_category_*·agency_* 와 같은 축).
+    // D-6F4-9 — 공고명. provenance 컬럼 없음(business_category_*·agency_* 와 같은 축).
     val title: String?,
-    // M6/6F-9 D-6F9-3 — 업무구분 새 칸 셋(V17). 대분류는 문서 열거 라벨 그대로 저장한다. provenance 컬럼 없음(같은 축).
+    // D-6F9-3 — 업무구분 새 칸 셋(V17). 대분류는 문서 열거 라벨 그대로 저장한다. provenance 컬럼 없음(같은 축).
     val businessDivision: String?,
     val serviceDivision: String?,
     val mainConstructionType: String?,

@@ -104,10 +104,10 @@ def _bump_field_value(
 def test_checksum_changes_for_every_declared_field(
     field: dataclasses.Field[object],
 ) -> None:
-    """verifier r1 M-2 — 손 목록이 아니라 `dataclasses.fields(InferencePolicy)`
+    """M-2 — 손 목록이 아니라 `dataclasses.fields(InferencePolicy)`
     **전수**를 재는 test. 열거에서 필드 하나가 빠지면(예: `maturity_window_days`)
-    이 test 의 그 case 만 초록으로 남아 누락을 드러낸다(변이 검증, verifier 재현:
-    parametrize 밖 필드를 손 목록에서 빼도 890 passed 로 안 붉어졌다)."""
+    이 test 의 그 case 만 초록으로 남아 누락을 드러낸다(변이 검증: parametrize 밖
+    필드를 손 목록에서 빼도 890 passed 로 안 붉어졌다)."""
     current_value = getattr(_POLICY, field.name)
     changed = dataclasses.replace(
         _POLICY, **{field.name: _bump_field_value(current_value)}

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * scope.md 우회 (7)(계약 갱신 2, verifier r1 V-1) — `ArchitectureGateTest`의 Locale 축은
+ * scope.md 우회 (7)(계약 갱신 2) — `ArchitectureGateTest`의 Locale 축은
  * `policy.domainModules`(`layer.domain`)에만 걸리고 `workflow`는 `layer.application`이라
  * 대상 밖이다(`architecture-policy.properties`). 이 test 가 S-5 `NotificationBoundaryTest`
  * 관례(소스 텍스트 스캔 + 양성 대조)를 `EvidenceLines.kt` 한 파일에 적용해 그 자리를 대신한다.
@@ -50,7 +50,7 @@ class EvidenceLinesBoundaryTest {
     }
 }
 
-/** 이 파일에서 금지하는 서식 API 어휘(팀장 지시 — 매직 문자열은 이 목록 하나로). */
+/** 이 파일에서 금지하는 서식 API 어휘(매직 문자열은 이 목록 하나로). */
 private val DISALLOWED_FORMATTING_SUBSTRINGS =
     listOf(
         "java.util.Locale",

@@ -15,15 +15,15 @@ fun interface Clock {
  * **설계 검토 (2) #3 실측 판정 — `internal interface`로는 닫히지 않는다.** `internal
  * interface`로 두면 `EditStrategyWorkflow`(공개 클래스)의 생성자가 그 internal 타입을
  * 노출해 `:workflow:compileKotlin`이 즉시 컴파일 에러로 거부한다("public function exposes
- * its 'internal' parameter type", 실측 2026-09-08). `EditStrategyWorkflow` 자체를
+ * its 'internal' parameter type", 실측). `EditStrategyWorkflow` 자체를
  * `internal`로 닫으면 4C/6A 의 실 어댑터가 이 use case 를 배선할 수 없어 slice 존재 이유
  * (⑥ "모든 편집 경로가 이 use case 를 지난다")와 충돌한다. 그래서 이 port 인터페이스
  * 자체는 `public`으로 남는다.
  *
- * **인자 타입이 닫는다 — verifier H-1/H-2 수정.** `save`가 [OperatorStrategy]를 직접
- * 받던 이전 형태는 우회 (3)을 막지 못했다 — `bidvector.strategy.validate()`가 public 이라
- * 어느 모듈에서든 [OperatorStrategy] 값을 얻어 이 port 의 자체 구현에 바로 넘길 수 있었다
- * (verifier 실측: `app` test 에 `StrategyRepository` 를 구현하고 `validate()` 결과를
+ * **인자 타입이 닫는다.** `save`가 [OperatorStrategy]를 직접
+ * 받으면 우회 (3)을 막지 못한다 — `bidvector.strategy.validate()`가 public 이라
+ * 어느 모듈에서든 [OperatorStrategy] 값을 얻어 이 port 의 자체 구현에 바로 넘길 수 있다
+ * (실측: `app` test 에 `StrategyRepository` 를 구현하고 `validate()` 결과를
  * `save()` 에 전달하는 클래스를 심어 `:app:compileTestKotlin` exit 0). `save`가
  * [AppliedStrategy](internal constructor, `workflow` 모듈 밖에서 생성 불가)를 요구하도록
  * 바꾸면 그 우회는 컴파일되지 않는다 — 재현 시도가 `Cannot access '<init>': it is internal
@@ -40,9 +40,9 @@ interface StrategyRepository : StrategyReader {
 /**
  * 전략 **읽기** port(D-6A2b-41) — `save` 가 없다.
  *
- * verifier r4 F-r4-1: 읽기만 하는 요청 스코프 조립이 쓰기 가능한 [StrategyRepository] 를 쥐고
- * 있었고, 그것 하나로 메모리 세션 저장소·no-op sink 를 붙여 편집 use case 를 **스스로 조립**하면
- * HTTP GET 한 번에 전략이 바뀌면서 outbox·세션 행은 0 이었다. 능력은 **호출 지점**이 아니라
+ * 읽기만 하는 요청 스코프 조립이 쓰기 가능한 [StrategyRepository] 를 쥐면,
+ * 그것 하나로 메모리 세션 저장소·no-op sink 를 붙여 편집 use case 를 **스스로 조립**해
+ * HTTP GET 한 번에 전략이 바뀌면서 outbox·세션 행은 0 일 수 있다. 능력은 **호출 지점**이 아니라
  * **전달**에서 샌다 — 읽기 자리에 쓰기 능력을 주지 않는 것이 그 축을 닫는 구조다.
  *
  * 밖에 허락하는 것은 「현재 전략을 읽는다」뿐이다. 쓰기는 [StrategyRepository.save] 이고 그
@@ -60,8 +60,8 @@ interface StrategyReader {
  * `EditSession`은 `internal constructor`(M4가 위조를 막았다)라 `adapters`에서 생성자
  * 호출 자체가 컴파일되지 않는다 — `friendPaths`·`associate` 설정이 저장소에 0건이라
  * `AppliedStrategy` 같은 통로 타입으로는 이 문제(획득/복원)가 풀리지 않는다(통로 타입은
- * 쓰기 주체만 가른다). M4/4C-1이 같은 계열을 겪었고(`EventEnvelope.restore`가 public
- * 이라 저장소 복원 진입점이 위조 재료를 내줬다, verifier H-1) 해법이 **port 반환을 원시
+ * 쓰기 주체만 가른다). 다른 slice 도 같은 계열을 겪었다(`EventEnvelope.restore`가 public
+ * 이라 저장소 복원 진입점이 위조 재료를 내줬다) — 해법이 **port 반환을 원시
  * 값으로**(`OutboxPort.claim() -> ClaimedOutboxRow`, 복원은 `workflow` 안 `internal`)였다
  * — 이 port도 같은 형태를 취한다. 실 복원은 [restoreEditSession] 하나뿐이고
  * [EditStrategyWorkflow]가 로드 직후 그것을 거친다. `save`의 시그니처는 그대로다
@@ -91,11 +91,11 @@ class EditSessionConflictException(
  * 적용 이벤트 발행 port(scope.md ⑥) — 봉투·outbox 는 4C, 이 slice 는 payload 를 넘기는
  * 자리까지.
  *
- * **4A 계약 갱신 2026-09-09(운영자 승인, `reports/evidence/m4/4a/scope.md` 하단) — `actor`
+ * **4A 계약 갱신(`reports/evidence/m4/4a/scope.md` 하단) — `actor`
  * 매개변수 추가.** ③ 은 「`Applied` 가 낳는 `StrategyUpdated` 는 이 command actor 를 함께
  * 넘긴다」고 적었으나 원래 시그니처엔 그 통로가 없었다(값 자체는
  * [bidvector.workflow.strategy.TransitionOutcome.Applied.session] 의 actor 에 있었다).
- * M4/4C-1 이 봉투의 `StrategyUpdated actor` 필수 요구(D-M4-4 (a))를 맞추려다 이 공백을
+ * 봉투의 `StrategyUpdated actor` 필수 요구(D-M4-4 (a))를 맞추려다 이 공백을
  * 찾아 좁게 넓혔다 — 의미 변경이 아니라 미완 전달의 완성이다.
  */
 fun interface EventSink {

@@ -77,7 +77,7 @@ class AccountingTest {
 
     // 블록 본문 + 명시 반환 타입 없음(= Unit 고정)이어야 JUnit Jupiter 가 discover 한다 —
     // `= runBlocking { checkAll(…) }` 식 본문은 반환형이 `PropertyContext`로 추론돼 조용히
-    // 건너뛴다(`test-discovery-guard`, MoneyTest.kt `P-3b`와 같은 회귀 형태, verifier r1 F-1).
+    // 건너뛴다(`test-discovery-guard`, MoneyTest.kt `P-3b`와 같은 회귀 형태).
     @Test
     fun `property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다`() {
         runBlocking {
@@ -114,7 +114,7 @@ class AccountingTest {
         allReasons.none { it.toString().contains("Duplicate") } shouldBe true
     }
 
-    // M3/3B 좁은 확장(verifier r1 H-3) — truncated 와 truncationCause 결합 불변식.
+    // truncated 와 truncationCause 결합 불변식.
     @Test
     fun `truncated=true 인데 truncationCause 가 없으면 생성이 거부된다`() {
         shouldThrow<IllegalArgumentException> {
@@ -166,8 +166,7 @@ class AccountingTest {
         }
     }
 
-    // verifier r1 F-3·F-8(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — 개찰 축
-    // masking 실패를 unknownFields 와 분리해 센다.
+    // 개찰 축 masking 실패를 unknownFields 와 분리해 센다.
     @Test
     fun `maskingFailures 는 기본값 0 이고 dropReasons_dropped 항등식 밖이다`() {
         val base = accounting(received = 3, normalized = 3, duplicate = 0, dropped = 0)
@@ -188,8 +187,7 @@ class AccountingTest {
         }
     }
 
-    // verifier r2 G-1(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — 행 식별자가
-    // 선언됐는데 부재·공백이라 dedup 을 적용하지 못한 건수를 별도 축으로 낸다.
+    // 행 식별자가 선언됐는데 부재·공백이라 dedup 을 적용하지 못한 건수를 별도 축으로 낸다.
     @Test
     fun `rowIdentifierIndeterminate 는 기본값 0 이고 dropReasons_dropped 항등식 밖이다`() {
         val base = accounting(received = 3, normalized = 3, duplicate = 0, dropped = 0)

@@ -18,7 +18,7 @@ from ml_engine.training.spec import (
 
 
 def test_shipped_spec_matches_policy_values_md() -> None:
-    """verifier r1 L-7 — 이 test 는 `policy-values.md` §2 표를 파싱하지 않는다. 표 값을
+    """L-7 — 이 test 는 `policy-values.md` §2 표를 파싱하지 않는다. 표 값을
     이 파일에 하드코딩해 대조한다(사람이 표와 눈으로 대조 확인) — 이름이 시사하는 것보다
     약한 대조다(5A/5B 와 같은 관행). legacy `ed4b06c` `award_rate_gbm.py:93-115` 이식,
     D-5C-2."""
@@ -141,7 +141,7 @@ def _mutate_hyperparameter_value(value: object) -> object:
 
 
 def test_spec_checksum_is_sensitive_to_every_hyperparameter_field() -> None:
-    """code-reviewer PR #13 LOW-1 — 기존 test(위)는 `num_boost_round` 변경 하나만
+    """LOW-1 — 기존 test(위)는 `num_boost_round` 변경 하나만
     확인했다. `LightGbmHyperparameters` 13필드를 `dataclasses.fields`로 전수 순회해
     필드마다 값을 하나 바꾸면 checksum 이 달라짐을 확인한다 — `spec_checksum`의 손
     나열 payload 가 실제 필드 집합과 어긋나면(향후 필드 추가 뒤 갱신 누락 등) 이

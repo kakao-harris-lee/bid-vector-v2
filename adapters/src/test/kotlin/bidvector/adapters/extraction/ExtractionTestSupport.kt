@@ -23,7 +23,7 @@ fun testExtractionPolicy(
     maxChunksPerDocument: Int = maxCallsPerDocument,
     chunkChars: Int = 40,
     callTimeout: Duration = Duration.ofMillis(300),
-    // verifier r1 F-2 — httpRequestTimeout 은 callTimeout 보다 항상 커야 한다(init 강제).
+    // httpRequestTimeout 은 callTimeout 보다 항상 커야 한다(init 강제).
     // 고정폭(+5s)으로 둬 커스텀 callTimeout 값과 무관하게 항상 성립한다.
     httpRequestTimeout: Duration = callTimeout.plusSeconds(5),
 ): ExtractionPolicyData =
@@ -83,7 +83,7 @@ const val ASSERTED_ABSENT_RESPONSE_JSON = """{"assertedAbsent": true, "items": [
 /**
  * **위반이 둘**인 응답(미등록 최상위 키 + `assertedAbsent:false`인데 `items` 가 비어
  * `else: minItems 1` 위반) — `additionalProperties` 단독 위반 test 로는 쓰지 않는다
- * (verifier r1 F-4(a) — 이 fixture 만 쓰면 `additionalProperties:false` 를 지워도
+ * (이 fixture 만 쓰면 `additionalProperties:false` 를 지워도
  * 두 번째 위반 때문에 여전히 Invalid 라 test 가 그 규칙의 강제를 증명하지 못한다).
  */
 const val SCHEMA_VIOLATING_RESPONSE_JSON = """{"assertedAbsent": false, "items": [], "extra": "field"}"""

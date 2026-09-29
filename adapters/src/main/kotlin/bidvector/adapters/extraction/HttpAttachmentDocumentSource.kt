@@ -27,7 +27,7 @@ private sealed interface RawFetchOutcome {
 }
 
 /**
- * 첨부문서 취득 어댑터(①, verifier r1 F-5(a) KDoc 정정) — 크기 상한은 **실제 수신 바이트
+ * 첨부문서 취득 어댑터(①) — 크기 상한은 **실제 수신 바이트
  * 수**(`bytes.size`)만 잰다. `Content-Length` 헤더는 main 어디에서도 읽지 않는다 —
  * `HttpResponse.BodyHandlers.ofByteArray()`가 본문을 전부 메모리에 받은 **뒤**에야
  * 상한을 검사하므로, 헤더 사전 검사가 주려는 "본문을 다 받기 전에 거부" 이점은 없다.

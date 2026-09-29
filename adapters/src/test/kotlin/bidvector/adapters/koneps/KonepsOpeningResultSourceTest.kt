@@ -46,7 +46,7 @@ private fun newSource(
             ),
     )
 
-// F-6(verifier r1 재검토) — opengCorpInfo·progrsDivCdNm 는 presentIn 이 OPENING_RESULT_LIST
+// F-6 — opengCorpInfo·progrsDivCdNm 는 presentIn 이 OPENING_RESULT_LIST
 // 뿐이다. presentIn 강제 뒤로는 그 엔드포인트로 구성한 source 로만 이 필드들을 검증할 수 있다.
 private fun newResultListSource(
     server: MockKonepsServer,

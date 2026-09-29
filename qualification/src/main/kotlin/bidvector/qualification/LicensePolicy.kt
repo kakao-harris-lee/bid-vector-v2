@@ -42,12 +42,12 @@ val LICENSE_QUALIFICATION_POLICY: EffectiveDatedPolicy<LicenseQualificationPolic
     )
 
 /**
- * verifier r1 F-4 · r2 N-2 — legacy `_KEY_NOISE_RE = re.compile(r"[\s·・‧⋅,.\-_/()\[\]（）]+")`
+ * legacy `_KEY_NOISE_RE = re.compile(r"[\s·・‧⋅,.\-_/()\[\]（）]+")`
  * (`bid-vector/app/services/license_eligibility.py:142`) 가 정본이다. **`\s` 는 리터럴로
  * 옮기지 않는다** — Python `str` 정규식의 `\s` 는 유니코드 공백 전체(전각 공백 `U+3000`·
  * NBSP `U+00A0`·`U+2000`~`U+200A`·`U+202F`·`U+205F`·줄/문단 구분자 `U+2028`·`U+2029` 포함,
- * 실측: `re.fullmatch(r"\s", chr(cp))`)를 매치하는데, 이전 판(공백 넷 `' ' '\t' '\n' '\r'`
- * 리터럴 나열)은 전각 공백 등을 놓쳐 거짓 `Ineligible` 을 냈다(PROBE WS 실측). Kotlin
+ * 실측: `re.fullmatch(r"\s", chr(cp))`)를 매치하는데, 공백 넷(`' ' '\t' '\n' '\r'`)
+ * 리터럴 나열만으로는 전각 공백 등을 놓쳐 거짓 `Ineligible` 을 낼 수 있다(PROBE WS 실측). Kotlin
  * `Char.isWhitespace()` 는 `Character.isWhitespace(code) || Character.isSpaceChar(code)`
  * 의 합집합이라(stdlib 정의) 정확히 이 codepoint 집합을 덮는다(Java `Character.isWhitespace`
  * 단독은 NBSP·`U+2007`·`U+202F` 를 **일부러** 제외하므로 그것만으로는 부족하다 — 실측).

@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
 /**
- * [ObservationKey]의 실제 유도 지점(verifier r1 F-2 뒤 신설) — `MessageDigest`(SHA-256)를
+ * [ObservationKey]의 실제 유도 지점(신설) — `MessageDigest`(SHA-256)를
  * `RawObservationStore.kt` KDoc이 procurement가 가질 수 없다고 적은 바로 그 이유(domain
  * 허용 목록 밖)로 여기(adapters)에 둔다. `ObservationPayloadCodec.encode`가 이미 만드는
  * **정본 직렬화**(계약 등재 필드 전체, `raw_observation.payload`에 그대로 저장되는 것과
@@ -15,7 +15,7 @@ import java.security.MessageDigest
  * 유도되는 재료가 같은 문자열이라 「같은 payload인데 다른 키」·「다른 payload인데 같은 키」
  * 가 (해시 충돌을 제외하면) 구조적으로 생기지 않는다.
  *
- * **재료의 범위(M6/6F-9, code-review r1 L4)** — 위 불변식은 `raw_observation` 에 저장되는
+ * **재료의 범위** — 위 불변식은 `raw_observation` 에 저장되는
  * 축에 대한 것이다. `RawNoticeObservation.sourceDivision`(수집 오퍼레이션의 업무 대분류)은
  * 관측 **동등성**에는 들지만 이 재료에도, `raw_observation` 열에도 없다 — 원문 행은 대분류를
  * 저장하지 않고 정본은 `notice.business_division` 이다(`checklist.md` 알려진 제한 2). 그래서
@@ -24,7 +24,7 @@ import java.security.MessageDigest
  * 전부 바꾸므로 하지 않는다.
  *
  * SHA-256(256비트)은 `Object.hashCode()`류(32비트, `"Aa"`·`"BB"`가 `String.hashCode()`에서
- * 충돌하는 실물이 F-2였다)와 달리 실무에서 우연 충돌을 기대할 수 없는 자리수다.
+ * 충돌하는 실물이다)와 달리 실무에서 우연 충돌을 기대할 수 없는 자리수다.
  */
 internal object ObservationKeyDerivation {
     private const val SEPARATOR = "|"
@@ -32,12 +32,12 @@ internal object ObservationKeyDerivation {
     /**
      * `canonicalPayload`는 [ObservationPayloadCodec.encode]가 낸 **같은** 문자열을 호출부가
      * 그대로 넘긴다 — `raw_observation.payload_fields`에 저장되는 등재분 투영과 키 유도
-     * 재료가 한 몸이다(이중 계산·이중 정의를 피한다). `observation.sourceText`(원문, F-7
+     * 재료가 한 몸이다(이중 계산·이중 정의를 피한다). `observation.sourceText`(원문,
      * 운영자 결정)도 재료에 더한다 — 등재분이 같아도 원문이 다르면(예: 미등재 필드만 바뀜)
      * 다른 관측으로 본다. 원문이 없으면 빈 문자열로 접는다(등재분만으로 유도하던 기존
      * 동작과 하위호환).
      *
-     * `rowDiscriminator`(M3/3E 신설, D-3E-1a (a)) — 값이 있으면 그 값, 부재·공백이면 응답 안
+     * `rowDiscriminator`(신설, D-3E-1a (a)) — 값이 있으면 그 값, 부재·공백이면 응답 안
      * 위치가 재료 마지막 칸에 더해진다(`OPEN-3B2-STORAGE-ROW-KEY-COLLISION`). `null`(기본값,
      * 행 구별이 필요 없는 오퍼레이션)이면 이 칸은 빈 문자열이라 **기존 키 유도와 동치**다 —
      * 목록 오퍼레이션의 기존 raw 행 키는 이 확장으로 바뀌지 않는다(상대적 동등/비동등만

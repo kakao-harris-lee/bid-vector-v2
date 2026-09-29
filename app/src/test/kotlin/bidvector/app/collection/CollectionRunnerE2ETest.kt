@@ -39,7 +39,7 @@ import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
- * D-6F8-1~4 E2E(M6/6F-8) — production 조립을 `mode=once` 로 부팅해 mock KONEPS → 원문 저장 → 정규화 → 영속 →
+ * D-6F8-1~4 E2E — production 조립을 `mode=once` 로 부팅해 mock KONEPS → 원문 저장 → 정규화 → 영속 →
  * 회계까지 끝에서 끝으로 잰다(실 KONEPS 호출 없음). 잠그는 것: ① 공고명이 계약 경유로 `notice_title` 에 실린다
  * ② `collection_run` 행 = 조회일 × 업종 ③ 회계 등식과 사유별 탈락(형식이 어긋난 차수 포함 — 실행이 죽지 않는다)
  * ④ 재실행은 새 notice 행이 0 이다 ⑤ 모든 로그·표준 출력·표준 오류(예외 cause 체인 전체)에 서비스 키도 공고명
@@ -175,7 +175,7 @@ class CollectionRunnerE2ETest {
 
         private fun bootAndRun(extraProperties: Map<String, String>): List<Int> {
             val context: ConfigurableApplicationContext =
-                // M6/6A-2b D-6A2b-9 — 출하 조립이 Boot 기본 `TypeExcludeFilter` 를 되살리면서
+                // D-6A2b-9 — 출하 조립이 Boot 기본 `TypeExcludeFilter` 를 되살리면서
                 // `@TestConfiguration`(=`@TestComponent`)이 더는 컴포넌트 스캔에 잡히지 않는다.
                 // 그것이 그 필터의 존재 이유다 — test 전용 빈이 출하 조립의 스캔에 섞이면 안 된다.
                 // 이 test 는 그 빈을 **명시 source** 로 준다(profile 잠금은 그대로).

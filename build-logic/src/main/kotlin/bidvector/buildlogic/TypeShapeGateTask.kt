@@ -29,7 +29,7 @@ abstract class TypeShapeGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classes: ConfigurableFileCollection
 
-    /** D-7·verifier r2 H-1 — 소유 판정을 넓히는 루트 패키지 접두. `architecture-policy.properties`
+    /** D-7 — 소유 판정을 넓히는 루트 패키지 접두. `architecture-policy.properties`
      * 의 `package.root`(ADR 0006 D-3)에서 호출부가 읽어 넘긴다 — 하드코딩하지 않는다. */
     @get:Input
     abstract val rootPackagePrefix: Property<String>
@@ -48,7 +48,7 @@ abstract class TypeShapeGateTask : DefaultTask() {
                 ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
             }
         failOnEmptyScan(imported)
-        // D-7 — 소유 판정 = 이 배선이 스캔한 집합이거나 루트 패키지 아래(verifier r2 H-1 — 모듈
+        // D-7 — 소유 판정 = 이 배선이 스캔한 집합이거나 루트 패키지 아래(모듈
         // 경계를 넘는 소유 클래스 상속도 계수하기 위해 스캔 집합만으로는 부족했다).
         val ownedTypeNames = imported.map { it.name }.toSet()
         val prefix = rootPackagePrefix.get()
@@ -59,7 +59,7 @@ abstract class TypeShapeGateTask : DefaultTask() {
     }
 
     /**
-     * verifier r2 M-1 — `classes` 입력 경로가 배선 실수로 어긋나면(예: 존재하지 않는 디렉터리)
+     * `classes` 입력 경로가 배선 실수로 어긋나면(예: 존재하지 않는 디렉터리)
      * `roots`가 비어 `imported`도 비고, 그러면 조용히 「위반 0건」으로 통과했다 —
      * `cpdReportPresenceGate`(D-4)가 막는 것과 같은 계열의 퇴화다. 자리표시자 모듈(타입 1개)은
      * 이 단언에 걸리지 않는다 — 걸리는 것은 정확히 0개일 때뿐이다.
@@ -78,7 +78,7 @@ abstract class TypeShapeGateTask : DefaultTask() {
     ) {
         val violations = policy.violations(shapes)
         if (violations.isEmpty()) return
-        // verifier r1 L-1 — `sizeGate`의 파일·함수 축은 위반 메시지가 `v2-지침서.md §5`를
+        // `sizeGate`의 파일·함수 축은 위반 메시지가 `v2-지침서.md §5`를
         // 문면으로 가리킨다. 이 축도 같은 형태로 상향 경로를 명시한다 — 빌드 로그만 보는
         // 개발자가 결정 ID(D-3)만으로는 그 문면에 닿지 못한다.
         throw GradleException(

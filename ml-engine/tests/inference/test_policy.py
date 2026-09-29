@@ -18,8 +18,8 @@ from ml_engine.inference.policy import (
 
 _POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
 
-# M5/5F-1 — `assessment.agency_sample_threshold`는 이제 출하 `inference-v1.yaml`에
-# 잠정값 10으로 있다(`OPEN-5D2-POLICY-VALUES` 종결, 운영자 결정 2026-09-16 ③). 이 test
+# `assessment.agency_sample_threshold`는 이제 출하 `inference-v1.yaml`에
+# 잠정값 10으로 있다(`OPEN-5D2-POLICY-VALUES` 종결, 결정 ③). 이 test
 # 파일의 다른 모든 test 는 이 키와 무관한 동작(다른 필드의 불변식)을 검증하므로,
 # `_base_values()`가 실제 출하 값 위에 이 키만 synthetic 으로 **덮어써** 격리한다 — 값
 # 자체(`1`, 가장 관대해 다른 어떤 test 의 단언에도 영향을 주지 않는다)는 잠정값 10 과
@@ -185,7 +185,7 @@ def test_gbm_min_category_rows_negative_is_rejected(tmp_path: Path) -> None:
 
 
 def test_clamp_min_non_positive_is_rejected(tmp_path: Path) -> None:
-    """verifier r1 M-2 — `clamp_min <= 0`은 하한<상한 검사만으로는 걸리지 않는다(예:
+    """M-2 — `clamp_min <= 0`은 하한<상한 검사만으로는 걸리지 않는다(예:
     -1.0 < 1.4). 이 값이 통과하면 `build_scenario_candidates`가 `bid_rate <= 0`인 후보를
     만들어 `Candidate.__post_init__`의 `ValueError`가 결과 타입 경계 밖으로 샌다."""
     values = _base_values()
@@ -203,10 +203,10 @@ def test_clamp_min_zero_is_rejected(tmp_path: Path) -> None:
 
 
 def test_clamp_min_quantizes_to_zero_is_rejected_digits_1(tmp_path: Path) -> None:
-    """verifier r2 F-1 재현 1 — `clamp_min > 0`(quantize **전**) 만으로는 부족하다.
+    """F-1 재현 1 — `clamp_min > 0`(quantize **전**) 만으로는 부족하다.
     `bid_rate_digits=1`에서 `quantize_bid_rate(0.04, 1)`은 `0.0`(0.04 는 한 자리로
-    반올림하면 0)이라, 이전 판은 이 정책을 통과시켜 `build_scenario_candidates`가
-    `Candidate.__post_init__`의 `ValueError`를 던지게 했다."""
+    반올림하면 0)이라, 이 정책을 통과시키면 `build_scenario_candidates`가
+    `Candidate.__post_init__`의 `ValueError`를 던진다."""
     values = _base_values()
     values["scenario.bid_rate_digits"] = 1
     values["scenario.clamp_min"] = 0.04
@@ -216,7 +216,7 @@ def test_clamp_min_quantizes_to_zero_is_rejected_digits_1(tmp_path: Path) -> Non
 
 
 def test_clamp_min_quantizes_to_zero_is_rejected_digits_4(tmp_path: Path) -> None:
-    """verifier r2 F-1 재현 2 — `bid_rate_digits=4`(출하 기본)에서도
+    """F-1 재현 2 — `bid_rate_digits=4`(출하 기본)에서도
     `clamp_min=0.00001`(1e-05)은 quantize 뒤 `0.0000`이 된다."""
     values = _base_values()
     values["scenario.clamp_min"] = 0.00001
@@ -246,7 +246,7 @@ def test_shipped_clamp_min_survives_quantize_check(tmp_path: Path) -> None:
 def test_negative_weight_is_rejected_even_when_sum_is_one(
     tmp_path: Path, weight_key: str
 ) -> None:
-    """verifier r1 M-2 — 가중치 셋이 합 1 을 유지해도 개별 값이 음수면 거부한다."""
+    """M-2 — 가중치 셋이 합 1 을 유지해도 개별 값이 음수면 거부한다."""
     values = _base_values()
     values[weight_key] = -0.10
     other_keys = [

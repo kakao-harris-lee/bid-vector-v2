@@ -1,8 +1,8 @@
-"""M5/5D-2·5D-3 — wire `CompetitionSample` 조립 test 지원(golden `_adapter.py`·
+"""wire `CompetitionSample` 조립 test 지원(golden `_adapter.py`·
 `_policy_support.py`와 같은 관례). `test_observations.py`·`test_distribution.py`·
 `test_engine.py`가 공유한다(중복 금지).
 
-M5/5D-3(D-5D3-2) — `agency_id`/`category_code`(M2/2F additive) 기본값은 두 축 모두
+D-5D3-2 — `agency_id`/`category_code`(additive) 기본값은 두 축 모두
 `MISSING_REASON_NOT_COLLECTED_YET`다(허용되는 유일한 결측 사유, wire 관례와 일치) —
 이 기본값이라야 기존(5D-2) test 가 세그먼트 게이트에서 조용히 거부되지 않고
 D-5D3-5 비트 동일 회귀가 성립한다. `agency_id`/`category_code`에 문자열을 주면 그
@@ -51,7 +51,7 @@ def money(amount_won: int, **overrides: object) -> common_pb2.Money:
 
 def _set_text_fact(fact: object, value: str | int | None) -> None:
     """`AgencyIdFact`/`CategoryCodeFact`(oneof `value`/`missing`) 공용 설정 — `str`은
-    값, `int`는 결측 사유, `None`은 oneof 자체를 비워 둔다(판독 거부 재현용, M5/5D-3)."""
+    값, `int`는 결측 사유, `None`은 oneof 자체를 비워 둔다(판독 거부 재현용)."""
     if value is None:
         return
     if isinstance(value, str):

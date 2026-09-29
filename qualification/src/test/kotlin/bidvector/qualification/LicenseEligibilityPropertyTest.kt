@@ -16,7 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 
 /**
- * M1/1C property test — 위협 모델 우회 (2)(3) 방어. legacy 회귀
+ * property test — 위협 모델 우회 (2)(3) 방어. legacy 회귀
  * `test_required_keys_subset_equals_missing_empty` ·
  * `report_license_gate_impact._representative_missing` 의 V2 대응(R-QUAL-01·06).
  */
@@ -24,7 +24,7 @@ class LicenseEligibilityPropertyTest {
     private val version = PolicyVersion(EffectiveFrom.Initial, "test-policy")
     private val emptyPolicy = LicenseQualificationPolicyData(LicenseAliasTable(emptyList()), emptyList())
 
-    /** verifier r1 F-5 — 값과 version 을 하나로 묶은 Resolution.Resolved 하나만 judge 에 넘긴다. */
+    /** 값과 version 을 하나로 묶은 Resolution.Resolved 하나만 judge 에 넘긴다. */
     private val resolvedPolicy = Resolution.Resolved(emptyPolicy, version)
     private val licenseNameArb: Arb<String> = Arb.string(1..8, "abcde")
 
@@ -122,7 +122,7 @@ class LicenseEligibilityPropertyTest {
     }
 
     /**
-     * verifier r1 F-1 — 그룹 유형(제한 면허·허용업종 전용·혼합)과 그룹 번호를 임의로 섞어도
+     * 그룹 유형(제한 면허·허용업종 전용·혼합)과 그룹 번호를 임의로 섞어도
      * 보유가 전혀 없으면 어떤 조합도 `Eligible` 을 내지 않는다. `restrictedRows` 가 빈 그룹의
      * `containsAll(emptySet())` 공허 참(PROBE A·D)이 회귀하면 이 property 가 잡는다.
      */

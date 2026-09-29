@@ -13,7 +13,7 @@
 **왜 PyYAML 을 쓰지 않는가.** 이 저장소의 `python3` 에 `PyYAML` 이 없다 —
 `fixtures-commands.md` **F-7** 이 그 사실 때문에 격리 venv 를 쓴다고 적고, 커밋된
 다른 도구(`check_legacy_numbers.py`)는 표준 라이브러리만 쓴다. 스윕은 **clean HEAD
-에서 추가 설치 없이 재실행되어야** 하므로(운영자 승인 2026-09-02, Codex B10 medium #3)
+에서 추가 설치 없이 재실행되어야** 하므로
 manifest 의 **계약 부분만 읽는 좁은 reader** 를 여기 둔다.
 
 **reader 는 범용 YAML 파서가 아니다.** 이 manifest 가 실제로 쓰는 블록 형태만 안다.
@@ -241,8 +241,8 @@ def _mirror_case(case, operand, cases, manifest):
 def holds(case, mutated, cases=None, manifest=MANIFEST):
     """계약(`verified_paths` 정확 비교 ∪ `verified_projections` 술어)이 원본과 같은 판정인가.
 
-    **술어 어휘는 넷이다** — `not-equals`(2026-09-02 동결분) 에 **운영자 결정 2026-09-05
-    decision 18** 이 `is-present` · `differs-from-path` · `differs-from-case` 를 더했다.
+    **술어 어휘는 넷이다** — `not-equals`(동결분) 에 **decision 18** 이
+    `is-present` · `differs-from-path` · `differs-from-case` 를 더했다.
     정의의 정본은 `manifest.yaml` 의 `schema.extensions.verified_projections` 이고 이 함수는
     그 정의의 실행이다. **모르는 술어는 조용히 통과시키지 않고 예외를 낸다.**
 

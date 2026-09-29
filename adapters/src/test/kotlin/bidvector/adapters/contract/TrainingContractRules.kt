@@ -8,11 +8,11 @@ import contract.bidvector.ml.v1.StartTrainingRequest
 import contract.bidvector.ml.v1.TrainingJob
 
 /**
- * M2/2C — `TrainingJobService` 계약이 요구하는 거부 규칙(전이표·조합 불변식·timestamp
+ * `TrainingJobService` 계약이 요구하는 거부 규칙(전이표·조합 불변식·timestamp
  * 순서·dataset_id 일치·fail-closed enum·checksum 정규형)을 순수 함수로 문서화·고정한다
- * (`TrainingContractTest`·`test_training_contract.py` 양쪽에서 대칭으로 검증, 2A
+ * (`TrainingContractTest`·`test_training_contract.py` 양쪽에서 대칭으로 검증,
  * `ContractFractionRules.kt`와 같은 관례 — `TrainingContractTest.kt`의 500줄 한도를
- * 넘기지 않도록 분리했다, v2-지침서.md §5). 실제 Kotlin validation 구현은 M4 몫이다.
+ * 넘기지 않도록 분리했다, v2-지침서.md §5). 실제 Kotlin validation 구현은 아직 없다.
  */
 private val allowedJobStateTransitions =
     setOf(

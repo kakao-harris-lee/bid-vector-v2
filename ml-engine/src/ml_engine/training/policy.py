@@ -52,7 +52,7 @@ def load_training_policy(path: Path) -> TrainingPolicy | PolicyRejected:
     5A `load_policy`가 던지는 `PolicyError`로 걸러진다(여기서 결과 타입으로 옮긴다) —
     `min_training_rows` 자체의 도메인 불변식(≥ 1)은 이 모듈이 추가로 검사한다.
 
-    code-reviewer PR #13 HIGH-2 — 5A `load_policy`는 `yaml.safe_load`가 던지는
+    HIGH-2 — 5A `load_policy`는 `yaml.safe_load`가 던지는
     `yaml.YAMLError`(문법이 깨진 YAML, 예: 닫히지 않은 flow sequence)를 잡지 않고
     그대로 전파한다. `PolicyError`도 `OSError`도 아니므로 여기서 별도로 잡는다 —
     5A `registry/policy.py`는 편집 금지(5C 경계에서 잡는다, 인계 대상은

@@ -113,7 +113,7 @@ class EditSessionTransitionTableTest {
     }
 
     /**
-     * code-review r4 N-r4-8 — 기준 대조(판정 순서 ①-b)는 actor·전이표보다 **앞선다**. 그래서
+     * 기준 대조(판정 순서 ①-b)는 actor·전이표보다 **앞선다**. 그래서
      * 기준이 어긋난 `ProvideValue` 는 다른 축의 사유로 거부되지 않는다. HTTP 로는 도달하지
      * 않지만(행위자가 상수이고 기준을 서버가 같은 트랜잭션에서 싣는다) 커널의 거동이므로
      * 행으로 덮는다 — 순서를 되돌리면 이 test 가 RED 다.
@@ -250,13 +250,12 @@ class EditSessionTransitionTableTest {
     }
 
     /**
-     * verifier r4 MEDIUM-8 — `EditStrategyWorkflow.process`(D-6B1-10)가 저장 여부를 가르는
+     * `EditStrategyWorkflow.process`(D-6B1-10)가 저장 여부를 가르는
      * 판별자는 `outcome.session !== session`(인스턴스 동일성)이지 「버전이 올랐다」가
      * 아니다. 둘의 등가는 **현재 전이표에서만** 참이고 코드 어디에도 잠겨 있지 않다 —
-     * verifier 실측: `StaleRevision` 거부 갈래에 "새 인스턴스인데 버전 그대로"를 심어도
+     * 실측: `StaleRevision` 거부 갈래에 "새 인스턴스인데 버전 그대로"를 심어도
      * `:workflow:test`·어댑터 test 전건이 초록이었다. 판별자 자체(`!==`)는 바꾸지 않는다
-     * (`begin()`/`expire()`와 일관되고 code-reviewer가 현 전이표 위에서 구조적으로 옳음을
-     * 확인했다) — 대신 **등가 자체를 불변식으로 잠근다**: `apply()`가 새 인스턴스를 낼 때는
+     * (`begin()`/`expire()`와 일관된다) — 대신 **등가 자체를 불변식으로 잠근다**: `apply()`가 새 인스턴스를 낼 때는
      * 반드시 `sessionVersion`이 입력보다 정확히 1 크다. 전이표가 바뀌어(새 command·새 분기)
      * 이 등가가 깨지면 이 test 가 먼저 붉어져야 한다 — `process`의 저장 판별자가 아니라
      * `apply()`가 지키는 계약이므로 이 table test 에 둔다(같은 파일이 이미 전이표 전수를
@@ -279,7 +278,7 @@ class EditSessionTransitionTableTest {
     }
 }
 
-/** verifier r4 MEDIUM-8 위 test 전용 — `EditSessionTransitionTableTest`의 50줄 함수 한도로 분리(설계 변경 아님). */
+/** 위 test 전용 — `EditSessionTransitionTableTest`의 50줄 함수 한도로 분리(설계 변경 아님). */
 private data class SaveDiscriminatorCase(
     val label: String,
     val session: EditSession,

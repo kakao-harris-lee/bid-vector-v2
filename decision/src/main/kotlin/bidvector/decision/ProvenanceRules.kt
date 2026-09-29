@@ -38,7 +38,7 @@ internal fun isSuspectRatio(
 
 /**
  * `|base - round(base)| < tolerance`(허용 오차 미만, 조사 §1.1). `roundingMode`는 정책
- * 슬롯에서 온다(verifier r2 N-1) — 이 함수가 값을 지어내지 않는다.
+ * 슬롯에서 온다 — 이 함수가 값을 지어내지 않는다.
  */
 internal fun isCleanInteger(
     row: ProvenanceRow,
@@ -72,7 +72,7 @@ private fun yegaGap(
 
 /**
  * `|base × vatMultiplier − round(base × vatMultiplier)| < tolerance`(허용 오차 미만,
- * 조사 §1.1). `roundingMode`는 정책 슬롯에서 온다(verifier r2 N-1).
+ * 조사 §1.1). `roundingMode`는 정책 슬롯에서 온다.
  */
 internal fun isDerivedVat(
     row: ProvenanceRow,

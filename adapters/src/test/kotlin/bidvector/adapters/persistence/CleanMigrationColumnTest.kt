@@ -7,12 +7,12 @@ import org.junit.jupiter.api.Test
 /**
  * S-5 축 2·3·4(컬럼 존재·타입·NOT NULL) — `CleanMigrationTest`(sizeGate 500줄, v2-지침서.md
  * §5)에서 분리한 파일 — `CleanMigrationTriggerTest`(축 7)·`CleanMigrationCheckTest`(축 8)와
- * 같은 이유·같은 전례다(M4/4C-2에서 재분리 — outbox·inbox 컬럼이 더해지며 원판이 500줄을
+ * 같은 이유·같은 전례다(재분리 — outbox·inbox 컬럼이 더해지며 원판이 500줄을
  * 넘었다). D-3D-6 여덟 축 중 컬럼 셋만 다룬다(다른 다섯 축은 `CleanMigrationTest`).
  */
 class CleanMigrationColumnTest : PersistenceTestSupport() {
     /**
-     * `hasDefault` — M6/6B-1 verifier r1 MEDIUM-1(a) 시정. 이름·타입·NOT NULL 삼중항만으로는
+     * `hasDefault` — 이름·타입·NOT NULL 삼중항만으로는
      * `session_version INTEGER NOT NULL DEFAULT 0`(D-6B1-3 이 금지한 바로 그 것)이 초록으로
      * 지났다. 정확한 DEFAULT 식 문자열이 아니라 **있고 없음**만 잰다 — 식 문자열은 Postgres
      * 버전·캐스트 표기가 갈릴 수 있어 이름 재작성만으로 오탐이 날 수 있다(예: `1` vs
@@ -72,14 +72,14 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "floor_rate_fraction", "numeric", true),
             ColumnSpec("notice", "floor_rate_origin_kind", "text", true),
             ColumnSpec("notice", "floor_rate_origin_detail", "text", true),
-            // M3/3H-1 D-3H-4 — 발주기관 넷(추가만, V7). provenance 컬럼 없음(D-3H-3).
+            // D-3H-4 — 발주기관 넷(추가만, V7). provenance 컬럼 없음(D-3H-3).
             ColumnSpec("notice", "demand_agency_code", "text", true),
             ColumnSpec("notice", "demand_agency_name", "text", true),
             ColumnSpec("notice", "notice_agency_code", "text", true),
             ColumnSpec("notice", "notice_agency_name", "text", true),
-            // M6/6F-4 D-6F4-1·9 — 감시 키워드 매칭 입력(공고명).
+            // D-6F4-1·9 — 감시 키워드 매칭 입력(공고명).
             ColumnSpec("notice", "notice_title", "text", true),
-            // M6/6F-9 D-6F9-3 — 업무구분 새 칸 셋(추가만, V17). 전부 nullable·DEFAULT 없음(기존 행 보존, 재수집이 채운다).
+            // D-6F9-3 — 업무구분 새 칸 셋(추가만, V17). 전부 nullable·DEFAULT 없음(기존 행 보존, 재수집이 채운다).
             ColumnSpec("notice", "business_division", "text", true),
             ColumnSpec("notice", "service_division", "text", true),
             ColumnSpec("notice", "main_construction_type", "text", true),
@@ -126,7 +126,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "observation_key", "text", false),
             ColumnSpec("opening_result", "created_at", "timestamp with time zone", false, true),
             ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false, true),
-            // M3/3E — 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
+            // 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외).
             ColumnSpec("opening_result", "final_award_amount_won", "numeric", true),
             ColumnSpec("opening_result", "final_award_amount_currency", "text", true),
             ColumnSpec("opening_result", "final_award_company_name", "text", true),
@@ -139,21 +139,21 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "opening_base_amount_vat", "text", true),
             ColumnSpec("opening_result", "total_reserve_price_candidate_count", "integer", true),
             ColumnSpec("opening_result", "actual_opening_at", "timestamp with time zone", true),
-            // verifier r1 H-1 뒤(V5) — provenance 왕복(추가만).
+            // H-1 뒤(V5) — provenance 왕복(추가만).
             ColumnSpec("opening_result", "final_award_amount_provenance", "text", true),
             ColumnSpec("opening_result", "final_award_amount_provenance_detail", "text", true),
             ColumnSpec("opening_result", "planned_price_provenance", "text", true),
             ColumnSpec("opening_result", "planned_price_provenance_detail", "text", true),
             ColumnSpec("opening_result", "opening_base_amount_provenance", "text", true),
             ColumnSpec("opening_result", "opening_base_amount_provenance_detail", "text", true),
-            // M3/3F — 개찰완료 축 부모 슬롯(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
+            // 개찰완료 축 부모 슬롯(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
             ColumnSpec("opening_result", "opening_rank_one_kind", "text", true),
             ColumnSpec("opening_result", "opening_rank_one_duplicate_count", "integer", true),
             ColumnSpec("opening_result", "opening_rank_one_bidder_name", "text", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
-            // verifier r1 F-2 뒤 — 축별 관측 시각(3E OpeningReservePriceRow.observedAt 과 같은 자리).
+            // F-2 뒤 — 축별 관측 시각(OpeningReservePriceRow.observedAt 과 같은 자리).
             ColumnSpec("opening_result", "opening_rank_one_observed_at", "timestamp with time zone", true),
             ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
             ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
@@ -161,7 +161,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "draw_numbers_valid_range_max", "integer", true),
         )
 
-    // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
+    // 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외).
     private val openingReservePriceColumns =
         listOf(
             ColumnSpec("opening_reserve_price", "notice_number", "text", false),
@@ -212,7 +212,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false, true),
         )
 
-    // M4/4C-2 — outbox·inbox(추가만, D-4C2-2). 어휘·필드는 V6__outbox_inbox.sql 그대로.
+    // outbox·inbox(추가만, D-4C2-2). 어휘·필드는 V6__outbox_inbox.sql 그대로.
     private val outboxColumns =
         listOf(
             ColumnSpec("outbox", "entry_id", "text", false),
@@ -237,7 +237,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("inbox", "processed_at", "timestamp with time zone", false, true),
         )
 
-    // M6/6B-1 — V8__edit_session.sql(추가만, D-6B1-8). state_payload·last_command 는
+    // V8__edit_session.sql(추가만, D-6B1-8). state_payload·last_command 는
     // JSON 텍스트(nullable — EXPIRED 는 payload 없음, 세션 시작 직후는 command 없음).
     private val editSessionColumns =
         listOf(
@@ -251,7 +251,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("edit_session", "created_at", "timestamp with time zone", false, true),
         )
 
-    // M6/6F-1 — 전략 영속(추가만, D-6F1-1). 두 표가 감시·임계·상한 열 형태를 공유한다
+    // 전략 영속(추가만, D-6F1-1). 두 표가 감시·임계·상한 열 형태를 공유한다
     // (operator_strategy = 싱글턴 현재 값, operator_strategy_revision = 개정 이력). 감시 규칙
     // 다섯 축은 `StrategyDraft`가 항상 `List<String>`(빈 목록이 「규칙 없음」)이라 NOT NULL —
     // 나머지(예산·점수·상한)만 진짜 nullable이다.
@@ -281,7 +281,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             "bid_now_threshold" to "numeric",
             "review_threshold" to "numeric",
             "candidate_limit" to "integer",
-            // M6/6A-3+6F-3 D-6A3-4·D-6A3-14 — 활성 투찰 여력 상한(추가만, V16).
+            // D-6A3-4·D-6A3-14 — 활성 투찰 여력 상한(추가만, V16).
             "max_active_bids" to "integer",
         )
 
@@ -302,7 +302,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy_revision")
 
-    // M6/6F-6 — 프로필 영속(추가만, D-6F6-2·D-6F6-3). V12__operator_profile.sql. 업종·지역
+    // 프로필 영속(추가만, D-6F6-2·D-6F6-3). V12__operator_profile.sql. 업종·지역
     // 어휘는 전략과 같은 이유로 NOT NULL 배열(빈 목록이 「없음」). `licenses_declared`가
     // `license_names`와 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·Declared(빈 목록))를
     // 구분한다.
@@ -316,7 +316,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("operator_profile", "updated_at", "timestamp with time zone", false, true),
         )
 
-    // M6/6F-5-a — 자격 요건 영속(추가만, D-6F5-4). 헤더(notice_requirement)는 공고당 한 행,
+    // 자격 요건 영속(추가만, D-6F5-4). 헤더(notice_requirement)는 공고당 한 행,
     // 행(notice_requirement_row)은 `RequirementRow`(Parsed·Unparsable) 왕복 — PARSED만
     // group_no·source_field·license_names를 채운다(nullable, UNPARSABLE은 항상 NULL).
     private val noticeRequirementColumns =
@@ -340,7 +340,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice_requirement_row", "created_at", "timestamp with time zone", false, true),
         )
 
-    // M6/6A-1 — 요청 감사(추가만, D-6A1-7). 요청 본문·자격증명 값은 담지 않는다.
+    // 요청 감사(추가만, D-6A1-7). 요청 본문·자격증명 값은 담지 않는다.
     private val apiRequestAuditColumns =
         listOf(
             ColumnSpec("api_request_audit", "id", "bigint", false),
@@ -388,7 +388,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
         actual shouldContainExactlyInAnyOrder expectedColumns
     }
 
-    /** D-3D-5(정수 원) — 금액 `_won` 컬럼은 정확히 `NUMERIC(20,0)`. verifier B②(20,4로 확대)를 여기서 잡는다. */
+    /** D-3D-5(정수 원) — 금액 `_won` 컬럼은 정확히 `NUMERIC(20,0)`. 20,4로 확대하는 변이를 여기서 잡는다. */
     @Test
     fun `축3 부가 — 금액 won 컬럼은 정확히 NUMERIC(20,0)이다`() {
         val wonColumns =
@@ -397,14 +397,14 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
                 "notice.estimated_amount_won",
                 "notice.allocated_budget_won",
                 "opening_result.derived_base_amount_won",
-                // M3/3E — 층 B·C 신규 won 컬럼(추가만).
+                // 층 B·C 신규 won 컬럼(추가만).
                 "opening_result.final_award_amount_won",
                 "opening_result.planned_price_won",
                 "opening_result.opening_base_amount_won",
                 "opening_reserve_price.base_reserve_price_won",
-                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                // 개찰완료 축 부모 슬롯(추가만).
                 "opening_result.opening_rank_one_bid_amount_won",
-                // M6/6F-1 — 전략 예산 한계 둘(추가만, D-6F1-1).
+                // 전략 예산 한계 둘(추가만, D-6F1-1).
                 "operator_strategy.min_budget_won",
                 "operator_strategy.max_budget_won",
                 "operator_strategy_revision.min_budget_won",
@@ -425,7 +425,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             listOf(
                 "notice.floor_rate_fraction",
                 "opening_result.winning_rate_fraction",
-                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                // 개찰완료 축 부모 슬롯(추가만).
                 "opening_result.opening_rank_one_bid_rate_fraction",
             )
         for (qualified in fractionColumns) {

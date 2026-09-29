@@ -2,8 +2,8 @@
 """`contracts/proto`(단일 출처, ADR 0003 D-1)를 `grpc_tools.protoc`로 생성하는 배선 하나.
 
 `ml-engine/tests/conftest.py`(pytest 세션)와 이 파일을 CLI 로 부르는 CI/개발자 양쪽이
-**같은 함수**(`generate`)를 쓴다 — M2/2A 가 만든 conftest 안의 protoc 호출을 5A 가 이어받아
-한 자리로 모은다(scope.md ①, D-5A-0 (b)).
+**같은 함수**(`generate`)를 쓴다 — conftest 안의 protoc 호출을 한 자리로 모은다(scope.md ①,
+D-5A-0 (b)).
 
 이 스크립트는 `ml-engine/` 안에서만 쓰는 개발 도구다(`[project.dependencies]` 밖, 배포되는
 `ml_engine` 패키지의 일부가 아니다) — `ml_engine` 런타임 코드는 이 모듈을 import하지 않는다.

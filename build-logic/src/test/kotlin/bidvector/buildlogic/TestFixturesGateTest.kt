@@ -7,7 +7,7 @@ import java.io.File
 import kotlin.test.assertTrue
 
 /**
- * M1/1A-b ④(a)(D-2) — `java-test-fixtures` 적용이 명시 사유로 실패하는지의 유일한 실행
+ * D-2 — `java-test-fixtures` 적용이 명시 사유로 실패하는지의 유일한 실행
  * 증거. **이 저장소에서 TestKit(`GradleRunner`) 을 쓰는 첫 사례**다 — 다른 게이트 test 는
  * 전부 순수 함수([KotlinFunctionLengthsTest] 류)이거나 ArchUnit 으로 이미 컴파일된 바이트코드를
  * 재평가([TypeShapeFixtureTest])하지만, 이 판정은 **플러그인 적용 자체**(project 평가 단계)에서

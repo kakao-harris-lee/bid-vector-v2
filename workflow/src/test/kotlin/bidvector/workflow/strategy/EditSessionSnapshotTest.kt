@@ -17,7 +17,7 @@ import java.time.Instant
  * D-6B1-7(계약 갱신 (2)) — [EditSessionSnapshot]은 어댑터가 만드는 유일한 타입이고
  * [restoreEditSession]은 `workflow` 안에서만 호출 가능한 유일한 복원 경로다. 이 test는
  * (a) 왕복이 원래 [EditSession]과 값 동등함을 (b) 미지·불량 값이 조용히 기본값으로
- * 채워지지 않고 거부됨을 고정한다(팀장 판정 — "조용히 기본값을 채우는 것만 금지").
+ * 채워지지 않고 거부됨을 고정한다("조용히 기본값을 채우는 것만 금지").
  */
 class EditSessionSnapshotTest {
     private val id = EditSessionId("session-1")

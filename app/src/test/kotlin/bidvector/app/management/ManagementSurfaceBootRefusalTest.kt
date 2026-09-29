@@ -15,9 +15,9 @@ import org.springframework.core.env.SystemEnvironmentPropertySource
 /**
  * D-6A2a-11 — **잠금 밖에서 부팅해** 잰다. `ManagementSurfaceLockTest` 는 `ConfigurableEnvironment`
  * 하나를 손으로 세워 판정 함수를 부른다. 그 형태로는 **배선**(잠금이 출하 조립에 실제로
- * 얹혀 있는가, 얹힌 자리가 우선순위 최상위인가)을 잴 수 없다 — 직전 판의 사각이 정확히
- * 그것이었다(code-review r1 MEDIUM ②: `.initializers(ManagementSurfaceLock())` 를 떼고
- * `.properties(MANAGEMENT_SURFACE_LOCK)` 로 바꿔도 test 전건이 초록이었다).
+ * 얹혀 있는가, 얹힌 자리가 우선순위 최상위인가)을 잴 수 없다 —
+ * `.initializers(ManagementSurfaceLock())` 를 떼고 `.properties(MANAGEMENT_SURFACE_LOCK)` 로
+ * 바꿔도 test 전건이 초록일 수 있다.
  *
  * 그래서 여기서는 **출하 조립 자신**([productionApplication])을 적대적 명령행 인자·환경변수로
  * 부팅한다. 두 가지를 구별해야 한다:
@@ -85,9 +85,8 @@ class ManagementSurfaceBootRefusalTest {
     }
 
     /**
-     * **사유를 좁힌다**(code-review r2 LOW-1). 직전 판은 예외 형만 단언해, `lockManagementSurface`
-     * 에 `check()` 가 하나 더 붙는 날(이 라운드가 실제로 그랬다 — 배치 자유 키가 늘었다) 다른
-     * 사유로도 초록이 될 수 있었다. 기대 문면은 **손으로 적지 않고 파생**한다: 환경변수 매퍼가
+     * **사유를 좁힌다.** 예외 형만 단언하면 `lockManagementSurface` 에 `check()` 가 하나 더
+     * 붙는 날 다른 사유로도 초록이 될 수 있다. 기대 문면은 **손으로 적지 않고 파생**한다: 환경변수 매퍼가
      * 내는 정규형은 `-` 가 사라진 형태다(`SHOWDETAILS` → `showdetails`).
      */
     @Test
@@ -104,7 +103,7 @@ class ManagementSurfaceBootRefusalTest {
     }
 
     /**
-     * D-6A2a-14 **보조 잠금** — verifier r2 F-1r 이 출하 이미지에서 쓴 **그 형태**다.
+     * D-6A2a-14 **보조 잠금** — 출하 이미지에서 쓰는 **그 형태**다.
      * `--server.servlet.context-parameters.[<점이 든 키>]=…` 는 Boot 가 map 원소 하나로 읽는다
      * (대괄호가 없으면 점이 경로로 갈린다). 늦은 재검사가 주 잠금이지만, 이 채널은 앱이 쓰지
      * 않으므로 이름공간째 조기에 끊는다 — 가장 짧은 경로에서 가장 이른 자리에 실패한다.
@@ -178,8 +177,7 @@ class ManagementSurfaceBootRefusalTest {
         private val MINIMAL_ENVIRONMENT = mapOf("MANAGEMENT_SERVER_PORT" to "0")
 
         /**
-         * r1 세 레인이 실측한 우회 키 전부(verifier F-1·F-2·F-3 · code-review HIGH-1 ·
-         * privacy-gate M-1). 값은 그 레인들이 실제로 쓴 값이다 — 판정은 값을 보지 않지만,
+         * 실측으로 확인된 우회 키 전부. 값은 실제로 관측된 값이다 — 판정은 값을 보지 않지만,
          * 이 표가 **무엇을 모형하는지**가 값에 남는다.
          */
         private val HOSTILE_MANAGEMENT_KEYS: List<Pair<String, String>> =
@@ -194,15 +192,15 @@ class ManagementSurfaceBootRefusalTest {
             )
 
         /**
-         * r2 가 더한 **운반·인접 이름공간** 둘(D-6A2a-14 보조 잠금 · D-6A2a-17 ①).
+         * **운반·인접 이름공간** 둘(D-6A2a-14 보조 잠금 · D-6A2a-17 ①).
          *
-         * - `server.servlet.context-parameters.*` — verifier r2 F-1r 의 채널. 이 이름공간의 값은
-         *   refresh 중에 서블릿 컨텍스트 init-param 으로 옮겨져 **환경변수보다 높은 우선순위**로
-         *   환경에 들어온다. 주 잠금은 늦은 재검사이고 이 행은 가장 짧은 경로를 조기에 끊는다.
-         * - `spring.web.error.*` — 관리 child context 의 `/error` 본문을 환경이 넓힌다(실측,
-         *   privacy-gate r2 L-4): `include-message=always` 만으로 본문 키가 셋에서 넷으로 늘고
-         *   (`message`), 같은 옵션 집합이 예외 클래스·스택을 싣는 스위치다. `management.` 밖이라
-         *   r1 의 접두사 거부가 보지 못했다.
+         * - `server.servlet.context-parameters.*` — 이 이름공간의 값은 refresh 중에 서블릿
+         *   컨텍스트 init-param 으로 옮겨져 **환경변수보다 높은 우선순위**로 환경에 들어온다.
+         *   주 잠금은 늦은 재검사이고 이 행은 가장 짧은 경로를 조기에 끊는다.
+         * - `spring.web.error.*` — 관리 child context 의 `/error` 본문을 환경이 넓힌다(실측):
+         *   `include-message=always` 만으로 본문 키가 셋에서 넷으로 늘고(`message`), 같은
+         *   옵션 집합이 예외 클래스·스택을 싣는 스위치다. `management.` 밖이라 주 잠금의
+         *   접두사 거부가 보지 못했다.
          */
         private val HOSTILE_CARRIER_KEYS: List<Pair<String, String>> =
             listOf(

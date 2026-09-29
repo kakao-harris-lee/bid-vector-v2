@@ -63,7 +63,7 @@ def test_get_returns_stored_record() -> None:
 
 
 def test_apply_transition_persists_running_state() -> None:
-    """verifier r2 R2-4 — `replace()`는 production 호출자가 0이 되어 제거됐다
+    """R2-4 — `replace()`는 production 호출자가 0이 되어 제거됐다
     (H-2 가 이미 모든 전이를 `apply_transition`으로 옮겼다). 원자적 읽기·계산·
     쓰기 한 번으로 같은 결과(전이가 store 에 반영됨)를 확인한다."""
     store = InMemoryJobStore()

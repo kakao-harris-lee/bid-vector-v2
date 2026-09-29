@@ -12,7 +12,7 @@ import java.time.LocalDate
 private fun weightsOf(vararg overrides: Pair<Component, BigDecimal>): Map<Component, BigDecimal> =
     (TEST_PRIORITY_POLICY.weights + overrides.toMap())
 
-// ---- F-1(verifier r1 medium) — 출하 값을 재정규화 산식으로 독립 재구성(리터럴 복제 아님) ----
+// ---- 출하 값을 재정규화 산식으로 독립 재구성(리터럴 복제 아님) ----
 
 private val LEGACY_PROBABILITY_WEIGHT = BigDecimal("0.40")
 
@@ -31,8 +31,7 @@ private const val WEIGHT_RENORMALIZATION_SCALE = 4
 /**
  * `policy-values.md` §1 의 유도(÷(1-확률가중치) → scale 4 반올림 → 잔차를 `Match` 에
  * 흡수)를 이 test 가 독립적으로 재계산한다 — `PRIORITY_POLICY` 리터럴을 그대로 베끼지
- * 않는다. 값이 바뀌면(예: verifier r1 재현 — `Match` 를 0.3834→0.5834) 이 산식과 어긋나
- * F-1 이 다시 열린다.
+ * 않는다. 값이 바뀌면(예: `Match` 를 0.3834→0.5834) 이 산식과 어긋나는 회귀가 다시 드러난다.
  */
 private fun renormalizedLegacyWeights(): Map<Component, BigDecimal> {
     val divisor = BigDecimal.ONE - LEGACY_PROBABILITY_WEIGHT

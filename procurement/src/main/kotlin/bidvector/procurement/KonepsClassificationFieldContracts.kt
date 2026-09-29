@@ -1,7 +1,7 @@
 package bidvector.procurement
 
 /**
- * M6/6F-9 D-6F9-2 — 업무구분 세부 분류 넷 필드 계약 열(6F-8 실수집이 응답에서 실측한 키). `CollectionPolicy.kt` 에서
+ * D-6F9-2 — 업무구분 세부 분류 넷 필드 계약 열(응답에서 실측한 키). `CollectionPolicy.kt` 에서
  * 분리한 파일이다(sizeGate 500줄 — `KonepsAgencyFieldContracts.kt` 와 같은 전례). **키 리터럴은 계약 데이터인
  * 이 파일에만 있다**(6F-8 키 리터럴 게이트가 이 파일 클래스를 허용 클래스로 둔다) — 어댑터·use case 는 키를 모른다.
  *

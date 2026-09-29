@@ -1,4 +1,4 @@
-// M2/2A included build — `.proto` 단일 출처(`../contracts/proto`)의 Kotlin/Java 생성 전용
+// included build — `.proto` 단일 출처(`../contracts/proto`)의 Kotlin/Java 생성 전용
 // 빌드(D-2A-0 (c)). subproject 가 아니라 included build 인 이유는
 // `reports/evidence/m2/2a/scope.md` D-2A-0(1A 게이트 가족이 subproject 안의 생성물을 어떤
 // 형태로든 거부)이다. **손으로 쓴 소스가 0**이다 — 이 파일 셋(`settings.gradle.kts`·
@@ -57,8 +57,7 @@ dependencies {
 protobuf {
     protoc {
         // 정본은 카탈로그의 `protobuf-protoc` alias 하나다 — 좌표 문자열을 여기서 다시
-        // 적지 않는다(verifier r1 F-5, 이전 판은 `libs.versions.protobuf.runtime` 를 직접
-        // 보간해 alias 를 우회했다).
+        // 적지 않는다.
         artifact = libs.protobuf.protoc.get().let { "${it.group}:${it.name}:${it.version}" }
     }
     plugins {

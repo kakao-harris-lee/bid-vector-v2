@@ -58,7 +58,7 @@ interface OpeningResultSourcePort {
     fun fetchReservePrices(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 
     /**
-     * M3/3F D-3F-1 (a) — 개찰완료(`getOpengResultListInfoOpengCompt`) 단건 조회. [fetchReservePrices]
+     * D-3F-1 (a) — 개찰완료(`getOpengResultListInfoOpengCompt`) 단건 조회. [fetchReservePrices]
      * 와 같은 성질(공고당 1콜·증거 값 요구, D-3F-2 — [DetailFetchDecision] 재사용)이라 새 결정
      * 타입을 만들지 않는다. 투찰자별 행은 raw_observation 감사 기록까지만 나른다(D-3F-3 해소 —
      * canonical 승격은 이 port 의 몫이 아니다).

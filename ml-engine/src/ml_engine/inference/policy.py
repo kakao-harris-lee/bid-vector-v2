@@ -1,11 +1,11 @@
 """`ml_engine.inference.policy` — `InferencePolicy`(신규, D-5D-8) + `load_inference_policy`.
 
-5A `registry.policy.load_policy`(D-M5-6, `known_keys` 전수 로더)의 `PolicyError`(예외)를
+`registry.policy.load_policy`(D-M5-6, `known_keys` 전수 로더)의 `PolicyError`(예외)를
 **경계에서** 결과 타입 `PolicyRejected`로 바꾼다(digest §6 (c) — 구성 실패 축과 추론 실패
 축을 섞지 않는다). 값 범위 불변식(z>0·가중치 합 1·밴드 하한<상한·표본 임계 ≥1)도 여기서
 검증하고 위반은 전부 `PolicyRejected`다(scope.md D-5D-8).
 
-M5/5E-3 D-5E3-1 — `load_policy`는 이제 뿌리에서 `yaml.YAMLError`도 `PolicyError`로
+D-5E3-1 — `load_policy`는 이제 뿌리에서 `yaml.YAMLError`도 `PolicyError`로
 정규화한다. 이 모듈은 여전히 `PolicyError`(문법 오류 포함)·`OSError`만 잡으면 되고,
 `yaml.YAMLError`를 별도로 잡을 필요가 없다(뿌리가 이미 잡아 이 지점에는 도달하지
 않는다) — `app/server.py::_load_inference_policy_safe` 래퍼가 제거된 것도 같은
@@ -16,10 +16,10 @@ M5/5E-3 D-5E3-1 — `load_policy`는 이제 뿌리에서 `yaml.YAMLError`도 `Po
 의 `max(1, ·)`)이 두 번째 겹으로 보장한다. 이 모듈은 그 값이 음수가 아님만 확인한다 —
 "정책 파일이 0 을 줘도 1"이 성립하려면 0 자체를 거부하지 않아야 하기 때문이다.
 
-`assessment.agency_sample_threshold`(M5/5D-2, D-5D2-3)는 `_KNOWN_KEYS`의 다른 필수 키와
+`assessment.agency_sample_threshold`(D-5D2-3)는 `_KNOWN_KEYS`의 다른 필수 키와
 같은 「미선언 → `PolicyRejected`」 규칙을 그대로 받는다 — **값을 지어내 출하
-`inference-v1.yaml`에 채우지 않는다**(`OPEN-5D2-POLICY-VALUES`, 운영자 결정 2026-09-13
-(c) — 5C 재학습 지표가 나온 뒤 값을 정한다). 그래서 출하 정책 파일은 이 키 신설 이후
+`inference-v1.yaml`에 채우지 않는다**(`OPEN-5D2-POLICY-VALUES` (c) — 5C 재학습
+지표가 나온 뒤 값을 정한다). 그래서 출하 정책 파일은 이 키 신설 이후
 **로드에 실패하는 것이 의도된 상태**다 — 서빙(5E)이 켜지려면 값 승인이 선행돼야 함이
 로더에서 드러난다.
 """
@@ -137,7 +137,7 @@ def _scenario_tuples(
     values: Mapping[str, PolicyScalar],
 ) -> tuple[tuple[Decimal, Decimal, Decimal], tuple[int, int, int]]:
     """`scenario.{conservative,base,aggressive}.{weight,z_sign}` 여섯 키 → 두 튜플
-    (설계 래칫 함수 50줄 완화 — M5/5D-2 신설 키로 `_coerce_values`가 한계를 넘어 분리)."""
+    (설계 래칫 함수 50줄 완화 — 신설 키로 `_coerce_values`가 한계를 넘어 분리)."""
     weights = (
         _to_decimal(values["scenario.conservative.weight"]),
         _to_decimal(values["scenario.base.weight"]),
@@ -199,8 +199,8 @@ def _coerce_values(
 
 
 def _validate_bands(raw: InferencePolicy) -> str | None:
-    """밴드 하한 < 상한 불변식(D-5D-8) + `clamp_min > 0`(verifier r1 M-2) + `quantize(
-    clamp_min, bid_rate_digits) > 0`(verifier r2 F-1) — 위반 시 사유 문자열, 통과 시
+    """밴드 하한 < 상한 불변식(D-5D-8) + `clamp_min > 0`(M-2) + `quantize(
+    clamp_min, bid_rate_digits) > 0`(F-1) — 위반 시 사유 문자열, 통과 시
     `None`. `clamp_min > 0` 만으로는 부족했다 — `scenario.py::build_scenario_candidates`
     는 클램프 **뒤**에 정책 `bid_rate_digits`로 quantize 하므로, quantize 전에는 양수여도
     quantize 뒤 0 이 되는 조합(예: `bid_rate_digits 1`+`clamp_min 0.04` → `quantize`
@@ -260,7 +260,7 @@ def _validate_thresholds(raw: InferencePolicy) -> str | None:
 
 def _validate_invariants(raw: InferencePolicy) -> str | None:
     """z>0·가중치 합 1·가중치 각각 ≥0·`min_predictive_std>0`·밴드 하한<상한(clamp_min>0
-    포함)·임계≥1(D-5D-8, verifier r1 M-2 보강) — 위반 시 사유, 통과 시 `None`."""
+    포함)·임계≥1(D-5D-8, M-2 보강) — 위반 시 사유, 통과 시 `None`."""
     if raw.scenario_z <= 0:
         return f"scenario.z 는 0보다 커야 한다: {raw.scenario_z}"
     if any(weight < 0 for weight in raw.scenario_weights):

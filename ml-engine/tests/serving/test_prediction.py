@@ -1,5 +1,5 @@
 """RED → GREEN — `ml_engine.serving.prediction.BidPredictionServicer`(scope.md ①~④).
-M5/5E-2 가 `CalculateOptimalBid`를 채운다(5E-1 의 UNIMPLEMENTED 단언을 대체) — 검증
+`CalculateOptimalBid`를 채운다(이전 UNIMPLEMENTED 단언을 대체) — 검증
 순서 ①⑴~⑺ 각 1 + 순서 test(검증 실패가 미준비보다 먼저·검증 실패 시 `serve_bid_rates`
 0회) + READY/NOT_READY 각."""
 
@@ -253,7 +253,7 @@ def test_step3b_exact_release_mismatch_is_unsupported_release() -> None:
 def test_step3b_exact_release_same_id_different_checksum_is_unsupported_release() -> (
     None
 ):
-    """verifier r1 M-4 — D-5E2-9 는 「id·checksum 둘 다 같아야 통과」다. 기존
+    """M-4 — D-5E2-9 는 「id·checksum 둘 다 같아야 통과」다. 기존
     `..._mismatch...` test 는 둘 다 틀린 값을 썼다 — 재야 할 case 는 한쪽만 같은
     부분 불일치다."""
     runtime = _runtime()
@@ -274,7 +274,7 @@ def test_step3b_exact_release_same_id_different_checksum_is_unsupported_release(
 def test_step3b_exact_release_same_checksum_different_id_is_unsupported_release() -> (
     None
 ):
-    """verifier r1 M-4 — 반대 방향 부분 불일치(checksum 만 같음)."""
+    """M-4 — 반대 방향 부분 불일치(checksum 만 같음)."""
     runtime = _runtime()
     servicer = _servicer(runtime=runtime)
     request = _valid_calc_request()
@@ -322,9 +322,9 @@ def test_step4a_unspecified_objective_is_invalid_request() -> None:
 
 
 def test_step4b_unsupported_objective_value_is_invalid_request() -> None:
-    """verifier r1 M-1 — `OBJECTIVE_UNSUPPORTED`(닫힌 집합 밖 값, `UNSPECIFIED`와
+    """M-1 — `OBJECTIVE_UNSUPPORTED`(닫힌 집합 밖 값, `UNSPECIFIED`와
     다른 사유)에 생산 test 가 없었다. `_validate_objective`는 이미 옳게 이 값을
-    내지만(실측 — 5E-1 verifier r1 M-8/L-5 규율의 반대 방향: 생산은 있고 증거가
+    내지만(실측 — M-8/L-5 규율의 반대 방향: 생산은 있고 증거가
     없는 어휘를 남기지 않는다) 그것을 고정하는 test 가 없었다."""
     servicer = _servicer(runtime=_runtime())
     request = _valid_calc_request(objective=99)  # 닫힌 집합(SCENARIO_TRIPLE) 밖 값
@@ -502,7 +502,7 @@ def test_calculate_optimal_bid_logs_rejection_with_request_id(
     with caplog.at_level(logging.WARNING, logger="ml_engine.serving.prediction"):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-reject" in caplog.text
-    # verifier r2 N-6 — `correlation_id`도 실제로 실리지만 단언이 없었다.
+    # N-6 — `correlation_id`도 실제로 실리지만 단언이 없었다.
     assert "corr-log-reject" in caplog.text
     assert "FEATURE_SCHEMA_VERSION_UNSUPPORTED" in caplog.text
 
@@ -529,14 +529,14 @@ def test_calculate_optimal_bid_logs_before_raising_on_mapping_rejected(
     ):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-mapping-rejected" in caplog.text
-    # verifier r2 N-6
+    # N-6
     assert "corr-log-mapping-rejected" in caplog.text
 
 
 def test_nan_candidate_rate_is_controlled_exception_with_log(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """code-reviewer HIGH/verifier r2 N-1 — `wire.py`의 비유한 검사가 범위 검사보다
+    """N-1 — `wire.py`의 비유한 검사가 범위 검사보다
     앞으로 옮겨진 뒤에도 end-to-end 로 통제된 예외(D-5E2-6 문구)와 ERROR 로그
     (request_id·correlation_id 둘 다)가 나오는지 확인한다. 시정 전에는
     `decimal.InvalidOperation`이 그대로 새 나가 이 test 가 `RuntimeError`를 못 잡고
@@ -574,5 +574,5 @@ def test_calculate_optimal_bid_logs_completion_with_request_id(
     with caplog.at_level(logging.INFO, logger="ml_engine.serving.prediction"):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-success" in caplog.text
-    # verifier r2 N-6
+    # N-6
     assert "corr-log-success" in caplog.text

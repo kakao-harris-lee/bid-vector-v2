@@ -45,10 +45,10 @@ class UnmeasurableDetail(StrEnum):
     DEGENERATE_VARIANCE = "DEGENERATE_VARIANCE"
     TOO_FEW_DRAWS = "TOO_FEW_DRAWS"
     ROW_REJECTED = "ROW_REJECTED"
-    # verifier r1 L-2 — K5 global 표본 0 은 추첨(K6) 축의 `TOO_FEW_DRAWS`와 다른 사유다
+    # L-2 — K5 global 표본 0 은 추첨(K6) 축의 `TOO_FEW_DRAWS`와 다른 사유다
     # (위협 모델 (b) 「두 사유 합침」의 약한 형태였다 — 재사용하지 않는다).
     NO_GLOBAL_SAMPLES = "NO_GLOBAL_SAMPLES"
-    # M5/5D-2 — `distribution_availability`(D-5D2-7) 전용 세분 사유 둘. GBM 축의
+    # `distribution_availability`(D-5D2-7) 전용 세분 사유 둘. GBM 축의
     # `SHALLOW_SEGMENT`(공종 학습 행 부족)와는 다른 축(공고 관측 행 수·비율 표본 수)이라
     # 재사용하지 않는다 — 사유가 섞이면 "왜 측정 불가인가"가 응답만으로 구별되지 않는다
     # (scope.md ③).
@@ -128,7 +128,7 @@ class SegmentSupport(StrEnum):
 class Diagnostics:
     """진단 — `shrinkage_weight`·`excluded_observations`는 Python 결과 타입에만 실린다
     (wire 에 없음, `OPEN-5D-DIAGNOSTICS-WIRE`). `agency_sample_count`·
-    `agency_sample_below_threshold`는 M5/5D-2 추가(golden `ml-kernel-011`, ML-04 ②) —
+    `agency_sample_below_threshold`는 golden `ml-kernel-011`(ML-04 ②)이 근거다 —
     기관 표본이 `policy.assessment_agency_sample_threshold` 미만이면 수축 가중치가
     응답 근거에 실린다는 acceptance 를 구조화 값으로 나른다. GBM 경로(`predict.py`)는
     기관 표본 축을 쓰지 않아 항상 `0`/`False`다(알려진 제한, checklist.md)."""

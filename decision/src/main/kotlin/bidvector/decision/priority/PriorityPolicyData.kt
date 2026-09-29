@@ -40,7 +40,7 @@ data class ComplexityPenaltyPolicy(
  * 「빠진 축 = 생성 실패」 규율, 부동소수 반올림 잔차를 흡수하는 재정규화 값이라 정확한
  * 4자리 비교로 잰다). 확률 축을 뺀 legacy 가중치(조사 §1.1 `allocation.py:38-43`)를
  * 재정규화한 값이다(D-4B4-1·D-4B4-4) — 값 자체는 `policy-values.md`(legacy-behavior 층,
- * 사용자 승인 2026-09-10 으로 `OPEN-4B4-POLICY-VALUES` 종결).
+ * 사용자 승인으로 `OPEN-4B4-POLICY-VALUES` 종결).
  *
  * [categoryOffsetMin]·[categoryOffsetMax] 는 카테고리 offset 의 허용 범위(조사 §1.2
  * `operator_strategy_tuning.py:16-17` `[-0.2, 0.2]`) — 범위 밖은 [SemanticMatch.of] 가
@@ -78,9 +78,9 @@ data class PriorityPolicyData(
 }
 
 /**
- * 운영 정책 인스턴스(D-4B4-4) — **사용자 승인 2026-09-10으로 확정됐다**(`policy-values.md`
- * §1~§4). 착수 시(2026-09-10)에는 구조 검증용 placeholder였으나(근거는 실측이 아니라
- * legacy 재정규화 값, ADR 0010 D-1 「보수적 상한 + 측정 의무」), slice 4B-4 종결 승인과
+ * 운영 정책 인스턴스(D-4B4-4) — **사용자 승인으로 확정됐다**(`policy-values.md`
+ * §1~§4). 착수 시에는 구조 검증용 placeholder였으나(근거는 실측이 아니라
+ * legacy 재정규화 값, ADR 0010 D-1 「보수적 상한 + 측정 의무」), 종결 승인과
  * 함께 이 값 자체가 승인됐다(`OPEN-4B4-POLICY-VALUES` 종결). 정본은
  * `reports/evidence/m4/4b4/policy-values.md §1~§4` — 값을 바꾸려면 그 문서를 먼저
  * 갱신한다(정본이 코드가 아니라 문서다, 3A `KONEPS_COLLECTION_POLICY`·4D-1

@@ -35,8 +35,8 @@ enum class FieldScale {
     OPAQUE_TEXT,
 
     /**
-     * 구분자로 나뉜 복합 목록(`[a^b^c],[a^b^c]`류) — §5.5 D-3A-8, v2-defect 018 수정(3A
-     * 잔여 일괄 verifier r3 전). 레코드·성분으로 쪼개는 **수집 형태만** 열고, 단위·과세
+     * 구분자로 나뉜 복합 목록(`[a^b^c],[a^b^c]`류) — §5.5 D-3A-8. 레코드·성분으로 쪼개는
+     * **수집 형태만** 열고, 단위·과세
      * 정규화(Money 변환)는 하지 않는다(`OPEN-QUAL-10` 소유) — [UnnormalizedFigure]가 그
      * 미확정을 타입으로 나른다.
      */
@@ -60,9 +60,7 @@ enum class FieldNullability {
 
 /**
  * 기대 범위의 단일 출처 참조 — 계약이 밴드를 재선언하지 않는다(§5.3 규율 2). 실제 밴드
- * 값은 [KonepsCollectionPolicyData.rangeBands]가 이 id 로 참조되는 단일 출처로 소유한다
- * (v2-defect 002 수정, 3A 잔여 일괄 verifier r3 전 — 이전 판은 이 슬롯이 어디서도
- * 강제되지 않았다).
+ * 값은 [KonepsCollectionPolicyData.rangeBands]가 이 id 로 참조되는 단일 출처로 소유한다.
  */
 data class ExpectedRangeKey(
     val id: String,
@@ -90,8 +88,8 @@ enum class SourceZoneRuleId {
 }
 
 /**
- * 원문 값이 **무엇을 재는가**(§5.3 `unit` 슬롯, verifier r1 F-2 — `scale`과 분리된 슬롯이
- * 승인 명세에 있는데 이전 판이 빠뜨렸다). `scale`이 파싱 **규칙**이라면 `unit`은 그 규칙이
+ * 원문 값이 **무엇을 재는가**(§5.3 `unit` 슬롯 — `scale`과 분리된 슬롯이
+ * 승인 명세에 있다). `scale`이 파싱 **규칙**이라면 `unit`은 그 규칙이
  * 적용되는 **물리 단위**다 — `data-dictionary.md` §1.4.1 "원문 unit이 보존되는 자리는 값이
  * 아니라 필드 계약이다"의 그 자리.
  */
@@ -163,10 +161,9 @@ internal fun basisMismatch(contract: KonepsFieldContract): Boolean {
  * canonical 값으로 소비될 수 없다 — 소비 함수([RawNoticeObservation.valueOf])가 이 타입을
  * 인자로 요구하는 구조 자체가 그 닫힘이다.
  *
- * **생성자와 [of] 팩토리가 모두 `internal`이다**(verifier r1 F-4, r2 N-1 정정) — 생성자만
- * 닫았던 r1 판은 `of()`가 public이라 다른 모듈이 그 자리에서 계약을 지어내 미등재 키를 읽는
- * 경로가 그대로 열려 있었다(r2 실측: 격리 worktree의 `adapters`에서 `KonepsFieldContract.of(
- * rawName = RawKey("ghostKey"), …)`가 컴파일·실행됨). `of()`까지 `internal`로 낮춰 같은 모듈
+ * **생성자와 [of] 팩토리가 모두 `internal`이다** — 생성자만 닫으면 `of()`가 public이라 다른
+ * 모듈이 그 자리에서 계약을 지어내 미등재 키를 읽는 경로가 열린다(예: 다른 모듈에서
+ * `KonepsFieldContract.of(rawName = RawKey("ghostKey"), …)`가 컴파일·실행됨). `of()`까지 `internal`로 낮춰 같은 모듈
  * 밖에서는 이 타입을 조립하는 경로가 없다 — 운영 인스턴스는 [KONEPS_COLLECTION_POLICY]
  * 하나다. **경계는 모듈이지 파일이 아니다** — 같은 모듈 안(이 파일의 다른 저자, test 소스셋)의
  * 조립은 여전히 열려 있고, 그것은 위협 모델이 방어 대상으로 두지 않은 자리다(scope.md
@@ -187,7 +184,7 @@ data class KonepsFieldContract internal constructor(
     val effectiveFrom: EffectiveFrom,
     val expectedRange: ExpectedRangeKey?,
     val sourceZone: SourceZoneRuleId?,
-    // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — `DELIMITED_LIST` 축의 성분 구분자.
+    // `DELIMITED_LIST` 축의 성분 구분자.
     // `sourceZone`과 같은 자리(축 전용 슬롯, 그 축에만 쌍을 이룬다).
     val listComponentSeparator: Char?,
 ) {

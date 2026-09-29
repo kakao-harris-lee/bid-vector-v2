@@ -7,7 +7,7 @@ import bidvector.sharedkernel.Money
 import bidvector.sharedkernel.PolicyVersion
 
 /**
- * 기초금액 provenance first-match 규칙 넷의 이름(M1/1D ①, D-12) — legacy 술어 어휘
+ * 기초금액 provenance first-match 규칙 넷의 이름(D-12) — legacy 술어 어휘
  * (조사 §5.2 ②, kebab-case: `suspect-ratio`·`clean-integer`·`derived-yega`·`derived-vat`)를
  * variant 로 옮긴다. 순서·부분집합은 이 sealed 가 아니라 정책 데이터
  * (`ProvenancePolicyData.ruleOrder`)가 정한다 — 코드 상수 순서를 두지 않는다.

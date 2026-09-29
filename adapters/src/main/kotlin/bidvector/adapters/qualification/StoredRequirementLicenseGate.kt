@@ -17,7 +17,7 @@ import bidvector.workflow.evaluation.OperatorProfilePort
  * 자리를 잠근다).
  *
  * **D-6F5-3 — [OperatorLicenses]는 [OperatorProfilePort] 주입으로 받는다.** 그 port의 실
- * 구현(6F-6, PR #38)에 직접 의존하지 않는다 — 진행 중 다른 slice의 미병합 브랜치에 이
+ * 구현(6F-6)에 직접 의존하지 않는다 — 진행 중 다른 slice의 미병합 브랜치에 이
  * slice가 얹히지 않는다. 프로필이 미설정(`current()`가 `null`)이면
  * [OperatorLicenses.NotDeclared]로 낸다 — 커널이 그 값을
  * `Uncertain(OperatorLicensesNotDeclared)`로 옮긴다(U-5, `Uncertain ≠ Ineligible`).

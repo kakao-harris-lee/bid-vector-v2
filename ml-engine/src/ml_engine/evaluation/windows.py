@@ -91,11 +91,11 @@ class WindowExclusionReason(StrEnum):
 
 @dataclass(frozen=True)
 class DroppedRowCount:
-    """verifier r1 H-1 — 창 안 구조적 행 중 `build_row`가 만들 수 없어(base_amount·
+    """H-1 — 창 안 구조적 행 중 `build_row`가 만들 수 없어(base_amount·
     denominator_source 가 wire `Missing`) 채점에서 빠진 행의 사유별 계수. `reason`은
-    5B `MissingFact`(evaluation 이 이미 `features` 층을 아는 것과 같은 경계 — training
+    `MissingFact`(evaluation 이 이미 `features` 층을 아는 것과 같은 경계 — training
     층의 `RejectedRowAccounting`을 직접 담지 않는다, layers). `report.py`가 아니라
-    여기 있는 이유(verifier r2 M-1r) — `WindowExclusion`도 이 타입을 쓰는데
+    여기 있는 이유(M-1r) — `WindowExclusion`도 이 타입을 쓰는데
     `report.py`가 `windows.py`를 import 하므로(`WindowExclusion` 재사용) 반대
     방향으로 두면 순환 import 가 된다."""
 
@@ -107,7 +107,7 @@ class DroppedRowCount:
 class WindowExclusion:
     """제외된 창 하나와 그 사유. 제외는 리포트에 남는 사실이지 침묵이 아니다.
 
-    verifier r2 M-1r — `buildable_row_count`/`dropped_rows`는 **실행 단계**
+    M-1r — `buildable_row_count`/`dropped_rows`는 **실행 단계**
     (`training._holdout_fit.build_split`의 buildability 재대조, H-A)에서 제외된
     창에만 채워진다. 계획 단계 제외(`IMMATURE`·`NO_TRAINING_ROWS`·
     `BEYOND_MAX_ORIGINS`)는 buildability 자체를 재지 않으므로 `None`/빈

@@ -17,7 +17,7 @@ import java.time.Instant
  * 자식 목록). 기존 4-positional 생성자 호출(`OpeningQualificationRepositoryTest` 등 3D 기존
  * test)이 그대로 컴파일·통과하는지가 「추가만」의 회귀 방지 test다.
  *
- * **§1.9.7 실측 정정(팀리드, 2026-09-08, 8건 23행 표본)** — `plnprc`(예정가격)·`bssamt`
+ * **§1.9.7 실측** — `plnprc`(예정가격)·`bssamt`
  * (기초금액)·`totRsrvtnPrceNum`(총예가건수)·`rlOpengDt`(실개찰일시)는 응답이 행마다 반복해
  * 실어도 **공고 층**(부모)이다. 순번 공백은 총예가건수가 1(단수 예가)일 때만 관측됐다 —
  * 그때 자식 행은 0개이지만 부모의 예정가격·기초금액은 여전히 있어야 한다(잃지 않는다).

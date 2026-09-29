@@ -125,7 +125,7 @@ class FieldContractTest {
 }
 
 /**
- * M3/3H-1 D-3H-1 — 발주기관 넷이 운영 정책에 등재되고(scope.md 종결 조건), 담당자 키
+ * D-3H-1 — 발주기관 넷이 운영 정책에 등재되고(scope.md 종결 조건), 담당자 키
  * (`*Ofcl*`)는 어디에도 없다는 것을 단언한다(우회 (4)).
  */
 class AgencyFieldContractTest {
@@ -165,7 +165,7 @@ class AgencyFieldContractTest {
     }
 }
 
-/** v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — §5.5 D-3A-8 「수집 형태만」. */
+/** §5.5 D-3A-8 「수집 형태만」. */
 class ParseDelimitedFigureListTest {
     @Test
     fun `한 레코드를 캐럿 성분으로 쪼갠다 — koneps-collection-018 표본`() {

@@ -17,8 +17,8 @@ import java.io.File
  * 자체**는 `check`가 강제한다. 관찰이 "실행 안 함"으로 조용히 퇴화하는 것(task 삭제·
  * `onlyIf false`·`--tests`/`-x` 배제와 같은 계열의 침묵)을 막는 자리다.
  *
- * **`hasExpectedSource`가 거짓이면 리포트 부재가 위반이 아니다** — 운영자 결정 2026-09-06,
- * main/test 축 분리 뒤 실측: `adapters` 모듈은 test source set 이 비어 있어(`.kt` 0개)
+ * **`hasExpectedSource`가 거짓이면 리포트 부재가 위반이 아니다** — main/test 축 분리 뒤
+ * 실측: `adapters` 모듈은 test source set 이 비어 있어(`.kt` 0개)
  * `cpdCheckObserved` 가 `NO-SOURCE` 로 건너뛰고 리포트를 내지 않는다. 이것은 정책 회피가
  * 아니라 그 축에 잴 것이 없다는 사실이다 — 소스가 실제로 있는데 리포트가 없는 경우만
  * (`-x`·`onlyIf`로 조용히 뺀 경우 포함) 위반으로 잡는다.
@@ -37,7 +37,7 @@ internal fun cpdReportPresenceViolation(
 abstract class CpdReportPresenceGateTask : DefaultTask() {
     /**
      * `cpdCheck`(또는 `cpdCheckObserved`)의 XML 리포트 경로. **`@InputFile`이 아니라
-     * `@Internal`이다** — verifier r1 L-3: `@InputFile`은 task 실행 전에 Gradle 자체가 파일
+     * `@Internal`이다** — `@InputFile`은 task 실행 전에 Gradle 자체가 파일
      * 존재를 검증해 "Input file does not exist"로 죽으므로 [cpdReportPresenceViolation]의
      * 「존재하지 않는다」 사유가 프로덕션 배선에서는 닿지 못하는 죽은 가지였다(`-x cpdCheck`로
      * 재현). 순서 보장은 `@InputFile`의 암묵적 의존이 아니라 배선부의 명시적

@@ -41,10 +41,10 @@ class MoneyTest {
     }
 
     /**
-     * verifier r4 H-1 — 이전 판(Codex 1차 #2)의 제네릭 `fun <T : Money> compareKnownVat(left:
-     * T, right: T)` 는 이 test 처럼 같은 타입 쌍만 불러 공허하게 통과했다 — Kotlin 이 `T` 를
+     * 제네릭 `fun <T : Money> compareKnownVat(left:
+     * T, right: T)` 는 이 test 처럼 같은 타입 쌍만 부르면 공허하게 통과한다 — Kotlin 이 `T` 를
      * 두 인자의 최소 상위 타입(LUB)으로 추론해 `compareKnownVat(base, estimated)`(`T = Money`)
-     * 도 실제로는 컴파일됐다(회귀). 타입별 오버로드 여섯으로 되돌린 지금은 그 시그니처
+     * 도 컴파일된다(회귀). 타입별 오버로드 여섯으로 되돌린 지금은 그 시그니처
      * 자체가 없다 — 교차 쌍 컴파일 차단은 `CompileFailureHarnessTest` 의 fixture 11
      * (모듈 밖, 별도 컴파일 단위)이 확인한다.
      */
@@ -64,10 +64,10 @@ class MoneyTest {
     }
 
     /**
-     * verifier r4 M-1 — `hasDeclaredProvenance` 의 KDoc(`MoneyArithmetic.kt`)은 자신을
-     * "산술·파생 성공 경계 전건의 유일한 자리"로 선언하는데, Codex 1차 #2 가 신설한
-     * `compareKnownVat` 는 그 전건을 부르지 않아 출처를 모르는 두 값의 순서가 성공으로
-     * 나왔다 — 이 셋이 그 회귀를 잡는다. 검사 순서는 `sumOfBaseAmounts`의 `accumulate`와
+     * `hasDeclaredProvenance` 의 KDoc(`MoneyArithmetic.kt`)은 자신을
+     * "산술·파생 성공 경계 전건의 유일한 자리"로 선언한다 —
+     * `compareKnownVat` 가 그 전건을 부르지 않으면 출처를 모르는 두 값의 순서가 성공으로
+     * 샌다. 이 셋이 그 회귀를 잡는다. 검사 순서는 `sumOfBaseAmounts`의 `accumulate`와
      * 같다(provenance 먼저, VAT 다음) — 셋째 test 가 그 순서를 확인한다.
      */
     @Test
@@ -96,15 +96,15 @@ class MoneyTest {
     }
 
     /**
-     * Codex 1차 #2 — 여섯 타입의 `compareTo`가 `won`만 비교해 `VAT` `UNKNOWN`과 `INCLUSIVE`
-     * 금액도 정렬되고 동일 금액이면 `VAT`가 달라도 0을 냈다. 공개 `Comparable` 을 없애고
+     * 여섯 타입의 `compareTo`가 `won`만 비교하면 `VAT` `UNKNOWN`과 `INCLUSIVE`
+     * 금액도 정렬되고 동일 금액이면 `VAT`가 달라도 0을 낸다. 공개 `Comparable` 을 없애고
      * `sameKnownVat` 전건을 건 `compareKnownVat`로 대체한다 — 다른 `VAT`는 비교 자체가
      * 거부된다.
      *
      * **`Measurement` 대신 `Fact`를 반환한다** — 비교는 정책 version 을 소비하지 않는다
      * (`sumOfBaseAmounts`가 이미 같은 이유로 `Fact`를 쓴다). `Measurement.Measured`가
      * 요구하는 `policyVersion`/`sampleSize`는 비교에 자연스러운 입력이 없어 지어내는
-     * 것이 되므로(매직 넘버 금지 원칙과 같은 성질), Codex 전달문이 든 "Unmeasurable"
+     * 것이 되므로(매직 넘버 금지 원칙과 같은 성질), "Unmeasurable"
      * 대신 `Fact.Absent`로 낸다 — `VAT_TREATMENT_MISMATCH` 사유는 그대로다.
      */
     @Test

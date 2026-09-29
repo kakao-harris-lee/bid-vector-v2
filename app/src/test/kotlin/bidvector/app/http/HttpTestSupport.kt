@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
- * test 들이 공유한다(M6/6A-2b, 같은 값을 파일마다 베끼지 않는다).
+ * test 들이 공유한다(같은 값을 파일마다 베끼지 않는다).
  */
 val PATH_VARIABLE_PATTERN: Regex = Regex("\\{[^/}]+}")
 
@@ -62,8 +62,7 @@ const val TEST_CREDENTIAL = "http-layer-test-fixture-credential"
  * 시간 상수만 받아 `main()`의 [bidvector.app.PRODUCTION_DISPATCH_PROPERTIES]를 직접
  * 참조할 수 없어 이 두 `const val`로 값만 복제한다.
  *
- * **D-6A1-27 정정 — 이 복제는 드리프트를 스스로 드러내지 않는다.** 이전 판은 「드리프트가
- * 나면 D-6A1-21 test가 곧바로 실패한다」고 적었으나 거짓으로 실측됐다(verifier r1) —
+ * **D-6A1-27 — 이 복제는 드리프트를 스스로 드러내지 않는다.**
  * `main()`의 `PRODUCTION_DISPATCH_PROPERTIES`에서 두 속성을 지워도 이 test들은 **자기
  * 사본**을 그대로 쓰므로 영향받지 않고 exit 0이다. 실제 drift 감지는
  * `ProductionAssemblyAuthAuditTest`(production 조립을 직접 부팅하고
@@ -74,10 +73,10 @@ const val PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND = "spring.mvc.throw-exception
 const val PROP_NO_STATIC_RESOURCE_MAPPINGS = "spring.web.resources.add-mappings=false"
 
 /**
- * **M6/6A-2a — 이 test 전용 조립에는 관리 서버가 없다.** `-1` 은 Boot 의 `ManagementPortType
+ * **이 test 전용 조립에는 관리 서버가 없다.** `-1` 은 Boot 의 `ManagementPortType
  * .DISABLED` 로, actuator 의 web endpoint 배선 자체가 올라오지 않는다.
  *
- * 왜 필요한가(실측, 2026-09-26): actuator 좌표가 들어오자 이 조립에 `RequestMappingHandlerMapping`
+ * 왜 필요한가(실측): actuator 좌표가 들어오자 이 조립에 `RequestMappingHandlerMapping`
  * **빈이 둘**(우리 것 + actuator 의 controller endpoint 매핑)이 되어 `OperatorAuthenticationTest`
  * 의 타입 주입이 `NoUniqueBeanDefinitionException` 으로 깨졌다. 이름으로 한정하는 대신 조립에서
  * 빼는 쪽을 고른다 — 이 test 들이 재는 것은 **API 포트의 필터 체인**이고, 그 조립에 actuator 가
@@ -92,7 +91,7 @@ const val PROP_NO_MANAGEMENT_SERVER = "management.server.port=-1"
  * `TestRestTemplate`을 **직접 만든다** — Boot 4.1의 `@AutoConfigureTestRestTemplate`
  * 자동 배선이 `@ConditionalOnMissingBean`의 타입 추론에서 예외를 던지는 것을 실측했다
  * (`org.springframework.boot.resttestclient.autoconfigure.TestRestTemplateTestAutoConfiguration
- * .testRestTemplate`, 2026-09-19 — 이 Boot 버전 자체의 결함으로 보인다). 이 slice는 그
+ * .testRestTemplate` — 이 Boot 버전 자체의 결함으로 보인다). 이 slice는 그
  * 자동 배선에 기대지 않고 `TestRestTemplate()`(빈 생성자, HttpClientOption vararg 0개)와
  * `@LocalServerPort`만으로 직접 URL을 조립한다 — 표준 API 조합이라 그 결함을 우회한다.
  */
@@ -133,8 +132,7 @@ class SequentialCorrelationIdFactory : CorrelationIdFactory {
 }
 
 /**
- * `load()`를 제어할 수 있는 fake. **M6/6A-2b — `save()`가 실제로 저장한다**(6A-1 에서는
- * 쓰기 경로가 없어 `error()`였다): 편집 endpoint test 가 「confirm 뒤 `GET /api/strategy`
+ * `load()`를 제어할 수 있는 fake. **`save()`가 실제로 저장한다**: 편집 endpoint test 가 「confirm 뒤 `GET /api/strategy`
  * 가 새 값을 낸다」를 같은 저장소에서 확인한다.
  */
 class TestStrategyRepository(
@@ -150,12 +148,12 @@ class TestStrategyRepository(
 }
 
 /**
- * M6/6A-3+6F-3 — `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
+ * `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
  * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
  * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
  * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
  *
- * **D-6A3-20(검토 라운드 1 contract-keeper V3) — [failure]는 `TestStrategyRepository.
+ * **D-6A3-20 — [failure]는 `TestStrategyRepository.
  * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
  * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
  */
@@ -189,7 +187,7 @@ class RecordingAuditSink {
 }
 
 /**
- * M6/6A-2b — 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
+ * 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
  * 이다(상태 기계·멱등·만료 판정을 test 사본으로 다시 짓지 않는다) — 바뀌는 것은 커넥션
  * 경계뿐이라, 이 이중체 위에서 재는 것은 「HTTP 층이 결과를 어떤 상태 코드로 옮기는가」다.
  * 원자성 자체(전략+outbox+세션 한 커밋)는 이 자리가 아니라 실 DB test 가 잰다.
@@ -255,7 +253,7 @@ open class HttpTestApplication {
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
 
-    /** M6/6A-2b D-6A2b-8 — `StrategyReadController` 는 포트가 아니라 이 조회기를 받는다. */
+    /** D-6A2b-8 — `StrategyReadController` 는 포트가 아니라 이 조회기를 받는다. */
     @Bean
     open fun strategyQuery(strategyRepository: TestStrategyRepository): StrategyQuery =
         StrategyQuery(strategyRepository)

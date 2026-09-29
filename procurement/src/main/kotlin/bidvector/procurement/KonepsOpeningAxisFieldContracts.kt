@@ -4,9 +4,9 @@ import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.VatTreatment
 
 /**
- * 개찰 축 필드 계약 열 — 운영자 승인 2026-09-08(P-9, `policy-values.md` §1.7·§6b)의
+ * 개찰 축 필드 계약 열 — 운영자 승인(P-9, `policy-values.md` §1.7·§6b)의
  * `authoritative` 칸 13 행 가운데 **12 행**(§1.7)에 더해 **§1.9.5(license-limit) 2 행**
- * (`lmtGrpNo`·`lmtSno`, verifier r2 G-4)을 옮긴다. `bidwinnrBizno`(사업자등록번호)는
+ * (`lmtGrpNo`·`lmtSno`)을 옮긴다. `bidwinnrBizno`(사업자등록번호)는
  * 문서로 서지만 이 열에 없다 — P-10 (a) 결정(「사업자등록번호는 저장하지 않는다」)으로
  * 어댑터 경계에서 치환·폐기되어 계약으로 등재하지 않는다(allow-list 반전 — 계약 없는
  * 키는 자동으로 제외된다, 설계 검토 Phase 2.5 게이트 ①). `bsisPlnprc`(기초예정가격)의

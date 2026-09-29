@@ -250,7 +250,7 @@ class EvaluationDryRunE2ETest {
     }
 
     /**
-     * D-6A3-22(검토 라운드 1 privacy R-1) — 위협 모델 ④(응답에 원문이 실리지 않는다)를
+     * D-6A3-22 — 위협 모델 ④(응답에 원문이 실리지 않는다)를
      * **거동**으로 잰다. 지금까지 닫힘은 구조(DTO 타입·OpenAPI 키 집합)뿐이었다 —
      * `NoticeId.label()` 대신 `Notice`에서 파생한 값을 응답에 넣는 변이가 생겨도 키 집합
      * test 는 초록으로 남는다(`List<String>` 안의 값은 형태가 같다). 원시 응답 **문자열**에
@@ -286,11 +286,11 @@ class EvaluationDryRunE2ETest {
     }
 
     /**
-     * D-6A3-20(검토 라운드 1 contract-keeper R3) 시정 — `as? List<*>` + null-safe 호출은
+     * D-6A3-20 시정 — `as? List<*>` + null-safe 호출은
      * 키가 없거나 타입이 달라도 `null?.`로 조용히 건너뛴다(공허한 단언). [shouldNotBeNull]
      * 로 body 를 먼저 확정하고, **최상위 키 집합 등식**까지 더해 production 조립(E2E)에서도
      * `OpenApiContractTest`의 계약 키 집합 등식(`propertyKeys("EvaluationDryRunResponse")`)
-     * 과 같은 강도로 잰다 — 전에는 E2E 어디에도 200 키 집합 등식이 없었다.
+     * 과 같은 강도로 잰다.
      */
     @Test
     fun `① 후보 없음 → 200, 네 배열 빈, candidateCount 0`() {
@@ -342,8 +342,8 @@ class EvaluationDryRunE2ETest {
      * ⑤⑥⑦을 한 test 로 묶는다 — 같은 호출 하나의 응답에서 세 불변식을 같이 잰다
      * (별도 호출로 가르면 서로 다른 판정 인스턴스를 대조하게 된다).
      *
-     * **D-6A3-20(검토 라운드 1 contract-keeper R3) 시정** — `orEmpty().toSet()` 등식은 두
-     * 키가 다 없어도(둘 다 `emptySet()`) 참이 되는 공허한 단언이었다. [shouldNotBeNull]로
+     * **D-6A3-20 시정** — `orEmpty().toSet()` 등식은 두
+     * 키가 다 없어도(둘 다 `emptySet()`) 참이 되는 공허한 단언이다. [shouldNotBeNull]로
      * body 를 확정하고 각 필드를 **엄격 캐스트**(`as List<String>`)로 읽는다 — 키가 없거나
      * 타입이 다르면 `ClassCastException`/NPE 로 곧바로 실패한다(조용히 빈 값으로 접지
      * 않는다).

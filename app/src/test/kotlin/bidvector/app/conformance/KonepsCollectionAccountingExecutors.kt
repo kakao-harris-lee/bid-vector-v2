@@ -12,7 +12,7 @@ import tools.jackson.databind.JsonNode
 import java.time.Instant
 
 /**
- * M3/3A 잔여 일괄 ② — `koneps-collection` 의 회계·조회 가치·resultCode 축(019~027).
+ * 잔여 일괄 ② — `koneps-collection` 의 회계·조회 가치·resultCode 축(019~027).
  * 필드 계약·업무구분·율·금액 해석 축(001·005~015·017)은 [KonepsCollectionExecutors.kt]
  * 에 있다 — 크기 한도(v2-지침서.md §5, 500줄)를 기계적으로 회피하려는 분할이 아니라
  * 「필드 계약을 대조하는 법」과 「회계·조회 가치 gate 를 대조하는 법」이 서로 다른

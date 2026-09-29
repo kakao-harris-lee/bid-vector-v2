@@ -31,8 +31,8 @@ private const val UNKNOWN_HANDLER_KIND = "알 수 없는 종류"
 /**
  * D-6A2b-27 — **HTTP 로 무엇이 닿는가를 출하 조립에서 거둬 계약 집합과 등식으로 잠근다.**
  *
- * verifier r2 F-r2-1 이 보인 것: 의존 게이트의 대상이 「핸들러 종류」였을 때 `RouterFunction`
- * 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터가 목록 밖에서 SQL 을 실행했고 전건 초록이었다.
+ * 의존 게이트의 대상을 「핸들러 종류」로 두면: `RouterFunction`
+ * 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터가 목록 밖에서 SQL 을 실행해도 전건 초록일 수 있다.
  * 종류를 더 세는 대신, **등록된 것을 전부 거둔다**: 모든 `HandlerMapping` 빈이 내는 handler
  * 집합과 서블릿 컨테이너의 `Filter`·`Servlet` 등록 집합. 하나라도 늘면 등식이 깨진다.
  *

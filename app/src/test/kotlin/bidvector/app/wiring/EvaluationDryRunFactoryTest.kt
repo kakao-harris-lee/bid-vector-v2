@@ -111,10 +111,10 @@ private fun factoryWith(
  * `EvaluationDryRunControllerTest`·`EvaluationDryRunE2ETest`는 HTTP 층 전체를 거쳐 같은
  * 분기를 간접으로 재확인한다 — 이 test는 그 판정이 어디서 나는지(팩토리 자신)를 좁혀 잠근다.
  *
- * **D-6A3-18(검토 라운드 1 HIGH-2) — `forRequest 는 전략을 정확히 한 번 읽는다`는 절반만
+ * **D-6A3-18 — `forRequest 는 전략을 정확히 한 번 읽는다`는 절반만
  * 잰다.** `forRequest()`만 부르고 `evaluate()`는 구동하지 않아, use case가 저장소를 따로
  * 부르는 경로(예: factory가 use case에 pinned 가 아니라 delegate 를 그대로 넘기는 변이)는
- * 이 test에 보이지 않았다(verifier M2). 아래 `forRequest 뒤 evaluate 까지 돌려도` test가
+ * 이 test에 보이지 않는다. 아래 `forRequest 뒤 evaluate 까지 돌려도` test가
  * `evaluate()`까지 실제로 돌려 그 사각을 닫는다.
  */
 class EvaluationDryRunFactoryTest {
@@ -128,11 +128,11 @@ class EvaluationDryRunFactoryTest {
     }
 
     /**
-     * D-6A3-18 — HIGH-2 시정. `forRequest(n).useCase.evaluate()`까지 돌려 실 저장소
+     * D-6A3-18 — `forRequest(n).useCase.evaluate()`까지 돌려 실 저장소
      * (delegate)의 `load` 호출이 **요청 전체**에서 1회임을 센다. 후보가 0건이어도 `load`는
      * `evaluate()` 진입에서 불리므로(`EvaluateCandidatesUseCase.evaluate` 첫 줄) 이 단언은
      * 성립한다. `factory`의 `strategies = pinnedStrategies`를 `strategies = strategyRepository`
-     * (delegate 그대로)로 바꾸는 변이(verifier M2)는 `evaluate()`가 `strategies.load()`를
+     * (delegate 그대로)로 바꾸는 변이는 `evaluate()`가 `strategies.load()`를
      * 다시 불러 `loadCount`가 2가 되므로 이 test가 RED가 된다.
      */
     @Test

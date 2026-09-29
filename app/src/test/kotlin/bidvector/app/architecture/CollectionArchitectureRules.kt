@@ -11,7 +11,7 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import java.nio.charset.StandardCharsets
 
 /**
- * M6/6F-8 D-6F8 수집 배선 게이트 — `ArchitectureRules` 와 같은 형태(패키지 루트를 값으로 받아 production 을 지키는
+ * D-6F8 수집 배선 게이트 — `ArchitectureRules` 와 같은 형태(패키지 루트를 값으로 받아 production 을 지키는
  * 규칙을 fixture 루트에 그대로 적용한다)이고 전부 **집합**이다. 500줄 한도 때문에 별도 파일로 갈렸다.
  * 허용 집합은 전부 `architecture-policy.properties` 에서 온다.
  */
@@ -97,7 +97,7 @@ class CollectionArchitectureRules {
     }
 
     /**
-     * D-6F8-13(verifier r2 F2-2) — 리플렉션으로 원문 값을 얻는 길(`javaClass.getMethod("getSourceText").invoke(...)`)은
+     * D-6F8-13 — 리플렉션으로 원문 값을 얻는 길(`javaClass.getMethod("getSourceText").invoke(...)`)은
      * 원문 타입을 이름 붙이지 않아 위 규칙 둘이 못 본다. 그래서 값 획득 규칙을 **타입 이름이 아니라 반사 표면**으로도 닫는다:
      * [roots] 아래 production 전체가 ① [reflectionPackages] 의 어떤 타입도 참조하지 못하고(허용 = [allowedReferencers]),
      * ② [classType] 의 멤버 가운데 [allowedClassMembers](이름 조회) 밖의 것에 접근하지 못한다. ② 는 **허용 목록**이라
@@ -241,7 +241,7 @@ class CollectionArchitectureRules {
         )
 
     /**
-     * M6/6F-9 D-6F9-2 우회 4 — 업무구분 세부 분류 **원시 키 리터럴들**([keys], 값은 그 개념들의 필드 계약이 정한다)을 상수 풀에 가진
+     * D-6F9-2 우회 4 — 업무구분 세부 분류 **원시 키 리터럴들**([keys], 값은 그 개념들의 필드 계약이 정한다)을 상수 풀에 가진
      * production 클래스 집합은 키마다 [allowedClasses] 의 부분집합이다. 공고명 키 게이트([titleKeyLiteralMustStayInAllowedClasses])와
      * 같은 형태의 집합 규칙 — 키마다 규칙을 따로 내서 위반 상세가 어느 키 때문인지 가른다.
      */
@@ -344,10 +344,10 @@ class CollectionArchitectureRules {
         }
 
     /**
-     * 클래스 파일 바이트를 ISO-8859-1 로 읽어 [literal] 을 **부분 문자열**로 찾는다(상수 풀 항목 단위 파싱이 아니다,
-     * code-review r1 L8). 그래서 어떤 계약 키가 허용 클래스에 있는 다른 키의 부분 문자열이면 그 개념이 허위로
+     * 클래스 파일 바이트를 ISO-8859-1 로 읽어 [literal] 을 **부분 문자열**로 찾는다(상수 풀 항목 단위
+     * 파싱이 아니다). 그래서 어떤 계약 키가 허용 클래스에 있는 다른 키의 부분 문자열이면 그 개념이 허위로
      * 「허용 클래스에 있다」로 판정되어 개념 집합을 무관한 개념까지 넓혀야 초록이 된다 — 오늘 등재된 키들은 서로
-     * 부분 문자열이 아니라 잠재적 한계다(6F-8 에서 물려받은 술어). 반대 방향(위반을 놓치는 쪽)은 생기지 않는다:
+     * 부분 문자열이 아니라 잠재적 한계다. 반대 방향(위반을 놓치는 쪽)은 생기지 않는다:
      * 리터럴이 상수 풀에 있으면 바이트열에도 반드시 있다. 항목 단위 일치가 필요해지면 `CONSTANT_Utf8` 파싱으로 좁힌다.
      */
     private fun constantPoolContains(

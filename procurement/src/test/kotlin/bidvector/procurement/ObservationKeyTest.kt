@@ -5,8 +5,8 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * `ObservationKey`는 값만 나른다 — 유도 규칙은 어댑터 소유다(verifier r1 F-2 뒤 정정,
- * `RawObservationStore.kt` KDoc). 이 test는 값 타입 자체의 불변식만 잰다.
+ * `ObservationKey`는 값만 나른다 — 유도 규칙은 어댑터 소유다(`RawObservationStore.kt` KDoc).
+ * 이 test는 값 타입 자체의 불변식만 잰다.
  */
 class ObservationKeyTest {
     @Test

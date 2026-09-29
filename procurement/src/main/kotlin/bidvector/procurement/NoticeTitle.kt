@@ -1,7 +1,7 @@
 package bidvector.procurement
 
 /**
- * 공고명(D-6F4-1·9, M6/6F-4) — 감시 키워드 매칭 입력의 조각 하나(`bidvector.strategy.
+ * 공고명(D-6F4-1·9) — 감시 키워드 매칭 입력의 조각 하나(`bidvector.strategy.
  * KeywordScopeText`로 조립된다, D-6F4-3). 원문 **trim만** 하고 정규화하지 않는다([AgencyName]과
  * 같은 관례 — 표기 흔들림을 그대로 보존한다). 생성은 [of] 하나뿐이고 `@ConsistentCopyVisibility`
  * 로 `copy()`도 그 경계 밖으로 나가지 않는다.

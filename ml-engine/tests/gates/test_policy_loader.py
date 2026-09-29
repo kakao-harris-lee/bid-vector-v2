@@ -1,4 +1,4 @@
-"""M5/5A 게이트 — `ml_engine.registry.policy.load_policy` 형태(D-M5-6): version 필수,
+"""게이트 — `ml_engine.registry.policy.load_policy` 형태(D-M5-6): version 필수,
 미지 키 거부, frozen. 값은 여기 없다(정책 값 33개는 5C·5D)."""
 
 from __future__ import annotations

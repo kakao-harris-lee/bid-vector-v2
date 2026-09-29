@@ -56,11 +56,11 @@ class JobRunner:
     ) -> JobRecord | TransitionRejected:
         """`job_id`를 `RUNNING`으로 전이하고 파이프라인을 스레드 풀에 제출한다.
 
-        verifier r2 R2-1 — `_accept_or_reuse`가 `start_or_reuse`로 job 을 ACCEPTED
+        R2-1 — `_accept_or_reuse`가 `start_or_reuse`로 job 을 ACCEPTED
         로 만든 뒤 이 메서드를 호출하는 사이, 다른 writer(`CancelTrainingJob`)가
-        먼저 CANCEL 을 커밋할 수 있다(경합에서 Cancel 이 이긴다). 이전에는 START
-        전이 거부를 `ValueError`로 던져 그 StartTraining 호출 자체가 처리되지 않은
-        예외로 gRPC `UNKNOWN`이 됐다 — **예외로 알리지 않는다.** 거부되면 파이프라인을
+        먼저 CANCEL 을 커밋할 수 있다(경합에서 Cancel 이 이긴다). START
+        전이 거부를 `ValueError`로 던지면 그 StartTraining 호출 자체가 처리되지 않은
+        예외로 gRPC `UNKNOWN`이 된다 — **예외로 알리지 않는다.** 거부되면 파이프라인을
         전혀 제출하지 않고 `TransitionRejected`를 돌려준다(호출자가 최신 상태를
         다시 읽어 정직하게 응답한다)."""
         started = self._store.apply_transition(

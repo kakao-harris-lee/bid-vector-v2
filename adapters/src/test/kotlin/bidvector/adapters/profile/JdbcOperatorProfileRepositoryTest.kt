@@ -97,14 +97,14 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10 수정 라운드 1) — 이 표가 싣는
+     * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10) — 이 표가 싣는
      * `bidvector.strategy.CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리
      * 정규화가 없는 평범한 `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다.
      *
-     * **verifier r1 HIGH-1 시정** — 원판은 `repository().current()!!.businessTypes shouldBe
-     * facts.businessTypes`로, 양변이 같은 `CategoryCode(...)` 생성자를 지난 값이라 그 생성자
-     * 안에 멱등 정규화가 들어오면 양변이 함께 접혀 단언이 계속 통과하는 항진명제였다(6F-2
-     * HIGH-1과 같은 결함 클래스 — 함수와 그 함수 본문 재계산값의 비교). 이 판은 복원된
+     * **HIGH-1 시정** — `repository().current()!!.businessTypes shouldBe
+     * facts.businessTypes`처럼 양변이 같은 `CategoryCode(...)` 생성자를 지나면, 그 생성자
+     * 안에 멱등 정규화가 들어올 때 양변이 함께 접혀 단언이 계속 통과하는 항진명제가 된다(
+     * 함수와 그 함수 본문 재계산값의 비교와 같은 결함 클래스). 이 판은 복원된
      * `.value`(String, 재구성이 아니라 단순 필드 접근)를 리터럴 `String` 기대값과 직접
      * 대조한다 — 어느 쪽도 `CategoryCode(...)`를 다시 통과하지 않는다. `CategoryCode`
      * 생성자에 trim+lowercase가 들어오면 `spaced`·`plain` 두 리터럴이 생성 시점부터 이미

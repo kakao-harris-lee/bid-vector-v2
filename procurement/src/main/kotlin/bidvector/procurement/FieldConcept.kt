@@ -3,10 +3,9 @@ package bidvector.procurement
 /**
  * 이 필드가 나르는 도메인 개념 — [canonicalize]의 목적지(②).
  *
- * **P-9 ① 승인(3B-2, 2026-09-08)** — 개찰 축 토큰을 더한다(`policy-values.md` §1.7. 낡는
- * 수치를 KDoc 에 박지 않는다 — 실제 수는 이 enum 의 선언 목록 자체가 정본이다, verifier r1
- * L-1). `WINNING_RATE`는 이미 있던 토큰을 그대로 쓴다 — `sucsfbidRate`(최종낙찰률)가 그
- * 개념에 정확히 들어맞아 새 토큰을 만들지 않는다(2026-09-01 규칙 「어휘를 지어내지 않는다」).
+ * **P-9 ① 승인** — 개찰 축 토큰을 더한다(`policy-values.md` §1.7. 낡는
+ * 수치를 KDoc 에 박지 않는다 — 실제 수는 이 enum 의 선언 목록 자체가 정본이다). `WINNING_RATE`는 이미 있던 토큰을 그대로 쓴다 — `sucsfbidRate`(최종낙찰률)가 그
+ * 개념에 정확히 들어맞아 새 토큰을 만들지 않는다(규칙 「어휘를 지어내지 않는다」).
  * `bidwinnrBizno`(사업자등록번호)·대표자명 축은 토큰을 두지 않는다 — P-10 (a) 결정으로
  * 어댑터 경계에서 치환·폐기되어 계약 레지스트리에 등재되지 않기 때문이다(어느 토큰도 그
  * 값을 가리키지 않는다).
@@ -19,7 +18,7 @@ enum class FieldConcept {
     ALLOCATED_BUDGET,
 
     /**
-     * 최종낙찰률(`sucsfbidRate`, 분자는 **최종낙찰금액**) — verifier r1 L-5. 투찰률
+     * 최종낙찰률(`sucsfbidRate`, 분자는 **최종낙찰금액**) — 투찰률
      * (개찰완료의 `bidprcrt`, 분자는 투찰금액)과 **다른 축**이다(§1.7.2 「두 율을 한
      * 축으로 접지 않는다」, P-11). 개찰완료 오퍼레이션을 여는 후속 slice 는 `bidprcrt`
      * 에 이 토큰을 재사용하지 마라 — 새 토큰(예: `BID_RATE`)이 필요하다.
@@ -44,7 +43,7 @@ enum class FieldConcept {
     AWARD_COMPANY_NAME,
 
     /**
-     * 제한그룹번호(`lmtGrpNo`, license-limit §1.9.5) — verifier r2 G-4. license-limit 이 행
+     * 제한그룹번호(`lmtGrpNo`, license-limit §1.9.5) — license-limit 이 행
      * 식별자로 쓰는 두 축 중 하나이지만 계약이 없어 「행 식별자로 쓰는 키가 계약 미등재로
      * 돈다」는 지적을 받았다 — 계약 없이 도는 상태를 없앤다.
      */
@@ -53,7 +52,7 @@ enum class FieldConcept {
     /** 제한순번(`lmtSno`, license-limit §1.9.5) — `LICENSE_LIMIT_GROUP_NUMBER`와 같은 이유. */
     LICENSE_LIMIT_SEQUENCE_NUMBER,
 
-    // M3/3F P-13 (a) 승인(§1.11) — 개찰완료 오퍼레이션(투찰 행) 축. 평가점수 넷은 scale
+    // P-13 (a) 승인(§1.11) — 개찰완료 오퍼레이션(투찰 행) 축. 평가점수 넷은 scale
     // 미확정이라 토큰을 두지 않는다(P-13 「제외」 — 어휘를 지어내지 않는다).
 
     /** 입찰분류번호(`bidClsfcNo`, 동일 공고번호의 집행일련번호, §1.11). */
@@ -94,7 +93,7 @@ enum class FieldConcept {
     BID_AT,
 
     /**
-     * 수요기관코드(`dminsttCd`, M3/3H-1 D-3H-1) — 엔진 `agency_id` 정본(D-3H-2). 코드가
+     * 수요기관코드(`dminsttCd`, D-3H-1) — 엔진 `agency_id` 정본(D-3H-2). 코드가
      * 있으면 「행자부코드, 없으면 조달청 부여 코드」(참고자료 문면). [NOTICE_AGENCY_CODE]
      * 값으로 접지 않는다(폴백 없음, scope.md 우회 (3)).
      */
@@ -110,13 +109,13 @@ enum class FieldConcept {
     NOTICE_AGENCY_NAME,
 
     /**
-     * 공고명(`bidNtceNm`, M6/6F-8 D-6F8-2 — `OPEN-6F4-TITLE-INGEST` 닫음) — 감시 키워드 매칭 입력의
+     * 공고명(`bidNtceNm`, D-6F8-2 — `OPEN-6F4-TITLE-INGEST` 닫음) — 감시 키워드 매칭 입력의
      * 조각이다(D-6F4-3). 원문 키는 이 개념의 계약 행이 나른다(D-6F4-6 — 어댑터·use case 에 키를
      * 박지 않는다).
      */
     NOTICE_TITLE,
 
-    // M6/6F-9 D-6F9-2 — 업무구분 세부 분류 넷. 대분류는 필드가 아니라 수집 오퍼레이션이 정한다(D-6F9-1,
+    // D-6F9-2 — 업무구분 세부 분류 넷. 대분류는 필드가 아니라 수집 오퍼레이션이 정한다(D-6F9-1,
     // `RawNoticeObservation.sourceDivision`). 서로 다른 축이라 [BUSINESS_CATEGORY_CODE]·[BUSINESS_CATEGORY_LABEL]
     // (코드+라벨 축, `bsnsDivNm` 행)에 섞지 않는다(P-7 · `OPEN-COL-03`).
 

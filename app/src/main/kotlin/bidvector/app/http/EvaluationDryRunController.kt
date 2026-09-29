@@ -18,13 +18,13 @@ import tools.jackson.databind.JsonNode
  * evaluate()`만 부른다**(6A 완료 조건, D-6A3-8) — 판정·조립을 복제하거나 포트를 직접
  * 부르지 않는다(우회 5 폐쇄 대상).
  *
- * `evaluate()`가 `suspend`(M4/4B-3 ADR 0010 D-2, 실 ML 취소 전파 대비)라 `runBlocking`
+ * `evaluate()`가 `suspend`(ADR 0010 D-2, 실 ML 취소 전파 대비)라 `runBlocking`
  * 으로 동기 Spring MVC 경계 하나만 다리 놓는다 — 이 slice가 그 포트를 처음 production
  * 에서 돈다(app/build.gradle.kts에 `kotlinx-coroutines-core`를 처음 컴파일 의존으로
  * 더한 이유).
  *
- * **`@RequestBody`가 [EvaluationDryRunRequest]가 아니라 [JsonNode]다(D-6A3-19, 검토 라운드
- * 1 contract-keeper V1·verifier MEDIUM 시정).** `currentActiveBids: Int`(non-null primitive)
+ * **`@RequestBody`가 [EvaluationDryRunRequest]가 아니라 [JsonNode]다(D-6A3-19).**
+ * `currentActiveBids: Int`(non-null primitive)
  * 로 직접 바인딩하면 Jackson 3의 기본 강제 변환(`ALLOW_COERCION_OF_SCALARS`·
  * `ACCEPT_FLOAT_AS_INT`)이 `"3"`(문자열)·`1.7`(소수)을 **조용히** 200으로 통과시킨다(실측
  * — 값을 지어내는 것에 가깝다, D-6F1-5 위반). 원시 트리로 받아 [parseCurrentActiveBids]가

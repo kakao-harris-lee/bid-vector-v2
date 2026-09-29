@@ -1,4 +1,4 @@
-"""ml_engine.training.jobs — training job 상태 기계·저장소·실행기·servicer(M5/5E-1).
+"""ml_engine.training.jobs — training job 상태 기계·저장소·실행기·servicer.
 
 공개 표면 재수출((2b) 값 획득 축 표가 전수) — 다른 패키지는 이 최상위 이름만 보고 하위
 모듈을 직접 import 하지 않는다. `serving`은 이 패키지를 알지 못한다(pyproject.toml

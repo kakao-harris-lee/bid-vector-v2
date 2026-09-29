@@ -20,7 +20,7 @@ private val typeMemberSourceSets =
     readPolicy(layout.settingsDirectory.file("config/quality/size-policy.properties").asFile)
         .requireList("limit.type.members.source-sets")
 
-// D-7·verifier r2 H-1 — kotlin-conventions 의 `typeShapeRootPackagePrefix` 와 같은 값·같은 이유.
+// D-7 — kotlin-conventions 의 `typeShapeRootPackagePrefix` 와 같은 값·같은 이유.
 private val typeShapeRootPackagePrefix =
     readPolicy(layout.settingsDirectory.file("config/quality/architecture-policy.properties").asFile)
         .requireValue("package.root")
@@ -49,7 +49,7 @@ val buildLogicSizeGate =
         report = layout.buildDirectory.file("reports/size-gate/build-logic.txt")
     }
 
-// verifier r1 M-2 — 세 축(파일·함수·타입 멤버)은 위에서 build-logic 을 재지만 넷째 축(상속
+// 세 축(파일·함수·타입 멤버)은 위에서 build-logic 을 재지만 넷째 축(상속
 // 깊이·인터페이스 수 래칫)은 `kotlin-conventions`(9 모듈)에만 등록돼 build-logic 자신은
 // 빠져 있었다. `TypeShapeGateTask`는 **바이트코드**가 필요해(PSI로는 상위 타입 해석이 안
 // 된다) `SizeGateTask`처럼 소스를 텍스트로 읽을 수 없다 — 대신 이미 컴파일된 build-logic
@@ -68,10 +68,9 @@ val buildLogicTypeShapeGate =
         report = layout.buildDirectory.file("reports/type-shape-gate/build-logic.txt")
     }
 
-// verifier r1 M-3 — build-logic 자신에는 `gateExecutionGate`가 없어 이 slice 가 더한 test
-// 여섯(과 1A 부터의 기존 게이트 test 열셋 — verifier r3 장부층 ④ 정정, 이전 판은 「열둘」로
-// 하나 적었다)이 "돌았다"는 증거층 밖이었다. `--tests` 로
-// `TestFixturesGateTest`(④(a)의 유일한 실행 증거)를 빼도 아무도 알려주지 못했다. 이 task 도
+// build-logic 자신에는 `gateExecutionGate`가 없어 이 slice 가 더한 test
+// 여섯(과 기존 게이트 test 열셋)이 "돌았다"는 증거층 밖이었다. `--tests` 로
+// `TestFixturesGateTest`(유일한 실행 증거)를 빼도 아무도 알려주지 못했다. 이 task 도
 // `GateExecutionGateTask` 클래스를 build-logic 자신의 build.gradle.kts 안에서 쓸 수 없어
 // (같은 순환 — 그 클래스가 이 빌드의 산출물이다) 루트에 둔다. JUnit XML 만 읽으므로
 // `buildLogicTypeShapeGate`와 달리 컴파일된 클래스는 필요 없다 — `:build-logic:test` 산출물
@@ -99,9 +98,9 @@ val buildLogicTestShapeGate =
         report = layout.buildDirectory.file("reports/test-shape-gate/build-logic.txt")
     }
 
-// M2/2D — `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트(scope.md
+// `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트(scope.md
 // 「이 slice 가 하는 일」 ①②③). `contracts`·`ml-contract`는 어느 subproject 에도 속하지 않아
-// (2A D-2A-0 (c)) 다른 곳의 게이트가 자연히 못 본다 — build-logic 자신처럼 루트에 둔다.
+// (D-2A-0 (c)) 다른 곳의 게이트가 자연히 못 본다 — build-logic 자신처럼 루트에 둔다.
 // 외부 프로세스(`buf`·`gradlew`·`git`)에 기댄 판정이라 항상 재실행한다.
 val contractGate =
     tasks.register<ContractGateTask>("contractGate") {
@@ -112,7 +111,7 @@ val contractGate =
         rootGradlew = layout.settingsDirectory.file("gradlew")
         catalogProtobufRuntimeVersion = versionCatalog.version("protobuf-runtime")
         catalogGrpcKotlinVersion = versionCatalog.version("grpc-kotlin")
-        // verifier r1 F-13 — `ml-contract`가 `protoc-gen-grpc-java`를 이 카탈로그 버전
+        // `ml-contract`가 `protoc-gen-grpc-java`를 이 카탈로그 버전
         // 그대로 참조한다(별도 alias 없음, ContractPolicy.protocGenGrpcJavaVersion 참고).
         catalogGrpcJavaVersion = versionCatalog.version("grpc-java")
         report = layout.buildDirectory.file("reports/contract-gate/violations.txt")
@@ -132,9 +131,9 @@ val memberEffectGate =
         report = layout.buildDirectory.file("reports/member-effects/derived.properties")
     }
 
-// PR #5 게이트 시정(privacy-gate) — `leak-patterns.txt`(M4/4E 신설)가 어느 task 에도
+// `leak-patterns.txt`가 어느 task 에도
 // 배선돼 있지 않아 slice 마다 손으로 돌리는 관행이었다(gate-tests.properties 에도 부재).
-// 스캔 대상은 `reports/evidence/`(4E 의 실제 관행을 승격 — `LeakPatternGateTask` KDoc의
+// 스캔 대상은 `reports/evidence/`(실제 관행을 승격 — `LeakPatternGateTask` KDoc의
 // 근거). 모듈에도 source set 에도 속하지 않으므로(evidence 는 어느 Kotlin 모듈도 아니다)
 // `contractGate`·`memberEffectGate`처럼 루트에 둔다.
 val leakPatternGate =

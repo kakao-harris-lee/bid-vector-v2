@@ -115,7 +115,7 @@ internal fun testSuccessResponse(
         .build()
 
 /**
- * M4/4D-3(scope.md D-4D3-2) — `hasValidDiagnosticsShape`가 진단 없는 응답(proto 기본
+ * (scope.md D-4D3-2) — `hasValidDiagnosticsShape`가 진단 없는 응답(proto 기본
  * 인스턴스, `shrinkage_weight.fraction = ""`)을 거부하므로(우회 (5)) 이 fixture 는 항상
  * 유효한 진단을 채운다. `testSuccessResponse()`의 기본 `releaseKind`(`ARTIFACT`)와 짝을
  * 맞춰 `trainingRowCount`를 0보다 크게 둔다(D-4D3-2(d)는 `DERIVED`에서만 0을 강제한다).
@@ -139,8 +139,8 @@ internal fun testDiagnostics(
         .build()
 
 /**
- * M2/2F(D-2F-2) — `releaseKind`는 기본 `RELEASE_KIND_ARTIFACT`다. 이 fixture 는 4D-1 부터
- * 쓰여 온 공용 헬퍼라 기본값을 바꾸면 이 파일을 쓰는 모든 기존 test(`ReleaseCheckTest`·
+ * (D-2F-2) — `releaseKind`는 기본 `RELEASE_KIND_ARTIFACT`다. 이 fixture 는 여러 test 가
+ * 함께 쓰는 공용 헬퍼라 기본값을 바꾸면 이 파일을 쓰는 모든 기존 test(`ReleaseCheckTest`·
  * `SuccessShapeFailClosedTest`·`GrpcBidPredictionGatewayTest` 등)가 `hasValidReleaseShape`
  * 의 `UNSPECIFIED` 거부에 걸려 의도와 다른 이유로 깨진다 — 명시 인자를 받는 이유다.
  */
@@ -178,7 +178,7 @@ internal fun protoResponse(success: Success): CalculateOptimalBidResponse =
 
 /**
  * 고정 응답 servicer(consumer test 공용) — `GrpcBidPredictionGatewayTest`와
- * `GrpcBidPredictionGatewayVerifierR2Test`(verifier r2 신설) 양쪽이 같은 모양의 servicer 를
+ * `GrpcBidPredictionGatewayVerifierR2Test` 양쪽이 같은 모양의 servicer 를
  * 쓴다(detekt `TooManyFunctions`로 갈라낸 파일 사이의 중복 방지, size ratchet §5).
  */
 internal fun fixedServicer(

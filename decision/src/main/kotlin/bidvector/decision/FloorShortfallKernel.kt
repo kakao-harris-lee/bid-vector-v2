@@ -53,7 +53,7 @@ private fun biasDirectionOf(
  * 분모가 문턱 아래로 줄어드는 경우도 같은 가지로 떨어진다(`floor-shortfall-005` 전이,
  * runner projection이 그 사실을 감사 필드로 낸다).
  *
- * `critical`은 `Derived<AssessmentRate>`다(verifier r1 F-1) — 봉투가 계산 정책 version을
+ * `critical`은 `Derived<AssessmentRate>`다 — 봉투가 계산 정책 version을
  * 그대로 나른다. `decision`은 `Derived`를 새로 만들 수 없으므로(shared-kernel `internal`
  * 생성자) 호출부가 [criticalAssessmentRateFor] 또는 shared-kernel의
  * [bidvector.sharedkernel.criticalAssessmentRate]로 만든 값을 그대로 넘긴다.
@@ -82,9 +82,8 @@ fun measureFloorShortfall(
 
 /**
  * `FloorShortfallPolicyData.criticalRateRounding`(D-10)에서 나눗셈 정책을 만들어 임계
- * 사정률을 계산한다(verifier r1 F-3) — 이 함수가 그 정책 슬롯의 유일한 소비자다.
- * **verifier r2 N-1 정정**: 반올림 모드를 이 함수가 리터럴로 지어내던 이전 판을 없앴다 —
- * 자리수·모드 둘 다 정책 슬롯에서 그대로 온다. main 에 `RoundingMode` 리터럴이 없다.
+ * 사정률을 계산한다 — 이 함수가 그 정책 슬롯의 유일한 소비자다. 반올림 모드를 리터럴로
+ * 짓지 않는다 — 자리수·모드 둘 다 정책 슬롯에서 그대로 온다. main 에 `RoundingMode` 리터럴이 없다.
  */
 fun criticalAssessmentRateFor(
     bid: BidRate,

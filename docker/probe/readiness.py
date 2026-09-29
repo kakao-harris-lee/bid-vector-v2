@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M6/6C — readiness 프로브(scope.md ③, D-6C-3). **`GetModelMetadata.readiness`
+"""readiness 프로브(scope.md ③, D-6C-3). **`GetModelMetadata.readiness`
 가 READY 인지**만 잰다(5E-1 `ReadinessGate` 실물 — 정책 넷 preload 전부 성공해야
 READY, 5E-2 D-5E2-10) — 서버가 살아 있는지(liveness.py)와는 반대 축이다: 서버가
 멀쩡히 응답해도 정책 preload 가 하나라도 실패하면 `NOT_READY`이고 이 프로브는
@@ -41,9 +41,9 @@ _READY = prediction_pb2.READINESS_READY
 
 
 class _ReadinessResultKind(StrEnum):
-    """verifier r1 F-7(LOW) — 이전 판은 transport 실패와 `NOT_READY`가 종료 코드(1)
-    뿐 아니라 **문면까지** 같아 운영자가 서버가 죽었는지 그냥 미준비인지 로그만으로
-    가르지 못했다. 종료 코드 계약(모듈 docstring)은 그대로 두고 — 그 계약은
+    """transport 실패와 `NOT_READY`가 종료 코드(1)
+    뿐 아니라 **문면까지** 같으면 운영자가 서버가 죽었는지 그냥 미준비인지 로그만으로
+    가르지 못한다. 종료 코드 계약(모듈 docstring)은 그대로 두고 — 그 계약은
     `NOT_READY`·`failure`·transport 실패를 전부 1로 묶는다 — **문면만** 사유별로
     가른다."""
 

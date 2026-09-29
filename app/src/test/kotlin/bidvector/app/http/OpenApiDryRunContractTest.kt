@@ -28,10 +28,9 @@ import java.time.LocalDate
  * 선례와 같은 관심사 경계(기계적 절삭이 아니라 dry-run endpoint 하나의 전 상태 코드).
  * YAML 로딩·스키마 조회 헬퍼는 `OpenApiSpecSupport.kt`를 공유한다(중복 금지).
  *
- * D-6A3-20(검토 라운드 1) 시정 셋: contract-keeper V2(`ErrorCode` 상수 ↔ 문서 `enum` 양방향)·
- * R1(path 상태 코드 선언 집합)·R2(요청 스키마 속성·필수 집합 ↔ DTO), verifier M8
- * (409 `CANDIDATE_CAP_EXCEEDED` HTTP 층 대조), verifier R5(이 path 의 401·500도 `ErrorBody`
- * 키 등식).
+ * D-6A3-20 시정 셋: `ErrorCode` 상수 ↔ 문서 `enum` 양방향 등식·path 상태 코드 선언 집합·
+ * 요청 스키마 속성·필수 집합 ↔ DTO, 409 `CANDIDATE_CAP_EXCEEDED` 의 HTTP 층 대조, 이 path 의
+ * 401·500 도 `ErrorBody` 키 등식.
  */
 @Suppress("UNCHECKED_CAST")
 @SpringBootTest(
@@ -113,7 +112,7 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A3-20(검토 라운드 1 verifier R5) — 이 path 의 401·500 도 `ErrorBody` 키 등식으로
+     * D-6A3-20 — 이 path 의 401·500 도 `ErrorBody` 키 등식으로
      * 대조한다. `/api/strategy` 는 이미 대조되지만(`OpenApiContractTest`), 이 path 는 여태
      * 200·400·409 만 잰다 — D-6A1-27 전수 test(GET 으로만 때린다) 뒤 실제 메서드(POST)에
      * 대한 증거이기도 하다.
@@ -147,9 +146,9 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A3-20 — D-6A3-7 의 HTTP 쪽 절반(verifier M8: `ErrorMapping` 의 `CandidateCapExceededException`
-     * 행을 지우면 `@ExceptionHandler(Throwable)` 폴백으로 떨어져 500이 되는데도 이전까지는
-     * 어떤 HTTP test 도 이 경로를 때리지 않아 전건 초록이었다). `EmptyCandidateSource.failure`
+     * D-6A3-20 — D-6A3-7 의 HTTP 쪽 절반(`ErrorMapping` 의 `CandidateCapExceededException`
+     * 행을 지우면 `@ExceptionHandler(Throwable)` 폴백으로 떨어져 500이 되는데, 이 경로를 때리는
+     * HTTP test 가 없으면 전건 초록일 수 있다). `EmptyCandidateSource.failure`
      * 로 그 예외를 직접 낸다 — production 배선(`JdbcCandidateSource`)의 SQL 실 상한 도달은
      * adapter 층(`JdbcCandidateSourceTest`)의 몫이다.
      */
@@ -166,7 +165,7 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A3-20(검토 라운드 1 contract-keeper V2) — `ErrorCode` 의 상수 집합과 문서
+     * D-6A3-20 — `ErrorCode` 의 상수 집합과 문서
      * `ErrorBody.code` 의 `enum` 이 **양방향** 등식이다. 한쪽에만 코드를 더하면(리플렉션이
      * `ErrorCode`를 직접 읽으므로 이 목록을 손으로 복제하지 않는다) RED가 된다.
      */
@@ -189,9 +188,8 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A3-20(검토 라운드 1 contract-keeper R1) — `paths` 의 상태 코드 **선언 집합**이
-     * 문서 자신 안에서 기대값과 같다(verifier M7a·M7b·M7d — 409·401 을 지워도 이전에는
-     * 어떤 test 도 「지워졌다」를 몰랐다). HTTP 호출 없이 YAML 만 본다.
+     * D-6A3-20 — `paths` 의 상태 코드 **선언 집합**이
+     * 문서 자신 안에서 기대값과 같다(409·401 을 지워도 그 사실을 test 가 놓칠 수 있다). HTTP 호출 없이 YAML 만 본다.
      */
     @Test
     fun `각 path 의 상태 코드 선언 집합이 기대값과 같다`() {
@@ -199,16 +197,15 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
         spec.responseStatusCodes(
             "/api/evaluation-dry-runs",
             "post",
-            // M6/6A-2b D-6A2b-7 — 미지원 미디어 타입이 500 에서 415 로 바뀌면서 이 operation 의
-            // 응답 집합에도 415 가 들어왔다(이전에는 선언할 수 없는 상태였다).
+            // D-6A2b-7 — 미지원 미디어 타입이 500 에서 415 로 바뀌면서 이 operation 의
+            // 응답 집합에도 415 가 들어온다.
         ) shouldBe setOf("200", "400", "401", "409", "415", "500")
         spec.responseStatusCodes("/{unmatched}", "get") shouldBe setOf("404")
     }
 
     /**
-     * D-6A3-20(검토 라운드 1 contract-keeper R2) — 요청 스키마의 **속성 키 집합**·**필수
-     * 집합**이 DTO 필드와 같다(verifier M7c — 요청 스키마에 필드를 더해도 이전에는 어떤
-     * test 도 몰랐다). 기존 `/api/strategy`는 요청 본문이 없어 이 축이 없다.
+     * D-6A3-20 — 요청 스키마의 **속성 키 집합**·**필수
+     * 집합**이 DTO 필드와 같다(요청 스키마에 필드를 더해도 그 사실을 test 가 놓칠 수 있다). 기존 `/api/strategy`는 요청 본문이 없어 이 축이 없다.
      *
      * **`kotlin-reflect` 없이 순수 Java reflection만 쓴다**(app 모듈에 그 의존이 없다 —
      * 새로 들이지 않는다, 재사용 우선). Kotlin `data class`의 프로퍼티는 생성자 파라미터와

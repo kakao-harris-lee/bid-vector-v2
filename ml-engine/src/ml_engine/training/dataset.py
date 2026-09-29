@@ -50,16 +50,15 @@ class DatasetManifestV1:
     opened_at_last: datetime
     feature_schema_version: str
     settlements_checksum: str = ""
-    """M5/5E-1 D-5E-4 — `settlements.jsonl`(정산 관측, 5C-2 성숙도 입력의 실체) 세
+    """D-5E-4 — `settlements.jsonl`(정산 관측, 성숙도 입력의 실체) 세
     번째 파일의 checksum.
 
-    verifier r1 M-1 — 이전 판은 여기서 "`_parse_manifest`가 이 키를 필수로 요구한다"
-    고 적었는데 **거짓**이었다(`_parse_manifest`는 `raw.get("settlements_checksum",
-    None)`으로 **선택적**으로 읽는다 — 실측: 키가 없으면 `""`로 통과한다). 실제 강제는
+    `_parse_manifest`는 이 키를 `raw.get("settlements_checksum",
+    None)`으로 **선택적**으로 읽는다 — 실측: 키가 없으면 `""`로 통과한다. 실제 강제는
     **`load_dataset`이 `settlements_bytes`를 받았을 때**(`_load_settlements`)에서만
     일어난다 — 그때는 `manifest.settlements_checksum`이 비어 있으면
     `SETTLEMENTS_CHECKSUM_MISMATCH`로 거부한다. `settlements_bytes=None`으로 부르는
-    5E-1 이전 호출자(2C 이하 test)에는 이 강제가 아예 적용되지 않는다.
+    이 검증 이전 호출자(2C 이하 test)에는 이 강제가 아예 적용되지 않는다.
 
     여기 기본값 `""`은 기존 5C-1 test fixture(이 필드를 모르는 채 `DatasetManifestV1`을
     직접 생성)와의 생성자 호환을 위한 것이다(hunk 격리 — `dataset.py`·
@@ -162,7 +161,7 @@ def _optional_string(value: _ManifestScalar, name: str) -> str:
 
 
 def _parse_manifest(manifest_bytes: bytes) -> DatasetManifestV1 | DatasetRejected:
-    """code-reviewer PR #13 MEDIUM-1 — 문자열·boolean·정수 필드의 **타입**을 `_require_*`
+    """MEDIUM-1 — 문자열·boolean·정수 필드의 **타입**을 `_require_*`
     헬퍼(스칼라 매개변수, 설계 래칫 약한 경계 판정 밖)로 강제한다."""
     try:
         raw = json.loads(manifest_bytes.decode("utf-8"))

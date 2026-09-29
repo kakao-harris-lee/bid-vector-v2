@@ -5,7 +5,7 @@ package bidvector.workflow.notification
  * ([DeliveryResult.Delivered])로 바뀌는 문이 타입에 없다. [Suppressed]는 [DeliveryPlan]
  * 전체(정책·환경 두 판정)를 실어 NOTI-03 「두 개의 서로 다른 값으로 구분 기록」을 위로
  * 전달한다(설계 검토 (3)). `internal constructor`(+`@ConsistentCopyVisibility`) — dispatch
- * 만 만든다(4C 소비도 같은 `workflow` 모듈이라 닫는 데 비용이 없다, verifier r1 M-1).
+ * 만 만든다(다른 소비 지점도 같은 `workflow` 모듈이라 닫는 데 비용이 없다).
  */
 sealed interface DeliveryOutcome {
     @ConsistentCopyVisibility
@@ -24,7 +24,7 @@ sealed interface DeliveryOutcome {
  * [RouteDirectory.routesFor]로만 얻는다(owner isolation, 우회 없음 — API 표면 자체가
  * 방어선). 억제([DeliveryOutcome.Suppressed])면 [sender]를 읽지도 않는다(dry-run이
  * sender를 감싸지 않음, 우회 (5)). [DeliveryResult.Unknown]은 재시도하지 않는다(호출
- * 최대 1, D-4E-2 — 격리 판단은 4C 소유).
+ * 최대 1, D-4E-2 — 격리 판단은 다른 slice 소유).
  */
 class DispatchNotification(
     private val routes: RouteDirectory,

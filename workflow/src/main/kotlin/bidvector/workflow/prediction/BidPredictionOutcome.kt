@@ -5,11 +5,11 @@ import bidvector.sharedkernel.Rate
 import java.math.BigDecimal
 
 /**
- * **파일 규율(verifier r3 G-1·r4 I-1)** — 이 파일의 값 타입 `init` 불변식은 마지막
+ * **파일 규율** — 이 파일의 값 타입 `init` 불변식은 마지막
  * 안전판이지 게이트가 아니다. `bidvector.adapters.ml.isAcceptableSuccessShape`(구조
- * 검증층)가 응답 단계에서 먼저 걸러야 `predict` 밖으로 예외가 새지 않는다(r1 F-5 수정이
- * 이 짝을 빠뜨려 r2 G-1이 났고, `SuccessShapeFailClosedTest`의 table-driven test는 손으로
- * 유지돼 새 조건은 못 잡는다 — r4 I-1). **값 타입 `init` 조건을 늘리는 커밋은 같은
+ * 검증층)가 응답 단계에서 먼저 걸러야 `predict` 밖으로 예외가 새지 않는다 —
+ * `SuccessShapeFailClosedTest`의 table-driven test는 손으로
+ * 유지돼 새 조건은 못 잡는다. **값 타입 `init` 조건을 늘리는 커밋은 같은
  * 커밋에서 검증층 술어와 `SuccessShapeFailClosedTest`의 table 행을 함께 늘린다.**
  *
  * 후보 셋 — 정확히 셋, 리스트가 아니다(scope.md ①·⑦, 2B ③ 라벨 순서 고정). 생성자는
@@ -29,7 +29,7 @@ data class BidRateCandidates(
     val aggressive: Rate,
 ) {
     init {
-        // verifier r1 F-5(low) — 라벨이 나르는 순서 의미(2B ③ 라벨 고정 CONSERVATIVE·
+        // 라벨이 나르는 순서 의미(2B ③ 라벨 고정 CONSERVATIVE·
         // BASE·AGGRESSIVE, legacy "기준 후보는 항상 가운데")를 값 스스로도 지킨다. 현재
         // 소비자는 0 이라 사는 값이 없으나(T-1a), 4B 후속이 소비하는 순간 이 불변식이
         // 역순·중복 값의 위조를 컴파일이 아니라 생성 시점에 막는다.
@@ -46,7 +46,7 @@ data class BidRateCandidates(
  * 가격 적합도 — 확률이 아니다(ML-03, D-M2-8, scope.md ⑨). `UnitScore`·`Rate`와 상호
  * 대입되지 않는 별도 타입이다 — `OPEN-ML-03`의 「타입 분리」 후보를 Kotlin 쪽에서 실물로
  * 세운다. 생성자가 public인 이유는 [BidRateCandidates] KDoc과 같다(cross-module 어댑터 생성).
- * **부호 불변식을 두지 않는다**(verifier r2 G-2 — r1 F-5 가 넣었던 「음수 거부」를 되돌림).
+ * **부호 불변식을 두지 않는다.**
  * `prediction.proto`의 `PriceFitness` 주석이 "값의 산식은 이 계약이 규정하지 않는다"라고
  * 명시하고, `data-dictionary.md`에도 이 축의 범위 규정이 없다 — 부호를 제약하면 계약이
  * 허용하는 정직한 `Success`를 버리게 된다. 형태 검증은 decimal string 정규형(파싱 가능성)
@@ -60,7 +60,7 @@ data class PriceFitness(
  * 불확실성 출처(scope.md ⑦, 2B `IntervalSource` 미러) — legacy 의 합성 `confidence` 단일
  * 값과 달리 성분+출처로 구조화된다(`docs/discovery/data-dictionary.md` §6.5).
  *
- * `PosteriorPredictive`(M2/2F additive, D-2F-3) — 사후예측분산 기반(분포 엔진). 잔차 기반
+ * `PosteriorPredictive`(D-2F-3) — 사후예측분산 기반(분포 엔진). 잔차 기반
  * 두 값과 다른 축이라 `null`로 접지 않는다(2A ⑥ 제3 변환 금지의 정신 — 엔진이 정직하게
  * 낸 답을 client 가 버리지 않는다). `docs/discovery/data-dictionary.md` §6.5 는 아직 이
  * 값을 정의하지 않는다(`OPEN-2F-DICT-INTERVAL-SOURCE`, 문서 소유 — 후속).
@@ -72,7 +72,7 @@ enum class IntervalSource {
 }
 
 /**
- * release 의 종류(scope.md ⑥, M2/2F additive, D-2F-2) — 아티팩트가 있는 release(`Artifact`,
+ * release 의 종류(scope.md ⑥, D-2F-2) — 아티팩트가 있는 release(`Artifact`,
  * GBM 등)와 아티팩트 없이 정책·코드만으로 서빙하는 release(`Derived`, 분포 엔진)를 값 위장
  * 없이 1급으로 가른다(5D-2 위협 (h)). 계약의 `RELEASE_KIND_UNSPECIFIED`/`UNRECOGNIZED`는
  * 이 타입에 값이 없다 — 어댑터 검증층(`hasValidReleaseShape`)이 그 값을 가진 응답을
@@ -103,13 +103,13 @@ data class Uncertainty(
  * 모델 release 식별(scope.md ⑥, 2B `ModelRelease` 미러) — 다섯 성분 전부 non-null 이라
  * provenance 가 탈락할 수 없다(우회 (10)). 생성자가 public인 이유는 [BidRateCandidates]
  * KDoc과 같다(cross-module 어댑터 생성). **다섯 성분 전부 비공백을 생성 시점에 강제한다**
- * (verifier r1 F-2 — proto3 기본값 `""`이 「non-null이라 탈락할 수 없다」는 문면을 뚫어
- * 공백 release가 `Predicted`로 샜었다). 어댑터 쪽 매핑(package `adapters ml`)이 이
+ * — proto3 기본값 `""`이 「non-null이라 탈락할 수 없다」는 문면을 뚫어
+ * 공백 release가 `Predicted`로 샐 수 있다. 어댑터 쪽 매핑(package `adapters ml`)이 이
  * 불변식을 fail-closed 검사로 먼저 걸러 예외가 새지 않게 한다 — 이 `init`은
  * 방어의 마지막 층(2B `ModelRelease` KDoc "여기 넷[+식별자 하나]은 release를 지목하는 데
  * 필요한 성분과 식별자다" — 다섯 전부가 지목에 필요하다).
  *
- * `kind`(M2/2F additive, D-2F-2) — 기본값 [ReleaseKind.Artifact]다. 이 타입은
+ * `kind`(D-2F-2) — 기본값 [ReleaseKind.Artifact]다. 이 타입은
  * `adapters.ml`(prediction)뿐 아니라 `adapters.ml`(embedding, `EmbeddingResponseMapping.kt`)
  * 도 같이 짓는다 — embedding 쪽은 release_kind 축을 아직 나르지 않으므로(2F out_of_scope)
  * 기본값을 명시하지 않는 기존 호출부가 그대로 컴파일된다. `datasetId` 공백 허용은
@@ -217,7 +217,7 @@ sealed interface BidPredictionOutcome {
         val fitness: PriceFitness,
         val uncertainty: Uncertainty,
         val release: ModelReleaseRef,
-        // M4/4D-3(scope.md D-4D3-1) — 필수 인자, 기본값 없음. 진단 없는 Predicted 를
+        // (scope.md D-4D3-1) — 필수 인자, 기본값 없음. 진단 없는 Predicted 를
         // 표현 불가능하게 한다(불가능한 상태는 타입으로 닫는다).
         val diagnostics: PredictionDiagnostics,
     ) : BidPredictionOutcome

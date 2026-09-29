@@ -35,7 +35,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * verifier r1 F-8 — 금액·범주·마감이 실린 notice의 `find()` 왕복을 단언하는 test가 없었다.
+ * F-8 — 금액·범주·마감이 실린 notice의 `find()` 왕복을 단언하는 test가 없었다.
  * 저장한 값과 `find()`로 다시 읽은 값이 필드별로 정확히 같은지(재구성이 손실·왜곡 없이
  * 되는지)를 여기서 고정한다.
  */
@@ -222,7 +222,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r2 MEDIUM-1(팀장 2차 지적) — 1차 표본(빈 문자열·ASCII 공백·탭·개행·NBSP·전각
+     * 1차 표본(빈 문자열·ASCII 공백·탭·개행·NBSP·전각
      * 공백)은 손으로 골라 VT(U+000B)·FF(U+000C)·CR(U+000D)를 빠뜨렸고, V14 CHECK도 같은
      * 세 문자를 빠뜨린 채 그 표본을 통과했다(실무에서 흔한 "\r\n"이 뚫린다). 표본을 다시
      * 손으로 나열하지 않는다 — **정의에서 유도한다**: `NoticeTitle.of`가 쓰는 `String.trim()`은
@@ -336,7 +336,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         )
 
     /**
-     * verifier r1 F-1 — `NoticeRowMerge`의 발주기관 존재 가드(「유입이 없으면 기존을 지킨다」,
+     * F-1 — `NoticeRowMerge`의 발주기관 존재 가드(「유입이 없으면 기존을 지킨다」,
      * `business_category_*`와 같은 형태)가 실제 재수집 흐름에서 성립하는지 3단계로 잠근다.
      * ① 기관 넷이 실린 insert ② 기관이 결측인 재관측 — 존재 가드가 기존 값을 지켜 다른
      * 필드도 안 바뀌므로 `Unchanged`(SQL write 자체가 없다 — 가드가 없으면 컬럼이 null 로
@@ -383,7 +383,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r2 MEDIUM-2 — `NoticeRowMerge`의 공고명 존재 가드(`title = incomingRow.title
+     * MEDIUM-2 — `NoticeRowMerge`의 공고명 존재 가드(`title = incomingRow.title
      * ?: existing.title`)가 발주기관 축과 같은 형태이지만 그 대응 test가 없었다. 같은 3단계
      * 형태로 잠근다: ① 공고명이 실린 insert ② 결측 재관측 — 존재 가드가 기존 값을 지켜
      * `Unchanged`(가드가 없으면 title 이 null 로 덮여 merged != existing 이 되어 Updated로

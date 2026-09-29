@@ -15,7 +15,7 @@ import contract.bidvector.ml.v1.ReserveDrawObservation as ProtoReserveDrawObserv
 import contract.bidvector.ml.v1.VatTreatment as ProtoVatTreatment
 
 /**
- * M4/4D-1(scope.md ①) — `bidvector.sharedkernel.Money`(다섯 성분, [Money.export]로만 나온다)
+ * scope.md ① — `bidvector.sharedkernel.Money`(다섯 성분, [Money.export]로만 나온다)
  * → 계약 `Money`. `RequestMapping.kt`에서 갈라낸 파일이다(detekt `TooManyFunctions` — 한
  * 파일에 열넷을 몰아두지 않는다). `internal` — `RequestMapping.kt`(다른 파일, 같은 모듈)가
  * [toProtoMoney]를 그대로 쓴다.
@@ -33,7 +33,7 @@ internal fun Money.toProtoMoney(): ProtoMoney {
 }
 
 /**
- * M4/4B-7(D-4B7-5) — `reserve_draw`(7). `RequestMapping.kt`에서 갈라낸 함수다(같은 이유,
+ * D-4B7-5 — `reserve_draw`(7). `RequestMapping.kt`에서 갈라낸 함수다(같은 이유,
  * 이 파일의 [toProtoMoney]를 그대로 쓴다 — 파일을 가르면서 중복은 만들지 않는다).
  * `null`이면 어댑터가 필드 자체를 안 채운다(호출부, `RequestMapping.kt` — 엔진이
  * `NO_RESERVE_DRAW`로 계수).

@@ -57,7 +57,7 @@ class PredictionValueTest {
         )
     }
 
-    // ---- verifier r1 F-5(low) — 결과 값 타입 불변식 공백(probe P11) ----
+    // ---- 결과 값 타입 불변식 공백(probe P11) ----
 
     @Test
     fun `BidRateCandidates 는 conservative 대비 base 대비 aggressive 순서를 강제한다`() {
@@ -84,7 +84,7 @@ class PredictionValueTest {
         PriceFitness(BigDecimal("-9999")).score shouldBe BigDecimal("-9999")
     }
 
-    // ---- M4/4D-3(scope.md D-4D3-1) — Weight·PredictionDiagnostics 불변식 ----
+    // ---- (scope.md D-4D3-1) — Weight·PredictionDiagnostics 불변식 ----
 
     @Test
     fun `Weight 는 0과 1 경계를 포함해 정상 생성된다`() {
@@ -120,7 +120,7 @@ class PredictionValueTest {
         diagnostics.agencySampleCount shouldBe 0
     }
 
-    // ---- M4/4B-7(D-4B7-5) — ReserveDrawObservation 불변식 ----
+    // ---- (D-4B7-5) — ReserveDrawObservation 불변식 ----
 
     private fun testBaseAmount(won: Long) =
         bidvector.sharedkernel.BaseAmount(

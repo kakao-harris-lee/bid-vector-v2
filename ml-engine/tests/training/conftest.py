@@ -1,4 +1,4 @@
-"""M5/5C-1 — 모듈 캐시 격리(`tests/adapters/conftest.py`와 같은 사유). 이 디렉터리의
+"""모듈 캐시 격리(`tests/adapters/conftest.py`와 같은 사유). 이 디렉터리의
 test 가 끝날 때마다 `ml_engine.training` 흔적을 지워 5A `test_serving_purity.py`(전역
 `sys.modules` 관측, 편집하지 않는다)가 이 slice 의 신규 test 존재와 무관하게 원래
 의미를 유지하게 한다.

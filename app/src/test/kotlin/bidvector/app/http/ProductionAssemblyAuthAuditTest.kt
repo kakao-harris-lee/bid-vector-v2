@@ -21,13 +21,13 @@ import org.testcontainers.utility.DockerImageName
 import javax.sql.DataSource
 
 /**
- * D-6A1-27 시정(verifier r1 HIGH — F-1) — 그동안 http test 넷(`OperatorAuthenticationTest`·
+ * D-6A1-27 시정 — 그동안 http test 넷(`OperatorAuthenticationTest`·
  * `RequestAuditFilterTest`·`OpenApiContractTest`·`ConstantTimeComparisonStructureTest`)이
  * 전부 [HttpTestApplication](test 전용 조립)을 띄워 필터 등록을 **다시 선언**했다.
  * `BidVectorApplication`을 부팅하는 test가 **0**이라 production 자격증명 필터 bean을
- * 삭제(9줄)해도 `./gradlew check`가 BUILD SUCCESSFUL이었다(verifier 실측).
+ * 삭제(9줄)해도 `./gradlew check`가 BUILD SUCCESSFUL일 수 있다.
  *
- * 이 test는 **`main()`과 같은 조립 호출**([bidvector.app.productionApplication] — M6/6A-2a 부터
+ * 이 test는 **`main()`과 같은 조립 호출**([bidvector.app.productionApplication] —
  * `main()`과 이 test 가 공유하는 유일한 조립 함수)로 production 조립 그 자체를
  * 부팅해 위협 모델 (a)·(c)를 잰다. 닫힘 판정(D-6A1-27 문면 그대로) — **production 필터
  * bean을 삭제했을 때 전건 `check`가 RED**인가. 더해 ⓐ production `urlPatterns`를 아무
@@ -39,7 +39,7 @@ import javax.sql.DataSource
  * scope.md「Phase 3 중 계약 정정」과 같은 이유). 같은 기법(수동 컨테이너 시작/종료,
  * `PersistenceTestSupport`와 같은 형태)을 이 파일 안에서 반복한다.
  *
- * **D-6A1-40 시정(verifier r2 레인 B HIGH) — (a)만 재고 (c)는 안 쟀다.** 위 두 test는
+ * **D-6A1-40 시정 — (a)만 재고 (c)는 안 쟀다.** 위 두 test는
  * 상태 코드·body 키만 확인해 production **audit 필터** bean을 삭제해도 전건 `check`가
  * 초록이었다(배포 앱이 audit 행 0건을 남겨도 무엇도 안 붉음). `ApiAuditStore`는
  * (2b) 「닫는다」에 따라 읽기 메서드가 없으므로(D-6A1-7, 추가 전용 불변식을 이 test가
@@ -70,16 +70,16 @@ class ProductionAssemblyAuthAuditTest {
                     .properties(
                         mapOf(
                             "server.port" to "0",
-                            // M6/6A-2a — 관리 포트 기본값(8081)을 test 가 점유하지 않는다(병렬 fork 충돌).
+                            // 관리 포트 기본값(8081)을 test 가 점유하지 않는다(병렬 fork 충돌).
                             // `0` 은 커널이 고르게 한다 — 미리 고른 번호를 닫고 다시 bind 하는
-                            // 사이의 틈(TOCTOU)을 만들지 않는다(code-review r1 LOW). 이 test 는
+                            // 사이의 틈(TOCTOU)을 만들지 않는다. 이 test 는
                             // 관리 포트를 부르지 않으므로 실제 번호를 읽을 필요가 없다.
                             "management.server.port" to "0",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                            // M6/6A-3+6F-3 D-6A3-7 — `EvaluationWiring`이 이 값 없이는 기동하지
+                            // D-6A3-7 — `EvaluationWiring`이 이 값 없이는 기동하지
                             // 않는다(기본값 없음, fail-fast). 이 test는 평가 endpoint를 부르지
                             // 않지만 production 조립 전체가 뜨려면 모든 `@ConfigurationProperties`가
                             // 바인딩돼야 한다.
@@ -145,7 +145,7 @@ class ProductionAssemblyAuthAuditTest {
             handlerMapping.handlerMethods.keys
                 .mapNotNull { it.pathPatternsCondition }
                 .flatMap { it.patterns }
-                // M6/6A-2b — 경로 변수를 가진 매핑이 생겼다(`/{sessionId}`). 패턴 문자열을 그대로
+                // 경로 변수를 가진 매핑이 생겼다(`/{sessionId}`). 패턴 문자열을 그대로
                 // URL 로 쓰면 RestTemplate 이 그것을 **템플릿**으로 보고 확장에 실패한다 — 고정
                 // 값으로 치환해 구체 경로를 만든다(어느 세션도 가리키지 않는다: 인증 경계만 잰다).
                 .map { it.patternString.replace(PATH_VARIABLE_PATTERN, "auth-probe") }

@@ -34,7 +34,7 @@ def test_preload_outcome_failure_requires_reason() -> None:
 
 
 def test_mark_ready_is_not_a_public_method() -> None:
-    """verifier r1 M-5 — `mark_ready()`(인자 없이 READY 로 만드는 메서드)는 production
+    """M-5 — `mark_ready()`(인자 없이 READY 로 만드는 메서드)는 production
     호출자가 0이라 지웠다. 상태를 READY 로 만드는 유일한 경로는 `from_preload`뿐이다."""
     gate = ReadinessGate.from_preload([PreloadOutcome(name="x", ok=True)])
     assert gate.snapshot().state is Readiness.READY

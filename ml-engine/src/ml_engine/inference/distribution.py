@@ -6,13 +6,13 @@
 이미 이식돼 있다 — 이 모듈은 legacy `_estimate_distribution`·`_resolve_posterior`가 하던
 **조립**만 새로 짠다(D-5D2-1 (b), 분포 단독 엔진).
 
-M5/5D-3(scope.md, `_workspace/m5-5d3/02_design-review.md`) — `OPEN-5D2-SAMPLE-SEGMENT`
-해소. M2/2F 가 `CompetitionSample`에 표본별 기관·공종 축(`agency_id`·`category_code`,
+(scope.md, `_workspace/m5-5d3/02_design-review.md`) — `OPEN-5D2-SAMPLE-SEGMENT`
+해소. `CompetitionSample`에 표본별 기관·공종 축(`agency_id`·`category_code`,
 `AgencyIdFact`/`CategoryCodeFact`)을 추가했다(D-2F-1). 이 조립기는 그 축을 요청 축
 (`DistributionRequest.agency`/`category`)과 **정규화 문자열 동일 매칭**(별칭 없음,
 D-5D3-1)으로 이어 3계층(발주기관/공종/전역) 수축을 서빙 경로에서 만든다. 요청 축이
 `Missing`이면 그 계층은 매칭 불가(`None`) — 표본 축이 있어도 요청을 같은 기관이라
-가정하지 않는다(D-5D3-3). 표본 축 판독은 5B `resolve_text_fact`(허용 결측 사유를
+가정하지 않는다(D-5D3-3). 표본 축 판독은 `resolve_text_fact`(허용 결측 사유를
 `{NOT_COLLECTED_YET, UNKNOWN}`로 좁힘 — 3H-2 D-3H2-3, `UNKNOWN`은 「수집했으나 원천에
 없음」)를 그대로 쓴다 — 분포 엔진 안에 두 번째 판독기를 두지
 않는다(D-5D3-6). 판독 거부는 표본 하나만 `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`로
@@ -71,7 +71,7 @@ from ml_engine.inference.scenario import build_scenario_candidates, resolve_unce
 # `UNKNOWN`(수집했으나 원천에 없음) 둘만 수용한다 — `NOT_APPLICABLE`·`UNSPECIFIED`·
 # 미지 정수는 그대로 거부. 송신 어댑터가 이 둘 밖의 사유를 지어내면 거부다(2F
 # `features.proto` 주석 「송신 어댑터는 이 둘만 싣고 수신(분포 엔진)은 그 밖을 표본
-# 거부한다」, M3/3H-2 갱신).
+# 거부한다」).
 _ALLOWED_SEGMENT_MISSING_REASONS = frozenset(
     {
         common_pb2.MISSING_REASON_NOT_COLLECTED_YET,
@@ -273,7 +273,7 @@ def _resolve_diagnostics(
     policy: InferencePolicy,
 ) -> Diagnostics:
     """`segment_support` = agency 관측 ≥1 이면 DIRECT, 아니면 category 관측 ≥1 이면
-    PARENT_CATEGORY, 아니면 GLOBAL(scope.md ②). M5/5D-3부터 `agency`·`category`는
+    PARENT_CATEGORY, 아니면 GLOBAL(scope.md ②). `agency`·`category`는
     실제 매칭 결과다(`_resolve_levels`) — 요청 축이 `Missing`이거나 매칭 표본이 없으면
     여전히 `None`이라 GLOBAL로 접힌다(D-5D3-5, 5D-2 회귀와 같은 갈래)."""
     agency_sample_count = agency.sample_count if agency is not None else 0

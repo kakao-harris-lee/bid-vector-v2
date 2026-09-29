@@ -25,16 +25,16 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 
 /**
- * M2/2D ⑧ — 2B(`BidPredictionService`)·2C(`TrainingJobService`) fake servicer 를 **같은
+ * `BidPredictionService`·`TrainingJobService` fake servicer 를 **같은
  * in-process 서버**에 함께 얹어 한 suite 로 묶는다(ADR 0010 D-8 "별도 job API, 같은 gRPC
  * 서버"의 실제 배선 가능성 증명 — 서비스 이름 충돌·등록 순서 문제가 있었다면 이 test 의
  * 서버 기동 자체가 실패했을 것이다). 각 서비스 RPC 를 한 번씩 부른다 — 개별 계약 불변식은
  * `PredictionContractTest`·`TrainingContractTest`·`EmbeddingContractTest`가 이미 상세히
  * 지킨다.
  *
- * **M2/2E — 셋째 서비스(`EmbeddingService`)를 더한다**(verifier r1 F-5 — 이전 판은
- * 「넷째」로 잘못 셌다. 이 test 가 공존시키는 서비스는 `BidPredictionService`·
- * `TrainingJobService`·`EmbeddingService` 셋뿐이다). 설계 검토 (4) 우회 (8) — 이 test 가
+ * **셋째 서비스(`EmbeddingService`)를 더한다**(이 test 가 공존시키는 서비스는
+ * `BidPredictionService`·`TrainingJobService`·`EmbeddingService` 셋뿐이다).
+ * 설계 검토 (4) 우회 (8) — 이 test 가
  * `EmbeddingService`를 안 넣으면 stub 이름 충돌이 안 잡힌다. D-2E-2(별도 서비스, release
  * 축·readiness가 `BidPredictionService`와 다르다)의 배선 가능성 증명이기도 하다.
  */

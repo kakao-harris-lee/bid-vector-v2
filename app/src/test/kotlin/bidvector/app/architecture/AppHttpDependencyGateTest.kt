@@ -55,7 +55,7 @@ class AppHttpDependencyGateTest {
     }
 
     /**
-     * 규칙 다섯을 **한 번에** 평가한다(verifier r3 L-r3-1) — `forEach { check }` 로 돌면 첫 규칙이
+     * 규칙 다섯을 **한 번에** 평가한다 — `forEach { check }` 로 돌면 첫 규칙이
      * RED 일 때 뒤 규칙의 위반이 가려져, 한 변이가 몇 개의 잠금을 지났는지 알 수 없다.
      */
     @Test
@@ -84,8 +84,8 @@ class AppHttpDependencyGateTest {
 
     /**
      * D-6A2b-26 — 대상은 **`bidvector.app` 전체**이고 면제는 계약 파일의 **정확한 이름**뿐이다
-     * (verifier r2 F-r2-1 시정 — r1 은 대상을 「핸들러 종류」로 열거했고 그 목록 밖의 진입점
-     * 셋이 SQL 을 실행했다). 게이트가 보고 있는 집합을 직접 단언한다: app 의 모든 최상위
+     * (대상을 「핸들러 종류」로 열거하면 그 목록 밖의 진입점이 SQL 을 실행할 수 있다). 게이트가
+     * 보고 있는 집합을 직접 단언한다: app 의 모든 최상위
      * 클래스에서 면제 목록을 뺀 것과 **같다**. 대상이 조용히 줄면 이 단언이 먼저 붉어진다.
      */
     @Test
@@ -138,20 +138,20 @@ class AppHttpDependencyGateTest {
         fixtureRules() mustReport ("RogueHttpSqlUser" to "java.sql")
     }
 
-    /** verifier r1 MU1 재현 — HTTP 층이 자동 구성 JDBC 클라이언트를 쥐는 형태. */
+    /** MU1 재현 — HTTP 층이 자동 구성 JDBC 클라이언트를 쥐는 형태. */
     @Test
     fun `HTTP 층의 JDBC 클라이언트 지름길을 잡는다 — MU1`() {
         fixtureRules() mustReport ("RogueHttpJdbcShortcut" to "JdbcClient")
     }
 
-    /** verifier r1 MU2b 재현 — HTTP 층 **밖** 패키지의 진짜 컨트롤러. 이전 판은 보지 못했다. */
+    /** MU2b 재현 — HTTP 층 **밖** 패키지의 진짜 컨트롤러. */
     @Test
     fun `다른 패키지의 컨트롤러가 JDBC 로 전략을 바꾸면 잡는다 — MU2b`() {
         fixtureRules() mustReport ("RogueAdminBumpController" to "JdbcClient")
     }
 
     /**
-     * verifier r1 MU2 재현(계약 ④ 의 형태) — 경계 빈을 쥔 헬퍼 자체는 경계 밖이지만,
+     * MU2 재현(계약 ④ 의 형태) — 경계 빈을 쥔 헬퍼 자체는 경계 밖이지만,
      * **컨트롤러가 그것을 참조하는 순간** 허용 목록 밖이라 걸린다.
      */
     @Test
@@ -194,7 +194,7 @@ class AppHttpDependencyGateTest {
     }
 
     /**
-     * D-6A2b-50(N-r5-1·N-r5-2·F-r5-3) — ② 층 workflow 허용 목록의 두 성질.
+     * D-6A2b-50 — ② 층 workflow 허용 목록의 두 성질.
      *
      * ① **능력 포트를 담지 않는다.** 계약 문면이 요구한 「구조 분류로 도출」이 이 단언이다 —
      * 다음 편집이 `EventSink` 를 목록에 넣는 순간 RED 다. 술어 쪽에도 같은 갈래가 서 있어
@@ -222,7 +222,7 @@ class AppHttpDependencyGateTest {
 
     /**
      * D-6A2b-49 — **범용 능력 운반 타입은 목록에 오를 수 없다.** 무엇이든 담는 그릇이라 「이 타입을
-     * 받아도 된다」가 아무것도 제한하지 않는다(verifier r5 F-r5-1 이 그 그릇으로 SQL 을 날랐다).
+     * 받아도 된다」가 아무것도 제한하지 않는다(범용 운반 타입으로 SQL 을 실행할 수 있다).
      * 예외는 계약 파일의 (클래스, 타입) 쌍뿐이고, 그 쌍도 **오늘 실재하는 주입점**이어야 한다.
      */
     @Test
@@ -258,7 +258,7 @@ class AppHttpDependencyGateTest {
     /**
      * D-6A2b-45 — 규칙마다 **영구 음성 fixture** 가 하나씩 있고, **그 규칙이** 그것을 보고한다.
      *
-     * verifier r4 F-r4-4: 규칙 넷을 항상 공집합이 되게 바꿔도 RED 는 한 건뿐이었다. production 이
+     * 규칙 넷을 항상 공집합이 되게 바꿔도 RED 는 한 건뿐이다. production 이
      * 오늘 그 규칙들을 어기지 않으니 **항진식이 되어도 조용하다**. 합쳐서 보면 다른 규칙의 위반이
      * 그 자리를 메우므로, 판정은 **규칙별로** 한다 — 어느 규칙 하나를 공집합으로 바꾸면 그 규칙의
      * 줄이 RED 다. 층 배정은 규칙마다 다르므로 규칙 값은 그대로 두고 배정만 얹는다.

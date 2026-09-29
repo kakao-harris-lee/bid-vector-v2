@@ -43,7 +43,7 @@ data class OpportunityPolicyData(
      */
     val recommendedAmountRounding: RoundingPolicy,
     /**
-     * M4/4B-7 신설(D-4B7-3) — 경쟁 표본 조회 창(일) + 상한(건). 착수 값 365일·500건은
+     * (D-4B7-3) — 경쟁 표본 조회 창(일) + 상한(건). 착수 값 365일·500건은
      * `reports/evidence/m4/4b7/policy-values.md`가 정본이고 `OPEN-4B7-POLICY-VALUES`로
      * 승인 대기다(5C/5E 실측 뒤 갱신).
      */
@@ -116,6 +116,6 @@ val OPPORTUNITY_POLICY: EffectiveDatedPolicy<OpportunityPolicyData> =
             ),
     )
 
-/** M4/4B-7 착수 값(승인 대기, `OPEN-4B7-POLICY-VALUES`) — `reports/evidence/m4/4b7/policy-values.md`. */
+/** 착수 값(승인 대기, `OPEN-4B7-POLICY-VALUES`) — `reports/evidence/m4/4b7/policy-values.md`. */
 private const val SAMPLE_WINDOW_DAYS_PLACEHOLDER = 365
 private const val MAX_SAMPLES_PLACEHOLDER = 500

@@ -60,7 +60,7 @@ class KonepsIdentifierMaskingTest {
         val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
         mapped.observation.keys shouldNotContain RawKey("opengCorpInfo")
         mapped.observation.sourceText!! shouldNotContain "opengCorpInfo"
-        // F-3·F-8(verifier r1) 수정 — masking 실패는 별도 축(maskingFailureCount)이고,
+        // F-3·F-8 — masking 실패는 별도 축(maskingFailureCount)이고,
         // unknownFieldCount(계약 밖 키 수)는 이 항목에 그런 키가 없으므로 0 이다.
         mapped.unknownFieldCount shouldBe 0
         mapped.maskingFailureCount shouldBe 1
@@ -92,8 +92,8 @@ class KonepsIdentifierMaskingTest {
         mapped.observation.sourceText!! shouldNotContain "1234567890"
         val nameContract = POLICY.fieldContracts.contractFor(RawKey("bidwinnrNm"))!!
         mapped.observation.valueOf(nameContract) shouldBe "SYN-CORP"
-        // F-3(verifier r1) 수정 — allow-list 가 떨어뜨린 계약 밖 키(bidwinnrBizno) 1개가
-        // 이제 unknownFieldCount 로 관측된다(이전 판은 0 이었다 — §5.3 규율 1 이 무력).
+        // F-3 — allow-list 가 떨어뜨린 계약 밖 키(bidwinnrBizno) 1개가
+        // 이제 unknownFieldCount 로 관측된다.
         mapped.unknownFieldCount shouldBe 1
         mapped.maskingFailureCount shouldBe 0
     }

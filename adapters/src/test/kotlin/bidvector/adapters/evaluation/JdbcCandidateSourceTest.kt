@@ -104,7 +104,7 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
     }
 
     /**
-     * D-6F2-9 ① 거동 등식(verifier r1 HIGH-1 수정) — `NoticeStatus.entries` **전 값**을 DB에
+     * D-6F2-9 ① 거동 등식 — `NoticeStatus.entries` **전 값**을 DB에
      * 심고, 스캔 결과 집합이 `isBiddable`이 참인 집합과 같은지를 잰다. 기대 집합은 손으로
      * 적지 않고 `isBiddable`을 걸러 산출한다 — `NoticeStatus`에 값이 늘면 표본·기대 둘 다
      * 같이 는다. 이 DB 왕복 test는 「스캔이 실제로 낸 값」을 재므로 SQL이 `biddableStatuses()`
@@ -170,7 +170,7 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r1 MEDIUM-1 — 기존 순서 test 넷은 표본의 `round`가 전부 `"000"`이라
+     * 기존 순서 test 넷은 표본의 `round`가 전부 `"000"`이라
      * `notice_round ASC` 타이브레이커를 재지 못했다(그 축을 빼도 9건이 초록이었다). 같은
      * 공고번호·같은 마감·다른 차수 표본으로 그 축만 따로 잠근다.
      */
@@ -183,7 +183,7 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
         source().openCandidates().map { it.id } shouldBe listOf(earlier, later)
     }
 
-    /** verifier r1 LOW-1 — 잘못된 배선(`cap <= 0`)은 DB 오류가 아니라 생성자에서 즉시 거부된다. */
+    /** 잘못된 배선(`cap <= 0`)은 DB 오류가 아니라 생성자에서 즉시 거부된다. */
     @Test
     fun `cap 이 0 이하이면 생성자가 거부한다`() {
         shouldThrow<IllegalArgumentException> { JdbcCandidateSource(dataSource(), clock, cap = 0) }

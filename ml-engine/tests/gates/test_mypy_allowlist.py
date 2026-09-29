@@ -1,4 +1,4 @@
-"""M5/5A 게이트 — `[[tool.mypy.overrides]]` 각 항목에 `# reason:`·`# resolve:` 주석이
+"""게이트 — `[[tool.mypy.overrides]]` 각 항목에 `# reason:`·`# resolve:` 주석이
 있는지 확인한다(D-5A-2 — 사유·해소 계획 없는 strict 예외 금지, 설계 검토 (1) 「strict」)."""
 
 from __future__ import annotations

@@ -8,7 +8,7 @@ import org.springframework.boot.context.TypeExcludeFilter
 import org.springframework.context.annotation.ComponentScan
 
 /**
- * `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` 폐쇄 판정(M6/6A-2b D-6A2b-9). 명시
+ * `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` 폐쇄 판정(D-6A2b-9). 명시
  * `@ComponentScan` 은 `@SpringBootApplication` 의 메타 선언을 **대체**하므로, 6A-1 이
  * 중첩 조립을 빼려고 그 애너테이션을 붙이면서 Boot 기본 필터 둘이 함께 사라졌다.
  *

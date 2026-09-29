@@ -5,7 +5,7 @@ import bidvector.procurement.ResultCodeCategory
 
 /**
  * KONEPS 응답 envelope 판정(③, D-3B-7) — `resultCode` 분류에 따라 갈린다. **범주표는 3A
- * `KONEPS_COLLECTION_POLICY.resultCodeCategories`(§3, 운영자 승인 2026-09-07 P-4)를 읽기만
+ * `KONEPS_COLLECTION_POLICY.resultCodeCategories`(§3, P-4)를 읽기만
  * 한다 — 3B 가 재선언하지 않는다.**
  */
 internal sealed interface KonepsEnvelopeOutcome {

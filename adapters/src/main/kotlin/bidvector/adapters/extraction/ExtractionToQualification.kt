@@ -21,12 +21,12 @@ import bidvector.qualification.RequirementSourceField
  * 「나머지 → RequirementUnparsable」은 실제 `RequirementRow.Unparsable` 행이 있어야
  * 나오는 값이라 행 단위 사유에만 쓴다 — 문서 전체 실패에 그 행을 지어내지 않는다).
  *
- * **판단이 갈린 지점(verifier r1 판단 셋 (3), 근거 정정 L-5)**: 모델이 "요건 없음"이라고
+ * **판단이 갈린 지점**: 모델이 "요건 없음"이라고
  * 명시한 [ExtractedRequirements.assertedAbsent]도 `CollectionFailed`로 접는다(scope.md
- * ⑦의 "RequirementUnparsable" 문면과 다르다). **정정**: `Collected(emptyList())`를
+ * ⑦의 "RequirementUnparsable" 문면과 다르다). `Collected(emptyList())`를
  * 그대로 뒀어도 1C `LicenseEligibility.judgeCollected`가 내는 `RequirementDataAbsent`는
- * `LicenseVerdict.Uncertain`의 한 **사유**이지 자격 「없음」의 **확정**이 아니다 — 그러니
- * "확정된 없음이 되어 버린다"는 이전 서술은 부정확했다. 실제 이유는 둘이다: (a)
+ * `LicenseVerdict.Uncertain`의 한 **사유**이지 자격 「없음」의 **확정**이 아니다. 실제
+ * 이유는 둘이다: (a)
  * `RequirementUnparsable`에 닿으려면 실재하지 않는 자리표시 `LmtSno`로 가짜
  * `Unparsable` 행을 지어내야 한다(§(3)이 경계한 안티패턴) (b) `RequirementDataAbsent`와
  * `CollectionFailed`(→ `Uncertain(CollectionFailed)`) 둘 다 이미 `Uncertain`이라 자격

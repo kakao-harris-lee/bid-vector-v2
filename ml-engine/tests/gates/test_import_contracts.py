@@ -1,11 +1,11 @@
-"""M5/5A 게이트 — import-linter 실제 계약 실행 + 양성 대조(설계 검토 (5)-2, RED 목록 1번,
-verifier r1 F-1 수정 포함).
+"""게이트 — import-linter 실제 계약 실행 + 양성 대조(설계 검토 (5)-2, RED 목록 1번,
+F-1 수정 포함).
 
 `tests/gates/fixtures/bad_serving/`·`bad_contracts_bypass/`(둘 다 독립 미니 프로젝트, 각자
 `pyproject.toml`)가 **실제로 실패**함을 증명한다 — 계약이 문서에만 있고 아무것도 안 거르는
 상태가 아님을 실행으로 확인한다(우회 (1)·(7) 방어). `good_serving/`은 그 반대 방향(F-1) —
 승인 통로의 **간접** 연쇄가 실제로 열려 있는지 증명한다. 「막아야 할 것이 막힘」과 「열어야
-할 것이 열림」을 짝으로 둔다(M4/4D-1 init≠gate 교훈과 같은 축).
+할 것이 열림」을 짝으로 둔다(init≠gate 교훈과 같은 축).
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def test_bad_contracts_bypass_fixture_is_broken_by_lint_imports() -> None:
 
 
 def test_good_serving_fixture_approved_indirect_path_passes() -> None:
-    """verifier r1 F-1 — 승인 통로(`from ml_engine.contracts import common_pb2`)를 쓰는
+    """F-1 — 승인 통로(`from ml_engine.contracts import common_pb2`)를 쓰는
     `serving`이 `contracts`를 거쳐 간접적으로 `bidvector`에 닿아도 KEPT 여야 한다."""
     result = _run_lint_imports(_FIXTURES_ROOT / "good_serving")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -64,8 +64,8 @@ def test_good_serving_fixture_approved_indirect_path_passes() -> None:
 
 
 def _read_features_forbidden_contract() -> dict[str, object]:
-    """실제 `pyproject.toml`에서 `features`→DB/HTTP forbidden 계약 하나를 읽는다(verifier
-    r1 H-3 — 이 함수가 실패하면 아래 두 test 가 **먼저** 이 자리에서 붉어진다, 실제 계약이
+    """실제 `pyproject.toml`에서 `features`→DB/HTTP forbidden 계약 하나를 읽는다(
+    H-3 — 이 함수가 실패하면 아래 두 test 가 **먼저** 이 자리에서 붉어진다, 실제 계약이
     지워졌을 때 양성 대조가 그 사실과 무관하게 계속 통과하는 것을 막는다)."""
     data = tomllib.loads(
         (_ML_ENGINE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -105,7 +105,7 @@ def _render_contract_block(contract: dict[str, object]) -> str:
 
 
 def test_real_pyproject_has_features_forbidden_contract() -> None:
-    """verifier r1 H-3(a) — 5A `test_forbidden_contract_forbids_bidvector_with_indirect_imports_allowed`
+    """H-3(a) — `test_forbidden_contract_forbids_bidvector_with_indirect_imports_allowed`
     와 같은 패턴. 실제 계약의 존재·형태를 tomllib 로 직접 단언한다(⑫, D-5C-13)."""
     contract = _read_features_forbidden_contract()
     for expected_source in (
@@ -129,7 +129,7 @@ def test_real_pyproject_has_features_forbidden_contract() -> None:
 
 
 def test_bad_features_db_fixture_is_broken_by_lint_imports() -> None:
-    """M5/5C-1 ⑫(D-5C-13, verifier r1 H-3(b)) — `bad_features_db/`의 checked-in
+    """D-5C-13, H-3(b) — `bad_features_db/`의 checked-in
     `pyproject.toml`은 계약을 갖지 않는다(스캐폴드뿐). 이 test 가 실제 `pyproject.toml`에서
     계약을 읽어 **임시 사본**에 덧쓴 뒤 실행한다 — 실제 계약을 지우면
     `_read_features_forbidden_contract`의 assert 에서 이 test 부터 먼저 붉어진다(위 (a)와
@@ -157,7 +157,7 @@ def test_forbidden_contract_forbids_bidvector_with_indirect_imports_allowed() ->
     assert matching, "bidvector 를 막는 forbidden 계약이 pyproject.toml 에 없다"
     contract = matching[0]
     assert contract["allow_indirect_imports"] is True
-    # verifier r1 F-2 — `_generated`는 이제 열거 대상이 아니다(패키지 트리 밖이라 그 이름의
+    # F-2 — `_generated`는 이제 열거 대상이 아니다(패키지 트리 밖이라 그 이름의
     # import 경로 자체가 없다, test_generated_not_tracked.py가 구조적 폐쇄를 확인한다).
     assert "ml_engine.contracts._generated" not in contract["forbidden_modules"]
     assert "ml_engine.contracts" not in contract["source_modules"]

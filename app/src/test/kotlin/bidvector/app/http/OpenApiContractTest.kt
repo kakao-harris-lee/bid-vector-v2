@@ -234,8 +234,8 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * D-6A1-32 — 계약(`responses.500`)에 적힌 상태를 실제로 대조한다. 이전 판은 500을
-     * `RequestAuditFilterTest`가 code/message만 개별 확인하고 계약 대조 경로에는 없었다
+     * D-6A1-32 — 계약(`responses.500`)에 적힌 상태를 실제로 대조한다. 500을
+     * `RequestAuditFilterTest`가 code/message만 개별 확인하면 계약 대조 경로에는 없다
      * (D-6A1-8 단일 출처의 구멍). `InvalidStoredStrategyException` 전용 분기를 때려
      * `ErrorMapping`의 매핑표 두 번째 분기(기본 분기가 아니다)를 실제로 지난다.
      */

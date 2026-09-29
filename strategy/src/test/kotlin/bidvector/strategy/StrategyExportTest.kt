@@ -48,7 +48,7 @@ private fun fullyPopulatedDraft(): StrategyDraft =
     )
 
 /**
- * M6/6A-2b D-6A2b-22(code-review r1 MEDIUM-4) — `toDraft()` 의 **전수성**을 게이트에 건다.
+ * D-6A2b-22 — `toDraft()` 의 **전수성**을 게이트에 건다.
  *
  * 이 함수는 편집의 안전장치다: 필드 하나를 바꾸는 요청이 **나머지 필드를 현재 값 그대로**
  * 싣게 한다. 한 필드를 빠뜨리면 그 필드는 편집할 때마다 조용히 기본값(대개 `null`)으로

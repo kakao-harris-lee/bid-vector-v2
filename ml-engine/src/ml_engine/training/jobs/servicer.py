@@ -183,7 +183,7 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
                 outcome.record.job_id, dataset_ref, self._pipeline_factory(spec)
             )
             if isinstance(submit_result, TransitionRejected):
-                # verifier r2 R2-1 — CancelTrainingJob 이 이 START 전이보다 먼저
+                # R2-1 — CancelTrainingJob 이 이 START 전이보다 먼저
                 # 커밋된 경합(다른 writer 가 이미 종료 상태로 옮김). outcome.record
                 # 는 start_or_reuse 시점의 스냅샷(ACCEPTED)이라 그대로 쓰면 거짓
                 # 응답이 된다 — store 를 다시 읽어 실제 최신 상태로 응답한다.
@@ -226,7 +226,7 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
     def _validate_get_or_cancel(
         envelope: training_pb2.RequestEnvelope, job_id: str
     ) -> _ValidationDetailCode | None:
-        """verifier r1 H-3 — `GetTrainingJob`·`CancelTrainingJob`도 `RequestEnvelope`
+        """H-3 — `GetTrainingJob`·`CancelTrainingJob`도 `RequestEnvelope`
         를 검증한다(`common.proto` 「모든 RPC의 필수 봉투」, 설계 검토 (5) 7). 빈
         `job_id`는 구조적으로 무효한 요청이라 `JOB_NOT_FOUND`가 아니라
         `INVALID_REQUEST(JOB_ID_EMPTY)`다 — 미지 job_id(유효한 형식이지만 없음)와

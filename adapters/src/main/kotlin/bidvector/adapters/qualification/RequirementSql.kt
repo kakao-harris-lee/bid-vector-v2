@@ -2,9 +2,9 @@ package bidvector.adapters.qualification
 
 /**
  * 자격 요건 영속 SQL 문자열 상수(3D `Sql.kt` 관례 — mapper/adapter 코드와 분리, sizeGate) —
- * `bidvector.adapters.event.EventSql`와 같은 이유·같은 전례다. M6/6F-5-a·6F-6 병합 뒤 두
+ * `bidvector.adapters.event.EventSql`와 같은 이유·같은 전례다. 6F-5-a·6F-6 병합 뒤 두
  * slice가 각자 정당하게 `persistence.Sql`에 더한 상수의 합이 타입 멤버 31개가 되어(각자는
- * 30개 한도 안이었다, OPEN-ADR-06 (a)) 이 slice(6F-5-a) 몫 여섯을 떼어냈다 — `persistence
+ * 30개 한도 안이었다, OPEN-ADR-06 (a)) 이 slice 몫 여섯을 떼어냈다 — `persistence
  * .Sql`은 6F-6의 `PROFILE_*` 상수를 포함해 그대로 둔다(남의 몫을 옮기지 않는다).
  *
  * D-6F5-4 — `JdbcRequirementStore.save()`는 매번 헤더를 upsert하고 행을 통째로 교체한다

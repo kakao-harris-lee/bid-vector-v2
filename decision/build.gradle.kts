@@ -2,9 +2,9 @@ plugins {
     id("bidvector.kotlin-conventions")
 }
 
-// M1/1D — decision 은 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
+// decision 은 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
 // architecture-policy.properties layer.domain.shareable). qualification/build.gradle.kts
-// 와 같은 배선이다(scout §4.4 — 1C 배관을 그대로 옮길 수 있다).
+// 와 같은 배선이다(scout §4.4 — 배관을 그대로 옮길 수 있다).
 //
 // kotest-property 의 checkAll 은 suspend 함수다 — qualification 과 같은 이유로 이 모듈도
 // coroutines-core 를 직접 건다(kotest-property-jvm 은 runtime scope 로만 선언해 컴파일

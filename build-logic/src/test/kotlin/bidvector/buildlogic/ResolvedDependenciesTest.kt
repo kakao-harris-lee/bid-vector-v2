@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 
 /**
  * `resolveDependencies`의 분류 — composite 치환 의존(다른 build 의 project)이 같은 build 의
- * project 의존과 섞이지 않는지가 요점이다(M2/2A 리뷰 r3 ⓕ). `adapters`의
+ * project 의존과 섞이지 않는지가 요점이다. `adapters`의
  * `testImplementation("bidvector:ml-contract")`가 해석되면 그 component 의 `id`는
  * `ProjectComponentIdentifier`이지만 **다른 build**(`ml-contract` included build)에 속한다 —
  * `id` 타입만 보고 전부 `projectPaths`로 접으면 이 좌표가 `ModuleDependencyPolicy`의 업무

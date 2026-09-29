@@ -57,7 +57,7 @@ private fun strategyOf(
 ): OperatorStrategy = (validate(draft, StrategyRevision(revision), racePolicy()) as StrategyValidation.Valid).strategy
 
 /**
- * **읽기 사이에 다른 커밋을 끼우는** 저장소 — verifier r2 F-r2-3 의 결정적 재현이다.
+ * **읽기 사이에 다른 커밋을 끼우는** 저장소 — 경합을 결정적으로 재현한다.
  * 실 DB 의 READ COMMITTED 창을 흉내내기 위해 「N 번째 `load()` 직후 값이 바뀐다」로 고정한다
  * (시간에 기대지 않는다 — 경합 test 가 flaky 해지는 흔한 이유를 피한다).
  */
@@ -128,7 +128,7 @@ private class DirectStrategyEditTransaction(
 /**
  * D-6A2b-28 회귀 — **기준 revision 은 draft 를 만든 그 읽기에서 온다.**
  *
- * verifier r2 F-r2-3: 실행기가 전략을 한 번 읽어 draft 를 만들고, use case 가 **다시** 읽어
+ * 실행기가 전략을 한 번 읽어 draft 를 만들고, use case 가 **다시** 읽어
  * 그 값의 revision 을 기준으로 심었다. 두 읽기 사이에 다른 커밋이 끼면 기준은 새 revision 이
  * 되고 draft 는 낡은 값이라, 확인이 통과하며 앞 세션의 변경이 409 없이 사라졌다.
  */

@@ -26,9 +26,9 @@ import java.time.Instant
 
 /**
  * S-2, 층 B(V4~V6 마이그레이션 + repository 매핑) — `opening_reserve_price` 자식 표와
- * `opening_result` 신규 fact 슬롯의 통합 test. §1.9.7 실측 정정(팀리드, 8건 23행 표본)이
+ * `opening_result` 신규 fact 슬롯의 통합 test. §1.9.7 실측 정정(8건 23행 표본)이
  * 겨눈 두 시나리오(단수 예가 · 복수예비가격 15행)와 D-3E-3 (a)·D-3E-1b (a)·bypass #4·#6,
- * verifier r1 H-1·H-2·M-1을 여기서 고정한다.
+ * H-1·H-2·M-1을 여기서 고정한다.
  */
 class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
     private val id = NoticeId(NoticeNumber.of("RSV-20260908-001"), NoticeRound.of("000"))
@@ -71,7 +71,7 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
 
     /**
      * 귀결 1 test ① — 총예가건수 1(단수 예가) + 순번 공백 응답은 자식 행 0개를 낳지만,
-     * §1.9.7 정정으로 예정가격·기초금액은 부모 슬롯이라 저장된다. 3B-2
+     * §1.9.7 정정으로 예정가격·기초금액은 부모 슬롯이라 저장된다.
      * `rowIdentifierIndeterminate` 회계(별도 층, 이 slice가 다시 만들지 않는다)가 승격 불가
      * 건수를 이미 센다 — 여기서는 저장 층이 부모 값을 잃지 않는 것만 증명한다.
      */
@@ -126,10 +126,10 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * 귀결 1 test ③(verifier r1 L-7 뒤 정정) — 부모 값이 행마다 반복돼 응답에 실려도 부모
-     * 행은 정확히 하나다. **이전 판은 `PersistOutcome.Inserted`만 쟀는데, 그것은 이름이
-     * 주장하는 「부모 upsert 실행 1회」를 재지 않는다**(outcome은 upsert 결과 종류일 뿐 실행
-     * 횟수의 증거가 아니다). 지금은 `opening_result` 행 수를 직접 세어 정확히 1임을 잰다 —
+     * 귀결 1 test ③ — 부모 값이 행마다 반복돼 응답에 실려도 부모
+     * 행은 정확히 하나다. **`PersistOutcome.Inserted`만으로는 이름이
+     * 주장하는 「부모 upsert 실행 1회」를 재지 못한다**(outcome은 upsert 결과 종류일 뿐 실행
+     * 횟수의 증거가 아니다). 그래서 `opening_result` 행 수를 직접 세어 정확히 1임을 잰다 —
      * 자식 15개를 반복 삽입해도 부모 표에 중복 행이 생기지 않는다는 것을 실제로 증명한다.
      */
     @Test
@@ -148,8 +148,8 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
 
     /**
      * D-3E-3 (a) — 15행 뒤 12행만 오는 재수집(사라진 3행)은 기존 행을 지우지 않는다. 사라진
-     * 순번(013·014·015)은 이번 응답에 없었을 뿐 표에는 그대로 남는다. **verifier r1 H-2 뒤
-     * 추가** — 남은 행이 「조용히 낡지」 않는다는 것도 함께 잰다: 사라진 3행의 `observedAt`은
+     * 순번(013·014·015)은 이번 응답에 없었을 뿐 표에는 그대로 남는다.
+     * 남은 행이 「조용히 낡지」 않는다는 것도 함께 잰다: 사라진 3행의 `observedAt`은
      * 첫 관측 시각 그대로이고, 갱신된 12행의 `observedAt`보다 이르다 — 소비자가 그 시각
      * 비교만으로 「이번 관측에 없었다」를 판정할 수 있다(파생 플래그를 저장하지 않는다).
      */
@@ -236,11 +236,11 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r2 N-1 — DB CHECK와 Kotlin `String.isNotBlank()`가 **같은 입력 집합에 같은
+     * N-1 — DB CHECK와 Kotlin `String.isNotBlank()`가 **같은 입력 집합에 같은
      * 답**을 낸다. Kotlin `Char.isWhitespace()`는 `Character.isWhitespace()` OR
      * `Character.isSpaceChar()`의 합집합이라 ASCII 공백·탭·개행뿐 아니라 NBSP(U+00A0)·전각
      * 공백(U+3000) 같은 유니코드 공백 분리자도 「공백」으로 본다 — `btrim()`(ASCII 공백만)은
-     * 그 부분집합만 막아 결함이었다(M-1). 최소 입력 집합(팀리드 지정): 앞 일곱은 거부, 뒤
+     * 그 부분집합만 막아 결함이었다(M-1). 최소 입력 집합: 앞 일곱은 거부, 뒤
      * 둘은 허용.
      */
     @Test
@@ -346,7 +346,7 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r1 H-1 — canonical 왕복이 provenance 를 지어내지 않는다. `Undeclared`(비권위)로
+     * canonical 왕복이 provenance 를 지어내지 않는다. `Undeclared`(비권위)로
      * 저장한 값이 `Published`(권위)로 복원되면 권위가 조용히 오른다 — 셋(최종낙찰금액·
      * 예정가격·기초금액) 전부를 확인한다.
      */

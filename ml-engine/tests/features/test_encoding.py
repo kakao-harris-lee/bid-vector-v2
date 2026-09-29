@@ -1,6 +1,6 @@
 """RED — `ml_engine.features.encoding`(D-5B-6·D-5B-7). 2단 pseudo-count 수축,
 `MappingProxyType` 봉인, `category_sample_count` 유도, κ 필수 인자(기본값 없음),
-관측 0 은 결과 타입 `NoObservations`(verifier r1 M-2)."""
+관측 0 은 결과 타입 `NoObservations`(M-2)."""
 
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ def test_category_sample_count_sums_across_agencies() -> None:
 def test_build_agency_target_encoding_empty_observations_is_no_observations_result() -> (
     None
 ):
-    """verifier r1 M-2 — 관측 0 은 `global_mean=0.0`인 표를 조용히 내지 않고 결과 타입으로
+    """M-2 — 관측 0 은 `global_mean=0.0`인 표를 조용히 내지 않고 결과 타입으로
     구별한다(「낙찰률 0%」와 「학습 데이터 없음」을 갈라야 한다)."""
     outcome = build_agency_target_encoding([], policy=_POLICY)
     assert outcome == NoObservations()

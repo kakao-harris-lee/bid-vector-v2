@@ -26,7 +26,7 @@ import contract.bidvector.ml.v1.OptimizationObjective as ProtoOptimizationObject
 import contract.bidvector.ml.v1.Rate as ProtoRate
 
 /**
- * M4/4D-1(scope.md ①) — 도메인 [BidPredictionRequest] → `CalculateOptimalBidRequest`(2B 계약
+ * scope.md ① — 도메인 [BidPredictionRequest] → `CalculateOptimalBidRequest`(2B 계약
  * DTO). 자유 `String`은 만들지 않는다 — 값이 없으면 `MissingReason.UNKNOWN`으로 「모른다」를
  * 정직하게 싣는다(fact 가 결측 사유 없이 접히지 않는다, features.proto 관례). `Money`(공통)
  * 축 변환(`Currency`·`Basis`·`VatTreatment`·`Provenance`)은 `MoneyMapping.kt`에 있다
@@ -97,20 +97,20 @@ private fun CompetitionSample.toProto(): ProtoCompetitionSample {
 }
 
 /**
- * M3/3H-2(D-3H2-2) — 표본 축 `agency_id` 결측 사유는 이제 대상 공고 축([toAgencyIdFact])과
- * 같은 `UNKNOWN`이다. M2/2F 시점에는 `NOT_COLLECTED_YET`(수집 전이라 값이 없다) 하나였지만,
- * 3H-1 뒤로는 수요기관 코드가 실제로 수집되는데도 원천 문서에 코드 자체가 없는 공고가 있어
- * "수집 전"이 더 이상 참이 아니다(`OPEN-3H-AGENCY-BACKFILL`). 「수집 전」과 「원천에 없음」을
+ * D-3H2-2 — 표본 축 `agency_id` 결측 사유는 대상 공고 축([toAgencyIdFact])과
+ * 같은 `UNKNOWN`이다. 수요기관 코드가 실제로 수집되는데도 원천 문서에 코드 자체가 없는
+ * 공고가 있어 `NOT_COLLECTED_YET`(수집 전이라 값이 없다) 하나로는 부족하다
+ * (`OPEN-3H-AGENCY-BACKFILL`). 「수집 전」과 「원천에 없음」을
  * 구별하는 컬럼을 새로 두지 않기로 했으므로(D-3H2-2 — 백필은 값을 채울 뿐 사유를 바꾸지
- * 않는다) 두 축이 갈릴 이유가 사라져 [toAgencyIdFact]에 위임한다. `categoryCode`
- * ([toSampleCategoryCodeFact], M2/2F)는 이 slice가 건드리지 않는다 — 여전히
+ * 않는다) 두 축이 갈릴 이유가 없어 [toAgencyIdFact]에 위임한다. `categoryCode`
+ * ([toSampleCategoryCodeFact])는 이 slice가 건드리지 않는다 — 여전히
  * `NOT_COLLECTED_YET` 하나뿐이다.
  */
 private fun AgencyId?.toSampleAgencyIdFact(): AgencyIdFact = toAgencyIdFact()
 
 /**
- * M2/2F 규약 그대로 — `CategoryCode`(procurement, 표본 축)는 M3/3H-2가 건드리지 않는다.
- * [toSampleAgencyIdFact]와 결측 사유가 이제 다르다(이쪽은 `NOT_COLLECTED_YET` 유지) — 공종
+ * 기존 규약 그대로 — `CategoryCode`(procurement, 표본 축)는 건드리지 않는다.
+ * [toSampleAgencyIdFact]와 결측 사유가 다르다(이쪽은 `NOT_COLLECTED_YET` 유지) — 공종
  * 축은 아직 「원천에 없음」과 「수집 전」을 구별할 필요가 제기되지 않았다.
  */
 private fun CategoryCode?.toSampleCategoryCodeFact(): CategoryCodeFact =

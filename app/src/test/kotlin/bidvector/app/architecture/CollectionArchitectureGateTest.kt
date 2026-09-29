@@ -15,7 +15,7 @@ import org.junit.jupiter.api.TestInstance
 import java.time.LocalDate
 
 /**
- * M6/6F-8 수집 배선 게이트의 **양성** 쪽 — production 바이트코드가 규칙을 지킨다. 규칙과 허용 집합은
+ * 수집 배선 게이트의 **양성** 쪽 — production 바이트코드가 규칙을 지킨다. 규칙과 허용 집합은
  * [CollectionArchitectureRules]·`architecture-policy.properties` 가 갖는다(음성 쪽은
  * `CollectionArchitectureGateCatchesViolationsTest`).
  */

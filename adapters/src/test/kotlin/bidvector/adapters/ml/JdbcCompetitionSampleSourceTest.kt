@@ -42,7 +42,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 /**
- * [JdbcCompetitionSampleSource](M4/4B-7, D-4B7-3) — 창·상한·최신 순·대상 제외·공종 일치·
+ * [JdbcCompetitionSampleSource](D-4B7-3) — 창·상한·최신 순·대상 제외·공종 일치·
  * 개찰일 결측 행 포함 여부(초과 집합이라 포함 — 자격은 `SampleEligibility`가 거른다)를 잰다.
  * 기존 repository test 관례(Testcontainers PostgreSQL, `PersistenceTestSupport`)를 그대로
  * 쓴다. `adapters.ml` 패키지에 있는 이유는 `JdbcCompetitionSampleSource.kt` KDoc 참고
@@ -64,7 +64,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
     private fun query(
         windowDays: Int = 365,
         limit: Int = 500,
-        // M4/4B-8(D-4B8-4) — 정규화 일치 test 용(기본값은 기존 fixture와 바이트 동일).
+        // (D-4B8-4) — 정규화 일치 test 용(기본값은 기존 fixture와 바이트 동일).
         categoryCode: String = category,
     ): CompetitionSampleQuery = CompetitionSampleQuery(CategoryCode.of(categoryCode), targetId, asOf, windowDays, limit)
 
@@ -182,7 +182,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         supply.excluded shouldBe emptyMap()
     }
 
-    /** verifier r1 F-6 — 술어는 `<`(엄격 미만)다. `actual_opening_at == asOf`는 제외돼야 한다. */
+    /** 술어는 `<`(엄격 미만)다. `actual_opening_at == asOf`는 제외돼야 한다. */
     @Test
     fun `개찰일이 asOf 와 정확히 같으면 제외된다 — 경계값`() {
         seedCandidate("SAMPLE-BOUNDARY-EQ-001", actualOpeningAt = asOf)
@@ -193,7 +193,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         supply.excluded shouldBe emptyMap()
     }
 
-    /** verifier r1 F-6 — 창 하한 술어는 `>=`(포함)다. `actual_opening_at == asOf - windowDays`는 포함돼야 한다. */
+    /** 창 하한 술어는 `>=`(포함)다. `actual_opening_at == asOf - windowDays`는 포함돼야 한다. */
     @Test
     fun `개찰일이 창 하한과 정확히 같으면 포함된다 — 경계값`() {
         val windowDays = 30
@@ -237,9 +237,9 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r1 F-1 — 이전 판은 두 후보를 같은 Asia/Seoul 날짜(같은 시각대의 `-3600s`·
-     * `-7200s`)로 심어 `openedOn`(유일하게 식별 가능한 축) 으로 정렬을 구별할 수 없었다
-     * (`ORDER BY … DESC` → `ASC` 변이가 살아남았다, 리포트 「변이 실측」). 후보 셋을 **서로
+     * 두 후보를 같은 Asia/Seoul 날짜(같은 시각대의 `-3600s`·
+     * `-7200s`)로 심으면 `openedOn`(유일하게 식별 가능한 축) 으로 정렬을 구별할 수 없다
+     * (`ORDER BY … DESC` → `ASC` 변이가 살아남는다). 후보 셋을 **서로
      * 다른 날짜**(1·2·3일 전)로 심고, `NULLS LAST` 후보(개찰일 결측)도 함께 심어 상한을
      * 먼저 먹지 않는지 대조한다 — 상한 2에 유효 날짜 후보 3 + 결측 1이면, DESC 정렬은
      * 가장 최근 둘(1일 전·2일 전)만 낸다.
@@ -275,7 +275,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r1 F-3 — 합계 불변식 `samples.size + excluded.values.sum() == 후보 수`.
+     * 합계 불변식 `samples.size + excluded.values.sum() == 후보 수`.
      * `VanishingNoticeRepository`로 스캔(SQL)과 복원(`find`) 사이에 행 하나가 사라지는
      * 상황을 흉내 낸다 — 실제 삭제 경로는 이 저장소에 없지만, `candidatePair`의 `null`
      * 분기가 조용히 사라지지 않고 `CANDIDATE_VANISHED`로 계수되는지는 이렇게만 잴 수 있다.

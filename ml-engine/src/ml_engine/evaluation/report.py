@@ -93,7 +93,7 @@ class WindowResult:
     coverage: tuple[CoverageSplit, ...]
     unlearned_baseline_cells: tuple[UnlearnedCell, ...]
     dropped_rows: tuple[DroppedRowCount, ...]
-    """창 안 구조적 행 중 buildability 로 버려진 행(verifier r1 H-1) —
+    """창 안 구조적 행 중 buildability 로 버려진 행(H-1) —
     `gate_test_row_count`(채점된 행)와 합치면 창의 구조적 행 수가 된다."""
     outcome: GateOutcome
     stability: StabilitySummary
@@ -318,9 +318,9 @@ def _window_result_json(window: WindowResult) -> _JsonValue:
 
 
 def _window_exclusion_json(exclusion: WindowExclusion) -> _JsonValue:
-    """verifier r3 MEDIUM M-1r(잔존) — `buildable_row_count`/`dropped_rows`가
-    dataclass 에는 있었으나 여기서 직렬화되지 않아 canonical JSON/checksum 에서
-    공시가 사라졌었다(서로 다른 buildable 수의 실행이 같은 checksum 을 냄).
+    """M-1r(잔존) — `buildable_row_count`/`dropped_rows`가
+    dataclass 에는 있지만 여기서 직렬화하지 않으면 canonical JSON/checksum 에서
+    공시가 사라진다(서로 다른 buildable 수의 실행이 같은 checksum 을 낸다).
     계획 단계 제외는 두 값이 `None`/`()` 그대로 실려 「몰라서 비었다」가 JSON 에서도
     구별된다."""
     window = exclusion.window

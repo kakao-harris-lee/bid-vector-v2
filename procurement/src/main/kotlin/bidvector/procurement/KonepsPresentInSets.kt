@@ -2,7 +2,7 @@ package bidvector.procurement
 
 /**
  * 공용 `presentIn` 집합 — `CollectionPolicy.kt`에서 분리한 파일이다(sizeGate 500줄,
- * v2-지침서 §5 — M3/3H-1 발주기관 넷 추가로 그 파일이 한도를 넘겨 이 상수를 옮겼다.
+ * v2-지침서 §5 — 발주기관 넷 추가로 그 파일이 한도를 넘겨 이 상수를 옮겼다.
  * `KonepsOpeningCompleteFieldContracts.kt` 분리와 같은 전례). `internal`(`private`에서
  * 완화) — 같은 모듈의 `CollectionPolicy.kt`가 소비한다.
  *

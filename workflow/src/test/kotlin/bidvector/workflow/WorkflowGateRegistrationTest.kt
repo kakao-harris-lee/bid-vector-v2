@@ -7,7 +7,7 @@ import java.io.File
 import java.util.Properties
 
 /**
- * 운영자 결정 2026-09-11 (a) — `workflow` 패키지 전체의 게이트 등재 완전성. `adapters`의
+ * 운영자 결정 (a) — `workflow` 패키지 전체의 게이트 등재 완전성. `adapters`의
  * `MlGateRegistrationTest`·`EventGateRegistrationTest`는 패키지 하나(`listFiles`, 재귀
  * 아님)만 훑고 단방향(누락만)만 잰다. `workflow`는 하위 패키지 다섯
  * (`evaluation`·`event`·`notification`·`prediction`·`strategy`)에 걸쳐 있어 재귀

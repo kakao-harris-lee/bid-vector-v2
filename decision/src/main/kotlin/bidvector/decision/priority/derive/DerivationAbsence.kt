@@ -36,8 +36,8 @@ sealed interface DerivationAbsence {
     ) : DerivationAbsence
 
     /**
-     * `Notice.floorRate` 가 `1` 을 넘는다(verifier r2 G-1, 사용자 승인 2026-09-10 4B-6
-     * 인계) — `recommendedRate`·`predictedRate` 와 달리 `floorRate` 는 4D-1 계약(`D-2B-8`)의
+     * `Notice.floorRate` 가 `1` 을 넘는다(사용자 승인) — `recommendedRate`·`predictedRate` 와
+     * 달리 `floorRate` 는 4D-1 계약(`D-2B-8`)의
      * 보호를 받지 않는다(`FloorRate`·`Canonicalize`·`NoticeReconstruction` 어디에도 `≤ 1`
      * 불변식이 없다, 전수 grep 0건). `MarginInputs.init` 이 이 값으로는 애초에 구성을
      * 거부하므로(`IllegalArgumentException`), **4B-6 조합기가 `MarginInputs` 생성 전에**

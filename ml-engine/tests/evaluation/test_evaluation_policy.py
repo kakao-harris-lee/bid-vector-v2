@@ -208,7 +208,7 @@ def test_load_evaluation_policy_rejects_duplicate_segment_axis(
 def test_load_evaluation_policy_rejects_non_finite_values(
     tmp_path: Path, override_line: str
 ) -> None:
-    """verifier r1 M-1 재현 — `paired_t_threshold: .nan`은 `<= 0` 비교가 NaN 에서
+    """M-1 재현 — `paired_t_threshold: .nan`은 `<= 0` 비교가 NaN 에서
     항상 거짓이라 그 불변식을 통과했고(재현: 수정 전 `EvaluationPolicy` 생성 성공,
     `policy_checksum`에서 `ValueError: Out of range float values are not JSON
     compliant`로 나중에 터짐), `amount_band_edges.3: .inf`도 「양수·오름차순」을
@@ -246,7 +246,7 @@ def test_load_evaluation_policy_rejects_non_finite_values(
 def test_policy_checksum_never_raises_because_non_finite_cannot_be_constructed() -> (
     None
 ):
-    """verifier r1 M-1 — `policy_checksum`의 docstring 전제(「값이 전부 정책 불변식을
+    """M-1 — `policy_checksum`의 docstring 전제(「값이 전부 정책 불변식을
     통과한 유한값」)가 실제로 강제된다는 것을 `EvaluationPolicy` 직접 생성에서도
     확인한다(로더 경유 없이도 비유한 값은 생성 자체가 막힌다)."""
     with pytest.raises(ValueError):

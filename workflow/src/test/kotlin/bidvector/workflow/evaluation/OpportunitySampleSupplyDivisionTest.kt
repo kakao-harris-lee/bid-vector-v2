@@ -25,7 +25,7 @@ private const val SERVICE_CLASS_NAME = "정보시스템 개발 서비스"
 private const val CONSTRUCTION_TYPE_NAME = "전기공사업"
 
 /**
- * M6/6F-9 D-6F9-6 — 업무구분 수집이 **기회 분석의 거동**에 만드는 변화를 잠근다: 용역 공고에 공공조달분류 번호가
+ * D-6F9-6 — 업무구분 수집이 **기회 분석의 거동**에 만드는 변화를 잠근다: 용역 공고에 공공조달분류 번호가
  * 생기면서 `competitionSampleSupplyFor` 의 조기 반환이 처음으로 통과해 표본 조회가 **실제로 돈다**. 공사 공고는
  * 코드가 없어 조회를 부르지 않는다. 이 slice 는 ML·표본 조회 쪽 코드를 바꾸지 않는다 — 여기 있는 것은 잠금뿐이다.
  *

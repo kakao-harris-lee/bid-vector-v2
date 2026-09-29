@@ -6,7 +6,7 @@ import bidvector.procurement.TruncationCause
 private const val HTTP_TOO_MANY_REQUESTS_TC = 429
 
 /**
- * [KonepsRawStep] → [TruncationCause]·사람이 읽는 사유 문자열 변환(H-3, verifier r1) —
+ * [KonepsRawStep] → [TruncationCause]·사람이 읽는 사유 문자열 변환 —
  * `KonepsResilientCall.kt` 의 detekt `TooManyFunctions`(파일당 함수 상한 11)를 지키려고
  * 분리한 파일이다(로직상 새 관심사는 아니다).
  */

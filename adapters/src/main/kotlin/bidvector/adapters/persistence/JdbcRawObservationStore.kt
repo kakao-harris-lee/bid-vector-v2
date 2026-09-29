@@ -13,7 +13,7 @@ import javax.sql.DataSource
  * 재시도를 멱등하게 흡수한다. `releaseSha`는 구성 근이 주입한다(운영 배선은 M6 6C 소관,
  * 빈 문자열만 이 클래스가 거부한다).
  *
- * **M4/4C-2 D-4C2-1 갈래 (b) 개조** — 주 생성자가 [ConnectionSource]를 받는다(`DataSource`가
+ * **D-4C2-1 갈래 (b) 개조** — 주 생성자가 [ConnectionSource]를 받는다(`DataSource`가
  * 아니다). [TransactionBoundary]가 주는 [ConnectionSource]로 append하면 outbox 등록과 같은
  * 트랜잭션에서 커밋된다(scope.md ②의 유일한 실 도메인 write 참여자, 설계 검토 (0-a) 갈래
  * (b)). 기존 `DataSource` 생성자는 [DataSourceConnectionSource]로 위임하는 보조
@@ -40,12 +40,12 @@ class JdbcRawObservationStore(
         rowDiscriminator: RowDiscriminator?,
     ): ObservationKey {
         val payloadFields = ObservationPayloadCodec.encode(observation, fieldContracts)
-        // F-7 운영자 결정 — 원문(sourceText)이 있으면 그대로 싣는다(재직렬화 없이, 바이트
+        // 운영자 결정 — 원문(sourceText)이 있으면 그대로 싣는다(재직렬화 없이, 바이트
         // 동일). 원문이 없는 관측(koneps 밖 호출부·구 fixture)은 등재분 투영으로 대신한다
         // — 그 경우 payload 는 payload_fields 와 같은 문자열이 되어 바이트 동일을
         // 보장하지 않는다(알려진 제한, evidence 기록).
         val payload = observation.sourceText ?: payloadFields
-        // M3/3E — rowDiscriminator(값 우선/부재 시 위치)를 키 재료에 더한다
+        // rowDiscriminator(값 우선/부재 시 위치)를 키 재료에 더한다
         // (OPEN-3B2-STORAGE-ROW-KEY-COLLISION). `null`이면 기존 유도와 동치다.
         val key = ObservationKeyDerivation.of(observation, payloadFields, rowDiscriminator)
         connections.withConnection { connection ->

@@ -45,8 +45,8 @@ class ContractGateChecksTest {
         assertNull(generationDeterminismViolation(map, map.toMap()))
     }
 
-    // verifier r1 F-1(high) — 빈 집합 둘은 "잴 것이 없다"이지 "결정적으로 같다"가 아니다.
-    // 산출물 경로가 바뀌어 두 회차 모두 아무것도 못 찾으면 이전 판은 조용히 통과했다.
+    // 빈 집합 둘은 "잴 것이 없다"이지 "결정적으로 같다"가 아니다.
+    // 산출물 경로가 바뀌어 두 회차 모두 아무것도 못 찾으면 조용히 통과해서는 안 된다.
     @Test
     fun `빈 산출물 집합 둘은 위반이다(F-1)`() {
         assertNotNull(generationDeterminismViolation(emptyMap(), emptyMap()))

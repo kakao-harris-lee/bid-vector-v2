@@ -29,11 +29,11 @@ import org.testcontainers.utility.DockerImageName
 private const val LATE_SOURCE_SIBLING_KEY = "management.endpoint.health.group.readiness.show-details"
 
 /**
- * **거부가 기동 완료 전에 났는가**의 표지(verifier r3 M-1). refresh 가 끝난 **뒤에** Boot 이
+ * **거부가 기동 완료 전에 났는가**의 표지. refresh 가 끝난 **뒤에** Boot 이
  * 내는 event 셋을 기록한다 — 하나라도 관측되면 재검사 자리가 refresh 밖으로 밀린 것이다.
  *
- * 왜 `AvailabilityChangeEvent(ACCEPTING_TRAFFIC)`·`ApplicationReadyEvent` 만으로 부족한가
- * (verifier r3 M-1 실측): 재검사를 **그 두 event 자리로 옮기는** 변이에서는 재검사 listener 가
+ * 왜 `AvailabilityChangeEvent(ACCEPTING_TRAFFIC)`·`ApplicationReadyEvent` 만으로 부족한가:
+ * 재검사를 **그 두 event 자리로 옮기는** 변이에서는 재검사 listener 가
  * 같은 event 를 먼저 받아 던지고, multicast 가 그 자리에서 끊겨 이 기록기가 그 event 를 보지
  * 못할 수 있다(재검사의 우선순위가 최상위다). `ApplicationStartedEvent` 는 어느 변형에서도
  * 재검사가 듣지 않는 자리이고 셋 가운데 가장 먼저 오므로, **listener 순서에 기대지 않고**
@@ -63,17 +63,17 @@ private class PostRefreshEventRecorder : ApplicationListener<ApplicationEvent> {
  * D-6A2a-14 — **refresh 를 지나는** 부팅으로 늦은 재검사를 잰다.
  *
  * `ManagementSurfaceBootRefusalTest` 는 초기화자(또는 `ApplicationPreparedEvent`)에서 끝난다 —
- * 그래서 refresh **도중에** 실체로 채워지는 property source 를 구조적으로 볼 수 없다. verifier r2
- * F-1r 이 그 사각을 출하 이미지에서 실측했다: 서블릿 컨텍스트 init-param 소스는 초기화자 시점에
- * 비열거 stub 이고, `createWebServer()` 끝의 `initPropertySources()` 가 그것을 열거 가능한 소스로
- * 바꾼다. 그 소스가 잠금이 이름 대지 않은 **형제 키**를 들고 오면 r1 결함이 전부 다시 열렸다.
+ * 그래서 refresh **도중에** 실체로 채워지는 property source 를 구조적으로 볼 수 없다. 서블릿
+ * 컨텍스트 init-param 소스는 초기화자 시점에 비열거 stub 이고, `createWebServer()` 끝의
+ * `initPropertySources()` 가 그것을 열거 가능한 소스로 바꾼다. 그 소스가 잠금이 이름 대지
+ * 않은 **형제 키**를 들고 오면 그 결함이 다시 열린다.
  *
  * **적대 입력을 `server.servlet.context-parameters` 속성으로 주지 않는다.** 그 이름공간은 이제
  * 조기 거부 대상(보조 잠금)이라 초기화자가 먼저 끊고, 그러면 이 test 는 **늦은 재검사를 지우고도
  * 초록**이 된다(공허한 단언). 대신 init-param 을 **서블릿 컨텍스트에 직접** 심는다 — 채널이
  * 무엇이든 「늦게 채워지는 소스가 형제 키를 운반한다」는 형태 그대로다.
  *
- * **적대 조각을 `@Configuration` 으로 두지 않는다**(2026-09-26 실측 — D-6A1-27 과 같은 함정):
+ * **적대 조각을 `@Configuration` 으로 두지 않는다**(D-6A1-27 과 같은 함정):
  * 출하 조립의 컴포넌트 스캔 기준은 `bidvector.app` 과 그 하위 전부이고 test 소스도 그 범위 안이라,
  * `@Configuration` 을 붙이면 이 조각이 **다른 모든 production 조립 부팅에 끼어들어** 그 부팅들을
  * 전부 거부시켰다. 그래서 초기화자가 bean 을 **손으로 등재**한다(스테레오타입 annotation 0).
@@ -130,7 +130,7 @@ class ManagementSurfaceLateSourceRefusalTest {
             )
 
     /**
-     * 「검사는 readiness 전에」를 **거부 자체와 같은 부팅에서** 잠근다(verifier r3 M-1). 재검사를
+     * 「검사는 readiness 전에」를 **거부 자체와 같은 부팅에서** 잠근다. 재검사를
      * 늦은 자리(`AvailabilityChangeEvent(ACCEPTING_TRAFFIC)`·`ApplicationReadyEvent`)로 옮기면
      * 거부는 여전히 나므로 문면 단언만으로는 자리 이동이 보이지 않는다 — 그래서 **그 자리들에
      * 도달했다는 흔적이 0** 임을 함께 요구한다([PostRefreshEventRecorder] 의 KDoc 이 왜 세 event 를
@@ -161,8 +161,7 @@ class ManagementSurfaceLateSourceRefusalTest {
     }
 
     /**
-     * **readiness 가 수락을 알리기 전인가**를 실측한다(r3 정정 — privacy-gate r3 L-5 · verifier r3
-     * L-3). 늦은 재검사가 도는 자리(`ContextRefreshedEvent`)는 Boot 이
+     * **readiness 가 수락을 알리기 전인가**를 실측한다. 늦은 재검사가 도는 자리(`ContextRefreshedEvent`)는 Boot 이
      * `ReadinessState.ACCEPTING_TRAFFIC` 을 발행하는 자리보다 앞이다(그 발행은
      * `ApplicationReadyEvent` **뒤**다) — 그래서 그 시점의 readiness 프로브는 200 이 아니다.
      *

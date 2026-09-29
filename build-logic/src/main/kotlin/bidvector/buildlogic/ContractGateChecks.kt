@@ -4,7 +4,7 @@ import java.io.File
 import java.security.MessageDigest
 
 /*
- * M2/2D `ContractGateTask`의 판정 로직 — 전부 순수 함수다(`CpdReportPresenceGateTask`의
+ * `ContractGateTask`의 판정 로직 — 전부 순수 함수다(`CpdReportPresenceGateTask`의
  * `cpdReportPresenceViolation`과 같은 관례). Task 는 외부 프로세스(`buf`·gradle)를 실행하고
  * 그 결과를 여기 넘기기만 한다 — 프로세스 실행 자체는 build-logic test 로 재현하지 않는다.
  */
@@ -43,10 +43,10 @@ internal fun bufProcessViolation(
  * (d) `generateProto`를 두 번 실행한 산출물이 바이트 단위로 같은지 — 결정성 실측. 파일
  * 집합(상대 경로)이 다르거나 내용 해시가 다르면 위반.
  *
- * **verifier r1 F-1(high) — 빈 집합 둘도 위반이다.** 산출물 경로가 바뀌거나(플러그인 상향
- * 등) `hashDirectoryContents`가 디렉터리 부재로 `emptyMap()`을 두 번 내면, 이전 판은
- * "집합이 같고 내용도 같다"로 읽어 조용히 통과했다 — 아무것도 안 재고 통과하는 것과
- * "결정적으로 같다"를 구분하지 못했다. 빈 집합은 애초에 잴 것이 없다는 사실이지 결정성의
+ * **빈 집합 둘도 위반이다.** 산출물 경로가 바뀌거나(플러그인 상향
+ * 등) `hashDirectoryContents`가 디렉터리 부재로 `emptyMap()`을 두 번 내면, 집합이 같고
+ * 내용도 같다고 조용히 통과시켜서는 안 된다 — 아무것도 안 재고 통과하는 것과
+ * "결정적으로 같다"를 구분하지 못한다. 빈 집합은 애초에 잴 것이 없다는 사실이지 결정성의
  * 증거가 아니다.
  */
 internal fun generationDeterminismViolation(

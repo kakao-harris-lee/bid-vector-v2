@@ -3,7 +3,7 @@
 `ml_engine.training._holdout_fit` — 창 분할 + GBM 두 변형 학습(scope ⑦ 세부). `holdout.py`
 의 비공개 내부 모듈이다(public 표면은 `run_holdout`/`HoldoutRejected`뿐) — scope.md 는
 파일 하나를 계획했으나 설계 래칫 `file_loc_soft_limit`(500줄) 준수를 위해 창 단위 실행
-로직을 형제 파일 여럿으로 분리했다(`pyproject.toml` allowlist 편집은 팀장 소관이라 대신
+로직을 형제 파일 여럿으로 분리했다(`pyproject.toml` allowlist 편집 대신
 분리를 택했다 — checklist.md 「계약과 어긋나 판단이 필요했던 자리」).
 
 evaluation 층은 `TrainedArtifact.booster`/`feature_manifest`를 모른다(layers) — 이
@@ -129,7 +129,7 @@ class WindowSuccess:
 
 @dataclass(frozen=True)
 class WindowSkip:
-    """verifier r2 M-1r — `buildable_row_count`/`dropped_rows`는 buildability
+    """M-1r — `buildable_row_count`/`dropped_rows`는 buildability
     재대조가 실제로 도는 경로(`build_split`의 `INSUFFICIENT_EVALUATION_ROWS`)만
     채운다. `detail` 문자열은 사람이 읽는 요약으로 남기고, `WindowExclusion`이
     싣는 구조화 필드는 여기서 나른다(잃지 않는다)."""
@@ -148,7 +148,7 @@ class Split:
     train_rows_all: list[TrainingRow]
     usable_test_rows: list[TrainingRow]
     dropped_rows: tuple[DroppedRowCount, ...]
-    """verifier r1 H-1 — 창 안 구조적 행 중 `is_buildable`이 거부한 행의 사유별 계수."""
+    """H-1 — 창 안 구조적 행 중 `is_buildable`이 거부한 행의 사유별 계수."""
     gate_train_raw: tuple[RawTrainingRow, ...]
     train_rows_raw: tuple[RawTrainingRow, ...]
     targets: np.ndarray
@@ -166,7 +166,7 @@ class _BuildabilityFilter:
 
 def _filter_buildable(gate_test_all: list[TrainingRow]) -> _BuildabilityFilter:
     """`gate_test_all`을 `is_buildable`로 갈라 사용 가능한 행과 사유별 버림 계수를
-    낸다(verifier r1 H-1 — 이 필터가 정책 하한 재대조의 입력이다)."""
+    낸다(H-1 — 이 필터가 정책 하한 재대조의 입력이다)."""
     usable_test_rows: list[TrainingRow] = []
     dropped_counts: dict[MissingFact, int] = {}
     for row in gate_test_all:
@@ -223,7 +223,7 @@ def build_split(
     evaluation_policy: EvaluationPolicy,
 ) -> Split | WindowSkip:
     """`_split_at_window`(legacy) — 경계 동시각은 평가측, 학습은 `opened_at <
-    window.start`. verifier r1 H-1 — 창 계획의 `INSUFFICIENT_EVALUATION_ROWS` 선검사는
+    window.start`. H-1 — 창 계획의 `INSUFFICIENT_EVALUATION_ROWS` 선검사는
     구조적 행 수만 보므로, `is_buildable`이 더 거른 뒤의 표본 수를 정책 하한에
     재대조한다(안 하면 하한이 buildable 비율에 따라 무력화된다)."""
     gate_stratum = evaluation_policy.gate_stratum

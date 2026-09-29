@@ -9,7 +9,7 @@ import bidvector.decision.UnitScore
  * — 이 타입은 이미 계산된 값만 받는다(설계 검토 (0) 경계).
  *
  * 여덟 전부 [UnitScore]([0,1] 구조적 경계, `decision` 모듈이 이미 소유한 타입 — 새로
- * 만들지 않는다). **`loadRatio`는 verifier r1 F-2로 [BigDecimal]에서 이 타입으로
+ * 만들지 않는다). **`loadRatio`는 [BigDecimal]에서 이 타입으로
  * 좁혔다** — legacy `load_ratio`(활성 입찰 / 최대 입찰)는 용량 초과가 구조적으로
  * 가능해 원래 `[0,1]`로 안 닫힌다고 판단했으나, 그 열린 하한이 음수 입력을 막지 못해
  * penalty 항이 조용히 가산점으로 뒤집히는 경로를 열었다(재현: `loadRatio=-1.0` →

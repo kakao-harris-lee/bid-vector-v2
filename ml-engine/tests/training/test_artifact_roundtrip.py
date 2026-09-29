@@ -164,10 +164,10 @@ def _train_and_write(
 
 
 def _expected_ref(trained: TrainedArtifact, written: ArtifactBytes) -> ModelReleaseRef:
-    """H-1 시정 — `feature_manifest_checksum`을 검사 대상 payload 자신이 아니라 5B
-    `compute_checksum(trained.feature_manifest)`으로 **독립 재계산**한다(verifier r3
-    H-1 (2) — 이전 판은 `payload["feature_manifest_checksum"]`을 그대로 기대값으로
-    써 5D 의 대조가 동어반복이었다). `artifact_checksum`은 원래도 `written.sha256`
+    """H-1 — `feature_manifest_checksum`을 검사 대상 payload 자신이 아니라 5B
+    `compute_checksum(trained.feature_manifest)`으로 **독립 재계산**한다(H-1 (2) —
+    `payload["feature_manifest_checksum"]`을 그대로 기대값으로 쓰면 5D 의 대조가
+    동어반복이 된다). `artifact_checksum`은 원래도 `written.sha256`
     (bytes 재해시)로 독립적이었다(변경 없음)."""
     independent_checksum = compute_checksum(trained.feature_manifest)
     assert not isinstance(independent_checksum, CanonicalizationRejected)

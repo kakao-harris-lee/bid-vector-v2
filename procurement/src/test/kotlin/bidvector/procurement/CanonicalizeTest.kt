@@ -54,7 +54,7 @@ internal val TEST_REGISTRY =
                 Basis.BASE_AMOUNT,
                 FieldProvenanceTemplate.PUBLISHED,
                 // N-2 회귀 가드 — INCLUSIVE 는 코드의 VatTreatment.UNKNOWN 리터럴과 값이 달라야
-                // "계약에서 읽는다" test 가 실제로 그 리터럴 회귀를 잡는다(verifier r2 실측).
+                // "계약에서 읽는다" test 가 실제로 그 리터럴 회귀를 잡는다.
                 VatTreatment.INCLUSIVE,
             ),
             testContract(
@@ -114,7 +114,7 @@ internal val TEST_REGISTRY =
                 FieldScale.DATETIME_NO_ZONE,
                 sourceZone = SourceZoneRuleId.ASSUME_KST,
             ),
-            // M3/3H-1 D-3H-1 — 발주기관 넷.
+            // D-3H-1 — 발주기관 넷.
             testContract("dminsttCd", FieldConcept.DEMAND_AGENCY_CODE, FieldScale.IDENTIFIER),
             testContract("dminsttNm", FieldConcept.DEMAND_AGENCY_NAME, FieldScale.OPAQUE_TEXT),
             testContract("ntceInsttCd", FieldConcept.NOTICE_AGENCY_CODE, FieldScale.IDENTIFIER),
@@ -202,8 +202,8 @@ class ResolveAmountTest {
             )
     }
 
-    // v2-defect 002 수정(3A 잔여 일괄 verifier r3 전) — expectedRange 가 참조하는 밴드를
-    // resolveAmount 가 실제로 강제한다. 값 크기로 단위를 되짚지 않는다(ADR 0002 D-4) —
+    // expectedRange 가 참조하는 밴드를 resolveAmount 가 실제로 강제한다.
+    // 값 크기로 단위를 되짚지 않는다(ADR 0002 D-4) —
     // 범위 밖이면 그대로 거부이지, 다른 scale 로 재해석하지 않는다.
     @Test
     fun `expectedRange 밴드 밖 값은 RANGE 위반으로 거부된다 — v2-defect 002 회귀 가드`() {
@@ -338,7 +338,7 @@ class CanonicalizeTest {
         val direct = outcome.command.baseAmount as ResolvedBaseAmount.Direct
 
         // 계약의 값(INCLUSIVE)은 코드가 예전에 쓰던 리터럴(UNKNOWN)과 달라야 한다 — 리터럴로
-        // 되돌리는 변이가 이 test 를 실제로 실패시킨다(verifier r2 N-2, 재발 방지).
+        // 되돌리는 변이가 이 test 를 실제로 실패시킨다(재발 방지).
         direct.amount.vatTreatment shouldBe VatTreatment.INCLUSIVE
     }
 
@@ -409,7 +409,7 @@ class CanonicalizeTest {
     @Test
     fun `마감·개찰예정 일시는 계약의 sourceZone 규칙으로 Instant 로 해석된다 — N-3`() {
         // v2-defect 026 재발 방지 — KONEPS 실제 wire 형식(공백 구분자, policy-values.md §1.4)을
-        // 쓴다. ISO `T` 표기(이전 판 test 데이터)는 이제 이 형식 목록 밖이라 파싱되지 않는다.
+        // 쓴다. ISO `T` 표기는 이제 이 형식 목록 밖이라 파싱되지 않는다.
         val observation =
             observationOf(
                 mapOf(
