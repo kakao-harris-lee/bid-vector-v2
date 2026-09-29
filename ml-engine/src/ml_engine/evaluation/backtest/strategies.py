@@ -159,18 +159,26 @@ def bid_from_rate(request: StrategyInput, rate: float) -> StrategyOutcome:
     return _round_up_won(request.base_amount * rate)
 
 
+S0_BAND_PURPOSE: Final[str] = "s0-band"
+"""S0 밴드 내 난수의 **용도 구분자**(스키마 §2.2, vr r4 L-14).
+
+Kotlin 표본 추첨이 `sha256("sample-draw"|seed|key)` 를 쓴다. 구분자가 없으면 두
+무작위가 같은 `seed|key` digest 에서 나와, 두 seed 가 우연히 같을 때 「어떤 공고가
+뽑혔나」와 「S0 가 그 공고에 낸 값」이 상관을 갖는다 — 판정이 그만큼 덜 독립이다.
+
+값을 바꾸면 표본과 S0 값이 둘 다 바뀐다. 그것은 **새 실험**이고 정책 version 을
+올린다 — 그래서 이 값은 문서(§2.2 표)가 정본이고 코드가 따라간다."""
+
+
 def notice_rng(request: StrategyInput, *, stream: str) -> np.random.Generator:
-    """`(판정 seed, 공고 키 해시, 스트림 이름)` 에서 결정적으로 나오는 난수원 — 공고
+    """`(용도 구분자, 판정 seed, 공고 키 해시)` 에서 결정적으로 나오는 난수원 — 공고
     처리 순서가 바뀌어도 같은 표본이 나온다(재현성, 위협 모델 ③).
 
-    **`stream` 이 전략마다 다르다**(code-review r1 L-2). 없으면 S0 의 첫 균등 난수와
-    S4 의 사정률 표본이 같은 상태에서 나와 두 전략이 독립이 아니고, seed 안정성 스윕도
-    둘을 함께 움직인다. 배관이지 사전 등록 값이 아니라 실행 전에 고친다."""
-    # 구분자 `:` 는 **전략 내부 난수** 전용이다. 표본 뽑기 순서(Kotlin 레인,
-    # 스키마 §5)는 `sha256("<seed>|<notice_key_hash>")` 로 구분자가 `|` 다 — 두
-    # 용도가 다르고 서로를 재현하지 않으므로 일부러 다른 구분자를 쓴다(같은 문자열을
-    # 쓰면 표본 선택과 전략 난수가 상관을 갖는다).
-    material = f"{request.seed}:{request.notice.notice_key_hash}:{stream}".encode()
+    **`stream` 이 곧 용도 구분자다**(스키마 §2.2). 전략마다 달라서 두 몫을 한꺼번에
+    한다: ⑴ S0 의 첫 균등 난수와 S4 의 사정률 표본이 같은 상태에서 나오지 않게 하고
+    (code-review r1 L-2) ⑵ Kotlin 표본 추첨(`"sample-draw"`)과 영역을 가른다
+    (vr r4 L-14). 형태는 두 레인이 같다 — `sha256(용도 + "|" + seed + "|" + 키)`."""
+    material = f"{stream}|{request.seed}|{request.notice.notice_key_hash}".encode()
     digest = hashlib.sha256(material).digest()
     return np.random.default_rng(int.from_bytes(digest, "big"))
 
@@ -192,7 +200,7 @@ class UniformBandStrategy:
         high = request.floor_rate * (1.0 + half_width)
         return bid_from_rate(
             request,
-            float(notice_rng(request, stream=self.name).uniform(low, high)),
+            float(notice_rng(request, stream=S0_BAND_PURPOSE).uniform(low, high)),
         )
 
 
