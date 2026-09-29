@@ -85,7 +85,7 @@ git diff 57869cc7~1..57869cc7 -- milestone-6.md | git apply -R
 | ③ diff 빈 것 | `git diff a8adf8f5 -- <경로들>` **0 줄** — 되돌린 트리가 복원 출처와 바이트 동일(갈음은 「HEAD 초록」이 아니라 이 트리 동일성이다) |
 | ④ 컴파일 | 통과(`check` 안) |
 | ⑤ test | 통과(`check` 안) |
-| ⑥ 게이트 | 통과 — `./gradlew --no-daemon check` BUILD SUCCESSFUL(되돌린 트리에서 exit 0). **첫 시도는 earlyoom 이 죽였다** — 다른 레인의 16GB python 과 겹쳐 가용 메모리가 1GB 로 떨어졌고 java 가 SIGTERM 을 받았다(결함이 아니라 호스트 사건, 재시도 3분 12초 초록) |
+| ⑥ 게이트 | 통과 — `./gradlew --no-daemon check` BUILD SUCCESSFUL(되돌린 트리에서 exit 0). **첫 시도는 earlyoom 이 죽였다** — 같은 호스트의 **다른 프로젝트 세션**이 돌린 16GB python 과 겹쳐 가용 메모리가 1GB 로 떨어졌고 이 레인의 JVM 이 먼저 SIGTERM 을 받았다(결함이 아니라 호스트 사건, 재시도 3분 12초 초록) |
 
 ## 두 레인의 실측 HEAD 가 다르다
 
