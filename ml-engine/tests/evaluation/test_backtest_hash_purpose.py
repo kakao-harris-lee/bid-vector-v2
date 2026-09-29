@@ -186,7 +186,16 @@ def _stream_names() -> dict[str, str]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if not (isinstance(node.func, ast.Name) and node.func.id == _RNG_FUNCTION):
+            # 이름 호출과 **속성 호출**(`strategies.notice_rng(...)`)을 둘 다 본다 —
+            # 한쪽만 보면 import 형태를 바꾸는 것만으로 수집에서 빠진다.
+            called = (
+                node.func.id
+                if isinstance(node.func, ast.Name)
+                else node.func.attr
+                if isinstance(node.func, ast.Attribute)
+                else None
+            )
+            if called != _RNG_FUNCTION:
                 continue
             keyword = next(
                 (item for item in node.keywords if item.arg == _STREAM_KEYWORD), None
