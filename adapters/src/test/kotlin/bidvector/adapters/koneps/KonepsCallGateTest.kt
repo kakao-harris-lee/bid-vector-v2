@@ -26,8 +26,14 @@ private val UNREACHABLE: URI = URI.create("http://127.0.0.1:1/mock/getOpengResul
  * 하나가 전부 센다」이고, 그 하나가 틀리면 다른 어디에도 보정이 없다.
  */
 class KonepsCallGateTest {
+    /**
+     * 이 test 는 **관문을 지난 호출마다** 한 벌이 남는 것만 잰다 — `send` 를 세 번 직접 부른다.
+     * 「재시도가 관문을 지난다」는 여기서 서지 않는다(retry 는 `fetchPageResilient` 에 있다):
+     * 그것을 잠그는 것은 E2E 의 `재시도로 나간 호출도 시도 원장에 실린다` 하나다(cr r4 L-2 —
+     * 앞 이름이 여기서 재지 않는 성질을 주장했다).
+     */
     @Test
-    fun `호출마다 의도 한 줄과 결말 한 줄 — 재시도도 각자 한 벌이다`() {
+    fun `관문을 지난 호출마다 의도 한 줄과 결말 한 줄이 남는다`() {
         val ledger = RecordingAttemptLedger()
         val gate = testCallGate(ledger = ledger)
 
