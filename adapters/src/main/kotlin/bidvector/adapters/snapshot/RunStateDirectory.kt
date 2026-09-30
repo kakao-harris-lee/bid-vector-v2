@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.adapters.koneps.JsonValue
 import bidvector.adapters.koneps.KonepsJsonParser
 import bidvector.adapters.koneps.asIntOrNull
 import bidvector.adapters.koneps.asObject
@@ -29,7 +30,8 @@ internal const val STATE_NAME = "state.json"
 /** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
 internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
 
-private const val ATTEMPT_MAX_DEPTH = 4
+/** 원장·장부 줄의 JSON 깊이 상한 — 두 파일이 같은 값을 쓴다(줄 형태가 같다). */
+internal const val ATTEMPT_MAX_DEPTH = 4
 
 /**
  * 실행 상태의 무결성 장부(D-6G-48) — 이 넷이 맞아야 기동한다.
@@ -82,9 +84,10 @@ class RunStateDirectory(
      * 데서도 대조하지 않아 죽은 칸이었고, 「다른 디렉터리로의 복사가 모두 거부된다」는 참이 아니었다.
      * 자리에 묶으면 파일 셋을 통째로 복사해 상한을 0 에서 다시 시작하는 길이 닫힌다(넷이 서로 맞아도
      * 표식이 그 자리의 것이 아니다).
+     *
+     * **실경로**로 짓는다(vr r5 L-5) — `toAbsolutePath().normalize()` 는 심링크를 풀지 않아, 같은
+     * 디렉터리를 심링크로 가리킨 **정직한** 기동이 「다른 자리의 표식」으로 거부됐다.
      */
-    // **실경로**로 짓는다(vr r5 L-5) — `toAbsolutePath().normalize()` 는 심링크를 풀지 않아
-    // 같은 디렉터리를 심링크로 가리킨 정직한 기동이 「다른 자리의 표식」으로 거부됐다.
     private val directoryId: String = sha256Hex(realPathOf(root))
 
     /** 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6). */
@@ -338,109 +341,6 @@ private fun linesOf(file: Path): List<String> =
         .lineSequence()
         .filter { it.isNotBlank() }
         .toList()
-
-/**
- * 시도 원장의 파일 구현 — 줄마다 한 시도, JSON 하나. **덧붙이기만** 한다(고쳐 쓰지 않는다).
- *
- * 줄이 형태를 어기면 읽지 않는다 — 시도 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은
- * 상한이 없는 것보다 나쁘다(있다고 믿게 된다).
- */
-internal class FileAttemptLedger(
-    private val file: Path,
-    /**
-     * 줄을 쓸 때마다 무결성 장부를 갱신한다(D-6G-48) — 기록과 장부가 갈리는 창을 남기지 않는다.
-     * **기본값이 없다**(vr r4 L-10): 장부를 갱신하지 않는 append 는 그 디렉터리를 다음 기동에서
-     * 막아 버리고, 그것을 쉽게 만드는 기본값은 이 타입이 주는 편의가 아니라 함정이다.
-     */
-    private val onAppended: (String) -> Unit,
-) : AttemptLedger {
-    override fun append(attempt: CollectionAttempt) {
-        val line = lineOf(attempt)
-        Files.writeString(file, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-        onAppended(line)
-    }
-
-    override fun read(): AttemptHistory {
-        if (!Files.isRegularFile(file)) return AttemptHistory(emptyList())
-        val lines =
-            Files
-                .readString(file)
-                .lineSequence()
-                .filter { it.isNotBlank() }
-                .toList()
-        // `torn` 표식 줄은 시도가 아니라 **잃어버린 호출**이다(D-6G-70) — 세기만 한다. 그 밖의
-        // 줄이 형태를 어기면 여전히 멈춘다: 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고,
-        // 그것은 상한이 없는 것보다 나쁘다.
-        val (tornLines, attemptLines) = lines.partition(::isTornMarker)
-        return AttemptHistory(attemptLines.map(::parseLine), tornLines = tornLines.size)
-    }
-
-    private fun isTornMarker(line: String): Boolean =
-        runCatching { KonepsJsonParser.parse(line, ATTEMPT_MAX_DEPTH).asObject()?.fields?.containsKey(TORN_KEY) }
-            .getOrNull() == true
-
-    private fun lineOf(attempt: CollectionAttempt): String =
-        SnapshotJson
-            .Obj(
-                listOf(
-                    "at" to SnapshotJson.Text(attempt.at.toString()),
-                    "axis" to SnapshotJson.Text(attempt.axis.name),
-                    "notice_key_hash" to (attempt.noticeKey?.let { SnapshotJson.Text(it) } ?: SnapshotJson.Null),
-                    // 의도 줄에는 결말이 **없다**(cr r5 L-3). 앞 판은 `SUCCEEDED` 를 적었고,
-                    // `kind` 를 함께 보지 않는 판독자에게는 나가지도 않은 호출이 성공으로 보였다.
-                    "outcome" to
-                        if (attempt.kind == AttemptKind.PENDING) {
-                            SnapshotJson.Null
-                        } else {
-                            SnapshotJson.Text(labelOf(attempt.outcome))
-                        },
-                    "kind" to SnapshotJson.Text(attempt.kind.name),
-                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 없는 줄은 키 자체를 싣지 않는다.
-                    "walk" to (attempt.walk?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null),
-                ),
-            ).render() + "\n"
-
-    private fun parseLine(line: String): CollectionAttempt {
-        val fields =
-            requireNotNull(KonepsJsonParser.parse(line, ATTEMPT_MAX_DEPTH).asObject()?.fields) {
-                "시도 원장 줄이 JSON 객체가 아니다"
-            }
-        val axis =
-            requireNotNull(SourceEndpoint.entries.firstOrNull { it.name == fields["axis"].asStringOrNull() }) {
-                "시도 원장의 축 어휘가 아니다"
-            }
-        return CollectionAttempt(
-            // 형태 검사는 값 타입이 진다 — 원장에는 이미 지어진 hex 가 실린다.
-            noticeKey = fields["notice_key_hash"]?.asStringOrNull()?.let { NoticeKeyHash.ofHex(it).value },
-            axis = axis,
-            // 결말 없는 의도 줄은 값이 아니라 **자리표시**다 — 상한은 `kind` 로 센다.
-            outcome = fields["outcome"].asStringOrNull()?.let(::outcomeOf) ?: AttemptOutcome.Succeeded,
-            at = Instant.parse(requireNotNull(fields["at"].asStringOrNull()) { "시도 원장에 시각이 없다" }),
-            kind =
-                requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
-                    "시도 원장의 줄 갈래 어휘가 아니다"
-                },
-            // 이 칸 이전에 쓰인 원장은 값이 없다 — 그 축은 걷기를 모르므로 추출이 미완으로 센다.
-            walk = fields["walk"]?.asStringOrNull()?.let(Instant::parse),
-        )
-    }
-}
-
-/** 결말 어휘 — 오류는 코드를 뒤에 붙인다(`FAILED:<코드>`). 값이 아니라 분류만 싣는다. */
-private fun labelOf(outcome: AttemptOutcome): String =
-    when (outcome) {
-        AttemptOutcome.Succeeded -> "SUCCEEDED"
-        AttemptOutcome.Empty -> "EMPTY"
-        is AttemptOutcome.Failed -> "FAILED:${outcome.code}"
-    }
-
-private fun outcomeOf(label: String): AttemptOutcome =
-    when {
-        label == "SUCCEEDED" -> AttemptOutcome.Succeeded
-        label == "EMPTY" -> AttemptOutcome.Empty
-        label.startsWith("FAILED:") -> AttemptOutcome.Failed(label.removePrefix("FAILED:"))
-        else -> throw IllegalArgumentException("시도 원장의 결말 어휘가 아니다")
-    }
 
 internal const val RUN_LOCK_NAME = "run.lock"
 

@@ -24,15 +24,6 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZonedDateTime
-import javax.sql.DataSource
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -43,6 +34,15 @@ import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
+import javax.sql.DataSource
 
 /**
  * D-6F8-1~4 E2E — production 조립을 `mode=once` 로 부팅해 mock KONEPS → 원문 저장 → 정규화 → 영속 →
@@ -59,11 +59,8 @@ class CollectionRunnerE2ETest {
         private const val TEST_CREDENTIAL_VALUE = "collection-e2e-test-fixture-credential"
         private const val SERVICE_KEY = "E2E-SENTINEL+KEY/value="
         private const val SLOTS = 6
-        private const val NORMAL_PER_SLOT = 3
         private const val BLANK_PER_SLOT = 1
         private const val NOTICES_PER_SLOT = NORMAL_PER_SLOT + BLANK_PER_SLOT
-        private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
-        private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
         private const val DAYS = 3
 
         /** 오늘치 경계를 재는 자리의 일 상한 — 이만큼 써 둔 실행 상태로 KST 00:30 에 기동한다. */
@@ -92,65 +89,6 @@ class CollectionRunnerE2ETest {
         /** 로거 이벤트 전부(예외 cause 체인 포함) — 러너·어댑터·Boot 의 로그를 한 자리에서 잡는다. */
         private val logs = ListAppender<ILoggingEvent>()
         private lateinit var mock: MockKonepsHttp
-
-        private fun itemOf(
-            category: String,
-            number: String,
-            closing: String = "2026-12-31 10:00:00",
-            classification: Map<String, String> = emptyMap(),
-        ) = mapOf(
-            "bidNtceNo" to number,
-            "bidNtceOrd" to "000",
-            "bidNtceNm" to "공고명 $category $number",
-            // 실 응답에는 이 키가 없다(6F-8 실측) — 있어도 대분류는 오퍼레이션이 정한다(D-6F9-1): 용역 응답에도 「공사」를 싣는다.
-            "bsnsDivNm" to "공사",
-            "bidClseDt" to closing,
-        ) + classification
-
-        private fun itemsFor(
-            operation: String,
-            day: String,
-        ): List<Map<String, String>> {
-            val category = operation.removePrefix("getBidPblancListInfo")
-
-            fun item(
-                number: String,
-                closing: String = "2026-12-31 10:00:00",
-                classification: Map<String, String> = emptyMap(),
-            ) = itemOf(category, number, closing, classification)
-            val normal =
-                (1..NORMAL_PER_SLOT).map {
-                    item(
-                        "E2E-$category-$day-$it",
-                        classification = classificationFor(category, it),
-                    )
-                }
-            // D-6F8-11 — KONEPS 는 옵션 일시·금액을 빈 문자열로 내기도 한다(실수집 실측). 합성 표본이며 정규화되고 마감은 null 이다.
-            val blankOptionals =
-                item("E2E-$category-$day-BLANK", closing = "", classification = blankClassificationFor(category)) +
-                    mapOf("opengDt" to "", "bssamt" to "", "presmptPrce" to "", "chgDt" to "", "tpEvalApplClseDt" to "")
-            val missingNumber = mapOf("bidNtceNm" to "번호 없는 공고명")
-            val duplicate = normal.first()
-            val firstConstructionDay = category == "Cnstwk" && day == firstDay.toString().replace("-", "")
-            val badDate =
-                if (firstConstructionDay) {
-                    listOf(
-                        item(BAD_DATE_ITEM_NUMBER, closing = "not-a-date"),
-                    )
-                } else {
-                    emptyList()
-                }
-            // 차수가 비어 있지 않지만 세 자리 숫자가 아니다 — 어댑터는 통과시키고 정규화가 IDENTIFIER 탈락으로 접는다.
-            val badRound =
-                if (firstConstructionDay) {
-                    listOf(
-                        item(BAD_ROUND_ITEM_NUMBER) + mapOf("bidNtceOrd" to "1"),
-                    )
-                } else {
-                    emptyList()
-                }
-            return normal + listOf(blankOptionals) + missingNumber + duplicate + badDate + badRound
-        }
 
         /** 러너 한 번의 관측 — 종료 코드, 로거 이벤트 전부, 표준 출력·표준 오류 전부. */
         private class RunResult(
@@ -276,7 +214,7 @@ class CollectionRunnerE2ETest {
         @JvmStatic
         @BeforeAll
         fun boot() {
-            mock = MockKonepsHttp(::itemsFor)
+            mock = MockKonepsHttp { operation, day -> noticeListItemsFor(operation, day, firstDay) }
             firstRun = runOnce()
             firstRunDb = DbCounts()
         }
