@@ -28,6 +28,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-16** 관문 거부는 상한 밖 | 이행 | `AttemptOutcome.Refused`(라벨 `REFUSED:<코드>`) · `failureOf` 의 세 갈래 · `doneWith` 는 `Failed` 만 센다. 형식 version 2 |
 | **D-6G2d-17** 확정 실패는 정확히 셋 | 이행 | `failureOf` 의 확정 갈래 = INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES. `ALL_TRUNCATION_CAUSES` 전수 등식 test 둘 |
 | **D-6G2d-18** 일괄 | **부분 — 이탈 9** | 형식 version 정수만(`requireCurrentFormat`·`STRICT_FORMAT_VERSION`) · 낡은 KDoc 넷 · 중복 하한을 쓰는 자리 하나로 · test 대역의 확정 코드 교정 · 계수 이름 유지. **형식 거부의 전용 종료 코드는 안 했다**(이탈 9) |
+| **D-6G2d-21** `a_value` 전부 아니면 무 | **ⓐ 이행 · ⓑ 보류(이탈 13)** | `aValueTotalOf` 가 공개일시 부재에서 묶음을 비운다 · `SnapshotExtraction.incompleteAValues` · 러너 로그 한 칸. ⓑ(구성 항목 결측)는 golden 바이트를 바꿔 보류 |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
 ## 변이표
@@ -55,6 +56,8 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-refusal-counted** 예산 거부를 일시 실패로 되돌린다 | `CollectOpeningResultsUseCaseTest` | RED 1(넷째 기동이 부르지 않음) |
 | **M-unclassified-final** 미지 코드를 확정으로 | `CollectionAttemptLedgerTest` | RED 3 |
 | **M-count-whole-life** 상한을 디렉터리 생애 전체로 센다 | `CollectionAttemptLedgerTest` | RED 1 |
+| **M-a-open-at-ignored** A 공개일시 부재를 무시한다 | `SnapshotAmountContractTest` | RED 1 |
+| **M-a-undersum**(ⓑ 판에서 실측) 결측 항목을 빼고 합산한다 | 같은 클래스 | RED 1 |
 
 ## 착수 실측 표 갱신
 
@@ -119,6 +122,7 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 |---|---|
 | `AttemptOutcome.Refused(code)` | 결말 줄을 짓는 누구나 「호출이 나가지 않았다」를 말할 수 있다. `isSettled` 는 `false` 라 그 축은 다시 불리고, 재호출 상한은 이 갈래를 **세지 않는다** — 코드 문자열로 되읽어 분류하는 길을 열지 않는다 |
 | `SnapshotExtraction.fractionalAmounts` | 판독이 「소수부로 없는 값이 된 금액 칸 수」를 읽는다(집계는 통째로 하나). `unusableRawRows` 와 같은 자리 — 네 항 항등식 **밖**이다 |
+| `SnapshotExtraction.incompleteAValues` | 판독이 「A 묶음이 전부-아니면-무 규율로 사라진 수」를 읽는다. 소수부와 **원인이 다르므로** 칸을 따로 둔다 — 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시 항등식 밖 |
 
 좁아진 표면 하나: `DetailFetchGates` 의 `init` 에서 상한 하한 검사가 사라졌다(쓰는 자리 하나로,
 D-6G2d-18). 생성자 형태는 그대로다.
@@ -160,15 +164,15 @@ D-6G2d-18). 생성자 형태는 그대로다.
   없는 유일하게 싼 때다(6G verifier r5-t L-1 의 노출 판단과 같은 근거).
 - **(g)** 찢어진 끝 줄 표식이 오늘치 상한에서도 한 칸을 계속 뺀다(6G cr r5-t L-7)는 이 slice 밖이다 —
   보수적 방향이고 계약이 경계 밖으로 두었다.
-- **(h)** `a_value.open_at` 은 스키마 §2.2 가 `datetime`(널 허용 아님)으로 두는데, A 구성 항목은 있고
-  공개일시가 없는 원문이 오면 그 묶음이 `{total:<수>, open_at:null, …}` 로 렌더된다 — D-6G2d-15 와
-  **같은 형태 위반 계열**이고 금액 칸이 아니라 이 라운드의 표적 밖이다(구현 레인 관측, 미수정).
-  고치는 방향은 「공개일시 없으면 `a_value` 통째로 null」이지만 그것은 A 를 가진 공고의 제외 사유를
-  바꾸는 데이터 정확성 결정이라 계약 항목이다.
+- **(h) 닫혔다** — 공개일시 없는 A 는 묶음 전체가 비고 그 수가 공시된다(D-6G2d-21 ⓐ).
 - **(j)** version 2 아래에서 쓰인 옛 `PENDING` 줄이 그대로 수락되어 상한 +1 소비·재호출로 흐른다 —
   보수 방향(덜 세지 않는다)이라 등재만 한다(D-6G2d-19 문면).
-- **(i)** `aValueTotalOf` 는 **결측** 구성 항목을 빼고 나머지를 더한다(6G 부터의 기존 부채, vr r1 참고).
-  이 라운드가 바꾼 것은 **소수부** 처분뿐이다 — 결측 항목의 과소 합산은 그대로다.
+- **(i)** `aValueTotalOf` 는 **결측** 구성 항목을 빼고 나머지를 더한다(6G 부터의 기존 부채). 줄어든 A 는
+  오류도 결측도 아닌 **틀린 값**이라 채점에 그대로 들어간다. D-6G2d-21 ⓑ 가 이것을 겨누는데 **이 라운드
+  에서 닫지 못했다**: 출하 조립 E2E 의 A 축 대역이 여섯 구성 항목 중 하나만 싣고 품질관리비 술어는 `Y`
+  인데 금액이 없어, golden 의 `a_value.total` 자체가 그 과소 합산의 값이다(실측: ⓑ 적용 시 golden 대조
+  E2E 가 RED). 닫으려면 대역의 A 행을 온전히 채우고 golden 을 재생성해야 하고, 그것은 운영자 결정 A-2
+  가 이 slice 밖으로 둔 일이다 → 이탈 13.
 
 ## 6G evidence 정정 (D-6G2d-7)
 
@@ -218,6 +222,9 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
    경로는 적재 **전에** 떨어뜨린다, 이것은 방어 심화다)와 걷기 부재 `requireNotNull` 의 도달 가능성
    서술(cr r1 L-4: 발화하지 않는 이중 잠금). 코드 거동 무변경. 알면서 거짓인 KDoc 을 남기는 것이 이
    slice 가 반복해서 고치는 결함 계열이라 함께 담았다.
+13. **D-6G2d-21 ⓑ 를 하지 않았다 — golden 바이트를 바꾼다.** 위 알려진 제한 (i) 의 실측이 근거다.
+   ⓐ 만 이행했고 ⓑ 의 변이 RED 는 ⓑ 판에서 한 번 재어 두었다(`M-a-undersum`). 운영자 판단 필요:
+   대역의 A 행을 온전히 채우고 golden 을 재생성할지, 규칙을 좁힐지.
 12. **D-6G2d-19 의 「`doneWith` 가 `at` 순서를 읽는다」를 따르지 않았다** — 원장의 덧붙인 순서로 읽는다.
    사유는 위 알려진 제한 (e): `at` 정렬은 시계가 뒤로 간 실행에서 앞 실행의 결말을 「마지막」으로 만들어
    추출 쪽 규율과 어긋난다. 정착 창을 고르는 성질(계약이 요구한 것)은 그대로 성립한다.
