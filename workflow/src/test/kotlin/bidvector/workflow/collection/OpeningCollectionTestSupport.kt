@@ -95,6 +95,8 @@ internal class ScriptedOpeningPort(
             listOf(item),
             sourceAccounting(normalized = 1, truncationCause = truncation),
             next = null,
+            // 대역도 걷기의 이름을 단다(D-6G-68) — 실물이 그렇고, 없으면 그 축이 0 행으로 읽힌다.
+            observedAt = COLLECTION_NOW,
         )
     }
 }

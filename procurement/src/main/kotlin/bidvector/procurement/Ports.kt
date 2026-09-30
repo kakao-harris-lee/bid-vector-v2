@@ -24,6 +24,15 @@ data class SourceBatch<T>(
     val items: List<T>,
     val accounting: CollectionAccounting,
     val next: PageCursor?,
+    /**
+     * **이 걷기의 이름**(D-6G-68) — 한 걷기의 모든 쪽이 다는 관측 시각이다. 걷기를 수행한 어댑터가
+     * 한 번 적고, 원장의 AXIS 결말 줄이 그 값을 실어 추출이 「어느 걷기의 행인가」를 짐작하지
+     * 않는다. 걷기가 아닌 자리(단건 조립·test 대역)는 `null`.
+     *
+     * 항목에서 읽지 않는 이유가 둘이다. 빈 응답에는 항목이 없어 걷기의 이름을 잃고, 항목의 멤버를
+     * 읽는 것은 use case 가 원문을 **들여다보는** 일이라 구조 게이트가 막는다(그 금지는 옳다).
+     */
+    val observedAt: java.time.Instant? = null,
 )
 
 /**

@@ -367,6 +367,13 @@ private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
 // 자체로 강제해 다른 발급자가 끼어들 여지를 남기지 않는다.
 private val STRICT_PAGE_TOKEN = Regex("[1-9][0-9]*")
 
+/**
+ * **걷기의 이름은 저장이 견디는 정밀도여야 한다**(D-6G-68). `observed_at` 은 TIMESTAMPTZ(마이크로초)
+ * 이고 시계는 나노초를 준다 — 자르지 않으면 원장이 적은 걷기 식별자가 저장된 행의 시각과 영원히
+ * 다르고, 추출은 그 축의 행을 **하나도** 찾지 못한다(실측).
+ */
+private fun walkNameOf(clock: Clock): java.time.Instant = clock.instant().truncatedTo(ChronoUnit.MICROS)
+
 private fun startPageOf(cursor: PageCursor?): Int? {
     val token = cursor?.token ?: return START_PAGE
     return token.takeIf(STRICT_PAGE_TOKEN::matches)?.toIntOrNull()
@@ -405,10 +412,7 @@ internal fun walkKonepsNoticePages(
             httpPolicy,
             collectionPolicy,
             clock,
-            // **걷기의 이름은 저장이 견디는 정밀도여야 한다**(D-6G-68). `observed_at` 은 TIMESTAMPTZ
-            // (마이크로초)이고 시계는 나노초를 준다 — 자르지 않으면 원장이 적은 걷기 식별자가
-            // 저장된 행의 시각과 영원히 다르고, 추출은 그 축의 행을 **하나도** 찾지 못한다(실측).
-            clock.instant().truncatedTo(ChronoUnit.MICROS),
+            walkNameOf(clock),
             counters,
             itemMapper,
         )
@@ -422,5 +426,11 @@ internal fun walkKonepsNoticePages(
     // 축의 결말은 **여기서 적지 않는다**(D-6G-58 ⓑ) — 걷기가 끝난 것과 그 행이 적재된 것은 다르고,
     // 적재 전에 「완료」를 적으면 그 사이에 죽은 실행의 축이 영영 다시 불리지 않는다. 적재하는
     // 자리(use case)가 적는다.
-    return SourceBatch(accumulator.items, accumulator.toAccounting(counters), next = accumulator.nextCursor())
+    return SourceBatch(
+        accumulator.items,
+        accumulator.toAccounting(counters),
+        next = accumulator.nextCursor(),
+        // 걷기의 이름은 걷기를 한 자리가 적는다(D-6G-68) — 쪽마다 같은 값이다.
+        observedAt = context.observedAt,
+    )
 }
