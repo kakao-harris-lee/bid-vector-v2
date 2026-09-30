@@ -85,6 +85,24 @@ internal class AssemblyTally {
             fractionalAmounts++
             null
         }
+
+    /**
+     * **투찰자 목록도 전부 아니면 무다**(D-6G2d-43). 한 명의 금액만 `null` 로 두면 순번이 **밀린다** —
+     * 순번은 금액 오름차순에 `null` 을 뒤로 두어 매기므로(D-6G-2 §1.3), 비운 한 명이 맨 뒤로 가고 그
+     * 뒤의 모든 순위가 한 칸씩 당겨진다. 1위 투찰가와 참가자 구성이 조용히 달라지고, 판독은 그 행을
+     * 「수의계약」 계열 사유로 빼 **사유까지 틀린다**. 목록을 통째로 비우면 기존의 행 단위 제외로
+     * 떨어지고 계수는 한 번이다(집계 둘과 같은 규율).
+     *
+     * 금액이 **없는** 투찰자는 여기서 비우지 않는다 — 원천의 정직한 결측이고 순번 규칙이 이미 그
+     * 자리를 정해 둔다(`null` 은 뒤로).
+     */
+    fun wonBidderRows(raw: List<Pair<Int?, BigDecimal?>>): List<SnapshotBidderRow> =
+        if (raw.any { (_, amount) -> amount != null && !amount.isWonInteger() }) {
+            fractionalAmounts++
+            emptyList()
+        } else {
+            orderedBidderRows(raw)
+        }
 }
 
 private fun AssemblyTally.noticeOf(
@@ -132,9 +150,11 @@ private fun AssemblyTally.noticeOf(
 private fun AssemblyTally.outcomeOf(axes: Map<SourceEndpoint, List<RawRow>>): SnapshotOutcome {
     val reserveRows = axes[SourceEndpoint.RESERVE_PRICE_DETAIL].orEmpty()
     val listRow = axes[SourceEndpoint.OPENING_RESULT_LIST]?.firstOrNull()
+    // 금액을 칸 단위로 비우지 않는다(D-6G2d-43) — 목록 전체의 판정은 [AssemblyTally.wonBidderRows] 가
+    // 한 자리에서 한다. 여기서 `wonAmount` 를 쓰면 한 명만 비어 순번이 밀린다.
     val bidders =
         axes[SourceEndpoint.OPENING_COMPLETE].orEmpty().map { row ->
-            row.countOf(FieldConcept.OPENING_RANK) to wonAmount(row.amountOf(FieldConcept.BID_AMOUNT))
+            row.countOf(FieldConcept.OPENING_RANK) to row.amountOf(FieldConcept.BID_AMOUNT)
         }
     return SnapshotOutcome(
         // 대체값(EPOCH)을 지어내지 않는다 — 없으면 행 단위 제외의 입력이다(D-6G-28).
@@ -145,7 +165,7 @@ private fun AssemblyTally.outcomeOf(axes: Map<SourceEndpoint, List<RawRow>>): Sn
         reservePrices = reservePricesOf(reserveRows),
         drawnSerialNumbers = drawnSerialNumbersOf(reserveRows),
         participantCount = listRow?.countOf(FieldConcept.PARTICIPANT_COUNT),
-        bidderRows = orderedBidderRows(bidders),
+        bidderRows = wonBidderRows(bidders),
     )
 }
 

@@ -9,6 +9,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -137,8 +138,9 @@ class SnapshotAmountContractTest {
     }
 
     /**
-     * 스칼라 다섯은 `int | null` 이므로 그 칸만 비운다 — 기초금액·순공사원가·예정가격·개찰 기초금액·
-     * 투찰금액. 행은 사라지지 않고 다른 칸은 그대로다.
+     * 스칼라 넷은 `int | null` 이므로 그 칸만 비운다 — 기초금액·순공사원가·예정가격·개찰 기초금액.
+     * 행은 사라지지 않고 다른 칸은 그대로다. **투찰금액은 이 무리가 아니다**(D-6G2d-43): 그 칸을
+     * 비우면 순번이 밀리므로 목록 전체가 사라진다(아래 판).
      */
     @Test
     fun `스칼라 금액 칸의 소수부는 그 칸만 비운다`() {
@@ -151,18 +153,61 @@ class SnapshotAmountContractTest {
                     intactReserveRows(
                         scalars = mapOf("plnprc" to "$PLANNED_PRICE.25", "bssamt" to "$OPENING_BASE_AMOUNT.5"),
                     ),
-                openingFields = listOf(mapOf("opengRank" to "1", "bidprcAmt" to "1100000000.5")),
+                openingFields = listOf(mapOf("opengRank" to "1", "bidprcAmt" to "1100000000")),
             )
 
-        rendered.fractional shouldBe 5
+        rendered.fractional shouldBe 4
         rendered.bytes shouldContain "\"base_amount\":null"
         rendered.bytes shouldContain "\"pure_construction_cost\":null"
         rendered.bytes shouldContain "\"planned_price\":null"
         rendered.bytes shouldContain "\"opening_base_amount\":null"
-        rendered.bytes shouldContain "\"amount\":null"
+        // 투찰자는 온전하므로 그대로 실린다.
+        rendered.bytes shouldContain "\"amount\":1100000000"
         // 집계 둘은 온전하므로 형태를 지킨다.
         rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
         rendered.bytes shouldContain "\"reserve_prices\":[$RESERVE_PRICE_AMOUNT,"
+    }
+
+    /**
+     * **D-6G2d-43 (cr r5 ④) — 투찰자 한 명의 소수 금액은 목록 전체를 비운다.** 그 한 명만 `null` 로
+     * 두면 순번이 밀린다: 순번은 금액 오름차순에 `null` 을 뒤로 두어 매기므로(D-6G-2 §1.3) 비운 한 명이
+     * 맨 뒤로 가고 그 뒤 순위가 한 칸씩 당겨진다 — 1위 투찰가와 참가자 구성이 조용히 달라지고 판독은
+     * 사유까지 틀린다. 집계 둘과 같은 규율로 통째로 비우고 **한 번** 센다.
+     */
+    @Test
+    fun `투찰자 금액의 소수부는 투찰자 목록 전체를 비운다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(),
+                reserveFields = intactReserveRows(),
+                openingFields =
+                    listOf(
+                        mapOf("opengRank" to "1", "bidprcAmt" to "1100000000"),
+                        mapOf("opengRank" to "2", "bidprcAmt" to "1200000000.5"),
+                        mapOf("opengRank" to "3", "bidprcAmt" to "1300000000"),
+                    ),
+            )
+
+        rendered.fractional shouldBe 1
+        rendered.bytes shouldContain "\"bidder_rows\":[]"
+        // 온전한 두 명도 남지 않는다 — 남기면 그 둘의 순번이 실제 순위가 아니다.
+        rendered.bytes shouldNotContain "\"amount\":1100000000"
+    }
+
+    /** 반대 방향 — 금액이 **없는** 투찰자는 목록을 비우지 않는다(원천의 정직한 결측, 순번은 뒤로). */
+    @Test
+    fun `금액 없는 투찰자는 목록을 비우지 않는다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(),
+                reserveFields = intactReserveRows(),
+                openingFields =
+                    listOf(mapOf("opengRank" to "1", "bidprcAmt" to "1100000000"), mapOf("opengRank" to "2")),
+            )
+
+        rendered.fractional shouldBe 0
+        rendered.bytes shouldContain "\"amount\":1100000000"
+        rendered.bytes shouldContain "\"amount\":null"
     }
 
     /**
