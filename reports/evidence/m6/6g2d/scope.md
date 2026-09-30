@@ -113,6 +113,14 @@
 
 **OPEN 표 갱신(레인 보고 4)**: 신설 `OPEN-6G2D-EMPTY-AXIS-REASON` · `OPEN-6G2D-AXIS-RETRY-LIMIT`(값 3 · 창 = 디렉터리 생애, 마지막 정착 뒤 누적 — 운영자 A-3) · `OPEN-6G-REVIEW-FOLLOWUPS` 추가(형식 거부 종료 코드 · `unusableRawRows` 세 원인 분리 계수).
 
+## 계약 갱신 r1-c (2026-09-30, 팀장 — 레인 보고 「D-21 ⓑ 는 골든 바이트를 바꾼다」 수령 · 운영자 결정 「지금 6G-2d 에 포함」)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-25** | **D-21 ⓑ 를 이 slice 에서 닫는다 — 골든 재생성 포함(운영자 결정 2026-09-30).** 골든의 `a_value.total` 260,853,707 은 출하 조립 E2E 의 A 축 대역이 여섯 구성 항목 중 하나(`npnInsrprm`)만 싣고 품질관리비 술어 `Y` 인데 금액이 없는 **반쪽 원문**이 만든 과소 합산이다 — 골든이 결함을 굳히고 있었다. 처방: ⓐ 대역의 A 축 원문을 **여섯 항목 + 공개일시 온전히** 채운다(합성값, 식별자 없음) ⓑ `a_value` 는 항목 하나라도 결측이면 null(전부 아니면 무), 발생 수는 `incompleteAValues` 계수 ⓒ Kotlin writer 로 골든을 **재생성**하고 manifest 의 해시·행 수·`sample_scope_divisions` 를 함께 갱신(12 = 9+1+1+1 항등식 유지, 스키마 칸·`schema_version` 무변경 — A-2 유지) ⓓ **Python 왕복**: CI `ml-engine` job 명령 그대로(`.github/workflows/ci.yml`)를 레인이 한 번 돌려 골든 판독 test 가 초록임을 확인(`ml-engine/src/**` 무변경) ⓔ 골든 바이트 변화는 evidence 에 「무엇이 바뀌었나」(행별 `a_value` before/after)로 공시. in_scope 에 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 를 더한다(골든 파일만 — Python 소스·다른 fixture 금지). 변이: 항목 결측에 `total` 이 나옴 → RED(M-a-undersum). 골든 재생성이 세 행의 `a_value` 를 null 로 만들면 그것은 대역이 아직 반쪽이라는 뜻이다 — 대역을 채운 뒤에는 세 행 모두 `a_value` 가 **있어야** 한다 |
+
+in_scope 추가: `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**`(D-25, 골든 파일만). out_scope 유지: `ml-engine/src/**` · `ml-engine/tests/**` 의 그 밖 · `snapshot-schema.md` 계약 칸.
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
