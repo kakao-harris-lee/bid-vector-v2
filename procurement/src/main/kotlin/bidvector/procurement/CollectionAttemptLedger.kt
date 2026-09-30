@@ -108,7 +108,7 @@ sealed interface AttemptOutcome {
     /**
      * **다시 불러 볼 값이 있는** 실패 — 5xx·타임아웃·상한 거부·짧은 걷기. 다시 부른다(D-6G-58): 한 번
      * 실패한 축을 영구히 포기하면 그 결측이 무작위가 아니게 된다(느린 응답·과부하 시간대에 몰린 공고만
-     * 빠진다). 재호출 상한은 정책이 정한다([KonepsCollectionPolicyData.axisRetryLimit]).
+     * 빠진다). 재호출 상한은 정책이 정한다([DetailFetchGates.axisRetryLimit]).
      */
     data class Failed(
         val code: String,
@@ -148,7 +148,9 @@ sealed interface AttemptOutcome {
  *
  * 추출이 이 둘을 함께 읽어야 짐작이 사라진다. [settled] 만 있으면 「끝났다」는 알아도 **어느 행이
  * 그 끝난 걷기의 것인지**는 모르고, 그 자리를 원문 행의 시각으로 메우는 순간 잘린 걷기가 완료 행이
- * 된다. [walk] 가 `null` 인 settled 는 빈 응답이고 **0 행**이다.
+ * 된다. **0 행은 걷기 부재가 아니라 결말 어휘가 말한다**([AttemptOutcome.Empty], D-6G2d-4 ⓑ) — 걷기는
+ * AXIS 줄이 언제나 싣는다. 앞 판은 그 둘을 `null` 하나로 접었고, 그래서 걷기를 모르는 옛 줄이 빈 응답과
+ * 같은 값이 되어 축이 통째로 빠진 완료 행을 냈다(vr r5-t probe W7).
  */
 data class AxisConclusion(
     /**
@@ -198,17 +200,14 @@ class AttemptHistory(
     }
 
     /**
-     * (공고, 축)마다 **마지막** 결말이 끝난 것인가(D-6G-58) — 원장에 줄이 하나라도 있으면 **원장이
-     * 이긴다.** 원문 행의 존재는 원장 이전 실행의 흔적에만 쓴다: 잘린 걷기도 행을 남기므로, 행이
-     * 있다고 다 받은 것이 아니다(그 축은 영영 다시 불리지 않고 결측이 조용해진다).
+     * (공고, 축)마다 **마지막 AXIS 결말** — 결말 어휘와 그 걷기다. **추출이 읽는 자리**이고, 이어
+     * 돌기가 묻는 것은 이것이 아니라 [axisResumptions] 다(그쪽은 재호출 상한과 원장 시대 판별까지
+     * 함께 본다). 두 물음을 한 함수로 접으면 추출이 상한 값을 알아야 하는데, 추출에게는 실패가 일시든
+     * 확정이든 같은 답(`incomplete_axis`)이라 그 인자가 뜻을 갖지 않는다.
      *
-     * 값이 `false` 인 것(실패·타임아웃·5xx·쿼터 거절·짧은 걷기)은 **다시 부른다.** 한 번 실패한 축을
-     * 영구히 포기하면 그 결측이 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고,
-     * 그 행은 값 결측 제외로 계수되어 사유 귀속까지 틀린다.
+     * 줄이 없는 (공고, 축)은 **항목 자체가 없다** — 원장 이전 원문의 처리는 D-6G-58 그대로다.
      */
     fun axisConclusions(): Map<String, Map<SourceEndpoint, AxisConclusion>> =
-        // AXIS 줄은 걷기를 반드시 갖는다(`CollectionAttempt.init`) — 판독이 그 불변식을 다시 요구해,
-        // 형태를 어긴 줄이 여기까지 왔으면 조용히 지나가지 않는다.
         byNoticeAndAxis { it.kind == AttemptKind.AXIS }
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> conclusionOf(lines.last()) } }
 
@@ -226,6 +225,8 @@ class AttemptHistory(
      * 매 실행 승인 호출을 태우고, 그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다.
      */
     fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> {
+        // 하한을 **여기 한 자리**에서만 본다(D-6G2d-18) — 상한을 쓰는 자리가 이곳이고, 정책 구성 쪽에
+        // 같은 문장을 두면 같은 불변식이 둘이 되어 한쪽이 낡는다.
         require(axisRetryLimit >= 1) { "재호출 상한은 1 이상이다 — 0 이면 한 번의 일시 실패가 축을 영구히 버린다" }
         // 갈래를 **거르지 않는다** — 의도·결말 줄의 존재가 「원장 시대인가」를 말한다(D-6G2d-8 ⓑ).
         return byNoticeAndAxis { true }

@@ -41,13 +41,19 @@ internal const val STATE_NAME = "state.json"
  */
 internal const val RUN_STATE_FORMAT_VERSION = 2
 
-/** 형식 거부의 **닫힌 사유** — 잠금 경합(`ALREADY_RUNNING`)과도, 장부 불일치와도 다른 값이다. */
-internal enum class RunStateFormatFault {
-    /** 장부에 형식 version 칸이 없다 — 이 칸이 생기기 전에 쓰인 디렉터리다. */
-    MISSING,
+/**
+ * 형식 거부의 **닫힌 사유** — 잠금 경합(`ALREADY_RUNNING`)과도, 장부 불일치와도 다른 값이다.
+ * [causeCode] 는 기동 실패 출력에서 **그대로 grep 되는 토큰**이다(cr r1 M-3 부분 이행 — 전용 종료
+ * 코드는 배선 재설계가 필요해 이 라운드 밖이다, evidence 「이탈」).
+ */
+internal enum class RunStateFormatFault(
+    val causeCode: String,
+) {
+    /** 장부에 형식 version 칸이 없다(또는 값이 `null`) — 이 칸이 생기기 전에 쓰인 디렉터리다. */
+    MISSING("RUN_STATE_FORMAT_MISSING"),
 
-    /** 칸은 있는데 이 코드가 읽을 줄 아는 version 이 아니다(앞·뒤 양방향). */
-    MISMATCHED,
+    /** 칸은 있는데 이 코드가 읽을 줄 아는 형태·값이 아니다(문자열·선행 0·소수·다른 수). */
+    MISMATCHED("RUN_STATE_FORMAT_MISMATCHED"),
 }
 
 /**
@@ -57,7 +63,7 @@ internal enum class RunStateFormatFault {
  */
 internal class RunStateFormatRefusedException(
     val fault: RunStateFormatFault,
-) : RuntimeException("실행 상태 형식이 이 코드의 것이 아니다 — fault=$fault")
+) : RuntimeException("실행 상태 형식이 이 코드의 것이 아니다 — cause=${fault.causeCode}")
 
 /** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
 internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
@@ -321,12 +327,20 @@ class RunStateDirectory(
     }
 
     /**
-     * 형식 version 대조(D-6G2d-4 ⓐ) — 없거나 다르면 **기동 거부**다(경고가 아니다). 거부는 잠금을
+     * 형식 version 대조(D-6G2d-4 ⓐ · 18) — 없거나 다르면 **기동 거부**다(경고가 아니다). 거부는 잠금을
      * 놓고 나가야 하므로 [heldOrRelease] 안에서 일어난다(이 함수는 [readFacts] 가 부른다).
+     *
+     * **정수만 받는다**(vr r1 L-1). 일반 판독기(`asIntOrNull`)는 문자열 `"1"` 과 선행 0 `01` 을 받아
+     * 주는데, 이 칸은 **우리가 쓰는 값**이라 관용할 이유가 없고 관용은 형식 판별을 무르게 만든다.
+     * 칸이 있는데 형태가 틀리면 그것은 「없다」가 아니라 「다르다」다 — `1.0` 이 MISSING 으로 가면
+     * 운영자가 옛 디렉터리와 손상된 장부를 구별할 수 없다.
      */
-    private fun requireCurrentFormat(declared: Int?) {
-        if (declared == null) throw RunStateFormatRefusedException(RunStateFormatFault.MISSING)
-        if (declared != RUN_STATE_FORMAT_VERSION) {
+    private fun requireCurrentFormat(declared: JsonValue?) {
+        if (declared == null || declared == JsonValue.JsonNull) {
+            throw RunStateFormatRefusedException(RunStateFormatFault.MISSING)
+        }
+        val version = (declared as? JsonValue.JsonNumber)?.raw?.takeIf(STRICT_FORMAT_VERSION::matches)?.toIntOrNull()
+        if (version != RUN_STATE_FORMAT_VERSION) {
             throw RunStateFormatRefusedException(RunStateFormatFault.MISMATCHED)
         }
     }
@@ -337,7 +351,7 @@ class RunStateDirectory(
                 .getOrNull()
                 ?.let { KonepsJsonParser.parse(it, ATTEMPT_MAX_DEPTH).asObject()?.fields }
                 ?: return null
-        requireCurrentFormat(fields["format_version"].asIntOrNull())
+        requireCurrentFormat(fields["format_version"])
         return RunStateFacts(
             directoryId = requireNotNull(fields["directory_id"].asStringOrNull()) { "장부에 디렉터리 식별자가 없다" },
             sampleListSha256 = requireNotNull(fields["sample_list_sha256"].asStringOrNull()) { "장부에 표본 해시가 없다" },
@@ -419,6 +433,9 @@ private fun linesOf(file: Path): List<String> =
         .lineSequence()
         .filter { it.isNotBlank() }
         .toList()
+
+/** 형식 version 의 형태 — 선행 0 도 부호도 소수점도 없는 십진 정수 하나다(D-6G2d-18). */
+private val STRICT_FORMAT_VERSION = Regex("0|[1-9][0-9]*")
 
 internal const val RUN_LOCK_NAME = "run.lock"
 

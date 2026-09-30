@@ -176,7 +176,9 @@ class JdbcSnapshotSource(
         // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
         // **무방비로 정규화하지 않는다**(D-6G2d-8 ⓐ) — 공고번호 칸이 빈 문자열로 온 원문 행이 있으면
         // `NoticeNumber.of` 가 던지고 그 한 행이 추출 전체를 멈춘다. 원문은 append-only 라 지울 수도
-        // 없다. 차수와 같은 규율이다: 형태를 어긴 행은 키를 갖지 못한다.
+        // 없다. 차수와 같은 규율이다: 형태를 어긴 행은 키를 갖지 못한다. 오늘의 수집 경로는 그런
+        // 항목을 적재 전에 떨어뜨리므로 이것은 **방어 심화**다(cr r1 L-1) — 판독은 적재 경로의
+        // 전제에 기대지 않는다.
         val number = rows.getString("notice_number")?.let { NoticeNumber.ofOrNull(it)?.value }
         val round = rows.getString("notice_round")?.let(::roundOrNull)
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()

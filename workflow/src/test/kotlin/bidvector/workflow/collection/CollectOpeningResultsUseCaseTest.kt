@@ -448,14 +448,17 @@ private fun shortWalkOn(
     walk = COLLECTION_NOW,
 )
 
-/** 결정적 실패의 결말 줄(D-6G2d-8 ⓒ) — 다시 불러도 같은 답이 온다. */
+/**
+ * 결정적 실패의 결말 줄(D-6G2d-8 ⓒ · 17) — 다시 불러도 같은 답이 온다. 코드는 **실제로 확정인 셋**
+ * 중 하나여야 한다(cr r1 L-2): 구조 붕괴는 일시라 production 이 이 조합을 쓸 수 없다.
+ */
 private fun finalFailureOn(
     key: String,
     axis: SourceEndpoint,
 ) = CollectionAttempt(
     key,
     axis,
-    AttemptOutcome.FinalFailure("STRUCTURE_FAILURE"),
+    AttemptOutcome.FinalFailure("MAX_PAGES"),
     COLLECTION_NOW,
     AttemptKind.AXIS,
     walk = COLLECTION_NOW,

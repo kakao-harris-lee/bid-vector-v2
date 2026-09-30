@@ -61,15 +61,15 @@ data class DetailFetchGates(
      * 이유는 이것이 조회 가치 술어의 값이고, 수집 use case 가 **읽을 수 있는** 유일한 정책 자리이기
      * 때문이다 — `KonepsCollectionPolicyData` 는 그 패키지에서 통과 전용이다(구조 게이트가 멤버 접근을
      * 막는다, D-6F8-1 우회 1). 그 금지는 옳다: 정책의 원문 키를 use case 가 들여다볼 자리를 주지 않는다.
+     *
+     * 하한(1 이상)은 **쓰는 자리**가 본다([AttemptHistory.axisResumptions], D-6G2d-18) — 같은 불변식을
+     * 두 자리에 두면 한쪽이 낡는다.
      */
     val axisRetryLimit: Int,
 ) {
     init {
         require(ageGateHours >= 0) { "ageGateHours는 음수일 수 없다: $ageGateHours" }
         require(recheckGateHours >= 0) { "recheckGateHours는 음수일 수 없다: $recheckGateHours" }
-        require(axisRetryLimit >= 1) {
-            "axisRetryLimit은 1 이상이다 — 0 이면 한 번의 일시 실패가 그 축을 영구히 버린다: $axisRetryLimit"
-        }
     }
 }
 

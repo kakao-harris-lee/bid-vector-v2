@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Comparator
 import java.time.Instant
 import java.time.LocalDate
 
@@ -447,6 +448,43 @@ class RunStateDirectoryTest {
         )
 
         shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
+    }
+
+    /**
+     * **D-6G2d-18 (vr r1 L-1) — 형식 version 은 정수만이다.** 일반 판독기는 문자열과 선행 0 을 받아
+     * 주는데 이 칸은 우리가 쓰는 값이라 관용할 이유가 없다. 그리고 칸이 있는데 형태가 틀린 것은
+     * 「없다」가 아니라 **「다르다」**다 — 그 구별이 옛 디렉터리와 손상된 장부를 가른다.
+     */
+    @Test
+    fun `형식 version 은 정수만 받는다 — 문자열·선행 0·소수는 다르다`() {
+        listOf("\"$RUN_STATE_FORMAT_VERSION\"", "0$RUN_STATE_FORMAT_VERSION", "$RUN_STATE_FORMAT_VERSION.0")
+            .forEach { malformed ->
+                open().sampleList.confirm(sample())
+                val state = root().resolve(STATE_NAME)
+                Files.writeString(
+                    state,
+                    Files
+                        .readString(state)
+                        .replace("\"format_version\":$RUN_STATE_FORMAT_VERSION", "\"format_version\":$malformed"),
+                )
+
+                shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
+                releaseLocks()
+                Files.walk(root()).sorted(Comparator.reverseOrder()).forEach(Files::delete)
+            }
+    }
+
+    /** 값이 명시 `null` 인 것은 「없다」다 — 그 장부는 이 칸이 생기기 전에 쓰였다. */
+    @Test
+    fun `형식 version 이 명시 null 이면 없는 것이다`() {
+        open().sampleList.confirm(sample())
+        val state = root().resolve(STATE_NAME)
+        Files.writeString(
+            state,
+            Files.readString(state).replace("\"format_version\":$RUN_STATE_FORMAT_VERSION", "\"format_version\":null"),
+        )
+
+        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISSING
     }
 
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */

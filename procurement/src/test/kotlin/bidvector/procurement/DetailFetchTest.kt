@@ -86,13 +86,6 @@ class DetailFetchTest {
         }
     }
 
-    /** D-6G2d-8 ⓒ — 상한 0 은 한 번의 일시 실패로 그 축을 영구히 버린다(비랜덤 결측). */
-    @Test
-    fun `DetailFetchGates 는 0 회 재호출 상한을 거부한다`() {
-        io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
-            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 0)
-        }
-    }
 }
 
 /** D-3B2-5 (a) — COL-04 「업종제한 플래그 N → 서브콜 0회」의 순수 술어. */

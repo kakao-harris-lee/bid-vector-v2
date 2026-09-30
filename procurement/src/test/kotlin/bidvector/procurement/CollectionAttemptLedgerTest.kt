@@ -292,6 +292,17 @@ class CollectionAttemptLedgerTest {
         AttemptOutcome.Refused("QUOTA_EXHAUSTED").isSettled shouldBe false
     }
 
+    /**
+     * D-6G2d-18 — 하한은 **쓰는 자리**가 본다. 상한 0 은 한 번의 일시 실패로 그 축을 영구히 버리므로
+     * 정책이 그 값을 주면 질의가 거부한다(같은 문장을 정책 구성 쪽에 두지 않는다).
+     */
+    @Test
+    fun `재호출 상한 0 은 질의가 거부한다`() {
+        io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+            AttemptHistory(emptyList()).axisResumptions(0)
+        }
+    }
+
     /** 거부가 상한만큼 쌓여도 그 축은 미정착이다 — 세는 것은 실제로 나간 호출의 일시 실패뿐이다. */
     @Test
     fun `관문 거부는 재호출 상한에 세지 않는다`() {
