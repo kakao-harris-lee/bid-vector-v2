@@ -18,7 +18,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-4 ⓒ** `CollectionAttempt.walk` 기본값 제거 | 이행 | `init` 이 `(kind == AXIS) == (walk != null)` 를 요구 |
 | **D-6G2d-4 ⓓ** `SourceBatch.observedAt` 기본값 판정 | 이행 — **기본값·nullable 둘 다 제거** | 착수 실측: production 생성 자리 둘 중 빈 배치(무효 cursor)도 걷기 이름을 실을 수 있다 → 「채우지 않는 자리 0」 |
 | **D-6G2d-5** 「정착했으나 0 행」은 등재로 | 이행(문서) | 아래 「알려진 제한」 (a)(b) · `OPEN-6G2D-EMPTY-AXIS-REASON` |
-| **D-6G2d-6** 게이트 술어 확장 0 · 새 public 표면 0 | **부분 — 이탈 2·5** | 술어 확장 0 은 지켰다(계약 파일 변경은 등재 **해제** 한 줄). 새 public 표면은 여덟 |
+| **D-6G2d-6** 게이트 술어 확장 0 · 새 public 표면 0 | **부분 — 이탈 2·5** | 술어 확장 0 은 지켰다(계약 파일 변경은 등재 **해제** 한 줄). 새 public 표면은 **열하나**(아래 표 둘의 합) |
 | **D-6G2d-7** 6G evidence 정정 선언 | 이행 | 아래 「6G evidence 정정」 |
 | **D-6G2d-8 ⓐ** 빈 번호 원문 행 | 이행 | `NoticeNumber.ofOrNull` — 추출의 `keyAndEndpointOf`·이어 돌기의 `JdbcCollectedAxisStore.matched` 두 자리. 계수 `SnapshotExtraction.unusableRawRows`, 러너 로그 한 칸 |
 | **D-6G2d-8 ⓑ** raw 있고 결말 없는 축은 재호출 | 이행 | `AttemptHistory.axisResumptions` 가 「줄 있음 · 결말 없음」을 `false` 로 낸다. 줄이 아예 없으면 항목 부재(D-6G-58 그대로) |
@@ -32,6 +32,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-28** 합산 술어가 `Y`/`N` 밖이면 A 비움 | 이행 | `aValueTotalOf` 가 술어 `null` 을 「A 를 낼 수 없음」으로 읽는다 · `aValuePartsOf` 는 「참일 때만」 한 가지만 답한다 · 계수 `incompleteAValues` |
 | **D-6G2d-29** `Refused` 의 뜻 | 이행(문면) | `AttemptOutcome.Refused` KDoc · `failureOf` 갈래 주석 · evidence 두 자리. 코드 무변경 |
 | **D-6G2d-30** 일괄 | 이행 | 절단 사유 전수를 **sealed 계층에서 도출**(`TruncationCauseClassificationGateTest`) · 덧붙인 순서 전용 test · 러너 로그 계수 셋 단언 · `axisResumptions` 안내 문면 · 이탈 13·표면 표·rollback 범위 문면 |
+| **D-6G2d-34** 승인 전 일괄 | 이행 | ① rollback 복원 경로에 app 게이트 test 디렉터리 · 유효성 술어와 ③ 대조에 게이트 등재 파일 · 새 파일 **일곱** · 문서 명령 그대로 재실측 ② `axisResumptions` 안내 문면(「상한 N = N 번째 일시 실패에서 확정」) ③ 표면 수 세 자리 ④ `snapshotFinishedLine` 값 함수 + 계수마다 다른 수로 전문 대조 · 술어 거짓 + 금액 있음 판 ⑤ sealed 도출을 **잎까지 재귀**(`leavesOf`) · 자기교집합 단언을 갈래 이름 등식으로. **거동 변경 0 · 술어 확장 0** |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
 ## 변이표
@@ -63,6 +64,10 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-unknown-predicate-as-false** 모름 술어를 거짓으로 접는다 | 같은 클래스 | RED 2 |
 | **M-log-cell-dropped** 러너 로그에서 계수 칸 하나를 뺀다 | `SnapshotExtractionE2ETest` | RED 1 |
 | **M-a-undersum** 결측 항목을 빼고 합산한다 | 같은 클래스 | RED 1 |
+| **M-sealed-nested** 중첩 sealed 층에 확정 실패 잎 하나를 심는다 | `TruncationCauseClassificationGateTest` | RED 2(전수 3→4 · 확정 집합에 심은 코드) |
+| **M-log-swap** 로그 줄에서 계수 둘을 맞바꾼다 | `SnapshotFinishedLineTest` | RED 1 |
+| **M-log-literal** 계수 칸 하나를 리터럴 0 으로 | 같은 클래스 | RED 1(앞 판의 E2E 단언에서는 **초록**이었다 — 그 fixture 는 계수가 모두 0) |
+| **M-quality-or** 품질관리비 포함 조건에 「금액이 있으면」을 or 로 더한다 | `SnapshotAmountContractTest` | RED 1(새 판만 — 술어와 값 존재를 가르는 유일한 자리) |
 
 ## 착수 실측 표 갱신
 
@@ -76,21 +81,24 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 
 ## acceptance
 
-CI `check` job 의 명령 그대로에 `clean` 과 `--no-build-cache` 를 더한 집합이다(CI 는 `check` 를
-캐시와 함께 돌린다 — 더 좁은 쪽이라 이 집합이 그것을 덮는다).
+**CI `check` job 의 명령 그대로**다(`.github/workflows/ci.yml`, 넷). 앞 라운드가 더했던 `clean` ·
+`--no-build-cache` 는 CI 에 없는 인자라 뺐다 — acceptance 의 정본은 job 이 돌리는 명령 그대로이고
+(evidence-pack 규격), 다른 집합으로 갈음하면 「CI 와 다른 것을 재고 초록이라 적는」 자리가 하나 생긴다.
+더 강한 그 집합도 앞 라운드 HEAD 에서 초록이었다.
 
-HEAD `19746e2b`(재작업 2 의 마지막 산출물 커밋) 실측:
+버릴 clone 을 `4c09e390`(마지막 산출물 커밋)에 **clean 하게** 두고 실측했다 — 작업 트리의 미커밋
+evidence 편집이 섞이지 않는다.
 
 | 명령 | exit |
 |---|---|
-| `./gradlew --no-daemon clean` | 0 |
-| `./gradlew --no-daemon check --no-build-cache` | 0 |
+| `install buf` step | 러너는 정책 파일의 version 으로 바이너리를 받는다. 이 호스트의 `buf` 는 `tool.buf.version` 과 **같은 version** 이라 그 step 의 결과 상태와 같다 |
+| `./gradlew --no-daemon check` | 0 |
 | `./gradlew --no-daemon qualityBaseline` | 0 |
-| `./tools/one-command-check.sh` | 0 (「Kotlin 전건 + Python 전건 통과」) |
+| `./tools/one-command-check.sh` | 0 (마지막 줄 「완료 — Kotlin 전건 + Python 전건 통과」) |
 
 test XML 합은 **task 별로** 적는다(vr r1 L-3 — 앞 판은 `test` task 만 세면서 그 기준을 적지 않았다):
-`test` 2,550 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
-전체 합 2,558. base 대비 `test` 는 **+45** 다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
+`test` 2,552 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
+전체 합 2,560. base 대비 `test` 는 **+47** 이다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
 rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는다.
 
 `container` job 은 돌리지 않았다 — 이 slice 는 그 job 이 돌리는 이미지·compose·실서버 경로를
@@ -103,12 +111,9 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 묶기 네 줄을 복제했다 → `byNoticeAndAxis` 하나로. **cpd 의 지적이 옳았다**: 두 물음이 같은 묶음을
 쓴다는 사실이 코드에 없었다.
 
-재작업 1 에서 셋 더: `:adapters:detekt` 파일당 함수 수(금액 정수 술어를 **판정하는 자리 옆**으로 옮겼다 —
-상한을 비껴가는 이동이 아니다) · `:adapters:sizeGate` 파일 500줄 **둘**(production·test 각각 501 —
-형식 판별 축을 제 파일로 갈랐다, `FileAttemptLedger.kt` 를 가른 경계와 같은 이유) · 그 분리가 만든
-이름 충돌(`internal` 은 패키지 전체에 보인다 — 하네스의 파일 수준 이름에 접두를 줬다).
+## 새 public 표면 (D-6G2d-6 기대값 0 — 실제 **열하나**, 이탈 2)
 
-## 새 public 표면 (D-6G2d-6 기대값 0 — 실제 여덟, 이탈 2)
+첫 표 여덟 + 「재작업 1 이 더한 표면 셋」 = 열하나. 절 제목과 이탈 2 와 D-6G2d-6 행이 같은 수를 말한다.
 
 | 표면 | 밖에서 허용하는 것 |
 |---|---|
@@ -130,13 +135,15 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 | `SnapshotExtraction.incompleteAValues` | 판독이 「A 묶음이 전부-아니면-무 규율로 사라진 수」를 읽는다. 소수부와 **원인이 다르므로** 칸을 따로 둔다 — 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시 항등식 밖 |
 
 좁아진 표면 하나: `DetailFetchGates` 의 `init` 에서 상한 하한 검사가 사라졌다(쓰는 자리 하나로,
-D-6G2d-18). 생성자 형태는 그대로다. **재작업 2 는 표면을 더하지 않았다** — D-28 은 판정을 부르는 쪽으로
-올린 것이고 `aValuePartsOf` 는 파일 범위 `private` 이다.
+D-6G2d-18). 생성자 형태는 그대로다. **재작업 2 도 재작업 3 앞 일괄도 표면을 더하지 않았다** — D-28 은 판정을
+부르는 쪽으로 올린 것이고 `aValuePartsOf` 는 파일 범위 `private` 이며, D-34 가 뗀 로그 줄 함수는
+`internal` 이다.
 
 **모듈 밖에 열리지 않는 것**(cr r1 L-3 정정 — 앞 판은 전부 `internal` 이라고 적었으나 다섯은
 `private` 이다): `internal` 은 `RUN_STATE_FORMAT_VERSION` · `RunStateFormatFault` ·
 `RunStateFormatRefusedException` · `requireCurrentFormat` · `STAGED_ATTEMPT_NAME` · `AXIS_WALK_REQUIRED` ·
-`isWonInteger` · `AssemblyTally`. **파일 범위 `private`** 은 `EXCLUDED_FROM_LEDGERED_SET` · `WalkRows` ·
+`isWonInteger` · `AssemblyTally` · `snapshotFinishedLine`(재작업 3 — 로그 줄을 짓는 값 함수, app 모듈
+안). **파일 범위 `private`** 은 `EXCLUDED_FROM_LEDGERED_SET` · `WalkRows` ·
 `usableAxis` · `fromLedgeredWalk` · `failureOf` · `conclusionOf` · `STRICT_FORMAT_VERSION`. 결론(밖에
 열리지 않는다)은 `private` 쪽이 더 강하게 참이다.
 
@@ -231,8 +238,9 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
    `adapters/.../persistence/JdbcCollectedAxisStore.kt` — D-6G2d-8 ⓐ 결정문이 이름으로 든 자리인데
    in_scope **경로 목록**에는 없다. `app/src/main/.../collection/SnapshotExtractionRunner.kt` — 계수를
    공시하는 로그 한 칸(어댑터는 로거를 쓸 수 없다, 구조 게이트).
-2. **D-6G2d-6 「새 public 표면 0」을 어긴다** — 여덟(위 표). 여섯은 **좁히는** 방향이고(기본값 제거·
-   nullable 제거·메서드 제거·양방향 `require`), 둘은 새 값을 나른다(`FinalFailure`·`unusableRawRows`).
+2. **D-6G2d-6 「새 public 표면 0」을 어긴다** — **열하나**(위 표 둘). 여섯은 **좁히는** 방향이고(기본값
+   제거·nullable 제거·메서드 제거·양방향 `require`), 다섯은 새 값을 나른다(`FinalFailure` · `Refused` ·
+   계수 셋 `unusableRawRows`·`fractionalAmounts`·`incompleteAValues`).
    ⓒ 의 상한을 「정책 값으로」 두라는 요구와 ⓐ 의 「계수 공시」 요구는 표면 없이 이행할 수 없다.
 3. **D-6G2d-8 ⓒ 가 든 결정적 실패 넷 중 구조 붕괴는 일시로 두었다.** 이 저장소에서 HTTP 5xx 는 봉투가
    없어 그 사유로 오고(개찰 예산 E2E 의 5xx 절단이 그 사유다 — 확정으로 두었을 때 그 E2E 가 RED 였다),
@@ -292,3 +300,7 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
   (값 이름 하나), 이 slice 가 더한 줄만 따로 스캔하면 0 이다. 정본 판정은 `check` 안의 해당 게이트다.
 - 좌표: `reports/evidence/m6/6g2d/` 에 `<파일>.<확장자>:<숫자>` 형태 0건. 역방향(이 slice 가 편집한
   파일 stem 을 가리키는 좌표) 0건.
+- **새 파일 ↔ in_scope 대조**(라운드마다 다시 돌린다 — 수정 라운드가 만드는 파일이 계약 밖으로 나가는
+  것이 반복 사각이다): `git diff --name-status <base>..HEAD | grep '^A'` 가 evidence 셋을 빼고 **일곱**을
+  낸다. 전부 in_scope 다 — `adapters/src/main/.../snapshot`(형식 판별) · `adapters/src/test/**`(넷) ·
+  `app/src/test/**`(둘: 절단 사유 게이트 · 로그 줄 값). 같은 수를 rollback.md 의 기계 목록이 A 로 센다.
