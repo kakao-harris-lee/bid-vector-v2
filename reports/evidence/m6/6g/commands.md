@@ -19,7 +19,11 @@ compose 프로젝트 이름은 `docker` 이고 호스트에 떠 있는 셋(`bid-
 않는다. 포트도 겹치지 않는다(50051 · 루프백 18080; postgres 는 publish 하지 않는다) — 남의 프로젝트는
 멈추지도 지우지도 않았다.
 
-실측 HEAD: `41603713`(merge 커밋 — acceptance 다섯과 rollback ①~⑥ 을 모두 이 트리에서 다시 쟀다).
+**r5 표적 수정 뒤 다시 쟀다**(`7994719b`) — 다섯 명령 전부 exit 0, container job 열둘 전부 exit 0,
+마지막이 `down -v`. 되돌린 트리의 `check` 도 exit 0.
+
+실측 HEAD: `7994719b`(r5 표적 수정의 마지막 산출물 커밋 — acceptance 다섯과 rollback ①~⑥ 을 모두
+이 트리에서 다시 쟀다. 복원 출처는 `a8adf8f5` 그대로다).
 
 ## main 합치기 (D-6G-67)
 
@@ -156,13 +160,22 @@ main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
 | D-6G-58 「쪽 중간에 끊긴 축은 미완」 | E2E 둘(5xx · **상한 거부**) | 5xx: 둘째 기동이 다시 걷고 마지막 걷기가 전 참가자. 상한 거부: mock 요청 == 상한(4) · 그 공고의 원문이 1쪽뿐 · 둘째 기동 뒤 마지막 걷기가 전 참가자 |
 | D-6G-58 ⓑ 「축 결말은 raw 적재 **뒤에**」 | `runAxes` 의 순서 | 그 축의 적재만 실패시키면 결말이 남지 않는다(`적재가 실패한 축은 원장에 결말이 남지 않는다`) |
 | D-6G-58 ⓒ 「받은 수 < 원천 총수면 `SHORT_WALK`」 | `attemptOutcomeOf` | 0/250·100/250 은 `Failed(SHORT_WALK)`, 250/250 은 `Succeeded`, 0/0 만 `Empty` |
-| D-6G-58 r4-d 「추출은 (공고, 축)마다 마지막 걷기만」 | `JdbcSnapshotSource` 의 걷기 선별 | 앞 걷기의 쪽은 raw 에 **남고**(append-only) 행 수에서는 빠진다 — E2E 가 두 수를 각각 단언 |
+| D-6G-58 r4-d → **D-6G-68 로 대체** 「추출은 원장이 가리키는 걷기만」 | `JdbcSnapshotSource.collectWalkRow` · `CollectionAttempt.walk` | 앞 걷기의 쪽은 raw 에 **남고**(append-only) 행 수에서는 빠진다. 「마지막 걷기」를 **행의 시각으로 고르던** 경로는 지웠다(vr r5 H-1) — 어댑터 test 셋(W1 빈 응답 · W2 시계 역행 · W5 창 밖)과 변이 W-lat·W-win 이 잰다 |
 | D-6G-59 「`partialNotice` 는 관측」 | `haltOf(cause, settledAny)` | 예산·쿼터가 같은 물음을 쓴다 — 갈래마다 다른 답을 쓰면 계수가 사유에 따라 달라진다 |
 | D-6G-60 「무결성 장부 = 디렉터리 파일 전부」 | `RunStateDirectory` 의 `state.json` | 장부 대상 집합 == 디렉터리 목록에서 도출한 집합(등식 test) · `sample-scope.json` 삭제·편집 각각 거부 |
 | D-6G-61 「선기록 · 뒤처진 장부는 재동기」 | `KonepsCallGate.sendAndRecord`·`RunStateDirectory` | 의도 줄이 호출 **전에** 남는다 · 마지막 append 뒤 죽은 흔적은 수락하고 상한이 줄지 않는다 · 앞부분 불일치·줄 감소는 여전히 거부 |
-| D-6G-62 「관문 우회 경로가 구조적으로 없다」 | `collection.http-client.roots=bidvector` 정확 집합 · `collection.transport-bypass.holders=`(빈 집합) | 뿌리가 production 전체다 — 이웃 패키지로 옮겨도 붉어진다. `URL`·`Socket`·`java.lang.reflect.Method` 까지 대상 |
+| D-6G-62 「관문 우회 경로가 구조적으로 없다」 | `collection.http-client.roots=bidvector` 정확 집합 · `collection.transport-bypass.holders=`(빈 집합) | **부분 — OPEN**(vr r5 H-3). 뿌리는 production 전체이고 목록 밖 클래스가 클라이언트를 쥐면 붉어진다. 그러나 술어가 **호출 대상의 소유 타입**만 보므로 `uri.toURL().readText()`(KA1)·`ProcessBuilder("curl")`·비동기 채널·Spring 클라이언트는 보이지 않는다. 출하 코드에 그런 호출은 없다 → `OPEN-6G-TRANSPORT-GATE-HARDENING` |
 | D-6G-64 「원문 키 이름은 한 정의에서」 | `NOTICE_NUMBER_RAW_KEY`·`NOTICE_ROUND_RAW_KEY` | 계약 행과 두 SQL(`OBSERVATION_SQL`·`COLLECTED_SQL`)이 같은 값을 읽는다 — **구조**가 두 벌을 없앤다(대조 test 가 아니라) |
 | D-6G-66 「표본 업무 범위는 manifest 칸에서」 | `sample_scope_divisions`(확정 범위 파일 출처) | 한 업무가 행에서 통째로 빠져도 이 칸은 줄지 않는다 — 문턱이 결측을 따라 내려가지 않는다 |
+| **D-6G-68** 「원장의 AXIS 줄이 걷기를 가리킨다」 | `CollectionAttempt.walk` · `AxisConclusion` · `JdbcSnapshotSource.collectWalkRow` | 빈 응답 → 0 행 · 실패·미완 → `incomplete_axis` · 행의 시각으로 고르는 경로 **없음**. 어댑터 test 셋(W1·W2·W5), 변이 W-lat·W-win |
+| **D-6G-68** 「추출에 관측 창을 걸지 않는다」 | `OBSERVATION_SQL`(창 조건 제거) | 창은 원장에 걸리지 않아 창 밖 재걷기가 보이지 않았다. 범위는 표본 목록과 원장이 정한다 — `from..to` 는 manifest 기간의 되돌아갈 자리로만 남았다 |
+| **D-6G-68** 「걷기 식별자는 저장이 견디는 정밀도」 | `KonepsWalkContext.observedAt`(마이크로초 절삭) | `observed_at` 은 TIMESTAMPTZ(마이크로초)이고 시계는 나노초다 — 자르지 않으면 원장의 식별자가 어느 행과도 같지 않다(실측: 전 행 소실) |
+| **D-6G-69** 「상한의 범위는 실행 상태 디렉터리」 | `AttemptHistory.spend(dayStart)` — 시작 시점 인자 **없음** | 값을 1 초 뒤로 옮겨 총계·오늘치를 되감는 길이 사라졌다. 변이 P4 |
+| **D-6G-70** 「찢어진 끝 줄은 복구하고 호출 하나로」 | `RunStateDirectory.healTornTail` · `torn` 표식 줄 · `AttemptHistory.tornLines` | 기동 수락 · 상한 불변(오늘치에도 넣는다) · 축을 지어내지 않는다. 변이 C2 |
+| **D-6G-71** 「추출은 잠금 안에서만」 | `SnapshotExtractionRunner.run` 의 `underRunStateLock` | 잠금을 밖에서 들고 추출 → `ALREADY_RUNNING` · 바이트 0. 변이 L1 |
+| **D-6G-72** 「공고 목록 갈래의 상한 seed」 | 공고 목록 E2E(KST 00:30 · 오늘치 소진) · `alreadySpent` 기본값 **제거** | mock 요청 0. 변이 KN1n |
+| **D-6G-73** 「키 누출 검사를 두 갈래 같게」 | `capturedEverything()`(로거 + cause 체인 + 표준 출력·오류) · 실행 상태 파일 훑기 · 실패 경로 test | 원문과 URL 인코딩 형태 둘 다. 스냅숏에 대표자명 부재 한 줄 |
+| **D-6G-74** 「값싼 것 여섯」 | `STAGED_STATE_NAME` · `realPathOf` · 의도 줄 `outcome` 없음 · 항 넷 · §2.2 재료식 test · 예산 반쪽 test | 변이 KH1(구분자 제거) |
 
 ## 손으로 쓴 fixture 가 못 보는 것 — 무엇이 그 자리를 덮는가
 
@@ -269,6 +282,13 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
 | **Kb** 축의 결말을 raw 적재 **앞으로** 옮긴다 | **RED** — 적재가 실패한 축에도 결말이 남는다 |
 | **Kc1** `SHORT_WALK` 판정에 `received > 0` 을 더한다 | **RED** — 0/250 이 `Empty` 로 선다 |
 | **Kc2** `SHORT_WALK` 판정에 `received == 0` 을 더한다 | **RED** — 100/250 이 `Succeeded` 로 선다 |
+| **W-lat** 걷기를 다시 원문 행의 시각으로 고른다 | **RED** 3건 — W1·W2 와 기존 재걷기 test |
+| **W-win** 상세 축에 관측 창을 다시 건다 | **RED** — W5 |
+| **P4** 상한에 「시작 시점」을 되살려 그 이후만 센다 | **RED** 4건 |
+| **C2** 찢어진 끝 줄을 세지 않고 버린다 | **RED** |
+| **L1** 잠금을 보지 않고 추출한다 | **RED** |
+| **KN1n** 공고 목록 갈래의 예산을 원장에서 seed 하지 않는다 | **RED** |
+| **KH1** 표본 추첨 재료에서 용도 구분자를 뺀다 | **RED** |
 | 원문 키를 계약이 아니라 SQL 리터럴에서 짓는다 | **변이하지 않았다** — r5 가 그 두 벌을 없앴다. 지금 키를 바꾸려면 `NOTICE_NUMBER_RAW_KEY` 하나를 바꾸고 계약과 두 SQL 이 함께 따라간다(구조라 변이할 자리가 없다) |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
@@ -304,6 +324,18 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 
 그 귀결로 이 문서의 「내 절」을 담은 커밋과 그 커밋의 메시지가 어긋난다. 이 절 자체가 그 대조표다.
 
+## 게이트 분리 종결 — 이 slice 에서 고치지 않은 것 (D-6G-75)
+
+아래 셋은 **게이트 하드닝**이라 D-6G-65 대로 분리 종결한다. 게이트는 지금 상태(엄격·초록)로 남고,
+**출하 코드에는 그 우회가 없다** — 열리려면 저자가 새 코드를 써야 한다. 대조표의 해당 행은 「이행」이
+아니라 **「부분 — OPEN」** 이다.
+
+| OPEN | 무엇이 남았나 | 왜 지금 고치지 않나 |
+|---|---|---|
+| `OPEN-6G-SENSITIVITY-HARDENING` | 민감도 test 가 비교에 `policy_checksum`·`policy_version` 을 넣어 **무엇을 흔들어도 바뀐다**. 그 둘을 빼면 39 중 20 이 판정문을 못 움직인다(경계 위의 판이 필요하다) | 출하 코드는 오늘 정책 값을 읽는다 — 판정이 틀려지려면 저자가 상수를 넣어야 한다 |
+| `OPEN-6G-TRANSPORT-GATE-HARDENING` | 술어가 호출 대상의 **소유 타입**만 본다 — `uri.toURL().readText()`·`ProcessBuilder("curl")`·비동기 채널·Spring 클라이언트가 대상 밖 | 출하 코드에 관문 밖 호출이 없다. 닫으려면 인자·반환 타입까지 모으고 금지 집합을 패키지 뿌리로 바꿔야 한다(술어 교체) |
+| `OPEN-6G-REVIEW-FOLLOWUPS` | cr r5 M-3(두 프로세스 실측)·`IOException` 구별 · vr r5 L-7·L-8·L-9 · cr r5 나머지 LOW · privacy r2 INFO | 실수집 값에 닿지 않는다 |
+
 ## 이탈 (이 레인 — 계약 항목을 이행하지 않은 자리와 사유)
 
 | 항목 | 처분 | 사유 |
@@ -312,7 +344,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | cr r3 L-12 · cr r4 L-9 항진식 `require` | **문면만 고쳤다**(이탈) | 항등식을 진짜 대조로 만들려면 계수를 **독립된 두 출처**에서 세야 하는데 오늘 생산자는 하나다. 지우지 않는 이유는 두 번째 생산자가 생기는 날 그 자리가 여기서 멈추기 때문이고, 주석·대조표·변이표가 이제 「방어가 아니라 표기」라고 적는다. 깨질 수 있는 대조는 판독 쪽에 있다 |
 | cr r4 L-3 배선의 KST 구역 단언 | **구조로 닫혔다** | 관문에서 `zone` 인자를 없앴다(D-6G-56) — 배선이 구역을 넘기지 않으므로 「배선이 넘긴 구역」을 잴 대상이 없다. 남은 변이는 상수 자체를 바꾸는 것뿐이고 그것은 출하 조립 E2E(KST 00:30 기동)가 RED 로 잡는다 |
 | cr r4 L-4 `startPageOf` 앞 주석 | **주석이 사라졌다** | 「모든 소스 호출이 이 자리를 지난다」는 문장은 관문을 어댑터로 옮기며 없어졌다(D-6G-47). 잘못된 cursor 는 호출을 내지 않으므로 상한에도 원장에도 빚이 없다 |
-| cr r4 L-1 관문 우회 봉쇄 범위 | **이행**(D-6G-62) | 뿌리를 production 전체로, 술어를 `URL`·`Socket`·반사까지 넓혔다 |
+| cr r4 L-1 관문 우회 봉쇄 범위 | **부분**(D-6G-62) | 뿌리는 production 전체로 넓혔다. 술어는 여전히 **열거**이고 호출 대상의 인자·반환 타입을 보지 않는다(vr r5 H-3) → `OPEN-6G-TRANSPORT-GATE-HARDENING` |
 | cr r3 L-1 `notAttempted` 오계수(마지막 축) | **이행**(D-6G-59) | `partialNotice` 가 「이 공고의 축 중 하나라도 끝났는가」의 **관측**이 되어 마지막 축에서 물어도 반쪽으로 선다 |
 | 호스트 규율 「무거운 빌드 1개」 | **지켰다 · 그래도 빌드가 한 번 죽었다**(사실 선언) | Gradle 은 매 실행 전 `pgrep` 으로 확인했고 이 저장소의 두 레인 가운데 무거운 실행은 언제나 하나였다. 그럼에도 **2026-09-30 00:24 earlyoom 이 이 레인의 Gradle JVM(RSS 1550 MiB)을 죽였고**, 19초 뒤 **RSS 16,460 MiB 의 python** 을 죽였다(가용 1027 MiB · swap 여유 0). 그 python 은 **이 저장소의 것이 아니다** — 같은 호스트의 다른 프로젝트 세션(`kis-unified-sts`)이 돌린 365일 SQLite 이력 벤치마크다. 그 실패는 rollback ⑥ 이고 **결함이 아니라 호스트 사건**이다(재시도 3분 12초 초록). **교훈**: 두 레인을 직렬화해도 호스트는 보호되지 않는다 — 같은 기계에서 다른 세션도 무거운 작업을 돌리고, 16GB 를 쥐는 이웃 앞에서는 1.5GB 짜리 JVM 이 먼저 죽는다. 사전 점검을 셋으로 늘린다(각각 별 호출): `pgrep` · `free -m`(가용 ≥ 6GB **그리고** swap 여유 ≥ 2GB) · RSS 상위 프로세스 |
 
@@ -451,9 +483,9 @@ available 이 16.8GB 를 유지했다 — 캡·청킹 처방의 근거는 없다
 | D-6G-39 ⑴ 해시는 **파일 바이트**의 것 | `sample_list.check_sample_list` | manifest 값과 그 파일의 sha256 대조 |
 | D-6G-39 ⑵ 행 ⊆ 표본 목록 | 같은 함수의 `stray` | 목록 밖 행은 거부 · **진부분집합은 정상** |
 | D-6G-39 ⑵ 선언 == 파일의 키 수 | 같은 함수의 `len(sampled)` 대조 | 선언을 남은 행만큼 줄이는 사후 선택이 잡힌다 |
-| D-6G-39 ⑶ 닫힌 항등식 | 같은 함수의 `accounted` | `sample_size == 행 + 상세없음 + 공고없음` |
+| D-6G-39 ⑶ 닫힌 항등식 | 같은 함수의 `accounted` | `sample_size == 행 + 상세없음 + 공고없음 + 축미완`(항 **넷** — 앞 문면은 셋이었다, cr r5 L-5) |
 | D-6G-39 계수 공시 | `report.verdict_payload` | 판정 JSON 이 세 계수를 판 셋마다 싣는다(실측) |
-| M-6 업무 수는 파일이 말한다 | `SampleList.divisions` · `_sampling_record` | 목록의 distinct 집합 크기로 최소 표본이 정해진다 |
+| M-6 업무 수는 파일이 말한다 | `sample_scope_divisions` · `_sampling_record` | 최소 표본은 **확정 범위 칸**이 정한다 — 목록 행의 distinct 가 아니다(D-6G-66 이 그 반대 문면을 대체했다, vr r5 L-2) |
 | M-6 층 칸은 비면 안 된다 | `parse_sample_list` | 빈 업무 축·빈 주는 형태 실패 |
 | M-8 채움률 분모 | `LoadedSnapshot.notice_observed_count` | 공고 결측만 빼고 상세 결측은 남긴다 |
 | M-8 분모 공시 | `SamplingRecord.notice_observed_count` | 하한임을 읽는 쪽이 볼 수 있게 분모를 싣는다 |
@@ -485,8 +517,8 @@ available 이 16.8GB 를 유지했다 — 캡·청킹 처방의 근거는 없다
 | L-7 디코드 실패의 파일 귀속 | `parse_sample_list` 의 자기 `except` | 행·목록 각각 제 사유로 |
 | L-8 이름 분리 | `SamplingRecord.row_count` | `sampling` 에 `sample_size` 없음 · 두 수가 다름 |
 | D-6G-63 대상 집합 도출 | `test_target_value_set_is_derived_from_the_schema` | 정책 파일 키 수 == 로더 필드 수 |
-| D-6G-63 값마다 판정문이 움직인다 | `test_every_policy_value_changes_the_verdict` | 39개 전부 · 로더 거부는 통과로 세지 않음 |
-| D-6G-63 **판정 자체**가 움직인다 | `test_named_judgement_values_move_the_decision_itself` | 판정 투영(결말·통과)만 본다 |
+| D-6G-63 값마다 판정문이 움직인다 | `test_every_policy_value_changes_the_verdict` | **부분 — OPEN**(vr r5 H-2). 39 개 전부가 「판정문이 바뀐다」를 지나지만, 비교 대상에 `policy_checksum`·`policy_version` 이 들어 있어 **무엇을 흔들어도 반드시 바뀐다** — 그 둘을 빼면 20 개가 판정문을 움직이지 않는다 → `OPEN-6G-SENSITIVITY-HARDENING` |
+| D-6G-63 **판정 자체**가 움직인다 | `test_named_judgement_values_move_the_decision_itself` | **부분 — OPEN**(vr r5 H-2). 실제로 움직이는 것은 `alpha`·`min_window_count`·`min_window_rows` 셋이고, Bonferroni 분모·상대 개선 하한·검정력·비열등 여유는 코드 상수로 바꿔도 어느 층도 붉지 않는다 → `OPEN-6G-SENSITIVITY-HARDENING` |
 | cr r4 L-5 유한 수·자릿수 | `_is_finite` · `_parsed_number` 의 자릿수 요구 | `j`·`abc`·`nan` 이 수가 아니다 |
 | cr r4 L-7 두 레인 어휘 결합 | `test_business_division_vocabulary_matches_the_schema_document` | 어휘 ↔ 스키마 §2.1 등식 |
 | D-6G-58 항이 넷인 항등식 | `sample_list._check_identity` | 축 미완 항을 빼면 RED |
