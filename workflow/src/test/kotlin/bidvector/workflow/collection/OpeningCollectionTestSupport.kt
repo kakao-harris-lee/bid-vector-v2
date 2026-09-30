@@ -2,8 +2,8 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.AttemptHistory
 import bidvector.procurement.AttemptKind
-import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AttemptLedger
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectionAttempt
@@ -183,6 +183,12 @@ internal class FakeSampleListLedger : SampleListLedger {
             .also { stored = it }
     }
 }
+
+/**
+ * 운영 정책의 재호출 상한 — test 가 그 값을 다시 적지 않는다(두 자리에 같은 수를 두지 않는다).
+ * 상한 회계를 재는 판이 둘이라 공통 대역에 둔다.
+ */
+internal val POLICY_RETRY_LIMIT = COLLECTION_POLICY.detailFetchGates.axisRetryLimit
 
 internal class OpeningFixture(
     sampleSize: Int,
