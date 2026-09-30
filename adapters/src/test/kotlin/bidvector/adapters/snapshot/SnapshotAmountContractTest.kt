@@ -35,6 +35,9 @@ private const val A_COMPONENT_AMOUNT = "1000000"
 /** 품질관리비의 합산 대상 술어와 그 금액 — 이 둘의 짝이 D-6G2d-28 의 자리다. */
 private const val QUALITY_PREDICATE_KEY = "qltyMngcstAObjYn"
 
+/** A 적용 술어의 원문 키 — 기초금액 축이 나른다(공사 전용). */
+private const val A_APPLICABLE_KEY = "bidPrceCalclAYn"
+
 private const val QUALITY_COST_KEY = "qltyMngcst"
 
 private const val RESERVE_PRICE_AMOUNT = "1200000000"
@@ -63,11 +66,17 @@ class SnapshotAmountContractTest {
         formulaAFields: Map<String, String> = emptyMap(),
         reserveFields: List<Map<String, String>> = emptyList(),
         openingFields: List<Map<String, String>> = emptyList(),
+        /**
+         * A 적용 여부(D-6G2d-48 ④) — `incompleteAValues` 는 **적용되는 공고에서만** 센다. 기본이 참인
+         * 이유: 이 test 셋이 재는 것은 A 값의 규율이고, 그 판들은 A 가 적용되는 공고다.
+         */
+        formulaAApplicable: Boolean = true,
     ): Rendered {
         val tally = AssemblyTally()
+        val baseAmount = baseAmountFields + mapOf(A_APPLICABLE_KEY to if (formulaAApplicable) "Y" else "N")
         val axes =
             buildMap<SourceEndpoint, List<RawRow>> {
-                put(SourceEndpoint.BASE_AMOUNT_DETAIL, listOf(rawRow(baseAmountFields)))
+                put(SourceEndpoint.BASE_AMOUNT_DETAIL, listOf(rawRow(baseAmount)))
                 put(SourceEndpoint.BID_PRICE_FORMULA_A, listOf(rawRow(formulaAFields)))
                 put(SourceEndpoint.RESERVE_PRICE_DETAIL, reserveFields.map(::rawRow))
                 put(SourceEndpoint.OPENING_COMPLETE, openingFields.map(::rawRow))
@@ -377,6 +386,38 @@ class SnapshotAmountContractTest {
 
         rendered.incompleteAValues shouldBe 0
         rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
+    }
+
+    /**
+     * **D-6G2d-48 ④ — A 가 적용되지 않는 공고의 빈 A 행은 계수가 아니다.** 값은 같은 `null` 이지만
+     * 뜻이 다르다: 결측이 아니라 「그 공고에 A 가 없다」다. 세면 계수가 미적용 공고 수로 부풀어
+     * 백테스트 판정 보고에서 그 공시가 뜻을 잃는다.
+     */
+    @Test
+    fun `A 가 적용되지 않는 공고의 빈 A 행은 세지 않는다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA() - "bidPrceCalclAOpenDt",
+                reserveFields = intactReserveRows(),
+                formulaAApplicable = false,
+            )
+
+        rendered.incompleteAValues shouldBe 0
+        rendered.bytes shouldContain "\"a_value\":null"
+    }
+
+    /** 반대 방향 — 적용되는 공고의 같은 빈 행은 **센다**(그것이 결측이다). */
+    @Test
+    fun `A 가 적용되는 공고의 빈 A 행은 센다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA() - "bidPrceCalclAOpenDt",
+                reserveFields = intactReserveRows(),
+                formulaAApplicable = true,
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
     }
 
     /** 끝자리 0 은 소수부가 아니다 — 원천 표기가 `.00` 이어도 정수 리터럴로 실린다. */

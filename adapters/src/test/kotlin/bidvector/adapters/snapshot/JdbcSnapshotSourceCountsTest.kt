@@ -27,6 +27,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
+/** A 가 적용되는 공고 — 기초금액 축의 술어다(공사 전용 칸이지만 술어 자체는 축에 실린다). */
+private val A_APPLIES = mapOf("bidPrceCalclAYn" to "Y")
+
 /**
  * **cr r4 ⑧ — 추출 계수의 배선.** 문턱 판(`JdbcSnapshotSourceSampleTest`)과 대역을 나눠 쓰고, 재는
  * 것이 다르다: 저쪽은 「무엇이 행이 되는가」이고 이쪽은 「그 수가 어느 칸으로 가는가」다.
@@ -53,7 +56,11 @@ class JdbcSnapshotSourceCountsTest : SnapshotSourceTestBase() {
 
         rowNotices.forEach { number ->
             persistCanonical(number, listObservation(number))
-            serviceAxes.forEach { observe(number, it) }
+            // 기초금액 축이 **A 적용 술어**를 나른다(D-6G2d-48 ④) — 적용되지 않는 공고의 빈 A 행은
+            // 계수가 아니므로, 이 판이 `incompleteAValues` 를 재려면 적용된다고 말해야 한다.
+            serviceAxes.forEach { axis ->
+                observe(number, axis, fields = if (axis == SourceEndpoint.BASE_AMOUNT_DETAIL) A_APPLIES else emptyMap())
+            }
         }
         // 첫 행이 소수 금액 **셋**(예정가격·개찰 기초금액·투찰금액)과 반쪽 A **하나**를 나른다.
         observe(

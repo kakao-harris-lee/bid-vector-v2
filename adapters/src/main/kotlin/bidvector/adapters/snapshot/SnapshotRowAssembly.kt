@@ -115,6 +115,7 @@ private fun AssemblyTally.noticeOf(
     val listRow = axes[SourceEndpoint.OPENING_RESULT_LIST]?.firstOrNull()
     val noticeListRow = axes[SourceEndpoint.NOTICE_LIST]?.firstOrNull()
     val disclosedAt = baseAmountRow?.instantOf(FieldConcept.BASE_AMOUNT_DISCLOSED_AT)
+    val formulaAApplies = baseAmountRow?.predicateOf(FieldConcept.BID_PRICE_FORMULA_A_APPLICABLE)
     // D-6G-19 provenance 분리 — 마감 뒤 공개된 기초금액은 투찰 시점에 없던 값이다.
     val knownAtBidTime = disclosedAt != null && canonical.bidCloseAt != null && disclosedAt < canonical.bidCloseAt
     return SnapshotNotice(
@@ -129,11 +130,13 @@ private fun AssemblyTally.noticeOf(
         floorRate = canonical.floorRate,
         reserveRangeBeginRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_BEGIN_RATE),
         reserveRangeEndRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_END_RATE),
-        aValueTotal = formulaARow?.let { aValueTotalOf(it) },
+        // **A 가 적용되는 공고에서만** 계수한다(D-6G2d-48 ④) — 미적용 공고의 빈 A 행은 결측이 아니라
+        // 「그 공고에 A 가 없다」이고, 그것을 세면 계수가 미적용 공고 수로 부풀어 공시가 뜻을 잃는다.
+        aValueTotal = formulaARow?.let { aValueTotalOf(it, applies = formulaAApplies == true) },
         aValueOpenAt = formulaARow?.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT),
         standardMarketPriceApplicable =
             formulaARow?.predicateOf(FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
-        bidPriceFormulaAApplicable = baseAmountRow?.predicateOf(FieldConcept.BID_PRICE_FORMULA_A_APPLICABLE),
+        bidPriceFormulaAApplicable = formulaAApplies,
         successfulBidMethodCode = noticeListRow?.textOf(FieldConcept.AWARD_METHOD_CODE),
         successfulBidMethodName = noticeListRow?.textOf(FieldConcept.AWARD_METHOD_NAME),
         prearrangedPriceDecisionMethod = formulaARow?.textOf(FieldConcept.PLANNED_PRICE_DECISION_METHOD),
@@ -229,13 +232,17 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
  * 미확보로 §3.3 이 합산에서 **항상** 빼고, 술어 자신은 스키마가 `bool | null` 로 두어 모름이 합법이다.
  * 그래서 이 규칙의 대상은 합산을 가르는 술어 하나다(실측: 합산 목록을 가르는 술어는 그것뿐).
  */
-private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
+private fun AssemblyTally.aValueTotalOf(
+    row: RawRow,
+    applies: Boolean,
+): BigDecimal? {
     val qualityApplies = row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE)
     val parts = aValuePartsOf(row, qualityApplies)
     val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
     return when {
         qualityApplies == null || disclosedAt == null || parts.any { it == null } -> {
-            countIncompleteAValue()
+            // 미적용 공고는 세지 않는다(D-6G2d-48 ④) — 값은 같은 `null` 이고 계수만 다르다.
+            if (applies) countIncompleteAValue()
             null
         }
 
