@@ -246,16 +246,30 @@ class AttemptHistory(
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, lines) -> lines.groupBy { it.axis } }
 
-    /** 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 결말 부재 · 정착 · 재호출 상한 셋을 본다. */
+    /**
+     * 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 결말 부재 · 정착 · 재호출 상한 셋을 본다.
+     *
+     * 상한이 세는 것은 **마지막 정착 뒤의 일시 실패**뿐이다(D-6G2d-19, vr r1 M-2). 한 번 끝난 축이
+     * 나중에 다시 미완이 되면(원장은 append-only 라 앞 줄이 남는다) 정착 **앞**의 실패는 그 정착으로
+     * 무효가 된 증거다 — 그것까지 세면 「성공했다가 일시적으로 실패한」 축이 새 예산 없이 곧바로 확정
+     * 된다. 관문 거부도 세지 않는다(D-6G2d-16): 호출이 나가지 않은 것은 그 축에 대한 관측이 아니다.
+     * 확정 실패는 `isSettled` 가 이미 답한다.
+     *
+     * 순서는 **원장의 덧붙인 순서**로 읽는다(`at` 값으로 다시 세우지 않는다). 그것이 실제 사건 순서이고,
+     * 시계가 뒤로 간 실행이 있으면 `at` 정렬은 앞 실행의 결말을 「마지막」으로 만들어 추출 쪽의
+     * 「마지막 줄이 이긴다」(D-6G-58)와 어긋난다.
+     */
     private fun doneWith(
         byAxis: List<CollectionAttempt>,
         axisRetryLimit: Int,
     ): Boolean {
         val conclusions = byAxis.filter { it.kind == AttemptKind.AXIS }
-        val last = conclusions.lastOrNull() ?: return false
-        // **일시 실패만** 센다(D-6G2d-16) — 관문 거부는 호출이 나가지 않은 것이라 그 축에 대한 관측이
-        // 아니고, 확정 실패는 이미 `isSettled` 가 답한다.
-        return last.outcome.isSettled || conclusions.count { it.outcome is AttemptOutcome.Failed } >= axisRetryLimit
+        val sinceSettled = conclusions.takeLastWhile { !it.outcome.isSettled }
+        return when {
+            conclusions.isEmpty() -> false
+            sinceSettled.isEmpty() -> true
+            else -> sinceSettled.count { it.outcome is AttemptOutcome.Failed } >= axisRetryLimit
+        }
     }
 
     val size: Int get() = attempts.size

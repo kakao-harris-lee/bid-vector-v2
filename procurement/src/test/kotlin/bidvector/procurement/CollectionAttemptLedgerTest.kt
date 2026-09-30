@@ -303,6 +303,27 @@ class CollectionAttemptLedgerTest {
         }
     }
 
+    /**
+     * **D-6G2d-19 (vr r1 M-2) — 상한은 마지막 정착 뒤부터 센다.** 원장은 append-only 라 한 번 끝난
+     * 축의 앞 실패 줄이 그대로 남는다. 그것까지 세면 「성공했다가 일시적으로 실패한」 축이 새 예산
+     * 없이 곧바로 확정된다 — 정착이 앞의 증거를 무효로 만든다. 등식으로 잠근다.
+     */
+    @Test
+    fun `재호출 상한은 마지막 정착 뒤의 일시 실패만 센다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val failed = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+        val succeeded = settled("2026-09-24T02:00:00Z", key, axis, AttemptOutcome.Succeeded)
+
+        // 정착 앞의 실패가 상한을 채웠어도, 정착 뒤의 실패 하나면 다시 부른다.
+        val revived = List(RETRY_LIMIT) { failed } + succeeded + failed
+        AttemptHistory(revived).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
+
+        // 정착 **뒤**의 실패가 상한에 닿으면 접는다.
+        val exhausted = List(RETRY_LIMIT) { failed } + succeeded + List(RETRY_LIMIT) { failed }
+        AttemptHistory(exhausted).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to true)
+    }
+
     /** 거부가 상한만큼 쌓여도 그 축은 미정착이다 — 세는 것은 실제로 나간 호출의 일시 실패뿐이다. */
     @Test
     fun `관문 거부는 재호출 상한에 세지 않는다`() {
