@@ -33,6 +33,8 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-29** `Refused` 의 뜻 | 이행(문면) | `AttemptOutcome.Refused` KDoc · `failureOf` 갈래 주석 · evidence 두 자리. 코드 무변경 |
 | **D-6G2d-30** 일괄 | 이행 | 절단 사유 전수를 **sealed 계층에서 도출**(`TruncationCauseClassificationGateTest`) · 덧붙인 순서 전용 test · 러너 로그 계수 셋 단언 · `axisResumptions` 안내 문면 · 이탈 13·표면 표·rollback 범위 문면 |
 | **D-6G2d-34** 승인 전 일괄 | 이행 | ① rollback 복원 경로에 app 게이트 test 디렉터리 · 유효성 술어와 ③ 대조에 게이트 등재 파일 · 새 파일 **일곱** · 문서 명령 그대로 재실측 ② `axisResumptions` 안내 문면(「상한 N = N 번째 일시 실패에서 확정」) ③ 표면 수 세 자리 ④ `snapshotFinishedLine` 값 함수 + 계수마다 다른 수로 전문 대조 · 술어 거짓 + 금액 있음 판 ⑤ sealed 도출을 **잎까지 재귀**(`leavesOf`) · 자기교집합 단언을 갈래 이름 등식으로. **거동 변경 0 · 술어 확장 0** |
+| **D-6G2d-36** 리뷰 대응 일괄(코드 여섯) | 이행 | ② `doneWith`·`spentOf` — 마지막 정착 뒤의 일시 실패 결말 **+ 결말 없는 꼬리의 호출 줄** ③ `replaceDurably`(`DURABLE_WRITE_OPTIONS` 의 `SYNC` + 교체 뒤 디렉터리 fsync, 복구와 장부 쓰기가 같은 함수) ④ 하한을 `DetailFetchGates.init` 으로(`AXIS_RETRY_LIMIT_MINIMUM`) · 읽는 자리의 `require` 제거 ⑥ `jsonAmount` 가 조립 밖 소수를 `check` 로 거부(`AMOUNT_NOT_TALLIED`) ⑦ `conclusionOf` 의 도달 불가 검사·문장 상수 제거 — fail-closed 자리는 `CollectionAttempt.init` 하나 ⑧ `SnapshotExtraction(...)` 명명 인자 + 계수 여덟이 서로 다른 수로 동시에 서는 조립 판 |
+| **D-6G2d-37** OPEN 등재 둘 | 이행(문서) | 아래 「OPEN 등재(D-6G2d-37)」 |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
 ## 변이표
@@ -68,6 +70,11 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-log-swap** 로그 줄에서 계수 둘을 맞바꾼다 | `SnapshotFinishedLineTest` | RED 1 |
 | **M-log-literal** 계수 칸 하나를 리터럴 0 으로 | 같은 클래스 | RED 1(앞 판의 E2E 단언에서는 **초록**이었다 — 그 fixture 는 계수가 모두 0) |
 | **M-quality-or** 품질관리비 포함 조건에 「금액이 있으면」을 or 로 더한다 | `SnapshotAmountContractTest` | RED 1(새 판만 — 술어와 값 존재를 가르는 유일한 자리) |
+| **M-tail-uncounted** 결말 없는 꼬리의 호출을 상한에 세지 않는다 | `CollectionAttemptLedgerTest` · `CollectOpeningResultsUseCaseTest` | RED 2(도메인 등식 · 네 번째 기동이 다시 부른다) |
+| **M-no-sync** 내구 쓰기 옵션에서 `SYNC` 를 뺀다 | `RunStateFormatTest` | RED 1 |
+| **M-gates-unchecked** 정책 구성의 상한 하한 검사를 뺀다 | `DetailFetchTest` | RED 1 |
+| **M-silent-null** 조립 밖 소수를 다시 조용한 `null` 로 | `SnapshotWriterTest` | RED 1 |
+| **M-counter-swap** 추출 계수 둘을 호출부에서 맞바꾼다 | `JdbcSnapshotSourceSampleTest` | RED 5(계수 여덟 판 + 사유별 판 넷) |
 
 ## 착수 실측 표 갱신
 
@@ -86,7 +93,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 (evidence-pack 규격), 다른 집합으로 갈음하면 「CI 와 다른 것을 재고 초록이라 적는」 자리가 하나 생긴다.
 더 강한 그 집합도 앞 라운드 HEAD 에서 초록이었다.
 
-버릴 clone 을 `4c09e390`(마지막 산출물 커밋)에 **clean 하게** 두고 실측했다 — 작업 트리의 미커밋
+버릴 clone 을 `ff808399`(마지막 산출물 커밋)에 **clean 하게** 두고 실측했다 — 작업 트리의 미커밋
 evidence 편집이 섞이지 않는다.
 
 | 명령 | exit |
@@ -97,14 +104,17 @@ evidence 편집이 섞이지 않는다.
 | `./tools/one-command-check.sh` | 0 (마지막 줄 「완료 — Kotlin 전건 + Python 전건 통과」) |
 
 test XML 합은 **task 별로** 적는다(vr r1 L-3 — 앞 판은 `test` task 만 세면서 그 기준을 적지 않았다):
-`test` 2,552 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
-전체 합 2,560. base 대비 `test` 는 **+47** 이다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
+`test` 2,558 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
+전체 합 2,566. base 대비 `test` 는 **+53** 이다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
 rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는다.
 
 `container` job 은 돌리지 않았다 — 이 slice 는 그 job 이 돌리는 이미지·compose·실서버 경로를
 바꾸지 않는다(실행 상태 디렉터리 E2E 는 `check` job 의 `:app:test` 안에 있다).
 
-**중간 실측 여섯** — `check` 가 실제로 여섯 번 막았고 그 이력은 결함이 아니라 게이트가 작동했다는 증거다.
+**중간 실측 열** — `check` 가 실제로 열 번 막았고 그 이력은 결함이 아니라 게이트가 작동했다는 증거다.
+리뷰 대응 일괄에서 넷이 더 났다: `:adapters:detekt` 줄 길이 1건 · `:adapters:sizeGate` 파일 500 줄 1건 ·
+`:workflow:sizeGate` 1건 · `:adapters:ktlint`+`detekt` 의 이름·빈 줄 규칙(파일명↔단일 선언, 멤버 이름
+표기) 1건. **넷 다 표적 test 만 돌려서 못 본 것**이고 전건 `check` 가 막았다.
 `:adapters:detekt` 3건(줄 길이 둘 · 한 함수의 return 수) → 술어를 이름 있는 함수로 분리.
 `:adapters:ktlintTestSourceSetCheck`·`:procurement:ktlintTestSourceSetCheck` 4건(연속 빈 줄 · 본문
 한 줄 · import 순서) → `ktlintFormat`. `:procurement:cpdCheck` 1건 — 이어 돌기의 두 물음이 (공고, 축)
@@ -138,6 +148,22 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 D-6G2d-18). 생성자 형태는 그대로다. **재작업 2 도 재작업 3 앞 일괄도 표면을 더하지 않았다** — D-28 은 판정을
 부르는 쪽으로 올린 것이고 `aValuePartsOf` 는 파일 범위 `private` 이며, D-34 가 뗀 로그 줄 함수는
 `internal` 이다.
+
+### 리뷰 대응 일괄(D-6G2d-36)이 더한 표면
+
+**새 public 표면 0** — 더한 이름 셋은 전부 모듈 안이다(`AXIS_RETRY_LIMIT_MINIMUM` ·
+`AMOUNT_NOT_TALLIED` · `DURABLE_WRITE_OPTIONS` 는 `internal`, `settlesAxis` · `spentOf` ·
+`replaceDurably` 는 `private`). 지운 이름 하나(`AXIS_WALK_REQUIRED`, `internal`)로 표면은 **줄었다**.
+
+test 소스의 공통 대역 클래스는 `public` 이다 — Kotlin 이 「`public` 하위 클래스가 `internal` 상위
+타입을 노출한다」를 거부한다. **출하 산출물이 아니고** test 소스 집합 안에서만 보인다.
+
+**public 거동 변경 둘**은 따로 적는다 — 표면의 수는 그대로여도 밖에서 보이는 답이 달라진다.
+
+| 자리 | 앞 | 뒤 |
+|---|---|---|
+| `DetailFetchGates(…)` 생성자 | 상한 0 을 받아 세웠다(읽는 자리가 나중에 던졌다) | **구성 시점에 거부**한다 — 그 상한으로는 호출이 한 번도 나가지 않는다 |
+| `SnapshotWriter.renderRows(…)` | 조립 밖 소수 금액을 조용한 `null` 로 실었다 | **던진다**(`AMOUNT_NOT_TALLIED`) — 계수되지 않는 생산자를 숨기지 않는다. 조립을 지난 값에는 발화하지 않는다 |
 
 **모듈 밖에 열리지 않는 것**(cr r1 L-3 정정 — 앞 판은 전부 `internal` 이라고 적었으나 다섯은
 `private` 이다): `internal` 은 `RUN_STATE_FORMAT_VERSION` · `RunStateFormatFault` ·
@@ -222,6 +248,13 @@ CI `ml-engine` job 의 명령으로 **현행 골든**에 대해 한 번 돌렸�
 `ml-engine/src/**` 와 그 밖 `ml-engine/tests/**` 무변경(`git diff --name-only <base>..HEAD --
 ml-engine/` 0 줄 · 미커밋 0).
 
+## OPEN 등재(D-6G2d-37) — 운영자 가시
+
+| OPEN | 무엇이 미결인가 | 지금 왜 그대로 두는가 |
+|---|---|---|
+| `OPEN-6G2D-MAX-PAGES-FINAL` | 쪽 상한 소진(`MAX_PAGES`)이 **확정 실패**다 — 참가자가 정책의 쪽 상한을 넘는 축은 `incomplete_axis` 로 영구 제외되고, 나중에 상한을 올려도 그 축은 다시 불리지 않는다(확정은 되감기지 않는다). | 계수가 **정직하다**(그 공고는 사유와 함께 빠진다) — 조용한 결측이 아니다. 갈래를 바꾸는 것은 세 선택지(유지 / 일시로 바꿔 상한에 맡김 / 쪽 상한 상향) 중 운영자 결정이고, A-3 과 함께 올린다. |
+| `OPEN-6G-REVIEW-FOLLOWUPS` 에 한 줄 | 정착한 축을 **다시 걸 경로**가 생기면 판독기 둘이 한 원장을 다르게 읽는다 — 이어 돌기는 「마지막 정착 뒤의 창」을, 추출은 「마지막 줄」을 본다. | 오늘 그 경로가 **없다**(정착한 축은 다시 불리지 않는다). 술어를 공유하는 것이 처방이고, 그 편집은 두 판독기의 계약을 함께 바꾼다 — 이 slice 의 표적(데이터 정확성) 밖이다. |
+
 ## 6G evidence 정정 (D-6G2d-7)
 
 6G `commands.md` 를 되쓰지 않고 여기서 선언한다. 그 문서의 D-6G-70 행(「기동 수락 · 상한 불변」)은
@@ -290,6 +323,30 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
    걸린다)은 그대로 성립하고, 값 단위 거동은 도메인 test 에 남는다.
 11. **vr r1 L-5 는 이 레인이 고치지 않는다** — scope.md 의 「OPEN 수령·신설」 표에
    `OPEN-6G2D-AXIS-RETRY-LIMIT` 행이 없다. slice 계약은 세션 모델 단독 소관이라 보고만 한다.
+15. **D-6G2d-36 ② 가 세는 단위는 「실행」이 아니라 「호출」이다.** 계약 문면은 「결말 없이 끝난 시도
+    라운드」이고, 원장에는 **실행 경계가 없다**(형식 version 불변이 이 라운드의 제약이라 실행 표식 줄을
+    더하지 않았다). 한 걷기의 쪽들과 다음 실행의 쪽들이 같은 꼬리에 이어 붙으므로 「라운드 하나」를 셀
+    수 없다. 그래서 꼬리의 호출 줄 수를 센다 — 상한이 지키는 것이 실행 수가 아니라 태우는 호출 수이므로
+    방향은 맞고, 쪽을 여럿 걷는 축은 상한에 **더 빨리** 닿는다(보수적: 그 축은 지어낸 값 없이
+    `incomplete_axis` 로 공시된다). 실행 단위로 세려면 원장 형식이 실행을 말해야 한다.
+16. **③ 의 내구 쓰기를 장부 쓰기에도 적용했다.** 리뷰가 든 자리는 복구 하나인데 장부 교체가 같은 창을
+    갖고 같은 세 걸음을 쓴다 — 두 자리에 옵션을 늘어놓으면 한쪽에서 조용히 빠지므로 한 함수로 묶었다.
+    내구성 **자체**는 단위 test 로 잴 수 없다(크래시를 심을 자리가 없다): 옵션 배열의 등식으로 갈음했고,
+    교체 뒤 디렉터리 fsync 는 관측 가능한 표면이 없다.
+17. **⑥ 은 public 거동 변경이다** — 렌더가 조립 밖 소수 금액에서 던진다. 그 자리를 조용한 `null` 로
+    적어 둔 옛 판 하나를 재작성했다(같은 판이 이제 던짐을 잰다).
+19. **새 판 둘이 파일 500 줄 한도를 넘겨 test 를 둘로 갈랐다**(⑧ 은 adapters, ② 는 workflow). 크기를
+    피하는 기계적 분할이 아니라 **재는 것**으로 갈랐다 — 문턱(무엇이 행이 되는가)과 계수 배선(그 수가
+    어느 칸으로 가는가), 수집 계약(무엇을 부르는가)과 상한 회계(같은 축을 언제 그만 부르는가)다.
+    공통 대역은 한 자리(`SnapshotSourceTestBase`)이고, 그 이름들을 파일 수준이 아니라 보호된 멤버로
+    둔 이유는 `internal` 파일 수준 이름이 패키지 전체에 보이며 같은 패키지의 다른 test 가 같은
+    이름(`policy`)을 이미 쓰기 때문이다. test 수는 19 그대로다(18 + 1).
+    **표적 test 만 돌린 탓에 두 번의 `check` 실패를 봤다**(줄 길이 · 파일 크기) — 「부분 게이트는 안
+    돌린 것과 같다」가 이 라운드에서 두 번 실측됐다.
+18. **② 를 재려고 workflow harness 를 바꿨다.** 대역 포트가 상세 호출마다 관문의 두 줄(의도·호출)을
+    남긴다 — 출하 경로에서 그 줄을 적는 것은 관문이고, 대역이 빠뜨리면 「결말 없이 끝난 호출」이 원장에
+    아예 없어 이 셈을 그 층에서 잴 수 없다. 절단으로 돌아온 호출에는 남기지 않는다: 관문 거부는 호출
+    **전에** 접히고(실물도 남기지 않는다), 그 밖의 절단은 축의 결말 줄이 이미 그 라운드를 센다.
 
 ## 게이트 실측(evidence 편집 전)
 
@@ -301,6 +358,8 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
 - 좌표: `reports/evidence/m6/6g2d/` 에 `<파일>.<확장자>:<숫자>` 형태 0건. 역방향(이 slice 가 편집한
   파일 stem 을 가리키는 좌표) 0건.
 - **새 파일 ↔ in_scope 대조**(라운드마다 다시 돌린다 — 수정 라운드가 만드는 파일이 계약 밖으로 나가는
-  것이 반복 사각이다): `git diff --name-status <base>..HEAD | grep '^A'` 가 evidence 셋을 빼고 **일곱**을
-  낸다. 전부 in_scope 다 — `adapters/src/main/.../snapshot`(형식 판별) · `adapters/src/test/**`(넷) ·
-  `app/src/test/**`(둘: 절단 사유 게이트 · 로그 줄 값). 같은 수를 rollback.md 의 기계 목록이 A 로 센다.
+  것이 반복 사각이다): `git diff --name-status <base>..HEAD | grep '^A'` 가 evidence 셋을 빼고 **열**을
+  낸다. 전부 in_scope 다 — `adapters/src/main/.../snapshot`(형식 판별 하나) · `adapters/src/test/**`(여섯) ·
+  `app/src/test/**`(둘: 절단 사유 게이트 · 로그 줄 값) · `workflow/src/test/**`(하나: 상한 회계). 리뷰 대응
+  일괄이 더한 셋은 추출 계수 배선 판과 그 공통 대역, 그리고 상한 회계 판이다. 같은 수를 rollback.md 의
+  기계 목록이 A 로 센다.
