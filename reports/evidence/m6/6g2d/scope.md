@@ -150,6 +150,15 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-32** | **이탈 수용 둘**: ① D-30 의 sealed 도출 등식 test 는 도메인 모듈이 아니라 **app 의 구조 게이트 test 자리**에 둔다 — 도메인 test classpath 에 kotlin-reflect 가 없고(`-Werror`) 의존 추가는 in_scope 밖이며 도메인 test 의 능력을 넓힌다. 값 단위 거동 test 는 도메인에 남는다 ② `config/quality/gate-tests.properties` 의 한 줄은 새 게이트 test 의 **양방향 등재**다(술어 확장 아님) — verifier 가 등재임을 확인 |
 | **D-6G2d-33** | **r3 판정 SHA 는 이 갱신 커밋.** 표적: D-28 여섯 판 + 변이 · D-29 문면 · D-30 각 항목(sealed 등식이 새 subclass 를 실제로 잡는가 — 정적) · 등재 한 줄 · acceptance `check` 넷 · rollback(공유 파일 hunk 격리 셋) · 새 public 표면 0 확인. container job 은 이 라운드가 조립 층을 바꾸지 않았으므로 생략 가능(verifier 판단) |
 
+## 계약 갱신 r3 (2026-10-01, 팀장 — verifier r3 **ready-for-review**(R-1 rollback 문서 · L 2) · code-reviewer r3 high 1(= R-1) · medium 3 · low 3 수령)
+
+판정 SHA `f2998be0`. 코드·게이트·계약 high 0 — r1·r2 의 차단 항목(소수 금액 필수 칸 · 관문 거부 셈 · 셈 창 · 술어 미지) 전부 닫힘. acceptance 넷 exit 0(test 2,558) · Python 1,209 · 변이 RED · 새 public 표면 0. **승인 전 일괄 하나**(6A-2b D-6A2b-54 선례) 뒤 종결. 재작업 계수 불변(2/5).
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-34** | **승인 전 일괄(코드 거동 변경 0, 술어 확장 0)**: ① **rollback.md** — 복원 경로에 `app/src/test/kotlin/bidvector/app/architecture/**`(새 게이트 test) 추가, 유효성 술어·③ 대조 경로에 `config/quality/gate-tests.properties` 추가, 「새 파일 다섯」→ 여섯, 문서에 적힌 명령 **그대로** ①~⑥ 재실측(`실측 HEAD` 갱신; D 6 · ③ 빈 것 · ④ compile 0 이 문서의 명령에서 나와야 한다) ② `axisResumptions` 안내 문면: 「상한 N = N 번째 일시 실패에서 확정(N=1 이면 첫 실패에 확정)」 ③ evidence 표면 절 제목·D-6G2d-6 상태 행·이탈 2 의 「여덟」→ 실제 수 ④ 로그 계수 test 가 **값**을 잠그게(fixture 계수를 서로 다른 0 아닌 값으로, 두 계수 바꿔치기 → RED) · 분기 키 자기교집합 단언 제거 · 술어 `N` + 금액 있음 판 하나 ⑤ cr r3 M-2: sealed 도출을 **잎까지 재귀**(중첩 sealed 층이 대표 하나로 접히지 않게) — 술어 확장이 아니라 도출 범위 정정, 변이(중첩 층의 넷째 확정 원인) → RED |
+| **D-6G2d-35** | **종결 절차**: 일괄 커밋 뒤 verifier **표적 확인**(문서 명령 그대로 rollback ①~⑥ · 게이트 test 초록 · 로그 test 변이 · sealed 재귀 변이 · evidence 정직성) → 팀장 종결 문단(`milestone-6.md`, 「실행 상태 형식 version 2 부터」·A-3 대기) → rollback 2단계 등재 → push · PR · 판정 코멘트(r1·r2·r3·표적 확인) · `/code-review` · 처분 · CI 초록이면 머지(사용자 사전 승인 2026-09-30) |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
