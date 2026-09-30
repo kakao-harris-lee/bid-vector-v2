@@ -31,6 +31,11 @@ private val A_COMPONENT_KEYS =
 
 private const val A_COMPONENT_AMOUNT = "1000000"
 
+/** 품질관리비의 합산 대상 술어와 그 금액 — 이 둘의 짝이 D-6G2d-28 의 자리다. */
+private const val QUALITY_PREDICATE_KEY = "qltyMngcstAObjYn"
+
+private const val QUALITY_COST_KEY = "qltyMngcst"
+
 private const val RESERVE_PRICE_AMOUNT = "1200000000"
 
 private const val PLANNED_PRICE = "1250000000"
@@ -79,10 +84,14 @@ class SnapshotAmountContractTest {
 
     private fun rawRow(fields: Map<String, String>): RawRow = RawRow(fields.mapValues { it.value }, policy())
 
-    /** 온전한 A 묶음 — 구성 항목 여섯과 공개일시. */
+    /**
+     * 온전한 A 묶음 — 구성 항목 여섯과 공개일시, 그리고 **품질관리비 술어**다. 술어가 `Y`/`N` 밖이면
+     * A 를 낼 수 없으므로(D-6G2d-28) 온전한 판은 그 술어를 명시한다: `N` 이면 그 항목은 합산 대상이
+     * 아니고, 대상이 아닌 것의 부재는 결측이 아니다.
+     */
     private fun intactFormulaA(overrides: Map<String, String> = emptyMap()): Map<String, String> =
         A_COMPONENT_KEYS.associateWith { A_COMPONENT_AMOUNT } +
-            mapOf("bidPrceCalclAOpenDt" to "2026-06-10 09:00:00") + overrides
+            mapOf("bidPrceCalclAOpenDt" to "2026-06-10 09:00:00", QUALITY_PREDICATE_KEY to "N") + overrides
 
     /** 기초금액 축의 온전한 행 — 공개일시가 마감보다 앞이라 기초금액이 실린다. */
     private fun intactBaseAmount(overrides: Map<String, String> = emptyMap()): Map<String, String> =
@@ -226,6 +235,73 @@ class SnapshotAmountContractTest {
         rendered.bytes shouldContain "\"a_value\":null"
         // 과소 합산이 아니다 — 남은 다섯의 합이 실리지 않는다.
         rendered.bytes.contains("\"total\":5000000") shouldBe false
+    }
+
+    /**
+     * **D-6G2d-28 (vr r2 H-1) — 품질관리비 술어가 `Y`/`N` 밖이면 A 묶음을 비운다.** 앞 판은 술어가
+     * 참일 때만 항목을 합산 목록에 넣어, 술어가 **없거나 빈 문자열이거나 제3의 값**이면 「합산 대상
+     * 아님」으로 접혔다 — A 가 그 금액만큼 작게 실리고 계수도 0 이었다(실측 6,000,000 vs 6,500,000).
+     *
+     * 「모름」은 「대상 아님」이 아니라 **「A 를 낼 수 없음」**이다. 필드 계약이 술어를 boolean 으로 접지
+     * 않는 이유(「세 번째 값이 오면 조용히 false 가 되는 자리를 만들지 않는다」)와 같은 방향이고, 줄어든
+     * A 는 오류도 결측도 아닌 **틀린 값**이라 공사 적격 판정이 그대로 틀린다.
+     */
+    @Test
+    fun `품질관리비 술어가 Y 도 N 도 아니면 A 묶음 전체가 없다`() {
+        val unknown = listOf("", "   ", "X", "1")
+        val amountCases = listOf(emptyMap<String, String>(), mapOf(QUALITY_COST_KEY to "500000"))
+
+        unknown.forEach { predicate ->
+            amountCases.forEach { amount ->
+                val rendered =
+                    render(
+                        formulaAFields = intactFormulaA(mapOf(QUALITY_PREDICATE_KEY to predicate) + amount),
+                        reserveFields = intactReserveRows(),
+                    )
+
+                rendered.incompleteAValues shouldBe 1
+                rendered.bytes shouldContain "\"a_value\":null"
+            }
+        }
+    }
+
+    /** 술어 **칸 자체가 없는** 원문도 같다 — 부재와 빈 값을 가르지 않는다(둘 다 「모름」이다). */
+    @Test
+    fun `품질관리비 술어 칸이 없으면 A 묶음 전체가 없다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA() - QUALITY_PREDICATE_KEY,
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+    }
+
+    /** 술어가 참이면 그 금액은 **필수**다 — 대상인데 없으면 결측이고 A 묶음이 비는 쪽이다. */
+    @Test
+    fun `품질관리비가 대상인데 금액이 없으면 A 묶음 전체가 없다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(mapOf(QUALITY_PREDICATE_KEY to "Y")),
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+    }
+
+    /** 술어가 참이고 금액이 있으면 **합산에 든다** — 일곱 항목의 합이다. */
+    @Test
+    fun `품질관리비가 대상이고 금액이 있으면 합산에 든다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(mapOf(QUALITY_PREDICATE_KEY to "Y", QUALITY_COST_KEY to "500000")),
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 0
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6500000,"
     }
 
     /** 술어가 거짓인 품질관리비는 합산 대상이 아니다 — 그 부재로 A 가 흔들리지 않는다. */

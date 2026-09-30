@@ -197,13 +197,24 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
  * 들어간다. 공사 하한가가 `(예정가격 − A) × r + A` 라 A 가 작으면 하한가를 낮게 잡고 적격 판정 자체가
  * 틀린다. 술어가 거짓인 품질관리비는 결측이 아니다(합산 대상이 아니다).
  *
- * 둘 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
+ * ⓒ **합산 대상 술어가 `Y`/`N` 밖이면** 없다(D-6G2d-28). 술어가 부재·빈 문자열·제3의 값이면 그 항목이
+ * 합산에 드는지 **모르는** 것이고, 「모름」은 「대상 아님」이 아니라 **「A 를 낼 수 없음」**이다. 앞 판은
+ * 술어가 참일 때만 항목을 넣어 모름을 조용히 거짓으로 접었고, A 가 그 금액만큼 작게 실렸다(실측
+ * 6,000,000 vs 6,500,000, 계수 0). 필드 계약이 술어를 boolean 으로 접지 않는 이유와 같은 방향이다 —
+ * 그 자리에서 값을 지어내지 않는다.
+ *
+ * 셋 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
+ *
+ * **A 안의 다른 `*Yn` 술어**(표준시장단가 적용 여부)는 합산을 가르지 않는다 — 그 금액은 근거 예규
+ * 미확보로 §3.3 이 합산에서 **항상** 빼고, 술어 자신은 스키마가 `bool | null` 로 두어 모름이 합법이다.
+ * 그래서 이 규칙의 대상은 합산을 가르는 술어 하나다(실측: 합산 목록을 가르는 술어는 그것뿐).
  */
 private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
-    val parts = aValuePartsOf(row)
+    val qualityApplies = row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE)
+    val parts = aValuePartsOf(row, qualityApplies)
     val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
     return when {
-        disclosedAt == null || parts.any { it == null } -> {
+        qualityApplies == null || disclosedAt == null || parts.any { it == null } -> {
             countIncompleteAValue()
             null
         }
@@ -215,12 +226,16 @@ private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
 }
 
 /**
- * A 합산의 구성 항목 — `null` 원소는 **결측**이고 빼지 않는다(D-6G2d-21 ⓑ). 술어가 참인 품질관리비만
- * 목록에 들어온다: 술어가 거짓이면 그 항목은 합산 대상이 아니므로 결측이 아니다.
+ * A 합산의 구성 항목 — `null` 원소는 **결측**이고 빼지 않는다(D-6G2d-21 ⓑ). 품질관리비는 [qualityApplies]
+ * 가 **참일 때만** 목록에 들어온다: 거짓이면 합산 대상이 아니므로 결측이 아니고, **모름**(`null`)은 이
+ * 함수가 답할 물음이 아니다 — 부르는 쪽이 A 를 비운다(D-6G2d-28).
  */
-private fun aValuePartsOf(row: RawRow): List<BigDecimal?> =
+private fun aValuePartsOf(
+    row: RawRow,
+    qualityApplies: Boolean?,
+): List<BigDecimal?> =
     A_ALWAYS_SUMMED.map(row::amountOf) +
-        if (row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) == true) {
+        if (qualityApplies == true) {
             listOf(row.amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST))
         } else {
             emptyList()
