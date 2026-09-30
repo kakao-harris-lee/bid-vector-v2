@@ -130,6 +130,19 @@ in_scope 추가: `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**`(D-25, 골
 
 in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가를 철회한다.
 
+## 계약 갱신 r2 (2026-09-30, 팀장 — verifier r2 not-ready H-1 · code-reviewer r2 H-1·H-2·M-1~3·L-1~5 수령)
+
+판정 SHA `38311917`. 통과: D-15/21 여섯 칸·A 두 경우 Python 거부 0 · D-16 [1,1,1,1](쿼터·스로틀·총 상한 동일) · D-17 · D-19 정착 창 · D-23 version 2(옛 디렉터리 MISMATCHED, 바이트 불변) · D-25/26 · 변이 12 RED · acceptance 넷 exit 0(test 2,552) · container 전 단계 exit 0 · rollback ①~⑥. 막는 것 하나. **재작업 2/5.**
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-28** | **(vr r2 H-1 · cr r2 H-1 · 레인 자기 보고 — 데이터 정확성) 품질관리비 술어가 `Y`/`N` 밖이면 A 묶음을 비운다.** `aValuePartsOf` 는 술어가 `true` 일 때만 항목을 넣어, 술어 부재·빈 문자열·제3값이면 「합산 대상 아님」으로 접혀 A 가 그 금액만큼 작게 실린다(실측 6,000,000 vs 6,500,000, `incompleteAValues` 0). 「모름」은 「대상 아님」이 아니라 **「A 를 낼 수 없음」**이다(fail-safe, 필드 계약의 「세 번째 값이 오면 조용히 false 가 되는 자리를 만들지 않는다」와 같은 방향) → `a_value: null` + `incompleteAValues` 계수. test 는 네 칸(술어 부재·빈·제3값 × 금액 유·무) + `N` 유지. 변이: null 술어를 false 로 → RED. A 안의 다른 `*Yn` 술어가 있으면 같은 규칙 |
+| **D-6G2d-29** | **(cr r2 H-2 기각) 쿼터 소진은 `Refused` 가 맞다.** `Refused` 의 뜻은 「HTTP 가 안 나갔다」가 아니라 **「그 축에 귀속되지 않는 거부」**다 — 예산·스로틀은 호출 없음, 쿼터(429·resultCode 22)는 계정 단위 사고이고 6G D-6G-11 대로 실행이 멈춘다. verifier 실측: 쿼터·스로틀·총 상한이 같은 거동, 다음 기동에서 재호출. `AttemptOutcome.Refused` KDoc 과 commands.md 문면을 이 뜻으로 고친다(코드 무변경) |
+| **D-6G2d-30** | **일괄(low)**: D-17 등식을 손 목록이 아니라 **sealed 계층에서 도출한 집합**과 맞댄다(새 원인이 등식에 걸리게) · D-22 ② 덧붙인 순서 규칙의 전용 test 하나 · 러너 로그 줄의 두 계수 단언 · 이탈 13 문면을 D-26 대로(멈춘 이유 = 권한 분류기, A-2 아님) · 표면 표의 `init` 하한 문장 제거 · rollback.md 명령 범위를 마지막 산출물 커밋으로 · `axisResumptions` 안내 메시지의 한계 뜻(「상한 n = 확정 전 허용하는 일시 실패 수」) 정정(cr M-1) · evidence 표면 절 제목·행 수 정합(cr M-3) |
+| **D-6G2d-31** | **r3 는 표적**: D-28 네 칸 + 변이 · D-30 각 항목 · acceptance(`check` 넷; container 는 코드 변경이 조립 층에 없으면 verifier 판단으로 생략 가능) · rollback 재실측 · 새 public 표면 갱신. code-reviewer 는 `38311917..판정 SHA` |
+
+**사실 선언**: 동결 뒤 레인 evidence 커밋 `af5c23cb`(commands.md 골든 상태·Python 왕복 1,209 passed)가 판정 SHA 위에 올라갔다 — 코드 0, 판정 유효. 검증 중 레인이 `check` 를 한 번 돌려 verifier 가 기다렸다(동결 통지와 엇갈림, 세 번째 사례).
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
