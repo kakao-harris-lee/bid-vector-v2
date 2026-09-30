@@ -90,20 +90,40 @@ class RunStateDirectory(
      */
     private val directoryId: String = sha256Hex(realPathOf(root))
 
-    /** 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6). */
-    private val ledger = LedgerDigest(attemptFile)
+    /**
+     * 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6).
+     *
+     * **복구가 끝난 바이트로 짓는다**(D-6G2d-1). 프로퍼티 초기화는 선언 순서라, 이 자리에서 곧바로
+     * `LedgerDigest(attemptFile)` 을 부르면 [healTornTail] 보다 **앞서** 돈다 — 장부에 조각까지 포함한
+     * 해시가 굳고, 그 뒤의 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다(vr r5-t probe C2: 기동 A
+     * 만 수락하고 B·C 는 영구 거부). 복구를 이 초기화식 자신 안에 두어, 새 상태가 이 식 앞에 끼어들
+     * 자리를 남기지 않는다.
+     */
+    private val ledger: LedgerDigest = healedLedgerDigest()
 
     init {
+        if (lock is RunStateLock.Held) heldOrRelease { verifyIntegrity() }
+    }
+
+    /**
+     * 복구·되돌림을 먼저 끝낸 뒤 **그 바이트**로 누적 해시를 짓는다. 무결성 대조는 그다음이다 —
+     * 장부를 재동기하는 해시([requireLedgerAheadOrEqual])가 디스크에 없는 바이트를 가리킬 수 없다.
+     */
+    private fun healedLedgerDigest(): LedgerDigest {
         if (lock is RunStateLock.Held) {
-            // 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다.
-            runCatching {
+            heldOrRelease {
                 rollBackInterruptedConfirmation()
                 healTornTail()
-                verifyIntegrity()
-            }.onFailure {
-                lock.release()
-                throw it
             }
+        }
+        return LedgerDigest(attemptFile)
+    }
+
+    /** 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다. */
+    private fun heldOrRelease(body: () -> Unit) {
+        runCatching(body).onFailure {
+            lock.release()
+            throw it
         }
     }
 

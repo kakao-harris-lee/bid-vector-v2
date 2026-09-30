@@ -335,6 +335,44 @@ class RunStateDirectoryTest {
             .spend(AT)
             .total shouldBe spentBefore + 2
     }
+
+    /**
+     * **D-6G2d-1 (vr r5-t probe C2) — 누적 해심은 복구 뒤에 짓는다.** 한 번만 여는 test 는 이
+     * 결함을 보지 못한다: 복구 **전** 바이트의 해심이 장부에 굳으부 기동 A 는 성공하고 **기동 B
+     * 부터** 「앞부분이 장부와 다르다」로 영구 거부된다. 벗어나는 길은 디렉터리를 므는 것밖에 없고
+     * 그러면 상한이 0 에서 다시 새다 — 실제로 나간 호출 수와 상한이 어긋나는 자리다.
+     */
+    @Test
+    fun `첢어진 끝 줄을 고친 뒤의 기동도 열린다 — 장부는 고친 바이트를 적는다`() {
+        val file = tornLedger()
+
+        val first = open()
+        first.attempts.append(httpAttempt())
+        val second = reopen()
+        val third = reopen()
+
+        // 기동 A 가 세운 조각 하나 + PENDING 둘 = 셋. 기동 B·C 가 같은 것을 읽으면 거부되지 않았다.
+        second.attempts
+            .read()
+            .spend(AT)
+            .total shouldBe 3
+        third.attempts
+            .read()
+            .spend(AT)
+            .total shouldBe 3
+        Files.readString(root().resolve(STATE_NAME)) shouldContain
+            "\"attempts_sha256\":\"${sha256Hex(Files.readString(file))}\""
+    }
+
+    /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */
+    private fun tornLedger(): Path {
+        val directory = open()
+        directory.attempts.append(httpAttempt())
+        directory.close()
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(file, Files.readString(file) + "{\"at\":\"2026-09-24T01:00:00Z\",\"axis\":\"RES")
+        return file
+    }
 }
 
 private val OTHER_KEY = NoticeKeyHash.of("SYN-6G-9999", "000")
