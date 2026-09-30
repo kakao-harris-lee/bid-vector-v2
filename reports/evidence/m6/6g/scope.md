@@ -245,6 +245,12 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 
 **레인 분담**: 구현 레인 없음(정전으로 소멸, 재기동하지 않는다 — 코드 변경 0). 문서는 팀장, 확인은 verifier.
 
+## 리뷰 처분 (2026-09-30, 팀장 — PR #50 `/code-review` 10건, verifier 정적 판독 「머지를 막는 것 없음」 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G-82** | **`/code-review` 10건의 처분 — 코드 변경 0(D-6G-76).** 실데이터에서만 드러나고 실수집 값·회계·강건성에 닿는 넷은 **6G-2d 범위**(실수집 전 닫는다): ① `keyAndEndpointOf` 가 원문 `bidNtceNo` 에 `NoticeNumber.of` 를 무방비로 불러 **빈 공고번호 행 하나가 추출을 멈춘다**(원문은 정규화 전에 append 되고 표는 append-only 라 손으로 지울 수도 없다 — 행 단위 이름 있는 제외로) ② `runAxes` 의 raw append 와 AXIS 결말 쓰기 **사이**의 크래시는 「raw 로는 수집됨 · 원장으로는 미정착」을 남겨 재호출도 추출도 영원히 안 된다(`incomplete_axis` 고정) — 그 축의 PENDING/HTTP 줄이 원장 시대임을 가르므로 재호출 대상으로 ③ `attemptOutcomeOf` 가 모든 절단을 `Failed` 로 접고 재호출 상한이 없어 결정적 실패(INPUT_ERROR · NOT_RETRYABLE · 구조 실패 · MAX_PAGES)가 **매 실행 상한을 되풀이 소모**한다(하루 20,000 의 일부가 행 0 으로 샌다) — 결정적 실패는 정착(실패 확정)으로, 사유 계수 ④ `jsonAmount` 의 `setScale(0)` 이 소수 금액에서 던져 **추출 전체가 멈춘다**(`parseAmount` 는 소수를 받는다) — 행 단위 제외로. 나머지 여섯(⑤ Busy 때 표본 목록 원장이 잠금 없이 쓰기 가능 — 구조상 도달 안 함 · ⑥ Python `splitlines()` 와 Kotlin `quote()` 의 줄 정의 차이(U+0085·2028·2029) · ⑦ 층 표지 `%d` 의 Locale · ⑧ `OBSERVATION_SQL` 전건 읽기와 네 번 전표 스캔 · ⑨ 죽은 코드(`lineCountOf`·framer `executionDay`·`framePage`·미사용 import) · ⑩ Python 판정의 중복 계산)는 **`OPEN-6G-REVIEW-FOLLOWUPS`**(6G-2c). 판독 근거는 verifier r5 표적 리포트 「/code-review 지적 판독」 절, 정본은 PR #50 조치 코멘트 |
+
 ## 결정
 
 | ID | 결정 | 근거 |

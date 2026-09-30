@@ -338,6 +338,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | `OPEN-6G-SENSITIVITY-HARDENING` | 민감도 test 가 비교에 `policy_checksum`·`policy_version` 을 넣어 **무엇을 흔들어도 바뀐다**. 그 둘을 빼면 39 중 20 이 판정문을 못 움직인다(경계 위의 판이 필요하다) | 출하 코드는 오늘 정책 값을 읽는다 — 판정이 틀려지려면 저자가 상수를 넣어야 한다 |
 | `OPEN-6G-TRANSPORT-GATE-HARDENING` | 술어가 호출 대상의 **소유 타입**만 본다 — `uri.toURL().readText()`·`ProcessBuilder("curl")`·비동기 채널·Spring 클라이언트가 대상 밖 | 출하 코드에 관문 밖 호출이 없다. 닫으려면 인자·반환 타입까지 모으고 금지 집합을 패키지 뿌리로 바꿔야 한다(술어 교체) |
 | `OPEN-6G-REVIEW-FOLLOWUPS` | cr r5 M-3(두 프로세스 실측)·`IOException` 구별 · vr r5 L-7·L-8·L-9 · cr r5 나머지 LOW · privacy r2 INFO · **r5-t 추가(D-6G-79)**: cr r5-t M-4(실패 경로 test 가 그 실행의 stdio 를 읽지 않고 harness 가 `System.out/err` 를 되돌리지 않는다 — 로거 채널은 산다) · L-3(구분자 등식이 리터럴 ↔ 코드) · L-4(고정 시계 harness 걷기 이름 충돌) · L-5(`OBSERVATION_SQL` 전건 순차 훑기) · L-6(`torn` 표식 위치 무제한) · L-7(표식 줄이 매일 오늘치 1 을 뺀다) · vr r5-t L-2(남은 `budget-since` 설정이 조용히 무시된다) · L-3 | 실수집 값에 닿지 않는다 |
+| `OPEN-6G-REVIEW-FOLLOWUPS` (PR #50 `/code-review`, D-6G-82) | ⑤ Busy 때 `FileSampleListLedger` 가 잠금 밖에서 쓰기 가능(구조상 도달 안 함) · ⑥ Python `splitlines()` ↔ Kotlin `quote()` 의 줄 정의(U+0085·2028·2029) · ⑦ 층 표지 `%d` Locale · ⑧ `OBSERVATION_SQL` 전건 읽기·네 번 전표 스캔 · ⑨ 죽은 코드 · ⑩ Python 판정 중복 계산 | verifier 정적 판독: 값에 닿지 않는다(low) |
 
 ## 데이터 정확성 분리 종결 — D-6G-76 발동 (D-6G-77 · D-6G-78)
 
@@ -349,6 +350,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 |---|---|---|
 | `OPEN-6G-RUN-STATE-HEAL-ORDER` | 찢어진 끝 줄을 고친 기동의 **다음** 기동이 영구 거부된다(누적 해시가 복구 전 바이트로 선다). 출구가 디렉터리 폐기라 승인 상한이 0 에서 다시 센다. 복구 쓰기도 제자리 truncate+rewrite 라 복구 도중 크래시가 원장을 줄인다 | D-6G-76 「라운드는 더 없다」. 실수집 전에는 실행 상태 디렉터리가 없어 발화할 대상이 없다 |
 | `OPEN-6G-LIST-AXIS-WALK-SELECTION` | AXIS 결말 줄이 없는 목록 축 둘이 **가장 먼저 적재된 관측**을 쓴다. 개발 DB 의 옛 공고 목록 행에서 공고일·낙찰방법이 null → Python 이 공고일 결측으로 통째로 뺀다(날짜로 몰린 비랜덤 제외, 사유도 틀림) | 같다. 실수집 추출이 이 코드로 돌면 표본이 틀리므로 **실수집이 차단**된다 |
+| **6G-2d 범위 추가(PR #50 `/code-review`, D-6G-82)** | ① 빈 `bidNtceNo` 원문 행 하나가 추출을 멈춘다(`NoticeNumber.of` 무방비) ② raw append 와 AXIS 결말 사이 크래시 → 영구 `incomplete_axis` ③ 결정적 실패의 재호출 무상한(상한을 되풀이 소모) ④ 소수 금액에서 `jsonAmount` 가 던져 추출 전체 중단 | 실데이터에서만 드러난다 — 실수집이 차단된 채 6G-2d 가 실수집 전에 닫는다(verifier 정적 판독: ①④ fail-closed medium · ② 데이터 정확성 medium · ③ 회계는 지키나 호출 낭비 medium) |
 | `OPEN-6G-LEGACY-AXIS-LINE` | `walk` 칸 없는 옛 AXIS 줄이 「빈 응답 = 0 행 · 완료」로 읽힌다. `state.json` 에 형식 version 이 없다. 「정착했으나 0 행」과 「걷기 모름」이 같은 값이라 결측 사유가 `sampled_without_detail` 로 간다 | 옛 디렉터리가 없다 — 그 전제를 코드가 지키게 하는 것(fail-closed)이 처방이다 |
 
 ## 이탈 (이 레인 — 계약 항목을 이행하지 않은 자리와 사유)
