@@ -317,6 +317,23 @@ class SnapshotAmountContractTest {
         rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
     }
 
+    /**
+     * 술어가 거짓이면 **금액이 있어도** 합산에 들지 않는다(D-6G2d-34 항목 4). 앞 자리는 술어가 거짓일 때
+     * 금액을 **비워** 재서, 「금액이 있으면 넣는다」로 바꾼 변이가 초록이었다 — 배제가 술어에 달렸는지
+     * 값의 존재에 달렸는지를 그 판은 가르지 못한다.
+     */
+    @Test
+    fun `술어가 거짓이면 품질관리비 금액이 있어도 합산에 들지 않는다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(mapOf(QUALITY_PREDICATE_KEY to "N", QUALITY_COST_KEY to "500000")),
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 0
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
+    }
+
     /** 끝자리 0 은 소수부가 아니다 — 원천 표기가 `.00` 이어도 정수 리터럴로 실린다. */
     @Test
     fun `끝자리 0 은 소수부가 아니다`() {
