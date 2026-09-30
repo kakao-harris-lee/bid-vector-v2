@@ -57,6 +57,13 @@ internal class ScriptedOpeningPort(
      */
     var detailPagesPerCall: Int = 1
 
+    /**
+     * 이 축에서만 의도 줄만 적고 죽는다(D-6G2d-48 ②) — 관문이 의도 줄을 적은 **뒤**, 호출 줄을 적기
+     * **전**의 크래시다. 실물에서는 프로세스가 그 사이에 죽고, 예산은 이미 그 의도 줄을 나간 호출로 센다.
+     * 축을 고르는 이유는 [RecordingRawStore] 의 적재 실패와 같다 — 한 축만 끊어 다른 축의 진행을 본다.
+     */
+    var crashAfterIntentOn: SourceEndpoint? = null
+
     private var detailCallCount = 0
 
     override fun fetchOpeningResults(
@@ -127,9 +134,13 @@ internal class ScriptedOpeningPort(
     ) {
         val ledger = attempts ?: return
         val key = NoticeKeyHash.of(evidence.noticeId.number.value, evidence.noticeId.round.value).value
-        listOf(AttemptKind.PENDING, AttemptKind.HTTP).forEach { kind ->
-            ledger.append(CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, kind, null))
-        }
+        ledger.append(
+            CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.PENDING, null),
+        )
+        check(endpoint != crashAfterIntentOn) { "의도 줄 뒤·호출 줄 전 크래시를 흉내낸다" }
+        ledger.append(
+            CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.HTTP, null),
+        )
     }
 }
 

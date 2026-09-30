@@ -63,6 +63,24 @@ class OpeningRetryCapTest {
     }
 
     /**
+     * **D-6G2d-48 ② — 의도 줄만 남은 크래시도 라운드 하나다.** 관문이 의도 줄을 적은 뒤·호출 줄을 적기
+     * 전에 죽으면 꼬리에 HTTP 줄이 없다. 앞 판은 그 꼬리를 열린 라운드로 보지 않아 **상한 없이** 매 실행
+     * 다시 불렀다 — 예산은 이미 그 의도 줄을 나간 호출로 세므로 두 장부의 가정이 갈렸다.
+     */
+    @Test
+    fun `의도 줄만 남기고 죽은 라운드도 상한에 센다`() {
+        val fixture = OpeningFixture(sampleSize = 1)
+        fixture.service.crashAfterIntentOn = axis
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+        repeat(POLICY_RETRY_LIMIT) { shouldThrow<IllegalStateException> { fixture.run() } }
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT
+    }
+
+    /**
      * **관문 거부는 셈을 끊지 않는다**(D-6G2d-16 · 42). 앞 판은 꼬리를 호출 줄로 셌고 그 꼬리가
      * `Refused` 결말에서 끊겨 **거부 뒤의 크래시가 사라졌다**. 지금은 닫힌 라운드가 세어지므로 거부가
      * 사이에 끼어도 앞의 둘이 남는다 — 크래시·크래시·거부 뒤의 기동에서 셈은 둘이고, 그 축은 상한

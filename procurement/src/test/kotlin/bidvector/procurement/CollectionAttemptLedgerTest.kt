@@ -302,12 +302,16 @@ class CollectionAttemptLedgerTest {
         AttemptHistory(concluded).interruptedRounds()[KEY]?.get(AXIS) shouldBe null
     }
 
-    /** 의도 줄만 있는 꼬리도 열린 라운드가 아니다 — 나가지 않은 호출은 닫을 라운드가 아니다. */
+    /**
+     * **D-6G2d-48 ② — 의도 줄만 남은 꼬리도 끊긴 라운드다.** 관문은 호출 **전에** 의도 줄을 적고 예산을
+     * 이미 그 호출로 세므로(D-6G-61 ①), 의도 줄 뒤·HTTP 줄 전에 죽은 라운드를 세지 않으면 두 장부의
+     * 가정이 갈린다 — 예산은 쓴 것으로, 상한은 안 쓴 것으로 센다.
+     */
     @Test
-    fun `보낸 적 없는 의도 줄만 있으면 열린 라운드가 아니다`() {
+    fun `의도 줄만 남은 꼬리도 끊긴 라운드다`() {
         val intentOnly = listOf(line(AttemptKind.PENDING, AttemptOutcome.Succeeded))
 
-        AttemptHistory(intentOnly).interruptedRounds()[KEY]?.get(AXIS) shouldBe null
+        AttemptHistory(intentOnly).interruptedRounds()[KEY]?.get(AXIS) shouldBe WALK
     }
 
     /** 닫힌 라운드가 상한만큼 쌓이면 접는다 — 닫는 어휘는 일시 실패다(`Refused` 는 세지 않는다). */
@@ -339,11 +343,12 @@ class CollectionAttemptLedgerTest {
     }
 
     /**
-     * 의도 줄만 있는 꼬리는 세지 않는다 — **나가지 않은 호출은 관측이 아니다**. 그 축은 상한을 쓰지
-     * 않고 다시 불린다(보수적인 방향: 호출이 실제로 나갔는지가 기준이다).
+     * **닫히지 않은 꼬리는 그 자체로 상한을 쓰지 않는다** — 상한은 결말 줄만 세고, 꼬리를 라운드 하나로
+     * 만드는 것은 재개하는 쪽이다([AttemptHistory.interruptedRounds]). 꼬리가 길어도(쪽이 여럿이어도)
+     * 셈은 그대로다.
      */
     @Test
-    fun `보낸 적 없는 의도 줄은 상한에 세지 않는다`() {
+    fun `닫히지 않은 꼬리는 그 자체로 상한을 쓰지 않는다`() {
         val intentsOnly = List(RETRY_LIMIT * 2) { line(AttemptKind.PENDING, AttemptOutcome.Succeeded) }
 
         AttemptHistory(intentsOnly).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false

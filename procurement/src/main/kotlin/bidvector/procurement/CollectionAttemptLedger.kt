@@ -41,6 +41,12 @@ data class CollectionAttempt(
      */
     val walk: Instant?,
 ) {
+    /*
+     * **예외 하나**(D-6G2d-49): 끊긴 라운드를 닫는 `Failed(INTERRUPTED)` 줄의 걷기는 관측 시각이 아니라
+     * 그 라운드의 **마지막 줄의 시각**이다 — 배치를 끝내지 못했으므로 관측 시각이 없다. 그 줄은 `Failed`
+     * 라 추출이 행을 쓰지 않으므로(축이 미완) 값이 행 선별에 쓰이지 않는다. 고정 시계 test 에서는 그
+     * 값이 관측 시각과 겹칠 수 있고, 오늘은 `Failed` 라 무해하다(알려진 제한).
+     */
     init {
         // 형태를 여기서 닫는다 — 원장은 영속 파일이고, 키가 아닌 문자열이 한 줄 들어가면 그 줄은
         // 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만 태운다).
@@ -249,8 +255,10 @@ class AttemptHistory(
      * 셀 방법이 없고(결말 줄이 없다), 꼬리의 호출 줄을 세면 **쪽 수가 많은 축이 크래시 한 번에 상한을
      * 다 쓴다** — 참가자가 많은 공고만 빠지는 비랜덤 결측이다.
      *
-     * 의도 줄만 있는 꼬리는 항목이 **없다** — 나가지 않은 호출은 닫을 라운드가 아니다(그 축은 상한을
-     * 쓰지 않고 다시 불린다).
+     * **의도 줄만 남은 꼬리도 끊긴 라운드다**(D-6G2d-48 ②). 관문은 호출 **전에** 의도 줄을 적고 예산을
+     * 이미 그 호출로 세므로(D-6G-61 ①), 의도 줄 뒤·HTTP 줄 전에 죽은 라운드를 세지 않으면 두 장부의
+     * 가정이 갈린다 — 예산은 쓴 것으로 세고 상한은 안 쓴 것으로 센다. 그 틈이 곧 「구조적으로 실패하는
+     * 축이 매 실행 호출을 태운다」의 다른 얼굴이다.
      */
     fun interruptedRounds(): Map<String, Map<SourceEndpoint, Instant>> =
         byNoticeAndAxis { true }
@@ -258,11 +266,14 @@ class AttemptHistory(
                 byAxis.mapNotNull { (axis, lines) -> lastCallOfOpenRound(lines)?.let { axis to it } }.toMap()
             }.filterValues { it.isNotEmpty() }
 
-    /** 마지막 결말 줄 뒤에 나간 호출이 있으면 그 **마지막 호출의 시각** — 없으면 열린 라운드가 아니다. */
+    /**
+     * 마지막 결말 줄 뒤에 남은 **마지막 줄의 시각** — 없으면(결말로 끝났으면) 열린 라운드가 아니다.
+     * 의도 줄과 호출 줄을 **가리지 않는다**(D-6G2d-48 ②): 의도 줄은 이미 나간 호출로 예산에 세어졌다.
+     */
     private fun lastCallOfOpenRound(byAxis: List<CollectionAttempt>): Instant? =
         byAxis
             .takeLastWhile { it.kind != AttemptKind.AXIS }
-            .lastOrNull { it.kind == AttemptKind.HTTP }
+            .lastOrNull()
             ?.at
 
     /**
