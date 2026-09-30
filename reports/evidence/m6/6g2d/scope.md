@@ -184,6 +184,13 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-44** | **(cr ⑤) Busy 경로도 형식을 검사한다** — 잠금을 못 잡아도 `requireCurrentFormat`(읽기 전용)은 돌려 옛 디렉터리는 `RunStateFormatRefused` 로, 손상은 손상으로 갈린다. `LockedOutAttemptLedger.read` 가 옛 AXIS 줄에서 generic 예외를 내지 않게. test: v1 디렉터리를 다른 프로세스가 잠근 채 열기 → 형식 거부 |
 | **D-6G2d-45** | **표적 확인(verifier)**: D-41 순서 test·변이 + append 당 비용 실측 · D-42 두 판(두 쪽 축 · Refused 사이) + 변이 · D-43 변이 · D-44 · 형식 version(2 유지 또는 3) 거부/수락 · acceptance 강한 집합 · rollback 문서 명령 그대로 · 새 public 표면. 그 뒤 `/code-review` 재실행 |
 
+## 계약 갱신 r5-b (2026-10-01, 팀장 — 재리뷰 대응 보고 수령: HEAD `a5581341` · 이탈 셋)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-46** | **이탈 수용 셋**: ① D-42 의 끊긴 라운드 걷기 식별자는 형식 v3 가 아니라 **그 라운드의 마지막 호출 시각** — 그 라운드의 원문은 결말이 `Failed(INTERRUPTED)` 라 어차피 쓰이지 않으므로(그 공고는 `incomplete_axis`) 값이 0 인 칸을 위해 version 을 올리지 않는다; 「형식 version 2 부터」 유지 ② D-44 가 기동 실패 사유 토큰 `RUN_STATE_FORMAT_LEGACY_LINE` 을 더했다 — 장부가 아니라 **줄**에서 드러나는 옛 형식이라 기존 둘로 말할 수 없다. A-2 의 「사유 어휘」는 스냅숏 스키마의 결측 사유이고 이것은 기동 출력이다 ③ D-41 이 장부 판독을 제 타입으로 갈랐다(함수 수 한도) — 그 과정의 초기화 순서 함정(D-1 계열)은 전건 `check` 가 잡았다(표적 test 는 초록이었다 — 「부분 게이트는 안 돌린 것과 같다」 다섯 번째 실측) |
+| **D-6G2d-47** | **표적 확인 SHA 는 이 갱신 커밋.** verifier: D-41 순서 test·변이·append 당 6,795 µs 재실측 · D-42 두 판·변이(두 쪽 축이 한 쪽 축과 같은 기동에서 멈춤 · 크래시·크래시·Refused → 2) · D-43 변이 · D-44 v1 디렉터리 잠긴 채 열기 → 형식 거부 · 형식 version 2 유지 확인 · acceptance 강한 집합 · rollback 문서 명령 그대로(hunk 일곱) · 새 public 표면 |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
