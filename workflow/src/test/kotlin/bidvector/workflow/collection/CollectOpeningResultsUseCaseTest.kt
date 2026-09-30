@@ -294,7 +294,10 @@ class CollectOpeningResultsUseCaseTest {
         val fixture =
             OpeningFixture(
                 sampleSize = 1,
-                attemptSeed = syntheticServiceKeys().flatMap { key -> List(POLICY_RETRY_LIMIT) { shortWalkOn(key, axis) } },
+                attemptSeed =
+                    syntheticServiceKeys().flatMap { key ->
+                        List(POLICY_RETRY_LIMIT) { shortWalkOn(key, axis) }
+                    },
             )
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
 

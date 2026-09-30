@@ -1,9 +1,9 @@
 package bidvector.procurement
 
 import bidvector.sharedkernel.NoticeRound
-import java.time.Instant
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 private val NOTICE_ID = NoticeId(NoticeNumber.of("20260101002"), NoticeRound.of("000"))
 

@@ -301,8 +301,10 @@ class CollectOpeningResultsUseCase(
             DetailAxis.entries.forEach { axis ->
                 when (known[axis.endpoint]) {
                     true -> out.getOrPut(id) { mutableSetOf() }.add(axis)
+
                     // 원장 시대인데 끝나지 않았다 — 원문이 있어도 다시 부른다(D-6G2d-8 ⓑ).
                     false -> out[id]?.remove(axis)
+
                     // 그 축에 원장 줄이 하나도 없다 — 원장 이전 원문의 존재로 판정한다(D-6G-58).
                     null -> Unit
                 }
