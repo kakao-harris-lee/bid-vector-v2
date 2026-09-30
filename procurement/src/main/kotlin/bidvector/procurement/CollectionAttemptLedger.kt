@@ -231,7 +231,9 @@ class AttemptHistory(
     fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> {
         // 하한을 **여기 한 자리**에서만 본다(D-6G2d-18) — 상한을 쓰는 자리가 이곳이고, 정책 구성 쪽에
         // 같은 문장을 두면 같은 불변식이 둘이 되어 한쪽이 낡는다.
-        require(axisRetryLimit >= 1) { "재호출 상한은 1 이상이다 — 0 이면 한 번의 일시 실패가 축을 영구히 버린다" }
+        require(axisRetryLimit >= 1) {
+            "재호출 상한은 확정 전 허용하는 일시 실패 수다 — 1 이상이어야 한다(0 이면 첫 일시 실패가 축을 버린다)"
+        }
         // 갈래를 **거르지 않는다** — 의도·결말 줄의 존재가 「원장 시대인가」를 말한다(D-6G2d-8 ⓑ).
         return byNoticeAndAxis { true }
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> doneWith(lines, axisRetryLimit) } }

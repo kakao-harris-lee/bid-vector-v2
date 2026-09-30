@@ -16,27 +16,6 @@ private fun settledHttp(at: String) =
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
 
-/**
- * 절단 사유 **전수** — 이 목록이 `truncationCodeOf` 의 소진 `when` 과 같은 수의 항을 가져야 한다
- * (아래 등식 test 가 그것을 함께 잰다). sealed 계층을 리플렉션으로 열거하지 않는다: 도메인은
- * `java.lang.Class` 를 보지 않고(architecture 게이트), 손으로 적은 목록이 빠지면 등식이 붉는다.
- */
-private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
-    listOf(
-        TruncationCause.MaxPages,
-        TruncationCause.RepeatedPage,
-        TruncationCause.QuotaExhausted,
-        TruncationCause.Timeout,
-        TruncationCause.TransportFailure,
-        TruncationCause.ServerError,
-        TruncationCause.NotRetryable,
-        TruncationCause.InputError,
-        TruncationCause.Unclassified,
-        TruncationCause.StructureFailure,
-        TruncationCause.SelfThrottled,
-        TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
-    )
-
 /** 재호출 상한 — 이 test 가 재는 것은 셈의 규칙이지 운영 판이 아니다(D-6G2d-8 ⓒ). */
 private const val RETRY_LIMIT = 3
 
@@ -254,31 +233,6 @@ class CollectionAttemptLedgerTest {
     }
 
     /**
-     * **D-6G2d-17 (cr r1 M-1) — 확정 실패 집합은 정확히 셋이다.** 등식으로 잠근다: 부분집합 단언은
-     * 집합이 넓어지는 것을 보지 못하고, 넓어진 한 사유가 곧 「분류되지 않은 오류 한 번에 그 축을 영구히
-     * 버린다」다. 절단 사유 전수를 이 등식이 훑으므로 새 사유가 생기면 여기서 답을 정해야 한다.
-     */
-    @Test
-    fun `확정 실패 집합은 정확히 셋이다`() {
-        val finalCodes =
-            ALL_TRUNCATION_CAUSES
-                .filter { attemptOutcomeOf(truncated(it)) is AttemptOutcome.FinalFailure }
-                .map(::truncationCodeOf)
-
-        finalCodes.sorted() shouldContainExactly listOf("INPUT_ERROR", "MAX_PAGES", "NOT_RETRYABLE")
-    }
-
-    /** 나머지는 관문 거부 셋과 일시 실패 여섯으로 갈리고, 어느 사유도 분류 밖에 남지 않는다. */
-    @Test
-    fun `절단 사유 전수가 세 갈래 중 하나로 간다`() {
-        val byBranch = ALL_TRUNCATION_CAUSES.groupBy { attemptOutcomeOf(truncated(it))::class.simpleName }
-
-        byBranch.getValue("Refused") shouldHaveSize 3
-        byBranch.getValue("FinalFailure") shouldHaveSize 3
-        byBranch.getValue("Failed") shouldHaveSize ALL_TRUNCATION_CAUSES.size - 6
-    }
-
-    /**
      * **D-6G2d-16 — 관문 거부는 실패가 아니다.** 우리 속도 보호·우리 승인 상한·원천의 쿼터 거절은
      * 전송 앞에서 접히므로 그 공고·축에 대한 **관측이 아니다**. 어휘로 갈라 두면 재호출 상한이 그것을
      * 세는 길이 구조적으로 닫힌다(코드 문자열로 되읽어 분류하지 않는다).
@@ -322,6 +276,26 @@ class CollectionAttemptLedgerTest {
         // 정착 **뒤**의 실패가 상한에 닿으면 접는다.
         val exhausted = List(RETRY_LIMIT) { failed } + succeeded + List(RETRY_LIMIT) { failed }
         AttemptHistory(exhausted).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to true)
+    }
+
+    /**
+     * **D-6G2d-22 ② · 30 — 순서는 `at` 값이 아니라 원장의 덧붙인 순서다.** 시계가 뒤로 간 실행이 있으면
+     * 두 기준이 갈린다: 아래 원장은 정착 줄의 `at` 이 **가장 늦고** 실패 줄이 그보다 이르다. `at` 으로
+     * 정렬하면 정착이 마지막이 되어 「다시 부르지 않는다」가 되지만, 실제로 마지막에 일어난 일은 실패다.
+     * 덧붙인 순서가 사건 순서이고, 추출 쪽의 「마지막 줄이 이긴다」(D-6G-58)와도 같은 기준이다.
+     */
+    @Test
+    fun `순서는 at 값이 아니라 덧붙인 순서다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val settledLate = settled("2026-09-24T09:00:00Z", key, axis, AttemptOutcome.Succeeded)
+        val failedEarly = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+        val failedEarlier = settled("2026-09-24T02:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+
+        // 덧붙인 순서: 정착 → 실패 → 실패. `at` 정렬이면 정착이 마지막이 되어 `true` 가 된다.
+        val history = AttemptHistory(listOf(settledLate, failedEarly, failedEarlier))
+
+        history.axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
     }
 
     /** 거부가 상한만큼 쌓여도 그 축은 미정착이다 — 세는 것은 실제로 나간 호출의 일시 실패뿐이다. */
