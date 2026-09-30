@@ -243,6 +243,29 @@ class AttemptHistory(
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> doneWith(lines, axisRetryLimit) } }
 
     /**
+     * **결말 없이 끝난 라운드**(D-6G2d-42) — (공고, 축)마다 그 라운드의 **마지막 호출 시각**이다.
+     *
+     * 재개하는 쪽이 이 값으로 앞 라운드를 닫는다(`AXIS Failed`). 닫지 않으면 상한이 크래시 라운드를
+     * 셀 방법이 없고(결말 줄이 없다), 꼬리의 호출 줄을 세면 **쪽 수가 많은 축이 크래시 한 번에 상한을
+     * 다 쓴다** — 참가자가 많은 공고만 빠지는 비랜덤 결측이다.
+     *
+     * 의도 줄만 있는 꼬리는 항목이 **없다** — 나가지 않은 호출은 닫을 라운드가 아니다(그 축은 상한을
+     * 쓰지 않고 다시 불린다).
+     */
+    fun interruptedRounds(): Map<String, Map<SourceEndpoint, Instant>> =
+        byNoticeAndAxis { true }
+            .mapValues { (_, byAxis) ->
+                byAxis.mapNotNull { (axis, lines) -> lastCallOfOpenRound(lines)?.let { axis to it } }.toMap()
+            }.filterValues { it.isNotEmpty() }
+
+    /** 마지막 결말 줄 뒤에 나간 호출이 있으면 그 **마지막 호출의 시각** — 없으면 열린 라운드가 아니다. */
+    private fun lastCallOfOpenRound(byAxis: List<CollectionAttempt>): Instant? =
+        byAxis
+            .takeLastWhile { it.kind != AttemptKind.AXIS }
+            .lastOrNull { it.kind == AttemptKind.HTTP }
+            ?.at
+
+    /**
      * (공고, 축)마다 그 축의 줄들 — 두 물음(결말·이어 돌기)이 같은 묶음을 쓴다. 공고 키 없는 줄
      * (목록 축)은 공고 단위가 아니라 빠진다.
      */
@@ -264,15 +287,11 @@ class AttemptHistory(
      * 않는다(D-6G2d-16): 호출이 나가지 않은 것은 그 축에 대한 관측이 아니다. 확정 실패는 `isSettled`
      * 가 이미 답한다.
      *
-     * **결말 없이 끝난 호출을 세는 이유**: 걷기는 받은 뒤 원문을 적재하고 그다음 결말을 적는다
-     * (D-6G-58 ⓑ). 그 사이에서 던지면 남는 것은 의도·호출 줄뿐이고 일시 실패 결말이 하나도 없다 —
-     * 앞 판은 그 축을 **매 실행 상한 없이** 다시 불렀다(적재가 구조적으로 실패하면 승인 호출을 영영
-     * 태운다). 세는 단위는 [AttemptKind.HTTP] 줄, 곧 **나갔고 결말을 남기지 못한 호출 하나**다:
-     * 원장에 실행 경계가 없어(형식 불변) 「실행 하나」를 셀 수 없고, 상한이 지키는 것은 실행 수가
-     * 아니라 태우는 호출 수다. 쪽을 여럿 걷는 축은 그래서 상한에 더 빨리 닿는다 — 보수적인 방향이고,
-     * 그 축은 지어낸 값 없이 `incomplete_axis` 로 공시된다.
-     *
-     * 의도 줄만 있는 꼬리(보낸 적 없는 호출)는 세지 않는다 — 나가지 않은 호출은 관측이 아니다.
+     * **크래시 라운드도 결말 줄로 센다**(D-6G2d-42). 걷기는 받은 뒤 원문을 적재하고 그다음 결말을
+     * 적으므로(D-6G-58 ⓑ) 그 사이에서 던지면 결말 줄이 없다 — 그것을 세지 못하면 그 축은 매 실행
+     * 상한 없이 다시 불린다. 그래서 **재개하는 쪽이 앞 라운드를 닫고**([interruptedRounds]) 이 함수는
+     * 결말 줄만 센다. 꼬리의 호출 줄을 직접 세던 앞 판은 쪽이 여럿인 축을 크래시 한 번에 확정시켜
+     * **참가자 수와 결측을 상관**시켰다(참가자가 많은 공고만 빠진다).
      *
      * 순서는 **원장의 덧붙인 순서**로 읽는다(`at` 값으로 다시 세우지 않는다). 그것이 실제 사건 순서이고,
      * 시계가 뒤로 간 실행이 있으면 `at` 정렬은 앞 실행의 결말을 「마지막」으로 만들어 추출 쪽의
@@ -285,21 +304,13 @@ class AttemptHistory(
         val sinceSettled = byAxis.takeLastWhile { !it.settlesAxis }
         return when {
             sinceSettled.isEmpty() -> true
-            else -> spentOf(sinceSettled) >= axisRetryLimit
+            else -> sinceSettled.count(::isTransientConclusion) >= axisRetryLimit
         }
     }
 
-    /**
-     * 마지막 정착 뒤에 **쓴 재호출 예산** — 일시 실패 결말 수 + 결말 없는 꼬리의 호출 수.
-     *
-     * 꼬리를 **결말 줄 뒤에서만** 센다: 일시 실패로 끝난 라운드의 호출 줄은 그 결말이 이미 한 번
-     * 세었으므로 같은 라운드를 두 번 세지 않는다.
-     */
-    private fun spentOf(sinceSettled: List<CollectionAttempt>): Int {
-        val failures = sinceSettled.count { it.kind == AttemptKind.AXIS && it.outcome is AttemptOutcome.Failed }
-        val unconcluded = sinceSettled.takeLastWhile { it.kind != AttemptKind.AXIS }
-        return failures + unconcluded.count { it.kind == AttemptKind.HTTP }
-    }
+    /** 일시 실패로 닫힌 라운드 하나 — 관문 거부(`Refused`)도, 호출 줄도 아니다. */
+    private fun isTransientConclusion(line: CollectionAttempt): Boolean =
+        line.kind == AttemptKind.AXIS && line.outcome is AttemptOutcome.Failed
 
     val size: Int get() = attempts.size
 }

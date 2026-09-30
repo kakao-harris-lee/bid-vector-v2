@@ -51,6 +51,12 @@ internal class ScriptedOpeningPort(
     /** 몇 번째 상세 호출부터 절단인가(0-based) — 「앞 축은 받았고 이 축에서 막혔다」를 짓는다. */
     var detailTruncationFromCall: Int = 0
 
+    /**
+     * 한 걷기가 거는 **쪽 수**(D-6G2d-42) — 실물은 쪽마다 관문을 지나므로 원장에 쪽마다 두 줄이 남는다.
+     * 크래시 라운드를 「라운드 하나」로 세는지 재려면 쪽이 여럿인 축이 필요하다.
+     */
+    var detailPagesPerCall: Int = 1
+
     private var detailCallCount = 0
 
     override fun fetchOpeningResults(
@@ -104,7 +110,7 @@ internal class ScriptedOpeningPort(
         val item = observationOf(evidence.noticeId.number.value, endpoint)
         val truncation = detailTruncation.takeIf { detailCallCount >= detailTruncationFromCall }
         detailCallCount++
-        if (truncation == null) recordCallLines(evidence, endpoint)
+        if (truncation == null) repeat(detailPagesPerCall) { recordCallLines(evidence, endpoint) }
         return SourceBatch(
             listOf(item),
             sourceAccounting(normalized = 1, truncationCause = truncation),

@@ -154,6 +154,7 @@ class CollectOpeningResultsUseCase(
 ) {
     private val framer = OpeningSampleFramer(rawObservations, runs, policyFor, clock)
     private val samples = SampleResolution(sampler, sampleList)
+    private val interruptedRounds = InterruptedRoundCloser(attempts) { clock.now() }
 
     /**
      * ①② 만 — 상세를 부르지 않는다. **표본을 확정하지도 않는다**: 시험 삼아 돌린 계획이 표본을
@@ -294,6 +295,9 @@ class CollectOpeningResultsUseCase(
                 out.getOrPut(id) { mutableSetOf() }.add(axis)
             }
         }
+        // **앞 라운드를 먼저 닫는다**(D-6G2d-42) — 그 뒤에 이어 돌기를 물어야 상한이 크래시 라운드를
+        // 센다. 순서가 뒤집히면 이번 실행이 그 축을 다시 부르고 상한은 여전히 0 이다.
+        interruptedRounds.close()
         // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
         val resumptions = attempts.read().axisResumptions(axisRetryLimit())
         ids.forEach { id ->
@@ -378,6 +382,49 @@ private fun axisConclusion(
         kind = AttemptKind.AXIS,
         walk = walk,
     )
+
+/**
+ * **결말 없이 끝난 라운드를 닫는 자리**(D-6G2d-42) — 재개의 **첫 걸음**이라 수집 흐름과 분리한다.
+ *
+ * 적재와 결말 사이에서 죽은 걷기는 의도·호출 줄만 남긴다. 그 라운드를 `AXIS Failed` 로 닫으면 상한이
+ * 그것을 **라운드 하나**로 세고, 쪽이 여럿인 축도 한 쪽 축과 같은 기동에서 멈춘다(앞 판은 꼬리의 호출
+ * 줄을 세어 참가자 수와 결측을 상관시켰다).
+ *
+ * 걷기 식별자는 그 라운드의 **마지막 호출 시각**이다 — 배치를 끝내지 못했으므로 배치의 관측 시각이
+ * 없고, 그 라운드가 남긴 원문 행은 이 결말이 `Failed` 라 **어차피 쓰이지 않는다**(축이 미완이므로 그
+ * 공고는 `incomplete_axis` 다). 형식 version 을 올려 라운드 표지를 두는 길도 있었으나, 그러면 승인
+ * 문서의 「형식 version 2 부터」가 낡고 얻는 것은 **쓰이지 않는 칸의 정확한 이름**뿐이다.
+ *
+ * 닫는 것은 **재개하는 쪽의 일**이다: 죽은 실행은 아무것도 적지 못하고, 다음 실행만이 「앞 라운드가
+ * 끝나지 않았다」를 안다.
+ */
+private class InterruptedRoundCloser(
+    private val attempts: AttemptLedger,
+    private val now: () -> Instant,
+) {
+    fun close() {
+        attempts.read().interruptedRounds().forEach { (noticeKey, byAxis) ->
+            byAxis.forEach { (axis, lastCall) ->
+                attempts.append(
+                    CollectionAttempt(
+                        noticeKey = noticeKey,
+                        axis = axis,
+                        outcome = AttemptOutcome.Failed(INTERRUPTED_ROUND),
+                        at = now(),
+                        kind = AttemptKind.AXIS,
+                        walk = lastCall,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 중단된 라운드의 결말 코드(D-6G2d-42) — 「이 라운드는 결말을 적지 못했다」이고, 절단 사유가 아니다
+ * (그 사유들은 `failureOf` 가 분류한다). 일시 실패이므로 상한이 세고 그 축은 상한 미만에서 다시 불린다.
+ */
+private const val INTERRUPTED_ROUND = "INTERRUPTED"
 
 private sealed interface DetailStep {
     data class Done(

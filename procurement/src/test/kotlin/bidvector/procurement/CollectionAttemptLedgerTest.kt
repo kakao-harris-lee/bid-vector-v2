@@ -264,19 +264,78 @@ class CollectionAttemptLedgerTest {
     }
 
     /**
-     * **cr r4 ② — 결말 없이 끝난 호출도 상한에 센다.** 걷기는 받은 뒤 원문을 적재하고 그다음 결말을
-     * 적는다(D-6G-58 ⓑ). 그 사이에서 던지면 일시 실패 결말이 **하나도 없어**, 앞 판은 그 축을 매 실행
-     * 상한 없이 다시 불렀다. 세는 단위는 나갔고 결말을 남기지 못한 **호출 하나**([AttemptKind.HTTP]).
-     *
-     * 등식으로 잠근다 — 상한 미만에서는 다시 부르고, 닿으면 접는다.
+     * **D-6G2d-42 (cr r5 ②⑥) — 결말 없는 꼬리는 상한을 쓰지 않는다.** 꼬리의 호출 줄을 세던 앞 판은
+     * 쪽이 여럿인 축을 크래시 **한 번**에 확정시켰다 — 참가자가 많은 공고만 빠지는 비랜덤 결측이다.
+     * 상한은 결말 줄만 세고, 그 꼬리를 라운드 하나로 만드는 것은 **재개하는 쪽**이다([interruptedRounds]).
      */
     @Test
-    fun `결말 없는 호출이 상한만큼 쌓이면 그 축을 접는다`() {
-        val twoCalls = callRounds(2)
-        val threeCalls = callRounds(3)
+    fun `결말 없는 꼬리는 상한을 쓰지 않는다 — 쪽 수와 무관하다`() {
+        val onePage = callRounds(1)
+        val sixPages = callRounds(6)
 
-        AttemptHistory(twoCalls).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
-        AttemptHistory(threeCalls).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe true
+        AttemptHistory(onePage).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(sixPages).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+    }
+
+    /**
+     * **결말 없는 라운드를 드러낸다**(D-6G2d-42) — 값은 그 라운드의 **마지막 호출 시각**이고, 재개하는
+     * 쪽이 그것으로 앞 라운드를 닫는다. 쪽이 여럿이어도 라운드는 하나다.
+     */
+    @Test
+    fun `결말 없는 라운드는 마지막 호출 시각으로 드러난다`() {
+        val lastCall = WALK.plusSeconds(30)
+        val twoPages =
+            callRounds(1) +
+                listOf(
+                    line(AttemptKind.PENDING, AttemptOutcome.Succeeded),
+                    CollectionAttempt(KEY, AXIS, AttemptOutcome.Succeeded, lastCall, AttemptKind.HTTP, walk = null),
+                )
+
+        AttemptHistory(twoPages).interruptedRounds()[KEY]?.get(AXIS) shouldBe lastCall
+    }
+
+    /** 결말 줄로 끝난 축은 열린 라운드가 없다 — 닫을 것이 없다(두 번 닫으면 상한이 두 번 준다). */
+    @Test
+    fun `결말로 끝난 축은 열린 라운드가 없다`() {
+        val concluded = callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("SHORT_WALK"), walk = WALK)
+
+        AttemptHistory(concluded).interruptedRounds()[KEY]?.get(AXIS) shouldBe null
+    }
+
+    /** 의도 줄만 있는 꼬리도 열린 라운드가 아니다 — 나가지 않은 호출은 닫을 라운드가 아니다. */
+    @Test
+    fun `보낸 적 없는 의도 줄만 있으면 열린 라운드가 아니다`() {
+        val intentOnly = listOf(line(AttemptKind.PENDING, AttemptOutcome.Succeeded))
+
+        AttemptHistory(intentOnly).interruptedRounds()[KEY]?.get(AXIS) shouldBe null
+    }
+
+    /** 닫힌 라운드가 상한만큼 쌓이면 접는다 — 닫는 어휘는 일시 실패다(`Refused` 는 세지 않는다). */
+    @Test
+    fun `닫힌 크래시 라운드가 상한만큼이면 그 축을 접는다`() {
+        val closed = { rounds: Int ->
+            (1..rounds).flatMap {
+                callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK)
+            }
+        }
+
+        AttemptHistory(closed(RETRY_LIMIT - 1)).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(closed(RETRY_LIMIT)).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe true
+    }
+
+    /** 관문 거부가 사이에 끼어도 앞의 닫힌 라운드는 그대로 센다 — `Refused` 는 정착도 실패도 아니다. */
+    @Test
+    fun `관문 거부는 닫힌 라운드의 셈을 끊지 않는다`() {
+        val lines =
+            callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK) +
+                callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK) +
+                line(AttemptKind.AXIS, AttemptOutcome.Refused("BUDGET_EXHAUSTED"), walk = WALK)
+
+        // 닫힌 라운드 둘 — 상한 셋 미만이라 다시 부른다.
+        AttemptHistory(lines).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(lines + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK))
+            .axisResumptions(RETRY_LIMIT)[KEY]
+            ?.get(AXIS) shouldBe true
     }
 
     /**
@@ -290,11 +349,7 @@ class CollectionAttemptLedgerTest {
         AttemptHistory(intentsOnly).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
     }
 
-    /**
-     * 같은 라운드를 두 번 세지 않는다 — 일시 실패로 **끝난** 라운드의 호출 줄은 그 결말이 이미 세었다.
-     * 상한 3 에서 「호출+실패 결말」 두 라운드는 2 를 쓰므로 아직 접히지 않는다(호출까지 같이 세면 4 가
-     * 되어 접힌다).
-     */
+    /** 같은 라운드를 두 번 세지 않는다 — 상한 3 에서 「호출+실패 결말」 두 라운드는 2 를 쓴다. */
     @Test
     fun `일시 실패로 끝난 라운드의 호출 줄은 다시 세지 않는다`() {
         val concluded =
