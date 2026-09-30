@@ -19,6 +19,23 @@ private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
 /** 재호출 상한 — 이 test 가 재는 것은 셈의 규칙이지 운영 판이 아니다(D-6G2d-8 ⓒ). */
 private const val RETRY_LIMIT = 3
 
+private val KEY = "0".repeat(64)
+
+private val WALK: Instant = Instant.parse("2026-09-24T01:00:00Z")
+
+/** 한 줄 — 갈래와 어휘만 다르다. 시각은 셈에 쓰이지 않으므로(덧붙인 순서로 읽는다) 한 값으로 둔다. */
+private fun line(
+    kind: AttemptKind,
+    outcome: AttemptOutcome,
+    walk: Instant? = null,
+) = CollectionAttempt(KEY, AXIS, outcome, WALK, kind, walk = walk)
+
+/** 결말을 남기지 못한 호출 라운드 — 의도 줄과 호출 줄만 남는다(적재와 결말 사이에서 던졌다). */
+private fun callRounds(count: Int): List<CollectionAttempt> =
+    (1..count).flatMap {
+        listOf(line(AttemptKind.PENDING, AttemptOutcome.Succeeded), line(AttemptKind.HTTP, AttemptOutcome.Succeeded))
+    }
+
 /** 나가려는 호출 한 줄 — 한 줄이 한 호출이다(D-6G-61 ①). */
 private fun attempt(
     at: String,
@@ -247,14 +264,49 @@ class CollectionAttemptLedgerTest {
     }
 
     /**
-     * D-6G2d-18 — 하한은 **쓰는 자리**가 본다. 상한 0 은 한 번의 일시 실패로 그 축을 영구히 버리므로
-     * 정책이 그 값을 주면 질의가 거부한다(같은 문장을 정책 구성 쪽에 두지 않는다).
+     * **cr r4 ② — 결말 없이 끝난 호출도 상한에 센다.** 걷기는 받은 뒤 원문을 적재하고 그다음 결말을
+     * 적는다(D-6G-58 ⓑ). 그 사이에서 던지면 일시 실패 결말이 **하나도 없어**, 앞 판은 그 축을 매 실행
+     * 상한 없이 다시 불렀다. 세는 단위는 나갔고 결말을 남기지 못한 **호출 하나**([AttemptKind.HTTP]).
+     *
+     * 등식으로 잠근다 — 상한 미만에서는 다시 부르고, 닿으면 접는다.
      */
     @Test
-    fun `재호출 상한 0 은 질의가 거부한다`() {
-        io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
-            AttemptHistory(emptyList()).axisResumptions(0)
-        }
+    fun `결말 없는 호출이 상한만큼 쌓이면 그 축을 접는다`() {
+        val twoCalls = callRounds(2)
+        val threeCalls = callRounds(3)
+
+        AttemptHistory(twoCalls).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(threeCalls).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe true
+    }
+
+    /**
+     * 의도 줄만 있는 꼬리는 세지 않는다 — **나가지 않은 호출은 관측이 아니다**. 그 축은 상한을 쓰지
+     * 않고 다시 불린다(보수적인 방향: 호출이 실제로 나갔는지가 기준이다).
+     */
+    @Test
+    fun `보낸 적 없는 의도 줄은 상한에 세지 않는다`() {
+        val intentsOnly = List(RETRY_LIMIT * 2) { line(AttemptKind.PENDING, AttemptOutcome.Succeeded) }
+
+        AttemptHistory(intentsOnly).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+    }
+
+    /**
+     * 같은 라운드를 두 번 세지 않는다 — 일시 실패로 **끝난** 라운드의 호출 줄은 그 결말이 이미 세었다.
+     * 상한 3 에서 「호출+실패 결말」 두 라운드는 2 를 쓰므로 아직 접히지 않는다(호출까지 같이 세면 4 가
+     * 되어 접힌다).
+     */
+    @Test
+    fun `일시 실패로 끝난 라운드의 호출 줄은 다시 세지 않는다`() {
+        val concluded =
+            (1..2).flatMap {
+                listOf(
+                    line(AttemptKind.PENDING, AttemptOutcome.Succeeded),
+                    line(AttemptKind.HTTP, AttemptOutcome.Succeeded),
+                    line(AttemptKind.AXIS, AttemptOutcome.Failed("SHORT_WALK"), walk = WALK),
+                )
+            }
+
+        AttemptHistory(concluded).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
     }
 
     /**

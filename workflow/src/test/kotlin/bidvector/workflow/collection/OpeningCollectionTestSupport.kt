@@ -1,6 +1,8 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.AttemptHistory
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AttemptLedger
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
@@ -23,6 +25,15 @@ import java.time.LocalDate
 /** 6G 수집 갈래 test 의 fake 포트·조립 — 값과 호출 기록뿐이고 mock framework 는 없다. */
 internal class ScriptedOpeningPort(
     private val division: BusinessDivision,
+    /**
+     * 출하 경로에서 상세 호출은 관문(`KonepsCallGate`)을 지나고, 그 자리가 **의도 줄과 호출 줄**을
+     * 원장에 남긴다(D-6G-61 ①). 대역이 그것을 빠뜨리면 「결말 없이 끝난 호출」이 원장에 아예 없어
+     * 그 셈(cr r4 ②)을 이 harness 로 잴 수 없다.
+     *
+     * 절단으로 돌아온 호출에는 줄을 남기지 않는다 — 관문 거부는 **호출 전에** 접히므로 실물도 남기지
+     * 않고(D-6G2d-16), 그 밖의 절단은 축의 결말 줄이 이미 그 라운드를 센다.
+     */
+    private val attempts: AttemptLedger? = null,
 ) : OpeningResultSourcePort {
     /** (공고일 → 그 슬롯이 낼 공고번호들). */
     val listScript = mutableMapOf<LocalDate, List<String>>()
@@ -93,6 +104,7 @@ internal class ScriptedOpeningPort(
         val item = observationOf(evidence.noticeId.number.value, endpoint)
         val truncation = detailTruncation.takeIf { detailCallCount >= detailTruncationFromCall }
         detailCallCount++
+        if (truncation == null) recordCallLines(evidence, endpoint)
         return SourceBatch(
             listOf(item),
             sourceAccounting(normalized = 1, truncationCause = truncation),
@@ -100,6 +112,18 @@ internal class ScriptedOpeningPort(
             // 대역도 걷기의 이름을 단다(D-6G-68) — 실물이 그렇고, 없으면 그 축이 0 행으로 읽힌다.
             observedAt = COLLECTION_NOW,
         )
+    }
+
+    /** 관문이 적는 두 줄 — 한 줄이 한 호출이다(D-6G-61 ①). 호출 단위 줄은 걷기를 모른다(D-6G2d-4 ⓒ). */
+    private fun recordCallLines(
+        evidence: DetailFetchDecision.Fetch,
+        endpoint: SourceEndpoint,
+    ) {
+        val ledger = attempts ?: return
+        val key = NoticeKeyHash.of(evidence.noticeId.number.value, evidence.noticeId.round.value).value
+        listOf(AttemptKind.PENDING, AttemptKind.HTTP).forEach { kind ->
+            ledger.append(CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, kind, null))
+        }
     }
 }
 
@@ -171,8 +195,8 @@ internal class OpeningFixture(
     val attempts = FakeAttemptLedger(attemptSeed)
     val raw = RecordingRawStore(rawFailsOn)
     val runs = RecordingRunStore()
-    val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION)
-    val service = ScriptedOpeningPort(BusinessDivision.SERVICE)
+    val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION, attempts)
+    val service = ScriptedOpeningPort(BusinessDivision.SERVICE, attempts)
 
     private val sources =
         listOf(

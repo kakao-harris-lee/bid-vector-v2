@@ -61,12 +61,19 @@ internal val NOTICE_KEY_HEX = Regex("[0-9a-f]{64}")
 
 internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 64 자다"
 
-/** AXIS 줄의 걷기 부재 — 형태 위반이다(D-6G2d-4 ⓑ). 「모름」을 「빈 응답」으로 접지 않는다. */
-internal const val AXIS_WALK_REQUIRED = "AXIS 줄은 걷기 식별자를 반드시 싣는다"
+/** 그 줄이 **축을 정착시키는 결말**인가 — 갈래와 어휘를 함께 본다(한쪽만 보면 호출 줄이 섞인다). */
+private val CollectionAttempt.settlesAxis: Boolean
+    get() = kind == AttemptKind.AXIS && outcome.isSettled
 
-/** 결말 줄 하나 → 그 축의 결말. 걷기 부재는 형태 위반이다(D-6G2d-4 ⓑ). */
-private fun conclusionOf(line: CollectionAttempt): AxisConclusion =
-    AxisConclusion(line.outcome, requireNotNull(line.walk) { AXIS_WALK_REQUIRED })
+/**
+ * 결말 줄 하나 → 그 축의 결말.
+ *
+ * 걷기 부재를 **여기서 다시 보지 않는다**(cr r4 ⑦). AXIS 줄이 걷기를 갖는다는 것은
+ * [CollectionAttempt] 의 `init` 이 양방향으로 닫고(D-6G2d-4 ⓒ), 원장을 읽는 파서도 그 생성자를
+ * 지난다 — 여기에 같은 문장을 또 두면 **도달할 수 없는 검사**가 불변식의 자리를 둘로 만든다.
+ * `!!` 는 그 사실의 표기다: 형태가 깨졌다면 이 줄이 서기 전에 생성자가 이미 거부했다.
+ */
+private fun conclusionOf(line: CollectionAttempt): AxisConclusion = AxisConclusion(line.outcome, line.walk!!)
 
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**
@@ -228,16 +235,12 @@ class AttemptHistory(
      * 일시 실패는 [axisRetryLimit] 번까지만 다시 부른다(ⓒ). 상한이 없으면 구조적으로 실패하는 축이
      * 매 실행 승인 호출을 태우고, 그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다.
      */
-    fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> {
-        // 하한을 **여기 한 자리**에서만 본다(D-6G2d-18) — 상한을 쓰는 자리가 이곳이고, 정책 구성 쪽에
-        // 같은 문장을 두면 같은 불변식이 둘이 되어 한쪽이 낡는다.
-        require(axisRetryLimit >= 1) {
-            "재호출 상한 N 은 N 번째 일시 실패에서 확정한다(N=1 이면 첫 실패에 확정) — 1 이상이어야 한다"
-        }
+    fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> =
         // 갈래를 **거르지 않는다** — 의도·결말 줄의 존재가 「원장 시대인가」를 말한다(D-6G2d-8 ⓑ).
-        return byNoticeAndAxis { true }
+        // 하한(1 이상)은 `DetailFetchGates` 의 생성자가 본다(cr r4 ④) — 정책이 서는 시점이 첫 호출보다
+        // 이르고, 이 함수에 같은 문장을 두면 불변식의 자리가 둘이 된다.
+        byNoticeAndAxis { true }
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> doneWith(lines, axisRetryLimit) } }
-    }
 
     /**
      * (공고, 축)마다 그 축의 줄들 — 두 물음(결말·이어 돌기)이 같은 묶음을 쓴다. 공고 키 없는 줄
@@ -253,13 +256,23 @@ class AttemptHistory(
             .mapValues { (_, lines) -> lines.groupBy { it.axis } }
 
     /**
-     * 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 결말 부재 · 정착 · 재호출 상한 셋을 본다.
+     * 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 정착과 재호출 상한 둘을 본다.
      *
-     * 상한이 세는 것은 **마지막 정착 뒤의 일시 실패**뿐이다(D-6G2d-19, vr r1 M-2). 한 번 끝난 축이
-     * 나중에 다시 미완이 되면(원장은 append-only 라 앞 줄이 남는다) 정착 **앞**의 실패는 그 정착으로
-     * 무효가 된 증거다 — 그것까지 세면 「성공했다가 일시적으로 실패한」 축이 새 예산 없이 곧바로 확정
-     * 된다. 관문 거부도 세지 않는다(D-6G2d-16): 호출이 나가지 않은 것은 그 축에 대한 관측이 아니다.
-     * 확정 실패는 `isSettled` 가 이미 답한다.
+     * 상한이 세는 것은 **마지막 정착 뒤**의 두 가지다(D-6G2d-19 · cr r4 ②): 일시 실패 결말과 **결말
+     * 없이 끝난 호출**. 정착 **앞**의 실패는 그 정착으로 무효가 된 증거이므로 세지 않는다 — 그것까지
+     * 세면 「성공했다가 일시적으로 실패한」 축이 새 예산 없이 곧바로 확정된다. 관문 거부도 세지
+     * 않는다(D-6G2d-16): 호출이 나가지 않은 것은 그 축에 대한 관측이 아니다. 확정 실패는 `isSettled`
+     * 가 이미 답한다.
+     *
+     * **결말 없이 끝난 호출을 세는 이유**: 걷기는 받은 뒤 원문을 적재하고 그다음 결말을 적는다
+     * (D-6G-58 ⓑ). 그 사이에서 던지면 남는 것은 의도·호출 줄뿐이고 일시 실패 결말이 하나도 없다 —
+     * 앞 판은 그 축을 **매 실행 상한 없이** 다시 불렀다(적재가 구조적으로 실패하면 승인 호출을 영영
+     * 태운다). 세는 단위는 [AttemptKind.HTTP] 줄, 곧 **나갔고 결말을 남기지 못한 호출 하나**다:
+     * 원장에 실행 경계가 없어(형식 불변) 「실행 하나」를 셀 수 없고, 상한이 지키는 것은 실행 수가
+     * 아니라 태우는 호출 수다. 쪽을 여럿 걷는 축은 그래서 상한에 더 빨리 닿는다 — 보수적인 방향이고,
+     * 그 축은 지어낸 값 없이 `incomplete_axis` 로 공시된다.
+     *
+     * 의도 줄만 있는 꼬리(보낸 적 없는 호출)는 세지 않는다 — 나가지 않은 호출은 관측이 아니다.
      *
      * 순서는 **원장의 덧붙인 순서**로 읽는다(`at` 값으로 다시 세우지 않는다). 그것이 실제 사건 순서이고,
      * 시계가 뒤로 간 실행이 있으면 `at` 정렬은 앞 실행의 결말을 「마지막」으로 만들어 추출 쪽의
@@ -269,13 +282,23 @@ class AttemptHistory(
         byAxis: List<CollectionAttempt>,
         axisRetryLimit: Int,
     ): Boolean {
-        val conclusions = byAxis.filter { it.kind == AttemptKind.AXIS }
-        val sinceSettled = conclusions.takeLastWhile { !it.outcome.isSettled }
+        val sinceSettled = byAxis.takeLastWhile { !it.settlesAxis }
         return when {
-            conclusions.isEmpty() -> false
             sinceSettled.isEmpty() -> true
-            else -> sinceSettled.count { it.outcome is AttemptOutcome.Failed } >= axisRetryLimit
+            else -> spentOf(sinceSettled) >= axisRetryLimit
         }
+    }
+
+    /**
+     * 마지막 정착 뒤에 **쓴 재호출 예산** — 일시 실패 결말 수 + 결말 없는 꼬리의 호출 수.
+     *
+     * 꼬리를 **결말 줄 뒤에서만** 센다: 일시 실패로 끝난 라운드의 호출 줄은 그 결말이 이미 한 번
+     * 세었으므로 같은 라운드를 두 번 세지 않는다.
+     */
+    private fun spentOf(sinceSettled: List<CollectionAttempt>): Int {
+        val failures = sinceSettled.count { it.kind == AttemptKind.AXIS && it.outcome is AttemptOutcome.Failed }
+        val unconcluded = sinceSettled.takeLastWhile { it.kind != AttemptKind.AXIS }
+        return failures + unconcluded.count { it.kind == AttemptKind.HTTP }
     }
 
     val size: Int get() = attempts.size
