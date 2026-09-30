@@ -79,7 +79,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 CI `check` job 의 명령 그대로에 `clean` 과 `--no-build-cache` 를 더한 집합이다(CI 는 `check` 를
 캐시와 함께 돌린다 — 더 좁은 쪽이라 이 집합이 그것을 덮는다).
 
-HEAD `0e8b957a`(재작업 1 의 마지막 산출물 커밋) 실측:
+HEAD `19746e2b`(재작업 2 의 마지막 산출물 커밋) 실측:
 
 | 명령 | exit |
 |---|---|
@@ -89,8 +89,8 @@ HEAD `0e8b957a`(재작업 1 의 마지막 산출물 커밋) 실측:
 | `./tools/one-command-check.sh` | 0 (「Kotlin 전건 + Python 전건 통과」) |
 
 test XML 합은 **task 별로** 적는다(vr r1 L-3 — 앞 판은 `test` task 만 세면서 그 기준을 적지 않았다):
-`test` 2,544 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
-전체 합 2,552. base 대비 `test` 는 **+39** 다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
+`test` 2,550 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
+전체 합 2,558. base 대비 `test` 는 **+45** 다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
 rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는다.
 
 `container` job 은 돌리지 않았다 — 이 slice 는 그 job 이 돌리는 이미지·compose·실서버 경로를
