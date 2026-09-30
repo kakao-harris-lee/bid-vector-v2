@@ -25,56 +25,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Comparator
 
-private val KEY = NoticeKeyHash.of("SYN-6G-0001", "000")
-private val STRATUM = SampleStratum(BusinessDivision.SERVICE, "2026-W23")
-private val AT: Instant = Instant.parse("2026-09-24T01:00:00Z")
-
-private fun sample() =
-    SampleConfirmation(
-        SampleOutcome(listOf(KEY), mapOf(STRATUM to StratumOutcome(1, 1, 1)), mapOf(KEY to STRATUM), 1),
-        SampleScope(LocalDate.of(2026, 6, 3), LocalDate.of(2026, 6, 3), setOf(BusinessDivision.SERVICE)),
-    )
-
-private fun httpAttempt() =
-    CollectionAttempt(
-        KEY.value,
-        SourceEndpoint.RESERVE_PRICE_DETAIL,
-        AttemptOutcome.Succeeded,
-        AT,
-        AttemptKind.PENDING,
-        walk = null,
-    )
-
 /**
  * D-6G-45 — 실행 상태는 저장소 밖 디렉터리 하나다. 이 test 가 재는 것은 **거부**다: 디렉터리가
  * 없거나 표본 목록이 뒤에 바뀌면, 조용히 0 에서 시작하지 않고 기동이 실패해야 한다.
  */
-class RunStateDirectoryTest {
-    @TempDir
-    lateinit var temp: Path
-
-    private val opened = mutableListOf<RunStateDirectory>()
-
-    /**
-     * 연 디렉터리는 **잠금을 들고 있다**(D-6G-57). 한 JVM 안에서 두 번 열면 둘째가 「이미 도는
-     * 실행」이 되므로, test 마다 놓아 준다(출하에서는 프로세스가 끝나며 OS 가 놓는다).
-     */
-    @AfterEach
-    fun releaseLocks() {
-        opened.forEach { it.close() }
-        opened.clear()
-    }
-
-    private fun open(at: Path = root()): RunStateDirectory = RunStateDirectory(at).also { opened += it }
-
-    /** 같은 자리를 **다시 기동**한다 — 앞 실행이 끝난 뒤이므로 잠금을 놓고 다시 잡는다. */
-    private fun reopen(at: Path = root()): RunStateDirectory {
-        releaseLocks()
-        return open(at)
-    }
-
-    private fun root(): Path = Files.createDirectories(temp.resolve("run-state"))
-
+class RunStateDirectoryTest : RunStateDirectoryFixture() {
     @Test
     fun `디렉터리가 없으면 거부한다 — 만들지 않는다`() {
         shouldThrow<IllegalArgumentException> { open(temp.resolve("없는-자리")) }
@@ -85,7 +40,7 @@ class RunStateDirectoryTest {
     fun `첫 확정이 무결성 장부 넷을 남긴다`() {
         val state = open()
 
-        state.sampleList.confirm(sample())
+        state.sampleList.confirm(runStateSample())
 
         val declared = Files.readString(root().resolve(STATE_NAME))
         declared shouldContain "\"directory_id\""
@@ -99,8 +54,8 @@ class RunStateDirectoryTest {
     @Test
     fun `시도 원장을 지우면 기동을 거부한다`() {
         val state = open()
-        state.sampleList.confirm(sample())
-        state.attempts.append(httpAttempt())
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
         Files.delete(root().resolve(ATTEMPT_LEDGER_NAME))
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -109,9 +64,9 @@ class RunStateDirectoryTest {
     @Test
     fun `시도 원장을 자르면 기동을 거부한다`() {
         val state = open()
-        state.sampleList.confirm(sample())
-        state.attempts.append(httpAttempt())
-        state.attempts.append(httpAttempt())
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
+        state.attempts.append(runStatePendingAttempt())
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
         Files.writeString(file, Files.readString(file).lines().first() + "\n")
 
@@ -125,8 +80,8 @@ class RunStateDirectoryTest {
     @Test
     fun `디렉터리를 통째로 복사하면 거부한다`() {
         val source = open()
-        source.sampleList.confirm(sample())
-        source.attempts.append(httpAttempt())
+        source.sampleList.confirm(runStateSample())
+        source.attempts.append(runStatePendingAttempt())
         val copy = Files.createDirectories(temp.resolve("whole-copy"))
         listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME, STATE_NAME).forEach {
             Files.copy(root().resolve(it), copy.resolve(it))
@@ -139,8 +94,8 @@ class RunStateDirectoryTest {
     @Test
     fun `원장 없이 표본과 장부만 복사하면 거부한다`() {
         val source = open()
-        source.sampleList.confirm(sample())
-        source.attempts.append(httpAttempt())
+        source.sampleList.confirm(runStateSample())
+        source.attempts.append(runStatePendingAttempt())
         val copy = Files.createDirectories(temp.resolve("copied"))
         listOf(SAMPLE_LIST_NAME, STATE_NAME).forEach {
             Files.copy(root().resolve(it), copy.resolve(it))
@@ -153,7 +108,7 @@ class RunStateDirectoryTest {
     @Test
     fun `장부만 지워도 거부한다`() {
         val state = open()
-        state.sampleList.confirm(sample())
+        state.sampleList.confirm(runStateSample())
         Files.delete(root().resolve(STATE_NAME))
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -162,10 +117,10 @@ class RunStateDirectoryTest {
     @Test
     fun `줄을 쓸 때마다 장부가 따라온다`() {
         val state = open()
-        state.sampleList.confirm(sample())
+        state.sampleList.confirm(runStateSample())
 
-        state.attempts.append(httpAttempt())
-        state.attempts.append(httpAttempt())
+        state.attempts.append(runStatePendingAttempt())
+        state.attempts.append(runStatePendingAttempt())
 
         Files.readString(root().resolve(STATE_NAME)) shouldContain "\"attempt_lines\":2"
         // 같은 디렉터리로 다시 기동해도 넷이 맞는다.
@@ -175,8 +130,15 @@ class RunStateDirectoryTest {
     /** 바깥에서 목록을 바꿔치우면 「결과를 보기 전에 확정했다」가 거짓이 된다 — 안을 봐서는 모른다. */
     @Test
     fun `확정된 뒤 표본 목록이 바뀌면 기동을 거부한다`() {
-        open().sampleList.confirm(sample())
-        val swapped = SampleListFile.render(SampleOutcome(listOf(OTHER_KEY), emptyMap(), mapOf(OTHER_KEY to STRATUM)))
+        open().sampleList.confirm(runStateSample())
+        val swapped =
+            SampleListFile.render(
+                SampleOutcome(
+                    listOf(OTHER_KEY),
+                    emptyMap(),
+                    mapOf(OTHER_KEY to RUN_STATE_STRATUM),
+                ),
+            )
         Files.writeString(root().resolve(SAMPLE_LIST_NAME), swapped)
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -184,7 +146,7 @@ class RunStateDirectoryTest {
 
     @Test
     fun `해시 파일이 사라져도 거부한다`() {
-        open().sampleList.confirm(sample())
+        open().sampleList.confirm(runStateSample())
         Files.delete(root().resolve(STATE_NAME))
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -202,7 +164,7 @@ class RunStateDirectoryTest {
     @Test
     fun `장부가 모르는 파일이 디렉터리에 있으면 거부한다`() {
         val state = open()
-        state.sampleList.confirm(sample())
+        state.sampleList.confirm(runStateSample())
         Files.writeString(root().resolve("옆에-둔-메모.txt"), "x")
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -211,7 +173,7 @@ class RunStateDirectoryTest {
     /** 자물쇠는 상태가 아니다 — 잠금 파일이 있다고 기동이 막히면 두 번째 실행이 영영 못 돈다. */
     @Test
     fun `잠금 파일은 장부 대상이 아니다`() {
-        open().sampleList.confirm(sample())
+        open().sampleList.confirm(runStateSample())
 
         Files.isRegularFile(root().resolve(RUN_LOCK_NAME)) shouldBe true
         reopen().sampleList.confirmed() shouldBe null.let { open().sampleList.confirmed() }
@@ -220,7 +182,7 @@ class RunStateDirectoryTest {
     /** D-6G-60 — 표본틀 범위 파일도 장부 대상이다. 지우거나 고치면 그 표본이 무엇의 표본인지 달라진다. */
     @Test
     fun `표본틀 범위 파일을 지우면 거부한다`() {
-        open().sampleList.confirm(sample())
+        open().sampleList.confirm(runStateSample())
         Files.delete(root().resolve(SAMPLE_SCOPE_NAME))
 
         shouldThrow<IllegalArgumentException> { reopen() }
@@ -228,7 +190,7 @@ class RunStateDirectoryTest {
 
     @Test
     fun `표본틀 범위 파일을 고치면 거부한다`() {
-        open().sampleList.confirm(sample())
+        open().sampleList.confirm(runStateSample())
         val scope = root().resolve(SAMPLE_SCOPE_NAME)
         Files.writeString(scope, Files.readString(scope).replace("2026-06-03", "2026-06-10"))
 
@@ -243,11 +205,11 @@ class RunStateDirectoryTest {
     @Test
     fun `장부보다 한 줄 앞선 원장은 거부가 아니라 재동기다`() {
         val state = open()
-        state.sampleList.confirm(sample())
-        state.attempts.append(httpAttempt())
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
         // 마지막 append 직후 kill 을 흉내낸다 — 줄은 붙었고 장부는 아직 앞 상태다.
         val stale = Files.readString(root().resolve(STATE_NAME))
-        state.attempts.append(httpAttempt())
+        state.attempts.append(runStatePendingAttempt())
         Files.writeString(root().resolve(STATE_NAME), stale)
 
         val reopened = reopen()
@@ -264,8 +226,8 @@ class RunStateDirectoryTest {
     @Test
     fun `앞부분이 바뀐 원장은 줄이 늘어도 거부한다`() {
         val state = open()
-        state.sampleList.confirm(sample())
-        state.attempts.append(httpAttempt())
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
         val rewritten = Files.readString(file).replace("\"kind\":\"PENDING\"", "\"kind\":\"AXIS\"")
         Files.writeString(file, rewritten + rewritten)
@@ -280,9 +242,9 @@ class RunStateDirectoryTest {
     @Test
     fun `확정 중간에 죽은 표본 파일은 되돌린다 — 기동이 막히지 않는다`() {
         val state = open()
-        state.attempts.append(httpAttempt())
+        state.attempts.append(runStatePendingAttempt())
         // 첫 걸음만 끝난 모양 — 목록 파일은 있고 범위 파일과 장부 기록이 없다.
-        Files.writeString(root().resolve(SAMPLE_LIST_NAME), SampleListFile.render(sample().sample))
+        Files.writeString(root().resolve(SAMPLE_LIST_NAME), SampleListFile.render(runStateSample().sample))
 
         val reopened = reopen()
 
@@ -299,15 +261,15 @@ class RunStateDirectoryTest {
     @Test
     fun `잠금을 들지 못한 실행은 원장에 쓰지 못한다`() {
         val held = open()
-        held.sampleList.confirm(sample())
-        held.attempts.append(httpAttempt())
+        held.sampleList.confirm(runStateSample())
+        held.attempts.append(runStatePendingAttempt())
 
         val second = RunStateDirectory(root()).also { opened += it }
 
         second.lock shouldBe RunStateLock.Busy
         // 읽기는 된다 — 막는 것은 쓰기다.
         second.attempts.read().size shouldBe 1
-        shouldThrow<IllegalStateException> { second.attempts.append(httpAttempt()) }
+        shouldThrow<IllegalStateException> { second.attempts.append(runStatePendingAttempt()) }
     }
 
     /**
@@ -319,11 +281,11 @@ class RunStateDirectoryTest {
     @Test
     fun `찢어진 끝 줄은 기동을 막지 않고 호출 하나로 센다`() {
         val directory = open()
-        directory.attempts.append(httpAttempt())
+        directory.attempts.append(runStatePendingAttempt())
         val spentBefore =
             directory.attempts
                 .read()
-                .spend(AT)
+                .spend(RUN_STATE_AT)
                 .total
         directory.close()
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
@@ -334,13 +296,13 @@ class RunStateDirectoryTest {
 
         reopened.attempts
             .read()
-            .spend(AT)
+            .spend(RUN_STATE_AT)
             .total shouldBe spentBefore + 1
         // 조각을 닫았으므로 다음 append 가 그 줄에 이어 붙지 않는다.
-        reopened.attempts.append(httpAttempt())
+        reopened.attempts.append(runStatePendingAttempt())
         reopened.attempts
             .read()
-            .spend(AT)
+            .spend(RUN_STATE_AT)
             .total shouldBe spentBefore + 2
     }
 
@@ -355,18 +317,18 @@ class RunStateDirectoryTest {
         val file = tornLedger()
 
         val first = open()
-        first.attempts.append(httpAttempt())
+        first.attempts.append(runStatePendingAttempt())
         val second = reopen()
         val third = reopen()
 
         // 기동 A 가 세운 조각 하나 + PENDING 둘 = 셋. 기동 B·C 가 같은 것을 읽으면 거부되지 않았다.
         second.attempts
             .read()
-            .spend(AT)
+            .spend(RUN_STATE_AT)
             .total shouldBe 3
         third.attempts
             .read()
-            .spend(AT)
+            .spend(RUN_STATE_AT)
             .total shouldBe 3
         Files.readString(root().resolve(STATE_NAME)) shouldContain
             "\"attempts_sha256\":\"${sha256Hex(Files.readString(file))}\""
@@ -399,8 +361,8 @@ class RunStateDirectoryTest {
     @Test
     fun `복구가 남긴 중간 파일은 장부 대상이 아니다`() {
         val state = open()
-        state.sampleList.confirm(sample())
-        state.attempts.append(httpAttempt())
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
         val intact = Files.readString(file)
         Files.writeString(root().resolve(STAGED_ATTEMPT_NAME), "{\"at\":\"2026-09-2")
@@ -411,86 +373,10 @@ class RunStateDirectoryTest {
         Files.readString(file) shouldBe intact
     }
 
-    /**
-     * **D-6G2d-4 ⓐ — 실행 상태에 형식 version 이 있다.** 이것이 없으면 옛 형식 디렉터리가 그대로
-     * 기동하고, 옛 코드가 쓴 AXIS 줄이 「빈 응답 = 0 행」으로 읽혀 축이 통째로 빠진 완료 행이 나온다
-     * (vr r5-t probe W7). 실수집이 아직 없는 지금이 형식을 닫는 유일하게 싼 때다.
-     */
-    @Test
-    fun `첫 확정이 형식 version 을 남긴다`() {
-        open().sampleList.confirm(sample())
-
-        Files.readString(root().resolve(STATE_NAME)) shouldContain "\"format_version\":$RUN_STATE_FORMAT_VERSION"
-    }
-
-    /** D-6G2d-4 ⓐ — version 이 없는 장부는 옛 형식이다. 경고가 아니라 **기동 거부**다(fail-closed). */
-    @Test
-    fun `형식 version 이 없는 장부는 기동을 거부한다`() {
-        open().sampleList.confirm(sample())
-        val state = root().resolve(STATE_NAME)
-        Files.writeString(state, Files.readString(state).replace("\"format_version\":$RUN_STATE_FORMAT_VERSION,", ""))
-
-        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISSING
-    }
-
-    /** D-6G2d-4 ⓐ — 다른 version 도 거부다. 이 코드가 읽을 줄 아는 형식은 하나다. */
-    @Test
-    fun `형식 version 이 다르면 기동을 거부한다`() {
-        open().sampleList.confirm(sample())
-        val state = root().resolve(STATE_NAME)
-        val ahead = RUN_STATE_FORMAT_VERSION + 1
-        Files.writeString(
-            state,
-            Files.readString(state).replace(
-                "\"format_version\":$RUN_STATE_FORMAT_VERSION",
-                "\"format_version\":$ahead",
-            ),
-        )
-
-        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
-    }
-
-    /**
-     * **D-6G2d-18 (vr r1 L-1) — 형식 version 은 정수만이다.** 일반 판독기는 문자열과 선행 0 을 받아
-     * 주는데 이 칸은 우리가 쓰는 값이라 관용할 이유가 없다. 그리고 칸이 있는데 형태가 틀린 것은
-     * 「없다」가 아니라 **「다르다」**다 — 그 구별이 옛 디렉터리와 손상된 장부를 가른다.
-     */
-    @Test
-    fun `형식 version 은 정수만 받는다 — 문자열·선행 0·소수는 다르다`() {
-        listOf("\"$RUN_STATE_FORMAT_VERSION\"", "0$RUN_STATE_FORMAT_VERSION", "$RUN_STATE_FORMAT_VERSION.0")
-            .forEach { malformed ->
-                open().sampleList.confirm(sample())
-                val state = root().resolve(STATE_NAME)
-                Files.writeString(
-                    state,
-                    Files
-                        .readString(state)
-                        .replace("\"format_version\":$RUN_STATE_FORMAT_VERSION", "\"format_version\":$malformed"),
-                )
-
-                shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
-                releaseLocks()
-                Files.walk(root()).sorted(Comparator.reverseOrder()).forEach(Files::delete)
-            }
-    }
-
-    /** 값이 명시 `null` 인 것은 「없다」다 — 그 장부는 이 칸이 생기기 전에 쓰였다. */
-    @Test
-    fun `형식 version 이 명시 null 이면 없는 것이다`() {
-        open().sampleList.confirm(sample())
-        val state = root().resolve(STATE_NAME)
-        Files.writeString(
-            state,
-            Files.readString(state).replace("\"format_version\":$RUN_STATE_FORMAT_VERSION", "\"format_version\":null"),
-        )
-
-        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISSING
-    }
-
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */
     private fun tornLedger(): Path {
         val directory = open()
-        directory.attempts.append(httpAttempt())
+        directory.attempts.append(runStatePendingAttempt())
         directory.close()
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
         Files.writeString(file, Files.readString(file) + "{\"at\":\"2026-09-24T01:00:00Z\",\"axis\":\"RES")
