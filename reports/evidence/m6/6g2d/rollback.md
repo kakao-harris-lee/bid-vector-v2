@@ -1,6 +1,6 @@
 # M6/6G-2d — rollback
 
-실측 HEAD: `44a70d5f` (재작업 1 의 마지막 산출물 커밋)
+실측 HEAD: `f1dd6d8d` (재작업 1 의 마지막 산출물 커밋)
 
 base `c357e437`. 되돌림은 **range revert 가 아니라 경로 한정**이다 — 같은 range 의 팀장 레인 커밋
 (마일스톤 문단)까지 걷지 않는다.
@@ -8,7 +8,7 @@ base `c357e437`. 되돌림은 **range revert 가 아니라 경로 한정**이다
 ## 목록은 손으로 쓰지 않는다
 
 ```
-git diff --name-status c357e437..44a70d5f
+git diff --name-status c357e437..f1dd6d8d
 ```
 에서 기계적으로 낸다. `reports/evidence/m6/6g2d/**`(되돌리지 않는다) 와 공유 파일 둘(아래 hunk 격리)
 을 빼면 **A 5 · M 34**. 라운드마다 파일이 늘면 이 절차를 다시 돌린다 — 목록이 낡는 것이 이 결함의
@@ -64,7 +64,7 @@ git diff 9a411591~1..9a411591 -- config/quality/architecture-policy.properties |
 **되살리고**(알파벳 순서가 아니라 원래 자리 — 목록 머리의 시도 갈래 타입 바로 뒤) 다른 줄은 손대지
 않는다. 확인은 **둘 다** 본다: 「내 줄이 사라졌다」와 「남의 줄이 남았다」.
 
-## ①~⑥ 실측 (버릴 clone, 실측 HEAD `44a70d5f`)
+## ①~⑥ 실측 (버릴 clone, 실측 HEAD `f1dd6d8d`)
 
 | 축 | 결과 |
 |---|---|
@@ -82,7 +82,7 @@ git diff 9a411591~1..9a411591 -- config/quality/architecture-policy.properties |
 ## 실측이 유효한가 (verifier 대조)
 
 ```
-git diff --name-only 44a70d5f..<판정 SHA> -- <위 ① 의 경로들> milestone-6.md \
+git diff --name-only f1dd6d8d..<판정 SHA> -- <위 ① 의 경로들> milestone-6.md \
   config/quality/architecture-policy.properties
 ```
 **빈 출력이면 유효하다.** 한 줄이라도 나오면 그 뒤 커밋이 되돌림 대상을 바꾼 것이므로 이 실측은
@@ -107,7 +107,7 @@ git diff --name-only 44a70d5f..<판정 SHA> -- <위 ① 의 경로들> milestone
 
 ## 실측
 
-- 버릴 clone(`--no-hardlinks`)에서 `44a70d5f` 를 checkout 한 뒤 위 ①②③④⑤⑥ 을 순서대로 돌렸다 —
+- 버릴 clone(`--no-hardlinks`)에서 `f1dd6d8d` 를 checkout 한 뒤 위 ①②③④⑤⑥ 을 순서대로 돌렸다 —
   전부 위 표의 값이다. 갈음은 「HEAD 가 초록이다」가 아니라 **③ 의 트리 동일성**이다.
 - ⑥ 재실측(r0 에서, evidence 커밋 checkout → 같은 ①② 절차): evidence 셋을 **남긴 채** `check` 가
   exit 0 이었다 — 되돌리지 않기로 한 문서가 base 의 게이트를 붉히지 않는다. 재작업 1 은 evidence 파일을
