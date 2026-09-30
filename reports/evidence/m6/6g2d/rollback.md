@@ -107,5 +107,7 @@ git diff --name-only 21d979e9..<판정 SHA> -- <위 ① 의 경로들> milestone
 
 - 버릴 clone(`--no-hardlinks`)에서 `21d979e9` 를 checkout 한 뒤 위 ①②③④⑤⑥ 을 순서대로 돌렸다 —
   전부 위 표의 값이다. 갈음은 「HEAD 가 초록이다」가 아니라 **③ 의 트리 동일성**이다.
-- ⑥ 재실측: evidence 셋(`scope.md`·`commands.md`·`rollback.md`)을 **남긴 채** 같은 절차를 돌려도
-  `check` 는 exit 0 이다 — 되돌리지 않기로 한 문서가 base 의 게이트를 붉히지 않는다.
+- ⑥ 재실측(별 clone, evidence 커밋 `6c3a8651` checkout → 같은 ①② 절차): evidence 셋
+  (`scope.md`·`commands.md`·`rollback.md`)을 **남긴 채** `check` 가 exit 0 이다 — 되돌리지 않기로 한
+  문서가 base 의 게이트를 붉히지 않는다. 이 줄 자신을 더하는 커밋은 그 실측 뒤에 오므로, 마지막
+  HEAD 의 판정은 verifier 와 PR 조치 코멘트가 정본이다(evidence-pack 규격).
