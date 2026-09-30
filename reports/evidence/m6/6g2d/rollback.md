@@ -58,6 +58,7 @@ git restore --source=c357e437 --staged --worktree -- \
 라운드마다 그 값으로 다시 돌린다, vr r1 L-4), 그다음 자기 커밋만 역적용한다.
 
 ```
+git diff ec7e144f~1..ec7e144f -- milestone-6.md | git apply -R
 git diff a3843716~1..a3843716 -- milestone-6.md | git apply -R
 git diff f714e3f5~1..f714e3f5 -- milestone-6.md | git apply -R
 git diff de50a997~1..de50a997 -- milestone-6.md | git apply -R
@@ -67,10 +68,10 @@ git diff 4c09e390~1..4c09e390 -- config/quality/gate-tests.properties | git appl
 git diff 19746e2b~1..19746e2b -- config/quality/gate-tests.properties | git apply -R
 ```
 
-- `milestone-6.md` — 이 slice 가 만진 커밋은 **셋**: 착수 문단(`de50a997`)과 종결 문단(`f714e3f5`, D-6G2d-35)과 종결 문단의 A-3 문면 정정(`a3843716` — 이 목록 갱신 커밋은 문단 커밋 뒤에 따로 온다). 역적용은 **정정 → 종결 → 착수** 순서(새 커밋부터). 종결 문단은 착수 문단 아래 같은 자리에 있고 문단 단위로 지운다.
+- `milestone-6.md` — 이 slice 가 만진 커밋은 **넷**: 착수 문단(`de50a997`)과 종결 문단(`f714e3f5`, D-6G2d-35)과 종결 문단의 A-3 문면 정정 둘(`ec7e144f` · `a3843716` — 이 목록 갱신 커밋은 문단 커밋 뒤에 따로 온다). 역적용은 **정정 → 종결 → 착수** 순서(새 커밋부터). 종결 문단은 착수 문단 아래 같은 자리에 있고 문단 단위로 지운다.
 - `config/quality/architecture-policy.properties` — 이 slice 가 만진 커밋은 **등재 해제 한 줄**
   (`9a411591`)이다. 역적용은 그 한 줄을 **되살린다**.
-- `config/quality/gate-tests.properties` — 이 slice 가 만진 커밋은 **셋**(`19746e2b`·`4c09e390`·
+- `config/quality/gate-tests.properties` — 이 slice 가 만진 커밋은 **넷**(`19746e2b`·`4c09e390`·
   `ff808399`)이고 각각 등재 한 줄이다(마지막은 `gate.tests.workflow` 쪽이라 목록이 다르다). 역적용은 **새 커밋부터**(위 순서) 돌린다 — 뒤 커밋의 줄이 남은 상태에서 앞
   커밋을 되돌리면 컨텍스트가 어긋난다. 되돌린 트리에는 그 게이트 test 파일들이 없으므로 등재도 없어야
   한다.
