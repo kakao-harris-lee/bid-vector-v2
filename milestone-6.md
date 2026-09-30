@@ -605,6 +605,13 @@ privacy-gate, Codex 없음.
 
 **6G 종결 2026-09-30 — D-6G-76 분리 종결, 실수집 차단** — PR **#50**(계약 갱신 r1~r5·r5-t: D-6G-27~81). 판정은 PR 코멘트 여섯에 있다. 재작업 **5/5 + 운영자 승인 표적 수정 1**(D-6G-68~74: 원장의 AXIS 줄이 걷기를 가리킨다 · `budget-since` 제거 · 찢어진 끝 줄 복구 · 추출은 잠금 안 · 공고 목록 seed 잠금). verifier 는 r1~r5 not-ready, **r5 표적 not-ready(D-6G-76 발동)**. r5 의 실수집 차단 결함 H-1(끊긴 걷기의 행이 완료 행으로 실림)은 재현되지 않았으나 표적 수정이 **새 high 셋**(데이터 정확성)을 만들었다 — 복구 순서(D-6G-70 미이행, 다음 기동 영구 거부 → 상한 0 재시작) · 목록 축이 가장 오래된 관측을 씀(개발 DB 의 6F-8·6F-9 행에서 공고일·낙찰방법 null) · 옛 형식 AXIS 줄. 계약대로 더 고치지 않고 머지했다: **실 KONEPS 수집은 6G-2d(`OPEN-6G-RUN-STATE-HEAL-ORDER` · `OPEN-6G-LIST-AXIS-WALK-SELECTION` · `OPEN-6G-LEGACY-AXIS-LINE`) 머지 뒤에만**(D-6G-77). 게이트 하드닝은 D-6G-75 분리 종결(`OPEN-6G-SENSITIVITY-HARDENING` → 6G-2a · `OPEN-6G-TRANSPORT-GATE-HARDENING` → 6G-2b · `OPEN-6G-REVIEW-FOLLOWUPS` → 6G-2c). 다섯 라운드의 공통 뿌리는 **완료 판정(원장)과 데이터(원문 행)를 시각으로 짐작해 잇는 것**이었고(r3 「원문이 있으면 받은 것」 → r4 「적재 전에 결말」 → r5 「행의 시각으로 마지막 걷기」 → r5-t 「결말 줄 없는 축의 선별 소실」), 처방은 원장의 줄이 걷기를 가리키는 것이다 — 결말 줄이 없는 축에는 그 답이 없어 6G-2d 가 「가장 늦은 걷기」를 되살린다. 남긴 것: 스냅숏 snapshot-v5 · 골든 12 = 9+1+1+1 · 정책 `strategy-backtest-v1.yaml`(A-3 값) · 실수집 runbook 은 실수집 준비 slice 몫. 후속 순서(운영자 2026-09-30): 6G-2d → 6G-2a → 6G-2b → 6G-2c, 실수집 준비와 병행. rollback 의 공유 파일 절차는 이 종결 문단도 착수 문단과 같은 문단 단위 삭제로 지운다.
 
+**6G-2d 착수 2026-09-30 — 추출·실행 상태의 데이터 정확성 셋 + 실수집 강건성 넷** — base `c357e437`(PR #50 6G 머지 뒤 `main`), worktree `bid-vector-v2-m6-6g2d`·
+브랜치 `m6-6g2d/2026-09-30`. 정본 `reports/evidence/m6/6g2d/scope.md`(D-6G2d-1~8, 운영자 결정 A-1 즉시 착수 · A-2 스키마 무변경, DEC-03 현행 유지). 수령
+OPEN: `OPEN-6G-RUN-STATE-HEAL-ORDER`(복구 뒤 누적 해시 · 원자 복구 쓰기) · `OPEN-6G-LIST-AXIS-WALK-SELECTION`(결말 줄 없는 축은 가장 늦은 걷기) ·
+`OPEN-6G-LEGACY-AXIS-LINE`(형식 version fail-closed · walk 필수) + PR #50 `/code-review` 넷(빈 공고번호 행 · 적재와 결말 사이 크래시 · 결정적 실패 재호출 상한 ·
+소수 금액). **실 KONEPS 수집은 이 slice 머지 뒤에만**(6G D-6G-77). Kotlin 단일 레인, `ml-engine/**`·golden·스키마 칸 무변경. 리뷰 레인 verifier +
+code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 착수 문단을 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
