@@ -295,13 +295,15 @@ class CollectOpeningResultsUseCase(
             }
         }
         // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
-        val conclusions = attempts.read().axisConclusions()
+        val resumptions = attempts.read().axisResumptions(axisRetryLimit())
         ids.forEach { id ->
-            val known = conclusions[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
+            val known = resumptions[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
             DetailAxis.entries.forEach { axis ->
-                when (known[axis.endpoint]?.settled) {
+                when (known[axis.endpoint]) {
                     true -> out.getOrPut(id) { mutableSetOf() }.add(axis)
+                    // 원장 시대인데 끝나지 않았다 — 원문이 있어도 다시 부른다(D-6G2d-8 ⓑ).
                     false -> out[id]?.remove(axis)
+                    // 그 축에 원장 줄이 하나도 없다 — 원장 이전 원문의 존재로 판정한다(D-6G-58).
                     null -> Unit
                 }
             }
@@ -326,6 +328,13 @@ class CollectOpeningResultsUseCase(
      * 때마다 일 회계가 0 으로 되돌아가 일 상한이 아무것도 막지 못한다(test 가 잡은 자리).
      */
     private fun executionDay(): LocalDate = LocalDate.ofInstant(clock.now(), COLLECTION_BUDGET_ZONE)
+
+    /**
+     * 재호출 상한은 **정책 값**이다(D-6G2d-8 ⓒ) — 리터럴로 박으면 판을 바꿀 자리가 코드가 된다.
+     * 조회 가치 술어의 값들과 같은 자리에서 온다([DetailFetchGates]) — `KonepsCollectionPolicyData`
+     * 는 이 패키지에서 통과 전용이라 멤버를 읽을 수 없고, 그 금지는 옳다(구조 게이트).
+     */
+    private fun axisRetryLimit(): Int = gates.axisRetryLimit
 }
 
 /**

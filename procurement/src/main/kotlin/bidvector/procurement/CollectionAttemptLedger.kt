@@ -101,10 +101,27 @@ sealed interface AttemptOutcome {
         override val isSettled: Boolean = true
     }
 
+    /**
+     * **다시 불러 볼 값이 있는** 실패 — 5xx·타임아웃·상한 거부·짧은 걷기. 다시 부른다(D-6G-58): 한 번
+     * 실패한 축을 영구히 포기하면 그 결측이 무작위가 아니게 된다(느린 응답·과부하 시간대에 몰린 공고만
+     * 빠진다). 재호출 상한은 정책이 정한다([KonepsCollectionPolicyData.axisRetryLimit]).
+     */
     data class Failed(
         val code: String,
     ) : AttemptOutcome {
         override val isSettled: Boolean = false
+    }
+
+    /**
+     * **다시 불러도 답이 달라지지 않는** 실패(D-6G2d-8 ⓒ) — 입력 오류·비재시도 결과코드·봉투 구조
+     * 붕괴·최대 페이지 백스톱. 정착으로 센다: 매 실행 다시 걸면 승인 호출을 그만큼 태우고도 같은
+     * 답을 받는다(그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다). 정착이지만 **행을 쓸 수는
+     * 없다** — 추출은 그 공고를 `incomplete_axis` 로 정직하게 뺀다.
+     */
+    data class FinalFailure(
+        val code: String,
+    ) : AttemptOutcome {
+        override val isSettled: Boolean = true
     }
 }
 
@@ -184,9 +201,36 @@ class AttemptHistory(
                 }
             }
 
-    /** **다시 부르지 않을** (공고, 축) — [axisConclusions] 중 끝난 것만. 이어 돌기가 쓴다. */
-    fun settledAxes(): Map<String, Set<SourceEndpoint>> =
-        axisConclusions().mapValues { (_, byAxis) -> byAxis.filterValues { it.settled }.keys }
+    /**
+     * **이어 돌기의 답**(D-6G-58 · D-6G2d-8 ⓑⓒ) — (공고, 축)마다 `true` 면 다시 부르지 않는다.
+     *
+     * 항목이 **없다**는 것은 세 번째 답이다: 그 (공고, 축)에 원장 줄이 하나도 없으므로 원장 시대
+     * 이전의 원문이고, 판정은 원문의 존재에 맡긴다(D-6G-58 그대로).
+     *
+     * 줄은 있는데 **AXIS 결말이 없으면** 다시 부른다(ⓑ). 걷기는 받은 뒤 원문을 적재하고 그다음에
+     * 결말을 적으므로(D-6G-58 ⓑ), 그 사이에서 죽으면 원문만 남는다 — 그것을 「받았다」로 읽으면 그
+     * 축은 영영 다시 불리지 않고 추출에서 영구 `incomplete_axis` 가 된다(표본이 조용히 준다).
+     *
+     * 일시 실패는 [axisRetryLimit] 번까지만 다시 부른다(ⓒ). 상한이 없으면 구조적으로 실패하는 축이
+     * 매 실행 승인 호출을 태우고, 그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다.
+     */
+    fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> {
+        require(axisRetryLimit >= 1) { "재호출 상한은 1 이상이다 — 0 이면 한 번의 일시 실패가 축을 영구히 버린다" }
+        return attempts
+            .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, lines) -> lines.groupBy { it.axis }.mapValues { (_, byAxis) -> doneWith(byAxis, axisRetryLimit) } }
+    }
+
+    /** 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 결말 부재 · 정착 · 재호출 상한 셋을 본다. */
+    private fun doneWith(
+        byAxis: List<CollectionAttempt>,
+        axisRetryLimit: Int,
+    ): Boolean {
+        val conclusions = byAxis.filter { it.kind == AttemptKind.AXIS }
+        val last = conclusions.lastOrNull() ?: return false
+        return last.outcome.isSettled || conclusions.count { it.outcome is AttemptOutcome.Failed } >= axisRetryLimit
+    }
 
     val size: Int get() = attempts.size
 }
@@ -239,10 +283,11 @@ fun truncationCodeOf(cause: TruncationCause): String =
 fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     when {
         accounting.truncationCause != null -> {
-            AttemptOutcome.Failed(truncationCodeOf(accounting.truncationCause))
+            failureOf(accounting.truncationCause)
         }
 
         accounting.sourceTotal != null && accounting.received < accounting.sourceTotal -> {
+            // 짧은 걷기는 **일시**다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
             AttemptOutcome.Failed(SHORT_WALK_CODE)
         }
 
@@ -256,3 +301,40 @@ fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     }
 
 private const val SHORT_WALK_CODE = "SHORT_WALK"
+
+/**
+ * 절단 사유마다 **다시 불러 볼 값이 있는가**(D-6G2d-8 ⓒ) — 소진 `when` 이라 새 사유가 생기면 컴파일이
+ * 이 자리를 가리킨다. [truncationCodeOf] 와 같은 형태·같은 이유다(어휘를 리플렉션으로 짓지 않는다).
+ *
+ * 갈림의 기준은 「**처음부터 다시 걸으면** 답이 달라질 수 있는가」다. 이어 돌기는 cursor 를 쓰지 않고
+ * 그 축을 1쪽부터 다시 걷는다(`fetchDetails`) — 그래서 이 물음은 어댑터의 `isResumable`(재개 지점에서
+ * 이어 갈 수 있는가)과 **다른 물음**이고, 두 답이 갈리는 사유가 실제로 있다: 백스톱(`MaxPages`·
+ * `RepeatedPage`)은 cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또 멈춘다.
+ *
+ * 시간이 풀어 주는 것은 일시다: 5xx·타임아웃·전송 실패·쿼터·예산·자체 속도 제한. **구조 붕괴도 일시**
+ * 다 — 그것은 서버가 그 순간 보낸 응답이 무너졌다는 관측이고(어댑터 `isResumable` 이 같은 판단을 문면
+ * 으로 적는다), 이 저장소에서 HTTP 5xx 는 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측: 개찰 예산 E2E
+ * 의 5xx 절단이 `STRUCTURE_FAILURE` 다). 확정으로 두면 일시적 5xx 한 번이 그 축을 영구히 버려, 느린
+ * 시간대에 몰린 공고만 빠지는 **비랜덤 결측**이 된다 — 이 slice 가 막으려는 것보다 나쁘다.
+ *
+ * 확정은 입력·구성이 틀렸거나 백스톱에 걸린 것이다: 입력 오류·비재시도 코드·미지 코드·백스톱 둘.
+ * 미지 코드(`Unclassified`)가 확정 쪽인 것은 어댑터의 같은 판단과 같다.
+ */
+private fun failureOf(cause: TruncationCause): AttemptOutcome =
+    when (cause) {
+        TruncationCause.QuotaExhausted,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.SelfThrottled,
+        TruncationCause.StructureFailure,
+        is TruncationCause.BudgetExhausted,
+        -> AttemptOutcome.Failed(truncationCodeOf(cause))
+
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        TruncationCause.Unclassified,
+        -> AttemptOutcome.FinalFailure(truncationCodeOf(cause))
+    }

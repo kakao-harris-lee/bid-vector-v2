@@ -15,6 +15,9 @@ private fun settledHttp(at: String) =
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
 
+/** 재호출 상한 — 이 test 가 재는 것은 셈의 규칙이지 운영 판이 아니다(D-6G2d-8 ⓒ). */
+private const val RETRY_LIMIT = 3
+
 /** 나가려는 호출 한 줄 — 한 줄이 한 호출이다(D-6G-61 ①). */
 private fun attempt(
     at: String,
@@ -49,6 +52,21 @@ private fun walked(
     truncated = false,
     unknownFields = 0,
 )
+
+/** 절단으로 끝난 걷기 — 사유만 다르다. */
+private fun truncated(cause: TruncationCause) =
+    CollectionAccounting(
+        received = 0,
+        normalized = 0,
+        duplicate = 0,
+        dropped = 0,
+        dropReasons = emptyMap(),
+        sourceTotal = null,
+        pagesFetched = 1,
+        truncated = true,
+        unknownFields = 0,
+        truncationCause = cause,
+    )
 
 /**
  * D-6G-45 — 상한이 세는 것은 **나간 호출**이다. 받은 페이지만 세면 재시도·5xx·429·타임아웃이
@@ -138,9 +156,13 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        val axes = history.settledAxes().getValue(key)
+        val axes = history.axisResumptions(RETRY_LIMIT).getValue(key)
 
-        axes.map { it.name }.sorted() shouldContainExactly
+        axes
+            .filterValues { it }
+            .keys
+            .map { it.name }
+            .sorted() shouldContainExactly
             listOf(SourceEndpoint.BASE_AMOUNT_DETAIL.name, SourceEndpoint.RESERVE_PRICE_DETAIL.name)
     }
 
@@ -189,6 +211,42 @@ class CollectionAttemptLedgerTest {
         attemptOutcomeOf(walked(received = 0, sourceTotal = 0)) shouldBe AttemptOutcome.Empty
     }
 
+    /**
+     * **D-6G2d-8 ⓒ — 절단 사유가 확정 실패와 일시 실패를 가른다.** 이어 돌기는 cursor 를 쓰지 않고 그
+     * 축을 1쪽부터 다시 걷는다 — 그래서 백스톱(최대 페이지·같은 쪽 반복)은 다시 걸어도 같은 자리에서
+     * 멈추는 **확정**이고, 입력 오류·비재시도 코드·미지 코드도 확정이다. 서버가 그 순간 무너뜨린 응답
+     * (구조 붕괴)은 **일시**다: 이 저장소에서 HTTP 5xx 가 봉투 없이 와 이 사유가 된다(6G-2d 실측).
+     * 확정으로 두면 일시적 5xx 한 번이 그 축을 영구히 버려 느린 시간대에 몰린 공고만 빠진다.
+     */
+    @Test
+    fun `절단 사유가 확정 실패와 일시 실패를 가른다`() {
+        attemptOutcomeOf(truncated(TruncationCause.StructureFailure)) shouldBe
+            AttemptOutcome.Failed("STRUCTURE_FAILURE")
+        attemptOutcomeOf(truncated(TruncationCause.ServerError)) shouldBe AttemptOutcome.Failed("SERVER_ERROR")
+        attemptOutcomeOf(truncated(TruncationCause.Timeout)) shouldBe AttemptOutcome.Failed("TIMEOUT")
+        attemptOutcomeOf(truncated(TruncationCause.QuotaExhausted)) shouldBe AttemptOutcome.Failed("QUOTA_EXHAUSTED")
+        attemptOutcomeOf(truncated(TruncationCause.MaxPages)) shouldBe AttemptOutcome.FinalFailure("MAX_PAGES")
+        attemptOutcomeOf(truncated(TruncationCause.RepeatedPage)) shouldBe AttemptOutcome.FinalFailure("REPEATED_PAGE")
+        attemptOutcomeOf(truncated(TruncationCause.InputError)) shouldBe AttemptOutcome.FinalFailure("INPUT_ERROR")
+        attemptOutcomeOf(truncated(TruncationCause.NotRetryable)) shouldBe AttemptOutcome.FinalFailure("NOT_RETRYABLE")
+        attemptOutcomeOf(truncated(TruncationCause.Unclassified)) shouldBe AttemptOutcome.FinalFailure("UNCLASSIFIED")
+    }
+
+    /** 확정 실패는 다시 부르지 않고, 일시 실패는 상한까지 다시 부른다 — 결말 하나가 그 답을 정한다. */
+    @Test
+    fun `확정 실패는 한 줄로도 이어 돌기에서 빠진다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val final = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.FinalFailure("MAX_PAGES"))
+        val transient = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("STRUCTURE_FAILURE"))
+
+        AttemptHistory(listOf(final)).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to true)
+        AttemptHistory(listOf(transient)).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
+        // 상한에 닿으면 일시 실패도 확정으로 접는다 — 같은 축을 매 실행 다시 걸지 않는다.
+        AttemptHistory(List(RETRY_LIMIT) { transient }).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(axis to true)
+    }
+
     /** HTTP 줄은 이어 돌기가 보지 않는다 — 나간 호출이지 축의 결말이 아니다. */
     @Test
     fun `HTTP 시도 줄은 이어 돌기에 들지 않는다`() {
@@ -196,7 +254,9 @@ class CollectionAttemptLedgerTest {
         val history =
             AttemptHistory(listOf(attempt("2026-09-24T01:00:00Z", key, SourceEndpoint.OPENING_COMPLETE)))
 
-        history.settledAxes().keys.shouldBeEmpty()
+        // 줄은 있으나 결말이 없다 — 다시 부른다(D-6G2d-8 ⓑ). 「없음」이 아니라 `false` 다.
+        history.axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(SourceEndpoint.OPENING_COMPLETE to false)
         history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 1
     }
 
@@ -213,7 +273,7 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        history.settledAxes().keys.shouldBeEmpty()
+        history.axisResumptions(RETRY_LIMIT).keys.shouldBeEmpty()
         history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 4
     }
 }

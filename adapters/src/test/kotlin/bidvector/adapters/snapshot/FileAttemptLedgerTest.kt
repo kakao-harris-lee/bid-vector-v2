@@ -21,6 +21,9 @@ import java.time.Instant
 private val LEDGER_KEY = NoticeKeyHash.of("SYN-6G-0001", "000")
 private val LEDGER_AT: Instant = Instant.parse("2026-09-24T01:00:00Z")
 
+/** 이 test 가 재는 것은 줄의 형태다 — 재호출 상한은 값으로 고정한다(정책 판이 아니다). */
+private const val LEDGER_RETRY_LIMIT = 3
+
 class FileAttemptLedgerTest {
     @TempDir
     lateinit var temp: Path
@@ -61,8 +64,12 @@ class FileAttemptLedgerTest {
 
         val history = ledger.read()
         history.size shouldBe written.size
-        // 축 결말 줄만 이어 돌기에 든다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
-        history.settledAxes().getValue(LEDGER_KEY.value) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
+        // 축 결말 줄만 이어 돌기의 답을 정한다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
+        history
+            .axisResumptions(LEDGER_RETRY_LIMIT)
+            .getValue(LEDGER_KEY.value)
+            .filterValues { it }
+            .keys shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
         history.spend(LEDGER_AT).total shouldBe 2
     }
 

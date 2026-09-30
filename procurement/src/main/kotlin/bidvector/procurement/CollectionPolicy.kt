@@ -334,7 +334,11 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         // 접음)이 되살아난다.
                         estimatedPriceResolutionOrder = listOf(RawKey("presmptPrce")),
                         dateInterpretation = SourceZoneRuleId.ASSUME_KST,
-                        detailFetchGates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
+                        // `axisRetryLimit` 은 6G-2d D-6G2d-8 ⓒ 의 **잠정값**이다 — `policy-values.md`
+                        // 의 운영자 승인 표(P-1~P-6)에 이 축이 아직 없고, 계약이 든 「예: 3회」를
+                        // 옮겼다. 실수집 뒤 재호출 분포를 보고 정한다(`OPEN-6G2D-AXIS-RETRY-LIMIT`).
+                        detailFetchGates =
+                            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3),
                         // policy-values.md §1.4 authoritative — "YYYY-MM-DD HH:MM:SS"(항목크기
                         // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
                         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),

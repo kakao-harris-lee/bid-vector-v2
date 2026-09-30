@@ -116,18 +116,30 @@ internal class FileAttemptLedger(
     }
 }
 
-/** 결말 어휘 — 오류는 코드를 뒤에 붙인다(`FAILED:<코드>`). 값이 아니라 분류만 싣는다. */
+/**
+ * 결말 어휘 — 오류는 코드를 뒤에 붙인다(`FAILED:<코드>` · `FINAL:<코드>`). 값이 아니라 분류만 싣는다.
+ *
+ * **다시 불러 볼 값이 있는 실패와 없는 실패를 원장이 가른다**(D-6G2d-8 ⓒ). 코드에서 되읽어 분류하지
+ * 않는다: 그러면 사유 어휘가 늘 때마다 판독 쪽에 같은 표가 한 벌 더 생기고 두 표가 갈린다. 분류는
+ * 절단 사유를 손에 든 자리(`attemptOutcomeOf`)가 한 번 하고, 줄이 그 답을 나른다.
+ */
 private fun labelOf(outcome: AttemptOutcome): String =
     when (outcome) {
         AttemptOutcome.Succeeded -> "SUCCEEDED"
         AttemptOutcome.Empty -> "EMPTY"
-        is AttemptOutcome.Failed -> "FAILED:${outcome.code}"
+        is AttemptOutcome.Failed -> "$RETRYABLE_PREFIX${outcome.code}"
+        is AttemptOutcome.FinalFailure -> "$FINAL_PREFIX${outcome.code}"
     }
 
 private fun outcomeOf(label: String): AttemptOutcome =
     when {
         label == "SUCCEEDED" -> AttemptOutcome.Succeeded
         label == "EMPTY" -> AttemptOutcome.Empty
-        label.startsWith("FAILED:") -> AttemptOutcome.Failed(label.removePrefix("FAILED:"))
+        label.startsWith(RETRYABLE_PREFIX) -> AttemptOutcome.Failed(label.removePrefix(RETRYABLE_PREFIX))
+        label.startsWith(FINAL_PREFIX) -> AttemptOutcome.FinalFailure(label.removePrefix(FINAL_PREFIX))
         else -> throw IllegalArgumentException("시도 원장의 결말 어휘가 아니다")
     }
+
+private const val RETRYABLE_PREFIX = "FAILED:"
+
+private const val FINAL_PREFIX = "FINAL:"

@@ -129,7 +129,7 @@ internal val TEST_POLICY =
         baseAmountResolutionOrder = listOf(RawKey("bssAmt"), RawKey("bdgtAmt")),
         estimatedPriceResolutionOrder = listOf(RawKey("presmptPrce")),
         dateInterpretation = SourceZoneRuleId.ASSUME_KST,
-        detailFetchGates = DetailFetchGates(24, 48),
+        detailFetchGates = DetailFetchGates(24, 48, axisRetryLimit = 3),
         // policy-values.md §1.4 authoritative 형식과 같다 — main 정책과 같은 패턴을 test 도 써야
         // "실제 KONEPS wire 형식이 파싱된다"는 회귀 가드가 성립한다(v2-defect 026 재발 방지).
         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),

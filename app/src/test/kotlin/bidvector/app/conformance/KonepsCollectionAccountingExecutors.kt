@@ -12,6 +12,12 @@ import tools.jackson.databind.JsonNode
 import java.time.Instant
 
 /**
+ * 적합성 vector 의 정책 JSON 에 없는 축 — 이 vector 들이 재는 것은 회계이고 재호출 상한이 아니다
+ * (D-6G2d-8 ⓒ). 값은 `DetailFetchGates` 가 요구하는 최소 유효값 위의 아무 값이면 된다.
+ */
+private const val CONFORMANCE_AXIS_RETRY_LIMIT = 3
+
+/**
  * 잔여 일괄 ② — `koneps-collection` 의 회계·조회 가치·resultCode 축(019~027).
  * 필드 계약·업무구분·율·금액 해석 축(001·005~015·017)은 [KonepsCollectionExecutors.kt]
  * 에 있다 — 크기 한도(v2-지침서.md §5, 500줄)를 기계적으로 회피하려는 분할이 아니라
@@ -149,7 +155,12 @@ private fun noticeIdFrom(notice: JsonNode): NoticeId =
 
 private fun case024(input: JsonNode): Map<String, Any?> {
     val policy = input.path("policy")
-    val gates = DetailFetchGates(policy.path("ageGateHours").asLong(), policy.path("recheckGateHours").asLong())
+    val gates =
+        DetailFetchGates(
+            policy.path("ageGateHours").asLong(),
+            policy.path("recheckGateHours").asLong(),
+            axisRetryLimit = CONFORMANCE_AXIS_RETRY_LIMIT,
+        )
     val notice = input.path("notice")
     val noticeId = noticeIdFrom(notice)
     val decision =
@@ -172,7 +183,12 @@ private fun case024(input: JsonNode): Map<String, Any?> {
 
 private fun case025(input: JsonNode): Map<String, Any?> {
     val policy = input.path("policy")
-    val gates = DetailFetchGates(policy.path("ageGateHours").asLong(), policy.path("recheckGateHours").asLong())
+    val gates =
+        DetailFetchGates(
+            policy.path("ageGateHours").asLong(),
+            policy.path("recheckGateHours").asLong(),
+            axisRetryLimit = CONFORMANCE_AXIS_RETRY_LIMIT,
+        )
     val notice = input.path("notice")
     val noticeId = noticeIdFrom(notice)
     val openedAt = Instant.parse(notice.path("openedAt").asString())

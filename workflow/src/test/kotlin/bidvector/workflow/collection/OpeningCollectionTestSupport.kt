@@ -186,7 +186,7 @@ internal class OpeningFixture(
             runs = runs,
             sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), SampleSize(sampleSize)),
             policyFor = { COLLECTION_POLICY },
-            gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
+            gates = COLLECTION_POLICY.detailFetchGates,
             collectedAxes = collectedAxes,
             sampleList = sampleList,
             attempts = attempts,

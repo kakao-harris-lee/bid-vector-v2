@@ -23,7 +23,7 @@ import java.time.ZoneOffset
 
 private val FIXED_CLOCK: Clock = Clock.fixed(Instant.parse("2026-09-27T00:00:00Z"), ZoneOffset.UTC)
 private val NOTICE_ID = NoticeId(NoticeNumber.of("SYN-6G-A0001"), NoticeRound.of("001"))
-private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)
+private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3)
 
 private fun contractRegistry() =
     resolvedCollectionPolicy(CollectionReferenceDate(LocalDate.of(2026, 9, 27))).fieldContracts
