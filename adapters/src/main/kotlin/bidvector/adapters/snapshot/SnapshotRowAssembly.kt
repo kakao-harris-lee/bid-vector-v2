@@ -207,7 +207,9 @@ private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
             null
         }
 
-        present.isEmpty() -> null
+        present.isEmpty() -> {
+            null
+        }
 
         else -> {
             wonAggregate(present) { integral -> integral.reduce(BigDecimal::add) }
