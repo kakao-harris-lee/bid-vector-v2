@@ -25,7 +25,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-8 ⓒ** 결정적 실패는 확정 · 일시는 상한까지 | 이행 — **분류 하나 이탈 3** | `AttemptOutcome.FinalFailure`(원장 라벨 `FINAL:<코드>`) · `failureOf` 의 소진 `when` · 상한은 `DetailFetchGates.axisRetryLimit`(잠정 3) |
 | **D-6G2d-8 ⓓ** 소수 금액은 행 단위 부재 | **D-6G2d-15 로 교정** | 칸 단위 `null` 이 집계 둘에서 스키마 형태 위반이었다 — 아래 D-15 |
 | **D-6G2d-15** 소수 금액은 집계 전체 null · 계수 | 이행 | `AssemblyTally.wonAmount`(스칼라 다섯)·`wonAggregate`(집계 둘)·`isWonInteger` · `SnapshotExtraction.fractionalAmounts` · 러너 로그 한 칸. `jsonAmount` 의 같은 검사는 발화하지 않는 마지막 방어로 남고 KDoc 이 그 사실을 적는다 |
-| **D-6G2d-16** 관문 거부는 상한 밖 | 이행 | `AttemptOutcome.Refused`(라벨 `REFUSED:<코드>`) · `failureOf` 의 세 갈래 · `doneWith` 는 `Failed` 만 센다. 형식 version 2 |
+| **D-6G2d-16 · 29** 그 축에 귀속되지 않는 거부는 상한 밖 | 이행 | `AttemptOutcome.Refused`(라벨 `REFUSED:<코드>`) · `failureOf` 의 세 갈래 · `doneWith` 는 `Failed` 만 센다. 형식 version 2. 쿼터가 이 갈래인 근거는 **계정 단위 사고**라는 것이다(cr r2 H-2 기각, verifier 실측: 예산·쿼터·스로틀·총 상한이 같은 거동) |
 | **D-6G2d-17** 확정 실패는 정확히 셋 | 이행 | `failureOf` 의 확정 갈래 = INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES. `ALL_TRUNCATION_CAUSES` 전수 등식 test 둘 |
 | **D-6G2d-18** 일괄 | **부분 — 이탈 9** | 형식 version 정수만(`requireCurrentFormat`·`STRICT_FORMAT_VERSION`) · 낡은 KDoc 넷 · 중복 하한을 쓰는 자리 하나로 · test 대역의 확정 코드 교정 · 계수 이름 유지. **형식 거부의 전용 종료 코드는 안 했다**(이탈 9) |
 | **D-6G2d-21** `a_value` 전부 아니면 무 | **ⓐⓑ 이행** | `aValueTotalOf` 가 공개일시 부재·구성 항목 결측 둘에서 묶음을 비운다(`aValuePartsOf` 의 `null` 원소는 결측이고 빼지 않는다) · `SnapshotExtraction.incompleteAValues` · 러너 로그 한 칸 |
@@ -120,7 +120,7 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 
 | 표면 | 밖에서 허용하는 것 |
 |---|---|
-| `AttemptOutcome.Refused(code)` | 결말 줄을 짓는 누구나 「호출이 나가지 않았다」를 말할 수 있다. `isSettled` 는 `false` 라 그 축은 다시 불리고, 재호출 상한은 이 갈래를 **세지 않는다** — 코드 문자열로 되읽어 분류하는 길을 열지 않는다 |
+| `AttemptOutcome.Refused(code)` | 결말 줄을 짓는 누구나 「**그 축에 귀속되지 않는 거부**」를 말할 수 있다(D-6G2d-29 — 「HTTP 가 안 나갔다」가 아니다: 예산·스로틀은 호출이 없고, 쿼터는 계정 단위 사고여서 그 축과 무관하다). `isSettled` 는 `false` 라 그 축은 다시 불리고, 재호출 상한은 이 갈래를 **세지 않는다** — 코드 문자열로 되읽어 분류하는 길을 열지 않는다 |
 | `SnapshotExtraction.fractionalAmounts` | 판독이 「소수부로 없는 값이 된 금액 칸 수」를 읽는다(집계는 통째로 하나). `unusableRawRows` 와 같은 자리 — 네 항 항등식 **밖**이다 |
 | `SnapshotExtraction.incompleteAValues` | 판독이 「A 묶음이 전부-아니면-무 규율로 사라진 수」를 읽는다. 소수부와 **원인이 다르므로** 칸을 따로 둔다 — 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시 항등식 밖 |
 
