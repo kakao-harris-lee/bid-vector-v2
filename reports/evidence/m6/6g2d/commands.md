@@ -28,7 +28,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-16** 관문 거부는 상한 밖 | 이행 | `AttemptOutcome.Refused`(라벨 `REFUSED:<코드>`) · `failureOf` 의 세 갈래 · `doneWith` 는 `Failed` 만 센다. 형식 version 2 |
 | **D-6G2d-17** 확정 실패는 정확히 셋 | 이행 | `failureOf` 의 확정 갈래 = INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES. `ALL_TRUNCATION_CAUSES` 전수 등식 test 둘 |
 | **D-6G2d-18** 일괄 | **부분 — 이탈 9** | 형식 version 정수만(`requireCurrentFormat`·`STRICT_FORMAT_VERSION`) · 낡은 KDoc 넷 · 중복 하한을 쓰는 자리 하나로 · test 대역의 확정 코드 교정 · 계수 이름 유지. **형식 거부의 전용 종료 코드는 안 했다**(이탈 9) |
-| **D-6G2d-21** `a_value` 전부 아니면 무 | **ⓐ 이행 · ⓑ 보류(이탈 13)** | `aValueTotalOf` 가 공개일시 부재에서 묶음을 비운다 · `SnapshotExtraction.incompleteAValues` · 러너 로그 한 칸. ⓑ(구성 항목 결측)는 golden 바이트를 바꿔 보류 |
+| **D-6G2d-21** `a_value` 전부 아니면 무 | **ⓐⓑ 이행** | `aValueTotalOf` 가 공개일시 부재·구성 항목 결측 둘에서 묶음을 비운다(`aValuePartsOf` 의 `null` 원소는 결측이고 빼지 않는다) · `SnapshotExtraction.incompleteAValues` · 러너 로그 한 칸 |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
 ## 변이표
@@ -57,7 +57,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-unclassified-final** 미지 코드를 확정으로 | `CollectionAttemptLedgerTest` | RED 3 |
 | **M-count-whole-life** 상한을 디렉터리 생애 전체로 센다 | `CollectionAttemptLedgerTest` | RED 1 |
 | **M-a-open-at-ignored** A 공개일시 부재를 무시한다 | `SnapshotAmountContractTest` | RED 1 |
-| **M-a-undersum**(ⓑ 판에서 실측) 결측 항목을 빼고 합산한다 | 같은 클래스 | RED 1 |
+| **M-a-undersum** 결측 항목을 빼고 합산한다 | 같은 클래스 | RED 1 |
 
 ## 착수 실측 표 갱신
 
@@ -74,7 +74,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 CI `check` job 의 명령 그대로에 `clean` 과 `--no-build-cache` 를 더한 집합이다(CI 는 `check` 를
 캐시와 함께 돌린다 — 더 좁은 쪽이라 이 집합이 그것을 덮는다).
 
-HEAD `0c3a8bf0`(재작업 1 의 마지막 산출물 커밋) 실측:
+HEAD `0e8b957a`(재작업 1 의 마지막 산출물 커밋) 실측:
 
 | 명령 | exit |
 |---|---|
@@ -84,8 +84,8 @@ HEAD `0c3a8bf0`(재작업 1 의 마지막 산출물 커밋) 실측:
 | `./tools/one-command-check.sh` | 0 (「Kotlin 전건 + Python 전건 통과」) |
 
 test XML 합은 **task 별로** 적는다(vr r1 L-3 — 앞 판은 `test` task 만 세면서 그 기준을 적지 않았다):
-`test` 2,543 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
-전체 합 2,551. base 대비 `test` 는 **+38** 다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
+`test` 2,544 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
+전체 합 2,552. base 대비 `test` 는 **+39** 다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
 rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는다.
 
 `container` job 은 돌리지 않았다 — 이 slice 는 그 job 이 돌리는 이미지·compose·실서버 경로를
@@ -167,12 +167,11 @@ D-6G2d-18). 생성자 형태는 그대로다.
 - **(h) 닫혔다** — 공개일시 없는 A 는 묶음 전체가 비고 그 수가 공시된다(D-6G2d-21 ⓐ).
 - **(j)** version 2 아래에서 쓰인 옛 `PENDING` 줄이 그대로 수락되어 상한 +1 소비·재호출로 흐른다 —
   보수 방향(덜 세지 않는다)이라 등재만 한다(D-6G2d-19 문면).
-- **(i)** `aValueTotalOf` 는 **결측** 구성 항목을 빼고 나머지를 더한다(6G 부터의 기존 부채). 줄어든 A 는
-  오류도 결측도 아닌 **틀린 값**이라 채점에 그대로 들어간다. D-6G2d-21 ⓑ 가 이것을 겨누는데 **이 라운드
-  에서 닫지 못했다**: 출하 조립 E2E 의 A 축 대역이 여섯 구성 항목 중 하나만 싣고 품질관리비 술어는 `Y`
-  인데 금액이 없어, golden 의 `a_value.total` 자체가 그 과소 합산의 값이다(실측: ⓑ 적용 시 golden 대조
-  E2E 가 RED). 닫으려면 대역의 A 행을 온전히 채우고 golden 을 재생성해야 하고, 그것은 운영자 결정 A-2
-  가 이 slice 밖으로 둔 일이다 → 이탈 13.
+- **(i) 닫혔다** — 구성 항목 하나라도 결측이면 A 묶음이 통째로 비고 그 수가 공시된다(D-6G2d-21 ⓑ).
+  6G 부터의 과소 합산 부채가 함께 닫혔다. **golden 은 재생성하지 않았다**: 출하 조립 E2E 의 A 축 대역이
+  여섯 중 하나만 싣고 품질관리비 술어는 `Y` 인데 금액이 없어 golden 의 `a_value.total` 자체가 그 과소
+  합산의 값이었으므로, 대역의 A 행을 실물처럼 일곱 항목으로 채우고 **합을 그 값과 같게** 골랐다 —
+  `a_value` 의 바이트가 그대로다(`total` 만 그 항목들에서 파생된다). `ml-engine/**` diff 0.
 
 ## 6G evidence 정정 (D-6G2d-7)
 
@@ -222,9 +221,10 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
    경로는 적재 **전에** 떨어뜨린다, 이것은 방어 심화다)와 걷기 부재 `requireNotNull` 의 도달 가능성
    서술(cr r1 L-4: 발화하지 않는 이중 잠금). 코드 거동 무변경. 알면서 거짓인 KDoc 을 남기는 것이 이
    slice 가 반복해서 고치는 결함 계열이라 함께 담았다.
-13. **D-6G2d-21 ⓑ 를 하지 않았다 — golden 바이트를 바꾼다.** 위 알려진 제한 (i) 의 실측이 근거다.
-   ⓐ 만 이행했고 ⓑ 의 변이 RED 는 ⓑ 판에서 한 번 재어 두었다(`M-a-undersum`). 운영자 판단 필요:
-   대역의 A 행을 온전히 채우고 golden 을 재생성할지, 규칙을 좁힐지.
+13. **D-6G2d-21 ⓑ 는 한 번 보류했다가 같은 라운드에서 닫았다.** 첫 판에서 golden 대조 E2E 가 RED 였고
+   (대역의 A 행이 반쪽이라 golden 의 `a_value.total` 이 과소 합산의 값이었다) 운영자 결정 A-2 가 golden
+   재생성을 slice 밖으로 두어 멈췄다. 그 뒤 **golden 을 바꾸지 않는 길**을 찾아 닫았다 — 대역의 A 행을
+   일곱 항목으로 채우고 합을 같은 값으로. 남은 것은 없다. 커밋 이력에 두 판이 다 있다.
 12. **D-6G2d-19 의 「`doneWith` 가 `at` 순서를 읽는다」를 따르지 않았다** — 원장의 덧붙인 순서로 읽는다.
    사유는 위 알려진 제한 (e): `at` 정렬은 시계가 뒤로 간 실행에서 앞 실행의 결말을 「마지막」으로 만들어
    추출 쪽 규율과 어긋난다. 정착 창을 고르는 성질(계약이 요구한 것)은 그대로 성립한다.
