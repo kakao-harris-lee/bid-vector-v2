@@ -143,6 +143,13 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 
 **사실 선언**: 동결 뒤 레인 evidence 커밋 `af5c23cb`(commands.md 골든 상태·Python 왕복 1,209 passed)가 판정 SHA 위에 올라갔다 — 코드 0, 판정 유효. 검증 중 레인이 `check` 를 한 번 돌려 verifier 가 기다렸다(동결 통지와 엇갈림, 세 번째 사례).
 
+## 계약 갱신 r2-b (2026-09-30, 팀장 — 수정 라운드 2 보고 수령: HEAD `5020646a` · 이탈 둘)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-32** | **이탈 수용 둘**: ① D-30 의 sealed 도출 등식 test 는 도메인 모듈이 아니라 **app 의 구조 게이트 test 자리**에 둔다 — 도메인 test classpath 에 kotlin-reflect 가 없고(`-Werror`) 의존 추가는 in_scope 밖이며 도메인 test 의 능력을 넓힌다. 값 단위 거동 test 는 도메인에 남는다 ② `config/quality/gate-tests.properties` 의 한 줄은 새 게이트 test 의 **양방향 등재**다(술어 확장 아님) — verifier 가 등재임을 확인 |
+| **D-6G2d-33** | **r3 판정 SHA 는 이 갱신 커밋.** 표적: D-28 여섯 판 + 변이 · D-29 문면 · D-30 각 항목(sealed 등식이 새 subclass 를 실제로 잡는가 — 정적) · 등재 한 줄 · acceptance `check` 넷 · rollback(공유 파일 hunk 격리 셋) · 새 public 표면 0 확인. container job 은 이 라운드가 조립 층을 바꾸지 않았으므로 생략 가능(verifier 판단) |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
