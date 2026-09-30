@@ -89,6 +89,19 @@
 
 **OPEN 신설**: `OPEN-6G2D-EMPTY-AXIS-REASON`(계약 예고) · `OPEN-6G2D-AXIS-RETRY-LIMIT`(잠정값 3, 운영자 결정 A-3). **판정 SHA 는 이 갱신 커밋**이다(레인 동결 유지, 코드 0).
 
+## 계약 갱신 r1 (2026-09-30, 팀장 — verifier r1 not-ready H-1·M-1·L · code-reviewer r1 H-1·H-2·M-1~3·L-1~4 수령)
+
+판정 SHA `2a1bb88b`. 통과: 기동 셋·복구 도중 크래시·옛 디렉터리 거부(MISSING) · W6b 최신 걷기 · 빈 번호 `unusableRawRows` · 결정적 실패 1회 · 변이 13 RED · (2b) 여덟 표면 새 권한 없음 · acceptance 넷 exit 0(test XML 2,535) · container job 전 단계 exit 0 · rollback ①~⑥. 막는 것 하나, 고칠 것 셋. **재작업 1/5.**
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-15** | **(vr r1 H-1 · cr r1 H-2 — 데이터 정확성) 소수 금액은 집계 전체를 null 로.** `jsonAmount` 가 여섯 금액 칸 중 `a_value.total`·`reserve_prices[i]` 에서 `null` 을 내면 스키마 §2.2(`total:int` · `int[15] | null`)를 어겨 Python `_a_value`·`_numbers` 가 `INVALID_VALUE` 로 **스냅숏 전체**를 거부한다. 처방: 소수부가 있는 값이 집계에 들어가면 **그 집계 자체를 null**(`a_value: null` · `reserve_prices: null`)로 내어 기존 행 단위 제외로 떨어뜨린다. `parseAmount` 에서 거르지 않는다(`aValueTotalOf` 의 `mapNotNull` 이 A 를 조용히 줄인다). 여섯 칸 전부에 **스키마 계약 test**(렌더 결과가 §2.2 형태 집합 안) + 소수 금액 발생 수를 러너 로그에 공시(manifest 어휘 추가 없음, A-2). 변이: 집계 안 원소만 null → RED · `parseAmount` 절삭 → RED |
+| **D-6G2d-16** | **(cr r1 H-1 · vr r1 M-1 — 데이터 정확성) 관문 거부는 상한에 세지 않는다.** `SelfThrottled`·`BudgetExhausted`·`QuotaExhausted` 는 HTTP 가 나가기 전에 접히는 거부다 — `Failed` 가 아니라 **넷째 결말 어휘 `Refused`**(또는 상한 셈에서 구조적으로 제외되는 형태)로 원장에 싣고 `doneWith` 는 **실제로 나간 호출의 일시 실패**만 센다. 계약 ⓒ 「상한 거부는 재호출」의 이행이다. 변이: 거부를 셈 → RED(verifier 판: 오늘치 소진 상태로 세 번 기동 뒤 예산 있는 네 번째 기동에서 그 축이 **호출된다**, mock 요청 수) |
+| **D-6G2d-17** | **(cr r1 M-1) 결정적 실패는 정확히 셋** — INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES. `RepeatedPage`·`Unclassified` 는 **일시**로 두고 상한이 확정한다(미지 사유 한 번에 영구 확정하지 않는다). 집합은 test 가 등식으로 잠근다. 변이: `Unclassified` 를 확정으로 → RED |
+| **D-6G2d-18** | **일괄(값싼 것)**: cr M-2 `unusableRawRows` 의 KDoc·러너 로그가 세 원인(빈 번호 · 형태 어긴 차수 · 열거 밖 엔드포인트)을 정확히 말하게(이름 유지) · cr M-3 형식 거부가 러너 종료 코드·로그에 닫힌 어휘로 나오게(디렉터리 열기를 bean 생성이 아니라 러너의 `catch` 안으로 — 불가하면 이탈로 사유 기록) · vr L `format_version` 은 **정수만**(문자열·선행 0 거부, `1.0` 은 MISMATCHED) · `CollectionAttemptLedger.kt` 낡은 KDoc 넷 · 중복 하한 `require` 는 한 자리로(도메인 질의 쪽 유지, 사유 한 줄) · cr L test 대역의 `FinalFailure("STRUCTURE_FAILURE")` 조합 제거 · evidence 의 `private`/`internal` 표기 정정 |
+| **D-6G2d-19** | **재호출 상한의 셈 창을 등재한다(레인 자기 보고).** `doneWith` 는 실행 상태 디렉터리 **생애 전체**에 걸쳐 그 (공고, 축)의 일시 실패를 누적한다 — 하루치도 실행치도 아니다. 알려진 제한 (e) 에 이 문장을 넣고 `OPEN-6G2D-AXIS-RETRY-LIMIT` 의 운영자 결정 A-3 은 **값과 창**(디렉터리 생애 / 일 단위)을 함께 묻는다. 이 라운드에서 창은 바꾸지 않는다 |
+| **D-6G2d-20** | **재검증은 표적**: D-15 여섯 칸 스키마 계약 + Python 판독 규칙 대조 · D-16 mock 요청 수 판 · D-17 등식 · D-18 각 항목 · acceptance(`check` job 넷 + container) · rollback 재실측 · 새 public 표면(수정이 만든 것) 갱신. code-reviewer 는 수정 diff 를 본다 |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
