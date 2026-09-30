@@ -101,8 +101,13 @@ class RunStateDirectory(
         // **형식 판별은 잠금과 무관하다**(D-6G2d-44) — 잠금을 못 잡아도 옛 디렉터리는 「형식」으로
         // 거부돼야 한다. 잠금 뒤로 미루면 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱
         // 오류로 죽고, 운영자는 무엇이 틀렸는지 출력에서 읽을 수 없다.
-        factsFile.requireReadableFormat()
-        if (lock is RunStateLock.Held) heldOrRelease { verifyIntegrity() }
+        //
+        // **가드 안에서** 돈다(D-6G2d-48 ⑥) — 잠금을 쥔 실행이 형식 거부로 죽으면 그 잠금이 열린 채
+        // 남고, 다음 실행은 「다른 실행이 돌고 있다」로 조용히 끝난다(거부 사유가 사라진다).
+        heldOrRelease {
+            factsFile.requireReadableFormat()
+            if (lock is RunStateLock.Held) verifyIntegrity()
+        }
     }
 
     /**

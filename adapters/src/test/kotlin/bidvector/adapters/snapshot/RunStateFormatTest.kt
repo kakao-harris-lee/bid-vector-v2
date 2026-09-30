@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
@@ -106,6 +107,28 @@ class RunStateFormatTest : RunStateDirectoryFixture() {
 
         // 잠금을 **놓지 않는다** — 두 번째 열기는 Busy 로 간다(다른 실행이 도는 모양).
         shouldThrow<RunStateFormatRefusedException> { open() }.fault shouldBe RunStateFormatFault.MISSING
+    }
+
+    /**
+     * **D-6G2d-48 ⑥ — 형식 거부는 잠금을 남기지 않는다.** 거부가 잠금 가드 밖에서 일어나면 그 잠금이
+     * 열린 채 남고, 다음 실행은 「다른 실행이 돌고 있다」로 **조용히** 끝난다 — 거부 사유가 사라지고
+     * 운영자는 무엇을 고쳐야 하는지 모른다.
+     *
+     * 관측은 **그 뒤의 열기**로 한다: 형식을 되돌린 뒤 열면 잠금을 잡아야 한다(`Held`). 남아 있었다면
+     * `Busy` 다 — 거부 자체는 두 경우 모두 같은 예외라 그것으로는 갈리지 않는다.
+     */
+    @Test
+    fun `형식 거부는 잠금을 남기지 않는다`() {
+        open().sampleList.confirm(runStateSample())
+        val state = root().resolve(STATE_NAME)
+        val current = Files.readString(state)
+        Files.writeString(state, current.replace("\"format_version\":$RUN_STATE_FORMAT_VERSION,", ""))
+        releaseLocks()
+
+        shouldThrow<RunStateFormatRefusedException> { open() }
+
+        Files.writeString(state, current)
+        open().lock.shouldBeInstanceOf<RunStateLock.Held>()
     }
 
     /** 반대 방향 — 이 형식의 디렉터리는 잠금을 못 잡아도 **열린다**(읽기 전용으로 쓰인다). */
