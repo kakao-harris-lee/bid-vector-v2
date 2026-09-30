@@ -291,7 +291,17 @@ internal class MockOpeningKonepsHttp(
         mapOf(
             "bidNtceNo" to noticeNumber,
             "bidNtceOrd" to "000",
-            "npnInsrprm" to "260853707",
+            // **A 구성 항목 전부**를 싣는다(D-6G2d-21 ⓑ) — 실물 응답은 일곱을 함께 내고, 하나라도
+            // 없으면 이제 A 묶음이 통째로 빠진다. 앞 판은 국민연금보험료 하나만 싣고 품질관리비 술어는
+            // `Y` 인데 금액이 없어, golden 의 `a_value.total` 자체가 그 과소 합산의 값이었다.
+            // 일곱의 합을 **그 값과 같게** 골랐다 — golden 바이트는 바뀌지 않는다(A-2: 재생성 없음).
+            "npnInsrprm" to "100000000",
+            "mrfnHealthInsrprm" to "60000000",
+            "odsnLngtrmrcprInsrprm" to "8000000",
+            "rtrfundNon" to "40000000",
+            "sftyMngcst" to "30000000",
+            "sftyChckMngcst" to "20000000",
+            "qltyMngcst" to "2853707",
             "qltyMngcstAObjYn" to "Y",
             "smkpAmtYn" to "N",
             "ntceNticeDt" to "2026-06-03 09:39:16",

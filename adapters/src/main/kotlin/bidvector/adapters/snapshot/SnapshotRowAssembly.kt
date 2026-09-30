@@ -194,25 +194,22 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
  *
  * ⓑ **구성 항목 하나라도 결측이면** 없다. 앞 판은 결측 항목을 `mapNotNull` 로 빼고 나머지를 더해 A 를
  * **조용히 줄였다**(6G 부터의 부채) — 줄어든 A 는 오류도 결측도 아닌 **틀린 값**이라 채점에 그대로
- * 들어간다. 술어가 거짓인 품질관리비는 결측이 아니다(합산 대상이 아니다).
+ * 들어간다. 공사 하한가가 `(예정가격 − A) × r + A` 라 A 가 작으면 하한가를 낮게 잡고 적격 판정 자체가
+ * 틀린다. 술어가 거짓인 품질관리비는 결측이 아니다(합산 대상이 아니다).
  *
  * 둘 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
  */
 private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
-    val present = aValuePartsOf(row).filterNotNull()
+    val parts = aValuePartsOf(row)
     val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
     return when {
-        disclosedAt == null -> {
+        disclosedAt == null || parts.any { it == null } -> {
             countIncompleteAValue()
             null
         }
 
-        present.isEmpty() -> {
-            null
-        }
-
         else -> {
-            wonAggregate(present) { integral -> integral.reduce(BigDecimal::add) }
+            wonAggregate(parts.filterNotNull()) { integral -> integral.reduce(BigDecimal::add) }
         }
     }
 }

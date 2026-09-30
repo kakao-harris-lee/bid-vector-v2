@@ -208,6 +208,26 @@ class SnapshotAmountContractTest {
         rendered.bytes.contains("\"open_at\":null") shouldBe false
     }
 
+    /**
+     * **D-6G2d-21 ⓑ — 구성 항목이 하나라도 결측이면 A 묶음 전체가 없다.** 앞 판은 결측 항목을 빼고
+     * 나머지를 더해 A 를 **조용히 줄였다**(6G 부터의 부채). 줄어든 A 는 오류도 결측도 아닌 **틀린 값**
+     * 이라 채점에 그대로 들어간다 — 공사 하한가가 `(예정가격 − A) × r + A` 라 A 가 작으면 하한가를
+     * 낮게 잡고 적격 판정 자체가 틀린다. 결측보다 나쁘다.
+     */
+    @Test
+    fun `A 구성 항목이 하나라도 결측이면 A 묶음 전체가 없다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA() - A_COMPONENT_KEYS.last(),
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+        // 과소 합산이 아니다 — 남은 다섯의 합이 실리지 않는다.
+        rendered.bytes.contains("\"total\":5000000") shouldBe false
+    }
+
     /** 술어가 거짓인 품질관리비는 합산 대상이 아니다 — 그 부재로 A 가 흔들리지 않는다. */
     @Test
     fun `합산 대상이 아닌 항목의 부재는 결측이 아니다`() {
