@@ -106,6 +106,7 @@ class SnapshotExtractionRunner(
                 "incompleteAxis=${extraction.incompleteAxis} " +
                 "unusableRawRows=${extraction.unusableRawRows} " +
                 "fractionalAmounts=${extraction.fractionalAmounts} " +
+                "incompleteAValues=${extraction.incompleteAValues} " +
                 "outsideSample=${extraction.observedOutsideSample} bytes=${rows.length}",
         )
         termination.terminate(CollectionExitCode.COMPLETE.value)

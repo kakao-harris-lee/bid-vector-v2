@@ -59,6 +59,17 @@ internal class AssemblyTally {
         }
 
     /**
+     * A 묶음이 **전부 아니면 무**의 규율로 사라진 수(D-6G2d-21) — 소수부와 다른 원인이라 칸을 따로
+     * 둔다. 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다.
+     */
+    var incompleteAValues: Int = 0
+        private set
+
+    fun countIncompleteAValue() {
+        incompleteAValues++
+    }
+
+    /**
      * **집계는 통째로 없어진다**(vr r1 H-1). `a_value.total` 과 `reserve_prices[i]` 는 스키마 §2.2 가
      * `int` 를 **필수**로 두는 자리다 — 원소만 `null` 로 두면 그 바이트는 `{total:int, …} | null` 도
      * `int[15] | null` 도 아니고, 판독은 그 행이 아니라 **스냅숏 전체**를 거부한다. 집계를 `null` 로
@@ -171,17 +182,50 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
     return wonAggregate((1..RESERVE_PRICE_SLOTS).map { bySequence.getValue(it) }) { it }
 }
 
-/** A 합산액 — **술어가 참인 항목만** 더한다. 표준시장단가금액은 근거 예규 미확보로 제외한다(§3.3). */
+/**
+ * A 합산액 — **술어가 참인 항목만** 더한다. 표준시장단가금액은 근거 예규 미확보로 제외한다(§3.3).
+ *
+ * **A 묶음은 전부 아니면 무다**(D-6G2d-21). 두 자리에서 통째로 사라진다.
+ *
+ * ⓐ **공개일시가 없으면** 없다. 스키마 §2.2 는 `a_value` 를 `{total:int, open_at:datetime, …} | null`
+ * 로 두고 `open_at` 은 널을 허용하지 않는다 — 합산액만 싣고 공개일시를 `null` 로 두면 그 바이트는 두
+ * 모양 어느 쪽도 아니고 판독이 **스냅숏 전체**를 거부한다(D-6G2d-15 와 같은 계열). 공개일시는 누출
+ * 판정의 입력이므로(D-6G-13 ⑥) 없는 A 는 채점에 쓸 수도 없다.
+ *
+ * ⓑ **구성 항목 하나라도 결측이면** 없다. 앞 판은 결측 항목을 `mapNotNull` 로 빼고 나머지를 더해 A 를
+ * **조용히 줄였다**(6G 부터의 부채) — 줄어든 A 는 오류도 결측도 아닌 **틀린 값**이라 채점에 그대로
+ * 들어간다. 술어가 거짓인 품질관리비는 결측이 아니다(합산 대상이 아니다).
+ *
+ * 둘 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
+ */
 private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
-    val always = A_ALWAYS_SUMMED.mapNotNull(row::amountOf)
-    val quality =
-        row
-            .amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST)
-            ?.takeIf { row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) == true }
-    val parts = always + listOfNotNull(quality)
-    if (parts.isEmpty()) return null
-    return wonAggregate(parts) { integral -> integral.reduce(BigDecimal::add) }
+    val present = aValuePartsOf(row).filterNotNull()
+    val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
+    return when {
+        disclosedAt == null -> {
+            countIncompleteAValue()
+            null
+        }
+
+        present.isEmpty() -> null
+
+        else -> {
+            wonAggregate(present) { integral -> integral.reduce(BigDecimal::add) }
+        }
+    }
 }
+
+/**
+ * A 합산의 구성 항목 — `null` 원소는 **결측**이고 빼지 않는다(D-6G2d-21 ⓑ). 술어가 참인 품질관리비만
+ * 목록에 들어온다: 술어가 거짓이면 그 항목은 합산 대상이 아니므로 결측이 아니다.
+ */
+private fun aValuePartsOf(row: RawRow): List<BigDecimal?> =
+    A_ALWAYS_SUMMED.map(row::amountOf) +
+        if (row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) == true) {
+            listOf(row.amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST))
+        } else {
+            emptyList()
+        }
 
 private val A_ALWAYS_SUMMED =
     listOf(

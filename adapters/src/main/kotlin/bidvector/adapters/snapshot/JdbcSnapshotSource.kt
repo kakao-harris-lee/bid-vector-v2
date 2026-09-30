@@ -77,6 +77,7 @@ class JdbcSnapshotSource(
             incomplete,
             observed.unusableRows,
             tally.fractionalAmounts,
+            tally.incompleteAValues,
         )
     }
 
@@ -298,6 +299,12 @@ data class SnapshotExtraction(
      * 정수를 낸다는 조사 문서의 관측이 깨졌다는 뜻이고, 그 사실은 로그로 공시된다.
      */
     val fractionalAmounts: Int,
+    /**
+     * A 묶음이 **전부 아니면 무**의 규율로 사라진 수(D-6G2d-21) — 공개일시 부재 또는 구성 항목 결측이다.
+     * 소수부 계수와 칸이 다르다: 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시
+     * 항등식 밖이다 — 그 행은 버려지지 않고 A 칸만 빈다.
+     */
+    val incompleteAValues: Int,
 )
 
 /**

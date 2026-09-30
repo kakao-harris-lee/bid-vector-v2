@@ -57,7 +57,7 @@ class SnapshotAmountContractTest {
         formulaAFields: Map<String, String> = emptyMap(),
         reserveFields: List<Map<String, String>> = emptyList(),
         openingFields: List<Map<String, String>> = emptyList(),
-    ): Pair<String, Int> {
+    ): Rendered {
         val tally = AssemblyTally()
         val axes =
             buildMap<SourceEndpoint, List<RawRow>> {
@@ -67,8 +67,15 @@ class SnapshotAmountContractTest {
                 put(SourceEndpoint.OPENING_COMPLETE, openingFields.map(::rawRow))
             }
         val row = assembleSnapshotRow(KEY, axes, CANONICAL, tally)
-        return SnapshotWriter.renderRows(listOf(row)) to tally.fractionalAmounts
+        return Rendered(SnapshotWriter.renderRows(listOf(row)), tally.fractionalAmounts, tally.incompleteAValues)
     }
+
+    /** 렌더 결과와 그때의 계수 둘 — 원인이 다른 계수를 한 수로 접지 않는다. */
+    private class Rendered(
+        val bytes: String,
+        val fractional: Int,
+        val incompleteAValues: Int,
+    )
 
     private fun rawRow(fields: Map<String, String>): RawRow = RawRow(fields.mapValues { it.value }, policy())
 
@@ -102,7 +109,7 @@ class SnapshotAmountContractTest {
 
     @Test
     fun `온전한 금액은 전부 정수 리터럴로 실린다 — 양성 대조`() {
-        val (rendered, fractional) =
+        val rendered =
             render(
                 baseAmountFields = intactBaseAmount(),
                 formulaAFields = intactFormulaA(),
@@ -110,14 +117,14 @@ class SnapshotAmountContractTest {
                 openingFields = listOf(mapOf("opengRank" to "1", "bidprcAmt" to "1100000000")),
             )
 
-        fractional shouldBe 0
-        rendered shouldContain "\"a_value\":{\"total\":6000000,"
-        rendered shouldContain "\"reserve_prices\":[$RESERVE_PRICE_AMOUNT,"
-        rendered shouldContain "\"base_amount\":1234567890"
-        rendered shouldContain "\"pure_construction_cost\":900000000"
-        rendered shouldContain "\"planned_price\":$PLANNED_PRICE"
-        rendered shouldContain "\"opening_base_amount\":$OPENING_BASE_AMOUNT"
-        rendered shouldContain "\"amount\":1100000000"
+        rendered.fractional shouldBe 0
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
+        rendered.bytes shouldContain "\"reserve_prices\":[$RESERVE_PRICE_AMOUNT,"
+        rendered.bytes shouldContain "\"base_amount\":1234567890"
+        rendered.bytes shouldContain "\"pure_construction_cost\":900000000"
+        rendered.bytes shouldContain "\"planned_price\":$PLANNED_PRICE"
+        rendered.bytes shouldContain "\"opening_base_amount\":$OPENING_BASE_AMOUNT"
+        rendered.bytes shouldContain "\"amount\":1100000000"
     }
 
     /**
@@ -126,7 +133,7 @@ class SnapshotAmountContractTest {
      */
     @Test
     fun `스칼라 금액 칸의 소수부는 그 칸만 비운다`() {
-        val (rendered, fractional) =
+        val rendered =
             render(
                 baseAmountFields =
                     intactBaseAmount(mapOf("bssamt" to "1234567890.01", "bssAmtPurcnstcst" to "900000000.5")),
@@ -138,15 +145,15 @@ class SnapshotAmountContractTest {
                 openingFields = listOf(mapOf("opengRank" to "1", "bidprcAmt" to "1100000000.5")),
             )
 
-        fractional shouldBe 5
-        rendered shouldContain "\"base_amount\":null"
-        rendered shouldContain "\"pure_construction_cost\":null"
-        rendered shouldContain "\"planned_price\":null"
-        rendered shouldContain "\"opening_base_amount\":null"
-        rendered shouldContain "\"amount\":null"
+        rendered.fractional shouldBe 5
+        rendered.bytes shouldContain "\"base_amount\":null"
+        rendered.bytes shouldContain "\"pure_construction_cost\":null"
+        rendered.bytes shouldContain "\"planned_price\":null"
+        rendered.bytes shouldContain "\"opening_base_amount\":null"
+        rendered.bytes shouldContain "\"amount\":null"
         // 집계 둘은 온전하므로 형태를 지킨다.
-        rendered shouldContain "\"a_value\":{\"total\":6000000,"
-        rendered shouldContain "\"reserve_prices\":[$RESERVE_PRICE_AMOUNT,"
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
+        rendered.bytes shouldContain "\"reserve_prices\":[$RESERVE_PRICE_AMOUNT,"
     }
 
     /**
@@ -156,17 +163,17 @@ class SnapshotAmountContractTest {
      */
     @Test
     fun `A 구성 항목의 소수부는 A 묶음 전체를 비운다`() {
-        val (rendered, fractional) =
+        val rendered =
             render(
                 formulaAFields = intactFormulaA(mapOf("sftyChckMngcst" to "1000000.5")),
                 reserveFields = intactReserveRows(),
             )
 
-        fractional shouldBe 1
-        rendered shouldContain "\"a_value\":null"
-        rendered.contains("\"total\":null") shouldBe false
+        rendered.fractional shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+        rendered.bytes.contains("\"total\":null") shouldBe false
         // 과소 합산이 아니다 — 남은 다섯의 합(5,000,000)이 실리지 않는다.
-        rendered.contains("\"total\":5000000") shouldBe false
+        rendered.bytes.contains("\"total\":5000000") shouldBe false
     }
 
     /**
@@ -175,25 +182,57 @@ class SnapshotAmountContractTest {
      */
     @Test
     fun `예비가격 한 칸의 소수부는 배열 전체를 비운다`() {
-        val (rendered, fractional) = render(formulaAFields = intactFormulaA(), reserveFields = intactReserveRows(7))
+        val rendered = render(formulaAFields = intactFormulaA(), reserveFields = intactReserveRows(7))
 
-        fractional shouldBe 1
-        rendered shouldContain "\"reserve_prices\":null"
-        rendered.contains("\"reserve_prices\":[") shouldBe false
+        rendered.fractional shouldBe 1
+        rendered.bytes shouldContain "\"reserve_prices\":null"
+        rendered.bytes.contains("\"reserve_prices\":[") shouldBe false
+    }
+
+    /**
+     * **D-6G2d-21 ⓐ — 공개일시가 없는 A 는 없는 A 다.** 스키마 §2.2 는 `open_at` 에 널을 허용하지
+     * 않으므로 합산액만 싣고 공개일시를 비우면 그 바이트는 `{total:int, open_at:datetime, …} | null`
+     * 어느 쪽도 아니고 판독이 스냅숏 **전체**를 거부한다. 공개일시는 누출 판정의 입력이라(D-6G-13 ⑥)
+     * 없는 A 는 채점에 쓸 수도 없다.
+     */
+    @Test
+    fun `A 공개일시가 없으면 A 묶음 전체가 없다`() {
+        val rendered =
+            render(
+                formulaAFields = A_COMPONENT_KEYS.associateWith { A_COMPONENT_AMOUNT },
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+        rendered.bytes.contains("\"open_at\":null") shouldBe false
+    }
+
+    /** 술어가 거짓인 품질관리비는 합산 대상이 아니다 — 그 부재로 A 가 흔들리지 않는다. */
+    @Test
+    fun `합산 대상이 아닌 항목의 부재는 결측이 아니다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA(mapOf("qltyMngcstAObjYn" to "N")),
+                reserveFields = intactReserveRows(),
+            )
+
+        rendered.incompleteAValues shouldBe 0
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
     }
 
     /** 끝자리 0 은 소수부가 아니다 — 원천 표기가 `.00` 이어도 정수 리터럴로 실린다. */
     @Test
     fun `끝자리 0 은 소수부가 아니다`() {
-        val (rendered, fractional) =
+        val rendered =
             render(
                 baseAmountFields = intactBaseAmount(mapOf("bssamt" to "1234567890.00")),
                 formulaAFields = intactFormulaA(A_COMPONENT_KEYS.associateWith { "$A_COMPONENT_AMOUNT.000" }),
                 reserveFields = intactReserveRows(),
             )
 
-        fractional shouldBe 0
-        rendered shouldContain "\"base_amount\":1234567890"
-        rendered shouldContain "\"a_value\":{\"total\":6000000,"
+        rendered.fractional shouldBe 0
+        rendered.bytes shouldContain "\"base_amount\":1234567890"
+        rendered.bytes shouldContain "\"a_value\":{\"total\":6000000,"
     }
 }
