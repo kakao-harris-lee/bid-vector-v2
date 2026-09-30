@@ -336,13 +336,19 @@ private const val SHORT_WALK_CODE = "SHORT_WALK"
  * ① **관문 거부**([AttemptOutcome.Refused], D-6G2d-16) — 우리 속도 보호·우리 승인 상한·원천의 쿼터
  * 거절. 전송 앞에서 접히므로 그 공고·축에 대한 관측이 아니고, 재호출 상한이 세지 않는다.
  *
- * ② **확정 실패**([AttemptOutcome.FinalFailure]) — 입력·구성이 틀렸거나 백스톱에 걸린 것. 이어 돌기는 cursor 를 쓰지 않고 그 축을 1쪽부터 다시 걷으므로(`fetchDetails`), 이
- * 물음은 어댑터의 `isResumable`(재개 지점에서 이어 갈 수 있는가)과 **다른 물음**이다 — 백스톱은
- * cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또 멈춘다.
+ * ② **확정 실패**([AttemptOutcome.FinalFailure], D-6G2d-17) — 입력 오류·비재시도 코드·최대 페이지
+ * 백스톱 **정확히 셋**이다(test 가 등식으로 잠근다). 이어 돌기는 cursor 를 쓰지 않고 그 축을 1쪽부터
+ * 다시 걷으므로(`fetchDetails`), 이 물음은 어댑터의 `isResumable`(재개 지점에서 이어 갈 수 있는가)과
+ * **다른 물음**이다 — 백스톱은 cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또
+ * 멈춘다.
  *
- * ③ **일시 실패**([AttemptOutcome.Failed]) — 그 밖. 5xx·타임아웃·전송 실패와 **구조 붕괴**가 여기다.
- * 구조 붕괴가 일시인 근거: 서버가 그 순간 보낸 응답이 무너졌다는 관측이고(어댑터 `isResumable` 이 같은
- * 판단을 문면으로 적는다), 이 저장소에서 HTTP 5xx 는 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측).
+ * ③ **일시 실패**([AttemptOutcome.Failed]) — 그 밖 전부. 5xx·타임아웃·전송 실패에 **구조 붕괴**와
+ * **미지 코드**와 **같은 쪽 반복**이 함께 든다. 구조 붕괴가 일시인 근거: 서버가 그 순간 보낸 응답이
+ * 무너졌다는 관측이고(어댑터 `isResumable` 이 같은 판단을 문면으로 적는다), 이 저장소에서 HTTP 5xx 는
+ * 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측). 미지 코드가 일시인 근거(cr r1 M-1): 분류되지 않은 새
+ * 오류 형태 **한 번**에 그 축을 영구히 버리면 그것이 곧 표본의 조용한 축소다 — 「재개 가능한가」와
+ * 「그 공고를 영구히 버릴까」의 fail-safe 방향은 반대이고 후자는 보수적으로 **재시도**다. 같은 쪽 반복도
+ * 원천의 쪽 넘김이 그 순간 어긋난 관측이다. 영구 포기는 **상한이** 한다.
  */
 private fun failureOf(cause: TruncationCause): AttemptOutcome =
     when (cause) {
@@ -352,15 +358,15 @@ private fun failureOf(cause: TruncationCause): AttemptOutcome =
         -> AttemptOutcome.Refused(truncationCodeOf(cause))
 
         TruncationCause.MaxPages,
-        TruncationCause.RepeatedPage,
         TruncationCause.NotRetryable,
         TruncationCause.InputError,
-        TruncationCause.Unclassified,
         -> AttemptOutcome.FinalFailure(truncationCodeOf(cause))
 
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,
         TruncationCause.ServerError,
         TruncationCause.StructureFailure,
+        TruncationCause.RepeatedPage,
+        TruncationCause.Unclassified,
         -> AttemptOutcome.Failed(truncationCodeOf(cause))
     }

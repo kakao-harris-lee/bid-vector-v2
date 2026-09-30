@@ -2,6 +2,7 @@ package bidvector.procurement
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -14,6 +15,27 @@ private fun settledHttp(at: String) =
     CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP, walk = null)
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
+
+/**
+ * 절단 사유 **전수** — 이 목록이 `truncationCodeOf` 의 소진 `when` 과 같은 수의 항을 가져야 한다
+ * (아래 등식 test 가 그것을 함께 잰다). sealed 계층을 리플렉션으로 열거하지 않는다: 도메인은
+ * `java.lang.Class` 를 보지 않고(architecture 게이트), 손으로 적은 목록이 빠지면 등식이 붉는다.
+ */
+private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
+    listOf(
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.QuotaExhausted,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        TruncationCause.Unclassified,
+        TruncationCause.StructureFailure,
+        TruncationCause.SelfThrottled,
+        TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
+    )
 
 /** 재호출 상한 — 이 test 가 재는 것은 셈의 규칙이지 운영 판이 아니다(D-6G2d-8 ⓒ). */
 private const val RETRY_LIMIT = 3
@@ -224,11 +246,36 @@ class CollectionAttemptLedgerTest {
             AttemptOutcome.Failed("STRUCTURE_FAILURE")
         attemptOutcomeOf(truncated(TruncationCause.ServerError)) shouldBe AttemptOutcome.Failed("SERVER_ERROR")
         attemptOutcomeOf(truncated(TruncationCause.Timeout)) shouldBe AttemptOutcome.Failed("TIMEOUT")
+        attemptOutcomeOf(truncated(TruncationCause.RepeatedPage)) shouldBe AttemptOutcome.Failed("REPEATED_PAGE")
+        attemptOutcomeOf(truncated(TruncationCause.Unclassified)) shouldBe AttemptOutcome.Failed("UNCLASSIFIED")
         attemptOutcomeOf(truncated(TruncationCause.MaxPages)) shouldBe AttemptOutcome.FinalFailure("MAX_PAGES")
-        attemptOutcomeOf(truncated(TruncationCause.RepeatedPage)) shouldBe AttemptOutcome.FinalFailure("REPEATED_PAGE")
         attemptOutcomeOf(truncated(TruncationCause.InputError)) shouldBe AttemptOutcome.FinalFailure("INPUT_ERROR")
         attemptOutcomeOf(truncated(TruncationCause.NotRetryable)) shouldBe AttemptOutcome.FinalFailure("NOT_RETRYABLE")
-        attemptOutcomeOf(truncated(TruncationCause.Unclassified)) shouldBe AttemptOutcome.FinalFailure("UNCLASSIFIED")
+    }
+
+    /**
+     * **D-6G2d-17 (cr r1 M-1) — 확정 실패 집합은 정확히 셋이다.** 등식으로 잠근다: 부분집합 단언은
+     * 집합이 넓어지는 것을 보지 못하고, 넓어진 한 사유가 곧 「분류되지 않은 오류 한 번에 그 축을 영구히
+     * 버린다」다. 절단 사유 전수를 이 등식이 훑으므로 새 사유가 생기면 여기서 답을 정해야 한다.
+     */
+    @Test
+    fun `확정 실패 집합은 정확히 셋이다`() {
+        val finalCodes =
+            ALL_TRUNCATION_CAUSES
+                .filter { attemptOutcomeOf(truncated(it)) is AttemptOutcome.FinalFailure }
+                .map(::truncationCodeOf)
+
+        finalCodes.sorted() shouldContainExactly listOf("INPUT_ERROR", "MAX_PAGES", "NOT_RETRYABLE")
+    }
+
+    /** 나머지는 관문 거부 셋과 일시 실패 여섯으로 갈리고, 어느 사유도 분류 밖에 남지 않는다. */
+    @Test
+    fun `절단 사유 전수가 세 갈래 중 하나로 간다`() {
+        val byBranch = ALL_TRUNCATION_CAUSES.groupBy { attemptOutcomeOf(truncated(it))::class.simpleName }
+
+        byBranch.getValue("Refused") shouldHaveSize 3
+        byBranch.getValue("FinalFailure") shouldHaveSize 3
+        byBranch.getValue("Failed") shouldHaveSize ALL_TRUNCATION_CAUSES.size - 6
     }
 
     /**
