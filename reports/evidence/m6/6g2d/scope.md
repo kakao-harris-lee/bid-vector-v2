@@ -191,6 +191,14 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-46** | **이탈 수용 셋**: ① D-42 의 끊긴 라운드 걷기 식별자는 형식 v3 가 아니라 **그 라운드의 마지막 호출 시각** — 그 라운드의 원문은 결말이 `Failed(INTERRUPTED)` 라 어차피 쓰이지 않으므로(그 공고는 `incomplete_axis`) 값이 0 인 칸을 위해 version 을 올리지 않는다; 「형식 version 2 부터」 유지 ② D-44 가 기동 실패 사유 토큰 `RUN_STATE_FORMAT_LEGACY_LINE` 을 더했다 — 장부가 아니라 **줄**에서 드러나는 옛 형식이라 기존 둘로 말할 수 없다. A-2 의 「사유 어휘」는 스냅숏 스키마의 결측 사유이고 이것은 기동 출력이다 ③ D-41 이 장부 판독을 제 타입으로 갈랐다(함수 수 한도) — 그 과정의 초기화 순서 함정(D-1 계열)은 전건 `check` 가 잡았다(표적 test 는 초록이었다 — 「부분 게이트는 안 돌린 것과 같다」 다섯 번째 실측) |
 | **D-6G2d-47** | **표적 확인 SHA 는 이 갱신 커밋.** verifier: D-41 순서 test·변이·append 당 6,795 µs 재실측 · D-42 두 판·변이(두 쪽 축이 한 쪽 축과 같은 기동에서 멈춤 · 크래시·크래시·Refused → 2) · D-43 변이 · D-44 v1 디렉터리 잠긴 채 열기 → 형식 거부 · 형식 version 2 유지 확인 · acceptance 강한 집합 · rollback 문서 명령 그대로(hunk 일곱) · 새 public 표면 |
 
+## 계약 갱신 r6 (2026-10-01, 팀장 — PR #51 `/code-review` 3차 9건 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-48** | **소수정 여섯(코드 거동 최소, 술어 확장 0, 형식 version 2 유지)**: ① 러너의 `openingCauseCodeOf` 가 `RunStateFormatRefusedException` 의 사유 토큰(MISSING/MISMATCHED/LEGACY_LINE)을 로그·종료 사유로 내게(클래스명으로 떨어지지 않게 — 예외를 app 이 식별할 수 있는 최소 표면, 사유 코드 문자열만) ② **PENDING 만 남은 꼬리**(의도 줄 뒤·HTTP 줄 전 크래시)도 끊긴 라운드다 — `interruptedRounds` 가 닫고(walk = PENDING 의 `at`) 상한에 하나로 센다; 예산은 이미 그 PENDING 을 나간 호출로 세므로 두 장부의 가정이 같아진다. test: 매 실행 PENDING 뒤 크래시 세 번 → 네 번째 0 호출. 변이 → RED ③ 디렉터리 fsync 실패(DrvFs·9p 등 미지원 마운트)는 **한 번 경고하고 계속**(파일 데이터 fsync 는 유지) — 예외로 append 전체를 막지 않는다; runbook 에 「실행 상태 디렉터리는 ext4(WSL 내부)」 권고 ④ `incompleteAValues` 는 **A 가 적용되는 공고**(`bid_price_formula_a_applicable = Y`)에서만 센다 — 미적용 공고의 빈 A 행은 계수 없이 null ⑤ `FileChannelAppend.append` 는 `while (buffer.hasRemaining()) channel.write(buffer)` ⑥ `requireReadableFormat` 호출을 `heldOrRelease` 가드 안으로(잠금 쥔 채 던지지 않게) + 낡은 KDoc(`readFacts`) 정정 |
+| **D-6G2d-49** | **등재 셋**: cr ④ 「끊긴 라운드를 `INTERRUPTED` 줄로 닫는 대신 `doneWith` 가 열린 꼬리를 하나로 세라」는 설계 이견 — 계약 D-42 는 닫는 쪽을 택했다(원장이 사실을 말하고 셈이 원장만 읽게). INTERRUPTED 줄의 `walk` 가 관측 시각이 아니라 마지막 호출 시각임은 `AxisConclusion.walk` KDoc 에 예외로 적고, 고정 시계 test 에서 그 값이 관측 시각과 겹칠 수 있음(오늘은 `Failed` 라 무해)을 알려진 제한으로 · cr ⑥ 장부 갱신을 AXIS 결말·표본 확정 때만(원장 앞섬은 재동기가 처리) → `OPEN-6G2D-FSYNC-BATCHING` 의 구체안으로 · cr ⑦ 원장 이중 파싱 → `OPEN-6G-REVIEW-FOLLOWUPS` |
+| **D-6G2d-50** | **표적 확인(verifier)**: ①~⑥ 각 test·변이(②③⑤ 필수) · acceptance 강한 집합 · rollback 문서 명령 그대로 · 새 public 표면(①의 사유 코드 표면). 그 뒤 `/code-review` 4차 — **새 high 가 없으면 나머지는 등재로 닫고 머지한다**(수렴 규칙: 라운드마다 새 low·medium 이 나오는 것은 리뷰의 성질이지 slice 의 미완이 아니다) |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
