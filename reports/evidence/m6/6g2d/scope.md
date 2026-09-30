@@ -74,6 +74,21 @@
 | **D-6G2d-8** | **PR #50 `/code-review` 가 더한 넷(6G D-6G-82) — 실수집 전에 닫는다.** ⓐ 원문 `bidNtceNo` 가 빈 행: `NoticeNumber.of` 를 무방비로 부르지 않고 **행 단위 이름 있는 제외**(계수 공시)로 — 추출과 `JdbcCollectedAxisStore` 둘 다. 변이: 빈 번호 행을 심으면 추출이 던짐 → RED ⓑ raw append 와 AXIS 결말 사이의 크래시: 그 축의 PENDING/HTTP 줄이 있으면 「원장 시대 · 미정착」으로 읽어 **재호출 대상**으로(원장 이전 원문과 구별). 변이: 결말 없는 원장 시대 축이 「수집됨」으로 → RED ⓒ 결정적 실패(INPUT_ERROR · NOT_RETRYABLE · 구조 실패 · MAX_PAGES)는 **실패 확정으로 정착**하고 사유별 계수, 일시 실패(5xx·타임아웃·상한 거부·SHORT_WALK)만 재호출 — 재호출 상한(예: 3회)은 정책 값으로 두고 넘으면 확정. 변이: 결정적 실패가 둘째 기동에서 재호출됨 → RED ⓓ `jsonAmount` 는 소수 금액을 **행 단위 제외**(이름 있는 사유)로 — 추출 전체를 멈추지 않는다. 변이: 소수 금액 한 행 → 추출 전체 실패 → RED. ⓐⓓ 의 새 사유는 스키마 칸이 아니라 manifest 제외 계수 어휘의 추가라면 A-2 와 함께 결정 | 넷 다 실데이터에서만 드러나고 실수집 값·회계·강건성에 닿는다(verifier 정적 판독) |
 | **D-6G2d-7** | **6G evidence 정정 선언.** 6G `commands.md` 의 D-6G-70 행 · D-6G-68 「원장 이전 원문은 D-6G-58 그대로」 행이 어느 전제 위의 서술이었는지 이 slice evidence 에 한 문단 | 닫힌 slice 의 evidence 를 되쓰지 않는다 |
 
+## 계약 갱신 r0-b (2026-09-30, 팀장 — Kotlin 레인 완료 보고 수령: 이탈 넷 · 새 public 표면 여덟 · OPEN 둘)
+
+레인 HEAD `2d2a5548`(산출물 `21d979e9`), acceptance `check` job 넷 exit 0 · test XML 2,527 · rollback D1/M33 실측. 아래는 검증 전 팀장 처분이고, 각 항목은 verifier 표적이다.
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-9** | **in_scope 에 넷을 더한다(레인 이탈 1 수용)**: `adapters/.../koneps/KonepsPageUriBuilder.kt` · `adapters/.../koneps/KonepsCallGate.kt`(D-4 ⓒⓓ 기본값 제거의 기계적 귀결, 각 한 자리) · `adapters/.../persistence/JdbcCollectedAxisStore.kt`(D-8 ⓐ 결정문이 이름으로 든 자리 — 착수 계약의 경로 누락, 6A-3·6G 교훈 재발) · `app/src/main/.../collection/SnapshotExtractionRunner.kt`(D-8 ⓐ 계수 로그 한 칸). **전송 거동 무변경**이 조건이다 — verifier 는 koneps 둘의 diff 가 생성자 인자 전달 외 아무것도 아님을 확인한다 |
+| **D-6G2d-10** | **구조 붕괴(StructureFailure)는 일시 실패로 둔다(레인 이탈 2 수용).** 이 저장소에서 HTTP 5xx 가 봉투 없이 그 사유로 오므로, 확정으로 두면 일시적 5xx 한 번이 축을 영구히 버린다. 결정적 실패 = INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES 셋. 영구적인 구조 붕괴는 **재호출 상한(D-11)에서 확정**된다 — verifier 는 「매번 구조 붕괴인 축이 상한 뒤 확정되고 더 호출되지 않는다」를 mock 요청 수로 잰다 |
+| **D-6G2d-11** | **재호출 상한은 `DetailFetchGates.axisRetryLimit`(기본값 없음)에 둔다(레인 이탈 3 수용)** — 수집 use case 는 `KonepsCollectionPolicyData` 의 멤버를 읽을 수 없고 구조 게이트가 그것을 막았다(게이트 무확장). 배선이 넣는 값 **3 은 잠정**이다 — 운영자 승인 표(6G A-1~5)에 없다 → `OPEN-6G2D-AXIS-RETRY-LIMIT`, 이 slice 종결 보고에서 운영자 결정 항목(A-3)으로 올린다. verifier 는 상한 값이 배선 한 자리에서만 오고 리터럴이 use case 에 없음을 확인한다 |
+| **D-6G2d-12** | **`architecture-policy.properties` 의 변경은 `AxisConclusion` 등재 해제 한 줄이다(레인 이탈 4 수용)** — 허용 집합 == 관측 집합 등식에서 use case 가 더는 그 타입을 쓰지 않으므로 좁히는 방향이다. 술어 무변경 — verifier 확인 |
+| **D-6G2d-13** | **새 public 표면 여덟은 D-6G2d-6 「0」의 이탈이며 (2b) 값 획득 축으로 verifier 가 전수한다.** 좁히는 여섯(`SourceBatch.observedAt` 비널 · `CollectionAttempt.walk` 기본값 제거+양방향 · `AxisConclusion` 비널 걷기 · `AttemptHistory.settledAxes` 제거/`axisResumptions` 신설 · `DetailFetchGates.axisRetryLimit` · `NoticeNumber.ofOrNull`)과 새 값을 나르는 둘(`AttemptOutcome.FinalFailure` · `SnapshotExtraction.unusableRawRows`) 각각에 「밖에서 무엇을 할 수 있는가」. 특히 `FinalFailure` 를 밖에서 지어 원장에 쓰면 축이 영구 확정되는가(누가 쓸 수 있는가) · `ofOrNull` 이 정규화 우회를 여는가 |
+| **D-6G2d-14** | **`container` job 도 acceptance 다.** 레인은 돌리지 않았다(실행 상태 E2E 가 `check` 안이라는 이유) — verifier 가 판정 SHA 에서 한 번 돌린다(자기 compose 프로젝트, 다른 프로젝트 불간섭) |
+
+**OPEN 신설**: `OPEN-6G2D-EMPTY-AXIS-REASON`(계약 예고) · `OPEN-6G2D-AXIS-RETRY-LIMIT`(잠정값 3, 운영자 결정 A-3). **판정 SHA 는 이 갱신 커밋**이다(레인 동결 유지, 코드 0).
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
@@ -112,7 +127,7 @@
 - `adapters/src/main/kotlin/bidvector/adapters/snapshot/**` · `adapters/src/test/**`(실행 상태 디렉터리·추출·조립)
 - `procurement/src/main/kotlin/bidvector/procurement/**`(`CollectionAttemptLedger` 의 AXIS 줄 계약) · `procurement/src/test/**`
 - `workflow/src/main/kotlin/bidvector/workflow/collection/**` · `workflow/src/test/kotlin/bidvector/workflow/collection/**`(AXIS 기록 자리 — D-4 ⓒⓓ 가 닿을 때만)
-- `app/src/test/**`(출하 조립 E2E 의 기동 셋·옛 형식 거부 단언)
+- `app/src/test/**`(출하 조립 E2E 의 기동 셋·옛 형식 거부 단언) · **(r0-b D-6G2d-9)** `app/src/main/kotlin/bidvector/app/collection/SnapshotExtractionRunner.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsPageUriBuilder.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsCallGate.kt` · `adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcCollectedAxisStore.kt`
 - `config/quality/**`(새 타입 **등재**만)
 - `reports/evidence/m6/6g2d/**` · `milestone-6.md`(착수·종결 문단만)
 
