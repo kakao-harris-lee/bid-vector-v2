@@ -121,6 +121,15 @@
 
 in_scope 추가: `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**`(D-25, 골든 파일만). out_scope 유지: `ml-engine/src/**` · `ml-engine/tests/**` 의 그 밖 · `snapshot-schema.md` 계약 칸.
 
+## 계약 갱신 r1-d (2026-09-30, 팀장 — D-21 ⓐⓑ 완료 HEAD `5adcaa0c` 수령 · D-25 이행 방식 확정)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-26** | **D-25 는 골든 불변으로 이행된 것으로 확정한다.** 레인이 대역의 A 행을 **일곱 항목 온전히** 채우되 합을 골든의 `total` 260,853,707 과 같게 두었다 — `a_value` 에서 원문으로부터 파생되는 값은 `total` 뿐이라 골든 바이트가 그대로다. 골든은 합성 왕복 fixture 이고 그 값의 의미는 「writer 와 reader 가 같은 바이트에 합의한다」이지 실측 금액이 아니므로, 「반쪽 원문이 굳힌 과소 합산」은 대역이 온전해진 순간 사라졌다(이제 일곱 항목의 참 합). 따라서 D-25 ⓒ(재생성)·ⓓ(Python 왕복)·ⓔ(before/after 공시)는 **불필요**하고 in_scope 의 골든 디렉터리 추가는 **철회**한다(`ml-engine/**` diff 0 유지). 골든 재생성 시도는 auto mode 권한 분류기(「Modify Shared Resources」)가 막았고 레인은 우회하지 않았다 — 사실로 등재, 종결 보고에 적는다 |
+| **D-6G2d-27** | **판정 SHA 는 이 갱신 커밋.** r2 표적(D-24)에 D-21 ⓑ 의 대역 온전성(일곱 항목·술어와 금액 정합)과 `incompleteAValues` 계수 (2b) 를 더한다 |
+
+in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가를 철회한다.
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
