@@ -1,0 +1,192 @@
+"""M6/6G 합성 스냅숏 fixture 생성기(비식별). **실 데이터를 쓰지 않는다** — 공고 키는
+지어낸 라벨의 sha256 이고 금액·날짜는 전부 합성이다(`data-extract.md` §7 — 실 스냅숏은
+저장소 밖, test fixture 는 합성).
+
+제도 형태는 지킨다: 예가 범위를 15구간으로 나눠 구간마다 균등 난수 하나를 뽑고 그중
+무작위 4개의 평균을 예정가격으로 쓴다 — 그래야 P-4 적합도 검정이 통과하고, 그 뒤 판정
+경로 전체가 돈다(적합도에서 멈추면 재현 test 가 재는 것이 없다).
+
+창 배치(정책 `window.days=7`, `embargo_days=7` 기준):
+
+| 블록 | 개찰 주 | 공고 수 | 이 fixture 에서의 자리 |
+|---|---|---|---|
+| W0 | 2026-06-15~21 | 30 | 이력 전용(자기 이력이 없어 `NO_HISTORY` 로 빠진다) |
+| W1 | 2026-06-22~28 | 0 | 빈 창(`INSUFFICIENT_ROWS`) — 제외가 기록되는지 본다 |
+| W2~W4 | 06-29~, 07-06~, 07-13~ | 30씩 | 채점 창 셋 |
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import date, timedelta
+from pathlib import Path
+from random import Random
+from typing import Any
+
+FIXTURE_DIR_NAME = "backtest-snapshot"
+_FIXTURE_SEED = 20260927
+_BASE_AMOUNT = 1_000_000_000.0
+_RESERVE_BIN_COUNT = 15
+_DRAW_COUNT = 4
+_HALF_WIDTH = 0.02
+_NOTICES_PER_BLOCK = 30
+_BIDDERS_PER_NOTICE = 6
+_OPENING_LAG_DAYS = 14
+# 공고일은 개찰일 14일 전이다 — 블록 시작을 06-15 로 잡아야 첫 블록의 공고일(06-01)이
+# 일반용역 하한율 시행일(2026-05-26) 뒤에 온다(제외 ⑬). 블록 사이에 한 주를 비워
+# 「빈 창」이 제외 사유와 함께 기록되는지도 함께 잰다.
+_BLOCK_STARTS = (
+    date(2026, 6, 15),
+    date(2026, 6, 29),
+    date(2026, 7, 6),
+    date(2026, 7, 13),
+)
+
+
+def _reserve_draw(rng: Random) -> tuple[float, list[float], list[int]]:
+    """예비가격 15개와 추첨 번호 4개, 그 평균인 예정가격 — 제도 그대로."""
+    low = _BASE_AMOUNT * (1.0 - _HALF_WIDTH)
+    step = _BASE_AMOUNT * 2.0 * _HALF_WIDTH / _RESERVE_BIN_COUNT
+    prices = [
+        low + step * index + rng.random() * step for index in range(_RESERVE_BIN_COUNT)
+    ]
+    drawn = sorted(rng.sample(range(1, _RESERVE_BIN_COUNT + 1), _DRAW_COUNT))
+    planned = sum(prices[number - 1] for number in drawn) / _DRAW_COUNT
+    return planned, prices, drawn
+
+
+def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
+    planned, prices, drawn = _reserve_draw(rng)
+    floor_rate = 0.87995
+    floor_price = planned * floor_rate
+    amounts = sorted(
+        floor_price * (1.0 + rng.uniform(-0.004, 0.02))
+        for _ in range(_BIDDERS_PER_NOTICE)
+    )
+    noticed = opened - timedelta(days=_OPENING_LAG_DAYS)
+    return {
+        "notice": {
+            "notice_key_hash": hashlib.sha256(label.encode("utf-8")).hexdigest(),
+            "category": "SERVICE",
+            "noticed_on": noticed.isoformat(),
+            "bid_close_at": f"{(opened - timedelta(days=1)).isoformat()}T10:00:00+09:00",
+            "base_amount": int(_BASE_AMOUNT),
+            "base_amount_disclosed_at": (
+                f"{(opened - timedelta(days=_OPENING_LAG_DAYS - 2)).isoformat()}"
+                "T09:00:00+09:00"
+            ),
+            "floor_rate": floor_rate,
+            "reserve_range_begin_rate": -_HALF_WIDTH,
+            "reserve_range_end_rate": _HALF_WIDTH,
+            "a_value": None,
+            "successful_bid_method_code": "낙030001",
+            "successful_bid_method_name": "적격심사제-추정가격 2억원 미만인 용역",
+            "prearranged_price_decision_method": "복수예가",
+            "notice_ordinal": 0,
+            "procurement_class_code": "0600",
+            "demand_agency_code": "A0001",
+            "bid_price_formula_a_applicable": None,
+            "pure_construction_cost": None,
+            "has_award_method_application_standard": True,
+            "has_application_basis_content": False,
+        },
+        "outcome": {
+            "opened_on": opened.isoformat(),
+            "planned_price": int(planned),
+            "progress_division": "일반",
+            "opening_base_amount": int(_BASE_AMOUNT),
+            "reserve_prices": [int(price) for price in prices],
+            "drawn_serial_numbers": drawn,
+            "participant_count": _BIDDERS_PER_NOTICE,
+            "bidder_rows": [
+                {"ordinal": index + 1, "rank": index + 1, "amount": int(amount)}
+                for index, amount in enumerate(amounts)
+            ],
+        },
+    }
+
+
+# 행이 되지 못한 표본 둘 — 상세를 못 받은 것과 공고 canonical 이 없던 것.
+# 해시는 결정적으로 만든다(같은 seed 면 같은 바이트).
+_MISSING_DETAIL_KEY = hashlib.sha256(b"m6-6g-sampled-without-detail").hexdigest()
+_MISSING_NOTICE_KEY = hashlib.sha256(b"m6-6g-sampled-without-notice").hexdigest()
+_INCOMPLETE_AXIS_KEY = hashlib.sha256(b"m6-6g-incomplete-axis").hexdigest()
+
+
+def build_rows() -> list[dict[str, Any]]:
+    """결정적 생성 — 같은 seed 면 같은 바이트. 커밋된 fixture 와 대조된다."""
+    rng = Random(_FIXTURE_SEED)
+    rows: list[dict[str, Any]] = []
+    for block, start in enumerate(_BLOCK_STARTS):
+        for index in range(_NOTICES_PER_BLOCK):
+            opened = start + timedelta(days=index % 5)
+            rows.append(_row(f"m6-6g-synthetic-{block}-{index}", opened, rng))
+    return rows
+
+
+def build_files() -> tuple[bytes, bytes, bytes]:
+    rows = build_rows()
+    rows_bytes = (
+        "\n".join(json.dumps(row, sort_keys=True, ensure_ascii=False) for row in rows)
+        + "\n"
+    ).encode("utf-8")
+    # v4 — 표본 목록이 파일이다. **일부러 「표본 != 행」으로 둔다**: 표본 둘이 행이
+    # 되지 못한 판이라야 `sample_size`(행+2) · `notice_observed_count`(행+1) · 행 수가
+    # 셋 다 다른 값이 되고, 판정 JSON 이 분모를 어디서 가져오는지 test 가 가를 수
+    # 있다. 셋이 같은 판에서는 분모를 무엇으로 적든 같은 수가 나와 아무것도 잠기지
+    # 않는다 — 왕복 golden 이 10/10/0/0 이던 동안 겪은 것과 같은 함정이다.
+    extra = (_MISSING_DETAIL_KEY, _MISSING_NOTICE_KEY, _INCOMPLETE_AXIS_KEY)
+    listing = (
+        "\n".join(
+            f"{key}\tSERVICE\t2026-W25"
+            for key in sorted(
+                [row["notice"]["notice_key_hash"] for row in rows] + list(extra)
+            )
+        )
+        + "\n"
+    ).encode("utf-8")
+    manifest = {
+        "schema_version": "snapshot-v5",
+        "snapshot_id": "m6-6g-synthetic-v1",
+        "row_count": len(rows),
+        # 기간은 **행들의 개찰일 범위**다 — 판독기가 재계산해 대조하므로 블록 경계를
+        # 적으면 거부된다(D-6G-32).
+        "period_start": min(row["outcome"]["opened_on"] for row in rows),
+        "period_end": max(row["outcome"]["opened_on"] for row in rows),
+        "rows_sha256": hashlib.sha256(rows_bytes).hexdigest(),
+        # v4 — 표본 목록 **파일 바이트**의 해시다(행에서 재계산한 값이 아니다).
+        # v3 의 재계산 대조는 원형이라 성립하지 않았다 — D-6G-39.
+        "sample_list_sha256": hashlib.sha256(listing).hexdigest(),
+        "sample_size": len(rows) + len(extra),
+        "sampled_without_detail": 1,
+        "sampled_without_notice": 1,
+        # v5 — 축이 반쪽인 표본도 하나 둔다. 0 만 지나가는 fixture 는 그 항을 검사하지
+        # 않는다(왕복 golden 이 10/10/0/0 이던 때와 같은 함정).
+        "incomplete_axis": 1,
+        # v5 — 확정 범위(D-6G-66). 이 fixture 는 층도 행도 용역 하나라 범위도 하나다.
+        # 문턱이 이 **수**로 정해지므로, 둘이 갈리는 판은 전용 test 가 따로 짓는다.
+        "sample_scope_divisions": ["SERVICE"],
+    }
+    return (
+        json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8"),
+        rows_bytes,
+        listing,
+    )
+
+
+def write_fixture(directory: Path) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    manifest_bytes, rows_bytes, sample_list = build_files()
+    (directory / "manifest.json").write_bytes(manifest_bytes)
+    (directory / "rows.jsonl").write_bytes(rows_bytes)
+    (directory / "sample-list.tsv").write_bytes(sample_list)
+    return directory
+
+
+def fixture_dir() -> Path:
+    return Path(__file__).resolve().parent / "fixtures" / FIXTURE_DIR_NAME
+
+
+if __name__ == "__main__":  # pragma: no cover - 재생성용 진입점
+    print(write_fixture(fixture_dir()))

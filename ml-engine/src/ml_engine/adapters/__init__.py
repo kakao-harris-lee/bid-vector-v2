@@ -15,6 +15,12 @@ from ml_engine.adapters.dataset_files import (
     DatasetUnreadableReason,
     read_dataset_files,
 )
+from ml_engine.adapters.snapshot_files import (
+    SnapshotFiles,
+    SnapshotUnreadable,
+    SnapshotUnreadableReason,
+    read_snapshot_files,
+)
 
 __all__ = [
     "ArtifactFileRefs",
@@ -22,6 +28,10 @@ __all__ = [
     "DatasetFiles",
     "DatasetUnreadable",
     "DatasetUnreadableReason",
+    "SnapshotFiles",
+    "SnapshotUnreadable",
+    "SnapshotUnreadableReason",
     "read_dataset_files",
+    "read_snapshot_files",
     "write_artifact_files",
 ]

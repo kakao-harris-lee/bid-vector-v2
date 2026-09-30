@@ -238,6 +238,50 @@ class CollectionArchitectureGateTest {
             ).checkAll()
     }
 
+    /**
+     * D-6G-47 — **HTTP 클라이언트를 쥔 자리가 관문 하나**임을 잰다(만드는 배선 한 곳 포함).
+     *
+     * 관문이 상한을 세고 원장에 적는데, 다른 곳에서 클라이언트를 얻으면 그 호출은 어느 셈에도
+     * 들어가지 않는다. 「관문을 지나라」는 규율이 아니라 **의존 구조**여야 하고, 이 등식이 그
+     * 구조를 잰다 — 새 클라이언트 참조가 생기면 목록을 고치지 않고는 초록이 되지 않는다.
+     */
+    @Test
+    fun `HTTP 클라이언트를 쥔 자리는 관문과 그것을 만드는 배선뿐이다`() {
+        referencersOf(policy.httpClientRoots, setOf(policy.httpClientType)) shouldBe policy.httpClientHolders.toSet()
+    }
+
+    /**
+     * D-6G-62 — `java.net.http` 를 쓰지 않아도 URL·소켓으로 바이트를 가져올 수 있고, 그 호출은
+     * 상한에도 원장에도 들어가지 않는다. 이름을 문자열로 짓는 반사도 같은 구멍이라 함께 막는다.
+     * 허용 집합은 **비어 있다**: 6G 의 모든 바깥 호출은 관문의 `java.net.http` 를 지난다.
+     */
+    @Test
+    fun `관문을 우회하는 전송·반사 타입을 쥔 production 클래스가 없다`() {
+        referencersOf(policy.transportBypassRoots, policy.transportBypassTypes.toSet()) shouldBe
+            policy.transportBypassHolders.toSet()
+    }
+
+    /**
+     * vr r4 L-12·L-13 — 공고 키 해시를 **짓는 자리**를 정확 집합으로 잠근다. `sha256Hex` 는 public
+     * top-level 이라 `sha256Hex("$번호/$차수")` 를 다른 곳에서 써도 컴파일이 통과하고, 그러면 같은
+     * 값을 짓는 두 번째 정의가 생긴다 — 그 값은 영속 원장과 레인 간 계약(스냅숏 manifest)에 실린다.
+     */
+    @Test
+    fun `공고 키 해시를 짓는 자리는 등재된 집합뿐이다`() {
+        referencersOf(policy.keyHashRoots, setOf(policy.keyHashType)) shouldBe policy.keyHashHolders.toSet()
+    }
+
+    /** root 아래 production 에서 [types] 중 하나라도 직접 참조하는 클래스 이름 집합. */
+    private fun referencersOf(
+        roots: List<String>,
+        types: Set<String>,
+    ): Set<String> =
+        production
+            .filter { item -> roots.any { item.name.startsWith("$it.") } }
+            .filter { item -> item.directDependenciesFromSelf.any { it.targetClass.name in types } }
+            .map { it.name }
+            .toSet()
+
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 
     companion object {

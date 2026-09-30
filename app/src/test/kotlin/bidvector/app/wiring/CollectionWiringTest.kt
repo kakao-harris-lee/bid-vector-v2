@@ -21,6 +21,8 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import java.time.LocalDate
 import java.util.function.Supplier
@@ -78,6 +80,10 @@ class CollectionWiringTest {
         "bidvector.collection.from=$from",
         "bidvector.collection.to=$to",
         "bidvector.collection.categories=$categories",
+        // D-6G-47 H-1 — 이 갈래도 승인 상한 아래다. 기본값이 없으므로 켜려면 넷을 대야 한다.
+        "bidvector.collection.calls-per-day=1000",
+        "bidvector.collection.calls-total=1000",
+        "bidvector.collection.run-state-dir=$NOTICE_RUN_STATE",
         "bidvector.koneps.service-key=$secretKey",
     )
 
@@ -310,3 +316,6 @@ class CollectionWiringTest {
         }
     }
 }
+
+/** 저장소 밖 — 배선은 디렉터리가 있는지만 본다(표본 확정과 시도 기록은 수집이 한다). */
+private val NOTICE_RUN_STATE: Path = Files.createTempDirectory("6g-notice-run-state")

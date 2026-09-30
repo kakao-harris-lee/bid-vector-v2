@@ -11,7 +11,6 @@ import bidvector.sharedkernel.NoticeRound
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -27,7 +26,7 @@ private fun newSource(
         baseUri = server.baseUri,
         config =
             KonepsSourceConfig(
-                httpClient = HttpClient.newHttpClient(),
+                gate = testCallGate(),
                 serviceKey = ServiceKey.of("test-service-key"),
                 httpPolicy = policy,
                 collectionPolicyProvider = ::resolvedCollectionPolicy,
@@ -166,28 +165,20 @@ class KonepsLicenseLimitDocumentSourceTest {
         }
     }
 
+    /**
+     * M6/6G D-6G-11 이 F-2 의 판정을 바꿨다 — `resultCode 22`(일 트래픽 한도)는 백오프로
+     * 회복되지 않으므로 재시도가 거부될 호출을 더 낼 뿐이다. 재시도가 뚫는 축은 HTTP 429
+     * (속도 한도, legacy 실측 「~2분 안에 회복」)이고 그 분기는 그대로다.
+     */
     @Test
-    fun `F-2 — resultCode 22 는 quota 초과로 재시도 대상이다(bounded retry)`() {
-        val row =
-            mapOf("bidNtceNo" to NOTICE_ID.number.value, "bidNtceOrd" to "000", "lmtGrpNo" to "1", "lmtSno" to "1")
-        val successBody =
-            KonepsEnvelopeFixtures.success(
-                listOf(row),
-                totalCount = 1,
-                pageNo = 1,
-                numOfRows = 100,
-            )
-        val script =
-            listOf(
-                MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")),
-                MockKonepsResponse.Reply(200, successBody),
-            )
+    fun `F-2(개정) — resultCode 22 는 일 한도라 재시도 없이 즉시 quota 소진이다`() {
+        val script = listOf(MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")))
         MockKonepsServer.start(script).use { server ->
             val batch = newSource(server, testKonepsHttpPolicy(maxAttempts = 3)).fetchQualificationText(fetchEvidence())
 
-            batch.items.size shouldBe 1
+            batch.accounting.truncationCause shouldBe TruncationCause.QuotaExhausted
             batch.accounting.quotaExceeded shouldBe 1
-            server.requestCount shouldBe 2
+            server.requestCount shouldBe 1
         }
     }
 }

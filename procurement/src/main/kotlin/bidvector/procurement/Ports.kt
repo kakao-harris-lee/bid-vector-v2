@@ -24,6 +24,15 @@ data class SourceBatch<T>(
     val items: List<T>,
     val accounting: CollectionAccounting,
     val next: PageCursor?,
+    /**
+     * **이 걷기의 이름**(D-6G-68) — 한 걷기의 모든 쪽이 다는 관측 시각이다. 걷기를 수행한 어댑터가
+     * 한 번 적고, 원장의 AXIS 결말 줄이 그 값을 실어 추출이 「어느 걷기의 행인가」를 짐작하지
+     * 않는다. 걷기가 아닌 자리(단건 조립·test 대역)는 `null`.
+     *
+     * 항목에서 읽지 않는 이유가 둘이다. 빈 응답에는 항목이 없어 걷기의 이름을 잃고, 항목의 멤버를
+     * 읽는 것은 use case 가 원문을 **들여다보는** 일이라 구조 게이트가 막는다(그 금지는 옳다).
+     */
+    val observedAt: java.time.Instant? = null,
 )
 
 /**
@@ -64,6 +73,22 @@ interface OpeningResultSourcePort {
      * canonical 승격은 이 port 의 몫이 아니다).
      */
     fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
+
+    /**
+     * M6/6G D-6G-12 — 입찰가격산식 A 정보(`getBidPblancListBidPrceCalclAInfo`) 단건 조회.
+     * 위 둘과 같은 성질(공고당 1콜 · 증거 값 요구)이라 새 결정 타입을 만들지 않는다. A 합산
+     * 항목·적용 여부 술어·공개일시는 raw 관측까지만 간다 — canonical 자리는 이 slice 가 열지
+     * 않는다(D-6G-1 「새 표·마이그레이션 없음」). **낙찰정보서비스가 아니라 입찰공고정보
+     * 서비스**의 오퍼레이션이라 baseUri 가 다른 서비스를 가리킨다.
+     */
+    fun fetchBidPriceFormulaA(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
+
+    /**
+     * M6/6G D-6G-19 — 기초금액 조회(`getBidPblancListInfo{Thng,Cnstwk,Servc}BsisAmount`) 단건 조회.
+     * **업무 대분류마다 다른 오퍼레이션**이라 구현 인스턴스가 자기 업무의 경로를 안다(호출부가 고르지
+     * 않는다). 예가 범위율·기초금액 공개일시와 공사 전용 칸을 나른다.
+     */
+    fun fetchBaseAmount(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }
 
 /**

@@ -47,6 +47,8 @@ class KonepsOpeningResultSource(
     private val listSourceEndpoint: SourceEndpoint,
     private val reserveDetailBaseUri: URI,
     private val openingCompleteBaseUri: URI,
+    private val bidPriceFormulaABaseUri: URI,
+    private val baseAmountBaseUri: URI,
     private val config: KonepsSourceConfig,
 ) : OpeningResultSourcePort {
     private val retryName = "koneps-opening-${listSourceEndpoint.name.lowercase()}"
@@ -71,7 +73,8 @@ class KonepsOpeningResultSource(
                 )
             }
         return walkKonepsNoticePages(
-            config.httpClient,
+            config.gate,
+            KonepsCallContext(listSourceEndpoint),
             retry,
             rateLimiter,
             uriBuilder,
@@ -102,6 +105,8 @@ class KonepsOpeningResultSource(
             reserveDetailBaseUri,
             KonepsOperationPolicy.RESERVE_PRICE_DETAIL,
             evidence.noticeId,
+            SourceEndpoint.RESERVE_PRICE_DETAIL,
+            evidence.noticeKeyHash,
         ) { item, itemPolicy, observedAt ->
             // 예비가격 상세는 한 공고에 복수예가 15행까지 온다
             // (compnoRsrvtnPrceSno 마다 반복, §1.7.1). 그 순번을 행 식별자에 더하지
@@ -130,6 +135,8 @@ class KonepsOpeningResultSource(
             openingCompleteBaseUri,
             KonepsOperationPolicy.OPENING_COMPLETE,
             evidence.noticeId,
+            SourceEndpoint.OPENING_COMPLETE,
+            evidence.noticeKeyHash,
         ) { item, itemPolicy, observedAt ->
             mapMaskedOpeningItem(
                 item,
@@ -139,4 +146,82 @@ class KonepsOpeningResultSource(
                 KonepsOperationPolicy.OPENING_COMPLETE.rowIdentifierRawKeys,
             )
         }
+
+    /**
+     * 입찰가격산식 A 정보(M6/6G D-6G-12) — 공사 하한가 산식의 A 를 나른다.
+     * [bidPriceFormulaABaseUri] 는 위 셋과 **다른 서비스**(입찰공고정보서비스)의 엔드포인트라
+     * baseUri 가 넷이 된다. 항목 매핑은 같은 masking 경로를 지난다 — 이 응답에는 사업자·개인
+     * 식별자 키가 없지만 계약 미등재 키를 떨어뜨리는 반전은 그대로 선다.
+     */
+    override fun fetchBidPriceFormulaA(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
+        fetchSingleKonepsNotice(
+            config,
+            retry,
+            rateLimiter,
+            bidPriceFormulaABaseUri,
+            KonepsOperationPolicy.BID_PRICE_FORMULA_A,
+            evidence.noticeId,
+            SourceEndpoint.BID_PRICE_FORMULA_A,
+            evidence.noticeKeyHash,
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.BID_PRICE_FORMULA_A,
+                observedAt,
+                KonepsOperationPolicy.BID_PRICE_FORMULA_A.rowIdentifierRawKeys,
+            )
+        }
+
+    /**
+     * 기초금액 조회(M6/6G D-6G-19) — [baseAmountBaseUri] 는 **이 인스턴스의 업무 대분류**에 해당하는
+     * 경로다(물품·공사·용역이 각자 다른 오퍼레이션이다). 호출부가 업무를 고르지 않는다 — 인스턴스가
+     * 자기 경로를 들고 있으므로 잘못된 업무의 오퍼레이션을 부르는 조합이 생기지 않는다.
+     */
+    override fun fetchBaseAmount(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
+        fetchSingleKonepsNotice(
+            config,
+            retry,
+            rateLimiter,
+            baseAmountBaseUri,
+            KonepsOperationPolicy.BASE_AMOUNT_DETAIL,
+            evidence.noticeId,
+            SourceEndpoint.BASE_AMOUNT_DETAIL,
+            evidence.noticeKeyHash,
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.BASE_AMOUNT_DETAIL,
+                observedAt,
+                KonepsOperationPolicy.BASE_AMOUNT_DETAIL.rowIdentifierRawKeys,
+            )
+        }
 }
+
+/**
+ * 6G 표본틀 소스 한 벌(M6/6G D-6G-11·19) — 호출부는 **경로만** 준다. `inqryDiv` 축과 행 식별자 같은
+ * wire 계약은 이 모듈 안에 남는다(`KonepsOperationPolicy` 는 `internal` 이다) — 배선이 조회 축을 고르면
+ * 조용히 다른 축을 걷는 경로가 생긴다.
+ *
+ * baseUri 가 **넷**인 이유는 서비스가 둘이기 때문이다: 목록·예비가격 상세·개찰완료는 낙찰정보서비스,
+ * 입찰가격산식 A·기초금액 조회는 입찰공고정보서비스다.
+ */
+fun konepsOpeningResultSourceByNoticeDate(
+    listBaseUri: URI,
+    reserveDetailBaseUri: URI,
+    openingCompleteBaseUri: URI,
+    bidPriceFormulaABaseUri: URI,
+    baseAmountBaseUri: URI,
+    config: KonepsSourceConfig,
+): OpeningResultSourcePort =
+    KonepsOpeningResultSource(
+        listBaseUri = listBaseUri,
+        listOperation = KonepsOperationPolicy.OPENING_RESULT_LIST_BY_NOTICE_DATE,
+        listSourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
+        reserveDetailBaseUri = reserveDetailBaseUri,
+        openingCompleteBaseUri = openingCompleteBaseUri,
+        bidPriceFormulaABaseUri = bidPriceFormulaABaseUri,
+        baseAmountBaseUri = baseAmountBaseUri,
+        config = config,
+    )

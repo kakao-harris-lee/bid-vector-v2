@@ -77,6 +77,14 @@ sealed interface TruncationCause {
 
     /** rate limiter 자체 거부(허가 대기 시간 초과)가 재시도를 소진시켰다 — 호출조차 못 나갔다. */
     data object SelfThrottled : TruncationCause
+
+    /**
+     * 승인 호출 상한이 막았다(D-6G-47) — 호출이 나가지 않았다. KONEPS 가 거절한 [QuotaExhausted]
+     * 와 다르고, 속도 보호인 [SelfThrottled] 와도 다르다: 우리가 승인받은 범위를 다 썼다는 뜻이다.
+     */
+    data class BudgetExhausted(
+        val limit: BudgetLimit,
+    ) : TruncationCause
 }
 
 /**

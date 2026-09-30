@@ -5,7 +5,10 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
+import bidvector.app.wiring.E2E_FIXED_NOW
+import bidvector.app.wiring.FixedClockTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
@@ -17,6 +20,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.spi.ThrowableProxyUtil
 import ch.qos.logback.core.read.ListAppender
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -34,7 +38,10 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
 import javax.sql.DataSource
 
 /**
@@ -52,15 +59,15 @@ class CollectionRunnerE2ETest {
         private const val TEST_CREDENTIAL_VALUE = "collection-e2e-test-fixture-credential"
         private const val SERVICE_KEY = "E2E-SENTINEL+KEY/value="
         private const val SLOTS = 6
-        private const val NORMAL_PER_SLOT = 3
         private const val BLANK_PER_SLOT = 1
         private const val NOTICES_PER_SLOT = NORMAL_PER_SLOT + BLANK_PER_SLOT
-        private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
-        private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
         private const val DAYS = 3
-        private const val SERVICE_CLASS_CODE = "81111500"
-        private const val SERVICE_CLASS_NAME = "정보시스템 개발 서비스"
-        private const val CONSTRUCTION_TYPE = "전기공사업"
+
+        /** 오늘치 경계를 재는 자리의 일 상한 — 이만큼 써 둔 실행 상태로 KST 00:30 에 기동한다. */
+        private const val NOTICE_DAILY_CAP = 4
+
+        /** 미리 깔아 두는 시도의 시각 — 기동 시각보다 조금 앞이면 같은 KST 하루에 든다. */
+        private const val SEED_BACKDATE_SECONDS = 60L
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -82,98 +89,6 @@ class CollectionRunnerE2ETest {
         /** 로거 이벤트 전부(예외 cause 체인 포함) — 러너·어댑터·Boot 의 로그를 한 자리에서 잡는다. */
         private val logs = ListAppender<ILoggingEvent>()
         private lateinit var mock: MockKonepsHttp
-
-        private fun itemOf(
-            category: String,
-            number: String,
-            closing: String = "2026-12-31 10:00:00",
-            classification: Map<String, String> = emptyMap(),
-        ) = mapOf(
-            "bidNtceNo" to number,
-            "bidNtceOrd" to "000",
-            "bidNtceNm" to "공고명 $category $number",
-            // 실 응답에는 이 키가 없다(6F-8 실측) — 있어도 대분류는 오퍼레이션이 정한다(D-6F9-1): 용역 응답에도 「공사」를 싣는다.
-            "bsnsDivNm" to "공사",
-            "bidClseDt" to closing,
-        ) + classification
-
-        private fun itemsFor(
-            operation: String,
-            day: String,
-        ): List<Map<String, String>> {
-            val category = operation.removePrefix("getBidPblancListInfo")
-
-            fun item(
-                number: String,
-                closing: String = "2026-12-31 10:00:00",
-                classification: Map<String, String> = emptyMap(),
-            ) = itemOf(category, number, closing, classification)
-            val normal =
-                (1..NORMAL_PER_SLOT).map {
-                    item(
-                        "E2E-$category-$day-$it",
-                        classification = classificationFor(category, it),
-                    )
-                }
-            // D-6F8-11 — KONEPS 는 옵션 일시·금액을 빈 문자열로 내기도 한다(실수집 실측). 합성 표본이며 정규화되고 마감은 null 이다.
-            val blankOptionals =
-                item("E2E-$category-$day-BLANK", closing = "", classification = blankClassificationFor(category)) +
-                    mapOf("opengDt" to "", "bssamt" to "", "presmptPrce" to "", "chgDt" to "", "tpEvalApplClseDt" to "")
-            val missingNumber = mapOf("bidNtceNm" to "번호 없는 공고명")
-            val duplicate = normal.first()
-            val firstConstructionDay = category == "Cnstwk" && day == firstDay.toString().replace("-", "")
-            val badDate =
-                if (firstConstructionDay) {
-                    listOf(
-                        item(BAD_DATE_ITEM_NUMBER, closing = "not-a-date"),
-                    )
-                } else {
-                    emptyList()
-                }
-            // 차수가 비어 있지 않지만 세 자리 숫자가 아니다 — 어댑터는 통과시키고 정규화가 IDENTIFIER 탈락으로 접는다.
-            val badRound =
-                if (firstConstructionDay) {
-                    listOf(
-                        item(BAD_ROUND_ITEM_NUMBER) + mapOf("bidNtceOrd" to "1"),
-                    )
-                } else {
-                    emptyList()
-                }
-            return normal + listOf(blankOptionals) + missingNumber + duplicate + badDate + badRound
-        }
-
-        /**
-         * D-6F9-2 — 오퍼레이션마다 응답이 싣는 세부 분류 키가 다르다(6F-8 실측): 용역은 용역구분·공공조달분류 번호·명, 공사는 주공종이고
-         * 주공종은 일부 항목만 채워진다(전기공사업 · 빈 문자열 · 키 없음이 한 슬롯에 섞인다).
-         */
-        private fun classificationFor(
-            category: String,
-            index: Int,
-        ): Map<String, String> =
-            when (category) {
-                "Servc" -> {
-                    mapOf(
-                        "srvceDivNm" to if (index == 1) "일반용역" else "기술용역",
-                        "pubPrcrmntClsfcNo" to SERVICE_CLASS_CODE,
-                        "pubPrcrmntClsfcNm" to SERVICE_CLASS_NAME,
-                    )
-                }
-
-                else -> {
-                    when (index) {
-                        1 -> mapOf("mainCnsttyNm" to CONSTRUCTION_TYPE)
-                        2 -> mapOf("mainCnsttyNm" to "")
-                        else -> emptyMap()
-                    }
-                }
-            }
-
-        /** 빈 문자열로 오는 옵션 값(D-6F8-11) — 새 세부 분류 키도 빈 값은 없는 값이다. */
-        private fun blankClassificationFor(category: String): Map<String, String> =
-            when (category) {
-                "Servc" -> mapOf("srvceDivNm" to "", "pubPrcrmntClsfcNo" to " ", "pubPrcrmntClsfcNm" to "  ")
-                else -> mapOf("mainCnsttyNm" to "   ")
-            }
 
         /** 러너 한 번의 관측 — 종료 코드, 로거 이벤트 전부, 표준 출력·표준 오류 전부. */
         private class RunResult(
@@ -217,6 +132,8 @@ class CollectionRunnerE2ETest {
                 SpringApplicationBuilder(
                     BidVectorApplication::class.java,
                     CollectionTerminationTestConfiguration::class.java,
+                    // 시계는 `E2E_FIXED_NOW` 가 비면 실 시계다 — 이 소스를 더해도 다른 test 는 그대로다.
+                    FixedClockTestConfiguration::class.java,
                 ).properties(
                     PRODUCTION_DISPATCH_PROPERTIES +
                         mapOf(
@@ -231,6 +148,9 @@ class CollectionRunnerE2ETest {
                             "bidvector.collection.from" to firstDay.toString(),
                             "bidvector.collection.to" to today.toString(),
                             "bidvector.collection.categories" to "construction,service",
+                            "bidvector.collection.calls-per-day" to "10000",
+                            "bidvector.collection.calls-total" to "10000",
+                            "bidvector.collection.run-state-dir" to NOTICE_E2E_RUN_STATE.toString(),
                             "bidvector.koneps.service-key" to SERVICE_KEY,
                             "bidvector.koneps.base-url" to mock.baseUrl,
                         ) + extraProperties,
@@ -294,7 +214,7 @@ class CollectionRunnerE2ETest {
         @JvmStatic
         @BeforeAll
         fun boot() {
-            mock = MockKonepsHttp(::itemsFor)
+            mock = MockKonepsHttp { operation, day -> noticeListItemsFor(operation, day, firstDay) }
             firstRun = runOnce()
             firstRunDb = DbCounts()
         }
@@ -327,6 +247,60 @@ class CollectionRunnerE2ETest {
     private fun assertNoServiceKey(run: RunResult) {
         run.everything shouldNotContain SERVICE_KEY
         run.everything shouldNotContain URLEncoder.encode(SERVICE_KEY, StandardCharsets.UTF_8)
+    }
+
+    /**
+     * **D-6G-72 (vr r5 H-4) — 공고 목록 갈래의 상한 seed 를 잰다.** 개찰 갈래에는 같은 모양의
+     * test 가 있었고 이 갈래에는 없었다: 증분 등식(요청 수 == HTTP 줄 수)은 **seed 가 없어도**
+     * 성립하므로, 배선이 원장에서 seed 하지 않게 되어도 아무것도 붉어지지 않았다.
+     *
+     * 오늘치를 다 쓴 실행 상태로 KST 00:30 에 기동하면 **한 요청도 나가면 안 된다.** 하루 경계를
+     * UTC 로 잡거나 seed 를 빼먹으면 오늘치가 0 으로 되살아나 그만큼 더 나간다.
+     */
+    @Test
+    fun `오늘치를 다 쓴 실행 상태로 공고 목록 갈래를 KST 00시 30분에 기동하면 한 요청도 나가지 않는다`() {
+        val bootAt = ZonedDateTime.of(today, LocalTime.of(0, 30), COLLECTION_BUDGET_ZONE).toInstant()
+        val runStateDir = Files.createTempDirectory("6g-notice-budget-seeded")
+        seedSpentCallsAt(runStateDir, bootAt.minusSeconds(SEED_BACKDATE_SECONDS), NOTICE_DAILY_CAP)
+        val requestsBefore = mock.requestCount()
+
+        E2E_FIXED_NOW.set(bootAt)
+        val exitCodes =
+            try {
+                bootAndRun(
+                    mapOf(
+                        "bidvector.collection.run-state-dir" to runStateDir.toString(),
+                        "bidvector.collection.calls-per-day" to NOTICE_DAILY_CAP.toString(),
+                        "bidvector.collection.calls-total" to "10000",
+                    ),
+                )
+            } finally {
+                E2E_FIXED_NOW.set(null)
+            }
+
+        mock.requestCount() shouldBe requestsBefore
+        exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
+    }
+
+    /**
+     * **D-6G-56 — 공고 목록 갈래도 같은 관문 아래다.** 기준은 원장 자신의 합이 아니라 **mock 이
+     * 실제로 받은 요청 수**다. 한 test 클래스의 모든 기동이 같은 mock 과 같은 실행 상태를 쓰므로
+     * **증분**으로 잰다 — 두 번 기동해도 증분이 맞아야 한다.
+     */
+    @Test
+    fun `공고 목록 갈래가 낸 요청 수가 원장의 HTTP 줄 수와 같다 — 두 번 기동해도`() {
+        repeat(2) {
+            val requestsBefore = mock.requestCount()
+            val httpBefore = attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP")
+
+            runOnce()
+
+            val sent = mock.requestCount() - requestsBefore
+            sent shouldBeGreaterThan 0
+            sent shouldBe attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP") - httpBefore
+        }
+        // 의도 줄과 결말 줄은 한 벌이다 — 한쪽만 적히면 상한과 원장이 갈린다.
+        attemptKindCount(NOTICE_E2E_RUN_STATE, "PENDING") shouldBe attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP")
     }
 
     @Test

@@ -1,0 +1,302 @@
+"""D-6G-27 — **레인 간 왕복 golden** 의 소비 쪽.
+
+verifier r1 H-1 과 code-review r1 M-11 의 공통 뿌리는 하나다: **Kotlin 이 쓴 바이트를
+Python 이 한 번도 읽지 않았다.** Python fixture 는 소비 쪽 생성기가 만든 것이라, 생산
+쪽이 스키마를 어겨도(추첨번호 상수 `null`, 공고일이 개찰일, 필수 칸이 `null`) 초록 CI
+아래 살아남았다 — 실데이터면 승인 0건이 되는 결함 셋이 그렇게 지나갔다.
+
+이 파일이 그 왕복의 **소비 반쪽**이다: Kotlin `SnapshotWriter` 가 출하 추출 경로로 낸
+golden 바이트를 `load_snapshot` 과 전 과정에 통과시킨다. 생산 반쪽(같은 바이트를 낸다는
+단언)은 Kotlin 레인에 있다 — 스키마가 한쪽만 움직이면 **둘 중 하나가 RED** 다.
+
+**부재를 성공으로 접지 않는다.** golden 이 선언된 자리에 없으면 **실패**다(code-review r2)
+— skip 은 「아직 안 왔다」와 「사라졌다」를 같은 초록으로 접는다. golden 은 계약 산출물이고
+(D-6G-27·37) 없으면 왕복이 서지 않은 것이다. 더해서 **저장소 어딘가에 golden 이 있는데
+선언된 자리가 비어 있으면** 그 사실을 따로 짚는다
+(`test_no_golden_lives_outside_the_declared_path`). 두 레인이 서로 다른 자리를
+보는 상태가 조용히 초록으로 지나가는 것이 이 slice 가 고치려는 결함(왕복 부재) 바로 그
+모양이기 때문이다 — Kotlin 레인이 「없으면 쓰고 있으면 비교」로 짰다가 빈 파일로 초록을
+받은 것과 같은 갈래다.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+from ml_engine.adapters.snapshot_files import SnapshotFiles, read_snapshot_files
+from ml_engine.evaluation.backtest.exclusions import admit_rows, exclusion_counts
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
+from ml_engine.evaluation.backtest.policy import (
+    StrategyBacktestPolicy,
+    load_strategy_backtest_policy,
+)
+from ml_engine.evaluation.backtest.reasons import ExclusionReason
+from ml_engine.evaluation.backtest.sample_list import parse_sample_list
+from ml_engine.evaluation.backtest.snapshot import (
+    load_snapshot,
+    opening_date_range,
+)
+
+_TESTS_ROOT = Path(__file__).resolve().parents[1]
+_SHIPPED_BACKTEST_POLICY = (
+    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v1.yaml"
+)
+
+
+def _policy() -> StrategyBacktestPolicy:
+    loaded = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(loaded, StrategyBacktestPolicy), loaded
+    return loaded
+
+
+GOLDEN_SNAPSHOT_DIR = _TESTS_ROOT / "evaluation" / "fixtures" / "m6-6g-golden"
+"""생산 쪽이 낸 golden 스냅숏 디렉터리(v4 는 **파일 셋**이다 — `manifest.json` ·
+`rows.jsonl` · `sample-list.tsv`).
+
+**경로는 두 레인이 같이 아는 한 자리여야 한다** — 여기서만 선언하고, 바뀌면 이 상수
+하나를 고친다. 자리 선택의 근거 둘(팀장 지시 2026-09-27):
+- `reports/evidence/` 가 아니다 — evidence 크기 게이트(evidence <= 산출물)에 걸린다.
+  golden 은 산출물이지 장부가 아니다.
+- 저장소 루트 `fixtures/` 도 아니다 — 그쪽은 `data-extract.md` 가 manifest·SHA·출처
+  규율로 관리하는 **검증 corpus** 자리다. 레인 간 왕복 golden 은 그 규율의 대상이
+  아니고 test 의 입력이므로, 합성 스냅숏 fixture 옆(`tests/evaluation/fixtures/`)에
+  둔다."""
+
+_ABSENT = (
+    "golden 이 선언된 자리에 없다 — 레인 간 왕복이 서지 않았다"
+    f" (기대 경로: {GOLDEN_SNAPSHOT_DIR})"
+)
+
+
+_GOLDEN_DIR_MARKER = "golden"
+_SCAN_SKIP = frozenset({".git", ".venv", "node_modules", "__pycache__", "build"})
+
+
+def _discover_golden_dirs() -> list[Path]:
+    """저장소 안에서 **golden 처럼 보이는** 디렉터리 전수 — 경로의 어느 마디에든
+    `golden` 이 있고 `rows.jsonl` 을 가진 곳. 상대 레인이 상위 마디에 붙일 수 있어
+    마디 전체를 본다(`fixtures/golden/m6-6g/` 처럼 — 실제로 그랬다).
+
+    이름 술어인 것은 한계다(그렇게 부르지 않으면 못 찾는다). 그래도 「두 레인이 다른
+    자리를 본다」는 실제 상태를 잡기에는 충분하고, 합성 fixture(`backtest-snapshot`)와
+    섞이지 않는다."""
+    repo_root = _TESTS_ROOT.parents[1]
+    found: list[Path] = []
+    for path in repo_root.rglob("rows.jsonl"):
+        if _SCAN_SKIP & set(path.parts):
+            continue
+        relative = path.relative_to(repo_root)
+        if any(_GOLDEN_DIR_MARKER in part.lower() for part in relative.parts):
+            found.append(path.parent)
+    return sorted(found)
+
+
+def _golden_files() -> SnapshotFiles:
+    if not GOLDEN_SNAPSHOT_DIR.is_dir():
+        pytest.fail(_ABSENT)
+    files = read_snapshot_files(GOLDEN_SNAPSHOT_DIR.as_uri())
+    assert isinstance(files, SnapshotFiles), (
+        f"golden 의 파일 셋이 v4 를 채우지 못했다(셋: manifest·rows·sample-list): {files}"
+    )
+    return files
+
+
+def _golden_snapshot() -> LoadedSnapshot:
+    files = _golden_files()
+    loaded = load_snapshot(
+        files.manifest_bytes, files.rows_bytes, files.sample_list_bytes
+    )
+    assert isinstance(loaded, LoadedSnapshot), (
+        f"생산 쪽 golden 이 판독을 통과하지 못했다 — 레인 간 스키마가 갈렸다: {loaded}"
+    )
+    return loaded
+
+
+def test_golden_snapshot_is_readable_by_the_shipped_reader() -> None:
+    """생산 바이트 -> 소비 판독. 여기가 붉으면 **스키마가 한쪽만 움직인 것**이다."""
+    snapshot = _golden_snapshot()
+    assert snapshot.rows
+    assert len(snapshot.rows_sha256) == 64
+
+
+def test_golden_snapshot_carries_the_fields_the_exclusion_rules_need() -> None:
+    """verifier r1 H-1 이 지목한 세 칸이 **상수 `null` 이 아님**을 생산 바이트에서
+    확인한다. 소비 쪽 fixture 로는 잴 수 없던 것이다.
+
+    golden 에는 값 결측 행이 각 칸 하나씩 **일부러** 들어 있으므로(팀장 지시), 단언은
+    「모든 행이 차 있다」가 아니라 **「채워진 행이 있다」**다 — 전자로 쓰면 의도된
+    결측 행이 test 를 붉히고, 그렇다고 `!= None` 비교로 느슨하게 쓰면 결측 행이
+    단언을 **거짓 통과**시킨다(`None != date` 는 참이다)."""
+    rows = _golden_snapshot().rows
+    assert any(row.outcome.drawn_serial_numbers for row in rows), (
+        "전 행의 추첨번호가 비어 있다 — 제외 ⑤ 가 전량에 걸린다(verifier H-1)"
+    )
+    both_dates = [
+        row
+        for row in rows
+        if row.notice.noticed_on is not None and row.outcome.opened_on is not None
+    ]
+    assert both_dates, "공고일과 개찰일이 함께 있는 행이 없다"
+    assert any(row.notice.noticed_on != row.outcome.opened_on for row in both_dates), (
+        "공고일이 개찰일과 같다 — 시행일 경계 제외가 개찰일 기준으로 돈다(H-2)"
+    )
+    prices = [
+        row.outcome.planned_price
+        for row in rows
+        if row.outcome.planned_price is not None
+    ]
+    assert prices and all(price > 0 for price in prices)
+
+
+def test_golden_exercises_the_row_level_exclusion_path() -> None:
+    """golden 이 **값 결측 행을 일부러 담는다**(팀장 지시) — 그 행들이 v3 부터의 행 단위
+    제외로 내려가고 **나머지 행은 산다**는 것을 생산 바이트에서 확인한다.
+
+    이 단언이 v2 라면 성립하지 않는다: 그때는 한 행의 `null` 이 스냅숏 전체를 거부해
+    `load_snapshot` 단계에서 이미 멈춘다(verifier r1 H-1). 판독이 여기까지 왔다는 것
+    자체가 갈래가 갈렸다는 증거다."""
+    snapshot = _golden_snapshot()
+    policy = _policy()
+    result = admit_rows(snapshot.rows, policy)
+    assert result.admitted, "golden 에서 승인된 행이 하나도 없다"
+    reasons = {item.reason for item in result.excluded}
+    absence = {
+        ExclusionReason.NOTICE_DATE_ABSENT,
+        ExclusionReason.BID_CLOSE_AT_ABSENT,
+        ExclusionReason.OPENING_DATE_ABSENT,
+        ExclusionReason.PLANNED_PRICE_ABSENT,
+    }
+    assert absence <= reasons, (
+        f"값 결측 사유가 다 나오지 않았다 — 빠진 것: {sorted(absence - reasons)}"
+    )
+    counts = dict(exclusion_counts(result.excluded))
+    assert all(counts[reason] >= 1 for reason in absence)
+
+
+def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
+    """v4 의 표본 목록 대조 셋이 **생산 바이트에서** 실제로 서는지.
+
+    v3 에서 이 자리는 원형이었다 — 판독기가 행에서 재계산한 값을 manifest 와 맞춰
+    봤으니, 생산 쪽이 같은 식으로 적기만 하면 무조건 통과했다(D-6G-39). v4 는
+    표본 목록이 **파일**이라 셋 다 실제 대조다:
+
+    1. manifest 해시 == 그 **파일 바이트**의 해시
+    2. 행의 키 ⊆ 표본 목록(진부분집합이 정상 — 상세가 없어 빠진 표본이 있다)
+    3. 닫힌 항등식(v5, D-6G-58) `sample_size == 행 수 + 상세 결측 + 공고 결측 + 축 미완`
+       — 항이 **넷**이다. 셋으로 적으면 생산 바이트에서 바로 어긋난다
+    """
+    files = _golden_files()
+    snapshot = _golden_snapshot()
+    assert (
+        snapshot.sample_list_sha256
+        == hashlib.sha256(files.sample_list_bytes).hexdigest()
+    )
+
+    sampled = set(parse_sample_list(files.sample_list_bytes).keys)
+    assert sampled, "표본 목록이 비어 있다"
+    assert {row.notice.notice_key_hash for row in snapshot.rows} <= sampled
+
+    assert snapshot.sample_size == (
+        len(snapshot.rows)
+        + snapshot.sampled_without_detail
+        + snapshot.sampled_without_notice
+        + snapshot.incomplete_axis
+    )
+
+
+def test_golden_actually_exercises_the_missing_sample_paths() -> None:
+    """**왕복이 헛돌지 않는다는 확인**(D-6G-42). golden 이 「표본 == 행」이면 v4 가 연
+    세 자리 중 둘이 생산 바이트에서 한 번도 실행되지 않는다 — 진부분집합 경로와 두
+    결측 계수다. 그 상태는 초록으로 보이므로 **이 test 가 없으면 보이지 않는다.**
+
+    실측으로 드러난 자리다: golden 이 10/10/0/0 이던 동안, ⑵ 를 계약의 `⊆` 에서 v3 의
+    `==` 로 되돌리는 변이(L9)가 단위 test 는 붉혔지만 golden 여덟은 **그대로 초록**
+    이었다. 지금 golden 은 12/10/1/1 이라 같은 변이가 왕복에서도 붉어진다.
+
+    그러므로 이 단언은 golden 의 성질이 아니라 **왕복의 검출력**에 대한 것이다."""
+    snapshot = _golden_snapshot()
+    sampled = set(parse_sample_list(_golden_files().sample_list_bytes).keys)
+    row_keys = {row.notice.notice_key_hash for row in snapshot.rows}
+    assert row_keys < sampled, (
+        "golden 의 행이 표본 목록과 같다 — 진부분집합 경로가 왕복에서 헛돈다"
+    )
+    assert snapshot.sampled_without_detail > 0, "상세 결측 표본이 없다"
+    assert snapshot.sampled_without_notice > 0, "공고 결측 표본이 없다"
+    # v5 의 넷째 항(D-6G-58). 생산 쪽이 여기에 0 을 적으면 「축 미완」 자리가 왕복에서
+    # 한 번도 실행되지 않고, 항이 셋이던 v4 판과 구별되지 않는다 — 앞 판의 golden 이
+    # 정확히 그 상태였다(10/10/0/0 이라 L9 변이가 왕복에서 초록이었다).
+    assert snapshot.incomplete_axis > 0, (
+        "golden 의 축 미완 계수가 0 이다 — v5 의 넷째 항이 왕복에서 헛돈다"
+    )
+    # 분모가 행 수와 **다른** 판이어야 M-8 의 분모 선택이 왕복에서 의미를 갖는다.
+    assert snapshot.notice_observed_count != len(snapshot.rows)
+
+
+def test_golden_carries_the_sample_scope_the_threshold_is_built_from() -> None:
+    """D-6G-66 — 문턱의 출처가 **생산 바이트에 실제로 있다**.
+
+    이 칸이 manifest 에 없으면 판독이 스냅숏 전체를 거부하므로, 여기까지 온 것만으로
+    생산 쪽이 범위를 싣는다는 뜻이다. 그 위에 계약의 부분집합 관계를 확인한다 —
+    표본의 업무가 범위 밖이면 어느 쪽이 거짓인지 판정문이 말할 수 없다."""
+    snapshot = _golden_snapshot()
+    assert snapshot.sample_scope_divisions, "golden manifest 에 확정 범위가 비었다"
+    assert set(snapshot.sample_divisions) <= set(snapshot.sample_scope_divisions)
+    covered = dict(snapshot.division_row_counts)
+    assert set(covered) == set(snapshot.sample_scope_divisions), (
+        "업무 대표 공시가 범위 전체를 덮지 않는다 — 빠진 업무가 목록에서 사라진다"
+    )
+
+
+def test_golden_manifest_declares_the_supported_schema_version() -> None:
+    """버전이 갈리면 판독이 전체를 거부한다 — 그 거부가 이 test 에서 먼저 보이게."""
+    files = _golden_files()
+    manifest = json.loads(files.manifest_bytes)
+    loaded = load_snapshot(
+        files.manifest_bytes, files.rows_bytes, files.sample_list_bytes
+    )
+    assert isinstance(loaded, LoadedSnapshot), (
+        f"golden 의 schema_version={manifest.get('schema_version')!r} 을 판독기가 "
+        "지원하지 않는다 — 두 레인이 같이 움직여야 한다"
+    )
+
+
+def test_no_golden_lives_outside_the_declared_path() -> None:
+    """**부재를 성공으로 접지 않는 잠금**(D-6G-32 「manifest 가 사실을 말하는가」와 같은
+    계열 — 이쪽은 「파일이 선언된 자리에 있는가」다). 선언된 자리가 비어 있는데 저장소
+    어딘가에 golden 이 있으면 두 레인이 다른 자리를 보고 있다는 뜻이고, 그 상태로 skip 이
+    초록을 내면 왕복이 서지 않은 채 섰다고 읽힌다 — 이 slice 가 고치려는 결함 그 모양이다.
+
+    golden 이 아무 데도 없으면(골격 단계) 통과한다 — 「아직 안 왔다」와 「다른 데 있다」는
+    다른 사실이다."""
+    stray = [path for path in _discover_golden_dirs() if path != GOLDEN_SNAPSHOT_DIR]
+    assert not stray, (
+        "선언된 자리 밖에 golden 이 있다 — 두 레인이 다른 자리를 본다. "
+        f"선언: {GOLDEN_SNAPSHOT_DIR} · 발견: {stray}"
+    )
+
+
+def test_golden_manifest_period_matches_its_rows() -> None:
+    """생산 쪽이 적은 기간이 **그 파일의 행**과 묶여 있는지(D-6G-32). 판독이 이미
+    거부하지만, golden 에서 그 잠금이 실제로 서는지는 여기서 본다."""
+    snapshot = _golden_snapshot()
+    observed = opening_date_range(snapshot.rows)
+    assert observed is not None
+    assert (snapshot.period_start, snapshot.period_end) == observed
+
+
+def test_golden_path_is_declared_in_exactly_one_place() -> None:
+    """경로가 흩어지면 golden 이 온 뒤에도 한쪽이 옛 자리를 본다. 이 test 는 golden 이
+    없어도 돈다 — 골격이 살아 있다는 확인이다. 자리 선택의 근거 둘도 함께 잠근다:
+    evidence 안이 아니고(크기 게이트), 저장소 루트 `fixtures/` 안도 아니다(그쪽은
+    `data-extract.md` 의 검증 corpus 규율 자리다)."""
+    assert GOLDEN_SNAPSHOT_DIR.name == "m6-6g-golden"
+    assert GOLDEN_SNAPSHOT_DIR.parent == _TESTS_ROOT / "evaluation" / "fixtures"
+    repo_root = _TESTS_ROOT.parents[1]
+    assert not GOLDEN_SNAPSHOT_DIR.is_relative_to(repo_root / "reports")
+    assert not GOLDEN_SNAPSHOT_DIR.is_relative_to(repo_root / "fixtures")

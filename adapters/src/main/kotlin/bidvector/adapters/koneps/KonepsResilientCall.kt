@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.ResultCodeCategory
 import bidvector.procurement.TruncationCause
@@ -10,7 +11,6 @@ import io.github.resilience4j.ratelimiter.RequestNotPermitted
 import io.github.resilience4j.retry.Retry
 import io.github.resilience4j.retry.RetryConfig
 import java.net.URI
-import java.net.http.HttpClient
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
 
@@ -31,6 +31,15 @@ internal sealed interface KonepsCallOutcome {
     /** rate limiter 대기 시간 초과 — 이 어댑터 자신의 quota 보호(호출조차 나가지 않았다). */
     data class Throttled(
         val detail: String,
+    ) : KonepsCallOutcome
+
+    /**
+     * 승인 호출 상한이 막았다(D-6G-47) — 호출이 **나가지 않았다.** 쿼터(KONEPS 거절)와 다르고
+     * 자체 throttle(속도 보호)과도 다르다: 이것은 우리가 승인받은 범위를 다 썼다는 뜻이고,
+     * 다음 걸음을 정하는 답이 다르다(오늘은 멈추고 내일 이어 돈다).
+     */
+    data class BudgetDenied(
+        val limit: BudgetLimit,
     ) : KonepsCallOutcome
 }
 
@@ -65,15 +74,29 @@ internal sealed interface KonepsRawStep {
     data class TransportStep(
         val outcome: KonepsTransportOutcome,
     ) : KonepsRawStep
+
+    /**
+     * 승인 상한이 막았다(D-6G-47) — **재시도 대상이 아니다.** 백오프를 태워도 상한은 돌아오지
+     * 않는다(날이 바뀌거나 승인이 늘어야 한다). KONEPS 가 거절한 것이 아니므로 쿼터와도 다르다.
+     */
+    data class BudgetStep(
+        val limit: BudgetLimit,
+    ) : KonepsRawStep
 }
 
 private fun rawStep(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     uri: URI,
     httpPolicy: KonepsHttpPolicyData,
     collectionPolicy: KonepsCollectionPolicyData,
 ): KonepsRawStep {
-    val transport = sendKonepsRequest(httpClient, uri, httpPolicy.requestTimeout)
+    val sent =
+        when (val gated = gate.send(callContext, uri, httpPolicy.requestTimeout)) {
+            is KonepsGateOutcome.Denied -> return KonepsRawStep.BudgetStep(gated.limit)
+            is KonepsGateOutcome.Sent -> gated
+        }
+    val transport = sent.transport
     return when {
         transport is KonepsTransportOutcome.Received && transport.status != HTTP_TOO_MANY_REQUESTS -> {
             KonepsRawStep.EnvelopeStep(parseKonepsEnvelope(transport.body, collectionPolicy, httpPolicy.maxJsonDepth))
@@ -95,9 +118,16 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
             }
         }
 
+        // M6/6G D-6G-11 — 봉투가 나르는 quota 초과는 **일 트래픽 한도**다. 백오프 몇 십 ms 로
+        // 회복되지 않으므로 재시도는 거부될 호출을 더 낼 뿐이다(한도가 풀리는 것은 날이 바뀔
+        // 때다). 속도 한도(HTTP 429)는 위 TransportStep 분기가 그대로 재시도한다 — legacy
+        // 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고 두 축은 다른 것이다.
         is KonepsRawStep.EnvelopeStep -> {
-            val category = (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category
-            category == ResultCodeCategory.RETRYABLE || category == ResultCodeCategory.QUOTA_EXCEEDED
+            (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.RETRYABLE
+        }
+
+        is KonepsRawStep.BudgetStep -> {
+            false
         }
     }
 
@@ -113,6 +143,10 @@ private fun foldFinal(step: KonepsRawStep): KonepsCallOutcome =
                 KonepsEnvelopeOutcome.NoData -> KonepsCallOutcome.NoData
                 else -> KonepsCallOutcome.Failed(causeFor(step), describeEnvelope(envelope))
             }
+        }
+
+        is KonepsRawStep.BudgetStep -> {
+            KonepsCallOutcome.BudgetDenied(step.limit)
         }
     }
 
@@ -162,7 +196,8 @@ internal fun buildKonepsRateLimiter(
  * 센다 — Resilience4j 가 내부에서 삼키는 중간 실패도 놓치지 않는다(H-3).
  */
 internal fun fetchPageResilient(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     retry: Retry,
     rateLimiter: RateLimiter,
     uri: URI,
@@ -171,7 +206,7 @@ internal fun fetchPageResilient(
     counters: KonepsAttemptCounters,
 ): KonepsCallOutcome {
     val supplier = {
-        val step = rawStep(httpClient, uri, httpPolicy, collectionPolicy)
+        val step = rawStep(gate, callContext, uri, httpPolicy, collectionPolicy)
         if (isQuotaSignal(step)) counters.recordQuotaSignal()
         step
     }

@@ -111,7 +111,8 @@ class CanonicalizeBlankValuesTest {
 
         outcome.command.deadlineAt shouldBe null
         outcome.command.openingScheduledAt shouldBe instantOf("2026-10-06 10:00:00")
-        outcome.unknownFieldCount shouldBe 11
+        // M6/6G D-6G-28 로 `bidNtceDt`(공고일)가 계약에 등재돼 미지 키에서 빠진다.
+        outcome.unknownFieldCount shouldBe 10
     }
 
     @Test

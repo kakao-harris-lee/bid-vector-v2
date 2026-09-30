@@ -596,6 +596,15 @@ code-reviewer 의 N-r6-1(주입 표면 전개가 배열·`vararg` 를 버린다 
 포함) · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(전제 「영향 0」은 거짓이었다 — test classpath 에서 `@TestConfiguration` 을 걷어냈다). rollback 의 공유 파일 절차는
 이 종결 문단도 같은 문단 단위 삭제로 지운다.
 
+**6G 착수 2026-09-27 — 가격 경로 결정 실험** — base `678c6ed7`(PR #48 6A-2b 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6g`·브랜치
+`m6-6g/2026-09-27`. 정본 `reports/evidence/m6/6g/scope.md`(D-6G-1~14, 운영자 승인 A-1~A-5 · 운영계정 키). 2026-09-07 사전 등록 결정 실험 **D-ML-2** 를
+V2 자체 개찰 데이터로 실행한다 — S0 밴드 내 균등 난수 · S1 규칙 앵커 · S2 V2 분포 엔진(세 후보) · S3 GBM(N/A) · S4 제도 분포 + **실측** 경쟁자 분포(개찰완료
+오퍼레이션의 참가자 전 행) 몬테카를로. 산출물은 판정 하나: 분포 엔진을 운영 경로에 꽂을 것인가(`OPEN-ML-ANALYSIS-WIRING` 의 입력). 층화 무작위 24,000 공고 ·
+호출 상한 일 20,000 / 총 80,000 · 실수집 전 `OPEN-6F8-QUOTA-XML-ENVELOPE` 폐쇄 · 제외 15 · 공고일 기준 창. 리뷰 레인 verifier + code-reviewer(sonnet) +
+privacy-gate, Codex 없음.
+
+**6G 종결 2026-09-30 — D-6G-76 분리 종결, 실수집 차단** — PR **#50**(계약 갱신 r1~r5·r5-t: D-6G-27~81). 판정은 PR 코멘트 여섯에 있다. 재작업 **5/5 + 운영자 승인 표적 수정 1**(D-6G-68~74: 원장의 AXIS 줄이 걷기를 가리킨다 · `budget-since` 제거 · 찢어진 끝 줄 복구 · 추출은 잠금 안 · 공고 목록 seed 잠금). verifier 는 r1~r5 not-ready, **r5 표적 not-ready(D-6G-76 발동)**. r5 의 실수집 차단 결함 H-1(끊긴 걷기의 행이 완료 행으로 실림)은 재현되지 않았으나 표적 수정이 **새 high 셋**(데이터 정확성)을 만들었다 — 복구 순서(D-6G-70 미이행, 다음 기동 영구 거부 → 상한 0 재시작) · 목록 축이 가장 오래된 관측을 씀(개발 DB 의 6F-8·6F-9 행에서 공고일·낙찰방법 null) · 옛 형식 AXIS 줄. 계약대로 더 고치지 않고 머지했다: **실 KONEPS 수집은 6G-2d(`OPEN-6G-RUN-STATE-HEAL-ORDER` · `OPEN-6G-LIST-AXIS-WALK-SELECTION` · `OPEN-6G-LEGACY-AXIS-LINE`) 머지 뒤에만**(D-6G-77). 게이트 하드닝은 D-6G-75 분리 종결(`OPEN-6G-SENSITIVITY-HARDENING` → 6G-2a · `OPEN-6G-TRANSPORT-GATE-HARDENING` → 6G-2b · `OPEN-6G-REVIEW-FOLLOWUPS` → 6G-2c). 다섯 라운드의 공통 뿌리는 **완료 판정(원장)과 데이터(원문 행)를 시각으로 짐작해 잇는 것**이었고(r3 「원문이 있으면 받은 것」 → r4 「적재 전에 결말」 → r5 「행의 시각으로 마지막 걷기」 → r5-t 「결말 줄 없는 축의 선별 소실」), 처방은 원장의 줄이 걷기를 가리키는 것이다 — 결말 줄이 없는 축에는 그 답이 없어 6G-2d 가 「가장 늦은 걷기」를 되살린다. 남긴 것: 스냅숏 snapshot-v5 · 골든 12 = 9+1+1+1 · 정책 `strategy-backtest-v1.yaml`(A-3 값) · 실수집 runbook 은 실수집 준비 slice 몫. 후속 순서(운영자 2026-09-30): 6G-2d → 6G-2a → 6G-2b → 6G-2c, 실수집 준비와 병행. rollback 의 공유 파일 절차는 이 종결 문단도 착수 문단과 같은 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서

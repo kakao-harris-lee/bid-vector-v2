@@ -164,6 +164,22 @@ class ArchitecturePolicy private constructor(
     val runnerAllowedReferencers: List<String> get() = list("app.runner.allowed-referencers")
     val serviceKeyType: String get() = value("app.secret.service-key-type")
     val serviceKeyReaders: List<String> get() = list("app.secret.service-key-readers")
+
+    /** M6/6G D-6G-47 — HTTP 클라이언트 타입과 그것을 쥐어도 되는 클래스 집합(관문과 그 조립). */
+    val httpClientType: String get() = value("collection.http-client.type")
+    val httpClientRoots: List<String> get() = list("collection.http-client.roots")
+    val httpClientHolders: List<String> get() = list("collection.http-client.holders")
+
+    /** M6/6G D-6G-62 — 관문을 우회하는 전송·반사 타입과 그것을 참조해도 되는 클래스 집합(비어 있다). */
+    val transportBypassRoots: List<String> get() = list("collection.transport-bypass.roots")
+    val transportBypassTypes: List<String> get() = list("collection.transport-bypass.types")
+    val transportBypassHolders: List<String> get() = list("collection.transport-bypass.holders")
+
+    /** vr r4 L-12·L-13 — 공고 키 해시·hex 형태를 짓는 함수와 그것을 불러도 되는 클래스 집합. */
+    val keyHashRoots: List<String> get() = list("collection.key-hash.roots")
+    val keyHashType: String get() = value("collection.key-hash.type")
+    val keyHashHolders: List<String> get() = list("collection.key-hash.holders")
+
     val loggingTypes: List<String> get() = list("app.logging.types")
     val loggingAllowedUsers: List<String> get() = list("app.logging.allowed-users")
 

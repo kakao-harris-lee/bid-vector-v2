@@ -10,7 +10,6 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -25,7 +24,7 @@ private fun newSource(
     policy: KonepsHttpPolicyData,
 ): KonepsOpenApiNoticeSource =
     KonepsOpenApiNoticeSource(
-        httpClient = HttpClient.newHttpClient(),
+        gate = testCallGate(),
         baseUri = server.baseUri,
         serviceKey = ServiceKey.of("test-service-key"),
         httpPolicy = policy,
@@ -211,25 +210,51 @@ class KonepsOpenApiNoticeSourceTest {
         }
     }
 
+    /**
+     * M6/6G D-6G-12 — 낙찰방법 둘은 **이미 오던 응답**에 있었고 계약이 없어 떨어지고 있었다.
+     * 계약 행 추가가 실제로 wire 에 닿는지(관측까지 살아남는지)를 잰다 — 계약 표만 보는
+     * test 는 「그 값이 실제로 오는가」를 재지 못한다.
+     */
     @Test
-    fun `resultCode 22 는 quota 초과로 재시도 대상이다`() {
-        val successBody =
-            KonepsEnvelopeFixtures.success(
-                listOf(mapOf("bidNtceNo" to "SYN-3B-0008", "bidNtceOrd" to "000")),
-                totalCount = 1,
-                pageNo = 1,
-                numOfRows = 100,
-            )
-        val script =
+    fun `D-6G-12 — 낙찰방법 코드·명이 관측까지 살아남고 미지 필드로 세지 않는다`() {
+        val items =
             listOf(
-                MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")),
-                MockKonepsResponse.Reply(200, successBody),
+                mapOf(
+                    "bidNtceNo" to "SYN-6G-0002",
+                    "bidNtceOrd" to "000",
+                    "sucsfbidLwltRate" to "87.745",
+                    "sucsfbidMthdCd" to "낙030001",
+                    "sucsfbidMthdNm" to "적격심사제-추정가격 2억원 미만인 용역",
+                ),
             )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            val observation = batch.items.single()
+            val code = fieldContractFor(FieldConcept.AWARD_METHOD_CODE)
+            val name = fieldContractFor(FieldConcept.AWARD_METHOD_NAME)
+            observation.valueOf(code) shouldBe "낙030001"
+            observation.valueOf(name) shouldBe "적격심사제-추정가격 2억원 미만인 용역"
+            // 제로패딩·한글 접두가 보존된다(IDENTIFIER 축 — 수치로 접지 않는다).
+            batch.accounting.unknownFields shouldBe 0
+        }
+    }
+
+    /**
+     * M6/6G D-6G-11 이 이 자리의 판정을 바꿨다 — `resultCode 22` 는 **일 트래픽 한도**라
+     * 백오프로 회복되지 않는다. 재시도는 거부될 호출을 더 낼 뿐이고, 회복되는 축은 HTTP 429
+     * (속도 한도, legacy 실측 「~2분 안에 회복, 원인은 동시성」)이다. 두 축이 다르다는 것은
+     * 위 429 test 가 함께 잰다.
+     */
+    @Test
+    fun `resultCode 22 는 일 한도라 재시도 없이 즉시 quota 소진이다`() {
+        val script = listOf(MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")))
         MockKonepsServer.start(script).use { server ->
             val batch = newSource(server, testKonepsHttpPolicy(maxAttempts = 3)).fetchNotices(REFERENCE_DATE, null)
 
-            batch.items.size shouldBe 1
-            server.requestCount shouldBe 2
+            batch.accounting.truncationCause shouldBe TruncationCause.QuotaExhausted
+            server.requestCount shouldBe 1
             batch.accounting.quotaExceeded shouldBe 1
         }
     }

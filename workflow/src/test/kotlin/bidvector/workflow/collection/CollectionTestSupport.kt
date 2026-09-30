@@ -94,13 +94,20 @@ internal class ScriptedSource(
     }
 }
 
-internal class RecordingRawStore : RawObservationStore {
+internal class RecordingRawStore(
+    /**
+     * 이 축의 적재만 실패시킨다(D-6G-58 ⓑ) — 실 저장소의 실패(제약 위반·연결 끊김)와 적재 도중
+     * 프로세스가 죽는 경우가 호출부에서는 같은 모양이다. 축의 결말을 **적재 뒤에** 적는지 재는 자리.
+     */
+    private val failOn: SourceEndpoint? = null,
+) : RawObservationStore {
     val appended = mutableListOf<RawNoticeObservation>()
 
     override fun append(
         observation: RawNoticeObservation,
         rowDiscriminator: RowDiscriminator?,
     ): ObservationKey {
+        check(observation.sourceEndpoint != failOn) { "적재 실패를 흉내낸다: $failOn" }
         appended += observation
         return ObservationKey("raw-${appended.size}")
     }

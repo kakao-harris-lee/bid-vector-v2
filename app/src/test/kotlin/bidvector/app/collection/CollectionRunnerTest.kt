@@ -1,5 +1,6 @@
 package bidvector.app.collection
 
+import bidvector.adapters.snapshot.RunStateLock
 import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
@@ -33,6 +34,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
+import java.nio.file.Files
 import java.sql.SQLException
 import java.time.Instant
 import java.time.LocalDate
@@ -152,7 +154,10 @@ class CollectionRunnerTest {
         sources: List<CollectionSource>,
         lines: Lines,
         exits: Exits,
-    ) = CollectionRunner(useCase, range(), sources, lines.log, exits.termination)
+    ) = CollectionRunner(useCase, range(), sources, heldLock(), lines.log, exits.termination)
+
+    /** 러너 단위 test 는 잠금 거동이 아니라 로그·종료 코드를 잰다 — 실제로 잡은 잠금을 준다. */
+    private fun heldLock(): RunStateLock = RunStateLock.tryAcquire(Files.createTempDirectory("6g-runner-lock"))
 
     @Test
     fun `끝까지 읽히면 시작·슬롯·종료 줄을 남기고 종료 코드 0 으로 끝낸다`() {

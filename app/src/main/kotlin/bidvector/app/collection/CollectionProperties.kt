@@ -17,6 +17,14 @@ data class CollectionProperties(
     val from: LocalDate,
     val to: LocalDate,
     val categories: List<String>,
+    /**
+     * 승인 호출 상한(D-6G-47 H-1) — **이 갈래도 같은 상한 아래다.** A-1 은 6G 의 모든 KONEPS
+     * 호출을 덮는다(D-6G-29 ⑥)는데 공고 목록 갈래만 밖에 있었다. 기본값을 두지 않는다.
+     */
+    val callsPerDay: Int,
+    val callsTotal: Int,
+    /** 실행 상태 디렉터리 — 개찰 갈래와 **같은 자리**여야 두 갈래의 호출이 한 원장에서 합쳐진다. */
+    val runStateDir: String,
     val releaseSha: String = UNVERSIONED_RELEASE,
 )
 

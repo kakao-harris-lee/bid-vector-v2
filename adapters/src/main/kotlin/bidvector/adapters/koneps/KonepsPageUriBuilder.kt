@@ -9,11 +9,12 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.procurement.attemptOutcomeOf
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 /** [walkKonepsNoticePages] 한 스텝이 요구하는 페이지별 URI 조립 — 조회일·페이지 번호만 안다. */
 internal fun interface KonepsPageUriBuilder {
@@ -214,9 +215,13 @@ private class KonepsPageWalkAccumulator {
  */
 private fun isResumable(cause: TruncationCause): Boolean =
     when (cause) {
+        // 상한은 날이 바뀌거나 승인이 늘면 풀린다 — 같은 자리에서 이어 돌 수 있다.
+        is TruncationCause.BudgetExhausted -> true
+
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
         TruncationCause.QuotaExhausted,
+
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,
         TruncationCause.ServerError,
@@ -236,7 +241,7 @@ private fun applySuccess(
     accumulator: KonepsPageWalkAccumulator,
     page: KonepsEnvelopeOutcome.Success,
     policy: KonepsCollectionPolicyData,
-    clock: Clock,
+    observedAt: Instant,
     pageNo: Int,
     itemMapper: KonepsItemMapper,
 ): WalkStep {
@@ -245,7 +250,7 @@ private fun applySuccess(
         accumulator.recordRepeatedPage(pageNo)
         return WalkStep.STOP
     }
-    accumulator.recordPage(page, signature, clock.instant(), policy, itemMapper)
+    accumulator.recordPage(page, signature, observedAt, policy, itemMapper)
     return if (accumulator.currentlyComplete() || page.items.isEmpty()) WalkStep.STOP else WalkStep.CONTINUE
 }
 
@@ -253,13 +258,13 @@ private fun applyOutcome(
     accumulator: KonepsPageWalkAccumulator,
     outcome: KonepsCallOutcome,
     policy: KonepsCollectionPolicyData,
-    clock: Clock,
+    observedAt: Instant,
     pageNo: Int,
     itemMapper: KonepsItemMapper,
 ): WalkStep =
     when (outcome) {
         is KonepsCallOutcome.Success -> {
-            applySuccess(accumulator, outcome.body, policy, clock, pageNo, itemMapper)
+            applySuccess(accumulator, outcome.body, policy, observedAt, pageNo, itemMapper)
         }
 
         KonepsCallOutcome.NoData -> {
@@ -276,17 +281,29 @@ private fun applyOutcome(
             accumulator.markTruncated(TruncationCause.SelfThrottled, pageNo)
             WalkStep.STOP
         }
+
+        is KonepsCallOutcome.BudgetDenied -> {
+            accumulator.markTruncated(TruncationCause.BudgetExhausted(outcome.limit), pageNo)
+            WalkStep.STOP
+        }
     }
 
 /** page-walk 한 번을 이루는 고정 배선 — 매개변수 개수를 줄이려고 묶은 값 전달 객체(설계 판단, 로직 없음). */
 private class KonepsWalkContext(
-    val httpClient: HttpClient,
+    val gate: KonepsCallGate,
+    val callContext: KonepsCallContext,
     val retry: Retry,
     val rateLimiter: RateLimiter,
     val uriBuilder: KonepsPageUriBuilder,
     val httpPolicy: KonepsHttpPolicyData,
     val collectionPolicy: KonepsCollectionPolicyData,
     val clock: Clock,
+    /**
+     * **한 걷기는 한 관측이다**(D-6G-58) — 쪽마다 시각을 새로 읽으면 같은 걷기의 쪽들이 서로 다른
+     * 관측 시각을 달고, 추출이 「마지막 걷기」를 골라낼 수 없다. 원문은 append-only 라 다시 걸어도
+     * 앞 쪽이 남고, 그 둘이 합쳐지면 참가자 수와 1위 투찰가가 조용히 틀린다.
+     */
+    val observedAt: Instant,
     val counters: KonepsAttemptCounters,
     val itemMapper: KonepsItemMapper,
 )
@@ -300,7 +317,8 @@ private fun fetchNextPage(
     val uri = context.uriBuilder.uriFor(pageNo)
     val outcome =
         fetchPageResilient(
-            context.httpClient,
+            context.gate,
+            context.callContext,
             context.retry,
             context.rateLimiter,
             uri,
@@ -308,7 +326,8 @@ private fun fetchNextPage(
             context.collectionPolicy,
             context.counters,
         )
-    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock, pageNo, context.itemMapper)
+    val step =
+        applyOutcome(accumulator, outcome, context.collectionPolicy, context.observedAt, pageNo, context.itemMapper)
     return step == WalkStep.CONTINUE
 }
 
@@ -348,6 +367,13 @@ private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
 // 자체로 강제해 다른 발급자가 끼어들 여지를 남기지 않는다.
 private val STRICT_PAGE_TOKEN = Regex("[1-9][0-9]*")
 
+/**
+ * **걷기의 이름은 저장이 견디는 정밀도여야 한다**(D-6G-68). `observed_at` 은 TIMESTAMPTZ(마이크로초)
+ * 이고 시계는 나노초를 준다 — 자르지 않으면 원장이 적은 걷기 식별자가 저장된 행의 시각과 영원히
+ * 다르고, 추출은 그 축의 행을 **하나도** 찾지 못한다(실측).
+ */
+private fun walkNameOf(clock: Clock): java.time.Instant = clock.instant().truncatedTo(ChronoUnit.MICROS)
+
 private fun startPageOf(cursor: PageCursor?): Int? {
     val token = cursor?.token ?: return START_PAGE
     return token.takeIf(STRICT_PAGE_TOKEN::matches)?.toIntOrNull()
@@ -361,7 +387,8 @@ private fun startPageOf(cursor: PageCursor?): Int? {
  * checklist.md 「판단이 갈린 지점」).
  */
 internal fun walkKonepsNoticePages(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     retry: Retry,
     rateLimiter: RateLimiter,
     uriBuilder: KonepsPageUriBuilder,
@@ -377,13 +404,15 @@ internal fun walkKonepsNoticePages(
     val counters = KonepsAttemptCounters()
     val context =
         KonepsWalkContext(
-            httpClient,
+            gate,
+            callContext,
             retry,
             rateLimiter,
             uriBuilder,
             httpPolicy,
             collectionPolicy,
             clock,
+            walkNameOf(clock),
             counters,
             itemMapper,
         )
@@ -394,5 +423,14 @@ internal fun walkKonepsNoticePages(
         walking = nextWalkState(accumulator, context, pageNo)
         if (walking) pageNo++
     }
-    return SourceBatch(accumulator.items, accumulator.toAccounting(counters), next = accumulator.nextCursor())
+    // 축의 결말은 **여기서 적지 않는다**(D-6G-58 ⓑ) — 걷기가 끝난 것과 그 행이 적재된 것은 다르고,
+    // 적재 전에 「완료」를 적으면 그 사이에 죽은 실행의 축이 영영 다시 불리지 않는다. 적재하는
+    // 자리(use case)가 적는다.
+    return SourceBatch(
+        accumulator.items,
+        accumulator.toAccounting(counters),
+        next = accumulator.nextCursor(),
+        // 걷기의 이름은 걷기를 한 자리가 적는다(D-6G-68) — 쪽마다 같은 값이다.
+        observedAt = context.observedAt,
+    )
 }

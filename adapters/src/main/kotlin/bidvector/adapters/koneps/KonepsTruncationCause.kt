@@ -16,6 +16,11 @@ internal fun isQuotaSignal(step: KonepsRawStep): Boolean =
             (step.outcome as? KonepsTransportOutcome.Received)?.status == HTTP_TOO_MANY_REQUESTS_TC
         }
 
+        // 승인 상한은 우리 쪽 셈이다 — KONEPS 가 낸 quota 신호가 아니다.
+        is KonepsRawStep.BudgetStep -> {
+            false
+        }
+
         is KonepsRawStep.EnvelopeStep -> {
             (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.QUOTA_EXCEEDED
         }
@@ -48,6 +53,10 @@ private fun causeForCategory(category: ResultCodeCategory): TruncationCause =
 /** 최종 실패 스텝을 [TruncationCause] 로 접는다(H-3) — 다섯 사유가 회계에서 구별되게 한다. */
 internal fun causeFor(step: KonepsRawStep): TruncationCause =
     when (step) {
+        is KonepsRawStep.BudgetStep -> {
+            TruncationCause.BudgetExhausted(step.limit)
+        }
+
         is KonepsRawStep.TransportStep -> {
             when (step.outcome) {
                 KonepsTransportOutcome.TimedOut -> TruncationCause.Timeout

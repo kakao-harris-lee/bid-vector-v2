@@ -7,10 +7,10 @@ import bidvector.procurement.NoticeSourcePort
 import bidvector.procurement.PageCursor
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
+import bidvector.procurement.SourceEndpoint
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.URI
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.format.DateTimeFormatter
 
@@ -61,7 +61,7 @@ private fun buildListUri(
  * 얻지 않는다(경로와 대분류가 어긋나도 이 값이 이긴다 — 표류는 설정 표 한 행이 막는다).
  */
 class KonepsOpenApiNoticeSource(
-    private val httpClient: HttpClient,
+    private val gate: KonepsCallGate,
     private val baseUri: URI,
     private val serviceKey: ServiceKey,
     private val httpPolicy: KonepsHttpPolicyData,
@@ -84,8 +84,12 @@ class KonepsOpenApiNoticeSource(
             }
         // itemMapper 기본값이 없다(3B-2). 이 port 는 항상 공고 축
         // 원문 보존 mapper 를 쓴다(동작 불변 — 암묵 기본값이던 것과 같은 값을 명시할 뿐이다).
+        // D-6G-47 H-1 — 공고 목록 갈래도 같은 관문을 지난다. 이 갈래가 상한 밖에 있던 것이
+        // 세 라운드 동안 열려 있던 구멍이다(계약 D-6G-29 ⑥ 「A-1 은 6G 의 모든 호출을 덮는다」).
+        val callContext = KonepsCallContext(SourceEndpoint.NOTICE_LIST)
         return walkKonepsNoticePages(
-            httpClient,
+            gate,
+            callContext,
             retry,
             rateLimiter,
             uriBuilder,

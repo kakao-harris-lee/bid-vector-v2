@@ -3,6 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -82,6 +83,39 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
         "drwtNo1",
         "drwtNo2",
         "bidprcDt",
+        // M6/6G D-6G-12 — 낙찰방법 둘. 공고 목록 응답에 이미 오던 키이고 계약이 없어
+        // 떨어지고 있었다(제외 조건 ①⑦⑩의 1차 입력).
+        "sucsfbidMthdCd",
+        "sucsfbidMthdNm",
+        // M6/6G D-6G-12 — 입찰가격산식 A 정보(op 24) 13행. A 합산 항목 일곱 + 표준시장단가
+        // 금액 + 적용 여부 술어 둘 + 일시 둘 + 예정가격결정방법명.
+        "npnInsrprm",
+        "mrfnHealthInsrprm",
+        "odsnLngtrmrcprInsrprm",
+        "rtrfundNon",
+        "sftyMngcst",
+        "sftyChckMngcst",
+        "qltyMngcst",
+        "smkpAmt",
+        "qltyMngcstAObjYn",
+        "smkpAmtYn",
+        "ntceNticeDt",
+        "bidPrceCalclAOpenDt",
+        "prearngPrceDcsnMthdNm",
+        // M6/6G D-6G-19 — 기초금액 조회(op 5·6·7) 신규 다섯. A 합산 항목 열은 행을 늘리지 않고
+        // presentIn 만 넓혔다(같은 raw 키를 두 행으로 등재할 수 없다).
+        "rsrvtnPrceRngBgnRate",
+        "rsrvtnPrceRngEndRate",
+        "bssamtOpenDt",
+        "bidPrceCalclAYn",
+        "bssAmtPurcnstcst",
+        "industSftyHelthMngcst",
+        // M6/6G D-6G-22 — 새 호출 비용 0(공고 목록 응답에 이미 온다).
+        "sucsfbidMthdAppStd",
+        "aplBssCntnts",
+        // M6/6G D-6G-28 — 공고일을 목록 축에서도 읽는다(A 오퍼레이션은 공사 전용이라 그것만으로는
+        // 용역·물품의 공고일이 빈다).
+        "bidNtceDt",
     )
 
 /**
@@ -131,7 +165,7 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트 + license-limit + 개찰완료에도 실린다 — F-6·G-4·P-13`() {
+    fun `bidNtceNo·bidNtceOrd 는 식별자는 공고 축 밖 여섯 엔드포인트에도 실린다 — F-6·G-4·P-13·D-6G-12`() {
         val allEndpoints =
             setOf(
                 SourceEndpoint.NOTICE_LIST,
@@ -141,6 +175,11 @@ class CollectionPolicyTest {
                 SourceEndpoint.LICENSE_LIMIT_DETAIL,
                 // P-13 (a) 승인.
                 SourceEndpoint.OPENING_COMPLETE,
+                // M6/6G D-6G-12 — 입찰가격산식 A 정보. 좁히면 이 축의 allow-list 반전이
+                // 식별자부터 떨어뜨려 전 항목이 「공고번호 없음」으로 오분류된다.
+                SourceEndpoint.BID_PRICE_FORMULA_A,
+                // M6/6G D-6G-19 — 기초금액 조회.
+                SourceEndpoint.BASE_AMOUNT_DETAIL,
             )
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceNo"))!!.presentIn shouldBe allEndpoints
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceOrd"))!!.presentIn shouldBe allEndpoints
@@ -155,9 +194,13 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `bssamt 의 presentIn 은 예비가격 상세로 넓어진다 — policy-values md 1-7-1 각주, verifier r1 F-6`() {
+    fun `bssamt 의 presentIn 은 예비가격 상세·기초금액 조회로 넓어진다 — F-6 · D-6G-19`() {
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssamt"))!!.presentIn shouldBe
-            setOf(SourceEndpoint.NOTICE_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL)
+            setOf(
+                SourceEndpoint.NOTICE_LIST,
+                SourceEndpoint.RESERVE_PRICE_DETAIL,
+                SourceEndpoint.BASE_AMOUNT_DETAIL,
+            )
     }
 
     @Test
@@ -203,11 +246,20 @@ class CollectionPolicyTest {
         }
     }
 
+    /**
+     * M6/6G D-6G-19 로 `bssAmtPurcnstcst` 가 **등재된다** — 다만 기초금액으로가 아니라 순공사원가
+     * (제외 ⑨의 입력)로다. 이 test 가 지키는 것은 「그 키가 없다」가 아니라 **「기초금액 축에 서는
+     * raw 키는 `bssamt` 하나다」**였다(legacy 가 부분을 전체 자리에 넣은 것을 되돌린 판정) — 그
+     * 판정을 개념 축으로 다시 세운다.
+     */
     @Test
-    fun `bssamt 가 문서로 서는 유일한 기초금액 raw 키다 — bssAmt·bssAmtPurcnstcst 는 등재되지 않는다`() {
-        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssamt"))?.basis shouldBe Basis.BASE_AMOUNT
+    fun `기초금액 축에 서는 raw 키는 bssamt 하나다 — 순공사원가는 다른 개념으로 등재된다`() {
+        RESOLVED_POLICY.fieldContracts.contractsFor(FieldConcept.BASE_AMOUNT).map { it.rawName } shouldBe
+            listOf(RawKey("bssamt"))
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssAmt")) shouldBe null
-        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssAmtPurcnstcst")) shouldBe null
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssAmtPurcnstcst"))!!.concept shouldBe
+            FieldConcept.PURE_CONSTRUCTION_COST
+        RESOLVED_POLICY.baseAmountResolutionOrder shouldNotContain RawKey("bssAmtPurcnstcst")
     }
 
     @Test

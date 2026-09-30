@@ -62,6 +62,21 @@ internal object KonepsOperationPolicy {
             rowIdentifierRawKeys = emptyList(),
         )
 
+    /**
+     * 개찰결과 목록(5~8)을 **공고일 축**으로 걷는다(M6/6G D-6G-11) — 그 군의 `inqryDiv` 표에서 `2` 가
+     * 공고일시다(§1.9.2). 6G 표본틀이 이 축을 쓰는 이유는 응답에 **공고일 항목이 없기** 때문이다:
+     * 개찰일 축으로 걸으면 슬롯의 조회일이 개찰일이라 층(업무 × **공고 주**)을 세울 수가 없다.
+     * 공고일로 걸으면 슬롯의 조회일이 곧 그 행의 공고일이다.
+     */
+    val OPENING_RESULT_LIST_BY_NOTICE_DATE =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = true,
+            requiresNoticeNumber = false,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = emptyList(),
+        )
+
     /** 개찰결과 목록(5~8) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). 한 행=한 공고. */
     val OPENING_RESULT_LIST =
         KonepsOperationDescriptor(
@@ -120,6 +135,42 @@ internal object KonepsOperationPolicy {
             requiresNoticeNumber = true,
             requiresNoticeRound = true,
             rowIdentifierRawKeys = listOf("prcbdrNm"),
+        )
+
+    /**
+     * 입찰가격산식 A 정보(**입찰공고정보서비스** op 24, M6/6G D-6G-12) — 이 군의 `inqryDiv` 는
+     * **1 = 공고게시일시 · 2 = 입찰공고번호**다(문서 문면). 단건 조회로 쓰므로 `2` 이고
+     * `bidNtceNo` 가 필수다. 다른 군의 `2` 와 값이 같은 것은 우연이다 — 군마다 축이 다르다는
+     * 것이 이 서술자가 있는 이유다.
+     *
+     * `bidNtceOrd` 는 문서가 **요청** 항목으로 적지 않는다 — 보내지 않는다(옵션이라는 근거가
+     * 없는 파라미터를 지어내지 않는다). 대신 **응답**이 차수를 싣고(`bidNtceOrd` 필수 항목),
+     * 한 공고번호에 차수가 여럿이면 그 키가 행을 가른다.
+     */
+    val BID_PRICE_FORMULA_A =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = false,
+            requiresNoticeNumber = true,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = listOf("bidNtceOrd"),
+        )
+
+    /**
+     * 기초금액 조회(입찰공고정보서비스 op 5·6·7, M6/6G D-6G-19) — 이 군의 `inqryDiv` 는
+     * **1 = 입력일시 · 2 = 입찰공고번호**다(P-5 §2.1 — 목록 4종·op 24 와 **다른 축**이다). 단건
+     * 조회로 쓰므로 `2` 이고 `bidNtceNo` 가 필수다.
+     *
+     * `bidNtceOrd` 는 **요청 항목에 아예 없다**(응답에는 필수로 있다) — 보내지 않고, 응답의 차수 키가
+     * 행을 가른다(op 24 와 같은 형태). 업무 대분류는 **경로**가 정한다: 같은 서술자를 세 경로에 쓴다.
+     */
+    val BASE_AMOUNT_DETAIL =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = false,
+            requiresNoticeNumber = true,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = listOf("bidNtceOrd"),
         )
 }
 
