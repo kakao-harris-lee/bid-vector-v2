@@ -46,7 +46,8 @@ git restore --source=c357e437 --staged --worktree -- \
 ## ② 공유 파일 — 커밋 해시 hunk 격리
 
 두 파일은 다른 slice 의 줄을 담고 있어 `base..HEAD` 통째 역적용을 쓰지 않는다. 먼저 그 파일을 만진
-커밋을 나열한다(`git log --oneline c357e437..bfad2201 -- <파일>`), 그다음 자기 커밋만 역적용한다.
+커밋을 나열한다(`git log --oneline c357e437..<실측 HEAD> -- <파일>` — 범위의 끝은 위 「실측 HEAD」이고
+라운드마다 그 값으로 다시 돌린다, vr r1 L-4), 그다음 자기 커밋만 역적용한다.
 
 ```
 git diff de50a997~1..de50a997 -- milestone-6.md | git apply -R

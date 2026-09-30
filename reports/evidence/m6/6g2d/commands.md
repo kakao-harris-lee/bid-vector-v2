@@ -29,6 +29,9 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-17** 확정 실패는 정확히 셋 | 이행 | `failureOf` 의 확정 갈래 = INPUT_ERROR · NOT_RETRYABLE · MAX_PAGES. `ALL_TRUNCATION_CAUSES` 전수 등식 test 둘 |
 | **D-6G2d-18** 일괄 | **부분 — 이탈 9** | 형식 version 정수만(`requireCurrentFormat`·`STRICT_FORMAT_VERSION`) · 낡은 KDoc 넷 · 중복 하한을 쓰는 자리 하나로 · test 대역의 확정 코드 교정 · 계수 이름 유지. **형식 거부의 전용 종료 코드는 안 했다**(이탈 9) |
 | **D-6G2d-21** `a_value` 전부 아니면 무 | **ⓐⓑ 이행** | `aValueTotalOf` 가 공개일시 부재·구성 항목 결측 둘에서 묶음을 비운다(`aValuePartsOf` 의 `null` 원소는 결측이고 빼지 않는다) · `SnapshotExtraction.incompleteAValues` · 러너 로그 한 칸 |
+| **D-6G2d-28** 합산 술어가 `Y`/`N` 밖이면 A 비움 | 이행 | `aValueTotalOf` 가 술어 `null` 을 「A 를 낼 수 없음」으로 읽는다 · `aValuePartsOf` 는 「참일 때만」 한 가지만 답한다 · 계수 `incompleteAValues` |
+| **D-6G2d-29** `Refused` 의 뜻 | 이행(문면) | `AttemptOutcome.Refused` KDoc · `failureOf` 갈래 주석 · evidence 두 자리. 코드 무변경 |
+| **D-6G2d-30** 일괄 | 이행 | 절단 사유 전수를 **sealed 계층에서 도출**(`TruncationCauseClassificationGateTest`) · 덧붙인 순서 전용 test · 러너 로그 계수 셋 단언 · `axisResumptions` 안내 문면 · 이탈 13·표면 표·rollback 범위 문면 |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
 ## 변이표
@@ -57,6 +60,8 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-unclassified-final** 미지 코드를 확정으로 | `CollectionAttemptLedgerTest` | RED 3 |
 | **M-count-whole-life** 상한을 디렉터리 생애 전체로 센다 | `CollectionAttemptLedgerTest` | RED 1 |
 | **M-a-open-at-ignored** A 공개일시 부재를 무시한다 | `SnapshotAmountContractTest` | RED 1 |
+| **M-unknown-predicate-as-false** 모름 술어를 거짓으로 접는다 | 같은 클래스 | RED 2 |
+| **M-log-cell-dropped** 러너 로그에서 계수 칸 하나를 뺀다 | `SnapshotExtractionE2ETest` | RED 1 |
 | **M-a-undersum** 결측 항목을 빼고 합산한다 | 같은 클래스 | RED 1 |
 
 ## 착수 실측 표 갱신
@@ -110,13 +115,13 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 | `AttemptOutcome.FinalFailure(code)` | 결말 줄을 짓는 누구나 「다시 부르지 않는 실패」를 말할 수 있다. 코드 문자열만 나르고 새 주입 자리는 없다 |
 | `AxisConclusion(outcome, walk)` — 형태 변경(`settled` 파생, `usesRows` 신설) | 판독이 결말 **어휘**를 본다. 걷기가 non-null 이라 「모름」을 만들 수 없다 |
 | `AttemptHistory.axisResumptions(axisRetryLimit)` — `settledAxes()` 제거 | 이어 돌기의 답을 상한과 함께 묻는다. 1 미만 상한은 `require` 가 막는다 |
-| `DetailFetchGates.axisRetryLimit`(기본값 없음) | 배선이 재호출 상한을 정한다. 1 미만은 `init` 이 막고, 운영 값은 정책 데이터 한 자리다 |
+| `DetailFetchGates.axisRetryLimit`(기본값 없음) | 배선이 재호출 상한을 정한다. 하한(1 이상)은 **쓰는 자리**가 본다(`axisResumptions`, D-6G2d-18) — 이 타입의 `init` 에는 그 문장이 없다. 운영 값은 정책 데이터 한 자리다 |
 | `SourceBatch.observedAt: Instant`(기본값·nullable 제거) | 포트 구현이 걷기 이름을 **반드시** 싣는다 — 빠뜨림이 컴파일 오류다. 앞 판의 위험(아무 걷기나 실을 수 있다)은 그대로이고 출하 어댑터는 한 자리에서 짓는다 |
 | `CollectionAttempt.walk`(기본값 제거 · 양방향 `init`) | AXIS 줄은 걷기를 반드시, 그 밖의 줄은 절대 갖지 못한다 |
 | `NoticeNumber.ofOrNull(raw)` | 형태를 어긴 원문 번호를 예외 없이 거른다. 정규화 규칙은 여전히 한 자리(`of` 와 같은 함수를 지난다) |
 | `SnapshotExtraction.unusableRawRows` | 판독이 「키가 서지 않아 버린 원문 행 수」를 읽는다 — 네 항 항등식 **밖**이다 |
 
-### 재작업 1 이 더한 표면 둘
+### 재작업 1 이 더한 표면 셋
 
 | 표면 | 밖에서 허용하는 것 |
 |---|---|
@@ -125,7 +130,8 @@ rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는�
 | `SnapshotExtraction.incompleteAValues` | 판독이 「A 묶음이 전부-아니면-무 규율로 사라진 수」를 읽는다. 소수부와 **원인이 다르므로** 칸을 따로 둔다 — 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시 항등식 밖 |
 
 좁아진 표면 하나: `DetailFetchGates` 의 `init` 에서 상한 하한 검사가 사라졌다(쓰는 자리 하나로,
-D-6G2d-18). 생성자 형태는 그대로다.
+D-6G2d-18). 생성자 형태는 그대로다. **재작업 2 는 표면을 더하지 않았다** — D-28 은 판정을 부르는 쪽으로
+올린 것이고 `aValuePartsOf` 는 파일 범위 `private` 이다.
 
 **모듈 밖에 열리지 않는 것**(cr r1 L-3 정정 — 앞 판은 전부 `internal` 이라고 적었으나 다섯은
 `private` 이다): `internal` 은 `RUN_STATE_FORMAT_VERSION` · `RunStateFormatFault` ·
@@ -236,8 +242,11 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
 4. **ⓒ 의 재호출 상한이 `KonepsCollectionPolicyData` 가 아니라 `DetailFetchGates` 에 있다.** 수집
    use case 는 전자의 **멤버를 읽을 수 없다**(구조 게이트 D-6F8-1 우회 1 — 실측으로 RED). 그 금지는
    옳으므로 게이트를 넓히지 않고 값을 옮겼다.
-5. `config/quality/architecture-policy.properties` 변경은 **등재 해제** 한 줄이다(use case 가 더는
-   이름 붙이지 않는 타입 하나). 「허용 == 관측」 등식이 요구하는 좁히는 방향이고 술어는 그대로다.
+5. `config/quality/**` 변경은 **등재**뿐이다(D-6G2d-6 이 허용한 범위). 둘: `architecture-policy.properties`
+   의 **등재 해제** 한 줄(use case 가 더는 이름 붙이지 않는 타입 하나 — 「허용 == 관측」 등식이 요구하는
+   좁히는 방향이고 술어는 그대로다) · `gate-tests.properties` 의 **등재** 한 줄(재작업 2 가 더한 게이트
+   test 클래스 — app 의 모든 test 클래스가 등재돼야 한다는 양방향 게이트가 실측으로 잡았다). 술어 확장
+   0 은 그대로다.
 6. **D-6G2d-8 ⓑⓒ 는 한 커밋이다** — 두 항목이 같은 술어(`axisResumptions`)를 바꾼다.
 7. **D-6G2d-8 ⓐⓑⓒ 의 RED 는 base 가 아니라 변이로 실측했다.** ⓒ 는 새 결말 타입 없이는 test 가
    컴파일되지 않아 base-RED 가 구조적으로 불가능했고, ⓐⓑ 는 구현이 test 보다 앞섰다. 잠그는 술어는
@@ -257,13 +266,20 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
    경로는 적재 **전에** 떨어뜨린다, 이것은 방어 심화다)와 걷기 부재 `requireNotNull` 의 도달 가능성
    서술(cr r1 L-4: 발화하지 않는 이중 잠금). 코드 거동 무변경. 알면서 거짓인 KDoc 을 남기는 것이 이
    slice 가 반복해서 고치는 결함 계열이라 함께 담았다.
-13. **D-6G2d-21 ⓑ 는 한 번 보류했다가 같은 라운드에서 닫았다.** 첫 판에서 golden 대조 E2E 가 RED 였고
-   (대역의 A 행이 반쪽이라 golden 의 `a_value.total` 이 과소 합산의 값이었다) 운영자 결정 A-2 가 golden
-   재생성을 slice 밖으로 두어 멈췄다. 그 뒤 **golden 을 바꾸지 않는 길**을 찾아 닫았다 — 대역의 A 행을
-   일곱 항목으로 채우고 합을 같은 값으로. 남은 것은 없다. 커밋 이력에 두 판이 다 있다.
+13. **D-6G2d-21 ⓑ 는 한 번 보류했다가 같은 라운드에서 닫았다.** 첫 판에서 golden 대조 E2E 가 RED 였다
+   — 대역의 A 행이 반쪽이라 golden 의 `a_value.total` 이 과소 합산의 값이었다. **멈춘 이유는 A-2 가
+   아니라 권한 분류기**다(D-6G2d-26): 골든 디렉터리 쓰기가 「Modify Shared Resources」로 거부됐고 그
+   거부를 우회하지 않았다. 그 뒤 **골든을 바꾸지 않는 길**을 찾아 닫았다 — 대역의 A 행을 일곱 항목으로
+   채우고 합을 같은 값으로. D-6G2d-26 이 그 상태를 이행으로 확정했고 골든 in_scope 추가는 철회됐다.
+   커밋 이력에 두 판이 다 있다.
 12. **D-6G2d-19 의 「`doneWith` 가 `at` 순서를 읽는다」를 따르지 않았다** — 원장의 덧붙인 순서로 읽는다.
    사유는 위 알려진 제한 (e): `at` 정렬은 시계가 뒤로 간 실행에서 앞 실행의 결말을 「마지막」으로 만들어
    추출 쪽 규율과 어긋난다. 정착 창을 고르는 성질(계약이 요구한 것)은 그대로 성립한다.
+14. **D-6G2d-30 의 sealed 도출 등식을 도메인 test 가 아니라 app test 에 두었다.** 도메인 모듈의 test
+   compile classpath 에 kotlin-reflect 가 없다(실측: `-Werror` 로 컴파일 실패). 그 모듈에 test 의존을
+   더하는 것은 in_scope 밖이고 도메인 test 가 할 수 있는 일을 넓힌다 — 구조를 훑는 게이트가 모여 있는
+   `app/src/test/.../architecture/` 가 제자리다. 계약이 요구한 성질(계층에서 도출 · 새 사유가 등식에
+   걸린다)은 그대로 성립하고, 값 단위 거동은 도메인 test 에 남는다.
 11. **vr r1 L-5 는 이 레인이 고치지 않는다** — scope.md 의 「OPEN 수령·신설」 표에
    `OPEN-6G2D-AXIS-RETRY-LIMIT` 행이 없다. slice 계약은 세션 모델 단독 소관이라 보고만 한다.
 
