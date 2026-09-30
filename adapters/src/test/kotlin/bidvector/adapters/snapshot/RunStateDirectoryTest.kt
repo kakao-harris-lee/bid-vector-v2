@@ -19,6 +19,7 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -362,6 +363,45 @@ class RunStateDirectoryTest {
             .total shouldBe 3
         Files.readString(root().resolve(STATE_NAME)) shouldContain
             "\"attempts_sha256\":\"${sha256Hex(Files.readString(file))}\""
+    }
+
+    /**
+     * **D-6G2d-2 (cr r5-t M-3) — 복구 쓰기도 원자적이다.** 복구가 도는 새간은 방금 죽은 기계
+     * 위다. 제자리 truncate+rewrite 는 그 중간에 또 죽으면 원장을 **짧게** 만들고, 다음 기동은
+     * 「줄 수가 장부보다 적다」로 영구 거부한다. 중간 파일 자리를 막아 쓰기를 실패시키면, 원자
+     * 교안는 원장을 **손대지 않은 채** 거부하고 제자리 쓰기는 그 자리를 아예 지나지 않는다.
+     */
+    @Test
+    fun `복구 쓰기가 실패하면 원장이 짧아지지 않는다`() {
+        val file = tornLedger()
+        val torn = Files.readString(file)
+        // 중간 파일 이름을 디렉터리로 막는다 — 그 자리로 쓰는 구현만 여기서 멈울다.
+        Files.createDirectory(root().resolve(STAGED_ATTEMPT_NAME))
+
+        shouldThrow<IOException> { open() }
+
+        Files.readString(file) shouldBe torn
+    }
+
+    /**
+     * D-6G2d-2 — 중간 파일이 남은 디렉터리는 기동을 막지 않는다. 교체가 원자적이라 **원장이 성한**
+     * 채로 중간 파일만 남는 모양이 있다(중간 파일은 썼는데 교체가 실패해 사람이 끝 줄을 손으로
+     * 닫은 뒤). 그 이름은 장부 대상 집합에서 빠진다 — 빠지지 않으면 복구가 남긴 흔적이 「모르는
+     * 파일」로 그 디렉터리를 영구히 막고, 그 사고를 만든 것은 복구 자신이다.
+     */
+    @Test
+    fun `복구가 남긴 중간 파일은 장부 대상이 아니다`() {
+        val state = open()
+        state.sampleList.confirm(sample())
+        state.attempts.append(httpAttempt())
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        val intact = Files.readString(file)
+        Files.writeString(root().resolve(STAGED_ATTEMPT_NAME), "{\"at\":\"2026-09-2")
+
+        val reopened = reopen()
+
+        reopened.attempts.read().size shouldBe 1
+        Files.readString(file) shouldBe intact
     }
 
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */

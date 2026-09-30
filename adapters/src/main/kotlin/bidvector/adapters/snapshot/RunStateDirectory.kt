@@ -30,6 +30,12 @@ internal const val STATE_NAME = "state.json"
 /** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
 internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
 
+/**
+ * 원장 복구의 원자적 교안 중간 이름(D-6G2d-2) — 장부 교안과 같은 모양이다. 장부 대상
+ * 집합에서 빼는 이름은 이제 둘이고, 둘 다 이 클래스가 직접 쓰는 이름이다(`*.staged` 통째 제외 아니다).
+ */
+internal const val STAGED_ATTEMPT_NAME = "$ATTEMPT_LEDGER_NAME.staged"
+
 /** 원장·장부 줄의 JSON 깊이 상한 — 두 파일이 같은 값을 쓴다(줄 형태가 같다). */
 internal const val ATTEMPT_MAX_DEPTH = 4
 
@@ -223,8 +229,10 @@ class RunStateDirectory(
                 .list(root)
                 .use { paths -> paths.map { it.fileName.toString() }.toList() }
                 // `*.staged` 를 통째로 빼면 `anything.staged` 가 장부 검사에 보이지 않는다
-                // (cr r5 L-2). 이 클래스가 쓰는 **한 이름**만 뺀다.
-                .filterNot { it == STATE_NAME || it == RUN_LOCK_NAME || it == STAGED_STATE_NAME }
+                // (cr r5 L-2). 이 클래스가 **직접 쓰는 이름**만 뺀다 — 장부 교체와 원장 복구 교체
+                // 둘(D-6G2d-2). 복구 도중 죽어 남은 중간 파일이 「모르는 파일」로 기동을 막으면,
+                // 그 사고를 만든 것은 복구 자신이다.
+                .filterNot { it in EXCLUDED_FROM_LEDGERED_SET }
                 .toSet()
         require(present == LEDGERED_FILES.filter { Files.isRegularFile(root.resolve(it)) }.toSet()) {
             "실행 상태 디렉터리에 장부가 모르는 파일이 있다 — 무엇이 정본인지 알 수 없다"
@@ -262,8 +270,11 @@ class RunStateDirectory(
      * 축을 **지어내지 않는다** — 조각이 무엇이었는지 모르는 채로 시도 줄을 만들면 이어 돌기가
      * 있지도 않은 축을 완료로 읽는다.
      *
-     * 재동기보다 **먼저** 돈다 — 순서가 반대면 장부가 조각까지 포함한 해시를 굳히고, 그 뒤의
-     * 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다.
+     * 누적 해시보다 **먼저** 돈다 — 그 순서는 [healedLedgerDigest] 가 구조로 든다.
+     *
+     * 교체는 **원자적이다**(D-6G2d-2, cr r5-t M-3). 제자리 truncate+rewrite 는 8 만 줄짜리 원장을
+     * 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다 적다」로 영구
+     * 거부한다 — 복구가 도는 순간은 방금 죽은 기계 위다. [recordState] 와 같은 형태를 쓴다.
      */
     private fun healTornTail() {
         if (!Files.isRegularFile(attemptFile)) return
@@ -271,7 +282,9 @@ class RunStateDirectory(
         if (text.isEmpty() || text.endsWith("\n")) return
         val fragment = text.substringAfterLast('\n')
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
-        Files.writeString(attemptFile, healed, StandardOpenOption.TRUNCATE_EXISTING)
+        val staged = root.resolve(STAGED_ATTEMPT_NAME)
+        Files.writeString(staged, healed)
+        Files.move(staged, attemptFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
     private fun readFacts(): RunStateFacts? {
@@ -366,6 +379,13 @@ internal const val RUN_LOCK_NAME = "run.lock"
 
 /** 장부가 지키는 정본 파일 — 디렉터리에 이 밖의 파일이 있으면 기동이 거부된다(D-6G-60). */
 private val LEDGERED_FILES = listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME)
+
+/**
+ * 장부 대상 집합에서 빼는 이름 — 자물쇠와 장부 자신, 그리고 **원자 교체의 중간 이름 둘**이다
+ * (D-6G2d-2). 이름을 여기 적지 않은 파일이 디렉터리에 생기면 기동이 거부된다(D-6G-60).
+ */
+private val EXCLUDED_FROM_LEDGERED_SET =
+    setOf(STATE_NAME, RUN_LOCK_NAME, STAGED_STATE_NAME, STAGED_ATTEMPT_NAME)
 
 /**
  * 실행 상태 디렉터리의 **잠금**(D-6G-57) — 상태가 파일 범위이므로 잠금도 파일 범위다.
