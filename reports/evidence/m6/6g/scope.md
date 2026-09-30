@@ -229,6 +229,22 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 
 **레인 분담**: Kotlin — 68~74 전부와 75 의 evidence 문면. Python — 작업 없음(동결 유지). `ml-engine/**` 와 golden 바이트가 판정 SHA `02142854` 와 같으면 Python acceptance·rollback 은 **트리 동일성으로 갈음**한다; Kotlin 이 golden 이나 스키마 문서의 계약 칸을 바꾸게 되면 멈추고 보고한다.
 
+## 계약 갱신 r5-t (2026-09-30, 팀장 — verifier r5 표적 not-ready(D-6G-76 발동 — high 2 · medium 2, acceptance·container·rollback 초록) · code-reviewer r5 표적 high 2·medium 4·low 8 수령 · 운영자 결정 「규칙대로 분리 종결」)
+
+표적 재검증 판정 SHA `ceb9990f`. **r5 H-1 은 재현되지 않았다** — 출하 `JdbcSnapshotSource` 의 probe W1·W2·W5 와 출하 조립 E2E(기동 1 이 2쪽에서 끊김 → 기동 2 가 `03` → 추출)에서 끊긴 걷기의 행은 실리지 않는다(그 공고는 투찰 0 행으로 실려 Python `BIDDER_AMOUNT_ABSENT` 로 빠진다, 네 항 항등식 성립). D-6G-69·71·72·73 도 닫혔다. acceptance(Kotlin `check` job · container job · ml-engine job 트리 동일성)·golden 불변·rollback 실측은 통과했다(Kotlin `check` job exit 0 · test XML 2,513 · skipped 4 · failures 0, container job 12 단계 exit 0 · S-24 4/4, ml-engine 은 트리 동일성, rollback ①~⑥ D64/M46 · 되돌린 트리 `check` 2,337 tests, 실측 HEAD `7994719b` 이후 복원 경로 이동 0). **그러나 이 수정이 새 high 를 만들었다** — D-6G-76 「이 수정이 새 high 를 만들어도 같다」가 발동한다. 운영자 결정 2026-09-30: **규칙대로 — 더 고치지 않고 이 SHA 로 PR·리뷰·머지, 실수집은 차단, 결함은 별 slice.**
+
+정전(2026-09-30 10:30 경, 호스트 전원 차단)으로 검증 레인이 리포트 도중 끊겨 새 세션이 같은 판정 SHA 에서 잔여 항목을 다시 쟀다(리포트 한 파일에 이어 썼다).
+
+| ID | 결정 |
+|---|---|
+| **D-6G-77** | **분리 종결과 실수집 차단(D-6G-65 데이터 정확성 갈래).** 이 slice 는 수집·추출·실험 코드를 판정 SHA 상태로 머지한다. **실 KONEPS 수집은 `OPEN-6G-RUN-STATE-HEAL-ORDER` · `OPEN-6G-LIST-AXIS-WALK-SELECTION` · `OPEN-6G-LEGACY-AXIS-LINE` 을 닫는 slice(6G-2d)가 머지된 뒤에만 시작한다.** `commands.md` 「실 KONEPS 호출」 절과 실수집 runbook 의 첫 줄이 이 조건이다. 실수집 준비(dev DB 재기동·설정·runbook)는 병행할 수 있다 |
+| **D-6G-78** | **OPEN 셋 신설(처방은 6G-2d 계약 초안 `reports/evidence/m6/6g2d/scope.md`, 브랜치 `docs/m6-6g2-contracts`).** `OPEN-6G-RUN-STATE-HEAL-ORDER`(vr r5-t D-6G-70 미이행 · cr r5-t H-1 · M-3 — `RunStateDirectory` 가 `LedgerDigest` 를 `init` 의 `healTornTail()` 보다 먼저 지어 복구 뒤 다음 기동이 영구 거부되고, 출구가 디렉터리 폐기 = 상한 0 재시작; 복구 쓰기도 제자리 truncate+rewrite) · `OPEN-6G-LIST-AXIS-WALK-SELECTION`(vr r5-t H-A · cr r5-t M-1 — AXIS 결말 줄이 없는 목록 축 둘이 가장 먼저 적재된 관측을 쓴다; 개발 DB 의 6F-8·6F-9 공고 목록 행은 6G 칸을 싣지 않아 실수집 표본의 공고일·낙찰방법이 null 로 떨어진다) · `OPEN-6G-LEGACY-AXIS-LINE`(cr r5-t H-2 · vr r5-t L-1(노출 0 — 호스트의 `attempts.jsonl` 은 verifier 자신의 test 산출뿐) · M-2 · L-1·L-2 — `walk` 칸 없는 AXIS 줄이 「빈 응답 = 0 행 · 완료」로 읽히고 `state.json` 에 형식 version 이 없다; 실수집 전이라 오늘은 발화하지 않는다). evidence 대조표: D-6G-70 행 → **「미이행 — OPEN」**, D-6G-68 「원장 이전 원문은 D-6G-58 그대로」 → **「미이행 — OPEN」**(목록 축), 옛 형식 줄은 알려진 제한 + OPEN |
+| **D-6G-79** | **`OPEN-6G-REVIEW-FOLLOWUPS` 에 추가**: cr r5-t M-4(D-6G-73 실패 경로 test 가 그 실행의 stdio 를 읽지 않고 harness 가 `System.out/err` 를 되돌리지 않는다 — 로거 채널은 산다) · L-3(구분자 등식이 문서 ↔ 코드가 아니라 리터럴 ↔ 코드) · L-4(고정 시계 harness 의 걷기 이름 충돌) · L-5(`OBSERVATION_SQL` 전건 순차 훑기) · L-6(`torn` 표식 위치 무제한) · L-7(표식 줄이 매일 오늘치 1 을 뺀다 — 보수 방향) · vr r5-t L-2(남은 `budget-since` 설정이 조용히 무시된다) · L-3 · 초록으로 남은 저위 변이 둘(UTC 하루 경계 변형 — test KDoc 이 잡는다고 적었으나 GREEN · `alreadySpent` 기본값 되살림 GREEN). vr r5-t M-4(D-6G-73 부분 이행 — 게이트 하드닝 분류)도 여기. cr r5-t M-3 은 6G-2d 가 닫는다(D-6G-78) |
+| **D-6G-80** | **걷기 식별자의 정밀도(D-6G-68 문면 편입, Kotlin 레인 보고).** 걷기 식별자 = 관측 시각을 **마이크로초로 절삭**한 값이고 짓는 자리는 `walkNameOf` 하나다. `observed_at` 이 TIMESTAMPTZ(마이크로초)이고 시계는 나노초라 절삭하지 않으면 원장의 식별자가 어느 행과도 같지 않다(실측: 전 행 소실). 대조표 행 「걷기 식별자는 저장이 견디는 정밀도」가 이것이다 |
+| **D-6G-81** | **종결 절차 — 라운드 없음.** 팀장 문서 커밋(이 갱신 · evidence 문면 · `milestone-6.md` 종결 문단) → verifier 종결 확인(rollback 술어 `git diff --name-only 7994719b..<HEAD> -- <복원 경로>` 빈 출력 · 종결 문단 커밋의 hunk 역적용 · evidence 정직성) → push · PR · 라운드별 판정 코멘트 여섯(r1~r4 · r5 · r5-t) · `/code-review` · 지적 처분 코멘트 · 머지. 종결 문단 커밋은 rollback 공유 파일 절에 착수 커밋과 나란히 등재한다(6A-2b PR #48 교훈 — 목록 갱신 커밋은 문단 커밋 뒤에 따로) |
+
+**레인 분담**: 구현 레인 없음(정전으로 소멸, 재기동하지 않는다 — 코드 변경 0). 문서는 팀장, 확인은 verifier.
+
 ## 결정
 
 | ID | 결정 | 근거 |

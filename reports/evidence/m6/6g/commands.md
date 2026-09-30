@@ -52,6 +52,9 @@ main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
 
 ## 실 KONEPS 호출
 
+> **차단(D-6G-77).** 실 KONEPS 수집은 `OPEN-6G-RUN-STATE-HEAL-ORDER` · `OPEN-6G-LIST-AXIS-WALK-SELECTION` ·
+> `OPEN-6G-LEGACY-AXIS-LINE` 을 닫는 slice(6G-2d)가 머지된 뒤에만 시작한다. 그 전의 실 호출은 승인 밖이다.
+
 **없다.** 이 레인은 코드·test·evidence 까지다. 모든 시나리오는 loopback in-process mock server
 (`MockKonepsServer`, 소켓은 127.0.0.1 뿐)에서 돈다. 서비스 키는 합성값이고 운영 키를 쓰지 않았다.
 실수집은 검증 뒤 운영자 키로 팀장이 연다.
@@ -160,18 +163,18 @@ main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
 | D-6G-58 「쪽 중간에 끊긴 축은 미완」 | E2E 둘(5xx · **상한 거부**) | 5xx: 둘째 기동이 다시 걷고 마지막 걷기가 전 참가자. 상한 거부: mock 요청 == 상한(4) · 그 공고의 원문이 1쪽뿐 · 둘째 기동 뒤 마지막 걷기가 전 참가자 |
 | D-6G-58 ⓑ 「축 결말은 raw 적재 **뒤에**」 | `runAxes` 의 순서 | 그 축의 적재만 실패시키면 결말이 남지 않는다(`적재가 실패한 축은 원장에 결말이 남지 않는다`) |
 | D-6G-58 ⓒ 「받은 수 < 원천 총수면 `SHORT_WALK`」 | `attemptOutcomeOf` | 0/250·100/250 은 `Failed(SHORT_WALK)`, 250/250 은 `Succeeded`, 0/0 만 `Empty` |
-| D-6G-58 r4-d → **D-6G-68 로 대체** 「추출은 원장이 가리키는 걷기만」 | `JdbcSnapshotSource.collectWalkRow` · `CollectionAttempt.walk` | 앞 걷기의 쪽은 raw 에 **남고**(append-only) 행 수에서는 빠진다. 「마지막 걷기」를 **행의 시각으로 고르던** 경로는 지웠다(vr r5 H-1) — 어댑터 test 셋(W1 빈 응답 · W2 시계 역행 · W5 창 밖)과 변이 W-lat·W-win 이 잰다 |
+| D-6G-58 r4-d → **D-6G-68 로 대체** 「추출은 원장이 가리키는 걷기만」 | `JdbcSnapshotSource.collectWalkRow` · `CollectionAttempt.walk` | 앞 걷기의 쪽은 raw 에 **남고**(append-only) 행 수에서는 빠진다. 「마지막 걷기」를 **행의 시각으로 고르던** 경로는 지웠다(vr r5 H-1) — 어댑터 test 셋(W1 빈 응답 · W2 시계 역행 · W5 창 밖)과 변이 W-lat·W-win 이 잰다. **결말 줄이 없는 축(`NOTICE_LIST`·`OPENING_RESULT_LIST`)은 미이행 — OPEN**(vr r5-t H-A · cr r5-t M-1): 계약의 「원장 이전 원문은 D-6G-58 그대로(마지막 걷기)」와 달리 선별이 사라져 `firstOrNull()`+`ORDER BY inserted_at` 이 **가장 먼저 적재된 관측**을 쓴다. 개발 DB 의 6F-8·6F-9 공고 목록 행은 6G 칸(`bidNtceDt`·`sucsfbidMthdCd/Nm`)을 싣지 않아 실수집 표본의 공고일·낙찰방법이 null 로 떨어진다(probe W6b: `02142854` 는 `2026-06-03 · 적격심사제`, `ceb9990f` 는 null·null) → `OPEN-6G-LIST-AXIS-WALK-SELECTION`(6G-2d) |
 | D-6G-59 「`partialNotice` 는 관측」 | `haltOf(cause, settledAny)` | 예산·쿼터가 같은 물음을 쓴다 — 갈래마다 다른 답을 쓰면 계수가 사유에 따라 달라진다 |
 | D-6G-60 「무결성 장부 = 디렉터리 파일 전부」 | `RunStateDirectory` 의 `state.json` | 장부 대상 집합 == 디렉터리 목록에서 도출한 집합(등식 test) · `sample-scope.json` 삭제·편집 각각 거부 |
 | D-6G-61 「선기록 · 뒤처진 장부는 재동기」 | `KonepsCallGate.sendAndRecord`·`RunStateDirectory` | 의도 줄이 호출 **전에** 남는다 · 마지막 append 뒤 죽은 흔적은 수락하고 상한이 줄지 않는다 · 앞부분 불일치·줄 감소는 여전히 거부 |
 | D-6G-62 「관문 우회 경로가 구조적으로 없다」 | `collection.http-client.roots=bidvector` 정확 집합 · `collection.transport-bypass.holders=`(빈 집합) | **부분 — OPEN**(vr r5 H-3). 뿌리는 production 전체이고 목록 밖 클래스가 클라이언트를 쥐면 붉어진다. 그러나 술어가 **호출 대상의 소유 타입**만 보므로 `uri.toURL().readText()`(KA1)·`ProcessBuilder("curl")`·비동기 채널·Spring 클라이언트는 보이지 않는다. 출하 코드에 그런 호출은 없다 → `OPEN-6G-TRANSPORT-GATE-HARDENING` |
 | D-6G-64 「원문 키 이름은 한 정의에서」 | `NOTICE_NUMBER_RAW_KEY`·`NOTICE_ROUND_RAW_KEY` | 계약 행과 두 SQL(`OBSERVATION_SQL`·`COLLECTED_SQL`)이 같은 값을 읽는다 — **구조**가 두 벌을 없앤다(대조 test 가 아니라) |
 | D-6G-66 「표본 업무 범위는 manifest 칸에서」 | `sample_scope_divisions`(확정 범위 파일 출처) | 한 업무가 행에서 통째로 빠져도 이 칸은 줄지 않는다 — 문턱이 결측을 따라 내려가지 않는다 |
-| **D-6G-68** 「원장의 AXIS 줄이 걷기를 가리킨다」 | `CollectionAttempt.walk` · `AxisConclusion` · `JdbcSnapshotSource.collectWalkRow` | 빈 응답 → 0 행 · 실패·미완 → `incomplete_axis` · 행의 시각으로 고르는 경로 **없음**. 어댑터 test 셋(W1·W2·W5), 변이 W-lat·W-win |
+| **D-6G-68** 「원장의 AXIS 줄이 걷기를 가리킨다」 | `CollectionAttempt.walk` · `AxisConclusion` · `JdbcSnapshotSource.collectWalkRow` | 빈 응답 → 0 행 · 실패·미완 → `incomplete_axis` · 행의 시각으로 고르는 경로 **없음**. 어댑터 test 셋(W1·W2·W5), 변이 W-lat·W-win. **알려진 제한 — 옛 형식 AXIS 줄**(cr r5-t H-2 · vr r5-t W7): `walk` 칸이 생기기 전에 쓰인 `SUCCEEDED` 줄은 「빈 응답 = 0 행 · 축 완료」로 읽히고 `state.json` 에 형식 version 이 없다. 실수집 전이라 그런 디렉터리는 없다 — 그 전제를 코드가 지키게 하는 것이 `OPEN-6G-LEGACY-AXIS-LINE`(6G-2d) |
 | **D-6G-68** 「추출에 관측 창을 걸지 않는다」 | `OBSERVATION_SQL`(창 조건 제거) | 창은 원장에 걸리지 않아 창 밖 재걷기가 보이지 않았다. 범위는 표본 목록과 원장이 정한다 — `from..to` 는 manifest 기간의 되돌아갈 자리로만 남았다 |
 | **D-6G-68** 「걷기 식별자는 저장이 견디는 정밀도」 | `KonepsWalkContext.observedAt`(마이크로초 절삭) | `observed_at` 은 TIMESTAMPTZ(마이크로초)이고 시계는 나노초다 — 자르지 않으면 원장의 식별자가 어느 행과도 같지 않다(실측: 전 행 소실) |
 | **D-6G-69** 「상한의 범위는 실행 상태 디렉터리」 | `AttemptHistory.spend(dayStart)` — 시작 시점 인자 **없음** | 값을 1 초 뒤로 옮겨 총계·오늘치를 되감는 길이 사라졌다. 변이 P4 |
-| **D-6G-70** 「찢어진 끝 줄은 복구하고 호출 하나로」 | `RunStateDirectory.healTornTail` · `torn` 표식 줄 · `AttemptHistory.tornLines` | 기동 수락 · 상한 불변(오늘치에도 넣는다) · 축을 지어내지 않는다. 변이 C2 |
+| **D-6G-70** 「찢어진 끝 줄은 복구하고 호출 하나로」 | `RunStateDirectory.healTornTail` · `torn` 표식 줄 · `AttemptHistory.tornLines` | **미이행 — OPEN**(vr r5-t probe C2 기동 2·3 REJECT · cr r5-t H-1). 복구한 기동은 수락되고 상한도 줄지 않지만, `LedgerDigest` 가 `init` 의 `healTornTail()` 보다 **먼저** 서서 복구 **전** 바이트의 해시가 `state.json` 에 굳는다 — 다음 기동부터 「앞부분이 장부와 다르다」로 영구 거부되고 출구는 디렉터리 폐기(= 상한 0 재시작)다. 레인 test 와 변이 C2 는 기동을 한 번만 열어 못 봤다. 축을 지어내지 않는 것은 그대로다 → `OPEN-6G-RUN-STATE-HEAL-ORDER`(6G-2d) |
 | **D-6G-71** 「추출은 잠금 안에서만」 | `SnapshotExtractionRunner.run` 의 `underRunStateLock` | 잠금을 밖에서 들고 추출 → `ALREADY_RUNNING` · 바이트 0. 변이 L1 |
 | **D-6G-72** 「공고 목록 갈래의 상한 seed」 | 공고 목록 E2E(KST 00:30 · 오늘치 소진) · `alreadySpent` 기본값 **제거** | mock 요청 0. 변이 KN1n |
 | **D-6G-73** 「키 누출 검사를 두 갈래 같게」 | `capturedEverything()`(로거 + cause 체인 + 표준 출력·오류) · 실행 상태 파일 훑기 · 실패 경로 test | 원문과 URL 인코딩 형태 둘 다. 스냅숏에 대표자명 부재 한 줄 |
@@ -334,7 +337,19 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 |---|---|---|
 | `OPEN-6G-SENSITIVITY-HARDENING` | 민감도 test 가 비교에 `policy_checksum`·`policy_version` 을 넣어 **무엇을 흔들어도 바뀐다**. 그 둘을 빼면 39 중 20 이 판정문을 못 움직인다(경계 위의 판이 필요하다) | 출하 코드는 오늘 정책 값을 읽는다 — 판정이 틀려지려면 저자가 상수를 넣어야 한다 |
 | `OPEN-6G-TRANSPORT-GATE-HARDENING` | 술어가 호출 대상의 **소유 타입**만 본다 — `uri.toURL().readText()`·`ProcessBuilder("curl")`·비동기 채널·Spring 클라이언트가 대상 밖 | 출하 코드에 관문 밖 호출이 없다. 닫으려면 인자·반환 타입까지 모으고 금지 집합을 패키지 뿌리로 바꿔야 한다(술어 교체) |
-| `OPEN-6G-REVIEW-FOLLOWUPS` | cr r5 M-3(두 프로세스 실측)·`IOException` 구별 · vr r5 L-7·L-8·L-9 · cr r5 나머지 LOW · privacy r2 INFO | 실수집 값에 닿지 않는다 |
+| `OPEN-6G-REVIEW-FOLLOWUPS` | cr r5 M-3(두 프로세스 실측)·`IOException` 구별 · vr r5 L-7·L-8·L-9 · cr r5 나머지 LOW · privacy r2 INFO · **r5-t 추가(D-6G-79)**: cr r5-t M-4(실패 경로 test 가 그 실행의 stdio 를 읽지 않고 harness 가 `System.out/err` 를 되돌리지 않는다 — 로거 채널은 산다) · L-3(구분자 등식이 리터럴 ↔ 코드) · L-4(고정 시계 harness 걷기 이름 충돌) · L-5(`OBSERVATION_SQL` 전건 순차 훑기) · L-6(`torn` 표식 위치 무제한) · L-7(표식 줄이 매일 오늘치 1 을 뺀다) · vr r5-t L-2(남은 `budget-since` 설정이 조용히 무시된다) · L-3 | 실수집 값에 닿지 않는다 |
+
+## 데이터 정확성 분리 종결 — D-6G-76 발동 (D-6G-77 · D-6G-78)
+
+표적 수정(D-6G-68~74)의 재검증(판정 SHA `ceb9990f`)에서 r5 H-1 은 재현되지 않았으나 수정이 **새 high 셋**을 만들었다. 셋 다 D-6G-65
+의 **데이터 정확성**(상한 회계 · 스냅숏 값 · 결측 사유)이라 계약대로 더 고치지 않고 **실수집을 차단**한 채 머지한다 — 운영자 결정 2026-09-30.
+출하 코드의 결함이므로 「부분」이 아니라 **「미이행 — OPEN」** 이다. 처방은 6G-2d 계약 초안(`reports/evidence/m6/6g2d/scope.md`).
+
+| OPEN | 무엇이 틀리나 | 왜 지금 고치지 않나 |
+|---|---|---|
+| `OPEN-6G-RUN-STATE-HEAL-ORDER` | 찢어진 끝 줄을 고친 기동의 **다음** 기동이 영구 거부된다(누적 해시가 복구 전 바이트로 선다). 출구가 디렉터리 폐기라 승인 상한이 0 에서 다시 센다. 복구 쓰기도 제자리 truncate+rewrite 라 복구 도중 크래시가 원장을 줄인다 | D-6G-76 「라운드는 더 없다」. 실수집 전에는 실행 상태 디렉터리가 없어 발화할 대상이 없다 |
+| `OPEN-6G-LIST-AXIS-WALK-SELECTION` | AXIS 결말 줄이 없는 목록 축 둘이 **가장 먼저 적재된 관측**을 쓴다. 개발 DB 의 옛 공고 목록 행에서 공고일·낙찰방법이 null → Python 이 공고일 결측으로 통째로 뺀다(날짜로 몰린 비랜덤 제외, 사유도 틀림) | 같다. 실수집 추출이 이 코드로 돌면 표본이 틀리므로 **실수집이 차단**된다 |
+| `OPEN-6G-LEGACY-AXIS-LINE` | `walk` 칸 없는 옛 AXIS 줄이 「빈 응답 = 0 행 · 완료」로 읽힌다. `state.json` 에 형식 version 이 없다. 「정착했으나 0 행」과 「걷기 모름」이 같은 값이라 결측 사유가 `sampled_without_detail` 로 간다 | 옛 디렉터리가 없다 — 그 전제를 코드가 지키게 하는 것(fail-closed)이 처방이다 |
 
 ## 이탈 (이 레인 — 계약 항목을 이행하지 않은 자리와 사유)
 
