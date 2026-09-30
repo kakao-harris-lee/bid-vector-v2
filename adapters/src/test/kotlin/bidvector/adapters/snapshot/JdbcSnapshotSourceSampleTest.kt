@@ -330,6 +330,94 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         row.notice.successfulBidMethodCode shouldBe "낙030001"
     }
 
+    /**
+     * **D-6G2d-3 (vr r5-t probe W6) — 결말 줄이 없는 축은 가장 늦은 걷기의 행만 쓴다.** AXIS 결말
+     * 줄을 쓰는 자리는 상세 축 넷뿐이라 목록 축 둘은 **언제나** 결말이 없다. 앞 판은 그 축의 행을
+     * 아무 선별 없이 모으고 조립이 적재 순서의 첫 행을 취해 **가장 오래된 관측**을 썼다 — 발주처가
+     * 정정해 다시 걸어도 낡은 값이 실린다. 계수로는 드러나지 않는다(어느 쪽이든 사유가 같다).
+     */
+    @Test
+    fun `결말 줄이 없는 목록 축은 가장 늦은 관측을 쓴다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        appendRawObservation(openingListObservation(number, participants = "2", at = OBSERVED_AT))
+        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        appendRawObservation(openingListObservation(number, participants = "5", at = again))
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.outcome.participantCount shouldBe 5
+    }
+
+    /**
+     * **D-6G2d-3 (vr r5-t probe W6b) — 실수집에서 발화하는 모양.** 개발 DB 에는 6F-8·6F-9 수집이
+     * 남긴 공고 목록 원문이 있고 그 행들은 6G 가 계약에 더한 공고일·낙찰방법 칸을 **싣지 않는다**
+     * (`payload_fields` 는 적재 당시 등재 칸의 투영이다). 가장 오래된 관측을 쓰면 그 기간 표본의
+     * 공고일이 null 이 되고 Python 이 공고일 결측으로 **통째로** 뺀다 — 날짜로 몰린 비랜덤 제외다.
+     */
+    @Test
+    fun `6G 칸이 없는 옛 목록 관측 뒤의 새 관측이 공고일과 낙찰방법을 채운다`() {
+        val number = "20260617001-00"
+        // 6F-8 판 — 식별자 둘뿐이다.
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        // 6G 판 — 같은 공고를 다시 걸어 새 칸이 실렸다.
+        appendRawObservation(
+            RawNoticeObservation.of(
+                mapOf(
+                    RawKey("bidNtceNo") to number,
+                    RawKey("bidNtceOrd") to "000",
+                    RawKey("bidNtceDt") to "2026-06-03 09:00:00",
+                    RawKey("sucsfbidMthdCd") to "낙030001",
+                ),
+                SourceEndpoint.NOTICE_LIST,
+                OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS),
+            ),
+        )
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.notice.noticedOn shouldBe LocalDate.of(2026, 6, 3)
+        row.notice.successfulBidMethodCode shouldBe "낙030001"
+    }
+
+    /**
+     * **D-6G2d-3 — 걷기의 순서는 적재 순서가 아니라 관측 시각이다.** 재걷기는 보통 뒤에 적재되므로
+     * 두 기준이 같은 답처럼 보인다. backfill(이른 관측을 뒤늦게 적재)은 두 기준을 갈라놓는다 —
+     * `inserted_at` 으로 고르면 나중에 들어온 **이른** 관측이 이긴다.
+     */
+    @Test
+    fun `걷기 선별의 기준은 적재 시각이 아니다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        appendRawObservation(openingListObservation(number, participants = "5", at = again))
+        // 이른 관측이 **뒤에** 적재된다.
+        appendRawObservation(openingListObservation(number, participants = "2", at = OBSERVED_AT))
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.outcome.participantCount shouldBe 5
+    }
+
+    /** 개찰결과 목록 관측 — 참가자 수가 이 축에서만 온다(결말 줄이 없는 축이다). */
+    private fun openingListObservation(
+        number: String,
+        participants: String,
+        at: Instant,
+    ): RawNoticeObservation =
+        RawNoticeObservation.of(
+            mapOf(
+                RawKey("bidNtceNo") to number,
+                RawKey("bidNtceOrd") to "000",
+                RawKey("prtcptCnum") to participants,
+            ),
+            SourceEndpoint.OPENING_RESULT_LIST,
+            at,
+        )
+
     /** canonical 공고를 **출하 경로**(repository)로 세운다 — test 전용 SQL 사본을 두지 않는다. */
     private fun listObservation(number: String): RawNoticeObservation =
         RawNoticeObservation.of(

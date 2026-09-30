@@ -63,7 +63,7 @@ class JdbcSnapshotSource(
                 when {
                     canonical == null -> withoutNotice++
                     !complete(hash, canonical.division, axisConclusions) -> incomplete++
-                    else -> rows += assembleSnapshotRow(key, axes, canonical)
+                    else -> rows += assembleSnapshotRow(key, axes.mapValues { it.value.rows }, canonical)
                 }
             }
         }
@@ -114,7 +114,7 @@ class JdbcSnapshotSource(
         sample: SampleList,
         axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): ObservedRows {
-        val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>()
+        val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>()
         val outside = mutableSetOf<NoticeKey>()
         while (rows.next()) {
             // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
@@ -131,19 +131,18 @@ class JdbcSnapshotSource(
     }
 
     /**
-     * **(공고, 축)마다 원장이 가리키는 걷기의 행만 쓴다**(D-6G-68). 원문은 append-only 라(DB 트리거)
+     * **(공고, 축)마다 한 걷기의 행만 쓴다**(D-6G-68 · D-6G2d-3). 원문은 append-only 라(DB 트리거)
      * 잘린 걷기의 쪽이 그대로 남고, 다시 걸어 받은 전 쪽과 **합쳐지면** 그 공고의 참가자 수와 1위
      * 투찰가가 조용히 틀린다 — 행이 늘 뿐 오류가 없어 아무 데서도 붉어지지 않는다.
      *
-     * 앞 판은 걷기를 **행의 시각**으로 골랐다(가장 늦은 `observed_at`). 그것은 세 자리에서 틀린다:
-     * 빈 응답 재걷기는 행이 없어 보이지 않고, 추출 창 밖 재걷기도 보이지 않으며, 시계가 뒤로 가면
-     * 순서가 뒤집힌다. 지금은 원장의 마지막 AXIS 줄이 걷기를 **가리킨다** — 짐작할 자리가 없다.
-     *
-     * 결말이 없는 축(원장 이전 원문)은 행을 모아만 둔다. 그 축은 완료로 서지 못해(D-6G-58) 그
-     * 공고가 `incomplete_axis` 로 빠지므로 어느 행도 조립에 닿지 않는다.
+     * 어느 걷기인가를 정하는 것은 **둘**이다. 원장에 AXIS 결말 줄이 있으면 그 줄이 가리킨다 —
+     * 짐작할 자리가 없다(앞 판은 행의 시각으로 골라, 빈 응답 재걷기·창 밖 재걷기·시계 역행 셋에서
+     * 앞의 잘린 걷기를 마지막으로 봤다). 결말 줄이 **없는** 축(목록 축 둘)에는 원장이 줄 답이 없어
+     * **가장 늦은 `observed_at`** 만 남긴다(D-6G-58 r4-d 복원). 적재 순서로 고르면 backfill 이
+     * 뒤집고, 선별을 아예 안 하면 여러 걷기가 합쳐져 **가장 오래된 관측**이 실린다(vr r5-t W6).
      */
     private fun collectWalkRow(
-        byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>,
+        byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>,
         key: NoticeKey,
         endpoint: SourceEndpoint,
         rows: ResultSet,
@@ -153,8 +152,11 @@ class JdbcSnapshotSource(
         if (conclusion != null && conclusion.walk == null) return
         val observedAt = rows.getTimestamp("observed_at").toInstant()
         if (conclusion != null && observedAt != conclusion.walk) return
-        byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { mutableListOf() } +=
-            RawRow(parseFields(rows.getString("payload_fields")), policy)
+        val kept = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { WalkRows(observedAt) }
+        // 결말 줄이 있는 축은 위에서 그 걷기의 행만 통과했으므로 여기서 걷기가 갈리지 않는다.
+        if (observedAt < kept.walk) return
+        if (observedAt > kept.walk) kept.replaceWalk(observedAt)
+        kept.rows += RawRow(parseFields(rows.getString("payload_fields")), policy)
     }
 
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
@@ -198,11 +200,30 @@ class JdbcSnapshotSource(
 /** 제로패딩 세 자리가 아니면 **기본값을 쓰지 않는다** — 차수를 모르는 행은 키를 갖지 못한다. */
 private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { NoticeRound.of(it) }.getOrNull() }
 
-/** 창 안의 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다. */
+/** 이 추출이 본 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다(관측 창은 없다, D-6G-68). */
 private class ObservedRows(
-    val byKey: Map<NoticeKey, Map<SourceEndpoint, List<RawRow>>>,
+    val byKey: Map<NoticeKey, Map<SourceEndpoint, WalkRows>>,
     val outsideSample: Set<NoticeKey>,
 )
+
+/**
+ * 한 (공고, 축)에서 **쓰기로 정한 걷기**와 그 걷기의 행(D-6G2d-3). 걷기를 값으로 들고 있어야
+ * 결말 줄이 없는 축에서 「더 늦은 걷기가 오면 앞 걷기를 버린다」가 표현된다 — 행만 모으면 여러
+ * 걷기가 합쳐지고, 그 합쳐짐은 계수에 드러나지 않는다.
+ */
+private class WalkRows(
+    private var walkValue: Instant,
+) {
+    val rows: MutableList<RawRow> = mutableListOf()
+
+    val walk: Instant get() = walkValue
+
+    /** 더 늦은 걷기가 왔다 — 앞 걷기의 행은 **버린다**(합치지 않는다). */
+    fun replaceWalk(later: Instant) {
+        walkValue = later
+        rows.clear()
+    }
+}
 
 private const val OBSERVATION_FETCH_SIZE = 500
 
