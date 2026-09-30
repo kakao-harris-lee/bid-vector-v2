@@ -74,6 +74,34 @@ class FileAttemptLedgerTest {
     }
 
     /**
+     * **D-6G2d-16 — 결말 어휘 넷이 왕복한다.** 관문 거부가 어휘로 갈라졌으므로 원장이 그 답을 나른다.
+     * 코드 문자열로 되읽어 분류하지 않기 때문에, 판독이 이 라벨을 모르면 상한 셈이 조용히 갈린다.
+     */
+    @Test
+    fun `결말 어휘 넷이 왕복한다 — 관문 거부 포함`() {
+        val ledger = ledger()
+        val written =
+            listOf(
+                attemptOf(AttemptOutcome.Succeeded, kind = AttemptKind.AXIS),
+                attemptOf(AttemptOutcome.Empty, kind = AttemptKind.AXIS),
+                attemptOf(AttemptOutcome.Failed("STRUCTURE_FAILURE"), kind = AttemptKind.AXIS),
+                attemptOf(AttemptOutcome.FinalFailure("MAX_PAGES"), kind = AttemptKind.AXIS),
+                attemptOf(AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY"), kind = AttemptKind.AXIS),
+            )
+
+        written.forEach(ledger::append)
+
+        // 같은 축의 줄이라 마지막이 이긴다 — 왕복을 재는 것은 줄 수와 그 마지막 값이다.
+        ledger.read().size shouldBe written.size
+        ledger
+            .read()
+            .axisConclusions()
+            .getValue(LEDGER_KEY.value)
+            .getValue(SourceEndpoint.RESERVE_PRICE_DETAIL)
+            .outcome shouldBe AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY")
+    }
+
+    /**
      * 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. 관용은
      * **끝 줄 하나**뿐이다(D-6G-70) — 그 앞의 줄이 형태를 어기면 여전히 멈춘다.
      */

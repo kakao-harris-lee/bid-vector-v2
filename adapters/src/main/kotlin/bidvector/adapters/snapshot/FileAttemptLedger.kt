@@ -129,6 +129,7 @@ private fun labelOf(outcome: AttemptOutcome): String =
         AttemptOutcome.Empty -> "EMPTY"
         is AttemptOutcome.Failed -> "$RETRYABLE_PREFIX${outcome.code}"
         is AttemptOutcome.FinalFailure -> "$FINAL_PREFIX${outcome.code}"
+        is AttemptOutcome.Refused -> "$REFUSED_PREFIX${outcome.code}"
     }
 
 private fun outcomeOf(label: String): AttemptOutcome =
@@ -137,9 +138,13 @@ private fun outcomeOf(label: String): AttemptOutcome =
         label == "EMPTY" -> AttemptOutcome.Empty
         label.startsWith(RETRYABLE_PREFIX) -> AttemptOutcome.Failed(label.removePrefix(RETRYABLE_PREFIX))
         label.startsWith(FINAL_PREFIX) -> AttemptOutcome.FinalFailure(label.removePrefix(FINAL_PREFIX))
+        label.startsWith(REFUSED_PREFIX) -> AttemptOutcome.Refused(label.removePrefix(REFUSED_PREFIX))
         else -> throw IllegalArgumentException("시도 원장의 결말 어휘가 아니다")
     }
 
 private const val RETRYABLE_PREFIX = "FAILED:"
 
 private const val FINAL_PREFIX = "FINAL:"
+
+/** 관문 거부 — 호출이 나가지 않았다(D-6G2d-16). 상한 셈 밖이라는 것을 줄이 스스로 말한다. */
+private const val REFUSED_PREFIX = "REFUSED:"

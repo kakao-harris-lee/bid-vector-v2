@@ -9,6 +9,7 @@ import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -304,6 +305,30 @@ class CollectOpeningResultsUseCaseTest {
         fixture.run()
 
         fixture.service.reservePriceCalls.shouldBeEmpty()
+    }
+
+    /**
+     * **D-6G2d-16 (cr r1 H-1) — 관문 거부는 재호출 상한에 세지 않는다.** 승인 상한·쿼터·자체 속도
+     * 보호는 HTTP 가 나가기 **전에** 접힌다 — 그 공고·축에 대한 관측이 아니다. 앞 판은 그것을 일시
+     * 실패로 적었고 상한이 함께 세어, 상한이 소진된 뒤 실행 몇 번으로 **호출이 한 번도 나가지 않은
+     * 축이 영구 확정**됐다(나중에 승인 범위를 늘려도 되살아나지 않는다).
+     *
+     * 기준은 **대역 포트가 받은 요청 수**다: 예산이 막은 기동 셋 뒤, 예산이 있는 넷째 기동에서 그
+     * 축이 **불린다**. 세 번의 기동은 각각 한 번씩 부르므로(거부는 호출 뒤가 아니라 관문에서 나므로
+     * 대역은 그 호출을 받는다) 넷째가 부르면 넷이 된다.
+     */
+    @Test
+    fun `관문 거부가 상한만큼 쌓여도 예산이 돌아오면 그 축을 다시 부른다`() {
+        val fixture = OpeningFixture(sampleSize = 1)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.DAILY)
+        repeat(POLICY_RETRY_LIMIT) { fixture.run() }
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT
+
+        fixture.service.detailTruncation = null
+        fixture.run()
+
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT + 1
     }
 
     /**

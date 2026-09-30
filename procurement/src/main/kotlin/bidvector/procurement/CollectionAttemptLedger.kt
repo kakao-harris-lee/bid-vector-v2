@@ -117,15 +117,29 @@ sealed interface AttemptOutcome {
     }
 
     /**
-     * **다시 불러도 답이 달라지지 않는** 실패(D-6G2d-8 ⓒ) — 입력 오류·비재시도 결과코드·봉투 구조
-     * 붕괴·최대 페이지 백스톱. 정착으로 센다: 매 실행 다시 걸면 승인 호출을 그만큼 태우고도 같은
-     * 답을 받는다(그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다). 정착이지만 **행을 쓸 수는
-     * 없다** — 추출은 그 공고를 `incomplete_axis` 로 정직하게 뺀다.
+     * **다시 불러도 답이 달라지지 않는** 실패(D-6G2d-8 ⓒ · 17) — 입력 오류·비재시도 결과코드·최대
+     * 페이지 백스톱 셋. 정착으로 센다: 매 실행 다시 걸면 승인 호출을 그만큼 태우고도 같은 답을
+     * 받는다(그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다). 정착이지만 **행을 쓸 수는 없다** —
+     * 추출은 그 공고를 `incomplete_axis` 로 정직하게 뺀다.
      */
     data class FinalFailure(
         val code: String,
     ) : AttemptOutcome {
         override val isSettled: Boolean = true
+    }
+
+    /**
+     * **호출이 나가지 않았다**(D-6G2d-16) — 우리 속도 보호·우리 승인 상한·원천의 쿼터 거절이 전송
+     * 앞에서 접은 것이다. 그 공고·축에 대한 **관측이 아니므로** 재호출 상한이 세지 않는다: 세면
+     * 상한이 소진된 뒤 실행 몇 번으로 **호출 0 번인 축이 영구 확정**되고, 나중에 승인 범위를 늘려도
+     * 되살아나지 않는다(cr r1 H-1 실측: 대역 포트가 `[1,1,1,0,0,0]`). 정착이 아니므로 다시 부른다.
+     *
+     * 코드 문자열로 되읽어 분류하지 않는다 — 어휘가 늘 때 표가 둘로 갈린다. 원장 줄이 답을 나른다.
+     */
+    data class Refused(
+        val code: String,
+    ) : AttemptOutcome {
+        override val isSettled: Boolean = false
     }
 }
 
@@ -238,6 +252,8 @@ class AttemptHistory(
     ): Boolean {
         val conclusions = byAxis.filter { it.kind == AttemptKind.AXIS }
         val last = conclusions.lastOrNull() ?: return false
+        // **일시 실패만** 센다(D-6G2d-16) — 관문 거부는 호출이 나가지 않은 것이라 그 축에 대한 관측이
+        // 아니고, 확정 실패는 이미 `isSettled` 가 답한다.
         return last.outcome.isSettled || conclusions.count { it.outcome is AttemptOutcome.Failed } >= axisRetryLimit
     }
 
@@ -315,30 +331,25 @@ private const val SHORT_WALK_CODE = "SHORT_WALK"
  * 절단 사유마다 **다시 불러 볼 값이 있는가**(D-6G2d-8 ⓒ) — 소진 `when` 이라 새 사유가 생기면 컴파일이
  * 이 자리를 가리킨다. [truncationCodeOf] 와 같은 형태·같은 이유다(어휘를 리플렉션으로 짓지 않는다).
  *
- * 갈림의 기준은 「**처음부터 다시 걸으면** 답이 달라질 수 있는가」다. 이어 돌기는 cursor 를 쓰지 않고
- * 그 축을 1쪽부터 다시 걷는다(`fetchDetails`) — 그래서 이 물음은 어댑터의 `isResumable`(재개 지점에서
- * 이어 갈 수 있는가)과 **다른 물음**이고, 두 답이 갈리는 사유가 실제로 있다: 백스톱(`MaxPages`·
- * `RepeatedPage`)은 cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또 멈춘다.
+ * 갈래는 **셋**이다.
  *
- * 시간이 풀어 주는 것은 일시다: 5xx·타임아웃·전송 실패·쿼터·예산·자체 속도 제한. **구조 붕괴도 일시**
- * 다 — 그것은 서버가 그 순간 보낸 응답이 무너졌다는 관측이고(어댑터 `isResumable` 이 같은 판단을 문면
- * 으로 적는다), 이 저장소에서 HTTP 5xx 는 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측: 개찰 예산 E2E
- * 의 5xx 절단이 `STRUCTURE_FAILURE` 다). 확정으로 두면 일시적 5xx 한 번이 그 축을 영구히 버려, 느린
- * 시간대에 몰린 공고만 빠지는 **비랜덤 결측**이 된다 — 이 slice 가 막으려는 것보다 나쁘다.
+ * ① **관문 거부**([AttemptOutcome.Refused], D-6G2d-16) — 우리 속도 보호·우리 승인 상한·원천의 쿼터
+ * 거절. 전송 앞에서 접히므로 그 공고·축에 대한 관측이 아니고, 재호출 상한이 세지 않는다.
  *
- * 확정은 입력·구성이 틀렸거나 백스톱에 걸린 것이다: 입력 오류·비재시도 코드·미지 코드·백스톱 둘.
- * 미지 코드(`Unclassified`)가 확정 쪽인 것은 어댑터의 같은 판단과 같다.
+ * ② **확정 실패**([AttemptOutcome.FinalFailure]) — 입력·구성이 틀렸거나 백스톱에 걸린 것. 이어 돌기는 cursor 를 쓰지 않고 그 축을 1쪽부터 다시 걷으므로(`fetchDetails`), 이
+ * 물음은 어댑터의 `isResumable`(재개 지점에서 이어 갈 수 있는가)과 **다른 물음**이다 — 백스톱은
+ * cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또 멈춘다.
+ *
+ * ③ **일시 실패**([AttemptOutcome.Failed]) — 그 밖. 5xx·타임아웃·전송 실패와 **구조 붕괴**가 여기다.
+ * 구조 붕괴가 일시인 근거: 서버가 그 순간 보낸 응답이 무너졌다는 관측이고(어댑터 `isResumable` 이 같은
+ * 판단을 문면으로 적는다), 이 저장소에서 HTTP 5xx 는 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측).
  */
 private fun failureOf(cause: TruncationCause): AttemptOutcome =
     when (cause) {
-        TruncationCause.QuotaExhausted,
-        TruncationCause.Timeout,
-        TruncationCause.TransportFailure,
-        TruncationCause.ServerError,
         TruncationCause.SelfThrottled,
-        TruncationCause.StructureFailure,
+        TruncationCause.QuotaExhausted,
         is TruncationCause.BudgetExhausted,
-        -> AttemptOutcome.Failed(truncationCodeOf(cause))
+        -> AttemptOutcome.Refused(truncationCodeOf(cause))
 
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
@@ -346,4 +357,10 @@ private fun failureOf(cause: TruncationCause): AttemptOutcome =
         TruncationCause.InputError,
         TruncationCause.Unclassified,
         -> AttemptOutcome.FinalFailure(truncationCodeOf(cause))
+
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.StructureFailure,
+        -> AttemptOutcome.Failed(truncationCodeOf(cause))
     }

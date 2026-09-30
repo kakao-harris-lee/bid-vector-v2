@@ -224,12 +224,36 @@ class CollectionAttemptLedgerTest {
             AttemptOutcome.Failed("STRUCTURE_FAILURE")
         attemptOutcomeOf(truncated(TruncationCause.ServerError)) shouldBe AttemptOutcome.Failed("SERVER_ERROR")
         attemptOutcomeOf(truncated(TruncationCause.Timeout)) shouldBe AttemptOutcome.Failed("TIMEOUT")
-        attemptOutcomeOf(truncated(TruncationCause.QuotaExhausted)) shouldBe AttemptOutcome.Failed("QUOTA_EXHAUSTED")
         attemptOutcomeOf(truncated(TruncationCause.MaxPages)) shouldBe AttemptOutcome.FinalFailure("MAX_PAGES")
         attemptOutcomeOf(truncated(TruncationCause.RepeatedPage)) shouldBe AttemptOutcome.FinalFailure("REPEATED_PAGE")
         attemptOutcomeOf(truncated(TruncationCause.InputError)) shouldBe AttemptOutcome.FinalFailure("INPUT_ERROR")
         attemptOutcomeOf(truncated(TruncationCause.NotRetryable)) shouldBe AttemptOutcome.FinalFailure("NOT_RETRYABLE")
         attemptOutcomeOf(truncated(TruncationCause.Unclassified)) shouldBe AttemptOutcome.FinalFailure("UNCLASSIFIED")
+    }
+
+    /**
+     * **D-6G2d-16 — 관문 거부는 실패가 아니다.** 우리 속도 보호·우리 승인 상한·원천의 쿼터 거절은
+     * 전송 앞에서 접히므로 그 공고·축에 대한 **관측이 아니다**. 어휘로 갈라 두면 재호출 상한이 그것을
+     * 세는 길이 구조적으로 닫힌다(코드 문자열로 되읽어 분류하지 않는다).
+     */
+    @Test
+    fun `관문 거부는 넷째 어휘로 나가고 정착이 아니다`() {
+        attemptOutcomeOf(truncated(TruncationCause.SelfThrottled)) shouldBe AttemptOutcome.Refused("SELF_THROTTLED")
+        attemptOutcomeOf(truncated(TruncationCause.QuotaExhausted)) shouldBe AttemptOutcome.Refused("QUOTA_EXHAUSTED")
+        attemptOutcomeOf(truncated(TruncationCause.BudgetExhausted(BudgetLimit.DAILY))) shouldBe
+            AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY")
+        AttemptOutcome.Refused("QUOTA_EXHAUSTED").isSettled shouldBe false
+    }
+
+    /** 거부가 상한만큼 쌓여도 그 축은 미정착이다 — 세는 것은 실제로 나간 호출의 일시 실패뿐이다. */
+    @Test
+    fun `관문 거부는 재호출 상한에 세지 않는다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val refused = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY"))
+
+        AttemptHistory(List(RETRY_LIMIT + 1) { refused }).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(axis to false)
     }
 
     /** 확정 실패는 다시 부르지 않고, 일시 실패는 상한까지 다시 부른다 — 결말 하나가 그 답을 정한다. */

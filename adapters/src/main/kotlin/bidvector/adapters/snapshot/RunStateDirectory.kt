@@ -33,8 +33,13 @@ internal const val STATE_NAME = "state.json"
  * 실수집이 한 번도 돌지 않은 지금이 형식을 닫는 유일하게 싼 때다. 이 값이 없던 동안 옛 디렉터리가
  * 그대로 기동했고, 옛 코드가 쓴 걷기 없는 AXIS 줄이 「빈 응답 = 0 행」으로 읽혀 축이 통째로 빠진
  * **완료 행**이 나왔다(vr r5-t probe W7). 관용할 이유가 없다 — 옛 형식은 읽지 않는다.
+ *
+ * **2 로 올렸다**(D-6G2d-16). AXIS 줄의 결말 어휘에 관문 거부가 생겼다 — version 1 의 원장에서 상한
+ * 거부는 일시 실패(`FAILED:`) 로 적혀 있고, 이 코드가 그 줄을 읽으면 **재호출 상한에 세어** 호출 0 번인
+ * 축을 확정시킨다(고치려던 결함 그대로다). 어휘가 바뀌면 version 이 오른다. 올리는 비용은 지금 0 이다:
+ * version 1 로 쓰인 디렉터리는 test 임시 디렉터리 밖에 존재하지 않는다(실수집 전).
  */
-internal const val RUN_STATE_FORMAT_VERSION = 1
+internal const val RUN_STATE_FORMAT_VERSION = 2
 
 /** 형식 거부의 **닫힌 사유** — 잠금 경합(`ALREADY_RUNNING`)과도, 장부 불일치와도 다른 값이다. */
 internal enum class RunStateFormatFault {
