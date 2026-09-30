@@ -2,12 +2,14 @@ package bidvector.adapters.snapshot
 
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.nio.channels.WritableByteChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 실행 상태 파일의 **내구 원시연산** — 순서가 곧 보장이라 한 자리에 모은다(D-6G2d-41).
@@ -48,12 +50,24 @@ private class FileChannelAppend(
         FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
 
     override fun append(text: String) {
-        channel.write(ByteBuffer.wrap(text.toByteArray(StandardCharsets.UTF_8)))
+        writeFully(channel, ByteBuffer.wrap(text.toByteArray(StandardCharsets.UTF_8)))
     }
 
     override fun force() = channel.force(true)
 
     override fun close() = channel.close()
+}
+
+/**
+ * 버퍼를 **끝까지** 쓴다(D-6G2d-48 ⑤) — `write` 한 번이 전부를 쓴다는 보장은 없다. 짧은 쓰기를 무시하면
+ * 원장에 **반쪽 줄**이 남고, 그 줄은 다음 기동의 복구가 「찢어진 끝 줄」로 감싸 호출 하나로 세지만 그 전에
+ * 이어 붙은 다음 append 가 두 시도를 한 줄로 만든다.
+ */
+internal fun writeFully(
+    channel: WritableByteChannel,
+    bytes: ByteBuffer,
+) {
+    while (bytes.hasRemaining()) channel.write(bytes)
 }
 
 /** 이미 쓴 파일의 바이트를 굳힌다 — 장부가 그 파일을 가리키기 **전에** 부른다. */
@@ -75,8 +89,34 @@ internal fun replaceDurably(
     target: Path,
     text: String,
     directory: Path,
+    directorySync: (Path) -> Unit = ::forceDirectory,
 ) {
     Files.writeString(staged, text, *DURABLE_WRITE_OPTIONS)
     Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    // **굳히지 못하는 마운트에서도 계속 간다**(D-6G2d-48 ③) — 이 자리에서 예외를 올리면 append 가 통째로
+    // 막혀 수집이 아예 못 돈다. 잃는 것은 「이름 교체의 내구」 한 층이고 파일 데이터 fsync 는 그대로다.
+    runCatching { directorySync(directory) }.onFailure(::warnDirectorySyncOnce)
+}
+
+/** 디렉터리 항목을 굳힌다 — 못 굳히는 마운트의 처분은 부르는 자리([replaceDurably])가 정한다. */
+internal fun forceDirectory(directory: Path) {
     FileChannel.open(directory, StandardOpenOption.READ).use { it.force(true) }
 }
+
+/**
+ * 경고는 프로세스에 **한 번**이다(교체마다 같은 줄을 내면 로그가 그 줄로 덮인다). 어댑터에는 로그
+ * 포트가 없어 닫힌 토큰 한 줄을 표준 오류로 낸다 — 운영자가 그 토큰으로 마운트를 고칠 수 있다.
+ */
+private fun warnDirectorySyncOnce(cause: Throwable) {
+    if (directorySyncWarned.compareAndSet(false, true)) {
+        System.err.println("$DIRECTORY_FSYNC_UNSUPPORTED cause=${cause.javaClass.name}")
+    }
+}
+
+/**
+ * 마운트가 디렉터리 fsync 를 받지 않는다 — 운영자가 grep 하는 토큰이다. 실행 상태 디렉터리는 **ext4
+ * (WSL 내부)** 에 두는 것이 권고이고, 그 권고가 지켜지면 이 줄은 나오지 않는다.
+ */
+internal const val DIRECTORY_FSYNC_UNSUPPORTED = "RUN_STATE_DIRECTORY_FSYNC_UNSUPPORTED"
+
+private val directorySyncWarned = AtomicBoolean(false)
