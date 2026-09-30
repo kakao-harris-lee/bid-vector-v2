@@ -159,6 +159,14 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-34** | **승인 전 일괄(코드 거동 변경 0, 술어 확장 0)**: ① **rollback.md** — 복원 경로에 `app/src/test/kotlin/bidvector/app/architecture/**`(새 게이트 test) 추가, 유효성 술어·③ 대조 경로에 `config/quality/gate-tests.properties` 추가, 「새 파일 다섯」→ 여섯, 문서에 적힌 명령 **그대로** ①~⑥ 재실측(`실측 HEAD` 갱신; D 6 · ③ 빈 것 · ④ compile 0 이 문서의 명령에서 나와야 한다) ② `axisResumptions` 안내 문면: 「상한 N = N 번째 일시 실패에서 확정(N=1 이면 첫 실패에 확정)」 ③ evidence 표면 절 제목·D-6G2d-6 상태 행·이탈 2 의 「여덟」→ 실제 수 ④ 로그 계수 test 가 **값**을 잠그게(fixture 계수를 서로 다른 0 아닌 값으로, 두 계수 바꿔치기 → RED) · 분기 키 자기교집합 단언 제거 · 술어 `N` + 금액 있음 판 하나 ⑤ cr r3 M-2: sealed 도출을 **잎까지 재귀**(중첩 sealed 층이 대표 하나로 접히지 않게) — 술어 확장이 아니라 도출 범위 정정, 변이(중첩 층의 넷째 확정 원인) → RED |
 | **D-6G2d-35** | **종결 절차**: 일괄 커밋 뒤 verifier **표적 확인**(문서 명령 그대로 rollback ①~⑥ · 게이트 test 초록 · 로그 test 변이 · sealed 재귀 변이 · evidence 정직성) → 팀장 종결 문단(`milestone-6.md`, 「실행 상태 형식 version 2 부터」·A-3 대기) → rollback 2단계 등재 → push · PR · 판정 코멘트(r1·r2·r3·표적 확인) · `/code-review` · 처분 · CI 초록이면 머지(사용자 사전 승인 2026-09-30) |
 
+## 계약 갱신 r4 (2026-10-01, 팀장 — PR #51 `/code-review` 8건 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-36** | **리뷰 대응 일괄(코드, 소수정 여섯 — 술어 확장 0, 형식 version 불변)**: ② **PENDING/HTTP 줄만 남은 라운드도 상한에 센다** — raw 적재와 AXIS 결말 사이에서 던진 축(ⓑ 창)은 지금 `Failed` 줄이 없어 매 실행 상한 없이 재호출된다(구조적 적재 실패면 승인 호출을 매번 태운다). `doneWith` 는 마지막 정착 뒤 「결말 없이 끝난 시도 라운드」(HTTP 줄 있음·결말 없음)를 일시 실패와 같이 센다. test: 적재가 던지는 축 세 실행 → 네 번째 호출 0. 변이(세지 않음) → RED ③ `healTornTail` staged 쓰기에 `SYNC`(또는 `force(true)`) + 디렉터리 fsync — rename 이 바이트보다 먼저 굳는 창 제거 ④ `axisRetryLimit >= 1` 검증을 `DetailFetchGates.init` 으로(형제 필드와 같은 자리, HTTP 전) — `axisResumptions` 의 `require` 는 제거(D-30 의 「도메인 질의 쪽 유지」를 뒤집는다: 정책 구성 시점이 더 이르다) ⑥ `jsonAmount` 의 소수 → `null` 은 **tally 를 거치지 않으면 fail-loud**(`check`) — 조용한 결측 금지, 계수는 tally 한 자리 ⑦ `conclusionOf` 의 도달 불가 `requireNotNull`·`AXIS_WALK_REQUIRED` 제거, fail-closed 자리는 `CollectionAttempt.init` 이라고 KDoc 이 가리키게 ⑧ `SnapshotExtraction(...)` 호출을 **명명 인자**로(일곱 `Int` 위치 인자 금지) — 계수 둘 바꾸기 변이가 컴파일·test 어디선가 RED 가 되게(값 test 가 wiring 까지 덮도록 조립 test 하나) |
+| **D-6G2d-37** | **OPEN 등재 둘(운영자 가시)**: ① `FinalFailure(MAX_PAGES)` 는 정책 값 `maxPages`(50×100) 에 의존하는 확정이다 — 5,000 초과 참가 축이 `incomplete_axis` 로 영구 제외되고 `maxPages` 를 올려도 재호출되지 않는다. 지금은 계수가 정직하므로 유지하되 `OPEN-6G2D-MAX-PAGES-FINAL` 로 등재, **A-3 과 함께** 운영자에게(선택지: 유지 / 일시로 바꿔 상한에 맡김 / `maxPages` 상향) ⑤ 정착한 축을 다시 걸 경로가 오늘 없지만, 생기면 `doneWith`(정착 뒤 창)와 `axisConclusions`(마지막 줄)가 같은 원장을 다르게 읽는다 → `OPEN-6G-REVIEW-FOLLOWUPS` 에 「두 판독기가 한 술어를 공유」 |
+| **D-6G2d-38** | **표적 확인**: ② 판(적재 예외 세 실행 → 네 번째 0) + 변이 · ③ 옵션 확인 · ④ 정책 구성 시점 실패 · ⑥ 변이(tally 우회 → 던짐) · ⑧ 계수 맞바꾸기 변이 RED · acceptance 강한 집합 · rollback 재실측(`실측 HEAD` 갱신, 종결 문단 커밋 `f714e3f5` 유지) · 새 public 표면. code-reviewer 정적 리뷰는 `/code-review` 재실행으로 갈음 |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
