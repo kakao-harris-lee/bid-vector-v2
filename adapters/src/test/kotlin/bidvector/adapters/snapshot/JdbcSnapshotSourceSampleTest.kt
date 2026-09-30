@@ -535,8 +535,9 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         unfinished: List<String>,
     ): Map<String, Map<SourceEndpoint, AxisConclusion>> {
         val hashes = unfinished.map { NoticeKeyHash.of(it, "000").value }.toSet()
+        val unusable = SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT)
         return allAxesSettled(sample).mapValues { (key, axes) ->
-            if (key in hashes) axes + (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT)) else axes
+            if (key in hashes) axes + unusable else axes
         }
     }
 
