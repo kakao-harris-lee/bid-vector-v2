@@ -85,7 +85,6 @@ class DetailFetchTest {
             DetailFetchGates(ageGateHours = -1, recheckGateHours = 0, axisRetryLimit = 3)
         }
     }
-
 }
 
 /** D-3B2-5 (a) — COL-04 「업종제한 플래그 N → 서브콜 0회」의 순수 술어. */

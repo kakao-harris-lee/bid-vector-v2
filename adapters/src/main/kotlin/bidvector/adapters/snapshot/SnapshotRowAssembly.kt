@@ -21,6 +21,15 @@ internal fun assembleSnapshotRow(
     )
 
 /**
+ * 스냅숏이 싣는 금액은 **원 단위 정수**다(스키마 §1·§2.2) — 소수점이 없어야 양쪽 언어에서 왕복이
+ * exact 하다. 끝자리 0 은 소수부가 아니다(`1200.00` 은 정수다).
+ *
+ * **판정하는 자리 옆에 둔다** — 소비자는 둘이지만(조립이 거르고, 렌더의 마지막 방어가 같은 술어를
+ * 본다) 값을 버리는 결정은 이 파일의 [AssemblyTally] 가 한다.
+ */
+internal fun BigDecimal.isWonInteger(): Boolean = stripTrailingZeros().scale() <= 0
+
+/**
  * 조립이 **형태를 어겨 버린 값**의 계수(D-6G2d-15). 조립 자체는 값 함수로 두고 계수만 밖으로 나른다 —
  * 소수부 금액이 한 번 오면 그 칸(또는 집계)이 조용히 비므로, 세지 않으면 백테스트 판정 보고에서 그
  * 제외가 보통의 값 결측과 구별되지 않는다(A-2: 스키마를 올리지 않고 **공시**한다).
@@ -35,8 +44,14 @@ internal class AssemblyTally {
      */
     fun wonAmount(value: BigDecimal?): BigDecimal? =
         when {
-            value == null -> null
-            value.isWonInteger() -> value
+            value == null -> {
+                null
+            }
+
+            value.isWonInteger() -> {
+                value
+            }
+
             else -> {
                 fractionalAmounts++
                 null

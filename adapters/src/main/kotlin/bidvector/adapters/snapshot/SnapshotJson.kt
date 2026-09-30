@@ -98,15 +98,6 @@ internal fun jsonInstant(value: Instant?): SnapshotJson =
     value?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null
 
 /**
- * 스냅숏이 싣는 금액은 **원 단위 정수**다(스키마 §1·§2.2) — 소수점이 없어야 양쪽 언어에서 왕복이
- * exact 하다. 끝자리 0 은 소수부가 아니다(`1200.00` 은 정수다).
- *
- * 이 술어의 소비자는 둘이고 **판정은 한 자리**다: 행을 조립하는 자리가 이 술어로 값을 거르고
- * ([bidvector.adapters.snapshot.AssemblyTally]), 렌더는 그 결과를 쓴다.
- */
-internal fun BigDecimal.isWonInteger(): Boolean = stripTrailingZeros().scale() <= 0
-
-/**
  * 금액은 **정수 리터럴**이다 — `setScale(0)` 은 반올림 모드가 없어 소수부에서 던지고, 그 예외 하나가
  * 스냅숏 바이트를 한 줄도 내지 못하게 한다.
  *
