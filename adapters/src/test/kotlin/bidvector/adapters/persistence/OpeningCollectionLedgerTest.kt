@@ -89,6 +89,21 @@ class OpeningCollectionLedgerTest : PersistenceTestSupport() {
         found shouldBe setOf(noticeId("2026abc-01"))
     }
 
+    /**
+     * **D-6G2d-8 ⓐ — 번호가 빈 원문 행이 이어 돌기 조회를 던지지 않는다.** 이 조회는 축마다 원문
+     * 전건을 훑으므로, 번호 없는 행 하나가 `NoticeNumber.of` 를 던지면 **표본 전체를 다시 불러**
+     * 승인 상한을 그만큼 태운다. 그 행은 어떤 공고와도 맞지 않으므로 버린다.
+     */
+    @Test
+    fun `번호가 빈 원문 행은 이어 돌기를 멈추지 않는다`() {
+        val id = noticeId("20260924001-00")
+        appendRawObservation(observation("20260924001-00", SourceEndpoint.RESERVE_PRICE_DETAIL))
+        appendRawObservation(observation(" ", SourceEndpoint.RESERVE_PRICE_DETAIL))
+
+        JdbcCollectedAxisStore(dataSource())
+            .alreadyCollected(SourceEndpoint.RESERVE_PRICE_DETAIL, listOf(id)) shouldBe setOf(id)
+    }
+
     @Test
     fun `물어본 공고가 없으면 질의하지 않는다`() {
         JdbcCollectedAxisStore(dataSource())

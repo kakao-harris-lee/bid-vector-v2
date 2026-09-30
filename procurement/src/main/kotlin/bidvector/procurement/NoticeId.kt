@@ -55,7 +55,18 @@ data class NoticeNumber(
         }
 
         /** 원문 공고번호 문자열에서 정규화한다 — 정규화 규칙은 여기 하나뿐이다(COL-05). */
-        fun of(raw: String): NoticeNumber = NoticeNumber(asciiUppercase(raw.trim()).replace(WHITESPACE_RUN, "-"))
+        fun of(raw: String): NoticeNumber = NoticeNumber(canonicalOf(raw))
+
+        /**
+         * 번호가 서지 않는 **원문 행**을 위한 자리(D-6G2d-8 ⓐ) — 공고번호 칸이 빈 문자열로 온 행은
+         * 어떤 공고에도 속하지 않는다. 그 행을 만나 [of] 를 무방비로 부르면 **한 행이 추출 전체를
+         * 멈춘다**: 원문은 append-only 라(DB 트리거) 지울 수 없고, 정규화는 적재 **뒤**에 오므로
+         * 그런 행은 실제로 남는다. 형태를 어긴 행은 키를 갖지 못하고(차수와 같은 규율), 부르는 쪽이
+         * 그 수를 공시한다. 예외로 갈래를 나누지 않는다 — 없음이 값이다.
+         */
+        fun ofOrNull(raw: String): NoticeNumber? = canonicalOf(raw).takeIf { it.isNotBlank() }?.let(::NoticeNumber)
+
+        private fun canonicalOf(raw: String): String = asciiUppercase(raw.trim()).replace(WHITESPACE_RUN, "-")
     }
 }
 

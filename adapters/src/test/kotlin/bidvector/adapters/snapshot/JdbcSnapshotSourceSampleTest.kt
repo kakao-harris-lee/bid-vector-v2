@@ -407,6 +407,33 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         row.outcome.participantCount shouldBe 5
     }
 
+    /**
+     * **D-6G2d-8 ⓐ — 공고번호가 빈 원문 행 한 줄이 추출 전체를 멈추지 않는다.** 적재는 정규화
+     * **전에** 일어나고 원문은 append-only 다(DB 트리거) — 번호 없는 항목이 한 번 들어오면 그 행은
+     * 지울 수 없고, 관측 창도 없어져 추출은 매번 그 행을 만난다. 키를 갖지 못한 행은 버리고 **수를
+     * 공시한다**: 어느 표본 공고에도 속하지 않으므로 네 항 항등식은 그대로다.
+     */
+    @Test
+    fun `번호가 빈 원문 행은 추출을 멈추지 않고 계수된다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        appendRawObservation(
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to " ", RawKey("bidNtceOrd") to "000"),
+                SourceEndpoint.OPENING_COMPLETE,
+                OBSERVED_AT,
+            ),
+        )
+
+        val extraction = extract(sampleOf(number))
+
+        extraction.rows shouldHaveSize 1
+        extraction.unusableRawRows shouldBe 1
+        extraction.observedOutsideSample shouldBe 0
+    }
+
+
     /** 개찰결과 목록 관측 — 참가자 수가 이 축에서만 온다(결말 줄이 없는 축이다). */
     private fun openingListObservation(
         number: String,

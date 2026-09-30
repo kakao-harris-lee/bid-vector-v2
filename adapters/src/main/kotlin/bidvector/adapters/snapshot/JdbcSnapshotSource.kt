@@ -74,6 +74,7 @@ class JdbcSnapshotSource(
             sample.keys.size - withDetail.size,
             observed.outsideSample.size,
             incomplete,
+            observed.unusableRows,
         )
     }
 
@@ -119,18 +120,24 @@ class JdbcSnapshotSource(
     ): ObservedRows {
         val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>()
         val outside = mutableSetOf<NoticeKey>()
+        var unusable = 0
         while (rows.next()) {
-            // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
-            keyAndEndpointOf(rows)?.let { (key, endpoint) ->
-                val hash = NoticeKeyHash.of(key.number, key.round.value)
-                if (hash in sample.keys) {
-                    collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
-                } else {
-                    outside += key
-                }
+            // 식별자나 엔드포인트 어휘가 서지 않는 행은 키를 갖지 못한다(D-6G2d-8 ⓐ) — 그 행만
+            // 버리고 **수를 공시한다**. 조용히 지나가면 「왜 표본이 비었나」를 물을 자리가 없다.
+            val keyed = keyAndEndpointOf(rows)
+            if (keyed == null) {
+                unusable++
+                continue
+            }
+            val (key, endpoint) = keyed
+            val hash = NoticeKeyHash.of(key.number, key.round.value)
+            if (hash in sample.keys) {
+                collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
+            } else {
+                outside += key
             }
         }
-        return ObservedRows(byKey, outside)
+        return ObservedRows(byKey, outside, unusable)
     }
 
     /**
@@ -167,7 +174,10 @@ class JdbcSnapshotSource(
         // **canonical 형태로 키를 맞춘다.** 원문 payload 는 수집 때 온 그대로이고 `notice` 표는
         // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이
         // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
-        val number = rows.getString("notice_number")?.let { NoticeNumber.of(it).value }
+        // **무방비로 정규화하지 않는다**(D-6G2d-8 ⓐ) — 공고번호 칸이 빈 문자열로 온 원문 행이 있으면
+        // `NoticeNumber.of` 가 던지고 그 한 행이 추출 전체를 멈춘다. 원문은 append-only 라 지울 수도
+        // 없다. 차수와 같은 규율이다: 형태를 어긴 행은 키를 갖지 못한다.
+        val number = rows.getString("notice_number")?.let { NoticeNumber.ofOrNull(it)?.value }
         val round = rows.getString("notice_round")?.let(::roundOrNull)
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
@@ -208,6 +218,8 @@ private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { N
 private class ObservedRows(
     val byKey: Map<NoticeKey, Map<SourceEndpoint, WalkRows>>,
     val outsideSample: Set<NoticeKey>,
+    /** 키를 갖지 못한 원문 행 수(D-6G2d-8 ⓐ) — 어느 표본에도 속하지 않아 항등식 밖이다. */
+    val unusableRows: Int,
 )
 
 /**
@@ -253,6 +265,12 @@ data class SnapshotExtraction(
     val observedOutsideSample: Int,
     /** 완료되지 않은 축이 있는 표본 수(D-6G-58) — 반쪽 원문으로 행을 쓰지 않는다. */
     val incompleteAxis: Int,
+    /**
+     * 공고 키가 서지 않아 버린 원문 행 수(D-6G2d-8 ⓐ) — **항등식 밖**이다([observedOutsideSample]
+     * 과 같은 자리). 그 행은 어느 표본 공고에도 속하지 않으므로 네 항 어디에도 들지 않는다. 0 이
+     * 아니면 적재 경로가 번호 없는 항목을 받았다는 뜻이고, 그 사실은 로그로 공시된다.
+     */
+    val unusableRawRows: Int,
 )
 
 /**

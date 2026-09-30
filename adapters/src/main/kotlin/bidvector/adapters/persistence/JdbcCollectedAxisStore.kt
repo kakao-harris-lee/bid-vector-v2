@@ -51,7 +51,9 @@ class JdbcCollectedAxisStore(
     ): Set<NoticeId> {
         val out = mutableSetOf<NoticeId>()
         while (rows.next()) {
-            val number = rows.getString("notice_number")?.let { NoticeNumber.of(it).value }
+            // 빈 번호로 온 원문 행은 키를 갖지 못한다(D-6G2d-8 ⓐ) — 무방비로 정규화하면 그 한 행이
+            // 이어 돌기 조회 전체를 던지고, 그러면 표본 전체를 다시 불러 승인 상한을 태운다.
+            val number = rows.getString("notice_number")?.let { NoticeNumber.ofOrNull(it)?.value }
             // 차수가 형태를 어기면 **키를 갖지 못한다** — 기본값으로 접으면 다른 차수의 관측이
             // 「이미 받았다」로 답해 그 축이 영영 불리지 않는다.
             val round = rows.getString("notice_round")?.let { runCatching { NoticeRound.of(it).value }.getOrNull() }
