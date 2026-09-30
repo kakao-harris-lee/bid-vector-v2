@@ -111,24 +111,21 @@ class SnapshotWriterTest {
     }
 
     /**
-     * **D-6G2d-8 ⓓ — 소수부가 있는 금액이 추출 전체를 멈추지 않는다.** `setScale(0)` 은 반올림 모드가
-     * 없어 소수부에서 던지고, 그 예외 하나가 스냅숏 바이트를 **한 줄도** 내지 못하게 한다. 원천이 원
-     * 단위 정수를 낸다는 것은 조사 문서의 관측이고 계약이 아니다. 반올림하지 않는다 — 지어낸 값이
-     * 채점에 들어가는 것이 결측보다 나쁘고, 「값이 없다」는 이미 행 단위 제외의 입력이다(D-6G-28).
+     * **cr r4 ⑥ — 조립을 거치지 않은 소수 금액은 조용한 `null` 이 되지 않는다.** 소수부의 처분은
+     * 조립이 정하고 그 자리가 계수한다(D-6G2d-15) — 렌더까지 소수가 왔다는 것은 **계수되지 않는
+     * 생산자**가 생겼다는 뜻이고, 그것을 `null` 로 접으면 판독이 「값이 없는 칸」과 「셈에서 빠진 칸」을
+     * 구별할 수 없다. 이 slice 가 고치고 있는 결함 계열 그대로다.
+     *
+     * 값 칸과 투찰자 칸 **둘 다** 본다 — 같은 함수를 지나므로, 한쪽만 재면 그 함수가 아니라 그 칸을
+     * 잠근 것이 된다. 실 경로에서는 발화하지 않는다(조립이 이미 비웠다).
      */
     @Test
-    fun `소수부가 있는 금액은 행 단위 부재로 떨어진다`() {
-        val row =
-            rowOf("aa", bidders = listOf(1 to BigDecimal("1100000000.5"))).let {
-                it.copy(notice = it.notice.copy(baseAmount = BigDecimal("1234567890.01")))
-            }
+    fun `조립을 거치지 않은 소수 금액은 렌더에서 던진다`() {
+        val noticeCell = rowOf("aa").let { it.copy(notice = it.notice.copy(baseAmount = BigDecimal("1234567890.01"))) }
+        val bidderCell = rowOf("bb", bidders = listOf(1 to BigDecimal("1100000000.5")))
 
-        val rendered = SnapshotWriter.renderRows(listOf(row))
-
-        rendered shouldContain "\"base_amount\":null"
-        rendered shouldContain "\"amount\":null"
-        // 다른 칸은 그대로 실린다 — 행 전체가 사라지지 않는다.
-        rendered shouldContain "\"planned_price\":1250000000"
+        shouldThrow<IllegalStateException> { SnapshotWriter.renderRows(listOf(noticeCell)) }
+        shouldThrow<IllegalStateException> { SnapshotWriter.renderRows(listOf(bidderCell)) }
     }
 
     @Test
