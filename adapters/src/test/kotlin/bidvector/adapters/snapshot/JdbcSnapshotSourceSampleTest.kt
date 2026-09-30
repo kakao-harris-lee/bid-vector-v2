@@ -27,33 +27,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private val OBSERVED_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")
-
-/** 짧은 걷기 — 미완이다(다시 부른다). 원장이 그 축을 끝내지 않았다는 뜻이다. */
-private val SHORT_WALK = AttemptOutcome.Failed("SHORT_WALK")
-
-/** 다시 걷기는 다른 시각에 온다 — 그 시각이 걷기의 이름이다(D-6G-58). */
-private const val RE_WALK_GAP_SECONDS = 3600L
-/** 용역이 부르는 축 셋 — 업무가 정한다(`expectedAxesFor`). */
-private val SERVICE_AXES: List<SourceEndpoint> =
-    listOf(
-        SourceEndpoint.RESERVE_PRICE_DETAIL,
-        SourceEndpoint.OPENING_COMPLETE,
-        SourceEndpoint.BASE_AMOUNT_DETAIL,
-    )
-
-private val WINDOW_FROM: LocalDate = LocalDate.of(2026, 6, 16)
-private val WINDOW_TO: LocalDate = LocalDate.of(2026, 6, 18)
-
-private fun policy(): KonepsCollectionPolicyData =
-    (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 7)) as Resolution.Resolved).value
-
-private fun sampleOf(vararg numbers: String): SampleList =
-    SampleList(
-        numbers.associate { NoticeKeyHash.of(it, "000") to SampleStratum(BusinessDivision.SERVICE, "2026-W25") },
-        scope = SampleScope(WINDOW_FROM, WINDOW_TO, setOf(BusinessDivision.SERVICE)),
-    )
-
 /**
  * D-6G-40 — 추출이 **확정 표본만** 싣는지(D-6G-39), 그리고 표본인데 행이 되지 못한 공고가
  * **사유별로** 계수되는지. dev DB 를 읽는 자리라 실 Postgres 로 잰다.
@@ -61,44 +34,7 @@ private fun sampleOf(vararg numbers: String): SampleList =
  * canonical `notice` 행을 세우지 않는다 — 여기서 재는 것은 「무엇이 행이 되는가」의 **문턱**이고,
  * 문턱을 넘지 못한 공고는 canonical 이 있든 없든 행이 되지 않아야 한다.
  */
-class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
-    private fun observe(
-        number: String,
-        endpoint: SourceEndpoint,
-        round: String = "000",
-        at: Instant = OBSERVED_AT,
-        marker: String? = null,
-        fields: Map<String, String> = emptyMap(),
-    ) = appendRawObservation(
-        RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round) +
-                (marker?.let { mapOf(RawKey("prcbdrNm") to it) } ?: emptyMap()) +
-                fields.mapKeys { RawKey(it.key) },
-            endpoint,
-            at,
-        ),
-    )
-
-    /** 기본은 **전 축 완료 · 걷기는 [OBSERVED_AT]** — 이 test 들이 재는 것은 그 앞의 문턱들이다. */
-    private fun extract(
-        sample: SampleList,
-        conclusions: Map<String, Map<SourceEndpoint, AxisConclusion>> = allAxesSettled(sample),
-    ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(sample, conclusions)
-
-    /**
-     * 원장이 가리키는 걷기(D-6G-68)와 그 걷기의 **결말**. 걷기는 언제나 있다(D-6G2d-4 ⓑ) — 0 행은
-     * [AttemptOutcome.Empty] 가 말하고, 걷기 부재로 말하면 옛 형식 줄과 같은 값이 된다.
-     */
-    private fun allAxesSettled(
-        sample: SampleList,
-        walk: Instant = OBSERVED_AT,
-        outcome: AttemptOutcome = AttemptOutcome.Succeeded,
-    ): Map<String, Map<SourceEndpoint, AxisConclusion>> =
-        sample.keys.associate { key ->
-            key.value to
-                expectedAxesFor(BusinessDivision.SERVICE.name).associateWith { AxisConclusion(outcome, walk) }
-        }
-
+class JdbcSnapshotSourceSampleTest : SnapshotSourceTestBase() {
     /** 표본틀에만 있던 공고(목록 축만)는 행이 되지 않는다 — 상세를 부르지 않았으므로 결과가 없다. */
     @Test
     fun `표본이어도 상세가 없으면 행이 아니라 사유다`() {
@@ -163,7 +99,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
                 (
                     sample.keys.single().value to
                         allAxesSettled(sample).getValue(sample.keys.single().value) +
-                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT))
+                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(shortWalk, observedAt))
                 )
         val extraction = extract(sample, partial)
 
@@ -186,68 +122,12 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         // 첫 걷기 — 2쪽 중 1쪽에서 끊겨 투찰 행 둘만 남았다.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
         // 다시 걷기 — 전 쪽을 받아 투찰 행 셋.
-        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = again, marker = "다시-걷기-$it") }
 
         val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), again)).rows.single()
 
         row.outcome.bidderRows shouldHaveSize 3
-    }
-
-    /**
-     * **cr r4 ⑧ — 계수 여덟이 제 칸으로 간다.** `SnapshotExtraction` 의 계수는 전부 `Int` 라 두 칸을
-     * 맞바꾼 편집이 컴파일을 지나고, 판독은 **사유가 뒤바뀐** 스냅숏을 받는다(행이 줄지 않으므로 어느
-     * 항등식도 걸리지 않는다). 호출부를 명명 인자로 두는 것은 읽는 사람을 위한 것이고, 배선을 **잠그는
-     * 것은 이 판**이다: 여덟 값이 서로 다른 수로 **동시에** 서므로 어느 둘을 바꿔도 붉어진다.
-     *
-     * 사유별 판을 하나씩 두는 것으로는 부족하다 — 그 판들은 다른 계수가 전부 0 이라, 0 과 0 을 바꾼
-     * 맞바꾸기가 그대로 지나간다(같은 이유로 D-6G2d-34 가 로그 줄에서 값을 잠갔다).
-     */
-    @Test
-    fun `계수 여덟이 제 칸으로 간다 — 서로 다른 수로 동시에`() {
-        val rowNotices = syntheticNumbers(1..2)
-        val withoutDetail = syntheticNumbers(11..14)
-        val withoutCanonical = syntheticNumbers(21..25)
-        val unfinished = syntheticNumbers(31..36)
-        val outside = syntheticNumbers(41..47)
-        val unusable = syntheticNumbers(51..58)
-        val sample = sampleOf(*(rowNotices + withoutDetail + withoutCanonical + unfinished).toTypedArray())
-
-        rowNotices.forEach { number ->
-            persistCanonical(number, listObservation(number))
-            SERVICE_AXES.forEach { observe(number, it) }
-        }
-        // 첫 행이 소수 금액 **셋**(예정가격·개찰 기초금액·투찰금액)과 반쪽 A **하나**를 나른다.
-        observe(
-            rowNotices[0],
-            SourceEndpoint.RESERVE_PRICE_DETAIL,
-            fields = mapOf("plnprc" to "1250000000.5", "bssamt" to "1239999999.5"),
-        )
-        observe(rowNotices[0], SourceEndpoint.OPENING_COMPLETE, fields = mapOf("bidprcAmt" to "1100000000.5"))
-        observe(
-            rowNotices[0],
-            SourceEndpoint.BID_PRICE_FORMULA_A,
-            fields = mapOf("bidPrceCalclAOpenDt" to "2026-06-10 09:00:00"),
-        )
-        withoutCanonical.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE) }
-        unfinished.forEach { number ->
-            persistCanonical(number, listObservation(number))
-            observe(number, SourceEndpoint.OPENING_COMPLETE)
-        }
-        outside.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE) }
-        // 차수가 서지 않는 행은 키를 갖지 못한다 — 어느 표본에도 속하지 않아 항등식 밖이다.
-        unusable.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE, round = "1") }
-
-        val extraction = extract(sample, conclusionsWithUnfinished(sample, unfinished))
-
-        extraction.rows shouldHaveSize 2
-        extraction.fractionalAmounts shouldBe 3
-        extraction.sampledWithoutDetail shouldBe 4
-        extraction.skippedWithoutNotice shouldBe 5
-        extraction.incompleteAxis shouldBe 6
-        extraction.observedOutsideSample shouldBe 7
-        extraction.unusableRawRows shouldBe 8
-        extraction.incompleteAValues shouldBe 1
     }
 
     /** 공사는 A값까지 넷이다 — 부르지 않는 축을 기다리면 공사 아닌 공고가 영영 행이 되지 않는다. */
@@ -339,12 +219,12 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val number = "20260617001-00"
         persistCanonical(number, listObservation(number))
         // 끊긴 걷기가 **더 늦은** 시각을 달았다(시계가 앞서 있던 실행).
-        val skewed = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        val skewed = observedAt.plusSeconds(reWalkGapSeconds)
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = skewed, marker = "끊긴-걷기-$it") }
         // 다시 걸어 전 쪽을 받았지만 시각은 뒤로 간 시계의 것이다.
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "전-쪽-$it") }
 
-        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), OBSERVED_AT)).rows.single()
+        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), observedAt)).rows.single()
 
         row.outcome.bidderRows shouldHaveSize 3
     }
@@ -361,7 +241,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         persistCanonical(number, listObservation(number))
         // 첫 걷기는 끊겨 투찰 행 둘, 다시 걷기는 **한 달 뒤**(옛 추출 창 밖)에 전 쪽 셋.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
-        val farLater = OBSERVED_AT.plus(30, ChronoUnit.DAYS)
+        val farLater = observedAt.plus(30, ChronoUnit.DAYS)
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = farLater, marker = "창-밖-$it") }
 
         val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), farLater))
@@ -415,8 +295,8 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val number = "20260617001-00"
         persistCanonical(number, listObservation(number))
         observe(number, SourceEndpoint.OPENING_COMPLETE)
-        appendRawObservation(openingListObservation(number, participants = "2", at = OBSERVED_AT))
-        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        appendRawObservation(openingListObservation(number, participants = "2", at = observedAt))
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
         appendRawObservation(openingListObservation(number, participants = "5", at = again))
 
         val row = extract(sampleOf(number)).rows.single()
@@ -446,7 +326,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
                     RawKey("sucsfbidMthdCd") to "낙030001",
                 ),
                 SourceEndpoint.NOTICE_LIST,
-                OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS),
+                observedAt.plusSeconds(reWalkGapSeconds),
             ),
         )
 
@@ -466,10 +346,10 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val number = "20260617001-00"
         persistCanonical(number, listObservation(number))
         observe(number, SourceEndpoint.OPENING_COMPLETE)
-        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
         appendRawObservation(openingListObservation(number, participants = "5", at = again))
         // 이른 관측이 **뒤에** 적재된다.
-        appendRawObservation(openingListObservation(number, participants = "2", at = OBSERVED_AT))
+        appendRawObservation(openingListObservation(number, participants = "2", at = observedAt))
 
         val row = extract(sampleOf(number)).rows.single()
 
@@ -491,7 +371,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
             RawNoticeObservation.of(
                 mapOf(RawKey("bidNtceNo") to " ", RawKey("bidNtceOrd") to "000"),
                 SourceEndpoint.OPENING_COMPLETE,
-                OBSERVED_AT,
+                observedAt,
             ),
         )
 
@@ -500,68 +380,5 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.rows shouldHaveSize 1
         extraction.unusableRawRows shouldBe 1
         extraction.observedOutsideSample shouldBe 0
-    }
-
-    /** 개찰결과 목록 관측 — 참가자 수가 이 축에서만 온다(결말 줄이 없는 축이다). */
-    private fun openingListObservation(
-        number: String,
-        participants: String,
-        at: Instant,
-    ): RawNoticeObservation =
-        RawNoticeObservation.of(
-            mapOf(
-                RawKey("bidNtceNo") to number,
-                RawKey("bidNtceOrd") to "000",
-                RawKey("prtcptCnum") to participants,
-            ),
-            SourceEndpoint.OPENING_RESULT_LIST,
-            at,
-        )
-
-    /** canonical 공고를 **출하 경로**(repository)로 세운다 — test 전용 SQL 사본을 두지 않는다. */
-    private fun listObservation(number: String): RawNoticeObservation =
-        RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to "000"),
-            SourceEndpoint.NOTICE_LIST,
-            OBSERVED_AT,
-        )
-
-    /** 합성 공고번호 — 같은 형태에 순번만 다르다(키 해시가 접히지 않게). */
-    private fun syntheticNumbers(range: IntRange): List<String> = range.map { "20260617%03d-00".format(it) }
-
-    /** [unfinished] 의 개찰완료만 미완으로 — 그 공고는 행이 아니라 `incompleteAxis` 다. */
-    private fun conclusionsWithUnfinished(
-        sample: SampleList,
-        unfinished: List<String>,
-    ): Map<String, Map<SourceEndpoint, AxisConclusion>> {
-        val hashes = unfinished.map { NoticeKeyHash.of(it, "000").value }.toSet()
-        val unusable = SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT)
-        return allAxesSettled(sample).mapValues { (key, axes) ->
-            if (key in hashes) axes + unusable else axes
-        }
-    }
-
-    private fun persistCanonical(
-        number: String,
-        observation: RawNoticeObservation,
-    ) {
-        val id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
-        JdbcNoticeRepository(dataSource()).persist(
-            NoticeCollected(
-                id = id,
-                businessCategory = null,
-                baseAmount = null,
-                estimatedAmount = null,
-                allocatedBudget = null,
-                floorRate = null,
-                deadlineAt = null,
-                openingScheduledAt = null,
-                raw = observation,
-                businessDivision = BusinessDivision.SERVICE,
-                serviceDivision = null,
-                mainConstructionType = null,
-            ),
-            appendRawObservation(observation),
-        )
     }
 }
