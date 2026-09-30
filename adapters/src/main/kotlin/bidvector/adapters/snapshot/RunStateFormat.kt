@@ -49,8 +49,21 @@ internal class RunStateFormatRefusedException(
 ) : RuntimeException("실행 상태 형식이 이 코드의 것이 아니다 — cause=${fault.causeCode}")
 
 /**
- * 형식 version 대조(D-6G2d-4 ⓐ · 18) — 없거나 다르면 **기동 거부**다(경고가 아니다). 거부는 잠금을
- * 놓고 나가야 하므로 [heldOrRelease] 안에서 일어난다(이 함수는 [readFacts] 가 부른다).
+ * 형식 거부의 **사유 토큰** — 형식 거부가 아니면 `null`(D-6G2d-48 ①).
+ *
+ * 밖에서 읽을 수 있는 **유일한** 표면이다: 예외 타입은 `internal` 로 남으므로 바깥 모듈은 그 타입을
+ * 이름으로 잡을 수 없고, 러너는 이 함수로 사유를 얻어 로그·종료 사유에 싣는다. 앞 판은 클래스 이름이
+ * 떨어져(`RunStateFormatRefusedException`) 운영자가 「옛 디렉터리인가 손상인가」를 가릴 수 없었다.
+ *
+ * `Throwable` 을 받는다 — 러너가 잡는 것은 `Exception` 이고, 원인 사슬을 따라가지 않는다(감싸는 자리가
+ * 없다: 이 예외는 원장 판독에서 곧바로 올라온다).
+ */
+fun runStateFormatCauseCode(error: Throwable): String? = (error as? RunStateFormatRefusedException)?.fault?.causeCode
+
+/**
+ * 형식 version 대조(D-6G2d-4 ⓐ · 18) — 없거나 다르면 **기동 거부**다(경고가 아니다). 부르는 자리는
+ * `RunStateFactsFile` 둘이고(`requireReadableFormat` · `read`), 거부는 잠금을 놓고 나가야 하므로
+ * 디렉터리의 `init` 이 그 호출을 잠금 가드 안에 둔다(D-6G2d-48 ⑥).
  *
  * **정수만 받는다**(vr r1 L-1). 일반 판독기(`asIntOrNull`)는 문자열 `"1"` 과 선행 0 `01` 을 받아
  * 주는데, 이 칸은 **우리가 쓰는 값**이라 관용할 이유가 없고 관용은 형식 판별을 무르게 만든다.
