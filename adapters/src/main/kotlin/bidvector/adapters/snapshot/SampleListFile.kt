@@ -112,6 +112,10 @@ class FileSampleListLedger(
             }
         if (!won) return requireNotNull(confirmed()) { "표본 목록 파일을 읽지 못했다" }
         Files.writeString(scopeFile, SampleScopeFile.render(confirmation))
+        // 두 파일을 **장부가 그것을 가리키기 전에** 굳힌다(D-6G2d-41) — 장부가 먼저 굳으면 정전 뒤에
+        // 「장부는 확정을 말하는데 목록 바이트가 없다」가 되고, 그 불일치는 다음 기동이 거부한다.
+        forceDurable(file)
+        forceDurable(scopeFile)
         onConfirmed(text)
         val facts = SampleScopeFile.parse(Files.readString(scopeFile))
         return SampleListFile.parse(text, facts.scope).withFacts(facts)

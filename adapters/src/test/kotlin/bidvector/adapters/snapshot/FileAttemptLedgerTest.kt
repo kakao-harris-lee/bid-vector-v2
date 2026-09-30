@@ -44,6 +44,39 @@ class FileAttemptLedgerTest {
         walk = LEDGER_AT.takeIf { kind == AttemptKind.AXIS },
     )
 
+    /**
+     * **D-6G2d-41 (cr r5 ①③) — 원장이 장부보다 먼저 굳는다.** 장부(`state.json`)는 원장의 누적 해시와
+     * 줄 수를 싣는다. 장부가 먼저 굳으면 정전 뒤에 「줄 수가 장부보다 적다」가 되고 그 디렉터리는
+     * **영구 거부**된다 — 이 slice 가 닫으려던 부류 그대로다. 반대 순서의 손해는 「굳은 줄을 장부가
+     * 아직 모른다」이고 다음 기동이 장부를 원장 쪽으로 재동기해 흡수한다.
+     *
+     * 내구성 자체는 단위 test 로 잴 수 없다(크래시를 심을 자리가 없다). 잴 수 있는 것은 **순서**이고,
+     * 그래서 덧붙임 채널을 값으로 뺐다 — 대역이 두 걸음을 기록하고 장부 갱신이 세 번째로 온다.
+     */
+    @Test
+    fun `원장 바이트를 굳힌 뒤에 장부를 갱신한다`() {
+        val order = mutableListOf<String>()
+        val ledger = FileAttemptLedger(ledgerFile(), { RecordingAppend(order) }) { order += "장부" }
+
+        ledger.append(attemptOf(AttemptOutcome.Succeeded))
+
+        order shouldContainExactly listOf("덧붙임", "굳힘", "장부")
+    }
+
+    private class RecordingAppend(
+        private val order: MutableList<String>,
+    ) : DurableAppend {
+        override fun append(text: String) {
+            order += "덧붙임"
+        }
+
+        override fun force() {
+            order += "굳힘"
+        }
+
+        override fun close() = Unit
+    }
+
     @Test
     fun `원장이 없으면 빈 이력이다 — 첫 실행이다`() {
         ledger().read().size shouldBe 0
@@ -126,20 +159,22 @@ class FileAttemptLedgerTest {
      * 읽지 않는다(fail-closed). 빈 응답은 결말 어휘(`EMPTY`)가 말하고 걷기는 언제나 실린다.
      */
     @Test
-    fun `걷기를 싣지 않은 AXIS 줄은 읽지 않는다`() {
+    fun `걷기를 싣지 않은 AXIS 줄은 형식으로 거부한다`() {
         val ledger = ledger()
         Files.writeString(ledgerFile(), axisLineWithoutWalk("\"walk\":null"))
 
-        shouldThrow<IllegalArgumentException> { ledger.read() }
+        // **형식 거부**다(D-6G2d-44) — generic 예외로 죽으면 운영자 출력에서 「손상」과 구별되지 않고,
+        // 그 구별이 처방을 가른다(옛 디렉터리는 폐기해도 되고 손상은 사람이 봐야 한다).
+        shouldThrow<RunStateFormatRefusedException> { ledger.read() }.fault shouldBe RunStateFormatFault.LEGACY_LINE
     }
 
     /** 같은 이유로 **칸이 아예 없는** 옛 줄도 읽지 않는다 — 부재와 명시 null 을 함께 거부한다. */
     @Test
-    fun `걷기 칸이 없는 옛 AXIS 줄도 읽지 않는다`() {
+    fun `걷기 칸이 없는 옛 AXIS 줄도 형식으로 거부한다`() {
         val ledger = ledger()
         Files.writeString(ledgerFile(), axisLineWithoutWalk(null))
 
-        shouldThrow<IllegalArgumentException> { ledger.read() }
+        shouldThrow<RunStateFormatRefusedException> { ledger.read() }.fault shouldBe RunStateFormatFault.LEGACY_LINE
     }
 
     /** 걷기는 AXIS 줄만 갖는다 — 호출 단위 줄이 걷기를 달고 있으면 그 원장은 이 코드의 것이 아니다. */

@@ -41,36 +41,6 @@ internal const val STAGED_ATTEMPT_NAME = "$ATTEMPT_LEDGER_NAME.staged"
 internal const val ATTEMPT_MAX_DEPTH = 4
 
 /**
- * 실행 상태 파일의 **내구 쓰기** 열기 옵션(cr r4 ③) — `SYNC` 가 바이트를 교체보다 **먼저** 굳힌다.
- * 이 배열이 정본이다: 옵션을 호출부마다 늘어놓으면 한 자리에서 빠져도 조용하다.
- */
-internal val DURABLE_WRITE_OPTIONS: Array<OpenOption> =
-    arrayOf(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING,
-        StandardOpenOption.SYNC,
-    )
-
-/**
- * 실행 상태의 무결성 장부(D-6G-48) — 이 넷이 맞아야 기동한다.
- *
- * 앞 판은 표본 해시 하나였고, 그래서 **원장만 지우거나 잘라도** 거부 없이 상한이 0 에서 다시
- * 시작했다(vr M-7). 원장의 해시와 줄 수를 함께 적으면 삭제·절삭·부분 복사가 전부 어긋난다.
- * [directoryId] 는 첫 확정이 지은 표식이다 — 파일 셋이 한 실행의 것임을 말한다.
- *
- * **세 파일을 통째로 복사한 것은 구별되지 않는다**(넷이 서로 맞으므로). 그것은 운영자 행위이고
- * 경계 밖이다 — 이 장부가 겨누는 것은 사고와 오조작이다.
- */
-private class RunStateFacts(
-    val directoryId: String,
-    val sampleListSha256: String,
-    val sampleScopeSha256: String,
-    val attemptsSha256: String,
-    val attemptLines: Int,
-)
-
-/**
  * 실험 실행 상태 디렉터리(D-6G-45·48) — 저장소 **밖**에 있고 파일 셋을 담는다.
  *
  * | 파일 | 무엇 |
@@ -110,6 +80,13 @@ class RunStateDirectory(
     private val directoryId: String = sha256Hex(realPathOf(root))
 
     /**
+     * 장부 파일의 판독([RunStateFactsFile]) — **누적 해시 초기화식보다 앞에 선다.** 복구·되돌림이 그
+     * 식 안에서 돌고 되돌림이 장부를 읽으므로, 뒤에 두면 그 읽기가 `null` 을 부른다(D-6G2d-1 과 같은
+     * 계열의 함정 — 프로퍼티 초기화는 선언 순서다).
+     */
+    private val factsFile = RunStateFactsFile(stateFile)
+
+    /**
      * 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6).
      *
      * **복구가 끝난 바이트로 짓는다**(D-6G2d-1). 프로퍼티 초기화는 선언 순서라, 이 자리에서 곧바로
@@ -121,6 +98,10 @@ class RunStateDirectory(
     private val ledger: LedgerDigest = healedLedgerDigest()
 
     init {
+        // **형식 판별은 잠금과 무관하다**(D-6G2d-44) — 잠금을 못 잡아도 옛 디렉터리는 「형식」으로
+        // 거부돼야 한다. 잠금 뒤로 미루면 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱
+        // 오류로 죽고, 운영자는 무엇이 틀렸는지 출력에서 읽을 수 없다.
+        factsFile.requireReadableFormat()
         if (lock is RunStateLock.Held) heldOrRelease { verifyIntegrity() }
     }
 
@@ -192,27 +173,7 @@ class RunStateDirectory(
                     "attempt_lines" to SnapshotJson.Number(ledger.lines.toString()),
                 ),
             )
-        replaceDurably(root.resolve(STAGED_STATE_NAME), stateFile, facts.render() + "\n")
-    }
-
-    /**
-     * staged 쓰기 → 원자적 교체 → **디렉터리 fsync**(cr r4 ③). 셋이 한 함수인 이유는 순서가 곧
-     * 보장이기 때문이다.
-     *
-     * `ATOMIC_MOVE` 는 **이름의 교체**만 원자적으로 만든다. 바이트가 아직 페이지 캐시에 있는 동안
-     * rename 이 먼저 굳으면, 그 사이의 전원 손실 뒤에 **이름은 새 파일을 가리키는데 내용이 0 바이트**
-     * 인 모양이 남는다 — 복구가 도는 순간은 방금 죽은 기계 위라 그 창이 실제로 열린다. [DURABLE_WRITE_OPTIONS]
-     * 의 `SYNC` 가 바이트를 먼저 굳히고, 교체 뒤의 디렉터리 fsync 가 **그 이름 자체**를 굳힌다(디렉터리
-     * 항목은 파일 fsync 로 굳지 않는다).
-     */
-    private fun replaceDurably(
-        staged: Path,
-        target: Path,
-        text: String,
-    ) {
-        Files.writeString(staged, text, *DURABLE_WRITE_OPTIONS)
-        Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        FileChannel.open(root, StandardOpenOption.READ).use { it.force(true) }
+        replaceDurably(root.resolve(STAGED_STATE_NAME), stateFile, facts.render() + "\n", root)
     }
 
     /**
@@ -228,7 +189,7 @@ class RunStateDirectory(
      * 뒤에 오므로 그 시점에는 장부가 이미 서 있다.
      */
     private fun rollBackInterruptedConfirmation() {
-        val facts = readFacts() ?: return
+        val facts = factsFile.read() ?: return
         if (facts.sampleListSha256 != EMPTY_DIGEST) return
         Files.deleteIfExists(sampleFile)
         Files.deleteIfExists(scopeFile)
@@ -239,7 +200,7 @@ class RunStateDirectory(
      * 없지만, **파일이 있는데 장부가 없으면** 거부다: 그것이 「장부만 지웠다」의 모양이다.
      */
     private fun verifyIntegrity() {
-        val facts = readFacts()
+        val facts = factsFile.read()
         val hasFiles = Files.isRegularFile(sampleFile) || Files.isRegularFile(attemptFile)
         require(facts != null || !hasFiles) {
             "실행 상태 장부가 없는데 파일이 있다 — 무엇이 지워졌는지 알 수 없다"
@@ -315,24 +276,7 @@ class RunStateDirectory(
         if (text.isEmpty() || text.endsWith("\n")) return
         val fragment = text.substringAfterLast('\n')
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
-        replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed)
-    }
-
-    private fun readFacts(): RunStateFacts? {
-        val fields =
-            runCatching { Files.readString(stateFile) }
-                .getOrNull()
-                ?.let { KonepsJsonParser.parse(it, ATTEMPT_MAX_DEPTH).asObject()?.fields }
-                ?: return null
-        requireCurrentFormat(fields["format_version"])
-        return RunStateFacts(
-            directoryId = requireNotNull(fields["directory_id"].asStringOrNull()) { "장부에 디렉터리 식별자가 없다" },
-            sampleListSha256 = requireNotNull(fields["sample_list_sha256"].asStringOrNull()) { "장부에 표본 해시가 없다" },
-            sampleScopeSha256 =
-                requireNotNull(fields["sample_scope_sha256"].asStringOrNull()) { "장부에 범위 해시가 없다" },
-            attemptsSha256 = requireNotNull(fields["attempts_sha256"].asStringOrNull()) { "장부에 원장 해시가 없다" },
-            attemptLines = requireNotNull(fields["attempt_lines"].asIntOrNull()) { "장부에 원장 줄 수가 없다" },
-        )
+        replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed, root)
     }
 }
 

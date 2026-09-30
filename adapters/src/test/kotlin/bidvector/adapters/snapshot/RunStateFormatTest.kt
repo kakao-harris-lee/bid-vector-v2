@@ -92,6 +92,31 @@ class RunStateFormatTest : RunStateDirectoryFixture() {
     }
 
     /**
+     * **D-6G2d-44 (cr r5 ⑤) — 형식 판별은 잠금과 무관하다.** 잠금을 못 잡은 열기는 읽기만 하지만,
+     * 그 읽기도 **이 코드의 형식**에서만 뜻이 있다. 앞 판은 형식 검사를 잠금을 든 갈래에만 두어,
+     * 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱 오류로 죽었다 — 운영자 출력에서 「손상」과
+     * 구별되지 않고 그 구별이 처방을 가른다.
+     */
+    @Test
+    fun `잠금을 못 잡아도 옛 형식은 형식으로 거부한다`() {
+        val held = open()
+        held.sampleList.confirm(runStateSample())
+        val state = root().resolve(STATE_NAME)
+        Files.writeString(state, Files.readString(state).replace("\"format_version\":$RUN_STATE_FORMAT_VERSION,", ""))
+
+        // 잠금을 **놓지 않는다** — 두 번째 열기는 Busy 로 간다(다른 실행이 도는 모양).
+        shouldThrow<RunStateFormatRefusedException> { open() }.fault shouldBe RunStateFormatFault.MISSING
+    }
+
+    /** 반대 방향 — 이 형식의 디렉터리는 잠금을 못 잡아도 **열린다**(읽기 전용으로 쓰인다). */
+    @Test
+    fun `잠금을 못 잡아도 이 형식이면 열린다`() {
+        open().sampleList.confirm(runStateSample())
+
+        open().lock shouldBe RunStateLock.Busy
+    }
+
+    /**
      * **cr r4 ③ — 교체 전에 바이트를 굳힌다.** `ATOMIC_MOVE` 는 **이름의 교체**만 원자적으로 만든다.
      * 바이트가 아직 페이지 캐시에 있는 동안 rename 이 먼저 굳으면, 그 사이의 전원 손실 뒤에 이름은 새
      * 파일을 가리키는데 내용이 0 바이트인 모양이 남는다 — 복구가 도는 순간은 방금 죽은 기계 위라 그

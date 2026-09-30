@@ -1,7 +1,12 @@
 package bidvector.app.collection
 
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.adapters.snapshot.RunStateLock
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
+import bidvector.procurement.CollectionAttempt
+import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -15,6 +20,7 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
@@ -326,4 +332,45 @@ class OpeningBudgetE2ETest {
             (mock.baseAmountNotices + second.baseAmountNotices) shouldContain notice
         }
     }
+
+    /**
+     * **D-6G2d-41 비용 공시** — append 하나가 fsync **셋**을 부른다(원장 · staged 장부 · 디렉터리 항목).
+     * 그것이 이 slice 가 택한 값이다: 장부가 원장보다 먼저 굳으면 정전 뒤 그 디렉터리는 영구 거부되고,
+     * 출구는 폐기(= 승인 상한을 0 에서 다시 시작)다.
+     *
+     * **문턱을 걸지 않는다** — 기계·파일시스템마다 한 자리 수가 다르고, 문턱은 그 차이에서 붉어지기만
+     * 한다. 재는 것은 크기의 자리수이고, 한 줄로 **공시**한다. 묶는 길(결말 단위)은
+     * `OPEN-6G2D-FSYNC-BATCHING` 이다 — 묶으면 크래시 창이 그만큼 넓어지므로 값을 보고 정한다.
+     */
+    @Test
+    fun `원장 append 의 내구 비용을 공시한다`() {
+        val root = Files.createTempDirectory("6g2d-append-cost")
+        val runState = RunStateDirectory(root)
+        val started = System.nanoTime()
+        repeat(APPEND_COST_LINES) { runState.attempts.append(costProbeLine()) }
+        val elapsedMicros = (System.nanoTime() - started) / 1_000
+        runState.close()
+
+        println(
+            "run-state append durable lines=$APPEND_COST_LINES " +
+                "totalMicros=$elapsedMicros perAppendMicros=${elapsedMicros / APPEND_COST_LINES}",
+        )
+        attemptLinesOf(root) shouldHaveSize APPEND_COST_LINES
+    }
+
+    /** 비용 공시용 한 줄 — 의도 줄이라 걷기를 갖지 않는다(D-6G2d-4 ⓒ). */
+    private fun costProbeLine() =
+        CollectionAttempt(
+            noticeKey = null,
+            axis = SourceEndpoint.OPENING_RESULT_LIST,
+            outcome = AttemptOutcome.Succeeded,
+            at = COST_PROBE_AT,
+            kind = AttemptKind.PENDING,
+            walk = null,
+        )
 }
+
+/** 공시에 쓰는 줄 수 — 자리수를 보는 데 충분하고 test 시간을 늘리지 않는 값이다. */
+private const val APPEND_COST_LINES = 50
+
+private val COST_PROBE_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")

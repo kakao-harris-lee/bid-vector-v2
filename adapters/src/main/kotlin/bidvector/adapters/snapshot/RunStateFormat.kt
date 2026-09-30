@@ -29,6 +29,14 @@ internal enum class RunStateFormatFault(
 
     /** 칸은 있는데 이 코드가 읽을 줄 아는 형태·값이 아니다(문자열·선행 0·소수·다른 수). */
     MISMATCHED("RUN_STATE_FORMAT_MISMATCHED"),
+
+    /**
+     * **원장 줄**이 이 형식의 것이 아니다(D-6G2d-44) — 걷기 칸이 생기기 전에 쓰인 AXIS 줄이다.
+     * 장부(`state.json`)가 아니라 줄에서 드러나므로 사유를 따로 둔다: 잠금을 못 잡아 장부 대조를
+     * 건너뛴 열기에서도, 장부가 지워진 디렉터리에서도 이 줄은 **형식**으로 거부돼야 한다. 앞 판은
+     * 값 타입의 generic `require` 로 죽어 운영자 출력에 「손상」과 같은 모양으로 보였다.
+     */
+    LEGACY_LINE("RUN_STATE_FORMAT_LEGACY_LINE"),
 }
 
 /**
