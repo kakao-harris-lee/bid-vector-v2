@@ -85,6 +85,18 @@ class DetailFetchTest {
             DetailFetchGates(ageGateHours = -1, recheckGateHours = 0, axisRetryLimit = 3)
         }
     }
+
+    /**
+     * cr r4 ④ — 재호출 상한의 하한을 **정책이 서는 시점**에 본다. 0 은 첫 일시 실패로 그 축을 영구히
+     * 버리는 값이라 정책으로 둘 수 없고, 여기서 막으면 잘못된 상한으로 **호출이 한 번도 나가지 않는다**
+     * (읽는 자리에 두면 그 앞의 배선·표본 선택이 이미 돌아 있다).
+     */
+    @Test
+    fun `DetailFetchGates 는 재호출 상한 0 을 거부한다 — 정책이 서는 시점에`() {
+        io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 0)
+        }
+    }
 }
 
 /** D-3B2-5 (a) — COL-04 「업종제한 플래그 N → 서브콜 0회」의 순수 술어. */
