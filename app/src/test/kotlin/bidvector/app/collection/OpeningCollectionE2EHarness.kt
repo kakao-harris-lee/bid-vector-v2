@@ -10,6 +10,12 @@ import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.spi.ThrowableProxyUtil
 import ch.qos.logback.core.read.ListAppender
+import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.context.event.ApplicationPreparedEvent
+import org.springframework.context.ApplicationContext
+import org.springframework.context.ApplicationListener
+import org.testcontainers.postgresql.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.charset.StandardCharsets
@@ -19,12 +25,6 @@ import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
-import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.boot.context.event.ApplicationPreparedEvent
-import org.springframework.context.ApplicationContext
-import org.springframework.context.ApplicationListener
-import org.testcontainers.postgresql.PostgreSQLContainer
-import org.testcontainers.utility.DockerImageName
 
 /** 업무마다 여섯 — 마지막 하나는 상세 응답이 비어 원문이 한 줄도 남지 않는다(D-6G-42). */
 internal const val NOTICES_PER_SLOT = 6

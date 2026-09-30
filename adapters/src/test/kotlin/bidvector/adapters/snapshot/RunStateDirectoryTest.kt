@@ -312,7 +312,11 @@ class RunStateDirectoryTest {
     fun `찢어진 끝 줄은 기동을 막지 않고 호출 하나로 센다`() {
         val directory = open()
         directory.attempts.append(httpAttempt())
-        val spentBefore = directory.attempts.read().spend(AT).total
+        val spentBefore =
+            directory.attempts
+                .read()
+                .spend(AT)
+                .total
         directory.close()
         val file = root().resolve(ATTEMPT_LEDGER_NAME)
         // 개행 없이 끝난 조각 — 마지막 append 가 절반만 디스크에 닿았다.
@@ -320,10 +324,16 @@ class RunStateDirectoryTest {
 
         val reopened = open()
 
-        reopened.attempts.read().spend(AT).total shouldBe spentBefore + 1
+        reopened.attempts
+            .read()
+            .spend(AT)
+            .total shouldBe spentBefore + 1
         // 조각을 닫았으므로 다음 append 가 그 줄에 이어 붙지 않는다.
         reopened.attempts.append(httpAttempt())
-        reopened.attempts.read().spend(AT).total shouldBe spentBefore + 2
+        reopened.attempts
+            .read()
+            .spend(AT)
+            .total shouldBe spentBefore + 2
     }
 }
 
@@ -383,5 +393,4 @@ class FileAttemptLedgerTest {
 
         shouldThrow<IllegalArgumentException> { ledger.read() }
     }
-
 }

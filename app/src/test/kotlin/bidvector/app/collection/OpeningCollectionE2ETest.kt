@@ -10,10 +10,10 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * M6/6G D-6G-1·11·19·20 E2E — **무엇을 부르는가**. 출하 조립을 mock KONEPS 로 기동해 표본틀 →
@@ -78,9 +78,10 @@ class OpeningCollectionE2ETest {
     fun `전송이 실패해도 서비스 키가 어느 채널에도 없다`() {
         // 닿을 수 없는 주소면 표본틀이 절단돼 실행 자체가 실패한다(D-6G-50) — 그것이 이 test 가
         // 원하는 상태다. 실패를 삼키지 않고 **일어났음을 단언**한 뒤 채널을 훑는다.
-        val failure = runCatching {
-            e2e.bootAndRun(mapOf("bidvector.koneps.opening.scsbid-base-url" to "http://127.0.0.1:1/mock"))
-        }
+        val failure =
+            runCatching {
+                e2e.bootAndRun(mapOf("bidvector.koneps.opening.scsbid-base-url" to "http://127.0.0.1:1/mock"))
+            }
 
         failure.isFailure shouldBe true
         assertNoServiceKey(e2e.capturedEverything())

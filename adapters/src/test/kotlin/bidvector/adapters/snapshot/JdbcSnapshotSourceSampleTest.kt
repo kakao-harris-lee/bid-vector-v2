@@ -293,7 +293,9 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), farLater))
 
         extraction.sampledWithoutDetail shouldBe 0
-        extraction.rows.single().outcome.bidderRows shouldHaveSize 3
+        extraction.rows
+            .single()
+            .outcome.bidderRows shouldHaveSize 3
     }
 
     /**

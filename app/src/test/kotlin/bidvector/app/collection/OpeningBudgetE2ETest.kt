@@ -102,9 +102,9 @@ class OpeningBudgetE2ETest {
         val nonce = "CAPCUT"
         val capped =
             mapOf(
-                    "bidvector.opening-collection.calls-per-day" to CAP_CUTS_SECOND_PAGE.toString(),
-                    "bidvector.opening-collection.calls-total" to CAP_CUTS_SECOND_PAGE.toString(),
-                )
+                "bidvector.opening-collection.calls-per-day" to CAP_CUTS_SECOND_PAGE.toString(),
+                "bidvector.opening-collection.calls-total" to CAP_CUTS_SECOND_PAGE.toString(),
+            )
 
         val (_, first) = e2e.bootAndRun(capped, nonce = nonce, openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE)
 
