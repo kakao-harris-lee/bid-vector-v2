@@ -97,9 +97,20 @@ internal fun jsonDateOrNull(value: LocalDate?): SnapshotJson =
 internal fun jsonInstant(value: Instant?): SnapshotJson =
     value?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null
 
-/** 금액은 **정수 리터럴**이다 — 소수점이 없어야 양쪽 언어에서 왕복이 exact 하다(스키마 §1). */
+/**
+ * 금액은 **정수 리터럴**이다 — 소수점이 없어야 양쪽 언어에서 왕복이 exact 하다(스키마 §1).
+ *
+ * 소수부가 있는 값은 **행 단위 부재**로 떨어진다(D-6G2d-8 ⓓ). `setScale(0)` 은 반올림 모드가 없어
+ * 소수부에서 던지고, 그 예외 하나가 스냅숏 바이트를 한 줄도 내지 못하게 한다 — 금액 칸은 예정가격·
+ * 투찰금액·A 구성 항목 넷 이상이고, 원천이 원 단위 정수를 낸다는 것은 조사 문서의 **관측**이지 계약이
+ * 아니다. 반올림하지 않는다: 지어낸 값이 채점에 들어가는 것이 결측보다 나쁘고, 「값이 없다」는 이미
+ * 행 단위 제외의 입력이다(D-6G-28). 끝자리 0 은 소수부가 아니다(`1200.00` → `1200`).
+ */
 internal fun jsonAmount(value: BigDecimal?): SnapshotJson =
-    value?.let { SnapshotJson.Number(it.setScale(0).toPlainString()) } ?: SnapshotJson.Null
+    value
+        ?.takeIf { it.stripTrailingZeros().scale() <= 0 }
+        ?.let { SnapshotJson.Number(it.setScale(0).toPlainString()) }
+        ?: SnapshotJson.Null
 
 /** 비율은 지수 표기 없이 — `1E-2` 는 JSON 으로 유효하지만 같은 값이 두 표기를 갖게 된다(재현성). */
 internal fun jsonRate(value: BigDecimal?): SnapshotJson =

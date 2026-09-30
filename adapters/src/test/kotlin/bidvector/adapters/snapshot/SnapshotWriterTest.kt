@@ -110,6 +110,27 @@ class SnapshotWriterTest {
         rendered shouldNotContain "1E-2"
     }
 
+    /**
+     * **D-6G2d-8 ⓓ — 소수부가 있는 금액이 추출 전체를 멈추지 않는다.** `setScale(0)` 은 반올림 모드가
+     * 없어 소수부에서 던지고, 그 예외 하나가 스냅숏 바이트를 **한 줄도** 내지 못하게 한다. 원천이 원
+     * 단위 정수를 낸다는 것은 조사 문서의 관측이고 계약이 아니다. 반올림하지 않는다 — 지어낸 값이
+     * 채점에 들어가는 것이 결측보다 나쁘고, 「값이 없다」는 이미 행 단위 제외의 입력이다(D-6G-28).
+     */
+    @Test
+    fun `소수부가 있는 금액은 행 단위 부재로 떨어진다`() {
+        val row =
+            rowOf("aa", bidders = listOf(1 to BigDecimal("1100000000.5"))).let {
+                it.copy(notice = it.notice.copy(baseAmount = BigDecimal("1234567890.01")))
+            }
+
+        val rendered = SnapshotWriter.renderRows(listOf(row))
+
+        rendered shouldContain "\"base_amount\":null"
+        rendered shouldContain "\"amount\":null"
+        // 다른 칸은 그대로 실린다 — 행 전체가 사라지지 않는다.
+        rendered shouldContain "\"planned_price\":1250000000"
+    }
+
     @Test
     fun `투찰자 순번은 금액 오름차순이고 금액 없는 행은 뒤로 간다`() {
         val bidders = listOf<Pair<Int?, BigDecimal?>>(3 to BigDecimal("300"), null to null, 1 to BigDecimal("100"))
