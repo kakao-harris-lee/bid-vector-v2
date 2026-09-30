@@ -34,6 +34,14 @@ private val SHORT_WALK = AttemptOutcome.Failed("SHORT_WALK")
 
 /** 다시 걷기는 다른 시각에 온다 — 그 시각이 걷기의 이름이다(D-6G-58). */
 private const val RE_WALK_GAP_SECONDS = 3600L
+/** 용역이 부르는 축 셋 — 업무가 정한다(`expectedAxesFor`). */
+private val SERVICE_AXES: List<SourceEndpoint> =
+    listOf(
+        SourceEndpoint.RESERVE_PRICE_DETAIL,
+        SourceEndpoint.OPENING_COMPLETE,
+        SourceEndpoint.BASE_AMOUNT_DETAIL,
+    )
+
 private val WINDOW_FROM: LocalDate = LocalDate.of(2026, 6, 16)
 private val WINDOW_TO: LocalDate = LocalDate.of(2026, 6, 18)
 
@@ -60,10 +68,12 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         round: String = "000",
         at: Instant = OBSERVED_AT,
         marker: String? = null,
+        fields: Map<String, String> = emptyMap(),
     ) = appendRawObservation(
         RawNoticeObservation.of(
             mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round) +
-                (marker?.let { mapOf(RawKey("prcbdrNm") to it) } ?: emptyMap()),
+                (marker?.let { mapOf(RawKey("prcbdrNm") to it) } ?: emptyMap()) +
+                fields.mapKeys { RawKey(it.key) },
             endpoint,
             at,
         ),
@@ -182,6 +192,62 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), again)).rows.single()
 
         row.outcome.bidderRows shouldHaveSize 3
+    }
+
+    /**
+     * **cr r4 ⑧ — 계수 여덟이 제 칸으로 간다.** `SnapshotExtraction` 의 계수는 전부 `Int` 라 두 칸을
+     * 맞바꾼 편집이 컴파일을 지나고, 판독은 **사유가 뒤바뀐** 스냅숏을 받는다(행이 줄지 않으므로 어느
+     * 항등식도 걸리지 않는다). 호출부를 명명 인자로 두는 것은 읽는 사람을 위한 것이고, 배선을 **잠그는
+     * 것은 이 판**이다: 여덟 값이 서로 다른 수로 **동시에** 서므로 어느 둘을 바꿔도 붉어진다.
+     *
+     * 사유별 판을 하나씩 두는 것으로는 부족하다 — 그 판들은 다른 계수가 전부 0 이라, 0 과 0 을 바꾼
+     * 맞바꾸기가 그대로 지나간다(같은 이유로 D-6G2d-34 가 로그 줄에서 값을 잠갔다).
+     */
+    @Test
+    fun `계수 여덟이 제 칸으로 간다 — 서로 다른 수로 동시에`() {
+        val rowNotices = syntheticNumbers(1..2)
+        val withoutDetail = syntheticNumbers(11..14)
+        val withoutCanonical = syntheticNumbers(21..25)
+        val unfinished = syntheticNumbers(31..36)
+        val outside = syntheticNumbers(41..47)
+        val unusable = syntheticNumbers(51..58)
+        val sample = sampleOf(*(rowNotices + withoutDetail + withoutCanonical + unfinished).toTypedArray())
+
+        rowNotices.forEach { number ->
+            persistCanonical(number, listObservation(number))
+            SERVICE_AXES.forEach { observe(number, it) }
+        }
+        // 첫 행이 소수 금액 **셋**(예정가격·개찰 기초금액·투찰금액)과 반쪽 A **하나**를 나른다.
+        observe(
+            rowNotices[0],
+            SourceEndpoint.RESERVE_PRICE_DETAIL,
+            fields = mapOf("plnprc" to "1250000000.5", "bssamt" to "1239999999.5"),
+        )
+        observe(rowNotices[0], SourceEndpoint.OPENING_COMPLETE, fields = mapOf("bidprcAmt" to "1100000000.5"))
+        observe(
+            rowNotices[0],
+            SourceEndpoint.BID_PRICE_FORMULA_A,
+            fields = mapOf("bidPrceCalclAOpenDt" to "2026-06-10 09:00:00"),
+        )
+        withoutCanonical.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE) }
+        unfinished.forEach { number ->
+            persistCanonical(number, listObservation(number))
+            observe(number, SourceEndpoint.OPENING_COMPLETE)
+        }
+        outside.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE) }
+        // 차수가 서지 않는 행은 키를 갖지 못한다 — 어느 표본에도 속하지 않아 항등식 밖이다.
+        unusable.forEach { observe(it, SourceEndpoint.OPENING_COMPLETE, round = "1") }
+
+        val extraction = extract(sample, conclusionsWithUnfinished(sample, unfinished))
+
+        extraction.rows shouldHaveSize 2
+        extraction.fractionalAmounts shouldBe 3
+        extraction.sampledWithoutDetail shouldBe 4
+        extraction.skippedWithoutNotice shouldBe 5
+        extraction.incompleteAxis shouldBe 6
+        extraction.observedOutsideSample shouldBe 7
+        extraction.unusableRawRows shouldBe 8
+        extraction.incompleteAValues shouldBe 1
     }
 
     /** 공사는 A값까지 넷이다 — 부르지 않는 축을 기다리면 공사 아닌 공고가 영영 행이 되지 않는다. */
@@ -459,6 +525,20 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
             SourceEndpoint.NOTICE_LIST,
             OBSERVED_AT,
         )
+
+    /** 합성 공고번호 — 같은 형태에 순번만 다르다(키 해시가 접히지 않게). */
+    private fun syntheticNumbers(range: IntRange): List<String> = range.map { "20260617%03d-00".format(it) }
+
+    /** [unfinished] 의 개찰완료만 미완으로 — 그 공고는 행이 아니라 `incompleteAxis` 다. */
+    private fun conclusionsWithUnfinished(
+        sample: SampleList,
+        unfinished: List<String>,
+    ): Map<String, Map<SourceEndpoint, AxisConclusion>> {
+        val hashes = unfinished.map { NoticeKeyHash.of(it, "000").value }.toSet()
+        return allAxesSettled(sample).mapValues { (key, axes) ->
+            if (key in hashes) axes + (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT)) else axes
+        }
+    }
 
     private fun persistCanonical(
         number: String,

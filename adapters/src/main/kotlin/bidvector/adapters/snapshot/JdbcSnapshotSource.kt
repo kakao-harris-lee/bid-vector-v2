@@ -69,15 +69,17 @@ class JdbcSnapshotSource(
                 }
             }
         }
+        // **명명 인자**다(cr r4 ⑧) — 같은 타입의 계수 일곱을 위치로 넘기면 두 칸을 맞바꾼 편집이
+        // 컴파일을 지나고, 그 뒤 판독은 「사유가 바뀐 스냅숏」을 받는다. 배선은 아래 조립 test 가 잰다.
         return SnapshotExtraction(
-            rows,
-            withoutNotice,
-            sample.keys.size - withDetail.size,
-            observed.outsideSample.size,
-            incomplete,
-            observed.unusableRows,
-            tally.fractionalAmounts,
-            tally.incompleteAValues,
+            rows = rows,
+            skippedWithoutNotice = withoutNotice,
+            sampledWithoutDetail = sample.keys.size - withDetail.size,
+            observedOutsideSample = observed.outsideSample.size,
+            incompleteAxis = incomplete,
+            unusableRawRows = observed.unusableRows,
+            fractionalAmounts = tally.fractionalAmounts,
+            incompleteAValues = tally.incompleteAValues,
         )
     }
 
