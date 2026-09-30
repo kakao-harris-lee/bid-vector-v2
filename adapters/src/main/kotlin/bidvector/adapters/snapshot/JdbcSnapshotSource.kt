@@ -90,7 +90,7 @@ class JdbcSnapshotSource(
         val known = axisConclusions[noticeKeyHash].orEmpty()
         // **성공 또는 빈 응답**만 완료다(D-6G2d-4 · D-6G2d-8 ⓒ). 실패로 정착한 축은 다시 부르지
         // 않지만 그 행으로 스냅숏을 쓸 수도 없다 — 그 공고는 `incomplete_axis` 로 정직하게 빠진다.
-        return expectedAxesFor(division).all { known[it]?.let { c -> c.usesRows || c.outcome == AttemptOutcome.Empty } == true }
+        return expectedAxesFor(division).all { axis -> known[axis]?.let(::usableAxis) == true }
     }
 
     private fun readObservations(
@@ -158,16 +158,14 @@ class JdbcSnapshotSource(
         rows: ResultSet,
         conclusion: AxisConclusion?,
     ) {
-        // 빈 응답으로 끝난 축은 **0 행**이다 — 앞의 잘린 걷기가 남긴 쪽을 쓰지 않는다. 결말 어휘가
-        // 그것을 말한다(D-6G2d-4 ⓑ): 걷기 부재로 읽으면 옛 형식 줄이 같은 값이 된다.
-        if (conclusion != null && conclusion.outcome == AttemptOutcome.Empty) return
         val observedAt = rows.getTimestamp("observed_at").toInstant()
-        if (conclusion != null && observedAt != conclusion.walk) return
+        if (!fromLedgeredWalk(conclusion, observedAt)) return
         val kept = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { WalkRows(observedAt) }
         // 결말 줄이 있는 축은 위에서 그 걷기의 행만 통과했으므로 여기서 걷기가 갈리지 않는다.
-        if (observedAt < kept.walk) return
-        if (observedAt > kept.walk) kept.replaceWalk(observedAt)
-        kept.rows += RawRow(parseFields(rows.getString("payload_fields")), policy)
+        if (observedAt >= kept.walk) {
+            if (observedAt > kept.walk) kept.replaceWalk(observedAt)
+            kept.rows += RawRow(parseFields(rows.getString("payload_fields")), policy)
+        }
     }
 
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
@@ -213,6 +211,23 @@ class JdbcSnapshotSource(
 
 /** 제로패딩 세 자리가 아니면 **기본값을 쓰지 않는다** — 차수를 모르는 행은 키를 갖지 못한다. */
 private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { NoticeRound.of(it) }.getOrNull() }
+
+/**
+ * 그 축이 **완료**인가 — 성공과 빈 응답만이다(D-6G2d-4 · D-6G2d-8 ⓒ). 실패로 정착한 축은 다시
+ * 부르지 않지만 그 행으로 스냅숏을 쓸 수도 없다.
+ */
+private fun usableAxis(conclusion: AxisConclusion): Boolean =
+    conclusion.usesRows || conclusion.outcome == AttemptOutcome.Empty
+
+/**
+ * 이 행이 **쓸 걷기의 것인가**. 결말 줄이 있으면 그 줄이 가리킨 걷기의 행만이고, 빈 응답으로 끝난
+ * 축은 0 행이다(결말 어휘가 그것을 말한다 — 걷기 부재로 읽으면 옛 형식 줄이 같은 값이 된다,
+ * D-6G2d-4 ⓑ). 결말 줄이 없으면 전부 후보이고 선별은 부르는 쪽이 한다.
+ */
+private fun fromLedgeredWalk(
+    conclusion: AxisConclusion?,
+    observedAt: Instant,
+): Boolean = conclusion == null || (conclusion.outcome != AttemptOutcome.Empty && observedAt == conclusion.walk)
 
 /** 이 추출이 본 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다(관측 창은 없다, D-6G-68). */
 private class ObservedRows(

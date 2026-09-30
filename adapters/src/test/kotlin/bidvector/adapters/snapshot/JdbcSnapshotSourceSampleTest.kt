@@ -29,6 +29,9 @@ import java.time.temporal.ChronoUnit
 
 private val OBSERVED_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")
 
+/** 짧은 걷기 — 미완이다(다시 부른다). 원장이 그 축을 끝내지 않았다는 뜻이다. */
+private val SHORT_WALK = AttemptOutcome.Failed("SHORT_WALK")
+
 /** 다시 걷기는 다른 시각에 온다 — 그 시각이 걷기의 이름이다(D-6G-58). */
 private const val RE_WALK_GAP_SECONDS = 3600L
 private val WINDOW_FROM: LocalDate = LocalDate.of(2026, 6, 16)
@@ -150,7 +153,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
                 (
                     sample.keys.single().value to
                         allAxesSettled(sample).getValue(sample.keys.single().value) +
-                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(AttemptOutcome.Failed("SHORT_WALK"), OBSERVED_AT))
+                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(SHORT_WALK, OBSERVED_AT))
                 )
         val extraction = extract(sample, partial)
 
