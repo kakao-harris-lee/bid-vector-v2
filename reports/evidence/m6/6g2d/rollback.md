@@ -1,6 +1,6 @@
 # M6/6G-2d — rollback
 
-실측 HEAD: `21d979e9` (이 slice 의 마지막 산출물 커밋)
+실측 HEAD: `44a70d5f` (재작업 1 의 마지막 산출물 커밋)
 
 base `c357e437`. 되돌림은 **range revert 가 아니라 경로 한정**이다 — 같은 range 의 팀장 레인 커밋
 (마일스톤 문단)까지 걷지 않는다.
@@ -8,11 +8,12 @@ base `c357e437`. 되돌림은 **range revert 가 아니라 경로 한정**이다
 ## 목록은 손으로 쓰지 않는다
 
 ```
-git diff --name-status c357e437..21d979e9
+git diff --name-status c357e437..44a70d5f
 ```
 에서 기계적으로 낸다. `reports/evidence/m6/6g2d/**`(되돌리지 않는다) 와 공유 파일 둘(아래 hunk 격리)
-을 빼면 **A 1 · M 33**. 라운드마다 파일이 늘면 이 절차를 다시 돌린다 — 목록이 낡는 것이 이 결함의
-실제 원인이다.
+을 빼면 **A 5 · M 34**. 라운드마다 파일이 늘면 이 절차를 다시 돌린다 — 목록이 낡는 것이 이 결함의
+실제 원인이다(재작업 1 에서 A 가 1 → 5 로 늘었다: 금액 계약 test · 형식 판별 production·test · 공통
+하네스 · 원장 줄 형태 test). **새 파일 다섯은 전부 in_scope** 경로다.
 
 ## ① Kotlin 경로 한정 복원
 
@@ -57,22 +58,23 @@ git diff 9a411591~1..9a411591 -- config/quality/architecture-policy.properties |
   (`9a411591`)이다. 역적용은 그 한 줄을 **되살린다**.
 
 **`--3way` 도 자동 해소에 실패할 수 있다**(같은 삽입 지점에 다른 slice 의 문단이 붙은 경우). 수동
-해소 절차: `milestone-6.md` 는 「6G-2d 착수」 문단 **전체**를 지우고 그 앞뒤 문단은 남긴다.
+해소 절차: `milestone-6.md` 는 「6G-2d 착수」 문단 **전체**를 지우고 그 앞뒤 문단은 남긴다(실측: 남은 6G 언급
+넷은 base 의 것이다).
 `architecture-policy.properties` 는 use case 의 procurement 허용 목록에서 축 결말 타입 한 줄을
 **되살리고**(알파벳 순서가 아니라 원래 자리 — 목록 머리의 시도 갈래 타입 바로 뒤) 다른 줄은 손대지
 않는다. 확인은 **둘 다** 본다: 「내 줄이 사라졌다」와 「남의 줄이 남았다」.
 
-## ①~⑥ 실측 (버릴 clone, 실측 HEAD `21d979e9`)
+## ①~⑥ 실측 (버릴 clone, 실측 HEAD `44a70d5f`)
 
 | 축 | 결과 |
 |---|---|
 | ① `git restore …` | exit 0 |
-| ② D/M 수 | **D 1 · M 33** — 위 기계 목록과 같다. 남은 untracked 0 |
+| ② D/M 수 | **D 5 · M 34** — 위 기계 목록과 같다. 남은 untracked 0 |
 | ② 공유 파일 hunk 역적용 둘 | 각각 exit 0 · conflict 0(`--3way` 없이) |
 | ③ `git diff c357e437 -- <복원 경로들 + 공유 파일 둘>` | **0 줄**(트리 동일) |
 | ③ 남의 줄 남음 | `milestone-6.md` 에 base 의 6G 언급 넷 그대로 · 허용 목록의 축 결말 타입 한 줄 **되살아남** |
 | ④ `./gradlew --no-daemon compileTestKotlin` | exit 0 |
-| ⑤⑥ `./gradlew --no-daemon check --no-build-cache` | exit 0 · 2,505 tests · skipped 4 · failures 0 · errors 0 |
+| ⑤⑥ `./gradlew --no-daemon check --no-build-cache` | exit 0 · `test` 2,505 · skipped 4 · failures 0 · errors 0 · `compatibilitySmokeTest` 8 |
 
 갈음은 「HEAD 가 초록이다」가 아니라 **트리 동일성**으로만 한다 — 되돌린 트리의 파일이 base 와 같은지
 (③)를 재고, 그 위에서 ④⑤⑥ 을 돌린다.
@@ -80,7 +82,7 @@ git diff 9a411591~1..9a411591 -- config/quality/architecture-policy.properties |
 ## 실측이 유효한가 (verifier 대조)
 
 ```
-git diff --name-only 21d979e9..<판정 SHA> -- <위 ① 의 경로들> milestone-6.md \
+git diff --name-only 44a70d5f..<판정 SHA> -- <위 ① 의 경로들> milestone-6.md \
   config/quality/architecture-policy.properties
 ```
 **빈 출력이면 유효하다.** 한 줄이라도 나오면 그 뒤 커밋이 되돌림 대상을 바꾼 것이므로 이 실측은
@@ -105,9 +107,10 @@ git diff --name-only 21d979e9..<판정 SHA> -- <위 ① 의 경로들> milestone
 
 ## 실측
 
-- 버릴 clone(`--no-hardlinks`)에서 `21d979e9` 를 checkout 한 뒤 위 ①②③④⑤⑥ 을 순서대로 돌렸다 —
+- 버릴 clone(`--no-hardlinks`)에서 `44a70d5f` 를 checkout 한 뒤 위 ①②③④⑤⑥ 을 순서대로 돌렸다 —
   전부 위 표의 값이다. 갈음은 「HEAD 가 초록이다」가 아니라 **③ 의 트리 동일성**이다.
-- ⑥ 재실측(별 clone, evidence 커밋 `6c3a8651` checkout → 같은 ①② 절차): evidence 셋
-  (`scope.md`·`commands.md`·`rollback.md`)을 **남긴 채** `check` 가 exit 0 이다 — 되돌리지 않기로 한
-  문서가 base 의 게이트를 붉히지 않는다. 이 줄 자신을 더하는 커밋은 그 실측 뒤에 오므로, 마지막
-  HEAD 의 판정은 verifier 와 PR 조치 코멘트가 정본이다(evidence-pack 규격).
+- ⑥ 재실측(r0 에서, evidence 커밋 checkout → 같은 ①② 절차): evidence 셋을 **남긴 채** `check` 가
+  exit 0 이었다 — 되돌리지 않기로 한 문서가 base 의 게이트를 붉히지 않는다. 재작업 1 은 evidence 파일을
+  늘리지 않았고(같은 셋을 고쳤다) 누출 어휘를 축어로 담지 않는 규율도 그대로라, 그 성질은 유지된다.
+- 이 줄 자신을 더하는 커밋은 실측 뒤에 오므로, 마지막 HEAD 의 판정은 verifier 와 PR 조치 코멘트가
+  정본이다(evidence-pack 규격).
