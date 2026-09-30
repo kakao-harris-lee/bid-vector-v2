@@ -25,8 +25,13 @@ data class CollectionAttempt(
     val kind: AttemptKind,
     /**
      * **이 결말이 가리키는 걷기**(D-6G-68) — 그 걷기의 관측 시각이고, 한 걷기의 모든 쪽이 같은 값을
-     * 단다. [AttemptKind.AXIS] 줄만 갖는다(호출 단위 줄은 걷기를 모른다). 빈 응답이면 `null` 이다 —
-     * 그 걷기는 행을 남기지 않았고, 그것이 곧 「이 축은 0 행」이라는 뜻이다.
+     * 단다. [AttemptKind.AXIS] 줄만 갖고, AXIS 줄은 **언제나** 갖는다(D-6G2d-4 ⓒ — `init` 이 양방향으로
+     * 요구한다). 빈 응답도 걷기의 이름은 있다: 행을 남기지 않았다는 것은 결말 어휘([AttemptOutcome.Empty])
+     * 가 말한다. 앞 판은 그 둘을 `null` 하나로 접었고, 그래서 **걷기를 모르는 옛 줄**과 **빈 응답**이
+     * 같은 값이 되어 축이 통째로 빠진 완료 행이 나왔다(vr r5-t probe W7).
+     *
+     * **기본값이 없다**(cr r5-t L-1). AXIS 줄을 쓰는 새 자리가 인자를 잊으면 그 축이 조용히 「0 행」이
+     * 되는 것이 아니라 컴파일이 깨진다.
      *
      * 이 칸이 없던 동안 추출은 「원문 행 중 가장 늦은 시각」으로 걷기를 **짐작**했다. 그러면 셋이
      * 조용히 틀린다: 빈 응답으로 끝난 재걷기는 행을 남기지 않아 앞의 잘린 걷기가 마지막으로 보이고,
@@ -34,13 +39,15 @@ data class CollectionAttempt(
      * 순서가 뒤집힌다. 셋 다 정직한 운영자에게 일어나고(예비 추출·일시적 `NODATA`·시계 보정),
      * 결과는 **잘린 투찰 행이 완료 행으로 실리는 것**이다 — 계수도 오류도 없이.
      */
-    val walk: Instant? = null,
+    val walk: Instant?,
 ) {
     init {
         // 형태를 여기서 닫는다 — 원장은 영속 파일이고, 키가 아닌 문자열이 한 줄 들어가면 그 줄은
         // 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만 태운다).
         require(noticeKey == null || NOTICE_KEY_HEX.matches(noticeKey)) { NOTICE_KEY_HEX_MESSAGE }
-        require(walk == null || kind == AttemptKind.AXIS) { "걷기 식별자는 AXIS 줄만 갖는다" }
+        // **양방향**이다(D-6G2d-4 ⓒ) — AXIS 아닌 줄이 걷기를 갖는 것도, AXIS 줄이 빠뜨리는 것도 막는다.
+        // 한쪽만 막으면 빠뜨림이 「빈 응답」으로 조용히 읽힌다.
+        require((kind == AttemptKind.AXIS) == (walk != null)) { "걷기 식별자는 AXIS 줄만, 그리고 AXIS 줄은 반드시 갖는다" }
     }
 }
 
@@ -53,6 +60,9 @@ data class CollectionAttempt(
 internal val NOTICE_KEY_HEX = Regex("[0-9a-f]{64}")
 
 internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 64 자다"
+
+/** AXIS 줄의 걷기 부재 — 형태 위반이다(D-6G2d-4 ⓑ). 「모름」을 「빈 응답」으로 접지 않는다. */
+internal const val AXIS_WALK_REQUIRED = "AXIS 줄은 걷기 식별자를 반드시 싣는다"
 
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**
@@ -106,9 +116,21 @@ sealed interface AttemptOutcome {
  * 된다. [walk] 가 `null` 인 settled 는 빈 응답이고 **0 행**이다.
  */
 data class AxisConclusion(
-    val settled: Boolean,
-    val walk: Instant?,
-)
+    /**
+     * 그 걷기가 **어떻게 끝났는가**. 「끝났다」만으로는 부족하다: 빈 응답으로 정착한 축은 0 행이고,
+     * 실패로 끝난 축은 걷기가 있어도 그 행을 쓸 수 없다 — 셋을 한 `Boolean` 으로 접으면 판독이
+     * 그 차이를 잃는다(vr r5-t probe W7 · M-2).
+     */
+    val outcome: AttemptOutcome,
+    /** 이 결말이 가리키는 걷기 — AXIS 줄은 언제나 싣는다(D-6G2d-4 ⓑ). */
+    val walk: Instant,
+) {
+    /** 다시 부르지 않는가 — 이어 돌기가 보는 값이다. */
+    val settled: Boolean get() = outcome.isSettled
+
+    /** 그 걷기의 **행을 쓰는가** — 빈 응답과 실패는 행을 쓰지 않는다. */
+    val usesRows: Boolean get() = outcome == AttemptOutcome.Succeeded
+}
 
 /**
  * 읽어 온 시도 이력 — 두 물음에만 답한다. 파일 판독은 어댑터가 하고 이 타입은 값만 센다.
@@ -156,7 +178,9 @@ class AttemptHistory(
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, lines) ->
                 lines.groupBy { it.axis }.mapValues { (_, byAxis) ->
-                    byAxis.last().let { AxisConclusion(it.outcome.isSettled, it.walk) }
+                    // AXIS 줄은 걷기를 반드시 갖는다(`CollectionAttempt.init`) — 판독이 그 불변식을
+                    // 다시 요구해, 형태를 어긴 줄이 여기까지 왔으면 조용히 지나가지 않는다.
+                    byAxis.last().let { AxisConclusion(it.outcome, requireNotNull(it.walk) { AXIS_WALK_REQUIRED }) }
                 }
             }
 

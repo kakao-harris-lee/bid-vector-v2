@@ -39,6 +39,9 @@ import java.sql.SQLException
 import java.time.Instant
 import java.time.LocalDate
 
+/** 대역 배치의 걷기 이름(D-6G2d-4 ⓓ) — 빈 배치도 걷기는 돌았다. */
+private val RUNNER_WALK: Instant = Instant.parse("2026-06-17T02:00:00Z")
+
 /**
  * D-6F8-3·4 — 러너는 use case 를 한 번 돌리고 건수·조회일·업종·원인 코드만 로그로 남긴 뒤 프로세스를
  * 끝낸다. 실패는 원 예외를 잇지 않는 정제된 예외로만 나간다(SQL 상세·요청 URI 가 로그로 새지 않는다).
@@ -99,7 +102,7 @@ class CollectionRunnerTest {
                 override fun fetchNotices(
                     referenceDate: CollectionReferenceDate,
                     cursor: PageCursor?,
-                ) = SourceBatch(items, accounting(items.size, cause), next = null)
+                ) = SourceBatch(items, accounting(items.size, cause), next = null, observedAt = RUNNER_WALK)
             },
         )
 

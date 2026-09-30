@@ -11,7 +11,7 @@ private val KST: ZoneId = ZoneId.of("Asia/Seoul")
 
 /** 나간 호출의 결말 줄 — 상한이 세지 않는다(의도 줄이 이미 세었다). */
 private fun settledHttp(at: String) =
-    CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP)
+    CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP, walk = null)
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
 
@@ -21,15 +21,19 @@ private fun attempt(
     key: String? = null,
     axis: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL,
     outcome: AttemptOutcome = AttemptOutcome.Succeeded,
-) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.PENDING)
+) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.PENDING, walk = null)
 
-/** 축의 결말 줄 — 호출이 아니므로 상한에 계상되지 않는다(D-6G-49). */
+/**
+ * 축의 결말 줄 — 호출이 아니므로 상한에 계상되지 않는다(D-6G-49). 걷기의 이름은 **언제나** 실린다
+ * (D-6G2d-4 ⓒ) — 결말 시각과 걷기 시각은 다를 수 있으므로 기본값을 결말 시각으로 접지 않는다.
+ */
 private fun settled(
     at: String,
     key: String?,
     axis: SourceEndpoint,
     outcome: AttemptOutcome,
-) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.AXIS)
+    walk: String = at,
+) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.AXIS, walk = Instant.parse(walk))
 
 private fun walked(
     received: Int,
@@ -66,6 +70,7 @@ class CollectionAttemptLedgerTest {
                         AttemptOutcome.Succeeded,
                         Instant.parse("2026-09-24T02:00:01Z"),
                         AttemptKind.HTTP,
+                        walk = null,
                     ),
                 ),
             )
@@ -163,8 +168,10 @@ class CollectionAttemptLedgerTest {
 
         history.axisConclusions().getValue(key) shouldBe
             mapOf(
-                SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = true, walk = null),
-                SourceEndpoint.BASE_AMOUNT_DETAIL to AxisConclusion(settled = false, walk = null),
+                SourceEndpoint.OPENING_COMPLETE to
+                    AxisConclusion(AttemptOutcome.Succeeded, Instant.parse("2026-09-24T02:00:00Z")),
+                SourceEndpoint.BASE_AMOUNT_DETAIL to
+                    AxisConclusion(AttemptOutcome.Failed("SHORT_WALK"), Instant.parse("2026-09-24T02:00:00Z")),
             )
     }
 

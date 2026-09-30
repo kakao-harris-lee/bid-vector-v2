@@ -2,6 +2,7 @@ package bidvector.adapters.snapshot
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
@@ -71,14 +72,18 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         conclusions: Map<String, Map<SourceEndpoint, AxisConclusion>> = allAxesSettled(sample),
     ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(sample, conclusions)
 
-    /** 원장이 가리키는 걷기(D-6G-68) — [walk] 가 `null` 이면 빈 응답으로 끝난 축이다(0 행). */
+    /**
+     * 원장이 가리키는 걷기(D-6G-68)와 그 걷기의 **결말**. 걷기는 언제나 있다(D-6G2d-4 ⓑ) — 0 행은
+     * [AttemptOutcome.Empty] 가 말하고, 걷기 부재로 말하면 옛 형식 줄과 같은 값이 된다.
+     */
     private fun allAxesSettled(
         sample: SampleList,
-        walk: Instant? = OBSERVED_AT,
+        walk: Instant = OBSERVED_AT,
+        outcome: AttemptOutcome = AttemptOutcome.Succeeded,
     ): Map<String, Map<SourceEndpoint, AxisConclusion>> =
         sample.keys.associate { key ->
             key.value to
-                expectedAxesFor(BusinessDivision.SERVICE.name).associateWith { AxisConclusion(true, walk) }
+                expectedAxesFor(BusinessDivision.SERVICE.name).associateWith { AxisConclusion(outcome, walk) }
         }
 
     /** 표본틀에만 있던 공고(목록 축만)는 행이 되지 않는다 — 상세를 부르지 않았으므로 결과가 없다. */
@@ -145,7 +150,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
                 (
                     sample.keys.single().value to
                         allAxesSettled(sample).getValue(sample.keys.single().value) +
-                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = false, walk = OBSERVED_AT))
+                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(AttemptOutcome.Failed("SHORT_WALK"), OBSERVED_AT))
                 )
         val extraction = extract(sample, partial)
 
@@ -248,7 +253,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         // 첫 걷기는 2쪽 중 1쪽에서 끊겨 투찰 행 둘을 남겼다. 재걷기는 NODATA — 원문 0 행.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "끊긴-걷기-$it") }
 
-        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), walk = null))
+        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), outcome = AttemptOutcome.Empty))
 
         extraction.rows.shouldBeEmpty()
         extraction.sampledWithoutDetail shouldBe 1

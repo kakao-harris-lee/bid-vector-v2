@@ -80,7 +80,9 @@ internal class FileAttemptLedger(
                             SnapshotJson.Text(labelOf(attempt.outcome))
                         },
                     "kind" to SnapshotJson.Text(attempt.kind.name),
-                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 없는 줄은 키 자체를 싣지 않는다.
+                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 키는 **언제나** 싣고 값만 `null` 이다
+                    // (cr r5-t L-2 — 앞 주석은 사실이 아니었다). 그 덕에 판독이 「이 코드가 쓴 줄」과
+                    // 「칸이 생기기 전에 쓰인 줄」을 가릴 수 있다: AXIS 줄의 값이 `null` 이면 옛 줄이다.
                     "walk" to (attempt.walk?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null),
                 ),
             ).render() + "\n"
@@ -105,7 +107,10 @@ internal class FileAttemptLedger(
                 requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
                     "시도 원장의 줄 갈래 어휘가 아니다"
                 },
-            // 이 칸 이전에 쓰인 원장은 값이 없다 — 그 축은 걷기를 모르므로 추출이 미완으로 센다.
+            // AXIS 줄은 걷기를 반드시 싣는다(D-6G2d-4 ⓑ) — 이 칸 이전에 쓰인 줄은 값이 없고, 앞
+            // 판은 그것을 「빈 응답 = 0 행」과 같은 값으로 읽어 축이 통째로 빠진 완료 행을 냈다
+            // (vr r5-t probe W7). 모르는 줄은 읽지 않는다: `CollectionAttempt.init` 이 양방향으로
+            // 요구하므로, 값이 없는 AXIS 줄은 여기서 형태 위반으로 멈춘다.
             walk = fields["walk"]?.asStringOrNull()?.let(Instant::parse),
         )
     }

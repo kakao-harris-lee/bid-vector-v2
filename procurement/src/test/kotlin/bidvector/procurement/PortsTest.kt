@@ -1,6 +1,7 @@
 package bidvector.procurement
 
 import bidvector.sharedkernel.NoticeRound
+import java.time.Instant
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -22,6 +23,7 @@ private fun emptyBatch(): SourceBatch<RawNoticeObservation> =
                 unknownFields = 0,
             ),
         next = null,
+        observedAt = Instant.parse("2026-09-24T01:00:00Z"),
     )
 
 /**

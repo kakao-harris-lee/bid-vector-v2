@@ -58,6 +58,8 @@ internal class ScriptedOpeningPort(
                 truncationCause = listTruncation,
             ),
             next = null,
+            // 목록 갈래 대역도 걷기의 이름을 단다(D-6G2d-4 ⓓ) — 빈 배치도 걷기는 돌았다.
+            observedAt = COLLECTION_NOW,
         )
     }
 

@@ -343,8 +343,14 @@ private fun nextWalkState(
         fetchNextPage(accumulator, context, pageNo)
     }
 
-/** cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다. */
-private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
+/**
+ * cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다.
+ *
+ * 걷기의 이름은 **여기서도 싣는다**(D-6G2d-4 ⓓ) — 이 배치는 쪽을 한 장도 받지 않았지만, 배치가
+ * 걷기의 이름을 빠뜨릴 수 있으면 AXIS 결말 줄도 빠뜨릴 수 있고 그 부재는 판독에서 「이 축은 0 행」과
+ * 같은 값이 된다. 「항목이 없다」는 회계가 말한다(`truncationCause`).
+ */
+private fun invalidCursorBatch(walk: java.time.Instant): SourceBatch<RawNoticeObservation> {
     val accounting =
         CollectionAccounting(
             received = 0,
@@ -358,7 +364,7 @@ private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
             unknownFields = 0,
             truncationCause = TruncationCause.InputError,
         )
-    return SourceBatch(emptyList(), accounting, next = null)
+    return SourceBatch(emptyList(), accounting, next = null, observedAt = walk)
 }
 
 // `toIntOrNull()` 단독은 "007"·"+4" 처럼 표기가 관대한 토큰도 받아준다
@@ -400,7 +406,7 @@ internal fun walkKonepsNoticePages(
     // 호출부([KonepsOpenApiNoticeSource.fetchNotices])도 [noticeListItemMapper]를 명시한다.
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
-    val startPage = startPageOf(cursor) ?: return invalidCursorBatch()
+    val startPage = startPageOf(cursor) ?: return invalidCursorBatch(walkNameOf(clock))
     val counters = KonepsAttemptCounters()
     val context =
         KonepsWalkContext(

@@ -27,6 +27,33 @@ internal const val SAMPLE_LIST_NAME = "sample-list.tsv"
 internal const val ATTEMPT_LEDGER_NAME = "attempts.jsonl"
 internal const val STATE_NAME = "state.json"
 
+/**
+ * 실행 상태 **형식**의 version(D-6G2d-4 ⓐ) — 장부가 이 값을 싣고, 다르거나 없으면 기동을 거부한다.
+ *
+ * 실수집이 한 번도 돌지 않은 지금이 형식을 닫는 유일하게 싼 때다. 이 값이 없던 동안 옛 디렉터리가
+ * 그대로 기동했고, 옛 코드가 쓴 걷기 없는 AXIS 줄이 「빈 응답 = 0 행」으로 읽혀 축이 통째로 빠진
+ * **완료 행**이 나왔다(vr r5-t probe W7). 관용할 이유가 없다 — 옛 형식은 읽지 않는다.
+ */
+internal const val RUN_STATE_FORMAT_VERSION = 1
+
+/** 형식 거부의 **닫힌 사유** — 잠금 경합(`ALREADY_RUNNING`)과도, 장부 불일치와도 다른 값이다. */
+internal enum class RunStateFormatFault {
+    /** 장부에 형식 version 칸이 없다 — 이 칸이 생기기 전에 쓰인 디렉터리다. */
+    MISSING,
+
+    /** 칸은 있는데 이 코드가 읽을 줄 아는 version 이 아니다(앞·뒤 양방향). */
+    MISMATCHED,
+}
+
+/**
+ * 옛 형식 실행 상태의 기동 거부(D-6G2d-4 ⓐ) — 무결성 불일치(`IllegalArgumentException`)와 **다른
+ * 타입**이다: 운영자가 「사고인가 옛 디렉터리인가」를 그 자리에서 가릴 수 있어야 한다. 모듈 밖에서
+ * 이름으로 잡을 자리가 없어 `internal` 이다(새 public 표면 0).
+ */
+internal class RunStateFormatRefusedException(
+    val fault: RunStateFormatFault,
+) : RuntimeException("실행 상태 형식이 이 코드의 것이 아니다 — fault=$fault")
+
 /** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
 internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
 
@@ -171,6 +198,7 @@ class RunStateDirectory(
         val facts =
             SnapshotJson.Obj(
                 listOf(
+                    "format_version" to SnapshotJson.Number(RUN_STATE_FORMAT_VERSION.toString()),
                     "directory_id" to SnapshotJson.Text(directoryId),
                     "sample_list_sha256" to SnapshotJson.Text(digestOf(sampleFile)),
                     "sample_scope_sha256" to SnapshotJson.Text(digestOf(scopeFile)),
@@ -287,12 +315,24 @@ class RunStateDirectory(
         Files.move(staged, attemptFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
+    /**
+     * 형식 version 대조(D-6G2d-4 ⓐ) — 없거나 다르면 **기동 거부**다(경고가 아니다). 거부는 잠금을
+     * 놓고 나가야 하므로 [heldOrRelease] 안에서 일어난다(이 함수는 [readFacts] 가 부른다).
+     */
+    private fun requireCurrentFormat(declared: Int?) {
+        if (declared == null) throw RunStateFormatRefusedException(RunStateFormatFault.MISSING)
+        if (declared != RUN_STATE_FORMAT_VERSION) {
+            throw RunStateFormatRefusedException(RunStateFormatFault.MISMATCHED)
+        }
+    }
+
     private fun readFacts(): RunStateFacts? {
         val fields =
             runCatching { Files.readString(stateFile) }
                 .getOrNull()
                 ?.let { KonepsJsonParser.parse(it, ATTEMPT_MAX_DEPTH).asObject()?.fields }
                 ?: return null
+        requireCurrentFormat(fields["format_version"].asIntOrNull())
         return RunStateFacts(
             directoryId = requireNotNull(fields["directory_id"].asStringOrNull()) { "장부에 디렉터리 식별자가 없다" },
             sampleListSha256 = requireNotNull(fields["sample_list_sha256"].asStringOrNull()) { "장부에 표본 해시가 없다" },

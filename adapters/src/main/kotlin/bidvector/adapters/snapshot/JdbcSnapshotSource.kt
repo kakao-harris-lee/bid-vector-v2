@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.FieldConcept
@@ -86,7 +87,9 @@ class JdbcSnapshotSource(
         axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): Boolean {
         val known = axisConclusions[noticeKeyHash].orEmpty()
-        return expectedAxesFor(division).all { known[it]?.settled == true }
+        // **성공 또는 빈 응답**만 완료다(D-6G2d-4 · D-6G2d-8 ⓒ). 실패로 정착한 축은 다시 부르지
+        // 않지만 그 행으로 스냅숏을 쓸 수도 없다 — 그 공고는 `incomplete_axis` 로 정직하게 빠진다.
+        return expectedAxesFor(division).all { known[it]?.let { c -> c.usesRows || c.outcome == AttemptOutcome.Empty } == true }
     }
 
     private fun readObservations(
@@ -148,8 +151,9 @@ class JdbcSnapshotSource(
         rows: ResultSet,
         conclusion: AxisConclusion?,
     ) {
-        // 빈 응답으로 끝난 축은 **0 행**이다 — 앞의 잘린 걷기가 남긴 쪽을 쓰지 않는다.
-        if (conclusion != null && conclusion.walk == null) return
+        // 빈 응답으로 끝난 축은 **0 행**이다 — 앞의 잘린 걷기가 남긴 쪽을 쓰지 않는다. 결말 어휘가
+        // 그것을 말한다(D-6G2d-4 ⓑ): 걷기 부재로 읽으면 옛 형식 줄이 같은 값이 된다.
+        if (conclusion != null && conclusion.outcome == AttemptOutcome.Empty) return
         val observedAt = rows.getTimestamp("observed_at").toInstant()
         if (conclusion != null && observedAt != conclusion.walk) return
         val kept = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { WalkRows(observedAt) }

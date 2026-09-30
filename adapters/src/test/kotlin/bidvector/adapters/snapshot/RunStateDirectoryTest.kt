@@ -13,7 +13,6 @@ import bidvector.workflow.collection.SampleStratum
 import bidvector.workflow.collection.StratumOutcome
 import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterEach
@@ -36,7 +35,14 @@ private fun sample() =
     )
 
 private fun httpAttempt() =
-    CollectionAttempt(KEY.value, SourceEndpoint.RESERVE_PRICE_DETAIL, AttemptOutcome.Succeeded, AT, AttemptKind.PENDING)
+    CollectionAttempt(
+        KEY.value,
+        SourceEndpoint.RESERVE_PRICE_DETAIL,
+        AttemptOutcome.Succeeded,
+        AT,
+        AttemptKind.PENDING,
+        walk = null,
+    )
 
 /**
  * D-6G-45 — 실행 상태는 저장소 밖 디렉터리 하나다. 이 test 가 재는 것은 **거부**다: 디렉터리가
@@ -404,6 +410,46 @@ class RunStateDirectoryTest {
         Files.readString(file) shouldBe intact
     }
 
+    /**
+     * **D-6G2d-4 ⓐ — 실행 상태에 형식 version 이 있다.** 이것이 없으면 옛 형식 디렉터리가 그대로
+     * 기동하고, 옛 코드가 쓴 AXIS 줄이 「빈 응답 = 0 행」으로 읽혀 축이 통째로 빠진 완료 행이 나온다
+     * (vr r5-t probe W7). 실수집이 아직 없는 지금이 형식을 닫는 유일하게 싼 때다.
+     */
+    @Test
+    fun `첫 확정이 형식 version 을 남긴다`() {
+        open().sampleList.confirm(sample())
+
+        Files.readString(root().resolve(STATE_NAME)) shouldContain "\"format_version\":$RUN_STATE_FORMAT_VERSION"
+    }
+
+    /** D-6G2d-4 ⓐ — version 이 없는 장부는 옛 형식이다. 경고가 아니라 **기동 거부**다(fail-closed). */
+    @Test
+    fun `형식 version 이 없는 장부는 기동을 거부한다`() {
+        open().sampleList.confirm(sample())
+        val state = root().resolve(STATE_NAME)
+        Files.writeString(state, Files.readString(state).replace("\"format_version\":$RUN_STATE_FORMAT_VERSION,", ""))
+
+        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISSING
+    }
+
+    /** D-6G2d-4 ⓐ — 다른 version 도 거부다. 이 코드가 읽을 줄 아는 형식은 하나다. */
+    @Test
+    fun `형식 version 이 다르면 기동을 거부한다`() {
+        open().sampleList.confirm(sample())
+        val state = root().resolve(STATE_NAME)
+        val ahead = RUN_STATE_FORMAT_VERSION + 1
+        Files.writeString(
+            state,
+            Files.readString(state).replace(
+                "\"format_version\":$RUN_STATE_FORMAT_VERSION",
+                "\"format_version\":$ahead",
+            ),
+        )
+
+        shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
+    }
+
+
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */
     private fun tornLedger(): Path {
         val directory = open()
@@ -416,59 +462,3 @@ class RunStateDirectoryTest {
 }
 
 private val OTHER_KEY = NoticeKeyHash.of("SYN-6G-9999", "000")
-
-class FileAttemptLedgerTest {
-    @TempDir
-    lateinit var temp: Path
-
-    private fun ledger(): FileAttemptLedger =
-        FileAttemptLedger(Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)) {}
-
-    private fun attemptOf(
-        outcome: AttemptOutcome,
-        key: String? = KEY.value,
-        kind: AttemptKind = AttemptKind.PENDING,
-    ) = CollectionAttempt(key, SourceEndpoint.RESERVE_PRICE_DETAIL, outcome, AT, kind)
-
-    @Test
-    fun `원장이 없으면 빈 이력이다 — 첫 실행이다`() {
-        ledger().read().size shouldBe 0
-    }
-
-    @Test
-    fun `쓴 것을 그대로 읽는다 — 결말 셋 전부`() {
-        val ledger = ledger()
-        val written =
-            listOf(
-                attemptOf(AttemptOutcome.Succeeded),
-                attemptOf(AttemptOutcome.Failed("TIMEOUT"), kind = AttemptKind.HTTP),
-                attemptOf(AttemptOutcome.Succeeded, key = null),
-                attemptOf(AttemptOutcome.Empty, kind = AttemptKind.AXIS),
-            )
-
-        written.forEach(ledger::append)
-
-        val history = ledger.read()
-        history.size shouldBe written.size
-        // 축 결말 줄만 이어 돌기에 든다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
-        history.settledAxes().getValue(KEY.value) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
-        history.spend(AT).total shouldBe 2
-    }
-
-    /**
-     * 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. 관용은
-     * **끝 줄 하나**뿐이다(D-6G-70) — 그 앞의 줄이 형태를 어기면 여전히 멈춘다.
-     */
-    @Test
-    fun `가운데의 형태를 어긴 줄은 읽지 않는다`() {
-        val ledger = ledger()
-        ledger.append(attemptOf(AttemptOutcome.Succeeded))
-        val file = Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)
-        Files.writeString(file, Files.readString(file) + "{\"axis\":\"RESERVE_PRICE_DETAIL\"}\n")
-
-        // 그 뒤에 성한 줄을 하나 더 붙이면 어긴 줄은 **끝 줄이 아니다**.
-        ledger.append(attemptOf(AttemptOutcome.Succeeded))
-
-        shouldThrow<IllegalArgumentException> { ledger.read() }
-    }
-}

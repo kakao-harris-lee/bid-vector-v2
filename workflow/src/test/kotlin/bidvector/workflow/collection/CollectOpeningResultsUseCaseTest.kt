@@ -333,9 +333,23 @@ private fun syntheticServiceKeys(): List<String> =
 private fun shortWalkOn(
     key: String,
     axis: SourceEndpoint,
-) = CollectionAttempt(key, axis, AttemptOutcome.Failed("SHORT_WALK"), COLLECTION_NOW, AttemptKind.AXIS)
+) = CollectionAttempt(
+    key,
+    axis,
+    AttemptOutcome.Failed("SHORT_WALK"),
+    COLLECTION_NOW,
+    AttemptKind.AXIS,
+    walk = COLLECTION_NOW,
+)
 
 private fun settledOn(
     key: String,
     axis: SourceEndpoint,
-) = CollectionAttempt(key, axis, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.AXIS)
+) = CollectionAttempt(
+    key,
+    axis,
+    AttemptOutcome.Succeeded,
+    COLLECTION_NOW,
+    AttemptKind.AXIS,
+    walk = COLLECTION_NOW,
+)

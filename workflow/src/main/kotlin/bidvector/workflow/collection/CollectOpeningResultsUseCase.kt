@@ -259,9 +259,9 @@ class CollectOpeningResultsUseCase(
             // **적재 뒤에** 축의 결말을 적는다(D-6G-58 ⓑ). 적재 전에 적으면 적재가 실패하거나 그
             // 사이에 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시 부르지 않는다.
             val outcome = attemptOutcomeOf(batch.accounting)
-            // 행이 없으면 걷기의 이름도 없다 — 그것이 추출에게 「이 축은 0 행」이라는 뜻이다.
-            val walk = batch.observedAt.takeIf { batch.items.isNotEmpty() }
-            attempts.append(axisConclusion(picked, axis, outcome, clock.now(), walk))
+            // 걷기의 이름은 **언제나** 적는다(D-6G2d-4). 항목이 0 이었다는 것은 결말 어휘가 말한다 —
+            // 걷기 부재로 말하면 「걷기를 모르는 옛 줄」과 같은 값이 되어 판독이 그 차이를 잃는다.
+            attempts.append(axisConclusion(picked, axis, outcome, clock.now(), batch.observedAt))
             recordDetailRun(batch, axis)
             if (outcome.isSettled) settledAny = true
             haltOf(batch.accounting.truncationCause, settledAny)?.let { return DetailStep.Halted(it, calls) }
@@ -357,7 +357,7 @@ private fun axisConclusion(
     axis: DetailAxis,
     outcome: AttemptOutcome,
     at: Instant,
-    walk: Instant?,
+    walk: Instant,
 ): CollectionAttempt =
     CollectionAttempt(
         noticeKey = NoticeKeyHash.of(picked.id.number.value, picked.id.round.value).value,

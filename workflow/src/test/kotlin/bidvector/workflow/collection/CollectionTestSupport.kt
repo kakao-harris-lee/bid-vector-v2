@@ -77,7 +77,11 @@ internal fun batchOf(
     items: List<RawNoticeObservation>,
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
     next: PageCursor? = null,
-): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next)
+    /** 대역도 걷기의 이름을 단다(D-6G2d-4 ⓓ) — 빈 배치도 걷기는 돌았다. */
+    observedAt: Instant = BATCH_WALK,
+): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next, observedAt)
+
+private val BATCH_WALK: Instant = Instant.parse("2026-06-17T02:00:00Z")
 
 /** 호출 기록을 남기는 소스 — `script` 가 (조회일, 커서)마다 배치를 낸다. */
 internal class ScriptedSource(

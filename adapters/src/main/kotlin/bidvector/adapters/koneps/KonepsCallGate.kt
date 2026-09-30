@@ -91,6 +91,9 @@ class KonepsCallGate(
             outcome = outcome,
             at = now(),
             kind = kind,
+            // 호출 단위 줄은 걷기를 모른다(D-6G2d-4 ⓒ) — 관문은 쪽 하나를 보내고, 걷기는 그 쪽들을
+            // 묶는 자리의 이름이다. 기본값이 없어 이 자리가 그 사실을 **명시**한다.
+            walk = null,
         )
 }
 
