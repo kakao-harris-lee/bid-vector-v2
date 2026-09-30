@@ -9,6 +9,7 @@ import bidvector.procurement.truncationCodeOf
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import org.junit.jupiter.api.Test
+import kotlin.reflect.KClass
 
 /**
  * **D-6G2d-17 · 30 — 절단 사유의 분류를 등식으로 잠그는 게이트.**
@@ -37,21 +38,29 @@ class TruncationCauseClassificationGateTest {
     @Test
     fun `절단 사유 전수가 세 갈래 중 하나로 간다`() {
         val causes = allTruncationCauses()
-        val byBranch = causes.groupBy { attemptOutcomeOf(truncatedBy(it))::class.simpleName }
+        val byBranch = causes.groupBy { requireNotNull(attemptOutcomeOf(truncatedBy(it))::class.simpleName) }
 
         byBranch.getValue("Refused") shouldHaveSize 3
         byBranch.getValue("FinalFailure") shouldHaveSize 3
         byBranch.getValue("Failed") shouldHaveSize causes.size - 6
-        byBranch.keys shouldContainExactly listOf("Refused", "FinalFailure", "Failed").intersect(byBranch.keys)
+        // 세 갈래 **밖의** 결말이 나오면 잡는다 — 자기교집합 단언은 무엇도 잠그지 않았다(vr r3).
+        byBranch.keys.sorted() shouldContainExactly listOf("Failed", "FinalFailure", "Refused")
     }
 
     /**
-     * 계층에서 뽑은 전수 — 값을 나르는 갈래는 `objectInstance` 가 없어 대표값을 [PARAMETRISED_CAUSES]
-     * 에서 가져온다. 그런 갈래가 새로 생기면 `getValue` 가 던져 **여기서 멈춘다**(조용히 빠지지 않는다).
+     * 계층에서 뽑은 전수 — **잎까지 재귀한다**(cr r3 M-2). 직계만 순회하면 중첩 sealed 층(사유를 묶는
+     * 중간 갈래)이 대표값 하나로 접히거나 표 누락으로 멈춰, 그 층 **안의** 사유들이 등식에 들지 않는다.
+     * 잎(`object` 또는 값을 나르는 갈래)까지 내려가면 새 층이 생겨도 그 안의 사유가 전부 측정된다.
+     *
+     * 값을 나르는 잎은 `objectInstance` 가 없어 대표값을 [PARAMETRISED_CAUSES] 에서 가져온다 — 그런
+     * 잎이 새로 생기면 `getValue` 가 던져 **여기서 멈춘다**(조용히 빠지지 않는다).
      */
-    private fun allTruncationCauses(): List<TruncationCause> =
-        TruncationCause::class.sealedSubclasses.map { branch ->
-            branch.objectInstance ?: PARAMETRISED_CAUSES.getValue(requireNotNull(branch.simpleName))
+    private fun allTruncationCauses(): List<TruncationCause> = leavesOf(TruncationCause::class)
+
+    private fun leavesOf(branch: KClass<out TruncationCause>): List<TruncationCause> =
+        when {
+            branch.sealedSubclasses.isNotEmpty() -> branch.sealedSubclasses.flatMap(::leavesOf)
+            else -> listOf(branch.objectInstance ?: PARAMETRISED_CAUSES.getValue(requireNotNull(branch.simpleName)))
         }
 }
 
