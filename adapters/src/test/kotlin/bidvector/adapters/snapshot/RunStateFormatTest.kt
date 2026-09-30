@@ -1,10 +1,12 @@
 package bidvector.adapters.snapshot
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import java.util.Comparator
 
 /**
@@ -87,5 +89,26 @@ class RunStateFormatTest : RunStateDirectoryFixture() {
         )
 
         shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISSING
+    }
+
+    /**
+     * **cr r4 ③ — 교체 전에 바이트를 굳힌다.** `ATOMIC_MOVE` 는 **이름의 교체**만 원자적으로 만든다.
+     * 바이트가 아직 페이지 캐시에 있는 동안 rename 이 먼저 굳으면, 그 사이의 전원 손실 뒤에 이름은 새
+     * 파일을 가리키는데 내용이 0 바이트인 모양이 남는다 — 복구가 도는 순간은 방금 죽은 기계 위라 그
+     * 창이 실제로 열린다.
+     *
+     * 내구성 자체는 단위 test 로 잴 수 없다(크래시를 심을 자리가 없다). 잴 수 있는 것은 **쓰기가 그
+     * 보장을 요구하는가**이고, 옵션 배열이 그 요구의 정본이다 — 빠지면 이 등식이 붉어진다. 교체 뒤의
+     * 디렉터리 fsync 는 같은 함수 안에 있고 관측 가능한 표면이 없다.
+     */
+    @Test
+    fun `실행 상태 쓰기는 SYNC 를 요구한다`() {
+        DURABLE_WRITE_OPTIONS.toList() shouldContainExactly
+            listOf(
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.SYNC,
+            )
     }
 }

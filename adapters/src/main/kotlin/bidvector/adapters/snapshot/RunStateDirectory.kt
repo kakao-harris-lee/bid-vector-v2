@@ -17,6 +17,7 @@ import bidvector.workflow.collection.sha256Hex
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.file.Files
+import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
@@ -38,6 +39,18 @@ internal const val STAGED_ATTEMPT_NAME = "$ATTEMPT_LEDGER_NAME.staged"
 
 /** 원장·장부 줄의 JSON 깊이 상한 — 두 파일이 같은 값을 쓴다(줄 형태가 같다). */
 internal const val ATTEMPT_MAX_DEPTH = 4
+
+/**
+ * 실행 상태 파일의 **내구 쓰기** 열기 옵션(cr r4 ③) — `SYNC` 가 바이트를 교체보다 **먼저** 굳힌다.
+ * 이 배열이 정본이다: 옵션을 호출부마다 늘어놓으면 한 자리에서 빠져도 조용하다.
+ */
+internal val DURABLE_WRITE_OPTIONS: Array<OpenOption> =
+    arrayOf(
+        StandardOpenOption.CREATE,
+        StandardOpenOption.WRITE,
+        StandardOpenOption.TRUNCATE_EXISTING,
+        StandardOpenOption.SYNC,
+    )
 
 /**
  * 실행 상태의 무결성 장부(D-6G-48) — 이 넷이 맞아야 기동한다.
@@ -179,9 +192,27 @@ class RunStateDirectory(
                     "attempt_lines" to SnapshotJson.Number(ledger.lines.toString()),
                 ),
             )
-        val staged = root.resolve(STAGED_STATE_NAME)
-        Files.writeString(staged, facts.render() + "\n")
-        Files.move(staged, stateFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        replaceDurably(root.resolve(STAGED_STATE_NAME), stateFile, facts.render() + "\n")
+    }
+
+    /**
+     * staged 쓰기 → 원자적 교체 → **디렉터리 fsync**(cr r4 ③). 셋이 한 함수인 이유는 순서가 곧
+     * 보장이기 때문이다.
+     *
+     * `ATOMIC_MOVE` 는 **이름의 교체**만 원자적으로 만든다. 바이트가 아직 페이지 캐시에 있는 동안
+     * rename 이 먼저 굳으면, 그 사이의 전원 손실 뒤에 **이름은 새 파일을 가리키는데 내용이 0 바이트**
+     * 인 모양이 남는다 — 복구가 도는 순간은 방금 죽은 기계 위라 그 창이 실제로 열린다. [DURABLE_WRITE_OPTIONS]
+     * 의 `SYNC` 가 바이트를 먼저 굳히고, 교체 뒤의 디렉터리 fsync 가 **그 이름 자체**를 굳힌다(디렉터리
+     * 항목은 파일 fsync 로 굳지 않는다).
+     */
+    private fun replaceDurably(
+        staged: Path,
+        target: Path,
+        text: String,
+    ) {
+        Files.writeString(staged, text, *DURABLE_WRITE_OPTIONS)
+        Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        FileChannel.open(root, StandardOpenOption.READ).use { it.force(true) }
     }
 
     /**
@@ -273,9 +304,10 @@ class RunStateDirectory(
      *
      * 누적 해시보다 **먼저** 돈다 — 그 순서는 [healedLedgerDigest] 가 구조로 든다.
      *
-     * 교체는 **원자적이다**(D-6G2d-2, cr r5-t M-3). 제자리 truncate+rewrite 는 8 만 줄짜리 원장을
-     * 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다 적다」로 영구
-     * 거부한다 — 복구가 도는 순간은 방금 죽은 기계 위다. [recordState] 와 같은 형태를 쓴다.
+     * 교체는 **원자적이고 내구적이다**(D-6G2d-2, cr r5-t M-3 · cr r4 ③). 제자리 truncate+rewrite 는
+     * 8 만 줄짜리 원장을 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다
+     * 적다」로 영구 거부한다 — 복구가 도는 순간은 방금 죽은 기계 위다. [replaceDurably] 가 그 순서를
+     * 든다([recordState] 와 같은 형태다).
      */
     private fun healTornTail() {
         if (!Files.isRegularFile(attemptFile)) return
@@ -283,9 +315,7 @@ class RunStateDirectory(
         if (text.isEmpty() || text.endsWith("\n")) return
         val fragment = text.substringAfterLast('\n')
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
-        val staged = root.resolve(STAGED_ATTEMPT_NAME)
-        Files.writeString(staged, healed)
-        Files.move(staged, attemptFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed)
     }
 
     private fun readFacts(): RunStateFacts? {
