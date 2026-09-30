@@ -102,6 +102,17 @@
 | **D-6G2d-19** | **재호출 상한의 셈 창을 등재한다(레인 자기 보고).** `doneWith` 는 실행 상태 디렉터리 **생애 전체**에 걸쳐 그 (공고, 축)의 일시 실패를 누적한다 — 하루치도 실행치도 아니다. 알려진 제한 (e) 에 이 문장을 넣고 `OPEN-6G2D-AXIS-RETRY-LIMIT` 의 운영자 결정 A-3 은 **값과 창**(디렉터리 생애 / 일 단위)을 함께 묻는다. 이 라운드에서 창은 바꾸지 않되 **(r1 추가, vr r1 M-2)** 셈은 그 (공고, 축)의 **마지막 정착 결말(성공·빈 응답) 뒤**의 일시 실패만 — 정착 앞의 실패는 세지 않는다(`doneWith` 가 `at` 순서를 읽는다). 등식 test 하나. 옛 PENDING 줄이 올바른 version 아래 수락되어 +1 소비·재호출로 흐르는 것은 보수 방향이라 등재만 |
 | **D-6G2d-20** | **재검증은 표적**: D-15 여섯 칸 스키마 계약 + Python 판독 규칙 대조 · D-16 mock 요청 수 판 · D-17 등식 · D-18 각 항목 · acceptance(`check` job 넷 + container) · rollback 재실측 · 새 public 표면(수정이 만든 것) 갱신. code-reviewer 는 수정 diff 를 본다 |
 
+## 계약 갱신 r1-b (2026-09-30, 팀장 — 수정 라운드 1 보고 수령: HEAD `8448f9f2` · 이탈 넷 · 새 알려진 제한 둘)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-21** | **(레인 보고 — D-15 와 같은 계열, 데이터 정확성) `a_value` 는 전부 아니면 무.** ⓐ A 구성 항목은 있는데 `open_at`(공개일시)이 없는 원문 → 스키마(`open_at` 비널)를 어겨 Python 이 스냅숏 전체를 거부한다 → **`a_value: null`** 로 낸다. ⓑ `aValueTotalOf` 의 `mapNotNull` 은 결측 항목을 빼고 합산해 **A 를 조용히 줄인다**(6G 부채) → 구성 항목 하나라도 결측이면 **`a_value: null`**(전부 아니면 무). 둘 다 기존 행 단위 제외(A 부재)로 떨어진다 — 사유 어휘 추가 없음(A-2). 스키마 계약 test 에 두 경우 추가, 발생 수를 러너 로그 계수(`fractionalAmounts` 와 별도 칸 또는 합산 사유 명시). 변이: 항목 하나 결측에 `total` 이 나옴 → RED · `open_at` 결측에 `a_value` 가 나옴 → RED |
+| **D-6G2d-22** | **이탈 수용 둘**: ① D-18 「형식 거부의 러너 종료 코드」는 하지 않는다 — 디렉터리 열기가 네 빈의 의존이고 「여는 자리 = 잠금 자리」(D-6G-57)라 러너 catch 로 옮기면 배선·잠금·seed 순서를 다시 짜야 한다. 거부 사유가 기동 실패 출력에서 grep 되는 닫힌 토큰을 갖는 것으로 충분 → `OPEN-6G-REVIEW-FOLLOWUPS` 에 등재 ② D-19 의 셈은 `at` 정렬이 아니라 **원장의 덧붙인 순서**로 읽는다 — 시계 역행 실행이 있으면 `at` 정렬이 추출 쪽 「마지막 줄이 이긴다」와 어긋난다. 정착 창 성질은 그대로 |
+| **D-6G2d-23** | **형식 version 2** — AXIS 결말 어휘에 `Refused` 가 더해져 version 1 원장의 `FAILED:BUDGET_EXHAUSTED_*` 줄을 새 코드가 읽으면 고친 결함이 재현되므로 올린 것이 맞다. 실수집 전이라 비용 0. 종결 문단에 「실행 상태 형식 version 2 부터」를 적는다 |
+| **D-6G2d-24** | **r2 는 표적 재검증**: D-15·21 스키마 계약(여섯 금액 칸 + `a_value` 전부/무) · D-16 [1,1,1,→호출] 판 · D-17 등식 · D-19 정착 창(Failed·Failed·Succeeded·Failed → 재호출) · version 2 거부/수락 · D-18 항목 · 새 public 표면(`Refused` · `fractionalAmounts` · D-21 계수) (2b) · acceptance(`check` 넷 + container) · rollback. code-reviewer 는 `2a1bb88b..판정 SHA` diff |
+
+**OPEN 표 갱신(레인 보고 4)**: 신설 `OPEN-6G2D-EMPTY-AXIS-REASON` · `OPEN-6G2D-AXIS-RETRY-LIMIT`(값 3 · 창 = 디렉터리 생애, 마지막 정착 뒤 누적 — 운영자 A-3) · `OPEN-6G-REVIEW-FOLLOWUPS` 추가(형식 거부 종료 코드 · `unusableRawRows` 세 원인 분리 계수).
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
@@ -176,3 +187,5 @@ Codex 없음 — 되돌리기 어려운 경로가 아니다. privacy-gate 는 �
 | `OPEN-6G-LEGACY-AXIS-LINE` | **이 slice 가 닫는다**(D-4) |
 | `OPEN-6G-REVIEW-FOLLOWUPS` 의 code-review r5-t M-3(복구 쓰기 비원자) · L-1 · L-2 | **이 slice 가 닫는다**(D-2·D-4) — 나머지 항목은 6G-2c 그대로 |
 | (신설) `OPEN-6G2D-EMPTY-AXIS-REASON` | 「정착했으나 0 행」의 정확한 사유 어휘 — 스키마 v6 후보, 백테스트 판정 보고에 계수 공시(D-5) |
+| (신설) `OPEN-6G2D-AXIS-RETRY-LIMIT` | 재호출 상한 값 3 은 잠정 · 창 = 실행 상태 디렉터리 생애, 마지막 정착 뒤 누적(D-11·19) — 운영자 결정 A-3(값·창) |
+| `OPEN-6G-REVIEW-FOLLOWUPS` | 추가: 형식 거부의 러너 종료 코드(D-22 ①) · `unusableRawRows` 세 원인 분리 계수(cr r1 M-2) |
