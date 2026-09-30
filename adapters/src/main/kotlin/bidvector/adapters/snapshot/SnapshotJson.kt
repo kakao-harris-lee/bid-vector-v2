@@ -98,17 +98,25 @@ internal fun jsonInstant(value: Instant?): SnapshotJson =
     value?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null
 
 /**
- * 금액은 **정수 리터럴**이다 — 소수점이 없어야 양쪽 언어에서 왕복이 exact 하다(스키마 §1).
+ * 스냅숏이 싣는 금액은 **원 단위 정수**다(스키마 §1·§2.2) — 소수점이 없어야 양쪽 언어에서 왕복이
+ * exact 하다. 끝자리 0 은 소수부가 아니다(`1200.00` 은 정수다).
  *
- * 소수부가 있는 값은 **행 단위 부재**로 떨어진다(D-6G2d-8 ⓓ). `setScale(0)` 은 반올림 모드가 없어
- * 소수부에서 던지고, 그 예외 하나가 스냅숏 바이트를 한 줄도 내지 못하게 한다 — 금액 칸은 예정가격·
- * 투찰금액·A 구성 항목 넷 이상이고, 원천이 원 단위 정수를 낸다는 것은 조사 문서의 **관측**이지 계약이
- * 아니다. 반올림하지 않는다: 지어낸 값이 채점에 들어가는 것이 결측보다 나쁘고, 「값이 없다」는 이미
- * 행 단위 제외의 입력이다(D-6G-28). 끝자리 0 은 소수부가 아니다(`1200.00` → `1200`).
+ * 이 술어의 소비자는 둘이고 **판정은 한 자리**다: 행을 조립하는 자리가 이 술어로 값을 거르고
+ * ([bidvector.adapters.snapshot.AssemblyTally]), 렌더는 그 결과를 쓴다.
+ */
+internal fun BigDecimal.isWonInteger(): Boolean = stripTrailingZeros().scale() <= 0
+
+/**
+ * 금액은 **정수 리터럴**이다 — `setScale(0)` 은 반올림 모드가 없어 소수부에서 던지고, 그 예외 하나가
+ * 스냅숏 바이트를 한 줄도 내지 못하게 한다.
+ *
+ * **여기 오는 값은 이미 정수다**(D-6G2d-15) — 소수부의 처분은 조립이 정하고 그 자리가 계수한다.
+ * 이 `takeIf` 는 그래서 **발화하지 않는 마지막 방어**다: 조립을 거치지 않는 새 경로가 생겨도 스냅숏
+ * 전체가 멈추지는 않게 둔다. 반올림하지 않는다 — 지어낸 값이 채점에 들어가는 것이 결측보다 나쁘다.
  */
 internal fun jsonAmount(value: BigDecimal?): SnapshotJson =
     value
-        ?.takeIf { it.stripTrailingZeros().scale() <= 0 }
+        ?.takeIf { it.isWonInteger() }
         ?.let { SnapshotJson.Number(it.setScale(0).toPlainString()) }
         ?: SnapshotJson.Null
 

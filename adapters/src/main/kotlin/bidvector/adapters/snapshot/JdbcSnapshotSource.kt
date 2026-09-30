@@ -51,6 +51,7 @@ class JdbcSnapshotSource(
         val observed = readObservations(sample, axisConclusions)
         val notices = readNotices(observed.byKey.keys)
         val rows = mutableListOf<SnapshotRow>()
+        val tally = AssemblyTally()
         val withDetail = mutableSetOf<String>()
         var withoutNotice = 0
         var incomplete = 0
@@ -64,7 +65,7 @@ class JdbcSnapshotSource(
                 when {
                     canonical == null -> withoutNotice++
                     !complete(hash, canonical.division, axisConclusions) -> incomplete++
-                    else -> rows += assembleSnapshotRow(key, axes.mapValues { it.value.rows }, canonical)
+                    else -> rows += assembleSnapshotRow(key, axes.mapValues { it.value.rows }, canonical, tally)
                 }
             }
         }
@@ -75,6 +76,7 @@ class JdbcSnapshotSource(
             observed.outsideSample.size,
             incomplete,
             observed.unusableRows,
+            tally.fractionalAmounts,
         )
     }
 
@@ -281,11 +283,19 @@ data class SnapshotExtraction(
     /** 완료되지 않은 축이 있는 표본 수(D-6G-58) — 반쪽 원문으로 행을 쓰지 않는다. */
     val incompleteAxis: Int,
     /**
-     * 공고 키가 서지 않아 버린 원문 행 수(D-6G2d-8 ⓐ) — **항등식 밖**이다([observedOutsideSample]
-     * 과 같은 자리). 그 행은 어느 표본 공고에도 속하지 않으므로 네 항 어디에도 들지 않는다. 0 이
-     * 아니면 적재 경로가 번호 없는 항목을 받았다는 뜻이고, 그 사실은 로그로 공시된다.
+     * **공고 키 또는 축 어휘가 서지 않아 버린** 원문 행 수(D-6G2d-8 ⓐ · 18) — **항등식 밖**이다
+     * ([observedOutsideSample] 과 같은 자리). 그 행은 어느 표본 공고에도 속하지 않으므로 네 항 어디에도
+     * 들지 않는다. 원인은 셋이고 이 계수는 셋을 합친다: 공고번호가 빈 행 · 차수가 제로패딩 세 자리가
+     * 아닌 행 · `source_endpoint` 가 열거 어휘 밖인 행. 마지막 하나는 **코드 변경으로만** 생기므로
+     * (축 개명·제거 뒤 옛 행이 남음) 0 이 아닌 값을 한 원인으로 단정하지 않는다.
      */
     val unusableRawRows: Int,
+    /**
+     * 소수부 때문에 **없는 값이 된 금액 칸 수**(D-6G2d-15) — 집계(`a_value`·`reserve_prices`)는 통째로
+     * 하나로 센다. 역시 항등식 밖이다: 그 행은 버려지지 않고 그 칸만 빈다. 0 이 아니면 원천이 원 단위
+     * 정수를 낸다는 조사 문서의 관측이 깨졌다는 뜻이고, 그 사실은 로그로 공시된다.
+     */
+    val fractionalAmounts: Int,
 )
 
 /**

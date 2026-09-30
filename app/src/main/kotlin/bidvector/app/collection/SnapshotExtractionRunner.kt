@@ -104,7 +104,8 @@ class SnapshotExtractionRunner(
                 "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
                 "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
                 "incompleteAxis=${extraction.incompleteAxis} " +
-                "unusableRawRows=${extraction.unusableRawRows} " +
+                "unkeyedRawRows=${extraction.unusableRawRows} " +
+                "fractionalAmounts=${extraction.fractionalAmounts} " +
                 "outsideSample=${extraction.observedOutsideSample} bytes=${rows.length}",
         )
         termination.terminate(CollectionExitCode.COMPLETE.value)
