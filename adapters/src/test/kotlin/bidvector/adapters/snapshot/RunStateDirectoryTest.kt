@@ -449,7 +449,6 @@ class RunStateDirectoryTest {
         shouldThrow<RunStateFormatRefusedException> { reopen() }.fault shouldBe RunStateFormatFault.MISMATCHED
     }
 
-
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */
     private fun tornLedger(): Path {
         val directory = open()

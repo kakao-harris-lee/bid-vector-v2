@@ -436,7 +436,6 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.observedOutsideSample shouldBe 0
     }
 
-
     /** 개찰결과 목록 관측 — 참가자 수가 이 축에서만 온다(결말 줄이 없는 축이다). */
     private fun openingListObservation(
         number: String,

@@ -128,8 +128,7 @@ class FileAttemptLedgerTest {
         shouldThrow<IllegalArgumentException> { ledger.read() }
     }
 
-    private fun ledgerFile(): Path =
-        Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)
+    private fun ledgerFile(): Path = Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)
 
     /** 걷기 칸이 [walkField] 인 AXIS 줄 — `null` 이면 칸 자체를 싣지 않는다(옛 형식). */
     private fun axisLineWithoutWalk(walkField: String?): String =
