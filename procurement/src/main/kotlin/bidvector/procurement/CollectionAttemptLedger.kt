@@ -64,6 +64,10 @@ internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 
 /** AXIS 줄의 걷기 부재 — 형태 위반이다(D-6G2d-4 ⓑ). 「모름」을 「빈 응답」으로 접지 않는다. */
 internal const val AXIS_WALK_REQUIRED = "AXIS 줄은 걷기 식별자를 반드시 싣는다"
 
+/** 결말 줄 하나 → 그 축의 결말. 걷기 부재는 형태 위반이다(D-6G2d-4 ⓑ). */
+private fun conclusionOf(line: CollectionAttempt): AxisConclusion =
+    AxisConclusion(line.outcome, requireNotNull(line.walk) { AXIS_WALK_REQUIRED })
+
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**
  *
@@ -189,17 +193,10 @@ class AttemptHistory(
      * 그 행은 값 결측 제외로 계수되어 사유 귀속까지 틀린다.
      */
     fun axisConclusions(): Map<String, Map<SourceEndpoint, AxisConclusion>> =
-        attempts
-            .filter { it.kind == AttemptKind.AXIS }
-            .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, lines) ->
-                lines.groupBy { it.axis }.mapValues { (_, byAxis) ->
-                    // AXIS 줄은 걷기를 반드시 갖는다(`CollectionAttempt.init`) — 판독이 그 불변식을
-                    // 다시 요구해, 형태를 어긴 줄이 여기까지 왔으면 조용히 지나가지 않는다.
-                    byAxis.last().let { AxisConclusion(it.outcome, requireNotNull(it.walk) { AXIS_WALK_REQUIRED }) }
-                }
-            }
+        // AXIS 줄은 걷기를 반드시 갖는다(`CollectionAttempt.init`) — 판독이 그 불변식을 다시 요구해,
+        // 형태를 어긴 줄이 여기까지 왔으면 조용히 지나가지 않는다.
+        byNoticeAndAxis { it.kind == AttemptKind.AXIS }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> conclusionOf(lines.last()) } }
 
     /**
      * **이어 돌기의 답**(D-6G-58 · D-6G2d-8 ⓑⓒ) — (공고, 축)마다 `true` 면 다시 부르지 않는다.
@@ -216,11 +213,23 @@ class AttemptHistory(
      */
     fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> {
         require(axisRetryLimit >= 1) { "재호출 상한은 1 이상이다 — 0 이면 한 번의 일시 실패가 축을 영구히 버린다" }
-        return attempts
+        // 갈래를 **거르지 않는다** — 의도·결말 줄의 존재가 「원장 시대인가」를 말한다(D-6G2d-8 ⓑ).
+        return byNoticeAndAxis { true }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> doneWith(lines, axisRetryLimit) } }
+    }
+
+    /**
+     * (공고, 축)마다 그 축의 줄들 — 두 물음(결말·이어 돌기)이 같은 묶음을 쓴다. 공고 키 없는 줄
+     * (목록 축)은 공고 단위가 아니라 빠진다.
+     */
+    private fun byNoticeAndAxis(
+        keep: (CollectionAttempt) -> Boolean,
+    ): Map<String, Map<SourceEndpoint, List<CollectionAttempt>>> =
+        attempts
+            .filter(keep)
             .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
             .groupBy({ it.first }, { it.second })
-            .mapValues { (_, lines) -> lines.groupBy { it.axis }.mapValues { (_, byAxis) -> doneWith(byAxis, axisRetryLimit) } }
-    }
+            .mapValues { (_, lines) -> lines.groupBy { it.axis } }
 
     /** 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 결말 부재 · 정착 · 재호출 상한 셋을 본다. */
     private fun doneWith(
