@@ -1400,9 +1400,11 @@ def test_the_census_reproduces_the_independent_count() -> None:
     assert isinstance(policy, StrategyBacktestPolicy), policy
     decision: dict[str, set[tuple[str, str]]] = {}
     for use in policy_use_census(policy):
-        if _USE_COVERAGE[(use.key, use.site, use.consumer)].startswith(
-            ("ECHO", "PASS:")
-        ):
+        # **등재가 없는 삼중은 여기서 터지지 않는다** — 그 사실은 명단 등식 test 의 몫이고,
+        # 이 test 가 같은 사실로 함께 붉어지면 어느 쪽이 깨졌는지 알 수 없다(변이 측정에서
+        # 거동 열이 구조 드리프트로 오염된다 — 실측으로 드러난 자리다).
+        coverage = _USE_COVERAGE.get((use.key, use.site, use.consumer), "CLASS")
+        if coverage.startswith(("ECHO", "PASS:")):
             continue
         decision.setdefault(use.key, set()).add((use.site, use.consumer))
     measured = {
