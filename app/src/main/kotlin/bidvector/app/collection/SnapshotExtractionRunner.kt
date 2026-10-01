@@ -98,17 +98,31 @@ class SnapshotExtractionRunner(
         Files.writeString(directory.resolve("manifest.json"), manifest)
         // 표본 목록은 **바이트 그대로** 곁에 둔다 — 판독이 manifest 해시를 실제 파일로 대조한다.
         Files.writeString(directory.resolve("sample-list.tsv"), sample.text)
-        log.write(
-            "snapshot-extract finished rows=${extraction.rows.size} " +
-                "sampleSize=${sample.size} " +
-                "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
-                "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
-                "incompleteAxis=${extraction.incompleteAxis} " +
-                "outsideSample=${extraction.observedOutsideSample} bytes=${rows.length}",
-        )
+        log.write(snapshotFinishedLine(sample.size, extraction, rows.length))
         termination.terminate(CollectionExitCode.COMPLETE.value)
     }
 }
+
+/**
+ * 추출이 끝난 줄 — 계수들은 **이 줄이 유일한 공시 자리**다(manifest 어휘를 늘리지 않는다, 운영자 결정
+ * A-2). 그래서 줄을 짓는 일을 값 함수로 둔다: 칸 하나가 빠지거나 **두 계수가 서로 바뀌어도** test 가
+ * 붉어진다. 줄 안에 값을 박아 두면 그 배선은 어느 test 도 보지 못한다(vr r3 L-2 — 앞 판의 fixture 는
+ * 세 계수가 모두 0 이라 리터럴 `0` 으로 바꾼 변이가 초록이었다).
+ */
+internal fun snapshotFinishedLine(
+    sampleSize: Int,
+    extraction: SnapshotExtraction,
+    bytes: Int,
+): String =
+    "snapshot-extract finished rows=${extraction.rows.size} " +
+        "sampleSize=$sampleSize " +
+        "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
+        "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
+        "incompleteAxis=${extraction.incompleteAxis} " +
+        "unusableRawRows=${extraction.unusableRawRows} " +
+        "fractionalAmounts=${extraction.fractionalAmounts} " +
+        "incompleteAValues=${extraction.incompleteAValues} " +
+        "outsideSample=${extraction.observedOutsideSample} bytes=$bytes"
 
 /** 계수 넷은 모두 **측정값**이다 — 항등식 자체는 구성상 참이라 [SnapshotCounts] 에서 표기로 선다. */
 private fun countsOf(

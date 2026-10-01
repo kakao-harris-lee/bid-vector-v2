@@ -3,6 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.NoticeRound
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 private val NOTICE_ID = NoticeId(NoticeNumber.of("20260101002"), NoticeRound.of("000"))
 
@@ -22,6 +23,7 @@ private fun emptyBatch(): SourceBatch<RawNoticeObservation> =
                 unknownFields = 0,
             ),
         next = null,
+        observedAt = Instant.parse("2026-09-24T01:00:00Z"),
     )
 
 /**

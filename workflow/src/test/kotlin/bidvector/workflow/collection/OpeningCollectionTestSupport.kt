@@ -1,7 +1,9 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.AttemptHistory
+import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectionAttempt
@@ -23,6 +25,15 @@ import java.time.LocalDate
 /** 6G 수집 갈래 test 의 fake 포트·조립 — 값과 호출 기록뿐이고 mock framework 는 없다. */
 internal class ScriptedOpeningPort(
     private val division: BusinessDivision,
+    /**
+     * 출하 경로에서 상세 호출은 관문(`KonepsCallGate`)을 지나고, 그 자리가 **의도 줄과 호출 줄**을
+     * 원장에 남긴다(D-6G-61 ①). 대역이 그것을 빠뜨리면 「결말 없이 끝난 호출」이 원장에 아예 없어
+     * 그 셈(cr r4 ②)을 이 harness 로 잴 수 없다.
+     *
+     * 절단으로 돌아온 호출에는 줄을 남기지 않는다 — 관문 거부는 **호출 전에** 접히므로 실물도 남기지
+     * 않고(D-6G2d-16), 그 밖의 절단은 축의 결말 줄이 이미 그 라운드를 센다.
+     */
+    private val attempts: AttemptLedger? = null,
 ) : OpeningResultSourcePort {
     /** (공고일 → 그 슬롯이 낼 공고번호들). */
     val listScript = mutableMapOf<LocalDate, List<String>>()
@@ -39,6 +50,19 @@ internal class ScriptedOpeningPort(
 
     /** 몇 번째 상세 호출부터 절단인가(0-based) — 「앞 축은 받았고 이 축에서 막혔다」를 짓는다. */
     var detailTruncationFromCall: Int = 0
+
+    /**
+     * 한 걷기가 거는 **쪽 수**(D-6G2d-42) — 실물은 쪽마다 관문을 지나므로 원장에 쪽마다 두 줄이 남는다.
+     * 크래시 라운드를 「라운드 하나」로 세는지 재려면 쪽이 여럿인 축이 필요하다.
+     */
+    var detailPagesPerCall: Int = 1
+
+    /**
+     * 이 축에서만 의도 줄만 적고 죽는다(D-6G2d-48 ②) — 관문이 의도 줄을 적은 **뒤**, 호출 줄을 적기
+     * **전**의 크래시다. 실물에서는 프로세스가 그 사이에 죽고, 예산은 이미 그 의도 줄을 나간 호출로 센다.
+     * 축을 고르는 이유는 [RecordingRawStore] 의 적재 실패와 같다 — 한 축만 끊어 다른 축의 진행을 본다.
+     */
+    var crashAfterIntentOn: SourceEndpoint? = null
 
     private var detailCallCount = 0
 
@@ -58,6 +82,8 @@ internal class ScriptedOpeningPort(
                 truncationCause = listTruncation,
             ),
             next = null,
+            // 목록 갈래 대역도 걷기의 이름을 단다(D-6G2d-4 ⓓ) — 빈 배치도 걷기는 돌았다.
+            observedAt = COLLECTION_NOW,
         )
     }
 
@@ -91,12 +117,29 @@ internal class ScriptedOpeningPort(
         val item = observationOf(evidence.noticeId.number.value, endpoint)
         val truncation = detailTruncation.takeIf { detailCallCount >= detailTruncationFromCall }
         detailCallCount++
+        if (truncation == null) repeat(detailPagesPerCall) { recordCallLines(evidence, endpoint) }
         return SourceBatch(
             listOf(item),
             sourceAccounting(normalized = 1, truncationCause = truncation),
             next = null,
             // 대역도 걷기의 이름을 단다(D-6G-68) — 실물이 그렇고, 없으면 그 축이 0 행으로 읽힌다.
             observedAt = COLLECTION_NOW,
+        )
+    }
+
+    /** 관문이 적는 두 줄 — 한 줄이 한 호출이다(D-6G-61 ①). 호출 단위 줄은 걷기를 모른다(D-6G2d-4 ⓒ). */
+    private fun recordCallLines(
+        evidence: DetailFetchDecision.Fetch,
+        endpoint: SourceEndpoint,
+    ) {
+        val ledger = attempts ?: return
+        val key = NoticeKeyHash.of(evidence.noticeId.number.value, evidence.noticeId.round.value).value
+        ledger.append(
+            CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.PENDING, null),
+        )
+        check(endpoint != crashAfterIntentOn) { "의도 줄 뒤·호출 줄 전 크래시를 흉내낸다" }
+        ledger.append(
+            CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.HTTP, null),
         )
     }
 }
@@ -158,6 +201,12 @@ internal class FakeSampleListLedger : SampleListLedger {
     }
 }
 
+/**
+ * 운영 정책의 재호출 상한 — test 가 그 값을 다시 적지 않는다(두 자리에 같은 수를 두지 않는다).
+ * 상한 회계를 재는 판이 둘이라 공통 대역에 둔다.
+ */
+internal val POLICY_RETRY_LIMIT = COLLECTION_POLICY.detailFetchGates.axisRetryLimit
+
 internal class OpeningFixture(
     sampleSize: Int,
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
@@ -169,8 +218,8 @@ internal class OpeningFixture(
     val attempts = FakeAttemptLedger(attemptSeed)
     val raw = RecordingRawStore(rawFailsOn)
     val runs = RecordingRunStore()
-    val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION)
-    val service = ScriptedOpeningPort(BusinessDivision.SERVICE)
+    val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION, attempts)
+    val service = ScriptedOpeningPort(BusinessDivision.SERVICE, attempts)
 
     private val sources =
         listOf(
@@ -184,7 +233,7 @@ internal class OpeningFixture(
             runs = runs,
             sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), SampleSize(sampleSize)),
             policyFor = { COLLECTION_POLICY },
-            gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
+            gates = COLLECTION_POLICY.detailFetchGates,
             collectedAxes = collectedAxes,
             sampleList = sampleList,
             attempts = attempts,

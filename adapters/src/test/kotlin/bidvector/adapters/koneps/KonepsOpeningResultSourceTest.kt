@@ -22,7 +22,7 @@ import java.time.ZoneOffset
 private val REFERENCE_DATE = CollectionReferenceDate(LocalDate.of(2026, 9, 8))
 private val FIXED_CLOCK: Clock = Clock.fixed(Instant.parse("2026-09-08T00:00:00Z"), ZoneOffset.UTC)
 private val NOTICE_ID = NoticeId(NoticeNumber.of("SYN-OPEN-0001"), NoticeRound.of("000"))
-private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)
+private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3)
 
 private fun newSource(
     server: MockKonepsServer,

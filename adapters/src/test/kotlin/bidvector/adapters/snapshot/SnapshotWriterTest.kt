@@ -110,6 +110,24 @@ class SnapshotWriterTest {
         rendered shouldNotContain "1E-2"
     }
 
+    /**
+     * **cr r4 ⑥ — 조립을 거치지 않은 소수 금액은 조용한 `null` 이 되지 않는다.** 소수부의 처분은
+     * 조립이 정하고 그 자리가 계수한다(D-6G2d-15) — 렌더까지 소수가 왔다는 것은 **계수되지 않는
+     * 생산자**가 생겼다는 뜻이고, 그것을 `null` 로 접으면 판독이 「값이 없는 칸」과 「셈에서 빠진 칸」을
+     * 구별할 수 없다. 이 slice 가 고치고 있는 결함 계열 그대로다.
+     *
+     * 값 칸과 투찰자 칸 **둘 다** 본다 — 같은 함수를 지나므로, 한쪽만 재면 그 함수가 아니라 그 칸을
+     * 잠근 것이 된다. 실 경로에서는 발화하지 않는다(조립이 이미 비웠다).
+     */
+    @Test
+    fun `조립을 거치지 않은 소수 금액은 렌더에서 던진다`() {
+        val noticeCell = rowOf("aa").let { it.copy(notice = it.notice.copy(baseAmount = BigDecimal("1234567890.01"))) }
+        val bidderCell = rowOf("bb", bidders = listOf(1 to BigDecimal("1100000000.5")))
+
+        shouldThrow<IllegalStateException> { SnapshotWriter.renderRows(listOf(noticeCell)) }
+        shouldThrow<IllegalStateException> { SnapshotWriter.renderRows(listOf(bidderCell)) }
+    }
+
     @Test
     fun `투찰자 순번은 금액 오름차순이고 금액 없는 행은 뒤로 간다`() {
         val bidders = listOf<Pair<Int?, BigDecimal?>>(3 to BigDecimal("300"), null to null, 1 to BigDecimal("100"))

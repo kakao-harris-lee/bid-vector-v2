@@ -11,7 +11,7 @@ import java.time.Instant
 private const val TEST_KEY_HASH = "69319a9b03a9d88f35d363e669aff8ee6d36d64973c678594b5ab57b077bb7a6"
 
 private val NOTICE_ID = NoticeId(NoticeNumber.of("20260101001"), NoticeRound.of("000"))
-private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)
+private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3)
 private val OPENED_AT = Instant.parse("2026-09-01T00:00:00Z")
 
 /** ⑪ COL-03 — 「무엇을 언제 조회할 가치가 있는가」라는 순수 술어. */
@@ -82,7 +82,19 @@ class DetailFetchTest {
     @Test
     fun `DetailFetchGates 는 음수 시간을 거부한다`() {
         io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
-            DetailFetchGates(ageGateHours = -1, recheckGateHours = 0)
+            DetailFetchGates(ageGateHours = -1, recheckGateHours = 0, axisRetryLimit = 3)
+        }
+    }
+
+    /**
+     * cr r4 ④ — 재호출 상한의 하한을 **정책이 서는 시점**에 본다. 0 은 첫 일시 실패로 그 축을 영구히
+     * 버리는 값이라 정책으로 둘 수 없고, 여기서 막으면 잘못된 상한으로 **호출이 한 번도 나가지 않는다**
+     * (읽는 자리에 두면 그 앞의 배선·표본 선택이 이미 돌아 있다).
+     */
+    @Test
+    fun `DetailFetchGates 는 재호출 상한 0 을 거부한다 — 정책이 서는 시점에`() {
+        io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 0)
         }
     }
 }

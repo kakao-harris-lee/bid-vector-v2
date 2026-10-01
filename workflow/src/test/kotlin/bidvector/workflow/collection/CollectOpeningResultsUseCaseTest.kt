@@ -10,6 +10,7 @@ import bidvector.procurement.TruncationCause
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
@@ -262,6 +263,111 @@ class CollectOpeningResultsUseCaseTest {
         fixture.service.reservePriceCalls.size shouldBe 1
     }
 
+    /**
+     * **D-6G2d-8 ⓒ — 결정적 실패는 확정이다.** 입력 오류·비재시도 코드·봉투 구조 붕괴·최대 페이지
+     * 백스톱은 같은 요청을 다시 보내도 같은 답이 온다. 앞 판은 모든 절단을 미정착으로 접어 매 실행
+     * 그 축을 처음부터 다시 걸었다 — 승인 호출을 그만큼 태우고도 같은 답을 받는다(D-6G-65: 실제로
+     * 나간 호출 수와 상한의 어긋남). 정착이지만 행을 쓸 수는 없어 추출이 `incomplete_axis` 로 뺀다.
+     */
+    @Test
+    fun `결정적 실패로 정착한 축은 다시 부르지 않는다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture =
+            OpeningFixture(
+                sampleSize = 1,
+                attemptSeed = syntheticServiceKeys().map { finalFailureOn(it, axis) },
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.shouldBeEmpty()
+    }
+
+    /**
+     * **D-6G2d-8 ⓒ — 일시 실패도 상한이 있다.** 상한이 없으면 구조적으로 실패하는 축이 매 실행
+     * 승인 호출을 태운다. 상한은 정책 값이고(리터럴이 아니다), 닿으면 확정으로 접는다. 상한 **미만**
+     * 에서 다시 부르는 쪽은 위의 「원문이 있어도 원장이 미완이라고 하면 다시 부른다」가 잠근다.
+     */
+    @Test
+    fun `일시 실패가 재호출 상한에 닿으면 확정으로 접는다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture =
+            OpeningFixture(
+                sampleSize = 1,
+                attemptSeed =
+                    syntheticServiceKeys().flatMap { key ->
+                        List(POLICY_RETRY_LIMIT) { shortWalkOn(key, axis) }
+                    },
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.shouldBeEmpty()
+    }
+
+    /**
+     * **D-6G2d-16 (cr r1 H-1) — 관문 거부는 재호출 상한에 세지 않는다.** 승인 상한·쿼터·자체 속도
+     * 보호는 HTTP 가 나가기 **전에** 접힌다 — 그 공고·축에 대한 관측이 아니다. 앞 판은 그것을 일시
+     * 실패로 적었고 상한이 함께 세어, 상한이 소진된 뒤 실행 몇 번으로 **호출이 한 번도 나가지 않은
+     * 축이 영구 확정**됐다(나중에 승인 범위를 늘려도 되살아나지 않는다).
+     *
+     * 기준은 **대역 포트가 받은 요청 수**다: 예산이 막은 기동 셋 뒤, 예산이 있는 넷째 기동에서 그
+     * 축이 **불린다**. 세 번의 기동은 각각 한 번씩 부르므로(거부는 호출 뒤가 아니라 관문에서 나므로
+     * 대역은 그 호출을 받는다) 넷째가 부르면 넷이 된다.
+     */
+    @Test
+    fun `관문 거부가 상한만큼 쌓여도 예산이 돌아오면 그 축을 다시 부른다`() {
+        val fixture = OpeningFixture(sampleSize = 1)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.DAILY)
+        repeat(POLICY_RETRY_LIMIT) { fixture.run() }
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT
+
+        fixture.service.detailTruncation = null
+        fixture.run()
+
+        fixture.service.reservePriceCalls shouldHaveSize POLICY_RETRY_LIMIT + 1
+    }
+
+    /**
+     * **D-6G2d-8 ⓑ — 원문 적재와 결말 사이의 크래시.** 걷기는 받은 뒤 원문을 적재하고 그다음에 결말을
+     * 적는다(D-6G-58 ⓑ). 그 사이에서 죽으면 원문만 남고, 그것을 「받았다」로 읽으면 그 축은 영영 다시
+     * 불리지 않아 추출에서 **영구 `incomplete_axis`** 가 된다(표본이 조용히 준다). 같은 (공고, 축)의
+     * 의도·결말 줄이 「원장 시대인데 끝나지 않았다」를 말해 준다.
+     */
+    @Test
+    fun `원문은 적재됐는데 결말 줄이 없으면 다시 부른다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture =
+            OpeningFixture(
+                sampleSize = 1,
+                collectedAxes = FakeCollectedAxisStore(setOf(axis)),
+                attemptSeed = syntheticServiceKeys().map { pendingOn(it, axis) },
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.size shouldBe 1
+    }
+
+    /**
+     * D-6G2d-8 ⓑ 의 **반대 방향** — 그 축에 원장 줄이 하나도 없으면 원장 이전 원문이고, 판정은 원문의
+     * 존재에 맡긴다(D-6G-58 그대로). 이 구별이 없으면 이어 돌기가 원장 이전 원문을 매번 다시 부른다.
+     */
+    @Test
+    fun `원장 줄이 아예 없는 축은 원문의 존재로 판정한다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture = OpeningFixture(sampleSize = 1, collectedAxes = FakeCollectedAxisStore(setOf(axis)))
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.shouldBeEmpty()
+    }
+
     /** 반대 방향 — 원장이 「끝났다」고 하면 원문이 없어도 부르지 않는다(빈 응답이 영원히 불리지 않게). */
     @Test
     fun `원문이 없어도 원장이 끝났다고 하면 부르지 않는다`() {
@@ -333,9 +439,45 @@ private fun syntheticServiceKeys(): List<String> =
 private fun shortWalkOn(
     key: String,
     axis: SourceEndpoint,
-) = CollectionAttempt(key, axis, AttemptOutcome.Failed("SHORT_WALK"), COLLECTION_NOW, AttemptKind.AXIS)
+) = CollectionAttempt(
+    key,
+    axis,
+    AttemptOutcome.Failed("SHORT_WALK"),
+    COLLECTION_NOW,
+    AttemptKind.AXIS,
+    walk = COLLECTION_NOW,
+)
+
+/**
+ * 결정적 실패의 결말 줄(D-6G2d-8 ⓒ · 17) — 다시 불러도 같은 답이 온다. 코드는 **실제로 확정인 셋**
+ * 중 하나여야 한다(cr r1 L-2): 구조 붕괴는 일시라 production 이 이 조합을 쓸 수 없다.
+ */
+private fun finalFailureOn(
+    key: String,
+    axis: SourceEndpoint,
+) = CollectionAttempt(
+    key,
+    axis,
+    AttemptOutcome.FinalFailure("MAX_PAGES"),
+    COLLECTION_NOW,
+    AttemptKind.AXIS,
+    walk = COLLECTION_NOW,
+)
+
+/** 나가려는 호출 줄 — 결말 없는 원장 시대의 흔적(D-6G2d-8 ⓑ). */
+private fun pendingOn(
+    key: String,
+    axis: SourceEndpoint,
+) = CollectionAttempt(key, axis, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.PENDING, walk = null)
 
 private fun settledOn(
     key: String,
     axis: SourceEndpoint,
-) = CollectionAttempt(key, axis, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.AXIS)
+) = CollectionAttempt(
+    key,
+    axis,
+    AttemptOutcome.Succeeded,
+    COLLECTION_NOW,
+    AttemptKind.AXIS,
+    walk = COLLECTION_NOW,
+)

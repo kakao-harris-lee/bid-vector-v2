@@ -98,6 +98,7 @@ class OpeningCollectionWiringTest {
                         outcome = AttemptOutcome.Succeeded,
                         at = Instant.parse(at),
                         kind = AttemptKind.PENDING,
+                        walk = null,
                     ),
                 )
             }

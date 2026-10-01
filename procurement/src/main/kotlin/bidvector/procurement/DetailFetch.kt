@@ -44,16 +44,44 @@ sealed interface DetailFetchDecision {
     ) : DetailFetchDecision
 }
 
-/** age-gate·recheck-gate 시간 — 값(legacy 기본 24h/48h)은 정책 데이터다(매직넘버 금지). */
+/**
+ * 「무엇을 언제 다시 조회할 가치가 있는가」의 값들 — age-gate·recheck-gate 시간(legacy 기본 24h/48h)과
+ * 축 재호출 상한. 전부 정책 데이터다(매직넘버 금지).
+ */
 data class DetailFetchGates(
     val ageGateHours: Long,
     val recheckGateHours: Long,
+    /**
+     * 한 (공고, 축)을 **일시 실패로 다시 부를 횟수 상한**(D-6G2d-8 ⓒ). 앞 판에는 상한이 없어, 구조적
+     * 으로 실패하는 축이 매 실행 승인 호출을 다시 태우고도 같은 답을 받았다 — 실제로 나간 호출 수와
+     * 상한이 어긋나는 D-6G-65 의 항목이다. 상한에 닿은 축은 확정으로 접고, 추출이 그 공고를
+     * `incomplete_axis` 로 공시한다.
+     *
+     * **기본값이 없다**: 상한을 잊은 배선이 「상한 없음」으로 조용히 돌지 않는다. 이 값이 여기 있는
+     * 이유는 이것이 조회 가치 술어의 값이고, 수집 use case 가 **읽을 수 있는** 유일한 정책 자리이기
+     * 때문이다 — `KonepsCollectionPolicyData` 는 그 패키지에서 통과 전용이다(구조 게이트가 멤버 접근을
+     * 막는다, D-6F8-1 우회 1). 그 금지는 옳다: 정책의 원문 키를 use case 가 들여다볼 자리를 주지 않는다.
+     *
+     * 하한(1 이상)은 **이 생성자**가 본다(cr r4 ④ — D-6G2d-18 의 「쓰는 자리 하나로」를 뒤집는다).
+     * 정책이 서는 시점이 첫 호출보다 이르므로, 여기서 막으면 잘못된 상한으로 **호출이 한 번도 나가지
+     * 않는다**. 읽는 자리에 두면 그 앞의 배선·표본 선택이 이미 돌아 있고, 형제 필드의 하한과 같은
+     * 자리에 없어 한쪽만 보는 판이 된다.
+     */
+    val axisRetryLimit: Int,
 ) {
     init {
         require(ageGateHours >= 0) { "ageGateHours는 음수일 수 없다: $ageGateHours" }
         require(recheckGateHours >= 0) { "recheckGateHours는 음수일 수 없다: $recheckGateHours" }
+        require(axisRetryLimit >= 1) { AXIS_RETRY_LIMIT_MINIMUM }
     }
 }
+
+/**
+ * 재호출 상한의 하한 — 상한 N 은 **N 번째 일시 실패에서 확정**한다(N=1 이면 첫 실패에 확정). 0 이면
+ * 첫 일시 실패가 그 축을 버리므로 「상한 없음」이 아니라 「재호출 없음」이고, 그 값을 정책으로 두는
+ * 길은 열지 않는다.
+ */
+internal const val AXIS_RETRY_LIMIT_MINIMUM = "재호출 상한은 1 이상이어야 한다 — N 번째 일시 실패에서 확정한다"
 
 /**
  * 조회 가치 술어(⑪) — 순수 함수. 이미 저장돼 있으면 [DetailFetchSkipReason.AlreadyHeld],

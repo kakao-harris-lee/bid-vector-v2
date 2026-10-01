@@ -2,6 +2,7 @@ package bidvector.adapters.snapshot
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
@@ -26,22 +27,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private val OBSERVED_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")
-
-/** 다시 걷기는 다른 시각에 온다 — 그 시각이 걷기의 이름이다(D-6G-58). */
-private const val RE_WALK_GAP_SECONDS = 3600L
-private val WINDOW_FROM: LocalDate = LocalDate.of(2026, 6, 16)
-private val WINDOW_TO: LocalDate = LocalDate.of(2026, 6, 18)
-
-private fun policy(): KonepsCollectionPolicyData =
-    (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 7)) as Resolution.Resolved).value
-
-private fun sampleOf(vararg numbers: String): SampleList =
-    SampleList(
-        numbers.associate { NoticeKeyHash.of(it, "000") to SampleStratum(BusinessDivision.SERVICE, "2026-W25") },
-        scope = SampleScope(WINDOW_FROM, WINDOW_TO, setOf(BusinessDivision.SERVICE)),
-    )
-
 /**
  * D-6G-40 — 추출이 **확정 표본만** 싣는지(D-6G-39), 그리고 표본인데 행이 되지 못한 공고가
  * **사유별로** 계수되는지. dev DB 를 읽는 자리라 실 Postgres 로 잰다.
@@ -49,38 +34,7 @@ private fun sampleOf(vararg numbers: String): SampleList =
  * canonical `notice` 행을 세우지 않는다 — 여기서 재는 것은 「무엇이 행이 되는가」의 **문턱**이고,
  * 문턱을 넘지 못한 공고는 canonical 이 있든 없든 행이 되지 않아야 한다.
  */
-class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
-    private fun observe(
-        number: String,
-        endpoint: SourceEndpoint,
-        round: String = "000",
-        at: Instant = OBSERVED_AT,
-        marker: String? = null,
-    ) = appendRawObservation(
-        RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round) +
-                (marker?.let { mapOf(RawKey("prcbdrNm") to it) } ?: emptyMap()),
-            endpoint,
-            at,
-        ),
-    )
-
-    /** 기본은 **전 축 완료 · 걷기는 [OBSERVED_AT]** — 이 test 들이 재는 것은 그 앞의 문턱들이다. */
-    private fun extract(
-        sample: SampleList,
-        conclusions: Map<String, Map<SourceEndpoint, AxisConclusion>> = allAxesSettled(sample),
-    ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(sample, conclusions)
-
-    /** 원장이 가리키는 걷기(D-6G-68) — [walk] 가 `null` 이면 빈 응답으로 끝난 축이다(0 행). */
-    private fun allAxesSettled(
-        sample: SampleList,
-        walk: Instant? = OBSERVED_AT,
-    ): Map<String, Map<SourceEndpoint, AxisConclusion>> =
-        sample.keys.associate { key ->
-            key.value to
-                expectedAxesFor(BusinessDivision.SERVICE.name).associateWith { AxisConclusion(true, walk) }
-        }
-
+class JdbcSnapshotSourceSampleTest : SnapshotSourceTestBase() {
     /** 표본틀에만 있던 공고(목록 축만)는 행이 되지 않는다 — 상세를 부르지 않았으므로 결과가 없다. */
     @Test
     fun `표본이어도 상세가 없으면 행이 아니라 사유다`() {
@@ -145,7 +99,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
                 (
                     sample.keys.single().value to
                         allAxesSettled(sample).getValue(sample.keys.single().value) +
-                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = false, walk = OBSERVED_AT))
+                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(shortWalk, observedAt))
                 )
         val extraction = extract(sample, partial)
 
@@ -168,7 +122,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         // 첫 걷기 — 2쪽 중 1쪽에서 끊겨 투찰 행 둘만 남았다.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
         // 다시 걷기 — 전 쪽을 받아 투찰 행 셋.
-        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = again, marker = "다시-걷기-$it") }
 
         val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), again)).rows.single()
@@ -248,7 +202,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         // 첫 걷기는 2쪽 중 1쪽에서 끊겨 투찰 행 둘을 남겼다. 재걷기는 NODATA — 원문 0 행.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "끊긴-걷기-$it") }
 
-        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), walk = null))
+        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), outcome = AttemptOutcome.Empty))
 
         extraction.rows.shouldBeEmpty()
         extraction.sampledWithoutDetail shouldBe 1
@@ -265,12 +219,12 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val number = "20260617001-00"
         persistCanonical(number, listObservation(number))
         // 끊긴 걷기가 **더 늦은** 시각을 달았다(시계가 앞서 있던 실행).
-        val skewed = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        val skewed = observedAt.plusSeconds(reWalkGapSeconds)
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = skewed, marker = "끊긴-걷기-$it") }
         // 다시 걸어 전 쪽을 받았지만 시각은 뒤로 간 시계의 것이다.
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "전-쪽-$it") }
 
-        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), OBSERVED_AT)).rows.single()
+        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), observedAt)).rows.single()
 
         row.outcome.bidderRows shouldHaveSize 3
     }
@@ -287,7 +241,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         persistCanonical(number, listObservation(number))
         // 첫 걷기는 끊겨 투찰 행 둘, 다시 걷기는 **한 달 뒤**(옛 추출 창 밖)에 전 쪽 셋.
         repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
-        val farLater = OBSERVED_AT.plus(30, ChronoUnit.DAYS)
+        val farLater = observedAt.plus(30, ChronoUnit.DAYS)
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = farLater, marker = "창-밖-$it") }
 
         val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), farLater))
@@ -330,35 +284,101 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         row.notice.successfulBidMethodCode shouldBe "낙030001"
     }
 
-    /** canonical 공고를 **출하 경로**(repository)로 세운다 — test 전용 SQL 사본을 두지 않는다. */
-    private fun listObservation(number: String): RawNoticeObservation =
-        RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to "000"),
-            SourceEndpoint.NOTICE_LIST,
-            OBSERVED_AT,
+    /**
+     * **D-6G2d-3 (vr r5-t probe W6) — 결말 줄이 없는 축은 가장 늦은 걷기의 행만 쓴다.** AXIS 결말
+     * 줄을 쓰는 자리는 상세 축 넷뿐이라 목록 축 둘은 **언제나** 결말이 없다. 앞 판은 그 축의 행을
+     * 아무 선별 없이 모으고 조립이 적재 순서의 첫 행을 취해 **가장 오래된 관측**을 썼다 — 발주처가
+     * 정정해 다시 걸어도 낡은 값이 실린다. 계수로는 드러나지 않는다(어느 쪽이든 사유가 같다).
+     */
+    @Test
+    fun `결말 줄이 없는 목록 축은 가장 늦은 관측을 쓴다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        appendRawObservation(openingListObservation(number, participants = "2", at = observedAt))
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
+        appendRawObservation(openingListObservation(number, participants = "5", at = again))
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.outcome.participantCount shouldBe 5
+    }
+
+    /**
+     * **D-6G2d-3 (vr r5-t probe W6b) — 실수집에서 발화하는 모양.** 개발 DB 에는 6F-8·6F-9 수집이
+     * 남긴 공고 목록 원문이 있고 그 행들은 6G 가 계약에 더한 공고일·낙찰방법 칸을 **싣지 않는다**
+     * (`payload_fields` 는 적재 당시 등재 칸의 투영이다). 가장 오래된 관측을 쓰면 그 기간 표본의
+     * 공고일이 null 이 되고 Python 이 공고일 결측으로 **통째로** 뺀다 — 날짜로 몰린 비랜덤 제외다.
+     */
+    @Test
+    fun `6G 칸이 없는 옛 목록 관측 뒤의 새 관측이 공고일과 낙찰방법을 채운다`() {
+        val number = "20260617001-00"
+        // 6F-8 판 — 식별자 둘뿐이다.
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        // 6G 판 — 같은 공고를 다시 걸어 새 칸이 실렸다.
+        appendRawObservation(
+            RawNoticeObservation.of(
+                mapOf(
+                    RawKey("bidNtceNo") to number,
+                    RawKey("bidNtceOrd") to "000",
+                    RawKey("bidNtceDt") to "2026-06-03 09:00:00",
+                    RawKey("sucsfbidMthdCd") to "낙030001",
+                ),
+                SourceEndpoint.NOTICE_LIST,
+                observedAt.plusSeconds(reWalkGapSeconds),
+            ),
         )
 
-    private fun persistCanonical(
-        number: String,
-        observation: RawNoticeObservation,
-    ) {
-        val id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
-        JdbcNoticeRepository(dataSource()).persist(
-            NoticeCollected(
-                id = id,
-                businessCategory = null,
-                baseAmount = null,
-                estimatedAmount = null,
-                allocatedBudget = null,
-                floorRate = null,
-                deadlineAt = null,
-                openingScheduledAt = null,
-                raw = observation,
-                businessDivision = BusinessDivision.SERVICE,
-                serviceDivision = null,
-                mainConstructionType = null,
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.notice.noticedOn shouldBe LocalDate.of(2026, 6, 3)
+        row.notice.successfulBidMethodCode shouldBe "낙030001"
+    }
+
+    /**
+     * **D-6G2d-3 — 걷기의 순서는 적재 순서가 아니라 관측 시각이다.** 재걷기는 보통 뒤에 적재되므로
+     * 두 기준이 같은 답처럼 보인다. backfill(이른 관측을 뒤늦게 적재)은 두 기준을 갈라놓는다 —
+     * `inserted_at` 으로 고르면 나중에 들어온 **이른** 관측이 이긴다.
+     */
+    @Test
+    fun `걷기 선별의 기준은 적재 시각이 아니다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        val again = observedAt.plusSeconds(reWalkGapSeconds)
+        appendRawObservation(openingListObservation(number, participants = "5", at = again))
+        // 이른 관측이 **뒤에** 적재된다.
+        appendRawObservation(openingListObservation(number, participants = "2", at = observedAt))
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.outcome.participantCount shouldBe 5
+    }
+
+    /**
+     * **D-6G2d-8 ⓐ — 공고번호가 빈 원문 행 한 줄이 추출 전체를 멈추지 않는다.** 적재는 정규화
+     * **전에** 일어나고 원문은 append-only 다(DB 트리거) — 번호 없는 항목이 한 번 들어오면 그 행은
+     * 지울 수 없고, 관측 창도 없어져 추출은 매번 그 행을 만난다. 키를 갖지 못한 행은 버리고 **수를
+     * 공시한다**: 어느 표본 공고에도 속하지 않으므로 네 항 항등식은 그대로다.
+     */
+    @Test
+    fun `번호가 빈 원문 행은 추출을 멈추지 않고 계수된다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        appendRawObservation(
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to " ", RawKey("bidNtceOrd") to "000"),
+                SourceEndpoint.OPENING_COMPLETE,
+                observedAt,
             ),
-            appendRawObservation(observation),
         )
+
+        val extraction = extract(sampleOf(number))
+
+        extraction.rows shouldHaveSize 1
+        extraction.unusableRawRows shouldBe 1
+        extraction.observedOutsideSample shouldBe 0
     }
 }

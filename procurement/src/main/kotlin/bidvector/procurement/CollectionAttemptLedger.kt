@@ -25,8 +25,13 @@ data class CollectionAttempt(
     val kind: AttemptKind,
     /**
      * **이 결말이 가리키는 걷기**(D-6G-68) — 그 걷기의 관측 시각이고, 한 걷기의 모든 쪽이 같은 값을
-     * 단다. [AttemptKind.AXIS] 줄만 갖는다(호출 단위 줄은 걷기를 모른다). 빈 응답이면 `null` 이다 —
-     * 그 걷기는 행을 남기지 않았고, 그것이 곧 「이 축은 0 행」이라는 뜻이다.
+     * 단다. [AttemptKind.AXIS] 줄만 갖고, AXIS 줄은 **언제나** 갖는다(D-6G2d-4 ⓒ — `init` 이 양방향으로
+     * 요구한다). 빈 응답도 걷기의 이름은 있다: 행을 남기지 않았다는 것은 결말 어휘([AttemptOutcome.Empty])
+     * 가 말한다. 앞 판은 그 둘을 `null` 하나로 접었고, 그래서 **걷기를 모르는 옛 줄**과 **빈 응답**이
+     * 같은 값이 되어 축이 통째로 빠진 완료 행이 나왔다(vr r5-t probe W7).
+     *
+     * **기본값이 없다**(cr r5-t L-1). AXIS 줄을 쓰는 새 자리가 인자를 잊으면 그 축이 조용히 「0 행」이
+     * 되는 것이 아니라 컴파일이 깨진다.
      *
      * 이 칸이 없던 동안 추출은 「원문 행 중 가장 늦은 시각」으로 걷기를 **짐작**했다. 그러면 셋이
      * 조용히 틀린다: 빈 응답으로 끝난 재걷기는 행을 남기지 않아 앞의 잘린 걷기가 마지막으로 보이고,
@@ -34,13 +39,21 @@ data class CollectionAttempt(
      * 순서가 뒤집힌다. 셋 다 정직한 운영자에게 일어나고(예비 추출·일시적 `NODATA`·시계 보정),
      * 결과는 **잘린 투찰 행이 완료 행으로 실리는 것**이다 — 계수도 오류도 없이.
      */
-    val walk: Instant? = null,
+    val walk: Instant?,
 ) {
+    /*
+     * **예외 하나**(D-6G2d-49): 끊긴 라운드를 닫는 `Failed(INTERRUPTED)` 줄의 걷기는 관측 시각이 아니라
+     * 그 라운드의 **마지막 줄의 시각**이다 — 배치를 끝내지 못했으므로 관측 시각이 없다. 그 줄은 `Failed`
+     * 라 추출이 행을 쓰지 않으므로(축이 미완) 값이 행 선별에 쓰이지 않는다. 고정 시계 test 에서는 그
+     * 값이 관측 시각과 겹칠 수 있고, 오늘은 `Failed` 라 무해하다(알려진 제한).
+     */
     init {
         // 형태를 여기서 닫는다 — 원장은 영속 파일이고, 키가 아닌 문자열이 한 줄 들어가면 그 줄은
         // 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만 태운다).
         require(noticeKey == null || NOTICE_KEY_HEX.matches(noticeKey)) { NOTICE_KEY_HEX_MESSAGE }
-        require(walk == null || kind == AttemptKind.AXIS) { "걷기 식별자는 AXIS 줄만 갖는다" }
+        // **양방향**이다(D-6G2d-4 ⓒ) — AXIS 아닌 줄이 걷기를 갖는 것도, AXIS 줄이 빠뜨리는 것도 막는다.
+        // 한쪽만 막으면 빠뜨림이 「빈 응답」으로 조용히 읽힌다.
+        require((kind == AttemptKind.AXIS) == (walk != null)) { "걷기 식별자는 AXIS 줄만, 그리고 AXIS 줄은 반드시 갖는다" }
     }
 }
 
@@ -53,6 +66,20 @@ data class CollectionAttempt(
 internal val NOTICE_KEY_HEX = Regex("[0-9a-f]{64}")
 
 internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 64 자다"
+
+/** 그 줄이 **축을 정착시키는 결말**인가 — 갈래와 어휘를 함께 본다(한쪽만 보면 호출 줄이 섞인다). */
+private val CollectionAttempt.settlesAxis: Boolean
+    get() = kind == AttemptKind.AXIS && outcome.isSettled
+
+/**
+ * 결말 줄 하나 → 그 축의 결말.
+ *
+ * 걷기 부재를 **여기서 다시 보지 않는다**(cr r4 ⑦). AXIS 줄이 걷기를 갖는다는 것은
+ * [CollectionAttempt] 의 `init` 이 양방향으로 닫고(D-6G2d-4 ⓒ), 원장을 읽는 파서도 그 생성자를
+ * 지난다 — 여기에 같은 문장을 또 두면 **도달할 수 없는 검사**가 불변식의 자리를 둘로 만든다.
+ * `!!` 는 그 사실의 표기다: 형태가 깨졌다면 이 줄이 서기 전에 생성자가 이미 거부했다.
+ */
+private fun conclusionOf(line: CollectionAttempt): AxisConclusion = AxisConclusion(line.outcome, line.walk!!)
 
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**
@@ -91,7 +118,42 @@ sealed interface AttemptOutcome {
         override val isSettled: Boolean = true
     }
 
+    /**
+     * **다시 불러 볼 값이 있는** 실패 — 5xx·타임아웃·상한 거부·짧은 걷기. 다시 부른다(D-6G-58): 한 번
+     * 실패한 축을 영구히 포기하면 그 결측이 무작위가 아니게 된다(느린 응답·과부하 시간대에 몰린 공고만
+     * 빠진다). 재호출 상한은 정책이 정한다([DetailFetchGates.axisRetryLimit]).
+     */
     data class Failed(
+        val code: String,
+    ) : AttemptOutcome {
+        override val isSettled: Boolean = false
+    }
+
+    /**
+     * **다시 불러도 답이 달라지지 않는** 실패(D-6G2d-8 ⓒ · 17) — 입력 오류·비재시도 결과코드·최대
+     * 페이지 백스톱 셋. 정착으로 센다: 매 실행 다시 걸면 승인 호출을 그만큼 태우고도 같은 답을
+     * 받는다(그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다). 정착이지만 **행을 쓸 수는 없다** —
+     * 추출은 그 공고를 `incomplete_axis` 로 정직하게 뺀다.
+     */
+    data class FinalFailure(
+        val code: String,
+    ) : AttemptOutcome {
+        override val isSettled: Boolean = true
+    }
+
+    /**
+     * **그 축에 귀속되지 않는 거부**(D-6G2d-16 · 29) — 이 어휘의 뜻은 「HTTP 가 안 나갔다」가 아니다.
+     * 세 사유가 든다: 우리 속도 보호와 우리 승인 상한은 호출이 **나가지 않은** 것이고, 원천의 쿼터
+     * 거절(429 · resultCode 22)은 **계정 단위** 사고여서 그 공고·축이 무엇을 담고 있었는지와 무관하다
+     * (6G D-6G-11 대로 그 실행이 멈춘다). 셋 다 그 축에 대한 **관측이 아니다**.
+     *
+     * 그래서 재호출 상한이 세지 않는다: 세면 상한이 소진된 뒤 실행 몇 번으로 **그 축이 영구 확정**되고
+     * 나중에 승인 범위를 늘려도 되살아나지 않는다(cr r1 H-1 · vr r2 실측: 예산·쿼터·스로틀·총 상한이
+     * 같은 거동이고 다음 기동에서 재호출된다). 정착이 아니므로 다시 부른다.
+     *
+     * 코드 문자열로 되읽어 분류하지 않는다 — 어휘가 늘 때 표가 둘로 갈린다. 원장 줄이 답을 나른다.
+     */
+    data class Refused(
         val code: String,
     ) : AttemptOutcome {
         override val isSettled: Boolean = false
@@ -103,12 +165,26 @@ sealed interface AttemptOutcome {
  *
  * 추출이 이 둘을 함께 읽어야 짐작이 사라진다. [settled] 만 있으면 「끝났다」는 알아도 **어느 행이
  * 그 끝난 걷기의 것인지**는 모르고, 그 자리를 원문 행의 시각으로 메우는 순간 잘린 걷기가 완료 행이
- * 된다. [walk] 가 `null` 인 settled 는 빈 응답이고 **0 행**이다.
+ * 된다. **0 행은 걷기 부재가 아니라 결말 어휘가 말한다**([AttemptOutcome.Empty], D-6G2d-4 ⓑ) — 걷기는
+ * AXIS 줄이 언제나 싣는다. 앞 판은 그 둘을 `null` 하나로 접었고, 그래서 걷기를 모르는 옛 줄이 빈 응답과
+ * 같은 값이 되어 축이 통째로 빠진 완료 행을 냈다(vr r5-t probe W7).
  */
 data class AxisConclusion(
-    val settled: Boolean,
-    val walk: Instant?,
-)
+    /**
+     * 그 걷기가 **어떻게 끝났는가**. 「끝났다」만으로는 부족하다: 빈 응답으로 정착한 축은 0 행이고,
+     * 실패로 끝난 축은 걷기가 있어도 그 행을 쓸 수 없다 — 셋을 한 `Boolean` 으로 접으면 판독이
+     * 그 차이를 잃는다(vr r5-t probe W7 · M-2).
+     */
+    val outcome: AttemptOutcome,
+    /** 이 결말이 가리키는 걷기 — AXIS 줄은 언제나 싣는다(D-6G2d-4 ⓑ). */
+    val walk: Instant,
+) {
+    /** 다시 부르지 않는가 — 이어 돌기가 보는 값이다. */
+    val settled: Boolean get() = outcome.isSettled
+
+    /** 그 걷기의 **행을 쓰는가** — 빈 응답과 실패는 행을 쓰지 않는다. */
+    val usesRows: Boolean get() = outcome == AttemptOutcome.Succeeded
+}
 
 /**
  * 읽어 온 시도 이력 — 두 물음에만 답한다. 파일 판독은 어댑터가 하고 이 타입은 값만 센다.
@@ -141,28 +217,111 @@ class AttemptHistory(
     }
 
     /**
-     * (공고, 축)마다 **마지막** 결말이 끝난 것인가(D-6G-58) — 원장에 줄이 하나라도 있으면 **원장이
-     * 이긴다.** 원문 행의 존재는 원장 이전 실행의 흔적에만 쓴다: 잘린 걷기도 행을 남기므로, 행이
-     * 있다고 다 받은 것이 아니다(그 축은 영영 다시 불리지 않고 결측이 조용해진다).
+     * (공고, 축)마다 **마지막 AXIS 결말** — 결말 어휘와 그 걷기다. **추출이 읽는 자리**이고, 이어
+     * 돌기가 묻는 것은 이것이 아니라 [axisResumptions] 다(그쪽은 재호출 상한과 원장 시대 판별까지
+     * 함께 본다). 두 물음을 한 함수로 접으면 추출이 상한 값을 알아야 하는데, 추출에게는 실패가 일시든
+     * 확정이든 같은 답(`incomplete_axis`)이라 그 인자가 뜻을 갖지 않는다.
      *
-     * 값이 `false` 인 것(실패·타임아웃·5xx·쿼터 거절·짧은 걷기)은 **다시 부른다.** 한 번 실패한 축을
-     * 영구히 포기하면 그 결측이 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고,
-     * 그 행은 값 결측 제외로 계수되어 사유 귀속까지 틀린다.
+     * 줄이 없는 (공고, 축)은 **항목 자체가 없다** — 원장 이전 원문의 처리는 D-6G-58 그대로다.
      */
     fun axisConclusions(): Map<String, Map<SourceEndpoint, AxisConclusion>> =
+        byNoticeAndAxis { it.kind == AttemptKind.AXIS }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> conclusionOf(lines.last()) } }
+
+    /**
+     * **이어 돌기의 답**(D-6G-58 · D-6G2d-8 ⓑⓒ) — (공고, 축)마다 `true` 면 다시 부르지 않는다.
+     *
+     * 항목이 **없다**는 것은 세 번째 답이다: 그 (공고, 축)에 원장 줄이 하나도 없으므로 원장 시대
+     * 이전의 원문이고, 판정은 원문의 존재에 맡긴다(D-6G-58 그대로).
+     *
+     * 줄은 있는데 **AXIS 결말이 없으면** 다시 부른다(ⓑ). 걷기는 받은 뒤 원문을 적재하고 그다음에
+     * 결말을 적으므로(D-6G-58 ⓑ), 그 사이에서 죽으면 원문만 남는다 — 그것을 「받았다」로 읽으면 그
+     * 축은 영영 다시 불리지 않고 추출에서 영구 `incomplete_axis` 가 된다(표본이 조용히 준다).
+     *
+     * 일시 실패는 [axisRetryLimit] 번까지만 다시 부른다(ⓒ). 상한이 없으면 구조적으로 실패하는 축이
+     * 매 실행 승인 호출을 태우고, 그 호출 수와 상한의 어긋남이 D-6G-65 의 항목이다.
+     */
+    fun axisResumptions(axisRetryLimit: Int): Map<String, Map<SourceEndpoint, Boolean>> =
+        // 갈래를 **거르지 않는다** — 의도·결말 줄의 존재가 「원장 시대인가」를 말한다(D-6G2d-8 ⓑ).
+        // 하한(1 이상)은 `DetailFetchGates` 의 생성자가 본다(cr r4 ④) — 정책이 서는 시점이 첫 호출보다
+        // 이르고, 이 함수에 같은 문장을 두면 불변식의 자리가 둘이 된다.
+        byNoticeAndAxis { true }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> doneWith(lines, axisRetryLimit) } }
+
+    /**
+     * **결말 없이 끝난 라운드**(D-6G2d-42) — (공고, 축)마다 그 라운드의 **마지막 호출 시각**이다.
+     *
+     * 재개하는 쪽이 이 값으로 앞 라운드를 닫는다(`AXIS Failed`). 닫지 않으면 상한이 크래시 라운드를
+     * 셀 방법이 없고(결말 줄이 없다), 꼬리의 호출 줄을 세면 **쪽 수가 많은 축이 크래시 한 번에 상한을
+     * 다 쓴다** — 참가자가 많은 공고만 빠지는 비랜덤 결측이다.
+     *
+     * **의도 줄만 남은 꼬리도 끊긴 라운드다**(D-6G2d-48 ②). 관문은 호출 **전에** 의도 줄을 적고 예산을
+     * 이미 그 호출로 세므로(D-6G-61 ①), 의도 줄 뒤·HTTP 줄 전에 죽은 라운드를 세지 않으면 두 장부의
+     * 가정이 갈린다 — 예산은 쓴 것으로 세고 상한은 안 쓴 것으로 센다. 그 틈이 곧 「구조적으로 실패하는
+     * 축이 매 실행 호출을 태운다」의 다른 얼굴이다.
+     */
+    fun interruptedRounds(): Map<String, Map<SourceEndpoint, Instant>> =
+        byNoticeAndAxis { true }
+            .mapValues { (_, byAxis) ->
+                byAxis.mapNotNull { (axis, lines) -> lastCallOfOpenRound(lines)?.let { axis to it } }.toMap()
+            }.filterValues { it.isNotEmpty() }
+
+    /**
+     * 마지막 결말 줄 뒤에 남은 **마지막 줄의 시각** — 없으면(결말로 끝났으면) 열린 라운드가 아니다.
+     * 의도 줄과 호출 줄을 **가리지 않는다**(D-6G2d-48 ②): 의도 줄은 이미 나간 호출로 예산에 세어졌다.
+     */
+    private fun lastCallOfOpenRound(byAxis: List<CollectionAttempt>): Instant? =
+        byAxis
+            .takeLastWhile { it.kind != AttemptKind.AXIS }
+            .lastOrNull()
+            ?.at
+
+    /**
+     * (공고, 축)마다 그 축의 줄들 — 두 물음(결말·이어 돌기)이 같은 묶음을 쓴다. 공고 키 없는 줄
+     * (목록 축)은 공고 단위가 아니라 빠진다.
+     */
+    private fun byNoticeAndAxis(
+        keep: (CollectionAttempt) -> Boolean,
+    ): Map<String, Map<SourceEndpoint, List<CollectionAttempt>>> =
         attempts
-            .filter { it.kind == AttemptKind.AXIS }
+            .filter(keep)
             .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
             .groupBy({ it.first }, { it.second })
-            .mapValues { (_, lines) ->
-                lines.groupBy { it.axis }.mapValues { (_, byAxis) ->
-                    byAxis.last().let { AxisConclusion(it.outcome.isSettled, it.walk) }
-                }
-            }
+            .mapValues { (_, lines) -> lines.groupBy { it.axis } }
 
-    /** **다시 부르지 않을** (공고, 축) — [axisConclusions] 중 끝난 것만. 이어 돌기가 쓴다. */
-    fun settledAxes(): Map<String, Set<SourceEndpoint>> =
-        axisConclusions().mapValues { (_, byAxis) -> byAxis.filterValues { it.settled }.keys }
+    /**
+     * 그 축의 줄들이 「다시 부르지 않는다」를 말하는가 — 정착과 재호출 상한 둘을 본다.
+     *
+     * 상한이 세는 것은 **마지막 정착 뒤**의 두 가지다(D-6G2d-19 · cr r4 ②): 일시 실패 결말과 **결말
+     * 없이 끝난 호출**. 정착 **앞**의 실패는 그 정착으로 무효가 된 증거이므로 세지 않는다 — 그것까지
+     * 세면 「성공했다가 일시적으로 실패한」 축이 새 예산 없이 곧바로 확정된다. 관문 거부도 세지
+     * 않는다(D-6G2d-16): 호출이 나가지 않은 것은 그 축에 대한 관측이 아니다. 확정 실패는 `isSettled`
+     * 가 이미 답한다.
+     *
+     * **크래시 라운드도 결말 줄로 센다**(D-6G2d-42). 걷기는 받은 뒤 원문을 적재하고 그다음 결말을
+     * 적으므로(D-6G-58 ⓑ) 그 사이에서 던지면 결말 줄이 없다 — 그것을 세지 못하면 그 축은 매 실행
+     * 상한 없이 다시 불린다. 그래서 **재개하는 쪽이 앞 라운드를 닫고**([interruptedRounds]) 이 함수는
+     * 결말 줄만 센다. 꼬리의 호출 줄을 직접 세던 앞 판은 쪽이 여럿인 축을 크래시 한 번에 확정시켜
+     * **참가자 수와 결측을 상관**시켰다(참가자가 많은 공고만 빠진다).
+     *
+     * 순서는 **원장의 덧붙인 순서**로 읽는다(`at` 값으로 다시 세우지 않는다). 그것이 실제 사건 순서이고,
+     * 시계가 뒤로 간 실행이 있으면 `at` 정렬은 앞 실행의 결말을 「마지막」으로 만들어 추출 쪽의
+     * 「마지막 줄이 이긴다」(D-6G-58)와 어긋난다.
+     */
+    private fun doneWith(
+        byAxis: List<CollectionAttempt>,
+        axisRetryLimit: Int,
+    ): Boolean {
+        val sinceSettled = byAxis.takeLastWhile { !it.settlesAxis }
+        return when {
+            sinceSettled.isEmpty() -> true
+            else -> sinceSettled.count(::isTransientConclusion) >= axisRetryLimit
+        }
+    }
+
+    /** 일시 실패로 닫힌 라운드 하나 — 관문 거부(`Refused`)도, 호출 줄도 아니다. */
+    private fun isTransientConclusion(line: CollectionAttempt): Boolean =
+        line.kind == AttemptKind.AXIS && line.outcome is AttemptOutcome.Failed
 
     val size: Int get() = attempts.size
 }
@@ -215,10 +374,11 @@ fun truncationCodeOf(cause: TruncationCause): String =
 fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     when {
         accounting.truncationCause != null -> {
-            AttemptOutcome.Failed(truncationCodeOf(accounting.truncationCause))
+            failureOf(accounting.truncationCause)
         }
 
         accounting.sourceTotal != null && accounting.received < accounting.sourceTotal -> {
+            // 짧은 걷기는 **일시**다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
             AttemptOutcome.Failed(SHORT_WALK_CODE)
         }
 
@@ -232,3 +392,48 @@ fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     }
 
 private const val SHORT_WALK_CODE = "SHORT_WALK"
+
+/**
+ * 절단 사유마다 **다시 불러 볼 값이 있는가**(D-6G2d-8 ⓒ) — 소진 `when` 이라 새 사유가 생기면 컴파일이
+ * 이 자리를 가리킨다. [truncationCodeOf] 와 같은 형태·같은 이유다(어휘를 리플렉션으로 짓지 않는다).
+ *
+ * 갈래는 **셋**이다.
+ *
+ * ① **관문 거부**([AttemptOutcome.Refused], D-6G2d-16 · 29) — 우리 속도 보호·우리 승인 상한·원천의
+ * 쿼터 거절. **그 축에 귀속되지 않는** 거부라 관측이 아니고(앞 둘은 호출이 없고, 쿼터는 계정 단위
+ * 사고다), 재호출 상한이 세지 않는다.
+ *
+ * ② **확정 실패**([AttemptOutcome.FinalFailure], D-6G2d-17) — 입력 오류·비재시도 코드·최대 페이지
+ * 백스톱 **정확히 셋**이다(test 가 등식으로 잠근다). 이어 돌기는 cursor 를 쓰지 않고 그 축을 1쪽부터
+ * 다시 걷으므로(`fetchDetails`), 이 물음은 어댑터의 `isResumable`(재개 지점에서 이어 갈 수 있는가)과
+ * **다른 물음**이다 — 백스톱은 cursor 로는 이어 갈 수 있지만 1쪽부터 다시 걸으면 같은 자리에서 또
+ * 멈춘다.
+ *
+ * ③ **일시 실패**([AttemptOutcome.Failed]) — 그 밖 전부. 5xx·타임아웃·전송 실패에 **구조 붕괴**와
+ * **미지 코드**와 **같은 쪽 반복**이 함께 든다. 구조 붕괴가 일시인 근거: 서버가 그 순간 보낸 응답이
+ * 무너졌다는 관측이고(어댑터 `isResumable` 이 같은 판단을 문면으로 적는다), 이 저장소에서 HTTP 5xx 는
+ * 봉투가 없어 실제로 이 사유로 온다(6G-2d 실측). 미지 코드가 일시인 근거(cr r1 M-1): 분류되지 않은 새
+ * 오류 형태 **한 번**에 그 축을 영구히 버리면 그것이 곧 표본의 조용한 축소다 — 「재개 가능한가」와
+ * 「그 공고를 영구히 버릴까」의 fail-safe 방향은 반대이고 후자는 보수적으로 **재시도**다. 같은 쪽 반복도
+ * 원천의 쪽 넘김이 그 순간 어긋난 관측이다. 영구 포기는 **상한이** 한다.
+ */
+private fun failureOf(cause: TruncationCause): AttemptOutcome =
+    when (cause) {
+        TruncationCause.SelfThrottled,
+        TruncationCause.QuotaExhausted,
+        is TruncationCause.BudgetExhausted,
+        -> AttemptOutcome.Refused(truncationCodeOf(cause))
+
+        TruncationCause.MaxPages,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        -> AttemptOutcome.FinalFailure(truncationCodeOf(cause))
+
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.StructureFailure,
+        TruncationCause.RepeatedPage,
+        TruncationCause.Unclassified,
+        -> AttemptOutcome.Failed(truncationCodeOf(cause))
+    }

@@ -57,6 +57,7 @@ internal fun seedSpentCallsAt(
                 outcome = AttemptOutcome.Succeeded,
                 at = at,
                 kind = AttemptKind.PENDING,
+                walk = null,
             ),
         )
     }

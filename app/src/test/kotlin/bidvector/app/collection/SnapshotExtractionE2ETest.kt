@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -275,6 +277,36 @@ class SnapshotExtractionE2ETest {
         val rowKeys = rows.map { it.substringAfter("\"notice_key_hash\":\"").substringBefore('"') }.toSet()
         sampleKeys.containsAll(rowKeys) shouldBe true
         (sampleKeys - rowKeys) shouldHaveSize 3
+    }
+
+    /**
+     * **D-6G2d-30 — 러너 로그 줄이 계수 셋을 싣는다.** 이 계수들은 **러너 로그가 유일한 공시 자리**다
+     * (manifest 어휘를 늘리지 않는다 — 운영자 결정 A-2). 그래서 그 줄에서 칸 하나가 빠지거나 이름이
+     * 바뀌면 공시가 조용히 사라지는데, 지금까지 어느 test 도 그 줄을 읽지 않았다(vr r2 low).
+     *
+     * 표준 출력으로 읽는다 — 기동이 Logback 을 다시 세우므로 기동 **전에** 붙인 appender 는 떨어진다
+     * (실측). 되돌리기는 `finally` 에 둔다: 던지는 경로에서 복구가 돌지 않으면 그 JVM 의 다음 test 가
+     * 버려진 스트림에 쓴다(6G cr r5-t M-4 와 같은 함정).
+     *
+     * 값까지 잠근다 — 이 fixture 는 소수부 금액도, 반쪽 A 도, 키 없는 원문도 없으므로 셋 다 0 이다.
+     */
+    @Test
+    fun `추출 로그 줄이 계수 셋을 싣는다`() {
+        val captured = ByteArrayOutputStream()
+        val original = System.out
+        val printed =
+            try {
+                System.setOut(PrintStream(captured, true, Charsets.UTF_8))
+                extractTo(Files.createTempDirectory("snapshot-log"))
+                captured.toString(Charsets.UTF_8)
+            } finally {
+                System.setOut(original)
+            }
+
+        val finished = printed.lines().last { it.contains("snapshot-extract finished") }
+        finished shouldContain "unusableRawRows=0"
+        finished shouldContain "fractionalAmounts=0"
+        finished shouldContain "incompleteAValues=0"
     }
 
     /**

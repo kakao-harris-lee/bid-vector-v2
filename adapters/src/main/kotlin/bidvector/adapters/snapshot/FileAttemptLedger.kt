@@ -28,15 +28,30 @@ import java.time.Instant
 internal class FileAttemptLedger(
     private val file: Path,
     /**
+     * 덧붙임 채널의 출처 — 출하는 파일 채널이고, **순서를 재는 test 가 대역을 끼운다**(D-6G2d-41).
+     * 기본값을 두는 이유는 이 인자가 배선의 선택이 아니라 test 의 관측 자리이기 때문이다.
+     */
+    private val channels: (Path) -> DurableAppend = ::appendChannel,
+    /**
      * 줄을 쓸 때마다 무결성 장부를 갱신한다(D-6G-48) — 기록과 장부가 갈리는 창을 남기지 않는다.
      * **기본값이 없다**(vr r4 L-10): 장부를 갱신하지 않는 append 는 그 디렉터리를 다음 기동에서
      * 막아 버리고, 그것을 쉽게 만드는 기본값은 이 타입이 주는 편의가 아니라 함정이다.
      */
     private val onAppended: (String) -> Unit,
 ) : AttemptLedger {
+    /**
+     * 한 줄을 덧붙이고 **그 바이트를 굳힌 뒤** 장부 갱신을 부른다(D-6G2d-41).
+     *
+     * 순서가 뒤집히면 정전 뒤에 장부는 이 줄을 세는데 원장에는 없다 — 다음 기동이 「줄 수가 장부보다
+     * 적다」로 **영구 거부**하고 출구는 디렉터리 폐기(= 상한 0 재시작)다. 반대 순서의 손해는 「굳은
+     * 줄을 장부가 아직 모른다」이고, 그것은 다음 기동이 장부를 원장 쪽으로 재동기해 흡수한다.
+     */
     override fun append(attempt: CollectionAttempt) {
         val line = lineOf(attempt)
-        Files.writeString(file, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+        channels(file).use { channel ->
+            channel.append(line)
+            channel.force()
+        }
         onAppended(line)
     }
 
@@ -80,7 +95,9 @@ internal class FileAttemptLedger(
                             SnapshotJson.Text(labelOf(attempt.outcome))
                         },
                     "kind" to SnapshotJson.Text(attempt.kind.name),
-                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 없는 줄은 키 자체를 싣지 않는다.
+                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 키는 **언제나** 싣고 값만 `null` 이다
+                    // (cr r5-t L-2 — 앞 주석은 사실이 아니었다). 그 덕에 판독이 「이 코드가 쓴 줄」과
+                    // 「칸이 생기기 전에 쓰인 줄」을 가릴 수 있다: AXIS 줄의 값이 `null` 이면 옛 줄이다.
                     "walk" to (attempt.walk?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null),
                 ),
             ).render() + "\n"
@@ -94,6 +111,17 @@ internal class FileAttemptLedger(
             requireNotNull(SourceEndpoint.entries.firstOrNull { it.name == fields["axis"].asStringOrNull() }) {
                 "시도 원장의 축 어휘가 아니다"
             }
+        val kind =
+            requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
+                "시도 원장의 줄 갈래 어휘가 아니다"
+            }
+        val walk = fields["walk"]?.asStringOrNull()?.let(Instant::parse)
+        // **옛 줄은 형식으로 거부한다**(D-6G2d-44). 걷기 없는 AXIS 줄은 이 칸이 생기기 전의 줄이고,
+        // 값 타입의 generic `require` 로 죽으면 운영자 출력에서 「손상」과 구별되지 않는다. 그 구별이
+        // 처방을 가른다: 옛 디렉터리는 폐기해도 되고, 손상은 사람이 봐야 한다.
+        if (kind == AttemptKind.AXIS && walk == null) {
+            throw RunStateFormatRefusedException(RunStateFormatFault.LEGACY_LINE)
+        }
         return CollectionAttempt(
             // 형태 검사는 값 타입이 진다 — 원장에는 이미 지어진 hex 가 실린다.
             noticeKey = fields["notice_key_hash"]?.asStringOrNull()?.let { NoticeKeyHash.ofHex(it).value },
@@ -101,28 +129,43 @@ internal class FileAttemptLedger(
             // 결말 없는 의도 줄은 값이 아니라 **자리표시**다 — 상한은 `kind` 로 센다.
             outcome = fields["outcome"].asStringOrNull()?.let(::outcomeOf) ?: AttemptOutcome.Succeeded,
             at = Instant.parse(requireNotNull(fields["at"].asStringOrNull()) { "시도 원장에 시각이 없다" }),
-            kind =
-                requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
-                    "시도 원장의 줄 갈래 어휘가 아니다"
-                },
-            // 이 칸 이전에 쓰인 원장은 값이 없다 — 그 축은 걷기를 모르므로 추출이 미완으로 센다.
-            walk = fields["walk"]?.asStringOrNull()?.let(Instant::parse),
+            kind = kind,
+            // 걷기를 **실은** 호출 줄은 옛 형식이 아니라 형태 위반이다 — 이 코드는 그런 줄을 쓴 적이
+            // 없으므로 값 타입의 양방향 `require`(D-6G2d-4 ⓒ)가 그 자리에서 막는다.
+            walk = walk,
         )
     }
 }
 
-/** 결말 어휘 — 오류는 코드를 뒤에 붙인다(`FAILED:<코드>`). 값이 아니라 분류만 싣는다. */
+/**
+ * 결말 어휘 — 오류는 코드를 뒤에 붙인다(`FAILED:<코드>` · `FINAL:<코드>`). 값이 아니라 분류만 싣는다.
+ *
+ * **다시 불러 볼 값이 있는 실패와 없는 실패를 원장이 가른다**(D-6G2d-8 ⓒ). 코드에서 되읽어 분류하지
+ * 않는다: 그러면 사유 어휘가 늘 때마다 판독 쪽에 같은 표가 한 벌 더 생기고 두 표가 갈린다. 분류는
+ * 절단 사유를 손에 든 자리(`attemptOutcomeOf`)가 한 번 하고, 줄이 그 답을 나른다.
+ */
 private fun labelOf(outcome: AttemptOutcome): String =
     when (outcome) {
         AttemptOutcome.Succeeded -> "SUCCEEDED"
         AttemptOutcome.Empty -> "EMPTY"
-        is AttemptOutcome.Failed -> "FAILED:${outcome.code}"
+        is AttemptOutcome.Failed -> "$RETRYABLE_PREFIX${outcome.code}"
+        is AttemptOutcome.FinalFailure -> "$FINAL_PREFIX${outcome.code}"
+        is AttemptOutcome.Refused -> "$REFUSED_PREFIX${outcome.code}"
     }
 
 private fun outcomeOf(label: String): AttemptOutcome =
     when {
         label == "SUCCEEDED" -> AttemptOutcome.Succeeded
         label == "EMPTY" -> AttemptOutcome.Empty
-        label.startsWith("FAILED:") -> AttemptOutcome.Failed(label.removePrefix("FAILED:"))
+        label.startsWith(RETRYABLE_PREFIX) -> AttemptOutcome.Failed(label.removePrefix(RETRYABLE_PREFIX))
+        label.startsWith(FINAL_PREFIX) -> AttemptOutcome.FinalFailure(label.removePrefix(FINAL_PREFIX))
+        label.startsWith(REFUSED_PREFIX) -> AttemptOutcome.Refused(label.removePrefix(REFUSED_PREFIX))
         else -> throw IllegalArgumentException("시도 원장의 결말 어휘가 아니다")
     }
+
+private const val RETRYABLE_PREFIX = "FAILED:"
+
+private const val FINAL_PREFIX = "FINAL:"
+
+/** 관문 거부 — 호출이 나가지 않았다(D-6G2d-16). 상한 셈 밖이라는 것을 줄이 스스로 말한다. */
+private const val REFUSED_PREFIX = "REFUSED:"

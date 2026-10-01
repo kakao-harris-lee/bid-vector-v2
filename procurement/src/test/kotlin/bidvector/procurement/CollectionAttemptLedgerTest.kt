@@ -2,6 +2,7 @@ package bidvector.procurement
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -11,9 +12,29 @@ private val KST: ZoneId = ZoneId.of("Asia/Seoul")
 
 /** 나간 호출의 결말 줄 — 상한이 세지 않는다(의도 줄이 이미 세었다). */
 private fun settledHttp(at: String) =
-    CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP)
+    CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP, walk = null)
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
+
+/** 재호출 상한 — 이 test 가 재는 것은 셈의 규칙이지 운영 판이 아니다(D-6G2d-8 ⓒ). */
+private const val RETRY_LIMIT = 3
+
+private val KEY = "0".repeat(64)
+
+private val WALK: Instant = Instant.parse("2026-09-24T01:00:00Z")
+
+/** 한 줄 — 갈래와 어휘만 다르다. 시각은 셈에 쓰이지 않으므로(덧붙인 순서로 읽는다) 한 값으로 둔다. */
+private fun line(
+    kind: AttemptKind,
+    outcome: AttemptOutcome,
+    walk: Instant? = null,
+) = CollectionAttempt(KEY, AXIS, outcome, WALK, kind, walk = walk)
+
+/** 결말을 남기지 못한 호출 라운드 — 의도 줄과 호출 줄만 남는다(적재와 결말 사이에서 던졌다). */
+private fun callRounds(count: Int): List<CollectionAttempt> =
+    (1..count).flatMap {
+        listOf(line(AttemptKind.PENDING, AttemptOutcome.Succeeded), line(AttemptKind.HTTP, AttemptOutcome.Succeeded))
+    }
 
 /** 나가려는 호출 한 줄 — 한 줄이 한 호출이다(D-6G-61 ①). */
 private fun attempt(
@@ -21,15 +42,19 @@ private fun attempt(
     key: String? = null,
     axis: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL,
     outcome: AttemptOutcome = AttemptOutcome.Succeeded,
-) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.PENDING)
+) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.PENDING, walk = null)
 
-/** 축의 결말 줄 — 호출이 아니므로 상한에 계상되지 않는다(D-6G-49). */
+/**
+ * 축의 결말 줄 — 호출이 아니므로 상한에 계상되지 않는다(D-6G-49). 걷기의 이름은 **언제나** 실린다
+ * (D-6G2d-4 ⓒ) — 결말 시각과 걷기 시각은 다를 수 있으므로 기본값을 결말 시각으로 접지 않는다.
+ */
 private fun settled(
     at: String,
     key: String?,
     axis: SourceEndpoint,
     outcome: AttemptOutcome,
-) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.AXIS)
+    walk: String = at,
+) = CollectionAttempt(key, axis, outcome, Instant.parse(at), AttemptKind.AXIS, walk = Instant.parse(walk))
 
 private fun walked(
     received: Int,
@@ -45,6 +70,21 @@ private fun walked(
     truncated = false,
     unknownFields = 0,
 )
+
+/** 절단으로 끝난 걷기 — 사유만 다르다. */
+private fun truncated(cause: TruncationCause) =
+    CollectionAccounting(
+        received = 0,
+        normalized = 0,
+        duplicate = 0,
+        dropped = 0,
+        dropReasons = emptyMap(),
+        sourceTotal = null,
+        pagesFetched = 1,
+        truncated = true,
+        unknownFields = 0,
+        truncationCause = cause,
+    )
 
 /**
  * D-6G-45 — 상한이 세는 것은 **나간 호출**이다. 받은 페이지만 세면 재시도·5xx·429·타임아웃이
@@ -66,6 +106,7 @@ class CollectionAttemptLedgerTest {
                         AttemptOutcome.Succeeded,
                         Instant.parse("2026-09-24T02:00:01Z"),
                         AttemptKind.HTTP,
+                        walk = null,
                     ),
                 ),
             )
@@ -133,9 +174,13 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        val axes = history.settledAxes().getValue(key)
+        val axes = history.axisResumptions(RETRY_LIMIT).getValue(key)
 
-        axes.map { it.name }.sorted() shouldContainExactly
+        axes
+            .filterValues { it }
+            .keys
+            .map { it.name }
+            .sorted() shouldContainExactly
             listOf(SourceEndpoint.BASE_AMOUNT_DETAIL.name, SourceEndpoint.RESERVE_PRICE_DETAIL.name)
     }
 
@@ -163,8 +208,10 @@ class CollectionAttemptLedgerTest {
 
         history.axisConclusions().getValue(key) shouldBe
             mapOf(
-                SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = true, walk = null),
-                SourceEndpoint.BASE_AMOUNT_DETAIL to AxisConclusion(settled = false, walk = null),
+                SourceEndpoint.OPENING_COMPLETE to
+                    AxisConclusion(AttemptOutcome.Succeeded, Instant.parse("2026-09-24T02:00:00Z")),
+                SourceEndpoint.BASE_AMOUNT_DETAIL to
+                    AxisConclusion(AttemptOutcome.Failed("SHORT_WALK"), Instant.parse("2026-09-24T02:00:00Z")),
             )
     }
 
@@ -182,6 +229,213 @@ class CollectionAttemptLedgerTest {
         attemptOutcomeOf(walked(received = 0, sourceTotal = 0)) shouldBe AttemptOutcome.Empty
     }
 
+    /**
+     * **D-6G2d-8 ⓒ — 절단 사유가 확정 실패와 일시 실패를 가른다.** 이어 돌기는 cursor 를 쓰지 않고 그
+     * 축을 1쪽부터 다시 걷는다 — 그래서 백스톱(최대 페이지·같은 쪽 반복)은 다시 걸어도 같은 자리에서
+     * 멈추는 **확정**이고, 입력 오류·비재시도 코드·미지 코드도 확정이다. 서버가 그 순간 무너뜨린 응답
+     * (구조 붕괴)은 **일시**다: 이 저장소에서 HTTP 5xx 가 봉투 없이 와 이 사유가 된다(6G-2d 실측).
+     * 확정으로 두면 일시적 5xx 한 번이 그 축을 영구히 버려 느린 시간대에 몰린 공고만 빠진다.
+     */
+    @Test
+    fun `절단 사유가 확정 실패와 일시 실패를 가른다`() {
+        attemptOutcomeOf(truncated(TruncationCause.StructureFailure)) shouldBe
+            AttemptOutcome.Failed("STRUCTURE_FAILURE")
+        attemptOutcomeOf(truncated(TruncationCause.ServerError)) shouldBe AttemptOutcome.Failed("SERVER_ERROR")
+        attemptOutcomeOf(truncated(TruncationCause.Timeout)) shouldBe AttemptOutcome.Failed("TIMEOUT")
+        attemptOutcomeOf(truncated(TruncationCause.RepeatedPage)) shouldBe AttemptOutcome.Failed("REPEATED_PAGE")
+        attemptOutcomeOf(truncated(TruncationCause.Unclassified)) shouldBe AttemptOutcome.Failed("UNCLASSIFIED")
+        attemptOutcomeOf(truncated(TruncationCause.MaxPages)) shouldBe AttemptOutcome.FinalFailure("MAX_PAGES")
+        attemptOutcomeOf(truncated(TruncationCause.InputError)) shouldBe AttemptOutcome.FinalFailure("INPUT_ERROR")
+        attemptOutcomeOf(truncated(TruncationCause.NotRetryable)) shouldBe AttemptOutcome.FinalFailure("NOT_RETRYABLE")
+    }
+
+    /**
+     * **D-6G2d-16 — 관문 거부는 실패가 아니다.** 우리 속도 보호·우리 승인 상한·원천의 쿼터 거절은
+     * 전송 앞에서 접히므로 그 공고·축에 대한 **관측이 아니다**. 어휘로 갈라 두면 재호출 상한이 그것을
+     * 세는 길이 구조적으로 닫힌다(코드 문자열로 되읽어 분류하지 않는다).
+     */
+    @Test
+    fun `관문 거부는 넷째 어휘로 나가고 정착이 아니다`() {
+        attemptOutcomeOf(truncated(TruncationCause.SelfThrottled)) shouldBe AttemptOutcome.Refused("SELF_THROTTLED")
+        attemptOutcomeOf(truncated(TruncationCause.QuotaExhausted)) shouldBe AttemptOutcome.Refused("QUOTA_EXHAUSTED")
+        attemptOutcomeOf(truncated(TruncationCause.BudgetExhausted(BudgetLimit.DAILY))) shouldBe
+            AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY")
+        AttemptOutcome.Refused("QUOTA_EXHAUSTED").isSettled shouldBe false
+    }
+
+    /**
+     * **D-6G2d-42 (cr r5 ②⑥) — 결말 없는 꼬리는 상한을 쓰지 않는다.** 꼬리의 호출 줄을 세던 앞 판은
+     * 쪽이 여럿인 축을 크래시 **한 번**에 확정시켰다 — 참가자가 많은 공고만 빠지는 비랜덤 결측이다.
+     * 상한은 결말 줄만 세고, 그 꼬리를 라운드 하나로 만드는 것은 **재개하는 쪽**이다([interruptedRounds]).
+     */
+    @Test
+    fun `결말 없는 꼬리는 상한을 쓰지 않는다 — 쪽 수와 무관하다`() {
+        val onePage = callRounds(1)
+        val sixPages = callRounds(6)
+
+        AttemptHistory(onePage).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(sixPages).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+    }
+
+    /**
+     * **결말 없는 라운드를 드러낸다**(D-6G2d-42) — 값은 그 라운드의 **마지막 호출 시각**이고, 재개하는
+     * 쪽이 그것으로 앞 라운드를 닫는다. 쪽이 여럿이어도 라운드는 하나다.
+     */
+    @Test
+    fun `결말 없는 라운드는 마지막 호출 시각으로 드러난다`() {
+        val lastCall = WALK.plusSeconds(30)
+        val twoPages =
+            callRounds(1) +
+                listOf(
+                    line(AttemptKind.PENDING, AttemptOutcome.Succeeded),
+                    CollectionAttempt(KEY, AXIS, AttemptOutcome.Succeeded, lastCall, AttemptKind.HTTP, walk = null),
+                )
+
+        AttemptHistory(twoPages).interruptedRounds()[KEY]?.get(AXIS) shouldBe lastCall
+    }
+
+    /** 결말 줄로 끝난 축은 열린 라운드가 없다 — 닫을 것이 없다(두 번 닫으면 상한이 두 번 준다). */
+    @Test
+    fun `결말로 끝난 축은 열린 라운드가 없다`() {
+        val concluded = callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("SHORT_WALK"), walk = WALK)
+
+        AttemptHistory(concluded).interruptedRounds()[KEY]?.get(AXIS) shouldBe null
+    }
+
+    /**
+     * **D-6G2d-48 ② — 의도 줄만 남은 꼬리도 끊긴 라운드다.** 관문은 호출 **전에** 의도 줄을 적고 예산을
+     * 이미 그 호출로 세므로(D-6G-61 ①), 의도 줄 뒤·HTTP 줄 전에 죽은 라운드를 세지 않으면 두 장부의
+     * 가정이 갈린다 — 예산은 쓴 것으로, 상한은 안 쓴 것으로 센다.
+     */
+    @Test
+    fun `의도 줄만 남은 꼬리도 끊긴 라운드다`() {
+        val intentOnly = listOf(line(AttemptKind.PENDING, AttemptOutcome.Succeeded))
+
+        AttemptHistory(intentOnly).interruptedRounds()[KEY]?.get(AXIS) shouldBe WALK
+    }
+
+    /** 닫힌 라운드가 상한만큼 쌓이면 접는다 — 닫는 어휘는 일시 실패다(`Refused` 는 세지 않는다). */
+    @Test
+    fun `닫힌 크래시 라운드가 상한만큼이면 그 축을 접는다`() {
+        val closed = { rounds: Int ->
+            (1..rounds).flatMap {
+                callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK)
+            }
+        }
+
+        AttemptHistory(closed(RETRY_LIMIT - 1)).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(closed(RETRY_LIMIT)).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe true
+    }
+
+    /** 관문 거부가 사이에 끼어도 앞의 닫힌 라운드는 그대로 센다 — `Refused` 는 정착도 실패도 아니다. */
+    @Test
+    fun `관문 거부는 닫힌 라운드의 셈을 끊지 않는다`() {
+        val lines =
+            callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK) +
+                callRounds(1) + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK) +
+                line(AttemptKind.AXIS, AttemptOutcome.Refused("BUDGET_EXHAUSTED"), walk = WALK)
+
+        // 닫힌 라운드 둘 — 상한 셋 미만이라 다시 부른다.
+        AttemptHistory(lines).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+        AttemptHistory(lines + line(AttemptKind.AXIS, AttemptOutcome.Failed("INTERRUPTED"), walk = WALK))
+            .axisResumptions(RETRY_LIMIT)[KEY]
+            ?.get(AXIS) shouldBe true
+    }
+
+    /**
+     * **닫히지 않은 꼬리는 그 자체로 상한을 쓰지 않는다** — 상한은 결말 줄만 세고, 꼬리를 라운드 하나로
+     * 만드는 것은 재개하는 쪽이다([AttemptHistory.interruptedRounds]). 꼬리가 길어도(쪽이 여럿이어도)
+     * 셈은 그대로다.
+     */
+    @Test
+    fun `닫히지 않은 꼬리는 그 자체로 상한을 쓰지 않는다`() {
+        val intentsOnly = List(RETRY_LIMIT * 2) { line(AttemptKind.PENDING, AttemptOutcome.Succeeded) }
+
+        AttemptHistory(intentsOnly).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+    }
+
+    /** 같은 라운드를 두 번 세지 않는다 — 상한 3 에서 「호출+실패 결말」 두 라운드는 2 를 쓴다. */
+    @Test
+    fun `일시 실패로 끝난 라운드의 호출 줄은 다시 세지 않는다`() {
+        val concluded =
+            (1..2).flatMap {
+                listOf(
+                    line(AttemptKind.PENDING, AttemptOutcome.Succeeded),
+                    line(AttemptKind.HTTP, AttemptOutcome.Succeeded),
+                    line(AttemptKind.AXIS, AttemptOutcome.Failed("SHORT_WALK"), walk = WALK),
+                )
+            }
+
+        AttemptHistory(concluded).axisResumptions(RETRY_LIMIT)[KEY]?.get(AXIS) shouldBe false
+    }
+
+    /**
+     * **D-6G2d-19 (vr r1 M-2) — 상한은 마지막 정착 뒤부터 센다.** 원장은 append-only 라 한 번 끝난
+     * 축의 앞 실패 줄이 그대로 남는다. 그것까지 세면 「성공했다가 일시적으로 실패한」 축이 새 예산
+     * 없이 곧바로 확정된다 — 정착이 앞의 증거를 무효로 만든다. 등식으로 잠근다.
+     */
+    @Test
+    fun `재호출 상한은 마지막 정착 뒤의 일시 실패만 센다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val failed = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+        val succeeded = settled("2026-09-24T02:00:00Z", key, axis, AttemptOutcome.Succeeded)
+
+        // 정착 앞의 실패가 상한을 채웠어도, 정착 뒤의 실패 하나면 다시 부른다.
+        val revived = List(RETRY_LIMIT) { failed } + succeeded + failed
+        AttemptHistory(revived).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
+
+        // 정착 **뒤**의 실패가 상한에 닿으면 접는다.
+        val exhausted = List(RETRY_LIMIT) { failed } + succeeded + List(RETRY_LIMIT) { failed }
+        AttemptHistory(exhausted).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to true)
+    }
+
+    /**
+     * **D-6G2d-22 ② · 30 — 순서는 `at` 값이 아니라 원장의 덧붙인 순서다.** 시계가 뒤로 간 실행이 있으면
+     * 두 기준이 갈린다: 아래 원장은 정착 줄의 `at` 이 **가장 늦고** 실패 줄이 그보다 이르다. `at` 으로
+     * 정렬하면 정착이 마지막이 되어 「다시 부르지 않는다」가 되지만, 실제로 마지막에 일어난 일은 실패다.
+     * 덧붙인 순서가 사건 순서이고, 추출 쪽의 「마지막 줄이 이긴다」(D-6G-58)와도 같은 기준이다.
+     */
+    @Test
+    fun `순서는 at 값이 아니라 덧붙인 순서다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val settledLate = settled("2026-09-24T09:00:00Z", key, axis, AttemptOutcome.Succeeded)
+        val failedEarly = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+        val failedEarlier = settled("2026-09-24T02:00:00Z", key, axis, AttemptOutcome.Failed("TIMEOUT"))
+
+        // 덧붙인 순서: 정착 → 실패 → 실패. `at` 정렬이면 정착이 마지막이 되어 `true` 가 된다.
+        val history = AttemptHistory(listOf(settledLate, failedEarly, failedEarlier))
+
+        history.axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
+    }
+
+    /** 거부가 상한만큼 쌓여도 그 축은 미정착이다 — 세는 것은 실제로 나간 호출의 일시 실패뿐이다. */
+    @Test
+    fun `관문 거부는 재호출 상한에 세지 않는다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val refused = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Refused("BUDGET_EXHAUSTED_DAILY"))
+
+        AttemptHistory(List(RETRY_LIMIT + 1) { refused }).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(axis to false)
+    }
+
+    /** 확정 실패는 다시 부르지 않고, 일시 실패는 상한까지 다시 부른다 — 결말 하나가 그 답을 정한다. */
+    @Test
+    fun `확정 실패는 한 줄로도 이어 돌기에서 빠진다`() {
+        val key = "0".repeat(64)
+        val axis = SourceEndpoint.OPENING_COMPLETE
+        val final = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.FinalFailure("MAX_PAGES"))
+        val transient = settled("2026-09-24T01:00:00Z", key, axis, AttemptOutcome.Failed("STRUCTURE_FAILURE"))
+
+        AttemptHistory(listOf(final)).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to true)
+        AttemptHistory(listOf(transient)).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe mapOf(axis to false)
+        // 상한에 닿으면 일시 실패도 확정으로 접는다 — 같은 축을 매 실행 다시 걸지 않는다.
+        AttemptHistory(List(RETRY_LIMIT) { transient }).axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(axis to true)
+    }
+
     /** HTTP 줄은 이어 돌기가 보지 않는다 — 나간 호출이지 축의 결말이 아니다. */
     @Test
     fun `HTTP 시도 줄은 이어 돌기에 들지 않는다`() {
@@ -189,7 +443,9 @@ class CollectionAttemptLedgerTest {
         val history =
             AttemptHistory(listOf(attempt("2026-09-24T01:00:00Z", key, SourceEndpoint.OPENING_COMPLETE)))
 
-        history.settledAxes().keys.shouldBeEmpty()
+        // 줄은 있으나 결말이 없다 — 다시 부른다(D-6G2d-8 ⓑ). 「없음」이 아니라 `false` 다.
+        history.axisResumptions(RETRY_LIMIT).getValue(key) shouldBe
+            mapOf(SourceEndpoint.OPENING_COMPLETE to false)
         history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 1
     }
 
@@ -206,7 +462,7 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        history.settledAxes().keys.shouldBeEmpty()
+        history.axisResumptions(RETRY_LIMIT).keys.shouldBeEmpty()
         history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 4
     }
 }

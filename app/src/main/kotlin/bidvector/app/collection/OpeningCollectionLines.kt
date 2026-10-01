@@ -1,5 +1,6 @@
 package bidvector.app.collection
 
+import bidvector.adapters.snapshot.runStateFormatCauseCode
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.OpeningCollectionHalt
 import bidvector.workflow.collection.OpeningCollectionReport
@@ -36,9 +37,16 @@ internal fun openingFinishLine(
 internal fun openingExitCodeOf(report: OpeningCollectionReport): CollectionExitCode =
     if (report.halted == null) CollectionExitCode.COMPLETE else CollectionExitCode.INCOMPLETE
 
-/** 원 예외를 잇지 않는다 — SQL 메시지에 행 값이, 전송 예외에 요청 URI(서비스 키)가 실릴 수 있다(D-6F8-4). */
+/**
+ * 원 예외를 잇지 않는다 — SQL 메시지에 행 값이, 전송 예외에 요청 URI(서비스 키)가 실릴 수 있다(D-6F8-4).
+ *
+ * **형식 거부는 사유 토큰으로 낸다**(D-6G2d-48 ①). 클래스 이름으로 떨어지면 운영자가 「옛 디렉터리인가
+ * 손상인가」를 출력에서 가릴 수 없고, 그 구별이 처방을 가른다(폐기해도 되는가 / 사람이 봐야 하는가).
+ * 토큰은 닫힌 어휘라 로그에 실어도 새는 값이 없다.
+ */
 internal fun openingCauseCodeOf(failure: Exception): String =
-    when (failure) {
-        is SQLException -> "${failure.javaClass.name}:sqlState=${failure.sqlState}"
-        else -> failure.javaClass.name
-    }
+    runStateFormatCauseCode(failure)
+        ?: when (failure) {
+            is SQLException -> "${failure.javaClass.name}:sqlState=${failure.sqlState}"
+            else -> failure.javaClass.name
+        }

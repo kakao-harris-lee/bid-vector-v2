@@ -17,6 +17,7 @@ import bidvector.workflow.collection.sha256Hex
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.file.Files
+import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
@@ -30,26 +31,14 @@ internal const val STATE_NAME = "state.json"
 /** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
 internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
 
+/**
+ * 원장 복구의 원자적 교안 중간 이름(D-6G2d-2) — 장부 교안과 같은 모양이다. 장부 대상
+ * 집합에서 빼는 이름은 이제 둘이고, 둘 다 이 클래스가 직접 쓰는 이름이다(`*.staged` 통째 제외 아니다).
+ */
+internal const val STAGED_ATTEMPT_NAME = "$ATTEMPT_LEDGER_NAME.staged"
+
 /** 원장·장부 줄의 JSON 깊이 상한 — 두 파일이 같은 값을 쓴다(줄 형태가 같다). */
 internal const val ATTEMPT_MAX_DEPTH = 4
-
-/**
- * 실행 상태의 무결성 장부(D-6G-48) — 이 넷이 맞아야 기동한다.
- *
- * 앞 판은 표본 해시 하나였고, 그래서 **원장만 지우거나 잘라도** 거부 없이 상한이 0 에서 다시
- * 시작했다(vr M-7). 원장의 해시와 줄 수를 함께 적으면 삭제·절삭·부분 복사가 전부 어긋난다.
- * [directoryId] 는 첫 확정이 지은 표식이다 — 파일 셋이 한 실행의 것임을 말한다.
- *
- * **세 파일을 통째로 복사한 것은 구별되지 않는다**(넷이 서로 맞으므로). 그것은 운영자 행위이고
- * 경계 밖이다 — 이 장부가 겨누는 것은 사고와 오조작이다.
- */
-private class RunStateFacts(
-    val directoryId: String,
-    val sampleListSha256: String,
-    val sampleScopeSha256: String,
-    val attemptsSha256: String,
-    val attemptLines: Int,
-)
 
 /**
  * 실험 실행 상태 디렉터리(D-6G-45·48) — 저장소 **밖**에 있고 파일 셋을 담는다.
@@ -90,20 +79,56 @@ class RunStateDirectory(
      */
     private val directoryId: String = sha256Hex(realPathOf(root))
 
-    /** 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6). */
-    private val ledger = LedgerDigest(attemptFile)
+    /**
+     * 장부 파일의 판독([RunStateFactsFile]) — **누적 해시 초기화식보다 앞에 선다.** 복구·되돌림이 그
+     * 식 안에서 돌고 되돌림이 장부를 읽으므로, 뒤에 두면 그 읽기가 `null` 을 부른다(D-6G2d-1 과 같은
+     * 계열의 함정 — 프로퍼티 초기화는 선언 순서다).
+     */
+    private val factsFile = RunStateFactsFile(stateFile)
+
+    /**
+     * 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6).
+     *
+     * **복구가 끝난 바이트로 짓는다**(D-6G2d-1). 프로퍼티 초기화는 선언 순서라, 이 자리에서 곧바로
+     * `LedgerDigest(attemptFile)` 을 부르면 [healTornTail] 보다 **앞서** 돈다 — 장부에 조각까지 포함한
+     * 해시가 굳고, 그 뒤의 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다(vr r5-t probe C2: 기동 A
+     * 만 수락하고 B·C 는 영구 거부). 복구를 이 초기화식 자신 안에 두어, 새 상태가 이 식 앞에 끼어들
+     * 자리를 남기지 않는다.
+     */
+    private val ledger: LedgerDigest = healedLedgerDigest()
 
     init {
+        // **형식 판별은 잠금과 무관하다**(D-6G2d-44) — 잠금을 못 잡아도 옛 디렉터리는 「형식」으로
+        // 거부돼야 한다. 잠금 뒤로 미루면 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱
+        // 오류로 죽고, 운영자는 무엇이 틀렸는지 출력에서 읽을 수 없다.
+        //
+        // **가드 안에서** 돈다(D-6G2d-48 ⑥) — 잠금을 쥔 실행이 형식 거부로 죽으면 그 잠금이 열린 채
+        // 남고, 다음 실행은 「다른 실행이 돌고 있다」로 조용히 끝난다(거부 사유가 사라진다).
+        heldOrRelease {
+            factsFile.requireReadableFormat()
+            if (lock is RunStateLock.Held) verifyIntegrity()
+        }
+    }
+
+    /**
+     * 복구·되돌림을 먼저 끝낸 뒤 **그 바이트**로 누적 해시를 짓는다. 무결성 대조는 그다음이다 —
+     * 장부를 재동기하는 해시([requireLedgerAheadOrEqual])가 디스크에 없는 바이트를 가리킬 수 없다.
+     */
+    private fun healedLedgerDigest(): LedgerDigest {
         if (lock is RunStateLock.Held) {
-            // 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다.
-            runCatching {
+            heldOrRelease {
                 rollBackInterruptedConfirmation()
                 healTornTail()
-                verifyIntegrity()
-            }.onFailure {
-                lock.release()
-                throw it
             }
+        }
+        return LedgerDigest(attemptFile)
+    }
+
+    /** 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다. */
+    private fun heldOrRelease(body: () -> Unit) {
+        runCatching(body).onFailure {
+            lock.release()
+            throw it
         }
     }
 
@@ -145,6 +170,7 @@ class RunStateDirectory(
         val facts =
             SnapshotJson.Obj(
                 listOf(
+                    "format_version" to SnapshotJson.Number(RUN_STATE_FORMAT_VERSION.toString()),
                     "directory_id" to SnapshotJson.Text(directoryId),
                     "sample_list_sha256" to SnapshotJson.Text(digestOf(sampleFile)),
                     "sample_scope_sha256" to SnapshotJson.Text(digestOf(scopeFile)),
@@ -152,9 +178,7 @@ class RunStateDirectory(
                     "attempt_lines" to SnapshotJson.Number(ledger.lines.toString()),
                 ),
             )
-        val staged = root.resolve(STAGED_STATE_NAME)
-        Files.writeString(staged, facts.render() + "\n")
-        Files.move(staged, stateFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        replaceDurably(root.resolve(STAGED_STATE_NAME), stateFile, facts.render() + "\n", root)
     }
 
     /**
@@ -170,7 +194,7 @@ class RunStateDirectory(
      * 뒤에 오므로 그 시점에는 장부가 이미 서 있다.
      */
     private fun rollBackInterruptedConfirmation() {
-        val facts = readFacts() ?: return
+        val facts = factsFile.read() ?: return
         if (facts.sampleListSha256 != EMPTY_DIGEST) return
         Files.deleteIfExists(sampleFile)
         Files.deleteIfExists(scopeFile)
@@ -181,7 +205,7 @@ class RunStateDirectory(
      * 없지만, **파일이 있는데 장부가 없으면** 거부다: 그것이 「장부만 지웠다」의 모양이다.
      */
     private fun verifyIntegrity() {
-        val facts = readFacts()
+        val facts = factsFile.read()
         val hasFiles = Files.isRegularFile(sampleFile) || Files.isRegularFile(attemptFile)
         require(facts != null || !hasFiles) {
             "실행 상태 장부가 없는데 파일이 있다 — 무엇이 지워졌는지 알 수 없다"
@@ -203,8 +227,10 @@ class RunStateDirectory(
                 .list(root)
                 .use { paths -> paths.map { it.fileName.toString() }.toList() }
                 // `*.staged` 를 통째로 빼면 `anything.staged` 가 장부 검사에 보이지 않는다
-                // (cr r5 L-2). 이 클래스가 쓰는 **한 이름**만 뺀다.
-                .filterNot { it == STATE_NAME || it == RUN_LOCK_NAME || it == STAGED_STATE_NAME }
+                // (cr r5 L-2). 이 클래스가 **직접 쓰는 이름**만 뺀다 — 장부 교체와 원장 복구 교체
+                // 둘(D-6G2d-2). 복구 도중 죽어 남은 중간 파일이 「모르는 파일」로 기동을 막으면,
+                // 그 사고를 만든 것은 복구 자신이다.
+                .filterNot { it in EXCLUDED_FROM_LEDGERED_SET }
                 .toSet()
         require(present == LEDGERED_FILES.filter { Files.isRegularFile(root.resolve(it)) }.toSet()) {
             "실행 상태 디렉터리에 장부가 모르는 파일이 있다 — 무엇이 정본인지 알 수 없다"
@@ -242,8 +268,12 @@ class RunStateDirectory(
      * 축을 **지어내지 않는다** — 조각이 무엇이었는지 모르는 채로 시도 줄을 만들면 이어 돌기가
      * 있지도 않은 축을 완료로 읽는다.
      *
-     * 재동기보다 **먼저** 돈다 — 순서가 반대면 장부가 조각까지 포함한 해시를 굳히고, 그 뒤의
-     * 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다.
+     * 누적 해시보다 **먼저** 돈다 — 그 순서는 [healedLedgerDigest] 가 구조로 든다.
+     *
+     * 교체는 **원자적이고 내구적이다**(D-6G2d-2, cr r5-t M-3 · cr r4 ③). 제자리 truncate+rewrite 는
+     * 8 만 줄짜리 원장을 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다
+     * 적다」로 영구 거부한다 — 복구가 도는 순간은 방금 죽은 기계 위다. [replaceDurably] 가 그 순서를
+     * 든다([recordState] 와 같은 형태다).
      */
     private fun healTornTail() {
         if (!Files.isRegularFile(attemptFile)) return
@@ -251,23 +281,7 @@ class RunStateDirectory(
         if (text.isEmpty() || text.endsWith("\n")) return
         val fragment = text.substringAfterLast('\n')
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
-        Files.writeString(attemptFile, healed, StandardOpenOption.TRUNCATE_EXISTING)
-    }
-
-    private fun readFacts(): RunStateFacts? {
-        val fields =
-            runCatching { Files.readString(stateFile) }
-                .getOrNull()
-                ?.let { KonepsJsonParser.parse(it, ATTEMPT_MAX_DEPTH).asObject()?.fields }
-                ?: return null
-        return RunStateFacts(
-            directoryId = requireNotNull(fields["directory_id"].asStringOrNull()) { "장부에 디렉터리 식별자가 없다" },
-            sampleListSha256 = requireNotNull(fields["sample_list_sha256"].asStringOrNull()) { "장부에 표본 해시가 없다" },
-            sampleScopeSha256 =
-                requireNotNull(fields["sample_scope_sha256"].asStringOrNull()) { "장부에 범위 해시가 없다" },
-            attemptsSha256 = requireNotNull(fields["attempts_sha256"].asStringOrNull()) { "장부에 원장 해시가 없다" },
-            attemptLines = requireNotNull(fields["attempt_lines"].asIntOrNull()) { "장부에 원장 줄 수가 없다" },
-        )
+        replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed, root)
     }
 }
 
@@ -346,6 +360,13 @@ internal const val RUN_LOCK_NAME = "run.lock"
 
 /** 장부가 지키는 정본 파일 — 디렉터리에 이 밖의 파일이 있으면 기동이 거부된다(D-6G-60). */
 private val LEDGERED_FILES = listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME)
+
+/**
+ * 장부 대상 집합에서 빼는 이름 — 자물쇠와 장부 자신, 그리고 **원자 교체의 중간 이름 둘**이다
+ * (D-6G2d-2). 이름을 여기 적지 않은 파일이 디렉터리에 생기면 기동이 거부된다(D-6G-60).
+ */
+private val EXCLUDED_FROM_LEDGERED_SET =
+    setOf(STATE_NAME, RUN_LOCK_NAME, STAGED_STATE_NAME, STAGED_ATTEMPT_NAME)
 
 /**
  * 실행 상태 디렉터리의 **잠금**(D-6G-57) — 상태가 파일 범위이므로 잠금도 파일 범위다.

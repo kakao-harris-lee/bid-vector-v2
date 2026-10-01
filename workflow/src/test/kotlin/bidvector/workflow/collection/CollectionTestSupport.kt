@@ -77,7 +77,11 @@ internal fun batchOf(
     items: List<RawNoticeObservation>,
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
     next: PageCursor? = null,
-): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next)
+    /** 대역도 걷기의 이름을 단다(D-6G2d-4 ⓓ) — 빈 배치도 걷기는 돌았다. */
+    observedAt: Instant = BATCH_WALK,
+): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next, observedAt)
+
+private val BATCH_WALK: Instant = Instant.parse("2026-06-17T02:00:00Z")
 
 /** 호출 기록을 남기는 소스 — `script` 가 (조회일, 커서)마다 배치를 낸다. */
 internal class ScriptedSource(
@@ -99,7 +103,7 @@ internal class RecordingRawStore(
      * 이 축의 적재만 실패시킨다(D-6G-58 ⓑ) — 실 저장소의 실패(제약 위반·연결 끊김)와 적재 도중
      * 프로세스가 죽는 경우가 호출부에서는 같은 모양이다. 축의 결말을 **적재 뒤에** 적는지 재는 자리.
      */
-    private val failOn: SourceEndpoint? = null,
+    var failOn: SourceEndpoint? = null,
 ) : RawObservationStore {
     val appended = mutableListOf<RawNoticeObservation>()
 

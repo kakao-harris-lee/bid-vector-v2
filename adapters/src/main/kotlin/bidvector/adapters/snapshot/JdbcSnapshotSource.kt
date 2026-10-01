@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.FieldConcept
@@ -50,6 +51,7 @@ class JdbcSnapshotSource(
         val observed = readObservations(sample, axisConclusions)
         val notices = readNotices(observed.byKey.keys)
         val rows = mutableListOf<SnapshotRow>()
+        val tally = AssemblyTally()
         val withDetail = mutableSetOf<String>()
         var withoutNotice = 0
         var incomplete = 0
@@ -63,16 +65,21 @@ class JdbcSnapshotSource(
                 when {
                     canonical == null -> withoutNotice++
                     !complete(hash, canonical.division, axisConclusions) -> incomplete++
-                    else -> rows += assembleSnapshotRow(key, axes, canonical)
+                    else -> rows += assembleSnapshotRow(key, axes.mapValues { it.value.rows }, canonical, tally)
                 }
             }
         }
+        // **명명 인자**다(cr r4 ⑧) — 같은 타입의 계수 일곱을 위치로 넘기면 두 칸을 맞바꾼 편집이
+        // 컴파일을 지나고, 그 뒤 판독은 「사유가 바뀐 스냅숏」을 받는다. 배선은 아래 조립 test 가 잰다.
         return SnapshotExtraction(
-            rows,
-            withoutNotice,
-            sample.keys.size - withDetail.size,
-            observed.outsideSample.size,
-            incomplete,
+            rows = rows,
+            skippedWithoutNotice = withoutNotice,
+            sampledWithoutDetail = sample.keys.size - withDetail.size,
+            observedOutsideSample = observed.outsideSample.size,
+            incompleteAxis = incomplete,
+            unusableRawRows = observed.unusableRows,
+            fractionalAmounts = tally.fractionalAmounts,
+            incompleteAValues = tally.incompleteAValues,
         )
     }
 
@@ -86,7 +93,9 @@ class JdbcSnapshotSource(
         axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): Boolean {
         val known = axisConclusions[noticeKeyHash].orEmpty()
-        return expectedAxesFor(division).all { known[it]?.settled == true }
+        // **성공 또는 빈 응답**만 완료다(D-6G2d-4 · D-6G2d-8 ⓒ). 실패로 정착한 축은 다시 부르지
+        // 않지만 그 행으로 스냅숏을 쓸 수도 없다 — 그 공고는 `incomplete_axis` 로 정직하게 빠진다.
+        return expectedAxesFor(division).all { axis -> known[axis]?.let(::usableAxis) == true }
     }
 
     private fun readObservations(
@@ -114,54 +123,66 @@ class JdbcSnapshotSource(
         sample: SampleList,
         axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): ObservedRows {
-        val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>()
+        val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>()
         val outside = mutableSetOf<NoticeKey>()
+        var unusable = 0
         while (rows.next()) {
-            // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
-            keyAndEndpointOf(rows)?.let { (key, endpoint) ->
-                val hash = NoticeKeyHash.of(key.number, key.round.value)
-                if (hash in sample.keys) {
-                    collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
-                } else {
-                    outside += key
-                }
+            // 식별자나 엔드포인트 어휘가 서지 않는 행은 키를 갖지 못한다(D-6G2d-8 ⓐ) — 그 행만
+            // 버리고 **수를 공시한다**. 조용히 지나가면 「왜 표본이 비었나」를 물을 자리가 없다.
+            val keyed = keyAndEndpointOf(rows)
+            if (keyed == null) {
+                unusable++
+                continue
+            }
+            val (key, endpoint) = keyed
+            val hash = NoticeKeyHash.of(key.number, key.round.value)
+            if (hash in sample.keys) {
+                collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
+            } else {
+                outside += key
             }
         }
-        return ObservedRows(byKey, outside)
+        return ObservedRows(byKey, outside, unusable)
     }
 
     /**
-     * **(공고, 축)마다 원장이 가리키는 걷기의 행만 쓴다**(D-6G-68). 원문은 append-only 라(DB 트리거)
+     * **(공고, 축)마다 한 걷기의 행만 쓴다**(D-6G-68 · D-6G2d-3). 원문은 append-only 라(DB 트리거)
      * 잘린 걷기의 쪽이 그대로 남고, 다시 걸어 받은 전 쪽과 **합쳐지면** 그 공고의 참가자 수와 1위
      * 투찰가가 조용히 틀린다 — 행이 늘 뿐 오류가 없어 아무 데서도 붉어지지 않는다.
      *
-     * 앞 판은 걷기를 **행의 시각**으로 골랐다(가장 늦은 `observed_at`). 그것은 세 자리에서 틀린다:
-     * 빈 응답 재걷기는 행이 없어 보이지 않고, 추출 창 밖 재걷기도 보이지 않으며, 시계가 뒤로 가면
-     * 순서가 뒤집힌다. 지금은 원장의 마지막 AXIS 줄이 걷기를 **가리킨다** — 짐작할 자리가 없다.
-     *
-     * 결말이 없는 축(원장 이전 원문)은 행을 모아만 둔다. 그 축은 완료로 서지 못해(D-6G-58) 그
-     * 공고가 `incomplete_axis` 로 빠지므로 어느 행도 조립에 닿지 않는다.
+     * 어느 걷기인가를 정하는 것은 **둘**이다. 원장에 AXIS 결말 줄이 있으면 그 줄이 가리킨다 —
+     * 짐작할 자리가 없다(앞 판은 행의 시각으로 골라, 빈 응답 재걷기·창 밖 재걷기·시계 역행 셋에서
+     * 앞의 잘린 걷기를 마지막으로 봤다). 결말 줄이 **없는** 축(목록 축 둘)에는 원장이 줄 답이 없어
+     * **가장 늦은 `observed_at`** 만 남긴다(D-6G-58 r4-d 복원). 적재 순서로 고르면 backfill 이
+     * 뒤집고, 선별을 아예 안 하면 여러 걷기가 합쳐져 **가장 오래된 관측**이 실린다(vr r5-t W6).
      */
     private fun collectWalkRow(
-        byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>,
+        byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>,
         key: NoticeKey,
         endpoint: SourceEndpoint,
         rows: ResultSet,
         conclusion: AxisConclusion?,
     ) {
-        // 빈 응답으로 끝난 축은 **0 행**이다 — 앞의 잘린 걷기가 남긴 쪽을 쓰지 않는다.
-        if (conclusion != null && conclusion.walk == null) return
         val observedAt = rows.getTimestamp("observed_at").toInstant()
-        if (conclusion != null && observedAt != conclusion.walk) return
-        byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { mutableListOf() } +=
-            RawRow(parseFields(rows.getString("payload_fields")), policy)
+        if (!fromLedgeredWalk(conclusion, observedAt)) return
+        val kept = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { WalkRows(observedAt) }
+        // 결말 줄이 있는 축은 위에서 그 걷기의 행만 통과했으므로 여기서 걷기가 갈리지 않는다.
+        if (observedAt >= kept.walk) {
+            if (observedAt > kept.walk) kept.replaceWalk(observedAt)
+            kept.rows += RawRow(parseFields(rows.getString("payload_fields")), policy)
+        }
     }
 
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
         // **canonical 형태로 키를 맞춘다.** 원문 payload 는 수집 때 온 그대로이고 `notice` 표는
         // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이
         // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
-        val number = rows.getString("notice_number")?.let { NoticeNumber.of(it).value }
+        // **무방비로 정규화하지 않는다**(D-6G2d-8 ⓐ) — 공고번호 칸이 빈 문자열로 온 원문 행이 있으면
+        // `NoticeNumber.of` 가 던지고 그 한 행이 추출 전체를 멈춘다. 원문은 append-only 라 지울 수도
+        // 없다. 차수와 같은 규율이다: 형태를 어긴 행은 키를 갖지 못한다. 오늘의 수집 경로는 그런
+        // 항목을 적재 전에 떨어뜨리므로 이것은 **방어 심화**다(cr r1 L-1) — 판독은 적재 경로의
+        // 전제에 기대지 않는다.
+        val number = rows.getString("notice_number")?.let { NoticeNumber.ofOrNull(it)?.value }
         val round = rows.getString("notice_round")?.let(::roundOrNull)
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
@@ -198,11 +219,49 @@ class JdbcSnapshotSource(
 /** 제로패딩 세 자리가 아니면 **기본값을 쓰지 않는다** — 차수를 모르는 행은 키를 갖지 못한다. */
 private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { NoticeRound.of(it) }.getOrNull() }
 
-/** 창 안의 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다. */
+/**
+ * 그 축이 **완료**인가 — 성공과 빈 응답만이다(D-6G2d-4 · D-6G2d-8 ⓒ). 실패로 정착한 축은 다시
+ * 부르지 않지만 그 행으로 스냅숏을 쓸 수도 없다.
+ */
+private fun usableAxis(conclusion: AxisConclusion): Boolean =
+    conclusion.usesRows || conclusion.outcome == AttemptOutcome.Empty
+
+/**
+ * 이 행이 **쓸 걷기의 것인가**. 결말 줄이 있으면 그 줄이 가리킨 걷기의 행만이고, 빈 응답으로 끝난
+ * 축은 0 행이다(결말 어휘가 그것을 말한다 — 걷기 부재로 읽으면 옛 형식 줄이 같은 값이 된다,
+ * D-6G2d-4 ⓑ). 결말 줄이 없으면 전부 후보이고 선별은 부르는 쪽이 한다.
+ */
+private fun fromLedgeredWalk(
+    conclusion: AxisConclusion?,
+    observedAt: Instant,
+): Boolean = conclusion == null || (conclusion.outcome != AttemptOutcome.Empty && observedAt == conclusion.walk)
+
+/** 이 추출이 본 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다(관측 창은 없다, D-6G-68). */
 private class ObservedRows(
-    val byKey: Map<NoticeKey, Map<SourceEndpoint, List<RawRow>>>,
+    val byKey: Map<NoticeKey, Map<SourceEndpoint, WalkRows>>,
     val outsideSample: Set<NoticeKey>,
+    /** 키를 갖지 못한 원문 행 수(D-6G2d-8 ⓐ) — 어느 표본에도 속하지 않아 항등식 밖이다. */
+    val unusableRows: Int,
 )
+
+/**
+ * 한 (공고, 축)에서 **쓰기로 정한 걷기**와 그 걷기의 행(D-6G2d-3). 걷기를 값으로 들고 있어야
+ * 결말 줄이 없는 축에서 「더 늦은 걷기가 오면 앞 걷기를 버린다」가 표현된다 — 행만 모으면 여러
+ * 걷기가 합쳐지고, 그 합쳐짐은 계수에 드러나지 않는다.
+ */
+private class WalkRows(
+    private var walkValue: Instant,
+) {
+    val rows: MutableList<RawRow> = mutableListOf()
+
+    val walk: Instant get() = walkValue
+
+    /** 더 늦은 걷기가 왔다 — 앞 걷기의 행은 **버린다**(합치지 않는다). */
+    fun replaceWalk(later: Instant) {
+        walkValue = later
+        rows.clear()
+    }
+}
 
 private const val OBSERVATION_FETCH_SIZE = 500
 
@@ -228,6 +287,26 @@ data class SnapshotExtraction(
     val observedOutsideSample: Int,
     /** 완료되지 않은 축이 있는 표본 수(D-6G-58) — 반쪽 원문으로 행을 쓰지 않는다. */
     val incompleteAxis: Int,
+    /**
+     * **공고 키 또는 축 어휘가 서지 않아 버린** 원문 행 수(D-6G2d-8 ⓐ · 18) — **항등식 밖**이다
+     * ([observedOutsideSample] 과 같은 자리). 그 행은 어느 표본 공고에도 속하지 않으므로 네 항 어디에도
+     * 들지 않는다. 원인은 셋이고 이 계수는 셋을 합친다: 공고번호가 빈 행 · 차수가 제로패딩 세 자리가
+     * 아닌 행 · `source_endpoint` 가 열거 어휘 밖인 행. 마지막 하나는 **코드 변경으로만** 생기므로
+     * (축 개명·제거 뒤 옛 행이 남음) 0 이 아닌 값을 한 원인으로 단정하지 않는다.
+     */
+    val unusableRawRows: Int,
+    /**
+     * 소수부 때문에 **없는 값이 된 금액 칸 수**(D-6G2d-15) — 집계(`a_value`·`reserve_prices`)는 통째로
+     * 하나로 센다. 역시 항등식 밖이다: 그 행은 버려지지 않고 그 칸만 빈다. 0 이 아니면 원천이 원 단위
+     * 정수를 낸다는 조사 문서의 관측이 깨졌다는 뜻이고, 그 사실은 로그로 공시된다.
+     */
+    val fractionalAmounts: Int,
+    /**
+     * A 묶음이 **전부 아니면 무**의 규율로 사라진 수(D-6G2d-21) — 공개일시 부재 또는 구성 항목 결측이다.
+     * 소수부 계수와 칸이 다르다: 하나는 「원천이 소수를 냈다」이고 이것은 「원문이 반쪽이다」다. 역시
+     * 항등식 밖이다 — 그 행은 버려지지 않고 A 칸만 빈다.
+     */
+    val incompleteAValues: Int,
 )
 
 /**
