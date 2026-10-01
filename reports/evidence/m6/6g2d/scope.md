@@ -199,6 +199,13 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-49** | **등재 셋**: cr ④ 「끊긴 라운드를 `INTERRUPTED` 줄로 닫는 대신 `doneWith` 가 열린 꼬리를 하나로 세라」는 설계 이견 — 계약 D-42 는 닫는 쪽을 택했다(원장이 사실을 말하고 셈이 원장만 읽게). INTERRUPTED 줄의 `walk` 가 관측 시각이 아니라 마지막 호출 시각임은 `AxisConclusion.walk` KDoc 에 예외로 적고, 고정 시계 test 에서 그 값이 관측 시각과 겹칠 수 있음(오늘은 `Failed` 라 무해)을 알려진 제한으로 · cr ⑥ 장부 갱신을 AXIS 결말·표본 확정 때만(원장 앞섬은 재동기가 처리) → `OPEN-6G2D-FSYNC-BATCHING` 의 구체안으로 · cr ⑦ 원장 이중 파싱 → `OPEN-6G-REVIEW-FOLLOWUPS` |
 | **D-6G2d-50** | **표적 확인(verifier)**: ①~⑥ 각 test·변이(②③⑤ 필수) · acceptance 강한 집합 · rollback 문서 명령 그대로 · 새 public 표면(①의 사유 코드 표면). 그 뒤 `/code-review` 4차 — **새 high 가 없으면 나머지는 등재로 닫고 머지한다**(수렴 규칙: 라운드마다 새 low·medium 이 나오는 것은 리뷰의 성질이지 slice 의 미완이 아니다) |
 
+## 계약 갱신 r6-b (2026-10-01, 팀장 — 3차 리뷰 대응 보고 수령: HEAD `eb602adc` · 이탈 넷)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-51** | **이탈 수용 넷 + in_scope 한 파일**: ① 디렉터리 fsync 관용은 `forceDirectory` 안이 아니라 부르는 자리에(대역 주입 test 가 잠그려면) ② 경고는 표준 오류 한 줄(어댑터에 로그 포트 없음, 닫힌 토큰, 프로세스에 한 번) ③ 새 public 표면 하나 `runStateFormatCauseCode`(사유 코드 문자열만, 예외 타입은 비공개 유지) ④ **in_scope 에 `app/src/main/kotlin/bidvector/app/collection/OpeningCollectionLines.kt` 추가** — D-48 ① 이 그 자리를 지목했는데 목록이 추출 러너 한 파일만 들었다(팀장 누락). 그 누락이 rollback ④⑤⑥ 의 구멍이었고 레인이 실측으로 잡아 복원 목록에 더했다 |
+| **D-6G2d-52** | **표적 확인 SHA 는 이 갱신 커밋.** verifier: D-48 ①~⑥ test·변이(②③⑤ 필수) · 러너 로그에 형식 토큰 · acceptance 강한 집합 · rollback 문서 명령 그대로(D14/M39, hunk 아홉) · 새 public 표면. 그 뒤 `/code-review` 4차 — D-50 수렴 규칙 적용 |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의
@@ -237,7 +244,7 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 - `adapters/src/main/kotlin/bidvector/adapters/snapshot/**` · `adapters/src/test/**`(실행 상태 디렉터리·추출·조립)
 - `procurement/src/main/kotlin/bidvector/procurement/**`(`CollectionAttemptLedger` 의 AXIS 줄 계약) · `procurement/src/test/**`
 - `workflow/src/main/kotlin/bidvector/workflow/collection/**` · `workflow/src/test/kotlin/bidvector/workflow/collection/**`(AXIS 기록 자리 — D-4 ⓒⓓ 가 닿을 때만)
-- `app/src/test/**`(출하 조립 E2E 의 기동 셋·옛 형식 거부 단언) · **(r0-b D-6G2d-9)** `app/src/main/kotlin/bidvector/app/collection/SnapshotExtractionRunner.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsPageUriBuilder.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsCallGate.kt` · `adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcCollectedAxisStore.kt`
+- `app/src/test/**`(출하 조립 E2E 의 기동 셋·옛 형식 거부 단언) · **(r0-b D-6G2d-9)** `app/src/main/kotlin/bidvector/app/collection/SnapshotExtractionRunner.kt` · **(r6-b D-6G2d-51)** `app/src/main/kotlin/bidvector/app/collection/OpeningCollectionLines.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsPageUriBuilder.kt` · `adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsCallGate.kt` · `adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcCollectedAxisStore.kt`
 - `config/quality/**`(새 타입 **등재**만)
 - `reports/evidence/m6/6g2d/**` · `milestone-6.md`(착수·종결 문단만)
 
