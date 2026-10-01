@@ -411,6 +411,55 @@ class RunStateDirectoryTest : RunStateDirectoryFixture() {
     }
 
     /**
+     * **D-6G2e-5 (6G-2d cr 4차 ⑦) — 거부될 디렉터리를 먼저 고쳐 쓰지 않는다.** 앞 판은 복구가 자리
+     * 대조보다 앞서서, 복사된 디렉터리(directory_id 불일치)의 원장이 기동 거부 **전에** 이미 교체됐다.
+     * 사람이 보려던 증거가 거부 메시지와 함께 달라져 있으면, 무엇이 복사됐는지 판독할 자리가 사라진다.
+     * 복구는 그 디렉터리를 쓰기로 한 뒤의 일이다.
+     */
+    @Test
+    fun `복사된 디렉터리는 찢어진 끝 줄을 고치지 않고 거부한다 — 원장 바이트 불변`() {
+        val source = open()
+        source.sampleList.confirm(runStateSample())
+        source.attempts.append(runStatePendingAttempt())
+        val copy = Files.createDirectories(temp.resolve("torn-copy"))
+        listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME, STATE_NAME).forEach {
+            Files.copy(root().resolve(it), copy.resolve(it))
+        }
+        val ledger = copy.resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(ledger, Files.readString(ledger) + AXIS_UNREADABLE_FRAGMENT)
+        val received = Files.readString(ledger)
+
+        shouldThrow<IllegalArgumentException> { open(copy) }
+
+        Files.readString(ledger) shouldBe received
+        Files.exists(copy.resolve(STAGED_ATTEMPT_NAME)) shouldBe false
+    }
+
+    /**
+     * **D-6G2e-5 — 원장 **읽기**가 던져도 잠금은 남지 않는다.** 기동의 첫 걸음은 전부 가드 안이고
+     * 누적 해시를 짓는 읽기도 그 안이다. 잠금이 남으면 다음 실행은 「다른 실행이 돌고 있다」로 조용히
+     * 끝나고(exit 3), 운영자는 거부 사유를 영영 보지 못한다 — 사고 하나가 둘이 된다.
+     */
+    @Test
+    fun `원장이 UTF-8 이 아니면 던지고 잠금을 놓는다 — 다음 기동이 Busy 가 아니다`() {
+        val state = open()
+        state.sampleList.confirm(runStateSample())
+        state.attempts.append(runStatePendingAttempt())
+        state.close()
+        opened.clear()
+        Files.write(root().resolve(ATTEMPT_LEDGER_NAME), byteArrayOf(0x7B, 0xC3.toByte(), 0x28, 0x0A))
+
+        shouldThrow<Exception> { open() }
+
+        // 같은 프로세스에서 다시 열면 잠금을 **얻는다**(Busy 가 아니다) — 거부 사유가 다시 보인다.
+        shouldThrow<Exception> { open() }.message.toString().isNotEmpty() shouldBe true
+        RunStateLock.tryAcquire(root()).let {
+            (it is RunStateLock.Held) shouldBe true
+            it.release()
+        }
+    }
+
+    /**
      * 조각 **하나만** 남은 원장 — 그 라운드의 첫 의도 줄을 쓰다 죽은 모양이라 앞 줄이 없다. 장부는
      * 표본 확정으로 세워 둔다(장부 없이 파일만 있으면 그 자체로 기동 거부다).
      */

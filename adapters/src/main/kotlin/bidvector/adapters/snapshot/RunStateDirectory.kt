@@ -87,50 +87,64 @@ class RunStateDirectory(
     private val factsFile = RunStateFactsFile(stateFile)
 
     /**
-     * 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6).
+     * 기동의 **첫 걸음 전부와 그 끝의 누적 해시**. 순서가 이 식 하나에 있다 — 새 상태가 중간에
+     * 끼어들 자리를 남기지 않는다.
      *
-     * **복구가 끝난 바이트로 짓는다**(D-6G2d-1). 프로퍼티 초기화는 선언 순서라, 이 자리에서 곧바로
-     * `LedgerDigest(attemptFile)` 을 부르면 [healTornTail] 보다 **앞서** 돈다 — 장부에 조각까지 포함한
-     * 해시가 굳고, 그 뒤의 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다(vr r5-t probe C2: 기동 A
-     * 만 수락하고 B·C 는 영구 거부). 복구를 이 초기화식 자신 안에 두어, 새 상태가 이 식 앞에 끼어들
-     * 자리를 남기지 않는다.
+     * ① **형식 판별은 잠금과 무관하다**(D-6G2d-44) — 잠금을 못 잡아도 옛 디렉터리는 「형식」으로
+     * 거부돼야 한다. 잠금 뒤로 미루면 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱 오류로
+     * 죽고, 운영자는 무엇이 틀렸는지 출력에서 읽을 수 없다.
+     *
+     * ② **자리 대조가 복구보다 앞선다**(D-6G2e-5) — 거부될 디렉터리를 먼저 **고쳐 쓰지 않는다**.
+     * 앞 판은 복구가 앞서서, 복사된 디렉터리(directory_id 불일치)의 원장이 기동 거부 전에 이미
+     * 교체됐다: 사람이 보려던 증거가 거부 메시지와 함께 달라져 있었다.
+     *
+     * ③ 되돌림·복구는 그 **뒤**다. 끝나지 않은 확정을 되돌리는 것이 확정 표본 해시 대조보다 앞서야
+     * 하므로(그 창이 곧 불일치다) 그 대조만 [verifyConfirmedSample] 로 뒤에 남는다.
+     *
+     * ④ 누적 해시는 **복구가 끝난 바이트로** 짓는다(D-6G2d-1). 조각까지 포함한 해시가 굳으면 그 뒤의
+     * 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다(vr r5-t probe C2: 기동 A 만 수락, B·C 영구 거부).
+     *
+     * 넷 다 **가드 안**이다(D-6G2d-48 ⑥ · D-6G2e-5) — 잠금을 쥔 실행이 거부로 죽으면 그 잠금이 열린
+     * 채 남고 다음 실행은 「다른 실행이 돌고 있다」로 조용히 끝난다(거부 사유가 사라진다). 원장
+     * **읽기**도 던질 수 있다(비UTF-8 바이트) — 그래서 해시를 짓는 자리까지 가드 안이다.
      */
-    private val ledger: LedgerDigest = healedLedgerDigest()
-
-    init {
-        // **형식 판별은 잠금과 무관하다**(D-6G2d-44) — 잠금을 못 잡아도 옛 디렉터리는 「형식」으로
-        // 거부돼야 한다. 잠금 뒤로 미루면 다른 실행이 도는 동안 열린 옛 디렉터리가 generic 파싱
-        // 오류로 죽고, 운영자는 무엇이 틀렸는지 출력에서 읽을 수 없다.
-        //
-        // **가드 안에서** 돈다(D-6G2d-48 ⑥) — 잠금을 쥔 실행이 형식 거부로 죽으면 그 잠금이 열린 채
-        // 남고, 다음 실행은 「다른 실행이 돌고 있다」로 조용히 끝난다(거부 사유가 사라진다).
+    private val ledger: LedgerDigest =
         heldOrRelease {
             factsFile.requireReadableFormat()
-            if (lock is RunStateLock.Held) verifyIntegrity()
+            if (lock is RunStateLock.Held) verifyThenHeal()
+            LedgerDigest(attemptFile)
+        }
+
+    init {
+        // 확정 표본 대조와 장부 재동기 — 복구 **뒤**이고 누적 해시를 손에 든 뒤다(재동기가 장부에
+        // 적는 해시가 디스크에 없는 바이트를 가리킬 수 없다). 장부는 여기서 **한 번** 읽는다.
+        if (lock is RunStateLock.Held) {
+            heldOrRelease {
+                factsFile.read()?.let { facts ->
+                    verifyConfirmedSample(facts)
+                    requireLedgerAheadOrEqual(facts)
+                }
+            }
         }
     }
 
     /**
-     * 복구·되돌림을 먼저 끝낸 뒤 **그 바이트**로 누적 해시를 짓는다. 무결성 대조는 그다음이다 —
-     * 장부를 재동기하는 해시([requireLedgerAheadOrEqual])가 디스크에 없는 바이트를 가리킬 수 없다.
+     * 잠금을 든 기동의 첫 걸음 — **자리 대조 → 끝나지 않은 확정 되돌림 → 찢어진 꼬리 복구**.
+     * 장부를 한 번 읽어 셋이 나눠 쓴다(앞 판은 걸음마다 다시 파싱했다).
      */
-    private fun healedLedgerDigest(): LedgerDigest {
-        if (lock is RunStateLock.Held) {
-            heldOrRelease {
-                rollBackInterruptedConfirmation()
-                healTornTail()
-            }
-        }
-        return LedgerDigest(attemptFile)
+    private fun verifyThenHeal() {
+        val facts = factsFile.read()
+        verifyPlacement(facts)
+        facts?.let(::rollBackInterruptedConfirmation)
+        healTornTail()
     }
 
     /** 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다. */
-    private fun heldOrRelease(body: () -> Unit) {
-        runCatching(body).onFailure {
+    private fun <T> heldOrRelease(body: () -> T): T =
+        runCatching(body).getOrElse {
             lock.release()
             throw it
         }
-    }
 
     val sampleList: FileSampleListLedger = FileSampleListLedger(sampleFile) { recordState() }
 
@@ -189,23 +203,24 @@ class RunStateDirectory(
      * **확정 전으로 되돌린다**: 끝나지 않은 확정은 확정이 아니다. 잠금 안이라 그 목록을 보고 있는 다른
      * 실행이 없고, 결과를 보기 전에 확정한다는 성질도 그대로다(다시 뽑아 다시 확정한다).
      *
-     * 장부가 **아예 없는** 모양은 확정 창이 아니다 — 그것은 「장부만 지웠다」이고 [verifyIntegrity] 가
+     * 장부가 **아예 없는** 모양은 확정 창이 아니다 — 그것은 「장부만 지웠다」이고 [verifyPlacement] 가
      * 거부한다(되돌리면 지워진 것이 무엇인지 모른 채 상한이 0 에서 시작한다). 확정은 목록 축 조회
      * 뒤에 오므로 그 시점에는 장부가 이미 서 있다.
      */
-    private fun rollBackInterruptedConfirmation() {
-        val facts = factsFile.read() ?: return
+    private fun rollBackInterruptedConfirmation(facts: RunStateFacts) {
         if (facts.sampleListSha256 != EMPTY_DIGEST) return
         Files.deleteIfExists(sampleFile)
         Files.deleteIfExists(scopeFile)
     }
 
     /**
-     * 기동 시 대조 — 넷 중 하나라도 어긋나면 거부한다. 장부가 아직 없으면(첫 실행) 검사할 것이
-     * 없지만, **파일이 있는데 장부가 없으면** 거부다: 그것이 「장부만 지웠다」의 모양이다.
+     * **이 자리의 디렉터리인가**(D-6G2e-5) — 복구가 바이트를 건드리기 **전에** 도는 대조다. 읽기만
+     * 하므로 거부가 디렉터리를 바꾸지 않는다: 거부된 디렉터리는 받은 그대로 사람이 본다.
+     *
+     * 장부가 아직 없으면(첫 실행) 검사할 것이 없지만, **파일이 있는데 장부가 없으면** 거부다 —
+     * 그것이 「장부만 지웠다」의 모양이다. 원장의 줄 **수**는 여기서 재지 않는다(복구 뒤의 사실이다).
      */
-    private fun verifyIntegrity() {
-        val facts = factsFile.read()
+    private fun verifyPlacement(facts: RunStateFacts?) {
         val hasFiles = Files.isRegularFile(sampleFile) || Files.isRegularFile(attemptFile)
         require(facts != null || !hasFiles) {
             "실행 상태 장부가 없는데 파일이 있다 — 무엇이 지워졌는지 알 수 없다"
@@ -213,12 +228,6 @@ class RunStateDirectory(
         if (facts == null) return
         require(facts.directoryId == directoryId) {
             "실행 상태 장부가 다른 자리에서 왔다 — 디렉터리가 복사되었거나 옮겨졌다"
-        }
-        require(facts.sampleListSha256 == digestOf(sampleFile)) {
-            "표본 목록이 확정된 뒤에 바뀌었다 — 결과를 보기 전에 확정했다는 것이 더는 참이 아니다"
-        }
-        require(facts.sampleScopeSha256 == digestOf(scopeFile)) {
-            "표본틀 범위가 확정된 뒤에 바뀌었다 — 그 표본이 무엇의 표본인지가 달라진다"
         }
         // **장부 대상 집합을 디렉터리 목록에서 도출한다**(D-6G-60) — 다음 파일이 생겨도 장부 밖에
         // 놓이지 않는다. 자물쇠(`run.lock`)와 장부 자신은 상태가 아니라 뺀다.
@@ -235,7 +244,20 @@ class RunStateDirectory(
         require(present == LEDGERED_FILES.filter { Files.isRegularFile(root.resolve(it)) }.toSet()) {
             "실행 상태 디렉터리에 장부가 모르는 파일이 있다 — 무엇이 정본인지 알 수 없다"
         }
-        requireLedgerAheadOrEqual(facts)
+    }
+
+    /**
+     * 확정 표본 두 파일이 장부와 같은가 — **되돌림 뒤**다([rollBackInterruptedConfirmation]). 끝나지
+     * 않은 확정은 「장부는 빈 해시인데 파일이 있다」 모양이고, 되돌림보다 앞서 재면 그 창이 그대로
+     * 거부가 된다(그 사고를 막으려던 장부가 만드는 사고다).
+     */
+    private fun verifyConfirmedSample(facts: RunStateFacts) {
+        require(facts.sampleListSha256 == digestOf(sampleFile)) {
+            "표본 목록이 확정된 뒤에 바뀌었다 — 결과를 보기 전에 확정했다는 것이 더는 참이 아니다"
+        }
+        require(facts.sampleScopeSha256 == digestOf(scopeFile)) {
+            "표본틀 범위가 확정된 뒤에 바뀌었다 — 그 표본이 무엇의 표본인지가 달라진다"
+        }
     }
 
     /**
@@ -269,7 +291,7 @@ class RunStateDirectory(
      * 축을 **지어내지 않는다**: 조각에 없는 것은 짓지 않고, 결말로 되살리지도 않는다 — 굳지 않은
      * 결말을 「끝났다」로 읽으면 받지 못한 축이 완료가 된다.
      *
-     * 누적 해시보다 **먼저** 돈다 — 그 순서는 [healedLedgerDigest] 가 구조로 든다.
+     * 누적 해시보다 **먼저**, 자리 대조보다 **뒤**에 돈다 — 그 순서는 [ledger] 의 초기화식이 구조로 든다.
      *
      * 교체는 **원자적이고 내구적이다**(D-6G2d-2, cr r5-t M-3 · cr r4 ③). 제자리 truncate+rewrite 는
      * 8 만 줄짜리 원장을 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다
@@ -316,7 +338,10 @@ private class LedgerDigest(
         private set
 
     init {
-        val text = runCatching { Files.readString(file) }.getOrDefault("")
+        // **없는 파일과 읽히지 않는 파일을 가른다**(D-6G2e-5) — 앞 판은 둘을 모두 빈 바이트로 접었고,
+        // 그러면 바이트가 있는 원장의 해시가 조용히 빈 해시로 굳는다(장부가 거짓을 적는다). 없으면
+        // 비었고, 있는데 읽히지 않으면 **던진다**(그 예외는 잠금 가드 안에서 난다).
+        val text = if (Files.isRegularFile(file)) Files.readString(file) else ""
         digest.update(text.toByteArray(Charsets.UTF_8))
         lines = text.lineSequence().count { it.isNotBlank() }
     }
