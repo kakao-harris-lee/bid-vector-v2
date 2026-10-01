@@ -38,6 +38,8 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **D-6G2d-41** 내구 순서 원장 → 장부 | 이행 | `DurableAppend` 채널로 append 가 **자기 바이트를 굳힌 뒤** 장부 갱신을 부른다 · 표본 두 파일도 `forceDurable` 뒤에 장부 · 내구 원시연산을 제 파일로(`RunStateDurability.kt`). 순서는 대역 채널이 잰다 — 내구성 자체는 크래시를 심을 자리가 없어 단위 test 로 못 잰다. append 당 비용은 아래 「내구 비용 공시」 |
 | **D-6G2d-42** 크래시 라운드는 하나 | 이행 | 재개가 앞 라운드를 닫는다(`InterruptedRoundCloser` → `AXIS Failed(INTERRUPTED)`) · `AttemptHistory.interruptedRounds()` 가 그 라운드의 **마지막 호출 시각**을 낸다 · `doneWith` 는 다시 **일시 실패 결말만** 센다. 형식 version **2 유지**(아래 이탈 20) |
 | **D-6G2d-43** 투찰자 소수 금액 | 이행 | `AssemblyTally.wonBidderRows` — 하나라도 소수면 목록을 비우고 한 번 센다. 금액 **없는** 투찰자는 비우지 않는다 |
+| **D-6G2d-48** 소수정 여섯 | 이행 | ① 러너가 형식 사유 토큰을 낸다(`runStateFormatCauseCode` — 밖으로 여는 유일한 표면) ② 의도 줄만 남은 꼬리도 끊긴 라운드(`lastCallOfOpenRound` 가 꼬리의 마지막 줄을 본다) ③ 디렉터리 fsync 실패는 한 번 경고하고 계속(관용은 **부르는 자리**에, 파일 데이터 fsync 유지) ④ `incompleteAValues` 는 A 적용 공고에서만 ⑤ 짧은 쓰기를 끝까지(`writeFully`) ⑥ 형식 검사를 잠금 가드 안으로 + 낡은 KDoc 정정 |
+| **D-6G2d-49** 등재 셋 | 이행(문서) | `walk` 의 예외와 고정 시계 겹침을 값 타입 주석에 · 아래 「OPEN 등재」의 배칭 구체안 · 원장 이중 파싱 한 줄 |
 | **D-6G2d-44** Busy 경로도 형식 검사 | 이행 | `RunStateFactsFile.requireReadableFormat()` 을 잠금과 무관하게 `init` 에서 · 걷기 없는 AXIS 줄은 `RunStateFormatFault.LEGACY_LINE` 으로 거부(generic 예외 아님) |
 | **D-6G2d-19** 셈 창 등재 + **마지막 정착 뒤부터** | 이행 | `doneWith` 의 `takeLastWhile { !isSettled }` — 정착 앞의 실패는 그 정착으로 무효가 된 증거다. 등식 test 하나. 아래 「알려진 제한」 (e) |
 
@@ -83,6 +85,11 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 | **M-open-round-uncounted** 재개가 앞 라운드를 닫지 않는다 | `OpeningRetryCapTest` | RED 2(쪽 여럿 판 · 거부 사이 판) |
 | **M-bidder-null** 투찰자 금액을 칸 단위로 비운다 | `SnapshotAmountContractTest` | RED 1 |
 | **M-busy-unchecked** 잠금 없는 열기의 형식 검사를 뺀다 | `RunStateFormatTest` | RED 1 |
+| **M-intent-tail-uncounted** 꼬리를 HTTP 줄만으로 본다 | `OpeningRetryCapTest` · `CollectionAttemptLedgerTest` | RED 2 |
+| **M-no-dir-tolerance** 디렉터리 fsync 실패를 그대로 올린다 | `RunStateDurabilityTest` | RED 1 |
+| **M-single-write** 짧은 쓰기 루프를 한 번 쓰기로 | 같은 클래스 | RED 1 |
+| **M-count-always** A 적용 여부와 무관하게 센다 | `SnapshotAmountContractTest` | RED 1 |
+| **M-cause-class-name** 형식 사유 분기를 뺀다(클래스 이름으로) | `OpeningCauseCodeTest` | RED 1 |
 
 ## 착수 실측 표 갱신
 
@@ -101,7 +108,7 @@ base `c357e437` · 레인 `kotlin-implementer` 하나 · 브랜치 `m6-6g2d/2026
 (evidence-pack 규격), 다른 집합으로 갈음하면 「CI 와 다른 것을 재고 초록이라 적는」 자리가 하나 생긴다.
 더 강한 그 집합도 앞 라운드 HEAD 에서 초록이었다.
 
-버릴 clone 을 `e0342a44`(마지막 산출물 커밋)에 **clean 하게** 두고 실측했다 — 작업 트리의 미커밋
+버릴 clone 을 `509aa9fe`(마지막 산출물 커밋)에 **clean 하게** 두고 실측했다 — 작업 트리의 미커밋
 evidence 편집이 섞이지 않는다.
 
 | 명령 | exit |
@@ -112,15 +119,17 @@ evidence 편집이 섞이지 않는다.
 | `./tools/one-command-check.sh` | 0 (마지막 줄 「완료 — Kotlin 전건 + Python 전건 통과」) |
 
 test XML 합은 **task 별로** 적는다(vr r1 L-3 — 앞 판은 `test` task 만 세면서 그 기준을 적지 않았다):
-`test` 2,571 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
-전체 합 2,579. base 대비 `test` 는 **+66** 이다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
+`test` 2,580 · skipped 4 · failures 0 · errors 0, `compatibilitySmokeTest` 8 · failures 0.
+전체 합 2,588. base 대비 `test` 는 **+75** 이다(되돌린 트리에서 같은 명령으로 2,505 를 실측했다 —
 rollback ⑤, 같은 기준). 이 slice 가 더한 test 수와 방향이 맞는다.
 
 `container` job 은 돌리지 않았다 — 이 slice 는 그 job 이 돌리는 이미지·compose·실서버 경로를
 바꾸지 않는다(실행 상태 디렉터리 E2E 는 `check` job 의 `:app:test` 안에 있다).
 
-**중간 실측 열넷** — `check` 가 실제로 열네 번 막았고 그 이력은 결함이 아니라 게이트가 작동했다는
-증거다. 리뷰 대응 일괄에서 넷(`:adapters:detekt` 줄 길이 · `:adapters:sizeGate` · `:workflow:sizeGate` ·
+**중간 실측 열일곱** — `check` 가 실제로 열일곱 번 막았고 그 이력은 결함이 아니라 게이트가 작동했다는
+증거다. 3차 리뷰 대응에서 셋이 더 났다: 계수 배선 판의 `incompleteAValues`(④ 의 귀결 — A 적용 술어를
+그 판이 말하지 않았다) · KDoc 자리 규칙 둘. **그리고 rollback 실측이 복원 목록의 구멍을 하나 잡았다**
+(아래 이탈 26). 리뷰 대응 일괄에서 넷(`:adapters:detekt` 줄 길이 · `:adapters:sizeGate` · `:workflow:sizeGate` ·
 이름·빈 줄 규칙), 재리뷰 대응에서 넷이 더 났다: 클래스 함수 수 한도 **둘**(디렉터리·use case — 억제
 대신 관심사로 갈랐다) · KDoc 자리 규칙 둘 · 그리고 **`RunStateDirectoryTest` 둘**이 초기화 순서 함정을
 잡았다(새 프로퍼티를 누적 해시 식 뒤에 두어 되돌림이 `null` 을 불렀다 — 그 실패는 style 이 아니라
@@ -174,6 +183,12 @@ test 소스의 공통 대역 클래스는 `public` 이다 — Kotlin 이 「`pub
 `INTERRUPTED_ROUND` 은 파일 범위 `private`). 도메인에 **읽기 질의 하나**가 늘었다(`AttemptHistory`
 `interruptedRounds()`) — 값을 내기만 하고 쓰는 자리를 열지 않는다. `FileAttemptLedger` 의 채널 인자는
 `internal` 타입이라 모듈 밖에서 끼울 수 없다.
+
+**3차 리뷰 대응(D-6G2d-48)은 새 public 표면 하나를 더한다** — `runStateFormatCauseCode(Throwable): String?`
+하나뿐이고, 그것이 **의도된 최소**다: 예외 타입은 `internal` 로 남아 바깥 모듈이 이름으로 잡을 수 없고,
+밖으로 나가는 것은 닫힌 어휘의 토큰 문자열이다. 그 밖에 더한 이름은 모듈 안이다(`writeFully` ·
+`forceDirectory` · `DIRECTORY_FSYNC_UNSUPPORTED` · `RunStateFormatFault.LEGACY_LINE` 은 `internal`,
+`warnDirectorySyncOnce` 는 파일 범위 `private`).
 
 **public 거동 변경 둘**은 따로 적는다 — 표면의 수는 그대로여도 밖에서 보이는 답이 달라진다.
 
@@ -286,7 +301,8 @@ append 하나가 fsync **셋**을 부른다 — 원장 채널 · staged 장부 �
 | OPEN | 무엇이 미결인가 | 지금 왜 그대로 두는가 |
 |---|---|---|
 | `OPEN-6G2D-MAX-PAGES-FINAL` | 쪽 상한 소진(`MAX_PAGES`)이 **확정 실패**다 — 참가자가 정책의 쪽 상한을 넘는 축은 `incomplete_axis` 로 영구 제외되고, 나중에 상한을 올려도 그 축은 다시 불리지 않는다(확정은 되감기지 않는다). | 계수가 **정직하다**(그 공고는 사유와 함께 빠진다) — 조용한 결측이 아니다. 갈래를 바꾸는 것은 세 선택지(유지 / 일시로 바꿔 상한에 맡김 / 쪽 상한 상향) 중 운영자 결정이고, A-3 과 함께 올린다. |
-| `OPEN-6G2D-FSYNC-BATCHING` | append 마다 fsync 셋이라 원장 쓰기가 **6.8 ms** 든다(위 공시). 승인 상한이 오르면 실행 시간이 여기 묶인다. | 지금 값에서 무해하고(실행당 append 한 자리 수), 묶는 것은 **크래시 창을 넓히는** 거래다 — 이 slice 가 닫은 역전(장부가 원장보다 먼저 굳음)이 다시 열릴 자리이므로 실수집 규모를 본 뒤 정한다. |
+| `OPEN-6G2D-FSYNC-BATCHING` | append 마다 fsync 셋이라 원장 쓰기가 **6.8 ms** 든다(위 공시). 승인 상한이 오르면 실행 시간이 여기 묶인다. **구체안(D-6G2d-49)**: 장부 갱신을 **AXIS 결말·표본 확정 때만** 하고 호출 단위 append 는 원장 fsync 만 한다 — 원장이 장부보다 앞서는 것은 기동의 재동기가 이미 처리한다(D-6G-48). | 지금 값에서 무해하고(실행당 append 한 자리 수), 묶는 것은 **크래시 창을 넓히는** 거래다 — 이 slice 가 닫은 역전(장부가 원장보다 먼저 굳음)이 다시 열릴 자리이므로 실수집 규모를 본 뒤 정한다. |
+| `OPEN-6G-REVIEW-FOLLOWUPS` 에 한 줄(D-6G2d-49) | 원장을 **두 번 파싱**한다 — 끊긴 라운드를 닫는 읽기와 이어 돌기 판정의 읽기가 각각 파일을 읽고 푼다(줄 수가 만 단위면 그 비용이 보인다). | 정확성에 닿지 않고(같은 바이트를 두 번 읽는다) 값을 캐싱하면 그 사이에 자기 append 가 끼는 자리가 생긴다 — 실수집 규모를 본 뒤 한 번 읽어 나누는 형태로 고친다. |
 | `OPEN-6G-REVIEW-FOLLOWUPS` 에 한 줄 | 정착한 축을 **다시 걸 경로**가 생기면 판독기 둘이 한 원장을 다르게 읽는다 — 이어 돌기는 「마지막 정착 뒤의 창」을, 추출은 「마지막 줄」을 본다. | 오늘 그 경로가 **없다**(정착한 축은 다시 불리지 않는다). 술어를 공유하는 것이 처방이고, 그 편집은 두 판독기의 계약을 함께 바꾼다 — 이 slice 의 표적(데이터 정확성) 밖이다. |
 
 ## 6G evidence 정정 (D-6G2d-7)
@@ -397,6 +413,26 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
     파일을 어떻게 읽는가**를 진다. 그 과정에서 **초기화 순서 함정을 한 번 밟았다**: 새 프로퍼티를 누적
     해시 초기화식 **뒤**에 두어 되돌림이 `null` 을 불렀고(D-6G2d-1 과 같은 계열), 전건 `check` 의
     `RunStateDirectoryTest` 둘이 그것을 잡았다. 선언을 앞으로 옮기고 그 이유를 KDoc 에 적었다.
+
+23. **D-6G2d-48 ③ 의 관용을 `forceDirectory` 가 아니라 `replaceDurably` 에 두었다.** 관용을 굳히는
+    함수 **안**에 두면 주입한 대역이 그 경로를 대체해 버려 **test 가 아무것도 잠그지 않는다**(첫 판이
+    그랬고 대역이 던진 예외가 그대로 올라왔다). 부르는 자리에 두면 대역이 실제 관용 경로를 지난다.
+24. **경고를 표준 오류 한 줄로 낸다.** 어댑터에 로그 포트가 없고(이 모듈에 로거 사용자가 0 이다) 값을
+    app 까지 올리려면 배선 셋을 지나야 한다 — 그 비용이 「굳지 않는 마운트」 경고보다 크다. 토큰은
+    닫힌 어휘(`RUN_STATE_DIRECTORY_FSYNC_UNSUPPORTED`)이고 프로세스에 한 번이다.
+26. **① 이 in_scope 밖 app 파일 하나를 고쳤고, 그것이 복원 목록의 구멍을 드러냈다.** in_scope 는
+    `app/src/main` 에서 **추출 러너 한 파일**만 이름으로 들었는데 `openingCauseCodeOf` 는 러너 줄 파일에
+    있다(계약 ① 이 그 자리를 지목했다). 그 파일이 복원 목록에 없어 **되돌린 트리가 컴파일되지 않았다**
+    (④⑤⑥ exit 1) — ③ 은 0 줄이었다(대조 집합이 같은 목록이라 구멍이 보이지 않는다). 목록에 더하고
+    재실측했다. 계약의 in_scope 경로 목록 갱신은 세션 모델 소관이라 보고만 한다.
+25. **① 이 새 public 표면 하나를 만든다** — 사유 코드 접근 함수다. 계약이 「최소 표면」을 허용했고,
+    예외 타입을 열지 않는 쪽을 택했다: 타입을 열면 바깥이 `catch` 로 분기해 이 모듈의 형식 판별을
+    복제할 수 있다.
+
+## 실행 상태 디렉터리의 마운트 권고 (D-6G2d-48 ③)
+
+실행 상태 디렉터리는 **ext4(WSL 내부)** 에 둔다 — `/mnt/c` 같은 DrvFs·9p 마운트는 디렉터리 fsync 를
+받지 않아 이름 교체의 내구가 한 층 약해지고, 그 사실이 표준 오류의 위 토큰으로 한 번 나온다.
 
 ## 게이트 실측(evidence 편집 전)
 
