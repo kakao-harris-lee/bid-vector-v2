@@ -453,10 +453,47 @@ _BOARD_BUILDERS: Final[dict[str, Any]] = {
         BoardSpec(_uniform(BoardWindow(10, 0, 40, 0)), wide_reserve_pad=12),
         variant=SampleVariant.EXCLUDE_WIDE_RESERVE_RANGE,
     ),
+    # 창당 행이 하한 **하나 아래**인 판 — 하한을 내리면 창이 선다(내리는 방향, D-6G2a-15).
+    "window-rows-short": lambda _: _planned_board(
+        BoardSpec(_uniform(BoardWindow(10, 0, 39, 0)), history=20, pad=30),
+        overrides={"verdict.min_window_rows": "50"},
+    ),
+}
+
+_DERIVED_BOARDS: Final[dict[str, tuple[str, dict[str, str]]]] = {
+    # **막힌 기준선** 판들(D-6G2a-15) — 바탕 판의 스냅숏을 그대로 쓰고 정책 override 만
+    # 다르다. 기준선이 이미 멈춤이므로 그 값을 **되돌리는 방향**으로 흔들면 판정이 선다.
+    # 우회 ④(`max(정책, 상수)`·`min(정책, 상수)` 처럼 한쪽으로만 따른다)는 **반대 방향**이
+    # 있어야 잡힌다 — r0 은 판정식의 일곱만 양방향이었다(verifier r1 M-3).
+    #
+    # 스냅숏을 다시 짓지 않으므로 판 하나당 비용은 판정 두 번이다.
+    "budget-tight": ("shipped", {"sampling.max_total_calls": "700"}),
+    "fit-loose": ("shipped", {"fit.alpha": "0.95"}),
+    "fit-starved": ("shipped", {"fit.min_sample_count": "9999"}),
+    "fit-narrow": ("shipped", {"fit.max_bin_ratio_deviation": "0.000001"}),
+    "band-low-raised": ("shipped", {"floor.rate_band_low": "0.9"}),
+    "band-high-lowered": ("shipped", {"floor.rate_band_high": "0.4975"}),
+    "ordinal-off": ("shipped", {"exclusion.first_notice_ordinal": "1"}),
+    "reserve-count-off": ("shipped", {"institution.reserve_price_count": "16"}),
+    "draw-count-off": ("shipped", {"institution.draw_count": "5"}),
+    "service-late": ("shipped", {"effective.service": '"2026-07-01"'}),
+    "mixed-late": (
+        "mixed",
+        {"effective.construction": '"2026-07-01"', "effective.goods": '"2026-07-01"'},
+    ),
+    "embargo-wide": ("pass", {"window.embargo_days": "60"}),
+    "window-span-wide": ("shipped", {"window.days": "8"}),
+    "s4-starved": ("shipped", {"strategy.s4_min_competitor_samples": "100000"}),
+    "s4-grid-off": ("shipped", {"strategy.s4_grid_size": "42"}),
 }
 
 
 # ── 부류 셋 (D-6G2a-2) ───────────────────────────────────────────────────────
+
+
+_ALL_BOARDS: Final[frozenset[str]] = frozenset(_BOARD_BUILDERS) | frozenset(
+    _DERIVED_BOARDS
+)
 
 
 @dataclass(frozen=True)
@@ -475,34 +512,34 @@ _STRONG_VALUES: Final[dict[str, tuple[str, ...]]] = {
     "verdict.ineligibility_noninferiority_margin": ("0.02", "0.005"),
     "verdict.target_power": ("0.95", "0.50"),
     "verdict.min_window_count": ("4", "2"),
-    "verdict.min_window_rows": ("51", "51"),
-    "window.days": ("8",),
-    "window.embargo_days": ("60",),
-    "institution.reserve_price_count": ("16",),
-    "institution.draw_count": ("5",),
-    "floor.rate_band_low": ("0.9",),
-    "floor.rate_band_high": ("0.4975",),
+    "verdict.min_window_rows": ("51", "49"),
+    "window.days": ("8", "7"),
+    "window.embargo_days": ("60", "7"),
+    "institution.reserve_price_count": ("16", "15"),
+    "institution.draw_count": ("5", "4"),
+    "floor.rate_band_low": ("0.9", "0.30"),
+    "floor.rate_band_high": ("0.4975", "0.995"),
     "floor.pure_construction_cost_ratio": ("0.90",),
     # 시행일은 YAML 이 따옴표를 쓰는 값이다 — 따옴표째 적는다(흔들기가 파일에 그대로 쓰인다).
-    "effective.construction": ('"2026-07-01"',),
-    "effective.service": ('"2026-07-01"',),
-    "effective.goods": ('"2026-07-01"',),
-    "exclusion.first_notice_ordinal": ("1",),
+    "effective.construction": ('"2026-07-01"', '"2026-01-30"'),
+    "effective.service": ('"2026-07-01"', '"2026-05-26"'),
+    "effective.goods": ('"2026-07-01"', '"2026-05-29"'),
+    "exclusion.first_notice_ordinal": ("1", "0"),
     "strategy.s1_offset_bp": ("900.0",),
     "strategy.s4_iteration_count": ("101",),
-    "strategy.s4_grid_size": ("42",),
+    "strategy.s4_grid_size": ("42", "41"),
     "strategy.s4_grid_span_bp": ("200.0",),
-    "strategy.s4_min_competitor_samples": ("100000",),
+    "strategy.s4_min_competitor_samples": ("100000", "30"),
     "sampling.list_call_count": ("601",),
     "sampling.calls_per_notice_construction": ("5",),
     "sampling.calls_per_notice_service": ("4",),
     "sampling.calls_per_notice_goods": ("4",),
-    "sampling.max_total_calls": ("100",),
+    "sampling.max_total_calls": ("100", "80000"),
     "sampling.headroom_ratio": ("0.1",),
     "sensitivity.wide_reserve_half_width": ("0.035",),
-    "fit.alpha": ("0.999",),
-    "fit.min_sample_count": ("9999",),
-    "fit.max_bin_ratio_deviation": ("0.000001",),
+    "fit.alpha": ("0.999", "0.05"),
+    "fit.min_sample_count": ("9999", "20"),
+    "fit.max_bin_ratio_deviation": ("0.000001", "0.20"),
     "stability_seeds.0": ("999001",),
     "stability_seeds.1": ("999002",),
     "stability_seeds.2": ("999003",),
@@ -540,33 +577,70 @@ _JUDGEMENT_INPUTS: Final[dict[str, tuple[_Probe, ...]]] = {
     "verdict.min_window_rows": (
         _Probe("window-rows", "51"),
         _Probe("sample-floor", "51"),
+        _Probe("window-rows-short", "49"),
     ),
     # 창 규칙 — 창 폭이 바뀌면 창 경계가 바뀌고, embargo 를 넓히면 이력이 끊긴다.
-    "window.days": (_Probe("shipped", "8"),),
-    "window.embargo_days": (_Probe("pass", "60"),),
+    "window.days": (_Probe("shipped", "8"), _Probe("window-span-wide", "7")),
+    "window.embargo_days": (_Probe("pass", "60"), _Probe("embargo-wide", "7")),
     # 제도 상수 — 예비가격 수·추첨 수가 제외 ⑮ 와 적합도와 S4 의 분포에 동시에 닿는다.
-    "institution.reserve_price_count": (_Probe("shipped", "16"),),
-    "institution.draw_count": (_Probe("shipped", "5"),),
+    "institution.reserve_price_count": (
+        _Probe("shipped", "16"),
+        _Probe("reserve-count-off", "15"),
+    ),
+    "institution.draw_count": (
+        _Probe("shipped", "5"),
+        _Probe("draw-count-off", "4"),
+    ),
     # 하한율 개연 밴드 — 밴드 밖이면 공고가 제외된다.
-    "floor.rate_band_low": (_Probe("shipped", "0.9"),),
-    "floor.rate_band_high": (_Probe("shipped", "0.4975"),),
+    "floor.rate_band_low": (
+        _Probe("shipped", "0.9"),
+        _Probe("band-low-raised", "0.30"),
+    ),
+    "floor.rate_band_high": (
+        _Probe("shipped", "0.4975"),
+        _Probe("band-high-lowered", "0.995"),
+    ),
     # 제외 규칙 상수 — 첫 공고 차수가 어긋나면 전량이 ③ 으로 빠진다.
-    "exclusion.first_notice_ordinal": (_Probe("shipped", "1"),),
+    "exclusion.first_notice_ordinal": (
+        _Probe("shipped", "1"),
+        _Probe("ordinal-off", "0"),
+    ),
     # 시행일 셋 — 업무마다 다른 자리에서 읽힌다(`rules.effective_date_for`).
-    "effective.service": (_Probe("shipped", '"2026-07-01"'),),
-    "effective.construction": (_Probe("mixed", '"2026-07-01"'),),
-    "effective.goods": (_Probe("mixed", '"2026-07-01"'),),
+    "effective.service": (
+        _Probe("shipped", '"2026-07-01"'),
+        _Probe("service-late", '"2026-05-26"'),
+    ),
+    "effective.construction": (
+        _Probe("mixed", '"2026-07-01"'),
+        _Probe("mixed-late", '"2026-01-30"'),
+    ),
+    "effective.goods": (
+        _Probe("mixed", '"2026-07-01"'),
+        _Probe("mixed-late", '"2026-05-29"'),
+    ),
     # P-4 적합도 — 어긋나면 판정 대신 멈춤이다.
-    "fit.alpha": (_Probe("shipped", "0.999"),),
-    "fit.min_sample_count": (_Probe("shipped", "9999"),),
-    "fit.max_bin_ratio_deviation": (_Probe("shipped", "0.000001"),),
+    "fit.alpha": (_Probe("shipped", "0.999"), _Probe("fit-loose", "0.05")),
+    "fit.min_sample_count": (
+        _Probe("shipped", "9999"),
+        _Probe("fit-starved", "20"),
+    ),
+    "fit.max_bin_ratio_deviation": (
+        _Probe("shipped", "0.000001"),
+        _Probe("fit-narrow", "0.20"),
+    ),
     # 표본 예산 상한 — 넘으면 판정 대신 멈춤이다.
-    "sampling.max_total_calls": (_Probe("shipped", "100"),),
+    "sampling.max_total_calls": (
+        _Probe("shipped", "100"),
+        _Probe("budget-tight", "80000"),
+    ),
     # 전략 상수 중 **판정을 뒤집는** 셋 — 격자 수는 S4 의 투찰금액을, 경쟁자 표본 하한은
     # S4 의 기권을 만든다(기권은 「부적격이고 못 이겼다」라 승률이 0 이 되고, 「못 쟀다」의
     # 사유가 seed 불안정에서 검정력 미달로 옮겨간다 — 사유를 담는 투영이라 보인다).
-    "strategy.s4_grid_size": (_Probe("shipped", "42"),),
-    "strategy.s4_min_competitor_samples": (_Probe("shipped", "100000"),),
+    "strategy.s4_grid_size": (_Probe("shipped", "42"), _Probe("s4-grid-off", "41")),
+    "strategy.s4_min_competitor_samples": (
+        _Probe("shipped", "100000"),
+        _Probe("s4-starved", "30"),
+    ),
     # 몬테카를로 반복 수 — 난수 흐름이 달라져 S4 의 투찰금액이 바뀌고, 그 승패가
     # seed 안정성을 뒤집는다(사유가 seed 불안정 -> 검정력 미달로 옮겨간다).
     "strategy.s4_iteration_count": (_Probe("shipped", "101"),),
@@ -577,6 +651,27 @@ _JUDGEMENT_INPUTS: Final[dict[str, tuple[_Probe, ...]]] = {
     "stability_seeds.3": (_Probe("seeded", "999004"),),
     "stability_seeds.4": (_Probe("seeded", "999005"),),
 }
+
+_NO_OPPOSITE_DIRECTION: Final[dict[str, str]] = {
+    # ⓐ 값 중 **반대 방향 흔들기를 둘 수 없는** 값과 그 사유(D-6G2a-15). 우회 ④
+    # (`max(정책, 상수)`·`min(정책, 상수)` 처럼 한쪽으로만 따른다)는 값이 **문턱과 비교되는**
+    # 자리에서만 성립한다 — 아래 값들은 비교 대상이 아니라 난수의 재료이거나 반복 수라
+    # 상수 바닥·천장이라는 형태 자체가 없다.
+    "strategy.s4_iteration_count": (
+        "몬테카를로 **반복 수**다 — 문턱과 비교되지 않고 표본 크기로 쓰인다."
+        " `max(정책, C)`·`min(정책, C)` 는 반복 수를 다른 수로 바꾸는 것과 구별되지 않고,"
+        " 그 변화는 한 방향 흔들기가 이미 잡는다(변이 P 계열 RED)"
+    ),
+    **{
+        f"stability_seeds.{index}": (
+            "난수 seed 다 — 크기 비교가 없으므로 한쪽 클램프라는 형태가 없다. seed 가"
+            " **전부** 전략에 닿는지는 seed 민감 판이, 첫 seed 가 적합도에 닿는지는"
+            " 적합도 칸 probe 가 잡는다"
+        )
+        for index in range(5)
+    },
+}
+
 
 _OUTPUT_INPUTS: Final[dict[str, _Probe]] = {
     # ⓑ **산출 입력** — 결말은 그대로이고 판정문의 **비메아리** 칸이 바뀐다. 흔든 값
@@ -700,8 +795,17 @@ class _Harness:
     verdicts: dict[tuple[str, str], bytes] = field(default_factory=dict)
 
     def board(self, name: str) -> _Board:
-        if name not in self.boards:
-            self.boards[name] = _BOARD_BUILDERS[name](self.inference)
+        if name in self.boards:
+            return self.boards[name]
+        if name in _DERIVED_BOARDS:
+            base_name, overrides = _DERIVED_BOARDS[name]
+            base = self.board(base_name)
+            # 스냅숏·전략을 **그대로 공유**한다 — 막힌 기준선 판은 정책만 다르다.
+            self.boards[name] = dataclasses.replace(
+                base, overrides={**base.overrides, **overrides}
+            )
+            return self.boards[name]
+        self.boards[name] = _BOARD_BUILDERS[name](self.inference)
         return self.boards[name]
 
     def values(self, name: str, **changes: str) -> dict[str, str]:
@@ -812,9 +916,9 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
     for key, probes in _JUDGEMENT_INPUTS.items():
         assert probes, f"{key} 의 흔들기가 비어 있다"
         for probe in probes:
-            assert probe.board in _BOARD_BUILDERS, f"{key}: 모르는 판 {probe.board}"
+            assert probe.board in _ALL_BOARDS, f"{key}: 모르는 판 {probe.board}"
     for key, probe in _OUTPUT_INPUTS.items():
-        assert probe.board in _BOARD_BUILDERS, f"{key}: 모르는 판 {probe.board}"
+        assert probe.board in _ALL_BOARDS, f"{key}: 모르는 판 {probe.board}"
     for key, reason in _UNREAD.items():
         assert reason.strip(), f"{key} 의 사유가 비어 있다"
     assert set(_STRONG_VALUES) == keys, (
@@ -831,6 +935,16 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
         assert probe.value in _STRONG_VALUES[key], (
             f"{key} 의 ⓑ 흔들기 {probe.value} 가 세기 표에 없다"
         )
+    # **우회 ④ 는 양쪽 방향으로만 닫힌다**(D-6G2a-15) — ⓐ 값마다 반대 방향 흔들기가 있거나,
+    # 없는 사유가 등재돼 있어야 한다. 등식이라 둘 다 빠뜨릴 수 없다.
+    one_way = {key for key, probes in _JUDGEMENT_INPUTS.items() if len(probes) < 2}
+    assert one_way == set(_NO_OPPOSITE_DIRECTION), (
+        f"반대 방향도 사유도 없는 ⓐ 값: {sorted(one_way - set(_NO_OPPOSITE_DIRECTION))} · "
+        f"반대 방향이 있는데 사유가 등재된 값: "
+        f"{sorted(set(_NO_OPPOSITE_DIRECTION) - one_way)}"
+    )
+    for key, reason in _NO_OPPOSITE_DIRECTION.items():
+        assert reason.strip(), f"{key} 의 사유가 비어 있다"
 
 
 def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
@@ -1374,7 +1488,7 @@ def test_output_inputs_move_a_non_echo_field_without_flipping(
 
 @pytest.mark.parametrize(
     ("key", "board"),
-    [(key, board) for key in sorted(_UNREAD) for board in sorted(_BOARD_BUILDERS)],
+    [(key, board) for key in sorted(_UNREAD) for board in sorted(_ALL_BOARDS)],
 )
 def test_unread_values_change_nothing(key: str, board: str, harness: _Harness) -> None:
     """ⓒ — 판독 밖 값은 **어느 판에서도** 아무것도 바꾸지 않는다(D-6G2a-3·13).
