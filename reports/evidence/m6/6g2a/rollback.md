@@ -1,6 +1,6 @@
 # M6/6G-2a — rollback
 
-실측 HEAD: `a3cde08d` (이 slice 의 **마지막 산출물 커밋** — 구현 완료 문단)
+실측 HEAD: `f204f794` (이 slice 의 **마지막 산출물 커밋** — r1 구현 완료 문단)
 
 base `30c6659e`. 되돌림은 **range revert 가 아니라 경로 한정**이다 — 같은 range 에 팀장 레인
 커밋(`228bd505`)이 있고, 그 커밋의 `milestone-6.md` hunk 는 이 slice 의 문단 **과 팀장 레인의
@@ -43,7 +43,8 @@ git restore --source=30c6659e --staged --worktree -- \
 
 ## ② 공유 파일 `milestone-6.md` — 문단 단위 삭제
 
-`milestone-6.md` 를 담은 커밋은 **둘**(`228bd505` 착수 문단, `a3cde08d` 구현 완료 문단)이고,
+`milestone-6.md` 를 담은 커밋은 **셋**(`228bd505` 착수 문단, `a3cde08d` 구현 완료 문단,
+`f204f794` 그 문단의 r1 갱신)이고,
 앞의 hunk 는 **팀장 레인의 운영자 결정 문단을 같이** 담는다. 그래서 **hunk 역적용을 쓸 수
 없다** — `git diff 228bd505~1..228bd505 -- milestone-6.md | git apply -R` 은 남의 문단까지
 지운다(`--3way` 도 자동 해소하지 못한다).
@@ -70,7 +71,9 @@ git restore --source=30c6659e --staged --worktree -- \
 
 ## 실측 (버릴 clone, ①~⑥)
 
-`a3cde08d` 를 clone 해 위 절차를 그대로 돌렸다. 갈음은 「HEAD 초록」이 아니라 **트리
+`f204f794` 를 clone 해 위 절차를 그대로 돌렸다. r0 에서 한 번, r1 수정 뒤 한 번 — **라운드마다
+다시 쟀다**(목록이 낡는 것이 이 결함의 실제 원인이다). 되돌리는 경로와 절차는 r0 과 같다:
+이 라운드가 **새 파일을 만들지 않았고** 기존 세 파일만 고쳤다. 갈음은 「HEAD 초록」이 아니라 **트리
 동일성**으로 했다 — 되돌린 세 경로가 base 와 **같은 트리**임을 ③ 이 재고, 그 위에서 ④⑤⑥ 을
 돌렸다.
 
@@ -80,11 +83,11 @@ git restore --source=30c6659e --staged --worktree -- \
 | ② | 문단 블록 삭제 — 지운 블록 수 · 두 확인 | **2 블록** · 내 줄 0 · 남의 줄 1 |
 | ③ | 되돌린 뒤 상태 수 · base 대비 diff | **M 4**(세 경로 + 공유 파일) · 세 경로의 diff **빈 출력** · 공유 파일은 남의 문단 **2 줄만** 남음 |
 | ④ | import(출하 모듈 · 되돌린 test 지원 모듈) + 수집 | **import ok** · **1,209 tests collected**(base 와 같은 수) |
-| ⑤ | `pytest tests -q` | **1,209 passed** |
+| ⑤ | `pytest tests -q` | **1,209 passed**(203 초) |
 | ⑥ | ruff check · ruff format --check · mypy --strict · import-linter · 설계 래칫 | **전부 exit 0** |
 
 ③ 의 「세 경로의 diff 빈 출력」이 트리 동일성이고, ④ 의 「1,209 collected」가 그 동일성의
-독립 확인이다 — base 의 test 수와 정확히 같다(이 slice 가 더한 87 이 사라졌다).
+독립 확인이다 — base 의 test 수와 정확히 같다(이 slice 가 더한 **125** 가 사라졌다).
 
 ## 이 실측이 유효한 범위
 
@@ -93,7 +96,7 @@ evidence 커밋은 언제나 마지막 산출물 커밋 **뒤에** 오므로 실
 움직였는가**다:
 
 ```
-git diff --name-only a3cde08d..<판정 SHA> -- \
+git diff --name-only f204f794..<판정 SHA> -- \
   ml-engine/tests/app/test_backtest_policy_sensitivity.py \
   ml-engine/tests/evaluation/_backtest_fixture.py \
   ml-engine/tests/evaluation/_backtest_support.py \
