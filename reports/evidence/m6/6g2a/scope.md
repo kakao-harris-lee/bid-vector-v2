@@ -33,10 +33,13 @@ verifier r5 가 그 test 가 계약이 요구한 것을 재지 않음을 실측�
 | 항목 | 값 |
 |---|---|
 | base SHA | `30c6659e` |
-| 정책 파일 키 수 · 로더 구조 필드 수 | 39(6G verifier r5) — 레인이 착수 때 재산출 |
-| checksum·version 을 뺀 투영에서 판정문을 움직이는 값 수 | 19(6G verifier r5) — 레인이 착수 때 재산출(기준선 먼저) |
-| 판정 투영을 움직이는 값 | `verdict.alpha` · `verdict.min_window_count` · `verdict.min_window_rows`(6G verifier r5) |
+| 정책 파일 키 수 · 로더 구조 필드 수 | **39 · 39** — 레인이 착수 때 재산출(일치) |
+| checksum·version 을 뺀 투영에서 판정문을 움직이는 값 수 | **19**(판정문 불변 20) — 레인이 착수 때 재산출, r5 와 일치 |
+| 판정 투영을 움직이는 값 | 극단 흔들기에서 `verdict.alpha` · `verdict.min_window_count` · `verdict.min_window_rows` 셋(r5 와 일치) · 작은 흔들기에서는 여덟 |
+| 판정 경로에서 읽는 자리가 0 인 키 | **0**(AST 전수 — 부류 ⓒ 가 비는 근거) |
 | `pytest tests -q` | 1,209 passed(6G-2d verifier 3차 확인, main `30c6659e` 와 ml-engine 동일 트리) |
+
+상세는 `commands.md` 「착수 실측」·「읽는 자리 전수」.
 
 ## 재사용 조사 (Phase 2)
 
