@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import ast
+import dataclasses
 import hashlib
 import json
 import math
@@ -363,3 +365,381 @@ _FLIPPED_RATES: dict[float, float] = {
 }
 """seed 민감 전략이 계획 밖 seed 에서 쓰는 반대쪽 투찰률 — 승패가 뒤집히므로 seed 안정성
 판정이 그 사실을 본다."""
+
+
+# ── 정책 값 **쓰임 명단** (M6/6G-2a r1, D-6G2a-12) ──────────────────────────────
+# 손으로 쓴 명단이 r1 의 막는 결함이었다: 「읽는 자리」를 셌더니 **읽은 값이 흘러가 쓰이는
+# 자리**가 가려졌다. `alpha_for(...)` 가 한 번 읽은 유의수준은 검정력 계산과 판정식 **두
+# 곳에서** 쓰이고, 창 최소 수는 창 계획·판정·**최소 표본식** 세 곳에서 쓰인다. 한 곳만
+# 상수로 바꾼 변이가 전체 suite 를 지났다(verifier r1 H-1 · code-review r1 H-1·H-2).
+#
+# 그래서 명단을 **생성**한다. 아래 함수들은 출하 코드의 AST 와 **로드된 정책 객체**에서만
+# 사실을 가져온다 — test 에 적은 목록이 없다. 새 쓰임이 생기면 삼중이 하나 늘고, 그것을
+# 덮는 probe·변이 등재가 없으면 등식 test 가 붉어진다.
+
+_POLICY_MODULE_ROOT = Path(__file__).resolve().parents[2] / "src" / "ml_engine"
+_POLICY_VALUES_PATH = (
+    _POLICY_MODULE_ROOT / "evaluation" / "backtest" / "policy_values.py"
+)
+_VERDICT_PATH_MODULES: tuple[Path, ...] = (
+    *sorted((_POLICY_MODULE_ROOT / "evaluation" / "backtest").glob("*.py")),
+    _POLICY_MODULE_ROOT / "app" / "backtest_job.py",
+)
+"""명단의 대상 — 위협 모델이 「방어하는 것」으로 든 판정 경로 전부."""
+
+_POLICY_ROOT_NAMES: frozenset[str] = frozenset({"policy", "backtest_policy"})
+"""정책 객체 전체를 가리키는 지역 이름들. 속성 체인 `*.policy` 도 같이 본다."""
+
+
+@dataclass(frozen=True)
+class PolicyUse:
+    """정책 값 하나가 **쓰이는 자리** 하나.
+
+    `site` 는 계약(D-6G2a-12)이 든 단위 — `모듈.함수`. `consumer` 는 그 함수 안에서 값이
+    흘러 들어가는 소비자 이름이고, 같은 함수에 쓰임이 둘일 때 그 둘을 가른다(적합도 seed 와
+    seed 순회가 같은 함수에 있다 — 소비자 축이 없으면 한쪽 상수가 보이지 않는다)."""
+
+    key: str
+    site: str
+    consumer: str
+
+
+def policy_file_keys(path: Path | None = None) -> tuple[str, ...]:
+    """평면 정책 파일의 키 순서 그대로 — 지어낸 목록이 아니다."""
+    source = SHIPPED_BACKTEST_POLICY_PATH if path is None else path
+    keys: list[str] = []
+    for line in source.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            keys.append(line.split(":", 1)[0].strip())
+    return tuple(keys)
+
+
+def _group_classes(
+    policy: StrategyBacktestPolicy,
+) -> dict[str, tuple[str, frozenset[str]]]:
+    """정책 객체의 그룹 속성 이름 -> (클래스 이름, 그 클래스의 필드 이름들)."""
+    groups: dict[str, tuple[str, frozenset[str]]] = {}
+    for info in dataclasses.fields(policy):
+        value = getattr(policy, info.name)
+        if dataclasses.is_dataclass(value) and not isinstance(value, type):
+            groups[info.name] = (
+                type(value).__name__,
+                frozenset(inner.name for inner in dataclasses.fields(value)),
+            )
+    return groups
+
+
+def _shared_prefix_length(left: str, right: str) -> int:
+    count = 0
+    for first, second in zip(left, right, strict=False):
+        if first != second:
+            break
+        count += 1
+    return count
+
+
+def _leaf_keys(
+    policy: StrategyBacktestPolicy, keys: tuple[str, ...]
+) -> dict[tuple[str, str], frozenset[str]]:
+    """(클래스 이름, 필드 이름) -> 그 필드가 담는 정책 키 집합. **정책 객체에서 도출**한다.
+
+    같은 잎 이름을 두 그룹이 쓰면(`alpha` 가 판정과 적합도에 둘 다 있다) 키 접두와 **공통
+    접두가 가장 긴** 속성으로 가른다 — 속성 이름이 접두의 복수형일 수 있어 접두 일치로는
+    갈리지 않는다(`strategies` 는 `strategy` 로 시작하지 않는다)."""
+    groups = _group_classes(policy)
+    top = type(policy).__name__
+    out: dict[tuple[str, str], set[str]] = {}
+    for key in keys:
+        if "." not in key:
+            out.setdefault((top, key), set()).add(key)
+            continue
+        prefix, leaf = key.split(".", 1)
+        holders = [
+            (attr, cls) for attr, (cls, fields) in groups.items() if leaf in fields
+        ]
+        if not holders:
+            # 평탄 인덱스 목록(`stability_seeds.N`)은 top-level tuple 필드다.
+            out.setdefault((top, prefix), set()).add(key)
+            continue
+        if len(holders) > 1:
+            holders.sort(
+                key=lambda item: _shared_prefix_length(item[0], prefix), reverse=True
+            )
+        out.setdefault((holders[0][1], leaf), set()).add(key)
+    return {name: frozenset(found) for name, found in out.items()}
+
+
+def _providers(
+    leaf_keys: dict[tuple[str, str], frozenset[str]],
+) -> dict[tuple[str, str], frozenset[str]]:
+    """(클래스, 메서드·프로퍼티) -> 그것이 읽는 정책 키 집합.
+
+    `policy_values` 의 AST 에서 `self.<필드>` 를 모으고 `self.<다른 프로퍼티>` 를 전이
+    닫힘으로 따라간다 — `alpha_for` 가 `primary_alpha` 를 거쳐 분모까지 읽는 것이 그래서
+    명단에 잡힌다. 불변식 검사(`__post_init__`)는 쓰임이 아니므로 뺀다."""
+    tree = ast.parse(_POLICY_VALUES_PATH.read_text(encoding="utf-8"))
+    direct: dict[tuple[str, str], set[str]] = {}
+    refs: dict[tuple[str, str], set[str]] = {}
+    for holder in (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)):
+        for method in (n for n in holder.body if isinstance(n, ast.FunctionDef)):
+            if method.name == "__post_init__":
+                continue
+            found: set[str] = set()
+            seen: set[str] = set()
+            for node in ast.walk(method):
+                if (
+                    isinstance(node, ast.Attribute)
+                    and isinstance(node.value, ast.Name)
+                    and node.value.id == "self"
+                ):
+                    if (holder.name, node.attr) in leaf_keys:
+                        found |= leaf_keys[(holder.name, node.attr)]
+                    else:
+                        seen.add(node.attr)
+            direct[(holder.name, method.name)] = found
+            refs[(holder.name, method.name)] = seen
+    changed = True
+    while changed:
+        changed = False
+        for name, referenced in refs.items():
+            for ref in referenced:
+                source = (name[0], ref)
+                if source in direct and not direct[source] <= direct[name]:
+                    direct[name] |= direct[source]
+                    changed = True
+    return {name: frozenset(found) for name, found in direct.items() if found}
+
+
+def _parents(tree: ast.AST) -> dict[int, tuple[ast.AST, str]]:
+    table: dict[int, tuple[ast.AST, str]] = {}
+    for node in ast.walk(tree):
+        for field, value in ast.iter_fields(node):
+            items = value if isinstance(value, list) else [value]
+            for item in items:
+                if isinstance(item, ast.AST):
+                    table[id(item)] = (node, field)
+    return table
+
+
+_CLIMBED_NODES = (
+    ast.Subscript,
+    ast.IfExp,
+    ast.BinOp,
+    ast.BoolOp,
+    ast.UnaryOp,
+    ast.Tuple,
+    ast.comprehension,
+    ast.JoinedStr,
+    ast.FormattedValue,
+)
+"""값을 **그대로 나르는** 노드들 — 소비자를 찾을 때 뚫고 올라간다."""
+
+
+def _consumer_name(parent: ast.AST, parents: dict[int, tuple[ast.AST, str]]) -> str:
+    """값이 흘러 들어가는 소비자 이름. 호출이면 피호출자, 비교면 `compare`."""
+    node: ast.AST = parent
+    for _ in range(6):
+        if isinstance(node, ast.Compare):
+            return "compare"
+        if isinstance(node, ast.Return):
+            return "return"
+        if isinstance(node, ast.Call):
+            func = node.func
+            return getattr(func, "attr", getattr(func, "id", "call"))
+        if isinstance(node, ast.keyword):
+            outer = parents.get(id(node))
+            if outer is not None and isinstance(outer[0], ast.Call):
+                func = outer[0].func
+                callee = getattr(func, "attr", getattr(func, "id", "call"))
+                return f"{callee}({node.arg})"
+            return f"kw:{node.arg}"
+        if isinstance(node, _CLIMBED_NODES):
+            outer = parents.get(id(node))
+            if outer is None:
+                break
+            node = outer[0]
+            continue
+        break
+    return type(node).__name__.lower()
+
+
+def _literal_index(
+    node: ast.AST, parents: dict[int, tuple[ast.AST, str]]
+) -> int | None:
+    """`stability_seeds[0]` 처럼 **상수 첨자**로 집은 원소의 번호. 아니면 `None`."""
+    outer = parents.get(id(node))
+    if outer is None or not isinstance(outer[0], ast.Subscript):
+        return None
+    index = outer[0].slice
+    if isinstance(index, ast.Constant) and isinstance(index.value, int):
+        return index.value
+    return None
+
+
+@dataclass(frozen=True)
+class _Resolver:
+    """한 함수 안에서 「이 식이 정책에서 온 값인가」를 답하는 해석기.
+
+    닫힘이 아니라 값으로 들고 다니는 이유는 함수마다 지역 바인딩이 다르기 때문이다 —
+    루프 변수를 닫는 중첩 함수는 바인딩이 늦게 평가돼 자리를 섞는다."""
+
+    leaf_keys: Mapping[tuple[str, str], frozenset[str]]
+    providers: Mapping[tuple[str, str], frozenset[str]]
+    groups: Mapping[str, tuple[str, frozenset[str]]]
+    top: str
+    group_names: dict[str, str]
+    value_names: dict[str, frozenset[str]]
+
+    def is_policy(self, node: ast.AST) -> bool:
+        if isinstance(node, ast.Name):
+            return node.id in _POLICY_ROOT_NAMES
+        return isinstance(node, ast.Attribute) and node.attr == "policy"
+
+    def group_of(self, node: ast.AST) -> str | None:
+        if isinstance(node, ast.Name):
+            return self.group_names.get(node.id)
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr in self.groups
+            and self.is_policy(node.value)
+        ):
+            return self.groups[node.attr][0]
+        return None
+
+    def resolve(self, node: ast.AST) -> tuple[str, frozenset[str]] | None:
+        if isinstance(node, ast.Name):
+            if node.id in self.value_names:
+                return ("value", self.value_names[node.id])
+            if node.id in self.group_names:
+                return ("group", frozenset())
+            return None
+        if not isinstance(node, ast.Attribute):
+            return None
+        if node.attr in self.groups and self.is_policy(node.value):
+            return ("group", frozenset())
+        owner = self.group_of(node.value)
+        if owner is not None:
+            if (owner, node.attr) in self.leaf_keys:
+                return ("value", self.leaf_keys[(owner, node.attr)])
+            if (owner, node.attr) in self.providers:
+                return ("value", self.providers[(owner, node.attr)])
+            return None
+        if self.is_policy(node.value) and (self.top, node.attr) in self.leaf_keys:
+            return ("value", self.leaf_keys[(self.top, node.attr)])
+        return None
+
+    def bind_locals(self, function: ast.FunctionDef) -> None:
+        """지역 대입을 모은다 — 세 번 훑어 연쇄 대입까지 받는다."""
+        for _ in range(3):
+            for node in ast.walk(function):
+                if not (
+                    isinstance(node, ast.Assign)
+                    and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                ):
+                    continue
+                found = self.resolve(node.value)
+                if found is None:
+                    continue
+                name = node.targets[0].id
+                if found[0] != "group":
+                    self.value_names[name] = found[1]
+                    continue
+                owner = self.group_of(node.value)
+                if owner is None and isinstance(node.value, ast.Attribute):
+                    owner = self.groups.get(node.value.attr, (None, frozenset()))[0]
+                if owner is not None:
+                    self.group_names[name] = owner
+
+
+def _enclosing_class(
+    function: ast.FunctionDef, parents: Mapping[int, tuple[ast.AST, str]]
+) -> str | None:
+    walker: ast.AST = function
+    while id(walker) in parents:
+        walker, _ = parents[id(walker)]
+        if isinstance(walker, ast.ClassDef):
+            return walker.name
+    return None
+
+
+def _scan_function(
+    function: ast.FunctionDef,
+    *,
+    module: str,
+    parents: Mapping[int, tuple[ast.AST, str]],
+    resolver: _Resolver,
+) -> set[PolicyUse]:
+    resolver.bind_locals(function)
+    uses: set[PolicyUse] = set()
+    for node in ast.walk(function):
+        found = resolver.resolve(node)
+        if found is None or found[0] != "value" or not found[1]:
+            continue
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            continue
+        parent_entry = parents.get(id(node))
+        if parent_entry is None:
+            continue
+        parent, field = parent_entry
+        if isinstance(parent, ast.Assign) and field == "value":
+            continue  # 바인딩은 쓰임이 아니다
+        if isinstance(parent, ast.Attribute):
+            continue  # 속성 체인 중간
+        keys = found[1]
+        index = _literal_index(node, parents)
+        if index is not None:
+            indexed = {key for key in keys if key.endswith(f".{index}")}
+            if indexed:
+                keys = frozenset(indexed)
+        consumer = _consumer_name(parent, parents)
+        for key in keys:
+            uses.add(PolicyUse(key, f"{module}.{function.name}", consumer))
+    return uses
+
+
+def _scan_module(
+    path: Path,
+    leaf_keys: dict[tuple[str, str], frozenset[str]],
+    providers: dict[tuple[str, str], frozenset[str]],
+    groups: dict[str, tuple[str, frozenset[str]]],
+    top: str,
+) -> set[PolicyUse]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    parents = _parents(tree)
+    module = path.stem
+    uses: set[PolicyUse] = set()
+    for function in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
+        if function.name == "__post_init__":
+            continue
+        holder = _enclosing_class(function, parents)
+        resolver = _Resolver(
+            leaf_keys=leaf_keys,
+            providers=providers,
+            groups=groups,
+            top=top,
+            group_names=(
+                {"self": holder}
+                if holder is not None and module == "policy_values"
+                else {}
+            ),
+            value_names={},
+        )
+        uses |= _scan_function(
+            function, module=module, parents=parents, resolver=resolver
+        )
+    return uses
+
+
+def policy_use_census(policy: StrategyBacktestPolicy) -> tuple[PolicyUse, ...]:
+    """판정 경로에서 정책 값이 **쓰이는 자리** 전부 — AST 와 정책 객체에서 생성한다."""
+    keys = policy_file_keys()
+    leaf_keys = _leaf_keys(policy, keys)
+    providers = _providers(leaf_keys)
+    groups = _group_classes(policy)
+    top = type(policy).__name__
+    found: set[PolicyUse] = set()
+    for path in _VERDICT_PATH_MODULES:
+        found |= _scan_module(path, leaf_keys, providers, groups, top)
+    return tuple(sorted(found, key=lambda use: (use.key, use.site, use.consumer)))

@@ -56,8 +56,9 @@ from ml_engine.app.backtest_job import (
     run_backtest_job,
 )
 from ml_engine.evaluation.backtest.exclusions import admit_rows
-from ml_engine.evaluation.backtest.fit import check_institutional_fit
+from ml_engine.evaluation.backtest.fit import _reference_sample, check_institutional_fit
 from ml_engine.evaluation.backtest.mcnemar import DiscordantCounts
+from ml_engine.evaluation.backtest.metrics import NoticeScore, StrategyScores
 from ml_engine.evaluation.backtest.observations import BusinessCategory, LoadedSnapshot
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
@@ -77,6 +78,8 @@ from ml_engine.evaluation.backtest.strategies import (
 from ml_engine.evaluation.backtest.verdict import (
     StrategyNotEvaluable,
     WindowOutcome,
+    evaluate_window,
+    passes_window,
     strategy_verdict,
 )
 from ml_engine.evaluation.policy import PolicyRejected
@@ -92,6 +95,8 @@ from tests.evaluation._backtest_fixture import (
 from tests.evaluation._backtest_support import (
     PlannedBidStrategy,
     manifest_bytes,
+    policy_file_keys,
+    policy_use_census,
     rows_bytes,
     sample_list_bytes,
 )
@@ -182,6 +187,21 @@ def _document_view(payload_bytes: bytes, echoed: frozenset[str]) -> object:
             if key not in _REPRODUCIBILITY_ECHO_KEYS
         }
     return _strip_echo(payload, echoed)
+
+
+def _outcome_view(payload_bytes: bytes) -> object:
+    """**결말 부류만** 남긴 투영 — 계약 D-6G2a-2 ⓐ 의 문면 그대로
+    (`Passed | Failed | NotEvaluable`)와 통과 여부. 「못 쟀다」의 **사유는 담지 않는다**.
+
+    부류 ⓐ 는 이 투영으로 재고(계약 문면), 사유 축은 `_decision_view` 가 담는다 — 사유만
+    옮겨가는 값은 ⓐ 가 아니라 ⓑ 이고, 그 사유 이동은 전용 단언이 따로 잠근다(r1 cr M-5)."""
+    payload = json.loads(payload_bytes)
+    if "strategies" not in payload:
+        return ("STOPPED", payload.get("stopped"))
+    return [
+        (item["strategy"], item["outcome"], (item.get("pooled") or {}).get("passed"))
+        for item in payload["strategies"]
+    ]
 
 
 def _decision_view(payload_bytes: bytes) -> object:
@@ -639,6 +659,14 @@ class _Harness:
         values.update(changes)
         return values
 
+    def policy(self, name: str, slug: str, **changes: str) -> StrategyBacktestPolicy:
+        """그 판의 override 위에 `changes` 를 얹은 정책 — 자리별 직접 호출이 쓴다."""
+        loaded = load_strategy_backtest_policy(
+            _write_policy(self.directory / slug, self.values(name, **changes))
+        )
+        assert isinstance(loaded, StrategyBacktestPolicy), (slug, loaded)
+        return loaded
+
     def verdict(self, name: str, **changes: str) -> bytes:
         signature = json.dumps(changes, sort_keys=True)
         if (name, signature) in self.verdicts:
@@ -766,6 +794,479 @@ def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
         assert reason.strip(), f"{key} 의 사유가 비어 있다"
 
 
+# ── 쓰임 명단의 덮개 등재 (D-6G2a-12) ────────────────────────────────────────
+# 명단은 **생성**된다(`_backtest_support.policy_use_census`). 아래 표는 그 삼중마다
+# 「무엇이 이 자리를 덮는가」를 선언하는 자리이고, 등식 test 가 생성 결과와 맞댄다 —
+# 새 쓰임이 생기면 덮개 등재가 없어 RED 다. r1 의 막는 결함이 바로 **손으로 쓴 명단**이었다.
+#
+# 덮개 어휘(이 다섯 뿐이고 test 가 어휘를 검사한다):
+#   `PROBE:<이름>` — 그 자리를 **직접** 겨눈 단언이 있다(함수 직접 호출이거나 그 자리만
+#                   묶이는 판).
+#   `CLASS`       — 그 키의 부류 단언(ⓐ/ⓑ)이 그 자리를 덮는다. **키마다 한 자리까지만**
+#                   허용한다 — 두 자리를 부류 단언 하나로 덮으면 한 자리의 상수가 다른
+#                   자리의 움직임에 가린다(r1 의 결함 그 자체).
+#   `PASS:<이름>` — 정책 값을 **그대로 넘기는** 자리(helper 의 `return`·표 조회·술어 위임).
+#                   판정은 그 아래에서 나고, 그 아래 자리가 따로 등재돼 있다.
+#   `ECHO`        — 판정문에 **공시만** 한다. 비교 투영이 지우고, 산출물에 남는 것은 전용
+#                   test 가 값까지 단언한다.
+_USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
+    ("effective.construction", "rules.effective_date_for", "return"): "CLASS",
+    ("effective.goods", "rules.effective_date_for", "return"): "CLASS",
+    ("effective.service", "rules.effective_date_for", "return"): "CLASS",
+    ("exclusion.first_notice_ordinal", "rules._is_rebid", "compare"): "CLASS",
+    ("fit.alpha", "fit._fit_rejection", "compare"): "CLASS",
+    ("fit.max_bin_ratio_deviation", "fit._fit_rejection", "compare"): "CLASS",
+    ("fit.min_sample_count", "fit.check_institutional_fit", "compare"): "CLASS",
+    (
+        "floor.pure_construction_cost_ratio",
+        "rules.pure_cost_floor",
+        "pure_construction_floor(ratio)",
+    ): "PROBE:construction-pad",
+    (
+        "floor.pure_construction_cost_ratio",
+        "strategies._simulated_floors",
+        "assign",
+    ): "PROBE:s4-bid",
+    ("floor.rate_band_high", "policy_values.contains", "compare"): "CLASS",
+    (
+        "floor.rate_band_high",
+        "rules._is_floor_rate_unusable",
+        "contains",
+    ): "PASS:contains",
+    ("floor.rate_band_low", "policy_values.contains", "compare"): "CLASS",
+    (
+        "floor.rate_band_low",
+        "rules._is_floor_rate_unusable",
+        "contains",
+    ): "PASS:contains",
+    (
+        "institution.draw_count",
+        "fit._reference_sample",
+        "sample_assessment_ratios(draw_count)",
+    ): "PROBE:fit-direct",
+    (
+        "institution.draw_count",
+        "rules._is_reserve_draw_incomplete",
+        "compare",
+    ): "PROBE:admit-rows",
+    (
+        "institution.draw_count",
+        "strategies._win_probabilities",
+        "sample_assessment_ratios(draw_count)",
+    ): "PROBE:s4-bid",
+    (
+        "institution.reserve_price_count",
+        "fit._reference_sample",
+        "sample_assessment_ratios(reserve_price_count)",
+    ): "PROBE:fit-direct",
+    (
+        "institution.reserve_price_count",
+        "fit.check_institutional_fit",
+        "bin_proportions(bin_count)",
+    ): "PROBE:fit-bin-count",
+    (
+        "institution.reserve_price_count",
+        "rules._is_reserve_draw_incomplete",
+        "compare",
+    ): "PROBE:admit-rows",
+    (
+        "institution.reserve_price_count",
+        "strategies._win_probabilities",
+        "sample_assessment_ratios(reserve_price_count)",
+    ): "PROBE:s4-bid",
+    (
+        "sampling.calls_per_notice_construction",
+        "policy_values.calls_per_notice_for",
+        "dict",
+    ): "PASS:calls_per_notice_for",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "calls_per_notice_for",
+    ): "CLASS",
+    (
+        "sampling.calls_per_notice_goods",
+        "policy_values.calls_per_notice_for",
+        "dict",
+    ): "PASS:calls_per_notice_for",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "calls_per_notice_for",
+    ): "CLASS",
+    (
+        "sampling.calls_per_notice_service",
+        "policy_values.calls_per_notice_for",
+        "dict",
+    ): "PASS:calls_per_notice_for",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "calls_per_notice_for",
+    ): "CLASS",
+    (
+        "sampling.headroom_ratio",
+        "policy_values.minimum_required_sample",
+        "ceil",
+    ): "PASS:minimum_required_sample",
+    (
+        "sampling.headroom_ratio",
+        "run._sampling_record",
+        "minimum_required_sample",
+    ): "CLASS",
+    (
+        "sampling.list_call_count",
+        "run._sampling_record",
+        "SamplingRecord(list_call_count)",
+    ): "ECHO",
+    ("sampling.list_call_count", "run._sampling_record", "assign"): "CLASS",
+    (
+        "sampling.max_total_calls",
+        "run._sampling_record",
+        "SamplingRecord(max_total_calls)",
+    ): "ECHO",
+    ("sampling.max_total_calls", "run._sampling_record", "compare"): "CLASS",
+    ("sensitivity.wide_reserve_half_width", "run._variant_record", "compare"): "CLASS",
+    ("stability_seeds.0", "run._assemble_verdict", "BacktestVerdict(seeds)"): "ECHO",
+    (
+        "stability_seeds.0",
+        "run.run_strategy_backtest",
+        "check_institutional_fit(seed)",
+    ): "PROBE:fit-seed",
+    ("stability_seeds.0", "run.run_strategy_backtest", "listcomp"): "CLASS",
+    ("stability_seeds.1", "run._assemble_verdict", "BacktestVerdict(seeds)"): "ECHO",
+    ("stability_seeds.1", "run.run_strategy_backtest", "listcomp"): "CLASS",
+    ("stability_seeds.2", "run._assemble_verdict", "BacktestVerdict(seeds)"): "ECHO",
+    ("stability_seeds.2", "run.run_strategy_backtest", "listcomp"): "CLASS",
+    ("stability_seeds.3", "run._assemble_verdict", "BacktestVerdict(seeds)"): "ECHO",
+    ("stability_seeds.3", "run.run_strategy_backtest", "listcomp"): "CLASS",
+    ("stability_seeds.4", "run._assemble_verdict", "BacktestVerdict(seeds)"): "ECHO",
+    ("stability_seeds.4", "run.run_strategy_backtest", "listcomp"): "CLASS",
+    ("strategy.s1_offset_bp", "strategies.bid", "rate_from_basis_points"): "CLASS",
+    ("strategy.s4_grid_size", "strategies._candidate_rates", "linspace"): "CLASS",
+    (
+        "strategy.s4_grid_span_bp",
+        "strategies._candidate_rates",
+        "rate_from_basis_points",
+    ): "CLASS",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "choice(size)",
+    ): "CLASS",
+    ("strategy.s4_iteration_count", "strategies._win_probabilities", "full"): "CLASS",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "sample_assessment_ratios(count)",
+    ): "CLASS",
+    ("strategy.s4_min_competitor_samples", "strategies.bid", "compare"): "CLASS",
+    ("verdict.alpha", "policy_values.alpha_for", "return"): "PASS:alpha_for",
+    ("verdict.alpha", "policy_values.primary_alpha", "return"): "PASS:primary_alpha",
+    ("verdict.alpha", "verdict.evaluate_window", "alpha_for"): "CLASS",
+    ("verdict.alpha", "verdict.passes_window", "alpha_for"): "PROBE:passes_window",
+    (
+        "verdict.ineligibility_noninferiority_margin",
+        "verdict.strategy_verdict",
+        "compare",
+    ): "CLASS",
+    (
+        "verdict.min_relative_improvement",
+        "verdict.evaluate_window",
+        "alternative_success_probability(relative_improvement)",
+    ): "PROBE:evaluate_window",
+    (
+        "verdict.min_relative_improvement",
+        "verdict.passes_window",
+        "compare",
+    ): "PROBE:passes_window",
+    ("verdict.min_window_count", "run._plan_or_stop", "compare"): "CLASS",
+    (
+        "verdict.min_window_count",
+        "run._sampling_record",
+        "minimum_required_sample(window_count)",
+    ): "PROBE:sample-floor-window-count",
+    (
+        "verdict.min_window_count",
+        "verdict._not_evaluable",
+        "compare",
+    ): "PROBE:strategy-verdict-direct",
+    (
+        "verdict.min_window_rows",
+        "run._sampling_record",
+        "minimum_required_sample(rows_per_window)",
+    ): "PROBE:sample-floor-rows",
+    (
+        "verdict.min_window_rows",
+        "windows.plan_backtest_windows",
+        "compare",
+    ): "PROBE:window-rows",
+    (
+        "verdict.primary_hypothesis_count",
+        "backtest_job._load_policies",
+        "JobFailed",
+    ): "ECHO",
+    (
+        "verdict.primary_hypothesis_count",
+        "backtest_job._load_policies",
+        "compare",
+    ): "PROBE:job-direct",
+    (
+        "verdict.primary_hypothesis_count",
+        "policy_values.alpha_for",
+        "return",
+    ): "PASS:alpha_for",
+    (
+        "verdict.primary_hypothesis_count",
+        "policy_values.primary_alpha",
+        "return",
+    ): "PASS:primary_alpha",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.evaluate_window",
+        "alpha_for",
+    ): "CLASS",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.passes_window",
+        "alpha_for",
+    ): "PROBE:passes_window",
+    (
+        "verdict.target_power",
+        "verdict.evaluate_window",
+        "required_discordant_pairs(target_power)",
+    ): "CLASS",
+    ("version", "run._assemble_verdict", "BacktestVerdict(policy_version)"): "ECHO",
+    ("window.days", "windows._calendar_windows", "timedelta(days)"): "CLASS",
+    (
+        "window.embargo_days",
+        "windows.plan_backtest_windows",
+        "timedelta(days)",
+    ): "CLASS",
+}
+
+_COVERAGE_KINDS: Final[tuple[str, ...]] = ("PROBE:", "CLASS", "PASS:", "ECHO")
+
+
+def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
+    """D-6G2a-12 — 쓰임 명단은 **생성**이고, 자리마다 덮개가 있다(등식).
+
+    r1 의 막는 결함: 명단을 손으로 적고 「읽는 자리」를 셌더니, 읽은 값이 흘러가 쓰이는
+    자리가 가려졌다. `alpha_for` 가 한 번 읽은 유의수준은 검정력 계산과 판정식 **두
+    곳에서** 쓰이고, 창 최소 수는 창 계획·판정·**최소 표본식** 세 곳에서 쓰인다. 한 곳만
+    상수로 바꾼 변이가 전체 suite 를 지났다.
+
+    이제 명단은 출하 코드의 AST 와 로드된 정책 객체에서만 나온다. 새 쓰임이 생기면 삼중이
+    늘고 덮개 등재가 없어 여기서 RED 다 — 목록이 낡지 않는다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    census = policy_use_census(policy)
+    generated = {(use.key, use.site, use.consumer) for use in census}
+    assert generated == set(_USE_COVERAGE), (
+        f"덮개 등재가 없는 쓰임: {sorted(generated - set(_USE_COVERAGE))} · "
+        f"출하 코드에 없는 등재: {sorted(set(_USE_COVERAGE) - generated)}"
+    )
+    keys = set(policy_file_keys())
+    assert {use.key for use in census} == keys, (
+        f"쓰임이 하나도 없는 정책 값: {sorted(keys - {use.key for use in census})}"
+    )
+    for triple, coverage in _USE_COVERAGE.items():
+        assert any(coverage.startswith(kind) for kind in _COVERAGE_KINDS), (
+            f"{triple} 의 덮개 어휘가 낯설다: {coverage}"
+        )
+    # **키마다 부류 단언으로 덮는 자리는 하나까지.** 둘을 부류 단언 하나로 덮으면 한 자리의
+    # 상수가 다른 자리의 움직임에 가린다 — r1 의 결함을 구조로 막는 자리다.
+    class_sites: dict[str, set[str]] = {}
+    for (key, site, _), coverage in _USE_COVERAGE.items():
+        if coverage == "CLASS":
+            class_sites.setdefault(key, set()).add(site)
+    crowded = {
+        key: sorted(sites) for key, sites in class_sites.items() if len(sites) > 1
+    }
+    assert not crowded, (
+        "부류 단언 하나로 두 자리를 덮으려 한다 — 자리마다 전용 probe 나 변이가 필요하다: "
+        f"{crowded}"
+    )
+
+
+# ── 자리별 probe (D-6G2a-12) ────────────────────────────────────────────────
+# 아래 표는 덮개 등재의 `PROBE:<이름>` 이 **실제로 존재하는 단언**임을 구조로 잠근다 —
+# 이름만 적고 단언을 안 쓰면 `test_every_probe_named_in_the_coverage_table_exists` 가 RED 다.
+_PROBE_TESTS: Final[dict[str, str]] = {
+    "PROBE:passes_window": "test_passes_window_follows_the_policy_at_its_own_site",
+    "PROBE:evaluate_window": "test_evaluate_window_follows_the_improvement_at_the_power_site",
+    "PROBE:fit-seed": "test_the_fit_seed_site_follows_the_first_stability_seed",
+    "PROBE:sample-floor-window-count": "test_min_window_count_is_read_at_three_sites",
+    "PROBE:sample-floor-rows": "test_min_window_rows_is_read_at_both_sites",
+    "PROBE:window-rows": "test_min_window_rows_is_read_at_both_sites",
+    "PROBE:admit-rows": "test_institution_constants_are_read_at_every_site",
+    "PROBE:fit-direct": "test_institution_constants_are_read_at_every_site",
+    "PROBE:fit-bin-count": "test_the_fit_bin_count_site_follows_the_reserve_price_count",
+    "PROBE:s4-bid": "test_institution_constants_are_read_at_every_site",
+    "PROBE:construction-pad": "test_pure_construction_cost_ratio_is_read_at_both_sites",
+    "PROBE:strategy-verdict-direct": "test_min_window_count_is_read_at_three_sites",
+    "PROBE:job-direct": "test_primary_hypothesis_count_is_read_at_both_sites",
+}
+
+
+def test_every_probe_named_in_the_coverage_table_exists() -> None:
+    """덮개 등재의 `PROBE:` 이름마다 **그 단언이 이 모듈에 있다**.
+
+    이름만 적고 단언을 안 쓰면 명단 등식이 초록인데 자리는 비어 있다 — 그 조합이 r1 의
+    결함 모양이다. 여기서 이름과 함수를 맞댄다."""
+    named = {
+        coverage for coverage in _USE_COVERAGE.values() if coverage.startswith("PROBE:")
+    }
+    assert named == set(_PROBE_TESTS), (
+        f"등재됐는데 구현 표에 없는 probe: {sorted(named - set(_PROBE_TESTS))} · "
+        f"구현 표에만 있는 probe: {sorted(set(_PROBE_TESTS) - named)}"
+    )
+    for probe, function_name in _PROBE_TESTS.items():
+        assert function_name in globals(), (
+            f"{probe} 가 가리키는 {function_name} 가 없다"
+        )
+        assert callable(globals()[function_name]), function_name
+
+
+def test_passes_window_follows_the_policy_at_its_own_site(harness: _Harness) -> None:
+    """D-6G2a-12 — 판정식(`passes_window`)은 **그 자리에서** 정책을 따른다.
+
+    `alpha_for(...)` 가 한 번 낸 유의수준은 **두 곳에서** 쓰인다: 필요 표본 수 계산과 이
+    판정식이다. 판으로는 검정력 쪽만 보인다 — 검정력이 서면 p 가 유의수준보다 훨씬 아래로
+    내려가 판정식 쪽 유의수준이 결말을 못 바꾼다(구조적 사실, evidence 「판을 지을 수 없었던
+    방향」). 그래서 판정식을 **직접** 부르고 p 를 두 유의수준 **사이**에 둔다.
+
+    이 자리가 비어 있던 것이 r1 의 막는 결함이다: 분모만 상수로 바꾼 변이(E1 r5 형)와
+    유의수준만 상수로 바꾼 변이(V1n)가 전체 suite 를 지났다."""
+    base = harness.policy("pass", "pw-base")
+    assert base.verdict.alpha == 0.05, base.verdict.alpha
+    assert base.verdict.primary_hypothesis_count == 3, base.verdict
+
+    # p = 0.03 은 보조 유의수준(0.05) 아래이고 주 유의수준(0.05/3) 위다.
+    assert passes_window(0.25, 0.03, base, primary=False) is True
+    assert passes_window(0.25, 0.03, base, primary=True) is False
+
+    # 분모를 1 로 내리면 주 유의수준이 0.05 가 되어 주에서도 선다 — **분모가 이 자리에서
+    # 읽히지 않으면** 여전히 거짓이다(E1 r5 형을 잡는 단언).
+    loosened = harness.policy(
+        "pass", "pw-loose", **{"verdict.primary_hypothesis_count": "1"}
+    )
+    assert passes_window(0.25, 0.03, loosened, primary=True) is True
+
+    # 유의수준을 0.02 로 내리면 보조에서도 떨어진다 — **유의수준이 이 자리에서 읽히지
+    # 않으면** 여전히 참이다(V1n 을 잡는 단언).
+    tightened = harness.policy("pass", "pw-tight", **{"verdict.alpha": "0.02"})
+    assert passes_window(0.25, 0.03, tightened, primary=False) is False
+
+    # 상대 개선 하한도 같은 자리에서 비교된다.
+    raised = harness.policy(
+        "pass", "pw-gain", **{"verdict.min_relative_improvement": "0.30"}
+    )
+    assert passes_window(0.25, 0.03, raised, primary=False) is False
+
+
+def _window_scores(name: str, wins: tuple[bool, ...]) -> StrategyScores:
+    """창 하나의 채점 묶음 — 승패만 지정한다(적격·bp 는 이 단언에 들어오지 않는다)."""
+    return StrategyScores(
+        name=name,
+        scores=tuple(
+            NoticeScore(f"n-{index}", True, 0.0, won, None)
+            for index, won in enumerate(wins)
+        ),
+    )
+
+
+def test_evaluate_window_follows_the_improvement_at_the_power_site(
+    harness: _Harness,
+) -> None:
+    """D-6G2a-12 — 상대 개선 하한은 **두 자리**에서 쓰인다.
+
+    자리 ① 판정식의 비교(위 test) 자리 ② **필요 표본 수** 계산 — 사전 등록한 효과 크기가
+    대립가설의 성공 확률을 정하므로, 하한을 올리면 필요 표본 수가 줄어든다. 같은 창 점수로
+    두 정책을 재면 그 자리가 정책을 따르는지 보인다."""
+    baseline = _window_scores("S0", (True,) * 30 + (False,) * 10)
+    strategy = _window_scores("C", (True,) * 36 + (False,) * 4)
+    measured = {
+        value: evaluate_window(
+            window_index=0,
+            baseline=baseline,
+            strategy=strategy,
+            policy=harness.policy(
+                "pass", f"ew-{value}", **{"verdict.min_relative_improvement": value}
+            ),
+            primary=False,
+        ).required_discordant_pairs
+        for value in ("0.05", "0.40")
+    }
+    assert None not in measured.values(), measured
+    assert measured["0.05"] != measured["0.40"], (
+        f"자리 ② — 필요 표본 수가 상대 개선 하한을 따르지 않는다: {measured}"
+    )
+
+
+def test_the_fit_seed_site_follows_the_first_stability_seed(harness: _Harness) -> None:
+    """D-6G2a-12 — 적합도의 seed 자리는 `stability_seeds.0` 을 따른다.
+
+    그 자리와 seed 순회가 **같은 함수**에 있어 판으로는 묶여 보인다. 가르는 방법은 seed 에
+    **민감하지 않은** 판이다: 계획 전략은 seed 를 보지 않으므로 순회 쪽은 아무것도 바꾸지
+    못하고, 첫 seed 를 흔들면 **적합도 칸만** 움직인다.
+
+    대조도 함께 둔다 — `stability_seeds.1` 은 적합도에 닿지 않으므로 적합도 칸이 그대로다.
+    그래서 「첫 seed 가 적합도에 간다」가 선언이 아니라 측정이다."""
+
+    def fit_fields(**changes: str) -> tuple[float, float]:
+        payload = json.loads(harness.verdict("pass", **changes))
+        fit = payload["distribution_fit"]
+        return (fit["ks_statistic"], fit["max_bin_deviation"])
+
+    base = fit_fields()
+    moved_first = fit_fields(**{"stability_seeds.0": "999101"})
+    moved_second = fit_fields(**{"stability_seeds.1": "999102"})
+    assert moved_first != base, (
+        f"적합도 seed 자리가 첫 seed 를 따르지 않는다: {base} == {moved_first}"
+    )
+    assert moved_second == base, (
+        f"둘째 seed 가 적합도에 닿는다 — 자리 등재가 틀렸다: {base} != {moved_second}"
+    )
+    assert _outcome_view(harness.verdict("pass")) == _outcome_view(
+        harness.verdict("pass", **{"stability_seeds.0": "999101"})
+    ), "이 판은 seed 비민감이어야 한다(결말이 움직이면 자리가 섞인다)"
+
+
+def test_the_fit_bin_count_site_follows_the_reserve_price_count(
+    harness: _Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D-6G2a-14 — 적합도의 **구간 수** 자리가 예비가격 수를 따른다.
+
+    r0 에서 「이 층에서 가를 수 없다」로 등재했다. 그 논증은 **정책 입력만 쓸 때** 참이다:
+    공시 스칼라 둘이 기준 표본과 구간 수에 동시에 의존하고 정책 값 하나가 둘을 정한다.
+    verifier r1 M-2 가 test 쪽 seam 을 지적했다 — **기준 표본을 고정**하면 구간 수만 남는다.
+    그러면 정직한 코드에서 구간 편차가 움직이고, 구간 수를 상수로 박은 변이에서는 그대로다.
+    `OPEN-6G2A-FIT-BIN-COUNT-SITE` 는 이 단언으로 닫힌다."""
+    board = harness.board("mixed")
+    shipped = harness.policy("mixed", "bins-base")
+    admission = admit_rows(board.snapshot.rows, shipped)
+    assert admission.admitted, admission.excluded
+    pinned = _reference_sample(shipped, shipped.stability_seeds[0])
+    monkeypatch.setattr(
+        "ml_engine.evaluation.backtest.fit._reference_sample",
+        lambda policy, seed: pinned,
+    )
+    measured = {
+        value: check_institutional_fit(
+            admission.admitted,
+            harness.policy(
+                "mixed", f"bins-{value}", **{"institution.reserve_price_count": value}
+            ),
+            seed=shipped.stability_seeds[0],
+        ).max_bin_deviation
+        for value in ("15", "16")
+    }
+    assert measured["15"] != measured["16"], (
+        f"구간 수 자리가 정책을 따르지 않는다(기준 표본 고정): {measured}"
+    )
+
+
 @pytest.mark.parametrize("key", sorted(_JUDGEMENT_INPUTS))
 def test_judgement_inputs_flip_the_decision(key: str, harness: _Harness) -> None:
     """ⓐ — 판정 입력은 **결말**을 바꾼다(D-6G2a-3).
@@ -840,15 +1341,26 @@ def test_the_pass_branch_actually_runs(harness: _Harness) -> None:
         assert pooled["passed"] is True, pooled
 
 
-def test_min_window_count_is_read_at_both_sites(harness: _Harness) -> None:
-    """D-6G2a-6 — `verdict.min_window_count` 는 **두 자리**에서 읽힌다.
+def test_min_window_count_is_read_at_three_sites(harness: _Harness) -> None:
+    """D-6G2a-6·12 — `verdict.min_window_count` 는 **세 자리**에서 쓰인다.
 
     자리 ① 창 계획 뒤의 멈춤 판정(`run`) — 선택된 창이 최소 수에 못 미치면 판정 대신 멈춤.
-    자리 ② 「못 쟀다」의 창 부족 갈래(`verdict`) — 그 자리는 ① 이 먼저 멈추므로 전체 실행으로
-    도달할 수 없다. 그래서 판정 함수를 **직접** 불러 잰다: 한 자리만 상수로 바뀌어도
-    다른 자리가 움직여 「바뀌었다」가 되는 것을 막는다."""
+    자리 ② 「못 쟀다」의 창 부족 갈래(`verdict`) — ① 이 먼저 멈추므로 전체 실행으로 도달할 수
+    없고, 판정 함수를 **직접** 불러 잰다.
+    자리 ③ **최소 필요 표본 결정식**(`run` 의 표본 기록) — r0 의 손 등재가 빠뜨린 자리다
+    (code-review r1 H-1). 창 밖 행 수로 가른 판에서 그 자리만 묶인다: 창당 하한 50 · 창 3 ·
+    업무 1 · 여유 0.20 이면 최소 필요 표본이 180 이고 행이 183 이라 선다. 창 최소 수를 4 로
+    올리면 최소가 240 > 183 이 되어 **표본 쪽** 멈춤이 먼저 난다 — 그 자리를 상수로 박으면
+    최소가 180 에 묶여 표본 멈춤이 나지 않고 창 쪽 멈춤으로 떨어진다."""
     stopped = json.loads(harness.verdict("pass", **{"verdict.min_window_count": "4"}))
     assert stopped.get("stopped") == "INSUFFICIENT_WINDOWS", stopped.get("stopped")
+
+    by_sample = json.loads(
+        harness.verdict("sample-floor", **{"verdict.min_window_count": "4"})
+    )
+    assert by_sample.get("stopped") == "SAMPLE_SIZE_BELOW_MINIMUM", by_sample.get(
+        "stopped"
+    )
 
     window = _window_outcome()
     values = harness.values("pass")
@@ -1073,13 +1585,14 @@ def test_institution_constants_are_read_at_every_site(
         **{key: str(int(harness.values("mixed")[key]) + 1)},
     )
 
-    # 자리 ① — 전체 실행에서 전량 제외(부류 ⓐ 단언이 이미 잠근다; 여기서는 자리 확인).
-    excluded = _decision_view(
-        harness.verdict(
-            "shipped", **{key: str(int(harness.values("shipped")[key]) + 1)}
-        )
+    # 자리 ① — 제외 ⑮. **전체 실행이 아니라 제외 단계를 직접 부른다**: 전체 실행은 ①②③ 이
+    # 모두 같은 값을 읽어 움직임의 출처를 가리지 못한다(code-review r1 H-2).
+    first = admit_rows(board.snapshot.rows, shipped)
+    second = admit_rows(board.snapshot.rows, nudged)
+    assert len(first.admitted) != len(second.admitted), (
+        f"자리 ① — 제외 ⑮ 가 {key} 를 따르지 않는다: "
+        f"{len(first.admitted)} == {len(second.admitted)}"
     )
-    assert excluded != _decision_view(harness.verdict("shipped")), excluded
 
     # 자리 ② — 적합도. 승인 집합을 고정해 두고 정책만 바꾼다.
     admission = admit_rows(board.snapshot.rows, shipped)
