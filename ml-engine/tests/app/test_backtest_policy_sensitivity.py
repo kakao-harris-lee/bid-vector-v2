@@ -149,27 +149,60 @@ def _echo_forms(raw: str) -> tuple[object, ...]:
     return tuple(forms)
 
 
+_PUBLICATION_FIELDS: Final[dict[str, frozenset[str]]] = {}
+"""정책 키 -> 그 값이 판정문에 **공시되는 칸 이름**들. 덮개 등재의 `ECHO` 소비자에서
+**도출**한다(손으로 적은 목록이 아니고, 등재는 생성된 쓰임 명단과 등식으로 묶여 있다).
+
+메아리를 **값**으로 지우면 무관한 칸이 함께 사라진다. 메아리를 **경로**로 지우면 좁아지지만
+여전히 열린 구멍이 남는다: 어떤 칸이 우연히 옛 정책 값에서 새 정책 값으로 **같이** 움직이면
+그 칸도 지워진다(verifier r1 이 합동 불일치 쌍 1↔2 로 그 경우를 지었다). 그래서 **칸 이름**까지
+본다 — 그 키가 실제로 공시되는 칸이 아니면 값이 일치해도 지우지 않는다."""
+
+
+def _derive_publication_fields() -> None:
+    for (key, _, consumer), coverage in _USE_COVERAGE.items():
+        if coverage != "ECHO":
+            continue
+        start = consumer.find("(")
+        if start < 0 or not consumer.endswith(")"):
+            continue
+        field_name = consumer[start + 1 : -1]
+        _PUBLICATION_FIELDS[key] = _PUBLICATION_FIELDS.get(
+            key, frozenset()
+        ) | frozenset({field_name})
+
+
 def _is_echo_leaf(
-    base: object, moved: object, before: frozenset[str], after: frozenset[str]
+    base: object,
+    moved: object,
+    before: frozenset[str],
+    after: frozenset[str],
+    *,
+    published: bool,
 ) -> bool:
-    """이 잎이 **흔든 값의 메아리**인가 — 같은 자리에서 값이 정책 값을 따라갔는가."""
-    return repr(base) in before and repr(moved) in after
+    """이 잎이 **흔든 값의 메아리**인가 — 공시되는 칸이고 값이 정책 값을 따라갔는가."""
+    return published and repr(base) in before and repr(moved) in after
 
 
 def _without_echo_paths(
-    base: object, moved: object, before: frozenset[str], after: frozenset[str]
+    base: object,
+    moved: object,
+    before: frozenset[str],
+    after: frozenset[str],
+    fields: frozenset[str],
+    *,
+    published: bool = False,
 ) -> tuple[object, object]:
-    """두 판정문에서 **메아리 경로만** 지운 쌍.
+    """두 판정문에서 **그 키가 공시되는 칸의 메아리만** 지운 쌍.
 
-    6G 에서 물려받은 `_strip_echo` 는 흔든 값과 `repr` 이 같은 **모든 잎**을 지웠다 — 이름이
-    아니라 값이 기준이라, 정책 값이 작은 정수면 판정문의 무관한 칸이 함께 사라졌다
-    (`stability_seeds.1` 을 1 -> 2 로 흔들면 승률 `1.0` · p 값 `1.0` 같은 **판정의 핵심
-    칸**까지 빠진다). 오차 방향이 「움직이지 않았다」 쪽이어서 ⓒ 단언이 공허해질 수 있고,
-    불변 목록에 삭제가 만든 항목이 섞일 수 있다(code-review r1 M-4 · verifier r1 M-5).
+    6G 에서 물려받은 투영은 흔든 값과 `repr` 이 같은 **모든 잎**을 지웠다 — 이름이 아니라
+    값이 기준이라, 정책 값이 작은 정수면 판정문의 무관한 칸이 함께 사라졌다(승률 `1.0` ·
+    p 값 `1.0` 같은 판정의 핵심 칸까지). 오차 방향이 「움직이지 않았다」 쪽이어서 ⓒ 단언이
+    공허해질 수 있다(code-review r1 M-4 · verifier r1 M-5).
 
-    그래서 **경로**로 지운다: 같은 자리에서 흔들기 전 값이 정책의 옛 값이고 흔든 뒤 값이
-    정책의 새 값인 잎만 메아리다. 그 둘 중 하나라도 어긋나면 그 칸은 **그 값이 움직인 몫**이고
-    투영에 남는다."""
+    그래서 두 겹으로 좁힌다: ① **같은 자리**에서 값이 정책의 옛 값 -> 새 값으로 움직였고
+    ② 그 자리가 그 키가 **실제로 공시되는 칸**(`fields`)이다. ② 가 없으면 우연히 같은 수로
+    움직인 칸이 지워진다 — verifier r1 이 합동 불일치 쌍 1↔2 로 그 경우를 지었다."""
     if isinstance(base, dict) and isinstance(moved, dict):
         pruned_base: dict[str, object] = {}
         pruned_moved: dict[str, object] = {}
@@ -180,9 +213,12 @@ def _without_echo_paths(
                 if key in moved:
                     pruned_moved[key] = moved[key]
                 continue
-            if _is_echo_leaf(base[key], moved[key], before, after):
+            in_field = key in fields
+            if _is_echo_leaf(base[key], moved[key], before, after, published=in_field):
                 continue
-            left, right = _without_echo_paths(base[key], moved[key], before, after)
+            left, right = _without_echo_paths(
+                base[key], moved[key], before, after, fields, published=in_field
+            )
             pruned_base[key] = left
             pruned_moved[key] = right
         return pruned_base, pruned_moved
@@ -190,9 +226,11 @@ def _without_echo_paths(
         left_items: list[object] = []
         right_items: list[object] = []
         for first, second in zip(base, moved, strict=True):
-            if _is_echo_leaf(first, second, before, after):
+            if _is_echo_leaf(first, second, before, after, published=published):
                 continue
-            left, right = _without_echo_paths(first, second, before, after)
+            left, right = _without_echo_paths(
+                first, second, before, after, fields, published=published
+            )
             left_items.append(left)
             right_items.append(right)
         return left_items, right_items
@@ -217,7 +255,7 @@ def _drop_reproducibility_echo(payload_bytes: bytes) -> object:
 
 
 def _document_pair(
-    base_bytes: bytes, moved_bytes: bytes, before: str, after: str
+    base_bytes: bytes, moved_bytes: bytes, before: str, after: str, key: str
 ) -> tuple[object, object]:
     """**판정문 투영 쌍** — 재현성 메아리 두 칸을 빼고, 흔든 값의 **메아리 경로**를 지운다.
 
@@ -227,6 +265,7 @@ def _document_pair(
         _drop_reproducibility_echo(moved_bytes),
         frozenset(repr(form) for form in _echo_forms(before)),
         frozenset(repr(form) for form in _echo_forms(after)),
+        _PUBLICATION_FIELDS.get(key, frozenset()),
     )
 
 
@@ -1255,6 +1294,8 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
 
 _COVERAGE_KINDS: Final[tuple[str, ...]] = ("PROBE:", "CLASS", "PASS:", "ECHO")
 
+_derive_publication_fields()
+
 
 def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
     """D-6G2a-12 — 쓰임 명단은 **생성**이고, 자리마다 덮개가 있다(등식).
@@ -1334,6 +1375,69 @@ def test_every_probe_named_in_the_coverage_table_exists() -> None:
             f"{probe} 가 가리키는 {function_name} 가 없다"
         )
         assert callable(globals()[function_name]), function_name
+
+
+_VERIFIER_DECISION_USE_COUNTS: Final[dict[str, int]] = {
+    # verifier r1 이 독립으로 센 **판정 쓰임** 수(공시와 helper 통과 자리 제외). 이 레인의
+    # 생성 명단이 같은 수를 내는지 맞댄다 — 두 레인의 셈이 갈리면 한쪽 정의가 틀렸다.
+    "verdict.min_window_count": 3,
+    "verdict.min_relative_improvement": 2,
+    "verdict.alpha": 2,
+    "verdict.primary_hypothesis_count": 3,
+    "institution.reserve_price_count": 4,
+    "stability_seeds.0": 2,
+}
+
+
+def test_the_census_reproduces_the_independent_count() -> None:
+    """생성 명단이 **독립 레인의 셈**을 재현한다.
+
+    verifier r1 은 자기 AST 로 판정 쓰임을 세고 이 레인의 손 등재와 여섯 값에서 갈렸다.
+    생성으로 바꾼 뒤 그 여섯을 맞댄다 — 공시(`ECHO`)와 helper 통과(`PASS:`) 자리를 빼면
+    같은 수여야 한다. 다르면 어느 한쪽의 「쓰임」 정의가 틀렸다는 뜻이고, 그 사실이 수로
+    드러난다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    decision: dict[str, set[tuple[str, str]]] = {}
+    for use in policy_use_census(policy):
+        if _USE_COVERAGE[(use.key, use.site, use.consumer)].startswith(
+            ("ECHO", "PASS:")
+        ):
+            continue
+        decision.setdefault(use.key, set()).add((use.site, use.consumer))
+    measured = {
+        key: len(decision.get(key, set())) for key in _VERIFIER_DECISION_USE_COUNTS
+    }
+    assert measured == _VERIFIER_DECISION_USE_COUNTS, measured
+
+
+def test_the_projection_does_not_hide_a_coincidental_change() -> None:
+    """투영이 **우연히 같은 수로 움직인 칸**을 지우지 않는다(verifier r1 M-5 의 구성 사례).
+
+    메아리를 값으로 지우면 정책 값이 1 -> 2 로 움직일 때 판정문의 **아무** 1 -> 2 이동이 함께
+    사라진다 — 합동 불일치 쌍 같은 판정의 핵심 칸이 그렇다. 경로로 좁혀도 같은 자리에서
+    우연히 같이 움직이면 여전히 지워진다. 그래서 그 키가 **실제로 공시되는 칸**까지 본다.
+
+    양성 대조를 함께 둔다 — 진짜 메아리(공시되는 칸)는 지워져야 한다. 둘 중 하나만 성립하면
+    투영이 과하거나 모자라다."""
+    before, after = "1", "2"
+    base = json.dumps(
+        {"seeds": [1, 7], "strategies": [{"pooled": {"discordant_strategy_only": 1}}]}
+    ).encode("utf-8")
+    moved = json.dumps(
+        {"seeds": [2, 7], "strategies": [{"pooled": {"discordant_strategy_only": 2}}]}
+    ).encode("utf-8")
+    pruned_base, pruned_moved = _document_pair(
+        base, moved, before, after, "stability_seeds.0"
+    )
+    assert pruned_moved != pruned_base, (
+        "판정의 핵심 칸이 우연히 정책 값과 같이 움직였는데 투영이 지웠다 — 투영이 과하다: "
+        f"{pruned_base}"
+    )
+    assert "seeds" in _PUBLICATION_FIELDS["stability_seeds.0"], _PUBLICATION_FIELDS
+    assert pruned_base["seeds"] == [7], (
+        f"진짜 메아리(공시 칸)가 지워지지 않았다 — 투영이 모자라다: {pruned_base}"
+    )
 
 
 def test_passes_window_follows_the_policy_at_its_own_site(harness: _Harness) -> None:
@@ -1532,7 +1636,9 @@ def test_output_inputs_move_a_non_echo_field_without_flipping(
     assert _outcome_view(moved) == _outcome_view(baseline), (
         f"{key} 가 **결말 부류**를 바꿨다 — 산출 입력이 아니라 판정 입력이다(부류를 옮겨라)"
     )
-    pruned_base, pruned_moved = _document_pair(baseline, moved, before, probe.value)
+    pruned_base, pruned_moved = _document_pair(
+        baseline, moved, before, probe.value, key
+    )
     assert pruned_moved != pruned_base, (
         f"{key} 를 {before} -> {probe.value} 로 바꿨는데 판정문이 그대로다 — 그 자리가 "
         "정책을 읽지 않는다(메아리를 뺀 투영에서 아무 칸도 움직이지 않았다)"
@@ -1559,7 +1665,7 @@ def test_unread_values_change_nothing(key: str, board: str, harness: _Harness) -
         baseline = harness.verdict(board)
         moved = harness.verdict(board, **{key: moved_value})
         pruned_base, pruned_moved = _document_pair(
-            baseline, moved, base_value, moved_value
+            baseline, moved, base_value, moved_value, key
         )
         assert pruned_moved == pruned_base, (
             f"{key} 가 판 {board} 에서 {moved_value} 로 판정문을 움직였다 — 「판독 밖」 "
@@ -1790,7 +1896,7 @@ def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -
     base = harness.verdict(probe.board)
     moved = harness.verdict(probe.board, **{key: probe.value})
     pruned_base, pruned_moved = _document_pair(
-        base, moved, harness.values(probe.board)[key], probe.value
+        base, moved, harness.values(probe.board)[key], probe.value, key
     )
     assert pruned_moved != pruned_base, (
         "자리 ① — 계획 전략 판에서 배제 비율을 내렸는데 판정문이 그대로다(제외 단계가 "
@@ -1992,6 +2098,7 @@ def test_every_policy_value_changes_the_verdict(
             _verdict_bytes(snapshot, strategies, policy),
             base_values[key],
             moved[key],
+            key,
         )
         if pruned_moved == pruned_base:
             unchanged.append(key)
