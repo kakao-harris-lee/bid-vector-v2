@@ -458,3 +458,9 @@ r1 의 code-review 는 제외 ⑮ 의 제도 상수 자리가 **열려 있다**�
 이 slice 의 산출물은 test 뿐이라 운영 경로를 끄는 스위치가 필요하지 않다. 게이트만 끄려면
 `rollback.md` ① 의 경로 한정 복원으로 세 파일을 base 로 되돌린다 — 출하 거동은 처음부터
 바뀌지 않았으므로(`src` diff 0) 되돌림이 제품에 닿지 않는다.
+
+## `/code-review` PR #53 (2026-10-02, 팀장 처분 D-6G2a-24)
+
+- `OPEN-6G2A-CENSUS-DERIVED-LOCALS`: 명단이 비제공자 호출·산술로 파생된 지역 변수의 소비자를 따라가지 못해 그 자리의 구조 축이 침묵(거동 축이 잡음) · 공시 test 가 칸당 키 하나만 흔듦. 알려진 제한 2 의 범위는 「제공자 호출 결과의 직접 대입까지」다.
+- `OPEN-6G-REVIEW-FOLLOWUPS` 추가: harness 우회 중복 실행 · 평탄 YAML 파서 네 벌 · `mkdtemp` 미정리 · seed `range(5)` 하드코딩.
+- rollback 실측은 종결 문단 커밋 뒤 verifier 가 재실측(실측 HEAD 는 rollback.md 의 별도 커밋).

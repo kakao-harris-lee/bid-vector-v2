@@ -103,6 +103,12 @@ verifier r5 가 그 test 가 계약이 요구한 것을 재지 않음을 실측�
 | **D-6G2a-22** | **표적 확인(verifier)**: `8a7d3981` 메아리 투영(경로+공시 칸)이 r1 사례를 구별하고 비메아리 잎의 old→new 우연 일치만 남김(저위) · ① 변이 · ② R1·R3 RED · ③ 등식 · acceptance `ml-engine` job · rollback 재실측(`실측 HEAD` 갱신, milestone 문단 셋 — 착수·결정 보존·완료 — 절차) · `src` 0 · 표면 0. 통과면 push → PR → 코멘트(r1·r2·표적 확인) → `/code-review` → 머지(사용자 사전 승인) |
 | **D-6G2a-23** | **동결 어휘**: 이후 모든 레인 통지에서 작업 허가는 「freeze lifted」 문자열 하나뿐이다. 보정·참고·질문은 허가가 아니다(네 번째 사례, 하네스 메모리에 등재) |
 
+## 계약 갱신 r3 (2026-10-02, 팀장 — PR #53 `/code-review` 8건 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2a-24** | **처분(코드 0)**: ① 명단이 **비제공자 호출·산술로 파생된 지역 변수**(`timedelta(days=…)` · `rate_from_basis_points(…)` · 합·곱)의 소비자를 못 따라가 그 자리에서 구조 축이 침묵(거동 축은 잡는다) → **`OPEN-6G2A-CENSUS-DERIVED-LOCALS`**(6G-2c; 알려진 제한 2 의 「지역 대입까지」 문면은 「제공자 호출 결과의 직접 대입까지」로 읽는다) ④ 공시 test 가 칸당 키 하나(`next`)만 흔들어 `primary_hypothesis_count`·`JobFailed` ECHO 는 값 미단언 → 같은 OPEN ⑤~⑧(harness 우회 중복 실행 · 평탄 YAML 파서 네 벌 · `mkdtemp` 미정리 · seed `range(5)` 하드코딩) → `OPEN-6G-REVIEW-FOLLOWUPS`. ② **rollback 실측 미검증 — 팀장 실수**: 종결 문단 커밋 `f7f4697a` 가 rollback 대상(`milestone-6.md`)과 목록(`rollback.md`)을 한 커밋에 담았고 실측 HEAD(`09e32d6b`) 뒤 대상이 움직였다 → 이 정정 커밋 뒤 verifier 가 문서 절차 그대로 ①~⑥ 재실측, 실측 HEAD 를 **별도 커밋**으로 갱신(6A-2b 교훈 재발 — 하네스 메모리에 재등재) ③ 구현 완료 문단의 사후 일괄 전 수치(43/40/36) → 46/43/36 으로 정정, PR 본문도 |
+
 ## 위협 모델 — 6G-2a 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `ml_engine.evaluation.backtest/**` 와 `ml_engine.app.backtest_*` 의 판정 경로에 정책 값 대신 **수를 박는 것** — 그 수를 어떤
@@ -227,3 +233,4 @@ slice 에서는 **스킬 파일을 고치지 않는다**(저작과 하네스 편
 |---|---|
 | `OPEN-6G-SENSITIVITY-HARDENING` | **이 slice 가 닫는다** |
 | (신설 가능) `OPEN-6G2A-INFERENCE-POLICY-SENSITIVITY` | 분포 엔진 정책 값의 민감도 — 경계 밖으로 둔 것을 등재만 |
+| (신설) `OPEN-6G2A-CENSUS-DERIVED-LOCALS` | 파생 지역 변수 소비자 미추적 + 공시 칸당 키 하나만 흔듦(PR #53 리뷰 ①④) — 6G-2c |
