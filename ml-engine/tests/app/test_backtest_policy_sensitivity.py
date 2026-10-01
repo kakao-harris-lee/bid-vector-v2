@@ -467,6 +467,58 @@ class _Probe:
     value: str
 
 
+_STRONG_VALUES: Final[dict[str, tuple[str, ...]]] = {
+    "version": ("strategy-backtest-v1-perturbed",),
+    "verdict.min_relative_improvement": ("0.30", "0.15"),
+    "verdict.alpha": ("0.005", "0.10"),
+    "verdict.primary_hypothesis_count": ("4", "1"),
+    "verdict.ineligibility_noninferiority_margin": ("0.02", "0.005"),
+    "verdict.target_power": ("0.95", "0.50"),
+    "verdict.min_window_count": ("4", "2"),
+    "verdict.min_window_rows": ("51", "51"),
+    "window.days": ("8",),
+    "window.embargo_days": ("60",),
+    "institution.reserve_price_count": ("16",),
+    "institution.draw_count": ("5",),
+    "floor.rate_band_low": ("0.9",),
+    "floor.rate_band_high": ("0.4975",),
+    "floor.pure_construction_cost_ratio": ("0.90",),
+    # 시행일은 YAML 이 따옴표를 쓰는 값이다 — 따옴표째 적는다(흔들기가 파일에 그대로 쓰인다).
+    "effective.construction": ('"2026-07-01"',),
+    "effective.service": ('"2026-07-01"',),
+    "effective.goods": ('"2026-07-01"',),
+    "exclusion.first_notice_ordinal": ("1",),
+    "strategy.s1_offset_bp": ("900.0",),
+    "strategy.s4_iteration_count": ("101",),
+    "strategy.s4_grid_size": ("42",),
+    "strategy.s4_grid_span_bp": ("200.0",),
+    "strategy.s4_min_competitor_samples": ("100000",),
+    "sampling.list_call_count": ("601",),
+    "sampling.calls_per_notice_construction": ("5",),
+    "sampling.calls_per_notice_service": ("4",),
+    "sampling.calls_per_notice_goods": ("4",),
+    "sampling.max_total_calls": ("100",),
+    "sampling.headroom_ratio": ("0.1",),
+    "sensitivity.wide_reserve_half_width": ("0.035",),
+    "fit.alpha": ("0.999",),
+    "fit.min_sample_count": ("9999",),
+    "fit.max_bin_ratio_deviation": ("0.000001",),
+    "stability_seeds.0": ("999001",),
+    "stability_seeds.1": ("999002",),
+    "stability_seeds.2": ("999003",),
+    "stability_seeds.3": ("999004",),
+    "stability_seeds.4": ("999005",),
+}
+"""정책 값마다 **흔들기의 세기** — 부류와 **독립인** 단일 출처다(verifier r1 M-1 처방).
+
+r0 에서 ⓒ 단언은 출하 판 하나에서 `_perturb` 의 작은 흔들기만 했다. 그래서 출하 판을
+움직이지 않는 19 값은 ⓐ 에서 ⓒ 로 옮겨도 초록이었다 — 우회 ⑥(값을 ⓒ 로 옮겨 단언을
+피한다) 방어가 그만큼 비어 있었다. 세기를 부류 표에서 떼어 두면 값을 다른 부류로 옮겨도
+**흔들기는 그대로**이고, ⓒ 단언이 모든 판에서 그 세기로 돈다.
+
+부류 표의 흔들기 값은 이 표의 부분집합이어야 한다 — 등식으로 잠근다."""
+
+
 _JUDGEMENT_INPUTS: Final[dict[str, tuple[_Probe, ...]]] = {
     # ⓐ **판정 입력** — 값을 흔들면 어느 판에서든 전략별 결말이 바뀐다. 판정식의 일곱은
     # **양쪽 방향**을 둔다(우회 ④ `max(policy.x, 상수)` — 한쪽만 따르는 코드를 잡는다).
@@ -765,6 +817,20 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
         assert probe.board in _BOARD_BUILDERS, f"{key}: 모르는 판 {probe.board}"
     for key, reason in _UNREAD.items():
         assert reason.strip(), f"{key} 의 사유가 비어 있다"
+    assert set(_STRONG_VALUES) == keys, (
+        f"흔들기 세기 표가 정책 키와 어긋난다: 빠진 키 {sorted(keys - set(_STRONG_VALUES))} · "
+        f"정책에 없는 키 {sorted(set(_STRONG_VALUES) - keys)}"
+    )
+    for key, probes in _JUDGEMENT_INPUTS.items():
+        for probe in probes:
+            assert probe.value in _STRONG_VALUES[key], (
+                f"{key} 의 ⓐ 흔들기 {probe.value} 가 세기 표에 없다 — 부류를 옮기면 세기가 "
+                "따라가야 한다"
+            )
+    for key, probe in _OUTPUT_INPUTS.items():
+        assert probe.value in _STRONG_VALUES[key], (
+            f"{key} 의 ⓑ 흔들기 {probe.value} 가 세기 표에 없다"
+        )
 
 
 def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
@@ -1306,21 +1372,30 @@ def test_output_inputs_move_a_non_echo_field_without_flipping(
     )
 
 
-@pytest.mark.parametrize("key", sorted(_UNREAD))
-def test_unread_values_change_nothing(key: str, harness: _Harness) -> None:
-    """ⓒ — 판독 밖 값은 **아무것도 바꾸지 않는다**(D-6G2a-3).
+@pytest.mark.parametrize(
+    ("key", "board"),
+    [(key, board) for key in sorted(_UNREAD) for board in sorted(_BOARD_BUILDERS)],
+)
+def test_unread_values_change_nothing(key: str, board: str, harness: _Harness) -> None:
+    """ⓒ — 판독 밖 값은 **어느 판에서도** 아무것도 바꾸지 않는다(D-6G2a-3·13).
 
-    목록이 낡지 않게 하는 자리다: 등재된 값이 무언가를 움직이기 시작하면 여기서 RED 가
-    되고, 그때 부류를 ⓐ 나 ⓑ 로 옮겨야 한다. 「못 잰다」는 선언이 아니라 「쓰이지
-    않는다」는 측정이다."""
-    values = harness.values("shipped")
-    moved_value = _perturb(key, values[key])
-    echoed = _echoed_forms(values[key], moved_value)
-    baseline = harness.verdict("shipped")
-    moved = harness.verdict("shipped", **{key: moved_value})
-    assert _document_view(moved, echoed) == _document_view(baseline, echoed), (
-        f"{key} 가 판정문을 움직였다 — 「판독 밖」 등재가 틀렸다. 사유: {_UNREAD[key]}"
-    )
+    목록이 낡지 않게 하는 자리다: 등재된 값이 무언가를 움직이기 시작하면 RED 가 되고, 그때
+    부류를 ⓐ 나 ⓑ 로 옮겨야 한다. 「못 잰다」는 선언이 아니라 「쓰이지 않는다」는 측정이다.
+
+    r0 은 **출하 판 하나 · 작은 흔들기 하나**로만 쟀다. 그래서 출하 판을 움직이지 않는
+    19 값은 ⓐ 에서 ⓒ 로 옮겨도 초록이었다 — 우회 ⑥ 방어가 그만큼 비어 있었다(verifier r1
+    M-1). 이제 **판 전부와 세기 표의 값 전부**로 돈다."""
+    base_value = harness.values(board)[key]
+    for moved_value in _STRONG_VALUES[key]:
+        if moved_value == base_value:
+            continue
+        echoed = _echoed_forms(base_value, moved_value)
+        baseline = harness.verdict(board)
+        moved = harness.verdict(board, **{key: moved_value})
+        assert _document_view(moved, echoed) == _document_view(baseline, echoed), (
+            f"{key} 가 판 {board} 에서 {moved_value} 로 판정문을 움직였다 — 「판독 밖」 "
+            f"등재가 틀렸다. 사유: {_UNREAD[key]}"
+        )
 
 
 def test_the_pass_branch_actually_runs(harness: _Harness) -> None:
