@@ -753,33 +753,11 @@ _UNREAD: Final[dict[str, str]] = {
 
 # ── 다중 자리 (D-6G2a-6) ─────────────────────────────────────────────────────
 
-_MULTI_SITE_READS: Final[dict[str, tuple[str, ...]]] = {
-    # 착수 AST 전수에서 **읽는 자리가 둘 이상**인 값 전부와 그 자리들. 자리마다 따로
-    # 단언하는 것은 판정 입력 셋이고(아래 전용 test 셋), 나머지 다섯의 둘째·셋째 자리는
-    # 사유와 함께 등재한다 — 등재된 사유가 틀리면 이 목록이 낡는다.
-    "verdict.primary_hypothesis_count": (
-        "Bonferroni 분모",
-        "job 조립의 주 가설 수 대조",
-    ),
-    "verdict.min_window_count": (
-        "창 계획 뒤의 멈춤 판정",
-        "「못 쟀다」의 창 부족 갈래",
-    ),
-    "verdict.min_window_rows": ("최소 필요 표본 결정식", "창 제외의 표본 하한"),
-    "institution.reserve_price_count": (
-        "제외 ⑮ 예비가격 수",
-        "적합도 기준 분포",
-        "S4 분포",
-    ),
-    "institution.draw_count": ("제외 ⑮ 추첨 수", "적합도 기준 분포", "S4 분포"),
-    "floor.pure_construction_cost_ratio": ("제외 단계의 순공사원가선", "S4 의 실격선"),
-    "sampling.list_call_count": ("호출 합계", "판정문 공시(메아리)"),
-    "sampling.max_total_calls": ("예산 초과 판정", "표본 기록", "판정문 공시(메아리)"),
-}
-
 _SITE_ASSERTED: Final[frozenset[str]] = frozenset(
     {
+        "verdict.alpha",
         "verdict.primary_hypothesis_count",
+        "verdict.min_relative_improvement",
         "verdict.min_window_count",
         "verdict.min_window_rows",
         "institution.reserve_price_count",
@@ -787,33 +765,62 @@ _SITE_ASSERTED: Final[frozenset[str]] = frozenset(
         "floor.pure_construction_cost_ratio",
     }
 )
-"""자리마다 **따로** 단언하는 값들 — 한 자리만 상수가 되면 다른 자리가 움직여
-「바뀌었다」가 되기 때문이다. 실측이 그 위험을 확인했다: 배제 비율을 **제외 단계에서만**
-상수로 바꾼 변이(P4)가 처음엔 초록이었다 — S4 가 같은 값을 따로 읽어 판정문이 움직였다.
-그래서 이 여섯은 전용 test 가 자리를 가른다."""
+"""자리마다 **따로** 단언하는 값들 — 한 자리만 상수가 되면 다른 자리가 움직여 「바뀌었다」가
+되기 때문이다. r1 이 그 위험을 두 번 실증했다: 배제 비율을 제외 단계에서만 상수로 바꾼
+변이(P4)와 예비가격 수를 적합도 기준 표본에서만 상수로 바꾼 변이(P9)가 초록이었다."""
 
 _SITE_NOT_ASSERTED: Final[dict[str, str]] = {
-    # 둘째·셋째 자리를 **따로** 단언하지 않는 다중 자리 값과 그 사유. `_SITE_ASSERTED` 와
-    # 합치면 `_MULTI_SITE_READS` 와 등식이다 — 새 다중 자리 값이 생기면 둘 중 하나에
-    # 등재해야 하고, 안 하면 `test_multi_site_reads_are_enumerated_from_the_kickoff_census`
-    # 가 RED 다.
-    "sampling.list_call_count": "둘째 자리가 판정문 공시(메아리)라 투영이 지운다",
-    "sampling.max_total_calls": "둘째·셋째 자리가 표본 기록과 판정문 공시(메아리)다",
+    # 쓰임이 둘 이상인데 자리별로 **따로** 단언하지 않는 값과 그 사유. 자리의 전수는 생성된
+    # 쓰임 명단이 내고(`_USE_COVERAGE`), 이 표와 `_SITE_ASSERTED` 의 합이 그 명단의 다중 자리
+    # 값 집합과 **등식**이다 — 손으로 적은 전수 목록을 두지 않는다(code-review r1 M-1).
+    "floor.rate_band_low": (
+        "둘째 자리는 밴드 술어를 **위임**하는 자리다(제외 규칙이 정책 객체의 술어를 부른다)"
+        " — 술어 자체가 첫 자리이고 거기서 비교가 난다"
+    ),
+    "floor.rate_band_high": "같은 이유 — 술어 위임이다",
+    "sampling.calls_per_notice_construction": (
+        "둘째 자리는 업무 이름을 호출 수로 바꾸는 **표 조회**이고, 첫 자리가 그 결과를 합산한다"
+        " — 둘이 한 사슬이라 표를 상수로 바꾸면 합계가 따라 움직인다"
+    ),
+    "sampling.calls_per_notice_service": "같은 이유 — 표 조회와 합산이 한 사슬이다",
+    "sampling.calls_per_notice_goods": "같은 이유 — 표 조회와 합산이 한 사슬이다",
+    "sampling.headroom_ratio": (
+        "둘째 자리는 최소 필요 표본의 **곱셈**이고 첫 자리가 그 결과를 비교한다 — 한 사슬이다"
+    ),
+    **{
+        f"stability_seeds.{index}": (
+            "둘째 자리는 판정문의 seed 목록 **공시**다(메아리) — 비교 투영이 지우고, 산출물에"
+            " 남는 것은 재현성 공시 test 가 본다"
+        )
+        for index in range(5)
+    },
 }
 
-_SITE_NOT_ISOLABLE: Final[dict[str, str]] = {
-    # 자리가 하나 더 있으나 **이 층에서 가를 수 없는** 자리와 그 사유. 선언이 아니라
-    # 변이 실측이 근거다 — 등재된 사유가 틀리면 그 변이가 RED 가 되어 드러난다.
-    "institution.reserve_price_count": (
-        "적합도의 네 자리 중 **구간 수 하나**: 적합도 결과가 공시하는 스칼라 둘"
-        "(KS 통계량 · 최대 구간 편차)이 **둘 다** 기준 표본에도 구간 수에도 의존한다."
-        " 그래서 구간 수만 상수로 바꾼 변이(P9b)는 기준 표본 쪽이 정책을 계속 따라"
-        " 두 스칼라가 모두 움직여 초록이다. 기준 표본을 고정한 채 구간 수만 흔드는 입력이"
-        " 없어(정책 값 하나가 둘을 동시에 정한다) 이 층에서는 가를 수 없다 —"
-        " `OPEN-6G2A-FIT-BIN-COUNT-SITE` 로 등재한다. 나머지 셋(제외 ⑮ · 기준 표본 ·"
-        " S4 분포)은 전용 test 가 가른다"
-    ),
-}
+
+def test_multi_site_values_are_derived_and_each_has_a_disposition() -> None:
+    """D-6G2a-6·12 · code-review r1 M-1 — 다중 자리 값의 전수는 **생성**이다.
+
+    r0 은 다중 자리 값을 손으로 적었고 그 표가 이미 틀렸다(창 최소 수 2 vs 실제 3 · 상대
+    개선 하한 누락 · 예비가격 수 3 과 4 가 같은 문서에서 충돌 · 첫 seed 누락). 「다중 자리
+    값이 표에 다 있는가」를 아무 test 도 보지 않았기 때문이다.
+
+    이제 전수는 쓰임 명단에서 나오고, 값마다 **자리별 단언** 또는 **사유** 중 하나를 등식으로
+    요구한다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    sites: dict[str, set[str]] = {}
+    for use in policy_use_census(policy):
+        sites.setdefault(use.key, set()).add(use.site)
+    multi = {key for key, found in sites.items() if len(found) > 1}
+    overlap = _SITE_ASSERTED & set(_SITE_NOT_ASSERTED)
+    assert not overlap, f"처분이 양쪽에 등재됐다: {sorted(overlap)}"
+    assert _SITE_ASSERTED | set(_SITE_NOT_ASSERTED) == multi, (
+        f"처분이 없는 다중 자리 값: {sorted(multi - _SITE_ASSERTED - set(_SITE_NOT_ASSERTED))} · "
+        f"다중 자리가 아닌데 등재된 값: "
+        f"{sorted((_SITE_ASSERTED | set(_SITE_NOT_ASSERTED)) - multi)}"
+    )
+    for key, reason in _SITE_NOT_ASSERTED.items():
+        assert reason.strip(), f"{key} 의 사유가 비어 있다"
 
 
 # ── 판·정책 캐시 ─────────────────────────────────────────────────────────────
@@ -993,33 +1000,6 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
     )
     for key, probe in _REASON_MOVERS.items():
         assert probe.value in _STRONG_VALUES[key], key
-
-
-def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
-    """D-6G2a-6 — 읽는 자리가 둘 이상인 값은 **전수 목록**으로 둔다.
-
-    한 자리만 움직여도 「바뀌었다」가 되면 다른 자리의 상수는 보이지 않는다. 자리마다
-    따로 단언하는 셋은 전용 test 가 있고(아래), 나머지는 사유와 함께 등재한다."""
-    keys = set(_flat_policy(_SHIPPED_BACKTEST_POLICY))
-    assert set(_MULTI_SITE_READS) <= keys, sorted(set(_MULTI_SITE_READS) - keys)
-    for key, sites in _MULTI_SITE_READS.items():
-        assert len(sites) >= 2, f"{key} 의 자리가 둘 미만이다: {sites}"
-        assert len(set(sites)) == len(sites), f"{key} 의 자리 이름이 중복이다: {sites}"
-    overlap = _SITE_ASSERTED & set(_SITE_NOT_ASSERTED)
-    assert not overlap, f"자리별 단언 여부가 양쪽에 등재됐다: {sorted(overlap)}"
-    assert _SITE_ASSERTED | set(_SITE_NOT_ASSERTED) == set(_MULTI_SITE_READS), (
-        "다중 자리 값마다 「자리별로 단언한다」 또는 「사유와 함께 안 한다」 중 하나여야 "
-        f"한다 — 빠진 값: "
-        f"{sorted(set(_MULTI_SITE_READS) - _SITE_ASSERTED - set(_SITE_NOT_ASSERTED))}"
-    )
-    for key, reason in _SITE_NOT_ASSERTED.items():
-        assert reason.strip(), f"{key} 의 사유가 비어 있다"
-    assert set(_SITE_NOT_ISOLABLE) <= _SITE_ASSERTED, (
-        "가를 수 없는 자리를 등재한 값은 나머지 자리를 자리별로 단언해야 한다: "
-        f"{sorted(set(_SITE_NOT_ISOLABLE) - _SITE_ASSERTED)}"
-    )
-    for key, reason in _SITE_NOT_ISOLABLE.items():
-        assert reason.strip(), f"{key} 의 사유가 비어 있다"
 
 
 # ── 쓰임 명단의 덮개 등재 (D-6G2a-12) ────────────────────────────────────────
@@ -1874,8 +1854,8 @@ def test_institution_constants_are_read_at_every_site(
         admission.admitted, nudged, seed=nudged.stability_seeds[0]
     )
     # **둘 다** 움직여야 한다 — 하나만 보면 적합도의 두 읽기(기준 표본 · 구간 수) 중
-    # 한쪽만 정책을 따라도 초록이 된다(변이 P9 실측). 그래도 남는 자리 하나는
-    # `_SITE_NOT_ISOLABLE` 에 사유와 함께 등재돼 있다.
+    # 한쪽만 정책을 따라도 초록이 된다(변이 P9 실측). 구간 수 자리는 기준 표본을 고정한
+    # 전용 probe 가 따로 가른다(D-6G2a-14 — `OPEN-6G2A-FIT-BIN-COUNT-SITE` 종결).
     assert first.ks_statistic != second.ks_statistic, (
         f"자리 ② — 적합도의 **기준 표본**이 {key} 를 따르지 않는다: "
         f"{first.ks_statistic} == {second.ks_statistic}"
