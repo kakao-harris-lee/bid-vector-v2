@@ -222,6 +222,33 @@ def _strip_echo(node: object, echoed: frozenset[str]) -> object:
     return node
 
 
+_REPRODUCIBILITY_ECHO_KEYS: Final[tuple[str, ...]] = (
+    "policy_checksum",
+    "policy_version",
+)
+"""**비교 투영에서만** 빼는 두 칸(D-6G2a-1). 판정 JSON 산출물에는 **남는다** — 재현성
+공시다(`test_the_artefact_still_carries_the_reproducibility_echo` 가 그것을 잠근다).
+
+`policy_checksum` 은 정책 파일 **전체**의 sha256 이라 어느 값을 흔들어도 바뀐다.
+`_strip_echo` 는 흔든 값과 같은 **잎**을 지우는데 checksum 은 값의 꼴이 아니라 걸러지지
+않았다 — 가장 강한 메아리를 빼먹은 것이 「39 개 전부 민감」이라는 초록의 정체다
+(6G verifier r5 H-2). 이 둘을 빼면 39 중 20 이 판정문을 움직이지 않는다(착수 실측)."""
+
+
+def _document_view(payload_bytes: bytes, echoed: frozenset[str]) -> object:
+    """**판정문 투영** — 재현성 메아리 두 칸을 뺀 뒤 흔든 값의 메아리 잎을 지운 나머지.
+
+    남는 차이는 그 값이 판정·산출을 **실제로 움직인 몫**이다."""
+    payload = json.loads(payload_bytes)
+    if isinstance(payload, dict):
+        payload = {
+            key: value
+            for key, value in payload.items()
+            if key not in _REPRODUCIBILITY_ECHO_KEYS
+        }
+    return _strip_echo(payload, echoed)
+
+
 def _verdict_bytes(
     snapshot: LoadedSnapshot,
     strategies: tuple[Any, tuple[Any, ...]],
@@ -297,6 +324,27 @@ def test_named_judgement_values_move_the_decision_itself(
     )
 
 
+def test_the_artefact_still_carries_the_reproducibility_echo(
+    tmp_path: Path, _inference: InferencePolicy
+) -> None:
+    """D-6G2a-1 의 **뒷문면** — 비교 투영에서 뺀 두 칸은 **산출물에는 남는다**.
+
+    빼는 자리가 test 의 비교 함수 하나임을 거동으로 잠근다. 판정 JSON 에서 이 둘이
+    사라지면 재현성 공시가 사라지고, 「어느 정책으로 낸 판정인가」를 산출물만 보고 말할 수
+    없게 된다 — 투영을 고치는 일이 산출물을 고치는 일로 번지지 않게 여기서 막는다."""
+    flat = _flat_policy(_SHIPPED_BACKTEST_POLICY)
+    base_values = dict(flat)
+    base_values.update(_BASE_OVERRIDES)
+    policy = load_strategy_backtest_policy(_write_policy(tmp_path, base_values))
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    payload = json.loads(
+        _verdict_bytes(_small_snapshot(), build_strategies(_inference), policy)
+    )
+    assert payload["policy_version"] == policy.version
+    assert payload["policy_checksum"] == strategy_backtest_policy_checksum(policy)
+    assert set(_REPRODUCIBILITY_ECHO_KEYS) <= set(payload), sorted(payload)
+
+
 def test_target_value_set_is_derived_from_the_schema() -> None:
     """대상 집합이 **도출**이라는 것 — 정책 파일의 키 수와 로더 구조의 필드 수가 같다.
 
@@ -364,10 +412,10 @@ def test_every_policy_value_changes_the_verdict(
             f"{key} 를 흔든 정책이 로더에 거부됐다 — 불변식을 깨지 않는 방향으로 "
             f"밀어야 판정 경로가 실제로 돈다: {policy}"
         )
-        moved_view = _strip_echo(
-            json.loads(_verdict_bytes(snapshot, strategies, policy)), echoed
+        moved_view = _document_view(
+            _verdict_bytes(snapshot, strategies, policy), echoed
         )
-        base_view = _strip_echo(json.loads(baseline_bytes), echoed)
+        base_view = _document_view(baseline_bytes, echoed)
         if moved_view == base_view:
             unchanged.append(key)
 
