@@ -13,10 +13,11 @@ import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.dayStartOf
+import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
+import bidvector.workflow.collection.CollectionRangePolicyData
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.net.URI
@@ -51,17 +52,22 @@ internal fun collectionPolicyAt(referenceDate: CollectionReferenceDate): KonepsC
     resolvedOrFail(KONEPS_COLLECTION_POLICY.resolve(referenceDate.date), "KONEPS 수집 정책")
 
 /**
- * 조회 범위 — 상한·미래 금지는 정책이 정하고 위반은 **기동 실패**다(조용히 자르지 않는다). 두 갈래가
- * 같은 정책을 쓰되 **무엇의 날짜인가는 다르다**: 공고 목록 갈래는 조회일, 개찰결과 갈래는 공고일이다.
+ * 조회 범위 — 상한·미래 금지는 정책이 정하고 위반은 **기동 실패**다(조용히 자르지 않는다).
+ *
+ * 두 갈래는 **무엇의 날짜인가**도 다르고(공고 목록 갈래는 조회일, 개찰결과 갈래는 공고일) **상한도**
+ * 다르다(D-6G2e-1). 그래서 정책을 인자로 받는다 — 기본값을 두지 않는다: 기본값이 있으면 새 갈래가
+ * 그 자리를 비워 둔 채 남의 상한을 물려받고, 그 상속은 조용하다. 부르는 자리마다 **어느 갈래의
+ * 상한인가**를 적게 한다.
  */
 internal fun resolveCollectionRange(
     from: LocalDate,
     to: LocalDate,
     clock: Clock,
     label: String,
+    rangePolicy: EffectiveDatedPolicy<CollectionRangePolicyData>,
 ): CollectionRange {
     val today = LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE)
-    val policy = resolvedOrFail(COLLECTION_RANGE_POLICY.resolve(today), "수집 범위 정책")
+    val policy = resolvedOrFail(rangePolicy.resolve(today), "$label 정책")
     return when (val outcome = CollectionRange.of(from, to, today, policy)) {
         is CollectionRangeOutcome.Valid -> outcome.range
         is CollectionRangeOutcome.Rejected -> error("$label 이 유효하지 않다: ${outcome.reason}")

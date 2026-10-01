@@ -26,11 +26,11 @@ import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.OpeningResultSourcePort
 import bidvector.procurement.dayStartOf
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.CollectOpeningResultsUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
 import bidvector.workflow.collection.CollectionSourceName
+import bidvector.workflow.collection.OPENING_COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.OpeningCollectionSource
 import bidvector.workflow.collection.SampleSize
 import bidvector.workflow.collection.SamplingSeed
@@ -72,12 +72,22 @@ class OpeningCollectionSources(
     KonepsOpeningEndpointProperties::class,
 )
 open class OpeningCollectionWiring {
-    /** 공고일 범위다 — 개찰결과 목록을 공고일 축으로 걷는다(D-6G-11). */
+    /**
+     * 공고일 범위다 — 개찰결과 목록을 공고일 축으로 걷는다(D-6G-11). 상한은 **이 갈래의 정책**이
+     * 정한다(D-6G2e-1, A-1 승인) — 공고 목록 갈래의 31일이 아니다.
+     */
     @Bean
     open fun openingCollectionRange(
         properties: OpeningCollectionProperties,
         clock: Clock,
-    ): CollectionRange = resolveCollectionRange(properties.from, properties.to, clock, "공고일 범위")
+    ): CollectionRange =
+        resolveCollectionRange(
+            properties.from,
+            properties.to,
+            clock,
+            "공고일 범위",
+            OPENING_COLLECTION_RANGE_POLICY,
+        )
 
     /**
      * `@ConditionalOnMissingBean` 이다 — 배선 조건 test 가 DB 없이 기동 조건만 재도록 대체 빈을 먼저

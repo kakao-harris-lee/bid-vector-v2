@@ -55,6 +55,25 @@ class CollectionRangeTest {
             CollectionRangeOutcome.Rejected(CollectionRangeViolation.TO_IN_FUTURE)
     }
 
+    /**
+     * **D-6G2e-1 — 갈래별 정책 인스턴스의 값.** 두 인스턴스가 **다른 수**를 든다는 것이 이 slice 의
+     * 산출물이다: 하나가 다른 하나를 덮으면(또는 같은 수가 되면) 개찰 갈래의 16주 창과 공고 목록
+     * 갈래의 호출 폭주 방지 중 하나가 틀린다. 수는 여기서 읽고 **배선에는 적지 않는다**.
+     */
+    @Test
+    fun `개찰 갈래의 범위 정책은 공고 목록 갈래보다 길다 — 같은 값이 아니다`() {
+        // 수를 여기 다시 적지 않는다 — 그러면 같은 값이 두 자리에 서고 둘이 갈린다. 승인된 수
+        // 자체는 배선 test 가 **거동으로** 못 박는다(120일 창은 뜨고 121일은 기동 거부).
+        val opening = OPENING_COLLECTION_RANGE_POLICY_DATA.maxSpanDays.toLong()
+
+        (opening > maxSpan) shouldBe true
+        CollectionRange
+            .of(today.minusDays(opening), today, today, OPENING_COLLECTION_RANGE_POLICY_DATA)
+            .shouldBeInstanceOf<CollectionRangeOutcome.Valid>()
+        CollectionRange.of(today.minusDays(opening + 1), today, today, OPENING_COLLECTION_RANGE_POLICY_DATA) shouldBe
+            CollectionRangeOutcome.Rejected(CollectionRangeViolation.SPAN_TOO_LONG)
+    }
+
     @Test
     fun `업종 이름은 소문자 영문으로 시작하는 짧은 토큰만 유효하다 — 로그에 그대로 실려도 안전하다`() {
         CollectionSourceName.of("construction")?.value shouldBe "construction"
