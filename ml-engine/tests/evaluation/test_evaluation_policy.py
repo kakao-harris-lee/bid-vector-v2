@@ -76,8 +76,14 @@ def test_load_evaluation_policy_unknown_key_is_rejected(tmp_path: Path) -> None:
     assert isinstance(result, PolicyRejected)
 
 
-def _write_full_policy(path: Path, **overrides: object) -> None:
-    values: dict[str, object] = {
+def _valid_values() -> dict[str, object]:
+    """로더가 **받는** 값 한 벌. 아래 거부 test 는 전부 여기서 한 칸만 비틀어 만들고,
+    `test_the_valid_values_load` 가 이 한 벌이 실제로 선다는 것을 잰다 — 그 양성 대조가
+    없으면 거부 test 가 비튼 칸과 **무관한 이유로** 통과한다(M6/6G-2e 실측: seed 가
+    둘뿐이어서, 개수를 다섯으로 고정한 뒤 여섯 test 가 전부 seed 개수로 거부됐다).
+
+    `stability_seeds` 는 출하 다섯 그대로다(D-6G2e-6b·10 — 로더가 개수를 요구한다)."""
+    return {
         "version": "evaluation-v1",
         "paired_t_threshold": 2.58,
         "gate_baseline": "category_x_band",
@@ -89,13 +95,40 @@ def _write_full_policy(path: Path, **overrides: object) -> None:
         "agency_baseline_min_count": 10,
         "stability_seeds.0": 20260812,
         "stability_seeds.1": 1,
+        "stability_seeds.2": 7,
+        "stability_seeds.3": 42,
+        "stability_seeds.4": 2026,
         "amount_band_edges.0": 100000000,
         "amount_band_edges.1": 500000000,
+        "amount_band_edges.2": 1000000000,
+        "amount_band_edges.3": 5000000000,
         "segment_axes.0": "category",
     }
-    values.update(overrides)
+
+
+def _write_values(path: Path, values: dict[str, object]) -> None:
     lines = [f"{key}: {value!r}" for key, value in values.items()]
     path.write_text("\n".join(lines) + "\n")
+
+
+def _write_full_policy(
+    path: Path, *, dropped: str | None = None, **overrides: object
+) -> None:
+    """`_valid_values()` 에서 키 하나를 지우거나(`dropped`) 값을 덮어쓴 정책 파일."""
+    values = _valid_values()
+    if dropped is not None:
+        del values[dropped]
+    values.update(overrides)
+    _write_values(path, values)
+
+
+def test_the_valid_values_load(tmp_path: Path) -> None:
+    """양성 대조 — 거부 test 들의 기준 한 벌이 실제로 선다. 이것이 붉어지면 아래 거부
+    test 전부가 「비튼 칸과 무관한 이유로」 통과하고 있다는 뜻이다."""
+    path = tmp_path / "policy.yaml"
+    _write_full_policy(path)
+    result = load_evaluation_policy(path)
+    assert isinstance(result, EvaluationPolicy), result
 
 
 @pytest.mark.parametrize(
@@ -124,22 +157,14 @@ def test_load_evaluation_policy_rejects_invalid_scalars(
 
 def test_load_evaluation_policy_rejects_empty_stability_seeds(tmp_path: Path) -> None:
     path = tmp_path / "policy.yaml"
-    values = {
-        "version": "evaluation-v1",
-        "paired_t_threshold": 2.58,
-        "gate_baseline": "category_x_band",
-        "gate_model": "gbm_all_strata",
-        "gate_stratum": "clean-base",
-        "maturity_threshold": 0.70,
-        "min_evaluation_rows": 100,
-        "max_origins": 5,
-        "agency_baseline_min_count": 10,
-        "amount_band_edges.0": 100000000,
-        "amount_band_edges.1": 500000000,
-        "segment_axes.0": "category",
-    }
-    lines = [f"{key}: {value!r}" for key, value in values.items()]
-    path.write_text("\n".join(lines) + "\n")
+    _write_values(
+        path,
+        {
+            key: value
+            for key, value in _valid_values().items()
+            if not key.startswith("stability_seeds.")
+        },
+    )
     result = load_evaluation_policy(path)
     assert isinstance(result, PolicyRejected)
 
@@ -169,11 +194,11 @@ def test_load_evaluation_policy_rejects_non_ascending_amount_band_edges(
 
 
 def test_load_evaluation_policy_rejects_gapped_indexed_list(tmp_path: Path) -> None:
+    """색인에 **구멍**이 있으면 거부. 앞 판은 `.0` 을 덮어쓰고 `.2` 를 더했을 뿐이어서
+    색인이 0·1·2 로 연속이었고, 거부는 구멍이 아니라 「엄격 오름차순」에서 났다 — 구멍
+    경로를 재지 못했다(6G-2e 에서 실측). 가운데 키를 **지워** 구멍을 만든다."""
     path = tmp_path / "policy.yaml"
-    _write_full_policy(
-        path,
-        **{"amount_band_edges.0": 100000000, "amount_band_edges.2": 500000000},
-    )
+    _write_full_policy(path, dropped="amount_band_edges.1")
     result = load_evaluation_policy(path)
     assert isinstance(result, PolicyRejected)
 
@@ -216,24 +241,7 @@ def test_load_evaluation_policy_rejects_non_finite_values(
     막아야 한다."""
     key, _, _ = override_line.partition(":")
     key = key.strip()
-    values: dict[str, object] = {
-        "version": "evaluation-v1",
-        "paired_t_threshold": 2.58,
-        "gate_baseline": "category_x_band",
-        "gate_model": "gbm_all_strata",
-        "gate_stratum": "clean-base",
-        "maturity_threshold": 0.70,
-        "min_evaluation_rows": 100,
-        "max_origins": 5,
-        "agency_baseline_min_count": 10,
-        "stability_seeds.0": 20260812,
-        "stability_seeds.1": 1,
-        "amount_band_edges.0": 100000000,
-        "amount_band_edges.1": 500000000,
-        "amount_band_edges.2": 1000000000,
-        "amount_band_edges.3": 5000000000,
-        "segment_axes.0": "category",
-    }
+    values = _valid_values()
     values.pop(key, None)
     lines = [f"{k}: {v!r}" for k, v in values.items()]
     lines.append(override_line)

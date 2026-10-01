@@ -2091,20 +2091,13 @@ def test_primary_hypothesis_count_is_read_at_both_sites(
 
 
 _REMOVAL_ACCEPTED: Final[dict[str, str]] = {
-    # 키를 **지워도 로더가 받는** 값과 그 사유. 실측으로 하나뿐이다. 등재는 등식으로
-    # 쓰이므로(아래 두 test), 받는 키가 늘거나 줄면 둘 중 하나가 RED 다.
-    "stability_seeds.4": (
-        "평탄 인덱스 목록의 **길이가 스키마에 고정돼 있지 않다**: 판독기"
-        " (`evaluation.policy.collect_indexed_list`)는 인덱스가 0 부터 **연속**일 것만"
-        " 요구하고 개수는 보지 않는다. 그래서 **뒤에서부터 몇 개를 지워도** 선다 —"
-        " 마지막 하나를 지우면 넷, `.1`~`.4` 를 지우면 **하나**로 로드된다(중간 인덱스를"
-        " 지우면 구멍이 생겨 거부된다). seed 가 하나면 seed 안정성 레그가 **자명하게 참**이"
-        " 되어(부호·판정 집합의 크기가 1 이라 `SEED_UNSTABLE` 이 불가능하다) 그 레그가"
-        " 아무것도 막지 못한다. A-3 승인 문면은 「seed 5」이고, 줄어든 수로 돈 판정은 거부가"
-        " 아니라 판정문의 `seeds` 목록으로만 드러난다 —"
-        " `OPEN-6G2A-SEED-COUNT-NOT-PINNED` 로 등재한다(출하 코드 변경은 이 slice 의"
-        " out_scope, D-6G2a-9 ⓑ — 로더 수정은 6G-2e 로 넘긴다)"
-    ),
+    # 키를 **지워도 로더가 받는** 값과 그 사유. **지금은 비어 있다** — 6G-2e(D-6G2e-6b)가
+    # `stability_seeds` 의 개수를 정책 키 스키마에 고정해, 마지막 자리를 지운 판도
+    # `INVALID_VALUE` 로 선다. 6G-2a 의 등재 하나(`stability_seeds.4`)와 그 양성 대조
+    # test 는 그래서 지웠다 — 등재가 낡은 채로 남아 다른 키의 구멍을 가리지 않게.
+    # 이 뺄셈이 아래 전수 거부 test 의 모수를 만든다: 받는 키가 생기면 그 키의 거부
+    # test 가 RED 가 되고, 빼려면 사유를 여기 적어야 한다.
+    # 「seed 하나까지 줄던 노출」은 `tests/app/test_seed_count_pinned.py` 가 잰다.
 }
 
 
@@ -2298,38 +2291,6 @@ def test_the_loader_refuses_a_policy_with_a_key_removed(
         f"그 키를 요구하지 않는다는 뜻이고, 그 값은 더 이상 정책 파일이 정하는 값이 "
         f"아니다: {loaded}"
     )
-
-
-@pytest.mark.parametrize("dropped", sorted(_REMOVAL_ACCEPTED))
-def test_the_registered_removable_keys_really_load(
-    dropped: str, tmp_path: Path
-) -> None:
-    """등재된 예외의 **양성 대조** — 「받는다」가 선언이 아니라 측정이다.
-
-    로더가 나중에 이 키를 거부하게 되면(길이를 고정하면) 여기서 RED 가 되고, 그때 등재를
-    지워야 한다. 등재가 낡은 채로 남아 다른 키의 구멍을 가리는 일을 막는 자리다."""
-    loaded = _dropped_policy(tmp_path, dropped)
-    assert isinstance(loaded, StrategyBacktestPolicy), (
-        f"{dropped} 를 지운 정책이 이제 거부된다 — 등재를 지워라: {loaded}"
-    )
-    assert len(loaded.stability_seeds) == 4, loaded.stability_seeds
-    assert _REMOVAL_ACCEPTED[dropped].strip()
-    # 노출의 **폭**도 측정으로 둔다(verifier r1 M-4): 뒤에서부터 지우면 **하나까지** 줄고,
-    # 그때 seed 안정성 레그가 자명하게 참이 된다. OPEN 문면이 그 폭을 적는다.
-    values = _flat_policy(_SHIPPED_BACKTEST_POLICY)
-    values.update(_BASE_OVERRIDES)
-    lines = [
-        f"{key}: {values[key]}" if key in values else line
-        for line in _SHIPPED_BACKTEST_POLICY.read_text(encoding="utf-8").splitlines()
-        for key in (line.split(":", 1)[0].strip(),)
-        if not (key.startswith("stability_seeds.") and key != "stability_seeds.0")
-    ]
-    single = tmp_path / "single-seed" / "strategy-backtest-single.yaml"
-    single.parent.mkdir(parents=True, exist_ok=True)
-    single.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    narrowed = load_strategy_backtest_policy(single)
-    assert isinstance(narrowed, StrategyBacktestPolicy), narrowed
-    assert len(narrowed.stability_seeds) == 1, narrowed.stability_seeds
 
 
 def test_the_artefact_still_carries_the_reproducibility_echo(
