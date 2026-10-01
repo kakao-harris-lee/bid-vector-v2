@@ -97,6 +97,7 @@ from tests.evaluation._backtest_support import (
     manifest_bytes,
     policy_file_keys,
     policy_use_census,
+    policy_value,
     rows_bytes,
     sample_list_bytes,
 )
@@ -828,8 +829,11 @@ _SITE_NOT_ASSERTED: Final[dict[str, str]] = {
     ),
     **{
         f"stability_seeds.{index}": (
-            "둘째 자리는 판정문의 seed 목록 **공시**다(메아리) — 비교 투영이 지우고, 산출물에"
-            " 남는 것은 재현성 공시 test 가 본다"
+            "둘째 자리는 판정문의 seed 목록 **공시**다(메아리) — 비교 투영이 지우고, 공시된"
+            " 값이 정책을 따르는지는 **공시 칸 단언**이 흔든 정책으로 본다"
+            " (`test_disclosed_fields_equal_the_loaded_policy_value`). r1 의 등재 사유는"
+            " 「재현성 공시 test 가 본다」였고 그것은 **거짓**이었다 — 그 test 는 정책 version 과"
+            " checksum 만 본다(verifier r2 M-1)"
         )
         for index in range(5)
     },
@@ -1518,6 +1522,102 @@ def test_the_projection_does_not_hide_a_coincidental_change() -> None:
     assert pruned_base["seeds"] == [7], (
         f"진짜 메아리(공시 칸)가 지워지지 않았다 — 투영이 모자라다: {pruned_base}"
     )
+
+
+_DISCLOSURE_CHECKS: Final[dict[str, str]] = {
+    # 판정문이 **공시하는 칸**마다 「실린 값 == 로드된 정책 값」을 어떻게 재는가.
+    # 칸 목록은 덮개 등재의 `ECHO` 소비자에서 생성되고(`_PUBLICATION_FIELDS`), 이 표가 그
+    # 생성 결과와 **등식**이다 — 새 공시 칸이 생기면 재는 법이 없어 RED 다.
+    #
+    # r1 까지 공시 칸은 **읽기를 유지한 상수**에 열려 있었다(verifier r2 M-1: 예산 상한 공시를
+    # 상수로 바꾼 변이가 전체 suite 를 지났다). 비교 투영이 메아리를 **일부러** 지우므로 거동
+    # 단언이 그 자리를 볼 수 없고, 구조 게이트는 읽기가 남아 있으면 조용하다.
+    "seeds": "정책의 seed 목록 전부",
+    "policy_version": "정책 version",
+    "max_total_calls": "표본 예산 상한",
+    "list_call_count": "목록 호출 수",
+    "alpha_used": "가설 종류에 맞는 유의수준(주 가설은 Bonferroni 보정값)",
+}
+
+
+def _collect_field(node: object, field_name: str) -> list[object]:
+    """판정문에서 그 이름의 칸을 **깊이 무관하게** 모은다."""
+    found: list[object] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == field_name:
+                found.append(value)
+            else:
+                found.extend(_collect_field(value, field_name))
+    elif isinstance(node, list):
+        for item in node:
+            found.extend(_collect_field(item, field_name))
+    return found
+
+
+def test_the_disclosure_check_table_covers_every_disclosed_field() -> None:
+    """공시 칸 표가 **생성된 공시 칸 집합**과 등식이다.
+
+    칸 목록은 덮개 등재에서 나오고 등재는 생성 명단과 묶여 있다. 새 공시 칸이 생기면 재는 법이
+    없어 여기서 RED 다 — 공시가 조용히 늘어나는 것을 막는 자리다."""
+    disclosed = {
+        field_name for fields in _PUBLICATION_FIELDS.values() for field_name in fields
+    }
+    assert disclosed == set(_DISCLOSURE_CHECKS), (
+        f"재는 법이 없는 공시 칸: {sorted(disclosed - set(_DISCLOSURE_CHECKS))} · "
+        f"공시되지 않는데 표에 있는 칸: {sorted(set(_DISCLOSURE_CHECKS) - disclosed)}"
+    )
+
+
+@pytest.mark.parametrize("field_name", sorted(_DISCLOSURE_CHECKS))
+def test_disclosed_fields_equal_the_loaded_policy_value(
+    field_name: str, harness: _Harness
+) -> None:
+    """D-6G2a-21 ② — 판정문의 **공시 칸**에 실린 값이 로드된 정책 값과 같다.
+
+    비교 투영은 메아리를 **일부러** 지운다(그래야 「값이 실리는가」가 아니라 「값이 판정을
+    움직이는가」를 잴 수 있다). 그 결과 공시 칸은 **읽기를 유지한 상수**에 열려 있었다 —
+    공시 자리에 출하값을 박아도 거동 단언은 보지 못하고 구조 게이트도 읽기가 남아 조용하다
+    (verifier r2 M-1 이 예산 상한 공시로 실증).
+
+    그래서 **흔든 정책**으로 판정을 내고 공시값을 로드된 정책 값과 맞댄다. 기대값은 test 에
+    적지 않고 정책 객체에서 꺼낸다 — 적으면 공시 칸이 상수가 된 것과 구별되지 않는다."""
+    key = next(
+        name for name, fields in _PUBLICATION_FIELDS.items() if field_name in fields
+    )
+    moved = _STRONG_VALUES[key][0]
+    payload = json.loads(harness.verdict("shipped", **{key: moved}))
+    policy = harness.policy("shipped", f"disclose-{field_name}", **{key: moved})
+
+    if field_name == "alpha_used":
+        # 가설 종류마다 다른 값이 실린다 — 전략마다 그 종류로 기대값을 계산한다.
+        strategies = payload.get("strategies") or []
+        assert strategies, "공시 칸을 볼 판정이 서지 않았다"
+        seen = 0
+        for item in strategies:
+            expected = policy.verdict.alpha_for(primary=item["primary_hypothesis"])
+            for disclosed in _collect_field(item, field_name):
+                assert disclosed == pytest.approx(expected), (
+                    f"{item['strategy']} 의 {field_name} 가 정책을 따르지 않는다: "
+                    f"{disclosed} != {expected}"
+                )
+                seen += 1
+        assert seen, f"{field_name} 칸이 판정문에 없다"
+        return
+
+    expected_value: object
+    if field_name == "seeds":
+        expected_value = list(policy.stability_seeds)
+    elif field_name == "policy_version":
+        expected_value = policy.version
+    else:
+        expected_value = policy_value(policy, f"sampling.{field_name}")
+    disclosed_values = _collect_field(payload, field_name)
+    assert disclosed_values, f"{field_name} 칸이 판정문에 없다"
+    for disclosed in disclosed_values:
+        assert disclosed == expected_value, (
+            f"{field_name} 가 정책을 따르지 않는다: {disclosed} != {expected_value}"
+        )
 
 
 def test_passes_window_follows_the_policy_at_its_own_site(harness: _Harness) -> None:

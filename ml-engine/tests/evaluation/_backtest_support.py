@@ -743,6 +743,23 @@ def _scan_module(
     return uses
 
 
+def policy_value(policy: StrategyBacktestPolicy, key: str) -> object:
+    """정책 키 -> **로드된 정책 객체의 값**. 그룹·필드 대응은 쓰임 명단과 같은 도출을 쓴다.
+
+    공시 칸 단언이 「판정문에 실린 값 == 정책이 실제로 들고 있는 값」을 재는 데 쓴다 — 기대값을
+    test 에 적으면 공시 칸이 상수가 된 것과 구별되지 않는다."""
+    if "." not in key:
+        return getattr(policy, key)
+    prefix, leaf = key.split(".", 1)
+    if prefix == "stability_seeds":
+        return policy.stability_seeds[int(leaf)]
+    groups = _group_classes(policy)
+    holders = [attr for attr, (_, fields) in groups.items() if leaf in fields]
+    if len(holders) > 1:
+        holders.sort(key=lambda attr: _shared_prefix_length(attr, prefix), reverse=True)
+    return getattr(getattr(policy, holders[0]), leaf)
+
+
 def policy_use_census(policy: StrategyBacktestPolicy) -> tuple[PolicyUse, ...]:
     """판정 경로에서 정책 값이 **쓰이는 자리** 전부 — AST 와 정책 객체에서 생성한다."""
     keys = policy_file_keys()
