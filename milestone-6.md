@@ -624,6 +624,12 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 
 **6G-2a 종결 2026-10-01** — PR **#53**(계약 갱신 r0-b~r2: D-6G2a-10~23). 판정은 PR 코멘트 셋에 있다. 재작업 **1/5** — verifier r1 not-ready(손으로 쓴 쓰임 명단이 읽기를 세어 자리 넷 열림: 6G r5 E1 여전히 GREEN), **r2 ready-for-review**, 사후 일괄 뒤 종결 확인 「종결 가능」. 닫은 것: `OPEN-6G-SENSITIVITY-HARDENING`(비교 투영에서 checksum·version 메아리 제거 → 39 값 중 19 만 움직이던 사실 재현 · 부류 ⓐ27/ⓑ11/ⓒ1 등식 분할 · 판 31 · **쓰임 명단을 출하 AST 와 로드된 정책 객체에서 생성(86 쓰임) + 등식 넷 + 자리별 probe** · 공시값 == 정책값 · 변이 46 중 거동 RED 43, 합집합 46/46) · `OPEN-6G2A-FIT-BIN-COUNT-SITE`(참조 표본 고정으로 분리, patch 호출 계수로 공허 방지). `ml-engine/src/**` 변경 0 — 출하 코드에 박힌 수는 없었다(D-6G2a-9 ⓐ 미발동). 사실 선언: 레인이 r2 동결 중 커밋 셋을 올렸고 되쓰지 않고 선언된 사후 일괄로 받았다(이후 허가 어휘는 「freeze lifted」 하나). 남긴 것: `OPEN-6G2A-SEED-COUNT-NOT-PINNED` → 6G-2e D-6G2e-6b · 미달 경계(관측값 밖 순수 거동 상수 — 적합도 p 0.436~0.969) · low 둘(공시 칸 안 old→new 우연 일치 · probe 1:1 매핑 자체의 단언). 다음: **6G-2e**(실수집 전 필수) → 6G-2b → 6G-2c. rollback 의 공유 파일 절차는 이 종결 문단도 착수·구현 완료 문단과 같은 표지 단위 삭제로 지운다.
 
+**6G-2e 착수 2026-10-02 — 실수집 전 필수 여섯** — base `c63d0d3a`(PR #53 6G-2a 머지 뒤 `main`), worktree `bid-vector-v2-m6-6g2e`·브랜치 `m6-6g2e/2026-10-02`. 정본
+`reports/evidence/m6/6g2e/scope.md`(D-6G2e-1~8, 운영자 결정 A-1 개찰 갈래 `maxSpanDays` **120일** · 순서 2026-10-01 「2a → 2e → 2b → 2c」). 수령 OPEN: `OPEN-6G-OPENING-RANGE-CAP`(PR #52
+리뷰 — 31일 상한이 개찰 갈래에도 걸려 A-1 16주 창 기동 거부, 표본틀이 from/to 고정) · `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋(찢어진 조각만 남은 꼬리 라운드 · `incompleteAValues` 의 기초금액 축
+의존 · 복구 쓰기 순서/잠금 가드) · `OPEN-6G-BACKTEST-CLI` · `OPEN-6G2A-SEED-COUNT-NOT-PINNED`. 레인 둘(Kotlin: 범위 정책·실행 상태 셋·runbook / ml-implementer: CLI·seed 수), 파일 집합 비겹침,
+호스트 빌드 직렬. **이 slice 머지가 실수집 시작 조건**(남은 것: 운영계정 키). 리뷰 레인 verifier + code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 착수 문단을 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
