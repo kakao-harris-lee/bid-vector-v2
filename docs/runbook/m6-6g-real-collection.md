@@ -81,17 +81,29 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.snapshot-extract.run-state-dir=$HOME/.local/bid-vector-run-state/m6-6g \
     <공통 인자> )
 ```
-- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5`, `row_count` · `sample_size` · 네 항 항등식 `표본 = 행 + sampled_without_detail + skipped_without_notice + incomplete_axis` · `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values`) · `sample-list.tsv`. 러너 로그 마지막 줄 `snapshot finished …` 의 계수 여덟을 그대로 적는다.
+- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5`, `row_count` · `sample_size` · 네 항 항등식 `표본 = 행 + sampled_without_detail + skipped_without_notice + incomplete_axis` · `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values`) · `sample-list.tsv`. 러너 로그 마지막 줄 `snapshot finished …` 의 계수 아홉(`outsideSample` 포함)을 그대로 적는다.
 - 수집 **도중**에도 돌릴 수 있지만(원장을 먼저 읽어 진행 중 걷기는 미완으로 떨어진다) 잠금을 쥔 프로세스가 있으면 `ALREADY_RUNNING` 으로 거부된다 — 수집 실행 사이에 돌린다.
 
 ### 2-4. 백테스트 — Python, 저장소 밖 입력·출력
+
+`ml_engine.app.backtest_job` 에는 **CLI 가 없다**(`run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path) -> JobCompleted | JobFailed`, 예외 없이 결과 타입). `__main__` 추가는 `src` 변경이라 `OPEN-6G-BACKTEST-CLI`(6G-2c 후보)로 두고, 그때까지는 아래 한 줄 스크립트로 부른다 — 정책 둘(판정 정책 `strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`, 둘 다 출하 파일 그대로, CLI 로 완화 불가):
 ```
-cd ml-engine && uv run python -m ml_engine.app.backtest_job \
-  --snapshot-uri $HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> \
-  --backtest-policy-path policy/strategy-backtest-v1.yaml \
-  --output $HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD>/verdict.json
+cd ml-engine && SNAP=$HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> uv run python - <<'PY'
+import os, sys
+from pathlib import Path
+from ml_engine.app.backtest_job import run_backtest_job, JobFailed
+snap = os.environ["SNAP"]
+r = run_backtest_job(snapshot_uri=snap,
+                     backtest_policy_path=Path("policy/strategy-backtest-v1.yaml"),
+                     inference_policy_path=Path("policy/inference-v1.yaml"))
+if isinstance(r, JobFailed):
+    print("FAILED", r.reason, r.detail); sys.exit(1)
+out = Path(snap) / "verdict.json"; out.write_bytes(r.verdict_bytes)
+print("verdict", out, "sha256", r.checksum, "bytes", len(r.verdict_bytes))
+PY
 ```
-(인자 이름은 `ml_engine.app.backtest_job` 의 `BacktestRequest` 를 따른다 — 실행 전 `--help` 로 확인.) 정책 `strategy-backtest-v1`(A-3 값, 2026-09-27 승인) 그대로, CLI 로 완화 불가. 판정 JSON 은 저장소 밖, 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만, 제외 사유 계수 · 세 판(주·a·b) 부호 · `MAX_PAGES` 확정 수 · 코드 SHA).
+- 판정 JSON(세 판 — 주·민감도 a·b 를 하나의 canonical 바이트열로)은 저장소 밖에 두고 sha256 을 evidence 에 적는다. 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만 — 제외 사유 계수 · 세 판의 부호 · 필요 표본 수 · `MAX_PAGES` 확정 수 · 코드 SHA · 스냅숏 id·sha256 · 정책 version·checksum).
+- `JobFailed` 사유: `SNAPSHOT_UNREADABLE` · `SNAPSHOT_REJECTED`(판독 거부 — 추출 쪽 결함, 6G-2d 가 닫은 부류) · `*_POLICY_REJECTED` · `PRIMARY_HYPOTHESIS_COUNT_MISMATCH`. 실패는 고치지 말고 보고.
 
 ## 3. 일일 보고 (수집 시작 때 일정을 세운다 — 사용자 지시 2026-09-30)
 
@@ -113,3 +125,8 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_job \
 - `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
+- 백테스트 job 에 CLI 가 없다 — 위 스크립트로 부른다(`OPEN-6G-BACKTEST-CLI`).
+
+## 6. 검증 기록
+
+2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · `snapshot finished` 계수 아홉(`rows sampleSize sampledWithoutDetail skippedWithoutNotice incompleteAxis unusableRawRows fractionalAmounts incompleteAValues outsideSample`) 전부 코드와 일치. 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다.
