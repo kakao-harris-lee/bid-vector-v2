@@ -1077,7 +1077,7 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "floor.pure_construction_cost_ratio",
         "strategies._simulated_floors",
         "assign",
-    ): "PROBE:s4-bid",
+    ): "PROBE:s4-pure-cost",
     ("floor.rate_band_high", "policy_values.contains", "compare"): "CLASS",
     (
         "floor.rate_band_high",
@@ -1104,7 +1104,7 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "institution.draw_count",
         "strategies._win_probabilities",
         "sample_assessment_ratios(draw_count)",
-    ): "PROBE:s4-bid",
+    ): "PROBE:s4-institution",
     (
         "institution.reserve_price_count",
         "fit._reference_sample",
@@ -1124,7 +1124,7 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "institution.reserve_price_count",
         "strategies._win_probabilities",
         "sample_assessment_ratios(reserve_price_count)",
-    ): "PROBE:s4-bid",
+    ): "PROBE:s4-institution",
     (
         "sampling.calls_per_notice_construction",
         "policy_values.calls_per_notice_for",
@@ -1231,7 +1231,11 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "verdict.passes_window",
         "compare",
     ): "PROBE:passes_window",
-    ("verdict.min_window_count", "run._plan_or_stop", "compare"): "CLASS",
+    (
+        "verdict.min_window_count",
+        "run._plan_or_stop",
+        "compare",
+    ): "PROBE:window-plan-count",
     (
         "verdict.min_window_count",
         "run._sampling_record",
@@ -1399,18 +1403,35 @@ def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
 # 아래 표는 덮개 등재의 `PROBE:<이름>` 이 **실제로 존재하는 단언**임을 구조로 잠근다 —
 # 이름만 적고 단언을 안 쓰면 `test_every_probe_named_in_the_coverage_table_exists` 가 RED 다.
 _PROBE_TESTS: Final[dict[str, str]] = {
+    # `PROBE:` 이름 -> **그 자리를 재는 단언 하나**. 이름과 함수는 **1:1** 이다(code-review r2
+    # M-4): r1 에서는 이름 다섯이 함수 둘을 가리켜서, 그 함수 안의 한 블록을 지우면 이름은 그대로
+    # 풀리고 등식도 초록이었다 — 「이름은 있는데 자리는 비었다」가 블록 단위로 남았다.
     "PROBE:passes_window": "test_passes_window_follows_the_policy_at_its_own_site",
-    "PROBE:evaluate_window": "test_evaluate_window_follows_the_improvement_at_the_power_site",
+    "PROBE:evaluate_window": (
+        "test_evaluate_window_follows_the_improvement_at_the_power_site"
+    ),
     "PROBE:fit-seed": "test_the_fit_seed_site_follows_the_first_stability_seed",
-    "PROBE:sample-floor-window-count": "test_min_window_count_is_read_at_three_sites",
-    "PROBE:sample-floor-rows": "test_min_window_rows_is_read_at_both_sites",
-    "PROBE:window-rows": "test_min_window_rows_is_read_at_both_sites",
-    "PROBE:admit-rows": "test_institution_constants_are_read_at_every_site",
-    "PROBE:fit-direct": "test_institution_constants_are_read_at_every_site",
-    "PROBE:fit-bin-count": "test_the_fit_bin_count_site_follows_the_reserve_price_count",
-    "PROBE:s4-bid": "test_institution_constants_are_read_at_every_site",
-    "PROBE:construction-pad": "test_pure_construction_cost_ratio_is_read_at_both_sites",
-    "PROBE:strategy-verdict-direct": "test_min_window_count_is_read_at_three_sites",
+    "PROBE:fit-bin-count": (
+        "test_the_fit_bin_count_site_follows_the_reserve_price_count"
+    ),
+    "PROBE:window-plan-count": "test_min_window_count_reaches_the_window_plan_site",
+    "PROBE:sample-floor-window-count": (
+        "test_min_window_count_reaches_the_minimum_sample_site"
+    ),
+    "PROBE:strategy-verdict-direct": (
+        "test_min_window_count_reaches_the_not_evaluable_site"
+    ),
+    "PROBE:window-rows": "test_min_window_rows_reaches_the_window_exclusion_site",
+    "PROBE:sample-floor-rows": "test_min_window_rows_reaches_the_minimum_sample_site",
+    "PROBE:admit-rows": "test_institution_constants_reach_the_exclusion_site",
+    "PROBE:fit-direct": "test_institution_constants_reach_the_fit_reference_site",
+    "PROBE:s4-institution": "test_institution_constants_reach_the_monte_carlo_site",
+    "PROBE:construction-pad": (
+        "test_pure_construction_cost_ratio_reaches_the_exclusion_site"
+    ),
+    "PROBE:s4-pure-cost": (
+        "test_pure_construction_cost_ratio_reaches_the_monte_carlo_site"
+    ),
     "PROBE:job-direct": "test_primary_hypothesis_count_is_read_at_both_sites",
 }
 
@@ -1790,9 +1811,19 @@ def test_the_fit_bin_count_site_follows_the_reserve_price_count(
     admission = admit_rows(board.snapshot.rows, shipped)
     assert admission.admitted, admission.excluded
     pinned = _reference_sample(shipped, shipped.stability_seeds[0])
+    # **패치가 실제로 불렸는지 센다**(code-review r2 M-5). 이름이 사라지면 `setattr` 가 터져
+    # RED 지만, 적합도가 모듈 전역 조회를 그만두면(지역 별칭·다른 모듈로 이동) 패치는 **무음
+    # no-op** 이 되고 기준 표본이 다시 정책을 따라 움직인다 — 그러면 두 값이 달라져 아래 단언이
+    # **공허하게 통과**하고, 이 probe 로 닫은 OPEN 의 근거가 사라진 것을 아무도 모른다.
+    calls: list[int] = []
+
+    def _pinned_reference(policy: StrategyBacktestPolicy, seed: int) -> Any:
+        del policy, seed
+        calls.append(1)
+        return pinned
+
     monkeypatch.setattr(
-        "ml_engine.evaluation.backtest.fit._reference_sample",
-        lambda policy, seed: pinned,
+        "ml_engine.evaluation.backtest.fit._reference_sample", _pinned_reference
     )
     measured = {
         value: check_institutional_fit(
@@ -1804,6 +1835,10 @@ def test_the_fit_bin_count_site_follows_the_reserve_price_count(
         ).max_bin_deviation
         for value in ("15", "16")
     }
+    assert len(calls) == len(measured), (
+        "기준 표본 고정이 실제로 걸리지 않았다 — 적합도가 그 이름을 모듈 전역에서 찾지 않는다. "
+        f"이 probe 가 닫은 OPEN 의 근거가 사라졌다: 호출 {len(calls)} != 판정 {len(measured)}"
+    )
     assert measured["15"] != measured["16"], (
         f"구간 수 자리가 정책을 따르지 않는다(기준 표본 고정): {measured}"
     )
@@ -1921,20 +1956,19 @@ def test_the_pass_branch_actually_runs(harness: _Harness) -> None:
         assert pooled["passed"] is True, pooled
 
 
-def test_min_window_count_is_read_at_three_sites(harness: _Harness) -> None:
-    """D-6G2a-6·12 — `verdict.min_window_count` 는 **세 자리**에서 쓰인다.
-
-    자리 ① 창 계획 뒤의 멈춤 판정(`run`) — 선택된 창이 최소 수에 못 미치면 판정 대신 멈춤.
-    자리 ② 「못 쟀다」의 창 부족 갈래(`verdict`) — ① 이 먼저 멈추므로 전체 실행으로 도달할 수
-    없고, 판정 함수를 **직접** 불러 잰다.
-    자리 ③ **최소 필요 표본 결정식**(`run` 의 표본 기록) — r0 의 손 등재가 빠뜨린 자리다
-    (code-review r1 H-1). 창 밖 행 수로 가른 판에서 그 자리만 묶인다: 창당 하한 50 · 창 3 ·
-    업무 1 · 여유 0.20 이면 최소 필요 표본이 180 이고 행이 183 이라 선다. 창 최소 수를 4 로
-    올리면 최소가 240 > 183 이 되어 **표본 쪽** 멈춤이 먼저 난다 — 그 자리를 상수로 박으면
-    최소가 180 에 묶여 표본 멈춤이 나지 않고 창 쪽 멈춤으로 떨어진다."""
+def test_min_window_count_reaches_the_window_plan_site(harness: _Harness) -> None:
+    """자리 ① 창 계획 뒤의 멈춤 판정 — 선택된 창이 최소 수에 못 미치면 판정 대신 멈춤이다."""
     stopped = json.loads(harness.verdict("pass", **{"verdict.min_window_count": "4"}))
     assert stopped.get("stopped") == "INSUFFICIENT_WINDOWS", stopped.get("stopped")
 
+
+def test_min_window_count_reaches_the_minimum_sample_site(harness: _Harness) -> None:
+    """자리 ③ **최소 필요 표본 결정식** — r0 의 손 등재가 빠뜨린 자리다(code-review r1 H-1).
+
+    창 밖 행 수로 가른 판에서 그 자리만 묶인다: 창당 하한 50 · 창 3 · 업무 1 · 여유 0.20 이면
+    최소 필요 표본이 180 이고 행이 183 이라 선다. 창 최소 수를 4 로 올리면 최소가 240 > 183 이
+    되어 **표본 쪽** 멈춤이 먼저 난다 — 그 자리를 상수로 박으면 최소가 180 에 묶여 표본 멈춤이
+    나지 않고 창 쪽 멈춤으로 떨어진다."""
     by_sample = json.loads(
         harness.verdict("sample-floor", **{"verdict.min_window_count": "4"})
     )
@@ -1942,6 +1976,10 @@ def test_min_window_count_is_read_at_three_sites(harness: _Harness) -> None:
         "stopped"
     )
 
+
+def test_min_window_count_reaches_the_not_evaluable_site(harness: _Harness) -> None:
+    """자리 ② 「못 쟀다」의 창 부족 갈래 — ① 이 먼저 멈추므로 전체 실행으로 도달할 수 없고,
+    판정 함수를 **직접** 부른다."""
     window = _window_outcome()
     values = harness.values("pass")
     for threshold, expected in (
@@ -1990,13 +2028,11 @@ def _window_outcome() -> WindowOutcome:
     )
 
 
-def test_min_window_rows_is_read_at_both_sites(harness: _Harness) -> None:
-    """D-6G2a-6 — `verdict.min_window_rows` 는 **두 자리**에서 읽힌다.
+def test_min_window_rows_reaches_the_window_exclusion_site(harness: _Harness) -> None:
+    """자리 ② 창 제외의 표본 하한 — 창당 행이 하한에 못 미치면 그 창이 빠진다.
 
-    자리 ① 최소 필요 표본 결정식(`run`) — 창당 하한 x 창 최소 수 x 업무 수 x (1 + 여유).
-    자리 ② 창 제외의 표본 하한(`windows`) — 창당 행이 하한에 못 미치면 그 창이 빠진다.
-    두 판은 **한쪽만 묶이게** 지었다(창 밖 행 수로 가른다) — 그래서 멈춤 사유가 다르고,
-    한 자리만 상수가 되면 그 판 하나만 초록이 된다."""
+    이 판은 창 밖 행을 넉넉히 둬서 **표본 하한은 묶이지 않는다** — 그래서 창 하한을 올리면
+    창 제외만 발화하고, 멈춤 사유가 자리를 가른다."""
     by_window = json.loads(
         harness.verdict("window-rows", **{"verdict.min_window_rows": "51"})
     )
@@ -2010,6 +2046,12 @@ def test_min_window_rows_is_read_at_both_sites(harness: _Harness) -> None:
     assert reasons, "창 제외가 하나도 기록되지 않았다"
     assert set(reasons) <= {"NO_HISTORY", "INSUFFICIENT_ROWS"}, reasons
 
+
+def test_min_window_rows_reaches_the_minimum_sample_site(harness: _Harness) -> None:
+    """자리 ① 최소 필요 표본 결정식 — 창당 하한 x 창 최소 수 x 업무 수 x (1 + 여유).
+
+    이 판은 행 수가 최소 필요 표본 **바로 위**이고 창당 행은 하한보다 하나 많다 — 그래서
+    하한을 올리면 표본 하한만 발화한다."""
     by_sample = json.loads(
         harness.verdict("sample-floor", **{"verdict.min_window_rows": "51"})
     )
@@ -2110,16 +2152,13 @@ def _policy_with(
     return policy
 
 
-def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -> None:
-    """D-6G2a-6 — 공사 순공사원가 배제 비율은 **두 자리**에서 읽힌다.
+def test_pure_construction_cost_ratio_reaches_the_exclusion_site(
+    harness: _Harness,
+) -> None:
+    """자리 ① 제외 단계의 순공사원가선 — 적격 투찰자가 없으면 그 공고가 빠진다.
 
-    자리 ① 제외 단계의 실격선(`rules.pure_cost_floor`) — 적격 투찰자가 없으면 그 공고가
-    빠진다. 자리 ② S4 의 실격선 — 몬테카를로의 후보 투찰률 격자에 같은 선이 걸린다.
-
-    **자리를 가르지 않으면 한쪽의 상수가 보이지 않는다**: 출하 전략 판에서 ① 에만 상수를
-    박은 변이(P4)가 초록이었다 — ② 가 정책을 계속 따라서 판정문이 움직였다. 그래서 ① 은
-    전략이 정책을 읽지 않는 **계획 전략 판**에서, ② 는 S4 의 투찰금액을 **직접** 비교해
-    잰다."""
+    판은 **계획 전략 판**이다: 출하 전략 판에서는 S4 가 같은 값을 따로 읽어서, 제외 단계에
+    상수를 박아도 S4 쪽이 움직여 초록이 된다(변이 P4 로 실측)."""
     key = "floor.pure_construction_cost_ratio"
     probe = _OUTPUT_INPUTS[key]
     assert probe.board == "construction-pad", probe
@@ -2133,6 +2172,11 @@ def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -
         "정책을 읽지 않는다)"
     )
 
+
+def test_pure_construction_cost_ratio_reaches_the_monte_carlo_site(
+    harness: _Harness,
+) -> None:
+    """자리 ② S4 의 실격선 — 몬테카를로의 후보 투찰률 격자에 같은 선이 걸린다."""
     request = _construction_strategy_input(harness)
     strategy = InstitutionalMonteCarloStrategy()
     bids = {
@@ -2152,30 +2196,37 @@ def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -
     )
 
 
-@pytest.mark.parametrize(
-    "key", ["institution.reserve_price_count", "institution.draw_count"]
+_INSTITUTION_KEYS: Final[tuple[str, ...]] = (
+    "institution.reserve_price_count",
+    "institution.draw_count",
 )
-def test_institution_constants_are_read_at_every_site(
-    key: str, harness: _Harness
-) -> None:
-    """D-6G2a-6 — 제도 상수 둘은 **세 자리**에서 읽힌다.
 
-    자리 ① 제외 ⑮(`rules` — 예비가격 수·추첨 수가 맞지 않는 행을 빼낸다) 자리 ② P-4 적합도의
-    기준 분포와 구간 수(`fit`) 자리 ③ S4 의 사정률 표본(`strategies`).
 
-    ① 은 전체 실행에서 전량 제외로 드러나지만(부류 ⓐ), ① 이 먼저 발화하므로 ②③ 은 그
-    경로로 **도달할 수 없다** — 그래서 두 함수를 직접 부른다. 셋 중 하나만 상수가 되는 변이를
-    전체 실행으로는 잡을 수 없다는 것이 실측이다(같은 계열의 P4)."""
-    board = harness.board("mixed")
-    shipped = _policy_with(harness, f"inst-{key}-base")
-    nudged = _policy_with(
-        harness,
-        f"inst-{key}-moved",
-        **{key: str(int(harness.values("mixed")[key]) + 1)},
+def _institution_policies(
+    harness: _Harness, key: str, slug: str
+) -> tuple[StrategyBacktestPolicy, StrategyBacktestPolicy]:
+    """같은 판의 정책 둘 — 그 제도 상수 하나만 다르다."""
+    return (
+        _policy_with(harness, f"inst-{slug}-{key}-base"),
+        _policy_with(
+            harness,
+            f"inst-{slug}-{key}-moved",
+            **{key: str(int(harness.values("mixed")[key]) + 1)},
+        ),
     )
 
-    # 자리 ① — 제외 ⑮. **전체 실행이 아니라 제외 단계를 직접 부른다**: 전체 실행은 ①②③ 이
-    # 모두 같은 값을 읽어 움직임의 출처를 가리지 못한다(code-review r1 H-2).
+
+@pytest.mark.parametrize("key", _INSTITUTION_KEYS)
+def test_institution_constants_reach_the_exclusion_site(
+    key: str, harness: _Harness
+) -> None:
+    """자리 ① 제외 ⑮ — 예비가격 수·추첨 수가 맞지 않는 행을 빼낸다.
+
+    **전체 실행이 아니라 제외 단계를 직접 부른다**: 전체 실행은 세 자리가 모두 같은 값을 읽어
+    움직임의 출처를 가리지 못한다. 덧붙여 이 자리만 상수로 바꾼 변이는 **원래도 RED** 였다
+    (code-review r1 H-2 의 추정이 실측에서 틀렸다) — 그래도 자리를 가르는 단언으로 남긴다."""
+    board = harness.board("mixed")
+    shipped, nudged = _institution_policies(harness, key, "excl")
     first = admit_rows(board.snapshot.rows, shipped)
     second = admit_rows(board.snapshot.rows, nudged)
     assert len(first.admitted) != len(second.admitted), (
@@ -2183,7 +2234,18 @@ def test_institution_constants_are_read_at_every_site(
         f"{len(first.admitted)} == {len(second.admitted)}"
     )
 
-    # 자리 ② — 적합도. 승인 집합을 고정해 두고 정책만 바꾼다.
+
+@pytest.mark.parametrize("key", _INSTITUTION_KEYS)
+def test_institution_constants_reach_the_fit_reference_site(
+    key: str, harness: _Harness
+) -> None:
+    """자리 ② P-4 적합도의 기준 분포 — ① 이 먼저 발화하므로 전체 실행으로 도달할 수 없다.
+
+    승인 집합을 고정해 두고 정책만 바꾼다. **공시 스칼라 둘 다** 움직여야 한다 — 하나만 보면
+    적합도의 두 읽기(기준 표본 · 구간 수) 중 한쪽만 정책을 따라도 초록이 된다(변이 P9 실측).
+    구간 수 자리는 기준 표본을 고정한 전용 probe 가 따로 가른다."""
+    board = harness.board("mixed")
+    shipped, nudged = _institution_policies(harness, key, "fit")
     admission = admit_rows(board.snapshot.rows, shipped)
     assert admission.admitted, admission.excluded
     first = check_institutional_fit(
@@ -2192,9 +2254,6 @@ def test_institution_constants_are_read_at_every_site(
     second = check_institutional_fit(
         admission.admitted, nudged, seed=nudged.stability_seeds[0]
     )
-    # **둘 다** 움직여야 한다 — 하나만 보면 적합도의 두 읽기(기준 표본 · 구간 수) 중
-    # 한쪽만 정책을 따라도 초록이 된다(변이 P9 실측). 구간 수 자리는 기준 표본을 고정한
-    # 전용 probe 가 따로 가른다(D-6G2a-14 — `OPEN-6G2A-FIT-BIN-COUNT-SITE` 종결).
     assert first.ks_statistic != second.ks_statistic, (
         f"자리 ② — 적합도의 **기준 표본**이 {key} 를 따르지 않는다: "
         f"{first.ks_statistic} == {second.ks_statistic}"
@@ -2204,7 +2263,13 @@ def test_institution_constants_are_read_at_every_site(
         f"{first.max_bin_deviation} == {second.max_bin_deviation}"
     )
 
-    # 자리 ③ — S4 의 투찰금액.
+
+@pytest.mark.parametrize("key", _INSTITUTION_KEYS)
+def test_institution_constants_reach_the_monte_carlo_site(
+    key: str, harness: _Harness
+) -> None:
+    """자리 ③ S4 의 사정률 표본 — S4 의 투찰금액을 직접 비교해 가른다."""
+    shipped, nudged = _institution_policies(harness, key, "s4")
     request = _construction_strategy_input(harness)
     strategy = InstitutionalMonteCarloStrategy()
     bids = (strategy.bid(request, shipped), strategy.bid(request, nudged))
