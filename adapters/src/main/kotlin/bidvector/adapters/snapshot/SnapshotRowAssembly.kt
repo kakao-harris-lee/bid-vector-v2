@@ -130,9 +130,8 @@ private fun AssemblyTally.noticeOf(
         floorRate = canonical.floorRate,
         reserveRangeBeginRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_BEGIN_RATE),
         reserveRangeEndRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_END_RATE),
-        // **A 가 적용되는 공고에서만** 계수한다(D-6G2d-48 ④) — 미적용 공고의 빈 A 행은 결측이 아니라
-        // 「그 공고에 A 가 없다」이고, 그것을 세면 계수가 미적용 공고 수로 부풀어 공시가 뜻을 잃는다.
-        aValueTotal = formulaARow?.let { aValueTotalOf(it, applies = formulaAApplies == true) },
+        // 계수는 **A 축 행 자체**가 가른다(D-6G2e-4) — 기초금액 축 행의 술어에 묶지 않는다.
+        aValueTotal = formulaARow?.let { aValueTotalOf(it) },
         aValueOpenAt = formulaARow?.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT),
         standardMarketPriceApplicable =
             formulaARow?.predicateOf(FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
@@ -228,21 +227,25 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
  *
  * 셋 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
  *
+ * **계수는 이 행 자체가 가른다**(D-6G2e-4 ★② — 6G-2d cr 4차 ③). 앞 판은 기초금액 축 행의
+ * `bidPrceCalclAYn` 에 묶었고, 그 축이 **걷히지 않은** 공고에서는 그 술어가 「모름」이라 A 행의
+ * 결손이 세어지지 않았다(값은 맞고 계수만 과소 — 공시가 조용히 줄었다). 적용 여부를 그 축에서
+ * 읽을 수 없으면 여기서 읽는다: A 가 적용되지 않는 공고의 op 24 응답은 A 입력을 **아무것도** 싣지
+ * 않으므로, 「입력이 하나라도 있는데 합산을 낼 수 없다」가 곧 결손이다.
+ *
  * **A 안의 다른 `*Yn` 술어**(표준시장단가 적용 여부)는 합산을 가르지 않는다 — 그 금액은 근거 예규
  * 미확보로 §3.3 이 합산에서 **항상** 빼고, 술어 자신은 스키마가 `bool | null` 로 두어 모름이 합법이다.
  * 그래서 이 규칙의 대상은 합산을 가르는 술어 하나다(실측: 합산 목록을 가르는 술어는 그것뿐).
  */
-private fun AssemblyTally.aValueTotalOf(
-    row: RawRow,
-    applies: Boolean,
-): BigDecimal? {
+private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
     val qualityApplies = row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE)
     val parts = aValuePartsOf(row, qualityApplies)
     val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
     return when {
         qualityApplies == null || disclosedAt == null || parts.any { it == null } -> {
-            // 미적용 공고는 세지 않는다(D-6G2d-48 ④) — 값은 같은 `null` 이고 계수만 다르다.
-            if (applies) countIncompleteAValue()
+            // **A 입력이 하나라도 있는 행만** 센다(D-6G2e-4) — 그 셋이 모두 없는 행은 반쪽이 아니라
+            // 「그 공고에 A 가 없다」이고, 그것을 세면 계수가 미적용 공고 수로 부풀어 공시가 뜻을 잃는다.
+            if (qualityApplies != null || disclosedAt != null || parts.any { it != null }) countIncompleteAValue()
             null
         }
 

@@ -67,16 +67,18 @@ class SnapshotAmountContractTest {
         reserveFields: List<Map<String, String>> = emptyList(),
         openingFields: List<Map<String, String>> = emptyList(),
         /**
-         * A 적용 여부(D-6G2d-48 ④) — `incompleteAValues` 는 **적용되는 공고에서만** 센다. 기본이 참인
-         * 이유: 이 test 셋이 재는 것은 A 값의 규율이고, 그 판들은 A 가 적용되는 공고다.
+         * 기초금액 축 행의 `bidPrceCalclAYn` — 스냅숏의 `bid_price_formula_a_applicable` 칸이 된다.
+         * **`incompleteAValues` 를 가르지 않는다**(D-6G2e-4): 그 계수는 A 축 행 자신이 가른다.
          */
         formulaAApplicable: Boolean = true,
+        /** 기초금액 축이 **걷히지 않은** 공고 — 그 축의 술어를 읽을 수 없는 자리다(D-6G2e-4). */
+        baseAmountAxisCollected: Boolean = true,
     ): Rendered {
         val tally = AssemblyTally()
         val baseAmount = baseAmountFields + mapOf(A_APPLICABLE_KEY to if (formulaAApplicable) "Y" else "N")
         val axes =
             buildMap<SourceEndpoint, List<RawRow>> {
-                put(SourceEndpoint.BASE_AMOUNT_DETAIL, listOf(rawRow(baseAmount)))
+                if (baseAmountAxisCollected) put(SourceEndpoint.BASE_AMOUNT_DETAIL, listOf(rawRow(baseAmount)))
                 put(SourceEndpoint.BID_PRICE_FORMULA_A, listOf(rawRow(formulaAFields)))
                 put(SourceEndpoint.RESERVE_PRICE_DETAIL, reserveFields.map(::rawRow))
                 put(SourceEndpoint.OPENING_COMPLETE, openingFields.map(::rawRow))
@@ -389,35 +391,57 @@ class SnapshotAmountContractTest {
     }
 
     /**
-     * **D-6G2d-48 ④ — A 가 적용되지 않는 공고의 빈 A 행은 계수가 아니다.** 값은 같은 `null` 이지만
+     * **D-6G2d-48 ④ / D-6G2e-4 — A 가 없는 공고의 A 행은 계수가 아니다.** 값은 같은 `null` 이지만
      * 뜻이 다르다: 결측이 아니라 「그 공고에 A 가 없다」다. 세면 계수가 미적용 공고 수로 부풀어
      * 백테스트 판정 보고에서 그 공시가 뜻을 잃는다.
+     *
+     * **그 판정을 A 행 자신이 한다**(D-6G2e-4): A 가 적용되지 않는 공고의 응답은 A 입력을 아무것도
+     * 싣지 않는다. 기초금액 축 행의 술어가 무엇이든(여기서는 `Y`) 그 행은 결손이 아니다.
      */
     @Test
-    fun `A 가 적용되지 않는 공고의 빈 A 행은 세지 않는다`() {
+    fun `A 입력을 하나도 싣지 않은 A 행은 세지 않는다`() {
         val rendered =
             render(
-                formulaAFields = intactFormulaA() - "bidPrceCalclAOpenDt",
+                formulaAFields = mapOf("ntceNticeDt" to "2026-06-01 09:00:00"),
                 reserveFields = intactReserveRows(),
-                formulaAApplicable = false,
             )
 
         rendered.incompleteAValues shouldBe 0
         rendered.bytes shouldContain "\"a_value\":null"
     }
 
-    /** 반대 방향 — 적용되는 공고의 같은 빈 행은 **센다**(그것이 결측이다). */
+    /** 반대 방향 — A 입력이 있는데 합산을 낼 수 없는 행은 **센다**(그것이 결측이다). */
     @Test
-    fun `A 가 적용되는 공고의 빈 A 행은 센다`() {
+    fun `A 입력이 있는데 합산을 낼 수 없으면 센다`() {
         val rendered =
             render(
                 formulaAFields = intactFormulaA() - "bidPrceCalclAOpenDt",
                 reserveFields = intactReserveRows(),
-                formulaAApplicable = true,
             )
 
         rendered.incompleteAValues shouldBe 1
         rendered.bytes shouldContain "\"a_value\":null"
+    }
+
+    /**
+     * **D-6G2e-4 (★② — 6G-2d cr 4차 ③) — 기초금액 축이 걷히지 않아도 A 결손은 세어진다.** 앞 판은
+     * 계수를 그 축 행의 `bidPrceCalclAYn` 에 묶어, 축이 비면 술어가 「모름」이고 모름이 「미적용」으로
+     * 접혀 **계수만 조용히 과소**했다(값은 맞다). 실수집에서 기초금액 축이 상한·일시 실패로 미완인
+     * 공고는 드물지 않고, 그 공고들의 A 결손이 판정 보고에서 사라지면 공시가 사실이 아니게 된다.
+     */
+    @Test
+    fun `기초금액 축이 걷히지 않은 공고의 A 결손도 센다`() {
+        val rendered =
+            render(
+                formulaAFields = intactFormulaA() - A_COMPONENT_KEYS.last(),
+                reserveFields = intactReserveRows(),
+                baseAmountAxisCollected = false,
+            )
+
+        rendered.incompleteAValues shouldBe 1
+        rendered.bytes shouldContain "\"a_value\":null"
+        // 기초금액 축이 없으므로 그 축의 칸들은 비어 있다 — 계수만 달라지고 값은 그대로다.
+        rendered.bytes shouldContain "\"bid_price_formula_a_applicable\":null"
     }
 
     /** 끝자리 0 은 소수부가 아니다 — 원천 표기가 `.00` 이어도 정수 리터럴로 실린다. */
