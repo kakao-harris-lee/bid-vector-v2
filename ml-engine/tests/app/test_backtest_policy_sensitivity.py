@@ -1718,11 +1718,14 @@ _REMOVAL_ACCEPTED: Final[dict[str, str]] = {
     "stability_seeds.4": (
         "평탄 인덱스 목록의 **길이가 스키마에 고정돼 있지 않다**: 판독기"
         " (`evaluation.policy.collect_indexed_list`)는 인덱스가 0 부터 **연속**일 것만"
-        " 요구하고 개수는 보지 않는다. 그래서 마지막 인덱스를 지우면 seed 넷짜리 정책이"
-        " 조용히 선다(중간 인덱스를 지우면 구멍이 생겨 거부된다). A-3 승인 문면은"
-        " 「seed 5」이고, 넷으로 돈 판정은 거부가 아니라 판정문의 `seeds` 목록으로만"
-        " 드러난다 — `OPEN-6G2A-SEED-COUNT-NOT-PINNED` 로 등재한다(출하 코드 변경은"
-        " 이 slice 의 out_scope, D-6G2a-9 ⓑ)"
+        " 요구하고 개수는 보지 않는다. 그래서 **뒤에서부터 몇 개를 지워도** 선다 —"
+        " 마지막 하나를 지우면 넷, `.1`~`.4` 를 지우면 **하나**로 로드된다(중간 인덱스를"
+        " 지우면 구멍이 생겨 거부된다). seed 가 하나면 seed 안정성 레그가 **자명하게 참**이"
+        " 되어(부호·판정 집합의 크기가 1 이라 `SEED_UNSTABLE` 이 불가능하다) 그 레그가"
+        " 아무것도 막지 못한다. A-3 승인 문면은 「seed 5」이고, 줄어든 수로 돈 판정은 거부가"
+        " 아니라 판정문의 `seeds` 목록으로만 드러난다 —"
+        " `OPEN-6G2A-SEED-COUNT-NOT-PINNED` 로 등재한다(출하 코드 변경은 이 slice 의"
+        " out_scope, D-6G2a-9 ⓑ — 로더 수정은 6G-2e 로 넘긴다)"
     ),
 }
 
@@ -1910,6 +1913,22 @@ def test_the_registered_removable_keys_really_load(
     )
     assert len(loaded.stability_seeds) == 4, loaded.stability_seeds
     assert _REMOVAL_ACCEPTED[dropped].strip()
+    # 노출의 **폭**도 측정으로 둔다(verifier r1 M-4): 뒤에서부터 지우면 **하나까지** 줄고,
+    # 그때 seed 안정성 레그가 자명하게 참이 된다. OPEN 문면이 그 폭을 적는다.
+    values = _flat_policy(_SHIPPED_BACKTEST_POLICY)
+    values.update(_BASE_OVERRIDES)
+    lines = [
+        f"{key}: {values[key]}" if key in values else line
+        for line in _SHIPPED_BACKTEST_POLICY.read_text(encoding="utf-8").splitlines()
+        for key in (line.split(":", 1)[0].strip(),)
+        if not (key.startswith("stability_seeds.") and key != "stability_seeds.0")
+    ]
+    single = tmp_path / "single-seed" / "strategy-backtest-single.yaml"
+    single.parent.mkdir(parents=True, exist_ok=True)
+    single.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    narrowed = load_strategy_backtest_policy(single)
+    assert isinstance(narrowed, StrategyBacktestPolicy), narrowed
+    assert len(narrowed.stability_seeds) == 1, narrowed.stability_seeds
 
 
 def test_the_artefact_still_carries_the_reproducibility_echo(
