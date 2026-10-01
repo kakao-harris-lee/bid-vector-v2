@@ -383,9 +383,13 @@ _POLICY_VALUES_PATH = (
 )
 _VERDICT_PATH_MODULES: tuple[Path, ...] = (
     *sorted((_POLICY_MODULE_ROOT / "evaluation" / "backtest").glob("*.py")),
-    _POLICY_MODULE_ROOT / "app" / "backtest_job.py",
+    *sorted((_POLICY_MODULE_ROOT / "app").glob("backtest_*.py")),
 )
-"""명단의 대상 — 위협 모델이 「방어하는 것」으로 든 판정 경로 전부."""
+"""명단의 대상 — 위협 모델이 「방어하는 것」으로 든 판정 경로 전부.
+
+app 쪽도 **glob** 이다(code-review r2 M-3). 파일 하나를 적어 두면 선언한 범위(위협 모델의
+`ml_engine.app.backtest_*`)와 기계가 보는 범위가 갈리고, 새 `app/backtest_*.py` 가 정책 값을
+읽어도 명단에 오르지 않은 채 등식이 초록으로 남는다."""
 
 _POLICY_ROOT_NAMES: frozenset[str] = frozenset({"policy", "backtest_policy"})
 """정책 객체 전체를 가리키는 지역 이름들. 속성 체인 `*.policy` 도 같이 본다."""
@@ -608,6 +612,13 @@ class _Resolver:
         return None
 
     def resolve(self, node: ast.AST) -> tuple[str, frozenset[str]] | None:
+        if isinstance(node, ast.Call):
+            # **제공자 호출의 결과도 정책 유래 값이다**(code-review r2 H-1). 이 분기가 없으면
+            # `alpha = policy.verdict.alpha_for(...)` 같은 지역 대입에서 기계가 조용히
+            # 「읽기」로 되돌아간다 — 호출 자리는 삼중이 되지만 그 값이 **같은 함수 안에서**
+            # 흘러가는 소비자들은 삼중이 아니게 되고, 거기 상수를 박아도 명단이 그대로다.
+            # r1 의 막는 결함과 같은 모양이라 같은 층에서 닫는다.
+            return self.resolve(node.func)
         if isinstance(node, ast.Name):
             if node.id in self.value_names:
                 return ("value", self.value_names[node.id])

@@ -1284,6 +1284,59 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "required_discordant_pairs(target_power)",
     ): "CLASS",
     ("version", "run._assemble_verdict", "BacktestVerdict(policy_version)"): "ECHO",
+    # code-review r2 H-1 — 제공자 호출 결과를 받은 **지역 변수의 소비자**들. `ast.Call` 분기를
+    # 더하자 올라온 삼중 열셋이다. 유의수준이 창 평가기 안에서 검정력 계산과 공시 칸 둘로
+    # 흘러가는 것이 그중 핵심이다 — 그 둘이 삼중이 아니던 동안은 거기 상수를 박아도 명단이
+    # 그대로였다(거동이 우연히 받고 있었을 뿐이다).
+    (
+        "floor.rate_band_high",
+        "rules._is_floor_rate_unusable",
+        "return",
+    ): "PASS:contains",
+    ("floor.rate_band_low", "rules._is_floor_rate_unusable", "return"): "PASS:contains",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "generatorexp",
+    ): "CLASS",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "generatorexp",
+    ): "CLASS",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "generatorexp",
+    ): "CLASS",
+    (
+        "sampling.headroom_ratio",
+        "run._sampling_record",
+        "SamplingRecord(minimum_required_sample)",
+    ): "CLASS",
+    ("sampling.headroom_ratio", "run._sampling_record", "compare"): "CLASS",
+    ("verdict.alpha", "verdict.evaluate_window", "WindowOutcome(alpha_used)"): "ECHO",
+    (
+        "verdict.alpha",
+        "verdict.evaluate_window",
+        "required_discordant_pairs(alpha)",
+    ): "PROBE:evaluate_window",
+    ("verdict.alpha", "verdict.passes_window", "compare"): "PROBE:passes_window",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.evaluate_window",
+        "WindowOutcome(alpha_used)",
+    ): "ECHO",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.evaluate_window",
+        "required_discordant_pairs(alpha)",
+    ): "PROBE:evaluate_window",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.passes_window",
+        "compare",
+    ): "PROBE:passes_window",
     ("window.days", "windows._calendar_windows", "timedelta(days)"): "CLASS",
     (
         "window.embargo_days",
@@ -1377,9 +1430,24 @@ def test_every_probe_named_in_the_coverage_table_exists() -> None:
         assert callable(globals()[function_name]), function_name
 
 
-_VERIFIER_DECISION_USE_COUNTS: Final[dict[str, int]] = {
-    # verifier r1 이 독립으로 센 **판정 쓰임** 수(공시와 helper 통과 자리 제외). 이 레인의
-    # 생성 명단이 같은 수를 내는지 맞댄다 — 두 레인의 셈이 갈리면 한쪽 정의가 틀렸다.
+_VERIFIER_DECISION_USES: Final[dict[str, tuple[int, int]]] = {
+    # 값 -> (판정 **자리** 수, 판정 **소비자** 수). verifier r2 가 적은 수는 키마다 둘 중
+    # 하나다 — 다섯은 자리 수이고 `stability_seeds.0` 은 한 자리 안의 소비자 둘이다(보고서가
+    # 「2(1; 적합도 + 실행, 공시 제외)」로 그렇게 적었다). 두 축을 함께 적어 어느 축을 센
+    # 것인지가 섞이지 않게 한다.
+    #
+    # 자리 수는 code-review r2 H-1 수정 **전후로 같다**. 늘어난 것은 소비자 축이고(유의수준
+    # 4 · 분모 5), 그 증가가 바로 H-1 이 요구한 것이다 — 제공자 호출 결과가 지역 변수로 묶인
+    # 뒤 흘러가는 소비자들이 명단에 올라왔다.
+    "verdict.min_window_count": (3, 3),
+    "verdict.min_relative_improvement": (2, 2),
+    "verdict.alpha": (2, 4),
+    "verdict.primary_hypothesis_count": (3, 5),
+    "institution.reserve_price_count": (4, 4),
+    "stability_seeds.0": (1, 2),
+}
+
+_VERIFIER_REPORTED: Final[dict[str, int]] = {
     "verdict.min_window_count": 3,
     "verdict.min_relative_improvement": 2,
     "verdict.alpha": 2,
@@ -1387,18 +1455,21 @@ _VERIFIER_DECISION_USE_COUNTS: Final[dict[str, int]] = {
     "institution.reserve_price_count": 4,
     "stability_seeds.0": 2,
 }
+"""verifier r2 보고서의 수 그대로. 각 수가 두 축 중 하나와 일치해야 한다 — 어느 쪽과도
+맞지 않으면 한쪽 「쓰임」 정의가 틀렸다는 뜻이다."""
 
 
 def test_the_census_reproduces_the_independent_count() -> None:
     """생성 명단이 **독립 레인의 셈**을 재현한다.
 
-    verifier r1 은 자기 AST 로 판정 쓰임을 세고 이 레인의 손 등재와 여섯 값에서 갈렸다.
-    생성으로 바꾼 뒤 그 여섯을 맞댄다 — 공시(`ECHO`)와 helper 통과(`PASS:`) 자리를 빼면
-    같은 수여야 한다. 다르면 어느 한쪽의 「쓰임」 정의가 틀렸다는 뜻이고, 그 사실이 수로
-    드러난다."""
+    verifier r2 는 자기 AST 로 판정 쓰임을 세고 이 레인과 여섯 값에서 맞댔다. 공시(`ECHO`)와
+    helper 통과(`PASS:`) 자리를 뺀 뒤 **자리 축과 소비자 축 둘 다** 적고, 보고서의 수가 둘
+    중 하나와 일치함을 단언한다. 축을 하나만 적으면 두 레인이 다른 축을 세고도 같은 수가
+    나올 수 있다."""
     policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
     assert isinstance(policy, StrategyBacktestPolicy), policy
-    decision: dict[str, set[tuple[str, str]]] = {}
+    sites: dict[str, set[str]] = {}
+    consumers: dict[str, set[tuple[str, str]]] = {}
     for use in policy_use_census(policy):
         # **등재가 없는 삼중은 여기서 터지지 않는다** — 그 사실은 명단 등식 test 의 몫이고,
         # 이 test 가 같은 사실로 함께 붉어지면 어느 쪽이 깨졌는지 알 수 없다(변이 측정에서
@@ -1406,11 +1477,18 @@ def test_the_census_reproduces_the_independent_count() -> None:
         coverage = _USE_COVERAGE.get((use.key, use.site, use.consumer), "CLASS")
         if coverage.startswith(("ECHO", "PASS:")):
             continue
-        decision.setdefault(use.key, set()).add((use.site, use.consumer))
+        sites.setdefault(use.key, set()).add(use.site)
+        consumers.setdefault(use.key, set()).add((use.site, use.consumer))
     measured = {
-        key: len(decision.get(key, set())) for key in _VERIFIER_DECISION_USE_COUNTS
+        key: (len(sites.get(key, set())), len(consumers.get(key, set())))
+        for key in _VERIFIER_DECISION_USES
     }
-    assert measured == _VERIFIER_DECISION_USE_COUNTS, measured
+    assert measured == _VERIFIER_DECISION_USES, measured
+    for key, reported in _VERIFIER_REPORTED.items():
+        assert reported in measured[key], (
+            f"{key}: verifier 가 적은 {reported} 가 두 축 {measured[key]} 어느 쪽과도 "
+            "맞지 않는다 — 한쪽 「쓰임」 정의가 틀렸다"
+        )
 
 
 def test_the_projection_does_not_hide_a_coincidental_change() -> None:
@@ -1490,31 +1568,81 @@ def _window_scores(name: str, wins: tuple[bool, ...]) -> StrategyScores:
     )
 
 
+_POWER_BASELINE_WINS: Final[tuple[bool, ...]] = (True,) * 10 + (False,) * 30
+_POWER_STRATEGY_WINS: Final[tuple[bool, ...]] = (True,) * 20 + (False,) * 20
+"""검정력 자리를 재는 창 점수. 승률을 낮게 둔 이유는 **포화를 피하는 것**이다 — 승률이 높으면
+대립가설 성공 확률이 1 로 포화해 효과 크기를 올려도 필요 표본 수가 움직이지 않는다(실측:
+승률 0.75 에서 Δ 0.20 과 0.40 이 둘 다 5 를 낸다). 포화한 판에서는 그 자리가 정책을 읽는지
+알 수 없다."""
+
+
+def _required_pairs(harness: _Harness, slug: str, **changes: str) -> int | None:
+    """같은 창 점수에서 **필요 표본 수**만 재는 직접 호출 — 창 평가기의 검정력 자리다."""
+    return evaluate_window(
+        window_index=0,
+        baseline=_window_scores("S0", _POWER_BASELINE_WINS),
+        strategy=_window_scores("C", _POWER_STRATEGY_WINS),
+        policy=harness.policy("pass", slug, **changes),
+        primary=False,
+    ).required_discordant_pairs
+
+
 def test_evaluate_window_follows_the_improvement_at_the_power_site(
     harness: _Harness,
 ) -> None:
-    """D-6G2a-12 — 상대 개선 하한은 **두 자리**에서 쓰인다.
+    """D-6G2a-12 · code-review r2 H-1 — 창 평가기의 **검정력 자리**가 정책을 따른다.
 
-    자리 ① 판정식의 비교(위 test) 자리 ② **필요 표본 수** 계산 — 사전 등록한 효과 크기가
-    대립가설의 성공 확률을 정하므로, 하한을 올리면 필요 표본 수가 줄어든다. 같은 창 점수로
-    두 정책을 재면 그 자리가 정책을 따르는지 보인다."""
-    baseline = _window_scores("S0", (True,) * 30 + (False,) * 10)
-    strategy = _window_scores("C", (True,) * 36 + (False,) * 4)
-    measured = {
-        value: evaluate_window(
-            window_index=0,
-            baseline=baseline,
-            strategy=strategy,
-            policy=harness.policy(
-                "pass", f"ew-{value}", **{"verdict.min_relative_improvement": value}
-            ),
-            primary=False,
-        ).required_discordant_pairs
-        for value in ("0.05", "0.40")
-    }
-    assert None not in measured.values(), measured
-    assert measured["0.05"] != measured["0.40"], (
-        f"자리 ② — 필요 표본 수가 상대 개선 하한을 따르지 않는다: {measured}"
+    이 한 함수 안에서 **셋**이 그 계산으로 흘러간다: 상대 개선 하한(효과 크기) · 유의수준 ·
+    Bonferroni 분모(유의수준 선택자를 거쳐서). 판으로는 묶여 보이고, 명단도 처음에는 이 자리를
+    보지 못했다 — 제공자 호출 결과가 지역 변수로 묶이면 기계가 「읽기」로 되돌아갔기 때문이다.
+    그래서 같은 창 점수로 필요 표본 수만 재는 직접 호출을 둔다.
+
+    셋 다 **방향이 정해져 있다**: 효과 크기를 올리면 대립가설의 성공 확률이 커져 필요 표본이
+    줄고, 유의수준을 내리면(또는 분모를 키우면) 임계가 높아져 필요 표본이 늘어난다."""
+    base = _required_pairs(harness, "ew-base")
+    assert base is not None, "기준선에서 필요 표본 수가 서지 않는다"
+
+    loose = _required_pairs(
+        harness, "ew-delta", **{"verdict.min_relative_improvement": "0.40"}
+    )
+    assert loose is not None and loose < base, (
+        f"효과 크기가 검정력 자리에 닿지 않는다: {base} -> {loose}"
+    )
+
+    strict = _required_pairs(harness, "ew-alpha", **{"verdict.alpha": "0.005"})
+    assert strict is not None and strict > base, (
+        f"유의수준이 검정력 자리에 닿지 않는다: {base} -> {strict}"
+    )
+
+    split = _required_pairs(
+        harness, "ew-denominator", **{"verdict.primary_hypothesis_count": "9"}
+    )
+    assert split is not None and split == base, (
+        "보조 가설에는 Bonferroni 분모가 걸리지 않아야 한다(정책 객체가 고른다): "
+        f"{base} -> {split}"
+    )
+    primary_base = evaluate_window(
+        window_index=0,
+        baseline=_window_scores("S0", _POWER_BASELINE_WINS),
+        strategy=_window_scores("C", _POWER_STRATEGY_WINS),
+        policy=harness.policy("pass", "ew-base"),
+        primary=True,
+    ).required_discordant_pairs
+    primary_split = evaluate_window(
+        window_index=0,
+        baseline=_window_scores("S0", _POWER_BASELINE_WINS),
+        strategy=_window_scores("C", _POWER_STRATEGY_WINS),
+        policy=harness.policy(
+            "pass", "ew-denominator", **{"verdict.primary_hypothesis_count": "9"}
+        ),
+        primary=True,
+    ).required_discordant_pairs
+    assert primary_base is not None and primary_split is not None, (
+        primary_base,
+        primary_split,
+    )
+    assert primary_split > primary_base, (
+        f"Bonferroni 분모가 검정력 자리에 닿지 않는다: {primary_base} -> {primary_split}"
     )
 
 
