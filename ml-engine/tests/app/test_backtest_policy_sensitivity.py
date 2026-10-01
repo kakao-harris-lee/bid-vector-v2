@@ -55,8 +55,10 @@ from ml_engine.app.backtest_job import (
     build_strategies,
     run_backtest_job,
 )
+from ml_engine.evaluation.backtest.exclusions import admit_rows
+from ml_engine.evaluation.backtest.fit import check_institutional_fit
 from ml_engine.evaluation.backtest.mcnemar import DiscordantCounts
-from ml_engine.evaluation.backtest.observations import LoadedSnapshot
+from ml_engine.evaluation.backtest.observations import BusinessCategory, LoadedSnapshot
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
@@ -66,6 +68,12 @@ from ml_engine.evaluation.backtest.records import BacktestRequest, SampleVariant
 from ml_engine.evaluation.backtest.report import canonical_verdict_bytes
 from ml_engine.evaluation.backtest.run import run_strategy_backtest
 from ml_engine.evaluation.backtest.snapshot import load_snapshot
+from ml_engine.evaluation.backtest.strategies import (
+    BidAmount,
+    InstitutionalMonteCarloStrategy,
+    StrategyInput,
+    build_strategy_input,
+)
 from ml_engine.evaluation.backtest.verdict import (
     StrategyNotEvaluable,
     WindowOutcome,
@@ -415,6 +423,11 @@ _BOARD_BUILDERS: Final[dict[str, Any]] = {
     "seeded": lambda _: _planned_board(
         BoardSpec(_uniform(BoardWindow(10, 0, 40, 0))), seed_sensitive=True
     ),
+    # 순공사원가선이 출하 비율에서 이미 묶이는 공사 공고를 섞은 **계획 전략** 판 —
+    # 전략이 정책을 읽지 않으므로 배제 비율의 **제외 단계 읽기 하나**만 살아 있다.
+    "construction-pad": lambda _: _planned_board(
+        BoardSpec(_uniform(BoardWindow(10, 0, 40, 0)), construction_pad=12)
+    ),
     # 예가 범위가 넓은 공고를 섞고 **판별 표본 걸러내기**로 도는 판.
     "wide-reserve": lambda _: _planned_board(
         BoardSpec(_uniform(BoardWindow(10, 0, 40, 0)), wide_reserve_pad=12),
@@ -505,9 +518,10 @@ _OUTPUT_INPUTS: Final[dict[str, _Probe]] = {
     # S1 의 공사 전용 offset — 투찰금액과 적격 여부를 바꾸지만, 이 판에서 S1 의 결말은
     # 양쪽 모두 「못 이겼다」다(바뀌는 것은 승률·bp 사분위 같은 산출 칸이다).
     "strategy.s1_offset_bp": _Probe("mixed", "900.0"),
-    # 공사의 **두 번째 실격선** 비율 — 1 에 가깝게 올리면 순공사원가선이 하한가 위로
-    # 올라가 적격 투찰자 집합과 최저 적격 금액이 바뀐다. 결말은 그대로다.
-    "floor.pure_construction_cost_ratio": _Probe("mixed", "0.999"),
+    # 공사의 **두 번째 실격선** 비율 — 내리면 순공사원가선이 적격 최저 투찰금액 아래로
+    # 내려와 제외가 풀린다. 판은 **계획 전략** 판이다: 출하 전략 판에서는 S4 가 같은 값을
+    # 따로 읽어서, 제외 단계에 상수를 박아도 S4 쪽이 움직여 초록이 된다(변이 P4 로 실측).
+    "floor.pure_construction_cost_ratio": _Probe("construction-pad", "0.90"),
     # 판별 표본 걸러내기의 반폭 — 넓은 범위(±3%) 공고가 남거나 빠진다. 이 판의 넓은 공고는
     # 채점 창 **밖**(이력 블록)에 있어 결말에 닿지 않고, 판별 기록의 제거 수가 바뀐다.
     "sensitivity.wide_reserve_half_width": _Probe("wide-reserve", "0.035"),
@@ -559,28 +573,37 @@ _SITE_ASSERTED: Final[frozenset[str]] = frozenset(
         "verdict.primary_hypothesis_count",
         "verdict.min_window_count",
         "verdict.min_window_rows",
+        "institution.reserve_price_count",
+        "institution.draw_count",
+        "floor.pure_construction_cost_ratio",
     }
 )
-"""자리마다 **따로** 단언하는 값들 — 판정식이 읽는 값이라 한 자리만 상수가 되면 다른
-자리가 움직여 「바뀌었다」가 된다. 전용 test 셋이 자리를 가른다."""
+"""자리마다 **따로** 단언하는 값들 — 한 자리만 상수가 되면 다른 자리가 움직여
+「바뀌었다」가 되기 때문이다. 실측이 그 위험을 확인했다: 배제 비율을 **제외 단계에서만**
+상수로 바꾼 변이(P4)가 처음엔 초록이었다 — S4 가 같은 값을 따로 읽어 판정문이 움직였다.
+그래서 이 여섯은 전용 test 가 자리를 가른다."""
 
 _SITE_NOT_ASSERTED: Final[dict[str, str]] = {
     # 둘째·셋째 자리를 **따로** 단언하지 않는 다중 자리 값과 그 사유. `_SITE_ASSERTED` 와
     # 합치면 `_MULTI_SITE_READS` 와 등식이다 — 새 다중 자리 값이 생기면 둘 중 하나에
     # 등재해야 하고, 안 하면 `test_multi_site_reads_are_enumerated_from_the_kickoff_census`
     # 가 RED 다.
-    "institution.reserve_price_count": (
-        "세 자리(제외 ⑮ · 적합도 기준 분포 · S4 분포)가 **같은 판에서 함께 돈다** —"
-        " 예비가격 수를 바꾸면 ⑮ 가 먼저 전량을 제외해 뒤의 둘에 도달하지 못하므로,"
-        " 자리별 판을 지으려면 제외 규칙을 우회해야 한다(그 자체가 범위 밖)"
-    ),
-    "institution.draw_count": "같은 이유 — 추첨 수도 ⑮ 가 먼저 본다",
-    "floor.pure_construction_cost_ratio": (
-        "두 자리(제외 단계의 순공사원가선 · S4 의 실격선)가 같은 공사 행에서 함께 돈다 —"
-        " 제외가 먼저 발화하면 S4 가 그 행을 보지 못한다"
-    ),
     "sampling.list_call_count": "둘째 자리가 판정문 공시(메아리)라 투영이 지운다",
     "sampling.max_total_calls": "둘째·셋째 자리가 표본 기록과 판정문 공시(메아리)다",
+}
+
+_SITE_NOT_ISOLABLE: Final[dict[str, str]] = {
+    # 자리가 하나 더 있으나 **이 층에서 가를 수 없는** 자리와 그 사유. 선언이 아니라
+    # 변이 실측이 근거다 — 등재된 사유가 틀리면 그 변이가 RED 가 되어 드러난다.
+    "institution.reserve_price_count": (
+        "적합도의 네 자리 중 **구간 수 하나**: 적합도 결과가 공시하는 스칼라 둘"
+        "(KS 통계량 · 최대 구간 편차)이 **둘 다** 기준 표본에도 구간 수에도 의존한다."
+        " 그래서 구간 수만 상수로 바꾼 변이(P9b)는 기준 표본 쪽이 정책을 계속 따라"
+        " 두 스칼라가 모두 움직여 초록이다. 기준 표본을 고정한 채 구간 수만 흔드는 입력이"
+        " 없어(정책 값 하나가 둘을 동시에 정한다) 이 층에서는 가를 수 없다 —"
+        " `OPEN-6G2A-FIT-BIN-COUNT-SITE` 로 등재한다. 나머지 셋(제외 ⑮ · 기준 표본 ·"
+        " S4 분포)은 전용 test 가 가른다"
+    ),
 }
 
 
@@ -734,6 +757,12 @@ def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
         f"{sorted(set(_MULTI_SITE_READS) - _SITE_ASSERTED - set(_SITE_NOT_ASSERTED))}"
     )
     for key, reason in _SITE_NOT_ASSERTED.items():
+        assert reason.strip(), f"{key} 의 사유가 비어 있다"
+    assert set(_SITE_NOT_ISOLABLE) <= _SITE_ASSERTED, (
+        "가를 수 없는 자리를 등재한 값은 나머지 자리를 자리별로 단언해야 한다: "
+        f"{sorted(set(_SITE_NOT_ISOLABLE) - _SITE_ASSERTED)}"
+    )
+    for key, reason in _SITE_NOT_ISOLABLE.items():
         assert reason.strip(), f"{key} 의 사유가 비어 있다"
 
 
@@ -945,6 +974,141 @@ def _dropped_policy(
     values.update(_BASE_OVERRIDES)
     return load_strategy_backtest_policy(
         _drop_key(tmp_path / dropped.replace(".", "_"), values, dropped)
+    )
+
+
+def _construction_strategy_input(
+    harness: _Harness, seed: int = 20260812
+) -> StrategyInput:
+    """업무 셋 판에서 **공사** 공고 하나의 전략 입력 — S4 가 순공사원가선과 제도 분포를
+    쓰는 자리를 직접 겨눈다. 판정 전체를 돌리지 않으므로 제외 단계의 읽기가 끼어들지
+    않는다(자리를 가르는 유일한 방법이다 — 두 자리는 같은 ratio 구간에서 함께 묶인다)."""
+    board = harness.board("mixed")
+    policy = load_strategy_backtest_policy(
+        _write_policy(harness.directory / "strategy-input", harness.values("mixed"))
+    )
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    admission = admit_rows(board.snapshot.rows, policy)
+    construction = [
+        item
+        for item in admission.admitted
+        if item.row.notice.category is BusinessCategory.CONSTRUCTION
+        and item.row.notice.pure_construction_cost is not None
+    ]
+    assert construction, "업무 셋 판에 승인된 공사 행이 없다"
+    target = construction[-1]
+    history = tuple(item for item in admission.admitted if item is not target)
+    return build_strategy_input(target, history, seed=seed)
+
+
+def _policy_with(
+    harness: _Harness, slug: str, **changes: str
+) -> StrategyBacktestPolicy:
+    policy = load_strategy_backtest_policy(
+        _write_policy(harness.directory / slug, harness.values("mixed", **changes))
+    )
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    return policy
+
+
+def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -> None:
+    """D-6G2a-6 — 공사 순공사원가 배제 비율은 **두 자리**에서 읽힌다.
+
+    자리 ① 제외 단계의 실격선(`rules.pure_cost_floor`) — 적격 투찰자가 없으면 그 공고가
+    빠진다. 자리 ② S4 의 실격선 — 몬테카를로의 후보 투찰률 격자에 같은 선이 걸린다.
+
+    **자리를 가르지 않으면 한쪽의 상수가 보이지 않는다**: 출하 전략 판에서 ① 에만 상수를
+    박은 변이(P4)가 초록이었다 — ② 가 정책을 계속 따라서 판정문이 움직였다. 그래서 ① 은
+    전략이 정책을 읽지 않는 **계획 전략 판**에서, ② 는 S4 의 투찰금액을 **직접** 비교해
+    잰다."""
+    key = "floor.pure_construction_cost_ratio"
+    probe = _OUTPUT_INPUTS[key]
+    assert probe.board == "construction-pad", probe
+    echoed = _echoed_forms(harness.values(probe.board)[key], probe.value)
+    base = harness.verdict(probe.board)
+    moved = harness.verdict(probe.board, **{key: probe.value})
+    assert _document_view(moved, echoed) != _document_view(base, echoed), (
+        "자리 ① — 계획 전략 판에서 배제 비율을 내렸는데 판정문이 그대로다(제외 단계가 "
+        "정책을 읽지 않는다)"
+    )
+
+    request = _construction_strategy_input(harness)
+    strategy = InstitutionalMonteCarloStrategy()
+    bids = {
+        value: strategy.bid(
+            request,
+            _policy_with(
+                harness,
+                f"s4-ratio-{value}",
+                **{"floor.pure_construction_cost_ratio": value},
+            ),
+        )
+        for value in ("0.98", "0.9999")
+    }
+    assert all(isinstance(item, BidAmount) for item in bids.values()), bids
+    assert bids["0.98"] != bids["0.9999"], (
+        f"자리 ② — S4 의 투찰금액이 배제 비율을 따르지 않는다: {bids}"
+    )
+
+
+@pytest.mark.parametrize(
+    "key", ["institution.reserve_price_count", "institution.draw_count"]
+)
+def test_institution_constants_are_read_at_every_site(
+    key: str, harness: _Harness
+) -> None:
+    """D-6G2a-6 — 제도 상수 둘은 **세 자리**에서 읽힌다.
+
+    자리 ① 제외 ⑮(`rules` — 예비가격 수·추첨 수가 맞지 않는 행을 빼낸다) 자리 ② P-4 적합도의
+    기준 분포와 구간 수(`fit`) 자리 ③ S4 의 사정률 표본(`strategies`).
+
+    ① 은 전체 실행에서 전량 제외로 드러나지만(부류 ⓐ), ① 이 먼저 발화하므로 ②③ 은 그
+    경로로 **도달할 수 없다** — 그래서 두 함수를 직접 부른다. 셋 중 하나만 상수가 되는 변이를
+    전체 실행으로는 잡을 수 없다는 것이 실측이다(같은 계열의 P4)."""
+    board = harness.board("mixed")
+    shipped = _policy_with(harness, f"inst-{key}-base")
+    nudged = _policy_with(
+        harness,
+        f"inst-{key}-moved",
+        **{key: str(int(harness.values("mixed")[key]) + 1)},
+    )
+
+    # 자리 ① — 전체 실행에서 전량 제외(부류 ⓐ 단언이 이미 잠근다; 여기서는 자리 확인).
+    excluded = _decision_view(
+        harness.verdict(
+            "shipped", **{key: str(int(harness.values("shipped")[key]) + 1)}
+        )
+    )
+    assert excluded != _decision_view(harness.verdict("shipped")), excluded
+
+    # 자리 ② — 적합도. 승인 집합을 고정해 두고 정책만 바꾼다.
+    admission = admit_rows(board.snapshot.rows, shipped)
+    assert admission.admitted, admission.excluded
+    first = check_institutional_fit(
+        admission.admitted, shipped, seed=shipped.stability_seeds[0]
+    )
+    second = check_institutional_fit(
+        admission.admitted, nudged, seed=nudged.stability_seeds[0]
+    )
+    # **둘 다** 움직여야 한다 — 하나만 보면 적합도의 두 읽기(기준 표본 · 구간 수) 중
+    # 한쪽만 정책을 따라도 초록이 된다(변이 P9 실측). 그래도 남는 자리 하나는
+    # `_SITE_NOT_ISOLABLE` 에 사유와 함께 등재돼 있다.
+    assert first.ks_statistic != second.ks_statistic, (
+        f"자리 ② — 적합도의 **기준 표본**이 {key} 를 따르지 않는다: "
+        f"{first.ks_statistic} == {second.ks_statistic}"
+    )
+    assert first.max_bin_deviation != second.max_bin_deviation, (
+        f"자리 ② — 적합도의 **구간 비교**가 {key} 를 따르지 않는다: "
+        f"{first.max_bin_deviation} == {second.max_bin_deviation}"
+    )
+
+    # 자리 ③ — S4 의 투찰금액.
+    request = _construction_strategy_input(harness)
+    strategy = InstitutionalMonteCarloStrategy()
+    bids = (strategy.bid(request, shipped), strategy.bid(request, nudged))
+    assert all(isinstance(item, BidAmount) for item in bids), bids
+    assert bids[0] != bids[1], (
+        f"자리 ③ — S4 의 투찰금액이 {key} 를 따르지 않는다: {bids}"
     )
 
 

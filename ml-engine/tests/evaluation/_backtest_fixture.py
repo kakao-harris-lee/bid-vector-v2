@@ -79,6 +79,12 @@ _METHOD_NAMES: dict[str, str] = {
 # (`사정률 * 0.87995`)보다 **아래**라 묶이지 않고, 비율을 1 에 가깝게 올리면 **위**로
 # 올라가 적격 투찰자 집합이 바뀐다 — 그래서 그 값이 판정 경로에 닿는지 거동으로 잴 수 있다.
 _PURE_COST_RATIO_OF_BASE = 0.89
+# 경계 판의 공사 행이 쓰는 순공사원가 비율. `0.95` 는 **출하 배제 비율(0.98)에서 이미
+# 묶이도록** 고른 값이다: 순공사원가선(`0.95 * 사정률 * 0.98` = 기초금액의 0.912~0.950)이
+# 적격 최저 투찰금액(`_GATE_BID_RATE` = 0.9050)보다 위라 그 공고는 적격 투찰자가 없어
+# 제외되고, 비율을 내리면 선이 내려와 제외가 풀린다 — 그래서 **제외 단계의 그 읽기 하나**를
+# 겨눌 수 있다(전략은 계획대로 투찰해 정책을 읽지 않는다).
+_BOARD_PURE_COST_RATIO_OF_BASE = 0.95
 
 
 def _row(
@@ -89,6 +95,7 @@ def _row(
     category: str = "SERVICE",
     lowest_bid_rate: float | None = None,
     half_width: float = _HALF_WIDTH,
+    pure_cost_ratio_of_base: float = _PURE_COST_RATIO_OF_BASE,
 ) -> dict[str, Any]:
     """합성 행 하나. 기본값은 **기존 fixture 그대로**다(`build_rows()` 의 바이트 불변).
 
@@ -134,7 +141,7 @@ def _row(
             # (`rules.resolve_a_value`) — 판정 불가(`None`)면 제외되므로 반드시 채운다.
             "bid_price_formula_a_applicable": False if construction else None,
             "pure_construction_cost": (
-                int(_BASE_AMOUNT * _PURE_COST_RATIO_OF_BASE) if construction else None
+                int(_BASE_AMOUNT * pure_cost_ratio_of_base) if construction else None
             ),
             "has_award_method_application_standard": True,
             "has_application_basis_content": False,
@@ -304,6 +311,10 @@ class BoardSpec:
     wide_reserve_pad: int = 0
     """예가 범위가 넓은(±3%) 공고 수 — 판별 표본 걸러내기가 실제로 지울 행."""
 
+    construction_pad: int = 0
+    """순공사원가선이 **출하 비율에서 이미 묶이는** 공사 공고 수 — 배제 비율을 내리면
+    제외가 풀린다. 채점 창 **밖**에 두므로 결말에 닿지 않고, 제외 계수가 움직인다."""
+
 
 @dataclass(frozen=True)
 class BoardRows:
@@ -343,6 +354,7 @@ def build_board_rows(spec: BoardSpec) -> BoardRows:
         *,
         category: str = "SERVICE",
         half_width: float = _HALF_WIDTH,
+        pure_cost_ratio_of_base: float = _PURE_COST_RATIO_OF_BASE,
     ) -> None:
         payload = _row(
             label,
@@ -351,6 +363,7 @@ def build_board_rows(spec: BoardSpec) -> BoardRows:
             category=category,
             lowest_bid_rate=_GATE_BID_RATE,
             half_width=half_width,
+            pure_cost_ratio_of_base=pure_cost_ratio_of_base,
         )
         key = payload["notice"]["notice_key_hash"]
         baseline_plan[key] = baseline_rate
@@ -372,6 +385,15 @@ def build_board_rows(spec: BoardSpec) -> BoardRows:
             win,
             win,
             category=spec.pad_categories[index % len(spec.pad_categories)],
+        )
+    for index in range(spec.construction_pad):
+        add(
+            f"board-construction-{index}",
+            _BOARD_FIRST_BLOCK + timedelta(days=index % 5),
+            win,
+            win,
+            category="CONSTRUCTION",
+            pure_cost_ratio_of_base=_BOARD_PURE_COST_RATIO_OF_BASE,
         )
     for index in range(spec.wide_reserve_pad):
         add(
