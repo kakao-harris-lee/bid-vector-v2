@@ -206,6 +206,16 @@ in_scope: r1-c 의 `ml-engine/tests/evaluation/fixtures/m6-6g-golden/**` 추가�
 | **D-6G2d-51** | **이탈 수용 넷 + in_scope 한 파일**: ① 디렉터리 fsync 관용은 `forceDirectory` 안이 아니라 부르는 자리에(대역 주입 test 가 잠그려면) ② 경고는 표준 오류 한 줄(어댑터에 로그 포트 없음, 닫힌 토큰, 프로세스에 한 번) ③ 새 public 표면 하나 `runStateFormatCauseCode`(사유 코드 문자열만, 예외 타입은 비공개 유지) ④ **in_scope 에 `app/src/main/kotlin/bidvector/app/collection/OpeningCollectionLines.kt` 추가** — D-48 ① 이 그 자리를 지목했는데 목록이 추출 러너 한 파일만 들었다(팀장 누락). 그 누락이 rollback ④⑤⑥ 의 구멍이었고 레인이 실측으로 잡아 복원 목록에 더했다 |
 | **D-6G2d-52** | **표적 확인 SHA 는 이 갱신 커밋.** verifier: D-48 ①~⑥ test·변이(②③⑤ 필수) · 러너 로그에 형식 토큰 · acceptance 강한 집합 · rollback 문서 명령 그대로(D14/M39, hunk 아홉) · 새 public 표면. 그 뒤 `/code-review` 4차 — D-50 수렴 규칙 적용 |
 
+## 계약 갱신 r7 (2026-10-01, 팀장 — PR #51 `/code-review` 4차 9건 수령 · D-50 수렴 규칙 발동)
+
+새 high 없음 → 코드 변경 0, 전부 등재. **실수집 전** 표지 셋은 6G-2c(리뷰 후속 일괄)가 실수집 시작 전에 닫는다 — 실수집 시작 조건에 더한다(A-3 · 운영계정 키 · 6G-2c 의 이 셋).
+
+| ID | 결정 |
+|---|---|
+| **D-6G2d-53** | **`OPEN-6G-REVIEW-FOLLOWUPS` 추가(실수집 전 ★)**: ★② 꼬리에 **찢어진 조각만** 남은 라운드(첫 PENDING 쓰기 도중 크래시)는 `read()` 가 조각을 걸러 열린 라운드로 안 보이고 예산은 그 조각을 호출 하나로 센다 — 같은 축의 반복 크래시가 상한을 안 올린다(예산 상한으로는 묶임). 처방: 꼬리의 torn 표식도 열린 라운드로 ★③ `incompleteAValues` 가 기초금액 축의 `formulaAApplies` 에 묶여 그 축이 비면 A 행의 결손을 세지 않는다(값은 맞고 계수만 과소) — A 적용 여부는 A 축 행 자체에서 ★⑦ `healTornTail` 이 `verifyIntegrity`(directory_id·모르는 파일) 앞에 돌아 거부될 디렉터리를 먼저 고쳐 쓴다 · `LedgerDigest` 읽기(비UTF-8 등)가 가드 밖이라 던지면 잠금이 남는다 — 순서 교환 + 가드 안으로. 그 밖: ① MISSING/MISMATCHED 토큰은 bean 생성 시점이라 러너 매핑에 안 닿는다(D-22 ① 수용 사실, KDoc 「감싸는 자리가 없다」 정정 필요) ⑥ `AxisConclusion.settled` 죽은 코드·KDoc 오도 ⑧ Held 경로에서 `state.json` 세 번 파싱 ⑨ `fromLedgeredWalk` 가 실패 결말 축의 원문도 파싱·보유(메모리) |
+| **D-6G2d-54** | **`OPEN-6G2D-FSYNC-BATCHING` 추가**: ④ `recordState()` 가 append 마다 표본 두 파일을 다시 읽고 해시한다(확정 콜백에서만 갱신하면 됨) ⑤ 원장을 collect 마다 두 번 전체 파싱 + 줄마다 JSON 두 번 — 묶기 설계와 같은 자리에서 |
+| **D-6G2d-55** | **머지.** 사용자 사전 승인(2026-09-30 「리뷰 이상 없으면 머지」) + D-50. 실수집 시작 조건: A-3 결정 · `OPEN-6G2D-MAX-PAGES-FINAL` 처분 · 운영계정 키 · D-53 ★ 셋 닫힘(6G-2c) |
+
 ## 위협 모델 — 6G-2d 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 실행 상태 **회계** — 정직한 크래시 한 번 뒤에 재기동이 되고 상한이 되감기지 않는다 ② 추출 값이 (공고, 축)마다 **하나의

@@ -450,3 +450,9 @@ D-6G-68 행의 「원장 이전 원문은 D-6G-58 그대로」는 **결말 줄�
   `workflow/src/test/**`(하나: 상한 회계). 재리뷰 대응이 더한 둘은 내구 원시연산과 장부 판독이고, 그 앞
   라운드가 더한 셋은 추출 계수 배선 판과 그 공통 대역, 상한 회계 판이다. 같은 수를 rollback.md 의 기계
   목록이 A 로 센다.
+
+## `/code-review` 4차 (2026-10-01) — 새 high 없음, 전부 등재 (D-6G2d-53~55, 팀장)
+
+- **`OPEN-6G-REVIEW-FOLLOWUPS` 추가 — 실수집 전 ★**: ★ 꼬리에 찢어진 조각만 남은 라운드를 열린 라운드로 보지 않음(예산은 셈) · ★ `incompleteAValues` 가 기초금액 축 행에 의존 · ★ 복구 쓰기가 무결성 검사보다 앞섬 + `LedgerDigest` 읽기 예외 시 잠금 잔류. 그 밖: MISSING/MISMATCHED 토큰은 bean 생성 시점(KDoc 정정) · `AxisConclusion.settled` 죽은 코드 · Held 경로 `state.json` 세 번 파싱 · 실패 결말 축 원문 파싱·보유.
+- **`OPEN-6G2D-FSYNC-BATCHING` 추가**: append 마다 표본 파일 재해시 · collect 마다 원장 이중 전체 파싱.
+- 실수집 시작 조건(D-55): A-3 · `OPEN-6G2D-MAX-PAGES-FINAL` · 운영계정 키 · ★ 셋(6G-2c).
