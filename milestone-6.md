@@ -620,6 +620,8 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 정본 `reports/evidence/m6/6g2a/scope.md`(D-6G2a-1~9, 운영자 결정 A-1 즉시 착수 · A-2 박힌 수 발견 시 멈춤). 수령 OPEN: `OPEN-6G-SENSITIVITY-HARDENING`(6G vr r5 H-2 — 비교 투영에서
 `policy_checksum`·`policy_version` 을 빼고, 정책 값 39 를 ⓐ 판정 입력 · ⓑ 산출 입력 · ⓒ 판독 밖 세 부류로 등식 분할, 판정 입력 일곱마다 경계 위의 판, 쓰이는 자리마다 측정, 변이 열 RED). `ml-engine/src/**` diff 0 이 기대값(D-6G2a-9), Python 단일 레인(`ml-implementer`), Gradle 0. 실수집·백테스트를 막지 않는다. 리뷰 레인 verifier + code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 착수 문단을 문단 단위 삭제로 지운다.
 
+**6G-2a 구현 완료 2026-10-01 — 리뷰 대기** — base `30c6659e`, 브랜치 `m6-6g2a/2026-10-01`. `ml-engine/src/**` diff **0**(D-6G2a-9 기대값 그대로 — 판정 경로에 **실제로 박힌 수는 없었다**). 비교 투영에서 `policy_checksum`·`policy_version` 을 뺀 뒤 정책 값 **39** 를 ⓐ 판정 입력 **29** · ⓑ 산출 입력 **9** · ⓒ 판독 밖 **1** 로 등식 분할했고, 판정 입력 일곱마다 경계 위의 판을 두어 **양쪽 방향**으로 결말이 뒤집힘을 쟀다(판 **열다섯**, 그중 둘에서 후보가 기준선을 실제로 이겨 `StrategyPassed` 가 난다 — `_DECISION_FROZEN` 등재 삭제). 변이 **스물넷 중 스물셋 RED**. 그 측정이 **설계의 구멍 둘을 잡았다**: 한 자리에만 상수를 박은 변이(배제 비율의 제외 단계 · 제도 상수의 적합도 기준 표본)가 초록이어서 자리별 단언을 셋에서 여섯으로 늘렸다. acceptance 는 CI `ml-engine` job 열한 단계 전부 exit 0 · `pytest tests -q` **1,296 passed**. 신설 OPEN 둘: `OPEN-6G2A-SEED-COUNT-NOT-PINNED`(평탄 인덱스 목록의 길이가 스키마에 고정돼 있지 않아 마지막 seed 를 지운 정책이 선다) · `OPEN-6G2A-FIT-BIN-COUNT-SITE`(적합도의 구간 수 자리를 이 층에서 가를 수 없다). 수령 OPEN `OPEN-6G-SENSITIVITY-HARDENING` 은 이 slice 가 닫는다. 실수집·백테스트를 막지 않는다. 다음: verifier + code-reviewer(sonnet) 병렬, 그 뒤 사용자 승인. rollback 의 공유 파일 절차는 이 문단도 착수 문단과 같은 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
