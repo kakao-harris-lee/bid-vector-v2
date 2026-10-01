@@ -13,7 +13,7 @@
 | `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ☐ 6G-2c 머지 대기(찢어진 조각만 남은 꼬리 라운드 · `incompleteAValues` 의 기초금액 축 의존 · 복구 쓰기 순서·잠금 가드) | 6G-2d D-6G2d-53 |
 | 운영계정 서비스 키 | ☐ 환경에 없음 — 운영자가 **저장소 밖 파일**로 제공 | 6G 운영자 결정 2026-09-27 |
 | **수집 범위 상한 31일**(`COLLECTION_RANGE_POLICY.maxSpanDays`, 6F-8 D-6F8-3)이 **개찰 갈래에도** 걸린다 — A-1 의 최대 16주 창은 기동 거부(`SPAN_TOO_LONG`)되고, 확정 표본이 from/to 를 고정해(`sample-scope.json`) 창을 쪼개 같은 디렉터리로 돌릴 수도 없다 | ☐ **차단** — 개찰 갈래의 범위 정책을 따로 두는 slice(`OPEN-6G-OPENING-RANGE-CAP`) 머지 대기 | PR #52 `/code-review` 2026-10-01 |
-| 백테스트 CLI | ☐ 없음 — 스크립트 호출(2-4) 또는 `OPEN-6G-BACKTEST-CLI` | PR #52 |
+| 백테스트 CLI | ✓ 있음 — `python -m ml_engine.app.backtest_cli`(2-4). `OPEN-6G-BACKTEST-CLI` 닫힘 | 6G-2e D-6G2e-6 |
 | DEC-03 지자체 판별 | ✓ 현행 유지(판정 불가 계수 + 민감도 두 판) | 운영자 2026-09-30 |
 
 ## 1. 호스트·DB 준비 (키 없이 할 수 있는 것)
@@ -90,23 +90,28 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
 
 ### 2-4. 백테스트 — Python, 저장소 밖 입력·출력
 
-`ml_engine.app.backtest_job` 에는 **CLI 가 없다**(`run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path) -> JobCompleted | JobFailed`, 예외 없이 결과 타입). `__main__` 추가는 `src` 변경이라 `OPEN-6G-BACKTEST-CLI`(6G-2c 후보)로 두고, 그때까지는 아래 한 줄 스크립트로 부른다 — 정책 둘(판정 정책 `strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`, 둘 다 출하 파일 그대로, CLI 로 완화 불가):
+`ml_engine.app.backtest_cli` 가 진입점이다(6G-2e D-6G2e-6 — 앞 판의 heredoc 스크립트를
+대신한다; `run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path)
+-> JobCompleted | JobFailed`, 예외 없이 결과 타입). 정책 둘(판정 정책
+`strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`)은 **출하 파일 그대로**이고
+CLI 로 완화할 수 없다 — 임계를 받는 인자가 없다.
 ```
-cd ml-engine && SNAP=$HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> OUT=$HOME/.local/bid-vector-verdicts/m6-6g-<YYYYMMDD> uv run python - <<'PY'
-import os, sys
-from pathlib import Path
-from ml_engine.app.backtest_job import run_backtest_job, JobFailed
-snap = os.environ["SNAP"]  # 판독기는 file:// URI 만 받는다(절대 경로, host 없음)
-r = run_backtest_job(snapshot_uri=f"file://{snap}",
-                     backtest_policy_path=Path("policy/strategy-backtest-v1.yaml"),
-                     inference_policy_path=Path("policy/inference-v1.yaml"))
-if isinstance(r, JobFailed):
-    print("FAILED", r.reason, r.detail); sys.exit(1)
-out = Path(os.environ["OUT"]); out.mkdir(parents=True, exist_ok=True); out = out / "verdict.json"; out.write_bytes(r.verdict_bytes)
-print("verdict", out, "sha256", r.checksum, "bytes", len(r.verdict_bytes))
-PY
+cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
+    --snapshot-uri $HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> \
+    --backtest-policy policy/strategy-backtest-v1.yaml \
+    --inference-policy policy/inference-v1.yaml \
+    --output-dir $HOME/.local/bid-vector-verdicts/m6-6g-<YYYYMMDD>
 ```
-- 판정 JSON(세 판 — 주·민감도 a·b 를 하나의 canonical 바이트열로)은 **스냅숏 디렉터리 밖**(`~/.local/bid-vector-verdicts/<snapshot-id>/`, 입력은 불변 — 그 sha256 이 evidence 의 닻이다)에 두고 sha256 을 evidence 에 적는다. 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만 — 제외 사유 계수 · 세 판의 부호 · 필요 표본 수 · `MAX_PAGES` 확정 수 · 코드 SHA · 스냅숏 id·sha256 · 정책 version·checksum).
+- `--snapshot-uri` 는 `file://` URI 또는 **맨 경로**다 — 맨 경로는 절대 `file://` URI 로
+  바뀌고 그 변환이 출력에 남는다(상대 경로는 부른 자리의 cwd 로 풀리므로, 어느 디렉터리를
+  읽었는지 출력에 남아야 판정과 스냅숏을 사후에 맞출 수 있다). `file://` 이 아닌 scheme 은
+  CLI 가 거부하고, `file://<host>/…` 는 판독기가 거부한다.
+- `--output-dir` 은 **스냅숏 디렉터리 밖**이어야 한다(안이면 거부 — 스냅숏은 불변 입력이고
+  그 sha256 이 evidence 의 닻이다). 없으면 만든다. 산출은 그 디렉터리의 `verdict.json`
+  하나이고 마지막 줄이 `verdict <경로> sha256 <hex> bytes <수>` 다 — 그 sha256·바이트 수를
+  evidence 에 적는다.
+- 종료 코드: `0` 성공 · `1` 실패(사유 문면이 stderr 로 나온다 — 판정은 쓰이지 않는다).
+- `verdict.json` 한 파일이 **세 판**(주·민감도 a·b)을 하나의 canonical 바이트열로 담는다. 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만 — 제외 사유 계수 · 세 판의 부호 · 필요 표본 수 · `MAX_PAGES` 확정 수 · 코드 SHA · 스냅숏 id·sha256 · 정책 version·checksum).
 - `JobFailed` 사유: `SNAPSHOT_UNREADABLE`(먼저 URI 가 `file://` 절대 경로인지, 디렉터리에 세 파일이 있는지 본다) · `SNAPSHOT_REJECTED`(판독 거부 — 추출 쪽 결함, 6G-2d 가 닫은 부류) · `*_POLICY_REJECTED` · `PRIMARY_HYPOTHESIS_COUNT_MISMATCH`. 설정 오류가 아니면 고치지 말고 보고.
 
 ## 3. 일일 보고 (수집 시작 때 일정을 세운다 — 사용자 지시 2026-09-30)
@@ -129,7 +134,6 @@ PY
 - `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
-- 백테스트 job 에 CLI 가 없다 — 위 스크립트로 부른다(`OPEN-6G-BACKTEST-CLI`).
 - **수집 범위 상한 31일이 개찰 갈래에도 걸린다**(`OPEN-6G-OPENING-RANGE-CAP`) — 닫히기 전에는 A-1 기간 실수집 불가.
 
 ## 6. 검증 기록
