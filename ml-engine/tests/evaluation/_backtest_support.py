@@ -7,10 +7,24 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
 from ml_engine.evaluation.backtest.sample_list import BUSINESS_DIVISIONS
+from ml_engine.evaluation.backtest.strategies import (
+    BidAmount,
+    StrategyInput,
+    StrategyOutcome,
+)
+from tests.evaluation._backtest_fixture import (
+    INELIGIBLE_BID_RATE,
+    LOSING_BID_RATE,
+    WINNING_BID_RATE,
+)
 
 _BASE_AMOUNT = 1_000_000_000
 _FLOOR_RATE = 0.87745
@@ -306,3 +320,46 @@ def write_snapshot_dir(
     (directory / "sample-list.tsv").write_bytes(sample_list_bytes(rows))
     (directory / "manifest.json").write_bytes(manifest_bytes(rows, **manifest_kwargs))
     return directory
+
+
+@dataclass(frozen=True)
+class PlannedBidStrategy:
+    """**계획대로 투찰하는** test 전략(M6/6G-2a, D-6G2a-4) — 공고마다 투찰률 하나.
+
+    출하 전략 다섯(S0·S1·S2 셋·S4)은 난수와 분포 엔진에 달려 있어 「이 창에서 후보가
+    기준선을 몇 번 이긴다」를 지정할 수 없다. 그래서 **판정 입력의 경계를 올라타는 판**에는
+    이 전략을 주입한다 — `StrategyLike` 는 Protocol 이고 전략은 조립 근이 넣는 것이라
+    (`run` 의 층 경계) 출하 코드를 건드리지 않는다.
+
+    **판정 입력을 읽는 자리는 전략이 아니다**: 일곱 값은 `verdict`·`run`·`windows`·
+    `policy_values` 에서 읽히고 전략 모듈에서는 읽히지 않는다(착수 AST 전수). 그래서 이
+    전략을 쓰는 것이 측정 범위를 줄이지 않는다. 전략 모듈에서만 읽히는 값
+    (`strategy.*` · `institution.*` · `floor.pure_construction_cost_ratio`)은 출하 전략을
+    그대로 돌리는 판에서 잰다.
+
+    `seed_sensitive` 가 참이면 `seeds` 밖의 seed 로 불릴 때 승패를 뒤집는다 — 정책의
+    seed 다섯이 **전부** 전략에 닿는지를 거동으로 잰다(하나만 닿으면 seed 안정성 판정이
+    흔들리지 않아 그 자리의 상수가 보이지 않는다)."""
+
+    name: str
+    plan: Mapping[str, float]
+    seeds: tuple[int, ...] = ()
+    seed_sensitive: bool = False
+
+    def bid(
+        self, request: StrategyInput, policy: StrategyBacktestPolicy
+    ) -> StrategyOutcome:
+        del policy  # 이 전략은 정책을 읽지 않는다 — 계획이 투찰률을 정한다.
+        rate = self.plan[request.notice.notice_key_hash]
+        if self.seed_sensitive and request.seed not in self.seeds:
+            rate = _FLIPPED_RATES[rate]
+        return BidAmount(float(math.ceil(request.base_amount * rate)))
+
+
+_FLIPPED_RATES: dict[float, float] = {
+    WINNING_BID_RATE: LOSING_BID_RATE,
+    LOSING_BID_RATE: WINNING_BID_RATE,
+    INELIGIBLE_BID_RATE: WINNING_BID_RATE,
+}
+"""seed 민감 전략이 계획 밖 seed 에서 쓰는 반대쪽 투찰률 — 승패가 뒤집히므로 seed 안정성
+판정이 그 사실을 본다."""
