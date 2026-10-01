@@ -86,6 +86,13 @@ verifier r5 가 그 test 가 계약이 요구한 것을 재지 않음을 실측�
 | **D-6G2a-17** | **장부 일괄**: N2~N7 설명을 r5 자리(`_not_evaluable` 창 수)로 · 변이 계수 22/23 로 세 문서 일치 · `_strip_echo` 는 전역 값 삭제가 아니라 **메아리 경로만** 제거(cr M — 수치 키의 ⓒ 공허 방지) · milestone 문단의 OPEN 수 셋 · ⓐ 중 「사유만 움직이는」 셋은 ⓑ 로 재분류하거나 ⓐ 정의(결말 부류 변화)를 만족하게 판 보강(cr M) |
 | **D-6G2a-18** | **r2 는 표적**: D-12 자리별 probe + 변이 다섯 · D-13 변이 · D-14 P9b · D-15 네 변이 · D-17 · acceptance `ml-engine` job · rollback 재실측. code-reviewer 는 수정 diff |
 
+## 계약 갱신 r1-b (2026-10-01, 팀장 — 수정 라운드 1 보고 수령: HEAD `149c8594`)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2a-19** | **수용**: 쓰임 명단을 출하 AST + 로드된 정책 객체에서 생성(키 × `module.function` × 소비자, 73/67, 쓰임 없는 키 0) + 등식 넷 · 자리별 probe 여섯 · GREEN 넷(E1r5·V1n·V4n·CR1) → RED · ⓐ→ⓒ 이동 셋 RED · V5n·V9n RED · P9b RED(`OPEN-6G2A-FIT-BIN-COUNT-SITE` 닫힘) · 변이 36 중 거동 RED 35(남은 하나는 공시 메아리 자리 — 구조 게이트가 잡음) · 부류 ⓐ27/ⓑ11/ⓒ1 · 판 31. **등재 둘**: 한쪽 clamp 의 상수가 모든 판의 관측값 밖에 있으면 보이지 않는다(적합도 유의수준 p 0.43~0.92 → 0.43 이하 floor 는 거동 동일) — 위협 모델 미달 경계로 기록, 판 추가 대신 · seed 수는 6G-2e(D-6G2e-6b) |
+| **D-6G2a-20** | **r2 판정 SHA 는 이 갱신 커밋.** 표적: D-12 명단 등식 넷(생성 명단 ↔ 등록부 · 키당 부류 단언 자리 ≤1 · probe 함수 존재 · 다중 자리 키마다 전용 단언 또는 사유) · 자리별 probe 여섯 · GREEN 넷 재실측 RED · 거동/구조 두 축 분리의 타당성 · D-13 셋 · D-15 · D-17 `_strip_echo` 경로 한정 · acceptance `ml-engine` job · rollback 절차 그대로 · `src` 0 · 표면 0. code-reviewer: `c042bac1..판정 SHA` |
+
 ## 위협 모델 — 6G-2a 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `ml_engine.evaluation.backtest/**` 와 `ml_engine.app.backtest_*` 의 판정 경로에 정책 값 대신 **수를 박는 것** — 그 수를 어떤
