@@ -106,11 +106,13 @@ _SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v1.yaml"
 _SHIPPED_INFERENCE_POLICY = _POLICY_DIR / "inference-v1.yaml"
 
 # 판정이 실제로 서려면 창 규칙을 낮춰야 한다(출하 값은 창당 483행을 요구한다).
-# **이 셋은 판정이 성립하는 판을 만드는 값이고, 민감도의 대상에서 빠지지 않는다** —
-# 아래 perturbation 이 이 키들도 그대로 흔든다.
+# **이 넷은 판정이 성립하는 판을 만드는 값이고, 민감도의 대상에서 빠지지 않는다** —
+# 아래 흔들기가 이 키들도 그대로 민다.
+#
+# 창 최소 수는 **여기 없다**: 출하 값이 이미 3 이라 override 가 무효였고, 무효 override 는
+# 「이 판은 그 값을 낮춰 쓴다」는 거짓 신호를 남긴다(code-review r1 L-1).
 _BASE_OVERRIDES: Final[dict[str, str]] = {
     "verdict.min_window_rows": "10",
-    "verdict.min_window_count": "3",
     "strategy.s4_iteration_count": "100",
     "fit.min_sample_count": "20",
     "fit.max_bin_ratio_deviation": "0.20",
@@ -147,26 +149,54 @@ def _echo_forms(raw: str) -> tuple[object, ...]:
     return tuple(forms)
 
 
-def _strip_echo(node: object, echoed: frozenset[str]) -> object:
-    """판정문에서 **입력값의 메아리**를 지운다.
+def _is_echo_leaf(
+    base: object, moved: object, before: frozenset[str], after: frozenset[str]
+) -> bool:
+    """이 잎이 **흔든 값의 메아리**인가 — 같은 자리에서 값이 정책 값을 따라갔는가."""
+    return repr(base) in before and repr(moved) in after
 
-    정책 값 다수는 판정문에 그대로 실린다(`alpha_used` · 창 규칙 · 표본 예산…).
-    그래서 전체 바이트를 맞대면 「값이 판정에 쓰이는가」가 아니라 「값이 실리는가」를
-    재게 된다 — 실제로 alpha 를 코드 상수로 바꿔도 `alpha_used` 가 움직여 초록이었다.
-    메아리를 지우면 남는 차이는 **그 값이 판정·산출을 실제로 움직인 몫**이다.
 
-    지우는 기준은 값 자체다(이름 열거가 아니다) — 흔들기 전후의 값과 같은 잎을 뺀다."""
-    if isinstance(node, dict):
-        return {
-            key: _strip_echo(value, echoed)
-            for key, value in node.items()
-            if repr(value) not in echoed
-        }
-    if isinstance(node, list):
-        return [
-            _strip_echo(value, echoed) for value in node if repr(value) not in echoed
-        ]
-    return node
+def _without_echo_paths(
+    base: object, moved: object, before: frozenset[str], after: frozenset[str]
+) -> tuple[object, object]:
+    """두 판정문에서 **메아리 경로만** 지운 쌍.
+
+    6G 에서 물려받은 `_strip_echo` 는 흔든 값과 `repr` 이 같은 **모든 잎**을 지웠다 — 이름이
+    아니라 값이 기준이라, 정책 값이 작은 정수면 판정문의 무관한 칸이 함께 사라졌다
+    (`stability_seeds.1` 을 1 -> 2 로 흔들면 승률 `1.0` · p 값 `1.0` 같은 **판정의 핵심
+    칸**까지 빠진다). 오차 방향이 「움직이지 않았다」 쪽이어서 ⓒ 단언이 공허해질 수 있고,
+    불변 목록에 삭제가 만든 항목이 섞일 수 있다(code-review r1 M-4 · verifier r1 M-5).
+
+    그래서 **경로**로 지운다: 같은 자리에서 흔들기 전 값이 정책의 옛 값이고 흔든 뒤 값이
+    정책의 새 값인 잎만 메아리다. 그 둘 중 하나라도 어긋나면 그 칸은 **그 값이 움직인 몫**이고
+    투영에 남는다."""
+    if isinstance(base, dict) and isinstance(moved, dict):
+        pruned_base: dict[str, object] = {}
+        pruned_moved: dict[str, object] = {}
+        for key in sorted(set(base) | set(moved)):
+            if key not in base or key not in moved:
+                if key in base:
+                    pruned_base[key] = base[key]
+                if key in moved:
+                    pruned_moved[key] = moved[key]
+                continue
+            if _is_echo_leaf(base[key], moved[key], before, after):
+                continue
+            left, right = _without_echo_paths(base[key], moved[key], before, after)
+            pruned_base[key] = left
+            pruned_moved[key] = right
+        return pruned_base, pruned_moved
+    if isinstance(base, list) and isinstance(moved, list) and len(base) == len(moved):
+        left_items: list[object] = []
+        right_items: list[object] = []
+        for first, second in zip(base, moved, strict=True):
+            if _is_echo_leaf(first, second, before, after):
+                continue
+            left, right = _without_echo_paths(first, second, before, after)
+            left_items.append(left)
+            right_items.append(right)
+        return left_items, right_items
+    return base, moved
 
 
 def _echoed_forms(before: str, after: str) -> frozenset[str]:
@@ -175,18 +205,29 @@ def _echoed_forms(before: str, after: str) -> frozenset[str]:
     )
 
 
-def _document_view(payload_bytes: bytes, echoed: frozenset[str]) -> object:
-    """**판정문 투영** — 재현성 메아리 두 칸을 뺀 뒤 흔든 값의 메아리 잎을 지운 나머지.
-
-    남는 차이는 그 값이 판정·산출을 **실제로 움직인 몫**이다."""
+def _drop_reproducibility_echo(payload_bytes: bytes) -> object:
     payload = json.loads(payload_bytes)
     if isinstance(payload, dict):
-        payload = {
+        return {
             key: value
             for key, value in payload.items()
             if key not in _REPRODUCIBILITY_ECHO_KEYS
         }
-    return _strip_echo(payload, echoed)
+    return payload
+
+
+def _document_pair(
+    base_bytes: bytes, moved_bytes: bytes, before: str, after: str
+) -> tuple[object, object]:
+    """**판정문 투영 쌍** — 재현성 메아리 두 칸을 빼고, 흔든 값의 **메아리 경로**를 지운다.
+
+    같은 자리에서 쟤야 메아리를 가릴 수 있으므로 투영은 한 쪽이 아니라 **쌍**으로 낸다."""
+    return _without_echo_paths(
+        _drop_reproducibility_echo(base_bytes),
+        _drop_reproducibility_echo(moved_bytes),
+        frozenset(repr(form) for form in _echo_forms(before)),
+        frozenset(repr(form) for form in _echo_forms(after)),
+    )
 
 
 def _outcome_view(payload_bytes: bytes) -> object:
@@ -633,17 +674,8 @@ _JUDGEMENT_INPUTS: Final[dict[str, tuple[_Probe, ...]]] = {
         _Probe("shipped", "100"),
         _Probe("budget-tight", "80000"),
     ),
-    # 전략 상수 중 **판정을 뒤집는** 셋 — 격자 수는 S4 의 투찰금액을, 경쟁자 표본 하한은
-    # S4 의 기권을 만든다(기권은 「부적격이고 못 이겼다」라 승률이 0 이 되고, 「못 쟀다」의
-    # 사유가 seed 불안정에서 검정력 미달로 옮겨간다 — 사유를 담는 투영이라 보인다).
+    # 전략 상수 중 **결말 부류를 뒤집는** 하나 — 격자 수가 S4 의 투찰금액을 바꾼다.
     "strategy.s4_grid_size": (_Probe("shipped", "42"), _Probe("s4-grid-off", "41")),
-    "strategy.s4_min_competitor_samples": (
-        _Probe("shipped", "100000"),
-        _Probe("s4-starved", "30"),
-    ),
-    # 몬테카를로 반복 수 — 난수 흐름이 달라져 S4 의 투찰금액이 바뀌고, 그 승패가
-    # seed 안정성을 뒤집는다(사유가 seed 불안정 -> 검정력 미달로 옮겨간다).
-    "strategy.s4_iteration_count": (_Probe("shipped", "101"),),
     # seed 다섯 — **전부** 전략에 닿아야 seed 안정성 판정이 성립한다.
     "stability_seeds.0": (_Probe("seeded", "999001"),),
     "stability_seeds.1": (_Probe("seeded", "999002"),),
@@ -652,16 +684,22 @@ _JUDGEMENT_INPUTS: Final[dict[str, tuple[_Probe, ...]]] = {
     "stability_seeds.4": (_Probe("seeded", "999005"),),
 }
 
+_REASON_MOVERS: Final[dict[str, _Probe]] = {
+    # 흔들면 **「못 쟀다」의 사유**가 옮겨가지만 결말 부류는 그대로인 값들(code-review r1 M-5).
+    # 부류는 ⓑ 다(계약 D-6G2a-2 ⓐ 의 문면이 「결말」이고, 사유는 결말 부류가 아니다). 그래도
+    # 사유 축을 버리지 않는다 — 「못 쟀다」는 결말 하나가 아니라 넷이고(창 부족 · seed 불안정 ·
+    # 기준선 무승 · 검정력 미달), 사유를 고르는 자리도 정책을 따라야 한다. 전용 단언이 그것을
+    # 잠근다.
+    "strategy.s4_min_competitor_samples": _Probe("shipped", "100000"),
+    "strategy.s4_iteration_count": _Probe("shipped", "101"),
+}
+
+
 _NO_OPPOSITE_DIRECTION: Final[dict[str, str]] = {
     # ⓐ 값 중 **반대 방향 흔들기를 둘 수 없는** 값과 그 사유(D-6G2a-15). 우회 ④
     # (`max(정책, 상수)`·`min(정책, 상수)` 처럼 한쪽으로만 따른다)는 값이 **문턱과 비교되는**
     # 자리에서만 성립한다 — 아래 값들은 비교 대상이 아니라 난수의 재료이거나 반복 수라
     # 상수 바닥·천장이라는 형태 자체가 없다.
-    "strategy.s4_iteration_count": (
-        "몬테카를로 **반복 수**다 — 문턱과 비교되지 않고 표본 크기로 쓰인다."
-        " `max(정책, C)`·`min(정책, C)` 는 반복 수를 다른 수로 바꾸는 것과 구별되지 않고,"
-        " 그 변화는 한 방향 흔들기가 이미 잡는다(변이 P 계열 RED)"
-    ),
     **{
         f"stability_seeds.{index}": (
             "난수 seed 다 — 크기 비교가 없으므로 한쪽 클램프라는 형태가 없다. seed 가"
@@ -682,6 +720,10 @@ _OUTPUT_INPUTS: Final[dict[str, _Probe]] = {
     "sampling.calls_per_notice_goods": _Probe("mixed", "4"),
     "sampling.headroom_ratio": _Probe("shipped", "0.1"),
     "strategy.s4_grid_span_bp": _Probe("shipped", "200.0"),
+    # S4 의 기권 문턱과 몬테카를로 반복 수 — 결말 부류는 그대로이고 사유·승률 같은 산출 칸이
+    # 움직인다. 사유 이동은 `_REASON_MOVERS` 의 전용 단언이 따로 잠근다.
+    "strategy.s4_min_competitor_samples": _Probe("shipped", "100000"),
+    "strategy.s4_iteration_count": _Probe("shipped", "101"),
     # S1 의 공사 전용 offset — 투찰금액과 적격 여부를 바꾸지만, 이 판에서 S1 의 결말은
     # 양쪽 모두 「못 이겼다」다(바뀌는 것은 승률·bp 사분위 같은 산출 칸이다).
     "strategy.s1_offset_bp": _Probe("mixed", "900.0"),
@@ -945,6 +987,12 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
     )
     for key, reason in _NO_OPPOSITE_DIRECTION.items():
         assert reason.strip(), f"{key} 의 사유가 비어 있다"
+    assert set(_REASON_MOVERS) <= set(_OUTPUT_INPUTS), (
+        "사유만 움직이는 값은 ⓑ 로 등재해야 한다: "
+        f"{sorted(set(_REASON_MOVERS) - set(_OUTPUT_INPUTS))}"
+    )
+    for key, probe in _REASON_MOVERS.items():
+        assert probe.value in _STRONG_VALUES[key], key
 
 
 def test_multi_site_reads_are_enumerated_from_the_kickoff_census() -> None:
@@ -1449,19 +1497,44 @@ def test_the_fit_bin_count_site_follows_the_reserve_price_count(
 
 @pytest.mark.parametrize("key", sorted(_JUDGEMENT_INPUTS))
 def test_judgement_inputs_flip_the_decision(key: str, harness: _Harness) -> None:
-    """ⓐ — 판정 입력은 **결말**을 바꾼다(D-6G2a-3).
+    """ⓐ — 판정 입력은 **결말 부류**를 바꾼다(D-6G2a-2·3).
+
+    투영은 계약 문면 그대로다 — `Passed | Failed | NotEvaluable` 과 통과 여부이고 「못
+    쟀다」의 **사유는 담지 않는다**. r0 은 사유까지 담은 투영으로 재서, 사유만 옮겨가는 값
+    셋이 ⓐ 로 통과했다(code-review r1 M-5 — 계약 문면과 구현의 불일치). 사유 축은 버리지
+    않는다: 그 셋은 ⓑ 로 옮기고 **사유가 움직인다**는 전용 단언이 따로 잠근다.
 
     극단으로 밀면 정직한 코드에서는 결말이 뒤집힌다. 그 자리에 코드에 박힌 수가
     닿아 있으면 정책을 아무리 밀어도 결말이 그대로라 RED 다 — 숨긴 수의 **형태**와
     무관하게 잡힌다(리터럴 게이트가 형태로 못 잡는 자리를 이 층이 받는다)."""
     for probe in _JUDGEMENT_INPUTS[key]:
-        baseline = _decision_view(harness.verdict(probe.board))
-        moved = _decision_view(harness.verdict(probe.board, **{key: probe.value}))
+        baseline = _outcome_view(harness.verdict(probe.board))
+        moved = _outcome_view(harness.verdict(probe.board, **{key: probe.value}))
         assert moved != baseline, (
             f"{key} 를 판 {probe.board} 에서 {probe.value} 로 밀었는데 **결말이 "
             f"그대로다** — 그 자리가 정책을 읽지 않는다(코드에 박힌 수가 판정에 닿았다). "
             f"결말: {baseline}"
         )
+
+
+@pytest.mark.parametrize("key", sorted(_REASON_MOVERS))
+def test_reason_movers_move_the_unmeasurable_reason(
+    key: str, harness: _Harness
+) -> None:
+    """「못 쟀다」의 **사유**도 정책을 따른다(code-review r1 M-5).
+
+    사유는 결말 부류가 아니므로 이 값들은 ⓑ 다. 그래도 사유를 고르는 자리는 정책을 따라야
+    한다 — 「못 쟀다」는 결말 하나가 아니라 넷이고, 사유만 옮겨가는 변화를 아무도 보지 않으면
+    그 자리의 상수가 숨는다. 그래서 부류 단언과 **별도로** 사유 이동을 단언한다."""
+    probe = _REASON_MOVERS[key]
+    base = _decision_view(harness.verdict(probe.board))
+    moved = _decision_view(harness.verdict(probe.board, **{key: probe.value}))
+    assert moved != base, (
+        f"{key} 를 {probe.value} 로 밀었는데 사유까지 그대로다 — 그 자리가 정책을 읽지 않는다"
+    )
+    assert _outcome_view(harness.verdict(probe.board)) == _outcome_view(
+        harness.verdict(probe.board, **{key: probe.value})
+    ), f"{key} 가 결말 부류를 바꿨다 — ⓐ 로 옮겨라"
 
 
 @pytest.mark.parametrize("key", sorted(_OUTPUT_INPUTS))
@@ -1474,13 +1547,13 @@ def test_output_inputs_move_a_non_echo_field_without_flipping(
     그대로면 그 자리가 정책을 읽지 않는다. 어느 쪽이든 표가 낡았다는 뜻이다."""
     probe = _OUTPUT_INPUTS[key]
     before = harness.values(probe.board)[key]
-    echoed = _echoed_forms(before, probe.value)
     baseline = harness.verdict(probe.board)
     moved = harness.verdict(probe.board, **{key: probe.value})
-    assert _decision_view(moved) == _decision_view(baseline), (
-        f"{key} 가 결말을 바꿨다 — 산출 입력이 아니라 **판정 입력**이다(부류를 옮겨라)"
+    assert _outcome_view(moved) == _outcome_view(baseline), (
+        f"{key} 가 **결말 부류**를 바꿨다 — 산출 입력이 아니라 판정 입력이다(부류를 옮겨라)"
     )
-    assert _document_view(moved, echoed) != _document_view(baseline, echoed), (
+    pruned_base, pruned_moved = _document_pair(baseline, moved, before, probe.value)
+    assert pruned_moved != pruned_base, (
         f"{key} 를 {before} -> {probe.value} 로 바꿨는데 판정문이 그대로다 — 그 자리가 "
         "정책을 읽지 않는다(메아리를 뺀 투영에서 아무 칸도 움직이지 않았다)"
     )
@@ -1503,10 +1576,12 @@ def test_unread_values_change_nothing(key: str, board: str, harness: _Harness) -
     for moved_value in _STRONG_VALUES[key]:
         if moved_value == base_value:
             continue
-        echoed = _echoed_forms(base_value, moved_value)
         baseline = harness.verdict(board)
         moved = harness.verdict(board, **{key: moved_value})
-        assert _document_view(moved, echoed) == _document_view(baseline, echoed), (
+        pruned_base, pruned_moved = _document_pair(
+            baseline, moved, base_value, moved_value
+        )
+        assert pruned_moved == pruned_base, (
             f"{key} 가 판 {board} 에서 {moved_value} 로 판정문을 움직였다 — 「판독 밖」 "
             f"등재가 틀렸다. 사유: {_UNREAD[key]}"
         )
@@ -1610,10 +1685,14 @@ def test_min_window_rows_is_read_at_both_sites(harness: _Harness) -> None:
         harness.verdict("window-rows", **{"verdict.min_window_rows": "51"})
     )
     assert by_window.get("stopped") == "INSUFFICIENT_WINDOWS", by_window.get("stopped")
-    assert {
+    reasons = [
         item["reason"]
         for item in json.loads(harness.verdict("window-rows"))["excluded_windows"]
-    } <= {"NO_HISTORY", "INSUFFICIENT_ROWS"}
+    ]
+    # 공집합에서도 통과하는 장식 단언을 두지 않는다(code-review r1 L-2) — 제외된 창이
+    # **적어도 하나** 있고 그 사유가 닫힌 어휘 안이다.
+    assert reasons, "창 제외가 하나도 기록되지 않았다"
+    assert set(reasons) <= {"NO_HISTORY", "INSUFFICIENT_ROWS"}, reasons
 
     by_sample = json.loads(
         harness.verdict("sample-floor", **{"verdict.min_window_rows": "51"})
@@ -1725,10 +1804,12 @@ def test_pure_construction_cost_ratio_is_read_at_both_sites(harness: _Harness) -
     key = "floor.pure_construction_cost_ratio"
     probe = _OUTPUT_INPUTS[key]
     assert probe.board == "construction-pad", probe
-    echoed = _echoed_forms(harness.values(probe.board)[key], probe.value)
     base = harness.verdict(probe.board)
     moved = harness.verdict(probe.board, **{key: probe.value})
-    assert _document_view(moved, echoed) != _document_view(base, echoed), (
+    pruned_base, pruned_moved = _document_pair(
+        base, moved, harness.values(probe.board)[key], probe.value
+    )
+    assert pruned_moved != pruned_base, (
         "자리 ① — 계획 전략 판에서 배제 비율을 내렸는데 판정문이 그대로다(제외 단계가 "
         "정책을 읽지 않는다)"
     )
@@ -1897,7 +1978,6 @@ def test_every_policy_value_changes_the_verdict(
         moved = dict(base_values)
         moved[key] = _perturb(key, base_values[key])
         assert moved[key] != base_values[key], f"{key} 가 흔들리지 않았다"
-        echoed = _echoed_forms(base_values[key], moved[key])
         policy = load_strategy_backtest_policy(
             _write_policy(tmp_path / key.replace(".", "_"), moved)
         )
@@ -1908,10 +1988,13 @@ def test_every_policy_value_changes_the_verdict(
             f"{key} 를 흔든 정책이 로더에 거부됐다 — 불변식을 깨지 않는 방향으로 "
             f"밀어야 판정 경로가 실제로 돈다: {policy}"
         )
-        moved_view = _document_view(
-            _verdict_bytes(snapshot, strategies, policy), echoed
+        pruned_base, pruned_moved = _document_pair(
+            baseline_bytes,
+            _verdict_bytes(snapshot, strategies, policy),
+            base_values[key],
+            moved[key],
         )
-        if moved_view == _document_view(baseline_bytes, echoed):
+        if pruned_moved == pruned_base:
             unchanged.append(key)
 
     assert sorted(unchanged) == sorted(_SHIPPED_BOARD_UNMOVED), (
