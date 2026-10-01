@@ -98,11 +98,11 @@ def test_module_run_writes_the_verdict_and_exits_zero(tmp_path: Path) -> None:
     assert result.returncode == 0, (result.stdout, result.stderr)
     verdict = output_dir / "verdict.json"
     payload = verdict.read_bytes()
-    tokens = result.stdout.split()
-    assert "converted-from" in tokens, result.stdout
-    assert snapshot.resolve().as_uri() in tokens, result.stdout
-    assert hashlib.sha256(payload).hexdigest() in tokens, result.stdout
-    assert str(len(payload)) in tokens, result.stdout
+    printed = result.stdout.split()
+    assert "converted-from" in printed, result.stdout
+    assert snapshot.resolve().as_uri() in printed, result.stdout
+    assert hashlib.sha256(payload).hexdigest() in printed, result.stdout
+    assert str(len(payload)) in printed, result.stdout
     variants = json.loads(payload)["variants"]
     assert variants[0]["variant"]["variant"] == "MAIN", variants[0]
 
