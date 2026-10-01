@@ -45,6 +45,13 @@
 | **D-6G2e-7** | **게이트 술어 확장 0 · 실행 상태 형식 version 2 유지 · 스키마 칸·golden 무변경.** 새 정책 데이터는 등재 | |
 | **D-6G2e-8** | **runbook 갱신은 이 slice 의 산출물** — `docs/runbook/m6-6g-real-collection.md` 0 절의 차단 행 둘을 닫고 2-2·2-4 를 코드대로 | 문서가 코드를 따라간다 |
 
+## 계약 갱신 r0-b (2026-10-02, 팀장 — Python 레인 조사 수령: seed 수의 자리 · in_scope 공백)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-9** | **in_scope carve-out(Python)**: `ml-engine/src/ml_engine/evaluation/backtest/policy.py`(백테스트 정책 키 스키마 — D-6b 의 자리; 길이는 공용 `collect_indexed_list` 가 아니라 정책별 키 스키마에, 리터럴 `5` 금지 → 다섯 키 열거 + `len`) · `ml-engine/src/ml_engine/evaluation/policy.py`(평가 정책 키 스키마, D-10) · `ml-engine/tests/app/test_backtest_policy_sensitivity.py`(6G-2a 양성 대조 등록이 설계상 RED 가 되므로 그 등록 삭제) · `ml-engine/tests/evaluation/test_evaluation_policy.py`(D-10 helper). out_scope 의 「`evaluation/**`」는 이 네 파일을 제외하고 유지 — `evaluation/backtest/run.py` 등 판정 경로 무변경 |
+| **D-6G2e-10** | **평가 정책 로더(`load_evaluation_policy`, `evaluation-v1.yaml`)도 seed 다섯을 요구한다** — 같은 구멍(M5 학습 안정성 레그가 seed 하나로 공허). 조건: 출하 `evaluation-v1.yaml` 이 정확히 다섯이 아니면 **멈추고 보고**(학습 경로를 깨지 않는다). test helper 가 두 seed 만 쓰던 것을 다섯으로, 거부 test 여섯이 「잘못된 이유로 통과」하지 않음을 확인. 한 커밋에 두 로더 |
+
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 공고 목록 갈래의 31일 상한은 그대로(호출 폭주 방지) ② 개찰 갈래의 긴 창은 표본 크기·호출 상한이 묶는다 ③ 실행 상태 회계(크래시 라운드 하나 · 거부될 디렉터리 불변 · 잠금 잔류 없음) ④ CLI 는 판정 경로를 바꾸지 않는다.
@@ -65,6 +72,7 @@
 - `app/src/main/kotlin/bidvector/app/wiring/**`(개찰·추출 배선의 정책 선택) · `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/test/**`
 - `adapters/src/main/kotlin/bidvector/adapters/snapshot/**`(★ 셋) · `adapters/src/test/**` · `procurement/src/main/kotlin/bidvector/procurement/**`(필요 시) · `procurement/src/test/**`
 - `config/quality/**`(등재만) · `ml-engine/src/ml_engine/app/**`(CLI 파일 하나) · `ml-engine/tests/app/**` · `ml-engine/pyproject.toml`(스크립트 등재 시)
+- **(r0-b D-6G2e-9)** `ml-engine/src/ml_engine/evaluation/backtest/policy.py` · `ml-engine/src/ml_engine/evaluation/policy.py`(정책 키 스키마의 seed 길이만) · `ml-engine/tests/evaluation/test_evaluation_policy.py`
 - `docs/runbook/m6-6g-real-collection.md` · `reports/evidence/m6/6g2e/**` · `milestone-6.md`(문단만)
 **out_scope**: `ml-engine/src/ml_engine/evaluation/**` · 정책 YAML 값 · 스키마·golden · koneps transport · `reports/evidence/m6/6g*/**`(이전 slice).
 
