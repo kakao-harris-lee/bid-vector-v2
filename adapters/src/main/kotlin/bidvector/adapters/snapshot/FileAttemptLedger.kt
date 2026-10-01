@@ -55,23 +55,84 @@ internal class FileAttemptLedger(
         onAppended(line)
     }
 
+    /**
+     * 줄 순서를 **그대로** 지킨다 — 열린 라운드와 재호출 상한은 덧붙인 순서로 읽는다(D-6G-58).
+     * 그 밖의 줄이 형태를 어기면 여전히 멈춘다: 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고,
+     * 그것은 상한이 없는 것보다 나쁘다.
+     */
     override fun read(): AttemptHistory {
         if (!Files.isRegularFile(file)) return AttemptHistory(emptyList())
-        val lines =
-            Files
-                .readString(file)
-                .lineSequence()
-                .filter { it.isNotBlank() }
-                .toList()
-        // `torn` 표식 줄은 시도가 아니라 **잃어버린 호출**이다(D-6G-70) — 세기만 한다. 그 밖의
-        // 줄이 형태를 어기면 여전히 멈춘다: 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고,
-        // 그것은 상한이 없는 것보다 나쁘다.
-        val (tornLines, attemptLines) = lines.partition(::isTornMarker)
-        return AttemptHistory(attemptLines.map(::parseLine), tornLines = tornLines.size)
+        val attempts = mutableListOf<CollectionAttempt>()
+        var lostCalls = 0
+        Files
+            .readString(file)
+            .lineSequence()
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                val fragment = tornFragmentOf(line)
+                when (val recovered = fragment?.let(::recoveredCall)) {
+                    null -> if (fragment == null) attempts += parseLine(line) else lostCalls++
+                    else -> attempts += recovered
+                }
+            }
+        return AttemptHistory(attempts, tornLines = lostCalls)
     }
 
-    private fun isTornMarker(line: String): Boolean =
-        runCatching { fieldsOf(line)?.containsKey(TORN_KEY) }.getOrNull() == true
+    /** 표식이면 그 조각(값이 문자열이 아니면 빈 조각), 표식이 아니면 `null`. */
+    private fun tornFragmentOf(line: String): String? {
+        val fields = runCatching { fieldsOf(line) }.getOrNull() ?: return null
+        if (!fields.containsKey(TORN_KEY)) return null
+        return fields[TORN_KEY].asStringOrNull().orEmpty()
+    }
+
+    /**
+     * **조각도 열린 라운드의 증거다**(D-6G2e-3) — 조각에서 (공고, 축, 시각)이 읽히면 그 라운드를
+     * **의도 줄**로 되살린다. 그러면 세 물음이 한 자리에서 맞는다: 예산은 이미 조각을 호출 하나로
+     * 셌고([AttemptHistory.spend] 의 `tornLines`), 열린 라운드는 꼬리의 의도 줄로 닫히고, 재호출
+     * 상한이 그 라운드를 하나로 센다. 앞 판은 조각을 **세기만** 해서 같은 축의 반복 크래시가
+     * 재호출 상한을 올리지 못했다(예산 상한만이 막았다 — 두 장부의 가정이 갈렸다).
+     *
+     * **결말로 되살리지 않는다.** 조각이 결말 줄의 접두사였더라도 그 결말은 굳지 않았고, 「끝났다」로
+     * 읽으면 받지 못한 축이 완료가 된다. 의도 줄은 **상한이 줄지 않는 쪽**이다: 라운드가 열린 채
+     * 남아 재개하는 쪽이 `AXIS Failed` 로 닫는다.
+     *
+     * 읽히지 않는 조각은 `null` 이다 — **축을 지어내지 않는다**(D-6G-70 그대로, 호출 하나로만 센다).
+     */
+    private fun recoveredCall(fragment: String): CollectionAttempt? {
+        val fields = truncatedFieldsOf(fragment) ?: return null
+        val axis = SourceEndpoint.entries.firstOrNull { it.name == fields["axis"].asStringOrNull() } ?: return null
+        val at = fields["at"].asStringOrNull()?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+        // 공고 키가 읽히지 않으면 되살리지 않는다 — `null` 로 두면 공고 축 라운드가 목록 축 줄로
+        // 보이고(공고 단위 묶기에서 빠진다) 그 라운드는 다시 영원히 열린 채가 아니게 된다.
+        val key = fields["notice_key_hash"].asStringOrNull() ?: return null
+        val hash = runCatching { NoticeKeyHash.ofHex(key).value }.getOrNull() ?: return null
+        return CollectionAttempt(
+            noticeKey = hash,
+            axis = axis,
+            // 결말 없는 의도 줄의 자리표시다 — 상한은 `kind` 로 센다([parseLine] 과 같은 규율).
+            outcome = AttemptOutcome.Succeeded,
+            at = at,
+            kind = AttemptKind.PENDING,
+            walk = null,
+        )
+    }
+
+    /**
+     * 조각을 **마지막 온전한 칸까지** 닫아 읽는다. 줄 형태가 `at`·`axis`·`notice_key_hash` 를 앞에
+     * 싣기 때문에([lineOf]) 조각이 거기까지 닿았으면 그 셋이 들어 있다. 쉼표 자리를 뒤에서부터 끊어
+     * **원장의 판독기 그대로** 파싱한다 — 문자열을 긁어 값을 짓지 않는다(값 어휘·형태 검사가 한
+     * 자리에 남는다). 어느 자리에서도 객체가 서지 않으면 읽히지 않는 조각이다.
+     */
+    private fun truncatedFieldsOf(fragment: String): Map<String, JsonValue>? {
+        if (!fragment.startsWith("{")) return null
+        runCatching { fieldsOf(fragment) }.getOrNull()?.let { return it }
+        var cut = fragment.length
+        while (true) {
+            cut = fragment.lastIndexOf(',', cut - 1)
+            if (cut <= 0) return null
+            runCatching { fieldsOf(fragment.take(cut) + "}") }.getOrNull()?.let { return it }
+        }
+    }
 
     private fun fieldsOf(line: String): Map<String, JsonValue>? =
         KonepsJsonParser

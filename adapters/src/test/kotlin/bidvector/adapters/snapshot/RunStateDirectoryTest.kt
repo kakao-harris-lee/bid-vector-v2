@@ -373,6 +373,56 @@ class RunStateDirectoryTest : RunStateDirectoryFixture() {
         Files.readString(file) shouldBe intact
     }
 
+    /**
+     * **D-6G2e-3 (6G-2d cr 4차 ②) — (공고, 축)까지 닿은 조각은 열린 라운드다.** 관문은 호출 **전에**
+     * 의도 줄을 적고 예산은 이미 그 조각을 호출 하나로 세는데(D-6G-61 ①), 앞 판은 조각을 **세기만**
+     * 해서 그 라운드가 열린 것으로 보이지 않았다 — 같은 축의 반복 크래시가 재호출 상한을 올리지
+     * 못하고 매 실행 새 호출을 태웠다(예산 상한만이 막았다). 조각에서 (공고, 축, 시각)이 읽히면
+     * 그 라운드를 의도 줄로 되살려, 두 장부가 같은 가정 위에 선다.
+     *
+     * 걷기 식별자는 **조각 자신의 시각**이다 — 그 호출이 나간 시각이고, 앞 줄에서 빌리지 않는다.
+     */
+    @Test
+    fun `축과 공고까지 닿은 조각은 열린 라운드로 읽힌다 — 호출 수는 그대로 하나`() {
+        val file = fragmentOnlyLedger(AXIS_READABLE_FRAGMENT)
+
+        val history = reopen().attempts.read()
+
+        // 조각이 의도 줄로 되살아나도 호출 수는 **하나**다(예산이 두 번 세지 않는다).
+        history.spend(RUN_STATE_AT).total shouldBe 1
+        history.interruptedRounds()[RUN_STATE_KEY.value]?.get(SourceEndpoint.RESERVE_PRICE_DETAIL) shouldBe
+            TORN_CALL_AT
+        // 되살린 줄을 원장에 **쓰지 않는다** — 표식 그대로다(판독이 매번 같은 답을 낸다).
+        Files.readString(file) shouldContain TORN_KEY
+    }
+
+    /**
+     * 반대 방향 — 축에 닿지 못한 조각은 **라운드를 짓지 않는다**(D-6G-70 그대로). 어느 (공고, 축)의
+     * 호출이었는지 모르는 채로 라운드를 세면 엉뚱한 축이 상한을 쓴다. 호출 하나로만 센다.
+     */
+    @Test
+    fun `축에 닿지 못한 조각은 라운드를 짓지 않고 호출 하나로만 센다`() {
+        fragmentOnlyLedger(AXIS_UNREADABLE_FRAGMENT)
+
+        val history = reopen().attempts.read()
+
+        history.spend(RUN_STATE_AT).total shouldBe 1
+        history.interruptedRounds() shouldBe emptyMap()
+    }
+
+    /**
+     * 조각 **하나만** 남은 원장 — 그 라운드의 첫 의도 줄을 쓰다 죽은 모양이라 앞 줄이 없다. 장부는
+     * 표본 확정으로 세워 둔다(장부 없이 파일만 있으면 그 자체로 기동 거부다).
+     */
+    private fun fragmentOnlyLedger(fragment: String): Path {
+        val directory = open()
+        directory.sampleList.confirm(runStateSample())
+        directory.close()
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(file, fragment)
+        return file
+    }
+
     /** 개행 없이 끝난 원장 — 마지막 append 가 절반만 디스크에 닿은 모양이다. */
     private fun tornLedger(): Path {
         val directory = open()
@@ -385,3 +435,14 @@ class RunStateDirectoryTest : RunStateDirectoryFixture() {
 }
 
 private val OTHER_KEY = NoticeKeyHash.of("SYN-6G-9999", "000")
+
+/** 되살린 라운드의 걷기 식별자 — 조각 자신의 시각이고 [RUN_STATE_AT] 과 다른 값으로 둔다. */
+private val TORN_CALL_AT: Instant = Instant.parse("2026-09-24T02:00:00Z")
+
+/** (시각, 축, 공고)까지 닿은 조각 — 의도 줄을 쓰다 `outcome` 칸에서 끊겼다. */
+private val AXIS_READABLE_FRAGMENT: String =
+    "{\"at\":\"$TORN_CALL_AT\",\"axis\":\"${SourceEndpoint.RESERVE_PRICE_DETAIL.name}\"," +
+        "\"notice_key_hash\":\"${RUN_STATE_KEY.value}\",\"outc"
+
+/** 축 값에서 끊긴 조각 — 어느 라운드의 호출이었는지 알 수 없다. */
+private const val AXIS_UNREADABLE_FRAGMENT = "{\"at\":\"2026-09-24T01:00:00Z\",\"axis\":\"RES"
