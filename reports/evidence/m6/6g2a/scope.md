@@ -72,6 +72,20 @@ verifier r5 가 그 test 가 계약이 요구한 것을 재지 않음을 실측�
 | **D-6G2a-10** | **수용**: ① 기준선 먼저(19/20 분할이 vr r5 H-2 를 독립 재현) → 부류 ⓐ 29 · ⓑ 9 · ⓒ 1(`version`, 메아리에만 읽힘 — 산출물에 남는 것을 별 test 가 잠금) · 판 열다섯, `pass`·`pass-primary` 가 실제 `StrategyPassed` ② 변이 24 중 **23 RED**, GREEN 하나(적합도 bin 수 자리 — 그 자리가 내는 두 스칼라가 참조 표본과 bin 수에 동시에 의존하고 한 정책 값이 둘을 정해 입력으로 분리 불가) → **`OPEN-6G2A-FIT-BIN-COUNT-SITE`**(사유 등재, 운영자 가시) ③ **`OPEN-6G2A-SEED-COUNT-NOT-PINNED`** — 안정성 seed 마지막 키를 뺀 정책이 네 개로 조용히 로드된다(색인 목록 판독기가 연속성만 요구, 길이 미요구; 승인 문면은 다섯). 로더는 out_scope → 양성 대조와 함께 예외 등재, 닫는 자리는 6G-2c 또는 정책 로더 slice ④ rollback 은 hunk 역적용 대신 **문단 삭제 절차**(착수 hunk 에 팀장의 운영자 결정 문단이 함께 있어 그 문단은 남긴다 — 표지 계수 0/1 로 확인) ⑤ D-6G2a-9 ⓐ 미발동(판정 경로에 박힌 수 없음) |
 | **D-6G2a-11** | **r1 판정 SHA 는 이 갱신 커밋.** verifier 표적: 기준선 재산출(checksum 뺀 투영에서 19/20) · 부류 등식(합집합 == 스키마 키 집합) · ⓒ 하나가 정말 안 쓰이는지 · 판정 입력 일곱의 판에서 결말이 실제로 뒤집히는지(양방향) · 변이 23 RED 재실측 + 새 우회 ≥3 고안 · GREEN 하나의 분리 불가 논증 검증 · seed 네 개 로드 재현 · acceptance `ml-engine` job 열한 단계 · rollback 문서 절차 그대로 · `src` diff 0 · 새 public 표면 0. code-reviewer(sonnet): 정적, test 공허 여부·부류 분류의 타당성 |
 
+## 계약 갱신 r1 (2026-10-01, 팀장 — verifier r1 not-ready H-1·M-1~4·L · code-reviewer r1 H-1·H-2·M 6·L 6 수령)
+
+판정 SHA `c042bac1`. 통과: 기준선 19/20 독립 재현 · 부류 합집합 == 키 집합(키 삭제·미분류 키 RED) · `pass`·`pass-primary` 실제 통과 · 변이 22/23 RED · acceptance 열 단계 exit 0(1,296) · rollback 절차 그대로 ①~⑥ · `src` 0 · 표면 0. 막는 것 하나, 고칠 것 여섯. **재작업 1/5.**
+
+| ID | 결정 |
+|---|---|
+| **D-6G2a-12** | **(vr H-1 · cr H-1·H-2 — 게이트 하드닝) 명단은 읽기가 아니라 「쓰임」이다.** 6G r5 의 E1(Bonferroni 분모 상수를 `passes_window` **한 자리**에만)이 여전히 초록이고, alpha 의 통과 test 자리(V1n) · `stability_seeds[0]` 의 적합도 seed 자리(V4n) · `min_window_count` 의 **세 번째** 자리(`_sampling_record` 최소 표본식, cr H-1) · 제외 ⑮ 의 기관 상수 자리(cr H-2)도 열려 있다. 손으로 쓴 명단이 원인이다. 처방: **쓰임 명단을 AST 로 생성**(`evaluation/backtest/**`·`app/backtest_job.py` 에서 정책 속성 접근 경로마다 둘러싼 함수 — 키 × 자리) → 등식 test 「자리마다 전용 probe 또는 변이 행이 있다」. 전용 probe: `passes_window` 를 두 alpha 사이의 p 로 직접 호출(E1 r5 형 · V1n) · seed 비민감 판에서 적합도 칸 이동(V4n) · `sample-floor` 판에서 `SAMPLE_SIZE_BELOW_MINIMUM`(cr H-1) · 두 정책으로 `admit_rows` 직접 비교(cr H-2). 변이 E1(r5 형)·V1n·V4n·cr H-1·cr H-2 전부 → RED |
+| **D-6G2a-13** | **(vr M-1) ⓒ 검사는 그 값의 자리가 닿는 모든 판에서** — 출하 판 하나로는 ⓐ 값 19 를 ⓒ 로 옮겨도 초록이다. ⓐ 값을 ⓒ 로 옮기는 변이 → RED(값마다는 아니어도 표본 셋) |
+| **D-6G2a-14** | **(vr M-2) `OPEN-6G2A-FIT-BIN-COUNT-SITE` 는 이 slice 에서 닫는다** — 참조 표본을 고정하면 bin 편차(0.0421→0.0648)가 움직인다. P9b → RED |
+| **D-6G2a-15** | **(vr M-3 · cr M) 한쪽 우회**: 판정 입력 일곱은 양방향 필수(`min_window_rows` 하향 방향 추가) · 그 밖 ⓐ 입력은 판이 있으면 반대 방향 probe(V5n 예산 상한 `min()` · V9n 적합도 alpha `max()` → RED), 없으면 값마다 사유 등재. 위협 모델 문장 4 를 그 범위로 정확히 |
+| **D-6G2a-16** | **(vr M-4) seed 노출은 「하나만 있어도 로드」** — `OPEN-6G2A-SEED-COUNT-NOT-PINNED` 문면 갱신(seed 안정성 레그가 항상 참이 되는 조건 명시). 로더는 out_scope 그대로 → **6G-2e 에 「seed 수 = 5 를 정책 스키마가 고정」 항목으로 넘긴다**(팀장이 2e 초안에 등재) |
+| **D-6G2a-17** | **장부 일괄**: N2~N7 설명을 r5 자리(`_not_evaluable` 창 수)로 · 변이 계수 22/23 로 세 문서 일치 · `_strip_echo` 는 전역 값 삭제가 아니라 **메아리 경로만** 제거(cr M — 수치 키의 ⓒ 공허 방지) · milestone 문단의 OPEN 수 셋 · ⓐ 중 「사유만 움직이는」 셋은 ⓑ 로 재분류하거나 ⓐ 정의(결말 부류 변화)를 만족하게 판 보강(cr M) |
+| **D-6G2a-18** | **r2 는 표적**: D-12 자리별 probe + 변이 다섯 · D-13 변이 · D-14 P9b · D-15 네 변이 · D-17 · acceptance `ml-engine` job · rollback 재실측. code-reviewer 는 수정 diff |
+
 ## 위협 모델 — 6G-2a 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `ml_engine.evaluation.backtest/**` 와 `ml_engine.app.backtest_*` 의 판정 경로에 정책 값 대신 **수를 박는 것** — 그 수를 어떤
