@@ -614,6 +614,12 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 
 **6G-2d 종결 2026-10-01** — PR **#51**(계약 갱신 r0-b~r3: D-6G2d-9~35). 판정은 PR 코멘트 넷에 있다. 재작업 **2/5** — verifier r1·r2 not-ready, **r3 ready-for-review**, 승인 전 일괄 하나(rollback 문서 경로·문면·test 강화). 닫은 것: `OPEN-6G-RUN-STATE-HEAL-ORDER`(복구 뒤 누적 해시 · 원자 복구 쓰기) · `OPEN-6G-LIST-AXIS-WALK-SELECTION`(결말 줄 없는 축은 가장 늦은 걷기) · `OPEN-6G-LEGACY-AXIS-LINE`(**실행 상태 형식 version 2 부터** — 없거나 다르면 기동 거부, walk 없는 AXIS 줄 읽기 거부) + PR #50 `/code-review` 넷(빈 공고번호 행 · 적재와 결말 사이 크래시 · 결정적 실패 확정과 재호출 상한 · 소수 금액) + 라운드가 드러낸 같은 계열 셋(A 집계 전부/무 — `open_at` 결측·구성 항목 결측·술어 미지, 6G 의 과소 합산 부채 포함 · 관문 거부는 `Refused` 로 상한 밖). 세 라운드의 계열은 **「반쪽 값이 조용히 온전한 값으로 실리는 자리」**였다 — 소수부 · 반쪽 A · 모르는 술어 — 처방은 한 문장(전부 아니면 무, 그리고 계수)이다. 스키마 칸·golden·`ml-engine/**` 무변경(A-2). **6G D-6G-77 의 실수집 차단 조건은 이 머지로 충족**되지만, 실수집 시작은 운영자 결정 A-3(`OPEN-6G2D-AXIS-RETRY-LIMIT` — 재호출 상한 값 3 · 창 = 실행 상태 디렉터리 생애 · 단위 = 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드는 `INTERRUPTED` 결말 하나(쪽 수 무관; N=3: 4번째 기동부터 안 부름))과 운영계정 키 뒤다. 남긴 OPEN: `OPEN-6G2D-EMPTY-AXIS-REASON` · `OPEN-6G-REVIEW-FOLLOWUPS` 추가 둘. 다음: 6G-2a → 6G-2b → 6G-2c, 실수집 준비 병행. rollback 의 공유 파일 절차는 이 종결 문단도 착수 문단과 같은 문단 단위 삭제로 지운다.
 
+**운영자 결정 2026-10-01(6G-2d 머지 뒤, 실수집 시작 조건)** — **A-3 재호출 상한 N=3 확정**(단위 = (공고, 축)마다 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드는 `INTERRUPTED` 하나, 관문 거부 미계수 · 창 = 실행 상태 디렉터리 생애) → `OPEN-6G2D-AXIS-RETRY-LIMIT` 닫힘(정책 값 등재만, 코드 0). **`OPEN-6G2D-MAX-PAGES-FINAL` 유지**(5,000 초과 참가 축은 확정 제외, 백테스트 판정 보고에 계수 공시; 많으면 그때 `maxPages` 상향 slice). 남은 실수집 시작 조건: 운영계정 키 · `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋(6G-2c).
+
+**6G-2a 착수 2026-10-01 — 정책 값 민감도 게이트 보강** — base `30c6659e`(PR #51 6G-2d 머지 뒤 `main`), worktree `bid-vector-v2-m6-6g2a`·브랜치 `m6-6g2a/2026-10-01`.
+정본 `reports/evidence/m6/6g2a/scope.md`(D-6G2a-1~9, 운영자 결정 A-1 즉시 착수 · A-2 박힌 수 발견 시 멈춤). 수령 OPEN: `OPEN-6G-SENSITIVITY-HARDENING`(6G vr r5 H-2 — 비교 투영에서
+`policy_checksum`·`policy_version` 을 빼고, 정책 값 39 를 ⓐ 판정 입력 · ⓑ 산출 입력 · ⓒ 판독 밖 세 부류로 등식 분할, 판정 입력 일곱마다 경계 위의 판, 쓰이는 자리마다 측정, 변이 열 RED). `ml-engine/src/**` diff 0 이 기대값(D-6G2a-9), Python 단일 레인(`ml-implementer`), Gradle 0. 실수집·백테스트를 막지 않는다. 리뷰 레인 verifier + code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 착수 문단을 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
