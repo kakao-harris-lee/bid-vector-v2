@@ -640,12 +640,12 @@ class _Harness:
         return values
 
     def verdict(self, name: str, **changes: str) -> bytes:
-        token = json.dumps(changes, sort_keys=True)
-        if (name, token) in self.verdicts:
-            return self.verdicts[(name, token)]
+        signature = json.dumps(changes, sort_keys=True)
+        if (name, signature) in self.verdicts:
+            return self.verdicts[(name, signature)]
         board = self.board(name)
         values = self.values(name, **changes)
-        slug = f"{name}-{abs(hash(token)):x}"
+        slug = f"{name}-{abs(hash(signature)):x}"
         policy = load_strategy_backtest_policy(
             _write_policy(self.directory / slug, values)
         )
@@ -664,8 +664,8 @@ class _Harness:
                 variant=board.variant,
             )
         )
-        self.verdicts[(name, token)] = canonical_verdict_bytes(outcome)
-        return self.verdicts[(name, token)]
+        self.verdicts[(name, signature)] = canonical_verdict_bytes(outcome)
+        return self.verdicts[(name, signature)]
 
 
 @pytest.fixture(scope="module")
