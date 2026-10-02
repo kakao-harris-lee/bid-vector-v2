@@ -301,3 +301,7 @@ test 하네스에 `SnapshotAssemblyFixture`(`abstract class`, test 소스 전용
    use case 를 한 자리에 세워야 하고, 그 조립은 `workflow` test 지원(약 250 줄)을 adapters
    쪽에 한 벌 더 두는 일이라 중복 금지에 걸린다. 두 토막의 **접합부**는 「되살린 줄이 쓰인
    의도 줄과 같은 값」이고 그것을 변이 둘이 든다.
+
+## `/code-review` PR #54 (2026-10-02, 팀장 처분 D-6G2e-25·26)
+
+새 high 없음 → 등재. `OPEN-6G-REVIEW-FOLLOWUPS` 추가: 확정 되돌림이 접두 대조 앞(표본 파일 선삭제) · 조각을 줄 수에 더해 절단을 변조로 진단 · Busy 경로의 원장 읽기 예외 · `SnapshotAValueContractTest` 미등재 · `_APPROVED_SEED_KEYS` 중복 · CLI `verdict.json` 덮어쓰기 · 기동 시 중복 읽기. 문면 정정: 되살린 의도 줄은 `walk = null`, 조각 시각은 `at`.

@@ -56,7 +56,7 @@
 
 | ID | 결정 |
 |---|---|
-| **D-6G2e-11** | **이탈 수용(Kotlin)**: ① D-3 의 처방 자리는 `interruptedRounds` 가 아니라 **원장 어댑터** — 조각에서 (시각·축·공고)가 읽히면 **의도 줄**로 되살려(결말로는 안 됨, walk = 조각 시각, `tornLines` 이중 셈 없음) 기존 규칙이 열린 라운드로 본다 ② 「세 번 크래시 → 네 번째 0 호출」은 사슬 둘(조각 → 열린 라운드 · 의도 줄 → 상한 → 0 호출)로 — 한 test 로 재려면 workflow 지원 250 줄을 adapters 에 복제해야 한다. verifier 는 접합부 변이 둘로 확인. **추출 배선 실측**: `SnapshotExtractionWiring` 은 범위를 재지 않는다(KONEPS 호출 없음) — 거동으로 못 박음 |
+| **D-6G2e-11** | **이탈 수용(Kotlin)**: ① D-3 의 처방 자리는 `interruptedRounds` 가 아니라 **원장 어댑터** — 조각에서 (시각·축·공고)가 읽히면 **의도 줄**로 되살려(결말로는 안 됨; 의도 줄이므로 `walk = null`, 조각 시각은 **`at`** 로 실려 `interruptedRounds` 가 그것을 읽는다 — PR #54 리뷰 ⑨ 문면 정정; `tornLines` 이중 셈 없음) 기존 규칙이 열린 라운드로 본다 ② 「세 번 크래시 → 네 번째 0 호출」은 사슬 둘(조각 → 열린 라운드 · 의도 줄 → 상한 → 0 호출)로 — 한 test 로 재려면 workflow 지원 250 줄을 adapters 에 복제해야 한다. verifier 는 접합부 변이 둘로 확인. **추출 배선 실측**: `SnapshotExtractionWiring` 은 범위를 재지 않는다(KONEPS 호출 없음) — 거동으로 못 박음 |
 | **D-6G2e-12** | **이탈 수용(Python)**: ① D-10 으로 두 로더 모두 seed 다섯(허가대로) ② `test_evaluation_policy.py` 의 부수 정정 둘 — 거부 test 여섯이 seed 수로만 거부하던 것을 기준값 통일 + 양성 대조, `..._rejects_gapped_indexed_list` 가 틈을 만들지 않고 엄격 상승으로 거부하던 공허(이 slice 이전 부채) 정정 ③ `pyproject.toml` 무변경(`[project.scripts]` 없음 → `python -m ml_engine.app.backtest_cli`) ④ Python 커밋 trailer 가 `Claude Opus 5` — 이력 되쓰지 않음, 사실 선언 |
 | **D-6G2e-13** | **교차 사실**: evidence 두 파일이 Kotlin 커밋 `caccd807` 에 Python 절을 품은 채 처음 추적됨(공유 트리에서 untracked 였음 — 두 커밋 메시지가 선언) · runbook 공유 hunk 역적용 순서는 **Kotlin(`dea3e6da`) → Python(`2e02b35f`)**, Python 축은 수동 절차가 정본(`--3way` 충돌) · 착수 표 test 수 2,588 → 되돌린 트리 기준 **2,580**(+10 = 2,590), pytest 1,350 → 1,372(+22) — 표는 고치지 않고 evidence 에 사실 |
 | **D-6G2e-14** | **r1 판정 SHA 는 이 갱신 커밋.** verifier 표적: D-1 120/121/32 + 변이 둘 · D-2 쪼갠 창 거부 · D-3 조각 → 의도 줄 → 상한 사슬(접합 변이 둘, 세 번 크래시 판을 verifier 가 직접 이어 잼) · D-4 기초금액 축 빈 + A 결손 · D-5 복사 디렉터리+찢어진 꼬리 거부·바이트 불변, 비UTF-8 뒤 Busy 아님 · D-6 CLI 성공·실패 사유 넷·스냅숏 안 출력 거부·경로→URI · D-6b/10 두 로더 1/4/5/6 · 출하 YAML 둘 로드 · acceptance `check` job 넷 + `ml-engine` job + container(판단) · rollback 두 축 문서 절차 그대로(runbook 순서 포함, 복원 목록 ⊇ 변경 소스 전수) · 새 public 표면(정책 인스턴스·`main(argv)`) · 형식 version 2 · `evaluation/backtest/run.py` 등 판정 경로 diff 0. code-reviewer(sonnet): 정적, 두 레인 diff |
@@ -89,6 +89,15 @@
 |---|---|
 | **D-6G2e-23** | **승인 전 일괄 — Python**: ① (cr MR2-1, 게이트 하드닝) `urllib.request.url2pathname` 은 app 층에 HTTP 모듈을 들인다(import-linter 열거 계약을 지나감) → `urllib.parse.unquote` 로(Windows 문면 제거) ② (vr L-r2-1) `%`+hex 이름의 실제 디렉터리를 URI 로 넘기면 guard 는 디코딩 경로를, 판독기는 리터럴 경로를 봐서 스냅숏 안 출력이 **통과**한다 — 판독기 OPEN 이 닫힐 때까지 **guard 는 디코딩 경로와 리터럴 경로 둘 다** 스냅숏 안인지 본다(어느 쪽이든 안이면 거부). test: `a%41b` 디렉터리 + URI + 안쪽 출력 → 거부. 변이(한쪽만) → RED. **Kotlin**: ③ (cr L) 접두 대조가 「마지막 줄」 두 뜻을 섞어 공백만 남은 찢어진 꼬리를 거짓 거부할 수 있음 → 한 뜻으로, test ④ (cr L) `carriesAValueInput` 이 파싱된 금액을 읽어 A 행 금액이 판독 불가일 때 fallback 이 없음 → 원문 존재로, test ⑤ 죽은 코드(`linesOf`·`lineCountOf`) 제거 · 재동기가 `LedgerDigest.lines` 를 두고 원장 전체를 다시 읽는 중복 제거 ⑥ 장부: rollback Kotlin 절 제목에 D-15/17/18 · 「변이 셋이 각자 다른 판」 → 「실패 집합이 다름」(vr L-r2-2) · evidence 트리 동일성 확인 범위를 `9c274fc0` 까지 명기(Python). **공유 evidence 혼입 방지**: 이번 일괄부터 evidence 커밋 전 `git diff -- reports/evidence/m6/6g2e/` 를 읽고 **자기 hunk 만** `git add -p` — 다른 레인 줄이 보이면 선언 |
 | **D-6G2e-24** | **종결 절차**: 일괄 커밋 뒤 verifier 표적 확인(①② 변이 · ③④ test · acceptance 두 job · rollback 두 축 재실측 · evidence 정직성) → 팀장 종결 문단(별 커밋) → verifier 가 그 커밋에서 rollback 절차 재실행 → rollback 실측 HEAD 갱신(별 커밋) → push · PR · 코멘트(r1·r2·종결 확인) · `/code-review` · 처분 · CI 초록이면 머지(사용자 사전 승인). 수렴 규칙(6G-2d D-50 과 같음): `/code-review` 에 새 high 가 없으면 나머지는 등재 |
+
+## 계약 갱신 r4 (2026-10-02, 팀장 — PR #54 `/code-review` 9건 수령 · D-24 수렴 규칙 발동)
+
+새 high 없음 → 코드 변경 0, 등재. 리뷰 에이전트가 공유 main 체크아웃에서 PR head 를 잠시 checkout 했다가 복원한 사실(worktree 아닌 main)을 기록한다 — 흔적 없음 확인.
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-25** | **`OPEN-6G-REVIEW-FOLLOWUPS` 추가(6G-2c)**: ① `verifyThenHeal` 이 중단된 확정의 되돌림(표본 파일 둘 삭제)을 읽기 전용 접두 대조 **앞**에 돌려, 접두 변조로 거부될 디렉터리의 표본 파일이 먼저 지워진다 — 순서를 접두 대조 → 되돌림으로(한 줄). 발생 조건은 「확정 중단 + 접두 변조」라 정직한 운영에서 드묾 ② 접두 대조가 찢어진 조각을 줄 수에 더해 **진짜 절단**(장부가 센 줄의 꼬리 손실)이 「변조」로 진단된다 — 둘 다 거부지만 메시지가 틀림 ⑦ Busy 경로에서도 `LedgerDigest` 를 지어 원장이 판독 불가면 Busy 대신 예외 — Held 에서만 짓기 ⑧ `SnapshotAValueContractTest`(·`SnapshotAmountContractTest`) 미등재 — snapshot 패키지에 양방향 등재 test 없음 ③ `_APPROVED_SEED_KEYS` 두 로더에 중복(열거를 실제 키 집합과 비교하지 않음) — 공용 자리로 ④ CLI 가 기존 `verdict.json` 을 조용히 덮어씀 — 거부 또는 명시 플래그(runbook 은 스냅숏별 판정 디렉터리라 실수집에서는 안 겹침) ⑤⑥ 기동 시 `state.json` 두 번·원장 세 번 읽기 |
+| **D-6G2e-26** | **문면 정정(이 커밋)**: D-11 ① 「walk = 조각 시각」 → 「의도 줄이라 `walk = null`, 조각 시각은 `at`」(리뷰 ⑨). **머지**: 사용자 사전 승인 + D-24. 머지 뒤 실수집 시작 조건 전부 충족(키 = 개발 키) |
 
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
