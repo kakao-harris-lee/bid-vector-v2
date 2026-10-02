@@ -73,7 +73,13 @@ open class CollectionWiring {
         properties: CollectionProperties,
         clock: Clock,
     ): CollectionRange =
-        resolveCollectionRange(properties.from, properties.to, clock, "수집 범위", COLLECTION_RANGE_POLICY)
+        resolveCollectionRange(
+            properties.from,
+            properties.to,
+            clock,
+            "수집 범위",
+            COLLECTION_RANGE_POLICY,
+        )
 
     @Bean
     open fun collectionSources(
