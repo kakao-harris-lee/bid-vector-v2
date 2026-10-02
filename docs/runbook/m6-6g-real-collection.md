@@ -134,7 +134,6 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 - `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
-- **수집 범위 상한 31일이 개찰 갈래에도 걸린다**(`OPEN-6G-OPENING-RANGE-CAP`) — 닫히기 전에는 A-1 기간 실수집 불가.
 
 ## 6. 검증 기록
 
