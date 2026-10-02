@@ -52,6 +52,15 @@
 | **D-6G2e-9** | **in_scope carve-out(Python)**: `ml-engine/src/ml_engine/evaluation/backtest/policy.py`(백테스트 정책 키 스키마 — D-6b 의 자리; 길이는 공용 `collect_indexed_list` 가 아니라 정책별 키 스키마에, 리터럴 `5` 금지 → 다섯 키 열거 + `len`) · `ml-engine/src/ml_engine/evaluation/policy.py`(평가 정책 키 스키마, D-10) · `ml-engine/tests/app/test_backtest_policy_sensitivity.py`(6G-2a 양성 대조 등록이 설계상 RED 가 되므로 그 등록 삭제) · `ml-engine/tests/evaluation/test_evaluation_policy.py`(D-10 helper). out_scope 의 「`evaluation/**`」는 이 네 파일을 제외하고 유지 — `evaluation/backtest/run.py` 등 판정 경로 무변경 |
 | **D-6G2e-10** | **평가 정책 로더(`load_evaluation_policy`, `evaluation-v1.yaml`)도 seed 다섯을 요구한다** — 같은 구멍(M5 학습 안정성 레그가 seed 하나로 공허). 조건: 출하 `evaluation-v1.yaml` 이 정확히 다섯이 아니면 **멈추고 보고**(학습 경로를 깨지 않는다). test helper 가 두 seed 만 쓰던 것을 다섯으로, 거부 test 여섯이 「잘못된 이유로 통과」하지 않음을 확인. 한 커밋에 두 로더 |
 
+## 계약 갱신 r1 (2026-10-02, 팀장 — 두 레인 완료 보고 수령: Kotlin HEAD `caccd807` · Python HEAD `4e8cfc76`)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-11** | **이탈 수용(Kotlin)**: ① D-3 의 처방 자리는 `interruptedRounds` 가 아니라 **원장 어댑터** — 조각에서 (시각·축·공고)가 읽히면 **의도 줄**로 되살려(결말로는 안 됨, walk = 조각 시각, `tornLines` 이중 셈 없음) 기존 규칙이 열린 라운드로 본다 ② 「세 번 크래시 → 네 번째 0 호출」은 사슬 둘(조각 → 열린 라운드 · 의도 줄 → 상한 → 0 호출)로 — 한 test 로 재려면 workflow 지원 250 줄을 adapters 에 복제해야 한다. verifier 는 접합부 변이 둘로 확인. **추출 배선 실측**: `SnapshotExtractionWiring` 은 범위를 재지 않는다(KONEPS 호출 없음) — 거동으로 못 박음 |
+| **D-6G2e-12** | **이탈 수용(Python)**: ① D-10 으로 두 로더 모두 seed 다섯(허가대로) ② `test_evaluation_policy.py` 의 부수 정정 둘 — 거부 test 여섯이 seed 수로만 거부하던 것을 기준값 통일 + 양성 대조, `..._rejects_gapped_indexed_list` 가 틈을 만들지 않고 엄격 상승으로 거부하던 공허(이 slice 이전 부채) 정정 ③ `pyproject.toml` 무변경(`[project.scripts]` 없음 → `python -m ml_engine.app.backtest_cli`) ④ Python 커밋 trailer 가 `Claude Opus 5` — 이력 되쓰지 않음, 사실 선언 |
+| **D-6G2e-13** | **교차 사실**: evidence 두 파일이 Kotlin 커밋 `caccd807` 에 Python 절을 품은 채 처음 추적됨(공유 트리에서 untracked 였음 — 두 커밋 메시지가 선언) · runbook 공유 hunk 역적용 순서는 **Kotlin(`dea3e6da`) → Python(`2e02b35f`)**, Python 축은 수동 절차가 정본(`--3way` 충돌) · 착수 표 test 수 2,588 → 되돌린 트리 기준 **2,580**(+10 = 2,590), pytest 1,350 → 1,372(+22) — 표는 고치지 않고 evidence 에 사실 |
+| **D-6G2e-14** | **r1 판정 SHA 는 이 갱신 커밋.** verifier 표적: D-1 120/121/32 + 변이 둘 · D-2 쪼갠 창 거부 · D-3 조각 → 의도 줄 → 상한 사슬(접합 변이 둘, 세 번 크래시 판을 verifier 가 직접 이어 잼) · D-4 기초금액 축 빈 + A 결손 · D-5 복사 디렉터리+찢어진 꼬리 거부·바이트 불변, 비UTF-8 뒤 Busy 아님 · D-6 CLI 성공·실패 사유 넷·스냅숏 안 출력 거부·경로→URI · D-6b/10 두 로더 1/4/5/6 · 출하 YAML 둘 로드 · acceptance `check` job 넷 + `ml-engine` job + container(판단) · rollback 두 축 문서 절차 그대로(runbook 순서 포함, 복원 목록 ⊇ 변경 소스 전수) · 새 public 표면(정책 인스턴스·`main(argv)`) · 형식 version 2 · `evaluation/backtest/run.py` 등 판정 경로 diff 0. code-reviewer(sonnet): 정적, 두 레인 diff |
+
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 공고 목록 갈래의 31일 상한은 그대로(호출 폭주 방지) ② 개찰 갈래의 긴 창은 표본 크기·호출 상한이 묶는다 ③ 실행 상태 회계(크래시 라운드 하나 · 거부될 디렉터리 불변 · 잠금 잔류 없음) ④ CLI 는 판정 경로를 바꾸지 않는다.
