@@ -134,6 +134,7 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 - `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
+- **KONEPS 쿼터는 operation 별이다(2026-10-02 실측).** 개찰완료 조회(`getOpengResultListInfoOpengCompt`)는 이 키로 하루 1,000 건에서 HTTP 429 가 오고(공고 목록·개찰 목록은 같은 날 1,000 을 넘겨 통과), 실행기는 재호출 상한 뒤 `REFUSED:QUOTA_EXHAUSTED` 로 멈춘다(exit 2, `truncation=QuotaExhausted`). 그 축은 공고당 1~35 페이지라 하루 약 470 공고가 끝난다 — 일 상한 20,000 보다 이 쿼터가 먼저 닫는다. 운영자 결정(2026-10-02): data.go.kr 트래픽 증량을 신청하고 승인 전까지 하루 1,000 건으로 자정 뒤 자동 재실행을 이어 간다(표본·상한 회계·디렉터리 불변). 증량 승인은 원장의 개찰완료 성공 수가 하루 1,000 을 넘는지로 확인한다.
 
 ## 6. 검증 기록
 

@@ -66,6 +66,8 @@ main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
 | 2026-10-02 20:52 | 개찰 · 스모크(`calls-per-day 1300` = 공고 목록 1,022 + 278) | 2(DAILY) | 표본틀 걷기 중 상한 — truncation none · notAttempted 0 · partialNotice false | — | frame 23,551(미완) | — | — | — | HTTP 1,300(누적) · AXIS 0 | 표본 확정 전 상한 정지(설계대로); 누출 0/0. seed `m6-6g-2026-10-02` · sample 24,000 · 창 06-11~10-01 |
 | 2026-10-02 20:53~21:52 | 개찰 · day1(`calls-per-day 20000` · `calls-total 80000`, seed `m6-6g-2026-10-02`, 표본 24,000) | 2(**QuotaExhausted**, budgetLimit none) | 표본틀 걷기 완료 21:12 — frame 65,064 · 층 34 · sampled 24,000/24,000 · short false · sampleUnseen 0 | 개찰 목록 812 | 상세 시도 공고 476 · notAttempted 23,524 · partialNotice true | 축 정착 1,663(SUCCEEDED 1,323 · EMPTY 339 · REFUSED 1) | — | — | 이 실행 HTTP 3,003(개찰 목록 812 · 개찰완료 1,004 · 기초금액 475 · 예정가격 476 · 산식 A 236) · 누적 4,303 | **개찰완료 축(`getOpengResultListInfoOpengCompt`)이 1,000건 성공 직후 HTTP 429 ×4(원장 `FAILED:HTTP_429`, 재호출 상한 N=3) → `REFUSED:QUOTA_EXHAUSTED` 로 정지(설계대로).** 이 키의 개찰완료 operation 일 쿼터가 1,000 으로 보인다 — 개찰 목록 1,090 · 공고 목록 1,022 는 같은 날 통과했으므로 전역이 아니라 operation 별 상한. 개찰완료는 공고당 1~35 페이지(1페이지 365 공고 · 2페이지 이상 111 공고). 누출 0/0. DB `raw_observation` 179,033 → 335,833 · `collection_run` 474 → 2,425 · `notice` 88,478 불변 · `opening_result`·`opening_reserve_price` 0(개찰 갈래는 `raw_observation` 에만 적재 — runbook §4 문면과 일치) |
 
+**운영자 결정 2026-10-02 (개찰완료 쿼터).** 선택지 넷(증량 신청 + 계속 · 표본 축소 · 그대로 50일 · 중간 스냅숏 선행) 중 **「data.go.kr 트래픽 증량 신청 + 계속」**. 승인 전까지는 하루 1,000 건(≈ 470 공고)으로 자정 뒤 자동 재실행을 이어 가고, 표본·상한 회계·실행 상태 디렉터리는 바꾸지 않는다. 날짜별 행은 아래 표에 계속 적는다.
+
 **없다(이 레인, 2026-09 당시).** 이 레인은 코드·test·evidence 까지다. 모든 시나리오는 loopback in-process mock server
 (`MockKonepsServer`, 소켓은 127.0.0.1 뿐)에서 돈다. 서비스 키는 합성값이고 운영 키를 쓰지 않았다.
 실수집은 검증 뒤 운영자 키로 팀장이 연다.
