@@ -52,6 +52,7 @@ r1 에서는 커밋이 둘이었다.
 **(가) 전 slice 를 되돌릴 때 — 나중 커밋부터, 즉 최신 Kotlin → Kotlin → Python.**
 
 ```
+git diff df357312~1..df357312 -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff a67a9162~1..a67a9162 -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff dea3e6da~1..dea3e6da -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff 2e02b35f~1..2e02b35f -- docs/runbook/m6-6g-real-collection.md | git apply -R
@@ -178,8 +179,10 @@ config/quality` 로 먼저 그 파일들을 만진 커밋을 나열한다. r2 �
 
 ```
 git diff 5fddfd1a~1..5fddfd1a -- config/quality/gate-tests.properties | git apply -R
+git diff df357312~1..df357312 -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff a67a9162~1..a67a9162 -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff dea3e6da~1..dea3e6da -- docs/runbook/m6-6g-real-collection.md | git apply -R
+git diff df357312~1..df357312 -- milestone-6.md | git apply -R
 git diff 519b9432~1..519b9432 -- milestone-6.md | git apply -R
 ```
 
@@ -238,3 +241,7 @@ Python 몫 hunk 를 **먼저** 역적용하면 `patch does not apply` 로 선다
   그대로 남는다).
 - **A 결손 계수의 정본(D-15)**: D-4 와 같다 — 계수는 공시이고 `a_value` 값·스키마 칸은 무변경이다.
   되돌려도 이미 추출한 스냅숏 바이트는 달라지지 않는다.
+
+## 종결 커밋의 공유 파일 hunk (팀장, D-6G2e-24)
+
+팀장 종결 커밋 `df357312` 가 runbook(0 절 키 행 · §1-5 · §2-1 한 줄)과 `milestone-6.md`(종결 문단)를 함께 바꿨다 — 두 레인의 역적용 순서에서 **가장 먼저**(새 것부터). 이 목록 갱신은 그 커밋 **뒤의 별도 커밋**이고, ①~⑥ 재실측은 이 갱신 커밋에서 verifier 가 돌려 아래 「실측 HEAD」를 또 한 번의 별도 커밋으로 적는다(6A-2b·6G-2a 교훈).
