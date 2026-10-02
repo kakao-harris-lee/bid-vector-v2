@@ -35,6 +35,7 @@
 --bidvector.persistence.jdbc-url=jdbc:postgresql://127.0.0.1:55432/bidvector
 --bidvector.persistence.username=bidvector
 --bidvector.koneps.base-url=...(기본값, 생략 가능)
+--bidvector.evaluation.candidate-cap=10   # 평가 endpoint 속성이 모드와 무관하게 필수 — 수집 모드에서는 쓰이지 않는 부팅 요건(6F-8 과 같은 값; 2026-10-02 첫 기동이 이 누락으로 거부됨)
 ```
 DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CREDENTIAL_VALUE` — `BidVectorApplication` 이 모드와 무관하게 **항상** 바인딩하므로 세 갈래 모두 필수)도 키와 같은 방식으로 환경에만.
 
