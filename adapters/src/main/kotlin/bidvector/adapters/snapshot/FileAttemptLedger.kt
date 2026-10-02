@@ -80,8 +80,9 @@ internal class FileAttemptLedger(
 
     /** 표식이면 그 조각(값이 문자열이 아니면 빈 조각), 표식이 아니면 `null`. */
     private fun tornFragmentOf(line: String): String? {
-        val fields = runCatching { fieldsOf(line) }.getOrNull()
-        return fields?.get(TORN_KEY).asStringOrNull().orEmpty().takeIf { fields?.containsKey(TORN_KEY) == true }
+        val fields = runCatching { fieldsOf(line) }.getOrNull() ?: return null
+        val fragment = fields[TORN_KEY].asStringOrNull().orEmpty()
+        return fragment.takeIf { fields.containsKey(TORN_KEY) }
     }
 
     /**
