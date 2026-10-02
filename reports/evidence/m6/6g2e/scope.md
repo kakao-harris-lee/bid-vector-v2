@@ -81,6 +81,15 @@
 | **D-6G2e-21** | **사실 선언(두 번째 혼입)**: Kotlin evidence 커밋 `0f7e3e16` 이 Python 의 미커밋 r2 evidence 편집을 **선언 없이** 품었다(첫 번째 `caccd807` 은 선언). 되쓰지 않는다 — Python `9c274fc0` 이 두 흡수 커밋과 저작 이력 자리를 기록. 교훈: 공유 evidence 파일은 레인마다 **별 파일**(`commands-kotlin.md`/`commands-python.md`)로 두는 편이 혼입을 구조로 막는다 → 다음 두 레인 slice(6G-2c)부터 적용(하네스 메모리) |
 | **D-6G2e-22** | **r2 판정 SHA 는 이 갱신 커밋.** verifier 표적: D-15 판 일곱 + 변이 셋 · D-17 변조+찢어진 꼬리 → 거부·바이트 동일 + 변이 · D-16 공백·한글 경로 넷 + 변이 · acceptance `check` 넷(2,592) + `ml-engine`(1,377) + container(참고) · rollback 두 축 문서 절차 그대로(순서 셋: 두 레인 Kotlin → Python, 자기 커밋 새 것부터, `config/quality` 먼저; 유효성 술어 `5fddfd1a..판정 SHA` · `a67a9162..판정 SHA`) · 새 public 표면 0 · 형식 version 2 · 판정 경로 diff 0. code-reviewer: `8b39b4c4..판정 SHA` |
 
+## 계약 갱신 r3 (2026-10-02, 팀장 — verifier r2 **ready-for-review** L 2 · code-reviewer r2 M 1 · L 5 수령)
+
+판정 SHA `71ffd202`. r1 의 high·medium 전부 실행으로 닫힘(D-15 열일곱 판 · D-17 변조 셋 거부·바이트 동일·중간 파일 0 · D-16 넷 + 변이 RED 2 · acceptance `check` 2,592 · `ml-engine` 1,377 · container S-21~25 · rollback 두 축 문서 절차 그대로, 복원 목록 19 == 19). **승인 전 일괄 하나**(코드 거동 최소) 뒤 종결. 재작업 1/5 불변.
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-23** | **승인 전 일괄 — Python**: ① (cr MR2-1, 게이트 하드닝) `urllib.request.url2pathname` 은 app 층에 HTTP 모듈을 들인다(import-linter 열거 계약을 지나감) → `urllib.parse.unquote` 로(Windows 문면 제거) ② (vr L-r2-1) `%`+hex 이름의 실제 디렉터리를 URI 로 넘기면 guard 는 디코딩 경로를, 판독기는 리터럴 경로를 봐서 스냅숏 안 출력이 **통과**한다 — 판독기 OPEN 이 닫힐 때까지 **guard 는 디코딩 경로와 리터럴 경로 둘 다** 스냅숏 안인지 본다(어느 쪽이든 안이면 거부). test: `a%41b` 디렉터리 + URI + 안쪽 출력 → 거부. 변이(한쪽만) → RED. **Kotlin**: ③ (cr L) 접두 대조가 「마지막 줄」 두 뜻을 섞어 공백만 남은 찢어진 꼬리를 거짓 거부할 수 있음 → 한 뜻으로, test ④ (cr L) `carriesAValueInput` 이 파싱된 금액을 읽어 A 행 금액이 판독 불가일 때 fallback 이 없음 → 원문 존재로, test ⑤ 죽은 코드(`linesOf`·`lineCountOf`) 제거 · 재동기가 `LedgerDigest.lines` 를 두고 원장 전체를 다시 읽는 중복 제거 ⑥ 장부: rollback Kotlin 절 제목에 D-15/17/18 · 「변이 셋이 각자 다른 판」 → 「실패 집합이 다름」(vr L-r2-2) · evidence 트리 동일성 확인 범위를 `9c274fc0` 까지 명기(Python). **공유 evidence 혼입 방지**: 이번 일괄부터 evidence 커밋 전 `git diff -- reports/evidence/m6/6g2e/` 를 읽고 **자기 hunk 만** `git add -p` — 다른 레인 줄이 보이면 선언 |
+| **D-6G2e-24** | **종결 절차**: 일괄 커밋 뒤 verifier 표적 확인(①② 변이 · ③④ test · acceptance 두 job · rollback 두 축 재실측 · evidence 정직성) → 팀장 종결 문단(별 커밋) → verifier 가 그 커밋에서 rollback 절차 재실행 → rollback 실측 HEAD 갱신(별 커밋) → push · PR · 코멘트(r1·r2·종결 확인) · `/code-review` · 처분 · CI 초록이면 머지(사용자 사전 승인). 수렴 규칙(6G-2d D-50 과 같음): `/code-review` 에 새 high 가 없으면 나머지는 등재 |
+
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 공고 목록 갈래의 31일 상한은 그대로(호출 폭주 방지) ② 개찰 갈래의 긴 창은 표본 크기·호출 상한이 묶는다 ③ 실행 상태 회계(크래시 라운드 하나 · 거부될 디렉터리 불변 · 잠금 잔류 없음) ④ CLI 는 판정 경로를 바꾸지 않는다.
