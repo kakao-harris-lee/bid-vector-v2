@@ -130,8 +130,8 @@ private fun AssemblyTally.noticeOf(
         floorRate = canonical.floorRate,
         reserveRangeBeginRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_BEGIN_RATE),
         reserveRangeEndRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_END_RATE),
-        // 계수는 **A 축 행 자체**가 가른다(D-6G2e-4) — 기초금액 축 행의 술어에 묶지 않는다.
-        aValueTotal = formulaARow?.let { aValueTotalOf(it) },
+        // 계수의 정본은 기초금액 축 술어이고, 그 축이 없을 때만 A 행이 가른다(D-6G2e-15).
+        aValueTotal = formulaARow?.let { aValueTotalOf(it, formulaAApplies) },
         aValueOpenAt = formulaARow?.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT),
         standardMarketPriceApplicable =
             formulaARow?.predicateOf(FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
@@ -227,25 +227,26 @@ private fun AssemblyTally.reservePricesOf(rows: List<RawRow>): List<BigDecimal>?
  *
  * 셋 다 기존의 이름 있는 행 단위 제외(A 부재)로 떨어지고 그 수는 로그가 공시한다.
  *
- * **계수는 이 행 자체가 가른다**(D-6G2e-4 ★② — 6G-2d cr 4차 ③). 앞 판은 기초금액 축 행의
- * `bidPrceCalclAYn` 에 묶었고, 그 축이 **걷히지 않은** 공고에서는 그 술어가 「모름」이라 A 행의
- * 결손이 세어지지 않았다(값은 맞고 계수만 과소 — 공시가 조용히 줄었다). 적용 여부를 그 축에서
- * 읽을 수 없으면 여기서 읽는다: A 가 적용되지 않는 공고의 op 24 응답은 A 입력을 **아무것도** 싣지
- * 않으므로, 「입력이 하나라도 있는데 합산을 낼 수 없다」가 곧 결손이다.
+ * **계수의 정본은 기초금액 축 술어다**(D-6G2e-15 — vr r1 H-1). 그 술어가 `Y` 면 센다: 원천이
+ * A 행을 통째로 비워 보내거나 금액을 읽을 수 없게 보내는 것이 가장 흔한 반쪽이고, 그것은 「A 가
+ * 없는 공고」가 아니라 **결손**이다. 그 축이 **걷히지 않았거나 술어를 모를 때만** A 행이 싣는
+ * 입력으로 가른다(D-6G2e-4 가 고친 자리 — 그 축이 미완인 공고의 결손이 세어지지 않았다).
+ * 술어가 `N` 이면 세지 않는다: 그 공고에 A 가 없다.
  *
  * **A 안의 다른 `*Yn` 술어**(표준시장단가 적용 여부)는 합산을 가르지 않는다 — 그 금액은 근거 예규
  * 미확보로 §3.3 이 합산에서 **항상** 빼고, 술어 자신은 스키마가 `bool | null` 로 두어 모름이 합법이다.
  * 그래서 이 규칙의 대상은 합산을 가르는 술어 하나다(실측: 합산 목록을 가르는 술어는 그것뿐).
  */
-private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
+private fun AssemblyTally.aValueTotalOf(
+    row: RawRow,
+    appliesByBaseAmount: Boolean?,
+): BigDecimal? {
     val qualityApplies = row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE)
     val parts = aValuePartsOf(row, qualityApplies)
     val disclosedAt = row.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT)
     return when {
         qualityApplies == null || disclosedAt == null || parts.any { it == null } -> {
-            // **A 입력이 하나라도 있는 행만** 센다(D-6G2e-4) — 그 셋이 모두 없는 행은 반쪽이 아니라
-            // 「그 공고에 A 가 없다」이고, 그것을 세면 계수가 미적용 공고 수로 부풀어 공시가 뜻을 잃는다.
-            if (qualityApplies != null || disclosedAt != null || parts.any { it != null }) countIncompleteAValue()
+            if (appliesByBaseAmount ?: row.carriesAValueInput()) countIncompleteAValue()
             null
         }
 
@@ -254,6 +255,23 @@ private fun AssemblyTally.aValueTotalOf(row: RawRow): BigDecimal? {
         }
     }
 }
+
+/**
+ * 이 행이 A 합산의 **입력을 하나라도** 싣는가 — 기초금액 축 술어를 모를 때만 쓰는 대체 판정이다
+ * (D-6G2e-15). 구성 항목 여섯 · 공개일시 · 품질관리비의 **금액과 술어**를 본다.
+ *
+ * 품질관리비 금액은 **그 술어와 무관하게** 입력이다. 술어가 없거나 빈 값이면 합산 목록에 들어가지
+ * 않지만(`aValuePartsOf`), 그 금액이 실렸다는 것 자체가 「이 공고에 A 가 있다」의 증거다 — 합산
+ * 목록으로만 보면 그 행이 「입력 없음」으로 보여 결손이 세어지지 않았다(vr r1 H-1 의 두 모양).
+ *
+ * 금액은 **읽힌 값**으로 본다 — 칸은 있는데 숫자로 읽히지 않는 원문은 입력이 아니다(그 모양에서는
+ * 기초금액 축 술어가 답한다).
+ */
+private fun RawRow.carriesAValueInput(): Boolean =
+    A_ALWAYS_SUMMED.any { amountOf(it) != null } ||
+        amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST) != null ||
+        predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) != null ||
+        instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT) != null
 
 /**
  * A 합산의 구성 항목 — `null` 원소는 **결측**이고 빼지 않는다(D-6G2d-21 ⓑ). 품질관리비는 [qualityApplies]

@@ -7,6 +7,7 @@ import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -391,24 +392,64 @@ class SnapshotAmountContractTest {
     }
 
     /**
-     * **D-6G2d-48 ④ / D-6G2e-4 — A 가 없는 공고의 A 행은 계수가 아니다.** 값은 같은 `null` 이지만
-     * 뜻이 다르다: 결측이 아니라 「그 공고에 A 가 없다」다. 세면 계수가 미적용 공고 수로 부풀어
-     * 백테스트 판정 보고에서 그 공시가 뜻을 잃는다.
+     * **D-6G2e-15 (vr r1 H-1 = cr r1 M-1·M-2) — 「A 가 적용되는가」의 정본은 기초금액 축 술어다.**
      *
-     * **그 판정을 A 행 자신이 한다**(D-6G2e-4): A 가 적용되지 않는 공고의 응답은 A 입력을 아무것도
-     * 싣지 않는다. 기초금액 축 행의 술어가 무엇이든(여기서는 `Y`) 그 행은 결손이 아니다.
+     * D-6G2e-4 는 계수를 **A 행 입력 유무**로만 갈랐고, 그 바꿈이 다른 모양에서 같은 과소를 만들었다:
+     * 기초금액 축이 `Y` 라고 말하는데 A 행이 통째로 비었거나 금액이 읽히지 않는 공고(원천이 반쪽을
+     * 보낸 **가장 흔한** 모양)가 1 에서 0 으로 줄었고, 품질관리비 금액만 실린 행도 그 술어가 없으면
+     * 합산 목록에 들어가지 않아 「입력 없음」으로 보였다.
+     *
+     * 정본은 **기초금액 축 술어**다. 그 축이 걷히지 않았거나 술어를 모를 때만 A 행이 싣는 입력으로
+     * 가른다(그것이 D-4 가 고친 자리다) — 두 처방이 같은 함수에서 각자의 자리를 갖는다.
+     *
+     * 판을 **한 표로** 둔다: 사유별로 test 를 쪼개면 어느 한 모양을 빠뜨린 변이가 나머지 판에서
+     * 초록으로 지나간다(이 파일의 「계수 여덟」 판과 같은 이유).
      */
     @Test
-    fun `A 입력을 하나도 싣지 않은 A 행은 세지 않는다`() {
-        val rendered =
-            render(
-                formulaAFields = mapOf("ntceNticeDt" to "2026-06-01 09:00:00"),
-                reserveFields = intactReserveRows(),
-            )
+    fun `A 결손 계수는 기초금액 축 술어가 정본이고 그 축이 없을 때만 A 행이 가른다`() {
+        val costOnly = mapOf(QUALITY_COST_KEY to "500000")
+        val unreadable = A_COMPONENT_KEYS.associateWith { "금액-아님" }
+        listOf(
+            Board("기초 Y + A 행 빔", emptyMap(), applicable = true, collected = true, expected = 1),
+            Board("기초 Y + A 행 해석 불가", unreadable, applicable = true, collected = true, expected = 1),
+            Board("품질관리비만 + 술어 부재", costOnly, applicable = true, collected = true, expected = 1),
+            Board(
+                "품질관리비만 + 술어 빈 값",
+                costOnly + mapOf(QUALITY_PREDICATE_KEY to ""),
+                applicable = true,
+                collected = true,
+                expected = 1,
+            ),
+            Board("기초 축 부재 + A 행 빔", emptyMap(), applicable = true, collected = false, expected = 0),
+            Board("기초 N + 품질관리비만", costOnly, applicable = false, collected = true, expected = 0),
+            // 계약의 여섯에 하나 더한다 — 「품질관리비 금액은 그 술어와 무관하게 입력」이 기초금액 축이
+            // 없을 때 실제로 쓰이는 자리다. 이 판이 없으면 그 절의 변이가 초록으로 지나간다.
+            Board("기초 축 부재 + 품질관리비만", costOnly, applicable = true, collected = false, expected = 1),
+        ).forEach { board ->
+            val rendered =
+                render(
+                    formulaAFields = board.formulaAFields,
+                    reserveFields = intactReserveRows(),
+                    formulaAApplicable = board.applicable,
+                    baseAmountAxisCollected = board.collected,
+                )
 
-        rendered.incompleteAValues shouldBe 0
-        rendered.bytes shouldContain "\"a_value\":null"
+            withClue(board.name) {
+                rendered.incompleteAValues shouldBe board.expected
+                // 값은 일곱 판 모두 같다 — 갈리는 것은 **공시 계수**뿐이다.
+                rendered.bytes shouldContain "\"a_value\":null"
+            }
+        }
     }
+
+    /** D-6G2e-15 의 판 하나 — 이름과 기대값을 함께 들어 변이가 어느 모양을 빠뜨렸는지 말하게 한다. */
+    private class Board(
+        val name: String,
+        val formulaAFields: Map<String, String>,
+        val applicable: Boolean,
+        val collected: Boolean,
+        val expected: Int,
+    )
 
     /** 반대 방향 — A 입력이 있는데 합산을 낼 수 없는 행은 **센다**(그것이 결측이다). */
     @Test
