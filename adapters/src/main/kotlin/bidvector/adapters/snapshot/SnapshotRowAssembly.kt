@@ -258,20 +258,18 @@ private fun AssemblyTally.aValueTotalOf(
 
 /**
  * 이 행이 A 합산의 **입력을 하나라도** 싣는가 — 기초금액 축 술어를 모를 때만 쓰는 대체 판정이다
- * (D-6G2e-15). 구성 항목 여섯 · 공개일시 · 품질관리비의 **금액과 술어**를 본다.
+ * (D-6G2e-15).
  *
- * 품질관리비 금액은 **그 술어와 무관하게** 입력이다. 술어가 없거나 빈 값이면 합산 목록에 들어가지
- * 않지만(`aValuePartsOf`), 그 금액이 실렸다는 것 자체가 「이 공고에 A 가 있다」의 증거다 — 합산
+ * **원문 칸의 존재로 본다**(D-6G2e-23 ④) — 파싱된 값이 아니다. 금액이 숫자로 읽히지 않거나 일시가
+ * 형식을 어기면 파싱은 전부 `null` 이고, 기초금액 축도 걷히지 않은 공고에서는 그 행이 「A 가 없는
+ * 공고」로 접힌다. 그러나 원천은 그 칸에 **무언가를 보냈다** — 그것이 바로 반쪽이다. 읽히는 값으로
+ * 재면 판독 불가가 결측보다 조용해진다(값은 둘 다 `null` 이고 계수만 사라진다).
+ *
+ * 품질관리비는 **그 술어와 무관하게** 입력이다. 술어가 없거나 빈 값이면 합산 목록에 들어가지
+ * 않지만(`aValuePartsOf`), 그 칸이 실렸다는 것 자체가 「이 공고에 A 가 있다」의 증거다 — 합산
  * 목록으로만 보면 그 행이 「입력 없음」으로 보여 결손이 세어지지 않았다(vr r1 H-1 의 두 모양).
- *
- * 금액은 **읽힌 값**으로 본다 — 칸은 있는데 숫자로 읽히지 않는 원문은 입력이 아니다(그 모양에서는
- * 기초금액 축 술어가 답한다).
  */
-private fun RawRow.carriesAValueInput(): Boolean =
-    A_ALWAYS_SUMMED.any { amountOf(it) != null } ||
-        amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST) != null ||
-        predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) != null ||
-        instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT) != null
+private fun RawRow.carriesAValueInput(): Boolean = A_VALUE_INPUT_CONCEPTS.any { textOf(it) != null }
 
 /**
  * A 합산의 구성 항목 — `null` 원소는 **결측**이고 빼지 않는다(D-6G2d-21 ⓑ). 품질관리비는 [qualityApplies]
@@ -298,3 +296,16 @@ private val A_ALWAYS_SUMMED =
         FieldConcept.A_INDUSTRIAL_SAFETY_HEALTH_COST,
         FieldConcept.A_SAFETY_MANAGEMENT_COST,
     )
+
+/**
+ * 합산을 낼 때 읽는 칸 전부 — 구성 항목 여섯 · 품질관리비의 금액과 술어 · 공개일시.
+ * **[A_ALWAYS_SUMMED] 뒤에 선다** — top-level 프로퍼티는 선언 순서로 초기화되므로 앞에 두면 그 목록이
+ * 아직 비어 있다(D-6G2d-1 과 같은 계열의 함정이고, 여기서는 컴파일러가 막는다).
+ */
+private val A_VALUE_INPUT_CONCEPTS =
+    A_ALWAYS_SUMMED +
+        listOf(
+            FieldConcept.A_QUALITY_MANAGEMENT_COST,
+            FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE,
+            FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT,
+        )

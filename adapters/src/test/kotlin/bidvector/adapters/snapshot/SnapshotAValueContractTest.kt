@@ -184,9 +184,13 @@ class SnapshotAValueContractTest : SnapshotAssemblyFixture() {
             ),
             Board("기초 축 부재 + A 행 빔", emptyMap(), applicable = true, collected = false, expected = 0),
             Board("기초 N + 품질관리비만", costOnly, applicable = false, collected = true, expected = 0),
-            // 계약의 여섯에 하나 더한다 — 「품질관리비 금액은 그 술어와 무관하게 입력」이 기초금액 축이
-            // 없을 때 실제로 쓰이는 자리다. 이 판이 없으면 그 절의 변이가 초록으로 지나간다.
+            // 계약의 여섯에 둘 더한다. ⓐ 「품질관리비 금액은 그 술어와 무관하게 입력」이 기초금액 축이
+            // 없을 때 실제로 쓰이는 자리다 — 이 판이 없으면 그 절의 변이가 초록으로 지나간다.
             Board("기초 축 부재 + 품질관리비만", costOnly, applicable = true, collected = false, expected = 1),
+            // ⓑ **D-6G2e-23 ④** — 기초금액 축이 없고 A 행 금액이 **판독 불가**인 판. 앞 판은 입력 유무를
+            // 파싱된 금액으로 재서 이 자리에 fallback 이 없었다(0): 기초금액 축 술어도 없고 읽히는 금액도
+            // 없으니 「A 가 없는 공고」로 접혔는데, 원천은 그 칸에 **무언가를 보냈다**. 반쪽이다.
+            Board("기초 축 부재 + A 행 해석 불가", unreadable, applicable = true, collected = false, expected = 1),
         ).forEach { board ->
             val rendered =
                 render(
