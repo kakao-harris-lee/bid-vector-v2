@@ -61,6 +61,17 @@
 | **D-6G2e-13** | **교차 사실**: evidence 두 파일이 Kotlin 커밋 `caccd807` 에 Python 절을 품은 채 처음 추적됨(공유 트리에서 untracked 였음 — 두 커밋 메시지가 선언) · runbook 공유 hunk 역적용 순서는 **Kotlin(`dea3e6da`) → Python(`2e02b35f`)**, Python 축은 수동 절차가 정본(`--3way` 충돌) · 착수 표 test 수 2,588 → 되돌린 트리 기준 **2,580**(+10 = 2,590), pytest 1,350 → 1,372(+22) — 표는 고치지 않고 evidence 에 사실 |
 | **D-6G2e-14** | **r1 판정 SHA 는 이 갱신 커밋.** verifier 표적: D-1 120/121/32 + 변이 둘 · D-2 쪼갠 창 거부 · D-3 조각 → 의도 줄 → 상한 사슬(접합 변이 둘, 세 번 크래시 판을 verifier 가 직접 이어 잼) · D-4 기초금액 축 빈 + A 결손 · D-5 복사 디렉터리+찢어진 꼬리 거부·바이트 불변, 비UTF-8 뒤 Busy 아님 · D-6 CLI 성공·실패 사유 넷·스냅숏 안 출력 거부·경로→URI · D-6b/10 두 로더 1/4/5/6 · 출하 YAML 둘 로드 · acceptance `check` job 넷 + `ml-engine` job + container(판단) · rollback 두 축 문서 절차 그대로(runbook 순서 포함, 복원 목록 ⊇ 변경 소스 전수) · 새 public 표면(정책 인스턴스·`main(argv)`) · 형식 version 2 · `evaluation/backtest/run.py` 등 판정 경로 diff 0. code-reviewer(sonnet): 정적, 두 레인 diff |
 
+## 계약 갱신 r2 (2026-10-02, 팀장 — verifier r1 **not-ready**(정정) H-1·M-1·M-2·L · code-reviewer r1 H-1·M-1~4·L 11 수령)
+
+판정 SHA `8b39b4c4`. 통과: D-1 변이 셋 RED·모듈 밖 생성 불가(Kotlin·억제·copy·Java) · D-2 · D-3 출하 조립 사슬(INTERRUPTED 1·2·3 → 네 번째 0 호출) · D-5 변이 · D-6 변이 셋 · seed 1/4/6 거부·5 수락 · acceptance `check` 2,590 · `ml-engine` 1,372 · container S-21~25 · rollback 두 축(Python 은 `7463ad35` 문서, 경로 (가)(나)). 막는 것 하나. **재작업 1/5.**
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-15** | **(vr H-1 = cr M-1·M-2 — 데이터 정확성) `incompleteAValues` 회귀.** D-4 가 「A 행 자체의 적용 여부」로 바꾸면서 기초금액 축이 **Y** 인데 A 행이 비었거나 판독 불가인 경우(base 1 → 0), 품질관리비만 있고 그 술어가 부재·빈 값인 경우(1 → 0)를 세지 않는다. 값(`a_value`)은 동일, 공시 계수만 과소. 처방(verifier 제안 채택): **기초금액 술어가 Y 면 센다**; A 행 입력 존재는 기초금액 술어가 **부재·미지일 때만** 쓴다; 품질관리비 금액은 그 술어와 무관하게 **입력**으로 친다. 여섯 판(base Y+빈 · Y+판독 불가 · 비용만+술어 부재 · 비용만+빈 · 축 부재+빈 → 0 · N+비용만 → 0)을 test 로, 변이: 어느 한 모양을 빠뜨림 → RED. 알려진 제한 4(「한 모양만 갈린다」) 정정 |
+| **D-6G2e-16** | **(cr H-1 · vr M-2 — 해당 없음, fail-closed) CLI 경로.** 포함 검사는 URI 문자열 재유도가 아니라 **해석된 `Path`** 로; 이미 URI 인 입력은 `url2pathname` 으로 복원; `file:<상대>` 도 변환 통지. 공백·한글 경로 test(판독기는 out_scope 라 그 경로의 성공은 요구하지 않는다 — **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`** 신설, 6G-2c). 변이: 문자열 재유도로 되돌림 → 공백 경로 판 RED |
+| **D-6G2e-17** | **(cr M-3 · vr M-1 — 해당 없음) 복구 순서**: 읽기 전용인 접두 대조·표본 해시 대조를 `healTornTail` **앞**으로(크래시 사례 답 불변 — 찢어진 끝 줄은 접두 대조에서 제외하고 센다). 거부될 디렉터리의 원장 바이트 불변 test(접두 변조 + 찢어진 꼬리 → 거부 · 바이트 동일). 변이 → RED. 불가하면 이탈로 사유 |
+| **D-6G2e-18** | **장부**: runbook §5 의 「31일 상한 차단」 줄 제거(L-1/cr M-4) · D-11 에 D-5 의 실제 순서 선언 · 알려진 제한 4 정정 · evidence 두 축 갱신. **r2 는 표적**: D-15 여섯 판+변이 · D-16 공백·한글 경로 넷 + 변이 · D-17 변이 · acceptance 두 job(container 는 D-17 이 실행 상태 코드라 한 번 더) · rollback 두 축 재실측(runbook 순서) · 새 public 표면 0 |
+
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 공고 목록 갈래의 31일 상한은 그대로(호출 폭주 방지) ② 개찰 갈래의 긴 창은 표본 크기·호출 상한이 묶는다 ③ 실행 상태 회계(크래시 라운드 하나 · 거부될 디렉터리 불변 · 잠금 잔류 없음) ④ CLI 는 판정 경로를 바꾸지 않는다.
