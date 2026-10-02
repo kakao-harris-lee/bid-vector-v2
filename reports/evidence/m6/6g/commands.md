@@ -55,7 +55,13 @@ main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
 > **차단(D-6G-77).** 실 KONEPS 수집은 `OPEN-6G-RUN-STATE-HEAL-ORDER` · `OPEN-6G-LIST-AXIS-WALK-SELECTION` ·
 > `OPEN-6G-LEGACY-AXIS-LINE` 을 닫는 slice(6G-2d)가 머지된 뒤에만 시작한다. 그 전의 실 호출은 승인 밖이다.
 
-**없다.** 이 레인은 코드·test·evidence 까지다. 모든 시나리오는 loopback in-process mock server
+**실수집 착수 2026-10-02 (팀장 실행, D-6G-77 조건 충족 — 6G-2d PR #51 · 6G-2e PR #54 머지).** jar = main `9a5aa26a` 의 `:app:bootJar`. 개발 DB `bid-vector-v2-dev`(127.0.0.1:55432, flyway V17). 실행 상태 디렉터리 `~/.local/bid-vector-run-state/m6-6g/`(ext4, 두 갈래 공유 — 상한 회계 하나), 스냅숏 `~/.local/bid-vector-snapshots/`, 판정 `~/.local/bid-vector-verdicts/`. 키: 운영계정 = 개발 키(사용자 2026-10-02) — legacy `.env` **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 서브셸에서 읽어 프로세스 환경으로만(값은 어디에도 없음; 실행기 `scratchpad/collect/run-lane.sh`, 로그는 실행 상태 디렉터리의 `logs/`, 실행마다 패턴 파일 참조형 + 64자 16진 누출 검사). 창(A-1): **2026-06-11 ~ 2026-10-01**(16주 = 112일 ≤ 개찰 갈래 상한 120). 공고 목록 갈래는 31일 창 넷(06-11~07-11 · 07-12~08-11 · 08-12~09-11 · 09-12~10-01). 개찰 갈래: `sampling-seed = m6-6g-2026-10-02`, `sample-size 24000`, 상한 일 20,000 / 총 80,000; 1일차는 `calls-per-day 200` 스모크 뒤 20,000 으로 이어 돈다. 운영자 결정: A-3 N=3 · MAX_PAGES 유지 · DEC-03 현행 유지.
+
+| 실행 | 갈래 · 창 | exit | 슬롯·절단·멈춤 | 페이지 | 수신 | 정규화 | 중복 | 탈락 | 호출(원장 HTTP 줄) | 비고 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (채움) | | | | | | | | | | |
+
+**없다(이 레인, 2026-09 당시).** 이 레인은 코드·test·evidence 까지다. 모든 시나리오는 loopback in-process mock server
 (`MockKonepsServer`, 소켓은 127.0.0.1 뿐)에서 돈다. 서비스 키는 합성값이고 운영 키를 쓰지 않았다.
 실수집은 검증 뒤 운영자 키로 팀장이 연다.
 
