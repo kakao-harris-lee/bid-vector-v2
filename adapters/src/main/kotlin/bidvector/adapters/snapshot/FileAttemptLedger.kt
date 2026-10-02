@@ -80,9 +80,8 @@ internal class FileAttemptLedger(
 
     /** 표식이면 그 조각(값이 문자열이 아니면 빈 조각), 표식이 아니면 `null`. */
     private fun tornFragmentOf(line: String): String? {
-        val fields = runCatching { fieldsOf(line) }.getOrNull() ?: return null
-        if (!fields.containsKey(TORN_KEY)) return null
-        return fields[TORN_KEY].asStringOrNull().orEmpty()
+        val fields = runCatching { fieldsOf(line) }.getOrNull()
+        return fields?.get(TORN_KEY).asStringOrNull().orEmpty().takeIf { fields?.containsKey(TORN_KEY) == true }
     }
 
     /**
@@ -99,22 +98,28 @@ internal class FileAttemptLedger(
      * 읽히지 않는 조각은 `null` 이다 — **축을 지어내지 않는다**(D-6G-70 그대로, 호출 하나로만 센다).
      */
     private fun recoveredCall(fragment: String): CollectionAttempt? {
-        val fields = truncatedFieldsOf(fragment) ?: return null
-        val axis = SourceEndpoint.entries.firstOrNull { it.name == fields["axis"].asStringOrNull() } ?: return null
-        val at = fields["at"].asStringOrNull()?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+        val fields = truncatedFieldsOf(fragment).orEmpty()
+        val axis = SourceEndpoint.entries.firstOrNull { it.name == fields["axis"].asStringOrNull() }
+        val at = fields["at"].asStringOrNull()?.let { runCatching { Instant.parse(it) }.getOrNull() }
         // 공고 키가 읽히지 않으면 되살리지 않는다 — `null` 로 두면 공고 축 라운드가 목록 축 줄로
-        // 보이고(공고 단위 묶기에서 빠진다) 그 라운드는 다시 영원히 열린 채가 아니게 된다.
-        val key = fields["notice_key_hash"].asStringOrNull() ?: return null
-        val hash = runCatching { NoticeKeyHash.ofHex(key).value }.getOrNull() ?: return null
-        return CollectionAttempt(
-            noticeKey = hash,
-            axis = axis,
-            // 결말 없는 의도 줄의 자리표시다 — 상한은 `kind` 로 센다([parseLine] 과 같은 규율).
-            outcome = AttemptOutcome.Succeeded,
-            at = at,
-            kind = AttemptKind.PENDING,
-            walk = null,
-        )
+        // 보이고(공고 단위 묶기에서 빠진다) 그 라운드는 열린 채로 남지 못한다.
+        val hash =
+            fields["notice_key_hash"]
+                .asStringOrNull()
+                ?.let { runCatching { NoticeKeyHash.ofHex(it).value }.getOrNull() }
+        return if (axis == null || at == null || hash == null) {
+            null
+        } else {
+            CollectionAttempt(
+                noticeKey = hash,
+                axis = axis,
+                // 결말 없는 의도 줄의 자리표시다 — 상한은 `kind` 로 센다([parseLine] 과 같은 규율).
+                outcome = AttemptOutcome.Succeeded,
+                at = at,
+                kind = AttemptKind.PENDING,
+                walk = null,
+            )
+        }
     }
 
     /**
@@ -123,16 +128,22 @@ internal class FileAttemptLedger(
      * **원장의 판독기 그대로** 파싱한다 — 문자열을 긁어 값을 짓지 않는다(값 어휘·형태 검사가 한
      * 자리에 남는다). 어느 자리에서도 객체가 서지 않으면 읽히지 않는 조각이다.
      */
-    private fun truncatedFieldsOf(fragment: String): Map<String, JsonValue>? {
-        if (!fragment.startsWith("{")) return null
-        runCatching { fieldsOf(fragment) }.getOrNull()?.let { return it }
-        var cut = fragment.length
-        while (true) {
-            cut = fragment.lastIndexOf(',', cut - 1)
-            if (cut <= 0) return null
-            runCatching { fieldsOf(fragment.take(cut) + "}") }.getOrNull()?.let { return it }
+    private fun truncatedFieldsOf(fragment: String): Map<String, JsonValue>? =
+        closedCandidatesOf(fragment).firstNotNullOfOrNull { runCatching { fieldsOf(it) }.getOrNull() }
+
+    /**
+     * 객체로 **닫은 후보들** — 조각 그대로(개행만 빠진 온전한 줄), 그리고 쉼표 자리를 뒤에서부터
+     * 하나씩 끊은 것들. 값 안에 쉼표가 든 자리에서는 파싱이 서지 않고 다음(더 앞) 자리로 물러선다.
+     */
+    private fun closedCandidatesOf(fragment: String): Sequence<String> =
+        if (!fragment.startsWith("{")) {
+            emptySequence()
+        } else {
+            sequenceOf(fragment) +
+                generateSequence(fragment.length) { fragment.lastIndexOf(',', it - 1).takeIf { cut -> cut > 0 } }
+                    .drop(1)
+                    .map { fragment.take(it) + "}" }
         }
-    }
 
     private fun fieldsOf(line: String): Map<String, JsonValue>? =
         KonepsJsonParser
