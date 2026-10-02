@@ -22,7 +22,7 @@
 2. **개발 DB**: 컨테이너 `bid-vector-v2-dev`(postgres:16.4, `127.0.0.1:55432`, user/db `bidvector`). 멈춰 있으면 `docker start bid-vector-v2-dev` 뒤 `pg_isready`. flyway 는 V17 까지 적용돼 있어야 한다(`SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1` → `17`). **legacy compose(`bid_vector_db` 5432)와 포트가 다르다 — 55432 를 쓴다.**
 3. **저장소 밖 디렉터리**(자동 생성되지 않는다, 둘 다 **WSL 내부 ext4** — DrvFs/9p 는 디렉터리 fsync 가 실패해 경고가 난다):
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
-   - 스냅숏: `~/.local/bid-vector-snapshots/`
+   - 스냅숏: `~/.local/bid-vector-snapshots/` · 판정: `~/.local/bid-vector-verdicts/` · **로그: `~/.local/bid-vector-logs/m6-6g/`** — 실행 상태 디렉터리 **안**에는 아무것도 더 두지 않는다(로그·메모 포함): 무결성 검사가 장부 밖 파일을 보면 「장부가 모르는 파일이 있다」로 기동을 거부한다(2026-10-02 실측 — 첫 기동은 빈 디렉터리라 통과했고 둘째부터 거부)
 4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다).
 5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
