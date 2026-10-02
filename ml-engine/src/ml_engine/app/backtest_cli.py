@@ -18,6 +18,18 @@ runbook 2-4 는 이 job 을 **heredoc 스크립트**로 불렀다. 그 스크립
 확인은 판독기(`adapters.snapshot_files.read_snapshot_files`)에 있다 — 같은 뜻을 두 자리에서
 재지 않는다. 첫 구간에 콜론이 있는 상대 경로(`a:b/c`)는 scheme 으로 읽혀 거부된다
 (fail-closed — 조용히 다른 뜻으로 읽는 것보다 낫다).
+
+**URI 를 다시 경로로 되읽지 않는다**(cr r1 H-1). `Path.as_uri()` 는 공백·비ASCII 를 퍼센트
+인코딩하고 `urlparse(...).path` 는 그것을 **풀지 않는다** — 그래서 앞 판은 공백이나 한글이 든
+스냅숏 경로에서 포함 검사가 **없는 경로**를 비교해 조용히 비활성이 됐다. 거부가 그 판에서도
+막혀 보인 유일한 이유는 판독기가 같은 결함을 공유해 job 이 먼저 서는 것이었고, 그것은
+fail-closed 가 아니라 우연이다. 이제 `_snapshot_dir` 이 `(URI, 그 URI 가 가리키는 디렉터리)`
+를 함께 내고 포함 검사는 **그 `Path`** 로 한다(이미 URI 로 받은 입력은 `url2pathname` 으로
+복원한다 — `unquote` 가 아니다, Windows 드라이브 문면까지 같은 규칙으로 처리한다).
+
+판독기 쪽 같은 자리는 이 slice 의 범위 밖이라 `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`(6G-2c)
+로 등재했다 — 그것이 닫히기 전에는 공백·한글 경로의 **실행 자체가** `SNAPSHOT_UNREADABLE`
+로 선다(변환과 거부는 맞고, 읽기가 못 한다).
 """
 
 from __future__ import annotations
@@ -27,6 +39,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 from ml_engine.app.backtest_job import JobCompleted, run_backtest_job
 
@@ -76,32 +89,40 @@ def _arguments(argv: Sequence[str] | None) -> _Arguments:
     )
 
 
-def _snapshot_uri(raw: str) -> str:
-    """맨 경로면 절대 `file://` URI 로 바꾸고 그 변환을 공시한다. 이미 `file://` 면 그대로.
+def _snapshot_dir(raw: str) -> tuple[str, Path]:
+    """`(URI, 그 URI 가 가리키는 디렉터리)`. 절대 경로가 아니면 절대로 바꾸고 공시한다.
 
     공시가 있는 이유: 상대 경로는 **부른 자리의 cwd** 로 풀린다 — 어느 디렉터리를 읽었는지
-    출력에 남지 않으면 판정이 어느 스냅숏의 것인지 사후에 말할 수 없다."""
-    scheme = urlparse(raw).scheme
-    if scheme == _FILE_SCHEME:
-        return raw
-    if scheme:
+    출력에 남지 않으면 판정이 어느 스냅숏의 것인지 사후에 말할 수 없다. `file:<상대 경로>`
+    도 같은 길로 보낸다(vr r1 L-3 — scheme 이 `file` 이라고 공시를 건너뛰면 그 목적이 빈다).
+
+    디렉터리를 **여기서 함께 내는** 이유는 모듈 docstring 의 「URI 를 다시 경로로 되읽지
+    않는다」다."""
+    parsed = urlparse(raw)
+    if parsed.scheme and parsed.scheme != _FILE_SCHEME:
         raise SystemExit(
-            f"REFUSED --snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {scheme}"
+            f"REFUSED --snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {parsed.scheme}"
         )
-    uri = Path(raw).resolve().as_uri()
+    given = Path(url2pathname(parsed.path)) if parsed.scheme else Path(raw)
+    if parsed.scheme and given.is_absolute():
+        return raw, given.resolve()
+    directory = given.resolve()
+    uri = directory.as_uri()
     print("snapshot-uri", uri, "converted-from", raw)
-    return uri
+    return uri, directory
 
 
-def _verdict_path(output_dir: Path, snapshot_uri: str) -> Path:
+def _verdict_path(output_dir: Path, snapshot_dir: Path) -> Path:
     """판정을 쓸 자리. 스냅숏 디렉터리 **안**이면 거부한다 — 스냅숏은 불변 입력이고 그
     sha256 이 evidence 의 닻이다(출력이 입력의 해시를 움직이면 닻이 사라진다).
 
+    `snapshot_dir` 은 `_snapshot_dir` 이 이미 해석해 건넨 `Path` 다 — URI 문자열에서 다시
+    유도하면 퍼센트 인코딩된 판에서 비교가 조용히 빗나간다(cr r1 H-1).
+
     문면에 경로를 싣지 않는다(실패 문면이 호스트 디렉터리 구조를 나르지 않는다) — 무엇을
     넘겼는지는 부른 쪽이 안다."""
-    snapshot = Path(urlparse(snapshot_uri).path).resolve()
     resolved = output_dir.resolve()
-    if resolved.is_relative_to(snapshot):
+    if resolved.is_relative_to(snapshot_dir):
         raise SystemExit(
             "REFUSED --output-dir 가 --snapshot-uri 의 디렉터리 안이다 — "
             "스냅숏은 불변 입력이다"
@@ -111,8 +132,8 @@ def _verdict_path(output_dir: Path, snapshot_uri: str) -> Path:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = _arguments(argv)
-    snapshot_uri = _snapshot_uri(arguments.snapshot_uri)
-    verdict_path = _verdict_path(arguments.output_dir, snapshot_uri)
+    snapshot_uri, snapshot_dir = _snapshot_dir(arguments.snapshot_uri)
+    verdict_path = _verdict_path(arguments.output_dir, snapshot_dir)
     outcome = run_backtest_job(
         snapshot_uri=snapshot_uri,
         backtest_policy_path=arguments.backtest_policy,

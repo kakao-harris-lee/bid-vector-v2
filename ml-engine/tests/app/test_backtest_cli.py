@@ -30,6 +30,7 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 
@@ -74,10 +75,20 @@ def _argv(
     ]
 
 
-def _snapshot_path(tmp_path: Path) -> Path:
-    """합성 스냅숏 디렉터리의 **경로**. 생성기는 URI 를 내므로 거기서 되돌린다(두 번째
-    생성기를 만들지 않는다)."""
-    return Path(urlparse(_snapshot_dir(tmp_path)).path)
+def _snapshot_path(root: Path) -> Path:
+    """`root` 아래 합성 스냅숏 디렉터리의 **경로**. 생성기는 URI 를 내므로 거기서 되돌린다
+    (두 번째 생성기를 만들지 않는다).
+
+    되돌릴 때 `url2pathname` 을 쓴다 — `urlparse(...).path` 는 퍼센트 인코딩을 **풀지
+    않는다**. 앞 판의 이 헬퍼가 그 디코딩을 빼먹었고, `tmp_path` 가 ASCII·공백 없음이라
+    아무 test 도 그 자리를 밟지 않았다(cr r1 H-1 의 test 사각과 같은 뿌리)."""
+    return Path(url2pathname(urlparse(_snapshot_dir(root)).path))
+
+
+def _spaced_snapshot(root: Path) -> Path:
+    """**공백과 한글**이 든 디렉터리 안의 합성 스냅숏. `tmp_path` 는 ASCII·공백 없음이라
+    이 판을 따로 만들지 않으면 퍼센트 인코딩 자리를 전부 지나간다."""
+    return _snapshot_path(root / "snap dir" / "스냅숏")
 
 
 def test_module_run_writes_the_verdict_and_exits_zero(tmp_path: Path) -> None:
@@ -258,3 +269,98 @@ def test_the_public_surface_is_one_entry_point() -> None:
     }
     assert defined == {"main"}, defined
     assert list(inspect.signature(backtest_cli.main).parameters) == ["argv"]
+
+
+def test_a_bare_path_with_a_space_converts_to_a_percent_encoded_uri(
+    tmp_path: Path,
+) -> None:
+    """D-6G2e-16 — 공백·한글 경로도 **올바른** URI 로 바뀐다.
+
+    끝까지 도는 것은 요구하지 않는다: 판독기(`adapters/snapshot_files.py`, in_scope 밖)가
+    퍼센트 인코딩을 풀지 않아 이 URI 를 못 읽는다(`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`,
+    6G-2c). 여기서 재는 것은 변환이 맞다는 것과 **예외로 새지 않는다**는 것이다."""
+    snapshot = _spaced_snapshot(tmp_path).resolve()
+    expected = snapshot.as_uri()
+    assert "%20" in expected, expected
+    result = _cli(
+        *_argv(
+            snapshot=str(snapshot),
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=tmp_path / "out",
+        ),
+        cwd=tmp_path,
+    )
+    assert expected in result.stdout.split(), result.stdout
+    assert "Traceback" not in result.stderr, result.stderr
+
+
+def test_output_inside_a_spaced_snapshot_is_refused_before_any_read(
+    tmp_path: Path,
+) -> None:
+    """cr r1 H-1 ② — 거부 술어가 **입력 형태에 따라 조용히 비활성**이 되지 않는다.
+
+    앞 판은 URI 문자열에서 경로를 되유도해 `/…/snap%20dir/…` 를 비교했고, 그래서 공백이
+    든 경로에서는 거부가 서지 않았다. 그 판에서 막혀 보였던 유일한 이유는 판독기가 같은
+    결함을 공유해 job 이 먼저 `NOT_FOUND` 로 선 것이다 — fail-closed 가 설계가 아니라
+    우연이었다. 그 우연을 쓰지 않는지 보려고 **읽기 사유가 출력에 없음**을 함께 단언한다."""
+    snapshot = _spaced_snapshot(tmp_path)
+    before = {path.name: path.read_bytes() for path in sorted(snapshot.iterdir())}
+    result = _cli(
+        *_argv(
+            snapshot=str(snapshot),
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=snapshot / "verdicts",
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    output = result.stdout + result.stderr
+    assert "REFUSED" in output, output
+    assert str(JobFailureReason.SNAPSHOT_UNREADABLE) not in output, (
+        "판독이 먼저 섰다 — 거부가 읽기 **앞**이 아니다"
+    )
+    assert not list(snapshot.glob("**/verdict.json"))
+    assert {
+        path.name: path.read_bytes() for path in sorted(snapshot.iterdir())
+    } == before, "거부된 실행이 스냅숏 디렉터리를 건드렸다"
+
+
+@pytest.mark.parametrize("encoded", [True, False])
+def test_a_uri_input_for_a_spaced_snapshot_also_refuses_output_inside(
+    tmp_path: Path, encoded: bool
+) -> None:
+    """URI 로 받은 판도 같은 거부를 받는다 — 퍼센트 인코딩된 URI 와 공백이 그대로 든 URI
+    **둘 다**. `url2pathname` 이 둘을 같은 `Path` 로 되돌리므로 거부가 입력 형태와 무관하다."""
+    snapshot = _spaced_snapshot(tmp_path).resolve()
+    uri = snapshot.as_uri() if encoded else f"file://{snapshot}"
+    result = _cli(
+        *_argv(
+            snapshot=uri,
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=snapshot / "verdicts",
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "REFUSED" in result.stdout + result.stderr, result.stdout
+    assert "converted-from" not in result.stdout.split(), result.stdout
+
+
+def test_a_relative_file_scheme_input_prints_the_conversion_notice(
+    tmp_path: Path,
+) -> None:
+    """vr r1 L-3 — `file:<상대 경로>` 도 절대 URI 로 바꾸고 **공시한다**. 앞 판은 scheme 이
+    `file` 이라 통지 없이 통과했고, 그러면 어느 디렉터리를 읽었는지가 출력에서 사라진다 —
+    D-6 이 변환을 공시하라고 한 목적이 그것이다."""
+    result = _cli(
+        *_argv(
+            snapshot="file:absent-dir",
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=tmp_path / "out",
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert (tmp_path / "absent-dir").resolve().as_uri() in result.stdout.split(), (
+        result.stdout
+    )
