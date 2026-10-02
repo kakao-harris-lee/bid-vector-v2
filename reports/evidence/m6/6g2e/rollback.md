@@ -7,7 +7,7 @@
 
 ## Python 축 (D-6G2e-6 · 6b · 10 · 8 Python 몫)
 
-**실측 HEAD: `caccd807`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
+**실측 HEAD: `8b39b4c4`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
 clone** 에서 실제로 돌린 결과다.
 
 ### 되돌림 목록
@@ -40,20 +40,27 @@ git restore --source=c63d0d3a --staged --worktree -- \
 `git checkout <base> -- <경로>` 는 쓰지 않는다 — base 에 없는 신규 파일에서 pathspec 오류로
 아무것도 적용되지 않는다.
 
-### ② 공유 파일(runbook) — Python 몫 hunk 만
+### ② 공유 파일(runbook) — 순서가 있다
 
 `git log --oneline c63d0d3a..<실측 HEAD> -- docs/runbook/m6-6g-real-collection.md` 로 먼저
 **그 파일을 만진 커밋을 나열**한다 — 실측 HEAD 에서는 **둘**이고(Python `2e02b35f` · Kotlin
-`dea3e6da`) 두 레인의 삽입 지점이 0 절 표에서 **인접**한다.
+`dea3e6da`) 두 레인의 삽입 지점이 0 절 표에서 **인접**하다(Kotlin 의 범위 상한 행이 내
+「백테스트 CLI」 행의 바로 위 context 다). 그래서 **순서가 결과를 가른다.**
+
+**(가) 전 slice 를 되돌릴 때 — 나중 커밋부터, 즉 Kotlin → Python.**
 
 ```
+git diff dea3e6da~1..dea3e6da -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff 2e02b35f~1..2e02b35f -- docs/runbook/m6-6g-real-collection.md | git apply -R
 ```
 
-**이 명령은 실측에서 선다** — `exit 1`(`patch does not apply`). `--3way` 도 자동 해소에
-실패하고 conflict marker 를 남긴다(`UU`). Kotlin 축이 0 절 범위 상한 행을 고쳤고 그 줄이
-내 「백테스트 CLI」 행의 바로 위 context 이기 때문이다. 그러므로 **아래 수동 절차가 이 축의
-실제 rollback 경로**다(위 명령은 이력 참조용으로만 남긴다). 되돌리기 전에 conflict 를 치운다:
+네 명령(`--check` 둘 포함) 전부 **exit 0** 이고, 끝난 runbook 은 base 와 **바이트 동일**
+(`git diff c63d0d3a -- <runbook>` 0 줄)이다. 수동 해소가 필요하지 않다 — 이 순서에서는
+인접 hunk 가 서로의 context 를 깨지 않는다. 역순(Python 먼저)은 아래 (나)와 같은 이유로 선다.
+
+**(나) Python 축만 되돌릴 때 — 수동 절차가 정본.** Kotlin 줄을 남겨야 하므로 (가)를 쓸 수 없고,
+내 hunk 단독 역적용은 **exit 1**(`patch does not apply`)이며 `--3way` 는 conflict marker 를
+남긴다(`UU`). 되돌리기 전에 conflict 를 치운다:
 `git restore --source=<실측 HEAD> --staged --worktree -- docs/runbook/m6-6g-real-collection.md`
 (unmerged 상태에서는 `git checkout --` 이 `path is unmerged` 로 선다 — 실측).
 
@@ -68,12 +75,13 @@ Python 몫만 base 문면으로 되돌리고 Kotlin 줄은 **남긴다**:
 4. 확인은 **둘 다** 본다: 내 줄 사라짐(`grep -c backtest_cli` = 0)과 남의 줄 남음
    (Kotlin 축이 고친 범위 상한 행·2-2 문면이 그대로).
 
-### ③~⑥ 실측 (버릴 clone, 실측 HEAD)
+### ①~⑥ 실측 (버릴 clone, 실측 HEAD `8b39b4c4`)
 
 | # | 항목 | 결과 |
 |---|---|---|
 | ① | 전용 파일 restore | exit 0 |
-| ② | runbook hunk 역적용 → **수동 절차** | `git apply -R` **exit 1** · `--3way` conflict → 수동 해소 실행. 확인 둘: 내 어휘(`backtest_cli`) **0 건** · Kotlin 줄 **셋 다 남음**(0 절 두 행 · 2-2 bullet), 되돌린 runbook 의 base 대비 diff **3+/3-**(= Kotlin 몫 그대로) |
+| ②가 | runbook 전 slice 순서(Kotlin → Python) | `--check`·`apply` 넷 전부 **exit 0** · 끝난 runbook 은 base 와 **바이트 동일**(diff 0 줄) |
+| ②나 | runbook Python 단독 | 내 hunk 단독 역적용 **exit 1**(`patch does not apply`) · `--3way` conflict → **수동 절차 실행**. 확인 둘: 내 어휘(`backtest_cli`) **0 건** · Kotlin 줄 **셋 다 남음**(0 절 두 행 · 2-2 bullet), 되돌린 runbook 의 base 대비 **3+/3-**(= Kotlin 몫 그대로) |
 | ③ | `git status --porcelain` 의 D/M 수 · 되돌린 경로의 `git diff c63d0d3a` | **D 3 · M 5** · diff **0 줄** |
 | ④ | Python 「compile」 축 — `ruff check .` · `ruff format --check .` · `mypy --strict src/ml_engine` | 전부 exit 0 · 215 files formatted · **96 source files** 오류 0(CLI 한 파일이 빠져 97→96) |
 | ⑤ | `python -m pytest tests -q` | exit 0 · **1,350 passed** — 6G-2a 종결 수 그대로(되돌림이 test 수를 정확히 base 로 되돌렸다) |
@@ -86,10 +94,14 @@ config/quality reports` 가 **빈 출력**(내 복원이 Kotlin 축·evidence �
 
 ### 실측의 유효 범위
 
-`docs/runbook/m6-6g-real-collection.md` 는 **두 레인이 만지는 공유 파일**이다. 이 실측 뒤에
-그 파일이 또 바뀌면 ② 는 낡는다 — verifier 는
-`git diff --name-only caccd807..<판정 SHA> -- <위 목록의 경로들>` 이 **빈 출력**인지로 가른다.
-한 줄이라도 나오면 이 축은 통과가 아니라 **미검증**이고, 그 HEAD 에서 ①~⑥ 을 다시 낸다.
+`docs/runbook/m6-6g-real-collection.md` 는 **두 레인이 만지는 공유 파일**이다. 그래서 이
+축은 Kotlin 레인의 runbook 커밋(`dea3e6da`) **뒤**에서 다시 실측했고, 실측 HEAD 는
+**r1 판정 SHA 와 같은 커밋**(`8b39b4c4`, D-6G2e-14)이다 — 그 둘이 같으므로
+`git diff --name-only 8b39b4c4..<판정 SHA> -- <위 목록의 경로들>` 은 r1 에서 **빈 출력**이다.
+
+판정 SHA 가 뒤로 움직이면 같은 술어를 다시 돌린다: 한 줄이라도 나오면 이 축은 통과가 아니라
+**미검증**이고, 그 HEAD 에서 ①~⑥ 을 다시 낸다. 앞 라운드 실측(`caccd807` 기준)은 옮기지
+않고 버렸다 — 이 절의 수는 전부 `8b39b4c4` 에서 다시 낸 것이다.
 
 ### 되돌리지 않는 것
 
