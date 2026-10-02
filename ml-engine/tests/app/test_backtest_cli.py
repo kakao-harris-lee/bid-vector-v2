@@ -23,17 +23,18 @@ import 하는 app 모듈이 되어 `tests/evaluation/test_evaluation_no_stray_nu
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import inspect
 import json
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.request import url2pathname
+from urllib.parse import unquote, urlparse
 
 import pytest
 
+import ml_engine.app
 from ml_engine.app import backtest_cli
 from ml_engine.app.backtest_job import JobFailureReason
 
@@ -79,10 +80,10 @@ def _snapshot_path(root: Path) -> Path:
     """`root` 아래 합성 스냅숏 디렉터리의 **경로**. 생성기는 URI 를 내므로 거기서 되돌린다
     (두 번째 생성기를 만들지 않는다).
 
-    되돌릴 때 `url2pathname` 을 쓴다 — `urlparse(...).path` 는 퍼센트 인코딩을 **풀지
+    되돌릴 때 `unquote` 를 쓴다 — `urlparse(...).path` 는 퍼센트 인코딩을 **풀지
     않는다**. 앞 판의 이 헬퍼가 그 디코딩을 빼먹었고, `tmp_path` 가 ASCII·공백 없음이라
     아무 test 도 그 자리를 밟지 않았다(cr r1 H-1 의 test 사각과 같은 뿌리)."""
-    return Path(url2pathname(urlparse(_snapshot_dir(root)).path))
+    return Path(unquote(urlparse(_snapshot_dir(root)).path))
 
 
 def _spaced_snapshot(root: Path) -> Path:
@@ -330,7 +331,7 @@ def test_a_uri_input_for_a_spaced_snapshot_also_refuses_output_inside(
     tmp_path: Path, encoded: bool
 ) -> None:
     """URI 로 받은 판도 같은 거부를 받는다 — 퍼센트 인코딩된 URI 와 공백이 그대로 든 URI
-    **둘 다**. `url2pathname` 이 둘을 같은 `Path` 로 되돌리므로 거부가 입력 형태와 무관하다."""
+    **둘 다**. `unquote` 가 둘을 같은 `Path` 로 되돌리므로 거부가 입력 형태와 무관하다."""
     snapshot = _spaced_snapshot(tmp_path).resolve()
     uri = snapshot.as_uri() if encoded else f"file://{snapshot}"
     result = _cli(
@@ -364,3 +365,61 @@ def test_a_relative_file_scheme_input_prints_the_conversion_notice(
     assert (tmp_path / "absent-dir").resolve().as_uri() in result.stdout.split(), (
         result.stdout
     )
+
+
+def test_output_inside_a_percent_named_snapshot_is_refused(tmp_path: Path) -> None:
+    """vr r2 L-r2-1 — 이름에 유효한 `%XX` 가 **문자 그대로** 든 디렉터리.
+
+    guard 가 디코딩한 경로만 보면 `a%41b` 를 `aAb` 와 비교해 **통과시키고**, 판독기는
+    `a%41b` 를 문자 그대로 읽어 **성공**한다 — 그래서 판정이 스냅숏 디렉터리 안에 쓰인다
+    (exit 0). 두 자리의 해석 규칙이 갈린 자리이고, 판독기 쪽
+    (`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`)이 닫힐 때까지 guard 가 **두 경로를 다** 본다.
+
+    같은 디렉터리를 맨 경로로 주면 앞 판에서도 거부된다 — 이 판이 성립하는 입력은 **URI** 다."""
+    snapshot = _snapshot_path(tmp_path / "a%41b")
+    before = {path.name: path.read_bytes() for path in sorted(snapshot.iterdir())}
+    result = _cli(
+        *_argv(
+            snapshot=f"file://{snapshot}",
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=snapshot / "verdicts",
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "REFUSED" in result.stdout + result.stderr, result.stdout
+    assert "verdict" not in result.stdout.split(), (
+        "성공 경로가 돌았다 — 거부가 서지 않았다"
+    )
+    assert not list(snapshot.glob("**/verdict.json"))
+    assert {
+        path.name: path.read_bytes() for path in sorted(snapshot.iterdir())
+    } == before, "거부된 실행이 스냅숏 디렉터리를 건드렸다"
+
+
+def test_the_app_package_does_not_import_urllib_request() -> None:
+    """cr r2 MR2-1 — `urllib.request` 는 `urlopen`·opener 기계와 `http.client` 를 함께
+    들여온다. import-linter 의 「app 은 DB·HTTP·업무 모듈을 모른다」는 서드파티 클라이언트
+    **다섯의 열거**라 그 모듈을 막지 못한다(초록인데 비어 있는 게이트). 열거 밖의 이 자리는
+    구조로 닫는다 — `ml_engine/app/**` 전체를 AST 로 훑는다(`urllib.parse` 는 허용).
+
+    퍼센트 인코딩 해제는 `urllib.parse.unquote` 로 한다(POSIX 에서 `url2pathname` 과 같은
+    함수다). 이 저장소의 실행 호스트는 Linux 하나이므로 잃는 것은 Windows 드라이브 문면뿐이고,
+    그것은 쓰이지 않는 범위다."""
+    app_dir = Path(ml_engine.app.__file__).resolve().parent
+    offenders: list[str] = []
+    for path in sorted(app_dir.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            if any(
+                name == "urllib.request" or name.startswith("urllib.request.")
+                for name in names
+            ):
+                offenders.append(f"{path.name}:{node.lineno}")
+    assert not offenders, f"ml_engine/app 이 urllib.request 를 import 한다: {offenders}"

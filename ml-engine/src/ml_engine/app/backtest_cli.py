@@ -23,9 +23,17 @@ runbook 2-4 는 이 job 을 **heredoc 스크립트**로 불렀다. 그 스크립
 인코딩하고 `urlparse(...).path` 는 그것을 **풀지 않는다** — 그래서 앞 판은 공백이나 한글이 든
 스냅숏 경로에서 포함 검사가 **없는 경로**를 비교해 조용히 비활성이 됐다. 거부가 그 판에서도
 막혀 보인 유일한 이유는 판독기가 같은 결함을 공유해 job 이 먼저 서는 것이었고, 그것은
-fail-closed 가 아니라 우연이다. 이제 `_snapshot_dir` 이 `(URI, 그 URI 가 가리키는 디렉터리)`
-를 함께 내고 포함 검사는 **그 `Path`** 로 한다(이미 URI 로 받은 입력은 `url2pathname` 으로
-복원한다 — `unquote` 가 아니다, Windows 드라이브 문면까지 같은 규칙으로 처리한다).
+fail-closed 가 아니라 우연이다. 이제 `_snapshot_dirs` 가 `(URI, 그 URI 가 가리킬 수 있는
+디렉터리 전부)` 를 함께 내고 포함 검사는 **그 `Path` 들**로 한다. 퍼센트 인코딩 해제는
+`urllib.parse.unquote` 로 한다 — `urllib.request.url2pathname` 은 POSIX 에서 같은 함수이지만
+`urlopen`·opener 기계와 `http.client` 를 함께 들여오고, app 층의 import 계약은 서드파티
+클라이언트 **다섯의 열거**라 그 모듈을 막지 못한다(cr r2 MR2-1 — 초록인데 비어 있는 게이트).
+
+**디렉터리가 「전부」인 이유**(vr r2 L-r2-1): 판독기는 URI 를 **문자 그대로** 읽는다. 그래서
+이름에 유효한 `%XX` 가 문자 그대로 든 디렉터리(`a%41b`)를 URI 로 주면 이 모듈이 디코딩한
+경로(`aAb`)와 판독기가 읽는 경로(`a%41b`)가 **갈린다** — 디코딩 쪽만 보면 스냅숏 안 출력이
+통과하고 판정이 입력 디렉터리 안에 쓰인다. 판독기 쪽이 고쳐질 때까지 포함 검사는 **두 경로를
+다** 본다(어느 쪽이든 안이면 거부 — 보수적인 방향이다).
 
 판독기 쪽 같은 자리는 이 slice 의 범위 밖이라 `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`(6G-2c)
 로 등재했다 — 그것이 닫히기 전에는 공백·한글 경로의 **실행 자체가** `SNAPSHOT_UNREADABLE`
@@ -38,8 +46,7 @@ import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.request import url2pathname
+from urllib.parse import unquote, urlparse
 
 from ml_engine.app.backtest_job import JobCompleted, run_backtest_job
 
@@ -89,40 +96,54 @@ def _arguments(argv: Sequence[str] | None) -> _Arguments:
     )
 
 
-def _snapshot_dir(raw: str) -> tuple[str, Path]:
-    """`(URI, 그 URI 가 가리키는 디렉터리)`. 절대 경로가 아니면 절대로 바꾸고 공시한다.
+def _converted(directory: Path, raw: str) -> tuple[str, tuple[Path, ...]]:
+    """절대 URI 로 바꾼 판 — 변환을 공시하고 디렉터리 하나를 낸다.
+
+    이 갈래는 **갈림이 없다**: 우리가 낸 URI 를 판독기가 문자 그대로 읽으면 그 경로가
+    `directory` 와 같다(퍼센트 인코딩이 생기는 이름은 우리가 다시 인코딩하므로, 판독기가
+    찾지 못하고 설 뿐 다른 디렉터리를 읽지는 않는다)."""
+    uri = directory.as_uri()
+    print("snapshot-uri", uri, "converted-from", raw)
+    return uri, (directory,)
+
+
+def _snapshot_dirs(raw: str) -> tuple[str, tuple[Path, ...]]:
+    """`(URI, 그 URI 가 가리킬 수 있는 디렉터리 전부)`. 절대 경로가 아니면 절대로 바꾸고
+    공시한다.
 
     공시가 있는 이유: 상대 경로는 **부른 자리의 cwd** 로 풀린다 — 어느 디렉터리를 읽었는지
     출력에 남지 않으면 판정이 어느 스냅숏의 것인지 사후에 말할 수 없다. `file:<상대 경로>`
     도 같은 길로 보낸다(vr r1 L-3 — scheme 이 `file` 이라고 공시를 건너뛰면 그 목적이 빈다).
 
-    디렉터리를 **여기서 함께 내는** 이유는 모듈 docstring 의 「URI 를 다시 경로로 되읽지
-    않는다」다."""
+    디렉터리를 **여기서 함께 내는** 이유와 그것이 하나가 아닌 이유는 모듈 docstring 에 있다."""
     parsed = urlparse(raw)
     if parsed.scheme and parsed.scheme != _FILE_SCHEME:
         raise SystemExit(
             f"REFUSED --snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {parsed.scheme}"
         )
-    given = Path(url2pathname(parsed.path)) if parsed.scheme else Path(raw)
-    if parsed.scheme and given.is_absolute():
-        return raw, given.resolve()
-    directory = given.resolve()
-    uri = directory.as_uri()
-    print("snapshot-uri", uri, "converted-from", raw)
-    return uri, directory
+    if not parsed.scheme:
+        return _converted(Path(raw).resolve(), raw)
+    decoded = Path(unquote(parsed.path))
+    if not decoded.is_absolute():
+        return _converted(decoded.resolve(), raw)
+    # 그대로 넘기는 갈래 — 여기서만 두 해석이 갈릴 수 있다(vr r2 L-r2-1).
+    literal = Path(parsed.path).resolve()
+    resolved = decoded.resolve()
+    return raw, (resolved,) if resolved == literal else (resolved, literal)
 
 
-def _verdict_path(output_dir: Path, snapshot_dir: Path) -> Path:
+def _verdict_path(output_dir: Path, snapshot_dirs: tuple[Path, ...]) -> Path:
     """판정을 쓸 자리. 스냅숏 디렉터리 **안**이면 거부한다 — 스냅숏은 불변 입력이고 그
     sha256 이 evidence 의 닻이다(출력이 입력의 해시를 움직이면 닻이 사라진다).
 
-    `snapshot_dir` 은 `_snapshot_dir` 이 이미 해석해 건넨 `Path` 다 — URI 문자열에서 다시
-    유도하면 퍼센트 인코딩된 판에서 비교가 조용히 빗나간다(cr r1 H-1).
+    `snapshot_dirs` 는 `_snapshot_dirs` 가 이미 해석해 건넨 `Path` 들이다 — URI 문자열에서
+    다시 유도하면 퍼센트 인코딩된 판에서 비교가 조용히 빗나가고(cr r1 H-1), 해석이 하나뿐이면
+    판독기와 갈리는 판에서 거부가 통과한다(vr r2 L-r2-1). **어느 쪽이든 안이면 거부**다.
 
     문면에 경로를 싣지 않는다(실패 문면이 호스트 디렉터리 구조를 나르지 않는다) — 무엇을
     넘겼는지는 부른 쪽이 안다."""
     resolved = output_dir.resolve()
-    if resolved.is_relative_to(snapshot_dir):
+    if any(resolved.is_relative_to(directory) for directory in snapshot_dirs):
         raise SystemExit(
             "REFUSED --output-dir 가 --snapshot-uri 의 디렉터리 안이다 — "
             "스냅숏은 불변 입력이다"
@@ -132,8 +153,8 @@ def _verdict_path(output_dir: Path, snapshot_dir: Path) -> Path:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = _arguments(argv)
-    snapshot_uri, snapshot_dir = _snapshot_dir(arguments.snapshot_uri)
-    verdict_path = _verdict_path(arguments.output_dir, snapshot_dir)
+    snapshot_uri, snapshot_dirs = _snapshot_dirs(arguments.snapshot_uri)
+    verdict_path = _verdict_path(arguments.output_dir, snapshot_dirs)
     outcome = run_backtest_job(
         snapshot_uri=snapshot_uri,
         backtest_policy_path=arguments.backtest_policy,
