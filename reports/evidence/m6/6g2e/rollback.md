@@ -7,7 +7,7 @@
 
 ## Python 축 (D-6G2e-6 · 6b · 10 · 8 Python 몫)
 
-**실측 HEAD: `c1f8b02f`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
+**실측 HEAD: `7368a619`**(종결 확인 — verifier 가 종결 커밋 `df357312`·목록 커밋 `7368a619` 뒤 문서 절차 그대로 재실측: 경로 (가) 여덟 명령 exit 0·runbook base 와 바이트 동일 · (나) 부활 0·키 절 보존 · ③ D 3/M 5 · ⑤ 1,350 · ⑥ 0; 앞 실측 `c1f8b02f` 는 runbook 이 움직여 미검증이 됐었다) · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
 clone** 에서 실제로 돌린 결과다.
 
 ### 되돌림 목록
@@ -134,7 +134,7 @@ git diff --name-only a67a9162..<판정 SHA> -- <위 목록의 경로들>
 
 ## Kotlin 축 (D-6G2e-1~5 · 7 · 8 · 15 · 17 · 18 · 23 ③~⑥ Kotlin 몫)
 
-**실측 HEAD: `01c451f5`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴 clone**
+**실측 HEAD: `7368a619`**(종결 확인 — verifier 재실측: 목록 19 == 19 · ①② `config/quality` → runbook `df357312`→`a67a9162`→`dea3e6da` → milestone `df357312`→`519b9432` 전부 exit 0 · milestone base 와 바이트 동일 · ③ D 3/M 19 diff 0 · ④⑤⑥ 0, 2,580; 앞 실측 `01c451f5` 는 runbook·milestone 이 움직여 미검증이 됐었다) · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴 clone**
 (`git clone` → `git checkout 01c451f5`)에서 실제로 돌린 결과다. 마지막 산출물 커밋은 `c1f8b02f` 이고
 그 뒤로 이 축이 되돌리는 경로는 움직이지 않았다 — 등식으로 확인했다(`git diff --name-only
 c1f8b02f..01c451f5 -- <① 의 경로 + 공유 파일 둘>` 빈 출력). 그래서 뒤의 evidence 커밋 둘이 이 측정을
