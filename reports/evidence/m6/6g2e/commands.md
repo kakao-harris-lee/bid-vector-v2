@@ -5,7 +5,7 @@
 > **마지막 HEAD 의 게이트 결과 정본은 이 문서가 아니라 verifier 리포트와 PR 조치 코멘트다**
 > (evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다).
 
-## Python 레인 (2026-10-01T23:5xZ, D-6G2e-6 · 6b · 10 · 8 Python 몫)
+## Python 레인 (2026-10-02T01:10Z, D-6G2e-6 · 6b · 10 · 8 Python 몫)
 
 산출물 커밋 셋 — 백테스트 CLI · seed 수 고정(로더 둘) · runbook 2-4. base `c63d0d3a`.
 
@@ -30,6 +30,40 @@
 | `_APPROVED_SEED_KEYS`(비공개) | 값 읽기 없음 — 길이만 쓴다 | 모듈 밖 노출 0(`_` 접두) |
 
 그 밖 0. 정책은 **파일로만** 온다(ML-07 acceptance ④ 와 같은 축).
+
+### acceptance — CI `ml-engine` job 명령 그대로, 한 HEAD 에서
+
+워크플로의 step 을 **무편집**으로 돌렸다(줄일 수 있는 단위는 job 이고, 이 slice 의 Python
+변경은 `ml-engine` job 하나가 전부 진다 — 워크플로가 두 job 의 소스 비겹침을 스스로 선언한다).
+전부 산출물 커밋 `caccd807` 의 트리에서.
+
+| step | 명령 | exit | 핵심 결과 |
+|---|---|---|---|
+| S-1 | `uv sync --frozen --all-extras` | 0 | lock 그대로 설치 |
+| S-1b | serving extras 분리(금지 다섯 import 불가 → 복구) | 0 | 분리 확인 통과 |
+| S-2 | `ruff check .` · `ruff format --check .` | 0 | 218 files already formatted |
+| S-3 | `mypy --strict src/ml_engine` | 0 | 97 source files, 오류 0 |
+| S-4 | `lint-imports` | 0 | Contracts 8 kept, 0 broken |
+| S-5 | `python -m pytest tests -q` | 0 | **1,372 passed**(6G-2a 종결 1,350 → +22) |
+| S-6 | `tools/design_ratchet.py --check` | 0 | allowlist 밖 위반 0 |
+| S-7 | `tools/reuse_provenance_check.py`(+양성 대조) | 0 | 위반 0 · 어긋난 evidence 는 거부됨 |
+| S-9 | Python 버전 두 자리 대조 | 0 | 3.12 일치 |
+| S-11 | `uv build --wheel` + 재수출 게이트 | 0 | 1 passed |
+
+test 수 증감의 내역: CLI 13 · seed 수 8 · 평가 정책 양성 대조 1 · 민감도 전수 거부에
+`stability_seeds.4` 1 추가 · 6G-2a 양성 대조 1 삭제 = **+22**.
+
+**S-11 의 `/tmp/ml-engine-wheel` 산출물은 저장소 밖**이다(커밋 0).
+
+### 비밀값 누출 대조
+
+`grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/6g2e/`
+→ **exit 1(매치 0 = 통과)**. 첫 실행에서 test 파일의 **지역 변수 이름 하나**가 패턴 어휘와
+겹쳐 매치가 났고(값이 아니라 이름), baseline 등재 대신 이름을 바꿨다 — CI 게이트의 scanRoot 는
+`reports/evidence` 뿐이라 CI 는 붉지 않았지만 스캔 술어가 계속 「매치 0」으로 읽히는 쪽이 낫다.
+
+**마지막 HEAD 의 결과 정본은 이 문서가 아니라 verifier 리포트와 PR 조치 코멘트다** — evidence 는
+자기 마지막 커밋의 post-state 를 담을 수 없다.
 
 ### 변이 실측 (셋 다 RED)
 
