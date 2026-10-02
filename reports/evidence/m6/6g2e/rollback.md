@@ -7,7 +7,7 @@
 
 ## Python 축 (D-6G2e-6 · 6b · 10 · 8 Python 몫)
 
-**실측 HEAD: `a67a9162`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
+**실측 HEAD: `c1f8b02f`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴
 clone** 에서 실제로 돌린 결과다.
 
 ### 되돌림 목록
@@ -83,7 +83,7 @@ Python 몫만 base 문면으로 되돌리고 Kotlin 줄은 **남긴다**:
    고친 0 절 두 행·2-2 문면 그대로) · **남의 삭제가 되살아나지 않음**
    (`grep -c OPEN-6G-OPENING-RANGE-CAP` = 0).
 
-### ①~⑥ 실측 (버릴 clone, 실측 HEAD `a67a9162`)
+### ①~⑥ 실측 (버릴 clone, 실측 HEAD `c1f8b02f`)
 
 | # | 항목 | 결과 |
 |---|---|---|
@@ -97,22 +97,23 @@ Python 몫만 base 문면으로 되돌리고 Kotlin 줄은 **남긴다**:
 
 **남의 줄 보존**도 같은 트리에서 실측했다: `git status --porcelain -- adapters workflow app
 config/quality reports` 가 **빈 출력**(내 복원이 Kotlin 축·evidence 를 건드리지 않았다)이고,
-`git diff c63d0d3a --name-only -- adapters workflow app` 는 **15 파일**(Kotlin 축 작업이 그대로
+`git diff c63d0d3a --name-only -- adapters workflow app` 는 **18 파일**(Kotlin 축 작업이 그대로
 남았다 — 전체 복원이었다면 0 이 된다).
 
 ### 실측의 유효 범위
 
-`docs/runbook/m6-6g-real-collection.md` 는 **두 레인이 만지는 공유 파일**이고, r2 에서 또
-바뀌었다(`a67a9162` — 5 절 삭제). 그래서 이 축은 **그 커밋 뒤**에서 다시 실측했다. 술어는
-그대로다:
+`docs/runbook/m6-6g-real-collection.md` 는 **두 레인이 만지는 공유 파일**이다. r1 에서
+`dea3e6da`, r2 에서 `a67a9162` 가 그 파일을 바꿨고 그때마다 이 축을 다시 쟀다. r3 에서는 그
+파일이 바뀌지 않았지만(만진 커밋 여전히 셋) 산출물 커밋이 하나 늘었으므로 같은 규율대로 다시
+쟀다 — **이 축의 세 번째 실측**이다. 술어는 그대로다:
 
 ```
 git diff --name-only a67a9162..<판정 SHA> -- <위 목록의 경로들>
 ```
 
 **빈 출력이면 유효하다.** 한 줄이라도 나오면 이 축은 통과가 아니라 **미검증**이고, 그 HEAD
-에서 ①~⑥ 을 다시 낸다. 앞 라운드 실측(r1 의 `8b39b4c4` · 그 전의 `caccd807`)은 옮기지 않고
-버렸다 — 이 절의 수는 전부 `a67a9162` 에서 다시 낸 것이다. 이 공유 파일이 **라운드마다 이
+에서 ①~⑥ 을 다시 낸다. 앞 라운드 실측(r2 의 `a67a9162` · r1 의 `8b39b4c4` · 그 전의 `caccd807`)은 옮기지 않고
+버렸다 — 이 절의 수는 전부 `c1f8b02f` 에서 다시 낸 것이다. 이 공유 파일이 **라운드마다 이
 재실측을 요구한다**는 것이 이 축의 구조적 비용이다(r1·r2 에서 각각 한 번 발생).
 
 ### 되돌리지 않는 것

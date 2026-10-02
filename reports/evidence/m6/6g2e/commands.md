@@ -16,8 +16,10 @@
 | D-6 「Python 파일 하나 … `python -m`」 | `ml_engine.app.backtest_cli` (`main(argv)`) | `test_the_public_surface_is_one_entry_point` |
 | D-6 「`--snapshot-uri`(file:// 강제, 상대 경로면 절대로)」 | `_snapshot_uri` | `…relative_bare_path_becomes_an_absolute_file_uri` · `…file_uri_is_passed_through_without_a_conversion_notice` · `…non_file_scheme_is_refused` |
 | D-6 「`--output-dir`(스냅숏 디렉터리 **밖** 강제)」 | `_verdict_path` | `test_output_dir_inside_the_snapshot_is_refused`(자신·하위 둘) |
-| **D-16** 「포함 검사는 해석된 `Path` 로 · 이미 URI 면 `url2pathname` · `file:<상대>` 도 공시」 | `_snapshot_dir`(`(URI, 디렉터리)`) · `_verdict_path(…, snapshot_dir)` | `…bare_path_with_a_space_converts_to_a_percent_encoded_uri` · `…output_inside_a_spaced_snapshot_is_refused_before_any_read` · `…uri_input_for_a_spaced_snapshot_also_refuses_output_inside`(인코딩·공백 그대로 둘) · `…relative_file_scheme_input_prints_the_conversion_notice` |
+| **D-16** 「포함 검사는 해석된 `Path` 로 · 이미 URI 면 **디코딩** · `file:<상대>` 도 공시」 | `_snapshot_dir`(`(URI, 디렉터리)`) · `_verdict_path(…, snapshot_dir)` | `…bare_path_with_a_space_converts_to_a_percent_encoded_uri` · `…output_inside_a_spaced_snapshot_is_refused_before_any_read` · `…uri_input_for_a_spaced_snapshot_also_refuses_output_inside`(인코딩·공백 그대로 둘) · `…relative_file_scheme_input_prints_the_conversion_notice` |
 | D-6 「종료 코드 0/1 · `JobFailed` 사유 출력」 | `main` 의 `SystemExit(<문면>)` / 정상 복귀 | `…module_run_writes_the_verdict_and_exits_zero` · `…each_failure_reason_is_reported_and_exits_one`(사유 다섯) |
+| **D-23 ①** 「app 층에 HTTP 모듈을 들이지 않는다」 | `from urllib.parse import unquote` (`urllib.request` 0) | `test_the_app_package_does_not_import_urllib_request`(`ml_engine/app/**` AST 전수) |
+| **D-23 ②** 「guard 는 디코딩 경로와 리터럴 경로 둘 다 본다」 | `_snapshot_dirs` 가 후보 tuple 을 내고 `_verdict_path` 가 `any(...)` | `test_output_inside_a_percent_named_snapshot_is_refused` |
 | D-6 「판정 경로·정책 로더 무변경」 | `run_backtest_job` 호출 한 자리 | `git diff c63d0d3a..HEAD -- ml-engine/src/ml_engine/evaluation ml-engine/policy` = D-6b·10 의 로더 둘뿐(아래 「무변경 실측」) |
 | D-6b·10 「로더가 길이 == 5 를 요구, 아니면 `*_POLICY_REJECTED`」 | `_APPROVED_SEED_KEYS` + `load_strategy_backtest_policy` · `load_evaluation_policy` | `test_seed_count_pinned.py` 8개 · `…loader_refuses_a_policy_with_a_key_removed[stability_seeds.4]` |
 | D-6b 「승인 A-3 값은 정책 schema 에서(리터럴 금지)」 | 승인 키 열거 + `len` | 숫자 리터럴 게이트(`5` 는 출하 임계 `max_origins` — 소스에 적으면 붉어진다) |
@@ -37,9 +39,10 @@
 워크플로의 step 을 **무편집**으로 돌렸다(줄일 수 있는 단위는 job 이고, 이 slice 의 Python
 변경은 `ml-engine` job 하나가 전부 진다 — 워크플로가 두 job 의 소스 비겹침을 스스로 선언한다).
 
-아래 수는 **r2(수정 라운드 1)** 의 것이고, Python 마지막 산출물 커밋 `ded28b45` 의 `ml-engine`
-트리에서 쟀다(`git diff --name-only ded28b45..<실행 HEAD> -- ml-engine` 빈 출력으로 트리 동일성을
-확인한 뒤 돌렸다 — 그 사이 커밋은 Kotlin 축 것이다). r1 의 수는 옮기지 않았다.
+아래 수는 **r3(승인 전 일괄)** 의 것이고, Python 마지막 산출물 커밋 `8f30025a` 의 `ml-engine`
+트리에서 쟀다 — `git diff --name-only 8f30025a..c1f8b02f -- ml-engine` 이 빈 출력이라 실행 HEAD 와
+트리가 같다(그 사이 커밋은 Kotlin 축 것이다). 앞 라운드 수는 옮기지 않았다. r2 의 수(1,377)도 같은
+방식으로 확인했고 그 트리 동일성은 **`9c274fc0` 까지** 유효했다(D-6G2e-23 ⑥).
 
 | step | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
@@ -48,15 +51,16 @@
 | S-2 | `ruff check .` · `ruff format --check .` | 0 | 218 files already formatted |
 | S-3 | `mypy --strict src/ml_engine` | 0 | 97 source files, 오류 0 |
 | S-4 | `lint-imports` | 0 | Contracts 8 kept, 0 broken |
-| S-5 | `python -m pytest tests -q` | 0 | **1,377 passed**(6G-2a 종결 1,350 → +27) |
+| S-5 | `python -m pytest tests -q` | 0 | **1,379 passed**(6G-2a 종결 1,350 → +29) |
 | S-6 | `tools/design_ratchet.py --check` | 0 | allowlist 밖 위반 0 |
 | S-7 | `tools/reuse_provenance_check.py`(+양성 대조) | 0 | 위반 0 · 어긋난 evidence 는 거부됨 |
 | S-9 | Python 버전 두 자리 대조 | 0 | 3.12 일치 |
 | S-11 | `uv build --wheel` + 재수출 게이트 | 0 | 1 passed |
 
 test 수 증감의 내역: CLI 13 · seed 수 8 · 평가 정책 양성 대조 1 · 민감도 전수 거부에
-`stability_seeds.4` 1 추가 · 6G-2a 양성 대조 1 삭제 = +22, **r2 의 D-16 test 5**(공백·한글
-변환 · 읽기 전 거부 · URI 입력 둘 · 상대 `file:` 공시) = **+27**.
+`stability_seeds.4` 1 추가 · 6G-2a 양성 대조 1 삭제 = +22, r2 의 D-16 test 5(공백·한글 변환 ·
+읽기 전 거부 · URI 입력 둘 · 상대 `file:` 공시) = +27, **r3 의 D-23 test 2**(`%XX` 이름 판 거부 ·
+app 층 `urllib.request` 전수) = **+29**.
 
 **S-11 의 `/tmp/ml-engine-wheel` 산출물은 저장소 밖**이다(커밋 0).
 
@@ -78,6 +82,7 @@ test 수 증감의 내역: CLI 13 · seed 수 8 · 평가 정책 양성 대조 1
 | 출력이 스냅숏 안인데 받아들인다 | `_verdict_path` 의 거부 블록 | 2 failed(디렉터리 자신 · 하위) |
 | 로더가 seed 개수를 보지 않는다 | 로더 둘의 개수 검사 블록 | `test_seed_count_pinned.py` 6 failed + 민감도 전수 거부 `[stability_seeds.4]` 1 failed |
 | 포함 검사를 **URI 문자열 재유도**로 되돌린다(D-16) | `main` 이 건네는 `Path` 대신 `Path(urlparse(uri).path).resolve()` | 2 failed(공백·한글 경로 판 · 인코딩된 URI 판) |
+| guard 가 **한쪽만** 본다(D-23 ②) | 리터럴 경로 후보를 뺀다 | 1 failed(`%XX` 이름 판). 거부가 설 때 0.8초 · 서지 못할 때 14초 — 뒤쪽에서는 판정 전체가 돌고 `verdict.json` 이 스냅숏 안에 생긴다 |
 
 변이 뒤 복원은 사본 덮어쓰기로 했다(`git checkout --` 금지 — 같은 워킹트리의 다른 레인
 미커밋 편집을 지운다). 복원 뒤 `git diff --quiet` 로 확인.
@@ -95,7 +100,7 @@ test 수 증감의 내역: CLI 13 · seed 수 8 · 평가 정책 양성 대조 1
 | OPEN | 처분 |
 |---|---|
 | `OPEN-6G-BACKTEST-CLI` | **닫는다**(D-6) — runbook 2-4 가 CLI 를 부르고 0 절 행이 ✓ |
-| **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`** | **신설**(D-16, 6G-2c 로) — 판독기가 `file://` URI 의 퍼센트 인코딩을 풀지 않는다. 이 slice 이전부터 있던 결함이고 in_scope 밖이다 |
+| **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`** | **신설**(D-16, 6G-2c 로) — 판독기가 `file://` URI 의 퍼센트 인코딩을 풀지 않는다. 이 slice 이전부터 있던 결함이고 in_scope 밖이다. 닫히기 전까지의 **대가**는 알려진 제한 2b 둘이고, 그중 (ㄴ)은 guard 가 후보 둘을 보는 것으로 막아 둔다(D-23 ②) |
 | `OPEN-6G2A-SEED-COUNT-NOT-PINNED` | **닫는다**(D-6b·10) — 로더 둘이 개수를 요구. 6G-2a 의 등재(`_REMOVAL_ACCEPTED`)와 양성 대조 test 는 설계대로 RED 가 되어 삭제, 그 키는 전수 거부 test 의 모수로 들어갔다 |
 
 ### 알려진 제한
@@ -104,13 +109,18 @@ test 수 증감의 내역: CLI 13 · seed 수 8 · 평가 정책 양성 대조 1
    뜻으로 읽는 것보다 낫다고 보고 fail-closed 로 두었다(문서화: CLI 모듈 docstring).
 2. **`file://<host>/…` 거부는 CLI 가 아니라 판독기가 진다** — 같은 뜻을 두 자리에서 재지
    않기 위해서다. CLI 는 scheme 만 본다.
-2b. **공백·한글이 든 스냅숏 경로는 아직 끝까지 돌지 못한다.** 변환(올바른 퍼센트 인코딩)과
+2b. **판독기가 URI 를 문자 그대로 읽는 데서 오는 것 둘.** (ㄱ) **공백·한글이 든 스냅숏 경로는
+   아직 끝까지 돌지 못한다.** 변환(올바른 퍼센트 인코딩)과
    출력 자리 거부는 r1 수정(D-16)으로 맞지만, 판독기(`adapters/snapshot_files.py`, 이 slice
    의 범위 밖)가 URI 의 퍼센트 인코딩을 풀지 않아 읽기가 `SNAPSHOT_UNREADABLE NOT_FOUND`
    로 선다 — **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`**(6G-2c). 그래서 그 경로의 test 는
    성공을 요구하지 않고 변환과 거부만 잰다. 수정 전에는 그 거부조차 비활성이었고 막혀 보인
    유일한 이유가 판독기의 같은 결함이었다 — fail-closed 가 설계가 아니라 우연이었다. 이제
-   거부는 판독기와 **무관하게** 성립한다.
+   거부는 판독기와 **무관하게** 성립한다. (ㄴ) 같은 갈림이 **반대 방향**으로도 난다: 이름에
+   유효한 `%XX` 가 문자 그대로 든 디렉터리(`a%41b`)를 URI 로 주면 판독기는 **읽어 내고** guard 가
+   디코딩 경로만 보면 스냅숏 안 출력이 통과한다(vr r2 L-r2-1 — exit 0 으로 판정이 입력 안에
+   쓰였다). r3 에서 guard 가 **두 경로를 다** 보게 해 닫았다(어느 쪽이든 안이면 거부). 그 OPEN 이
+   닫히면 후보 둘을 하나로 줄일 수 있고, 그때까지는 보수적인 쪽으로 둔다.
 3. **`verdict.json` 덮어쓰기를 막지 않는다** — 같은 `--output-dir` 로 두 번 돌리면 앞
    판정이 사라진다. runbook 이 스냅숏별 디렉터리를 쓰라고 적는 것으로 둔다(계약 밖).
 4. **곁딸린 수정 둘**(D-10 「잘못된 이유로 통과하지 않음을 확인」의 실측 결과):
