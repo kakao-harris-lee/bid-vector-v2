@@ -116,26 +116,31 @@ class RunStateDirectory(
         }
 
     init {
-        // 확정 표본 대조와 장부 재동기 — 복구 **뒤**이고 누적 해시를 손에 든 뒤다(재동기가 장부에
-        // 적는 해시가 디스크에 없는 바이트를 가리킬 수 없다). 장부는 여기서 **한 번** 읽는다.
+        // **재동기만** 복구 뒤에 남는다(D-6G2e-17) — 장부에 적을 해시를 손에 들어야 하고, 그 해시는
+        // 복구가 끝난 바이트의 것이어야 한다. 대조는 전부 복구 앞에서 이미 끝났다.
         if (lock is RunStateLock.Held) {
-            heldOrRelease {
-                factsFile.read()?.let { facts ->
-                    verifyConfirmedSample(facts)
-                    requireLedgerAheadOrEqual(facts)
-                }
-            }
+            heldOrRelease { factsFile.read()?.let(::resyncLedgerIfAhead) }
         }
     }
 
     /**
-     * 잠금을 든 기동의 첫 걸음 — **자리 대조 → 끝나지 않은 확정 되돌림 → 찢어진 꼬리 복구**.
-     * 장부를 한 번 읽어 셋이 나눠 쓴다(앞 판은 걸음마다 다시 파싱했다).
+     * 잠금을 든 기동의 첫 걸음 — **대조를 모두 끝낸 뒤에 고쳐 쓴다**(D-6G2e-17).
+     *
+     * 자리 대조 → 끝나지 않은 확정 되돌림 → 확정 표본 해시 대조 → 원장 앞부분 대조 → 찢어진 꼬리
+     * 복구. 복구 앞의 넷은 **읽기만** 하므로 어느 하나로 거부돼도 받은 바이트가 그대로 남는다.
+     * 되돌림이 표본 해시 대조보다 앞서는 것은 끝나지 않은 확정이 곧 그 불일치이기 때문이고
+     * (그 사고를 막으려던 장부가 만드는 사고다), 그 되돌림은 원장을 건드리지 않는다.
+     *
+     * 장부를 한 번 읽어 넷이 나눠 쓴다(앞 판은 걸음마다 다시 파싱했다).
      */
     private fun verifyThenHeal() {
         val facts = factsFile.read()
         verifyPlacement(facts)
-        facts?.let(::rollBackInterruptedConfirmation)
+        facts?.let {
+            rollBackInterruptedConfirmation(it)
+            verifyConfirmedSample(it)
+            requireLedgerPrefix(it)
+        }
         healTornTail()
     }
 
@@ -263,21 +268,32 @@ class RunStateDirectory(
     /**
      * 원장은 **append-only** 다(D-6G-61 ②). 그래서 「장부가 아는 앞부분이 그대로이고 뒤에 줄이
      * 더 있다」는 변조가 아니라 **크래시 흔적**이다 — 마지막 append 와 장부 교체 사이에서 죽으면
-     * 반드시 이 모양이 된다. 거부하면 그 실행 상태는 사람이 손대기 전까지 영영 막히고, 그 사고를
-     * 만든 것은 장부 자신이다. 이 경우는 **원장을 정본으로 재동기**한다.
+     * 반드시 이 모양이 된다. 그 경우는 거부가 아니라 재동기다([resyncLedgerIfAhead]): 거부하면 그
+     * 실행 상태가 사람이 손대기 전까지 영영 막히고, 그 사고를 만든 것은 장부 자신이다.
      *
-     * 앞부분이 다르거나 줄이 **줄었으면** 여전히 거부다 — 그것은 append-only 로 설명되지 않는다.
+     * 앞부분이 다르거나 줄이 **줄었으면** 거부다 — append-only 로 설명되지 않는다. 이 대조는
+     * **읽기만** 하고 복구 **앞**에서 돈다(D-6G2e-17): 이것으로 거부될 디렉터리를 고쳐 쓰지 않는다.
+     *
+     * **찢어진 끝 줄은 접두 대조에서 빼고 줄 수에는 센다.** 개행이 없는 마지막 조각은 아직 줄이
+     * 아니므로 장부가 아는 앞부분에 들 수 없고, 그 호출은 **나갔을 수 있으므로** 줄 수에는 든다
+     * (상한이 줄지 않는 쪽). 그래서 정직한 크래시의 답이 복구 전후로 같다.
      */
-    private fun requireLedgerAheadOrEqual(facts: RunStateFacts) {
-        val lines = linesOf(attemptFile)
-        require(lines.size >= facts.attemptLines) {
+    private fun requireLedgerPrefix(facts: RunStateFacts) {
+        val text = ledgerTextOf(attemptFile)
+        val torn = text.isNotEmpty() && !text.endsWith("\n")
+        val lines = linesIn(text).let { if (torn) it.dropLast(1) else it }
+        require(lines.size + (if (torn) 1 else 0) >= facts.attemptLines) {
             "시도 원장의 줄 수가 장부보다 적다 — 지워졌거나 잘렸다"
         }
         val known = lines.take(facts.attemptLines).joinToString("") { it + "\n" }
         require(sha256Hex(known) == facts.attemptsSha256) {
             "시도 원장의 앞부분이 장부와 다르다 — append-only 로 설명되지 않는 변경이다"
         }
-        if (lines.size > facts.attemptLines) recordState()
+    }
+
+    /** 원장이 장부보다 앞서 있으면(크래시 흔적) 장부를 원장 쪽으로 맞춘다 — 복구가 끝난 바이트로. */
+    private fun resyncLedgerIfAhead(facts: RunStateFacts) {
+        if (linesIn(ledgerTextOf(attemptFile)).size > facts.attemptLines) recordState()
     }
 
     /**
@@ -299,8 +315,7 @@ class RunStateDirectory(
      * 든다([recordState] 와 같은 형태다).
      */
     private fun healTornTail() {
-        if (!Files.isRegularFile(attemptFile)) return
-        val text = Files.readString(attemptFile)
+        val text = ledgerTextOf(attemptFile)
         if (text.isEmpty() || text.endsWith("\n")) return
         val fragment = text.substringAfterLast('\n')
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
@@ -338,12 +353,11 @@ private class LedgerDigest(
         private set
 
     init {
-        // **없는 파일과 읽히지 않는 파일을 가른다**(D-6G2e-5) — 앞 판은 둘을 모두 빈 바이트로 접었고,
-        // 그러면 바이트가 있는 원장의 해시가 조용히 빈 해시로 굳는다(장부가 거짓을 적는다). 없으면
-        // 비었고, 있는데 읽히지 않으면 **던진다**(그 예외는 잠금 가드 안에서 난다).
-        val text = if (Files.isRegularFile(file)) Files.readString(file) else ""
+        // 앞 판은 「없는 파일」과 「읽히지 않는 파일」을 모두 빈 바이트로 접었고, 그러면 바이트가 있는
+        // 원장의 해시가 조용히 빈 해시로 굳는다(장부가 거짓을 적는다) — [ledgerTextOf] 가 둘을 가른다.
+        val text = ledgerTextOf(file)
         digest.update(text.toByteArray(Charsets.UTF_8))
-        lines = text.lineSequence().count { it.isNotBlank() }
+        lines = linesIn(text).size
     }
 
     fun append(line: String) {
@@ -375,12 +389,15 @@ private fun tornMarkerOf(fragment: String): String =
 
 internal const val TORN_KEY = "torn"
 
-private fun linesOf(file: Path): List<String> =
-    runCatching { Files.readString(file) }
-        .getOrDefault("")
-        .lineSequence()
-        .filter { it.isNotBlank() }
-        .toList()
+private fun linesOf(file: Path): List<String> = linesIn(runCatching { Files.readString(file) }.getOrDefault(""))
+
+/**
+ * 원장 바이트 — **없는 파일과 읽히지 않는 파일을 가른다**(D-6G2e-5). 없으면 비었고, 있는데 읽히지
+ * 않으면 던진다(그 예외는 잠금 가드 안에서 난다). 원장을 읽는 자리가 셋이라 한 함수로 둔다.
+ */
+private fun ledgerTextOf(file: Path): String = if (Files.isRegularFile(file)) Files.readString(file) else ""
+
+private fun linesIn(text: String): List<String> = text.lineSequence().filter { it.isNotBlank() }.toList()
 
 internal const val RUN_LOCK_NAME = "run.lock"
 

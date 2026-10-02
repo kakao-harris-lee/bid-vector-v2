@@ -460,6 +460,53 @@ class RunStateDirectoryTest : RunStateDirectoryFixture() {
     }
 
     /**
+     * **D-6G2e-17 (vr r1 M-1 = cr r1 M-3) — 읽기 전용 대조는 전부 복구 앞이다.** D-6G2e-5 는 자리
+     * 대조 셋만 앞으로 옮겼고, 표본 해시 대조와 원장 **앞부분** 대조는 복구 뒤에 남았다 — 그 둘로
+     * 거부될 디렉터리도 원장을 고쳐 쓴 뒤 거부됐다. 조각은 표식 안에 원문 그대로 남으니 내용 손실은
+     * 없지만, 「거부될 디렉터리는 고쳐 쓰지 않는다」가 절반만 선 것이고 사람이 받은 바이트가 달라진다.
+     *
+     * 찢어진 끝 줄은 **접두 대조에서 빼고 줄 수에는 센다** — 아직 줄이 아니지만 그 호출은 나갔을 수
+     * 있다. 그래서 정직한 크래시의 답은 바뀌지 않는다(복구 뒤 재동기 그대로).
+     */
+    @Test
+    fun `원장 앞부분이 장부와 다르면 찢어진 끝 줄을 고치지 않고 거부한다 — 바이트 동일`() {
+        val file = tamperedLedgerWithTornTail { it.replaceFirst("2026-09-24T01:00:00Z", "2026-09-24T01:00:01Z") }
+        val received = Files.readString(file)
+
+        shouldThrow<IllegalArgumentException> { reopen() }
+
+        Files.readString(file) shouldBe received
+        Files.exists(root().resolve(STAGED_ATTEMPT_NAME)) shouldBe false
+    }
+
+    /** 같은 원칙의 다른 축 — 확정 표본이 바뀐 디렉터리도 원장을 고쳐 쓰지 않는다. */
+    @Test
+    fun `표본 목록이 바뀌면 찢어진 끝 줄을 고치지 않고 거부한다 — 바이트 동일`() {
+        val file = tamperedLedgerWithTornTail { it }
+        Files.writeString(root().resolve(SAMPLE_LIST_NAME), "SYN-6G-9999\tSERVICE\t2026-W23\n")
+        val received = Files.readString(file)
+
+        shouldThrow<IllegalArgumentException> { reopen() }
+
+        Files.readString(file) shouldBe received
+        Files.exists(root().resolve(STAGED_ATTEMPT_NAME)) shouldBe false
+    }
+
+    /**
+     * 표본 확정 + 줄 하나 + 찢어진 끝 줄까지 쓴 원장 — [tamper] 가 **앞부분**을 바꾼다(그대로 돌려
+     * 주면 앞부분은 성하고 다른 축만 어긋난 판이 된다).
+     */
+    private fun tamperedLedgerWithTornTail(tamper: (String) -> String): Path {
+        val directory = open()
+        directory.sampleList.confirm(runStateSample())
+        directory.attempts.append(runStatePendingAttempt())
+        directory.close()
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(file, tamper(Files.readString(file)) + AXIS_UNREADABLE_FRAGMENT)
+        return file
+    }
+
+    /**
      * 조각 **하나만** 남은 원장 — 그 라운드의 첫 의도 줄을 쓰다 죽은 모양이라 앞 줄이 없다. 장부는
      * 표본 확정으로 세워 둔다(장부 없이 파일만 있으면 그 자체로 기동 거부다).
      */
