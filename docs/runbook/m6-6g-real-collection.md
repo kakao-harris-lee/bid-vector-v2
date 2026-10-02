@@ -11,7 +11,7 @@
 | A-3 재호출 상한 | ✓ N=3 확정(단위 = 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드 `INTERRUPTED` 하나, 관문 거부 미계수 · 창 = 디렉터리 생애) | 운영자 2026-10-01 |
 | `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(5,000 초과 참가 축은 확정 제외, 계수 공시) | 운영자 2026-10-01 |
 | `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ✓ 6G-2e 가 셋을 닫는다(2026-10-02) — 찢어진 조각만 남은 꼬리 라운드는 의도 줄로 되살아나 재호출 상한에 하나로 셈(D-6G2e-3) · `incompleteAValues` 는 A 축 행 자체가 가름(D-6G2e-4) · 자리 대조가 복구보다 앞서고 기동 첫 걸음 전부가 잠금 가드 안(D-6G2e-5). **이 slice 가 머지된 뒤** 참이다 | 6G-2d D-6G2d-53 · 6G-2e |
-| 운영계정 서비스 키 | ☐ 환경에 없음 — 운영자가 **저장소 밖 파일**로 제공 | 6G 운영자 결정 2026-09-27 |
+| 운영계정 서비스 키 | ✓ **개발에서 쓰는 키와 같다**(사용자 2026-10-02) — legacy `../bid-vector/.env` 의 **원문형** 변수 `KONEPS_OPENAPI_SERVICE_KEY`(인코딩형 `KONEPS_OPENAPI_ENCODED_SERVICE_KEY` 는 쓰지 않는다, 6F-8 실측: 이중 인코딩 → `resultCode 30`). 값은 어디에도 적지 않는다 | 사용자 2026-10-02 · 6F-8 checklist 6항 |
 | 개찰 갈래의 수집 범위 상한이 A-1 의 최대 16주 창을 받는가 | ✓ 6G-2e 가 갈래별 정책으로 나눴다(2026-10-02) — 개찰 갈래 **120일**(`OPENING_COLLECTION_RANGE_POLICY`, A-1 승인), 공고 목록 갈래는 31일 그대로(6F-8 D-6F8-3). 창을 쪼개 돌리는 길은 여전히 없다(확정 표본이 from/to 를 고정한다 — D-6G2e-2). **이 slice 가 머지된 뒤** 참이다 | PR #52 `/code-review` 2026-10-01 · 6G-2e D-6G2e-1 |
 | 백테스트 CLI | ✓ 있음 — `python -m ml_engine.app.backtest_cli`(2-4). `OPEN-6G-BACKTEST-CLI` 닫힘 | 6G-2e D-6G2e-6 |
 | DEC-03 지자체 판별 | ✓ 현행 유지(판정 불가 계수 + 민감도 두 판) | 운영자 2026-09-30 |
@@ -24,7 +24,7 @@
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
    - 스냅숏: `~/.local/bid-vector-snapshots/`
 4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다).
-5. **키 파일**: 운영자가 저장소 밖(예: `~/.config/bid-vector/koneps.env`, 모드 600)에 `KONEPS_SERVICE_KEY_RAW=<원문형 키>` 한 줄로 둔다. **원문형**이어야 한다 — `ServiceKey` 가 스스로 URL 인코딩한다(인코딩형을 넣으면 이중 인코딩으로 `resultCode 30` + 쿼터만 소모, 6F-8 실측). 값은 명령 문자열·argv·history·transcript 어디에도 나타나지 않게 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다. 형태 확인은 `grep -c` 같은 계수만.
+5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
 ## 2. 실행 — 세 갈래, 순서 고정
 
@@ -40,8 +40,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
 
 ### 2-1. 공고 목록 갈래 (표본틀) — 1회
 ```
-( set -a; . ~/.config/bid-vector/koneps.env; set +a; \
-  BIDVECTOR_KONEPS_SERVICEKEY="$KONEPS_SERVICE_KEY_RAW" \
+( BIDVECTOR_KONEPS_SERVICEKEY="$(sed -n 's/^KONEPS_OPENAPI_SERVICE_KEY=//p' ../bid-vector/.env | tr -d '\r"')" \
   SPRING_MAIN_WEB_APPLICATION_TYPE=none \
   java -jar app/build/libs/app.jar \
     --bidvector.collection.mode=once \

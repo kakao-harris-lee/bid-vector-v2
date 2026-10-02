@@ -630,6 +630,8 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 의존 · 복구 쓰기 순서/잠금 가드) · `OPEN-6G-BACKTEST-CLI` · `OPEN-6G2A-SEED-COUNT-NOT-PINNED`. 레인 둘(Kotlin: 범위 정책·실행 상태 셋·runbook / ml-implementer: CLI·seed 수), 파일 집합 비겹침,
 호스트 빌드 직렬. **이 slice 머지가 실수집 시작 조건**(남은 것: 운영계정 키). 리뷰 레인 verifier + code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 착수 문단을 문단 단위 삭제로 지운다.
 
+**6G-2e 종결 2026-10-02** — PR **#54**(계약 갱신 r0-b~r3: D-6G2e-9~24). 판정은 PR 코멘트 셋에 있다. 재작업 **1/5** — verifier r1 not-ready(정정: D-4 가 `incompleteAValues` 를 다른 모양에서 과소 계수), **r2 ready-for-review**, 승인 전 일괄 뒤 종결 확인. 닫은 것: `OPEN-6G-OPENING-RANGE-CAP`(`OPENING_COLLECTION_RANGE_POLICY` **120일**, 공고 목록 31일 그대로, 쪼갠 창 거부 못 박음; 추출 배선은 범위를 재지 않음) · `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋(찢어진 조각만 남은 꼬리 라운드 → 조각을 의도 줄로 되살려 열린 라운드로 · `incompleteAValues` 정본 = 기초금액 술어, 부재·미지만 A 행 입력, 품질관리비는 항상 입력 — 열일곱 판 · 복구 앞 대조 넷이 읽기만, 거부될 디렉터리 바이트 불변) · `OPEN-6G-BACKTEST-CLI`(`python -m ml_engine.app.backtest_cli`, `file://`·스냅숏 밖 출력, 디코딩·리터럴 이중 guard) · `OPEN-6G2A-SEED-COUNT-NOT-PINNED`(두 정책 로더 seed 다섯, 열거 키 `len`). 형식 version 2 · golden·스키마 불변 · 판정 경로 diff 0. 사실 선언: evidence 혼입 둘(공유 트리에서 두 레인이 한 파일에 append — 다음 두 레인 slice 부터 레인별 파일) · container job 은 compose 가 실행 상태 배선을 적재하지 않아 verifier 가 대신 실행. 남긴 OPEN: `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`(6G-2c) · `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`(6G-2b). **이 머지로 실수집 시작 조건 충족** — 운영계정 키는 개발 키와 같다(사용자 2026-10-02, legacy `.env` 원문형). 다음: 실수집 준비·시작(runbook) 병행, 6G-2b → 6G-2c. rollback 의 공유 파일 절차는 이 종결 문단도 착수 문단과 같은 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서

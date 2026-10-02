@@ -101,6 +101,7 @@ app 층 `urllib.request` 전수) = **+29**.
 |---|---|
 | `OPEN-6G-BACKTEST-CLI` | **닫는다**(D-6) — runbook 2-4 가 CLI 를 부르고 0 절 행이 ✓ |
 | **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`** | **신설**(D-16, 6G-2c 로) — 판독기가 `file://` URI 의 퍼센트 인코딩을 풀지 않는다. 이 slice 이전부터 있던 결함이고 in_scope 밖이다. 닫히기 전까지의 **대가**는 알려진 제한 2b 둘이고, 그중 (ㄴ)은 guard 가 후보 둘을 보는 것으로 막아 둔다(D-23 ②) |
+| **`OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`** | **신설**(cr r2 M, 6G-2b 로 — 팀장 추가 행 2026-10-02) — import-linter 「app 은 DB·HTTP·업무 모듈을 모른다」 계약의 `forbidden_modules` 가 서드파티 다섯만 열거해 표준 `urllib.request` 가 지나간다. 이 slice 는 import 를 `urllib.parse.unquote` 로 바꾸고 `test_the_app_package_does_not_import_urllib_request`(AST, `ml_engine/app/**` 전수)를 임시 자물쇠로 둔다 — test 는 pytest 가 도는 것만 묶고 계약은 빌드를 묶으므로 진짜 닫힘은 6G-2b |
 | `OPEN-6G2A-SEED-COUNT-NOT-PINNED` | **닫는다**(D-6b·10) — 로더 둘이 개수를 요구. 6G-2a 의 등재(`_REMOVAL_ACCEPTED`)와 양성 대조 test 는 설계대로 RED 가 되어 삭제, 그 키는 전수 거부 test 의 모수로 들어갔다 |
 
 ### 알려진 제한
