@@ -167,7 +167,7 @@ qualification 31 · shared-kernel 89 · strategy 84 · workflow 401.
 | D-5 「`LedgerDigest` 읽기를 잠금 가드 안으로」 | `ledger` 초기화식 전체가 `heldOrRelease` 안 | `원장이 UTF-8 이 아니면 던지고 잠금을 놓는다 — 다음 기동이 Busy 가 아니다` |
 | D-7 「형식 version 2 유지 · 스키마 칸·golden 무변경」 | `RUN_STATE_FORMAT_VERSION` 무변경 | `git diff c63d0d3a..HEAD` 에 정책 YAML·스키마·golden 0 |
 
-### 변이 실측 (일곱, 전부 RED)
+### 변이 실측 (아홉, 전부 RED)
 
 | 변이 | 지운 것 | 결과 |
 |---|---|---|
@@ -176,11 +176,18 @@ qualification 31 · shared-kernel 89 · strategy 84 · workflow 401.
 | 표본틀 범위 대조를 `to` 만 비교 | `require(confirmed.scope == scope)` | 새 쪼갠 창 test 1 failed(기존 「창이 달라지면」 test 는 **통과** — 사각이 실재했다) |
 | 조각을 세기만 하는 앞 판 | 조각 되살림 | 열린 라운드 test 1 failed |
 | 조각을 결말 줄로 되살림 | `kind = PENDING` → `AXIS` | 같은 test 1 failed(열린 라운드가 아니게 된다) |
-| 계수를 A 행 입력 유무로만 가름(r1 판) | `appliesByBaseAmount ?:` | 판 표 1 failed — 「기초 Y + A 행 빔」 |
-| 계수를 기초금액 술어로만 가름(D-4 앞 판) | `?: row.carriesAValueInput()` | 판 표 1 + D-4 test 1 failed — 「기초 축 부재 + 품질관리비만」 |
-| 품질관리비 금액을 입력에서 뺌 | `carriesAValueInput` 의 한 줄 | 판 표 1 failed — 같은 판 |
+| 계수를 A 행 입력 유무로만 가름(r1 판) | `appliesByBaseAmount ?:` | 판 표 1 failed, 먼저 걸린 판 「기초 Y + A 행 빔」 |
+| 계수를 기초금액 술어로만 가름(D-4 앞 판) | `?: row.carriesAValueInput()` | 판 표 1 **+ D-4 test 1** failed, 먼저 걸린 판 「기초 축 부재 + 품질관리비만」 |
+| 품질관리비를 입력에서 뺌 | `A_VALUE_INPUT_CONCEPTS` 의 한 줄 | 판 표 1 failed, 먼저 걸린 판 「기초 축 부재 + 품질관리비만」 |
+| A 입력 존재를 파싱된 금액으로 가름(r2 판) | `textOf` → `amountOf` | 판 표 1 failed, 먼저 걸린 판 「기초 축 부재 + A 행 해석 불가」 |
+| 조각의 뜻을 두 가지로 다시 섞음 | 「개행 뒤 바이트」 정의 | 공백 꼬리 test 1 failed |
 | 기동 첫 걸음을 잠금 가드 밖으로 | `heldOrRelease` → `run` | 2 failed(비UTF-8 · 형식 거부의 잠금 잔류) |
 | 복구를 읽기 전용 대조보다 앞으로(r1 순서) | `verifyThenHeal` 의 걸음 순서 | 2 failed(원장 앞부분 · 표본 목록, 둘 다 바이트가 바뀐다) |
+
+**세 계수 변이가 가른 것은 「서로 다른 판」이 아니라 「서로 다른 실패 집합」이다**(vr r2 L-r2-2 정정).
+판을 한 표로 두었으므로 그 표의 test 는 **먼저 걸린 판에서 멈춘다** — 「판 표 1 failed」는 「판 하나만
+틀렸다」가 아니다(둘째 변이는 판 둘을 동시에 틀리게 하고 표는 앞의 하나만 말한다). 집합이 갈리는
+자리는 D-4 test 의 포함 여부와 먼저 걸린 판의 이름이고, 그 둘로 세 변이가 서로 구별된다.
 
 변이 뒤 복원은 **사본 덮어쓰기**로 했다(`git checkout --` 금지 — 같은 워킹트리의 다른 레인
 미커밋 편집을 지운다). 복원 뒤 영향 범위 test 재실행으로 초록 확인.

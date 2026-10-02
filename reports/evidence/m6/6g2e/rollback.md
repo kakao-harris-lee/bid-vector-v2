@@ -130,7 +130,7 @@ git diff --name-only a67a9162..<판정 SHA> -- <위 목록의 경로들>
   파일·판정 경로는 바뀌지 않았으므로 되돌림이 출하 판정에 닿지 않는다(출하 두 파일은
   이미 다섯이다).
 
-## Kotlin 축 (D-6G2e-1~5 · 7 · 8 Kotlin 몫)
+## Kotlin 축 (D-6G2e-1~5 · 7 · 8 · 15 · 17 · 18 · 23 ③~⑥ Kotlin 몫)
 
 **실측 HEAD: `5fddfd1a`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴 clone**
 (`git clone` → `git checkout 5fddfd1a`)에서 실제로 돌린 결과다.
