@@ -256,6 +256,27 @@ class RunStateRecoveryTest : RunStateDirectoryFixture() {
     }
 
     /**
+     * **D-6G2e-23 ③ (cr r2 L) — 조각의 뜻은 하나다: 개행 뒤의 바이트.** 접두 대조가 「마지막 줄」의
+     * 두 뜻을 섞으면(빈 줄을 걸러 낸 목록의 마지막 ↔ 개행 뒤의 조각) 공백만 남은 조각이 **성한 줄
+     * 하나를** 밀어내 접두가 짧아지고, 아무 잘못 없는 디렉터리가 「앞부분이 장부와 다르다」로
+     * 거부된다. 그 거부의 출구는 디렉터리 폐기(= 상한 0 재시작)뿐이라 손해가 크다.
+     */
+    @Test
+    fun `공백만 남은 찢어진 꼬리는 접두 대조를 깨지 않는다`() {
+        val directory = open()
+        directory.sampleList.confirm(runStateSample())
+        directory.attempts.append(runStatePendingAttempt())
+        directory.close()
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(file, Files.readString(file) + "   ")
+
+        val history = reopen().attempts.read()
+
+        // 조각으로 **세어** 호출 하나가 더 붙는다 — 거부가 아니다(상한이 줄지 않는 쪽).
+        history.spend(RUN_STATE_AT).total shouldBe 2
+    }
+
+    /**
      * 조각 **하나만** 남은 원장 — 그 라운드의 첫 의도 줄을 쓰다 죽은 모양이라 앞 줄이 없다. 장부는
      * 표본 확정으로 세워 둔다(장부 없이 파일만 있으면 그 자체로 기동 거부다).
      */

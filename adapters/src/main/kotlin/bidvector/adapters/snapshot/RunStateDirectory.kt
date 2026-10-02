@@ -277,12 +277,16 @@ class RunStateDirectory(
      * **찢어진 끝 줄은 접두 대조에서 빼고 줄 수에는 센다.** 개행이 없는 마지막 조각은 아직 줄이
      * 아니므로 장부가 아는 앞부분에 들 수 없고, 그 호출은 **나갔을 수 있으므로** 줄 수에는 든다
      * (상한이 줄지 않는 쪽). 그래서 정직한 크래시의 답이 복구 전후로 같다.
+     *
+     * 조각의 뜻은 **하나**다(D-6G2e-23 ③): **마지막 개행 뒤의 바이트**. 「빈 줄을 걸러 낸 목록의
+     * 마지막」과 섞으면 공백만 남은 조각이 성한 줄 하나를 밀어내 접두가 짧아지고, 아무 잘못 없는
+     * 디렉터리가 「앞부분이 다르다」로 거부된다 — 그 거부의 출구는 디렉터리 폐기뿐이다.
      */
     private fun requireLedgerPrefix(facts: RunStateFacts) {
         val text = ledgerTextOf(attemptFile)
-        val torn = text.isNotEmpty() && !text.endsWith("\n")
-        val lines = linesIn(text).let { if (torn) it.dropLast(1) else it }
-        require(lines.size + (if (torn) 1 else 0) >= facts.attemptLines) {
+        val fragment = if (text.endsWith("\n")) "" else text.substringAfterLast('\n')
+        val lines = linesIn(text.removeSuffix(fragment))
+        require(lines.size + (if (fragment.isEmpty()) 0 else 1) >= facts.attemptLines) {
             "시도 원장의 줄 수가 장부보다 적다 — 지워졌거나 잘렸다"
         }
         val known = lines.take(facts.attemptLines).joinToString("") { it + "\n" }
@@ -291,9 +295,12 @@ class RunStateDirectory(
         }
     }
 
-    /** 원장이 장부보다 앞서 있으면(크래시 흔적) 장부를 원장 쪽으로 맞춘다 — 복구가 끝난 바이트로. */
+    /**
+     * 원장이 장부보다 앞서 있으면(크래시 흔적) 장부를 원장 쪽으로 맞춘다 — 복구가 끝난 바이트로.
+     * 줄 수는 [ledger] 가 이미 들고 있다(D-6G2e-23 ⑤) — 8 만 줄짜리 원장을 다시 읽지 않는다.
+     */
     private fun resyncLedgerIfAhead(facts: RunStateFacts) {
-        if (linesIn(ledgerTextOf(attemptFile)).size > facts.attemptLines) recordState()
+        if (ledger.lines > facts.attemptLines) recordState()
     }
 
     /**
@@ -381,15 +388,11 @@ private class LockedOutAttemptLedger(
     override fun read(): AttemptHistory = reads.read()
 }
 
-private fun lineCountOf(file: Path): Int = linesOf(file).size
-
 /** 잃어버린 호출의 표식(D-6G-70) — 조각을 원문 그대로 담되 형태가 선 JSON 한 줄로. */
 private fun tornMarkerOf(fragment: String): String =
     SnapshotJson.Obj(listOf(TORN_KEY to SnapshotJson.Text(fragment))).render() + "\n"
 
 internal const val TORN_KEY = "torn"
-
-private fun linesOf(file: Path): List<String> = linesIn(runCatching { Files.readString(file) }.getOrDefault(""))
 
 /**
  * 원장 바이트 — **없는 파일과 읽히지 않는 파일을 가른다**(D-6G2e-5). 없으면 비었고, 있는데 읽히지
