@@ -72,6 +72,15 @@
 | **D-6G2e-17** | **(cr M-3 · vr M-1 — 해당 없음) 복구 순서**: 읽기 전용인 접두 대조·표본 해시 대조를 `healTornTail` **앞**으로(크래시 사례 답 불변 — 찢어진 끝 줄은 접두 대조에서 제외하고 센다). 거부될 디렉터리의 원장 바이트 불변 test(접두 변조 + 찢어진 꼬리 → 거부 · 바이트 동일). 변이 → RED. 불가하면 이탈로 사유 |
 | **D-6G2e-18** | **장부**: runbook §5 의 「31일 상한 차단」 줄 제거(L-1/cr M-4) · D-11 에 D-5 의 실제 순서 선언 · 알려진 제한 4 정정 · evidence 두 축 갱신. **r2 는 표적**: D-15 여섯 판+변이 · D-16 공백·한글 경로 넷 + 변이 · D-17 변이 · acceptance 두 job(container 는 D-17 이 실행 상태 코드라 한 번 더) · rollback 두 축 재실측(runbook 순서) · 새 public 표면 0 |
 
+## 계약 갱신 r2-b (2026-10-02, 팀장 — 수정 라운드 1 두 레인 보고 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G2e-19** | **수용(Kotlin)**: D-15 계수 정본 = 기초금액 술어(Y 셈 · N 안 셈 · 부재·미지만 A 행 입력), 품질관리비는 항상 입력 — 판 일곱 한 표, 변이 셋 각자 다른 판 RED · D-17 복구 앞 넷 읽기만(찢어진 끝 줄은 접두 대조 제외·줄 수 포함), 변이 RED · 크기 게이트로 test 파일 둘을 재는 물음으로 분할(`gate-tests` 등재 1) · **container job 미실행 이탈 수용** — compose 가 수집 변수를 두지 않고 실행 상태 배선 셋이 `mode=once` 조건부라 그 job 은 `RunStateDirectory` 를 적재하지 않는다(verifier 가 r2 에서 한 번 더 돌린다, 결과는 참고) · rollback 역적용 순서 둘 추가(같은 파일의 자기 커밋은 새 것부터 · `config/quality` hunk 는 ④⑤⑥ 앞) |
+| **D-6G2e-20** | **수용(Python)**: D-16 — 포함 검사는 `_snapshot_dir` 가 돌려준 해석된 `Path` · URI 입력 `url2pathname` · 상대 `file:` 절대화+통지 · test helper 도 같은 디코딩 결함이라 함께 정정 · 변이 RED 2 · **`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`**(6G-2c, 공백·한글 경로는 끝까지 못 읽음, 거부는 판독기와 무관하게 성립) · Python-only 되돌림 절차의 앵커를 §5 삭제에 맞춰 재앵커(+ 부활 0 확인), 전체 역적용 순서 `a67a9162 → dea3e6da → 2e02b35f` |
+| **D-6G2e-21** | **사실 선언(두 번째 혼입)**: Kotlin evidence 커밋 `0f7e3e16` 이 Python 의 미커밋 r2 evidence 편집을 **선언 없이** 품었다(첫 번째 `caccd807` 은 선언). 되쓰지 않는다 — Python `9c274fc0` 이 두 흡수 커밋과 저작 이력 자리를 기록. 교훈: 공유 evidence 파일은 레인마다 **별 파일**(`commands-kotlin.md`/`commands-python.md`)로 두는 편이 혼입을 구조로 막는다 → 다음 두 레인 slice(6G-2c)부터 적용(하네스 메모리) |
+| **D-6G2e-22** | **r2 판정 SHA 는 이 갱신 커밋.** verifier 표적: D-15 판 일곱 + 변이 셋 · D-17 변조+찢어진 꼬리 → 거부·바이트 동일 + 변이 · D-16 공백·한글 경로 넷 + 변이 · acceptance `check` 넷(2,592) + `ml-engine`(1,377) + container(참고) · rollback 두 축 문서 절차 그대로(순서 셋: 두 레인 Kotlin → Python, 자기 커밋 새 것부터, `config/quality` 먼저; 유효성 술어 `5fddfd1a..판정 SHA` · `a67a9162..판정 SHA`) · 새 public 표면 0 · 형식 version 2 · 판정 경로 diff 0. code-reviewer: `8b39b4c4..판정 SHA` |
+
 ## 위협 모델 — 6G-2e 고유 경계 (Phase 2.5 (0))
 
 **지키는 것**: ① 공고 목록 갈래의 31일 상한은 그대로(호출 폭주 방지) ② 개찰 갈래의 긴 창은 표본 크기·호출 상한이 묶는다 ③ 실행 상태 회계(크래시 라운드 하나 · 거부될 디렉터리 불변 · 잠금 잔류 없음) ④ CLI 는 판정 경로를 바꾸지 않는다.
