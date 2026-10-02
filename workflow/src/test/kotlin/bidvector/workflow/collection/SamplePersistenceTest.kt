@@ -65,6 +65,26 @@ class SamplePersistenceTest {
         shouldThrow<IllegalArgumentException> { fixture.run() }
     }
 
+    /**
+     * **D-6G2e-2 — 창을 쪼개는 길은 열지 않는다.** 개찰 갈래의 범위 상한이 넓어졌어도(D-6G2e-1) 그보다
+     * 긴 기간을 **조각내** 같은 실행 상태 디렉터리로 이어 돌리는 길은 여전히 막혀 있다. 조각은 앞 창의
+     * 부분집합이라 「넓혔다」도 「좁혔다」도 아니어서 눈으로는 무해해 보이지만, 확정 표본이 못 박은
+     * 모집단이 아니다 — 모집단이 하나여야 표본이 하나다. 열어 주면 조각마다 다시 뽑히고 「결과를 보기
+     * 전에 확정했다」가 조각 수만큼 갈린다. 나중에 누가 이 길을 열지 못하게 단언으로 못 박아 둔다.
+     */
+    @Test
+    fun `확정 뒤 창을 쪼개 뒷조각으로 돌리면 거부한다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-05", count = 5)
+        fixture.run()
+
+        // 끝날은 같고 시작날만 늦다 — 앞 창의 **뒷조각**이다.
+        fixture.window("2026-03-05", "2026-03-05")
+
+        shouldThrow<IllegalArgumentException> { fixture.run() }
+    }
+
     @Test
     fun `확정 표본인데 이번 표본틀에서 안 보이면 부르지 않고 센다`() {
         val fixture = OpeningFixture(sampleSize = 2)

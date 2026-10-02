@@ -214,7 +214,28 @@ class OpeningCollectionWiringTest {
 
         booted.failure shouldNotBe null
     }
+
+    /**
+     * **D-6G2e-1 (A-1 운영자 승인 2026-10-02) — 이 갈래의 범위 상한은 120일이다.** 공고 목록 갈래의
+     * 31일(6F-8 D-6F8-3)은 「조회일마다 쪽을 걷으므로 호출 수가 창 길이에 비례한다」에서 나온 값이고,
+     * 이 갈래의 호출 수는 **확정 표본 크기 × 축 + 개찰결과 목록 쪽 수**다 — 창은 표본틀의 모집단을
+     * 정할 뿐이다. A-1 승인 기간(업무별 하한율 변경일 ~ 현재, 최대 16주)이 그 31일에 걸려 실수집이
+     * 기동 거부되던 자리이고(PR #52 `/code-review`), 창을 쪼개 돌리는 길은 D-6G2e-2 가 닫아 둔다.
+     *
+     * **상한은 남는다** — 120일을 넘는 창은 여전히 기동 거부다(설정 실수를 실 호출 전에 잡는다).
+     */
+    @Test
+    fun `범위 상한 정확히(120일)는 뜨고 하루 더 넓으면 기동하지 않는다 — 경계 양쪽`() {
+        bootWith("bidvector.opening-collection.from=$SPAN_120_DAYS_FROM").failure shouldBe null
+        bootWith("bidvector.opening-collection.from=$SPAN_121_DAYS_FROM").failure shouldNotBe null
+    }
 }
+
+/** `approved` 의 `to`(2026-09-22)에서 정확히 120일 — A-1 의 16주를 덮는 상한의 경계다. */
+private const val SPAN_120_DAYS_FROM = "2026-05-25"
+
+/** 같은 `to` 에서 121일 — 경계 바로 밖이다. */
+private const val SPAN_121_DAYS_FROM = "2026-05-24"
 
 /**
  * M6/6G D-6G-2 — 추출 배선도 같은 성질이다: `mode=once` 일 때만 올라오고, 출력 경로·기간·표본 목록
@@ -293,5 +314,25 @@ class SnapshotExtractionWiringTest {
             )
 
         failure shouldNotBe null
+    }
+
+    /**
+     * **D-6G2e-1 착수 실측 — 추출 갈래는 범위 상한을 재지 않는다.** 이 배선은 `resolveCollectionRange`
+     * 를 부르지 않고 관측 창을 그대로 쓴다(KONEPS 를 부르지 않으므로 상한이 막을 호출이 없다). 그래서
+     * 개찰 갈래의 정책을 바꾸는 일이 이 갈래에 닿지 않는다 — 그 사실을 거동으로 적어 둔다: 두 갈래의
+     * 상한 어느 쪽보다도 긴 창이 여기서는 뜬다.
+     */
+    @Test
+    fun `추출 갈래는 관측 창의 길이를 재지 않는다 — 수집 범위 상한 밖이다`() {
+        val (context, failure) =
+            boot(
+                *approved
+                    .filterNot { it.startsWith("bidvector.snapshot-extract.from=") }
+                    .toTypedArray(),
+                "bidvector.snapshot-extract.from=2025-01-01",
+            )
+
+        failure shouldBe null
+        context.use { it.getBean(SnapshotExtractionRunner::class.java) shouldNotBe null }
     }
 }

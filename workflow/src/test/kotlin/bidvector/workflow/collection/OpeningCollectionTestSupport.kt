@@ -256,6 +256,18 @@ internal class OpeningFixture(
         to = listOfNotNull(to, day).max()
     }
 
+    /**
+     * 창을 **쪼갠 조각으로** 바꾼다(D-6G2e-2) — [listRows] 는 창을 넓히기만 하므로(min·max) 긴 기간을
+     * 조각내 같은 실행 상태로 이어 돌리려는 기동은 이 자리로만 재현된다.
+     */
+    fun window(
+        from: String,
+        to: String,
+    ) {
+        this.from = LocalDate.parse(from)
+        this.to = LocalDate.parse(to)
+    }
+
     /** 그 슬롯이 이번엔 아무것도 내지 않는다 — 목록 축 실패를 표본틀에 재현한다. */
     fun dropListRows(
         division: BusinessDivision,

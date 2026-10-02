@@ -6,6 +6,7 @@ import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.workflow.collection.CollectionRangeViolation
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
@@ -13,6 +14,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.postgresql.ds.PGSimpleDataSource
@@ -180,6 +182,20 @@ class CollectionWiringTest {
     @Test
     fun `상한 정확히(31일)는 뜬다 — 경계`() {
         withBoot(*validProperties(from = "2026-08-24")) { it.failure shouldBe null }
+    }
+
+    /**
+     * **D-6G2e-1 — 상한의 뜻은 갈래마다 다르고, 이 갈래의 값은 31일 그대로다.** 개찰 갈래는 A-1 의
+     * 16주 창을 받아야 해서 상한이 더 길지만, 이 갈래의 호출 수는 **창 길이에 비례한다**(조회일마다
+     * 쪽을 걷는다). 두 갈래가 정책 인스턴스를 공유하면 개찰 쪽을 넓히는 한 줄이 이 갈래의 호출 폭주
+     * 방지(6F-8 D-6F8-3)를 조용히 함께 연다 — 그 한 줄을 이 단언이 막는다.
+     */
+    @Test
+    fun `개찰 갈래의 긴 창은 이 갈래에서 거부된다 — 범위 정책을 공유하지 않는다`() {
+        withBoot(*validProperties(from = "2026-05-27")) { booted ->
+            booted.failure shouldNotBe null
+            failureText(booted.failure) shouldContain CollectionRangeViolation.SPAN_TOO_LONG.name
+        }
     }
 
     @Test

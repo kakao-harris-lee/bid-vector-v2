@@ -53,6 +53,26 @@ _INDEXED_LIST_PREFIXES: Final[tuple[str, ...]] = (
     "amount_band_edges",
     "segment_axes",
 )
+
+_APPROVED_SEED_KEYS: Final[tuple[str, ...]] = (
+    "stability_seeds.0",
+    "stability_seeds.1",
+    "stability_seeds.2",
+    "stability_seeds.3",
+    "stability_seeds.4",
+)
+"""승인 A-3 의 seed 키 전수 — **개수를 스키마가 진다**(D-6G2e-6b).
+
+판독기(`collect_indexed_list`)는 인덱스가 0 부터 연속일 것만 보고 개수를 모른다. 거기에
+길이를 넣을 수도 없다 — 같은 판독기가 길이 다른 목록 셋(seed 다섯 · 금액 밴드 넷 · 세그먼트
+축 둘)을 읽는다. 수를 리터럴로 적는 길도 막혀 있다: `5` 는 출하 임계(`max_origins`)라
+`evaluation/**` 소스에 적으면 숫자 리터럴 게이트가 거부한다. 그래서 **키를 열거하고 그
+길이를 센다** — 열거가 스키마 선언이고 수는 그 결과다.
+
+`_KNOWN_KEYS` 의 seed 칸은 여전히 `_MAX_INDEXED_LIST_LENGTH` 로 만든다(여기서 만들지
+않는다): 그러면 색인 여섯째가 **미지 키**(`MALFORMED`)가 아니라 개수 위반
+(`INVALID_VALUE`)으로 떨어져 두 로더의 거부 사유가 같아지고, 그 상수가 살아 있어야
+숫자 리터럴 게이트의 역방향 등재 검사(허용 목록에 죽은 항목 금지)가 성립한다."""
 _KNOWN_KEYS: Final[frozenset[str]] = _SCALAR_KEYS | frozenset(
     f"{prefix}.{index}"
     for prefix in _INDEXED_LIST_PREFIXES
@@ -335,6 +355,12 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     if parsed is None:
         return PolicyRejected(
             PolicyRejectionReason.INVALID_VALUE, f"malformed values: {raw.values!r}"
+        )
+    if len(parsed.stability_seeds) != len(_APPROVED_SEED_KEYS):
+        return PolicyRejected(
+            PolicyRejectionReason.INVALID_VALUE,
+            f"stability_seeds 는 {len(_APPROVED_SEED_KEYS)} 개여야 합니다: "
+            f"{len(parsed.stability_seeds)}",
         )
 
     try:

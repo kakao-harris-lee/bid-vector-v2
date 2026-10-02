@@ -10,10 +10,10 @@
 | 6G 머지 + 6G-2d 머지 | ✓ PR #50 · #51 | 6G D-6G-77 |
 | A-3 재호출 상한 | ✓ N=3 확정(단위 = 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드 `INTERRUPTED` 하나, 관문 거부 미계수 · 창 = 디렉터리 생애) | 운영자 2026-10-01 |
 | `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(5,000 초과 참가 축은 확정 제외, 계수 공시) | 운영자 2026-10-01 |
-| `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ☐ 6G-2c 머지 대기(찢어진 조각만 남은 꼬리 라운드 · `incompleteAValues` 의 기초금액 축 의존 · 복구 쓰기 순서·잠금 가드) | 6G-2d D-6G2d-53 |
-| 운영계정 서비스 키 | ☐ 환경에 없음 — 운영자가 **저장소 밖 파일**로 제공 | 6G 운영자 결정 2026-09-27 |
-| **수집 범위 상한 31일**(`COLLECTION_RANGE_POLICY.maxSpanDays`, 6F-8 D-6F8-3)이 **개찰 갈래에도** 걸린다 — A-1 의 최대 16주 창은 기동 거부(`SPAN_TOO_LONG`)되고, 확정 표본이 from/to 를 고정해(`sample-scope.json`) 창을 쪼개 같은 디렉터리로 돌릴 수도 없다 | ☐ **차단** — 개찰 갈래의 범위 정책을 따로 두는 slice(`OPEN-6G-OPENING-RANGE-CAP`) 머지 대기 | PR #52 `/code-review` 2026-10-01 |
-| 백테스트 CLI | ☐ 없음 — 스크립트 호출(2-4) 또는 `OPEN-6G-BACKTEST-CLI` | PR #52 |
+| `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ✓ 6G-2e 가 셋을 닫는다(2026-10-02) — 찢어진 조각만 남은 꼬리 라운드는 의도 줄로 되살아나 재호출 상한에 하나로 셈(D-6G2e-3) · `incompleteAValues` 는 A 축 행 자체가 가름(D-6G2e-4) · 자리 대조가 복구보다 앞서고 기동 첫 걸음 전부가 잠금 가드 안(D-6G2e-5). **이 slice 가 머지된 뒤** 참이다 | 6G-2d D-6G2d-53 · 6G-2e |
+| 운영계정 서비스 키 | ✓ **개발에서 쓰는 키와 같다**(사용자 2026-10-02) — legacy `../bid-vector/.env` 의 **원문형** 변수 `KONEPS_OPENAPI_SERVICE_KEY`(인코딩형 `KONEPS_OPENAPI_ENCODED_SERVICE_KEY` 는 쓰지 않는다, 6F-8 실측: 이중 인코딩 → `resultCode 30`). 값은 어디에도 적지 않는다 | 사용자 2026-10-02 · 6F-8 checklist 6항 |
+| 개찰 갈래의 수집 범위 상한이 A-1 의 최대 16주 창을 받는가 | ✓ 6G-2e 가 갈래별 정책으로 나눴다(2026-10-02) — 개찰 갈래 **120일**(`OPENING_COLLECTION_RANGE_POLICY`, A-1 승인), 공고 목록 갈래는 31일 그대로(6F-8 D-6F8-3). 창을 쪼개 돌리는 길은 여전히 없다(확정 표본이 from/to 를 고정한다 — D-6G2e-2). **이 slice 가 머지된 뒤** 참이다 | PR #52 `/code-review` 2026-10-01 · 6G-2e D-6G2e-1 |
+| 백테스트 CLI | ✓ 있음 — `python -m ml_engine.app.backtest_cli`(2-4). `OPEN-6G-BACKTEST-CLI` 닫힘 | 6G-2e D-6G2e-6 |
 | DEC-03 지자체 판별 | ✓ 현행 유지(판정 불가 계수 + 민감도 두 판) | 운영자 2026-09-30 |
 
 ## 1. 호스트·DB 준비 (키 없이 할 수 있는 것)
@@ -24,7 +24,7 @@
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
    - 스냅숏: `~/.local/bid-vector-snapshots/`
 4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다).
-5. **키 파일**: 운영자가 저장소 밖(예: `~/.config/bid-vector/koneps.env`, 모드 600)에 `KONEPS_SERVICE_KEY_RAW=<원문형 키>` 한 줄로 둔다. **원문형**이어야 한다 — `ServiceKey` 가 스스로 URL 인코딩한다(인코딩형을 넣으면 이중 인코딩으로 `resultCode 30` + 쿼터만 소모, 6F-8 실측). 값은 명령 문자열·argv·history·transcript 어디에도 나타나지 않게 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다. 형태 확인은 `grep -c` 같은 계수만.
+5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
 ## 2. 실행 — 세 갈래, 순서 고정
 
@@ -40,8 +40,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
 
 ### 2-1. 공고 목록 갈래 (표본틀) — 1회
 ```
-( set -a; . ~/.config/bid-vector/koneps.env; set +a; \
-  BIDVECTOR_KONEPS_SERVICEKEY="$KONEPS_SERVICE_KEY_RAW" \
+( BIDVECTOR_KONEPS_SERVICEKEY="$(sed -n 's/^KONEPS_OPENAPI_SERVICE_KEY=//p' ../bid-vector/.env | tr -d '\r"')" \
   SPRING_MAIN_WEB_APPLICATION_TYPE=none \
   java -jar app/build/libs/app.jar \
     --bidvector.collection.mode=once \
@@ -68,7 +67,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.opening-collection.release-sha=<jar SHA> \
     <공통 인자> )
 ```
-- **지금 코드로는 from/to 가 31일을 넘으면 기동 거부**된다(0 절 차단 항목). 개찰 갈래는 확정 표본이 from/to·업무를 고정하므로 창을 쪼개 돌리면 「표본틀 범위가 지금 설정과 다르다」로 거부된다 — `OPEN-6G-OPENING-RANGE-CAP` 머지 뒤에만 A-1 기간으로 돌린다.
+- **이 갈래의 from/to 는 120일까지**다(D-6G2e-1, A-1 승인 2026-10-02 — 개찰 갈래 전용 정책이고 공고 목록 갈래의 31일과 다른 값이다). 넘으면 기동 거부(`SPAN_TOO_LONG`)이고, 그 상한은 설정 실수를 실 호출 전에 잡는 자리다. **창을 쪼개 돌리지 않는다** — 확정 표본이 from/to·업무를 고정하므로 조각난 창은 「표본틀 범위가 지금 설정과 다르다」로 거부된다(D-6G2e-2). A-1 기간을 **한 창으로** 준다.
 - 첫 실행이 표본을 **뽑고 확정**한다(`sample-list.tsv` · `sample-scope.json`, 장부 해시). 이후 실행은 같은 seed 라도 다시 뽑지 않는다 — 확정된 목록이 정본.
 - 하루 상한(20,000)에 닿으면 exit 2 로 멈춘다. **KST 자정**이 지나면 다시 돌린다(일 상한은 KST 날짜 단위). 총 80,000 → 최소 4일.
 - 쿼터 응답(`resultCode 22` · HTTP 429)은 실행 전체를 멈춘다(exit 2). 다음 날 재실행.
@@ -90,23 +89,28 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
 
 ### 2-4. 백테스트 — Python, 저장소 밖 입력·출력
 
-`ml_engine.app.backtest_job` 에는 **CLI 가 없다**(`run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path) -> JobCompleted | JobFailed`, 예외 없이 결과 타입). `__main__` 추가는 `src` 변경이라 `OPEN-6G-BACKTEST-CLI`(6G-2c 후보)로 두고, 그때까지는 아래 한 줄 스크립트로 부른다 — 정책 둘(판정 정책 `strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`, 둘 다 출하 파일 그대로, CLI 로 완화 불가):
+`ml_engine.app.backtest_cli` 가 진입점이다(6G-2e D-6G2e-6 — 앞 판의 heredoc 스크립트를
+대신한다; `run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path)
+-> JobCompleted | JobFailed`, 예외 없이 결과 타입). 정책 둘(판정 정책
+`strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`)은 **출하 파일 그대로**이고
+CLI 로 완화할 수 없다 — 임계를 받는 인자가 없다.
 ```
-cd ml-engine && SNAP=$HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> OUT=$HOME/.local/bid-vector-verdicts/m6-6g-<YYYYMMDD> uv run python - <<'PY'
-import os, sys
-from pathlib import Path
-from ml_engine.app.backtest_job import run_backtest_job, JobFailed
-snap = os.environ["SNAP"]  # 판독기는 file:// URI 만 받는다(절대 경로, host 없음)
-r = run_backtest_job(snapshot_uri=f"file://{snap}",
-                     backtest_policy_path=Path("policy/strategy-backtest-v1.yaml"),
-                     inference_policy_path=Path("policy/inference-v1.yaml"))
-if isinstance(r, JobFailed):
-    print("FAILED", r.reason, r.detail); sys.exit(1)
-out = Path(os.environ["OUT"]); out.mkdir(parents=True, exist_ok=True); out = out / "verdict.json"; out.write_bytes(r.verdict_bytes)
-print("verdict", out, "sha256", r.checksum, "bytes", len(r.verdict_bytes))
-PY
+cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
+    --snapshot-uri $HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> \
+    --backtest-policy policy/strategy-backtest-v1.yaml \
+    --inference-policy policy/inference-v1.yaml \
+    --output-dir $HOME/.local/bid-vector-verdicts/m6-6g-<YYYYMMDD>
 ```
-- 판정 JSON(세 판 — 주·민감도 a·b 를 하나의 canonical 바이트열로)은 **스냅숏 디렉터리 밖**(`~/.local/bid-vector-verdicts/<snapshot-id>/`, 입력은 불변 — 그 sha256 이 evidence 의 닻이다)에 두고 sha256 을 evidence 에 적는다. 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만 — 제외 사유 계수 · 세 판의 부호 · 필요 표본 수 · `MAX_PAGES` 확정 수 · 코드 SHA · 스냅숏 id·sha256 · 정책 version·checksum).
+- `--snapshot-uri` 는 `file://` URI 또는 **맨 경로**다 — 맨 경로는 절대 `file://` URI 로
+  바뀌고 그 변환이 출력에 남는다(상대 경로는 부른 자리의 cwd 로 풀리므로, 어느 디렉터리를
+  읽었는지 출력에 남아야 판정과 스냅숏을 사후에 맞출 수 있다). `file://` 이 아닌 scheme 은
+  CLI 가 거부하고, `file://<host>/…` 는 판독기가 거부한다.
+- `--output-dir` 은 **스냅숏 디렉터리 밖**이어야 한다(안이면 거부 — 스냅숏은 불변 입력이고
+  그 sha256 이 evidence 의 닻이다). 없으면 만든다. 산출은 그 디렉터리의 `verdict.json`
+  하나이고 마지막 줄이 `verdict <경로> sha256 <hex> bytes <수>` 다 — 그 sha256·바이트 수를
+  evidence 에 적는다.
+- 종료 코드: `0` 성공 · `1` 실패(사유 문면이 stderr 로 나온다 — 판정은 쓰이지 않는다).
+- `verdict.json` 한 파일이 **세 판**(주·민감도 a·b)을 하나의 canonical 바이트열로 담는다. 요약 한 장은 `reports/evidence/m6/6g/verdict.md`(공고 식별자 없이 집계만 — 제외 사유 계수 · 세 판의 부호 · 필요 표본 수 · `MAX_PAGES` 확정 수 · 코드 SHA · 스냅숏 id·sha256 · 정책 version·checksum).
 - `JobFailed` 사유: `SNAPSHOT_UNREADABLE`(먼저 URI 가 `file://` 절대 경로인지, 디렉터리에 세 파일이 있는지 본다) · `SNAPSHOT_REJECTED`(판독 거부 — 추출 쪽 결함, 6G-2d 가 닫은 부류) · `*_POLICY_REJECTED` · `PRIMARY_HYPOTHESIS_COUNT_MISMATCH`. 설정 오류가 아니면 고치지 말고 보고.
 
 ## 3. 일일 보고 (수집 시작 때 일정을 세운다 — 사용자 지시 2026-09-30)
@@ -129,8 +133,6 @@ PY
 - `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
-- 백테스트 job 에 CLI 가 없다 — 위 스크립트로 부른다(`OPEN-6G-BACKTEST-CLI`).
-- **수집 범위 상한 31일이 개찰 갈래에도 걸린다**(`OPEN-6G-OPENING-RANGE-CAP`) — 닫히기 전에는 A-1 기간 실수집 불가.
 
 ## 6. 검증 기록
 

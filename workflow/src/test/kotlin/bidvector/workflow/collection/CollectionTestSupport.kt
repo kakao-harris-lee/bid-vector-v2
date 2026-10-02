@@ -178,3 +178,7 @@ internal fun rangeOf(
 
 internal val COLLECTION_RANGE_POLICY_DATA: CollectionRangePolicyData =
     (COLLECTION_RANGE_POLICY.resolve(LocalDate.of(2026, 9, 24)) as Resolution.Resolved).value
+
+/** 개찰 갈래의 범위 정책 값(D-6G2e-1) — 공고 목록 갈래와 **다른 인스턴스**다. */
+internal val OPENING_COLLECTION_RANGE_POLICY_DATA: CollectionRangePolicyData =
+    (OPENING_COLLECTION_RANGE_POLICY.resolve(LocalDate.of(2026, 9, 24)) as Resolution.Resolved).value

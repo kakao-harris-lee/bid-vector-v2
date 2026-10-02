@@ -64,11 +64,22 @@ class CollectionSources(
     KonepsEndpointProperties::class,
 )
 open class CollectionWiring {
+    /**
+     * 이 갈래의 상한은 31일 그대로다(6F-8 D-6F8-3) — 호출 수가 창 길이에 비례한다. 개찰 갈래의 긴
+     * 창을 쓰는 정책을 여기 꽂으면 그 한 줄이 호출 폭주 방지를 함께 연다(D-6G2e-1).
+     */
     @Bean
     open fun collectionRange(
         properties: CollectionProperties,
         clock: Clock,
-    ): CollectionRange = resolveCollectionRange(properties.from, properties.to, clock, "수집 범위")
+    ): CollectionRange =
+        resolveCollectionRange(
+            properties.from,
+            properties.to,
+            clock,
+            "수집 범위",
+            COLLECTION_RANGE_POLICY,
+        )
 
     @Bean
     open fun collectionSources(
