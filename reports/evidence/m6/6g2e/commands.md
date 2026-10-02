@@ -139,13 +139,19 @@ Python 절 내용을 기술하지 않으므로, Python 절의 저작 이력은 �
 `git log -- <이 파일>` 의 Python 커밋(`4e8cfc76` · `7463ad35`)에서 읽는다. r2 의 Python 절 수치는
 전부 이 레인이 실측해 쓴 것이고, 그것을 실은 커밋이 다른 레인의 것이라는 사실만 여기 남긴다.
 
-## Kotlin 레인 (2026-10-02, D-6G2e-1~5 · 7 · 8 · 15 · 17 · 18 Kotlin 몫)
+## Kotlin 레인 (2026-10-02, D-6G2e-1~5 · 7 · 8 · 15 · 17 · 18 · 23 ③~⑥ Kotlin 몫)
 
-산출물 커밋 열하나(마지막 `5fddfd1a`) — 갈래별 범위 정책 · 쪼갠 창 거부 못 박기 · 조각 꼬리 라운드 ·
-A 결손 계수(정본은 기초금액 축 술어) · 복구 순서와 잠금 가드 · 읽기 전용 대조를 모두 복구 앞으로 ·
-runbook 0 절·2-2·5 절 · test 파일 둘을 각자의 물음으로. base `c63d0d3a`.
+산출물 커밋 열셋(마지막 `c1f8b02f`) — 갈래별 범위 정책 · 쪼갠 창 거부 못 박기 · 조각 꼬리 라운드 ·
+A 결손 계수(정본은 기초금액 축 술어, 입력 존재는 원문 칸으로) · 복구 순서와 잠금 가드 · 읽기 전용
+대조를 모두 복구 앞으로 · 조각의 뜻을 하나로 · 죽은 코드 제거 · runbook 0 절·2-2·5 절 ·
+test 파일 둘을 각자의 물음으로. base `c63d0d3a`.
 
-### acceptance — CI `check` job 명령 그대로, 마지막 산출물 커밋 `5fddfd1a` 에서
+### acceptance — CI `check` job 명령 그대로
+
+마지막 산출물 커밋은 `c1f8b02f` 이고 **돌린 자리는 `01c451f5`**(그 뒤의 evidence 커밋 둘을 담은
+HEAD)다. 공유 워킹트리라 옛 커밋을 checkout 하지 않는다 — 다른 레인의 트리를 흔든다. 두 자리가 같은
+Kotlin 트리임을 등식으로 확인했다: `git diff --name-only c1f8b02f..01c451f5 -- <① 의 일곱 경로 +
+config/quality/gate-tests.properties + docs/runbook/m6-6g-real-collection.md>` → **빈 출력**.
 
 | 명령 | exit |
 |---|---|
@@ -154,11 +160,11 @@ runbook 0 절·2-2·5 절 · test 파일 둘을 각자의 물음으로. base `c6
 | `./gradlew --no-daemon qualityBaseline` | 0 |
 | `./tools/one-command-check.sh` | 0 (Kotlin 전건 + Python 전건) |
 
-test 수(`*/build/test-results/test/TEST-*.xml` 합): **2,592** · 실패 0 · 오류 0 · 건너뜀 4.
-모듈별: adapters 838 · app 451 · build-logic 251 · decision 184 · procurement 263 ·
+test 수(`*/build/test-results/test/TEST-*.xml` 합): **2,593** · 실패 0 · 오류 0 · 건너뜀 4.
+모듈별: adapters 839 · app 451 · build-logic 251 · decision 184 · procurement 263 ·
 qualification 31 · shared-kernel 89 · strategy 84 · workflow 401.
 
-### 계약 문면 ↔ 기호
+### 계약 문면 ↔ 기호 (r3 일괄 둘 포함)
 
 | 계약 문면 | 기호 | 잠그는 test |
 |---|---|---|
@@ -174,6 +180,9 @@ qualification 31 · shared-kernel 89 · strategy 84 · workflow 401.
 | D-15 「기초금액 술어가 정본 · 부재·미지일 때만 A 행 입력 · 품질관리비는 술어 무관 입력」 | `aValueTotalOf(row, appliesByBaseAmount)` 의 `?:` · `RawRow.carriesAValueInput` | `A 결손 계수는 기초금액 축 술어가 정본이고 그 축이 없을 때만 A 행이 가른다`(판 일곱) |
 | D-5 「`verifyIntegrity` 를 `healTornTail` 앞으로」 | `verifyPlacement`(자리 대조) → 되돌림 → `healTornTail` | `복사된 디렉터리는 찢어진 끝 줄을 고치지 않고 거부한다 — 원장 바이트 불변` |
 | D-17 「읽기 전용 대조를 모두 복구 앞으로 · 찢어진 끝 줄은 접두 대조에서 제외하고 센다」 | `verifyThenHeal` 의 넷 · `requireLedgerPrefix`(읽기 전용) · `resyncLedgerIfAhead`(복구 뒤 하나) | `원장 앞부분이 장부와 다르면 … 바이트 동일` · `표본 목록이 바뀌면 … 바이트 동일` · 기존 크래시 test 넷(답 불변) |
+| D-23 ③ 「접두 대조의 「마지막 줄」을 한 뜻으로」 | `requireLedgerPrefix` 의 조각 = 마지막 개행 뒤 바이트 | `공백만 남은 찢어진 꼬리는 접두 대조를 깨지 않는다` |
+| D-23 ④ 「A 입력 존재를 원문 칸으로」 | `carriesAValueInput` → `textOf` · `A_VALUE_INPUT_CONCEPTS` | 판 표의 여덟째 「기초 축 부재 + A 행 해석 불가」 |
+| D-23 ⑤ 「죽은 코드 제거 · 재동기의 중복 읽기 제거」 | `linesOf`·`lineCountOf` 삭제 · `resyncLedgerIfAhead` 가 `ledger.lines` | 거동 무변경 — 기존 재동기 test(`장부보다 한 줄 앞선 원장은 거부가 아니라 재동기다`) |
 | D-5 「`LedgerDigest` 읽기를 잠금 가드 안으로」 | `ledger` 초기화식 전체가 `heldOrRelease` 안 | `원장이 UTF-8 이 아니면 던지고 잠금을 놓는다 — 다음 기동이 Busy 가 아니다` |
 | D-7 「형식 version 2 유지 · 스키마 칸·golden 무변경」 | `RUN_STATE_FORMAT_VERSION` 무변경 | `git diff c63d0d3a..HEAD` 에 정책 YAML·스키마·golden 0 |
 
@@ -259,7 +268,7 @@ test 하네스에 `SnapshotAssemblyFixture`(`abstract class`, test 소스 전용
    판 일곱이 그 경계를 든다. 계수는 공시이지 판정 입력이 아니다(`a_value` 값은 어느 판에서도 같다).
 5. **착수 실측의 test 수(2,588)와 이 slice 의 측정이 맞지 않는다** — base `c63d0d3a` 의
    Kotlin 소스로 되돌린 트리에서 **2,580** 이 나왔다(되돌림 ⑤ 실측, 같은 집계 방법 — r1·r2 두
-   라운드에서 같은 수). 이 slice 가 더한 test 는 12 이고 2,580 + 12 = 2,592 로 맞는다. 착수 표의
+   라운드에서 같은 수 — r3 까지 셋). 이 slice 가 더한 test 는 13 이고 2,580 + 13 = 2,593 으로 맞는다. 착수 표의
    2,588 은 다른 방법으로 센 값이거나 낡은 값이다 — 계약 표의 숫자를 고치지 않고 사실만 적는다.
 
 ### 이탈

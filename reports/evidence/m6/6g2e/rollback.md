@@ -133,8 +133,11 @@ git diff --name-only a67a9162..<판정 SHA> -- <위 목록의 경로들>
 
 ## Kotlin 축 (D-6G2e-1~5 · 7 · 8 · 15 · 17 · 18 · 23 ③~⑥ Kotlin 몫)
 
-**실측 HEAD: `5fddfd1a`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴 clone**
-(`git clone` → `git checkout 5fddfd1a`)에서 실제로 돌린 결과다.
+**실측 HEAD: `01c451f5`** · base `c63d0d3a`. 아래 ①~⑥ 은 전부 그 HEAD 의 **버릴 clone**
+(`git clone` → `git checkout 01c451f5`)에서 실제로 돌린 결과다. 마지막 산출물 커밋은 `c1f8b02f` 이고
+그 뒤로 이 축이 되돌리는 경로는 움직이지 않았다 — 등식으로 확인했다(`git diff --name-only
+c1f8b02f..01c451f5 -- <① 의 경로 + 공유 파일 둘>` 빈 출력). 그래서 뒤의 evidence 커밋 둘이 이 측정을
+낡게 하지 않는다.
 
 ### ① 전용 경로 restore
 
@@ -162,7 +165,8 @@ git diff --name-only c63d0d3a..HEAD -- <위 일곱 경로> | sort            # �
 comm -23 <앞>.txt <뒤>.txt                                              # 전체 ∖ 목록
 ```
 
-실측(r2): **19 == 19**, `comm -23` **빈 출력**. 라운드마다 다시 낸다(손으로 쓰지 않는다).
+실측(r3): **19 == 19**, `comm -23` **빈 출력** — r2 와 같은 수다(r3 의 세 커밋은 이미 목록에 있는
+파일만 고쳤다). 라운드마다 다시 낸다(손으로 쓰지 않는다).
 
 ### ② 공유 파일 — Kotlin 몫 hunk 만
 
@@ -196,7 +200,7 @@ Python 몫 hunk 를 **먼저** 역적용하면 `patch does not apply` 로 선다
   문단은 남는다(`6G-2d` 5 · `6G-2a` 5 언급). 역적용 뒤 남은 `6G-2e` 언급 둘은 **base 에 이미
   있던 줄**이다(base 에서도 2 — 로드맵의 다음 slice 표기).
 
-### ①~⑥ 실측 (버릴 clone, 실측 HEAD `5fddfd1a`)
+### ①~⑥ 실측 (버릴 clone, 실측 HEAD `01c451f5`)
 
 | # | 항목 | 결과 |
 |---|---|---|
@@ -207,7 +211,7 @@ Python 몫 hunk 를 **먼저** 역적용하면 `patch does not apply` 로 선다
 | ⑤ | `./gradlew --no-daemon check --no-build-cache` 의 test 축 | exit 0 · **2,580** test · 실패 0 · 건너뜀 4 |
 | ⑥ | 같은 `check` 의 게이트 축(ktlint · detekt · sizeGate · domainDependencyGate · architecture · contractGate · gateExecutionGate) | **초록** — 보완 경로 불필요 |
 
-⑤ 의 2,580 은 이 slice 가 더한 test 12 를 뺀 수다(HEAD 2,592)이고 r1 실측과 같은 수다. 갈음은
+⑤ 의 2,580 은 이 slice 가 더한 test 13 을 뺀 수다(HEAD 2,593)이고 r1·r2 실측과 같은 수다. 갈음은
 「HEAD 초록」이 아니라 ③ 의 **트리 동일성**으로 한다.
 
 ### 되돌리지 않는 것
