@@ -90,6 +90,7 @@
 | **D-6G2c-30** | **acceptance 확정**: Kotlin `check` job · `ml-engine` job · container job(production 코드 변경: `RunStateDirectory` · `JdbcSnapshotSource` · `SnapshotExtractionRunner` · 수집 배선 KDoc). 구현 항목마다 변이 하나(D-14), 게이트 술어를 바꾸는 둘(D-19 누출 자물쇠 · D-23 import 계약)은 verifier 표적. **(2b) 표**는 K·P 보고에 「새 public 표면」 항목으로 | D-14 · CLAUDE.md 「게이트 술어 변경은 severity 무관 표적 재검증」 |
 | **D-6G2c-31** | **(P 레인 보고, 계약 갱신 r1) `snapshot-schema.md` §2 의 「판정문의 업무 대표 어휘」 문장 하나는 팀장이 고친다.** 그 문장은 **판정 JSON 어휘의 정본**이고 test(`test_division_coverage_vocabulary_matches_the_schema_document`)가 그것과 enum 의 집합 등식을 단언하므로, D-17 을 하려면 문장이 먼저 바뀌어야 한다. D-18 기준으로 판정 JSON 어휘는 형식에 닿지 않는다 — 문장이 스냅숏 스키마 문서 안에 산다는 사실이 그 어휘를 스키마로 만들지 않는다(스냅숏 manifest·rows 의 칸·판독기 술어 무변경). D-29 의 「이 PR 에서 편집하지 않는다」는 **그 문장 하나만 예외**(팀장 커밋, 다른 절 무편집). **필요 표본 수의 출처 확정**: `verdict.min_window_rows`(창당 표본 하한, 정책 주석 「창당 n ≥ 483」) — 업무 행 수 ≥ 그 값 `COVERED` · 1 이상 미만 `UNDERPOWERED` · 0 `ABSENT`. rollback 공유 파일 목록에 `snapshot-schema.md` 를 되돌린다(hunk 격리) | P 레인 보고 2026-10-04 · D-17·18·29 |
 | **D-6G2c-32** | **(P 레인 보고, 계약 갱신 r2) in_scope 누락 정정**: D-22 의 「판독기」는 `ml-engine/src/ml_engine/adapters/snapshot_files.py`(`read_snapshot_files` — `file:` URI → `Path` 변환이 그 한 자리)다. D-29 가 그 자리를 넓힌다고 적고 `adapters/**` 를 빠뜨렸다 → 그 파일 하나를 in_scope 에 더한다(`adapters/**` 전체는 아님). 변경은 `unquote` 한 줄(`urllib.parse` 만 — D-6G2e-23 ① 준수), 판독 술어는 느슨해지지도 엄격해지지도 않는다(없는 경로는 여전히 `NOT_FOUND`). 판독 책임을 `backtest_cli` 로 올리는 대안은 계층을 깨므로 택하지 않는다 | P 레인 보고 2026-10-04 · D-22·29 |
+| **D-6G2c-33** | **(K 레인 보고, 계약 갱신 r3) in_scope 에 `workflow/build.gradle.kts` 의 test task 입력 선언 한 블록을 더한다.** D-19 (b) 「구분자 등식을 문서 ↔ 코드로」는 test 가 `snapshot-schema.md` 를 런타임에 읽는 것만으로는 서지 않는다 — 실측: 문서의 용도 토큰을 바꾸고 `:workflow:test` 를 돌리면 Gradle 이 그 문서를 입력으로 모르므로 **UP-TO-DATE 로 건너뛰어 6초 초록**. 루트 `gradle.properties` 의 `org.gradle.caching=true` + CI 의 `setup-gradle` 캐시 복원이라 CI 에서도 문서만 고친 PR 이 캐시된 초록을 받는다(「안 돌린 게이트는 아무것도 막지 못한다」). 조치는 같은 파일의 기존 관례(`WorkflowGateRegistrationTest` 가 `gate-tests.properties` 를 입력으로 선언한 블록) 옆에 스냅숏 스키마 문서를 같은 형태로 한 줄 — 산출물 코드 무변경. **일반 규율로 올린다**: 문서를 읽어 등식을 재는 Kotlin test 는 그 문서를 test task 입력으로 선언해야 하고, 변이는 **문서만 바꾼 뒤** 재실행이 일어나는지(UP-TO-DATE 가 아닌지)까지 재야 한다. Python 쪽(D-12 · D-17 · D-23 의 문서 읽기 test)은 pytest 가 캐시를 쓰지 않아 이 문제가 없다 | K 레인 보고 2026-10-04 · CLAUDE.md CI 절 |
 
 ### 이 PR 의 항목 요약 (레인별)
 
@@ -135,7 +136,7 @@
 - `adapters/src/main/kotlin/bidvector/adapters/snapshot/**` · `adapters/src/test/kotlin/bidvector/adapters/snapshot/**`
 - `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/**`(KDoc · 사유 어휘)
 - `app/src/test/kotlin/bidvector/app/collection/**` · `app/src/test/kotlin/bidvector/app/wiring/**`
-- `workflow/src/main/kotlin/bidvector/workflow/collection/**`(사유 어휘가 여기 있을 때) · 대응 test
+- `workflow/src/main/kotlin/bidvector/workflow/collection/**`(사유 어휘가 여기 있을 때) · 대응 test · `workflow/build.gradle.kts`(**test task 입력 선언 블록만** — D-6G2c-33)
 - `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/src/ml_engine/adapters/snapshot_files.py`(D-22 의 판독기 — D-6G2c-32) · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
 - `config/quality/gate-tests.properties`(등재 추가만 — D-21 ⑧) · `app/src/test/kotlin/bidvector/app/architecture/**` 는 **out_scope**(등재 파일만 열림)
 - `reports/evidence/m6/6g2c/**` · `milestone-6.md`(착수·종결 문단만)
