@@ -724,6 +724,10 @@ verifier·Codex 승인은 다음을 자동 허용하지 않는다.
 - 기존 `bid-vector` 중지·삭제
 - 원격 merge/push
 
+**다음 마일스톤**: `milestone-7.md`(사용자 웹 화면·도메인·운영 반입·공공데이터 운영계정, 2026-10-03 초안). M7 착수는 위
+완료 조건이 성립한 뒤다 — 단, 6G 의 실 KONEPS 수집(1,000/operation/일 한도, 운영자 결정 2026-10-03)은 「수집 중」인 채
+M7 과 병행하며, 운영계정 신청은 M7 7G 에서 한다.
+
 **6F-5 분할·6F-5-a 착수 2026-09-19** — base `ede5d5b`, 레인 worktree `bid-vector-v2-m6f5`·브랜치
 `m6-6f5/2026-09-19`. 정본 `reports/evidence/m6/6f5a/scope.md`(D-6F5-1~8). 착수 조사가 **구조적 제약 셋**을
 냈고 그것이 분할 근거다: ① **`WatchGatedExtractor` 는 `WatchVerdict.Passed` 를 요구하는데
