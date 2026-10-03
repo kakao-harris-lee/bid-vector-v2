@@ -89,7 +89,12 @@ class TransportSurfaceGateCatchesViolationsTest {
     }
 
     private fun List<ArchRule>.details(classes: JavaClasses): List<String> =
-        flatMap { it.allowEmptyShould(true).evaluate(classes).failureReport.details }
+        flatMap {
+            it
+                .allowEmptyShould(true)
+                .evaluate(classes)
+                .failureReport.details
+        }
 
     /**
      * D-6G2b-2 양성 대조 — 호출 대상의 소유 타입만 보는 수집은 `uri.toURL().readText()` 의 `java.net.URL`

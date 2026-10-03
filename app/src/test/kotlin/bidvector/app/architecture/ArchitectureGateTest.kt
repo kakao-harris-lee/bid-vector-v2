@@ -159,5 +159,4 @@ class ArchitectureGateTest {
         /** ArchUnit 1.5.0 `AllowEmptyShould` 의 설정 키 — 이름이 틀리면 핀이 조용히 죽는다. */
         const val FAIL_ON_EMPTY_SHOULD = "archRule.failOnEmptyShould"
     }
-
 }
