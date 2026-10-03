@@ -256,6 +256,15 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`. 공
 (착수 뒤 리뷰 요청 시점마다 등재)
 
 - **팀장(2026-10-03, 착수)**: `milestone-6.md` 착수 문단(공유 파일 — rollback 은 hunk 역적용). 계약 파일 이 커밋.
+- **팀장(2026-10-03, 종결)**: `milestone-6.md` 종결 문단 `a6f55d17` + PR #58 리뷰 뒤 정정 커밋(rollback.md ② 목록에 SHA) · 계약 갱신 r1~r9 · rollback.md 실측 HEAD 커밋(종결 커밋 뒤 ①~③ 재실측, 별도 커밋 — D-42 B).
+
+## 계약 갱신 r9 (2026-10-03, 팀장 — PR #58 조치 수령)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-45** | 조치 커밋 넷(`3c739f0d` 코드/test · `b15a7ed1` 정책·장부·`DivisionValueRules` KDoc · `85d00ecf` ktlint · `faf27e5a` evidence). **마지막 산출물 커밋 `85d00ecf`**. test 2,638(+31). 변이 ⑫ **핀 키를 옛 이름으로 되돌리면 값 단언만 RED, probe 는 초록** — ArchUnit 기본값이 `true` 라 죽은 핀은 거동으로 안 보였다(둘이 서로를 대신하지 못함, 제한 18) · ⑬ 반사 뿌리에서 `workflow` 제거 → `layer.*` 등식 RED · ⑭ 덮개 표 한 이름 제거 → 양방향 RED. 덮개를 「게이트가 신고하는 전수」로 바꾸자 **다른 slice 의 fixture 다섯**이 들어와 `FOREIGN_FIXTURES_REPORTED` 로 등재(변하면 양방향 등식이 드러낸다). `externalPackagesOf`·반사 수집이 `collection` 인자를 무시하고 FULL 을 박아 두고 있었음을 고치고 1층 양성 대조(깊은 수집이 production 바깥 참조 패키지를 실제로 더한다 — 처음 「더하지 않는다」 단언이 실측에 반증돼 정정) · 반사는 더하는 쌍 0(제한 20). K 의 경계 강화가 fixture 이름 불일치(`…PeekKt`)를 드러내 정정. 복원 경로 17 → **19**(`ArchitectureGateTest.kt`·`DivisionValueRules.kt`), 공유 hunk 7 → 9(+ 팀장 milestone 정정 1 = 10) | 레인 보고 |
+
+## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 ## OPEN 수령·신설 (예상)
 
