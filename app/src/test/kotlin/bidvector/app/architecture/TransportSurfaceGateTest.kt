@@ -92,19 +92,22 @@ class TransportSurfaceGateTest {
     }
 
     /**
-     * D-6G2b-24(cr M-4) — 수입된 production 모집단을 고정한다. 모듈 하나가 런타임 classpath 에서 빠지면
+     * D-6G2b-24·30(cr M-4) — 수입된 production 모집단을 고정한다. 모듈 하나가 런타임 classpath 에서 빠지면
      * `roots=bidvector` 는 그대로라 모든 등식이 **공허하게** 초록이 된다.
+     *
+     * 기대값은 test 상수가 아니라 정책의 `layer.*` 다 — 아래 바깥 참조 판정 대상도 같은 자리에서 읽으므로
+     * 모듈을 빠뜨리는 편집은 둘을 **함께** 붉게 만든다.
      */
     @Test
-    fun `수입된 production 모듈 집합이 아홉 그대로다 — 모듈이 빠지면 등식이 공허해진다`() {
-        val modules =
+    fun `수입된 production 모듈 집합이 layer 선언과 같다 — 모듈이 빠지면 등식이 공허해진다`() {
+        val imported =
             production
                 .map { it.packageName }
                 .filter { it.startsWith("${policy.packageRoot}.") }
                 .map { it.split('.').take(2).joinToString(".") }
                 .toSet()
 
-        modules shouldBe EXPECTED_PRODUCTION_MODULES
+        imported shouldBe policy.allModules.map { "${policy.packageRoot}.$it" }.toSet()
     }
 
     /**
@@ -119,13 +122,13 @@ class TransportSurfaceGateTest {
     /** D-6G2b-22 — 모듈별 허용 패키지 키 집합이 닫힌 모듈 목록과 같다. */
     @Test
     fun `바깥 참조 허용 집합의 모듈 키는 닫힌 목록과 같다`() {
-        policy.externalModuleKeys shouldBe policy.externalModules.toSet()
+        policy.externalModuleKeys shouldBe policy.externalJudgedModules.toSet()
     }
 
     /** D-6G2b-22 — 모듈별 관측 == 허용(두 방향). 쓰이지 않는 허용 패키지도 RED 다. */
     @Test
     fun `모듈별 바깥 참조 패키지는 허용 집합과 같다 — 두 방향`() {
-        policy.externalModules.forEach { module ->
+        policy.externalJudgedModules.forEach { module ->
             val root = "${policy.packageRoot}.$module"
             withClue("모듈 $module") {
                 rules.observedExternalPackages(production, root) shouldBe
@@ -136,7 +139,7 @@ class TransportSurfaceGateTest {
 
     @Test
     fun `허용 밖 바깥 패키지를 참조하는 production 클래스가 없다`() {
-        policy.externalModules.forEach { module ->
+        policy.externalJudgedModules.forEach { module ->
             rules
                 .externalReferenceRules("${policy.packageRoot}.$module", policy.externalAllowedPackages(module).toSet())
                 .forEach { rule -> rule.check(production) }
@@ -149,7 +152,7 @@ class TransportSurfaceGateTest {
      */
     @Test
     fun `허용 패키지 하나를 빼면 그 패키지가 위반으로 나온다 — 양성 대조`() {
-        val module = policy.externalModules.first()
+        val module = policy.externalJudgedModules.first()
         val root = "${policy.packageRoot}.$module"
         val allowed = policy.externalAllowedPackages(module).toSet()
         val dropped = allowed.first()
@@ -165,7 +168,7 @@ class TransportSurfaceGateTest {
     /** 양성 대조 — 관측에 없는 패키지를 허용에 더하면 두 방향 등식이 그것을 낸다. */
     @Test
     fun `관측에 없는 허용 패키지를 더하면 등식이 그것을 낸다 — 양성 대조`() {
-        val module = policy.externalModules.first()
+        val module = policy.externalJudgedModules.first()
         val root = "${policy.packageRoot}.$module"
         val ghost = "com.example.unused"
 
@@ -187,19 +190,4 @@ class TransportSurfaceGateTest {
         (shallow - full).shouldBeEmpty()
     }
 
-    private companion object {
-        /** 수입된 production 모듈 전수(아홉). 하나가 빠지면 위 등식들이 공허해진다. */
-        val EXPECTED_PRODUCTION_MODULES =
-            setOf(
-                "bidvector.adapters",
-                "bidvector.app",
-                "bidvector.decision",
-                "bidvector.procurement",
-                "bidvector.qualification",
-                "bidvector.settlement",
-                "bidvector.sharedkernel",
-                "bidvector.strategy",
-                "bidvector.workflow",
-            )
-    }
 }

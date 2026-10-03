@@ -205,14 +205,15 @@ class ArchitecturePolicy private constructor(
     val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
 
     /**
-     * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부: 판정 대상 모듈과 **모듈별** 허용 패키지 집합. 허용은 정확한
-     * 패키지 이름이고(접두 뿌리가 아니다) 두 방향 등식으로 관측과 같아야 한다.
+     * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부의 **판정 대상 모듈**. 별도 키로 적지 않고 `layer.*` 에서
+     * 도출한다(domain 계열을 뺀 셋 — application · adapters · app). 그래서 모듈을 빠뜨리는 편집은 여기만
+     * 아니라 **모집단 단언**(`allModules`)과 다른 층 게이트도 함께 붉게 만든다 — 한 자리에서 읽는다.
      */
-    val externalModules: List<String> get() = list("collection.external.modules")
+    val externalJudgedModules: List<String> get() = applicationModules + adapterModules + appModules
 
     fun externalAllowedPackages(module: String): List<String> = list("$EXTERNAL_PACKAGES_PREFIX$module")
 
-    /** 정책 파일에 실제로 있는 모듈 키 집합 — [externalModules] 와 같아야 한다(조용히 더하는 길을 막는다). */
+    /** 정책 파일에 실제로 있는 모듈 키 집합 — [externalJudgedModules] 와 같아야 한다(조용히 더하는 길을 막는다). */
     val externalModuleKeys: Set<String>
         get() =
             values.keys
