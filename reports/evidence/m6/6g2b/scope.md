@@ -95,6 +95,16 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-15** | `policy.version` 7 → 8(정책 파일 구조 변경: 두 게이트 키 삭제 + `collection.transport.*` 여섯). `OPEN-6G-GATE-REGISTRY-KONEPS` 는 **닫지 않는다** — 등재는 했으나 그 OPEN 은 게이트 장부 전반이라 쌍 등식이 갈음하지 못한다(6G-2c 후보) | 레인 ⑤·⑦ |
 | **D-6G2b-16** | **RED 의 형태**: 「컴파일 안 되는 RED 커밋」 대신 **같은 fixture 뿌리를 6G 술어 형태(소유 타입만 + 타입 이름 열거)로 돌린 실측**(19 중 놓침 14 · 변이 타입으로만 5)을 RED 로 받는다 — 게이트 slice 에서 「옛 술어가 못 잡는다」가 곧 RED 다. 변이 셋(깊은 수집 → 소유 타입만 4 failed · 뿌리 17 → 3 **1 failed, 양성 쪽 전건 초록** · 용도 하나 제거 3 failed) — 둘째가 D-7 음성 fixture 의 존재 이유를 실측으로 보인다 | 레인 보고 |
 
+## 계약 갱신 r2 (2026-10-03, 팀장 — A-2 집행 수령)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-17** | **반사 허용은 (클래스, 멤버/타입) 쌍 12 다 — 운영자 결정의 「9건」 + 앞 판이 전역 `getName` 허용으로 덮던 3**(`RunStateDurabilityKt` · `CollectionRunnerKt` · `OpeningCollectionLinesKt`). 전역 허용을 없앤 결과이고 등재하지 않으면 그 셋이 RED. 멤버 이름은 `getName` 3 · `getSimpleName` 6 · `getResourceAsStream` 1 + `KClass` 2 — 전부 값 획득 아님 | 쌍 정확 집합의 귀결 |
+| **D-6G2b-18** | **반사 뿌리는 별도 키 `collection.reflection.roots`**(`bidvector.workflow,bidvector.app,bidvector.adapters`) — 원문 값 획득 뿌리와 겹쳐 적으면 한쪽을 넓히는 편집이 다른 쪽을 조용히 넓힌다. 앞 판 키 둘(`allowed-referencers`·`class-allowed-members`) 삭제. in_scope 에 `archfixture/violating/adapters/**` 추가 | 레인 ② |
+| **D-6G2b-19** | **참조 수집 정의를 하나로**(`referencedTypeNames` 공유, `outermostClass` 공유) — 수집 범위를 좁히는 편집이 두 게이트의 양성 대조를 동시에 RED 로. 변이 셋: 쌍 제거 2 failed · 새 반사 참조 2 failed · **뿌리를 앞 판으로 좁힘 1 failed(규칙 초록, 쌍 등식만 RED)** — 규칙과 등식이 서로 다른 것을 든다 | 레인 실측 |
+| **D-6G2b-20** | **반사 뿌리는 production 전체가 아니다** — `procurement`·`decision`·`qualification`·`settlement`·`shared-kernel` 은 밖(domain 계열, 다른 게이트가 프레임워크·반사 참조를 금지하나 이 쌍 등식으로는 재지 않음). 운영자 결정 문면(`adapters` 까지)을 넘지 않는다 → **`OPEN-6G2B-REFLECTION-ROOT-DOMAIN`** 신설(6G-2c 후보: 그 모듈들의 기존 참조 실측 뒤 넓힐지) | 레인 알려진 제한 |
+| **D-6G2b-21** | **판정 SHA 는 이 갱신 커밋**(레인 산출물 `cc3fd1c7` · evidence `79091d02` 뒤). 게이트 술어를 바꾸는 slice 이므로 **수정 라운드의 모든 커밋이 표적 재검증 대상**. verifier 표적: 음성 fixture 21+2 전수 재실행 · 새 우회 고안 ≥3(fixture 밖 — 예: Kotlin `kotlin.io.path` 경유 네트워크 아님 대조 · `java.net.URI.toURL` 외 체인 · 인터페이스 타입으로 받은 전송 객체 · 람다/SAM 경유 · 제네릭 인자 안의 전송 타입 `List<HttpClient>`) · 6G 변이 KA2~4 유지 · 뿌리 축소 변이 · 쌍 등식 양방향 · 반사 12쌍 변이 · acceptance `check` 1회 · rollback 두 술어(실측 HEAD `cc3fd1c7`, 복원 13 경로, 공유 hunk 넷 — A-2 쪽 먼저) · evidence 위생 · 새 public 표면(정책 키 순증 7, production 0) | |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
@@ -145,6 +155,7 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 
 - `app/src/test/kotlin/bidvector/app/architecture/**`
 - `app/src/test/kotlin/bidvector/archfixture/violating/transport/**`(음성 fixture — 6G·6F-8 fixture 가 사는 자리, 계약 갱신 r1 D-6G2b-10 으로 추가)
+- `app/src/test/kotlin/bidvector/archfixture/violating/adapters/**`(A-2 음성 fixture — fixture 의 패키지가 게이트 뿌리를 정하므로 `adapters` 층 반사는 이 자리여야 한다, r2 D-6G2b-18)
 - `config/quality/architecture-policy.properties`
 - `config/quality/gate-tests.properties`(게이트 test 등재, D-6G2b-9)
 - `app/src/main/kotlin/bidvector/app/wiring/CollectionWiring.kt` · `OpeningCollectionWiring.kt`(쓰이지 않는 import 제거만)
