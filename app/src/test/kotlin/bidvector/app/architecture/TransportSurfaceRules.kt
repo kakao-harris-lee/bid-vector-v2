@@ -206,5 +206,4 @@ class TransportSurfaceRules(
         /** 무패키지 클래스를 가리키는 자리표 — 허용 집합의 어떤 패키지 이름과도 같지 않아 신고된다. */
         const val NO_PACKAGE = "<무패키지>"
     }
-
 }
