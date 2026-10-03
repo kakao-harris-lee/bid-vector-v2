@@ -6,7 +6,7 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | 항목 | 상태 | 근거 |
 |---|---|---|
-| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `57493a71` · clean-tree 양성 대조 |
+| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `85d00ecf` · clean-tree 양성 대조 |
 | acceptance 전부 exit 0 | ✓ | `commands.md` 「acceptance」 셋 |
 | test/lint/type/architecture/contract 전건 | ✓ | 축약 없이 `check` + `qualityBaseline` + `one-command-check.sh`(Python job 까지) |
 | fixture·정책 version 근거 | ✓ | `architecture-policy.properties` `policy.version` 7 → 8(키 계열 셋 제거 · 허용의 모양이 집합 → 쌍 → 기본 거부 허용 목록). 도메인 fixture·golden 무변경 |
@@ -64,13 +64,13 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
 |---|---|---|---|
-| 줄 | 963 | 719 | 1,660 |
-| 바이트 | 100,188 | 63,132 | 87,820 |
+| 줄 | 1019 | 752 | 1,841 |
+| 바이트 | 109,651 | 67,630 | 99,039 |
 
-**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 12,368 B(14%) 초과한다** — 앞 라운드의 21% 에서 줄었다
-(수정 라운드가 산출물을 1,660줄 / 87,820 B 로 늘렸다). 남은 초과는 전부 `scope.md` 쪽이다: 그 한 파일이
-evidence 바이트의 37% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r4 로 커졌다). 레인 세 파일만
-보면 산출물의 72% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 **사실 등재**다.
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 10,612 B(11%) 초과한다** — 앞 라운드의 21% 에서 줄었다
+(수정 라운드가 산출물을 1,841줄 / 99,039 B 로 늘렸다). 남은 초과는 전부 `scope.md` 쪽이다: 그 한 파일이
+evidence 바이트의 38% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r4 로 커졌다). 레인 세 파일만
+보면 산출물의 68% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 **사실 등재**다.
 
 산출물 줄 구성: 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷. `milestone-6.md` 착수
 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다. 바이트는 양쪽 다 diff 의 `+` 접두를 포함한 같은
@@ -79,7 +79,7 @@ evidence 바이트의 37% 이고 레인이 만지지 않는 팀장 파일이다(
 
 ## clean-tree 양성 대조
 
-HEAD `57493a71` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
+HEAD `85d00ecf` 에서 in_scope 열아홉 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
 공유 파일 하나의 마지막 줄을 **비파괴 절삭**해 `M` 을 확인하고 사본으로 복원했다. `git checkout --` 는 쓰지
 않는다(다른 레인의 미커밋 편집을 지운다). 경로를 변수 하나로 묶지 않는다 — pathspec 이 하나가 되면 「빈
 출력」이 더러운 트리와 구별되지 않는다. evidence 를 포함한 마지막 상태의 판정은 verifier 와 PR 조치 코멘트
@@ -182,6 +182,15 @@ M-4 의 모집단 단언과 같은 자리에서 읽게 해 모듈을 빠뜨리�
 17. **`archunit.properties` 핀의 범위는 `:app` test classpath 다**(cr r2 L-8). `build-logic` 도 ArchUnit 을
     의존하지만 `ArchRule`·`should` 를 쓰지 않아 오늘 효과는 같다. 다른 모듈에 rule 이 생기면 그 모듈에도
     같은 핀이 필요하다.
-18. **바깥 참조 허용 집합은 `app`·`workflow`·`adapters` 셋뿐이다.** `procurement`·`decision`·`qualification`·
+18. **ArchUnit 핀의 두 단언은 서로를 대신하지 못한다**(PR #58 A). 설정 **값** 단언은 키 이름이 틀린 **죽은
+    핀**을 드러내고, 빈 `should` **probe** 는 ArchUnit 이 기본값을 바꾸는 날을 드러낸다. 앞 판의 죽은 핀은
+    거동으로는 보이지 않았다 — 기본값이 이미 `true` 였기 때문이다(변이 ⑫ 실측).
+19. **덮개 모집단에 다른 slice 의 fixture 다섯이 든다**(PR #58 D). 구조적 모집단(게이트가 신고하는 전수)이
+    드러낸 것이고, 이 게이트들이 신고하는 것이 **맞으므로** 빼지 않고 등재했다. 그 집합이 늘거나 줄면 다른
+    slice 가 fixture 를 더하거나 지운 것이고 양방향 등식이 드러낸다 — 이 레인이 고칠 일은 아니다.
+20. **반사 축은 수집 깊이에 민감하지 않다**(PR #58 G). 깊은 수집이 더하는 반사 쌍이 0 이라 양성·음성 어느
+    대조도 들지 않는다. 전송은 양쪽이 들고 바깥 참조는 양성 쪽이 든다 — 축마다 다르다는 사실을
+    `referencedTypeNames` KDoc 에 적었다.
+21. **바깥 참조 허용 집합은 `app`·`workflow`·`adapters` 셋뿐이다.** `procurement`·`decision`·`qualification`·
    `settlement`·`strategy`·`sharedkernel` 은 이 층 밖이다(domain 계열이고 `ArchitectureGateTest` 의 T-A~T-D
    가 그 층의 바깥 참조를 따로 잠근다). 운영자 결정 문면(세 모듈)을 넘지 않았다.

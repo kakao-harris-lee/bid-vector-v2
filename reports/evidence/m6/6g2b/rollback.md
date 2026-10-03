@@ -4,7 +4,7 @@
 > `git diff --name-status <base>..<실측 HEAD>` 에서 기계로 낸다. **라운드마다 그 라운드의 마지막 산출물
 > 커밋에서 다시 낸다** — 앞 라운드 실측을 옮기지 않는다.
 
-**실측 HEAD `57493a71`**(장부 일괄 뒤 마지막 산출물 커밋) · base **`1745a3e2`**. ①②③ 은 그 HEAD 의 **버릴
+**실측 HEAD `85d00ecf`**(PR #58 조치 라운드 뒤 마지막 산출물 커밋) · base **`1745a3e2`**. ①②③ 은 그 HEAD 의 **버릴
 clone** 에서 돌렸고, ④⑤⑥ 은 앞 산출물 커밋 `dca888aa` 의 값이다(아래 절에 사유 — 되돌린 두 트리가
 동일하다). 복원 **경로 목록은 바뀌지 않았다**(장부 일괄은 이미 목록에 있는 파일만 고쳤다).
 
@@ -19,7 +19,7 @@ clone** 에서 돌렸고, ④⑤⑥ 은 앞 산출물 커밋 `dca888aa` 의 값�
 
 | 상태 | 파일 | 되돌림 |
 |---|---|---|
-| M | `ArchitecturePolicy.kt` · `CollectionArchitectureRules.kt` · `CollectionArchitectureGateTest.kt` · `CollectionArchitectureGateCatchesViolationsTest.kt`(app test) | ① base 로 restore |
+| M | `ArchitecturePolicy.kt` · `CollectionArchitectureRules.kt` · `CollectionArchitectureGateTest.kt` · `CollectionArchitectureGateCatchesViolationsTest.kt` · **`ArchitectureGateTest.kt`** · **`DivisionValueRules.kt`**(app test) | ① base 로 restore |
 | A | `TransportSurfaceRules.kt` · `TransportSurfaceGateTest.kt` · `TransportSurfaceGateCatchesViolationsTest.kt`(app test) | ① restore 가 삭제(base 에 없다) |
 | A | `TransportBypassSamples.kt` · `TransportRegressionSamples.kt` · `TransportIndirectionSamples.kt`(`archfixture/violating/transport`) | ① 같음 |
 | A | `RogueAdapterReflectionPeek.kt` · `external/ExternalBypassSamples.kt`(`archfixture/violating/adapters`) | ① 같음 |
@@ -36,7 +36,9 @@ clone** 에서 돌렸고, ④⑤⑥ 은 앞 산출물 커밋 `dca888aa` 의 값�
 
 ```
 git restore --source=1745a3e2 --staged --worktree -- \
+  app/src/test/kotlin/bidvector/app/architecture/ArchitectureGateTest.kt \
   app/src/test/kotlin/bidvector/app/architecture/ArchitecturePolicy.kt \
+  app/src/test/kotlin/bidvector/app/architecture/DivisionValueRules.kt \
   app/src/test/kotlin/bidvector/app/architecture/CollectionArchitectureGateCatchesViolationsTest.kt \
   app/src/test/kotlin/bidvector/app/architecture/CollectionArchitectureGateTest.kt \
   app/src/test/kotlin/bidvector/app/architecture/CollectionArchitectureRules.kt \
@@ -57,10 +59,13 @@ pathspec 오류로 아무것도 적용되지 않는다. 실측 `exit 0`.
 
 ## ② 공유 파일 셋 — hunk 격리, 나중 커밋부터
 
-커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..57493a71 -- <파일>`. 실측은 아키텍처
-정책 **넷**(모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **하나** · `milestone-6.md` **둘**(착수 `7938ae8d` · 종결 `a6f55d17`, 팀장)이다.
+커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..85d00ecf -- <파일>`. 실측은 아키텍처
+정책 **다섯**(PR #58 주석 · 모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **둘**(PR #58 주석 ·
+등재) · `milestone-6.md` **둘**(착수 `7938ae8d` · 종결 `a6f55d17`, 팀장)이다.
 
 ```
+git diff b15a7ed1~1..b15a7ed1 -- config/quality/architecture-policy.properties | git apply -R
+git diff b15a7ed1~1..b15a7ed1 -- config/quality/gate-tests.properties | git apply -R
 git diff 28c789c6~1..28c789c6 -- config/quality/architecture-policy.properties | git apply -R
 git diff 0f11117a~1..0f11117a -- config/quality/architecture-policy.properties | git apply -R
 git diff cc3fd1c7~1..cc3fd1c7 -- config/quality/architecture-policy.properties | git apply -R
@@ -70,7 +75,7 @@ git diff a6f55d17~1..a6f55d17 -- milestone-6.md | git apply -R
 git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ```
 
-일곱 전부 **exit 0** · conflict 0(`milestone-6.md` 둘은 팀장이 종결 커밋 뒤 버릴 clone 에서 재실측 — 역적용 뒤 base 와 바이트 동일, 6G-2f 종결 문단 보존 1). 나중 것부터 역적용한다 — 정책 파일의 세 hunk 는 **늦은 커밋이 먼저**다
+아홉 전부 **exit 0** · conflict 0(`milestone-6.md` 둘은 팀장이 종결 커밋 뒤 버릴 clone 에서 재실측 — 역적용 뒤 base 와 바이트 동일, 6G-2f 종결 문단 보존 1). 나중 것부터 역적용한다 — 정책 파일의 다섯 hunk 는 **늦은 커밋이 먼저**다
 (앞 커밋을 먼저 되돌리면 뒤 hunk 의 문맥이 사라진다). **목록이 늘면 이 절차를 다시 돌린다** — 종결 문단
 커밋과 다음 라운드의 공유 파일 커밋이 각각 한 줄씩 늘린다.
 
@@ -85,21 +90,23 @@ git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
   `(i)` 머리 주석을 복원. (d) `collection.external.allowed-packages.<모듈>` **셋**과 그 머리 주석 단락을
   삭제한다 — base 에 없던 절이라 그 자리에 복원할 것은 없다. `collection.external.modules` 는 **HEAD 에
   없다**(한 판 있었다가 `28c789c6` 에서 삭제됐다) — 그 키를 지우라는 지시였던 앞 판 문면을 지웠다
-  (vr L-r2b-1). 넷 다 base 파일에서 그 블록을 떠 온다.
+  (vr L-r2b-1). (e) PR #58 의 주석 셋(대분류 주석의 「보완이 없다」 문면 · 「겹쳐 적지 않는다」 · v8 note 의
+  바깥 참조 줄)은 **주석만**이라 base 문면으로 되돌린다. 다섯 다 base 파일에서 그 블록을 떠 온다.
 - 장부: `gate.tests.app` 의 이름 둘(`TransportSurfaceGateTest`·`TransportSurfaceGateCatchesViolationsTest`)과
-  머리 주석 일곱 줄 삭제.
+  머리 주석 일곱 줄 삭제(PR #58 J 가 그 주석의 수를 고쳤으므로 **base 문면**으로 되돌린다).
 - `milestone-6.md`: 6G-2b 착수 문단 한 단락(그리고 종결 문단이 생기면 그것도) 삭제.
 
-## ③ 실측 (버릴 clone, HEAD `57493a71`)
+## ③ 실측 (버릴 clone, HEAD `85d00ecf`)
 
-`restore` exit 0 · `apply -R` 여섯 exit 0. 되돌린 뒤 `git status --porcelain` 이 **D 10 · M 7** 이고,
-`git diff 1745a3e2 --name-status -- <되돌린 열일곱 경로>` 는 **빈 출력**이다 — 그 경로에서 base 와 **트리
+`restore` exit 0 · `apply -R` 아홉 exit 0. 되돌린 뒤 `git status --porcelain` 이 **D 10 · M 9** 이고,
+`git diff 1745a3e2 --name-status -- <되돌린 열아홉 경로>` 는 **빈 출력**이다 — 그 경로에서 base 와 **트리
 동일**이다(갈음을 「HEAD 초록」이 아니라 트리 동일성으로 한다).
 
 ## ④⑤⑥ 실측 (되돌린 트리) — 앞 산출물 커밋 `dca888aa` 에서 잰 값이고 갈음 근거는 **트리 동일성**이다
 
-①②③ 은 이 라운드의 마지막 산출물 커밋 `57493a71` 에서 다시 돌렸다. ④⑤⑥ 은 **다시 돌리지 않았다** —
-③ 이 두 HEAD 에서 모두 「되돌린 트리 == base(열일곱 경로 전부)」를 냈으므로 **되돌린 두 트리가 서로
+①②③ 은 이 라운드의 마지막 산출물 커밋 `85d00ecf` 에서 다시 돌렸다(복원 경로가 **열일곱 → 열아홉**으로,
+공유 hunk 가 **일곱 → 아홉**으로 늘었다 — 이 라운드가 `ArchitectureGateTest.kt`·`DivisionValueRules.kt` 를
+처음 만지고 공유 파일 둘에 주석 hunk 를 더했다). ④⑤⑥ 은 **다시 돌리지 않았다** — ③ 이 네 HEAD 에서 모두 「되돌린 트리 == base(열일곱 경로 전부)」를 냈으므로 **되돌린 두 트리가 서로
 동일**하고, 그 트리에서 잰 ④⑤⑥ 은 그대로 유효하다. 갈음을 「HEAD 초록」이 아니라 트리 동일성으로 한다는
 규율 그대로다. 아래 값은 `dca888aa` 의 측정이다(옮겨 적은 것이 아니라 그 자리의 값임을 밝힌다).
 
@@ -138,15 +145,15 @@ git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ## verifier 가 대조할 것
 
 「실측 HEAD == 판정 SHA」가 **아니다**(evidence 커밋이 언제나 뒤에 오므로 둘은 영원히 다르다). 보는 것은
-그 사이에 되돌림 대상이 움직였는가다 — `git diff --name-only 57493a71..<판정 SHA> -- <위 열일곱 경로 개별
+그 사이에 되돌림 대상이 움직였는가다 — `git diff --name-only 85d00ecf..<판정 SHA> -- <위 열아홉 경로 개별
 인자>` 가 빈 출력이면 유효하다. 한 줄이라도 나오거나 **판정 SHA 가 실측 HEAD 의 자손이 아니면**
 미검증이다.
 
 이 slice 는 **게이트 술어를 바꾸므로** 수정 라운드의 모든 커밋이 severity 와 무관하게 표적 재검증 대상이고,
-그 커밋이 위 열일곱 경로에 닿으면 이 절의 대조가 깨져 ①~⑥ 을 다시 돌려야 한다(A-2 라운드와 이 수정
+그 커밋이 위 열아홉 경로에 닿으면 이 절의 대조가 깨져 ①~⑥ 을 다시 돌려야 한다(A-2 라운드와 이 수정
 라운드가 그 사례다 — 복원 목록이 열 → 열넷, 공유 hunk 가 넷 → 다섯으로 늘었다).
 
 ## 되돌리지 않는 것
 
 하네스 경로(`CLAUDE.md`·`.claude/**`) — 이 range 의 하네스 레인 커밋은 **없다**
-(`git log --oneline 1745a3e2..57493a71 -- CLAUDE.md .claude/` 빈 출력).
+(`git log --oneline 1745a3e2..85d00ecf -- CLAUDE.md .claude/` 빈 출력).

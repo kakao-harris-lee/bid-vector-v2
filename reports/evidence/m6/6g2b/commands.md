@@ -7,17 +7,18 @@
 
 | 완료(UTC) | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
-| 2026-10-03T12:21Z | `./gradlew --no-daemon check` | 0 | 전 모듈 **2,633** test · 실패 0 · skip 4(base 2,607 에서 +26) |
-| 2026-10-03T12:21Z | `./gradlew --no-daemon qualityBaseline` | 0 | **up-to-date**(실행된 측정이 아니다 — production 입력이 바뀌지 않았다는 방증이고, 그것이 이 slice 의 기대값이다. cr L-11) |
-| 2026-10-03T12:34Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
+| 2026-10-03T13:36Z | `./gradlew --no-daemon check` | 0 | 전 모듈 **2,638** test · 실패 0 · skip 4(base 2,607 에서 +31) |
+| 2026-10-03T13:36Z | `./gradlew --no-daemon qualityBaseline` | 0 | **up-to-date**(실행된 측정이 아니다 — production 입력이 바뀌지 않았다는 방증이고, 그것이 이 slice 의 기대값이다. cr L-11) |
+| 2026-10-03T13:50Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
 
-**실측 HEAD `57493a71`**(마지막 산출물 커밋). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
+**실측 HEAD `85d00ecf`**(마지막 산출물 커밋). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
 
-test 증감 +26 — 전송 표면 게이트 22(`TransportSurfaceGateTest` 14 + 음성 쪽 8) + 반사 게이트 쌍 등식 6
+test 증감 +31 — 전송 표면 게이트 27(`TransportSurfaceGateTest` 18 + 음성 쪽 9) + ArchUnit 핀 둘
+(`ArchitectureGateTest`) + 반사 게이트 쌍 등식 6
 (음성 쪽 20 → 24, 양성 쪽은 반사 test 둘을 넷으로 바꾸고 전송 단언 둘을 지워 24 그대로) − 지운 test 2
 (6G 의 두 게이트 단언).
 
-`check` 는 라운드마다 첫 호출이 형식 게이트로 exit 1 이었다 — ktlint 합 37건(연속 KDoc·체인 연속·함수
+`check` 는 라운드마다 첫 호출이 형식 게이트로 exit 1 이었다 — ktlint 합 43건(연속 KDoc·체인 연속·함수
 시그니처·`}` 앞 빈 줄)과 detekt 2건(파일명 불일치·상수 반환). 전부 형식이고 술어·단언·fixture 의 의미는
 바뀌지 않았다. `ktlintTestSourceSetFormat` 과 fixture 두 건 손질 뒤 exit 0(`541b5065`·`130dc4c9`).
 
@@ -124,6 +125,14 @@ probe test 는 버릴 clone 에만 두었다(저장소에 남기지 않는다 �
 | ⑨ 접기를 `enclosingClass` 로 되돌림 | `git diff --numstat` `1 1` | **2 failed** — 쌍 등식 · 등재 밖 참조 0(`$BodyHandler` 셋이 관측에 돌아온다) |
 | ⑩ `java.util.ServiceLoader` 낱개 제거 | 사본 대조 1줄 | **1 failed** — ServiceLoader fixture 의 2층 단언만. 1층은 그대로 조용하다 |
 | ⑪ `layer.application` 을 비움(모듈 하나 빠뜨림) | 사본 대조 1줄 치환 | **4 failed** — 모집단 단언 · 바깥 참조 모듈 키 등식 · 앞선 두 게이트(1급 패키지 집합 · 의존 방향) |
+| ⑫ ArchUnit 핀 키를 옛 이름(`failOnEmptyShould`)으로 | `git diff --numstat` 1줄 | **1 failed** — 설정 값 단언만. **probe 는 초록**(아래 사유) |
+| ⑬ `collection.reflection.roots` 에서 `bidvector.workflow` 제거 | 사본 대조 1줄 치환 | **1 failed** — 반사 뿌리 == `layer.*` 도출 등식 |
+| ⑭ 덮개 표에서 한 이름 제거 | 사본 대조 1줄 삭제 | **1 failed** — 덮개 양방향 등식 |
+
+⑫가 가른 것(PR #58 A): **설정 값 단언과 거동 probe 는 다른 것을 잰다.** 키 이름을 틀리게 되돌려도 빈
+`should` 규칙은 여전히 실패한다 — ArchUnit 1.5.0 의 **기본값이 이미 `true`** 이기 때문이다. 그래서 앞 판의
+죽은 핀은 거동으로는 보이지 않았고, 값 단언만이 그것을 드러낸다. 거꾸로 ArchUnit 이 기본값을 바꾸는 날은
+probe 가 드러낸다. 둘을 함께 둔 이유다.
 
 ⑦⑧이 두 방향을 가른다 — 하나는 규칙과 등식 둘이, 다른 하나는 등식만 든다. ⑩은 두 층의 분기를 잰다:
 `java.util` 이 허용 패키지라 그 확장 지점은 **1층이 아니라 2층**이 잡는다. ⑪은 판정 대상 목록을 도출로 둔
@@ -328,6 +337,13 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 | cr L-4(죽은 가지) · cr L-9(중복 키) | 게이트 하드닝 | `f77c319a` + `de86738d` 중복 키 단언 |
 | cr L-7(주석이 두 게이트 겹침을 숨긴다) · cr L-8(멤버 이름만 비교) | 장부층 | 정책 주석·checklist 제한 |
 | cr L-11(`qualityBaseline` up-to-date) | 장부층 | acceptance 절에 사실로 적는다 |
+| **PR #58 A**(죽은 ArchUnit 핀 — 키 이름이 틀려 아무 설정도 켜지지 않았다) | 게이트 하드닝 | `3c739f0d` — 키 정정 + 설정 값 단언 + 빈 `should` probe. 변이 ⑫ |
+| **PR #58 C**(반사 뿌리 손 목록) | 게이트 하드닝 | `3c739f0d` — `layer.*` 도출과 등식. 변이 ⑬ |
+| **PR #58 D**(덮개가 패키지 모양에 기댄다) | 게이트 하드닝 | `3c739f0d` — 모집단을 게이트 신고 전수로, 양방향. 변이 ⑭. 다른 slice fixture 다섯을 등재로 드러냈다 |
+| **PR #58 G**(수집 깊이가 1층·반사에서 고정) | 게이트 하드닝 | `3c739f0d` — `collection` 파라미터화 + 1층 양성 대조. 반사는 더하는 쌍 0 을 KDoc 에 |
+| **PR #58 F·I·K**(접기 관례 문면 · 두 파서 등식 · 공허 단언·KDoc·경계) | 게이트 하드닝 / 해당 없음 | `3c739f0d`. `mustReport` 경계가 fixture 이름 둘의 실제 JVM 클래스 불일치를 드러냈다 |
+| **PR #58 E/O·J**(정책·장부 주석 셋, 수) | 장부층 | `b15a7ed1`(공유 파일) |
+| PR #58 B·H(rollback 실측 HEAD · 위협 모델 절) | — | **팀장 몫**(이 레인 밖) |
 
 ## 알려진 제한
 
@@ -365,17 +381,17 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 ## 낡는 좌표 점검
 
 편집한 파일을 `file:line` 으로 가리키지 않았다(인용문·절 제목·결정 ID·커밋 해시·클래스 이름만). 역방향
-파급도 쟀다 — 편집한 **열여섯** 파일의 stem 으로 `grep -rn '<stem>:[0-9]'` → **전부 0건**.
+파급도 쟀다 — 편집한 **열일곱** 파일의 stem 으로 `grep -rn '<stem>:[0-9]'` → **전부 0건**.
 
 ## clean-tree 게이트
 
-`git status --porcelain -- <in_scope 개별 인자 열일곱>` → **빈 출력**(0줄). 양성 대조 1회 — 공유 파일
+`git status --porcelain -- <in_scope 개별 인자 열아홉>` → **빈 출력**(0줄). 양성 대조 1회 — 공유 파일
 하나를 **비파괴 절삭**(마지막 한 줄 제거)해 porcelain 이 그 파일 한 줄을 내는 것을 확인하고 사본으로
 복원, 다시 0줄. `git checkout --` 는 쓰지 않았다.
 
 ## 크기 게이트 (evidence ≤ 산출물)
 
-표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..마지막 산출물 커밋(`57493a71`)의 in_scope 추가 **1,660줄 /
-87,820 B**(삭제 168줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
+표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..마지막 산출물 커밋(`85d00ecf`)의 in_scope 추가 **1,841줄 /
+99,039 B**(삭제 175줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
 `milestone-6.md` 착수 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다(바이트는 diff 의 `+`
 접두를 포함한 값이라 줄 수만큼 부풀어 있다 — 두 축을 같은 방법으로 쟀다).
