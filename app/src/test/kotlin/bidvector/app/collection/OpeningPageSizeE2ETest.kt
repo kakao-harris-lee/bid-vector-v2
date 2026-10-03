@@ -21,7 +21,10 @@ import java.nio.file.Files
  */
 class OpeningPageSizeE2ETest {
     companion object {
-        /** 개찰 축 다섯 — 이 집합이 통째로 요청에 설정 값을 실어야 한다. */
+        /**
+         * 개찰 축 다섯 — 이 집합이 통째로 요청에 설정 값을 실어야 한다. **리터럴로 적는다**:
+         * 분류기에서 유도하면 축 하나를 분류기에서 지우는 변경이 기대 집합도 같이 줄여 조용해진다.
+         */
         private val OPENING_AXES =
             setOf("개찰 목록", "개찰완료", "예비가격 상세", "기초금액", "산식 A")
 
@@ -127,16 +130,31 @@ class OpeningPageSizeE2ETest {
             "bidvector.opening-collection.sample-size" to CROWDED_SAMPLE_SIZE.toString(),
         )
 
-    /** 개찰 축 다섯의 이름 — mock 이 쓰는 것과 같은 기준(오퍼레이션 경로의 접미)으로 가른다. */
+    /**
+     * 개찰 축 다섯의 이름 — mock 이 쓰는 것과 같은 기준(오퍼레이션 경로의 접미)으로 가른다.
+     *
+     * **개찰 목록 접두는 상세 축 둘의 머리이기도 하다**(`getOpengResultListInfoOpengCompt` ·
+     * `…ServcPreparPcDetail`). 그래서 접미 넷을 먼저 가르고 접두는 **남은 것**만 받는다 — 분기 순서가
+     * 아니라 구조가 그 포함 관계를 처리하므로, 절을 옮겨도 답이 바뀌지 않는다(cr L-2).
+     */
     private fun axisOf(operation: String): String =
-        when {
-            operation.endsWith("PreparPcDetail") -> "예비가격 상세"
-            operation.endsWith("OpengCompt") -> "개찰완료"
-            operation.endsWith("BsisAmount") -> "기초금액"
-            operation.endsWith("BidPrceCalclAInfo") -> "산식 A"
-            operation.startsWith("getOpengResultListInfo") -> "개찰 목록"
-            else -> "그 밖"
-        }
+        DETAIL_AXIS_BY_SUFFIX.entries
+            .firstOrNull { (suffix, _) -> operation.endsWith(suffix) }
+            ?.value
+            ?: if (operation.startsWith(OPENING_LIST_PREFIX)) OPENING_LIST_AXIS else OTHER_AXIS
 }
+
+/** 상세 축 넷 — 접미가 서로 겹치지 않아 훑는 순서가 답을 바꾸지 않는다. */
+private val DETAIL_AXIS_BY_SUFFIX =
+    mapOf(
+        "PreparPcDetail" to "예비가격 상세",
+        "OpengCompt" to "개찰완료",
+        "BsisAmount" to "기초금액",
+        "BidPrceCalclAInfo" to "산식 A",
+    )
+
+private const val OPENING_LIST_PREFIX = "getOpengResultListInfo"
+private const val OPENING_LIST_AXIS = "개찰 목록"
+private const val OTHER_AXIS = "그 밖"
 
 private const val SAMPLE_LIST_FILE = "sample-list.tsv"

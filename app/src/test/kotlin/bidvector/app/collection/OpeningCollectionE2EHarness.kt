@@ -46,9 +46,11 @@ private const val SERVICE_KEY = "OPENING-E2E-SENTINEL+KEY/value="
 private const val BIDDER_NAME = "SYN-투찰업체-이름"
 
 /**
- * 개찰 수집 E2E 의 **출하 조립 기동기**. 두 test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
- * 「무엇을 부르는가」(표본·원문·조립 타입)와 「얼마나·언제 부르는가」(상한·잠금·이어 돌기)이고,
- * 기동 장치를 두 벌 두면 두 test 가 **서로 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
+ * 개찰 수집 E2E 의 **출하 조립 기동기**. **세** test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
+ * 「무엇을 부르는가」(표본·원문·조립 타입, [OpeningCollectionE2ETest]) · 「얼마나·언제 부르는가」
+ * (상한·잠금·이어 돌기, [OpeningBudgetE2ETest]) · 「한 호출이 몇 행을 받는가」(쪽 크기가 wire·호출
+ * 수·표본에 미치는 것, [OpeningPageSizeE2ETest])이고, 기동 장치를 여러 벌 두면 그 test 들이 **서로
+ * 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
  *
  * 기동은 `bidvector.opening-collection.mode=once` 로 `app` 의 배선 그대로 뜨고, 바깥 호출은 전부
  * loopback in-process mock 으로 간다(실 KONEPS 호출 0).
