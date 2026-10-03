@@ -123,6 +123,7 @@ internal class OpeningCollectionE2EHarness {
         throttleOnce: Set<String> = emptySet(),
         openingCompletePageSize: Int = 0,
         failOpeningCompleteSecondPageOnce: Boolean = false,
+        paging: MockPagingMode = MockPagingMode(),
         reuseRunState: Boolean = false,
         now: Instant? = null,
         inspect: (ApplicationContext) -> Unit = {},
@@ -137,14 +138,7 @@ internal class OpeningCollectionE2EHarness {
         E2E_FIXED_NOW.set(now)
         if (!reuseRunState) freshRunStateDir()
         val mock =
-            MockOpeningKonepsHttp(
-                noticesPerSlot = NOTICES_PER_SLOT,
-                bidderName = BIDDER_NAME,
-                nonce = nonce ?: newE2ENonce(),
-                throttleOnce = throttleOnce,
-                openingCompletePageSize = openingCompletePageSize,
-                failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
-            )
+            mockFor(nonce, throttleOnce, openingCompletePageSize, failOpeningCompleteSecondPageOnce, paging)
         val context =
             SpringApplicationBuilder(
                 BidVectorApplication::class.java,
@@ -166,6 +160,23 @@ internal class OpeningCollectionE2EHarness {
             lastStdio = stdio.toString(StandardCharsets.UTF_8)
         }
     }
+
+    /** mock 을 짓는 자리 — 기동 절차와 응답 판을 한 함수에 섞지 않는다. */
+    private fun mockFor(
+        nonce: String?,
+        throttleOnce: Set<String>,
+        openingCompletePageSize: Int,
+        failOpeningCompleteSecondPageOnce: Boolean,
+        paging: MockPagingMode,
+    ) = MockOpeningKonepsHttp(
+        noticesPerSlot = NOTICES_PER_SLOT,
+        bidderName = BIDDER_NAME,
+        nonce = nonce ?: newE2ENonce(),
+        throttleOnce = throttleOnce,
+        openingCompletePageSize = openingCompletePageSize,
+        failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
+        paging = paging,
+    )
 
     /** 기동 속성의 바탕 — test 가 `extra` 로 덮어쓴다. */
     private fun baseProperties(mock: MockOpeningKonepsHttp): Map<String, String> =

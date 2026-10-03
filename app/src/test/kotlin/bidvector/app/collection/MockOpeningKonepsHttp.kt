@@ -41,6 +41,8 @@ internal class MockOpeningKonepsHttp(
     private val openingCompletePageSize: Int = 0,
     /** 개찰완료 **2쪽의 첫 요청만** 5xx — 1쪽만 받고 끊긴 축을 만든다. */
     private val failOpeningCompleteSecondPageOnce: Boolean = false,
+    /** 쪽 크기 판(D-6G2f-3) — 기본은 요청의 `numOfRows` 를 **무시하는** 기존 판이다. */
+    private val paging: MockPagingMode = MockPagingMode(),
 ) : AutoCloseable {
     private val secondPageFailurePending = AtomicBoolean(failOpeningCompleteSecondPageOnce)
     private val throttled = CopyOnWriteArrayList<String>()
@@ -52,6 +54,20 @@ internal class MockOpeningKonepsHttp(
     val openingCompleteNotices = CopyOnWriteArrayList<String>()
     val baseAmountNotices = CopyOnWriteArrayList<String>()
     val formulaANotices = CopyOnWriteArrayList<String>()
+
+    /**
+     * 받은 요청의 `numOfRows`(D-6G2f-2) — **배선이 준 값이 wire 에 닿았는가**를 재는 자리다.
+     * 응답 본문의 에코가 아니라 **요청 URI 의 query** 를 적는다: 에코는 이 mock 이 짓는 값이라
+     * 배선이 아무것도 주지 않아도 원하는 수가 나온다.
+     */
+    val requestedRows = CopyOnWriteArrayList<RequestedRows>()
+
+    /**
+     * 공고마다 내는 투찰 행 — 기본은 **고정 셋**이다([BIDDERS], golden 바이트가 그 셋의 금액·추첨
+     * 번호에 달려 있다). 참가가 많은 판만 수를 받아 짓는다.
+     */
+    private val bidders: List<SyntheticBidder> =
+        paging.biddersPerNotice?.let { count -> (1..count).map(::crowdedBidder) } ?: BIDDERS
 
     val baseUrl: String get() = "http://127.0.0.1:${server.address.port}/mock"
 
@@ -80,6 +96,9 @@ internal class MockOpeningKonepsHttp(
         received.incrementAndGet()
         val query = exchange.requestURI.rawQuery.orEmpty()
         val operation = exchange.requestURI.path.substringAfterLast('/')
+        val requested = paramOf(query, "numOfRows")?.toIntOrNull()
+        // 429·5xx 로 끊는 요청도 센다 — 「배선이 준 값」은 응답이 무엇이든 그 요청에 실려 나갔다.
+        requestedRows += RequestedRows(operation, requested)
         if (operation in throttleOnce && throttled.addIfAbsent(operation)) {
             exchange.sendResponseHeaders(HTTP_TOO_MANY_REQUESTS, -1)
             exchange.close()
@@ -93,8 +112,9 @@ internal class MockOpeningKonepsHttp(
         }
         val noticeNumber = paramOf(query, "bidNtceNo")
         val all = itemsFor(operation, query, noticeNumber)
+        val pageSize = pageSizeFor(operation, requested)
         val bytes =
-            envelope(pageOf(operation, all, page), all.size, page, rowsPerPage(operation))
+            envelope(pageOf(all, page, pageSize), all.size, page, echoedRowsOf(pageSize))
                 .toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(200, bytes.size.toLong())
@@ -130,7 +150,7 @@ internal class MockOpeningKonepsHttp(
                 // **투찰자 셋.** 추첨번호의 출처는 예비가격 상세이고(D-6G-38) 이 행들의 선택은
                 // 그것과 일부러 어긋나 있다 — 추출이 틀린 출처에서 읽으면 golden 이 붉어진다.
                 // 셋을 두는 이유는 `prtcptCnum`(참가업체수)이 투찰 행 수와 같아야 하기 때문이다.
-                BIDDERS.map { bidder -> bidderRow(noticeNumber.orEmpty(), bidder) }
+                bidders.map { bidder -> bidderRow(noticeNumber.orEmpty(), bidder) }
             }
 
             operation.endsWith("BsisAmount") -> {
@@ -156,7 +176,7 @@ internal class MockOpeningKonepsHttp(
                             "bidNtceNo" to noticeNumber(suffix, index),
                             "bidNtceOrd" to "000",
                             // 참가업체수는 **투찰 행 수와 같다** — 실물이 어긋나지 않는 자리다(D-6G-38).
-                            "prtcptCnum" to BIDDERS.size.toString(),
+                            "prtcptCnum" to bidders.size.toString(),
                             "progrsDivCdNm" to "개찰완료",
                         )
                     }.also { require(query.contains("inqryDiv=2")) { "표본틀은 공고일 축으로 걸어야 한다" } }
@@ -321,21 +341,33 @@ internal class MockOpeningKonepsHttp(
     private fun isPagedOpeningComplete(operation: String): Boolean =
         openingCompletePageSize > 0 && operation.endsWith("OpengCompt")
 
-    /** 쪽으로 나눈 축은 그 쪽의 몫만 낸다 — `totalCount` 는 언제나 전수다(짧은 걷기를 볼 수 있게). */
-    private fun pageOf(
+    /**
+     * 이 응답의 쪽 크기 — `0` 은 「한 쪽에 전부」다.
+     *
+     * 기본 판은 요청의 `numOfRows` 를 **무시한다**(쪽으로 나눈 오퍼레이션에만 자기 수를 쓴다) —
+     * 다른 축까지 줄이면 그 축도 쪼개지고 기존 test 가 재는 거동이 바뀐다. [MockPagingMode] 를
+     * 켠 판에서만 **요청이 쪽 크기를 정한다**: 배선이 바꾼 값이 호출 수를 실제로 줄이는지는
+     * 요청을 존중하는 판에서만 잴 수 있다(D-6G2f-3).
+     */
+    private fun pageSizeFor(
         operation: String,
-        all: List<Map<String, String>>,
-        page: Int,
-    ): List<Map<String, String>> =
-        if (isPagedOpeningComplete(operation)) {
-            all.drop((page - 1) * openingCompletePageSize).take(openingCompletePageSize)
-        } else {
-            all
+        requested: Int?,
+    ): Int =
+        when {
+            paging.respectsRequestedRows -> requested ?: DEFAULT_PAGE_ROWS
+            isPagedOpeningComplete(operation) -> openingCompletePageSize
+            else -> 0
         }
 
-    /** 쪽 크기는 **쪽으로 나눈 오퍼레이션에만** 적용한다 — 다른 축까지 줄이면 그 축도 쪼개진다. */
-    private fun rowsPerPage(operation: String): Int =
-        if (isPagedOpeningComplete(operation)) openingCompletePageSize else DEFAULT_PAGE_ROWS
+    /** 쪽으로 나눈 축은 그 쪽의 몫만 낸다 — `totalCount` 는 언제나 전수다(짧은 걷기를 볼 수 있게). */
+    private fun pageOf(
+        all: List<Map<String, String>>,
+        page: Int,
+        pageSize: Int,
+    ): List<Map<String, String>> =
+        if (pageSize > 0) all.drop((page - 1) * pageSize).take(pageSize) else all
+
+    private fun echoedRowsOf(pageSize: Int): Int = if (pageSize > 0) pageSize else DEFAULT_PAGE_ROWS
 
     private fun envelope(
         items: List<Map<String, String>>,
@@ -372,12 +404,46 @@ private const val HTTP_SERVER_ERROR = 503
 
 private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
 
+/**
+ * 쪽 크기 판(D-6G2f-3) — 기본은 요청의 `numOfRows` 를 **무시하는** 기존 판이고, 기존 test 가 재는
+ * 것이 그 판이다.
+ *
+ * [respectsRequestedRows] 를 켜면 요청이 쪽 크기를 정한다 — 배선이 올린 값이 호출 수를 실제로 줄이는지
+ * 는 그렇게만 잴 수 있다. [biddersPerNotice] 는 참가가 많은 공고를 짓는다(`null` 이면 고정 셋).
+ */
+internal class MockPagingMode(
+    val respectsRequestedRows: Boolean = false,
+    val biddersPerNotice: Int? = null,
+)
+
+/** 받은 요청 한 건의 오퍼레이션과 `numOfRows` — 요청이 그 칸을 싣지 않았으면 `null` 이다. */
+internal class RequestedRows(
+    val operation: String,
+    val numOfRows: Int?,
+)
+
 internal class SyntheticBidder(
     val rank: Int,
     val amount: String,
     val firstDraw: String,
     val secondDraw: String,
 )
+
+/**
+ * 참가가 많은 판의 투찰 행(D-6G2f-3 ⓐ) — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않고, 추첨번호는
+ * 복수예가 행 범위를 돈다. 고정 셋([BIDDERS])과 달리 **수를 받아** 짓는다: 한 호출에 들어가지 않는
+ * 참가 규모가 이 판의 입력이다.
+ */
+private fun crowdedBidder(rank: Int) =
+    SyntheticBidder(
+        rank = rank,
+        amount = (CROWDED_BID_AMOUNT + rank * CROWDED_BID_AMOUNT_STEP).toString(),
+        firstDraw = (rank % RESERVE_PRICE_ROWS + 1).toString(),
+        secondDraw = ((rank + 1) % RESERVE_PRICE_ROWS + 1).toString(),
+    )
+
+private const val CROWDED_BID_AMOUNT = 1_100_000_000L
+private const val CROWDED_BID_AMOUNT_STEP = 1_000L
 
 /**
  * 합성 투찰자 셋(D-6G-38) — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않는다.
