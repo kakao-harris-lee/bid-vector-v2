@@ -2,16 +2,16 @@
 
 > **지위: 착수(2026-10-03).** base `9a5aa26a`(PR #54 6G-2e 머지 뒤 `main`), worktree `bid-vector-v2-m6-6g2f`, 브랜치 `m6-6g2f/2026-10-03`.
 > 운영자 결정 2026-10-03: 「운영계정 신청(운영자 작업)과 별개로 **페이지 크기 999 slice 를 지금**」 — 선택지 셋(지금 · 승인만 기다림 · 표본 축소) 중 첫째.
-> 수령: 실수집 day1·day2 실측(`reports/evidence/m6/6g/commands.md` 「실 KONEPS 호출」, 10-02·10-03) · **`OPEN-6G2D-FRAME-REWALK`** 후보(day2 관찰, 이 slice 가 비용만 줄이고 닫지는 않는다).
+> 수령: 실수집 day1·day2 실측 — 기록은 수집 기록 브랜치의 `reports/evidence/m6/6g/commands.md` 「실 KONEPS 호출」(**PR #56**, 머지 전까지 `main` 의 그 절은 「없다」) · **`OPEN-6G2D-FRAME-REWALK`** 후보(day2 관찰, 이 slice 가 비용만 줄이고 닫지는 않는다) · **`OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP`**(페이지 100 의 기록된 근거 — D-6G2f-15 가 관측으로 닫는다).
 
 - base: **`9a5aa26a`**.
 - 레인: `kotlin-implementer` 하나(Kotlin `app` 모듈 + runbook). Python·contracts 무변경. 호스트 빌드 직렬(수집 실행과 겹치지 않게 — §「배포」).
 
 ## 왜 이 slice 인가
 
-실수집 이틀의 실측: 이 키의 KONEPS 게이트웨이 한도는 **키 × operation × 일 1,000 건**이다(개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`; 두 레인이 쓰는 operation 일곱 전부 `X-RateLimit-Limit: 1000`, 팀장 진단 호출 10-03). 개찰완료(`getOpengResultListInfoOpengCompt`)만 업무 공통 **단일 operation** 이라 먼저 닫히고, 그 축은 페이지 크기 **100** 으로 공고당 1~35 페이지를 부른다(day1: 476 공고에 1,000 호출 — 1페이지 365 · 2페이지 이상 111). 결과 하루 약 470 공고, 표본 24,000 에 약 50일.
+실수집 이틀의 실측: 이 키의 KONEPS 게이트웨이 한도는 **키 × operation × 일 1,000 건**이다(개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`; 두 레인이 쓰는 operation 일곱 전부 `X-RateLimit-Limit: 1000`, 팀장 진단 호출 10-03). 업무 공통 단일 operation 은 **둘**(개찰완료 `getOpengResultListInfoOpengCompt` · 산식 A — 후자는 공사만 부른다)이고, 그중 개찰완료가 페이지 크기 **100** 으로 공고당 1~35 페이지를 불러 먼저 닫힌다(day1: 476 공고에 1,000 호출 — 1페이지 365 · 2페이지 이상 111). 결과 하루 약 470 공고, 표본 24,000 에 약 50일.
 
-게이트웨이는 `numOfRows=999` 를 그대로 받는다(팀장 실측 10-03: 개찰 목록 공사, `totalCount 1522` 에 `items 999` 반환, `numOfRows 999` 에코). 페이지 크기를 999 로 올리면 개찰완료가 사실상 공고당 1 호출이 되어 **하루 약 950 공고(2배)**, 표본틀 걷기(65,064 행)는 **812 → 약 66 호출**로 준다. 운영계정 승인(100,000/일) 뒤에도 일 상한 20,000 안의 낭비가 같은 비율로 준다. **우회가 아니다** — 같은 키·같은 한도 안에서 호출당 행 수를 올릴 뿐이다.
+게이트웨이는 `numOfRows=999` 를 그대로 받는다(팀장 실측 10-02 개찰 목록 공사 `totalCount 1522`/`items 999`, 10-03 나머지 여섯 — commands.md 「실측(팀장)」). 페이지 크기를 999 로 올리면 개찰완료가 사실상 공고당 1 호출이 되어 **하루 약 950 공고(2배)** 가 된다. 표본틀 걷기는 (공고일 × 업무) 슬롯마다 1 호출 이상이라 하한이 약 226(113일 × 2)이고, 999 에서는 슬롯당 1 쪽이라 **812 → 약 240 호출**(초안의 「약 66」은 슬롯 분할을 빠뜨린 값 — 2026-10-03 정정). **우회가 아니다** — 같은 키·같은 한도 안에서 호출당 행 수를 올릴 뿐이다.
 
 ## 착수 실측 (팀장, 2026-10-03)
 
@@ -95,7 +95,7 @@ rollback:
 | ID | 내용 | 자리 |
 |---|---|---|
 | `OPEN-6G2F-NOTICE-LIST-ROWS` | 공고 목록 레인 페이지 크기 100(3B 상수) — 일일 증분은 1,000 안이나 백필 재실행 시 1,022 호출 | 6G-2c |
-| `OPEN-6G2D-FRAME-REWALK` | 매 기동 표본틀 재걷기(이 slice 뒤 약 66 호출/일) | 6G-2c |
+| `OPEN-6G2D-FRAME-REWALK` | 매 기동 표본틀 재걷기(이 slice 뒤 약 240 호출/일 — 슬롯 하한 226) | 6G-2c |
 | `OPEN-6G2F-MAX-PAGES-PROVENANCE` | (cr M-1) `MAX_PAGES` 확정 제외의 **행 수 문턱**(`50 × rows-per-page`)이 `sample-scope.json`·무결성 장부·시도 원장 어디에도 실리지 않는다 — 되돌림 인자(`--bidvector.koneps.opening.rows-per-page=100`)를 쓰면 한 디렉터리에 「>5,000」과 「>49,950」 확정이 섞여 구별되지 않는다. 임시 운용: 인자를 바꾸는 실행은 evidence 표에 날짜·값을 적는다. 닫는 길은 원장 HTTP 줄 또는 `state.json` 에 쪽 크기 등재 | 6G-2c |
 
 ## 계약 갱신 r1 (2026-10-03, 팀장 — 검토 라운드 처분)
@@ -108,10 +108,20 @@ rollback:
 | **D-6G2f-12** | cr M-1 → `OPEN-6G2F-MAX-PAGES-PROVENANCE`(위 표) · cr M-2(산식 A 도 단일 operation) → runbook §5·배포 절 문면 · vr low 1(release-sha 는 실행기 계산값, 「cron」은 세션 cron) → runbook · cr L-2(`axisOf` 순서 의존) → 겹치지 않는 접미 표 · cr L-3(KDoc) → 셋으로 · cr L-4(`milestone-6.md` 의 「5,000」) → 팀장 종결 커밋에서 「50 × rows-per-page」로 | 장부층 |
 | **D-6G2f-13** | **배포(머지 뒤)**: 수집 실행이 없는 창에서 호스트 3단 점검 뒤 `main` 에서 `:app:bootJar`; 다음 재실행(세션 cron 00:41)이 D-10 의 사전 확인을 거쳐 새 jar 를 집는다. 원장 `release_sha` 는 실행기가 `git rev-parse` 로 계산한 새 SHA | runbook 「배포」 |
 
+## 계약 갱신 r2 (2026-10-03, 팀장 — PR #57 `/code-review` 처분)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2f-14** | **운영자 결정 2026-10-03: `MAX_PAGES` 영구 제외 문턱은 `50 × rows-per-page` 그대로(기본 49,950 참가).** 2026-10-01 의 「5,000 유지」는 50×100 의 파생값에 대한 결정이었고, 선택지 셋(그대로 · 5,000 근처 유지 = operation 별 maxPages 코드 · 행 수 정책값으로 전환) 중 첫째. 한 디렉터리에 두 문턱이 섞이는 문제는 `OPEN-6G2F-MAX-PAGES-PROVENANCE` 그대로 | 리뷰 #3 M-2 — 팀장 결정(D-4)이 아니라 운영자 결정이어야 할 자리 |
+| **D-6G2f-15** | **`OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` 을 관측으로 닫는다.** 페이지 100 의 기록된 근거는 「문서상 최대 메시지 4000 bytes 에 999 행이 잘릴 수 있다」였다. 팀장 실측 10-03(예비가격 상세 공사, 같은 창): `numOfRows=100` 과 `999` 의 앞 100 항목 **바이트 동일**, 키 집합 동일(19), 999 행 응답 742,122 B 를 정상 수신(빈 값 0, resultCode 00) · 응답 시간 total 1.83 s / 2.80 s(요청 시한 10 s). 제약은 실제로 걸리지 않는다. capability map §14.3 행을 취소선 + 닫힘으로(하네스 절) | 리뷰 #3 H-1 |
+| **D-6G2f-16** | **파라미터 오류 코드는 확정 실패다.** `KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES`(10·11 → INPUT_ERROR, 12·20·30~32 → NOT_RETRYABLE) → `FinalFailure`(영구 정착, 재시도 없음). D-10 의 「미지 코드가 일시 실패로」는 미지 코드에만 맞고 분류된 거부에는 틀렸다 → 배포 절차에 **첫 기동 노출 상한 `calls-per-day=200`** + 원장 AXIS 결말에 INPUT_ERROR/NOT_RETRYABLE 0 확인 뒤 전량(runbook §7). 분류: 데이터 정확성 | 리뷰 #4 F1 |
+| **D-6G2f-17** | 장부: 「개찰완료만 단일 operation」 → **둘**(이 문서·milestone-6) · 「812 → 66」 → **약 240**(슬롯 하한 226) · 인용 자리 PR #56 · test 3 종료 코드 단언(H) · 비기본값 wire 단언 + 기대 축 집합을 설정 경로 선언에서 유도(J) · mock 두 판 충돌 거부(I) · 주석·정렬(M) · rollback 조상 술어·milestone hunk(L) · evidence 축소(K). **크기 게이트**: 줄 382 ≤ 462 통과, 바이트 34,508 > 32,462(6% 초과 — 한국어 산문 3 B/자 vs Kotlin 1 B/자; 초과분은 이 scope.md). 사실로 등재하고 더 줄이지 않는다 | 리뷰어 5 + 채점 |
+
 ## 하네스 레인 변경 (상시 절) — 갱신
 
-- **팀장(2026-10-03, 종결 커밋)**: `milestone-6.md` 의 `OPEN-6G2D-MAX-PAGES-FINAL` 「5,000」 잔존 문면 정정 + 6G-2f 종결 문단. `milestone-6.md` 는 in_scope 밖(공유 파일)이라 rollback 복원 목록에 넣지 않고 여기 선언한다 — 되돌림은 그 커밋의 hunk 역적용.
+- **팀장(2026-10-03, 종결 커밋)**: `milestone-6.md` 의 `OPEN-6G2D-MAX-PAGES-FINAL` 「5,000」 잔존 문면 정정 + 6G-2f 종결 문단(`79525a77`), r2 정정(단일 operation 둘 · 약 240 · 운영자 결정 D-14 · 관례 문장). `milestone-6.md` 는 in_scope 밖(공유 파일)이라 rollback 복원 목록에 넣지 않고 여기 선언한다 — 되돌림은 그 커밋들의 hunk 역적용(rollback.md 목록).
+- **팀장(2026-10-03, r2)**: `docs/discovery/capability-map.md` §14.3 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` 행 취소선 + 닫힘(D-6G2f-15). 공유 파일, hunk 역적용.
 
 ## 종결 (2026-10-03, 팀장)
 
-판정 SHA `e16bf85e` ready-for-review → 장부층 일괄 `91725b1e` → 이 계약 갱신. 재작업 0/5. PR 은 `main` 으로 열고 `/code-review` 뒤 새 high 없으면 머지(운영자 사전 승인 2026-10-02 「후속 slice 리뷰 이상 없으면 PR·머지」). 머지 뒤 D-6G2f-13.
+판정 SHA `e16bf85e` ready-for-review → 장부층 일괄 `91725b1e` → 계약 갱신 r1 → PR #57 `/code-review`(80 이상 1건: test 3 종료 코드) → 조치 넷(`98261a05` 코드·test · `12d89ab1` runbook · `945f823b` rollback · `1d41453e` evidence) → 계약 갱신 r2(D-14~17). 재작업 0/5(verifier not-ready 0, 리뷰 조치는 장부·test 강화). 머지 조건: CI 초록 + 새 high 없음(운영자 사전 승인 2026-10-02). 머지 뒤 D-6G2f-13 + D-16 노출 상한.
