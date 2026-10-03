@@ -22,10 +22,12 @@ class RogueSamLambdaHolder {
     fun supplier(): Supplier<HttpClient> = Supplier { HttpClient.newHttpClient() }
 }
 
-/** 어노테이션 인자 — 클래스 리터럴로만 전송 타입을 이름 붙인다. */
+/** 어노테이션 인자 — 클래스 리터럴로만 전송 타입을 이름 붙인다. 본문에는 전송 타입이 없다. */
 @UsesTransport(HttpClient::class)
-class RogueAnnotatedHolder {
-    fun describe(): String = "no transport type in the body"
+class RogueAnnotatedHolder(
+    private val label: String,
+) {
+    fun describe(): String = label.uppercase()
 }
 
 @Target(AnnotationTarget.CLASS)
