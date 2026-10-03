@@ -165,15 +165,31 @@ class ArchitecturePolicy private constructor(
     val serviceKeyType: String get() = value("app.secret.service-key-type")
     val serviceKeyReaders: List<String> get() = list("app.secret.service-key-readers")
 
-    /** M6/6G D-6G-47 — HTTP 클라이언트 타입과 그것을 쥐어도 되는 클래스 집합(관문과 그 조립). */
-    val httpClientType: String get() = value("collection.http-client.type")
-    val httpClientRoots: List<String> get() = list("collection.http-client.roots")
-    val httpClientHolders: List<String> get() = list("collection.http-client.holders")
+    /**
+     * M6/6G-2b D-6G2b-1·2·3·4 — 관문 밖으로 바이트를 내는 길의 **전송 표면**: 판정 뿌리 · 금지 패키지
+     * 뿌리 · 뿌리로 금지할 수 없는 낱개 타입 · 등재 쌍의 닫힌 용도 어휘.
+     */
+    val transportRoots: List<String> get() = list("collection.transport.roots")
+    val transportSurfacePackages: List<String> get() = list("collection.transport.surface-packages")
+    val transportSurfaceTypes: List<String> get() = list("collection.transport.surface-types")
+    val transportPurposes: List<String> get() = list("collection.transport.purposes")
 
-    /** M6/6G D-6G-62 — 관문을 우회하는 전송·반사 타입과 그것을 참조해도 되는 클래스 집합(비어 있다). */
-    val transportBypassRoots: List<String> get() = list("collection.transport-bypass.roots")
-    val transportBypassTypes: List<String> get() = list("collection.transport-bypass.types")
-    val transportBypassHolders: List<String> get() = list("collection.transport-bypass.holders")
+    /**
+     * 정책 파일에 **실제로 있는** 용도 키 집합 — [transportPurposes] 와 같아야 한다(새 용도 키를 조용히
+     * 더하는 길을 막는다). 등재 쌍은 용도별 목록의 합이고, [transportHolderPairList] 는 중복 쌍을 잴 수
+     * 있게 집합으로 접기 전의 목록이다.
+     */
+    val transportHolderPurposeKeys: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(TRANSPORT_HOLDERS_PREFIX) }
+                .map { it.removePrefix(TRANSPORT_HOLDERS_PREFIX) }
+                .toSet()
+
+    val transportHolderPairList: List<Pair<String, String>>
+        get() = transportPurposes.flatMap { pairs("$TRANSPORT_HOLDERS_PREFIX$it") }
+
+    val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
 
     /** vr r4 L-12·L-13 — 공고 키 해시·hex 형태를 짓는 함수와 그것을 불러도 되는 클래스 집합. */
     val keyHashRoots: List<String> get() = list("collection.key-hash.roots")
@@ -228,6 +244,7 @@ class ArchitecturePolicy private constructor(
         }
 
     companion object {
+        private const val TRANSPORT_HOLDERS_PREFIX = "collection.transport.holders."
         private const val LOCATION_PROPERTY = "bidvector.architecture.policy"
         private const val MEMBER_EFFECTS_PROPERTY = "bidvector.member.effects"
 
