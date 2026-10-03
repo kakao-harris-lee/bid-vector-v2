@@ -205,11 +205,15 @@ class ArchitecturePolicy private constructor(
     val rawAccessAllowedReferencers: List<String> get() = list("collection.raw-access.allowed-referencers")
     val rawAccessAllowedMemberAccessors: List<String> get() = list("collection.raw-access.allowed-member-accessors")
 
-    /** D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
+    /**
+     * D-6F8-13 (i) · A-2(D-6G2b-6) — 리플렉션 봉쇄: 판정 뿌리(원문 값 획득 뿌리와 **따로** 둔다) · 금지
+     * 패키지 · (클래스, 리플렉션 타입) 쌍 · `Class` 와 (클래스, 멤버) 쌍.
+     */
+    val reflectionRoots: List<String> get() = list("collection.reflection.roots")
     val reflectionPackages: List<String> get() = list("collection.reflection.packages")
-    val reflectionAllowedReferencers: List<String> get() = list("collection.reflection.allowed-referencers")
+    val reflectionTypePairs: List<Pair<String, String>> get() = pairs("collection.reflection.type-pairs")
     val reflectionClassType: String get() = value("collection.reflection.class-type")
-    val reflectionClassAllowedMembers: List<String> get() = list("collection.reflection.class-allowed-members")
+    val reflectionClassMemberPairs: List<Pair<String, String>> get() = pairs("collection.reflection.class-member-pairs")
 
     /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")

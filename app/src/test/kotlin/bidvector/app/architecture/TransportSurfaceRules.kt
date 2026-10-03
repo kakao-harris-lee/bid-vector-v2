@@ -19,6 +19,36 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 enum class ReferenceCollection { OWNER_ONLY, FULL }
 
 /**
+ * 한 클래스가 **실제로 참조하는** 타입 이름 전수 — 의존 그래프 + [ReferenceCollection.FULL] 에서는 호출
+ * 대상(호출·메서드 참조)의 소유·인자·반환 타입과 필드 접근의 필드 타입까지. 이름은 배열을 벗기고 중첩
+ * 클래스를 최상위로 접은 것이다.
+ *
+ * **정의가 하나다.** 전송 표면 게이트와 반사 게이트가 같은 함수를 쓰므로, 수집 범위를 좁히는 편집은 두
+ * 게이트의 양성 대조를 동시에 RED 로 만든다 — KA1 의 구멍이 바로 이 정의에 있었다.
+ */
+internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set<String> {
+    val found = linkedSetOf<String>()
+
+    fun collect(type: JavaClass) {
+        found += type.baseComponentType.outermostClass().fullName
+    }
+
+    directDependenciesFromSelf.forEach { collect(it.targetClass) }
+    if (collection == ReferenceCollection.FULL) {
+        codeUnitAccessesFromSelf.forEach { access ->
+            collect(access.targetOwner)
+            access.target.rawParameterTypes.forEach(::collect)
+            collect(access.target.rawReturnType)
+        }
+        fieldAccessesFromSelf.forEach { collect(it.target.rawType) }
+    }
+    return found
+}
+
+/** 중첩 클래스(`Outer$Inner`)를 가장 바깥 클래스로 접는다 — 등재는 최상위 이름으로 적는다. */
+internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
+
+/**
  * D-6G2b-1·2·3 — **관문 밖으로 바이트를 내는 길**을 (클래스, 전송 표면 타입) 쌍의 정확 집합으로 닫는다.
  *
  * 금지는 타입 이름 열거가 아니라 [surfacePackages] **패키지 뿌리**다 — 그 패키지에 새 타입이 생겨도
@@ -50,32 +80,15 @@ class TransportSurfaceRules(
     ): Set<Pair<String, String>> =
         classes
             .filter { origin -> roots.any { origin.packageName == it || origin.packageName.startsWith("$it.") } }
-            .flatMap { origin -> transportTypesOf(origin).map { origin.topLevel().fullName to it } }
+            .flatMap { origin -> transportTypesOf(origin).map { origin.outermostClass().fullName to it } }
             .toSet()
 
     /** 등재된 쌍의 타입이 전송 표면 술어 안에 있는지 — 술어 밖 타입을 등재해 집합을 채우는 길을 막는다. */
     fun isSurfaceType(type: String): Boolean =
         type in surfaceTypes || surfacePackages.any { type == it || type.startsWith("$it.") }
 
-    private fun transportTypesOf(origin: JavaClass): Set<String> {
-        val found = linkedSetOf<String>()
-
-        fun collect(type: JavaClass) {
-            val name = type.baseComponentType.topLevel().fullName
-            if (isSurfaceType(name)) found += name
-        }
-
-        origin.directDependenciesFromSelf.forEach { collect(it.targetClass) }
-        if (collection == ReferenceCollection.FULL) {
-            origin.codeUnitAccessesFromSelf.forEach { access ->
-                collect(access.targetOwner)
-                access.target.rawParameterTypes.forEach(::collect)
-                collect(access.target.rawReturnType)
-            }
-            origin.fieldAccessesFromSelf.forEach { collect(it.target.rawType) }
-        }
-        return found
-    }
+    private fun transportTypesOf(origin: JavaClass): Set<String> =
+        origin.referencedTypeNames(collection).filterTo(linkedSetOf(), ::isSurfaceType)
 
     private fun referenceTransportSurfaceOutside(registered: Set<Pair<String, String>>): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>(
@@ -85,13 +98,10 @@ class TransportSurfaceRules(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val holder = item.topLevel().fullName
+                val holder = item.outermostClass().fullName
                 transportTypesOf(item)
                     .filterNot { holder to it in registered }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$holder -> $it")) }
             }
         }
-
-    /** 중첩 클래스(`Outer$Inner`)를 가장 바깥 클래스로 접는다 — 등재는 최상위 이름으로 적는다. */
-    private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)
 }

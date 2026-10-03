@@ -8,6 +8,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.ArchRule
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -91,29 +92,55 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
-    fun `workflow·app production 은 리플렉션 API 를 참조하지 않고 Class 는 이름 조회만 한다`() {
+    fun `리플렉션 뿌리가 실제로 production 에 있다 — adapters 를 포함해 규칙이 공허하지 않다`() {
+        policy.reflectionRoots.forEach { root ->
+            production.filter { it.packageName == root || it.packageName.startsWith("$root.") }.shouldNotBeEmpty()
+        }
+    }
+
+    @Test
+    fun `workflow·app·adapters production 의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
         rules
             .moduleMustNotUseReflection(
-                roots = policy.rawAccessRoots,
+                roots = policy.reflectionRoots,
                 reflectionPackages = policy.reflectionPackages.toSet(),
-                allowedReferencers = policy.reflectionAllowedReferencers.toSet(),
+                allowedTypePairs = policy.reflectionTypePairs.toSet(),
                 classType = policy.reflectionClassType,
-                allowedClassMembers = policy.reflectionClassAllowedMembers.toSet(),
+                allowedMemberPairs = policy.reflectionClassMemberPairs.toSet(),
             ).checkAll()
     }
 
     @Test
-    fun `리플렉션 봉쇄의 허용 참조자·허용 Class 멤버는 관측 집합과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
-        rules.observedReflectionReferencers(
+    fun `리플렉션 봉쇄의 두 쌍 집합은 관측 집합과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
+        rules.observedReflectionTypePairs(
             production,
-            policy.rawAccessRoots,
+            policy.reflectionRoots,
             policy.reflectionPackages.toSet(),
-        ) shouldBe policy.reflectionAllowedReferencers.toSet()
-        rules.observedClassMembers(
+        ) shouldBe policy.reflectionTypePairs.toSet()
+        rules.observedClassMemberPairs(
             production,
-            policy.rawAccessRoots,
+            policy.reflectionRoots,
             policy.reflectionClassType,
-        ) shouldBe policy.reflectionClassAllowedMembers.toSet()
+        ) shouldBe policy.reflectionClassMemberPairs.toSet()
+    }
+
+    /**
+     * A-2 양성 대조 — 뿌리를 앞 판(`workflow`·`app`)으로 좁히면 `adapters` 의 등재 쌍이 관측에서 빠진다.
+     * 뿌리 확장이 조용히 되돌려지면 이 단언이 RED 다.
+     */
+    @Test
+    fun `리플렉션 뿌리를 좁히면 adapters 쌍이 관측에서 사라진다 — 뿌리 확장의 양성 대조`() {
+        val narrowed =
+            rules.observedClassMemberPairs(production, policy.rawAccessRoots, policy.reflectionClassType) +
+                rules.observedReflectionTypePairs(
+                    production,
+                    policy.rawAccessRoots,
+                    policy.reflectionPackages.toSet(),
+                )
+        val widened = policy.reflectionClassMemberPairs.toSet() + policy.reflectionTypePairs.toSet()
+
+        (widened - narrowed).shouldNotBeEmpty()
+        (narrowed - widened).shouldBeEmpty()
     }
 
     @Test
