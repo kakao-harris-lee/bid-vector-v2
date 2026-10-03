@@ -29,6 +29,7 @@ class TransportSurfaceGateTest {
 
     private fun transportRules(collection: ReferenceCollection) =
         TransportSurfaceRules(
+            packageRoot = policy.packageRoot,
             surfacePackages = policy.transportSurfacePackages.toSet(),
             surfaceTypes = policy.transportSurfaceTypes.toSet(),
             collection = collection,
@@ -91,6 +92,89 @@ class TransportSurfaceGateTest {
     }
 
     /**
+     * D-6G2b-24(cr M-4) — 수입된 production 모집단을 고정한다. 모듈 하나가 런타임 classpath 에서 빠지면
+     * `roots=bidvector` 는 그대로라 모든 등식이 **공허하게** 초록이 된다.
+     */
+    @Test
+    fun `수입된 production 모듈 집합이 아홉 그대로다 — 모듈이 빠지면 등식이 공허해진다`() {
+        val modules =
+            production
+                .map { it.packageName }
+                .filter { it.startsWith("${policy.packageRoot}.") }
+                .map { it.split('.').take(2).joinToString(".") }
+                .toSet()
+
+        modules shouldBe EXPECTED_PRODUCTION_MODULES
+    }
+
+    /**
+     * cr L-9 — 정책 파일에 같은 키가 두 번 적히면 `Properties` 가 조용히 마지막만 남겨, 등재 목록 하나가
+     * 사라져도 키 집합 등식은 그대로다. 원문 줄에서 센다.
+     */
+    @Test
+    fun `정책 파일에 중복 선언된 키가 없다`() {
+        policy.duplicateKeys shouldBe emptySet()
+    }
+
+    /** D-6G2b-22 — 모듈별 허용 패키지 키 집합이 닫힌 모듈 목록과 같다. */
+    @Test
+    fun `바깥 참조 허용 집합의 모듈 키는 닫힌 목록과 같다`() {
+        policy.externalModuleKeys shouldBe policy.externalModules.toSet()
+    }
+
+    /** D-6G2b-22 — 모듈별 관측 == 허용(두 방향). 쓰이지 않는 허용 패키지도 RED 다. */
+    @Test
+    fun `모듈별 바깥 참조 패키지는 허용 집합과 같다 — 두 방향`() {
+        policy.externalModules.forEach { module ->
+            val root = "${policy.packageRoot}.$module"
+            withClue("모듈 $module") {
+                rules.observedExternalPackages(production, root) shouldBe
+                    policy.externalAllowedPackages(module).toSet()
+            }
+        }
+    }
+
+    @Test
+    fun `허용 밖 바깥 패키지를 참조하는 production 클래스가 없다`() {
+        policy.externalModules.forEach { module ->
+            rules
+                .externalReferenceRules("${policy.packageRoot}.$module", policy.externalAllowedPackages(module).toSet())
+                .forEach { rule -> rule.check(production) }
+        }
+    }
+
+    /**
+     * 양성 대조 — 허용 집합에서 패키지 하나를 빼면 **정확히 그 패키지**가 위반으로 나온다. 고정 문자열이
+     * 아니라 정책을 읽은 결과에서 뺀다.
+     */
+    @Test
+    fun `허용 패키지 하나를 빼면 그 패키지가 위반으로 나온다 — 양성 대조`() {
+        val module = policy.externalModules.first()
+        val root = "${policy.packageRoot}.$module"
+        val allowed = policy.externalAllowedPackages(module).toSet()
+        val dropped = allowed.first()
+
+        val details =
+            rules
+                .externalReferenceRules(root, allowed - dropped)
+                .flatMap { it.evaluate(production).failureReport.details }
+
+        withClue("빼낸 패키지 $dropped") { details.filter { it.endsWith(" -> $dropped") }.shouldNotBeEmpty() }
+    }
+
+    /** 양성 대조 — 관측에 없는 패키지를 허용에 더하면 두 방향 등식이 그것을 낸다. */
+    @Test
+    fun `관측에 없는 허용 패키지를 더하면 등식이 그것을 낸다 — 양성 대조`() {
+        val module = policy.externalModules.first()
+        val root = "${policy.packageRoot}.$module"
+        val ghost = "com.example.unused"
+
+        val observed = rules.observedExternalPackages(production, root)
+
+        ((policy.externalAllowedPackages(module).toSet() + ghost) - observed) shouldBe setOf(ghost)
+    }
+
+    /**
      * 양성 대조 — 호출 대상의 **인자·반환 타입** 수집이 production 에서 실제로 쌍을 더한다. 수집이 조용히
      * 소유 타입만 보는 쪽으로 되돌려지면 이 단언이 RED 가 된다(KA1 의 형태가 거기서 열렸다).
      */
@@ -102,4 +186,21 @@ class TransportSurfaceGateTest {
         (full - shallow).shouldNotBeEmpty()
         (shallow - full).shouldBeEmpty()
     }
+
+    private companion object {
+        /** 수입된 production 모듈 전수(아홉). 하나가 빠지면 위 등식들이 공허해진다. */
+        val EXPECTED_PRODUCTION_MODULES =
+            setOf(
+                "bidvector.adapters",
+                "bidvector.app",
+                "bidvector.decision",
+                "bidvector.procurement",
+                "bidvector.qualification",
+                "bidvector.settlement",
+                "bidvector.sharedkernel",
+                "bidvector.strategy",
+                "bidvector.workflow",
+            )
+    }
+
 }

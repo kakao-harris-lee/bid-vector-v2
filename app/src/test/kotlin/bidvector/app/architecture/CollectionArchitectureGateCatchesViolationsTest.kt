@@ -288,11 +288,31 @@ class CollectionArchitectureGateCatchesViolationsTest {
         details().filter { it.contains(mentioned) }.shouldBeEmpty()
     }
 
+    /**
+     * vr L-5 · cr ④ — 대상은 **이름 경계까지** 맞춰 본다. 맨 `contains` 로 재면 `java.net.URL` 단언이
+     * `java.net.URLConnection` 으로 잡혀도 통과해, 「다른 이유로 잡혔다」를 거르려는 취지가 헐거웠다.
+     * 이 파일의 상세 줄은 규칙마다 꼬리가 다르므로(서술자·따옴표) 전체 일치가 아니라 경계 일치다.
+     */
     private fun List<ArchRule>.mustReport(
         mentioned: String,
         target: String,
     ) {
-        details().filter { it.contains(mentioned) && it.contains(target) }.shouldNotBeEmpty()
+        details().filter { it.contains(mentioned) && it.mentionsAtNameBoundary(target) }.shouldNotBeEmpty()
+    }
+
+    /**
+     * [target] 이 **더 긴 이름의 앞토막**으로 걸리지 않는지 — 뒤 글자가 글자·숫자·`_` 면 다른 이름이다
+     * (`java.net.URL` 단언이 `java.net.URLConnection` 으로 통과하던 자리). `$` 는 경계로 센다: 같은 멤버의
+     * 합성 다리(`append$default`)와 중첩 타입은 그 이름을 가리키는 것이 맞다.
+     */
+    private fun String.mentionsAtNameBoundary(target: String): Boolean {
+        var from = indexOf(target)
+        while (from >= 0) {
+            val next = getOrNull(from + target.length)
+            if (next == null || !(next.isLetterOrDigit() || next == '_')) return true
+            from = indexOf(target, from + 1)
+        }
+        return false
     }
 
     private companion object {

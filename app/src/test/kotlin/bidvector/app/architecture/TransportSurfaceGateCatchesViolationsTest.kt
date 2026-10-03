@@ -4,6 +4,7 @@ import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -20,13 +21,16 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TransportSurfaceGateCatchesViolationsTest {
     private val policy = ArchitecturePolicy.load()
-    private val fixtureRoot = "${policy.packageRoot}.archfixture.violating.transport"
+    private val violatingRoot = "${policy.packageRoot}.archfixture.violating"
+    private val fixtureRoot = "$violatingRoot.transport"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
+    private val violatingAll: JavaClasses = ClassFileImporter().importPackages(violatingRoot)
     private val rules = transportRules(ReferenceCollection.FULL)
     private val ownerOnly = transportRules(ReferenceCollection.OWNER_ONLY)
 
     private fun transportRules(collection: ReferenceCollection) =
         TransportSurfaceRules(
+            packageRoot = policy.packageRoot,
             surfacePackages = policy.transportSurfacePackages.toSet(),
             surfaceTypes = policy.transportSurfaceTypes.toSet(),
             collection = collection,
@@ -78,9 +82,71 @@ class TransportSurfaceGateCatchesViolationsTest {
 
         val details = rules.details(registered)
 
-        details.filter { it.contains("$holder -> java.net.Socket") }.shouldNotBeEmpty()
-        details.filter { it.contains("$holder -> java.net.URI") }.shouldBeEmpty()
+        details shouldContain "$holder -> java.net.Socket"
+        details.filter { it == "$holder -> java.net.URI" }.shouldBeEmpty()
     }
+
+    /**
+     * D-6G2b-22·25 — 전송 표면 뿌리 **밖**의 JDK API 로 바이트를 내는 길. 금지 뿌리 열거에서는 전부 초록
+     * 이었다(vr H-1 실측). 기본 거부 허용 목록이 모듈마다 그것을 잡는지 잰다 — 허용 집합은 production 을
+     * 지키는 **같은 값**이다.
+     */
+    @Test
+    fun `전송 뿌리 밖 JDK API 로 바이트를 내는 길을 모듈마다 잡는다 — 기본 거부`() {
+        EXTERNAL_MUTATIONS.forEach { (module, fixture, externalPackage) ->
+            val details =
+                externalDetails("$violatingRoot.$module", policy.externalAllowedPackages(module).toSet())
+
+            withClue("$module / $fixture -> $externalPackage") {
+                details shouldContain "$violatingRoot.$fixture -> $externalPackage"
+            }
+        }
+    }
+
+    /**
+     * `java.util.ServiceLoader` 는 **1층이 잡지 못한다** — `java.util` 이 허용 패키지다. `java.lang` 의
+     * `ProcessBuilder` 와 같은 자리라 전송 낱개 타입으로 두고 2층이 잡는다.
+     */
+    @Test
+    fun `허용 패키지 안의 확장 지점은 전송 낱개 타입으로 잡는다 — ServiceLoader`() {
+        val holder = "$violatingRoot.adapters.external.RogueServiceLoaderExtension"
+        val layerOne =
+            externalDetails("$violatingRoot.adapters", policy.externalAllowedPackages("adapters").toSet())
+        val layerTwo =
+            rules
+                .rules(listOf("$violatingRoot.adapters"), emptySet())
+                .flatMap { it.allowEmptyShould(true).evaluate(violatingAll).failureReport.details }
+
+        layerOne.filter { it == "$holder -> java.util" }.shouldBeEmpty()
+        layerTwo shouldContain "$holder -> java.util.ServiceLoader"
+    }
+
+    /**
+     * 양성 대조 — 허용 집합에서 패키지 하나를 빼면 **그 패키지로** 신고가 늘어난다. 빼는 것은 고정 문자열이
+     * 아니라 **fixture 뿌리가 실제로 참조하면서 허용에도 있는** 패키지다(허용 목록 앞머리를 집으면 fixture
+     * 가 쓰지 않는 패키지라 늘어나는 신고가 없다 — 실측으로 한 번 그렇게 됐다).
+     */
+    @Test
+    fun `허용 패키지 하나를 빼면 그 패키지로 신고가 늘어난다 — 음성 쪽 양성 대조`() {
+        val root = "$violatingRoot.adapters"
+        val allowed = policy.externalAllowedPackages("adapters").toSet()
+        val dropped = rules.observedExternalPackages(violatingAll, root).first { it in allowed }
+
+        val before = externalDetails(root, allowed)
+        val after = externalDetails(root, allowed - dropped)
+
+        withClue("빼낸 패키지 $dropped") {
+            (after - before.toSet()).filter { it.endsWith(" -> $dropped") }.shouldNotBeEmpty()
+        }
+    }
+
+    private fun externalDetails(
+        root: String,
+        allowed: Set<String>,
+    ): List<String> =
+        rules
+            .externalReferenceRules(root, allowed)
+            .flatMap { it.allowEmptyShould(true).evaluate(violatingAll).failureReport.details }
 
     /**
      * 과잉 대조 둘. 들어오는 HTTP(서블릿 표면)는 바이트를 밖으로 내지 않아 뿌리 밖이고, 전송을 아예
@@ -101,26 +167,51 @@ class TransportSurfaceGateCatchesViolationsTest {
                     .failureReport.details
             }
 
+    /**
+     * vr L-5 · cr ④ — 상세 줄을 **정확히** 비교한다. `contains("-> java.net.URL")` 로 재면
+     * `java.net.URLConnection` 으로 잡혀도 통과해, 「다른 이유로 잡힘」을 거르려는 취지가 한 칸 헐거웠다.
+     */
     private fun TransportSurfaceRules.mustReport(
         fixture: String,
         surfaceType: String,
     ) {
-        details(emptySet()).filter { it.contains(".$fixture -> $surfaceType") }.shouldNotBeEmpty()
+        details(emptySet()) shouldContain "$fixtureRoot.$fixture -> $surfaceType"
     }
 
+    /**
+     * cr ⑤ — 타입을 주지 않으면 앞 판은 `contains("")` 로 항상 참이어서 **무동작**이었다. 지금은 그
+     * 클래스로 시작하는 상세가 하나도 없음을 잰다(타입을 주면 그 한 줄만).
+     */
     private fun TransportSurfaceRules.mustNotReport(
         fixture: String,
         surfaceType: String? = null,
     ) {
-        val suffix = surfaceType?.let { " -> $it" }.orEmpty()
-        details(emptySet()).filter { it.contains(".$fixture") && it.contains(suffix) }.shouldBeEmpty()
+        val reported = details(emptySet()).filter { it.startsWith("$fixtureRoot.$fixture -> ") }
+        if (surfaceType == null) {
+            reported.shouldBeEmpty()
+        } else {
+            reported.filter { it == "$fixtureRoot.$fixture -> $surfaceType" }.shouldBeEmpty()
+        }
     }
 
     private companion object {
+        /** D-6G2b-25 — (모듈, fixture 의 뿌리 아래 경로, 그 변이를 성립시키는 바깥 패키지). */
+        val EXTERNAL_MUTATIONS =
+            listOf(
+                Triple("adapters", "adapters.external.RogueLoggingSocketSend", "java.util.logging"),
+                Triple("adapters", "adapters.external.RogueXmlParseFetch", "javax.xml.parsers"),
+                Triple("adapters", "adapters.external.RogueJmxConnect", "javax.management.remote"),
+                Triple("adapters", "adapters.external.RogueSwingPageFetch", "javax.swing"),
+                Triple("adapters", "adapters.external.RogueDesktopBrowse", "java.awt"),
+                Triple("adapters", "adapters.external.RogueScriptEval", "javax.script"),
+                Triple("workflow", "workflow.external.RogueWorkflowSocketSend", "java.util.logging"),
+            )
+
         /**
          * 심은 우회 → **그 변이를 성립시키는** 전송 표면 타입. verifier r4·r5 의 변이(KA1·KA2·KA3·KA4·
-         * KA12·KA13·KA14·KA15)와 이 slice 가 고안한 열하나다. 한 fixture 에 여러 타입이 걸리는 경우에도
-         * 여기 적은 타입으로 잡혀야 한다 — 「다른 이유로 잡혔다」를 통과로 세지 않는다.
+         * KA12·KA13·KA14·KA15)와 이 slice 가 고안한 것들이다(cr M-2 의 간접 시그니처 넷 포함). 한 fixture 에
+         * 여러 타입이 걸리는 경우에도 여기 적은 타입으로 잡혀야 하고, 비교는 상세 줄 **전체 일치**다 —
+         * 「다른 이유로 잡혔다」를 통과로 세지 않는다.
          */
         val MUTATIONS =
             mapOf(
@@ -132,9 +223,11 @@ class TransportSurfaceGateCatchesViolationsTest {
                 // KA13·그 형제 — 바깥 호출을 프로세스에 맡긴다.
                 "RogueProcessCurl" to "java.lang.ProcessBuilder",
                 "RogueRuntimeExec" to "java.lang.Runtime",
-                // KA14 — 열거 목록에 없던 채널·소켓 형태.
+                // KA14 — 열거 목록에 없던 비동기 채널.
                 "RogueAsyncChannelFetch" to "java.nio.channels.AsynchronousSocketChannel",
+                // KA3 — 평범한 소켓(6G 가 이미 잡던 형태의 회귀).
                 "RogueRawSocket" to "java.net.Socket",
+                // 열거 목록에 없던 소켓 형태 둘.
                 "RogueDatagramSend" to "java.net.DatagramSocket",
                 "RogueSocketFactoryFetch" to "javax.net.SocketFactory",
                 // KA15·그 형제 — 클래스패스에 이미 있는 Spring 전송 표면.
@@ -151,6 +244,11 @@ class TransportSurfaceGateCatchesViolationsTest {
                 "RogueTypealiasedClient" to "java.net.http.HttpClient",
                 // 쌍 등식 축 — 등재된 보유자가 전송 타입을 더 쥔다.
                 "RogueRegisteredHolderGainingTransport" to "java.net.Socket",
+                // cr M-2 — 전송 타입이 시그니처의 간접 자리에만 있는 형태 넷.
+                "RogueGenericArgHolder" to "java.net.http.HttpClient",
+                "RogueSupplierArgHolder" to "java.net.http.HttpClient",
+                "RogueSamLambdaHolder" to "java.net.http.HttpClient",
+                "RogueAnnotatedHolder" to "java.net.http.HttpClient",
             )
     }
 }
