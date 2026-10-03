@@ -362,9 +362,9 @@ def test_a_bare_path_with_a_space_converts_to_a_percent_encoded_uri(
 ) -> None:
     """D-6G2e-16 — 공백·한글 경로도 **올바른** URI 로 바뀐다.
 
-    끝까지 도는 것은 요구하지 않는다: 판독기(`adapters/snapshot_files.py`, in_scope 밖)가
-    퍼센트 인코딩을 풀지 않아 이 URI 를 못 읽는다(`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`,
-    6G-2c). 여기서 재는 것은 변환이 맞다는 것과 **예외로 새지 않는다**는 것이다."""
+    여기서 재는 것은 변환 자체다(맞는 URI 이고 예외로 새지 않는다). 그 URI 로 **끝까지
+    도는가**는 D-6G2c-22 가 판독기를 고친 뒤의 자리이고
+    `test_a_spaced_snapshot_runs_end_to_end` 가 잰다."""
     snapshot = _spaced_snapshot(tmp_path).resolve()
     expected = snapshot.as_uri()
     assert "%20" in expected, expected
@@ -455,10 +455,10 @@ def test_a_relative_file_scheme_input_prints_the_conversion_notice(
 def test_output_inside_a_percent_named_snapshot_is_refused(tmp_path: Path) -> None:
     """vr r2 L-r2-1 — 이름에 유효한 `%XX` 가 **문자 그대로** 든 디렉터리.
 
-    guard 가 디코딩한 경로만 보면 `a%41b` 를 `aAb` 와 비교해 **통과시키고**, 판독기는
-    `a%41b` 를 문자 그대로 읽어 **성공**한다 — 그래서 판정이 스냅숏 디렉터리 안에 쓰인다
-    (exit 0). 두 자리의 해석 규칙이 갈린 자리이고, 판독기 쪽
-    (`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`)이 닫힐 때까지 guard 가 **두 경로를 다** 본다.
+    guard 가 디코딩한 경로만 보면 `a%41b` 를 `aAb` 와 비교해 **통과시킨다**. D-6G2c-22 로
+    판독기도 디코딩하게 되어 그 URI 로는 스냅숏을 못 찾지만(그 자리가 비어 있다), guard 는
+    **문자 그대로의 경로도** 보수적 여분으로 본다 — 그래서 거부가 판독보다 먼저 선다. 거부가
+    먼저여야 「읽기가 실패해서 안 썼다」와 「거부해서 안 썼다」가 섞이지 않는다.
 
     같은 디렉터리를 맨 경로로 주면 앞 판에서도 거부된다 — 이 판이 성립하는 입력은 **URI** 다."""
     snapshot = _snapshot_path(tmp_path / "a%41b")
@@ -480,6 +480,33 @@ def test_output_inside_a_percent_named_snapshot_is_refused(tmp_path: Path) -> No
     assert {
         path.name: path.read_bytes() for path in sorted(snapshot.iterdir())
     } == before, "거부된 실행이 스냅숏 디렉터리를 건드렸다"
+
+
+def test_a_spaced_snapshot_runs_end_to_end(tmp_path: Path) -> None:
+    """D-6G2c-22 — 공백·한글이 든 스냅숏 경로를 판독기가 **끝까지** 읽는다.
+
+    `Path.as_uri()` 는 그 이름을 `%XX` 로 인코딩하고 `urlparse(...).path` 는 풀지 않는다 —
+    앞 판은 그 문자열을 그대로 경로로 써서 `SNAPSHOT_UNREADABLE` 로 섰다. 변환과 거부는
+    맞았고 **읽기만** 못 했다(`OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`).
+
+    URI 를 직접 넘긴다 — 맨 경로 판은 변환 자리가 한 번 더 끼어 「판독기가 디코딩하는가」를
+    가리지 않는다."""
+    snapshot = _spaced_snapshot(tmp_path).resolve()
+    uri = snapshot.as_uri()
+    assert "%20" in uri, uri
+    output_dir = tmp_path / "verdicts"
+    result = _cli(
+        *_argv(
+            snapshot=uri,
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=output_dir,
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    payload = (output_dir / "verdict.json").read_bytes()
+    assert hashlib.sha256(payload).hexdigest() in result.stdout.split(), result.stdout
+    assert json.loads(payload)["variants"], result.stdout
 
 
 def test_the_app_package_does_not_import_urllib_request() -> None:
