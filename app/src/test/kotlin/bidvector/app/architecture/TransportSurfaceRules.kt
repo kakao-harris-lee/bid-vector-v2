@@ -20,8 +20,8 @@ enum class ReferenceCollection { OWNER_ONLY, FULL }
 
 /**
  * 한 클래스가 **실제로 참조하는** 타입 이름 전수 — 의존 그래프 + [ReferenceCollection.FULL] 에서는 호출
- * 대상(호출·메서드 참조)의 소유·인자·반환 타입과 필드 접근의 필드 타입까지. 이름은 배열을 벗기고 중첩
- * 클래스를 최상위로 접은 것이다.
+ * 대상(호출·메서드 참조)의 소유·인자·반환 타입과 필드 접근의 필드 타입까지. 이름은 배열을 벗기고
+ * [outermostName] 으로 접은 것이다.
  *
  * **정의가 하나다.** 전송 표면 게이트와 반사 게이트가 같은 함수를 쓰므로, 수집 범위를 좁히는 편집은 두
  * 게이트의 양성 대조를 동시에 RED 로 만든다 — KA1 의 구멍이 바로 이 정의에 있었다.
@@ -30,7 +30,7 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
     val found = linkedSetOf<String>()
 
     fun collect(type: JavaClass) {
-        found += type.baseComponentType.outermostClass().fullName
+        found += type.baseComponentType.fullName.outermostName()
     }
 
     directDependenciesFromSelf.forEach { collect(it.targetClass) }
@@ -45,7 +45,29 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
     return found
 }
 
-/** 중첩 클래스(`Outer$Inner`)를 가장 바깥 클래스로 접는다 — 등재는 최상위 이름으로 적는다. */
+/**
+ * 중첩 클래스를 가장 바깥 클래스로 접는다 — **이름의 첫 `$` 앞까지** 자른다(cr M-1).
+ *
+ * ArchUnit 의 `enclosingClass` 로 접으면 결과가 **해소 여부에 달린다**: 호출 대상 소유 타입으로 등장한
+ * JDK 클래스는 classpath 에서 해소되어 접히고, 인자·반환 타입으로만 등장한 클래스는 서술자에서 만든
+ * 자리표라 접히지 않았다. 그래서 전송 표면을 하나도 늘리지 않는 편집(`BodyHandler` 에 메서드 하나를
+ * 부르는 것)이 등재 철자를 바꿔 등식을 깼다. 이름 기준 절단은 그 결합을 끊는다.
+ *
+ * 접지 않는 선택지도 쟀다 — Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 더 자주 낡는다.
+ */
+internal fun String.outermostName(): String = substringBefore('$')
+
+/** [outermostName] 의 `JavaClass` 판 — 보유자 쪽 이름을 같은 규칙으로 접는다. */
+internal fun JavaClass.outermostClassName(): String = fullName.outermostName()
+
+/**
+ * ArchUnit `enclosingClass` 기준 접기 — **쌍 등식 게이트는 쓰지 않는다**([outermostName] 을 쓴다).
+ *
+ * 6F·6G 의 앞선 게이트들(원문 값 획득 · 대분류 · 공고명 키 · 러너·로거)이 이것으로 접은 집합을 정책
+ * 파일에 적고 있고, 그 게이트들이 접는 타입은 전부 `bidvector..` 라 두 규칙의 결과가 같다(해소가 보장된
+ * 자리다). 그 집합들을 이름 규칙으로 옮기는 것은 그 게이트들의 관측을 다시 재는 별도 slice 몫이다 —
+ * 여기서는 `packageName` 이 필요해 `JavaClass` 를 그대로 돌려주는 자리에만 남긴다.
+ */
 internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
 
 /**
@@ -56,6 +78,7 @@ internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.out
  * 허용은 등재 쌍과의 등식이고, 쌍이라 등재된 보유자가 **새 전송 타입을 더 쥐는** 것도 붉어진다.
  */
 class TransportSurfaceRules(
+    private val packageRoot: String,
     private val surfacePackages: Set<String>,
     private val surfaceTypes: Set<String>,
     private val collection: ReferenceCollection = ReferenceCollection.FULL,
@@ -80,12 +103,75 @@ class TransportSurfaceRules(
     ): Set<Pair<String, String>> =
         classes
             .filter { origin -> roots.any { origin.packageName == it || origin.packageName.startsWith("$it.") } }
-            .flatMap { origin -> transportTypesOf(origin).map { origin.outermostClass().fullName to it } }
+            .flatMap { origin -> transportTypesOf(origin).map { origin.outermostClassName() to it } }
             .toSet()
+
+    /**
+     * D-6G2b-22(vr H-1) — **바깥 참조의 기본 거부**. 전송 표면을 「금지 뿌리 열거」로 두면 목록 밖 패키지가
+     * 네트워크를 열 때 처음부터 대상이 아니다(`java.util.logging.SocketHandler` · `javax.xml.parsers` ·
+     * `javax.management.remote` · `javax.swing` 변이가 전부 초록이었다). 그래서 방향을 뒤집는다:
+     * [moduleRoot] 아래 production 이 참조하는 `bidvector..` 밖 타입은 **그 패키지가 [allowedPackages] 에
+     * 있어야** 한다.
+     *
+     * **두 층이다.** 타입이 전송 표면이면([isSurfaceType]) 이 층을 보지 않고 (클래스, 타입) 쌍 등식만
+     * 본다 — 그래서 `java.lang` 이 허용 패키지여도 `java.lang.ProcessBuilder` 는 쌍 층에서 붉고, 전송
+     * 뿌리는 허용 집합에 들어가지 않는다.
+     *
+     * 허용은 **정확한 패키지 이름**이다(접두 뿌리가 아니다). 접두로 두면 `java.util` 이 `java.util.logging`
+     * 을, `javax.xml` 이 `javax.xml.parsers` 를 끌고 들어와 거부 하위를 또 열거해야 한다 — 그 열거가 바로
+     * H-1 이 벌한 방향이다.
+     */
+    fun externalReferenceRules(
+        moduleRoot: String,
+        allowedPackages: Set<String>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAnyPackage("$moduleRoot..")
+                .should(referenceExternalPackageOutside(allowedPackages))
+                .because("D-6G2b-22 — $moduleRoot 의 바깥 참조는 허용 패키지 집합 안뿐이다(기본 거부)"),
+        )
+
+    /** [moduleRoot] 아래에서 관측한 **바깥 패키지** 전수(전송 표면 타입 제외) — 허용 집합과 같아야 한다. */
+    fun observedExternalPackages(
+        classes: JavaClasses,
+        moduleRoot: String,
+    ): Set<String> =
+        classes
+            .filter { it.packageName == moduleRoot || it.packageName.startsWith("$moduleRoot.") }
+            .flatMap { origin -> externalPackagesOf(origin) }
+            .toSet()
+
+    /**
+     * 한 클래스가 참조하는 바깥 패키지 이름 — `bidvector..` 와 전송 표면 타입과 **원시 타입**(`int`·`void`
+     * 처럼 패키지가 없는 이름)을 뺀다. 전송 표면을 빼는 것이 두 층의 분기다.
+     */
+    private fun externalPackagesOf(origin: JavaClass): Set<String> =
+        origin
+            .referencedTypeNames(ReferenceCollection.FULL)
+            .filterNot { it.startsWith("$packageRoot.") || it == packageRoot }
+            .filterNot(::isSurfaceType)
+            .map { it.substringBeforeLast('.', "") }
+            .filter(String::isNotEmpty)
+            .toSet()
+
+    private fun referenceExternalPackageOutside(allowed: Set<String>): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("허용 밖 바깥 패키지를 참조한다 (허용 ${allowed.size}종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                val referencer = item.outermostClassName()
+                externalPackagesOf(item)
+                    .filterNot { it in allowed }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "$referencer -> $it")) }
+            }
+        }
 
     /** 등재된 쌍의 타입이 전송 표면 술어 안에 있는지 — 술어 밖 타입을 등재해 집합을 채우는 길을 막는다. */
     fun isSurfaceType(type: String): Boolean =
-        type in surfaceTypes || surfacePackages.any { type == it || type.startsWith("$it.") }
+        type in surfaceTypes || surfacePackages.any { type.startsWith("$it.") }
 
     private fun transportTypesOf(origin: JavaClass): Set<String> =
         origin.referencedTypeNames(collection).filterTo(linkedSetOf(), ::isSurfaceType)
@@ -98,7 +184,7 @@ class TransportSurfaceRules(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val holder = item.outermostClass().fullName
+                val holder = item.outermostClassName()
                 transportTypesOf(item)
                     .filterNot { holder to it in registered }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$holder -> $it")) }

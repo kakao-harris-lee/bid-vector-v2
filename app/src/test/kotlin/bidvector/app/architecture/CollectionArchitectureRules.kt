@@ -140,7 +140,7 @@ class CollectionArchitectureRules {
                 origin
                     .referencedTypeNames(ReferenceCollection.FULL)
                     .filter { isInPackageNames(it, packages) }
-                    .map { origin.outermostClass().fullName to it }
+                    .map { origin.outermostClassName() to it }
             }.toSet()
 
     /** [roots] 아래에서 관측한 (최상위 클래스, [classType] 의 멤버) 쌍 전수 — 등재 집합과 같아야 한다. */
@@ -154,7 +154,7 @@ class CollectionArchitectureRules {
             .flatMap { origin ->
                 origin.accessesFromSelf
                     .filter { it.targetOwner.fullName == classType }
-                    .map { origin.outermostClass().fullName to it.name }
+                    .map { origin.outermostClassName() to it.name }
             }.toSet()
 
     /** [roots] 아래 클래스 가운데 [types] 를 참조하는 것의 최상위 클래스 이름 집합 — 허용 집합과 같아야 한다. */
@@ -197,7 +197,7 @@ class CollectionArchitectureRules {
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val referencer = item.outermostClass().fullName
+                val referencer = item.outermostClassName()
                 item
                     .referencedTypeNames(ReferenceCollection.FULL)
                     .filter { isInPackageNames(it, packages) }
@@ -215,7 +215,7 @@ class CollectionArchitectureRules {
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val accessor = item.outermostClass().fullName
+                val accessor = item.outermostClassName()
                 item.accessesFromSelf
                     .filter { it.targetOwner.fullName == classType && accessor to it.name !in registered }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$accessor -> $classType.${it.name}")) }

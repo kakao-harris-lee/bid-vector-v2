@@ -10,7 +10,15 @@ import java.util.Properties
 class ArchitecturePolicy private constructor(
     private val values: Map<String, String>,
     private val memberEffects: Map<String, String>,
+    private val declaredKeys: List<String>,
 ) {
+    /**
+     * cr L-9 — 같은 키가 파일에 두 번 적히면 `Properties` 가 조용히 **마지막만** 남긴다. 그러면 등재 목록
+     * 하나가 사라져도 키 집합 등식은 그대로라 보이지 않는다. 원문 줄에서 센다.
+     */
+    val duplicateKeys: Set<String>
+        get() = declaredKeys.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+
     val packageRoot: String get() = value("package.root")
 
     // 아래 넷은 **패키지 세그먼트**다. 정책 파일은 Gradle project 이름으로 적고
@@ -191,6 +199,22 @@ class ArchitecturePolicy private constructor(
 
     val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
 
+    /**
+     * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부: 판정 대상 모듈과 **모듈별** 허용 패키지 집합. 허용은 정확한
+     * 패키지 이름이고(접두 뿌리가 아니다) 두 방향 등식으로 관측과 같아야 한다.
+     */
+    val externalModules: List<String> get() = list("collection.external.modules")
+
+    fun externalAllowedPackages(module: String): List<String> = list("$EXTERNAL_PACKAGES_PREFIX$module")
+
+    /** 정책 파일에 실제로 있는 모듈 키 집합 — [externalModules] 와 같아야 한다(조용히 더하는 길을 막는다). */
+    val externalModuleKeys: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(EXTERNAL_PACKAGES_PREFIX) }
+                .map { it.removePrefix(EXTERNAL_PACKAGES_PREFIX) }
+                .toSet()
+
     /** vr r4 L-12·L-13 — 공고 키 해시·hex 형태를 짓는 함수와 그것을 불러도 되는 클래스 집합. */
     val keyHashRoots: List<String> get() = list("collection.key-hash.roots")
     val keyHashType: String get() = value("collection.key-hash.type")
@@ -249,10 +273,36 @@ class ArchitecturePolicy private constructor(
 
     companion object {
         private const val TRANSPORT_HOLDERS_PREFIX = "collection.transport.holders."
+        private const val EXTERNAL_PACKAGES_PREFIX = "collection.external.allowed-packages."
         private const val LOCATION_PROPERTY = "bidvector.architecture.policy"
         private const val MEMBER_EFFECTS_PROPERTY = "bidvector.member.effects"
 
-        fun load(): ArchitecturePolicy = ArchitecturePolicy(read(LOCATION_PROPERTY), read(MEMBER_EFFECTS_PROPERTY))
+        fun load(): ArchitecturePolicy =
+            ArchitecturePolicy(
+                read(LOCATION_PROPERTY),
+                read(MEMBER_EFFECTS_PROPERTY),
+                declaredKeys(LOCATION_PROPERTY),
+            )
+
+        /**
+         * 정책 파일이 **선언한 키 전수**(중복 포함). 줄 끝 `\` 로 이어지는 값 줄은 키 줄이 아니다 —
+         * `Properties` 가 접은 뒤의 Map 으로는 중복을 셀 수 없어 원문을 읽는다.
+         */
+        private fun declaredKeys(locationProperty: String): List<String> {
+            val location = System.getProperty(locationProperty) ?: error("시스템 속성 '$locationProperty' 가 없다")
+            val keys = mutableListOf<String>()
+            var continued = false
+            File(location).readLines(Charsets.UTF_8).forEach { line ->
+                val wasContinued = continued
+                continued = line.endsWith("\\")
+                if (wasContinued) return@forEach
+                val trimmed = line.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) return@forEach
+                val separator = trimmed.indexOfFirst { it == '=' || it == ':' }
+                if (separator > 0) keys += trimmed.substring(0, separator).trim()
+            }
+            return keys
+        }
 
         // UTF-8 Reader 로 읽는다 — `Properties.load(InputStream)` 은 ISO-8859-1 이라
         // 분류 사유(값에 든 한글)가 깨진다.
