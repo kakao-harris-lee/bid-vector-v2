@@ -13,8 +13,12 @@ v5 는 문턱의 출처를 **확정 범위**(`sample_scope_divisions`, 생산 �
 4. **행의** 업무도 범위 안 — 밖이면 채점에 들어가면서 공시에서 사라진다
 5. 범위 값은 §2.1 의 닫힌 어휘이고 오름차순·중복 없음
 
-더해서 manifest 의 **키 집합**을 스키마 문서와 맞댄다 — 키를 한쪽만 늘리면 여기서
-걸린다(업무 어휘·생산 귀속 사유를 문서에 맞대는 것과 같은 갈래).
+더해서 manifest 의 **키 집합**을 **세 자리**에서 맞댄다(M6/6G-2c, D-6G2c-12) — 스키마 문서
+§2 · 판독기의 허용 키 · **test 쪽 manifest 생성기 둘**. 앞 판은 문서와 판독기만 맞댔고,
+생성기는 그 등식 밖이었다: 칸을 하나 늘리면 판독이 거부해 잡히기는 하지만 **어느 자리를
+고쳐야 하는지** 등식이 말해 주지 않았다(6G r5 등재 제한). 생성기를 하나로 합치지 않는 이유는
+따로 있다 — 깨뜨린 manifest 를 짓는 test 가 헐거워진다(저자 판단 승계). 그래서 합치는 대신
+**둘 다 등식에 넣는다**.
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ from ml_engine.evaluation.backtest.snapshot import (
     load_snapshot,
 )
 from ml_engine.evaluation.backtest.strategies import UniformBandStrategy
+from tests.evaluation._backtest_fixture import build_files
 
 _TESTS_ROOT = Path(__file__).resolve().parents[1]
 _REPO_ROOT = _TESTS_ROOT.parents[1]
@@ -116,17 +121,57 @@ def _verdict_payload(snapshot: LoadedSnapshot) -> dict[str, Any]:
     return payload
 
 
-def test_manifest_key_set_equals_the_schema_document() -> None:
-    """문서 §2 의 manifest 예제와 판독기의 허용 키가 같다.
-
-    판독은 미지 키에 스냅숏 전체를 거부하므로, 생산 쪽이 칸을 하나 늘리면 문서를
-    고치는 것만으로는 부족하다 — 둘을 맞대 두면 한쪽만 움직인 순간 여기서 걸린다."""
+def _documented_manifest_keys() -> set[str]:
+    """스키마 문서 §2 의 manifest 예제가 적은 키 집합 — 문서를 **읽기만** 한다."""
     text = _SCHEMA_DOCUMENT.read_text(encoding="utf-8")
     marker = "## 2. `manifest.json`"
     assert marker in text, "스키마 문서에서 §2 를 찾지 못했다"
     block = re.search(r"```json\n(.+?)\n```", text[text.index(marker) :], re.DOTALL)
     assert block is not None, "§2 의 manifest 예제 블록을 찾지 못했다"
-    documented = set(json.loads(block.group(1)))
+    return set(json.loads(block.group(1)))
+
+
+def test_manifest_key_set_equals_the_schema_document() -> None:
+    """문서 §2 의 manifest 예제와 판독기의 허용 키가 같다.
+
+    판독은 미지 키에 스냅숏 전체를 거부하므로, 생산 쪽이 칸을 하나 늘리면 문서를
+    고치는 것만으로는 부족하다 — 둘을 맞대 두면 한쪽만 움직인 순간 여기서 걸린다."""
+    documented = _documented_manifest_keys()
+    assert documented == set(READER_MANIFEST_KEYS), (
+        f"문서 §2: {sorted(documented)} · 판독기: {sorted(READER_MANIFEST_KEYS)}"
+    )
+
+
+def test_both_manifest_generators_emit_the_documented_key_set() -> None:
+    """D-6G2c-12 — **세 자리 등식**: test 쪽 manifest 생성기 **둘** == 문서 §2 ==
+    판독기 허용 키.
+
+    앞 판의 등식은 문서와 판독기 둘뿐이었고 생성기는 밖이었다. 칸을 하나 늘리면 두
+    생성기가 그 칸을 빠뜨린 채 남고, 판독이 미지/부재로 거부하기는 하지만 **어느 자리를
+    고쳐야 하는지**는 말해 주지 않는다 — 거부 문면은 manifest 의 칸 이름만 나른다
+    (6G r5 가 등재한 제한 그대로다). 생성기까지 등식에 넣으면 빠뜨린 쪽이 **이름으로**
+    지목된다.
+
+    둘을 하나로 합치지 않는다: 하나는 인자로 **깨뜨린 manifest** 를 짓는 생성기이고
+    (`_backtest_support.manifest_bytes`), 다른 하나는 커밋된 왕복 golden 과 바이트가
+    묶인 고정 판이다(`_backtest_fixture.build_files`). 합치면 전자의 자유도가 후자의
+    고정에 묶여 깨뜨리는 test 가 헐거워진다(저자 판단 승계)."""
+    documented = _documented_manifest_keys()
+    rows = rows_bytes([row_payload("n-1")])
+    support_keys = set(json.loads(manifest_bytes(rows)))
+    fixture_manifest, _, _ = build_files()
+    fixture_keys = set(json.loads(fixture_manifest))
+
+    assert support_keys == documented, (
+        "`_backtest_support.manifest_bytes` 의 키가 문서 §2 와 다르다 — "
+        f"생성기에만: {sorted(support_keys - documented)} · "
+        f"문서에만: {sorted(documented - support_keys)}"
+    )
+    assert fixture_keys == documented, (
+        "`_backtest_fixture.build_files` 의 키가 문서 §2 와 다르다 — "
+        f"생성기에만: {sorted(fixture_keys - documented)} · "
+        f"문서에만: {sorted(documented - fixture_keys)}"
+    )
     assert documented == set(READER_MANIFEST_KEYS), (
         f"문서 §2: {sorted(documented)} · 판독기: {sorted(READER_MANIFEST_KEYS)}"
     )
