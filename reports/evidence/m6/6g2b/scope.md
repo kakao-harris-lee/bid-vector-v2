@@ -131,6 +131,16 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-31** | in_scope 에 `archfixture/violating/workflow/external/**` 와 `app/src/test/resources/archunit.properties` 추가(레인 계약 대조 11). 수정 라운드 결과: 허용 집합 모듈별 127 · fixture 위반 19 → 31(1층 7 + 2층 5) · 변이 열(⑦ 허용 패키지 제거 2 failed · ⑧ 미관측 허용 추가 **등식만 1 failed** · ⑨ 접기 되돌림 2 failed · ⑩ `ServiceLoader` 낱개 제거 **2층만 1 failed**) · test 2,633 · production diff 0. 수집 쪽 정확 매치는 「이름 경계 일치」(`$` 경계) — 기존 단언 하나가 느슨한 비교에 의존했음이 드러나(`RawObservationStore.append` 가 `append$default` 로만 잡힘) 경계 규칙으로 통과. `qualityBaseline` 은 up-to-date 로 실행된 측정이 아님(사실 등재) | 레인 보고 |
 | **D-6G2b-32** | **판정 SHA r2 = 이 갱신 커밋**. verifier r2 표적(D-27 그대로 + 수정 라운드 커밋 전수 `0f11117a`·`f77c319a`·`0c6f36b2`·`de86738d`·`0fb24e8d`·`541b5065`·`130dc4c9` 표적 재검증): H-1 변이 넷 + 새 fixture 12 전수 · 허용 등식 양방향(⑦⑧) · 두 층 분기(⑩) · 접기(⑨) · 전송 쌍 S1~S7 · KA2~4 · 반사 셋 · 모집단 단언(모듈 제외 변이) · **새 우회 ≥2**(허용 패키지 안에서 바이트를 내보내는 길 — 예: `java.io` 로 `/dev/tcp` 류·`java.nio.file.Files` 의 원격 FS·`javax.sql.DataSource` 의 JDBC URL(경계 밖 선언 확인)) · acceptance `check` 1회 · rollback(실측 HEAD `130dc4c9`, 복원 14 + 공유 hunk 5) · evidence 위생. 재작업 1/5 | |
 
+## 계약 갱신 r6 (2026-10-03, 팀장 — 판정 SHA 재고정 · code-reviewer r2 수령)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-33** | **사실 선언(레인 경계)**: r5 가 판정 SHA 를 `d1b2b7f0` 로 고정한 시점에 팀장의 앞선 지시(「모듈 목록을 M-4 단언과 같은 자리에서 읽게」)가 레인에서 집행 중이었다 → 동결 뒤 커밋 다섯(`28c789c6` 정책 · `9431ead0` 술어·단언 · `dca888aa` ktlint · `137d5615`·`a3dc58e1` evidence). 이력은 되쓰지 않는다. **판정 SHA r2 = 이 갱신 커밋**(a3dc58e1 뒤). 표적 커밋 목록에 `28c789c6`·`9431ead0`·`dca888aa` 추가(앞 둘은 술어/정책). 교훈은 하네스 메모리로: 동결은 「미완 항목 없음」 보고 뒤에 건다 | 팀장 책임의 경합 |
+| **D-6G2b-34** | **판정 대상 모듈은 `layer.*` 선언에서 도출**(`collection.external.modules` 키 삭제, 모집단 기대값도 `policy.allModules`) — 손 목록 셋이 하나로. 변이 ⑪: `layer.application` 을 비우면 **넷 RED**(모집단 · 모듈 키 등식 · 1급 패키지 집합 · 의존 방향). 새 public 표면 16 → 15 | cr r2 M-1 · 팀장 지시 |
+| **D-6G2b-35** | **cr r2 M-2**: `outermostClass()` KDoc 의 「두 접기 규칙의 결과가 같다」는 다른 게이트의 등재(`collection.key-hash.holders` 의 `NoticeKeyHash$Companion`, `app.injection.allowed-types` 의 `Resolution$Resolved`)로 반증된다 → KDoc 을 「**이 게이트의 관측(전송·바깥 참조·반사)에서** 같다; 다른 게이트는 `enclosingClass` 접기를 그대로 쓰며 옮기려면 그 등재를 재관측해야 한다」로 정정(장부 일괄). 다른 게이트의 접기 통일은 **`OPEN-6G2B-FOLDING-UNIFICATION`**(6G-2c 후보) | 뒤 slice 가 문장을 믿고 옮기면 등식이 깨진다 |
+| **D-6G2b-36** | **cr r2 M-3**: 허용 패키지 **안**의 바이트 출구(`java.io` 의 `/dev/tcp`·FIFO, `java.nio.file` 원격 FS)는 1층·2층 어느 쪽도 못 잡고 낱개 열거(`ServiceLoader` 선례)로만 닫힌다 → **`OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`** 등재(위협 모델 「방어하지 않는 것」에 「허용 패키지 안의 파일 시스템 경유 출구」 추가). 낱개 목록을 지금 늘리지 않는다 | 열거 축의 잔여 — 경계로 처리하고 OPEN |
+| **D-6G2b-37** | **verifier r2-b 표적**(r2 는 `d1b2b7f0` clone 에서 완료): `28c789c6`·`9431ead0` 델타 — 변이 ⑪ 재현 · `collection.external.modules` 잔존 참조 0 · 허용 키 집합 == 도출 모듈 집합 단언 · rollback 실측 HEAD `dca888aa`, `dca888aa..<판정 SHA>` 복원 경로 diff 빈 출력 · 공유 hunk 넷 · clean-tree. cr r2 low 열하나는 장부 일괄 | |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
