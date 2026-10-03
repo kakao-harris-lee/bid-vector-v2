@@ -83,6 +83,18 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-8** | **출하 코드 변경은 import 정리뿐이다.** 쓰이지 않는 `import java.net.http.HttpClient` 둘(code-review r5 L-6 — 6G 표적 수정이 이미 지웠으면 해당 없음) 밖의 production diff 는 없어야 한다. 착수 실측에서 **등재되지 않은 실제 전송 호출**이 나오면 멈추고 보고한다 | 게이트 slice 가 제품 거동을 바꾸면 범위가 샌다 |
 | **D-6G2b-9** | **게이트 등재 meta-gate 에 올린다.** 새 게이트 test 를 `AppGateRegistrationTest` 계열의 등재 목록에 넣는다 — 빠뜨리면 그 test 가 RED | 6G r5 에서 아키텍처 게이트가 한 커밋 동안 붉은 채 지나갔다(`check` 미실행). 등재는 게이트가 돌지 않는 사고를 막는다 |
 
+## 계약 갱신 r1 (2026-10-03, 팀장 — 착수 실측·구현 보고 수령)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-10** | **in_scope 에 음성 fixture 경로 `app/src/test/kotlin/bidvector/archfixture/violating/transport/**` 와 `config/quality/gate-tests.properties` 를 더한다.** 초안 in_scope 가 빠뜨린 자리 — fixture 는 기존 관례대로 `archfixture/violating/` 아래가 맞다 | 레인 계약 대조 ④ |
+| **D-6G2b-11** | **A-2 운영자 결정 2026-10-03: 반사 게이트 뿌리를 `adapters` 까지 넓히고, 기존 참조 9건(`kotlin.reflect.KClass` 2 · `java.lang.Class` 멤버 7 — `getSimpleName` 6, `getResourceAsStream` 1)을 (클래스, 멤버) 쌍 정확 집합으로 허용 등재한다.** 별도 커밋. 변이: 쌍 하나 제거 → RED, 새 반사 참조 → RED | 전송 게이트가 정적 분석이라 문자열 이름 반사가 유일한 구멍이고 adapters 가 전송 코드가 사는 모듈 |
+| **D-6G2b-12** | **금지 뿌리 15 → 17.** 6G 의 `transport-bypass.types` 에 있던 `java.lang.reflect.Method`·`java.lang.invoke.MethodHandles` 가 계약 뿌리 목록만으로는 빠진다(실측: `RogueMethodHandleInvoke` 를 6G 는 잡고 계약 뿌리는 못 잡음) → `java.lang.reflect`·`java.lang.invoke` 를 뿌리로. 클래스패스 실측으로 `jakarta.websocket`·`org.apache.tomcat.websocket`·`com.sun.net`·`sun.net` 추가(관측 0). `io.netty` 는 classpath 에 없으나 뿌리로 유지 | 6G 를 잃지 않는다(D-5 의 「합치기 전후 변이 유지」) |
+| **D-6G2b-13** | **무해 타입 목록을 두지 않는다 — 관측 쌍 전수(63)를 용도와 함께 등재.** 값·예외 타입이 14종으로 (3) 의 열 개 문턱을 넘었고, 문턱의 지시대로 다시 보니 무해 목록은 「그 타입을 모든 클래스에서 자유롭게」 해 게이트를 헐겁게 하는 쪽이었다. 쌍 등식의 취지는 그대로이고 더 조인다(무해 타입 0) | 레인 ⓓ · (3) 과잉 판단 |
+| **D-6G2b-14** | **낱개 타입은 `java.beans` 뿌리 + `java.lang` 넷(`ProcessBuilder`·`Runtime`·`Process`·`ProcessHandle`).** (1) 의 「`java.lang` 을 뿌리로 금지할 수 없어서」는 `java.beans` 에 해당하지 않는다 | 레인 ③ |
+| **D-6G2b-15** | `policy.version` 7 → 8(정책 파일 구조 변경: 두 게이트 키 삭제 + `collection.transport.*` 여섯). `OPEN-6G-GATE-REGISTRY-KONEPS` 는 **닫지 않는다** — 등재는 했으나 그 OPEN 은 게이트 장부 전반이라 쌍 등식이 갈음하지 못한다(6G-2c 후보) | 레인 ⑤·⑦ |
+| **D-6G2b-16** | **RED 의 형태**: 「컴파일 안 되는 RED 커밋」 대신 **같은 fixture 뿌리를 6G 술어 형태(소유 타입만 + 타입 이름 열거)로 돌린 실측**(19 중 놓침 14 · 변이 타입으로만 5)을 RED 로 받는다 — 게이트 slice 에서 「옛 술어가 못 잡는다」가 곧 RED 다. 변이 셋(깊은 수집 → 소유 타입만 4 failed · 뿌리 17 → 3 **1 failed, 양성 쪽 전건 초록** · 용도 하나 제거 3 failed) — 둘째가 D-7 음성 fixture 의 존재 이유를 실측으로 보인다 | 레인 보고 |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
@@ -132,7 +144,9 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 ## in_scope
 
 - `app/src/test/kotlin/bidvector/app/architecture/**`
+- `app/src/test/kotlin/bidvector/archfixture/violating/transport/**`(음성 fixture — 6G·6F-8 fixture 가 사는 자리, 계약 갱신 r1 D-6G2b-10 으로 추가)
 - `config/quality/architecture-policy.properties`
+- `config/quality/gate-tests.properties`(게이트 test 등재, D-6G2b-9)
 - `app/src/main/kotlin/bidvector/app/wiring/CollectionWiring.kt` · `OpeningCollectionWiring.kt`(쓰이지 않는 import 제거만)
 - `reports/evidence/m6/6g2b/**` · `milestone-6.md`(착수·종결 문단만)
 
