@@ -364,8 +364,7 @@ internal class MockOpeningKonepsHttp(
         all: List<Map<String, String>>,
         page: Int,
         pageSize: Int,
-    ): List<Map<String, String>> =
-        if (pageSize > 0) all.drop((page - 1) * pageSize).take(pageSize) else all
+    ): List<Map<String, String>> = if (pageSize > 0) all.drop((page - 1) * pageSize).take(pageSize) else all
 
     private fun echoedRowsOf(pageSize: Int): Int = if (pageSize > 0) pageSize else DEFAULT_PAGE_ROWS
 
