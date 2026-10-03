@@ -96,3 +96,22 @@ rollback:
 |---|---|---|
 | `OPEN-6G2F-NOTICE-LIST-ROWS` | 공고 목록 레인 페이지 크기 100(3B 상수) — 일일 증분은 1,000 안이나 백필 재실행 시 1,022 호출 | 6G-2c |
 | `OPEN-6G2D-FRAME-REWALK` | 매 기동 표본틀 재걷기(이 slice 뒤 약 66 호출/일) | 6G-2c |
+| `OPEN-6G2F-MAX-PAGES-PROVENANCE` | (cr M-1) `MAX_PAGES` 확정 제외의 **행 수 문턱**(`50 × rows-per-page`)이 `sample-scope.json`·무결성 장부·시도 원장 어디에도 실리지 않는다 — 되돌림 인자(`--bidvector.koneps.opening.rows-per-page=100`)를 쓰면 한 디렉터리에 「>5,000」과 「>49,950」 확정이 섞여 구별되지 않는다. 임시 운용: 인자를 바꾸는 실행은 evidence 표에 날짜·값을 적는다. 닫는 길은 원장 HTTP 줄 또는 `state.json` 에 쪽 크기 등재 | 6G-2c |
+
+## 계약 갱신 r1 (2026-10-03, 팀장 — 검토 라운드 처분)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2f-9** | **판정 SHA `e16bf85e`: verifier `ready-for-review`(low 2) · code-reviewer high 1 / medium 2 / low 4 → 차단 없음.** 장부층·low 는 규율대로 종결 전 일괄(커밋 `61787985`·`a033e80d`·`91725b1e`), verifier 재검증 없음 | CLAUDE.md 「차단 문턱」 |
+| **D-6G2f-10** | **cr H-1(999 수용 실측이 한 operation) 처분 = 운영 전제로 닫는다.** 팀장이 10-03 에 나머지 여섯 operation 을 실측(전부 `resultCode 00`, `numOfRows 999` 에코, 999 행 반환 — commands.md 「실측(팀장)」). **개찰완료만 당일 쿼터 0 이라 미실측 → 배포 전제**: 새 jar 첫 기동 전에 그 operation 에 `numOfRows=999` 실 호출 1건으로 확인하고, 거부면 `--bidvector.koneps.opening.rows-per-page=100` 으로 기동(runbook 「배포」 0항·재실행 cron 절차). D-6G-65 분류: 데이터 정확성 | 거부 시 미지 코드가 일시 실패로 분류돼 A-3 재호출 상한(디렉터리 생애)을 먹는다 — 값이 싼 사전 확인 |
+| **D-6G2f-11** | vr low 2(바인딩 기동 거부 test 없음 — 생성자 호출 test 뿐) · cr L-1(999 상수 잠금 test 없음) → **등재**(checklist 알려진 제한 9·10), 코드 무변경. 분류: 게이트 하드닝 | low, verifier 가 기동 probe 로 1000·0·-5 거부와 1·999 수락을 실측함 |
+| **D-6G2f-12** | cr M-1 → `OPEN-6G2F-MAX-PAGES-PROVENANCE`(위 표) · cr M-2(산식 A 도 단일 operation) → runbook §5·배포 절 문면 · vr low 1(release-sha 는 실행기 계산값, 「cron」은 세션 cron) → runbook · cr L-2(`axisOf` 순서 의존) → 겹치지 않는 접미 표 · cr L-3(KDoc) → 셋으로 · cr L-4(`milestone-6.md` 의 「5,000」) → 팀장 종결 커밋에서 「50 × rows-per-page」로 | 장부층 |
+| **D-6G2f-13** | **배포(머지 뒤)**: 수집 실행이 없는 창에서 호스트 3단 점검 뒤 `main` 에서 `:app:bootJar`; 다음 재실행(세션 cron 00:41)이 D-10 의 사전 확인을 거쳐 새 jar 를 집는다. 원장 `release_sha` 는 실행기가 `git rev-parse` 로 계산한 새 SHA | runbook 「배포」 |
+
+## 하네스 레인 변경 (상시 절) — 갱신
+
+- **팀장(2026-10-03, 종결 커밋)**: `milestone-6.md` 의 `OPEN-6G2D-MAX-PAGES-FINAL` 「5,000」 잔존 문면 정정 + 6G-2f 종결 문단. `milestone-6.md` 는 in_scope 밖(공유 파일)이라 rollback 복원 목록에 넣지 않고 여기 선언한다 — 되돌림은 그 커밋의 hunk 역적용.
+
+## 종결 (2026-10-03, 팀장)
+
+판정 SHA `e16bf85e` ready-for-review → 장부층 일괄 `91725b1e` → 이 계약 갱신. 재작업 0/5. PR 은 `main` 으로 열고 `/code-review` 뒤 새 high 없으면 머지(운영자 사전 승인 2026-10-02 「후속 slice 리뷰 이상 없으면 PR·머지」). 머지 뒤 D-6G2f-13.
