@@ -189,5 +189,4 @@ class TransportSurfaceGateTest {
         (full - shallow).shouldNotBeEmpty()
         (shallow - full).shouldBeEmpty()
     }
-
 }
