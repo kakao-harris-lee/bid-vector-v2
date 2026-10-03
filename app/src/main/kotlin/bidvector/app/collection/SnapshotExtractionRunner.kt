@@ -57,7 +57,7 @@ class SnapshotExtractionRunner(
      * 덜 읽은 스냅숏보다 없는 스냅숏이 낫다.
      */
     override fun run(args: ApplicationArguments) =
-        underRunStateLock(runState.lock, "snapshot-extract", log, termination) { extractOrFail() }
+        underRunStateLock(runState, "snapshot-extract", log, termination) { extractOrFail() }
 
     private fun extractOrFail() {
         try {

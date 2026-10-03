@@ -1,6 +1,5 @@
 package bidvector.app.collection
 
-import bidvector.adapters.snapshot.RunStateLock
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
@@ -172,15 +171,10 @@ class SnapshotExtractionE2ETest {
      */
     @Test
     fun `수집이 도는 중이면 추출을 거부한다 — 바이트를 쓰지 않는다`() {
-        val held = RunStateLock.tryAcquire(RUN_STATE)
         val dir = Files.createTempDirectory("snapshot-e2e-locked")
 
-        val exitCodes =
-            try {
-                extractTo(dir)
-            } finally {
-                held.release()
-            }
+        // 보유자는 **별 프로세스**다(D-6G2c-1) — 같은 JVM 의 겹치는 잠금은 두 프로세스를 재지 못한다.
+        val exitCodes = RunStateLockHolder.hold(RUN_STATE).use { extractTo(dir) }
 
         exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
         Files.exists(dir.resolve("rows.jsonl")) shouldBe false

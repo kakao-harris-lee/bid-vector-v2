@@ -208,7 +208,7 @@ open class OpeningCollectionWiring {
             useCase,
             range,
             sources.all,
-            runState.lock,
+            runState,
             CollectionLog { logger.info(it) },
             termination,
         )

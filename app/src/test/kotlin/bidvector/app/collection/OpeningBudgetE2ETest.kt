@@ -1,7 +1,6 @@
 package bidvector.app.collection
 
 import bidvector.adapters.snapshot.RunStateDirectory
-import bidvector.adapters.snapshot.RunStateLock
 import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
@@ -261,23 +260,25 @@ class OpeningBudgetE2ETest {
     }
 
     /**
-     * D-6G-42 M-3 · D-6G-57 — 겹쳐 도는 두 실행은 같은 표본을 두 번 부르고 두 상한 회계가 서로의
-     * 호출을 보지 못한다. 잠금은 **실행 상태 디렉터리**에 걸린다(갈래별 DB advisory lock 은 범위가
-     * 달라 같은 것을 지키지 못했다 — vr r4 H-2). 잠금을 밖에서 들고 기동해, 출하 조립이 실제로
-     * 아무것도 부르지 않고 끝나는지 **mock 이 받은 요청 수**로 잰다.
+     * D-6G-42 M-3 · D-6G-57 · **D-6G2c-1** — 겹쳐 도는 두 실행은 같은 표본을 두 번 부르고 두 상한
+     * 회계가 서로의 호출을 보지 못한다. 잠금은 **실행 상태 디렉터리**에 걸린다(갈래별 DB advisory
+     * lock 은 범위가 달라 같은 것을 지키지 못했다 — vr r4 H-2). 출하 조립이 실제로 아무것도 부르지
+     * 않고 끝나는지 **mock 이 받은 요청 수**로 잰다.
+     *
+     * 보유자는 **별 프로세스**다(cr r5 M-3). 같은 JVM 에서 두 번째로 잠그면 잡히는 것은
+     * `OverlappingFileLockException` 이고 그것은 JVM 안의 사실이라, 재려던 것(두 **프로세스**)을
+     * 재지 못했다 — `tryAcquire` 를 JVM 안 맵 가드로 바꾸는 변이가 그 판을 통과했다.
      */
     @Test
-    fun `이미 도는 실행이 있으면 아무것도 부르지 않고 끝난다`() {
-        e2e.freshRunStateDir()
-        val held = RunStateLock.tryAcquire(e2e.freshRunStateDir())
-        try {
+    fun `다른 프로세스가 잠금을 들고 있으면 아무것도 부르지 않고 끝난다`() {
+        val directory = e2e.freshRunStateDir()
+
+        RunStateLockHolder.hold(directory).use {
             val (exitCodes, mock) = e2e.bootAndRun(emptyMap(), reuseRunState = true)
 
             exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
             mock.requestCount() shouldBe 0
-            e2e.capturedLog() shouldContain "ALREADY_RUNNING"
-        } finally {
-            held.release()
+            e2e.capturedLog() shouldContain "opening-collection skipped reason=ALREADY_RUNNING"
         }
     }
 

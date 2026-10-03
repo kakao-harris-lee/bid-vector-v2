@@ -1,7 +1,10 @@
 package bidvector.app.collection
 
-import bidvector.adapters.snapshot.RunStateLock
+import bidvector.adapters.snapshot.RunStateDirectory
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.CollectionAccounting
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -31,6 +34,7 @@ import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
@@ -157,10 +161,76 @@ class CollectionRunnerTest {
         sources: List<CollectionSource>,
         lines: Lines,
         exits: Exits,
-    ) = CollectionRunner(useCase, range(), sources, heldLock(), lines.log, exits.termination)
+    ) = CollectionRunner(useCase, range(), sources, heldRunState(), lines.log, exits.termination)
 
     /** 러너 단위 test 는 잠금 거동이 아니라 로그·종료 코드를 잰다 — 실제로 잡은 잠금을 준다. */
-    private fun heldLock(): RunStateLock = RunStateLock.tryAcquire(Files.createTempDirectory("6g-runner-lock"))
+    private fun heldRunState(): RunStateDirectory = RunStateDirectory(runStateDirectory())
+
+    private fun runStateDirectory() = Files.createTempDirectory("6g-runner-lock")
+
+    /**
+     * **D-6G2c-21 ⑦ — 잠금을 못 든 실행은 판독 불가 원장에도 멈추지 않고 물러난다.** 앞 판은 Busy
+     * 에서도 누적 해시를 지어 원장 전체를 읽었고, 그 읽기가 던지면(비UTF-8 바이트) 조용히 끝나야 할
+     * 실행이 예외로 죽었다 — 운영자는 사유 토큰이 아니라 스택 트레이스를 본다.
+     *
+     * 든 실행을 먼저 세운 **뒤** 원장을 깨뜨린다: 든 실행의 판독은 이미 끝났고, 둘째 실행이 그
+     * 바이트를 만난다.
+     */
+    @Test
+    fun `원장이 판독 불가여도 잠금을 못 든 실행은 사유만 남기고 끝난다`() {
+        val directory = runStateDirectory()
+        val held = RunStateDirectory(directory)
+        held.attempts.append(runnerAttempt())
+        Files.write(directory.resolve("attempts.jsonl"), byteArrayOf(0x7B, 0xC3.toByte(), 0x28, 0x0A))
+        val lines = Lines()
+        val exits = Exits()
+        val sources = listOf(source(listOf(observation("N-1"))))
+
+        try {
+            CollectionRunner(useCase(), range(), sources, RunStateDirectory(directory), lines.log, exits.termination)
+                .run(DefaultApplicationArguments())
+        } finally {
+            held.close()
+        }
+
+        lines.written shouldContainExactly listOf("collection skipped reason=ALREADY_RUNNING")
+        exits.codes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
+    }
+
+    /**
+     * **D-6G2c-2 — 자물쇠를 걸 수 없는 자리는 「다른 실행 중」이 아니다.** 둘 다 0 호출로 멈추지만
+     * 처방이 다르다: 기다리면 풀리는 쪽과 영영 풀리지 않는 쪽이다. 사유 토큰과 종료 코드가 갈린다.
+     */
+    @Test
+    fun `자물쇠를 걸 수 없으면 다른 사유와 다른 종료 코드로 끝난다`() {
+        val directory = runStateDirectory()
+        Files.createDirectory(directory.resolve("run.lock"))
+        val lines = Lines()
+        val exits = Exits()
+
+        CollectionRunner(
+            useCase(),
+            range(),
+            listOf(source(listOf(observation("N-1")))),
+            RunStateDirectory(directory),
+            lines.log,
+            exits.termination,
+        ).run(DefaultApplicationArguments())
+
+        lines.written shouldContainExactly listOf("collection skipped reason=UNLOCKABLE")
+        exits.codes shouldContainExactly listOf(CollectionExitCode.UNLOCKABLE.value)
+        exits.codes shouldNotBe listOf(CollectionExitCode.ALREADY_RUNNING.value)
+    }
+
+    private fun runnerAttempt() =
+        CollectionAttempt(
+            noticeKey = null,
+            axis = SourceEndpoint.NOTICE_LIST,
+            outcome = AttemptOutcome.Succeeded,
+            at = RUNNER_WALK,
+            kind = AttemptKind.PENDING,
+            walk = null,
+        )
 
     @Test
     fun `끝까지 읽히면 시작·슬롯·종료 줄을 남기고 종료 코드 0 으로 끝낸다`() {

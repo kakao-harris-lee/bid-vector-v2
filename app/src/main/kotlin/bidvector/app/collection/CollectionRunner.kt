@@ -1,6 +1,6 @@
 package bidvector.app.collection
 
-import bidvector.adapters.snapshot.RunStateLock
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.workflow.collection.CollectNoticesUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionReport
@@ -44,7 +44,7 @@ class CollectionRunner(
     private val useCase: CollectNoticesUseCase,
     private val range: CollectionRange,
     private val sources: List<CollectionSource>,
-    private val lock: RunStateLock,
+    private val runState: RunStateDirectory,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
@@ -53,7 +53,7 @@ class CollectionRunner(
      * 두 갈래가 같은 시도 원장을 쓰게 된 뒤로는 나란히 떠서 남은 상한을 각자 다 쓰는 길이 열려 있었다.
      */
     override fun run(args: ApplicationArguments) =
-        underRunStateLock(lock, "collection", log, termination) { collectUnderLock() }
+        underRunStateLock(runState, "collection", log, termination) { collectUnderLock() }
 
     private fun collectUnderLock() {
         log.write(startLine(range, sources))
