@@ -124,6 +124,13 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-29** | **중첩 이름 접기 = 이름 기준 첫 `$` 절단(NAMECUT).** 쌍 수: 현(ArchUnit `enclosingClass`) 63 · NAMECUT **60** · 접지 않음 81. 접지 않으면 Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 무관한 편집마다 철자가 바뀐다. NAMECUT 은 현 등재에서 `HttpResponse$BodyHandler` 쌍 셋만 `HttpResponse` 로 접히고 나머지 60 은 글자 그대로(`namecut − current = ∅`) — 결정적, KDoc 과 일치 | cr M-1 |
 | **D-6G2b-30** | **수입된 production 모집단 = 아홉 모듈**(adapters · app · decision · procurement · qualification · settlement · sharedkernel · strategy · workflow) 고정 단언 — 모듈 하나가 classpath 에서 빠지면 RED | cr M-4 |
 
+## 계약 갱신 r5 (2026-10-03, 팀장 — 수정 라운드 1 수령, 판정 r2)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-31** | in_scope 에 `archfixture/violating/workflow/external/**` 와 `app/src/test/resources/archunit.properties` 추가(레인 계약 대조 11). 수정 라운드 결과: 허용 집합 모듈별 127 · fixture 위반 19 → 31(1층 7 + 2층 5) · 변이 열(⑦ 허용 패키지 제거 2 failed · ⑧ 미관측 허용 추가 **등식만 1 failed** · ⑨ 접기 되돌림 2 failed · ⑩ `ServiceLoader` 낱개 제거 **2층만 1 failed**) · test 2,633 · production diff 0. 수집 쪽 정확 매치는 「이름 경계 일치」(`$` 경계) — 기존 단언 하나가 느슨한 비교에 의존했음이 드러나(`RawObservationStore.append` 가 `append$default` 로만 잡힘) 경계 규칙으로 통과. `qualityBaseline` 은 up-to-date 로 실행된 측정이 아님(사실 등재) | 레인 보고 |
+| **D-6G2b-32** | **판정 SHA r2 = 이 갱신 커밋**. verifier r2 표적(D-27 그대로 + 수정 라운드 커밋 전수 `0f11117a`·`f77c319a`·`0c6f36b2`·`de86738d`·`0fb24e8d`·`541b5065`·`130dc4c9` 표적 재검증): H-1 변이 넷 + 새 fixture 12 전수 · 허용 등식 양방향(⑦⑧) · 두 층 분기(⑩) · 접기(⑨) · 전송 쌍 S1~S7 · KA2~4 · 반사 셋 · 모집단 단언(모듈 제외 변이) · **새 우회 ≥2**(허용 패키지 안에서 바이트를 내보내는 길 — 예: `java.io` 로 `/dev/tcp` 류·`java.nio.file.Files` 의 원격 FS·`javax.sql.DataSource` 의 JDBC URL(경계 밖 선언 확인)) · acceptance `check` 1회 · rollback(실측 HEAD `130dc4c9`, 복원 14 + 공유 hunk 5) · evidence 위생. 재작업 1/5 | |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
@@ -175,6 +182,8 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 - `app/src/test/kotlin/bidvector/app/architecture/**`
 - `app/src/test/kotlin/bidvector/archfixture/violating/transport/**`(음성 fixture — 6G·6F-8 fixture 가 사는 자리, 계약 갱신 r1 D-6G2b-10 으로 추가)
 - `app/src/test/kotlin/bidvector/archfixture/violating/adapters/**`(A-2 음성 fixture — fixture 의 패키지가 게이트 뿌리를 정하므로 `adapters` 층 반사는 이 자리여야 한다, r2 D-6G2b-18)
+- `app/src/test/kotlin/bidvector/archfixture/violating/workflow/external/**`(모듈별 허용 집합을 모듈마다 재는 fixture, r5 D-6G2b-31)
+- `app/src/test/resources/archunit.properties`(ArchUnit `failOnEmptyShould` 핀 — cr L-3, r5 D-6G2b-31)
 - `config/quality/architecture-policy.properties`
 - `config/quality/gate-tests.properties`(게이트 test 등재, D-6G2b-9)
 - `app/src/main/kotlin/bidvector/app/wiring/CollectionWiring.kt` · `OpeningCollectionWiring.kt`(쓰이지 않는 import 제거만)
