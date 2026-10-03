@@ -48,7 +48,7 @@ pathspec 오류로 아무것도 적용되지 않는다. 실측 `exit 0`.
 ## ② 공유 파일 셋 — hunk 격리, 나중 커밋부터
 
 커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 9a5aa26a..12d89ab1 -- <파일>`. 실측은 runbook
-**셋** · 장부 **둘** · `milestone-6.md` **하나**다.
+**셋** · 장부 **둘** · `milestone-6.md` **둘** · `docs/discovery/capability-map.md` **하나**(팀장, D-6G2f-15)다.
 
 ```
 git diff 12d89ab1~1..12d89ab1 -- docs/runbook/m6-6g-real-collection.md | git apply -R
@@ -56,11 +56,13 @@ git diff a033e80d~1..a033e80d -- docs/runbook/m6-6g-real-collection.md | git app
 git diff 6150f9ef~1..6150f9ef -- docs/runbook/m6-6g-real-collection.md | git apply -R
 git diff 98261a05~1..98261a05 -- config/quality/gate-tests.properties | git apply -R
 git diff bf8bbac3~1..bf8bbac3 -- config/quality/gate-tests.properties | git apply -R
+git diff 679ee2dd~1..679ee2dd -- milestone-6.md | git apply -R
 git diff 79525a77~1..79525a77 -- milestone-6.md | git apply -R
+git diff 7b41c4ec~1..7b41c4ec -- docs/discovery/capability-map.md | git apply -R
 ```
 
-여섯 전부 **exit 0** · conflict 0. `milestone-6.md` 에는 팀장 커밋이 더 붙으므로 **그 SHA 는 종결 시 채우고**
-역시 나중 것부터 역적용한다. **목록이 늘면 이 절차를 다시 돌린다**(runbook 은 라운드마다 한 커밋씩 늘어
+여덟 전부 **exit 0** · conflict 0(팀장이 종결 커밋 뒤 clone 에서 `milestone-6.md` 둘 · `capability-map.md` 하나를
+재실측 — 역적용 뒤 두 파일이 base 와 바이트 동일). 나중 것부터 역적용한다. **목록이 늘면 이 절차를 다시 돌린다**(runbook 은 라운드마다 한 커밋씩 늘어
 셋이 됐다). 삽입 지점이 인접하면 `--3way` 도 실패하므로(M4·M6 선례) 그때는 내 몫만 문면으로 되돌리는 수동
 절차가 정본이다 — runbook: §0 표의 `OPEN-6G2D-MAX-PAGES-FINAL` 행 · §1 4단계 `<jar SHA>` 문장 · §2-2 불릿
 셋 · §5 의 `MAX_PAGES`·쿼터 줄 · §7 전체 / 장부: `gate.tests.app` 이름 둘과 머리 주석 세 줄 /
