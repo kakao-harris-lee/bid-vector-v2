@@ -5,6 +5,8 @@ import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -39,6 +41,34 @@ class ArchitectureGateTest {
     @Test
     fun `멤버 판정이 기대는 classpath 해석이 켜져 있다`() {
         ArchConfiguration.get().resolveMissingDependenciesFromClassPath() shouldBe true
+    }
+
+    /**
+     * PR #58 A — **빈 `should` 에서 실패하는** 설정이 실제로 켜져 있다. 이 저장소의 여러 게이트가
+     * 「뿌리가 비면 규칙이 공허하게 통과하지 않는다」에 기대는데, 그것을 지탱하는 것은 이 설정 하나다.
+     *
+     * `archunit.properties` 의 키 이름이 틀리면 **아무 설정도 켜지지 않는다**(앞 판이 그랬다 —
+     * `failOnEmptyShould` 로 적어 죽은 핀이었다). 그래서 설정 값을 읽어서 본다.
+     */
+    @Test
+    fun `빈 should 에서 실패하는 설정이 켜져 있다 — 핀의 키 이름까지`() {
+        ArchConfiguration.get().getPropertyOrDefault(FAIL_ON_EMPTY_SHOULD, "") shouldBe "true"
+    }
+
+    /**
+     * PR #58 A — 설정 값만 보면 「그 값이 거동을 만드는가」는 재지 못한다. 아무 클래스도 고르지 못하는
+     * 규칙을 실제로 돌려 **실패하는 것**을 잰다. 핀이 죽거나 ArchUnit 이 거동을 바꾸면 여기가 붉다.
+     */
+    @Test
+    fun `아무 클래스도 고르지 못하는 규칙은 실제로 실패한다`() {
+        val vacuous =
+            classes()
+                .that()
+                .resideInAPackage("${policy.packageRoot}.없는패키지..")
+                .should()
+                .bePublic()
+
+        shouldThrow<AssertionError> { vacuous.check(production) }
     }
 
     @Test
@@ -124,4 +154,9 @@ class ArchitectureGateTest {
     }
 
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
+
+    private companion object {
+        /** ArchUnit 1.5.0 `AllowEmptyShould` 의 설정 키 — 이름이 틀리면 핀이 조용히 죽는다. */
+        const val FAIL_ON_EMPTY_SHOULD = "archRule.failOnEmptyShould"
+    }
 }

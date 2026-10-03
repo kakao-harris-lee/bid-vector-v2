@@ -39,8 +39,9 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 반환은 `Object`), `Class.getEnumConstants`(`Object[]`), 역직렬화기의 타입 토큰(뒤따르는 `as` 는 CHECKCAST 이고
  * access 가 아니다). 축 ③은 클래스 **리터럴**만 보므로 인스턴스의 `javaClass`(`Object.getClass`)나 문자열의
  * `Class.forName` 으로 얻은 `Class` 도 밖이다. 6F-8 리플렉션·`Class` 멤버 게이트가 그 길을 덮는 root 는
- * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이라 `procurement`·`adapters` 에는 그 보완이
- * 없다 — 구조로 닫는 방향은 `OPEN-6F9-DIVISION-REFLECTION`(evidence 알려진 제한 7).
+ * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이었다. **`adapters` 는 M6/6G-2b 의
+ * `collection.reflection.roots` 가 덮고**(D-6G2b-11), 남은 것은 `procurement`(domain 계열) —
+ * `OPEN-6G2B-REFLECTION-ROOT-DOMAIN` 소관이다. 구조로 닫는 방향은 `OPEN-6F9-DIVISION-REFLECTION` 이다.
  */
 internal class DivisionValueRules(
     private val type: String,
