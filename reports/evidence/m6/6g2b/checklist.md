@@ -1,7 +1,7 @@
 # M6/6G-2b — 리뷰 요청 조건 점검
 
 **D-6G-65 분류: 게이트 하드닝.** 제품 거동·수집 코드·실행 상태 형식·원장 형식 무변경, production diff 0.
-실수집을 막지 않는다.
+실수집을 막지 않는다. 축은 둘이다 — 전송 표면 게이트(D-6G2b-1~5)와 반사 게이트 뿌리 확장(A-2, D-6G2b-11).
 
 | 항목 | 상태 | 근거 |
 |---|---|---|
@@ -13,7 +13,7 @@
 | 누출 어휘 스캔 | ✓ | `commands.md` — 이 slice 가 더한 줄 매치 0 |
 | `differential.json` | **N/A** | Python 대조 축 없음(Kotlin `check` job 하나, `ml-engine` 무변경) |
 | `golden-manifest.json` | **N/A** | 도메인 fixture 를 쓰지도 바꾸지도 않는다 — 음성 fixture 는 바이트코드용 Kotlin 클래스다 |
-| 설계 검토 우회 대응표 | ✓ | 아래 표 |
+| 설계 검토 우회 대응표 | ✓ | 아래 표 둘(전송 축 열 · 반사 축) |
 
 ## 설계 검토 (2) 의 우회 열 → 막는 자리
 
@@ -36,17 +36,30 @@
 (3) 과잉 — 뿌리가 넓어 무해한 참조가 걸리는 쪽은 과잉 대조 둘(들어오는 서블릿 표면 · 전송 무관 계산)이
 잰다. 무해 타입 목록은 두지 않았다(그 쪽이 더 조인다 — `commands.md` 「계약 대조」 2).
 
+### A-2 — 반사 축 (D-6G2b-11)
+
+| 우회 | 막는 구조 | 측정 |
+|---|---|---|
+| 반사를 `adapters` 로 한 걸음 옮긴다 | 뿌리에 `bidvector.adapters` 를 더하고 **원문 값 획득 뿌리와 별도 키**로 둔다 | fixture `RogueAdapterReflectionPeek` 신고 · 뿌리 좁힘 양성·음성 대조 둘 · 변이 ⑤⑥ |
+| 등재된 클래스가 **새 반사 멤버**를 더 부른다 | 허용이 (클래스, 멤버) 쌍 | fixture `RogueAdapterNameLookupGainingReflection` — 합성 등재로 「등재한 `getName` 은 조용 · `getDeclaredMethod` 만 신고」 |
+| 멤버 이름을 전역으로 허용받는다(앞 판의 `getName`) | 전역 멤버 허용 목록을 없앴다 | 등재 밖 이름 조회가 신고됨을 잰다(과잉 대조의 쌍둥이 단언) |
+| 등재 쌍을 조용히 지운다 | 두 쌍 집합 == 관측 집합 | 변이 ④(쌍 하나 제거 → 2 failed) |
+| 뿌리 확장을 조용히 되돌린다 | 좁힌 뿌리에서는 `adapters` 쌍이 관측에서 사라져 등식이 깨진다 | 변이 ⑥(규칙은 초록, 등식만 RED) |
+
 ## 크기 게이트
 
 | | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
 |---|---|---|---|
-| 줄 | 571 | 399 | 705 |
-| 바이트 | 49,469 | 31,916 | 37,345 |
+| 줄 | 675 | 489 | 962 |
+| 바이트 | 61,953 | 40,994 | 54,020 |
 
-**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 12,124 B(32%) 초과한다.** 초과는 전부 그 한 파일 쪽이다
-— `scope.md` 가 evidence 바이트의 **36%**(17,553 B)이고 레인이 만지지 않는 팀장 파일이다. 레인 세 파일만
-보면 산출물의 **85%** 로 통과한다. 한국어 산문은 한 자 3 바이트이고 Kotlin 은 1 이라 이 축은 같은 일의 양을
-같은 바이트로 세지 않는다 — **줄 축이 이 slice 에서 더 바른 척도**다(6G-2f 와 같은 판단).
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 7,933 B(15%) 초과한다.** A-2 라운드가 산출물을
+늘려 초과폭이 앞 라운드의 32% 에서 줄었다. 초과는 전부 그 한 파일 쪽이다 — `scope.md` 가 evidence 바이트의
+**28%**(17,553 B)이고 레인이 만지지 않는 팀장 파일이다. 레인 세 파일만 보면 산출물의 **76%**
+로 통과한다. 산출물 줄 구성: 게이트·fixture Kotlin 여섯 · 정책 둘 · 기존 test 넷. `milestone-6.md` 착수
+문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다. 바이트는 양쪽 다 diff 의 `+` 접두를 포함한 같은
+방법으로 쟀다. 한국어 산문은 한 자 3 바이트이고 Kotlin 은 1 이라 바이트 축은 같은 일의 양을 같은 수로 세지
+않으므로 **줄 축이 이 slice 에서 더 바른 척도**다(6G-2f 와 같은 판단).
 
 ## clean-tree 양성 대조
 
@@ -56,11 +69,15 @@ HEAD `3e670054` 에서 in_scope 아홉 경로를 **개별 인자**로 쟀다 —
 출력」이 더러운 트리와 구별되지 않는다. evidence 를 포함한 마지막 상태의 판정은 verifier 와 PR 조치 코멘트
 몫이다.
 
-## 새 public 표면 — 정책 파일 키 여섯
+## 새 public 표면 — 정책 파일 키 아홉(순증 일곱)
 
-`collection.transport.roots` · `surface-packages` · `surface-types` · `purposes` ·
-`holders.<용도>` 다섯(용도 어휘가 닫혀 있어 키 이름은 다섯으로 고정). production 의 새 public 선언은 0 이다
-(production diff 0). test 쪽 표면 `TransportSurfaceRules`·`ReferenceCollection` 은 출하 바이트에 없다.
+전송 여섯: `collection.transport.roots` · `surface-packages` · `surface-types` · `purposes` ·
+`holders.<용도>` 다섯(용도 어휘가 닫혀 있어 키 이름은 다섯으로 고정). 반사 셋:
+`collection.reflection.roots` · `type-pairs` · `class-member-pairs`. 앞 판의 반사 키 둘
+(`allowed-referencers`·`class-allowed-members`)을 없앴으니 순증은 일곱이다.
+
+production 의 새 public 선언은 0 이다(production diff 0). test 쪽 표면 `TransportSurfaceRules` ·
+`ReferenceCollection` · 공유 함수 `referencedTypeNames`·`outermostClass` 는 출하 바이트에 없다.
 
 `ReferenceCollection.OWNER_ONLY` 는 **쓰이는 게이트가 아니라 양성 대조**다 — 깊은 수집이 조용히 되돌려지는
 변이를 음성·양성 양쪽에서 잡는다(변이 ①: 4 failed).
@@ -73,8 +90,11 @@ HEAD `3e670054` 에서 in_scope 아홉 경로를 **개별 인자**로 쟀다 —
 2. **반사 타입이 전혀 남지 않는 형태는 밖이다.** 뿌리가 `java.lang.reflect`·`java.lang.invoke` 를 덮어 6G
    보다 넓어졌지만, 서드파티 반사 도구(Spring `BeanWrapper`·Jackson `convertValue` 류)를 경유하면 전송·반사
    타입이 남지 않는다. 타입 이름 목록으로 막으면 열거로 돌아가므로 두지 않았다(6G 의 같은 제한 승계).
-3. **A-2 미결** — 반사 게이트 뿌리는 `workflow`·`app` 그대로다. `adapters` 까지 넓히면 기존 참조 **9건**이
-   걸린다(`commands.md` A-2 표). 운영자 결정 뒤 별도 커밋 몫이다.
+3. **A-2 는 집행했다** — 뿌리가 `workflow`·`app`·`adapters` 이고 등재 쌍 12 다. 남는 제한은 **뿌리가
+   production 전체가 아니라는 것**이다: `procurement`·`decision`·`qualification`·`settlement`·
+   `shared-kernel` 은 여전히 반사 게이트 밖이다(그 모듈들은 domain 계열이고 다른 게이트가 프레임워크·반사
+   참조를 금지하지만, 이 게이트의 쌍 등식으로는 재지 않는다). 전송 표면 게이트와 달리 뿌리를 production
+   전체로 올리지 않은 것은 운영자 결정 문면(`adapters` 까지)을 넘지 않기 위해서다.
 4. **`OPEN-6G-GATE-REGISTRY-KONEPS` 는 닫지 않았다.** D-6G2b-9 의 등재는 했으나 그 OPEN 의 내용은 게이트
    장부 전반이라 쌍 등식이 갈음하지 못한다.
 5. **`io.netty` 뿌리는 오늘 아무것도 재지 않는다** — 클래스패스에 없다(gRPC 전송 모듈이 `runtimeClasspath`
@@ -84,7 +104,9 @@ HEAD `3e670054` 에서 in_scope 아홉 경로를 **개별 인자**로 쟀다 —
    fixture 는 없다**(음성 fixture 는 test 소스셋에 있어야 하므로 같은 방식으로 재지 못한다).
 7. **뿌리를 좁히는 변이는 production 등식이 잡지 못한다**(변이 ② 실측 — 뿌리 열일곱 → 셋에서 양성 쪽
    전건 초록). 잡는 것은 음성 fixture 표뿐이므로 그 표가 이 게이트의 민감도를 혼자 든다.
-8. **fixture 경로가 계약 in_scope 문면 밖이다**(`archfixture/violating/transport/**`) — 기존 선례의 자리이고
-   계약 갱신이 필요한 항목이다(`commands.md` 「계약 대조」 4).
+8. **A-2 fixture 경로가 아직 in_scope 문면 밖이다** — 전송 fixture 경로
+   (`archfixture/violating/transport/**`)는 계약 갱신 r1(D-6G2b-10)이 넣었지만, A-2 가 더한
+   `archfixture/violating/adapters/RogueAdapterReflectionPeek.kt` 는 그 문면에 없다. 계약 갱신이 필요한
+   항목이다(`commands.md` 「계약 대조」 4).
 9. **클래스패스 전수는 `:app:runtimeClasspath` 기준이다**(좌표 101). 다른 구성(test 전용 의존)에만 있는
    전송 표면은 production 뿌리 밖이라 이 게이트의 대상이 아니다.

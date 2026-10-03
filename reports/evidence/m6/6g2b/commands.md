@@ -7,18 +7,18 @@
 
 | 완료(UTC) | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
-| 2026-10-03T07:10Z | `./gradlew --no-daemon check` | 0 | 전 모듈 2,617 test · 실패 0 · skip 4(base 2,607 에서 +10) |
-| 2026-10-03T07:11Z | `./gradlew --no-daemon qualityBaseline` | 0 | 33 task up-to-date(production 입력 무변경의 방증) |
-| 2026-10-03T07:18Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
+| 2026-10-03T08:08Z | `./gradlew --no-daemon check` | 0 | 전 모듈 **2,623** test · 실패 0 · skip 4(base 2,607 에서 +16) |
+| 2026-10-03T08:08Z | `./gradlew --no-daemon qualityBaseline` | 0 | up-to-date(production 입력 무변경의 방증) |
+| 2026-10-03T08:17Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
 
-**실측 HEAD `3e670054`**(마지막 산출물 커밋). 세 줄 가운데 첫 줄만 test 를 실제로 실행했다 — 스크립트가
-도는 `check`·`qualityBaseline` 은 같은 트리라 Gradle 입력 등식으로 up-to-date 였고(12s·6s), 그 사실을
-숨기지 않고 적는다. test 수 증감은 새 test 12(`TransportSurfaceGateTest` 7 + `TransportSurfaceGateCatchesViolationsTest`
-5) − 지운 test 2(6G 의 두 게이트 단언) = +10.
+**실측 HEAD `cc3fd1c7`**(마지막 산출물 커밋). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
+test 증감 +16 = 전송 표면 게이트 12(`TransportSurfaceGateTest` 7 + 음성 쪽 5) + 반사 게이트 쌍 등식 6
+(음성 쪽 20 → 24, 양성 쪽은 반사 test 둘을 넷으로 바꾸고 전송 단언 둘을 지워 24 그대로) − 지운 test 2
+(6G 의 두 게이트 단언).
 
-첫 `check` 호출은 ktlint 20건으로 exit 1 이었다(연속 KDoc 둘 · 체인 연속 9 · 함수 시그니처 7 · dangling
-KDoc 2). 형식만이고 술어·fixture 의미는 바뀌지 않았다 — 파일 머리 KDoc 을 줄 주석으로 바꾸고
-`ktlintTestSourceSetFormat` 을 돌린 뒤 exit 0.
+`check` 는 두 라운드에서 각각 첫 호출이 ktlint 로 exit 1 이었다(합 21건: 연속 KDoc·체인 연속·함수
+시그니처·dangling KDoc). 형식만이고 술어·fixture 의미는 바뀌지 않았다 — 파일 머리 KDoc 을 줄 주석으로
+바꾸고 `ktlintTestSourceSetFormat` 을 돌린 뒤 exit 0.
 
 ## 착수 실측 (ArchUnit 전수 — scope.md 의 import 기준 표를 갈음한다)
 
@@ -38,15 +38,14 @@ production 클래스 1,390 기준. 수집 범위는 의존 그래프 + **호출 
 깊은 수집이 더하는 14 쌍: `HttpResponse$BodyHandler` 셋 · 첨부·LLM·주소 조립의 `java.net.URI` 둘 ·
 gRPC `Channel`·`CallOptions`·`Metadata`·`stub.AbstractStub` 여덟 · `WritableByteChannel` 하나.
 
-### A-2 (반사 게이트 뿌리를 `adapters` 까지) — 0 이 아니다, 운영자 결정 대기
+### A-2 착수 실측 (반사 게이트 뿌리를 `adapters` 까지) — 0 이 아니다
 
 | 걸리는 것 | 수 | 클래스 |
 |---|---|---|
 | `kotlin.reflect.KClass` 참조 | 2 | `adapters.event.OutboxPayloadCodec` · `adapters.persistence.JdbcCollectionRunStore` |
-| `java.lang.Class` 의 허용 밖 멤버 | 7 | `getSimpleName` 여섯(extraction 셋 · koneps 둘 · `DocumentFormatKt`) · `getResourceAsStream` 하나(`RequirementSchemaValidator`) |
+| `java.lang.Class` 의 **허용 밖** 멤버 | 7 | `getSimpleName` 여섯(extraction 넷 · koneps 둘) · `getResourceAsStream` 하나(`RequirementSchemaValidator`) |
 
-D-6G2b-6 대로 **현 뿌리를 유지**했다(이 slice 는 반사 게이트를 건드리지 않는다). 넓히려면 허용 집합
-7~9줄이 생기므로 운영자 결정 뒤 별도 커밋이 맞다.
+이 실측을 받아 운영자가 2026-10-03 에 확장을 결정했다(D-6G2b-11). 집행은 아래 절이다.
 
 ## 음성 fixture 별 결과 (열아홉 + 과잉 대조 둘)
 
@@ -108,64 +107,122 @@ D-6G2b-6 대로 **현 뿌리를 유지**했다(이 slice 는 반사 게이트를
 ①은 거꾸로 양성·음성 양쪽이 든다. ③은 (2b) 값 획득 축의 실측이다 — 정책 키를 비우거나 조용히 바꾸는
 길이 닫혀 있다.
 
+## A-2 집행 — 반사 게이트 뿌리 확장과 쌍 등식 (D-6G2b-11)
+
+뿌리를 `bidvector.workflow,bidvector.app,bidvector.adapters` 로 넓히고 **별도 키**에 둔다 — 앞 판은 원문 값
+획득 뿌리를 그대로 썼고, 겹쳐 적으면 한쪽을 넓히는 편집이 다른 쪽을 조용히 넓힌다.
+
+허용은 (클래스, 리플렉션 타입)·(클래스, `Class` 멤버) **쌍**이다. 앞 판의 두 허용은 각각 한 칸 헐거웠다 —
+멤버 이름을 전역으로 허용하면(`class-allowed-members=getName`) 어느 클래스든 그 이름을 쓸 수 있고, 클래스만
+허용하면 등재된 클래스가 새 반사 멤버를 더 부를 수 있다.
+
+| 축 | 값 |
+|---|---|
+| 등재 쌍 | **12** — (클래스, 타입) 2 + (클래스, 멤버) 10 |
+| 그중 A-2 로 **새로 금지 범위에 든 것** | 9(`KClass` 2 + 허용 밖 `Class` 멤버 7) |
+| 그중 앞 판이 **전역 `getName` 으로 덮고 있던 것** | 3(`adapters.snapshot.RunStateDurabilityKt` · `app.collection.CollectionRunnerKt` · `app.collection.OpeningCollectionLinesKt`) |
+| 등장하는 멤버 이름 | 셋(`getName` 3 · `getSimpleName` 6 · `getResourceAsStream` 1) — 전부 값 획득이 아니다 |
+| 깊은 수집이 더하는 타입 쌍 | **0**(소유 타입만 본 결과와 같다) — 그래도 같은 함수를 쓴다 |
+
+**참조 수집의 정의를 하나로 합쳤다.** 전송 표면 게이트가 쓰던 깊은 수집을 공유 함수로 올려 반사 게이트도
+같은 것을 쓴다 — 수집 범위를 좁히는 편집이 두 게이트의 양성 대조를 동시에 RED 로 만든다. 중첩 클래스를
+접는 helper 도 한 정의로 모았다(앞 판은 두 파일에 같은 것이 있었다).
+
+### A-2 변이 실측 (셋)
+
+| 변이 | 적용 확인 | 결과 |
+|---|---|---|
+| ④ 등재 멤버 쌍 하나 제거(`RequirementSchemaValidator->getResourceAsStream`) | 사본 대조 1줄 삭제 | **2 failed** — 쌍 등식 · 등재 밖 참조 0 |
+| ⑤ production 에 **새 반사 참조**(등재된 `adapters.snapshot` 파일에 `javaClass.getMethod(...).invoke(...)` 한 줄) | `git diff --numstat` `2 0` | **2 failed** — 같은 둘 |
+| ⑥ ⑤를 그대로 두고 뿌리를 앞 판(`workflow`·`app`)으로 좁힘 | 사본 대조 1줄 치환 | **1 failed** — 쌍 등식만. 규칙 쪽은 **초록** |
+
+⑥이 A-2 의 값을 잰다 — 좁힌 뿌리는 ⑤의 새 반사 참조를 **보지 못한다**. 남은 한 실패는 좁힘 때문에 등재
+쌍이 관측에서 사라진 것(낡은 항목)이므로, 뿌리를 조용히 되돌리는 편집도 그 등식에 걸린다. 규칙과 등식이
+서로 다른 것을 들고 있다.
+
+변이 ⑤는 production 파일을 만졌다(out_scope). 사본 덮어쓰기로 복원하고 `git diff --quiet` 로 확인했다 —
+**산출물의 production diff 는 0 그대로**다.
+
+영구 대조 둘도 남겼다. 뿌리를 앞 판으로 좁히면 ⓐ `adapters` 쌍이 관측에서 사라지고(양성 쪽) ⓑ `adapters`
+층 음성 fixture 가 신고되지 않는다(음성 쪽). 새 음성 fixture 둘 — `adapters` 층 반사(`getMethod`·`forName`)와
+**등재된 클래스가 새 반사 멤버를 더 부르는** 쌍 축이다. 쌍 축은 합성 등재 집합으로 「등재한 `getName` 은
+조용 · 더 부른 `getDeclaredMethod` 만 신고」를 잰다.
+
 ## 등재와 새 public 표면
 
 - 등재 쌍 **63**, 용도 다섯. 용도 키 집합 == 닫힌 어휘(변이 ③이 그 등식을 잰다), 쌍 중복 0.
-- **새 public 표면은 정책 파일 키 여섯뿐이다**(`collection.transport.roots`·`surface-packages`·
-  `surface-types`·`purposes`·`holders.<용도>` 다섯). production 의 새 public 선언 **0**.
+- **새 public 표면은 정책 파일 키 아홉뿐이다** — 전송 여섯(`collection.transport.roots`·`surface-packages`·
+  `surface-types`·`purposes`·`holders.<용도>` 다섯)과 반사 셋(`collection.reflection.roots`·`type-pairs`·
+  `class-member-pairs`). 앞 판의 반사 키 둘(`allowed-referencers`·`class-allowed-members`)은 없앴으니
+  순증은 일곱이다. production 의 새 public 선언 **0**.
 - 게이트 등재: `gate.tests.app` 에 새 test class 둘. 그 키는 「app test 전수」 양방향 등식이라 등재 없이는
   `AppGateRegistrationTest` 가 즉시 붉다.
-- 이 라운드가 만든 새 파일 다섯은 전부 in_scope 안이다(`app/src/test/kotlin/bidvector/app/architecture/**`
-  셋 · 새 fixture 디렉터리 둘 — fixture 경로는 in_scope 의 `app/src/test/kotlin/bidvector/app/architecture/**`
-  밖이라 「계약 대조」 4 로 선언한다).
+- 새 파일 여섯 가운데 다섯은 in_scope 안이다(`app/src/test/kotlin/bidvector/app/architecture/**` 셋 ·
+  `archfixture/violating/transport/**` 둘 — 뒤쪽은 계약 갱신 r1 D-6G2b-10 이 in_scope 에 넣었다).
+  여섯째 `archfixture/violating/adapters/RogueAdapterReflectionPeek.kt` 는 **아직 in_scope 문면 밖**이다
+  (「계약 대조」 4).
 
 ## 계약 대조 (scope.md 문면과 다르게 한 것)
 
-1. **뿌리를 열다섯에서 열일곱으로 늘렸다.** 6G 의 금지 목록에 `java.lang.reflect.Method`·
+아래 1~3·5~7 은 계약 갱신 r1(D-6G2b-10~16)이 결정으로 받았다 — 그 갱신 **전에** 레인이 한 판단이므로
+근거를 여기 남긴다. **아직 계약 문면과 다른 것은 4 와 8 둘**이다.
+
+1. **뿌리를 열다섯에서 열일곱으로 늘렸다**(→ D-6G2b-12). 6G 의 금지 목록에 `java.lang.reflect.Method`·
    `java.lang.invoke.MethodHandles` 가 있어 계약의 뿌리만으로 합치면 그 둘이 빠진다(실측 — `RogueMethodHandleInvoke`
    가 6G 에서 잡히고 계약 뿌리에서 놓쳐진다). 두 패키지를 뿌리로 올려 잃지 않았다(production 참조 0).
    클래스패스 실측으로 더한 것: `jakarta.websocket`·`org.apache.tomcat.websocket`(tomcat-embed-websocket
    이 실제로 있다) · `com.sun.net`·`sun.net`. `kotlin.reflect` 는 **넣지 않았다** — 반사 게이트 소관이고
    그 게이트의 뿌리 범위는 A-2 결정이다(겹쳐 적으면 한쪽이 낡는다).
-2. **무해 타입 목록을 두지 않았다**(D-6G2b-3 의 「무해 타입은 쌍 등식에서 뺀다」와 다르다). 관측 19종 중
+2. **무해 타입 목록을 두지 않았다**(초안 D-6G2b-3 의 「무해 타입은 쌍 등식에서 뺀다」와 다르다 → D-6G2b-13). 관측 19종 중
    「바이트를 밖으로 내지 못하는」 값·예외 타입이 14종으로 계약 (3) 의 열 개 문턱을 넘었고, 그 문턱의
    지시대로 뿌리를 다시 보니 무해 목록 **자체**가 게이트를 헐겁게 하는 쪽이었다 — 목록에 오른 타입은 모든
    클래스에서 자유로워진다. 보유자 28 이 닫힌 어휘 다섯으로 빠짐없이 분류되므로 예외를 없애고 관측 쌍
    전수를 등재했다. 쌍 등식의 취지는 그대로이고 결과는 더 조인다(무해 타입 수 0).
-3. **낱개 타입 넷의 구성이 다르다.** 계약은 `ProcessBuilder`·`Runtime`·`java.beans.Expression`·
+3. **낱개 타입 넷의 구성이 다르다**(→ D-6G2b-14). 초안은 `ProcessBuilder`·`Runtime`·`java.beans.Expression`·
    `Statement` 넷이었다. `java.beans` 는 뿌리로 둘 수 있어((1) 의 열거 사유 「`java.lang` 을 뿌리로 금지할
    수 없어서」가 해당하지 않는다) 뿌리로 올렸고, 낱개는 `java.lang` 넷(`Process`·`ProcessBuilder`·
    `ProcessHandle`·`Runtime`)으로 바꿨다. 전부 production 참조 0.
-4. **fixture 경로가 in_scope 문면 밖이다.** 계약의 in_scope 는 `app/src/test/kotlin/bidvector/app/architecture/**`
-   이고 음성 fixture 는 기존 선례대로 `app/src/test/kotlin/bidvector/archfixture/violating/transport/**`
-   에 두었다(6G·6F-8 의 fixture 가 사는 자리). scope.md 는 고치지 않았다 — 계약 갱신이 필요한 항목이다.
+4. **A-2 fixture 경로가 아직 in_scope 문면 밖이다**(갱신 필요). 전송 fixture 경로
+   (`archfixture/violating/transport/**`)는 D-6G2b-10 이 in_scope 에 넣었지만, A-2 가 더한
+   `archfixture/violating/adapters/RogueAdapterReflectionPeek.kt` 는 그 문면에 없다. 그 자리에 둔 이유는
+   fixture 의 패키지가 **게이트 뿌리를 정하기 때문**이다 — `adapters` 층 반사를 재려면 fixture 가
+   `archfixture/violating/adapters` 아래 있어야 한다. scope.md 는 고치지 않았다.
 5. **acceptance 의 `clean`·`--no-build-cache` 는 쓰지 않았다**(계약 정정 문면대로 현 CI `check` job 명령 셋).
-6. **`policy.version` 을 7 → 8 로 올렸다.** 계약에 없던 편집이다 — 같은 파일의 v6·v7 주석 관례(판이 오르는
+6. **`policy.version` 을 7 → 8 로 올렸다**(→ D-6G2b-15). 초안에 없던 편집이다 — 같은 파일의 v6·v7 주석 관례(판이 오르는
    것은 임계가 아니라 **대상의 모양**이 바뀔 때)에 맞췄다. 두 키 계열이 사라지고 허용의 모양이 집합에서
-   쌍으로 바뀌었으므로 판을 올리지 않으면 앞 판과 구별되지 않는다.
-7. **`OPEN-6G-GATE-REGISTRY-KONEPS` 는 닫지 않았다.** D-6G2b-9 는 「새 게이트 test 를 등재 목록에 넣는다」를
+   쌍으로 바뀌었으므로 판을 올리지 않으면 앞 판과 구별되지 않는다. A-2 가 반사 키 계열도 같은 모양으로
+   바꾸지만 **판은 8 그대로** 두고 그 주석에 둘째 축을 더했다 — 한 slice 가 판 하나다.
+7. **`OPEN-6G-GATE-REGISTRY-KONEPS` 는 닫지 않았다**(→ D-6G2b-15). D-6G2b-9 는 「새 게이트 test 를 등재 목록에 넣는다」를
    요구하고 그것은 했지만, 그 OPEN 의 내용은 게이트 장부 전반이라 이 slice 의 쌍 등식이 갈음하지 못한다 —
    판단은 종결 보고로 넘긴다.
+8. **A-2 등재 쌍이 열둘이다 — 계약 문면의 「9건」보다 셋 많다**(갱신 필요). D-6G2b-11 이 센 9 는 앞 판에서
+   **금지였던** 참조다(`KClass` 2 + 허용 밖 `Class` 멤버 7). 허용을 쌍으로 바꾸면 앞 판이 **전역 `getName`
+   으로 덮고 있던** 셋(`adapters.snapshot.RunStateDurabilityKt` · `app.collection.CollectionRunnerKt` ·
+   `app.collection.OpeningCollectionLinesKt`)도 등재해야 한다 — 전역 허용을 없앤 결과이고, 등재하지 않으면
+   그 셋이 RED 다. 9 + 3 = 12.
 
 ## 알려진 제한
 
 1. **목적지를 모른다**(계약의 경계 밖 선언 그대로). 등재된 `attachment`·`llm`·`ml-grpc` 보유자가 KONEPS
    주소로 호출하는지는 정적 분석이 재지 못한다. 통제는 「서비스 키 원문 설정은 배선 한 곳만 참조한다」다.
-2. **이름을 문자열로 짓는 반사 가운데 반사 게이트의 뿌리 밖.** 전송 표면 뿌리가 `java.lang.reflect`·
+2. **반사 타입이 전혀 남지 않는 형태.** 전송 표면 뿌리가 `java.lang.reflect`·
    `java.lang.invoke` 를 덮어 6G 보다 넓어졌지만, 반사 타입이 **전혀 남지 않는** 형태(서드파티 반사
    도구 경유)는 여전히 밖이다 — 그것을 타입 이름 목록으로 막으면 열거로 돌아간다(6G 의 같은 제한 승계).
 3. **게이트 test·정책 파일·빌드 스크립트를 고치는 저자**는 경계 밖이다(M1/1A 승계).
 4. **JNI·네이티브·JDBC 경유 DB 쪽 네트워크·새 빌드 의존**은 빌드 의존 게이트 소관이다.
-5. **A-2 미결** — 반사 게이트 뿌리는 `workflow`·`app` 그대로다. `adapters` 의 반사 9건은 위 표에 있다.
+5. **반사 게이트 뿌리는 production 전체가 아니다.** A-2 로 `adapters` 가 들어왔지만 `procurement`·
+   `decision`·`qualification`·`settlement`·`shared-kernel` 은 밖이다(domain 계열이고 프레임워크·반사 참조는
+   다른 게이트가 금지하지만, 이 게이트의 쌍 등식으로는 재지 않는다). 전송 표면 게이트처럼 production
+   전체로 올리지 않은 것은 운영자 결정 문면(`adapters` 까지)을 넘지 않기 위해서다.
 6. **`io.netty` 는 클래스패스에 없다.** 뿌리로 남겼으나 오늘 그 뿌리는 아무것도 재지 않는다(의존이 들어오면
    그때부터 닫힌다).
 
 ## 누출 어휘 스캔 (패턴을 축어로 적지 않고 파일 참조로)
 
-- 이 slice 가 더한 줄만: `git diff 1745a3e2..HEAD -- <in_scope> | grep '^+' | grep -niE -f config/quality/leak-patterns.txt`
+- 이 slice 가 더한 줄만: `git diff 1745a3e2..<실측 HEAD> -- <in_scope> | grep '^+' | grep -niE -f config/quality/leak-patterns.txt`
   → **exit 1**(매치 없음).
-- in_scope 전체 파일: **10 매치**, 전부 기존 줄이다(위 줄 단위 스캔이 0 인 것이 그 방증) — `ArchitecturePolicy.kt`
-  4 · `EditableFieldVocabularyGateTest.kt` 2 · `architecture-policy.properties` 4. 건드리지 않았다.
+- in_scope 전체 파일: **10 매치**, 전부 기존 줄이다(위 줄 단위 스캔이 0 인 것이 그 방증) — `ArchitecturePolicy.kt` ·
+  `EditableFieldVocabularyGateTest.kt` · `architecture-policy.properties` 세 파일에 흩어져 있고 건드리지 않았다.
 - `reports/evidence/m6/6g2b/`(이 셋 + `scope.md`): `grep -rniE -f config/quality/leak-patterns.txt` →
   **exit 1**(매치 없음). evidence 편집 커밋 뒤의 재확인과 마지막 HEAD 의 정본은 verifier 와 PR 조치
   코멘트 몫이다.
@@ -175,17 +232,17 @@ D-6G2b-6 대로 **현 뿌리를 유지**했다(이 slice 는 반사 게이트를
 ## 낡는 좌표 점검
 
 편집한 파일을 `file:line` 으로 가리키지 않았다(인용문·절 제목·결정 ID·커밋 해시·클래스 이름만). 역방향
-파급도 쟀다 — 편집한 아홉 파일의 stem 으로 `grep -rn '<stem>:[0-9]'` → **전부 0건**.
+파급도 쟀다 — 편집한 **열두** 파일의 stem 으로 `grep -rn '<stem>:[0-9]'` → **전부 0건**.
 
 ## clean-tree 게이트
 
-`git status --porcelain -- <in_scope 개별 인자 아홉>` → **빈 출력**(0줄). 양성 대조 1회 — 공유 파일
+`git status --porcelain -- <in_scope 개별 인자 열셋>` → **빈 출력**(0줄). 양성 대조 1회 — 공유 파일
 하나를 **비파괴 절삭**(마지막 한 줄 제거)해 porcelain 이 그 파일 한 줄을 내는 것을 확인하고 사본으로
 복원, 다시 0줄. `git checkout --` 는 쓰지 않았다.
 
 ## 크기 게이트 (evidence ≤ 산출물)
 
-표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..실측 HEAD 의 in_scope 추가 **705줄 /
-37,345 B**(삭제 66줄). 구성은 게이트·fixture Kotlin 다섯 531줄 · 정책 둘 149줄 · 기존 test 둘 25줄.
+표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..실측 HEAD 의 in_scope 추가 **962줄 /
+54,020 B**(삭제 167줄). 구성은 게이트·fixture Kotlin 여섯 · 정책 둘 · 기존 test 넷.
 `milestone-6.md` 착수 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다(바이트는 diff 의 `+`
 접두를 포함한 값이라 줄 수만큼 부풀어 있다 — 두 축을 같은 방법으로 쟀다).
