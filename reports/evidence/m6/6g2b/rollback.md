@@ -58,7 +58,7 @@ pathspec 오류로 아무것도 적용되지 않는다. 실측 `exit 0`.
 ## ② 공유 파일 셋 — hunk 격리, 나중 커밋부터
 
 커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..57493a71 -- <파일>`. 실측은 아키텍처
-정책 **넷**(모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **하나** · `milestone-6.md` **하나**다.
+정책 **넷**(모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **하나** · `milestone-6.md` **둘**(착수 `7938ae8d` · 종결 `a6f55d17`, 팀장)이다.
 
 ```
 git diff 28c789c6~1..28c789c6 -- config/quality/architecture-policy.properties | git apply -R
@@ -66,10 +66,11 @@ git diff 0f11117a~1..0f11117a -- config/quality/architecture-policy.properties |
 git diff cc3fd1c7~1..cc3fd1c7 -- config/quality/architecture-policy.properties | git apply -R
 git diff 3e670054~1..3e670054 -- config/quality/gate-tests.properties | git apply -R
 git diff 96c6f73d~1..96c6f73d -- config/quality/architecture-policy.properties | git apply -R
+git diff a6f55d17~1..a6f55d17 -- milestone-6.md | git apply -R
 git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ```
 
-여섯 전부 **exit 0** · conflict 0. 나중 것부터 역적용한다 — 정책 파일의 세 hunk 는 **늦은 커밋이 먼저**다
+일곱 전부 **exit 0** · conflict 0(`milestone-6.md` 둘은 팀장이 종결 커밋 뒤 버릴 clone 에서 재실측 — 역적용 뒤 base 와 바이트 동일, 6G-2f 종결 문단 보존 1). 나중 것부터 역적용한다 — 정책 파일의 세 hunk 는 **늦은 커밋이 먼저**다
 (앞 커밋을 먼저 되돌리면 뒤 hunk 의 문맥이 사라진다). **목록이 늘면 이 절차를 다시 돌린다** — 종결 문단
 커밋과 다음 라운드의 공유 파일 커밋이 각각 한 줄씩 늘린다.
 
