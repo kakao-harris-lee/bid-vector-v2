@@ -724,6 +724,16 @@ verifier·Codex 승인은 다음을 자동 허용하지 않는다.
 - 기존 `bid-vector` 중지·삭제
 - 원격 merge/push
 
+## 다음 마일스톤 (2026-10-03, PR #55)
+
+- 다음은 `milestone-7.md`(사용자 웹 화면·도메인·운영 반입). **M7 착수는 「완료 조건」 절의 아홉이 성립한 뒤**다.
+- **완료 조건의 범위 조정(운영자 결정 2026-10-03)**: 6G 의 실 KONEPS 수집(2026-10-02 착수 승인, 포털 한도 키 × operation ×
+  일 1,000 안에서 진행 — 기록은 `reports/evidence/m6/6g/commands.md`, 수집 기록 PR #56)과 그 백테스트 판정은 표본 완료까지
+  수십 일이 걸리므로 **M6 완료 조건과 분리해 「6G 종결」로 따로 닫는다.** 조건 9 의 「verifier 최종 ready-for-review」는
+  6G 를 제외한 M6 산출물에 대해 재며, 6G 종결은 `milestone-6.md` 6G 절의 종결 문단으로 적는다. 이 조정은 수집 실행을
+  새로 허용하는 것이 아니다(실행 승인은 2026-10-02 에 이미 있었다).
+- 공공데이터포털 운영계정 신청은 M7 종결 뒤 절차다(`milestone-7.md` 「M7 종결 뒤」).
+
 **6F-5 분할·6F-5-a 착수 2026-09-19** — base `ede5d5b`, 레인 worktree `bid-vector-v2-m6f5`·브랜치
 `m6-6f5/2026-09-19`. 정본 `reports/evidence/m6/6f5a/scope.md`(D-6F5-1~8). 착수 조사가 **구조적 제약 셋**을
 냈고 그것이 분할 근거다: ① **`WatchGatedExtractor` 는 `WatchVerdict.Passed` 를 요구하는데
