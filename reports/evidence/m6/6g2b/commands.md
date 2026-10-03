@@ -248,8 +248,8 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 
 ## 계약 대조 (scope.md 문면과 다르게 한 것)
 
-아래 1~10 은 계약 갱신 r1·r2·r4(D-6G2b-10~18·28~30)가 결정으로 받았다 — 그 갱신 **전에** 레인이 한
-판단이므로 근거를 여기 남긴다. **아직 계약 문면과 다른 것은 11 하나**이고, 그것도 두 자리로 줄었다.
+아래 열하나 전부 계약 갱신 r1·r2·r4·r5(D-6G2b-10~18·28~31)가 결정으로 받았다 — 그 갱신들 **전에** 레인이
+한 판단이므로 근거를 여기 남긴다. **계약 문면과 다른 것은 남지 않았다.**
 
 1. **뿌리를 열다섯에서 열일곱으로 늘렸다**(→ D-6G2b-12). 6G 의 금지 목록에 `java.lang.reflect.Method`·
    `java.lang.invoke.MethodHandles` 가 있어 계약의 뿌리만으로 합치면 그 둘이 빠진다(실측 — `RogueMethodHandleInvoke`
@@ -293,10 +293,10 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 10. **`java.util.ServiceLoader` 를 낱개 전송 타입에 더했다**(→ D-6G2b-28). `java.util` 이 허용 패키지라 1층을
    지나므로 `java.lang` 의 `ProcessBuilder` 와 같은 자리로 두었다 — 지시가 든 변이 후보 하나를 **2층**이
    잡게 하는 선택이고 production 관측은 0 이다.
-11. **in_scope 문면 밖 자리 둘이 남는다**(갱신 필요) — `archfixture/violating/workflow/external/**` 와
+11. **in_scope 문면 밖이던 자리 둘**(→ D-6G2b-31 이 넣었다) — `archfixture/violating/workflow/external/**` 와
    `app/src/test/resources/archunit.properties`(cr L-3 핀). `adapters/external/**` 는 D-6G2b-18 이 넣은
-   `adapters/**` 아래라 문면 안이다. workflow fixture 는 **모듈별 허용 집합을 모듈마다 재려면** 그 모듈
-   뿌리 아래여야 해서 다른 자리에 둘 수 없고, ArchUnit 핀은 test 리소스라 Kotlin 경로 밖이다.
+   `adapters/**` 아래라 처음부터 문면 안이었다. workflow fixture 는 **모듈별 허용 집합을 모듈마다 재려면**
+   그 모듈 뿌리 아래여야 해서 다른 자리에 둘 수 없고, ArchUnit 핀은 test 리소스라 Kotlin 경로 밖이다.
 
 ## 검토 처분 (D-6G-65 분류)
 
