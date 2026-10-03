@@ -9,7 +9,7 @@
 |---|---|---|
 | 6G 머지 + 6G-2d 머지 | ✓ PR #50 · #51 | 6G D-6G-77 |
 | A-3 재호출 상한 | ✓ N=3 확정(단위 = 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드 `INTERRUPTED` 하나, 관문 거부 미계수 · 창 = 디렉터리 생애) | 운영자 2026-10-01 |
-| `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(5,000 초과 참가 축은 확정 제외, 계수 공시) | 운영자 2026-10-01 |
+| `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(**50 × rows-per-page** 초과 참가 축은 확정 제외, 계수 공시 — 기본 999 에서 49,950. 쪽 수 상한 50 은 무변경이고 뜻만 행 수로 넓어졌다) | 운영자 2026-10-01 · 6G-2f D-6G2f-4 |
 | `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ✓ 6G-2e 가 셋을 닫는다(2026-10-02) — 찢어진 조각만 남은 꼬리 라운드는 의도 줄로 되살아나 재호출 상한에 하나로 셈(D-6G2e-3) · `incompleteAValues` 는 A 축 행 자체가 가름(D-6G2e-4) · 자리 대조가 복구보다 앞서고 기동 첫 걸음 전부가 잠금 가드 안(D-6G2e-5). **이 slice 가 머지된 뒤** 참이다 | 6G-2d D-6G2d-53 · 6G-2e |
 | 운영계정 서비스 키 | ✓ **개발에서 쓰는 키와 같다**(사용자 2026-10-02) — legacy `../bid-vector/.env` 의 **원문형** 변수 `KONEPS_OPENAPI_SERVICE_KEY`(인코딩형 `KONEPS_OPENAPI_ENCODED_SERVICE_KEY` 는 쓰지 않는다, 6F-8 실측: 이중 인코딩 → `resultCode 30`). 값은 어디에도 적지 않는다 | 사용자 2026-10-02 · 6F-8 checklist 6항 |
 | 개찰 갈래의 수집 범위 상한이 A-1 의 최대 16주 창을 받는가 | ✓ 6G-2e 가 갈래별 정책으로 나눴다(2026-10-02) — 개찰 갈래 **120일**(`OPENING_COLLECTION_RANGE_POLICY`, A-1 승인), 공고 목록 갈래는 31일 그대로(6F-8 D-6F8-3). 창을 쪼개 돌리는 길은 여전히 없다(확정 표본이 from/to 를 고정한다 — D-6G2e-2). **이 slice 가 머지된 뒤** 참이다 | PR #52 `/code-review` 2026-10-01 · 6G-2e D-6G2e-1 |
@@ -67,6 +67,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.opening-collection.release-sha=<jar SHA> \
     <공통 인자> )
 ```
+- **페이지 크기는 기본 999** 다(`bidvector.koneps.opening.rows-per-page`, D-6G2f-1) — 인자를 주지 않으면 그 값이고, 다섯 축(개찰 목록·개찰완료·예비가격 상세·기초금액·산식 A)이 그 값 하나를 쓴다. 게이트웨이 상한 999 는 실측이다(2026-10-03: `numOfRows=999` 에 항목 999 · 에코 999). 1..999 밖의 값은 기동 거부이고, 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이).
 - **이 갈래의 from/to 는 120일까지**다(D-6G2e-1, A-1 승인 2026-10-02 — 개찰 갈래 전용 정책이고 공고 목록 갈래의 31일과 다른 값이다). 넘으면 기동 거부(`SPAN_TOO_LONG`)이고, 그 상한은 설정 실수를 실 호출 전에 잡는 자리다. **창을 쪼개 돌리지 않는다** — 확정 표본이 from/to·업무를 고정하므로 조각난 창은 「표본틀 범위가 지금 설정과 다르다」로 거부된다(D-6G2e-2). A-1 기간을 **한 창으로** 준다.
 - 첫 실행이 표본을 **뽑고 확정**한다(`sample-list.tsv` · `sample-scope.json`, 장부 해시). 이후 실행은 같은 seed 라도 다시 뽑지 않는다 — 확정된 목록이 정본.
 - 하루 상한(20,000)에 닿으면 exit 2 로 멈춘다. **KST 자정**이 지나면 다시 돌린다(일 상한은 KST 날짜 단위). 총 80,000 → 최소 4일.
@@ -130,10 +131,19 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 ## 5. 알려진 제한 (판정문에도 실린다)
 
 - 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시).
-- `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
+- `MAX_PAGES` 확정: 참가 **50 × rows-per-page** 초과 축은 `incomplete_axis`(기본 999 에서 49,950). 쪽 수 상한은 폭주 방지 문턱이지 데이터 정확성 문턱이 아니다 — 페이지 크기를 올리면 같은 50 쪽이 더 많은 행을 덮는다(D-6G2f-4).
+- 쿼터는 **키 × operation × 일 1,000 건**이다(day1·day2 실측: 개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`). 개찰완료만 업무 공통 단일 operation 이라 먼저 닫힌다 — 페이지 100 에서 하루 약 470 공고였고 **페이지 999 뒤 하루 약 950 공고**다(공고당 1 호출로 정착하므로). 한도 자체는 운영계정 승인(100,000/일)으로만 움직인다.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
 
 ## 6. 검증 기록
 
 2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · 러너 마지막 줄의 계수 아홉 — 코드와 일치(단 토큰은 `snapshot-extract finished` 이고 초판이 `snapshot finished` 로 적은 것은 PR #52 리뷰가 잡았다). 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다. PR #52 `/code-review`(2026-10-01)가 추가로 잡은 것: 범위 상한 31일(차단) · `file://` URI · 스냅숏별 출력 디렉터리 · 운영자 토큰 상시 필수 · manifest 키 이름 · 관측 창 뜻 · 판정 출력 위치 — 전부 반영.
+
+## 7. 배포 — 개찰 축 페이지 크기 999 교체 (6G-2f, 머지 직후 1회)
+
+실수집이 도는 중에 jar 를 바꾸는 절차다. 인자가 바뀌지 않으므로 교체는 **새 jar 를 놓는 것**뿐이다.
+
+1. 수집 실행이 돌지 않는 창(`pgrep -af 'java -jar .*app.jar'` 빈 출력)에서, 호스트 3단 점검을 **별도 호출**로 본 뒤 `main` 체크아웃에서 `./gradlew --no-daemon :app:bootJar`.
+2. 다음 재실행(cron 00:41)이 같은 경로의 jar 를 집는다 — 인자 무변경(기본 999). 원장 `release_sha` 가 새 SHA 로 바뀌는 것은 정상 기록이다. 첫 실행 뒤 **개찰완료 HTTP 줄 수 ≈ 정착 공고 수**임을 evidence 표에 적는다(그것이 「공고당 1 호출」의 실측이다).
+3. 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이). 확정된 표본은 쪽 크기와 무관하므로 이 되돌림이 `sample-list.tsv` 를 건드리지 않는다.
