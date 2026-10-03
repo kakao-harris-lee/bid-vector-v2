@@ -23,6 +23,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -91,7 +92,64 @@ class JdbcSnapshotSourceCountsTest : SnapshotSourceTestBase() {
         extraction.skippedWithoutNotice shouldBe 5
         extraction.incompleteAxis shouldBe 6
         extraction.observedOutsideSample shouldBe 7
-        extraction.unusableRawRows shouldBe 8
+        extraction.unusableRawRows.total shouldBe 8
         extraction.incompleteAValues shouldBe 1
+    }
+
+    /**
+     * **D-6G2c-20 (6G-2d cr r1 M-2) — 세 원인이 각자 칸에서만 선다.** 합계 하나로는 0 이 아닌 값을
+     * 받은 사람이 무엇이 틀렸는지 물을 자리가 없고, 셋의 처방이 다르다: 빈 번호는 적재 쪽 결함,
+     * 형태를 어긴 차수는 원천의 값, 열거 밖 축은 **코드 변경**의 흔적이다.
+     *
+     * 세 행을 **직접 INSERT** 로 심는다. 출하 적재 경로는 이런 행을 만들지 못하므로(번호·차수는 적재
+     * 전에 떨어지고 축은 열거 타입이다) 그 경로로는 이 판을 세울 수 없다 — 이 계수가 애초에 **방어
+     * 심화**인 이유와 같다(판독은 적재 경로의 전제에 기대지 않는다).
+     *
+     * 셋을 **서로 다른 수**로 두지 않고 각각 1 로 둔 뒤 칸마다 1 을 단언한다 — 한 행이 두 칸에 들면
+     * 합계가 3 을 넘고, 칸을 맞바꾸면 그 칸이 0 이 된다.
+     */
+    @Test
+    fun `키가 서지 않는 세 원인이 각자 칸에서만 하나로 센다`() {
+        val sampled = syntheticNumbers(1..1)
+        val sample = sampleOf(*sampled.toTypedArray())
+        insertRawRow(number = "", round = "000", endpoint = SourceEndpoint.OPENING_COMPLETE.name, key = "blank")
+        insertRawRow(number = sampled[0], round = "1", endpoint = SourceEndpoint.OPENING_COMPLETE.name, key = "round")
+        insertRawRow(number = sampled[0], round = "000", endpoint = "OPENING_RENAMED_AXIS", key = "endpoint")
+
+        val unusable = extract(sample).unusableRawRows
+
+        unusable.total shouldBe 3
+        unusable[UnusableRawRowCause.BLANK_NOTICE_NUMBER] shouldBe 1
+        unusable[UnusableRawRowCause.MALFORMED_ROUND] shouldBe 1
+        unusable[UnusableRawRowCause.UNKNOWN_ENDPOINT] shouldBe 1
+    }
+
+    /**
+     * 원문 행 하나를 **표 그대로** 심는다 — 출하 적재가 만들 수 없는 모양을 세우는 유일한 길이다.
+     * `source_endpoint` 는 열거가 아니라 빈 문자열만 거부하는 TEXT 칸이므로 옛 축 이름이 그대로 들어간다.
+     */
+    private fun insertRawRow(
+        number: String,
+        round: String,
+        endpoint: String,
+        key: String,
+    ) {
+        val fields = """{"bidNtceNo":"$number","bidNtceOrd":"$round"}"""
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO raw_observation" +
+                        "(observation_key, source_endpoint, payload, payload_fields, observed_at, release_sha) " +
+                        "VALUES (?, ?, ?, ?::jsonb, ?, ?)",
+                ).use { statement ->
+                    statement.setString(1, "6g2c-unusable-$key")
+                    statement.setString(2, endpoint)
+                    statement.setString(3, fields)
+                    statement.setString(4, fields)
+                    statement.setTimestamp(5, Timestamp.from(observedAt))
+                    statement.setString(6, "6g2c-unusable-test")
+                    statement.executeUpdate()
+                }
+        }
     }
 }

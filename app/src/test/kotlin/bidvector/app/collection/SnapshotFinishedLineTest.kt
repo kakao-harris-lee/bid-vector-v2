@@ -4,7 +4,10 @@ import bidvector.adapters.snapshot.SnapshotExtraction
 import bidvector.adapters.snapshot.SnapshotNotice
 import bidvector.adapters.snapshot.SnapshotOutcome
 import bidvector.adapters.snapshot.SnapshotRow
+import bidvector.adapters.snapshot.UnusableRawRowCause
+import bidvector.adapters.snapshot.UnusableRawRows
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -24,8 +27,31 @@ class SnapshotFinishedLineTest {
         line shouldBe
             "snapshot-extract finished rows=3 sampleSize=11 sampledWithoutDetail=5 " +
             "skippedWithoutNotice=7 incompleteAxis=13 unusableRawRows=17 " +
+            "blankNoticeNumber=2 malformedRound=3 unknownEndpoint=12 " +
             "fractionalAmounts=19 incompleteAValues=23 outsideSample=29 bytes=97"
     }
+
+    /**
+     * **D-6G2c-20 — 합계 칸은 원인 셋의 합이다.** 합계를 따로 들면 그 둘이 갈리는 날이 오고, 갈린
+     * 뒤에는 어느 쪽이 참인지 줄만 보고 알 수 없다. 합계는 **파생**이므로 여기서 그것을 못 박는다.
+     */
+    @Test
+    fun `원인 셋의 합이 곧 합계 칸이다`() {
+        val causes = distinctCounts().unusableRawRows
+
+        causes.total shouldBe
+            UnusableRawRowCause.entries.sumOf { causes[it] }
+    }
+
+    /** 등재되지 않은 원인은 0 이다 — 빈 지도를 받은 추출의 줄에서 칸이 사라지지 않는다. */
+    @Test
+    fun `원인 지도가 비면 세 칸이 모두 0 으로 선다`() {
+        val line = snapshotFinishedLine(sampleSize = 1, extraction = noUnusableRows(), bytes = 1)
+
+        line shouldContain "unusableRawRows=0 blankNoticeNumber=0 malformedRound=0 unknownEndpoint=0 "
+    }
+
+    private fun noUnusableRows() = distinctCounts().copy(unusableRawRows = UnusableRawRows.NONE)
 
     private fun distinctCounts() =
         SnapshotExtraction(
@@ -34,7 +60,14 @@ class SnapshotFinishedLineTest {
             sampledWithoutDetail = 5,
             observedOutsideSample = 29,
             incompleteAxis = 13,
-            unusableRawRows = 17,
+            unusableRawRows =
+                UnusableRawRows(
+                    mapOf(
+                        UnusableRawRowCause.BLANK_NOTICE_NUMBER to 2,
+                        UnusableRawRowCause.MALFORMED_ROUND to 3,
+                        UnusableRawRowCause.UNKNOWN_ENDPOINT to 12,
+                    ),
+                ),
             fractionalAmounts = 19,
             incompleteAValues = 23,
         )

@@ -125,25 +125,33 @@ class JdbcSnapshotSource(
     ): ObservedRows {
         val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, WalkRows>>()
         val outside = mutableSetOf<NoticeKey>()
-        var unusable = 0
+        val unusable = mutableMapOf<UnusableRawRowCause, Int>()
         while (rows.next()) {
             // 식별자나 엔드포인트 어휘가 서지 않는 행은 키를 갖지 못한다(D-6G2d-8 ⓐ) — 그 행만
             // 버리고 **수를 공시한다**. 조용히 지나가면 「왜 표본이 비었나」를 물을 자리가 없다.
-            val keyed = keyAndEndpointOf(rows)
-            if (keyed == null) {
-                unusable++
-                continue
-            }
-            val (key, endpoint) = keyed
-            val hash = NoticeKeyHash.of(key.number, key.round.value)
-            if (hash in sample.keys) {
-                collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
-            } else {
-                outside += key
+            // **원인까지 공시한다**(D-6G2c-20) — 셋이 한 수에 접히면 0 이 아닌 값에서 무엇이 틀렸는지
+            // 물을 자리가 없고, 셋의 처방이 다르다(적재 결함 · 원천 형태 · 코드 변경).
+            when (val keyed = keyAndEndpointOf(rows)) {
+                is RawRowKey.Unusable -> unusable.merge(keyed.cause, 1, Int::plus)
+
+                is RawRowKey.Keyed -> {
+                    val hash = NoticeKeyHash.of(keyed.key.number, keyed.key.round.value)
+                    if (hash in sample.keys) {
+                        collectWalkRow(byKey, keyed.key, keyed.endpoint, rows, conclusionFor(axisConclusions, hash, keyed))
+                    } else {
+                        outside += keyed.key
+                    }
+                }
             }
         }
-        return ObservedRows(byKey, outside, unusable)
+        return ObservedRows(byKey, outside, UnusableRawRows(unusable))
     }
+
+    private fun conclusionFor(
+        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
+        hash: NoticeKeyHash,
+        keyed: RawRowKey.Keyed,
+    ): AxisConclusion? = axisConclusions[hash.value]?.get(keyed.endpoint)
 
     /**
      * **(공고, 축)마다 한 걷기의 행만 쓴다**(D-6G-68 · D-6G2d-3). 원문은 append-only 라(DB 트리거)
@@ -173,7 +181,7 @@ class JdbcSnapshotSource(
         }
     }
 
-    private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
+    private fun keyAndEndpointOf(rows: ResultSet): RawRowKey {
         // **canonical 형태로 키를 맞춘다.** 원문 payload 는 수집 때 온 그대로이고 `notice` 표는
         // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이
         // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
@@ -185,7 +193,14 @@ class JdbcSnapshotSource(
         val number = rows.getString("notice_number")?.let { NoticeNumber.ofOrNull(it)?.value }
         val round = rows.getString("notice_round")?.let(::roundOrNull)
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()
-        return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
+        // **원인은 하나다** — 셋이 겹친 행도 한 칸에만 센다(겹치면 합계가 행 수를 넘어 「행마다 하나」가
+        // 깨진다). 순서는 키를 짓는 순서 그대로다: 번호 → 차수 → 축.
+        return when {
+            number == null -> RawRowKey.Unusable(UnusableRawRowCause.BLANK_NOTICE_NUMBER)
+            round == null -> RawRowKey.Unusable(UnusableRawRowCause.MALFORMED_ROUND)
+            endpoint == null -> RawRowKey.Unusable(UnusableRawRowCause.UNKNOWN_ENDPOINT)
+            else -> RawRowKey.Keyed(NoticeKey(number, round), endpoint)
+        }
     }
 
     /**
@@ -240,9 +255,24 @@ private fun fromLedgeredWalk(
 private class ObservedRows(
     val byKey: Map<NoticeKey, Map<SourceEndpoint, WalkRows>>,
     val outsideSample: Set<NoticeKey>,
-    /** 키를 갖지 못한 원문 행 수(D-6G2d-8 ⓐ) — 어느 표본에도 속하지 않아 항등식 밖이다. */
-    val unusableRows: Int,
+    /** 키를 갖지 못한 원문 행(D-6G2d-8 ⓐ) — 어느 표본에도 속하지 않아 항등식 밖이다. */
+    val unusableRows: UnusableRawRows,
 )
+
+/**
+ * 원문 행 하나의 판독 결과 — 키가 서거나, 서지 않은 **원인**이다(D-6G2c-20). `null` 하나로 돌려주던
+ * 앞 판은 세 원인을 한 값에 접었고, 그래서 계수가 0 이 아닐 때 무엇이 틀렸는지 물을 자리가 없었다.
+ */
+private sealed interface RawRowKey {
+    class Keyed(
+        val key: NoticeKey,
+        val endpoint: SourceEndpoint,
+    ) : RawRowKey
+
+    class Unusable(
+        val cause: UnusableRawRowCause,
+    ) : RawRowKey
+}
 
 /**
  * 한 (공고, 축)에서 **쓰기로 정한 걷기**와 그 걷기의 행(D-6G2d-3). 걷기를 값으로 들고 있어야
@@ -288,13 +318,12 @@ data class SnapshotExtraction(
     /** 완료되지 않은 축이 있는 표본 수(D-6G-58) — 반쪽 원문으로 행을 쓰지 않는다. */
     val incompleteAxis: Int,
     /**
-     * **공고 키 또는 축 어휘가 서지 않아 버린** 원문 행 수(D-6G2d-8 ⓐ · 18) — **항등식 밖**이다
+     * **공고 키 또는 축 어휘가 서지 않아 버린** 원문 행(D-6G2d-8 ⓐ · 18 · D-6G2c-20) — **항등식 밖**이다
      * ([observedOutsideSample] 과 같은 자리). 그 행은 어느 표본 공고에도 속하지 않으므로 네 항 어디에도
-     * 들지 않는다. 원인은 셋이고 이 계수는 셋을 합친다: 공고번호가 빈 행 · 차수가 제로패딩 세 자리가
-     * 아닌 행 · `source_endpoint` 가 열거 어휘 밖인 행. 마지막 하나는 **코드 변경으로만** 생기므로
-     * (축 개명·제거 뒤 옛 행이 남음) 0 이 아닌 값을 한 원인으로 단정하지 않는다.
+     * 들지 않는다. 합계(`total`)의 이름은 그대로이고 **원인별 계수가 그 안에 선다** — 앞 판은 셋을 한
+     * 수로 접어, 0 이 아닌 값을 받은 사람이 어느 원인인지 물을 자리가 없었다(처방이 셋 다 다르다).
      */
-    val unusableRawRows: Int,
+    val unusableRawRows: UnusableRawRows,
     /**
      * 소수부 때문에 **없는 값이 된 금액 칸 수**(D-6G2d-15) — 집계(`a_value`·`reserve_prices`)는 통째로
      * 하나로 센다. 역시 항등식 밖이다: 그 행은 버려지지 않고 그 칸만 빈다. 0 이 아니면 원천이 원 단위
@@ -339,3 +368,41 @@ internal data class NoticeKey(
     val number: String,
     val round: NoticeRound,
 )
+
+/**
+ * 키가 서지 않은 원문 행의 **원인**(D-6G2c-20) — 어휘를 열거로 두면 계수를 나르는 자리가 칸 순서가
+ * 아니라 **이름**으로 선다(같은 타입 셋을 위치로 넘기는 자리를 만들지 않는다).
+ */
+enum class UnusableRawRowCause {
+    /** 공고번호가 비었거나 형태를 어겼다 — 적재 경로가 그런 항목을 떨어뜨리므로 **방어 심화**다. */
+    BLANK_NOTICE_NUMBER,
+
+    /** 차수가 제로패딩 세 자리가 아니다 — 기본값을 쓰지 않는다(파싱 실패가 첫 차수로 둔갑하지 않게). */
+    MALFORMED_ROUND,
+
+    /** `source_endpoint` 가 열거 어휘 밖이다 — **코드 변경으로만** 생긴다(축 개명·제거 뒤 옛 행). */
+    UNKNOWN_ENDPOINT,
+}
+
+/**
+ * 원인별 계수(D-6G2c-20) — 합계는 [total] 이고 그 이름이 러너 로그에서 유지된다.
+ *
+ * **manifest 에는 싣지 않는다**: 칸을 늘리면 스냅숏 스키마가 바뀌고, 진행 중인 실행 상태 디렉터리가
+ * 있는 동안 그 변경은 머지할 수 없다(D-6G2c-18). 공시 자리는 러너 로그 한 줄이다.
+ */
+data class UnusableRawRows(
+    val byCause: Map<UnusableRawRowCause, Int>,
+) {
+    init {
+        require(byCause.values.all { it >= 0 }) { "원인별 계수는 음수일 수 없다: $byCause" }
+    }
+
+    val total: Int get() = byCause.values.sum()
+
+    operator fun get(cause: UnusableRawRowCause): Int = byCause[cause] ?: 0
+
+    companion object {
+        /** 하나도 버리지 않은 추출 — 세 칸이 모두 0 이다. */
+        val NONE = UnusableRawRows(emptyMap())
+    }
+}
