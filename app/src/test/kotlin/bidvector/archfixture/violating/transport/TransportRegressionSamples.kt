@@ -32,7 +32,11 @@ class RogueRegisteredHolderGainingTransport {
     ): java.net.Socket = java.net.Socket(host, port)
 }
 
-/** 경계 밖(알려진 제한) — 메서드 핸들로 이름을 문자열로 지어 부른다. 전송 표면 타입이 남지 않는다. */
+/**
+ * 메서드 핸들로 대상 메서드를 문자열로 지어 부른다 — **`java.lang.invoke.MethodHandles` 가 남아 잡힌다**
+ * (뿌리에 `java.lang.invoke` 가 있다). 경계 밖은 이 형태가 아니라 **반사 타입이 전혀 남지 않는** 쪽이다
+ * (서드파티 반사 도구 경유 — checklist 알려진 제한).
+ */
 class RogueMethodHandleInvoke {
     fun call(target: Any): Any? {
         val lookup =
