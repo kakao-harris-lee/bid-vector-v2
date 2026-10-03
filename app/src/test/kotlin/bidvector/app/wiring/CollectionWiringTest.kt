@@ -1,23 +1,28 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeViolation
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.postgresql.ds.PGSimpleDataSource
+import org.springframework.beans.factory.NoUniqueBeanDefinitionException
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
@@ -91,6 +96,56 @@ class CollectionWiringTest {
 
     private fun failureText(failure: Throwable?): String =
         generateSequence(failure) { it.cause }.joinToString(" | ") { it.message.orEmpty() }
+
+    /**
+     * **D-6G2c-6 (cr r5 L-8) — 두 갈래는 따로 기동한다.** 둘이 각자 `RunStateDirectory`·
+     * `CallBudgetLedger`·`CollectionRange` 빈을 등록하므로 한 프로세스에 함께 켜면 주입이 모호해져
+     * 컨텍스트가 뜨지 않는다. 그 fail-closed 가 **선언이 아니라 거동**임을 여기서 잰다 — `@Qualifier`
+     * 로 공존시키는 편집은 이 test 를 붉힌다.
+     *
+     * 공존시키지 않는 이유: 한 프로세스에 두 갈래를 두는 요구가 없고, 두면 **한 원장을 두 러너가
+     * 번갈아 쓰는** 판이 생긴다(한 인스턴스는 한 스레드라는 전제가 프로세스 안에서 깨진다).
+     */
+    @Test
+    fun `두 수집 모드를 함께 켜면 기동하지 않는다 — 한 프로세스에 두 갈래를 두지 않는다`() {
+        val openingRunState = Files.createTempDirectory("6g2c-both-modes-opening")
+        val context = AnnotationConfigApplicationContext()
+        TestPropertyValues
+            .of(
+                *validProperties(),
+                "bidvector.opening-collection.mode=once",
+                "bidvector.opening-collection.from=2026-09-20",
+                "bidvector.opening-collection.to=2026-09-22",
+                "bidvector.opening-collection.categories=construction,service",
+                "bidvector.opening-collection.sampling-seed=6g2c-both-modes",
+                "bidvector.opening-collection.sample-size=2",
+                "bidvector.opening-collection.calls-per-day=100",
+                "bidvector.opening-collection.calls-total=1000",
+                "bidvector.opening-collection.run-state-dir=$openingRunState",
+            ).applyTo(context)
+        context.register(CollectionWiring::class.java, OpeningCollectionWiring::class.java)
+        context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
+        context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+
+        val failure = runCatching { context.refresh() }.exceptionOrNull()
+
+        try {
+            failure shouldNotBe null
+            // 뜨지 못한 사유가 **주입의 모호함**임을 타입으로 본다. 어느 공유 타입에서 먼저 걸리는지는
+            // 빈 생성 순서가 정하므로 이름 하나로 고정하지 않고, 걸린 것이 **두 갈래가 공유하는 타입
+            // 뿐임**을 단언한다 — 그래야 「다른 사유로 뜨지 못했다」가 이 test 를 통과하지 못한다.
+            val ambiguous =
+                generateSequence(failure) { it.cause }
+                    .filterIsInstance<NoUniqueBeanDefinitionException>()
+                    .mapNotNull { it.beanType?.name }
+                    .toSet()
+
+            ambiguous.shouldNotBeEmpty()
+            (ambiguous - SHARED_BETWEEN_BRANCHES) shouldBe emptySet()
+        } finally {
+            context.close()
+        }
+    }
 
     @Test
     fun `속성이 없으면 러너도 수집 빈도 없다 — 키·범위·업종 속성이 하나도 없어도 컨텍스트가 뜬다`() {
@@ -335,3 +390,14 @@ class CollectionWiringTest {
 
 /** 저장소 밖 — 배선은 디렉터리가 있는지만 본다(표본 확정과 시도 기록은 수집이 한다). */
 private val NOTICE_RUN_STATE: Path = Files.createTempDirectory("6g-notice-run-state")
+
+/**
+ * 두 수집 배선이 **각자 등록하는** 타입(D-6G2c-6) — 함께 켜면 이 셋이 둘씩 되어 주입이 모호해진다.
+ * 한 프로세스에 두 갈래를 두는 요구가 없으므로 `@Qualifier` 로 공존시키지 않는다.
+ */
+private val SHARED_BETWEEN_BRANCHES =
+    setOf(
+        CollectionRange::class.java.name,
+        RunStateDirectory::class.java.name,
+        CallBudgetLedger::class.java.name,
+    )
