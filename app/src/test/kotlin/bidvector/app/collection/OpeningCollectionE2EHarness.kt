@@ -37,7 +37,10 @@ internal const val DIVISIONS = 2
 /** 개찰완료 축을 두 쪽으로 나눈다 — 투찰 행 셋이 2 + 1 로 갈린다(D-6G-58). */
 internal const val OPENING_COMPLETE_PAGE_SIZE = 2
 
-/** mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. */
+/**
+ * mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. **기본 판에서만 이 값이다**:
+ * [MockPagingMode.biddersPerNotice] 를 준 판은 그 수만큼 짓는다(참가가 많은 공고).
+ */
 internal const val BIDDERS_PER_NOTICE = 3
 
 private const val POSTGRES_IMAGE = "postgres:16.4"

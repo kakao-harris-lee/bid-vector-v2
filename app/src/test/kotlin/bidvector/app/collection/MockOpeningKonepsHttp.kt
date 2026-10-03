@@ -75,6 +75,12 @@ internal class MockOpeningKonepsHttp(
         reservePriceNotices.size + openingCompleteNotices.size + baseAmountNotices.size + formulaANotices.size
 
     init {
+        // **두 판을 함께 켜지 못한다.** 요청 존중 판은 쪽 크기를 요청에서 받으므로
+        // [openingCompletePageSize] 와 [failOpeningCompleteSecondPageOnce] 를 **조용히 무력화**한다 —
+        // 그 둘을 기대하는 test 가 아무것도 재지 않는 채 초록이 되는 자리라 거부로 닫는다.
+        require(
+            !(paging.respectsRequestedRows && (openingCompletePageSize > 0 || failOpeningCompleteSecondPageOnce)),
+        ) { "요청 존중 판은 고정 쪽 크기·2쪽 실패 판과 함께 쓸 수 없다" }
         server.createContext("/mock") { exchange -> respond(exchange) }
         server.executor = Executors.newCachedThreadPool()
         server.start()
@@ -348,6 +354,11 @@ internal class MockOpeningKonepsHttp(
      * 다른 축까지 줄이면 그 축도 쪼개지고 기존 test 가 재는 거동이 바뀐다. [MockPagingMode] 를
      * 켠 판에서만 **요청이 쪽 크기를 정한다**: 배선이 바꾼 값이 호출 수를 실제로 줄이는지는
      * 요청을 존중하는 판에서만 잴 수 있다(D-6G2f-3).
+     *
+     * **우선순위**: 요청 존중 판이 켜져 있으면 그 판이 먼저이고 [openingCompletePageSize] 는 보지
+     * 않는다 — 그래서 둘을 함께 주는 것을 `init` 이 거부한다. 기본 판은 쪽을 나누지 않는 응답에
+     * `numOfRows` 를 **100 으로 에코**한다(요청이 999 여도) — 걷기의 완료 판정은 `totalCount` 와 짧은
+     * 쪽으로만 서므로 그 에코는 거동에 영향이 없고, 실 게이트웨이와 다른 자리로 여기 적어 둔다.
      */
     private fun pageSizeFor(
         operation: String,

@@ -28,6 +28,12 @@ class OpeningPageSizeE2ETest {
         private val OPENING_AXES =
             setOf("개찰 목록", "개찰완료", "예비가격 상세", "기초금액", "산식 A")
 
+        /** 공사 전용 축 — 용역 한 업무만 걷는 판에서는 이 축이 불리지 않는다. */
+        private const val FORMULA_A_AXIS = "산식 A"
+
+        /** 설정이 선언하는 개찰 축 경로 수 — 업무 둘 × 셋 + 업무 공통 단일 둘. */
+        private const val DECLARED_AXIS_PATHS = 8
+
         /** 한 호출에 들어가지 않는 참가 규모 — day1 실측의 2쪽 이상 공고(111건)에 해당하는 자리다. */
         private const val CROWDED_BIDDERS = 150
 
@@ -59,11 +65,14 @@ class OpeningPageSizeE2ETest {
         val (exitCodes, mock) = e2e.bootAndRun(emptyMap())
 
         exitCodes shouldContainExactly listOf(0)
-        val requestedByAxis = mock.requestedRows.groupBy({ axisOf(it.operation) }, { it.numOfRows })
-        val opening = requestedByAxis.filterKeys { it in OPENING_AXES }
+        // **기대 축 집합을 출하 설정의 경로 선언과 맞댄다** — 새 축이 설정에 생기면 경로 수가 늘어 이
+        // 단언이 먼저 붉다. 수를 리터럴로 못 박으므로 축을 **지우는** 변경도 기대를 조용히 줄이지 못한다.
+        val declared = declaredOpeningAxisPaths(KonepsOpeningEndpointProperties())
+        declared.size shouldBe DECLARED_AXIS_PATHS
+        declared.map(::axisOf).toSet() shouldBe OPENING_AXES
         // 다섯 축이 **실제로 불렸다** — 한 축이라도 빠지면 그 축의 단언이 공집합에서 참이 된다.
-        opening.keys shouldBe OPENING_AXES
-        opening.values.flatten().toSet() shouldBe setOf(KONEPS_MAX_ROWS_PER_PAGE)
+        openingRowsOf(mock).keys shouldBe OPENING_AXES
+        openingRowsOf(mock).values.flatten().toSet() shouldBe setOf(KONEPS_MAX_ROWS_PER_PAGE)
     }
 
     /**
@@ -88,6 +97,11 @@ class OpeningPageSizeE2ETest {
 
         wideExit shouldContainExactly listOf(0)
         narrowExit shouldContainExactly listOf(0)
+        // **설정 값이 기본값일 때만 wire 에 닿는 것이 아니다**(wire 축 보강) — 기본값으로만 재면 배선이
+        // 상수를 직접 넘기는 변이가 통과한다. 이 판은 용역 한 업무라 산식 A(공사 전용)가 없어 네 축이다.
+        openingRowsOf(wide).values.flatten().toSet() shouldBe setOf(KONEPS_MAX_ROWS_PER_PAGE)
+        openingRowsOf(narrow).values.flatten().toSet() shouldBe setOf(NARROW_ROWS)
+        openingRowsOf(narrow).keys shouldBe OPENING_AXES - FORMULA_A_AXIS
         // 두 판이 같은 수의 공고를 걸었다 — 공고 수가 갈리면 호출 수 비교가 다른 것을 재게 된다.
         wideCalls.keys.size shouldBe CROWDED_SAMPLE_SIZE
         narrowCalls.keys.size shouldBe CROWDED_SAMPLE_SIZE
@@ -107,17 +121,42 @@ class OpeningPageSizeE2ETest {
         val nonce = "PAGESIZE"
         val respectful = MockPagingMode(respectsRequestedRows = true)
 
-        e2e.bootAndRun(mapOf(ROWS_PER_PAGE_PROPERTY to TINY_ROWS.toString()), nonce = nonce, paging = respectful)
+        val (tinyExit, _) =
+            e2e.bootAndRun(
+                mapOf(ROWS_PER_PAGE_PROPERTY to TINY_ROWS.toString()),
+                nonce = nonce,
+                paging = respectful,
+            )
         val tiny = Files.readAllBytes(e2e.runStateDir.resolve(SAMPLE_LIST_FILE))
 
-        e2e.bootAndRun(emptyMap(), nonce = nonce, paging = respectful)
+        val (wideExit, _) = e2e.bootAndRun(emptyMap(), nonce = nonce, paging = respectful)
         val wide = Files.readAllBytes(e2e.runStateDir.resolve(SAMPLE_LIST_FILE))
 
+        // **두 기동의 종료 코드를 버리지 않는다** — 멈춘 실행도 표본을 확정하므로, 종료 코드를 안 보면
+        // 상한에 걸려 절단된 두 판이 「바이트가 같다」로 통과한다.
+        tinyExit shouldContainExactly listOf(0)
+        wideExit shouldContainExactly listOf(0)
         tiny.isNotEmpty() shouldBe true
         // 바이트 동일성이 주장이고, 텍스트 비교는 갈렸을 때 어디가 갈렸는지 보이게 하려고 함께 둔다.
         wide.decodeToString() shouldBe tiny.decodeToString()
         wide.contentEquals(tiny) shouldBe true
     }
+
+    /** 받은 요청의 `numOfRows` 를 개찰 축 다섯으로만 좁혀 축마다 모은다. */
+    private fun openingRowsOf(mock: MockOpeningKonepsHttp): Map<String, List<Int?>> =
+        mock.requestedRows
+            .groupBy({ axisOf(it.operation) }, { it.numOfRows })
+            .filterKeys { it in OPENING_AXES }
+
+    /**
+     * 출하 설정이 선언하는 개찰 축 경로 전수 — 업무별 셋(목록·예비가격 상세·기초금액)과 업무 공통
+     * 단일 둘(개찰완료·산식 A). 기대 축 집합을 이 선언과 맞대면 설정에 축이 생겨도 조용히 걸러지지
+     * 않는다.
+     */
+    private fun declaredOpeningAxisPaths(opening: KonepsOpeningEndpointProperties): List<String> =
+        opening.operations.values.flatMap {
+            listOf(it.openingResultListPath, it.reservePriceDetailPath, it.baseAmountPath)
+        } + listOf(opening.openingCompletePath, opening.bidPriceFormulaAPath)
 
     /**
      * 용역 한 업무만 걷는다 — 공사 층에는 상세 응답이 비어 오는 공고가 섞여 있어(D-6G-42) 그 공고의
