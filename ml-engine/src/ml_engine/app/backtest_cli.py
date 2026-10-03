@@ -1,9 +1,10 @@
 """`ml_engine.app.backtest_cli` — 백테스트 job 의 CLI(M6/6G-2e D-6G2e-6).
 
 runbook 2-4 는 이 job 을 **heredoc 스크립트**로 불렀다. 그 스크립트는 저장소에 없어
-리뷰도 test 도 닿지 않고, 실수집 당일 터미널에서 다시 적힌다 — 틀리기 쉬운 자리가 셋
-있었다: 스냅숏 URI 를 `file://` 로 만드는 일, 판정을 **스냅숏 밖**에 쓰는 일, 실패를
-종료 코드로 나르는 일. 셋을 코드로 옮겨 test 가 잠근다.
+리뷰도 test 도 닿지 않고, 실수집 당일 터미널에서 다시 적힌다 — 틀리기 쉬운 자리가 넷
+있었다: 스냅숏 URI 를 `file://` 로 만드는 일, 판정을 **스냅숏 밖**에 쓰는 일, 앞 판정을
+**덮어쓰지 않는** 일(D-6G2c-21 ④), 실패를 종료 코드로 나르는 일. 넷을 코드로 옮겨 test 가
+잠근다.
 
 **판정 경로는 건드리지 않는다** — `run_backtest_job` 을 그대로 부르고 정책은 파일로만
 온다(임계를 낱개 인자로 받는 자리가 없다, ML-07 acceptance ④ 와 같은 축). 이 모듈이
@@ -45,13 +46,35 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
+from typing import NoReturn
 from urllib.parse import unquote, urlparse
 
 from ml_engine.app.backtest_job import JobCompleted, run_backtest_job
 
 _FILE_SCHEME = "file"
 _VERDICT_NAME = "verdict.json"
+
+
+class _Refusal(StrEnum):
+    """CLI 가 **판정을 돌리기 전에** 멈추는 사유 — 닫힌 어휘(D-6G2c-21 ④).
+
+    job 실패 사유(`JobFailureReason`)와 다른 축이다: 저쪽은 판정 경로가 낸 결과이고 이쪽은
+    인자가 틀려 **판정을 시작조차 하지 않은** 자리다. 어휘를 닫는 이유는 job 쪽과 같다 —
+    닫혀 있어야 사유가 늘 때 출력·종료 코드 계약 밖에 새 사유가 남지 않는다."""
+
+    UNSUPPORTED_SCHEME = "UNSUPPORTED_SCHEME"
+    OUTPUT_INSIDE_SNAPSHOT = "OUTPUT_INSIDE_SNAPSHOT"
+    VERDICT_EXISTS = "VERDICT_EXISTS"
+
+
+def _refuse(reason: _Refusal, detail: str) -> NoReturn:
+    """`SystemExit(<문면>)` — Python 이 문면을 stderr 로 보내고 **1** 로 끝낸다.
+
+    문면에 호스트 경로를 싣지 않는다(실패 문면이 디렉터리 구조를 나르지 않는다) — 무엇을
+    넘겼는지는 부른 쪽이 안다."""
+    raise SystemExit(f"REFUSED {reason} {detail}")
 
 
 @dataclass(frozen=True)
@@ -118,8 +141,9 @@ def _snapshot_dirs(raw: str) -> tuple[str, tuple[Path, ...]]:
     디렉터리를 **여기서 함께 내는** 이유와 그것이 하나가 아닌 이유는 모듈 docstring 에 있다."""
     parsed = urlparse(raw)
     if parsed.scheme and parsed.scheme != _FILE_SCHEME:
-        raise SystemExit(
-            f"REFUSED --snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {parsed.scheme}"
+        _refuse(
+            _Refusal.UNSUPPORTED_SCHEME,
+            f"--snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {parsed.scheme}",
         )
     if not parsed.scheme:
         return _converted(Path(raw).resolve(), raw)
@@ -133,22 +157,33 @@ def _snapshot_dirs(raw: str) -> tuple[str, tuple[Path, ...]]:
 
 
 def _verdict_path(output_dir: Path, snapshot_dirs: tuple[Path, ...]) -> Path:
-    """판정을 쓸 자리. 스냅숏 디렉터리 **안**이면 거부한다 — 스냅숏은 불변 입력이고 그
-    sha256 이 evidence 의 닻이다(출력이 입력의 해시를 움직이면 닻이 사라진다).
+    """판정을 쓸 자리 — 거부 **둘**을 여기서 낸다(둘 다 job 을 돌리기 전이다).
+
+    ① 스냅숏 디렉터리 **안**이면 거부한다 — 스냅숏은 불변 입력이고 그 sha256 이 evidence 의
+    닻이다(출력이 입력의 해시를 움직이면 닻이 사라진다). ② 그 자리에 판정이 **이미 있으면**
+    거부한다(D-6G2c-21 ④).
 
     `snapshot_dirs` 는 `_snapshot_dirs` 가 이미 해석해 건넨 `Path` 들이다 — URI 문자열에서
     다시 유도하면 퍼센트 인코딩된 판에서 비교가 조용히 빗나가고(cr r1 H-1), 해석이 하나뿐이면
-    판독기와 갈리는 판에서 거부가 통과한다(vr r2 L-r2-1). **어느 쪽이든 안이면 거부**다.
-
-    문면에 경로를 싣지 않는다(실패 문면이 호스트 디렉터리 구조를 나르지 않는다) — 무엇을
-    넘겼는지는 부른 쪽이 안다."""
+    판독기와 갈리는 판에서 거부가 통과한다(vr r2 L-r2-1). **어느 쪽이든 안이면 거부**다."""
     resolved = output_dir.resolve()
     if any(resolved.is_relative_to(directory) for directory in snapshot_dirs):
-        raise SystemExit(
-            "REFUSED --output-dir 가 --snapshot-uri 의 디렉터리 안이다 — "
-            "스냅숏은 불변 입력이다"
+        _refuse(
+            _Refusal.OUTPUT_INSIDE_SNAPSHOT,
+            "--output-dir 가 --snapshot-uri 의 디렉터리 안이다 — 스냅숏은 불변 입력이다",
         )
-    return resolved / _VERDICT_NAME
+    verdict_path = resolved / _VERDICT_NAME
+    # D-6G2c-21 ④ — **이미 있으면 거부**한다. 앞 판은 조용히 덮어썼다: 같은 디렉터리로 두
+    # 번 부르면 앞 판정이 사라지고, 그 판정의 sha256 을 적은 evidence 가 가리키는 바이트가
+    # 없어진다(판정은 재현 대조의 닻이다). 덮어쓰기 플래그는 **만들지 않는다** — runbook 은
+    # 스냅숏별 판정 디렉터리를 쓰므로 그 플래그가 필요한 자리가 없고, 있으면 「한 번만 쓴다」가
+    # 인자 하나로 풀린다.
+    if verdict_path.exists():
+        _refuse(
+            _Refusal.VERDICT_EXISTS,
+            f"--output-dir 에 {_VERDICT_NAME} 이 이미 있다 — 덮어쓰지 않는다",
+        )
+    return verdict_path
 
 
 def main(argv: Sequence[str] | None = None) -> None:

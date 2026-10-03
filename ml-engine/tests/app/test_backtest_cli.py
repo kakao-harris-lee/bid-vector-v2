@@ -218,6 +218,91 @@ def test_output_dir_inside_the_snapshot_is_refused(tmp_path: Path, inside: str) 
     } == before, "거부된 실행이 스냅숏 디렉터리를 건드렸다"
 
 
+_SENTINEL_VERDICT = '{"schema_version":"앞-판정"}'.encode()
+"""앞 판정의 표식 — 출하 판정 바이트와 섞이지 않는 값이라 덮어쓰기가 바이트로 보인다."""
+
+
+def _existing_verdict(tmp_path: Path) -> list[str]:
+    """출력 디렉터리에 **앞 판정이 이미 있는** 판(D-6G2c-21 ④)."""
+    output_dir = tmp_path / "out"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "verdict.json").write_bytes(_SENTINEL_VERDICT)
+    return _argv(
+        snapshot=_snapshot_path(tmp_path).as_uri(),
+        backtest_policy=_derived_policy(tmp_path / "policy"),
+        output_dir=output_dir,
+    )
+
+
+def _output_inside_snapshot(tmp_path: Path) -> list[str]:
+    snapshot = _snapshot_path(tmp_path)
+    return _argv(
+        snapshot=snapshot.as_uri(),
+        backtest_policy=_derived_policy(tmp_path / "policy"),
+        output_dir=snapshot / "verdicts",
+    )
+
+
+def _unsupported_scheme(tmp_path: Path) -> list[str]:
+    return _argv(
+        snapshot="s3://bucket/snapshot",
+        backtest_policy=_derived_policy(tmp_path / "policy"),
+        output_dir=tmp_path / "out",
+    )
+
+
+_REFUSAL_INPUTS = {
+    "UNSUPPORTED_SCHEME": _unsupported_scheme,
+    "OUTPUT_INSIDE_SNAPSHOT": _output_inside_snapshot,
+    "VERDICT_EXISTS": _existing_verdict,
+}
+
+
+def test_the_refusal_reasons_are_covered_exhaustively() -> None:
+    """D-6G2c-21 ④ — 거부 어휘가 **닫혀 있다**. 사유가 늘면 이 표가 RED 다.
+
+    job 실패 사유 표(`_FAILURE_INPUTS`)와 같은 모양이다 — 저쪽은 판정 경로가 낸 결과이고
+    이쪽은 판정을 시작하기 전에 멈춘 자리다."""
+    assert set(_REFUSAL_INPUTS) == {str(reason) for reason in backtest_cli._Refusal}
+
+
+@pytest.mark.parametrize("reason", sorted(_REFUSAL_INPUTS))
+def test_each_refusal_reason_is_reported_and_exits_nonzero(
+    reason: str, tmp_path: Path
+) -> None:
+    """사유 토큰이 출력에 있고 프로세스가 0 이 아닌 코드로 끝나며 산출물은 없다."""
+    result = _cli(*_REFUSAL_INPUTS[reason](tmp_path), cwd=tmp_path)
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    output = result.stdout + result.stderr
+    assert f"REFUSED {reason}" in output, output
+    assert "verdict" not in result.stdout.split(), (
+        "성공 경로가 돌았다 — 거부가 서지 않았다"
+    )
+
+
+def test_an_existing_verdict_is_not_overwritten(tmp_path: Path) -> None:
+    """D-6G2c-21 ④ — 앞 판정의 **바이트가 그대로다**.
+
+    앞 판은 조용히 덮어썼다: 같은 디렉터리로 두 번 부르면 앞 판정이 사라지고, 그 sha256 을
+    적은 evidence 가 가리키는 바이트가 없어진다. 거부는 **판정을 돌리기 전**이라 10초짜리
+    실행을 낭비하지도 않는다."""
+    argv = _existing_verdict(tmp_path)
+    result = _cli(*argv, cwd=tmp_path)
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert (tmp_path / "out" / "verdict.json").read_bytes() == _SENTINEL_VERDICT, (
+        "앞 판정이 덮어써졌다"
+    )
+
+
+def test_there_is_no_overwrite_flag(tmp_path: Path) -> None:
+    """덮어쓰기 플래그를 **만들지 않았다**(D-6G2c-21 ④) — 있으면 「한 번만 쓴다」가 인자
+    하나로 풀린다. argparse 가 모르는 플래그로 끝난다(2)."""
+    for flag in ("--overwrite", "--force"):
+        result = _cli(*_existing_verdict(tmp_path), flag, cwd=tmp_path)
+        assert result.returncode == 2, (flag, result.stdout, result.stderr)
+        assert "unrecognized arguments" in result.stderr, (flag, result.stderr)
+
+
 def test_a_relative_bare_path_becomes_an_absolute_file_uri(tmp_path: Path) -> None:
     """④ 상대 경로도 절대 URI 로 — 변환 결과가 출력에 남는다(판독은 뒤에서 선다)."""
     result = _cli(
