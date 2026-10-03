@@ -293,6 +293,10 @@ class ArchitecturePolicy private constructor(
         /**
          * 정책 파일이 **선언한 키 전수**(중복 포함). 줄 끝 `\` 로 이어지는 값 줄은 키 줄이 아니다 —
          * `Properties` 가 접은 뒤의 Map 으로는 중복을 셀 수 없어 원문을 읽는다.
+         *
+         * **주석은 이어지지 않는다**(cr r2 L-5). `Properties` 는 `#`·`!` 줄의 끝 `\` 를 연속으로 보지
+         * 않는데 앞 판은 그것을 연속으로 읽어 **다음 키 줄을 건너뛰었다**(오늘 그런 주석은 0 건이라 잠복
+         * 이었다). 구분자는 공백도 센다 — `Properties` 는 `key value` 도 받는다.
          */
         private fun declaredKeys(locationProperty: String): List<String> {
             val location = System.getProperty(locationProperty) ?: error("시스템 속성 '$locationProperty' 가 없다")
@@ -300,11 +304,11 @@ class ArchitecturePolicy private constructor(
             var continued = false
             File(location).readLines(Charsets.UTF_8).forEach { line ->
                 val wasContinued = continued
-                continued = line.endsWith("\\")
-                if (wasContinued) return@forEach
                 val trimmed = line.trim()
-                if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) return@forEach
-                val separator = trimmed.indexOfFirst { it == '=' || it == ':' }
+                val isComment = trimmed.startsWith("#") || trimmed.startsWith("!")
+                continued = !isComment && line.endsWith("\\")
+                if (wasContinued || trimmed.isEmpty() || isComment) return@forEach
+                val separator = trimmed.indexOfFirst { it == '=' || it == ':' || it == ' ' || it == '\t' }
                 if (separator > 0) keys += trimmed.substring(0, separator).trim()
             }
             return keys

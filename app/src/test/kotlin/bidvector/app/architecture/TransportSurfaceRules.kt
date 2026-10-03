@@ -63,9 +63,12 @@ internal fun JavaClass.outermostClassName(): String = fullName.outermostName()
 /**
  * ArchUnit `enclosingClass` 기준 접기 — **쌍 등식 게이트는 쓰지 않는다**([outermostName] 을 쓴다).
  *
- * 6F·6G 의 앞선 게이트들(원문 값 획득 · 대분류 · 공고명 키 · 러너·로거)이 이것으로 접은 집합을 정책
- * 파일에 적고 있고, 그 게이트들이 접는 타입은 전부 `bidvector..` 라 두 규칙의 결과가 같다(해소가 보장된
- * 자리다). 그 집합들을 이름 규칙으로 옮기는 것은 그 게이트들의 관측을 다시 재는 별도 slice 몫이다 —
+ * 두 규칙의 결과가 같은 것은 **이 게이트들의 관측(전송 표면 · 바깥 참조 · 반사)에서**다. 저장소 전체에서
+ * 같지는 않다 — 다른 게이트의 등재가 중첩 이름을 **그대로** 담고 있다(`collection.key-hash.holders` 의
+ * `NoticeKeyHash$Companion` · `app.injection.allowed-types` 의 `Resolution$Resolved`). 그 자리들은
+ * `enclosingClass` 접기를 그대로 쓰며, 이름 규칙으로 옮기려면 **그 등재를 다시 관측해야** 한다
+ * (`OPEN-6G2B-FOLDING-UNIFICATION`).
+ *
  * 여기서는 `packageName` 이 필요해 `JavaClass` 를 그대로 돌려주는 자리에만 남긴다.
  */
 internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
@@ -144,16 +147,21 @@ class TransportSurfaceRules(
             .toSet()
 
     /**
-     * 한 클래스가 참조하는 바깥 패키지 이름 — `bidvector..` 와 전송 표면 타입과 **원시 타입**(`int`·`void`
-     * 처럼 패키지가 없는 이름)을 뺀다. 전송 표면을 빼는 것이 두 층의 분기다.
+     * 한 클래스가 참조하는 바깥 패키지 이름 — `bidvector..` 와 전송 표면 타입과 **원시 타입**을 뺀다.
+     * 전송 표면을 빼는 것이 두 층의 분기다.
+     *
+     * 원시 타입은 [PRIMITIVE_TYPE_NAMES] 로 **이름을 보고** 가른다(cr r2 L-7). 앞 판은 「패키지가 비면
+     * 버린다」였는데 그러면 **무패키지(default package) 클래스**도 같이 조용히 사라졌다. 지금은 그런 타입을
+     * [NO_PACKAGE] 로 돌려주므로 허용 집합에 들 수 없고(허용은 패키지 이름이다) 신고된다 — production 관측은
+     * 0 이라 오늘 결과는 같다.
      */
     private fun externalPackagesOf(origin: JavaClass): Set<String> =
         origin
             .referencedTypeNames(ReferenceCollection.FULL)
             .filterNot { it.startsWith("$packageRoot.") || it == packageRoot }
             .filterNot(::isSurfaceType)
-            .map { it.substringBeforeLast('.', "") }
-            .filter(String::isNotEmpty)
+            .filterNot { it in PRIMITIVE_TYPE_NAMES }
+            .map { it.substringBeforeLast('.', NO_PACKAGE) }
             .toSet()
 
     private fun referenceExternalPackageOutside(allowed: Set<String>): ArchCondition<JavaClass> =
@@ -189,4 +197,14 @@ class TransportSurfaceRules(
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$holder -> $it")) }
             }
         }
+
+    private companion object {
+        /** JVM 원시 타입과 `void` — 패키지가 없는 이름이지만 클래스가 아니다(바깥 참조 판정 밖). */
+        val PRIMITIVE_TYPE_NAMES =
+            setOf("boolean", "byte", "char", "short", "int", "long", "float", "double", "void")
+
+        /** 무패키지 클래스를 가리키는 자리표 — 허용 집합의 어떤 패키지 이름과도 같지 않아 신고된다. */
+        const val NO_PACKAGE = "<무패키지>"
+    }
+
 }

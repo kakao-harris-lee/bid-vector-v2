@@ -301,19 +301,29 @@ class CollectionArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * [target] 이 **더 긴 이름의 앞토막**으로 걸리지 않는지 — 뒤 글자가 글자·숫자·`_` 면 다른 이름이다
-     * (`java.net.URL` 단언이 `java.net.URLConnection` 으로 통과하던 자리). `$` 는 경계로 센다: 같은 멤버의
-     * 합성 다리(`append$default`)와 중첩 타입은 그 이름을 가리키는 것이 맞다.
+     * [target] 이 **더 긴 이름의 토막**으로 걸리지 않는지 — 앞뒤 글자가 식별자 문자면 다른 이름이다
+     * (cr r2 L-6 — 앞 판은 뒤쪽만 봤다).
+     *
+     * `$` 와 `.` 은 **경계로 센다**: 같은 멤버의 합성 다리(`append$default`)와, 상세 줄이 전체 이름으로
+     * 적는 멤버를 단순 이름 + 멤버로 단언하는 자리(`RawObservationStore.append` ⊂
+     * `bidvector.procurement.RawObservationStore.append`)가 그 형태다.
+     *
+     * **남는 한 칸**: 그래서 `net.URL` 처럼 **점 뒤에서 시작하는 꼬리 조각**은 여전히 `java.net.URL` 로
+     * 통과한다. 두 경우가 글자 종류로는 구별되지 않는다(둘 다 「점 뒤의 완전한 조각」이다). 닫으려면 규칙마다
+     * 상세 형식을 알고 전체 일치로 비교해야 하고, 이 파일의 상세 꼬리는 규칙마다 다르다 — checklist 알려진
+     * 제한. 전송 쪽 음성 단언은 이미 전체 일치다.
      */
     private fun String.mentionsAtNameBoundary(target: String): Boolean {
         var from = indexOf(target)
         while (from >= 0) {
-            val next = getOrNull(from + target.length)
-            if (next == null || !(next.isLetterOrDigit() || next == '_')) return true
+            if (!getOrNull(from - 1).continuesName() && !getOrNull(from + target.length).continuesName()) return true
             from = indexOf(target, from + 1)
         }
         return false
     }
+
+    /** 이름이 이어지는 글자인가 — `null`(줄 머리·줄 끝)과 `.`·`$` 는 경계다. */
+    private fun Char?.continuesName(): Boolean = this != null && (isLetterOrDigit() || this == '_')
 
     private companion object {
         /** 과잉 대조 fixture — `Class` 의 이름 조회만 한다. 쌍 등식에서는 **등재해야** 조용하다. */

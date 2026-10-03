@@ -43,17 +43,30 @@ class TransportSurfaceGateCatchesViolationsTest {
         }
     }
 
-    /** fixture 뿌리가 비어 있지 않다 — 컴파일 출력이 바뀌어 모집단을 잃으면 위 단언이 조용히 공허해진다. */
+    /**
+     * fixture 뿌리가 비어 있지 않다 — 컴파일 출력이 바뀌어 모집단을 잃으면 위 단언이 조용히 공허해진다.
+     *
+     * 덮개는 **전송 fixture 와 바깥 참조 fixture 둘 다**다(cr r2 L-4). 앞 판은 `…violating.transport` 한
+     * 패키지만 봐서, `adapters/external`·`workflow/external` 에 fixture 를 더하고 변이 표에 적지 않아도
+     * 조용했다.
+     */
     @Test
     fun `음성 fixture 모집단이 비어 있지 않고 변이 표가 그 클래스들을 덮는다`() {
-        val planted =
+        val plantedTransport =
             violating
                 .filter { it.simpleName.startsWith("Rogue") }
                 .map { it.simpleName }
                 .toSet()
+        val plantedExternal =
+            violatingAll
+                .filter { it.packageName.endsWith(".external") && it.simpleName.startsWith("Rogue") }
+                .map { it.simpleName }
+                .toSet()
 
-        planted.shouldNotBeEmpty()
-        (planted - MUTATIONS.keys) shouldBe emptySet()
+        plantedTransport.shouldNotBeEmpty()
+        plantedExternal.shouldNotBeEmpty()
+        (plantedTransport - MUTATIONS.keys) shouldBe emptySet()
+        (plantedExternal - EXTERNAL_COVERED) shouldBe emptySet()
     }
 
     /**
@@ -205,6 +218,13 @@ class TransportSurfaceGateCatchesViolationsTest {
     }
 
     private companion object {
+        /**
+         * 바깥 참조 fixture 가운데 **변이 표나 전용 test 가 덮는** 단순 이름(cr r2 L-4 덮개).
+         * `RogueServiceLoaderExtension` 은 두 층의 분기를 재는 전용 test 가 덮는다.
+         */
+        val EXTERNAL_COVERED: Set<String>
+            get() = EXTERNAL_MUTATIONS.map { it.second.substringAfterLast('.') }.toSet() + "RogueServiceLoaderExtension"
+
         /** D-6G2b-25 — (모듈, fixture 의 뿌리 아래 경로, 그 변이를 성립시키는 바깥 패키지). */
         val EXTERNAL_MUTATIONS =
             listOf(
