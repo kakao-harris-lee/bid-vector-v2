@@ -141,6 +141,15 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-36** | **cr r2 M-3**: 허용 패키지 **안**의 바이트 출구(`java.io` 의 `/dev/tcp`·FIFO, `java.nio.file` 원격 FS)는 1층·2층 어느 쪽도 못 잡고 낱개 열거(`ServiceLoader` 선례)로만 닫힌다 → **`OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`** 등재(위협 모델 「방어하지 않는 것」에 「허용 패키지 안의 파일 시스템 경유 출구」 추가). 낱개 목록을 지금 늘리지 않는다 | 열거 축의 잔여 — 경계로 처리하고 OPEN |
 | **D-6G2b-37** | **verifier r2-b 표적**(r2 는 `d1b2b7f0` clone 에서 완료): `28c789c6`·`9431ead0` 델타 — 변이 ⑪ 재현 · `collection.external.modules` 잔존 참조 0 · 허용 키 집합 == 도출 모듈 집합 단언 · rollback 실측 HEAD `dca888aa`, `dca888aa..<판정 SHA>` 복원 경로 diff 빈 출력 · 공유 hunk 넷 · clean-tree. cr r2 low 열하나는 장부 일괄 | |
 
+## 계약 갱신 r7 (2026-10-03, 팀장 — verifier r2·r2-b 최종 ready-for-review @79c865d2)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-38** | **판정**: verifier r2 @d1b2b7f0 ready-for-review(M 1 · L 2) + r2-b @79c865d2 ready-for-review(델타 셋: 변이 ⑪ 4 RED · 잔존 키 0 · 양방향 등식 · rollback 17/17 · clean-tree). code-reviewer r2 high 1(동결 중 미커밋 — 해소) · medium 3(M-1 해소 D-34, M-2 D-35, M-3 D-36) · low 11. **재작업 1/5.** r1 H-1 우회 넷은 전부 1층에서 RED | 보고서 `_workspace/m6-6g2b/` |
+| **D-6G2b-39** | **vr M-r2-1 → D-36 문면 확장**: `OPEN-6G2B-ALLOWED-PACKAGE-EGRESS` 와 위협 모델 「방어하지 않는 것」을 「**허용 패키지 안의 출구 — 파일 시스템 경유(`java.io`·`java.nio.file`) + 라이브러리 자체 로더(예: `com.networknt.schema` 의 원격 스키마 적재)**」로. 정확 패키지 입도(D-28)의 귀결이고 낱개 열거를 늘리지 않는다 | 게이트 하드닝, 비차단 |
+| **D-6G2b-40** | **장부층 일괄(판정 뒤, verifier 재검증 없음)**: cr r2 M-2 KDoc · low 11 · vr L-r2-1(크기 쌍 최종값)·L-r2-2(키 15/8)·L-r2b-1(rollback (d) 모순) · OPEN 셋을 checklist 에. 코드 쪽 low(중복 키 파서 `\` 연속 주석 · 이름 경계 양쪽 · 무패키지 클래스 · 핀 범위 주석)는 test 코드 한 커밋, 표적 test 로만 — 술어 의미 변경이면 OPEN | CLAUDE.md 차단 문턱 |
+| **D-6G2b-41** | **닫는 OPEN**: `OPEN-6G-TRANSPORT-GATE-HARDENING`(**닫음** — KA1·KA12~15 + H-1 넷 + 간접 시그니처 넷 전부 RED, 허용 목록 + 쌍 등식 두 층). **남기는 OPEN**: `OPEN-6G-GATE-REGISTRY-KONEPS`(D-15) · `OPEN-6G2B-HOLDER-INTERNAL-SURFACE`(D-23) · `OPEN-6G2B-REFLECTION-ROOT-DOMAIN`(D-20) · `OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`(D-36·39) · `OPEN-6G2B-FOLDING-UNIFICATION`(D-35) · `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`(이관) → 전부 6G-2c 후보 | |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
