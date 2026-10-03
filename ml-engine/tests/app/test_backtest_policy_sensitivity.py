@@ -1060,6 +1060,10 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
 #                   판정은 그 아래에서 나고, 그 아래 자리가 따로 등재돼 있다.
 #   `ECHO`        — 판정문에 **공시만** 한다. 비교 투영이 지우고, 산출물에 남는 것은 전용
 #                   test 가 값까지 단언한다.
+#   `DERIVED`     — 정책 값을 품은 식에서 대입된 **파생 지역 변수**의 소비자(D-6G2c-24).
+#                   같은 (키, 자리)에 `PROBE:`/`CLASS` 가 **반드시 함께** 있어야 한다 —
+#                   그 동반을 `test_every_derived_use_has_a_measured_anchor` 가 강제하므로
+#                   이 어휘가 「파생이라서 안 쟀다」가 되지 않는다.
 _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ("effective.construction", "rules.effective_date_for", "return"): "CLASS",
     ("effective.goods", "rules.effective_date_for", "return"): "CLASS",
@@ -1351,6 +1355,136 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "compare",
     ): "PROBE:passes_window",
     ("window.days", "windows._calendar_windows", "timedelta(days)"): "CLASS",
+    # M6/6G-2c D-6G2c-24 — **파생 한 단계** 뒤의 소비자들(`OPEN-6G2A-CENSUS-DERIVED-LOCALS`).
+    # 명단이 정책 값을 **품은 식**에서 대입된 지역 변수를 한 단계 따라가자 올라온 삼중
+    # 스물아홉이다. 창 폭이 창 경계를 만드는 자리 · embargo 가 이력을 끊는 자리 · 업무별 호출
+    # 수가 예산 비교로 가는 자리가 그중이다 — 그 자리들이 삼중이 아니던 동안은 거기 상수를
+    # 박아도 명단이 그대로였다(읽는 자리만 셌으므로).
+    #
+    # 덮개가 `DERIVED` 인 이유: 그 자리를 덮는 단언은 **같은 자리의 등재된 PROBE/CLASS** 이고
+    # (`test_every_derived_use_has_a_measured_anchor` 가 그 동반을 등식으로 강제한다), 이
+    # 어휘는 그 동반 없이는 쓸 수 없다 — 「파생이라서 안 쟀다」가 되지 않는다.
+    (
+        "floor.pure_construction_cost_ratio",
+        "strategies._simulated_floors",
+        "maximum",
+    ): "DERIVED",
+    (
+        "institution.draw_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "fit.check_institutional_fit",
+        "FitResult",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "fit.check_institutional_fit",
+        "_fit_rejection",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.list_call_count",
+        "run._sampling_record",
+        "SamplingRecord(total_calls)",
+    ): "DERIVED",
+    ("sampling.list_call_count", "run._sampling_record", "compare"): "DERIVED",
+    (
+        "sensitivity.wide_reserve_half_width",
+        "run._variant_record",
+        "len",
+    ): "DERIVED",
+    (
+        "sensitivity.wide_reserve_half_width",
+        "run._variant_record",
+        "return",
+    ): "DERIVED",
+    (
+        "stability_seeds.0",
+        "run.run_strategy_backtest",
+        "_assemble_verdict",
+    ): "DERIVED",
+    ("stability_seeds.0", "run.run_strategy_backtest", "_plan_or_stop"): "DERIVED",
+    ("stability_seeds.0", "run.run_strategy_backtest", "_stopped"): "DERIVED",
+    (
+        "strategy.s4_grid_span_bp",
+        "strategies._candidate_rates",
+        "linspace",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "compare",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "where",
+    ): "DERIVED",
+    (
+        "verdict.alpha",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.min_relative_improvement",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.target_power",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    ("window.days", "windows._calendar_windows", "BacktestWindow"): "DERIVED",
+    ("window.days", "windows._calendar_windows", "augassign"): "DERIVED",
+    ("window.embargo_days", "windows.plan_backtest_windows", "compare"): "DERIVED",
     (
         "window.embargo_days",
         "windows.plan_backtest_windows",
@@ -1358,7 +1492,13 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ): "CLASS",
 }
 
-_COVERAGE_KINDS: Final[tuple[str, ...]] = ("PROBE:", "CLASS", "PASS:", "ECHO")
+_COVERAGE_KINDS: Final[tuple[str, ...]] = (
+    "PROBE:",
+    "CLASS",
+    "PASS:",
+    "ECHO",
+    "DERIVED",
+)
 
 _derive_publication_fields()
 
@@ -1401,6 +1541,30 @@ def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
     assert not crowded, (
         "부류 단언 하나로 두 자리를 덮으려 한다 — 자리마다 전용 probe 나 변이가 필요하다: "
         f"{crowded}"
+    )
+
+
+def test_every_derived_use_has_a_measured_anchor() -> None:
+    """D-6G2c-24 — `DERIVED` 는 **동반 없이 쓸 수 없다**.
+
+    파생 소비자는 「한 단계 뒤」라서 전용 단언을 따로 두지 않는다 — 그 자리를 덮는 것은 같은
+    (키, 자리)의 등재된 `PROBE:` 또는 `CLASS` 다. 그 동반이 없으면 `DERIVED` 가 「파생이라서
+    안 쟀다」는 면죄부가 되므로, 여기서 등식으로 강제한다.
+
+    이 단언이 있어야 파생 추적을 넓히는 일이 **측정 없는 등재**를 늘리지 않는다."""
+    measured = {
+        (key, site)
+        for (key, site, _), coverage in _USE_COVERAGE.items()
+        if coverage.startswith(("PROBE:", "CLASS"))
+    }
+    orphans = sorted(
+        (key, site, consumer)
+        for (key, site, consumer), coverage in _USE_COVERAGE.items()
+        if coverage == "DERIVED" and (key, site) not in measured
+    )
+    assert not orphans, (
+        "같은 자리에 재는 단언이 없는 파생 소비자 — PROBE 나 CLASS 를 그 자리에 먼저 둔다: "
+        f"{orphans}"
     )
 
 
@@ -1508,7 +1672,7 @@ def test_the_census_reproduces_the_independent_count() -> None:
         # 이 test 가 같은 사실로 함께 붉어지면 어느 쪽이 깨졌는지 알 수 없다(변이 측정에서
         # 거동 열이 구조 드리프트로 오염된다 — 실측으로 드러난 자리다).
         coverage = _USE_COVERAGE.get((use.key, use.site, use.consumer), "CLASS")
-        if coverage.startswith(("ECHO", "PASS:")):
+        if coverage.startswith(("ECHO", "PASS:", "DERIVED")):
             continue
         sites.setdefault(use.key, set()).add(use.site)
         consumers.setdefault(use.key, set()).add((use.site, use.consumer))
@@ -1598,9 +1762,24 @@ def test_the_disclosure_check_table_covers_every_disclosed_field() -> None:
     )
 
 
-@pytest.mark.parametrize("field_name", sorted(_DISCLOSURE_CHECKS))
+_DISCLOSED_PAIRS: Final[tuple[tuple[str, str], ...]] = tuple(
+    sorted(
+        (field_name, key)
+        for key, fields in _PUBLICATION_FIELDS.items()
+        for field_name in fields
+    )
+)
+"""(공시 칸, 그 칸을 공시하는 정책 키) **전부** — PR #53 리뷰 ④.
+
+앞 판은 칸마다 `next(...)` 로 **첫 키 하나만** 흔들었다. 칸 하나를 두 키 이상이 공시하면
+(지금 `alpha_used` 는 유의수준과 Bonferroni 분모 둘, `seeds` 는 다섯) 나머지 키는 그 칸에서
+한 번도 흔들리지 않는다 — 그 키 자리에 출하값을 박아도 이 단언이 보지 못한다. 쌍 전수로
+돌린다."""
+
+
+@pytest.mark.parametrize(("field_name", "key"), _DISCLOSED_PAIRS)
 def test_disclosed_fields_equal_the_loaded_policy_value(
-    field_name: str, harness: _Harness
+    field_name: str, key: str, harness: _Harness
 ) -> None:
     """D-6G2a-21 ② — 판정문의 **공시 칸**에 실린 값이 로드된 정책 값과 같다.
 
@@ -1611,9 +1790,6 @@ def test_disclosed_fields_equal_the_loaded_policy_value(
 
     그래서 **흔든 정책**으로 판정을 내고 공시값을 로드된 정책 값과 맞댄다. 기대값은 test 에
     적지 않고 정책 객체에서 꺼낸다 — 적으면 공시 칸이 상수가 된 것과 구별되지 않는다."""
-    key = next(
-        name for name, fields in _PUBLICATION_FIELDS.items() if field_name in fields
-    )
     moved = _STRONG_VALUES[key][0]
     payload = json.loads(harness.verdict("shipped", **{key: moved}))
     policy = harness.policy("shipped", f"disclose-{field_name}", **{key: moved})

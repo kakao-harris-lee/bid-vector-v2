@@ -663,6 +663,78 @@ class _Resolver:
                 if owner is not None:
                     self.group_names[name] = owner
 
+    def bind_derived_locals(
+        self, function: ast.FunctionDef, parents: Mapping[int, tuple[ast.AST, str]]
+    ) -> None:
+        """**한 단계** 파생 — 정책 유래 값을 *품은* 식에서 대입된 지역 변수(D-6G2c-24).
+
+        `resolve` 는 식 **자체**가 정책 값일 때만 답한다. 그래서 `timedelta(days=p.x)` ·
+        `rate_from_basis_points(p.y)` · 합·곱처럼 정책 값을 **인자나 항으로 품은** 식에서
+        대입된 지역 변수는 이름이 묶이지 않았고, 그 변수의 소비자들이 명단에서 빠졌다
+        (`OPEN-6G2A-CENSUS-DERIVED-LOCALS`).
+
+        **한 단계만** 따라간다: 파생 이름들을 따로 모아 **한 번에** 얹으므로, 파생 이름이 또
+        다른 파생의 재료가 되지 않는다(두 단계 이상은 알려진 제한 — 데이터 흐름 해석기를 짓지
+        않는다). **컨테이너 리터럴도 따라가지 않는다**: `{...}` · `[...]` 로 담는 식은 값이
+        아니라 담는 자리이고, 거기서 꺼내는 자리를 좇으려면 첨자·키까지 해석해야 한다."""
+        derived: dict[str, frozenset[str]] = {}
+        for node in ast.walk(function):
+            if not (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+            ):
+                continue
+            name = node.targets[0].id
+            if name in self.value_names or name in self.group_names:
+                continue  # 직접 바인딩이 이미 답했다
+            if isinstance(node.value, _CONTAINER_NODES):
+                continue
+            if self.resolve(node.value) is not None:
+                continue
+            keys = self._contained_keys(node.value, parents)
+            if keys:
+                derived[name] = keys
+        self.value_names.update(derived)
+
+    def _contained_keys(
+        self, expression: ast.expr, parents: Mapping[int, tuple[ast.AST, str]]
+    ) -> frozenset[str]:
+        """식 **안에서** 풀리는 정책 키 전부 — 어느 재료에서 왔는지는 묻지 않는다.
+
+        상수 첨자로 집은 원소는 **그 원소의 키로 좁힌다**(`_scan_function` 과 같은 규칙).
+        좁히지 않으면 `stability_seeds[0]` 하나를 품은 식이 seed **다섯 전부**를 나르는
+        것으로 읽히고, 그 지역 변수의 소비자마다 쓰이지 않은 seed 넷이 명단에 오른다
+        (착수 실측 — 거짓 양성 열둘)."""
+        found: set[str] = set()
+        for node in ast.walk(expression):
+            resolved = self.resolve(node)
+            if resolved is None or resolved[0] != "value":
+                continue
+            keys = resolved[1]
+            index = _literal_index(node, parents)
+            if index is not None:
+                indexed = {key for key in keys if key.endswith(f".{index}")}
+                if indexed:
+                    keys = frozenset(indexed)
+            found |= keys
+        return frozenset(found)
+
+
+_CONTAINER_NODES = (
+    ast.Dict,
+    ast.DictComp,
+    ast.List,
+    ast.ListComp,
+    ast.Set,
+    ast.SetComp,
+    ast.GeneratorExp,
+)
+"""값을 **담는** 식들 — 파생 추적이 뚫고 들어가지 않는다(D-6G2c-24 의 알려진 제한).
+
+담긴 값을 좇으려면 첨자·키까지 해석해야 하고, 그것은 데이터 흐름 해석기다. 담는 자리 자체의
+쓰임은 그 자리의 소비자로 이미 명단에 오른다(`_scan_function` 이 식 안의 정책 값을 본다)."""
+
 
 def _enclosing_class(
     function: ast.FunctionDef, parents: Mapping[int, tuple[ast.AST, str]]
@@ -683,6 +755,7 @@ def _scan_function(
     resolver: _Resolver,
 ) -> set[PolicyUse]:
     resolver.bind_locals(function)
+    resolver.bind_derived_locals(function, parents)
     uses: set[PolicyUse] = set()
     for node in ast.walk(function):
         found = resolver.resolve(node)
