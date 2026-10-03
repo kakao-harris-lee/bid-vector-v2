@@ -4,9 +4,11 @@
 > `git diff --name-status <base>..<실측 HEAD>` 에서 기계로 낸다. **라운드마다 그 라운드의 마지막 산출물
 > 커밋에서 다시 낸다** — 앞 라운드 실측을 옮기지 않는다.
 
-**실측 HEAD `85d00ecf`**(PR #58 조치 라운드 뒤 마지막 산출물 커밋) · base **`1745a3e2`**. ①②③ 은 그 HEAD 의 **버릴
-clone** 에서 돌렸고, ④⑤⑥ 은 앞 산출물 커밋 `dca888aa` 의 값이다(아래 절에 사유 — 되돌린 두 트리가
-동일하다). 복원 **경로 목록은 바뀌지 않았다**(장부 일괄은 이미 목록에 있는 파일만 고쳤다).
+**실측 HEAD `08a92439`**(팀장 종결 문단 정정 커밋 — 복원 경로 `milestone-6.md` 를 마지막으로 건드린 커밋; 레인의 마지막 산출물 커밋은
+`85d00ecf`) · base **`1745a3e2`**. ①②③ 은 팀장이 `08a92439` 의 **버릴 clone** 에서 다시 돌렸다(PR #58 /code-review B — 종결 커밋이 복원
+경로를 움직였으면 ①~③ 을 그 커밋에서 다시 재고 실측 HEAD 를 **별도 커밋**으로 올린다): ① restore exit 0 · ② hunk **열** 전부 exit 0 ·
+③ D 10 · M 9, `git diff 1745a3e2` 열아홉 경로 빈 출력, 보존(6G-2f 문단 1 · `layer.application=workflow` 1). ④⑤⑥ 은 앞 산출물 커밋
+`dca888aa` 의 값이다(아래 절에 사유 — 되돌린 트리가 동일하다). 복원 **경로 목록은 바뀌지 않았다**(종결 정정은 `milestone-6.md` 뿐).
 
 ## 되돌림이 싼 이유
 
@@ -59,9 +61,9 @@ pathspec 오류로 아무것도 적용되지 않는다. 실측 `exit 0`.
 
 ## ② 공유 파일 셋 — hunk 격리, 나중 커밋부터
 
-커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..85d00ecf -- <파일>`. 실측은 아키텍처
+커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..08a92439 -- <파일>`. 실측은 아키텍처
 정책 **다섯**(PR #58 주석 · 모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **둘**(PR #58 주석 ·
-등재) · `milestone-6.md` **둘**(착수 `7938ae8d` · 종결 `a6f55d17`, 팀장)이다.
+등재) · `milestone-6.md` **셋**(착수 `7938ae8d` · 종결 `a6f55d17` · 종결 정정 `08a92439`, 팀장)이다.
 
 ```
 git diff b15a7ed1~1..b15a7ed1 -- config/quality/architecture-policy.properties | git apply -R
@@ -71,11 +73,12 @@ git diff 0f11117a~1..0f11117a -- config/quality/architecture-policy.properties |
 git diff cc3fd1c7~1..cc3fd1c7 -- config/quality/architecture-policy.properties | git apply -R
 git diff 3e670054~1..3e670054 -- config/quality/gate-tests.properties | git apply -R
 git diff 96c6f73d~1..96c6f73d -- config/quality/architecture-policy.properties | git apply -R
+git diff 08a92439~1..08a92439 -- milestone-6.md | git apply -R
 git diff a6f55d17~1..a6f55d17 -- milestone-6.md | git apply -R
 git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ```
 
-아홉 전부 **exit 0** · conflict 0(`milestone-6.md` 둘은 팀장이 종결 커밋 뒤 버릴 clone 에서 재실측 — 역적용 뒤 base 와 바이트 동일, 6G-2f 종결 문단 보존 1). 나중 것부터 역적용한다 — 정책 파일의 다섯 hunk 는 **늦은 커밋이 먼저**다
+열 전부 **exit 0** · conflict 0(팀장이 `08a92439` 의 버릴 clone 에서 ①②③ 전체를 재실측 — 역적용 뒤 열아홉 경로가 base 와 바이트 동일, 6G-2f 종결 문단 보존 1). 나중 것부터 역적용한다 — 정책 파일의 다섯 hunk 는 **늦은 커밋이 먼저**다
 (앞 커밋을 먼저 되돌리면 뒤 hunk 의 문맥이 사라진다). **목록이 늘면 이 절차를 다시 돌린다** — 종결 문단
 커밋과 다음 라운드의 공유 파일 커밋이 각각 한 줄씩 늘린다.
 
