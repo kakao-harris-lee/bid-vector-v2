@@ -170,8 +170,7 @@ class TransportSurfaceRules(
         }
 
     /** 등재된 쌍의 타입이 전송 표면 술어 안에 있는지 — 술어 밖 타입을 등재해 집합을 채우는 길을 막는다. */
-    fun isSurfaceType(type: String): Boolean =
-        type in surfaceTypes || surfacePackages.any { type.startsWith("$it.") }
+    fun isSurfaceType(type: String): Boolean = type in surfaceTypes || surfacePackages.any { type.startsWith("$it.") }
 
     private fun transportTypesOf(origin: JavaClass): Set<String> =
         origin.referencedTypeNames(collection).filterTo(linkedSetOf(), ::isSurfaceType)

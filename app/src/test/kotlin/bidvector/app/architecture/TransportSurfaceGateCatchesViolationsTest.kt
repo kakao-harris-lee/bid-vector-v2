@@ -115,7 +115,12 @@ class TransportSurfaceGateCatchesViolationsTest {
         val layerTwo =
             rules
                 .rules(listOf("$violatingRoot.adapters"), emptySet())
-                .flatMap { it.allowEmptyShould(true).evaluate(violatingAll).failureReport.details }
+                .flatMap {
+                    it
+                        .allowEmptyShould(true)
+                        .evaluate(violatingAll)
+                        .failureReport.details
+                }
 
         layerOne.filter { it == "$holder -> java.util" }.shouldBeEmpty()
         layerTwo shouldContain "$holder -> java.util.ServiceLoader"
@@ -146,7 +151,12 @@ class TransportSurfaceGateCatchesViolationsTest {
     ): List<String> =
         rules
             .externalReferenceRules(root, allowed)
-            .flatMap { it.allowEmptyShould(true).evaluate(violatingAll).failureReport.details }
+            .flatMap {
+                it
+                    .allowEmptyShould(true)
+                    .evaluate(violatingAll)
+                    .failureReport.details
+            }
 
     /**
      * 과잉 대조 둘. 들어오는 HTTP(서블릿 표면)는 바이트를 밖으로 내지 않아 뿌리 밖이고, 전송을 아예

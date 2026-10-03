@@ -45,15 +45,25 @@ class RogueSwingPageFetch {
 
 /** 신규 — 데스크톱 브라우저를 띄워 바깥 호출을 맡긴다. */
 class RogueDesktopBrowse {
-    fun open(uri: java.net.URI) = java.awt.Desktop.getDesktop().browse(uri)
+    fun open(uri: java.net.URI) =
+        java.awt.Desktop
+            .getDesktop()
+            .browse(uri)
 }
 
 /** 신규 — 스크립트 엔진에 바깥 호출을 맡긴다(코드가 문자열이다). */
 class RogueScriptEval {
-    fun eval(script: String): Any? = javax.script.ScriptEngineManager().getEngineByName("js")?.eval(script)
+    fun eval(script: String): Any? =
+        javax.script
+            .ScriptEngineManager()
+            .getEngineByName("js")
+            ?.eval(script)
 }
 
 /** 신규 — `ServiceLoader` 로 바깥 구현을 이름으로 실어 온다. `java.util` 은 허용 패키지라 낱개 타입이 든다. */
 class RogueServiceLoaderExtension {
-    fun load(): Any? = java.util.ServiceLoader.load(Runnable::class.java).firstOrNull()
+    fun load(): Any? =
+        java.util.ServiceLoader
+            .load(Runnable::class.java)
+            .firstOrNull()
 }

@@ -17,7 +17,12 @@ class ArchitecturePolicy private constructor(
      * 하나가 사라져도 키 집합 등식은 그대로라 보이지 않는다. 원문 줄에서 센다.
      */
     val duplicateKeys: Set<String>
-        get() = declaredKeys.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        get() =
+            declaredKeys
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
 
     val packageRoot: String get() = value("package.root")
 
