@@ -7,17 +7,17 @@
 
 | 완료(UTC) | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
-| 2026-10-03T10:19Z | `./gradlew --no-daemon check` | 0 | 전 모듈 **2,633** test · 실패 0 · skip 4(base 2,607 에서 +26) |
-| 2026-10-03T10:20Z | `./gradlew --no-daemon qualityBaseline` | 0 | **up-to-date**(실행된 측정이 아니다 — production 입력이 바뀌지 않았다는 방증이고, 그것이 이 slice 의 기대값이다. cr L-11) |
-| 2026-10-03T10:37Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
+| 2026-10-03T12:21Z | `./gradlew --no-daemon check` | 0 | 전 모듈 **2,633** test · 실패 0 · skip 4(base 2,607 에서 +26) |
+| 2026-10-03T12:21Z | `./gradlew --no-daemon qualityBaseline` | 0 | **up-to-date**(실행된 측정이 아니다 — production 입력이 바뀌지 않았다는 방증이고, 그것이 이 slice 의 기대값이다. cr L-11) |
+| 2026-10-03T12:34Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
 
-**실측 HEAD `dca888aa`**(acceptance 를 잰 산출물 커밋 — 장부 일괄 뒤 마지막 산출물 커밋은 `1bcbed39` 이고 그 커밋은 술어 의미를 바꾸지 않는다). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
+**실측 HEAD `57493a71`**(마지막 산출물 커밋). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
 
 test 증감 +26 — 전송 표면 게이트 22(`TransportSurfaceGateTest` 14 + 음성 쪽 8) + 반사 게이트 쌍 등식 6
 (음성 쪽 20 → 24, 양성 쪽은 반사 test 둘을 넷으로 바꾸고 전송 단언 둘을 지워 24 그대로) − 지운 test 2
 (6G 의 두 게이트 단언).
 
-`check` 는 라운드마다 첫 호출이 형식 게이트로 exit 1 이었다 — ktlint 합 35건(연속 KDoc·체인 연속·함수
+`check` 는 라운드마다 첫 호출이 형식 게이트로 exit 1 이었다 — ktlint 합 37건(연속 KDoc·체인 연속·함수
 시그니처·`}` 앞 빈 줄)과 detekt 2건(파일명 불일치·상수 반환). 전부 형식이고 술어·단언·fixture 의 의미는
 바뀌지 않았다. `ktlintTestSourceSetFormat` 과 fixture 두 건 손질 뒤 exit 0(`541b5065`·`130dc4c9`).
 
@@ -375,7 +375,7 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 
 ## 크기 게이트 (evidence ≤ 산출물)
 
-표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..마지막 산출물 커밋(`1bcbed39`)의 in_scope 추가 **1,661줄 /
-87,822 B**(삭제 168줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
+표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..마지막 산출물 커밋(`57493a71`)의 in_scope 추가 **1,660줄 /
+87,820 B**(삭제 168줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
 `milestone-6.md` 착수 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다(바이트는 diff 의 `+`
 접두를 포함한 값이라 줄 수만큼 부풀어 있다 — 두 축을 같은 방법으로 쟀다).
