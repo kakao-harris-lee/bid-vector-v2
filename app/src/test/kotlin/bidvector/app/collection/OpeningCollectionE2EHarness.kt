@@ -37,7 +37,10 @@ internal const val DIVISIONS = 2
 /** 개찰완료 축을 두 쪽으로 나눈다 — 투찰 행 셋이 2 + 1 로 갈린다(D-6G-58). */
 internal const val OPENING_COMPLETE_PAGE_SIZE = 2
 
-/** mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. */
+/**
+ * mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. **기본 판에서만 이 값이다**:
+ * [MockPagingMode.biddersPerNotice] 를 준 판은 그 수만큼 짓는다(참가가 많은 공고).
+ */
 internal const val BIDDERS_PER_NOTICE = 3
 
 private const val POSTGRES_IMAGE = "postgres:16.4"
@@ -46,9 +49,11 @@ private const val SERVICE_KEY = "OPENING-E2E-SENTINEL+KEY/value="
 private const val BIDDER_NAME = "SYN-투찰업체-이름"
 
 /**
- * 개찰 수집 E2E 의 **출하 조립 기동기**. 두 test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
- * 「무엇을 부르는가」(표본·원문·조립 타입)와 「얼마나·언제 부르는가」(상한·잠금·이어 돌기)이고,
- * 기동 장치를 두 벌 두면 두 test 가 **서로 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
+ * 개찰 수집 E2E 의 **출하 조립 기동기**. **세** test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
+ * 「무엇을 부르는가」(표본·원문·조립 타입, [OpeningCollectionE2ETest]) · 「얼마나·언제 부르는가」
+ * (상한·잠금·이어 돌기, [OpeningBudgetE2ETest]) · 「한 호출이 몇 행을 받는가」(쪽 크기가 wire·호출
+ * 수·표본에 미치는 것, [OpeningPageSizeE2ETest])이고, 기동 장치를 여러 벌 두면 그 test 들이 **서로
+ * 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
  *
  * 기동은 `bidvector.opening-collection.mode=once` 로 `app` 의 배선 그대로 뜨고, 바깥 호출은 전부
  * loopback in-process mock 으로 간다(실 KONEPS 호출 0).
@@ -123,6 +128,7 @@ internal class OpeningCollectionE2EHarness {
         throttleOnce: Set<String> = emptySet(),
         openingCompletePageSize: Int = 0,
         failOpeningCompleteSecondPageOnce: Boolean = false,
+        paging: MockPagingMode = MockPagingMode(),
         reuseRunState: Boolean = false,
         now: Instant? = null,
         inspect: (ApplicationContext) -> Unit = {},
@@ -137,14 +143,7 @@ internal class OpeningCollectionE2EHarness {
         E2E_FIXED_NOW.set(now)
         if (!reuseRunState) freshRunStateDir()
         val mock =
-            MockOpeningKonepsHttp(
-                noticesPerSlot = NOTICES_PER_SLOT,
-                bidderName = BIDDER_NAME,
-                nonce = nonce ?: newE2ENonce(),
-                throttleOnce = throttleOnce,
-                openingCompletePageSize = openingCompletePageSize,
-                failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
-            )
+            mockFor(nonce, throttleOnce, openingCompletePageSize, failOpeningCompleteSecondPageOnce, paging)
         val context =
             SpringApplicationBuilder(
                 BidVectorApplication::class.java,
@@ -166,6 +165,23 @@ internal class OpeningCollectionE2EHarness {
             lastStdio = stdio.toString(StandardCharsets.UTF_8)
         }
     }
+
+    /** mock 을 짓는 자리 — 기동 절차와 응답 판을 한 함수에 섞지 않는다. */
+    private fun mockFor(
+        nonce: String?,
+        throttleOnce: Set<String>,
+        openingCompletePageSize: Int,
+        failOpeningCompleteSecondPageOnce: Boolean,
+        paging: MockPagingMode,
+    ) = MockOpeningKonepsHttp(
+        noticesPerSlot = NOTICES_PER_SLOT,
+        bidderName = BIDDER_NAME,
+        nonce = nonce ?: newE2ENonce(),
+        throttleOnce = throttleOnce,
+        openingCompletePageSize = openingCompletePageSize,
+        failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
+        paging = paging,
+    )
 
     /** 기동 속성의 바탕 — test 가 `extra` 로 덮어쓴다. */
     private fun baseProperties(mock: MockOpeningKonepsHttp): Map<String, String> =

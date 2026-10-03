@@ -39,6 +39,17 @@ data class OpeningCollectionProperties(
 private const val DEFAULT_SCSBID_BASE_URL = "https://apis.data.go.kr/1230000/as/ScsbidInfoService"
 
 /**
+ * 게이트웨이가 한 호출에 주는 행 수의 상한(D-6G2f-1) — **실측값이다**(2026-10-02 개찰결과 목록
+ * 공사: `numOfRows=999` 요청에 `resultCode 00` · 항목 999 · `numOfRows` 999 에코, 같은 창의
+ * `totalCount` 1522. 나머지 여섯 operation 은 2026-10-03, 개찰완료는 배포 전 사전 확인 몫이다).
+ * `1000` 도 200 을 내지만 문서화된 상한을 모르므로 그것을 근거로 올리지 않는다.
+ *
+ * 기본값과 [KonepsOpeningEndpointProperties] 의 상한 검사가 **이 한 자리**에서 나온다 — 같은 수가
+ * 두 자리에 있으면 한쪽만 바뀌는 날이 온다.
+ */
+internal const val KONEPS_MAX_ROWS_PER_PAGE = 999
+
+/**
  * 개찰 축 오퍼레이션 경로(D-6G-19) — 업무 대분류마다 **다른 오퍼레이션**인 것 셋(개찰결과 목록·예비가격
  * 상세·기초금액)을 한 행에 묶는다. 한쪽만 바꾸고 다른 쪽을 잊는 표류를 행 형태가 막는다(D-6F9-1 관례).
  */
@@ -85,4 +96,24 @@ data class KonepsOpeningEndpointProperties(
                     division = BusinessDivision.SERVICE,
                 ),
         ),
-)
+    /**
+     * 개찰 축 한 호출이 받을 행 수(D-6G2f-1) — **기본이 게이트웨이 상한**이다.
+     *
+     * 이 키의 한도는 키 × operation × 일 1,000 건이고, 개찰완료는 업무 공통 **단일 operation** 이라
+     * 다섯 축에서 먼저 닫힌다(실수집 day1 실측: 476 공고에 1,000 호출). 한도 자체는 운영계정
+     * 승인으로만 움직이므로, 같은 한도 안에서 공고 수를 늘리는 축은 **호출당 행 수**뿐이다.
+     *
+     * 되돌림은 재빌드 없이 이 값을 100 으로 주는 인자 하나다.
+     */
+    val rowsPerPage: Int = KONEPS_MAX_ROWS_PER_PAGE,
+) {
+    init {
+        // 상한 밖 값은 **기동 거부**다 — 게이트웨이가 무엇을 하는지 모르는 수(**1,000 이상**: 1000 도
+        // 실측된 적이 없다)로 실수집이 도는 길을 열지 않는다. 밖에 허락하는 것은 1..상한 안의 선택뿐이다.
+        // 거부가 값싼 이유: 파라미터 거부는 분류된 코드(10·11 INPUT_ERROR · 12·20·30~32 NOT_RETRYABLE)로
+        // 와서 그 축을 `FinalFailure` 로 **영구 정착**시킨다 — 기동 전에 막지 못하면 되돌릴 수 없다.
+        require(rowsPerPage in 1..KONEPS_MAX_ROWS_PER_PAGE) {
+            "bidvector.koneps.opening.rows-per-page 는 1..$KONEPS_MAX_ROWS_PER_PAGE 안이어야 한다: $rowsPerPage"
+        }
+    }
+}
