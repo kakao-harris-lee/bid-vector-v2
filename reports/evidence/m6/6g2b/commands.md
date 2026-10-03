@@ -11,7 +11,7 @@
 | 2026-10-03T10:20Z | `./gradlew --no-daemon qualityBaseline` | 0 | **up-to-date**(실행된 측정이 아니다 — production 입력이 바뀌지 않았다는 방증이고, 그것이 이 slice 의 기대값이다. cr L-11) |
 | 2026-10-03T10:37Z | `./tools/one-command-check.sh` | 0 | Kotlin 전건 + Python 전건(pytest 1,379 · wheel 1) |
 
-**실측 HEAD `dca888aa`**(마지막 산출물 커밋). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
+**실측 HEAD `dca888aa`**(acceptance 를 잰 산출물 커밋 — 장부 일괄 뒤 마지막 산출물 커밋은 `1bcbed39` 이고 그 커밋은 술어 의미를 바꾸지 않는다). 세 줄은 그 한 스크립트가 순서대로 돈 것이다.
 
 test 증감 +26 — 전송 표면 게이트 22(`TransportSurfaceGateTest` 14 + 음성 쪽 8) + 반사 게이트 쌍 등식 6
 (음성 쪽 20 → 24, 양성 쪽은 반사 test 둘을 넷으로 바꾸고 전송 단언 둘을 지워 24 그대로) − 지운 test 2
@@ -149,7 +149,7 @@ probe test 는 버릴 clone 에만 두었다(저장소에 남기지 않는다 �
 | 축 | 값 |
 |---|---|
 | 모듈별 허용 패키지 | **app 55 · workflow 21 · adapters 51 = 127** |
-| 판정 대상 모듈 | `layer.application`·`layer.adapters`·`layer.app` **도출**(별도 키 없음) |
+| 판정 대상 모듈 | `layer.application`·`layer.adapters`·`layer.app` **도출** — 별도 키 없음(`collection.external.modules` 는 **삭제된 키**다, `28c789c6`) |
 | 공통(합집합)으로 두면 | 82 |
 | 입도 | **정확한 패키지 이름**(접두 뿌리가 아니다) |
 | 판정 대상 production 클래스 | app 98 · workflow 376 · adapters 371 |
@@ -160,7 +160,8 @@ probe test 는 버릴 clone 에만 두었다(저장소에 남기지 않는다 �
 
 **정확 패키지를 고른 근거**: 「계약 대조」 9.
 
-**판정 대상 모듈을 별도 키로 적지 않는다**(팀장 지시 2026-10-03). 별도 키였다면 그 키에서 모듈 하나를 빼는
+**판정 대상 모듈을 별도 키로 적지 않는다**(팀장 지시 2026-10-03). 한 판 동안 있었던 `collection.external.modules`
+는 `28c789c6` 에서 **삭제됐다** — 지금 트리에 없는 키다. 별도 키였다면 그 키에서 모듈 하나를 빼는
 것만으로 그 모듈이 판정 밖이 된다. `layer.*` 는 **모집단 단언과 다른 층 게이트가 같이 읽는 자리**라 빠뜨리면
 함께 붉다 — 변이 ⑪이 그것을 잰다. 허용 키 집합(`allowed-packages.<모듈>`)이 그 도출 결과와 같아야 한다는
 단언이 양쪽을 묶는다.
@@ -190,7 +191,19 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 |---|---|---|
 | ArchUnit `enclosingClass`(앞 판) | 63 | 해소 여부에 달려, 전송 표면을 늘리지 않는 편집이 철자를 바꾼다 |
 | **이름의 첫 `$` 절단(채택)** | **60** | 없다. 앞 판에서 `HttpResponse$BodyHandler` 셋만 접힌다(`namecut − current = ∅`) |
-| 접지 않음 | 81 | Kotlin 합성 람다 클래스 이름이 정책에 들어와 더 자주 낡는다 |
+| 접지 않음 | 81 | 아래 21 이 더해진다 — 무관한 편집마다 철자가 바뀐다 |
+
+접지 않을 때 더해지는 **21 쌍의 정체**(cr r2 L-11 — 다음 라운드가 다시 재지 않게 적는다). 두 부류다.
+
+- **보유자 쪽 합성·중첩 이름** — Kotlin 이 지어 주는 이름이다: 코루틴·람다 클래스(`…$predict$3` ·
+  `…$embed$3` · `…$handleSuccess$promoted…$1` · `…$callMlRpc$1` · `…$callMlRpc$outcome$1`) ·
+  `when` 분기 표(`RetryRulesKt$WhenMappings`) · `$Companion` · sealed 하위(`RawFetchOutcome$Received` ·
+  `RunStateLock$Held`).
+- **JDK 중첩 타입** — `HttpRequest$Builder` · `HttpResponse$BodyHandler(s)` · `HttpRequest$BodyPublisher(s)` ·
+  `HttpClient$Builder` · `Status$Code`.
+
+앞 부류가 문제다. 람다 하나를 더하거나 줄이면 그 이름이 바뀌고, 전송 표면을 하나도 늘리지 않은 편집이 정책
+파일을 낡게 만든다. 뒤 부류는 안정적이지만 접으면 이미 등재된 바깥 타입으로 들어간다.
 
 ## A-2 집행 — 반사 게이트 뿌리 확장과 쌍 등식 (D-6G2b-11)
 
@@ -241,10 +254,9 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
   production 의 새 public 선언 **0**.
 - 게이트 등재: `gate.tests.app` 에 새 test class 둘. 그 키는 「app test 전수」 양방향 등식이라 등재 없이는
   `AppGateRegistrationTest` 가 즉시 붉다.
-- 새 파일 여섯 가운데 다섯은 in_scope 안이다(`app/src/test/kotlin/bidvector/app/architecture/**` 셋 ·
-  `archfixture/violating/transport/**` 둘 — 뒤쪽은 계약 갱신 r1 D-6G2b-10 이 in_scope 에 넣었다).
-  여섯째 `archfixture/violating/adapters/RogueAdapterReflectionPeek.kt` 는 **아직 in_scope 문면 밖**이다
-  (「계약 대조」 4).
+- 새 파일은 **열**이고 전부 in_scope 안이다 — 게이트 셋(`app/.../architecture/**`) · fixture 여섯
+  (`violating/transport/**` 셋 · `violating/adapters/**` 둘 · `violating/workflow/external/**` 하나) ·
+  `app/src/test/resources/archunit.properties`. 경로를 넣은 것은 계약 갱신 r1 D-10 · r2 D-18 · r5 D-31 이다.
 
 ## 계약 대조 (scope.md 문면과 다르게 한 것)
 
@@ -363,7 +375,7 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 
 ## 크기 게이트 (evidence ≤ 산출물)
 
-표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..실측 HEAD 의 in_scope 추가 **1,605줄 /
-84,026 B**(삭제 168줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
+표는 `checklist.md` 「크기 게이트」가 정본이다. 산출물 쪽 값: base..마지막 산출물 커밋(`1bcbed39`)의 in_scope 추가 **1,661줄 /
+87,822 B**(삭제 168줄). 구성은 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷.
 `milestone-6.md` 착수 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다(바이트는 diff 의 `+`
 접두를 포함한 값이라 줄 수만큼 부풀어 있다 — 두 축을 같은 방법으로 쟀다).

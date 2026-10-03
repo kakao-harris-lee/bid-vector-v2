@@ -4,9 +4,9 @@
 > `git diff --name-status <base>..<실측 HEAD>` 에서 기계로 낸다. **라운드마다 그 라운드의 마지막 산출물
 > 커밋에서 다시 낸다** — 앞 라운드 실측을 옮기지 않는다.
 
-**실측 HEAD `dca888aa`**(수정 라운드 뒤 마지막 산출물 커밋) · base **`1745a3e2`**. ①~⑥ 전부 그 HEAD 의
-**버릴 clone** 에서 돌렸다. 이 라운드가 전용 파일 넷과 공유 정책 hunk **둘**을 더했으므로 목록·절차·실측을
-다시 냈다(앞 라운드 값을 옮기지 않았다).
+**실측 HEAD `1bcbed39`**(장부 일괄 뒤 마지막 산출물 커밋) · base **`1745a3e2`**. ①②③ 은 그 HEAD 의 **버릴
+clone** 에서 돌렸고, ④⑤⑥ 은 앞 산출물 커밋 `dca888aa` 의 값이다(아래 절에 사유 — 되돌린 두 트리가
+동일하다). 복원 **경로 목록은 바뀌지 않았다**(장부 일괄은 이미 목록에 있는 파일만 고쳤다).
 
 ## 되돌림이 싼 이유
 
@@ -57,7 +57,7 @@ pathspec 오류로 아무것도 적용되지 않는다. 실측 `exit 0`.
 
 ## ② 공유 파일 셋 — hunk 격리, 나중 커밋부터
 
-커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..dca888aa -- <파일>`. 실측은 아키텍처
+커밋 목록을 먼저 낸다(라운드마다 다시): `git log --oneline 1745a3e2..1bcbed39 -- <파일>`. 실측은 아키텍처
 정책 **넷**(모듈 도출 · 바깥 참조 축 · A-2 반사 축 · 전송 축) · 장부 **하나** · `milestone-6.md` **하나**다.
 
 ```
@@ -81,20 +81,26 @@ git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
   `collection.http-client.*` 셋 · `collection.transport-bypass.*` 셋과 각자의 주석을 복원.
   (c) `collection.reflection.roots`·`type-pairs`·`class-member-pairs` 와 A-2 주석 단락 둘을 삭제한 뒤
   `collection.reflection.allowed-referencers=`(빈 값) · `class-allowed-members=getName` 두 줄과 base 의
-  `(i)` 머리 주석을 복원. (d) `collection.external.modules` 와 `allowed-packages.<모듈>` 셋, 그 머리 주석
-  단락을 삭제(base 에 없던 절이라 복원할 것이 없다 — 판정 대상 모듈은 키가 아니라 `layer.*` 도출이므로
-  되돌릴 키가 없다). 넷 다 base 파일에서 그 블록을 떠 온다.
+  `(i)` 머리 주석을 복원. (d) `collection.external.allowed-packages.<모듈>` **셋**과 그 머리 주석 단락을
+  삭제한다 — base 에 없던 절이라 그 자리에 복원할 것은 없다. `collection.external.modules` 는 **HEAD 에
+  없다**(한 판 있었다가 `28c789c6` 에서 삭제됐다) — 그 키를 지우라는 지시였던 앞 판 문면을 지웠다
+  (vr L-r2b-1). 넷 다 base 파일에서 그 블록을 떠 온다.
 - 장부: `gate.tests.app` 의 이름 둘(`TransportSurfaceGateTest`·`TransportSurfaceGateCatchesViolationsTest`)과
   머리 주석 일곱 줄 삭제.
 - `milestone-6.md`: 6G-2b 착수 문단 한 단락(그리고 종결 문단이 생기면 그것도) 삭제.
 
-## ③ 실측 (버릴 clone, HEAD `dca888aa`)
+## ③ 실측 (버릴 clone, HEAD `1bcbed39`)
 
 `restore` exit 0 · `apply -R` 여섯 exit 0. 되돌린 뒤 `git status --porcelain` 이 **D 10 · M 7** 이고,
 `git diff 1745a3e2 --name-status -- <되돌린 열일곱 경로>` 는 **빈 출력**이다 — 그 경로에서 base 와 **트리
 동일**이다(갈음을 「HEAD 초록」이 아니라 트리 동일성으로 한다).
 
-## ④⑤⑥ 실측 (같은 clone, 되돌린 트리)
+## ④⑤⑥ 실측 (되돌린 트리) — 앞 산출물 커밋 `dca888aa` 에서 잰 값이고 갈음 근거는 **트리 동일성**이다
+
+①②③ 은 이 라운드의 마지막 산출물 커밋 `1bcbed39` 에서 다시 돌렸다. ④⑤⑥ 은 **다시 돌리지 않았다** —
+③ 이 두 HEAD 에서 모두 「되돌린 트리 == base(열일곱 경로 전부)」를 냈으므로 **되돌린 두 트리가 서로
+동일**하고, 그 트리에서 잰 ④⑤⑥ 은 그대로 유효하다. 갈음을 「HEAD 초록」이 아니라 트리 동일성으로 한다는
+규율 그대로다. 아래 값은 `dca888aa` 의 측정이다(옮겨 적은 것이 아니라 그 자리의 값임을 밝힌다).
 
 `./gradlew --no-daemon check` **exit 0**(9m 23s · 348 task).
 
@@ -131,7 +137,7 @@ git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ## verifier 가 대조할 것
 
 「실측 HEAD == 판정 SHA」가 **아니다**(evidence 커밋이 언제나 뒤에 오므로 둘은 영원히 다르다). 보는 것은
-그 사이에 되돌림 대상이 움직였는가다 — `git diff --name-only dca888aa..<판정 SHA> -- <위 열일곱 경로 개별
+그 사이에 되돌림 대상이 움직였는가다 — `git diff --name-only 1bcbed39..<판정 SHA> -- <위 열일곱 경로 개별
 인자>` 가 빈 출력이면 유효하다. 한 줄이라도 나오거나 **판정 SHA 가 실측 HEAD 의 자손이 아니면**
 미검증이다.
 
@@ -142,4 +148,4 @@ git diff 7938ae8d~1..7938ae8d -- milestone-6.md | git apply -R
 ## 되돌리지 않는 것
 
 하네스 경로(`CLAUDE.md`·`.claude/**`) — 이 range 의 하네스 레인 커밋은 **없다**
-(`git log --oneline 1745a3e2..dca888aa -- CLAUDE.md .claude/` 빈 출력).
+(`git log --oneline 1745a3e2..1bcbed39 -- CLAUDE.md .claude/` 빈 출력).

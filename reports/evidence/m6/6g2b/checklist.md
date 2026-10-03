@@ -6,7 +6,7 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | 항목 | 상태 | 근거 |
 |---|---|---|
-| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `dca888aa` · clean-tree 양성 대조 |
+| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `1bcbed39` · clean-tree 양성 대조 |
 | acceptance 전부 exit 0 | ✓ | `commands.md` 「acceptance」 셋 |
 | test/lint/type/architecture/contract 전건 | ✓ | 축약 없이 `check` + `qualityBaseline` + `one-command-check.sh`(Python job 까지) |
 | fixture·정책 version 근거 | ✓ | `architecture-policy.properties` `policy.version` 7 → 8(키 계열 셋 제거 · 허용의 모양이 집합 → 쌍 → 기본 거부 허용 목록). 도메인 fixture·golden 무변경 |
@@ -31,7 +31,8 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 | 9. 전송 표면을 쥔 test 지원 코드를 production 소스셋에 둔다 | 뿌리가 production 전체(`roots=bidvector`)이고 등재 쌍 등식이 전수다 | 등재에서 한 쌍을 빼면 그 쌍이 위반으로 나오는 양성 대조 · 변이 ③(쌍 등식 RED). **fixture 로는 재지 않았다**(알려진 제한 6) |
 | 10. `com.sun.net.httpserver`·`sun.net` | 뿌리 `com.sun.net`·`sun.net`(착수 실측으로 더했다) | fixture `RogueHttpServerExposure` |
 
-(2b) 값 획득 축 — **새 public 표면은 정책 파일 키 여섯뿐**이고 production 의 새 public 선언은 0 이다.
+(2b) 값 획득 축 — **새 public 표면은 정책 파일 키뿐이다**(더한 것 15 · 지운 것 8 · 순증 7, 아래 절의 기계
+산출값과 같다)이고 production 의 새 public 선언은 0 이다.
 키를 비우거나 용도를 조용히 바꾸는 길은 변이 ③이 잰다(용도 키 등식 · 쌍 등식 · 등재 밖 참조 0 셋이 RED).
 
 (3) 과잉 — 뿌리가 넓어 무해한 참조가 걸리는 쪽은 과잉 대조 둘(들어오는 서블릿 표면 · 전송 무관 계산)이
@@ -63,13 +64,13 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
 |---|---|---|---|
-| 줄 | 910 | 675 | 1,605 |
-| 바이트 | 93,172 | 58,077 | 84,026 |
+| 줄 | 963 | 719 | 1,661 |
+| 바이트 | 100,318 | 63,262 | 87,822 |
 
-**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 9,146 B(11%) 초과한다** — 앞 라운드의 21% 에서 줄었다
-(수정 라운드가 산출물을 1,605줄 / 84,026 B 로 늘렸다). 남은 초과는 전부 `scope.md` 쪽이다: 그 한 파일이
-evidence 바이트의 38% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r4 로 커졌다). 레인 세 파일만
-보면 산출물의 69% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 **사실 등재**다.
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 12,496 B(14%) 초과한다** — 앞 라운드의 21% 에서 줄었다
+(수정 라운드가 산출물을 1,661줄 / 87,822 B 로 늘렸다). 남은 초과는 전부 `scope.md` 쪽이다: 그 한 파일이
+evidence 바이트의 37% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r4 로 커졌다). 레인 세 파일만
+보면 산출물의 72% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 **사실 등재**다.
 
 산출물 줄 구성: 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷. `milestone-6.md` 착수
 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다. 바이트는 양쪽 다 diff 의 `+` 접두를 포함한 같은
@@ -78,7 +79,7 @@ evidence 바이트의 38% 이고 레인이 만지지 않는 팀장 파일이다(
 
 ## clean-tree 양성 대조
 
-HEAD `dca888aa` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
+HEAD `1bcbed39` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
 공유 파일 하나의 마지막 줄을 **비파괴 절삭**해 `M` 을 확인하고 사본으로 복원했다. `git checkout --` 는 쓰지
 않는다(다른 레인의 미커밋 편집을 지운다). 경로를 변수 하나로 묶지 않는다 — pathspec 이 하나가 되면 「빈
 출력」이 더러운 트리와 구별되지 않는다. evidence 를 포함한 마지막 상태의 판정은 verifier 와 PR 조치 코멘트
@@ -144,7 +145,9 @@ M-4 의 모집단 단언과 같은 자리에서 읽게 해 모듈을 빠뜨리�
    fixture 는 없다**(음성 fixture 는 test 소스셋에 있어야 하므로 같은 방식으로 재지 못한다).
 7. **뿌리를 좁히는 변이는 production 등식이 잡지 못한다**(변이 ② 실측 — 뿌리 열일곱 → 셋에서 양성 쪽
    전건 초록). 잡는 것은 음성 fixture 표뿐이므로 그 표가 이 게이트의 민감도를 혼자 든다.
-8. **in_scope 문면 밖 자리는 남지 않는다** — 전송·A-2·adapters 경로는 계약 갱신 r1·r2 가, workflow external
+8. **클래스패스 전수는 `:app:runtimeClasspath` 기준이다**(좌표 101). 다른 구성(test 전용 의존)에만 있는
+   전송 표면은 production 뿌리 밖이라 이 게이트의 대상이 아니다.
+9. **in_scope 문면 밖 자리는 남지 않는다** — 전송·A-2·adapters 경로는 계약 갱신 r1·r2 가, workflow external
    fixture 와 ArchUnit 핀은 r5(D-6G2b-31)가 넣었다. 남는 제한은 **그 둘을 다른 자리에 둘 수 없다**는 사실
    이다: fixture 는 모듈별 허용 집합을 모듈마다 재려면 그 모듈 뿌리 아래여야 하고, 핀은 test 리소스다.
 10. **등재 보유자 안의 새 사용처는 쌍의 해상도 밖이다**(vr M-1 → D-6G2b-23,
@@ -154,8 +157,31 @@ M-4 의 모집단 단언과 같은 자리에서 읽게 해 모듈을 빠뜨리�
    멤버) 쌍이고 보유자 스물여덟의 멤버 전수가 또 한 라운드다.
 11. **반사 음성 fixture 는 뿌리를 정책이 아니라 test 리터럴로 받는다**(vr 참고 관찰). 그래서 정책 뿌리 축소는
    쌍 등식 하나만 잡고, `adapters` 쌍이 0 이 되는 날에는 축소가 보이지 않는다.
-12. **바깥 참조 허용 집합은 `app`·`workflow`·`adapters` 셋뿐이다.** `procurement`·`decision`·`qualification`·
+12. **허용 패키지 *안*의 출구는 어느 층도 잡지 못한다**(cr r2 M-3 · vr M-r2-1 → D-6G2b-36·39,
+    **`OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`**). 둘이다 — ⓐ **파일 시스템 경유**(`java.io`·`java.nio.file` 로
+    `/dev/tcp`·FIFO·원격 파일 시스템) ⓑ **라이브러리 자체 로더**(예: `com.networknt.schema` 의 원격 스키마
+    적재). 둘 다 허용 패키지라 1층을 지나고 전송 표면 타입이 남지 않아 2층도 못 본다. 정확 패키지 입도
+    (D-28)의 귀결이고, 닫는 길은 `ServiceLoader` 선례처럼 낱개 열거뿐이라 **지금 늘리지 않는다** —
+    위협 모델 「방어하지 않는 것」에 둔다.
+13. **접기 규칙이 저장소에서 하나가 아니다**(cr r2 M-2 → D-6G2b-35, **`OPEN-6G2B-FOLDING-UNIFICATION`**).
+    쌍 등식 게이트 셋은 이름 기준 절단을 쓰지만 6F·6G 의 앞선 게이트들은 `enclosingClass` 접기를 그대로
+    쓰고 그 등재가 중첩 이름을 담는다(`collection.key-hash.holders` 의 `NoticeKeyHash$Companion` ·
+    `app.injection.allowed-types` 의 `Resolution$Resolved`). 옮기려면 그 게이트들의 관측을 다시 재야 한다.
+14. **수집 쪽 음성 단언의 이름 경계에 한 칸 남는다**(cr r2 L-6). 앞뒤를 다 보지만 `.`·`$` 를 경계로 세므로
+    **점 뒤에서 시작하는 꼬리 조각**(`net.URL` ⊂ `java.net.URL`)은 여전히 통과한다. 그 형태와 「전체 이름의
+    멤버를 단순 이름으로 단언하는」 정당한 형태가 글자 종류로 구별되지 않는다. 닫으려면 규칙마다 상세 형식을
+    알고 전체 일치로 비교해야 한다 — 전송 쪽 음성 단언은 이미 전체 일치다.
+15. **`Class` 멤버를 이름으로만 맞춘다**(cr r2 L-10). 서술자를 보지 않으므로 동명 과적재가 생기면 구별하지
+    못한다 — 오늘 `java.lang.Class` 에는 없다.
+16. **반사 패키지 둘이 두 목록에 다 있다**(cr r2 L-9). `java.lang.reflect`·`java.lang.invoke` 가 전송 표면
+    뿌리와 `collection.reflection.packages` 양쪽에 있다. 전송 쪽은 production **전체**를, 반사 쪽은 세 모듈을
+    뿌리로 삼아 **범위가 다르므로** 겹침이 중복이 아니다. 닫힌 용도 어휘 다섯에는 반사 등재 자리가 없다 —
+    반사는 쌍 등식이 따로 들기 때문이다. **정책 파일 주석은 이 라운드에서 고치지 않았다**(「겹쳐 적지
+    않는다」로 읽히는 문면이 남아 있다) — 그 파일은 공유 파일이고 이번 장부 일괄은 공유 파일을 만지지
+    않는다. 다음에 그 파일을 여는 slice 가 함께 고칠 자리다.
+17. **`archunit.properties` 핀의 범위는 `:app` test classpath 다**(cr r2 L-8). `build-logic` 도 ArchUnit 을
+    의존하지만 `ArchRule`·`should` 를 쓰지 않아 오늘 효과는 같다. 다른 모듈에 rule 이 생기면 그 모듈에도
+    같은 핀이 필요하다.
+18. **바깥 참조 허용 집합은 `app`·`workflow`·`adapters` 셋뿐이다.** `procurement`·`decision`·`qualification`·
    `settlement`·`strategy`·`sharedkernel` 은 이 층 밖이다(domain 계열이고 `ArchitectureGateTest` 의 T-A~T-D
    가 그 층의 바깥 참조를 따로 잠근다). 운영자 결정 문면(세 모듈)을 넘지 않았다.
-9. **클래스패스 전수는 `:app:runtimeClasspath` 기준이다**(좌표 101). 다른 구성(test 전용 의존)에만 있는
-   전송 표면은 production 뿌리 밖이라 이 게이트의 대상이 아니다.
