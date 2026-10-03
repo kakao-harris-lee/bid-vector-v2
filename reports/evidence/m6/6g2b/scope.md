@@ -150,6 +150,14 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-40** | **장부층 일괄(판정 뒤, verifier 재검증 없음)**: cr r2 M-2 KDoc · low 11 · vr L-r2-1(크기 쌍 최종값)·L-r2-2(키 15/8)·L-r2b-1(rollback (d) 모순) · OPEN 셋을 checklist 에. 코드 쪽 low(중복 키 파서 `\` 연속 주석 · 이름 경계 양쪽 · 무패키지 클래스 · 핀 범위 주석)는 test 코드 한 커밋, 표적 test 로만 — 술어 의미 변경이면 OPEN | CLAUDE.md 차단 문턱 |
 | **D-6G2b-41** | **닫는 OPEN**: `OPEN-6G-TRANSPORT-GATE-HARDENING`(**닫음** — KA1·KA12~15 + H-1 넷 + 간접 시그니처 넷 전부 RED, 허용 목록 + 쌍 등식 두 층). **남기는 OPEN**: `OPEN-6G-GATE-REGISTRY-KONEPS`(D-15) · `OPEN-6G2B-HOLDER-INTERNAL-SURFACE`(D-23) · `OPEN-6G2B-REFLECTION-ROOT-DOMAIN`(D-20) · `OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`(D-36·39) · `OPEN-6G2B-FOLDING-UNIFICATION`(D-35) · `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`(이관) → 전부 6G-2c 후보 | |
 
+## 계약 갱신 r8 (2026-10-03, 팀장 — PR #58 `/code-review` 처분)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-42** | **`/code-review`(리뷰어 5 + 채점) 80 이상 셋**: A 죽은 ArchUnit 핀(`failOnEmptyShould` → **`archRule.failOnEmptyShould`**, 구조 단언 추가) · B rollback 실측 HEAD 낡음(종결 커밋 뒤 ①~③ 전체 재실측 + 실측 HEAD **별도 커밋** — 네 번째 반복, 팀장 책임) · H 위협 모델 절 미갱신(이 r8 로). **75 이하지만 집행**: C 반사 뿌리 ↔ `layer.*` 도출 등식 · D fixture 덮개를 `archfixture.violating..` 전수 == 변이 표 양방향(구조) · E `OPEN-6F9-DIVISION-REFLECTION` 교차 참조(D-43) · F 접기 KDoc(세 관례: 없음/NAMECUT/enclosingClass 사실대로) · G 수집 깊이 양성 대조를 1층·반사에도 · I 두 파서 등식 · J 수(열아홉→23/31, 열여섯→17, 쌍 10+2) · K 공허 단언·KDoc · L OPEN 문면(StAX·Spring bean factory) · M 조치 코멘트 · O 「겹쳐 적지 않는다」 정정(이 PR 이 쓴 줄) | 리뷰어 5 보고 |
+| **D-6G2b-43** | **`OPEN-6F9-DIVISION-REFLECTION`(6F-9) 부분 진전 등재**: 그 OPEN 의 방향 「반사 게이트 뿌리를 `procurement`·`adapters` 로」 중 **`adapters` 는 이 slice 가 했고**(D-11·18), `procurement`(domain 계열)는 `OPEN-6G2B-REFLECTION-ROOT-DOMAIN`(D-20)이 잇는다 — 두 OPEN 이 같은 잔여를 들지 않게 6F-9 OPEN 행에 「adapters 닫힘(6G-2b), 잔여는 6G2B-REFLECTION-ROOT-DOMAIN」을 적는다(정책 파일 주석·`DivisionValueRules` KDoc 의 「procurement·adapters 에는 보완이 없다」 정정). capability map 행은 6G-2c 가 | 리뷰 #3 M2 |
+| **D-6G2b-44** | **`OPEN-6G2B-COLLECTION-DEPTH` 신설**(6G-2c): 형제 정확 집합 게이트(`raw-access`·`key-hash`·`usecase`·domain 허용 목록)는 아직 소유 타입만 수집한다(깊은 수집이 더하는 쌍 14 의 실측이 깊이가 하중을 든다는 증거). 이 slice 는 전송·반사 둘만 깊게 했다 | 리뷰 #4 F-2 |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
@@ -159,15 +167,23 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 - 게이트 test · 정책 파일 · 빌드 스크립트를 고치는 저자(M1/1A 의 경계 승계).
 - 등재된 보유자(첨부 · LLM · ML gRPC)가 **KONEPS 주소로** 호출하는 것 — 정적 분석은 목적지를 모른다. 통제는 그 보유자들의 주소가 설정에서만 오고
   KONEPS 주소 설정을 읽는 자리가 관문 배선 하나라는 기존 게이트(「서비스 키 원문 설정은 배선 한 곳만 참조한다」)다.
-- 이름을 문자열로 짓는 반사 가운데 기존 반사 게이트의 뿌리 밖(D-6G2b-6 에서 정한다).
-- JNI · 네이티브 · JDBC 를 거친 DB 쪽 네트워크 기능 · 새 빌드 의존을 더하는 것(빌드 의존 게이트 소관).
+- 이름을 문자열로 짓는 반사 가운데 반사 게이트의 뿌리 밖 — 뿌리는 `workflow`·`app`·`adapters`(운영자 결정 A-2, D-6G2b-11·18); `procurement`·`decision`·
+  `qualification`·`settlement`·`shared-kernel`(domain 계열)은 밖이고 `OPEN-6G2B-REFLECTION-ROOT-DOMAIN`(D-20) — 그 모듈은 도메인 순수성 게이트의 기본 거부가 덮는다.
+- **허용 패키지 안의 출구**(D-6G2b-36·39, PR #58 리뷰로 확장 2026-10-03): 파일 시스템 경유(`java.io`·`java.nio.file` 의 `/dev/tcp`·FIFO·원격 FS) · 라이브러리 자체
+  로더(`com.networknt.schema` 원격 스키마 적재 · `javax.xml.stream` 외부 엔티티 — production 플래그 `SUPPORT_DTD=false`·`IS_SUPPORTING_EXTERNAL_ENTITIES=false` 가 막지만
+  게이트가 핀하지 않음 · `org.springframework.beans.factory.support` 문자열 클래스 적재) · `java.lang.ClassLoader.loadClass` — 전부 `OPEN-6G2B-ALLOWED-PACKAGE-EGRESS`.
+  정확 패키지 입도(D-28)의 귀결이고 낱개 열거를 늘리지 않는다.
+- 등재 보유자 **안**의 String 시그니처 raw send 를 등재 밖 클래스가 부르는 것(vr r1 M-1) — `OPEN-6G2B-HOLDER-INTERNAL-SURFACE`(D-23).
+- JNI · 네이티브 · JDBC 를 거친 DB 쪽 네트워크 기능(`DriverManager` — vr r2 실측 초록, 경계대로) · 새 빌드 의존을 더하는 것(빌드 의존 게이트 소관).
 
 이 경계는 6G 의 D-6G-62 문면(「관문 밖에서 … 금지. 변이 KA1~KA3 RED」)을 줄이지 않는다 — KA1 을 포함해 그 요구를 실제로 채운다.
 
 ### (1) 열거인가 구성인가
 
-금지는 **패키지 뿌리**(구성)다. 허용은 **관측과의 등식**(구성)이다. 낱개 타입 넷(`ProcessBuilder` 등)만 열거이고, 그것은 `java.lang` 을 뿌리로
-금지할 수 없어서다 — 이 넷의 근거를 계약에 적고 새 낱개 타입을 더할 때는 계약을 갱신한다.
+**(r3 뒤 갱신)** 금지 열거는 **허용 목록 + 기본 거부**로 뒤집혔다(D-6G2b-22·28 — vr r1 H-1 이 열거 밖 JDK API 넷을 실측). 1층: `bidvector` 밖 참조의 정확 패키지 ∈
+모듈별 허용 집합(127, 양방향 등식). 2층: 전송 뿌리 열일곱 안은 (클래스, 타입) 쌍 등식(60). 열거로 남은 것은 **낱개 타입 다섯**(`ProcessBuilder`·`Runtime`·`Process`·
+`ProcessHandle`·`ServiceLoader` — `java.lang`·`java.util` 을 뿌리로 금지할 수 없어서, D-14·28)과 그 귀결인 「허용 패키지 안의 출구」(경계 밖, 위 문단)다. 무해 타입 목록은
+두지 않았다(D-13 — 목록에 오르면 모든 클래스에서 자유로워져 게이트를 헐겁게 한다). 초안의 「낱개 타입 넷 … 계약을 갱신한다」는 그 갱신(D-14·28)으로 닫혔다.
 
 ### (2) 우회 — 다섯 이상 (착수 시 실측으로 갱신)
 
@@ -180,11 +196,18 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 7. 등재된 보유자 클래스 안에 새 전송 타입을 더 쥔다. ← D-6G2b-3 쌍 등식.
 8. typealias 로 이름을 가린다(6G KA4 — 이미 RED). ← 바이트코드에는 원 타입이 남는다. 회귀로 유지.
 9. 전송 표면을 쥔 **test 지원 코드**를 production 소스셋에 둔다. ← 뿌리가 production 전체다.
-10. `com.sun.net.httpserver` · `sun.net..` 내부 API. ← 착수 실측에서 뿌리에 더할지 정한다(수신 전용이면 무해 타입).
+10. `com.sun.net.httpserver` · `sun.net..` 내부 API. ← 뿌리에 더했다(D-6G2b-12).
+11. **(vr r1 H-1)** `java.util.logging.SocketHandler` · `javax.xml.parsers.DocumentBuilder.parse(String)` · `javax.management.remote.JMXConnectorFactory` · `javax.swing.JEditorPane(String)` — 거부 뿌리 열거 밖 JDK API. ← 1층 허용 목록 + 기본 거부(D-22·28), 상시 fixture(D-25).
+12. 제네릭 인자 `List<HttpClient>`·`Supplier<HttpClient>` · SAM 람다 · 인터페이스/`Any` 로 받은 전송 객체 · 어노테이션 인자. ← D-2 깊은 수집, 상시 fixture(cr M-2 → D-24).
+13. `java.util.ServiceLoader` 경유 외부 구현 적재(허용 패키지 `java.util` 안). ← 낱개 타입(D-28), 2층.
+14. `adapters` 층 `Class.forName`/`getMethod` 반사. ← 반사 뿌리 확장(A-2, D-11·18), (클래스, 멤버) 쌍 12.
+15. **(cr r2 M-1·팀장)** 판정 대상 모듈을 별도 키에서 빼는 편집. ← `layer.*` 도출(D-34), 변이 ⑪ 넷 RED.
 
 ### (2b) 값 획득 축
 
-새 public 표면은 정책 파일의 키뿐이다. 키를 비우면 등식이 RED 가 되므로 「비워서 통과」는 없다. production 의 새 public 선언은 0 이어야 한다.
+**(r3 뒤 갱신)** 새 public 표면은 **정책 파일 키(+15/−8)** 와 **test 소스의 공개 타입 둘**(`enum class ReferenceCollection` · `class TransportSurfaceRules` — 게이트 test 가 쓰는
+도구, production 이 아니다)이다. 키를 비우면 등식이 RED 가 되므로 「비워서 통과」는 없고, 허용 패키지를 더하는 길은 「관측 ⊃ 허용」 방향 등식이 막는다(미관측 허용 → RED).
+production 의 새 public 선언은 **0**(`git diff 1745a3e2..HEAD -- */src/main` 빈 출력, verifier r1~r3 전부 확인).
 
 ### (3) 과잉·미달
 
