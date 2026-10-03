@@ -1253,6 +1253,11 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ): "PROBE:sample-floor-rows",
     (
         "verdict.min_window_rows",
+        "run._division_coverage_records",
+        "_division_coverage",
+    ): "PROBE:division-coverage",
+    (
+        "verdict.min_window_rows",
         "windows.plan_backtest_windows",
         "compare",
     ): "PROBE:window-rows",
@@ -1423,6 +1428,9 @@ _PROBE_TESTS: Final[dict[str, str]] = {
     ),
     "PROBE:window-rows": "test_min_window_rows_reaches_the_window_exclusion_site",
     "PROBE:sample-floor-rows": "test_min_window_rows_reaches_the_minimum_sample_site",
+    "PROBE:division-coverage": (
+        "test_min_window_rows_reaches_the_division_coverage_site"
+    ),
     "PROBE:admit-rows": "test_institution_constants_reach_the_exclusion_site",
     "PROBE:fit-direct": "test_institution_constants_reach_the_fit_reference_site",
     "PROBE:s4-institution": "test_institution_constants_reach_the_monte_carlo_site",
@@ -2057,6 +2065,32 @@ def test_min_window_rows_reaches_the_minimum_sample_site(harness: _Harness) -> N
     )
     assert by_sample.get("stopped") == "SAMPLE_SIZE_BELOW_MINIMUM", by_sample.get(
         "stopped"
+    )
+
+
+def test_min_window_rows_reaches_the_division_coverage_site(
+    harness: _Harness,
+) -> None:
+    """자리 ③ **업무 대표 표지**(M6/6G-2c D-6G2c-17) — 업무 하나의 행 수가 이 하한에
+    못 미치면 `UNDERPOWERED` 다.
+
+    표지는 앞 판에서 행 수의 **참/거짓**으로 지어졌다(`COVERED if count else …`) — 그러면
+    하한을 어떻게 밀어도 `COVERED` 로 남는다. 여기서 재는 것은 그 자리가 **정책 값을
+    읽는가**다: 같은 행으로 하한만 행 수보다 크게 밀면 표지가 내려와야 한다.
+
+    기대 하한을 test 에 적지 않는다 — 판정문이 공시한 행 수에서 만든다(적으면 판이 바뀔 때
+    조용히 어긋난다). 밀린 판은 표본 하한에 걸려 **멈춤**으로 끝나지만 멈춤도 업무 대표를
+    그대로 싣는다."""
+    base = json.loads(harness.verdict("pass"))["snapshot"]["division_coverage"]
+    assert set(base) == {"SERVICE"}, f"판이 용역 하나가 아니다: {sorted(base)}"
+    rows = base["SERVICE"]["row_count"]
+    assert base["SERVICE"]["status"] == "COVERED", base
+
+    raised = json.loads(
+        harness.verdict("pass", **{"verdict.min_window_rows": str(rows + 1)})
+    )["snapshot"]["division_coverage"]
+    assert raised["SERVICE"] == {"row_count": rows, "status": "UNDERPOWERED"}, (
+        "하한을 행 수 위로 밀었는데 표지가 COVERED 로 남았다 — 그 자리가 정책을 읽지 않는다"
     )
 
 

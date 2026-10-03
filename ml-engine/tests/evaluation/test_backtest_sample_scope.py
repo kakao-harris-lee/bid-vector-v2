@@ -47,7 +47,10 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.backtest.reasons import DivisionCoverage
 from ml_engine.evaluation.backtest.records import BacktestRequest
 from ml_engine.evaluation.backtest.report import canonical_verdict_bytes
-from ml_engine.evaluation.backtest.run import run_strategy_backtest
+from ml_engine.evaluation.backtest.run import (
+    _division_coverage,
+    run_strategy_backtest,
+)
 from ml_engine.evaluation.backtest.snapshot import (
     _MANIFEST_KEYS as READER_MANIFEST_KEYS,
 )
@@ -56,7 +59,14 @@ from ml_engine.evaluation.backtest.snapshot import (
     load_snapshot,
 )
 from ml_engine.evaluation.backtest.strategies import UniformBandStrategy
-from tests.evaluation._backtest_fixture import build_files
+from tests.app.test_backtest_job import _derived_policy
+from tests.evaluation._backtest_fixture import (
+    BoardSpec,
+    BoardWindow,
+    build_board_rows,
+    build_files,
+)
+from tests.evaluation._backtest_support import PlannedBidStrategy
 
 _TESTS_ROOT = Path(__file__).resolve().parents[1]
 _REPO_ROOT = _TESTS_ROOT.parents[1]
@@ -259,11 +269,14 @@ def test_threshold_comes_from_the_scope_not_from_the_sample_list() -> None:
     assert _verdict_payload(snapshot)["sampling"]["minimum_required_sample"] == expected
 
 
-def test_threshold_holds_and_the_empty_division_is_disclosed_underpowered() -> None:
+def test_threshold_holds_and_the_empty_division_is_disclosed_absent() -> None:
     """**변이 표적 둘**: 한 업무의 행을 전부 지워도 ⑴ 문턱이 내려가지 않고 ⑵ 그 업무가
-    판정문에 UNDERPOWERED 로 남는다.
+    판정문에 남는다.
 
-    D-6G-66 이 요구한 거동이 그것이다 — 결측이 문턱을 낮추는 대신 **보이게** 된다."""
+    D-6G-66 이 요구한 거동이 그것이다 — 결측이 문턱을 낮추는 대신 **보이게** 된다.
+    D-6G2c-17 이 그 표지를 갈랐다: 행 0 은 `ABSENT` 이고, **행이 있는데 적은** 업무는
+    `UNDERPOWERED` 다. 이 판의 두 업무는 행이 한둘뿐이라 창당 표본 하한에 한참 못 미친다 —
+    그래서 앞 판이 `COVERED` 로 공시하던 자리가 전부 `UNDERPOWERED` 로 내려온다."""
     scope = ("CONSTRUCTION", "SERVICE")
     both = _loaded(
         _rows({"n-1": "SERVICE", "n-2": "CONSTRUCTION"}),
@@ -284,13 +297,114 @@ def test_threshold_holds_and_the_empty_division_is_disclosed_underpowered() -> N
     ), "한 업무의 행이 사라지자 문턱이 내려갔다 — 결측이 자기 검사를 낮춘다"
 
     coverage = thinned["snapshot"]["division_coverage"]
-    assert coverage["SERVICE"]["status"] == str(DivisionCoverage.COVERED)
     assert coverage["CONSTRUCTION"] == {
         "row_count": 0,
+        "status": str(DivisionCoverage.ABSENT),
+    }, "행이 0 인 업무가 판정문에서 ABSENT 로 공시되지 않는다"
+    assert coverage["SERVICE"] == {
+        "row_count": 2,
         "status": str(DivisionCoverage.UNDERPOWERED),
-    }, "행이 0 인 업무가 판정문에서 UNDERPOWERED 로 공시되지 않는다"
-    assert full["snapshot"]["division_coverage"]["CONSTRUCTION"]["status"] == str(
-        DivisionCoverage.COVERED
+    }, "행 둘뿐인 업무가 COVERED 로 접혔다 — 표지가 행 수의 참/거짓으로 지어졌다"
+    assert full["snapshot"]["division_coverage"]["CONSTRUCTION"] == {
+        "row_count": 1,
+        "status": str(DivisionCoverage.UNDERPOWERED),
+    }, "행 하나뿐인 업무가 COVERED 로 읽힌다 — 6G verifier r5 L-8 의 자리다"
+
+
+def test_the_division_label_turns_over_at_the_window_row_floor() -> None:
+    """D-6G2c-17 의 **문턱 경계** — 표지가 갈리는 자리가 정책의 창당 표본 하한이다.
+
+    기대값을 test 에 적지 않는다(적으면 하한이 상수가 된 것과 구별되지 않는다) — 로드된
+    정책에서 꺼내 그 값의 **앞·뒤·그 자리**를 잰다. 새 정책 키를 만들지 않았으므로 이
+    하한이 움직이면 표지도 함께 움직여야 한다."""
+    required = _policy().verdict.min_window_rows
+    assert _division_coverage(0, required) is DivisionCoverage.ABSENT
+    assert _division_coverage(1, required) is DivisionCoverage.UNDERPOWERED
+    assert _division_coverage(required - 1, required) is DivisionCoverage.UNDERPOWERED
+    assert _division_coverage(required, required) is DivisionCoverage.COVERED
+    assert _division_coverage(required + 1, required) is DivisionCoverage.COVERED
+
+
+def test_the_verdict_discloses_all_three_division_labels() -> None:
+    """표지 셋이 **판정문에서** 다 난다 — 어느 하나가 도달 불가면 그 이름은 장식이다.
+
+    업무 셋을 범위에 두고 행 수를 하한 이상 · 하나 · 0 으로 갈라 둔다. 이 판은 최소 표본에
+    못 미쳐 **멈춤**으로 끝나지만 멈춤도 산출물이고 업무 대표를 그대로 싣는다."""
+    required = _policy().verdict.min_window_rows
+    labels = {f"covered-{index}": "SERVICE" for index in range(required)}
+    labels["thin-1"] = "GOODS"
+    scope = ("CONSTRUCTION", "GOODS", "SERVICE")
+    snapshot = _loaded(_rows(labels), listing_division="SERVICE", scope=scope)
+
+    coverage = _verdict_payload(snapshot)["snapshot"]["division_coverage"]
+    assert coverage["SERVICE"] == {
+        "row_count": required,
+        "status": str(DivisionCoverage.COVERED),
+    }
+    assert coverage["GOODS"] == {
+        "row_count": 1,
+        "status": str(DivisionCoverage.UNDERPOWERED),
+    }
+    assert coverage["CONSTRUCTION"] == {
+        "row_count": 0,
+        "status": str(DivisionCoverage.ABSENT),
+    }
+
+
+def test_the_division_label_does_not_change_the_window_verdict(tmp_path: Path) -> None:
+    """D-6G2c-17 — 업무 표지와 **창 단위** UNDERPOWERED(D-6G-31)는 이름만 같은 다른 축이다.
+
+    한 업무가 `UNDERPOWERED` 인 판에서도 창은 자기 축으로 판정된다: 창 셋이 전부 섰고
+    후보가 `StrategyPassed` 다. 업무 표지를 창 판정에 물리면 이 판이 `NotEvaluable` 로
+    내려앉아 여기서 붉어진다.
+
+    판 짓기: 채점 창 셋은 용역으로 채우고(창마다 50 공고), 공사는 창 **밖**에 다섯만 둔다 —
+    창당 행 하한(이 판에서 10)보다 적어 공사는 `UNDERPOWERED` 이고, 창은 용역 행으로 선다.
+    정책은 `test_backtest_job._derived_policy` 를 **그대로 쓴다**(완화 축의 허용 목록이 그
+    모듈의 test 로 잠겨 있다 — 여기서 두 번째 완화 경로를 만들지 않는다)."""
+    board = build_board_rows(
+        BoardSpec(
+            (BoardWindow(10, 0, 40, 0),) * 3,
+            pad=5,
+            pad_categories=("CONSTRUCTION",),
+        )
+    )
+    rows = rows_bytes(list(board.payloads))
+    listing = sample_list_bytes(rows, division="SERVICE")
+    snapshot = load_snapshot(manifest_bytes(rows, sample_list=listing), rows, listing)
+    assert isinstance(snapshot, LoadedSnapshot), snapshot
+
+    policy = load_strategy_backtest_policy(_derived_policy(tmp_path / "policy"))
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    outcome = run_strategy_backtest(
+        BacktestRequest(
+            snapshot=snapshot,
+            baseline=PlannedBidStrategy("S0-planned", board.baseline_plan),
+            candidates=(PlannedBidStrategy("C-planned", board.candidate_plan),),
+            primary_names=(),
+            policy=policy,
+            policy_checksum=strategy_backtest_policy_checksum(policy),
+        )
+    )
+    payload: dict[str, Any] = json.loads(canonical_verdict_bytes(outcome))
+    assert "strategies" in payload, (
+        f"판이 멈췄다 — 창 축을 잴 수 없다: {payload.get('stopped')} {payload.get('detail')}"
+    )
+
+    coverage = payload["snapshot"]["division_coverage"]
+    assert coverage["CONSTRUCTION"]["status"] == str(DivisionCoverage.UNDERPOWERED), (
+        f"판을 잘못 지었다 — 공사가 UNDERPOWERED 가 아니면 두 축을 가를 수 없다: {coverage}"
+    )
+    assert coverage["SERVICE"]["status"] == str(DivisionCoverage.COVERED), coverage
+
+    candidate = next(
+        item for item in payload["strategies"] if item["strategy"] == "C-planned"
+    )
+    assert candidate["outcome"] == "StrategyPassed", candidate
+    assert len(candidate["windows"]) == len(payload["selected_windows"])
+    assert all(window["passed"] for window in candidate["windows"]), candidate
+    assert not any(window["underpowered"] for window in candidate["windows"]), (
+        "창이 검정력 미달로 내려갔다 — 업무 표지가 창 축에 샜을 수 있다"
     )
 
 

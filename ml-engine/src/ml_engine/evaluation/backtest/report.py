@@ -16,10 +16,7 @@ import json
 from collections.abc import Sequence
 
 from ml_engine.evaluation.backtest.fit import FitResult
-from ml_engine.evaluation.backtest.reasons import (
-    DivisionCoverage,
-    ProducerExclusionReason,
-)
+from ml_engine.evaluation.backtest.reasons import ProducerExclusionReason
 from ml_engine.evaluation.backtest.records import (
     BacktestStopped,
     BacktestVerdict,
@@ -47,16 +44,17 @@ def _snapshot(record: SnapshotRecord) -> dict[str, JsonValue]:
         "sample_size": record.sample_size,
         "sample_divisions": list(record.sample_divisions),
         # D-6G-66 — 문턱의 출처(확정 범위)와, 그 범위에서 **행이 오지 않은** 업무.
-        # 범위에서 세므로 빠진 업무가 목록에서 사라지지 않고 UNDERPOWERED 로 남는다.
+        # 범위에서 세므로 빠진 업무가 목록에서 사라지지 않고 ABSENT 로 남는다.
         "sample_scope_divisions": list(record.sample_scope_divisions),
+        # 표지는 **판정 경로가 정한다**(D-6G2c-17). 여기서 행 수의 참/거짓으로 지으면
+        # 「행 하나 == 대표됨」이라는 판단이 직렬화 코드에 숨고, 그 판단이 쓰는 문턱(정책의
+        # 창당 표본 하한)이 판정 경로에 나타나지 않는다.
         "division_coverage": {
-            division: {
-                "row_count": count,
-                "status": str(
-                    DivisionCoverage.COVERED if count else DivisionCoverage.UNDERPOWERED
-                ),
+            item.division: {
+                "row_count": item.row_count,
+                "status": str(item.status),
             }
-            for division, count in record.division_row_counts
+            for item in record.division_coverage
         },
         # 생산 귀속 결측은 **닫힌 어휘로** 싣는다(스키마 §6, v5) — 행이 오지 않는
         # 표본들이라 판독은 계수만 볼 수 있고, 이름이 닫혀 있어야 「왜 빠졌는지 모르는
