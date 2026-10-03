@@ -8,9 +8,9 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 
 ## P — Python
 
-판정 대상 SHA **`8ebc64bf`**(P 레인 마지막 산출물 커밋). 그 커밋과 HEAD 사이에 `ml-engine/**` 의
-변경은 **0** 이다(`git diff --name-only 8ebc64bf..HEAD -- ml-engine/` 빈 출력) — K 레인 커밋이 뒤에
-붙었지만 Python 트리는 움직이지 않았다. 아래 acceptance 는 그 트리에서 잰 값이다.
+판정 대상 SHA **`20f1e7ba`**(P 레인 마지막 산출물 커밋). 그 커밋과 HEAD 사이에 `ml-engine/**` 의
+변경은 **0** 이다(`git diff --name-only 20f1e7ba..HEAD -- ml-engine/` 빈 출력) — K 레인 커밋이 뒤에
+붙어도 Python 트리는 움직이지 않는다. 아래 acceptance 는 그 트리에서 잰 값이다.
 
 ### 항목별 처분과 변이
 
@@ -22,7 +22,9 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 | **D-6G2c-12** manifest 키 세 자리 등식 | 구현 | 생성기 하나에서 `incomplete_axis` 칸 제거 | RED, 문면이 그 생성기를 이름으로 지목 |
 | **D-6G2c-21 ③** seed 키 열거 한 자리 | 구현 | 둘째 열거 되살림 + 길이 비교로 되돌림 | RED(자리 수 등식 · 거부 문면 이름 등식) |
 | **D-6G2c-21 ④** 기존 판정 덮어쓰기 거부 | 구현 | 존재 검사 제거 | RED(사유 전수 · 바이트 불변 둘) |
-| **D-6G2c-22** 판독기 URI 디코드 | 구현 | 디코딩 제거 | RED(`SNAPSHOT_UNREADABLE NOT_FOUND`) |
+| **D-6G2c-22** 판독기 URI 디코드 | 구현 | 디코딩 제거 | RED — CLI 끝까지 도는 판이 `SNAPSHOT_UNREADABLE NOT_FOUND` 로 선다 |
+| | | 같은 변이를 판독기 단위에서 | RED 둘(디코딩을 재는 둘) · 음성 대조 셋은 초록 |
+| | (음성 대조) | 없는 경로 · 파일 셋 결손 · 파일을 가리킴 · 다른 scheme | **거부 그대로** — `NOT_FOUND` · `NOT_FOUND` · `NOT_A_DIRECTORY` · `UNSUPPORTED_SCHEME` |
 | **D-6G2c-23** app 층 HTTP 금지(게이트 술어) | 구현 | `app/pipeline.py` 에 `import urllib.request` 한 줄 | `lint-imports` BROKEN **그리고** AST 스윕 RED |
 | **D-6G2c-24** 파생 지역 변수 한 단계 | 구현 | 파생 변수의 소비자를 한 단계 더 멀리(거동 동일) | RED(삼중 둘 소실) |
 | | | 공시가 seed 0 만 따르고 넷은 출하값 고정 | RED(쌍 전수에서 seed 1~4; seed 0 은 초록) |
@@ -46,10 +48,10 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 |---|---|
 | S-1 `uv sync --frozen --all-extras` | exit 0 |
 | S-1b serving extras 분리 | 금지 패키지 다섯 모두 미설치 |
-| S-2 `ruff check .` · `ruff format --check .` | 위반 0 · 220 파일 포맷 일치 |
+| S-2 `ruff check .` · `ruff format --check .` | 위반 0 · 221 파일 포맷 일치 |
 | S-3 `mypy --strict src/ml_engine` | 97 파일 이슈 0 |
 | S-4 `lint-imports` | 계약 **8 kept, 0 broken**(앞 판 8, 금지 뿌리가 다섯 → 열셋) |
-| S-5 `pytest tests -q` | **1402 passed** (320s) |
+| S-5 `pytest tests -q` | **1407 passed** (331s) |
 | S-6 설계 래칫 | 위반 0 |
 | S-7 재활용 출처 두 자리 + 양성 대조 | 위반 0 · 양성 대조가 실패함을 확인 |
 | S-9 Python 버전 두 자리 | exit 0 |
@@ -72,8 +74,20 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 
 ### 판정 JSON 어휘 변경이 건드린 기대값
 
+**공유 파일 하나가 함께 움직였다**: 스키마 문서 §2 의 「판정문의 업무 대표 어휘」 문장(팀장 커밋
+`ae1077e4`). 그 문장이 판정 JSON 어휘의 정본이고 test 가 그것과 enum 의 **집합 등식**을 단언하므로,
+D-17 은 문장이 먼저 바뀌어야 성립한다(D-6G2c-31). **rollback 의 공유 파일 목록에 그 커밋이 들어간다**
+— 되돌릴 때 hunk 격리가 필요한 자리다(그 문서의 다른 절은 이 slice 가 읽기만 했다).
+
+등식 창의 실측(팀장 요청): 마커 「판정문의 업무 대표 어휘」는 문서에 **한 번** 나오고, 그 뒤 200자
+창에 백틱 대문자 토큰이 다섯(`COVERED` · `UNDERPOWERED` · `ABSENT` · `ABSENT` · `UNDERPOWERED`)
+있어 집합은 정확히 셋이다. 창 안에 **다른 대문자 백틱 토큰은 없다**(정책 키 이름은 소문자라 패턴에
+걸리지 않는다). 가장 늦게 처음 나오는 토큰이 창 73자 자리이고 끝까지 119자 여유가 있다 — 창을 넘길
+위험은 지금 없다. 다만 마커 뒤 200자 안에 **새 대문자 백틱 토큰을 넣으면** 집합 등식이 깨진다(창 바로
+뒤 100자에는 `COVERED` 가 한 번 더 있고, 그것은 창 밖이라 무해하다).
+
 golden 은 **스냅숏 입력**(`manifest.json`·`rows.jsonl`·`sample-list.tsv`)이고 판정 JSON 출력이 아니다 —
-그래서 왕복 golden 바이트는 한 줄도 바뀌지 않았다. 바뀐 기대값은 **test 안의 단언 셋**이다:
+그래서 왕복 golden 바이트는 한 줄도 바뀌지 않았다. 그 밖에 바뀐 기대값은 **test 안의 단언 셋**이다:
 
 - 업무 대표 공시를 읽던 단언(행 0 → `ABSENT`, 행 한둘 → `UNDERPOWERED`). 근거: 스키마 문서 §2 의
   「판정문의 업무 대표 어휘」 문장(팀장 커밋 `ae1077e4`, D-6G2c-31)이 정본이고 test 가 그 문장과
