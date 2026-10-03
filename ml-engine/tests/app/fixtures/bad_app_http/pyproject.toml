@@ -1,0 +1,10 @@
+# D-6G2c-23 양성 대조 — 실제 `ml-engine/pyproject.toml` 의 app 층 forbidden 계약과 같은
+# 형태를 이 독립 미니 프로젝트(자기 `ml_engine` 트리)에 적용한다. `ml_engine/app/__init__.py`
+# 가 의도적으로 `urllib.request` 와 `http.client` 를 import 하므로 `lint-imports --config` 가
+# 이 파일을 가리키면 exit 0 이 아니어야 한다(`tests/app/test_backtest_cli.py`).
+#
+# 계약 블록은 **여기 적지 않는다** — test 가 실제 pyproject 에서 읽어 덧쓴다. 적어 두면 실제
+# 계약이 바뀌어도 양성 대조가 옛 목록으로 계속 통과한다.
+[tool.importlinter]
+root_packages = ["ml_engine"]
+include_external_packages = true

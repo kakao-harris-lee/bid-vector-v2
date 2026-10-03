@@ -27,9 +27,13 @@ import ast
 import hashlib
 import inspect
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
+import tomllib
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 import pytest
@@ -42,7 +46,10 @@ from ml_engine.app.backtest_job import JobFailureReason
 # 두 벌을 만들면 CLI 판과 job 판이 조용히 갈린다. 허용 완화 축의 등식은 그 모듈이 잠근다.
 from tests.app.test_backtest_job import _derived_policy, _snapshot_dir
 
-_POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
+_ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
+_LINT_IMPORTS_BIN = Path(sys.executable).parent / "lint-imports"
+_BAD_APP_HTTP_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "bad_app_http"
+_POLICY_DIR = _ML_ENGINE_ROOT / "policy"
 _INFERENCE_POLICY = _POLICY_DIR / "inference-v1.yaml"
 _MODULE = "ml_engine.app.backtest_cli"
 
@@ -509,29 +516,151 @@ def test_a_spaced_snapshot_runs_end_to_end(tmp_path: Path) -> None:
     assert json.loads(payload)["variants"], result.stdout
 
 
-def test_the_app_package_does_not_import_urllib_request() -> None:
-    """cr r2 MR2-1 — `urllib.request` 는 `urlopen`·opener 기계와 `http.client` 를 함께
-    들여온다. import-linter 의 「app 은 DB·HTTP·업무 모듈을 모른다」는 서드파티 클라이언트
-    **다섯의 열거**라 그 모듈을 막지 못한다(초록인데 비어 있는 게이트). 열거 밖의 이 자리는
-    구조로 닫는다 — `ml_engine/app/**` 전체를 AST 로 훑는다(`urllib.parse` 는 허용).
+# ── app 층의 HTTP·소켓 금지: 계약 파일 한 자리 + AST 스윕 (D-6G2c-23) ──────────
+# `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT` 종결. 두 층이 같은 집합을 본다:
+#   ① `lint-imports` — 뿌리 단위(도구가 외부 패키지의 하위 모듈을 forbidden 으로 받지 않는다).
+#   ② 이 AST 스윕 — 하위 모듈 단위(`urllib.request` 는 막고 `urllib.parse` 는 허용).
+# 금지 목록은 **계약 파일 한 자리**이고 스윕이 그것을 읽어 만든다 — 두 벌을 두면 갈린다.
+_APP_IMPORT_CONTRACT_NAME = "app 은 DB·HTTP·업무 모듈을 모른다"
 
-    퍼센트 인코딩 해제는 `urllib.parse.unquote` 로 한다(POSIX 에서 `url2pathname` 과 같은
-    함수다). 이 저장소의 실행 호스트는 Linux 하나이므로 잃는 것은 Windows 드라이브 문면뿐이고,
-    그것은 쓰이지 않는 범위다."""
-    app_dir = Path(ml_engine.app.__file__).resolve().parent
+_ALLOWED_SUBMODULES = frozenset({"urllib.parse"})
+"""금지 뿌리 **아래에서 유일하게 허용되는** 하위 모듈들.
+
+`urllib.parse` 는 scheme 판정(`urlparse`)과 퍼센트 인코딩 해제(`unquote`)를 낸다.
+`urllib.request.url2pathname` 은 POSIX 에서 `unquote` 와 같은 함수이지만 `urlopen`·opener
+기계와 `http.client` 를 함께 들여온다 — 이 저장소의 실행 호스트는 Linux 하나이므로 잃는
+것은 Windows 드라이브 문면뿐이고 그것은 쓰이지 않는 범위다."""
+
+
+def _app_import_contract() -> dict[str, Any]:
+    """실제 `pyproject.toml` 에서 app 층 forbidden 계약 하나를 읽는다.
+
+    계약이 지워지거나 이름이 바뀌면 이 함수가 먼저 터진다 — 스윕이 **빈 집합으로 조용히
+    통과하는** 상태를 막는 자리다(계약 없음이 스윕을 장식으로 만든다)."""
+    data = tomllib.loads(
+        (_ML_ENGINE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    matching = [
+        contract
+        for contract in data["tool"]["importlinter"]["contracts"]
+        if contract.get("name") == _APP_IMPORT_CONTRACT_NAME
+    ]
+    assert len(matching) == 1, (
+        f"app 층 forbidden 계약이 pyproject.toml 에 하나가 아니다: {len(matching)}"
+    )
+    contract = matching[0]
+    assert contract["type"] == "forbidden", contract
+    assert contract["source_modules"] == ["ml_engine.app"], contract
+    return contract
+
+
+def _forbidden_roots() -> frozenset[str]:
+    roots = frozenset(_app_import_contract()["forbidden_modules"])
+    assert roots, "금지 목록이 비었다 — 스윕이 아무것도 막지 않는다"
+    return roots
+
+
+def _imported_names(tree: ast.AST) -> list[tuple[str, int]]:
+    found: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.extend((alias.name, node.lineno) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0:
+            found.append((node.module or "", node.lineno))
+    return found
+
+
+def _offending_imports(directory: Path, roots: frozenset[str]) -> list[str]:
+    """`directory` 아래 모듈이 금지 뿌리를 import 하는 자리 — 허용 하위 모듈만 뺀다."""
     offenders: list[str] = []
-    for path in sorted(app_dir.rglob("*.py")):
+    for path in sorted(directory.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom):
-                names = [node.module or ""]
-            else:
+        for name, lineno in _imported_names(tree):
+            if name.split(".")[0] not in roots:
                 continue
             if any(
-                name == "urllib.request" or name.startswith("urllib.request.")
-                for name in names
+                name == allowed or name.startswith(f"{allowed}.")
+                for allowed in _ALLOWED_SUBMODULES
             ):
-                offenders.append(f"{path.name}:{node.lineno}")
-    assert not offenders, f"ml_engine/app 이 urllib.request 를 import 한다: {offenders}"
+                continue
+            offenders.append(f"{path.name}:{lineno} -> {name}")
+    return offenders
+
+
+def test_the_app_package_imports_no_forbidden_http_module() -> None:
+    """D-6G2c-23 — `ml_engine/app/**` 전수에 금지 뿌리의 import 가 없다(허용 하위 모듈 제외).
+
+    앞 판은 `urllib.request` **한 이름**만 봤다. 그러면 `http.client`·`socket` 은 그대로
+    지나가고, 스윕이 초록인 채 비어 있다. 이제 금지 집합이 계약 파일에서 온다."""
+    app_dir = Path(ml_engine.app.__file__).resolve().parent
+    offenders = _offending_imports(app_dir, _forbidden_roots())
+    assert not offenders, f"app 층이 금지 모듈을 import 한다: {offenders}"
+
+
+def test_every_allowed_submodule_has_a_forbidden_root() -> None:
+    """허용 예외가 **무엇의 예외인지** 분명하다 — 뿌리가 금지 목록에 없으면 그 예외는
+    아무것도 열지 않는 장식이고, 그 상태는 「뿌리를 목록에서 빼도 초록」과 같다.
+
+    이것이 목록이 조용히 줄어드는 것을 막는 자리다: `urllib` 를 계약에서 지우면 여기서 RED."""
+    roots = _forbidden_roots()
+    orphans = sorted(
+        allowed for allowed in _ALLOWED_SUBMODULES if allowed.split(".")[0] not in roots
+    )
+    assert not orphans, f"금지 뿌리가 없는 허용 예외: {orphans}"
+
+
+def test_the_sweep_set_equals_the_contract_list(tmp_path: Path) -> None:
+    """**등식**: 스윕이 보는 금지 집합 == 계약 파일의 목록(D-6G2c-23).
+
+    열거를 두 벌 두지 않았다는 것을 선언이 아니라 **거동**으로 잰다 — 금지 뿌리마다 한 줄씩
+    import 하는 합성 모듈을 지어 스윕에 물리고, 뿌리 **전부**가 지목되는지 본다. 허용 하위
+    모듈 한 줄은 지목되지 않아야 한다(예외가 실제로 열려 있음)."""
+    roots = _forbidden_roots()
+    probe = tmp_path / "probe"
+    probe.mkdir()
+    lines = [f"import {root}" for root in sorted(roots)]
+    lines += [f"import {allowed}" for allowed in sorted(_ALLOWED_SUBMODULES)]
+    (probe / "sample.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    reported = {
+        entry.rsplit(" -> ", maxsplit=1)[-1]
+        for entry in _offending_imports(probe, roots)
+    }
+    assert reported == set(roots), (
+        f"스윕이 놓친 뿌리: {sorted(roots - reported)} · "
+        f"계약 밖인데 지목된 이름: {sorted(reported - roots)}"
+    )
+
+
+def test_the_import_contract_refuses_a_stdlib_http_import() -> None:
+    """양성 대조 — 계약이 **실제로** 막는다. `lint-imports` 를 독립 미니 프로젝트에 걸어
+    `ml_engine/app` 의 `urllib.request` 가 BROKEN 임을 실행으로 확인한다.
+
+    계약 블록은 실제 `pyproject.toml` 에서 읽어 fixture 사본에 덧쓴다 — 계약을 지우면
+    `_app_import_contract` 가 먼저 터져 이 양성 대조가 그 사실과 무관하게 통과하는 일이
+    없다(`tests/gates/test_import_contracts.py` H-3 과 같은 갈래)."""
+    contract = _app_import_contract()
+    with tempfile.TemporaryDirectory(prefix="bad-app-http-") as tmp:
+        root = Path(tmp)
+        shutil.copytree(_BAD_APP_HTTP_FIXTURE, root, dirs_exist_ok=True)
+        block = [
+            "",
+            "[[tool.importlinter.contracts]]",
+            f"name = {contract['name']!r}",
+            'type = "forbidden"',
+            f"source_modules = {list(contract['source_modules'])!r}",
+            f"forbidden_modules = {sorted(contract['forbidden_modules'])!r}",
+            "",
+        ]
+        with (root / "pyproject.toml").open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(block))
+        result = subprocess.run(
+            [str(_LINT_IMPORTS_BIN), "--config", "pyproject.toml", "--no-cache"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "BROKEN" in result.stdout, result.stdout
+    assert "urllib" in result.stdout, result.stdout
