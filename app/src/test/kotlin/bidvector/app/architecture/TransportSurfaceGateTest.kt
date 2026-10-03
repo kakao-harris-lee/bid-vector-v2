@@ -119,6 +119,44 @@ class TransportSurfaceGateTest {
         policy.duplicateKeys shouldBe emptySet()
     }
 
+    /**
+     * PR #58 I — 중복 검사용 원문 파서와 `Properties` 가 **같은 키 집합**을 본다. 둘이 갈리면 중복 검사가
+     * 보는 세계와 게이트가 읽는 세계가 달라져, 한쪽에만 있는 키는 어느 단언도 지키지 않는다.
+     */
+    @Test
+    fun `원문 파서가 센 키 집합이 Properties 가 읽은 키 집합과 같다`() {
+        policy.declaredKeySet shouldBe policy.loadedKeySet
+    }
+
+    /**
+     * PR #58 C — 반사 게이트의 뿌리를 손 목록으로 두면 `layer.*` 가 늘어도 그 모듈이 반사 판정 밖에 남는다.
+     * 바깥 참조 판정 대상과 **같은 집합**임을 단언해 둘을 묶는다(키는 남겨 둔다 — 두 축이 갈라질 결정이
+     * 나면 이 단언이 그 결정을 드러낸다).
+     */
+    @Test
+    fun `반사 게이트 뿌리는 layer 도출 판정 대상과 같다`() {
+        policy.reflectionRoots.toSet() shouldBe
+            policy.externalJudgedModules.map { "${policy.packageRoot}.$it" }.toSet()
+    }
+
+    /**
+     * PR #58 G — 수집 깊이 양성 대조를 **1층(바깥 참조)에도** 둔다. 깊은 수집이 production 에서 실제로
+     * 허용 패키지를 더하므로, 수집이 조용히 소유 타입만 보는 쪽으로 되돌려지면 등식이 깨진다.
+     *
+     * 반대 방향(`소유 타입만 - 깊은 수집` 이 비었다)은 정의상 참이라 싣지 않는다.
+     */
+    @Test
+    fun `깊은 수집이 production 의 바깥 참조 패키지를 더한다 — 양성 대조`() {
+        val added =
+            policy.externalJudgedModules.flatMap { module ->
+                val root = "${policy.packageRoot}.$module"
+                rules.observedExternalPackages(production, root) -
+                    ownerOnly.observedExternalPackages(production, root)
+            }
+
+        added.shouldNotBeEmpty()
+    }
+
     /** D-6G2b-22 — 모듈별 허용 패키지 키 집합이 닫힌 모듈 목록과 같다. */
     @Test
     fun `바깥 참조 허용 집합의 모듈 키는 닫힌 목록과 같다`() {
@@ -180,6 +218,9 @@ class TransportSurfaceGateTest {
     /**
      * 양성 대조 — 호출 대상의 **인자·반환 타입** 수집이 production 에서 실제로 쌍을 더한다. 수집이 조용히
      * 소유 타입만 보는 쪽으로 되돌려지면 이 단언이 RED 가 된다(KA1 의 형태가 거기서 열렸다).
+     *
+     * 반대 방향(`shallow - full` 이 비었다)은 **정의상 참**이라 싣지 않는다 — `FULL` 은 `OWNER_ONLY` 가
+     * 모으는 것을 모두 모으고 더 모은다(같은 함수의 분기 하나다). 공허한 단언은 재는 것이 없다.
      */
     @Test
     fun `호출 인자·반환 타입 수집이 production 에서 쌍을 더한다 — 양성 대조`() {
@@ -187,6 +228,5 @@ class TransportSurfaceGateTest {
         val shallow = ownerOnly.observedPairs(production, policy.transportRoots)
 
         (full - shallow).shouldNotBeEmpty()
-        (shallow - full).shouldBeEmpty()
     }
 }

@@ -2,6 +2,7 @@ package bidvector.app.architecture
 
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
+import com.tngtech.archunit.lang.ArchRule
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -44,30 +45,51 @@ class TransportSurfaceGateCatchesViolationsTest {
     }
 
     /**
-     * fixture 뿌리가 비어 있지 않다 — 컴파일 출력이 바뀌어 모집단을 잃으면 위 단언이 조용히 공허해진다.
+     * PR #58 D — 덮개를 **열거에서 구조로**. 모집단은 패키지 모양이 아니라 **이 slice 의 게이트 셋이 실제로
+     * 신고하는 fixture 전수**다. 그래서 `violating..` 아래 어느 패키지에 fixture 를 더해도, 그 게이트가 그것을
+     * 신고하면 모집단에 들어오고 덮개 표에 없으면 RED 다. 앞 판은 `…transport` 한 패키지와
+     * `endsWith(".external")` 라는 **이름 모양**에 기대어 새 패키지를 놓쳤다.
      *
-     * 덮개는 **전송 fixture 와 바깥 참조 fixture 둘 다**다(cr r2 L-4). 앞 판은 `…violating.transport` 한
-     * 패키지만 봐서, `adapters/external`·`workflow/external` 에 fixture 를 더하고 변이 표에 적지 않아도
-     * 조용했다.
+     * 양방향이다 — 표에만 있고 신고되지 않는 이름도 RED(fixture 가 지워졌거나 변이가 더는 성립하지 않는다).
      */
     @Test
-    fun `음성 fixture 모집단이 비어 있지 않고 변이 표가 그 클래스들을 덮는다`() {
-        val plantedTransport =
-            violating
-                .filter { it.simpleName.startsWith("Rogue") }
-                .map { it.simpleName }
-                .toSet()
-        val plantedExternal =
-            violatingAll
-                .filter { it.packageName.endsWith(".external") && it.simpleName.startsWith("Rogue") }
-                .map { it.simpleName }
-                .toSet()
+    fun `게이트가 신고하는 음성 fixture 전수가 덮개 표와 같다 — 양방향`() {
+        val reported = reportedFixtureNames()
 
-        plantedTransport.shouldNotBeEmpty()
-        plantedExternal.shouldNotBeEmpty()
-        (plantedTransport - MUTATIONS.keys) shouldBe emptySet()
-        (plantedExternal - EXTERNAL_COVERED) shouldBe emptySet()
+        reported.shouldNotBeEmpty()
+        (reported - COVERED) shouldBe emptySet()
+        (COVERED - reported) shouldBe emptySet()
     }
+
+    /** 이 slice 의 세 게이트(전송 쌍 · 바깥 참조 · 반사)가 `violating..` 에서 신고하는 최상위 단순 이름 전수. */
+    private fun reportedFixtureNames(): Set<String> {
+        val transport = rules.rules(listOf(violatingRoot), policy.transportHolderPairs).details(violatingAll)
+        val external =
+            policy.externalJudgedModules.flatMap { module ->
+                rules
+                    .externalReferenceRules(
+                        "$violatingRoot.$module",
+                        policy.externalAllowedPackages(module).toSet(),
+                    ).details(violatingAll)
+            }
+        val reflection =
+            CollectionArchitectureRules()
+                .moduleMustNotUseReflection(
+                    roots = policy.externalJudgedModules.map { "$violatingRoot.$it" },
+                    reflectionPackages = policy.reflectionPackages.toSet(),
+                    allowedTypePairs = policy.reflectionTypePairs.toSet(),
+                    classType = policy.reflectionClassType,
+                    allowedMemberPairs = policy.reflectionClassMemberPairs.toSet(),
+                ).details(violatingAll)
+
+        return (transport + external + reflection)
+            .map { it.substringBefore(" ->").substringAfterLast('.') }
+            .filter { it.startsWith("Rogue") }
+            .toSet()
+    }
+
+    private fun List<ArchRule>.details(classes: JavaClasses): List<String> =
+        flatMap { it.allowEmptyShould(true).evaluate(classes).failureReport.details }
 
     /**
      * D-6G2b-2 양성 대조 — 호출 대상의 소유 타입만 보는 수집은 `uri.toURL().readText()` 의 `java.net.URL`
@@ -117,8 +139,10 @@ class TransportSurfaceGateCatchesViolationsTest {
     }
 
     /**
-     * `java.util.ServiceLoader` 는 **1층이 잡지 못한다** — `java.util` 이 허용 패키지다. `java.lang` 의
-     * `ProcessBuilder` 와 같은 자리라 전송 낱개 타입으로 두고 2층이 잡는다.
+     * `java.util.ServiceLoader` 는 **1층이 보지 않는다**. 이유는 「`java.util` 이 허용 패키지라서」가 아니다 —
+     * 1층은 패키지를 유도하기 **전에** 전송 표면 타입을 걸러 내므로(두 층의 분기) 낱개 전송 타입으로 등재된
+     * 이 타입은 1층의 입력에 아예 들어가지 않는다. 그래서 1층 신고가 0 이고 2층이 잡는다. `java.lang` 의
+     * `ProcessBuilder` 와 같은 자리다.
      */
     @Test
     fun `허용 패키지 안의 확장 지점은 전송 낱개 타입으로 잡는다 — ServiceLoader`() {
@@ -219,11 +243,43 @@ class TransportSurfaceGateCatchesViolationsTest {
 
     private companion object {
         /**
-         * 바깥 참조 fixture 가운데 **변이 표나 전용 test 가 덮는** 단순 이름(cr r2 L-4 덮개).
-         * `RogueServiceLoaderExtension` 은 두 층의 분기를 재는 전용 test 가 덮는다.
+         * PR #58 D — 이 slice 의 음성 단언이 덮는 fixture 전수(**한 자리**). 세 표의 합이고, 전용 test 가
+         * 덮는 둘(`RogueServiceLoaderExtension` 두 층 분기 · `RogueRegisteredHolderGainingTransport` 쌍 축)과
+         * 반사 fixture 셋은 그 사유를 [DEDICATED_TEST_FIXTURES] 에 적는다.
          */
-        val EXTERNAL_COVERED: Set<String>
-            get() = EXTERNAL_MUTATIONS.map { it.second.substringAfterLast('.') }.toSet() + "RogueServiceLoaderExtension"
+        val COVERED: Set<String>
+            get() =
+                MUTATIONS.keys +
+                    EXTERNAL_MUTATIONS.map { it.second.substringAfterLast('.') } +
+                    DEDICATED_TEST_FIXTURES +
+                    FOREIGN_FIXTURES_REPORTED
+
+        /**
+         * **다른 slice 의 fixture 인데 이 게이트들도 신고하는 것들**(PR #58 D 의 구조적 모집단이 드러낸 전수).
+         * 6A·6F 의 음성 test 가 각자의 축으로 덮는 fixture 이고, 이 게이트에는 전송 표면·바깥 참조·반사
+         * 타입이 들어 있어 함께 신고된다 — 위반인 것이 맞으므로 모집단에서 빼지 않고 여기 적는다. 이 집합이
+         * 늘면 다른 slice 가 fixture 를 더한 것이고, 줄면 지운 것이다(어느 쪽이든 RED 로 드러난다).
+         */
+        val FOREIGN_FIXTURES_REPORTED =
+            setOf(
+                "RogueAdminBumpController",
+                "RogueDivisionFromString",
+                "RogueHttpJdbcShortcut",
+                "RogueTier1HttpExtension",
+                "RogueTier2JdbcHolder",
+            )
+
+        /**
+         * 변이 표가 아니라 **전용 test** 가 덮는 fixture — 표의 「한 fixture, 한 타입」 모양에 들어가지 않는
+         * 축들이다. 반사 셋은 `CollectionArchitectureGateCatchesViolationsTest` 가 덮는다.
+         */
+        val DEDICATED_TEST_FIXTURES =
+            setOf(
+                "RogueServiceLoaderExtension",
+                "RogueReflectionPeek",
+                "RogueAdapterReflectionPeek",
+                "RogueAdapterNameLookupGainingReflection",
+            )
 
         /** D-6G2b-25 — (모듈, fixture 의 뿌리 아래 경로, 그 변이를 성립시키는 바깥 패키지). */
         val EXTERNAL_MUTATIONS =

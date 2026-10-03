@@ -59,8 +59,8 @@ class CollectionArchitectureGateCatchesViolationsTest {
 
     @Test
     fun `use case 패키지 밖 이웃 workflow 패키지의 헬퍼가 원문 필드를 읽어도 잡는다 — 한 걸음 옮긴 변이`() {
-        moduleRules().mustReport("RogueNeighborTitlePeek", "FieldConcept")
-        moduleRules().mustReport("RogueNeighborTitlePeek", "RawNoticeObservation.valueOf")
+        moduleRules().mustReport("RogueNeighborTitlePeekKt", "FieldConcept")
+        moduleRules().mustReport("RogueNeighborTitlePeekKt", "RawNoticeObservation.valueOf")
     }
 
     @Test
@@ -292,12 +292,15 @@ class CollectionArchitectureGateCatchesViolationsTest {
      * vr L-5 · cr ④ — 대상은 **이름 경계까지** 맞춰 본다. 맨 `contains` 로 재면 `java.net.URL` 단언이
      * `java.net.URLConnection` 으로 잡혀도 통과해, 「다른 이유로 잡혔다」를 거르려는 취지가 헐거웠다.
      * 이 파일의 상세 줄은 규칙마다 꼬리가 다르므로(서술자·따옴표) 전체 일치가 아니라 경계 일치다.
+     * **클래스 이름 쪽도 같은 경계로 본다**(PR #58 K — 앞 판은 그쪽만 맨 `contains` 였다).
      */
     private fun List<ArchRule>.mustReport(
         mentioned: String,
         target: String,
     ) {
-        details().filter { it.contains(mentioned) && it.mentionsAtNameBoundary(target) }.shouldNotBeEmpty()
+        details()
+            .filter { it.mentionsAtNameBoundary(mentioned) && it.mentionsAtNameBoundary(target) }
+            .shouldNotBeEmpty()
     }
 
     /**

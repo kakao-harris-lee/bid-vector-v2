@@ -23,8 +23,12 @@ enum class ReferenceCollection { OWNER_ONLY, FULL }
  * 대상(호출·메서드 참조)의 소유·인자·반환 타입과 필드 접근의 필드 타입까지. 이름은 배열을 벗기고
  * [outermostName] 으로 접은 것이다.
  *
- * **정의가 하나다.** 전송 표면 게이트와 반사 게이트가 같은 함수를 쓰므로, 수집 범위를 좁히는 편집은 두
- * 게이트의 양성 대조를 동시에 RED 로 만든다 — KA1 의 구멍이 바로 이 정의에 있었다.
+ * **정의가 하나다** — 전송 표면 · 바깥 참조 · 반사 세 게이트가 같은 함수를 쓴다. 수집 범위를 좁히는 편집이
+ * 몇 개를 붉게 만드는지는 축마다 다르다(KA1 의 구멍이 이 정의에 있었다):
+ *
+ *  - **전송 쌍** — production 에서 깊은 수집이 쌍 14 를 더하므로 양성·음성 양쪽 대조가 든다.
+ *  - **바깥 참조** — production 관측이 같아 **양성 쪽은 들지 않는다**. 음성 fixture 쪽 대조가 든다.
+ *  - **반사** — 깊은 수집이 더하는 쌍이 0 이라 양쪽 다 들지 않는다. 그 사실을 대조 test 가 적어 둔다.
  */
 internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set<String> {
     val found = linkedSetOf<String>()
@@ -63,13 +67,19 @@ internal fun JavaClass.outermostClassName(): String = fullName.outermostName()
 /**
  * ArchUnit `enclosingClass` 기준 접기 — **쌍 등식 게이트는 쓰지 않는다**([outermostName] 을 쓴다).
  *
- * 두 규칙의 결과가 같은 것은 **이 게이트들의 관측(전송 표면 · 바깥 참조 · 반사)에서**다. 저장소 전체에서
- * 같지는 않다 — 다른 게이트의 등재가 중첩 이름을 **그대로** 담고 있다(`collection.key-hash.holders` 의
- * `NoticeKeyHash$Companion` · `app.injection.allowed-types` 의 `Resolution$Resolved`). 그 자리들은
- * `enclosingClass` 접기를 그대로 쓰며, 이름 규칙으로 옮기려면 **그 등재를 다시 관측해야** 한다
- * (`OPEN-6G2B-FOLDING-UNIFICATION`).
+ * 저장소에 접기 관례가 **셋** 있다(`OPEN-6G2B-FOLDING-UNIFICATION`).
  *
- * 여기서는 `packageName` 이 필요해 `JavaClass` 를 그대로 돌려주는 자리에만 남긴다.
+ *  1. **접지 않음** — 등재가 바이트코드 이름을 그대로 담는다: `collection.key-hash.holders` 의
+ *     `NoticeKeyHash$Companion` · `app.injection.allowed-types` 의 `Resolution$Resolved`. 그 게이트들은
+ *     관측도 접지 않으므로 중첩 이름이 등재에 남는다.
+ *  2. **이름 기준 절단**([outermostName]) — 이 slice 의 쌍 등식 게이트 셋(전송 표면 · 바깥 참조 · 반사)과
+ *     `AppHttpDependencyGateTest` 의 보유자 쪽.
+ *  3. **`enclosingClass` 접기**(이 함수) — 6F·6G 의 앞선 게이트들(원문 값 획득 · 대분류 · 공고명 키 ·
+ *     러너·로거)이 쓴다. 그 등재가 이 규칙으로 접힌 집합이라 이름 규칙으로 옮기려면 **그 게이트들의 관측을
+ *     다시 재야** 한다.
+ *
+ * 1 과 3 의 결과는 중첩 타입에서 갈리고, 2 와 3 은 ArchUnit 이 해소하지 못한 타입에서 갈린다 —
+ * `bidvector..` 안에서는 2 와 3 이 같다(해소가 보장된다).
  */
 internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
 
@@ -157,7 +167,7 @@ class TransportSurfaceRules(
      */
     private fun externalPackagesOf(origin: JavaClass): Set<String> =
         origin
-            .referencedTypeNames(ReferenceCollection.FULL)
+            .referencedTypeNames(collection)
             .filterNot { it.startsWith("$packageRoot.") || it == packageRoot }
             .filterNot(::isSurfaceType)
             .filterNot { it in PRIMITIVE_TYPE_NAMES }

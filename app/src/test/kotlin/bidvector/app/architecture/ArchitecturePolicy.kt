@@ -16,6 +16,11 @@ class ArchitecturePolicy private constructor(
      * cr L-9 — 같은 키가 파일에 두 번 적히면 `Properties` 가 조용히 **마지막만** 남긴다. 그러면 등재 목록
      * 하나가 사라져도 키 집합 등식은 그대로라 보이지 않는다. 원문 줄에서 센다.
      */
+    /** PR #58 I — 원문 파서가 센 키 집합과 `Properties` 가 읽은 키 집합. 둘이 같아야 한다. */
+    val declaredKeySet: Set<String> get() = declaredKeys.toSet()
+
+    val loadedKeySet: Set<String> get() = values.keys
+
     val duplicateKeys: Set<String>
         get() =
             declaredKeys

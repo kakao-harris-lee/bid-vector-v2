@@ -15,7 +15,9 @@ import java.nio.charset.StandardCharsets
  * 규칙을 fixture 루트에 그대로 적용한다)이고 전부 **집합**이다. 500줄 한도 때문에 별도 파일로 갈렸다.
  * 허용 집합은 전부 `architecture-policy.properties` 에서 온다.
  */
-class CollectionArchitectureRules {
+class CollectionArchitectureRules(
+    private val collection: ReferenceCollection = ReferenceCollection.FULL,
+) {
     /**
      * 우회 1 — 수집 use case 는 원문 필드를 직접 읽지 않는다. ① [collectionPackage] 가 [procurementPackage]
      * 에서 참조하는 **최상위 타입** 집합은 [allowedTypes] 의 부분집합이다(원문 키 접근 타입 —
@@ -138,7 +140,7 @@ class CollectionArchitectureRules {
             .filter { inRoots(it, roots) }
             .flatMap { origin ->
                 origin
-                    .referencedTypeNames(ReferenceCollection.FULL)
+                    .referencedTypeNames(collection)
                     .filter { isInPackageNames(it, packages) }
                     .map { origin.outermostClassName() to it }
             }.toSet()
@@ -199,7 +201,7 @@ class CollectionArchitectureRules {
             ) {
                 val referencer = item.outermostClassName()
                 item
-                    .referencedTypeNames(ReferenceCollection.FULL)
+                    .referencedTypeNames(collection)
                     .filter { isInPackageNames(it, packages) }
                     .filterNot { referencer to it in registered }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$referencer -> $it")) }
