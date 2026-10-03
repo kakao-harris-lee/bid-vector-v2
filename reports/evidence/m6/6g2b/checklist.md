@@ -1,0 +1,90 @@
+# M6/6G-2b — 리뷰 요청 조건 점검
+
+**D-6G-65 분류: 게이트 하드닝.** 제품 거동·수집 코드·실행 상태 형식·원장 형식 무변경, production diff 0.
+실수집을 막지 않는다.
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `3e670054` · clean-tree 양성 대조 |
+| acceptance 전부 exit 0 | ✓ | `commands.md` 「acceptance」 셋 |
+| test/lint/type/architecture/contract 전건 | ✓ | 축약 없이 `check` + `qualityBaseline` + `one-command-check.sh`(Python job 까지) |
+| fixture·정책 version 근거 | ✓ | `architecture-policy.properties` `policy.version` 7 → 8(두 키 계열 제거 · 허용의 모양이 집합 → 쌍). 도메인 fixture·golden 무변경 |
+| 알려진 제한과 rollback | ✓ | 아래 「알려진 제한」 · `rollback.md` |
+| 누출 어휘 스캔 | ✓ | `commands.md` — 이 slice 가 더한 줄 매치 0 |
+| `differential.json` | **N/A** | Python 대조 축 없음(Kotlin `check` job 하나, `ml-engine` 무변경) |
+| `golden-manifest.json` | **N/A** | 도메인 fixture 를 쓰지도 바꾸지도 않는다 — 음성 fixture 는 바이트코드용 Kotlin 클래스다 |
+| 설계 검토 우회 대응표 | ✓ | 아래 표 |
+
+## 설계 검토 (2) 의 우회 열 → 막는 자리
+
+| 우회 | 막는 구조 | 측정 |
+|---|---|---|
+| 1. KA1 — 호출 사슬의 반환 타입으로만 지난다 | 수집이 호출 대상의 `rawReturnType` 을 모은다 | fixture `RogueUrlChainFetch` 신고 · 깊은 수집 양성 대조 · 변이 ① |
+| 2. KA12 — `java.beans.Expression` | 뿌리 `java.beans` | fixture `RogueBeanExpressionCall`(형제 `Statement` 도) · 변이 ② |
+| 3. KA13 — 프로세스 실행 | 낱개 `java.lang.ProcessBuilder`·`Runtime`·`Process`·`ProcessHandle` | fixture `RogueProcessCurl`·`RogueRuntimeExec` |
+| 4. KA14 — 비동기 채널 | 뿌리 `java.nio.channels` | fixture `RogueAsyncChannelFetch` |
+| 5. KA15 — Spring 클라이언트 | 뿌리 `org.springframework.web.client`·`.reactive`·`org.springframework.http.client` | fixture `RogueSpringRestClient`·`RogueSpringRequestFactory` · 변이 ② |
+| 6. Kotlin 확장 함수(소유 타입이 `kotlin.io`) | 수집이 호출 대상의 `rawParameterTypes` 를 모은다 | fixture `RogueResourceUrlRead` — 소유 타입만 보면 **전혀** 신고되지 않는다(양성 대조) |
+| 7. 등재된 보유자가 새 전송 타입을 더 쥔다 | 허용이 (클래스, 타입) **쌍**의 정확 집합 | fixture `RogueRegisteredHolderGainingTransport` — 합성 등재 집합으로 「등재된 쌍은 조용 · 더 쥔 타입만 신고」 |
+| 8. typealias 로 이름을 가린다(KA4) | 바이트코드에 원 타입이 남는다 | fixture `RogueTypealiasedClient` |
+| 9. 전송 표면을 쥔 test 지원 코드를 production 소스셋에 둔다 | 뿌리가 production 전체(`roots=bidvector`)이고 등재 쌍 등식이 전수다 | 등재에서 한 쌍을 빼면 그 쌍이 위반으로 나오는 양성 대조 · 변이 ③(쌍 등식 RED). **fixture 로는 재지 않았다**(알려진 제한 6) |
+| 10. `com.sun.net.httpserver`·`sun.net` | 뿌리 `com.sun.net`·`sun.net`(착수 실측으로 더했다) | fixture `RogueHttpServerExposure` |
+
+(2b) 값 획득 축 — **새 public 표면은 정책 파일 키 여섯뿐**이고 production 의 새 public 선언은 0 이다.
+키를 비우거나 용도를 조용히 바꾸는 길은 변이 ③이 잰다(용도 키 등식 · 쌍 등식 · 등재 밖 참조 0 셋이 RED).
+
+(3) 과잉 — 뿌리가 넓어 무해한 참조가 걸리는 쪽은 과잉 대조 둘(들어오는 서블릿 표면 · 전송 무관 계산)이
+잰다. 무해 타입 목록은 두지 않았다(그 쪽이 더 조인다 — `commands.md` 「계약 대조」 2).
+
+## 크기 게이트
+
+| | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
+|---|---|---|---|
+| 줄 | 571 | 399 | 705 |
+| 바이트 | 49,469 | 31,916 | 37,345 |
+
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 12,124 B(32%) 초과한다.** 초과는 전부 그 한 파일 쪽이다
+— `scope.md` 가 evidence 바이트의 **36%**(17,553 B)이고 레인이 만지지 않는 팀장 파일이다. 레인 세 파일만
+보면 산출물의 **85%** 로 통과한다. 한국어 산문은 한 자 3 바이트이고 Kotlin 은 1 이라 이 축은 같은 일의 양을
+같은 바이트로 세지 않는다 — **줄 축이 이 slice 에서 더 바른 척도**다(6G-2f 와 같은 판단).
+
+## clean-tree 양성 대조
+
+HEAD `3e670054` 에서 in_scope 아홉 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
+공유 파일 하나의 마지막 줄을 **비파괴 절삭**해 `M` 을 확인하고 사본으로 복원했다. `git checkout --` 는 쓰지
+않는다(다른 레인의 미커밋 편집을 지운다). 경로를 변수 하나로 묶지 않는다 — pathspec 이 하나가 되면 「빈
+출력」이 더러운 트리와 구별되지 않는다. evidence 를 포함한 마지막 상태의 판정은 verifier 와 PR 조치 코멘트
+몫이다.
+
+## 새 public 표면 — 정책 파일 키 여섯
+
+`collection.transport.roots` · `surface-packages` · `surface-types` · `purposes` ·
+`holders.<용도>` 다섯(용도 어휘가 닫혀 있어 키 이름은 다섯으로 고정). production 의 새 public 선언은 0 이다
+(production diff 0). test 쪽 표면 `TransportSurfaceRules`·`ReferenceCollection` 은 출하 바이트에 없다.
+
+`ReferenceCollection.OWNER_ONLY` 는 **쓰이는 게이트가 아니라 양성 대조**다 — 깊은 수집이 조용히 되돌려지는
+변이를 음성·양성 양쪽에서 잡는다(변이 ①: 4 failed).
+
+## 알려진 제한
+
+1. **목적지를 모른다**(계약의 경계 밖 선언). 등재된 `attachment`·`llm`·`ml-grpc` 보유자가 KONEPS 주소로
+   호출하는지는 정적 분석이 재지 못한다 — 통제는 「서비스 키 원문 설정은 배선 한 곳만 참조한다」다.
+   이 게이트는 그 보유자들의 존재를 **숨기지 않고 등재로 드러낸다**.
+2. **반사 타입이 전혀 남지 않는 형태는 밖이다.** 뿌리가 `java.lang.reflect`·`java.lang.invoke` 를 덮어 6G
+   보다 넓어졌지만, 서드파티 반사 도구(Spring `BeanWrapper`·Jackson `convertValue` 류)를 경유하면 전송·반사
+   타입이 남지 않는다. 타입 이름 목록으로 막으면 열거로 돌아가므로 두지 않았다(6G 의 같은 제한 승계).
+3. **A-2 미결** — 반사 게이트 뿌리는 `workflow`·`app` 그대로다. `adapters` 까지 넓히면 기존 참조 **9건**이
+   걸린다(`commands.md` A-2 표). 운영자 결정 뒤 별도 커밋 몫이다.
+4. **`OPEN-6G-GATE-REGISTRY-KONEPS` 는 닫지 않았다.** D-6G2b-9 의 등재는 했으나 그 OPEN 의 내용은 게이트
+   장부 전반이라 쌍 등식이 갈음하지 못한다.
+5. **`io.netty` 뿌리는 오늘 아무것도 재지 않는다** — 클래스패스에 없다(gRPC 전송 모듈이 `runtimeClasspath`
+   에 없다). 의존이 들어오면 그때부터 닫힌다.
+6. **우회 9(production 소스셋에 심은 test 지원 코드)는 fixture 로 재지 않았다.** 뿌리가 production 전체라
+   구조로는 닫혀 있고 등재 쌍 등식의 양성 대조가 「등재 밖 쌍은 신고된다」를 재지만, **그 배치 자체를 심은
+   fixture 는 없다**(음성 fixture 는 test 소스셋에 있어야 하므로 같은 방식으로 재지 못한다).
+7. **뿌리를 좁히는 변이는 production 등식이 잡지 못한다**(변이 ② 실측 — 뿌리 열일곱 → 셋에서 양성 쪽
+   전건 초록). 잡는 것은 음성 fixture 표뿐이므로 그 표가 이 게이트의 민감도를 혼자 든다.
+8. **fixture 경로가 계약 in_scope 문면 밖이다**(`archfixture/violating/transport/**`) — 기존 선례의 자리이고
+   계약 갱신이 필요한 항목이다(`commands.md` 「계약 대조」 4).
+9. **클래스패스 전수는 `:app:runtimeClasspath` 기준이다**(좌표 101). 다른 구성(test 전용 의존)에만 있는
+   전송 표면은 production 뿌리 밖이라 이 게이트의 대상이 아니다.
