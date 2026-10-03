@@ -89,6 +89,7 @@
 | **D-6G2c-29** | **in_scope 정정**(초안 대비): Python 쪽을 `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**` 로 넓힌다(D-21 ③④ · D-22 · D-23 · D-24 의 자리). Kotlin 쪽 `adapters/.../koneps/**` 는 **넣지 않는다**(D-25 등재 유지; cr L-4 의 `walkNameOf` 는 harness 쪽에서 푼다 — production 무편집). `snapshot-schema.md` 는 **이 PR 에서 편집하지 않는다**(형식 무관 PR 의 정의) — 단 cr L-3 의 test 가 그 파일을 **읽기만** 한다 | D-18 |
 | **D-6G2c-30** | **acceptance 확정**: Kotlin `check` job · `ml-engine` job · container job(production 코드 변경: `RunStateDirectory` · `JdbcSnapshotSource` · `SnapshotExtractionRunner` · 수집 배선 KDoc). 구현 항목마다 변이 하나(D-14), 게이트 술어를 바꾸는 둘(D-19 누출 자물쇠 · D-23 import 계약)은 verifier 표적. **(2b) 표**는 K·P 보고에 「새 public 표면」 항목으로 | D-14 · CLAUDE.md 「게이트 술어 변경은 severity 무관 표적 재검증」 |
 | **D-6G2c-31** | **(P 레인 보고, 계약 갱신 r1) `snapshot-schema.md` §2 의 「판정문의 업무 대표 어휘」 문장 하나는 팀장이 고친다.** 그 문장은 **판정 JSON 어휘의 정본**이고 test(`test_division_coverage_vocabulary_matches_the_schema_document`)가 그것과 enum 의 집합 등식을 단언하므로, D-17 을 하려면 문장이 먼저 바뀌어야 한다. D-18 기준으로 판정 JSON 어휘는 형식에 닿지 않는다 — 문장이 스냅숏 스키마 문서 안에 산다는 사실이 그 어휘를 스키마로 만들지 않는다(스냅숏 manifest·rows 의 칸·판독기 술어 무변경). D-29 의 「이 PR 에서 편집하지 않는다」는 **그 문장 하나만 예외**(팀장 커밋, 다른 절 무편집). **필요 표본 수의 출처 확정**: `verdict.min_window_rows`(창당 표본 하한, 정책 주석 「창당 n ≥ 483」) — 업무 행 수 ≥ 그 값 `COVERED` · 1 이상 미만 `UNDERPOWERED` · 0 `ABSENT`. rollback 공유 파일 목록에 `snapshot-schema.md` 를 되돌린다(hunk 격리) | P 레인 보고 2026-10-04 · D-17·18·29 |
+| **D-6G2c-32** | **(P 레인 보고, 계약 갱신 r2) in_scope 누락 정정**: D-22 의 「판독기」는 `ml-engine/src/ml_engine/adapters/snapshot_files.py`(`read_snapshot_files` — `file:` URI → `Path` 변환이 그 한 자리)다. D-29 가 그 자리를 넓힌다고 적고 `adapters/**` 를 빠뜨렸다 → 그 파일 하나를 in_scope 에 더한다(`adapters/**` 전체는 아님). 변경은 `unquote` 한 줄(`urllib.parse` 만 — D-6G2e-23 ① 준수), 판독 술어는 느슨해지지도 엄격해지지도 않는다(없는 경로는 여전히 `NOT_FOUND`). 판독 책임을 `backtest_cli` 로 올리는 대안은 계층을 깨므로 택하지 않는다 | P 레인 보고 2026-10-04 · D-22·29 |
 
 ### 이 PR 의 항목 요약 (레인별)
 
@@ -135,7 +136,7 @@
 - `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/**`(KDoc · 사유 어휘)
 - `app/src/test/kotlin/bidvector/app/collection/**` · `app/src/test/kotlin/bidvector/app/wiring/**`
 - `workflow/src/main/kotlin/bidvector/workflow/collection/**`(사유 어휘가 여기 있을 때) · 대응 test
-- `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
+- `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/src/ml_engine/adapters/snapshot_files.py`(D-22 의 판독기 — D-6G2c-32) · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
 - `config/quality/gate-tests.properties`(등재 추가만 — D-21 ⑧) · `app/src/test/kotlin/bidvector/app/architecture/**` 는 **out_scope**(등재 파일만 열림)
 - `reports/evidence/m6/6g2c/**` · `milestone-6.md`(착수·종결 문단만)
 
