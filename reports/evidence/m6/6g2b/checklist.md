@@ -62,10 +62,10 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
 |---|---|---|---|
-| 줄 | 855 | 639 | 1,613 |
-| 바이트 | 85,014 | 54,624 | 83,647 |
+| 줄 | 856 | 640 | 1,613 |
+| 바이트 | 85,100 | 54,710 | 83,647 |
 
-**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 1,367 B(2%) 초과한다** — 앞 라운드의 21% 에서
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 1,453 B(2%) 초과한다** — 앞 라운드의 21% 에서
 거의 사라졌다(수정 라운드가 산출물을 1,613줄 / 83,647 B 로 늘렸다). 남은 초과는 전부 그 한 파일 쪽이다:
 `scope.md` 가 evidence 바이트의 36% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r3 로 커졌다).
 레인 세 파일만 보면 산출물의 65% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 사실 등재다. 산출물 줄 구성: 게이트·fixture Kotlin 여섯 · 정책 둘 · 기존 test 넷. `milestone-6.md` 착수
@@ -120,9 +120,9 @@ production 의 새 public 선언은 0 이다(production diff 0). test 쪽 표면
    fixture 는 없다**(음성 fixture 는 test 소스셋에 있어야 하므로 같은 방식으로 재지 못한다).
 7. **뿌리를 좁히는 변이는 production 등식이 잡지 못한다**(변이 ② 실측 — 뿌리 열일곱 → 셋에서 양성 쪽
    전건 초록). 잡는 것은 음성 fixture 표뿐이므로 그 표가 이 게이트의 민감도를 혼자 든다.
-8. **in_scope 문면 밖 자리가 셋 남는다** — 전송·A-2 fixture 경로는 계약 갱신 r1·r2 가 넣었고, 이 라운드가
-   더한 `archfixture/violating/{adapters,workflow}/external/**` 와 `app/src/test/resources/archunit.properties`
-   는 아직 문면에 없다(`commands.md` 「계약 대조」 11).
+8. **in_scope 문면 밖 자리가 둘 남는다** — `archfixture/violating/workflow/external/**` 와
+   `app/src/test/resources/archunit.properties`(`commands.md` 「계약 대조」 11). 전송·A-2·adapters 경로는
+   계약 갱신 r1·r2 가 넣었다.
 10. **등재 보유자 안의 새 사용처는 쌍의 해상도 밖이다**(vr M-1 → D-6G2b-23,
    `OPEN-6G2B-HOLDER-INTERNAL-SURFACE`). 등재 보유자에 String 시그니처의 public 함수를 더해 그 안에서 이미
    등재된 전송 타입으로 호출을 내면, 어느 클래스든 그 함수를 문자열로 부를 수 있고 관문을 지나지 않는다.

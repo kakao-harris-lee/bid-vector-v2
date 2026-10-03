@@ -239,8 +239,8 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
 
 ## 계약 대조 (scope.md 문면과 다르게 한 것)
 
-아래 1~8 은 계약 갱신 r1·r2(D-6G2b-10~18)가 결정으로 받았다 — 그 갱신 **전에** 레인이 한 판단이므로
-근거를 여기 남긴다. **아직 계약 문면과 다른 것은 9·10·11 셋**이다.
+아래 1~10 은 계약 갱신 r1·r2·r4(D-6G2b-10~18·28~30)가 결정으로 받았다 — 그 갱신 **전에** 레인이 한
+판단이므로 근거를 여기 남긴다. **아직 계약 문면과 다른 것은 11 하나**이고, 그것도 두 자리로 줄었다.
 
 1. **뿌리를 열다섯에서 열일곱으로 늘렸다**(→ D-6G2b-12). 6G 의 금지 목록에 `java.lang.reflect.Method`·
    `java.lang.invoke.MethodHandles` 가 있어 계약의 뿌리만으로 합치면 그 둘이 빠진다(실측 — `RogueMethodHandleInvoke`
@@ -276,17 +276,18 @@ fixture 하나가 잰다** — 1층 신고 0 · 2층 신고 1.
    `app.collection.OpeningCollectionLinesKt`)도 등재해야 한다 — 전역 허용을 없앤 결과이고, 등재하지 않으면
    그 셋이 RED 다. 9 + 3 = 12.
 9. **허용 집합의 입도가 「정확 패키지」다 — 지시 문면의 「가장 넓은 안전 단위 + 거부 하위 명시」와 다르다**
-   (갱신 필요). 접두 뿌리로 묶으면 `java.util` 과 `javax.xml` 이 허용 뿌리가 되고 **H-1 변이 둘이 그 아래로
+   (→ D-6G2b-28). 접두 뿌리로 묶으면 `java.util` 과 `javax.xml` 이 허용 뿌리가 되고 **H-1 변이 둘이 그 아래로
    들어온다**(`java.util.logging.SocketHandler` · `javax.xml.parsers.DocumentBuilder`). 막으려면 거부 하위를
    열거해야 하는데 그 열거가 H-1 이 벌한 방향이다. 정확 패키지는 거부 목록이 **필요 없다** — 관측에 없으면
    거부다. 관측도 그 입도를 뒷받침한다: `javax.xml` 아래 관측은 `javax.xml.stream` 뿐이고
    `java.util.logging` 은 0 이다.
-10. **`java.util.ServiceLoader` 를 낱개 전송 타입에 더했다**(갱신 필요). `java.util` 이 허용 패키지라 1층을
+10. **`java.util.ServiceLoader` 를 낱개 전송 타입에 더했다**(→ D-6G2b-28). `java.util` 이 허용 패키지라 1층을
    지나므로 `java.lang` 의 `ProcessBuilder` 와 같은 자리로 두었다 — 지시가 든 변이 후보 하나를 **2층**이
    잡게 하는 선택이고 production 관측은 0 이다.
-11. **in_scope 문면 밖 자리 셋이 더 생겼다**(갱신 필요) — `archfixture/violating/adapters/external/**` ·
-   `archfixture/violating/workflow/external/**` · `app/src/test/resources/archunit.properties`(cr L-3 핀).
-   fixture 경로는 **모듈별 허용 집합을 모듈마다 재려면** 그 모듈 뿌리 아래여야 해서 다른 자리에 둘 수 없다.
+11. **in_scope 문면 밖 자리 둘이 남는다**(갱신 필요) — `archfixture/violating/workflow/external/**` 와
+   `app/src/test/resources/archunit.properties`(cr L-3 핀). `adapters/external/**` 는 D-6G2b-18 이 넣은
+   `adapters/**` 아래라 문면 안이다. workflow fixture 는 **모듈별 허용 집합을 모듈마다 재려면** 그 모듈
+   뿌리 아래여야 해서 다른 자리에 둘 수 없고, ArchUnit 핀은 test 리소스라 Kotlin 경로 밖이다.
 
 ## 검토 처분 (D-6G-65 분류)
 
