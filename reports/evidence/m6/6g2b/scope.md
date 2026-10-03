@@ -116,6 +116,14 @@ verifier r5 가 둘째 게이트의 구멍을 실측했다 — 변이 다섯이 
 | **D-6G2b-26** | **장부 일괄(판정 뒤)**: checklist 마지막 산출물 `3e670054` → 재측정 HEAD · 제한 8 해소 · 키 수(실제 +12/−8) · commands.md 계약 대조 머리글·4·8 · D-16 RED 실측 명령 추가(vr L-3) · `RogueMethodHandleInvoke` KDoc(vr L-4) · `mustReport` 부분 문자열 → 정확 매치(vr L-5, cr ④⑤) · cr low ①③⑥⑦⑧⑨⑪. 크기 게이트 바이트(21% 초과)는 D-6G2f-17 과 같은 사실 등재 | 장부층 |
 | **D-6G2b-27** | **r2 판정**: 게이트 술어를 바꾸는 slice 라 **수정 라운드의 모든 커밋이 표적 재검증**. verifier r2 표적: H-1 변이 넷 + 새 fixture 전수 RED · 허용 뿌리 등식 양방향 변이 · 전송 쌍 등식 유지(S1~S7) · 6G 변이 KA2~4 · 반사 변이 셋 · M-4 모집단 단언 변이(모듈 제외) · 접기 규칙 변이 · acceptance `check` 1회 · rollback 두 술어(복원 목록 재산출) · evidence 위생. 재작업 **1/5** | |
 
+## 계약 갱신 r4 (2026-10-03, 팀장 — 수정 라운드 착수 실측 수령)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2b-28** | **허용 집합의 입도는 「정확 패키지」, 등식은 「모듈별」.** 실측(base, production 클래스 app 98 · workflow 376 · adapters 371): 정확 패키지 app 55 · workflow 21 · adapters 51 = **127**(공통 합집합 82) · 2세그먼트 뿌리 76 · 3세그먼트 102. 접두 뿌리를 쓰면 `java.util`·`javax.xml` 이 허용돼 H-1 변이 둘(`java.util.logging.SocketHandler`·`javax.xml.parsers.DocumentBuilder`)이 그대로 들어오고, 막으려면 거부 하위를 열거해야 한다 — H-1 이 벌한 방향. 정확 패키지는 거부 목록 없이 기본 거부가 잡는다(`java.util.logging` 관측 0 · `javax.xml` 은 `.stream` 둘뿐). 모듈별 등식 `허용(m) == 관측(m)` 이 공통 `허용 == ∪관측` 보다 엄격(다른 모듈만 쓰는 패키지 참조가 공통에서는 초록). 정책 키 `collection.external.allowed-packages.<module>=`, 모듈 목록은 M-4 모집단 단언과 같은 자리에서 읽는다. **두 층**: 전송 표면 타입이면 허용 패키지를 보지 않고 (클래스,타입) 쌍 등식만 · 아니면 그 타입의 패키지 ∈ 허용(m). `java.lang` 허용 아래의 `ProcessBuilder`·`Runtime` 처럼 **`java.util.ServiceLoader` 를 전송 낱개 타입에 추가**(production 관측 0) | 레인 실측 2026-10-03 18:49 |
+| **D-6G2b-29** | **중첩 이름 접기 = 이름 기준 첫 `$` 절단(NAMECUT).** 쌍 수: 현(ArchUnit `enclosingClass`) 63 · NAMECUT **60** · 접지 않음 81. 접지 않으면 Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 무관한 편집마다 철자가 바뀐다. NAMECUT 은 현 등재에서 `HttpResponse$BodyHandler` 쌍 셋만 `HttpResponse` 로 접히고 나머지 60 은 글자 그대로(`namecut − current = ∅`) — 결정적, KDoc 과 일치 | cr M-1 |
+| **D-6G2b-30** | **수입된 production 모집단 = 아홉 모듈**(adapters · app · decision · procurement · qualification · settlement · sharedkernel · strategy · workflow) 고정 단언 — 모듈 하나가 classpath 에서 빠지면 RED | cr M-4 |
+
 ## 위협 모델 — 6G-2b 고유 경계 (Phase 2.5 (0))
 
 **방어하는 것**: 저자가 `bidvector..` production 코드에 **관문을 지나지 않는 바깥 호출**을 더하는 것 — JDK · Kotlin 표준 라이브러리 · 클래스패스에
