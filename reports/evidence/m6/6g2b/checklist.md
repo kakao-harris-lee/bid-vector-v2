@@ -6,7 +6,7 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | 항목 | 상태 | 근거 |
 |---|---|---|
-| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `130dc4c9` · clean-tree 양성 대조 |
+| diff 가 커밋되어 base/head 고정 | ✓ | base `1745a3e2` · 마지막 산출물 커밋 `dca888aa` · clean-tree 양성 대조 |
 | acceptance 전부 exit 0 | ✓ | `commands.md` 「acceptance」 셋 |
 | test/lint/type/architecture/contract 전건 | ✓ | 축약 없이 `check` + `qualityBaseline` + `one-command-check.sh`(Python job 까지) |
 | fixture·정책 version 근거 | ✓ | `architecture-policy.properties` `policy.version` 7 → 8(키 계열 셋 제거 · 허용의 모양이 집합 → 쌍 → 기본 거부 허용 목록). 도메인 fixture·golden 무변경 |
@@ -45,7 +45,8 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 | 허용 패키지 **하위**의 전송 성격 패키지 | 허용을 **정확 패키지**로 두어 하위가 따라오지 않는다 — 거부 하위 목록이 필요 없다 | 접두 뿌리로 묶으면 V1·V3 가 지나는 것을 실측(「계약 대조」 9) |
 | 허용 패키지 **안**의 확장 지점(`ServiceLoader`) | 낱개 전송 타입으로 2층이 잡는다 | fixture 하나가 1층 신고 0 · 2층 신고 1 을 함께 잰다 |
 | 쓰이지 않는 허용 패키지를 남겨 둔다 | 두 방향 등식(허용 ⊂ 관측) | 미관측 패키지를 더하면 등식이 그것을 낸다(양성 대조) |
-| 모듈 하나가 classpath 에서 빠져 등식이 공허해진다 | 모집단 아홉 고정(cr M-4) | 모듈 집합 단언 |
+| 모듈 하나가 classpath 에서 빠져 등식이 공허해진다 | 모집단 기대값을 `layer.*` 에서 읽는다(cr M-4·D-30) | 모듈 집합 단언 |
+| 판정 대상 모듈 목록에서 한 모듈을 뺀다 | 목록을 별도 키로 두지 않고 `layer.*` 에서 **도출** — 모집단 단언과 같은 자리 | 변이 ⑪: `layer.application` 을 비우면 **넷이 붉다**(모집단 · 모듈 키 등식 · 1급 패키지 집합 · 의존 방향) |
 | 전송 타입이 **시그니처 간접 자리**에만 있다 | 수집이 호출 대상의 인자·반환 타입을 모은다 | fixture 넷(제네릭 둘 · SAM · 어노테이션, cr M-2) |
 
 ### A-2 — 반사 축 (D-6G2b-11)
@@ -62,20 +63,22 @@ D-6G2b-11) · **바깥 참조 기본 거부**(vr H-1 → D-6G2b-22).
 
 | | evidence(`scope.md` 포함) | 레인 세 파일만 | 산출물(코드·`config/quality` 추가분) |
 |---|---|---|---|
-| 줄 | 856 | 640 | 1,613 |
-| 바이트 | 85,100 | 54,710 | 83,647 |
+| 줄 | 879 | 654 | 1,605 |
+| 바이트 | 88,808 | 56,452 | 84,026 |
 
-**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 1,453 B(2%) 초과한다** — 앞 라운드의 21% 에서
-거의 사라졌다(수정 라운드가 산출물을 1,613줄 / 83,647 B 로 늘렸다). 남은 초과는 전부 그 한 파일 쪽이다:
-`scope.md` 가 evidence 바이트의 36% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r3 로 커졌다).
-레인 세 파일만 보면 산출물의 65% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 사실 등재다. 산출물 줄 구성: 게이트·fixture Kotlin 여섯 · 정책 둘 · 기존 test 넷. `milestone-6.md` 착수
+**줄은 두 축 다 통과, 바이트는 `scope.md` 를 넣으면 4,782 B(6%) 초과한다** — 앞 라운드의 21% 에서 줄었다
+(수정 라운드가 산출물을 1,605줄 / 84,026 B 로 늘렸다). 남은 초과는 전부 `scope.md` 쪽이다: 그 한 파일이
+evidence 바이트의 36% 이고 레인이 만지지 않는 팀장 파일이다(갱신 r1~r4 로 커졌다). 레인 세 파일만
+보면 산출물의 67% 로 통과한다. 6G-2f·D-6G2f-17 과 같은 **사실 등재**다.
+
+산출물 줄 구성: 게이트·fixture Kotlin 열 · 정책 둘 · ArchUnit 핀 하나 · 기존 test 넷. `milestone-6.md` 착수
 문단과 `scope.md` 는 팀장 커밋이라 산출물에 세지 않는다. 바이트는 양쪽 다 diff 의 `+` 접두를 포함한 같은
 방법으로 쟀다. 한국어 산문은 한 자 3 바이트이고 Kotlin 은 1 이라 바이트 축은 같은 일의 양을 같은 수로 세지
 않으므로 **줄 축이 이 slice 에서 더 바른 척도**다(6G-2f 와 같은 판단).
 
 ## clean-tree 양성 대조
 
-HEAD `130dc4c9` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
+HEAD `dca888aa` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 — **빈 출력(0줄) → `M` 한 줄 → 빈 출력**.
 공유 파일 하나의 마지막 줄을 **비파괴 절삭**해 `M` 을 확인하고 사본으로 복원했다. `git checkout --` 는 쓰지
 않는다(다른 레인의 미커밋 편집을 지운다). 경로를 변수 하나로 묶지 않는다 — pathspec 이 하나가 되면 「빈
 출력」이 더러운 트리와 구별되지 않는다. evidence 를 포함한 마지막 상태의 판정은 verifier 와 PR 조치 코멘트
@@ -85,9 +88,9 @@ HEAD `130dc4c9` 에서 in_scope 열일곱 경로를 **개별 인자**로 쟀다 
 
 기계로 센 값이다(base 와 HEAD 의 선언 키 집합 차집합).
 
-- 더한 것 16 — 전송 아홉(`collection.transport.roots`·`surface-packages`·`surface-types`·`purposes` +
+- 더한 것 15 — 전송 아홉(`collection.transport.roots`·`surface-packages`·`surface-types`·`purposes` +
   `holders.<용도>` 다섯) · 반사 셋(`collection.reflection.roots`·`type-pairs`·`class-member-pairs`) ·
-  바깥 참조 넷(`collection.external.modules` + `allowed-packages.<모듈>` 셋).
+  바깥 참조 셋(`allowed-packages.<모듈>`). 판정 대상 모듈 목록은 키가 아니라 `layer.*` 도출이다.
 - 지운 것 8 — `collection.http-client.*` 셋 · `collection.transport-bypass.*` 셋 ·
   `collection.reflection.{allowed-referencers,class-allowed-members}` 둘.
 
