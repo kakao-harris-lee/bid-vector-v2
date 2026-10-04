@@ -63,15 +63,25 @@ def test_a_percent_encoded_path_that_does_not_exist_is_still_not_found(
     result = read_snapshot_files(missing.as_uri())
     assert isinstance(result, SnapshotUnreadable), result
     assert result.reason is SnapshotUnreadableReason.NOT_FOUND
+    # 같은 사유 값을 내는 두 검사(디렉터리 부재 · 파일 셋 미달)를 `detail` 로 가른다(P-13).
+    assert result.detail.endswith(missing.name), result.detail
 
 
 def test_a_spaced_directory_missing_one_file_is_not_found(tmp_path: Path) -> None:
-    """파일 셋 대조도 그대로다 — 셋 중 하나가 없으면 전체가 선다(디코딩과 무관)."""
+    """파일 셋 대조도 그대로다 — 셋 중 하나가 없으면 전체가 선다(디코딩과 무관).
+
+    **어느 검사가 섰는지까지 본다**(cr r1 P-13): 판독기는 디렉터리 부재와 파일 셋 미달에
+    **같은 사유 값**을 낸다. 사유만 보면 디코딩이 깨져 디렉터리를 아예 못 찾아도 이 test 가
+    초록이고, docstring 의 주장이 실제로 재지는 자리가 없다. `detail` 이 **없는 파일**로
+    끝나는지를 함께 보면 두 경우가 갈린다."""
     directory = _write_snapshot(_spaced(tmp_path))
     (directory / "sample-list.tsv").unlink()
     result = read_snapshot_files(directory.as_uri())
     assert isinstance(result, SnapshotUnreadable), result
     assert result.reason is SnapshotUnreadableReason.NOT_FOUND
+    assert result.detail.endswith("sample-list.tsv"), (
+        f"디렉터리를 못 찾은 것과 파일이 없는 것이 갈리지 않는다: {result.detail}"
+    )
 
 
 def test_a_spaced_path_that_is_a_file_is_not_a_directory(tmp_path: Path) -> None:
