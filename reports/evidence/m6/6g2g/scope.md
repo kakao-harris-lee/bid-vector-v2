@@ -51,7 +51,7 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`architectur
 
 | ID | 결정 | 근거 |
 |---|---|---|
-| **D-6G2g-1** | D-1 FULL 통일 시 증가: raw-access +2(이미 허용 보유자) · usecase 0 · key-hash 0 · workflow→procurement +2(`NoticeCollected`·`RowDiscriminator`) · **domain 순수성 +28**(`java.lang.Class`, 컴파일러 생성) → 결정 **B-4** 신설 | 착수 실측 D-1 |
+| **D-6G2g-1** | D-1 FULL 통일 시 증가: raw-access **참조자 축**(`collection.raw-access.allowed-referencers`) **∅ → 2**(`CollectionWiring`·`OpeningCollectionWiring` — 멤버 접근 축에는 이미 허용 2 라 새 표면은 아니나, 「아무도 참조하지 않는다」는 구조적 성질이 「둘만 참조한다」로 약해진다 — 설계 검토 (3) 자리) · usecase 0 · key-hash 0 · workflow→procurement +2(`NoticeCollected`·`RowDiscriminator`) · **domain 순수성 +28**(`java.lang.Class`, 컴파일러 생성) → 결정 **B-4** 신설 | 착수 실측 D-1 |
 | **D-6G2g-2** | 접기 관례 셋이 구현 다섯 자리(`outermostClass()` 하나 + `topLevel()` private 복사 셋). 재등재 필요 둘(`NoticeKeyHash$Companion`·`Resolution$Resolved`), `Map$Entry`·Spring 핸들러는 보유자 축 아님 | 착수 실측 D-2 |
 | **D-6G2g-3** | domain 여섯 모듈 반사 참조 0 — B-1 (가)면 등재 0, 바꿀 자리는 `layer.*` 도출 식 | 착수 실측 D-3 |
 | **D-6G2g-4** | `java.nio.file` 은 전송 뿌리 밖; `Path`/`File` 생성 보유자 10(13) — B-2 입력 | 착수 실측 D-4 |
