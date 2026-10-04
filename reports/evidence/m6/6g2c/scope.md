@@ -93,6 +93,7 @@
 | **D-6G2c-33** | **(K 레인 보고, 계약 갱신 r3) in_scope 에 `workflow/build.gradle.kts` 의 test task 입력 선언 한 블록을 더한다.** D-19 (b) 「구분자 등식을 문서 ↔ 코드로」는 test 가 `snapshot-schema.md` 를 런타임에 읽는 것만으로는 서지 않는다 — 실측: 문서의 용도 토큰을 바꾸고 `:workflow:test` 를 돌리면 Gradle 이 그 문서를 입력으로 모르므로 **UP-TO-DATE 로 건너뛰어 6초 초록**. 루트 `gradle.properties` 의 `org.gradle.caching=true` + CI 의 `setup-gradle` 캐시 복원이라 CI 에서도 문서만 고친 PR 이 캐시된 초록을 받는다(「안 돌린 게이트는 아무것도 막지 못한다」). 조치는 같은 파일의 기존 관례(`WorkflowGateRegistrationTest` 가 `gate-tests.properties` 를 입력으로 선언한 블록) 옆에 스냅숏 스키마 문서를 같은 형태로 한 줄 — 산출물 코드 무변경. **일반 규율로 올린다**: 문서를 읽어 등식을 재는 Kotlin test 는 그 문서를 test task 입력으로 선언해야 하고, 변이는 **문서만 바꾼 뒤** 재실행이 일어나는지(UP-TO-DATE 가 아닌지)까지 재야 한다. Python 쪽(D-12 · D-17 · D-23 의 문서 읽기 test)은 pytest 가 캐시를 쓰지 않아 이 문제가 없다 | K 레인 보고 2026-10-04 · CLAUDE.md CI 절 |
 | **D-6G2c-34** | **사실 선언 — P 레인 판정 SHA 이동.** 팀장이 P 레인을 `8ebc64bf` 로 동결했을 때, 동결 **앞서** 보낸 두 지시(등식 창 확인 · D-22 음성 대조 두 줄)가 아직 실행 중이었고 레인이 그 지시대로 커밋을 더해 Python 판정 대상이 **`20f1e7ba`** 로 올라갔다(evidence `e045a4b4`, 새 판독기 단위 test 하나 · `ml-engine` job 열 step 재실측 exit 0). 6G-2b D-6G2b-33 과 같은 부류(지시와 동결의 교차)다 — 이력을 되쓰지 않고 verifier·code-reviewer 에 판정 SHA 를 다시 고정해 알린다. 교훈 재확인: **동결 선언 전에 미처리 지시가 없는지 레인에 먼저 묻는다** | 레인 보고 2026-10-04 · CLAUDE.md 「레인 동결 + 판정 대상 SHA 고정」 |
 | **D-6G2c-35** | **P 레인 수정 라운드 1(계약 갱신 r5) — verifier Python r1 `not-ready`(F-1 high) + code-reviewer r1(새 high 없음). 재작업 1/5.** 처분: **F-1 high = cr P-4 → 구현(게이트 술어 — 표적 재검증)**: AST 스윕 범위를 `app/**` + **계약의 `ignore_imports` source 모듈**(pyproject 에서 읽음 — 손 목록 아님)로; 세 모듈 각각에 `import urllib.request` 변이 RED · **F-2 medium = cr P-3**: 금지 목록(계약 파일 한 자리)에 표준 **네트워크 클라이언트** 모듈(`imaplib`·`poplib`·`ftplib`·`smtplib`·`xmlrpc`·`nntplib`)을 더하고, **동적 import(`importlib`·`__import__`)·`asyncio`·`multiprocessing`·`subprocess` 는 경계 밖으로 등재**(import 그래프 게이트는 정적 import 층을 재는 것 — 위협 모델 「방어하지 않는 것」에 한 줄, pyproject 주석 「네 자리 전부 잠근다」 정정) · **F-3 medium = cr P-2 → 구현**: `verdict.json` 쓰기를 `open(…, "xb")` 한 술어로(사전 `exists()` 검사는 빠른 거부로 남겨도 되나 정본은 xb) + 끊어진 링크·같은 디렉터리 두 기동 test · **F-4 medium → 구현**: 길이 같고 키 다른 변이가 RED 인 test · **cr P-5 medium → 구현**: 명단이 파생 여부를 칸으로 나르고 `DERIVED` ⟺ 그 칸 참을 등식으로 · **low 구현**: F-5(`%00` → 닫힌 사유) · F-7(`DivisionCoverageRecord` 가 status ↔ row_count 불변식 검사) · P-7(「한 자리」를 저장소 상대 경로로) · P-8(`ast.Tuple` 컨테이너 추가) · P-9(`--output-dir` 가 기존 파일이면 사전 거부 닫힌 사유) · P-13(파일 셋 미달 test 가 `detail` 끝도 본다) · 문면 F-6 · P-6 · P-10 · **등재**: P-11(창이 문자 200 — 이 slice 가 만든 test 아님) · **P-12 info → 알려진 제한(운영자 가시)**: 창당 하한 483 을 업무당 요구로 쓰므로 표본 24,000·업무 다섯 판에서 업무 대부분이 `UNDERPOWERED` 로 공시될 수 있다 — 판정 경로 소비자 없음, 공시 의미만. **규율**: 수정은 항목별 커밋, 변이 하나씩, 새 public 표면 보고, `ml-engine` job 열 step 전부 재실측, evidence P 절 갱신(F-6 수치 정정 포함). 끝나면 동결·판정 SHA 재고정 → verifier 표적 재검증(F-1 술어 + F-3·F-4·P-5) | verifier r1 `_workspace/m6-6g2c/01_verifier_python_r1.md` · cr r1 `02_code_review_python_r1.md` |
+| **D-6G2c-36** | **(계약 갱신 r6) P 수정 라운드 1 수령 — 판정 SHA `f3a47f05`(evidence `e3422ce4`), 게이트 술어 커밋 둘 `49505a74`·`a179e784`.** ① `ml-engine/src/ml_engine/app/__init__.py` 의 금지 목록 **문면 한 곳**(서드파티 다섯 → 계약 파일 한 자리 참조)을 in_scope 에 더한다(P-10, 거동 0) ② F-2 경계 문장을 위협 모델 「방어하지 않는 것」에 등재(위) ③ F-3 변이 비대칭 수용: `xb` 되돌림이 끊긴 링크 test 만 가르고 「두 기동」 test 는 사전 `exists()` 가 잡아 초록 — 둘 다 두되 변이를 가르는 것은 링크 판 하나임을 evidence 에 적음(레인이 적었다) ④ P-7 변이는 `registry/policy.py` 로 이동(backtest 쪽은 import 순환) — 앞 판 초록 → 이 판 RED. 다음: verifier 표적 재검증(F-1 술어 `a179e784` · F-3 · F-4 · P-5/F-8 · P-7/F-9 · acceptance 열 step) + code-reviewer r2(diff `20f1e7ba..f3a47f05`) | P 레인 보고 2026-10-04 |
 
 ### 이 PR 의 항목 요약 (레인별)
 
@@ -108,7 +109,7 @@
 잠금만 풀린 채 원장이 살아 있는 상태.
 
 **방어하지 않는 것(경계 밖)**: 실행 상태 파일을 손으로 고쳐 해시까지 맞추는 운영자 · 한 인스턴스를 여러 스레드가 쓰는 코드(쓰는 자리가 없다) ·
-공개 공고번호에서 해시를 되돌리는 것(A-1 에서 정한다).
+공개 공고번호에서 해시를 되돌리는 것(A-1 (가)로 등재) · **동적 import(`importlib`·`__import__`)·`asyncio`·`multiprocessing`·`subprocess` 경유의 네트워크 출구**(D-23 의 import 계약·AST 스윕은 **정적 import 층**을 재는 게이트다 — 문자열로 모듈을 고르는 저자는 경계 밖, verifier F-2 실측 2026-10-04).
 
 ### (2b) 값 획득 축
 
@@ -139,7 +140,7 @@
 - `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/**`(KDoc · 사유 어휘)
 - `app/src/test/kotlin/bidvector/app/collection/**` · `app/src/test/kotlin/bidvector/app/wiring/**`
 - `workflow/src/main/kotlin/bidvector/workflow/collection/**`(사유 어휘가 여기 있을 때) · 대응 test · `workflow/build.gradle.kts`(**test task 입력 선언 블록만** — D-6G2c-33)
-- `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/src/ml_engine/adapters/snapshot_files.py`(D-22 의 판독기 — D-6G2c-32) · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
+- `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/src/ml_engine/app/__init__.py`(**문면 한 곳만** — D-6G2c-36) · `ml-engine/src/ml_engine/adapters/snapshot_files.py`(D-22 의 판독기 — D-6G2c-32) · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
 - `config/quality/gate-tests.properties`(등재 추가만 — D-21 ⑧) · `app/src/test/kotlin/bidvector/app/architecture/**` 는 **out_scope**(등재 파일만 열림)
 - `reports/evidence/m6/6g2c/**` · `milestone-6.md`(착수·종결 문단만)
 
