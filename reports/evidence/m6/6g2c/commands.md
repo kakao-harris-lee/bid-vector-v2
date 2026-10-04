@@ -222,10 +222,12 @@ test 입력 선언 · 전건 게이트 보완 · 승인 전 일괄.
 
 - **in_scope 정정 둘을 받았다.** `workflow/build.gradle.kts`(test 입력 선언 블록만 — r3
   D-6G2c-33) · `config/quality/architecture-policy.properties`(r8 ①). 후자는 전송 표면 **쌍 셋
-  등재**이고 키·뿌리·술어 무변경이다. 셋 중 둘(`RunStateLockKt->FileChannel`·`->FileLock`)은
-  자물쇠 파일 분리로 **같은 참조가 새 클래스 이름**으로 관측된 것이고, 나머지 하나
-  (`RunStateLock->OverlappingFileLockException`)는 **새 참조**다 — 사유를 값으로 가르는 catch 절이
-  생겼기 때문이다(예외 타입이라 밖에 허락하는 것은 없다).
+  등재**이고 키·뿌리·술어 무변경이다. 두 종류가 섞여 있다: 자물쇠 파일 분리로 **같은 참조가 새
+  클래스 이름**으로 관측된 것(`RunStateLockKt->FileChannel`·`->FileLock`)과, 사유를 값으로 가르는
+  분류가 생기며 **새로 선 참조**(예외 타입 셋 — 겹침·인터럽트 둘). 예외 타입이라 밖에 허락하는
+  것은 없다. 분류를 파일 수준 함수로 뺀 뒤에는 그 셋이 전부 `RunStateLockKt` 에 선다 — 게이트의
+  **양방향** 등식이 그 이동을 죽은 줄로 잡아 냈고(`RunStateLock->OverlappingFileLockException`),
+  그 줄은 지웠다. 등재가 관측보다 넓어질 수 없다는 뜻이다.
 - **D-6G2c-21 ⑦ 의 절반은 러너까지다.** 러너 단위로는 판독 불가 원장 + 밖에서 잠긴 디렉터리가
   `ALREADY_RUNNING` 으로 끝난다. **전 조립 기동**은 그렇지 않다 — 상한 원장 seed 가 Busy 경로에서도
   시도 원장을 읽으므로 그 읽기가 먼저 던진다. 고치려면 seed 를 늦추거나 Busy 에서 0 으로 시작해야

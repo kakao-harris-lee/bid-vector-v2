@@ -445,6 +445,7 @@ private class LedgerDigest(
     /** 복제해서 뽑는다 — `digest()` 는 상태를 되돌리므로 원본을 쓰면 다음 줄부터 해시가 갈린다. */
     fun hex(): String = hexOf((digest.clone() as MessageDigest).digest())
 }
+
 /** 잃어버린 호출의 표식(D-6G-70) — 조각을 원문 그대로 담되 형태가 선 JSON 한 줄로. */
 private fun tornMarkerOf(fragment: String): String =
     SnapshotJson.Obj(listOf(TORN_KEY to SnapshotJson.Text(fragment))).render() + "\n"

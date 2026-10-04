@@ -1,8 +1,8 @@
 package bidvector.adapters.snapshot
 
 import java.io.IOException
-import java.nio.channels.FileChannel
 import java.nio.channels.ClosedByInterruptException
+import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.channels.FileLockInterruptionException
 import java.nio.channels.OverlappingFileLockException
