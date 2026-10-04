@@ -530,9 +530,15 @@ def test_a_spaced_snapshot_runs_end_to_end(tmp_path: Path) -> None:
 # `ignore_imports` 출발 모듈에서 유도한다: 예외를 늘리면 스윕 범위가 **같은 커밋에서** 함께
 # 늘고, 예외와 감시가 갈릴 자리가 없다.
 #
-# **재는 층은 정적 import 하나다**(F-2 경계). 동적 import(`importlib.import_module` ·
-# `__import__`)와 목록 밖 네트워크 경로(`asyncio` · `multiprocessing` · `subprocess`)는 두 층
-# 모두 보지 못한다 — 알려진 제한으로 등재했고 코드로 막지 않는다.
+# **재는 층은 정적 import 하나다**(F-2 경계, 알려진 제한). 두 층이 보는 것은 `ast.Import` ·
+# `ast.ImportFrom` 과 grimp 의 import 그래프, 즉 **import 문**이다. 그래서 경계 밖인 것:
+#   ① 동적 import — `importlib.import_module("http.client")` · `__import__("socket")`.
+#   ② 목록 밖 네트워크 경로 — `asyncio`(`open_connection`) · `multiprocessing.connection` ·
+#      `subprocess`·`os`(curl 호출) · `webbrowser` · `wsgiref`. 네트워크 전용이 아닌 이름이라
+#      금지하면 정상 사용까지 막는다 — 열거하지 않고 경계 밖으로 적는다.
+# 둘 다 **코드로 막지 않는다**(계약 D-6G2c-35 F-2). 막는 길이 없다는 뜻이 아니라, 이 게이트가
+# 재는 층이 아니라는 뜻이다 — 그 층을 재려면 실행 시점 관측(`sys.modules` 감시)이 필요하고
+# 그것은 `tests/gates/test_serving_purity.py` 가 serving 에 대해 지는 다른 게이트다.
 _APP_IMPORT_CONTRACT_NAME = "app 은 DB·HTTP·업무 모듈을 모른다"
 
 _ALLOWED_SUBMODULES = frozenset({"urllib.parse"})

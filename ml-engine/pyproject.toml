@@ -265,6 +265,16 @@ ignore_imports = ["ml_engine.training.jobs.servicer -> grpc"]
 name = "app 은 DB·HTTP·업무 모듈을 모른다"
 type = "forbidden"
 source_modules = ["ml_engine.app"]
+#
+# **이 목록이 재는 층은 정적 import 하나다**(D-6G2c-35 F-2, 경계 문면 정정). 앞 판 주석은 두 층이
+# 「네 자리 전부 잠근다」고 적었는데 그것은 **열거한 이름**에 대해서만 참이다. 경계 밖(코드로 막지
+# 않고 알려진 제한으로 등재한 것):
+#   - **동적 import** — `importlib.import_module("http.client")` · `__import__("socket")`.
+#     grimp 도 AST 스윕도 보지 못한다(둘 다 import 문을 읽는다).
+#   - **목록 밖 네트워크 경로** — `asyncio`(`open_connection`) · `multiprocessing.connection` ·
+#     `subprocess`·`os`(curl 호출) · `webbrowser` · `wsgiref`. 이 이름들은 네트워크 전용이 아니라
+#     금지하면 정상 사용까지 막는다 — 그래서 열거하지 않고 경계 밖으로 적는다.
+# 열거는 **표준 네트워크 클라이언트**까지다(cr P-3): 아래 목록.
 forbidden_modules = [
     "sqlalchemy",
     "psycopg",
@@ -273,6 +283,9 @@ forbidden_modules = [
     "celery",
     "ftplib",
     "http",
+    "imaplib",
+    "nntplib",
+    "poplib",
     "smtplib",
     "socket",
     "socketserver",
@@ -285,8 +298,9 @@ forbidden_modules = [
 # 모듈의 자리까지 함께 열거한다. 자리가 늘면 `lint-imports` 가 **먼저** 붉어지고, 없어진 자리를
 # 남겨 두면 도구가 "No matches for ignored import" 로 거부한다(실측) — 양방향으로 낡지 않는다.
 #
-# 네 자리 다 `urllib.parse` 뿐이고 `urllib.request` 는 하나도 없다. 그 사실은 뿌리 단위인 이
-# 계약이 아니라 AST 스윕이 잠근다(`ml_engine/app/**` 전수).
+# **이 네 자리는 AST 스윕의 대상이기도 하다**(D-6G2c-35 F-1). 뿌리 간선을 지우는 예외는 그 모듈의
+# `urllib` 를 **전부** 열므로, 스윕이 `app/**` 뿐이던 앞 판에서는 app 밖 셋이 두 층 모두 초록이었다.
+# 스윕은 이 목록을 읽어 자기 범위를 만든다 — 예외를 늘리면 감시도 같은 커밋에서 는다.
 ignore_imports = [
     "ml_engine.app.backtest_cli -> urllib",
     "ml_engine.adapters.snapshot_files -> urllib",
