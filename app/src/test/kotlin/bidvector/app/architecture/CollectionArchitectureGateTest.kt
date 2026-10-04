@@ -96,14 +96,14 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
-    fun `리플렉션 뿌리가 실제로 production 에 있다 — adapters 를 포함해 규칙이 공허하지 않다`() {
+    fun `리플렉션 뿌리가 실제로 production 에 있다 — domain 여섯을 포함해 규칙이 공허하지 않다`() {
         policy.reflectionRoots.forEach { root ->
             production.filter { it.packageName == root || it.packageName.startsWith("$root.") }.shouldNotBeEmpty()
         }
     }
 
     @Test
-    fun `workflow·app·adapters production 의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
+    fun `production 전 층의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
         rules
             .moduleMustNotUseReflection(
                 roots = policy.reflectionRoots,
