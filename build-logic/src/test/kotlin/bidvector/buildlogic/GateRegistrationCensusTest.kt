@@ -132,20 +132,47 @@ class GateRegistrationCensusTest {
     }
 
     /**
-     * 인터페이스의 default `@Test` 는 Kotlin 이 `…$DefaultImpls` 에 실어, 접으면 **인터페이스 이름**이
-     * 모집단에 든다. JUnit 은 그 이름을 돌리지 않으므로 등재하면 실행 게이트가 붉고 안 하면 등재
-     * 게이트가 붉다 — 만족 불가다. 구현 클래스만 센다(vr r2 R2-L-2).
+     * 인터페이스의 default `@Test` 는 구현 클래스가 센다(vr r2 R2-L-2). 인터페이스 자신은 JUnit 이
+     * 돌리지 않고, Kotlin 이 본문을 싣는 `…$DefaultImpls` 는 그 test 메서드가 **전부 static** 이라
+     * 모집단 근거가 되지 못한다 — 판독기가 인스턴스 메서드만 모으므로 그 클래스의 사실은 비어 있다.
      */
     @Test
     fun `인터페이스의 default test 는 구현 클래스만 모집단이다`() {
         val census =
             census(
                 facts("p.ContractTests", methods = setOf(TEST), isAbstract = true, isInterface = true),
-                facts("p.ContractTests\u0024DefaultImpls", methods = setOf(TEST)),
+                facts("p.ContractTests\u0024DefaultImpls"),
                 facts("p.ImplTest", superTypes = listOf("p.ContractTests")),
             )
 
         assertEquals(setOf("p.ImplTest"), census.population)
+    }
+
+    /**
+     * **제외는 접기 전 이진 클래스 단위다**(vr r3 R3-M-1). 접은 바깥 이름에 걸면 인터페이스 안에 둔
+     * 중첩 구체 test 클래스가 **조용히** 모집단에서 빠진다 — JUnit 은 그 클래스를 돌린다.
+     */
+    @Test
+    fun `인터페이스 안의 중첩 구체 test 는 모집단이다`() {
+        val census =
+            census(
+                facts("p.Holder", isAbstract = true, isInterface = true),
+                facts("p.Holder\u0024NestedTest", methods = setOf(TEST)),
+            )
+
+        assertEquals(setOf("p.Holder"), census.population)
+    }
+
+    /** 추상 클래스 안의 중첩 구체 test 도 같다 — 추상 자신은 빠지고 중첩은 센다. */
+    @Test
+    fun `추상 클래스 안의 중첩 구체 test 는 모집단이고 추상 자신은 아니다`() {
+        val census =
+            census(
+                facts("p.AbstractHolder", methods = setOf(TEST), isAbstract = true),
+                facts("p.AbstractHolder\u0024NestedTest", methods = setOf(TEST)),
+            )
+
+        assertEquals(setOf("p.AbstractHolder"), census.population)
     }
 
     // ---- 제외 — build 사실에서만 ----

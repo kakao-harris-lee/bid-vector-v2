@@ -8,6 +8,13 @@ package bidvector.buildlogic
  */
 internal data class TestClassFacts(
     val binaryName: String,
+    /**
+     * **인스턴스** 메서드의 애노테이션만 담는다 — JUnit 은 `static` `@Test` 를 돌리지 않는다.
+     *
+     * 그 가름이 Kotlin 의 `…$DefaultImpls` 를 모집단에서 뺀다(그 클래스의 test 메서드는 전부 static
+     * 이다). 이름 규약으로 가르지 않는다 — `DefaultImpls` 라는 낱말은 컴파일러 관례이고, **JUnit 이
+     * 돌리지 않는다**는 사실은 메서드가 static 이라는 바이트코드 플래그에 있다.
+     */
     val methodAnnotations: Set<String>,
     val classAnnotations: Set<String>,
     /** 상위 클래스와 인터페이스 — JUnit 은 **물려받은** test 메서드도 돌린다(cr r1 G-2). */
@@ -15,9 +22,10 @@ internal data class TestClassFacts(
     /** 추상 클래스·인터페이스는 인스턴스화되지 않는다 — JUnit 도 돌리지 않으므로 모집단 밖이다. */
     val isAbstract: Boolean = false,
     /**
-     * 인터페이스인가 — Kotlin 은 default 메서드 본문을 `…$DefaultImpls` 라는 **별도 클래스**에 싣고
-     * 그 클래스가 `@Test` 를 들고 다닌다. 접으면 인터페이스 이름이 모집단에 드는데 JUnit 은 그 이름을
-     * 돌리지 않는다 — 등재하면 실행 게이트가, 안 하면 등재 게이트가 붉어 **만족 불가**다(vr r2 R2-L-2).
+     * 인터페이스인가 — JUnit 은 인터페이스 자신을 돌리지 않는다. 추상 플래그와 **같은 자리**에서,
+     * **접기 전 이진 클래스 단위로** 본다(vr r3 R3-M-1): 접은 바깥 이름에 걸면 인터페이스나 추상
+     * 클래스 **안에 둔 중첩 구체 test 클래스**가 조용히 모집단에서 빠진다 — JUnit 은 그것을 돌린다.
+     * 접기는 **등재 집계**에만 쓴다.
      */
     val isInterface: Boolean = false,
 )
@@ -68,13 +76,11 @@ internal object GateRegistration {
         val isDiscovery = discoveryPredicate(vocabulary.annotations, metaAnnotations)
         val declared = classes.associateBy(TestClassFacts::binaryName)
         val runsTests = inheritedTestPredicate(isDiscovery) { declared[it] ?: superFacts(it) }
-        val factsOf = { name: String -> declared[name] ?: superFacts(name) }
         val population =
             classes
-                .filterNot(TestClassFacts::isAbstract)
+                .filterNot { it.isAbstract || it.isInterface }
                 .filter(runsTests)
                 .map { it.binaryName.outermost() }
-                .filterNot { factsOf(it)?.isInterface == true }
                 .toSet()
         val conditional =
             classes

@@ -65,8 +65,10 @@ private class TestClassFactsVisitor : ClassVisitor(Opcodes.ASM9) {
         descriptor: String,
         signature: String?,
         exceptions: Array<out String>?,
-    ): MethodVisitor =
-        object : MethodVisitor(Opcodes.ASM9) {
+    ): MethodVisitor {
+        // JUnit 은 static `@Test` 를 돌리지 않는다 — 그 메서드의 애노테이션은 모집단 근거가 아니다.
+        if (access and Opcodes.ACC_STATIC != 0) return SKIP_METHOD
+        return object : MethodVisitor(Opcodes.ASM9) {
             override fun visitAnnotation(
                 annotationDescriptor: String,
                 visible: Boolean,
@@ -75,6 +77,12 @@ private class TestClassFactsVisitor : ClassVisitor(Opcodes.ASM9) {
                 return null
             }
         }
+    }
+
+    private companion object {
+        /** 애노테이션을 모으지 않는 방문자 — static 메서드에 쓴다. */
+        val SKIP_METHOD = object : MethodVisitor(Opcodes.ASM9) {}
+    }
 }
 
 /** [roots] 아래 모든 `.class` 를 읽어 사실로 만든다. */
