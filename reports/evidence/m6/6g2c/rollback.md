@@ -4,8 +4,8 @@
 > `git diff --name-status <base>..<실측 HEAD>` 에서 기계로 낸다. **라운드마다 그 라운드의 마지막 산출물
 > 커밋에서 다시 낸다** — 앞 라운드 실측을 옮기지 않는다.
 
-**실측 HEAD `82c8b809`**(팀장 종결 문단 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋; 레인의 마지막 산출물 커밋은
-K `51b4d960` · P `fa7483cb`) · base **`ecdc9d9f`**. ①~⑥ 전부 그 커밋의 **버릴 clone**(`git clone --no-hardlinks`, 공유 worktree 무편집)에서 돌렸다.
+**실측 HEAD `522d2bff`**(PR #59 조치 라운드 뒤 팀장 종결 문단 정정 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋; 레인의 마지막 산출물 커밋은
+K `97a7993c` · P `ba6a33d2`) · base **`ecdc9d9f`**. 앞 실측(`82c8b809`)은 조치 라운드가 K·P 코드·runbook·milestone 을 움직여 무효가 됐고 전부 다시 돌렸다. ①~⑥ 전부 그 커밋의 **버릴 clone**(`git clone --no-hardlinks`, 공유 worktree 무편집)에서 돌렸다.
 
 ## 되돌림이 무엇을 건드리는가
 
@@ -20,25 +20,25 @@ K `51b4d960` · P `fa7483cb`) · base **`ecdc9d9f`**. ①~⑥ 전부 그 커밋�
 
 | 상태 | 묶음 | 되돌림 |
 |---|---|---|
-| M | adapters `snapshot` production 둘(`JdbcSnapshotSource.kt`·`RunStateDirectory.kt`) · test 넷 | ① base 로 restore |
+| M | adapters `snapshot` production(`JdbcSnapshotSource.kt`·`RunStateDirectory.kt`) · 기존 test | ① base 로 restore |
 | A | adapters `snapshot` 신설 넷(`RunStateLock.kt`·`RunStateLedgerGuards.kt`·`RunStateLockTest.kt`·`UnusableRawRowsTest.kt`) | ① restore 가 삭제(base 에 없다) |
-| M | app `collection`·`wiring` production 일곱 · test 열하나 | ① 같음 |
+| M | app `collection`·`wiring` production · 기존 test | ① 같음 |
 | A | app test 신설 셋(`RunStateLockHolderProcess.kt`·`CollectionLedgerSurfaceTest.kt`·`FixedClockHarnessTest.kt`) | ① 같음 |
 | M | workflow `SampleSelectionTest.kt` | ① 같음 |
-| M/A | `ml-engine` 스물(소스 열 · test 여섯 · fixture 미니 프로젝트 셋 · `pyproject.toml`) | ① 같음 |
+| M/A | `ml-engine` 소스 · test · fixture 미니 프로젝트 · `pyproject.toml` | ① 같음 |
 | M | `config/quality/architecture-policy.properties` | ② **공유 파일** — 커밋 해시로 hunk 격리, **두 커밋**(`51b4d960`·`ec07df09`) |
 | M | `config/quality/gate-tests.properties` | ② 같음, **네 커밋**(`93789f5c`·`2554bfbb`·`df54d4bb`·`2c176baa`) |
 | M | `workflow/build.gradle.kts` | ② 같음, 한 커밋(`d65e8a80` — test 입력 선언 블록) |
 | M | `reports/evidence/m6/6g/snapshot-schema.md` | ② 같음, 한 커밋(`ae1077e4` — §2 어휘 문장, 팀장) |
-| M | `docs/runbook/m6-6g-real-collection.md` | ② 같음, **두 커밋**(`8ff4d1ec`·`f21d83c7` — 계수 문장 둘, 팀장) |
-| M | `milestone-6.md` | ② 같음 — 종결 문단(`82c8b809`)과 착수 문단(`429d4bbc`) 문단 단위 둘 |
+| M | `docs/runbook/m6-6g-real-collection.md` | ② 같음, **세 커밋**(`4c4deae8`·`8ff4d1ec`·`f21d83c7` — 문장 셋, 팀장) |
+| M | `milestone-6.md` | ② 같음 — **세 커밋**(종결 정정 `522d2bff` · 종결 `82c8b809` · 착수 `429d4bbc`) 문단 단위 |
 
-`reports/evidence/m6/6g2c/**` 는 **되돌리지 않는다**(이 slice 의 기록, `scope.md` 는 계약 커밋의 것). 그 선택의 게이트 영향은 ⑥ 에 있다.
+묶음별 개수는 적지 않는다 — 수는 ① 명령이 내고(47: A 11 · M 36), 옮겨 적은 수는 라운드마다 낡는다(PR #59 리뷰 B 가 그 사례였다). `reports/evidence/m6/6g2c/**` 는 **되돌리지 않는다**(이 slice 의 기록, `scope.md` 는 계약 커밋의 것). 그 선택의 게이트 영향은 ⑥ 에 있다.
 
 ## ① 전용 파일 — 한 번에 (경로 47: A 11 · M 36)
 
 ```
-git diff --name-status ecdc9d9f..82c8b809 \
+git diff --name-status ecdc9d9f..522d2bff \
   | awk '{print $NF}' \
   | grep -v '^reports/evidence/m6/6g2c/' \
   | grep -vE '^(reports/evidence/m6/6g/snapshot-schema\.md|milestone-6\.md|config/quality/architecture-policy\.properties|config/quality/gate-tests\.properties|workflow/build\.gradle\.kts|docs/runbook/m6-6g-real-collection\.md)$' \
@@ -54,7 +54,7 @@ git diff --name-status ecdc9d9f..82c8b809 \
 for f in config/quality/architecture-policy.properties config/quality/gate-tests.properties \
          workflow/build.gradle.kts reports/evidence/m6/6g/snapshot-schema.md \
          docs/runbook/m6-6g-real-collection.md milestone-6.md; do
-  for sha in $(git log --format=%h ecdc9d9f..82c8b809 -- "$f"); do
+  for sha in $(git log --format=%h ecdc9d9f..522d2bff -- "$f"); do
     git diff "$sha~1..$sha" -- "$f" | git apply -R --index --
   done
 done
@@ -63,11 +63,11 @@ done
 커밋 목록은 **손으로 적지 않고 그 자리에서 `git log` 로 낸다** — 손 목록으로 돌리면 뒤 라운드가 더한 커밋(가령 승인 전 일괄이 `gate-tests` 에 등재한
 `UnusableRawRowsTest`)의 문맥에서 앞 커밋의 patch 가 `does not apply` 로 선다. `--3way` 는 쓰지 않는다. 한 hunk 가 실패하면 그 파일만 `git checkout
 HEAD -- <파일>` 로 되살린 뒤 목록을 다시 내어 처음부터 돈다 — 이 slice 의 공유 파일 변경은 전부 **추가**(정책 쌍 다섯 · 등재 열 · 입력 선언 블록 ·
-문장 하나 · 문장 둘 · 문단 둘)라 수동 보정은 지울 줄만 있다. 실측 `exit 0` **열두 hunk 전부**.
+문장 하나 · 문장 셋 · 문단 셋)라 수동 보정은 지울 줄만 있다. 실측 `exit 0` **열네 hunk 전부**(2+4+1+1+3+3).
 
 ## ③ 트리 대조
 
-`git diff --name-status ecdc9d9f` 에 남는 것은 `reports/evidence/m6/6g2c/**` 셋뿐. 복원 47 + 공유 6 = **53 경로의 파일 SHA 가 base 와 같다**
+`git diff --name-status ecdc9d9f` 에 남는 것은 `reports/evidence/m6/6g2c/**` 넷뿐. 복원 47 + 공유 6 = **53 경로의 파일 SHA 가 base 와 같다**
 (`git diff --name-only ecdc9d9f -- <53 경로>` 빈 출력). `ml-engine/**` 는 base 와 **동일**(0 경로 차이) — Python job 은 그 트리에서 base 의 결과
 (`main` CI, PR #58 머지)가 그대로 적용되므로 **트리 동일성으로 갈음**한다. Kotlin 은 evidence 디렉터리가 게이트 입력이라 갈음하지 않고 ④⑤⑥ 을 돈다.
 
@@ -86,8 +86,8 @@ HEAD -- <파일>` 로 되살린 뒤 목록을 다시 내어 처음부터 돈다 
 
 | 축 | 확인 |
 |---|---|
-| **내 줄이 사라졌다** | 정책에 `RunStateLockKt->` 0 / 등재에 snapshot·wiring 신설 test 이름 일곱 0 / `workflow/build.gradle.kts` 에 `snapshot-schema.md` 0 / 스키마 문서에 `D-6G2c-17` 0 / runbook 에 「계수 열둘」·「당시 코드」 0 / `milestone-6.md` 에 「6G-2c 착수」·「6G-2c 종결」 0 |
-| **남의 줄이 남았다** | 정책에 `collection.transport.roots` 1 · `policy.version=8` 1(6G-2b) / 등재에 `TransportSurfaceGateTest` 2 / 스키마 문서의 `UNDERPOWERED` **3**(base 에 이미 셋 있다 — 그래서 「내 줄」 표지는 이 낱말이 아니라 `D-6G2c-17` 이다) / runbook 의 「계수 아홉」 2 / `milestone-6.md` 에 「6G-2b 착수·종결」 2 |
+| **내 줄이 사라졌다** | 정책에 `RunStateLockKt->` 0 / 등재에 snapshot·wiring 신설 test 이름 일곱 0 / `workflow/build.gradle.kts` 에 `snapshot-schema.md` 0 / 스키마 문서에 `D-6G2c-17` 0 / runbook 에 `UNLOCKABLE`·`blankNoticeNumber`·「당시 코드」 0 / `milestone-6.md` 에 「6G-2c 착수」·「6G-2c 종결」 0 |
+| **남의 줄이 남았다** | 정책에 `collection.transport.roots` 1 · `policy.version=8` 1(6G-2b) / 등재에 `TransportSurfaceGateTest` 2 / 스키마 문서의 `UNDERPOWERED` **3**(base 에 이미 셋 있다 — 그래서 「내 줄」 표지는 이 낱말이 아니라 `D-6G2c-17` 이다) / runbook 의 `ALREADY_RUNNING` 2 / `milestone-6.md` 에 「6G-2b 착수·종결」 2 |
 
 뒤 축을 안 재면 「통째로 되돌려 남의 줄까지 걷었다」가 보이지 않는다. 세는 **형태**도 조심해야 한다 — `UNDERPOWERED` 로 「내 줄 사라짐」을 세면
 base 의 셋이 남아 거짓 경보가 된다(이 실측에서 겪었다).
@@ -95,10 +95,10 @@ base 의 셋이 남아 거짓 경보가 된다(이 실측에서 겪었다).
 ## verifier 가 대조할 것
 
 「실측 HEAD == 판정 SHA」가 **아니다**. 보는 것은 그 사이에 되돌림 대상이 움직였는가다 —
-`git diff --name-only 82c8b809..<판정 SHA> -- <① 경로 47 + ② 파일 여섯>` 이 빈 출력이면 유효하다. 이 slice 의 판정 SHA(K `51b4d960` · P `fa7483cb`)는
+`git diff --name-only 522d2bff..<판정 SHA> -- <① 경로 47 + ② 파일 여섯>` 이 빈 출력이면 유효하다. 이 slice 의 판정 SHA(K `97a7993c` · P `ba6a33d2`)는
 실측 HEAD 의 **조상**이다 — 실측 HEAD 가 뒤에 오는 것은 종결 문단 커밋이 `milestone-6.md`(hunk 대상)를 건드리기 때문이고(6G-2b PR #58 리뷰가 세운
-순서), 그 사이 커밋이 K·P 경로를 건드리지 않았음은 재동결 대조(`git diff --name-only 51b4d960..82c8b809 -- adapters app workflow config` ·
-`git diff --name-only fa7483cb..82c8b809 -- ml-engine`)가 빈 출력으로 보였다. **종결 커밋 뒤에 복원·hunk 경로가 다시 움직이면**(PR 조치 라운드) ①~③ 을
+순서), 그 사이 커밋이 K·P 경로를 건드리지 않았음은 재동결 대조(`git diff --name-only 97a7993c..522d2bff -- adapters app workflow config` ·
+`git diff --name-only ba6a33d2..522d2bff -- ml-engine`)가 빈 출력으로 보였다. **종결 커밋 뒤에 복원·hunk 경로가 다시 움직이면**(PR 조치 라운드) ①~③ 을
 그 커밋에서 다시 재고 실측 HEAD 를 **별도 커밋**으로 올린다.
 
 ## 되돌리지 않는 것
