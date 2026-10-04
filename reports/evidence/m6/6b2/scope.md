@@ -30,7 +30,7 @@
 | D-3 | **되돌림 리허설** — forward-fix 가 정본임을 **실측으로 보인다**: (i) 백업 → 가짜 `V18__rehearsal.sql`(열 추가, 테스트 전용 임시 파일, 커밋 안 함) 적용 → forward-fix `V19` 로 되돌림 → `validate()`·등식 셋 (ii) 데이터 손실 축: 쓰기 왕복 뒤 백업 → 파괴(표 TRUNCATE) → 복원 → `candidateLimit=13`·`revision` 동일 | (i)(ii) 둘 다 exit 0, 되돌린 뒤 이력에 V18·V19 가 남는 것(forward-fix 의 성질)을 runbook 에 적는다 |
 | D-4 | **CI 배선** — `container` job 의 S-23b 와 S-25 사이에 리허설 step(S-23c) 추가(ci.yml `run` 블록 그대로가 `tools/one-command-check.sh` 와 같은 규율) | CI 초록 · 로컬 재현(ci.yml `run` 추출 실행) exit 0 · step 이 자기 생성 자원만 파괴 |
 | D-5 | **runbook** `docs/runbook/m6-6b2-backup-restore.md` — 백업 주기·보관·복원 절차·되돌림 정책(forward-fix 정본, 백업 복원은 데이터 손실 축)·멈춤 조건·금지(운영 DB 에 `clean`/`down -v` 금지) | 절차 전부가 D-1~D-3 의 실측 명령과 1:1 |
-| D-6 | **compose 프로젝트 이름 고정**(A-4) — `docker/compose.yaml` 에 `name: bidvector-v2` 한 줄(6C 산출물 편집 — in_scope 확장, 운영자 결정) | 두 worktree 에서 `docker compose ls` 가 같은 프로젝트를 들지 않음; 기존 호출(ci.yml·runbook) 무영향 실측 |
+| D-6 | **compose 프로젝트 이름 고정**(A-4) — `docker/compose.yaml` 에 `name: bidvector-v2` 한 줄(6C 산출물 편집 — in_scope 확장, 운영자 결정) | 프로젝트 이름이 **디렉터리와 무관하게 파일에서 결정**된다(어느 cwd 에서 불러도 `bidvector-v2`, base 파일은 어디서든 `docker`) · `name:` 제거 변이에서 `docker` 로 되돌아감 · 기존 호출(ci.yml·runbook) 무영향 실측. ~~두 worktree 가 같은 프로젝트를 들지 않음~~ — r2 D-6B2-5 로 정정(이 저장소의 worktree 끼리는 **같은** 이름을 든다; 갈림은 `COMPOSE_PROJECT_NAME`/`-p` 의 몫) |
 
 ## 위협 모델 경계 (Phase 2.5 (0), 초안)
 
@@ -65,9 +65,17 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`c
 | **D-6B2-2** | **설계 검토(팀장, `_workspace/m6-6b2/01_design-review.md`) 요지**: (0) 경계 위 절 · (1) 등식은 **구성**(복원 뒤 Flyway `validate()` + 이력 행 + 표별 행 수·내용 해시 + 6B-1 축9 권한 행렬 — 손 목록 아님) · (2) 우회 다섯: 역할 복원 생략(권한 행렬 RED) · manifest 변조(해시 RED) · 시퀀스 되감김(IDENTITY 현재값 등식 RED) · 다른 프로젝트 자원 파괴(자기 생성 자원만 — 프로젝트 이름·컨테이너 이름을 리허설이 생성해 지목) · 비밀 argv(스캔 RED) · (2b) 새 public 표면 없음(스크립트·CI·문서) · (3) 과잉 후보 PITR/WAL 은 경계, 미달 후보 「되돌림 = 백업 복원」 오해는 runbook 이 forward-fix 정본을 못 박는다 | 설계 검토 |
 | **D-6B2-3** | **리허설 자원 격리(필수)**: 리허설은 **자기가 만든** 일회성 postgres 컨테이너/프로젝트만 쓰고 파괴한다 — compose 프로젝트 `bidvector-v2`(A-4) 안의 서비스를 지목하되, 파괴(`down -v`·TRUNCATE·DROP)는 **S-23c 가 만든 복원 대상 컨테이너**에만; host 포트 publish 없음(`-p` 금지); `bid-vector-v2-dev`·legacy·easy-doc·kis_paper 는 이름·포트·볼륨 어느 축으로도 닿지 않음을 스크립트가 사전 단언(존재하는 컨테이너 목록과 교차 0) | 조사 7 |
 
+## 계약 갱신 r2 (2026-10-05, 팀장 — 구현 완료 수령 · 동결 · 판정 SHA)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-4** | **구현 완료 수령·레인 동결.** 산출물 마지막 커밋 `36a3bff9`(= rollback 실측 HEAD) · evidence 커밋 `05042cd0` = **판정 SHA**. 팀장 대조: 변경 11 파일 +1,226/−0 전부 in_scope · production `src/main`·`db/migration`·`ml-engine` diff **0** · in_scope porcelain 빈 출력 · 스크립트 셋 mode 755 · 참조형 누출 스캔 evidence **0**(산출물 쪽 매치는 전부 플래그·환경변수의 **이름** — `ci.yml` 은 base 와 같은 1) · 호스트에 남은 `bidvector-v2` 컨테이너·볼륨 0 · rollback 술어 `git diff --name-only 36a3bff9..05042cd0 -- <복원 여섯 + milestone-6.md>` 빈 출력. 「미처리 지시 없음」 — 레인이 자기 보고에서 동결을 선언했다 | 레인 보고 2026-10-05 |
+| **D-6B2-5** | **레인이 지시 문면 대신 택한 셋의 처분.** ① **역할 덤프에 자격 제외 플래그 — 채택.** 지시 「역할 제외 없이 그대로」는 *역할 필터링* 금지의 뜻이었고 레인도 역할을 거르지 않았다; 맨 형태는 로그인 역할의 SCRAM 검증자를 평문 파일에 적어 위협 모델 「자격 값이 백업 산출물에 없다」와 정면 충돌(실측 1건 → 0건). 대가(운영 복원 뒤 로그인 암호 별도 설정)는 runbook §2·§6 에 등재됨. ② **D-6 수용 문면 정정(팀장 오기).** 「두 worktree 가 같은 프로젝트를 들지 않음」은 틀렸다 — 파일에 이름을 박으면 이 저장소의 모든 checkout 이 **같은** `bidvector-v2` 를 든다. 결정 A-4 (a) 가 닫는 것은 (가) 디렉터리 basename `docker` 로 **다른 저장소**와 충돌하는 축 · (나) 리허설이 「내 프로젝트 안의 서비스」를 이름으로 단언할 수 있는 축이고, **이 저장소 worktree 끼리의 공유는 남는다**(알려진 제한 — 로컬 container job 재현은 호스트 전체 1개, 빌드 직렬화 규율과 같이). 갈라야 하면 파일 편집 없이 `COMPOSE_PROJECT_NAME`/`-p` 가 이긴다 — 팀장 실측: 기본 `bidvector-v2` · env 지정 시 그 이름 · `-p` 지정 시 그 이름. 위 D-6 표에 정정 반영. ③ **리터럴 13 대신 원본 대조 · 권한 행렬을 해시 대신 객체 — 채택.** 전자는 매직 넘버 제거 + S-23b→S-23c 순서를 단언으로 잠금(S-23c 를 앞으로 옮기면 「쓰기 왕복이 선행하지 않았다」 RED); 후자는 판정 문면이 「어느 등식의 어느 이름」을 대야 한다는 요구의 귀결 | 팀장 판단 |
+| **D-6B2-6** | **판정 레인 표적**(verifier opus + code-reviewer sonnet 병렬, 판정 SHA `05042cd0`, 산출물 `36a3bff9`): (a) 격리 — 리허설이 원본에 쓰기·파괴 명령을 갖지 않는가(스크립트 전수), 복원 대상이 라벨 등식 없이 손대지는 자리가 없는가, `--network none`·host publish 0, 다른 compose 프로젝트·`bid-vector-v2-dev`·legacy 에 닿는 경로 0(변이: 라벨 불일치 컨테이너 지목 → exit 3) (b) 등식 열 가지 각각이 **살아 있는가**(측정별 변조 → 그 이름을 대며 RED; 무시 목록 jq 결함의 회귀 — `flywayHistory` 무시 호출에서 다른 측정이 여전히 재지는가) (c) 역할 축 — 역할 복원 생략·`--exit-on-error` 제거·종료 코드 무시 세 겹을 전부 뚫어도 `privilegeMatrix` 등식이 붉은가 (d) forward-fix — V18/V19 가 임시 디렉터리에만 살고 `adapters/src/main/resources/db/migration/` 에 남지 않음(실행 뒤 porcelain) · 이력에 18,19 남음 단언이 **순서**까지 보는가 (e) S-23c 의 ci.yml `run` 블록 재현(참조 스크립트 `scratchpad/rb6g2c/container-job.sh` 와 같은 추출 방식; 자격 생성은 `openssl rand`, `::add-mask::` 줄 redaction, 값 출력 0) (f) 자격 값·공고 식별자가 산출물·evidence·로그에 0(참조형 스캔만) (g) rollback — 복원 여섯·hunk 하나가 `36a3bff9..05042cd0` 에서 움직이지 않았는가, 목록 등식 `comm` 양방향 (h) `one-command-check.sh` 생략 사유의 성립(production diff 0) (i) 크기 게이트(evidence 341 ≤ 산출물) · `file:line` 좌표 0 · 축어 스캔 어휘 0. **빌드 규율**: 전건 `check` 는 verifier 만, 사전 확인 셋 별도 호출, flock, `--no-daemon`, 끝나면 자기 daemon PID 만 정리; 00:30~01:00 KST 는 Gradle·docker 빌드 시작 금지 | 설계 검토 (2) · D-6B2-3 |
+
 ## 하네스 레인 변경
 
-(착수 뒤 리뷰 요청 시점마다 `git log -- <파일>` 산출로 등재)
+`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
 
 ## 입력·이관
 
