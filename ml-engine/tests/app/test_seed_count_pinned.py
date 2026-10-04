@@ -79,7 +79,9 @@ def test_the_approved_seed_key_enumeration_lives_in_exactly_one_place() -> None:
     앞 판은 두 로더가 각자 한 벌씩 들고 있었다. 두 벌은 조용히 갈릴 수 있다 — 한쪽에만
     여섯째를 더하면 그 로더만 여섯을 받고 다른 쪽 test 는 그대로 초록이다. 자리를 세는 것은
     **문자열 grep 이 아니라 AST** 다: 주석·문면에 같은 이름이 나와도 세지 않고, 할당이
-    어디에 있든 잡는다.
+    어디에 있든 잡는다. 자리는 **저장소 상대 경로**로 센다(cr r1 P-7) — basename 으로 세면
+    저장소에 `policy.py` 가 셋 있어(`evaluation/` · `evaluation/backtest/` · `registry/`)
+    열거를 **옮겨도** 초록이었다.
 
     더해서 판정 로더가 **같은 술어 객체**를 쓰는지 본다 — 이름만 import 하고 자기 비교를
     따로 두면 열거는 하나인데 판단이 둘이다."""
@@ -93,13 +95,14 @@ def test_the_approved_seed_key_enumeration_lives_in_exactly_one_place() -> None:
             elif isinstance(node, ast.AnnAssign):
                 targets = [node.target]
             assigned.extend(
-                path.name
+                str(path.relative_to(_SRC_ROOT))
                 for target in targets
                 if isinstance(target, ast.Name)
                 and target.id.lstrip("_") == "APPROVED_SEED_KEYS"
             )
-    assert assigned == [Path(evaluation_policy.__file__).name], (
-        f"승인 seed 키 열거가 한 자리가 아니다: {assigned}"
+    expected = str(Path(evaluation_policy.__file__).resolve().relative_to(_SRC_ROOT))
+    assert assigned == [expected], (
+        f"승인 seed 키 열거가 한 자리가 아니다: {assigned}(기대: {expected})"
     )
     assert backtest_policy.seed_key_mismatch is evaluation_policy.seed_key_mismatch, (
         "판정 로더가 공용 술어를 쓰지 않는다 — 열거는 하나인데 판단이 둘이다"
