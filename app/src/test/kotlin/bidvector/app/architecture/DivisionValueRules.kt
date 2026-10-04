@@ -41,7 +41,10 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * `Class.forName` 으로 얻은 `Class` 도 밖이다. 6F-8 리플렉션·`Class` 멤버 게이트가 그 길을 덮는 root 는
  * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이었다. **`adapters` 는 M6/6G-2b 의
  * `collection.reflection.roots` 가 덮고**(D-6G2b-11), 남은 것은 `procurement`(domain 계열) —
- * `OPEN-6G2B-REFLECTION-ROOT-DOMAIN` 소관이다. 구조로 닫는 방향은 `OPEN-6F9-DIVISION-REFLECTION` 이다.
+ * M6/6G-2g 가 반사 뿌리를 production 전 층으로 넓혀 `OPEN-6G2B-REFLECTION-ROOT-DOMAIN` 은 닫혔다
+ * (`procurement` 를 포함한 domain 여섯이 그 쌍 등식 안이다). 구조로 닫지 **못하는** 범위(제네릭 소멸·
+ * 컨테이너 원소·`getEnumConstants`)만 `OPEN-6F9-DIVISION-REFLECTION` 으로 남는다 — 정책 파일의
+ * `collection.division-value` 주석과 같은 문면이다.
  */
 internal class DivisionValueRules(
     private val type: String,

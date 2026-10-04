@@ -15,9 +15,12 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 참조를 모으는 범위. [OWNER_ONLY] 는 ArchUnit 의존 그래프 그대로 — **호출 대상의 소유 타입**까지만
  * 본다. [FULL] 은 거기에 **호출 대상의 인자·반환 타입**과 필드 접근의 필드 타입을 더한다.
  *
- * [OWNER_ONLY] 는 쓰이는 게이트가 아니라 **양성 대조**다: `uri.toURL().readText()` 처럼 타입을 쥐지 않고
- * 호출 사슬로만 지나는 길은 [OWNER_ONLY] 에 보이지 않는다. [FULL] 이 조용히 [OWNER_ONLY] 로 되돌려지면
- * 그 대조가 RED 가 된다.
+ [OWNER_ONLY] 는 **쓰이는 깊이이자 양성 대조**다. 쓰이는 자리는 `collection.depth.collection-procurement`
+ * 와 `collection.depth.raw-access` 둘 — 깊게 보면 그 게이트들이 막으려는 타입이 허용 집합에 들어오거나
+ * 「아무도 참조하지 않는다」가 약해진다(정책 파일 `collection.depth.*` 주석이 근거를 든다).
+ *
+ * 대조로도 쓴다: `uri.toURL().readText()` 처럼 타입을 쥐지 않고 호출 사슬로만 지나는 길은 [OWNER_ONLY]
+ * 에 보이지 않으므로, [FULL] 축이 조용히 [OWNER_ONLY] 로 되돌려지면 그 대조가 RED 가 된다.
  */
 enum class ReferenceCollection { OWNER_ONLY, FULL }
 
@@ -62,7 +65,9 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
  *
  * 접지 않는 선택지도 쟀다 — Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 더 자주 낡는다.
  *
- * **D-6G2g-14 — 저장소의 접기는 이제 이 함수 하나다**(`OPEN-6G2B-FOLDING-UNIFICATION` 종결). 앞서 관례가
+ * **D-6G2g-14 — app 아키텍처 게이트 모듈 안에서 접기는 이제 이 함수 하나다**
+ * (`OPEN-6G2B-FOLDING-UNIFICATION` 종결). build-logic 의 등재 등식은 **모듈 경계** 밖이라 자기 접기를
+ * 따로 가진다(그쪽은 test 클래스 이름 축이고 이쪽은 보유자 축이다). 앞서 관례가
  * 셋이었다: 접지 않음(`collection.key-hash.holders` 의 `NoticeKeyHash$Companion` ·
  * `app.injection.allowed-types` 의 `Resolution$Resolved`) · 이름 절단(쌍 등식 셋) · `enclosingClass` 접기
  * (`outermostClass()` 와 그것을 각자 복사한 `topLevel()` 셋). `enclosingClass` 접기는 위 cr M-1 의 결함을

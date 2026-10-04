@@ -124,9 +124,9 @@ class CollectionDepthGateTest {
 
     private companion object {
         /**
-         * 오늘 production 에서 두 깊이의 관측이 갈리는 축 — 착수 실측(`00_kickoff_measurement.md` D-1)의
-         * 수치가 근거다: 전송 쌍 +14 · `collection-procurement` +2 · `raw-access` +2.
-         * 나머지 일곱 축은 +0 이다.
+         * 오늘 production 에서 두 깊이의 관측이 **실제로 갈리는** 축. 이 집합의 근거(축마다 왜 그 깊이인가)는
+         * `architecture-policy.properties` 의 `collection.depth.*` 주석이 든다 — 수치를 여기 옮겨 적지
+         * 않는다(옮겨 적으면 두 자리가 따로 낡는다). 나머지 축은 두 깊이의 관측이 같다.
          */
         val DEPTH_SENSITIVE_AXES =
             setOf(
