@@ -87,58 +87,38 @@ class CollectionDepthGateTest {
     private fun observe(
         axis: DepthAxis,
         depth: ReferenceCollection,
-    ): Set<String> {
-        val collectionRules = CollectionArchitectureRules(depth)
-        val procurement = "${policy.packageRoot}.procurement"
-        return when (axis) {
-            DepthAxis.TRANSPORT -> {
-                transportPairs(depth)
-            }
-
-            DepthAxis.REFLECTION -> {
-                collectionRules
-                    .observedReflectionTypePairs(production, policy.reflectionRoots, policy.reflectionPackages.toSet())
-                    .map { "${it.first}->${it.second}" }
-                    .toSet()
-            }
-
-            DepthAxis.COLLECTION_PROCUREMENT -> {
-                collectionRules.observedProcurementTypes(production, policy.collectionPackage, procurement, depth)
-            }
-
-            DepthAxis.USECASE -> {
-                referencers(listOf(policy.packageRoot), setOf(policy.collectionUseCaseType), depth)
-            }
-
-            DepthAxis.KEY_HASH -> {
-                referencers(policy.keyHashRoots, setOf(policy.keyHashType), depth)
-            }
-
-            DepthAxis.RAW_ACCESS -> {
-                referencers(policy.rawAccessRoots, policy.rawAccessTypes.toSet(), depth)
-            }
-
-            DepthAxis.DOMAIN_PURITY -> {
-                domainExternalReferences(depth)
-            }
-
-            DepthAxis.RUNNER -> {
-                referencers(listOf(appRoot()), policy.runnerTypes.toSet(), depth)
-            }
-
-            DepthAxis.SERVICE_KEY -> {
-                referencers(listOf(appRoot()), setOf(policy.serviceKeyType), depth)
-            }
-
-            DepthAxis.LOGGING -> {
-                referencers(listOf(appRoot()), policy.loggingTypes.toSet(), depth)
-            }
-
-            DepthAxis.OPERATOR_CREDENTIAL -> {
-                referencers(listOf(appRoot()), policy.operatorCredentialTypes.toSet(), depth)
-            }
+    ): Set<String> =
+        when (axis) {
+            DepthAxis.TRANSPORT -> transportPairs(depth)
+            DepthAxis.REFLECTION -> reflectionPairs(depth)
+            DepthAxis.COLLECTION_PROCUREMENT -> procurementTypes(depth)
+            DepthAxis.USECASE -> referencers(listOf(policy.packageRoot), setOf(policy.collectionUseCaseType), depth)
+            DepthAxis.KEY_HASH -> referencers(policy.keyHashRoots, setOf(policy.keyHashType), depth)
+            DepthAxis.RAW_ACCESS -> referencers(policy.rawAccessRoots, policy.rawAccessTypes.toSet(), depth)
+            DepthAxis.DOMAIN_PURITY -> domainExternalReferences(depth)
+            DepthAxis.RUNNER -> referencers(listOf(appRoot()), policy.runnerTypes.toSet(), depth)
+            DepthAxis.SERVICE_KEY -> referencers(listOf(appRoot()), setOf(policy.serviceKeyType), depth)
+            DepthAxis.LOGGING -> referencers(listOf(appRoot()), policy.loggingTypes.toSet(), depth)
+            DepthAxis.OPERATOR_CREDENTIAL -> credentialReferencers(depth)
         }
-    }
+
+    private fun credentialReferencers(depth: ReferenceCollection): Set<String> =
+        referencers(listOf(appRoot()), policy.operatorCredentialTypes.toSet(), depth)
+
+    private fun reflectionPairs(depth: ReferenceCollection): Set<String> =
+        CollectionArchitectureRules(depth)
+            .observedReflectionTypePairs(production, policy.reflectionRoots, policy.reflectionPackages.toSet())
+            .map { "${it.first}->${it.second}" }
+            .toSet()
+
+    private fun procurementTypes(depth: ReferenceCollection): Set<String> =
+        CollectionArchitectureRules(depth)
+            .observedProcurementTypes(
+                production,
+                policy.collectionPackage,
+                "${policy.packageRoot}.procurement",
+                depth,
+            )
 
     private fun appRoot(): String = "${policy.packageRoot}.app"
 
