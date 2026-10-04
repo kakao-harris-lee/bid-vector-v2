@@ -740,6 +740,7 @@ _CONTAINER_NODES = (
     ast.Set,
     ast.SetComp,
     ast.GeneratorExp,
+    ast.Tuple,
 )
 """값을 **담는** 식들 — 파생 추적이 뚫고 들어가지 않는다(D-6G2c-24 의 알려진 제한).
 
@@ -802,9 +803,25 @@ def _scan_module(
     groups: dict[str, tuple[str, frozenset[str]]],
     top: str,
 ) -> set[PolicyUse]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return _scan_tree(
+        ast.parse(path.read_text(encoding="utf-8")),
+        path.stem,
+        leaf_keys,
+        providers,
+        groups,
+        top,
+    )
+
+
+def _scan_tree(
+    tree: ast.AST,
+    module: str,
+    leaf_keys: dict[tuple[str, str], frozenset[str]],
+    providers: dict[tuple[str, str], frozenset[str]],
+    groups: dict[str, tuple[str, frozenset[str]]],
+    top: str,
+) -> set[PolicyUse]:
     parents = _parents(tree)
-    module = path.stem
     uses: set[PolicyUse] = set()
     for function in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
         if function.name == "__post_init__":
@@ -827,6 +844,31 @@ def _scan_module(
             function, module=module, parents=parents, resolver=resolver
         )
     return uses
+
+
+def scan_source_for_uses(
+    policy: StrategyBacktestPolicy, source: str, *, module: str = "probe"
+) -> tuple[PolicyUse, ...]:
+    """합성 소스 한 조각에서 쓰임을 뽑는다 — **추적 규칙의 경계**를 재는 test 용.
+
+    출하 모듈은 그 경계를 올라타는 모양을 늘 담고 있지 않다(지금 tuple 리터럴 대입이 하나도
+    없다). 그런 자리는 합성 조각으로 재야 규칙이 문면과 같은지 확인할 수 있고, 나중에 그런
+    코드가 들어와도 규칙이 먼저 선언돼 있다."""
+    keys = policy_file_keys()
+    leaf_keys = _leaf_keys(policy, keys)
+    return tuple(
+        sorted(
+            _scan_tree(
+                ast.parse(source),
+                module,
+                leaf_keys,
+                _providers(leaf_keys),
+                _group_classes(policy),
+                type(policy).__name__,
+            ),
+            key=lambda use: (use.key, use.site, use.consumer),
+        )
+    )
 
 
 def policy_value(policy: StrategyBacktestPolicy, key: str) -> object:

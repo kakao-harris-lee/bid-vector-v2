@@ -100,6 +100,7 @@ from tests.evaluation._backtest_support import (
     policy_value,
     rows_bytes,
     sample_list_bytes,
+    scan_source_for_uses,
 )
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
@@ -1542,6 +1543,48 @@ def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
         "부류 단언 하나로 두 자리를 덮으려 한다 — 자리마다 전용 probe 나 변이가 필요하다: "
         f"{crowded}"
     )
+
+
+_TUPLE_PROBE_SOURCE = """
+def probe(policy):
+    pair = (policy.verdict.alpha, policy.verdict.target_power)
+    return consume(pair)
+"""
+
+_CALL_PROBE_SOURCE = """
+def probe(policy):
+    scaled = widen(policy.verdict.alpha)
+    return consume(scaled)
+"""
+
+
+def test_a_container_literal_is_not_followed_but_a_call_is() -> None:
+    """cr r1 P-8 — 「컨테이너는 뚫지 않는다」가 문면이 아니라 **규칙**이다.
+
+    `_CONTAINER_NODES` 에 `ast.Tuple` 이 없던 동안 `x = (p.a, p.b)` 는 추적을 통과했고,
+    docstring 의 「담는 식은 값이 아니라 담는 자리」와 코드가 갈려 있었다. 방향이 보수적이라
+    (등재가 늘 뿐 쓰임이 숨지 않는다) 거동 결함은 아니었지만, 규칙이 문면과 같아야 다음 사람이
+    경계를 읽을 수 있다.
+
+    출하 코드에 tuple 리터럴 대입이 **하나도 없어** 명단은 이 변경에 움직이지 않는다(실측).
+    그래서 합성 조각으로 잰다 — 양성 대조(호출을 품은 식)를 함께 둬서 「아무것도 안 따라간다」와
+    구별한다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+
+    from_tuple = scan_source_for_uses(policy, _TUPLE_PROBE_SOURCE)
+    assert not [use for use in from_tuple if use.derived], (
+        f"tuple 리터럴을 뚫고 파생을 만들었다: {from_tuple}"
+    )
+    assert {use.consumer for use in from_tuple} == {"assign"}, from_tuple
+    """담긴 값의 읽기는 **대입 자리에서** 그대로 남는다 — 쓰임이 숨지 않는다."""
+
+    from_call = scan_source_for_uses(policy, _CALL_PROBE_SOURCE)
+    derived = [use for use in from_call if use.derived]
+    assert derived, (
+        f"호출을 품은 식에서 파생이 나지 않았다 — 양성 대조가 비었다: {from_call}"
+    )
+    assert {use.consumer for use in derived} == {"consume"}, derived
 
 
 def test_the_derived_label_equals_the_measured_derivation() -> None:
