@@ -71,9 +71,15 @@ _assert_plain_identifier() {
   esac
 }
 
+# `flyway_schema_history` 는 이 목록에서 뺀다 — 그 표의 정본 측정은 아래 `flywayHistory`
+# 이고(행 집합 전체 해시라 내용 해시보다 강하다), 두 자리에서 재면 같은 사실이 두 번
+# 들어가 **되돌림 판정이 갈라진다**: forward-fix 뒤 이력은 늘어나는 것이 정상인데
+# `tables` 쪽 사본이 그것을 「데이터가 돌아오지 않았다」로 신고했다(2026-10-05 실측).
+# 권한 행렬에는 그대로 남는다 — 이력 표의 GRANT 는 6B-1 축9 가 못 박은 사실이다.
 Q_TABLES=$(cat <<'SQL'
 select table_name from information_schema.tables
  where table_schema = 'public' and table_type = 'BASE TABLE'
+   and table_name <> 'flyway_schema_history'
  order by table_name
 SQL
 )
@@ -114,7 +120,7 @@ select coalesce(jsonb_object_agg(table_name, cols), '{}'::jsonb) from (
                                      coalesce(column_default, ''), is_identity)
                    order by ordinal_position) as cols
     from information_schema.columns
-   where table_schema = 'public'
+   where table_schema = 'public' and table_name <> 'flyway_schema_history'
    group by table_name) c
 SQL
 )
