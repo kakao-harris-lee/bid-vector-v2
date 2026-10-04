@@ -88,7 +88,17 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`architectur
 
 ## 하네스 레인 변경
 
-(착수 뒤 리뷰 요청 시점마다 등재)
+(착수 뒤 리뷰 요청 시점마다 등재 — slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다)
+
+PR 요청 시점(2026-10-05) 기준 팀장 레인 커밋 18:
+
+| 커밋 | 내용 | 닿는 파일 |
+|---|---|---|
+| `7839edfb` · `3e41dff5` | milestone-6 착수 문단 · 종결 문단(rollback 실측 HEAD) | `milestone-6.md`(hunk 둘) |
+| `7839edfb` · `f9beea36` · `74d2e05a` · `7936b28f` · `311223f5` · `31fe04fc` · `048e77f6` · `0730297c` · `bc9d4b2e` · `84cefbef` · `33664c75` · `7356050f` · `d4029a1e` · `3e41dff5` · `003e7498` · `9ecc44f9` · `a5d78905` · `aa47b171` | 계약 초안 + 갱신 r1~r13(D-6G2g-1~29) + 이 커밋 | `scope.md` |
+| (다음) | `rollback.md` 실측 HEAD 갱신(종결 커밋에서 ①~⑥ 재실측) | `rollback.md` |
+
+`.claude/**`·`CLAUDE.md` 편집 없음(`git log ecdc9d9f..HEAD -- .claude CLAUDE.md` 빈 출력). 설계 검토는 `_workspace/m6-6g2g/01_design-review.md`(세션 모델 단독, 미커밋 — `_workspace/` 는 gitignore).
 
 ## 입력 OPEN (이 slice 가 닫지 않는 것)
 
