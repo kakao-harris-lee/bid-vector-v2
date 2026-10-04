@@ -100,6 +100,27 @@ class GateRegistrationCensusTest {
         assertEquals(setOf("p.CycleTest"), census.population)
     }
 
+    /**
+     * **순환 참가자를 먼저 풀고, 그 다음 그 참가자에 의존하는 다른 애노테이션을 묻는다**(cr r2 R-1).
+     *
+     * 이 모양이 캐시의 결함을 가른다: `A` 를 풀 때 `B` 가 「진행 중인 `A`」에서 거짓을 받아 자기 결과를
+     * 거짓으로 굳히면, 뒤이은 `C`(→`B`)가 거짓이 된다. 앞 판의 두 구현(원래 `getOrPut` · 진행 중 노드만
+     * 빼는 판) 모두 이 질문에서 틀린다 — **질문한 노드 자신**만 보는 test 는 둘 다 통과시킨다.
+     */
+    @Test
+    fun `순환 참가자를 먼저 푼 뒤 그것에 의존하는 애노테이션을 물어도 참이다`() {
+        val meta = mapOf("p.A" to setOf("p.B", TEST), "p.B" to setOf("p.A"), "p.C" to setOf("p.B"))
+
+        val census =
+            census(
+                facts("p.FirstTest", methods = setOf("p.A")),
+                facts("p.SecondTest", methods = setOf("p.C")),
+                meta = meta,
+            )
+
+        assertEquals(setOf("p.FirstTest", "p.SecondTest"), census.population)
+    }
+
     /** 어디에도 닿지 않는 순환은 거짓이고, 두 번 물어도 같은 답이다(캐시가 답을 바꾸지 않는다). */
     @Test
     fun `어휘에 닿지 않는 순환은 모집단을 늘리지 않는다 — 두 번 물어도 같다`() {

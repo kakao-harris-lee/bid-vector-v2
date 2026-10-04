@@ -135,25 +135,29 @@ internal object GateRegistration {
 }
 
 /**
- * 메타 애노테이션을 따라가 발견 어휘에 닿는지 — 순환은 **진행 중 집합**이 끊는다.
+ * 메타 애노테이션을 따라가 발견 어휘에 닿는지 — **질의마다 방문 집합 BFS** 이고 교차 질의 캐시가 없다.
  *
- * 순환을 끊으며 낸 `false` 를 캐시하면 안 된다(cr r1 G-5): 그 값은 「이 경로로는 못 닿는다」일 뿐인데
- * 캐시는 「영원히 못 닿는다」로 읽힌다 — 같은 노드가 **다른 경로로** 발견 어휘에 닿아도 영구히 거짓이
- * 되고, 방향이 **미탐**이다. 진행 중인 노드는 그 자리에서만 거짓을 돌려주고 캐시하지 않는다.
+ * 캐시를 두면 안 된다(cr r2 R-1). 순환을 끊으며 돌려준 거짓은 「이 경로로는 못 닿는다」일 뿐인데, 그
+ * 거짓을 **소비한 이웃 노드**가 자기 결과를 캐시하면 그 이웃은 영구히 거짓이 된다 — 뒤이어 그 이웃에
+ * 의존하는 다른 애노테이션을 물으면 거짓이 돌아온다(반례 `A→[B,Test] · B→[A] · C→[B]` 에서 `A` 를 먼저
+ * 풀면 `B` 가 거짓으로 굳고 `C` 가 거짓이 된다). 진행 중 노드만 캐시에서 빼는 것으로는 부족하다.
+ *
+ * 애노테이션 그래프는 노드가 한 줌이라 질의마다 다시 걷는 비용이 무시할 만하다. class 파일 읽기는
+ * [ClasspathMetaAnnotations] 가 따로 캐시한다 — 캐시를 없앤 것은 **판정**이지 I/O 가 아니다.
  */
 private class DiscoveryReach(
     private val annotations: Set<String>,
     private val metaAnnotations: (String) -> Set<String>,
 ) : (String) -> Boolean {
-    private val resolved = mutableMapOf<String, Boolean>()
-    private val inProgress = mutableSetOf<String>()
-
-    override fun invoke(name: String): Boolean = resolved[name] ?: if (inProgress.add(name)) compute(name) else false
-
-    private fun compute(name: String): Boolean {
-        val result = name in annotations || metaAnnotations(name).any(this)
-        inProgress -= name
-        resolved[name] = result
-        return result
+    override fun invoke(name: String): Boolean {
+        val seen = mutableSetOf<String>()
+        val pending = ArrayDeque(listOf(name))
+        while (pending.isNotEmpty()) {
+            val current = pending.removeFirst()
+            if (!seen.add(current)) continue
+            if (current in annotations) return true
+            pending += metaAnnotations(current)
+        }
+        return false
     }
 }
