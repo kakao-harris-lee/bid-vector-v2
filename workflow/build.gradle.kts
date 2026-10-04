@@ -32,4 +32,12 @@ tasks.withType<Test>().configureEach {
     inputs
         .file(rootProject.file("config/quality/gate-tests.properties"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // `SampleSelectionTest`(D-6G2c-19 (b))도 같은 자리다 — 용도 구분자의 정본은 스냅숏 스키마
+    // 계약 문서이고 그 test 가 **문서에서 읽어** 코드와 맞댄다. 선언이 없으면 문서만 바꾼 편집이
+    // task 를 UP-TO-DATE 로 건너뛰어 등식이 꺼진 채 초록이 된다(실측: 용도 토큰 변경 뒤 재실행 0).
+    // 루트가 빌드 캐시를 켜 두므로 CI 도 같다 — 안 돌린 게이트는 아무것도 막지 못한다.
+    inputs
+        .file(rootProject.file("reports/evidence/m6/6g/snapshot-schema.md"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

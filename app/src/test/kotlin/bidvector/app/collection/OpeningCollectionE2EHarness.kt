@@ -14,6 +14,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.boot.context.event.ApplicationPreparedEvent
 import org.springframework.context.ApplicationContext
 import org.springframework.context.ApplicationListener
+import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.io.ByteArrayOutputStream
@@ -140,31 +141,44 @@ internal class OpeningCollectionE2EHarness {
         val originalErr = System.err
         System.setOut(PrintStream(stdio, true, StandardCharsets.UTF_8))
         System.setErr(PrintStream(stdio, true, StandardCharsets.UTF_8))
-        E2E_FIXED_NOW.set(now)
-        if (!reuseRunState) freshRunStateDir()
-        val mock =
-            mockFor(nonce, throttleOnce, openingCompletePageSize, failOpeningCompleteSecondPageOnce, paging)
-        val context =
-            SpringApplicationBuilder(
-                BidVectorApplication::class.java,
-                CollectionTerminationTestConfiguration::class.java,
-                FixedClockTestConfiguration::class.java,
-            ).properties(
-                PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
-            ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachRootLogCapture(logs) })
-                .run()
-        return try {
+        // **기동도 `try` 안이다**(D-6G2c-19 (a) = cr r5-t M-4 = vr r5-t M-4). 앞 판은 `.run()` 이
+        // `try` **밖**이라 기동이 던지면 `finally` 가 돌지 않았다: 표준 출력·오류가 되돌려지지 않고
+        // [lastStdio] 가 **앞 실행의 것**으로 남았다. 그래서 실패 경로의 누출 자물쇠가 이번 실행의
+        // 출력을 보지 않았다 — 심은 누출 둘이 그 경로에서 초록이었다.
+        var mock: MockOpeningKonepsHttp? = null
+        var context: ConfigurableApplicationContext? = null
+        try {
+            E2E_FIXED_NOW.set(now)
+            if (!reuseRunState) freshRunStateDir()
+            val started =
+                mockFor(nonce, throttleOnce, openingCompletePageSize, failOpeningCompleteSecondPageOnce, paging)
+            mock = started
+            context = bootContext(started, extra)
             inspect(context)
-            context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to mock
+            return context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to started
         } finally {
-            context.close()
-            mock.close()
+            context?.close()
+            mock?.close()
             E2E_FIXED_NOW.set(null)
             System.setOut(originalOut)
             System.setErr(originalErr)
             lastStdio = stdio.toString(StandardCharsets.UTF_8)
         }
     }
+
+    /** 출하 조립을 띄운다 — 기동 절차와 누출 자물쇠의 `try/finally` 를 한 함수에 섞지 않는다. */
+    private fun bootContext(
+        mock: MockOpeningKonepsHttp,
+        extra: Map<String, String>,
+    ): ConfigurableApplicationContext =
+        SpringApplicationBuilder(
+            BidVectorApplication::class.java,
+            CollectionTerminationTestConfiguration::class.java,
+            FixedClockTestConfiguration::class.java,
+        ).properties(
+            PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
+        ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachRootLogCapture(logs) })
+            .run()
 
     /** mock 을 짓는 자리 — 기동 절차와 응답 판을 한 함수에 섞지 않는다. */
     private fun mockFor(

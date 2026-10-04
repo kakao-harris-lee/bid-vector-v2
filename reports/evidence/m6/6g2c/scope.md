@@ -1,0 +1,206 @@
+# M6/6G-2c — 6G 리뷰 후속 일괄(형식 무관분): 잠금 실측 · 실행 상태 표면 · 공시 어휘 (계약 초안 2026-09-30 · 착수 2026-10-04)
+
+> **지위: 착수(계약 갱신 r0-b, 2026-10-04).** 초안은 `docs/m6-6g2-contracts` 커밋 `576d92f7`(2026-09-30). 착수 실측과 운영자 결정 A-1~A-3 은 아래
+> 「계약 갱신 r0-b」 절이 정본이고, 초안 표의 처분이 그 절과 다르면 **r0-b 가 이긴다**(표에는 → D-6G2c-nn 포인터만 달았다).
+> **운영자 결정 A-3 으로 이 slice 는 셋으로 갈린다** — ① **이 PR(6G-2c)**: 실행 상태 **형식·스키마에 닿지 않는** 항목만 ② **6G-2g**(신설, 게이트 OPEN 여섯)
+> ③ **6G-2c-형식**: 스냅숏 추출 뒤에만 머지할 수 있는 항목(아래 D-6G2c-28). 수집은 지금 진행 중(디렉터리 `m6-6g`, 3일째)이라 형식에 닿는 변경은 머지할 수 없다.
+> 수령하는 OPEN: **`OPEN-6G-REVIEW-FOLLOWUPS`**(6G 계약 D-6G-75 — code-review r5 M-3·LOW 잔여, verifier r5 L-7·L-8·L-9, privacy r2 INFO).
+> **항목 목록은 6G 표적 재검증과 PR 리뷰 결과로 갱신한다** — 거기서 나온 low 도 이 slice 가 받는다.
+
+- base: **`ecdc9d9f`**(main, PR #58 머지 커밋). worktree `bid-vector-v2-m6-6g2c` · 브랜치 `m6-6g2c/2026-10-04`.
+- 레인: `kotlin-implementer`(항목 K) · `ml-implementer`(항목 P). 두 레인의 파일이 겹치지 않는다 — 공유 파일(`milestone-6.md` · 이 scope.md · `config/quality/gate-tests.properties`)은 팀장과 K 만 만진다(P 는 `ml-engine/**` 안에서만).
+
+## 왜 이 slice 인가
+
+6G 는 재작업 상한에 닿아 **실수집에 닿는 것만** 고치고 닫았다(D-6G-65·75). 남은 것은 셋으로 갈린다: 게이트 둘(6G-2a·6G-2b 가 받는다)과
+이 slice 가 받는 **작은 항목들**이다. 하나하나는 low 또는 info 지만 같은 자리(실행 상태 디렉터리 · 잠금 · 판정문 공시)에 모여 있어 한 번에 본다.
+
+이 slice 의 항목은 **오늘 출하 거동을 틀리게 만들지 않는다** — 전부 fail-closed 이거나 회귀 자물쇠의 부재이거나 문면이다.
+
+## 실수집과의 관계 — 머지 시점 제약
+
+6G 실수집은 **며칠에 걸쳐 같은 실행 상태 디렉터리**로 이어 돈다. 그 사이에 실행 상태의 형식이나 해시가 바뀌면 진행 중인 디렉터리가 기동을 거부한다.
+
+- 항목마다 **「실행 상태 형식에 닿는가」** 를 표에 적는다.
+- **닿는 항목은 실수집이 끝나고 스냅숏을 추출한 뒤에만 머지한다.** 닿지 않는 항목은 아무 때나.
+- 그래서 이 slice 는 PR 을 **둘로 나눌 수 있다**(형식 무관 항목 먼저). 나누는지는 착수 시 실수집 진행 상태를 보고 정한다.
+
+## 착수 실측 (착수 시 채운다)
+
+| 항목 | 값 |
+|---|---|
+| base SHA | `ecdc9d9f` |
+| 6G 표적 수정(D-6G-74)이 이미 닫은 항목 | vr r5 M-2 · L-2 · L-4 · L-5 · L-6, cr r5 LOW 한 줄짜리(항등식 test 항 넷 · 미사용 import · PENDING `outcome` 표기) — 초안 표에 없던 것들이라 뺄 행 없음. vr r5-t **L-2(`budget-since` 잔존 설정)** 는 저장소에서 그 설정이 사라져(`grep -rn 'budget-since\|budgetSince' app/src adapters/src workflow/src` 0건) **닫힘**. vr r5-t **L-3** 은 verifier 가 「low(확인) — 걷기 식별자는 한 자리에서 지어진다」로 적은 확인 항목이라 할 일 없음 |
+| 6G 뒤 slice 들이 이 slice 로 넘긴 항목 전수 | D-6G-79(cr r5-t M-4 · L-3~L-7 · vr r5-t 저위 변이 둘 · vr r5-t M-4) · 6G-2d(D-6G2d-22 ① · cr r1 M-2) · 6G-2e(D-6G2e-25 ①②③④⑤⑥⑦⑧ · `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE` · `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`) · 6G-2a(`OPEN-6G2A-CENSUS-DERIVED-LOCALS`) · 6G-2f(`OPEN-6G2F-NOTICE-LIST-ROWS` · `OPEN-6G2D-FRAME-REWALK` · `OPEN-6G2F-MAX-PAGES-PROVENANCE`) · 6G-2b 게이트 OPEN 여섯 · 6G-2d `OPEN-6G2D-EMPTY-AXIS-REASON` — 처분은 D-6G2c-19~28 |
+| 실수집 진행 상태 | **진행 중** — 디렉터리 `~/.local/bid-vector-run-state/m6-6g/`, 2026-10-02 시작, 표본 24,000 중 HTTP 7,489(2일) + 3일째 진행. 쪽 999(6G-2f) 뒤 하루 ~1,000 개찰완료 호출 → **추출까지 약 25일**. 형식에 닿는 항목은 이 PR 에 없다 |
+| 코드 실측(D-7·9·11 의 전제) | `NoticeKeyHash` salt 없음(그대로) · 명칭 셋은 스키마 §(`successful_bid_method_name` string\|null · `progress_division` string\|null)에 **원문 자유 텍스트**로 실린다 → D-9 는 스키마 변경(**6G-2c-형식**) · `DivisionCoverage` 는 `COVERED if count else UNDERPOWERED` 두 값(`report.py`) · `RunStateLock.release()` 는 인터페이스 public, `RunStateDirectory.close() = lock.release()` · `sampleList: FileSampleListLedger` 는 held 가드 없는 public val · `_APPROVED_SEED_KEYS` 두 벌(`evaluation/policy.py` · `evaluation/backtest/policy.py`) · `unusableRawRows` 는 러너 로그 한 줄에만(manifest 밖) |
+
+## 항목과 처분
+
+처분은 셋 중 하나다: **구현**(test 와 함께) · **등재**(고치지 않고 사유와 함께 알려진 제한으로) · **운영자 결정**.
+
+### K — Kotlin
+
+| ID | 출처 | 항목 | 처분 | 형식에 닿는가 |
+|---|---|---|---|---|
+| **D-6G2c-1** | cr r5 M-3 | 잠금 E2E 둘이 **같은 JVM** 에서 두 번째 `tryLock()` 을 부른다. 잡히는 것은 `OverlappingFileLockException` 이고 두 프로세스의 경우는 재지 않는다. `tryAcquire` 를 JVM 안 맵 가드로 바꾸는 변이가 초록 | **구현** — 별 프로세스(자식 JVM 또는 셸)가 잠금 파일을 든 상태에서 두 갈래를 각각 기동 → 0 요청 · `ALREADY_RUNNING`. 변이(JVM 안 가드) → RED. verifier r5 가 손으로 잰 것을 저장소에 둔다 | 아니오 |
+| **D-6G2c-2** | cr r5 M-3 부수 | `runCatching` 이 `IOException` 도 삼켜 「잠글 수 없는 파일시스템」과 「다른 실행 중」이 같은 코드로 보고된다 | **구현** — 사유 어휘를 둘로 가른다(닫힌 어휘에 하나 추가). 둘 다 0 호출로 멈추는 것은 그대로 | 아니오(로그·종료 사유만) |
+| **D-6G2c-3** | vr r5 L-7 | 「잠금을 밖에서 들고 **각 갈래**를 기동」 중 공고 목록 갈래 E2E 가 없다 | **구현** — D-6G2c-1 의 test 가 두 갈래를 다 덮는다 | 아니오 |
+| **D-6G2c-4** | cr r5 L-1 · vr r5 L-9 | `RunStateDirectory.sampleList` 는 잠금을 못 든 인스턴스에서도 쓰기 가능하다. `RunStateLock.release()` 가 public 이라 살아 있는 실행의 잠금만 풀 수 있다(원장은 쓰기 가능한 채) | **구현** — 표본 원장도 잠금 없는 인스턴스에서 쓰기를 거부(시도 원장과 같은 감싸기). `release` 는 가시성을 내리거나 `close` 하나로 합쳐 「잠금만 풀린 원장」 상태를 없앤다. **값 획득 축**: 가시성 변경이 새 public 표면을 만들지 않는지 표에 적는다 | 아니오(파일 형식 무변경) |
+| **D-6G2c-5** | vr r5 L-9 | 한 `RunStateDirectory` 인스턴스를 두 스레드가 쓰면 장부가 깨진다(probe P2b). 운영 경로는 순차다 | **등재** — 「한 인스턴스는 한 스레드」를 KDoc 과 알려진 제한에 적는다. 동기화를 넣지 않는다(쓰는 자리가 없다) | — |
+| **D-6G2c-6** | cr r5 L-8 | 두 수집 배선이 각자 `RunStateDirectory`·`CallBudgetLedger` 빈을 등록한다. 두 모드를 **함께** 켜면 컨텍스트가 뜨지 않는다(fail-closed). `CollectionProperties.runStateDir` KDoc 은 한 프로세스에서 둘을 켜는 판을 상상하게 한다 | **구현(문면 + test 하나)** — KDoc 을 「두 갈래는 따로 기동한다」로 좁히고, 두 모드를 함께 켠 기동이 실패함을 test 로 고정한다. `@Qualifier` 로 공존시키지 않는다 — 한 프로세스에 두 갈래를 두는 요구가 없다 | 아니오 |
+| **D-6G2c-7** | privacy r2 INFO-1 | `NoticeKeyHash` 는 `sha256("<공고번호>/<차수>")` 이고 salt 가 없다. 공고번호는 공개 정보라 해시를 되돌릴 수 있다. 이 해시가 스냅숏 · 표본 목록 · 시도 원장에 실린다 | **운영자 결정 A-1 → (가) 그대로(D-6G2c-16)** — 등재로 닫는다 | **예** — 그래서 (나)는 처음부터 선택지 밖이었다 |
+| **D-6G2c-8** | privacy r2 INFO-3 | `state.json` 의 `directory_id` 는 절대 경로의 sha256 이다. 경로에 로컬 계정명이 들어 있다. 파일은 저장소 밖에 있다 | **등재** — 이 값은 「디렉터리를 다른 자리로 복사했는가」를 재는 것이라 경로에서 와야 한다. 임의 UUID 로 바꾸면 복사본이 같은 값을 갖는다. 통제는 저장소 밖 강제(`requireOutsideRepository`)다 | — |
+| **D-6G2c-9** | privacy r2 INFO-5 | 명칭 셋(낙찰방법 · 예정가격 결정방법 · 진행 상태)이 원문 그대로 스냅숏에 간다. Python 은 판정 조건으로만 쓰고 판정문에 싣지 않는다 | 착수 실측: **원문 자유 텍스트**다 → 닫힌 어휘화는 스키마 변경 → **6G-2c-형식으로 이관(D-6G2c-28)**. 이 PR 에서는 없음 | **예** |
+| **D-6G2c-10** | privacy r1·r2 INFO-A | 상호가 raw 관측에 표본 공고 규모로 적재된다 | **등재 + 연결** — 6B-3 보존 기간(90일, 운영자 결정 2026-09-26)이 raw 관측에 적용되는지를 6B-3 계약의 확인 항목으로 넘긴다. 이 slice 는 파기 코드를 만들지 않는다(데이터 파기는 되돌리기 어려운 경로 — Codex 심판 대상) | — |
+
+### P — Python
+
+| ID | 출처 | 항목 | 처분 | 형식에 닿는가 |
+|---|---|---|---|---|
+| **D-6G2c-11** | vr r5 L-8 | `division_coverage` 는 행이 1 이상이면 `COVERED` 다. 1 행뿐인 업무도 COVERED 로 읽힌다 | **운영자 결정 A-2 → (가) 표지 셋(D-6G2c-17) — 구현** | 판정 JSON 어휘(실행 상태 아님 — 이 PR) |
+| **D-6G2c-12** | Python r5 등재 제한 | manifest 키를 늘리면 고칠 자리가 판독기 하나가 아니다 — test 쪽 생성기 둘(`_backtest_support.manifest_bytes` · `_backtest_fixture.build_files`). 빠뜨리면 판독이 거부해 잡히지만, 어느 자리를 고칠지 등식이 말해 주지 않는다 | **구현** — 두 생성기가 내는 키 집합 == 스키마 문서 §2 의 키 집합 == 판독기 허용 키(**세 자리 등식**). 생성기를 하나로 합치지 않는다(깨뜨린 manifest 를 짓는 test 가 헐거워진다 — 저자 판단 승계) | 아니오 |
+
+## 결정 (항목 밖)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2c-13** | **게이트 술어를 넓히지 않는다.** 이 slice 가 만지는 게이트는 없다. 게이트에 닿는 low(cr r5 L-7 열거 · L-9 판)는 6G-2b·6G-2a 가 받았고, 6G-2b 가 남긴 게이트 OPEN 여섯은 **6G-2g**(D-6G2c-27)가 받는다 | 세 slice 의 경계 |
+| **D-6G2c-14** | **구현 항목마다 변이 하나.** 「고쳤다」는 그 수정을 되돌리는 변이가 RED 일 때만 적는다 | 6G 에서 「대조표에 이행, 실제로 다름」이 반복됐다 |
+| **D-6G2c-15** | **새 항목의 수령 문턱.** 6G 표적 재검증 · PR 리뷰에서 나온 항목 가운데 low·info 만 받는다. medium 이상은 이 slice 에 넣지 않고 팀장이 분류한다(데이터 정확성이면 실수집 차단) | 일괄 slice 가 큰 결함의 은신처가 되지 않게 |
+
+## 계약 갱신 r0-b (2026-10-04, 팀장 — 착수 실측 · 운영자 결정 A-1~A-3 · 수령 항목 처분)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2c-16** | **A-1 (가) — 공고 키 해시는 지금대로**(salt 없음). D-7 은 **등재로 닫는다**: 이 해시의 역할은 익명화가 아니라 결합 키이고, 통제는 저장소 밖 강제(`requireOutsideRepository`)다. `OPEN-6G2C-NOTICE-HASH-KEYING` 은 신설하지 않는다 | 운영자 결정 2026-10-04 · 위협 모델 ⑤ 는 공고번호를 말하지 않는다 |
+| **D-6G2c-17** | **A-2 (가) — 업무 대표 표지를 셋으로**: `COVERED`(업무별 필요 표본 이상) · `UNDERPOWERED`(행은 있으나 필요 표본 미만) · `ABSENT`(행 0). 지금의 행 0 `UNDERPOWERED` 는 `ABSENT` 가 된다. **업무별 필요 표본 수의 출처는 백테스트 정책의 기존 값**(창별 필요 표본 수 공시와 같은 값 — 새 정책 키를 만들지 않는다; 없으면 멈추고 계약 갱신). **창 단위 `NotEvaluableReason.UNDERPOWERED`(D-6G-31) 와 이름이 같지만 다른 축**이다 — 업무 표지가 `UNDERPOWERED` 여도 창 판정은 바뀌지 않음을 test 로 잠근다. 변이: 행 1 업무가 `COVERED` 로 접히면 RED · 행 0 이 `UNDERPOWERED` 로 남으면 RED | 운영자 결정 2026-10-04 · 백테스트 판정 보고 전(추출까지 ~25일) |
+| **D-6G2c-18** | **A-3 — 셋으로 가른다**: ① 이 PR = 형식·스키마 무관 항목 ② **6G-2g 신설**(게이트 OPEN 여섯 — D-6G2c-27) ③ **6G-2c-형식**(D-6G2c-28, 스냅숏 추출 뒤). 「형식에 닿는가」의 판정 기준: 실행 상태 디렉터리(`state.json` · 시도 원장 · 표본 목록 · `sample-scope.json`)의 **바이트·판독 술어**, 또는 스냅숏 스키마(`snapshot-schema.md`)의 **칸·어휘** 가 바뀌면 닿는 것이다. **판독기를 엄격하게 하는 변경도 닿는 것**으로 센다(진행 중 디렉터리를 거부할 수 있다). 판정 JSON(백테스트 verdict)·러너 로그·종료 사유 어휘는 닿지 않는다 | 운영자 결정 2026-10-04 · 「실수집과의 관계」 절 |
+| **D-6G2c-19** | **수령 — D-6G-79(6G code-review r5-t · verifier r5-t), K 레인**: **cr r5-t M-4 = vr r5-t M-4**(같은 결함) — E2E harness `bootAndRun` 이 `System.setOut/setErr` 뒤 `.run()` 을 `try` 밖에서 불러 실패 경로 test 가 **그 실행의** stdio 를 읽지 않는다(심은 누출 둘이 실패 경로에서 초록) → **구현**: `try/finally` 로 되돌리기·`lastStdio` 대입을 보장하고 실패 경로 누출 test 가 이번 실행의 출력을 읽음을 **심은 누출 변이 RED** 로 보인다. **게이트 술어(누출 자물쇠)를 바꾸는 커밋**이라 verifier 표적 재검증 대상 · **cr L-3** 구분자 등식이 문서 ↔ 코드가 아니라 리터럴 ↔ 코드 → **구현**: `snapshot-schema.md` §2.2 의 구분자 문면을 test 가 파일에서 읽어 비교(문서만 바뀌면 RED) · **cr L-4** 고정 시계 harness 의 걷기 이름 충돌 → **구현(test harness)**: 고정 시계 test 가 서로 다른 걷기를 만들 때 `walkNameOf` 가 같은 이름을 내지 않게 harness 쪽에서 시계를 전진 · **cr L-5** `OBSERVATION_SQL` 전건 순차 훑기 → **등재**(표본 24,000 규모에서 추출은 1회성 배치; 측정 없이 색인·조건을 더하지 않는다) · **cr L-6** `torn` 표식 위치 무제한 → **6G-2c-형식**(판독 엄격화) · **cr L-7** 표식 줄이 매일 오늘치 1 을 뺀다(보수 방향) → **등재**(하루 1 호출 손해, 상한 1,000 에서 무시 가능; 고치면 예산 셈이 바뀌어 진행 중 디렉터리의 오늘치 셈과 어긋남) · **vr r5-t 저위 변이 둘**(UTC 하루 경계 변형 GREEN · `alreadySpent` 기본값 되살림 GREEN) → **구현**: 각각을 RED 로 만드는 test 하나씩 | D-6G-79 · 변이 적용 확인 규율 |
+| **D-6G2c-20** | **수령 — 6G-2d(D-6G2d-22 ① · cr r1 M-2), K 레인**: 형식 거부의 러너 종료 코드 → **등재 유지**(D-6G2d-22 ① 의 사유 그대로 — 디렉터리 열기가 빈 의존이고 「여는 자리 = 잠금 자리」; 거부 사유의 닫힌 토큰이 기동 실패 출력에 있음은 6G-2d 가 test 로 잠갔다) · `unusableRawRows` 세 원인(빈 번호 · 형태 어긴 차수 · 열거 밖 엔드포인트) 분리 계수 → **구현**: 러너 로그 한 줄에 세 계수를 따로 싣고(`unusableRawRows` 합계 이름 유지), 세 원인 각각을 심은 raw 행 셋이 각자 칸에서만 1 임을 test 로. **manifest 에는 싣지 않는다**(실으면 스키마). 새 public 표면이 생기면(계수 셋을 나르는 타입) (2b) 표에 올린다 | 6G-2d OPEN 표 |
+| **D-6G2c-21** | **수령 — 6G-2e D-6G2e-25, K 레인(①②⑦⑧) · P 레인(③④⑤⑥)**: ① `verifyThenHeal` 의 순서를 **접두 대조 → 되돌림**으로(한 줄) → **구현** + 「확정 중단 + 접두 변조」 디렉터리의 표본 파일이 거부 뒤에도 남아 있음을 test 로 ② 진짜 절단(장부가 센 줄의 꼬리 손실)과 변조의 진단 메시지 분리 → **구현(메시지만 — 둘 다 거부 그대로)**; 거부 사유 어휘에 값 하나 추가는 「닫힌 어휘에 추가」로 형식에 닿지 않는다(실행 상태 바이트 무변경) ⑦ Busy 경로에서 `LedgerDigest` 를 짓지 않는다(Held 에서만) → **구현** + 원장이 판독 불가인 디렉터리를 밖에서 잠근 채 기동하면 예외가 아니라 `ALREADY_RUNNING` 임을 test 로 ⑧ `SnapshotAValueContractTest`·`SnapshotAmountContractTest` 가 snapshot 패키지 양방향 등재에 없다 → **구현(등재 추가만)**: `config/quality/gate-tests.properties` 에 등재하고 **등재 ↔ 패키지의 test 클래스 집합 등식**이 이미 있으면 그 등식이 왜 이 둘을 놓쳤는지 적는다(없으면 신설하지 않는다 — 게이트 술어 확장은 6G-2g) ③ `_APPROVED_SEED_KEYS` 두 로더 중복 → **구현**: 공용 자리 하나로, 두 로더가 같은 객체를 쓰고 길이 비교가 아니라 **키 집합 등식**으로 ④ CLI 가 기존 `verdict.json` 을 조용히 덮어씀 → **구현**: 존재하면 거부(종료 코드 ≠ 0, 닫힌 사유), 덮어쓰기 플래그는 **만들지 않는다**(runbook 은 스냅숏별 판정 디렉터리) ⑤⑥ 기동 시 `state.json` 두 번·원장 세 번 읽기 → **등재**(정확성 무관, 측정 없이 캐시를 넣지 않는다) | D-6G2e-25 |
+| **D-6G2c-22** | **수령 — `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE`, P 레인 → 구현**: 공백·한글이 든 스냅숏 경로를 판독기가 끝까지 읽는다(`file:` URI 는 `urllib.parse.unquote` — HTTP 모듈 금지는 D-6G2e-23 ① 그대로). test: 공백·한글 디렉터리의 스냅숏을 지어 백테스트 CLI 가 exit 0 · 변이(디코딩 제거) RED | 6G-2e D-16·20 |
+| **D-6G2c-23** | **수령 — `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`, P 레인 → 구현**: `ml-engine/pyproject.toml` import-linter 「app 은 DB·HTTP·업무 모듈을 모른다」 계약의 `forbidden_modules` 가 서드파티 다섯만 열거해 `urllib.request`·`http.client` 같은 **표준 HTTP 모듈**이 지나간다 → 금지를 **패키지 뿌리 + 표준 HTTP 모듈**(`urllib.request` · `http` · `socket` 등 — 목록은 계약 파일 한 자리)까지 넓히고, 6G-2e 가 임시로 둔 test 쪽 AST sweep 의 금지 집합과 **등식**(test 가 pyproject 를 읽어 비교). 변이: app 층 모듈에 `import urllib.request` 한 줄 → `lint-imports` RED **그리고** AST sweep RED. 이것은 게이트 술어 변경이라 verifier 표적 재검증 대상 | 6G-2b D-6G2b-41 이관 |
+| **D-6G2c-24** | **수령 — `OPEN-6G2A-CENSUS-DERIVED-LOCALS`, P 레인 → 구현(한 단계)**: 쓰임 명단(AST) 이 **제공자 호출 결과를 품은 식에서 대입된 지역 변수**(`timedelta(days=p.x)` · `rate_from_basis_points(p.y)` · 합·곱)의 소비자를 **한 단계** 따라간다. 두 단계 이상·컨테이너 경유는 알려진 제한으로 남긴다(사유: 데이터 흐름 해석기를 짓지 않는다). 공시 칸당 키 **둘 이상** 흔들기(PR #53 리뷰 ④)도 함께. 변이: 파생 지역 변수의 소비자를 하나 지우면 구조 축 RED. 넘치면(한 단계가 명단을 거짓 양성으로 채우면) 이탈 사유와 함께 등재로 되돌린다 | 6G-2a D-6G2a-24 |
+| **D-6G2c-25** | **수령 — `OPEN-6G2F-NOTICE-LIST-ROWS` → 등재 유지(이 PR 코드 0)**: 공고 목록 레인 쪽 100 은 일일 증분(하루 ~470 공고 → 5 쪽)에서 1,000 안이고 백필은 끝났다. 백필 재실행이 필요해지는 때(운영 전환 M7 뒤)에 값 slice 로 연다 — 그때 3B 기존 test 무편집 제약을 다시 본다 | 6G-2f D-6G2f-5 |
+| **D-6G2c-26** | **수령 — D-6G2c-10(raw 관측 보존 기간) → 등재 + `OPEN-6B3-RAW-OBSERVATION-RETENTION` 신설**(6B-3 으로). 이 slice 는 파기 코드를 만들지 않는다 | 초안 그대로 |
+| **D-6G2c-27** | **6G-2g 신설 — 게이트 OPEN 여섯**: `OPEN-6G2B-COLLECTION-DEPTH` · `OPEN-6G2B-FOLDING-UNIFICATION` · `OPEN-6G2B-REFLECTION-ROOT-DOMAIN` · `OPEN-6G2B-ALLOWED-PACKAGE-EGRESS` · `OPEN-6G2B-HOLDER-INTERNAL-SURFACE` · `OPEN-6G-GATE-REGISTRY-KONEPS` (+ r8 에서 `OPEN-6G2G-REGISTRATION-PACKAGE-COVER` — D-38 ④). 전부 **게이트 술어 확장**이라 D-13(이 slice 는 게이트를 넓히지 않는다)에 걸린다. 계약 초안은 이 PR 종결 뒤 팀장이 쓴다(`reports/evidence/m6/6g2g/scope.md`). 순서: **6G-2c → 6G-2g → (추출 뒤) 6G-2c-형식** | 운영자 결정 A-3 |
+| **D-6G2c-28** | **6G-2c-형식 — 스냅숏 추출 뒤에만 머지할 수 있는 항목**: D-6G2c-9(명칭 셋 닫힌 어휘 — 스키마) · `OPEN-6G2D-EMPTY-AXIS-REASON`(스키마 v6 후보) · `OPEN-6G2D-FRAME-REWALK`(표본틀을 실행 상태에 보존 — 형식) · `OPEN-6G2F-MAX-PAGES-PROVENANCE`(행 수 문턱을 `sample-scope.json`·장부에 싣기 — 형식) · cr r5-t L-6(`torn` 표식 위치 — 판독 엄격화). **그 PR 의 전제**: 디렉터리 `m6-6g` 의 스냅숏이 추출돼 있고 다음 수집은 새 디렉터리에서 시작한다(상한 N=3 창도 새로). 계약은 추출 뒤 쓴다 | 운영자 결정 A-3 · D-18 기준 |
+| **D-6G2c-29** | **in_scope 정정**(초안 대비): Python 쪽을 `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**` 로 넓힌다(D-21 ③④ · D-22 · D-23 · D-24 의 자리). Kotlin 쪽 `adapters/.../koneps/**` 는 **넣지 않는다**(D-25 등재 유지; cr L-4 의 `walkNameOf` 는 harness 쪽에서 푼다 — production 무편집). `snapshot-schema.md` 는 **이 PR 에서 편집하지 않는다**(형식 무관 PR 의 정의) — 단 cr L-3 의 test 가 그 파일을 **읽기만** 한다 | D-18 |
+| **D-6G2c-30** | **acceptance 확정**: Kotlin `check` job · `ml-engine` job · container job(production 코드 변경: `RunStateDirectory` · `JdbcSnapshotSource` · `SnapshotExtractionRunner` · 수집 배선 KDoc). 구현 항목마다 변이 하나(D-14), 게이트 술어를 바꾸는 둘(D-19 누출 자물쇠 · D-23 import 계약)은 verifier 표적. **(2b) 표**는 K·P 보고에 「새 public 표면」 항목으로 | D-14 · CLAUDE.md 「게이트 술어 변경은 severity 무관 표적 재검증」 |
+| **D-6G2c-31** | **(P 레인 보고, 계약 갱신 r1) `snapshot-schema.md` §2 의 「판정문의 업무 대표 어휘」 문장 하나는 팀장이 고친다.** 그 문장은 **판정 JSON 어휘의 정본**이고 test(`test_division_coverage_vocabulary_matches_the_schema_document`)가 그것과 enum 의 집합 등식을 단언하므로, D-17 을 하려면 문장이 먼저 바뀌어야 한다. D-18 기준으로 판정 JSON 어휘는 형식에 닿지 않는다 — 문장이 스냅숏 스키마 문서 안에 산다는 사실이 그 어휘를 스키마로 만들지 않는다(스냅숏 manifest·rows 의 칸·판독기 술어 무변경). D-29 의 「이 PR 에서 편집하지 않는다」는 **그 문장 하나만 예외**(팀장 커밋, 다른 절 무편집). **필요 표본 수의 출처 확정**: `verdict.min_window_rows`(창당 표본 하한, 정책 주석 「창당 n ≥ 483」) — 업무 행 수 ≥ 그 값 `COVERED` · 1 이상 미만 `UNDERPOWERED` · 0 `ABSENT`. rollback 공유 파일 목록에 `snapshot-schema.md` 를 되돌린다(hunk 격리) | P 레인 보고 2026-10-04 · D-17·18·29 |
+| **D-6G2c-32** | **(P 레인 보고, 계약 갱신 r2) in_scope 누락 정정**: D-22 의 「판독기」는 `ml-engine/src/ml_engine/adapters/snapshot_files.py`(`read_snapshot_files` — `file:` URI → `Path` 변환이 그 한 자리)다. D-29 가 그 자리를 넓힌다고 적고 `adapters/**` 를 빠뜨렸다 → 그 파일 하나를 in_scope 에 더한다(`adapters/**` 전체는 아님). 변경은 `unquote` 한 줄(`urllib.parse` 만 — D-6G2e-23 ① 준수), 판독 술어는 느슨해지지도 엄격해지지도 않는다(없는 경로는 여전히 `NOT_FOUND`). 판독 책임을 `backtest_cli` 로 올리는 대안은 계층을 깨므로 택하지 않는다 | P 레인 보고 2026-10-04 · D-22·29 |
+| **D-6G2c-33** | **(K 레인 보고, 계약 갱신 r3) in_scope 에 `workflow/build.gradle.kts` 의 test task 입력 선언 한 블록을 더한다.** D-19 (b) 「구분자 등식을 문서 ↔ 코드로」는 test 가 `snapshot-schema.md` 를 런타임에 읽는 것만으로는 서지 않는다 — 실측: 문서의 용도 토큰을 바꾸고 `:workflow:test` 를 돌리면 Gradle 이 그 문서를 입력으로 모르므로 **UP-TO-DATE 로 건너뛰어 6초 초록**. 루트 `gradle.properties` 의 `org.gradle.caching=true` + CI 의 `setup-gradle` 캐시 복원이라 CI 에서도 문서만 고친 PR 이 캐시된 초록을 받는다(「안 돌린 게이트는 아무것도 막지 못한다」). 조치는 같은 파일의 기존 관례(`WorkflowGateRegistrationTest` 가 `gate-tests.properties` 를 입력으로 선언한 블록) 옆에 스냅숏 스키마 문서를 같은 형태로 한 줄 — 산출물 코드 무변경. **일반 규율로 올린다**: 문서를 읽어 등식을 재는 Kotlin test 는 그 문서를 test task 입력으로 선언해야 하고, 변이는 **문서만 바꾼 뒤** 재실행이 일어나는지(UP-TO-DATE 가 아닌지)까지 재야 한다. Python 쪽(D-12 · D-17 · D-23 의 문서 읽기 test)은 pytest 가 캐시를 쓰지 않아 이 문제가 없다 | K 레인 보고 2026-10-04 · CLAUDE.md CI 절 |
+| **D-6G2c-34** | **사실 선언 — P 레인 판정 SHA 이동.** 팀장이 P 레인을 `8ebc64bf` 로 동결했을 때, 동결 **앞서** 보낸 두 지시(등식 창 확인 · D-22 음성 대조 두 줄)가 아직 실행 중이었고 레인이 그 지시대로 커밋을 더해 Python 판정 대상이 **`20f1e7ba`** 로 올라갔다(evidence `e045a4b4`, 새 판독기 단위 test 하나 · `ml-engine` job 열 step 재실측 exit 0). 6G-2b D-6G2b-33 과 같은 부류(지시와 동결의 교차)다 — 이력을 되쓰지 않고 verifier·code-reviewer 에 판정 SHA 를 다시 고정해 알린다. 교훈 재확인: **동결 선언 전에 미처리 지시가 없는지 레인에 먼저 묻는다** | 레인 보고 2026-10-04 · CLAUDE.md 「레인 동결 + 판정 대상 SHA 고정」 |
+| **D-6G2c-35** | **P 레인 수정 라운드 1(계약 갱신 r5) — verifier Python r1 `not-ready`(F-1 high) + code-reviewer r1(새 high 없음). 재작업 1/5.** 처분: **F-1 high = cr P-4 → 구현(게이트 술어 — 표적 재검증)**: AST 스윕 범위를 `app/**` + **계약의 `ignore_imports` source 모듈**(pyproject 에서 읽음 — 손 목록 아님)로; 세 모듈 각각에 `import urllib.request` 변이 RED · **F-2 medium = cr P-3**: 금지 목록(계약 파일 한 자리)에 표준 **네트워크 클라이언트** 모듈(`imaplib`·`poplib`·`ftplib`·`smtplib`·`xmlrpc`·`nntplib`)을 더하고, **동적 import(`importlib`·`__import__`)·`asyncio`·`multiprocessing`·`subprocess` 는 경계 밖으로 등재**(import 그래프 게이트는 정적 import 층을 재는 것 — 위협 모델 「방어하지 않는 것」에 한 줄, pyproject 주석 「네 자리 전부 잠근다」 정정) · **F-3 medium = cr P-2 → 구현**: `verdict.json` 쓰기를 `open(…, "xb")` 한 술어로(사전 `exists()` 검사는 빠른 거부로 남겨도 되나 정본은 xb) + 끊어진 링크·같은 디렉터리 두 기동 test · **F-4 medium → 구현**: 길이 같고 키 다른 변이가 RED 인 test · **cr P-5 medium → 구현**: 명단이 파생 여부를 칸으로 나르고 `DERIVED` ⟺ 그 칸 참을 등식으로 · **low 구현**: F-5(`%00` → 닫힌 사유) · F-7(`DivisionCoverageRecord` 가 status ↔ row_count 불변식 검사) · P-7(「한 자리」를 저장소 상대 경로로) · P-8(`ast.Tuple` 컨테이너 추가) · P-9(`--output-dir` 가 기존 파일이면 사전 거부 닫힌 사유) · P-13(파일 셋 미달 test 가 `detail` 끝도 본다) · 문면 F-6 · P-6 · P-10 · **등재**: P-11(창이 문자 200 — 이 slice 가 만든 test 아님) · **P-12 info → 알려진 제한(운영자 가시)**: 창당 하한 483 을 업무당 요구로 쓰므로 표본 24,000·업무 다섯 판에서 업무 대부분이 `UNDERPOWERED` 로 공시될 수 있다 — 판정 경로 소비자 없음, 공시 의미만. **규율**: 수정은 항목별 커밋, 변이 하나씩, 새 public 표면 보고, `ml-engine` job 열 step 전부 재실측, evidence P 절 갱신(F-6 수치 정정 포함). 끝나면 동결·판정 SHA 재고정 → verifier 표적 재검증(F-1 술어 + F-3·F-4·P-5) | verifier r1 `_workspace/m6-6g2c/01_verifier_python_r1.md` · cr r1 `02_code_review_python_r1.md` |
+| **D-6G2c-36** | **(계약 갱신 r6) P 수정 라운드 1 수령 — 판정 SHA `f3a47f05`(evidence `e3422ce4`), 게이트 술어 커밋 둘 `49505a74`·`a179e784`.** ① `ml-engine/src/ml_engine/app/__init__.py` 의 금지 목록 **문면 한 곳**(서드파티 다섯 → 계약 파일 한 자리 참조)을 in_scope 에 더한다(P-10, 거동 0) ② F-2 경계 문장을 위협 모델 「방어하지 않는 것」에 등재(위) ③ F-3 변이 비대칭 수용: `xb` 되돌림이 끊긴 링크 test 만 가르고 「두 기동」 test 는 사전 `exists()` 가 잡아 초록 — 둘 다 두되 변이를 가르는 것은 링크 판 하나임을 evidence 에 적음(레인이 적었다) ④ P-7 변이는 `registry/policy.py` 로 이동(backtest 쪽은 import 순환) — 앞 판 초록 → 이 판 RED. 다음: verifier 표적 재검증(F-1 술어 `a179e784` · F-3 · F-4 · P-5/F-8 · P-7/F-9 · acceptance 열 step) + code-reviewer r2(diff `20f1e7ba..f3a47f05`) | P 레인 보고 2026-10-04 |
+| **D-6G2c-37** | **(계약 갱신 r7) Python 범위 판정 — verifier r2 `ready-for-review` @`f3a47f05`(`_workspace/m6-6g2c/03_verifier_python_r2.md`; F-1~F-9 전부 닫힘 실측, acceptance 열한 step exit 0, pytest 1,417) · code-reviewer r2 새 high 없음(`04_code_review_python_r2.md`). **승인 전 일괄(P, 한 라운드·재검증 없음)**: cr **R-1 low → 구현**: `--output-dir` 의 부모 사슬에 파일이 끼면 사전 거부가 서지 않고 job 뒤 `NotADirectoryError` — 디렉터리 생성(`mkdir(parents=True, exist_ok=True)`)을 **job 앞**으로 올리고 `OSError` 를 `OUTPUT_NOT_A_DIRECTORY` 로 묶어 잎·부모 구분을 없앤다(변이: mkdir 을 뒤로 되돌리면 부모-파일 test RED) · R-2 info(유도가 와일드카드·패키지 예외를 받지 못해 fail-closed RED — docstring 한 줄) · R-4 info(test 함수 중간 no-op 문자열 → `#` 주석) · vr **L-1 장부**: evidence 의 「수정 라운드 1」 라운드 이력 절을 없애고 현재형 표로 접는다(evidence-pack) · **L-2 장부**: 새 public 표면 표의 `DivisionCoverageRecord` 「값만 담는다」 → 불변식 위반 시 거부. R-3 은 기록용. 일괄은 **코드 커밋 하나 + evidence 커밋 하나**로; 끝나면 판정 SHA 를 다시 고정해 보고. K 레인 판정 뒤 rollback·container job·종결은 팀장 | verifier r2 · cr r2 2026-10-04 |
+| **D-6G2c-38** | **(계약 갱신 r8) K 레인 완료 수령 — 판정 SHA `ec07df09`(evidence `9506de0c`), 게이트 술어 커밋 `92b35a82`(누출 자물쇠 harness)·`d65e8a80`(`:workflow:test` 문서 입력 선언).** ① `config/quality/architecture-policy.properties` **사후 승인**: 자물쇠를 `RunStateLock.kt` 로 가르자 같은 참조가 새 클래스 이름으로 관측돼 6G-2b 쌍 등식이 붉었고 쌍 셋을 **옮겨 적은 것**(허용 참조 집합 불변, 술어 확장 없음 — verifier 가 확인) · ② **D-21 ⑦ 절반 — 이탈 수용**: 러너 단위로는 판독 불가 원장 + 밖에서 잠긴 디렉터리가 `ALREADY_RUNNING`; 전 조립 기동은 상한 원장 seed 가 Busy 경로에서도 시도 원장을 읽어 먼저 던진다. 고치려면 seed 순서를 바꾸거나 Busy 에서 0 으로 시작해야 하고 후자는 막아 둔 변이와 같은 모양 → **`OPEN-6G2C-BUSY-SEED-ORDER` 신설**(발생 조건 「원장 판독 불가 **그리고** 동시 기동」 이중 결함, 둘 다 0 호출로 멈춘다 — 운영 영향 없음) · ③ 러너 로그 계수 아홉 → 열둘: runbook §2 문장 하나를 팀장이 고친다(in_scope 한 줄) · ④ **D-21 ⑧ 둘 → 여섯**: 같은 이유로 빠진 `JdbcSnapshotSourceCountsTest`·`RunStateDurabilityTest`·`RunStateFormatTest`·`RunStateLockTest` 까지 등재. 등재 ↔ 소스 양방향 등식이 `adapters` 에서 패키지마다 서 있고 `snapshot`(·koneps·persistence·strategy)을 **덮지 않는다** → **`OPEN-6G2G-REGISTRATION-PACKAGE-COVER`** 를 6G-2g 목록(D-27)에 더한다(술어 확장) · ⑤ **새 public 표면 넷**(`RunStateLock.Unlockable` · `CollectionExitCode.UNLOCKABLE` · `UnusableRawRowCause` · `UnusableRawRows`): 계약 (2b) 는 「없어야 한다」였다 — 레인은 넷 다 읽기 전용 값이고 `UnusableRawRows` 는 `SnapshotExtraction` 공개 생성자 때문에 새 권한이 아니라고 보고; **수용 여부는 verifier K (2b) 판정으로** 정한다 · ⑥ **커밋 트레일러 갈림 — 사실 선언, 되쓰지 않음**: 세션 계정 전환(2026-10-04 08:4x) 뒤 하네스 지정 서명이 바뀌어 같은 slice 안에 `Claude Fable 5.1 + Claude-Session` 형과 `Claude Opus 5` 형, `Claude Fable 5.1`(세션 줄 없음) 형이 섞였다(`git log --format='%h %(trailers:key=Co-Authored-By,valueonly)' ecdc9d9f..HEAD`). 이력 되쓰기 금지 규율대로 둔다. 다음: verifier K + code-reviewer K 병렬(지금) → 두 레인 판정 뒤 팀장 rollback.md · `one-command-check.sh` · container job · 종결 문단 | K 레인 보고 2026-10-04 |
+| **D-6G2c-39** | **(계약 갱신 r9) P 승인 전 일괄 수령 — 판정 SHA `fa7483cb`(코드), evidence `6e65cc50`. P 재동결.** R-1 구현: 잎 전용 검사(`exists() and not is_dir()`)를 지우고 `mkdir(parents=True, exist_ok=True)` 를 job **앞**으로 올려 `OSError` 전부를 `OUTPUT_NOT_A_DIRECTORY` 로 묶음(어휘 넷 그대로, 새 public 표면 없음 — `_make_output_dir` 비공개). 변이(mkdir 을 job 뒤로): 부모-파일 test **그리고** 어휘 전수 test 의 그 파라미터 둘 다 RED. R-2 docstring · R-4 주석 · L-1(라운드 이력 절 → 현재형 「항목과 잠금」 표, 게이트 술어 커밋 둘은 표 아래 한 줄) · L-2 · R-3 반영. `ml-engine` job 열 step exit 0, pytest 1,417 → 1,418. 게이트 술어 커밋(`49505a74`·`a179e784`)은 verifier r2 가 이미 표적 재검증했고 `fa7483cb` 는 CLI 거부 경로라 술어 아님 — 재검증 없음(D-37 규율). 트레일러는 `Claude Opus 5` 형(D-38 ⑥ 사실 선언 안) | P 레인 보고 2026-10-04 |
+| **D-6G2c-40** | **(계약 갱신 r9) K 판정 — verifier K r1 `ready-for-review` @`ec07df09`**(`_workspace/m6-6g2c/05_verifier_kotlin_r1.md`: 게이트 술어 둘 실측 확인 · 두 프로세스 잠금 변이 L1/L2/L3 · D-4 컴파일 probe 넷 + `Suppress` 탈출 `-Werror` 거부 · D-18 양방향 5×2 바이트 동일 · D-21 ⑦ 전 조립 재현이 OPEN 문면과 일치 · Kotlin `check` exit 0) · **code-reviewer K r1 새 high 없음**(`06_code_review_kotlin_r1.md`, medium 2·low 3·info 4). ① **(2b) 새 public 표면 넷 — verifier 수용**(전부 읽기; `UnusableRawRows` 의 유일한 소비자는 러너 로그 한 줄) → D-38 ⑤ 종결, (2b) 표 아래 사실로 적음 ② **D-38 ① 문면 정정**(vr F-3): 쌍 셋 중 둘은 옮겨 적음, `RunStateLock->OverlappingFileLockException` 은 새 catch 절의 **새 참조** — 예외 타입이라 허용 집합이 한 쌍 늘었을 뿐 술어 확장은 아님(사후 승인 유지, cr K-6 동의) ③ **D-38 ④ 문면 정정**(vr F-4): 등재 등식이 덮지 않는 adapters 패키지는 넷이 아니라 **여섯**(contract·extraction·koneps·persistence·snapshot·strategy) — `OPEN-6G2G-REGISTRATION-PACKAGE-COVER` 입력; 등식 밖 미등재 test 클래스 일곱(contract 둘·koneps 하나·persistence 넷)도 같은 OPEN 입력 ④ **승인 전 일괄(K, 한 라운드·재검증 없음, 코드 커밋 하나 + evidence 커밋 하나)**: vr **F-1 medium 산출물(D-4)** — `close()` 뒤에도 같은 인스턴스의 두 원장이 쓰기 가능해 「잠금만 풀린 원장」이 `release` 대신 `close` 로 지어진다(계약 D-4 문면·위협 모델 「방어하는 것」 미달) → `close()` 가 닫힘 표지를 세우고 두 원장이 그 표지에서도 거부, test 「close 뒤 append 거부」 + 변이(표지 무시 → RED) · vr **F-2 medium test(D-20)** — 원인 셋을 각 1 행으로 심어 분류 맞바꿈이 초록 → 원인별 다른 수(1·2·3) · vr **F-5 low + cr K-5 low** — `UnusableRawRows` 생성자 방어 복사(별칭 우회 `total=-5` 실측) + 열거 전수 조밀 정규화(`NONE` == 세 칸 0) · cr **K-1 medium harness** — `RunStateLockHolderProcess.hold()` 가 `HELD_LINE` 또는 EOF 까지 기한을 두고 읽고 실패 경로에서 `destroyForcibly()` 뒤 던짐(자식 좀비 → 같은 디렉터리 뒤 test 전부 `ALREADY_RUNNING` 전염) · cr **K-2 medium KDoc** — `RunStateDirectory` KDoc ⑤ 에 「러너까지」 한정과 `OPEN-6G2C-BUSY-SEED-ORDER` 이름(코드 변경 없음) · cr **K-3 low** — `tryAcquire` 가 `ClosedByInterruptException`·`FileLockInterruptionException` 을 `IOException` 앞에서 다시 던짐(인터럽트가 `Unlockable` 로 접히지 않게) · cr **K-4 low** — 합계 test 를 렌더한 줄에서 합계 칸·원인 세 칸을 되읽어 맞대는 것으로(지금 단언은 모든 입력에서 참) · 장부: evidence 「이탈」의 ①·④ 문면(F-3·F-4) · cr **K-9 info 등재만**(두 모드 test 의 잠금 해제가 Spring 실패 정리에 기댐 — 알려진 제한) · **cr K-8 info 팀장**: runbook 2026-10-01 문단 한정(`8ff4d1ec`, in_scope 「계수 문장 둘」) · vr **I-1 info**(반사로 `release$bid_vector_adapters` 호출 가능) → 6G-2g `OPEN-6G2B-HOLDER-INTERNAL-SURFACE`·`REFLECTION-ROOT-DOMAIN` 입력 · 범위 밖 부채(공고 목록 갈래 E2E `runOnce` 가 기동 예외를 돌려주지 않고 실패 경로 누출 test 없음) → 6G-2g 입력 메모. 일괄 보고 항목: 변이마다 numstat 적용 확인 + RED · **새 public 표면 유무** · Kotlin `check` job 재실측 · 새 판정 SHA → 재동결. 그 뒤 팀장 rollback.md · `one-command-check.sh` 두 job · container job · 종결 문단 | verifier K r1 · cr K r1 2026-10-04 |
+| **D-6G2c-41** | **(계약 갱신 r10) K 승인 전 일괄 수령 — 판정 SHA `51b4d960`(코드; 일괄 본 커밋 `93789f5c` + 전건 게이트 보완 `51b4d960`), evidence `7fc6b1f2`. K 재동결.** 변이 전부 numstat 확인 후 RED(F-1 닫힘 갈래 제거 · F-2 분류 맞바꿈 — 앞 판 초록이던 그 변이 · F-5 복사 생략 셋 · K-5 성긴 지도 셋 · K-1 자식 선행 출력 한 줄: 고친 부모 초록/앞 판 부모 RED 넷 · K-3 인터럽트 갈래 제거 · K-4 합계 칸 자리 바꿈 셋), K-2 는 KDoc 만. **새 public 표면 없음** — 새 파일 `RunStateLedgerGuards.kt`(sizeGate 500 분할)의 `GuardedAttemptLedger`·`GuardedSampleListLedger`·`writeRefusalFor`·`runStateLockFailure` 전부 internal, 닫힘 표지 private, `UnusableRawRows` 는 `data` 를 떼어 `copy()`·`componentN()` 이 **사라짐**(좁힘). 새 파일 일곱(`RunStateLedgerGuards.kt`·`RunStateLock.kt`·`RunStateLockTest.kt`·`UnusableRawRowsTest.kt`·`RunStateLockHolderProcess.kt`·`CollectionLedgerSurfaceTest.kt`·`FixedClockHarnessTest.kt`) 전부 in_scope. **정책 파일 사실**: 분류를 파일 수준 함수로 빼자 전송 표면 게이트의 양방향 등식이 미등재 셋과 죽은 줄 하나(`RunStateLock->OverlappingFileLockException`, 이 slice 가 더했던 줄)를 양쪽에서 잡았다 → 셋 등재·죽은 줄 삭제. base 대비 쌍 **다섯 추가 · 삭제 0**(`git diff` 의 `6/1` 에서 `-1` 은 쌍이 아니라 앞 마지막 줄 `RunStateLock->FileLock` 에 붙은 `,\` 이어붙임 표시 — 쌍은 그대로다; slice 안의 삭제 하나는 base 에 없던 줄이라 base 대비 흔적이 없다)(`RunStateLockKt->` 쌍 다섯: `FileChannel`·`FileLock`·`OverlappingFileLockException` + K-3 가 더한 `ClosedByInterruptException`·`FileLockInterruptionException` — 뒤 둘은 새 참조, 예외 타입이라 술어 확장 아님). in_scope 「쌍 등재 추가만」 유지. Kotlin `check` 349 task exit 0 · `qualityBaseline` exit 0(evidence HEAD 에서 재실측). 다음: 팀장 `one-command-check.sh`(두 job) · container job · milestone-6 종결 문단 · rollback.md(실측 HEAD = 복원 경로를 마지막으로 건드린 커밋, 별도 커밋) · 하네스 절 · push · PR · `/code-review` | K 레인 보고 2026-10-04 |
+| **D-6G2c-42** | **(계약 갱신 r11) PR #59 리뷰 처분 — `/code-review` 80 이상 1 + 리뷰어 다섯의 75 이하 17, 전부 처분.** ① **K(100) runbook §2 종료 코드 열거에 `4` UNLOCKABLE 없음** → 팀장 `4c4deae8`(처방: 기다려도 풀리지 않음, 경로·권한 고친 뒤 재기동, 호출 0) · **F(75)** 같은 커밋 — 계수 열둘을 방출 순서·토큰 이름 그대로(원인 셋은 `unusableRawRows` 바로 뒤) · in_scope runbook 「문장 셋」 ② **A(60)** out_scope 가 `snapshot-schema.md`(읽기만) 이라 적었으나 `ae1077e4` 가 §2 문장 하나를 편집(D-31) → in/out_scope 정정(위) + K 일괄: `SampleSelectionTest` KDoc 「읽기만」 문면 ③ **I(75)** `OPEN-6G-REVIEW-FOLLOWUPS` 「전량 닫음」은 과대 — 다른 slice 등재 잔여 열하나에 처분이 없었다 → **OPEN 유지**, 6G-2c-형식 입력(OPEN 표 정정; milestone 종결 문단의 「닫은 OPEN」도 고친다) ④ **H(75)** (2b) 「P 없음」은 거짓 — P evidence 표에 일곱 행, verifier P r2 는 셋만 판정 → **verifier P 표적 (2b) 판정 요청**(`07_verifier_python_2b.md`), 결과는 D-43; scope (2b) 「결과」·milestone 문장 정정은 그때 ⑤ **J(75)** `adapters/build.gradle.kts` 의 `tasks.test` 가 `config/quality/gate-tests.properties` 를 입력으로 선언하지 않아(app 은 선언) 등재만 바뀐 편집에서 adapters 등재 등식 test 가 UP-TO-DATE — base 에도 있던 간극, 파일은 out_scope → **`OPEN-6G2G-REGISTRATION-PACKAGE-COVER` 문면에 더한다**(등재 덮개 + 입력 선언, 6G-2g) ⑥ **B(75)** rollback.md 묶음 수 셋이 기계 산출과 어긋남(test 넷→셋 · 열하나→여덟+신설 셋 · 스물→열아홉) → 조치 라운드 뒤 재산출 커밋에서 묶음 수를 빼고 총계만 둔다 ⑦ **P 일괄**(코드 1 + evidence 1, 재검증 없음): C(75) S-4 「열셋」→ 계약 목록 길이 참조 · E(75) P clean-tree 게이트 기록 · M(75) `_make_output_dir` docstring 「세 거부」→넷 · 「성공할 실행에서만」 거짓(실패 job 뒤 빈 디렉터리) → 사실 + 알려진 제한 · D(50) 판정 JSON version 유지 근거(D-18·31, A-2) · N(50) bare-path 갈래를 `INVALID_SNAPSHOT_URI` 로 ⑧ **K 일괄**(코드 1, 재검증 없음): L(75) `verifyThenHeal` KDoc 「셋」→「둘」 · A KDoc · O(50) holder reader 닫기 · R(70) test 둘째 디렉터리 close · 등재만 Q(50) `underRunStateLock` 재진입(도달 불가) · P(50) 전역 시계 카운터(의도) ⑨ **G(75) 사실 선언**: scope.md 의 계약 갱신 ledger(r0-b~r11)는 evidence-pack 「라운드 이력 절 금지」와 긴장한다 — 이 ledger 는 Phase 1 「scope 확장 시 갱신 사유를 하단에 append」의 형태이고 모든 slice 의 관행이라 이 PR 에서 바꾸지 않는다; 다음 하네스 편집의 결정 항목으로 넘긴다. 조치 라운드 뒤: 두 레인 재동결 → rollback ①~⑥ 재실측(복원·hunk 대상이 움직였다) + 실측 HEAD 별도 커밋 → push → 조치 코멘트 | PR #59 리뷰 2026-10-04 |
+| **D-6G2c-43** | **(계약 갱신 r12) PR #59 조치 라운드 수령 — 두 레인 재동결.** ① **P** 판정 SHA `ba6a33d2`(코드; N 맨 경로 갈래를 `INVALID_SNAPSHOT_URI` 로 — 변이 RED · M docstring 사실화(거부 넷, 실패 job 은 빈 디렉터리를 남김 — 알려진 제한) · C `app/__init__.py` 에서 수 제거 · D `VERDICT_SCHEMA_VERSION` 고정 test), evidence `f24d57b8`(C S-4 수 제거 → 계약 목록 길이 참조 · E clean-tree 기록(전용 경로, 공유 evidence 파일은 두 레인의 합이라 인자에서 제외 — 사유 등재, 팀장 수용) · D version 유지 근거 · M 제한). `ml-engine` 열 step exit 0, pytest 1,418 → 1,420 ② **K** 판정 SHA `97a7993c`(L KDoc 「둘」 · A KDoc 주어를 test 로 · O 보유자 pipe 닫기 · R 둘째 인스턴스 close), evidence `eecf467c`(Q·P 등재). `check` exit 0(340 task; 잰 트리 == 커밋 트리) ③ **(2b) Python 새 public 표면 일곱 — verifier P 표적 판정 전부 수용**(`07_verifier_python_2b.md` @`fa7483cb`, `ba6a33d2` 에서 새 표면 없음 덧확인): `SEED_PREFIX`(불변 str) · `APPROVED_SEED_KEYS`(tuple, 재바인딩은 경계) · `seed_key_mismatch`(입력 불변, 키 이름만) · `DivisionCoverage.ABSENT`(닫힌 열거 값) · `DivisionCoverageRecord`(frozen, 불변식 위반 거부 — 문턱은 경계) · `SnapshotUnreadableReason.INVALID_PATH`(detail 은 예외 이름만) · `PolicyUse.derived`(test 전용). D-38 ⑤·D-40 ① 의 「P 없음」은 **오기** — (2b) 「결과」와 milestone 문장을 고친다. verifier 가 올린 참고: 5,000자 경로에서 판독기 `OSError` 문면에 경로가 실림 — base 와 같은 거동(비회귀), 6G-2c-형식 입력으로 등재 ④ 다음: milestone 종결 문단 정정(P 일곱 · 닫은 OPEN · 1,420) → rollback ①~⑥ 재실측(복원·hunk 대상이 움직였다: K·P 코드, runbook, milestone) + 실측 HEAD 별도 커밋 → push → 조치 코멘트 → CI → 머지 | 레인 보고 · verifier P 2026-10-04 |
+
+### 이 PR 의 항목 요약 (레인별)
+
+**K(kotlin-implementer, production 셋 + test)**: D-1·2·3(두 프로세스 잠금 E2E · `IOException` 사유 분리) · D-4(표본 원장 held 가드 · `release` 가시성) · D-5(KDoc 등재) · D-6(두 모드 동시 기동 실패 test + KDoc) · D-19(harness `try/finally` 누출 자물쇠 · 구분자 등식 문서 읽기 · 고정 시계 harness · 저위 변이 test 둘) · D-20(`unusableRawRows` 세 계수) · D-21 ①②⑦⑧.
+**P(ml-implementer)**: D-12(manifest 키 세 자리 등식) · D-17(표지 셋) · D-21 ③④ · D-22(URI 디코드) · D-23(import 계약) · D-24(파생 지역 변수 한 단계).
+**등재만(코드 0)**: D-5 · D-8 · D-16 · D-19 의 L-5·L-7 · D-20 의 종료 코드 · D-21 ⑤⑥ · D-25 · D-26.
+
+## 위협 모델 — 6G-2c 고유 경계 (Phase 2.5 (0))
+
+이 slice 는 새 경계를 세우지 않는다. 6G 의 경계(판정의 정직성 · 승인 상한 · 개인정보) 안에서 **자물쇠의 빈 자리**를 채운다.
+
+**방어하는 것**: 두 프로세스가 같은 실행 상태로 겹쳐 도는 것(이미 막혀 있다 — 그것을 재는 test 가 없다) · 잠금 없이 표본 원장을 쓰는 것 ·
+잠금만 풀린 채 원장이 살아 있는 상태.
+
+**방어하지 않는 것(경계 밖)**: 실행 상태 파일을 손으로 고쳐 해시까지 맞추는 운영자 · 한 인스턴스를 여러 스레드가 쓰는 코드(쓰는 자리가 없다) ·
+공개 공고번호에서 해시를 되돌리는 것(A-1 (가)로 등재) · **동적 import(`importlib`·`__import__`)·`asyncio`·`multiprocessing`·`subprocess` 경유의 네트워크 출구**(D-23 의 import 계약·AST 스윕은 **정적 import 층**을 재는 게이트다 — 문자열로 모듈을 고르는 저자는 경계 밖, verifier F-2 실측 2026-10-04).
+
+### (2b) 값 획득 축
+
+| 표면 | 변화 | 밖에 허락하는 것 |
+|---|---|---|
+| `RunStateLock.release` | 가시성을 내리거나 `close` 로 합친다 | 줄어든다 — 밖에서 잠금만 풀 수 없다 |
+| `RunStateDirectory.sampleList` | 잠금 없는 인스턴스에서 쓰기 거부 | 줄어든다 |
+| 잠금 실패 사유 어휘 | 값 하나 추가 | 읽기만 |
+
+새로 public 이 되는 선언은 없어야 한다. 생기면 수정 라운드 보고 항목으로 올린다.
+
+**결과(r9·r12)**: K 넷 — `RunStateLock.Unlockable` · `CollectionExitCode.UNLOCKABLE` · `UnusableRawRowCause` · `UnusableRawRows`, verifier K (2b) 가 넷 다 수용(전부 읽기 전용 값; `UnusableRawRows` 는 로그 한 줄만 먹인다). **P 일곱** — `SEED_PREFIX` · `APPROVED_SEED_KEYS` · `seed_key_mismatch` · `DivisionCoverage.ABSENT` · `DivisionCoverageRecord` · `SnapshotUnreadableReason.INVALID_PATH` · `PolicyUse.derived`(test), verifier P 표적 (2b) 가 일곱 다 수용(D-6G2c-43 ③; r9 가 「P 없음」이라 적은 것은 오기였다 — PR #59 리뷰 H). 줄어든 넷(`release` 인터페이스 제거 · `Held` 생성자 internal · `tryAcquire` internal · `sampleList` 판독 비노출)이 컴파일 probe 로 확인됐다 — D-6G2c-40 ①.
+
+## 운영자 승인 (착수 전 — 2026-10-04 결정 완료: A-1 (가) · A-2 (가) · A-3 셋으로 분할, 정본은 D-6G2c-16~18)
+
+- **A-1 공고 키 해시의 salt**(D-6G2c-7). 선택지:
+  - **(가) 지금대로 둔다(추천).** 공고번호는 공개 정보이고 이 해시의 역할은 익명화가 아니라 **결합 키**다. 통제는 스냅숏과 실행 상태가 저장소 밖에만
+    있다는 것이고 그것은 코드가 강제한다. 위협 모델 ⑤ 는 상호 · 사업자번호 · 담당자를 말하고 공고번호를 말하지 않는다.
+  - (나) 로컬 비밀로 키를 건 해시(HMAC)로 바꾼다. 스냅숏이 새도 공고를 특정하기 어렵다. 대가: 해시가 바뀌어 원장 · 표본 목록 · 스냅숏 · golden 을
+    전부 다시 짓고, 비밀을 잃으면 기존 스냅숏을 raw 와 맞댈 수 없다. **실수집 · 추출이 끝난 뒤에만** 할 수 있다.
+- **A-2 업무 대표 표지**(D-6G2c-11). 선택지:
+  - **(가) 표지를 셋으로(추천).** `COVERED`(업무별 필요 표본 이상) · `UNDERPOWERED`(행은 있으나 필요 표본 미만) · `ABSENT`(행 0). 지금의
+    `UNDERPOWERED`(행 0)는 `ABSENT` 가 된다. 판정 JSON 어휘가 바뀌므로 **백테스트 판정 보고 전에** 머지한다.
+  - (나) 지금대로 둔다. 1 행 업무가 COVERED 로 읽히는 것은 판정문의 창별 필요 표본 수 공시로 보완된다.
+- **A-3 PR 분할**: 형식 무관 항목을 먼저 머지할지(「실수집과의 관계」 절).
+
+## in_scope
+
+- `adapters/src/main/kotlin/bidvector/adapters/snapshot/**` · `adapters/src/test/kotlin/bidvector/adapters/snapshot/**`
+- `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/**`(KDoc · 사유 어휘)
+- `app/src/test/kotlin/bidvector/app/collection/**` · `app/src/test/kotlin/bidvector/app/wiring/**`
+- `workflow/src/main/kotlin/bidvector/workflow/collection/**`(사유 어휘가 여기 있을 때) · 대응 test · `workflow/build.gradle.kts`(**test task 입력 선언 블록만** — D-6G2c-33)
+- `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/app/backtest_cli.py` · `ml-engine/src/ml_engine/app/__init__.py`(**문면 한 곳만** — D-6G2c-36) · `ml-engine/src/ml_engine/adapters/snapshot_files.py`(D-22 의 판독기 — D-6G2c-32) · `ml-engine/pyproject.toml`(import-linter 계약 절만) · `ml-engine/tests/**`(D-6G2c-29)
+- `config/quality/gate-tests.properties`(등재 추가만 — D-21 ⑧) · `config/quality/architecture-policy.properties`(**쌍 등재 추가만** — D-6G2c-38 ①) · `docs/runbook/m6-6g-real-collection.md`(**문장 셋** — §2 산출 줄 D-38 ③ · 2026-10-01 대조 문단 한정 D-40 · §2 종료 코드 열거 D-42, 팀장) · `reports/evidence/m6/6g/snapshot-schema.md`(**§2 어휘 문장 하나만** — D-6G2c-31, 팀장; 열 형식은 out_scope) · `app/src/test/kotlin/bidvector/app/architecture/**` 는 **out_scope**(등재 파일만 열림)
+- `reports/evidence/m6/6g2c/**` · `milestone-6.md`(착수·종결 문단만)
+
+**out_scope**: 게이트 술어(`app/src/test/.../architecture/**`) · `reports/evidence/m6/6g/snapshot-schema.md` 의 **열 형식 절**(§2 어휘 문장 하나는 in_scope — D-31; 「읽기만」이라 적었던 것은 D-42 에서 정정) · `adapters/src/main/kotlin/bidvector/adapters/koneps/**` · `ml-engine/policy/**` · golden fixture · `db/migration/**` · `contracts/**` · `docker/**` · 데이터 파기 코드 · 실행 상태 디렉터리의 바이트·판독 술어(D-18).
+
+## acceptance
+
+CI job 명령 그대로 — Kotlin `check` job 과 `ml-engine` job. production 코드가 바뀌므로 container job 도 돌린다. `commands.md` 에 항목별 처분과
+변이 결과를 한 줄씩 적는다.
+
+## rollback
+
+in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`. 공유 파일(`snapshot-schema.md` · `milestone-6.md` ·
+`architecture-policy.properties`)은 커밋 해시 hunk 격리와 수동 절차. 버릴 clone 에서 ①~⑥ 실측. **실행 상태 형식에 닿는 항목이 머지된 뒤의 rollback 은
+진행 중인 실행 상태 디렉터리를 거부하게 만들 수 있다** — 그 경우의 복구 절차(디렉터리를 새로 시작하면 상한이 0 부터 다시 센다)를 rollback.md 에 적는다.
+
+## 리뷰 레인
+
+`verifier`(두 프로세스 잠금 재실측 · 구현 항목마다 변이 · 가시성 변경이 연 표면) + `code-reviewer`(sonnet) + `privacy-gate`(A-1·D-6G2c-9·10 의
+처분이 문면과 맞는지). Codex 없음 — 데이터 파기와 마이그레이션이 없다(생기면 멈추고 계약 갱신).
+
+## 하네스 레인 변경
+
+(착수 뒤 리뷰 요청 시점마다 등재 — slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다)
+
+PR 요청 시점(2026-10-04) 기준 하네스 레인(팀장) 커밋:
+
+| 커밋 | 내용 | 닿는 파일 |
+|---|---|---|
+| `429d4bbc` | 착수 — 계약 r0-b(D-16~30) · milestone-6 착수 문단 | `scope.md` · `milestone-6.md`(hunk) |
+| `ae1077e4` | 스키마 문서 §2 어휘 문장 하나(D-17, 계약 예외) | `reports/evidence/m6/6g/snapshot-schema.md`(hunk) |
+| `ceb49c1b` · `861108bb` · `4b9d694a` · `ea91f423` · `3bcf2e52` · `7363b002` · `dd708232` | 계약 갱신 r1~r7(D-31~37) | `scope.md` |
+| `f21d83c7` · `8ff4d1ec` | runbook 계수 문장 둘(D-38 ③ · D-40 K-8) | `docs/runbook/m6-6g-real-collection.md`(hunk) |
+| `004f5e28` · `efd8be92` · `374ddc41` · `b2a98300` | 계약 갱신 r8~r10(D-38~41) + D-41 문면 | `scope.md` |
+| `82c8b809` | milestone-6 종결 문단 — rollback 실측 HEAD | `milestone-6.md`(hunk) |
+| `22b0c38f` · `75699ed8` | 하네스 절 등재 · `rollback.md`(실측 ①~⑥, 실측 HEAD `82c8b809`) | `scope.md` · `rollback.md` |
+| `4c4deae8` | runbook §2 종료 코드 4 · 계수 열둘 순서(PR #59 리뷰 K·F) | `docs/runbook/m6-6g-real-collection.md`(hunk) |
+| `202f74da` | 계약 갱신 r11(D-42) — PR #59 리뷰 처분 · in/out_scope 정정 · OPEN 표 정정 | `scope.md` |
+| (이 커밋) | 계약 갱신 r12(D-43) — 조치 라운드 수령 · (2b) P 일곱 | `scope.md` |
+| (다음 둘) | milestone 종결 문단 정정(P 일곱 · OPEN · 1,420) = rollback 실측 HEAD · `rollback.md` 재실측 | `milestone-6.md`(hunk) · `rollback.md` |
+
+`.claude/**`·`CLAUDE.md` 편집 없음. 레인 커밋에 하네스 파일 혼입 0(`git log --format=%h ecdc9d9f..HEAD -- .claude CLAUDE.md` 빈 출력).
+
+## OPEN 수령·신설 (r0-b)
+
+| OPEN | 처분 |
+|---|---|
+| `OPEN-6G-REVIEW-FOLLOWUPS` | **이 PR 이 D-6G-75 의 항목을 닫는다**(아래 둘 + 6G-2g 여섯 + 6G-2c-형식 다섯으로 이름을 얻음). **OPEN 자체는 유지**(D-42 정정, PR #59 리뷰 I) — 다른 slice 가 이 OPEN 에 등재한 잔여가 이 PR 에 처분이 없다: 6G-2a D-6G2a-24 ⑤~⑧(harness 우회 중복 실행 · 평탄 YAML 파서 네 벌 · `mkdtemp` 미정리 · seed `range(5)`) · 6G D-6G-82 ⑥⑦⑨⑩(`splitlines()`↔`quote()` 줄 정의 · 층 표지 `%d` Locale · 죽은 코드 · Python 판정 중복 계산) · 6G-2d D-49 ⑦(원장 이중 파싱) · D-53(`AxisConclusion.settled` 죽은 코드 · 두 판독기 한 술어). 전부 코드 0 의 정리 항목 — **6G-2c-형식**(D-28)의 입력으로 넘기고 그 PR 이 닫는다 |
+| `OPEN-6G2E-SNAPSHOT-READER-URI-DECODE` · `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT` · `OPEN-6G2A-CENSUS-DERIVED-LOCALS` | **이 PR 이 닫는다**(D-22 · D-23 · D-24; D-24 는 한 단계까지 — 남는 한계는 알려진 제한) |
+| `OPEN-6G2F-NOTICE-LIST-ROWS` | **등재 유지**(D-25) — M7 뒤 운영 전환 때 값 slice |
+| (신설) `OPEN-6B3-RAW-OBSERVATION-RETENTION` | D-26 — 6B-3 으로 |
+| `OPEN-6G2D-EMPTY-AXIS-REASON` · `OPEN-6G2D-FRAME-REWALK` · `OPEN-6G2F-MAX-PAGES-PROVENANCE` · D-9 · cr r5-t L-6 | **6G-2c-형식**(D-28, 추출 뒤) |
+| 6G-2b 게이트 OPEN 여섯 | **6G-2g**(D-27) |
+| `OPEN-6G2C-NOTICE-HASH-KEYING` | **신설하지 않음**(A-1 (가)) |

@@ -100,6 +100,7 @@ from tests.evaluation._backtest_support import (
     policy_value,
     rows_bytes,
     sample_list_bytes,
+    scan_source_for_uses,
 )
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
@@ -1060,6 +1061,10 @@ def test_every_policy_value_is_classified_exactly_once() -> None:
 #                   판정은 그 아래에서 나고, 그 아래 자리가 따로 등재돼 있다.
 #   `ECHO`        — 판정문에 **공시만** 한다. 비교 투영이 지우고, 산출물에 남는 것은 전용
 #                   test 가 값까지 단언한다.
+#   `DERIVED`     — 정책 값을 품은 식에서 대입된 **파생 지역 변수**의 소비자(D-6G2c-24).
+#                   같은 (키, 자리)에 `PROBE:`/`CLASS` 가 **반드시 함께** 있어야 한다 —
+#                   그 동반을 `test_every_derived_use_has_a_measured_anchor` 가 강제하므로
+#                   이 어휘가 「파생이라서 안 쟀다」가 되지 않는다.
 _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ("effective.construction", "rules.effective_date_for", "return"): "CLASS",
     ("effective.goods", "rules.effective_date_for", "return"): "CLASS",
@@ -1253,6 +1258,11 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ): "PROBE:sample-floor-rows",
     (
         "verdict.min_window_rows",
+        "run._division_coverage_records",
+        "_division_coverage",
+    ): "PROBE:division-coverage",
+    (
+        "verdict.min_window_rows",
         "windows.plan_backtest_windows",
         "compare",
     ): "PROBE:window-rows",
@@ -1346,6 +1356,136 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "compare",
     ): "PROBE:passes_window",
     ("window.days", "windows._calendar_windows", "timedelta(days)"): "CLASS",
+    # M6/6G-2c D-6G2c-24 — **파생 한 단계** 뒤의 소비자들(`OPEN-6G2A-CENSUS-DERIVED-LOCALS`).
+    # 명단이 정책 값을 **품은 식**에서 대입된 지역 변수를 한 단계 따라가자 올라온 삼중
+    # 스물아홉이다. 창 폭이 창 경계를 만드는 자리 · embargo 가 이력을 끊는 자리 · 업무별 호출
+    # 수가 예산 비교로 가는 자리가 그중이다 — 그 자리들이 삼중이 아니던 동안은 거기 상수를
+    # 박아도 명단이 그대로였다(읽는 자리만 셌으므로).
+    #
+    # 덮개가 `DERIVED` 인 이유: 그 자리를 덮는 단언은 **같은 자리의 등재된 PROBE/CLASS** 이고
+    # (`test_every_derived_use_has_a_measured_anchor` 가 그 동반을 등식으로 강제한다), 이
+    # 어휘는 그 동반 없이는 쓸 수 없다 — 「파생이라서 안 쟀다」가 되지 않는다.
+    (
+        "floor.pure_construction_cost_ratio",
+        "strategies._simulated_floors",
+        "maximum",
+    ): "DERIVED",
+    (
+        "institution.draw_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "fit.check_institutional_fit",
+        "FitResult",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "fit.check_institutional_fit",
+        "_fit_rejection",
+    ): "DERIVED",
+    (
+        "institution.reserve_price_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_construction",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_goods",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "SamplingRecord(detail_calls)",
+    ): "DERIVED",
+    (
+        "sampling.calls_per_notice_service",
+        "run._sampling_record",
+        "assign",
+    ): "DERIVED",
+    (
+        "sampling.list_call_count",
+        "run._sampling_record",
+        "SamplingRecord(total_calls)",
+    ): "DERIVED",
+    ("sampling.list_call_count", "run._sampling_record", "compare"): "DERIVED",
+    (
+        "sensitivity.wide_reserve_half_width",
+        "run._variant_record",
+        "len",
+    ): "DERIVED",
+    (
+        "sensitivity.wide_reserve_half_width",
+        "run._variant_record",
+        "return",
+    ): "DERIVED",
+    (
+        "stability_seeds.0",
+        "run.run_strategy_backtest",
+        "_assemble_verdict",
+    ): "DERIVED",
+    ("stability_seeds.0", "run.run_strategy_backtest", "_plan_or_stop"): "DERIVED",
+    ("stability_seeds.0", "run.run_strategy_backtest", "_stopped"): "DERIVED",
+    (
+        "strategy.s4_grid_span_bp",
+        "strategies._candidate_rates",
+        "linspace",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "_simulated_floors",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "compare",
+    ): "DERIVED",
+    (
+        "strategy.s4_iteration_count",
+        "strategies._win_probabilities",
+        "where",
+    ): "DERIVED",
+    (
+        "verdict.alpha",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.min_relative_improvement",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.primary_hypothesis_count",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    (
+        "verdict.target_power",
+        "verdict.evaluate_window",
+        "WindowOutcome(required_discordant_pairs)",
+    ): "DERIVED",
+    ("window.days", "windows._calendar_windows", "BacktestWindow"): "DERIVED",
+    ("window.days", "windows._calendar_windows", "augassign"): "DERIVED",
+    ("window.embargo_days", "windows.plan_backtest_windows", "compare"): "DERIVED",
     (
         "window.embargo_days",
         "windows.plan_backtest_windows",
@@ -1353,7 +1493,13 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
     ): "CLASS",
 }
 
-_COVERAGE_KINDS: Final[tuple[str, ...]] = ("PROBE:", "CLASS", "PASS:", "ECHO")
+_COVERAGE_KINDS: Final[tuple[str, ...]] = (
+    "PROBE:",
+    "CLASS",
+    "PASS:",
+    "ECHO",
+    "DERIVED",
+)
 
 _derive_publication_fields()
 
@@ -1399,6 +1545,102 @@ def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
     )
 
 
+_TUPLE_PROBE_SOURCE = """
+def probe(policy):
+    pair = (policy.verdict.alpha, policy.verdict.target_power)
+    return consume(pair)
+"""
+
+_CALL_PROBE_SOURCE = """
+def probe(policy):
+    scaled = widen(policy.verdict.alpha)
+    return consume(scaled)
+"""
+
+
+def test_a_container_literal_is_not_followed_but_a_call_is() -> None:
+    """cr r1 P-8 — 「컨테이너는 뚫지 않는다」가 문면이 아니라 **규칙**이다.
+
+    `_CONTAINER_NODES` 에 `ast.Tuple` 이 없던 동안 `x = (p.a, p.b)` 는 추적을 통과했고,
+    docstring 의 「담는 식은 값이 아니라 담는 자리」와 코드가 갈려 있었다. 방향이 보수적이라
+    (등재가 늘 뿐 쓰임이 숨지 않는다) 거동 결함은 아니었지만, 규칙이 문면과 같아야 다음 사람이
+    경계를 읽을 수 있다.
+
+    출하 코드에 tuple 리터럴 대입이 **하나도 없어** 명단은 이 변경에 움직이지 않는다(실측).
+    그래서 합성 조각으로 잰다 — 양성 대조(호출을 품은 식)를 함께 둬서 「아무것도 안 따라간다」와
+    구별한다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+
+    from_tuple = scan_source_for_uses(policy, _TUPLE_PROBE_SOURCE)
+    assert not [use for use in from_tuple if use.derived], (
+        f"tuple 리터럴을 뚫고 파생을 만들었다: {from_tuple}"
+    )
+    # 담긴 값의 읽기는 **대입 자리에서** 그대로 남는다 — 쓰임이 숨지 않는다.
+    assert {use.consumer for use in from_tuple} == {"assign"}, from_tuple
+
+    from_call = scan_source_for_uses(policy, _CALL_PROBE_SOURCE)
+    derived = [use for use in from_call if use.derived]
+    assert derived, (
+        f"호출을 품은 식에서 파생이 나지 않았다 — 양성 대조가 비었다: {from_call}"
+    )
+    assert {use.consumer for use in derived} == {"consume"}, derived
+
+
+def test_the_derived_label_equals_the_measured_derivation() -> None:
+    """cr r1 P-5 — `DERIVED` 는 **저자 선언이 아니라 명단이 잰 사실**이다.
+
+    막는 결함: `PolicyUse` 가 파생 여부를 나르지 않아 「이 삼중이 정말 파생인가」를 재는 자리가
+    없었다. 동시에 독립 레인 셈은 `DERIVED` 를 **건너뛴다**. 둘을 겹치면 이미 앵커가 있는
+    (키, 자리)에 **직접** 소비자를 하나 더 붙이고 `DERIVED` 로 적는 길이 열린다 — 앵커 동반
+    규칙은 앵커가 이미 있어 통과하고, 독립 레인 수는 움직이지 않는다. 결정 쓰임 하나가 조용히
+    들어온다.
+
+    이제 명단이 `derived` 칸을 나르고 여기서 **등식**으로 맞댄다. 같은 삼중이 파생과 직접
+    양쪽에 있으면 칸이 등식이 될 수 없으므로 그것부터 거부한다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    census = policy_use_census(policy)
+    measured = {(use.key, use.site, use.consumer) for use in census if use.derived}
+    direct = {(use.key, use.site, use.consumer) for use in census if not use.derived}
+    ambiguous = sorted(measured & direct)
+    assert not ambiguous, (
+        "같은 삼중이 파생과 직접 양쪽에서 났다 — 칸이 덮개의 등식이 될 수 없다: "
+        f"{ambiguous}"
+    )
+    labelled = {
+        triple for triple, coverage in _USE_COVERAGE.items() if coverage == "DERIVED"
+    }
+    assert labelled == measured, (
+        f"파생이 아닌데 DERIVED 로 등재: {sorted(labelled - measured)} · "
+        f"파생인데 다른 어휘로 등재: {sorted(measured - labelled)}"
+    )
+
+
+def test_every_derived_use_has_a_measured_anchor() -> None:
+    """D-6G2c-24 — `DERIVED` 는 **동반 없이 쓸 수 없다**.
+
+    파생 소비자는 「한 단계 뒤」라서 전용 단언을 따로 두지 않는다 — 그 자리를 덮는 것은 같은
+    (키, 자리)의 등재된 `PROBE:` 또는 `CLASS` 다. 그 동반이 없으면 `DERIVED` 가 「파생이라서
+    안 쟀다」는 면죄부가 되므로, 여기서 등식으로 강제한다.
+
+    이 단언이 있어야 파생 추적을 넓히는 일이 **측정 없는 등재**를 늘리지 않는다."""
+    measured = {
+        (key, site)
+        for (key, site, _), coverage in _USE_COVERAGE.items()
+        if coverage.startswith(("PROBE:", "CLASS"))
+    }
+    orphans = sorted(
+        (key, site, consumer)
+        for (key, site, consumer), coverage in _USE_COVERAGE.items()
+        if coverage == "DERIVED" and (key, site) not in measured
+    )
+    assert not orphans, (
+        "같은 자리에 재는 단언이 없는 파생 소비자 — PROBE 나 CLASS 를 그 자리에 먼저 둔다: "
+        f"{orphans}"
+    )
+
+
 # ── 자리별 probe (D-6G2a-12) ────────────────────────────────────────────────
 # 아래 표는 덮개 등재의 `PROBE:<이름>` 이 **실제로 존재하는 단언**임을 구조로 잠근다 —
 # 이름만 적고 단언을 안 쓰면 `test_every_probe_named_in_the_coverage_table_exists` 가 RED 다.
@@ -1423,6 +1665,9 @@ _PROBE_TESTS: Final[dict[str, str]] = {
     ),
     "PROBE:window-rows": "test_min_window_rows_reaches_the_window_exclusion_site",
     "PROBE:sample-floor-rows": "test_min_window_rows_reaches_the_minimum_sample_site",
+    "PROBE:division-coverage": (
+        "test_min_window_rows_reaches_the_division_coverage_site"
+    ),
     "PROBE:admit-rows": "test_institution_constants_reach_the_exclusion_site",
     "PROBE:fit-direct": "test_institution_constants_reach_the_fit_reference_site",
     "PROBE:s4-institution": "test_institution_constants_reach_the_monte_carlo_site",
@@ -1487,10 +1732,15 @@ _VERIFIER_REPORTED: Final[dict[str, int]] = {
 def test_the_census_reproduces_the_independent_count() -> None:
     """생성 명단이 **독립 레인의 셈**을 재현한다.
 
-    verifier r2 는 자기 AST 로 판정 쓰임을 세고 이 레인과 여섯 값에서 맞댔다. 공시(`ECHO`)와
-    helper 통과(`PASS:`) 자리를 뺀 뒤 **자리 축과 소비자 축 둘 다** 적고, 보고서의 수가 둘
-    중 하나와 일치함을 단언한다. 축을 하나만 적으면 두 레인이 다른 축을 세고도 같은 수가
-    나올 수 있다."""
+    verifier r2 는 자기 AST 로 판정 쓰임을 세고 이 레인과 여섯 값에서 맞댔다. 제외 축은
+    **셋**이다(cr r1 P-6): 공시(`ECHO`) · helper 통과(`PASS:`) · **파생 한 단계**(`DERIVED`,
+    M6/6G-2c). 그래서 이 수가 재는 것은 「파생 아닌 결정 쓰임」이고, 독립 레인의 셈을
+    재현한다는 주장의 범위도 거기까지다 — 그쪽 AST 도 파생 지역 변수를 따라가지 않았다.
+    `DERIVED` 가 저자 선언이 아니라는 것은 `test_the_derived_label_equals_the_measured_
+    derivation` 이 등식으로 잠근다(그 등식이 없으면 이 제외가 구멍이 된다).
+
+    남은 뒤 **자리 축과 소비자 축 둘 다** 적고, 보고서의 수가 둘 중 하나와 일치함을 단언한다.
+    축을 하나만 적으면 두 레인이 다른 축을 세고도 같은 수가 나올 수 있다."""
     policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
     assert isinstance(policy, StrategyBacktestPolicy), policy
     sites: dict[str, set[str]] = {}
@@ -1500,7 +1750,7 @@ def test_the_census_reproduces_the_independent_count() -> None:
         # 이 test 가 같은 사실로 함께 붉어지면 어느 쪽이 깨졌는지 알 수 없다(변이 측정에서
         # 거동 열이 구조 드리프트로 오염된다 — 실측으로 드러난 자리다).
         coverage = _USE_COVERAGE.get((use.key, use.site, use.consumer), "CLASS")
-        if coverage.startswith(("ECHO", "PASS:")):
+        if coverage.startswith(("ECHO", "PASS:", "DERIVED")):
             continue
         sites.setdefault(use.key, set()).add(use.site)
         consumers.setdefault(use.key, set()).add((use.site, use.consumer))
@@ -1590,9 +1840,24 @@ def test_the_disclosure_check_table_covers_every_disclosed_field() -> None:
     )
 
 
-@pytest.mark.parametrize("field_name", sorted(_DISCLOSURE_CHECKS))
+_DISCLOSED_PAIRS: Final[tuple[tuple[str, str], ...]] = tuple(
+    sorted(
+        (field_name, key)
+        for key, fields in _PUBLICATION_FIELDS.items()
+        for field_name in fields
+    )
+)
+"""(공시 칸, 그 칸을 공시하는 정책 키) **전부** — PR #53 리뷰 ④.
+
+앞 판은 칸마다 `next(...)` 로 **첫 키 하나만** 흔들었다. 칸 하나를 두 키 이상이 공시하면
+(지금 `alpha_used` 는 유의수준과 Bonferroni 분모 둘, `seeds` 는 다섯) 나머지 키는 그 칸에서
+한 번도 흔들리지 않는다 — 그 키 자리에 출하값을 박아도 이 단언이 보지 못한다. 쌍 전수로
+돌린다."""
+
+
+@pytest.mark.parametrize(("field_name", "key"), _DISCLOSED_PAIRS)
 def test_disclosed_fields_equal_the_loaded_policy_value(
-    field_name: str, harness: _Harness
+    field_name: str, key: str, harness: _Harness
 ) -> None:
     """D-6G2a-21 ② — 판정문의 **공시 칸**에 실린 값이 로드된 정책 값과 같다.
 
@@ -1603,9 +1868,6 @@ def test_disclosed_fields_equal_the_loaded_policy_value(
 
     그래서 **흔든 정책**으로 판정을 내고 공시값을 로드된 정책 값과 맞댄다. 기대값은 test 에
     적지 않고 정책 객체에서 꺼낸다 — 적으면 공시 칸이 상수가 된 것과 구별되지 않는다."""
-    key = next(
-        name for name, fields in _PUBLICATION_FIELDS.items() if field_name in fields
-    )
     moved = _STRONG_VALUES[key][0]
     payload = json.loads(harness.verdict("shipped", **{key: moved}))
     policy = harness.policy("shipped", f"disclose-{field_name}", **{key: moved})
@@ -2057,6 +2319,32 @@ def test_min_window_rows_reaches_the_minimum_sample_site(harness: _Harness) -> N
     )
     assert by_sample.get("stopped") == "SAMPLE_SIZE_BELOW_MINIMUM", by_sample.get(
         "stopped"
+    )
+
+
+def test_min_window_rows_reaches_the_division_coverage_site(
+    harness: _Harness,
+) -> None:
+    """자리 ③ **업무 대표 표지**(M6/6G-2c D-6G2c-17) — 업무 하나의 행 수가 이 하한에
+    못 미치면 `UNDERPOWERED` 다.
+
+    표지는 앞 판에서 행 수의 **참/거짓**으로 지어졌다(`COVERED if count else …`) — 그러면
+    하한을 어떻게 밀어도 `COVERED` 로 남는다. 여기서 재는 것은 그 자리가 **정책 값을
+    읽는가**다: 같은 행으로 하한만 행 수보다 크게 밀면 표지가 내려와야 한다.
+
+    기대 하한을 test 에 적지 않는다 — 판정문이 공시한 행 수에서 만든다(적으면 판이 바뀔 때
+    조용히 어긋난다). 밀린 판은 표본 하한에 걸려 **멈춤**으로 끝나지만 멈춤도 업무 대표를
+    그대로 싣는다."""
+    base = json.loads(harness.verdict("pass"))["snapshot"]["division_coverage"]
+    assert set(base) == {"SERVICE"}, f"판이 용역 하나가 아니다: {sorted(base)}"
+    rows = base["SERVICE"]["row_count"]
+    assert base["SERVICE"]["status"] == "COVERED", base
+
+    raised = json.loads(
+        harness.verdict("pass", **{"verdict.min_window_rows": str(rows + 1)})
+    )["snapshot"]["division_coverage"]
+    assert raised["SERVICE"] == {"row_count": rows, "status": "UNDERPOWERED"}, (
+        "하한을 행 수 위로 밀었는데 표지가 COVERED 로 남았다 — 그 자리가 정책을 읽지 않는다"
     )
 
 

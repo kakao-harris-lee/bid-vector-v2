@@ -20,21 +20,28 @@ M5 학습 안정성 레그가 같은 구멍을 가졌다, D-6G2e-10).
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
 
+import ml_engine.evaluation.backtest.policy as backtest_policy
+import ml_engine.evaluation.policy as evaluation_policy
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
 )
 from ml_engine.evaluation.policy import (
+    APPROVED_SEED_KEYS,
+    SEED_PREFIX,
     EvaluationPolicy,
     PolicyRejected,
     PolicyRejectionReason,
     load_evaluation_policy,
+    seed_key_mismatch,
 )
 
+_SRC_ROOT = Path(evaluation_policy.__file__).resolve().parents[2]
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
 _SHIPPED_BACKTEST = _POLICY_DIR / "strategy-backtest-v1.yaml"
 _SHIPPED_EVALUATION = _POLICY_DIR / "evaluation-v1.yaml"
@@ -64,6 +71,101 @@ def _write(tmp_path: Path, name: str, text: str) -> Path:
     path = tmp_path / name
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def test_the_approved_seed_key_enumeration_lives_in_exactly_one_place() -> None:
+    """D-6G2c-21 ③ — 승인 seed 키 **열거는 한 자리**다.
+
+    앞 판은 두 로더가 각자 한 벌씩 들고 있었다. 두 벌은 조용히 갈릴 수 있다 — 한쪽에만
+    여섯째를 더하면 그 로더만 여섯을 받고 다른 쪽 test 는 그대로 초록이다. 자리를 세는 것은
+    **문자열 grep 이 아니라 AST** 다: 주석·문면에 같은 이름이 나와도 세지 않고, 할당이
+    어디에 있든 잡는다. 자리는 **저장소 상대 경로**로 센다(cr r1 P-7) — basename 으로 세면
+    저장소에 `policy.py` 가 셋 있어(`evaluation/` · `evaluation/backtest/` · `registry/`)
+    열거를 **옮겨도** 초록이었다.
+
+    더해서 판정 로더가 **같은 술어 객체**를 쓰는지 본다 — 이름만 import 하고 자기 비교를
+    따로 두면 열거는 하나인데 판단이 둘이다."""
+    assigned: list[str] = []
+    for path in sorted((_SRC_ROOT / "ml_engine").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            targets: list[ast.expr] = []
+            if isinstance(node, ast.Assign):
+                targets = list(node.targets)
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+            assigned.extend(
+                str(path.relative_to(_SRC_ROOT))
+                for target in targets
+                if isinstance(target, ast.Name)
+                and target.id.lstrip("_") == "APPROVED_SEED_KEYS"
+            )
+    expected = str(Path(evaluation_policy.__file__).resolve().relative_to(_SRC_ROOT))
+    assert assigned == [expected], (
+        f"승인 seed 키 열거가 한 자리가 아니다: {assigned}(기대: {expected})"
+    )
+    assert backtest_policy.seed_key_mismatch is evaluation_policy.seed_key_mismatch, (
+        "판정 로더가 공용 술어를 쓰지 않는다 — 열거는 하나인데 판단이 둘이다"
+    )
+
+
+def test_seed_key_mismatch_is_a_set_equality_not_a_length_check() -> None:
+    """verifier r1 F-4 — **길이는 같고 키가 다른** 판이 거부된다.
+
+    막는 결함: `seed_key_mismatch` 를 `len(present) == len(approved)` 로 되돌려도 전체
+    suite 가 초록이었다. 두 로더를 거치는 판은 전부 **연속 색인**이라(판독기가 그것만 받는다)
+    길이와 집합이 같은 답을 내고, 그래서 집합 등식 **자체**를 잠그는 자리가 없었다. 승인
+    목록이 비연속으로 바뀌는 날 그 차이가 난다.
+
+    술어를 직접 부른다 — 로더를 거치면 연속 색인 검사가 먼저 서서 이 축이 가려진다.
+    기대값은 승인 목록에서 만든다(`.5` 는 그 목록의 길이에서 나온다)."""
+    approved: dict[str, int] = dict.fromkeys(APPROVED_SEED_KEYS, 0)
+    assert seed_key_mismatch(approved) is None, "승인 전수가 거부됐다"
+
+    missing = APPROVED_SEED_KEYS[-1]
+    extra = f"{SEED_PREFIX}.{len(APPROVED_SEED_KEYS)}"
+    assert extra not in approved, extra
+    swapped = {key: value for key, value in approved.items() if key != missing}
+    swapped[extra] = 0
+    assert len(swapped) == len(approved), "판을 잘못 지었다 — 길이가 같아야 축이 갈린다"
+
+    message = seed_key_mismatch(swapped)
+    assert message is not None, (
+        "길이는 같고 키가 다른 판이 통과했다 — 술어가 집합이 아니라 길이를 본다"
+    )
+    assert missing in message and extra in message, message
+
+
+def test_the_rejection_names_the_missing_seed_key(tmp_path: Path) -> None:
+    """D-6G2c-21 ③ — 거부가 **집합 등식**이다: 없는 키를 이름으로 적는다.
+
+    길이 비교는 수 둘(`5 != 4`)만 남겨 읽는 쪽이 어느 색인이 빠졌는지 알 수 없었다. 두
+    로더가 같은 술어를 쓰므로 두 문면이 같은 모양으로 나온다 — 그것도 함께 잰다."""
+    missing = APPROVED_SEED_KEYS[-1]
+    short = _APPROVED_SEED_COUNT - 1
+    rejections = (
+        load_strategy_backtest_policy(
+            _write(
+                tmp_path,
+                "backtest-named.yaml",
+                _with_seed_count(_SHIPPED_BACKTEST.read_text(encoding="utf-8"), short),
+            )
+        ),
+        load_evaluation_policy(
+            _write(
+                tmp_path,
+                "evaluation-named.yaml",
+                _with_seed_count(
+                    _SHIPPED_EVALUATION.read_text(encoding="utf-8"), short
+                ),
+            )
+        ),
+    )
+    for rejected in rejections:
+        assert isinstance(rejected, PolicyRejected), rejected
+        assert missing in rejected.detail, (
+            f"거부 문면이 빠진 키를 이름으로 적지 않는다: {rejected.detail}"
+        )
 
 
 def test_both_shipped_policies_carry_exactly_the_approved_five() -> None:
