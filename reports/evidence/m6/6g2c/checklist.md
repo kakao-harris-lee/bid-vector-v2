@@ -45,7 +45,7 @@ D-6G2c-22 의 판독기 단위 test 하나(`tests/adapters/test_snapshot_files.p
 
 ## K — Kotlin
 
-판정 대상 SHA **`93789f5c`**(마지막 K 커밋).
+판정 대상 SHA **`51b4d960`**(마지막 K 산출물 커밋).
 
 | 조건 | 상태 |
 |---|---|
