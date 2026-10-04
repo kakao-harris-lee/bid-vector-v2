@@ -41,6 +41,11 @@ USAGE
 }
 
 # ---- 등식 비교(단독 모드로도 쓴다) -------------------------------------------------
+# 무시 목록은 **키를 먼저 결속한 뒤** 조회한다(`. as $k` 가 `$ignore | index($k)` 보다 앞선다).
+# 파이프 안에서 `.` 는 `$ignore` 로 재결속되므로 `($ignore | index(.))` 는 배열에서 배열을
+# 찾아 늘 0 을 돌려주고, 그러면 **모든 측정이 무시되어 판정이 아무것도 재지 않는다**
+# (2026-10-05 실측 — 리허설의 음성 대조가 이것을 잡았다). 무시 목록을 쓰는 호출자는 같은
+# 목록으로 음성 대조를 함께 돌려 이 자리가 비어 있지 않음을 보여야 한다.
 _compare() {
   local expected="$1" actual="$2" ignore_csv="${3:-}" ignore_json findings
   [ -r "$expected" ] || _die "원본 manifest 를 읽을 수 없다: $expected" 3
@@ -53,8 +58,8 @@ _compare() {
     ($e[0].measurements) as $E | ($a[0].measurements) as $A |
     (($E | keys) + ($A | keys) | unique) as $keys |
     $keys[]
-    | select(($ignore | index(.)) == null)
     | . as $k
+    | select(($ignore | index($k)) == null)
     | select($E[$k] != $A[$k])
     | (if ($E[$k] | type) == "object" and ($A[$k] | type) == "object"
        then ((($E[$k] | keys) + ($A[$k] | keys) | unique)
