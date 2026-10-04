@@ -1576,8 +1576,8 @@ def test_a_container_literal_is_not_followed_but_a_call_is() -> None:
     assert not [use for use in from_tuple if use.derived], (
         f"tuple 리터럴을 뚫고 파생을 만들었다: {from_tuple}"
     )
+    # 담긴 값의 읽기는 **대입 자리에서** 그대로 남는다 — 쓰임이 숨지 않는다.
     assert {use.consumer for use in from_tuple} == {"assign"}, from_tuple
-    """담긴 값의 읽기는 **대입 자리에서** 그대로 남는다 — 쓰임이 숨지 않는다."""
 
     from_call = scan_source_for_uses(policy, _CALL_PROBE_SOURCE)
     derived = [use for use in from_call if use.derived]

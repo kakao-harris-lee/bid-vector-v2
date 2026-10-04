@@ -325,6 +325,38 @@ def test_an_existing_verdict_is_not_overwritten(tmp_path: Path) -> None:
     )
 
 
+def test_a_file_in_the_output_parent_chain_is_refused_before_the_job(
+    tmp_path: Path,
+) -> None:
+    """cr r2 R-1 — 부모 사슬에 파일이 끼어도 **job 앞에서** 선다.
+
+    앞 판의 거부는 **잎 하나**만 봤다(`--output-dir` 자신이 파일인가). `a` 가 파일인
+    `--output-dir a/b` 는 그 검사를 지나고, job 뒤의 `mkdir` 이 `NotADirectoryError` 로 터져
+    백테스트를 다 돌린 뒤 traceback 과 함께 판정 바이트를 잃었다 — P-9 가 닫으려던 피해가 한
+    단계 위에 그대로 남아 있었다.
+
+    이제 만들기 자체가 술어라 잎·부모가 한 자리에서 같은 사유로 선다. **job 앞**이라는 것은
+    스냅숏이 읽히지도 않았음으로 본다(판정 경로가 돌았으면 성공 출력이 났을 것이다)."""
+    parent = tmp_path / "a"
+    parent.write_bytes(_SENTINEL_VERDICT)
+    result = _cli(
+        *_argv(
+            snapshot=_snapshot_path(tmp_path).as_uri(),
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=parent / "b",
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    output = result.stdout + result.stderr
+    assert f"REFUSED {backtest_cli._Refusal.OUTPUT_NOT_A_DIRECTORY}" in output, output
+    assert "Traceback" not in result.stderr, result.stderr
+    assert "verdict" not in result.stdout.split(), (
+        "판정 경로가 돌았다 — 거부가 job 뒤다"
+    )
+    assert parent.read_bytes() == _SENTINEL_VERDICT, "부모 파일이 건드려졌다"
+
+
 def test_a_dangling_verdict_symlink_is_refused_and_writes_nothing(
     tmp_path: Path,
 ) -> None:
@@ -676,7 +708,14 @@ def _ignored_source_modules() -> tuple[str, ...]:
     """app 계약의 `ignore_imports` **출발 모듈** 전수 — 손 목록이 아니라 계약에서 읽는다.
 
     비어 있으면 유도가 공허해지므로 그 자체를 거부한다(예외가 없으면 F-1 의 구멍도 없지만,
-    조용히 빈 집합이 되는 길을 열어 두지 않는다)."""
+    조용히 빈 집합이 되는 길을 열어 두지 않는다).
+
+    **받는 모양은 정확한 모듈 이름 하나다**(cr r2 R-2). import-linter 의 `ignore_imports` 는
+    와일드카드(`ml_engine.app.* -> urllib`)와 패키지 이름도 받는데, 그 모양이 들어오면 스윕이
+    그 범위를 덮는 대신 `_module_path` 의 `assert` 에서 **선다**. 조용히 지나가지 않으니 안전
+    방향이지만, 「예외를 늘리면 감시도 같은 커밋에서 는다」는 문장이 그 두 모양에서는 성립하지
+    않는다 — 그때는 이 유도를 `__init__.py`·디렉터리까지 받도록 넓혀야 한다. RED 를 보고
+    당황하지 않도록 여기 적어 둔다."""
     contract = _app_import_contract()
     sources = {
         str(entry).split("->", maxsplit=1)[0].strip()

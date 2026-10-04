@@ -180,16 +180,6 @@ def _verdict_path(output_dir: Path, snapshot_dirs: tuple[Path, ...]) -> Path:
             _Refusal.OUTPUT_INSIDE_SNAPSHOT,
             "--output-dir 가 --snapshot-uri 의 디렉터리 안이다 — 스냅숏은 불변 입력이다",
         )
-    # cr r1 P-9 — 출력 자리가 **기존 파일**이면 세 검사를 다 지나고, job 이 끝난 뒤
-    # `mkdir(exist_ok=True)` 가 `FileExistsError` 로 터져 traceback 과 함께 판정 바이트를
-    # 잃었다(`exist_ok=True` 는 디렉터리일 때만 삼킨다). 닫힌 어휘가 「판정 앞에 멈추는 사유」를
-    # 닫았다고 적으면서 실제 사전 실패 집합에 대해서는 닫혀 있지 않던 자리다 — 사전 거부로
-    # 옮기고 어휘에 값 하나를 더한다.
-    if resolved.exists() and not resolved.is_dir():
-        _refuse(
-            _Refusal.OUTPUT_NOT_A_DIRECTORY,
-            "--output-dir 가 디렉터리가 아니다 — 판정을 쓸 자리가 없다",
-        )
     verdict_path = resolved / _VERDICT_NAME
     # D-6G2c-21 ④ — **이미 있으면 거부**한다. 앞 판은 조용히 덮어썼다: 같은 디렉터리로 두
     # 번 부르면 앞 판정이 사라지고, 그 판정의 sha256 을 적은 evidence 가 가리키는 바이트가
@@ -204,10 +194,36 @@ def _verdict_path(output_dir: Path, snapshot_dirs: tuple[Path, ...]) -> Path:
     return verdict_path
 
 
+def _make_output_dir(directory: Path) -> None:
+    """출력 자리를 **job 앞에서** 만든다 — 「쓸 수 있는가」가 한 술어다(cr r2 R-1).
+
+    앞 판은 거부가 `resolved.exists() and not resolved.is_dir()` 로 **잎 하나**만 봤다. 부모
+    사슬에 파일이 끼면(`--output-dir a/b` 에서 `a` 가 파일) 그 검사를 그대로 지나고, job 뒤의
+    `mkdir` 이 `NotADirectoryError` 로 터져 **백테스트를 다 돌린 뒤** traceback 과 함께 판정
+    바이트를 잃었다 — P-9 가 닫으려던 피해가 한 단계 위에 그대로 남아 있었다.
+
+    거부를 한 겹 더 쌓는 대신 **만들기 자체를 술어로 쓴다**: 잎이 파일이면 `FileExistsError`,
+    부모가 파일이면 `NotADirectoryError`, 권한이 없으면 `PermissionError` — 전부 `OSError` 라
+    한 자리에서 같은 닫힌 사유가 된다. 잎·부모 구분이 사라진다.
+
+    디렉터리를 미리 만드는 것은 거동 변화다. 거부 경로는 이미 디렉터리를 만들지 않고 서므로
+    (위 세 거부가 전부 이 앞이다) 새로 생기는 자리는 **성공할 실행에서만** 만들어진다.
+
+    문면에 경로를 싣지 않는다 — 무엇을 넘겼는지는 부른 쪽이 안다."""
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        _refuse(
+            _Refusal.OUTPUT_NOT_A_DIRECTORY,
+            "--output-dir 를 디렉터리로 만들 수 없다 — 판정을 쓸 자리가 없다",
+        )
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = _arguments(argv)
     snapshot_uri, snapshot_dirs = _snapshot_dirs(arguments.snapshot_uri)
     verdict_path = _verdict_path(arguments.output_dir, snapshot_dirs)
+    _make_output_dir(verdict_path.parent)
     outcome = run_backtest_job(
         snapshot_uri=snapshot_uri,
         backtest_policy_path=arguments.backtest_policy,
@@ -215,7 +231,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     if not isinstance(outcome, JobCompleted):
         raise SystemExit(f"FAILED {outcome.reason} {outcome.detail}")
-    verdict_path.parent.mkdir(parents=True, exist_ok=True)
     # **정본 술어는 이 쓰기다**(D-6G2c-35 F-3 = cr P-2). 앞 판은 `exists()` 로 거부하고 job 이
     # 끝난 뒤 `write_bytes`(= `open("wb")`, 잘라내기 + 링크 추종)로 썼다 — 검사와 쓰기 사이가
     # **실행 전체**였고 둘을 두 가지가 지나갔다: 같은 디렉터리로 두 번 기동하면 둘 다 검사를
