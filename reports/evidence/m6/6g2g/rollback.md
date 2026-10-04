@@ -1,16 +1,16 @@
 # M6/6G-2g — rollback
 
-**실측 HEAD: `ace32c8b`** (이 slice 의 마지막 산출물 커밋). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한
+**실측 HEAD: `419914a6`** (이 slice 의 마지막 산출물 커밋). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한
 **버릴 clone** 에서 실제로 실행한 결과다. 앞 라운드의 실측을 옮기지 않는다.
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only ace32c8b..<판정 SHA> -- <아래 「되돌리는 경로」 전부>` 가 **빈 출력**이면 유효하다.
+> `git diff --name-only 419914a6..<판정 SHA> -- <아래 「되돌리는 경로」 전부>` 가 **빈 출력**이면 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 의 산출물 경로. 목록은 손으로 쓰지 않고
-`git diff --name-status 31721008..ace32c8b` 에서 기계로 냈다(A 13 = 삭제 대상, D 8·M 21 = base 로 복원).
+`git diff --name-status 31721008..419914a6` 에서 기계로 냈다(A 13 = 삭제 대상, D 8·M 21 = base 로 복원).
 **디렉터리로 접지 않는다**(vr r1 L-2) — 접으면 목록이 slice 가 만진 파일보다 넓어지고, 파일 그대로 두면
 `comm -23 <(기계 산출) <(문서 목록)` 이 **빈 출력**이라는 등식으로 잴 수 있다.
 **라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
@@ -71,7 +71,7 @@ git restore --source=31721008 --staged --worktree -- \
 적용되지 않는다.
 
 두 정책 파일(`architecture-policy.properties`·`gate-tests.properties`)은 **이 range 에서 이 slice 의
-커밋만 만졌다**(`git log --oneline 31721008..ace32c8b -- <파일>` 로 확인 — 전부 `m6-6g2g`). 그래서 hunk 격리가 필요 없고 base 로의 단일 복원이 맞다. **다른 slice 의 커밋이 섞이면
+커밋만 만졌다**(`git log --oneline 31721008..419914a6 -- <파일>` 로 확인 — 전부 `m6-6g2g`). 그래서 hunk 격리가 필요 없고 base 로의 단일 복원이 맞다. **다른 slice 의 커밋이 섞이면
 이 판단이 바뀌므로 라운드마다 그 `git log` 를 다시 돌린다.**
 
 ### 2단계 — `milestone-6.md` 는 커밋 해시 hunk 격리
@@ -93,7 +93,7 @@ git diff 3e41dff5~1..3e41dff5 -- milestone-6.md | git apply -R -
 
 | # | 확인 | 명령 | 결과 |
 |---|---|---|---|
-| ⓪ | 목록이 기계 산출과 같다 | `comm -23 <(git diff --name-status 31721008..ace32c8b 의 산출물 경로) <(이 문서의 목록)` | 빈 출력 |
+| ⓪ | 목록이 기계 산출과 같다 | `comm -23 <(git diff --name-status 31721008..419914a6 의 산출물 경로) <(이 문서의 목록)` | 빈 출력 |
 | ① | 복원 명령이 선다 | 위 `git restore` | exit 0 |
 | ② | 복원 규모 | `git status --porcelain` 의 상태 집계 | A 8 · D 9 · M 20 |
 | ③ | 복원 경로가 base 와 같다 | `git diff 31721008 -- <복원 경로들>` | 빈 출력 |
@@ -106,6 +106,9 @@ git diff 3e41dff5~1..3e41dff5 -- milestone-6.md | git apply -R -
 A 8 = 이 slice 가 지웠던 등식 test 여덟이 돌아온 것. D 9 = 이 slice 가 만든 파일 아홉이 지워진 것.
 M 20 = base 로 되돌아간 수정 파일. (`git diff --name-status` 쪽 집계는 A 13 · D 8 · M 21 로, evidence
 경로 넷과 `milestone-6.md` 를 포함한 수다 — 복원 목록은 그 둘을 빼고 37 경로다.)
+
+수정 라운드 2 에서 산출물 파일 수는 그대로다(새 파일 없음 — 라운드가 더한 것은 기존 파일 안의
+fixture 셋과 test 넷이다).
 
 ⑥ 이 초록이라는 것은 **되돌린 상태가 CI 를 통과한다**는 뜻이다 — 「HEAD 가 초록이니 되돌려도 초록」이
 아니라 그 트리에서 직접 쟀다.
@@ -120,6 +123,7 @@ M 20 = base 로 되돌아간 수정 파일. (`git diff --name-status` 쪽 집계
 | 등재 등식 | `bidvector.kotlin-conventions.gradle.kts`·`bidvector.quality-baseline.gradle.kts` 의 `check` 의존에서 두 task 이름을 뺀다 |
 | 파일 시스템 출구(⑥) | `collection.transport.surface-packages` 에서 `java.nio.file` 과 `surface-types` 의 `java.io` 여섯을 빼고, 1층 허용 목록에 `java.nio.file`·`java.nio.file.attribute` 를 되돌려 넣고, `file-system` 용도 키와 `collection.transport.purposes` 의 그 낱말을 지운다 |
 | 멤버 표면(⑦) | `TransportSurfaceGateTest` 의 3층 test 둘을 지우고 `collection.transport.member-surface` 를 비운다 |
+| 3층 전송 서명 갈래 | `TransportSurfaceRules` 의 호출 시그니처 판정을 빼고 `collection.transport.member-surface` 를 그 전 집합으로 되돌린다 |
 | 새 목적지 둘(⑥ 후속) | `collection.transport.purposes` 에서 `http-response`·`process-stdio` 와 그 두 키를 지우고, 낱개에서 `PrintWriter`·`PrintStream`·`Formatter` 를 빼고, `app` 허용에 `java.io` 를 되돌려 넣는다 |
 | 반사 뿌리 확장(⑤) | `collection.reflection.roots` 를 `workflow`·`app`·`adapters` 로 되돌리고 도출식을 `externalJudgedModules` 로 되돌린다 |
 | 수집 깊이(③) | 축 키를 지우고 각 호출 자리에 앞 판의 깊이를 되돌린다 — **가장 넓은 조치**이고, 이 축만 끌 일이면 되돌림이 낫다 |
@@ -128,7 +132,7 @@ M 20 = base 로 되돌아간 수정 파일. (`git diff --name-status` 쪽 집계
 
 ## 하네스 레인 변경
 
-`git log --oneline 31721008..ace32c8b -- CLAUDE.md .claude/` — **없음**.
+`git log --oneline 31721008..419914a6 -- CLAUDE.md .claude/` — **없음**.
 이 range 의 팀장 레인 커밋(`3e41dff5` 와 계약 갱신들)은 `milestone-6.md` 와
 `reports/evidence/m6/6g2g/scope.md` 만 만졌고, 둘 다 위 절차가 다룬다(2단계 · 되돌리지 않음).
 slice 산출물이 아니며 in_scope 안이고, 운영자 승인 아래 같은 range 에 있다.
