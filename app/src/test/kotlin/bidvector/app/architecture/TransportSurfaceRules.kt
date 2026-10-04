@@ -67,7 +67,12 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
  * `app.injection.allowed-types` 의 `Resolution$Resolved`) · 이름 절단(쌍 등식 셋) · `enclosingClass` 접기
  * (`outermostClass()` 와 그것을 각자 복사한 `topLevel()` 셋). `enclosingClass` 접기는 위 cr M-1 의 결함을
  * 그대로 안고 있어 그쪽으로 통일할 수 없고, 접지 않는 둘은 중첩 이름을 등재에 남긴다. 그래서 이름 절단
- * 하나로 모으고 나머지를 지웠다 — 재등재 둘은 아래 두 키에서 중첩 접미가 떨어진 것이다.
+ * 하나로 모으고 나머지를 지웠다 — `collection.key-hash.holders` 의 `NoticeKeyHash$Companion` 에서
+ * 중첩 접미가 떨어졌다.
+ *
+ * **접기는 「누가 쥐는가」 축에만 쓴다**(cr r1 G-4). `app.injection.allowed-types` 는 **타입 동일성**
+ * 축이라 접지 않는다 — 접으면 `Resolution$Resolved` 허용이 sealed 형제 `Resolution$NotApplicable`
+ * 까지 열어 준다. 그 키는 정확한 JVM 이름을 담는다.
  */
 internal fun String.outermostName(): String = substringBefore('$')
 

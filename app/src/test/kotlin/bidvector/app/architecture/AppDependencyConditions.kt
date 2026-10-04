@@ -461,8 +461,11 @@ internal class AppDependencyConditions(
                 val caller = item.outermostClassName()
                 injectionTypes(item)
                     .filterNot { it.outermostClassName() == caller }
-                    .filterNot { it.outermostClassName() in allowed }
-                    .filterNot { "$caller|${it.outermostClassName()}" in exemptions }
+                    // 주입 축은 **타입 동일성**이다 — 접지 않는다(cr r1 G-4). 접기는 **보유자 축**
+                    // (누가 쥐는가)의 규칙이고, 여기서 접으면 `Resolution$Resolved` 허용이 sealed
+                    // 형제 `Resolution$NotApplicable` 까지 열어 준다. 허용 목록은 정확한 JVM 이름이다.
+                    .filterNot { it.name in allowed }
+                    .filterNot { "$caller|${it.name}" in exemptions }
                     .distinct()
                     .forEach {
                         events.add(SimpleConditionEvent.violated(item, "${item.fullName} 이 주입받는다 -> ${it.fullName}"))

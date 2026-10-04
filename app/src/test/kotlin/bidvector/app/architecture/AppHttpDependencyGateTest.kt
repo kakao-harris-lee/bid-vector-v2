@@ -242,7 +242,8 @@ class AppHttpDependencyGateTest {
                 rules
                     .injectionTypes(item)
                     .filterNot { it.outermostClassName() == item.outermostClassName() }
-                    .map { it.outermostClassName() }
+                    // 주입 **타입**은 접지 않는다(cr r1 G-4) — 보유자 쪽만 접는다.
+                    .map { it.name }
             }.toSet()
 
     /** 그 가운데 운반 타입인 것 — (클래스, 타입) 쌍으로 낸다. */
@@ -253,7 +254,7 @@ class AppHttpDependencyGateTest {
                 rules
                     .injectionTypes(item)
                     .filter { rules.isCapabilityCarrier(it) }
-                    .map { "${item.outermostClassName()}|${it.outermostClassName()}" }
+                    .map { "${item.outermostClassName()}|${it.name}" }
             }.toSet()
 
     /**
