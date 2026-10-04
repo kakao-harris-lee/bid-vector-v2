@@ -69,6 +69,7 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`architectur
 | **D-6G2g-11** | raw-access **참조자 축은 OWNER_ONLY 유지**(∅ 보존 — 「아무도 참조하지 않는다」 성질을 지킨다); FULL 로 올리는 축은 workflow→procurement(+2 등재)·usecase·key-hash(0). domain 순수성 OWNER_ONLY. 전부 `collection.depth.*` 표에 적고 test 가 등식으로 잠근다 | 설계 검토 (3) 과잉 |
 | **D-6G2g-12** | 기존 등재 등식 test(app 1 · workflow 1 · adapters 6)는 task 가 초록이 된 **뒤** 같은 slice 에서 삭제(두 벌 금지). 삭제는 별도 커밋, 그 커밋도 게이트 술어 변경이라 표적 재검증 | 설계 검토 (1) |
 | **D-6G2g-13** | 항목 순서(구현 레인): ① D-7·D-6 task(+입력 선언, 등재 보강 D-10, 제외 build 사실) → ② 기존 등식 test 삭제(D-12) → ③ D-1 깊이 정책 키 + 등식 test(D-11) → ④ D-2 접기 통일 + 재등재 둘 → ⑤ D-3 반사 뿌리 도출 식 → ⑥ D-4 뿌리·낱개 + 쌍 등재(≈13 보유자) → ⑦ D-5 3층 `collection.transport.member-surface`(후보 5). 항목마다 변이 ≥1 RED(numstat 확인, 「대신」 변이, 커밋 뒤 변이), 새 public 표면 보고 항목, production diff 0 유지 | 설계 검토 |
+| **D-6G2g-14** | **(계약 갱신 r3) ④ 접기 통일의 방향 = 이름 절단(`outermostName()`)** — D-13 문면 「`outermostClass()` 하나만」은 팀장 오기. `outermostClass()` 는 `enclosingClass` 접기이고 6G-2b cr M-1 이 실측한 결함(해소 여부에 따라 JDK 중첩 타입의 접힘이 갈려 전송 표면을 늘리지 않는 편집이 등식을 깼다)을 피해 쌍 등식 셋이 이름 절단으로 옮겨 간 것이다 → 이름 절단 하나로 통일하고 `outermostClass()`·`topLevel()` 복사 셋을 함께 삭제. 재등재 둘(`NoticeKeyHash$Companion`·`Resolution$Resolved`)은 어느 쪽이든 같다. `enclosingClass` 접기를 쓰던 게이트(원문 값 획득·대분류·공고명 키·러너·로거)는 등재가 전부 `bidvector..` 안이라 두 접기가 같다 — 재관측 결과를 evidence 에 적고 바뀌면 멈춘다. 레인 ①·② 커밋 `ec999d45`·`5ee8ca92` 수령 | 레인 질문 2026-10-04 |
 
 ## 하네스 레인 변경
 
