@@ -33,10 +33,12 @@ from ml_engine.evaluation.backtest.policy import (
 )
 from ml_engine.evaluation.policy import (
     APPROVED_SEED_KEYS,
+    SEED_PREFIX,
     EvaluationPolicy,
     PolicyRejected,
     PolicyRejectionReason,
     load_evaluation_policy,
+    seed_key_mismatch,
 )
 
 _SRC_ROOT = Path(evaluation_policy.__file__).resolve().parents[2]
@@ -102,6 +104,33 @@ def test_the_approved_seed_key_enumeration_lives_in_exactly_one_place() -> None:
     assert backtest_policy.seed_key_mismatch is evaluation_policy.seed_key_mismatch, (
         "판정 로더가 공용 술어를 쓰지 않는다 — 열거는 하나인데 판단이 둘이다"
     )
+
+
+def test_seed_key_mismatch_is_a_set_equality_not_a_length_check() -> None:
+    """verifier r1 F-4 — **길이는 같고 키가 다른** 판이 거부된다.
+
+    막는 결함: `seed_key_mismatch` 를 `len(present) == len(approved)` 로 되돌려도 전체
+    suite 가 초록이었다. 두 로더를 거치는 판은 전부 **연속 색인**이라(판독기가 그것만 받는다)
+    길이와 집합이 같은 답을 내고, 그래서 집합 등식 **자체**를 잠그는 자리가 없었다. 승인
+    목록이 비연속으로 바뀌는 날 그 차이가 난다.
+
+    술어를 직접 부른다 — 로더를 거치면 연속 색인 검사가 먼저 서서 이 축이 가려진다.
+    기대값은 승인 목록에서 만든다(`.5` 는 그 목록의 길이에서 나온다)."""
+    approved: dict[str, int] = dict.fromkeys(APPROVED_SEED_KEYS, 0)
+    assert seed_key_mismatch(approved) is None, "승인 전수가 거부됐다"
+
+    missing = APPROVED_SEED_KEYS[-1]
+    extra = f"{SEED_PREFIX}.{len(APPROVED_SEED_KEYS)}"
+    assert extra not in approved, extra
+    swapped = {key: value for key, value in approved.items() if key != missing}
+    swapped[extra] = 0
+    assert len(swapped) == len(approved), "판을 잘못 지었다 — 길이가 같아야 축이 갈린다"
+
+    message = seed_key_mismatch(swapped)
+    assert message is not None, (
+        "길이는 같고 키가 다른 판이 통과했다 — 술어가 집합이 아니라 길이를 본다"
+    )
+    assert missing in message and extra in message, message
 
 
 def test_the_rejection_names_the_missing_seed_key(tmp_path: Path) -> None:
