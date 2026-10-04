@@ -260,9 +260,21 @@ def _unsupported_scheme(tmp_path: Path) -> list[str]:
     )
 
 
+def _output_dir_is_a_file(tmp_path: Path) -> list[str]:
+    """출력 자리가 **기존 파일**인 판(cr r1 P-9)."""
+    output_dir = tmp_path / "out"
+    output_dir.write_bytes(_SENTINEL_VERDICT)
+    return _argv(
+        snapshot=_snapshot_path(tmp_path).as_uri(),
+        backtest_policy=_derived_policy(tmp_path / "policy"),
+        output_dir=output_dir,
+    )
+
+
 _REFUSAL_INPUTS = {
     "UNSUPPORTED_SCHEME": _unsupported_scheme,
     "OUTPUT_INSIDE_SNAPSHOT": _output_inside_snapshot,
+    "OUTPUT_NOT_A_DIRECTORY": _output_dir_is_a_file,
     "VERDICT_EXISTS": _existing_verdict,
 }
 

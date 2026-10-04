@@ -63,6 +63,7 @@ class _Refusal(StrEnum):
 
     UNSUPPORTED_SCHEME = "UNSUPPORTED_SCHEME"
     OUTPUT_INSIDE_SNAPSHOT = "OUTPUT_INSIDE_SNAPSHOT"
+    OUTPUT_NOT_A_DIRECTORY = "OUTPUT_NOT_A_DIRECTORY"
     VERDICT_EXISTS = "VERDICT_EXISTS"
 
 
@@ -168,6 +169,16 @@ def _verdict_path(output_dir: Path, snapshot_dirs: tuple[Path, ...]) -> Path:
         _refuse(
             _Refusal.OUTPUT_INSIDE_SNAPSHOT,
             "--output-dir 가 --snapshot-uri 의 디렉터리 안이다 — 스냅숏은 불변 입력이다",
+        )
+    # cr r1 P-9 — 출력 자리가 **기존 파일**이면 세 검사를 다 지나고, job 이 끝난 뒤
+    # `mkdir(exist_ok=True)` 가 `FileExistsError` 로 터져 traceback 과 함께 판정 바이트를
+    # 잃었다(`exist_ok=True` 는 디렉터리일 때만 삼킨다). 닫힌 어휘가 「판정 앞에 멈추는 사유」를
+    # 닫았다고 적으면서 실제 사전 실패 집합에 대해서는 닫혀 있지 않던 자리다 — 사전 거부로
+    # 옮기고 어휘에 값 하나를 더한다.
+    if resolved.exists() and not resolved.is_dir():
+        _refuse(
+            _Refusal.OUTPUT_NOT_A_DIRECTORY,
+            "--output-dir 가 디렉터리가 아니다 — 판정을 쓸 자리가 없다",
         )
     verdict_path = resolved / _VERDICT_NAME
     # D-6G2c-21 ④ — **이미 있으면 거부**한다. 앞 판은 조용히 덮어썼다: 같은 디렉터리로 두
