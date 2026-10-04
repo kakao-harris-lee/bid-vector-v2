@@ -140,7 +140,7 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 
 ## 6. 검증 기록
 
-2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · 러너 마지막 줄의 계수 아홉 — 코드와 일치(단 토큰은 `snapshot-extract finished` 이고 초판이 `snapshot finished` 로 적은 것은 PR #52 리뷰가 잡았다). 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다. PR #52 `/code-review`(2026-10-01)가 추가로 잡은 것: 범위 상한 31일(차단) · `file://` URI · 스냅숏별 출력 디렉터리 · 운영자 토큰 상시 필수 · manifest 키 이름 · 관측 창 뜻 · 판정 출력 위치 — 전부 반영.
+2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · 러너 마지막 줄의 계수 아홉 — **당시** 코드(main `30c6659e`)와 일치, 6G-2c 뒤로는 열둘이고 §2 산출 줄이 정본(단 토큰은 `snapshot-extract finished` 이고 초판이 `snapshot finished` 로 적은 것은 PR #52 리뷰가 잡았다). 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다. PR #52 `/code-review`(2026-10-01)가 추가로 잡은 것: 범위 상한 31일(차단) · `file://` URI · 스냅숏별 출력 디렉터리 · 운영자 토큰 상시 필수 · manifest 키 이름 · 관측 창 뜻 · 판정 출력 위치 — 전부 반영.
 
 ## 7. 배포 — 개찰 축 페이지 크기 999 교체 (6G-2f, 머지 뒤 자정 사전 확인을 거쳐 1회)
 
