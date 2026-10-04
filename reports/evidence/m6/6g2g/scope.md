@@ -26,9 +26,9 @@
 
 **방어하는 것**: 등재 밖 전송·반사·raw 접근·키 해시·use case 호출이 production 코드에 생기면 게이트가 붉는다(수집 깊이·접기·패키지 덮개의 간극으로 조용히 통과하는 길을 닫는다). **방어하지 않는 것**: 빌드 스크립트를 임의로 쓰는 저자(6G 경계) · 허용 패키지 안의 라이브러리 자체 로더·StAX·bean factory 출구(D-4) · 동적 import 류(6G-2c 경계).
 
-## in_scope (초안 — 착수 실측 뒤 확정)
+## in_scope (r2 확정)
 
-- `app/src/test/kotlin/bidvector/app/architecture/**`(게이트 술어) · `app/src/test/kotlin/bidvector/archfixture/**`(음성 fixture) · `adapters/src/test/kotlin/bidvector/adapters/**/…GateRegistrationTest.kt`(등재 등식) · `workflow/src/test/kotlin/bidvector/workflow/WorkflowGateRegistrationTest.kt`(D-2·6·7 가 고친다 — 초안 누락, 착수 실측 8-1) · **B-5 (다) 를 고르면** `build-logic/src/main/kotlin/**`·`build-logic/src/test/kotlin/**`(등재 등식 task) · **B-4 에서 domain 순수성을 FULL 로 올리면** `config/quality/member-effects*.properties` · `config/quality/architecture-policy.properties` · `config/quality/gate-tests.properties` · `app|adapters|workflow/build.gradle.kts`(**test task 입력 선언 블록만**) · `reports/evidence/m6/6g2g/**` · `milestone-6.md`(착수·종결 문단만).
+- `app/src/test/kotlin/bidvector/app/architecture/**`(게이트 술어) · `app/src/test/kotlin/bidvector/archfixture/**`(음성 fixture) · `adapters/src/test/kotlin/bidvector/adapters/**/…GateRegistrationTest.kt`(등재 등식) · `workflow/src/test/kotlin/bidvector/workflow/WorkflowGateRegistrationTest.kt`(D-2·6·7 가 고친다 — 초안 누락, 착수 실측 8-1) · `build-logic/src/main/kotlin/**`·`build-logic/src/test/kotlin/**`(등재 등식 task — B-5 (다)) · `app|adapters|workflow|shared-kernel|decision|procurement|qualification|strategy/build.gradle.kts`(**task 배선·입력 선언 블록만**) · `config/quality/member-effects*.properties` 는 **불필요**(B-4 (나)) · `config/quality/architecture-policy.properties` · `config/quality/gate-tests.properties` · `app|adapters|workflow/build.gradle.kts`(**test task 입력 선언 블록만**) · `reports/evidence/m6/6g2g/**` · `milestone-6.md`(착수·종결 문단만).
 - **out_scope**: production 코드 전부(변경이 필요해지면 멈추고 계약 갱신) · `ml-engine/**` · 실행 상태·스냅숏 형식.
 
 ## acceptance
@@ -39,7 +39,7 @@ CI `check` job 명령 그대로(`./gradlew --no-daemon check` · `qualityBaselin
 
 in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`architecture-policy.properties`·`gate-tests.properties`·`build.gradle.kts` 셋·`milestone-6.md`)은 커밋 해시 hunk — 목록은 실측 HEAD 에서 `git log` 로 낸다(6G-2c 교훈). ①~⑥ 버릴 clone.
 
-## 운영자 승인 (착수 전 결정 필요)
+## 운영자 승인 (2026-10-04 결정 완료 — 「추천대로 진행해」: B-1 (가) · B-2 (가) · B-3 (나) · B-4 (나) · B-5 (다), 정본은 D-6G2g-9)
 
 - **B-1** 반사 뿌리를 domain 계열까지 넓힐지 — (가) 넓힌다 · (나) 순수성 게이트에 맡기고 OPEN 유지. 착수 실측: domain 여섯 모듈 반사 참조 **0**(소스·바이트코드 셋 다), 뿌리는 `layer.*` 도출이라 바꿀 자리는 상수가 아니라 도출 식 → (가)면 **등재 0**. **팀장 추천 (가)**.
 - **B-2** 허용 패키지 안 출구 — (가) 파일 시스템 출구만 구조 한 수(D-4) · (나) 전부 경계 유지(코드 0, 문면만). 착수 실측: `java.nio.file` 은 전송 뿌리 열일곱에 **없다**(있는 것은 `java.nio.channels`) — 파일 시스템 출구는 오늘 쌍 층 밖이고 1층이 통째로 허용. `Path`/`File` 을 만드는 보유자 **10**(타입을 이름 붙이는 데까지 13), 그중 여섯은 이미 전송 등재 → 새 이름 네댓. **팀장 추천 (가)** — 뿌리에 `java.nio.file`·`java.io`(File) 를 더하고 쌍 등재; 라이브러리 로더·StAX·bean factory 는 경계 유지.
@@ -59,6 +59,16 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`architectur
 | **D-6G2g-6** | `OPEN-6G-GATE-REGISTRY-KONEPS` 원 문장 없음 → 이 slice 가 정의(위 표 D-6) | 착수 실측 D-6 |
 | **D-6G2g-7** | 등재 등식 현황: app 52==52 · workflow 48==48 · **adapters 131 vs 124**(미등재 7 = 의도적 `check` 밖 2 + **순수 누락 5**: `KonepsOpeningCompleteSourceTest`·`JdbcEditSessionRepositoryTest`·`JdbcEditSessionSaveGuardTest`·`JdbcStrategyRepositoryCodexRegressionTest`·`JdbcStrategyRepositoryTest`) · **shared-kernel 8 vs 1**(장부 머리말의 의도적 선별 7) · 나머지 모듈 일치, 잉여 0. adapters 덮개 열두 패키지 중 여섯, 등재 124 중 78(63%)이 등식 밖. 술어 세 모양(app 컴파일 클래스 양방향 · workflow 소스 재귀 양방향 · adapters 소스 비재귀 단방향), 파일명 술어 구멍 아홉(한 파일에 test 둘 이상 — `FileSampleListLedgerTest` 는 어떤 등식도 못 봄). 입력 선언 app·workflow 예, adapters 아니오 → 결정 **B-5** 신설 | 착수 실측 D-7 |
 | **D-6G2g-8** | in_scope 보강: `WorkflowGateRegistrationTest.kt` 추가(초안 누락) · B-5 (다)면 `build-logic/**` · B-4 (가)면 `member-effects*.properties`. 순수 누락 5 등재는 정책 파일 편집만 | 착수 실측 8 |
+
+## 계약 갱신 r2 (2026-10-04, 팀장 — 운영자 결정 · 설계 검토 `_workspace/m6-6g2g/01_design-review.md`)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6G2g-9** | **운영자 결정 B-1~B-5** = 추천대로: B-1 (가) 반사 뿌리를 domain 여섯까지(`layer.*` 도출 식, 등재 0) · B-2 (가) 전송 뿌리 + `java.nio.file`, 낱개 `java.io.File`·`FileInputStream`·`FileOutputStream`·`FileReader`·`FileWriter`·`RandomAccessFile`(라이브러리 로더·StAX·bean factory 는 경계 유지) · B-3 (나) 제외는 build 사실(Test task `filter.excludePatterns` · `@EnabledIfSystemProperty`)에서 기계로 · B-4 (나) 깊이는 축별 정책 키 `collection.depth.<axis>=FULL\|OWNER_ONLY` + 구현 모드 == 정책 표 등식 test · B-5 (다) 등재 등식은 build-logic 의 `gateExecutionGate` 형제 task(컴파일된 `@Test` 클래스 전수 == 등재 ∖ 제외, 양방향, 입력 선언 포함) | 운영자 2026-10-04 |
+| **D-6G2g-10** | shared-kernel 의 「의도적 선별 7」은 build 사실로 표현되지 않으므로 **등재한다** — 장부의 뜻이 「CI 가 돌려야 하는 test 전수」로 바뀌고 `gate-tests.properties` 머리말을 그렇게 고친다. adapters 순수 누락 5 도 등재. `check` 밖 둘(`CrossLangSmokeTest` filter · `RealServerIntegrationTest` `@EnabledIf`)은 제외 집합 | 설계 검토 (3) 미달 |
+| **D-6G2g-11** | raw-access **참조자 축은 OWNER_ONLY 유지**(∅ 보존 — 「아무도 참조하지 않는다」 성질을 지킨다); FULL 로 올리는 축은 workflow→procurement(+2 등재)·usecase·key-hash(0). domain 순수성 OWNER_ONLY. 전부 `collection.depth.*` 표에 적고 test 가 등식으로 잠근다 | 설계 검토 (3) 과잉 |
+| **D-6G2g-12** | 기존 등재 등식 test(app 1 · workflow 1 · adapters 6)는 task 가 초록이 된 **뒤** 같은 slice 에서 삭제(두 벌 금지). 삭제는 별도 커밋, 그 커밋도 게이트 술어 변경이라 표적 재검증 | 설계 검토 (1) |
+| **D-6G2g-13** | 항목 순서(구현 레인): ① D-7·D-6 task(+입력 선언, 등재 보강 D-10, 제외 build 사실) → ② 기존 등식 test 삭제(D-12) → ③ D-1 깊이 정책 키 + 등식 test(D-11) → ④ D-2 접기 통일 + 재등재 둘 → ⑤ D-3 반사 뿌리 도출 식 → ⑥ D-4 뿌리·낱개 + 쌍 등재(≈13 보유자) → ⑦ D-5 3층 `collection.transport.member-surface`(후보 5). 항목마다 변이 ≥1 RED(numstat 확인, 「대신」 변이, 커밋 뒤 변이), 새 public 표면 보고 항목, production diff 0 유지 | 설계 검토 |
 
 ## 하네스 레인 변경
 
