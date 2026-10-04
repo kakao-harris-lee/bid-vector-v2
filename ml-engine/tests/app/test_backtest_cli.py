@@ -32,12 +32,14 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 import pytest
 
+import ml_engine
 import ml_engine.app
 from ml_engine.app import backtest_cli
 from ml_engine.app.backtest_job import JobFailureReason
@@ -516,11 +518,21 @@ def test_a_spaced_snapshot_runs_end_to_end(tmp_path: Path) -> None:
     assert json.loads(payload)["variants"], result.stdout
 
 
-# ── app 층의 HTTP·소켓 금지: 계약 파일 한 자리 + AST 스윕 (D-6G2c-23) ──────────
+# ── app 층의 HTTP·소켓 금지: 계약 파일 한 자리 + AST 스윕 (D-6G2c-23 · 35 F-1) ───
 # `OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT` 종결. 두 층이 같은 집합을 본다:
 #   ① `lint-imports` — 뿌리 단위(도구가 외부 패키지의 하위 모듈을 forbidden 으로 받지 않는다).
 #   ② 이 AST 스윕 — 하위 모듈 단위(`urllib.request` 는 막고 `urllib.parse` 는 허용).
 # 금지 목록은 **계약 파일 한 자리**이고 스윕이 그것을 읽어 만든다 — 두 벌을 두면 갈린다.
+#
+# **스윕이 보는 자리도 그 계약에서 나온다**(verifier r1 F-1 = cr P-4). 뿌리 간선을 지우는
+# `ignore_imports` 는 그 모듈의 `urllib` **전부**를 연다 — `urllib.parse` 만 여는 것이 아니다.
+# 그래서 예외를 받은 모듈은 app 밖에 있어도 스윕 대상이다. 그 목록을 손으로 적지 않고 계약의
+# `ignore_imports` 출발 모듈에서 유도한다: 예외를 늘리면 스윕 범위가 **같은 커밋에서** 함께
+# 늘고, 예외와 감시가 갈릴 자리가 없다.
+#
+# **재는 층은 정적 import 하나다**(F-2 경계). 동적 import(`importlib.import_module` ·
+# `__import__`)와 목록 밖 네트워크 경로(`asyncio` · `multiprocessing` · `subprocess`)는 두 층
+# 모두 보지 못한다 — 알려진 제한으로 등재했고 코드로 막지 않는다.
 _APP_IMPORT_CONTRACT_NAME = "app 은 DB·HTTP·업무 모듈을 모른다"
 
 _ALLOWED_SUBMODULES = frozenset({"urllib.parse"})
@@ -570,10 +582,43 @@ def _imported_names(tree: ast.AST) -> list[tuple[str, int]]:
     return found
 
 
-def _offending_imports(directory: Path, roots: frozenset[str]) -> list[str]:
-    """`directory` 아래 모듈이 금지 뿌리를 import 하는 자리 — 허용 하위 모듈만 뺀다."""
+def _ignored_source_modules() -> tuple[str, ...]:
+    """app 계약의 `ignore_imports` **출발 모듈** 전수 — 손 목록이 아니라 계약에서 읽는다.
+
+    비어 있으면 유도가 공허해지므로 그 자체를 거부한다(예외가 없으면 F-1 의 구멍도 없지만,
+    조용히 빈 집합이 되는 길을 열어 두지 않는다)."""
+    contract = _app_import_contract()
+    sources = {
+        str(entry).split("->", maxsplit=1)[0].strip()
+        for entry in contract.get("ignore_imports", [])
+    }
+    assert sources, "app 계약에 ignore_imports 가 없다 — 스윕 범위 유도가 공허하다"
+    for module in sources:
+        assert module.startswith("ml_engine."), (
+            f"계약 밖 패키지의 예외는 이 스윕이 따라갈 수 없다: {module}"
+        )
+    return tuple(sorted(sources))
+
+
+def _module_path(module: str) -> Path:
+    root = Path(ml_engine.__file__).resolve().parent
+    path = root.joinpath(*module.split(".")[1:]).with_suffix(".py")
+    assert path.is_file(), f"예외가 가리키는 모듈 파일이 없다: {module}"
+    return path
+
+
+def _swept_paths() -> tuple[Path, ...]:
+    """스윕이 여는 파일 전수 — `app/**` 과 계약의 예외를 받은 모듈들의 합집합."""
+    app_dir = Path(ml_engine.app.__file__).resolve().parent
+    paths = set(app_dir.rglob("*.py"))
+    paths |= {_module_path(module) for module in _ignored_source_modules()}
+    return tuple(sorted(paths))
+
+
+def _offending_imports(paths: Sequence[Path], roots: frozenset[str]) -> list[str]:
+    """그 파일들이 금지 뿌리를 import 하는 자리 — 허용 하위 모듈만 뺀다."""
     offenders: list[str] = []
-    for path in sorted(directory.rglob("*.py")):
+    for path in sorted(paths):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for name, lineno in _imported_names(tree):
             if name.split(".")[0] not in roots:
@@ -587,14 +632,40 @@ def _offending_imports(directory: Path, roots: frozenset[str]) -> list[str]:
     return offenders
 
 
-def test_the_app_package_imports_no_forbidden_http_module() -> None:
-    """D-6G2c-23 — `ml_engine/app/**` 전수에 금지 뿌리의 import 가 없다(허용 하위 모듈 제외).
+def test_the_swept_modules_import_no_forbidden_http_module() -> None:
+    """D-6G2c-23 · F-1 — 스윕 대상 전수에 금지 뿌리의 import 가 없다(허용 하위 모듈 제외).
 
-    앞 판은 `urllib.request` **한 이름**만 봤다. 그러면 `http.client`·`socket` 은 그대로
-    지나가고, 스윕이 초록인 채 비어 있다. 이제 금지 집합이 계약 파일에서 온다."""
+    앞 판은 둘 다 좁았다: 보는 이름이 `urllib.request` **하나**였고(그래서 `http.client`·
+    `socket` 이 지나갔다), 여는 자리가 `app/**` **뿐**이었다(그래서 뿌리 간선 예외를 받은
+    app 밖 셋이 지나갔다). 이제 금지 집합도 스윕 범위도 계약 파일에서 온다."""
+    offenders = _offending_imports(_swept_paths(), _forbidden_roots())
+    assert not offenders, f"스윕 대상이 금지 모듈을 import 한다: {offenders}"
+
+
+def test_the_sweep_covers_every_module_the_contract_excepts() -> None:
+    """verifier r1 F-1 — 예외를 받은 모듈은 **전부** 스윕 대상이다.
+
+    `ignore_imports` 의 `-> urllib` 는 뿌리 간선이라 그 모듈의 `urllib` 를 **전부** 연다 —
+    `urllib.parse` 만 여는 것이 아니다. 그래서 예외 넷 가운데 app 밖 셋(`adapters` 둘 ·
+    `training.jobs.servicer`)에 `import urllib.request` 를 넣으면 `lint-imports` 는 ignore 로
+    지우고, 앞 판의 스윕은 `app/**` 만 열어 그 자리를 보지 못했다 — 두 층 모두 초록이었다.
+
+    범위를 손으로 적지 않고 **계약에서 유도**하므로 예외가 늘면 스윕도 같은 커밋에서 는다.
+    여기서 재는 것은 그 유도가 실제로 성립하는가다: 예외 모듈의 파일이 스윕 집합 안이고,
+    그중 **app 밖인 것이 실제로 있다**(없으면 이 단언이 공허하다)."""
+    swept = set(_swept_paths())
+    excepted = {_module_path(module) for module in _ignored_source_modules()}
+    assert excepted <= swept, (
+        f"예외를 받았는데 스윕 밖인 모듈: {sorted(excepted - swept)}"
+    )
+
     app_dir = Path(ml_engine.app.__file__).resolve().parent
-    offenders = _offending_imports(app_dir, _forbidden_roots())
-    assert not offenders, f"app 층이 금지 모듈을 import 한다: {offenders}"
+    outside = {path for path in excepted if app_dir not in path.parents}
+    assert outside, (
+        "app 밖 예외가 하나도 없다 — 이 단언이 공허하다. 예외가 전부 app 안이면 "
+        "F-1 의 구멍도 없지만, 그 사실을 여기서 보고 판단해야 한다"
+    )
+    assert set(app_dir.rglob("*.py")) <= swept, "app 층이 스윕에서 빠졌다"
 
 
 def test_every_allowed_submodule_has_a_forbidden_root() -> None:
@@ -624,7 +695,7 @@ def test_the_sweep_set_equals_the_contract_list(tmp_path: Path) -> None:
 
     reported = {
         entry.rsplit(" -> ", maxsplit=1)[-1]
-        for entry in _offending_imports(probe, roots)
+        for entry in _offending_imports(tuple(probe.rglob("*.py")), roots)
     }
     assert reported == set(roots), (
         f"스윕이 놓친 뿌리: {sorted(roots - reported)} · "
