@@ -57,10 +57,12 @@ import java.util.UUID
  * 전달한다).
  *
  * **패키지가 `bidvector.adapters.contract`다(D-6C-8)** —
- * `bidvector.adapters.ml`에는 두지 않는다. 그 패키지에는 `MlGateRegistrationTest`
- * (디렉터리의 모든 `*Test.kt` 전수를 `gate-tests.properties` 등재와 대조)와
- * `gateExecutionGate`(등재된 클래스의 skip 0 요구)가 함께 있어, 환경 조건부로 항상
- * skip 될 수 있는 이 test 를 그 자리에 두면 두 게이트가 동시에 만족 불가능해진다
+ * `bidvector.adapters.ml`에는 두지 않는다. 등재 등식(M6/6G-2g 부터 build-logic 의
+ * `gateRegistrationGate` — 모듈의 컴파일된 test 클래스 전수 ∖ 제외 == 등재)과
+ * `gateExecutionGate`(등재된 클래스의 skip 0 요구)가 함께 걸려 있어, 환경 조건부로 항상
+ * skip 될 수 있는 이 test 를 등재하면 두 게이트가 동시에 만족 불가능해진다. 지금 이 클래스는
+ * `gate.tests.adapters.excluded` 에 선언돼 있고, 그 제외를 만드는 것은 아래
+ * `@EnabledIfSystemProperty` 라는 **build 사실**이다
  * (등재하면 skip 위반, 빼면 등재 위반).
  * 같은 축의 기존 전례(`CrossLangSmokeTest` — 교차 언어 스모크, 컨테이너 없이 도는
  * Python 서버 대상)가 이미 이 패키지에 있다 — 이 test 는 그 컨테이너 판이다. 게이트

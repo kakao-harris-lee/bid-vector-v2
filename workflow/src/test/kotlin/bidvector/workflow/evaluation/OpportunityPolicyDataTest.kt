@@ -28,7 +28,7 @@ private const val TEST_MAX_SAMPLES = 500
  * 값 대조(D-4B6A-4 — `textMaxChars`는 2E `contract-policy.properties`의
  * `embedding.text.max-chars`와 같아야 한다). 정책 파일은 `ContractPolicySupport`(adapters
  * test 전용)를 재사용할 수 없어(모듈 경계) 이 test가 직접 상대 경로로 읽는다
- * (`MlGateRegistrationTest`가 `gate-tests.properties`를 읽는 것과 같은 관례).
+ * (정책 파일을 상대 경로로 읽는 test 의 관례와 같다).
  */
 class OpportunityPolicyDataTest {
     private fun policy(
