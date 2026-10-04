@@ -36,6 +36,14 @@ class SnapshotFiles:
 
 class SnapshotUnreadableReason(StrEnum):
     UNSUPPORTED_SCHEME = "UNSUPPORTED_SCHEME"
+    INVALID_PATH = "INVALID_PATH"
+    """디코딩한 경로를 운영체제가 경로로 받지 않는다(M6/6G-2c 수정 r1, verifier F-5).
+
+    `%00` 이 든 URI 가 그 자리다 — 푼 뒤에 널 바이트가 섞여 `resolve()` 가 `ValueError` 를
+    던진다. 앞 판은 문자 그대로 읽어 `NOT_FOUND` 였고, 디코딩을 넣은 뒤로는 **닫힌 어휘 밖**
+    예외가 호출자에게 샜다. 거부는 그대로이되 이름이 있어야 「왜 못 읽었는지 모르는 입력」이
+    생기지 않는다."""
+
     NOT_FOUND = "NOT_FOUND"
     NOT_A_DIRECTORY = "NOT_A_DIRECTORY"
 
@@ -60,7 +68,14 @@ def read_snapshot_files(uri: str) -> SnapshotFiles | SnapshotUnreadable:
         return SnapshotUnreadable(
             SnapshotUnreadableReason.UNSUPPORTED_SCHEME, f"file://{parsed.netloc}/…"
         )
-    directory = Path(unquote(parsed.path)).resolve()
+    try:
+        directory = Path(unquote(parsed.path)).resolve()
+    except ValueError as exc:
+        # 널 바이트처럼 운영체제가 경로로 받지 않는 바이트 — 닫힌 사유로 돌려준다(F-5).
+        # 문면에 경로를 싣지 않는다(예외 문면은 바이트를 그대로 담을 수 있다).
+        return SnapshotUnreadable(
+            SnapshotUnreadableReason.INVALID_PATH, type(exc).__name__
+        )
     if not directory.exists():
         return SnapshotUnreadable(SnapshotUnreadableReason.NOT_FOUND, str(directory))
     if not directory.is_dir():

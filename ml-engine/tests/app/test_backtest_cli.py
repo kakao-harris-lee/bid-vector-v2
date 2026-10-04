@@ -271,8 +271,18 @@ def _output_dir_is_a_file(tmp_path: Path) -> list[str]:
     )
 
 
+def _undecodable_snapshot_uri(tmp_path: Path) -> list[str]:
+    """푼 뒤 운영체제가 경로로 받지 않는 URI(verifier r1 F-5)."""
+    return _argv(
+        snapshot="file:///tmp/a%00b",
+        backtest_policy=_derived_policy(tmp_path / "policy"),
+        output_dir=tmp_path / "out",
+    )
+
+
 _REFUSAL_INPUTS = {
     "UNSUPPORTED_SCHEME": _unsupported_scheme,
+    "INVALID_SNAPSHOT_URI": _undecodable_snapshot_uri,
     "OUTPUT_INSIDE_SNAPSHOT": _output_inside_snapshot,
     "OUTPUT_NOT_A_DIRECTORY": _output_dir_is_a_file,
     "VERDICT_EXISTS": _existing_verdict,

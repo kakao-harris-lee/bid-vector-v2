@@ -62,6 +62,7 @@ class _Refusal(StrEnum):
     닫혀 있어야 사유가 늘 때 출력·종료 코드 계약 밖에 새 사유가 남지 않는다."""
 
     UNSUPPORTED_SCHEME = "UNSUPPORTED_SCHEME"
+    INVALID_SNAPSHOT_URI = "INVALID_SNAPSHOT_URI"
     OUTPUT_INSIDE_SNAPSHOT = "OUTPUT_INSIDE_SNAPSHOT"
     OUTPUT_NOT_A_DIRECTORY = "OUTPUT_NOT_A_DIRECTORY"
     VERDICT_EXISTS = "VERDICT_EXISTS"
@@ -146,11 +147,20 @@ def _snapshot_dirs(raw: str) -> tuple[str, tuple[Path, ...]]:
     if not parsed.scheme:
         return _converted(Path(raw).resolve(), raw)
     decoded = Path(unquote(parsed.path))
-    if not decoded.is_absolute():
-        return _converted(decoded.resolve(), raw)
-    # 그대로 넘기는 갈래 — 여기서만 두 해석이 갈릴 수 있다(vr r2 L-r2-1).
-    literal = Path(parsed.path).resolve()
-    resolved = decoded.resolve()
+    try:
+        if not decoded.is_absolute():
+            return _converted(decoded.resolve(), raw)
+        # 그대로 넘기는 갈래 — 여기서만 두 해석이 갈릴 수 있다(vr r2 L-r2-1).
+        literal = Path(parsed.path).resolve()
+        resolved = decoded.resolve()
+    except ValueError:
+        # `%00` 처럼 푼 뒤 운영체제가 경로로 받지 않는 바이트(F-5). 앞 판은 traceback 으로
+        # 끝났다 — 멈추기는 했지만 닫힌 어휘 밖이라 「왜 멈췄는지」가 출력에 이름으로 없었다.
+        # 문면에 경로를 싣지 않는다.
+        _refuse(
+            _Refusal.INVALID_SNAPSHOT_URI,
+            "--snapshot-uri 를 푼 경로를 운영체제가 받지 않는다",
+        )
     return raw, (resolved,) if resolved == literal else (resolved, literal)
 
 

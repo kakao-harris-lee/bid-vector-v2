@@ -84,6 +84,21 @@ def test_a_spaced_path_that_is_a_file_is_not_a_directory(tmp_path: Path) -> None
     assert result.reason is SnapshotUnreadableReason.NOT_A_DIRECTORY
 
 
+def test_a_path_the_os_refuses_gets_a_closed_reason(tmp_path: Path) -> None:
+    """verifier r1 F-5 — `%00` 이 **닫힌 사유**로 돌아온다(예외가 아니다).
+
+    디코딩을 넣기 전에는 `%00` 이 문자 그대로라 `NOT_FOUND` 였다. 푼 뒤로는 널 바이트가 섞여
+    `resolve()` 가 `ValueError` 를 던졌고, 그것은 닫힌 어휘 **밖**이라 호출자에게 샌다. 거부는
+    그대로이되 이름이 있어야 「왜 못 읽었는지 모르는 입력」이 생기지 않는다.
+
+    문면에 경로를 싣지 않는다 — 예외 문면은 그 바이트를 그대로 담을 수 있다."""
+    del tmp_path
+    result = read_snapshot_files("file:///tmp/a%00b")
+    assert isinstance(result, SnapshotUnreadable), result
+    assert result.reason is SnapshotUnreadableReason.INVALID_PATH
+    assert "\x00" not in result.detail and "/tmp" not in result.detail, result.detail
+
+
 def test_scheme_and_host_boundaries_are_unchanged(tmp_path: Path) -> None:
     """scheme 경계도 그대로다. `file://<host>/…` 은 host 를 조용히 무시할 위험이라
     fail-closed 이고, 그 판정은 디코딩 **앞**에 있다."""
