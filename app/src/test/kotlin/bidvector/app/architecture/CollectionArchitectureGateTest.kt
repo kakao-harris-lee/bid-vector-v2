@@ -296,8 +296,9 @@ class CollectionArchitectureGateTest {
     ): Set<String> =
         production
             .filter { item -> roots.any { item.name.startsWith("$it.") } }
-            .filter { item -> item.referencedTypeNames(depth).any { it in types && it != item.name } }
-            .map { it.name }
+            .filter { item ->
+                item.referencedTypeNames(depth).any { it in types && it != item.outermostClassName() }
+            }.map { it.outermostClassName() }
             .toSet()
 
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }

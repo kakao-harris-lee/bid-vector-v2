@@ -170,8 +170,8 @@ class CollectionArchitectureRules(
         classes
             .filter { inRoots(it, roots) }
             .filter { origin ->
-                origin.referencedTypeNames(depth).any { it in types && it != origin.outermostClass().fullName }
-            }.map { it.outermostClass().fullName }
+                origin.referencedTypeNames(depth).any { it in types && it != origin.outermostClassName() }
+            }.map { it.outermostClassName() }
             .toSet()
 
     /** [roots] 아래 클래스 가운데 [types] 의 멤버에 접근하는 것의 최상위 클래스 이름 집합 — 허용 집합과 같아야 한다. */
@@ -182,8 +182,8 @@ class CollectionArchitectureRules(
     ): Set<String> =
         classes
             .filter { inRoots(it, roots) }
-            .filter { origin -> origin.accessesFromSelf.any { it.targetOwner.outermostClass().fullName in types } }
-            .map { it.outermostClass().fullName }
+            .filter { origin -> origin.accessesFromSelf.any { it.targetOwner.outermostClassName() in types } }
+            .map { it.outermostClassName() }
             .toSet()
 
     /** 타입 **이름**이 [packages] 뿌리 안인가 — 쌍 등식과 규칙이 같은 술어를 쓴다. */
@@ -270,7 +270,7 @@ class CollectionArchitectureRules(
     ): Set<String> =
         production
             .filter { item -> keys.any { constantPoolContains(item, it) } }
-            .map { it.outermostClass().fullName }
+            .map { it.outermostClassName() }
             .toSet()
 
     /**
@@ -295,7 +295,7 @@ class CollectionArchitectureRules(
 
     private fun isOutside(allowed: Set<String>) =
         object : com.tngtech.archunit.base.DescribedPredicate<JavaClass>("허용 집합 밖 클래스 (${allowed.size}종)") {
-            override fun test(target: JavaClass): Boolean = target.outermostClass().fullName !in allowed
+            override fun test(target: JavaClass): Boolean = target.outermostClassName() !in allowed
         }
 
     private fun referenceProcurementTypesOutside(
@@ -323,7 +323,7 @@ class CollectionArchitectureRules(
                 events: ConditionEvents,
             ) {
                 item.accessesFromSelf
-                    .filter { access -> access.targetOwner.outermostClass().fullName in types }
+                    .filter { access -> access.targetOwner.outermostClassName() in types }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, it.describe())) }
             }
         }
@@ -337,8 +337,7 @@ class CollectionArchitectureRules(
                 item.fields
                     .filter { field ->
                         field.rawType.baseComponentType
-                            .outermostClass()
-                            .fullName in types
+                            .outermostClassName() in types
                     }.forEach {
                         events.add(
                             SimpleConditionEvent.satisfied(item, "${item.fullName}.${it.name}: ${it.rawType.name}"),
@@ -386,7 +385,7 @@ class CollectionArchitectureRules(
             ) {
                 item
                     .referencedTypeNames(depth)
-                    .filter { it in types && it != item.outermostClass().fullName }
+                    .filter { it in types && it != item.outermostClassName() }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $it")) }
             }
         }

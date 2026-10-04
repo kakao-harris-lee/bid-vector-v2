@@ -51,7 +51,7 @@ internal class AppDependencyConditions(
                     .map { it.targetClass.baseComponentType }
                     .filterNot { it.isPrimitive || it.isArray }
                     // 자기 자신(중첩·컴패니언 포함)은 의존이 아니다 — 최상위 소유자로 가린다.
-                    .filterNot { it.topLevel().fullName == item.topLevel().fullName }
+                    .filterNot { it.outermostClassName() == item.outermostClassName() }
                     .filterNot { target ->
                         isAllowed(
                             target,
@@ -91,7 +91,7 @@ internal class AppDependencyConditions(
 
             // 중첩 타입(sealed 의 하위 등)은 **최상위 이름**으로 판정한다 — 허용 목록에 하위
             // 타입을 하나씩 적으면 그것이 곧 열거로 되돌아가는 길이다.
-            target.topLevel().fullName in allowedClasses -> true
+            target.outermostClassName() in allowedClasses -> true
 
             // 오류 매핑표가 옮기는 어댑터 예외 — 값일 뿐 포트를 건네지 않는다. 판정은 **정확
             // 목록 소속**이다(D-6A2b-42): 계층 해석(`isAssignableTo(Throwable)`)은 목록 밖의
@@ -121,7 +121,7 @@ internal class AppDependencyConditions(
                 item.directDependenciesFromSelf
                     .map { it.targetClass.baseComponentType }
                     .filterNot { it.isPrimitive || it.isArray }
-                    .filterNot { it.topLevel().fullName == item.topLevel().fullName }
+                    .filterNot { it.outermostClassName() == item.outermostClassName() }
                     .filterNot { target ->
                         tier2Allows(
                             target,
@@ -158,7 +158,7 @@ internal class AppDependencyConditions(
                 false
             }
 
-            target.topLevel().fullName in allowedClasses -> {
+            target.outermostClassName() in allowedClasses -> {
                 true
             }
 
@@ -222,7 +222,7 @@ internal class AppDependencyConditions(
             (listOf(owner) + owner.allRawSuperclasses + owner.allRawInterfaces)
                 .filter { it.packageName.isUnder(listOf(adaptersRoot)) }
                 .filter { declarer -> declarer.declares(signature) }
-        val caller = item.topLevel().fullName
+        val caller = item.outermostClassName()
         return candidates
             .firstNotNullOfOrNull { declarer ->
                 if (declarer.fullName in exceptions) {
@@ -309,7 +309,7 @@ internal class AppDependencyConditions(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val caller = item.topLevel().fullName
+                val caller = item.outermostClassName()
                 item.constructorCallsFromSelf
                     .map { it.targetOwner }
                     .filter { it.fullName in assemblyTypes }
@@ -381,8 +381,7 @@ internal class AppDependencyConditions(
                 item.directDependenciesFromSelf
                     .map {
                         it.targetClass.baseComponentType
-                            .topLevel()
-                            .fullName
+                            .outermostClassName()
                     }.filter { it in collection }
                     .distinct()
                     .forEach { events.add(SimpleConditionEvent.violated(item, "${item.fullName} -> $it")) }
@@ -459,11 +458,11 @@ internal class AppDependencyConditions(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val caller = item.topLevel().fullName
+                val caller = item.outermostClassName()
                 injectionTypes(item)
-                    .filterNot { it.topLevel().fullName == caller }
-                    .filterNot { it.fullName in allowed }
-                    .filterNot { "$caller|${it.fullName}" in exemptions }
+                    .filterNot { it.outermostClassName() == caller }
+                    .filterNot { it.outermostClassName() in allowed }
+                    .filterNot { "$caller|${it.outermostClassName()}" in exemptions }
                     .distinct()
                     .forEach {
                         events.add(SimpleConditionEvent.violated(item, "${item.fullName} 이 주입받는다 -> ${it.fullName}"))
@@ -471,7 +470,4 @@ internal class AppDependencyConditions(
             }
         }
     }
-
-    /** 중첩·동반 객체는 자신을 담은 최상위 클래스로 판정한다 — 컨트롤러 안쪽에 숨기는 형태를 함께 든다. */
-    private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)
 }

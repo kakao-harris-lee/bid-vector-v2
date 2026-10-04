@@ -241,8 +241,8 @@ class AppHttpDependencyGateTest {
             .flatMap { item ->
                 rules
                     .injectionTypes(item)
-                    .filterNot { it.name.substringBefore('$') == item.name.substringBefore('$') }
-                    .map { it.name }
+                    .filterNot { it.outermostClassName() == item.outermostClassName() }
+                    .map { it.outermostClassName() }
             }.toSet()
 
     /** 그 가운데 운반 타입인 것 — (클래스, 타입) 쌍으로 낸다. */
@@ -253,7 +253,7 @@ class AppHttpDependencyGateTest {
                 rules
                     .injectionTypes(item)
                     .filter { rules.isCapabilityCarrier(it) }
-                    .map { "${item.name.substringBefore('$')}|${it.name}" }
+                    .map { "${item.outermostClassName()}|${it.outermostClassName()}" }
             }.toSet()
 
     /**

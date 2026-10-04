@@ -72,7 +72,7 @@ internal class DivisionValueRules(
                             item: JavaClass,
                             events: ConditionEvents,
                         ) {
-                            val caller = item.topLevel().fullName
+                            val caller = item.outermostClassName()
                             if (caller == type || caller in allowed || !referencesClassObject(item)) return
                             events.add(SimpleConditionEvent.satisfied(item, "$caller -> $type 클래스 객체"))
                         }
@@ -91,20 +91,20 @@ internal class DivisionValueRules(
     /** 실제로 관측된 축 ③ 클래스 — 허용 집합과 **같아야** 한다. */
     fun observedClassObjectReferences(classes: JavaClasses): Set<String> =
         classes
-            .filter { it.topLevel().fullName != type && referencesClassObject(it) }
-            .map { it.topLevel().fullName }
+            .filter { it.outermostClassName() != type && referencesClassObject(it) }
+            .map { it.outermostClassName() }
             .toSet()
 
     private fun typeAccessesIn(item: JavaClass): List<Pair<String, String>> {
-        val caller = item.topLevel().fullName
+        val caller = item.outermostClassName()
         if (caller == type) return emptyList()
         return item.accessesFromSelf
-            .filter { it.targetOwner.topLevel().fullName == type }
+            .filter { it.targetOwner.outermostClassName() == type }
             .map { caller to it.name }
     }
 
     private fun acquisitionsIn(item: JavaClass): List<Pair<String, String>> {
-        val caller = item.topLevel().fullName
+        val caller = item.outermostClassName()
         if (caller == type) return emptyList()
         val accesses =
             buildList<JavaAccess<*>> {
@@ -116,7 +116,7 @@ internal class DivisionValueRules(
                 )
             }
         return accesses
-            .map { it.targetOwner.topLevel().fullName to it.name }
+            .map { it.targetOwner.outermostClassName() to it.name }
             .filter { (owner, _) -> owner != caller }
             .map { (owner, member) -> caller to "$owner#$member" }
     }
@@ -142,7 +142,4 @@ internal class DivisionValueRules(
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "${it.first} -> ${it.second}")) }
             }
         }
-
-    /** 중첩 클래스(`Outer$Inner`)를 가장 바깥 클래스로 접는다 — 허용 집합은 최상위 이름으로 적는다. */
-    private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)
 }

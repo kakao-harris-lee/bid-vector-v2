@@ -58,30 +58,18 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
  * 부르는 것)이 등재 철자를 바꿔 등식을 깼다. 이름 기준 절단은 그 결합을 끊는다.
  *
  * 접지 않는 선택지도 쟀다 — Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 더 자주 낡는다.
+ *
+ * **D-6G2g-14 — 저장소의 접기는 이제 이 함수 하나다**(`OPEN-6G2B-FOLDING-UNIFICATION` 종결). 앞서 관례가
+ * 셋이었다: 접지 않음(`collection.key-hash.holders` 의 `NoticeKeyHash$Companion` ·
+ * `app.injection.allowed-types` 의 `Resolution$Resolved`) · 이름 절단(쌍 등식 셋) · `enclosingClass` 접기
+ * (`outermostClass()` 와 그것을 각자 복사한 `topLevel()` 셋). `enclosingClass` 접기는 위 cr M-1 의 결함을
+ * 그대로 안고 있어 그쪽으로 통일할 수 없고, 접지 않는 둘은 중첩 이름을 등재에 남긴다. 그래서 이름 절단
+ * 하나로 모으고 나머지를 지웠다 — 재등재 둘은 아래 두 키에서 중첩 접미가 떨어진 것이다.
  */
 internal fun String.outermostName(): String = substringBefore('$')
 
 /** [outermostName] 의 `JavaClass` 판 — 보유자 쪽 이름을 같은 규칙으로 접는다. */
 internal fun JavaClass.outermostClassName(): String = fullName.outermostName()
-
-/**
- * ArchUnit `enclosingClass` 기준 접기 — **쌍 등식 게이트는 쓰지 않는다**([outermostName] 을 쓴다).
- *
- * 저장소에 접기 관례가 **셋** 있다(`OPEN-6G2B-FOLDING-UNIFICATION`).
- *
- *  1. **접지 않음** — 등재가 바이트코드 이름을 그대로 담는다: `collection.key-hash.holders` 의
- *     `NoticeKeyHash$Companion` · `app.injection.allowed-types` 의 `Resolution$Resolved`. 그 게이트들은
- *     관측도 접지 않으므로 중첩 이름이 등재에 남는다.
- *  2. **이름 기준 절단**([outermostName]) — 이 slice 의 쌍 등식 게이트 셋(전송 표면 · 바깥 참조 · 반사)과
- *     `AppHttpDependencyGateTest` 의 보유자 쪽.
- *  3. **`enclosingClass` 접기**(이 함수) — 6F·6G 의 앞선 게이트들(원문 값 획득 · 대분류 · 공고명 키 ·
- *     러너·로거)이 쓴다. 그 등재가 이 규칙으로 접힌 집합이라 이름 규칙으로 옮기려면 **그 게이트들의 관측을
- *     다시 재야** 한다.
- *
- * 1 과 3 의 결과는 중첩 타입에서 갈리고, 2 와 3 은 ArchUnit 이 해소하지 못한 타입에서 갈린다 —
- * `bidvector..` 안에서는 2 와 3 이 같다(해소가 보장된다).
- */
-internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
 
 /**
  * D-6G2b-1·2·3 — **관문 밖으로 바이트를 내는 길**을 (클래스, 전송 표면 타입) 쌍의 정확 집합으로 닫는다.
