@@ -1,18 +1,19 @@
 # M6/6G-2g — rollback
 
-**실측 HEAD: `7839edfb`** (팀장 종결 문단 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋; 이 slice 의 마지막 **산출물** 커밋은 `52cbca24`). 레인의 ①~⑥ 은 `52cbca24` 의 버릴 clone 에서, 종결 뒤 팀장의 ⓪~⑥ 재실측은 `7839edfb` 의 버릴 clone 에서 돌렸다(아래 「팀장 재실측」). 앞 라운드의 실측을 옮기지 않는다.
+**실측 HEAD: `7839edfb`** (팀장 종결 문단 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋; 이 slice 의 마지막 **산출물** 커밋은 `93c51e4c`). 레인의 ①~⑥ 은 `93c51e4c` 의 버릴 clone 에서, 종결 뒤 팀장의 ⓪~⑥ 재실측은 `7839edfb` 의 버릴 clone 에서 돌렸다(아래 「팀장 재실측」). 앞 라운드의 실측을 옮기지 않는다.
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 7839edfb..<판정 SHA 또는 HEAD> -- <아래 「되돌리는 경로」 전부 + milestone-6.md>` 가 **빈 출력**이면 유효하다(판정 SHA `52cbca24` 는 실측 HEAD 의 조상 — 그 사이 커밋은 evidence·계약·종결 문단뿐).
+> `git diff --name-only 7839edfb..<판정 SHA 또는 HEAD> -- <아래 「되돌리는 경로」 전부 + milestone-6.md>` 가 **빈 출력**이면 유효하다(판정 SHA `93c51e4c` 는 실측 HEAD 의 조상 — 그 사이 커밋은 evidence·계약·종결 문단뿐).
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 의 산출물 경로. 목록은 손으로 쓰지 않고
-`git diff --name-status 31721008..52cbca24` 에서 기계로 냈다(A 13 = 삭제 대상, D 8·M 21 = base 로 복원).
+`git diff --name-status 31721008..93c51e4c` 에서 기계로 냈다(A 13 = 삭제 대상, D 8·M 21 = base 로 복원).
 **디렉터리로 접지 않는다**(vr r1 L-2) — 접으면 목록이 slice 가 만진 파일보다 넓어지고, 파일 그대로 두면
 `comm -23 <(기계 산출) <(문서 목록)` 이 **빈 출력**이라는 등식으로 잴 수 있다.
-**라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
+목록은 **실측 HEAD 에서 다시 낸다** — 목록이 낡는 것이 이 결함의 실제 원인이다. 아래 ⓪ 이 그
+등식(`comm -3` 빈 출력)을 재고, 그 등식이 성립해야 나머지 확인이 뜻을 갖는다.
 
 **되돌리지 않는다**:
 - 하네스 경로(`CLAUDE.md`·`.claude/**`) — 이 range 에 변경 없음(아래 「하네스 레인 변경」).
@@ -70,36 +71,36 @@ git restore --source=31721008 --staged --worktree -- \
 적용되지 않는다.
 
 두 정책 파일(`architecture-policy.properties`·`gate-tests.properties`)은 **이 range 에서 이 slice 의
-커밋만 만졌다**(`git log --oneline 31721008..52cbca24 -- <파일>` 로 확인 — 전부 `m6-6g2g`). 그래서 hunk 격리가 필요 없고 base 로의 단일 복원이 맞다. **다른 slice 의 커밋이 섞이면
+커밋만 만졌다**(`git log --oneline 31721008..93c51e4c -- <파일>` 로 확인 — 전부 `m6-6g2g`). 그래서 hunk 격리가 필요 없고 base 로의 단일 복원이 맞다. **다른 slice 의 커밋이 섞이면
 이 판단이 바뀌므로 라운드마다 그 `git log` 를 다시 돌린다.**
 
 ### 2단계 — `milestone-6.md` 는 커밋 해시 hunk 격리
 
-이 파일은 여러 slice 가 이어 쓰는 공유 파일이다. **base 로 복원하면 안 된다.** 이 range 에서
-이 파일을 만진 커밋은 **둘**이다(`3e41dff5` 착수 문단 · `7839edfb` 종결 문단, 둘 다 팀장 레인). 목록은 손으로 적지 않고 그 자리에서 낸다 — 뒤 커밋부터:
+이 파일은 여러 slice 가 이어 쓰는 공유 파일이다. **base 로 복원하면 안 된다.** 목록은 손으로 적지
+않고 **실측 HEAD 에서 그 자리에서** 낸다(라운드마다 늘어난다 — 지금은 착수·종결·종결 정정 셋이고
+전부 팀장 레인이다). 뒤 커밋부터 역적용한다:
 
 ```
-for sha in $(git log --format=%h 31721008..7839edfb -- milestone-6.md); do
+for sha in $(git log --format=%h 31721008..<실측 HEAD> -- milestone-6.md); do
   git diff "$sha~1..$sha" -- milestone-6.md | git apply -R --index --
 done
 ```
 
-**수동 해소 절차**(자동 적용이 conflict 를 내면): `milestone-6.md` 에서 **「6G-2g 착수 2026-10-04」로
-시작하는 문단 하나**를 통째로 지운다. 그 문단만 지우고 이웃한 「6G-2c 종결」 문단은 **남긴다**.
-종결 문단이 추가돼 있으면(이 slice 가 종결되면 팀장이 쓴다) 그것도 같은 방식으로 문단 단위로 지운다.
+**수동 해소 절차**(자동 적용이 conflict 를 내면): `milestone-6.md` 에서 **「6G-2g 」로 시작하는 문단
+전부**(착수·종결)를 통째로 지운다. 이웃한 「6G-2c 종결」 문단은 **남긴다**.
 
 확인은 둘 다 본다 — **내 줄이 사라졌는가**와 **남의 줄이 남았는가**.
 
-## ①~⑥ 실측 (버릴 clone, HEAD `d6c79a99`)
+## ⓪~⑥ 실측 (버릴 clone, 위 **실측 HEAD**)
 
 | # | 확인 | 명령 | 결과 |
 |---|---|---|---|
-| ⓪ | 목록이 기계 산출과 같다 | `comm -23 <(git diff --name-status 31721008..52cbca24 의 산출물 경로) <(이 문서의 목록)` | 빈 출력 |
+| ⓪ | 목록이 기계 산출과 같다 | `comm -23 <(git diff --name-status 31721008..93c51e4c 의 산출물 경로) <(이 문서의 목록)` | 빈 출력 |
 | ① | 복원 명령이 선다 | 위 `git restore` | exit 0 |
 | ② | 복원 규모 | `git status --porcelain` 의 상태 집계 | A 8 · D 9 · M 20 |
 | ③ | 복원 경로가 base 와 같다 | `git diff 31721008 -- <복원 경로들>` | 빈 출력 |
-| ③b | 공유 파일도 base 로 | 2단계 hunk 역적용 뒤 `git diff 31721008 -- milestone-6.md` | exit 0 · conflict 0 · 빈 출력 |
-| ③c | 내 줄 사라짐 · 남의 줄 남음 | 되돌린 `milestone-6.md` 에서 「6G-2g 착수」 문단과 「6G-2c 종결」 문단 | 0 · 1 |
+| ③b | 공유 파일도 base 로 | 2단계 hunk 역적용(그 자리에서 낸 **셋**) 뒤 `git diff 31721008 -- milestone-6.md` | 셋 다 exit 0 · conflict 0 · 빈 출력 |
+| ③c | 내 줄 사라짐 · 남의 줄 남음 | 되돌린 `milestone-6.md` 의 「6G-2g 」 문단과 「6G-2c 종결」 문단 | 내 문단 0(남은 `6G-2g` 둘은 **base 에도 있는** 6G-2c 문단의 언급이다) · 남의 줄 1 |
 | ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` | exit 0 |
 | ⑤ | 그 트리의 test 가 초록 | 아래 `check` 에 포함 | exit 0 |
 | ⑥ | **그 트리에서 게이트가 초록** | `./gradlew --no-daemon check` | exit 0 |
@@ -133,7 +134,7 @@ fixture 셋과 test 넷이다).
 
 ## 하네스 레인 변경
 
-`git log --oneline 31721008..52cbca24 -- CLAUDE.md .claude/` — **없음**.
+`git log --oneline 31721008..93c51e4c -- CLAUDE.md .claude/` — **없음**.
 이 range 의 팀장 레인 커밋(`3e41dff5` 와 계약 갱신들)은 `milestone-6.md` 와
 `reports/evidence/m6/6g2g/scope.md` 만 만졌고, 둘 다 위 절차가 다룬다(2단계 · 되돌리지 않음).
 slice 산출물이 아니며 in_scope 안이고, 운영자 승인 아래 같은 range 에 있다.

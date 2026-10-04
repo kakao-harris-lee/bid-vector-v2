@@ -16,13 +16,13 @@ production 무변경이라 `container` job 은 생략한다(6G-2e 선례 — 아
 
 | HEAD | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
-| `52cbca24` | `./gradlew --no-daemon check` | 0 | 전건 초록, test 2,677 |
-| `52cbca24` | `./gradlew --no-daemon qualityBaseline` | 0 | 측정(게이트 아님) |
+| `93c51e4c` | `./gradlew --no-daemon check` | 0 | 전건 초록, test 2,679 |
+| `93c51e4c` | `./gradlew --no-daemon qualityBaseline` | 0 | 측정(게이트 아님) |
 
-**크기 게이트가 두 번 붉었고 두 번 다 전건 `check` 만 잡았다.** `3ee5f905` 에서 `:app:sizeGate` —
-관측 분배 함수 55 줄. 그 뒤 `:buildLogicSizeGate` — 상위 사슬 판독을 더한 class 파일 판독기 55 줄.
-둘 다 분할로 닫았다(`d6c79a99` · `ace32c8b`). 실패 이력은 게이트가 실제로 작동했다는 증거다 —
-부분 게이트만 돌렸다면 둘 다 지나갔다.
+**크기 게이트가 세 번 붉었고 세 번 다 전건 `check` 만 잡았다.** 관측 분배 함수 55 줄(`:app:sizeGate`) ·
+상위 사슬 판독을 더한 class 파일 판독기 55 줄 · 배선 주석이 민 convention 파일 502 줄
+(뒤 둘은 `:buildLogicSizeGate`). 셋 다 분할·압축으로 닫았다(`d6c79a99` · `ace32c8b` · `93c51e4c`).
+실패 이력은 게이트가 실제로 작동했다는 증거다 — 부분 게이트만 돌렸다면 셋 다 지나갔다.
 
 ### 생략한 job
 
@@ -36,13 +36,13 @@ production 경로 0 줄이며, verifier 가 같은 명령으로 재현할 수 �
 |---|---|---|---|
 | ① 등재 등식 | `./gradlew --no-daemon gateRegistrationGate -x test` | 0 | 모듈 아홉 전부 등식 성립 |
 | ① build-logic | `./gradlew --no-daemon buildLogicGateRegistrationGate` | 0 | 모집단 25 == 등재 25 |
-| ①  코어 | `./gradlew --no-daemon -p build-logic test --tests '*GateRegistrationCensusTest*'` | 0 | 12 tests |
+| ①  코어 | `./gradlew --no-daemon -p build-logic test --tests '*GateRegistrationCensusTest*'` | 0 | 23 tests |
 | ②~⑦ | `./gradlew --no-daemon :app:test --tests 'bidvector.app.architecture.*'` | 0 | 아키텍처 게이트 전건 |
 | ④ 전건 | `./gradlew --no-daemon :app:test` | 0 | app 전건 초록 |
 
 ### ① 모듈별 모집단·제외 (task 리포트의 한 줄)
 
-HEAD `52cbca24` 의 task 리포트. **이 표는 라운드마다 다시 잰다** — 앞 판은 ① 커밋 시점의 수를 들고
+HEAD `93c51e4c` 의 task 리포트. **이 표는 라운드마다 다시 잰다** — 앞 판은 ① 커밋 시점의 수를 들고
 있어 ③ 이 더한 app 의 test 하나가 빠져 있었다(vr r1 L-1 · cr r1 G-7).
 
 | 모듈 | 모집단 | 제외 | 등재 |
@@ -76,7 +76,7 @@ HEAD `52cbca24` 의 task 리포트. **이 표는 라운드마다 다시 잰다**
 
 ### ⑥⑦ 등재 규모
 
-HEAD `52cbca24`.
+HEAD `93c51e4c`.
 
 | 축 | 쌍 | 보유자 |
 |---|---|---|
@@ -129,7 +129,9 @@ SHA-256 일치로 확인했다.
 | ① R3-M-1 | 인터페이스 안에 중첩 구체 test 를 둔다(미등재) | RED — 실제 class 파일로도 확인 |
 | ① R-1 | 순환 참가자를 먼저 풀고 그것에 의존하는 애노테이션을 묻는다 | **구판 RED · 신판 GREEN** — 앞 판 test 는 둘 다 통과시켰다 |
 | ⑥ R-5 | 낱개 아홉에서 하나를 빼면 그 영구 fixture 가 신고되지 않는다 | 변이 표·덮개 양방향 등식이 RED |
-| ⑦ 경계 | 전송 서명이 **없는** 다른 그룹 멤버로 넘긴다 | **초록** — 남는 경계(알려진 제한 5) |
+| ⑦ 경계 | 전송 서명이 **없는** 비-private 멤버로 넘긴다 | **초록** — 남는 경계(알려진 제한 5) |
+| ⑦ A | 미등재 String 서명 멤버가 **vararg 전송 서명** callee 로 위임 | RED(앞 판 초록 — 배열을 JVM 철자로 받아 두 갈래 다 놓쳤다) |
+| ① R | `testClasses` 를 빈 디렉터리로 | RED — 「test 소스가 있는데 컴파일된 모집단이 비었다」 |
 
 ⑥ 은 **영구 음성 fixture** 둘도 함께 둔다(`FileSystemEgressSamples.kt`) — 변이 표와 덮개 양방향 등식이 든다.
 
@@ -180,7 +182,16 @@ SHA-256 일치로 확인했다.
    (`Array<FileChannel>` 는 그 이름으로, `List<FileChannel>` 는 `java.util.List` 로 보인다).
    **두 술어가 같은 값을 쓰므로** 「시그니처가 말한다」와 「호출 대상 시그니처가 말한다」의 이분법은
    그대로 선다 — 한쪽이 놓치면 다른 쪽도 놓치고, 그 자리는 그 타입을 **쥐는** 클래스를 2층이 덮는다.
-6. **경계 유지(운영자 결정 B-2)** — 허용 패키지 안의 **라이브러리 자체 로더**·StAX 외부 엔티티·
+6. **① 제외의 접기 입도** — 모집단·제외 **판정**은 접기 전 이진 클래스 단위인데, 제외의 두 출처는
+   입도가 다르다: 실행 조건 애노테이션은 **그 클래스**에 붙고, Gradle `Test.filter` 패턴은 보통
+   **단순 이름**에 걸려 중첩·합성 클래스까지 함께 덮는다. 그래서 바깥 클래스만 필터로 뺐는데 중첩 test
+   클래스가 함께 빠지는 비대칭이 가능하다. 조용하지 않다 — 그 제외는 **선언과 어긋나 래칫이 붉는다**
+   (제외 선언은 등식의 한 변이다). 오늘 그런 조합은 없다.
+7. **경계 유지(운영자 결정 B-2)** — 허용 패키지 안의 **라이브러리 자체 로더**·StAX 외부 엔티티·
    Spring bean factory 출구는 이 slice 가 닫지 않는다. 파일 시스템 출구만 구조 한 수로 닫았다.
-7. **새 public 표면 둘** — build-logic 의 Gradle task 타입 하나(빌드 스크립트가 꽂는 자리, 그 저자는
+8. **① build-logic 판의 Gradle 필터 출처** — included build 라 루트가 그 빌드의 `Test` task 속성을
+   읽지 못해 그 축의 제외 출처가 없다. 오늘 그 모듈에 `filter` 블록이 없음을 확인했고, 생기면 그 제외가
+   **선언과 어긋나 래칫이 붉는다** — 미탐이 아니라 오탐 방향이다. 유도하려면 그 빌드가 자기 필터를
+   파일로 내보내야 하고 그 파일은 이 slice 의 in_scope 밖이다(PR #60 H).
+9. **새 public 표면 둘** — build-logic 의 Gradle task 타입 하나(빌드 스크립트가 꽂는 자리, 그 저자는
    6G 경계 밖)와 app test 소스셋의 축 enum 하나. production public 표면 변화 0, production diff 0.

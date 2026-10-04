@@ -14,6 +14,7 @@
 | `OPEN-6G2B-HOLDER-INTERNAL-SURFACE` | 3층 `collection.transport.member-surface` 쌍 **47** — 술어는 **도달 추적 + 전송 서명 호출**, 키는 (보유자, **소유 클래스 이진 이름** + 멤버 + 서술자) | **닫음** |
 | `OPEN-6G-GATE-REGISTRY-KONEPS` | build-logic `gateRegistrationGate` — 모듈 전수 양방향 | **닫음** (원 문장이 없어 이 slice 가 정의, D-6G2g-6) |
 | `OPEN-6G2G-REGISTRATION-PACKAGE-COVER` | 같은 task — 패키지 열거가 아니라 모듈 전수 | **닫음** |
+| `OPEN-6C-CONDITIONAL-GATE-TEST`(M6/6C 등재) | 그 OPEN 의 전제는 「패키지 분리로 피했다」였다. 등재 등식이 **모듈 전수**가 되면서 패키지가 그 판단과 무관해졌고, 필요한 것은 제외 선언과 그것을 만드는 build 사실 하나다 — 조건부 test 는 어느 패키지에든 둘 수 있다 | **닫음**(D-6G2g-26) |
 
 ## 항목별 잠금 — 무엇이 지금 붉게 만드는가
 
@@ -75,19 +76,16 @@
    55 줄(`:buildLogicSizeGate`). 둘 다 전건 `check` 만 잡았고 분할로 닫았다. `commands.md` 의
    acceptance 표가 그 실패와 통과를 든다.
 
-## 남의 slice 의 OPEN 하나가 전제를 잃었다 (D-6G2g-24 ②)
+## (2b) 값 획득 축 — 새 public 표면 전수
 
-`OPEN-6C-CONDITIONAL-GATE-TEST`(M6/6C 가 등재, `reports/evidence/m6/6c/checklist.md` 「잔여」)의
-**원 문장**: *"`adapters.ml` 안에 환경 조건부 test 가 실제로 필요해지면 그때 설계 검토로 게이트 술어
-개정을 받는다. 지금은 패키지 분리로 피했다."*
+| 표면 | 처분 |
+|---|---|
+| build-logic 의 Gradle task 타입 `GateRegistrationGateTask` | **등재** — 빌드 스크립트가 꽂는 자리이고 그 저자는 6G 경계 밖이다 |
+| app test 소스셋의 `enum class DepthAxis` | **등재** — test 전용, 배포물 밖 |
+| `archfixture.violating.transport` 의 public fixture 클래스 **다섯**(`RogueFileSystemWrite`·`RogueLegacyFileWrite`·`RogueStringPathPrintWriter`·`RogueStringPathPrintStream`·`RogueStringPathFormatter`) | **경계로 처리** — ArchUnit 이 import 해 평가하려면 public 이어야 하고, test 소스셋의 **위반 fixture 패키지**는 production 밖이다. 이 slice 이전의 fixture 33 과 같은 처분이고, 그 패키지 전수가 덮개 양방향 등식에 든다 |
+| app·adapters·workflow test 소스셋의 기존 공개 멤버(`ArchitecturePolicy`·`TransportSurfaceRules` 등) | **경계로 처리** — 같은 이유(배포물 밖) |
 
-**무효가 된 전제는 「패키지 분리로 피했다」**이다. 이 slice 의 등재 등식이 **모듈 전수**가 되면서
-패키지는 그 판단과 무관해졌다 — 조건부 test 를 어느 패키지에 두든 같고, 필요한 것은 제외 선언과
-그것을 만드는 build 사실(`Test.filter` 또는 실행 조건 애노테이션) 하나다. `RealServerIntegrationTest`
-KDoc 이 그 사실을 적고 있다.
-
-**처분은 이 slice 가 하지 않는다** — 남의 slice 가 등재한 OPEN 이고, 닫을지 문면만 고칠지는 팀장 몫이다
-(계약 r10). 여기 적는 것은 **전제가 무효가 됐다는 사실**뿐이다.
+**production public 표면 변화 0.** `git diff <base>..<판정 SHA> -- '*/src/main/**' ':!build-logic'` 빈 출력.
 
 ## 3층 장부가 컴파일러 생성 이름을 담는다 — 수용 비용 (D-6G2g-24 ①)
 
