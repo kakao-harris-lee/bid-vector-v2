@@ -171,7 +171,21 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`. 공
 
 ## 하네스 레인 변경
 
-(착수 뒤 리뷰 요청 시점마다 등재)
+(착수 뒤 리뷰 요청 시점마다 등재 — slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다)
+
+PR 요청 시점(2026-10-04) 기준 하네스 레인(팀장) 커밋:
+
+| 커밋 | 내용 | 닿는 파일 |
+|---|---|---|
+| `429d4bbc` | 착수 — 계약 r0-b(D-16~30) · milestone-6 착수 문단 | `scope.md` · `milestone-6.md`(hunk) |
+| `ae1077e4` | 스키마 문서 §2 어휘 문장 하나(D-17, 계약 예외) | `reports/evidence/m6/6g/snapshot-schema.md`(hunk) |
+| `ceb49c1b` · `861108bb` · `4b9d694a` · `ea91f423` · `3bcf2e52` · `7363b002` · `dd708232` | 계약 갱신 r1~r7(D-31~37) | `scope.md` |
+| `f21d83c7` · `8ff4d1ec` | runbook 계수 문장 둘(D-38 ③ · D-40 K-8) | `docs/runbook/m6-6g-real-collection.md`(hunk) |
+| `004f5e28` · `efd8be92` · `374ddc41` · `b2a98300` | 계약 갱신 r8~r10(D-38~41) + D-41 문면 | `scope.md` |
+| `82c8b809` | milestone-6 종결 문단 — rollback 실측 HEAD | `milestone-6.md`(hunk) |
+| (이 커밋) | 하네스 절 등재 · 그 다음 커밋이 `rollback.md`(실측 ①~⑥) | `scope.md` · `rollback.md` |
+
+`.claude/**`·`CLAUDE.md` 편집 없음. 레인 커밋에 하네스 파일 혼입 0(`git log --format=%h ecdc9d9f..HEAD -- .claude CLAUDE.md` 빈 출력).
 
 ## OPEN 수령·신설 (r0-b)
 
