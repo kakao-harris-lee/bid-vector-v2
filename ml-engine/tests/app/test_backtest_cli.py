@@ -325,6 +325,29 @@ def test_an_existing_verdict_is_not_overwritten(tmp_path: Path) -> None:
     )
 
 
+def test_a_bare_path_the_os_refuses_gets_the_same_closed_reason(tmp_path: Path) -> None:
+    """PR #59 N — **맨 경로 갈래도** 같은 닫힌 사유로 선다.
+
+    `%00` 거부를 더할 때 `file:` 갈래만 `try` 안에 넣었다. 맨 경로 갈래(`scheme` 없음)는 밖에
+    남아 같은 바이트가 traceback 으로 끝났다 — 같은 입력이 갈래에 따라 닫힌 사유와 예외로
+    갈리면 어휘가 반쪽이다.
+
+    **하위 프로세스로는 이 자리에 닿지 못한다**: 셸도 `execve` 도 argv 에 널 바이트를 넣지
+    못한다. 그래서 여기서만 `main(argv)` 를 같은 프로세스에서 부른다 — 종료 코드 계약이 아니라
+    **사유 어휘**를 재는 판이다."""
+    with pytest.raises(SystemExit) as raised:
+        backtest_cli.main(
+            _argv(
+                snapshot="a\x00b",
+                backtest_policy=_derived_policy(tmp_path / "policy"),
+                output_dir=tmp_path / "out",
+            )
+        )
+    message = str(raised.value)
+    assert f"REFUSED {backtest_cli._Refusal.INVALID_SNAPSHOT_URI}" in message, message
+    assert not (tmp_path / "out").exists(), "거부가 출력 자리를 만들었다"
+
+
 def test_a_file_in_the_output_parent_chain_is_refused_before_the_job(
     tmp_path: Path,
 ) -> None:

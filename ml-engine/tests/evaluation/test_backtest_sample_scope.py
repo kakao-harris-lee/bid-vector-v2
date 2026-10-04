@@ -50,7 +50,10 @@ from ml_engine.evaluation.backtest.records import (
     BacktestRequest,
     DivisionCoverageRecord,
 )
-from ml_engine.evaluation.backtest.report import canonical_verdict_bytes
+from ml_engine.evaluation.backtest.report import (
+    VERDICT_SCHEMA_VERSION,
+    canonical_verdict_bytes,
+)
 from ml_engine.evaluation.backtest.run import (
     _division_coverage,
     run_strategy_backtest,
@@ -313,6 +316,26 @@ def test_threshold_holds_and_the_empty_division_is_disclosed_absent() -> None:
         "row_count": 1,
         "status": str(DivisionCoverage.UNDERPOWERED),
     }, "행 하나뿐인 업무가 COVERED 로 읽힌다 — 6G verifier r5 L-8 의 자리다"
+
+
+def test_the_verdict_schema_version_is_held_across_the_vocabulary_change() -> None:
+    """PR #59 D — 어휘가 둘에서 셋이 됐는데 **version 을 올리지 않은 것은 결정**이다.
+
+    `division_coverage.status` 의 닫힌 셋이 `ABSENT` 를 얻었지만 `schema_version` 은 그대로다.
+    근거 둘: ⑴ 이 어휘는 **판정 JSON** 의 것이고 스냅숏 형식 축 밖이다(D-6G2c-18·31) ⑵ 이
+    표지를 읽는 소비자가 없다(공시 전용 — 판정 경로에 소비자가 0).
+
+    그래서 version 을 멈춰 둔 것이고, 그 결정이 **코드에 자리를 갖는다**: 어휘를 또 바꾸는
+    사람이 이 단언에서 멈춰 「version 을 올릴 것인가」를 한 번 묻게 된다. 소비자가 생기면
+    그때는 올려야 한다."""
+    assert VERDICT_SCHEMA_VERSION == "strategy-backtest-verdict-v1"
+    payload = _verdict_payload(
+        _loaded(_rows({"n-1": "SERVICE"}), listing_division="SERVICE")
+    )
+    assert payload["schema_version"] == VERDICT_SCHEMA_VERSION
+    assert {
+        entry["status"] for entry in payload["snapshot"]["division_coverage"].values()
+    } <= {str(value) for value in DivisionCoverage}
 
 
 def test_the_division_label_turns_over_at_the_window_row_floor() -> None:

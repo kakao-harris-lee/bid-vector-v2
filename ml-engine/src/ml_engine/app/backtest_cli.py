@@ -144,10 +144,14 @@ def _snapshot_dirs(raw: str) -> tuple[str, tuple[Path, ...]]:
             _Refusal.UNSUPPORTED_SCHEME,
             f"--snapshot-uri 는 file:// 여야 한다 — 받은 scheme: {parsed.scheme}",
         )
-    if not parsed.scheme:
-        return _converted(Path(raw).resolve(), raw)
-    decoded = Path(unquote(parsed.path))
     try:
+        if not parsed.scheme:
+            # 맨 경로 갈래. **이 갈래도 같은 거부로 묶는다**(PR #59 N) — 앞 판은 `try` 밖이라
+            # 널 바이트가 든 맨 경로가 traceback 으로 끝났다. 셸은 argv 에 널을 넣지 못하므로
+            # 그 자리에 닿는 것은 in-process `main(argv)` 뿐이지만, 같은 입력이 갈래에 따라
+            # 닫힌 사유와 예외로 갈리는 것 자체가 어휘를 반쪽으로 만든다.
+            return _converted(Path(raw).resolve(), raw)
+        decoded = Path(unquote(parsed.path))
         if not decoded.is_absolute():
             return _converted(decoded.resolve(), raw)
         # 그대로 넘기는 갈래 — 여기서만 두 해석이 갈릴 수 있다(vr r2 L-r2-1).
@@ -206,8 +210,12 @@ def _make_output_dir(directory: Path) -> None:
     부모가 파일이면 `NotADirectoryError`, 권한이 없으면 `PermissionError` — 전부 `OSError` 라
     한 자리에서 같은 닫힌 사유가 된다. 잎·부모 구분이 사라진다.
 
-    디렉터리를 미리 만드는 것은 거동 변화다. 거부 경로는 이미 디렉터리를 만들지 않고 서므로
-    (위 세 거부가 전부 이 앞이다) 새로 생기는 자리는 **성공할 실행에서만** 만들어진다.
+    디렉터리를 미리 만드는 것은 거동 변화다. **거부 넷**(`UNSUPPORTED_SCHEME` ·
+    `INVALID_SNAPSHOT_URI` · `OUTPUT_INSIDE_SNAPSHOT` · `VERDICT_EXISTS`)이 전부 이 앞이라
+    거부된 실행은 디렉터리를 만들지 않는다. 다만 **job 이 `FAILED` 로 끝나는 실행에서는 빈
+    디렉터리가 남는다**(PR #59 M) — 판정 바이트가 없을 뿐이고, 같은 자리로 다시 부르면
+    `verdict.json` 이 없으므로 그대로 간다. 거부를 job 앞에 두는 것이 목적이고 그 대가는
+    빈 디렉터리 하나다(알려진 제한).
 
     문면에 경로를 싣지 않는다 — 무엇을 넘겼는지는 부른 쪽이 안다."""
     try:
