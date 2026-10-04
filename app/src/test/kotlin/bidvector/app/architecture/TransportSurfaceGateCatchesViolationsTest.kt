@@ -324,6 +324,9 @@ class TransportSurfaceGateCatchesViolationsTest {
                 // KA15·그 형제 — 클래스패스에 이미 있는 Spring 전송 표면.
                 "RogueSpringRestClient" to "org.springframework.web.client.RestClient",
                 "RogueSpringRequestFactory" to "org.springframework.http.client.JdkClientHttpRequestFactory",
+                // D-6G2g-9 (B-2 (가)) — 허용 패키지 **안**의 파일 시스템 출구. 뿌리와 낱개 열거 각각.
+                "RogueFileSystemWrite" to "java.nio.file.Path",
+                "RogueLegacyFileWrite" to "java.io.File",
                 // 이 slice 가 고안한 것 — JDK 내장 서버·원격 이름 조회·자원 URL·메서드 핸들.
                 "RogueHttpServerExposure" to "com.sun.net.httpserver.HttpServer",
                 "RogueRmiLookup" to "java.rmi.Naming",
