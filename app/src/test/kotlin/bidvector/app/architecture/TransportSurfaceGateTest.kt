@@ -193,10 +193,10 @@ class TransportSurfaceGateTest {
     fun `모듈별 바깥 참조 패키지는 허용 집합과 같다 — 두 방향`() {
         policy.externalJudgedModules.forEach { module ->
             val root = "${policy.packageRoot}.$module"
-            withClue("모듈 $module") {
-                rules.observedExternalPackages(production, root) shouldBe
-                    policy.externalAllowedPackages(module).toSet()
-            }
+            val observed = rules.observedExternalPackages(production, root)
+            val allowed = policy.externalAllowedPackages(module).toSet()
+            withClue("모듈 $module — 허용 밖 관측") { (observed - allowed) shouldBe emptySet() }
+            withClue("모듈 $module — 관측 없는 허용") { (allowed - observed) shouldBe emptySet() }
         }
     }
 
