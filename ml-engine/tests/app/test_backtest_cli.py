@@ -303,6 +303,68 @@ def test_an_existing_verdict_is_not_overwritten(tmp_path: Path) -> None:
     )
 
 
+def test_a_dangling_verdict_symlink_is_refused_and_writes_nothing(
+    tmp_path: Path,
+) -> None:
+    """D-6G2c-35 F-3 = cr P-2 — **끊어진 링크가 거부를 통과하지 않는다**.
+
+    `exists()` 는 링크를 **따라간다**. 그래서 출력 자리에 끊어진 `verdict.json` 링크를 두면
+    사전 검사는 「없다」로 읽고, 쓰기가 링크 대상으로 나간다 — 대상을 스냅숏 안으로 겨누면
+    판정이 **불변 입력 안에** exit 0 으로 쓰였다(`VERDICT_EXISTS` 와 `OUTPUT_INSIDE_SNAPSHOT`
+    둘 다 우회). `O_EXCL` 은 링크 자체를 존재로 보므로 그 길이 닫힌다."""
+    snapshot = _snapshot_path(tmp_path)
+    before = {path.name: path.read_bytes() for path in sorted(snapshot.iterdir())}
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    (output_dir / "verdict.json").symlink_to(snapshot / "verdict.json")
+    assert not (output_dir / "verdict.json").exists(), (
+        "링크가 끊어져 있어야 이 판이 선다"
+    )
+
+    result = _cli(
+        *_argv(
+            snapshot=snapshot.as_uri(),
+            backtest_policy=_derived_policy(tmp_path / "policy"),
+            output_dir=output_dir,
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert f"REFUSED {backtest_cli._Refusal.VERDICT_EXISTS}" in (
+        result.stdout + result.stderr
+    ), (result.stdout, result.stderr)
+    assert not list(snapshot.glob("**/verdict.json")), "판정이 스냅숏 안에 쓰였다"
+    assert {
+        path.name: path.read_bytes() for path in sorted(snapshot.iterdir())
+    } == before, "거부된 실행이 스냅숏 디렉터리를 건드렸다"
+
+
+def test_a_second_run_into_the_same_output_dir_is_refused(tmp_path: Path) -> None:
+    """D-6G2c-35 F-3 — 같은 `--output-dir` 로 **두 번 기동**하면 뒤가 거부된다.
+
+    앞 test 는 판정 바이트를 **미리 둔** 판이라 「우리가 쓴 판정」과 「누가 둔 파일」을 가르지
+    못했다. 여기서는 첫 기동이 실제로 쓰고, 둘째가 그 바이트를 보고 선다 — 첫 판정이
+    그대로임을 해시로 확인한다."""
+    snapshot = _snapshot_path(tmp_path)
+    policy = _derived_policy(tmp_path / "policy")
+    output_dir = tmp_path / "verdicts"
+    argv = _argv(
+        snapshot=snapshot.as_uri(), backtest_policy=policy, output_dir=output_dir
+    )
+
+    first = _cli(*argv, cwd=tmp_path)
+    assert first.returncode == 0, (first.stdout, first.stderr)
+    written = (output_dir / "verdict.json").read_bytes()
+    assert hashlib.sha256(written).hexdigest() in first.stdout.split(), first.stdout
+
+    second = _cli(*argv, cwd=tmp_path)
+    assert second.returncode != 0, (second.stdout, second.stderr)
+    assert f"REFUSED {backtest_cli._Refusal.VERDICT_EXISTS}" in (
+        second.stdout + second.stderr
+    ), (second.stdout, second.stderr)
+    assert (output_dir / "verdict.json").read_bytes() == written, "첫 판정이 덮어써졌다"
+
+
 def test_there_is_no_overwrite_flag(tmp_path: Path) -> None:
     """덮어쓰기 플래그를 **만들지 않았다**(D-6G2c-21 ④) — 있으면 「한 번만 쓴다」가 인자
     하나로 풀린다. argparse 가 모르는 플래그로 끝난다(2)."""

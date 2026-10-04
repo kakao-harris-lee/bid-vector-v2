@@ -195,7 +195,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     if not isinstance(outcome, JobCompleted):
         raise SystemExit(f"FAILED {outcome.reason} {outcome.detail}")
     verdict_path.parent.mkdir(parents=True, exist_ok=True)
-    verdict_path.write_bytes(outcome.verdict_bytes)
+    # **정본 술어는 이 쓰기다**(D-6G2c-35 F-3 = cr P-2). 앞 판은 `exists()` 로 거부하고 job 이
+    # 끝난 뒤 `write_bytes`(= `open("wb")`, 잘라내기 + 링크 추종)로 썼다 — 검사와 쓰기 사이가
+    # **실행 전체**였고 둘을 두 가지가 지나갔다: 같은 디렉터리로 두 번 기동하면 둘 다 검사를
+    # 지나 뒤가 앞을 덮었고, `exists()` 는 링크를 따라가므로 **끊어진** 링크가 거부를 통과해
+    # 쓰기가 링크 대상(출력 디렉터리 밖, 스냅숏 안일 수도 있다)으로 나갔다.
+    # `"xb"` 는 `O_CREAT|O_EXCL` 이라 둘을 한 술어로 닫는다 — 끊어진 링크에도 `FileExistsError`
+    # 이고, 검사와 쓰기 사이에 틈이 없다. 위의 `exists()` 는 **빠른 거부**로만 남는다(10초짜리
+    # 실행을 낭비하지 않는다).
+    try:
+        with verdict_path.open("xb") as handle:
+            handle.write(outcome.verdict_bytes)
+    except FileExistsError:
+        _refuse(
+            _Refusal.VERDICT_EXISTS,
+            f"--output-dir 에 {_VERDICT_NAME} 이 이미 있다 — 덮어쓰지 않는다",
+        )
     print(
         "verdict",
         verdict_path,
