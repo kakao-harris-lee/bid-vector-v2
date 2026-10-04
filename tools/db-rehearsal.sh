@@ -63,7 +63,7 @@ PROJECT="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.name
 [ -n "$PROJECT" ] && [ "$PROJECT" != "null" ] \
   || _die "compose 파일이 프로젝트 이름을 들지 않는다 — top-level name: 이 필요하다" 3
 
-SOURCE="$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE")"
+SOURCE="$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE" 2>/dev/null || true)"
 [ -n "$SOURCE" ] || _die "compose 프로젝트 '$PROJECT' 에 동작 중인 '$SERVICE' 가 없다" 3
 [ "$(printf '%s\n' "$SOURCE" | wc -l)" -eq 1 ] || _die "'$SERVICE' 가 하나가 아니다" 3
 [ "$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$SOURCE")" = "$PROJECT" ] \
