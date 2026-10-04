@@ -36,7 +36,13 @@ abstract class GateRegistrationGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val testClasses: ConfigurableFileCollection
 
-    /** 메타 애노테이션을 푸는 자리 — `@ParameterizedTest` 가 `@TestTemplate` 임을 열거하지 않는다. */
+    /**
+     * 메타 애노테이션을 푸는 자리 — `@ParameterizedTest` 가 `@TestTemplate` 임을 열거하지 않는다.
+     *
+     * **모듈 자신의 test 출력도 조회 자리다**(vr r1 H-2). 저자가 **그 모듈의 test 소스에** 선언한
+     * 합성 애노테이션(`@Test` 를 메타로 단 `annotation class`)은 런타임 클래스패스에 없다 — 그것만
+     * 쓰는 test 클래스가 모집단 밖으로 빠져 등재 없이 조용히 통과했다. 조회는 이 둘의 합집합이다.
+     */
     @get:Classpath
     abstract val testRuntimeClasspath: ConfigurableFileCollection
 
@@ -62,7 +68,7 @@ abstract class GateRegistrationGateTask : DefaultTask() {
                     conditionPackages = policy.requireList(CONDITION_PACKAGES).toSet(),
                 ),
                 excludePatterns.get(),
-                ClasspathMetaAnnotations(testRuntimeClasspath.files),
+                ClasspathMetaAnnotations(testRuntimeClasspath.files + testClasses.files),
             )
         val violations =
             GateRegistration.violations(

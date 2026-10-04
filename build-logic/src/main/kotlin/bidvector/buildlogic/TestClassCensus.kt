@@ -74,6 +74,9 @@ internal fun testClassFactsIn(roots: Iterable<File>): List<TestClassFacts> =
  * 애노테이션 타입에 **붙은** 애노테이션을 클래스패스에서 읽는다 — `@ParameterizedTest` 가
  * `@TestTemplate` 이라는 사실을 열거하지 않고 푸는 자리다.
  *
+ * 조회 자리에는 test 런타임 클래스패스뿐 아니라 **그 모듈의 test 출력**도 든다. 저자가 그 모듈의
+ * test 소스에 선언한 합성 애노테이션은 런타임 클래스패스 어디에도 없기 때문이다(vr r1 H-2).
+ *
  * 읽히지 않는 좌표는 **빈 집합**이다. 그러면 그 애노테이션은 발견 어휘에 닿지 못하고, 그 클래스는
  * 모집단에서 빠져 **등재 잉여로 붉는다** — 조용히 통과하는 방향이 아니다.
  */

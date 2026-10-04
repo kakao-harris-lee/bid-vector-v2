@@ -8,6 +8,7 @@ import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
+import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
@@ -91,10 +92,17 @@ val buildLogicGateExecutionGate =
 // 같은 순환(그 클래스가 이 빌드의 산출물이다) 때문에 루트에 둔다. 컴파일된 test 클래스를 읽으므로
 // `:build-logic:testClasses` 에 의존한다.
 //
-// **알려진 제한 — 메타 애노테이션을 풀 클래스패스가 없다.** included build 의 `testRuntimeClasspath`
-// 를 루트에서 집기 어려워 비워 둔다. 그래서 `@ParameterizedTest` 만 가진 build-logic test 클래스는
-// 모집단에 들지 못하고, 등재돼 있으면 **잉여로 붉는다**(조용히 통과하는 방향이 아니다). 오늘 그런
-// 클래스는 없다 — `@ParameterizedTest` 를 쓰는 셋은 전부 `@Test` 도 가진다.
+// **메타 애노테이션 조회 자리 둘**(vr r1 H-2·M-1). ① build-logic 자신의 test 출력 — 저자가 그 소스에
+// 선언한 합성 애노테이션은 다른 어디에도 없다. ② JUnit 아티팩트 — `@ParameterizedTest` 가
+// `@TestTemplate` 이라는 사실이 그 jar 안에 있다. 앞 판은 ② 가 비어 있어 `@ParameterizedTest` 만 가진
+// **미등재** build-logic test 가 모집단 밖으로 빠져 조용히 통과했다(그 방향은 fail-loud 가 아니다).
+// included build 의 `testRuntimeClasspath` 를 루트에서 집는 대신, 같은 좌표를 카탈로그에서 읽어
+// detached configuration 하나로 만든다 — 해소에 필요한 것은 **애노테이션 클래스**뿐이다.
+val buildLogicMetaAnnotations =
+    configurations.detachedConfiguration(
+        dependencies.create("${versionCatalog.lib("junit-jupiter").get().module}:${versionCatalog.version("junit")}"),
+    )
+
 val buildLogicGateRegistrationGate =
     tasks.register<GateRegistrationGateTask>("buildLogicGateRegistrationGate") {
         group = "verification"
@@ -102,6 +110,7 @@ val buildLogicGateRegistrationGate =
         policyFile = layout.settingsDirectory.file("config/quality/gate-tests.properties")
         moduleName = "build-logic"
         testClasses.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/test"))
+        testRuntimeClasspath.from(buildLogicMetaAnnotations)
         excludePatterns = emptySet<String>()
         dependsOn(gradle.includedBuild("build-logic").task(":testClasses"))
         report = layout.buildDirectory.file("reports/gate-registration/build-logic.txt")
