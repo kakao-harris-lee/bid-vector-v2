@@ -31,12 +31,13 @@ class CollectionArchitectureRules(
         allowedTypes: Set<String>,
         passThroughTypes: Set<String>,
         forbiddenFieldTypes: Set<String>,
+        depth: ReferenceCollection,
     ): List<ArchRule> =
         listOf(
             noClasses()
                 .that()
                 .resideInAPackage("$collectionPackage..")
-                .should(referenceProcurementTypesOutside(procurementPackage, allowedTypes))
+                .should(referenceProcurementTypesOutside(procurementPackage, allowedTypes, depth))
                 .because("D-6F8-1 우회 1 — 수집 use case 의 procurement 참조 집합은 허용 집합의 부분집합이다"),
             noClasses()
                 .that()
@@ -58,13 +59,12 @@ class CollectionArchitectureRules(
         classes: JavaClasses,
         collectionPackage: String,
         procurementPackage: String,
+        depth: ReferenceCollection,
     ): Set<String> =
         classes
             .filter { it.packageName == collectionPackage || it.packageName.startsWith("$collectionPackage.") }
-            .flatMap { it.directDependenciesFromSelf }
-            .map { it.targetClass.baseComponentType.outermostClass() }
-            .filter { it.packageName == procurementPackage || it.packageName.startsWith("$procurementPackage.") }
-            .map { it.fullName }
+            .flatMap { origin -> origin.referencedTypeNames(depth) }
+            .filter { it.startsWith("$procurementPackage.") }
             .toSet()
 
     /**
@@ -80,6 +80,7 @@ class CollectionArchitectureRules(
         allowedReferencers: Set<String>,
         passThroughTypes: Set<String>,
         allowedMemberAccessors: Set<String>,
+        depth: ReferenceCollection,
     ): List<ArchRule> {
         val rootPackages = roots.map { "$it.." }.toTypedArray()
         return listOf(
@@ -87,7 +88,7 @@ class CollectionArchitectureRules(
                 .that()
                 .resideInAnyPackage(*rootPackages)
                 .and(isOutside(allowedReferencers))
-                .should(referenceAnyOf(rawAccessTypes))
+                .should(referenceAnyOf(rawAccessTypes, depth))
                 .because("D-6F8-6 우회 1 — 원문 키 접근 타입 참조 집합은 허용 집합의 부분집합이다(모듈 전체)"),
             noClasses()
                 .that()
@@ -164,11 +165,12 @@ class CollectionArchitectureRules(
         classes: JavaClasses,
         roots: List<String>,
         types: Set<String>,
+        depth: ReferenceCollection,
     ): Set<String> =
         classes
             .filter { inRoots(it, roots) }
             .filter { origin ->
-                referencedTypesOf(origin).any { it in types && it != origin.outermostClass().fullName }
+                origin.referencedTypeNames(depth).any { it in types && it != origin.outermostClass().fullName }
             }.map { it.outermostClass().fullName }
             .toSet()
 
@@ -229,13 +231,6 @@ class CollectionArchitectureRules(
         roots: List<String>,
     ): Boolean = roots.any { item.packageName == it || item.packageName.startsWith("$it.") }
 
-    private fun referencedTypesOf(origin: JavaClass): List<String> =
-        origin.directDependenciesFromSelf.map {
-            it.targetClass.baseComponentType
-                .outermostClass()
-                .fullName
-        }
-
     /**
      * 우회 2 — [key](공고명 원시 키, 값은 필드 계약이 정한다)를 상수 풀에 가진 production 클래스 집합은
      * [allowedClasses] 의 부분집합이다. 클래스 파일 바이트를 읽는다(소스 텍스트가 아니라 컴파일 산출물 —
@@ -287,13 +282,14 @@ class CollectionArchitectureRules(
         types: Set<String>,
         allowedReferencers: Set<String>,
         reason: String,
+        depth: ReferenceCollection,
     ): List<ArchRule> =
         listOf(
             noClasses()
                 .that(isOutside(allowedReferencers))
                 .and()
                 .resideInAPackage("$appRoot..")
-                .should(referenceAnyOf(types))
+                .should(referenceAnyOf(types, depth))
                 .because(reason),
         )
 
@@ -305,22 +301,18 @@ class CollectionArchitectureRules(
     private fun referenceProcurementTypesOutside(
         procurementPackage: String,
         allowed: Set<String>,
+        depth: ReferenceCollection,
     ): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("$procurementPackage 의 허용 밖 타입을 참조한다 (허용 ${allowed.size}종)") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType.outermostClass() }
-                    .filter {
-                        it.packageName == procurementPackage ||
-                            it.packageName.startsWith(
-                                "$procurementPackage.",
-                            )
-                    }.filter { it.fullName !in allowed }
-                    .distinct()
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${it.fullName}")) }
+                item
+                    .referencedTypeNames(depth)
+                    .filter { it.startsWith("$procurementPackage.") }
+                    .filterNot { it in allowed }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $it")) }
             }
         }
 
@@ -383,17 +375,19 @@ class CollectionArchitectureRules(
             }
         }
 
-    private fun referenceAnyOf(types: Set<String>): ArchCondition<JavaClass> =
+    private fun referenceAnyOf(
+        types: Set<String>,
+        depth: ReferenceCollection,
+    ): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("${types.size}종 타입 중 하나를 참조한다") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType.outermostClass() }
-                    .filter { it.fullName in types && it.fullName != item.outermostClass().fullName }
-                    .distinct()
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${it.fullName}")) }
+                item
+                    .referencedTypeNames(depth)
+                    .filter { it in types && it != item.outermostClass().fullName }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $it")) }
             }
         }
 

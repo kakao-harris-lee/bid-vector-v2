@@ -17,7 +17,7 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CollectionArchitectureGateCatchesViolationsTest {
     private val policy = ArchitecturePolicy.load()
-    private val rules = CollectionArchitectureRules()
+    private val rules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
@@ -29,6 +29,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
             allowedTypes = policy.collectionAllowedProcurementTypes.toSet(),
             passThroughTypes = policy.collectionPassThroughTypes.toSet(),
             forbiddenFieldTypes = policy.collectionForbiddenFieldTypes.toSet(),
+            depth = policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
         )
 
     @Test
@@ -55,6 +56,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
             allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
             passThroughTypes = policy.collectionPassThroughTypes.toSet(),
             allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+            depth = policy.depth(DepthAxis.RAW_ACCESS),
         )
 
     @Test
@@ -274,7 +276,13 @@ class CollectionArchitectureGateCatchesViolationsTest {
         types: Set<String>,
         allowed: Set<String>,
         label: String,
-    ) = rules.appTypesMustBeReferencedOnlyBy("$fixtureRoot.app", types, allowed, "음성 대조 — $label")
+    ) = rules.appTypesMustBeReferencedOnlyBy(
+        "$fixtureRoot.app",
+        types,
+        allowed,
+        "음성 대조 — $label",
+        policy.depth(DepthAxis.USECASE),
+    )
 
     private fun List<ArchRule>.details(): List<String> =
         flatMap { rule ->

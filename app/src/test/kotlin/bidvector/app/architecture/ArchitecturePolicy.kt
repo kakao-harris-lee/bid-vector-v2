@@ -253,6 +253,24 @@ class ArchitecturePolicy private constructor(
     val reflectionClassType: String get() = value("collection.reflection.class-type")
     val reflectionClassMemberPairs: List<Pair<String, String>> get() = pairs("collection.reflection.class-member-pairs")
 
+    /**
+     * D-6G2g-11 — 축마다의 참조 수집 깊이. 값 어휘는 닫힌 둘이고, 정책 파일에 없는 축이나 어휘 밖
+     * 값은 **오류**다(조용한 기본값이 없다 — 기본값을 두면 축을 지운 편집이 통과한다).
+     */
+    fun depth(axis: DepthAxis): ReferenceCollection {
+        val raw = value("$DEPTH_PREFIX${axis.key}")
+        return ReferenceCollection.entries.firstOrNull { it.name == raw }
+            ?: error("수집 깊이 어휘 밖 값이다: ${axis.key}=$raw")
+    }
+
+    /** 정책 파일이 선언한 깊이 축 전수 — [DepthAxis] 와 양방향으로 같아야 한다. */
+    val declaredDepthAxes: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(DEPTH_PREFIX) }
+                .map { it.removePrefix(DEPTH_PREFIX) }
+                .toSet()
+
     /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")
     val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")
@@ -297,6 +315,8 @@ class ArchitecturePolicy private constructor(
                 read(MEMBER_EFFECTS_PROPERTY),
                 declaredKeys(LOCATION_PROPERTY),
             )
+
+        private const val DEPTH_PREFIX = "collection.depth."
 
         /**
          * 정책 파일이 **선언한 키 전수**(중복 포함). 줄 끝 `\` 로 이어지는 값 줄은 키 줄이 아니다 —

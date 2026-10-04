@@ -26,7 +26,7 @@ class TransportSurfaceGateCatchesViolationsTest {
     private val fixtureRoot = "$violatingRoot.transport"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
     private val violatingAll: JavaClasses = ClassFileImporter().importPackages(violatingRoot)
-    private val rules = transportRules(ReferenceCollection.FULL)
+    private val rules = transportRules(policy.depth(DepthAxis.TRANSPORT))
     private val ownerOnly = transportRules(ReferenceCollection.OWNER_ONLY)
 
     private fun transportRules(collection: ReferenceCollection) =
@@ -73,7 +73,7 @@ class TransportSurfaceGateCatchesViolationsTest {
                     ).details(violatingAll)
             }
         val reflection =
-            CollectionArchitectureRules()
+            CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
                 .moduleMustNotUseReflection(
                     roots = policy.externalJudgedModules.map { "$violatingRoot.$it" },
                     reflectionPackages = policy.reflectionPackages.toSet(),

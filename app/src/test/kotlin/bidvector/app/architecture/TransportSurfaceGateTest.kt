@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TransportSurfaceGateTest {
     private val policy = ArchitecturePolicy.load()
-    private val rules = transportRules(ReferenceCollection.FULL)
+    private val rules = transportRules(policy.depth(DepthAxis.TRANSPORT))
     private val ownerOnly = transportRules(ReferenceCollection.OWNER_ONLY)
     private val production: JavaClasses =
         ClassFileImporter()

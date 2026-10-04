@@ -22,7 +22,7 @@ import org.junit.jupiter.api.TestInstance
 class AppHttpDependencyGateTest {
     private val policy = ArchitecturePolicy.load()
     private val rules = AppHttpDependencyRules(policy)
-    private val collectionRules = CollectionArchitectureRules()
+    private val collectionRules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val production: JavaClasses =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
@@ -190,6 +190,7 @@ class AppHttpDependencyGateTest {
             production,
             listOf("${policy.packageRoot}.app"),
             policy.operatorCredentialTypes.toSet(),
+            policy.depth(DepthAxis.OPERATOR_CREDENTIAL),
         ) shouldBe policy.operatorCredentialReferencers.toSet()
     }
 
