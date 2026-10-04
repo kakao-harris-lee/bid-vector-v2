@@ -1,12 +1,14 @@
 import bidvector.buildlogic.ContractGateTask
 import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.GateExecutionGateTask
+import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.LeakPatternGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
+import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
@@ -84,6 +86,41 @@ val buildLogicGateExecutionGate =
         resultDirectories.from(layout.settingsDirectory.dir("build-logic/build/test-results/test"))
         dependsOn(gradle.includedBuild("build-logic").task(":test"))
         report = layout.buildDirectory.file("reports/gate-execution/build-logic.txt")
+    }
+
+// `buildLogicGateExecutionGate` 의 반대축 — build-logic 자신의 등재 장부가 소스와 같은지 잰다.
+// 같은 순환(그 클래스가 이 빌드의 산출물이다) 때문에 루트에 둔다. 컴파일된 test 클래스를 읽으므로
+// `:build-logic:testClasses` 에 의존한다.
+//
+// **메타 애노테이션 조회 자리 둘**(vr r1 H-2·M-1). ① build-logic 자신의 test 출력 — 저자가 그 소스에
+// 선언한 합성 애노테이션은 다른 어디에도 없다. ② JUnit 아티팩트 — `@ParameterizedTest` 가
+// `@TestTemplate` 이라는 사실이 그 jar 안에 있다. 앞 판은 ② 가 비어 있어 `@ParameterizedTest` 만 가진
+// **미등재** build-logic test 가 모집단 밖으로 빠져 조용히 통과했다(그 방향은 fail-loud 가 아니다).
+// included build 의 `testRuntimeClasspath` 를 루트에서 집는 대신, 같은 좌표를 카탈로그에서 읽어
+// detached configuration 하나로 만든다 — 해소에 필요한 것은 **애노테이션 클래스**뿐이다.
+val buildLogicMetaAnnotations =
+    configurations.detachedConfiguration(
+        dependencies.create("${versionCatalog.lib("junit-jupiter").get().module}:${versionCatalog.version("junit")}"),
+    )
+
+val buildLogicGateRegistrationGate =
+    tasks.register<GateRegistrationGateTask>("buildLogicGateRegistrationGate") {
+        group = "verification"
+        description = "build-logic 자신의 게이트 등재 장부가 test 클래스 전수와 같은지 잰다"
+        policyFile = layout.settingsDirectory.file("config/quality/gate-tests.properties")
+        moduleName = "build-logic"
+        testClasses.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/test"))
+        testSources.from(layout.settingsDirectory.dir("build-logic/src/test"))
+        testRuntimeClasspath.from(buildLogicMetaAnnotations)
+        // **알려진 제한 — Gradle 필터 출처가 없다**(PR #60 H). build-logic 은 included build 라 루트가 그
+        // 빌드의 `Test` task **속성**을 읽지 못한다(`gradle.includedBuild(…)` 가 주는 것은 task 참조뿐).
+        // 오늘 그 모듈의 `tasks.withType<Test>` 에 `filter` 블록이 없음을 확인했고, 나중에 생기면 그
+        // 제외가 **선언과 어긋나 래칫이 붉는다**(제외 선언은 이미 등식의 한 변이다) — 미탐이 아니라
+        // 오탐 방향이다. 유도하려면 그 빌드가 자기 필터를 파일로 내보내야 하고 그 파일은 이 slice 의
+        // in_scope 밖이다.
+        excludePatterns = emptySet<String>()
+        dependsOn(gradle.includedBuild("build-logic").task(":testClasses"))
+        report = layout.buildDirectory.file("reports/gate-registration/build-logic.txt")
     }
 
 // 하네스 `test-discovery-guard`(`OPEN-2B-TEST-DISCOVERY-GUARD`) — build-logic 자신의 test
@@ -192,6 +229,7 @@ tasks.register("check") {
         buildLogicSizeGate,
         buildLogicTypeShapeGate,
         buildLogicGateExecutionGate,
+        buildLogicGateRegistrationGate,
         buildLogicTestShapeGate,
         scriptSizeGate,
         conventionCoverageGate,

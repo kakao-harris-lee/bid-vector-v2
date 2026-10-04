@@ -1,7 +1,10 @@
 package bidvector.app.architecture
 
+import com.tngtech.archunit.core.domain.JavaCall
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
+import com.tngtech.archunit.core.domain.JavaCodeUnit
+import com.tngtech.archunit.core.domain.JavaModifier
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.ConditionEvents
@@ -12,9 +15,12 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 참조를 모으는 범위. [OWNER_ONLY] 는 ArchUnit 의존 그래프 그대로 — **호출 대상의 소유 타입**까지만
  * 본다. [FULL] 은 거기에 **호출 대상의 인자·반환 타입**과 필드 접근의 필드 타입을 더한다.
  *
- * [OWNER_ONLY] 는 쓰이는 게이트가 아니라 **양성 대조**다: `uri.toURL().readText()` 처럼 타입을 쥐지 않고
- * 호출 사슬로만 지나는 길은 [OWNER_ONLY] 에 보이지 않는다. [FULL] 이 조용히 [OWNER_ONLY] 로 되돌려지면
- * 그 대조가 RED 가 된다.
+ [OWNER_ONLY] 는 **쓰이는 깊이이자 양성 대조**다. 쓰이는 자리는 `collection.depth.collection-procurement`
+ * 와 `collection.depth.raw-access` 둘 — 깊게 보면 그 게이트들이 막으려는 타입이 허용 집합에 들어오거나
+ * 「아무도 참조하지 않는다」가 약해진다(정책 파일 `collection.depth.*` 주석이 근거를 든다).
+ *
+ * 대조로도 쓴다: `uri.toURL().readText()` 처럼 타입을 쥐지 않고 호출 사슬로만 지나는 길은 [OWNER_ONLY]
+ * 에 보이지 않으므로, [FULL] 축이 조용히 [OWNER_ONLY] 로 되돌려지면 그 대조가 RED 가 된다.
  */
 enum class ReferenceCollection { OWNER_ONLY, FULL }
 
@@ -58,30 +64,25 @@ internal fun JavaClass.referencedTypeNames(collection: ReferenceCollection): Set
  * 부르는 것)이 등재 철자를 바꿔 등식을 깼다. 이름 기준 절단은 그 결합을 끊는다.
  *
  * 접지 않는 선택지도 쟀다 — Kotlin 합성 람다 클래스 이름이 정책 파일에 들어와 더 자주 낡는다.
+ *
+ * **D-6G2g-14 — app 아키텍처 게이트 모듈 안에서 접기는 이제 이 함수 하나다**
+ * (`OPEN-6G2B-FOLDING-UNIFICATION` 종결). build-logic 의 등재 등식은 **모듈 경계** 밖이라 자기 접기를
+ * 따로 가진다(그쪽은 test 클래스 이름 축이고 이쪽은 보유자 축이다). 앞서 관례가
+ * 셋이었다: 접지 않음(`collection.key-hash.holders` 의 `NoticeKeyHash$Companion` ·
+ * `app.injection.allowed-types` 의 `Resolution$Resolved`) · 이름 절단(쌍 등식 셋) · `enclosingClass` 접기
+ * (`outermostClass()` 와 그것을 각자 복사한 `topLevel()` 셋). `enclosingClass` 접기는 위 cr M-1 의 결함을
+ * 그대로 안고 있어 그쪽으로 통일할 수 없고, 접지 않는 둘은 중첩 이름을 등재에 남긴다. 그래서 이름 절단
+ * 하나로 모으고 나머지를 지웠다 — `collection.key-hash.holders` 의 `NoticeKeyHash$Companion` 에서
+ * 중첩 접미가 떨어졌다.
+ *
+ * **접기는 「누가 쥐는가」 축에만 쓴다**(cr r1 G-4). `app.injection.allowed-types` 는 **타입 동일성**
+ * 축이라 접지 않는다 — 접으면 `Resolution$Resolved` 허용이 sealed 형제 `Resolution$NotApplicable`
+ * 까지 열어 준다. 그 키는 정확한 JVM 이름을 담는다.
  */
 internal fun String.outermostName(): String = substringBefore('$')
 
 /** [outermostName] 의 `JavaClass` 판 — 보유자 쪽 이름을 같은 규칙으로 접는다. */
 internal fun JavaClass.outermostClassName(): String = fullName.outermostName()
-
-/**
- * ArchUnit `enclosingClass` 기준 접기 — **쌍 등식 게이트는 쓰지 않는다**([outermostName] 을 쓴다).
- *
- * 저장소에 접기 관례가 **셋** 있다(`OPEN-6G2B-FOLDING-UNIFICATION`).
- *
- *  1. **접지 않음** — 등재가 바이트코드 이름을 그대로 담는다: `collection.key-hash.holders` 의
- *     `NoticeKeyHash$Companion` · `app.injection.allowed-types` 의 `Resolution$Resolved`. 그 게이트들은
- *     관측도 접지 않으므로 중첩 이름이 등재에 남는다.
- *  2. **이름 기준 절단**([outermostName]) — 이 slice 의 쌍 등식 게이트 셋(전송 표면 · 바깥 참조 · 반사)과
- *     `AppHttpDependencyGateTest` 의 보유자 쪽.
- *  3. **`enclosingClass` 접기**(이 함수) — 6F·6G 의 앞선 게이트들(원문 값 획득 · 대분류 · 공고명 키 ·
- *     러너·로거)이 쓴다. 그 등재가 이 규칙으로 접힌 집합이라 이름 규칙으로 옮기려면 **그 게이트들의 관측을
- *     다시 재야** 한다.
- *
- * 1 과 3 의 결과는 중첩 타입에서 갈리고, 2 와 3 은 ArchUnit 이 해소하지 못한 타입에서 갈린다 —
- * `bidvector..` 안에서는 2 와 3 이 같다(해소가 보장된다).
- */
-internal fun JavaClass.outermostClass(): JavaClass = enclosingClass.map { it.outermostClass() }.orElse(this)
 
 /**
  * D-6G2b-1·2·3 — **관문 밖으로 바이트를 내는 길**을 (클래스, 전송 표면 타입) 쌍의 정확 집합으로 닫는다.
@@ -184,6 +185,188 @@ class TransportSurfaceRules(
                 externalPackagesOf(item)
                     .filterNot { it in allowed }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$referencer -> $it")) }
+            }
+        }
+
+    /**
+     * D-6G2g-9 — **3층(클래스, 멤버)**. 2층의 (클래스, 타입) 쌍은 등재 보유자 **안**을 보지 못한다:
+     * 보유자가 `fun sendRaw(s: String)` 처럼 **시그니처에 전송 타입이 없는** 멤버를 두면, 그 멤버를
+     * 반사로 부르는 길이 (클래스, 타입) 해상도 밖에 남는다(`OPEN-6G2B-HOLDER-INTERNAL-SURFACE`,
+     * 6G-2c vr I-1 의 `release$bid_vector_adapters` 자리).
+     *
+     * 술어는 **도달 추적**이다(vr r1 H-1). 앞 판은 「그 멤버의 몸이 전송 멤버를 직접 부르는가」만 봐서
+     * **본문 모양**에 걸려 있었다 — private 헬퍼로 한 번 감싸거나 람다 안에서 부르면 초록이었고,
+     * production 이 이미 그 모양이었다(짝인 두 배선 가운데 하나만 등재되는 식). 지금은 비-private
+     * 멤버에서 같은 **보유자 그룹**(접은 이름이 같은 클래스 전부 — 중첩·합성 람다 클래스 포함)의
+     * **private·합성 멤버**를 따라가 전송 멤버 호출에 닿는지를 본다. 호출 그래프가 그 그룹 안에서 닫힌다.
+     *
+     * 비-public 멤버만 따라간다. 비-private 멤버를 거쳐 가는 길은 **그 멤버 자신이** 이 집합에 들어오므로
+     * 등재가 그 자리를 든다 — 두 번 세지 않는다.
+     *
+     * 쌍은 (클래스, **이름 + 서술자**)다(cr r1 G-3). 이름만 담으면 등재된 이름의 오버로드를 더해
+     * 전송하는 길이 등재를 움직이지 않는다.
+     */
+    fun observedMemberSurface(
+        classes: JavaClasses,
+        holders: Set<String>,
+    ): Set<Pair<String, String>> =
+        classes
+            .filter { it.outermostClassName() in holders }
+            .groupBy { it.outermostClassName() }
+            .flatMap { (holder, group) -> hiddenSendMembers(holder, group) }
+            .toSet()
+
+    /**
+     * [roots] 아래 등재 보유자가 등재 밖 숨은 송신 멤버를 두지 않는다.
+     *
+     * 관측을 **먼저 한 번** 내고 규칙이 그것을 읽는다 — 도달 추적이 보유자 **그룹** 단위라
+     * 클래스 하나씩 보는 `ArchCondition` 안에서는 합성 람다 클래스를 따라갈 수 없다.
+     */
+    fun memberSurfaceRules(
+        classes: JavaClasses,
+        roots: List<String>,
+        holders: Set<String>,
+        registeredMembers: Set<Pair<String, String>>,
+    ): List<ArchRule> {
+        val observed = observedMemberSurface(classes, holders).groupBy({ it.first }, { it.second })
+        return listOf(
+            noClasses()
+                .that()
+                .resideInAnyPackage(*roots.map { "$it.." }.toTypedArray())
+                .should(holdHiddenSendMemberOutside(observed, registeredMembers))
+                .because("D-6G2g-9 — 등재 보유자의 (클래스, 멤버) 쌍은 등재된 쌍뿐이다(3층)"),
+        )
+    }
+
+    private fun hiddenSendMembers(
+        holder: String,
+        group: List<JavaClass>,
+    ): List<Pair<String, String>> {
+        val members = group.flatMap { it.methods + it.constructors }
+        val calledInGroup = members.flatMap { it.callsFromSelf }.mapTo(mutableSetOf()) { it.callKey() }
+        val reachesTransport = transportReachability(members)
+        return members
+            .filter { isEntryPoint(it, calledInGroup) }
+            .filterNot(::signatureNamesSurface)
+            .filter(reachesTransport)
+            .map { holder to it.signatureKey() }
+    }
+
+    /**
+     * 등재 대상은 **진입점**이다 — 비-private 멤버, 그리고 **그룹 안의 어떤 호출도 가리키지 않는 숨은
+     * 멤버**. 후자가 필요한 이유는 람다다(vr r1 H-1 의 셋째 변이): Kotlin 이 SAM 변환을
+     * `invokedynamic` 으로 내면 람다 본문은 같은 클래스의 private·합성 메서드가 되는데 **그것을 가리키는
+     * 호출 간선이 바이트코드 분석에 없다**(부트스트랩 인자에만 있다). 호출자가 없으면 그 멤버가 스스로
+     * 진입점이고, 반사로 이름을 불러 쓸 수 있으므로 등재가 맞다. 이름 규약(`…$lambda$0`)으로 가르지
+     * 않는다 — 그것은 스타일 하나로 열리는 문자열 술어다.
+     */
+    private fun isEntryPoint(
+        member: JavaCodeUnit,
+        calledInGroup: Set<String>,
+    ): Boolean {
+        val hidden = JavaModifier.PRIVATE in member.modifiers || JavaModifier.SYNTHETIC in member.modifiers
+        return !hidden || member.callKey() !in calledInGroup
+    }
+
+    /**
+     * 그룹 안의 **비-public 멤버**(private·합성)를 따라가 전송 호출에 닿는지. 순환은 방문 집합이 끊는다.
+     */
+    private fun transportReachability(members: List<JavaCodeUnit>): (JavaCodeUnit) -> Boolean {
+        val byKey = members.associateBy { it.callKey() }
+        val hidden = { unit: JavaCodeUnit ->
+            JavaModifier.PRIVATE in unit.modifiers ||
+                JavaModifier.SYNTHETIC in unit.modifiers
+        }
+
+        fun reaches(
+            unit: JavaCodeUnit,
+            seen: MutableSet<String>,
+        ): Boolean =
+            unit.accessesFromSelf.any { isSurfaceType(it.targetOwner.outermostClassName()) } ||
+                unit.callsFromSelf.any(::callSignatureNamesSurface) ||
+                unit.callsFromSelf.any { call ->
+                    val next = byKey[call.callKey()]
+                    next != null && hidden(next) && seen.add(next.callKey()) && reaches(next, seen)
+                }
+
+        return { unit -> reaches(unit, mutableSetOf(unit.callKey())) }
+    }
+
+    /**
+     * 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다.
+     *
+     * **배열을 벗긴다**(PR #60 A). `JavaClass.name` 은 배열을 JVM 철자(`[Ljava.nio.file.OpenOption;`)로
+     * 주고 그 이름은 전송 뿌리 술어에 걸리지 않는다 — `vararg o: OpenOption` 류가 두 갈래 다 빠져
+     * R2-H-1 이 닫은 구멍이 배열 서명에서 다시 열렸다(오늘 live 미탐 0). 같은 파일의
+     * [referencedTypeNames] 가 이미 `baseComponentType` 으로 벗기고 있어 그쪽과 통일한다.
+     */
+    private fun signatureNamesSurface(member: JavaCodeUnit): Boolean = member.signatureTypes().any { isSurfaceType(it) }
+
+    /**
+     * **호출 대상의 시그니처가 전송 타입을 말하면 그 호출도 전송 도달이다**(vr r2 R2-H-1).
+     *
+     * 도달 추적은 「비-private 멤버를 거쳐 가는 길은 그 멤버 자신이 등재된다」를 전제로 비-private
+     * 호출을 따라가지 않는데, **시그니처에 전송 타입이 있는 비-private 멤버는 3층에서 빠진다**(2층 몫).
+     * 그래서 `fun x(s: String) = w(channel, s)` 의 `x` 가 어느 층에도 남지 않았다 — production 의
+     * `FileChannelAppend.append(String)` 이 그 모양이다(`writeFully(WritableByteChannel, ByteBuffer)`
+     * 로 넘긴다). 그룹 안팎을 가리지 않는다 — 넘기는 상대가 어느 클래스든 바이트는 나간다.
+     */
+    private fun callSignatureNamesSurface(call: JavaCall<*>): Boolean =
+        (call.target.rawParameterTypes + call.target.rawReturnType)
+            .any { isSurfaceType(it.surfaceName()) }
+
+    /** 시그니처가 말하는 타입 이름 전수 — 배열을 벗기고 중첩을 접은 뒤의 이름이다. */
+    private fun JavaCodeUnit.signatureTypes(): List<String> =
+        (rawParameterTypes + rawReturnType).map { it.surfaceName() }
+
+    /** 전송 표면 판정에 쓰는 이름 — 배열을 벗기고([JavaClass.baseComponentType]) 중첩을 접는다. */
+    private fun JavaClass.surfaceName(): String = baseComponentType.name.outermostName()
+
+    /**
+     * 등재 키에 쓰는 **읽을 수 있는** 타입 철자 — 배열은 `java.nio.file.OpenOption[]` 로 적는다(PR #60 C).
+     *
+     * JVM 철자(`[Ljava.nio.file.OpenOption;`)를 그대로 쓰면 그 안의 `;` 가 **인자 구분자와 같아** 한 쌍이
+     * 여러 쌍으로 읽힌다. 차원은 이름 앞의 `[` 수가 든다.
+     */
+    private fun JavaClass.readableName(): String =
+        baseComponentType.name + "[]".repeat(name.takeWhile { it == '[' }.length)
+
+    /**
+     * 등재에 쓰는 이름 — **소유 클래스의 이진 이름 + 멤버 이름 + 서술자**다.
+     *
+     * 오버로드를 가르고(cr r1 G-3) **같은 보유자 안의 다른 중첩·합성 클래스도 가른다**(vr r2 R2-H-2).
+     * 앞 판은 멤버 축도 바깥 이름으로 접어, 이미 등재된 범용 키(코루틴 본문의 `invokeSuspend` ·
+     * 익명 객체의 `run()` · `close()`·`read()`)가 있는 보유자에 **새 송신 본문을 더해도 등재가 움직이지
+     * 않았다**. 접기는 **보유자 축**(누가 쥐는가)에만 쓴다 — 멤버 축은 주입 축과 같은 동일성 축이다.
+     *
+     * 인자 구분자는 **`;`** 다: 정책 파일의 목록 구분자가 `,` 라 서술자 안에 쉼표를 두면 한 쌍이 여러
+     * 쌍으로 쪼개진다.
+     */
+    private fun JavaCodeUnit.signatureKey(): String =
+        "${owner.fullName}#$name(${rawParameterTypes.joinToString(";") { it.readableName() }})"
+
+    /** 그룹 안에서 호출 대상을 찾는 열쇠 — 등재 키와 같은 모양이다. */
+    private fun JavaCodeUnit.callKey(): String = signatureKey()
+
+    private fun JavaCall<*>.callKey(): String =
+        "${targetOwner.fullName}#${target.name}(${target.rawParameterTypes.joinToString(";") { it.readableName() }})"
+
+    private fun holdHiddenSendMemberOutside(
+        observed: Map<String, List<String>>,
+        registered: Set<Pair<String, String>>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("등재 밖 숨은 송신 멤버를 둔다 (등재 쌍 ${registered.size})") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                // 그룹은 바깥 이름 하나로 신고한다 — 중첩·합성 클래스마다 같은 쌍을 되풀이하지 않는다.
+                val holder = item.outermostClassName()
+                if (item.fullName != holder) return
+                observed[holder]
+                    .orEmpty()
+                    .filterNot { holder to it in registered }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "$holder#$it")) }
             }
         }
 

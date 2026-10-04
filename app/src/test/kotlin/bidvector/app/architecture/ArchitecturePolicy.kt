@@ -212,6 +212,12 @@ class ArchitecturePolicy private constructor(
 
     val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
 
+    /** 등재된 보유자 클래스 전수 — 3층(멤버 표면)의 대상이다. */
+    val transportHolders: Set<String> get() = transportHolderPairs.map { it.first }.toSet()
+
+    /** D-6G2g-9 3층 — 보유자 안의 (클래스, 멤버) 쌍. */
+    val transportMemberSurface: Set<Pair<String, String>> get() = pairs("collection.transport.member-surface").toSet()
+
     /**
      * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부의 **판정 대상 모듈**. 별도 키로 적지 않고 `layer.*` 에서
      * 도출한다(domain 계열을 뺀 셋 — application · adapters · app). 그래서 모듈을 빠뜨리는 편집은 여기만
@@ -248,10 +254,37 @@ class ArchitecturePolicy private constructor(
      * 패키지 · (클래스, 리플렉션 타입) 쌍 · `Class` 와 (클래스, 멤버) 쌍.
      */
     val reflectionRoots: List<String> get() = list("collection.reflection.roots")
+
+    /**
+     * D-6G2g-9 (운영자 결정 B-1 (가)) — 반사 판정 대상은 **production 전 층**이다(domain 포함).
+     * 바깥 참조 판정([externalJudgedModules])과 갈린 축이고, 그 갈림이 B-1 의 내용이다: 바깥 참조는
+     * 모듈마다 허용 패키지 집합을 들어야 해서 domain 을 넣으려면 키 여섯이 더 필요하지만, 반사는
+     * 쌍 등식이라 관측이 0 이면 등재도 0 이다(domain 여섯의 반사 참조는 실측 0).
+     */
+    val reflectionJudgedModules: List<String>
+        get() = domainModules + externalJudgedModules
     val reflectionPackages: List<String> get() = list("collection.reflection.packages")
     val reflectionTypePairs: List<Pair<String, String>> get() = pairs("collection.reflection.type-pairs")
     val reflectionClassType: String get() = value("collection.reflection.class-type")
     val reflectionClassMemberPairs: List<Pair<String, String>> get() = pairs("collection.reflection.class-member-pairs")
+
+    /**
+     * D-6G2g-11 — 축마다의 참조 수집 깊이. 값 어휘는 닫힌 둘이고, 정책 파일에 없는 축이나 어휘 밖
+     * 값은 **오류**다(조용한 기본값이 없다 — 기본값을 두면 축을 지운 편집이 통과한다).
+     */
+    fun depth(axis: DepthAxis): ReferenceCollection {
+        val raw = value("$DEPTH_PREFIX${axis.key}")
+        return ReferenceCollection.entries.firstOrNull { it.name == raw }
+            ?: error("수집 깊이 어휘 밖 값이다: ${axis.key}=$raw")
+    }
+
+    /** 정책 파일이 선언한 깊이 축 전수 — [DepthAxis] 와 양방향으로 같아야 한다. */
+    val declaredDepthAxes: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(DEPTH_PREFIX) }
+                .map { it.removePrefix(DEPTH_PREFIX) }
+                .toSet()
 
     /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")
@@ -297,6 +330,8 @@ class ArchitecturePolicy private constructor(
                 read(MEMBER_EFFECTS_PROPERTY),
                 declaredKeys(LOCATION_PROPERTY),
             )
+
+        private const val DEPTH_PREFIX = "collection.depth."
 
         /**
          * 정책 파일이 **선언한 키 전수**(중복 포함). 줄 끝 `\` 로 이어지는 값 줄은 키 줄이 아니다 —

@@ -26,7 +26,7 @@ class TransportSurfaceGateCatchesViolationsTest {
     private val fixtureRoot = "$violatingRoot.transport"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
     private val violatingAll: JavaClasses = ClassFileImporter().importPackages(violatingRoot)
-    private val rules = transportRules(ReferenceCollection.FULL)
+    private val rules = transportRules(policy.depth(DepthAxis.TRANSPORT))
     private val ownerOnly = transportRules(ReferenceCollection.OWNER_ONLY)
 
     private fun transportRules(collection: ReferenceCollection) =
@@ -73,9 +73,9 @@ class TransportSurfaceGateCatchesViolationsTest {
                     ).details(violatingAll)
             }
         val reflection =
-            CollectionArchitectureRules()
+            CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
                 .moduleMustNotUseReflection(
-                    roots = policy.externalJudgedModules.map { "$violatingRoot.$it" },
+                    roots = policy.reflectionJudgedModules.map { "$violatingRoot.$it" },
                     reflectionPackages = policy.reflectionPackages.toSet(),
                     allowedTypePairs = policy.reflectionTypePairs.toSet(),
                     classType = policy.reflectionClassType,
@@ -324,6 +324,13 @@ class TransportSurfaceGateCatchesViolationsTest {
                 // KA15·그 형제 — 클래스패스에 이미 있는 Spring 전송 표면.
                 "RogueSpringRestClient" to "org.springframework.web.client.RestClient",
                 "RogueSpringRequestFactory" to "org.springframework.http.client.JdkClientHttpRequestFactory",
+                // D-6G2g-9 (B-2 (가)) — 허용 패키지 **안**의 파일 시스템 출구. 뿌리와 낱개 열거 각각.
+                "RogueFileSystemWrite" to "java.nio.file.Path",
+                "RogueLegacyFileWrite" to "java.io.File",
+                // D-6G2g-20 — 타입 없이 문자열 경로로 여는 생성자 셋(세 번째 기제).
+                "RogueStringPathPrintWriter" to "java.io.PrintWriter",
+                "RogueStringPathPrintStream" to "java.io.PrintStream",
+                "RogueStringPathFormatter" to "java.util.Formatter",
                 // 이 slice 가 고안한 것 — JDK 내장 서버·원격 이름 조회·자원 URL·메서드 핸들.
                 "RogueHttpServerExposure" to "com.sun.net.httpserver.HttpServer",
                 "RogueRmiLookup" to "java.rmi.Naming",

@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
  * 허용 집합은 전부 `architecture-policy.properties` 에서 온다.
  */
 class CollectionArchitectureRules(
-    private val collection: ReferenceCollection = ReferenceCollection.FULL,
+    private val collection: ReferenceCollection,
 ) {
     /**
      * 우회 1 — 수집 use case 는 원문 필드를 직접 읽지 않는다. ① [collectionPackage] 가 [procurementPackage]
@@ -31,12 +31,13 @@ class CollectionArchitectureRules(
         allowedTypes: Set<String>,
         passThroughTypes: Set<String>,
         forbiddenFieldTypes: Set<String>,
+        depth: ReferenceCollection,
     ): List<ArchRule> =
         listOf(
             noClasses()
                 .that()
                 .resideInAPackage("$collectionPackage..")
-                .should(referenceProcurementTypesOutside(procurementPackage, allowedTypes))
+                .should(referenceProcurementTypesOutside(procurementPackage, allowedTypes, depth))
                 .because("D-6F8-1 우회 1 — 수집 use case 의 procurement 참조 집합은 허용 집합의 부분집합이다"),
             noClasses()
                 .that()
@@ -58,13 +59,12 @@ class CollectionArchitectureRules(
         classes: JavaClasses,
         collectionPackage: String,
         procurementPackage: String,
+        depth: ReferenceCollection,
     ): Set<String> =
         classes
             .filter { it.packageName == collectionPackage || it.packageName.startsWith("$collectionPackage.") }
-            .flatMap { it.directDependenciesFromSelf }
-            .map { it.targetClass.baseComponentType.outermostClass() }
-            .filter { it.packageName == procurementPackage || it.packageName.startsWith("$procurementPackage.") }
-            .map { it.fullName }
+            .flatMap { origin -> origin.referencedTypeNames(depth) }
+            .filter { it.startsWith("$procurementPackage.") }
             .toSet()
 
     /**
@@ -80,6 +80,7 @@ class CollectionArchitectureRules(
         allowedReferencers: Set<String>,
         passThroughTypes: Set<String>,
         allowedMemberAccessors: Set<String>,
+        depth: ReferenceCollection,
     ): List<ArchRule> {
         val rootPackages = roots.map { "$it.." }.toTypedArray()
         return listOf(
@@ -87,7 +88,7 @@ class CollectionArchitectureRules(
                 .that()
                 .resideInAnyPackage(*rootPackages)
                 .and(isOutside(allowedReferencers))
-                .should(referenceAnyOf(rawAccessTypes))
+                .should(referenceAnyOf(rawAccessTypes, depth))
                 .because("D-6F8-6 우회 1 — 원문 키 접근 타입 참조 집합은 허용 집합의 부분집합이다(모듈 전체)"),
             noClasses()
                 .that()
@@ -164,12 +165,13 @@ class CollectionArchitectureRules(
         classes: JavaClasses,
         roots: List<String>,
         types: Set<String>,
+        depth: ReferenceCollection,
     ): Set<String> =
         classes
             .filter { inRoots(it, roots) }
             .filter { origin ->
-                referencedTypesOf(origin).any { it in types && it != origin.outermostClass().fullName }
-            }.map { it.outermostClass().fullName }
+                origin.referencedTypeNames(depth).any { it in types && it != origin.outermostClassName() }
+            }.map { it.outermostClassName() }
             .toSet()
 
     /** [roots] 아래 클래스 가운데 [types] 의 멤버에 접근하는 것의 최상위 클래스 이름 집합 — 허용 집합과 같아야 한다. */
@@ -180,8 +182,8 @@ class CollectionArchitectureRules(
     ): Set<String> =
         classes
             .filter { inRoots(it, roots) }
-            .filter { origin -> origin.accessesFromSelf.any { it.targetOwner.outermostClass().fullName in types } }
-            .map { it.outermostClass().fullName }
+            .filter { origin -> origin.accessesFromSelf.any { it.targetOwner.outermostClassName() in types } }
+            .map { it.outermostClassName() }
             .toSet()
 
     /** 타입 **이름**이 [packages] 뿌리 안인가 — 쌍 등식과 규칙이 같은 술어를 쓴다. */
@@ -229,13 +231,6 @@ class CollectionArchitectureRules(
         roots: List<String>,
     ): Boolean = roots.any { item.packageName == it || item.packageName.startsWith("$it.") }
 
-    private fun referencedTypesOf(origin: JavaClass): List<String> =
-        origin.directDependenciesFromSelf.map {
-            it.targetClass.baseComponentType
-                .outermostClass()
-                .fullName
-        }
-
     /**
      * 우회 2 — [key](공고명 원시 키, 값은 필드 계약이 정한다)를 상수 풀에 가진 production 클래스 집합은
      * [allowedClasses] 의 부분집합이다. 클래스 파일 바이트를 읽는다(소스 텍스트가 아니라 컴파일 산출물 —
@@ -275,7 +270,7 @@ class CollectionArchitectureRules(
     ): Set<String> =
         production
             .filter { item -> keys.any { constantPoolContains(item, it) } }
-            .map { it.outermostClass().fullName }
+            .map { it.outermostClassName() }
             .toSet()
 
     /**
@@ -287,40 +282,37 @@ class CollectionArchitectureRules(
         types: Set<String>,
         allowedReferencers: Set<String>,
         reason: String,
+        depth: ReferenceCollection,
     ): List<ArchRule> =
         listOf(
             noClasses()
                 .that(isOutside(allowedReferencers))
                 .and()
                 .resideInAPackage("$appRoot..")
-                .should(referenceAnyOf(types))
+                .should(referenceAnyOf(types, depth))
                 .because(reason),
         )
 
     private fun isOutside(allowed: Set<String>) =
         object : com.tngtech.archunit.base.DescribedPredicate<JavaClass>("허용 집합 밖 클래스 (${allowed.size}종)") {
-            override fun test(target: JavaClass): Boolean = target.outermostClass().fullName !in allowed
+            override fun test(target: JavaClass): Boolean = target.outermostClassName() !in allowed
         }
 
     private fun referenceProcurementTypesOutside(
         procurementPackage: String,
         allowed: Set<String>,
+        depth: ReferenceCollection,
     ): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("$procurementPackage 의 허용 밖 타입을 참조한다 (허용 ${allowed.size}종)") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType.outermostClass() }
-                    .filter {
-                        it.packageName == procurementPackage ||
-                            it.packageName.startsWith(
-                                "$procurementPackage.",
-                            )
-                    }.filter { it.fullName !in allowed }
-                    .distinct()
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${it.fullName}")) }
+                item
+                    .referencedTypeNames(depth)
+                    .filter { it.startsWith("$procurementPackage.") }
+                    .filterNot { it in allowed }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $it")) }
             }
         }
 
@@ -331,7 +323,7 @@ class CollectionArchitectureRules(
                 events: ConditionEvents,
             ) {
                 item.accessesFromSelf
-                    .filter { access -> access.targetOwner.outermostClass().fullName in types }
+                    .filter { access -> access.targetOwner.outermostClassName() in types }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, it.describe())) }
             }
         }
@@ -345,8 +337,7 @@ class CollectionArchitectureRules(
                 item.fields
                     .filter { field ->
                         field.rawType.baseComponentType
-                            .outermostClass()
-                            .fullName in types
+                            .outermostClassName() in types
                     }.forEach {
                         events.add(
                             SimpleConditionEvent.satisfied(item, "${item.fullName}.${it.name}: ${it.rawType.name}"),
@@ -383,17 +374,19 @@ class CollectionArchitectureRules(
             }
         }
 
-    private fun referenceAnyOf(types: Set<String>): ArchCondition<JavaClass> =
+    private fun referenceAnyOf(
+        types: Set<String>,
+        depth: ReferenceCollection,
+    ): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("${types.size}종 타입 중 하나를 참조한다") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType.outermostClass() }
-                    .filter { it.fullName in types && it.fullName != item.outermostClass().fullName }
-                    .distinct()
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${it.fullName}")) }
+                item
+                    .referencedTypeNames(depth)
+                    .filter { it in types && it != item.outermostClassName() }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $it")) }
             }
         }
 

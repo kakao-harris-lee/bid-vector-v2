@@ -23,7 +23,7 @@ import java.time.LocalDate
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CollectionArchitectureGateTest {
     private val policy = ArchitecturePolicy.load()
-    private val rules = CollectionArchitectureRules()
+    private val rules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val appRoot = "${policy.packageRoot}.app"
     private val production: JavaClasses =
@@ -46,6 +46,7 @@ class CollectionArchitectureGateTest {
                 allowedTypes = policy.collectionAllowedProcurementTypes.toSet(),
                 passThroughTypes = policy.collectionPassThroughTypes.toSet(),
                 forbiddenFieldTypes = policy.collectionForbiddenFieldTypes.toSet(),
+                depth = policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
             ).checkAll()
     }
 
@@ -55,6 +56,7 @@ class CollectionArchitectureGateTest {
             production,
             policy.collectionPackage,
             "${policy.packageRoot}.procurement",
+            policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
         ) shouldBe policy.collectionAllowedProcurementTypes.toSet()
     }
 
@@ -74,6 +76,7 @@ class CollectionArchitectureGateTest {
                 allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
                 passThroughTypes = policy.collectionPassThroughTypes.toSet(),
                 allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+                depth = policy.depth(DepthAxis.RAW_ACCESS),
             ).checkAll()
     }
 
@@ -83,6 +86,7 @@ class CollectionArchitectureGateTest {
             production,
             policy.rawAccessRoots,
             policy.rawAccessTypes.toSet(),
+            policy.depth(DepthAxis.RAW_ACCESS),
         ) shouldBe policy.rawAccessAllowedReferencers.toSet()
         rules.observedMemberAccessors(
             production,
@@ -92,14 +96,14 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
-    fun `리플렉션 뿌리가 실제로 production 에 있다 — adapters 를 포함해 규칙이 공허하지 않다`() {
+    fun `리플렉션 뿌리가 실제로 production 에 있다 — domain 여섯을 포함해 규칙이 공허하지 않다`() {
         policy.reflectionRoots.forEach { root ->
             production.filter { it.packageName == root || it.packageName.startsWith("$root.") }.shouldNotBeEmpty()
         }
     }
 
     @Test
-    fun `workflow·app·adapters production 의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
+    fun `production 전 층의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
         rules
             .moduleMustNotUseReflection(
                 roots = policy.reflectionRoots,
@@ -151,11 +155,13 @@ class CollectionArchitectureGateTest {
                 setOf(policy.collectionUseCaseType),
                 policy.collectionUseCaseReferencers.toSet(),
                 "D-6F8-6 우회 5 — 수집 use case 참조 집합은 러너와 배선이다",
+                policy.depth(DepthAxis.USECASE),
             ).checkAll()
         rules.observedReferencers(
             production,
             listOf(policy.packageRoot),
             setOf(policy.collectionUseCaseType),
+            policy.depth(DepthAxis.USECASE),
         ) shouldBe policy.collectionUseCaseReferencers.toSet()
     }
 
@@ -240,6 +246,7 @@ class CollectionArchitectureGateTest {
                 policy.runnerTypes.toSet(),
                 policy.runnerAllowedReferencers.toSet(),
                 "D-6F8-3 우회 5 — 러너 타입 참조 집합은 수집 러너 하나다",
+                policy.depth(DepthAxis.RUNNER),
             ).checkAll()
     }
 
@@ -251,6 +258,7 @@ class CollectionArchitectureGateTest {
                 setOf(policy.serviceKeyType),
                 policy.serviceKeyReaders.toSet(),
                 "D-6F8-4 우회 4 — 서비스 키 원문 설정 참조 집합은 배선 한 곳이다",
+                policy.depth(DepthAxis.SERVICE_KEY),
             ).checkAll()
     }
 
@@ -262,6 +270,7 @@ class CollectionArchitectureGateTest {
                 policy.loggingTypes.toSet(),
                 policy.loggingAllowedUsers.toSet(),
                 "D-6F8-4 우회 4 — 로거 사용 집합은 수집 로그 출구 하나다",
+                policy.depth(DepthAxis.LOGGING),
             ).checkAll()
     }
 
@@ -272,18 +281,24 @@ class CollectionArchitectureGateTest {
      */
     @Test
     fun `공고 키 해시를 짓는 자리는 등재된 집합뿐이다`() {
-        referencersOf(policy.keyHashRoots, setOf(policy.keyHashType)) shouldBe policy.keyHashHolders.toSet()
+        referencersOf(
+            policy.keyHashRoots,
+            setOf(policy.keyHashType),
+            policy.depth(DepthAxis.KEY_HASH),
+        ) shouldBe policy.keyHashHolders.toSet()
     }
 
     /** root 아래 production 에서 [types] 중 하나라도 직접 참조하는 클래스 이름 집합. */
     private fun referencersOf(
         roots: List<String>,
         types: Set<String>,
+        depth: ReferenceCollection,
     ): Set<String> =
         production
             .filter { item -> roots.any { item.name.startsWith("$it.") } }
-            .filter { item -> item.directDependenciesFromSelf.any { it.targetClass.name in types } }
-            .map { it.name }
+            .filter { item ->
+                item.referencedTypeNames(depth).any { it in types && it != item.outermostClassName() }
+            }.map { it.outermostClassName() }
             .toSet()
 
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }

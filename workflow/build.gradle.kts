@@ -24,15 +24,6 @@ dependencies {
 tasks.withType<Test>().configureEach {
     systemProperty("kotest.proptest.default.seed", "20260908")
 
-    // `WorkflowGateRegistrationTest`(gate.tests.workflow)는
-    // 런타임에 `config/quality/gate-tests.properties`를 직접 읽지만, Gradle `Test` task는
-    // 그 파일을 선언된 입력으로 모른다 — 파일만 바뀌면(등재 삭제·유령 추가 둘 다) task가
-    // UP-TO-DATE로 건너뛰어 그 test가 실제로는 재실행되지 않은 채 이전 결과가 그대로
-    // "통과"로 남는다(거짓 초록). 이 파일을 입력으로 선언해 변경 시 재실행을 강제한다.
-    inputs
-        .file(rootProject.file("config/quality/gate-tests.properties"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-
     // `SampleSelectionTest`(D-6G2c-19 (b))도 같은 자리다 — 용도 구분자의 정본은 스냅숏 스키마
     // 계약 문서이고 그 test 가 **문서에서 읽어** 코드와 맞댄다. 선언이 없으면 문서만 바꾼 편집이
     // task 를 UP-TO-DATE 로 건너뛰어 등식이 꺼진 채 초록이 된다(실측: 용도 토큰 변경 뒤 재실행 0).
