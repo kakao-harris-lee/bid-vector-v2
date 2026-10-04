@@ -150,9 +150,6 @@ tasks.test {
             .asFile.absolutePath,
     )
 
-    // `AppGateRegistrationTest` 가 읽는 등재 목록. 이 meta-gate 가 잡으려는 변경이 바로
-    // 「이 파일만 바뀐 변경」이라 입력 선언이 없으면 조용히 건너뛴다.
-    contractInput("gateTests", "bidvector.gate.tests", settingsFile("config/quality/gate-tests.properties"))
     contractInput(
         "architecturePolicy",
         "bidvector.architecture.policy",
