@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
  * 허용 집합은 전부 `architecture-policy.properties` 에서 온다.
  */
 class CollectionArchitectureRules(
-    private val collection: ReferenceCollection = ReferenceCollection.FULL,
+    private val collection: ReferenceCollection,
 ) {
     /**
      * 우회 1 — 수집 use case 는 원문 필드를 직접 읽지 않는다. ① [collectionPackage] 가 [procurementPackage]

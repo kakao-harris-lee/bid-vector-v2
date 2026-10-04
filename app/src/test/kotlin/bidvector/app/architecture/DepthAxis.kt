@@ -31,9 +31,6 @@ enum class DepthAxis(
     /** 원문 키 접근 타입을 참조하는 클래스 집합 — **참조자 축**(멤버 접근 축과 다르다). */
     RAW_ACCESS("raw-access"),
 
-    /** domain 모듈이 허용 목록 밖 좌표를 참조하는지 — T-A~T-C. */
-    DOMAIN_PURITY("domain-purity"),
-
     /** 프로세스를 자동 시작하는 Spring 러너 타입을 참조하는 클래스 집합. */
     RUNNER("runner"),
 

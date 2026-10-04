@@ -66,23 +66,6 @@ class CollectionDepthGateTest {
         sensitive shouldBe DEPTH_SENSITIVE_AXES
     }
 
-    /**
-     * domain 순수성이 `OWNER_ONLY` 인 이유를 값으로 고정한다 — 깊은 수집이 더하는 좌표는 둘뿐이고
-     * 둘 다 저자가 쓴 좌표가 아니다: `java.lang.Class` 는 `enum class` 마다 생기는
-     * `Enum.valueOf(Class, String)` 과 함수 참조가 남기는 **컴파일러 산출**이고,
-     * `java.time.chrono.ChronoLocalDate` 는 `LocalDate` 비교 메서드의 **상위 타입 시그니처**다
-     * (허용 패키지는 `java.time`·`java.time.temporal` 이라 `java.time.chrono` 는 밖이다).
-     */
-    @Test
-    fun `domain 순수성에서 깊은 수집이 더하는 좌표는 둘뿐이고 둘 다 저자가 쓴 것이 아니다`() {
-        val added =
-            observe(DepthAxis.DOMAIN_PURITY, ReferenceCollection.FULL) -
-                observe(DepthAxis.DOMAIN_PURITY, ReferenceCollection.OWNER_ONLY)
-
-        added.map { it.substringAfter("->") }.toSet() shouldBe
-            setOf("java.lang.Class", "java.time.chrono.ChronoLocalDate")
-    }
-
     /** 축마다의 관측 — 두 깊이에서 각각 부르려고 깊이를 인자로 받는다. */
     private fun observe(
         axis: DepthAxis,
@@ -95,7 +78,6 @@ class CollectionDepthGateTest {
             DepthAxis.USECASE -> referencers(listOf(policy.packageRoot), setOf(policy.collectionUseCaseType), depth)
             DepthAxis.KEY_HASH -> referencers(policy.keyHashRoots, setOf(policy.keyHashType), depth)
             DepthAxis.RAW_ACCESS -> referencers(policy.rawAccessRoots, policy.rawAccessTypes.toSet(), depth)
-            DepthAxis.DOMAIN_PURITY -> domainExternalReferences(depth)
             DepthAxis.RUNNER -> referencers(listOf(appRoot()), policy.runnerTypes.toSet(), depth)
             DepthAxis.SERVICE_KEY -> referencers(listOf(appRoot()), setOf(policy.serviceKeyType), depth)
             DepthAxis.LOGGING -> referencers(listOf(appRoot()), policy.loggingTypes.toSet(), depth)
@@ -140,39 +122,17 @@ class CollectionDepthGateTest {
         CollectionArchitectureRules(depth)
             .observedReferencers(production, roots, types, depth)
 
-    /**
-     * domain 모듈이 허용 목록(T-A 하위 · T-B 정확 패키지 · T-C 클래스) 밖 좌표를 참조하는 자리.
-     * 원시 타입은 패키지가 없어 점이 없는 이름으로 들어온다 — 클래스가 아니므로 뺀다.
-     */
-    private fun domainExternalReferences(depth: ReferenceCollection): Set<String> {
-        val allowedClasses = (policy.allowedApiClasses + policy.allowedRuntimeClasses).toSet()
-        val exactPackages = policy.allowedExactPackages.toSet()
-        val byClassPackages = policy.byClassPackages.toSet()
-        val domainRoots = policy.domainModules.map { "${policy.packageRoot}.$it" }
-
-        return production
-            .filter { item -> domainRoots.any { item.packageName == it || item.packageName.startsWith("$it.") } }
-            .flatMap { origin -> origin.referencedTypeNames(depth).map { origin.outermostClassName() to it } }
-            .filter { (_, type) -> type.contains('.') }
-            .filterNot { (_, type) -> policy.allowedSubtrees.any { type == it || type.startsWith("$it.") } }
-            .filterNot { (_, type) -> type.substringBeforeLast('.') in exactPackages }
-            .filterNot { (_, type) -> type.substringBeforeLast('.') in byClassPackages && type in allowedClasses }
-            .map { (holder, type) -> "$holder->$type" }
-            .toSet()
-    }
-
     private companion object {
         /**
          * 오늘 production 에서 두 깊이의 관측이 갈리는 축 — 착수 실측(`00_kickoff_measurement.md` D-1)의
-         * 수치가 근거다: 전송 쌍 +14 · `collection-procurement` +2 · `raw-access` +2 ·
-         * domain 순수성 +28. 나머지 일곱은 +0 이다.
+         * 수치가 근거다: 전송 쌍 +14 · `collection-procurement` +2 · `raw-access` +2.
+         * 나머지 일곱 축은 +0 이다.
          */
         val DEPTH_SENSITIVE_AXES =
             setOf(
                 DepthAxis.TRANSPORT,
                 DepthAxis.COLLECTION_PROCUREMENT,
                 DepthAxis.RAW_ACCESS,
-                DepthAxis.DOMAIN_PURITY,
             )
     }
 }
