@@ -4,15 +4,15 @@
 
 ## P — Python
 
-판정 대상 SHA **`fa7483cb`**.
+판정 대상 SHA **`ba6a33d2`**.
 
 | 조건 | 상태 |
 |---|---|
-| 구현 diff 가 커밋돼 base/head 고정 | 예 — base `ecdc9d9f` |
+| 구현 diff 가 커밋돼 base/head 고정 | 예 — base `ecdc9d9f`. P 전용 in_scope 경로 clean-tree **빈 출력** + 양성 대조 1회(비파괴 절삭, `checkout --` 금지) |
 | 관련 test/lint/type/architecture/contract 명령 통과 | 예 — `ml-engine` job 열 step 전부 exit 0 |
 | 구현 항목마다 변이 하나(D-6G2c-14) | 예 — commands.md 「항목과 잠금」 표, 변이 전부 기대대로 |
 | 게이트 술어를 바꾼 커밋 표시 | 예 — `49505a74`(D-6G2c-23) · **`a179e784`**(F-1 스윕 범위) |
-| 변경된 fixture·정책 version 의 근거 기록 | 해당 없음 — fixture 바이트·정책 파일 무변경. 공유 파일 하나(스키마 문서 §2 어휘 문장, 팀장 커밋 `ae1077e4`)가 함께 움직였고 rollback 공유 파일 목록 대상이다 |
+| 변경된 fixture·정책 version 의 근거 기록 | fixture 바이트·정책 파일 무변경. **판정 JSON 어휘가 둘에서 셋이 됐는데 `VERDICT_SCHEMA_VERSION` 은 그대로다** — 그 어휘는 스냅숏 형식 축 밖이고(D-6G2c-18·31) 읽는 소비자가 0 이라 version 을 멈춰 뒀다. 어휘 변경의 근거는 운영자 결정 A-2 이고, version 을 멈춘 결정은 `test_the_verdict_schema_version_is_held_across_the_vocabulary_change` 가 자리를 갖는다. 공유 파일 하나(스키마 문서 §2 어휘 문장, 팀장 커밋 `ae1077e4`)가 함께 움직였고 rollback 공유 파일 목록 대상이다 |
 | 알려진 제한과 되돌리는 방법 기록 | 예 — commands.md 「이탈과 알려진 제한」 · rollback 은 in_scope 경로 한정 복원 |
 | 자기 승인 금지 | 예 — 이 레인은 판정하지 않는다 |
 

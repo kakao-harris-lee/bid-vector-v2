@@ -8,7 +8,7 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 
 ## P — Python
 
-판정 대상 SHA **`fa7483cb`**. evidence 는 그 뒤에 온다(규격상 자기 post-state 를 담을 수 없다).
+판정 대상 SHA **`ba6a33d2`**. evidence 는 그 뒤에 온다(규격상 자기 post-state 를 담을 수 없다).
 
 ### 항목과 잠금
 
@@ -62,14 +62,19 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 | S-1b serving extras 분리 | 금지 패키지 다섯 모두 미설치 |
 | S-2 `ruff check .` · `ruff format --check .` | 위반 0 · 221 파일 포맷 일치 |
 | S-3 `mypy --strict src/ml_engine` | 97 파일 이슈 0 |
-| S-4 `lint-imports` | 계약 **8 kept, 0 broken**(앞 판 8, 금지 뿌리가 다섯 → 열셋) |
-| S-5 `pytest tests -q` | **1418 passed** (332s) |
+| S-4 `lint-imports` | 계약 **8 kept, 0 broken**. 금지 뿌리의 수는 **계약 파일의 목록 길이**이고 `test_the_sweep_set_equals_the_contract_list` 가 등식으로 잰다 — 여기 옮겨 적지 않는다(옮기면 목록이 자랄 때 이 줄만 낡는다) |
+| S-5 `pytest tests -q` | **1420 passed** (330s) |
 | S-6 설계 래칫 | 위반 0 |
 | S-7 재활용 출처 두 자리 + 양성 대조 | 위반 0 · 양성 대조가 실패함을 확인 |
 | S-9 Python 버전 두 자리 | exit 0 |
 | S-11 wheel 빌드 + 설치본 재수출 | 1 passed |
 
 무거운 step 은 `flock` 으로 K 레인의 Gradle 과 직렬화했다. 실수집 java 프로세스는 건드리지 않았다.
+
+**clean-tree 게이트** — P **전용** in_scope 경로를 개별 인자로 준 `git status --porcelain -- …` 가 **빈
+출력**이다(산출물이 전부 커밋됐다). 양성 대조 1회: test 파일 하나에 개행을 붙여 게이트가 `M` 을 내는 것을
+보고, 저장해 둔 바이트로 되돌려 다시 빈 출력임을 확인했다 — 비파괴 절삭이고 `checkout --` 를 쓰지 않았다.
+공유 evidence 파일은 K 레인과 함께 쓰므로 이 인자에 넣지 않는다(그 파일의 상태는 두 레인의 합이다).
 
 ### 새 public 표면 (2b)
 
@@ -114,6 +119,10 @@ golden 은 **스냅숏 입력**(`manifest.json`·`rows.jsonl`·`sample-list.tsv`
 
 ### 이탈과 알려진 제한
 
+- **실패한 실행은 빈 출력 디렉터리를 남긴다.** 거부 넷이 전부 job 앞이라 **거부된** 실행은 디렉터리를
+  만들지 않지만, job 이 `FAILED` 로 끝나면 자리가 만들어진 뒤라 빈 디렉터리가 남는다. 판정 바이트가 없을
+  뿐이고 같은 자리로 다시 부르면 `verdict.json` 이 없어 그대로 간다. 거부를 job **앞**에 두는 것이 목적이고
+  그 대가다 — 거동은 그대로 둔다.
 - **in_scope 정정 둘을 받았다**: 스키마 문서 §2 어휘 문장(D-6G2c-31, 팀장 편집) ·
   `adapters/snapshot_files.py`(D-6G2c-32). 둘 다 P 레인이 보고해 계약이 갱신된 뒤에 구현했다.
 - `urllib` ignore 가 걸린 `app/backtest_cli.py` 자리에서는 `import urllib.request` 한 줄이
