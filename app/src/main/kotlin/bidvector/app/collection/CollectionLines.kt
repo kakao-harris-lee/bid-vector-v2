@@ -85,9 +85,13 @@ internal fun underRunStateLock(
     body: () -> Unit,
 ) {
     when (runState.lock) {
-        RunStateLock.Busy -> skipRun(label, CollectionExitCode.ALREADY_RUNNING, log, termination)
+        RunStateLock.Busy -> {
+            skipRun(label, CollectionExitCode.ALREADY_RUNNING, log, termination)
+        }
 
-        RunStateLock.Unlockable -> skipRun(label, CollectionExitCode.UNLOCKABLE, log, termination)
+        RunStateLock.Unlockable -> {
+            skipRun(label, CollectionExitCode.UNLOCKABLE, log, termination)
+        }
 
         is RunStateLock.Held -> {
             try {

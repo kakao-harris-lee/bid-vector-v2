@@ -165,7 +165,7 @@ class RunStateDirectory(
     /** 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다. */
     private fun <T> heldOrRelease(body: () -> T): T =
         runCatching(body).getOrElse {
-            releaseLock()
+            lock.releaseIfHeld()
             throw it
         }
 
@@ -210,11 +210,7 @@ class RunStateDirectory(
      * **놓는 길은 이것 하나다**(D-6G2c-4) — [RunStateLock] 에는 공개된 놓기가 없다. 있던 동안
      * 밖에서 잠금만 풀고 원장은 쓰기 가능한 채로 둘 수 있었고, 그 상태에는 이름이 없었다.
      */
-    fun close() = releaseLock()
-
-    private fun releaseLock() {
-        (lock as? RunStateLock.Held)?.release()
-    }
+    fun close() = lock.releaseIfHeld()
 
     /** 추출이 읽는다 — 목록과 그 **바이트**(manifest 해시·곁파일 복사). */
     fun confirmedSampleList(): ConfirmedSampleList? = sampleListReader.read()
@@ -379,6 +375,14 @@ class RunStateDirectory(
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
         replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed, root)
     }
+}
+
+/**
+ * 놓을 수 있는 모양만 놓는다(D-6G2c-4) — 들지 못한 잠금을 놓는 것은 아무 일도 아니므로 호출부가
+ * 갈래를 나누지 않는다. 디렉터리 밖에서는 부를 수 없다(`internal` 멤버를 쓴다).
+ */
+private fun RunStateLock.releaseIfHeld() {
+    (this as? RunStateLock.Held)?.release()
 }
 
 /** 심링크를 푼 절대 경로 — 풀 수 없으면(경쟁 상태) 앞 규칙으로 물러선다. */

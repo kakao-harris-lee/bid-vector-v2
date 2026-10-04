@@ -132,12 +132,15 @@ class JdbcSnapshotSource(
             // **원인까지 공시한다**(D-6G2c-20) — 셋이 한 수에 접히면 0 이 아닌 값에서 무엇이 틀렸는지
             // 물을 자리가 없고, 셋의 처방이 다르다(적재 결함 · 원천 형태 · 코드 변경).
             when (val keyed = keyAndEndpointOf(rows)) {
-                is RawRowKey.Unusable -> unusable.merge(keyed.cause, 1, Int::plus)
+                is RawRowKey.Unusable -> {
+                    unusable.merge(keyed.cause, 1, Int::plus)
+                }
 
                 is RawRowKey.Keyed -> {
                     val hash = NoticeKeyHash.of(keyed.key.number, keyed.key.round.value)
                     if (hash in sample.keys) {
-                        collectWalkRow(byKey, keyed.key, keyed.endpoint, rows, conclusionFor(axisConclusions, hash, keyed))
+                        val conclusion = axisConclusions[hash.value]?.get(keyed.endpoint)
+                        collectWalkRow(byKey, keyed.key, keyed.endpoint, rows, conclusion)
                     } else {
                         outside += keyed.key
                     }
@@ -146,12 +149,6 @@ class JdbcSnapshotSource(
         }
         return ObservedRows(byKey, outside, UnusableRawRows(unusable))
     }
-
-    private fun conclusionFor(
-        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
-        hash: NoticeKeyHash,
-        keyed: RawRowKey.Keyed,
-    ): AxisConclusion? = axisConclusions[hash.value]?.get(keyed.endpoint)
 
     /**
      * **(공고, 축)마다 한 걷기의 행만 쓴다**(D-6G-68 · D-6G2d-3). 원문은 append-only 라(DB 트리거)
