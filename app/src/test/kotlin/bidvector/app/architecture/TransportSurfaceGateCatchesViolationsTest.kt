@@ -75,7 +75,7 @@ class TransportSurfaceGateCatchesViolationsTest {
         val reflection =
             CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
                 .moduleMustNotUseReflection(
-                    roots = policy.externalJudgedModules.map { "$violatingRoot.$it" },
+                    roots = policy.reflectionJudgedModules.map { "$violatingRoot.$it" },
                     reflectionPackages = policy.reflectionPackages.toSet(),
                     allowedTypePairs = policy.reflectionTypePairs.toSet(),
                     classType = policy.reflectionClassType,

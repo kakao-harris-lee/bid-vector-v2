@@ -248,6 +248,15 @@ class ArchitecturePolicy private constructor(
      * 패키지 · (클래스, 리플렉션 타입) 쌍 · `Class` 와 (클래스, 멤버) 쌍.
      */
     val reflectionRoots: List<String> get() = list("collection.reflection.roots")
+
+    /**
+     * D-6G2g-9 (운영자 결정 B-1 (가)) — 반사 판정 대상은 **production 전 층**이다(domain 포함).
+     * 바깥 참조 판정([externalJudgedModules])과 갈린 축이고, 그 갈림이 B-1 의 내용이다: 바깥 참조는
+     * 모듈마다 허용 패키지 집합을 들어야 해서 domain 을 넣으려면 키 여섯이 더 필요하지만, 반사는
+     * 쌍 등식이라 관측이 0 이면 등재도 0 이다(domain 여섯의 반사 참조는 실측 0).
+     */
+    val reflectionJudgedModules: List<String>
+        get() = domainModules + externalJudgedModules
     val reflectionPackages: List<String> get() = list("collection.reflection.packages")
     val reflectionTypePairs: List<Pair<String, String>> get() = pairs("collection.reflection.type-pairs")
     val reflectionClassType: String get() = value("collection.reflection.class-type")

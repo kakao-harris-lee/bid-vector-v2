@@ -130,13 +130,18 @@ class TransportSurfaceGateTest {
 
     /**
      * PR #58 C — 반사 게이트의 뿌리를 손 목록으로 두면 `layer.*` 가 늘어도 그 모듈이 반사 판정 밖에 남는다.
-     * 바깥 참조 판정 대상과 **같은 집합**임을 단언해 둘을 묶는다(키는 남겨 둔다 — 두 축이 갈라질 결정이
-     * 나면 이 단언이 그 결정을 드러낸다).
+     * 도출식과의 등식으로 묶는다.
+     *
+     * **D-6G2g-9 (B-1 (가)) — 그 도출식이 바깥 참조와 갈렸다.** 앞 판은 둘이 같은 집합이었고 KDoc 이
+     * 「두 축이 갈라질 결정이 나면 이 단언이 그 결정을 드러낸다」고 적어 두었는데, B-1 이 그 결정이다:
+     * 반사 뿌리는 **production 전 층**(domain 여섯 포함)이고 바깥 참조는 그대로다. 바깥 참조는 모듈마다
+     * 허용 패키지 집합을 들어야 해 domain 을 넣으려면 키 여섯이 더 필요하지만, 반사는 쌍 등식이라
+     * 관측이 0 이면 등재도 0 이다.
      */
     @Test
     fun `반사 게이트 뿌리는 layer 도출 판정 대상과 같다`() {
         policy.reflectionRoots.toSet() shouldBe
-            policy.externalJudgedModules.map { "${policy.packageRoot}.$it" }.toSet()
+            policy.reflectionJudgedModules.map { "${policy.packageRoot}.$it" }.toSet()
     }
 
     /**
