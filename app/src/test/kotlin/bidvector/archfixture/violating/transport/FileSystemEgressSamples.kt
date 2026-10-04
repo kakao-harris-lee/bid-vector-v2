@@ -21,3 +21,19 @@ class RogueFileSystemWrite {
 class RogueLegacyFileWrite {
     fun leak(name: String) = File(name).writeText("관문 밖으로 나간 바이트")
 }
+
+/**
+ * **세 번째 기제** — 타입 없이 **문자열 경로로** 파일을 여는 생성자(D-6G2g-20). 뿌리로도 `File`/`Path`
+ * 낱개로도 잡히지 않아 낱개 열거가 여섯에서 아홉으로 늘었다. 셋 다 같은 모양이라 각각 둔다.
+ */
+class RogueStringPathPrintWriter {
+    fun leak(name: String) = java.io.PrintWriter(name).use { it.println("관문 밖으로 나간 바이트") }
+}
+
+class RogueStringPathPrintStream {
+    fun leak(name: String) = java.io.PrintStream(name).use { it.println("관문 밖으로 나간 바이트") }
+}
+
+class RogueStringPathFormatter {
+    fun leak(name: String) = java.util.Formatter(name).use { it.format("%s", "관문 밖으로 나간 바이트") }
+}
