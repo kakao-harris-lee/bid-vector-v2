@@ -15,59 +15,62 @@ import java.util.zip.ZipFile
  * 기존 의존이라 좌표가 늘지 않는다.
  */
 internal fun ByteArray.testClassFacts(): TestClassFacts? {
-    var binaryName: String? = null
-    var superTypes: List<String> = emptyList()
-    var isAbstract = false
-    val classAnnotations = linkedSetOf<String>()
-    val methodAnnotations = linkedSetOf<String>()
+    val visitor = TestClassFactsVisitor()
+    ClassReader(this).accept(visitor, ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
+    return visitor.facts()
+}
 
-    ClassReader(this).accept(
-        object : ClassVisitor(Opcodes.ASM9) {
-            override fun visit(
-                version: Int,
-                access: Int,
-                name: String,
-                signature: String?,
-                superName: String?,
-                interfaces: Array<out String>?,
-            ) {
-                binaryName = name.replace('/', '.')
-                isAbstract = access and Opcodes.ACC_ABSTRACT != 0
-                superTypes =
-                    (listOfNotNull(superName) + interfaces.orEmpty())
-                        .map { it.replace('/', '.') }
-                        .filterNot { it == "java.lang.Object" }
-            }
+/** ASM 방문자 — 등식이 쓰는 사실만 담는다(이름·상위 사슬·추상 여부·클래스/메서드 애노테이션). */
+private class TestClassFactsVisitor : ClassVisitor(Opcodes.ASM9) {
+    private var binaryName: String? = null
+    private var superTypes: List<String> = emptyList()
+    private var isAbstract = false
+    private val classAnnotations = linkedSetOf<String>()
+    private val methodAnnotations = linkedSetOf<String>()
 
+    fun facts(): TestClassFacts? =
+        binaryName?.let { TestClassFacts(it, methodAnnotations, classAnnotations, superTypes, isAbstract) }
+
+    override fun visit(
+        version: Int,
+        access: Int,
+        name: String,
+        signature: String?,
+        superName: String?,
+        interfaces: Array<out String>?,
+    ) {
+        binaryName = name.replace('/', '.')
+        isAbstract = access and Opcodes.ACC_ABSTRACT != 0
+        superTypes =
+            (listOfNotNull(superName) + interfaces.orEmpty())
+                .map { it.replace('/', '.') }
+                .filterNot { it == "java.lang.Object" }
+    }
+
+    override fun visitAnnotation(
+        descriptor: String,
+        visible: Boolean,
+    ): AnnotationVisitor? {
+        classAnnotations += descriptor.annotationName()
+        return null
+    }
+
+    override fun visitMethod(
+        access: Int,
+        name: String,
+        descriptor: String,
+        signature: String?,
+        exceptions: Array<out String>?,
+    ): MethodVisitor =
+        object : MethodVisitor(Opcodes.ASM9) {
             override fun visitAnnotation(
-                descriptor: String,
+                annotationDescriptor: String,
                 visible: Boolean,
             ): AnnotationVisitor? {
-                classAnnotations += descriptor.annotationName()
+                methodAnnotations += annotationDescriptor.annotationName()
                 return null
             }
-
-            override fun visitMethod(
-                access: Int,
-                name: String,
-                descriptor: String,
-                signature: String?,
-                exceptions: Array<out String>?,
-            ): MethodVisitor =
-                object : MethodVisitor(Opcodes.ASM9) {
-                    override fun visitAnnotation(
-                        annotationDescriptor: String,
-                        visible: Boolean,
-                    ): AnnotationVisitor? {
-                        methodAnnotations += annotationDescriptor.annotationName()
-                        return null
-                    }
-                }
-        },
-        ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES,
-    )
-
-    return binaryName?.let { TestClassFacts(it, methodAnnotations, classAnnotations, superTypes, isAbstract) }
+        }
 }
 
 /** [roots] 아래 모든 `.class` 를 읽어 사실로 만든다. */
