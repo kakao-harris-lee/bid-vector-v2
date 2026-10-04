@@ -21,7 +21,7 @@
 | **위험(새 발견)** | `docker/compose.yaml` 에 top-level `name:` 이 없다 → 프로젝트 이름이 디렉터리 basename **`docker`** 로 고정되어 **main·모든 worktree 가 같은 compose 프로젝트·같은 볼륨(`docker_bidvector-pg-data`)을 공유**한다. S-25 의 `down -v` 가 다른 worktree 의 실행을 지울 수 있다(CI 일회성 VM 에선 무해, 로컬 리허설에선 실재). 금지 자산: `bid-vector-v2-dev`(55432, 6G 실수집 보유) · legacy `bid_vector_db`(5432) · easy-doc · kis_paper |
 | 넘어온 OPEN | 0(`OPEN-…-RETENTION` 넷은 전부 6B-3) |
 
-## 항목(초안 — 운영자 결정 뒤 확정)
+## 항목(r1 확정)
 
 | ID | 항목 | 수용 기준(실측) |
 |---|---|---|
@@ -36,7 +36,7 @@
 
 **방어하는 것**: 백업으로 돌아올 수 없는 상태(역할 미포함·권한 상실·시퀀스 되감김·Flyway 거부)가 **운영 반입 전에** 실측으로 드러난다 · 리허설이 자기 밖 자원(다른 compose 프로젝트·dev 컨테이너·legacy DB)에 닿지 않는다 · 자격 값이 백업 산출물·argv·로그에 실리지 않는다. **방어하지 않는 것**: 운영 DB 의 실제 백업 저장소·암호화·보존(6B-3 + M7) · PITR/WAL 아카이브(이 slice 는 논리 백업만) · Flyway undo(community 에 없음 — forward-fix 정책으로 대신).
 
-## in_scope (초안)
+## in_scope (r1 확정)
 
 - `tools/db-backup.sh` · `tools/db-restore.sh` · `tools/db-rehearsal.sh`(또는 하나로) · `.github/workflows/ci.yml`(**`container` job 의 step 추가만**) · `docs/runbook/m6-6b2-backup-restore.md` · `docker/compose.yaml`(**`name:` 한 줄만** — A-4 (a) 일 때) · `reports/evidence/m6/6b2/**` · `milestone-6.md`(착수·종결 문단만) · Kotlin test 를 만들면 그 파일 + `config/quality/gate-tests.properties`(등재 추가만).
 - **out_scope**: production 코드 전부 · `adapters/src/main/resources/db/migration/**`(새 V 파일 금지 — 리허설의 V18/V19 는 커밋하지 않는 임시 파일) · 이미지 위생 정책·Dockerfile · 보존 기간(6B-3) · 운영 DB.
@@ -49,13 +49,21 @@ CI `container` job 명령 그대로(S-21~S-25 + 새 S-23c) 로컬 재현 exit 0 
 
 in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`compose.yaml`·`gate-tests.properties`·`milestone-6.md`)은 커밋 해시 hunk — 목록은 실측 HEAD 에서 `git log` 로. 되돌려도 운영 영향 0(절차 자산뿐).
 
-## 운영자 승인 (착수 전 결정)
+## 운영자 승인 (2026-10-05 결정 완료 — 「추천대로 진행해」: A-1 (a) · A-2 (a) · A-3 (c) · A-4 (a) · A-5 (a); 정본은 D-6B2-1)
 
 - **A-1 백업 저장 위치** — (a) 리허설 안에서만 생성·폐기(저장소 밖 고정 자리는 M7 운영 반입에서) · (b) 저장소 밖 고정 자리 지금 지정(보존 기간이 6B-3 입력으로 신설) · (c) 미정. **추천 (a)**.
 - **A-2 CI 주기** — (a) `container` job 상시 step(매 PR — 리허설은 같은 postgres 컨테이너 안이라 분 단위) · (b) 별도 schedule 워크플로(전제 복제 — D-6C-10 ④ 와 상충) · (c) `workflow_dispatch`. **추천 (a)**.
 - **A-3 리허설 범위** — (a) 스키마·데이터만 · (b) + 시퀀스 · (c) **+ 역할·권한·소유자까지**(조사의 1순위 실측 축). **추천 (c)**.
 - **A-4 compose 프로젝트 이름** — (a) `compose.yaml` 에 `name: bidvector-v2`(6C 산출물 한 줄, in_scope 확장) · (b) 리허설 호출에만 `-p` · (c) 무변경. **추천 (a)** — 이 호스트에서 main·worktree 가 볼륨을 공유하는 실재 위험이고, 어제 팀장이 돌린 container job 도 그 프로젝트 이름으로 `down -v` 했다.
 - **A-5 Codex 심판** — (a) 안 탄다(마이그레이션 SQL 0, 파괴 대상은 자기 생성 DB) · (b) 탄다(비용 승인). **추천 (a)**.
+
+## 계약 갱신 r1 (2026-10-05, 팀장 — 운영자 결정)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-1** | **운영자 결정 A-1~A-5 = 추천대로**: A-1 (a) 백업은 리허설 안에서만 생성·폐기(운영 저장소·암호화·보존은 M7·6B-3) · A-2 (a) `container` job 상시 step S-23c(매 PR) · A-3 (c) 리허설 범위 = 스키마·데이터 + 시퀀스 + **역할·권한·소유자**(`pg_dumpall --roles-only` 또는 역할 정의 선복원) · A-4 (a) `docker/compose.yaml` 에 `name: bidvector-v2` 한 줄(in_scope 확장, 6C 산출물 — D-6C-2 문면에 사실 추가) · A-5 (a) Codex 안 탐 | 운영자 2026-10-05 |
+| **D-6B2-2** | **설계 검토(팀장, `_workspace/m6-6b2/01_design-review.md`) 요지**: (0) 경계 위 절 · (1) 등식은 **구성**(복원 뒤 Flyway `validate()` + 이력 행 + 표별 행 수·내용 해시 + 6B-1 축9 권한 행렬 — 손 목록 아님) · (2) 우회 다섯: 역할 복원 생략(권한 행렬 RED) · manifest 변조(해시 RED) · 시퀀스 되감김(IDENTITY 현재값 등식 RED) · 다른 프로젝트 자원 파괴(자기 생성 자원만 — 프로젝트 이름·컨테이너 이름을 리허설이 생성해 지목) · 비밀 argv(스캔 RED) · (2b) 새 public 표면 없음(스크립트·CI·문서) · (3) 과잉 후보 PITR/WAL 은 경계, 미달 후보 「되돌림 = 백업 복원」 오해는 runbook 이 forward-fix 정본을 못 박는다 | 설계 검토 |
+| **D-6B2-3** | **리허설 자원 격리(필수)**: 리허설은 **자기가 만든** 일회성 postgres 컨테이너/프로젝트만 쓰고 파괴한다 — compose 프로젝트 `bidvector-v2`(A-4) 안의 서비스를 지목하되, 파괴(`down -v`·TRUNCATE·DROP)는 **S-23c 가 만든 복원 대상 컨테이너**에만; host 포트 publish 없음(`-p` 금지); `bid-vector-v2-dev`·legacy·easy-doc·kis_paper 는 이름·포트·볼륨 어느 축으로도 닿지 않음을 스크립트가 사전 단언(존재하는 컨테이너 목록과 교차 0) | 조사 7 |
 
 ## 하네스 레인 변경
 
