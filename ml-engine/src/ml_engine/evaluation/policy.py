@@ -74,9 +74,10 @@ APPROVED_SEED_KEYS: Final[tuple[str, ...]] = (
 열거가 스키마 선언이다.
 
 `_KNOWN_KEYS` 의 seed 칸은 여전히 `_MAX_INDEXED_LIST_LENGTH` 로 만든다(여기서 만들지
-않는다): 그러면 색인 여섯째가 **미지 키**(`MALFORMED`)가 아니라 개수 위반
-(`INVALID_VALUE`)으로 떨어져 두 로더의 거부 사유가 같아지고, 그 상수가 살아 있어야
-숫자 리터럴 게이트의 역방향 등재 검사(허용 목록에 죽은 항목 금지)가 성립한다.
+않는다): 그러면 색인 여섯째가 **미지 키**(`MALFORMED`)가 아니라 **집합 불일치**
+(`INVALID_VALUE`)로 떨어져 두 로더의 거부 사유가 같아지고, 그 상수가 살아 있어야 숫자 리터럴
+게이트의 역방향 등재 검사(허용 목록에 죽은 항목 금지)가 성립한다. 거부가 개수가 아니라
+집합인 것은 M6/6G-2c 수정 r1(F-4) — `seed_key_mismatch` 를 참고.
 
 **자리는 하나다**(M6/6G-2c D-6G2c-21 ③). 앞 판은 이 열거가 로더마다 한 벌씩 있었고
 (`evaluation.policy` · `evaluation.backtest.policy`) 두 벌이 조용히 갈릴 수 있었다 —

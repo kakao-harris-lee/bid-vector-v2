@@ -121,9 +121,9 @@ def _arguments(argv: Sequence[str] | None) -> _Arguments:
 def _converted(directory: Path, raw: str) -> tuple[str, tuple[Path, ...]]:
     """절대 URI 로 바꾼 판 — 변환을 공시하고 디렉터리 하나를 낸다.
 
-    이 갈래는 **갈림이 없다**: 우리가 낸 URI 를 판독기가 문자 그대로 읽으면 그 경로가
-    `directory` 와 같다(퍼센트 인코딩이 생기는 이름은 우리가 다시 인코딩하므로, 판독기가
-    찾지 못하고 설 뿐 다른 디렉터리를 읽지는 않는다)."""
+    이 갈래는 **갈림이 없다**: 우리가 낸 URI 를 판독기가 같은 함수로 풀면 그 경로가
+    `directory` 와 같다(D-6G2c-22 로 두 해석이 수렴했다 — 앞 판은 판독기가 문자 그대로 읽어
+    퍼센트 인코딩이 생기는 이름에서 찾지 못하고 섰다)."""
     uri = directory.as_uri()
     print("snapshot-uri", uri, "converted-from", raw)
     return uri, (directory,)
