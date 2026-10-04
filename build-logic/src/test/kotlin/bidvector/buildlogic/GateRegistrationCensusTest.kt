@@ -87,6 +87,29 @@ class GateRegistrationCensusTest {
         assertEquals(emptySet<String>(), census.population)
     }
 
+    /**
+     * 메타 애노테이션에 순환이 있어도 **다른 경로로** 발견 어휘에 닿으면 발견된다(cr r1 G-5).
+     * 순환을 끊으며 낸 거짓이 캐시되면 그 노드는 영구히 거짓이 되고 방향이 **미탐**이다.
+     */
+    @Test
+    fun `순환에 낀 애노테이션도 다른 경로로 어휘에 닿으면 모집단이다`() {
+        val meta = mapOf("p.Cyclic" to setOf("p.Partner"), "p.Partner" to setOf("p.Cyclic", TEMPLATE))
+
+        val census = census(facts("p.CycleTest", methods = setOf("p.Cyclic")), meta = meta)
+
+        assertEquals(setOf("p.CycleTest"), census.population)
+    }
+
+    /** 어디에도 닿지 않는 순환은 거짓이고, 두 번 물어도 같은 답이다(캐시가 답을 바꾸지 않는다). */
+    @Test
+    fun `어휘에 닿지 않는 순환은 모집단을 늘리지 않는다 — 두 번 물어도 같다`() {
+        val meta = mapOf("p.Left" to setOf("p.Right"), "p.Right" to setOf("p.Left"))
+        val probe = facts("p.CycleTest", methods = setOf("p.Left"))
+
+        assertEquals(emptySet<String>(), census(probe, meta = meta).population)
+        assertEquals(emptySet<String>(), census(probe, meta = meta).population)
+    }
+
     // ---- 제외 — build 사실에서만 ----
 
     @Test

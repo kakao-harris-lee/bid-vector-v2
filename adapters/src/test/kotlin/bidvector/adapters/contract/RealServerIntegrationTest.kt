@@ -56,8 +56,8 @@ import java.util.UUID
  * `bidvector.realServer.enabled` system property 로 project property 를 그대로
  * 전달한다).
  *
- * **패키지가 `bidvector.adapters.contract`다(D-6C-8)** —
- * `bidvector.adapters.ml`에는 두지 않는다. 등재 등식(M6/6G-2g 부터 build-logic 의
+ * **이 test 가 등재되지 않는 이유**(M6/6G-2g 로 갱신 — 앞 판의 사유였던 「패키지를 가려 둔다」는
+ * 더 이상 서지 않는다: 등재 등식이 **모듈 전수**라 어느 패키지에 두든 같다). 등재 등식(build-logic 의
  * `gateRegistrationGate` — 모듈의 컴파일된 test 클래스 전수 ∖ 제외 == 등재)과
  * `gateExecutionGate`(등재된 클래스의 skip 0 요구)가 함께 걸려 있어, 환경 조건부로 항상
  * skip 될 수 있는 이 test 를 등재하면 두 게이트가 동시에 만족 불가능해진다. 지금 이 클래스는
@@ -65,10 +65,11 @@ import java.util.UUID
  * `@EnabledIfSystemProperty` 라는 **build 사실**이다
  * (등재하면 skip 위반, 빼면 등재 위반).
  * 같은 축의 기존 전례(`CrossLangSmokeTest` — 교차 언어 스모크, 컨테이너 없이 도는
- * Python 서버 대상)가 이미 이 패키지에 있다 — 이 test 는 그 컨테이너 판이다. 게이트
- * 술어(두 파일 모두 build-logic·기존 test)는 건드리지 않는다(`OPEN-6C-CONDITIONAL-
- * GATE-TEST` — `adapters.ml` 안에 조건부 test 가 실제로 필요해지면 그때 설계 검토로
- * 게이트 술어 개정을 받는다).
+ * Python 서버 대상)도 같은 제외 선언에 있다 — 이 test 는 그 컨테이너 판이다. 둘의 제외를
+ * 만드는 build 사실은 다르다(저쪽은 `adapters/build.gradle.kts` 의 `Test.filter`).
+ * 패키지는 이제 이 판단과 무관하므로 `OPEN-6C-CONDITIONAL-GATE-TEST` 의 「`adapters.ml` 안에
+ * 조건부 test 가 필요해지면」 조건도 사라졌다 — 조건부 test 는 어느 패키지에든 둘 수 있고,
+ * 필요한 것은 제외 선언과 그것을 만드는 build 사실 하나다.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledIfSystemProperty(named = "bidvector.realServer.enabled", matches = "true")

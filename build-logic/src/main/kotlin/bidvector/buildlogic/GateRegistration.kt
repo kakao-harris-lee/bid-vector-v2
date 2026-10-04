@@ -114,23 +114,10 @@ internal object GateRegistration {
         return { facts -> reaches(facts, mutableSetOf(facts.binaryName)) }
     }
 
-    /** 메타 애노테이션을 따라가 발견 어휘에 닿는지 — 순환은 방문 집합이 끊는다. */
     private fun discoveryPredicate(
         annotations: Set<String>,
         metaAnnotations: (String) -> Set<String>,
-    ): (String) -> Boolean {
-        val resolved = mutableMapOf<String, Boolean>()
-
-        fun reaches(
-            name: String,
-            seen: MutableSet<String>,
-        ): Boolean =
-            resolved.getOrPut(name) {
-                name in annotations || (seen.add(name) && metaAnnotations(name).any { reaches(it, seen) })
-            }
-
-        return { name -> reaches(name, mutableSetOf()) }
-    }
+    ): (String) -> Boolean = DiscoveryReach(annotations, metaAnnotations)
 
     /** 중첩 클래스를 바깥으로 접는다 — 등재는 최상위 이름이고, 중첩 test 는 바깥 suite 로 돈다. */
     private fun String.outermost(): String = substringBefore('$')
@@ -144,5 +131,29 @@ internal object GateRegistration {
     private fun String.matchesTestFilter(pattern: String): Boolean {
         val regex = Regex(pattern.split('*').joinToString(".*") { Regex.escape(it) })
         return regex.matches(this) || regex.matches(substringAfterLast('.'))
+    }
+}
+
+/**
+ * 메타 애노테이션을 따라가 발견 어휘에 닿는지 — 순환은 **진행 중 집합**이 끊는다.
+ *
+ * 순환을 끊으며 낸 `false` 를 캐시하면 안 된다(cr r1 G-5): 그 값은 「이 경로로는 못 닿는다」일 뿐인데
+ * 캐시는 「영원히 못 닿는다」로 읽힌다 — 같은 노드가 **다른 경로로** 발견 어휘에 닿아도 영구히 거짓이
+ * 되고, 방향이 **미탐**이다. 진행 중인 노드는 그 자리에서만 거짓을 돌려주고 캐시하지 않는다.
+ */
+private class DiscoveryReach(
+    private val annotations: Set<String>,
+    private val metaAnnotations: (String) -> Set<String>,
+) : (String) -> Boolean {
+    private val resolved = mutableMapOf<String, Boolean>()
+    private val inProgress = mutableSetOf<String>()
+
+    override fun invoke(name: String): Boolean = resolved[name] ?: if (inProgress.add(name)) compute(name) else false
+
+    private fun compute(name: String): Boolean {
+        val result = name in annotations || metaAnnotations(name).any(this)
+        inProgress -= name
+        resolved[name] = result
+        return result
     }
 }
