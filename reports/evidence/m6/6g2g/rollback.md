@@ -1,11 +1,10 @@
 # M6/6G-2g — rollback
 
-**실측 HEAD: `52cbca24`** (이 slice 의 마지막 산출물 커밋). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한
-**버릴 clone** 에서 실제로 실행한 결과다. 앞 라운드의 실측을 옮기지 않는다.
+**실측 HEAD: `7839edfb`** (팀장 종결 문단 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋; 이 slice 의 마지막 **산출물** 커밋은 `52cbca24`). 레인의 ①~⑥ 은 `52cbca24` 의 버릴 clone 에서, 종결 뒤 팀장의 ⓪~⑥ 재실측은 `7839edfb` 의 버릴 clone 에서 돌렸다(아래 「팀장 재실측」). 앞 라운드의 실측을 옮기지 않는다.
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 52cbca24..<판정 SHA> -- <아래 「되돌리는 경로」 전부>` 가 **빈 출력**이면 유효하다.
+> `git diff --name-only 7839edfb..<판정 SHA 또는 HEAD> -- <아래 「되돌리는 경로」 전부 + milestone-6.md>` 가 **빈 출력**이면 유효하다(판정 SHA `52cbca24` 는 실측 HEAD 의 조상 — 그 사이 커밋은 evidence·계약·종결 문단뿐).
 
 ## 되돌리는 것과 되돌리지 않는 것
 
@@ -77,10 +76,12 @@ git restore --source=31721008 --staged --worktree -- \
 ### 2단계 — `milestone-6.md` 는 커밋 해시 hunk 격리
 
 이 파일은 여러 slice 가 이어 쓰는 공유 파일이다. **base 로 복원하면 안 된다.** 이 range 에서
-이 파일을 만진 커밋은 하나뿐이다(`3e41dff5`, 팀장 레인의 6G-2g 착수 문단).
+이 파일을 만진 커밋은 **둘**이다(`3e41dff5` 착수 문단 · `7839edfb` 종결 문단, 둘 다 팀장 레인). 목록은 손으로 적지 않고 그 자리에서 낸다 — 뒤 커밋부터:
 
 ```
-git diff 3e41dff5~1..3e41dff5 -- milestone-6.md | git apply -R -
+for sha in $(git log --format=%h 31721008..7839edfb -- milestone-6.md); do
+  git diff "$sha~1..$sha" -- milestone-6.md | git apply -R --index --
+done
 ```
 
 **수동 해소 절차**(자동 적용이 conflict 를 내면): `milestone-6.md` 에서 **「6G-2g 착수 2026-10-04」로
@@ -136,3 +137,18 @@ fixture 셋과 test 넷이다).
 이 range 의 팀장 레인 커밋(`3e41dff5` 와 계약 갱신들)은 `milestone-6.md` 와
 `reports/evidence/m6/6g2g/scope.md` 만 만졌고, 둘 다 위 절차가 다룬다(2단계 · 되돌리지 않음).
 slice 산출물이 아니며 in_scope 안이고, 운영자 승인 아래 같은 range 에 있다.
+
+## 팀장 재실측 (버릴 clone, HEAD `7839edfb` — 종결 문단 커밋)
+
+종결 문단이 `milestone-6.md`(hunk 대상)를 움직였으므로 ⓪~⑥ 을 그 커밋에서 다시 돌렸다(6G-2b PR #58 리뷰가 세운 순서).
+
+| 단계 | 결과 |
+|---|---|
+| ⓪ 목록 등식 | 기계 산출 37(A 9 · D 8 · M 20) vs 문서 목록 37 — `comm -23`·`comm -13` 둘 다 빈 출력 |
+| ① 복원 | exit 0 |
+| ③b `milestone-6.md` hunk 둘(`7839edfb`·`3e41dff5`, `git log` 산출, 뒤부터) | 둘 다 exit 0 |
+| ③ 트리 | `git diff --name-status 31721008` 에 남는 것은 `reports/evidence/m6/6g2g/**` 뿐; 복원 37 + `milestone-6.md` 의 파일 SHA 가 base 와 같다(차이 0) |
+| ③c 보존 | 「6G-2g 착수·종결」 문단 0 · 「6G-2c 착수·종결」 문단 2 |
+| ④⑤⑥ | 되돌린 트리 `./gradlew --no-daemon check` exit **0**(349 task) · test **2,665**(= base `main` 의 수; HEAD 2,677 에서 이 slice 가 더한 12 가 빠졌다) · 게이트 전부 수행 |
+
+이 파일을 담은 커밋은 실측 뒤에 오므로 그 트리에 없다 — 참조형 누출 스캔 0 은 이 파일까지 돌렸고, 그 HEAD 의 `check` 정본은 CI 와 PR 조치 코멘트다.
