@@ -28,6 +28,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 from _backtest_support import (
     manifest_bytes,
     row_payload,
@@ -45,7 +46,10 @@ from ml_engine.evaluation.backtest.policy import (
     strategy_backtest_policy_checksum,
 )
 from ml_engine.evaluation.backtest.reasons import DivisionCoverage
-from ml_engine.evaluation.backtest.records import BacktestRequest
+from ml_engine.evaluation.backtest.records import (
+    BacktestRequest,
+    DivisionCoverageRecord,
+)
 from ml_engine.evaluation.backtest.report import canonical_verdict_bytes
 from ml_engine.evaluation.backtest.run import (
     _division_coverage,
@@ -323,6 +327,33 @@ def test_the_division_label_turns_over_at_the_window_row_floor() -> None:
     assert _division_coverage(required - 1, required) is DivisionCoverage.UNDERPOWERED
     assert _division_coverage(required, required) is DivisionCoverage.COVERED
     assert _division_coverage(required + 1, required) is DivisionCoverage.COVERED
+
+
+def test_the_coverage_record_refuses_a_label_its_row_count_contradicts() -> None:
+    """verifier r1 F-7 — 표지와 행 수가 어긋난 값은 **만들 수 없다**.
+
+    `ABSENT` 는 「행이 하나도 오지 않았다」는 뜻이다. `row_count=0` 인데 `COVERED` 인 값을 지을
+    수 있으면 판정문이 스스로 모순된 것을 실을 수 있다 — 지금 생성자는 판정 경로 하나뿐이지만
+    타입이 그것을 보증하지는 않았다(그 표면이 (2b) 에 올라 있다).
+
+    문턱 쪽은 여기서 보지 않는다(정책을 모른다) — 양성 대조로 하한 미만·이상 둘이 모두 서는지
+    함께 확인한다."""
+    required = _policy().verdict.min_window_rows
+    for row_count, status in (
+        (0, DivisionCoverage.ABSENT),
+        (1, DivisionCoverage.UNDERPOWERED),
+        (required, DivisionCoverage.COVERED),
+    ):
+        assert DivisionCoverageRecord("SERVICE", row_count, status).status is status
+
+    for row_count, status in (
+        (0, DivisionCoverage.COVERED),
+        (0, DivisionCoverage.UNDERPOWERED),
+        (1, DivisionCoverage.ABSENT),
+        (required, DivisionCoverage.ABSENT),
+    ):
+        with pytest.raises(ValueError, match="업무 대표 표지와 행 수"):
+            DivisionCoverageRecord("SERVICE", row_count, status)
 
 
 def test_the_verdict_discloses_all_three_division_labels() -> None:

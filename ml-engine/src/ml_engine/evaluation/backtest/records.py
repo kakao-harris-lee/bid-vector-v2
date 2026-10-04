@@ -98,6 +98,27 @@ class DivisionCoverageRecord:
     row_count: int
     status: DivisionCoverage
 
+    def __post_init__(self) -> None:
+        """표지와 행 수가 **서로를 설명하는가**(M6/6G-2c 수정 r1, verifier F-7).
+
+        `ABSENT` 는 「행이 하나도 오지 않았다」는 뜻이다. 그 둘이 어긋난 값(`row_count=0` 인데
+        `COVERED`)을 만들 수 있으면 판정문이 스스로 모순된 것을 실을 수 있다 — 지금 생성자는
+        판정 경로 하나뿐이지만 타입이 그것을 보증하지는 않았다.
+
+        문턱 쪽(`UNDERPOWERED` ↔ `COVERED`)은 **여기서 볼 수 없다**: 그 경계는 정책의 창당
+        표본 하한이고 이 값은 그것을 모른다. 그 축은 `run._division_coverage` 와 그 자리를
+        재는 test 가 진다 — 여기서 닫는 것은 정책을 몰라도 참이어야 하는 한 가지다.
+
+        음수 행 수는 이 등식이 잡지 못한다(`not -1` 이 거짓이라 `COVERED` 와 짝이 맞는 것처럼
+        보인다). 유일한 생성자가 `Counter` 로 세므로 도달하지 않고, 수를 적으면 숫자 리터럴
+        게이트의 허용 목록을 늘려야 해서 닫지 않았다 — 알려진 제한."""
+        absent = self.status is DivisionCoverage.ABSENT
+        if absent != (not self.row_count):
+            raise ValueError(
+                "업무 대표 표지와 행 수가 어긋납니다 — "
+                f"{self.division}: row_count={self.row_count}, status={self.status}"
+            )
+
 
 @dataclass(frozen=True)
 class SnapshotRecord:
