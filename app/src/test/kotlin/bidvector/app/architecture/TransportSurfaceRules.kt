@@ -306,14 +306,21 @@ class TransportSurfaceRules(
             .any { isSurfaceType(it.outermostName()) }
 
     /**
-     * 등재에 쓰는 이름 — 오버로드를 가른다(cr r1 G-3). 인자 구분자는 **`;`** 다: 정책 파일의 목록
-     * 구분자가 `,` 라 서술자 안에 쉼표를 두면 한 쌍이 여러 쌍으로 쪼개진다.
+     * 등재에 쓰는 이름 — **소유 클래스의 이진 이름 + 멤버 이름 + 서술자**다.
+     *
+     * 오버로드를 가르고(cr r1 G-3) **같은 보유자 안의 다른 중첩·합성 클래스도 가른다**(vr r2 R2-H-2).
+     * 앞 판은 멤버 축도 바깥 이름으로 접어, 이미 등재된 범용 키(코루틴 본문의 `invokeSuspend` ·
+     * 익명 객체의 `run()` · `close()`·`read()`)가 있는 보유자에 **새 송신 본문을 더해도 등재가 움직이지
+     * 않았다**. 접기는 **보유자 축**(누가 쥐는가)에만 쓴다 — 멤버 축은 주입 축과 같은 동일성 축이다.
+     *
+     * 인자 구분자는 **`;`** 다: 정책 파일의 목록 구분자가 `,` 라 서술자 안에 쉼표를 두면 한 쌍이 여러
+     * 쌍으로 쪼개진다.
      */
     private fun JavaCodeUnit.signatureKey(): String =
-        "$name(${rawParameterTypes.joinToString(";", transform = JavaClass::getName)})"
+        "${owner.fullName}#$name(${rawParameterTypes.joinToString(";", transform = JavaClass::getName)})"
 
-    /** 그룹 안에서 호출 대상을 찾는 열쇠 — 소유자까지 담아 같은 이름의 다른 클래스를 가른다. */
-    private fun JavaCodeUnit.callKey(): String = "${owner.fullName}#${signatureKey()}"
+    /** 그룹 안에서 호출 대상을 찾는 열쇠 — 등재 키와 같은 모양이다. */
+    private fun JavaCodeUnit.callKey(): String = signatureKey()
 
     private fun JavaCall<*>.callKey(): String =
         "${targetOwner.fullName}#${target.name}(${target.rawParameterTypes.joinToString(
