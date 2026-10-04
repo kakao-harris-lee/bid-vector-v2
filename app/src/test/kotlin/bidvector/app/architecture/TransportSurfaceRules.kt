@@ -1,5 +1,6 @@
 package bidvector.app.architecture
 
+import com.tngtech.archunit.core.domain.JavaCall
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.domain.JavaCodeUnit
@@ -183,12 +184,17 @@ class TransportSurfaceRules(
      * 반사로 부르는 길이 (클래스, 타입) 해상도 밖에 남는다(`OPEN-6G2B-HOLDER-INTERNAL-SURFACE`,
      * 6G-2c vr I-1 의 `release$bid_vector_adapters` 자리).
      *
-     * 그래서 보유자의 **비-private 멤버 전수** 가운데 「시그니처는 전송 타입을 말하지 않는데 몸이 전송
-     * 멤버를 부르는」 것을 세어 등재와 양방향으로 맞댄다. 그런 멤버가 하나 생기면 등재가 함께 움직여야
-     * 초록이다.
+     * 술어는 **도달 추적**이다(vr r1 H-1). 앞 판은 「그 멤버의 몸이 전송 멤버를 직접 부르는가」만 봐서
+     * **본문 모양**에 걸려 있었다 — private 헬퍼로 한 번 감싸거나 람다 안에서 부르면 초록이었고,
+     * production 이 이미 그 모양이었다(짝인 두 배선 가운데 하나만 등재되는 식). 지금은 비-private
+     * 멤버에서 같은 **보유자 그룹**(접은 이름이 같은 클래스 전부 — 중첩·합성 람다 클래스 포함)의
+     * **private·합성 멤버**를 따라가 전송 멤버 호출에 닿는지를 본다. 호출 그래프가 그 그룹 안에서 닫힌다.
      *
-     * **깊이는 1 이다**(`memberEffectGate` 의 「서명 ∪ depth-1 본문」 관례). 같은 클래스의 다른 멤버를
-     * 거쳐 부르는 두 걸음은 이 층이 재지 못한다 — 경계 문장에 등재한다.
+     * 비-public 멤버만 따라간다. 비-private 멤버를 거쳐 가는 길은 **그 멤버 자신이** 이 집합에 들어오므로
+     * 등재가 그 자리를 든다 — 두 번 세지 않는다.
+     *
+     * 쌍은 (클래스, **이름 + 서술자**)다(cr r1 G-3). 이름만 담으면 등재된 이름의 오버로드를 더해
+     * 전송하는 길이 등재를 움직이지 않는다.
      */
     fun observedMemberSurface(
         classes: JavaClasses,
@@ -196,40 +202,108 @@ class TransportSurfaceRules(
     ): Set<Pair<String, String>> =
         classes
             .filter { it.outermostClassName() in holders }
-            .flatMap(::hiddenSendMembers)
+            .groupBy { it.outermostClassName() }
+            .flatMap { (holder, group) -> hiddenSendMembers(holder, group) }
             .toSet()
 
-    /** [roots] 아래 등재 보유자가 등재 밖 숨은 송신 멤버를 두지 않는다. */
+    /**
+     * [roots] 아래 등재 보유자가 등재 밖 숨은 송신 멤버를 두지 않는다.
+     *
+     * 관측을 **먼저 한 번** 내고 규칙이 그것을 읽는다 — 도달 추적이 보유자 **그룹** 단위라
+     * 클래스 하나씩 보는 `ArchCondition` 안에서는 합성 람다 클래스를 따라갈 수 없다.
+     */
     fun memberSurfaceRules(
+        classes: JavaClasses,
         roots: List<String>,
         holders: Set<String>,
         registeredMembers: Set<Pair<String, String>>,
-    ): List<ArchRule> =
-        listOf(
+    ): List<ArchRule> {
+        val observed = observedMemberSurface(classes, holders).groupBy({ it.first }, { it.second })
+        return listOf(
             noClasses()
                 .that()
                 .resideInAnyPackage(*roots.map { "$it.." }.toTypedArray())
-                .should(holdHiddenSendMemberOutside(holders, registeredMembers))
+                .should(holdHiddenSendMemberOutside(observed, registeredMembers))
                 .because("D-6G2g-9 — 등재 보유자의 (클래스, 멤버) 쌍은 등재된 쌍뿐이다(3층)"),
         )
+    }
 
-    private fun hiddenSendMembers(origin: JavaClass): List<Pair<String, String>> =
-        (origin.methods + origin.constructors)
-            .filterNot { JavaModifier.PRIVATE in it.modifiers }
+    private fun hiddenSendMembers(
+        holder: String,
+        group: List<JavaClass>,
+    ): List<Pair<String, String>> {
+        val members = group.flatMap { it.methods + it.constructors }
+        val calledInGroup = members.flatMap { it.callsFromSelf }.mapTo(mutableSetOf()) { it.callKey() }
+        val reachesTransport = transportReachability(members)
+        return members
+            .filter { isEntryPoint(it, calledInGroup) }
             .filterNot(::signatureNamesSurface)
-            .filter(::bodyCallsSurface)
-            .map { origin.outermostClassName() to it.name }
+            .filter(reachesTransport)
+            .map { holder to it.signatureKey() }
+    }
+
+    /**
+     * 등재 대상은 **진입점**이다 — 비-private 멤버, 그리고 **그룹 안의 어떤 호출도 가리키지 않는 숨은
+     * 멤버**. 후자가 필요한 이유는 람다다(vr r1 H-1 의 셋째 변이): Kotlin 이 SAM 변환을
+     * `invokedynamic` 으로 내면 람다 본문은 같은 클래스의 private·합성 메서드가 되는데 **그것을 가리키는
+     * 호출 간선이 바이트코드 분석에 없다**(부트스트랩 인자에만 있다). 호출자가 없으면 그 멤버가 스스로
+     * 진입점이고, 반사로 이름을 불러 쓸 수 있으므로 등재가 맞다. 이름 규약(`…$lambda$0`)으로 가르지
+     * 않는다 — 그것은 스타일 하나로 열리는 문자열 술어다.
+     */
+    private fun isEntryPoint(
+        member: JavaCodeUnit,
+        calledInGroup: Set<String>,
+    ): Boolean {
+        val hidden = JavaModifier.PRIVATE in member.modifiers || JavaModifier.SYNTHETIC in member.modifiers
+        return !hidden || member.callKey() !in calledInGroup
+    }
+
+    /**
+     * 그룹 안의 **비-public 멤버**(private·합성)를 따라가 전송 호출에 닿는지. 순환은 방문 집합이 끊는다.
+     */
+    private fun transportReachability(members: List<JavaCodeUnit>): (JavaCodeUnit) -> Boolean {
+        val byKey = members.associateBy { it.callKey() }
+        val hidden = { unit: JavaCodeUnit ->
+            JavaModifier.PRIVATE in unit.modifiers ||
+                JavaModifier.SYNTHETIC in unit.modifiers
+        }
+
+        fun reaches(
+            unit: JavaCodeUnit,
+            seen: MutableSet<String>,
+        ): Boolean =
+            unit.accessesFromSelf.any { isSurfaceType(it.targetOwner.outermostClassName()) } ||
+                unit.callsFromSelf.any { call ->
+                    val next = byKey[call.callKey()]
+                    next != null && hidden(next) && seen.add(next.callKey()) && reaches(next, seen)
+                }
+
+        return { unit -> reaches(unit, mutableSetOf(unit.callKey())) }
+    }
 
     /** 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다. */
     private fun signatureNamesSurface(member: JavaCodeUnit): Boolean =
         (member.rawParameterTypes.map(JavaClass::getName) + member.rawReturnType.name)
             .any { isSurfaceType(it.outermostName()) }
 
-    private fun bodyCallsSurface(member: JavaCodeUnit): Boolean =
-        member.accessesFromSelf.any { isSurfaceType(it.targetOwner.outermostClassName()) }
+    /**
+     * 등재에 쓰는 이름 — 오버로드를 가른다(cr r1 G-3). 인자 구분자는 **`;`** 다: 정책 파일의 목록
+     * 구분자가 `,` 라 서술자 안에 쉼표를 두면 한 쌍이 여러 쌍으로 쪼개진다.
+     */
+    private fun JavaCodeUnit.signatureKey(): String =
+        "$name(${rawParameterTypes.joinToString(";", transform = JavaClass::getName)})"
+
+    /** 그룹 안에서 호출 대상을 찾는 열쇠 — 소유자까지 담아 같은 이름의 다른 클래스를 가른다. */
+    private fun JavaCodeUnit.callKey(): String = "${owner.fullName}#${signatureKey()}"
+
+    private fun JavaCall<*>.callKey(): String =
+        "${targetOwner.fullName}#${target.name}(${target.rawParameterTypes.joinToString(
+            ";",
+            transform = JavaClass::getName,
+        )})"
 
     private fun holdHiddenSendMemberOutside(
-        holders: Set<String>,
+        observed: Map<String, List<String>>,
         registered: Set<Pair<String, String>>,
     ): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("등재 밖 숨은 송신 멤버를 둔다 (등재 쌍 ${registered.size})") {
@@ -237,10 +311,13 @@ class TransportSurfaceRules(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                if (item.outermostClassName() !in holders) return
-                hiddenSendMembers(item)
-                    .filterNot { it in registered }
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${it.first}#${it.second}")) }
+                // 그룹은 바깥 이름 하나로 신고한다 — 중첩·합성 클래스마다 같은 쌍을 되풀이하지 않는다.
+                val holder = item.outermostClassName()
+                if (item.fullName != holder) return
+                observed[holder]
+                    .orEmpty()
+                    .filterNot { holder to it in registered }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "$holder#$it")) }
             }
         }
 

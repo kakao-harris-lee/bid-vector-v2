@@ -140,8 +140,12 @@ class TransportSurfaceGateTest {
     @Test
     fun `등재 보유자는 등재 밖 숨은 송신 멤버를 두지 않는다 — 3층`() {
         rules
-            .memberSurfaceRules(policy.transportRoots, policy.transportHolders, policy.transportMemberSurface)
-            .forEach { it.check(production) }
+            .memberSurfaceRules(
+                production,
+                policy.transportRoots,
+                policy.transportHolders,
+                policy.transportMemberSurface,
+            ).forEach { it.check(production) }
     }
 
     /**
