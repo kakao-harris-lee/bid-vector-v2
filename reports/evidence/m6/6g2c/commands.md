@@ -8,69 +8,51 @@ base `ecdc9d9f` · 브랜치 `m6-6g2c/2026-10-04` · 레인 둘(K: Kotlin · P: 
 
 ## P — Python
 
-판정 대상 SHA **`f3a47f05`**(수정 라운드 1 의 마지막 P 커밋). 라운드 1 앞의 판정 대상은
-`20f1e7ba` 였다. 아래 acceptance 는 `f3a47f05` 트리에서 잰 값이고, 라운드 1 에서 **새로 만든
-파일은 없다**(고친 파일 열둘).
+판정 대상 SHA **`fa7483cb`**. evidence 는 그 뒤에 온다(규격상 자기 post-state 를 담을 수 없다).
 
-### 항목별 처분과 변이
+### 항목과 잠금
+
+항목마다 **처분 · 그 자리를 여는 변이 · 변이의 결과**를 적는다. 변이는 전부 적용(`git diff --numstat`
+1행 이상)과 복원(0행)을 확인했다.
 
 | 항목 | 처분 | 변이 | 결과 |
 |---|---|---|---|
-| **D-6G2c-17** 업무 대표 표지 셋 | 구현 | 앞 판 두 값으로 되돌림 | RED(evaluation 4건) |
-| | | 행 0 이 `UNDERPOWERED` 로 남음 | RED(3건) |
-| | | 하한을 상수로 | RED(3건 + 쓰임 명단 등식 + 자리 probe) |
-| **D-6G2c-12** manifest 키 세 자리 등식 | 구현 | 생성기 하나에서 `incomplete_axis` 칸 제거 | RED, 문면이 그 생성기를 이름으로 지목 |
-| **D-6G2c-21 ③** seed 키 열거 한 자리 | 구현 | 둘째 열거 되살림 + 길이 비교로 되돌림 | RED(자리 수 등식 · 거부 문면 이름 등식) |
-| **D-6G2c-21 ④** 기존 판정 덮어쓰기 거부 | 구현 | 존재 검사 제거 | RED(사유 전수 · 바이트 불변 둘) |
-| **D-6G2c-22** 판독기 URI 디코드 | 구현 | 디코딩 제거 | RED — CLI 끝까지 도는 판이 `SNAPSHOT_UNREADABLE NOT_FOUND` 로 선다 |
-| | | 같은 변이를 판독기 단위에서 | RED 둘(디코딩을 재는 둘) · 음성 대조 셋은 초록 |
-| | (음성 대조) | 없는 경로 · 파일 셋 결손 · 파일을 가리킴 · 다른 scheme | **거부 그대로** — `NOT_FOUND` · `NOT_FOUND` · `NOT_A_DIRECTORY` · `UNSUPPORTED_SCHEME` |
-| **D-6G2c-23** app 층 HTTP 금지(게이트 술어) | 구현 | `app/pipeline.py` 에 `import urllib.request` 한 줄 | `lint-imports` BROKEN **그리고** AST 스윕 RED |
-| **D-6G2c-24** 파생 지역 변수 한 단계 | 구현 | 파생 변수의 소비자를 한 단계 더 멀리(거동 동일) | RED(삼중 둘 소실) |
-| | | 공시가 seed 0 만 따르고 넷은 출하값 고정 | RED(쌍 전수에서 seed 1~4; seed 0 은 초록) |
+| **D-6G2c-12** manifest 키 세 자리 등식 | 구현 | 생성기 하나에서 `incomplete_axis` 칸 제거 | RED — 문면이 그 생성기를 이름으로 지목 |
+| **D-6G2c-17** 업무 대표 표지 셋 | 구현 | 두 값으로 되돌림 / 행 0 이 `UNDERPOWERED` / 하한을 상수로 | RED 넷 · RED 셋 · RED 셋 + 명단 등식 + 자리 probe |
+| | | 표지·행 수 불변식 제거 | RED — 어긋난 네 쌍을 거부하는 test |
+| **D-6G2c-21 ③** seed 키 열거 한 자리 | 구현 | 둘째 열거 되살림 + 길이 비교 | RED — 자리 수 등식 · 거부 문면 이름 등식 |
+| | | 술어를 길이 비교로(집합 등식 축) | RED 하나, 나머지 351 초록 |
+| | | 열거를 같은 basename 의 다른 파일로 이동 | RED(앞 판은 초록 — basename 비교였다) |
+| **D-6G2c-21 ④** 기존 판정 덮어쓰기 거부 | 구현 | 존재 검사 제거 | RED — 사유 전수 · 바이트 불변 |
+| | | 쓰기를 `"xb"` 에서 `write_bytes` 로 | RED — 끊긴 링크 판(순차 재실행은 사전 `exists()` 가 잡아 초록) |
+| | | 출력 자리 만들기를 job 뒤로 | RED — 부모-파일 판 · 어휘 전수 |
+| **D-6G2c-22** 판독기 URI 디코드 | 구현 | 디코딩 제거(CLI 끝까지 / 판독기 단위) | RED(`SNAPSHOT_UNREADABLE NOT_FOUND`) / RED 둘 |
+| | | 닫힌 사유(`INVALID_PATH`·`INVALID_SNAPSHOT_URI`) 제거 | RED 둘 |
+| | (음성 대조) | 없는 경로 · 파일 셋 결손 · 파일을 가리킴 · 다른 scheme | **거부 그대로** — 디코딩이 판독을 느슨하게 하지 않았다 |
+| **D-6G2c-23** app 층 HTTP 금지(게이트 술어) | 구현 | `app/**` 모듈에 `import urllib.request` | `lint-imports` BROKEN **그리고** AST 스윕 RED |
+| | | 예외를 받은 app 밖 모듈 **셋 각각**에 같은 한 줄 | 스윕 RED 셋(`lint-imports` 는 뿌리 간선 예외라 KEPT — 그래서 스윕이 진다) |
+| | | `imaplib`·`poplib`·`nntplib` | BROKEN + RED |
+| | (경계 실측) | `asyncio` · 동적 import | 둘 다 초록 — 아래 알려진 제한 |
+| **D-6G2c-24** 파생 지역 변수 한 단계 | 구현 | 파생 변수의 소비자를 한 단계 더 멀리(거동 동일) | RED — 삼중 둘 소실 |
+| | | 공시가 seed 0 만 따르고 넷은 출하값 고정 | RED — 쌍 전수에서 seed 1~4(seed 0 은 초록) |
+| | | 직접 쓰임을 `DERIVED` 로 거짓 등재 | RED — 파생 측정 등식 + 앵커 동반 등식 |
+| | | `ast.Tuple` 을 컨테이너에서 제거 | RED(명단은 무변경 — 합성 조각으로 잰다) |
 
-**게이트 술어를 바꾼 커밋**: `49505a74`(D-6G2c-23 — import 계약 + AST 스윕). verifier 표적 재검증 대상.
+**게이트 술어를 바꾼 커밋 둘**: `49505a74`(import 계약 + AST 스윕) · `a179e784`(스윕 범위를 계약의
+예외 목록에서 유도). 둘 다 표적 재검증 대상이다.
 
-### 착수 실측 — D-6G2c-24 의 「넘치는가」 판정
+### D-6G2c-24 의 「넘치는가」 판정
 
-파생 추적을 켜자 삼중이 **41** 늘었다(87 → 128). 그중 **열둘이 거짓 양성**이었다: 상수 첨자 좁히기가
-파생 쪽에 없어 `stability_seeds[0]` 를 품은 식이 seed 다섯 전부를 나르는 것으로 읽혔고, 쓰이지 않은
-seed 넷이 소비자 셋마다 올라왔다. 직접 훑기와 같은 규칙으로 좁혀 **29**(128 → 116)로 줄였고, 29 는
-전부 실제 쓰임이다
-(창 폭이 창 경계를 만드는 자리 · embargo 가 이력을 끊는 자리 · 업무별 호출 수가 예산 비교로 가는
-자리 · 유의수준이 필요 쌍 수 공시로 가는 자리 등). 그래서 **등재로 되돌리지 않았다**.
+파생 추적은 삼중을 **41** 늘린다(87 → 128). 그중 **열둘이 거짓 양성**이었다: 상수 첨자 좁히기가 파생
+쪽에 없어 `stability_seeds[0]` 를 품은 식이 seed 다섯 전부를 나르는 것으로 읽혔고, 쓰이지 않은 seed
+넷이 소비자 셋마다 올라왔다. 직접 훑기와 같은 규칙으로 좁혀 **29**(128 → 116)로 줄였고, 29 는 전부
+실제 쓰임이다(창 폭이 창 경계를 만드는 자리 · embargo 가 이력을 끊는 자리 · 업무별 호출 수가 예산
+비교로 가는 자리 · 유의수준이 필요 쌍 수 공시로 가는 자리 등). 그래서 **등재로 되돌리지 않았다**.
+수는 명단 덤프 네 벌의 줄 수로 센다.
 
-29 전부 `DERIVED` 로 등재하고, 그 어휘는 같은 (키, 자리)에 `PROBE:`/`CLASS` 가 함께 있어야만 쓸 수
-있다는 새 등식을 붙였다 — 동반 없이 등재하면 RED 다. 수정 라운드 1 에서 `DERIVED` 자체도 등식이 됐다
-(아래 P-5).
-
-**앞 판의 「39」는 틀린 수였다**(verifier F-6) — 41 − 12 = 29 다. 명단 덤프 네 벌의 줄 수로 다시 셌다.
-
-### 수정 라운드 1 (D-6G2c-35) — verifier r1 `not-ready` + code-review r1
-
-| finding | sev | 처분 | 변이 | 결과 |
-|---|---|---|---|---|
-| **F-1 = P-4** 예외를 받은 모듈이 스윕 밖 | high(게이트) | 구현 | 셋 각각에 `import urllib.request` | **RED 셋**(`lint-imports` 는 뿌리 간선 예외라 KEPT — 그래서 스윕이 진다) |
-| **F-2 = P-3** 목록 밖 네트워크 모듈·동적 import | medium | 구현(열거) + 등재(경계) | `imaplib`·`poplib`·`nntplib` | BROKEN + RED 셋 |
-| | | | `asyncio` · 동적 import(경계 밖) | 둘 다 초록 — **경계의 실측** |
-| **F-3 = P-2** 검사-후-쓰기 창 | medium | 구현(`"xb"`) | `xb` 를 `write_bytes` 로 되돌림 | 끊긴 링크 test RED(두 기동 test 는 사전 `exists()` 가 이미 잡아 초록) |
-| **F-4** 길이 비교로 되돌려도 초록 | medium | 구현(test) | `present == approved` → 길이 비교 | 새 test RED, 나머지 351 초록 |
-| **P-5** `DERIVED` 가 저자 선언 | medium | 구현 | 직접 쓰임 하나를 `DERIVED` 로 거짓 등재 | 새 등식 RED + 앵커 동반 등식 RED |
-| **F-5** `%00` 에서 예외 누출 | low | 구현(두 층) | 각 층의 닫힌 사유 제거 | 판독기 test RED · CLI 전수 사유 RED |
-| **F-7** 표지·행 수 정합 미검사 | low | 구현 | 불변식 제거 | 어긋난 네 쌍 test RED |
-| **P-7** basename 으로 센 「한 자리」 | low | 구현 | 같은 basename 의 다른 파일로 이동 | 앞 판 **초록** → 이 판 **RED** |
-| **P-8** `ast.Tuple` 누락 | low | 구현 | `ast.Tuple` 제거 | RED(명단은 무변경 — 합성 조각으로 잰다) |
-| **P-9** 출력 자리가 파일 | low | 구현 | 사전 거부 제거 | 전수 사유 그 파라미터 RED |
-| **P-13** 음성 대조 입자 | low | 구현 | — | `detail` 끝으로 두 검사를 가른다 |
-| **F-6 · P-6 · P-10** 문면 | low | 구현 | — | 수치 정정(39 → 41) · 제외 축 셋 · 낡은 docstring 셋 |
-| **P-11** 문서 창이 문자 200 | low | **등재** | — | 이 slice 가 만든 test 가 아니다. 여백은 실측돼 있다(119자) |
-| **P-12** `COVERED` 의 뜻 | info | **등재** | — | 아래 알려진 제한 |
-
-새로 **코드로 막지 않기로** 한 것(F-2 경계, 알려진 제한): 동적 import(`importlib` · `__import__`)와
-목록 밖 네트워크 경로(`asyncio` · `multiprocessing.connection` · `subprocess`·`os` · `webbrowser` ·
-`wsgiref`). 두 층이 보는 것은 **import 문**이고, 그 층을 넘어서려면 실행 시점 관측이 필요하다 —
-그것은 serving 순수성 게이트가 지는 다른 층이다. 이 문장은 pyproject 주석과 test 모듈 docstring
-두 자리에 있다. **scope.md 위협 모델 「방어하지 않는 것」 한 줄은 팀장 소관이라 넣지 않았다.**
+29 전부 `DERIVED` 로 등재한다. 그 어휘는 두 등식이 받친다 — 같은 (키, 자리)에 `PROBE:`/`CLASS` 가
+함께 있어야 하고(동반 없이 등재하면 RED), 명단이 재는 파생 여부와 **집합이 같아야 한다**(직접 쓰임을
+그 이름으로 숨길 수 없다).
 
 ### acceptance — `ml-engine` job 명령 그대로, 전부 exit 0
 
@@ -81,7 +63,7 @@ seed 넷이 소비자 셋마다 올라왔다. 직접 훑기와 같은 규칙으�
 | S-2 `ruff check .` · `ruff format --check .` | 위반 0 · 221 파일 포맷 일치 |
 | S-3 `mypy --strict src/ml_engine` | 97 파일 이슈 0 |
 | S-4 `lint-imports` | 계약 **8 kept, 0 broken**(앞 판 8, 금지 뿌리가 다섯 → 열셋) |
-| S-5 `pytest tests -q` | **1417 passed** (331s) |
+| S-5 `pytest tests -q` | **1418 passed** (332s) |
 | S-6 설계 래칫 | 위반 0 |
 | S-7 재활용 출처 두 자리 + 양성 대조 | 위반 0 · 양성 대조가 실패함을 확인 |
 | S-9 Python 버전 두 자리 | exit 0 |
@@ -94,11 +76,11 @@ seed 넷이 소비자 셋마다 올라왔다. 직접 훑기와 같은 규칙으�
 | 표면 | 변화 | 밖에 허락하는 것 |
 |---|---|---|
 | `DivisionCoverage.ABSENT` | enum 값 하나 추가 | 읽기만 — 판정 JSON 어휘 |
-| `records.DivisionCoverageRecord` | 새 dataclass(업무·행 수·표지) | 값을 **담기만** 한다. 임계를 받는 자리가 없다 |
+| `records.DivisionCoverageRecord` | 새 frozen dataclass(업무·행 수·표지) | 임계를 받는 자리가 없고, **표지와 행 수가 어긋나면 `ValueError` 로 거부**한다(`ABSENT` ⟺ 행 0). 문턱 축은 이 값이 정책을 몰라 보지 못한다 |
 | `evaluation.policy.APPROVED_SEED_KEYS` · `SEED_PREFIX` | 비공개 이름이 공개로(중복 제거) | 읽기만. 패키지 `__all__` 에는 올리지 않았다 |
 | `evaluation.policy.seed_key_mismatch` | 새 함수(값 하나 → 문면\|`None`) | 정책 값을 받지 않는다 — 평탄 값 매핑의 키 집합만 본다 |
-| `app.backtest_cli._Refusal` | 비공개 enum, 라운드 1 에서 값 둘 추가 | 밖에 없다(이름이 `_` 로 시작) |
-| `SnapshotUnreadableReason.INVALID_PATH` | enum 값 하나 추가(라운드 1 F-5) | 읽기만. 문면은 예외 **이름**만 나르고 경로를 싣지 않는다 |
+| `app.backtest_cli._Refusal` | 비공개 enum(값 넷) | 밖에 없다(이름이 `_` 로 시작) |
+| `SnapshotUnreadableReason.INVALID_PATH` | enum 값 하나 추가 | 읽기만. 문면은 예외 **이름**만 나르고 경로를 싣지 않는다 |
 | `PolicyUse.derived` · `scan_source_for_uses` | test 지원 모듈(`tests/evaluation/_backtest_support.py`) | 출하 표면이 아니다 — 명단이 재는 사실을 나르고 합성 조각을 훑는다 |
 
 `backtest_cli` 의 public 표면은 `main(argv)` **하나 그대로**이고 그 사실을 기존 test 가 계속 잰다.
@@ -150,13 +132,17 @@ golden 은 **스냅숏 입력**(`manifest.json`·`rows.jsonl`·`sample-list.tsv`
 - **P-11** — 어휘 등식 test 의 문서 창이 문자 200 이다(이 slice 가 만든 test 가 아니다). 지금 여백은
   119자이고 창 안에 다른 대문자 백틱 토큰이 없다 — 그 문단에 ALL-CAPS 토큰이 하나 더 들어오면 거짓
   RED 다. 창을 문단 경계로 끊으면 닫힌다.
-- **F-2 경계** — 동적 import 와 목록 밖 네트워크 경로는 두 층 모두 보지 못한다(위 라운드 1 절).
+- **import 그래프 게이트의 경계** — 동적 import 와 목록 밖 네트워크 경로는 두 층 모두 보지 못한다
+  (위 「항목과 잠금」의 경계 실측 행).
 - **F-7 잔여** — 음수 행 수는 표지 불변식이 잡지 못한다. 유일한 생성자가 `Counter` 로 세므로
   도달하지 않고, 수를 적으면 숫자 리터럴 게이트의 허용 목록을 늘려야 해서 닫지 않았다.
-- **in_scope 한 줄 필요** — 라운드 1 의 P-10 이 `ml-engine/src/ml_engine/app/__init__.py` 의 문면
-  한 곳을 고쳤다(거동 0). 그 파일은 in_scope 열거에 없다(`app/backtest_cli.py` 만 열려 있다) —
-  D-6G2c-35 가 P-10 을 구현으로 배정하고 라운드 경계를 `ml-engine/**` 로 적어 그대로 했다. 계약
-  갱신이 필요하면 팀장 판단이다.
+- **`app/__init__.py` 는 문면만 열려 있다** — 그 파일의 금지 목록 서술 한 곳을 계약 파일을 가리키는
+  문장으로 고쳤다(거동 0). 계약이 그 파일을 **문면만** in_scope 에 두고 있다(D-6G2c-36).
+- **스윕 범위 유도의 대가**(기록) — 유도가 빈 예외 목록을 거부하므로, 네 자리의 `urllib.parse` 를
+  전부 없애 예외가 필요 없어지는 **정당한 청소**가 그 단언을 붉힌다. 그때 함께 지울 자리는 둘이다
+  (예외 비었음 거부와, app 밖 예외가 있는지 보는 단언). 조용히 빈 집합이 되는 길을 막는 쪽을 택한
+  결과다. 유도가 받는 모양은 **정확한 모듈 이름** 하나이고, 와일드카드·패키지 예외는 덮는 대신
+  선다(fail-closed) — 그 둘이 들어오면 유도를 넓혀야 한다.
 - `in_scope` 밖 파일 변경 **없음**(P 레인 커밋 전부 `ml-engine/**` 안).
 
 ## K — Kotlin
