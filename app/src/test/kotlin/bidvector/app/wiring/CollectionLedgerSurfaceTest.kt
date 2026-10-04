@@ -81,7 +81,15 @@ class CollectionLedgerSurfaceTest {
         repeat(DAILY_CAP) { seeded.attempts.append(pendingAt(yesterdayEvening)) }
         seeded.close()
 
-        val budget = seededBudget(RunStateDirectory(directory), DAILY_CAP, TOTAL_CAP, Clock { bootAt })
+        // 바로 위 형제와 같이 **닫는다**(PR #59 R) — 열어 둔 인스턴스가 잠금을 쥐면 같은 JVM 의 뒤
+        // 기동이 조용히 `Busy` 가 되고, 그 어긋남은 이 test 가 아니라 다른 test 에서 드러난다.
+        val reopened = RunStateDirectory(directory)
+        val budget =
+            try {
+                seededBudget(reopened, DAILY_CAP, TOTAL_CAP, Clock { bootAt })
+            } finally {
+                reopened.close()
+            }
 
         budget.spentToday shouldBe 0
         // 어제치는 총 상한에는 그대로 남는다 — 되감기는 것은 하루 몫뿐이다.

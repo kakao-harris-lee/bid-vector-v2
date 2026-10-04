@@ -235,8 +235,11 @@ class SampleSelectionTest {
 
 /**
  * 스냅숏 스키마 계약 문서 — test 의 작업 디렉터리는 모듈 자리라 한 단계 올라간다
- * (`WorkflowGateRegistrationTest` 가 정책 파일을 읽는 관례와 같다). 이 slice 는 이 파일을 **읽기만**
- * 한다(편집은 6G-2c-형식 몫이다).
+ * (`WorkflowGateRegistrationTest` 가 정책 파일을 읽는 관례와 같다).
+ *
+ * **이 test 는 읽기만 한다.** 6G-2c 가 이 파일에 한 편집은 §2 어휘 문장 하나뿐이고(D-6G2c-31), 칸·
+ * 어휘를 바꾸는 **형식 편집은 6G-2c-형식 몫**이다 — 진행 중인 실행 상태 디렉터리가 있는 동안 그
+ * 변경은 머지할 수 없다.
  */
 private const val SNAPSHOT_SCHEMA_PATH = "../reports/evidence/m6/6g/snapshot-schema.md"
 

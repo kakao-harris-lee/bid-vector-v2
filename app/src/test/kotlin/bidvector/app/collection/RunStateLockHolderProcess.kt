@@ -36,6 +36,7 @@ internal object RunStateLockHolder {
             // **자식을 두고 던지지 않는다**(cr r1 K-1) — 던지면 `use { }` 가 아직 없어 아무도 닫지
             // 않고, 자식은 `run.lock` 을 쥔 채 남아 같은 디렉터리를 쓰는 뒤 test 를 전부 번지게 한다.
             process.destroyForcibly().waitFor(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            closePipes(process)
             throw failure
         }
     }
@@ -59,6 +60,17 @@ internal object RunStateLockHolder {
     private fun stop(process: Process) {
         process.outputStream.close()
         if (!process.waitFor(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) process.destroyForcibly()
+        closePipes(process)
+    }
+
+    /**
+     * 부모 쪽 pipe 를 닫는다(PR #59 O) — 자식이 끝나도 부모의 읽기 기술자는 남는다. 잠금 test 가
+     * 세 갈래에서 여러 번 보유자를 띄우므로 holder 마다 하나씩 쌓이고, 그 누수는 한참 뒤 다른 test 가
+     * 기술자를 얻지 못할 때에야 드러난다. 읽기 스트림이 유일한 출구다(`redirectErrorStream` 이라
+     * 표준 오류가 거기 합쳐진다).
+     */
+    private fun closePipes(process: Process) {
+        runCatching { process.inputStream.close() }
     }
 }
 
