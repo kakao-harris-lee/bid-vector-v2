@@ -383,6 +383,9 @@ val gateRegistrationGate =
         testSources.from(provider { sourceSets["test"].allSource.matching { include("**/*.kt", "**/*.java") } })
         testRuntimeClasspath.from(configurations.named("testRuntimeClasspath"))
         excludePatterns = tasks.named("test", Test::class.java).map { it.filter.excludePatterns }
+        // 입력이 `provider { … }` 라 Gradle 이 생산자를 유추하지 못한다 — 이 파일의 다른 task 들과 같이
+        // 명시한다(PR #60 T). 없으면 깨끗한 트리에서 컴파일되지 않은 클래스를 읽어 모집단이 빈다.
+        dependsOn(tasks.named("testClasses"))
         report = layout.buildDirectory.file("reports/gate-registration/violations.txt")
     }
 

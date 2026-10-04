@@ -112,6 +112,12 @@ val buildLogicGateRegistrationGate =
         testClasses.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/test"))
         testSources.from(layout.settingsDirectory.dir("build-logic/src/test"))
         testRuntimeClasspath.from(buildLogicMetaAnnotations)
+        // **알려진 제한 — Gradle 필터 출처가 없다**(PR #60 H). build-logic 은 included build 라 루트가 그
+        // 빌드의 `Test` task **속성**을 읽지 못한다(`gradle.includedBuild(…)` 가 주는 것은 task 참조뿐).
+        // 오늘 그 모듈의 `tasks.withType<Test>` 에 `filter` 블록이 없음을 확인했고, 나중에 생기면 그
+        // 제외가 **선언과 어긋나 래칫이 붉는다**(제외 선언은 이미 등식의 한 변이다) — 미탐이 아니라
+        // 오탐 방향이다. 유도하려면 그 빌드가 자기 필터를 파일로 내보내야 하고 그 파일은 이 slice 의
+        // in_scope 밖이다.
         excludePatterns = emptySet<String>()
         dependsOn(gradle.includedBuild("build-logic").task(":testClasses"))
         report = layout.buildDirectory.file("reports/gate-registration/build-logic.txt")
