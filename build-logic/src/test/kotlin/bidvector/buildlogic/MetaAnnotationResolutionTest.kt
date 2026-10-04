@@ -46,12 +46,13 @@ class MetaAnnotationResolutionTest {
     }
 
     private fun censusOfTestOutput(metaRoots: List<File> = listOf(testClassesRoot())): GateRegistrationCensus {
-        val root = testClassesRoot()
+        val lookup = ClasspathMetaAnnotations(metaRoots)
         return GateRegistration.census(
-            testClassFactsIn(listOf(root)),
+            testClassFactsIn(listOf(testClassesRoot())),
             VOCABULARY,
             excludePatterns = emptySet(),
-            metaAnnotations = ClasspathMetaAnnotations(metaRoots),
+            metaAnnotations = lookup,
+            superFacts = lookup::factsOf,
         )
     }
 

@@ -16,6 +16,8 @@ import java.util.zip.ZipFile
  */
 internal fun ByteArray.testClassFacts(): TestClassFacts? {
     var binaryName: String? = null
+    var superTypes: List<String> = emptyList()
+    var isAbstract = false
     val classAnnotations = linkedSetOf<String>()
     val methodAnnotations = linkedSetOf<String>()
 
@@ -30,6 +32,11 @@ internal fun ByteArray.testClassFacts(): TestClassFacts? {
                 interfaces: Array<out String>?,
             ) {
                 binaryName = name.replace('/', '.')
+                isAbstract = access and Opcodes.ACC_ABSTRACT != 0
+                superTypes =
+                    (listOfNotNull(superName) + interfaces.orEmpty())
+                        .map { it.replace('/', '.') }
+                        .filterNot { it == "java.lang.Object" }
             }
 
             override fun visitAnnotation(
@@ -60,7 +67,7 @@ internal fun ByteArray.testClassFacts(): TestClassFacts? {
         ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES,
     )
 
-    return binaryName?.let { TestClassFacts(it, methodAnnotations, classAnnotations) }
+    return binaryName?.let { TestClassFacts(it, methodAnnotations, classAnnotations, superTypes, isAbstract) }
 }
 
 /** [roots] 아래 모든 `.class` 를 읽어 사실로 만든다. */
@@ -83,15 +90,16 @@ internal fun testClassFactsIn(roots: Iterable<File>): List<TestClassFacts> =
 internal class ClasspathMetaAnnotations(
     private val classpath: Iterable<File>,
 ) : (String) -> Set<String> {
-    private val cache = mutableMapOf<String, Set<String>>()
+    private val cache = mutableMapOf<String, List<TestClassFacts>>()
 
-    override fun invoke(annotation: String): Set<String> =
-        cache.getOrPut(annotation) {
-            bytesOf("${annotation.replace('.', '/')}.class")
-                ?.testClassFacts()
-                ?.classAnnotations
-                .orEmpty()
-        }
+    override fun invoke(annotation: String): Set<String> = factsOf(annotation)?.classAnnotations.orEmpty()
+
+    /** 상위 사슬을 푸는 같은 조회 자리 — 못 찾으면 `null` 이고 그 가지는 거기서 끝난다. */
+    fun factsOf(binaryName: String): TestClassFacts? =
+        cache
+            .getOrPut(binaryName) {
+                listOfNotNull(bytesOf("${binaryName.replace('.', '/')}.class")?.testClassFacts())
+            }.firstOrNull()
 
     private fun bytesOf(entryPath: String): ByteArray? =
         classpath.firstNotNullOfOrNull { entry ->

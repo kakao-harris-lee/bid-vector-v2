@@ -60,6 +60,33 @@ class GateRegistrationCensusTest {
         assertEquals(setOf("p.ParamTest"), census.population)
     }
 
+    @Test
+    fun `추상 상위에서 물려받은 test 도 모집단이다 — 구체 하위`() {
+        val census =
+            census(
+                facts("p.BaseTest", methods = setOf(TEST), isAbstract = true),
+                facts("p.ConcreteTest", superTypes = listOf("p.BaseTest")),
+            )
+
+        assertEquals(setOf("p.ConcreteTest"), census.population)
+    }
+
+    /** 추상 클래스는 인스턴스화되지 않는다 — JUnit 도 돌리지 않으므로 등재를 요구하면 안 된다. */
+    @Test
+    fun `test 를 선언한 추상 클래스는 모집단 밖이다`() {
+        val census = census(facts("p.BaseTest", methods = setOf(TEST), isAbstract = true))
+
+        assertEquals(emptySet<String>(), census.population)
+    }
+
+    /** 상위가 조회 자리에서 풀리지 않으면 그 가지는 끝난다 — 모집단 밖이고 등재돼 있으면 잉여로 붉는다. */
+    @Test
+    fun `풀리지 않는 상위는 모집단을 늘리지 않는다`() {
+        val census = census(facts("p.ConcreteTest", superTypes = listOf("other.UnknownBase")))
+
+        assertEquals(emptySet<String>(), census.population)
+    }
+
     // ---- 제외 — build 사실에서만 ----
 
     @Test
@@ -181,7 +208,9 @@ class GateRegistrationCensusTest {
             binaryName: String,
             methods: Set<String> = emptySet(),
             classes: Set<String> = emptySet(),
-        ) = TestClassFacts(binaryName, methods, classes)
+            superTypes: List<String> = emptyList(),
+            isAbstract: Boolean = false,
+        ) = TestClassFacts(binaryName, methods, classes, superTypes, isAbstract)
 
         fun census(
             vararg classes: TestClassFacts,
@@ -195,6 +224,7 @@ class GateRegistrationCensusTest {
             ),
             excludePatterns,
             metaAnnotations = { meta[it].orEmpty() },
+            superFacts = { name -> classes.firstOrNull { it.binaryName == name } },
         )
     }
 }

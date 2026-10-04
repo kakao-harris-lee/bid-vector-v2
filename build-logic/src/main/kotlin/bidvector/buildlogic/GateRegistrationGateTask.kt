@@ -60,6 +60,7 @@ abstract class GateRegistrationGateTask : DefaultTask() {
     fun gate() {
         val policy = readPolicy(policyFile.get().asFile)
         val module = moduleName.get()
+        val lookup = ClasspathMetaAnnotations(testRuntimeClasspath.files + testClasses.files)
         val census =
             GateRegistration.census(
                 testClassFactsIn(testClasses.files),
@@ -68,7 +69,8 @@ abstract class GateRegistrationGateTask : DefaultTask() {
                     conditionPackages = policy.requireList(CONDITION_PACKAGES).toSet(),
                 ),
                 excludePatterns.get(),
-                ClasspathMetaAnnotations(testRuntimeClasspath.files + testClasses.files),
+                lookup,
+                lookup::factsOf,
             )
         val violations =
             GateRegistration.violations(

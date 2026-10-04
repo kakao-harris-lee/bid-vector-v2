@@ -10,6 +10,10 @@ internal data class TestClassFacts(
     val binaryName: String,
     val methodAnnotations: Set<String>,
     val classAnnotations: Set<String>,
+    /** 상위 클래스와 인터페이스 — JUnit 은 **물려받은** test 메서드도 돌린다(cr r1 G-2). */
+    val superTypes: List<String> = emptyList(),
+    /** 추상 클래스·인터페이스는 인스턴스화되지 않는다 — JUnit 도 돌리지 않으므로 모집단 밖이다. */
+    val isAbstract: Boolean = false,
 )
 
 /**
@@ -53,11 +57,15 @@ internal object GateRegistration {
         vocabulary: TestDiscoveryVocabulary,
         excludePatterns: Set<String>,
         metaAnnotations: (String) -> Set<String>,
+        superFacts: (String) -> TestClassFacts?,
     ): GateRegistrationCensus {
         val isDiscovery = discoveryPredicate(vocabulary.annotations, metaAnnotations)
+        val declared = classes.associateBy(TestClassFacts::binaryName)
+        val runsTests = inheritedTestPredicate(isDiscovery) { declared[it] ?: superFacts(it) }
         val population =
             classes
-                .filter { facts -> facts.methodAnnotations.any(isDiscovery) }
+                .filterNot(TestClassFacts::isAbstract)
+                .filter(runsTests)
                 .map { it.binaryName.outermost() }
                 .toSet()
         val conditional =
@@ -82,6 +90,28 @@ internal object GateRegistration {
             (census.excluded - declaredExcluded) to "선언되지 않은 제외다 — build 사실이 이 클래스를 `check` 밖으로 뺐다",
             (declaredExcluded - census.excluded) to "선언만 있는 제외다 — 이 이름을 `check` 밖으로 빼는 build 사실이 없다",
         ).flatMap { (names, reason) -> names.sorted().map { "$reason: $it" } }
+    }
+
+    /**
+     * **물려받은** test 메서드까지 센다(cr r1 G-2) — JUnit 은 추상 상위가 선언한 `@Test` 를 구체
+     * 하위에서 돌린다. 상위 사슬은 같은 조회 자리에서 푼다(그 모듈의 test 출력 ∪ test 런타임
+     * 클래스패스). 풀리지 않는 상위는 그 가지에서 끝나고, 그러면 그 클래스는 모집단 밖이라
+     * **등재돼 있으면 잉여로 붉는다** — 조용히 통과하는 방향이 아니다.
+     */
+    private fun inheritedTestPredicate(
+        isDiscovery: (String) -> Boolean,
+        factsOf: (String) -> TestClassFacts?,
+    ): (TestClassFacts) -> Boolean {
+        fun reaches(
+            facts: TestClassFacts,
+            seen: MutableSet<String>,
+        ): Boolean =
+            facts.methodAnnotations.any(isDiscovery) ||
+                facts.superTypes.any { parent ->
+                    seen.add(parent) && factsOf(parent)?.let { reaches(it, seen) } == true
+                }
+
+        return { facts -> reaches(facts, mutableSetOf(facts.binaryName)) }
     }
 
     /** 메타 애노테이션을 따라가 발견 어휘에 닿는지 — 순환은 방문 집합이 끊는다. */
