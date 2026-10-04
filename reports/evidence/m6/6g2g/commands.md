@@ -56,6 +56,20 @@ production 경로 0 줄이며, verifier 가 같은 명령으로 재현할 수 �
 
 `settlement` 은 test 소스셋이 없고 장부에 키도 없다 — **빈 모듈에서도 등식이 성립**함을 같은 task 가 잰다.
 
+### ④ 접기 통일의 **재관측** (D-6G2g-14 요구)
+
+`enclosingClass` 접기를 쓰던 게이트들(원문 값 획득 · 대분류 · 공고명 키 · 러너 · 로거 · 층 판정)의 등재를
+이름 절단 기준으로 다시 관측했다. **재등재 둘 말고는 하나도 바뀌지 않았다** — 계약의 예상(그 등재가 전부
+`bidvector..` 안이라 두 접기가 같다)이 실측으로 확인됐다.
+
+| 확인 | 명령 | 결과 |
+|---|---|---|
+| 바뀐 등재가 둘뿐이다 | ④ 커밋의 `git diff -- config/quality/architecture-policy.properties` | 줄 둘(`NoticeKeyHash$Companion` → `NoticeKeyHash` · `Resolution$Resolved` → `Resolution`) |
+| 나머지 게이트가 초록 | `./gradlew --no-daemon :app:test` | exit 0, app 전건 |
+
+**바뀌는 것이 있으면 멈추는 조건**(계약 문면)에 걸리지 않았다. 주입 축은 규칙과 관측 **셋**이 모두 접어야
+등식이 서는 자리라 함께 옮겼다(규칙 하나 · 관측 둘).
+
 ### ⑥⑦ 등재 규모
 
 | 축 | 쌍 | 보유자 |
