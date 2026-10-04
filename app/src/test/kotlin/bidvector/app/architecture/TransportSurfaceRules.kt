@@ -2,6 +2,8 @@ package bidvector.app.architecture
 
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
+import com.tngtech.archunit.core.domain.JavaCodeUnit
+import com.tngtech.archunit.core.domain.JavaModifier
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.ConditionEvents
@@ -172,6 +174,73 @@ class TransportSurfaceRules(
                 externalPackagesOf(item)
                     .filterNot { it in allowed }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "$referencer -> $it")) }
+            }
+        }
+
+    /**
+     * D-6G2g-9 — **3층(클래스, 멤버)**. 2층의 (클래스, 타입) 쌍은 등재 보유자 **안**을 보지 못한다:
+     * 보유자가 `fun sendRaw(s: String)` 처럼 **시그니처에 전송 타입이 없는** 멤버를 두면, 그 멤버를
+     * 반사로 부르는 길이 (클래스, 타입) 해상도 밖에 남는다(`OPEN-6G2B-HOLDER-INTERNAL-SURFACE`,
+     * 6G-2c vr I-1 의 `release$bid_vector_adapters` 자리).
+     *
+     * 그래서 보유자의 **비-private 멤버 전수** 가운데 「시그니처는 전송 타입을 말하지 않는데 몸이 전송
+     * 멤버를 부르는」 것을 세어 등재와 양방향으로 맞댄다. 그런 멤버가 하나 생기면 등재가 함께 움직여야
+     * 초록이다.
+     *
+     * **깊이는 1 이다**(`memberEffectGate` 의 「서명 ∪ depth-1 본문」 관례). 같은 클래스의 다른 멤버를
+     * 거쳐 부르는 두 걸음은 이 층이 재지 못한다 — 경계 문장에 등재한다.
+     */
+    fun observedMemberSurface(
+        classes: JavaClasses,
+        holders: Set<String>,
+    ): Set<Pair<String, String>> =
+        classes
+            .filter { it.outermostClassName() in holders }
+            .flatMap(::hiddenSendMembers)
+            .toSet()
+
+    /** [roots] 아래 등재 보유자가 등재 밖 숨은 송신 멤버를 두지 않는다. */
+    fun memberSurfaceRules(
+        roots: List<String>,
+        holders: Set<String>,
+        registeredMembers: Set<Pair<String, String>>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAnyPackage(*roots.map { "$it.." }.toTypedArray())
+                .should(holdHiddenSendMemberOutside(holders, registeredMembers))
+                .because("D-6G2g-9 — 등재 보유자의 (클래스, 멤버) 쌍은 등재된 쌍뿐이다(3층)"),
+        )
+
+    private fun hiddenSendMembers(origin: JavaClass): List<Pair<String, String>> =
+        (origin.methods + origin.constructors)
+            .filterNot { JavaModifier.PRIVATE in it.modifiers }
+            .filterNot(::signatureNamesSurface)
+            .filter(::bodyCallsSurface)
+            .map { origin.outermostClassName() to it.name }
+
+    /** 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다. */
+    private fun signatureNamesSurface(member: JavaCodeUnit): Boolean =
+        (member.rawParameterTypes.map(JavaClass::getName) + member.rawReturnType.name)
+            .any { isSurfaceType(it.outermostName()) }
+
+    private fun bodyCallsSurface(member: JavaCodeUnit): Boolean =
+        member.accessesFromSelf.any { isSurfaceType(it.targetOwner.outermostClassName()) }
+
+    private fun holdHiddenSendMemberOutside(
+        holders: Set<String>,
+        registered: Set<Pair<String, String>>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("등재 밖 숨은 송신 멤버를 둔다 (등재 쌍 ${registered.size})") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                if (item.outermostClassName() !in holders) return
+                hiddenSendMembers(item)
+                    .filterNot { it in registered }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, "${it.first}#${it.second}")) }
             }
         }
 

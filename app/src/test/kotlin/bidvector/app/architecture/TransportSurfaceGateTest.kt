@@ -129,6 +129,22 @@ class TransportSurfaceGateTest {
     }
 
     /**
+     * D-6G2g-9 3층 — 등재 보유자 안의 **숨은 송신 멤버**(시그니처에 전송 타입이 없는데 몸이 전송 멤버를
+     * 부른다) 전수가 등재와 같다. 양방향이라 멤버가 하나 생겨도, 등재만 남고 멤버가 사라져도 붉다.
+     */
+    @Test
+    fun `등재 보유자의 숨은 송신 멤버 전수가 등재 쌍과 같다 — 3층 양방향`() {
+        rules.observedMemberSurface(production, policy.transportHolders) shouldBe policy.transportMemberSurface
+    }
+
+    @Test
+    fun `등재 보유자는 등재 밖 숨은 송신 멤버를 두지 않는다 — 3층`() {
+        rules
+            .memberSurfaceRules(policy.transportRoots, policy.transportHolders, policy.transportMemberSurface)
+            .forEach { it.check(production) }
+    }
+
+    /**
      * PR #58 C — 반사 게이트의 뿌리를 손 목록으로 두면 `layer.*` 가 늘어도 그 모듈이 반사 판정 밖에 남는다.
      * 도출식과의 등식으로 묶는다.
      *

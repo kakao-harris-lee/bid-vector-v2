@@ -212,6 +212,12 @@ class ArchitecturePolicy private constructor(
 
     val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
 
+    /** 등재된 보유자 클래스 전수 — 3층(멤버 표면)의 대상이다. */
+    val transportHolders: Set<String> get() = transportHolderPairs.map { it.first }.toSet()
+
+    /** D-6G2g-9 3층 — 보유자 안의 (클래스, 멤버) 쌍. */
+    val transportMemberSurface: Set<Pair<String, String>> get() = pairs("collection.transport.member-surface").toSet()
+
     /**
      * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부의 **판정 대상 모듈**. 별도 키로 적지 않고 `layer.*` 에서
      * 도출한다(domain 계열을 뺀 셋 — application · adapters · app). 그래서 모듈을 빠뜨리는 편집은 여기만
