@@ -1,6 +1,7 @@
 import bidvector.buildlogic.ContractGateTask
 import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.GateExecutionGateTask
+import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.LeakPatternGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
@@ -84,6 +85,26 @@ val buildLogicGateExecutionGate =
         resultDirectories.from(layout.settingsDirectory.dir("build-logic/build/test-results/test"))
         dependsOn(gradle.includedBuild("build-logic").task(":test"))
         report = layout.buildDirectory.file("reports/gate-execution/build-logic.txt")
+    }
+
+// `buildLogicGateExecutionGate` 의 반대축 — build-logic 자신의 등재 장부가 소스와 같은지 잰다.
+// 같은 순환(그 클래스가 이 빌드의 산출물이다) 때문에 루트에 둔다. 컴파일된 test 클래스를 읽으므로
+// `:build-logic:testClasses` 에 의존한다.
+//
+// **알려진 제한 — 메타 애노테이션을 풀 클래스패스가 없다.** included build 의 `testRuntimeClasspath`
+// 를 루트에서 집기 어려워 비워 둔다. 그래서 `@ParameterizedTest` 만 가진 build-logic test 클래스는
+// 모집단에 들지 못하고, 등재돼 있으면 **잉여로 붉는다**(조용히 통과하는 방향이 아니다). 오늘 그런
+// 클래스는 없다 — `@ParameterizedTest` 를 쓰는 셋은 전부 `@Test` 도 가진다.
+val buildLogicGateRegistrationGate =
+    tasks.register<GateRegistrationGateTask>("buildLogicGateRegistrationGate") {
+        group = "verification"
+        description = "build-logic 자신의 게이트 등재 장부가 test 클래스 전수와 같은지 잰다"
+        policyFile = layout.settingsDirectory.file("config/quality/gate-tests.properties")
+        moduleName = "build-logic"
+        testClasses.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/test"))
+        excludePatterns = emptySet<String>()
+        dependsOn(gradle.includedBuild("build-logic").task(":testClasses"))
+        report = layout.buildDirectory.file("reports/gate-registration/build-logic.txt")
     }
 
 // 하네스 `test-discovery-guard`(`OPEN-2B-TEST-DISCOVERY-GUARD`) — build-logic 자신의 test
@@ -192,6 +213,7 @@ tasks.register("check") {
         buildLogicSizeGate,
         buildLogicTypeShapeGate,
         buildLogicGateExecutionGate,
+        buildLogicGateRegistrationGate,
         buildLogicTestShapeGate,
         scriptSizeGate,
         conventionCoverageGate,
