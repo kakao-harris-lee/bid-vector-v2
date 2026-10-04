@@ -2,7 +2,9 @@ package bidvector.adapters.snapshot
 
 import java.io.IOException
 import java.nio.channels.FileChannel
+import java.nio.channels.ClosedByInterruptException
 import java.nio.channels.FileLock
+import java.nio.channels.FileLockInterruptionException
 import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -51,17 +53,11 @@ sealed interface RunStateLock {
          * 디렉터리를 **여는 자리가 곧 잠금 자리**다 — 잠그지 않고 원장을 얻는 길을 두지 않는다.
          * 잠금 파일은 상태가 아니라 자물쇠라 무결성 장부의 대상이 아니다(§장부 집합에서 뺀다).
          *
-         * 던지는 것을 **값으로 가른다**: 겹치는 잠금은 [Busy], 입출력 실패는 [Unlockable]. 그 밖은
-         * 그대로 던진다 — 모르는 실패를 「잠글 수 없다」로 접으면 그 사유가 영영 보이지 않는다.
+         * 던진 것의 분류는 [runStateLockFailure] 한 자리에 있다 — 열기와 잠그기가 같은 실패를 내므로
+         * 가르는 규칙을 둘로 두지 않는다.
          */
         internal fun tryAcquire(root: Path): RunStateLock =
-            try {
-                lockedChannelOf(root)
-            } catch (_: OverlappingFileLockException) {
-                Busy
-            } catch (_: IOException) {
-                Unlockable
-            }
+            runCatching { lockedChannelOf(root) }.getOrElse(::runStateLockFailure)
     }
 }
 
@@ -86,3 +82,22 @@ private fun lockedChannelOf(root: Path): RunStateLock {
         RunStateLock.Held(channel, lock)
     }
 }
+
+/**
+ * 잠금 시도가 던진 것을 **값으로 가른다**: 겹치는 잠금은 [RunStateLock.Busy], 입출력 실패는
+ * [RunStateLock.Unlockable]. 그 밖은 그대로 올려 보낸다 — 모르는 실패를 「잠글 수 없다」로 접으면
+ * 그 사유가 영영 보이지 않는다.
+ *
+ * **인터럽트는 입출력 실패가 아니다**(cr r1 K-3). `ClosedByInterruptException`·
+ * `FileLockInterruptionException` 은 `IOException` 하위라, 전부 접으면 이 스레드에 내려진 지시가
+ * 「영영 풀리지 않으니 운영자가 경로를 고쳐라」(종료 코드 4)로 보고되고 인터럽트는 삼켜진다.
+ *
+ * 순수 함수라 **값으로 잴 수 있다** — 실제 인터럽트를 일으키지 않고도 분류를 test 가 고정한다.
+ */
+internal fun runStateLockFailure(failure: Throwable): RunStateLock =
+    when {
+        failure is OverlappingFileLockException -> RunStateLock.Busy
+        failure is ClosedByInterruptException || failure is FileLockInterruptionException -> throw failure
+        failure is IOException -> RunStateLock.Unlockable
+        else -> throw failure
+    }

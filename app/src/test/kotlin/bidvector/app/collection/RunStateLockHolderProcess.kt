@@ -4,6 +4,7 @@ import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 /**
@@ -28,13 +29,36 @@ internal object RunStateLockHolder {
                 directory.toString(),
             ).redirectErrorStream(true)
                 .start()
-        val ready = process.inputStream.bufferedReader().readLine()
-        check(ready == HELD_LINE) { "자식 프로세스가 잠금을 들지 못했다: $ready" }
-        return AutoCloseable {
-            // 표준 입력을 닫는 것이 「놓아라」다 — 신호를 파일로 두면 그 파일이 장부 검사에 보인다.
-            process.outputStream.close()
-            if (!process.waitFor(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) process.destroyForcibly()
+        return try {
+            awaitHeld(process)
+            AutoCloseable { stop(process) }
+        } catch (failure: Throwable) {
+            // **자식을 두고 던지지 않는다**(cr r1 K-1) — 던지면 `use { }` 가 아직 없어 아무도 닫지
+            // 않고, 자식은 `run.lock` 을 쥔 채 남아 같은 디렉터리를 쓰는 뒤 test 를 전부 번지게 한다.
+            process.destroyForcibly().waitFor(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            throw failure
         }
+    }
+
+    /**
+     * [HELD_LINE] **또는 EOF 까지** 기한을 두고 읽는다(cr r1 K-1). 한 줄만 읽고 비교하던 앞 판은 JVM
+     * 이 먼저 내는 줄(`Picked up …`·VM 경고) 하나에 깨졌고, 기한이 없어 자식이 멈추면 test 도 멈췄다.
+     * 읽기를 별 스레드에 두는 이유는 `readLine()` 자체에 기한을 걸 수 없기 때문이다 — 기한을 넘기면
+     * 부모가 자식을 강제로 끝내고, 그러면 스트림이 닫혀 그 읽기도 풀린다.
+     */
+    private fun awaitHeld(process: Process) {
+        val reader = process.inputStream.bufferedReader()
+        val held =
+            CompletableFuture
+                .supplyAsync { generateSequence(reader::readLine).firstOrNull { it == HELD_LINE } }
+                .get(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        checkNotNull(held) { "자식 프로세스가 잠금을 들지 못했다 — $HELD_LINE 없이 끝났다" }
+    }
+
+    /** 표준 입력을 닫는 것이 「놓아라」다 — 신호를 파일로 두면 그 파일이 장부 검사에 보인다. */
+    private fun stop(process: Process) {
+        process.outputStream.close()
+        if (!process.waitFor(HOLDER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) process.destroyForcibly()
     }
 }
 

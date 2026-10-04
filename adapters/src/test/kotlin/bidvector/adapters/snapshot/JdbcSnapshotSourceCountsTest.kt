@@ -105,23 +105,26 @@ class JdbcSnapshotSourceCountsTest : SnapshotSourceTestBase() {
      * 전에 떨어지고 축은 열거 타입이다) 그 경로로는 이 판을 세울 수 없다 — 이 계수가 애초에 **방어
      * 심화**인 이유와 같다(판독은 적재 경로의 전제에 기대지 않는다).
      *
-     * 셋을 **서로 다른 수**로 두지 않고 각각 1 로 둔 뒤 칸마다 1 을 단언한다 — 한 행이 두 칸에 들면
-     * 합계가 3 을 넘고, 칸을 맞바꾸면 그 칸이 0 이 된다.
+     * 셋을 **서로 다른 수**로 심는다(vr r1 F-2). 각각 1 로 두면 **분류를 맞바꾼 변이가 초록**이다 —
+     * 세 칸이 1·1·1 이라 어느 둘을 바꿔도 같은 수가 돌아온다. 1·2·3 이면 맞바꿈이 두 칸을 함께 틀리게
+     * 하고, 한 행이 두 칸에 들면 합계가 6 을 넘는다.
      */
     @Test
-    fun `키가 서지 않는 세 원인이 각자 칸에서만 하나로 센다`() {
+    fun `키가 서지 않는 세 원인이 각자 칸에서 제 수로 센다`() {
         val sampled = syntheticNumbers(1..1)
         val sample = sampleOf(*sampled.toTypedArray())
-        insertRawRow(number = "", round = "000", endpoint = SourceEndpoint.OPENING_COMPLETE.name, key = "blank")
-        insertRawRow(number = sampled[0], round = "1", endpoint = SourceEndpoint.OPENING_COMPLETE.name, key = "round")
-        insertRawRow(number = sampled[0], round = "000", endpoint = "OPENING_RENAMED_AXIS", key = "endpoint")
+        repeat(BLANK_ROWS) { insertRawRow("", "000", SourceEndpoint.OPENING_COMPLETE.name, "blank-$it") }
+        repeat(MALFORMED_ROUND_ROWS) {
+            insertRawRow(sampled[0], "1", SourceEndpoint.OPENING_COMPLETE.name, "round-$it")
+        }
+        repeat(UNKNOWN_ENDPOINT_ROWS) { insertRawRow(sampled[0], "000", "OPENING_RENAMED_AXIS-$it", "axis-$it") }
 
         val unusable = extract(sample).unusableRawRows
 
-        unusable.total shouldBe 3
-        unusable[UnusableRawRowCause.BLANK_NOTICE_NUMBER] shouldBe 1
-        unusable[UnusableRawRowCause.MALFORMED_ROUND] shouldBe 1
-        unusable[UnusableRawRowCause.UNKNOWN_ENDPOINT] shouldBe 1
+        unusable.total shouldBe BLANK_ROWS + MALFORMED_ROUND_ROWS + UNKNOWN_ENDPOINT_ROWS
+        unusable[UnusableRawRowCause.BLANK_NOTICE_NUMBER] shouldBe BLANK_ROWS
+        unusable[UnusableRawRowCause.MALFORMED_ROUND] shouldBe MALFORMED_ROUND_ROWS
+        unusable[UnusableRawRowCause.UNKNOWN_ENDPOINT] shouldBe UNKNOWN_ENDPOINT_ROWS
     }
 
     /**
@@ -153,3 +156,8 @@ class JdbcSnapshotSourceCountsTest : SnapshotSourceTestBase() {
         }
     }
 }
+
+/** 원인마다 **다른 수** — 같은 수면 분류를 맞바꾼 변이가 초록이다(vr r1 F-2). */
+private const val BLANK_ROWS = 1
+private const val MALFORMED_ROUND_ROWS = 2
+private const val UNKNOWN_ENDPOINT_ROWS = 3

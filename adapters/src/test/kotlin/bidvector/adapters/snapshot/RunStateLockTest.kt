@@ -4,6 +4,10 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.nio.channels.ClosedByInterruptException
+import java.nio.channels.FileLockInterruptionException
+import java.nio.channels.OverlappingFileLockException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 
 /**
@@ -73,6 +77,59 @@ class RunStateLockTest : RunStateDirectoryFixture() {
         val second = open()
 
         second.lock shouldBe RunStateLock.Busy
+    }
+
+    /**
+     * **vr r1 F-1 — 닫힌 뒤에는 같은 인스턴스도 쓰지 못한다.** 앞 판은 잠금만 보았고 그 판정이 생성
+     * 시점에 굳었다: `close()` 로 잠금을 놓은 뒤에도 같은 인스턴스의 두 원장이 그대로 썼고, 같은 JVM
+     * 의 둘째 인스턴스가 `Held` 를 얻어 **둘 다** 썼다 — 없애려던 「잠금만 풀린 원장」이 `release`
+     * 대신 `close` 로 다시 지어진 것이다.
+     */
+    @Test
+    fun `닫힌 뒤에는 같은 인스턴스가 두 원장에 쓰지 못한다`() {
+        val directory = open()
+        directory.sampleList.confirm(runStateSample())
+        directory.attempts.append(runStatePendingAttempt())
+        directory.close()
+
+        shouldThrow<IllegalStateException> { directory.attempts.append(runStatePendingAttempt()) }
+        shouldThrow<IllegalStateException> { directory.sampleList.confirm(runStateSample()) }
+        // 읽기는 그대로다 — 막는 것은 쓰기뿐이고, 닫힌 인스턴스로도 바이트를 볼 수 있다.
+        directory.attempts.read().size shouldBe 1
+    }
+
+    /**
+     * 양성 대조 — 닫힌 뒤의 **다음 실행**은 정상이다. 표지가 디렉터리가 아니라 인스턴스에 붙는다는
+     * 것을 고정한다(디렉터리에 붙으면 한 번 닫은 자리가 영영 막힌다).
+     */
+    @Test
+    fun `닫힌 뒤에 다시 열면 그 인스턴스는 쓸 수 있다`() {
+        val first = open()
+        first.attempts.append(runStatePendingAttempt())
+        first.close()
+        opened.clear()
+
+        val second = open()
+
+        second.lock.shouldBeInstanceOf<RunStateLock.Held>()
+        second.attempts.append(runStatePendingAttempt())
+        second.attempts.read().size shouldBe 2
+    }
+
+    /**
+     * **cr r1 K-3 — 인터럽트는 「자물쇠를 걸 수 없다」가 아니다.** 둘 다 `IOException` 하위라 전부
+     * 접으면 이 스레드에 내려진 지시가 종료 코드 4 와 「영영 풀리지 않는다」는 진단으로 나가고
+     * 인터럽트는 삼켜진다. 분류가 순수 함수라 실제 인터럽트를 일으키지 않고 값으로 잰다.
+     */
+    @Test
+    fun `잠금 실패의 분류 — 겹침은 Busy, 입출력은 Unlockable, 인터럽트는 올려 보낸다`() {
+        runStateLockFailure(OverlappingFileLockException()) shouldBe RunStateLock.Busy
+        runStateLockFailure(FileSystemException("자물쇠 파일")) shouldBe RunStateLock.Unlockable
+
+        shouldThrow<ClosedByInterruptException> { runStateLockFailure(ClosedByInterruptException()) }
+        shouldThrow<FileLockInterruptionException> { runStateLockFailure(FileLockInterruptionException()) }
+        // 모르는 실패도 접지 않는다 — 접으면 그 사유가 영영 보이지 않는다.
+        shouldThrow<IllegalStateException> { runStateLockFailure(IllegalStateException("모르는 실패")) }
     }
 
     /** 든 실행은 그대로 해시를 짓는다 — ⑦ 이 Held 쪽 판독까지 끄지 않았다는 양성 대조다. */

@@ -387,16 +387,31 @@ enum class UnusableRawRowCause {
  * **manifest 에는 싣지 않는다**: 칸을 늘리면 스냅숏 스키마가 바뀌고, 진행 중인 실행 상태 디렉터리가
  * 있는 동안 그 변경은 머지할 수 없다(D-6G2c-18). 공시 자리는 러너 로그 한 줄이다.
  */
-data class UnusableRawRows(
-    val byCause: Map<UnusableRawRowCause, Int>,
+class UnusableRawRows(
+    counts: Map<UnusableRawRowCause, Int>,
 ) {
+    /**
+     * 열거 **전수**를 채운 조밀 지도이고 넘긴 지도의 **복사본**이다.
+     *
+     * 복사하는 이유(vr r1 F-5): 넘긴 가변 지도를 뒤에서 바꾸면 아래 비음수 불변식이 우회된다
+     * (실측 `total=-5`). 조밀하게 채우는 이유(cr r1 K-5): 빈 지도와 「0 셋을 적은 지도」가 `total`·
+     * `get` 모두 같은데 `equals` 가 달라, 계수가 완전히 같은 두 추출이 불일치로 읽혔다.
+     */
+    val byCause: Map<UnusableRawRowCause, Int> = UnusableRawRowCause.entries.associateWith { counts[it] ?: 0 }
+
     init {
         require(byCause.values.all { it >= 0 }) { "원인별 계수는 음수일 수 없다: $byCause" }
     }
 
     val total: Int get() = byCause.values.sum()
 
-    operator fun get(cause: UnusableRawRowCause): Int = byCause[cause] ?: 0
+    operator fun get(cause: UnusableRawRowCause): Int = byCause.getValue(cause)
+
+    override fun equals(other: Any?): Boolean = other is UnusableRawRows && other.byCause == byCause
+
+    override fun hashCode(): Int = byCause.hashCode()
+
+    override fun toString(): String = "UnusableRawRows($byCause)"
 
     companion object {
         /** 하나도 버리지 않은 추출 — 세 칸이 모두 0 이다. */

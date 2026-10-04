@@ -32,16 +32,24 @@ class SnapshotFinishedLineTest {
     }
 
     /**
-     * **D-6G2c-20 — 합계 칸은 원인 셋의 합이다.** 합계를 따로 들면 그 둘이 갈리는 날이 오고, 갈린
-     * 뒤에는 어느 쪽이 참인지 줄만 보고 알 수 없다. 합계는 **파생**이므로 여기서 그것을 못 박는다.
+     * **D-6G2c-20 — 줄의 합계 칸은 줄의 원인 세 칸의 합이다**(cr r1 K-4 정정). 앞 판은 값 쪽에서
+     * `total` 과 열거 합을 맞댔는데, 지도가 열거 키 전용이라 두 식이 **모든 입력에서 같았다** — 어떤
+     * 변이도 가르지 못하는 단언이었다. 재야 할 것은 값이 아니라 **렌더한 줄**이다: 합계를 원인과 다른
+     * 자리에서 길어 오는 편집이 그때 붉어진다.
      */
     @Test
-    fun `원인 셋의 합이 곧 합계 칸이다`() {
-        val causes = distinctCounts().unusableRawRows
+    fun `렌더한 줄의 합계 칸은 되읽은 원인 세 칸의 합이다`() {
+        val fields = fieldsOf(snapshotFinishedLine(sampleSize = 11, extraction = distinctCounts(), bytes = 97))
 
-        causes.total shouldBe
-            UnusableRawRowCause.entries.sumOf { causes[it] }
+        fields.getValue("unusableRawRows") shouldBe
+            CAUSE_FIELDS.sumOf { fields.getValue(it) }
     }
+
+    /** 줄을 칸으로 되읽는다 — 재는 쪽이 줄을 짓는 코드를 다시 부르지 않는다. */
+    private fun fieldsOf(line: String): Map<String, Int> =
+        Regex("(\\w+)=(\\d+)")
+            .findAll(line)
+            .associate { it.groupValues[1] to it.groupValues[2].toInt() }
 
     /** 등재되지 않은 원인은 0 이다 — 빈 지도를 받은 추출의 줄에서 칸이 사라지지 않는다. */
     @Test
@@ -113,3 +121,6 @@ class SnapshotFinishedLineTest {
             bidderRows = emptyList(),
         )
 }
+
+/** 줄에 서는 원인 칸 셋 — 이름이 바뀌면 되읽기가 멈춘다(`getValue` 가 던진다). */
+private val CAUSE_FIELDS = listOf("blankNoticeNumber", "malformedRound", "unknownEndpoint")

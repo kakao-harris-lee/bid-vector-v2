@@ -5,15 +5,11 @@ import bidvector.adapters.koneps.KonepsJsonParser
 import bidvector.adapters.koneps.asIntOrNull
 import bidvector.adapters.koneps.asObject
 import bidvector.adapters.koneps.asStringOrNull
-import bidvector.procurement.AttemptHistory
 import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
 import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
-import bidvector.workflow.collection.SampleConfirmation
-import bidvector.workflow.collection.SampleList
 import bidvector.workflow.collection.SampleListLedger
 import bidvector.workflow.collection.hexOf
 import bidvector.workflow.collection.sha256Hex
@@ -116,8 +112,11 @@ class RunStateDirectory(
      *
      * ⑤ **잠금을 들지 못한 실행은 해시를 짓지 않는다**(D-6G2c-21 ⑦) — 그 실행은 아무것도 쓰지 않으므로
      * 누적 해시가 필요 없다. 그런데도 지으면 원장 전체를 읽고, 그 읽기가 던지는 순간(비UTF-8 바이트)
-     * 조용히 물러나야 할 실행이 **예외로 죽는다**: 운영자는 「다른 실행이 돌고 있다」가 아니라 스택
-     * 트레이스를 본다. 형식 판별만 ① 때문에 잠금과 무관하게 남는다.
+     * 조용히 물러나야 할 실행이 **예외로 죽는다**. 형식 판별만 ① 때문에 잠금과 무관하게 남는다.
+     *
+     * **이 약속은 러너까지다**(cr r1 K-2). 전 조립 기동에서는 상한 원장 seed 가 잠금과 무관하게 시도
+     * 원장을 읽으므로, 판독 불가 원장 + 동시 기동이면 빈 생성 중에 여전히 던진다 — 운영자는 건너뜀
+     * 줄 대신 스택 트레이스를 본다(호출은 0). 그 미달은 `OPEN-6G2C-BUSY-SEED-ORDER` 가 든다.
      */
     private val ledger: LedgerDigest? =
         heldOrRelease {
@@ -184,8 +183,10 @@ class RunStateDirectory(
      * [SampleListLedger] 로 내보낸다 — 판독용 `read()` 는 [confirmedSampleList] 한 자리에서만 나간다.
      */
     val sampleList: SampleListLedger =
-        ledger?.let { digest -> FileSampleListLedger(sampleFile) { recordState(digest) } }
-            ?: LockedOutSampleListLedger(sampleListReader)
+        GuardedSampleListLedger(
+            { writeRefusalFor(lock, closed) },
+            ledger?.let { digest -> FileSampleListLedger(sampleFile) { recordState(digest) } } ?: sampleListReader,
+        )
 
     /**
      * 잠금을 들었을 때만 쓸 수 있다 — 들지 않았으면 읽기만 되고 [AttemptLedger.append] 가 거부한다.
@@ -196,12 +197,15 @@ class RunStateDirectory(
      * 들지 못했다」이므로(D-6G2c-21 ⑦), 쓰기 자리와 해시 자리가 갈릴 수 없다.
      */
     val attempts: AttemptLedger =
-        ledger?.let { digest ->
-            FileAttemptLedger(attemptFile) { line ->
-                digest.append(line)
-                recordState(digest)
-            }
-        } ?: LockedOutAttemptLedger(FileAttemptLedger(attemptFile) {})
+        GuardedAttemptLedger(
+            { writeRefusalFor(lock, closed) },
+            ledger?.let { digest ->
+                FileAttemptLedger(attemptFile) { line ->
+                    digest.append(line)
+                    recordState(digest)
+                }
+            } ?: FileAttemptLedger(attemptFile) {},
+        )
 
     /**
      * 잠금을 놓는다 — Spring 이 컨텍스트를 닫을 때 이름으로 찾아 부른다(`destroyMethod` 추론).
@@ -210,7 +214,18 @@ class RunStateDirectory(
      * **놓는 길은 이것 하나다**(D-6G2c-4) — [RunStateLock] 에는 공개된 놓기가 없다. 있던 동안
      * 밖에서 잠금만 풀고 원장은 쓰기 가능한 채로 둘 수 있었고, 그 상태에는 이름이 없었다.
      */
-    fun close() = lock.releaseIfHeld()
+    fun close() {
+        closed = true
+        lock.releaseIfHeld()
+    }
+
+    /**
+     * 닫힌 뒤인가 — [close] 는 되돌릴 수 없다(다시 쓰려면 디렉터리를 다시 연다). 두 원장이 **매
+     * 호출에** 이 값을 묻는다(vr r1 F-1): 앞 판은 잠금만 보았고 그 판정이 생성 시점에 굳어, `close()`
+     * 로 잠금을 놓은 뒤에도 같은 인스턴스가 그대로 썼다 — 없애려던 「잠금만 풀린 원장」이 `release`
+     * 대신 `close` 로 다시 지어졌다.
+     */
+    private var closed = false
 
     /** 추출이 읽는다 — 목록과 그 **바이트**(manifest 해시·곁파일 복사). */
     fun confirmedSampleList(): ConfirmedSampleList? = sampleListReader.read()
@@ -430,35 +445,6 @@ private class LedgerDigest(
     /** 복제해서 뽑는다 — `digest()` 는 상태를 되돌리므로 원본을 쓰면 다음 줄부터 해시가 갈린다. */
     fun hex(): String = hexOf((digest.clone() as MessageDigest).digest())
 }
-
-/**
- * 잠금을 들지 않은 실행의 시도 원장 — 읽기는 되고 **쓰기는 거부**한다(D-6G-57). 두 실행이 나란히
- * 원장에 쓰면 무결성 장부가 서로의 줄에 어긋나고, 그보다 먼저 두 상한 회계가 서로의 호출을 못 본다.
- */
-private class LockedOutAttemptLedger(
-    private val reads: AttemptLedger,
-) : AttemptLedger {
-    override fun append(attempt: CollectionAttempt): Unit = error(LOCKED_OUT_MESSAGE)
-
-    override fun read(): AttemptHistory = reads.read()
-}
-
-/**
- * 잠금을 들지 않은 실행의 표본 목록(D-6G2c-4) — 읽기는 되고 **확정은 거부**한다. 확정은 한 번뿐이라
- * (`CREATE_NEW`) 잠금 밖의 확정 하나가 그 디렉터리의 표본을 영구히 정한다. 시도 원장과 같은 감싸기다:
- * 두 원장이 같은 자물쇠 아래 있어야 「잠금은 풀렸는데 장부는 살아 있는」 모양이 생기지 않는다.
- */
-private class LockedOutSampleListLedger(
-    private val reads: SampleListLedger,
-) : SampleListLedger {
-    override fun confirm(confirmation: SampleConfirmation): SampleList = error(LOCKED_OUT_MESSAGE)
-
-    override fun confirmed(): SampleList? = reads.confirmed()
-}
-
-/** 두 원장이 같은 말을 한다 — 거부 사유가 자리마다 갈리면 운영자가 둘을 다른 사고로 읽는다. */
-private const val LOCKED_OUT_MESSAGE = "실행 상태 잠금을 들지 않았다 — 다른 실행이 돌고 있거나 자물쇠를 걸 수 없다"
-
 /** 잃어버린 호출의 표식(D-6G-70) — 조각을 원문 그대로 담되 형태가 선 JSON 한 줄로. */
 private fun tornMarkerOf(fragment: String): String =
     SnapshotJson.Obj(listOf(TORN_KEY to SnapshotJson.Text(fragment))).render() + "\n"
