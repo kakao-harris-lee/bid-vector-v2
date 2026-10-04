@@ -28,7 +28,7 @@
 
 ## 2. 실행 — 세 갈래, 순서 고정
 
-모든 실행은 `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(HTTP 표면 없음) + `mode=once`. 종료 코드: `0` COMPLETE · `2` INCOMPLETE(상한·쿼터·일시 실패로 멈춤, 다음 실행이 이어 돈다) · `3` ALREADY_RUNNING(같은 디렉터리를 다른 프로세스가 쥠). 기동 실패 출력에 `RUN_STATE_FORMAT_MISSING|MISMATCHED|LEGACY_LINE` 이 보이면 **실행 상태 디렉터리가 옛 형식**이다 — 고치지 말고 보고(실수집 전에는 그런 디렉터리가 없어야 한다).
+모든 실행은 `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(HTTP 표면 없음) + `mode=once`. 종료 코드: `0` COMPLETE · `2` INCOMPLETE(상한·쿼터·일시 실패로 멈춤, 다음 실행이 이어 돈다) · `3` ALREADY_RUNNING(같은 디렉터리를 다른 프로세스가 쥠 — 기다리면 풀린다, 호출 0) · `4` UNLOCKABLE(6G-2c — 자물쇠를 **걸 수 없다**: 잠금을 지원하지 않는 파일 시스템이거나 자물쇠 파일을 열 수 없다. 기다려도 풀리지 않는다 — 실행 상태 디렉터리 경로·권한을 고친 뒤 재기동, 호출 0). 기동 실패 출력에 `RUN_STATE_FORMAT_MISSING|MISMATCHED|LEGACY_LINE` 이 보이면 **실행 상태 디렉터리가 옛 형식**이다 — 고치지 말고 보고(실수집 전에는 그런 디렉터리가 없어야 한다).
 
 공통 인자(값은 A-1 승인 그대로; 비밀 아님):
 ```
@@ -87,7 +87,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     <공통 인자> )
 ```
 - `from/to` 는 **관측 창**(`observed_at`, 공고일 창이 아니다 — 둘을 같게 두면 manifest 가 거짓을 말한다)이고 `to` 가 정책 기준일도 정한다 — 실제 수집이 돈 날짜 범위를 넣는다. `output-dir` 은 **스냅숏마다 다른 디렉터리**(러너가 `rows.jsonl` 등을 그 디렉터리에 바로 쓰므로 같은 디렉터리를 재사용하면 앞 스냅숏을 덮어쓴다; `snapshot-id` 는 manifest 안에만 들어간다).
-- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5` · `row_count` · `sample_size` · `sampled_without_detail` · `sampled_without_notice` · `incomplete_axis` · 기간·해시 칸; 네 항 항등식 `표본 = 행 + sampled_without_detail + sampled_without_notice + incomplete_axis`) · `sample-list.tsv`. `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values` 는 manifest 가 아니라 **러너 로그 마지막 줄 `snapshot-extract finished …`** 에만 있다(A-2) — 그 줄의 계수 열둘(`rows sampleSize sampledWithoutDetail skippedWithoutNotice incompleteAxis unusableRawRows fractionalAmounts incompleteAValues outsideSample` + 6G-2c 가 더한 원인 셋 — 빈 번호 · 형태 어긴 차수 · 열거 밖 엔드포인트, 합 = `unusableRawRows`)을 그대로 적는다(토큰 이름은 러너 코드 `SnapshotExtractionRunner` 의 마지막 줄이 정본).
+- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5` · `row_count` · `sample_size` · `sampled_without_detail` · `sampled_without_notice` · `incomplete_axis` · 기간·해시 칸; 네 항 항등식 `표본 = 행 + sampled_without_detail + sampled_without_notice + incomplete_axis`) · `sample-list.tsv`. `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values` 는 manifest 가 아니라 **러너 로그 마지막 줄 `snapshot-extract finished …`** 에만 있다(A-2) — 그 줄의 계수 열둘을 **나오는 순서 그대로** 적는다 — `rows sampleSize sampledWithoutDetail skippedWithoutNotice incompleteAxis unusableRawRows blankNoticeNumber malformedRound unknownEndpoint fractionalAmounts incompleteAValues outsideSample`(6G-2c 가 더한 원인 셋은 `unusableRawRows` **바로 뒤**에 서고 합이 그 값과 같다; 뒤따르는 `bytes` 는 계수가 아니다). 토큰 이름·순서의 정본은 러너 코드 `SnapshotExtractionRunner` 의 마지막 줄이다.
 - 수집 **도중**에도 돌릴 수 있지만(원장을 먼저 읽어 진행 중 걷기는 미완으로 떨어진다) 잠금을 쥔 프로세스가 있으면 `ALREADY_RUNNING` 으로 거부된다 — 수집 실행 사이에 돌린다.
 
 ### 2-4. 백테스트 — Python, 저장소 밖 입력·출력
