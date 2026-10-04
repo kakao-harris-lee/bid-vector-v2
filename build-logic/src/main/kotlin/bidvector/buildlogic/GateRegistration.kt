@@ -14,6 +14,12 @@ internal data class TestClassFacts(
     val superTypes: List<String> = emptyList(),
     /** 추상 클래스·인터페이스는 인스턴스화되지 않는다 — JUnit 도 돌리지 않으므로 모집단 밖이다. */
     val isAbstract: Boolean = false,
+    /**
+     * 인터페이스인가 — Kotlin 은 default 메서드 본문을 `…$DefaultImpls` 라는 **별도 클래스**에 싣고
+     * 그 클래스가 `@Test` 를 들고 다닌다. 접으면 인터페이스 이름이 모집단에 드는데 JUnit 은 그 이름을
+     * 돌리지 않는다 — 등재하면 실행 게이트가, 안 하면 등재 게이트가 붉어 **만족 불가**다(vr r2 R2-L-2).
+     */
+    val isInterface: Boolean = false,
 )
 
 /**
@@ -62,11 +68,13 @@ internal object GateRegistration {
         val isDiscovery = discoveryPredicate(vocabulary.annotations, metaAnnotations)
         val declared = classes.associateBy(TestClassFacts::binaryName)
         val runsTests = inheritedTestPredicate(isDiscovery) { declared[it] ?: superFacts(it) }
+        val factsOf = { name: String -> declared[name] ?: superFacts(name) }
         val population =
             classes
                 .filterNot(TestClassFacts::isAbstract)
                 .filter(runsTests)
                 .map { it.binaryName.outermost() }
+                .filterNot { factsOf(it)?.isInterface == true }
                 .toSet()
         val conditional =
             classes

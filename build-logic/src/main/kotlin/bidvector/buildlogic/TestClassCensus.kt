@@ -25,11 +25,14 @@ private class TestClassFactsVisitor : ClassVisitor(Opcodes.ASM9) {
     private var binaryName: String? = null
     private var superTypes: List<String> = emptyList()
     private var isAbstract = false
+    private var isInterface = false
     private val classAnnotations = linkedSetOf<String>()
     private val methodAnnotations = linkedSetOf<String>()
 
     fun facts(): TestClassFacts? =
-        binaryName?.let { TestClassFacts(it, methodAnnotations, classAnnotations, superTypes, isAbstract) }
+        binaryName?.let {
+            TestClassFacts(it, methodAnnotations, classAnnotations, superTypes, isAbstract, isInterface)
+        }
 
     override fun visit(
         version: Int,
@@ -41,6 +44,7 @@ private class TestClassFactsVisitor : ClassVisitor(Opcodes.ASM9) {
     ) {
         binaryName = name.replace('/', '.')
         isAbstract = access and Opcodes.ACC_ABSTRACT != 0
+        isInterface = access and Opcodes.ACC_INTERFACE != 0
         superTypes =
             (listOfNotNull(superName) + interfaces.orEmpty())
                 .map { it.replace('/', '.') }

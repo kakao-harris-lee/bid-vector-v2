@@ -131,6 +131,23 @@ class GateRegistrationCensusTest {
         assertEquals(emptySet<String>(), census(probe, meta = meta).population)
     }
 
+    /**
+     * 인터페이스의 default `@Test` 는 Kotlin 이 `…$DefaultImpls` 에 실어, 접으면 **인터페이스 이름**이
+     * 모집단에 든다. JUnit 은 그 이름을 돌리지 않으므로 등재하면 실행 게이트가 붉고 안 하면 등재
+     * 게이트가 붉다 — 만족 불가다. 구현 클래스만 센다(vr r2 R2-L-2).
+     */
+    @Test
+    fun `인터페이스의 default test 는 구현 클래스만 모집단이다`() {
+        val census =
+            census(
+                facts("p.ContractTests", methods = setOf(TEST), isAbstract = true, isInterface = true),
+                facts("p.ContractTests\u0024DefaultImpls", methods = setOf(TEST)),
+                facts("p.ImplTest", superTypes = listOf("p.ContractTests")),
+            )
+
+        assertEquals(setOf("p.ImplTest"), census.population)
+    }
+
     // ---- 제외 — build 사실에서만 ----
 
     @Test
@@ -254,7 +271,8 @@ class GateRegistrationCensusTest {
             classes: Set<String> = emptySet(),
             superTypes: List<String> = emptyList(),
             isAbstract: Boolean = false,
-        ) = TestClassFacts(binaryName, methods, classes, superTypes, isAbstract)
+            isInterface: Boolean = false,
+        ) = TestClassFacts(binaryName, methods, classes, superTypes, isAbstract, isInterface)
 
         fun census(
             vararg classes: TestClassFacts,
