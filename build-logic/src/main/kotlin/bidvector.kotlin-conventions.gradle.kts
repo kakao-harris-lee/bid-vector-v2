@@ -380,6 +380,7 @@ val gateRegistrationGate =
         policyFile = configDir.file("quality/gate-tests.properties")
         moduleName = project.name
         testClasses.from(provider { sourceSets["test"].output.classesDirs })
+        testSources.from(provider { sourceSets["test"].allSource.matching { include("**/*.kt", "**/*.java") } })
         testRuntimeClasspath.from(configurations.named("testRuntimeClasspath"))
         excludePatterns = tasks.named("test", Test::class.java).map { it.filter.excludePatterns }
         report = layout.buildDirectory.file("reports/gate-registration/violations.txt")

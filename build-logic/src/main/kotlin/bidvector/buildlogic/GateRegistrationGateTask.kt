@@ -46,6 +46,15 @@ abstract class GateRegistrationGateTask : DefaultTask() {
     @get:Classpath
     abstract val testRuntimeClasspath: ConfigurableFileCollection
 
+    /**
+     * 그 모듈의 test **소스** — 모집단이 비었을 때 「test 가 없다」와 「산출 경로를 잃었다」를 가른다
+     * (PR #60 R). 지운 `AppGateRegistrationTest` 가 들고 있던 「모집단이 비어 있지 않다」 단언을
+     * 손 임계(`MINIMUM_DISCOVERED`)가 아니라 **build 사실**로 되살린 자리다.
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val testSources: ConfigurableFileCollection
+
     @get:Input
     abstract val moduleName: Property<String>
 
@@ -77,6 +86,7 @@ abstract class GateRegistrationGateTask : DefaultTask() {
                 census,
                 registered = policy.coordinates("gate.tests.$module"),
                 declaredExcluded = policy.coordinates("gate.tests.$module.excluded"),
+                hasTestSources = testSources.files.any { it.isFile && it.extension in SOURCE_EXTENSIONS },
             )
 
         writeReport(module, census, violations)
@@ -107,6 +117,8 @@ abstract class GateRegistrationGateTask : DefaultTask() {
     }
 
     private companion object {
+        val SOURCE_EXTENSIONS = setOf("kt", "java")
+
         const val DISCOVERY_ANNOTATIONS = "gate.tests.discovery.annotations"
         const val CONDITION_PACKAGES = "gate.tests.discovery.condition-packages"
 

@@ -110,6 +110,7 @@ val buildLogicGateRegistrationGate =
         policyFile = layout.settingsDirectory.file("config/quality/gate-tests.properties")
         moduleName = "build-logic"
         testClasses.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/test"))
+        testSources.from(layout.settingsDirectory.dir("build-logic/src/test"))
         testRuntimeClasspath.from(buildLogicMetaAnnotations)
         excludePatterns = emptySet<String>()
         dependsOn(gradle.includedBuild("build-logic").task(":testClasses"))

@@ -287,10 +287,15 @@ class TransportSurfaceRules(
         return { unit -> reaches(unit, mutableSetOf(unit.callKey())) }
     }
 
-    /** 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다. */
-    private fun signatureNamesSurface(member: JavaCodeUnit): Boolean =
-        (member.rawParameterTypes.map(JavaClass::getName) + member.rawReturnType.name)
-            .any { isSurfaceType(it.outermostName()) }
+    /**
+     * 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다.
+     *
+     * **배열을 벗긴다**(PR #60 A). `JavaClass.name` 은 배열을 JVM 철자(`[Ljava.nio.file.OpenOption;`)로
+     * 주고 그 이름은 전송 뿌리 술어에 걸리지 않는다 — `vararg o: OpenOption` 류가 두 갈래 다 빠져
+     * R2-H-1 이 닫은 구멍이 배열 서명에서 다시 열렸다(오늘 live 미탐 0). 같은 파일의
+     * [referencedTypeNames] 가 이미 `baseComponentType` 으로 벗기고 있어 그쪽과 통일한다.
+     */
+    private fun signatureNamesSurface(member: JavaCodeUnit): Boolean = member.signatureTypes().any { isSurfaceType(it) }
 
     /**
      * **호출 대상의 시그니처가 전송 타입을 말하면 그 호출도 전송 도달이다**(vr r2 R2-H-1).
@@ -302,8 +307,24 @@ class TransportSurfaceRules(
      * 로 넘긴다). 그룹 안팎을 가리지 않는다 — 넘기는 상대가 어느 클래스든 바이트는 나간다.
      */
     private fun callSignatureNamesSurface(call: JavaCall<*>): Boolean =
-        (call.target.rawParameterTypes.map(JavaClass::getName) + call.target.rawReturnType.name)
-            .any { isSurfaceType(it.outermostName()) }
+        (call.target.rawParameterTypes + call.target.rawReturnType)
+            .any { isSurfaceType(it.surfaceName()) }
+
+    /** 시그니처가 말하는 타입 이름 전수 — 배열을 벗기고 중첩을 접은 뒤의 이름이다. */
+    private fun JavaCodeUnit.signatureTypes(): List<String> =
+        (rawParameterTypes + rawReturnType).map { it.surfaceName() }
+
+    /** 전송 표면 판정에 쓰는 이름 — 배열을 벗기고([JavaClass.baseComponentType]) 중첩을 접는다. */
+    private fun JavaClass.surfaceName(): String = baseComponentType.name.outermostName()
+
+    /**
+     * 등재 키에 쓰는 **읽을 수 있는** 타입 철자 — 배열은 `java.nio.file.OpenOption[]` 로 적는다(PR #60 C).
+     *
+     * JVM 철자(`[Ljava.nio.file.OpenOption;`)를 그대로 쓰면 그 안의 `;` 가 **인자 구분자와 같아** 한 쌍이
+     * 여러 쌍으로 읽힌다. 차원은 이름 앞의 `[` 수가 든다.
+     */
+    private fun JavaClass.readableName(): String =
+        baseComponentType.name + "[]".repeat(name.takeWhile { it == '[' }.length)
 
     /**
      * 등재에 쓰는 이름 — **소유 클래스의 이진 이름 + 멤버 이름 + 서술자**다.
@@ -317,16 +338,13 @@ class TransportSurfaceRules(
      * 쌍으로 쪼개진다.
      */
     private fun JavaCodeUnit.signatureKey(): String =
-        "${owner.fullName}#$name(${rawParameterTypes.joinToString(";", transform = JavaClass::getName)})"
+        "${owner.fullName}#$name(${rawParameterTypes.joinToString(";") { it.readableName() }})"
 
     /** 그룹 안에서 호출 대상을 찾는 열쇠 — 등재 키와 같은 모양이다. */
     private fun JavaCodeUnit.callKey(): String = signatureKey()
 
     private fun JavaCall<*>.callKey(): String =
-        "${targetOwner.fullName}#${target.name}(${target.rawParameterTypes.joinToString(
-            ";",
-            transform = JavaClass::getName,
-        )})"
+        "${targetOwner.fullName}#${target.name}(${target.rawParameterTypes.joinToString(";") { it.readableName() }})"
 
     private fun holdHiddenSendMemberOutside(
         observed: Map<String, List<String>>,

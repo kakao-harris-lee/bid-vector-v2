@@ -92,12 +92,22 @@ internal object GateRegistration {
         return GateRegistrationCensus(population, (conditional + filtered) intersect population)
     }
 
+    /**
+     * [hasTestSources] 는 그 모듈의 test 소스셋에 Kotlin·Java 파일이 **있는가**(build 사실)다.
+     * 있는데 모집단이 비면 **산출 경로를 잃은 것**이고, 그때 등재까지 비어 있으면 양쪽이 공집합이라
+     * 등식이 조용히 성립한다 — 지운 `AppGateRegistrationTest` 의 「모집단이 비어 있지 않다」를 손 임계가
+     * 아니라 build 사실로 되살린 자리다(PR #60 R). 소스가 없는 모듈은 통과한다.
+     */
     fun violations(
         census: GateRegistrationCensus,
         registered: Set<String>,
         declaredExcluded: Set<String>,
+        hasTestSources: Boolean,
     ): List<String> {
         val required = census.population - census.excluded
+        if (hasTestSources && census.population.isEmpty()) {
+            return listOf("test 소스가 있는데 컴파일된 모집단이 비었다 — 산출 경로를 잃었다")
+        }
         return listOf(
             (required - registered) to "게이트 등재 장부에 없는 test 클래스다 — 등재하지 않으면 지워져도 `check` 가 초록이다",
             (registered - required) to "등재돼 있지만 소스에 없다 — 장부가 유령 이름을 산 것처럼 센다",

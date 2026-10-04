@@ -214,6 +214,27 @@ class GateRegistrationCensusTest {
         assertEquals(setOf("p.FooTest"), census.population)
     }
 
+    // ---- 모집단을 잃은 자리 ----
+
+    /**
+     * test 소스가 있는데 모집단이 비면 **산출 경로를 잃은 것**이다. 등재까지 비어 있으면 양쪽이
+     * 공집합이라 등식이 조용히 성립한다 — 지운 등식 test 의 「모집단이 비어 있지 않다」를 손 임계가
+     * 아니라 build 사실로 되살린 자리다(PR #60 R).
+     */
+    @Test
+    fun `test 소스가 있는데 모집단이 비면 붉는다`() {
+        val violations = violationsOf(census(), registered = emptySet(), hasTestSources = true)
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("산출 경로"), "$violations")
+    }
+
+    /** test 소스가 없는 모듈은 모집단이 비어도 통과한다 — `settlement` 류. */
+    @Test
+    fun `test 소스가 없으면 빈 모집단도 통과한다`() {
+        assertEquals(emptyList<String>(), violationsOf(census(), registered = emptySet()))
+    }
+
     // ---- 등식 — 양방향 ----
 
     @Test
@@ -226,7 +247,7 @@ class GateRegistrationCensusTest {
             )
 
         val violations =
-            GateRegistration.violations(
+            violationsOf(
                 census,
                 registered = setOf("p.FooTest"),
                 declaredExcluded = setOf("p.SmokeTest"),
@@ -239,7 +260,7 @@ class GateRegistrationCensusTest {
     fun `등재에서 한 줄을 빼면 누락으로 붉는다`() {
         val census = census(facts("p.FooTest", methods = setOf(TEST)))
 
-        val violations = GateRegistration.violations(census, registered = emptySet(), declaredExcluded = emptySet())
+        val violations = violationsOf(census, registered = emptySet(), declaredExcluded = emptySet())
 
         assertEquals(1, violations.size, "$violations")
         assertTrue(violations.single().contains("p.FooTest"), "$violations")
@@ -250,7 +271,7 @@ class GateRegistrationCensusTest {
         val census = census(facts("p.FooTest", methods = setOf(TEST)))
 
         val violations =
-            GateRegistration.violations(
+            violationsOf(
                 census,
                 registered = setOf("p.FooTest", "p.GhostTest"),
                 declaredExcluded = emptySet(),
@@ -265,7 +286,7 @@ class GateRegistrationCensusTest {
     fun `선언되지 않은 제외가 생기면 붉는다`() {
         val census = census(facts("p.FooTest", methods = setOf(TEST), classes = setOf(ENABLED_IF)))
 
-        val violations = GateRegistration.violations(census, registered = emptySet(), declaredExcluded = emptySet())
+        val violations = violationsOf(census, registered = emptySet(), declaredExcluded = emptySet())
 
         assertEquals(1, violations.size, "$violations")
         assertTrue(violations.single().contains("p.FooTest"), "$violations")
@@ -277,7 +298,7 @@ class GateRegistrationCensusTest {
         val census = census(facts("p.FooTest", methods = setOf(TEST)))
 
         val violations =
-            GateRegistration.violations(
+            violationsOf(
                 census,
                 registered = setOf("p.FooTest"),
                 declaredExcluded = setOf("p.GhostTest"),
@@ -291,6 +312,13 @@ class GateRegistrationCensusTest {
         const val TEST = "org.junit.jupiter.api.Test"
         const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
         const val ENABLED_IF = "org.junit.jupiter.api.condition.EnabledIfSystemProperty"
+
+        fun violationsOf(
+            census: GateRegistrationCensus,
+            registered: Set<String>,
+            declaredExcluded: Set<String> = emptySet(),
+            hasTestSources: Boolean = false,
+        ) = GateRegistration.violations(census, registered, declaredExcluded, hasTestSources)
 
         fun facts(
             binaryName: String,
