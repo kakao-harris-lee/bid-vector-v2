@@ -278,6 +278,7 @@ class TransportSurfaceRules(
             seen: MutableSet<String>,
         ): Boolean =
             unit.accessesFromSelf.any { isSurfaceType(it.targetOwner.outermostClassName()) } ||
+                unit.callsFromSelf.any(::callSignatureNamesSurface) ||
                 unit.callsFromSelf.any { call ->
                     val next = byKey[call.callKey()]
                     next != null && hidden(next) && seen.add(next.callKey()) && reaches(next, seen)
@@ -289,6 +290,19 @@ class TransportSurfaceRules(
     /** 시그니처가 전송 타입을 말하는가 — 말하면 2층의 쌍 등식이 이미 그 자리를 든다. */
     private fun signatureNamesSurface(member: JavaCodeUnit): Boolean =
         (member.rawParameterTypes.map(JavaClass::getName) + member.rawReturnType.name)
+            .any { isSurfaceType(it.outermostName()) }
+
+    /**
+     * **호출 대상의 시그니처가 전송 타입을 말하면 그 호출도 전송 도달이다**(vr r2 R2-H-1).
+     *
+     * 도달 추적은 「비-private 멤버를 거쳐 가는 길은 그 멤버 자신이 등재된다」를 전제로 비-private
+     * 호출을 따라가지 않는데, **시그니처에 전송 타입이 있는 비-private 멤버는 3층에서 빠진다**(2층 몫).
+     * 그래서 `fun x(s: String) = w(channel, s)` 의 `x` 가 어느 층에도 남지 않았다 — production 의
+     * `FileChannelAppend.append(String)` 이 그 모양이다(`writeFully(WritableByteChannel, ByteBuffer)`
+     * 로 넘긴다). 그룹 안팎을 가리지 않는다 — 넘기는 상대가 어느 클래스든 바이트는 나간다.
+     */
+    private fun callSignatureNamesSurface(call: JavaCall<*>): Boolean =
+        (call.target.rawParameterTypes.map(JavaClass::getName) + call.target.rawReturnType.name)
             .any { isSurfaceType(it.outermostName()) }
 
     /**
