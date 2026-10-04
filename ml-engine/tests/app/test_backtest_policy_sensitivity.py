@@ -1544,6 +1544,36 @@ def test_the_use_census_is_generated_and_every_site_is_covered() -> None:
     )
 
 
+def test_the_derived_label_equals_the_measured_derivation() -> None:
+    """cr r1 P-5 — `DERIVED` 는 **저자 선언이 아니라 명단이 잰 사실**이다.
+
+    막는 결함: `PolicyUse` 가 파생 여부를 나르지 않아 「이 삼중이 정말 파생인가」를 재는 자리가
+    없었다. 동시에 독립 레인 셈은 `DERIVED` 를 **건너뛴다**. 둘을 겹치면 이미 앵커가 있는
+    (키, 자리)에 **직접** 소비자를 하나 더 붙이고 `DERIVED` 로 적는 길이 열린다 — 앵커 동반
+    규칙은 앵커가 이미 있어 통과하고, 독립 레인 수는 움직이지 않는다. 결정 쓰임 하나가 조용히
+    들어온다.
+
+    이제 명단이 `derived` 칸을 나르고 여기서 **등식**으로 맞댄다. 같은 삼중이 파생과 직접
+    양쪽에 있으면 칸이 등식이 될 수 없으므로 그것부터 거부한다."""
+    policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    census = policy_use_census(policy)
+    measured = {(use.key, use.site, use.consumer) for use in census if use.derived}
+    direct = {(use.key, use.site, use.consumer) for use in census if not use.derived}
+    ambiguous = sorted(measured & direct)
+    assert not ambiguous, (
+        "같은 삼중이 파생과 직접 양쪽에서 났다 — 칸이 덮개의 등식이 될 수 없다: "
+        f"{ambiguous}"
+    )
+    labelled = {
+        triple for triple, coverage in _USE_COVERAGE.items() if coverage == "DERIVED"
+    }
+    assert labelled == measured, (
+        f"파생이 아닌데 DERIVED 로 등재: {sorted(labelled - measured)} · "
+        f"파생인데 다른 어휘로 등재: {sorted(measured - labelled)}"
+    )
+
+
 def test_every_derived_use_has_a_measured_anchor() -> None:
     """D-6G2c-24 — `DERIVED` 는 **동반 없이 쓸 수 없다**.
 
@@ -1659,10 +1689,15 @@ _VERIFIER_REPORTED: Final[dict[str, int]] = {
 def test_the_census_reproduces_the_independent_count() -> None:
     """생성 명단이 **독립 레인의 셈**을 재현한다.
 
-    verifier r2 는 자기 AST 로 판정 쓰임을 세고 이 레인과 여섯 값에서 맞댔다. 공시(`ECHO`)와
-    helper 통과(`PASS:`) 자리를 뺀 뒤 **자리 축과 소비자 축 둘 다** 적고, 보고서의 수가 둘
-    중 하나와 일치함을 단언한다. 축을 하나만 적으면 두 레인이 다른 축을 세고도 같은 수가
-    나올 수 있다."""
+    verifier r2 는 자기 AST 로 판정 쓰임을 세고 이 레인과 여섯 값에서 맞댔다. 제외 축은
+    **셋**이다(cr r1 P-6): 공시(`ECHO`) · helper 통과(`PASS:`) · **파생 한 단계**(`DERIVED`,
+    M6/6G-2c). 그래서 이 수가 재는 것은 「파생 아닌 결정 쓰임」이고, 독립 레인의 셈을
+    재현한다는 주장의 범위도 거기까지다 — 그쪽 AST 도 파생 지역 변수를 따라가지 않았다.
+    `DERIVED` 가 저자 선언이 아니라는 것은 `test_the_derived_label_equals_the_measured_
+    derivation` 이 등식으로 잠근다(그 등식이 없으면 이 제외가 구멍이 된다).
+
+    남은 뒤 **자리 축과 소비자 축 둘 다** 적고, 보고서의 수가 둘 중 하나와 일치함을 단언한다.
+    축을 하나만 적으면 두 레인이 다른 축을 세고도 같은 수가 나올 수 있다."""
     policy = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
     assert isinstance(policy, StrategyBacktestPolicy), policy
     sites: dict[str, set[str]] = {}

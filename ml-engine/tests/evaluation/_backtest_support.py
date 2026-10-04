@@ -406,6 +406,14 @@ class PolicyUse:
     key: str
     site: str
     consumer: str
+    derived: bool = False
+    """이 쓰임이 **파생 지역 변수**를 거쳐 왔는가(M6/6G-2c 수정 r1, cr P-5).
+
+    앞 판은 삼중만 날랐다. 그래서 「이 삼중이 정말 파생인가」를 재는 자리가 없었고 덮개의
+    `DERIVED` 는 **저자 선언**이었다 — 이미 앵커가 있는 (키, 자리)에 **직접** 소비자를 하나 더
+    붙이고 `DERIVED` 로 적으면 앵커 동반 규칙은 앵커가 이미 있어 통과하고 독립 레인 셈은
+    그 이름을 건너뛰므로, 결정 쓰임 하나가 조용히 들어올 수 있었다. 이제 명단이 사실을
+    나르고 등식이 덮개와 맞댄다."""
 
 
 def policy_file_keys(path: Path | None = None) -> tuple[str, ...]:
@@ -594,6 +602,8 @@ class _Resolver:
     top: str
     group_names: dict[str, str]
     value_names: dict[str, frozenset[str]]
+    derived_names: set[str]
+    """파생으로 묶인 지역 이름들 — 명단이 그 사실을 칸으로 나른다(cr P-5)."""
 
     def is_policy(self, node: ast.AST) -> bool:
         if isinstance(node, ast.Name):
@@ -696,6 +706,7 @@ class _Resolver:
             if keys:
                 derived[name] = keys
         self.value_names.update(derived)
+        self.derived_names.update(derived)
 
     def _contained_keys(
         self, expression: ast.expr, parents: Mapping[int, tuple[ast.AST, str]]
@@ -778,8 +789,9 @@ def _scan_function(
             if indexed:
                 keys = frozenset(indexed)
         consumer = _consumer_name(parent, parents)
+        derived = isinstance(node, ast.Name) and node.id in resolver.derived_names
         for key in keys:
-            uses.add(PolicyUse(key, f"{module}.{function.name}", consumer))
+            uses.add(PolicyUse(key, f"{module}.{function.name}", consumer, derived))
     return uses
 
 
@@ -809,6 +821,7 @@ def _scan_module(
                 else {}
             ),
             value_names={},
+            derived_names=set(),
         )
         uses |= _scan_function(
             function, module=module, parents=parents, resolver=resolver
