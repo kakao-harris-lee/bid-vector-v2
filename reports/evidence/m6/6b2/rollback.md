@@ -47,7 +47,7 @@ git restore --source=e922dc7b --staged --worktree -- \
 ### 2단계 — `milestone-6.md` 는 커밋 해시 hunk 격리
 
 공유 문서다. 이 range 에서 그 파일을 만진 커밋은 `git log --oneline e922dc7b..HEAD -- milestone-6.md`
-가 내며, 이 라운드의 재산출에서도 **하나**(`93b04488`, 6B-2 착수 문단)였다. 뒤부터 역적용한다:
+가 내며, 레인 재산출 시점에는 **하나**(`93b04488`, 6B-2 착수 문단)였고 종결 문단 커밋 뒤에는 **둘**(`61874bfc`·`93b04488`)이다 — 아래 「팀장 재실측」. 뒤부터 역적용한다:
 
 ```
 git diff 93b04488~1..93b04488 -- milestone-6.md | git apply -R
@@ -96,3 +96,16 @@ git diff 93b04488~1..93b04488 -- milestone-6.md | git apply -R
 ## 하네스 레인 변경
 
 `git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**. 이 slice 는 하네스 경로를 건드리지 않았다.
+
+## 팀장 재실측 @`61874bfc` (6B-2 종결 문단 커밋, 2026-10-05)
+
+종결 문단이 `milestone-6.md`(hunk 대상)를 움직였으므로 버릴 clone 에서 다시 쟀다 — 복원 여섯은 `47d5663b` 뒤 이동 0(`git diff --name-only 47d5663b..61874bfc -- <여섯>` 빈 출력)이라 ④~⑥ 은 위 실측이 그대로 유효하고, 여기서는 ⓪~③d 를 쟀다.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| ⓪ | 목록 등식(`git diff --name-status e922dc7b..47d5663b` ∖ evidence·milestone vs 1단계 여섯) | `comm -23`·`comm -13` 둘 다 0 |
+| ①② | 1단계 restore | exit 0 · D 4 · M 2 |
+| ③ | 복원 경로 vs base | 빈 출력 |
+| ③b | milestone hunk — `git log --format=%h e922dc7b..HEAD -- milestone-6.md` 산출 **둘**을 최신부터 역적용(`61874bfc` → `93b04488`) | apply exit 0 · conflict 0 · `git diff e922dc7b -- milestone-6.md` 빈 출력 |
+| ③c | 내 줄 사라짐 · 남의 줄 남음 | 6B-2 언급 HEAD 4 → 되돌린 뒤 2(= base) · 6B-1 10(= base) |
+| ③d | 트리 동일성 | base 와 다른 추적 파일은 `reports/evidence/m6/6b2/` 넷뿐(의도) |

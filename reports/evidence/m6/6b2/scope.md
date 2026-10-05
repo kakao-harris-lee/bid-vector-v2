@@ -104,9 +104,16 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`c
 |---|---|---|
 | **D-6B2-17** | **일괄 라운드 수령·동결.** 산출물 `a2e949af`(①~⑥ 코드) · runbook `47d5663b`(= **rollback 실측 HEAD**) · evidence `91f7303a` = **판정 SHA**. 팀장 대조: 변경 7 파일 전부 in_scope · 새 파일 0 · production diff 0 · evidence 누출 0 · 크기 483 ≤ 1,055 · `git diff --name-only 47d5663b..91f7303a -- <복원 여섯 + milestone-6.md>` 빈 출력 · 호스트 잔여 0. 레인이 commands.md 의 옛 「exit 1」 수치를 이번 라운드의 3 으로 고쳐 쓴 것은 낡은 수치 방지로 채택. 읽히는 Docker 소유 라벨 하나(`com.docker.compose.project.config_files`)가 늘었을 뿐 새 public 표면 0. 표적 재검증(D-6B2-16 셋)을 verifier 에 건다 — 통과하면 종결 | 레인 보고 |
 
+## 계약 갱신 r7 (2026-10-05, 팀장 — 종결)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-18** | **종결 판정.** verifier 표적 재검증 **ready-for-review** @`91f7303a`(`06_verifier_targeted.md` — D-6B2-16 셋 성립: 실제 역할 이름 `-`·`.`·대문자·따옴표 복원 끝까지 + manifest 위조 이름 exit 1 구문 오류 0 · 복원 대상이 원본 컨테이너 이미지로(옛 줄 복귀 변이 검출) · 깨진 manifest 넷 exit 3 생성 0 사유 parse/shape/shape/empty · R-4 객체 이름 보고 · rollback 술어·`comm` 0; `check`·container job 은 지시로 생략). 판정 이력: verifier r1 not-ready → r2 ready-for-review → 표적 ready-for-review · code-reviewer r1 high(≡M-1) → r2 새 high 없음. 재작업 **1/5**. 종결 문단 `milestone-6.md` `61874bfc`; **팀장 rollback 재실측 @`61874bfc`**(rollback.md — hunk 둘 역적용 conflict 0, 트리 base 동일). 다음: push → PR → `/code-review` → 판정·조치 코멘트 → 머지(운영자 상시 지시 「리뷰 이상 없으면 PR·머지」) | 판정 레인 |
+| **D-6B2-19** | **6C D-6C-2 「사실 추가」의 자리** — r1 D-6B2-1 이 「D-6C-2 문면에 사실 추가」라 적었으나 `reports/evidence/m6/6c/**` 는 닫힌 slice 의 evidence 이고 이 slice 의 in_scope 밖이다. 고치지 않는다. compose `name:` 의 사실은 `docker/compose.yaml` 머리 주석 + 이 계약 D-6B2-5 ② + milestone 종결 문단이 정본 | in_scope 경계 |
+
 ## 하네스 레인 변경
 
-`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 `caa78fe3` · r6 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
+`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 `caa78fe3` · r6 `de88833e` · r7 이 커밋)와 `milestone-6.md`(`93b04488` 착수 · `61874bfc` 종결) 뿐 — `git log -- <파일>` 산출.
 
 ## 입력·이관
 
