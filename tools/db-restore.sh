@@ -61,6 +61,7 @@ _assert_manifest() {
       if (type == "object")
          and (.schema == "bidvector-db-backup/1")
          and ((.measurements | type) == "object")
+         and ((.measurements | length) > 0)
       then "ok" else "shape" end' "$file" 2>/dev/null)" || verdict="parse"
   # 0 바이트 입력에서 jq 는 출력 없이 성공하므로 세 사유 어느 것도 아닌 빈 값이 나온다.
   [ -n "$verdict" ] || verdict="empty"
@@ -157,7 +158,7 @@ for artifact in roles.sql db.dump; do
   recorded="$(jq -r --arg a "$artifact" '.artifacts[$a].sha256' "$BACKUP/manifest.json")"
   measured="$(sha256sum "$BACKUP/$artifact" | cut -d' ' -f1)"
   [ "$recorded" = "$measured" ] \
-    || _die "$artifact 의 sha256 이 manifest 와 다르다 — 백업이 손상됐거나 바뀌었다" 1
+    || _die "$artifact 의 sha256 이 manifest 와 다르다 — 백업이 손상됐거나 바뀌었다" 3
 done
 
 # 복원 경로는 manifest 를 **믿지 않는 입력**으로 다룬다(형제 두 파일의 바이트를 해시로 맞추고
@@ -166,7 +167,7 @@ done
 # code-review G-2). 설계 검토 (2b) 의 「주입 자리 없음」은 manifest 를 입력으로 세지 않은 문장이다.
 _assert_plain_identifier() {
   case "$2" in
-    '' | *[!a-z0-9_]*) _die "$1 식별자 모양이 아니다: '$2'" 1 ;;
+    '' | *[!a-z0-9_]*) _die "$1 식별자 모양이 아니다: '$2'" 3 ;;
   esac
 }
 
@@ -182,7 +183,13 @@ _wait_ready() {
   # 공식 이미지는 initdb 용 **임시 서버**를 먼저 띄웠다 내린다 — 초기화 완료 표지를 먼저
   # 기다리지 않으면 그 임시 서버를 붙잡고 곧바로 연결이 끊긴다(2026-10-05 실측).
   for i in $(seq 1 60); do
-    docker logs "$CONTAINER" 2>&1 | grep -q 'init process complete' && break
+    # `docker logs … | grep -q` 를 쓰지 않는다 — `grep -q` 는 첫 일치에서 즉시 나가 파이프를
+    # 닫고, `pipefail` 아래 파이프라인 상태는 마지막 비-0 이므로 **일치했을 때에도** 거짓이 될
+    # 수 있다. ci.yml 의 스모크가 같은 이유로 금지한 모양이다. 로그를 변수로 먼저 받는다.
+    logs="$(docker logs "$CONTAINER" 2>&1 || true)"
+    case "$logs" in
+      *'init process complete'*) break ;;
+    esac
     sleep 1
   done
   for i in $(seq 1 60); do

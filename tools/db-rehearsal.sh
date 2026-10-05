@@ -67,9 +67,17 @@ _cleanup() {
 trap _cleanup EXIT
 
 # ---- 0. 사전 단언(D-6B2-3) ---------------------------------------------------------
-PROJECT="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.name')"
+PROJECT="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.name')" \
+  || _die "compose 파일을 해석하지 못했다: $COMPOSE_FILE" 3
 [ -n "$PROJECT" ] && [ "$PROJECT" != "null" ] \
   || _die "compose 파일이 프로젝트 이름을 들지 않는다 — top-level name: 이 필요하다" 3
+
+# ④ compose **파일 자체**에 top-level `name:` 선언이 있는지를 본다. `config` 의 결과로는 이것을
+# 구별할 수 없다 — 선언이 없으면 compose 가 디렉터리 basename 을 돌려주므로 값은 늘 비어 있지
+# 않다. 선언이 사라지면 프로젝트 이름이 checkout 위치에 좌우되고, 이 리허설의 격리 서술이
+# 통째로 흔들린다(PR #61 리뷰 D).
+grep -qE '^name:[[:space:]]*[^[:space:]]' "$COMPOSE_FILE" \
+  || _die "compose 파일에 top-level name: 선언이 없다 — 프로젝트 이름이 디렉터리에 좌우된다" 3
 
 SOURCE="$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE" 2>/dev/null || true)"
 [ -n "$SOURCE" ] || _die "compose 프로젝트 '$PROJECT' 에 동작 중인 '$SERVICE' 가 없다" 3
@@ -121,13 +129,16 @@ _step "사전 단언 — 원본 $PROJECT/$SERVICE(이 compose 파일이 만든 �
 # `APP_IMAGE` 는 파일에서 읽는다 — 원본 환경에 앱 컨테이너가 없을 수 있다.
 IMAGE="$(docker inspect --type container -f '{{.Config.Image}}' "$SOURCE")" \
   || _die "원본 컨테이너의 이미지를 읽지 못했다" 3
-APP_IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.services.app.image')"
+APP_IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.services.app.image')" \
+  || _die "compose 파일에서 앱 이미지를 읽지 못했다" 3
 [ -n "$IMAGE" ] && [ "$IMAGE" != "null" ] || _die "'$SERVICE' 의 이미지를 읽지 못했다" 3
 docker image inspect "$APP_IMAGE" >/dev/null 2>&1 \
   || _die "앱 이미지 '$APP_IMAGE' 가 없다 — ':app:bootJar' 와 app.Dockerfile 빌드를 먼저 돌린다" 2
 
-SUPERUSER="$(docker exec "$SOURCE" printenv POSTGRES_USER)"
-SOURCE_DB="$(docker exec "$SOURCE" printenv POSTGRES_DB)"
+SUPERUSER="$(docker exec "$SOURCE" printenv POSTGRES_USER)" \
+  || _die "원본 컨테이너에서 POSTGRES_USER 를 읽지 못했다 — postgres 컨테이너가 맞는가" 3
+SOURCE_DB="$(docker exec "$SOURCE" printenv POSTGRES_DB)" \
+  || _die "원본 컨테이너에서 POSTGRES_DB 를 읽지 못했다" 3
 
 _src_psql() {
   docker exec -i "$SOURCE" psql -X -q -t -A -v ON_ERROR_STOP=1 -U "$SUPERUSER" -d "$SOURCE_DB" -c "$1"
@@ -139,7 +150,17 @@ _tgt_psql() {
 # ---- 1. 백업 ----------------------------------------------------------------------
 "$SCRIPT_DIR/db-backup.sh" "$SOURCE" "$WORK/backup"
 
-leak_scan="$(grep -rniE -f "$REPO_ROOT/config/quality/leak-patterns.txt" "$WORK/backup" 2>/dev/null || true)"
+# 스캔이 **섰는지**를 먼저 본다. 앞 판은 grep 의 모든 비-0 을 `|| true` 로 삼켜, 패턴 파일이
+# 없거나(exit 2) 읽기 오류가 나도 「0건」으로 읽혔다. 0·1 만 정상이고 그 밖은 스캔이 돌지 않은
+# 것이다. `-a` 로 바이너리 덤프도 텍스트로 훑는다 — 그러지 않으면 매치가 stderr 의 한 줄로만
+# 나와 셈에 들어오지 않는다(PR #61 리뷰 C).
+LEAK_PATTERNS="$REPO_ROOT/config/quality/leak-patterns.txt"
+[ -r "$LEAK_PATTERNS" ] || _die "누출 패턴 파일을 읽을 수 없다: $LEAK_PATTERNS" 2
+leak_scan="$(grep -rniEa -f "$LEAK_PATTERNS" "$WORK/backup")" && leak_rc=0 || leak_rc=$?
+case "$leak_rc" in
+  0 | 1) ;;
+  *) _die "누출 스캔이 코드 ${leak_rc} 로 끝났다 — 스캔이 서지 않았다" 2 ;;
+esac
 leak_hits="$(printf '%s\n' "$leak_scan" | grep -c . || true)"
 [ "$leak_hits" -eq 0 ] || _die "백업 산출물이 누출 패턴에 걸린다(${leak_hits}건)" 1
 _step "백업 산출물 누출 스캔 0건"
@@ -151,6 +172,17 @@ _step "백업 산출물 누출 스캔 0건"
 JVM="$WORK/jvm"
 mkdir -p "$JVM/classes" "$JVM/migrations/db/migration"
 cp "$MIGRATION_SRC"/V*.sql "$JVM/migrations/db/migration/"
+
+# 프로브 버전을 **복사한 파일에서 도출한다.** 고정 V18/V19 를 쓰면 실제 V18 이 들어오는 날
+# 같은 버전이 둘이 되어 리허설이 「more than one migration」으로 붉어진다 — 리허설이 자기
+# 때문에 깨지는 자리다(PR #61 리뷰 A). 파일명 뒷부분과 DROP 대상 열 이름은 그대로 둔다.
+PROBE_BASE="$(ls "$JVM/migrations/db/migration"/V*.sql \
+  | sed -E 's#.*/V([0-9]+)__.*#\1#' | sort -n | tail -1)"
+case "$PROBE_BASE" in
+  '' | *[!0-9]*) _die "복사한 마이그레이션에서 최대 버전을 읽지 못했다: '$PROBE_BASE'" 1 ;;
+esac
+PROBE_ADD=$((PROBE_BASE + 1))
+PROBE_FIX=$((PROBE_BASE + 2))
 cat > "$JVM/RehearsalFlyway.java" <<'JAVA'
 import org.flywaydb.core.Flyway;
 
@@ -186,7 +218,7 @@ flyway_jar="$(docker run --rm --entrypoint sh "$APP_IMAGE" -c 'ls /application/l
 [ "$(printf '%s\n' "$flyway_jar" | grep -c .)" -eq 1 ] || _die "앱 이미지의 flyway-core 가 하나가 아니다" 2
 docker run --rm --entrypoint sh "$APP_IMAGE" -c "cat $flyway_jar" > "$JVM/flyway-core.jar" \
   || _die "flyway-core 를 꺼내지 못했다" 2
-javac -nowarn -cp "$JVM/flyway-core.jar" -d "$JVM/classes" "$JVM/RehearsalFlyway.java" \
+javac --release 21 -nowarn -cp "$JVM/flyway-core.jar" -d "$JVM/classes" "$JVM/RehearsalFlyway.java" \
   || _die "Flyway 호출자를 컴파일하지 못했다" 1
 chmod -R a+rX "$JVM"
 
@@ -201,32 +233,44 @@ _flyway() {
 }
 
 _flyway validate restore_1 >/dev/null || _die "복원본에서 Flyway validate 가 실패했다" 1
-_step "복원본 Flyway validate 통과 — 이력 $(_tgt_psql restore_1 'select count(*) from flyway_schema_history')행 top $(_tgt_psql restore_1 'select version from flyway_schema_history order by installed_rank desc limit 1')"
+hist_rows="$(_tgt_psql restore_1 'select count(*) from flyway_schema_history')" \
+  || _die "복원본의 이력 행 수를 읽지 못했다" 1
+hist_top="$(_tgt_psql restore_1 'select version from flyway_schema_history order by installed_rank desc limit 1')" \
+  || _die "복원본의 이력 최상위 버전을 읽지 못했다" 1
+_step "복원본 Flyway validate 통과 — 이력 ${hist_rows}행 top ${hist_top}"
 
 # ---- 4. (i) forward-fix 되돌림 ------------------------------------------------------
-cat > "$JVM/migrations/db/migration/V18__rehearsal.sql" <<SQL
+PROBE_ADD_SQL="$JVM/migrations/db/migration/V${PROBE_ADD}__rehearsal.sql"
+cat > "$PROBE_ADD_SQL" <<SQL
 ALTER TABLE notice ADD COLUMN $PROBE_COLUMN TEXT;
 SQL
-_flyway migrate restore_1 >/dev/null || _die "임시 V18 적용이 실패했다" 1
+chmod a+r "$PROBE_ADD_SQL"
+_flyway migrate restore_1 >/dev/null || _die "임시 V${PROBE_ADD} 적용이 실패했다" 1
 [ "$(_tgt_psql restore_1 "select count(*) from information_schema.columns where table_name='notice' and column_name='$PROBE_COLUMN'")" = "1" ] \
-  || _die "V18 이 열을 더하지 않았다" 1
+  || _die "V${PROBE_ADD} 이 열을 더하지 않았다" 1
 
-cat > "$JVM/migrations/db/migration/V19__rehearsal_forward_fix.sql" <<SQL
+PROBE_FIX_SQL="$JVM/migrations/db/migration/V${PROBE_FIX}__rehearsal_forward_fix.sql"
+cat > "$PROBE_FIX_SQL" <<SQL
 ALTER TABLE notice DROP COLUMN $PROBE_COLUMN;
 SQL
-_flyway migrate restore_1 >/dev/null || _die "forward-fix V19 적용이 실패했다" 1
+chmod a+r "$PROBE_FIX_SQL"
+_flyway migrate restore_1 >/dev/null || _die "forward-fix V${PROBE_FIX} 적용이 실패했다" 1
 _flyway validate restore_1 >/dev/null || _die "forward-fix 뒤 validate 가 실패했다" 1
 
 [ "$(_tgt_psql restore_1 "select count(*) from information_schema.columns where table_name='notice' and column_name='$PROBE_COLUMN'")" = "0" ] \
   || _die "forward-fix 뒤에도 열이 남아 있다" 1
-applied="$(_tgt_psql restore_1 "select string_agg(version, ',' order by installed_rank) from flyway_schema_history where version in ('18','19')")"
-[ "$applied" = "18,19" ] || _die "되돌린 뒤 이력에 V18·V19 가 남아 있지 않다: '$applied'" 1
+applied="$(_tgt_psql restore_1 "select string_agg(version, ',' order by installed_rank) from flyway_schema_history where version in ('${PROBE_ADD}','${PROBE_FIX}')")" \
+  || _die "되돌린 뒤 이력을 읽지 못했다" 1
+[ "$applied" = "${PROBE_ADD},${PROBE_FIX}" ] \
+  || _die "되돌린 뒤 이력에 V${PROBE_ADD}·V${PROBE_FIX} 가 순서대로 남아 있지 않다: '$applied'" 1
 
 rm -rf "$WORK/after-fix"
 "$SCRIPT_DIR/db-backup.sh" "$RESTORE_CONTAINER" "$WORK/after-fix" restore_1 >/dev/null
 "$SCRIPT_DIR/db-restore.sh" --compare "$WORK/backup/manifest.json" "$WORK/after-fix/manifest.json" flywayHistory >/dev/null \
   || _die "forward-fix 뒤 스키마·데이터가 원래대로 돌아오지 않았다" 1
-_step "(i) forward-fix — 열 사라짐·이력에 V18·V19 남음(top $(_tgt_psql restore_1 'select version from flyway_schema_history order by installed_rank desc limit 1'))·이력 밖 측정 전부 일치"
+fix_top="$(_tgt_psql restore_1 'select version from flyway_schema_history order by installed_rank desc limit 1')" \
+  || _die "forward-fix 뒤 이력 최상위 버전을 읽지 못했다" 1
+_step "(i) forward-fix — 열 사라짐·이력에 V${PROBE_ADD}·V${PROBE_FIX} 남음(top ${fix_top})·이력 밖 측정 전부 일치"
 
 # ---- 5. (ii) 데이터 손실 축 ---------------------------------------------------------
 Q_STRATEGY="select coalesce(candidate_limit::text, 'null') || '/' || revision::text from operator_strategy where id = 1"
@@ -239,14 +283,22 @@ esac
 [ "$(_tgt_psql restore_1 "$Q_STRATEGY")" = "$source_strategy" ] \
   || _die "복원본의 전략 값이 원본과 다르다" 1
 
-_tgt_psql restore_1 "truncate operator_strategy, operator_strategy_revision" >/dev/null
+_tgt_psql restore_1 "truncate operator_strategy, operator_strategy_revision" >/dev/null \
+  || _die "복원본의 전략 두 표를 비우지 못했다" 1
 [ -z "$(_tgt_psql restore_1 "$Q_STRATEGY")" ] || _die "TRUNCATE 뒤에도 전략 행이 남아 있다" 1
 rm -rf "$WORK/after-loss"
 "$SCRIPT_DIR/db-backup.sh" "$RESTORE_CONTAINER" "$WORK/after-loss" restore_1 >/dev/null
-if "$SCRIPT_DIR/db-restore.sh" --compare "$WORK/backup/manifest.json" "$WORK/after-loss/manifest.json" flywayHistory >/dev/null 2>&1; then
-  _die "데이터를 지웠는데 등식이 통과했다 — 판정이 아무것도 재지 않는다" 1
-fi
-_step "(ii) 음성 대조 — 전략 두 표를 지우자 등식이 붉어진다"
+# 음성 대조는 **등식 불일치(1)** 만 통과한다. 앞 판은 비-0 을 전부 「붉음」으로 읽어, 비교가
+# 아예 서지 않은 경우(도구 부재 2 · 대상 오류 3)까지 「잘 잡았다」로 지나쳤다 — 대조가 재는
+# 것이 사라져도 알 수 없었다(PR #61 리뷰 B). stderr 는 가리지 않는다: 어긋남 줄이 보여야 한다.
+"$SCRIPT_DIR/db-restore.sh" --compare "$WORK/backup/manifest.json" \
+  "$WORK/after-loss/manifest.json" flywayHistory >/dev/null && loss_rc=0 || loss_rc=$?
+case "$loss_rc" in
+  1) ;;
+  0) _die "데이터를 지웠는데 등식이 통과했다 — 판정이 아무것도 재지 않는다" 1 ;;
+  *) _die "음성 대조가 등식 불일치(1)가 아니라 코드 ${loss_rc} 로 끝났다 — 비교가 서지 않았다" 1 ;;
+esac
+_step "(ii) 음성 대조 — 전략 두 표를 지우자 등식이 1 로 붉어진다"
 
 "$SCRIPT_DIR/db-restore.sh" "$WORK/backup" "$RESTORE_CONTAINER" "$IMAGE" restore_2 "$RUN_ID"
 [ "$(_tgt_psql restore_2 "$Q_STRATEGY")" = "$source_strategy" ] \
