@@ -1,6 +1,6 @@
 # M6/6D-1 — 실행 명령과 실측 (구현 레인)
 
-base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `bc7f37d6`.
+base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `697a231b`.
 
 ## acceptance — CI `check` job 명령
 
@@ -39,6 +39,7 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ① production 조립 | 전략·후보 소스 배선을 위임 대역으로 교체 | RED |
 | ① production 조립 | 저장소 관례 **밖 패키지**(`outoftree.fake`)에 둔 위임 대역으로 감시 대상 교체 | RED |
 | ① production 조립 | 여력 포트를 SAM 람다 대역으로 교체 | RED |
+| ① production 조립 | 감시 대상을 **JDK 동적 `Proxy`** 대역으로 교체(출처 미상 + handler 는 test) | RED |
 | ① 그래프 순회 | 깊이 상한을 10 에서 2 로 낮춤 | RED — 건너뛴 가지가 신호로 남는다 |
 | ① 사다리 임계 | 승격·검토 임계를 둘 다 0 으로(유효한 전략) | RED |
 | ① 사다리 임계 | 낮은 match 주입 제거(두 후보가 같은 임베딩) | RED |
@@ -53,7 +54,7 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ② DB conflict (production, clone) | 전이 질의에서 `SKIP LOCKED` 제거 | RED — 둘째 claim 이 막혀 쥠 시한이 만료된다(변이 run 40.9s, 정상 10.8s) |
 | ② ML timeout (production, clone) | 출하 예측 예산을 1시간으로 교체 | RED — 서버를 부르기 전 예산 고정점 단언에서 |
 
-열여덟 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
+열아홉 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
 production 경로를 재지 않는다는 뜻이고, 그래서 두 축의 술어를 바꿨다.
 
 ## 그 밖의 게이트 실측

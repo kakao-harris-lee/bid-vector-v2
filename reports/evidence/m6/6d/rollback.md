@@ -1,6 +1,6 @@
 # M6/6D-1 — rollback 절차와 실측
 
-실측 HEAD: `bc7f37d6`
+실측 HEAD: `697a231b`
 base: `fd4629fe`
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 이 slice 의 in_scope 는 e2e test
@@ -10,7 +10,7 @@ base: `fd4629fe`
 ## ⓪ 복원 목록 — 기계 산출
 
 ```
-git diff --name-status fd4629fe..bc7f37d6 -- \
+git diff --name-status fd4629fe..697a231b -- \
   adapters/src/test/kotlin/bidvector/adapters/e2e \
   config/quality/gate-tests.properties milestone-6.md
 ```
@@ -21,8 +21,8 @@ evidence 경로를 뺀 차집합이 **빈 출력**이다 — 범위 밖 혼입 0
 ## 공유 파일의 hunk 출처 — `git log` 산출
 
 ```
-git log --oneline fd4629fe..bc7f37d6 -- config/quality/gate-tests.properties   # 커밋 둘
-git log --oneline fd4629fe..bc7f37d6 -- milestone-6.md                         # 커밋 하나
+git log --oneline fd4629fe..697a231b -- config/quality/gate-tests.properties   # 커밋 둘
+git log --oneline fd4629fe..697a231b -- milestone-6.md                         # 커밋 하나
 ```
 
 등재 파일은 **두 단계**다(최초 등재와 사다리 test 추가). 역적용은 **최신 커밋부터 거꾸로** 해야
@@ -53,7 +53,7 @@ git diff b42900d5~1..b42900d5 -- milestone-6.md | git apply -R
 
 3. 두 단계 뒤 인덱스를 푼다(`git reset`).
 
-## ①~⑥ 실측 (버릴 clone, `bc7f37d6` 체크아웃)
+## ①~⑥ 실측 (버릴 clone, `697a231b` 체크아웃)
 
 | 항목 | 결과 |
 |---|---|
@@ -62,13 +62,17 @@ git diff b42900d5~1..b42900d5 -- milestone-6.md | git apply -R
 | ③ diff 빈 것 | `git diff --name-only fd4629fe -- <세 경로>` **빈 출력** — 되돌린 트리가 base 와 같다 |
 | ④ compile | `check` 안의 컴파일 전부 통과 |
 | ⑤ test | `check` 안의 test 전부 통과 |
-| ⑥ 게이트 | `./gradlew --no-daemon check` BUILD SUCCESSFUL(9m 12s) · `./gradlew --no-daemon qualityBaseline` BUILD SUCCESSFUL |
+| ⑥ 게이트 | `./gradlew --no-daemon check` BUILD SUCCESSFUL(9m 08s) · `./gradlew --no-daemon qualityBaseline` BUILD SUCCESSFUL |
 
 확인은 **양방향**이다 — 「내 줄이 사라졌다」(③ 의 빈 diff)와 「남의 줄이 남았다」(되돌린 뒤 등재
 파일의 식별자 줄 수가 base 와 같은 333, 다른 레인의 문서 커밋도 그대로)를 함께 봤다.
 
 갈음 근거는 「HEAD 가 초록」이 아니라 **트리 동일성**이다 — 되돌린 트리의 세 경로가 base 와 바이트
 동일함을 ③ 이 보이고, 그 위에서 ④⑤⑥ 을 다시 실측했다.
+
+**갈음을 쓰지 않고 실제로 돌렸다.** 되돌린 트리가 base 와 다른 경로는 이 slice 의 evidence·계약
+마크다운 넷뿐이지만, 그중 evidence 디렉터리는 **누출 패턴 게이트의 선언된 입력**이라(`quality-baseline`
+규약) 「입력이 같으니 base 결과로 갈음한다」가 성립하지 않는다. 그래서 두 명령을 그대로 다시 돌렸다.
 
 ## 비활성화(되돌리지 않고 끄는 법)
 
