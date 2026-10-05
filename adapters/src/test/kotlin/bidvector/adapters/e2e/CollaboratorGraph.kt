@@ -22,20 +22,6 @@ import java.util.IdentityHashMap
  * 스타일을 바꿔도 값이 변하지 않고, production 을 test 대역으로 바꾸면 반드시 변한다.
  */
 
-internal enum class ClassOrigin { MAIN, TEST, UNKNOWN }
-
-internal fun originOf(instance: Any): ClassOrigin {
-    val location = instance.javaClass.protectionDomain?.codeSource?.location?.path ?: return ClassOrigin.UNKNOWN
-    return when {
-        location.contains("/classes/kotlin/test/") || location.contains("/classes/java/test/") -> ClassOrigin.TEST
-        location.contains("/classes/kotlin/main/") ||
-            location.contains("/classes/java/main/") ||
-            location.contains("/build/libs/") -> ClassOrigin.MAIN
-
-        else -> ClassOrigin.UNKNOWN
-    }
-}
-
 /**
  * [roots] 에서 필드를 따라 닿는 `bidvector.*` 객체 전수. 컬렉션·맵은 원소로 내려가고, 순환은
  * 동일성 집합으로 끊는다. `bidvector.*` 밖 객체(드라이버·JDK·gRPC)는 모으지도 않고 그 필드로
@@ -56,13 +42,23 @@ private fun visit(
 ) {
     if (value == null || depth > MAX_GRAPH_DEPTH) return
     if (seen.put(value, true) != null) return
-    if (visitContainer(value, depth, seen, collected)) return
-    if (!value.javaClass.name.startsWith(BIDVECTOR_PACKAGE_PREFIX)) return
-    collected += value
-    declaredInstanceFields(value.javaClass).forEach { field ->
+    val isContainer = visitContainer(value, depth, seen, collected)
+    if (!isContainer && value.javaClass.name.startsWith(BIDVECTOR_PACKAGE_PREFIX)) {
+        collected += value
+        collectFields(value, depth, seen, collected)
+    }
+}
+
+private fun collectFields(
+    owner: Any,
+    depth: Int,
+    seen: IdentityHashMap<Any, Boolean>,
+    collected: MutableList<Any>,
+) {
+    declaredInstanceFields(owner.javaClass).forEach { field ->
         runCatching {
             field.isAccessible = true
-            visit(field.get(value), depth + 1, seen, collected)
+            visit(field.get(owner), depth + 1, seen, collected)
         }
     }
 }
@@ -93,7 +89,9 @@ private fun visitContainer(
             true
         }
 
-        else -> false
+        else -> {
+            false
+        }
     }
 
 private fun declaredInstanceFields(type: Class<*>) =

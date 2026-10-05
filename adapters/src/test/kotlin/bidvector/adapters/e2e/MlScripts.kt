@@ -6,9 +6,9 @@ import bidvector.adapters.ml.MlCallPolicyData
 import bidvector.adapters.ml.embeddingMetadataResponse
 import bidvector.adapters.ml.protoEmbedResponse
 import bidvector.adapters.ml.testEmbeddingSuccess
-import bidvector.adapters.ml.testUnitVector
 import bidvector.adapters.ml.testMlCallPolicy
 import bidvector.adapters.ml.testSuccessResponse
+import bidvector.adapters.ml.testUnitVector
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.OPPORTUNITY_POLICY
 import bidvector.workflow.evaluation.OpportunityPolicyData

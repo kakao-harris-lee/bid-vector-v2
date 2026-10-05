@@ -120,4 +120,3 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
             )
     }
 }
-

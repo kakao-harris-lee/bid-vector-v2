@@ -1,8 +1,8 @@
 package bidvector.adapters.e2e
 
 import bidvector.adapters.event.JdbcOutboxPort
-import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.adapters.persistence.TransactionBoundary
+import bidvector.workflow.event.NotificationEvidencePayload
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
