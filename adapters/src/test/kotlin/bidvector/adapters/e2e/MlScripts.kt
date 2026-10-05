@@ -160,11 +160,28 @@ private fun appendUnknownVarint(
 /**
  * ML 호출에 실제로 걸리는 시한 — `OpportunityPolicyData` 의 호출 예산과 gateway 의
  * `deadlineCeiling` 중 **작은 쪽**이다(`GrpcBidPredictionGateway` 가 `minOf` 로 고른다).
- * timeout 축의 지연은 이 값에서 도출한다 — 손 상수를 쓰면 예산이 바뀌어도 test 가 조용히
- * 통과한다(설계 검토 (2) 우회 1).
+ *
+ * **앞 판은 이 값이 늘 test 상한이었다**(verifier r1 F-4 / review G-5): 상한 200ms 가 출하 예산
+ * 3s 보다 작아 `minOf` 가 언제나 test 쪽을 골랐고, 그래서 출하 예산을 어떻게 바꿔도 timeout 축이
+ * 초록이었다. 지금은 [timeoutMlCallPolicy] 가 상한을 **예산보다 크게** 두어 예산이 묶는 항이 되고,
+ * 그 사실 자체를 test 가 `effectivePredictionDeadline(policy) == 예산` 으로 단언한다.
  */
 internal fun effectivePredictionDeadline(policy: MlCallPolicyData): Duration =
     minOf(opportunityPolicy().predictionBudget, policy.deadlineCeiling)
+
+/**
+ * timeout 축 전용 호출 정책 — gateway 상한을 **출하 예산의 두 배**로 둔다. 상한이 예산보다 크므로
+ * `minOf` 가 예산을 고르고, 지연을 그 예산에서 도출하면 실제로 출하 값이 재어진다.
+ */
+internal fun timeoutMlCallPolicy(): MlCallPolicyData =
+    e2eMlCallPolicy(deadlineCeiling = opportunityPolicy().predictionBudget.multipliedBy(CEILING_HEADROOM))
+
+/**
+ * 출하 예측 예산의 **고정점**(`reports/evidence/m4/4b6b/policy-values.md`, 승인 대기). timeout 축의
+ * 지연이 이 값에서 나오므로, 값이 바뀌면 지연도 함께 따라가 timeout 이 늘 발화하는 공허한 test 가
+ * 된다 — 그래서 test 가 값 자체를 먼저 단언한다. 예산을 바꾸면 **서버를 부르기 전에** 붉어진다.
+ */
+internal val SHIPPED_PREDICTION_BUDGET: Duration = Duration.ofSeconds(3)
 
 internal fun opportunityPolicy(): OpportunityPolicyData {
     val resolution = OPPORTUNITY_POLICY.resolve(LocalDate.ofInstant(E2E_NOW, ZoneOffset.UTC))
@@ -173,6 +190,7 @@ internal fun opportunityPolicy(): OpportunityPolicyData {
 }
 
 private const val UNKNOWN_FIELD_NUMBER = 999
+private const val CEILING_HEADROOM = 2L
 
 /** `testEmbeddingSuccess` 의 기본 차원 — metadata 대조가 같은 값을 요구한다. */
 private const val EMBEDDING_DIMENSION = 4

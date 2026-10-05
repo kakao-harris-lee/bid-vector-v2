@@ -78,8 +78,11 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         seedStrategy()
         seedProfile()
         collectNotices(listOf(e2eNoticeItem(NOTICE)))
-        val policy = e2eMlCallPolicy(deadlineCeiling = SHORT_DEADLINE)
-        val delay = effectivePredictionDeadline(policy).plus(DELAY_MARGIN)
+        val budget = opportunityPolicy().predictionBudget
+        budget shouldBe SHIPPED_PREDICTION_BUDGET
+        val policy = timeoutMlCallPolicy()
+        effectivePredictionDeadline(policy) shouldBe budget
+        val delay = budget.plus(DELAY_MARGIN)
 
         val assembly = assembly(successfulMlScript(predictionDelay = delay), policy)
         runBlocking { assembly.evaluate() }
@@ -96,9 +99,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         seedStrategy()
         seedProfile()
         collectNotices(listOf(e2eNoticeItem(NOTICE)))
-        val policy = e2eMlCallPolicy(deadlineCeiling = SHORT_DEADLINE)
-
-        val assembly = assembly(successfulMlScript(predictionDelay = Duration.ZERO), policy)
+        val assembly = assembly(successfulMlScript(predictionDelay = Duration.ZERO), timeoutMlCallPolicy())
         runBlocking { assembly.evaluate() }
 
         val payload = outboxPayloads().single()
@@ -197,7 +198,6 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         const val NOTICE = "E2E-INJECT-0001"
         const val LATCH_TIMEOUT_SECONDS = 5L
         const val WORKER_TIMEOUT_SECONDS = 20L
-        val SHORT_DEADLINE: Duration = Duration.ofMillis(200)
         val DELAY_MARGIN: Duration = Duration.ofMillis(100)
     }
 }
