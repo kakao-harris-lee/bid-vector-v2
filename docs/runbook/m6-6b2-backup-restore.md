@@ -92,6 +92,10 @@
 ./tools/db-restore.sh --compare <원본 manifest> <복원본 manifest> [<무시할 측정>]
 ```
 
+**무시 목록을 쓰면 같은 목록으로 음성 대조를 함께 돌린다.** 무시가 과하면 판정이 아무것도 재지 않는데,
+통과만 보아서는 그 둘이 구별되지 않는다. 한 번은 일부러 어긋난 쌍을 같은 목록으로 넣어 **붉어지는지**
+확인한다 — 리허설이 (ii) 에서 그렇게 한다(2026-10-05 실측: 무시 목록 처리의 결함이 이 자리에서 드러났다).
+
 **Flyway `validate()` 는 이 스크립트가 부르지 않는다.** `flyway_schema_history` 의 행 집합 해시 등식이 그 자리에
 선다 — validate 는 이력 행과 마이그레이션 파일 체크섬만 보는 순수 함수이므로, 같은 checkout 에서 이력 행이 같으면
 답도 같다. 운영 복원에서 실제 validate 를 도는 것은 **앱 기동**이다(`validateOnMigrate` 가 기본값으로 켜져 있어
@@ -109,8 +113,14 @@
 `candidateLimit=13`·`revision+1` 이 데이터 손실 축의 재료이고, 그 행이 없으면 리허설이 「쓰기 왕복이 선행하지
 않았다」로 끊는다 — step 순서가 단언으로 잠겨 있다.
 
-**로컬** — 전제는 둘이다: compose 환경이 떠 있고 쓰기 왕복이 끝났을 것, 앱 이미지가 빌드돼 있을 것
-(`./gradlew --no-daemon :app:bootJar` → `docker build -f docker/app.Dockerfile -t bidvector/app:local .`).
+**로컬** — 전제는 넷이다.
+
+| 전제 | 확인 |
+|---|---|
+| 도구 여섯이 PATH 에 있다 | `docker` · `jq` · `javac` · `sha256sum` · `openssl` · `realpath`. 없으면 리허설이 그 이름을 대며 exit 2 |
+| compose 환경이 떠 있고 쓰기 왕복이 끝났다 | 전략 표가 비어 있으면 「쓰기 왕복이 선행하지 않았다」로 끊는다 |
+| **compose 가 요구하는 환경 변수가 그 셸에 있다** | `docker compose -f docker/compose.yaml config` 가 서야 한다. `${VAR:?}` 참조라 값이 없으면 리허설이 compose 해석 단계에서 exit 3 으로 끊긴다 |
+| 앱 이미지가 빌드돼 있다 | `./gradlew --no-daemon :app:bootJar` → `docker build -f docker/app.Dockerfile -t bidvector/app:local .` |
 
 ```
 ./tools/db-rehearsal.sh docker/compose.yaml postgres
@@ -130,6 +140,16 @@
 붉어진다.
 
 ## 5. 멈춤 조건
+
+스크립트 셋은 같은 종료 코드 규약을 쓴다. 코드가 무엇인지가 「무엇을 고쳐야 하는가」를 가른다.
+
+| 코드 | 뜻 | 먼저 볼 것 |
+|---|---|---|
+| **1** | 측정·복원이 실패했거나 **등식이 어긋났다** | 어긋난 측정과 이름을 댄 줄 |
+| **2** | **도구·전제가 없다** — 판정이 서지 않았다 | PATH 의 도구 여섯, 앱 이미지, 누출 패턴 파일 |
+| **3** | **사용법·대상 오류** — 인자나 대상이 틀렸다 | 인자, 대상 컨테이너의 라벨, manifest 의 형식, compose 파일 |
+
+2 와 3 은 「잘 막았다」가 아니다 — 그 실행은 **아무것도 재지 않았다.**
 
 | 증상 | 한다 | 하지 않는다 |
 |---|---|---|
@@ -164,6 +184,10 @@
   이름으로 대상 클러스터를 만들어 이 축을 닫는다.
 - **리허설은 호스트 포트를 열지 않는다.** 복원 대상은 `--network none` 이고, Flyway 호출자는 그 컨테이너의
   네트워크 이름공간을 공유해 루프백으로 붙는다.
+- **이 변경 전에 띄운 스택은 프로젝트 `docker` 로 남아 있다.** `name:` 이 생기기 전에 `docker compose up` 한
+  환경은 디렉터리 basename 을 프로젝트로 쓰므로, 지금의 `docker compose -f docker/compose.yaml down -v` 가
+  그것을 보지 못한다. 한 번
+  `docker compose -p docker -f docker/compose.yaml down -v` 로 치운다(그 뒤에는 필요 없다).
 - **복원 컨테이너의 임시 암호는 `docker inspect` 에 남는다.** 값은 호스트 argv 를 지나지 않지만, `-e NAME` 으로
   넘긴 값을 데몬이 컨테이너의 `Config.Env` 에 담으므로 docker 소켓에 닿는 사람은 컨테이너 수명 동안 읽을 수
   있다. 매 실행 새로 만드는 난수이고 **아무도 그것으로 인증하지 않으며**(접속은 전부 소켓과 루프백 `trust`)
