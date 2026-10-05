@@ -1,15 +1,17 @@
 # M6/6D-1 — 실행 명령과 실측 (구현 레인)
 
-base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `aa99e987`.
+base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `4f479e18`.
 
-## acceptance — CI `check` job 명령 그대로
+## acceptance — CI `check` job 명령
 
-| 명령 | 결과 |
-|---|---|
-| `./gradlew --no-daemon :adapters:test --rerun check` | BUILD SUCCESSFUL (1m 40s) |
-| `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL |
+| 명령 | 문면 | 결과 |
+|---|---|---|
+| `./gradlew --no-daemon check` | CI 문면 그대로 | BUILD SUCCESSFUL |
+| `./gradlew --no-daemon qualityBaseline` | CI 문면 그대로 | BUILD SUCCESSFUL |
+| `./gradlew --no-daemon :adapters:test --rerun check` | 레인이 **덧붙인** 실행 강제 | BUILD SUCCESSFUL (1m 38s) |
 
-`--rerun` 을 붙인다 — 붙이지 않으면 `:adapters:test` 가 FROM-CACHE 로 끝나 **실행 증거가 아니다**.
+CI 문면은 위 둘이다. 셋째 줄은 그 첫 줄에 `--rerun` 을 더한 것으로, 붙이지 않으면 `:adapters:test`
+가 FROM-CACHE 로 끝나 **실행 증거가 아니기** 때문이다 — 게이트를 줄인 것이 아니라 늘렸다.
 E2E 는 기본 `check` 안에서 돈다: 조건 애노테이션도 `Test.filter` 제외도 쓰지 않고, 새 test 클래스
 다섯은 `config/quality/gate-tests.properties` 의 `gate.tests.adapters` 에 등재했으며 **제외는 0** 이다.
 
@@ -35,6 +37,9 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ① relay 구간 | relay 호출 제거 | RED |
 | ① 면허 gate | 막힌 공고의 요건을 보유 면허로 교체 | RED |
 | ① production 조립 | 전략·후보 소스 배선을 위임 대역으로 교체 | RED |
+| ① production 조립 | 저장소 관례 **밖 패키지**(`outoftree.fake`)에 둔 위임 대역으로 감시 대상 교체 | RED |
+| ① production 조립 | 여력 포트를 SAM 람다 대역으로 교체 | RED |
+| ① 그래프 순회 | 깊이 상한을 10 에서 2 로 낮춤 | RED — 건너뛴 가지가 신호로 남는다 |
 | ① 사다리 임계 | 승격·검토 임계를 둘 다 0 으로(유효한 전략) | RED |
 | ① 사다리 임계 | 낮은 match 주입 제거(두 후보가 같은 임베딩) | RED |
 | ② 중복 공고 | 둘째 평가 제거 | RED |
@@ -48,7 +53,7 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ② DB conflict (production, clone) | 전이 질의에서 `SKIP LOCKED` 제거 | RED — 둘째 claim 이 막혀 대기 반환값이 거짓이 된다 |
 | ② ML timeout (production, clone) | 출하 예측 예산을 1시간으로 교체 | RED — 서버를 부르기 전 예산 고정점 단언에서 |
 
-열다섯 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
+열여덟 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
 production 경로를 재지 않는다는 뜻이고, 그래서 두 축의 술어를 바꿨다.
 
 ## 그 밖의 게이트 실측

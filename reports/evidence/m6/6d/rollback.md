@@ -1,6 +1,6 @@
 # M6/6D-1 — rollback 절차와 실측
 
-실측 HEAD: `aa99e987`
+실측 HEAD: `4f479e18`
 base: `fd4629fe`
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 이 slice 의 in_scope 는 e2e test
@@ -10,7 +10,7 @@ base: `fd4629fe`
 ## ⓪ 복원 목록 — 기계 산출
 
 ```
-git diff --name-status fd4629fe..aa99e987 -- \
+git diff --name-status fd4629fe..4f479e18 -- \
   adapters/src/test/kotlin/bidvector/adapters/e2e \
   config/quality/gate-tests.properties milestone-6.md
 ```
@@ -21,8 +21,8 @@ evidence 경로를 뺀 차집합이 **빈 출력**이다 — 범위 밖 혼입 0
 ## 공유 파일의 hunk 출처 — `git log` 산출
 
 ```
-git log --oneline fd4629fe..aa99e987 -- config/quality/gate-tests.properties   # 커밋 둘
-git log --oneline fd4629fe..aa99e987 -- milestone-6.md                         # 커밋 하나
+git log --oneline fd4629fe..4f479e18 -- config/quality/gate-tests.properties   # 커밋 둘
+git log --oneline fd4629fe..4f479e18 -- milestone-6.md                         # 커밋 하나
 ```
 
 등재 파일은 **두 단계**다(최초 등재와 사다리 test 추가). 역적용은 **최신 커밋부터 거꾸로** 해야
@@ -53,7 +53,7 @@ git diff b42900d5~1..b42900d5 -- milestone-6.md | git apply -R
 
 3. 두 단계 뒤 인덱스를 푼다(`git reset`).
 
-## ①~⑥ 실측 (버릴 clone, `aa99e987` 체크아웃)
+## ①~⑥ 실측 (버릴 clone, `4f479e18` 체크아웃)
 
 | 항목 | 결과 |
 |---|---|
@@ -62,7 +62,7 @@ git diff b42900d5~1..b42900d5 -- milestone-6.md | git apply -R
 | ③ diff 빈 것 | `git diff --name-only fd4629fe -- <세 경로>` **빈 출력** — 되돌린 트리가 base 와 같다 |
 | ④ compile | `check` 안의 컴파일 전부 통과 |
 | ⑤ test | `check` 안의 test 전부 통과 |
-| ⑥ 게이트 | `./gradlew --no-daemon check` BUILD SUCCESSFUL(9m 06s) · `./gradlew --no-daemon qualityBaseline` BUILD SUCCESSFUL |
+| ⑥ 게이트 | `./gradlew --no-daemon check` BUILD SUCCESSFUL(9m 13s) · `./gradlew --no-daemon qualityBaseline` BUILD SUCCESSFUL |
 
 확인은 **양방향**이다 — 「내 줄이 사라졌다」(③ 의 빈 diff)와 「남의 줄이 남았다」(되돌린 뒤 등재
 파일의 식별자 줄 수가 base 와 같은 333, 다른 레인의 문서 커밋도 그대로)를 함께 봤다.
