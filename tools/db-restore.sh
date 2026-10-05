@@ -46,13 +46,31 @@ USAGE
 # 찾아 늘 0 을 돌려주고, 그러면 **모든 측정이 무시되어 판정이 아무것도 재지 않는다**
 # (2026-10-05 실측 — 리허설의 음성 대조가 이것을 잡았다). 무시 목록을 쓰는 호출자는 같은
 # 목록으로 음성 대조를 함께 돌려 이 자리가 비어 있지 않음을 보여야 한다.
+# 아래 비교는 `.measurements` 가 object 임을 전제로 `keys` 를 부른다. 그 전제가 깨진 입력에서
+# jq 가 죽으면 **빈 findings 가 「일치」로 읽힌다** — `_compare` 는 `||` 목록과 `if !` 조건에서
+# 불리므로 함수 본문까지 errexit 가 억제되고, 실패한 대입이 함수를 끊지 못한다. 그래서 형식을
+# 먼저 단언하고(아래), jq 의 종료 코드는 **명시 분기**로 받는다(2026-10-05 code-review G-1 ·
+# verifier M-1). manifest 는 자기 해시로 자기를 증명할 수 없으므로 이 형식 단언이 그 자리다.
+_assert_manifest() {
+  local file="$1" role="$2" verdict
+  verdict="$(jq -r '
+      if (type == "object")
+         and (.schema == "bidvector-db-backup/1")
+         and ((.measurements | type) == "object")
+      then "ok" else "shape" end' "$file" 2>/dev/null)" || verdict="parse"
+  [ "$verdict" = "ok" ] \
+    || _die "$role manifest 가 이 형식이 아니다(${verdict}): $file" 1
+}
+
 _compare() {
   local expected="$1" actual="$2" ignore_csv="${3:-}" ignore_json findings
   [ -r "$expected" ] || _die "원본 manifest 를 읽을 수 없다: $expected" 3
   [ -r "$actual" ] || _die "복원본 manifest 를 읽을 수 없다: $actual" 3
+  _assert_manifest "$expected" "원본"
+  _assert_manifest "$actual" "복원본"
   ignore_json="$(jq -cn --arg s "$ignore_csv" '$s | split(",") | map(select(length > 0))')"
 
-  findings="$(jq -rn \
+  if ! findings="$(jq -rn \
     --slurpfile e "$expected" --slurpfile a "$actual" --argjson ignore "$ignore_json" '
     def brief: tojson | if length > 90 then .[0:87] + "..." else . end;
     ($e[0].measurements) as $E | ($a[0].measurements) as $A |
@@ -67,7 +85,10 @@ _compare() {
        else "(측정 전체)" end) as $n
     | (if ($E[$k] | type) == "object" and ($A[$k] | type) == "object"
        then [$E[$k][$n], $A[$k][$n]] else [$E[$k], $A[$k]] end) as $pair
-    | "등식 어긋남: \($k) / \($n) — 원본 \($pair[0] | brief) · 복원본 \($pair[1] | brief)"')"
+    | "등식 어긋남: \($k) / \($n) — 원본 \($pair[0] | brief) · 복원본 \($pair[1] | brief)"')"; then
+    echo "db-restore: manifest 비교가 실패했다 — 입력을 읽지 못했다" >&2
+    return 1
+  fi
 
   if [ -n "$findings" ]; then
     printf '%s\n' "$findings" >&2
@@ -122,6 +143,7 @@ for artifact in roles.sql db.dump; do
     || _die "$artifact 의 sha256 이 manifest 와 다르다 — 백업이 손상됐거나 바뀌었다" 1
 done
 
+_assert_manifest "$BACKUP/manifest.json" "백업"
 SUPERUSER="$(jq -r '.measurements.database.owner' "$BACKUP/manifest.json")"
 ENCODING="$(jq -r '.measurements.database.encoding' "$BACKUP/manifest.json")"
 COLLATE="$(jq -r '.measurements.database.collate' "$BACKUP/manifest.json")"
