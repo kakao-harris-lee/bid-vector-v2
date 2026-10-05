@@ -1,60 +1,72 @@
 # M6/6D-1 — 리뷰 요청 점검표 (구현 레인)
 
-base `fd4629fe` · 산출물 커밋 `428551f3` · 정본 계약 `scope.md`(D-6D-1~3).
+base `fd4629fe` · 마지막 산출물 커밋 `aa99e987` · 정본 계약 `scope.md`(D-6D-1~11).
 
 ## 리뷰 요청 조건
 
 | 조건 | 상태 |
 |---|---|
-| 구현 diff 가 커밋되어 base/head 가 고정됨 | 예 — 산출물 커밋 하나(`428551f3`), in_scope 10 경로 |
-| test/lint/type/architecture/contract 명령 통과 | 예 — `check` · `qualityBaseline` 둘 다 SUCCESS(`commands.md`) |
-| 변경된 fixture 와 정책 version 의 근거 | fixture 변경 0 — 기존 `contracts/testdata` 골든과 `adapters/ml` fixture 를 읽기만 한다. 정책은 전부 **출하 정본**을 resolve 한다(`OPPORTUNITY_POLICY`·`STRATEGY_POLICY`·`LICENSE_QUALIFICATION_POLICY`·`NOTIFICATION_DELIVERY_POLICY`·`COLLECTION_RANGE_POLICY`) |
+| 구현 diff 가 커밋되어 base/head 가 고정됨 | 예 — in_scope 경로만, 혼입 0 |
+| test/lint/type/architecture/contract 명령 통과 | 예 — `check`(test 재실행 강제) · `qualityBaseline` 둘 다 SUCCESS |
+| 변경된 fixture 와 정책 version 의 근거 | fixture 변경 0 — 기존 `contracts/testdata` 골든과 `adapters/ml` fixture 를 읽기만 한다. 정책은 아래 절 |
 | 알려진 제한과 rollback | 아래 절과 `rollback.md` |
+
+## 정책의 출처 — 출하 정본과 test fixture를 가른다
+
+**출하 정본을 그대로 resolve 하는 것 다섯**: 기회 분석 정책(합성 규약·키워드·텍스트 상한·호출 예산·
+release 선택자) · 전략 정책 · 면허 자격 정책 · 알림 배달 정책 · 수집 범위 정책.
+
+**test 가 값을 고른 것 셋**: ML 호출 정책(시한 상한·재시도 횟수·백오프·차단기·feature schema 버전) ·
+KONEPS HTTP 정책 · KONEPS 호출 관문의 승인 상한. 셋 다 `adapters` 의 기존 test fixture 관례를 그대로
+쓴다(운영 값으로 돌리면 test 가 분 단위가 된다).
+
+**둘 사이의 경계가 timeout 축의 쟁점이었다.** 지금 ML 호출 정책의 시한 상한은 **출하 예측 예산의
+두 배**로 도출되고, 그래서 `minOf` 가 고르는 항은 출하 예산이다 — test 가 그 사실을 직접 단언한다.
+출하 예산 값 자체도 고정점으로 잠가, 값이 바뀌면 서버를 부르기 전에 붉어진다.
 
 ## 설계 검토 (2) 우회 ↔ 닫는 술어 대응
 
 | 우회 | 닫는 술어 | 실측 |
 |---|---|---|
-| 1. fake ML 이 늘 성공해 timeout 이 예산을 안 넘음 | 지연을 `OpportunityPolicyData` 예산과 gateway `deadlineCeiling` 의 `minOf` 에서 **도출**, 지연 0 대조 run 이 같은 배선에서 성공 | 변이 「지연 0」 RED |
-| 2. 중복 test 가 inbox 를 안 지남 | outbox 2행 · inbox 1행 · 발송 1건을 함께 단언(발송 횟수만으로는 「애초에 1행」과 구별 안 됨) | 변이 「둘째 평가 제거」 RED |
-| 3. 골든 대신 test 안 리터럴 | 두 갈래 모두 `contracts/testdata/prediction` 에서 바이트를 읽는다(부재 시 로딩이 던짐) | 변이 「골든 교체」 RED ×2 |
-| 4. 재현 등식이 같은 참조 비교 | 두 run 은 **다른 조립·다른 트랜잭션**이고, 비교 대상은 DB 에서 되읽은 직렬화 문자열. 음성 대조 포함 | 변이 「둘째 release 교체」 RED |
-| 5. E2E 가 기본 `check` 밖 | 조건 애노테이션·filter 0, `gate.tests.adapters` 등재(제외 0) — 등재 등식이 양방향 | `check` 안에서 12 test 실행 |
-| 6. use case 를 fake 로 대체 | 조립이 **실제로 쥔 객체**의 `CodeSource` 를 본다(main 출력 ↔ test 출력 양방향) | 변이 「협력자 하나를 fake 로」 RED |
-| 7. 순차 실행이라 충돌 0 | 래치로 동시성 강제 + 경합 대상 행과 첫 워커의 점유를 각각 변이로 확인 | 변이 둘 RED(래치 제거만은 GREEN — `commands.md` 에 사실로 등재) |
+| 1. fake ML 이 늘 성공해 timeout 이 예산을 안 넘음 | 지연을 **출하 예측 예산**에서 도출하고, 실효 시한이 그 예산과 같음을 단언. 지연 0 대조 run 이 같은 배선에서 성공 | 변이 「지연 0」 RED · 변이 「출하 예산 1시간」(clone) RED |
+| 2. 중복 test 가 inbox 를 안 지남 | outbox 2행 · inbox 1행 · 발송 1건을 함께 단언 | 변이 「둘째 평가 제거」 RED |
+| 3. 골든 대신 test 안 리터럴 | 두 갈래 모두 계약 골든에서 바이트를 읽는다(부재 시 로딩이 던짐) | 변이 「골든 교체」 RED ×2 |
+| 4. 재현 등식이 같은 참조 비교 | 두 run 은 다른 조립·다른 트랜잭션, 비교 대상은 DB 에서 되읽은 직렬화 문자열. 음성 대조 포함 | 변이 「둘째 release 교체」 RED |
+| 5. E2E 가 기본 `check` 밖 | 조건 애노테이션·filter 0, 등재 등식이 양방향 | `check` 안에서 13 test 실행(`--rerun` 으로 실행 확인) |
+| 6. use case 를 대역으로 대체 | 평가와 발송이 **실제로 쓰는** 두 객체에서 필드 그래프를 내려가 닿는 객체 전수의 `CodeSource` 를 본다. 목록이 아니라 그래프라 목록을 같이 고쳐 통과시킬 수 없다 | 변이 「전략·후보 소스 배선을 위임 대역으로」 RED |
+| 7. 순차 실행이라 충돌 0 | 첫 워커가 행을 **쥔 동안** 둘째가 claim 하고, 첫 워커는 롤백한다. 둘째가 막히지 않고 돌아왔다는 사실(대기 반환값)·쥔 동안 못 집음·롤백 뒤 복귀 셋을 단언 | 변이 「완전 순차」 RED · 변이 「경합 행 없음」 RED · 변이 「production `SKIP LOCKED` 제거」(clone) RED |
+
+## 사다리 임계 — 두 방향
+
+승격 임계가 후보를 가른다는 사실을 같은 run 에서 잠근다. 임베딩 대역이 공고 번호로 응답을 골라 한
+후보에만 직교 벡터를 돌려주고, 그 후보는 코사인 유사도 0 이라 priority 가 임계 아래로 간다. 승격은
+한쪽뿐이고 outbox 행도 하나다. 임계를 0 으로 내리면 둘 다 승격돼 붉어진다.
 
 ## (2b) 값 획득 축 — 새 production 표면 0
 
 `git diff --name-only fd4629fe..HEAD -- '*/src/main/*'` 빈 출력. production `internal` 완화도
-`@VisibleForTesting` 도 없다. 조립이 쓰는 모든 production 생성자는 **이미 public** 이었다.
+`@VisibleForTesting` 도 없다. 조립이 쓰는 모든 production 생성자는 **이미 public** 이었다. 협력자
+그래프 순회는 리플렉션이지만 **읽기 전용**이고 test 소스셋 안에만 있다.
 
 ## 계약 문면과 다르게 택한 자리
 
-**E2E 의 자리를 `app` 의 test 소스셋에서 `adapters` 의 test 소스셋으로 옮겼다.** 계약 in_scope 는
-`app` 쪽 신설 패키지를 적었으나, 그 소스셋에서는 지정된 파이프라인을 조립할 수 없다 —
-
-1. **in-process ML 대역을 지을 수 없다.** `app` 의 test classpath 에 `ml-contract` 생성 stub 도
-   `grpc-inprocess` 도 없고, `adapters` 가 `ml-contract` 를 `implementation`(비전이)으로만 물어
-   전이되지 않는다. ML timeout · 정의 밖 필드 · schema 거부 · EXACT rollback 네 축이 통째로 불가능해진다.
-2. **종단 전이 SQL 상수가 보이지 않는다.** 전이 UPDATE 상수는 `adapters` 의 `internal` 이다.
-
-`adapters` 의 test 소스셋은 계약 in_scope 에 이미 포함돼 있고, Testcontainers 하네스 · KONEPS mock ·
-ML fixture · 계약 골든 로더가 전부 거기 있어 **재사용**한다. 팀장에게 사유와 함께 보고했고 계약 갱신은
-팀장 몫이다. production 불변 규칙(D-6D-3)과 fake 경계 규칙은 그대로 지켰다.
+E2E 의 자리를 `adapters` 의 test 소스셋으로 옮긴 건은 계약 r3(D-6D-5)이 결정으로 받았다. 그 밖에
+문면과 다른 자리는 없다.
 
 ## 알려진 제한
 
 | 제한 | 받는 자리 |
 |---|---|
-| **종단 전이가 port 메서드를 지나지 않는다.** relay 는 `OutboxPort.markDelivered` 가 아니라 production 전이 SQL 상수를 사본 없이 직접 실행한다 — 전이 명령 타입의 생성자가 `workflow` 의 `internal` 이고, **그 통로를 열어 해결하지 않는다**는 것이 4C-2 의 명시 결정이다(`OPEN-4C2-MARK-UNEXERCISED`) | 6F-10(배달 오케스트레이션) |
-| **relay·reclaim·평가→outbox 커밋 경로가 production 에 없다.** 이 slice 의 relay 는 test 소스셋의 소비자 모양이고, 알림 요청은 자기 트랜잭션에서 커밋된다(도메인 write 와의 원자성 미소유) | 6F-10 · `OPEN-6A3-EVALUATION-COMMIT` · D-6F7-11 |
-| **재현 등식에 정책 버전·전략 revision 이 없다.** payload 가 그 둘을 싣지 않아 등식이 덮지 못한다(C-4) | 6F-10 payload 확장 → 6D-2 |
-| **rollback 축은 gateway 수준에서만 잰다.** 파이프라인이 쓰는 release 선택자는 `OPPORTUNITY_POLICY` 에 `LatestPromoted` 로 고정돼 있고, 그 정책 교체는 production 변경이다 | 6E runbook · ML 배선 결정 |
-| **restart 뒤 수렴·redelivery 는 재지 않는다.** CLAIMED 복귀(lease·reclaim) 기제가 없다 | 6D-2 |
-| **전략 행을 직접 INSERT 한다.** 여력 상한을 설정하는 HTTP 경로가 없다 | `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT`(6A-2) |
-| **요건은 DB 시딩이다.** LLM 추출 체인이 미배선이라 요건이 공고에서 자동으로 서지 않는다 | 추출 체인 배선 slice |
-| **발송 채널이 fake 다.** 실 sender 어댑터가 없다 | `OPEN-STR-12` |
-| **판정 임계가 test 값이다.** 전략의 승격·검토 임계는 이 test 가 심은 값이고 운영 값이 아니다 | `OPEN-4B1-LADDER-THRESHOLDS` |
+| **종단 전이가 port 메서드를 지나지 않는다.** relay 는 전이 명령 타입을 만들 수 없어 production 전이 SQL 상수를 사본 없이 직접 실행한다 — 그 통로를 열지 않는다는 것이 4C-2 의 명시 결정이다 | `OPEN-4C2-MARK-UNEXERCISED` → 6F-10 |
+| **relay·reclaim·평가→outbox 커밋 경로가 production 에 없다.** 알림 요청은 자기 트랜잭션에서 커밋된다(도메인 write 와의 원자성 미소유) | 6F-10 · `OPEN-6A3-EVALUATION-COMMIT` |
+| **재현 등식에 정책 버전·전략 revision 이 없다** | 6F-10 payload 확장 → 6D-2 |
+| **rollback 축은 gateway 수준에서만 잰다.** 파이프라인이 쓰는 release 선택자는 기회 분석 정책에 고정돼 있고 그 교체는 production 변경이다 | 6E runbook · ML 배선 결정 |
+| **restart 뒤 수렴·redelivery 는 재지 않는다** | 6D-2 |
+| **승격 임계가 test 리터럴이다.** 이 slice 가 잠그는 것은 값이 아니라 그 값이 후보를 가른다는 사실이다 — 운영 값은 아직 승인 전이다 | `OPEN-4B1-LADDER-THRESHOLDS` |
+| **기존 claim 경합 test 가 같은 구멍을 갖는다.** 4C 계열의 outbox claim test 는 완전 순차에서도 `SKIP LOCKED` 제거에서도 초록이다(verifier 실측). 이 slice 는 그 파일을 건드리지 않았다 | `OPEN-6D1-CLAIM-CONCURRENCY-TEST` → 6F-10 |
+| **전략 행 INSERT 사본이 저장소에 둘이다.** 여력 상한을 설정하는 HTTP 경로가 없어 직접 INSERT 하고, `app` 쪽 dry-run E2E 가 같은 열 목록을 이미 갖는다 — 표에 NOT NULL 열이 생기면 두 자리가 함께 깨진다 | `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT`(6A-2) |
+| **요건은 DB 시딩이다.** LLM 추출 체인이 미배선이다 | 추출 체인 배선 slice |
+| **발송 채널이 fake 다** | `OPEN-STR-12` |
 
 ## 하네스 레인 변경
 
