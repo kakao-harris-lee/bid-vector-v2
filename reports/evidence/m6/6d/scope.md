@@ -51,6 +51,12 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`gate-tests.
 | **D-6D-2** | **설계 검토(팀장, `_workspace/m6-6d/01_design-review.md`) 요지**: (0) 경계 — production 조립·relay·reclaim·커밋 경로·실 발송·정책/전략 버전 재현·LLM 체인은 밖 · (1) test 가 산출물이므로 술어는 「공허한 초록 불가」 — 단언은 DB 상태(canonical·outbox·inbox 행)와 FakeNotificationSender 기록으로, 로그·문자열 아님; timeout 지연은 정책값에서 도출; malformed/schema 골든은 `contracts/testdata` 에서 로드; 재현은 별도 run 의 직렬화 payload 집합 등식 + 음성 대조 · (2) 우회 일곱(항상 성공 fake · inbox 미경유 · 리터럴 골든 · 같은 참조 비교 · `check` 밖 태그 · use case 를 fake 로 대체 · 순차 실행 충돌 없음) 각각의 닫는 술어 · (2b) 새 production public 표면 0 — production `internal` 완화가 필요하면 **멈추고 보고** · (3) 과잉: production 급 relay·실 ML 컨테이너; 미달: 로그로 재기 | 설계 검토 |
 | **D-6D-3** | **production 불변 규칙**: `*/src/main/**`·`adapters/src/main/resources/db/migration/**`·`.github/**`·`docker/**` diff 0. fake 는 포트 경계(KONEPS HTTP·gRPC 서버·NotificationSender·Clock·IdFactory)에만; use case·adapter 는 production 클래스. test relay 는 test 소스셋의 소비자 모양(6F-10 의 입력 — 「relay 가 claim → DispatchNotification → sender → DELIVERED 전이」를 test 코드로 보여 주되 production 에 두지 않음) | D-6D-2 (2b) |
 
+## 계약 갱신 r2 (2026-10-05, 팀장 — 레인 착수 실측의 충돌 처분)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D-4** | **DELIVERED 전이는 6D-1 밖(= 레인 선택지 D, 명시 결정).** 레인 실측: `OutboxTransition.ToDelivered` 생성자·`transitionOutbox` 는 `workflow` `internal`, `EventSql` 은 `adapters` `internal object`, 저장소에 교차 test 의존 0 — `app` test 에서 DELIVERED 를 치려면 D-6D-3(production diff 0) 또는 (2b)(internal 완화 금지)를 깨야 한다. 그 폐쇄는 **승인된 결정**(`OPEN-4C2-MARK-UNEXERCISED`: 통로를 열어 해결하지 않는다 — legacy C-4 를 재현하는 문; 배달 오케스트레이션 slice 로 인계)이고 그 slice 가 **6F-10** 이다. 6D-1 의 relay 는 production 클래스만으로 claim → `DispatchNotification` → `FakeNotificationSender` → inbox 기록까지 잇고, 단언은 outbox 행 **`CLAIMED`**(PENDING 아님) + sender 기록 + inbox 행. DELIVERED 종단 전이는 **알려진 제한**으로 등재하고 `OPEN-4C2-MARK-UNEXERCISED` 를 6F-10 수취로 인용. 선택지 B(교차 test 의존 신설 — build 파일 in_scope 밖, 등재 모집단 영향)·C(E2E 를 adapters test 로 — in_scope 문면 위반·fixture 복제) 불채택 | 레인 보고 · 4C-2 결정 |
+
 ## 하네스 레인 변경
 
 (착수 뒤 리뷰 요청 시점마다 `git log -- <파일>` 산출로 등재)
