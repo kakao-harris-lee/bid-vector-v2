@@ -1,5 +1,6 @@
 package bidvector.adapters.e2e
 
+import bidvector.adapters.event.OutboxPayloadCodec
 import bidvector.adapters.koneps.KonepsEnvelopeFixtures
 import bidvector.adapters.koneps.KonepsOpenApiNoticeSource
 import bidvector.adapters.koneps.MockKonepsResponse
@@ -33,6 +34,7 @@ import bidvector.workflow.collection.CollectionReport
 import bidvector.workflow.collection.CollectionSource
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.event.NotificationRequestedPayload
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -164,6 +166,17 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
     protected fun outboxStates(): List<String> = queryStrings("SELECT state FROM outbox ORDER BY inserted_at, entry_id")
 
     protected fun outboxPayloads(): List<String> = queryStrings("SELECT payload FROM outbox ORDER BY idempotency_key")
+
+    /**
+     * outbox 행 하나를 **production codec 으로 되살려** 타입·필드로 단언할 수 있게 한다
+     * (verifier r1 F-5 / review G-3). 직렬화 문자열의 부분 일치는 값이 어느 칸에 있는지를
+     * 가르지 못한다 — `bidNowReasons` 가 자유 형식 문자열 목록이라 더 그렇다.
+     */
+    protected fun decodedOutboxPayload(): NotificationRequestedPayload =
+        OutboxPayloadCodec.decode(
+            OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE,
+            outboxPayloads().single(),
+        ) as NotificationRequestedPayload
 
     protected fun outboxIdempotencyKeys(): List<String> =
         queryStrings("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")

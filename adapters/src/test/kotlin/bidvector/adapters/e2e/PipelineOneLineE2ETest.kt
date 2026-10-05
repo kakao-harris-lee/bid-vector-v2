@@ -5,7 +5,6 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -55,7 +54,7 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         evaluations.filterIsInstance<CandidateEvaluation.NotReached>().map { it.noticeId.number.value } shouldBe
             listOf(BLOCKED_NOTICE)
         outboxIdempotencyKeys() shouldHaveSize 1
-        outboxIdempotencyKeys().single() shouldContain PASSING_NOTICE
+        outboxIdempotencyKeys().single() shouldBe idempotencyKeyFor(PASSING_NOTICE)
     }
 
     /**

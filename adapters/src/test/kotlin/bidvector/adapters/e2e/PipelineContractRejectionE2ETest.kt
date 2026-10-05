@@ -3,13 +3,12 @@ package bidvector.adapters.e2e
 import bidvector.adapters.ml.GrpcBidPredictionGateway
 import bidvector.adapters.ml.testBidPredictionRequest
 import bidvector.adapters.ml.testMlCallEffectivePolicy
+import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.CallBudget
 import bidvector.workflow.prediction.ModelReleaseSelector
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
@@ -41,20 +40,18 @@ internal class PipelineContractRejectionE2ETest : PipelineE2ESupport() {
         val response = predictionResponseWithUnknownField(release)
         unknownFieldCountOf(response) shouldBe 1
 
-        val payload = evaluateWith(successfulMlScript(release = release, predictionResponse = response))
+        val evidence = evaluateWith(successfulMlScript(release = release, predictionResponse = response))
 
-        payload shouldContain "DIAGNOSED"
-        payload shouldContain E2E_RELEASE_ID
-        payload shouldNotContain "NOT_PREDICTED"
+        evidence.shouldBeInstanceOf<NotificationEvidencePayload.Diagnosed>()
+        evidence.releaseId shouldBe E2E_RELEASE_ID
+        evidence.artifactChecksum shouldBe E2E_ARTIFACT_CHECKSUM
     }
 
     @Test
     fun `지원하지 않는 schema 거부 골든은 예측 없음으로 접히고 사유가 payload 에 남는다`() {
-        val payload = evaluateWith(successfulMlScript(predictionResponse = predictionUnsupportedSchemaResponse()))
+        val evidence = evaluateWith(successfulMlScript(predictionResponse = predictionUnsupportedSchemaResponse()))
 
-        payload shouldContain "NOT_PREDICTED"
-        payload shouldContain "UnsupportedSchema"
-        payload shouldNotContain "DIAGNOSED"
+        evidence shouldBe NotificationEvidencePayload.NotPredicted(reason = "UnsupportedSchema")
     }
 
     /**
@@ -111,7 +108,7 @@ internal class PipelineContractRejectionE2ETest : PipelineE2ESupport() {
         exact.release.releaseId shouldNotBe promoted.release.releaseId
     }
 
-    private fun evaluateWith(script: MlFakeScript): String {
+    private fun evaluateWith(script: MlFakeScript): NotificationEvidencePayload {
         seedStrategy()
         seedProfile()
         collectNotices(listOf(e2eNoticeItem(NOTICE)))
@@ -126,7 +123,7 @@ internal class PipelineContractRejectionE2ETest : PipelineE2ESupport() {
                 mlPolicy = e2eMlCallPolicy(),
             )
         runBlocking { assembly.evaluate() }
-        return outboxPayloads().single()
+        return decodedOutboxPayload().evidence
     }
 
     private fun budget(): CallBudget = CallBudget(CALL_BUDGET)

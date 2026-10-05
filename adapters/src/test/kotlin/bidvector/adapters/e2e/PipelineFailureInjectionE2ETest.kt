@@ -1,13 +1,13 @@
 package bidvector.adapters.e2e
 
 import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.adapters.persistence.TransactionBoundary
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -87,10 +87,9 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val assembly = assembly(successfulMlScript(predictionDelay = delay), policy)
         runBlocking { assembly.evaluate() }
 
-        val payload = outboxPayloads().single()
-        payload shouldContain "NOT_PREDICTED"
-        payload shouldContain "DeadlineExceeded"
-        payload shouldNotContain "DIAGNOSED"
+        val payload = decodedOutboxPayload()
+        payload.noticeId shouldBe "$NOTICE-000"
+        payload.evidence shouldBe NotificationEvidencePayload.NotPredicted(reason = "DeadlineExceeded")
     }
 
     /** 대조 run — 같은 배선에서 지연만 0 이면 예측이 성공해 근거가 `DIAGNOSED` 로 남는다. */
@@ -102,10 +101,10 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val assembly = assembly(successfulMlScript(predictionDelay = Duration.ZERO), timeoutMlCallPolicy())
         runBlocking { assembly.evaluate() }
 
-        val payload = outboxPayloads().single()
-        payload shouldContain "DIAGNOSED"
-        payload shouldContain E2E_RELEASE_ID
-        payload shouldNotContain "DeadlineExceeded"
+        val evidence = decodedOutboxPayload().evidence
+        evidence.shouldBeInstanceOf<NotificationEvidencePayload.Diagnosed>()
+        evidence.releaseId shouldBe E2E_RELEASE_ID
+        evidence.featureSchemaVersion shouldBe E2E_FEATURE_SCHEMA_VERSION
     }
 
     /**
