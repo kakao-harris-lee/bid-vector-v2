@@ -98,9 +98,15 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`c
 | **D-6B2-15** | **일괄 라운드 처분(산출물 한 커밋 → runbook 한 커밋 → evidence 한 커밋)**: ① **R-1** `$role` 의 `_assert_plain_identifier` 호출 삭제(값 자리는 `psql -v` 인용이 닫는다; `$SUPERUSER` 가드는 식별자 자리라 유지) ② **R-3** 도구 검사에 `realpath` ③ **R-4/R2-L-2** `_compare` 가 값이 object 이면 한 단계 더 파서 `측정 / 역할 / 객체` 로 보고 ④ **R-5** `IMAGE` 를 compose 파일이 아니라 원본 컨테이너 `docker inspect --type container -f '{{.Config.Image}}'` 에서(`APP_IMAGE` 는 파일 유지 — 원본에 앱 컨테이너가 없을 수 있다) ⑤ **R-6** 빈 manifest 의 사유 어휘(`empty`) ⑥ **R2-L-3** 복원 경로의 깨진 manifest 종료 코드를 규약(3 대상 오류)으로 — 형식 단언을 해시 대조 루프 **앞**으로 ⑦ **R-2/R2-L-1** `db-rehearsal.sh` 머리 주석의 기본값 괄호를 제자리로 + classpath 문단을 「둘 다 읽히며 바이트가 다르면 Flyway 가 거부한다 — 순서는 어느 쪽이 먼저 열리는가일 뿐」으로; runbook §7·checklist 제한 11 같은 문면 ⑧ **R2-L-4** checklist 제한 9 에 D-6B2-12 ② 인용(버전 유지·혼재 시 붉음·6B-3/M7 이관) ⑨ runbook §5 에 R-1 의 결과(역할 이름 모양 제약 없음) 반영이 필요하면 한 줄. **rollback 실측 HEAD 를 마지막 산출물 커밋(runbook 커밋)으로 재실측**(복원 여섯 그대로 — `comm` 양방향, hunk 목록 `git log` 재산출, 되돌린 트리 ④~⑥ 는 버릴 clone, 전건 `check` 호스트 규율) | 규율 「장부층·low 는 승인 전 일괄」 |
 | **D-6B2-16** | **일괄 뒤 표적 재검증(가볍게)** — ①(술어 완화)·④(값 출처 변경)·⑥(종료 코드)만 verifier 가 본다: `-`·`.`·대문자 역할 이름 manifest 수용 + 따옴표 역할은 여전히 fail-closed · `IMAGE` == 원본 컨테이너 이미지 · 깨진 manifest 셋 exit 3 컨테이너 생성 전. 그 밖은 PR `/code-review` 가 본다. 통과하면 **종결**(verifier ready-for-review 유지 + 운영자 승인은 PR 머지 결정으로) | 「게이트 술어를 바꾸는 커밋은 severity 무관 표적 재검증」 |
 
+## 계약 갱신 r6 (2026-10-05, 팀장 — 일괄 라운드 수령 · 동결 · 표적 재검증 착수)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-17** | **일괄 라운드 수령·동결.** 산출물 `a2e949af`(①~⑥ 코드) · runbook `47d5663b`(= **rollback 실측 HEAD**) · evidence `91f7303a` = **판정 SHA**. 팀장 대조: 변경 7 파일 전부 in_scope · 새 파일 0 · production diff 0 · evidence 누출 0 · 크기 483 ≤ 1,055 · `git diff --name-only 47d5663b..91f7303a -- <복원 여섯 + milestone-6.md>` 빈 출력 · 호스트 잔여 0. 레인이 commands.md 의 옛 「exit 1」 수치를 이번 라운드의 3 으로 고쳐 쓴 것은 낡은 수치 방지로 채택. 읽히는 Docker 소유 라벨 하나(`com.docker.compose.project.config_files`)가 늘었을 뿐 새 public 표면 0. 표적 재검증(D-6B2-16 셋)을 verifier 에 건다 — 통과하면 종결 | 레인 보고 |
+
 ## 하네스 레인 변경
 
-`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
+`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 `caa78fe3` · r6 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
 
 ## 입력·이관
 
