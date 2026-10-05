@@ -1,7 +1,7 @@
 # M6/6B-2 — rollback
 
-**실측 HEAD: `8ce3bb52`** (이 slice 의 마지막 산출물 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋).
-버릴 clone 에서 ⓪~⑥ 을 그 커밋 위에서 돌렸다. 앞 라운드의 실측(`36a3bff9`)은 옮기지 않고 전부 다시 냈다.
+**실측 HEAD: `47d5663b`** (이 slice 의 마지막 산출물 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋).
+버릴 clone 에서 ⓪~⑥ 을 그 커밋 위에서 돌렸다. 앞 라운드의 실측(`36a3bff9`·`8ce3bb52`)은 옮기지 않고 전부 다시 냈다.
 
 > **왜 runbook 이 따로 커밋됐는가** — runbook 은 아래 1단계가 되돌리는 경로다. 그것을 목록 갱신과 같은
 > 커밋에 담으면 그 커밋이 자기 목록에 들어갈 수 없어 실측 HEAD 가 자기를 가리키지 못한다. 그래서 산출물
@@ -9,13 +9,13 @@
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 8ce3bb52..<판정 SHA> -- <아래 1단계 목록 여섯 + milestone-6.md>` 가 **빈 출력**이면
+> `git diff --name-only 47d5663b..<판정 SHA> -- <아래 1단계 목록 여섯 + milestone-6.md>` 가 **빈 출력**이면
 > 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 의 산출물 경로 여섯. 목록은 손으로 쓰지 않고
-`git diff --name-status e922dc7b..8ce3bb52` 에서 기계로 냈다(A 4 = 삭제 대상, M 2 = base 로 복원;
+`git diff --name-status e922dc7b..47d5663b` 에서 기계로 냈다(A 4 = 삭제 대상, M 2 = base 로 복원;
 범위의 나머지 A 1·M 1 은 아래 「되돌리지 않는다」와 2단계가 가져간다).
 **디렉터리로 접지 않는다** — 접으면 목록이 slice 가 만진 파일보다 넓어진다. 파일 그대로 두면
 `comm` 으로 기계 산출과 문서 목록의 등식을 잴 수 있고, ⓪ 이 그것을 잰다.
@@ -88,7 +88,7 @@ git diff 93b04488~1..93b04488 -- milestone-6.md | git apply -R
 | ③c | 내 줄 사라짐 · 남의 줄 남음 | 되돌린 `milestone-6.md` 의 언급 수 | 6B-2 2(= **base 에도 있는** 6B-1 분할 문단의 언급. HEAD 는 3 이었다) · 6B-1 10(base 와 같음) |
 | ③d | **트리 동일성** | 되돌린 파일의 blob SHA 대 base | 수정 셋 전부 같음 · 신설 넷 전부 지워짐 |
 | ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` | exit 0 |
-| ⑤⑥ | test 와 게이트가 초록 | `./gradlew --no-daemon check` | exit 0(359 task) · test 2,679(= HEAD 와 같은 수 — 이 slice 는 Kotlin test 를 더하지 않는다) · 게이트 넷(`leakPatternGate`·`scriptSizeGate`·`memberEffectGate`·`contractGate`) 전부 **수행**(UP-TO-DATE 아님). test task 는 `FROM-CACHE` 다 — 되돌린 트리의 test 입력이 앞 실측 트리와 같은 바이트라는 뜻이고, evidence 는 그 입력에 들지 않는다 |
+| ⑤⑥ | test 와 게이트가 초록 | `./gradlew --no-daemon check` | exit 0(359 task) · test 2,679(= HEAD 와 같은 수 — 이 slice 는 Kotlin test 를 더하지 않는다) · 게이트 넷(`leakPatternGate`·`scriptSizeGate`·`memberEffectGate`·`contractGate`) 전부 **수행**(UP-TO-DATE 아님) |
 
 되돌린 트리에서 base 와 다른 추적 파일은 `reports/evidence/m6/6b2/` 의 넷뿐이다(이 slice 의 evidence —
 의도). 그 디렉터리를 남긴 채 `leakPatternGate` 가 초록이라 ⑥ 이 성립한다.

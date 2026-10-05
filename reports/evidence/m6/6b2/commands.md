@@ -75,7 +75,8 @@
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
 - 핵심 결과: 350 task 중 32 수행. **`leakPatternGate` 가 이번 실행에서 실제로 돌았다**(UP-TO-DATE 표시 없음) —
-  evidence 를 훑는 게이트라 이 slice 에서 붉어질 수 있는 유일한 자리다. `contractGate` 도 수행
+  evidence 를 훑는 게이트라 이 slice 에서 붉어질 수 있는 유일한 자리다. `contractGate` 도 수행.
+  **이 표가 담는 마지막 실행은 evidence 커밋 직전의 HEAD 다** — 그 뒤 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트다
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
 - exit: 0
@@ -94,12 +95,12 @@
 ## 2026-10-05T09:0x+09:00 — 깨진 manifest 비교
 
 - cmd: `--compare` 를 잘린 파일·`measurements` 없음·`measurements` null·`[]`·`null` 다섯에 **양방향**
-- exit: 1 ×10
+- exit: 비-0 ×10(현행 코드는 아래 「깨진 manifest 의 종료 코드」 절의 3)
 - 핵심 결과: 전부 형식 단언에서 끊는다. 손 안 댄 쌍은 0, 한 측정 변조는 1 이며 이름을 댄다
 
 - cmd: 형식 단언과 명시 분기를 구판으로 바꿔치운 변이에서 같은 다섯
 - exit: 0 ×5
-- 핵심 결과: 전부 「일치」로 읽혔다 — 고친 판은 다섯 다 1 이다(변이 뒤 numstat 빈 출력)
+- 핵심 결과: 전부 「일치」로 읽혔다 — 고친 판은 다섯 다 끊는다(변이 뒤 numstat 빈 출력)
 
 ## 2026-10-05T09:1x+09:00 — 원본 생성 출처
 
@@ -128,6 +129,44 @@
 - cmd: ci.yml `container` job 의 `run` 블록 13개를 순서대로
 - exit: 0
 - 핵심 결과: 전부 exit 0. S-23c 가 출처 단언을 문면에 내고, classpath 를 이 checkout 쪽으로 돌린 뒤에도 Flyway validate 가 통과한다. 끝난 뒤 남은 컨테이너·볼륨 0
+
+## 2026-10-05T09:4x+09:00 — 역할 이름 모양 제약 제거
+
+- cmd: `Admin`·`app-user`·`app.reader` 를 만든 클러스터에서 백업 → 새 컨테이너로 복원
+- exit: 0
+- 핵심 결과: manifest 의 역할 다섯이 그대로 복원되고 측정 10가지가 일치한다 — 앞 판은 이 셋을 모양 검사로 막았다
+
+- cmd: 같은 백업의 manifest 에 따옴표 든 역할 이름을 더해 복원
+- exit: 1
+- 핵심 결과: 「없는 역할」로 끊고 대상 컨테이너 로그의 구문 오류는 0 — 값 자리 인용이 닫는다(fail-closed 유지)
+
+## 2026-10-05T09:4x+09:00 — 깨진 manifest 의 종료 코드
+
+- cmd: 잘림·`[]`·빈 파일·`measurements` 없음·틀린 schema 다섯으로 복원
+- exit: 3 ×5
+- 핵심 결과: 전부 **컨테이너 생성 0** 이고 사유를 각각 댄다(parse·shape·empty). 앞 판은 해시 루프의 jq 가 먼저 죽어 규약 밖 코드였다
+
+- cmd: 같은 다섯을 `--compare` 단독 모드로
+- exit: 3 ×5
+- 핵심 결과: 두 모드가 같은 코드를 쓴다 — 깨진 입력은 등식의 어긋남이 아니라 대상 오류다
+
+## 2026-10-05T09:4x+09:00 — 보고가 객체 이름까지
+
+- cmd: 복원본에서 시퀀스 USAGE 회수 → 재측정 비교 · 함수 EXECUTE 회수 → 재측정 비교
+- exit: 1 / 1
+- 핵심 결과: `privilegeMatrix / bidvector_app / sequence/collection_run_id_seq` 와 `privilegeMatrix / Admin / function/notice_audit_insert()` 로 **어느 객체인지**까지 댄다
+
+## 2026-10-05T09:5x+09:00 — 복원 대상 이미지의 출처
+
+- cmd: compose postgres 를 띄우고 `docker inspect --type container -f '{{.Config.Image}}'` 와 `compose config` 의 이미지를 나란히
+- exit: 0
+- 핵심 결과: 두 값이 같다(이 저장소는 compose 파일이 하나다). 리허설이 읽는 자리는 컨테이너 쪽이다 — 다중 파일 환경에서 override 가 바꾼 이미지를 파일만 보면 놓친다
+
+## 2026-10-05T09:4x+09:00 — acceptance 재실행
+
+- cmd: ci.yml `container` job 의 `run` 블록 13개를 순서대로
+- exit: 0
+- 핵심 결과: 전부 exit 0, S-23c 포함. 끝난 뒤 남은 컨테이너·볼륨 0
 
 ## 게이트 실측
 
