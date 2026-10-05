@@ -16,7 +16,11 @@
 #
 # Flyway 호출은 **production 과 같은 조건**으로 한다 — 앱 이미지가 이미 풀어 둔
 # `/application/lib` 를 그대로 classpath 로 쓰므로 Flyway·방언·JDBC 드라이버가 출하본과
-# 같은 바이트이고, 설정도 `PersistenceWiring.migrate()` 와 같이 전부 기본값이다
+# 같은 바이트이고, 설정도 `PersistenceWiring.migrate()` 와 같이 전부 기본값이다.
+# **마이그레이션은 이 checkout 의 것이 정본**이라 `/jvm/migrations` 를 classpath 앞에 둔다 —
+# 앱 jar 에도 같은 이름의 자원이 들어 있고 뒤에 두면 그쪽 바이트가 이기므로, 빌드된 이미지가
+# checkout 보다 낡아도 리허설이 알아채지 못한다. 앞에 두면 그 어긋남이 체크섬에서 붉어진다
+# (2026-10-05 code-review G-3)
 # (validateOnMigrate · cleanDisabled · baselineOnMigrate=false). 앱을 기동하지 않는 이유는
 # 둘이다: 기동은 비싸고, bootJar 안에 봉인된 `classpath:db/migration` 에는 임시 V18·V19 를
 # 넣을 수 없다. Flyway CLI 는 이 저장소에 없고 flyway-core 에는 main 이 없다.
@@ -144,7 +148,9 @@ import org.flywaydb.core.Flyway;
 public final class RehearsalFlyway {
     public static void main(String[] args) {
         Flyway flyway = Flyway.configure()
-                .dataSource(args[1], args[2], System.getenv("REHEARSAL_PGPASSWORD"))
+                // 암호를 넘기지 않는다. 접속은 복원 컨테이너의 netns 안 루프백이고 공식
+                // postgres 이미지의 pg_hba 가 그 경로를 trust 로 두므로 서버가 묻지 않는다.
+                .dataSource(args[1], args[2], null)
                 .locations("classpath:db/migration")
                 .load();
         switch (args[0]) {
@@ -164,7 +170,10 @@ JAVA
 
 flyway_jar="$(docker run --rm --entrypoint sh "$APP_IMAGE" -c 'ls /application/lib/flyway-core-*.jar' | tr -d '\r')" \
   || _die "앱 이미지에서 flyway-core 를 찾지 못했다" 2
-[ "$(printf '%s\n' "$flyway_jar" | wc -l)" -eq 1 ] || _die "앱 이미지의 flyway-core 가 하나가 아니다" 2
+# `printf '%s\n' ""` 은 한 줄을 내므로 `wc -l` 로는 **빈 값도 1 로 읽힌다** — 단언이 읽히는
+# 대로 재지 않았다(2026-10-05 code-review G-8). 비어 있지 않음을 먼저 묻고, 셈은 `grep -c .` 로 한다.
+[ -n "$flyway_jar" ] || _die "앱 이미지에서 flyway-core 를 찾지 못했다" 2
+[ "$(printf '%s\n' "$flyway_jar" | grep -c .)" -eq 1 ] || _die "앱 이미지의 flyway-core 가 하나가 아니다" 2
 docker run --rm --entrypoint sh "$APP_IMAGE" -c "cat $flyway_jar" > "$JVM/flyway-core.jar" \
   || _die "flyway-core 를 꺼내지 못했다" 2
 javac -nowarn -cp "$JVM/flyway-core.jar" -d "$JVM/classes" "$JVM/RehearsalFlyway.java" \
@@ -177,7 +186,7 @@ _flyway() {
   docker run --rm --network "container:$RESTORE_CONTAINER" \
     --security-opt no-new-privileges:true -v "$JVM:/jvm:ro" \
     --entrypoint java "$APP_IMAGE" \
-    -cp "/application/lib/*:/jvm/classes:/jvm/migrations" \
+    -cp "/jvm/migrations:/jvm/classes:/application/lib/*" \
     RehearsalFlyway "$1" "jdbc:postgresql://127.0.0.1:5432/$2" "$SUPERUSER"
 }
 

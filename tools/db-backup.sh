@@ -144,31 +144,54 @@ SQL
 )
 
 # 축9 유효 권한 행렬 — `CleanMigrationPrivilegeTest`(6B-1)와 같은 술어다:
-# `has_table_privilege` 가 직접 부여·PUBLIC 부여·역할 상속을 모두 해소한다. 역할 목록도
-# 표 목록도 카탈로그에서 발견한다(그 test 의 손 기대 행렬은 clean DB 재현 축이고, 여기서는
+# `has_*_privilege` 가 직접 부여·PUBLIC 부여·역할 상속을 모두 해소한다. 역할 목록도 객체
+# 목록도 카탈로그에서 발견한다(그 test 의 손 기대 행렬은 clean DB 재현 축이고, 여기서는
 # 원본 대 복원본의 **등식**이 판정이다).
+#
+# 표만이 아니라 **시퀀스와 함수**까지 잰다(2026-10-05 verifier L-2) — V2 가 시퀀스에 USAGE 를
+# 주고 `SECURITY DEFINER` 감사 함수에 EXECUTE 를 주므로, 표 GRANT 만 보면 그 둘의 상실이
+# 단독으로는 드러나지 않는다. 키에 종류 접두를 붙여 한 역할의 행렬 안에서 섞이지 않게 한다.
 Q_PRIVILEGES=$(cat <<'SQL'
 select coalesce(jsonb_object_agg(rolname, matrix), '{}'::jsonb) from (
-  select r.rolname,
-         jsonb_object_agg(c.relname, jsonb_build_object(
-           'select',     has_table_privilege(r.oid, c.oid, 'SELECT'),
-           'insert',     has_table_privilege(r.oid, c.oid, 'INSERT'),
-           'update',     has_table_privilege(r.oid, c.oid, 'UPDATE'),
-           'delete',     has_table_privilege(r.oid, c.oid, 'DELETE'),
-           'truncate',   has_table_privilege(r.oid, c.oid, 'TRUNCATE'),
-           'references', has_table_privilege(r.oid, c.oid, 'REFERENCES'),
-           'trigger',    has_table_privilege(r.oid, c.oid, 'TRIGGER'))) as matrix
-    from pg_roles r, pg_class c, pg_namespace n
-   where n.oid = c.relnamespace and c.relkind = 'r' and n.nspname = 'public'
-     and r.rolname not like 'pg\_%' and not r.rolsuper
+  select r.rolname, jsonb_object_agg(o.key, o.priv) as matrix
+    from pg_roles r
+    cross join lateral (
+      select 'table/' || c.relname as key,
+             jsonb_build_object(
+               'select',     has_table_privilege(r.oid, c.oid, 'SELECT'),
+               'insert',     has_table_privilege(r.oid, c.oid, 'INSERT'),
+               'update',     has_table_privilege(r.oid, c.oid, 'UPDATE'),
+               'delete',     has_table_privilege(r.oid, c.oid, 'DELETE'),
+               'truncate',   has_table_privilege(r.oid, c.oid, 'TRUNCATE'),
+               'references', has_table_privilege(r.oid, c.oid, 'REFERENCES'),
+               'trigger',    has_table_privilege(r.oid, c.oid, 'TRIGGER')) as priv
+        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where c.relkind = 'r' and n.nspname = 'public'
+      union all
+      select 'sequence/' || c.relname,
+             jsonb_build_object(
+               'usage',  has_sequence_privilege(r.oid, c.oid, 'USAGE'),
+               'select', has_sequence_privilege(r.oid, c.oid, 'SELECT'),
+               'update', has_sequence_privilege(r.oid, c.oid, 'UPDATE'))
+        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where c.relkind = 'S' and n.nspname = 'public'
+      union all
+      select 'function/' || p.oid::regprocedure::text,
+             jsonb_build_object('execute', has_function_privilege(r.oid, p.oid, 'EXECUTE'))
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+    ) o
+   where r.rolname not like 'pg\_%' and not r.rolsuper
    group by r.rolname) m
 SQL
 )
 
 # `SECURITY DEFINER` 함수의 **소유자**가 복원에서 바뀌면 감사 삽입이 누구 권한으로 도는지가
-# 조용히 달라진다(조사 4.1 ②) — 소유자와 보안 속성을 같이 잰다.
+# 조용히 달라진다(조사 4.1 ②) — 소유자와 보안 속성을 같이 잰다. 키는 **전 서명**
+# (`regprocedure`)이다 — 이름+인자 수로 잡으면 타입만 다른 오버로드가 같은 키를 들어
+# `jsonb_object_agg` 가 조용히 뒤엣것만 남긴다(2026-10-05 code-review G-9).
 Q_FUNCTIONS=$(cat <<'SQL'
-select coalesce(jsonb_object_agg(p.proname || '/' || p.pronargs, jsonb_build_object(
+select coalesce(jsonb_object_agg(p.oid::regprocedure::text, jsonb_build_object(
          'owner', pg_get_userbyid(p.proowner), 'securityDefiner', p.prosecdef)), '{}'::jsonb)
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
