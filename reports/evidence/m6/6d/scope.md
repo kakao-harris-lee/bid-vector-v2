@@ -33,7 +33,7 @@
 
 ## in_scope (r1 확정 — 이 slice = **6D-1**)
 
-- 6D-1: `app/src/test/kotlin/bidvector/app/e2e/**`(신설) · 필요한 test fixture(`adapters/src/test/**`·`workflow/src/test/**` 의 fake 확장) · `config/quality/gate-tests.properties`(등재 추가만) · `reports/evidence/m6/6d/**` · `milestone-6.md`(착수·종결 문단만). **out_scope**: production 코드 전부(`*/src/main/**`) · 마이그레이션 · ci.yml.
+- 6D-1: ~~`app/src/test/kotlin/bidvector/app/e2e/**`~~ → **`adapters/src/test/kotlin/bidvector/adapters/e2e/**`(신설, r3 D-6D-5)** · 필요한 test fixture(`adapters/src/test/**`·`workflow/src/test/**` 의 fake 확장) · `config/quality/gate-tests.properties`(등재 추가만) · `reports/evidence/m6/6d/**` · `milestone-6.md`(착수·종결 문단만). **out_scope**: production 코드 전부(`*/src/main/**`) · 마이그레이션 · ci.yml.
 
 ## acceptance (초안)
 
@@ -56,6 +56,13 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`gate-tests.
 | ID | 결정 | 근거 |
 |---|---|---|
 | **D-6D-4** | **DELIVERED 전이는 6D-1 밖(= 레인 선택지 D, 명시 결정).** 레인 실측: `OutboxTransition.ToDelivered` 생성자·`transitionOutbox` 는 `workflow` `internal`, `EventSql` 은 `adapters` `internal object`, 저장소에 교차 test 의존 0 — `app` test 에서 DELIVERED 를 치려면 D-6D-3(production diff 0) 또는 (2b)(internal 완화 금지)를 깨야 한다. 그 폐쇄는 **승인된 결정**(`OPEN-4C2-MARK-UNEXERCISED`: 통로를 열어 해결하지 않는다 — legacy C-4 를 재현하는 문; 배달 오케스트레이션 slice 로 인계)이고 그 slice 가 **6F-10** 이다. 6D-1 의 relay 는 production 클래스만으로 claim → `DispatchNotification` → `FakeNotificationSender` → inbox 기록까지 잇고, 단언은 outbox 행 **`CLAIMED`**(PENDING 아님) + sender 기록 + inbox 행. DELIVERED 종단 전이는 **알려진 제한**으로 등재하고 `OPEN-4C2-MARK-UNEXERCISED` 를 6F-10 수취로 인용. 선택지 B(교차 test 의존 신설 — build 파일 in_scope 밖, 등재 모집단 영향)·C(E2E 를 adapters test 로 — in_scope 문면 위반·fixture 복제) 불채택 | 레인 보고 · 4C-2 결정 |
+
+## 계약 갱신 r3 (2026-10-05, 팀장 — E2E 의 자리 이동 · D-6D-4 보정)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D-5** | **E2E 는 `adapters/src/test/kotlin/bidvector/adapters/e2e/**` 에 둔다**(in_scope 문면 정정 — `adapters/src/test/**` 는 이미 in_scope). 레인 실측(팀장 대조 — `app/build.gradle.kts` test classpath 에 `grpc-inprocess`·`grpc-kotlin-stub`·`ml-contract` stub **0**, `adapters` 는 셋 다 있음): `app` test 에서는 fake ML gRPC 서버를 지을 수 없어 **ML timeout·unknown field·unsupported schema·EXACT rollback 네 축**(deadline·`ReleaseCheck`·`ReleaseShapeValidation` 이 gateway 안)이 통째로 불가능. `adapters` test 에는 `MlTestFixtures`(in-process gRPC)·`PersistenceTestSupport`(Testcontainers + TRUNCATE + production Flyway)·`MockKonepsServer`·`ContractTestdataSupport`(`contracts/testdata` 로더)가 이미 있어 **바퀴 재발명 금지**와 일치. 의존 게이트 여섯은 `src/main` 만 스캔(레인 실측). 비용: `FakeNotificationSender`·`FixedClock`·`SequentialCorrelationIdFactory` 는 `workflow` test 라 모듈 경계로 재사용 불가 → 같은 형태를 adapters test 에 둔다(선례 `BidNowFakeMlAnalysisTestConfiguration`). 등재는 `gate.tests.adapters`. build 파일 무편집(교차 test 의존 B 불채택 유지) | 레인 보고 |
+| **D-6D-4 보정** | adapters test 에서는 `EventSql`(adapters `internal`)이 보이므로 relay 가 **production SQL 상수 `EventSql.MARK_DELIVERED` 그대로** DELIVERED 종단 전이까지 간다(선례 `OutboxTransitionSqlTest`, 사본 아님). 단언은 outbox 행 **`DELIVERED`** + sender 기록 + inbox 행. 남는 알려진 제한은 「`OutboxPort.markDelivered` 포트 메서드 자체는 호출되지 않는다 — `OPEN-4C2-MARK-UNEXERCISED`, 6F-10 수취」 한 줄. 전이표 거부는 `OutboxTransitionTableTest`·`OutboxTransitionSqlTest` 가 이미 잠금 | D-6D-5 의 귀결 |
 
 ## 하네스 레인 변경
 
