@@ -1,6 +1,6 @@
 # M6/6D-1 — rollback 절차와 실측
 
-실측 HEAD: `697a231b`
+실측 HEAD: `e7ef9ffd`(복원·hunk 대상을 마지막으로 건드린 커밋 — 6D-1 종결 문단 `7a946be3` + 빈 줄 `e7ef9ffd`, `milestone-6.md` 만). 두 앵커: **⓪~③d 는 `e7ef9ffd`**(아래 「팀장 재실측」), **①~⑥ 레인 실측은 `697a231b`**(마지막 산출물 커밋 — 복원 12·등재 파일은 그 뒤 이동 0: `git diff --name-only 697a231b..e7ef9ffd -- adapters/src/test/kotlin/bidvector/adapters/e2e config/quality/gate-tests.properties` 빈 출력)
 base: `fd4629fe`
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 이 slice 의 in_scope 는 e2e test
@@ -79,3 +79,15 @@ git diff b42900d5~1..b42900d5 -- milestone-6.md | git apply -R
 이 slice 의 산출물은 test 와 등재뿐이라 **운영 거동을 끄는 스위치가 없다**. 실행만 멈추려면 등재
 다섯 줄을 지우면 되지만, 그 순간 등재 등식 게이트가 즉시 붉어진다(모집단 ∖ 제외 ≠ 등재) — 즉
 「조용히 끄는 길」이 없다. 끄려면 test 클래스 자체를 지우는 위 되돌림을 쓴다.
+
+## 팀장 재실측 @`e7ef9ffd` (6D-1 종결 문단 커밋, 2026-10-05)
+
+종결 문단 둘(`7a946be3`·`e7ef9ffd`)이 `milestone-6.md`(hunk 대상)를 움직였으므로 버릴 clone 에서 ⓪~③d 를 다시 쟀다. 복원 12·등재 파일은 `697a231b` 뒤 이동 0 이라 ④~⑥ 은 위 레인 실측(되돌린 트리 base 동일 · `check`·`qualityBaseline` exit 0)이 그대로 유효하다.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| ⓪ | 복원 목록 기계 산출(`git diff --name-status fd4629fe..697a231b -- <e2e 디렉터리>`) | 12 A — 위 목록과 같음 |
+| ①② | `git rm -r <e2e 디렉터리>` | exit 0 · D 12 |
+| ③b | hunk — `git log --format=%h fd4629fe..HEAD -- <파일>` 산출: `gate-tests.properties` **둘** · `milestone-6.md` **셋**(`e7ef9ffd` → `7a946be3` → `b42900d5`)을 최신부터 역적용 | apply exit 0 · conflict 0 · 두 파일 `git diff fd4629fe` 빈 출력 |
+| ③c | 내 줄 사라짐 · 남의 줄 남음 | 6D-1 언급 HEAD 2 → 0(= base) · 6B-2 4/4 · 등재 줄 323/323(= base) |
+| ③d | 트리 동일성 | base 와 다른 추적 파일은 `reports/evidence/m6/6d/` 넷뿐(의도) |

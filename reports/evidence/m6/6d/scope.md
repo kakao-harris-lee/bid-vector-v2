@@ -114,6 +114,12 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`gate-tests.
 |---|---|---|
 | **D-6D-20** | **R3-M-1 보정 수령·동결.** 산출물 `697a231b`(우리 타입을 구현하는 UNKNOWN 수집 + `Proxy.getInvocationHandler` 하강; = **rollback 실측 HEAD**, 레인이 ④~⑥ 갈음 대신 전부 실측 — evidence 디렉터리가 `leakPatternGate` 의 선언된 입력이라 「입력 동일」이 성립하지 않는다는 사유, **채택**) · evidence `45eb61c3` = **판정 SHA**. 레인 자기 정정: r2 자기 신고 「UNKNOWN 은 두 필터에서 RED」는 코드 오독 — 그 축은 열려 있었고 verifier 가 Proxy 로 보였다; 이번 라운드부터 게이트 종료 코드 단독 호출 + 별도 커밋(그 덕에 ktlint 실패를 커밋 전에 잡음). 팀장 대조: in_scope 밖 0 · production·build diff 0 · 누출 0 · 크기 ≤ 산출물 · 되돌림 대상 `697a231b..45eb61c3` 이동 0. 회귀 넷 RED(Proxy·out-of-tree·SAM·깊이) · 정상 13 GREEN. verifier **(1) Proxy 재확인만** → 통과하면 종결 | 레인 보고 |
 
+## 계약 갱신 r11 (2026-10-05, 팀장 — 종결)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D-21** | **종결 판정.** verifier Proxy 재확인 **ready-for-review** @`45eb61c3`(`07_verifier_proxy.md` — Proxy 대역(test 람다 handler) RED「비-MAIN·비-경계 비어야 함」· 경계 타입 Proxy 도 RED(UNKNOWN ≠ TEST) · out-of-tree + SAM 람다 같은 RED 목록 · 정상 13 GREEN 건너뜀 0 · 함수 타입 필드는 workflow internal 생성자로만 설정 가능 · rollback 술어 0). 판정 이력: verifier r1 not-ready → r2 ready → 표적(R3-M-1) → 보정 → Proxy 재확인 ready · code-reviewer r1 high(≡F-2) → r2 새 high 없음. 재작업 **1/5**. 종결 문단 `milestone-6.md` `7a946be3` + 문단 경계 빈 줄 `e7ef9ffd`(6B-2 종결/6D-1 착수 사이 — 착수 커밋이 남긴 같은 모양의 누락); **팀장 rollback 재실측 @`e7ef9ffd`**(rollback.md — hunk 둘+셋 conflict 0, 트리 base 동일). 다음: push → PR → `/code-review` → 판정·조치 코멘트 → 머지(운영자 상시 지시) | 판정 레인 |
+
 ## 하네스 레인 변경
 
-`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r4 시점). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 `172c0d9a` · r10 이 커밋)와 `milestone-6.md`(`b42900d5` 착수) — `git log -- <파일>` 산출.
+`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r4 시점). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 `172c0d9a` · r10 `be0c1491` · r11 이 커밋(+ `rollback.md` 팀장 재실측 절))와 `milestone-6.md`(`b42900d5` 착수 · `7a946be3` 종결 · `e7ef9ffd` 빈 줄) — `git log -- <파일>` 산출.
