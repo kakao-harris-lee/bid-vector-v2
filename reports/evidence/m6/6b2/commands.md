@@ -75,11 +75,59 @@
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
 - 핵심 결과: 350 task 중 32 수행. **`leakPatternGate` 가 이번 실행에서 실제로 돌았다**(UP-TO-DATE 표시 없음) —
-  evidence 를 훑는 게이트라 이 slice 에서 붉어질 수 있는 유일한 자리였다
+  evidence 를 훑는 게이트라 이 slice 에서 붉어질 수 있는 유일한 자리다. `contractGate` 도 수행
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
 - exit: 0
-- 핵심 결과: 33 task 전부 up-to-date
+- 핵심 결과: 전부 up-to-date
+
+## 2026-10-05T09:0x+09:00 — 라벨 등식
+
+- cmd: `./tools/db-restore.sh <백업> <라벨 없는 자기 컨테이너> <이미지> r_x ""` · 같은 호출에 공백뿐인 표식 · 비어 있지 않은 틀린 표식
+- exit: 3 / 3 / 3
+- 핵심 결과: 셋 다 거부하고 그 컨테이너의 역할은 그대로다
+
+- cmd: 위 두 가드를 **구판으로 바꿔치운** 변이에서 빈 표식 호출
+- exit: 0
+- 핵심 결과: 「복원 완료」를 내며 그 컨테이너에 데이터베이스 하나를 만들었다 — 고친 판은 그 자리에 가지 않는다(변이 뒤 `git diff --numstat` 빈 출력)
+
+## 2026-10-05T09:0x+09:00 — 깨진 manifest 비교
+
+- cmd: `--compare` 를 잘린 파일·`measurements` 없음·`measurements` null·`[]`·`null` 다섯에 **양방향**
+- exit: 1 ×10
+- 핵심 결과: 전부 형식 단언에서 끊는다. 손 안 댄 쌍은 0, 한 측정 변조는 1 이며 이름을 댄다
+
+- cmd: 형식 단언과 명시 분기를 구판으로 바꿔치운 변이에서 같은 다섯
+- exit: 0 ×5
+- 핵심 결과: 전부 「일치」로 읽혔다 — 고친 판은 다섯 다 1 이다(변이 뒤 numstat 빈 출력)
+
+## 2026-10-05T09:1x+09:00 — 원본 생성 출처
+
+- cmd: 같은 서비스 이름을 가진 일회성 foreign compose 프로젝트를 띄우고 `COMPOSE_PROJECT_NAME` 으로 그것을 가리킨 뒤 리허설
+- exit: 3
+- 핵심 결과: 「남의 환경이다」로 끊는다. 그 컨테이너의 출처 라벨은 foreign 파일을 가리키고 인자 realpath 와 다르다 — 앞 판의 이름 대조였다면 통과했을 경로다. foreign 프로젝트는 측정 뒤 폐기
+
+## 2026-10-05T09:1x+09:00 — manifest 식별자 가드
+
+- cmd: 소유자 이름에 따옴표를 넣은 manifest · 역할 이름에 따옴표를 넣은 manifest · 손 안 댄 백업
+- exit: 1 / 1 / 0
+- 핵심 결과: 앞 둘은 각각 컨테이너를 만들기 전·역할 단계에서 모양 검사로 끊고, 셋째는 복원돼 만들어진 데이터베이스의 인코딩·collation 이 manifest 와 같다
+
+- cmd: `psql -v v=hello -c "select :'v'"` 대 같은 문장을 stdin 으로
+- exit: 3 / 0
+- 핵심 결과: `-c` 는 변수 보간을 하지 않아 `:` 에서 구문 오류, stdin 은 `hello` — 로케일 인용을 stdin 경로로 옮긴 근거
+
+## 2026-10-05T09:1x+09:00 — 권한 행렬의 새 두 축
+
+- cmd: V1~V17 을 올린 컨테이너에서 백업 → 복원 → 시퀀스 USAGE 회수 후 재측정 → 함수 EXECUTE 회수 후 재측정
+- exit: 0 / 1 / 1
+- 핵심 결과: 행렬이 표 18 · 시퀀스 4 · 함수 5 이고, 두 회수가 각각 등식을 붉힌다. 함수 측정의 키는 다섯 다 전 서명이다
+
+## 2026-10-05T09:20+09:00 — acceptance 재실행
+
+- cmd: ci.yml `container` job 의 `run` 블록 13개를 순서대로
+- exit: 0
+- 핵심 결과: 전부 exit 0. S-23c 가 출처 단언을 문면에 내고, classpath 를 이 checkout 쪽으로 돌린 뒤에도 Flyway validate 가 통과한다. 끝난 뒤 남은 컨테이너·볼륨 0
 
 ## 게이트 실측
 
