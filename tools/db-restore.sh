@@ -105,6 +105,15 @@ case "$DATABASE" in
   '' | *[!a-z0-9_]*) _die "데이터베이스 이름이 식별자 모양이 아니다: '$DATABASE'" 3 ;;
 esac
 
+# **빈 실행 표식을 거부한다.** 없는 라벨을 묻는 Go 템플릿 `index` 는 빈 문자열을 돌려주므로,
+# 표식이 비어 있으면 「라벨이 없는 남의 컨테이너」가 등식을 통과한다 — unset 변수 하나가 이
+# 인자를 만든다. 아래 등식은 「라벨이 **존재**하고 값이 같다」로 따로 닫지만, 비어 있는 표식은
+# 그 자체로 쓸 수 없는 값이라 여기서 먼저 끊는다(2026-10-05 verifier H-1).
+case "$RUN_LABEL" in
+  *[![:space:]]*) ;;
+  *) _die "실행 표식이 비어 있다 — 그 값으로는 자기 자원을 가릴 수 없다" 3 ;;
+esac
+
 # 우회 2(백업 바이트 변조) — 복원 전에 manifest 가 적은 해시와 실제 파일을 맞춘다.
 for artifact in roles.sql db.dump; do
   recorded="$(jq -r --arg a "$artifact" '.artifacts[$a].sha256' "$BACKUP/manifest.json")"
@@ -135,11 +144,18 @@ _wait_ready() {
   _die "대상 컨테이너가 제한 시간 안에 접속을 받지 않았다" 1
 }
 
-if docker inspect "$CONTAINER" >/dev/null 2>&1; then
-  found_label="$(docker inspect -f "{{index .Config.Labels \"$LABEL_KEY\"}}" "$CONTAINER" 2>/dev/null || true)"
-  [ "$found_label" = "$RUN_LABEL" ] \
+# `--type container` — 같은 이름의 이미지·볼륨·네트워크가 컨테이너 조회에 끼어들지 않게 한다.
+if docker inspect --type container "$CONTAINER" >/dev/null 2>&1; then
+  # 라벨 맵을 통째로 받아 **존재와 값을 함께** 묻는다. Go 템플릿의 `index` 는 없는 키에 빈
+  # 문자열을 돌려주므로 템플릿만으로는 「없음」과 「빈 값」이 구분되지 않는다. 라벨이 하나도
+  # 없으면 `.Config.Labels` 는 `null` 이라 `has` 가 터지므로 타입부터 본다.
+  matched="$(docker inspect --type container -f '{{json .Config.Labels}}' "$CONTAINER" \
+    | jq -r --arg k "$LABEL_KEY" --arg v "$RUN_LABEL" \
+        'if (type == "object") and has($k) and (.[$k] == $v) then "yes" else "no" end')" \
+    || _die "컨테이너 '$CONTAINER' 의 라벨을 읽지 못했다" 3
+  [ "$matched" = "yes" ] \
     || _die "컨테이너 '$CONTAINER' 는 이 실행이 만든 것이 아니다 — 손대지 않는다" 3
-  [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" = "true" ] \
+  [ "$(docker inspect --type container -f '{{.State.Running}}' "$CONTAINER")" = "true" ] \
     || _die "대상 컨테이너 '$CONTAINER' 가 동작 중이 아니다" 3
 else
   # 자격 값은 여기서 만들고 **이름만** 넘긴다(`-e VAR`) — docker 의 argv 에 값이 실리지
