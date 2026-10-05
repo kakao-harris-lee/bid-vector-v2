@@ -133,6 +133,12 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`gate-tests.
 |---|---|---|
 | **D-6D-24** | **조치 라운드 수령·동결.** 산출물 `98d3a430`(①~⑦; = **rollback 실측 HEAD**) · evidence `e1195aa3` = **판정 SHA**. 팀장 대조: in_scope 밖 0 · production·build diff 0 · 누출 0 · 크기 ≤ 산출물 · 되돌림 대상 `98d3a430..e1195aa3` 이동 0 · 잔여 daemon 0. **레인 판단 채택**: ① 「불투명 보유자 신호」는 `Object` 로 선언된 필드를 가진 UNKNOWN 홀더만(리프 값 제외 — 정상 run 신호 0 실측) ② rollback.md 「팀장 재실측」 절 삭제 — 레인의 새 ⓪~⑥ 실측이 더 뒤 HEAD 에서 같은 앵커를 전부 덮으므로 두 앵커를 남기면 정본이 갈림(라운드 이력 절 금지); 사실은 표에 흡수 ③ rollback 2단계 `git log` 루프(등재 셋·milestone 넷). 표적 재검증 → verifier: ① `AtomicReference(fake)` 대역 RED(`skippedHolders`) · 정상 13 GREEN 신호 0 · 앞 변이 넷 RED · ② `seen` 순서 — 깊이 상한 집계 거짓 RED 없음 · rollback 술어 `git diff --name-only 98d3a430..e1195aa3 -- <e2e+등재+milestone>` 빈 출력 · `:adapters:test --rerun` 13. 통과하면 push → 조치 코멘트 → 머지 | 레인 보고 |
 
+## 계약 갱신 r14 (2026-10-05, 팀장 — PR #62 조치 뒤 종결 재확인)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D-25** | **표적 재검증 ready-for-review @`e1195aa3`**(`08_verifier_pr62.md`): ① `AtomicReference(fake)` → `skippedHolders` RED(신고 타입 `AtomicReference`) · `Array` 은닉 → 하강해 비-MAIN 필터 RED · 정상 13 GREEN 신호 0 · 앞 변이 넷 한 run 에 다섯 원소 RED ② `depthLimitHits` 정상 0 · 깊이 2 → 28 RED(공유 객체의 긴 경로는 RED 쪽으로만) ③ rollback 술어 빈 출력 · `git log` 루프 역적용(등재 셋·milestone 넷) conflict 0 · 트리 base 동일 · `comm` 양방향 0 · `--rerun` 13. **새 low R4-L-1 — 알려진 제한 등재**: 홀더 판정이 `Object` 로 선언된 필드만 세므로 `AtomicReferenceArray`(`Object[]`)·`ThreadLocal.withInitial`(`Supplier`) 안에 숨긴 대역은 신호 밖 — 다만 그 경로는 **이미 허용된 경계 fake 안**에서만 성립하고 그래프의 production 클래스에는 홀더 타입 필드가 0 이라 거짓 통과로 가는 길이 오늘 없다; 홀더 판정을 「비-원시 필드를 가진 비-소유 객체 전부」로 넓히는 것은 리프 값 소음과의 균형이 필요해 **6D-2(그래프를 다시 만질 때)** 수취. 종결 재확인 → push → 조치 코멘트 → 머지 | 판정 레인 |
+
 ## 하네스 레인 변경
 
-`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r12 시점까지 매 갱신에서 재확인). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 `172c0d9a` · r10 `be0c1491` · r11 `af41b579` · r12 `c62830db` · r13 이 커밋)와 `milestone-6.md`(`b42900d5` 착수 · `7a946be3` 종결 · `e7ef9ffd` 빈 줄 · `44580cca` 정정) — `git log -- <파일>` 산출.
+`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r12 시점까지 매 갱신에서 재확인). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 `172c0d9a` · r10 `be0c1491` · r11 `af41b579` · r12 `c62830db` · r13 `6cc868b9` · r14 이 커밋)와 `milestone-6.md`(`b42900d5` 착수 · `7a946be3` 종결 · `e7ef9ffd` 빈 줄 · `44580cca` 정정) — `git log -- <파일>` 산출.
