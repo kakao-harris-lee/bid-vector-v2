@@ -143,12 +143,23 @@ for artifact in roles.sql db.dump; do
     || _die "$artifact 의 sha256 이 manifest 와 다르다 — 백업이 손상됐거나 바뀌었다" 1
 done
 
+# 복원 경로는 manifest 를 **믿지 않는 입력**으로 다룬다(형제 두 파일의 바이트를 해시로 맞추고
+# 형식을 단언한다). 그 전제 아래 같은 파일에서 읽은 식별자를 무가드로 SQL 에 조립하면 일관되지
+# 않는다 — `db-backup.sh` 는 카탈로그에서 온 표 이름에도 같은 검사를 건다(2026-10-05
+# code-review G-2). 설계 검토 (2b) 의 「주입 자리 없음」은 manifest 를 입력으로 세지 않은 문장이다.
+_assert_plain_identifier() {
+  case "$2" in
+    '' | *[!a-z0-9_]*) _die "$1 식별자 모양이 아니다: '$2'" 1 ;;
+  esac
+}
+
 _assert_manifest "$BACKUP/manifest.json" "백업"
 SUPERUSER="$(jq -r '.measurements.database.owner' "$BACKUP/manifest.json")"
 ENCODING="$(jq -r '.measurements.database.encoding' "$BACKUP/manifest.json")"
 COLLATE="$(jq -r '.measurements.database.collate' "$BACKUP/manifest.json")"
 CTYPE="$(jq -r '.measurements.database.ctype' "$BACKUP/manifest.json")"
 [ -n "$SUPERUSER" ] && [ "$SUPERUSER" != "null" ] || _die "manifest 에 데이터베이스 소유자가 없다" 3
+_assert_plain_identifier "manifest 의 데이터베이스 소유자가" "$SUPERUSER"
 
 _wait_ready() {
   local i
@@ -199,6 +210,20 @@ _psql_db() {
     -U "$SUPERUSER" -d "$1" -c "$2"
 }
 
+# 리터럴을 셸에서 따옴표로 감싸 붙이는 대신 `psql -v` 로 넘기고 `:'var'` 로 인용한다 —
+# 인용 규칙이 psql 쪽에 있으므로 값에 무엇이 들었든 문자열로만 읽힌다.
+#
+# SQL 을 **stdin 으로** 준다. `-c` 는 psql 의 렉서를 거치지 않아 변수 보간이 일어나지 않는다
+# (2026-10-05 실측: `psql -v v=hello -c "select :'v'"` → `syntax error at or near ":"`,
+# 같은 문장을 stdin 으로 주면 `hello`). 오류는 `ON_ERROR_STOP` 이 비-0 으로 낸다.
+_psql_db_v() {
+  local database="$1" sql="$2"
+  shift 2
+  printf '%s\n' "$sql" \
+    | docker exec -i "$CONTAINER" psql -X -q -t -A -v ON_ERROR_STOP=1 \
+        -U "$SUPERUSER" -d "$database" "$@"
+}
+
 # ---- ① 역할 ---------------------------------------------------------------------
 # 이미 있는 역할의 `CREATE ROLE` 은 실패한다(초기화가 슈퍼유저를 먼저 만들고, 같은
 # 클러스터에 두 번째 데이터베이스를 복원할 때도 그렇다). 그래서 **명령의 종료 코드가 아니라
@@ -211,7 +236,9 @@ docker exec -i "$CONTAINER" psql -X -q -U "$SUPERUSER" -d "$SUPERUSER" \
 missing=""
 while IFS= read -r role; do
   [ -n "$role" ] || continue
-  present="$(_psql_db "$SUPERUSER" "select exists(select 1 from pg_roles where rolname = '$role')")"
+  _assert_plain_identifier "manifest 의 역할 이름이" "$role"
+  present="$(_psql_db_v "$SUPERUSER" \
+    "select exists(select 1 from pg_roles where rolname = :'r')" -v r="$role")"
   [ "$present" = "t" ] || missing="${missing:+$missing, }$role"
 done < <(jq -r '.measurements.roles | keys[]' "$BACKUP/manifest.json")
 if [ -n "$missing" ]; then
@@ -222,8 +249,10 @@ fi
 # ---- ② 새 빈 데이터베이스 -------------------------------------------------------
 exists="$(_psql_db "$SUPERUSER" "select exists(select 1 from pg_database where datname = '$DATABASE')")"
 [ "$exists" = "f" ] || _die "데이터베이스 '$DATABASE' 가 이미 있다 — 복원은 빈 DB 로만 한다" 3
-_psql_db "$SUPERUSER" "create database $DATABASE owner $SUPERUSER template template0
-  encoding '$ENCODING' lc_collate '$COLLATE' lc_ctype '$CTYPE'" >/dev/null \
+_psql_db_v "$SUPERUSER" \
+  "create database $DATABASE owner $SUPERUSER template template0
+   encoding :'enc' lc_collate :'coll' lc_ctype :'ctyp'" \
+  -v enc="$ENCODING" -v coll="$COLLATE" -v ctyp="$CTYPE" >/dev/null \
   || _die "대상 데이터베이스를 만들지 못했다" 1
 
 # ---- ③ 스키마·데이터 -------------------------------------------------------------
