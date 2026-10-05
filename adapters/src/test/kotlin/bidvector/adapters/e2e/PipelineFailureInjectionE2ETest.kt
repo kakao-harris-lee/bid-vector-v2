@@ -197,6 +197,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
 
     private companion object {
         const val NOTICE = "E2E-INJECT-0001"
+
         /** 첫 워커가 행을 집었다는 신호를 기다리는 시한 — 집지 못하면 그 자체가 결함이다. */
         const val CLAIM_SIGNAL_TIMEOUT_SECONDS = 5L
 
@@ -209,6 +210,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
 
         /** 워커 합류 시한 — 쥠 시한보다 커야 그 만료가 합류 실패로 가려지지 않는다. */
         const val WORKER_TIMEOUT_SECONDS = 60L
+
         val DELAY_MARGIN: Duration = Duration.ofMillis(100)
     }
 }
