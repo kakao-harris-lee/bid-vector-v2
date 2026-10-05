@@ -108,6 +108,12 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`gate-tests.
 | **D-6D-18** | **표적 재검증 @`fecbb75f`**(`06_verifier_targeted.md`): ready-for-review(blocker/high 0)이나 표적 (1) 의 UNKNOWN 조항 **실패 → 새 medium R3-M-1** — `collectOwned` 가 UNKNOWN 객체를 수집 없이 조기 반환하므로 **JDK 동적 `Proxy`**(CodeSource 없음 = UNKNOWN) 대역을 감시 대상에 꽂아도 13/13 GREEN, 정적 게이트 셋도 초록; r2 의 R2-K-2 판독(UNKNOWN 은 두 필터에서 RED)은 **뒤집힘** — 툴체인 변경으로 람다가 UNKNOWN 이 되면 거짓 통과. 그 밖 통과: out-of-tree·SAM 람다·깊이 2 RED, 정상 13 GREEN · conflict 정상 0.21s, `SKIP LOCKED` 제거 30.3s 뒤 `releasedInTime` RED · rollback 술어·`comm`·hunk 셋·트리 동일 · `--rerun` 13 실행. **보정 라운드(차단 아님, 재작업 1/5 유지)** | 판정 레인 |
 | **D-6D-19** | **R3-M-1 처분**: UNKNOWN 객체 중 **우리 build 출력의 타입(인터페이스/상위 클래스)을 구현하는 것**은 수집해 비-MAIN 필터로 보낸다(경계 여섯 중 하나가 아니면 RED; Proxy 는 handler 까지 하강) · JDK·드라이버 등 우리 타입을 구현하지 않는 UNKNOWN 은 계속 건너뜀 · 회귀: Proxy 대역 RED · 정상 13 GREEN · out-of-tree·SAM 람다 여전히 RED. evidence: 알려진 제한의 「UNKNOWN 은 RED」 서술을 사실로(「우리 타입을 구현하는 UNKNOWN 은 RED, 그 외는 건너뜀」) · rollback 실측 HEAD 를 그 커밋으로 — 복원 여섯·hunk 대상 무이동이면 ⓪~③d 재실측 + ④~⑥ 은 **트리 동일성 갈음**(되돌린 트리 == base 바이트 동일, base 는 main CI 초록 `fd4629fe`) 허용, 사유 등재. 그 뒤 verifier 표적 (1) 만 재확인(Proxy RED) → 종결 | 「술어 변경은 표적 재검증」 |
 
+## 계약 갱신 r10 (2026-10-05, 팀장 — R3-M-1 보정 수령 · 동결 · Proxy 재확인)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D-20** | **R3-M-1 보정 수령·동결.** 산출물 `697a231b`(우리 타입을 구현하는 UNKNOWN 수집 + `Proxy.getInvocationHandler` 하강; = **rollback 실측 HEAD**, 레인이 ④~⑥ 갈음 대신 전부 실측 — evidence 디렉터리가 `leakPatternGate` 의 선언된 입력이라 「입력 동일」이 성립하지 않는다는 사유, **채택**) · evidence `45eb61c3` = **판정 SHA**. 레인 자기 정정: r2 자기 신고 「UNKNOWN 은 두 필터에서 RED」는 코드 오독 — 그 축은 열려 있었고 verifier 가 Proxy 로 보였다; 이번 라운드부터 게이트 종료 코드 단독 호출 + 별도 커밋(그 덕에 ktlint 실패를 커밋 전에 잡음). 팀장 대조: in_scope 밖 0 · production·build diff 0 · 누출 0 · 크기 ≤ 산출물 · 되돌림 대상 `697a231b..45eb61c3` 이동 0. 회귀 넷 RED(Proxy·out-of-tree·SAM·깊이) · 정상 13 GREEN. verifier **(1) Proxy 재확인만** → 통과하면 종결 | 레인 보고 |
+
 ## 하네스 레인 변경
 
-`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r4 시점). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 이 커밋)와 `milestone-6.md`(`b42900d5` 착수) — `git log -- <파일>` 산출.
+`git log --oneline fd4629fe..HEAD -- CLAUDE.md .claude/` → **없음**(r4 시점). 팀장 레인 커밋은 `reports/evidence/m6/6d/scope.md`(초안 `2202184d` · r1 `8a918423` · r2 `c777f7c8` · r3 `a4f4d7b2` · r4 `d81f4761` · r5 `ae453c1d` · r6 `b826702b` · r7 `d648a671` · r8 `65716c23` · r9 `172c0d9a` · r10 이 커밋)와 `milestone-6.md`(`b42900d5` 착수) — `git log -- <파일>` 산출.
