@@ -1,6 +1,6 @@
 # M6/6D-1 — 실행 명령과 실측 (구현 레인)
 
-base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `697a231b`.
+base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `98d3a430`.
 
 ## acceptance — CI `check` job 명령
 
@@ -41,10 +41,11 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ① production 조립 | 여력 포트를 SAM 람다 대역으로 교체 | RED |
 | ① production 조립 | 감시 대상을 **JDK 동적 `Proxy`** 대역으로 교체(출처 미상 + handler 는 test) | RED |
 | ① 그래프 순회 | 깊이 상한을 10 에서 2 로 낮춤 | RED — 건너뛴 가지가 신호로 남는다 |
+| ① 그래프 순회 | 협력자를 **불투명 보유자**(`AtomicReference`) 뒤에 숨김 | RED — 멈춘 보유자가 신호에 오른다 |
 | ① 사다리 임계 | 승격·검토 임계를 둘 다 0 으로(유효한 전략) | RED |
 | ① 사다리 임계 | 낮은 match 주입 제거(두 후보가 같은 임베딩) | RED |
 | ② 중복 공고 | 둘째 평가 제거 | RED |
-| ② ML timeout | 지연을 0 으로 교체 | RED |
+| ② ML timeout | 지연을 0 으로 교체 | RED(payload 근거가 갈린다. 같은 test 가 **서버가 실제로 불렸음**도 호출 계수로 단언한다) |
 | ② DB conflict | 둘째 claim 을 첫 워커 종료 **뒤**로 옮김(완전 순차) | RED |
 | ② DB conflict | 경합 대상 행을 만들지 않음 | RED |
 | ② malformed contract | 정의 밖 필드를 붙이지 않은 골든으로 교체 | RED |
@@ -54,7 +55,7 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ② DB conflict (production, clone) | 전이 질의에서 `SKIP LOCKED` 제거 | RED — 둘째 claim 이 막혀 쥠 시한이 만료된다(변이 run 40.9s, 정상 10.8s) |
 | ② ML timeout (production, clone) | 출하 예측 예산을 1시간으로 교체 | RED — 서버를 부르기 전 예산 고정점 단언에서 |
 
-열아홉 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
+표의 모든 행이 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
 production 경로를 재지 않는다는 뜻이고, 그래서 두 축의 술어를 바꿨다.
 
 ## 그 밖의 게이트 실측
@@ -64,7 +65,7 @@ production 경로를 재지 않는다는 뜻이고, 그래서 두 축의 술어�
 | clean-tree | `git status --porcelain -- <in_scope 개별 인자>` | 빈 출력 |
 | clean-tree 양성 대조 | 같은 경로에 비파괴 절삭(한 줄) 후 같은 명령 | `M` 한 줄 — 게이트가 잡는다. 저장 바이트로 복원 |
 | 비밀값 스캔 | `grep -rniE -f config/quality/leak-patterns.txt <신규 경로들>` | exit 1(일치 0) |
-| 범위 혼입 | `git diff --name-only fd4629fe..aa99e987` ∖ in_scope | 빈 출력 |
+| 범위 혼입 | `git diff --name-only fd4629fe..98d3a430` ∖ in_scope(`comm` 양방향) | 양쪽 빈 출력 |
 | production 불변 | `git diff --name-only fd4629fe..HEAD -- '*/src/main/*'` | 빈 출력 |
 
 ## 실행하지 않은 것
