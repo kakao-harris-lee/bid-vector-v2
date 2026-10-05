@@ -17,13 +17,17 @@
 # Flyway 호출은 **production 과 같은 조건**으로 한다 — 앱 이미지가 이미 풀어 둔
 # `/application/lib` 를 그대로 classpath 로 쓰므로 Flyway·방언·JDBC 드라이버가 출하본과
 # 같은 바이트이고, 설정도 `PersistenceWiring.migrate()` 와 같이 전부 기본값이다.
-# **마이그레이션은 이 checkout 의 것이 정본**이라 `/jvm/migrations` 를 classpath 앞에 둔다 —
-# 앱 jar 에도 같은 이름의 자원이 들어 있고 뒤에 두면 그쪽 바이트가 이기므로, 빌드된 이미지가
-# checkout 보다 낡아도 리허설이 알아채지 못한다. 앞에 두면 그 어긋남이 체크섬에서 붉어진다
-# (2026-10-05 code-review G-3)
 # (validateOnMigrate · cleanDisabled · baselineOnMigrate=false). 앱을 기동하지 않는 이유는
 # 둘이다: 기동은 비싸고, bootJar 안에 봉인된 `classpath:db/migration` 에는 임시 V18·V19 를
 # 넣을 수 없다. Flyway CLI 는 이 저장소에 없고 flyway-core 에는 main 이 없다.
+#
+# **마이그레이션 자리가 둘이다.** `/jvm/migrations`(이 checkout 의 사본)와 `/application/lib` 의
+# 앱 jar 가 **둘 다** `db/migration` 을 담고, Flyway 는 classpath 순서와 무관하게 둘 다 읽는다.
+# 같은 버전이 서로 다른 바이트로 둘 있으면 「Found more than one migration with version N」으로
+# **거부**한다 — 즉 빌드된 이미지가 checkout 과 어긋나면 어느 순서에서든 fail-closed 이고,
+# 순서는 바이트가 같을 때 어느 쪽이 먼저 열리는가를 정할 뿐이다. checkout 을 앞에 두는 것은
+# 「이 checkout 이 정본」이라는 의도를 코드에 남기는 선택이지 그 자체가 탐지 장치는 아니다
+# (2026-10-05 code-review R-2 · verifier R2-L-1 — 앞 판의 「체크섬에서 붉어진다」 서술은 틀렸다).
 #
 # 종료 코드: 2 도구·전제 부재 · 3 사용법·대상 오류 · 1 단언 실패.
 set -euo pipefail
@@ -44,7 +48,7 @@ _step() { echo "-- db-rehearsal: $1"; }
 COMPOSE_FILE="$1"
 SERVICE="$2"
 
-for tool in docker jq javac sha256sum openssl; do
+for tool in docker jq javac sha256sum openssl realpath; do
   command -v "$tool" >/dev/null 2>&1 || _die "$tool 이 필요하다" 2
 done
 
@@ -110,7 +114,13 @@ if docker ps -a --format '{{.Names}}' | grep -Fxq "$RESTORE_CONTAINER"; then
 fi
 _step "사전 단언 — 원본 $PROJECT/$SERVICE(이 compose 파일이 만든 것 · 읽기 전용) · 만들 이름 교차 0(기존 ${existing}개) · 표식 $RUN_ID"
 
-IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r --arg s "$SERVICE" '.services[$s].image')"
+# 복원 대상 이미지는 compose 파일이 아니라 **도는 원본 컨테이너**에서 읽는다. 출처 라벨은 쉼표로
+# 이어진 여러 파일일 수 있고(이 호스트에 실제 사례가 있다) 그중 하나만 맞아도 통과하므로,
+# `-f a -f b` 로 뜬 환경을 `-f a` 로 지목하면 override 가 바꾼 이미지를 파일 쪽에서는 못 본다.
+# 컨테이너에서 읽으면 복원본이 늘 원본과 같은 판 postgres 다(2026-10-05 code-review R-5).
+# `APP_IMAGE` 는 파일에서 읽는다 — 원본 환경에 앱 컨테이너가 없을 수 있다.
+IMAGE="$(docker inspect --type container -f '{{.Config.Image}}' "$SOURCE")" \
+  || _die "원본 컨테이너의 이미지를 읽지 못했다" 3
 APP_IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.services.app.image')"
 [ -n "$IMAGE" ] && [ "$IMAGE" != "null" ] || _die "'$SERVICE' 의 이미지를 읽지 못했다" 3
 docker image inspect "$APP_IMAGE" >/dev/null 2>&1 \

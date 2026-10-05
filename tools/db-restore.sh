@@ -41,6 +41,10 @@ USAGE
 }
 
 # ---- 등식 비교(단독 모드로도 쓴다) -------------------------------------------------
+# 어긋남은 **두 단계까지** 판다 — 측정 안의 이름, 그 값이 또 object 면 그 안의 이름까지.
+# 권한 행렬은 한 역할의 행렬에 표·시퀀스·함수가 함께 들어 커졌으므로, 역할 이름만 대면 어느
+# 객체가 권한을 잃었는지가 문면에서 사라진다(2026-10-05 code-review R-4 · verifier R2-L-2).
+#
 # 무시 목록은 **키를 먼저 결속한 뒤** 조회한다(`. as $k` 가 `$ignore | index($k)` 보다 앞선다).
 # 파이프 안에서 `.` 는 `$ignore` 로 재결속되므로 `($ignore | index(.))` 는 배열에서 배열을
 # 찾아 늘 0 을 돌려주고, 그러면 **모든 측정이 무시되어 판정이 아무것도 재지 않는다**
@@ -58,8 +62,11 @@ _assert_manifest() {
          and (.schema == "bidvector-db-backup/1")
          and ((.measurements | type) == "object")
       then "ok" else "shape" end' "$file" 2>/dev/null)" || verdict="parse"
+  # 0 바이트 입력에서 jq 는 출력 없이 성공하므로 세 사유 어느 것도 아닌 빈 값이 나온다.
+  [ -n "$verdict" ] || verdict="empty"
+  # 깨진 manifest 는 등식의 어긋남이 아니라 **대상 오류**다 — 이 스크립트의 코드 규약에서 3 이다.
   [ "$verdict" = "ok" ] \
-    || _die "$role manifest 가 이 형식이 아니다(${verdict}): $file" 1
+    || _die "$role manifest 가 이 형식이 아니다(${verdict}): $file" 3
 }
 
 _compare() {
@@ -73,19 +80,25 @@ _compare() {
   if ! findings="$(jq -rn \
     --slurpfile e "$expected" --slurpfile a "$actual" --argjson ignore "$ignore_json" '
     def brief: tojson | if length > 90 then .[0:87] + "..." else . end;
+    def bothobj(x; y): (x | type) == "object" and (y | type) == "object";
+    def firstdiff(x; y): ((x | keys) + (y | keys) | unique)
+                         | map(select(x[.] != y[.])) | (.[0] // "?");
     ($e[0].measurements) as $E | ($a[0].measurements) as $A |
     (($E | keys) + ($A | keys) | unique) as $keys |
     $keys[]
     | . as $k
     | select(($ignore | index($k)) == null)
     | select($E[$k] != $A[$k])
-    | (if ($E[$k] | type) == "object" and ($A[$k] | type) == "object"
-       then ((($E[$k] | keys) + ($A[$k] | keys) | unique)
-             | map(select($E[$k][.] != $A[$k][.])) | (.[0] // "?"))
-       else "(측정 전체)" end) as $n
-    | (if ($E[$k] | type) == "object" and ($A[$k] | type) == "object"
-       then [$E[$k][$n], $A[$k][$n]] else [$E[$k], $A[$k]] end) as $pair
-    | "등식 어긋남: \($k) / \($n) — 원본 \($pair[0] | brief) · 복원본 \($pair[1] | brief)"')"; then
+    | (if bothobj($E[$k]; $A[$k]) then firstdiff($E[$k]; $A[$k]) else null end) as $n
+    | (if $n == null then $E[$k] else $E[$k][$n] end) as $e2
+    | (if $n == null then $A[$k] else $A[$k][$n] end) as $a2
+    | (if bothobj($e2; $a2) then firstdiff($e2; $a2) else null end) as $n2
+    | (if $n2 == null then $e2 else $e2[$n2] end) as $e3
+    | (if $n2 == null then $a2 else $a2[$n2] end) as $a3
+    | "등식 어긋남: \($k)"
+      + (if $n == null then " / (측정 전체)" else " / \($n)" end)
+      + (if $n2 == null then "" else " / \($n2)" end)
+      + " — 원본 \($e3 | brief) · 복원본 \($a3 | brief)"')"; then
     echo "db-restore: manifest 비교가 실패했다 — 입력을 읽지 못했다" >&2
     return 1
   fi
@@ -135,6 +148,10 @@ case "$RUN_LABEL" in
   *) _die "실행 표식이 비어 있다 — 그 값으로는 자기 자원을 가릴 수 없다" 3 ;;
 esac
 
+# 형식 단언이 **해시 대조보다 먼저** 선다. 뒤에 두면 아래 루프의 `jq` 가 깨진 manifest 에서 먼저
+# 죽어 종료 코드가 이 스크립트의 규약(1·2·3) 밖인 jq 의 것이 된다(2026-10-05 verifier R2-L-3).
+_assert_manifest "$BACKUP/manifest.json" "백업"
+
 # 우회 2(백업 바이트 변조) — 복원 전에 manifest 가 적은 해시와 실제 파일을 맞춘다.
 for artifact in roles.sql db.dump; do
   recorded="$(jq -r --arg a "$artifact" '.artifacts[$a].sha256' "$BACKUP/manifest.json")"
@@ -153,7 +170,6 @@ _assert_plain_identifier() {
   esac
 }
 
-_assert_manifest "$BACKUP/manifest.json" "백업"
 SUPERUSER="$(jq -r '.measurements.database.owner' "$BACKUP/manifest.json")"
 ENCODING="$(jq -r '.measurements.database.encoding' "$BACKUP/manifest.json")"
 COLLATE="$(jq -r '.measurements.database.collate' "$BACKUP/manifest.json")"
@@ -236,7 +252,9 @@ docker exec -i "$CONTAINER" psql -X -q -U "$SUPERUSER" -d "$SUPERUSER" \
 missing=""
 while IFS= read -r role; do
   [ -n "$role" ] || continue
-  _assert_plain_identifier "manifest 의 역할 이름이" "$role"
+  # 역할 **이름**에는 모양 검사를 걸지 않는다 — 아래 `:'r'` 이 값 자리를 완전히 인용하므로 더할
+  # 안전이 없고, 검사는 `Admin`·`app-user`·`app.reader` 같은 적법한 역할을 막았다(code-review R-1).
+  # `$SUPERUSER` 쪽 가드는 유지한다 — 그쪽은 `owner $SUPERUSER` 라는 진짜 식별자 자리다.
   present="$(_psql_db_v "$SUPERUSER" \
     "select exists(select 1 from pg_roles where rolname = :'r')" -v r="$role")"
   [ "$present" = "t" ] || missing="${missing:+$missing, }$role"
