@@ -17,6 +17,7 @@ import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.inprocess.InProcessServerBuilder
 import kotlinx.coroutines.delay
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import contract.bidvector.ml.v1.EmbedTextRequest as ProtoEmbedTextRequest
 
@@ -66,9 +67,11 @@ internal class MlFakeServer private constructor(
 
     fun embeddingCallCount(): Int = embeddingCalls.get()
 
+    /** 종료를 기다린다(review L-4) — 닫지 않은 서버가 다음 test 로 새지 않게 한다. */
     override fun close() {
         channel.shutdownNow()
         server.shutdownNow()
+        server.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
     companion object {
@@ -127,6 +130,8 @@ private class ScriptedEmbeddingServicer(
 private suspend fun delayFor(duration: Duration) {
     if (!duration.isZero) delay(duration.toMillis())
 }
+
+private const val SHUTDOWN_TIMEOUT_SECONDS = 5L
 
 internal fun predictionMetadataOf(promoted: ModelRelease): GetModelMetadataResponse =
     GetModelMetadataResponse

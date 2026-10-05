@@ -172,11 +172,18 @@ internal class PipelineAssembly(
         return delivered
     }
 
+    /**
+     * 모르는 payload 는 **조용히 건너뛰지 않는다**(review L-3) — production codec 이 모르는
+     * `payload_type` 에 fail-closed 인 것과 같은 처분이다. 건너뛰면 relay 계수만 줄어 사유가
+     * 사라진다.
+     */
     private fun dispatchFor(
         payload: Any?,
         idempotencyKey: String,
     ): Boolean {
-        val requested = payload as? NotificationRequestedPayload ?: return false
+        val requested =
+            payload as? NotificationRequestedPayload
+                ?: error("relay 가 모르는 outbox payload 를 받았다: ${payload?.let { it::class.qualifiedName }}")
         val intent =
             NotificationIntent(
                 idempotencyKey = IdempotencyKey(idempotencyKey),

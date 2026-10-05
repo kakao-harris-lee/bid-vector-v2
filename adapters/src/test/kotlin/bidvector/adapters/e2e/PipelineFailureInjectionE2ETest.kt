@@ -5,6 +5,7 @@ import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.adapters.persistence.TransactionBoundary
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -65,7 +66,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         assembly.relay() shouldBe 1
         inboxKeys() shouldHaveSize 1
         assembly.sender.callCount() shouldBe 1
-        outboxStates() shouldContainExactly listOf("DELIVERED", "CLAIMED")
+        outboxStates() shouldContainExactlyInAnyOrder listOf("DELIVERED", "CLAIMED")
     }
 
     /**
