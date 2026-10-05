@@ -74,8 +74,9 @@
 
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
-- 핵심 결과: 350 task 중 32 수행. **`leakPatternGate` 가 이번 실행에서 실제로 돌았다**(UP-TO-DATE 표시 없음) —
-  evidence 를 훑는 게이트라 이 slice 에서 붉어질 수 있는 유일한 자리다. `contractGate` 도 수행.
+- 핵심 결과: **`leakPatternGate` 가 이번 실행에서 실제로 돌았다**(UP-TO-DATE 표시 없음) — evidence 를 훑는
+  게이트라 이 slice 에서 붉어질 수 있는 유일한 자리다. `contractGate` 도 수행. test 수는 2,679 로 base 와 같다.
+  `actionable tasks` 수는 적지 않는다 — 빌드 캐시 상태의 함수이지 이 slice 의 사실이 아니다(rollback.md 끝 주).
   **이 표가 담는 마지막 실행은 evidence 커밋 직전의 HEAD 다** — 그 뒤 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트다
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
@@ -167,6 +168,48 @@
 - cmd: ci.yml `container` job 의 `run` 블록 13개를 순서대로
 - exit: 0
 - 핵심 결과: 전부 exit 0, S-23c 포함. 끝난 뒤 남은 컨테이너·볼륨 0
+
+## 2026-10-05T10:3x+09:00 — 프로브 버전 도출
+
+- cmd: 복사한 집합의 최대 버전 도출(`ls | sed | sort -n | tail -1`)을 현재 파일 집합과 가짜 V18 을 더한 집합에
+- exit: 0
+- 핵심 결과: 17 → 프로브 18/19, 18 → 프로브 19/20. 수치 정렬이라 V9 가 V17 보다 크게 잡히지 않는다
+
+- cmd: 「미래의 저장소」 변이 — 가짜 V18 을 복사본에 더하고 복원본에도 먼저 적용한 뒤 리허설 전건
+- exit: 0
+- 핵심 결과: 프로브가 19/20 으로 비켜 서고 리허설이 통과한다
+
+- cmd: 같은 상황에서 프로브 번호만 **앞 판의 고정 18/19** 로 되돌린 변이
+- exit: 1
+- 핵심 결과: `more than one migration with version 18` — 고정 번호였다면 실제 V18 이 들어오는 날 S-23c 가 멈춘다
+
+## 2026-10-05T10:3x+09:00 — 음성 대조의 종료 코드
+
+- cmd: 음성 대조의 비교 대상을 없는 파일로 바꿔 코드 3 이 나오게 한 변이
+- exit: 1
+- 핵심 결과: 「등식 불일치(1)가 아니라 코드 3 로 끝났다 — 비교가 서지 않았다」로 끊는다. 앞 판은 비-0 을 전부 「붉음」으로 읽었다
+
+## 2026-10-05T10:3x+09:00 — 누출 스캔이 섰는가
+
+- cmd: 패턴 파일 경로를 없는 파일로 바꾼 변이
+- exit: 2
+- 핵심 결과: 「패턴 파일을 읽을 수 없다」로 끊는다
+
+- cmd: 같은 상황에서 선단언과 상태 포착을 **앞 판으로 바꿔치운** 변이
+- exit: 0
+- 핵심 결과: 「누출 스캔 0건」을 내고 리허설이 통과했다 — 패턴 파일이 없어도 스캔이 돈 것으로 읽혔다
+
+## 2026-10-05T10:3x+09:00 — compose name 선언
+
+- cmd: `docker/compose.yaml` 의 `name:` 줄을 지운 변이로 리허설
+- exit: 3
+- 핵심 결과: 「top-level name: 선언이 없다」로 끊는다. `config` 의 결과로는 구별할 수 없는 자리다(선언이 없어도 basename 이 돌아온다)
+
+## 2026-10-05T10:3x+09:00 — acceptance 재실행
+
+- cmd: ci.yml `container` job 의 `run` 블록 13개를 순서대로
+- exit: 0
+- 핵심 결과: 전부 exit 0. 끝난 뒤 남은 컨테이너·볼륨 0
 
 ## 게이트 실측
 
