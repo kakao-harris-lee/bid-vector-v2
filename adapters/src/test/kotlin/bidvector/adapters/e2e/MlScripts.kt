@@ -6,6 +6,7 @@ import bidvector.adapters.ml.MlCallPolicyData
 import bidvector.adapters.ml.embeddingMetadataResponse
 import bidvector.adapters.ml.protoEmbedResponse
 import bidvector.adapters.ml.testEmbeddingSuccess
+import bidvector.adapters.ml.testUnitVector
 import bidvector.adapters.ml.testMlCallPolicy
 import bidvector.adapters.ml.testSuccessResponse
 import bidvector.sharedkernel.Resolution
@@ -14,6 +15,7 @@ import bidvector.workflow.evaluation.OpportunityPolicyData
 import com.google.protobuf.CodedOutputStream
 import com.google.protobuf.WireFormat
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
+import contract.bidvector.ml.v1.EmbedTextResponse
 import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.ReleaseKind
 import java.io.ByteArrayOutputStream
@@ -90,6 +92,32 @@ internal fun successfulMlScript(
         embeddingDelay = embeddingDelay,
     )
 
+/**
+ * **직교 벡터** 임베딩 — 공고 텍스트와 프로필 텍스트의 코사인 유사도를 0 으로 만든다. 그러면
+ * match 점수가 바닥이라 그 후보의 priority 가 떨어진다(사다리 음성 대조의 유일한 축).
+ * 기본 벡터가 전 성분 양수라, 부호를 번갈아 두면 내적이 정확히 0 이다.
+ */
+internal fun orthogonalEmbedding(release: ModelRelease): EmbedTextResponse {
+    val base = testUnitVector(EMBEDDING_DIMENSION)
+    val flipped = base.mapIndexed { index, value -> if (index % 2 == 0) value else -value }
+    return protoEmbedResponse(
+        testEmbeddingSuccess(values = flipped).toBuilder().setRelease(release).build(),
+    )
+}
+
+/**
+ * [markerNoticeNumber] 가 든 텍스트에만 직교 벡터를 돌려준다 — 같은 run 의 다른 후보는 평소대로
+ * 높은 match 를 받는다. 프로필 텍스트에는 공고 번호가 없어 영향받지 않는다.
+ */
+internal fun lowMatchEmbeddingResponder(
+    markerNoticeNumber: String,
+    release: ModelRelease,
+    standard: EmbedTextResponse,
+): EmbeddingResponder =
+    EmbeddingResponder { request ->
+        if (request.text.contains(markerNoticeNumber)) orthogonalEmbedding(release) else standard
+    }
+
 /** 계약이 정의하지 않은 필드 번호가 든 성공 응답 — 골든 바이트 뒤에 varint 하나를 잇는다. */
 internal fun predictionResponseWithUnknownField(release: ModelRelease): CalculateOptimalBidResponse {
     val golden = predictionGolden("calculate_optimal_bid_response_success.binpb")
@@ -145,3 +173,6 @@ internal fun opportunityPolicy(): OpportunityPolicyData {
 }
 
 private const val UNKNOWN_FIELD_NUMBER = 999
+
+/** `testEmbeddingSuccess` 의 기본 차원 — metadata 대조가 같은 값을 요구한다. */
+private const val EMBEDDING_DIMENSION = 4

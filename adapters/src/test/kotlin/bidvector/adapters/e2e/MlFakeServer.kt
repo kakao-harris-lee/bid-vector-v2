@@ -47,6 +47,14 @@ internal fun interface PredictionResponder {
     fun responseFor(request: CalculateOptimalBidRequest): CalculateOptimalBidResponse
 }
 
+/**
+ * 임베딩 응답을 요청 텍스트마다 고르는 자리 — 사다리 음성 대조가 **특정 공고에만** 직교 벡터를
+ * 돌려줘 그 후보의 match 점수를 떨어뜨린다(공고별 priority 를 가르는 유일한 축).
+ */
+internal fun interface EmbeddingResponder {
+    fun responseFor(request: ProtoEmbedTextRequest): EmbedTextResponse
+}
+
 internal class MlFakeServer private constructor(
     private val server: Server,
     val channel: ManagedChannel,
@@ -67,6 +75,7 @@ internal class MlFakeServer private constructor(
         fun start(
             script: MlFakeScript,
             responder: PredictionResponder = PredictionResponder { script.predictionResponse },
+            embeddingResponder: EmbeddingResponder = EmbeddingResponder { script.embeddingResponse },
         ): MlFakeServer {
             val predictionCalls = AtomicInteger(0)
             val embeddingCalls = AtomicInteger(0)
@@ -75,7 +84,7 @@ internal class MlFakeServer private constructor(
                 InProcessServerBuilder
                     .forName(name)
                     .addService(ScriptedPredictionServicer(script, responder, predictionCalls))
-                    .addService(ScriptedEmbeddingServicer(script, embeddingCalls))
+                    .addService(ScriptedEmbeddingServicer(script, embeddingResponder, embeddingCalls))
                     .build()
                     .start()
             val channel = InProcessChannelBuilder.forName(name).build()
@@ -101,12 +110,13 @@ private class ScriptedPredictionServicer(
 
 private class ScriptedEmbeddingServicer(
     private val script: MlFakeScript,
+    private val responder: EmbeddingResponder,
     private val calls: AtomicInteger,
 ) : EmbeddingServiceGrpcKt.EmbeddingServiceCoroutineImplBase() {
     override suspend fun embedText(request: ProtoEmbedTextRequest): EmbedTextResponse {
         calls.incrementAndGet()
         delayFor(script.embeddingDelay)
-        return script.embeddingResponse
+        return responder.responseFor(request)
     }
 
     override suspend fun getEmbeddingMetadata(request: GetEmbeddingMetadataRequest): GetEmbeddingMetadataResponse =

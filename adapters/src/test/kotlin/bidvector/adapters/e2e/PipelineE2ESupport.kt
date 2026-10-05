@@ -189,6 +189,13 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
 internal fun noticeIdOf(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
 /**
+ * `OutboxNotificationRequestPort` 가 짓는 멱등 키의 모양 — test 가 **전체 등식**으로 단언하려면
+ * 이 형태가 필요하다(review G-3: 부분 일치는 어느 칸에 있는지를 가르지 못한다). 형식 자체의
+ * 정본은 그 production 클래스이고 `OutboxNotificationRequestPortTest` 가 축어로 잠근다.
+ */
+internal fun idempotencyKeyFor(number: String): String = "notification-requested-$number-000"
+
+/**
  * 합성 공고 항목 — `bssamt`(기초금액)가 있어야 예측 호출이 일어난다(`OpportunityAnalysis`
  * 는 기초금액 없는 공고의 예측을 생략한다). 마감은 평가 시각 뒤라 후보 질의에 걸린다.
  */

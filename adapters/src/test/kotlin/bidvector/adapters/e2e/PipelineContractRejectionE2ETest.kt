@@ -72,13 +72,17 @@ internal class PipelineContractRejectionE2ETest : PipelineE2ESupport() {
         val rolledBack = e2eRelease(E2E_ROLLBACK_RELEASE_ID)
         val script = successfulMlScript(release = latest)
         val server =
-            MlFakeServer.start(script) { request ->
-                if (request.envelope.modelReleaseSelector.hasExactRelease()) {
-                    predictionSuccess(rolledBack)
-                } else {
-                    predictionSuccess(latest)
-                }
-            }
+            MlFakeServer.start(
+                script = script,
+                responder =
+                    PredictionResponder { request ->
+                        if (request.envelope.modelReleaseSelector.hasExactRelease()) {
+                            predictionSuccess(rolledBack)
+                        } else {
+                            predictionSuccess(latest)
+                        }
+                    },
+            )
         servers += server
         val gateway =
             GrpcBidPredictionGateway(
