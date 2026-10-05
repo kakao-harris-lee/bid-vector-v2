@@ -54,20 +54,24 @@ import javax.sql.DataSource
  * 평가 → outbox → relay → 발송 구간의 **production 조립**(6D-1 축 ①). `EvaluateCandidatesUseCase`·
  * `OpportunityAnalysis`·두 gRPC gateway·`StoredRequirementLicenseGate`·`JdbcCandidateSource`·
  * `OutboxNotificationRequestPort`·`JdbcOutboxPort`·`JdbcInboxPort`·`DispatchNotification` 은
- * 전부 production 클래스다 — 이 클래스는 그것들을 잇기만 한다(`EvaluationWiring`·
- * `EvaluationDryRunFactory` 가 production 에서 하는 일을 test 소스셋에서 같은 모양으로).
+ * 전부 production 클래스다 — 이 클래스는 그것들을 잇기만 한다.
  *
- * **production 에 relay 를 두지 않는다**(D-6D-3). 6F-10 이 그 자리를 갖는다 — 이 클래스의
- * [relay] 는 그 slice 가 받을 **소비자 모양**을 test 코드로 미리 보여 주는 것이다.
+ * **협력자의 생성 자리는 하나다**(review G-2). 앞 판은 배선과 출처 단언이 각자 생성자를 불러
+ * 같은 타입의 **다른 인스턴스 둘**을 만들었고, 그래서 배선만 대역으로 바꿔도 단언이 초록이었다.
+ * 지금은 전부 `val` 필드이고 [useCase]·[dispatcher] 도 한 번만 만든다 — [wiredCollaborators] 가
+ * 그 살아 있는 객체에서 필드 그래프를 따라 내려간다.
+ *
+ * **production 에 relay 를 두지 않는다**(D-6D-3). 6F-10 이 그 자리를 갖는다 — [relay] 는 그
+ * slice 가 받을 **소비자 모양**을 test 코드로 미리 보여 주는 것이다.
  */
 internal class PipelineAssembly(
     private val dataSource: DataSource,
     mlChannel: ManagedChannel,
-    private val at: Instant,
+    at: Instant,
     correlationPrefix: String,
     mlPolicy: MlCallPolicyData,
-    private val currentActiveBids: Int = 0,
-    private val maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
+    currentActiveBids: Int = 0,
+    maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
 ) {
     private val clock = fixedClock(at)
     private val javaClock: java.time.Clock = java.time.Clock.fixed(at, ZoneOffset.UTC)
@@ -78,77 +82,18 @@ internal class PipelineAssembly(
     val inbox = JdbcInboxPort(connections)
     val sender = RecordingNotificationSender(at, notificationPolicy)
 
-    private val prediction =
-        GrpcBidPredictionGateway(mlChannel, testMlCallEffectivePolicy(mlPolicy), javaClock)
-    private val embedding =
-        GrpcEmbeddingGateway(mlChannel, testEmbeddingCallEffectivePolicy(mlPolicy), javaClock)
-    private val correlationIds = SequentialCorrelationIdFactory(correlationPrefix)
+    private val profiles = JdbcOperatorProfileRepository(dataSource)
+    private val watchSubjects = NoticeWatchSubjectPort()
+    private val capacity = RequestCapacityPort(currentActiveBids, maxActiveBids)
 
-    /**
-     * 요청 스코프 평가 — `EvaluationDryRunFactory` 와 달리 `RecordingNotificationRequestPort`
-     * 가 아니라 **production `OutboxNotificationRequestPort`** 를 꽂는다. 그래서 알림 요청이
-     * 실제 `outbox` 행으로 남고, 그 행이 relay 의 입력이 된다.
-     */
-    suspend fun evaluate(): List<CandidateEvaluation> = useCase().evaluate()
-
-    /**
-     * 이 조립이 실제로 쥐고 있는 **협력자 인스턴스**(설계 검토 (2) 우회 6). 손으로 적은 이름
-     * 목록이 아니라 살아 있는 객체라, 어느 자리를 fake 로 바꾸면 그 객체의 출처가 바뀐다 —
-     * test 가 각 객체의 `CodeSource` 를 보고 production 출력에서 왔는지 잰다.
-     */
-    fun productionCollaborators(): List<Any> =
-        listOf(
-            useCase(),
-            opportunityAnalysis(),
-            prediction,
-            embedding,
-            licenseGate(),
-            JdbcCandidateSource(dataSource, clock, CANDIDATE_CAP),
-            OutboxNotificationRequestPort(outbox, JdbcEventIdFactory(), clock),
-            outbox,
-            inbox,
-            dispatcher(),
-            JdbcStrategyRepository(dataSource, resolvedStrategyPolicy(at)),
-            JdbcOperatorProfileRepository(dataSource),
-        )
-
-    /** 포트 경계 fake 전수 — 이 넷 밖에 fake 가 있으면 경계를 넘은 것이다. */
-    fun portBoundaryFakes(): List<Any> =
-        listOf(
-            sender,
-            SingleRouteDirectory(E2E_OWNER, E2E_CHANNEL, E2E_ROUTE),
-            EchoContentRenderer(),
-            AbsentWorkloadPort(),
-        )
-
-    private fun useCase(): EvaluateCandidatesUseCase =
-        EvaluateCandidatesUseCase(
-            strategies = JdbcStrategyRepository(dataSource, resolvedStrategyPolicy(at)),
-            candidateSource = JdbcCandidateSource(dataSource, clock, CANDIDATE_CAP),
-            watchSubjects = NoticeWatchSubjectPort(),
-            licenseGate = licenseGate(),
-            mlAnalysis = opportunityAnalysis(),
-            capacity = RequestCapacityPort(currentActiveBids, maxActiveBids),
-            notifications = OutboxNotificationRequestPort(outbox, JdbcEventIdFactory(), clock),
-            correlationIds = correlationIds,
-            clock = clock,
-        )
-
-    private fun licenseGate(): StoredRequirementLicenseGate =
-        StoredRequirementLicenseGate(
-            JdbcRequirementStore(dataSource),
-            JdbcOperatorProfileRepository(dataSource),
-            resolvedLicensePolicy(at),
-        )
-
-    private fun opportunityAnalysis(): OpportunityAnalysis =
+    private val mlAnalysis =
         OpportunityAnalysis(
-            embed = embedding,
-            prediction = prediction,
-            profile = JdbcOperatorProfileRepository(dataSource),
+            embed = GrpcEmbeddingGateway(mlChannel, testEmbeddingCallEffectivePolicy(mlPolicy), javaClock),
+            prediction = GrpcBidPredictionGateway(mlChannel, testMlCallEffectivePolicy(mlPolicy), javaClock),
+            profile = profiles,
             workload = AbsentWorkloadPort(),
-            watchSubjects = NoticeWatchSubjectPort(),
-            capacity = RequestCapacityPort(currentActiveBids, maxActiveBids),
+            watchSubjects = watchSubjects,
+            capacity = capacity,
             samples =
                 JdbcCompetitionSampleSource(
                     dataSource,
@@ -158,6 +103,48 @@ internal class PipelineAssembly(
                 ),
             clock = clock,
         )
+
+    private val useCase =
+        EvaluateCandidatesUseCase(
+            strategies = JdbcStrategyRepository(dataSource, resolvedStrategyPolicy(at)),
+            candidateSource = JdbcCandidateSource(dataSource, clock, CANDIDATE_CAP),
+            watchSubjects = watchSubjects,
+            licenseGate =
+                StoredRequirementLicenseGate(
+                    JdbcRequirementStore(dataSource),
+                    profiles,
+                    resolvedLicensePolicy(at),
+                ),
+            mlAnalysis = mlAnalysis,
+            capacity = capacity,
+            notifications = OutboxNotificationRequestPort(outbox, JdbcEventIdFactory(), clock),
+            correlationIds = SequentialCorrelationIdFactory(correlationPrefix),
+            clock = clock,
+        )
+
+    private val dispatcher =
+        DispatchNotification(
+            routes = SingleRouteDirectory(E2E_OWNER, E2E_CHANNEL, E2E_ROUTE),
+            renderer = EchoContentRenderer(),
+            sender = sender,
+            policyData = notificationPolicy,
+            // 발송이 실제로 일어나는 유일한 모드. sender 는 fake 라 외부 호출은 0 이다.
+            environment = RuntimeEnvironment.Production,
+        )
+
+    /**
+     * 요청 스코프 평가 — `EvaluationDryRunFactory` 와 달리 `RecordingNotificationRequestPort`
+     * 가 아니라 **production `OutboxNotificationRequestPort`** 를 꽂는다. 그래서 알림 요청이
+     * 실제 `outbox` 행으로 남고, 그 행이 relay 의 입력이 된다.
+     */
+    suspend fun evaluate(): List<CandidateEvaluation> = useCase.evaluate()
+
+    /**
+     * 평가와 발송이 **실제로 쓰는** 두 객체에서 출발해 닿는 `bidvector.*` 협력자 전수
+     * (verifier r1 F-1). 목록이 아니라 그래프라, 어느 자리를 대역으로 바꾸면 그 대역이 여기
+     * 나타난다.
+     */
+    fun wiredCollaborators(): List<Any> = collaboratorGraph(listOf(useCase, dispatcher))
 
     /**
      * test relay(축 ①의 마지막 구간) — `claim` → inbox 중복 제거 → `DispatchNotification` →
@@ -197,19 +184,9 @@ internal class PipelineAssembly(
                 channel = E2E_CHANNEL,
                 contentRef = ContentRef(requested.noticeId),
             )
-        val outcome = dispatcher().dispatch(intent)
+        val outcome = dispatcher.dispatch(intent)
         return outcome is DeliveryOutcome.Attempted && outcome.result is DeliveryResult.Delivered
     }
-
-    private fun dispatcher(): DispatchNotification =
-        DispatchNotification(
-            routes = SingleRouteDirectory(E2E_OWNER, E2E_CHANNEL, E2E_ROUTE),
-            renderer = EchoContentRenderer(),
-            sender = sender,
-            policyData = notificationPolicy,
-            // 발송이 실제로 일어나는 유일한 모드. sender 는 fake 라 외부 호출은 0 이다.
-            environment = RuntimeEnvironment.Production,
-        )
 
     private fun markDelivered(entryId: String) {
         dataSource.connection.use { connection ->

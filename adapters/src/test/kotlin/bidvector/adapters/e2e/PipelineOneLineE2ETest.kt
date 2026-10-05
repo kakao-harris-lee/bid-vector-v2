@@ -1,6 +1,7 @@
 package bidvector.adapters.e2e
 
 import bidvector.workflow.evaluation.CandidateEvaluation
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -58,24 +59,26 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
     }
 
     /**
-     * 설계 검토 (2) 우회 6 — use case 와 어댑터가 fake 로 바뀌어도 초록인 E2E 를 막는다. 손으로
-     * 적은 이름 목록이 아니라 조립이 실제로 쥔 객체의 `CodeSource` 를 본다: production 출력
-     * (`classes/kotlin/main`)에서 왔는가. fake 넷은 그 반대편(test 출력)에 있어야 한다 —
-     * 양방향이라 「전부 main」도 「전부 test」도 통과하지 못한다.
+     * 설계 검토 (2) 우회 6(verifier r1 F-1 / review G-2) — use case 와 어댑터가 대역으로
+     * 바뀌어도 초록인 E2E 를 막는다. 앞 판은 **따로 지은 목록**을 검사해서 배선을 바꿔도
+     * 초록이었다(실측). 지금은 평가와 발송이 **실제로 쓰는** 두 객체에서 필드 그래프를 따라
+     * 내려가 닿는 `bidvector.*` 객체 전수를 본다 — 목록을 같이 고쳐 통과시키는 길이 없다.
+     *
+     * 양방향이다: production 출력이 아닌 객체는 **선언된 포트 경계 여섯** 중 하나를 구현해야
+     * 하고, 그 여섯은 각각 그래프에 실제로 나타나야 한다.
      */
     @Test
-    fun `use case 와 어댑터는 production 출력에서 오고 fake 는 포트 경계 넷뿐이다`() {
+    fun `평가와 발송이 쥔 협력자는 production 출력에서 오고 대역은 선언된 포트 경계뿐이다`() {
         seedStrategy()
         seedProfile()
-        val assembly = assembly()
 
-        val production = assembly.productionCollaborators().map { it to originOf(it) }
-        val fakes = assembly.portBoundaryFakes().map { it to originOf(it) }
+        val graph = assembly().wiredCollaborators()
+        val boundaryBacked = graph.filter { portBoundariesOf(it).isNotEmpty() }
 
-        production.filterNot { it.second == ClassOrigin.MAIN } shouldBe emptyList()
-        fakes.filterNot { it.second == ClassOrigin.TEST } shouldBe emptyList()
-        production shouldHaveSize PRODUCTION_COLLABORATOR_COUNT
-        fakes shouldHaveSize PORT_BOUNDARY_FAKE_COUNT
+        graph.filter { originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty() } shouldBe emptyList()
+        boundaryBacked.filter { originOf(it) != ClassOrigin.TEST } shouldBe emptyList()
+        boundaryBacked.flatMap(::portBoundariesOf).toSet() shouldBe PORT_BOUNDARY_TYPES
+        graph.map { it.javaClass.name } shouldContainAll EXPECTED_WIRED_PRODUCTION_CLASSES
     }
 
     private fun runPipeline(): RecordingNotificationSender {
@@ -101,31 +104,21 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         const val PASSING_NOTICE = "E2E-PASS-0001"
         const val BLOCKED_NOTICE = "E2E-BLOCK-0001"
         const val UNHELD_LICENSE = "전기공사업"
-        const val PRODUCTION_COLLABORATOR_COUNT = 12
-        const val PORT_BOUNDARY_FAKE_COUNT = 4
+
+        /** 그래프가 얕아져 조용히 비는 것을 막는 하한 — 이 줄의 클래스는 전부 배선에 실재한다. */
+        val EXPECTED_WIRED_PRODUCTION_CLASSES =
+            listOf(
+                "bidvector.workflow.evaluation.EvaluateCandidatesUseCase",
+                "bidvector.workflow.evaluation.OpportunityAnalysis",
+                "bidvector.workflow.evaluation.OutboxNotificationRequestPort",
+                "bidvector.workflow.notification.DispatchNotification",
+                "bidvector.adapters.ml.GrpcBidPredictionGateway",
+                "bidvector.adapters.ml.GrpcEmbeddingGateway",
+                "bidvector.adapters.evaluation.JdbcCandidateSource",
+                "bidvector.adapters.strategy.JdbcStrategyRepository",
+                "bidvector.adapters.qualification.StoredRequirementLicenseGate",
+                "bidvector.adapters.event.JdbcOutboxPort",
+            )
     }
 }
 
-internal enum class ClassOrigin { MAIN, TEST, UNKNOWN }
-
-/**
- * 객체가 **어느 컴파일 출력**에서 왔는지 — 소스 문자열 grep 이 아니라 클래스로더가 아는
- * 사실이다(설계 검토 「게이트 술어는 문자열이 아니라 구조로」). 스타일을 바꿔도 이 값은
- * 바뀌지 않고, production 을 fake 로 바꾸면 반드시 바뀐다.
- */
-internal fun originOf(instance: Any): ClassOrigin {
-    val location =
-        instance.javaClass.protectionDomain
-            ?.codeSource
-            ?.location
-            ?.path ?: return ClassOrigin.UNKNOWN
-    return when {
-        location.contains("/classes/kotlin/main/") ||
-            location.contains("/classes/java/main/") ||
-            location.contains("/build/libs/") -> ClassOrigin.MAIN
-
-        location.contains("/classes/kotlin/test/") || location.contains("/classes/java/test/") -> ClassOrigin.TEST
-
-        else -> ClassOrigin.UNKNOWN
-    }
-}
