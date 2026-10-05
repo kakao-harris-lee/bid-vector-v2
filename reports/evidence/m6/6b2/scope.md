@@ -124,9 +124,15 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`c
 |---|---|---|
 | **D-6B2-22** | **PR #61 조치 라운드 수령·동결.** 산출물 `4a29b175`(①~⑩) · runbook `4aaf5966`(= **rollback 실측 HEAD**) · evidence `efb8c763` = **판정 SHA**. 팀장 대조: 변경 10 파일 전부 in_scope · 새 파일 0 · production diff 0 · evidence 누출 0 · 크기 579 ≤ 1,111 · `git diff --name-only 4aaf5966..efb8c763 -- <복원 여섯 + milestone-6.md>` 빈 출력 · 호스트 잔여 0. **J 처분 변경 채택** — `check` task 수는 clone(처음부터)과 worktree(증분)가 구조적으로 다른 수를 내므로 하나로 통일하지 않고 **둘 다 제거**(exit·게이트 수행·test 2,679 만 남김). 표적 재검증 → verifier: ① 가짜 V18 적용 공존에서 19/20 으로 통과 ② 음성 대조 exit 3 주입 시 `_die 1` ③ 패턴 파일 제거 시 exit 2 ④ `name:` 줄 제거 시 exit 3 — 전부 구판 복귀 변이 대조 포함. 통과하면 push → PR 조치 코멘트 → 머지 | 레인 보고 |
 
+## 계약 갱신 r10 (2026-10-05, 팀장 — PR #61 조치 뒤 종결 재확인)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-23** | **표적 재검증 ready-for-review @`efb8c763`**(`07_verifier_targeted_pr61.md`): A·B·C·D 신판 성립, 구판 복귀 변이 넷 전부 구멍 재현; `_wait_ready` 변수+case 가 init-complete 를 5초에 잡음; rollback 술어·`comm` 0 · hunk 셋 역적용 conflict 0. **새 low PR61-L-1 등재(알려진 제한)** — `name: ""` 는 텍스트 선언 단언을 지나지만 compose 는 `docker` 로 해석한다; 저자가 일부러 빈 값을 적는 모양이라 드리프트가 아니며, 구조로 닫으려면 해석 결과를 **env 미지정 상태로** 다시 해석해 선언값과 맞춰야 한다(6B-3/M7 에서 compose 를 다시 만질 때 함께). 팀장 후속: 종결 문단 `8fa46b29`(PR #61 결과 등재 · rollback SHA 정정) → **rollback 팀장 재실측 @`8fa46b29`**(hunk 넷 conflict 0, 트리 base 동일; 머리 두 앵커 — ⓪~③d `8fa46b29` · ④~⑥ `4aaf5966`). 종결 재확인 → push → PR 조치 코멘트 → 머지 | 판정 레인 |
+
 ## 하네스 레인 변경
 
-`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 `caa78fe3` · r6 `de88833e` · r7 `85f54627`(+ `rollback.md` 팀장 재실측 절) · r8 `181ea21f` · r9 이 커밋)와 `milestone-6.md`(`93b04488` 착수 · `61874bfc` 종결 · `6897e50e` 정정) — `git log -- <파일>` 산출.
+`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 `d9c0d9a7` · r5 `caa78fe3` · r6 `de88833e` · r7 `85f54627`(+ `rollback.md` 팀장 재실측 절) · r8 `181ea21f` · r9 `a3e33187` · r10 이 커밋(+ `rollback.md` 팀장 재실측 절))와 `milestone-6.md`(`93b04488` 착수 · `61874bfc` 종결 · `6897e50e`·`8fa46b29` 정정) — `git log -- <파일>` 산출.
 
 ## 입력·이관
 

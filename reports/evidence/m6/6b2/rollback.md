@@ -1,7 +1,7 @@
 # M6/6B-2 — rollback
 
-**실측 HEAD: `4aaf5966`** (이 slice 의 마지막 산출물 커밋 — 복원·hunk 대상을 마지막으로 건드린 커밋).
-버릴 clone 에서 ⓪~⑥ 을 그 커밋 위에서 돌렸다. 앞 라운드의 실측(`36a3bff9`·`8ce3bb52`·`47d5663b`)은 옮기지 않고 전부 다시 냈다.
+**실측 HEAD: `8fa46b29`** (복원·hunk 대상을 마지막으로 건드린 커밋 — 6B-2 종결 문단 정정, `milestone-6.md` 만). 두 앵커다: **⓪~③d 는 `8fa46b29`**(아래 「팀장 재실측」, hunk 넷), **④~⑥ 은 `4aaf5966`**(마지막 산출물 커밋 — 복원 여섯은 그 뒤 이동 0: `git diff --name-only 4aaf5966..8fa46b29 -- <1단계 여섯>` 빈 출력).
+레인은 버릴 clone 에서 ⓪~⑥ 을 `4aaf5966` 위에서 돌렸다. 앞 라운드의 실측(`36a3bff9`·`8ce3bb52`·`47d5663b`)은 옮기지 않고 전부 다시 냈다.
 
 > **왜 runbook 이 따로 커밋됐는가** — runbook 은 아래 1단계가 되돌리는 경로다. 그것을 목록 갱신과 같은
 > 커밋에 담으면 그 커밋이 자기 목록에 들어갈 수 없어 실측 HEAD 가 자기를 가리키지 못한다. 그래서 산출물
@@ -9,7 +9,7 @@
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 4aaf5966..<판정 SHA> -- <아래 1단계 목록 여섯 + milestone-6.md>` 가 **빈 출력**이면
+> `git diff --name-only 8fa46b29..<판정 SHA> -- <아래 1단계 목록 여섯 + milestone-6.md>` 가 **빈 출력**이면
 > 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
@@ -106,23 +106,15 @@ basename 으로 돌아가므로, 지금 이름으로 떠 있는 컨테이너·�
 
 `git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**. 이 slice 는 하네스 경로를 건드리지 않았다.
 
-## 팀장 재실측 @`61874bfc` (6B-2 종결 문단 커밋, 2026-10-05) — **위 실측이 대신한다**
+## 팀장 재실측 @`8fa46b29` (6B-2 종결 문단 정정 커밋, 2026-10-05)
 
-> 이 절은 기록으로 남긴다. PR #61 조치 라운드가 복원 경로 넷(스크립트 셋·runbook)을 움직였으므로
-> 「④~⑥ 은 그대로 유효」라는 아래 문장은 더는 서지 않는다. 현행 실측은 위 **⓪~⑥ @`4aaf5966`** 이고,
-> hunk 목록도 둘에서 셋으로 늘었다.
-
-종결 문단이 `milestone-6.md`(hunk 대상)를 움직였으므로 버릴 clone 에서 다시 쟀다 — 복원 여섯은 `47d5663b` 뒤 이동 0(`git diff --name-only 47d5663b..61874bfc -- <여섯>` 빈 출력)이라 ④~⑥ 은 위 실측이 그대로 유효하고, 여기서는 ⓪~③d 를 쟀다.
+종결 문단 편집 둘(`6897e50e` 착수 문면·빈 줄, `8fa46b29` PR #61 결과·rollback SHA 정정)이 `milestone-6.md`(hunk 대상)를 움직였으므로 버릴 clone 에서 ⓪~③d 를 다시 쟀다. 복원 여섯은 `4aaf5966` 뒤 이동 0 이라 ④~⑥ 은 위 레인 실측이 그대로 유효하다. 앞 팀장 재실측(@`61874bfc`, hunk 둘)은 이 절이 대신한다.
 
 | # | 확인 | 결과 |
 |---|---|---|
-| ⓪ | 목록 등식(`git diff --name-status e922dc7b..47d5663b` ∖ evidence·milestone vs 1단계 여섯) | `comm -23`·`comm -13` 둘 다 0 |
+| ⓪ | 목록 등식(`git diff --name-status e922dc7b..4aaf5966` ∖ evidence·milestone vs 1단계 여섯) | `comm -23`·`comm -13` 둘 다 0 |
 | ①② | 1단계 restore | exit 0 · D 4 · M 2 |
 | ③ | 복원 경로 vs base | 빈 출력 |
-| ③b | milestone hunk — `git log --format=%h e922dc7b..HEAD -- milestone-6.md` 산출 **둘**을 최신부터 역적용(`61874bfc` → `93b04488`) | apply exit 0 · conflict 0 · `git diff e922dc7b -- milestone-6.md` 빈 출력 |
+| ③b | milestone hunk — `git log --format=%h e922dc7b..HEAD -- milestone-6.md` 산출 **넷**(`8fa46b29` → `6897e50e` → `61874bfc` → `93b04488`)을 최신부터 역적용 | apply exit 0 · conflict 0 · `git diff e922dc7b -- milestone-6.md` 빈 출력 |
 | ③c | 내 줄 사라짐 · 남의 줄 남음 | 6B-2 언급 HEAD 4 → 되돌린 뒤 2(= base) · 6B-1 10(= base) |
 | ③d | 트리 동일성 | base 와 다른 추적 파일은 `reports/evidence/m6/6b2/` 넷뿐(의도) |
-
-> **task 수를 적지 않는다.** `actionable tasks` 는 빌드 캐시 상태의 함수다 — 바닥부터 도는 clone 과
-> 증분으로 도는 worktree 가 같은 커밋에서 서로 다른 수를 낸다(이 라운드 실측 359 대 350). 이 slice 의
-> 사실이 아니라 실행 환경의 사실이므로, 남기는 것은 **종료 코드 · 실제로 수행된 게이트 · test 수** 셋이다.
