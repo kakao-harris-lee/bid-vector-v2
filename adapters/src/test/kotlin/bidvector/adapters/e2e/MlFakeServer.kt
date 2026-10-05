@@ -40,7 +40,6 @@ internal class MlFakeScript(
     val embeddingResponse: EmbedTextResponse,
     val embeddingMetadata: GetEmbeddingMetadataResponse,
     val predictionDelay: Duration = Duration.ZERO,
-    val embeddingDelay: Duration = Duration.ZERO,
 )
 
 /** 예측 응답을 요청마다 고르는 자리 — rollback 축(EXACT 선택자)이 release 별로 다른 응답을 낸다. */
@@ -60,12 +59,9 @@ internal class MlFakeServer private constructor(
     private val server: Server,
     val channel: ManagedChannel,
     private val predictionCalls: AtomicInteger,
-    private val embeddingCalls: AtomicInteger,
 ) : AutoCloseable {
     /** 서버가 스스로 센 호출 횟수 — 「실제로 불렸는가」의 정본(`MockKonepsServer.requestCount` 관례). */
     fun predictionCallCount(): Int = predictionCalls.get()
-
-    fun embeddingCallCount(): Int = embeddingCalls.get()
 
     /** 종료를 기다린다(review L-4) — 닫지 않은 서버가 다음 test 로 새지 않게 한다. */
     override fun close() {
@@ -81,17 +77,16 @@ internal class MlFakeServer private constructor(
             embeddingResponder: EmbeddingResponder = EmbeddingResponder { script.embeddingResponse },
         ): MlFakeServer {
             val predictionCalls = AtomicInteger(0)
-            val embeddingCalls = AtomicInteger(0)
             val name = "bidvector-6d1-ml-${System.nanoTime()}"
             val server =
                 InProcessServerBuilder
                     .forName(name)
                     .addService(ScriptedPredictionServicer(script, responder, predictionCalls))
-                    .addService(ScriptedEmbeddingServicer(script, embeddingResponder, embeddingCalls))
+                    .addService(ScriptedEmbeddingServicer(script, embeddingResponder))
                     .build()
                     .start()
             val channel = InProcessChannelBuilder.forName(name).build()
-            return MlFakeServer(server, channel, predictionCalls, embeddingCalls)
+            return MlFakeServer(server, channel, predictionCalls)
         }
     }
 }
@@ -114,13 +109,8 @@ private class ScriptedPredictionServicer(
 private class ScriptedEmbeddingServicer(
     private val script: MlFakeScript,
     private val responder: EmbeddingResponder,
-    private val calls: AtomicInteger,
 ) : EmbeddingServiceGrpcKt.EmbeddingServiceCoroutineImplBase() {
-    override suspend fun embedText(request: ProtoEmbedTextRequest): EmbedTextResponse {
-        calls.incrementAndGet()
-        delayFor(script.embeddingDelay)
-        return responder.responseFor(request)
-    }
+    override suspend fun embedText(request: ProtoEmbedTextRequest): EmbedTextResponse = responder.responseFor(request)
 
     override suspend fun getEmbeddingMetadata(request: GetEmbeddingMetadataRequest): GetEmbeddingMetadataResponse =
         script.embeddingMetadata

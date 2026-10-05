@@ -88,6 +88,8 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val assembly = assembly(successfulMlScript(predictionDelay = delay), policy)
         runBlocking { assembly.evaluate() }
 
+        // 서버가 실제로 불렸고 지연했다 — 이것이 없으면 「호출 자체가 없었다」와 구별되지 않는다.
+        servers.last().predictionCallCount() shouldBe 1
         val payload = decodedOutboxPayload()
         payload.noticeId shouldBe "$NOTICE-000"
         payload.evidence shouldBe NotificationEvidencePayload.NotPredicted(reason = "DeadlineExceeded")
@@ -149,15 +151,18 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val release = CountDownLatch(1)
         val releasedInTime = AtomicBoolean(false)
         val executor = Executors.newSingleThreadExecutor()
+        val worker = executor.submit { holdRowThenRollback(boundary, held, release, releasedInTime) }
         try {
-            val worker = executor.submit { holdRowThenRollback(boundary, held, release, releasedInTime) }
             val firstHeld = held.await(CLAIM_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             val whileHeld = claimEntryIds(boundary)
             release.countDown()
             worker.get(WORKER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             return ClaimRace(firstHeld, releasedInTime.get(), whileHeld, claimEntryIds(boundary))
         } finally {
-            executor.shutdown()
+            // 단언이 깨져 빠져나가도 스레드를 남기지 않는다 — 남은 스레드가 쥔 트랜잭션은 다음
+            // test 의 TRUNCATE 를 막는다(review PR62 J).
+            worker.cancel(true)
+            executor.shutdownNow()
         }
     }
 
@@ -167,13 +172,18 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         release: CountDownLatch,
         releasedInTime: AtomicBoolean,
     ) {
-        runCatching {
+        try {
             boundary.inTransaction<Unit> {
                 JdbcOutboxPort(boundary).claim(1) shouldHaveSize 1
                 held.countDown()
                 releasedInTime.set(release.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-                error("첫 워커가 행을 쥔 채 죽는다 — 커밋 전 예외라 트랜잭션이 롤백된다")
+                throw WorkerDiedHoldingRow()
             }
+        } catch (
+            @Suppress("SwallowedException") expected: WorkerDiedHoldingRow,
+        ) {
+            // 의도한 sentinel 만 삼킨다 — 다른 예외는 그대로 올라가 워커 합류에서 드러난다
+            // (review PR62 J: `runCatching` 은 무엇이든 삼켰다).
         }
     }
 
@@ -214,6 +224,9 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val DELAY_MARGIN: Duration = Duration.ofMillis(100)
     }
 }
+
+/** 첫 워커가 행을 쥔 채 죽는 sentinel — 커밋 전 예외라 트랜잭션이 롤백된다. */
+internal class WorkerDiedHoldingRow : RuntimeException("첫 워커가 행을 쥔 채 죽는다")
 
 /** `claimWhileHeld` 의 관측 넷 — 셋째·넷째가 「쥔 동안 못 집음」과 「롤백 뒤 복귀」를 가른다. */
 internal class ClaimRace(

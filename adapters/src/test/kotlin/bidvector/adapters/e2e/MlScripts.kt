@@ -78,7 +78,6 @@ internal fun predictionSuccess(release: ModelRelease = e2eRelease()): CalculateO
  */
 internal fun successfulMlScript(
     predictionDelay: Duration = Duration.ZERO,
-    embeddingDelay: Duration = Duration.ZERO,
     release: ModelRelease = e2eRelease(),
     predictionResponse: CalculateOptimalBidResponse = predictionSuccess(release),
 ): MlFakeScript =
@@ -89,7 +88,6 @@ internal fun successfulMlScript(
             protoEmbedResponse(testEmbeddingSuccess().toBuilder().setRelease(release).build()),
         embeddingMetadata = embeddingMetadataResponse(release),
         predictionDelay = predictionDelay,
-        embeddingDelay = embeddingDelay,
     )
 
 /**

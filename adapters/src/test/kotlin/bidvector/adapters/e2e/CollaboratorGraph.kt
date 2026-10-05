@@ -40,13 +40,19 @@ internal class CollaboratorGraph(
     val collected: List<Any>,
     val depthLimitHits: Int,
     val traversalFailures: List<String>,
+    val skippedHolders: List<String>,
 )
 
 /** [roots] 에서 필드를 따라 닿는, **우리 build 출력에서 온** 객체 전수. 순환은 동일성 집합으로 끊는다. */
 internal fun collaboratorGraph(roots: List<Any>): CollaboratorGraph {
     val walk = GraphWalk()
     roots.forEach { walk.visit(it, 0) }
-    return CollaboratorGraph(walk.collected, walk.depthLimitHits, walk.traversalFailures)
+    return CollaboratorGraph(
+        walk.collected,
+        walk.depthLimitHits,
+        walk.traversalFailures,
+        walk.skippedHolders.toList(),
+    )
 }
 
 private class GraphWalk {
@@ -55,18 +61,22 @@ private class GraphWalk {
     var depthLimitHits = 0
         private set
     val traversalFailures = mutableListOf<String>()
+    val skippedHolders = linkedSetOf<String>()
 
+    /**
+     * `seen` 검사가 깊이 검사보다 **앞**이다(review PR62 I) — 이미 본 객체를 다른 경로로 다시
+     * 만났을 뿐인데 깊이 상한에 세면 거짓 신호가 된다.
+     */
     fun visit(
         value: Any?,
         depth: Int,
     ) {
-        if (value == null) return
+        if (value == null || seen.put(value, true) != null) return
         if (depth > MAX_GRAPH_DEPTH) {
             depthLimitHits += 1
-            return
+        } else if (!visitContainer(value, depth)) {
+            collectOwned(value, depth)
         }
-        val firstVisit = seen.put(value, true) == null
-        if (firstVisit && !visitContainer(value, depth)) collectOwned(value, depth)
     }
 
     private fun visitContainer(
@@ -74,6 +84,11 @@ private class GraphWalk {
         depth: Int,
     ): Boolean =
         when (value) {
+            is Array<*> -> {
+                value.forEach { visit(it, depth + 1) }
+                true
+            }
+
             is Collection<*> -> {
                 value.forEach { visit(it, depth + 1) }
                 true
@@ -111,7 +126,10 @@ private class GraphWalk {
         depth: Int,
     ) {
         val type = value.javaClass
-        if (originOf(value) == ClassOrigin.UNKNOWN && !implementsOwnedType(type)) return
+        if (originOf(value) == ClassOrigin.UNKNOWN && !implementsOwnedType(type)) {
+            if (isOpaqueHolder(type)) skippedHolders += type.name
+            return
+        }
         collected += value
         if (Proxy.isProxyClass(type)) visit(Proxy.getInvocationHandler(value), depth + 1)
         declaredInstanceFields(type).forEach { field -> readField(value, field, depth) }
@@ -138,6 +156,23 @@ private class GraphWalk {
         failure: Throwable,
     ): String = "${owner.javaClass.name}#${field.name}: ${failure.javaClass.simpleName}"
 }
+
+/**
+ * 우리 타입과 무관한 출처 미상 객체 가운데 **그 아래에 무엇이든 담을 수 있는 보유자**인가
+ * (review PR62 C). `AtomicReference`·`Optional`·`Lazy` 류는 `Object` 로 선언된 필드를 갖는다 —
+ * 그 아래에 대역이 숨으면 순회가 거기서 멈추므로 **멈췄다는 사실**을 신호로 남긴다.
+ *
+ * 값 자체인 리프(문자열·금액·시각·드라이버 설정)는 그런 필드가 없어 신호에 오르지 않는다 —
+ * 신호가 소음이 되면 0 단언이 무의미해진다.
+ */
+private fun isOpaqueHolder(type: Class<*>): Boolean = allDeclaredInstanceFields(type).any { it.type == Any::class.java }
+
+private fun allDeclaredInstanceFields(type: Class<*>): List<java.lang.reflect.Field> =
+    generateSequence(type) { it.superclass }
+        .takeWhile { it != Any::class.java }
+        .flatMap { it.declaredFields.asSequence() }
+        .filterNot { Modifier.isStatic(it.modifiers) }
+        .toList()
 
 /**
  * [type] 의 상위 타입(인터페이스·상위 클래스) 가운데 **우리 build 출력**에서 온 것이 있는가.

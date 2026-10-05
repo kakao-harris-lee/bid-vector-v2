@@ -1,6 +1,16 @@
 package bidvector.adapters.e2e
 
+import bidvector.adapters.evaluation.JdbcCandidateSource
+import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.ml.GrpcBidPredictionGateway
+import bidvector.adapters.ml.GrpcEmbeddingGateway
+import bidvector.adapters.qualification.StoredRequirementLicenseGate
+import bidvector.adapters.strategy.JdbcStrategyRepository
 import bidvector.workflow.evaluation.CandidateEvaluation
+import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
+import bidvector.workflow.evaluation.OpportunityAnalysis
+import bidvector.workflow.evaluation.OutboxNotificationRequestPort
+import bidvector.workflow.notification.DispatchNotification
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
@@ -13,8 +23,9 @@ import org.junit.jupiter.api.Test
  * 6D-1 축 ① — mock KONEPS → 수집 → canonical → 요건·면허 gate → in-process fake ML →
  * 평가 → outbox → relay → fake sender 한 줄을 **한 프로세스 안에서** 잇는다.
  *
- * 단언은 전부 **DB 상태**(canonical 행 · outbox state · inbox 행)와 **sender 기록**이다
- * (설계 검토 (1)) — 어느 단계도 로그 줄이나 반환값 문자열로 「지났다」고 주장하지 않는다.
+ * 단언의 자리는 셋이다 — **DB 상태**(canonical 행 · outbox state · inbox 행) · **sender 기록** ·
+ * **use case 반환값**(`CandidateEvaluation`·`Verdict` 같은 타입 값이고 문자열이 아니다). 어느
+ * 단계도 로그 줄로 「지났다」고 주장하지 않는다(설계 검토 (1)).
  */
 internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
     private val servers = mutableListOf<MlFakeServer>()
@@ -78,12 +89,13 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
 
         graph.depthLimitHits shouldBe 0
         graph.traversalFailures shouldBe emptyList()
+        graph.skippedHolders shouldBe emptyList()
         graph.collected.filter {
             originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty()
         } shouldBe emptyList()
         boundaryBacked.filter { originOf(it) != ClassOrigin.TEST } shouldBe emptyList()
         boundaryBacked.flatMap(::portBoundariesOf).toSet() shouldBe PORT_BOUNDARY_TYPES
-        graph.collected.map { it.javaClass.name } shouldContainAll EXPECTED_WIRED_PRODUCTION_CLASSES
+        graph.collected.map { it.javaClass } shouldContainAll EXPECTED_WIRED_PRODUCTION_CLASSES
     }
 
     private fun runPipeline(): RecordingNotificationSender {
@@ -110,19 +122,22 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         const val BLOCKED_NOTICE = "E2E-BLOCK-0001"
         const val UNHELD_LICENSE = "전기공사업"
 
-        /** 그래프가 얕아져 조용히 비는 것을 막는 하한 — 이 줄의 클래스는 전부 배선에 실재한다. */
-        val EXPECTED_WIRED_PRODUCTION_CLASSES =
+        /**
+         * 그래프가 얕아져 조용히 비는 것을 막는 하한. **문자열이 아니라 타입**이라 이름이 바뀌면
+         * 컴파일이 먼저 막는다(review PR62 P — 손으로 적은 FQN 은 조용히 낡는다).
+         */
+        val EXPECTED_WIRED_PRODUCTION_CLASSES: List<Class<*>> =
             listOf(
-                "bidvector.workflow.evaluation.EvaluateCandidatesUseCase",
-                "bidvector.workflow.evaluation.OpportunityAnalysis",
-                "bidvector.workflow.evaluation.OutboxNotificationRequestPort",
-                "bidvector.workflow.notification.DispatchNotification",
-                "bidvector.adapters.ml.GrpcBidPredictionGateway",
-                "bidvector.adapters.ml.GrpcEmbeddingGateway",
-                "bidvector.adapters.evaluation.JdbcCandidateSource",
-                "bidvector.adapters.strategy.JdbcStrategyRepository",
-                "bidvector.adapters.qualification.StoredRequirementLicenseGate",
-                "bidvector.adapters.event.JdbcOutboxPort",
+                EvaluateCandidatesUseCase::class.java,
+                OpportunityAnalysis::class.java,
+                OutboxNotificationRequestPort::class.java,
+                DispatchNotification::class.java,
+                GrpcBidPredictionGateway::class.java,
+                GrpcEmbeddingGateway::class.java,
+                JdbcCandidateSource::class.java,
+                JdbcStrategyRepository::class.java,
+                StoredRequirementLicenseGate::class.java,
+                JdbcOutboxPort::class.java,
             )
     }
 }
