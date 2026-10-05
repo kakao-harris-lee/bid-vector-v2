@@ -66,8 +66,37 @@ PROJECT="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.name
 SOURCE="$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE" 2>/dev/null || true)"
 [ -n "$SOURCE" ] || _die "compose 프로젝트 '$PROJECT' 에 동작 중인 '$SERVICE' 가 없다" 3
 [ "$(printf '%s\n' "$SOURCE" | wc -l)" -eq 1 ] || _die "'$SERVICE' 가 하나가 아니다" 3
-[ "$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$SOURCE")" = "$PROJECT" ] \
-  || _die "지목한 컨테이너가 프로젝트 '$PROJECT' 의 것이 아니다" 3
+
+# 원본이 **이 compose 파일에서 뜬 것인지**를 구조로 단언한다. 프로젝트 **이름** 대조로는 닫히지
+# 않는다 — 이름은 `COMPOSE_PROJECT_NAME`·`-p` 로 자유롭게 갈리고 D-6B2-5 ② 가 worktree 분리에
+# 바로 그 축을 권하므로, 이름이 같다는 사실은 남의 환경을 배제하지 못한다. compose 가 컨테이너에
+# 박는 `com.docker.compose.project.config_files` 는 **그것을 만든 파일의 경로**다. 그래서 이름을
+# 어떻게 바꿔 띄웠든 자기 파일로 뜬 것만 통과하고, 다른 저장소·다른 compose 파일의 컨테이너는
+# 이름이 무엇이든 거부된다(2026-10-05 verifier M-2).
+COMPOSE_REAL="$(realpath "$COMPOSE_FILE")" \
+  || _die "compose 파일 경로를 풀지 못했다: $COMPOSE_FILE" 3
+
+_origin_matches() {
+  local line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    if [ "$(realpath -m "$line" 2>/dev/null || printf '%s' "$line")" = "$COMPOSE_REAL" ]; then
+      return 0
+    fi
+  done <<EOF
+$(printf '%s' "$1" | tr ',' '\n')
+EOF
+  return 1
+}
+
+SOURCE_ORIGIN="$(docker inspect --type container -f '{{json .Config.Labels}}' "$SOURCE" \
+  | jq -r --arg k com.docker.compose.project.config_files \
+      'if (type == "object") and has($k) then .[$k] else "" end')" \
+  || _die "원본 컨테이너의 라벨을 읽지 못했다" 3
+[ -n "$SOURCE_ORIGIN" ] \
+  || _die "원본 컨테이너에 compose 출처 라벨이 없다 — compose 가 만든 서비스가 아니다" 3
+_origin_matches "$SOURCE_ORIGIN" \
+  || _die "원본 '$SERVICE' 를 만든 compose 파일이 인자와 다르다 — 남의 환경이다" 3
 
 RUN_ID="6b2-$(date +%Y%m%d%H%M%S)-$$"
 RESTORE_CONTAINER="${PROJECT}-rehearsal-${RUN_ID}"
@@ -75,7 +104,7 @@ existing="$(docker ps -a --format '{{.Names}}' | wc -l)"
 if docker ps -a --format '{{.Names}}' | grep -Fxq "$RESTORE_CONTAINER"; then
   _die "만들려는 이름이 기존 컨테이너와 겹친다: $RESTORE_CONTAINER" 3
 fi
-_step "사전 단언 — 원본 $PROJECT/$SERVICE(읽기 전용) · 만들 이름 교차 0(기존 ${existing}개) · 표식 $RUN_ID"
+_step "사전 단언 — 원본 $PROJECT/$SERVICE(이 compose 파일이 만든 것 · 읽기 전용) · 만들 이름 교차 0(기존 ${existing}개) · 표식 $RUN_ID"
 
 IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r --arg s "$SERVICE" '.services[$s].image')"
 APP_IMAGE="$(docker compose -f "$COMPOSE_FILE" config --format json | jq -r '.services.app.image')"
