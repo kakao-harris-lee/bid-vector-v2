@@ -9,6 +9,7 @@ import bidvector.workflow.strategy.Clock
 import java.lang.reflect.Field
 import java.lang.reflect.InaccessibleObjectException
 import java.lang.reflect.Modifier
+import java.lang.reflect.Proxy
 import java.util.IdentityHashMap
 
 /*
@@ -22,9 +23,9 @@ import java.util.IdentityHashMap
  * 패키지의 감시 대상 대역으로 13/13 GREEN). 이름 술어는 이름을 바꾸는 것만으로 열린다.
  *
  * 그래서 수집·하강 기준이 **이름이 아니라 출처**다 — 우리 build 출력(main·test)에서 온 객체면
- * 패키지와 무관하게 모은다. 제3자 jar·JDK 는 출처가 미상이라 모으지도 내려가지도 않는다.
- * 대역을 숨기려면 그것을 우리 build 출력 **밖**에 두어야 하는데, 그러면 test 소스셋에서 쓸 수
- * 없다.
+ * 패키지와 무관하게 모은다. 출처가 미상이어도 **우리 타입을 구현하면** 모아서 필터로 보낸다:
+ * 우리 포트를 구현한 출처 미상 객체가 곧 대역이고, JDK 동적 `Proxy` 가 바로 그 모양이다.
+ * 우리 타입과 무관한 미상(제3자 jar·JDK 값)만 모으지도 내려가지도 않는다.
  *
  * 순회는 필드 값을 **읽기만** 한다(`Field.get`). 쓰기는 없고, 바꾸는 것은 접근 가능 표시
  * (`setAccessible`)뿐이다. 컨테이너 가지는 `Collection`·`Map`·`Pair` 로 한정한다 — 임의
@@ -97,13 +98,23 @@ private class GraphWalk {
             }
         }
 
+    /**
+     * 출처가 미상이어도 **우리 타입을 구현하면 모은다**(verifier r3 R3-M-1). 앞 판은 미상을
+     * 모으지도 내려가지도 않고 돌아갔고, 그래서 미상은 두 필터에 **닿지도 않았다** — JDK 동적
+     * `Proxy` 는 `CodeSource` 가 없어 미상이라, 우리 포트를 구현한 Proxy 대역이 그대로 통과했다.
+     *
+     * 우리 포트를 구현한 **출처 미상 객체가 곧 대역**이다. 그래서 그런 것만 모아 비-MAIN 필터로
+     * 보낸다(경계 여섯이 아니면 붉다). JDK·드라이버처럼 우리 타입과 무관한 미상은 그대로 건너뛴다.
+     */
     private fun collectOwned(
         value: Any,
         depth: Int,
     ) {
-        if (originOf(value) == ClassOrigin.UNKNOWN) return
+        val type = value.javaClass
+        if (originOf(value) == ClassOrigin.UNKNOWN && !implementsOwnedType(type)) return
         collected += value
-        declaredInstanceFields(value.javaClass).forEach { field -> readField(value, field, depth) }
+        if (Proxy.isProxyClass(type)) visit(Proxy.getInvocationHandler(value), depth + 1)
+        declaredInstanceFields(type).forEach { field -> readField(value, field, depth) }
     }
 
     private fun readField(
@@ -126,6 +137,31 @@ private class GraphWalk {
         field: Field,
         failure: Throwable,
     ): String = "${owner.javaClass.name}#${field.name}: ${failure.javaClass.simpleName}"
+}
+
+/**
+ * [type] 의 상위 타입(인터페이스·상위 클래스) 가운데 **우리 build 출력**에서 온 것이 있는가.
+ * `Proxy` 는 선언 필드가 없으므로 이 판정과 handler 하강이 그 대역을 드러내는 유일한 길이다.
+ */
+private fun implementsOwnedType(type: Class<*>): Boolean {
+    val seen = mutableSetOf<Class<*>>()
+    val queue = ArrayDeque<Class<*>>()
+    enqueueSupertypes(type, queue)
+    while (queue.isNotEmpty()) {
+        val next = queue.removeFirst()
+        if (!seen.add(next)) continue
+        if (ClassOrigin.of(next) != ClassOrigin.UNKNOWN) return true
+        enqueueSupertypes(next, queue)
+    }
+    return false
+}
+
+private fun enqueueSupertypes(
+    type: Class<*>,
+    queue: ArrayDeque<Class<*>>,
+) {
+    type.interfaces.forEach { queue += it }
+    type.superclass?.let { queue += it }
 }
 
 /**
