@@ -140,11 +140,10 @@ internal class PipelineAssembly(
     suspend fun evaluate(): List<CandidateEvaluation> = useCase.evaluate()
 
     /**
-     * 평가와 발송이 **실제로 쓰는** 두 객체에서 출발해 닿는 `bidvector.*` 협력자 전수
-     * (verifier r1 F-1). 목록이 아니라 그래프라, 어느 자리를 대역으로 바꾸면 그 대역이 여기
-     * 나타난다.
+     * 평가와 발송이 **실제로 쓰는** 두 객체에서 출발해 닿는 협력자 전수. 목록이 아니라 그래프라,
+     * 어느 자리를 대역으로 바꾸면 그 대역이 여기 나타난다 — 패키지 이름과 무관하다.
      */
-    fun wiredCollaborators(): List<Any> = collaboratorGraph(listOf(useCase, dispatcher))
+    fun wiredCollaborators(): CollaboratorGraph = collaboratorGraph(listOf(useCase, dispatcher))
 
     /**
      * test relay(축 ①의 마지막 구간) — `claim` → inbox 중복 제거 → `DispatchNotification` →

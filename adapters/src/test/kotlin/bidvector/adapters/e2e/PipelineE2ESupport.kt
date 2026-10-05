@@ -35,6 +35,7 @@ import bidvector.workflow.collection.CollectionSource
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.event.NotificationRequestedPayload
+import io.kotest.matchers.shouldBe
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -172,11 +173,13 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * (verifier r1 F-5 / review G-3). 직렬화 문자열의 부분 일치는 값이 어느 칸에 있는지를
      * 가르지 못한다 — `bidNowReasons` 가 자유 형식 문자열 목록이라 더 그렇다.
      */
-    protected fun decodedOutboxPayload(): NotificationRequestedPayload =
-        OutboxPayloadCodec.decode(
-            OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE,
-            outboxPayloads().single(),
-        ) as NotificationRequestedPayload
+    protected fun decodedOutboxPayload(): NotificationRequestedPayload {
+        // 저장된 타입을 **읽어서** 복원한다 — 넣어서 복원하면 「저장된 타입이 그것이다」가 어디에도
+        // 단언되지 않는다(review r2 R-4).
+        val storedType = queryStrings("SELECT payload_type FROM outbox ORDER BY idempotency_key").single()
+        storedType shouldBe OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE
+        return OutboxPayloadCodec.decode(storedType, outboxPayloads().single()) as NotificationRequestedPayload
+    }
 
     protected fun outboxIdempotencyKeys(): List<String> =
         queryStrings("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")

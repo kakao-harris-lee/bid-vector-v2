@@ -13,9 +13,11 @@ internal enum class ClassOrigin {
     ;
 
     internal companion object {
-        fun of(instance: Any): ClassOrigin {
+        fun of(instance: Any): ClassOrigin = of(instance.javaClass)
+
+        fun of(type: Class<*>): ClassOrigin {
             val location =
-                instance.javaClass.protectionDomain
+                type.protectionDomain
                     ?.codeSource
                     ?.location
                     ?.path ?: return UNKNOWN

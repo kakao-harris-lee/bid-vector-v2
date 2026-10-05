@@ -58,13 +58,15 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
     }
 
     /**
-     * 설계 검토 (2) 우회 6(verifier r1 F-1 / review G-2) — use case 와 어댑터가 대역으로
-     * 바뀌어도 초록인 E2E 를 막는다. 앞 판은 **따로 지은 목록**을 검사해서 배선을 바꿔도
-     * 초록이었다(실측). 지금은 평가와 발송이 **실제로 쓰는** 두 객체에서 필드 그래프를 따라
-     * 내려가 닿는 `bidvector.*` 객체 전수를 본다 — 목록을 같이 고쳐 통과시키는 길이 없다.
+     * 설계 검토 (2) 우회 6 — use case 와 어댑터가 대역으로 바뀌어도 초록인 E2E 를 막는다.
+     * 평가와 발송이 **실제로 쓰는** 두 객체에서 필드 그래프를 내려가 닿는 객체 전수를 본다.
+     *
+     * 수집 기준은 패키지 이름이 아니라 **출처**다 — 우리 build 출력에서 온 객체면 어느 패키지든
+     * 그래프에 들어온다. 이름 술어였을 때는 관례 밖 패키지에 둔 대역이 보이지 않았다(실측).
      *
      * 양방향이다: production 출력이 아닌 객체는 **선언된 포트 경계 여섯** 중 하나를 구현해야
-     * 하고, 그 여섯은 각각 그래프에 실제로 나타나야 한다.
+     * 하고, 그 여섯은 각각 그래프에 실제로 나타나야 한다. 건너뛴 가지가 있으면(깊이 상한·필드
+     * 읽기 실패) 그 아래 대역을 못 보므로 둘 다 0 이어야 한다.
      */
     @Test
     fun `평가와 발송이 쥔 협력자는 production 출력에서 오고 대역은 선언된 포트 경계뿐이다`() {
@@ -72,12 +74,16 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         seedProfile()
 
         val graph = assembly().wiredCollaborators()
-        val boundaryBacked = graph.filter { portBoundariesOf(it).isNotEmpty() }
+        val boundaryBacked = graph.collected.filter { portBoundariesOf(it).isNotEmpty() }
 
-        graph.filter { originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty() } shouldBe emptyList()
+        graph.depthLimitHits shouldBe 0
+        graph.traversalFailures shouldBe emptyList()
+        graph.collected.filter {
+            originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty()
+        } shouldBe emptyList()
         boundaryBacked.filter { originOf(it) != ClassOrigin.TEST } shouldBe emptyList()
         boundaryBacked.flatMap(::portBoundariesOf).toSet() shouldBe PORT_BOUNDARY_TYPES
-        graph.map { it.javaClass.name } shouldContainAll EXPECTED_WIRED_PRODUCTION_CLASSES
+        graph.collected.map { it.javaClass.name } shouldContainAll EXPECTED_WIRED_PRODUCTION_CLASSES
     }
 
     private fun runPipeline(): RecordingNotificationSender {
