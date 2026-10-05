@@ -1,6 +1,6 @@
 # M6/6D-1 — 실행 명령과 실측 (구현 레인)
 
-base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `4f479e18`.
+base `fd4629fe` · 브랜치 `m6-6d/2026-10-05` · 마지막 산출물 커밋 `bc7f37d6`.
 
 ## acceptance — CI `check` job 명령
 
@@ -50,7 +50,7 @@ test 만 바꾸고, 마지막 둘은 production 을 바꾸므로 **버릴 clone 
 | ④ schema 거부 | 거부 골든을 성공 응답으로 교체 | RED |
 | ④ rollback | 응답자가 선택자와 무관하게 LATEST 를 반환 | RED |
 | ⑤ 재현 | 둘째 run 의 release 를 직전 release 로 교체 | RED |
-| ② DB conflict (production, clone) | 전이 질의에서 `SKIP LOCKED` 제거 | RED — 둘째 claim 이 막혀 대기 반환값이 거짓이 된다 |
+| ② DB conflict (production, clone) | 전이 질의에서 `SKIP LOCKED` 제거 | RED — 둘째 claim 이 막혀 쥠 시한이 만료된다(변이 run 40.9s, 정상 10.8s) |
 | ② ML timeout (production, clone) | 출하 예측 예산을 1시간으로 교체 | RED — 서버를 부르기 전 예산 고정점 단언에서 |
 
 열여덟 전부 RED 다. **production 쪽 둘이 이 표의 핵심**이다 — 그 둘이 초록이면 해당 축은 자기
