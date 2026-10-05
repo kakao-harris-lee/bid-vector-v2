@@ -82,9 +82,17 @@ in_scope 경로 한정 `git restore --source=<base>`; 공유 파일(`ci.yml`·`c
 | **D-6B2-9** | **수정 라운드 처분 — 문서·evidence(한 커밋, 산출물 커밋 뒤)**: runbook §0 「17 개」→「15 개(V17 까지)」(G-6; scope.md 착수 실측의 같은 오기는 이 r3 가 고침) · §3 「대상은 자기 자원뿐」 문면을 ① 뒤 사실로(L-3) · §7 에 G-4(임시 암호가 `docker inspect` Env 에 컨테이너 수명 동안 남음 — 미사용 난수, 포트 0) · §5 에 G-5(남은 리허설 컨테이너 치우는 줄; 단독 복원은 만들기만 함, 치명 신호는 EXIT 트랩을 안 돎) · §4 에 M-2 의 출처 단언 · checklist 「우회 4」 행을 ①③ 뒤 사실로, 「알려진 제한 2」의 「계약 문면 정정은 팀장 소관」 줄을 r2 D-6B2-5 ② 참조로, 알려진 제한에 함수 ACL 범위(L-2 잔여가 있으면)·G-3 선택 추가 · commands.md 에 이번 라운드 회귀 실측 행(한 줄씩) · rollback.md 실측 HEAD 를 **마지막 산출물 커밋**으로 재실측(복원 여섯 그대로인지 `comm` 양방향, hunk 목록 `git log` 재산출) | evidence-pack |
 | **D-6B2-10** | **보고 항목**: 이번 라운드가 만든 새 public 표면(새 CLI 인자·env 이름·라벨 키가 생겼는가) · 새 파일 ↔ in_scope 대조 · 산출물 마지막 SHA·evidence SHA · 「미처리 지시 없음」 뒤 동결. 판정 r2 = verifier 표적 재검증(①②③ 변이 + 회귀 다섯) + code-reviewer r2 | 규율 |
 
+## 계약 갱신 r4 (2026-10-05, 팀장 — 수정 라운드 1 수령 · 동결 · 판정 r2 표적)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6B2-11** | **수정 라운드 1 수령·동결.** 산출물 커밋 `30b5c34e`(H-1) · `a900dfe2`(G-1/M-1) · `64e9b309`(M-2) · `4517be43`(G-2) · `a9101bc5`(low 일괄) · `8ce3bb52`(runbook = **rollback 실측 HEAD**) · evidence `c995b576`·`d7a93d99` = **판정 SHA `d7a93d99`**. 팀장 대조: 이번 라운드 변경 8 파일 전부 in_scope · 새 파일 0 · production·migration diff 0 · evidence 누출 스캔 0 · 크기 422 ≤ 996 · `git diff --name-only 8ce3bb52..d7a93d99 -- <복원 여섯 + milestone-6.md>` 빈 출력 · 호스트 잔여 컨테이너·daemon 0 | 레인 보고 |
+| **D-6B2-12** | **레인 판단 둘의 처분.** ① **문서 커밋 분할 채택** — D-9 가 「한 커밋」이라 적었으나 runbook 은 rollback 복원 대상이라 목록 갱신과 같은 커밋에 두면 실측 HEAD 가 자기를 담은 커밋을 가리키게 된다(evidence-pack 자기참조 금지); 레인의 분할이 맞고 D-9 문면이 틀렸다. ② **manifest `schema` 버전 유지(알려진 제한 9 채택)** — 측정 모양이 바뀌었으나(`privilegeMatrix` 종류 키·함수 전 서명 키) 버전 문자열은 `/1` 그대로. 지금 어떤 manifest 도 리허설 밖에서 살지 않으므로(A-1 (a)) 구·신 혼재가 없고, 혼재가 생겨도 어긋남 방향은 **붉음**(거짓 일치가 아니다). 버전 올림은 **백업이 리허설 밖에 보존되기 시작하는 slice**(6B-3 보존·M7 저장소)의 첫 항목으로 이관 — 그때 `schema` 등식이 「다른 판으로 비교하지 않는다」를 구조로 막는다 | 팀장 판단 |
+| **D-6B2-13** | **판정 r2 표적**(verifier 표적 재검증 — 술어 변경 ①②③ 은 severity 무관; code-reviewer r2): (a) H-1 — 빈·공백·틀린 표식 각 exit 3, 라벨 없는 컨테이너 무변경(역할 속성 전후 동일), 구판 술어 복귀 변이 exit 0 재현 (b) G-1/M-1 — 다섯 깨진 입력 × 양방향 exit 1, 복원 경로가 생성 **전에** manifest 를 단언하는가(컨테이너를 만들기 전에 끊기는가) (c) M-2 — 다른 compose 파일로 뜬 같은 서비스 이름 컨테이너 exit 3 · 자기 파일로 뜬 것은 `COMPOSE_PROJECT_NAME` 을 바꿔도 통과 · realpath 대조가 symlink·상대경로에 흔들리지 않는가 (d) G-2 — 따옴표 든 역할 이름 manifest 가 SQL 조립 전에 끊기는가 (e) low 일괄 — classpath 순서 뒤 리허설 validate 가 **이 checkout** 의 파일을 읽는가(checkout V 파일 한 글자 변이 → 체크섬 RED, 저장 바이트 복원) · 시퀀스 USAGE·함수 EXECUTE 회수 → 그 이름을 대며 RED · 함수 키 전 서명 (f) 등식 축이 늘었으니 열 가지 + 신설 축이 **전부 여전히 살아 있는가**(측정별 변조) (g) container job 전건 재현 exit 0 · Kotlin `check` @판정 SHA (h) rollback 술어·`comm` 양방향·되돌린 트리 (i) 문서 — runbook §0/§3/§4/§5/§7 과 checklist 가 코드와 1:1 인가, 「계약 문면 정정은 팀장 소관」 잔존 0, 알려진 제한 9 의 서술이 D-6B2-12 ② 와 같은 방향인가 (j) 새 public 표면 0 · 제거된 env 이름이 문서에서도 사라졌는가 | 규율 |
+
 ## 하네스 레인 변경
 
-`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
+`git log --oneline e922dc7b..HEAD -- CLAUDE.md .claude/` → **없음**(r2 시점). 팀장 레인 커밋은 `reports/evidence/m6/6b2/scope.md`(`git log -- <파일>` 산출: 초안 `0e0b1b5e` · r1 `8ca6cf1b` · r2 `0d96bc58` · r3 `417a8727` · r4 이 커밋)와 `milestone-6.md`(`93b04488` 착수 문단) 뿐.
 
 ## 입력·이관
 
