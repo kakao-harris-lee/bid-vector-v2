@@ -12,10 +12,10 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.time.Duration
-import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 6D-1 축 ② — 장애 주입 셋(중복 공고 · ML timeout · DB conflict)을 **같은 조립**에 넣고,
@@ -108,47 +108,75 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
     }
 
     /**
-     * DB conflict — relay 두 벌이 같은 outbox 행을 동시에 집으려 하면 하나만 집는다
-     * (`FOR UPDATE SKIP LOCKED`). 순서는 래치로 고정한다(sleep 금지, `OutboxClaimConcurrencyTest`
-     * 와 같은 모양). 충돌이 실제로 없었다면 둘째 워커가 같은 행을 집어 `shouldBeEmpty` 가 깨진다.
+     * DB conflict — **첫 워커가 행을 쥔 동안** 둘째 relay 가 claim 한다(verifier r1 F-2 /
+     * review G-1 의 시제품 모양). 앞 판은 첫 워커가 claim 을 **커밋한 뒤** 둘째가 집었고,
+     * 그러면 「이미 `CLAIMED` 인 행은 다시 안 집힌다」만 재게 된다 — 그건 전이 UPDATE 의
+     * `WHERE state` 이고 `OutboxTransitionSqlTest` 가 이미 잠근 축이라, 완전 순차에서도
+     * production `SKIP LOCKED` 를 떼도 초록이었다(실측).
+     *
+     * 지금 재는 것은 셋이다 — ① 쥔 동안 둘째 claim 이 **막히지 않고** 빈 목록으로 돌아온다
+     * (`SKIP LOCKED` 가 없으면 막혀서 [ClaimRace.releasedWithoutTimeout] 가 거짓이 된다)
+     * ② 그 사이 둘째는 그 행을 못 집는다 ③ 첫 워커가 롤백하면 행이 `PENDING` 으로 돌아와
+     * 다시 집힌다. 완전 순차로 바꾸면 ②가, `SKIP LOCKED` 를 떼면 ①이 깨진다.
      */
     @Test
-    fun `두 relay 가 같은 outbox 행을 동시에 집으려 하면 하나만 집는다`() {
+    fun `첫 워커가 행을 쥔 동안 둘째는 못 집고 롤백 뒤에는 다시 집는다`() {
         seedStrategy()
         seedProfile()
         collectNotices(listOf(e2eNoticeItem(NOTICE)))
         runBlocking { assembly(successfulMlScript()).evaluate() }
-        outboxIdempotencyKeys() shouldHaveSize 1
+        outboxStates() shouldContainExactly listOf("PENDING")
 
-        val claims = concurrentClaims()
+        val race = claimWhileHeld()
 
-        claims.first shouldHaveSize 1
-        claims.second.shouldBeEmpty()
+        race.firstHeld shouldBe true
+        race.releasedWithoutTimeout shouldBe true
+        race.secondWhileHeld.shouldBeEmpty()
         outboxStates() shouldContainExactly listOf("CLAIMED")
+        race.secondAfterRollback shouldHaveSize 1
     }
 
-    private fun concurrentClaims(): Pair<List<String>, List<String>> {
+    /**
+     * 첫 워커는 행을 claim 한 채 대기하다 **커밋 전 예외로 롤백**한다 — 그래서 쥐고 있던
+     * 행이 `PENDING` 으로 돌아온다. `release` 래치는 둘째 claim 이 **돌아온 뒤에만** 내려가므로,
+     * 둘째가 막히면 그 대기가 시한 만료로 풀리고 [ClaimRace.releasedWithoutTimeout] 가 거짓이 된다.
+     */
+    private fun claimWhileHeld(): ClaimRace {
         val boundary = TransactionBoundary(dataSource())
-        val firstClaimed = CountDownLatch(1)
-        val secondDone = CountDownLatch(1)
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val releasedInTime = AtomicBoolean(false)
         val executor = Executors.newSingleThreadExecutor()
-        val worker =
-            Callable {
-                boundary.inTransaction {
-                    val claimed = JdbcOutboxPort(boundary).claim(1).map { it.entryId.value }
-                    firstClaimed.countDown()
-                    secondDone.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    claimed
-                }
-            }
-        val future = executor.submit(worker)
-        firstClaimed.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        val second = boundary.inTransaction { JdbcOutboxPort(boundary).claim(1) }.map { it.entryId.value }
-        secondDone.countDown()
-        val first = future.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        executor.shutdown()
-        return first to second
+        try {
+            val worker = executor.submit { holdRowThenRollback(boundary, held, release, releasedInTime) }
+            val firstHeld = held.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            val whileHeld = claimEntryIds(boundary)
+            release.countDown()
+            worker.get(WORKER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            return ClaimRace(firstHeld, releasedInTime.get(), whileHeld, claimEntryIds(boundary))
+        } finally {
+            executor.shutdown()
+        }
     }
+
+    private fun holdRowThenRollback(
+        boundary: TransactionBoundary,
+        held: CountDownLatch,
+        release: CountDownLatch,
+        releasedInTime: AtomicBoolean,
+    ) {
+        runCatching {
+            boundary.inTransaction<Unit> {
+                JdbcOutboxPort(boundary).claim(1) shouldHaveSize 1
+                held.countDown()
+                releasedInTime.set(release.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                error("첫 워커가 행을 쥔 채 죽는다 — 커밋 전 예외라 트랜잭션이 롤백된다")
+            }
+        }
+    }
+
+    private fun claimEntryIds(boundary: TransactionBoundary): List<String> =
+        boundary.inTransaction { JdbcOutboxPort(boundary).claim(1) }.map { it.entryId.value }
 
     private fun assembly(
         script: MlFakeScript,
@@ -168,7 +196,16 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
     private companion object {
         const val NOTICE = "E2E-INJECT-0001"
         const val LATCH_TIMEOUT_SECONDS = 5L
+        const val WORKER_TIMEOUT_SECONDS = 20L
         val SHORT_DEADLINE: Duration = Duration.ofMillis(200)
         val DELAY_MARGIN: Duration = Duration.ofMillis(100)
     }
 }
+
+/** `claimWhileHeld` 의 관측 넷 — 셋째·넷째가 「쥔 동안 못 집음」과 「롤백 뒤 복귀」를 가른다. */
+internal class ClaimRace(
+    val firstHeld: Boolean,
+    val releasedWithoutTimeout: Boolean,
+    val secondWhileHeld: List<String>,
+    val secondAfterRollback: List<String>,
+)
