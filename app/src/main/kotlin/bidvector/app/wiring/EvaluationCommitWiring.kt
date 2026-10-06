@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.evaluation.EvaluationCommitRun
+import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -60,9 +61,11 @@ data class EvaluationCommitProperties(
  * 하나다: dry-run 은 `RecordingNotificationRequestPort`, 커밋은 production
  * `OutboxNotificationRequestPort`(어댑터 조립 안).
  *
- * 전략은 **run 당 한 번** 저장소에서 읽는다 — `PinnedStrategyRepository` 로 감싸지 않는 이유는
- * use case 자신이 `evaluate()` 진입에서 `load()` 를 정확히 한 번 부르기 때문이다(dry-run 은
- * 응답 조립이 전략을 또 읽어야 해서 감쌌다, D-6A3-5).
+ * 전략은 **run 당 정확히 한 번** 저장소에서 읽는다(R1-M-4) — 배선이 한 번 읽어 여력·후보
+ * 상한을 뽑고, **그 값을** `PinnedStrategyRepository` 로 고정해 use case 에 넘긴다. use case 의
+ * `evaluate()` 진입 `load()` 는 그 고정값을 돌려받을 뿐 저장소를 다시 두드리지 않는다 —
+ * 그래서 판정에 쓰인 상한과 payload 에 적힌 개정이 **같은 스냅샷**에서 온다(dry-run 이 같은
+ * 이유로 쓰는 선례, D-6A3-5).
  */
 @Configuration
 @Import(CollectionTerminationWiring::class)
@@ -93,7 +96,11 @@ open class EvaluationCommitWiring {
             }.value
         return EvaluationCommitRun(
             dataSource = dataSource,
-            strategies = strategyRepository,
+            // R1-M-4 — **읽은 값을 고정한다.** 앞 판은 저장소를 그대로 넘겨 use case 가
+            // `evaluate()` 진입에서 다시 읽었고, 그 사이에 전략이 바뀌면 payload 에 적힌 개정과
+            // 실제로 쓴 상한이 **다른 개정에서** 온다(6D-2 재현 등식의 입력 불일치). dry-run 이
+            // 같은 이유로 쓰는 선례를 그대로 쓴다.
+            strategies = PinnedStrategyRepository(strategy),
             candidateSource = candidateSourcePort,
             watchSubjects = watchSubjectPort,
             licenseGate = licenseGatePort,
