@@ -111,3 +111,34 @@ Swap free ≥ 2GB) · `ps -eo pid,rss,args --sort=-rss | head` 를 **별도 호�
 - cmd: `git restore --source=<base> --staged --worktree -- "${P[@]}"` 뒤 `./gradlew --no-daemon check`
 - exit: restore 0 · compile 0 · check **0**
 - 핵심 결과: `D` 30 · `M` 28, 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 셋은 HEAD 그대로. 세부는 `rollback.md`
+
+## 2026-10-07T04:30:00Z — 수정 라운드 1: `check` 전건
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: 전건 통과. 라운드 중 세 번 붉었고 전부 게이트가 잡은 것이다 — detekt `TooGenericExceptionCaught`(임대 해제의 `Throwable` 포획) · `ReturnCount`(임대 상실 분기) · ktlint 체인·정렬 여섯 자리
+
+## 2026-10-07T05:10:00Z — 수정 라운드 1: 변이 재측정 (r1 에서 초록이던 둘 + 새 처분 넷)
+
+- cmd: 변이마다 적용 → `git diff --numstat` → 표적 test → `git checkout --` (산출물 전부 커밋 뒤)
+- exit: 아래 표
+- 핵심 결과: **C·12b 가 RED 로 전환**(r1 의 초록 둘) · L·L3·M4 RED · **G1 단독은 초록**이고 정책표 변이를 함께 걸어야 갈린다(그 둘을 따로 재서 사각을 재현했다)
+
+| 변이 | numstat | 결과 | 잡은 단언 |
+|---|---|---|---|
+| C 커밋 조립이 outbox 대신 기록 port | 1/6 | **RED**(r1 초록) | 변한 표 `{outbox}` → `{}` · 종료 코드 2 → 0 |
+| 12b 고아 조회 kind 필터 제거 | 1/1 | **RED**(r1 초록) | 다른 종류 고아 격리 0 → 1 |
+| L 행마다 임대 생존 확인 제거 | 0/4 | RED | fake 둘 + 실 DB 하나(임대 끊고 LeaseLost 기대) |
+| L3 `INCOMPLETE` 조건을 앞 판으로 | 1/1 | RED | 전량 거부 run 의 종료 코드 2 → 0 |
+| M4 전략 고정 제거 | 1/1 | RED | 읽기 1 → 2 (test 를 `evaluate()` 까지 돌리게 고친 뒤) |
+| G1 거부 술어를 enum 이름으로 | 1/1 | **초록** | 없음 — 오늘 두 술어가 같은 답을 낸다 |
+| G1 + 정책표 `Staging→Live` | 2/2 | **초록**(= 사각 재현) | 없음 — Staging 이 `Live` 인데 기동한다 |
+| 정책표 `Staging→Live` 만(새 술어) | 1/1 | RED | 「Live 가 아닌 환경 셋은 기동한다」 |
+
+마지막 두 줄이 cr G-1 의 요점이다 — 새 술어는 표가 바뀌는 날 거부하고, 앞 판 술어는 통과시킨다. 그 차이는 **정책표를 함께 변이해야** 보인다.
+
+## 2026-10-07T05:40:00Z — 수정 라운드 1: rollback 재실측 (버릴 clone, 실측 HEAD `63a15fda`)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → compile → `check`
+- exit: restore 0 · compile 0 · check **0**
+- 핵심 결과: `D` 36 · `M` 28(합 64), 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱(ADR 둘·마일스톤·evidence 넷)은 HEAD 그대로. 앞 라운드 실측(`cf59db87`)은 옮기지 않고 버렸다

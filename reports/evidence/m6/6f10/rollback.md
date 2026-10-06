@@ -1,6 +1,6 @@
 # M6/6F-10 — 되돌리기
 
-**실측 HEAD: `cf59db87`**(이 slice 의 마지막 산출물 커밋). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한 **버릴 clone** 에서 실제로 돌린 결과다.
+**실측 HEAD: `63a15fda`**(수정 라운드 1 의 마지막 산출물 커밋 — 라운드마다 재산출·재실행한다. 앞 라운드 실측값 `cf59db87` 은 옮기지 않고 버렸다). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한 **버릴 clone** 에서 실제로 돌린 결과다.
 base: `b137c670`(`git merge-base HEAD origin/main` 산출).
 
 라운드가 더 붙으면 이 절 전체를 **다시 산출하고 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
@@ -17,7 +17,7 @@ HTTP 평가 진입점은 dry-run 하나로 **무변경**이다 — 커밋 endpoi
 
 ```
 git diff --name-only <base>..<실측 HEAD> \
-  | grep -vE '^(reports/evidence/|docs/adr/0005-domain-events-and-outbox\.md$|milestone-6\.md$)' \
+  | grep -vE '^(reports/evidence/|docs/|milestone-6\.md$)' \
   | sort > restore-paths.txt
 ```
 
@@ -36,9 +36,10 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 |---|---|---|
 | `reports/evidence/m6/6f10/**` | 이 slice 의 기록이다 — 되돌리면 「무엇을 왜 되돌렸는가」가 사라진다. 그 보존이 게이트를 붉히는지는 ⑥ 에서 실측했다(붉히지 않았다) | 계약은 팀장 레인 여섯, 명령·점검표·이 파일은 산출물 커밋 뒤 |
 | `docs/adr/0005-domain-events-and-outbox.md` | **팀장 레인**의 승인 문서 addendum(어휘 해석표·`OPEN-OPS-10` ③ 답) — 이 레인의 산출물이 아니다 | `ce957478` |
+| `docs/discovery/data-dictionary.md` | **팀장 레인**의 §2.2.5 정정(cr G-2) — 같은 이유 | 수정 라운드 1 의 팀장 커밋 |
 | `milestone-6.md` | **팀장 레인**의 착수 문단 | `a996e049` |
 
-**공유 파일의 hunk 격리는 이번에 필요하지 않다.** `config/quality/architecture-policy.properties` 와 `gate-tests.properties` 를 이 range 에서 만진 커밋은 **`608baa82` 하나뿐**이고(`git log --format=%h <base>..HEAD -- <파일>` 산출) 그 커밋이 이 레인의 것이다. 그래서 두 파일은 `--source=<base>` 복원이 hunk 역적용과 **같은 결과**를 낸다 — 다른 slice 의 줄은 base 쪽에 있어 복원으로 보존된다. 라운드가 더 붙어 그 목록에 다른 레인의 해시가 나타나면 그때는 `git diff <sha>~1..<sha> -- <파일> | git apply -R` 로 **자기 커밋만** 역적용하고, 삽입 지점이 인접해 자동 해소가 깨지면(`--3way` 도 실패한다) 지울 블록과 남길 블록을 이름으로 적어 수동 해소한다.
+**공유 파일의 hunk 격리는 이번에도 필요하지 않다.** `config/quality/architecture-policy.properties` 와 `gate-tests.properties` 를 이 range 에서 만진 커밋은 **`608baa82`·`b6523054` 둘**이고(`git log --format=%h <base>..HEAD -- <파일>` 산출) **둘 다 이 레인의 것**이다 — 다른 레인의 줄이 없으므로 base 복원이 hunk 역적용과 같은 결과를 낸다. 그래서 두 파일은 `--source=<base>` 복원이 hunk 역적용과 **같은 결과**를 낸다 — 다른 slice 의 줄은 base 쪽에 있어 복원으로 보존된다. 라운드가 더 붙어 그 목록에 다른 레인의 해시가 나타나면 그때는 `git diff <sha>~1..<sha> -- <파일> | git apply -R` 로 **자기 커밋만** 역적용하고, 삽입 지점이 인접해 자동 해소가 깨지면(`--3way` 도 실패한다) 지울 블록과 남길 블록을 이름으로 적어 수동 해소한다.
 
 **하네스 레인 변경은 이 range 에 없다** — `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다.
 
@@ -48,6 +49,8 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 
 **이미 `ISOLATED` 로 옮긴 행은 되돌리지 않는다** — 종단 전이는 단방향이고 전이표에 그 상태에서 나가는 간선이 없다(재시도 API 없음, `DELETE` 권한 없음). 이것을 사실로 선언한다: relay 를 켠 적이 있으면 그 run 이 격리한 행은 코드를 되돌려도 격리된 채 남는다. 운영상 복구가 필요하면 그 행들을 **새 판정이 낳는 새 행**으로 대체하는 것이 유일한 경로다(같은 멱등 키의 새 행이 생긴다 — `idempotency_key` 에 UNIQUE 가 없다).
 
+**복호 불가 행 하나가 그 종류의 relay 전체를 멈춘다(cr L-12).** 아래의 「수동으로 `ISOLATED` 로 보낸다」는 **앱 권한 밖**이다 — 전이는 전이표를 지나야 하고 그 표에서 `Isolated` 로 가는 간선은 `Claimed` 에서만 있으므로, 복호조차 안 되는 행을 그 상태로 옮기는 애플리케이션 경로가 없다. 그 조치는 **DBA 가 직접 UPDATE** 하는 운영 작업이다.
+
 **payload 형식 되돌림은 이 slice 의 되돌리기 어려운 자리가 아니다.** `payload_type` 토큰을 바꾸지 않고 칸만 늘렸으므로 되돌린 codec 은 20칸 행을 「필드 수 불일치」로 **거부한다**(fail-closed, 조용히 틀리지 않는다). 그 행이 존재하려면 커밋 러너나 relay 가 돌아간 적이 있어야 한다 — 그랬다면 되돌린 뒤 relay 가 그 행에서 멈추므로, 운영자는 ⓐ 그 행들을 수동으로 `ISOLATED` 로 보내거나 ⓑ 코드를 재적용해 소비시킨 뒤 다시 되돌린다. 돌아간 적이 없으면(기본 꺼짐) 그런 행은 0 이다.
 
 ## 실측 ①~⑥ (버릴 clone, `cf59db87`)
@@ -55,9 +58,9 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 | # | 무엇 | 결과 |
 |---|---|---|
 | ① | `git restore` 명령 종료 코드 | 0 |
-| ② | 되돌린 뒤 상태별 수 | `D` 30 · `M` 28 (합 58 = 복원 목록 길이) |
+| ② | 되돌린 뒤 상태별 수 | `D` 36 · `M` 28 (합 64 = 복원 목록 길이) |
 | ③ | 되돌린 경로의 `git diff <base> -- <경로들>` | 빈 출력 (base 와 동일) |
-| ③b | **남의 줄이 남았는가** — 되돌리지 않은 셋의 `git status --porcelain` | 빈 출력 (ADR·마일스톤·계약이 HEAD 그대로) |
+| ③b | **남의 줄이 남았는가** — 되돌리지 않은 **일곱**의 `git status --porcelain` | 빈 출력 (ADR 둘·마일스톤·evidence 넷이 HEAD 그대로) |
 | ④ | `./gradlew --no-daemon :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` | exit 0 |
 | ⑤⑥ | `./gradlew --no-daemon check`(전건 — test + 게이트 전부) | **exit 0** |
 
