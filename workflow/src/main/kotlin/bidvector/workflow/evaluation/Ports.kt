@@ -7,6 +7,8 @@ import bidvector.procurement.CategoryCode
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.PolicyVersion
+import bidvector.strategy.StrategyRevision
 import bidvector.strategy.WatchSubject
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.CompetitionSample
@@ -131,6 +133,15 @@ data class NotificationRequest internal constructor(
     val correlationId: CorrelationId,
     val verdict: Verdict.BidNow,
     val evidence: PredictionEvidence,
+    /**
+     * 이 판정이 지난 사다리 정책의 버전(D-6F10-19) — 기본값이 **없다**: 빠뜨리면 컴파일이
+     * 깨진다(`evidence` 를 필수 인자로 둔 것과 같은 축). `reach` 가 `Resolution.Resolved` 에
+     * 싣는 것과 **같은 인스턴스**를 받는다([EVALUATION_LADDER_POLICY_VERSION]) — 두 자리에
+     * 값을 적으면 「판정에 쓰인 버전」과 「행에 적힌 버전」이 갈린다.
+     */
+    val ladderPolicyVersion: PolicyVersion,
+    /** 이 판정이 읽은 운영자 전략의 개정 번호(D-6F10-19) — 기본값 없음, 같은 이유. */
+    val strategyRevision: StrategyRevision,
 )
 
 /** [NotificationRequestPort]의 결과 — 배달 성공을 주장하지 않는다(요청 접수/실패만). */
@@ -138,6 +149,26 @@ sealed interface NotificationRequestOutcome {
     data object Requested : NotificationRequestOutcome
 
     data object Failed : NotificationRequestOutcome
+}
+
+/**
+ * 판정 하나에 대한 **알림 요청의 처분**(D-6F10-18 ⑤) — `CandidateEvaluation.Reached` 가
+ * 이 값을 싣는다. 앞 판의 `reach` 는 [NotificationRequestPort.request] 의 반환을
+ * **버렸다**: 그래서 outbox 쓰기가 실패해도 run 은 성공으로 끝났고, 오늘 평가에는 판정
+ * 기록 표가 없어(D-6F7-2) outbox 행이 판정의 **유일한 영속 흔적**이므로 그것은 판정이
+ * 흔적 없이 사라지는 길이었다.
+ *
+ * **nullable 이 아니다.** 「승격이 아니어서 요청하지 않았다」는 결측이 아니라 **사실**이고,
+ * `null` 로 두면 소비자가 그 둘(요청 안 함 / 요청 결과 모름)을 가를 수 없다 — v2-지침서 §5
+ * 「불법 상태를 타입으로 차단」. 러너는 소진 `when` 으로 [Requested] 안의 `Failed` 만 센다.
+ */
+sealed interface NotificationDisposition {
+    /** 판정이 `BidNow` 가 아니어서 요청 자체가 없다 — 실패가 아니다. */
+    data object NotApplicable : NotificationDisposition
+
+    data class Requested(
+        val outcome: NotificationRequestOutcome,
+    ) : NotificationDisposition
 }
 
 /** 알림 요청 port(scope.md) — 실 발송·렌더링은 4E. */

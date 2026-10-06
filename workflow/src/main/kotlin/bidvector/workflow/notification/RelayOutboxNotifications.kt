@@ -1,0 +1,298 @@
+package bidvector.workflow.notification
+
+import bidvector.workflow.event.ClaimedOutboxRow
+import bidvector.workflow.event.ConsumerLeasePort
+import bidvector.workflow.event.ConsumerTransactionPort
+import bidvector.workflow.event.IdempotencyKey
+import bidvector.workflow.event.InboxDecision
+import bidvector.workflow.event.InboxPort
+import bidvector.workflow.event.LeaseAttempt
+import bidvector.workflow.event.NotificationRequestedPayload
+import bidvector.workflow.event.OutboxCommand
+import bidvector.workflow.event.OutboxConsumerKind
+import bidvector.workflow.event.OutboxEntry
+import bidvector.workflow.event.OutboxPort
+import bidvector.workflow.event.OutboxTransition
+import bidvector.workflow.event.OutboxTransitionOutcome
+import bidvector.workflow.event.decideInbox
+import bidvector.workflow.event.transitionOutbox
+import bidvector.workflow.strategy.OperatorId
+
+/**
+ * relay 가 발송하는 **대상 축** — 「누구의 어느 채널로」. 값 하나로 묶는 이유는 둘이 항상
+ * 함께 오고([RouteDirectory.routesFor] 가 owner 를, 그 결과 map 이 channel 을 받는다) 설정
+ * 에서도 함께 오기 때문이다(`bidvector.relay.owner`·`channel`).
+ */
+data class RelayTarget(
+    val owner: OperatorId,
+    val channel: Channel,
+)
+
+/**
+ * relay 가 **아무 행도 집지 않은** 사유(ADR 0005 D-10 ③ 「억제가 관측 가능한 결과」) — 둘은
+ * 처방이 다르다: [LeaseBusy] 는 기다리면 풀리고, [EnvironmentSuppressed] 는 설정을 고쳐야
+ * 풀린다. 한 값으로 접으면 「조금 뒤 다시 돌려 보라」가 끝나지 않는 조언이 된다(수집의
+ * `ALREADY_RUNNING`/`UNLOCKABLE` 을 가른 것과 같은 축).
+ */
+enum class RelaySkipReason {
+    LeaseBusy,
+    EnvironmentSuppressed,
+}
+
+/**
+ * relay run 하나의 결과 — **전부 값이고 읽기만 한다**(계수가 쓴 값을 그대로 나른다).
+ *
+ * [Completed.claimed] 와 처분 계수의 불변식: `claimed == delivered + skippedDuplicates +
+ * failed + isolated`. [Completed.unknownPayload] 는 **[Completed.isolated] 의 부분 계수**다
+ * (미지 payload 도 격리되므로 둘을 더하지 않는다) — 그 행이 왜 격리됐는지를 가른다.
+ */
+sealed interface RelayReport {
+    data class Skipped(
+        val reason: RelaySkipReason,
+    ) : RelayReport
+
+    data class Completed(
+        val orphansIsolated: Int,
+        val claimed: Int,
+        val delivered: Int,
+        val skippedDuplicates: Int,
+        val failed: Int,
+        val isolated: Int,
+        val unknownPayload: Int,
+    ) : RelayReport
+}
+
+/**
+ * outbox 알림 행의 **production relay**(6F-10 ⓐ) — claim → inbox 판정 → [DispatchNotification]
+ * → 종단 전이. 6D-1 이 test 소스셋에 모양으로 보여 준 자리의 production 판이고,
+ * `OPEN-4C2-MARK-UNEXERCISED`(종단 전이의 port 호출부 부재)를 **통로를 열지 않고** 닫는다 —
+ * 이 클래스가 `workflow` 안에 살아서 `transitionOutbox`·`OutboxEntry.restore`(둘 다
+ * `internal`)를 부를 수 있기 때문이다. `OutboxEntry.restore` 의 KDoc 이 예고한 「미래 배달
+ * 오케스트레이션 use case」가 이것이다.
+ *
+ * **왜 `workflow.notification` 인가(D-6F10-18 ②).** `workflow.event` 에 두면 이 클래스가
+ * [DispatchNotification](`workflow.notification`)을 참조하는 순간 `event -> notification`
+ * 간선이 새로 생기고, 반대 방향(`notification -> event`, `DeliveryRequest.idempotencyKey:
+ * IdempotencyKey`)이 **이미 있어** 패키지 순환이 닫힌다(`packagesMustBeFreeOfCycles` 는
+ * 하위 패키지 단위로 잰다 — D-6F7-1 이 `workflow.evaluation` 에서 겪은 같은 함정). 이
+ * 패키지는 `workflow.event` 를 이미 보고 있어 새 간선이 없다.
+ *
+ * **순서가 at-most-once 다(D-6F10-3).** T1(claim 커밋) → 발송 → T2(종단 전이 + inbox 기록)
+ * 이고, inbox 는 **`Delivered` 일 때만, 발송 뒤에** 기록한다. 선기록하면 발송 실패 시 키가
+ * 소진되고 행이 `CLAIMED` 에 좌초한다(6D-1 이 인계한 자리). T1 과 T2 사이의 크래시가 남기는
+ * `CLAIMED` 는 다음 run 의 고아이고, 그 처분은 **격리**다(ADR 0005 D-3 — `running` 에서 죽은
+ * 행은 재실행하지 않는다; 놓침을 감수하는 것이 운영자 결정 `OPEN-NOTI-02` 다).
+ *
+ * **고아 판정에 시각이 없다(D-6F10-11).** [leases] 를 **새로** 쥔 relay 가 **첫 claim 전에**
+ * 보는 `CLAIMED` 는 전부 죽은 홀더의 것이다 — 살아 있는 홀더가 있으면 lease 를 못 쥐었다.
+ * TTL·`claimed_at` 열이 없는 이유가 그것이다(관측용 열은 `OPEN-6F10-CLAIM-OBSERVABILITY`).
+ *
+ * **환경 억제는 claim 자체를 하지 않는다**(ADR 0005 D-4 「억제는 기록 억제가 아니다」) — 행은
+ * `PENDING` 으로 보존되고 상태 분포가 전후로 불변이다. claim 한 뒤 억제하면 어휘 밖 종단이
+ * 없어 그 행이 `CLAIMED` 에 좌초한다.
+ */
+class RelayOutboxNotifications(
+    private val outbox: OutboxPort,
+    private val inbox: InboxPort,
+    private val dispatcher: DispatchNotification,
+    private val leases: ConsumerLeasePort,
+    private val transactions: ConsumerTransactionPort,
+    private val target: RelayTarget,
+    private val environment: RuntimeEnvironment,
+    private val policy: NotificationDeliveryPolicyData,
+) {
+    fun relay(limit: Int): RelayReport =
+        when (val attempt = leases.withLease(OutboxConsumerKind.NotificationRequested) { relayUnderLease(limit) }) {
+            is LeaseAttempt.Held -> attempt.result
+            LeaseAttempt.Busy -> RelayReport.Skipped(RelaySkipReason.LeaseBusy)
+        }
+
+    /**
+     * 억제 판정이 **고아 격리보다도 먼저**다 — 억제 환경의 relay 는 행을 하나도 만지지
+     * 않는다(격리도 하지 않는다: 격리는 단방향 종단이고, 보낼 수 없는 환경에서 남의 run 이
+     * 남긴 행을 태울 이유가 없다).
+     */
+    private fun relayUnderLease(limit: Int): RelayReport {
+        if (policy.environmentModes.getValue(environment) != DeliveryMode.Live) {
+            return RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+        }
+        val orphansIsolated = isolateOrphans()
+        val rows = transactions.inTransaction { outbox.claim(limit, OutboxConsumerKind.NotificationRequested) }
+        return reportOf(orphansIsolated, rows.size, rows.map(::settleRow))
+    }
+
+    private fun isolateOrphans(): Int {
+        val orphans = transactions.inTransaction { outbox.claimedEntries(OutboxConsumerKind.NotificationRequested) }
+        orphans.forEach { row ->
+            transactions.inTransaction { transition(OutboxEntry.restore(row), OutboxCommand.Isolate) }
+        }
+        return orphans.size
+    }
+
+    /**
+     * 미지 payload 는 **조용히 건너뛰지 않는다** — 건너뛰면 그 행이 `CLAIMED` 에 좌초하고
+     * 계수만 줄어 사유가 사라진다(6D-1 review L-3 과 같은 처분). 전달 여부가 모호한 것이
+     * 아니라 **전달을 시도조차 못 한 것**이지만, 어휘에 그 칸이 없고 V6 CHECK 를 바꾸는 것은
+     * 범위 밖이라 `ISOLATED`(모호) 로 보내고 [RelayReport.Completed.unknownPayload] 가 사유를
+     * 가른다(D-6F10-12 어휘 해석표).
+     */
+    private fun settleRow(row: ClaimedOutboxRow<*>): RowDisposition {
+        val entry = OutboxEntry.restore(row)
+        val payload =
+            entry.envelope.payload as? NotificationRequestedPayload
+                ?: return isolateUnknownPayload(entry)
+        val key = entry.envelope.idempotencyKey
+        return skipDuplicate(entry, key)
+            ?: settleDispatch(entry, key, dispatcher.dispatch(intentFor(key, payload, target)))
+    }
+
+    private fun isolateUnknownPayload(entry: OutboxEntry): RowDisposition =
+        transactions.inTransaction {
+            transition(entry, OutboxCommand.Isolate)
+            RowDisposition.ISOLATED_UNKNOWN_PAYLOAD
+        }
+
+    /**
+     * 이미 처리된 키면 **발송 없이** `DELIVERED` 로 보낸다(D-6F10-12 — 「같은 멱등 키가 이미
+     * 전달됨」도 전달이다). `null` 은 「중복이 아니다」이고 호출부의 `?:` 가 발송으로 잇는다 —
+     * `evaluateOne` 의 guard 체인과 같은 관례다.
+     */
+    private fun skipDuplicate(
+        entry: OutboxEntry,
+        key: IdempotencyKey,
+    ): RowDisposition? {
+        val alreadyProcessed = transactions.inTransaction { inbox.hasProcessed(key) }
+        if (decideInbox(alreadyProcessed) != InboxDecision.SkipDuplicate) return null
+        return transactions.inTransaction {
+            transition(entry, OutboxCommand.Deliver)
+            RowDisposition.SKIPPED_DUPLICATE
+        }
+    }
+
+    /**
+     * T2 — 종단 전이와 inbox 기록이 **한 커밋**이다. 매핑은 D-6F10-12 어휘 해석표다:
+     * `Delivered` → `DELIVERED` + inbox · `Rejected` → `FAILED` · `Unknown` → `ISOLATED`
+     * (모호, 재시도 없음 D-4E-2) · `Suppressed` → `FAILED`.
+     *
+     * 여기 오는 [DeliveryOutcome.Suppressed] 는 **채널 비활성·route 부재**다 — 환경 억제는
+     * [relayUnderLease] 가 claim 전에 걸렀다. 그 둘은 「이 entry 로는 전달이 일어나지 않았고
+     * 일어나지 않을 것」이라 `FAILED` 가 맞다(설정을 고치면 **다음** 판정이 새 행을 낳는다 —
+     * 이 행을 되살리는 간선은 표에 없다).
+     */
+    private fun settleDispatch(
+        entry: OutboxEntry,
+        key: IdempotencyKey,
+        outcome: DeliveryOutcome,
+    ): RowDisposition =
+        transactions.inTransaction {
+            when (outcome) {
+                is DeliveryOutcome.Suppressed -> {
+                    transition(entry, OutboxCommand.Fail)
+                    RowDisposition.FAILED
+                }
+
+                is DeliveryOutcome.Attempted -> {
+                    settleResult(entry, key, outcome.result)
+                }
+            }
+        }
+
+    private fun settleResult(
+        entry: OutboxEntry,
+        key: IdempotencyKey,
+        result: DeliveryResult,
+    ): RowDisposition =
+        when (result) {
+            is DeliveryResult.Delivered -> {
+                inbox.markProcessed(key)
+                transition(entry, OutboxCommand.Deliver)
+                RowDisposition.DELIVERED
+            }
+
+            is DeliveryResult.Rejected -> {
+                transition(entry, OutboxCommand.Fail)
+                RowDisposition.FAILED
+            }
+
+            is DeliveryResult.Unknown -> {
+                transition(entry, OutboxCommand.Isolate)
+                RowDisposition.ISOLATED
+            }
+        }
+
+    /**
+     * **전이표를 지나 port 로 올리는 유일한 자리** — 명령과 통로 타입의 짝이 이 한 함수에만
+     * 있다. 소진 `when` 이라 [OutboxTransition] 에 하위 타입이 생기면 컴파일이 깨진다(사본
+     * SQL 0, `internal` 완화 0).
+     *
+     * 거부는 `error` 다. 호출부가 넘기는 상태는 늘 [OutboxEntry.restore] 가 고정한
+     * `Claimed` 이고 명령 셋은 전부 그 상태에서 허용되므로, 거부가 돌아오면 그것은 전이표가
+     * 바뀌었다는 뜻이다(업무 분기가 아니라 불변식 위반). 러너가 그 예외를 정제된 원인
+     * 코드로 옮긴다(수집 러너 선례).
+     */
+    private fun transition(
+        entry: OutboxEntry,
+        command: OutboxCommand,
+    ) {
+        val accepted =
+            when (val outcome = transitionOutbox(entry.id, entry.state, command)) {
+                is OutboxTransitionOutcome.Accepted -> {
+                    outcome.transition
+                }
+
+                is OutboxTransitionOutcome.Rejected -> {
+                    error("outbox 전이표가 거부했다 — from=${outcome.from} command=${outcome.command}")
+                }
+            }
+        when (accepted) {
+            is OutboxTransition.ToDelivered -> outbox.markDelivered(accepted)
+            is OutboxTransition.ToFailed -> outbox.markFailed(accepted)
+            is OutboxTransition.ToIsolated -> outbox.markIsolated(accepted)
+            is OutboxTransition.ToClaimed -> error("relay 는 claim 전이를 port 로 올리지 않는다")
+        }
+    }
+}
+
+/** 행 하나의 처분 — [RelayReport.Completed] 의 계수가 이 값들을 센다. */
+private enum class RowDisposition {
+    DELIVERED,
+    SKIPPED_DUPLICATE,
+    FAILED,
+    ISOLATED,
+    ISOLATED_UNKNOWN_PAYLOAD,
+}
+
+private fun reportOf(
+    orphansIsolated: Int,
+    claimed: Int,
+    dispositions: List<RowDisposition>,
+): RelayReport.Completed =
+    RelayReport.Completed(
+        orphansIsolated = orphansIsolated,
+        claimed = claimed,
+        delivered = dispositions.count { it == RowDisposition.DELIVERED },
+        skippedDuplicates = dispositions.count { it == RowDisposition.SKIPPED_DUPLICATE },
+        failed = dispositions.count { it == RowDisposition.FAILED },
+        isolated =
+            dispositions.count {
+                it == RowDisposition.ISOLATED || it == RowDisposition.ISOLATED_UNKNOWN_PAYLOAD
+            },
+        unknownPayload = dispositions.count { it == RowDisposition.ISOLATED_UNKNOWN_PAYLOAD },
+    )
+
+/**
+ * payload 가 가리키는 **내용 참조**만 싣는다 — relay 는 문장을 만들지 않는다(렌더링은
+ * [ContentRenderer] 몫, `OPEN-STR-12`). `idempotencyKey` 는 봉투가 등록 시점에 고정한 값을
+ * 그대로 나른다(relay 가 새 키를 짓는 자리가 없다 — `decideInbox` 의 dedup 이 성립하는 전제).
+ */
+private fun intentFor(
+    key: IdempotencyKey,
+    payload: NotificationRequestedPayload,
+    target: RelayTarget,
+): NotificationIntent =
+    NotificationIntent(
+        idempotencyKey = key,
+        owner = target.owner,
+        channel = target.channel,
+        contentRef = ContentRef(payload.noticeId),
+    )

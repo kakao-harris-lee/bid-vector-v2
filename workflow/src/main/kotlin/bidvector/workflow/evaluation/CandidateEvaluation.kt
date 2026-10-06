@@ -23,6 +23,16 @@ sealed interface CandidateEvaluation {
         override val noticeId: NoticeId,
         override val correlationId: CorrelationId,
         val verdict: Verdict,
+        /**
+         * 이 판정이 낳은 알림 요청의 처분(D-6F10-18 ⑤) — `BidNow` 가 아니면
+         * [NotificationDisposition.NotApplicable] 이다. **`reach` 가 port 반환값을 버리지
+         * 않는다**는 사실이 이 필드이고, 커밋 러너가 이 값으로 종료 코드를 정한다.
+         *
+         * dry-run 의 거동은 바뀌지 않는다 — `RecordingNotificationRequestPort` 는 늘
+         * `Requested` 를 돌려주고, HTTP 응답은 이 필드를 읽지 않는다(D-6A3-6 평탄 스칼라
+         * 규칙 그대로, `OPEN-6A3-EVALUATION-DETAIL`).
+         */
+        val disposition: NotificationDisposition,
     ) : CandidateEvaluation
 
     @ConsistentCopyVisibility
