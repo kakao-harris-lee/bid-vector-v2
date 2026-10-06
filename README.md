@@ -52,6 +52,7 @@ dependency가 되어서는 안 된다.
 | M4 | workflow, event, 상태 제어, prediction gateway | side effect는 fake |
 | M5 | 기존 ML 코드를 이식·튜닝한 독립 Python training/serving engine | DB 없는 serving |
 | M6 | persistence·API·E2E·배포 후보 완성 | 승인된 테스트 환경만 |
+| M7 | 사용자 웹 화면(화면 다섯·입찰 건 모듈)·도메인·운영 반입 | 운영 host 만 — public 배포 제외 |
 
 ## 절대 규칙
 
