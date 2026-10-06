@@ -100,8 +100,14 @@ sealed interface RelayReport {
  * 행은 재실행하지 않는다; 놓침을 감수하는 것이 운영자 결정 `OPEN-NOTI-02` 다).
  *
  * **고아 판정에 시각이 없다(D-6F10-11).** [leases] 를 **새로** 쥔 relay 가 **첫 claim 전에**
- * 보는 `CLAIMED` 는 전부 죽은 홀더의 것이다 — 살아 있는 홀더가 있으면 lease 를 못 쥐었다.
- * TTL·`claimed_at` 열이 없는 이유가 그것이다(관측용 열은 `OPEN-6F10-CLAIM-OBSERVABILITY`).
+ * 보는 `CLAIMED` 는 **그 홀더가 더 이상 임대를 쥐지 않은** 행이다 — TTL·`claimed_at` 열이
+ * 없는 이유가 그것이다(관측용 열은 `OPEN-6F10-CLAIM-OBSERVABILITY`).
+ *
+ * **「전부 죽은 홀더의 것」은 아니다**(R1-M-1 이 반증, R2-L-4 로 문면 정정). advisory lock 을
+ * 놓게 하는 것은 프로세스 사망이 아니라 **연결 단절**이므로, 프로세스가 살아 있는 홀더도
+ * 임대를 잃는다 — 그 홀더가 아직 발송 중이면 그 행은 「살아 있는 남의 in-flight」다. 그래서
+ * 이쪽은 [LeaseGuard] 로 네 지점에서 자기 임대를 되묻고, 그 확인 **밖에 남는 창**이 알려진
+ * 제한 11 ⓐ·ⓑ 다.
  *
  * **환경 억제는 claim 자체를 하지 않는다**(ADR 0005 D-4 「억제는 기록 억제가 아니다」) — 행은
  * `PENDING` 으로 보존되고 상태 분포가 전후로 불변이다. claim 한 뒤 억제하면 어휘 밖 종단이
@@ -132,15 +138,50 @@ class RelayOutboxNotifications(
      * 억제 판정이 **고아 격리보다도 먼저**다 — 억제 환경의 relay 는 행을 하나도 만지지
      * 않는다(격리도 하지 않는다: 격리는 단방향 종단이고, 보낼 수 없는 환경에서 남의 run 이
      * 남긴 행을 태울 이유가 없다).
+     *
+     * **임대를 묻는 자리가 넷이다(D-6F10-31 ②).** 획득 직후 · 고아 격리 전 · claim 전 ·
+     * 행마다 발송 전. 어느 지점에서 잃어도 그 뒤 질의를 돌리지 않고 [RelayReport.LeaseLost]
+     * 로 멈춘다. 앞 판은 **행 루프 안 하나**였고 그때 열려 있던 것(verifier r2 probe V6c
+     * 실측): 임대를 이미 잃은 relay 가 **새 홀더가 막 집은** `CLAIMED` 행을 고아로 읽어
+     * 영구 격리하고, 집을 행이 0 이면 루프가 돌지 않아 guard 가 **한 번도 불리지 않고**
+     * `Completed` + 종료 코드 **0** 으로 끝났다. 그래서 claim 이 0 건인 경로도 반드시
+     * guard 를 지난다.
+     *
+     * 획득 직후 검사는 **억제 판정보다 앞**이다 — 둘 다 「아무것도 하지 않았다」이지만
+     * 「임대를 잃었다」가 더 센 신호다(종료 코드 1 대 4).
      */
     private fun relayUnderLease(
         limit: Int,
         guard: LeaseGuard,
-    ): RelayReport {
-        if (policy.environmentModes.getValue(environment) != DeliveryMode.Live) {
-            return RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+    ): RelayReport =
+        when {
+            !guard.stillHeld() -> leaseLostBefore(orphansIsolated = 0)
+            policy.environmentModes.getValue(environment) != DeliveryMode.Live ->
+                RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+
+            else -> relayHoldingLease(limit, guard)
         }
+
+    private fun relayHoldingLease(
+        limit: Int,
+        guard: LeaseGuard,
+    ): RelayReport {
+        // 고아 격리 전 — 잃은 뒤 격리하면 새 홀더의 in-flight 행을 태운다(되돌릴 간선 없음).
+        if (!guard.stillHeld()) return leaseLostBefore(orphansIsolated = 0)
         val orphansIsolated = isolateOrphans()
+        // claim 전 — 잃은 뒤 집으면 두 relay 가 같은 종류를 동시에 소비한다.
+        return if (guard.stillHeld()) {
+            claimAndSettle(limit, guard, orphansIsolated)
+        } else {
+            leaseLostBefore(orphansIsolated)
+        }
+    }
+
+    private fun claimAndSettle(
+        limit: Int,
+        guard: LeaseGuard,
+        orphansIsolated: Int,
+    ): RelayReport {
         val rows = transactions.inTransaction { outbox.claim(limit, OutboxConsumerKind.NotificationRequested) }
         val dispositions = mutableListOf<RowDisposition>()
         // 행마다 발송 **전에** 임대를 다시 묻는다(R1-M-1) — 거짓이면 남은 행을 건드리지
@@ -290,6 +331,14 @@ class RelayOutboxNotifications(
 }
 
 /** 행 하나의 처분 — [RelayReport.Completed] 의 계수가 이 값들을 센다. */
+/**
+ * 아직 아무 행도 집지 않은 상태의 임대 상실 — 처분 계수가 전부 0 이고 `orphansIsolated` 만
+ * 그때까지 격리한 수다. top-level 인 이유는 수신자 상태가 필요 없기 때문이다(클래스당 함수
+ * 11개 한도, detekt `TooManyFunctions`).
+ */
+private fun leaseLostBefore(orphansIsolated: Int): RelayReport.LeaseLost =
+    RelayReport.LeaseLost(reportOf(orphansIsolated, claimed = 0, dispositions = emptyList()))
+
 private enum class RowDisposition {
     DELIVERED,
     SKIPPED_DUPLICATE,

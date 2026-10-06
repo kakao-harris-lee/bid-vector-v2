@@ -123,10 +123,16 @@ internal class BusyLease : ConsumerLeasePort {
 /**
  * [heldFor] 번 묻는 동안만 쥐고 있다고 답하는 임대(R1-M-1) — 「본문 도중에 잃는다」를 fake 로
  * 표현한다. 실 DB 쪽 측정은 `RelayLeaseLossDatabaseTest` 가 임대 연결을 실제로 끊어서 한다.
+ *
+ * **호출 서수가 곧 지점이다**(D-6F10-31 ② 의 네 자리). 1 = 획득 직후 · 2 = 고아 격리 전 ·
+ * 3 = claim 전 · 4 번째부터 = 행마다 발송 전. 그래서 `heldFor = 2` 는 「격리는 했고 claim 은
+ * 안 했다」를 뜻한다. 지점을 더하거나 옮기면 이 대응이 깨지고 아래 test 들이 붉어진다 —
+ * 그것이 의도다(순서를 조용히 바꾸지 못하게 한다).
  */
 internal class LosingLease(
     private val heldFor: Int,
 ) : ConsumerLeasePort {
+    /** 몇 번 물었나 — 「지점이 넷이다」를 test 가 **셈으로** 확인하는 자리다(cr R-13 ⓐ). */
     var asked = 0
         private set
 

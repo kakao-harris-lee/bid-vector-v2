@@ -238,7 +238,7 @@ class RelayOutboxNotificationsTest {
         val sender = ScriptedSender(delivered())
 
         val report =
-            relay(outbox, inbox, sender, leases = LosingLease(heldFor = 1))
+            relay(outbox, inbox, sender, leases = LosingLease(heldFor = 4))
                 .relay(RELAY_LIMIT)
                 .shouldBeInstanceOf<RelayReport.LeaseLost>()
 
@@ -251,14 +251,17 @@ class RelayOutboxNotificationsTest {
         sender.requests.map { it.idempotencyKey.value } shouldBe listOf("key-keep")
     }
 
-    /** 임대를 처음부터 잃은 상태면 **한 행도 발송하지 않는다**(첫 행 앞에서 멈춘다). */
+    /**
+     * 집은 뒤 **첫 행 앞**에서 잃으면 한 행도 발송하지 않는다 — `claimed` 는 1 인데 처분이
+     * 0 이다(그 행은 `CLAIMED` 에 남아 다음 run 의 고아가 된다).
+     */
     @Test
     fun `첫 행 앞에서 임대를 잃으면 발송이 0 이다`() {
         val outbox = FakeOutboxPort(pending = listOf(notificationRow("none")))
         val sender = ScriptedSender(delivered())
 
         val report =
-            relay(outbox, FakeInboxPort(), sender, leases = LosingLease(heldFor = 0))
+            relay(outbox, FakeInboxPort(), sender, leases = LosingLease(heldFor = 3))
                 .relay(RELAY_LIMIT)
                 .shouldBeInstanceOf<RelayReport.LeaseLost>()
 
@@ -266,6 +269,92 @@ class RelayOutboxNotificationsTest {
         report.partial.delivered shouldBe 0
         sender.requests.shouldBeEmpty()
         outbox.delivered.shouldBeEmpty()
+    }
+
+    /**
+     * D-6F10-31 ② — **획득 직후**에 잃으면 고아 목록을 읽지도 않는다. 앞 판은 이 지점에
+     * 검사가 없어, 임대를 이미 잃은 relay 가 새 홀더의 in-flight 행을 고아로 격리했다
+     * (verifier r2 probe V6c). 고아와 집을 행을 **둘 다 심어** 「아무것도 안 했다」가
+     * 값으로 보이게 한다.
+     */
+    @Test
+    fun `획득 직후에 임대를 잃으면 격리도 claim 도 하지 않는다`() {
+        val outbox =
+            FakeOutboxPort(
+                pending = listOf(notificationRow("send")),
+                orphans = listOf(notificationRow("orphan")),
+            )
+        val sender = ScriptedSender(delivered())
+        val leases = LosingLease(heldFor = 0)
+
+        val report =
+            relay(outbox, FakeInboxPort(), sender, leases = leases)
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        // **첫 물음에서 멈췄다** — 더 물었다면 그 사이에 질의가 돌았다는 뜻이다(cr R-13 ⓐ).
+        leases.asked shouldBe 1
+
+        report.partial.orphansIsolated shouldBe 0
+        report.partial.claimed shouldBe 0
+        outbox.isolated.shouldBeEmpty()
+        outbox.claimedEntriesKinds.shouldBeEmpty()
+        outbox.claimedKinds.shouldBeEmpty()
+        sender.requests.shouldBeEmpty()
+    }
+
+    /** **고아 격리 전** 지점 — 격리 질의 자체가 돌지 않는다(읽기도 하지 않는다). */
+    @Test
+    fun `고아 격리 전에 임대를 잃으면 고아 목록을 읽지 않는다`() {
+        val outbox = FakeOutboxPort(orphans = listOf(notificationRow("orphan")))
+
+        val report =
+            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 1))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.orphansIsolated shouldBe 0
+        outbox.claimedEntriesKinds.shouldBeEmpty()
+        outbox.isolated.shouldBeEmpty()
+    }
+
+    /**
+     * **claim 전** 지점 — 격리는 이미 끝났으므로 계수에 남고(숨기지 않는다), claim 은 돌지
+     * 않는다. 두 relay 가 같은 종류를 동시에 소비하는 것을 막는 자리다.
+     */
+    @Test
+    fun `claim 전에 임대를 잃으면 격리 계수만 남고 집지 않는다`() {
+        val outbox =
+            FakeOutboxPort(
+                pending = listOf(notificationRow("send")),
+                orphans = listOf(notificationRow("orphan")),
+            )
+
+        val report =
+            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 2))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.orphansIsolated shouldBe 1
+        report.partial.claimed shouldBe 0
+        outbox.isolated shouldBe listOf(OutboxEntryId("orphan"))
+        outbox.claimedKinds.shouldBeEmpty()
+    }
+
+    /**
+     * **집을 행이 0 이어도 guard 를 본다**(probe V6c 의 핵심). 앞 판은 검사가 행 루프 안에만
+     * 있어 빈 배치에서 guard 가 한 번도 불리지 않고 `Completed` + 종료 코드 0 이 났다 —
+     * 「임대를 잃었는데 성공으로 보고한다」. 이 test 는 그 자리가 `LeaseLost` 임을 잠근다.
+     */
+    @Test
+    fun `집을 행이 0 이어도 임대 상실은 LeaseLost 다`() {
+        val report =
+            relay(FakeOutboxPort(), FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 2))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.claimed shouldBe 0
+        report.partial.delivered shouldBe 0
     }
 
     /**

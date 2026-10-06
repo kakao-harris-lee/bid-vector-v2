@@ -25,11 +25,14 @@ class RelayDatabaseTest : PersistenceTestSupport() {
         // 가 거부해 영향 행이 0 이 되는 유일한 자리다. 앞 판은 그 0 을 버려 전이 실패가
         // 조용한 no-op 였다.
         val harness =
-            RelayHarness(dataSource()) { boundary ->
-                InterferingTransactions(ConsumerTransactions(boundary), atCall = T2_CALL_INDEX) {
-                    forceOutboxState(dataSource(), "count-1", "DELIVERED")
-                }
-            }
+            RelayHarness(
+                dataSource(),
+                transactionsFor = { boundary ->
+                    InterferingTransactions(ConsumerTransactions(boundary), atCall = T2_CALL_INDEX) {
+                        forceOutboxState(dataSource(), "count-1", "DELIVERED")
+                    }
+                },
+            )
 
         shouldThrow<IllegalStateException> { harness.relay.relay(RELAY_DB_LIMIT) }
     }
@@ -46,9 +49,12 @@ class RelayDatabaseTest : PersistenceTestSupport() {
         // 주입 자체가 사라져 아래 상태 단언이 돌지 않는다.
         lateinit var harness: RelayHarness
         harness =
-            RelayHarness(dataSource()) { boundary ->
-                CrashAfterDispatch(ConsumerTransactions(boundary)) { harness.sender.sentKeys().isNotEmpty() }
-            }
+            RelayHarness(
+                dataSource(),
+                transactionsFor = { boundary ->
+                    CrashAfterDispatch(ConsumerTransactions(boundary)) { harness.sender.sentKeys().isNotEmpty() }
+                },
+            )
 
         shouldThrow<RelayWorkerDied> { harness.relay.relay(RELAY_DB_LIMIT) }
 

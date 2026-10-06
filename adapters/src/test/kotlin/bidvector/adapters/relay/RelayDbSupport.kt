@@ -12,6 +12,7 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.event.ConsumerLeasePort
 import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
@@ -60,6 +61,7 @@ internal class RelayHarness(
     channelEnabled: Boolean = true,
     sendOutcome: SendOutcome = SendOutcome.DELIVERED,
     transactionsFor: (TransactionBoundary) -> ConsumerTransactionPort = { ConsumerTransactions(it) },
+    leasesFor: (DataSource) -> ConsumerLeasePort = { PostgresAdvisoryLockLease(it) },
 ) {
     private val policy = relayNotificationPolicy()
     private val boundary = TransactionBoundary(dataSource)
@@ -78,7 +80,7 @@ internal class RelayHarness(
                     policyData = policy,
                     environment = environment,
                 ),
-            leases = PostgresAdvisoryLockLease(dataSource),
+            leases = leasesFor(dataSource),
             transactions = transactionsFor(boundary),
             target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
             environment = environment,

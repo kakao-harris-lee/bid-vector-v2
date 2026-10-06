@@ -21,7 +21,14 @@ import javax.sql.DataSource
  * **알려진 제한 — TCP 반개방.** 프로세스가 죽어도 커널이 FIN 을 보내지 못한 경우(전원 차단·
  * 네트워크 분단) 서버는 연결이 끊긴 것을 TCP keepalive 만료까지 모른다. 그 구간에서는 다음
  * 소비자가 `Busy` 를 받아 **아무것도 하지 않는다** — 안전한 쪽으로 실패한다(놓침은 at-most-once
- * 가 이미 감수한다, `OPEN-NOTI-02`). 반대쪽(살아 있는 홀더의 잠금을 빼앗는 것)은 일어나지 않는다.
+ * 가 이미 감수한다, `OPEN-NOTI-02`).
+ *
+ * **알려진 제한 — 일하는 중에 잠금을 잃는다(R2-L-4 정정).** 「살아 있는 홀더의 잠금은 빼앗기지
+ * 않는다」고 적었던 것은 **프로세스**와 **연결**을 섞은 것이었다. 서버가 잠금을 놓는 조건은
+ * 연결 단절이고, 연결은 프로세스와 무관하게 끊긴다(`pg_terminate_backend`·pooler 회수·
+ * 네트워크 재설정). 그러면 **본문이 아직 도는 중인** 홀더가 잠금을 잃고 다음 소비자가 `Held`
+ * 를 받는다 — 그 교차가 [stillHolding] 을 둔 이유이고, 호출부는 그것을 [LeaseGuard] 로 네
+ * 지점에서 되묻는다.
  *
  * `pg_try_advisory_lock`(블로킹하지 않는 쪽)을 쓴다 — 대기하면 일회 러너가 cron 주기를 넘겨
  * 겹친다. 못 쥐면 [LeaseAttempt.Busy]이고 본문은 **부르지 않는다**.
@@ -125,7 +132,13 @@ private fun lockKeyFor(kind: OutboxConsumerKind): Long =
         OutboxConsumerKind.StrategyUpdated -> STRATEGY_EVENT_RELAY_LOCK_KEY
     }
 
-private const val NOTIFICATION_RELAY_LOCK_KEY = 6_110_001L
+/**
+ * `internal` 인 이유(cr R-13 ⓒ): `RelayLeaseLossDatabaseTest` 가 **이 키를 손으로 베껴**
+ * `pg_locks` 에서 홀더 백엔드를 찾고 있었다. 어긋나면 그 test 가 아무 행도 못 찾아 기대가
+ * RED 가 되므로 fail-closed 이긴 하지만, 값을 한 자리에만 두면 어긋날 자리가 없다.
+ */
+internal const val NOTIFICATION_RELAY_LOCK_KEY = 6_110_001L
+
 private const val STRATEGY_EVENT_RELAY_LOCK_KEY = 6_110_002L
 
 private const val TRY_ADVISORY_LOCK = "SELECT pg_try_advisory_lock(?)"

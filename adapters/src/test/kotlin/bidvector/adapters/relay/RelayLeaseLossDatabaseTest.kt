@@ -1,16 +1,20 @@
 package bidvector.adapters.relay
 
 import bidvector.adapters.event.ConsumerTransactions
+import bidvector.adapters.event.NOTIFICATION_RELAY_LOCK_KEY
+import bidvector.adapters.event.PostgresAdvisoryLockLease
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.event.ConsumerLeasePort
 import bidvector.workflow.event.ConsumerTransactionPort
+import bidvector.workflow.event.LeaseAttempt
+import bidvector.workflow.event.LeaseGuard
+import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.notification.RelayReport
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import javax.sql.DataSource
-
-/** `NotificationRequested` 종류의 임대 키(`PostgresAdvisoryLockLease` 의 열거값과 같은 값). */
-private const val NOTIFICATION_LEASE_KEY = 6_110_001L
 
 /**
  * **R1-M-1 의 답** — 임대 **연결만** 끊겼을 때(프로세스는 살아 있다) relay 가 그것을 알고 멈추는지
@@ -35,13 +39,16 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
 
         lateinit var harness: RelayHarness
         harness =
-            RelayHarness(dataSource()) { boundary ->
+            RelayHarness(
+                dataSource(),
                 // 첫 행의 발송이 끝난 **직후**(그 행의 T2 경계에서) 임대 연결을 서버 쪽에서
                 // 끊는다 — 둘째 행의 임대 재확인이 거짓을 받게 되는 유일한 창이다.
-                TerminateLeaseAfterFirstSend(ConsumerTransactions(boundary), dataSource()) {
-                    harness.sender.sentKeys().size
-                }
-            }
+                transactionsFor = { boundary ->
+                    TerminateLeaseAfterFirstSend(ConsumerTransactions(boundary), dataSource()) {
+                        harness.sender.sentKeys().size
+                    }
+                },
+            )
 
         val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.LeaseLost>()
 
@@ -50,6 +57,43 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         harness.sender.sentKeys().size shouldBe 1
         // 발송한 행은 종단으로, 남은 행은 CLAIMED 로.
         outboxStateCounts(dataSource()) shouldBe mapOf("DELIVERED" to 1, "CLAIMED" to 1)
+    }
+
+    /**
+     * **probe V6c 를 상설로**(D-6F10-31 ②) — 임대를 **획득 직후**에 잃으면 고아 격리도 claim 도
+     * 하지 않는다.
+     *
+     * 앞 판이 여기서 무엇을 했나(verifier r2 실측): 재확인이 행 루프 안에만 있어, 이미 임대를
+     * 잃은 relay 가 `CLAIMED` 행을 고아로 읽어 **영구 격리**했고, 집을 행이 0 이면 루프가 돌지
+     * 않아 guard 가 한 번도 불리지 않고 `Completed` + 종료 코드 **0** 이 났다. 그 행이 새 홀더의
+     * in-flight 였다면 발송된 행이 `ISOLATED` 로 표기된다 — 되돌릴 간선이 없는 종단이다.
+     *
+     * 입력에 고아(`CLAIMED`)와 집을 행(`PENDING`) 을 **둘 다** 둔다. 둘 중 하나라도 움직이면
+     * 그것이 곧 결함이므로, 상태 분포가 **전후로 같다**가 이 test 의 단언이다.
+     *
+     * 종료 코드 1 은 여기서 재지 않는다 — `adapters` 는 `app` 에 의존하지 않는다(의존 방향).
+     * `LeaseLost` → 1 의 사상은 `RelayExitCodeTest` 가 잠근다.
+     */
+    @Test
+    fun `임대를 획득 직후에 잃으면 격리도 claim 도 하지 않는다`() {
+        insertPendingNotificationRow(dataSource(), "v6c-orphan")
+        forceOutboxState(dataSource(), "v6c-orphan", "CLAIMED")
+        insertPendingNotificationRow(dataSource(), "v6c-pending")
+        val before = outboxStateCounts(dataSource())
+
+        val harness =
+            RelayHarness(
+                dataSource(),
+                leasesFor = { source -> TerminateLeaseOnAcquire(PostgresAdvisoryLockLease(source), source) },
+            )
+
+        val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.orphansIsolated shouldBe 0
+        report.partial.claimed shouldBe 0
+        report.partial.delivered shouldBe 0
+        harness.sender.sentKeys().shouldBeEmpty()
+        outboxStateCounts(dataSource()) shouldBe before
     }
 
     /**
@@ -68,6 +112,28 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         report.delivered shouldBe 2
         outboxStateCounts(dataSource()) shouldBe mapOf("DELIVERED" to 2)
     }
+}
+
+/**
+ * 임대를 **쥔 직후, 본문을 부르기 전에** 끊는다 — relay 의 첫 `stillHeld()` 가 거짓을 받는
+ * 유일한 창이다. `ConsumerTransactionPort` 로는 이 지점에 걸 수 없다(첫 guard 확인이 어떤
+ * 트랜잭션보다 앞이다) — 그것이 이 데코레이터가 필요한 이유다.
+ *
+ * 임대 자체는 **production 구현**이다. 바꿔치우는 것은 「언제 끊기는가」뿐이고, 끊긴 뒤의
+ * 판정(`SELECT 1` 이 던지고 `stillHolding` 이 false 를 낸다)은 production 경로를 그대로 탄다.
+ */
+private class TerminateLeaseOnAcquire(
+    private val delegate: ConsumerLeasePort,
+    private val dataSource: DataSource,
+) : ConsumerLeasePort {
+    override fun <T> withLease(
+        kind: OutboxConsumerKind,
+        body: (LeaseGuard) -> T,
+    ): LeaseAttempt<T> =
+        delegate.withLease(kind) { guard ->
+            check(terminateLeaseBackend(dataSource)) { "임대 백엔드를 `pg_locks` 에서 찾지 못했다" }
+            body(guard)
+        }
 }
 
 /**
@@ -101,7 +167,7 @@ private fun terminateLeaseBackend(dataSource: DataSource): Boolean =
                 "SELECT pg_terminate_backend(pid) FROM pg_locks " +
                     "WHERE locktype = 'advisory' AND classid = 0 AND objid = ? AND objsubid = 1",
             ).use { statement ->
-                statement.setLong(1, NOTIFICATION_LEASE_KEY)
+                statement.setLong(1, NOTIFICATION_RELAY_LOCK_KEY)
                 statement.executeQuery().use { it.next() }
             }
     }
