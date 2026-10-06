@@ -18,7 +18,7 @@
 
 | 12 | **배치 claim 의 손실 증폭**(R1-L-5) — `claim` 이 `limit` 단위 배치라 행 하나의 예외가 같은 배치의 **미시도 행 전부**를 다음 run 의 고아 격리로 보낸다. 임대 상실(`LeaseLost`)도 같은 모양이다 — 멈춘 뒤 남은 행이 격리된다. 행 하나씩 claim 하면 사라지지만 run 당 질의 수가 배치 크기만큼 늘어난다 | 상시 — `bidvector.relay.claim-limit` 를 1 로 두면 증폭이 0 이다(운영 선택) | — |
 
-| 13 | **집었는데 전부 거부·격리된 run 은 비-0 이지만, 일부라도 전달된 run 은 0 이다**(D-6F10-27 ⑦ 의 경계, cr L-3). 부분 실패를 비-0 으로 올리면 정상 운영이 늘 붉어지므로 그 선을 택했다 — 개별 행의 거부·격리 수는 로그 한 줄의 계수로만 보인다 | 상시 | — |
+| 13 | **발송이 한 번도 성공하지 않았고 종단 실패가 있는 run 은 비-0 이고, 하나라도 전달된 run 은 0 이다**(D-6F10-27 ⑦ 의 경계, cr L-3; 문면은 cr R-8 로 술어에 맞췄다 — 앞 판의 「전부 거부·격리」는 술어보다 좁았다). 중복 처리는 전달로 세지 않는다 — 한 통도 보내지 않은 run 은 발송 경로가 살아 있다는 증거가 없다. 부분 실패를 비-0 으로 올리면 정상 운영이 늘 붉어지므로 그 선을 택했다 | 상시 | — |
 
 | 14 | **relay 의 종료 코드 다섯 중 `INCOMPLETE` 의 미지 payload 갈래는 도달 불가다**(cr L-12) — kind 필터 뒤로는 어댑터가 「종류는 맞고 타입은 아닌」 행을 만들 수 없고, 형식을 어긴 행은 복호 fail-closed 로 run 을 멈춘다(그쪽은 `FAILED`). 그 갈래는 심층 방어로 남기고 그 사실을 `RelayExitCode.INCOMPLETE` KDoc 에 적었다. 복호 불가 행 하나가 그 종류의 relay 전체를 매 run 멈추는 성질의 복구는 **앱 권한 밖**이다(`rollback.md` — DBA UPDATE) | 상시 | — |
 
@@ -39,10 +39,24 @@
 
 ## 값 두 축 (D-6F10-8)
 
+R2-H-1 이 앞 판의 이 절을 **과장**으로 판정했다 — 「되읽어 typed 등식」이라고 적었으나 그 등식을 재는 자리가 없었고, 투영의 두 줄을 고정 상수로 바꿔치우는 변이가 test 클래스 242 개에서 전부 초록이었다. 아래는 **지금 실제로 재는 것**만이다.
+
 | 축 | 무엇을 재는가 | 어디서 |
 |---|---|---|
-| ① wire | 정책 버전·전략 개정이 **outbox 행에 실린다** — DB 에 쓰고 되읽어 typed 등식 | codec 왕복 + 골든, 그리고 E2E 가 평가→행→relay 를 실제 DB 로 지난다 |
-| ② 거동 | 전략 개정이 다르면 **같은 입력의 payload 가 달라진다** | 평가 use case test — `reach` 가 `strategy.revision` 을 나르므로 개정만 바꿔도 payload 가 바뀐다 |
+| ① 투영 등식 | 요청의 두 값이 payload 에 **그대로** 실린다 — 기본값 아닌 값(개정 7 · `EffectiveFrom.On`)으로 typed 등식 | `OutboxNotificationRequestPortTest` 「요청의 정책 버전과 전략 개정을 그대로 나른다」 |
+| ② wire 왕복 | 두 값이 저장 형식을 **왕복**한다 + 축어 골든 | `OutboxPayloadCodecTest`(개정 7·0·1·12·3, 구분자·이스케이프 포함) |
+| ③ DB 열 | 그 종류의 행이 실제로 `payload_type = 'NotificationRequested'` 로 저장되고 production 경로가 그것을 디코드해 소비한다 | 커밋 E2E 가 열을 직접 단언 · relay DB test 들이 그 행을 claim→발송까지 지난다 |
+| ④ 거동 | 전략 개정 **하나만** 바꾸면 저장된 payload 가 달라지고, 되돌리면 같아진다 | 커밋 E2E 「전략 개정을 올리면 저장되는 payload 가 달라지고 되돌리면 같아진다」(같은 공고로 세 번 run) |
+
+**타입으로 되읽는 자리가 `app` E2E 가 아닌 이유**: `OutboxPayloadCodec` 은 `adapters` 모듈 `internal` 이고(저장 형식은 어댑터의 것이라는 경계) 그 모듈 test 는 `NotificationRequest`·`Verdict.BidNow` 의 `internal` 생성자 때문에 요청을 **만들 수 없다**(4A/4C 위조 차단). 그래서 ①(타입 등식)은 `workflow`, ②(형식)는 `adapters`, ③④(실 DB)는 `app` 으로 나뉘어 있고 가시성을 완화하지 않았다. 투영 두 줄의 상수 변이를 잡는 것은 ① 이다.
+
+**어느 변이가 어디서 붉어지는가**(R2-H-1 의 요구):
+
+| 변이 | ① | ④ |
+|---|---|---|
+| `ladderPolicyVersion` → 고정 상수 | RED | RED(저장 문자열에 승인 출처가 없다) |
+| `strategyRevision` → `StrategyRevision(1)` | RED | RED(개정을 올려도 payload 가 안 바뀐다) |
+| `strategyRevision` → `value + 1` | RED | 초록(결정적 사상이라 「다르다·되돌아온다」가 유지된다) |
 
 두 값은 **판정에 쓰인 것과 같은 인스턴스**다 — 사다리 정책 버전은 `EVALUATION_LADDER_POLICY_VERSION` 한 자리에서 와 `Resolution.Resolved` 와 payload 양쪽에 간다. 두 자리에 적으면 「판정에 쓰인 버전」과 「행에 적힌 버전」이 갈려 6D-2 의 재현 등식이 거짓을 말한다.
 
