@@ -283,6 +283,30 @@ class CollectionRunnerE2ETest {
     }
 
     /**
+     * **D-6G2c-1·3 — 공고 목록 갈래도 두 프로세스 잠금 아래다.** 개찰 갈래에는 같은 모양의 E2E 가
+     * 있었고 이 갈래에는 없었다(vr r5 L-7): 두 갈래가 같은 실행 상태를 쓰는데 한쪽만 재면, 다른
+     * 한쪽의 배선이 잠금 밖으로 나가도 아무것도 붉어지지 않는다.
+     *
+     * 보유자는 **별 프로세스**다. 같은 JVM 에서 두 번째로 잠그면 잡히는 것은 JVM 안의 겹침이고,
+     * 그것은 재려던 것(두 프로세스)이 아니다 — `tryAcquire` 를 JVM 안 맵 가드로 바꾸는 변이가
+     * 그 판을 통과했다(cr r5 M-3).
+     */
+    @Test
+    fun `다른 프로세스가 잠금을 들고 있으면 공고 목록 갈래가 한 요청도 내지 않는다`() {
+        val runStateDir = Files.createTempDirectory("6g-notice-lock-held")
+        val requestsBefore = mock.requestCount()
+
+        val run =
+            RunStateLockHolder.hold(runStateDir).use {
+                runOnce(mapOf("bidvector.collection.run-state-dir" to runStateDir.toString()))
+            }
+
+        run.exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
+        mock.requestCount() shouldBe requestsBefore
+        run.lines shouldContainExactly listOf("collection skipped reason=ALREADY_RUNNING")
+    }
+
+    /**
      * **D-6G-56 — 공고 목록 갈래도 같은 관문 아래다.** 기준은 원장 자신의 합이 아니라 **mock 이
      * 실제로 받은 요청 수**다. 한 test 클래스의 모든 기동이 같은 mock 과 같은 실행 상태를 쓰므로
      * **증분**으로 잰다 — 두 번 기동해도 증분이 맞아야 한다.

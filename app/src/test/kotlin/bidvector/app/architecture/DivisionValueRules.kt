@@ -39,8 +39,12 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 반환은 `Object`), `Class.getEnumConstants`(`Object[]`), 역직렬화기의 타입 토큰(뒤따르는 `as` 는 CHECKCAST 이고
  * access 가 아니다). 축 ③은 클래스 **리터럴**만 보므로 인스턴스의 `javaClass`(`Object.getClass`)나 문자열의
  * `Class.forName` 으로 얻은 `Class` 도 밖이다. 6F-8 리플렉션·`Class` 멤버 게이트가 그 길을 덮는 root 는
- * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이라 `procurement`·`adapters` 에는 그 보완이
- * 없다 — 구조로 닫는 방향은 `OPEN-6F9-DIVISION-REFLECTION`(evidence 알려진 제한 7).
+ * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이었다. **`adapters` 는 M6/6G-2b 의
+ * `collection.reflection.roots` 가 덮고**(D-6G2b-11), 남은 것은 `procurement`(domain 계열) —
+ * M6/6G-2g 가 반사 뿌리를 production 전 층으로 넓혀 `OPEN-6G2B-REFLECTION-ROOT-DOMAIN` 은 닫혔다
+ * (`procurement` 를 포함한 domain 여섯이 그 쌍 등식 안이다). 구조로 닫지 **못하는** 범위(제네릭 소멸·
+ * 컨테이너 원소·`getEnumConstants`)만 `OPEN-6F9-DIVISION-REFLECTION` 으로 남는다 — 정책 파일의
+ * `collection.division-value` 주석과 같은 문면이다.
  */
 internal class DivisionValueRules(
     private val type: String,
@@ -71,7 +75,7 @@ internal class DivisionValueRules(
                             item: JavaClass,
                             events: ConditionEvents,
                         ) {
-                            val caller = item.topLevel().fullName
+                            val caller = item.outermostClassName()
                             if (caller == type || caller in allowed || !referencesClassObject(item)) return
                             events.add(SimpleConditionEvent.satisfied(item, "$caller -> $type 클래스 객체"))
                         }
@@ -90,20 +94,20 @@ internal class DivisionValueRules(
     /** 실제로 관측된 축 ③ 클래스 — 허용 집합과 **같아야** 한다. */
     fun observedClassObjectReferences(classes: JavaClasses): Set<String> =
         classes
-            .filter { it.topLevel().fullName != type && referencesClassObject(it) }
-            .map { it.topLevel().fullName }
+            .filter { it.outermostClassName() != type && referencesClassObject(it) }
+            .map { it.outermostClassName() }
             .toSet()
 
     private fun typeAccessesIn(item: JavaClass): List<Pair<String, String>> {
-        val caller = item.topLevel().fullName
+        val caller = item.outermostClassName()
         if (caller == type) return emptyList()
         return item.accessesFromSelf
-            .filter { it.targetOwner.topLevel().fullName == type }
+            .filter { it.targetOwner.outermostClassName() == type }
             .map { caller to it.name }
     }
 
     private fun acquisitionsIn(item: JavaClass): List<Pair<String, String>> {
-        val caller = item.topLevel().fullName
+        val caller = item.outermostClassName()
         if (caller == type) return emptyList()
         val accesses =
             buildList<JavaAccess<*>> {
@@ -115,7 +119,7 @@ internal class DivisionValueRules(
                 )
             }
         return accesses
-            .map { it.targetOwner.topLevel().fullName to it.name }
+            .map { it.targetOwner.outermostClassName() to it.name }
             .filter { (owner, _) -> owner != caller }
             .map { (owner, member) -> caller to "$owner#$member" }
     }
@@ -141,7 +145,4 @@ internal class DivisionValueRules(
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "${it.first} -> ${it.second}")) }
             }
         }
-
-    /** 중첩 클래스(`Outer$Inner`)를 가장 바깥 클래스로 접는다 — 허용 집합은 최상위 이름으로 적는다. */
-    private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)
 }

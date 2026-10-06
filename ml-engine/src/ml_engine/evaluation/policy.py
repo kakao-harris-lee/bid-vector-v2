@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -48,13 +49,16 @@ _SCALAR_KEYS: Final[frozenset[str]] = frozenset(
         "agency_baseline_min_count",
     }
 )
+SEED_PREFIX: Final[str] = "stability_seeds"
+"""평탄 색인 목록의 seed 접두 — **두 로더가 같은 이름을 읽는다**(D-6G2c-21 ③)."""
+
 _INDEXED_LIST_PREFIXES: Final[tuple[str, ...]] = (
-    "stability_seeds",
+    SEED_PREFIX,
     "amount_band_edges",
     "segment_axes",
 )
 
-_APPROVED_SEED_KEYS: Final[tuple[str, ...]] = (
+APPROVED_SEED_KEYS: Final[tuple[str, ...]] = (
     "stability_seeds.0",
     "stability_seeds.1",
     "stability_seeds.2",
@@ -66,13 +70,38 @@ _APPROVED_SEED_KEYS: Final[tuple[str, ...]] = (
 판독기(`collect_indexed_list`)는 인덱스가 0 부터 연속일 것만 보고 개수를 모른다. 거기에
 길이를 넣을 수도 없다 — 같은 판독기가 길이 다른 목록 셋(seed 다섯 · 금액 밴드 넷 · 세그먼트
 축 둘)을 읽는다. 수를 리터럴로 적는 길도 막혀 있다: `5` 는 출하 임계(`max_origins`)라
-`evaluation/**` 소스에 적으면 숫자 리터럴 게이트가 거부한다. 그래서 **키를 열거하고 그
-길이를 센다** — 열거가 스키마 선언이고 수는 그 결과다.
+`evaluation/**` 소스에 적으면 숫자 리터럴 게이트가 거부한다. 그래서 **키를 열거한다** —
+열거가 스키마 선언이다.
 
 `_KNOWN_KEYS` 의 seed 칸은 여전히 `_MAX_INDEXED_LIST_LENGTH` 로 만든다(여기서 만들지
-않는다): 그러면 색인 여섯째가 **미지 키**(`MALFORMED`)가 아니라 개수 위반
-(`INVALID_VALUE`)으로 떨어져 두 로더의 거부 사유가 같아지고, 그 상수가 살아 있어야
-숫자 리터럴 게이트의 역방향 등재 검사(허용 목록에 죽은 항목 금지)가 성립한다."""
+않는다): 그러면 색인 여섯째가 **미지 키**(`MALFORMED`)가 아니라 **집합 불일치**
+(`INVALID_VALUE`)로 떨어져 두 로더의 거부 사유가 같아지고, 그 상수가 살아 있어야 숫자 리터럴
+게이트의 역방향 등재 검사(허용 목록에 죽은 항목 금지)가 성립한다. 거부가 개수가 아니라
+집합인 것은 M6/6G-2c 수정 r1(F-4) — `seed_key_mismatch` 를 참고.
+
+**자리는 하나다**(M6/6G-2c D-6G2c-21 ③). 앞 판은 이 열거가 로더마다 한 벌씩 있었고
+(`evaluation.policy` · `evaluation.backtest.policy`) 두 벌이 조용히 갈릴 수 있었다 —
+한쪽만 여섯째를 더하면 그 로더만 여섯을 받는다. 이제 판정 로더가 이 이름을 import 한다."""
+
+
+def seed_key_mismatch(values: Mapping[str, PolicyScalar]) -> str | None:
+    """평탄 정책 값의 seed 키 집합이 승인 전수와 다르면 그 **차이**를 적은 문면, 같으면
+    `None`(D-6G2c-21 ③).
+
+    길이 비교가 아니라 **집합 등식**이다. 길이는 「몇 개인가」만 말하고 「어느 키인가」를
+    말하지 않아, 거부 문면이 수 두 개뿐이었다 — 어느 색인이 없는지 읽는 쪽이 알 수 없다.
+    집합으로 재면 없는 키와 여분 키가 이름으로 나오고, 등식이므로 한쪽만 움직인 판을
+    길이 우연(같은 수, 다른 키)이 통과시킬 수 없다."""
+    present = {key for key in values if key.startswith(f"{SEED_PREFIX}.")}
+    approved = set(APPROVED_SEED_KEYS)
+    if present == approved:
+        return None
+    return (
+        f"{SEED_PREFIX} 키가 승인 전수와 다릅니다 — "
+        f"없음: {sorted(approved - present)} · 여분: {sorted(present - approved)}"
+    )
+
+
 _KNOWN_KEYS: Final[frozenset[str]] = _SCALAR_KEYS | frozenset(
     f"{prefix}.{index}"
     for prefix in _INDEXED_LIST_PREFIXES
@@ -356,12 +385,9 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
         return PolicyRejected(
             PolicyRejectionReason.INVALID_VALUE, f"malformed values: {raw.values!r}"
         )
-    if len(parsed.stability_seeds) != len(_APPROVED_SEED_KEYS):
-        return PolicyRejected(
-            PolicyRejectionReason.INVALID_VALUE,
-            f"stability_seeds 는 {len(_APPROVED_SEED_KEYS)} 개여야 합니다: "
-            f"{len(parsed.stability_seeds)}",
-        )
+    mismatch = seed_key_mismatch(raw.values)
+    if mismatch is not None:
+        return PolicyRejected(PolicyRejectionReason.INVALID_VALUE, mismatch)
 
     try:
         return EvaluationPolicy(

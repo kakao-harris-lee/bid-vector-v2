@@ -17,7 +17,7 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CollectionArchitectureGateCatchesViolationsTest {
     private val policy = ArchitecturePolicy.load()
-    private val rules = CollectionArchitectureRules()
+    private val rules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
@@ -29,6 +29,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
             allowedTypes = policy.collectionAllowedProcurementTypes.toSet(),
             passThroughTypes = policy.collectionPassThroughTypes.toSet(),
             forbiddenFieldTypes = policy.collectionForbiddenFieldTypes.toSet(),
+            depth = policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
         )
 
     @Test
@@ -55,12 +56,13 @@ class CollectionArchitectureGateCatchesViolationsTest {
             allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
             passThroughTypes = policy.collectionPassThroughTypes.toSet(),
             allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+            depth = policy.depth(DepthAxis.RAW_ACCESS),
         )
 
     @Test
     fun `use case 패키지 밖 이웃 workflow 패키지의 헬퍼가 원문 필드를 읽어도 잡는다 — 한 걸음 옮긴 변이`() {
-        moduleRules().mustReport("RogueNeighborTitlePeek", "FieldConcept")
-        moduleRules().mustReport("RogueNeighborTitlePeek", "RawNoticeObservation.valueOf")
+        moduleRules().mustReport("RogueNeighborTitlePeekKt", "FieldConcept")
+        moduleRules().mustReport("RogueNeighborTitlePeekKt", "RawNoticeObservation.valueOf")
     }
 
     @Test
@@ -68,14 +70,23 @@ class CollectionArchitectureGateCatchesViolationsTest {
         moduleRules().mustReport("RogueRawFieldPeek", "RawNoticeObservation.getSourceText")
     }
 
-    private fun reflectionRules() =
+    /**
+     * A-2 — production 을 지키는 **같은 규칙 값**에 fixture 뿌리를 넣는다. 뿌리에 `adapters` 가 들었고(운영자
+     * 결정 2026-10-03) 허용은 (클래스, 타입)·(클래스, 멤버) 쌍이다. 멤버 쌍에 [CLEAN_NAME_LOOKUP_PAIR] 하나를
+     * 더하는 것은 과잉 대조를 세우기 위해서다 — 쌍 등식에서는 「`getName` 은 어디서든 괜찮다」가 성립하지
+     * 않으므로, 「**등재된** 이름 조회는 신고되지 않는다」로 과잉을 재야 한다.
+     */
+    private fun reflectionRules(memberPairs: Set<Pair<String, String>> = defaultMemberPairs()) =
         rules.moduleMustNotUseReflection(
-            roots = listOf("$fixtureRoot.workflow", "$fixtureRoot.app"),
+            roots = listOf("$fixtureRoot.workflow", "$fixtureRoot.app", "$fixtureRoot.adapters"),
             reflectionPackages = policy.reflectionPackages.toSet(),
-            allowedReferencers = policy.reflectionAllowedReferencers.toSet(),
+            allowedTypePairs = policy.reflectionTypePairs.toSet(),
             classType = policy.reflectionClassType,
-            allowedClassMembers = policy.reflectionClassAllowedMembers.toSet(),
+            allowedMemberPairs = memberPairs,
         )
+
+    private fun defaultMemberPairs() =
+        policy.reflectionClassMemberPairs.toSet() + ("$fixtureRoot.app.$CLEAN_NAME_LOOKUP_PAIR" to "getName")
 
     @Test
     fun `원문 타입을 이름 붙이지 않고 리플렉션으로 값을 꺼내도 잡는다 — getMethod 와 invoke`() {
@@ -90,9 +101,54 @@ class CollectionArchitectureGateCatchesViolationsTest {
         reflectionRules().mustReport("RogueReflectionPeek", "kotlin.reflect.KClass")
     }
 
+    /** A-2 — 뿌리가 `workflow`·`app` 뿐이던 판에서 게이트 밖이던 자리. 한 걸음 옮긴 반사를 이제 잡는다. */
     @Test
-    fun `Class 의 이름 조회는 잡지 않는다 — 규칙이 반사가 아닌 사용까지 막는 과잉이 아니다`() {
-        reflectionRules().mustNotReport("CleanNameLookup")
+    fun `adapters 층의 반사도 잡는다 — 뿌리를 한 걸음 옮긴 변이`() {
+        reflectionRules().mustReport("RogueAdapterReflectionPeek", "java.lang.Class.getMethod")
+        reflectionRules().mustReport("RogueAdapterReflectionPeek", "java.lang.Class.forName")
+        reflectionRules().mustReport("RogueAdapterReflectionPeek", "java.lang.reflect.Method")
+    }
+
+    /** A-2 쌍 축 — 뿌리를 앞 판으로 좁히면 같은 fixture 가 신고되지 않는다(뿌리 확장의 음성 대조). */
+    @Test
+    fun `뿌리를 좁히면 adapters 층의 반사가 신고되지 않는다 — 뿌리 확장의 음성 대조`() {
+        val narrowed =
+            rules.moduleMustNotUseReflection(
+                roots = listOf("$fixtureRoot.workflow", "$fixtureRoot.app"),
+                reflectionPackages = policy.reflectionPackages.toSet(),
+                allowedTypePairs = policy.reflectionTypePairs.toSet(),
+                classType = policy.reflectionClassType,
+                allowedMemberPairs = defaultMemberPairs(),
+            )
+
+        narrowed.mustNotReport("RogueAdapterReflectionPeek")
+        narrowed.mustReport("RogueReflectionPeek", "java.lang.Class.getMethod")
+    }
+
+    /**
+     * A-2 쌍 축 — 등재된 클래스가 **새 반사 멤버**를 더 부르는 길. 멤버 이름만 전역으로 허용하거나 클래스만
+     * 등재하면 초록인 자리다. `getName` 쌍으로만 등재하고 더 부른 멤버만 신고됨을 잰다.
+     */
+    @Test
+    fun `등재된 클래스가 새 반사 멤버를 더 부르면 그 멤버만 잡는다 — 멤버 쌍 등식 축`() {
+        val holder = "$fixtureRoot.adapters.RogueAdapterNameLookupGainingReflection"
+        val registered = setOf(holder to "getName")
+
+        val details = reflectionRules(registered).details()
+
+        details.filter { it.contains("$holder -> java.lang.Class.getDeclaredMethod") }.shouldNotBeEmpty()
+        details.filter { it.contains("$holder -> java.lang.Class.getName") }.shouldBeEmpty()
+    }
+
+    @Test
+    fun `등재된 이름 조회는 잡지 않는다 — 규칙이 반사가 아닌 사용까지 막는 과잉이 아니다`() {
+        reflectionRules().mustNotReport(CLEAN_NAME_LOOKUP_PAIR)
+    }
+
+    @Test
+    fun `등재되지 않은 이름 조회는 잡는다 — 멤버 이름을 전역으로 허용하지 않는다`() {
+        reflectionRules(policy.reflectionClassMemberPairs.toSet())
+            .mustReport(CLEAN_NAME_LOOKUP_PAIR, "java.lang.Class.getName")
     }
 
     @Test
@@ -220,30 +276,68 @@ class CollectionArchitectureGateCatchesViolationsTest {
         types: Set<String>,
         allowed: Set<String>,
         label: String,
-    ) = rules.appTypesMustBeReferencedOnlyBy("$fixtureRoot.app", types, allowed, "음성 대조 — $label")
+    ) = rules.appTypesMustBeReferencedOnlyBy(
+        "$fixtureRoot.app",
+        types,
+        allowed,
+        "음성 대조 — $label",
+        policy.depth(DepthAxis.USECASE),
+    )
+
+    private fun List<ArchRule>.details(): List<String> =
+        flatMap { rule ->
+            rule
+                .allowEmptyShould(true)
+                .evaluate(violating)
+                .failureReport.details
+        }
 
     private fun List<ArchRule>.mustNotReport(mentioned: String) {
-        val details =
-            flatMap { rule ->
-                rule
-                    .allowEmptyShould(true)
-                    .evaluate(violating)
-                    .failureReport.details
-            }
-        details.filter { it.contains(mentioned) }.shouldBeEmpty()
+        details().filter { it.contains(mentioned) }.shouldBeEmpty()
     }
 
+    /**
+     * vr L-5 · cr ④ — 대상은 **이름 경계까지** 맞춰 본다. 맨 `contains` 로 재면 `java.net.URL` 단언이
+     * `java.net.URLConnection` 으로 잡혀도 통과해, 「다른 이유로 잡혔다」를 거르려는 취지가 헐거웠다.
+     * 이 파일의 상세 줄은 규칙마다 꼬리가 다르므로(서술자·따옴표) 전체 일치가 아니라 경계 일치다.
+     * **클래스 이름 쪽도 같은 경계로 본다**(PR #58 K — 앞 판은 그쪽만 맨 `contains` 였다).
+     */
     private fun List<ArchRule>.mustReport(
         mentioned: String,
         target: String,
     ) {
-        val details =
-            flatMap { rule ->
-                rule
-                    .allowEmptyShould(true)
-                    .evaluate(violating)
-                    .failureReport.details
-            }
-        details.filter { it.contains(mentioned) && it.contains(target) }.shouldNotBeEmpty()
+        details()
+            .filter { it.mentionsAtNameBoundary(mentioned) && it.mentionsAtNameBoundary(target) }
+            .shouldNotBeEmpty()
+    }
+
+    /**
+     * [target] 이 **더 긴 이름의 토막**으로 걸리지 않는지 — 앞뒤 글자가 식별자 문자면 다른 이름이다
+     * (cr r2 L-6 — 앞 판은 뒤쪽만 봤다).
+     *
+     * `$` 와 `.` 은 **경계로 센다**: 같은 멤버의 합성 다리(`append$default`)와, 상세 줄이 전체 이름으로
+     * 적는 멤버를 단순 이름 + 멤버로 단언하는 자리(`RawObservationStore.append` ⊂
+     * `bidvector.procurement.RawObservationStore.append`)가 그 형태다.
+     *
+     * **남는 한 칸**: 그래서 `net.URL` 처럼 **점 뒤에서 시작하는 꼬리 조각**은 여전히 `java.net.URL` 로
+     * 통과한다. 두 경우가 글자 종류로는 구별되지 않는다(둘 다 「점 뒤의 완전한 조각」이다). 닫으려면 규칙마다
+     * 상세 형식을 알고 전체 일치로 비교해야 하고, 이 파일의 상세 꼬리는 규칙마다 다르다 — checklist 알려진
+     * 제한. 전송 쪽 음성 단언은 이미 전체 일치다.
+     */
+    private fun String.mentionsAtNameBoundary(target: String): Boolean {
+        var from = indexOf(target)
+        while (from >= 0) {
+            if (!getOrNull(from - 1).continuesName() && !getOrNull(from + target.length).continuesName()) return true
+            from = indexOf(target, from + 1)
+        }
+        return false
+    }
+
+    /** 이름이 이어지는 글자인가 — `null`(줄 머리·줄 끝)과 `.`·`$` 는 경계다. */
+    private fun Char?.continuesName(): Boolean = this != null && (isLetterOrDigit() || this == '_')
+
+    private companion object {
+        /** 과잉 대조 fixture — `Class` 의 이름 조회만 한다. 쌍 등식에서는 **등재해야** 조용하다. */
+        const val CLEAN_NAME_LOOKUP_PAIR = "CleanNameLookup"
     }
 }

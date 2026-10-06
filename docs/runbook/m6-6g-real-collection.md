@@ -9,7 +9,7 @@
 |---|---|---|
 | 6G 머지 + 6G-2d 머지 | ✓ PR #50 · #51 | 6G D-6G-77 |
 | A-3 재호출 상한 | ✓ N=3 확정(단위 = 마지막 정착 뒤 일시 실패 결말 수, 끊긴 라운드 `INTERRUPTED` 하나, 관문 거부 미계수 · 창 = 디렉터리 생애) | 운영자 2026-10-01 |
-| `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(5,000 초과 참가 축은 확정 제외, 계수 공시) | 운영자 2026-10-01 |
+| `OPEN-6G2D-MAX-PAGES-FINAL` | ✓ 유지(**50 × rows-per-page** 초과 참가 축은 확정 제외, 계수 공시 — 기본 999 에서 49,950. 쪽 수 상한 50 은 무변경이고 뜻만 행 수로 넓어졌다) | 운영자 2026-10-01 · 6G-2f D-6G2f-4 |
 | `OPEN-6G-REVIEW-FOLLOWUPS` ★ 셋 | ✓ 6G-2e 가 셋을 닫는다(2026-10-02) — 찢어진 조각만 남은 꼬리 라운드는 의도 줄로 되살아나 재호출 상한에 하나로 셈(D-6G2e-3) · `incompleteAValues` 는 A 축 행 자체가 가름(D-6G2e-4) · 자리 대조가 복구보다 앞서고 기동 첫 걸음 전부가 잠금 가드 안(D-6G2e-5). **이 slice 가 머지된 뒤** 참이다 | 6G-2d D-6G2d-53 · 6G-2e |
 | 운영계정 서비스 키 | ✓ **개발에서 쓰는 키와 같다**(사용자 2026-10-02) — legacy `../bid-vector/.env` 의 **원문형** 변수 `KONEPS_OPENAPI_SERVICE_KEY`(인코딩형 `KONEPS_OPENAPI_ENCODED_SERVICE_KEY` 는 쓰지 않는다, 6F-8 실측: 이중 인코딩 → `resultCode 30`). 값은 어디에도 적지 않는다 | 사용자 2026-10-02 · 6F-8 checklist 6항 |
 | 개찰 갈래의 수집 범위 상한이 A-1 의 최대 16주 창을 받는가 | ✓ 6G-2e 가 갈래별 정책으로 나눴다(2026-10-02) — 개찰 갈래 **120일**(`OPENING_COLLECTION_RANGE_POLICY`, A-1 승인), 공고 목록 갈래는 31일 그대로(6F-8 D-6F8-3). 창을 쪼개 돌리는 길은 여전히 없다(확정 표본이 from/to 를 고정한다 — D-6G2e-2). **이 slice 가 머지된 뒤** 참이다 | PR #52 `/code-review` 2026-10-01 · 6G-2e D-6G2e-1 |
@@ -23,12 +23,12 @@
 3. **저장소 밖 디렉터리**(자동 생성되지 않는다, 둘 다 **WSL 내부 ext4** — DrvFs/9p 는 디렉터리 fsync 가 실패해 경고가 난다):
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
    - 스냅숏: `~/.local/bid-vector-snapshots/`
-4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다).
+4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다). 아래 명령 블록의 `<jar SHA>` 는 **손으로 돌릴 때의 리터럴 예시**다 — 세션 cron 으로 거는 실행기는 그 값을 같은 명령으로 **계산해** 넘기므로, jar 를 바꾸면 인자를 고치지 않아도 원장의 값이 바뀐다.
 5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
 ## 2. 실행 — 세 갈래, 순서 고정
 
-모든 실행은 `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(HTTP 표면 없음) + `mode=once`. 종료 코드: `0` COMPLETE · `2` INCOMPLETE(상한·쿼터·일시 실패로 멈춤, 다음 실행이 이어 돈다) · `3` ALREADY_RUNNING(같은 디렉터리를 다른 프로세스가 쥠). 기동 실패 출력에 `RUN_STATE_FORMAT_MISSING|MISMATCHED|LEGACY_LINE` 이 보이면 **실행 상태 디렉터리가 옛 형식**이다 — 고치지 말고 보고(실수집 전에는 그런 디렉터리가 없어야 한다).
+모든 실행은 `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(HTTP 표면 없음) + `mode=once`. 종료 코드: `0` COMPLETE · `2` INCOMPLETE(상한·쿼터·일시 실패로 멈춤, 다음 실행이 이어 돈다) · `3` ALREADY_RUNNING(같은 디렉터리를 다른 프로세스가 쥠 — 기다리면 풀린다, 호출 0) · `4` UNLOCKABLE(6G-2c — 자물쇠를 **걸 수 없다**: 잠금을 지원하지 않는 파일 시스템이거나 자물쇠 파일을 열 수 없다. 기다려도 풀리지 않는다 — 실행 상태 디렉터리 경로·권한을 고친 뒤 재기동, 호출 0). 기동 실패 출력에 `RUN_STATE_FORMAT_MISSING|MISMATCHED|LEGACY_LINE` 이 보이면 **실행 상태 디렉터리가 옛 형식**이다 — 고치지 말고 보고(실수집 전에는 그런 디렉터리가 없어야 한다).
 
 공통 인자(값은 A-1 승인 그대로; 비밀 아님):
 ```
@@ -67,9 +67,12 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.opening-collection.release-sha=<jar SHA> \
     <공통 인자> )
 ```
+- **페이지 크기는 기본 999** 다(`bidvector.koneps.opening.rows-per-page`, D-6G2f-1) — 인자를 주지 않으면 그 값이고, 다섯 축(개찰 목록·개찰완료·예비가격 상세·기초금액·산식 A)이 그 값 하나를 쓴다. 999 수용은 **operation 별로** 실측해야 한다(두 축은 다른 서비스다) — 일곱의 결과 표와 미실측 하나는 §7 0항에 있고, 그 표가 채워지기 전에는 배포하지 않는다. 1..999 밖의 값은 기동 거부이고, 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이).
+- `release-sha` 는 위 블록에서 리터럴로 보이지만 **실행기는 계산값을 넘긴다**(§1 4단계) — 원장의 그 칸이 안 바뀌면 새 jar 가 실행되지 않은 것이다.
 - **이 갈래의 from/to 는 120일까지**다(D-6G2e-1, A-1 승인 2026-10-02 — 개찰 갈래 전용 정책이고 공고 목록 갈래의 31일과 다른 값이다). 넘으면 기동 거부(`SPAN_TOO_LONG`)이고, 그 상한은 설정 실수를 실 호출 전에 잡는 자리다. **창을 쪼개 돌리지 않는다** — 확정 표본이 from/to·업무를 고정하므로 조각난 창은 「표본틀 범위가 지금 설정과 다르다」로 거부된다(D-6G2e-2). A-1 기간을 **한 창으로** 준다.
 - 첫 실행이 표본을 **뽑고 확정**한다(`sample-list.tsv` · `sample-scope.json`, 장부 해시). 이후 실행은 같은 seed 라도 다시 뽑지 않는다 — 확정된 목록이 정본.
-- 하루 상한(20,000)에 닿으면 exit 2 로 멈춘다. **KST 자정**이 지나면 다시 돌린다(일 상한은 KST 날짜 단위). 총 80,000 → 최소 4일.
+- **표본틀 걷기는 매 기동 다시 돈다**(`OPEN-6G2D-FRAME-REWALK`). 비용은 행 수가 아니라 **슬롯 수**가 정한다 — 슬롯 = 공고일 × 업무이고 슬롯마다 최소 1 호출이다. A-1 창(공고일 113일) × 업무 둘이면 **하한 226**이고, 페이지 999 에서는 슬롯당 1 쪽으로 끝나므로 기대는 **약 240**이다(쪽 100 에서는 행이 100 을 넘는 슬롯마다 쪽이 늘어 더 크다). 행 수를 쪽 크기로 나눈 수(65,064 ÷ 999)는 이 축의 비용이 아니다.
+- 하루 상한(20,000)에 닿으면 exit 2 로 멈춘다. **KST 자정**이 지나면 다시 돌린다(일 상한은 KST 날짜 단위). **캠페인 길이를 묶는 것은 승인 상한이 아니라 포털 한도다** — 키 × operation × 일 1,000 이고 개찰완료가 먼저 닫히므로, 페이지 999 에서 하루 약 950 공고이고 표본 24,000 이면 **약 25일**이다(승인 총 상한 80,000 은 그보다 앞서 소진되지 않는다 — 그 값은 호출 수 상한이고 묶는 축이 아니다).
 - 쿼터 응답(`resultCode 22` · HTTP 429)은 실행 전체를 멈춘다(exit 2). 다음 날 재실행.
 - **1일차 권고**: 첫 실행은 `calls-per-day=200` 정도로 짧게 돌려 로그·원장·DB 를 눈으로 확인한 뒤(키 흔적 0 · `raw_observation` 증가 · `attempts.jsonl` 의 PENDING/HTTP/AXIS 줄 형태), 같은 디렉터리로 상한을 20,000 으로 올려 이어 돈다(상한은 실행 인자이고 원장이 소비를 세므로 올려도 회계는 이어진다).
 
@@ -84,7 +87,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     <공통 인자> )
 ```
 - `from/to` 는 **관측 창**(`observed_at`, 공고일 창이 아니다 — 둘을 같게 두면 manifest 가 거짓을 말한다)이고 `to` 가 정책 기준일도 정한다 — 실제 수집이 돈 날짜 범위를 넣는다. `output-dir` 은 **스냅숏마다 다른 디렉터리**(러너가 `rows.jsonl` 등을 그 디렉터리에 바로 쓰므로 같은 디렉터리를 재사용하면 앞 스냅숏을 덮어쓴다; `snapshot-id` 는 manifest 안에만 들어간다).
-- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5` · `row_count` · `sample_size` · `sampled_without_detail` · `sampled_without_notice` · `incomplete_axis` · 기간·해시 칸; 네 항 항등식 `표본 = 행 + sampled_without_detail + sampled_without_notice + incomplete_axis`) · `sample-list.tsv`. `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values` 는 manifest 가 아니라 **러너 로그 마지막 줄 `snapshot-extract finished …`** 에만 있다(A-2) — 그 줄의 계수 아홉(`rows sampleSize sampledWithoutDetail skippedWithoutNotice incompleteAxis unusableRawRows fractionalAmounts incompleteAValues outsideSample`)을 그대로 적는다.
+- 산출: `rows.jsonl` · `manifest.json`(`schema_version=snapshot-v5` · `row_count` · `sample_size` · `sampled_without_detail` · `sampled_without_notice` · `incomplete_axis` · 기간·해시 칸; 네 항 항등식 `표본 = 행 + sampled_without_detail + sampled_without_notice + incomplete_axis`) · `sample-list.tsv`. `unusable_raw_rows` · `fractional_amounts` · `incomplete_a_values` 는 manifest 가 아니라 **러너 로그 마지막 줄 `snapshot-extract finished …`** 에만 있다(A-2) — 그 줄의 계수 열둘을 **나오는 순서 그대로** 적는다 — `rows sampleSize sampledWithoutDetail skippedWithoutNotice incompleteAxis unusableRawRows blankNoticeNumber malformedRound unknownEndpoint fractionalAmounts incompleteAValues outsideSample`(6G-2c 가 더한 원인 셋은 `unusableRawRows` **바로 뒤**에 서고 합이 그 값과 같다; 뒤따르는 `bytes` 는 계수가 아니다). 토큰 이름·순서의 정본은 러너 코드 `SnapshotExtractionRunner` 의 마지막 줄이다.
 - 수집 **도중**에도 돌릴 수 있지만(원장을 먼저 읽어 진행 중 걷기는 미완으로 떨어진다) 잠금을 쥔 프로세스가 있으면 `ALREADY_RUNNING` 으로 거부된다 — 수집 실행 사이에 돌린다.
 
 ### 2-4. 백테스트 — Python, 저장소 밖 입력·출력
@@ -130,10 +133,51 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 ## 5. 알려진 제한 (판정문에도 실린다)
 
 - 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시).
-- `MAX_PAGES` 확정: 참가 5,000 초과 축은 `incomplete_axis`.
+- `MAX_PAGES` 확정: 참가 **50 × rows-per-page** 초과 축은 `incomplete_axis`(기본 999 에서 49,950). 쪽 수 상한은 폭주 방지 문턱이지 데이터 정확성 문턱이 아니다 — 페이지 크기를 올리면 같은 50 쪽이 더 많은 행을 덮는다(D-6G2f-4).
+- 쿼터는 **키 × operation × 일 1,000 건**이다(day1·day2 실측: 개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`). 업무 공통 **단일 operation 은 둘**이다 — 개찰완료와 입찰가격산식 A. 업무별로 갈리는 축(목록·예비가격 상세·기초금액)은 공사·용역이 각자 1,000 을 쓰지만 이 둘은 한 통이라 **각각 1,000/일에 닿을 수 있다**. 개찰완료가 먼저 닫히고(페이지 100 에서 하루 약 470 공고, **페이지 999 뒤 하루 약 950 공고** — 공고당 1 호출로 정착하므로), 산식 A 는 공고당 1 행이라 쪽 크기로 줄지 않는다: 다만 **공사 공고만** 부르므로 하루 소비가 정착 공고 수보다 낮다. 한도 자체는 운영계정 승인(100,000/일)으로만 움직인다.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
 
 ## 6. 검증 기록
 
-2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · 러너 마지막 줄의 계수 아홉 — 코드와 일치(단 토큰은 `snapshot-extract finished` 이고 초판이 `snapshot finished` 로 적은 것은 PR #52 리뷰가 잡았다). 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다. PR #52 `/code-review`(2026-10-01)가 추가로 잡은 것: 범위 상한 31일(차단) · `file://` URI · 스냅숏별 출력 디렉터리 · 운영자 토큰 상시 필수 · manifest 키 이름 · 관측 창 뜻 · 판정 출력 위치 — 전부 반영.
+2026-10-01 runner 대조(읽기 전용, main `30c6659e`): 2-1~2-3 의 `mode=once` 조건(`@ConditionalOnProperty` 셋) · 속성 이름 kebab 바인딩(`callsPerDay`→`calls-per-day` 등) · `SPRING_MAIN_WEB_APPLICATION_TYPE=none`(6F-8 checklist) · `BIDVECTOR_KONEPS_SERVICEKEY`→`bidvector.koneps.serviceKey` · 러너 마지막 줄의 계수 아홉 — **당시** 코드(main `30c6659e`)와 일치, 6G-2c 뒤로는 열둘이고 §2 산출 줄이 정본(단 토큰은 `snapshot-extract finished` 이고 초판이 `snapshot finished` 로 적은 것은 PR #52 리뷰가 잡았다). 2-4 는 CLI 부재를 그 대조가 잡아 스크립트로 바꿨다. PR #52 `/code-review`(2026-10-01)가 추가로 잡은 것: 범위 상한 31일(차단) · `file://` URI · 스냅숏별 출력 디렉터리 · 운영자 토큰 상시 필수 · manifest 키 이름 · 관측 창 뜻 · 판정 출력 위치 — 전부 반영.
+
+## 7. 배포 — 개찰 축 페이지 크기 999 교체 (6G-2f, 머지 뒤 자정 사전 확인을 거쳐 1회)
+
+수집 캠페인 중, **실행이 없는 창**에서 jar 를 바꾸는 절차다. 페이지 크기 인자를 새로 주지 않으므로
+(기본 999) 교체는 새 jar 를 놓는 것이고, `release-sha` 는 실행기가 계산해 넘기므로 새 값이 간다.
+
+**되돌림이 싸다는 것은 「아직 거부를 만나지 않은 실행」에만 참이다.** 게이트웨이가 `numOfRows=999` 를
+거부하면 그 응답은 미지 코드가 아니라 **분류된 코드**로 온다 — `10`·`11` 은 `INPUT_ERROR`, `12`·`20`·
+`30`~`32` 는 `NOT_RETRYABLE` 이고(`KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES`), 그 둘은 원장에
+`FinalFailure` 로 적힌다(`CollectionAttemptLedger` 의 결말 분류). `FinalFailure` 는 **영구 정착**이라
+재시도도 다음 기동의 재걷기도 없고, `--…rows-per-page=100` 으로 되돌려도 **이미 정착한 축은 복구되지
+않는다**. 그래서 0항의 사전 확인과 2항의 노출 상한이 절차의 본체다.
+
+0. **operation 별 `numOfRows=999` 수용을 실 호출로 확인한다 — 배포 전제다.** 배선은 그 값을 다섯 축
+   전부에 싣고 두 축은 다른 서비스(`ad/BidPublicInfoService`)다. operation 하나의 실측을 나머지로
+   일반화하지 않는다(원장 밖 `curl` 각 1건, 키는 환경에만 두고 공고 식별자는 적지 않는다).
+
+   | operation | `totalCount` → `items` | 응답 크기 | 경과 total / TTFB | 실측일 |
+   |---|---|---|---|---|
+   | 개찰결과 목록 공사 | 1,522 → 999 | — | 미기록 | 2026-10-02 |
+   | 개찰결과 목록 용역 | 962 → 962 | 701 KB | 2.80 s / 2.46 s | 2026-10-03 |
+   | 예비가격 상세 공사 | 10,892 → 999 | 742 KB | 1.83 s / 1.65 s | 2026-10-03 |
+   | 예비가격 상세 용역 | 6,135 → 999 | — | 미기록 | 2026-10-03 |
+   | 기초금액 공사 | 901 → 901 | — | 미기록 | 2026-10-03 |
+   | 기초금액 용역 | 544 → 544 | — | 미기록 | 2026-10-03 |
+   | 입찰가격산식 A | 785 → 785 | — | 미기록 | 2026-10-03 |
+   | **개찰완료** | **미실측**(10-03 쿼터 0) | — | **기록 칸** | **10-04 KST 자정 뒤 1건** |
+
+   일곱은 전부 `resultCode 00` 이다. **go/no-go 문턱: total < 5 s**(요청 시한 10 s). 999 행이 사람이
+   기다릴 만한 시간에 오는지가 이 칸의 뜻이고, 문턱을 넘으면 쪽 크기를 올리지 않는다 — 시한을 넘긴
+   호출은 `Timeout` 으로 분류돼 재시도를 먹는다. 개찰완료 사전 확인 때 그 행의 크기·경과도 적는다.
+   같은 창을 `numOfRows=100` 과 `999` 로 각각 받아 **앞 100 항목의 바이트가 같고 키 집합이 같다**
+   (키 19 · 빈 값 0) — 쪽 크기가 항목의 모양을 바꾸지 않는다. 「최대 메시지 4000 bytes」
+   (`OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP`) 제약은 **실제로 걸리지 않았다**(999 행 742 KB 정상 수신).
+
+1. 수집 실행이 돌지 않는 창(`pgrep -af 'java -jar .*app.jar'` 빈 출력)에서, 호스트 3단 점검을 **별도 호출**로 본 뒤 `main` 체크아웃에서 `./gradlew --no-daemon :app:bootJar`.
+2. **첫 기동은 노출을 묶는다** — `--bidvector.opening-collection.calls-per-day=200` 으로 띄우고, 멈춘 뒤 원장의 AXIS 결말에 `INPUT_ERROR` 와 `NOT_RETRYABLE` 이 **0** 임을 확인한다(`grep -c` 로 계수만). 하나라도 있으면 즉시 멈추고 `--bidvector.koneps.opening.rows-per-page=100` 으로만 이어 돈다 — 그 축들은 이미 영구 정착이라 보고 대상이다.
+3. 0 을 확인한 뒤 같은 디렉터리로 전량(`calls-per-day=20000`) 재기동한다. 페이지 크기 인자는 주지 않는다(기본 999). **`release-sha` 는 인자 무변경이 아니다**: 실행기가 `git rev-parse --short HEAD` 로 계산해 넘기므로 새 jar 와 함께 새 값이 원장에 간다(그 값이 안 바뀌면 교체가 반영되지 않은 것이다). 재실행을 거는 자리는 OS crontab 이 아니라 **세션 cron(00:41, 7일 만료)** 이므로 만료 뒤에는 손으로 다시 걸어야 한다.
+4. 첫 전량 실행 뒤 evidence 표에 셋을 적는다 — **개찰완료 HTTP 줄 수 ≈ 정착 공고 수**(「공고당 1 호출」의 실측) · **산식 A 의 HTTP 줄 수**(그 축도 업무 공통 단일 operation 이라 각각 1,000/일에 닿을 수 있다) · **표본틀 걷기 호출 수 ≈ 240**(슬롯 = 공고일 × 업무, 슬롯당 1 쪽 — §2-2).
+5. 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이). 확정된 표본은 쪽 크기와 무관하므로 이 되돌림이 `sample-list.tsv` 를 건드리지 않는다. 다만 위 문단대로 **이미 `FinalFailure` 로 정착한 축은 이 인자로 복구되지 않는다**. **그 인자를 쓴 날과 값을 evidence 에 적는다** — 원장·판정문이 쪽 크기를 싣지 않아 한 디렉터리에 두 확정 제외 문턱이 섞일 수 있다(`OPEN-6G2F-MAX-PAGES-PROVENANCE`).

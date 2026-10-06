@@ -1,6 +1,6 @@
 package bidvector.app.collection
 
-import bidvector.adapters.snapshot.RunStateLock
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.workflow.collection.CollectOpeningResultsUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.OpeningCollectionReport
@@ -17,7 +17,7 @@ class OpeningCollectionRunner(
     private val useCase: CollectOpeningResultsUseCase,
     private val range: CollectionRange,
     private val sources: List<OpeningCollectionSource>,
-    private val lock: RunStateLock,
+    private val runState: RunStateDirectory,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
@@ -26,7 +26,7 @@ class OpeningCollectionRunner(
      * 서로의 호출을 못 봐 승인 상한이 사실상 두 배가 된다 — 호출이 나간 뒤에 아는 사고다.
      */
     override fun run(args: ApplicationArguments) =
-        underRunStateLock(lock, "opening-collection", log, termination) { collectUnderLock() }
+        underRunStateLock(runState, "opening-collection", log, termination) { collectUnderLock() }
 
     private fun collectUnderLock() {
         log.write(openingStartLine(range, sources))

@@ -22,7 +22,7 @@ import org.junit.jupiter.api.TestInstance
 class AppHttpDependencyGateTest {
     private val policy = ArchitecturePolicy.load()
     private val rules = AppHttpDependencyRules(policy)
-    private val collectionRules = CollectionArchitectureRules()
+    private val collectionRules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val production: JavaClasses =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
@@ -190,6 +190,7 @@ class AppHttpDependencyGateTest {
             production,
             listOf("${policy.packageRoot}.app"),
             policy.operatorCredentialTypes.toSet(),
+            policy.depth(DepthAxis.OPERATOR_CREDENTIAL),
         ) shouldBe policy.operatorCredentialReferencers.toSet()
     }
 
@@ -240,7 +241,8 @@ class AppHttpDependencyGateTest {
             .flatMap { item ->
                 rules
                     .injectionTypes(item)
-                    .filterNot { it.name.substringBefore('$') == item.name.substringBefore('$') }
+                    .filterNot { it.outermostClassName() == item.outermostClassName() }
+                    // 주입 **타입**은 접지 않는다(cr r1 G-4) — 보유자 쪽만 접는다.
                     .map { it.name }
             }.toSet()
 
@@ -252,7 +254,7 @@ class AppHttpDependencyGateTest {
                 rules
                     .injectionTypes(item)
                     .filter { rules.isCapabilityCarrier(it) }
-                    .map { "${item.name.substringBefore('$')}|${it.name}" }
+                    .map { "${item.outermostClassName()}|${it.name}" }
             }.toSet()
 
     /**

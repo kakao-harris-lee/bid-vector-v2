@@ -1,0 +1,347 @@
+package bidvector.buildlogic
+
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * D-6G2g-9 (B-5 다) · D-6G2g-13 ① — 등재 등식의 **순수 코어**. task 배선과 분리해 인라인 입력으로
+ * 잰다(`TestShapesTest` 관례).
+ *
+ * 등식은 **`모집단 ∖ 제외 == 등재`** 이고 양방향이다. 모집단은 소스 파일 이름이 아니라 컴파일된
+ * 클래스이고(파일명 술어는 한 파일에 test 클래스가 둘이면 둘째를 놓친다 — 저장소 실례 아홉),
+ * 제외는 손으로 적은 이름이 아니라 **build 사실**(Gradle `Test.filter` 의 제외 패턴 · 클래스에 붙은
+ * 실행 조건 애노테이션)에서만 나온다(운영자 결정 B-3 (나)).
+ *
+ * 제외 자신도 등식의 한 변이다 — build 사실이 제외를 **늘리면** 선언과 어긋나 붉어진다. 선언은
+ * 제외의 **출처가 아니라 래칫**이다: 선언에만 있는 이름은 아무것도 제외하지 못한다(한 방향으로만 안전).
+ */
+class GateRegistrationCensusTest {
+    // ---- 모집단 — 컴파일된 클래스, 접은 이름 ----
+
+    @Test
+    fun `test 메서드를 가진 최상위 클래스만 모집단이다`() {
+        val census =
+            census(
+                facts("p.FooTest", methods = setOf(TEST)),
+                facts("p.Helper", methods = emptySet()),
+                facts("p.BarKt", methods = emptySet()),
+            )
+
+        assertEquals(setOf("p.FooTest"), census.population)
+    }
+
+    @Test
+    fun `한 파일의 test 클래스 둘은 둘 다 모집단이다 — 파일명 술어의 구멍`() {
+        val census =
+            census(
+                facts("p.SampleListFileTest", methods = setOf(TEST)),
+                facts("p.FileSampleListLedgerTest", methods = setOf(TEST)),
+            )
+
+        assertEquals(setOf("p.SampleListFileTest", "p.FileSampleListLedgerTest"), census.population)
+    }
+
+    @Test
+    fun `중첩 클래스의 test 는 바깥 클래스로 접힌다`() {
+        val census = census(facts("p.OuterTest\$Inner", methods = setOf(TEST)))
+
+        assertEquals(setOf("p.OuterTest"), census.population)
+    }
+
+    @Test
+    fun `메타 애노테이션으로 TestTemplate 인 것도 test 메서드다 — ParameterizedTest`() {
+        val census =
+            census(
+                facts("p.ParamTest", methods = setOf("org.junit.jupiter.params.ParameterizedTest")),
+                meta = mapOf("org.junit.jupiter.params.ParameterizedTest" to setOf(TEMPLATE)),
+            )
+
+        assertEquals(setOf("p.ParamTest"), census.population)
+    }
+
+    @Test
+    fun `추상 상위에서 물려받은 test 도 모집단이다 — 구체 하위`() {
+        val census =
+            census(
+                facts("p.BaseTest", methods = setOf(TEST), isAbstract = true),
+                facts("p.ConcreteTest", superTypes = listOf("p.BaseTest")),
+            )
+
+        assertEquals(setOf("p.ConcreteTest"), census.population)
+    }
+
+    /** 추상 클래스는 인스턴스화되지 않는다 — JUnit 도 돌리지 않으므로 등재를 요구하면 안 된다. */
+    @Test
+    fun `test 를 선언한 추상 클래스는 모집단 밖이다`() {
+        val census = census(facts("p.BaseTest", methods = setOf(TEST), isAbstract = true))
+
+        assertEquals(emptySet<String>(), census.population)
+    }
+
+    /** 상위가 조회 자리에서 풀리지 않으면 그 가지는 끝난다 — 모집단 밖이고 등재돼 있으면 잉여로 붉는다. */
+    @Test
+    fun `풀리지 않는 상위는 모집단을 늘리지 않는다`() {
+        val census = census(facts("p.ConcreteTest", superTypes = listOf("other.UnknownBase")))
+
+        assertEquals(emptySet<String>(), census.population)
+    }
+
+    /**
+     * 메타 애노테이션에 순환이 있어도 **다른 경로로** 발견 어휘에 닿으면 발견된다(cr r1 G-5).
+     * 순환을 끊으며 낸 거짓이 캐시되면 그 노드는 영구히 거짓이 되고 방향이 **미탐**이다.
+     */
+    @Test
+    fun `순환에 낀 애노테이션도 다른 경로로 어휘에 닿으면 모집단이다`() {
+        val meta = mapOf("p.Cyclic" to setOf("p.Partner"), "p.Partner" to setOf("p.Cyclic", TEMPLATE))
+
+        val census = census(facts("p.CycleTest", methods = setOf("p.Cyclic")), meta = meta)
+
+        assertEquals(setOf("p.CycleTest"), census.population)
+    }
+
+    /**
+     * **순환 참가자를 먼저 풀고, 그 다음 그 참가자에 의존하는 다른 애노테이션을 묻는다**(cr r2 R-1).
+     *
+     * 이 모양이 캐시의 결함을 가른다: `A` 를 풀 때 `B` 가 「진행 중인 `A`」에서 거짓을 받아 자기 결과를
+     * 거짓으로 굳히면, 뒤이은 `C`(→`B`)가 거짓이 된다. 앞 판의 두 구현(원래 `getOrPut` · 진행 중 노드만
+     * 빼는 판) 모두 이 질문에서 틀린다 — **질문한 노드 자신**만 보는 test 는 둘 다 통과시킨다.
+     */
+    @Test
+    fun `순환 참가자를 먼저 푼 뒤 그것에 의존하는 애노테이션을 물어도 참이다`() {
+        val meta = mapOf("p.A" to setOf("p.B", TEST), "p.B" to setOf("p.A"), "p.C" to setOf("p.B"))
+
+        val census =
+            census(
+                facts("p.FirstTest", methods = setOf("p.A")),
+                facts("p.SecondTest", methods = setOf("p.C")),
+                meta = meta,
+            )
+
+        assertEquals(setOf("p.FirstTest", "p.SecondTest"), census.population)
+    }
+
+    /** 어디에도 닿지 않는 순환은 거짓이고, 두 번 물어도 같은 답이다(캐시가 답을 바꾸지 않는다). */
+    @Test
+    fun `어휘에 닿지 않는 순환은 모집단을 늘리지 않는다 — 두 번 물어도 같다`() {
+        val meta = mapOf("p.Left" to setOf("p.Right"), "p.Right" to setOf("p.Left"))
+        val probe = facts("p.CycleTest", methods = setOf("p.Left"))
+
+        assertEquals(emptySet<String>(), census(probe, meta = meta).population)
+        assertEquals(emptySet<String>(), census(probe, meta = meta).population)
+    }
+
+    /**
+     * 인터페이스의 default `@Test` 는 구현 클래스가 센다(vr r2 R2-L-2). 인터페이스 자신은 JUnit 이
+     * 돌리지 않고, Kotlin 이 본문을 싣는 `…$DefaultImpls` 는 그 test 메서드가 **전부 static** 이라
+     * 모집단 근거가 되지 못한다 — 판독기가 인스턴스 메서드만 모으므로 그 클래스의 사실은 비어 있다.
+     */
+    @Test
+    fun `인터페이스의 default test 는 구현 클래스만 모집단이다`() {
+        val census =
+            census(
+                facts("p.ContractTests", methods = setOf(TEST), isAbstract = true, isInterface = true),
+                facts("p.ContractTests\u0024DefaultImpls"),
+                facts("p.ImplTest", superTypes = listOf("p.ContractTests")),
+            )
+
+        assertEquals(setOf("p.ImplTest"), census.population)
+    }
+
+    /**
+     * **제외는 접기 전 이진 클래스 단위다**(vr r3 R3-M-1). 접은 바깥 이름에 걸면 인터페이스 안에 둔
+     * 중첩 구체 test 클래스가 **조용히** 모집단에서 빠진다 — JUnit 은 그 클래스를 돌린다.
+     */
+    @Test
+    fun `인터페이스 안의 중첩 구체 test 는 모집단이다`() {
+        val census =
+            census(
+                facts("p.Holder", isAbstract = true, isInterface = true),
+                facts("p.Holder\u0024NestedTest", methods = setOf(TEST)),
+            )
+
+        assertEquals(setOf("p.Holder"), census.population)
+    }
+
+    /** 추상 클래스 안의 중첩 구체 test 도 같다 — 추상 자신은 빠지고 중첩은 센다. */
+    @Test
+    fun `추상 클래스 안의 중첩 구체 test 는 모집단이고 추상 자신은 아니다`() {
+        val census =
+            census(
+                facts("p.AbstractHolder", methods = setOf(TEST), isAbstract = true),
+                facts("p.AbstractHolder\u0024NestedTest", methods = setOf(TEST)),
+            )
+
+        assertEquals(setOf("p.AbstractHolder"), census.population)
+    }
+
+    // ---- 제외 — build 사실에서만 ----
+
+    @Test
+    fun `Gradle 제외 패턴에 걸린 클래스는 제외다`() {
+        val census =
+            census(
+                facts("p.CrossLangSmokeTest", methods = setOf(TEST)),
+                facts("p.KeepTest", methods = setOf(TEST)),
+                excludePatterns = setOf("*CrossLangSmokeTest"),
+            )
+
+        assertEquals(setOf("p.CrossLangSmokeTest"), census.excluded)
+    }
+
+    @Test
+    fun `실행 조건 애노테이션이 붙은 클래스는 제외다`() {
+        val census =
+            census(
+                facts("p.RealServerIntegrationTest", methods = setOf(TEST), classes = setOf(ENABLED_IF)),
+                excludePatterns = emptySet(),
+            )
+
+        assertEquals(setOf("p.RealServerIntegrationTest"), census.excluded)
+    }
+
+    /**
+     * `@Disabled` 는 **제외가 아니다.** 제외로 치면 게이트 test 에 그 한 줄을 붙이는 것이 등재에서
+     * 빼는 길이 되고, 그러면 `gateExecutionGate` 의 「건너뛰었다」 판정도 함께 사라진다. 등재에 남겨야
+     * 그 판정이 붉는다.
+     */
+    @Test
+    fun `Disabled 는 제외가 아니다 — 게이트를 끄는 길이 되지 않게`() {
+        val census =
+            census(facts("p.FooTest", methods = setOf(TEST), classes = setOf("org.junit.jupiter.api.Disabled")))
+
+        assertEquals(emptySet<String>(), census.excluded)
+        assertEquals(setOf("p.FooTest"), census.population)
+    }
+
+    // ---- 모집단을 잃은 자리 ----
+
+    /**
+     * test 소스가 있는데 모집단이 비면 **산출 경로를 잃은 것**이다. 등재까지 비어 있으면 양쪽이
+     * 공집합이라 등식이 조용히 성립한다 — 지운 등식 test 의 「모집단이 비어 있지 않다」를 손 임계가
+     * 아니라 build 사실로 되살린 자리다(PR #60 R).
+     */
+    @Test
+    fun `test 소스가 있는데 모집단이 비면 붉는다`() {
+        val violations = violationsOf(census(), registered = emptySet(), hasTestSources = true)
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("산출 경로"), "$violations")
+    }
+
+    /** test 소스가 없는 모듈은 모집단이 비어도 통과한다 — `settlement` 류. */
+    @Test
+    fun `test 소스가 없으면 빈 모집단도 통과한다`() {
+        assertEquals(emptyList<String>(), violationsOf(census(), registered = emptySet()))
+    }
+
+    // ---- 등식 — 양방향 ----
+
+    @Test
+    fun `모집단에서 제외를 뺀 것이 등재와 같으면 위반이 없다`() {
+        val census =
+            census(
+                facts("p.FooTest", methods = setOf(TEST)),
+                facts("p.SmokeTest", methods = setOf(TEST)),
+                excludePatterns = setOf("*SmokeTest"),
+            )
+
+        val violations =
+            violationsOf(
+                census,
+                registered = setOf("p.FooTest"),
+                declaredExcluded = setOf("p.SmokeTest"),
+            )
+
+        assertEquals(emptyList<String>(), violations)
+    }
+
+    @Test
+    fun `등재에서 한 줄을 빼면 누락으로 붉는다`() {
+        val census = census(facts("p.FooTest", methods = setOf(TEST)))
+
+        val violations = violationsOf(census, registered = emptySet(), declaredExcluded = emptySet())
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.FooTest"), "$violations")
+    }
+
+    @Test
+    fun `소스에 없는 이름이 등재에 있으면 잉여로 붉는다`() {
+        val census = census(facts("p.FooTest", methods = setOf(TEST)))
+
+        val violations =
+            violationsOf(
+                census,
+                registered = setOf("p.FooTest", "p.GhostTest"),
+                declaredExcluded = emptySet(),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.GhostTest"), "$violations")
+    }
+
+    /** 제외가 선언보다 늘면 붉는다 — 게이트 test 에 조건 애노테이션을 붙여 등재에서 빼는 길을 막는다. */
+    @Test
+    fun `선언되지 않은 제외가 생기면 붉는다`() {
+        val census = census(facts("p.FooTest", methods = setOf(TEST), classes = setOf(ENABLED_IF)))
+
+        val violations = violationsOf(census, registered = emptySet(), declaredExcluded = emptySet())
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.FooTest"), "$violations")
+    }
+
+    /** 선언에만 있는 이름은 아무것도 제외하지 못한다 — 선언은 출처가 아니라 래칫이다. */
+    @Test
+    fun `선언에만 있고 build 사실이 없는 제외는 붉는다`() {
+        val census = census(facts("p.FooTest", methods = setOf(TEST)))
+
+        val violations =
+            violationsOf(
+                census,
+                registered = setOf("p.FooTest"),
+                declaredExcluded = setOf("p.GhostTest"),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.GhostTest"), "$violations")
+    }
+
+    private companion object {
+        const val TEST = "org.junit.jupiter.api.Test"
+        const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
+        const val ENABLED_IF = "org.junit.jupiter.api.condition.EnabledIfSystemProperty"
+
+        fun violationsOf(
+            census: GateRegistrationCensus,
+            registered: Set<String>,
+            declaredExcluded: Set<String> = emptySet(),
+            hasTestSources: Boolean = false,
+        ) = GateRegistration.violations(census, registered, declaredExcluded, hasTestSources)
+
+        fun facts(
+            binaryName: String,
+            methods: Set<String> = emptySet(),
+            classes: Set<String> = emptySet(),
+            superTypes: List<String> = emptyList(),
+            isAbstract: Boolean = false,
+            isInterface: Boolean = false,
+        ) = TestClassFacts(binaryName, methods, classes, superTypes, isAbstract, isInterface)
+
+        fun census(
+            vararg classes: TestClassFacts,
+            excludePatterns: Set<String> = emptySet(),
+            meta: Map<String, Set<String>> = emptyMap(),
+        ) = GateRegistration.census(
+            classes.toList(),
+            TestDiscoveryVocabulary(
+                annotations = setOf(TEST, "org.junit.jupiter.api.TestFactory", TEMPLATE),
+                conditionPackages = setOf("org.junit.jupiter.api.condition"),
+            ),
+            excludePatterns,
+            metaAnnotations = { meta[it].orEmpty() },
+            superFacts = { name -> classes.firstOrNull { it.binaryName == name } },
+        )
+    }
+}

@@ -6,6 +6,8 @@ import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.adapters.snapshot.SnapshotCounts
 import bidvector.adapters.snapshot.SnapshotExtraction
 import bidvector.adapters.snapshot.SnapshotWriter
+import bidvector.adapters.snapshot.UnusableRawRowCause
+import bidvector.adapters.snapshot.UnusableRawRows
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -57,7 +59,7 @@ class SnapshotExtractionRunner(
      * 덜 읽은 스냅숏보다 없는 스냅숏이 낫다.
      */
     override fun run(args: ApplicationArguments) =
-        underRunStateLock(runState.lock, "snapshot-extract", log, termination) { extractOrFail() }
+        underRunStateLock(runState, "snapshot-extract", log, termination) { extractOrFail() }
 
     private fun extractOrFail() {
         try {
@@ -119,10 +121,27 @@ internal fun snapshotFinishedLine(
         "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
         "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
         "incompleteAxis=${extraction.incompleteAxis} " +
-        "unusableRawRows=${extraction.unusableRawRows} " +
+        "unusableRawRows=${extraction.unusableRawRows.total} " +
+        unusableCauseFields(extraction.unusableRawRows) + " " +
         "fractionalAmounts=${extraction.fractionalAmounts} " +
         "incompleteAValues=${extraction.incompleteAValues} " +
         "outsideSample=${extraction.observedOutsideSample} bytes=$bytes"
+
+/**
+ * 키가 서지 않은 행의 **원인별 계수**(D-6G2c-20) — 합계 칸(`unusableRawRows`) 바로 뒤에 선다.
+ * 칸 이름을 열거에서 돌려 짓는다: 새 원인이 생기면 [logFieldOf] 의 소진 `when` 이 컴파일로 그 자리를
+ * 가리키고, 줄에는 자동으로 칸이 하나 더 선다 — 계수와 칸을 맞바꾸는 편집이 설 자리가 없다.
+ */
+private fun unusableCauseFields(rows: UnusableRawRows): String =
+    UnusableRawRowCause.entries.joinToString(" ") { "${logFieldOf(it)}=${rows[it]}" }
+
+/** 원인의 로그 칸 이름 — 소진 `when` 이라 새 원인을 더하면 컴파일이 여기를 가리킨다. */
+private fun logFieldOf(cause: UnusableRawRowCause): String =
+    when (cause) {
+        UnusableRawRowCause.BLANK_NOTICE_NUMBER -> "blankNoticeNumber"
+        UnusableRawRowCause.MALFORMED_ROUND -> "malformedRound"
+        UnusableRawRowCause.UNKNOWN_ENDPOINT -> "unknownEndpoint"
+    }
 
 /** 계수 넷은 모두 **측정값**이다 — 항등식 자체는 구성상 참이라 [SnapshotCounts] 에서 표기로 선다. */
 private fun countsOf(

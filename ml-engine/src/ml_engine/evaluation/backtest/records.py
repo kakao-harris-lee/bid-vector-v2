@@ -20,7 +20,11 @@ from ml_engine.evaluation.backtest.observations import (
     LoadedSnapshot,
 )
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
-from ml_engine.evaluation.backtest.reasons import ExclusionReason, UndecidableAxis
+from ml_engine.evaluation.backtest.reasons import (
+    DivisionCoverage,
+    ExclusionReason,
+    UndecidableAxis,
+)
 from ml_engine.evaluation.backtest.strategies import StrategyLike
 from ml_engine.evaluation.backtest.verdict import StrategyVerdict
 from ml_engine.evaluation.backtest.windows import WindowExclusion
@@ -83,6 +87,40 @@ class BacktestRequest:
 
 
 @dataclass(frozen=True)
+class DivisionCoverageRecord:
+    """확정 범위의 업무 **하나**가 표본에서 어떻게 대표됐는가(M6/6G-2c D-6G2c-17).
+
+    행 수와 표지를 **같은 자리**에 둔다 — 앞 판은 행 수만 날랐고 표지를 직렬화 시점에
+    `count` 의 참/거짓으로 지었다. 그러면 「행 하나 == 대표됨」이라는 판단이 직렬화 코드에
+    숨고, 그 판단이 쓰는 문턱(정책의 창당 표본 하한)은 판정 경로에 나타나지 않는다."""
+
+    division: str
+    row_count: int
+    status: DivisionCoverage
+
+    def __post_init__(self) -> None:
+        """표지와 행 수가 **서로를 설명하는가**(M6/6G-2c 수정 r1, verifier F-7).
+
+        `ABSENT` 는 「행이 하나도 오지 않았다」는 뜻이다. 그 둘이 어긋난 값(`row_count=0` 인데
+        `COVERED`)을 만들 수 있으면 판정문이 스스로 모순된 것을 실을 수 있다 — 지금 생성자는
+        판정 경로 하나뿐이지만 타입이 그것을 보증하지는 않았다.
+
+        문턱 쪽(`UNDERPOWERED` ↔ `COVERED`)은 **여기서 볼 수 없다**: 그 경계는 정책의 창당
+        표본 하한이고 이 값은 그것을 모른다. 그 축은 `run._division_coverage` 와 그 자리를
+        재는 test 가 진다 — 여기서 닫는 것은 정책을 몰라도 참이어야 하는 한 가지다.
+
+        음수 행 수는 이 등식이 잡지 못한다(`not -1` 이 거짓이라 `COVERED` 와 짝이 맞는 것처럼
+        보인다). 유일한 생성자가 `Counter` 로 세므로 도달하지 않고, 수를 적으면 숫자 리터럴
+        게이트의 허용 목록을 늘려야 해서 닫지 않았다 — 알려진 제한."""
+        absent = self.status is DivisionCoverage.ABSENT
+        if absent != (not self.row_count):
+            raise ValueError(
+                "업무 대표 표지와 행 수가 어긋납니다 — "
+                f"{self.division}: row_count={self.row_count}, status={self.status}"
+            )
+
+
+@dataclass(frozen=True)
 class SnapshotRecord:
     """판정 JSON 이 싣는 입력 좌표 — 같은 값이면 같은 판정이 나와야 한다."""
 
@@ -100,9 +138,10 @@ class SnapshotRecord:
     """**확정 범위**의 업무 구분들(D-6G-66). 최소 표본 문턱이 이 **수**로 정해지므로
     판정문이 그 근거를 싣는다 — 값이 보이지 않으면 문턱이 왜 그 값인지 알 수 없다."""
 
-    division_row_counts: tuple[tuple[str, int], ...]
-    """확정 범위의 업무마다 온 행 수. 0 인 업무는 판정문에서 UNDERPOWERED 로 공시된다
-    — 표본에서 사라지는 대신 이름이 남아야 문턱이 내려가지 않은 이유가 읽힌다."""
+    division_coverage: tuple[DivisionCoverageRecord, ...]
+    """확정 범위의 업무마다 온 행 수와 **대표 표지**(D-6G2c-17). 행 0 인 업무는 `ABSENT`,
+    행은 있는데 창당 표본 하한에 못 미치면 `UNDERPOWERED` 로 공시된다 — 표본에서 사라지는
+    대신 이름이 남아야 문턱이 내려가지 않은 이유가 읽힌다."""
 
     period_start: date
     period_end: date

@@ -38,13 +38,14 @@ from ml_engine.evaluation.backtest.observations import (
     LoadedSnapshot,
 )
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
-from ml_engine.evaluation.backtest.reasons import ExclusionReason
+from ml_engine.evaluation.backtest.reasons import DivisionCoverage, ExclusionReason
 from ml_engine.evaluation.backtest.records import (
     ESTIMATED_LOCAL_AGENCY_PREFIXES,
     KNOWN_LIMITATIONS,
     BacktestRequest,
     BacktestStopped,
     BacktestVerdict,
+    DivisionCoverageRecord,
     SampleVariant,
     SamplingRecord,
     SnapshotRecord,
@@ -72,7 +73,41 @@ from ml_engine.evaluation.backtest.windows import (
 )
 
 
-def _snapshot_record(snapshot: LoadedSnapshot) -> SnapshotRecord:
+def _division_coverage(row_count: int, required_rows: int) -> DivisionCoverage:
+    """업무 하나의 대표 표지(D-6G2c-17) — **행 0 과 「적다」를 가른다**.
+
+    앞 판은 `COVERED if count else UNDERPOWERED` 였고, 행 **하나**뿐인 업무가 `COVERED` 로
+    읽혔다(6G verifier r5 L-8). 문턱은 정책의 **창당 표본 하한**에서 오고 새 정책 키를
+    만들지 않는다 — 수를 여기 적으면 창 규칙이 바뀔 때 조용히 어긋난다(`SamplingBudget.
+    minimum_required_sample` 가 같은 이유로 파생값이다).
+
+    **창 판정을 바꾸지 않는다.** 이 표지는 공시이고, 창 단위 `NotEvaluableReason.
+    UNDERPOWERED`(D-6G-31)는 창의 불일치 쌍으로 따로 정해진다 — 이름만 같은 다른 축이다."""
+    if not row_count:
+        return DivisionCoverage.ABSENT
+    if row_count < required_rows:
+        return DivisionCoverage.UNDERPOWERED
+    return DivisionCoverage.COVERED
+
+
+def _division_coverage_records(
+    snapshot: LoadedSnapshot, policy: StrategyBacktestPolicy
+) -> tuple[DivisionCoverageRecord, ...]:
+    required_rows = policy.verdict.min_window_rows
+    return tuple(
+        DivisionCoverageRecord(
+            division=division,
+            row_count=count,
+            status=_division_coverage(count, required_rows),
+        )
+        for division, count in snapshot.division_row_counts
+    )
+
+
+def _snapshot_record(request: BacktestRequest) -> SnapshotRecord:
+    """`request` 를 받는 이유: 업무 대표 표지의 문턱이 **정책**에서 온다(D-6G2c-17).
+    스냅숏만 받으면 그 문턱을 직렬화 시점에 다시 지어야 하고, 그 자리는 정책을 모른다."""
+    snapshot = request.snapshot
     return SnapshotRecord(
         snapshot_id=snapshot.snapshot_id,
         rows_sha256=snapshot.rows_sha256,
@@ -83,7 +118,7 @@ def _snapshot_record(snapshot: LoadedSnapshot) -> SnapshotRecord:
         incomplete_axis=snapshot.incomplete_axis,
         sample_divisions=snapshot.sample_divisions,
         sample_scope_divisions=snapshot.sample_scope_divisions,
-        division_row_counts=snapshot.division_row_counts,
+        division_coverage=_division_coverage_records(snapshot, request.policy),
         period_start=snapshot.period_start,
         period_end=snapshot.period_end,
     )
@@ -239,7 +274,7 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
     `len(BusinessCategory)` 로 세면 이 레인의 코드 상수가 문턱을 정하고, 표본 목록에
     나타난 업무로 세면 한 업무가 통째로 빠질 때 문턱이 **함께 내려간다** — 결측이
     자기 검사를 낮추는 자리라 범위 쪽을 출처로 둔다(빠진 업무는 판정문이
-    UNDERPOWERED 로 공시한다)."""
+    ABSENT 로 공시한다 — D-6G2c-17 로 표지가 셋이 됐다)."""
     budget = request.policy.sampling
     rows = request.snapshot.rows
     size = len(rows)
@@ -338,7 +373,7 @@ def _stopped(
         reason=reason,
         detail=detail,
         variant=request.variant,
-        snapshot=_snapshot_record(request.snapshot),
+        snapshot=_snapshot_record(request),
         sampling=_sampling_record(request),
         fit=fit,
         exclusions=admitted_excluded,
@@ -430,7 +465,7 @@ def _assemble_verdict(
         policy_version=request.policy.version,
         policy_checksum=request.policy_checksum,
         variant=variant,
-        snapshot=_snapshot_record(request.snapshot),
+        snapshot=_snapshot_record(request),
         sampling=_sampling_record(request),
         fit=fit,
         exclusions=counts,

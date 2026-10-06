@@ -67,10 +67,11 @@ raw 행의 존재가 아니다. 다음 실행이 그 축을 다시 부르면 이
 `UNKNOWN_BUSINESS_DIVISION`, 정렬·중복이 어긋나면 `INVALID_VALUE`, 표본 목록의 업무가 이 칸 밖이면
 `SAMPLE_SCOPE_MISMATCH` 로 **스냅숏 전체를 거부**한다.
 
-**판정문의 업무 대표 어휘**(닫힌 셋): `COVERED` · `UNDERPOWERED`. 확정 범위의 업무 하나에 행이
-하나도 오지 않으면 `UNDERPOWERED` 다 — 문턱은 내려가지 않고, 그 업무가 판정 JSON 의
-`snapshot.division_coverage` 에 행 수 0 과 함께 남는다. 행이 있는데 적어서 검정력이 모자란 것은
-이 축이 아니라 **창 단위** UNDERPOWERED 가 잰다(D-6G-31) — 두 축은 다른 것을 센다.
+**판정문의 업무 대표 어휘**(닫힌 셋, 6G-2c D-6G2c-17 로 셋): `COVERED` · `UNDERPOWERED` · `ABSENT`. 확정 범위의
+업무 하나에 행이 하나도 오지 않으면 `ABSENT`, 행은 있으나 창당 표본 하한(백테스트 정책 `verdict.min_window_rows`, 새 키 없음)
+미만이면 `UNDERPOWERED`, 하한 이상이면 `COVERED` 다 — 문턱은 내려가지 않고, 그 업무가 판정 JSON 의
+`snapshot.division_coverage` 에 행 수와 함께 남는다. 업무 표지 `UNDERPOWERED` 는 **창 단위** UNDERPOWERED(D-6G-31)와
+이름이 같을 뿐 다른 축이다 — 업무 표지는 창 판정을 바꾸지 않는다(6G-2c 이전에는 둘이었고 행 0 이 `UNDERPOWERED` 였다).
 
 **닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice +
 incomplete_axis`.

@@ -138,7 +138,7 @@ class AppHttpDependencyRules(
     ): Set<String> =
         classes
             .filter { isTarget(it, appRoot, layers) }
-            .map { it.topLevel().fullName }
+            .map { it.outermostClassName() }
             .toSet()
 
     /** ② 층이 오늘 실제로 참조하는 `workflow` 타입 전수 — 목록 등식의 다른 한쪽. */
@@ -151,9 +151,8 @@ class AppHttpDependencyRules(
             .filter { layerOf(it, appRoot, layers) == AppLayer.REQUEST_SCOPED }
             .flatMap { item ->
                 item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType.topLevel() }
-                    .filter { it.packageName.isUnder(listOf(policy.appWorkflowRoot)) }
-                    .map(JavaClass::getName)
+                    .map { it.targetClass.baseComponentType.outermostClassName() }
+                    .filter { it.substringBeforeLast('.').isUnder(listOf(policy.appWorkflowRoot)) }
             }.toSet()
 
     /** 주입 표면 규칙의 대상 — 제한 층과 ② 층이다(D-6A2b-49). */
@@ -177,7 +176,7 @@ class AppHttpDependencyRules(
     ): Set<String> =
         classes
             .filter { it.packageName == appRoot || it.packageName.startsWith("$appRoot.") }
-            .map { it.topLevel().fullName }
+            .map { it.outermostClassName() }
             .toSet()
 
     /**
@@ -326,8 +325,8 @@ class AppHttpDependencyRules(
         appRoot: String,
         layers: LayerAssignment,
     ): AppLayer {
-        val top = item.topLevel().fullName
-        val topPackage = item.topLevel().packageName
+        val top = item.outermostClassName()
+        val topPackage = top.substringBeforeLast('.')
         return when {
             !(topPackage == appRoot || topPackage.startsWith("$appRoot.")) -> AppLayer.OUTSIDE
             top in layers.bootstrap -> AppLayer.BOOTSTRAP
@@ -350,7 +349,4 @@ class AppHttpDependencyRules(
         appRoot: String,
         layers: LayerAssignment,
     ): Boolean = layerOf(item, appRoot, layers) == AppLayer.RESTRICTED
-
-    /** 중첩·동반 객체는 자신을 담은 최상위 클래스로 판정한다 — 컨트롤러 안쪽에 숨기는 형태를 함께 든다. */
-    private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)
 }

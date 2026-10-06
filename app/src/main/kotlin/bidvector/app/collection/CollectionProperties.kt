@@ -23,7 +23,14 @@ data class CollectionProperties(
      */
     val callsPerDay: Int,
     val callsTotal: Int,
-    /** 실행 상태 디렉터리 — 개찰 갈래와 **같은 자리**여야 두 갈래의 호출이 한 원장에서 합쳐진다. */
+    /**
+     * 실행 상태 디렉터리 — 개찰 갈래와 **같은 자리**여야 두 갈래의 호출이 한 원장에서 합쳐진다.
+     *
+     * **두 갈래는 따로 기동한다**(D-6G2c-6) — 같은 자리를 **차례로** 쓴다는 뜻이고, 한 프로세스에
+     * 둘을 함께 켠다는 뜻이 아니다. 함께 켜면 두 배선이 각자 실행 상태 빈을 등록해 주입이 모호해져
+     * 컨텍스트가 뜨지 않는다(`CollectionWiringTest` 가 그 거동을 잡는다). 겹쳐 도는 두 프로세스는
+     * 잠금이 막는다.
+     */
     val runStateDir: String,
     val releaseSha: String = UNVERSIONED_RELEASE,
 )

@@ -6,6 +6,7 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
+import java.io.File
 import java.time.LocalDate
 
 private val SEED = SamplingSeed("6g-2026-09-27")
@@ -160,28 +161,56 @@ class SampleSelectionTest {
     }
 
     /**
-     * **D-6G-74 (cr r5 L-4) — 용도 구분자를 스키마 문서에 묶는다.** `SAMPLE_DRAW_DOMAIN` 을 바꾸거나
-     * 재료에서 빼는 변이는 두 레인 어느 test 도 붉히지 않았다 — Python 쪽 단언은 문서의 값만 읽고,
-     * Kotlin 쪽에는 그 값이 **실제로 쓰인다**는 단언이 없었다. 그 값이 바뀌면 같은 seed 에서 다른
-     * 표본이 뽑힌다(사전 등록 값이다).
+     * **D-6G-74 (cr r5 L-4) · D-6G2c-19 (b) (cr r5-t L-3) — 용도 구분자를 스키마 문서에 묶는다.**
+     * `SAMPLE_DRAW_DOMAIN` 을 바꾸거나 재료에서 빼는 변이는 두 레인 어느 test 도 붉히지 않았다 —
+     * Python 쪽 단언은 문서의 값만 읽고, Kotlin 쪽에는 그 값이 **실제로 쓰인다**는 단언이 없었다.
+     * 그 값이 바뀌면 같은 seed 에서 다른 표본이 뽑힌다(사전 등록 값이다).
      *
-     * 정본은 스키마 §2.2 의 재료식 `sha256("sample-draw" | seed | 공고 키 해시)` 이고, 여기서 그
-     * 재료를 손으로 지어 sampler 의 순서와 맞댄다.
+     * 재료를 **문서에서 읽는다**(앞 판은 이 test 안의 리터럴과 코드를 맞댔다 — 그러면 등식의 양끝이
+     * 모두 코드라서 문서가 혼자 움직여도 아무것도 붉어지지 않는다). 스키마 §2.2 의 「표본 추첨 순서」
+     * 행에서 용도 토큰과 구분자를 뽑아 그것으로 순서를 짓는다: **문서만 바꿔도 RED** 다.
      */
     @Test
-    fun `표본 추첨 순서는 스키마 §2·2 의 재료식 그대로다`() {
+    fun `표본 추첨 순서는 스키마 §2·2 가 적은 재료식 그대로다`() {
         val seed = SamplingSeed("6g-purpose-seed")
         val pool = candidates(4)
         val keys = pool.map { it.key }
+        val (purpose, separator) = schemaDrawRecipe()
 
         // 목표를 **둘**로 둔다 — 전수를 뽑으면 순서가 무엇이든 같은 집합이라 재료식이 드러나지 않는다.
         val drawn = StratifiedSampler(seed, SampleSize(2)).select(pool).selected
 
-        // 문서 §2.2 의 재료식으로 지은 순서의 앞 둘 — 구분자를 빼거나 바꾸면 **다른 둘**이 뽑힌다.
         // 뽑힌 뒤의 나열 순서는 계약이 아니므로 집합으로 맞댄다.
         val expected =
-            keys.sortedBy { sha256Hex("sample-draw|${seed.value}|${it.value}") }.take(2)
+            keys
+                .sortedBy { sha256Hex("$purpose$separator${seed.value}$separator${it.value}") }
+                .take(2)
         drawn.toSet() shouldBe expected.toSet()
+    }
+
+    /**
+     * 스키마 §2.2 의 「표본 추첨 순서」 행에서 **용도 토큰과 구분자**를 읽는다. 표 안에서는 구분자가
+     * 셀 구분과 겹쳐 `\|` 로 적히므로 역슬래시를 걷어 낸다. 읽히지 않으면 멈춘다 — 조용히 기본값을
+     * 쓰면 등식이 꺼진 채 초록이 된다.
+     */
+    private fun schemaDrawRecipe(): Pair<String, String> {
+        val document = File(SNAPSHOT_SCHEMA_PATH)
+        check(document.isFile) { "스키마 문서를 찾지 못했다: ${document.absolutePath}" }
+        val section =
+            document
+                .readText(Charsets.UTF_8)
+                .substringAfter(HASH_PURPOSE_SECTION)
+                .substringBefore("\n## ")
+        val row =
+            section.lineSequence().firstOrNull { DRAW_ROW_LABEL in it && "sha256(" in it }
+                ?: error("스키마 §2.2 에서 「$DRAW_ROW_LABEL」 재료식 행을 찾지 못했다")
+        val literals =
+            Regex("\"([^\"]*)\"")
+                .findAll(row)
+                .map { it.groupValues[1] }
+                .toList()
+        check(literals.size >= 2) { "재료식에서 리터럴 둘을 읽지 못했다: $row" }
+        return literals[0] to literals[1].replace("\\", "")
     }
 
     @Test
@@ -203,3 +232,19 @@ class SampleSelectionTest {
         NoticeKeyHash.of("SYN-6G-00001", "000").value.length shouldBe 64
     }
 }
+
+/**
+ * 스냅숏 스키마 계약 문서 — test 의 작업 디렉터리는 모듈 자리라 한 단계 올라간다
+ * (정책·계약 파일을 상대 경로로 읽는 test 의 관례와 같다).
+ *
+ * **이 test 는 읽기만 한다.** 6G-2c 가 이 파일에 한 편집은 §2 어휘 문장 하나뿐이고(D-6G2c-31), 칸·
+ * 어휘를 바꾸는 **형식 편집은 6G-2c-형식 몫**이다 — 진행 중인 실행 상태 디렉터리가 있는 동안 그
+ * 변경은 머지할 수 없다.
+ */
+private const val SNAPSHOT_SCHEMA_PATH = "../reports/evidence/m6/6g/snapshot-schema.md"
+
+/** 용도 구분자 표가 선 절의 제목 — 절 번호가 아니라 제목 문면으로 가리킨다(번호는 밀린다). */
+private const val HASH_PURPOSE_SECTION = "해시의 용도 구분자"
+
+/** 두 레인의 재료식 중 Kotlin 몫 — 같은 표의 다른 행(S0 밴드)과 섞이지 않게 행 이름으로 좁힌다. */
+private const val DRAW_ROW_LABEL = "표본 추첨 순서"

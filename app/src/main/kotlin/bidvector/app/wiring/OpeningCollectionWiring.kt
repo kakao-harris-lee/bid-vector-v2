@@ -152,6 +152,10 @@ open class OpeningCollectionWiring {
                 serviceKey = transport.serviceKey,
                 httpPolicy = transport.httpPolicy,
                 collectionPolicyProvider = ::collectionPolicyAt,
+                // **설정이 쪽 크기를 준다**(D-6G2f-1) — 이 인자가 없으면 어댑터 기본값 100 이고,
+                // 개찰완료가 공고당 1~35 호출로 키 × operation × 일 1,000 한도를 하루 470 공고에서
+                // 닫는다. 다섯 축이 이 값 하나를 쓴다(목록 걷기와 단건 조회 둘 다).
+                numOfRowsPerPage = opening.rowsPerPage,
             )
         val sources =
             properties.categories.map { category ->
@@ -204,7 +208,7 @@ open class OpeningCollectionWiring {
             useCase,
             range,
             sources.all,
-            runState.lock,
+            runState,
             CollectionLog { logger.info(it) },
             termination,
         )

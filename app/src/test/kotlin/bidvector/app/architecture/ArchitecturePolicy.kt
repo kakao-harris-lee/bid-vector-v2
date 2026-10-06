@@ -10,7 +10,28 @@ import java.util.Properties
 class ArchitecturePolicy private constructor(
     private val values: Map<String, String>,
     private val memberEffects: Map<String, String>,
+    private val declaredKeys: List<String>,
 ) {
+    /**
+     * PR #58 I — 원문 파서가 센 키 집합과 `Properties` 가 읽은 키 집합. **둘이 같아야 한다** — 갈리면 중복
+     * 검사가 보는 세계와 게이트가 읽는 세계가 달라져 한쪽에만 있는 키는 어느 단언도 지키지 않는다.
+     */
+    val declaredKeySet: Set<String> get() = declaredKeys.toSet()
+
+    val loadedKeySet: Set<String> get() = values.keys
+
+    /**
+     * cr L-9 — 같은 키가 파일에 두 번 적히면 `Properties` 가 조용히 **마지막만** 남긴다. 그러면 등재 목록
+     * 하나가 사라져도 키 집합 등식은 그대로라 보이지 않는다. 원문 줄에서 센다.
+     */
+    val duplicateKeys: Set<String>
+        get() =
+            declaredKeys
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
+
     val packageRoot: String get() = value("package.root")
 
     // 아래 넷은 **패키지 세그먼트**다. 정책 파일은 Gradle project 이름으로 적고
@@ -165,15 +186,54 @@ class ArchitecturePolicy private constructor(
     val serviceKeyType: String get() = value("app.secret.service-key-type")
     val serviceKeyReaders: List<String> get() = list("app.secret.service-key-readers")
 
-    /** M6/6G D-6G-47 — HTTP 클라이언트 타입과 그것을 쥐어도 되는 클래스 집합(관문과 그 조립). */
-    val httpClientType: String get() = value("collection.http-client.type")
-    val httpClientRoots: List<String> get() = list("collection.http-client.roots")
-    val httpClientHolders: List<String> get() = list("collection.http-client.holders")
+    /**
+     * M6/6G-2b D-6G2b-1·2·3·4 — 관문 밖으로 바이트를 내는 길의 **전송 표면**: 판정 뿌리 · 금지 패키지
+     * 뿌리 · 뿌리로 금지할 수 없는 낱개 타입 · 등재 쌍의 닫힌 용도 어휘.
+     */
+    val transportRoots: List<String> get() = list("collection.transport.roots")
+    val transportSurfacePackages: List<String> get() = list("collection.transport.surface-packages")
+    val transportSurfaceTypes: List<String> get() = list("collection.transport.surface-types")
+    val transportPurposes: List<String> get() = list("collection.transport.purposes")
 
-    /** M6/6G D-6G-62 — 관문을 우회하는 전송·반사 타입과 그것을 참조해도 되는 클래스 집합(비어 있다). */
-    val transportBypassRoots: List<String> get() = list("collection.transport-bypass.roots")
-    val transportBypassTypes: List<String> get() = list("collection.transport-bypass.types")
-    val transportBypassHolders: List<String> get() = list("collection.transport-bypass.holders")
+    /**
+     * 정책 파일에 **실제로 있는** 용도 키 집합 — [transportPurposes] 와 같아야 한다(새 용도 키를 조용히
+     * 더하는 길을 막는다). 등재 쌍은 용도별 목록의 합이고, [transportHolderPairList] 는 중복 쌍을 잴 수
+     * 있게 집합으로 접기 전의 목록이다.
+     */
+    val transportHolderPurposeKeys: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(TRANSPORT_HOLDERS_PREFIX) }
+                .map { it.removePrefix(TRANSPORT_HOLDERS_PREFIX) }
+                .toSet()
+
+    val transportHolderPairList: List<Pair<String, String>>
+        get() = transportPurposes.flatMap { pairs("$TRANSPORT_HOLDERS_PREFIX$it") }
+
+    val transportHolderPairs: Set<Pair<String, String>> get() = transportHolderPairList.toSet()
+
+    /** 등재된 보유자 클래스 전수 — 3층(멤버 표면)의 대상이다. */
+    val transportHolders: Set<String> get() = transportHolderPairs.map { it.first }.toSet()
+
+    /** D-6G2g-9 3층 — 보유자 안의 (클래스, 멤버) 쌍. */
+    val transportMemberSurface: Set<Pair<String, String>> get() = pairs("collection.transport.member-surface").toSet()
+
+    /**
+     * D-6G2b-22(vr H-1) — 바깥 참조 기본 거부의 **판정 대상 모듈**. 별도 키로 적지 않고 `layer.*` 에서
+     * 도출한다(domain 계열을 뺀 셋 — application · adapters · app). 그래서 모듈을 빠뜨리는 편집은 여기만
+     * 아니라 **모집단 단언**(`allModules`)과 다른 층 게이트도 함께 붉게 만든다 — 한 자리에서 읽는다.
+     */
+    val externalJudgedModules: List<String> get() = applicationModules + adapterModules + appModules
+
+    fun externalAllowedPackages(module: String): List<String> = list("$EXTERNAL_PACKAGES_PREFIX$module")
+
+    /** 정책 파일에 실제로 있는 모듈 키 집합 — [externalJudgedModules] 와 같아야 한다(조용히 더하는 길을 막는다). */
+    val externalModuleKeys: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(EXTERNAL_PACKAGES_PREFIX) }
+                .map { it.removePrefix(EXTERNAL_PACKAGES_PREFIX) }
+                .toSet()
 
     /** vr r4 L-12·L-13 — 공고 키 해시·hex 형태를 짓는 함수와 그것을 불러도 되는 클래스 집합. */
     val keyHashRoots: List<String> get() = list("collection.key-hash.roots")
@@ -189,11 +249,42 @@ class ArchitecturePolicy private constructor(
     val rawAccessAllowedReferencers: List<String> get() = list("collection.raw-access.allowed-referencers")
     val rawAccessAllowedMemberAccessors: List<String> get() = list("collection.raw-access.allowed-member-accessors")
 
-    /** D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
+    /**
+     * D-6F8-13 (i) · A-2(D-6G2b-6) — 리플렉션 봉쇄: 판정 뿌리(원문 값 획득 뿌리와 **따로** 둔다) · 금지
+     * 패키지 · (클래스, 리플렉션 타입) 쌍 · `Class` 와 (클래스, 멤버) 쌍.
+     */
+    val reflectionRoots: List<String> get() = list("collection.reflection.roots")
+
+    /**
+     * D-6G2g-9 (운영자 결정 B-1 (가)) — 반사 판정 대상은 **production 전 층**이다(domain 포함).
+     * 바깥 참조 판정([externalJudgedModules])과 갈린 축이고, 그 갈림이 B-1 의 내용이다: 바깥 참조는
+     * 모듈마다 허용 패키지 집합을 들어야 해서 domain 을 넣으려면 키 여섯이 더 필요하지만, 반사는
+     * 쌍 등식이라 관측이 0 이면 등재도 0 이다(domain 여섯의 반사 참조는 실측 0).
+     */
+    val reflectionJudgedModules: List<String>
+        get() = domainModules + externalJudgedModules
     val reflectionPackages: List<String> get() = list("collection.reflection.packages")
-    val reflectionAllowedReferencers: List<String> get() = list("collection.reflection.allowed-referencers")
+    val reflectionTypePairs: List<Pair<String, String>> get() = pairs("collection.reflection.type-pairs")
     val reflectionClassType: String get() = value("collection.reflection.class-type")
-    val reflectionClassAllowedMembers: List<String> get() = list("collection.reflection.class-allowed-members")
+    val reflectionClassMemberPairs: List<Pair<String, String>> get() = pairs("collection.reflection.class-member-pairs")
+
+    /**
+     * D-6G2g-11 — 축마다의 참조 수집 깊이. 값 어휘는 닫힌 둘이고, 정책 파일에 없는 축이나 어휘 밖
+     * 값은 **오류**다(조용한 기본값이 없다 — 기본값을 두면 축을 지운 편집이 통과한다).
+     */
+    fun depth(axis: DepthAxis): ReferenceCollection {
+        val raw = value("$DEPTH_PREFIX${axis.key}")
+        return ReferenceCollection.entries.firstOrNull { it.name == raw }
+            ?: error("수집 깊이 어휘 밖 값이다: ${axis.key}=$raw")
+    }
+
+    /** 정책 파일이 선언한 깊이 축 전수 — [DepthAxis] 와 양방향으로 같아야 한다. */
+    val declaredDepthAxes: Set<String>
+        get() =
+            values.keys
+                .filter { it.startsWith(DEPTH_PREFIX) }
+                .map { it.removePrefix(DEPTH_PREFIX) }
+                .toSet()
 
     /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")
@@ -228,10 +319,43 @@ class ArchitecturePolicy private constructor(
         }
 
     companion object {
+        private const val TRANSPORT_HOLDERS_PREFIX = "collection.transport.holders."
+        private const val EXTERNAL_PACKAGES_PREFIX = "collection.external.allowed-packages."
         private const val LOCATION_PROPERTY = "bidvector.architecture.policy"
         private const val MEMBER_EFFECTS_PROPERTY = "bidvector.member.effects"
 
-        fun load(): ArchitecturePolicy = ArchitecturePolicy(read(LOCATION_PROPERTY), read(MEMBER_EFFECTS_PROPERTY))
+        fun load(): ArchitecturePolicy =
+            ArchitecturePolicy(
+                read(LOCATION_PROPERTY),
+                read(MEMBER_EFFECTS_PROPERTY),
+                declaredKeys(LOCATION_PROPERTY),
+            )
+
+        private const val DEPTH_PREFIX = "collection.depth."
+
+        /**
+         * 정책 파일이 **선언한 키 전수**(중복 포함). 줄 끝 `\` 로 이어지는 값 줄은 키 줄이 아니다 —
+         * `Properties` 가 접은 뒤의 Map 으로는 중복을 셀 수 없어 원문을 읽는다.
+         *
+         * **주석은 이어지지 않는다**(cr r2 L-5). `Properties` 는 `#`·`!` 줄의 끝 `\` 를 연속으로 보지
+         * 않는데 앞 판은 그것을 연속으로 읽어 **다음 키 줄을 건너뛰었다**(오늘 그런 주석은 0 건이라 잠복
+         * 이었다). 구분자는 공백도 센다 — `Properties` 는 `key value` 도 받는다.
+         */
+        private fun declaredKeys(locationProperty: String): List<String> {
+            val location = System.getProperty(locationProperty) ?: error("시스템 속성 '$locationProperty' 가 없다")
+            val keys = mutableListOf<String>()
+            var continued = false
+            File(location).readLines(Charsets.UTF_8).forEach { line ->
+                val wasContinued = continued
+                val trimmed = line.trim()
+                val isComment = trimmed.startsWith("#") || trimmed.startsWith("!")
+                continued = !isComment && line.endsWith("\\")
+                if (wasContinued || trimmed.isEmpty() || isComment) return@forEach
+                val separator = trimmed.indexOfFirst { it == '=' || it == ':' || it == ' ' || it == '\t' }
+                if (separator > 0) keys += trimmed.substring(0, separator).trim()
+            }
+            return keys
+        }
 
         // UTF-8 Reader 로 읽는다 — `Properties.load(InputStream)` 은 ISO-8859-1 이라
         // 분류 사유(값에 든 한글)가 깨진다.
