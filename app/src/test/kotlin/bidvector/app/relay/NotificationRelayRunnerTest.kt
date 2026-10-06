@@ -13,12 +13,17 @@ import bidvector.workflow.strategy.OperatorId
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.DefaultApplicationArguments
+import org.testcontainers.postgresql.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
 import java.time.LocalDate
+import javax.sql.DataSource
 
 private const val RUN_LIMIT = 7
+private const val POSTGRES_IMAGE = "postgres:16.4"
 
 /**
  * 러너 **본문**을 직접 돌린다(cr L-2·L-4) — 앞 판은 `run()` 을 어느 test 도 부르지 않아
@@ -26,11 +31,41 @@ private const val RUN_LIMIT = 7
  * 미측정이었고, `RelayExitCode.FAILED` 는 **아무 코드도 만들지 않는 죽은 열거 값**이었다.
  *
  * 선례는 `CollectionRunnerTest` 다 — fake 로그·종료로 `run(DefaultApplicationArguments())`
- * 를 그대로 돌린다. `NotificationRelayRun` 은 `open` 이 아니라 상속으로 대역을 만들 수 없어
- * **실패만 거동으로** 잴 수 있다(연결 불가 `DataSource` 로 예외 경로). 성공 경로의 종료 코드
- * 매핑은 `RelayExitCodeTest` 가, production 조립의 실 DB 거동은 `RelayDatabaseTest` 가 든다.
+ * 를 그대로 돌린다.
+ *
+ * **성공 경로도 여기서 잰다(R2-L-1, cr R-5).** `NotificationRelayRun` 은 `open` 이 아니라
+ * 대역을 만들 수 없어, 앞 판은 예외 경로만 재고 「보고서 → 종료 코드 → `terminate`」 사슬을
+ * `RelayExitCodeTest`(사상만) 와 `RelayDatabaseTest`(use case 만) 로 나눠 두었다 — 러너가 그
+ * 둘을 **잇는다**는 것은 어느 쪽도 재지 않았다. 지금은 실 PostgreSQL 위에서 억제 환경으로
+ * 돌려 `[4]` 와 마침 줄을 함께 잰다.
+ *
+ * 표가 필요 없는 이유: 억제 판정은 임대 획득·guard 확인 **뒤·claim 앞**이라 이 run 은
+ * advisory lock 과 `SELECT 1` 만 돌린다. 그래서 Flyway 를 돌리지 않는다.
  */
 class NotificationRelayRunnerTest {
+    companion object {
+        private val postgres: PostgreSQLContainer =
+            PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
+                .withDatabaseName("bidvector_relay_runner_test")
+                .withUsername("bidvector_admin")
+                .withPassword("bidvector_test_only")
+                .also { it.start() }
+
+        @JvmStatic
+        @AfterAll
+        fun stopContainer() {
+            postgres.stop()
+        }
+
+        /** 임대만 쓰는 연결 — 표가 없어도 `pg_try_advisory_lock` 은 돈다. */
+        fun containerDataSource(): DataSource =
+            PGSimpleDataSource().apply {
+                setUrl(postgres.jdbcUrl)
+                user = postgres.username
+                password = postgres.password
+            }
+    }
+
     private class RecordingLog : CollectionLog {
         val written = mutableListOf<String>()
 
@@ -66,6 +101,26 @@ class NotificationRelayRunnerTest {
     }
 
     /**
+     * 성공 경로(R2-L-1) — 억제 환경의 run 은 `Skipped(EnvironmentSuppressed)` 이고 러너가
+     * 그것을 **`[4]` 로 옮긴다.** 종료 코드 목록이 정확히 한 칸인 것도 단언한다(두 번 종료를
+     * 부르는 구현이 있으면 붉어진다).
+     */
+    @Test
+    fun `억제 환경의 run 은 ENV_SUPPRESSED 4 로 끝나고 마침 줄을 남긴다`() {
+        val log = RecordingLog()
+        val termination = RecordingTermination()
+        val runner = NotificationRelayRunner(suppressedRelayRun(containerDataSource()), RUN_LIMIT, log, termination)
+
+        runner.run(DefaultApplicationArguments())
+
+        termination.codes shouldBe listOf(RelayExitCode.ENV_SUPPRESSED.value)
+        val lines = log.written.joinToString("\n")
+        lines shouldContain "relay start limit=$RUN_LIMIT"
+        lines shouldContain "exit=${RelayExitCode.ENV_SUPPRESSED.value}"
+        log.written.none { it.startsWith("relay failed") } shouldBe true
+    }
+
+    /**
      * 정제된 원인 코드만 나간다 — 원 예외 메시지(접속 문자열·호스트)는 로그에 없다. SQL 예외는
      * 클래스 이름 + SQLSTATE 5자리까지다.
      */
@@ -93,6 +148,19 @@ private const val UNREACHABLE_PORT = 1
 private fun unreachableRelayRun(): NotificationRelayRun =
     NotificationRelayRun(
         dataSource = unreachableDataSource(),
+        target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
+        environment = RuntimeEnvironment.Staging,
+        policy = relayRunnerTestPolicy(),
+    )
+
+/**
+ * 실 DB 위의 production 조립 — 환경이 `Staging` 이라 정책표가 `DryRun` 을 붙이고, relay 는
+ * 임대를 쥔 뒤 **claim 전에** 억제로 끝난다. 발송 축을 바꿔치울 필요가 없다(한 행도 집지
+ * 않으므로 sender 가 불리지 않는다).
+ */
+private fun suppressedRelayRun(dataSource: DataSource): NotificationRelayRun =
+    NotificationRelayRun(
+        dataSource = dataSource,
         target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
         environment = RuntimeEnvironment.Staging,
         policy = relayRunnerTestPolicy(),
