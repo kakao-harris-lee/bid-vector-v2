@@ -22,6 +22,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
+import bidvector.workflow.evaluation.EVALUATION_LADDER_POLICY_VERSION
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
@@ -32,9 +33,11 @@ import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.boot.DefaultApplicationArguments
@@ -52,6 +55,18 @@ private const val TEST_CREDENTIAL_VALUE = "evaluation-commit-e2e-test-fixture-cr
 private const val MAX_ACTIVE_BIDS = 10
 private const val BLOCK_CONSTRAINT = "outbox_commit_run_blocked"
 
+/** 심는 전략 개정 — **1 이 아니다**(R2-H-1: 1 은 test 지원 기본값이라 상수 변이를 숨긴다). */
+private const val SEEDED_REVISION = 7
+
+/** 거동 축에서 올려 보는 개정. */
+private const val RAISED_REVISION = 11
+
+/** 저장된 outbox 행의 두 칸 — 타입 열과 payload 문자열. */
+private data class OutboxRow(
+    val payloadType: String,
+    val payload: String,
+)
+
 /**
  * **R1-H-1 의 답** — production 커밋 조립(`EvaluationCommitRun`)과 그 러너를 **실 DB 위에서
  * 끝까지 돌린다.** 앞 판은 이 경로를 어떤 test 도 돌리지 않아, 알림 port 를
@@ -65,12 +80,11 @@ private const val BLOCK_CONSTRAINT = "outbox_commit_run_blocked"
  * `Failed` 를 값으로 돌려주고 → `tallyOf` 가 그것을 세고 → 러너가 **비-0 종료 코드**를 낸다
  * (설계 검토 (2) 5행, cr L-2) ④ 성공 run 의 종료 코드는 0 이다.
  *
- * **두 번 부팅하는 이유**: 러너는 `ApplicationRunner` 라 기동 중에 돈다 — 그러므로 전략·공고는
- * 그 **앞에** 심어야 하고, 표는 Flyway 가 만든 뒤여야 한다. 그래서 ⓐ mode 없이 한 번 띄워
- * 마이그레이션·seed 를 하고 ⓑ `mode=once` 로 다시 띄워 러너를 돌린다.
- *
- * `exitProcess` 를 부르는 production 종료 자리는 [RECORDING_TERMINATION_PROFILE] 이 기록으로
- * 바꿔치운다 — 그러지 않으면 이 test 가 test JVM 을 죽인다.
+ * **한 번만 부팅한다(cr R-11 로 문면 정정 — 앞 판은 「두 번 부팅」이라고 적었다).** mode 를
+ * 켜지 않고 한 번 띄워 Flyway 마이그레이션과 평가 port 싱글턴 배선만 얻고, 전략·공고를 심은
+ * 뒤 **러너를 직접 조립해** 돌린다. `mode=once` 로 띄우면 러너가 기동 중에 돌면서
+ * `exitProcess` 를 불러 test JVM 을 죽인다 — 그래서 종료 자리를 [RecordedExitCodes] 로
+ * 바꿔치운 조립을 손으로 세운다(배선 자체는 `EvaluationCommitWiringTest` 가 든다).
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EvaluationCommitRunE2ETest {
@@ -123,7 +137,13 @@ class EvaluationCommitRunE2ETest {
 
         private fun dataSource(): DataSource = seedContext.getBean(DataSource::class.java)
 
-        /** `bidNowThreshold` 0.9 — fake ML 의 priority 0.9 가 확정 `BidNow` 를 낸다. */
+        /**
+         * `bidNowThreshold` 0.9 — fake ML 의 priority 0.9 가 확정 `BidNow` 를 낸다.
+         *
+         * **개정을 1 이 아닌 [SEEDED_REVISION] 으로 심는다(R2-H-1).** 1 은 여러 test 지원
+         * 함수의 기본값이라, 1 로 심으면 「개정을 상수 1 로 바꿔치우는」 변이가 우연히 같은
+         * 값을 내며 빠져나간다.
+         */
         private fun insertStrategy() {
             dataSource().connection.use { connection ->
                 connection
@@ -131,7 +151,7 @@ class EvaluationCommitRunE2ETest {
                         "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
                             "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                             "bid_now_threshold, review_threshold, max_active_bids) " +
-                            "VALUES (1, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "VALUES (1, $SEEDED_REVISION, ?, ?, ?, ?, ?, ?, ?, ?)",
                     ).use { statement ->
                         val empty = connection.createArrayOf("text", emptyArray<String>())
                         statement.setArray(1, empty)
@@ -141,7 +161,7 @@ class EvaluationCommitRunE2ETest {
                         statement.setArray(5, connection.createArrayOf("text", arrayOf("없는-문구")))
                         statement.setBigDecimal(6, java.math.BigDecimal("0.9"))
                         statement.setBigDecimal(7, java.math.BigDecimal("0.1"))
-                        statement.setInt(8, 10)
+                        statement.setInt(8, MAX_ACTIVE_BIDS)
                         statement.executeUpdate()
                     }
             }
@@ -180,6 +200,22 @@ class EvaluationCommitRunE2ETest {
     }
 
     /**
+     * **순서 독립을 표 비우기로 만든다**(D-6F10-31 ④, `PersistenceTestSupport` 와 같은 규율).
+     * 이 클래스는 컨테이너·컨텍스트를 클래스당 하나만 쓰므로 test 들이 같은 DB 를 물려받는다 —
+     * 각 test 가 자기 전제를 **스스로** 세우지 않으면 실행 순서가 답을 바꾼다.
+     *
+     * 비우는 것은 `outbox` 와 `inbox` 뿐이고 seed(전략·공고·raw)는 남긴다 — 그 셋은
+     * `@BeforeAll` 이 한 번 심는 입력이다. 전략 **개정**은 거동 축 test 가 바꾸므로 여기서
+     * 되돌린다(그 test 가 중간에 실패해도 다음 test 가 영향을 받지 않는다).
+     */
+    @BeforeEach
+    fun resetRunState() {
+        clearOutbox()
+        setStrategyRevision(SEEDED_REVISION)
+        commitLog.clear()
+    }
+
+    /**
      * ①②④ — 커밋 run 이 outbox 행을 남기고, **변한 표가 `outbox` 하나**이며, 종료 코드가 0 이다.
      *
      * 「변한 표 == {outbox}」가 D-6F7-11 의 「도메인 write 만 커밋되고 outbox 행이 없다」가 오늘
@@ -196,7 +232,43 @@ class EvaluationCommitRunE2ETest {
         changedTables(before, after) shouldBe setOf("outbox")
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
-        notificationPayloads().single() shouldContain "20260101010"
+        // R-13 ⓑ — 러너의 마침 줄을 단언한다(앞 판은 로그를 모으기만 했다).
+        commitLog.single { it.startsWith("evaluation-commit finished") } shouldContain
+            "exit=${EvaluationCommitExitCode.COMPLETE.value}"
+        val row = notificationRows().single()
+        row.payloadType shouldBe "NotificationRequested"
+        row.payload shouldContain "20260101010"
+        // **값 축**(R2-H-1) — 판정이 지난 사다리 정책 식별자가 저장된 행에 축어로 있다.
+        // `EVALUATION_LADDER_POLICY_VERSION` 은 production 상수이므로 투영이 이 값을 다른
+        // 것으로 바꿔치우면 이 단언이 붉어진다.
+        row.payload shouldContain EVALUATION_LADDER_POLICY_VERSION.source
+    }
+
+    /**
+     * **거동 축**(R2-H-1) — 전략 개정 **하나만** 바꾸면 저장되는 payload 가 달라지고, 되돌리면
+     * 같은 payload 가 다시 나온다. 같은 공고로 세 번 돌린다(이 slice 는 이중 요청을 막지
+     * 않는다, D-6F7-6 — 그래서 같은 공고가 매 run 마다 새 행을 남긴다).
+     *
+     * 왜 「달라진다 + 되돌아온다」 둘인가: 「달라진다」만 보면 **아무 입력에나 흔들리는**
+     * 구현도 초록이고, 「되돌아온다」만 보면 **개정을 무시하는** 구현도 초록이다.
+     *
+     * 저장 형식을 이 test 가 알지 않는다 — 문자열 두 개를 **서로** 비교한다. `|` 로 쪼개
+     * 칸을 집으면 wire 형식 사본이 여기 하나 더 생긴다(그 형식의 정본은 `adapters` 의
+     * 어휘 골든이고, 디코더는 그 모듈 `internal` 이라 여기서 부를 수 없다).
+     */
+    @Test
+    fun `전략 개정을 올리면 저장되는 payload 가 달라지고 되돌리면 같아진다`() {
+        val first = runOnceAndTakePayload()
+
+        setStrategyRevision(RAISED_REVISION)
+        val raised = runOnceAndTakePayload()
+
+        setStrategyRevision(SEEDED_REVISION)
+        val restored = runOnceAndTakePayload()
+        // 다음 test 를 위한 복원은 `resetRunState` 가 진다 — 이 test 가 중간에 죽어도 선다.
+
+        raised shouldNotBe first
+        restored shouldBe first
     }
 
     /**
@@ -275,15 +347,41 @@ class EvaluationCommitRunE2ETest {
         after: Map<String, Long>,
     ): Set<String> = before.keys.filter { before.getValue(it) != after.getValue(it) }.toSet()
 
-    private fun notificationPayloads(): List<String> =
+    private fun notificationRows(): List<OutboxRow> =
         dataSource().connection.use { connection ->
             connection
-                .prepareStatement("SELECT payload FROM outbox WHERE payload_type = 'NotificationRequested'")
-                .use { statement ->
+                .prepareStatement(
+                    "SELECT payload_type, payload FROM outbox " +
+                        "WHERE payload_type = 'NotificationRequested' ORDER BY inserted_at, entry_id",
+                ).use { statement ->
                     statement.executeQuery().use { rs ->
-                        buildList { while (rs.next()) add(rs.getString(1)) }
+                        buildList { while (rs.next()) add(OutboxRow(rs.getString(1), rs.getString(2))) }
                     }
                 }
+        }
+
+    /**
+     * 한 run 의 payload — **비우고 돌려** 행 하나를 집는다. 「마지막 행」으로 집지 않는 이유:
+     * `inserted_at` 은 production 시각이라 같은 run 들 사이에서 같을 수 있고 `entry_id` 는
+     * 시간순이 아니다(UUID) — 정렬로는 「그 run 의 행」을 고를 수 없다.
+     */
+    private fun runOnceAndTakePayload(): String {
+        clearOutbox()
+        runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+        return notificationRows().single().payload
+    }
+
+    private fun clearOutbox() =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { it.execute("TRUNCATE TABLE outbox, inbox") }
+        }
+
+    private fun setStrategyRevision(revision: Int) =
+        dataSource().connection.use { connection ->
+            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
+                statement.setInt(1, revision)
+                statement.executeUpdate()
+            }
         }
 
     private fun blockNotificationInserts() =

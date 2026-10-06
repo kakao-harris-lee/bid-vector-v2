@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.sql.SQLException
 import java.time.Instant
+import java.time.LocalDate
 
 private val SINK_NOW: Instant = Instant.parse("2026-09-23T00:00:00Z")
 
@@ -341,6 +342,41 @@ class OutboxNotificationRequestPortTest {
         // 그렇지 않으면 이 assertion 은 production 코드의 같은 호출을 그대로
         // 복사할 뿐이라 toString 형식이 바뀌어도 항상 통과한다(우회 4 재발 형태).
         payload.bidNowReasons shouldBe verdict.reasons.map(::expectedBidNowReasonToString)
+    }
+
+    /**
+     * **R2-H-1** — 투영이 요청의 두 값을 **그대로** 나른다. 앞 판은 이 둘을 「고정 상수로
+     * 바꿔치우는」 변이가 전 test 초록이었다: 값을 싣는 test 들이 기본값 그대로 돌아, 심은
+     * 값과 상수가 우연히 같았다.
+     *
+     * 그래서 **기본값 아닌 값**을 쓴다 — 개정은 `1`(support 의 기본값)이 아닌 7 이고, 정책
+     * 식별자도 `EffectiveFrom.Initial` 이 아니다. 둘 중 하나라도 상수로 바뀌면 붉어진다.
+     */
+    @Test
+    fun `payload 는 요청의 정책 버전과 전략 개정을 그대로 나른다 — R2-H-1`() {
+        val outbox = NotificationInMemoryOutboxPort()
+        val sink =
+            OutboxNotificationRequestPort(
+                outbox,
+                NotificationSequentialEventIdFactory(),
+                NotificationFixedClock(SINK_NOW),
+            )
+        val policyVersion = PolicyVersion(EffectiveFrom.On(LocalDate.of(2026, 3, 4)), "r2h1-ladder-policy")
+        val notification =
+            notificationRequest(
+                noticeId("N7"),
+                CorrelationId("corr-r2h1"),
+                bidNowVerdict(),
+                diagnosedEvidence(),
+                ladderPolicyVersion = policyVersion,
+                strategyRevision = StrategyRevision(7),
+            )
+
+        sink.request(notification)
+
+        val payload = outbox.registered.single().payload as NotificationRequestedPayload
+        payload.ladderPolicyVersion shouldBe policyVersion
+        payload.strategyRevision shouldBe StrategyRevision(7)
     }
 
     @Test
