@@ -7,6 +7,7 @@ import bidvector.workflow.event.IdempotencyKey
 import bidvector.workflow.event.InboxDecision
 import bidvector.workflow.event.InboxPort
 import bidvector.workflow.event.LeaseAttempt
+import bidvector.workflow.event.LeaseGuard
 import bidvector.workflow.event.NotificationRequestedPayload
 import bidvector.workflow.event.OutboxCommand
 import bidvector.workflow.event.OutboxConsumerKind
@@ -42,13 +43,28 @@ enum class RelaySkipReason {
 /**
  * relay run 하나의 결과 — **전부 값이고 읽기만 한다**(계수가 쓴 값을 그대로 나른다).
  *
- * [Completed.claimed] 와 처분 계수의 불변식: `claimed == delivered + skippedDuplicates +
- * failed + isolated`. [Completed.unknownPayload] 는 **[Completed.isolated] 의 부분 계수**다
- * (미지 payload 도 격리되므로 둘을 더하지 않는다) — 그 행이 왜 격리됐는지를 가른다.
+ * [Completed.claimed] 와 처분 계수의 관계: 끝까지 돈 run 에서는 `claimed == delivered +
+ * skippedDuplicates + failed + isolated` 다. [LeaseLost] 의 [LeaseLost.partial] 에서는
+ * **처분 합이 claimed 보다 작다** — 남은 행을 건드리지 않고 멈췄기 때문이고, 그 차이가 곧
+ * 「`CLAIMED` 에 남아 다음 run 이 받을 행 수」다. [Completed.unknownPayload] 는
+ * **[Completed.isolated] 의 부분 계수**다(미지 payload 도 격리되므로 둘을 더하지 않는다).
  */
 sealed interface RelayReport {
     data class Skipped(
         val reason: RelaySkipReason,
+    ) : RelayReport
+
+    /**
+     * 본문 도중에 **임대를 잃었다**(R1-M-1) — 남은 행을 건드리지 않고 멈췄다. [partial] 은
+     * 멈추기 전까지의 계수다(이미 발송한 것을 숨기지 않는다).
+     *
+     * 왜 `Skipped` 가 아닌가: `Skipped` 는 **아무것도 하지 않았다**는 뜻이고(claim 0), 이쪽은
+     * 이미 집었고 일부를 발송했을 수 있다. 둘을 접으면 「행이 `CLAIMED` 에 남아 있다」는
+     * 사실이 보고에서 사라진다. 종료 코드도 다르다 — 이쪽은 `FAILED` 다(기다리면 풀리는
+     * 상황이 아니라 배타성이 깨진 상황이다).
+     */
+    data class LeaseLost(
+        val partial: Completed,
     ) : RelayReport
 
     data class Completed(
@@ -102,7 +118,12 @@ class RelayOutboxNotifications(
     private val policy: NotificationDeliveryPolicyData,
 ) {
     fun relay(limit: Int): RelayReport =
-        when (val attempt = leases.withLease(OutboxConsumerKind.NotificationRequested) { relayUnderLease(limit) }) {
+        when (
+            val attempt =
+                leases.withLease(OutboxConsumerKind.NotificationRequested) { guard ->
+                    relayUnderLease(limit, guard)
+                }
+        ) {
             is LeaseAttempt.Held -> attempt.result
             LeaseAttempt.Busy -> RelayReport.Skipped(RelaySkipReason.LeaseBusy)
         }
@@ -112,13 +133,28 @@ class RelayOutboxNotifications(
      * 않는다(격리도 하지 않는다: 격리는 단방향 종단이고, 보낼 수 없는 환경에서 남의 run 이
      * 남긴 행을 태울 이유가 없다).
      */
-    private fun relayUnderLease(limit: Int): RelayReport {
+    private fun relayUnderLease(
+        limit: Int,
+        guard: LeaseGuard,
+    ): RelayReport {
         if (policy.environmentModes.getValue(environment) != DeliveryMode.Live) {
             return RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
         }
         val orphansIsolated = isolateOrphans()
         val rows = transactions.inTransaction { outbox.claim(limit, OutboxConsumerKind.NotificationRequested) }
-        return reportOf(orphansIsolated, rows.size, rows.map(::settleRow))
+        val dispositions = mutableListOf<RowDisposition>()
+        // 행마다 발송 **전에** 임대를 다시 묻는다(R1-M-1) — 거짓이면 남은 행을 건드리지
+        // 않는다. 그 행들은 `CLAIMED` 에 남아 다음 run 의 고아 격리가 받는다(놓침).
+        var leaseLost = false
+        for (row in rows) {
+            if (!guard.stillHeld()) {
+                leaseLost = true
+                break
+            }
+            dispositions += settleRow(row)
+        }
+        val report = reportOf(orphansIsolated, rows.size, dispositions)
+        return if (leaseLost) RelayReport.LeaseLost(report) else report
     }
 
     private fun isolateOrphans(): Int {

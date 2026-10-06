@@ -26,8 +26,27 @@ package bidvector.workflow.event
 interface ConsumerLeasePort {
     fun <T> withLease(
         kind: OutboxConsumerKind,
-        body: () -> T,
+        body: (LeaseGuard) -> T,
     ): LeaseAttempt<T>
+}
+
+/**
+ * 본문이 **도중에** 임대를 다시 묻는 자리(R1-M-1) — 「쥐었다」가 run 내내 참이라고 가정하지
+ * 않는다.
+ *
+ * 왜 필요한가: advisory lock 은 홀더의 **연결**이 끊기면 서버가 즉시 놓는다. 그 해제는
+ * 프로세스가 죽었을 때만 일어나는 것이 아니다 — `pg_terminate_backend` 나 네트워크 단절로
+ * **살아 있는 홀더의 연결만** 끊겨도 일어난다. 그러면 다음 relay 가 임대를 쥐고, 첫째가
+ * 아직 발송 중인 `CLAIMED` 를 「고아」로 읽어 격리한다(verifier probe V6b 실측: 발송된 행이
+ * `ISOLATED` 로 표기되고 첫째 배치의 미발송 행은 놓친다).
+ *
+ * 그래서 relay 는 **행마다 발송 전에** 이것을 묻고, 거짓이면 남은 행을 건드리지 않고
+ * 멈춘다. 중복 발송을 막는 것이 아니라(at-most-once 는 그대로다) **자기가 더 이상
+ * 배타적이지 않다는 것을 알고 멈추는 것**이다.
+ */
+fun interface LeaseGuard {
+    /** 임대를 **아직** 쥐고 있는가. 거짓이면 이 소비자는 더 이상 배타적이지 않다. */
+    fun stillHeld(): Boolean
 }
 
 /** [ConsumerLeasePort.withLease]의 결과 — 「쥐었고 본문이 났다」와 「못 쥐었다」 둘뿐이다. */
