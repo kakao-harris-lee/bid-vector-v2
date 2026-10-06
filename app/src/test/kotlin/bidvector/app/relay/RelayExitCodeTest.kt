@@ -29,12 +29,29 @@ class RelayExitCodeTest {
     }
 
     /**
+     * cr R-3 — **두 갈래를 따로 잰다.** `INCOMPLETE` 의 술어는 「미지 payload 가 있다」 또는
+     * 「집었는데 하나도 전달하지 못했다」인데, 위 표본은 둘 다 참이라(전달 0) 앞 항을 지워도
+     * 초록이었다. 여기서는 **하나를 전달한** run 에 미지 payload 를 하나 섞어 뒷 항을 거짓으로
+     * 만든다 — 앞 항만으로 붉어야 한다.
+     *
+     * 뒷 항만 참인 표본은 아래 `집었는데 하나도 전달하지 못하면` 이 든다(미지 payload 0).
+     * 둘이 짝이다.
+     */
+    @Test
+    fun `전달이 있어도 미지 payload 하나면 INCOMPLETE 다 — 앞 항 단독`() {
+        val report = completed(claimed = 2, delivered = 1, isolated = 1, unknownPayload = 1)
+
+        exitCodeOf(report) shouldBe RelayExitCode.INCOMPLETE
+    }
+
+    /**
      * D-6F10-27 (7) — **집었는데 아무것도 전달하지 못한 run 은 비-0 이다**(cr L-3). 앞 판은
      * 집은 행이 전부 거부·격리로 타도 0 이었고, 그것은 「왜 발송이 안 되는가」의 가장 나쁜
      * 판이 가장 약한 신호를 내는 꼴이었다.
      */
     @Test
-    fun `집었는데 하나도 전달하지 못하면 INCOMPLETE 다`() {
+    fun `집었는데 하나도 전달하지 못하면 INCOMPLETE 다 — 뒷 항 단독`() {
+        // 미지 payload 가 0 이라 앞 항은 거짓이다 — 뒷 항만으로 붉어야 한다(cr R-3 의 짝).
         exitCodeOf(completed(claimed = 2, failed = 2)) shouldBe RelayExitCode.INCOMPLETE
         exitCodeOf(completed(claimed = 1, isolated = 1)) shouldBe RelayExitCode.INCOMPLETE
     }
