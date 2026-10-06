@@ -14,6 +14,7 @@ import bidvector.workflow.event.EventId
 import bidvector.workflow.event.IdempotencyKey
 import bidvector.workflow.event.InboxPort
 import bidvector.workflow.event.LeaseAttempt
+import bidvector.workflow.event.LeaseGuard
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
 import bidvector.workflow.event.OutboxConsumerKind
@@ -104,10 +105,10 @@ internal class GrantingLease : ConsumerLeasePort {
 
     override fun <T> withLease(
         kind: OutboxConsumerKind,
-        body: () -> T,
+        body: (LeaseGuard) -> T,
     ): LeaseAttempt<T> {
         kinds += kind
-        return LeaseAttempt.Held(body())
+        return LeaseAttempt.Held(body(LeaseGuard { true }))
     }
 }
 
@@ -115,8 +116,32 @@ internal class GrantingLease : ConsumerLeasePort {
 internal class BusyLease : ConsumerLeasePort {
     override fun <T> withLease(
         kind: OutboxConsumerKind,
-        body: () -> T,
+        body: (LeaseGuard) -> T,
     ): LeaseAttempt<Nothing> = LeaseAttempt.Busy
+}
+
+/**
+ * [heldFor] 번 묻는 동안만 쥐고 있다고 답하는 임대(R1-M-1) — 「본문 도중에 잃는다」를 fake 로
+ * 표현한다. 실 DB 쪽 측정은 `RelayLeaseLossDatabaseTest` 가 임대 연결을 실제로 끊어서 한다.
+ */
+internal class LosingLease(
+    private val heldFor: Int,
+) : ConsumerLeasePort {
+    var asked = 0
+        private set
+
+    override fun <T> withLease(
+        kind: OutboxConsumerKind,
+        body: (LeaseGuard) -> T,
+    ): LeaseAttempt<T> =
+        LeaseAttempt.Held(
+            body(
+                LeaseGuard {
+                    asked += 1
+                    asked <= heldFor
+                },
+            ),
+        )
 }
 
 internal class SingleRouteDirectory(

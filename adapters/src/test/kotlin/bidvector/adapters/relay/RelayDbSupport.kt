@@ -1,8 +1,6 @@
 package bidvector.adapters.relay
 
 import bidvector.adapters.e2e.EchoContentRenderer
-import bidvector.adapters.e2e.RecordingNotificationSender
-import bidvector.adapters.e2e.SingleRouteDirectory
 import bidvector.adapters.event.ConsumerTransactions
 import bidvector.adapters.event.JdbcInboxPort
 import bidvector.adapters.event.JdbcOutboxPort
@@ -18,11 +16,19 @@ import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
 import bidvector.workflow.notification.Channel
+import bidvector.workflow.notification.ChannelRoute
+import bidvector.workflow.notification.DeliveryRequest
+import bidvector.workflow.notification.DeliveryResult
 import bidvector.workflow.notification.DispatchNotification
+import bidvector.workflow.notification.MaskedTarget
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
+import bidvector.workflow.notification.NotificationSender
+import bidvector.workflow.notification.RejectionReason
 import bidvector.workflow.notification.RelayOutboxNotifications
 import bidvector.workflow.notification.RelayTarget
+import bidvector.workflow.notification.RenderedContent
+import bidvector.workflow.notification.RouteDirectory
 import bidvector.workflow.notification.RouteKey
 import bidvector.workflow.notification.RuntimeEnvironment
 import bidvector.workflow.strategy.OperatorId
@@ -51,12 +57,14 @@ internal fun relayNotificationPolicy(): NotificationDeliveryPolicyData {
 internal class RelayHarness(
     dataSource: DataSource,
     environment: RuntimeEnvironment = RuntimeEnvironment.Production,
+    channelEnabled: Boolean = true,
+    sendOutcome: SendOutcome = SendOutcome.DELIVERED,
     transactionsFor: (TransactionBoundary) -> ConsumerTransactionPort = { ConsumerTransactions(it) },
 ) {
     private val policy = relayNotificationPolicy()
     private val boundary = TransactionBoundary(dataSource)
 
-    val sender = RecordingNotificationSender(RELAY_DB_NOW, policy)
+    val sender = ScriptedDbSender(RELAY_DB_NOW, policy, sendOutcome)
 
     val relay =
         RelayOutboxNotifications(
@@ -64,7 +72,7 @@ internal class RelayHarness(
             inbox = JdbcInboxPort(boundary),
             dispatcher =
                 DispatchNotification(
-                    routes = SingleRouteDirectory(RELAY_DB_OWNER, RELAY_DB_CHANNEL, RELAY_DB_ROUTE),
+                    routes = TogglableRouteDirectory(channelEnabled),
                     renderer = EchoContentRenderer(),
                     sender = sender,
                     policyData = policy,
@@ -76,6 +84,44 @@ internal class RelayHarness(
             environment = environment,
             policy = policy,
         )
+}
+
+/** sender 가 낼 결과 — 어휘 해석표의 세 갈래를 실 DB 로 재기 위한 입력(R1-L-3). */
+internal enum class SendOutcome { DELIVERED, REJECTED, UNKNOWN }
+
+/** 채널 활성 여부를 끌 수 있는 route 저장소 — route 수준 억제(`Suppressed`)의 입력. */
+internal class TogglableRouteDirectory(
+    private val enabled: Boolean,
+) : RouteDirectory {
+    override fun routesFor(owner: OperatorId): Map<Channel, ChannelRoute> =
+        if (owner == RELAY_DB_OWNER) {
+            mapOf(RELAY_DB_CHANNEL to ChannelRoute(enabled = enabled, key = RELAY_DB_ROUTE))
+        } else {
+            emptyMap()
+        }
+}
+
+/** 미리 정한 결과를 내는 sender — 발송 요청을 기록한다(실 발송 0). */
+internal class ScriptedDbSender(
+    private val at: Instant,
+    private val policy: NotificationDeliveryPolicyData,
+    private val outcome: SendOutcome,
+) : NotificationSender {
+    private val requests = mutableListOf<DeliveryRequest>()
+
+    fun sentKeys(): List<String> = requests.map { it.idempotencyKey.value }
+
+    override fun send(
+        request: DeliveryRequest,
+        content: RenderedContent,
+    ): DeliveryResult {
+        requests += request
+        return when (outcome) {
+            SendOutcome.DELIVERED -> DeliveryResult.Delivered(at, MaskedTarget.mask("01012345678", policy))
+            SendOutcome.REJECTED -> DeliveryResult.Rejected(RejectionReason.ProviderDeclined)
+            SendOutcome.UNKNOWN -> DeliveryResult.Unknown(at)
+        }
+    }
 }
 
 /**
@@ -96,16 +142,20 @@ internal class InterferingTransactions(
     }
 }
 
-/** [atCall] 번째 경계 호출에서 던진다 — 「발송 뒤·종단 전 크래시」의 정직한 대역. */
-internal class CrashingTransactions(
+/**
+ * **발송이 일어난 뒤** 첫 경계 호출에서 던진다(R1-L-4) — 「발송 뒤·종단 전 크래시」의 정직한
+ * 대역.
+ *
+ * 앞 판은 호출 **순번**(네 번째)에 걸었는데, 그러면 변이가 경계 호출 수를 바꾸는 순간
+ * 주입 자체가 일어나지 않아 test 가 「크래시가 안 났다」로 붉어졌다 — 상태 단언(크래시 뒤
+ * 행이 `CLAIMED`)이 실제로 돌지 않았다. 지금은 **사건**(발송 발생)에 걸어 순번과 무관하다.
+ */
+internal class CrashAfterDispatch(
     private val delegate: ConsumerTransactionPort,
-    private val atCall: Int,
+    private val dispatched: () -> Boolean,
 ) : ConsumerTransactionPort {
-    private var calls = 0
-
     override fun <T> inTransaction(block: () -> T): T {
-        calls += 1
-        if (calls == atCall) throw RelayWorkerDied()
+        if (dispatched()) throw RelayWorkerDied()
         return delegate.inTransaction(block)
     }
 }
@@ -187,5 +237,37 @@ internal fun forceOutboxState(
         statement.setString(1, state)
         statement.setString(2, entryId)
         check(statement.executeUpdate() == 1) { "상태 강제 변경이 행을 옮기지 못했다: $entryId" }
+    }
+}
+
+/** 상태를 지정해 행을 심는다 — 고아(`CLAIMED`) 상황을 만들 때 쓴다. */
+internal fun insertClaimedStrategyRow(
+    dataSource: DataSource,
+    entryId: String,
+) {
+    insertPendingStrategyRow(dataSource, entryId)
+    forceOutboxState(dataSource, entryId, "CLAIMED")
+}
+
+/** 특정 entry 의 상태 한 개를 읽는다. */
+internal fun stateOf(
+    dataSource: DataSource,
+    entryId: String,
+): String? =
+    dataSource.connection.use { connection ->
+        connection.prepareStatement("SELECT state FROM outbox WHERE entry_id = ?").use { statement ->
+            statement.setString(1, entryId)
+            statement.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+    }
+
+/** inbox 에 키를 미리 심는다 — `SkipDuplicate` 경로를 실 DB 로 재는 입력. */
+internal fun seedInboxKey(
+    dataSource: DataSource,
+    key: String,
+) = dataSource.connection.use { connection ->
+    connection.prepareStatement("INSERT INTO inbox (idempotency_key) VALUES (?)").use { statement ->
+        statement.setString(1, key)
+        statement.executeUpdate()
     }
 }

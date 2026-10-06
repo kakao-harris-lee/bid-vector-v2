@@ -42,9 +42,12 @@ class RelayDatabaseTest : PersistenceTestSupport() {
     @Test
     fun `발송 뒤 종단 전이 전에 죽으면 행은 CLAIMED 로 남는다 — T1·T2 분리`() {
         insertPendingNotificationRow(dataSource(), "crash-1")
-        val harness =
+        // R1-L-4 — 주입을 **사건**(발송 발생)에 건다. 순번에 걸면 경계 호출 수를 바꾸는 변이에서
+        // 주입 자체가 사라져 아래 상태 단언이 돌지 않는다.
+        lateinit var harness: RelayHarness
+        harness =
             RelayHarness(dataSource()) { boundary ->
-                CrashingTransactions(ConsumerTransactions(boundary), atCall = T2_CALL_INDEX)
+                CrashAfterDispatch(ConsumerTransactions(boundary)) { harness.sender.sentKeys().isNotEmpty() }
             }
 
         shouldThrow<RelayWorkerDied> { harness.relay.relay(RELAY_DB_LIMIT) }
@@ -127,5 +130,8 @@ class RelayDatabaseTest : PersistenceTestSupport() {
 /**
  * 행 하나짜리 run 의 경계 호출 순서 — ① 고아 조회 ② T1 claim ③ inbox 조회 ④ **T2**.
  * `RelayOutboxNotificationsTest` 의 경계 계수 단언(총 4)과 같은 사실을 가리킨다.
+ *
+ * 이 순번을 쓰는 것은 **계수 계약 test 하나**다(그쪽은 「T2 직전에 행을 밀어 둔다」는 주입
+ * 지점이 순번으로만 표현된다). 크래시 주입은 순번을 쓰지 않는다(R1-L-4).
  */
 private const val T2_CALL_INDEX = 4

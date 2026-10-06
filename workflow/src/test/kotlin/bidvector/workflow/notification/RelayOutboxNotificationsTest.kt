@@ -223,6 +223,52 @@ class RelayOutboxNotificationsTest {
     }
 
     /**
+     * R1-M-1 — 본문 **도중에** 임대를 잃으면 남은 행을 건드리지 않고 멈춘다. verifier probe
+     * V6b 가 실측한 것: 임대 연결만 끊겨도(프로세스는 살아 있다) 다음 relay 가 임대를 쥐고
+     * 첫째의 in-flight `CLAIMED` 를 고아로 읽어 격리한다. 중복 발송은 0 이지만 발송된 행이
+     * `ISOLATED` 로 표기되고 첫째 배치의 미발송 행은 놓친다.
+     *
+     * 멈춤의 증거는 **계수 차이**다 — `claimed` 는 2 인데 처분은 1 개다(남은 하나는 건드리지
+     * 않았다). 그 차이가 곧 「`CLAIMED` 에 남아 다음 run 이 받을 행 수」다.
+     */
+    @Test
+    fun `본문 도중 임대를 잃으면 남은 행을 건드리지 않고 멈춘다 — LeaseLost`() {
+        val outbox = FakeOutboxPort(pending = listOf(notificationRow("keep"), notificationRow("drop")))
+        val inbox = FakeInboxPort()
+        val sender = ScriptedSender(delivered())
+
+        val report =
+            relay(outbox, inbox, sender, leases = LosingLease(heldFor = 1))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.claimed shouldBe 2
+        report.partial.delivered shouldBe 1
+        outbox.delivered shouldBe listOf(OutboxEntryId("keep"))
+        // 둘째 행은 어느 종단으로도 가지 않았다 — 건드리지 않은 것이 처분이다.
+        outbox.failed.shouldBeEmpty()
+        outbox.isolated.shouldBeEmpty()
+        sender.requests.map { it.idempotencyKey.value } shouldBe listOf("key-keep")
+    }
+
+    /** 임대를 처음부터 잃은 상태면 **한 행도 발송하지 않는다**(첫 행 앞에서 멈춘다). */
+    @Test
+    fun `첫 행 앞에서 임대를 잃으면 발송이 0 이다`() {
+        val outbox = FakeOutboxPort(pending = listOf(notificationRow("none")))
+        val sender = ScriptedSender(delivered())
+
+        val report =
+            relay(outbox, FakeInboxPort(), sender, leases = LosingLease(heldFor = 0))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.claimed shouldBe 1
+        report.partial.delivered shouldBe 0
+        sender.requests.shouldBeEmpty()
+        outbox.delivered.shouldBeEmpty()
+    }
+
+    /**
      * 전이표가 거부하면 **조용히 넘기지 않는다** — 그 거부는 업무 분기가 아니라 표가 바뀌었다는
      * 뜻이다. `claimedEntries` 가 `Claimed` 아닌 행을 돌려주는 정직하지 않은 어댑터를 흉내 내
      * 그 자리가 던지는 것을 잰다.
