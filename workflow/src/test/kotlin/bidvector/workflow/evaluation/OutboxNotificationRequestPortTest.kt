@@ -64,7 +64,7 @@ private fun notificationRequest(
  * `VerdictLadder.judge`(public, `decision` 모듈 소유)로 진짜 `Verdict.BidNow`를 얻는다 —
  * `internal` 생성자를 직접 못 지으므로(scope.md 우회 1).
  */
-private fun bidNowVerdict(): Verdict.BidNow {
+internal fun bidNowVerdict(): Verdict.BidNow {
     val policy =
         Resolution.Resolved(
             VerdictLadderPolicyData(
@@ -88,7 +88,7 @@ private fun bidNowVerdict(): Verdict.BidNow {
 }
 
 /** [bidNowVerdict]의 자매 — `ForceBidOverride` 사유를 내는 입력(priority 는 bidNowThreshold 밑, probability·matched 는 강제 임계 이상). */
-private fun forceBidOverrideVerdict(): Verdict.BidNow {
+internal fun forceBidOverrideVerdict(): Verdict.BidNow {
     val policy =
         Resolution.Resolved(
             VerdictLadderPolicyData(
@@ -110,60 +110,6 @@ private fun forceBidOverrideVerdict(): Verdict.BidNow {
         )
     return VerdictLadder.judge(input, policy) as Verdict.BidNow
 }
-
-/**
- * scope.md 우회 4 — [BidNowReason][bidvector.decision.BidNowReason]의 `toString()`은
- * `NotificationRequestedPayload.bidNowReasons`에 그대로 실려 outbox에 영속된다(sink
- * KDoc). 그 직렬화가 바뀌어도(필드명 변경 등) 아무것도 안 붉으면 옛 outbox 행은 조용히
- * 다른 형식을 이는 채 남는다 — 이 함수가 그 축을 축어로 잠근다. **`else` 없는 소진
- * `when`** 이라 `BidNowReason`에 새 하위 타입이 생기면 이 함수부터 컴파일이 깨진다.
- */
-private fun expectedBidNowReasonToString(reason: BidNowReason): String =
-    when (reason) {
-        is BidNowReason.PriorityAboveBidNowThreshold -> {
-            "PriorityAboveBidNowThreshold(priority=0.9, threshold=0.5)"
-        }
-
-        is BidNowReason.ForceBidOverride -> {
-            "ForceBidOverride(probability=0.95, matched=0.95, probabilityThreshold=0.9, matchedThreshold=0.9)"
-        }
-    }
-
-/**
- * scope.md 우회 4 — [MlUnavailableReason]의 `toString()`은
- * `NotificationEvidencePayload.NotPredicted.reason`에 그대로 실린다. 전부 `data object`
- * 라 실제로 "새는" 값은 없지만(클래스명=값) 이름이 바뀌면 영속 행의 뜻이 조용히
- * 바뀐다. **`else` 없는 소진 `when`** — 새 사유가 추가되면 이 함수부터 컴파일이 깨진다.
- */
-private fun expectedMlUnavailableReasonToString(reason: MlUnavailableReason): String =
-    when (reason) {
-        MlUnavailableReason.ScoreNotProvided -> "ScoreNotProvided"
-        MlUnavailableReason.DeadlineExceeded -> "DeadlineExceeded"
-        MlUnavailableReason.CircuitOpen -> "CircuitOpen"
-        MlUnavailableReason.RetryBudgetExhausted -> "RetryBudgetExhausted"
-        MlUnavailableReason.TransportFailed -> "TransportFailed"
-        MlUnavailableReason.ModelNotReady -> "ModelNotReady"
-        MlUnavailableReason.ReleaseMismatch -> "ReleaseMismatch"
-        MlUnavailableReason.ContractViolation -> "ContractViolation"
-        MlUnavailableReason.UnsupportedSchema -> "UnsupportedSchema"
-        MlUnavailableReason.UnsupportedRelease -> "UnsupportedRelease"
-        MlUnavailableReason.InvalidRequest -> "InvalidRequest"
-    }
-
-private val ALL_ML_UNAVAILABLE_REASONS =
-    listOf(
-        MlUnavailableReason.ScoreNotProvided,
-        MlUnavailableReason.DeadlineExceeded,
-        MlUnavailableReason.CircuitOpen,
-        MlUnavailableReason.RetryBudgetExhausted,
-        MlUnavailableReason.TransportFailed,
-        MlUnavailableReason.ModelNotReady,
-        MlUnavailableReason.ReleaseMismatch,
-        MlUnavailableReason.ContractViolation,
-        MlUnavailableReason.UnsupportedSchema,
-        MlUnavailableReason.UnsupportedRelease,
-        MlUnavailableReason.InvalidRequest,
-    )
 
 private fun diagnosedEvidence(): PredictionEvidence.Diagnosed =
     PredictionEvidence.Diagnosed(
@@ -445,36 +391,6 @@ class OutboxNotificationRequestPortTest {
 
         val payload = outbox.registered.single().payload as NotificationRequestedPayload
         payload.bidNowReasons shouldBe verdict.reasons.map(::expectedBidNowReasonToString)
-    }
-
-    /**
-     * scope.md 우회 4 — `BidNowReason` 두 case 의 `toString()` 직렬화를 축어로 잠근다.
-     * `expectedBidNowReasonToString`의 소진 `when`이 `BidNowReason`에 새 하위 타입이
-     * 생기는 순간 컴파일을 깬다(이 test 파일 자체가 컴파일 안 됨) — 리스트를 갱신하지
-     * 않아도 걸린다.
-     */
-    @Test
-    fun `BidNowReason 두 case 의 직렬화가 축어로 고정된다 — 우회 4, 소진 when`() {
-        bidNowVerdict().reasons.single().toString() shouldBe "PriorityAboveBidNowThreshold(priority=0.9, threshold=0.5)"
-        forceBidOverrideVerdict().reasons.single().toString() shouldBe
-            "ForceBidOverride(probability=0.95, matched=0.95, probabilityThreshold=0.9, matchedThreshold=0.9)"
-
-        // 잠금 함수 자신도 같은 값을 낸다는 것을 재확인 — 함수와 literal 이 갈라지면
-        // 다음에 sink test 가 잠금 함수만 보고 안심하는 것을 막는다.
-        bidNowVerdict().reasons.single().let { it.toString() shouldBe expectedBidNowReasonToString(it) }
-        forceBidOverrideVerdict().reasons.single().let { it.toString() shouldBe expectedBidNowReasonToString(it) }
-    }
-
-    /**
-     * scope.md 우회 4 — `MlUnavailableReason` 열한 case 전수. `expectedMlUnavailableReasonToString`
-     * 의 소진 `when`이 새 사유가 추가되는 순간 컴파일을 깬다.
-     */
-    @Test
-    fun `MlUnavailableReason 전 case 의 직렬화가 축어로 고정된다 — 우회 4, 소진 when`() {
-        ALL_ML_UNAVAILABLE_REASONS.size shouldBe 11
-        ALL_ML_UNAVAILABLE_REASONS.forEach { reason ->
-            reason.toString() shouldBe expectedMlUnavailableReasonToString(reason)
-        }
     }
 
     /**
