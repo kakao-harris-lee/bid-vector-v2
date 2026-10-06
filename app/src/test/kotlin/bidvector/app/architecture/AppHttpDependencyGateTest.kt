@@ -341,4 +341,4 @@ class AppHttpDependencyGateTest {
  * 면제 목록의 크기 — 새 이름이 눈에 띄지 않게 늘지 않도록 못박는다(M-r3-2). 늘려야 하면 이
  * 숫자를 함께 고치게 되고, 그 커밋이 사유를 남긴다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 46
+private const val EXPECTED_EXEMPT_COUNT = 44

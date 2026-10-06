@@ -22,9 +22,16 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 그 셋이 아니라 ① 기존 E2E 의 outbox 전후 등식과 ② 이 규칙이다.
  *
  * 이 규칙이 보는 것은 **참조**다 — dry-run 클래스 집합이 커밋 조립 타입을 **이름으로 알지
- * 못한다**. 람다 본문·bridge 안의 `invokedynamic` 참조는 ArchUnit 의 의존 그래프가 보지
- * 못하므로(6G-2g 교훈) 거동 쪽은 E2E 등식이 든다. 그 분담이 이 KDoc 의 요점이고, 변이 실측이
- * 둘의 사각을 각각 보인다(게이트 초록 + E2E RED 를 함께 기록한다).
+ * 못한다**.
+ *
+ * **사각은 「람다·bridge」가 아니었다**(R1-L-1 로 문면 정정). 변이 실측 결과 람다 본문·클래스
+ * 리터럴·소거 제네릭 세 모양은 ArchUnit 이 전부 잡았다(제네릭 시그니처 속성까지 읽는다).
+ * 실제 사각은 **선택자**였다 — 정확 이름 일치라 `외부$익명` 으로 컴파일되는 중첩 클래스가
+ * 대상 밖이었다. 그 자리는 위 선택자의 접두 비교가 닫는다.
+ *
+ * 남는 분담은 그대로다: 이 규칙은 **이름 참조**를 보고, 「불투명 클로저만 받고 커밋 조립은
+ * 열거 밖에서 짓는다」처럼 참조가 아예 생기지 않는 모양은 기존 주입 표면 집합 등식
+ * (`AppHttpDependencyGateTest`)과 dry-run E2E 의 outbox 전후 등식이 본다.
  */
 internal class DryRunCommitSeparationRules {
     fun dryRunMustNotReferenceCommitTypes(
@@ -46,7 +53,13 @@ internal class DryRunCommitSeparationRules {
  */
 private fun haveFullNameIn(names: Set<String>): DescribedPredicate<JavaClass> =
     object : DescribedPredicate<JavaClass>("이름이 dry-run 조립 집합(${names.size} 종)에 있다") {
-        override fun test(input: JavaClass): Boolean = input.fullName in names
+        // R1-L-1 — **중첩·합성 클래스까지 고른다.** 앞 판은 정확 일치라
+        // `EvaluationDryRunFactory$forRequest$tee$1`(익명 클래스)이 커밋 타입을 참조하는 변이를
+        // 보지 못했다(기존 주입 표면 게이트와 E2E 등식이 잡아 방어는 섰지만, 이 규칙이
+        // 주장하는 범위 밖이었다). Kotlin 의 람다·익명 object·내부 클래스는 전부
+        // `외부이름$...` 으로 컴파일되므로 그 접두가 선택자의 올바른 경계다.
+        override fun test(input: JavaClass): Boolean =
+            names.any { name -> input.fullName == name || input.fullName.startsWith("$name\$") }
     }
 
 /**
