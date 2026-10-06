@@ -6,6 +6,7 @@ import bidvector.app.collection.CollectionTermination
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel
+import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
 import bidvector.workflow.notification.RelayTarget
@@ -43,12 +44,16 @@ data class RelayProperties(
  * 올라온다. 속성이 없으면(기본) 러너도, 조립도, 임대 어댑터 생성도 없다 — 평가 endpoint 만
  * 쓰는 배포는 relay 설정 없이 그대로 뜬다(compose 는 `*.mode` 를 설정하지 않는다, D-6A2a-5).
  *
- * **`Production` 환경 설정은 기동을 거부한다(D-6F10-20).** 이 slice 에는 실 sender 가 없고
- * (`OPEN-STR-12`) 자리지킴 셋은 호출되면 던진다. `Production` 은 정책표에서 유일한
- * `DeliveryMode.Live` 환경이므로 그 설정으로 뜨면 relay 가 claim 한 뒤 발송 자리에서 터지고,
- * 그 행은 다음 run 의 고아 격리가 태운다 — 매 run 이 행을 영구히 잃는다. 그래서 「실 sender
- * 없이 Live 환경」을 **설정 오류**로 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
- * `OPEN-STR-12` 가 실 sender 를 들이면 이 `require` 와 자리지킴 셋이 함께 사라진다.
+ * **발송 가능(`DeliveryMode.Live`) 모드 환경 설정은 기동을 거부한다(D-6F10-20, 술어는 cr G-1
+ * 로 정정).** 이 slice 에는 실 sender 가 없고(`OPEN-STR-12`) 자리지킴 셋은 호출되면 던진다.
+ * 그 모드로 뜨면 relay 가 claim 한 뒤 발송 자리에서 터지고 그 행은 다음 run 의 고아 격리가
+ * 태운다 — 매 run 이 행을 영구히 잃는다. 그래서 「실 sender 없이 Live 환경」을 **설정 오류**로
+ * 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
+ *
+ * 검사가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다. 오늘 `Production`
+ * 하나가 `Live` 지만 그 표는 날짜에 따라 달라지도록 설계된 값이므로(`EffectiveDatedPolicy`)
+ * 이름을 보면 표가 바뀌는 날 두 층이 함께 뚫린다. `OPEN-STR-12` 가 실 sender 를 들이면 이
+ * `require` 와 자리지킴 셋이 함께 사라진다.
  *
  * 이 클래스가 조립을 직접 하지 않는 이유: outbox 쓰기 타입을 `app` 이 이름으로 볼 수 없다
  * (D-6A3-17(a)③). [NotificationRelayRun](어댑터 조립 경계)만 든다.
@@ -63,8 +68,15 @@ open class RelayWiring {
         dataSource: DataSource,
         properties: RelayProperties,
     ): NotificationRelayRun {
-        require(properties.environment != RuntimeEnvironment.Production) {
-            "실 발송 채널이 없는 동안 relay 는 Production 환경으로 기동하지 않는다(OPEN-STR-12)"
+        val policy = resolvedNotificationPolicy()
+        // cr G-1 — **지키려는 성질을 본다.** 앞 판은 `environment != Production` 이었는데
+        // 그것은 「발송 가능 환경」이라는 성질이 아니라 **오늘 그 성질을 가진 값의 이름**이다.
+        // 정책표는 날짜에 따라 달라지도록 설계된 값이라(`EffectiveDatedPolicy`) 표가
+        // `Staging -> Live` 를 갖는 날 ① 이 검사가 통과하고 ② relay 의 같은 술어도 통과해
+        // claim 이 일어나고 ③ 자리지킴이 던져 행이 영구 격리된다 — 두 층이 독립 방벽이 아니라
+        // 같은 사각을 공유했다. 지금은 둘이 **같은 표**를 보고 같은 뜻을 묻는다.
+        require(policy.environmentModes.getValue(properties.environment) != DeliveryMode.Live) {
+            "실 발송 채널이 없는 동안 relay 는 발송 가능(Live) 모드 환경으로 기동하지 않는다(OPEN-STR-12)"
         }
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
         require(properties.claimLimit > 0) { "bidvector.relay.claim-limit 는 1 이상이어야 한다" }
@@ -72,7 +84,7 @@ open class RelayWiring {
             dataSource = dataSource,
             target = RelayTarget(OperatorId(properties.owner), properties.channel),
             environment = properties.environment,
-            policy = resolvedNotificationPolicy(),
+            policy = policy,
         )
     }
 
