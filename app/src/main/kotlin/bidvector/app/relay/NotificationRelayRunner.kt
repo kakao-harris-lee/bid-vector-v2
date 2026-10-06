@@ -3,19 +3,9 @@ package bidvector.app.relay
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
-import bidvector.workflow.notification.RelayReport
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import java.sql.SQLException
-
-/**
- * 실행 실패의 정제된 표현 — 원인 코드만 싣고 **원 예외를 잇지 않는다**(수집 러너의
- * `CollectionRunFailedException` 과 같은 근거): 저장소 예외의 메시지에는 행 값이, 전송 계층
- * 예외에는 요청 URI 가 실릴 수 있어 원 예외가 스택에 붙어 로그로 나가는 경로를 만들지 않는다.
- */
-class RelayRunFailedException(
-    val causeCode: String,
-) : RuntimeException("relay run failed cause=$causeCode")
 
 /** 예외에서 로그에 실어도 되는 원인 코드만 뽑는다 — SQL 예외는 SQLSTATE 5자리만 더한다(메시지 없음). */
 private fun causeCodeOf(failure: Exception): String =
@@ -43,21 +33,29 @@ class NotificationRelayRunner(
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
+    /**
+     * **예외를 Spring 에 넘기지 않고 이 자리에서 종료 코드로 옮긴다**(cr L-4) — 앞 판은
+     * 정제된 예외를 다시 던져 종료 코드를 Spring 의 기동 실패 처리에 맡겼고, 그래서
+     * [RelayExitCode.FAILED] 를 **아무 코드도 만들지 않는** 죽은 열거 값으로 두었다.
+     * 지금은 사유 토큰(정제된 원인 코드)과 코드가 한 쌍으로 나간다.
+     *
+     * 결과를 담는 보조 타입을 두지 않는다 — app 에 최상위 타입이 하나 늘면 조립 층 등재와
+     * 주입 표면 집합 등식이 함께 움직인다(실측: 게이트 셋이 붉었다). `catch` 안에서 끝내는
+     * 쪽이 장부를 건드리지 않는다.
+     */
+    @Suppress("TooGenericExceptionCaught")
     override fun run(args: ApplicationArguments) {
         log.write(relayStartLine(limit))
-        val report = relayOrFail()
+        val report =
+            try {
+                run.relay(limit)
+            } catch (failure: Exception) {
+                log.write(relayFailureLine(causeCodeOf(failure)))
+                termination.terminate(RelayExitCode.FAILED.value)
+                return
+            }
         val exitCode = exitCodeOf(report)
         log.write(relayFinishLine(report, exitCode))
         termination.terminate(exitCode.value)
     }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun relayOrFail(): RelayReport =
-        try {
-            run.relay(limit)
-        } catch (failure: Exception) {
-            val causeCode = causeCodeOf(failure)
-            log.write(relayFailureLine(causeCode))
-            throw RelayRunFailedException(causeCode)
-        }
 }

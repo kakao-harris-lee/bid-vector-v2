@@ -3,16 +3,10 @@ package bidvector.app.evaluation
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
-import bidvector.workflow.evaluation.CandidateEvaluation
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import java.sql.SQLException
-
-/** 실행 실패의 정제된 표현 — 원인 코드만 싣고 원 예외를 잇지 않는다(수집 러너와 같은 근거). */
-class EvaluationCommitRunFailedException(
-    val causeCode: String,
-) : RuntimeException("evaluation commit run failed cause=$causeCode")
 
 private fun causeCodeOf(failure: Exception): String =
     when (failure) {
@@ -38,21 +32,24 @@ class EvaluationCommitRunner(
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
+    /**
+     * 예외를 Spring 에 넘기지 않고 이 자리에서 종료 코드로 옮긴다(cr L-4 — relay 러너와 같다).
+     * 보조 타입을 두지 않는 이유도 같다(app 최상위 타입이 늘면 조립 장부가 함께 움직인다).
+     */
+    @Suppress("TooGenericExceptionCaught")
     override fun run(args: ApplicationArguments) {
         log.write(evaluationCommitStartLine(candidateCap))
-        val tally = tallyOf(evaluateOrFail())
+        val results =
+            try {
+                runBlocking { run.evaluate() }
+            } catch (failure: Exception) {
+                log.write(evaluationCommitFailureLine(causeCodeOf(failure)))
+                termination.terminate(EvaluationCommitExitCode.FAILED.value)
+                return
+            }
+        val tally = tallyOf(results)
         val exitCode = exitCodeOf(tally)
         log.write(evaluationCommitFinishLine(tally, exitCode))
         termination.terminate(exitCode.value)
     }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun evaluateOrFail(): List<CandidateEvaluation> =
-        try {
-            runBlocking { run.evaluate() }
-        } catch (failure: Exception) {
-            val causeCode = causeCodeOf(failure)
-            log.write(evaluationCommitFailureLine(causeCode))
-            throw EvaluationCommitRunFailedException(causeCode)
-        }
 }
