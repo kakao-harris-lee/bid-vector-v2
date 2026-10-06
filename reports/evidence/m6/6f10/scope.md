@@ -191,7 +191,6 @@ in_scope:
   - docs/adr/0005-domain-events-and-outbox.md                      # 고아 격리·SkipDuplicate 처분·OPEN-OPS-10 ③ 등재(세션 모델) — A-1 (b) 면 D-3 개정
   - docs/discovery/data-dictionary.md                              # payload v2 · 상태 의미
   - reports/evidence/m6/6f10/**
-  - reports/evidence/m6/6d/scope.md                                # 6D-2 행 문면 정정만(A-1 뒤) — 닫힌 evidence 는 그 외 무변경
   - milestone-6.md                                                 # 착수·종결 문단(팀장) — 공유
   # A-2 (b) 채택 시에만 더한다:
   # - adapters/src/main/resources/db/migration/V18__outbox_claim_lease.sql
@@ -239,3 +238,11 @@ verifier 표적: T1/T2 분리(크래시 주입) · lease 없는 격리 · 계수
 ## 하네스 레인 변경 (상시 절)
 
 없음 — 리뷰 요청 시점마다 `git log --format=%h <base>..HEAD -- CLAUDE.md .claude/` 산출로 갱신.
+
+## 계약 갱신 r1 — 운영자 결정 수령 (2026-10-06)
+
+| 결정 | 내용 | 근거 |
+|---|---|---|
+| **D-6F10-9** | **운영자 결정 A-1~A-6 = 추천대로 전부 (a)**: A-1 고아 `CLAIMED` 는 **ISOLATED**(ADR 0005 at-most-once·전이표 그대로, PENDING 복귀 없음) · A-2 **새 열 없이** lease 기반 고아 판정(마이그레이션 0, `claimed_at` 관측은 `OPEN-6F10-CLAIM-OBSERVABILITY`) · A-3 `bidvector.relay.mode=once` 일회 러너(db-scheduler 는 `OPEN-6F10-SCHEDULER`) · A-4 `bidvector.evaluation.mode=once` 일회 러너, HTTP 는 dry-run 유지 · A-5 relay use case·조립·러너까지 production, **억제 환경에서는 claim 0**, sender 자리는 호출되면 던지는 자리지킴 · A-6 **Codex 안 탐**(verifier opus + code-reviewer sonnet) | 운영자 2026-10-06 |
+| **D-6F10-10** | **6D-2 문면 정정의 자리.** 6D scope 제안 표의 6D-2 행(「reclaim → 정확히 한 번 발송」)은 **닫힌 evidence 라 고치지 않는다**(D-6D-19 선례: 닫힌 evidence 문면 무변경). 정정의 정본은 이 문서(수취 표·D-6F10-9)와 `milestone-6.md` 6F-10 착수 문단이고, 6D-2 착수 계약이 그 문면을 받는다 — 「claim 중 크래시 → 재기동 → 고아 **격리** → 발송 0 또는 1, **중복 0**(놓침 감수)」. in_scope 에서 `reports/evidence/m6/6d/scope.md` 를 뺀다 | A-1 (a) 귀결 |
+| **D-6F10-11** | **lease 의 자리와 성질(A-2 a 의 전제)** — ADR 0005 D-10 대로 `workflow` 가 소유하는 port, `adapters` 가 구현. 요구 ②(홀더 사망 시 **즉시** 해제)를 만족하는 구현 후보 둘 — PostgreSQL **세션 advisory lock**(DB 와 같은 장애 영역, 연결이 끊기면 해제) 대 run-state **파일 잠금** 선례(`RunStateLock`, 프로세스 범위) — 중 **설계 검토가 고른다**. 고아 판정 술어는 「lease 를 새로 잡은 relay 가 **첫 claim 전에** 보는 `CLAIMED` 전부」이고, lease 를 얻지 못한 relay 는 claim·격리 **0** + 관측 결과(ADR D-10 ③). A-2 (b) 의 V18 행은 in_scope 주석으로만 남긴다(채택 안 함) | ADR 0005 D-10 |
