@@ -68,6 +68,12 @@ class DryRunCommitSeparationGateTest {
      * 접두로 뽑으면 요청·응답 값 타입과 파일 facade 가 함께 들어온다, 실측). 그래서 그 쪽의
      * 보증 범위는 **등재된 세 이름과 그 중첩 클래스로 한정**하고, 그 밖의 모양은 주입 표면 집합
      * 등식(`AppHttpDependencyGateTest`)과 dry-run E2E 의 outbox 전후 등식이 본다(규칙 KDoc).
+     *
+     * **중첩 이름은 버리지 않고 바깥으로 접는다(cr R-4).** 앞 판은 `'$'` 가 든 이름을 전부
+     * 걸러내, 커밋 조립을 **중첩·익명 클래스 안에서만** 참조하는 새 wrapper 가 이 등식에
+     * 들어오지 않았다 — 등식이 초록인 채 등재를 건너뛰고, 그러면 선택자(대상 쪽 정확 일치)가
+     * 그 바깥 이름을 금지 집합에서 못 찾는다. `substringBefore('$')` 로 접으면 중첩에서만
+     * 참조하는 wrapper 도 등재 대상이 되고, 선택자의 접두 비교와 **대칭**이 된다.
      */
     @Test
     fun `커밋 등재는 어댑터 조립과 그 참조자의 닫힘과 같다 — 모집단 등식`() {
@@ -75,9 +81,8 @@ class DryRunCommitSeparationGateTest {
         val referrers =
             production
                 .filter { candidate ->
-                    !candidate.fullName.contains('$') &&
-                        candidate.directDependenciesFromSelf.any { it.targetClass.fullName == root }
-                }.map { it.fullName }
+                    candidate.directDependenciesFromSelf.any { it.targetClass.fullName == root }
+                }.map { it.fullName.substringBefore('$') }
                 .toSet()
 
         (referrers + root) shouldBe policy.evaluationCommitTypes.toSet()

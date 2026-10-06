@@ -2,6 +2,7 @@ package bidvector.adapters.relay
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.workflow.notification.RelayReport
+import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RuntimeEnvironment
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -105,9 +106,9 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
     fun `production 조립은 claim 까지 지나고 자리지킴 발송에서 던진다 — 경계 공유`() {
         insertPendingNotificationRow(dataSource(), "assembly-1")
         val run =
-            bidvector.adapters.relay.NotificationRelayRun(
+            NotificationRelayRun(
                 dataSource = dataSource(),
-                target = bidvector.workflow.notification.RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
+                target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
                 environment = RuntimeEnvironment.Production,
                 policy = relayNotificationPolicy(),
             )
