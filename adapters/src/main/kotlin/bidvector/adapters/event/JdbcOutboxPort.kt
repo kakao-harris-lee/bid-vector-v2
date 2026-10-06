@@ -96,9 +96,10 @@ class JdbcOutboxPort(
      * `check(== 1)` 로 막아 두었다 — 그 검사를 port 안으로 옮긴다).
      *
      * 던지는 쪽을 택한 이유: 반환형을 바꾸면 세 port 메서드의 공개 표면이 바뀌고 호출부가
-     * 계수를 **다시 버릴 수 있다**. 예외는 버릴 자리가 없다. relay 는 이 예외를 run 단위로
-     * 받아 `INCOMPLETE` 로 올린다 — 행은 `CLAIMED` 에 남고 다음 run 의 고아 격리가 받는다
-     * (발송은 한 번 있었고 상태는 모호하므로 `ISOLATED` 가 정직하다).
+     * 계수를 **다시 버릴 수 있다**. 예외는 버릴 자리가 없다. 이 예외는 relay 를 지나 러너까지
+     * 올라가고 러너가 **`FAILED`(1)** 로 옮긴다(R1-L-2 정정 — 「끝났지만 미완」인 `INCOMPLETE`
+     * 가 아니다: 불변식 위반은 실행 실패다). 행은 `CLAIMED` 에 남고 다음 run 의 고아 격리가
+     * 받는다(발송은 한 번 있었고 상태는 모호하므로 `ISOLATED` 가 정직하다).
      */
     private fun transitionState(
         entryId: OutboxEntryId,

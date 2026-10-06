@@ -103,7 +103,9 @@ internal object OutboxPayloadCodec {
         val fields =
             listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) +
                 policyVersionFields(payload.ladderPolicyVersion) +
-                payload.strategyRevision.value.toString() +
+                // `List + List`(연결)와 `List + String`(원소 추가)을 한 식에 섞지 않는다
+                // (cr L-10) — 가운데 항이 나중에 목록을 내는 함수로 바뀌면 뜻이 조용히 바뀐다.
+                listOf(payload.strategyRevision.value.toString()) +
                 evidenceFieldsOf(payload.evidence)
         return fields.joinToString(FIELD_SEPARATOR.toString()) { escapeFor(it, FIELD_SEPARATOR) }
     }
