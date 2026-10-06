@@ -378,7 +378,7 @@ class JdbcSnapshotSourceSampleTest : SnapshotSourceTestBase() {
         val extraction = extract(sampleOf(number))
 
         extraction.rows shouldHaveSize 1
-        extraction.unusableRawRows shouldBe 1
+        extraction.unusableRawRows.total shouldBe 1
         extraction.observedOutsideSample shouldBe 0
     }
 }

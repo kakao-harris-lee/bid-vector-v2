@@ -249,10 +249,64 @@ ignore_imports = ["ml_engine.training.jobs.servicer -> grpc"]
 # M5/5E-1 우회 (11) — `ml_engine.app`(조립 근, layers 계약 밖)은 serving·training·
 # inference·adapters 를 전부 잇지만, DB·HTTP·업무 모듈은 여전히 몰라야 한다(serving 순수성
 # 이 조립 근을 거쳐 새는 것을 막는다).
+#
+# M6/6G-2c D-6G2c-23(`OPEN-6G2E-APP-HTTP-IMPORT-CONTRACT`) — 앞 판은 **서드파티 클라이언트
+# 다섯의 열거**였고 표준 라이브러리의 HTTP·소켓 모듈이 그대로 지나갔다(`urllib.request` 하나로
+# `urlopen`·opener 기계와 `http.client` 가 들어온다 — 초록인데 비어 있는 게이트). 금지를
+# **패키지 뿌리**까지 넓힌다.
+#
+# **뿌리여야 하는 이유는 도구가 정한다**: import-linter 는 외부 패키지의 하위 모듈을
+# forbidden 으로 받지 않는다(실측 — "Invalid forbidden module urllib.request: subpackages of
+# external packages are not valid"). 그래서 `urllib` 를 뿌리로 막고, 허용해야 하는 하위
+# 모듈(`urllib.parse` — scheme 판정과 퍼센트 인코딩 해제)은 아래 `ignore_imports` 로 **자리를
+# 열거**한다. 하위 모듈 단위의 금지(`urllib.request` 는 막고 `urllib.parse` 는 허용)는
+# `tests/app/test_backtest_cli.py` 의 AST 스윕이 지고, 그 스윕의 금지 집합은 **이 목록을 읽어**
+# 만든다 — 목록은 이 한 자리다.
 name = "app 은 DB·HTTP·업무 모듈을 모른다"
 type = "forbidden"
 source_modules = ["ml_engine.app"]
-forbidden_modules = ["sqlalchemy", "psycopg", "requests", "httpx", "celery"]
+#
+# **이 목록이 재는 층은 정적 import 하나다**(D-6G2c-35 F-2, 경계 문면 정정). 앞 판 주석은 두 층이
+# 「네 자리 전부 잠근다」고 적었는데 그것은 **열거한 이름**에 대해서만 참이다. 경계 밖(코드로 막지
+# 않고 알려진 제한으로 등재한 것):
+#   - **동적 import** — `importlib.import_module("http.client")` · `__import__("socket")`.
+#     grimp 도 AST 스윕도 보지 못한다(둘 다 import 문을 읽는다).
+#   - **목록 밖 네트워크 경로** — `asyncio`(`open_connection`) · `multiprocessing.connection` ·
+#     `subprocess`·`os`(curl 호출) · `webbrowser` · `wsgiref`. 이 이름들은 네트워크 전용이 아니라
+#     금지하면 정상 사용까지 막는다 — 그래서 열거하지 않고 경계 밖으로 적는다.
+# 열거는 **표준 네트워크 클라이언트**까지다(cr P-3): 아래 목록.
+forbidden_modules = [
+    "sqlalchemy",
+    "psycopg",
+    "requests",
+    "httpx",
+    "celery",
+    "ftplib",
+    "http",
+    "imaplib",
+    "nntplib",
+    "poplib",
+    "smtplib",
+    "socket",
+    "socketserver",
+    "ssl",
+    "urllib",
+    "xmlrpc",
+]
+# `urllib.parse` 를 쓰는 자리 전수 — 네 자리다. 이 계약은 간접 import 도 센다(기본값, 일부러
+# 그대로 둔다 — DB 모듈이 adapters 를 거쳐 새는 것을 막는 성질이다). 그래서 조립 근이 잇는
+# 모듈의 자리까지 함께 열거한다. 자리가 늘면 `lint-imports` 가 **먼저** 붉어지고, 없어진 자리를
+# 남겨 두면 도구가 "No matches for ignored import" 로 거부한다(실측) — 양방향으로 낡지 않는다.
+#
+# **이 네 자리는 AST 스윕의 대상이기도 하다**(D-6G2c-35 F-1). 뿌리 간선을 지우는 예외는 그 모듈의
+# `urllib` 를 **전부** 열므로, 스윕이 `app/**` 뿐이던 앞 판에서는 app 밖 셋이 두 층 모두 초록이었다.
+# 스윕은 이 목록을 읽어 자기 범위를 만든다 — 예외를 늘리면 감시도 같은 커밋에서 는다.
+ignore_imports = [
+    "ml_engine.app.backtest_cli -> urllib",
+    "ml_engine.adapters.snapshot_files -> urllib",
+    "ml_engine.adapters.dataset_files -> urllib",
+    "ml_engine.training.jobs.servicer -> urllib",
+]
 
 [[tool.importlinter.contracts]]
 # M5/5E-3 D-5E3-6(verifier r1 HIGH-1) — 「yaml 을 부르는 곳은 `registry/policy.py`

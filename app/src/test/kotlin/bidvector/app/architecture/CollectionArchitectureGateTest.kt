@@ -8,6 +8,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.ArchRule
 import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -22,7 +23,7 @@ import java.time.LocalDate
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CollectionArchitectureGateTest {
     private val policy = ArchitecturePolicy.load()
-    private val rules = CollectionArchitectureRules()
+    private val rules = CollectionArchitectureRules(policy.depth(DepthAxis.REFLECTION))
     private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val appRoot = "${policy.packageRoot}.app"
     private val production: JavaClasses =
@@ -45,6 +46,7 @@ class CollectionArchitectureGateTest {
                 allowedTypes = policy.collectionAllowedProcurementTypes.toSet(),
                 passThroughTypes = policy.collectionPassThroughTypes.toSet(),
                 forbiddenFieldTypes = policy.collectionForbiddenFieldTypes.toSet(),
+                depth = policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
             ).checkAll()
     }
 
@@ -54,6 +56,7 @@ class CollectionArchitectureGateTest {
             production,
             policy.collectionPackage,
             "${policy.packageRoot}.procurement",
+            policy.depth(DepthAxis.COLLECTION_PROCUREMENT),
         ) shouldBe policy.collectionAllowedProcurementTypes.toSet()
     }
 
@@ -73,6 +76,7 @@ class CollectionArchitectureGateTest {
                 allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
                 passThroughTypes = policy.collectionPassThroughTypes.toSet(),
                 allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+                depth = policy.depth(DepthAxis.RAW_ACCESS),
             ).checkAll()
     }
 
@@ -82,6 +86,7 @@ class CollectionArchitectureGateTest {
             production,
             policy.rawAccessRoots,
             policy.rawAccessTypes.toSet(),
+            policy.depth(DepthAxis.RAW_ACCESS),
         ) shouldBe policy.rawAccessAllowedReferencers.toSet()
         rules.observedMemberAccessors(
             production,
@@ -91,29 +96,55 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
-    fun `workflow·app production 은 리플렉션 API 를 참조하지 않고 Class 는 이름 조회만 한다`() {
+    fun `리플렉션 뿌리가 실제로 production 에 있다 — domain 여섯을 포함해 규칙이 공허하지 않다`() {
+        policy.reflectionRoots.forEach { root ->
+            production.filter { it.packageName == root || it.packageName.startsWith("$root.") }.shouldNotBeEmpty()
+        }
+    }
+
+    @Test
+    fun `production 전 층의 리플렉션 타입 참조와 Class 멤버 접근은 등재 쌍뿐이다`() {
         rules
             .moduleMustNotUseReflection(
-                roots = policy.rawAccessRoots,
+                roots = policy.reflectionRoots,
                 reflectionPackages = policy.reflectionPackages.toSet(),
-                allowedReferencers = policy.reflectionAllowedReferencers.toSet(),
+                allowedTypePairs = policy.reflectionTypePairs.toSet(),
                 classType = policy.reflectionClassType,
-                allowedClassMembers = policy.reflectionClassAllowedMembers.toSet(),
+                allowedMemberPairs = policy.reflectionClassMemberPairs.toSet(),
             ).checkAll()
     }
 
     @Test
-    fun `리플렉션 봉쇄의 허용 참조자·허용 Class 멤버는 관측 집합과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
-        rules.observedReflectionReferencers(
+    fun `리플렉션 봉쇄의 두 쌍 집합은 관측 집합과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
+        rules.observedReflectionTypePairs(
             production,
-            policy.rawAccessRoots,
+            policy.reflectionRoots,
             policy.reflectionPackages.toSet(),
-        ) shouldBe policy.reflectionAllowedReferencers.toSet()
-        rules.observedClassMembers(
+        ) shouldBe policy.reflectionTypePairs.toSet()
+        rules.observedClassMemberPairs(
             production,
-            policy.rawAccessRoots,
+            policy.reflectionRoots,
             policy.reflectionClassType,
-        ) shouldBe policy.reflectionClassAllowedMembers.toSet()
+        ) shouldBe policy.reflectionClassMemberPairs.toSet()
+    }
+
+    /**
+     * A-2 양성 대조 — 뿌리를 앞 판(`workflow`·`app`)으로 좁히면 `adapters` 의 등재 쌍이 관측에서 빠진다.
+     * 뿌리 확장이 조용히 되돌려지면 이 단언이 RED 다.
+     */
+    @Test
+    fun `리플렉션 뿌리를 좁히면 adapters 쌍이 관측에서 사라진다 — 뿌리 확장의 양성 대조`() {
+        val narrowed =
+            rules.observedClassMemberPairs(production, policy.rawAccessRoots, policy.reflectionClassType) +
+                rules.observedReflectionTypePairs(
+                    production,
+                    policy.rawAccessRoots,
+                    policy.reflectionPackages.toSet(),
+                )
+        val widened = policy.reflectionClassMemberPairs.toSet() + policy.reflectionTypePairs.toSet()
+
+        (widened - narrowed).shouldNotBeEmpty()
+        (narrowed - widened).shouldBeEmpty()
     }
 
     @Test
@@ -124,11 +155,13 @@ class CollectionArchitectureGateTest {
                 setOf(policy.collectionUseCaseType),
                 policy.collectionUseCaseReferencers.toSet(),
                 "D-6F8-6 우회 5 — 수집 use case 참조 집합은 러너와 배선이다",
+                policy.depth(DepthAxis.USECASE),
             ).checkAll()
         rules.observedReferencers(
             production,
             listOf(policy.packageRoot),
             setOf(policy.collectionUseCaseType),
+            policy.depth(DepthAxis.USECASE),
         ) shouldBe policy.collectionUseCaseReferencers.toSet()
     }
 
@@ -213,6 +246,7 @@ class CollectionArchitectureGateTest {
                 policy.runnerTypes.toSet(),
                 policy.runnerAllowedReferencers.toSet(),
                 "D-6F8-3 우회 5 — 러너 타입 참조 집합은 수집 러너 하나다",
+                policy.depth(DepthAxis.RUNNER),
             ).checkAll()
     }
 
@@ -224,6 +258,7 @@ class CollectionArchitectureGateTest {
                 setOf(policy.serviceKeyType),
                 policy.serviceKeyReaders.toSet(),
                 "D-6F8-4 우회 4 — 서비스 키 원문 설정 참조 집합은 배선 한 곳이다",
+                policy.depth(DepthAxis.SERVICE_KEY),
             ).checkAll()
     }
 
@@ -235,30 +270,8 @@ class CollectionArchitectureGateTest {
                 policy.loggingTypes.toSet(),
                 policy.loggingAllowedUsers.toSet(),
                 "D-6F8-4 우회 4 — 로거 사용 집합은 수집 로그 출구 하나다",
+                policy.depth(DepthAxis.LOGGING),
             ).checkAll()
-    }
-
-    /**
-     * D-6G-47 — **HTTP 클라이언트를 쥔 자리가 관문 하나**임을 잰다(만드는 배선 한 곳 포함).
-     *
-     * 관문이 상한을 세고 원장에 적는데, 다른 곳에서 클라이언트를 얻으면 그 호출은 어느 셈에도
-     * 들어가지 않는다. 「관문을 지나라」는 규율이 아니라 **의존 구조**여야 하고, 이 등식이 그
-     * 구조를 잰다 — 새 클라이언트 참조가 생기면 목록을 고치지 않고는 초록이 되지 않는다.
-     */
-    @Test
-    fun `HTTP 클라이언트를 쥔 자리는 관문과 그것을 만드는 배선뿐이다`() {
-        referencersOf(policy.httpClientRoots, setOf(policy.httpClientType)) shouldBe policy.httpClientHolders.toSet()
-    }
-
-    /**
-     * D-6G-62 — `java.net.http` 를 쓰지 않아도 URL·소켓으로 바이트를 가져올 수 있고, 그 호출은
-     * 상한에도 원장에도 들어가지 않는다. 이름을 문자열로 짓는 반사도 같은 구멍이라 함께 막는다.
-     * 허용 집합은 **비어 있다**: 6G 의 모든 바깥 호출은 관문의 `java.net.http` 를 지난다.
-     */
-    @Test
-    fun `관문을 우회하는 전송·반사 타입을 쥔 production 클래스가 없다`() {
-        referencersOf(policy.transportBypassRoots, policy.transportBypassTypes.toSet()) shouldBe
-            policy.transportBypassHolders.toSet()
     }
 
     /**
@@ -268,18 +281,24 @@ class CollectionArchitectureGateTest {
      */
     @Test
     fun `공고 키 해시를 짓는 자리는 등재된 집합뿐이다`() {
-        referencersOf(policy.keyHashRoots, setOf(policy.keyHashType)) shouldBe policy.keyHashHolders.toSet()
+        referencersOf(
+            policy.keyHashRoots,
+            setOf(policy.keyHashType),
+            policy.depth(DepthAxis.KEY_HASH),
+        ) shouldBe policy.keyHashHolders.toSet()
     }
 
     /** root 아래 production 에서 [types] 중 하나라도 직접 참조하는 클래스 이름 집합. */
     private fun referencersOf(
         roots: List<String>,
         types: Set<String>,
+        depth: ReferenceCollection,
     ): Set<String> =
         production
             .filter { item -> roots.any { item.name.startsWith("$it.") } }
-            .filter { item -> item.directDependenciesFromSelf.any { it.targetClass.name in types } }
-            .map { it.name }
+            .filter { item ->
+                item.referencedTypeNames(depth).any { it in types && it != item.outermostClassName() }
+            }.map { it.outermostClassName() }
             .toSet()
 
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }

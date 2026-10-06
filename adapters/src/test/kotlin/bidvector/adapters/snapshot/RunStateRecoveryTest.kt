@@ -5,6 +5,7 @@ import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import java.nio.file.Files
@@ -202,10 +203,7 @@ class RunStateRecoveryTest : RunStateDirectoryFixture() {
 
         // 같은 프로세스에서 다시 열면 잠금을 **얻는다**(Busy 가 아니다) — 거부 사유가 다시 보인다.
         shouldThrow<Exception> { open() }.message.toString().isNotEmpty() shouldBe true
-        RunStateLock.tryAcquire(root()).let {
-            (it is RunStateLock.Held) shouldBe true
-            it.release()
-        }
+        RunStateLock.tryAcquire(root()).shouldBeInstanceOf<RunStateLock.Held>().release()
     }
 
     /**
@@ -239,6 +237,56 @@ class RunStateRecoveryTest : RunStateDirectoryFixture() {
 
         Files.readString(file) shouldBe received
         Files.exists(root().resolve(STAGED_ATTEMPT_NAME)) shouldBe false
+    }
+
+    /**
+     * **D-6G2c-21 ① (cr r5-t 수령) — 읽기 전용 대조가 바이트를 바꾸는 걸음보다 앞선다.** D-6G2e-17 은
+     * 자리 대조만 앞으로 옮겼고 **접두 대조는 되돌림 뒤**에 남았다. 그래서 「확정이 중단되었고 원장
+     * 앞부분도 어긋난」 디렉터리에서는 거부 **전에** 되돌림이 표본 파일을 지웠다 — 사람이 보려던
+     * 증거가 거부 메시지와 함께 사라졌고, 그 디렉터리에서 무엇이 확정돼 있었는지 물을 자리가 없다.
+     */
+    @Test
+    fun `확정 중단과 접두 변조가 겹친 디렉터리는 표본 파일을 남긴 채 거부된다`() {
+        val directory = open()
+        directory.attempts.append(runStatePendingAttempt())
+        directory.close()
+        // 확정 첫 걸음만 끝난 모양 — 장부는 「확정된 목록 없음」인데 목록 파일이 있다.
+        val sampleFile = root().resolve(SAMPLE_LIST_NAME)
+        Files.writeString(sampleFile, SampleListFile.render(runStateSample().sample))
+        val ledger = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(
+            ledger,
+            Files.readString(ledger).replaceFirst("2026-09-24T01:00:00Z", "2026-09-24T01:00:01Z"),
+        )
+        val receivedSample = Files.readString(sampleFile)
+
+        shouldThrow<IllegalArgumentException> { reopen() }.message.orEmpty() shouldContain "앞부분이 장부와 다르다"
+
+        Files.readString(sampleFile) shouldBe receivedSample
+    }
+
+    /**
+     * **D-6G2c-21 ② (cr r5-t 수령) — 진짜 절단과 변조의 진단을 가른다.** 장부가 센 줄의 꼬리가
+     * 조각으로 남은 원장(쓰다 죽은 자리)은 접두 해시가 어긋나므로 앞 판이 「append-only 로 설명되지
+     * 않는 변경」으로 보고했다 — 운영자는 손이 닿은 디렉터리를 찾는다. 거부는 둘 다 그대로이고
+     * **갈리는 것은 사유 문면**이다(실행 상태 바이트 무변경).
+     */
+    @Test
+    fun `장부가 센 줄의 꼬리가 잘리면 변조가 아니라 절단으로 보고한다`() {
+        val directory = open()
+        directory.attempts.append(runStatePendingAttempt())
+        directory.attempts.append(runStatePendingAttempt())
+        directory.close()
+        val ledger = root().resolve(ATTEMPT_LEDGER_NAME)
+        val text = Files.readString(ledger)
+        // 둘째 줄을 중간에서 끊는다 — 첫 줄은 성하므로 변조가 아니다.
+        val truncated = text.substring(0, text.indexOf('\n') + 1 + HALF_LINE_BYTES)
+        Files.writeString(ledger, truncated)
+
+        val message = shouldThrow<IllegalArgumentException> { reopen() }.message.orEmpty()
+
+        message shouldContain "끝 줄이 잘렸다"
+        Files.readString(ledger) shouldBe truncated
     }
 
     /**
@@ -299,6 +347,9 @@ class RunStateRecoveryTest : RunStateDirectoryFixture() {
         return file
     }
 }
+
+/** 둘째 줄을 끊는 자리 — 줄 하나보다 짧으면 어디든 같은 모양(개행 뒤의 조각)이다. */
+private const val HALF_LINE_BYTES = 20
 
 /** 되살린 라운드의 걷기 식별자 — 조각 자신의 시각이고 [RUN_STATE_AT] 과 다른 값으로 둔다. */
 private val TORN_CALL_AT: Instant = Instant.parse("2026-09-24T02:00:00Z")

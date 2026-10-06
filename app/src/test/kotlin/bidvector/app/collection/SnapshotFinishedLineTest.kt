@@ -4,7 +4,10 @@ import bidvector.adapters.snapshot.SnapshotExtraction
 import bidvector.adapters.snapshot.SnapshotNotice
 import bidvector.adapters.snapshot.SnapshotOutcome
 import bidvector.adapters.snapshot.SnapshotRow
+import bidvector.adapters.snapshot.UnusableRawRowCause
+import bidvector.adapters.snapshot.UnusableRawRows
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -24,8 +27,39 @@ class SnapshotFinishedLineTest {
         line shouldBe
             "snapshot-extract finished rows=3 sampleSize=11 sampledWithoutDetail=5 " +
             "skippedWithoutNotice=7 incompleteAxis=13 unusableRawRows=17 " +
+            "blankNoticeNumber=2 malformedRound=3 unknownEndpoint=12 " +
             "fractionalAmounts=19 incompleteAValues=23 outsideSample=29 bytes=97"
     }
+
+    /**
+     * **D-6G2c-20 — 줄의 합계 칸은 줄의 원인 세 칸의 합이다**(cr r1 K-4 정정). 앞 판은 값 쪽에서
+     * `total` 과 열거 합을 맞댔는데, 지도가 열거 키 전용이라 두 식이 **모든 입력에서 같았다** — 어떤
+     * 변이도 가르지 못하는 단언이었다. 재야 할 것은 값이 아니라 **렌더한 줄**이다: 합계를 원인과 다른
+     * 자리에서 길어 오는 편집이 그때 붉어진다.
+     */
+    @Test
+    fun `렌더한 줄의 합계 칸은 되읽은 원인 세 칸의 합이다`() {
+        val fields = fieldsOf(snapshotFinishedLine(sampleSize = 11, extraction = distinctCounts(), bytes = 97))
+
+        fields.getValue("unusableRawRows") shouldBe
+            CAUSE_FIELDS.sumOf { fields.getValue(it) }
+    }
+
+    /** 줄을 칸으로 되읽는다 — 재는 쪽이 줄을 짓는 코드를 다시 부르지 않는다. */
+    private fun fieldsOf(line: String): Map<String, Int> =
+        Regex("(\\w+)=(\\d+)")
+            .findAll(line)
+            .associate { it.groupValues[1] to it.groupValues[2].toInt() }
+
+    /** 등재되지 않은 원인은 0 이다 — 빈 지도를 받은 추출의 줄에서 칸이 사라지지 않는다. */
+    @Test
+    fun `원인 지도가 비면 세 칸이 모두 0 으로 선다`() {
+        val line = snapshotFinishedLine(sampleSize = 1, extraction = noUnusableRows(), bytes = 1)
+
+        line shouldContain "unusableRawRows=0 blankNoticeNumber=0 malformedRound=0 unknownEndpoint=0 "
+    }
+
+    private fun noUnusableRows() = distinctCounts().copy(unusableRawRows = UnusableRawRows.NONE)
 
     private fun distinctCounts() =
         SnapshotExtraction(
@@ -34,7 +68,14 @@ class SnapshotFinishedLineTest {
             sampledWithoutDetail = 5,
             observedOutsideSample = 29,
             incompleteAxis = 13,
-            unusableRawRows = 17,
+            unusableRawRows =
+                UnusableRawRows(
+                    mapOf(
+                        UnusableRawRowCause.BLANK_NOTICE_NUMBER to 2,
+                        UnusableRawRowCause.MALFORMED_ROUND to 3,
+                        UnusableRawRowCause.UNKNOWN_ENDPOINT to 12,
+                    ),
+                ),
             fractionalAmounts = 19,
             incompleteAValues = 23,
         )
@@ -80,3 +121,6 @@ class SnapshotFinishedLineTest {
             bidderRows = emptyList(),
         )
 }
+
+/** 줄에 서는 원인 칸 셋 — 이름이 바뀌면 되읽기가 멈춘다(`getValue` 가 던진다). */
+private val CAUSE_FIELDS = listOf("blankNoticeNumber", "malformedRound", "unknownEndpoint")

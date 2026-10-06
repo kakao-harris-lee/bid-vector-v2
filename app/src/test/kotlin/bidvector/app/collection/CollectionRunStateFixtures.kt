@@ -40,6 +40,19 @@ internal fun attemptLinesOf(root: Path): List<String> =
     Files.readString(root.resolve("attempts.jsonl")).trimEnd('\n').lines()
 
 /**
+ * 한 축의 **나간 호출** 줄 수 — 원장의 `HTTP` 줄을 축으로 좁힌다(D-6G2f-3). 쪽 크기가 호출 수를
+ * 줄였는지는 mock 이 받은 요청 수와 이 값 **둘로** 본다: 한쪽만 보면 세는 자리의 결함을 그 자리로
+ * 재게 된다(D-6G-56 과 같은 이유).
+ */
+internal fun httpAttemptCountOf(
+    root: Path,
+    axis: SourceEndpoint,
+): Int =
+    attemptLinesOf(root).count {
+        it.contains("\"axis\":\"${axis.name}\"") && it.contains("\"kind\":\"HTTP\"")
+    }
+
+/**
  * 오늘치를 그만큼 써 둔 실행 상태 — **출하 경로로** 적는다(손으로 줄만 쓰면 무결성 장부와 어긋나
  * 기동이 거부되고, 그 거부는 재려는 것이 아니다). 쓰고 나면 잠금을 놓는다.
  */

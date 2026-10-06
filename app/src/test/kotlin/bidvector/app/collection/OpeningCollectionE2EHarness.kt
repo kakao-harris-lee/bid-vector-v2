@@ -14,6 +14,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.boot.context.event.ApplicationPreparedEvent
 import org.springframework.context.ApplicationContext
 import org.springframework.context.ApplicationListener
+import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.io.ByteArrayOutputStream
@@ -37,7 +38,10 @@ internal const val DIVISIONS = 2
 /** 개찰완료 축을 두 쪽으로 나눈다 — 투찰 행 셋이 2 + 1 로 갈린다(D-6G-58). */
 internal const val OPENING_COMPLETE_PAGE_SIZE = 2
 
-/** mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. */
+/**
+ * mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. **기본 판에서만 이 값이다**:
+ * [MockPagingMode.biddersPerNotice] 를 준 판은 그 수만큼 짓는다(참가가 많은 공고).
+ */
 internal const val BIDDERS_PER_NOTICE = 3
 
 private const val POSTGRES_IMAGE = "postgres:16.4"
@@ -46,9 +50,11 @@ private const val SERVICE_KEY = "OPENING-E2E-SENTINEL+KEY/value="
 private const val BIDDER_NAME = "SYN-투찰업체-이름"
 
 /**
- * 개찰 수집 E2E 의 **출하 조립 기동기**. 두 test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
- * 「무엇을 부르는가」(표본·원문·조립 타입)와 「얼마나·언제 부르는가」(상한·잠금·이어 돌기)이고,
- * 기동 장치를 두 벌 두면 두 test 가 **서로 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
+ * 개찰 수집 E2E 의 **출하 조립 기동기**. **세** test 클래스가 이것 하나를 쓴다 — 클래스를 가른 축은
+ * 「무엇을 부르는가」(표본·원문·조립 타입, [OpeningCollectionE2ETest]) · 「얼마나·언제 부르는가」
+ * (상한·잠금·이어 돌기, [OpeningBudgetE2ETest]) · 「한 호출이 몇 행을 받는가」(쪽 크기가 wire·호출
+ * 수·표본에 미치는 것, [OpeningPageSizeE2ETest])이고, 기동 장치를 여러 벌 두면 그 test 들이 **서로
+ * 다른 조립**을 재게 된다. 그 어긋남은 조용하다.
  *
  * 기동은 `bidvector.opening-collection.mode=once` 로 `app` 의 배선 그대로 뜨고, 바깥 호출은 전부
  * loopback in-process mock 으로 간다(실 KONEPS 호출 0).
@@ -123,6 +129,7 @@ internal class OpeningCollectionE2EHarness {
         throttleOnce: Set<String> = emptySet(),
         openingCompletePageSize: Int = 0,
         failOpeningCompleteSecondPageOnce: Boolean = false,
+        paging: MockPagingMode = MockPagingMode(),
         reuseRunState: Boolean = false,
         now: Instant? = null,
         inspect: (ApplicationContext) -> Unit = {},
@@ -134,38 +141,61 @@ internal class OpeningCollectionE2EHarness {
         val originalErr = System.err
         System.setOut(PrintStream(stdio, true, StandardCharsets.UTF_8))
         System.setErr(PrintStream(stdio, true, StandardCharsets.UTF_8))
-        E2E_FIXED_NOW.set(now)
-        if (!reuseRunState) freshRunStateDir()
-        val mock =
-            MockOpeningKonepsHttp(
-                noticesPerSlot = NOTICES_PER_SLOT,
-                bidderName = BIDDER_NAME,
-                nonce = nonce ?: newE2ENonce(),
-                throttleOnce = throttleOnce,
-                openingCompletePageSize = openingCompletePageSize,
-                failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
-            )
-        val context =
-            SpringApplicationBuilder(
-                BidVectorApplication::class.java,
-                CollectionTerminationTestConfiguration::class.java,
-                FixedClockTestConfiguration::class.java,
-            ).properties(
-                PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
-            ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachRootLogCapture(logs) })
-                .run()
-        return try {
+        // **기동도 `try` 안이다**(D-6G2c-19 (a) = cr r5-t M-4 = vr r5-t M-4). 앞 판은 `.run()` 이
+        // `try` **밖**이라 기동이 던지면 `finally` 가 돌지 않았다: 표준 출력·오류가 되돌려지지 않고
+        // [lastStdio] 가 **앞 실행의 것**으로 남았다. 그래서 실패 경로의 누출 자물쇠가 이번 실행의
+        // 출력을 보지 않았다 — 심은 누출 둘이 그 경로에서 초록이었다.
+        var mock: MockOpeningKonepsHttp? = null
+        var context: ConfigurableApplicationContext? = null
+        try {
+            E2E_FIXED_NOW.set(now)
+            if (!reuseRunState) freshRunStateDir()
+            val started =
+                mockFor(nonce, throttleOnce, openingCompletePageSize, failOpeningCompleteSecondPageOnce, paging)
+            mock = started
+            context = bootContext(started, extra)
             inspect(context)
-            context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to mock
+            return context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to started
         } finally {
-            context.close()
-            mock.close()
+            context?.close()
+            mock?.close()
             E2E_FIXED_NOW.set(null)
             System.setOut(originalOut)
             System.setErr(originalErr)
             lastStdio = stdio.toString(StandardCharsets.UTF_8)
         }
     }
+
+    /** 출하 조립을 띄운다 — 기동 절차와 누출 자물쇠의 `try/finally` 를 한 함수에 섞지 않는다. */
+    private fun bootContext(
+        mock: MockOpeningKonepsHttp,
+        extra: Map<String, String>,
+    ): ConfigurableApplicationContext =
+        SpringApplicationBuilder(
+            BidVectorApplication::class.java,
+            CollectionTerminationTestConfiguration::class.java,
+            FixedClockTestConfiguration::class.java,
+        ).properties(
+            PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
+        ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachRootLogCapture(logs) })
+            .run()
+
+    /** mock 을 짓는 자리 — 기동 절차와 응답 판을 한 함수에 섞지 않는다. */
+    private fun mockFor(
+        nonce: String?,
+        throttleOnce: Set<String>,
+        openingCompletePageSize: Int,
+        failOpeningCompleteSecondPageOnce: Boolean,
+        paging: MockPagingMode,
+    ) = MockOpeningKonepsHttp(
+        noticesPerSlot = NOTICES_PER_SLOT,
+        bidderName = BIDDER_NAME,
+        nonce = nonce ?: newE2ENonce(),
+        throttleOnce = throttleOnce,
+        openingCompletePageSize = openingCompletePageSize,
+        failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
+        paging = paging,
+    )
 
     /** 기동 속성의 바탕 — test 가 `extra` 로 덮어쓴다. */
     private fun baseProperties(mock: MockOpeningKonepsHttp): Map<String, String> =

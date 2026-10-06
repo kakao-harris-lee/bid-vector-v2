@@ -3,6 +3,7 @@ import bidvector.buildlogic.DomainApiTypeGateTask
 import bidvector.buildlogic.DomainSourceReferenceGateTask
 import bidvector.buildlogic.DuplicatePolicy
 import bidvector.buildlogic.GateExecutionGateTask
+import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
@@ -366,6 +367,24 @@ val gateExecutionGate =
         report = layout.buildDirectory.file("reports/gate-execution/violations.txt")
     }
 
+// `gateExecutionGate` 의 **반대축** — 등재된 것이 돌았는가가 아니라, 돌아야 할 것이 등재됐는가.
+// 등재되지 않은 게이트 test 는 지워도 비활성화해도 `check` 가 조용히 초록이다. 모집단이 **컴파일된
+// 클래스**이고 모듈 전수라, 패키지마다 손으로 걸던 앞 판의 덮개 구멍이 정의상 사라진다.
+// **알려진 순서**: 제외 출처가 `test` task 의 필터라 이 task 는 그 뒤에 선다(`gateExecutionGate` 와 같다).
+val gateRegistrationGate =
+    tasks.register<GateRegistrationGateTask>("gateRegistrationGate") {
+        description = "게이트 등재 장부가 컴파일된 test 클래스 전수와 같은지 잰다(양방향)"
+        policyFile = configDir.file("quality/gate-tests.properties")
+        moduleName = project.name
+        testClasses.from(provider { sourceSets["test"].output.classesDirs })
+        testSources.from(provider { sourceSets["test"].allSource.matching { include("**/*.kt", "**/*.java") } })
+        testRuntimeClasspath.from(configurations.named("testRuntimeClasspath"))
+        excludePatterns = tasks.named("test", Test::class.java).map { it.filter.excludePatterns }
+        // `provider { … }` 입력은 생산자를 유추시키지 못한다 — 이 파일의 다른 task 관례대로 명시한다.
+        dependsOn(tasks.named("testClasses"))
+        report = layout.buildDirectory.file("reports/gate-registration/violations.txt")
+    }
+
 // 하네스 `test-discovery-guard`(`OPEN-2B-TEST-DISCOVERY-GUARD`) — JUnit 이 조용히 discover
 // 하지 않는 test 메서드 형태(식 본문·비-Unit 명시 반환·suspend·private)를 잡는다. main 외
 // 전 source set(test·testFixtures)의 Kotlin 소스가 대상 — `gateExecutionGate`(돌았는가)와
@@ -446,6 +465,7 @@ tasks.named("check") {
         jarContentGate,
         sourceSetLayoutGate,
         gateExecutionGate,
+        gateRegistrationGate,
         testShapeGate,
         domainSourceReferenceGate,
         domainApiTypeGate,

@@ -5,22 +5,18 @@ import bidvector.adapters.koneps.KonepsJsonParser
 import bidvector.adapters.koneps.asIntOrNull
 import bidvector.adapters.koneps.asObject
 import bidvector.adapters.koneps.asStringOrNull
-import bidvector.procurement.AttemptHistory
 import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
 import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.SampleListLedger
 import bidvector.workflow.collection.hexOf
 import bidvector.workflow.collection.sha256Hex
-import java.nio.channels.FileChannel
-import java.nio.channels.FileLock
 import java.nio.file.Files
 import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.time.Instant
 
@@ -52,6 +48,12 @@ internal const val ATTEMPT_MAX_DEPTH = 4
  * **이 클래스는 디렉터리를 만들지 않는다.** 없으면 거부한다. 경로 오타 하나로 빈 디렉터리가 생기면
  * 승인 상한이 조용히 0 에서 시작하고 표본이 다시 뽑힌다 — 둘 다 실 호출이 나간 뒤에야 드러난다.
  * 디렉터리를 만드는 것은 운영자의 명시 행위여야 한다.
+ *
+ * **한 인스턴스는 한 스레드만 쓴다**(D-6G2c-5, vr r5 L-9 probe P2b). 누적 해시와 무결성 장부가
+ * 한 쌍으로 움직이므로, 두 스레드가 같은 인스턴스로 원장에 쓰면 그 쌍이 서로의 중간 상태를 적어
+ * 장부가 깨진다. 동기화를 넣지 않는다 — **두 스레드가 쓰는 자리가 없다**: 수집·추출은 한 프로세스
+ * 한 갈래의 순차 실행이고(배선이 러너 하나를 돌린다), 겹쳐 도는 두 **프로세스**는 잠금이 막는다.
+ * 넣으면 측정된 필요 없이 들어온 동기화가 「여러 스레드가 써도 된다」는 거짓 약속을 남긴다.
  */
 class RunStateDirectory(
     private val root: Path,
@@ -107,29 +109,46 @@ class RunStateDirectory(
      * 넷 다 **가드 안**이다(D-6G2d-48 ⑥ · D-6G2e-5) — 잠금을 쥔 실행이 거부로 죽으면 그 잠금이 열린
      * 채 남고 다음 실행은 「다른 실행이 돌고 있다」로 조용히 끝난다(거부 사유가 사라진다). 원장
      * **읽기**도 던질 수 있다(비UTF-8 바이트) — 그래서 해시를 짓는 자리까지 가드 안이다.
+     *
+     * ⑤ **잠금을 들지 못한 실행은 해시를 짓지 않는다**(D-6G2c-21 ⑦) — 그 실행은 아무것도 쓰지 않으므로
+     * 누적 해시가 필요 없다. 그런데도 지으면 원장 전체를 읽고, 그 읽기가 던지는 순간(비UTF-8 바이트)
+     * 조용히 물러나야 할 실행이 **예외로 죽는다**. 형식 판별만 ① 때문에 잠금과 무관하게 남는다.
+     *
+     * **이 약속은 러너까지다**(cr r1 K-2). 전 조립 기동에서는 상한 원장 seed 가 잠금과 무관하게 시도
+     * 원장을 읽으므로, 판독 불가 원장 + 동시 기동이면 빈 생성 중에 여전히 던진다 — 운영자는 건너뜀
+     * 줄 대신 스택 트레이스를 본다(호출은 0). 그 미달은 `OPEN-6G2C-BUSY-SEED-ORDER` 가 든다.
      */
-    private val ledger: LedgerDigest =
+    private val ledger: LedgerDigest? =
         heldOrRelease {
             factsFile.requireReadableFormat()
-            if (lock is RunStateLock.Held) verifyThenHeal()
-            LedgerDigest(attemptFile)
+            if (lock is RunStateLock.Held) {
+                verifyThenHeal()
+                LedgerDigest(attemptFile)
+            } else {
+                null
+            }
         }
 
     init {
         // **재동기만** 복구 뒤에 남는다(D-6G2e-17) — 장부에 적을 해시를 손에 들어야 하고, 그 해시는
         // 복구가 끝난 바이트의 것이어야 한다. 대조는 전부 복구 앞에서 이미 끝났다.
-        if (lock is RunStateLock.Held) {
-            heldOrRelease { factsFile.read()?.let(::resyncLedgerIfAhead) }
+        ledger?.let { digest ->
+            heldOrRelease { factsFile.read()?.let { facts -> resyncLedgerIfAhead(facts, digest) } }
         }
     }
 
     /**
      * 잠금을 든 기동의 첫 걸음 — **대조를 모두 끝낸 뒤에 고쳐 쓴다**(D-6G2e-17).
      *
-     * 자리 대조 → 끝나지 않은 확정 되돌림 → 확정 표본 해시 대조 → 원장 앞부분 대조 → 찢어진 꼬리
-     * 복구. 복구 앞의 넷은 **읽기만** 하므로 어느 하나로 거부돼도 받은 바이트가 그대로 남는다.
-     * 되돌림이 표본 해시 대조보다 앞서는 것은 끝나지 않은 확정이 곧 그 불일치이기 때문이고
-     * (그 사고를 막으려던 장부가 만드는 사고다), 그 되돌림은 원장을 건드리지 않는다.
+     * 자리 대조 → **원장 앞부분 대조** → 끝나지 않은 확정 되돌림 → 확정 표본 해시 대조 → 찢어진 꼬리
+     * 복구. **읽기만 하는 둘이 바이트를 바꾸는 첫 걸음보다 앞선다**(D-6G2c-21 ①) — 자리 대조와 접두
+     * 대조다. 앞 판은 되돌림이 접두 대조보다 앞서서, 「확정이 중단되었고 원장 앞부분도 어긋난」
+     * 디렉터리의 표본 파일이 거부 **전에** 지워졌다: 사람이 보려던 증거가 거부 메시지와 함께
+     * 사라져 있었다.
+     *
+     * 읽기 전용인데도 **뒤에 남는 것은 확정 표본 해시 대조 하나**다 — 끝나지 않은 확정이 곧 그
+     * 불일치이므로 되돌림보다 앞서 재면 그 창이 그대로 거부가 된다(사유는 [verifyConfirmedSample]).
+     * 그 되돌림은 원장을 건드리지 않는다.
      *
      * 장부를 한 번 읽어 넷이 나눠 쓴다(앞 판은 걸음마다 다시 파싱했다).
      */
@@ -137,9 +156,9 @@ class RunStateDirectory(
         val facts = factsFile.read()
         verifyPlacement(facts)
         facts?.let {
+            requireLedgerPrefix(it)
             rollBackInterruptedConfirmation(it)
             verifyConfirmedSample(it)
-            requireLedgerPrefix(it)
         }
         healTornTail()
     }
@@ -147,45 +166,77 @@ class RunStateDirectory(
     /** 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다. */
     private fun <T> heldOrRelease(body: () -> T): T =
         runCatching(body).getOrElse {
-            lock.release()
+            lock.releaseIfHeld()
             throw it
         }
 
-    val sampleList: FileSampleListLedger = FileSampleListLedger(sampleFile) { recordState() }
+    /**
+     * 판독만 하는 표본 목록 — 추출이 **바이트까지** 읽는다. 장부 갱신 콜백이 없으므로 이 자리로는
+     * 확정이 장부에 닿지 못한다(그래서 밖에 내보내지 않는다).
+     */
+    private val sampleListReader = FileSampleListLedger(sampleFile)
+
+    /**
+     * 표본 목록 원장 — **잠금을 들었을 때만 확정할 수 있다**(D-6G2c-4). 들지 않았으면 읽기만 되고
+     * [SampleListLedger.confirm] 이 거부한다. 앞 판은 시도 원장만 감쌌고, 그래서 잠금을 못 든 실행이
+     * 표본을 확정할 수 있었다: 확정은 한 번뿐이라(`CREATE_NEW`) 그 한 번을 남이 가져가면 **도는
+     * 실행의 표본이 아닌 목록**이 못 박히고, 그 뒤의 모든 수집과 추출이 그 목록을 읽는다.
+     *
+     * [SampleListLedger] 로 내보낸다 — 판독용 `read()` 는 [confirmedSampleList] 한 자리에서만 나간다.
+     */
+    val sampleList: SampleListLedger =
+        GuardedSampleListLedger(
+            { writeRefusalFor(lock, closed) },
+            ledger?.let { digest -> FileSampleListLedger(sampleFile) { recordState(digest) } } ?: sampleListReader,
+        )
 
     /**
      * 잠금을 들었을 때만 쓸 수 있다 — 들지 않았으면 읽기만 되고 [AttemptLedger.append] 가 거부한다.
      * 관문은 호출 **전에** 의도 줄을 적으므로(D-6G-61 ①), 잠금 없는 실행은 첫 호출이 나가기 전에
      * 멈춘다. 임차 검사를 잊은 배선이 있어도 호출은 나가지 못한다.
+     *
+     * **쓰기 가능한 모양은 누적 해시를 손에 든 모양과 같다** — [ledger] 가 `null` 인 것이 곧 「잠금을
+     * 들지 못했다」이므로(D-6G2c-21 ⑦), 쓰기 자리와 해시 자리가 갈릴 수 없다.
      */
     val attempts: AttemptLedger =
-        when (lock) {
-            is RunStateLock.Held -> {
+        GuardedAttemptLedger(
+            { writeRefusalFor(lock, closed) },
+            ledger?.let { digest ->
                 FileAttemptLedger(attemptFile) { line ->
-                    ledger.append(line)
-                    recordState()
+                    digest.append(line)
+                    recordState(digest)
                 }
-            }
-
-            RunStateLock.Busy -> {
-                LockedOutAttemptLedger(FileAttemptLedger(attemptFile) {})
-            }
-        }
+            } ?: FileAttemptLedger(attemptFile) {},
+        )
 
     /**
      * 잠금을 놓는다 — Spring 이 컨텍스트를 닫을 때 이름으로 찾아 부른다(`destroyMethod` 추론).
      * 프로세스가 죽으면 OS 가 놓지만, 한 프로세스가 여러 번 기동하는 test 는 여기서 놓아야 한다.
+     *
+     * **놓는 길은 이것 하나다**(D-6G2c-4) — [RunStateLock] 에는 공개된 놓기가 없다. 있던 동안
+     * 밖에서 잠금만 풀고 원장은 쓰기 가능한 채로 둘 수 있었고, 그 상태에는 이름이 없었다.
      */
-    fun close() = lock.release()
+    fun close() {
+        closed = true
+        lock.releaseIfHeld()
+    }
+
+    /**
+     * 닫힌 뒤인가 — [close] 는 되돌릴 수 없다(다시 쓰려면 디렉터리를 다시 연다). 두 원장이 **매
+     * 호출에** 이 값을 묻는다(vr r1 F-1): 앞 판은 잠금만 보았고 그 판정이 생성 시점에 굳어, `close()`
+     * 로 잠금을 놓은 뒤에도 같은 인스턴스가 그대로 썼다 — 없애려던 「잠금만 풀린 원장」이 `release`
+     * 대신 `close` 로 다시 지어졌다.
+     */
+    private var closed = false
 
     /** 추출이 읽는다 — 목록과 그 **바이트**(manifest 해시·곁파일 복사). */
-    fun confirmedSampleList(): ConfirmedSampleList? = sampleList.read()
+    fun confirmedSampleList(): ConfirmedSampleList? = sampleListReader.read()
 
     /**
      * 장부를 **원자적으로 갈아 끼운다** — 줄을 쓸 때마다다. 덮어쓰다 죽으면 반쯤 쓰인 장부가 남아
      * 다음 기동이 거부되는데, 그것은 「사고를 잡았다」가 아니라 이 장부 자신이 만든 사고다.
      */
-    private fun recordState() {
+    private fun recordState(ledger: LedgerDigest) {
         val facts =
             SnapshotJson.Obj(
                 listOf(
@@ -254,7 +305,8 @@ class RunStateDirectory(
     /**
      * 확정 표본 두 파일이 장부와 같은가 — **되돌림 뒤**다([rollBackInterruptedConfirmation]). 끝나지
      * 않은 확정은 「장부는 빈 해시인데 파일이 있다」 모양이고, 되돌림보다 앞서 재면 그 창이 그대로
-     * 거부가 된다(그 사고를 막으려던 장부가 만드는 사고다).
+     * 거부가 된다(그 사고를 막으려던 장부가 만드는 사고다). 그래서 이 대조만 바이트를 바꾸는 걸음
+     * 뒤에 남는다 — 나머지 읽기 전용 대조는 모두 그 앞이다(D-6G2c-21 ①).
      */
     private fun verifyConfirmedSample(facts: RunStateFacts) {
         require(facts.sampleListSha256 == digestOf(sampleFile)) {
@@ -281,6 +333,11 @@ class RunStateDirectory(
      * 조각의 뜻은 **하나**다(D-6G2e-23 ③): **마지막 개행 뒤의 바이트**. 「빈 줄을 걸러 낸 목록의
      * 마지막」과 섞으면 공백만 남은 조각이 성한 줄 하나를 밀어내 접두가 짧아지고, 아무 잘못 없는
      * 디렉터리가 「앞부분이 다르다」로 거부된다 — 그 거부의 출구는 디렉터리 폐기뿐이다.
+     *
+     * **진단이 셋으로 갈린다**(D-6G2c-21 ②, 거부는 셋 다 그대로다): 줄이 모자라는 것 · **장부가 센
+     * 줄의 꼬리가 조각으로 남은 것**(진짜 절단) · 앞부분이 다른 것(변조). 가운데를 가르지 않으면
+     * 성한 줄 하나가 중간에서 잘린 원장이 「append-only 로 설명되지 않는 변경」으로 보고되고,
+     * 운영자는 손이 닿은 디렉터리를 찾는다 — 실제로는 쓰다 죽은 자리다. 처방이 갈린다.
      */
     private fun requireLedgerPrefix(facts: RunStateFacts) {
         val text = ledgerTextOf(attemptFile)
@@ -288,6 +345,10 @@ class RunStateDirectory(
         val lines = linesIn(text.removeSuffix(fragment))
         require(lines.size + (if (fragment.isEmpty()) 0 else 1) >= facts.attemptLines) {
             "시도 원장의 줄 수가 장부보다 적다 — 지워졌거나 잘렸다"
+        }
+        // 조각이 줄 수를 메우고 있다 — 정직한 크래시라면 조각은 **장부가 모르는** 다음 줄이다.
+        require(lines.size >= facts.attemptLines) {
+            "시도 원장의 끝 줄이 잘렸다 — 장부가 센 줄의 꼬리가 조각으로 남았다"
         }
         val known = lines.take(facts.attemptLines).joinToString("") { it + "\n" }
         require(sha256Hex(known) == facts.attemptsSha256) {
@@ -297,10 +358,13 @@ class RunStateDirectory(
 
     /**
      * 원장이 장부보다 앞서 있으면(크래시 흔적) 장부를 원장 쪽으로 맞춘다 — 복구가 끝난 바이트로.
-     * 줄 수는 [ledger] 가 이미 들고 있다(D-6G2e-23 ⑤) — 8 만 줄짜리 원장을 다시 읽지 않는다.
+     * 줄 수는 누적 해시가 이미 들고 있다(D-6G2e-23 ⑤) — 8 만 줄짜리 원장을 다시 읽지 않는다.
      */
-    private fun resyncLedgerIfAhead(facts: RunStateFacts) {
-        if (ledger.lines > facts.attemptLines) recordState()
+    private fun resyncLedgerIfAhead(
+        facts: RunStateFacts,
+        ledger: LedgerDigest,
+    ) {
+        if (ledger.lines > facts.attemptLines) recordState(ledger)
     }
 
     /**
@@ -314,7 +378,7 @@ class RunStateDirectory(
      * 축을 **지어내지 않는다**: 조각에 없는 것은 짓지 않고, 결말로 되살리지도 않는다 — 굳지 않은
      * 결말을 「끝났다」로 읽으면 받지 못한 축이 완료가 된다.
      *
-     * 누적 해시보다 **먼저**, 자리 대조보다 **뒤**에 돈다 — 그 순서는 [ledger] 의 초기화식이 구조로 든다.
+     * 누적 해시보다 **먼저**, 자리 대조보다 **뒤**에 돈다 — 그 순서는 누적 해시의 초기화식이 구조로 든다.
      *
      * 교체는 **원자적이고 내구적이다**(D-6G2d-2, cr r5-t M-3 · cr r4 ③). 제자리 truncate+rewrite 는
      * 8 만 줄짜리 원장을 다시 쓰는 도중에 또 죽으면 파일을 짧게 만들고, 다음 기동은 「줄 수가 장부보다
@@ -328,6 +392,14 @@ class RunStateDirectory(
         val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
         replaceDurably(root.resolve(STAGED_ATTEMPT_NAME), attemptFile, healed, root)
     }
+}
+
+/**
+ * 놓을 수 있는 모양만 놓는다(D-6G2c-4) — 들지 못한 잠금을 놓는 것은 아무 일도 아니므로 호출부가
+ * 갈래를 나누지 않는다. 디렉터리 밖에서는 부를 수 없다(`internal` 멤버를 쓴다).
+ */
+private fun RunStateLock.releaseIfHeld() {
+    (this as? RunStateLock.Held)?.release()
 }
 
 /** 심링크를 푼 절대 경로 — 풀 수 없으면(경쟁 상태) 앞 규칙으로 물러선다. */
@@ -376,18 +448,6 @@ private class LedgerDigest(
     fun hex(): String = hexOf((digest.clone() as MessageDigest).digest())
 }
 
-/**
- * 잠금을 들지 않은 실행의 시도 원장 — 읽기는 되고 **쓰기는 거부**한다(D-6G-57). 두 실행이 나란히
- * 원장에 쓰면 무결성 장부가 서로의 줄에 어긋나고, 그보다 먼저 두 상한 회계가 서로의 호출을 못 본다.
- */
-private class LockedOutAttemptLedger(
-    private val reads: AttemptLedger,
-) : AttemptLedger {
-    override fun append(attempt: CollectionAttempt): Unit = error("실행 상태 잠금을 들지 않았다 — 다른 실행이 돌고 있다")
-
-    override fun read(): AttemptHistory = reads.read()
-}
-
 /** 잃어버린 호출의 표식(D-6G-70) — 조각을 원문 그대로 담되 형태가 선 JSON 한 줄로. */
 private fun tornMarkerOf(fragment: String): String =
     SnapshotJson.Obj(listOf(TORN_KEY to SnapshotJson.Text(fragment))).render() + "\n"
@@ -402,8 +462,6 @@ private fun ledgerTextOf(file: Path): String = if (Files.isRegularFile(file)) Fi
 
 private fun linesIn(text: String): List<String> = text.lineSequence().filter { it.isNotBlank() }.toList()
 
-internal const val RUN_LOCK_NAME = "run.lock"
-
 /** 장부가 지키는 정본 파일 — 디렉터리에 이 밖의 파일이 있으면 기동이 거부된다(D-6G-60). */
 private val LEDGERED_FILES = listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME)
 
@@ -413,54 +471,3 @@ private val LEDGERED_FILES = listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT
  */
 private val EXCLUDED_FROM_LEDGERED_SET =
     setOf(STATE_NAME, RUN_LOCK_NAME, STAGED_STATE_NAME, STAGED_ATTEMPT_NAME)
-
-/**
- * 실행 상태 디렉터리의 **잠금**(D-6G-57) — 상태가 파일 범위이므로 잠금도 파일 범위다.
- *
- * r3 은 DB advisory lock 을 썼고 개찰 갈래에만 걸었다. 공고 목록 갈래가 같은 원장을 쓰게 된 뒤로는
- * 두 갈래가 나란히 seed 한 뒤 **남은 상한을 각자 다 쓰는** 길이 열려 있었다(vr r4 H-2, 일 상한 10 에
- * HTTP 줄 20). 범위가 다른 두 자물쇠는 같은 것을 지키지 못한다 — 상태가 있는 자리에 건다.
- *
- * `FileChannel.tryLock` 은 **프로세스 범위**다: 프로세스가 죽으면 OS 가 놓는다(잠금 행을 표에 두면
- * 죽은 실행이 그것을 들고 남는다). 얻지 못하는 것은 오류가 아니라 정상적인 답이다.
- */
-sealed interface RunStateLock {
-    /** 놓는다 — 얻지 못한 잠금을 놓는 것은 아무 일도 아니다(호출부가 갈래를 나누지 않게). */
-    fun release()
-
-    class Held(
-        private val channel: FileChannel,
-        private val lock: FileLock,
-    ) : RunStateLock {
-        override fun release() {
-            if (lock.isValid) lock.release()
-            channel.close()
-        }
-    }
-
-    data object Busy : RunStateLock {
-        override fun release() = Unit
-    }
-
-    companion object {
-        /**
-         * 디렉터리를 **여는 자리가 곧 잠금 자리**다 — 잠그지 않고 원장을 얻는 길을 두지 않는다.
-         * 잠금 파일은 상태가 아니라 자물쇠라 무결성 장부의 대상이 아니다(§장부 집합에서 뺀다).
-         */
-        fun tryAcquire(root: Path): RunStateLock {
-            val channel =
-                FileChannel.open(
-                    root.resolve(RUN_LOCK_NAME),
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                )
-            val lock = runCatching { channel.tryLock() }.getOrNull()
-            return if (lock == null) {
-                channel.close()
-                Busy
-            } else {
-                Held(channel, lock)
-            }
-        }
-    }
-}
