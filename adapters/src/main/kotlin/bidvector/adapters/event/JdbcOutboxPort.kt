@@ -9,6 +9,7 @@ import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.event.EventEnvelope
 import bidvector.workflow.event.EventId
 import bidvector.workflow.event.IdempotencyKey
+import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntryId
 import bidvector.workflow.event.OutboxPort
 import bidvector.workflow.event.OutboxTransition
@@ -56,11 +57,27 @@ class JdbcOutboxPort(
      * 않는다 — 설계 검토 (4)-④가 요구하는 「claim 트랜잭션을 배달까지 열어 두지 않는다」는
      * 호출부의 규율이다.
      */
-    override fun claim(limit: Int): List<ClaimedOutboxRow<*>> =
+    override fun claim(
+        limit: Int,
+        kind: OutboxConsumerKind,
+    ): List<ClaimedOutboxRow<*>> =
         connections.withConnection { connection ->
-            val candidates = selectPendingForUpdate(connection, limit)
+            val candidates = selectPendingForUpdate(connection, limit, kind)
             markClaimed(connection, candidates)
             candidates
+        }
+
+    /** 읽기만 한다 — 전이는 `workflow` 의 `transitionOutbox` 를 지난 뒤 [markIsolated] 가 진다. */
+    override fun claimedEntries(kind: OutboxConsumerKind): List<ClaimedOutboxRow<*>> =
+        connections.withConnection { connection ->
+            val rows = mutableListOf<ClaimedOutboxRow<*>>()
+            connection.prepareStatement(EventSql.SELECT_CLAIMED_BY_TYPE).use { statement ->
+                statement.setString(1, OutboxPayloadCodec.payloadTypeOf(kind))
+                statement.executeQuery().use { rs ->
+                    while (rs.next()) rows += rs.toClaimedOutboxRow()
+                }
+            }
+            rows
         }
 
     override fun markDelivered(transition: OutboxTransition.ToDelivered) =
@@ -72,6 +89,17 @@ class JdbcOutboxPort(
     override fun markIsolated(transition: OutboxTransition.ToIsolated) =
         transitionState(transition.entryId, EventSql.MARK_ISOLATED)
 
+    /**
+     * **갱신 계수를 버리지 않는다**(D-6F10-2) — `WHERE state = 'CLAIMED'` 가 거부하면
+     * `executeUpdate()` 는 0 이고, 그것은 「행이 이미 다른 상태다」라는 사실이다. 앞 판은
+     * 그 0 을 버려 전이 실패가 조용한 no-op 였다(6D-1 의 test relay 는 자기 쪽에서
+     * `check(== 1)` 로 막아 두었다 — 그 검사를 port 안으로 옮긴다).
+     *
+     * 던지는 쪽을 택한 이유: 반환형을 바꾸면 세 port 메서드의 공개 표면이 바뀌고 호출부가
+     * 계수를 **다시 버릴 수 있다**. 예외는 버릴 자리가 없다. relay 는 이 예외를 run 단위로
+     * 받아 `INCOMPLETE` 로 올린다 — 행은 `CLAIMED` 에 남고 다음 run 의 고아 격리가 받는다
+     * (발송은 한 번 있었고 상태는 모호하므로 `ISOLATED` 가 정직하다).
+     */
     private fun transitionState(
         entryId: OutboxEntryId,
         sql: String,
@@ -79,7 +107,10 @@ class JdbcOutboxPort(
         connections.withConnection { connection ->
             connection.prepareStatement(sql).use { statement ->
                 statement.setString(1, entryId.value)
-                statement.executeUpdate()
+                val updated = statement.executeUpdate()
+                check(updated == 1) {
+                    "outbox 전이가 행을 옮기지 못했다(영향 행 $updated) — entryId=${entryId.value}"
+                }
             }
         }
     }
@@ -87,10 +118,12 @@ class JdbcOutboxPort(
     private fun selectPendingForUpdate(
         connection: java.sql.Connection,
         limit: Int,
+        kind: OutboxConsumerKind,
     ): List<ClaimedOutboxRow<*>> {
         val candidates = mutableListOf<ClaimedOutboxRow<*>>()
         connection.prepareStatement(EventSql.SELECT_PENDING_FOR_UPDATE_SKIP_LOCKED).use { statement ->
-            statement.setInt(1, limit)
+            statement.setString(1, OutboxPayloadCodec.payloadTypeOf(kind))
+            statement.setInt(2, limit)
             statement.executeQuery().use { rs ->
                 while (rs.next()) candidates += rs.toClaimedOutboxRow()
             }
@@ -106,7 +139,13 @@ class JdbcOutboxPort(
         connection.prepareStatement(EventSql.MARK_CLAIMED).use { statement ->
             for (row in candidates) {
                 statement.setString(1, row.entryId.value)
-                statement.executeUpdate()
+                val updated = statement.executeUpdate()
+                // 같은 트랜잭션이 바로 앞에서 FOR UPDATE 로 잠근 행이라 0 은 올 수 없다 —
+                // 그래도 세는 이유는 `mark*` 와 같다: 0 을 버리면 claim 이 돌려준 행과 실제
+                // 상태가 어긋난 채 relay 가 발송으로 넘어간다.
+                check(updated == 1) {
+                    "claim 이 PENDING 행을 옮기지 못했다(영향 행 $updated) — entryId=${row.entryId.value}"
+                }
             }
         }
     }
