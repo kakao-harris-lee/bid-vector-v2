@@ -4,9 +4,10 @@ import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.relay.NotificationRelayRunner
+import bidvector.app.relay.RelayBootDecision
+import bidvector.app.relay.relayBootDecision
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel
-import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
 import bidvector.workflow.notification.RelayTarget
@@ -50,10 +51,9 @@ data class RelayProperties(
  * 태운다 — 매 run 이 행을 영구히 잃는다. 그래서 「실 sender 없이 Live 환경」을 **설정 오류**로
  * 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
  *
- * 검사가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다. 오늘 `Production`
- * 하나가 `Live` 지만 그 표는 날짜에 따라 달라지도록 설계된 값이므로(`EffectiveDatedPolicy`)
- * 이름을 보면 표가 바뀌는 날 두 층이 함께 뚫린다. `OPEN-STR-12` 가 실 sender 를 들이면 이
- * `require` 와 자리지킴 셋이 함께 사라진다.
+ * 검사가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다 — 그 판정은
+ * [relayBootDecision] 이 값으로 내고(cr R-2), 이 자리는 그 값을 기동 실패로 옮긴다.
+ * `OPEN-STR-12` 가 실 sender 를 들이면 그 함수와 자리지킴 셋이 함께 사라진다.
  *
  * 이 클래스가 조립을 직접 하지 않는 이유: outbox 쓰기 타입을 `app` 이 이름으로 볼 수 없다
  * (D-6A3-17(a)③). [NotificationRelayRun](어댑터 조립 경계)만 든다.
@@ -69,13 +69,10 @@ open class RelayWiring {
         properties: RelayProperties,
     ): NotificationRelayRun {
         val policy = resolvedNotificationPolicy()
-        // cr G-1 — **지키려는 성질을 본다.** 앞 판은 `environment != Production` 이었는데
-        // 그것은 「발송 가능 환경」이라는 성질이 아니라 **오늘 그 성질을 가진 값의 이름**이다.
-        // 정책표는 날짜에 따라 달라지도록 설계된 값이라(`EffectiveDatedPolicy`) 표가
-        // `Staging -> Live` 를 갖는 날 ① 이 검사가 통과하고 ② relay 의 같은 술어도 통과해
-        // claim 이 일어나고 ③ 자리지킴이 던져 행이 영구 격리된다 — 두 층이 독립 방벽이 아니라
-        // 같은 사각을 공유했다. 지금은 둘이 **같은 표**를 보고 같은 뜻을 묻는다.
-        require(policy.environmentModes.getValue(properties.environment) != DeliveryMode.Live) {
+        // 판정은 [relayBootDecision] 이 **값으로** 낸다(cr R-2) — 여기 인라인되어 있던 동안은
+        // 정책표를 바꿔 넣은 변이로 직접 칠 수 없었다. 이 자리의 몫은 그 값을 기동 실패로
+        // 옮기는 것뿐이다.
+        require(relayBootDecision(properties.environment, policy) == RelayBootDecision.Allowed) {
             "실 발송 채널이 없는 동안 relay 는 발송 가능(Live) 모드 환경으로 기동하지 않는다(OPEN-STR-12)"
         }
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
