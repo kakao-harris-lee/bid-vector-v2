@@ -133,12 +133,13 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 
 ## 5. 알려진 제한 (판정문에도 실린다)
 
-- 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시).
+- 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시). 관문 거부(`REFUSED:*` — 쿼터·예산·자기 억제)와 호출 단위 전송 재시도(`FAILED:HTTP_429` 등)는 이 계수에 들지 않는다(D-6G2d-16).
 - `MAX_PAGES` 확정: 참가 **50 × rows-per-page** 초과 축은 `incomplete_axis`(기본 999 에서 49,950). 쪽 수 상한은 폭주 방지 문턱이지 데이터 정확성 문턱이 아니다 — 페이지 크기를 올리면 같은 50 쪽이 더 많은 행을 덮는다(D-6G2f-4).
 - 쿼터는 **키 × operation × 일 1,000 건**이다(day1·day2 실측: 개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`). 업무 공통 **단일 operation 은 둘**이다 — 개찰완료와 입찰가격산식 A. 업무별로 갈리는 축(목록·예비가격 상세·기초금액)은 공사·용역이 각자 1,000 을 쓰지만 이 둘은 한 통이라 **각각 1,000/일에 닿을 수 있다**. 개찰완료가 먼저 닫히고(페이지 100 에서 하루 약 470 공고, **페이지 999 뒤 하루 약 950 공고** — 공고당 1 호출로 정착하므로), 산식 A 는 공고당 1 행이라 쪽 크기로 줄지 않는다: 다만 **공사 공고만** 부르므로 하루 소비가 정착 공고 수보다 낮다. 한도 자체는 운영계정 승인(100,000/일)으로만 움직인다.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
-- **KONEPS 쿼터는 operation 별이다(2026-10-02 실측).** 개찰완료 조회(`getOpengResultListInfoOpengCompt`)는 이 키로 하루 1,000 건에서 HTTP 429 가 오고(공고 목록·개찰 목록은 같은 날 1,000 을 넘겨 통과), 실행기는 재호출 상한 뒤 `REFUSED:QUOTA_EXHAUSTED` 로 멈춘다(exit 2, `truncation=QuotaExhausted`). 그 축은 공고당 1~35 페이지라 하루 약 470 공고가 끝난다 — 일 상한 20,000 보다 이 쿼터가 먼저 닫는다. 운영자 결정(2026-10-02): data.go.kr 트래픽 증량을 신청하고 승인 전까지 하루 1,000 건으로 자정 뒤 자동 재실행을 이어 간다(표본·상한 회계·디렉터리 불변). 증량 승인은 원장의 개찰완료 성공 수가 하루 1,000 을 넘는지로 확인한다.
+- **KONEPS 쿼터는 operation 별이다(2026-10-02 실측, 10-03 진단으로 보강 — 위 셋째 항목이 정본).** 개찰완료 조회(`getOpengResultListInfoOpengCompt`)는 이 키로 하루 1,000 건에서 HTTP 429 가 오고, 실행기는 호출 하나의 전송 재시도(`maxAttempts 4`) 뒤 `REFUSED:QUOTA_EXHAUSTED` 로 멈춘다(exit 2, `truncation=QuotaExhausted`; 이 거부는 축 재호출 상한 N=3 에 세지 않는다 — D-6G2d-16). 하루 처리량은 쪽 999 뒤 약 950 공고(day3~day5 실측 971·976·950) — 일 상한 20,000 보다 이 쿼터가 먼저 닫는다. **운영자 결정 2026-10-03 이 10-02 의 「증량 신청」을 대체했다**: 운영계정·증량 신청은 M7 뒤, 그때까지 1,000/operation 안에서 자정 뒤 재실행을 이어 간다(표본·상한 회계·디렉터리 불변).
+- `OPEN-6G-RELEASE-SHA-LABEL`(release-sha 라벨 = main HEAD, jar 내용 SHA 아님 — §2-2 의 「그 칸이 안 바뀌면 새 jar 가 아니다」는 라벨 변화만으로는 jar 변화를 뜻하지 않는다; 프로브 생략 판단은 `*/src/main/**` diff 로) · `OPEN-6G-MODE-FAIL-FAST`(`mode` 가 알려진 값 밖이면 조용히 미기동·exit 0) · `OPEN-6G-EVALUATION-PROPERTIES-BINDING`(수집 모드가 `candidate-cap` 더미 값을 요구) — PR #56 리뷰, `reports/evidence/m6/6g/commands.md` 참조.
 
 ## 6. 검증 기록
 
