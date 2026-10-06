@@ -100,11 +100,32 @@ class RelayWiringTest {
         }
     }
 
+    /**
+     * cr G-1 — 거부가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다. 오늘
+     * `Production` 하나가 `Live` 이므로 그 설정이 거부된다. 메시지도 「Live 모드」를 말한다.
+     */
     @Test
-    fun `Production 환경 설정은 기동을 거부한다 — 실 sender 부재는 설정 오류다`() {
+    fun `발송 가능 모드 환경 설정은 기동을 거부한다 — 실 sender 부재는 설정 오류다`() {
         withBoot(*validProperties(environment = "production")) { booted ->
             booted.failure shouldNotBe null
-            booted.failure!!.stackTraceToString() shouldContain "OPEN-STR-12"
+            val trace = booted.failure!!.stackTraceToString()
+            trace shouldContain "OPEN-STR-12"
+            trace shouldContain "Live"
+        }
+    }
+
+    /**
+     * **거부 술어가 enum 이름에 묶이지 않았다는 증거**(cr G-1) — 정책표에서 `Live` 가 아닌 환경
+     * 셋은 전부 통과한다. 앞 판의 `environment != Production` 과 지금의 술어는 **오늘 같은
+     * 답**을 내므로, 이 test 만으로는 둘을 가를 수 없다. 가르는 것은 아래 「정책표가 바뀌면」
+     * test 다 — 그쪽이 변이 실측의 자리다.
+     */
+    @Test
+    fun `Live 가 아닌 환경 셋은 기동한다`() {
+        listOf("staging", "development", "test").forEach { environment ->
+            withBoot(*validProperties(environment = environment)) { booted ->
+                booted.failure shouldBe null
+            }
         }
     }
 

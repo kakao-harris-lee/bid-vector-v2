@@ -1,5 +1,6 @@
 package bidvector.adapters.relay
 
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -61,6 +62,35 @@ class RelayAdapterDependencyTest {
         val violations = classFiles.flatMap(::disallowedBytecodeReferences).distinct()
 
         violations shouldBe emptyList()
+    }
+
+    /**
+     * cr L-7 — **추출 층의 양성 대조.** 아래 두 대조는 문자열 술어만 재고 추출
+     * (`javap` 출력 → 정규식)은 재지 않는다. 추출이 조용히 아무것도 못 뽑게 되면(javap 출력
+     * 형태 변화·경로 오류) 위반 목록이 빈 목록이 되어 게이트가 영구 초록이다 —
+     * `classFiles.shouldNotBeEmpty()` 는 빈 디렉터리만 막는다.
+     *
+     * 그래서 추출이 **실제로 뽑는다**는 증거를 둔다: relay 패키지 바이트코드에서 뽑은 좌표
+     * 집합이 허용 루트 안의 알려진 이름을 담는다.
+     */
+    @Test
+    fun `상수 풀 추출이 허용 루트 안의 알려진 좌표를 실제로 뽑는다 — 추출 층 양성 대조`() {
+        val classesDir = File("build/classes/kotlin/main/bidvector/adapters/relay")
+        check(classesDir.isDirectory) {
+            "빌드 산출물을 찾지 못했다: ${classesDir.absolutePath} — :adapters:compileKotlin 선행 필요"
+        }
+        val extracted =
+            classesDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "class" }
+                .flatMap { classFile ->
+                    BIDVECTOR_INTERNAL_NAME
+                        .findAll(javapOutput(classFile))
+                        .map { it.value.replace('/', '.') }
+                }.toSet()
+
+        extracted shouldContain "bidvector.workflow.notification.RelayOutboxNotifications"
+        extracted shouldContain "bidvector.adapters.event.JdbcOutboxPort"
     }
 
     /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다. */

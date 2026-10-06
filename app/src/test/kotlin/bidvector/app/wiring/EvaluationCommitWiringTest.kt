@@ -161,6 +161,26 @@ class EvaluationCommitWiringTest {
         }
     }
 
+    /**
+     * R1-M-4 / cr L-11 — **전략을 run 당 정확히 한 번 읽는다.** 앞 판은 배선이 한 번(상한을
+     * 뽑는 자리) 읽고 use case 가 `evaluate()` 진입에서 또 읽어, 두 스냅샷이 다른 개정에서 올 수
+     * 있었다(payload 에 적힌 개정과 실제로 쓴 상한이 어긋난다 — 6D-2 재현 등식의 입력 불일치).
+     *
+     * 세는 방법: 저장소 대역이 `load()` 호출을 센다. 배선이 빈을 만든 뒤 use case 가 몇 번 더
+     * 읽는지는 `evaluate()` 를 돌려야 보이지만, **배선 단계의 읽기가 정확히 한 번**이고 그 값이
+     * 고정 저장소로 넘어간다는 것은 여기서 잴 수 있다 — 고정하지 않으면 그 뒤 읽기가 저장소로
+     * 다시 간다.
+     */
+    @Test
+    fun `배선은 전략을 한 번만 읽고 그 값을 고정해 넘긴다`() {
+        val counting = CommitCountingStrategyRepository(strategyWithCap())
+
+        withBoot(*validProperties(), strategyRepository = counting) { booted ->
+            booted.failure shouldBe null
+            counting.loads shouldBe 1
+        }
+    }
+
     /** dry-run 과 같은 fail-closed — 여력 상한이 없는 전략으로는 커밋 run 을 만들지 않는다. */
     @Test
     fun `전략에 여력 상한이 없으면 기동에 실패한다`() {
@@ -191,3 +211,24 @@ private fun eligible(): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
 
 private fun alwaysUnavailableMl(): MlAnalysisPort =
     MlAnalysisPort { _: Notice, _ -> MlAnalysisOutcome.SimilarityProjectionNotReady }
+
+/**
+ * `load()` 호출을 세는 저장소 대역 — 「run 당 한 번」의 유일한 증거다(R1-M-4).
+ *
+ * 같은 패키지의 `EvaluationDryRunFactoryTest` 에도 같은 일을 하는 private fake 가 있다 —
+ * 둘 다 `private` 이라 공유할 수 없고(파일 스코프), 이름만 달리 둔다. 공용으로 올리면 두
+ * test 가 한 대역의 변경에 함께 묶인다.
+ */
+private class CommitCountingStrategyRepository(
+    private val strategy: bidvector.strategy.OperatorStrategy,
+) : StrategyRepository {
+    var loads = 0
+        private set
+
+    override fun load(): bidvector.strategy.OperatorStrategy {
+        loads += 1
+        return strategy
+    }
+
+    override fun save(applied: bidvector.workflow.strategy.AppliedStrategy) = error("전략을 쓰지 않는다")
+}

@@ -28,11 +28,44 @@ class RelayExitCodeTest {
         RelayExitCode.INCOMPLETE.value shouldBe 2
     }
 
+    /**
+     * D-6F10-27 (7) — **집었는데 아무것도 전달하지 못한 run 은 비-0 이다**(cr L-3). 앞 판은
+     * 집은 행이 전부 거부·격리로 타도 0 이었고, 그것은 「왜 발송이 안 되는가」의 가장 나쁜
+     * 판이 가장 약한 신호를 내는 꼴이었다.
+     */
     @Test
-    fun `격리가 있어도 사유가 분명하면 COMPLETE 다 — Unknown 은 정상 처분이다`() {
-        val report = completed(claimed = 1, isolated = 1, unknownPayload = 0)
+    fun `집었는데 하나도 전달하지 못하면 INCOMPLETE 다`() {
+        exitCodeOf(completed(claimed = 2, failed = 2)) shouldBe RelayExitCode.INCOMPLETE
+        exitCodeOf(completed(claimed = 1, isolated = 1)) shouldBe RelayExitCode.INCOMPLETE
+    }
 
-        exitCodeOf(report) shouldBe RelayExitCode.COMPLETE
+    /** 하나라도 전달됐으면 경로는 살아 있다 — 개별 행의 거부·격리는 정상 처분이고 0 이다. */
+    @Test
+    fun `일부가 전달된 부분 실패는 COMPLETE 다`() {
+        exitCodeOf(completed(claimed = 3, delivered = 1, failed = 1, isolated = 1)) shouldBe RelayExitCode.COMPLETE
+    }
+
+    /** 조건 셋을 함께 보는 이유 — 집을 것이 없던 **빈 run** 과 전부 중복인 run 은 붉지 않다. */
+    @Test
+    fun `빈 run 과 전부 중복인 run 은 COMPLETE 다`() {
+        exitCodeOf(completed(claimed = 0)) shouldBe RelayExitCode.COMPLETE
+        exitCodeOf(completed(claimed = 2, skippedDuplicates = 2)) shouldBe RelayExitCode.COMPLETE
+    }
+
+    /**
+     * R1-M-1 — 임대를 도중에 잃은 run 은 `FAILED` 다. `Skipped` 와 다른 값인 이유: 저쪽은
+     * 아무것도 집지 않았고 이쪽은 이미 집었고 일부를 발송했을 수 있다(행이 `CLAIMED` 에 남는다).
+     */
+    @Test
+    fun `임대를 도중에 잃으면 FAILED 1 이고 부분 계수가 보고에 남는다`() {
+        val partial = completed(claimed = 3, delivered = 1)
+        val report = RelayReport.LeaseLost(partial)
+
+        exitCodeOf(report) shouldBe RelayExitCode.FAILED
+        RelayExitCode.FAILED.value shouldBe 1
+        relayFinishLine(report, exitCodeOf(report)) shouldBe
+            "relay lease-lost orphansIsolated=0 claimed=3 delivered=1 skippedDuplicates=0 " +
+            "failed=0 isolated=0 unknownPayload=0 exit=1"
     }
 
     @Test
@@ -49,8 +82,6 @@ class RelayExitCodeTest {
 
         exitCodeOf(report) shouldBe RelayExitCode.ENV_SUPPRESSED
         RelayExitCode.ENV_SUPPRESSED.value shouldBe 4
-        // 처방이 다르다 — 저쪽은 기다리면 풀리고 이쪽은 설정을 고쳐야 풀린다.
-        RelayExitCode.ENV_SUPPRESSED.value shouldBe RelayExitCode.LEASE_BUSY.value + 1
     }
 
     /** 코드 값이 서로 다르다 — 두 사유가 같은 값을 쓰면 가른 의미가 사라진다. */
