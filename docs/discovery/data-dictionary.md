@@ -692,9 +692,14 @@ D-M4-5 (a)로 종결됐다(`reports/evidence/m4/4c1/scope.md`).** 이 절이 그
 > `OutboxEntryState = sealed { Pending, Claimed, Delivered, Failed, Isolated }` — 전이는
 > `Pending → Claimed → Delivered | Failed | Isolated` 하나뿐이다. `Delivered`·`Failed`·
 > `Isolated`는 **종단**(이 셋에서 나가는 전이는 표에 없다 — 재시도 API 자체가 없다).
-> `Failed`는 최대 시도 소진, `Isolated`는 `Claimed`에서 워커가 죽어 격리된 것이다
-> (at-most-once, `OPEN-NOTI-02`) — 수동 검토는 앱 알림함 회수 경로가 진다(ADR 0005 D-4),
-> 이 상태 자체는 재실행 경로를 갖지 않는다. 표 밖 (state, command) 쌍은 전부 거부이고
+> 종단 셋의 뜻(M6/6F-10 D-6F10-12, ADR 0005 §7.1 해석표 — V6 어휘 불변, 뜻만 셋으로):
+> `Delivered` = 채널에 전달됐다 **또는** 같은 멱등 키의 알림이 이미 전달됐다(inbox dedup —
+> 이 entry 의 의무가 이미 이행됨) · `Failed` = 이 entry 로는 전달이 **일어나지 않았고 일어나지
+> 않을 것**이다(채널 거절·대상 무효·route 수준 억제; 재시도 없음 — V6 에 시도 횟수 열이 없으므로
+> 「시도 소진」이 아니다) · `Isolated` = 전달 여부가 **모호**하다(결과 미확인 · `Claimed` 에서
+> 워커가 죽은 고아 — at-most-once, `OPEN-NOTI-02`, 재가시화 없음). 환경 수준 억제는 종단이
+> 아니라 claim 자체를 하지 않는다(ADR 0005 D-4). 수동 검토는 앱 알림함 회수 경로가 진다(ADR 0005
+> D-4), 이 상태 자체는 재실행 경로를 갖지 않는다. 표 밖 (state, command) 쌍은 전부 거부이고
 > 거부가 관측 가능하다(`OutboxTransitionTableTest`).
 
 M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`OutboxPort`)·통로 타입
