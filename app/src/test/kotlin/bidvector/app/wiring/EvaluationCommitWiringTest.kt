@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.app.evaluation.EvaluationCommitRunner
 import bidvector.app.http.SequentialCorrelationIdFactory
 import bidvector.app.http.TestStrategyRepository
@@ -26,6 +27,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.ApplicationRunner
@@ -172,11 +174,16 @@ class EvaluationCommitWiringTest {
      * 다시 간다.
      */
     @Test
-    fun `배선은 전략을 한 번만 읽고 그 값을 고정해 넘긴다`() {
+    fun `배선과 use case 를 합쳐 전략 읽기가 run 당 한 번이다`() {
         val counting = CommitCountingStrategyRepository(strategyWithCap())
 
         withBoot(*validProperties(), strategyRepository = counting) { booted ->
             booted.failure shouldBe null
+            // **`evaluate()` 까지 돌려야 센다.** 배선 단계 읽기만 세면 고정 여부와 무관하게 늘
+            // 1 이다(실측: 고정을 걷는 변이가 초록이었다) — 두 번째 읽기는 use case 안에 있다.
+            // 후보가 빈 목록이라 DB·ML 에는 닿지 않는다.
+            runBlocking { booted.context.getBean(EvaluationCommitRun::class.java).evaluate() }
+
             counting.loads shouldBe 1
         }
     }
