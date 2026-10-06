@@ -38,8 +38,11 @@ import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
+import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
@@ -87,6 +90,7 @@ private data class OutboxRow(
  * 바꿔치운 조립을 손으로 세운다(배선 자체는 `EvaluationCommitWiringTest` 가 든다).
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class EvaluationCommitRunE2ETest {
     companion object {
         private val postgres: PostgreSQLContainer =
@@ -207,6 +211,11 @@ class EvaluationCommitRunE2ETest {
      * 비우는 것은 `outbox` 와 `inbox` 뿐이고 seed(전략·공고·raw)는 남긴다 — 그 셋은
      * `@BeforeAll` 이 한 번 심는 입력이다. 전략 **개정**은 거동 축 test 가 바꾸므로 여기서
      * 되돌린다(그 test 가 중간에 실패해도 다음 test 가 영향을 받지 않는다).
+     *
+     * **순서를 불리한 쪽으로 고정한다**(`@Order`) — 행을 남기는 거동 축 test 가 **먼저**
+     * 돌고, 행 하나를 단언하는 test 가 뒤에 온다. 그러지 않으면 이 비우기가 실제로 지는
+     * 짐이 없어 「지워도 초록」이다(실측: JUnit 의 기본 순서에서는 변이가 안 잡혔다).
+     * 이제 비우기를 떼면 뒤 test 의 `single()` 이 두 행을 보고 붉는다.
      */
     @BeforeEach
     fun resetRunState() {
@@ -223,6 +232,7 @@ class EvaluationCommitRunE2ETest {
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
      */
     @Test
+    @Order(2)
     fun `커밋 run 은 outbox 행을 남기고 변한 표는 outbox 하나이며 종료 코드가 0 이다`() {
         val before = rowCountsByTable()
 
@@ -257,6 +267,7 @@ class EvaluationCommitRunE2ETest {
      * 어휘 골든이고, 디코더는 그 모듈 `internal` 이라 여기서 부를 수 없다).
      */
     @Test
+    @Order(1)
     fun `전략 개정을 올리면 저장되는 payload 가 달라지고 되돌리면 같아진다`() {
         val first = runOnceAndTakePayload()
 
@@ -280,6 +291,7 @@ class EvaluationCommitRunE2ETest {
      * 뒤집는 변이가 전 test 초록이었다(cr L-2).
      */
     @Test
+    @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
         blockNotificationInserts()
         val before = rowCountsByTable()
