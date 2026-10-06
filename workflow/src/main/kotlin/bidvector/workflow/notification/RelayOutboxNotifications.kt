@@ -155,11 +155,17 @@ class RelayOutboxNotifications(
         guard: LeaseGuard,
     ): RelayReport =
         when {
-            !guard.stillHeld() -> leaseLostBefore(orphansIsolated = 0)
-            policy.environmentModes.getValue(environment) != DeliveryMode.Live ->
-                RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+            !guard.stillHeld() -> {
+                leaseLostBefore(orphansIsolated = 0)
+            }
 
-            else -> relayHoldingLease(limit, guard)
+            policy.environmentModes.getValue(environment) != DeliveryMode.Live -> {
+                RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+            }
+
+            else -> {
+                relayHoldingLease(limit, guard)
+            }
         }
 
     private fun relayHoldingLease(
@@ -330,7 +336,6 @@ class RelayOutboxNotifications(
     }
 }
 
-/** 행 하나의 처분 — [RelayReport.Completed] 의 계수가 이 값들을 센다. */
 /**
  * 아직 아무 행도 집지 않은 상태의 임대 상실 — 처분 계수가 전부 0 이고 `orphansIsolated` 만
  * 그때까지 격리한 수다. top-level 인 이유는 수신자 상태가 필요 없기 때문이다(클래스당 함수
@@ -339,6 +344,7 @@ class RelayOutboxNotifications(
 private fun leaseLostBefore(orphansIsolated: Int): RelayReport.LeaseLost =
     RelayReport.LeaseLost(reportOf(orphansIsolated, claimed = 0, dispositions = emptyList()))
 
+/** 행 하나의 처분 — [RelayReport.Completed] 의 계수가 이 값들을 센다. */
 private enum class RowDisposition {
     DELIVERED,
     SKIPPED_DUPLICATE,
