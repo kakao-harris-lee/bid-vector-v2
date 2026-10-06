@@ -142,3 +142,13 @@ Swap free ≥ 2GB) · `ps -eo pid,rss,args --sort=-rss | head` 를 **별도 호�
 - cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → compile → `check`
 - exit: restore 0 · compile 0 · check **0**
 - 핵심 결과: `D` 36 · `M` 28(합 64), 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱(ADR 둘·마일스톤·evidence 넷)은 HEAD 그대로. 앞 라운드 실측(`cf59db87`)은 옮기지 않고 버렸다
+
+## 2026-10-07T05:50:00Z — 수정 라운드 1: 비밀값 스캔 · clean-tree
+
+- cmd: 참조형 패턴 스캔을 **이 라운드가 더한 줄**(1441 줄)에
+- exit: 0 (매치 2)
+- 핵심 결과: 둘 다 새 E2E test 의 **test 컨테이너 자격 리터럴**이고, 이 저장소의 다른 app E2E 열 곳이 쓰는 것과 **같은 형태**다(그 형태를 그대로 옮겼다). 실 비밀값이 아니다. 정본 게이트(`leakPatternGate`, scanRoot 가 evidence)는 `check` 전건에서 통과했고 evidence 디렉터리 직접 스캔도 매치 0(exit 1)
+
+- cmd: `git status --porcelain -- <in_scope 경로 개별 인자>` + 양성 대조 1회(비파괴 절삭)
+- exit: 0
+- 핵심 결과: 빈 출력. 양성 대조에서 심은 줄이 `M` 으로 잡히고 `head -n` 절삭으로 복원됨(`git checkout --` 을 쓰지 않는다)
