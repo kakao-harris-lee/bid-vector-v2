@@ -200,3 +200,9 @@ R2-7 두 줄과 R2-10 이 이 라운드의 교훈이다 — **방어를 더한 �
 - 핵심 결과: 빈 출력. 양성 대조에서 심은 줄이 `M` 으로 잡히고 `head -n` 절삭으로 복원됨(`git checkout --` 을 쓰지 않는다)
 
 **마지막 HEAD 의 게이트 결과 정본은 이 파일이 아니다** — verifier 가 판정 SHA 에서 직접 재고, 저작 레인은 PR 조치 코멘트에 적는다(evidence 가 자기 마지막 커밋의 post-state 를 담으려 하면 커밋이 또 생긴다).
+
+## 2026-10-07T07:55:00Z — 수정 라운드 2 보강: 투영 등식의 표본 값을 양쪽으로 측정
+
+- cmd: 변이 `strategyRevision → StrategyRevision(1)` 적용 → `git diff --numstat` → `:workflow:test --tests '*OutboxNotificationRequestPortTest'` → 표본만 1 로 바꿔 재실행 → `git checkout --`
+- exit: 변이 단독 **1**(RED) · 변이 + 표본 1 **0**(초록)
+- 핵심 결과: 표본 **7**(지원 함수 기본값은 1)에서 상수 1 변이가 투영 등식 test 를 붉히고, 표본을 1 로 내리면 **같은 변이가 통과한다**. 거동 축의 두 값(7 → 11)도 둘 다 비기본값이고 서로 다르다 — 그 전제가 이 두 축을 지탱한다는 것을 양쪽으로 쟀다
