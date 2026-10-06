@@ -420,7 +420,7 @@ route 수준 `Suppressed`·inbox `SkipDuplicate`)과 고아 `CLAIMED` 를 종단
 |---|---|---|
 | `DELIVERED` | 채널에 전달됐다 **또는** 같은 멱등 키의 알림이 이미 전달됐다(이 entry 의 의무가 이미 이행됨) | `Attempted(Delivered)` · `SkipDuplicate`(inbox 에 키가 있음) |
 | `FAILED` | 이 entry 로는 전달이 **일어나지 않았고 일어나지 않을 것**이다(재시도 없음 — D-3·D-11) | `Attempted(Rejected)` · route 수준 `Suppressed`(채널 비활성·route 없음) |
-| `ISOLATED` | 전달 여부가 **모호**하다 | `Attempted(Unknown)` · **고아 `CLAIMED`**(워커가 죽어 남은 행 — 재실행하지 않는다, §1.2) |
+| `ISOLATED` | 전달 여부가 **모호**하다 | `Attempted(Unknown)` · **고아 `CLAIMED`**(워커가 죽어 남은 행 — 재실행하지 않는다, §1.2) · relay 가 해독할 수 없는 payload(종류는 맞고 타입은 아닌 행 — kind 필터 뒤의 심층 방어, 계수로 공시) |
 
 **환경 수준 억제**(`NotificationDeliveryPolicyData.environmentModes[환경] != Live`)는 종단이 아니다 — relay 가 **claim 자체를 하지 않는다**(행은 `PENDING` 으로
 보존, D-4 「억제는 기록 억제가 아니다」). 이 표가 없으면 `SkipDuplicate`·`Suppressed` 가 어휘 밖에 서서 `CLAIMED` 에 좌초한다(6D-1 test relay 실측).
