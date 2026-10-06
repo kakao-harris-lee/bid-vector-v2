@@ -152,3 +152,51 @@ Swap free ≥ 2GB) · `ps -eo pid,rss,args --sort=-rss | head` 를 **별도 호�
 - cmd: `git status --porcelain -- <in_scope 경로 개별 인자>` + 양성 대조 1회(비파괴 절삭)
 - exit: 0
 - 핵심 결과: 빈 출력. 양성 대조에서 심은 줄이 `M` 으로 잡히고 `head -n` 절삭으로 복원됨(`git checkout --` 을 쓰지 않는다)
+
+## 2026-10-07T06:40:00Z — 수정 라운드 2: `check` 전건
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: workflow 50 클래스 422 · adapters 134 클래스 885 · app 61 클래스 550, 실패 0. 라운드 중 네 번 붉었고 전부 게이트가 잡은 것이다 — detekt `ReturnCount`(임대 상실 분기 셋) · ktlint `when-entry-bracing`·`no-consecutive-comments` · `sizeGate` 파일 500줄(투영 등식 test 를 더해 527) · `gateRegistrationGate` 미등재 test 둘
+
+## 2026-10-07T07:05:00Z — 수정 라운드 2: 변이 실측
+
+- cmd: 변이마다 적용 → `git diff --numstat` → 표적 test → `git checkout --` (산출물 전부 커밋 뒤)
+- exit: 아래 표
+- 핵심 결과: 새 변이 **아홉 전부 RED**. 초록이 둘 나왔고 둘 다 **의도한 음성 대조**다(R2-7b 는 옛 도출의 사각 재현, R2-10 전 단계는 순서가 유리해 비우기가 짐을 안 지던 것 — 그래서 순서를 고정했다)
+
+| 변이 | numstat | 결과 | 잡은 단언 |
+|---|---|---|---|
+| R2-1 임대 재확인 세 지점 제거(행 루프 하나로) | 1/12 | **RED** | fake 넷 + 실 DB 하나(획득 직후 상실에서 상태 분포 불변) |
+| R2-2 투영 두 줄을 상수로 | 4/2 | **RED** | 투영 등식 test · 커밋 E2E 의 정책 출처 축어 |
+| R2-2b 개정만 `StrategyRevision(1)` | 2/1 | **RED** | 커밋 E2E 거동 축(개정을 올려도 payload 가 안 바뀐다) |
+| R2-3 기동 거부를 환경 이름 술어로 | 1/1 | **RED**(r1 의 G1 초록이 전환) | 변이표 test 둘(Staging 거부 · Production 허용) |
+| R2-4 `INCOMPLETE` 앞 항 제거 | 1/1 | **RED** | 앞 항 단독 표본(전달 1 + 미지 payload 1) |
+| R2-5 커밋 러너가 예외를 재던짐 | 1/2 | **RED** | 예외 경로 둘(종료 코드 1 · 실패 줄) |
+| R2-6 억제를 `COMPLETE` 로 사상 | 1/1 | **RED** | 러너 성공 경로 |
+| R2-6b 러너가 성공 경로에서 종료를 안 부름 | 0/1 | **RED** | 러너 성공 경로만(`RelayExitCodeTest` 12 는 초록 — cr R-5 의 요점) |
+| R2-7a 중첩 전용 참조자 추가(도출 접기 유지) | 신규 1 파일 | **RED** | 모집단 등식이 등재를 요구 |
+| R2-7b 같은 입력 + 옛 도출(`$` 버리기) | 3/2 | **초록**(= cr R-4 사각 재현) | 없음 — 등식이 초록인 채 등재를 건너뛴다 |
+| R2-8 억제 판정 제거 | 0/4 | **RED** | 억제 환경 claim 0·격리 0 |
+| R2-9 claim 을 자기 트랜잭션 밖으로 | 1/1 | **RED** | 경계 호출 계수(4 → 3) |
+| R2-10 커밋 E2E 의 표 비우기 제거 | 0/1 | **RED**(순서 고정 뒤) | 뒤 두 test 가 두 행을 본다 |
+
+R2-7 두 줄과 R2-10 이 이 라운드의 교훈이다 — **방어를 더한 것만으로는 측정이 되지 않는다.** 앞 것은 사각을 보이는 입력(중첩 전용 참조자)을 함께 만들어야 갈리고, 뒤 것은 불리한 순서를 고정해야 짐을 진다.
+
+## 2026-10-07T07:30:00Z — 수정 라운드 2: rollback 재실측 (버릴 clone, 실측 HEAD `c037c45e`)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → compile → `check`
+- exit: restore 0 · compile 0 · check **0**
+- 핵심 결과: 복원 목록 69 · `D` 40 · `M` 29(합 69), 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱(ADR 하나·data-dictionary 하나·마일스톤 하나·evidence 넷)은 HEAD 그대로. 앞 라운드 실측(`63a15fda`)은 옮기지 않고 버렸다. 세부는 `rollback.md`
+
+## 2026-10-07T07:40:00Z — 수정 라운드 2: 비밀값 스캔 · clean-tree
+
+- cmd: 참조형 패턴 스캔을 **이 라운드가 더한 줄**(900 줄)에
+- exit: 0 (매치 4)
+- 핵심 결과: 둘은 **일부러 심은 가짜 접속 문자열과 그것을 쓰는 단언**이다 — 커밋 러너의 실패 줄이 예외 메시지를 싣지 않음을 재는 입력이고, 그 값이 로그에 **없다**는 것이 바로 그 test 다. 나머지 둘은 test 컨테이너 자격(리터럴 하나 + 컨테이너가 생성한 값 읽기)이고 이 저장소의 다른 app E2E 와 같은 형태다. 실 비밀값 0. 정본 게이트(`leakPatternGate`, scanRoot 가 `reports/evidence`)는 `check` 전건에서 통과했고 evidence 디렉터리 직접 스캔도 매치 0
+
+- cmd: `git status --porcelain -- <in_scope 경로 개별 인자>` + 양성 대조 1회(비파괴 절삭)
+- exit: 0
+- 핵심 결과: 빈 출력. 양성 대조에서 심은 줄이 `M` 으로 잡히고 `head -n` 절삭으로 복원됨(`git checkout --` 을 쓰지 않는다)
+
+**마지막 HEAD 의 게이트 결과 정본은 이 파일이 아니다** — verifier 가 판정 SHA 에서 직접 재고, 저작 레인은 PR 조치 코멘트에 적는다(evidence 가 자기 마지막 커밋의 post-state 를 담으려 하면 커밋이 또 생긴다).
