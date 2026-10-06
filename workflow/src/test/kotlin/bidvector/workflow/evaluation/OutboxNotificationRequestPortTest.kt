@@ -13,6 +13,7 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
+import bidvector.strategy.StrategyRevision
 import bidvector.workflow.event.AggregateVersion
 import bidvector.workflow.event.ClaimedOutboxRow
 import bidvector.workflow.event.CorrelationId
@@ -21,6 +22,7 @@ import bidvector.workflow.event.EventId
 import bidvector.workflow.event.EventIdFactory
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
+import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntryId
 import bidvector.workflow.event.OutboxPort
 import bidvector.workflow.event.OutboxTransition
@@ -40,6 +42,22 @@ import java.time.Instant
 private val SINK_NOW: Instant = Instant.parse("2026-09-23T00:00:00Z")
 
 private fun noticeId(number: String = "N1") = NoticeId(NoticeNumber(number), NoticeRound("000"))
+
+/**
+ * test 전용 조립 — production 의 `NotificationRequest` 는 `ladderPolicyVersion`·
+ * `strategyRevision` 에 **기본값을 두지 않는다**(D-6F10-19: 빠뜨리면 컴파일이 깨져야 한다).
+ * 그 둘이 이 test 의 관심사가 아닌 자리에서만 이 헬퍼가 값을 채운다 — 관심사인 test 는
+ * 인자를 명시한다.
+ */
+private fun notificationRequest(
+    noticeId: NoticeId,
+    correlationId: CorrelationId,
+    verdict: Verdict.BidNow,
+    evidence: PredictionEvidence,
+    ladderPolicyVersion: PolicyVersion = PolicyVersion(EffectiveFrom.Initial, "test-ladder-policy"),
+    strategyRevision: StrategyRevision = StrategyRevision(1),
+): NotificationRequest =
+    NotificationRequest(noticeId, correlationId, verdict, evidence, ladderPolicyVersion, strategyRevision)
 
 /**
  * `VerdictLadder.judge`(public, `decision` 모듈 소유)로 진짜 `Verdict.BidNow`를 얻는다 —
@@ -196,7 +214,12 @@ private class NotificationInMemoryOutboxPort(
         return OutboxEntryId("outbox-${registered.size}")
     }
 
-    override fun claim(limit: Int): List<ClaimedOutboxRow<*>> = emptyList()
+    override fun claim(
+        limit: Int,
+        kind: OutboxConsumerKind,
+    ): List<ClaimedOutboxRow<*>> = emptyList()
+
+    override fun claimedEntries(kind: OutboxConsumerKind): List<ClaimedOutboxRow<*>> = emptyList()
 
     override fun markDelivered(transition: OutboxTransition.ToDelivered) = Unit
 
@@ -216,7 +239,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val notification =
-            NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
+            notificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
         val outcome = sink.request(notification)
 
@@ -234,7 +257,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val notification =
-            NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
+            notificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
         val outcome = sink.request(notification)
 
@@ -252,7 +275,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val notification =
-            NotificationRequest(noticeId(), CorrelationId("corr-trace"), bidNowVerdict(), diagnosedEvidence())
+            notificationRequest(noticeId(), CorrelationId("corr-trace"), bidNowVerdict(), diagnosedEvidence())
 
         sink.request(notification)
 
@@ -270,7 +293,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val notification =
-            NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
+            notificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
         sink.request(notification)
 
@@ -286,8 +309,8 @@ class OutboxNotificationRequestPortTest {
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
             )
-        val first = NotificationRequest(noticeId("N9"), CorrelationId("corr-a"), bidNowVerdict(), diagnosedEvidence())
-        val second = NotificationRequest(noticeId("N9"), CorrelationId("corr-b"), bidNowVerdict(), diagnosedEvidence())
+        val first = notificationRequest(noticeId("N9"), CorrelationId("corr-a"), bidNowVerdict(), diagnosedEvidence())
+        val second = notificationRequest(noticeId("N9"), CorrelationId("corr-b"), bidNowVerdict(), diagnosedEvidence())
 
         sink.request(first)
         sink.request(second)
@@ -308,7 +331,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val verdict = bidNowVerdict()
-        val notification = NotificationRequest(noticeId("N42"), CorrelationId("corr-1"), verdict, diagnosedEvidence())
+        val notification = notificationRequest(noticeId("N42"), CorrelationId("corr-1"), verdict, diagnosedEvidence())
 
         sink.request(notification)
 
@@ -330,7 +353,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val notification =
-            NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
+            notificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
         sink.request(notification)
 
@@ -361,7 +384,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.CircuitOpen)
-        val notification = NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), evidence)
+        val notification = notificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), evidence)
 
         sink.request(notification)
 
@@ -380,7 +403,7 @@ class OutboxNotificationRequestPortTest {
                 NotificationFixedClock(SINK_NOW),
             )
         val verdict = forceBidOverrideVerdict()
-        val notification = NotificationRequest(noticeId("N7"), CorrelationId("corr-1"), verdict, diagnosedEvidence())
+        val notification = notificationRequest(noticeId("N7"), CorrelationId("corr-1"), verdict, diagnosedEvidence())
 
         sink.request(notification)
 
@@ -424,6 +447,11 @@ class OutboxNotificationRequestPortTest {
      * 비민감(코드·수치·식별자, checklist.md "toString·민감값 실측" 절) — 이 test는
      * 그 사실이 아니라 **field 집합이 바뀌면 조용히 지나가지 않는다**를 보장한다.
      * 새 필드가 추가되면 이 test가 깨져 「그 필드가 민감한가」를 다시 묻게 만든다.
+     *
+     * **M6/6F-10 D-6F10-19 로 둘이 늘었고, 그 물음에 다시 답했다**: `ladderPolicyVersion` 은
+     * 정책 식별자(`EffectiveFrom` + 문서 출처 문자열)이고 `strategyRevision` 은 정수 개정
+     * 번호다 — 둘 다 공고·사업자·대상 값과 무관하다. `toString()` 이 흘리는 것은 「어느 정책
+     * 판으로 판정했는가」뿐이고, 그것이 payload 에 실리는 **이유** 자체다(6D-2 재현 등식).
      */
     @Test
     fun `payload 필드 집합은 고정돼 있다 — 새 필드가 조용히 안 늘어난다(우회 4)`() {
@@ -440,7 +468,8 @@ class OutboxNotificationRequestPortTest {
                 .map { it.name }
                 .toSet()
 
-        payloadFields shouldBe setOf("noticeId", "bidNowReasons", "evidence")
+        payloadFields shouldBe
+            setOf("noticeId", "bidNowReasons", "ladderPolicyVersion", "strategyRevision", "evidence")
         diagnosedFields shouldBe
             setOf(
                 "trainingRowCount",

@@ -76,6 +76,19 @@ class EventInternalClosureCompileTest {
         assertNegativeFails("7-notification-request-ctor")
         assertPositiveCompiles()
     }
+
+    /**
+     * D-6F10-21 — 격리 통로. 6F-10 이 `OutboxPort.claimedEntries` 를 **공개로** 더해
+     * `CLAIMED` 행의 id 를 아무 모듈이나 알 수 있게 됐다. 「안다」가 「태울 수 있다」로
+     * 넘어가지 않는 근거가 `OutboxTransition.ToIsolated` 생성자의 `internal` 이다 —
+     * 앞 세 probe 는 `ToDelivered` 만 보았고, 격리는 **이 slice 가 처음 쓰는 간선**이라
+     * 그 자리를 따로 잠근다(단방향 종단이라 잘못된 격리는 되돌릴 API 가 없다).
+     */
+    @Test
+    fun `OutboxTransition ToIsolated 생성자는 workflow 밖에서 internal 이다`() {
+        assertNegativeFails("8-outbox-transition-to-isolated-ctor")
+        assertPositiveCompiles()
+    }
 }
 
 private fun assertNegativeFails(fixtureName: String) {

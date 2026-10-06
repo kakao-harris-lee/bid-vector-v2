@@ -18,6 +18,19 @@ import java.io.File
  * 넓히지 않는다 — 이 test는 그 test들과 별개다). `bidvector.adapters.evaluation` 자신은
  * 이 패키지의 클래스끼리 서로 참조할 수 있어야 하므로 포함한다.
  *
+ * **`bidvector.adapters.event`(D-6F10-18 ③ 신설)** — [EvaluationCommitRun] 이 평가 커밋
+ * 경로를 조립하려면 `JdbcOutboxPort`·`JdbcEventIdFactory` 를 이름으로 불러야 한다. 그
+ * 조립이 `app` 이 아니라 이 패키지에 사는 이유가 그것이다 — `app` production 은 outbox 쓰기
+ * 타입을 참조하지 못하고(D-6A3-17(a)③), 그 게이트를 넓히는 것보다 이 패키지의 허용 루트를
+ * 하나 넓히는 편이 좁다(`app` 은 아홉 모듈 전체를 배선하는 층이고 이 패키지는 평가 조립 한
+ * 축이다). **선례 D-6A2b-3 이 같은 사유로 `StrategyAdapterDependencyTest` 의 허용 루트를 둘
+ * 넓혔다** — 이 한 줄은 그 형태를 그대로 따른다.
+ *
+ * 이 넓힘이 **열지 않는 것**: 클래스별 상수 풀 허용 목록
+ * ([ALLOWED_RECORDING_METHOD_REFERENCES]·[ALLOWED_METHOD_REFERENCES])은 무변경이라
+ * `RecordingNotificationRequestPort`·`NoticeWatchSubjectPort` 는 이름이 무엇이든 목록 밖
+ * 참조를 여전히 거부한다. 패키지 허용은 넓어졌고 그 두 클래스의 좁힘은 그대로다.
+ *
  * **`bidvector.strategy`(D-6F4W-3 신설)** — [NoticeWatchSubjectPort]가
  * `assembleKeywordScopeText`·`assembleFullScopeText`(순수 커널)를 불러 감시 텍스트를
  * 조립한다(우회 3 — 어댑터가 이어붙이기를 복제하지 않고 커널을 부른다). `WatchSubject`·
@@ -33,6 +46,7 @@ private val ALLOWED_ROOTS =
         "bidvector.strategy",
         "bidvector.adapters.persistence",
         "bidvector.adapters.evaluation",
+        "bidvector.adapters.event",
     )
 
 private fun isDisallowed(importedPackage: String): Boolean =
@@ -73,6 +87,7 @@ class EvaluationAdapterDependencyTest {
         isDisallowed("bidvector.qualification") shouldBe true
         isDisallowed("bidvector.workflow.ml") shouldBe true
         isDisallowed("bidvector.adapters.ml") shouldBe true
+        isDisallowed("bidvector.adapters.relay") shouldBe true
     }
 
     @Test
@@ -85,6 +100,7 @@ class EvaluationAdapterDependencyTest {
         isDisallowed("bidvector.strategy") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.evaluation") shouldBe false
+        isDisallowed("bidvector.adapters.event") shouldBe false
     }
 
     /**

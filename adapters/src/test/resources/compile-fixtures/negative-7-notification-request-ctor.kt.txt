@@ -13,6 +13,7 @@ import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.evaluation.NotificationRequest
 import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.decision.MlUnavailableReason
+import bidvector.strategy.StrategyRevision
 import java.math.BigDecimal
 
 fun probe() {
@@ -41,5 +42,9 @@ fun probe() {
         correlationId = CorrelationId("c"),
         verdict = verdict,
         evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+        // M6/6F-10 D-6F10-19 — 새 인자 둘을 **채운다**. 비워 두면 「인자 누락」이 먼저
+        // 보고돼 이 probe 가 재려는 접근 거부가 가려진다(probe 가 다른 것을 재게 된다).
+        ladderPolicyVersion = PolicyVersion(EffectiveFrom.Initial, "probe-ladder"),
+        strategyRevision = StrategyRevision(1),
     )
 }

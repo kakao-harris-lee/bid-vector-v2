@@ -11,10 +11,12 @@ import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
 import bidvector.workflow.evaluation.OpportunityAnalysis
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.notification.DispatchNotification
+import bidvector.workflow.notification.RelayReport
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -101,7 +103,11 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
     private fun runPipeline(): RecordingNotificationSender {
         val assembly = assembly()
         runBlocking { assembly.evaluate() }
-        assembly.relay() shouldBe 1
+        val report = assembly.relay().shouldBeInstanceOf<RelayReport.Completed>()
+        report.claimed shouldBe 1
+        report.delivered shouldBe 1
+        report.skippedDuplicates shouldBe 0
+        report.isolated shouldBe 0
         return assembly.sender
     }
 
