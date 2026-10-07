@@ -1,6 +1,6 @@
 # M6/6D-2 — rollback 절차와 실측
 
-실측 HEAD: `ea07b9a7`(승인 전 일괄의 산출물 커밋 = 이 slice 의 마지막 산출물 커밋)
+실측 HEAD: `3a3208d1`(PR #64 조치의 산출물 커밋 = 이 slice 의 마지막 산출물 커밋)
 base: `f4b4ff91`
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 경로는 셋 — e2e test 디렉터리와
@@ -20,9 +20,9 @@ in_scope 다. 커밋 주체가 팀장이어도 **되돌림 절차는 레인 문�
 BASE=f4b4ff91
 IN="adapters/src/test/kotlin/bidvector/adapters/e2e config/quality/gate-tests.properties \
     docs/adr/0005-domain-events-and-outbox.md"
-git diff --name-status $BASE..ea07b9a7 -- $IN
-git diff --name-only $BASE..ea07b9a7 | sort > all.txt
-git diff --name-only $BASE..ea07b9a7 -- $IN milestone-6.md reports/evidence/m6/6d2 | sort > covered.txt
+git diff --name-status $BASE..3a3208d1 -- $IN
+git diff --name-only $BASE..3a3208d1 | sort > all.txt
+git diff --name-only $BASE..3a3208d1 -- $IN milestone-6.md reports/evidence/m6/6d2 | sort > covered.txt
 comm -23 all.txt covered.txt     # 전체 ∖ 덮개 — 빈 출력
 comm -13 all.txt covered.txt     # 덮개 ∖ 전체 — 빈 출력
 ```
@@ -30,15 +30,16 @@ comm -13 all.txt covered.txt     # 덮개 ∖ 전체 — 빈 출력
 산출: `A` 3건(신규 test 소스 둘 + 주입 데코레이터) · `M` 7건(e2e 수정 다섯 + 공유 파일 둘).
 `comm` **양쪽 다 빈 출력**이다.
 
-**재산출 자리**는 `ea07b9a7` 이다. 이 뒤의 evidence 커밋이 건드리는 것은 이미 덮개에 든
-`reports/evidence/m6/6d2/` 뿐이므로 등식이 그대로 유지되고, 라운드가 더 붙으면 위 명령을 다시 돌린다
-(목록을 문서에 박지 않는다 — 하드코드는 바로 낡는다).
+**재산출 자리**는 `3a3208d1` 이다. 라운드마다 다시 돌린다 — 목록을 문서에 박지 않는다(하드코드는
+바로 낡는다). 이 뒤의 evidence 커밋이 건드리는 것은 이미 덮개에 든 `reports/evidence/m6/6d2/` 뿐이라
+등식이 그대로 유지된다. 앞 두 판(`8af675c1` · `ea07b9a7`)에서도 같은 명령이 양방향 빈 출력이었고,
+`A` 3 · `M` 7 은 승인 전 일괄 이후 변하지 않았다(이번 조치는 수정 파일 집합을 넓히지 않았다).
 
 ## 공유 파일의 hunk 출처 — `git log` 산출, `--no-merges`
 
 ```
 for f in config/quality/gate-tests.properties docs/adr/0005-domain-events-and-outbox.md; do
-  git log --no-merges --format=%h $BASE..ea07b9a7 -- "$f"
+  git log --no-merges --format=%h $BASE..3a3208d1 -- "$f"
 done
 ```
 
@@ -70,7 +71,7 @@ git restore --source=$BASE --staged --worktree -- \
 G=config/quality/gate-tests.properties
 A=docs/adr/0005-domain-events-and-outbox.md
 for f in $G $A; do
-  for c in $(git log --no-merges --format=%h $BASE..ea07b9a7 -- "$f"); do
+  for c in $(git log --no-merges --format=%h $BASE..3a3208d1 -- "$f"); do
     git diff "$c~1..$c" -- "$f" | git apply -R || { echo "FAIL $f @ $c"; exit 1; }
   done
 done
@@ -88,7 +89,7 @@ done
 
 4. 세 단계 뒤 인덱스를 푼다(`git reset`).
 
-## ①~⑥ 실측 (버릴 clone, `ea07b9a7` 체크아웃)
+## ①~⑥ 실측 (버릴 clone, `3a3208d1` 체크아웃)
 
 | 항목 | 결과 |
 |---|---|
@@ -97,16 +98,19 @@ done
 | ③ diff 빈 것 | `git diff --name-only f4b4ff91 -- <세 경로>` **빈 출력**(바이트 동일) |
 | ④ compile | `check` 안의 Kotlin 컴파일 과제 21건 전부 통과 |
 | ⑤ test | 348 클래스 · 2806 test · 실패 0 · 오류 0. e2e 는 **13**(6D-1 의 수)으로 돌아왔다 |
-| ⑥ 게이트 | `./gradlew --no-daemon check` exit 0(9m 25s) · `./gradlew --no-daemon qualityBaseline` exit 0 |
+| ⑥ 게이트 | `./gradlew --no-daemon check` exit 0(9m 26s) · `./gradlew --no-daemon qualityBaseline` exit 0 |
 
 확인은 **양방향**이다 — 「내 줄이 사라졌다」(③ 의 빈 diff)와 「남의 줄이 남았다」를 함께 봤다. 뒤쪽은
 공유 파일마다 술어를 둔다:
 
-| 술어 | 세는 것 | base | `ea07b9a7` | 되돌림 |
+| 술어 | 세는 것 | base | `3a3208d1` | 되돌림 |
 |---|---|---|---|---|
 | `grep -c '^  bidvector\.'` | 등재 목록의 식별자 줄 | 348 | 350 | 348 |
 | `grep -c 'bidvector\.'` | 등재 파일 전체 출현(주석 포함) | 358 | 360 | 358 |
 | `grep -c '^### 7\.'` | ADR §7 의 소절 수 | 5 | 6 | 5 |
+
+세 라운드 전부 같은 절차로 돌렸고 결과도 같다(`8af675c1` · `ea07b9a7` · `3a3208d1`). ④~⑥ 은 라운드마다
+다시 돌렸다 — 「앞 라운드에서 초록이었다」로 갈음하지 않는다.
 
 갈음 근거는 「HEAD 가 초록」이 아니라 **트리 동일성**이다 — 되돌린 트리의 세 경로가 base 와 바이트
 동일함을 ③ 이 보이고, 그 위에서 ④⑤⑥ 을 다시 실측했다.

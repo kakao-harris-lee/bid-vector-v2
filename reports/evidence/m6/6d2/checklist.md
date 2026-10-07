@@ -1,6 +1,6 @@
 # M6/6D-2 — 리뷰 요청 점검표 (구현 레인)
 
-base `f4b4ff91` · 마지막 산출물 커밋 `ea07b9a7`(승인 전 일괄) · 정본 계약 `scope.md`(D-6D2-1~9).
+base `f4b4ff91` · 마지막 산출물 커밋 `3a3208d1`(PR #64 조치) · 정본 계약 `scope.md`(D-6D2-1~13).
 
 ## 리뷰 요청 조건
 
@@ -24,7 +24,8 @@ base `f4b4ff91` · 마지막 산출물 커밋 `ea07b9a7`(승인 전 일괄) · �
 
 | 우회 | 닫는 술어 | 실측 |
 |---|---|---|
-| 1. 크래시 wrapper 가 안 불려 run 이 정상 완료 | 죽은 run 은 `shouldThrow<RelayAborted>` + cause 타입 + **중간 상태**(CLAIMED 잔류 · inbox 0 · sender 계수) | 변이 「hook 미호출」 RED ×4 · 「R-2 주입 제거」 RED |
+| 1. 크래시 wrapper 가 안 불려 run 이 정상 완료 | 죽은 run 은 `shouldThrow<RelayAborted>` + cause 타입 + **중간 상태**(CLAIMED 잔류 · inbox 0 · sender 계수) | 변이 「hook 미호출」 RED ×6 · 「R-2 주입 제거」 RED |
+| 1b. wrapper 가 불리기는 하는데 **자리가 틀림** | 「claim 커밋 뒤·발송 전」 술어가 hook 생성 시점의 `CLAIMED` **entry id 집합**을 기억하고 **그 밖의 id** 가 나타났을 때만 터진다 — 「`CLAIMED` 가 하나라도 있다」로는 선재 고아가 있는 DB 에서 **첫 경계 호출**(고아 목록)에서 터진다(PR #64 F1). 계수가 아니라 집합인 이유: 격리가 선재 `CLAIMED` 를 태우므로 이 run 이 하나를 집은 뒤에도 **수는 그대로**다. 자리 자체를 전용 test 가 잠근다 — 선재 고아 + 재평가한 둘째 entry 를 **상태 강제 없이** 만들고 `orphansIsolated 1`·`claimed 1` 을 단언한다 | 변이 「집합 차 → 합」 RED — **그 test 하나만**(R-1 은 선재 고아가 없어 두 술어가 같은 답을 낸다) |
 | 2. 「재기동」이 같은 인스턴스 재호출 | **인스턴스로는 닫히지 않는다**(verifier r1 R1-M-2 가 반증 — 아래 절). 닫는 것은 relay 의 무상태성이다: 임대 세션이 `withLease` **호출 단위**이고 relay 가 호출 사이에 상태를 갖지 않으므로 새 인스턴스와 재호출이 **동치**다. 그래서 「재기동이 아니었다」로 결과가 달라지는 경로가 없다 | 탐침 실측 — 막힌 홀더 앞에서 **같은 조립의 재호출도** `Busy` 를 받는다. 새 인스턴스의 실익은 sender 계수를 조립별로 가르는 것(발송 합)과 production 재기동 모양을 따르는 것뿐이다 |
 | 3. test 가 상태를 강제해 격리를 흉내 | e2e 에 상태 강제 helper 미사용 — 고아는 죽은 run 이 남긴 행이고 격리 계수는 relay 보고에서 | `forceOutboxState`·`insertClaimed*` 호출 0(e2e 소스셋 전체) |
 | 4. sender 가 dedup 해서 발송 1 | sender 는 기록만 하고(앞 결과를 돌려주되 호출은 센다) 판정은 `skippedDuplicates` + inbox 행 수 + 둘째 run 발송 0 | 변이 「inbox 판정 뒤집기」 RED |
@@ -89,6 +90,7 @@ base `f4b4ff91` · 마지막 산출물 커밋 `ea07b9a7`(승인 전 일괄) · �
 | **발송 채널이 fake 다** — 실 채널이 없어 route·renderer·sender 셋만 바꿔 끼운다 | `OPEN-STR-12` |
 | **요건·전략·프로필은 DB 시딩이다** — 편집 HTTP 경로·LLM 추출 체인이 미배선 | 6A-2 · 추출 체인 배선 slice |
 | **claim 관측 열이 없다** — 고아 판정에 시각이 없으므로 「언제 죽었는가」는 DB 에 남지 않는다 | `OPEN-6F10-CLAIM-OBSERVABILITY` |
+| **스레드 경합 시한 상수의 셋째 사본이 남아 있다**(PR #64 F6). 같은 값·같은 역할의 셋이 `adapters.event` 의 claim 경합 test(6F-10 산출물)에 따로 있다 — 그 파일은 이 slice 의 **in_scope 밖**이라 합치지 않고 e2e 쪽 상수 주석에 그 사실을 적었다. 거동 위험은 없다(값이 같다); 비용은 세 자리가 따로 움직일 수 있다는 것이다 | 그 파일을 만지는 다음 slice |
 
 ## 신설 OPEN 후보
 
