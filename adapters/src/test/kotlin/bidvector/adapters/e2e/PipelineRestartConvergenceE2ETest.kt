@@ -2,7 +2,6 @@ package bidvector.adapters.e2e
 
 import bidvector.adapters.event.ConsumerTransactions
 import bidvector.adapters.persistence.TransactionBoundary
-import bidvector.adapters.relay.CrashAfterDispatch
 import bidvector.adapters.relay.RelayWorkerDied
 import bidvector.adapters.relay.outboxStateCounts
 import bidvector.workflow.event.ConsumerTransactionPort
@@ -10,6 +9,7 @@ import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -100,8 +100,9 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
 
         val reevaluated = assembly()
         runBlocking { reevaluated.evaluate() }
-        outboxIdempotencyKeys() shouldHaveSize TWO_ENTRIES
-        outboxIdempotencyKeys().toSet() shouldHaveSize 1
+        val keys = outboxIdempotencyKeys()
+        keys shouldHaveSize TWO_ENTRIES
+        keys.toSet() shouldHaveSize 1
 
         val redelivery = reevaluated.relay().shouldBeInstanceOf<RelayReport.Completed>()
 
@@ -124,12 +125,11 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
     @Test
     fun `배치 중간에 죽으면 종단 행은 남고 나머지는 격리되며 재기동 발송은 0 이다`() {
         seedPipeline(BATCH_NOTICES)
-        lateinit var dying: PipelineAssembly
-        dying =
+        val dying =
             assembly(
-                relayBoundaryHook(
-                    crashAfterSettledRows(dataSource(), SETTLED_BEFORE_CRASH) { dying.sender.callCount() },
-                ),
+                relayBoundaryHook { sender ->
+                    crashAfterSettledRows(dataSource(), SETTLED_BEFORE_CRASH, sender::callCount)
+                },
             )
         runBlocking { dying.evaluate() }
         outboxStates() shouldContainExactly List(BATCH_SIZE) { PENDING_STATE }
@@ -199,6 +199,40 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
     }
 
     /**
+     * **주입의 자리 자체를 잠근다**(PR #64 F1). 앞 판의 술어는 「`CLAIMED` 가 하나라도 있고 발송
+     * 0」이라, 선재 고아가 있는 DB 에서 재사용하면 **첫 경계 호출**(고아 목록 조회)에서 터졌다 —
+     * 사건의 이름(「claim 커밋 뒤·발송 전」)과 실제 자리가 어긋났고, 그래도 `RelayAborted` 는
+     * 떴으므로 R-1 류 단언은 그 어긋남을 보지 못했다.
+     *
+     * 입력을 그 모양으로 만든다 — **상태 강제 없이**: R-1 의 죽은 run 이 남긴 `CLAIMED` 한 행이
+     * 선재 고아이고, 그 뒤 재평가가 같은 키의 둘째 entry 를 `PENDING` 으로 놓는다. 주입이 자리를
+     * 지키면 그 run 은 고아를 **격리하고 claim 까지 해낸 뒤** 죽는다(`orphansIsolated 1` ·
+     * `claimed 1`). 자리를 안 지키면 둘 다 0 이다.
+     *
+     * 이 test 가 「수가 아니라 id 집합」인 이유도 함께 잠근다 — 격리가 선재 `CLAIMED` 를 태우므로
+     * 이 run 이 하나를 집은 뒤에도 **수는 그대로 1** 이다.
+     */
+    @Test
+    fun `선재 고아가 있어도 주입은 이 run 의 claim 뒤에만 터진다`() {
+        val first = crashedBeforeFirstDispatch()
+
+        val reevaluated = assembly()
+        runBlocking { reevaluated.evaluate() }
+        outboxStateCounts(dataSource()) shouldBe mapOf(CLAIMED_STATE to 1, PENDING_STATE to 1)
+
+        val second = dyingBeforeFirstDispatch()
+        val aborted = shouldThrow<RelayAborted> { second.relay() }
+
+        aborted.cause.shouldBeInstanceOf<RelayWorkerDied>()
+        aborted.partial.orphansIsolated shouldBe 1
+        aborted.partial.claimed shouldBe 1
+        aborted.partial.delivered shouldBe 0
+        sentTotal(first, reevaluated, second) shouldBe 0
+        outboxStateCounts(dataSource()) shouldBe mapOf(ISOLATED_STATE to 1, CLAIMED_STATE to 1)
+        inboxKeys().shouldBeEmpty()
+    }
+
+    /**
      * R-5 — **살아 있는 홀더**. 첫 relay 가 배치 중간에서 막혀 있는 동안(임대 연결은 살아 있다)
      * 둘째 조립의 relay 는 `Skipped(LeaseBusy)` 여야 하고 상태 분포는 **움직이지 않아야** 한다 —
      * 살아 있는 남의 in-flight `CLAIMED` 를 격리하면 발송된 행이 `ISOLATED` 로 표기된다.
@@ -212,30 +246,46 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         val blocked = CountDownLatch(1)
         val release = CountDownLatch(1)
         val releasedInTime = AtomicBoolean(false)
-        lateinit var holder: PipelineAssembly
-        holder =
+        val holder =
             assembly(
-                relayBoundaryHook(
-                    pauseAfterFirstDispatch(blocked, release, releasedInTime) { holder.sender.callCount() },
-                ),
+                relayBoundaryHook { sender ->
+                    pauseAfterFirstDispatch(blocked, release, releasedInTime, sender::callCount)
+                },
             )
         runBlocking { holder.evaluate() }
         val executor = Executors.newSingleThreadExecutor()
         val running = executor.submit(Callable { holder.relay() })
+        var terminated = false
         try {
-            val signalled = blocked.await(E2E_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            // 홀더가 hook 에 닿기 전에 죽었으면 **그 예외를 먼저 올린다**(cr G-2) — 래치 단언만
-            // 두면 `expected true but was false` 가 실제 원인을 가리고 `finally` 가 그것을 버린다.
-            // 아직 돌고 있으면 올릴 원인이 없으므로 아래 단언이 그대로 진단이다.
-            if (!signalled && running.isDone) running.get(0, TimeUnit.SECONDS)
-            signalled shouldBe true
-            busyWhileHeld(holder, release, releasedInTime, running)
+            holdThenRelease(holder, blocked, release, releasedInTime, running)
         } finally {
             // 단언이 깨져 빠져나가도 스레드를 남기지 않는다 — 남은 스레드가 쥔 임대·트랜잭션은
-            // 다음 test 의 TRUNCATE 를 막는다(6D-1 review PR62 J).
+            // 다음 test 의 TRUNCATE 를 막는다(6D-1 review PR62 J). `shutdownNow` 는 **중단을
+            // 요청할 뿐**이라 돌아온 시점에 스레드가 아직 살아 있을 수 있어 합류를 기다린다
+            // (PR #64 F2). 여기서 단언하지 않는다 — finally 가 던지면 본문의 실패 원인을 덮는다.
             running.cancel(true)
             executor.shutdownNow()
+            terminated = executor.awaitTermination(E2E_JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         }
+        withClue("홀더 스레드가 합류 시한 안에 끝나지 않았다 — 다음 test 와 임대를 다툰다") {
+            terminated shouldBe true
+        }
+    }
+
+    private fun holdThenRelease(
+        holder: PipelineAssembly,
+        blocked: CountDownLatch,
+        release: CountDownLatch,
+        releasedInTime: AtomicBoolean,
+        running: Future<RelayReport>,
+    ) {
+        val signalled = blocked.await(E2E_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // 홀더가 hook 에 닿기 전에 끝났으면 그 사실을 단언에 싣는다(cr G-2 · PR #64 F3).
+        // 예외로 끝났으면 `get` 이 그 예외를 올리고, **값으로** 끝났으면 그 보고가 원인이므로
+        // clue 에 담는다 — 앞 판은 그 보고를 버려 `expected true but was false` 만 남았다.
+        val earlyReport = if (!signalled && running.isDone) running.get(0, TimeUnit.SECONDS) else null
+        withClue("홀더 relay 가 막히기 전에 끝났다면 그 보고: $earlyReport") { signalled shouldBe true }
+        busyWhileHeld(holder, release, releasedInTime, running)
     }
 
     private fun busyWhileHeld(
@@ -296,7 +346,7 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         seedProfile()
 
         val honest = assembly().wiredCollaborators()
-        val injected = assembly(relayBoundaryHook { }).wiredCollaborators()
+        val injected = assembly(relayBoundaryHook { NO_OP_BOUNDARY_HOOK }).wiredCollaborators()
 
         honest.collected.filter {
             originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty()
@@ -312,14 +362,18 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         injected.collected.map { it.javaClass } shouldContain ConsumerTransactions::class.java
     }
 
+    /** R-1 의 주입을 꽂은 조립 — 선재 고아가 있는 DB 에서도 **이 run 의 claim 뒤**에만 터진다. */
+    private fun dyingBeforeFirstDispatch(): PipelineAssembly =
+        assembly(
+            relayBoundaryHook { sender ->
+                crashAfterClaimBeforeDispatch(dataSource(), sender::callCount)
+            },
+        )
+
     /** R-1 의 죽은 run — 중간 상태까지 단언하고 그 조립을 돌려준다(발송 계수의 한쪽). */
     private fun crashedBeforeFirstDispatch(): PipelineAssembly {
         seedPipeline(listOf(NOTICE))
-        lateinit var dying: PipelineAssembly
-        dying =
-            assembly(
-                relayBoundaryHook(crashAfterClaimBeforeDispatch(dataSource()) { dying.sender.callCount() }),
-            )
+        val dying = dyingBeforeFirstDispatch()
         runBlocking { dying.evaluate() }
         outboxStates() shouldContainExactly listOf(PENDING_STATE)
 
@@ -334,14 +388,10 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         return dying
     }
 
-    /** R-2 의 죽은 run — 발송은 일어났고 T2 는 커밋되지 않았다(`CrashAfterDispatch` 재사용). */
+    /** R-2 의 죽은 run — 발송은 일어났고 T2 는 커밋되지 않았다. */
     private fun crashedAfterFirstDispatch(): PipelineAssembly {
         seedPipeline(listOf(NOTICE))
-        lateinit var dying: PipelineAssembly
-        dying =
-            assembly { boundary ->
-                CrashAfterDispatch(ConsumerTransactions(boundary)) { dying.sender.callCount() > 0 }
-            }
+        val dying = assembly(relayBoundaryHook { sender -> crashAfterFirstDispatch(sender::callCount) })
         runBlocking { dying.evaluate() }
 
         val aborted = shouldThrow<RelayAborted> { dying.relay() }
@@ -362,7 +412,8 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
     }
 
     private fun assembly(
-        relayTransactionsFor: (TransactionBoundary) -> ConsumerTransactionPort = { ConsumerTransactions(it) },
+        relayTransactionsFor: (TransactionBoundary, RecordingNotificationSender) -> ConsumerTransactionPort =
+            { boundary, _ -> ConsumerTransactions(boundary) },
     ): PipelineAssembly {
         val server = MlFakeServer.start(successfulMlScript())
         servers += server

@@ -41,8 +41,9 @@ internal class PipelineRedeliveryE2ETest : PipelineE2ESupport() {
 
         val second = assembly()
         runBlocking { second.evaluate() }
-        outboxIdempotencyKeys() shouldHaveSize TWO_ENTRIES
-        outboxIdempotencyKeys().toSet() shouldHaveSize 1
+        val keys = outboxIdempotencyKeys()
+        keys shouldHaveSize TWO_ENTRIES
+        keys.toSet() shouldHaveSize 1
 
         val report = second.relay().shouldBeInstanceOf<RelayReport.Completed>()
 

@@ -59,8 +59,7 @@ import javax.sql.DataSource
  * 지금은 전부 `val` 필드이고 [useCase]·[dispatcher] 도 한 번만 만든다 — [wiredCollaborators] 가
  * 그 살아 있는 객체에서 필드 그래프를 따라 내려간다.
  *
- * **production 에 relay 를 두지 않는다**(D-6D-3). 6F-10 이 그 자리를 갖는다 — [relay] 는 그
- * slice 가 받을 **소비자 모양**을 test 코드로 미리 보여 주는 것이다.
+ * relay 구간이 이 조립에서 어떤 모양인지는 [relay] 의 KDoc 이 든다.
  */
 internal class PipelineAssembly(
     private val dataSource: DataSource,
@@ -70,7 +69,8 @@ internal class PipelineAssembly(
     mlPolicy: MlCallPolicyData,
     currentActiveBids: Int = 0,
     maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
-    relayTransactionsFor: (TransactionBoundary) -> ConsumerTransactionPort = { ConsumerTransactions(it) },
+    relayTransactionsFor: (TransactionBoundary, RecordingNotificationSender) -> ConsumerTransactionPort =
+        { boundary, _ -> ConsumerTransactions(boundary) },
 ) {
     private val clock = fixedClock(at)
     private val javaClock: java.time.Clock = java.time.Clock.fixed(at, ZoneOffset.UTC)
@@ -141,6 +141,10 @@ internal class PipelineAssembly(
      * production [ConsumerTransactions] 이므로 아무 것도 넘기지 않은 조립은 정직하고, 크래시·
      * 정지 주입은 test 가 명시로 넘겨야 한다. 그 주입은 [wiredCollaborators] 에서 **비-MAIN
      * 협력자로 잡힌다**(`PipelineRestartConvergenceE2ETest` 가 실측) — 조용히 새지 않는다.
+     *
+     * 둘째 인자로 [sender] 를 건넨다(PR #64 F4) — 사건 술어가 발송 기록 수를 읽어야 하고 그
+     * sender 는 이 조립이 만든다. 건네지 않으면 호출부가 `lateinit var` 로 조립 자신을 되잡아야
+     * 한다(앞 판의 네 자리).
      */
     private val relayBoundary = TransactionBoundary(dataSource)
 
@@ -150,7 +154,7 @@ internal class PipelineAssembly(
             inbox = JdbcInboxPort(relayBoundary),
             dispatcher = dispatcher,
             leases = PostgresAdvisoryLockLease(dataSource),
-            transactions = relayTransactionsFor(relayBoundary),
+            transactions = relayTransactionsFor(relayBoundary, sender),
             target = RelayTarget(E2E_OWNER, E2E_CHANNEL),
             environment = RuntimeEnvironment.Production,
             policy = notificationPolicy,

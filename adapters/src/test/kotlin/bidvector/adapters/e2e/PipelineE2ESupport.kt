@@ -307,6 +307,10 @@ internal const val ISOLATED_STATE = "ISOLATED"
  * 있었고, 이 slice 가 top-level `internal` 로 같은 셋을 또 지었다. 집을 하나로 모으고 선례의
  * companion 상수를 지웠다.
  *
+ * **여기는 `e2e` 패키지의 자리다**(PR #64 F6) — 같은 값·같은 역할의 **셋째 사본**이
+ * `adapters.event` 의 claim 경합 test(6F-10 산출물)에 따로 있다. 그 파일은 이 slice 의 in_scope
+ * 밖이라 합치지 않았고, 합치는 것은 그 파일을 만지는 다음 slice 다(checklist 알려진 제한).
+ *
  * 이름이 두 쓰임을 함께 담는다 — 「신호」는 「첫 워커가 행을 집었다」(claim 경합)와 「홀더가
  * 막혔다」(임대 경합) 둘이다.
  */
