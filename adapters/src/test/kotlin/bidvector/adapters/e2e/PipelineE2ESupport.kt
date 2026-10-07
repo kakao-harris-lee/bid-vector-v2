@@ -224,8 +224,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
     private fun outboxTypedPayloads(): List<Pair<String, String>> =
         dataSource().connection.use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("SELECT payload_type, payload FROM outbox ORDER BY inserted_at, entry_id").use {
-                    rs ->
+                statement.executeQuery(OUTBOX_TYPED_PAYLOADS_SQL).use { rs ->
                     generateSequence { if (rs.next()) rs.getString(1) to rs.getString(2) else null }.toList()
                 }
             }
@@ -240,6 +239,9 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
             }
         }
 }
+
+/** 타입과 본문을 **한 질의로** 읽는다 — 두 열을 따로 질의하면 같은 키의 행끼리 짝이 어긋난다. */
+private const val OUTBOX_TYPED_PAYLOADS_SQL = "SELECT payload_type, payload FROM outbox ORDER BY inserted_at, entry_id"
 
 internal fun noticeIdOf(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
