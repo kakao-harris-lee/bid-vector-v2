@@ -4,9 +4,12 @@ import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.collection.CollectionLog
+import bidvector.app.relay.NotificationRelayRunner
+import bidvector.app.relay.RelayExitCode
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
@@ -29,7 +32,12 @@ import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.notification.Channel
+import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
+import bidvector.workflow.notification.RelayTarget
+import bidvector.workflow.notification.RuntimeEnvironment
 import bidvector.workflow.strategy.Clock
+import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.StrategyRepository
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -58,17 +66,14 @@ private const val TEST_CREDENTIAL_VALUE = "evaluation-commit-e2e-test-fixture-cr
 private const val MAX_ACTIVE_BIDS = 10
 private const val BLOCK_CONSTRAINT = "outbox_commit_run_blocked"
 
+/** relay 대상 소유자 — route 저장소가 자리지킴이라 값 자체는 중요하지 않다. */
+private const val RELAY_OWNER = "commit-run-e2e-operator"
+
 /** 심는 전략 개정 — **1 이 아니다**(R2-H-1: 1 은 test 지원 기본값이라 상수 변이를 숨긴다). */
 private const val SEEDED_REVISION = 7
 
 /** 거동 축에서 올려 보는 개정. */
 private const val RAISED_REVISION = 11
-
-/** 저장된 outbox 행의 두 칸 — 타입 열과 payload 문자열. */
-private data class OutboxRow(
-    val payloadType: String,
-    val payload: String,
-)
 
 /**
  * **R1-H-1 의 답** — production 커밋 조립(`EvaluationCommitRun`)과 그 러너를 **실 DB 위에서
@@ -219,8 +224,8 @@ class EvaluationCommitRunE2ETest {
      */
     @BeforeEach
     fun resetRunState() {
-        clearOutbox()
-        setStrategyRevision(SEEDED_REVISION)
+        clearOutbox(dataSource())
+        setStrategyRevision(dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
 
@@ -234,18 +239,18 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(2)
     fun `커밋 run 은 outbox 행을 남기고 변한 표는 outbox 하나이며 종료 코드가 0 이다`() {
-        val before = rowCountsByTable()
+        val before = rowCountsByTable(dataSource())
 
         val exitCodes = runCommitRunner()
 
-        val after = rowCountsByTable()
+        val after = rowCountsByTable(dataSource())
         changedTables(before, after) shouldBe setOf("outbox")
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
         // R-13 ⓑ — 러너의 마침 줄을 단언한다(앞 판은 로그를 모으기만 했다).
         commitLog.single { it.startsWith("evaluation-commit finished") } shouldContain
             "exit=${EvaluationCommitExitCode.COMPLETE.value}"
-        val row = notificationRows().single()
+        val row = notificationRows(dataSource()).single()
         row.payloadType shouldBe "NotificationRequested"
         row.payload shouldContain "20260101010"
         // **값 축**(R2-H-1) — 판정이 지난 사다리 정책 식별자가 저장된 행에 축어로 있다.
@@ -271,15 +276,56 @@ class EvaluationCommitRunE2ETest {
     fun `전략 개정을 올리면 저장되는 payload 가 달라지고 되돌리면 같아진다`() {
         val first = runOnceAndTakePayload()
 
-        setStrategyRevision(RAISED_REVISION)
+        setStrategyRevision(dataSource(), RAISED_REVISION)
         val raised = runOnceAndTakePayload()
 
-        setStrategyRevision(SEEDED_REVISION)
+        setStrategyRevision(dataSource(), SEEDED_REVISION)
         val restored = runOnceAndTakePayload()
         // 다음 test 를 위한 복원은 `resetRunState` 가 진다 — 이 test 가 중간에 죽어도 선다.
 
         raised shouldNotBe first
         restored shouldBe first
+    }
+
+    /**
+     * **RT2-L-1** — 커밋 run 이 남긴 **그 행**을 relay 러너가 집고, 실패 줄에 **부분 집계가
+     * 실린다.**
+     *
+     * 왜 이 자리인가: `RelayExitCodeTest` 는 `relayFailureLine(cause, partial)` 과 `partialOf`
+     * 를 순수 함수로 재는데, 러너의 실패 분기가 **그 둘을 잇는지**는 아무 test 도 보지 않았다 —
+     * 이음을 지워도 전 suite 초록이었다(앞 라운드 R3-M-1 과 같은 모양). 러너 대역을 만들 수
+     * 없으므로(`NotificationRelayRun` 은 `open` 이 아니다) **실제로 던지는 조립**이 필요하고,
+     * 그것은 `Production` 환경의 production relay 다 — 자리지킴 발송이 던진다(`OPEN-STR-12`).
+     *
+     * 덤으로 닫히는 것: 값 축 ③ 이 「커밋 run 이 쓴 그 행을 relay 로 한 바퀴 돌리는 test 는
+     * 없다」고 적었던 자리(R3-L-4)가 여기서 닫힌다 — production 인코드 → 실 DB → production
+     * 디코드 → claim 까지가 한 사슬로 돈다.
+     *
+     * 발송까지 가지 않는 것이 정상이다: 자리지킴이 던지는 것은 **실 채널이 없다는 사실**이고,
+     * 그 앞까지(claim 과 집계)가 이 test 가 재는 것이다.
+     */
+    @Test
+    @Order(4)
+    fun `커밋 run 이 남긴 행을 relay 러너가 집고 실패 줄에 집계를 싣는다`() {
+        runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+        notificationRows(dataSource()).size shouldBe 1
+        val relayLog = mutableListOf<String>()
+        val termination = RecordedExitCodes()
+
+        NotificationRelayRunner(
+            run = productionRelayRun(),
+            limit = CANDIDATE_CAP,
+            log = CollectionLog { relayLog += it },
+            termination = termination,
+        ).run(DefaultApplicationArguments())
+
+        termination.recorded() shouldBe listOf(RelayExitCode.FAILED.value)
+        val failure = relayLog.single { it.startsWith("relay failed") }
+        // 집계가 실린다 — 집었다는 사실과 아직 못 보냈다는 사실 둘 다.
+        failure shouldContain "claimed=1"
+        failure shouldContain "delivered=0"
+        // 그 행은 `CLAIMED` 에 남는다(다음 run 의 고아 격리가 받는다).
+        outboxStates(dataSource()) shouldBe mapOf("CLAIMED" to 1)
     }
 
     /**
@@ -293,16 +339,16 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
-        blockNotificationInserts()
-        val before = rowCountsByTable()
+        blockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
+        val before = rowCountsByTable(dataSource())
         try {
             val exitCodes = runCommitRunner()
 
             exitCodes shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
             // 행이 하나도 안 생겼다 = 쓰기가 실제로 거부됐다(주입이 들었다는 증거).
-            changedTables(before, rowCountsByTable()).shouldBeEmpty()
+            changedTables(before, rowCountsByTable(dataSource())).shouldBeEmpty()
         } finally {
-            unblockNotificationInserts()
+            unblockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
         }
     }
 
@@ -334,82 +380,32 @@ class EvaluationCommitRunE2ETest {
 
     private val commitLog = mutableListOf<String>()
 
-    private fun rowCountsByTable(): Map<String, Long> =
-        dataSource().connection.use { connection ->
-            val tables = mutableListOf<String>()
-            connection
-                .prepareStatement(
-                    "SELECT table_name FROM information_schema.tables " +
-                        "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name",
-                ).use { statement ->
-                    statement.executeQuery().use { rs -> while (rs.next()) tables += rs.getString(1) }
-                }
-            tables.associateWith { table ->
-                connection.createStatement().use { statement ->
-                    statement.executeQuery("SELECT count(*) FROM \"$table\"").use { rs ->
-                        check(rs.next())
-                        rs.getLong(1)
-                    }
-                }
-            }
-        }
-
-    private fun changedTables(
-        before: Map<String, Long>,
-        after: Map<String, Long>,
-    ): Set<String> = before.keys.filter { before.getValue(it) != after.getValue(it) }.toSet()
-
-    private fun notificationRows(): List<OutboxRow> =
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "SELECT payload_type, payload FROM outbox " +
-                        "WHERE payload_type = 'NotificationRequested' ORDER BY inserted_at, entry_id",
-                ).use { statement ->
-                    statement.executeQuery().use { rs ->
-                        buildList { while (rs.next()) add(OutboxRow(rs.getString(1), rs.getString(2))) }
-                    }
-                }
-        }
-
     /**
      * 한 run 의 payload — **비우고 돌려** 행 하나를 집는다. 「마지막 행」으로 집지 않는 이유:
      * `inserted_at` 은 production 시각이라 같은 run 들 사이에서 같을 수 있고 `entry_id` 는
      * 시간순이 아니다(UUID) — 정렬로는 「그 run 의 행」을 고를 수 없다.
      */
     private fun runOnceAndTakePayload(): String {
-        clearOutbox()
+        clearOutbox(dataSource())
         runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
-        return notificationRows().single().payload
+        return notificationRows(dataSource()).single().payload
     }
 
-    private fun clearOutbox() =
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { it.execute("TRUNCATE TABLE outbox, inbox") }
-        }
-
-    private fun setStrategyRevision(revision: Int) =
-        dataSource().connection.use { connection ->
-            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
-                statement.setInt(1, revision)
-                statement.executeUpdate()
-            }
-        }
-
-    private fun blockNotificationInserts() =
-        dataSource().connection.use { connection ->
-            connection.createStatement().use {
-                it.execute(
-                    "ALTER TABLE outbox ADD CONSTRAINT $BLOCK_CONSTRAINT " +
-                        "CHECK (payload_type <> 'NotificationRequested')",
-                )
-            }
-        }
-
-    private fun unblockNotificationInserts() =
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { it.execute("ALTER TABLE outbox DROP CONSTRAINT $BLOCK_CONSTRAINT") }
-        }
+    /**
+     * production relay 조립 — 환경을 `Production` 으로 준다(정책표가 그 환경에 `Live` 를 붙인다).
+     * 배선(`RelayWiring`)은 그 환경을 **거부**하지만 그 거부는 기동 자리의 것이고, 여기서는
+     * 조립을 직접 세워 relay 본문이 claim 까지 가는 경로를 돌린다.
+     */
+    private fun productionRelayRun(): NotificationRelayRun {
+        val resolution = NOTIFICATION_DELIVERY_POLICY.resolve(LocalDate.now())
+        check(resolution is Resolution.Resolved) { "알림 배달 정책이 해소되지 않았다: $resolution" }
+        return NotificationRelayRun(
+            dataSource = dataSource(),
+            target = RelayTarget(OperatorId(RELAY_OWNER), Channel.Telegram),
+            environment = RuntimeEnvironment.Production,
+            policy = resolution.value,
+        )
+    }
 }
 
 /**

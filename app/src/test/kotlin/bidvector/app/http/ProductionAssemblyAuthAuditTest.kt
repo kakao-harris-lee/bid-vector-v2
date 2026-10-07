@@ -1,6 +1,7 @@
 package bidvector.app.http
 
 import bidvector.app.productionApplication
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ConfigurableApplicationContext
@@ -137,6 +139,24 @@ class ProductionAssemblyAuthAuditTest {
                 }
             }
         }
+
+    /**
+     * **RT2-L-2** — 일회 러너 상호 배제 guard 가 **production 컨텍스트에 실린다.**
+     *
+     * guard 자신의 test 들은 `context.register(OneShotRunnerGuard::class.java, …)` 로 직접
+     * 등록하므로, guard 가 컴포넌트 스캔에서 빠져도 전부 초록이다 — 클래스를 옮기거나 스캔
+     * 필터가 바뀌는 날 조용히 꺼진다(verifier 가 `@Configuration` 한 줄을 지워 실측했다).
+     * 이 한 줄이 그 자리를 잡는다: **실제로 부팅한** 컨텍스트에 그 빈이 있어야 한다.
+     *
+     * 여기에 두는 이유: 이 test 가 `BidVectorApplication` 을 그대로 띄우는 유일한 자리이고,
+     * 「production 조립에 무엇이 실리는가」가 이 클래스의 축이다.
+     */
+    @Test
+    fun `RT2-L-2 — production 조립에 일회 러너 guard 빈이 실린다`() {
+        context.containsBean("oneShotRunnerLimit") shouldBe true
+        // 러너가 하나도 없는 배포(모드 미설정)에서도 guard 는 올라온다 — 조용히 통과할 뿐이다.
+        context.getBeanNamesForType(ApplicationRunner::class.java).toList().shouldBeEmpty()
+    }
 
     @Test
     fun `D-6A1-27 — production 조립에서 등록된 모든 endpoint가 자격증명 없이는 401이다 — 기계 전수`() {
