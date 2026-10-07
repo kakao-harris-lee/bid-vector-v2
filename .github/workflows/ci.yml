@@ -460,14 +460,23 @@ jobs:
           code="$(_code "$(_api_get /api/strategy/edit-sessions)")"
           [ "$code" = "405" ] || fail "미선언 메서드가 405 가 아니다: $code"
 
-          # M6/6E-1 G-4 — 완료 조건 4(「실제 외부 effect 없이 dry-run acceptance 가능」)를 **컨테이너
-          # 축에서** 잰다. 앞 왕복이 남긴 상태가 이 자리의 근거다: dry-run 은 저장된 전략을 읽으므로
-          # 여력 상한이 서 있어야 200 이고(없으면 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED`, fail-closed —
-          # 0 으로도 무한으로도 지어내지 않는다), 그 값을 세우는 수단이 바로 위 편집 세션 왕복이다.
-          # 단언 셋 — ① 200 ② 응답 본문 키 집합이 openapi `EvaluationDryRunResponse` 의 required
-          # 아홉과 **같다**(늘어도 줄어도 붉어진다) ③ **outbox 행 수가 전후로 같다**. ③ 이 「외부
-          # effect 없음」의 기계 술어다 — dry-run 은 `RecordingNotificationRequestPort` 로 조립돼
-          # outbox 에 쓰지 않고, 그 사실을 **산출물의 부재**가 아니라 행 수 등식으로 잰다.
+          # M6/6E-1 G-4 — 완료 조건 4(「실제 외부 effect 없이 dry-run acceptance 가능」)의 **컨테이너 축
+          # 관측**이다. 단언 셋 — ① 200 ② 응답 본문 키 집합이 openapi `EvaluationDryRunResponse` 의
+          # required 아홉과 **같다**(늘어도 줄어도 붉어진다) ③ 그 왕복 전후로 outbox 행 수가 같다.
+          #
+          # **③ 이 재는 것을 과대 주장하지 않는다**(verifier r1 R1-H-2). 이 job 의 DB 에는 공고 seed 가
+          # 없어 후보가 0 이고, 후보가 0 이면 dry-run 이 outbox 에 닿을 유일한 경로(`BidNow` 판정의 알림
+          # 요청)가 애초에 0 회 불린다 — 그래서 ③ 은 「쓰기 경로가 막혀 있다」가 아니라 **「빈 후보에서
+          # 쓰지 않는다」**를 잰다. 「외부 effect 없음」의 정본은 Kotlin `check` 안의
+          # `DryRunCommitSeparationGateTest`(조립 분리를 구조로 잠근다)이고, 후보 ≥ 1 ·
+          # `wouldNotifyNoticeIds` 비어 있지 않음을 전제로 둔 비공허 측정은 ML 배선 뒤
+          # `OPEN-6E1-G4-NONVACUOUS` 다.
+          #
+          # **이 블록의 실제 의존은 앞 왕복이 남긴 DB 상태가 아니라 같은 step 안의 정의들**이다(cr r1
+          # G-11) — `_api_post`·`_api_get`·`_code`·`_body`·`$bodies`·`jq` 선행 검사. 그 정의들보다
+          # 앞으로 옮기면 깨진다. 여력 상한은 **스스로** 세운다(위 왕복과 같은 형태) — dry-run 은 저장된
+          # 전략을 읽으므로 상한이 없으면 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED` 로 fail-closed 다
+          # (0 으로도 무한으로도 지어내지 않는다).
           echo "-- 여력 상한 세우기: begin → value → confirm (dry-run 200 의 전제) --"
           printf '{"field":"MAX_ACTIVE_BIDS"}' > "$bodies/begin-max.json"
           begun="$(_api_post /api/strategy/edit-sessions "$bodies/begin-max.json")"
@@ -480,12 +489,18 @@ jobs:
           [ "$(_code "$provided")" = "200" ] || fail "MAX_ACTIVE_BIDS value 가 200 이 아니다: $(_code "$provided")"
 
           # `revision + 2` 를 계산하지 않고 **다시 읽는다** — 낙관적 잠금의 기준값을 산술로 짐작하면
-          # 앞 왕복의 개수가 바뀔 때 조용히 409 로 떨어진다.
-          seen="$(_body "$(_api_get /api/strategy)" | jq -r '.revision')"
+          # 앞 왕복의 개수가 바뀔 때 조용히 409 로 떨어진다. 읽기 **전에** 코드를 단언한다(cr r1 G-4):
+          # 전송 오류면 본문이 빈 문자열이 되고 `jq -r '.revision'` 은 출력 없이 exit 0 이라, 단언이
+          # 없으면 confirm 본문이 깨져 「confirm 이 200 이 아니다: 400」 으로 **원인이 지워진다**.
+          seen_read="$(_api_get /api/strategy)"
+          [ "$(_code "$seen_read")" = "200" ] || fail "상한 confirm 전 GET /api/strategy 가 200 이 아니다: $(_code "$seen_read")"
+          seen="$(_body "$seen_read" | jq -r '.revision')"
           printf '{"commandId":"smoke-m2","seenRevision":%s}' "$seen" > "$bodies/confirm-max.json"
           confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/confirm-max.json")"
           [ "$(_code "$confirmed")" = "200" ] || fail "MAX_ACTIVE_BIDS confirm 이 200 이 아니다: $(_code "$confirmed")"
-          [ "$(_body "$(_api_get /api/strategy)" | jq -r '.maxActiveBids')" = "5" ] || fail "여력 상한이 조회에 반영되지 않았다"
+          max_read="$(_api_get /api/strategy)"
+          [ "$(_code "$max_read")" = "200" ] || fail "상한 반영 확인 GET /api/strategy 가 200 이 아니다: $(_code "$max_read")"
+          [ "$(_body "$max_read" | jq -r '.maxActiveBids')" = "5" ] || fail "여력 상한이 조회에 반영되지 않았다"
 
           echo "-- 평가 dry-run 왕복: 200 · 본문 키 아홉 · outbox 행 수 전후 등식 (G-4) --"
           # DB 질의는 S-23c 리허설과 같은 형태다 — 컨테이너 **안**의 유닉스 소켓이고 공식 postgres
@@ -504,7 +519,13 @@ jobs:
 
           printf '{"currentActiveBids":0}' > "$bodies/dry-run.json"
           dry="$(_api_post /api/evaluation-dry-runs "$bodies/dry-run.json")"
-          [ "$(_code "$dry")" = "200" ] || fail "dry-run 이 200 이 아니다: $(_code "$dry") 본문 $(_body "$dry")"
+          # 실패 문면에 **본문 전문을 싣지 않는다**(cr r1 G-3 — S-22c r3 의 「고정 표지 줄만」과 같은
+          # 선택). 오늘 본문은 평탄한 ID·계수뿐이지만 후보별 사유 상세를 더하는 것이 열린 항목
+          # (`OPEN-6A3-EVALUATION-DETAIL`)이라, 그 날 이 한 줄이 상세를 공개 CI 로그로 보낸다.
+          # 진단에 필요한 것은 키 집합과 오류 코드다.
+          if [ "$(_code "$dry")" != "200" ]; then
+            fail "dry-run 이 200 이 아니다: $(_code "$dry") 키 [$(_body "$dry" | jq -r 'keys|sort|join(",")' 2>/dev/null || echo parse-error)] code $(_body "$dry" | jq -r '.code // "none"' 2>/dev/null || echo parse-error)"
+          fi
           keys="$(_body "$dry" | jq -r 'keys | sort | join(",")')"
           dry_run_keys="bidNowNoticeIds,candidateCount,currentActiveBids,maxActiveBids,notReachedNoticeIds,reviewNoticeIds,skipNoticeIds,strategyRevision,wouldNotifyNoticeIds"
           [ "$keys" = "$dry_run_keys" ] || fail "dry-run 본문 키 집합이 openapi required 아홉과 다르다: [$keys]"
