@@ -90,9 +90,9 @@
 | 총 상한이 일 상한보다 작다 | 같은 자리 |
 | 실행 상태 디렉터리가 없거나 **저장소 안**이다 | 같은 자리 |
 | 스냅숏 출력 경로가 없다 | `SnapshotExtractionWiring` |
-| `bidvector.evaluation.candidate-cap` 이 없다 | `EvaluationCommitWiring` |
-| `bidvector.evaluation.commit.current-active-bids` 가 없거나 음수다 | 같은 자리 — 0 을 지어내지 않는다 |
-| 저장된 전략에 여력 상한(`max_active_bids`)이 없다 | 같은 자리 |
+| `bidvector.evaluation.candidate-cap` 이 없다 | **`EvaluationWiring`**(조건 없이 등록되는 `@ConfigurationProperties` 생성자 바인딩이 실패한다) — 러너를 하나도 켜지 않아도 거부된다. §1.2 의 「항상 필수」가 이 자리다 |
+| `bidvector.evaluation.commit.current-active-bids` 가 없거나 음수다 | `EvaluationCommitWiring` — 0 을 지어내지 않는다 |
+| 저장된 전략에 여력 상한(`max_active_bids`)이 없다 | `EvaluationCommitWiring`(러너 조립 시점) · HTTP dry-run 은 거부가 아니라 409 다(§5.3) |
 | relay `environment` 가 없거나 어휘 밖이다 | `RelayWiring` — 기본값 없음 |
 | relay `owner` 가 공백이거나 `claim-limit` 이 0 이다 | 같은 자리 |
 | relay 환경의 정책 모드가 `Live` 다 | `RelayBootDecision` — §5.2 |
@@ -228,7 +228,7 @@ service link 환경변수(`MANAGEMENT_SERVICE_HOST` 계열)가 **거부 대상�
 | 코드 | 이름 | 뜻 | 처방 |
 |---|---|---|---|
 | 0 | `COMPLETE` | 전 슬롯이 끝까지 읽혔다 | 없음 |
-| 1 | `FAILED` | 실행이 실패했다 | 사유 토큰을 읽는다 |
+| 1 | `FAILED` | 실행이 실패했다 | §3.5 로 사유 토큰을 읽는다. SQLSTATE 가 붙었으면 DB 쪽을, 붙지 않았으면 전송·파싱 계열이므로 그 클래스 이름으로 좁힌다. **이 값의 처방은 이 문서가 유일한 자리다** — 6G runbook §2 는 0·2·3·4 만 적는다. 실행 상태 디렉터리는 멱등이므로 원인을 없앤 뒤 같은 디렉터리로 재실행한다(이어 돈다) |
 | 2 | `INCOMPLETE` | 상한·쿼터·일시 실패로 멈췄다 — **다음 실행이 이어 돈다**(멱등, 같은 실행 상태 디렉터리) | 일 상한이면 **KST 자정** 뒤 재실행. 쿼터(`resultCode 22`·HTTP 429)도 다음 날 |
 | 3 | `ALREADY_RUNNING` | 같은 디렉터리를 다른 프로세스가 쥐고 있다. 호출 0 | **기다리면 풀린다** |
 | 4 | `UNLOCKABLE` | 자물쇠를 **걸 수 없다**(잠금 미지원 파일 시스템이거나 자물쇠 파일을 못 엶). 호출 0 | **기다려도 풀리지 않는다** — 실행 상태 디렉터리 경로·권한을 고친 뒤 재기동 |
@@ -241,8 +241,8 @@ service link 환경변수(`MANAGEMENT_SERVICE_HOST` 계열)가 **거부 대상�
 | 코드 | 이름 | 뜻 | 처방 |
 |---|---|---|---|
 | 0 | `COMPLETE` | 요청이 전부 접수됐다(승격이 0 건이어도 0) | 없음 |
-| 1 | `FAILED` | 협력자가 던졌다 | 사유 토큰을 읽는다 |
-| 2 | `INCOMPLETE` | 요청 하나 이상이 실패했다 — **판정은 남고 outbox 쓰기가 실패**했다 | outbox 쓰기 실패 사유(SQLSTATE)를 본다. 판정은 보존돼 있으므로 재실행이 안전하다 |
+| 1 | `FAILED` | 협력자가 던졌다 | §3.5 로 사유 토큰을 읽고 **두 갈래로 간다** — SQLSTATE 가 붙었으면 DB 쪽(권한·공간·연결 한도)을 보고 고친 뒤 재실행, 붙지 않았으면 클래스 이름으로 좁혀 그 협력자(ML gateway·전략 저장소)의 가용성을 본다. 재실행 전에 원인을 없앤다 — 같은 원인이면 같은 자리에서 또 죽는다 |
+| 2 | `INCOMPLETE` | 요청 하나 이상이 실패했다 — outbox 쓰기가 실패했다 | outbox 쓰기 실패 사유(SQLSTATE)를 본다. **「판정이 보존돼 있다」고 읽지 않는다** — 판정 기록 표가 없어 outbox 행이 판정의 유일한 영속 흔적이므로(§6.6) 쓰이지 않은 판정은 **사라진 것과 같다**. 재실행이 중복 발송을 내지 않는 근거는 「판정이 보존됐다」가 아니라 **relay 가 멱등 키로 중복을 접는다**는 것이다(`skippedDuplicates`). outbox 에 그 키의 UNIQUE 가 **없으므로** 앞 run 에서 성공했던 공고의 행은 재실행마다 **새로 생긴다** — 행 수가 늘어나는 것은 정상이고, 발송이 한 번인 것은 relay 가 보장한다 |
 
 ### 3.5 cause code 를 읽는 법
 
@@ -285,6 +285,10 @@ select state, count(*) from outbox group by state order by state;
 select entry_id, correlation_id, occurred_at, payload_type from outbox where state = 'ISOLATED' order by occurred_at desc limit 20;
 ```
 
+**위 질의가 `payload` 를 고르지 않는 것은 의도다** — 그 칸에 공고 ID·판정 사유가 들어 있어 터미널·셸
+이력·transcript 로 흘러나간다. 격리된 행의 **수와 상관 id** 를 먼저 세고, 내용을 꼭 봐야 하면 그때
+`entry_id` 하나로 좁혀 읽는다(결과를 파일·화면에 남기지 않는 자리에서).
+
 ### 3.7 임대 Busy 는 장애가 아니다
 
 `LEASE_BUSY`(relay 3) · `ALREADY_RUNNING`(수집 3) 은 **중복 실행 억제가 제대로 돈 것**이다. 이 값을 0
@@ -303,43 +307,85 @@ select entry_id, correlation_id, occurred_at, payload_type from outbox where sta
 
 ## 4. model rollback
 
-### 4.1 정의
+### 4.1 「rollback」이 무엇을 뜻할 수 있는가 — 타입과 실제가 다르다
 
-**model rollback = 릴리스 선택자 `EXACT` 로 직전 release 를 지정하는 것**이다. 타입은
+**타입**은 두 선택자를 준다 —
 `workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionRequest.kt` 의
-`sealed interface ModelReleaseSelector` 이고 두 값뿐이다.
+`sealed interface ModelReleaseSelector`:
 
 | 값 | 뜻 |
 |---|---|
-| `LatestPromoted` | 승격된 최신 release 를 쓴다 |
+| `LatestPromoted` | 서버가 「승격됐다」고 보고하는 release 를 쓴다 |
 | `Exact(releaseId, artifactChecksum)` | 그 release 를 쓴다. 두 인자 모두 blank 를 거부한다 |
 
-### 4.2 **오늘 production 에 운영자 경로가 없다**
+6D-1 이 적은 정의 — 「model rollback = 릴리스 선택자 `EXACT` 로 직전 release 지정」 — 은 **그 타입 위의
+정의**이고, **실 serving 에서는 성립하지 않는다**(§4.3). 그 정의가 돌아가는 자리는 `MlFakeServer`
+(test 대역)이다.
 
-파이프라인이 쓰는 선택자는 정책 데이터에 **`LatestPromoted` 로 고정**돼 있다 —
-`workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityPolicyData.kt` 의 출하 인스턴스가
-`releaseSelector = ModelReleaseSelector.LatestPromoted` 다. 그 값을 바꾸는 설정 키도, HTTP 표면도,
-명령행 인자도 **없다**.
+### 4.2 실 serving 의 release 는 레지스트리 상태가 아니라 **런타임 상수**다
 
-그래서 운영자가 **지금** 할 수 있는 것과 할 수 없는 것은 이렇게 갈린다.
+`ml-engine/src/ml_engine/serving/runtime.py` 의 `build_derived_release` 가 preload 때 **한 번** 만들고
+`GetModelMetadata` 의 `promoted` 가 그 하나를 낸다.
+
+| 칸 | 어디서 오는가 |
+|---|---|
+| `release_id` | `"distribution/" + 추론 정책의 version` — 오늘 출하 값은 `inference-v1` 하나다 |
+| `artifact_checksum` | `sha256:` + 추론 정책 **전 필드**의 canonical JSON 해시(`derived_release_checksum`, 필드는 `dataclasses.fields` 로 기계 열거) |
+| `code_version` | 배포가 주는 환경값(`ML_ENGINE_CODE_VERSION`) |
+| `release_kind` | `DERIVED` — 아티팩트 없는 release 라 `dataset_id` 는 빈 문자열이다 |
+
+**귀결 둘**(운영자가 알아야 하는 쪽):
+
+1. **`release_id` 는 정책의 `version:` 칸만 따른다.** 정책 **값**을 바꾸고 `version` 을 그대로 두면
+   `release_id` 는 같고 **checksum 만 움직인다**. 그래서 「release 가 바뀌었는가」를 `release_id` 로만
+   판정하면 놓친다 — 두 칸을 함께 본다.
+2. **승격·demote 연산이 없다.** `ml-engine/src/ml_engine/registry/` 는 아티팩트 파싱과 정책 로딩뿐이고
+   승격 상태를 **저장하는 자리도, 내리는 연산도 0** 이다. `evaluation` 쪽의 승격 게이트가 내는
+   `Passed`/`NotEvaluable` 은 **판정 값**이지 상태 변경이 아니다(ML-07).
+
+### 4.3 비현재 `EXACT` 는 실 serving 이 **거부한다**
+
+`ml-engine/src/ml_engine/serving/prediction.py` 의 `_validate_selector` 는 `exact_release` 의
+`release_id`·`artifact_checksum` 이 **런타임 release 와 다르면** `UNSUPPORTED_RELEASE` +
+`RELEASE_MISMATCH` 로 거부한다. 즉 「앞 release 를 `EXACT` 로 지목한다」는 실 서버에서 **요청이 거부되는
+경로**다 — 앞 release 를 쓰는 길이 아니다.
+
+### 4.4 그래서 오늘 운영자가 쓸 수 있는 **유일한 지렛대는 재배포**다
+
+release 가 추론 정책에서 파생되므로 release 를 되돌리는 것은 **그 정책 값을 되돌리는 것**이다. 그리고
+그 정책 파일은 **이미지에 구워진다** — `docker/ml-serving.Dockerfile` 의 `COPY ml-engine/policy /app/policy`
+이고, `ML_ENGINE_INFERENCE_POLICY` 는 그 디렉터리 안의 파일 하나를 **고르는** 환경값일 뿐이다(이미지 안의
+추론 정책은 `inference-v1.yaml` 하나). compose 에 그 디렉터리를 바꿔 끼우는 마운트가 없다.
 
 | 할 수 있다 | 할 수 없다 |
 |---|---|
-| 승격을 **멈춘다** — 나쁜 release 를 승격하지 않으면 `LatestPromoted` 가 그것을 고르지 않는다 | 파이프라인에게 「직전 release 로 돌아가라」고 **말한다** |
-| 레지스트리 쪽에서 **승격을 되돌린다**(그 release 를 승격 상태에서 내린다). 그러면 `LatestPromoted` 가 그 앞 release 를 고른다 | 설정·요청·플래그로 `EXACT` 를 주입한다 |
-| `EXACT` 가 실제로 직전 release 를 돌려준다는 것을 **gateway 수준에서 확인**한다 — `bidvector.adapters.e2e.PipelineContractRejectionE2ETest` 의 「`EXACT` 선택자는 직전 release 를 돌려주고 `LATEST` 와 다른 `releaseId` 를 낸다」 | 파이프라인 전체를 `EXACT` 로 돌린다 |
+| 되돌릴 추론 정책 값을 git 이력에서 고른다 | 실행 중인 서버에게 「앞 release 를 쓰라」고 **말한다** |
+| 그 값으로 ml-serving 이미지를 다시 만든다 — 저장소에 실재하는 명령은 CI `container` job 의 S-21 하나다(`docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .`) | 설정·요청·플래그로 `EXACT` 를 주입한다(§4.3 이 거부한다) |
+| 그 이미지로 서비스를 다시 올린다 — **그 절차는 이 저장소에 없다**(§4.5) | 레지스트리에서 승격을 내린다(§4.2 ②) |
+| 바뀐 release 를 `GetModelMetadata` 의 `promoted` 와 판정 payload 의 release 식별자로 **확인**한다 | 되돌림을 무중단으로 한다(preload 때 한 번 만드는 상수라 재기동이 필요하다) |
 
-### 4.3 그래서 오늘의 rollback 절차는 「승격을 되돌리기」다
+### 4.5 이 문서가 **쓰지 않는 명령** — 배포 절차가 저장소에 없다
 
-1. 어느 release 가 문제인지 고른다 — 판정 payload 가 release 식별자를 나르므로 그 값으로 좁힌다.
-2. 레지스트리에서 그 release 의 **승격을 내린다**. 승격은 예약 학습 실행이 만들 수 없고
-   (`아티팩트 무결성` 계약) 체크섬 없는 아티팩트는 「통과」가 아니라 별도 verdict 로 보고된다.
-3. 파이프라인을 다시 돌린다. `LatestPromoted` 가 이제 앞 release 를 고른다.
-4. **확인**은 판정 payload 의 release 식별자로 한다 — 그 값이 바뀌지 않았다면 되돌아가지 않은 것이다.
-   `bidvector.adapters.e2e.PipelineReproducibilityE2ETest` 의 「release 를 바꾸면 payload 등식이
-   깨진다」가 그 축을 test 로 잠근 것이다.
+ml-serving 을 「다시 올리는」 명령은 이 저장소에 **없다**. `tools/` 에 배포 스크립트가 없고(여섯 개 전부
+백업·복원·리허설·위생·교차언어·one-command), compose 는 **로컬 환경 기동**이고 배포 대상도 미정이다
+(`OPEN-6C-MULTIARCH` — 「배포 대상이 정해질 때」). 그래서 ③ 의 자리는 **배치 환경의 몫**이고, 이 문서는
+그 자리에 없는 명령을 지어내지 않는다.
 
-**운영자 경로(선택자 주입)를 만드는 것은 이 slice 의 범위 밖**이고, 그것 없이 2번 항목이 유일한 수단이다.
+확인만은 저장소 안에서 할 수 있다 — 바뀐 이미지를 로컬 compose 로 띄우고 S-23b 의 health·인증 경계가
+초록인지 보는 것, 그리고 판정 payload 의 release 식별자가 움직였는지 보는 것이다. 후자를 test 가 잠근
+자리는 `bidvector.adapters.e2e.PipelineReproducibilityE2ETest` 의 「release 를 바꾸면 payload 등식이
+깨진다」이고, 그 test 는 `MlFakeServer` 위에서 돈다 — **실 서버 위의 등식은 아직 측정되지 않았다**.
+
+### 4.6 알려진 제한 — 이 축의 정직한 상태
+
+1. **6D-1 C-3 의 정의(「`EXACT` 로 직전 release」)는 fake 서버 위에서만 성립한다.** 실 serving 은 그
+   요청을 거부한다(§4.3). 그 정의를 운영 절차로 읽으면 안 된다.
+2. **승격 상태도 demote 도 없다**(§4.2 ②) — 「승격을 되돌린다」는 수단이 존재하지 않는다.
+3. **재배포 절차가 저장소에 없다**(§4.5) — ③ 단계는 배치 환경이 지며 그 환경이 미정이다.
+4. **무중단 되돌림이 없다** — release 는 preload 때 만드는 상수이므로 재기동을 수반한다.
+5. 신설 **`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`** — 승격 상태와 demote(또는 그와 등가인 release 선택
+   수단)가 생기는 slice. ML 레인 산출물이고 **운영자 결정이 선행**한다(「되돌림의 단위를 정책 값으로
+   둘 것인가 아티팩트로 둘 것인가」). 그 결정 전에는 이 절의 ①~④ 가 전부다.
 
 ---
 
@@ -410,8 +456,13 @@ rm -f "$body"
 | 415 `UNSUPPORTED_MEDIA_TYPE` | 본문이 `application/json` 이 아니다 | 헤더를 고친다 |
 | 500 `INVALID_STORED_STRATEGY` \| `INTERNAL_ERROR` | 저장된 전략이 유효하지 않거나 **감사 기록이 실패**했다 | 후자는 §2.5 |
 
-**dry-run 이 outbox 를 건드리지 않는다는 것은 CI 가 매 PR 에 잰다** — `container` job 의 S-23b 스모크가
-왕복 뒤 outbox 행 수 전후 등식을 단언한다.
+**「외부 effect 가 없다」의 정본은 CI 스모크가 아니라 조립 구조다** — `bidvector.app.architecture`
+`DryRunCommitSeparationGateTest` 가 dry-run 조립과 커밋 조립의 분리를 Kotlin `check` 안에서 잠근다.
+`container` job 의 S-23b 가 매 PR 에 재는 것은 그보다 좁다 — **200 · 응답 본문 키 아홉 · 그리고 후보가
+0 건인 환경에서의 비쓰기**(outbox 행 수 전후 등식)다. 그 컨테이너 DB 에는 공고 seed 가 없어 후보가 0 이고,
+후보가 0 이면 알림 요청 경로가 애초에 0 회 불린다 — 그래서 그 등식은 **「쓰기 경로가 막혀 있다」를 재지
+않는다**. 후보 ≥ 1 과 `wouldNotifyNoticeIds` 가 비어 있지 않음을 전제로 둔 비공허 측정은 ML 배선 뒤로
+넘겼다(`OPEN-6E1-G4-NONVACUOUS`).
 
 ### 5.4 일반 운영의 live read probe — 절차만, 실행은 사용자 승인
 
@@ -454,7 +505,9 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
    (`OPEN-OPS-10`).
 5. **커넥션 풀이 없다**(§2.6, `OPEN-6A1-CONNECTION-POOL`).
 6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이다.
-7. **model rollback 의 운영자 경로가 없다**(§4.2).
+7. **model rollback 의 수단이 재배포뿐이고 그 재배포 절차가 저장소에 없다**(§4.4·§4.5). 승격 상태·demote
+   가 없고 비현재 `EXACT` 는 실 serving 이 거부한다 — 6D-1 의 정의는 fake 서버 위에서만 성립한다
+   (`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`).
 8. **실 알림 발송 채널이 없다**(`OPEN-STR-12`). `Live` 는 기동이 거부된다.
 9. **주기 실행(스케줄러)이 없다**(`OPEN-6F10-SCHEDULER`). 모든 러너는 `mode=once` 1회성이고 주기는
    외부 cron 이 진다.
@@ -464,6 +517,10 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
 12. **RBAC·다중 사용자·TLS·네트워크 배치를 다루지 않는다**(`OPEN-6A-RBAC`). 단일 운영자 전용이다.
 13. **자격증명 원문 경계가 완전히 닫히지 않았다**(`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`) — 환경변수
     원문은 어딘가에 `String` 으로 존재해야 한다는 구조적 뿌리가 남아 있다.
+14. **CI 의 dry-run 왕복은 비공허하지 않다**(§5.3) — 후보 0 환경에서 돌므로 「쓰기 경로가 막혀 있다」를
+    재지 못한다. 그 성질의 정본은 `DryRunCommitSeparationGateTest`(구조)이고, 비공허 측정은
+    `OPEN-6E1-G4-NONVACUOUS` 로 ML 배선 뒤에 있다.
+15. **일반 운영 live read probe 를 실행한 적이 없다**(§5.4는 절차뿐) — 실행은 사용자 승인 대상이다.
 
 ## 7. 이 문서의 표가 코드와 어긋나지 않는지 재는 법
 
