@@ -1,9 +1,13 @@
 package bidvector.adapters.e2e
 
 import bidvector.adapters.evaluation.JdbcCandidateSource
+import bidvector.adapters.event.ConsumerTransactions
+import bidvector.adapters.event.JdbcInboxPort
 import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.event.PostgresAdvisoryLockLease
 import bidvector.adapters.ml.GrpcBidPredictionGateway
 import bidvector.adapters.ml.GrpcEmbeddingGateway
+import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.adapters.qualification.StoredRequirementLicenseGate
 import bidvector.adapters.strategy.JdbcStrategyRepository
 import bidvector.workflow.evaluation.CandidateEvaluation
@@ -11,6 +15,7 @@ import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
 import bidvector.workflow.evaluation.OpportunityAnalysis
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.notification.DispatchNotification
+import bidvector.workflow.notification.RelayOutboxNotifications
 import bidvector.workflow.notification.RelayReport
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
@@ -80,6 +85,10 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
      * 양방향이다: production 출력이 아닌 객체는 **선언된 포트 경계 여섯** 중 하나를 구현해야
      * 하고, 그 여섯은 각각 그래프에 실제로 나타나야 한다. 건너뛴 가지가 있으면(깊이 상한·필드
      * 읽기 실패) 그 아래 대역을 못 보므로 둘 다 0 이어야 한다.
+     *
+     * 6D-2 가 뿌리에 relay use case 를 더했다 — 그래서 이 단언이 임대·트랜잭션 경계·inbox port
+     * 까지 덮는다. 그 자리에 주입을 꽂은 조립이 어떻게 보이는지는
+     * `PipelineRestartConvergenceE2ETest` 가 같은 그래프로 실측한다.
      */
     @Test
     fun `평가와 발송이 쥔 협력자는 production 출력에서 오고 대역은 선언된 포트 경계뿐이다`() {
@@ -144,6 +153,13 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
                 JdbcStrategyRepository::class.java,
                 StoredRequirementLicenseGate::class.java,
                 JdbcOutboxPort::class.java,
+                // 6D-2 — relay 축. 임대·트랜잭션 경계·inbox port 가 **MAIN 출력**임이 여기서
+                // 잡힌다(앞 판은 그래프 밖이라 test 대역으로 바꿔도 초록이었다).
+                RelayOutboxNotifications::class.java,
+                PostgresAdvisoryLockLease::class.java,
+                ConsumerTransactions::class.java,
+                TransactionBoundary::class.java,
+                JdbcInboxPort::class.java,
             )
     }
 }

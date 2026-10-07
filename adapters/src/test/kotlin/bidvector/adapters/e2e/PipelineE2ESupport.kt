@@ -133,8 +133,14 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * 전략 단일 행 — 편집 HTTP 경로는 6A 소관이라 직접 INSERT 한다(`EvaluationDryRunE2ETest` 와
      * 같은 알려진 제한). `exclude_keyword_terms` 하나만 채워 감시 규칙을 **비어 있지 않게**
      * 만든다: 비면 `WatchVerdict.NoGate` 라 모든 후보가 감시 단계에서 탈락한다.
+     *
+     * [revision] 의 기본값이 **1 이 아니다**([E2E_STRATEGY_REVISION]) — payload 의
+     * `strategyRevision` 을 1 로 시딩하면 「상수 1 을 싣는다」로 바꿔치운 구현도 초록이다
+     * (6F-10 checklist 가 실측한 사각). 재현 등식의 typed 단언이 **시딩값과 대조**하려면
+     * 그 값이 어느 기본값과도 겹치지 않아야 한다.
      */
     protected fun seedStrategy(
+        revision: Int = E2E_STRATEGY_REVISION,
         maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
         bidNowThreshold: String = E2E_BID_NOW_THRESHOLD,
         reviewThreshold: String = E2E_REVIEW_THRESHOLD,
@@ -145,17 +151,18 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
                     "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setArray(1, empty)
+                    statement.setInt(1, revision)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
-                    statement.setArray(5, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
-                    statement.setBigDecimal(6, BigDecimal(bidNowThreshold))
-                    statement.setBigDecimal(7, BigDecimal(reviewThreshold))
-                    statement.setInt(8, maxActiveBids)
+                    statement.setArray(5, empty)
+                    statement.setArray(6, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
+                    statement.setBigDecimal(7, BigDecimal(bidNowThreshold))
+                    statement.setBigDecimal(8, BigDecimal(reviewThreshold))
+                    statement.setInt(9, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -173,13 +180,35 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * (verifier r1 F-5 / review G-3). 직렬화 문자열의 부분 일치는 값이 어느 칸에 있는지를
      * 가르지 못한다 — `bidNowReasons` 가 자유 형식 문자열 목록이라 더 그렇다.
      */
-    protected fun decodedOutboxPayload(): NotificationRequestedPayload {
-        // 저장된 타입을 **읽어서** 복원한다 — 넣어서 복원하면 「저장된 타입이 그것이다」가 어디에도
-        // 단언되지 않는다(review r2 R-4).
-        val storedType = queryStrings("SELECT payload_type FROM outbox ORDER BY idempotency_key").single()
-        storedType shouldBe OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE
-        return OutboxPayloadCodec.decode(storedType, outboxPayloads().single()) as NotificationRequestedPayload
-    }
+    protected fun decodedOutboxPayload(): NotificationRequestedPayload = decodedOutboxPayloads().single()
+
+    /**
+     * **행 전부**를 되살린다 — 재현 등식은 두 run 의 payload 를 서로 대조하므로 한 행만 보는
+     * 단수형으로는 쓸 수 없다. 타입과 본문을 **한 질의로** 함께 읽는다: 두 열을 따로 질의하면
+     * 같은 멱등 키의 행끼리 정렬 순서가 묶이지 않아 타입과 본문의 짝이 어긋날 수 있다.
+     *
+     * 저장된 타입을 **읽어서** 복원한다 — 넣어서 복원하면 「저장된 타입이 그것이다」가 어디에도
+     * 단언되지 않는다(review r2 R-4).
+     */
+    protected fun decodedOutboxPayloads(): List<NotificationRequestedPayload> =
+        outboxTypedPayloads().map { (storedType, payload) ->
+            storedType shouldBe OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE
+            OutboxPayloadCodec.decode(storedType, payload) as NotificationRequestedPayload
+        }
+
+    /**
+     * 전략 revision 을 **DB 행에서** 바꾼다(설계 검토 (2) 우회 8) — 상수나 조립 인자를 바꾸면
+     * `operator_strategy` → repository → 평가 → payload → codec → outbox 사슬이 비어 있어도
+     * 값이 달라져 초록이 된다. `app` test 의 `setStrategyRevision` 과 같은 모양이지만 그쪽은
+     * 다른 소스셋이라 여기서 쓸 수 없다.
+     */
+    protected fun setStrategyRevision(revision: Int) =
+        dataSource().connection.use { connection ->
+            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
+                statement.setInt(1, revision)
+                check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
+            }
+        }
 
     protected fun outboxIdempotencyKeys(): List<String> =
         queryStrings("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")
@@ -191,6 +220,16 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
 
     protected fun outboxOccurredAt(): List<String> =
         queryStrings("SELECT occurred_at::text FROM outbox ORDER BY inserted_at, entry_id")
+
+    private fun outboxTypedPayloads(): List<Pair<String, String>> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT payload_type, payload FROM outbox ORDER BY inserted_at, entry_id").use {
+                    rs ->
+                    generateSequence { if (rs.next()) rs.getString(1) to rs.getString(2) else null }.toList()
+                }
+            }
+        }
 
     protected fun queryStrings(sql: String): List<String> =
         dataSource().connection.use { connection ->
@@ -238,5 +277,11 @@ internal const val E2E_CLOSING = "2026-12-31 10:00:00"
 internal const val E2E_LICENSE = "정보통신공사업"
 internal const val E2E_EXCLUDE_TERM = "zzz-없는-제외어"
 internal const val E2E_MAX_ACTIVE_BIDS = 10
+
+/**
+ * 시딩 전략의 revision — **어느 기본값과도 겹치지 않는 값**이다. `operator_strategy` 의 첫 행도,
+ * `JdbcStrategyRepository` 의 행 부재 대체값(0)도, 앞 판의 시딩값(1)도 아니다.
+ */
+internal const val E2E_STRATEGY_REVISION = 7
 internal const val E2E_BID_NOW_THRESHOLD = "0.50"
 internal const val E2E_REVIEW_THRESHOLD = "0.10"
