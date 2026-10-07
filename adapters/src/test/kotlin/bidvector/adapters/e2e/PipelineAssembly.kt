@@ -31,6 +31,7 @@ import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
 import bidvector.workflow.evaluation.OpportunityAnalysis
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
+import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.DispatchNotification
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
@@ -58,8 +59,7 @@ import javax.sql.DataSource
  * 지금은 전부 `val` 필드이고 [useCase]·[dispatcher] 도 한 번만 만든다 — [wiredCollaborators] 가
  * 그 살아 있는 객체에서 필드 그래프를 따라 내려간다.
  *
- * **production 에 relay 를 두지 않는다**(D-6D-3). 6F-10 이 그 자리를 갖는다 — [relay] 는 그
- * slice 가 받을 **소비자 모양**을 test 코드로 미리 보여 주는 것이다.
+ * relay 구간이 이 조립에서 어떤 모양인지는 [relay] 의 KDoc 이 든다.
  */
 internal class PipelineAssembly(
     private val dataSource: DataSource,
@@ -69,6 +69,8 @@ internal class PipelineAssembly(
     mlPolicy: MlCallPolicyData,
     currentActiveBids: Int = 0,
     maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
+    relayTransactionsFor: (TransactionBoundary, RecordingNotificationSender) -> ConsumerTransactionPort =
+        { boundary, _ -> ConsumerTransactions(boundary) },
 ) {
     private val clock = fixedClock(at)
     private val javaClock: java.time.Clock = java.time.Clock.fixed(at, ZoneOffset.UTC)
@@ -134,6 +136,15 @@ internal class PipelineAssembly(
      * ([OwnTransactionConnectionSource])이고, relay 는 T1/T2 를 스스로 갈라야 하므로
      * [TransactionBoundary] 를 쥔다(그 경계를 outbox·inbox·transactions 셋에 **같은 객체로**
      * 넘긴다). 이 비대칭이 production 조립의 비대칭과 같다.
+     *
+     * 생성자의 `relayTransactionsFor` 는 그 경계를 **감쌀 수 있는 자리**다(6D-2) — 기본값이
+     * production [ConsumerTransactions] 이므로 아무 것도 넘기지 않은 조립은 정직하고, 크래시·
+     * 정지 주입은 test 가 명시로 넘겨야 한다. 그 주입은 [wiredCollaborators] 에서 **비-MAIN
+     * 협력자로 잡힌다**(`PipelineRestartConvergenceE2ETest` 가 실측) — 조용히 새지 않는다.
+     *
+     * 둘째 인자로 [sender] 를 건넨다(PR #64 F4) — 사건 술어가 발송 기록 수를 읽어야 하고 그
+     * sender 는 이 조립이 만든다. 건네지 않으면 호출부가 `lateinit var` 로 조립 자신을 되잡아야
+     * 한다(앞 판의 네 자리).
      */
     private val relayBoundary = TransactionBoundary(dataSource)
 
@@ -143,7 +154,7 @@ internal class PipelineAssembly(
             inbox = JdbcInboxPort(relayBoundary),
             dispatcher = dispatcher,
             leases = PostgresAdvisoryLockLease(dataSource),
-            transactions = ConsumerTransactions(relayBoundary),
+            transactions = relayTransactionsFor(relayBoundary, sender),
             target = RelayTarget(E2E_OWNER, E2E_CHANNEL),
             environment = RuntimeEnvironment.Production,
             policy = notificationPolicy,
@@ -157,10 +168,14 @@ internal class PipelineAssembly(
     suspend fun evaluate(): List<CandidateEvaluation> = useCase.evaluate()
 
     /**
-     * 평가와 발송이 **실제로 쓰는** 두 객체에서 출발해 닿는 협력자 전수. 목록이 아니라 그래프라,
-     * 어느 자리를 대역으로 바꾸면 그 대역이 여기 나타난다 — 패키지 이름과 무관하다.
+     * 평가와 발송과 **relay** 가 실제로 쓰는 세 객체에서 출발해 닿는 협력자 전수. 목록이 아니라
+     * 그래프라, 어느 자리를 대역으로 바꾸면 그 대역이 여기 나타난다 — 패키지 이름과 무관하다.
+     *
+     * relay 가 뿌리에 든 것은 6D-2 다. 앞 판은 use case 와 dispatcher 만 순회해 임대·트랜잭션
+     * 경계·outbox/inbox port 가 그래프 밖이었다 — 그 자리를 test 대역으로 바꿔도 출처 단언이
+     * 초록이었다.
      */
-    fun wiredCollaborators(): CollaboratorGraph = collaboratorGraph(listOf(useCase, dispatcher))
+    fun wiredCollaborators(): CollaboratorGraph = collaboratorGraph(listOf(useCase, dispatcher, relayUseCase))
 
     /**
      * **production relay**(6F-10 ⓐ) — 6D-1 이 이 자리에 두었던 test relay 를 교체했다.

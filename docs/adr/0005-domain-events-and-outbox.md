@@ -447,3 +447,10 @@ relay 의 lease(D-10 port `ConsumerLeasePort`, `workflow` 소유)는 run 동안 
 
 T1: `claim` 커밋 → 발송 → T2: 종단 전이 + inbox 기록(같은 트랜잭션, inbox 는 `Delivered` 뒤에만). T1 과 T2 사이의 크래시가 7.2 의 고아다. 발송 뒤 T2 가
 실패하면 행은 `CLAIMED` 로 남아 다음 run 이 격리한다 — 발송은 한 번 있었고 상태는 모호하므로 정직하다.
+
+### 7.6 at-most-once 가 막는 것은 entry 의 재실행이지 키의 재발생이 아니다 (M6/6D-2 실측, 2026-10-07, 정본 `reports/evidence/m6/6d2/scope.md` B-2)
+
+inbox 는 전달 **뒤** T2 에서만 기록되므로, 전달과 T2 사이의 크래시 창에서는 같은 멱등 키의 **다음 entry**(재평가가 run 마다 만드는 행, D-6F7-6)가 inbox 를
+지나 **다시 전달된다** — 6D-2 `PipelineRestartConvergenceE2ETest` R-2 가 그 값(크래시 1회 + 재기동 + 재평가 뒤 발송 합 **2**)을 단언해 사실로 고정한다.
+「고아 격리 → 발송 0 또는 1, 중복 0」(6F-10 A-1)은 **entry 단위·단일 재기동** 문면이다. inbox 를 전달 전에 쓰는 것은 6D-1 이 좌초·키 소진을 실측한 모양이고,
+`idempotency_key` UNIQUE 는 D-6F7-6 번복이라 둘 다 택하지 않았다(운영자 결정 B-2 (a)). 이 창을 좁히는 것은 `OPEN-NOTI-02` 의 at-most-once 를 바꾸는 결정이다.

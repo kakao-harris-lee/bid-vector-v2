@@ -133,6 +133,11 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * 전략 단일 행 — 편집 HTTP 경로는 6A 소관이라 직접 INSERT 한다(`EvaluationDryRunE2ETest` 와
      * 같은 알려진 제한). `exclude_keyword_terms` 하나만 채워 감시 규칙을 **비어 있지 않게**
      * 만든다: 비면 `WatchVerdict.NoGate` 라 모든 후보가 감시 단계에서 탈락한다.
+     *
+     * revision 은 [E2E_STRATEGY_REVISION] 고정이고 **인자가 아니다**(cr G-3) — 넘기는 호출부가
+     * 하나도 없는 파라미터는 과잉이고, 전부 기본값인 목록의 맨 앞에 두면 뒤에 누가 positional 로
+     * 부를 때 `maxActiveBids` 자리가 조용히 revision 이 된다. run 사이에 revision 을 바꾸는 쪽은
+     * [setStrategyRevision] 이 든다.
      */
     protected fun seedStrategy(
         maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
@@ -145,17 +150,18 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
                     "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setArray(1, empty)
+                    statement.setInt(1, E2E_STRATEGY_REVISION)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
-                    statement.setArray(5, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
-                    statement.setBigDecimal(6, BigDecimal(bidNowThreshold))
-                    statement.setBigDecimal(7, BigDecimal(reviewThreshold))
-                    statement.setInt(8, maxActiveBids)
+                    statement.setArray(5, empty)
+                    statement.setArray(6, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
+                    statement.setBigDecimal(7, BigDecimal(bidNowThreshold))
+                    statement.setBigDecimal(8, BigDecimal(reviewThreshold))
+                    statement.setInt(9, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -173,13 +179,35 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * (verifier r1 F-5 / review G-3). 직렬화 문자열의 부분 일치는 값이 어느 칸에 있는지를
      * 가르지 못한다 — `bidNowReasons` 가 자유 형식 문자열 목록이라 더 그렇다.
      */
-    protected fun decodedOutboxPayload(): NotificationRequestedPayload {
-        // 저장된 타입을 **읽어서** 복원한다 — 넣어서 복원하면 「저장된 타입이 그것이다」가 어디에도
-        // 단언되지 않는다(review r2 R-4).
-        val storedType = queryStrings("SELECT payload_type FROM outbox ORDER BY idempotency_key").single()
-        storedType shouldBe OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE
-        return OutboxPayloadCodec.decode(storedType, outboxPayloads().single()) as NotificationRequestedPayload
-    }
+    protected fun decodedOutboxPayload(): NotificationRequestedPayload = decodedOutboxPayloads().single()
+
+    /**
+     * **행 전부**를 되살린다 — 재현 등식은 두 run 의 payload 를 서로 대조하므로 한 행만 보는
+     * 단수형으로는 쓸 수 없다. 타입과 본문을 **한 질의로** 함께 읽는다: 두 열을 따로 질의하면
+     * 같은 멱등 키의 행끼리 정렬 순서가 묶이지 않아 타입과 본문의 짝이 어긋날 수 있다.
+     *
+     * 저장된 타입을 **읽어서** 복원한다 — 넣어서 복원하면 「저장된 타입이 그것이다」가 어디에도
+     * 단언되지 않는다(review r2 R-4).
+     */
+    protected fun decodedOutboxPayloads(): List<NotificationRequestedPayload> =
+        outboxTypedPayloads().map { (storedType, payload) ->
+            storedType shouldBe OutboxPayloadCodec.NOTIFICATION_REQUESTED_TYPE
+            OutboxPayloadCodec.decode(storedType, payload) as NotificationRequestedPayload
+        }
+
+    /**
+     * 전략 revision 을 **DB 행에서** 바꾼다(설계 검토 (2) 우회 8) — 상수나 조립 인자를 바꾸면
+     * `operator_strategy` → repository → 평가 → payload → codec → outbox 사슬이 비어 있어도
+     * 값이 달라져 초록이 된다. `app` test 의 `setStrategyRevision` 과 같은 모양이지만 그쪽은
+     * 다른 소스셋이라 여기서 쓸 수 없다.
+     */
+    protected fun setStrategyRevision(revision: Int) =
+        dataSource().connection.use { connection ->
+            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
+                statement.setInt(1, revision)
+                check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
+            }
+        }
 
     protected fun outboxIdempotencyKeys(): List<String> =
         queryStrings("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")
@@ -192,6 +220,15 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
     protected fun outboxOccurredAt(): List<String> =
         queryStrings("SELECT occurred_at::text FROM outbox ORDER BY inserted_at, entry_id")
 
+    private fun outboxTypedPayloads(): List<Pair<String, String>> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(OUTBOX_TYPED_PAYLOADS_SQL).use { rs ->
+                    generateSequence { if (rs.next()) rs.getString(1) to rs.getString(2) else null }.toList()
+                }
+            }
+        }
+
     protected fun queryStrings(sql: String): List<String> =
         dataSource().connection.use { connection ->
             connection.createStatement().use { statement ->
@@ -201,6 +238,9 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
             }
         }
 }
+
+/** 타입과 본문을 **한 질의로** 읽는다 — 두 열을 따로 질의하면 같은 키의 행끼리 짝이 어긋난다. */
+private const val OUTBOX_TYPED_PAYLOADS_SQL = "SELECT payload_type, payload FROM outbox ORDER BY inserted_at, entry_id"
 
 internal fun noticeIdOf(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
@@ -238,5 +278,50 @@ internal const val E2E_CLOSING = "2026-12-31 10:00:00"
 internal const val E2E_LICENSE = "정보통신공사업"
 internal const val E2E_EXCLUDE_TERM = "zzz-없는-제외어"
 internal const val E2E_MAX_ACTIVE_BIDS = 10
+
+/**
+ * 시딩 전략의 revision — **어느 기본값과도 겹치지 않는 값**이다. `operator_strategy` 의 첫 행도,
+ * `JdbcStrategyRepository` 의 행 부재 대체값(0)도, 앞 판의 시딩값(1)도 아니다.
+ */
+internal const val E2E_STRATEGY_REVISION = 7
 internal const val E2E_BID_NOW_THRESHOLD = "0.50"
 internal const val E2E_REVIEW_THRESHOLD = "0.10"
+
+/*
+ * outbox 상태 어휘(cr G-7) — **정본은 V6 CHECK 와 전이 SQL** 이고 `main` 에는 이 문자열을 담은
+ * Kotlin 상수가 없다(그래서 test 상수를 둔다). 자리를 이 파일로 둔 이유는 세 e2e 클래스가 함께
+ * 쓰기 때문이다 — 크래시 주입 파일에 두면 그 파일의 주제와 무관한 어휘가 섞인다.
+ *
+ * 같은 어휘가 `bidvector.adapters.relay` 에는 축어 리터럴로 남아 있다 — 그 패키지는 이 slice 의
+ * in_scope 밖이다. 거동 위험은 없다: 양쪽 모두 DB 가 낸 문자열과 대조하므로 production 이 어휘를
+ * 바꾸면 fail-closed 로 붉어진다.
+ */
+internal const val PENDING_STATE = "PENDING"
+internal const val CLAIMED_STATE = "CLAIMED"
+internal const val DELIVERED_STATE = "DELIVERED"
+internal const val ISOLATED_STATE = "ISOLATED"
+
+/*
+ * 스레드 경합 test 의 시한 셋(cr G-6) — 값·역할·사유가 같은 사본이 이 패키지에 **둘** 있었다.
+ * 선례(`PipelineFailureInjectionE2ETest`)의 것은 `private companion object` 라 재사용이 막혀
+ * 있었고, 이 slice 가 top-level `internal` 로 같은 셋을 또 지었다. 집을 하나로 모으고 선례의
+ * companion 상수를 지웠다.
+ *
+ * **여기는 `e2e` 패키지의 자리다**(PR #64 F6) — 같은 값·같은 역할의 **셋째 사본**이
+ * `adapters.event` 의 claim 경합 test(6F-10 산출물)에 따로 있다. 그 파일은 이 slice 의 in_scope
+ * 밖이라 합치지 않았고, 합치는 것은 그 파일을 만지는 다음 slice 다(checklist 알려진 제한).
+ *
+ * 이름이 두 쓰임을 함께 담는다 — 「신호」는 「첫 워커가 행을 집었다」(claim 경합)와 「홀더가
+ * 막혔다」(임대 경합) 둘이다.
+ */
+internal const val E2E_SIGNAL_TIMEOUT_SECONDS = 5L
+
+/**
+ * 첫 스레드가 **쥐고 있는** 시한. 상대가 돌아오면 즉시 풀리므로 정상 경로의 비용은 0 이고, 이
+ * 값은 **거짓 RED 의 여유**로만 쓰인다 — 호스트가 느려 상대의 한 질의가 오래 걸리면 쥔 쪽이
+ * 조기에 풀려 막히지 않았는데도 막힌 것처럼 보인다. 넉넉히 둔다.
+ */
+internal const val E2E_HOLD_TIMEOUT_SECONDS = 30L
+
+/** 합류 시한 — 쥠 시한보다 커야 그 만료가 합류 실패로 가려지지 않는다. */
+internal const val E2E_JOIN_TIMEOUT_SECONDS = 60L
