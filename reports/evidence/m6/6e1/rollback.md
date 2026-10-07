@@ -1,6 +1,6 @@
 # M6/6E-1 — rollback 절차와 실측
 
-실측 HEAD: `9634498d` · base: `80dc33b3`
+실측 HEAD: `4a8600a5` · base: `80dc33b3`
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 이 레인이 되돌리는 것은 다섯 — 신설 넷
 (runbook 하나 + evidence 셋)과 공유 파일 **하나**(`.github/workflows/ci.yml`)다.
@@ -10,11 +10,16 @@
 `reports/evidence/m6/6e1/ledger-constraint-trace.md`(C-7, 다른 레인)는 **이 레인 소유가 아니다**.
 절차는 그 넷을 건드리지 않고 ③ 의 확인이 그것들이 **남아 있음**을 함께 잰다.
 
-**`rollback.md` 자신은 복원 목록에 없다** — 실측 HEAD 에 존재하지 않는 파일이고, 문서가 자기를 담은
-커밋을 가리킬 수 없다. 실측 HEAD 를 「마지막 산출물 커밋」(`bf5850b2`)보다 뒤인 `9634498d` 로 잡은 것은
-그 자리가 **이 문서 직전의 마지막 커밋**이어서 복원 목록이 evidence 셋을 모두 덮기 때문이다. 이 뒤에
-움직이는 경로는 `rollback.md` 하나뿐이고, 그것은 덮개(`reports/evidence/m6/6e1`) 안이라 ⓪ 의 등식이
-유지된다.
+**`rollback.md` 자신은 복원 목록에 없다** — 자기를 지우는 목록을 들면 되돌림 **대상이 라운드마다
+움직여** 「실측 뒤에 대상이 움직였는가」 확인이 영원히 깨진다. 그래서 이 문서는 대상에서 빠지고,
+되돌린 뒤에도 남는다(아래 ③ 실측이 그 사실을 적는다). 되돌림의 뜻은 「이 slice 의 **산출물**을 base 로
+되돌린다」이고 이 문서는 그 절차서다.
+
+**실측 HEAD 를 `4a8600a5` 로 잡은 근거**: 그 자리가 **이 문서 직전의 마지막 커밋**이고, 산출물 셋
+(runbook · `acceptance-trace.md` · `ci.yml`)은 그보다 앞(`bf5850b2`·`2df1da3b`)에서 멈춰 있다. 그 뒤에
+움직이는 경로는 `rollback.md` **하나뿐**이고 그것은 대상이 아니므로
+`git diff --name-only 4a8600a5..<판정 SHA> -- <대상 다섯>` 이 **빈 출력**이다 — 이것이 verifier 가 보는
+등식이다(「실측 HEAD == 판정 SHA」가 아니다).
 
 ## ⓪ 복원 목록 — 기계 산출과 양방향 등식
 
@@ -34,7 +39,7 @@ comm -13 all.txt covered.txt    # 덮개 ∖ 전체 — 빈 출력
 산출: `A` **4건**(runbook · `acceptance-trace.md` · `checklist.md` · `commands.md`) ·
 `M` **1건**(`ci.yml`). `comm` **양쪽 다 빈 출력**이다.
 
-**재산출 자리는 `9634498d`** 이고 라운드마다 다시 돌린다 — 목록을 문서에 박지 않는다.
+**재산출 자리는 `4a8600a5`** 이고 라운드마다 다시 돌린다 — 목록을 문서에 박지 않는다.
 
 ## 공유 파일의 hunk 출처 — `git log` 산출, `--no-merges`
 
@@ -84,17 +89,17 @@ ls docs/discovery/legacy-v2-differences.md reports/evidence/m6/6e1/scope.md \
 ## 실측 — 버릴 clone 에서 (①~⑥)
 
 ```sh
-git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로> && git checkout -q 9634498d
+git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로> && git checkout -q 4a8600a5
 ```
 
 | # | 무엇 | 결과 |
 |---|---|---|
 | **①** | 신설 4건 제거 명령 | **exit 0** · 삭제 **4** |
 | **②** | `ci.yml` hunk 역적용(`2df1da3b` 격리) | **exit 0** — 거부 없음, 수동 경로 불필요 |
-| **③** | base 대조 · **트리 동일성** · 남의 줄 | **빈 출력** · base blob `279b64f3` == 복원 blob `279b64f3` · 신설 넷 전부 **없음** · 다른 레인 산출물 넷 전부 **남음** |
+| **③** | base 대조 · **트리 동일성** · 남의 줄 | **빈 출력** · base blob `279b64f3` == 복원 blob `279b64f3` · 신설 넷 전부 **없음** · 다른 레인 산출물 넷(`legacy-v2-differences.md`·`scope.md`·`ledger-constraint-trace.md`·`milestone-6.md`) 전부 **남음** · 되돌린 `reports/evidence/m6/6e1/` 에 남는 것은 `scope.md`·`ledger-constraint-trace.md`·`rollback.md` 셋(설계대로) |
 | **④** | compile(`compileKotlin compileTestKotlin`) | **exit 0** (16s) |
 | **⑤** | test | **exit 0** — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4 |
-| **⑥** | 게이트(`check` · `qualityBaseline`) | **exit 0** (`check` 9m 23s · `qualityBaseline` 별도 exit 0 · `leakPatternGate` 실행 1회) |
+| **⑥** | 게이트(`check` · `qualityBaseline`) | **exit 0** (`check` 9m 18s · `qualityBaseline` 별도 exit 0 · `leakPatternGate` 가 캐시 표시 없이 **실행 1회** — 되돌린 뒤 남는 `rollback.md` 를 스캔하고도 초록) |
 
 **갈음은 「HEAD 초록」이 아니라 트리 동일성으로 했고, 그 위에서 ④~⑥ 을 실제로 돌렸다.** ③ 의 blob
 SHA 대조가 되돌린 `ci.yml` 이 base 와 **바이트 동일**함을 보이고, ④~⑥ 은 그 트리에서 **직접 실행**한
@@ -105,5 +110,7 @@ SHA 대조가 되돌린 `ci.yml` 이 base 와 **바이트 동일**함을 보이�
 (`checklist.md` 자기 점검). 그래서 ④~⑥ 의 유일한 위험원은 `ci.yml` 이었고, 그 파일의 되돌림은 ③ 에서
 바이트 동일로 확인됐다.
 
-**실측 자리**: 버릴 clone 을 새로 떠서(`--no-hardlinks`) `9634498d` 를 체크아웃하고 ①~③ 을 다시 적용한
-뒤 그 트리에서 ④~⑥ 을 돌렸다 — 앞 라운드의 clone 을 재사용하지 않았다.
+**실측 자리**: 버릴 clone 을 새로 떠서(`--no-hardlinks`) `4a8600a5` 를 체크아웃하고 ①~③ 을 적용한 뒤
+그 트리에서 ④~⑥ 을 돌렸다 — 앞 라운드의 clone 을 재사용하지 않았다. 앞 라운드(`9634498d`)에서도 같은
+①~⑥ 이 전부 exit 0 이었고, 두 트리는 `rollback.md` 한 파일만 다르다(`git write-tree` 로 확인) —
+그 파일이 대상에서 빠지기 때문이고, ⑥ 이 그 상태에서도 초록임을 위 표가 잰다.
