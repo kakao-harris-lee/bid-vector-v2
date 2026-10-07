@@ -279,3 +279,15 @@ cr T-4(대상 쪽 접기)는 **변이로 재지 않았다** — 오늘 커밋 �
 - cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → `--rerun-tasks` compile → `check`
 - exit: restore 0 · compile 0 · check **0**
 - 핵심 결과: base `2865c9b8` 그대로. 복원 목록 76(새 test 파일 둘이 들어왔다) · `D` 46 · `M` 30, 되돌린 경로의 base 대비 diff 빈 출력, 남긴 일곱 경로는 HEAD 그대로, 「목록 ⊇ main 소스 변경」 밖 0. 세부는 `rollback.md`
+
+## 2026-10-07T15:40:00Z — 소 커밋: `check` 전건 · rollback ⓪~③c
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: 전건 통과(주석 둘 + 장부 두 줄). 붉은 자리 없음. 변이는 재지 않았다 — 거동 변경이 0 이라 변이 대상이 없다(앞 라운드의 F3·F3b·F4a·F6 RED 가 그대로 유효하고, 그 넷은 이 커밋이 만지지 않은 코드에 걸린다)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → ③·③b·③c 대조 (버릴 clone, 실측 HEAD `d43128a9`)
+- exit: restore 0
+- 핵심 결과: base `2865c9b8` 그대로. 복원 목록 76 · `D` 46 · `M` 30 · 되돌린 경로의 base 대비 diff 빈 출력 · 남긴 일곱 경로 HEAD 그대로 · ③c 목록 밖 main 소스 0. **④~⑥ 은 레인이 돌리지 않았다** — verifier 몫이다(계약 D-6F10-45)
+
+**호스트 게이트 — 운영자 결정으로 문턱이 바뀌었다(2026-10-07).** 이 라운드 착수 시점의 swap free 는 1,849 MB 로 옛 문턱(2 GB) 아래였고, 레인은 규율대로 빌드를 **시작하지 않고 보고**했다. 회복을 기다렸으나 움직이지 않았다 — swap 을 쥔 것이 상주 서비스(python 하나 약 529 MB · intellij-server 넷)여서 반납될 성질이 아니었다. 운영자가 문턱을 **available ≥ 6 GB · swap free ≥ 1 GB** 로 바꾸고 Gradle 을 하나씩 띄우는 조건을 달아 그 뒤에 돌렸다(실행 시점 available 14.5 GB · swap free 2,051 MB, 종료 시점에도 2,051 MB).
