@@ -206,3 +206,33 @@ R2-7 두 줄과 R2-10 이 이 라운드의 교훈이다 — **방어를 더한 �
 - cmd: 변이 `strategyRevision → StrategyRevision(1)` 적용 → `git diff --numstat` → `:workflow:test --tests '*OutboxNotificationRequestPortTest'` → 표본만 1 로 바꿔 재실행 → `git checkout --`
 - exit: 변이 단독 **1**(RED) · 변이 + 표본 1 **0**(초록)
 - 핵심 결과: 표본 **7**(지원 함수 기본값은 1)에서 상수 1 변이가 투영 등식 test 를 붉히고, 표본을 1 로 내리면 **같은 변이가 통과한다**. 거동 축의 두 값(7 → 11)도 둘 다 비기본값이고 서로 다르다 — 그 전제가 이 두 축을 지탱한다는 것을 양쪽으로 쟀다
+
+## 2026-10-07T09:10:00Z — 승인 전 일괄: `check` 전건 · 변이 셋
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: 전건 통과. 이 일괄은 산출물 한 커밋(`2bc08209`)이고 붉은 자리 없이 지났다
+
+- cmd: 변이마다 적용 → `git diff --numstat` → 표적 test → `git checkout --` (산출물 커밋 뒤)
+- exit: 아래 표
+- 핵심 결과: 셋 **전부 RED**. ①은 fake 둘 + 실 DB 하나, ②는 verifier r3 가 초록을 실측한 그 변이가 이제 붉다, ③은 억제 환경 한 건이 순서를 잡는다
+
+| 변이 | numstat | 결과 | 잡은 단언 |
+|---|---|---|---|
+| T1 고아마다 임대 확인 제거(앞 판 `forEach` 로) | 2/5 | **RED** | fake 둘(격리 도중 상실 · claim 전 상실) + 실 DB 하나(`{ISOLATED=1, CLAIMED=1}` 보존) |
+| B3 배선만 옛 이름 술어로 | 1/1 | **RED**(verifier r3 에서는 초록 550/550) | 배선 구조 단언(함수 facade 의존 + 열거 상수 접근 0) |
+| P1s 임대 확인과 억제 판정 순서 교환 | 4/4 | **RED**(verifier r3 에서는 상설 0) | 억제 환경 첫 지점 fake |
+
+cr T-4(대상 쪽 접기)는 **변이로 재지 않았다** — 오늘 커밋 조립에 중첩 타입이 없어 사각이 도달 불가다. 재려면 중첩 타입과 그것을 이름으로 참조하는 dry-run 쪽을 **함께** 심어야 하고, 그 모양의 양쪽 측정은 라운드 2 의 R2-7 에서 이미 했다(접기 RED · 옛 도출 초록). 여기서 한 것은 세 자리 가운데 마지막 자리를 같은 모양으로 맞춘 것이다
+
+## 2026-10-07T09:30:00Z — 승인 전 일괄: rollback 재실측 (버릴 clone, 실측 HEAD `2bc08209`)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → `--rerun-tasks` compile → `check`
+- exit: restore 0 · compile 0 · check **0**
+- 핵심 결과: 복원 목록 69 · `D` 40 · `M` 29, 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱 경로는 HEAD 그대로. 세부는 `rollback.md`
+
+## 2026-10-07T09:35:00Z — 승인 전 일괄: 등재 정렬 전 블록 확인 (cr T-5)
+
+- cmd: `gate-tests.properties` 의 모든 블록을 서브패키지 그룹 안 사전순으로 기계 확인
+- exit: 0
+- 핵심 결과: **이 slice 의 패키지 아홉은 어긋남 0**. 그 밖에 **여덟 자리**가 어긋나 있고 전부 이 slice 밖 패키지(`app.collection`·`adapters.persistence`·`adapters.snapshot`·`procurement`·`workflow.collection`)다 — in_scope 가 이 파일을 「추가만」으로 한정하므로 고치지 않고 사실로 남긴다. cr T-5 의 제안(게이트에 「블록 안이 사전순」 단언)은 `build-logic/` 변경이라 in_scope 밖이다
