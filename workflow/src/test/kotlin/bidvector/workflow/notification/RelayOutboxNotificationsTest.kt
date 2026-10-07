@@ -330,8 +330,9 @@ class RelayOutboxNotificationsTest {
                 orphans = listOf(notificationRow("orphan")),
             )
 
+        // 고아가 하나라 서수 3 은 그 고아, 4 가 claim 전이다(cr T-1 로 지점이 하나 늘었다).
         val report =
-            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 2))
+            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 3))
                 .relay(RELAY_LIMIT)
                 .shouldBeInstanceOf<RelayReport.LeaseLost>()
 
@@ -339,6 +340,63 @@ class RelayOutboxNotificationsTest {
         report.partial.claimed shouldBe 0
         outbox.isolated shouldBe listOf(OutboxEntryId("orphan"))
         outbox.claimedKinds.shouldBeEmpty()
+    }
+
+    /**
+     * **cr T-1** — 고아를 태우는 **도중**에 임대를 잃으면 멈춘다. 격리는 단방향 종단이라
+     * (`ISOLATED` 에서 나가는 간선 0) 임대 없이 태운 행은 애플리케이션 경로로 되살릴 수 없다 —
+     * 그래서 되돌릴 수 있는 발송 루프보다 **더** 촘촘해야 한다. 앞 판은 목록을 읽기 전 한 번만
+     * 물어서, 첫째를 태우는 사이에 잃으면 남은 전부를 임대 없이 태웠다.
+     *
+     * 고아 둘 가운데 **하나만** 태워지고 둘째가 손대지지 않은 것이 증거다 — 계수와 port 기록
+     * 둘 다로 잰다(계수만 보면 「둘 다 태우고 1 을 보고하는」 구현도 초록이다).
+     */
+    @Test
+    fun `고아를 태우는 도중에 임대를 잃으면 남은 고아를 건드리지 않는다`() {
+        val outbox =
+            FakeOutboxPort(
+                pending = listOf(notificationRow("send")),
+                orphans = listOf(notificationRow("orphan-1"), notificationRow("orphan-2")),
+            )
+
+        // 1 획득 · 2 목록 전 · 3 첫 고아(참) · 4 둘째 고아(거짓).
+        val report =
+            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 3))
+                .relay(RELAY_LIMIT)
+                .shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.orphansIsolated shouldBe 1
+        report.partial.claimed shouldBe 0
+        outbox.isolated shouldBe listOf(OutboxEntryId("orphan-1"))
+        outbox.claimedKinds.shouldBeEmpty()
+    }
+
+    /**
+     * **R3-L-1 / cr T-2** — 획득 직후 검사가 **억제 판정보다 앞**이라는 것을 잠근다.
+     *
+     * 왜 이 한 건이 필요했나: 다른 임대 test 는 전부 Live 환경에서 돌아, 두 갈래의 순서를
+     * 뒤바꾸는 변이가 상설 test 전부 초록이었다(verifier r3 probe P1s). 억제 환경에서만 둘이
+     * 갈린다 — 순서가 지금대로면 `LeaseLost`(종료 코드 1), 뒤바뀌면 `Skipped`(종료 코드 4).
+     *
+     * 어느 쪽이 맞는가: 「임대를 잃었다」가 더 센 신호다. 억제는 설정을 고치면 풀리는 상태인데,
+     * 임대 상실은 **배타성이 깨진** 상태라 같은 run 을 다시 돌리는 것이 안전하지 않다.
+     */
+    @Test
+    fun `억제 환경에서도 획득 직후 임대 상실이 억제보다 앞이다`() {
+        val outbox = FakeOutboxPort(orphans = listOf(notificationRow("orphan")))
+
+        val report =
+            relay(
+                outbox,
+                FakeInboxPort(),
+                ScriptedSender(delivered()),
+                leases = LosingLease(heldFor = 0),
+                policy = relayPolicy(DeliveryMode.DryRun),
+            ).relay(RELAY_LIMIT)
+
+        report.shouldBeInstanceOf<RelayReport.LeaseLost>()
+        report.partial.orphansIsolated shouldBe 0
+        outbox.claimedEntriesKinds.shouldBeEmpty()
     }
 
     /**

@@ -29,6 +29,10 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 실제 사각은 **선택자**였다 — 정확 이름 일치라 `외부$익명` 으로 컴파일되는 중첩 클래스가
  * 대상 밖이었다. 그 자리는 위 선택자의 접두 비교가 닫는다.
  *
+ * **중첩 접기는 세 자리에 다 있다**(cr T-4 로 마지막 자리를 채웠다): 선택자(누구를 고르는가)는
+ * 접두 비교, 모집단 도출(누가 참조자인가)과 **대상**(무엇을 참조하면 위반인가)은 바깥 이름
+ * 접기. 한 자리만 남겨 두면 그 자리의 모양으로 규칙 전체가 열린다.
+ *
  * 남는 분담은 그대로다: 이 규칙은 **이름 참조**를 보고, 「불투명 클로저만 받고 커밋 조립은
  * 열거 밖에서 짓는다」처럼 참조가 아예 생기지 않는 모양은 기존 주입 표면 집합 등식
  * (`AppHttpDependencyGateTest`)과 dry-run E2E 의 outbox 전후 등식이 본다.
@@ -75,7 +79,12 @@ private fun referenceAnyNamed(forbidden: Set<String>): ArchCondition<JavaClass> 
             item
                 .directDependenciesFromSelf
                 .map { it.targetClass }
-                .filter { it.fullName in forbidden }
+                // cr T-4 — **대상 쪽도 바깥으로 접는다.** 선택자(접두 비교)와 모집단 도출
+                // (`substringBefore`)만 중첩을 덮고 여기만 정확 일치로 남아 대칭이 반쪽이었다.
+                // 그러면 커밋 조립이 중첩 타입을 갖는 날 dry-run 이 `EvaluationCommitRun$Inner`
+                // 만 이름으로 참조하는 모양을 규칙도 등식도 보지 못한다(오늘은 중첩 타입이
+                // 없어 도달 불가인 사각이었다).
+                .filter { it.fullName.substringBefore('$') in forbidden }
                 .distinct()
                 .forEach { target ->
                     events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))

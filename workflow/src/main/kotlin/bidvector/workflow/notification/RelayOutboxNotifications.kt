@@ -139,7 +139,8 @@ class RelayOutboxNotifications(
      * 않는다(격리도 하지 않는다: 격리는 단방향 종단이고, 보낼 수 없는 환경에서 남의 run 이
      * 남긴 행을 태울 이유가 없다).
      *
-     * **임대를 묻는 자리가 넷이다(D-6F10-31 ②).** 획득 직후 · 고아 격리 전 · claim 전 ·
+     * **임대를 묻는 자리가 다섯이다**(D-6F10-31 ② 가 넷으로 늘렸고, cr T-1 이 격리 루프
+     * 안쪽을 더했다). 획득 직후 · 고아 목록을 읽기 전 · **고아마다 태우기 전** · claim 전 ·
      * 행마다 발송 전. 어느 지점에서 잃어도 그 뒤 질의를 돌리지 않고 [RelayReport.LeaseLost]
      * 로 멈춘다. 앞 판은 **행 루프 안 하나**였고 그때 열려 있던 것(verifier r2 probe V6c
      * 실측): 임대를 이미 잃은 relay 가 **새 홀더가 막 집은** `CLAIMED` 행을 고아로 읽어
@@ -172,14 +173,14 @@ class RelayOutboxNotifications(
         limit: Int,
         guard: LeaseGuard,
     ): RelayReport {
-        // 고아 격리 전 — 잃은 뒤 격리하면 새 홀더의 in-flight 행을 태운다(되돌릴 간선 없음).
+        // 고아 목록을 읽기 전 — 잃은 뒤 읽으면 새 홀더의 in-flight 행이 목록에 섞인다.
         if (!guard.stillHeld()) return leaseLostBefore(orphansIsolated = 0)
-        val orphansIsolated = isolateOrphans()
+        val isolation = isolateOrphans(guard)
         // claim 전 — 잃은 뒤 집으면 두 relay 가 같은 종류를 동시에 소비한다.
-        return if (guard.stillHeld()) {
-            claimAndSettle(limit, guard, orphansIsolated)
+        return if (isolation.leaseHeld && guard.stillHeld()) {
+            claimAndSettle(limit, guard, isolation.isolated)
         } else {
-            leaseLostBefore(orphansIsolated)
+            leaseLostBefore(isolation.isolated)
         }
     }
 
@@ -204,12 +205,27 @@ class RelayOutboxNotifications(
         return if (leaseLost) RelayReport.LeaseLost(report) else report
     }
 
-    private fun isolateOrphans(): Int {
+    /**
+     * **고아마다** 태우기 전에 임대를 다시 묻는다(cr T-1). 발송 루프는 행마다 물었는데 이쪽은
+     * 목록을 읽기 전에 한 번만 물었다 — 되돌릴 수 있는 쪽이 더 촘촘했다. 격리는 **단방향
+     * 종단**이라(`ISOLATED` 에서 나가는 간선 0) 임대 없이 태운 행은 복구가 DBA 몫이다.
+     *
+     * 열려 있던 창: 목록을 읽은 뒤 n 개 가운데 첫째를 태우는 사이에 임대를 잃으면 남은 n−1
+     * 개를 **임대 없이 전부** 태웠다. 새 홀더가 그 사이 그 행들을 집어 발송 중이었다면 발송된
+     * 행이 `ISOLATED` 로 표기된다.
+     *
+     * 목록 자체는 임대를 쥔 동안 읽은 것이므로 다시 읽지 않는다 — 잃은 뒤 멈추는 것이
+     * 처분이고, 남은 행은 `CLAIMED` 에 그대로 남아 다음 run 의 고아 격리가 받는다.
+     */
+    private fun isolateOrphans(guard: LeaseGuard): OrphanIsolation {
         val orphans = transactions.inTransaction { outbox.claimedEntries(OutboxConsumerKind.NotificationRequested) }
-        orphans.forEach { row ->
+        var isolated = 0
+        for (row in orphans) {
+            if (!guard.stillHeld()) return OrphanIsolation(isolated, leaseHeld = false)
             transactions.inTransaction { transition(OutboxEntry.restore(row), OutboxCommand.Isolate) }
+            isolated += 1
         }
-        return orphans.size
+        return OrphanIsolation(isolated, leaseHeld = true)
     }
 
     /**
@@ -335,6 +351,15 @@ class RelayOutboxNotifications(
         }
     }
 }
+
+/**
+ * 고아 격리의 결과(cr T-1) — **몇 개를 태웠는가**와 **임대를 아직 쥐고 있는가**는 다른 축이다.
+ * 계수만 돌려주면 「n 개를 태우고 멈췄다」와 「n 개가 전부였다」를 호출부가 가를 수 없다.
+ */
+private data class OrphanIsolation(
+    val isolated: Int,
+    val leaseHeld: Boolean,
+)
 
 /**
  * 아직 아무 행도 집지 않은 상태의 임대 상실 — 처분 계수가 전부 0 이고 `orphansIsolated` 만

@@ -97,6 +97,42 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
     }
 
     /**
+     * **cr T-1 의 회귀 test** — 고아를 태우는 **도중**에 임대 연결이 끊기면 격리가 멈추고 남은
+     * `CLAIMED` 가 보존된다.
+     *
+     * 왜 실 DB 가 필요한가: fake 쪽은 「guard 가 거짓을 답하면 멈춘다」를 재고, 여기서는 **서버가
+     * 실제로 잠금을 놓은 뒤** 그 다음 질의가 어떻게 되는지를 잰다. 끊기면 `stillHolding` 의
+     * `SELECT 1` 이 던지고 `PostgresAdvisoryLockLease` 가 그것을 `false` 로 값화한다 — 그 사슬이
+     * 끊어지면(예: 예외를 올리면) 이 test 는 `LeaseLost` 대신 예외를 본다.
+     *
+     * 끊는 시점은 **순번이 아니라 사건**이다(`CrashAfterDispatch` 와 같은 이유) — 「`ISOLATED`
+     * 행이 하나 생겼다」가 조건이라, 경계 호출 수가 바뀌어도 이 test 는 같은 자리를 잡는다.
+     */
+    @Test
+    fun `고아를 태우는 도중 임대가 끊기면 격리가 멈추고 남은 CLAIMED 가 보존된다`() {
+        insertPendingNotificationRow(dataSource(), "burn-1")
+        forceOutboxState(dataSource(), "burn-1", "CLAIMED")
+        insertPendingNotificationRow(dataSource(), "burn-2")
+        forceOutboxState(dataSource(), "burn-2", "CLAIMED")
+
+        val harness =
+            RelayHarness(
+                dataSource(),
+                transactionsFor = { boundary ->
+                    TerminateLeaseAfterFirstIsolation(ConsumerTransactions(boundary), dataSource())
+                },
+            )
+
+        val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.LeaseLost>()
+
+        report.partial.orphansIsolated shouldBe 1
+        report.partial.claimed shouldBe 0
+        harness.sender.sentKeys().shouldBeEmpty()
+        // 하나만 태워지고 하나는 `CLAIMED` 에 남았다 — 다음 run 의 고아 격리가 받는다.
+        outboxStateCounts(dataSource()) shouldBe mapOf("ISOLATED" to 1, "CLAIMED" to 1)
+    }
+
+    /**
      * 임대를 **잃지 않은** run 의 대조 — 같은 harness 로 두 행을 끝까지 돈다. 이 대조가 없으면
      * 위 test 가 「두 행을 못 돌리는 구현」에서도 초록이다.
      */
@@ -111,6 +147,28 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         report.claimed shouldBe 2
         report.delivered shouldBe 2
         outboxStateCounts(dataSource()) shouldBe mapOf("DELIVERED" to 2)
+    }
+}
+
+/**
+ * `ISOLATED` 행이 **하나 생긴** 뒤 첫 경계 호출에서 임대 백엔드를 끊는다 — 그 다음 고아의
+ * 격리 전 임대 확인이 거짓을 받는다(cr T-1).
+ *
+ * 경계 **뒤**에 끊는다(`delegate` 를 먼저 부른다) — 앞에서 끊으면 그 격리 자체가 끊긴 연결로
+ * 들어간다. 조건이 순번이 아니라 상태이므로 경계 호출 수가 바뀌어도 자리가 밀리지 않는다.
+ */
+private class TerminateLeaseAfterFirstIsolation(
+    private val delegate: ConsumerTransactionPort,
+    private val dataSource: DataSource,
+) : ConsumerTransactionPort {
+    private var terminated = false
+
+    override fun <T> inTransaction(block: () -> T): T {
+        val result = delegate.inTransaction(block)
+        if (!terminated && outboxStateCounts(dataSource)["ISOLATED"] == 1) {
+            terminated = terminateLeaseBackend(dataSource)
+        }
+        return result
     }
 }
 

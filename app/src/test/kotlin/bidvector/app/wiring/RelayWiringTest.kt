@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.app.relay.NotificationRelayRunner
+import com.tngtech.archunit.core.importer.ClassFileImporter
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -12,6 +13,12 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/** 기동 거부 판정 함수의 파일 facade — 배선이 이것을 참조하지 않으면 함수를 지나지 않는다. */
+private const val BOOT_DECISION_FACADE = "bidvector.app.relay.RelayBootDecisionKt"
+
+/** 옛 술어가 상수를 읽던 열거 — 그 접근이 있으면 이름 술어로 되돌아간 것이다. */
+private const val RUNTIME_ENVIRONMENT = "bidvector.workflow.notification.RuntimeEnvironment"
 
 /**
  * D-6F10-18 ⑧·D-6F10-20 — relay 배선의 켜짐 조건과 기동 실패.
@@ -117,8 +124,12 @@ class RelayWiringTest {
     /**
      * **거부 술어가 enum 이름에 묶이지 않았다는 증거**(cr G-1) — 정책표에서 `Live` 가 아닌 환경
      * 셋은 전부 통과한다. 앞 판의 `environment != Production` 과 지금의 술어는 **오늘 같은
-     * 답**을 내므로, 이 test 만으로는 둘을 가를 수 없다. 가르는 것은 아래 「정책표가 바뀌면」
-     * test 다 — 그쪽이 변이 실측의 자리다.
+     * 답**을 내므로 이 test 만으로는 둘을 가를 수 없다.
+     *
+     * 가르는 것은 둘이다(cr T-3 로 문면 정정 — 앞 판은 이 파일에 없는 test 를 「아래」라고
+     * 가리켰다): **`bidvector.app.relay.RelayBootDecisionTest`** 가 정책표를 바꿔 넣어 순수
+     * 함수를 직접 치고, 아래 「배선은 판정 함수를 지난다」가 **이 배선이 그 함수를 실제로
+     * 부르는지**를 구조로 잠근다. 이 test 의 몫은 「오늘의 답이 맞다」뿐이다.
      */
     @Test
     fun `Live 가 아닌 환경 셋은 기동한다`() {
@@ -127,6 +138,38 @@ class RelayWiringTest {
                 booted.failure shouldBe null
             }
         }
+    }
+
+    /**
+     * **R3-M-1** — 배선이 판정 함수를 **부른다**는 것을 바이트코드로 잠근다.
+     *
+     * 왜 거동으로 재지 않는가: 거동으로 가르려면 정책표를 주입 가능하게 해야 하고, 그러면
+     * **운영 배선이 표를 밖에서 받는** 구조가 된다 — 기동 거부의 입력을 호출자가 고를 수 있게
+     * 만드는 것은 그 거부가 막으려는 것과 같은 축이다. 표는 코드 안의 승인된 값으로 남기고,
+     * 「그 표를 읽는 함수를 지나는가」만 구조로 묻는다.
+     *
+     * 무엇이 이 단언을 붉히는가: `relayBootDecision` 호출을 지우고 `environment !=
+     * RuntimeEnvironment.Production` 으로 되돌리면 ⓐ 함수 facade 의존이 사라지고 ⓑ 그 enum
+     * 상수 접근이 생긴다 — **둘 다** 잰다. 어느 하나만 재면 「둘을 함께 둔 채 옛 술어로
+     * 판정하는」 모양이 빠져나간다.
+     *
+     * 이 단언이 못 보는 것: 함수를 부르고 그 결과를 **버리는** 모양. 그 자리는 위의 거부
+     * test(`Production` 기동 실패)가 든다 — 함수 결과를 쓰지 않으면 거부가 사라져 그쪽이
+     * 붉는다. 둘이 짝이다.
+     */
+    @Test
+    fun `배선은 판정 함수를 지난다 — 옛 이름 술어로 되돌리면 붉는다`() {
+        val wiring =
+            ClassFileImporter()
+                .importClasses(RelayWiring::class.java)
+                .single()
+        val referenced = wiring.directDependenciesFromSelf.map { it.targetClass.fullName }.toSet()
+
+        referenced.contains(BOOT_DECISION_FACADE) shouldBe true
+        // 옛 술어는 enum 상수를 **이름으로** 읽는다 — 그 접근이 있으면 되돌아간 것이다.
+        wiring.fieldAccessesFromSelf
+            .filter { it.targetOwner.fullName == RUNTIME_ENVIRONMENT }
+            .map { it.name } shouldBe emptyList()
     }
 
     @Test
