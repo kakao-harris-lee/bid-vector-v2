@@ -1,116 +1,120 @@
 # M6/6E-1 — rollback 절차와 실측
 
-실측 HEAD: `4a8600a5` · base: `80dc33b3`
+실측 HEAD: `24bdc8bd` · base: `80dc33b3` · **수정 라운드 1** 반영.
 
-되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 이 레인이 되돌리는 것은 다섯 — 신설 넷
-(runbook 하나 + evidence 셋)과 공유 파일 **하나**(`.github/workflows/ci.yml`)다.
+되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 여덟이다 — **신설 여섯**(runbook · C-1 · C-6 ·
+C-7 · evidence 둘)과 **공유 파일 둘**(`.github/workflows/ci.yml` · `milestone-6.md`).
 
-**되돌리지 않는 것을 선언한다.** 같은 브랜치의 `milestone-6.md`·`reports/evidence/m6/6e1/scope.md`
-(팀장 레인)·`docs/discovery/legacy-v2-differences.md`(C-6, 팀장)·
-`reports/evidence/m6/6e1/ledger-constraint-trace.md`(C-7, 다른 레인)는 **이 레인 소유가 아니다**.
-절차는 그 넷을 건드리지 않고 ③ 의 확인이 그것들이 **남아 있음**을 함께 잰다.
+**r1 이 넓힌 것**(verifier r1 R1-L-1): 앞 판은 C-6(`docs/discovery/legacy-v2-differences.md`)·C-7
+(`reports/evidence/m6/6e1/ledger-constraint-trace.md`)·`milestone-6.md` 를 「되돌리지 않음」으로 선언만 하고
+절차를 두지 않았다. 그래서 ⓪ 의 `covered` 집합이 그 셋에 대해 **동어반복으로** 닫혔고 slice 단위 되돌림이
+산출물 둘을 빠뜨렸다. 셋을 전부 대상으로 올렸다 — **커밋 주체가 팀장·다른 레인이어도 되돌림 절차는 레인
+문서가 든다.**
 
-**`rollback.md` 자신은 복원 목록에 없다** — 자기를 지우는 목록을 들면 되돌림 **대상이 라운드마다
-움직여** 「실측 뒤에 대상이 움직였는가」 확인이 영원히 깨진다. 그래서 이 문서는 대상에서 빠지고,
-되돌린 뒤에도 남는다(아래 ③ 실측이 그 사실을 적는다). 되돌림의 뜻은 「이 slice 의 **산출물**을 base 로
-되돌린다」이고 이 문서는 그 절차서다.
+**대상에서 빠지는 둘을 선언한다.**
+- `reports/evidence/m6/6e1/scope.md` — 팀장 소유 **계약 문서**다. 되돌림은 산출물을 base 로 되돌리는 일이고
+  계약은 그 되돌림을 지시하는 자리라, 계약을 함께 지우면 되돌림의 근거가 사라진다.
+- `reports/evidence/m6/6e1/rollback.md`(이 문서) — 자기를 지우는 목록을 들면 되돌림 **대상이 라운드마다
+  움직여** 「실측 뒤 대상이 움직였는가」 확인이 영원히 깨진다.
 
-**실측 HEAD 를 `4a8600a5` 로 잡은 근거**: 그 자리가 **이 문서 직전의 마지막 커밋**이고, 산출물 셋
-(runbook · `acceptance-trace.md` · `ci.yml`)은 그보다 앞(`bf5850b2`·`2df1da3b`)에서 멈춰 있다. 그 뒤에
-움직이는 경로는 `rollback.md` **하나뿐**이고 그것은 대상이 아니므로
-`git diff --name-only 4a8600a5..<판정 SHA> -- <대상 다섯>` 이 **빈 출력**이다 — 이것이 verifier 가 보는
+**실측 HEAD 를 `24bdc8bd` 로 잡은 근거**: 그 자리가 **이 문서 직전의 마지막 커밋**이고 산출물·공유 파일의
+변경은 그보다 앞에서 멈춘다(runbook `57c571a7` · C-1 `427532a7` · `ci.yml` `1dacc5d7` · C-6·C-7 `b0df65c6` ·
+evidence 둘 `24bdc8bd`). 그 뒤에 움직이는 경로는 `rollback.md` 하나뿐이고 대상이 아니므로
+`git diff --name-only 24bdc8bd..<판정 SHA> -- <대상 여덟>` 이 **빈 출력**이다 — 이것이 verifier 가 보는
 등식이다(「실측 HEAD == 판정 SHA」가 아니다).
 
 ## ⓪ 복원 목록 — 기계 산출과 양방향 등식
 
 ```sh
 BASE=80dc33b3
-IN="docs/runbook/m6-6e-operations.md .github/workflows/ci.yml \
+IN="docs/runbook/m6-6e-operations.md docs/discovery/legacy-v2-differences.md \
+    .github/workflows/ci.yml milestone-6.md \
     reports/evidence/m6/6e1/acceptance-trace.md reports/evidence/m6/6e1/checklist.md \
-    reports/evidence/m6/6e1/commands.md"
+    reports/evidence/m6/6e1/commands.md reports/evidence/m6/6e1/ledger-constraint-trace.md"
 git diff --name-status $BASE..HEAD -- $IN
 git diff --name-only $BASE..HEAD | sort > all.txt
-git diff --name-only $BASE..HEAD -- $IN milestone-6.md \
-    docs/discovery/legacy-v2-differences.md reports/evidence/m6/6e1 | sort > covered.txt
+git diff --name-only $BASE..HEAD -- $IN reports/evidence/m6/6e1 | sort > covered.txt
 comm -23 all.txt covered.txt    # 전체 ∖ 덮개 — 빈 출력
 comm -13 all.txt covered.txt    # 덮개 ∖ 전체 — 빈 출력
 ```
 
-산출: `A` **4건**(runbook · `acceptance-trace.md` · `checklist.md` · `commands.md`) ·
-`M` **1건**(`ci.yml`). `comm` **양쪽 다 빈 출력**이다.
+산출: `A` **6건** · `M` **2건**. `comm` **양쪽 다 빈 출력**이다. `covered` 가 `IN` 에 더하는 것은
+`reports/evidence/m6/6e1` 하나이고 그 안의 비대상은 위에 선언한 둘(`scope.md`·`rollback.md`)뿐이다 —
+**그 둘 말고는 덮개가 대상과 같다**(앞 판처럼 「되돌리지 않음」 선언으로 셋을 더 덮지 않는다).
 
-**재산출 자리는 `4a8600a5`** 이고 라운드마다 다시 돌린다 — 목록을 문서에 박지 않는다.
+**재산출 자리는 `24bdc8bd`** 이고 라운드마다 다시 돌린다 — 목록을 문서에 박지 않는다.
 
 ## 공유 파일의 hunk 출처 — `git log` 산출, `--no-merges`
 
 ```sh
-git log --no-merges --format=%h $BASE..HEAD -- .github/workflows/ci.yml
+for f in .github/workflows/ci.yml milestone-6.md; do
+  echo "-- $f"; git log --no-merges --format=%h $BASE..HEAD -- "$f"
+done
 ```
 
-산출은 **한 건**(`2df1da3b`)이다. `--no-merges` 가 필요한 이유: range 에 `main` 병합 커밋이 들어오면
-`git diff <sha>~1..<sha>` 가 그 커밋에서 엉뚱한 범위를 낸다(6F-10 교훈).
+산출 — `ci.yml` **둘**(`1dacc5d7` · `2df1da3b`) · `milestone-6.md` **하나**(`89a0d8fc`).
+`--no-merges` 가 필요한 이유: range 에 `main` 병합 커밋이 들어오면 `git diff <sha>~1..<sha>` 가 그
+커밋에서 엉뚱한 범위를 낸다(6F-10 교훈).
 
 ## 되돌림 절차
 
-1. **신설 4건 제거** — base 에 없던 경로라 `git restore --source` 의 대상이 아니다.
+1. **신설 6건 제거** — base 에 없던 경로라 `git restore --source` 의 대상이 아니다.
 
 ```sh
-git rm -f -- docs/runbook/m6-6e-operations.md \
-  reports/evidence/m6/6e1/acceptance-trace.md \
-  reports/evidence/m6/6e1/checklist.md \
-  reports/evidence/m6/6e1/commands.md
+git rm -f -- docs/runbook/m6-6e-operations.md docs/discovery/legacy-v2-differences.md \
+  reports/evidence/m6/6e1/acceptance-trace.md reports/evidence/m6/6e1/checklist.md \
+  reports/evidence/m6/6e1/commands.md reports/evidence/m6/6e1/ledger-constraint-trace.md
 ```
 
-2. **공유 파일 `ci.yml` — 커밋 해시 hunk 격리.** 파일 전체 복원을 쓰지 않는다(다른 slice 의 줄이
-   함께 사라진다).
+2. **공유 파일 둘 — 커밋 해시 hunk 격리.** 파일 전체 복원을 쓰지 않는다(다른 slice 의 줄이 함께 사라진다).
+   `ci.yml` 은 커밋이 둘이므로 **새것부터 역순으로** 역적용한다 — 반대로 하면 뒤 커밋이 앞 커밋의 줄을
+   고친 자리에서 패치가 거부된다.
 
 ```sh
-git diff 2df1da3b~1..2df1da3b -- .github/workflows/ci.yml | git apply -R
+git diff 1dacc5d7~1..1dacc5d7 -- .github/workflows/ci.yml | git apply -R   # r1 수정분
+git diff 2df1da3b~1..2df1da3b -- .github/workflows/ci.yml | git apply -R   # G-4 블록 신설분
+git diff 89a0d8fc~1..89a0d8fc -- milestone-6.md          | git apply -R   # 6E 분할·착수 문단
 ```
 
-**`--3way` 도 자동 해소에 실패할 수 있으므로 수동 절차를 미리 적는다.** 위 역적용이 거부되면
-(`error: patch failed`), 그 뒤에 `ci.yml` 의 그 자리를 다른 커밋이 건드린 것이다 — 그때는 ① `git log
---no-merges -p -- .github/workflows/ci.yml` 로 `2df1da3b` 이후의 커밋을 찾고 ② G-4 블록의 경계 두 줄
-(`# M6/6E-1 G-4 —` 로 시작하는 주석 줄과 `dry-run 왕복 통과 —` 를 내는 `echo` 줄)을 눈으로 찾아 그
-사이 **55 줄을 손으로 지운다** ③ 지운 뒤 아래 ③ 의 blob SHA 대조로 갈음한다. 줄 수는 `git diff
---numstat 2df1da3b~1..2df1da3b -- .github/workflows/ci.yml` 가 낸 값(`55 0`)이다.
+**`--3way` 도 자동 해소에 실패할 수 있으므로 수동 절차를 미리 적는다.** 역적용이 거부되면
+(`error: patch failed`) 그 뒤에 같은 자리를 다른 커밋이 건드린 것이다 — 그때는 ① `git log --no-merges -p`
+로 그 파일의 이후 커밋을 찾고 ② 경계를 눈으로 잡아 손으로 지운다. `ci.yml` 의 G-4 블록 경계는
+`# M6/6E-1 G-4 —` 로 시작하는 주석 줄과 `dry-run 왕복 통과 —` 를 내는 `echo` 줄이고, `milestone-6.md` 의
+경계는 「Slice 6E」 절의 6E-1 착수 문단이다. ③ 지운 뒤 아래 ③ 의 blob SHA 대조로 갈음한다. 줄 수는
+`git diff --numstat <sha>~1..<sha> -- <파일>` 가 낸다.
 
 3. **확인은 둘 다** — 「내 줄 사라짐」과 「남의 줄 남음」.
 
 ```sh
-git add -A -- .github/workflows/ci.yml
-git diff --cached --name-only 80dc33b3 -- <IN 다섯>         # 빈 출력
-git rev-parse 80dc33b3:.github/workflows/ci.yml             # base blob
-git hash-object .github/workflows/ci.yml                    # 복원 blob — 위와 같아야 한다
-ls docs/discovery/legacy-v2-differences.md reports/evidence/m6/6e1/scope.md \
-   reports/evidence/m6/6e1/ledger-constraint-trace.md milestone-6.md   # 넷 다 남아 있어야 한다
+git add -A -- .github/workflows/ci.yml milestone-6.md
+git diff --cached --name-only 80dc33b3 -- $IN                 # 빈 출력
+git rev-parse 80dc33b3:.github/workflows/ci.yml; git hash-object .github/workflows/ci.yml   # 같아야 한다
+git rev-parse 80dc33b3:milestone-6.md;          git hash-object milestone-6.md              # 같아야 한다
+ls reports/evidence/m6/6e1/                                   # scope.md · rollback.md 둘만 남아야 한다
 ```
 
 ## 실측 — 버릴 clone 에서 (①~⑥)
 
 ```sh
-git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로> && git checkout -q 4a8600a5
+git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로> && git checkout -q 24bdc8bd
 ```
 
 | # | 무엇 | 결과 |
 |---|---|---|
-| **①** | 신설 4건 제거 명령 | **exit 0** · 삭제 **4** |
-| **②** | `ci.yml` hunk 역적용(`2df1da3b` 격리) | **exit 0** — 거부 없음, 수동 경로 불필요 |
-| **③** | base 대조 · **트리 동일성** · 남의 줄 | **빈 출력** · base blob `279b64f3` == 복원 blob `279b64f3` · 신설 넷 전부 **없음** · 다른 레인 산출물 넷(`legacy-v2-differences.md`·`scope.md`·`ledger-constraint-trace.md`·`milestone-6.md`) 전부 **남음** · 되돌린 `reports/evidence/m6/6e1/` 에 남는 것은 `scope.md`·`ledger-constraint-trace.md`·`rollback.md` 셋(설계대로) |
-| **④** | compile(`compileKotlin compileTestKotlin`) | **exit 0** (16s) |
-| **⑤** | test | **exit 0** — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4 |
-| **⑥** | 게이트(`check` · `qualityBaseline`) | **exit 0** (`check` 9m 18s · `qualityBaseline` 별도 exit 0 · `leakPatternGate` 가 캐시 표시 없이 **실행 1회** — 되돌린 뒤 남는 `rollback.md` 를 스캔하고도 초록) |
+| **⓪** | 복원 목록 기계 산출 · `comm` 양방향 | **`A` 6 · `M` 2** · 양쪽 다 빈 출력 |
+| **①** | 신설 6건 제거 명령 | **exit 0** · 삭제 **6** |
+| **②** | hunk 역적용 셋(`ci.yml` 둘 역순 · `milestone-6.md` 하나) | **전부 exit 0** — 거부 없음, 수동 경로 불필요 |
+| **③** | base 대조 · **트리 동일성** 둘 · 남의 줄 | **빈 출력** · `ci.yml` base `279b64f3` == 복원 `279b64f3` · `milestone-6.md` base `fc163048` == 복원 `fc163048` · 되돌린 evidence 디렉터리에 `scope.md`·`rollback.md` 둘만 남음 |
+| **④** | compile | **미실측(호스트)** — `commands.md` 「호스트」 절, swap free 1,421 MB < 1.5 GB |
+| **⑤** | test | **미실측(호스트)** |
+| **⑥** | 게이트(`check` · `qualityBaseline`) | **미실측(호스트)** |
 
-**갈음은 「HEAD 초록」이 아니라 트리 동일성으로 했고, 그 위에서 ④~⑥ 을 실제로 돌렸다.** ③ 의 blob
-SHA 대조가 되돌린 `ci.yml` 이 base 와 **바이트 동일**함을 보이고, ④~⑥ 은 그 트리에서 **직접 실행**한
-결과다 — 예측으로 대신하지 않았다.
+**r0 에서는 ④~⑥ 을 돌렸고 전부 exit 0 이었다**(compile · test 350 클래스/2817 · `check` 9m 18s +
+`qualityBaseline`, `leakPatternGate` 실행 1회). **그 결과로 r1 을 갈음하지 않는다** — r1 의 되돌림 목록이
+둘(C-6·C-7) 늘고 공유 파일이 하나(`milestone-6.md`) 늘었으므로 되돌린 트리가 r0 의 그것과 다르다.
+갈음은 「HEAD 초록」으로도, 「앞 라운드 초록」으로도 하지 않는다.
 
-되돌린 트리의 test 수는 되돌리지 않은 트리와 **같다**(350 클래스 · 2817 test). 이 slice 가 더한 것이
-문서 넷과 CI step 하나뿐이고 Kotlin 소스·build 파일·`config/quality` diff 가 **0** 이기 때문이다
-(`checklist.md` 자기 점검). 그래서 ④~⑥ 의 유일한 위험원은 `ci.yml` 이었고, 그 파일의 되돌림은 ③ 에서
-바이트 동일로 확인됐다.
-
-**실측 자리**: 버릴 clone 을 새로 떠서(`--no-hardlinks`) `4a8600a5` 를 체크아웃하고 ①~③ 을 적용한 뒤
-그 트리에서 ④~⑥ 을 돌렸다 — 앞 라운드의 clone 을 재사용하지 않았다. 앞 라운드(`9634498d`)에서도 같은
-①~⑥ 이 전부 exit 0 이었고, 두 트리는 `rollback.md` 한 파일만 다르다(`git write-tree` 로 확인) —
-그 파일이 대상에서 빠지기 때문이고, ⑥ 이 그 상태에서도 초록임을 위 표가 잰다.
+**그래도 ③ 이 주는 것**: 두 공유 파일이 base 와 **바이트 동일**하고 제거 대상 여섯이 전부 문서다 —
+Kotlin·Python 소스·build 파일·`config/quality` diff **0**(`checklist.md` 자기 점검). 그래서 ④~⑥ 의
+위험원은 공유 파일 둘이고, 그 둘의 되돌림은 바이트 동일로 확인됐다. **이것은 예측이고 실행이 아니다** —
+호스트 문턱이 열리면 같은 clone 에서 셋을 돌려 이 표를 채운다.
