@@ -1,17 +1,29 @@
 # M6/6E-1 — 실행 명령과 실측 (구현 레인)
 
-base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · 이 레인의 마지막 산출물 커밋 `bf5850b2`
-(공유 파일 `ci.yml` 은 `2df1da3b`).
+base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · **수정 라운드 1**(D-6E1-9) 뒤.
+이 레인의 산출물 커밋 — runbook `57c571a7` · C-1 `427532a7` · `ci.yml` `2df1da3b`+`1dacc5d7`(공유) ·
+C-6·C-7 `b0df65c6`.
 
 ## acceptance — CI 워크플로 job 명령 그대로
 
-| 명령 | 문면 | 결과 |
-|---|---|---|
-| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | **exit 0** (9m 42s) |
-| `./gradlew --no-daemon qualityBaseline` | 같은 job | **exit 0** (13s) |
-| `container` job 로컬 재현(S-21a~S-25) | G-4 가 `ci.yml` 을 바꾸므로 그 job 의 `run` 블록을 순서대로 | **전 step exit 0** |
+| 명령 | 문면 | r0 결과 | **r1 결과** |
+|---|---|---|---|
+| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | exit 0 (9m 42s) | **미실측(호스트)** |
+| `./gradlew --no-daemon qualityBaseline` | 같은 job | exit 0 (13s) | **미실측(호스트)** |
+| `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 순서대로 | 전 step exit 0 | **미실측(호스트)** |
 
-`check` 의 핵심 결과 한 줄 — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4
+**r1 미실측 사유**: 빌드 전 3단 점검(별도 호출)에서 available **14.2 GB**(통과) · 활성 Gradle **0**(통과) ·
+**Swap free 1,421 MB** 가 계약 `D-6E1-4` 의 1회 예외 문턱 1.5 GB **미달**이다. 세 차례 재확인에도 회복이
+없었고(swap 을 쥔 것은 빌드가 아니라 상주 서비스다 — 아래 「호스트」), 계약이 **「미달이면 「미실측」으로
+적고 보고한다」** 를 지시한다. 팀장이 호스트 회복 뒤 verifier 표적으로 돌린다.
+
+**r1 이 바꾼 것과 acceptance 의 관계**: 이 라운드의 diff 는 **문서 넷과 `ci.yml` 의 주석·셸 단언**이다.
+Kotlin·Python 소스·build 파일·`config/quality` diff **0** 이므로 `check` 의 test 결과를 움직일 입력이
+없고, `check` 안에서 이 라운드에 닿는 것은 **evidence 를 훑는 `leakPatternGate`** 하나다 — 그 축은 참조형
+자기 점검으로 매치 0 을 실측했다(아래 「비밀값·좌표 자기 점검」). `ci.yml` 축은 container job 이 정본이고
+그것이 미실측이다 — **r0 의 초록으로 갈음하지 않는다.**
+
+**r0 `check` 의 핵심 결과 한 줄**(참고 — 판정 SHA 가 다르다) — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4
 (`adapters` 137/900 · `app` 62/562 · `workflow` 51/425 · `build-logic` 27/279 · `procurement` 33/263 ·
 `decision` 24/184 · `shared-kernel` 8/89 · `strategy` 6/84 · `qualification` 2/31). e2e 는 기본 `check`
 안에서 돌았다(`adapters.e2e` 결과 파일 **7**) — 조건 애노테이션도 `Test.filter` 제외도 쓰지 않았고 이
@@ -55,32 +67,27 @@ S-23c 는 **G-4 가 전략을 한 번 더 쓴 뒤에도** 통과했다 — 리�
 **S-20(Python) 생략 사유**: Python 무변경 — Python 절반은 CI `ml-engine` job 이 정본이다(6D-1·6B-2·6D-2 와
 같은 처분).
 
-### 호스트 — 3단 점검과 1회 예외 (계약 r2 `D-6E1-4`)
+### 호스트 — 3단 점검과 1회 예외 (계약 `D-6E1-4`)
 
 빌드·컨테이너 job 전마다 **별도 호출 셋**으로 돌렸다(`pgrep` · `free -m` · `ps … --sort=-rss`).
 
-착수 시점의 실측이 `swap free 1.58 GB` 로 계약 `D-6E1-3` 의 2 GB 문턱 미달이었고, **swap 을 쥔 것이
-빌드가 아니라 상주 서비스**임을 per-process `VmSwap` 으로 확인했다(상위 여덟이 전부 상주 프로세스이고
-다른 프로젝트의 유휴 Gradle·Kotlin daemon 은 그 목록에 없다 — RAM 만 쥔다). 유휴 프로세스는 자기 swap
-페이지를 되불러오지 않아 **기다려도 문턱에 닿지 않으므로** waiter 를 취소하고 보고했다.
+| 라운드 | 시점 | available | swap free | 활성 Gradle | 판정 |
+|---|---|---|---|---|---|
+| r0 | `check` 전 | 14.2 GB | 1,599 MB | 0 | 진행 |
+| r0 | `qualityBaseline` 전 | 13.4 GB | 1,678 MB | 0 | 진행 |
+| r0 | container 앞·뒤 구간 전 | 13.3 GB | 1,682 / 1,684 MB | 0 | 진행 |
+| r0 | rollback ④~⑥ 전 | 13.2 GB | 1,685 MB | 0 | 진행 |
+| **r1** | 수정 뒤 재실측 전 | **14.2 GB** | **1,421 MB** | **0** | **보류 — 1.5 GB 미달** |
 
-**사용자 결정으로 이 slice 한정 1회 예외**(`D-6E1-4`): available ≥ 6 GB **그리고** swap free ≥ 1.5 GB
-면 Gradle·container job 을 **하나씩** 허용, swap free 1 GB 아래면 즉시 중단·보고.
+**swap 을 쥔 것은 빌드가 아니라 상주 서비스다** — per-process `VmSwap` 상위 여덟이 전부 상주 프로세스이고
+(MB 단위 558 · 497 · 411 · 211 · 204 · 175 · 169 · 151) 다른 프로젝트의 유휴 Gradle·Kotlin daemon 은 그
+목록에 없다(RAM 만 쥔다). 유휴 프로세스는 자기 swap 페이지를 되불러오지 않아 **기다려도 문턱에 닿지
+않는다** — r0 에서 waiter 를 걸었다가 그 사실을 확인하고 취소했다. **1회 예외를 레인이 또 낮춰 적용하지
+않았다**(1.5 GB 는 사용자 결정이고 1,421 MB 는 그 아래다).
 
-| 빌드 전 점검 | available | swap free | 활성 Gradle | 판정 |
-|---|---|---|---|---|
-| ① `check` | 14.2 GB | 1,599 MB | 0 | 진행 |
-| ② `qualityBaseline` | 13.4 GB | 1,678 MB | 0(남은 것은 내 `check` 의 TestKit daemon) | 진행 |
-| ③ container job 앞 구간 | 13.3 GB | 1,682 MB | 0 | 진행 |
-| ③ container job 뒤 구간 | 13.3 GB | 1,684 MB | 0 | 진행 |
-| rollback ④~⑥ | 13.2 GB | 1,685 MB | 0 | 진행 |
-
-**swap free 는 전 구간 1,599~1,686 MB 로 1 GB 중단 문턱에 닿지 않았다**(최저 1,599 MB). 무거운 작업은
-**항상 하나씩** 돌렸고 foreground 로만 띄웠다.
-
-**남은 Gradle daemon**: `check` 가 띄운 하나뿐이고(build-logic TestKit 의 계약 게이트 결정성 test 가
-띄운다 — `PWD` 가 `/tmp/bidvector-contract-gate-determinism…`) 그 **PID 만** 멈췄다.
-`./gradlew --stop` 은 쓰지 않았다.
+**남은 Gradle daemon**: r0 의 `check` 가 띄운 하나(build-logic TestKit 의 계약 게이트 결정성 test —
+`PWD` 가 `/tmp/bidvector-contract-gate-determinism…`)를 **그 PID 만** 멈췄다. `./gradlew --stop` 은 쓰지
+않았다. r1 은 빌드를 돌리지 않아 새로 생긴 daemon 이 없고, 현재 `pgrep` 0 건이다.
 
 **differential / golden**: **N/A** — 문서 + CI step slice 라 산출 데이터가 없다(fixture 변경 0, 골든 변경 0).
 
@@ -188,14 +195,69 @@ eq "E-14 §3.6 outbox 권한 == SELECT·INSERT·UPDATE(DELETE 없음)" "GRANT SE
    "$(grep -hoE 'GRANT [A-Z, ]+ ON outbox TO [a-z_]+' adapters/src/main/resources/db/migration/*.sql | sort -u | tr '\n' ' ')"
 
 # E-15 §4.2 「운영자 경로가 없다」 == 출하 정책의 선택자 고정
-eq "E-15 §4.2 출하 releaseSelector == LatestPromoted(유일)" "LatestPromoted " \
+eq "E-15 §4.1·§4.4 출하 releaseSelector == LatestPromoted(유일)" "LatestPromoted " \
    "$(grep -oE 'releaseSelector = ModelReleaseSelector\.[A-Za-z]+' workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityPolicyData.kt | sed 's/.*\.//' | sort -u | tr '\n' ' ')"
+
+# E-16 §4.2 ② 「승격·demote 연산 0」 — 레지스트리 전수
+reg_promo=$(grep -rniE 'promot|demot' ml-engine/src/ml_engine/registry/ | wc -l | tr -d ' ')
+eq "E-16 §4.2 레지스트리 승격·demote 어휘 == 0" "0" "$reg_promo"
+
+# E-17 §4.2 release_id 규약 == build_derived_release 의 접두사 상수
+pfx=$(grep -oE '_DERIVED_RELEASE_ID_PREFIX = "[^"]+"' ml-engine/src/ml_engine/serving/runtime.py | sed 's/.*"\(.*\)"/\1/')
+doc_pfx=$(awk '/^### 4\.2 /{s=1} /^### 4\.3 /{s=0} s' $RB | grep -oE '`"distribution/" \+ [^`]+`' | sed 's/`"\(distribution\/\)".*/\1/')
+eq "E-17 §4.2 release_id 접두사 문면 == serving 상수" "$pfx" "$doc_pfx"
+
+# E-18 §4.3 비현재 EXACT 거부 == _validate_selector 의 거부 코드 쌍
+rej=$(sed -n '/^def _validate_selector/,/^def _validate_objective/p' ml-engine/src/ml_engine/serving/prediction.py \
+  | grep -oE 'FAILURE_CODE_[A-Z_]+|RELEASE_MISMATCH' | sort -u | tr '\n' ' ')
+doc_rej=$(awk '/^### 4\.3 /{s=1} /^### 4\.4 /{s=0} s' $RB | grep -oE '`(UNSUPPORTED_RELEASE|RELEASE_MISMATCH)`' | tr -d '`' | sort -u | tr '\n' ' ')
+eq "E-18 §4.3 거부 코드 문면 == 실 serving 판정(해당 둘)" \
+   "RELEASE_MISMATCH UNSUPPORTED_RELEASE " "$doc_rej"
+eq "E-18b §4.3 그 둘이 실 serving 거부 집합에 있다" \
+   "FAILURE_CODE_INVALID_REQUEST FAILURE_CODE_UNSUPPORTED_RELEASE RELEASE_MISMATCH " "$rej"
+
+# E-19 §4.4 「정책은 이미지에 구워진다」 — Dockerfile COPY 한 줄 · compose 의 policy 마운트 0
+copy=$(grep -cE '^COPY ml-engine/policy /app/policy$' docker/ml-serving.Dockerfile | tr -d ' ')
+mnt=$(python3 -c "
+import yaml
+v=yaml.safe_load(open('docker/compose.yaml',encoding='utf-8'))['services']['ml-serving'].get('volumes') or []
+print(len(v))")
+eq "E-19 §4.4 정책 COPY 1 · ml-serving 의 volume 마운트 0" "1 0" "$copy $mnt"
+
+# E-20 §4.5 「배포 스크립트가 없다」 == tools/ 전수
+tools=$(ls tools/ | sort | tr '\n' ' ')
+n_tools=$(ls tools/ | wc -l | tr -d ' ')
+doc_n=$(awk '/^### 4\.5 /{s=1} /^## 5\./{s=0} s' $RB | grep -oE '\*\*없다\*\*\(여섯 개|여섯 개 전부' | head -1 | grep -oE '여섯' | wc -l | tr -d ' ')
+eq "E-20a §4.5 tools/ 전수 == 실측 여섯" \
+   "contract-crosslang-smoke.sh db-backup.sh db-rehearsal.sh db-restore.sh image-hygiene-check.sh one-command-check.sh " "$tools"
+eq "E-20b §4.5 문면의 「여섯 개」 == ls tools/ 수" "6 1" "$n_tools $doc_n"
+
+# E-21 C-6 분류 집계·서식 수 == capability-map 실측 (R1-L-2 — C-6 가 「결과는 commands.md 에」라고 가리키는 자리)
+C6=docs/discovery/legacy-v2-differences.md
+cap_tally=$(awk '/^### [A-Z]+-[0-9]+/{c=1;next} /^- \*\*분류\*\*:/{if(c){if($0~/`후속`/)f++; if($0~/`폐기`/)d++; if($0~/`근거 부족`/)i++; c=0}} END{printf "%d %d %d", f+0, d+0, i+0}' docs/discovery/capability-map.md)
+doc_tally=$(awk -F'|' '/^\| `후속`/{gsub(/ /,"",$3); f=$3} /^\| `폐기`/{gsub(/ /,"",$3); d=$3} /^\| `근거 부족`/{gsub(/ /,"",$3); i=$3} END{printf "%d %d %d", f, d, i}' $C6)
+eq "E-21a C-6 §0 분류 집계 == capability-map 분류 줄 실측" "$cap_tally" "$doc_tally"
+bold=$(grep -cE '^- \*\*분류\*\*: \*\*`' docs/discovery/capability-map.md | tr -d ' ')
+eq "E-21b C-6 「굵은 서식 4」 == 실측" "4" "$bold"
+
+# E-22 C-7 행 수·ID 집합·판정 분포 (문서 자신의 명령을 그대로)
+led=$(grep -cE '^### [RP]-[A-Z]+-[0-9]+ ' docs/discovery/regression-ledger.md | tr -d ' ')
+c7=$(grep -cE '^\| [RP]-[A-Z]+-[0-9]+ \|' reports/evidence/m6/6e1/ledger-constraint-trace.md | tr -d ' ')
+eq "E-22a C-7 행 수 == ledger 항목 heading 수" "$led" "$c7"
+idset=$(diff <(grep -oE '^### [RP]-[A-Z]+-[0-9]+' docs/discovery/regression-ledger.md | cut -c5- | sort) \
+             <(grep -oE '^\| [RP]-[A-Z]+-[0-9]+' reports/evidence/m6/6e1/ledger-constraint-trace.md | cut -c3- | sort) | wc -l | tr -d ' ')
+eq "E-22b C-7 ID 집합 == ledger ID 집합(diff 줄 0)" "0" "$idset"
+c7d=$(awk -F'|' '/^\| [RP]-[A-Z]+-[0-9]+ \|/{gsub(/ /,"",$6); print $6}' reports/evidence/m6/6e1/ledger-constraint-trace.md | sort | uniq -c | awk '{printf "%s=%s ", $2, $1}')
+c7h=$(awk -F'|' '/^\| 61 \| 43 \| 18 \|/{gsub(/ /,"",$0); print}' reports/evidence/m6/6e1/ledger-constraint-trace.md | head -1)
+eq "E-22c C-7 판정 분포 == 머리 집계(연결 43 · 미연결 18)" "미연결=18 연결=43 " "$c7d"
+[ -n "$c7h" ] || { printf 'DIFF E-22d C-7 머리 집계 행(61|43|18)을 찾지 못했다\n'; fails=$((fails+1)); }
+[ -n "$c7h" ] && printf 'OK   E-22d C-7 머리 집계 행 실재(61|43|18)\n'
 
 printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || echo 불일치)" "$fails"
 exit $fails
 ```
 
-**결과(2026-10-07, HEAD `bf5850b2`)**: `E-1`~`E-15` **전부 OK · DIFF 0 · exit 0**.
+**결과(r1, HEAD `b0df65c6`)**: `E-1`~`E-22d` **전부 OK · DIFF 0 · exit 0**(단언 **24** 개).
 모집단 실측 — 등재 test **349** · `ci.yml` step **25** · OPEN **298** / C-1 인용 — FQN **120** · step **2**
 · OPEN **20**.
 
@@ -203,22 +265,29 @@ exit $fails
 
 전부 **커밋 뒤**에 돌렸다(미커밋 산출물을 `git checkout --` 로 함께 지우지 않기 위해). 각 변이 전에
 `git diff --numstat` 으로 바뀐 줄 수를 먼저 보고, 뒤에 `git checkout --` 로 복원하고
-`git status --porcelain` 이 빈 출력임을 확인했다.
+`git status --porcelain` 이 빈 출력임을 확인했다. 전부 **더하기가 아니라 바꿔치우기**다.
 
-| # | 변이(더하기가 아니라 **바꿔치우기**) | 기대 | 실측 |
+| # | 변이 | 기대 | 실측 |
 |---|---|---|---|
-| **M1** | C-1 의 ⓐ 식별자 하나를 존재하지 않는 이름으로 교체(`WatchRulesTest` → `WatchRulesNotARealTest`) | E-2 RED | **RED** — `DIFF E-2 미등재 FQN ['bidvector.strategy.WatchRulesNotARealTest']`, exit 1. numstat `1 1` |
-| **M2** | runbook §3.2 의 종료 코드 **한 행 삭제**(`LEASE_BUSY` 3) | E-8 RED | **RED** — 기대 5 값, 실측 4 값, exit 1. numstat `0 1` |
-| **M3** | `ci.yml` 의 G-4 기대 키 한 칸 변경(`bidNowNoticeIds` → `bidNowNoticeIdsX`) | E-13 RED | **RED** — 기대·실측 문자열이 그 한 칸에서 갈림, exit 1. numstat `1 1` |
-| **M4** | G-4 의 기대 응답 코드 **교체**(`200` → `201`, 실패 문면도 같이) | container 스모크 RED | **RED** — `스모크 실패: dry-run 이 201 이 아니다: 200`, step exit 1. numstat `1 1`. 실패 문면이 실제 200 응답 본문을 함께 내고 그 본문의 칸이 **아홉**이며 `maxActiveBids` 가 G-4 가 세운 `5` 다 |
+| **M1** | C-1 의 ⓐ 식별자 하나를 존재하지 않는 이름으로 교체 | E-2 RED | **RED** exit 1 · numstat `1 1` |
+| **M2** | runbook §3.2 의 종료 코드 **한 행 삭제**(`LEASE_BUSY` 3) | E-8 RED | **RED** exit 1 · numstat `0 1` |
+| **M3** | `ci.yml` 의 G-4 기대 키 한 칸 변경 | E-13 RED | **RED** exit 1 · numstat `1 1` |
+| **M4** | G-4 의 기대 응답 코드 교체(`200`→`201`) | container 스모크 RED | **r0 에서 RED**(step exit 1, 실패 문면이 실제 코드를 낸다) · **r1 미실측(호스트)** |
+| **M5** | runbook §4.3 의 거부 코드 문면 교체(`UNSUPPORTED_RELEASE`→`UNSUPPORTED_REQUEST`) | E-18 RED | **RED** exit 1 · numstat `1 1` |
+| **M6** | runbook §4.5 의 「여섯 개 전부」를 「일곱 개 전부」로 | E-20b RED | **RED** exit 1 · numstat `1 1` |
+| **M7** | C-7 의 `R-ASYNC-03` 판정을 「연결」→「미연결」로 | E-22c RED | **RED** exit 1 · numstat `1 1` |
 
-**음성 대조**: M1~M3 을 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이고, M4 를 복원한 뒤
-같은 환경에서 S-23b 를 다시 돌리면 `exit 0` + `dry-run 왕복 통과` 다 — 변이가 게이트를 실제로 움직였고
-복원이 완전했다는 양방향 확인이다.
+**음성 대조**: 여섯(M1·M2·M3·M5·M6·M7)을 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이다 —
+변이가 게이트를 실제로 움직였고 복원이 완전했다.
 
-**M4 가 「더하기」가 아니라 「바꿔치우기」인 근거**: 기대값을 지우거나 단언을 늘린 것이 아니라 그 한
-단언의 기대 코드를 **다른 값으로 교체**했다. 교체 뒤 스모크가 붉어졌으므로 그 단언이 실제로 응답 코드를
-읽고 있고, 통과가 「단언이 없어서」가 아니다.
+**M5·M6·M7 을 r1 에 더한 이유**: verifier r1 R1-H-1 이 지적한 결함 클래스가 「**문면이 코드와 어긋나도
+등식이 잡지 못한다**」였다(앞 판 E-15 는 선택자 상수만 재서 §4 의 산문을 못 봤다). 그래서 새 §4 의 등식을
+**양면 대조**로 만들고(문서에서 뽑은 값 ↔ 코드에서 뽑은 값) 그 양면이 실제로 문면 변이에 반응함을
+M5·M6 으로, C-7 의 집계 축을 M7 로 실측했다.
+
+**E-16·E-19 는 양면이 아니라 코드 쪽 불변식이다** — 문면이 「승격·demote 연산이 **없다**」·「compose 에
+정책 마운트가 **없다**」라고 부재를 주장하므로, 그 부재가 **생기는 날** 게이트가 붉어지는 방향이 맞다.
+부재를 문서에서 뽑아 비교하는 형태는 동어반복이 된다.
 
 ## clean-tree 게이트
 
