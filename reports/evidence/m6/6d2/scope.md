@@ -1,0 +1,106 @@
+# M6/6D-2 — restart 수렴 · redelivery · 재현 등식에 정책·전략 버전 (2026-10-07, 착수 계약 초안, 팀장)
+
+6D 분할(D-6D-1 C-2 (a))이 6F-10 뒤로 넘긴 **test 조립 slice** 다. 6F-10 이 production 으로 낸 relay(`RelayOutboxNotifications` +
+`PostgresAdvisoryLockLease` + `EvaluationCommitRun`)와 넓힌 payload(정책 버전·전략 revision)를 **파이프라인 수준**에서 잇는다 — 6D 다섯 축 중
+③ 「restart 뒤 outbox/inbox 수렴」· ② 의 「broker redelivery」· ⑤ 「동일 input/policy/model version 재현」의 남은 자리. 완료 조건 **3·4·6** 의
+마지막 test-scope 자리.
+
+- base: 이 브랜치가 분기해 나온 **현재** `main` — `git merge-base HEAD origin/main`(고정 SHA 아님, D-6F5-30). 착수 실측값 `f4b4ff91`(PR #63
+  6F-10 머지 커밋). 라운드마다 재산출.
+- 선행: 6D-1(파이프라인 E2E 다섯 · `PipelineAssembly` · 협력자 출처 단언) · 6F-10(production relay · 임대 · 고아 격리 · 어휘 해석표 · payload
+  20 필드 · 커밋 러너) — 전부 `main`.
+- worktree `bid-vector-v2-m6-6d2`, 브랜치 `m6-6d2/2026-10-07`. evidence `reports/evidence/m6/6d2/`(6D-1 의 `6d/` 는 닫힌 evidence —
+  D-6F10-10 선례대로 고치지 않는다). 결정 ID `D-6D2-n`, 운영자 결정 `B-n`.
+- 성격: **production diff 0** 의 test slice(6D-1 D-6D-3 과 같은 규칙). production seam 이 필요해지면 **멈추고 보고**한다.
+- Codex: 없음(test 코드만 — 6D-1 C-5 (a) 와 같은 처분, B-4).
+
+## 수취하는 인계
+
+| 항목 | 출처 | 이 slice 의 처분 |
+|---|---|---|
+| 6D 표 6D-2 행 — 문면은 D-6F10-10 정정본 「claim 중 크래시 → 재기동 → 고아 **격리** → 발송 0 또는 1, **중복 0**(놓침 감수)」 | 6D scope 제안 표 · D-6F10-9/10 | **잰다** — 파이프라인 E2E 에서 production relay 로 (R-1~R-5) |
+| 6D 표 「redelivery(같은 entry 두 번 claim → inbox 가 두 번째를 거부)」 | 6D scope 제안 표 | **정의를 바로잡아 잰다** — 전이표에 `Claimed → Pending` 간선이 없고 claim SQL 이 `WHERE state = 'PENDING'` 이라 **같은 entry 는 두 번 claim 될 수 없다**(구조). redelivery 는 「같은 멱등 키의 **다른 entry**」(D-6F7-6: run 마다 행 하나)가 **재기동을 건너** 두 번째 relay 에 닿는 것이다 — inbox 가 거부한다(SkipDuplicate → DELIVERED, 발송 0) |
+| 6D-1 알려진 제한 「재현 등식에 정책 버전·전략 revision 없음」(C-4) | 6D-1 · 6F-10 ⓓ | **닫는다** — 등식의 typed 형에 두 값을 넣고 전략 revision 음성 대조를 더한다(정책 버전 음성 대조는 B-3) |
+| 6F-10 D-6F10-8 ② 「전략 revision 을 올리면 같은 입력의 payload 가 달라진다」 | 6F-10 | 재현 등식의 **음성 대조 값**으로 쓴다(app 수준 test 가 이미 재는 것을 파이프라인 등식에 넣는다) |
+| 6F-10 교훈 「production 조립을 돌리는 test」·「투영 단계」·「함수는 RED 호출 자리는 초록」 | 6F-10 종결 | 설계 검토 (2) 기본 항목으로 적용(아래 D-6D2-2) |
+| `OPEN-6F10-CLAIM-OBSERVABILITY` · `OPEN-6F10-SCHEDULER` · `OPEN-STR-12` | 6F-10 · M4 | 변경 없음 — 이 slice 는 열을 더하지 않고 실 sender 를 들이지 않는다 |
+| 6D-1 알려진 제한 「rollback 축은 gateway 수준」 | 6D-1 | 변경 없음(이 slice 의 축이 아니다) |
+
+## 착수 실측 (저장소 직접 대조, 2026-10-07)
+
+| 축 | 오늘 저장소 | 6D-2 가 더하는 것 |
+|---|---|---|
+| 고아 격리 | `RelayDatabaseTest` — 상태 **강제** 1행 → 다음 run 격리 · `CrashAfterDispatch` 로 T1·T2 분리(행 CLAIMED 잔류). 파이프라인(수집→평가→outbox)이 만든 행이 아니고 「재기동」 모양도 없다 | 파이프라인이 만든 행 위에서 **죽은 relay → 새 relay** 두 조립으로 격리·발송 계수·수렴 고정점을 잰다 |
+| 임대 | `RelayLeaseLossDatabaseTest` — 임대 연결 절단(`pg_terminate_backend`) 중간 정지 · `PostgresAdvisoryLockLease.withLease` 는 `finally` 에서 unlock + 연결 반납(죽은 relay 의 예외가 임대를 푼다) | 살아 있는 홀더가 있는 동안의 「재기동」은 **Busy** 여야 한다(살아 있는 홀더의 CLAIMED 를 남이 격리하면 안 된다) — R-5 음성 대조 |
+| 키 중복 | `PipelineFailureInjectionE2ETest` — 같은 키 2행을 **한 relay run** 이 집어 발송 1·SkipDuplicate 1 · `RelayVocabularyDatabaseTest` — inbox 선시딩 SkipDuplicate | **재기동을 건너**: run 1 이 키 K 전달(DELIVERED+inbox) → 새 조립 → 재평가가 새 행 K → 새 relay 는 발송 없이 DELIVERED(D-1); DELIVERED/ISOLATED 행은 새 relay 가 집지 않는다(claimed 0, D-2) |
+| 재현 등식 | `PipelineReproducibilityE2ETest` — DB 되읽은 payload **문자열** 집합 등식 + release 음성 대조. 6F-10 이 payload 를 20 필드로 넓혀 정책 버전·전략 revision 이 문자열에 **암묵적으로** 들어 있다. typed 단언 0 · 전략 revision 음성 대조 0(app `EvaluationCommitRunE2ETest` 는 production 커밋 러너의 payload 하나를 비교) · 시딩 revision = **1**(기본값 함정 — 6F-10 checklist 가 실측한 사각) | 등식의 typed 형(두 run 의 `ladderPolicyVersion` == 판정이 쓴 `EVALUATION_LADDER_POLICY_VERSION` · `strategyRevision` == 시딩값, 시딩값은 비기본값) + 전략 revision 음성 대조(release·시각·상관관계 고정) |
+| 정책 버전 음성 대조 | `EVALUATION_LADDER_POLICY_VERSION` 은 `workflow` 상수 — 밖에서 바꿀 자리가 없다 | production seam 없이는 불가 → **B-3** |
+| 발송 뒤·T2 전 크래시 + 재평가 | inbox 는 T2 에서만 기록(D-6F10-3) → 크래시 창에서는 키 중복 제거가 서지 않는다 → 재평가가 만든 같은 키 행이 **다시 발송**된다(at-most-once 의 창) | **실측해 사실로 등재**(B-2) — 「중복 0」은 entry 단위·단일 크래시/재기동 문면이다 |
+| 게이트 | `gate-tests.properties` 모듈별 모집단 == 등재(D-6G2g-10) | 새 test 클래스 전부 등재(추가만) |
+| 호스트 | Gradle daemon 0 · available 14GB · **swap free 1.9GB < 2GB 규칙**(사용자 2026-10-07: 2GB 유지) | 빌드는 swap ≥ 2GB 를 **별도 호출로** 확인한 뒤에만. 미달이면 시작하지 않고 보고 |
+
+## 운영자 결정 — B-1 ~ B-5 (선택지 + 추천; 추천안으로 착수하고 사용자 정정 시 계약을 갱신한다)
+
+- **B-1 「재기동」 모델** — (a) **새 조립 인스턴스**(새 `PipelineAssembly` = 새 lease 세션·새 relay·새 port 인스턴스; 죽은 relay 는 예외로 끝나
+  `withLease` 의 `finally` 가 임대를 푼다 — 프로세스 사망의 in-JVM 등가) + **살아 있는 홀더** 대조(첫 relay 가 배치 중간에서 막힌 동안 둘째 조립의
+  relay → `Skipped(LeaseBusy)`, 상태 분포 불변) · (b) Spring 컨텍스트 두 번 기동(app test — production 조립은 sender 자리지킴이라 발송 자체가 불가,
+  비용만 든다). **추천 (a)**.
+- **B-2 발송 뒤·T2 전 크래시 뒤 재평가의 재발송** — (a) **실측해 알려진 제한으로 등재**(production 무변경; ADR 0005 §7 addendum 에 한 줄 —
+  「inbox 는 전달 뒤에 쓰이므로 전달과 T2 사이의 크래시 창에서는 같은 키의 다음 entry 가 다시 전달된다; at-most-once 가 막는 것은 **entry 의
+  재실행**이지 키의 재발생이 아니다」) · (b) inbox 선기록 — 6D-1 이 좌초·키 소진을 실측한 모양, 불채택 · (c) outbox `idempotency_key` UNIQUE —
+  마이그레이션 + D-6F7-6 번복, 범위 밖. **추천 (a)**.
+- **B-3 정책 버전 음성 대조** — (a) **경계** — 등식의 typed 형에는 넣되(두 run 이 판정이 쓴 그 인스턴스와 같다) 「바꾸면 깨진다」 대조는 production
+  seam 없이 불가하므로 생략하고 알려진 제한으로 등재; 변이(상수 교체 → typed 단언 RED)로 등식이 그 축을 **읽고 있음**은 실측 · (b) 정책 버전
+  주입 seam — (2b) 위반(production 공개 표면). **추천 (a)**.
+- **B-4 Codex** — (a) **없음**(test 코드만; verifier opus + code-reviewer sonnet 병렬) · (b) 탐. **추천 (a)**.
+- **B-5 자리** — (a) **`adapters/src/test/kotlin/bidvector/adapters/e2e/`** 기존 suite 확장(새 클래스 둘 + `PipelineReproducibilityE2ETest` 확장 +
+  `PipelineAssembly`·support 의 test seam) · (b) app. **추천 (a)** — production relay 와 fake sender 가 이미 그 조립에 있다.
+
+## in_scope (초안)
+
+- `adapters/src/test/kotlin/bidvector/adapters/e2e/**`(신설 `PipelineRestartConvergenceE2ETest` · `PipelineRedeliveryE2ETest`, 확장
+  `PipelineReproducibilityE2ETest`·`PipelineAssembly`·`PipelineE2ESupport`·`PipelineFakes`) · `config/quality/gate-tests.properties`(등재 추가만) ·
+  `reports/evidence/m6/6d2/**` · `milestone-6.md`(착수·종결 문단만) · `docs/adr/0005-domain-events-and-outbox.md`(§7 addendum 한 줄, B-2 (a) —
+  공유 파일, 별도 커밋).
+- **out_scope**: production 코드 전부(`*/src/main/**`) · 마이그레이션 · `.github/**` · `docker/**` · Python · 닫힌 evidence(`reports/evidence/m6/6d/**`·
+  `6f10/**`).
+
+## 산출물 (초안 — 설계 검토 D-6D2-2 가 술어를 확정)
+
+| ID | 무엇 | 단언(공허한 초록 불가 — DB 상태·sender 기록) |
+|---|---|---|
+| **R-1** | claim 커밋 뒤·발송 전 크래시 → 재기동 | 고아 ISOLATED 1 · 발송 0 · 알림 종류 PENDING/CLAIMED 0 · inbox 0 |
+| **R-2** | 발송 뒤·T2 전 크래시 → 재기동 → 같은 입력 재평가 → relay | 재기동 run: 고아 ISOLATED 1 · 발송 총 1 · inbox 0. 재평가 뒤: 새 행 DELIVERED · **발송 총 2** · inbox 1 — B-2 의 실측(알려진 제한) |
+| **R-3** | N행 배치 중 k행 처리 뒤 크래시 → 재기동 | DELIVERED k + inbox k · ISOLATED N−k · 발송 k · 재기동 run 의 발송 0 |
+| **R-4** | 수렴 고정점 | 재기동 뒤 한 번 더 재기동 → 보고 전부 0(claimed·orphansIsolated) · 상태 분포 불변 — 「수렴」의 정의 |
+| **R-5** | 살아 있는 홀더 | 첫 relay 가 배치 중간에서 래치로 막힌 동안 둘째 조립 relay → `Skipped(LeaseBusy)` · 첫 relay 의 CLAIMED 가 격리되지 않음 · 풀리면 첫 relay 가 끝까지 전달 |
+| **D-1** | 재기동 건너 redelivery | run 1: 키 K DELIVERED + inbox K → 새 조립 재평가(행 2, 같은 키) → 새 relay: claimed 1 · skippedDuplicates 1 · 발송 0 · DELIVERED 2 · inbox 1 |
+| **D-2** | 같은 entry 재claim 불가 | 종단 행만 있는 상태에서 새 relay → claimed 0 · 상태 분포 불변(구조: 전이표·`WHERE state='PENDING'` — 변이는 verifier) |
+| **P-1** | 등식 typed 형 | 두 run 의 decoded payload: `ladderPolicyVersion == EVALUATION_LADDER_POLICY_VERSION` · `strategyRevision == StrategyRevision(시딩값 ≠ 1)` · 두 run 서로 같음 |
+| **P-2** | 전략 revision 음성 대조 | run 1 → revision 올림 → run 2: payload 집합 2 · 상관관계·시각 집합 1(갈린 축이 revision 임이 분리) · 되돌리면 run 3 == run 1 |
+| **P-3** | 등식 문면 갱신 | `PipelineReproducibilityE2ETest` KDoc 의 「알려진 제한(C-4)」 삭제, 등식의 입력 = 입력 공고 + 정책 버전 + release 다섯 + 전략 revision |
+
+## acceptance (초안)
+
+CI `check` job 명령 그대로 — `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline`. `:adapters:test` 는 `--rerun` 으로 **실제 실행**
+(FROM-CACHE 는 실행 증거가 아니다, 6D-1). **S-20 생략 사유**: Python 무변경(6D-1·6B-2 와 같은 처분, Python 절반은 CI `ml-engine` job 이 정본).
+**container job 생략 사유**: production·docker·CI diff 0. 변이: 축마다 ≥1 — 크래시 주입 제거 → R-1/R-2/R-3 RED · 격리 호출 제거(production,
+verifier 실측) → R-1 RED · SkipDuplicate 판정 제거 → D-1 RED · revision 올림 제거 → P-2 RED · typed 단언의 상수 교체 → P-1 RED · 래치 제거 → R-5
+RED(Busy 가 아니라 격리가 일어난다). 변이 전 커밋, 적용은 `git diff --numstat` 먼저(6F-4). 게이트 결과는 **종료 코드로**(6D-1 교훈).
+
+## rollback (초안)
+
+in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`; 공유 파일(`gate-tests.properties`·`milestone-6.md`·ADR 0005)은 커밋
+해시 hunk(`--no-merges`, 6F-10 교훈). 목록은 실측 HEAD 에서 `git diff --name-status <base>..HEAD` 기계 산출.
+
+## 하네스 레인 변경 (상시)
+
+- (없음 — 착수 시점)
+
+## 계약 갱신 r1 (2026-10-07, 팀장 — 착수 결정 · 설계 검토)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D2-1** | **B-1~B-5 추천안으로 착수**(사용자 부재 중 자율 진행 — 정정 지시가 오면 그 시점 계약 갱신으로 반영): B-1 (a) 새 조립 인스턴스 = 재기동, 살아 있는 홀더는 Busy · B-2 (a) 전달·T2 사이 크래시 뒤 키 재발생은 **실측해 알려진 제한 + ADR 0005 §7 한 줄** · B-3 (a) 정책 버전 음성 대조는 경계(typed 등식 + 상수 교체 변이로 「읽고 있음」만 실측) · B-4 (a) Codex 없음 · B-5 (a) adapters e2e | 팀장 2026-10-07 |
+| **D-6D2-2** | **설계 검토 요지**(`_workspace/m6-6d2/01_design-review.md`, 세션 모델 직접): (0) 경계 — production 조립 기동(6F-10 자리)·실 발송·키 재발생(B-2)·정책 버전 변경(B-3)·OS 사망·임대 밖 동시성은 밖 · (1) 크래시는 **사건**에 걸고(순번 아님) 재기동은 **새 인스턴스 집합**, 수렴은 **고정점**(재재기동 보고 0 + 분포 Map 등식), 발송 계수는 두 조립 sender **합**, 격리는 production 보고 + DB(상태 강제 helper 금지), 재기동 **전** 중간 상태 단언, typed 등식은 저장 타입 읽어 복원·시딩 revision 비기본값, **relay 를 협력자 출처 그래프에 추가** · (2) 우회 12(주입 미호출 · 같은 인스턴스 · 상태 강제 · sender dedup · 무차별 등식 · 같은 참조 · 변이 미적용 · 투영 공백 · 호출 자리 초록 · R-5 교착 · 재기동 run 의 우연한 발송 · B-2 오독) 각각의 닫는 술어 · (2b) production public 표면 0, test seam 은 `PipelineAssembly` 생성자 기본값 production, 크래시 wrapper 는 정직한 조립 그래프에서 비-MAIN 으로 잡혀야 함(「경계로 처리」 행 실측) · (3) 과잉: Spring 두 번·OS kill·UNIQUE·seam; 미달: 로그·단일 run 중복만·CLAIMED 0 정의·revision 1·문자열만 | 설계 검토 |
+| **D-6D2-3** | **production 불변 규칙 + 호스트 규율**: `*/src/main/**`·migration·`.github/**`·`docker/**` diff 0, `internal` 완화 0 — seam 이 필요하면 멈추고 보고. 빌드 전 `pgrep`·`free -m`·`ps` **별도 호출**로 확인, **swap free < 2GB 면 시작하지 않고 보고**(사용자 2026-10-07 결정 — 6F-10 의 1GB 는 1회 예외). 게이트 결과는 종료 코드로, 커밋은 별도 호출로. 변이 전 커밋, 적용은 `git diff --numstat` 먼저. 커밋은 `git add <in_scope 경로>` 개별 인자만 | 6D-1 D-6D-3 · 6F-10 D-6F10-7 · 호스트 규칙 |
