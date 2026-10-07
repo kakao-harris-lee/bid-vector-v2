@@ -27,8 +27,12 @@ import org.junit.jupiter.api.Test
  *
  * **음성 대조는 둘**이다 — release(아래)와 전략 revision(P-2). 정책 버전은 `workflow` 상수라
  * 바꿀 자리가 밖에 없어 「바꾸면 깨진다」를 재지 못한다(B-3 (a), 알려진 제한). 등식이 그 축을
- * **읽고 있음**은 typed 단언이 production 상수 인스턴스와 대조하는 것으로 서고, 그 상수를
- * 바꿔치운 변이가 이 test 를 붉히는 것으로 실측한다.
+ * **읽고 있음**은 typed 단언이 production 상수 인스턴스와 대조하는 것으로 서고, 판정이 그 값을
+ * payload 에 싣는 **사용 자리**를 바꿔치운 변이가 이 test 를 붉히는 것으로 실측한다.
+ *
+ * **정의 자리를 바꾸는 변이는 이 등식이 잡지 않는다**(cr G-5). `EVALUATION_LADDER_POLICY_VERSION`
+ * 은 `val` 하나이고 판정과 이 test 가 **같은 그 하나**를 참조하므로, 정의를 고치면 양쪽이 함께
+ * 움직여 초록으로 남는다. 그 초록을 「등식이 그 축을 읽지 않는다」로 오독하지 않도록 적는다.
  */
 internal class PipelineReproducibilityE2ETest : PipelineE2ESupport() {
     private val servers = mutableListOf<MlFakeServer>()

@@ -76,7 +76,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         report.skippedDuplicates shouldBe 1
         inboxKeys() shouldHaveSize 1
         assembly.sender.callCount() shouldBe 1
-        outboxStates() shouldContainExactlyInAnyOrder listOf("DELIVERED", "DELIVERED")
+        outboxStates() shouldContainExactlyInAnyOrder listOf(DELIVERED_STATE, DELIVERED_STATE)
     }
 
     /**
@@ -138,22 +138,22 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         seedProfile()
         collectNotices(listOf(e2eNoticeItem(NOTICE)))
         runBlocking { assembly(successfulMlScript()).evaluate() }
-        outboxStates() shouldContainExactly listOf("PENDING")
+        outboxStates() shouldContainExactly listOf(PENDING_STATE)
 
         val race = claimWhileHeld()
 
         race.firstHeld shouldBe true
         race.releasedWithoutTimeout shouldBe true
         race.secondWhileHeld.shouldBeEmpty()
-        outboxStates() shouldContainExactly listOf("CLAIMED")
+        outboxStates() shouldContainExactly listOf(CLAIMED_STATE)
         race.secondAfterRollback shouldHaveSize 1
     }
 
     /**
      * 첫 워커는 행을 claim 한 채 대기하다 **커밋 전 예외로 롤백**한다 — 그래서 쥐고 있던
      * 행이 `PENDING` 으로 돌아온다. `release` 래치는 둘째 claim 이 **돌아온 뒤에만** 내려가므로,
-     * 둘째가 막히면 그 대기가 [HOLD_TIMEOUT_SECONDS] 만료로 풀리고 [ClaimRace.releasedWithoutTimeout] 가
-     * 거짓이 된다.
+     * 둘째가 막히면 그 대기가 [E2E_HOLD_TIMEOUT_SECONDS] 만료로 풀리고
+     * [ClaimRace.releasedWithoutTimeout] 가 거짓이 된다.
      */
     private fun claimWhileHeld(): ClaimRace {
         val boundary = TransactionBoundary(dataSource())
@@ -163,10 +163,10 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         val executor = Executors.newSingleThreadExecutor()
         val worker = executor.submit { holdRowThenRollback(boundary, held, release, releasedInTime) }
         try {
-            val firstHeld = held.await(CLAIM_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            val firstHeld = held.await(E2E_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             val whileHeld = claimEntryIds(boundary)
             release.countDown()
-            worker.get(WORKER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            worker.get(E2E_JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             return ClaimRace(firstHeld, releasedInTime.get(), whileHeld, claimEntryIds(boundary))
         } finally {
             // 단언이 깨져 빠져나가도 스레드를 남기지 않는다 — 남은 스레드가 쥔 트랜잭션은 다음
@@ -186,7 +186,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
             boundary.inTransaction<Unit> {
                 JdbcOutboxPort(boundary).claim(1, OutboxConsumerKind.NotificationRequested) shouldHaveSize 1
                 held.countDown()
-                releasedInTime.set(release.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                releasedInTime.set(release.await(E2E_HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 throw WorkerDiedHoldingRow()
             }
         } catch (
@@ -219,19 +219,6 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
 
     private companion object {
         const val NOTICE = "E2E-INJECT-0001"
-
-        /** 첫 워커가 행을 집었다는 신호를 기다리는 시한 — 집지 못하면 그 자체가 결함이다. */
-        const val CLAIM_SIGNAL_TIMEOUT_SECONDS = 5L
-
-        /**
-         * 첫 워커가 행을 **쥐고 있는** 시한. 둘째 claim 이 돌아오면 즉시 풀리므로 정상 경로의
-         * 비용은 0 이고, 이 값은 **거짓 RED 의 여유**로만 쓰인다 — 호스트가 느려 둘째 claim 하나가
-         * 오래 걸리면 첫 워커가 조기 롤백해 막히지 않았는데도 막힌 것처럼 보인다. 넉넉히 둔다.
-         */
-        const val HOLD_TIMEOUT_SECONDS = 30L
-
-        /** 워커 합류 시한 — 쥠 시한보다 커야 그 만료가 합류 실패로 가려지지 않는다. */
-        const val WORKER_TIMEOUT_SECONDS = 60L
 
         val DELAY_MARGIN: Duration = Duration.ofMillis(100)
     }

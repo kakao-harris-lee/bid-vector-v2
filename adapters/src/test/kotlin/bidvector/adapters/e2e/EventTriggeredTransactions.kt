@@ -97,21 +97,7 @@ internal fun pauseAfterFirstDispatch(
     return {
         if (sentCount() > 0 && paused.compareAndSet(false, true)) {
             blocked.countDown()
-            releasedInTime.set(release.await(RELAY_HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            releasedInTime.set(release.await(E2E_HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
         }
     }
 }
-
-internal const val CLAIMED_STATE = "CLAIMED"
-internal const val DELIVERED_STATE = "DELIVERED"
-internal const val ISOLATED_STATE = "ISOLATED"
-internal const val PENDING_STATE = "PENDING"
-
-/** 홀더가 **쥐고 있는** 시한 — 둘째 relay 가 `Busy` 를 받고 돌아오면 즉시 풀리므로 정상 비용은 0 이다. */
-internal const val RELAY_HOLD_TIMEOUT_SECONDS = 30L
-
-/** 홀더가 막혔다는 신호를 기다리는 시한 — 막히지 않으면 그 자체가 결함이다. */
-internal const val RELAY_BLOCK_SIGNAL_TIMEOUT_SECONDS = 5L
-
-/** 홀더 합류 시한 — 쥠 시한보다 커야 그 만료가 합류 실패로 가려지지 않는다. */
-internal const val RELAY_JOIN_TIMEOUT_SECONDS = 60L

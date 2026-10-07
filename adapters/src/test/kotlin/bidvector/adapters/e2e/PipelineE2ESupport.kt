@@ -134,13 +134,12 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      * 같은 알려진 제한). `exclude_keyword_terms` 하나만 채워 감시 규칙을 **비어 있지 않게**
      * 만든다: 비면 `WatchVerdict.NoGate` 라 모든 후보가 감시 단계에서 탈락한다.
      *
-     * [revision] 의 기본값이 **1 이 아니다**([E2E_STRATEGY_REVISION]) — payload 의
-     * `strategyRevision` 을 1 로 시딩하면 「상수 1 을 싣는다」로 바꿔치운 구현도 초록이다
-     * (6F-10 checklist 가 실측한 사각). 재현 등식의 typed 단언이 **시딩값과 대조**하려면
-     * 그 값이 어느 기본값과도 겹치지 않아야 한다.
+     * revision 은 [E2E_STRATEGY_REVISION] 고정이고 **인자가 아니다**(cr G-3) — 넘기는 호출부가
+     * 하나도 없는 파라미터는 과잉이고, 전부 기본값인 목록의 맨 앞에 두면 뒤에 누가 positional 로
+     * 부를 때 `maxActiveBids` 자리가 조용히 revision 이 된다. run 사이에 revision 을 바꾸는 쪽은
+     * [setStrategyRevision] 이 든다.
      */
     protected fun seedStrategy(
-        revision: Int = E2E_STRATEGY_REVISION,
         maxActiveBids: Int = E2E_MAX_ACTIVE_BIDS,
         bidNowThreshold: String = E2E_BID_NOW_THRESHOLD,
         reviewThreshold: String = E2E_REVIEW_THRESHOLD,
@@ -154,7 +153,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
                         "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setInt(1, revision)
+                    statement.setInt(1, E2E_STRATEGY_REVISION)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
@@ -287,3 +286,38 @@ internal const val E2E_MAX_ACTIVE_BIDS = 10
 internal const val E2E_STRATEGY_REVISION = 7
 internal const val E2E_BID_NOW_THRESHOLD = "0.50"
 internal const val E2E_REVIEW_THRESHOLD = "0.10"
+
+/*
+ * outbox 상태 어휘(cr G-7) — **정본은 V6 CHECK 와 전이 SQL** 이고 `main` 에는 이 문자열을 담은
+ * Kotlin 상수가 없다(그래서 test 상수를 둔다). 자리를 이 파일로 둔 이유는 세 e2e 클래스가 함께
+ * 쓰기 때문이다 — 크래시 주입 파일에 두면 그 파일의 주제와 무관한 어휘가 섞인다.
+ *
+ * 같은 어휘가 `bidvector.adapters.relay` 에는 축어 리터럴로 남아 있다 — 그 패키지는 이 slice 의
+ * in_scope 밖이다. 거동 위험은 없다: 양쪽 모두 DB 가 낸 문자열과 대조하므로 production 이 어휘를
+ * 바꾸면 fail-closed 로 붉어진다.
+ */
+internal const val PENDING_STATE = "PENDING"
+internal const val CLAIMED_STATE = "CLAIMED"
+internal const val DELIVERED_STATE = "DELIVERED"
+internal const val ISOLATED_STATE = "ISOLATED"
+
+/*
+ * 스레드 경합 test 의 시한 셋(cr G-6) — 값·역할·사유가 같은 사본이 이 패키지에 **둘** 있었다.
+ * 선례(`PipelineFailureInjectionE2ETest`)의 것은 `private companion object` 라 재사용이 막혀
+ * 있었고, 이 slice 가 top-level `internal` 로 같은 셋을 또 지었다. 집을 하나로 모으고 선례의
+ * companion 상수를 지웠다.
+ *
+ * 이름이 두 쓰임을 함께 담는다 — 「신호」는 「첫 워커가 행을 집었다」(claim 경합)와 「홀더가
+ * 막혔다」(임대 경합) 둘이다.
+ */
+internal const val E2E_SIGNAL_TIMEOUT_SECONDS = 5L
+
+/**
+ * 첫 스레드가 **쥐고 있는** 시한. 상대가 돌아오면 즉시 풀리므로 정상 경로의 비용은 0 이고, 이
+ * 값은 **거짓 RED 의 여유**로만 쓰인다 — 호스트가 느려 상대의 한 질의가 오래 걸리면 쥔 쪽이
+ * 조기에 풀려 막히지 않았는데도 막힌 것처럼 보인다. 넉넉히 둔다.
+ */
+internal const val E2E_HOLD_TIMEOUT_SECONDS = 30L
+
+/** 합류 시한 — 쥠 시한보다 커야 그 만료가 합류 실패로 가려지지 않는다. */
+internal const val E2E_JOIN_TIMEOUT_SECONDS = 60L

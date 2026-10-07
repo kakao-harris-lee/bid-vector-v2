@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -29,10 +30,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 6D 축 ③ — **restart 뒤 outbox/inbox 수렴**. 파이프라인(수집 → 평가 → outbox)이 만든 행
  * 위에서 production relay 가 T1 과 T2 사이에 죽고, **새 조립**이 그 뒤를 받는다.
  *
- * **「재기동」의 뜻**(B-1 (a)) — 새 [PipelineAssembly] 인스턴스다: 새 임대 세션 · 새 relay ·
- * 새 port · 새 sender. 같은 relay 객체를 다시 부르는 것은 재기동이 아니다(임대 연결이 같다).
- * 프로세스 사망의 in-JVM 등가이고, 죽은 조립의 임대가 실제로 풀렸다는 사실은 둘째 relay 가
- * `Busy` 를 받지 **않는다**는 것으로 잰다 — 그 반대(살아 있는 홀더 → `Busy`)를 R-5 가 잰다.
+ * **「재기동」의 뜻**(B-1 (a)) — 새 [PipelineAssembly] 인스턴스이고, 프로세스 사망의 in-JVM
+ * 등가다. 새 조립은 새 relay · 새 port · 새 sender 를 준다.
+ *
+ * **임대 세션은 인스턴스 단위가 아니다**(verifier r1 R1-M-2 가 반증). `PostgresAdvisoryLockLease`
+ * 는 `withLease` **호출마다** `dataSource.connection` 을 새로 열므로, 같은 조립의 relay 를 다시
+ * 불러도 그 호출은 새 세션에서 잠금을 다툰다 — 막혀 있는 홀더가 있으면 **같은 조립의 재호출도
+ * `Busy` 를 받는다**(탐침 실측). 그래서 「새 인스턴스라서 새 세션이다」라는 논증은 서지 않는다.
+ * relay 는 호출 사이에 상태가 없어 **새 인스턴스와 재호출이 동치**이고, 새 인스턴스를 쓰는 실익은
+ * sender 계수를 조립별로 가르는 것(발송 합)과 production 재기동의 모양을 따르는 것뿐이다.
+ *
+ * 「죽은 조립의 임대가 실제로 풀렸다」의 증거는 **재기동 relay 가 `Busy` 가 아니라는 사실뿐**이다 —
+ * 죽은 run 의 예외가 `withLease` 의 `finally` 를 지나 연결을 반납했기 때문이다. 그 반대(살아
+ * 있는 홀더가 막혀 있으면 `Busy`)를 R-5 가 잰다.
  *
  * **크래시는 순번이 아니라 사건에 걸린다**([EventTriggeredTransactions] 의 술어들). 발송 계수는
  * 조립마다 sender 가 다르므로 **두 조립의 합**으로 센다 — 「발송 0 또는 1」은 그 합이다.
@@ -98,7 +108,9 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         redelivery.claimed shouldBe 1
         redelivery.delivered shouldBe 1
         redelivery.skippedDuplicates shouldBe 0
-        sentTotal(dying, restarted, reevaluated) shouldBe TWO_ENTRIES
+        // 이미 `ISOLATED` 인 행은 `claimedEntries` 에 들지 않는다 — 셋째 run 은 고아를 보지 않는다.
+        redelivery.orphansIsolated shouldBe 0
+        sentTotal(dying, restarted, reevaluated) shouldBe REDISPATCHED_TOTAL
         outboxStateCounts(dataSource()) shouldBe mapOf(ISOLATED_STATE to 1, DELIVERED_STATE to 1)
         inboxKeys() shouldHaveSize 1
     }
@@ -144,16 +156,29 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
     }
 
     /**
-     * R-4 — **수렴은 고정점이다.** 「`CLAIMED` 0」으로 정의하지 않는다(PENDING 이 남아도 `CLAIMED`
-     * 는 0 이다): 한 번 더 재기동해도 보고의 **계수 전부**가 0 이고 상태 **분포 Map** 이 같다.
-     * 보고를 값 하나로 대조하므로 [RelayReport.Completed] 에 계수가 늘면 컴파일이 깨진다.
+     * R-4 — **수렴은 고정점이고, 그 고정점이 종단이어야 한다.** 한 번 더 재기동해도 보고의 **계수
+     * 전부**가 0 이고 상태 **분포 Map** 이 같다. 보고를 값 하나로 대조하므로
+     * [RelayReport.Completed] 에 계수가 늘면 컴파일이 깨진다.
+     *
+     * 「고정점」만으로는 부족하다(verifier r1 R1-M-1 실측) — production 의 고아 격리를 no-op 로
+     * 바꾸면 `CLAIMED` 1 이 좌초한 채 **그것도 고정점이 되어** 앞 판의 R-4 가 초록이었다. 그래서
+     * 둘을 더했다: 첫 재기동 보고의 `orphansIsolated == 1` 과, 수렴한 분포가 **종단뿐**이라는
+     * Map 전체 등식(PENDING·CLAIMED 0). 둘 다 그 변이에서 붉어진다.
+     *
+     * 「`CLAIMED` 0」 하나로 수렴을 정의하지 않는 이유는 그대로다 — PENDING 이 남아도 `CLAIMED`
+     * 는 0 이다.
      */
     @Test
-    fun `격리 뒤 한 번 더 재기동하면 보고가 전부 0 이고 분포가 그대로다`() {
+    fun `격리 뒤 한 번 더 재기동하면 보고가 전부 0 이고 알림 행이 전부 종단으로 남는다`() {
         val dying = crashedBeforeFirstDispatch()
         val restarted = assembly()
-        restarted.relay().shouldBeInstanceOf<RelayReport.Completed>()
+        val isolation = restarted.relay().shouldBeInstanceOf<RelayReport.Completed>()
+
+        // 수렴의 전제 — 첫 재기동이 **실제로 격리했다**. 이 줄이 없으면 격리가 없어도 고정점이다.
+        isolation.orphansIsolated shouldBe 1
         val converged = outboxStateCounts(dataSource())
+        // 알림 종류 행이 전부 종단 — Map 전체 등식이라 PENDING·CLAIMED 는 0 이다.
+        converged shouldBe mapOf(ISOLATED_STATE to 1)
 
         val again = assembly()
         val report = again.relay().shouldBeInstanceOf<RelayReport.Completed>()
@@ -198,7 +223,12 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         val executor = Executors.newSingleThreadExecutor()
         val running = executor.submit(Callable { holder.relay() })
         try {
-            blocked.await(RELAY_BLOCK_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS) shouldBe true
+            val signalled = blocked.await(E2E_SIGNAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            // 홀더가 hook 에 닿기 전에 죽었으면 **그 예외를 먼저 올린다**(cr G-2) — 래치 단언만
+            // 두면 `expected true but was false` 가 실제 원인을 가리고 `finally` 가 그것을 버린다.
+            // 아직 돌고 있으면 올릴 원인이 없으므로 아래 단언이 그대로 진단이다.
+            if (!signalled && running.isDone) running.get(0, TimeUnit.SECONDS)
+            signalled shouldBe true
             busyWhileHeld(holder, release, releasedInTime, running)
         } finally {
             // 단언이 깨져 빠져나가도 스레드를 남기지 않는다 — 남은 스레드가 쥔 임대·트랜잭션은
@@ -212,7 +242,7 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         holder: PipelineAssembly,
         release: CountDownLatch,
         releasedInTime: AtomicBoolean,
-        running: java.util.concurrent.Future<RelayReport>,
+        running: Future<RelayReport>,
     ) {
         val held = outboxStateCounts(dataSource())
         held shouldBe mapOf(CLAIMED_STATE to HOLDER_BATCH_SIZE)
@@ -225,7 +255,7 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         release.countDown()
         val completed =
             running
-                .get(RELAY_JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .get(E2E_JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .shouldBeInstanceOf<RelayReport.Completed>()
 
         releasedInTime.get() shouldBe true
@@ -249,8 +279,16 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
      * 로 쥐고 있어 그래프가 둘 다 본다. 그러므로 주입은 「production 자리를 대체해 숨는」 모양이
      * 아니라 **앞에 덧대어 드러나는** 모양이다 — 위임으로는 숨지 못한다.
      *
-     * 단언은 개수가 아니다(람다의 합성 클래스 이름을 적으면 표기 하나로 낡는다): 「wrapper 가
-     * 거기 있다 · 비-MAIN 은 전부 test 출력이다 · 감싸인 production 경계도 함께 보인다」 셋이다.
+     * 단언에 **이름은 적지 않는다** — 람다의 합성 클래스 이름은 표기 하나로 낡는다. 그러나 **개수는
+     * 이름이 아니다**(cr G-1): `leaks` 가 둘이라는 단언이 위 실측 ① 자체를 회귀 test 로 만든다.
+     *
+     * 그리고 **건너뛴 가지 셋을 0 으로 잠근다**(cr G-1). hook 람다는 깊이 2 이므로, 그 필드 읽기가
+     * 실패하거나 깊이 상한에 걸리면 `leaks` 에서 람다만 조용히 사라진다 — 그때 「wrapper 가 거기
+     * 있다」와 「전부 test 출력이다」는 **둘 다 그대로 통과한다**. 잠그는 것은 오늘의 거동이 아니라
+     * 그 거동이 유지된다는 사실이다.
+     *
+     * 그래서 이 test 가 붉어지는 길은 둘이다 — 주입이 그래프 밖으로 새거나, 순회가 주입 아래에서
+     * 잘리는 것.
      */
     @Test
     fun `주입을 꽂은 조립은 협력자 그래프에서 비-MAIN 으로 잡힌다`() {
@@ -264,7 +302,11 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
             originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty()
         } shouldBe emptyList()
         honest.collected.map { it.javaClass } shouldContain ConsumerTransactions::class.java
+        injected.depthLimitHits shouldBe 0
+        injected.traversalFailures shouldBe emptyList()
+        injected.skippedHolders shouldBe emptyList()
         val leaks = injected.collected.filter { originOf(it) != ClassOrigin.MAIN && portBoundariesOf(it).isEmpty() }
+        leaks shouldHaveSize INJECTED_NON_MAIN_COUNT
         leaks.map { it.javaClass } shouldContain EventTriggeredTransactions::class.java
         leaks.map { originOf(it) }.toSet() shouldBe setOf(ClassOrigin.TEST)
         injected.collected.map { it.javaClass } shouldContain ConsumerTransactions::class.java
@@ -342,9 +384,22 @@ internal class PipelineRestartConvergenceE2ETest : PipelineE2ESupport() {
         const val CORRELATION_PREFIX = "restart"
         const val BATCH_SIZE = 3
         const val SETTLED_BEFORE_CRASH = 1
-        const val ORPHANS_AFTER_CRASH = 2
+
+        /** 도출값이다(cr G-4) — 배치 크기를 손보면 이 값이 함께 움직인다. */
+        const val ORPHANS_AFTER_CRASH = BATCH_SIZE - SETTLED_BEFORE_CRASH
         const val HOLDER_BATCH_SIZE = 2
+
+        /** 같은 멱등 키의 **행 수** — 재평가가 새 entry 를 낳는다. */
         const val TWO_ENTRIES = 2
+
+        /**
+         * B-2 가 「사실로 고정한다」고 적은 **발송 합** — 행 수와 우연히 같을 뿐 축이 다르다
+         * (cr G-9). 이 값이 바뀌면 at-most-once 설계가 바뀐 것이다.
+         */
+        const val REDISPATCHED_TOTAL = 2
+
+        /** 주입 조립의 비-MAIN 협력자 수 — wrapper 와 그 hook 람다 둘이다(실측 ①). */
+        const val INJECTED_NON_MAIN_COUNT = 2
         val BATCH_NOTICES = listOf("E2E-RESTART-B001", "E2E-RESTART-B002", "E2E-RESTART-B003")
         val HOLDER_NOTICES = listOf("E2E-RESTART-H001", "E2E-RESTART-H002")
     }
