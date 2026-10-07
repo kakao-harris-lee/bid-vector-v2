@@ -459,6 +459,61 @@ jobs:
           [ "$code" = "401" ] || fail "무인증 쓰기가 401 이 아니다: $code"
           code="$(_code "$(_api_get /api/strategy/edit-sessions)")"
           [ "$code" = "405" ] || fail "미선언 메서드가 405 가 아니다: $code"
+
+          # M6/6E-1 G-4 — 완료 조건 4(「실제 외부 effect 없이 dry-run acceptance 가능」)를 **컨테이너
+          # 축에서** 잰다. 앞 왕복이 남긴 상태가 이 자리의 근거다: dry-run 은 저장된 전략을 읽으므로
+          # 여력 상한이 서 있어야 200 이고(없으면 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED`, fail-closed —
+          # 0 으로도 무한으로도 지어내지 않는다), 그 값을 세우는 수단이 바로 위 편집 세션 왕복이다.
+          # 단언 셋 — ① 200 ② 응답 본문 키 집합이 openapi `EvaluationDryRunResponse` 의 required
+          # 아홉과 **같다**(늘어도 줄어도 붉어진다) ③ **outbox 행 수가 전후로 같다**. ③ 이 「외부
+          # effect 없음」의 기계 술어다 — dry-run 은 `RecordingNotificationRequestPort` 로 조립돼
+          # outbox 에 쓰지 않고, 그 사실을 **산출물의 부재**가 아니라 행 수 등식으로 잰다.
+          echo "-- 여력 상한 세우기: begin → value → confirm (dry-run 200 의 전제) --"
+          printf '{"field":"MAX_ACTIVE_BIDS"}' > "$bodies/begin-max.json"
+          begun="$(_api_post /api/strategy/edit-sessions "$bodies/begin-max.json")"
+          [ "$(_code "$begun")" = "201" ] || fail "MAX_ACTIVE_BIDS begin 이 201 이 아니다: $(_code "$begun")"
+          session="$(_body "$begun" | jq -r '.sessionId')"
+          [ -n "$session" ] && [ "$session" != "null" ] || fail "MAX_ACTIVE_BIDS begin 응답에 sessionId 가 없다"
+
+          printf '{"commandId":"smoke-m1","field":"MAX_ACTIVE_BIDS","count":5}' > "$bodies/value-max.json"
+          provided="$(_api_post "/api/strategy/edit-sessions/$session/value" "$bodies/value-max.json")"
+          [ "$(_code "$provided")" = "200" ] || fail "MAX_ACTIVE_BIDS value 가 200 이 아니다: $(_code "$provided")"
+
+          # `revision + 2` 를 계산하지 않고 **다시 읽는다** — 낙관적 잠금의 기준값을 산술로 짐작하면
+          # 앞 왕복의 개수가 바뀔 때 조용히 409 로 떨어진다.
+          seen="$(_body "$(_api_get /api/strategy)" | jq -r '.revision')"
+          printf '{"commandId":"smoke-m2","seenRevision":%s}' "$seen" > "$bodies/confirm-max.json"
+          confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/confirm-max.json")"
+          [ "$(_code "$confirmed")" = "200" ] || fail "MAX_ACTIVE_BIDS confirm 이 200 이 아니다: $(_code "$confirmed")"
+          [ "$(_body "$(_api_get /api/strategy)" | jq -r '.maxActiveBids')" = "5" ] || fail "여력 상한이 조회에 반영되지 않았다"
+
+          echo "-- 평가 dry-run 왕복: 200 · 본문 키 아홉 · outbox 행 수 전후 등식 (G-4) --"
+          # DB 질의는 S-23c 리허설과 같은 형태다 — 컨테이너 **안**의 유닉스 소켓이고 공식 postgres
+          # 이미지의 `pg_hba.conf` 가 그 경로를 `trust` 로 두므로 자격 값을 새 자리에 두지 않는다.
+          _outbox_rows() {
+            local out
+            out="$($COMPOSE exec -T postgres psql -X -q -t -A -v ON_ERROR_STOP=1 \
+              -U "$BIDVECTOR_PG_USER" -d "$BIDVECTOR_PG_DB" -c 'select count(*) from outbox')" \
+              || out="query-error"
+            printf '%s' "$out"
+          }
+          outbox_before="$(_outbox_rows)"
+          case "$outbox_before" in
+            ''|*[!0-9]*) fail "dry-run 전 outbox 행 수를 읽지 못했다: [$outbox_before]" ;;
+          esac
+
+          printf '{"currentActiveBids":0}' > "$bodies/dry-run.json"
+          dry="$(_api_post /api/evaluation-dry-runs "$bodies/dry-run.json")"
+          [ "$(_code "$dry")" = "200" ] || fail "dry-run 이 200 이 아니다: $(_code "$dry") 본문 $(_body "$dry")"
+          keys="$(_body "$dry" | jq -r 'keys | sort | join(",")')"
+          dry_run_keys="bidNowNoticeIds,candidateCount,currentActiveBids,maxActiveBids,notReachedNoticeIds,reviewNoticeIds,skipNoticeIds,strategyRevision,wouldNotifyNoticeIds"
+          [ "$keys" = "$dry_run_keys" ] || fail "dry-run 본문 키 집합이 openapi required 아홉과 다르다: [$keys]"
+          [ "$(_body "$dry" | jq -r '.maxActiveBids')" = "5" ] || fail "dry-run 이 방금 세운 여력 상한을 읽지 않았다"
+
+          outbox_after="$(_outbox_rows)"
+          [ "$outbox_after" = "$outbox_before" ] \
+            || fail "dry-run 이 outbox 를 건드렸다 — 전 $outbox_before 후 $outbox_after"
+          echo "dry-run 왕복 통과 — outbox 행 수 $outbox_before == $outbox_after (쓰기 0)"
           rm -rf "$bodies"
 
           echo "-- API 포트의 actuator: 401 또는 404(200 이면 실패) --"
