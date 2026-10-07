@@ -22,7 +22,7 @@
 2. **개발 DB**: 컨테이너 `bid-vector-v2-dev`(postgres:16.4, `127.0.0.1:55432`, user/db `bidvector`). 멈춰 있으면 `docker start bid-vector-v2-dev` 뒤 `pg_isready`. flyway 는 V17 까지 적용돼 있어야 한다(`SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1` → `17`). **legacy compose(`bid_vector_db` 5432)와 포트가 다르다 — 55432 를 쓴다.**
 3. **저장소 밖 디렉터리**(자동 생성되지 않는다, 둘 다 **WSL 내부 ext4** — DrvFs/9p 는 디렉터리 fsync 가 실패해 경고가 난다):
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
-   - 스냅숏: `~/.local/bid-vector-snapshots/`
+   - 스냅숏: `~/.local/bid-vector-snapshots/` · 판정: `~/.local/bid-vector-verdicts/` · **로그: `~/.local/bid-vector-logs/m6-6g/`** — 실행 상태 디렉터리 **안**에는 아무것도 더 두지 않는다(로그·메모 포함): 무결성 검사가 장부 밖 파일을 보면 「장부가 모르는 파일이 있다」로 기동을 거부한다(2026-10-02 실측 — 첫 기동은 빈 디렉터리라 통과했고 둘째부터 거부)
 4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다). 아래 명령 블록의 `<jar SHA>` 는 **손으로 돌릴 때의 리터럴 예시**다 — 세션 cron 으로 거는 실행기는 그 값을 같은 명령으로 **계산해** 넘기므로, jar 를 바꾸면 인자를 고치지 않아도 원장의 값이 바뀐다.
 5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
@@ -35,6 +35,7 @@
 --bidvector.persistence.jdbc-url=jdbc:postgresql://127.0.0.1:55432/bidvector
 --bidvector.persistence.username=bidvector
 --bidvector.koneps.base-url=...(기본값, 생략 가능)
+--bidvector.evaluation.candidate-cap=10   # 평가 endpoint 속성이 모드와 무관하게 필수 — 수집 모드에서는 쓰이지 않는 부팅 요건(6F-8 과 같은 값; 2026-10-02 첫 기동이 이 누락으로 거부됨)
 ```
 DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CREDENTIAL_VALUE` — `BidVectorApplication` 이 모드와 무관하게 **항상** 바인딩하므로 세 갈래 모두 필수)도 키와 같은 방식으로 환경에만.
 
@@ -132,11 +133,13 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 
 ## 5. 알려진 제한 (판정문에도 실린다)
 
-- 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시).
+- 재호출 상한 N=3 은 디렉터리 생애 누적이라 서로 다른 날의 일시 실패 셋이 같은 축을 확정 제외한다(계수 공시). 관문 거부(`REFUSED:*` — 쿼터·예산·자기 억제)와 호출 단위 전송 재시도(`FAILED:HTTP_429` 등)는 이 계수에 들지 않는다(D-6G2d-16).
 - `MAX_PAGES` 확정: 참가 **50 × rows-per-page** 초과 축은 `incomplete_axis`(기본 999 에서 49,950). 쪽 수 상한은 폭주 방지 문턱이지 데이터 정확성 문턱이 아니다 — 페이지 크기를 올리면 같은 50 쪽이 더 많은 행을 덮는다(D-6G2f-4).
 - 쿼터는 **키 × operation × 일 1,000 건**이다(day1·day2 실측: 개찰완료 `HTTP 429` · `X-RateLimit-Limit: 1000` · `returnReasonCode 22`). 업무 공통 **단일 operation 은 둘**이다 — 개찰완료와 입찰가격산식 A. 업무별로 갈리는 축(목록·예비가격 상세·기초금액)은 공사·용역이 각자 1,000 을 쓰지만 이 둘은 한 통이라 **각각 1,000/일에 닿을 수 있다**. 개찰완료가 먼저 닫히고(페이지 100 에서 하루 약 470 공고, **페이지 999 뒤 하루 약 950 공고** — 공고당 1 호출로 정착하므로), 산식 A 는 공고당 1 행이라 쪽 크기로 줄지 않는다: 다만 **공사 공고만** 부르므로 하루 소비가 정착 공고 수보다 낮다. 한도 자체는 운영계정 승인(100,000/일)으로만 움직인다.
 - append 마다 fsync 셋(약 7 ms) — 80,000 호출이면 수십 분(`OPEN-6G2D-FSYNC-BATCHING`).
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
+- **KONEPS 쿼터는 operation 별이다(2026-10-02 실측, 10-03 진단으로 보강 — 위 셋째 항목이 정본).** 개찰완료 조회(`getOpengResultListInfoOpengCompt`)는 이 키로 하루 1,000 건에서 HTTP 429 가 오고, 실행기는 호출 하나의 전송 재시도(`maxAttempts 4`) 뒤 `REFUSED:QUOTA_EXHAUSTED` 로 멈춘다(exit 2, `truncation=QuotaExhausted`; 이 거부는 축 재호출 상한 N=3 에 세지 않는다 — D-6G2d-16). 하루 처리량은 쪽 999 뒤 약 950 공고(day3~day5 실측 971·976·950) — 일 상한 20,000 보다 이 쿼터가 먼저 닫는다. **운영자 결정 2026-10-03 이 10-02 의 「증량 신청」을 대체했다**: 운영계정·증량 신청은 M7 뒤, 그때까지 1,000/operation 안에서 자정 뒤 재실행을 이어 간다(표본·상한 회계·디렉터리 불변).
+- `OPEN-6G-RELEASE-SHA-LABEL`(release-sha 라벨 = main HEAD, jar 내용 SHA 아님 — §2-2 의 「그 칸이 안 바뀌면 새 jar 가 아니다」는 라벨 변화만으로는 jar 변화를 뜻하지 않는다; 프로브 생략 판단은 `*/src/main/**` diff 로) · `OPEN-6G-MODE-FAIL-FAST`(`mode` 가 알려진 값 밖이면 조용히 미기동·exit 0) · `OPEN-6G-EVALUATION-PROPERTIES-BINDING`(수집 모드가 `candidate-cap` 더미 값을 요구) — PR #56 리뷰, `reports/evidence/m6/6g/commands.md` 참조.
 
 ## 6. 검증 기록
 
