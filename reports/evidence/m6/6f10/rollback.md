@@ -43,6 +43,8 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 
 **공유 파일의 hunk 격리는 이번에도 필요하지 않다.** `architecture-policy.properties` 와 `gate-tests.properties` 를 이 range 에서 만진 커밋은 `git log --format=%h <base>..<실측 HEAD> -- <파일>` 이 내고 **전부 이 레인의 것**이다(라운드마다, 그리고 base 가 움직이면 다시 낸다) — 다른 레인의 줄이 없으므로 `--source=<base>` 복원이 hunk 역적용과 **같은 결과**를 낸다(다른 slice 의 줄은 base 쪽에 있어 복원으로 보존된다). 라운드가 더 붙어 그 목록에 다른 레인의 해시가 나타나면 그때는 `git diff <sha>~1..<sha> -- <파일> | git apply -R` 로 **자기 커밋만** 역적용하고, 삽입 지점이 인접해 자동 해소가 깨지면(`--3way` 도 실패한다) 지울 블록과 남길 블록을 이름으로 적어 수동 해소한다.
 
+**hunk 목록은 `--no-merges` 로 낸다(팀장, 2026-10-07).** 이 브랜치는 main 을 병합한 커밋(`c3024eb8`)을 range 안에 갖는다. `git log --format=%h <base>..<HEAD> -- <파일>` 은 그 병합 커밋을 포함하고, 병합 커밋의 첫 부모 대비 diff 를 역적용하면 **main 이 그 파일에 더한 줄까지 걷어** 되돌린 트리가 base 와 달라진다(팀장 실측 @`004245f5`: `milestone-6.md` 에 병합 포함 역적용 → base 동일 no / `--no-merges` → base 동일 yes, 내 줄 0 · 남의 줄 1). 그러므로 공유 파일(`milestone-6.md` · 두 properties · ADR · data-dictionary)의 hunk 커밋 열은 `git log --no-merges --format=%h <base>..<HEAD> -- <파일>` 로 낸다.
+
 **하네스 레인 변경은 이 range 에 없다** — `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다.
 
 ## DB 되돌림
