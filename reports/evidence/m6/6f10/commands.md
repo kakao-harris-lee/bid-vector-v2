@@ -236,3 +236,25 @@ cr T-4(대상 쪽 접기)는 **변이로 재지 않았다** — 오늘 커밋 �
 - cmd: `gate-tests.properties` 의 모든 블록을 서브패키지 그룹 안 사전순으로 기계 확인
 - exit: 0
 - 핵심 결과: **이 slice 의 패키지 아홉은 어긋남 0**. 그 밖에 **여덟 자리**가 어긋나 있고 전부 이 slice 밖 패키지(`app.collection`·`adapters.persistence`·`adapters.snapshot`·`procurement`·`workflow.collection`)다 — in_scope 가 이 파일을 「추가만」으로 한정하므로 고치지 않고 사실로 남긴다. cr T-5 의 제안(게이트에 「블록 안이 사전순」 단언)은 `build-logic/` 변경이라 in_scope 밖이다
+
+## 2026-10-07T12:00:00Z — PR #63 조치: `check` 전건 · 변이 다섯
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: 전건 통과. 라운드 중 여섯 번 붉었고 전부 게이트가 잡은 것이다 — detekt `UtilityClassWithPublicConstructor`(companion 전용 설정 클래스) · ktlint 넷(체인·고아 KDoc·import 순서·빈 줄) · `sizeGate` 파일 500줄(임대 상실 test 를 갈랐다) · `gateRegistrationGate` 미등재 둘 · 아키텍처 게이트 다섯(바깥 패키지·러너 참조·반사 쌍·죽은 등재 둘·조립 tier)
+
+| 변이 | numstat | 결과 | 잡은 단언 |
+|---|---|---|---|
+| F1 guard 를 「셋 이상」으로 | 1/1 | **RED** | 둘 켜면 실패 · 임의 러너 하나로도 둘 |
+| F2 `orphansIsolated` 갈래 제거 | 1/1 | **RED** | 가운데 항 단독 표본 · 완료 줄의 exit |
+| F3 잠금 인식 probe 를 `SELECT 1` 로 되돌림 | 1/3 | **초록** | 없음 — 아래 사유 |
+| F4 부분 집계를 싣지 않고 통과 | 5/14 | **RED** | 집계 단언 둘(port 실패 · 도중 터짐) |
+| F5 걷어낸 중복 `stillHeld()` 되돌려 넣기 | 1/3 | **RED** | 임대 상실 test 넷(서수가 밀린다) |
+
+**F3 이 초록인 사유를 숨기지 않는다.** 두 probe 를 가르는 입력은 「연결은 살아 있는데 그 backend 가 잠금을 들고 있지 않다」이고, 그것은 **pooler 뒤에서만** 생긴다 — 이 저장소의 test 는 직접 연결이고 pooler 를 지원하지도 않는다(알려진 제한 20). 기존 상실 test 들은 백엔드를 **종료**하므로 두 probe 가 똑같이 거짓을 낸다. 그래서 이 변경은 변이로 갈리지 않고, 재는 것은 ⓐ 기존 상실 test 가 새 probe 에서도 그대로 상실을 잡는다(초록 = 잡는다) ⓑ 제한 20 이 그 경계를 문서로 선언한다 둘이다. cr T-4·R2-7 과 같은 계열(도달 불가 사각)이다
+
+## 2026-10-07T12:30:00Z — PR #63 조치: rollback 재실측 (버릴 clone, 실측 HEAD `3db918ab`)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → `--rerun-tasks` compile → `check`
+- exit: restore 0 · compile 0 · check **0**
+- 핵심 결과: **base 가 `b137c670` → `2865c9b8` 로 전진했다**(브랜치가 main 을 병합, `c3024eb8`) — 목록·셈·공유 파일 커밋 목록을 전부 새 base 로 다시 냈다. 복원 목록 73 · `D` 44 · `M` 29, 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱 경로는 HEAD 그대로. 세부는 `rollback.md`

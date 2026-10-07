@@ -1,7 +1,7 @@
 # M6/6F-10 — 되돌리기
 
-**실측 HEAD: `2bc08209`**(승인 전 일괄의 산출물 커밋 — 라운드마다 재산출·재실행한다. 앞 실측값 `c037c45e` 은 옮기지 않고 버렸다). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한 **버릴 clone** 에서 실제로 돌린 결과다.
-base: `b137c670`(`git merge-base HEAD origin/main` 산출).
+**실측 HEAD: `3db918ab`**(PR #63 조치의 마지막 산출물 커밋 — 라운드마다 재산출·재실행한다. 앞 실측값 `2bc08209` 은 옮기지 않고 버렸다). 아래 ①~⑥ 은 전부 그 커밋을 체크아웃한 **버릴 clone** 에서 실제로 돌린 결과다.
+base: `2865c9b8`(`git merge-base HEAD origin/main` 산출). **앞 판의 `b137c670` 에서 전진했다** — 브랜치가 main 을 병합했기 때문이다(`c3024eb8`). 옛 base 로 재산출한 목록은 명령이 exit 0 을 내면서 틀리므로, 아래 전부를 새 base 로 다시 냈다.
 
 라운드가 더 붙으면 이 절 전체를 **다시 산출하고 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
 
@@ -35,13 +35,13 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 | 경로 | 이유 | 그 파일을 만진 커밋 |
 |---|---|---|
 | `reports/evidence/m6/6f10/**` | 이 slice 의 기록이다 — 되돌리면 「무엇을 왜 되돌렸는가」가 사라진다. 그 보존이 게이트를 붉히는지는 ⑥ 에서 실측했다(붉히지 않았다) | 계약은 팀장 레인 여섯, 명령·점검표·이 파일은 산출물 커밋 뒤 |
-| `docs/adr/0005-domain-events-and-outbox.md` | **팀장 레인**의 승인 문서 addendum(어휘 해석표·`OPEN-OPS-10` ③ 답 · §7.1 미지 payload 유입) — 이 레인의 산출물이 아니다 | `ce957478`·`e2fcf63a` |
-| `docs/discovery/data-dictionary.md` | **팀장 레인**의 §2.2.5 정정(cr G-2) — 같은 이유 | `4f90dbec` |
-| `milestone-6.md` | **팀장 레인**의 착수 문단 | `a996e049` |
+| `docs/adr/0005-domain-events-and-outbox.md` | **팀장 레인**의 승인 문서 addendum(어휘 해석표·`OPEN-OPS-10` ③ 답 · §7.1 미지 payload 유입) — 이 레인의 산출물이 아니다 | 아래 명령으로 낸다 |
+| `docs/discovery/data-dictionary.md` | **팀장 레인**의 §2.2.5 정정(cr G-2) — 같은 이유 | 같은 명령 |
+| `milestone-6.md` | **팀장 레인**의 착수·종결 문단 | 같은 명령 |
 
-목록은 손으로 적지 않는다 — `git diff --name-only <base>..<실측 HEAD>` 에서 되돌림 대상의 여집합으로 낸다(위 ③b 가 그 산출물을 그대로 센다). **수는 산문에 적지 않는다** — 표의 행 수와 각 행을 만진 커밋 수는 다음 명령이 낸다(evidence 디렉터리 행은 이 slice 의 커밋 대부분이 만진다)(`git log --format=%h <base>..<실측 HEAD> -- <그 넷>` 산출 — 셈을 산문에 박지 않고 명령을 적는다). 파일 수와 커밋 수를 섞어 적으면 ③b 의 괄호가 어긋난다(R2-L-5 → R3-L-2 로 두 라운드 걸린 자리다).
+목록은 손으로 적지 않는다 — `git diff --name-only <base>..<실측 HEAD>` 에서 되돌림 대상의 여집합으로 낸다(위 ③b 가 그 산출물을 그대로 센다). **셈은 산문에 적지 않는다** — 각 행을 만진 커밋은 `git log --format=%h <base>..<실측 HEAD> -- <경로>` 가 낸다. base 가 움직이면 그 셈도 움직이고(이번 라운드에 실제로 움직였다), 파일 수와 커밋 수를 섞어 적으면 ③b 의 괄호가 어긋난다(R2-L-5 → R3-L-2 로 두 라운드 걸린 자리다).
 
-**공유 파일의 hunk 격리는 이번에도 필요하지 않다.** `architecture-policy.properties` 를 만진 커밋은 **`608baa82`·`b6523054`·`e60b0849`**, `gate-tests.properties` 는 **그 셋 + `fe5670e9`·`2bc08209`**(`git log --format=%h <base>..<실측 HEAD> -- <파일>` 산출 — 라운드마다 재산출한다)이고 **전부 이 레인의 것**이다 — 다른 레인의 줄이 없으므로 base 복원이 hunk 역적용과 같은 결과를 낸다. 그래서 두 파일은 `--source=<base>` 복원이 hunk 역적용과 **같은 결과**를 낸다 — 다른 slice 의 줄은 base 쪽에 있어 복원으로 보존된다. 라운드가 더 붙어 그 목록에 다른 레인의 해시가 나타나면 그때는 `git diff <sha>~1..<sha> -- <파일> | git apply -R` 로 **자기 커밋만** 역적용하고, 삽입 지점이 인접해 자동 해소가 깨지면(`--3way` 도 실패한다) 지울 블록과 남길 블록을 이름으로 적어 수동 해소한다.
+**공유 파일의 hunk 격리는 이번에도 필요하지 않다.** `architecture-policy.properties` 와 `gate-tests.properties` 를 이 range 에서 만진 커밋은 `git log --format=%h <base>..<실측 HEAD> -- <파일>` 이 내고 **전부 이 레인의 것**이다(라운드마다, 그리고 base 가 움직이면 다시 낸다) — 다른 레인의 줄이 없으므로 `--source=<base>` 복원이 hunk 역적용과 **같은 결과**를 낸다(다른 slice 의 줄은 base 쪽에 있어 복원으로 보존된다). 라운드가 더 붙어 그 목록에 다른 레인의 해시가 나타나면 그때는 `git diff <sha>~1..<sha> -- <파일> | git apply -R` 로 **자기 커밋만** 역적용하고, 삽입 지점이 인접해 자동 해소가 깨지면(`--3way` 도 실패한다) 지울 블록과 남길 블록을 이름으로 적어 수동 해소한다.
 
 **하네스 레인 변경은 이 range 에 없다** — `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다.
 
@@ -55,12 +55,12 @@ git restore --source=<base> --staged --worktree -- "${P[@]}"
 
 **payload 형식 되돌림은 이 slice 의 되돌리기 어려운 자리가 아니다.** `payload_type` 토큰을 바꾸지 않고 칸만 늘렸으므로 되돌린 codec 은 20칸 행을 「필드 수 불일치」로 **거부한다**(fail-closed, 조용히 틀리지 않는다). 그 행이 존재하려면 커밋 러너나 relay 가 돌아간 적이 있어야 한다 — 그랬다면 되돌린 뒤 relay 가 그 행에서 멈추므로, 운영자는 ⓐ 그 행들을 수동으로 `ISOLATED` 로 보내거나 ⓑ 코드를 재적용해 소비시킨 뒤 다시 되돌린다. 돌아간 적이 없으면(기본 꺼짐) 그런 행은 0 이다.
 
-## 실측 ①~⑥ (버릴 clone, 실측 HEAD `2bc08209`)
+## 실측 ①~⑥ (버릴 clone, 실측 HEAD `3db918ab`)
 
 | # | 무엇 | 결과 |
 |---|---|---|
 | ① | `git restore` 명령 종료 코드 | 0 |
-| ② | 되돌린 뒤 상태별 수 | `D` 40 · `M` 29 (합 69 = 복원 목록 길이) |
+| ② | 되돌린 뒤 상태별 수 | `D` 44 · `M` 29 (합 73 = 복원 목록 길이) |
 | ③ | 되돌린 경로의 `git diff <base> -- <경로들>` | 빈 출력 (base 와 동일) |
 | ③b | **남의 줄이 남았는가** — 되돌리지 않은 **일곱 경로**의 `git status --porcelain` | 빈 출력 (위 「되돌리지 않는 넷」의 셋 + 이 slice 의 evidence 넷. 셈이 두 자리에서 어긋났던 자리라 둘을 명령으로 낸다 — R2-L-5 → R3-L-2) |
 | ④ | `./gradlew --no-daemon --rerun-tasks :app:compileTestKotlin` 외 두 모듈 | exit 0. **`--rerun-tasks` 를 쓴 이유**: 공유 Gradle 캐시 때문에 첫 실행이 14초였고 그것은 「컴파일했다」의 증거가 아니다(1분 15초 재실행으로 확인). 되돌린 트리에 `app/build/classes/.../app/relay/` 가 **없다**는 것이 복원이 실제로 일어난 증거다 |
