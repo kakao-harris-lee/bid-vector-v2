@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 프로세스 사망의 in-JVM 등가이고, 죽은 조립의 임대가 실제로 풀렸다는 사실은 둘째 relay 가
  * `Busy` 를 받지 **않는다**는 것으로 잰다 — 그 반대(살아 있는 홀더 → `Busy`)를 R-5 가 잰다.
  *
- * **크래시는 순번이 아니라 사건에 걸린다**([PipelineRelayInjection] 의 술어들). 발송 계수는
+ * **크래시는 순번이 아니라 사건에 걸린다**([EventTriggeredTransactions] 의 술어들). 발송 계수는
  * 조립마다 sender 가 다르므로 **두 조립의 합**으로 센다 — 「발송 0 또는 1」은 그 합이다.
  *
  * **격리는 production 이 한다** — 이 파일에는 상태 강제(`forceOutboxState` 류)가 없다. 고아는
