@@ -28,8 +28,8 @@ private val LOCK_QUERY_MARKERS = listOf("advisory_lock", "advisory_unlock")
  * B 로 보낸다. 그러면 잠금은 A 의 backend 가 들고 있고 probe 는 B 의 backend 에서 돌아,
  * 실제 pooler 뒤에서 벌어지는 「둘이 동시에 `Held`」의 입력이 그대로 재현된다.
  *
- * 무엇을 주장하지 않는가: 이 test 는 pooler **지원**을 뜻하지 않는다(알려진 제한 21 그대로).
- * 재는 것은 「그 어긋남을 **조용히 넘기지 않는다**」 한 줄이고, 그 문장이 제한 21 에 있다.
+ * 무엇을 주장하지 않는가: 이 test 는 pooler **지원**을 뜻하지 않는다(알려진 제한 22 그대로).
+ * 재는 것은 「그 어긋남을 **조용히 넘기지 않는다**」 한 줄이고, 그 문장이 제한 22 에 있다.
  */
 class PoolerLeaseProbeTest : PersistenceTestSupport() {
     @Test
