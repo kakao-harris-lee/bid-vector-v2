@@ -110,3 +110,11 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`; 공
 | ID | 결정 | 근거 |
 |---|---|---|
 | **D-6D2-4** | **사용자 결정: swap 2GB 규칙 1회 예외 적용**(착수 실측 available 14.6GB · swap free 1.94GB · Gradle daemon 0). 이 slice 안에서 Gradle 은 available ≥ 6GB · swap free ≥ 1GB 면 **하나씩** 허용, swap free 1GB 아래면 즉시 중단·보고. 규칙 자체(2GB)는 유지 — 다음 slice 에는 적용되지 않는다 | 사용자 2026-10-07 |
+
+## 계약 갱신 r3 (2026-10-07, 팀장 — 구현 수령·동결 · 판정 표적)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D2-5** | **구현 수령·동결.** 레인 커밋 ①~⑧(`c89e01b6`…`8af675c1`·evidence `dcc72cd4`; 보고 `_workspace/m6-6d2/02_implementer_report.md`). 팀장 대조: in_scope 밖 변경 0 · production·migration·CI·docker diff **0** · `internal` 완화 0 · 크기 게이트(산출물 765 줄 ≥ evidence 395 줄) · 새 파일 셋 전부 e2e 디렉터리 안(계약 갱신 불필요) · Gradle daemon 0. **마지막 산출물 커밋 `8af675c1` = rollback 실측 HEAD**. **판정 SHA = 이 r3 커밋**(ADR §7.6 커밋 뒤). 레인 자기 신고 — clean-tree 양성 대조 복원에 `git checkout HEAD --` 1회(금지 위반, 손실 0, 두 번째 측정이 정본) — **사실로 선언**, 이력 되쓰기 없음 | 레인 보고 · 팀장 대조 |
+| **D-6D2-6** | **B-2 (a) 등재 완료** — ADR 0005 **§7.6** 「at-most-once 가 막는 것은 entry 의 재실행이지 키의 재발생이 아니다」(R-2 실측 발송 합 2, 공유 파일 별도 커밋). 설계 검토 (2b) 문면 둘은 레인 실측대로 정정 — 주입 조립의 비-MAIN 은 wrapper + hook 람다 둘이고 감싸인 production 경계는 `delegate` 로 **함께 보인다**(「대체해 숨는」 모양이 아니라 「앞에 덧대어 드러나는」 모양). 레인이 만든 `EventTriggeredTransactions` 는 `InterferingTransactions`(호출 순번) 와 다른 사건 술어라 사본이 아니다 — 수용 | 레인 보고 |
+| **D-6D2-7** | **verifier 표적**(opus, 판정 SHA 에서): ① acceptance 둘 재실측(`check` 의 `:adapters:test` 실제 실행 확인, FROM-CACHE 불인정) ② 계약이 맡긴 production 변이 둘 — `isolateOrphans` 호출 제거 → R-1 RED · claim SQL `WHERE state` 제거 → D-2 RED — 와 레인 표 여덟 중 **production 둘** 재현(inbox 판정 뒤집기 · 정책 버전 사용 자리 교체) ③ 우회 고안 ≥3(특히: 재기동 run 이 PENDING 을 새로 집어 「발송 ≤ 1」이 우연히 성립하는 모양 · R-5 가 Busy 를 **같은 세션**에서 얻는 모양 · typed 등식이 두 run 을 서로만 비교하는 모양) ④ (2b) 경계 행 — 정직한 조립의 그래프에 비-MAIN 0 · wrapper 조립에서 RED 를 실측 ⑤ rollback 유효성 `git diff --name-only 8af675c1..<판정 SHA> -- adapters/src/test/kotlin/bidvector/adapters/e2e config/quality/gate-tests.properties` 빈 출력 ⑥ 장부(좌표·축어·크기·누출 참조형) ⑦ 호스트 D-6D2-4(available ≥ 6GB · swap ≥ 1GB, 하나씩, 미달 시 중단·보고). **code-reviewer(sonnet) 병렬** — test 설계 결함·공허한 초록·시한 의존·사본 | 하네스 |
