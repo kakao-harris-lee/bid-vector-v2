@@ -5,14 +5,6 @@ import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
-import java.sql.SQLException
-
-/** 예외에서 로그에 실어도 되는 원인 코드만 뽑는다 — SQL 예외는 SQLSTATE 5자리만 더한다(메시지 없음). */
-private fun causeCodeOf(failure: Exception): String =
-    when (failure) {
-        is SQLException -> "${failure.javaClass.name}:sqlState=${failure.sqlState}"
-        else -> failure.javaClass.name
-    }
 
 /**
  * 일회성 relay 러너(D-6F10-18 ⑧) — `bidvector.relay.mode=once` 일 때만 빈으로 등록된다
@@ -50,7 +42,7 @@ class NotificationRelayRunner(
             try {
                 run.relay(limit)
             } catch (failure: Exception) {
-                log.write(relayFailureLine(causeCodeOf(failure)))
+                log.write(relayFailureLine(causeCodeOf(failure), partialOf(failure)))
                 termination.terminate(RelayExitCode.FAILED.value)
                 return
             }

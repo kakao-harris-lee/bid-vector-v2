@@ -1,5 +1,6 @@
 package bidvector.app.relay
 
+import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 import io.kotest.matchers.shouldBe
@@ -122,9 +123,54 @@ class RelayExitCodeTest {
     fun `완료 로그 줄은 계수 일곱을 싣는다 — 공고 내용은 싣지 않는다`() {
         val report = completed(orphansIsolated = 1, claimed = 3, delivered = 1, skippedDuplicates = 1, failed = 1)
 
+        // exit 는 **2** 다 — 고아를 하나 태웠다(PR #63 finding 2 로 이 핀을 뒤집었다).
         relayFinishLine(report, exitCodeOf(report)) shouldBe
             "relay finished orphansIsolated=1 claimed=3 delivered=1 skippedDuplicates=1 " +
-            "failed=1 isolated=0 unknownPayload=0 exit=0"
+            "failed=1 isolated=0 unknownPayload=0 exit=2"
+    }
+
+    /**
+     * **PR #63 finding 2** — 고아 격리는 **알림을 영구히 잃는 사건**이라(`ISOLATED` 에서 나가는
+     * 간선 0) 그 run 은 0 일 수 없다. 앞 판은 이 계수를 보지 않아 고아 50 을 태운 run 이
+     * exit 0 이었다 — 열거가 세는 사건 가운데 가장 센 것이 가장 약한 신호를 냈다.
+     *
+     * **다른 두 갈래를 거짓으로** 둔 표본이다: 미지 payload 0, 전달 1(발송 경로는 살아 있다).
+     * 그래서 이 한 갈래만으로 붉어야 한다.
+     */
+    @Test
+    fun `고아를 태운 run 은 전달이 있어도 INCOMPLETE 다 — 가운데 항 단독`() {
+        val report = completed(orphansIsolated = 1, claimed = 1, delivered = 1)
+
+        exitCodeOf(report) shouldBe RelayExitCode.INCOMPLETE
+    }
+
+    /** 고아 0 이면 그 갈래는 거짓이다 — 위 test 가 「늘 INCOMPLETE」 구현에서도 초록이 아니게. */
+    @Test
+    fun `고아가 없고 전부 전달되면 COMPLETE 다 — 가운데 항 음성 대조`() {
+        exitCodeOf(completed(orphansIsolated = 0, claimed = 1, delivered = 1)) shouldBe RelayExitCode.COMPLETE
+    }
+
+    /**
+     * **PR #63 finding 4** — 실패 줄이 **그때까지의 집계를 싣는다.** [partialOf] 가 그 값을
+     * 예외에서 꺼내고(없으면 null), [relayFailureLine] 이 그것을 줄에 붙인다. 러너는 이 둘을
+     * 이어 붙이기만 한다 — 그래서 결정 내용이 순수 함수 둘로 측정된다.
+     */
+    @Test
+    fun `실패 줄은 부분 집계를 싣는다 — 없으면 싣지 않는다`() {
+        val partial = completed(orphansIsolated = 1, claimed = 20, delivered = 12)
+
+        relayFailureLine("Boom", partial) shouldBe
+            "relay failed cause=Boom orphansIsolated=1 claimed=20 delivered=12 " +
+            "skippedDuplicates=0 failed=0 isolated=0 unknownPayload=0"
+        relayFailureLine("Boom", null) shouldBe "relay failed cause=Boom"
+    }
+
+    @Test
+    fun `부분 집계는 RelayAborted 만 나른다`() {
+        val partial = completed(claimed = 20, delivered = 12)
+
+        partialOf(RelayAborted(partial, IllegalStateException("전이 실패"))) shouldBe partial
+        partialOf(IllegalStateException("그냥 터짐")) shouldBe null
     }
 }
 

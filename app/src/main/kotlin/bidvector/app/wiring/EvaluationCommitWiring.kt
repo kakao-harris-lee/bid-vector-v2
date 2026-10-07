@@ -83,7 +83,6 @@ open class EvaluationCommitWiring {
         mlAnalysisPort: MlAnalysisPort,
         correlationIdFactory: CorrelationIdFactory,
         clock: Clock,
-        evaluationProperties: EvaluationProperties,
         commitProperties: EvaluationCommitProperties,
     ): EvaluationCommitRun {
         require(commitProperties.currentActiveBids >= 0) {

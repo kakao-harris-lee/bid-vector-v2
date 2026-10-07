@@ -124,12 +124,12 @@ internal class BusyLease : ConsumerLeasePort {
  * [heldFor] 번 묻는 동안만 쥐고 있다고 답하는 임대(R1-M-1) — 「본문 도중에 잃는다」를 fake 로
  * 표현한다. 실 DB 쪽 측정은 `RelayLeaseLossDatabaseTest` 가 임대 연결을 실제로 끊어서 한다.
  *
- * **호출 서수가 곧 지점이다**(다섯 자리 — D-6F10-31 ② 의 넷 + cr T-1 의 격리 루프 안쪽).
- * 1 = 획득 직후 · 2 = 고아 목록을 읽기 전 · 3..(2+고아 수) = **고아마다 태우기 전** ·
- * 그 다음 = claim 전 · 그 다음부터 = 행마다 발송 전.
+ * **호출 서수가 곧 지점이다**(네 자리). 1 = 획득 직후(= 고아 목록을 읽기 전 — 둘 사이에
+ * 질의가 없어 PR #63 finding 7 로 중복 하나를 걷었다) · 2..(1+고아 수) = **고아마다 태우기
+ * 전** · 그 다음 = claim 전 · 그 다음부터 = 행마다 발송 전.
  *
  * 그래서 서수는 **고아 수에 따라 밀린다** — 고아가 0 이면 격리 루프가 아무것도 묻지 않아
- * 3 이 곧 claim 전이고, 고아가 1 이면 3 이 그 고아, 4 가 claim 전이다. 지점을 더하거나 옮기면
+ * 2 가 곧 claim 전이고, 고아가 1 이면 2 가 그 고아, 3 이 claim 전이다. 지점을 더하거나 옮기면
  * 이 대응이 깨지고 아래 test 들이 붉어진다 — 그것이 의도다(순서를 조용히 바꾸지 못하게 한다).
  */
 internal class LosingLease(
@@ -230,4 +230,41 @@ private fun <P> outboxRow(
         idempotencyKey = IdempotencyKey(idempotencyKey),
         actor = null,
         payload = payload,
+    )
+
+/** 공유 claim 상한 — 값 자체는 중요하지 않다(배치가 한 번에 다 들어갈 만큼). */
+internal const val RELAY_LIMIT = 10
+
+internal fun delivered(): DeliveryResult.Delivered =
+    DeliveryResult.Delivered(RELAY_NOW, MaskedTarget.mask("01012345678", relayPolicy(DeliveryMode.Live)))
+
+/**
+ * 두 test 클래스가 공유하는 조립(§5 중복 금지) — `RelayOutboxNotificationsTest`(처분 어휘·경계)와
+ * `RelayLeaseLossTest`(임대 상실 네 지점)가 같은 모양을 쓴다.
+ */
+internal fun relay(
+    outbox: OutboxPort,
+    inbox: FakeInboxPort,
+    sender: ScriptedSender,
+    leases: ConsumerLeasePort = GrantingLease(),
+    transactions: ConsumerTransactionPort = CountingTransactions(),
+    routes: RouteDirectory = SingleRouteDirectory(),
+    policy: NotificationDeliveryPolicyData = relayPolicy(DeliveryMode.Live),
+): RelayOutboxNotifications =
+    RelayOutboxNotifications(
+        outbox = outbox,
+        inbox = inbox,
+        dispatcher =
+            DispatchNotification(
+                routes = routes,
+                renderer = EchoRenderer(),
+                sender = sender,
+                policyData = policy,
+                environment = RuntimeEnvironment.Production,
+            ),
+        leases = leases,
+        transactions = transactions,
+        target = RELAY_TARGET,
+        environment = RuntimeEnvironment.Production,
+        policy = policy,
     )

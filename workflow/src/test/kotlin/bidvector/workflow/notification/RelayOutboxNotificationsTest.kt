@@ -12,8 +12,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 
-private const val RELAY_LIMIT = 10
-
 /**
  * relay 의 어휘 해석표(D-6F10-12)와 순서(D-6F10-3)를 fake port 로 잰다 — mock framework 0.
  *
@@ -223,250 +221,58 @@ class RelayOutboxNotificationsTest {
     }
 
     /**
-     * R1-M-1 — 본문 **도중에** 임대를 잃으면 남은 행을 건드리지 않고 멈춘다. verifier probe
-     * V6b 가 실측한 것: 임대 연결만 끊겨도(프로세스는 살아 있다) 다음 relay 가 임대를 쥐고
-     * 첫째의 in-flight `CLAIMED` 를 고아로 읽어 격리한다. 중복 발송은 0 이지만 발송된 행이
-     * `ISOLATED` 로 표기되고 첫째 배치의 미발송 행은 놓친다.
-     *
-     * 멈춤의 증거는 **계수 차이**다 — `claimed` 는 2 인데 처분은 1 개다(남은 하나는 건드리지
-     * 않았다). 그 차이가 곧 「`CLAIMED` 에 남아 다음 run 이 받을 행 수」다.
-     */
-    @Test
-    fun `본문 도중 임대를 잃으면 남은 행을 건드리지 않고 멈춘다 — LeaseLost`() {
-        val outbox = FakeOutboxPort(pending = listOf(notificationRow("keep"), notificationRow("drop")))
-        val inbox = FakeInboxPort()
-        val sender = ScriptedSender(delivered())
-
-        val report =
-            relay(outbox, inbox, sender, leases = LosingLease(heldFor = 4))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.claimed shouldBe 2
-        report.partial.delivered shouldBe 1
-        outbox.delivered shouldBe listOf(OutboxEntryId("keep"))
-        // 둘째 행은 어느 종단으로도 가지 않았다 — 건드리지 않은 것이 처분이다.
-        outbox.failed.shouldBeEmpty()
-        outbox.isolated.shouldBeEmpty()
-        sender.requests.map { it.idempotencyKey.value } shouldBe listOf("key-keep")
-    }
-
-    /**
-     * 집은 뒤 **첫 행 앞**에서 잃으면 한 행도 발송하지 않는다 — `claimed` 는 1 인데 처분이
-     * 0 이다(그 행은 `CLAIMED` 에 남아 다음 run 의 고아가 된다).
-     */
-    @Test
-    fun `첫 행 앞에서 임대를 잃으면 발송이 0 이다`() {
-        val outbox = FakeOutboxPort(pending = listOf(notificationRow("none")))
-        val sender = ScriptedSender(delivered())
-
-        val report =
-            relay(outbox, FakeInboxPort(), sender, leases = LosingLease(heldFor = 3))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.claimed shouldBe 1
-        report.partial.delivered shouldBe 0
-        sender.requests.shouldBeEmpty()
-        outbox.delivered.shouldBeEmpty()
-    }
-
-    /**
-     * D-6F10-31 ② — **획득 직후**에 잃으면 고아 목록을 읽지도 않는다. 앞 판은 이 지점에
-     * 검사가 없어, 임대를 이미 잃은 relay 가 새 홀더의 in-flight 행을 고아로 격리했다
-     * (verifier r2 probe V6c). 고아와 집을 행을 **둘 다 심어** 「아무것도 안 했다」가
-     * 값으로 보이게 한다.
-     */
-    @Test
-    fun `획득 직후에 임대를 잃으면 격리도 claim 도 하지 않는다`() {
-        val outbox =
-            FakeOutboxPort(
-                pending = listOf(notificationRow("send")),
-                orphans = listOf(notificationRow("orphan")),
-            )
-        val sender = ScriptedSender(delivered())
-        val leases = LosingLease(heldFor = 0)
-
-        val report =
-            relay(outbox, FakeInboxPort(), sender, leases = leases)
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        // **첫 물음에서 멈췄다** — 더 물었다면 그 사이에 질의가 돌았다는 뜻이다(cr R-13 ⓐ).
-        leases.asked shouldBe 1
-
-        report.partial.orphansIsolated shouldBe 0
-        report.partial.claimed shouldBe 0
-        outbox.isolated.shouldBeEmpty()
-        outbox.claimedEntriesKinds.shouldBeEmpty()
-        outbox.claimedKinds.shouldBeEmpty()
-        sender.requests.shouldBeEmpty()
-    }
-
-    /** **고아 격리 전** 지점 — 격리 질의 자체가 돌지 않는다(읽기도 하지 않는다). */
-    @Test
-    fun `고아 격리 전에 임대를 잃으면 고아 목록을 읽지 않는다`() {
-        val outbox = FakeOutboxPort(orphans = listOf(notificationRow("orphan")))
-
-        val report =
-            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 1))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.orphansIsolated shouldBe 0
-        outbox.claimedEntriesKinds.shouldBeEmpty()
-        outbox.isolated.shouldBeEmpty()
-    }
-
-    /**
-     * **claim 전** 지점 — 격리는 이미 끝났으므로 계수에 남고(숨기지 않는다), claim 은 돌지
-     * 않는다. 두 relay 가 같은 종류를 동시에 소비하는 것을 막는 자리다.
-     */
-    @Test
-    fun `claim 전에 임대를 잃으면 격리 계수만 남고 집지 않는다`() {
-        val outbox =
-            FakeOutboxPort(
-                pending = listOf(notificationRow("send")),
-                orphans = listOf(notificationRow("orphan")),
-            )
-
-        // 고아가 하나라 서수 3 은 그 고아, 4 가 claim 전이다(cr T-1 로 지점이 하나 늘었다).
-        val report =
-            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 3))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.orphansIsolated shouldBe 1
-        report.partial.claimed shouldBe 0
-        outbox.isolated shouldBe listOf(OutboxEntryId("orphan"))
-        outbox.claimedKinds.shouldBeEmpty()
-    }
-
-    /**
-     * **cr T-1** — 고아를 태우는 **도중**에 임대를 잃으면 멈춘다. 격리는 단방향 종단이라
-     * (`ISOLATED` 에서 나가는 간선 0) 임대 없이 태운 행은 애플리케이션 경로로 되살릴 수 없다 —
-     * 그래서 되돌릴 수 있는 발송 루프보다 **더** 촘촘해야 한다. 앞 판은 목록을 읽기 전 한 번만
-     * 물어서, 첫째를 태우는 사이에 잃으면 남은 전부를 임대 없이 태웠다.
-     *
-     * 고아 둘 가운데 **하나만** 태워지고 둘째가 손대지지 않은 것이 증거다 — 계수와 port 기록
-     * 둘 다로 잰다(계수만 보면 「둘 다 태우고 1 을 보고하는」 구현도 초록이다).
-     */
-    @Test
-    fun `고아를 태우는 도중에 임대를 잃으면 남은 고아를 건드리지 않는다`() {
-        val outbox =
-            FakeOutboxPort(
-                pending = listOf(notificationRow("send")),
-                orphans = listOf(notificationRow("orphan-1"), notificationRow("orphan-2")),
-            )
-
-        // 1 획득 · 2 목록 전 · 3 첫 고아(참) · 4 둘째 고아(거짓).
-        val report =
-            relay(outbox, FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 3))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.orphansIsolated shouldBe 1
-        report.partial.claimed shouldBe 0
-        outbox.isolated shouldBe listOf(OutboxEntryId("orphan-1"))
-        outbox.claimedKinds.shouldBeEmpty()
-    }
-
-    /**
-     * **R3-L-1 / cr T-2** — 획득 직후 검사가 **억제 판정보다 앞**이라는 것을 잠근다.
-     *
-     * 왜 이 한 건이 필요했나: 다른 임대 test 는 전부 Live 환경에서 돌아, 두 갈래의 순서를
-     * 뒤바꾸는 변이가 상설 test 전부 초록이었다(verifier r3 probe P1s). 억제 환경에서만 둘이
-     * 갈린다 — 순서가 지금대로면 `LeaseLost`(종료 코드 1), 뒤바뀌면 `Skipped`(종료 코드 4).
-     *
-     * 어느 쪽이 맞는가: 「임대를 잃었다」가 더 센 신호다. 억제는 설정을 고치면 풀리는 상태인데,
-     * 임대 상실은 **배타성이 깨진** 상태라 같은 run 을 다시 돌리는 것이 안전하지 않다.
-     */
-    @Test
-    fun `억제 환경에서도 획득 직후 임대 상실이 억제보다 앞이다`() {
-        val outbox = FakeOutboxPort(orphans = listOf(notificationRow("orphan")))
-
-        val report =
-            relay(
-                outbox,
-                FakeInboxPort(),
-                ScriptedSender(delivered()),
-                leases = LosingLease(heldFor = 0),
-                policy = relayPolicy(DeliveryMode.DryRun),
-            ).relay(RELAY_LIMIT)
-
-        report.shouldBeInstanceOf<RelayReport.LeaseLost>()
-        report.partial.orphansIsolated shouldBe 0
-        outbox.claimedEntriesKinds.shouldBeEmpty()
-    }
-
-    /**
-     * **집을 행이 0 이어도 guard 를 본다**(probe V6c 의 핵심). 앞 판은 검사가 행 루프 안에만
-     * 있어 빈 배치에서 guard 가 한 번도 불리지 않고 `Completed` + 종료 코드 0 이 났다 —
-     * 「임대를 잃었는데 성공으로 보고한다」. 이 test 는 그 자리가 `LeaseLost` 임을 잠근다.
-     */
-    @Test
-    fun `집을 행이 0 이어도 임대 상실은 LeaseLost 다`() {
-        val report =
-            relay(FakeOutboxPort(), FakeInboxPort(), ScriptedSender(delivered()), leases = LosingLease(heldFor = 2))
-                .relay(RELAY_LIMIT)
-                .shouldBeInstanceOf<RelayReport.LeaseLost>()
-
-        report.partial.claimed shouldBe 0
-        report.partial.delivered shouldBe 0
-    }
-
-    /**
      * 전이표가 거부하면 **조용히 넘기지 않는다** — 그 거부는 업무 분기가 아니라 표가 바뀌었다는
      * 뜻이다. `claimedEntries` 가 `Claimed` 아닌 행을 돌려주는 정직하지 않은 어댑터를 흉내 내
      * 그 자리가 던지는 것을 잰다.
      */
     @Test
-    fun `종단 전이가 port 에서 실패하면 예외가 run 밖으로 나간다`() {
+    fun `종단 전이가 port 에서 실패하면 집계를 실은 예외가 run 밖으로 나간다`() {
         val outbox = ThrowingOutboxPort()
 
-        shouldThrow<IllegalStateException> {
-            relay(outbox, FakeInboxPort(), ScriptedSender(delivered())).relay(RELAY_LIMIT)
-        }
+        val aborted =
+            shouldThrow<RelayAborted> {
+                relay(outbox, FakeInboxPort(), ScriptedSender(delivered())).relay(RELAY_LIMIT)
+            }
+
+        // 원인은 가려지지 않는다 — 그 위에 집계가 얹힌 것이다(PR #63 finding 4).
+        aborted.cause.shouldBeInstanceOf<IllegalStateException>()
+        aborted.partial.claimed shouldBe 1
+        aborted.partial.delivered shouldBe 0
+    }
+
+    /**
+     * **집계가 실제로 누적된 뒤 터진다**(PR #63 finding 4 의 요점) — 앞 행들의 처분이 실려야
+     * 운영자가 「얼마나 갔는가」를 안다. 셋째 행에서 터지게 해 **둘은 전달됐다**를 잰다.
+     */
+    @Test
+    fun `도중에 터지면 그때까지의 처분이 집계에 실린다`() {
+        val outbox = ThrowingOutboxPort(failAfterDelivered = 2)
+
+        val aborted =
+            shouldThrow<RelayAborted> {
+                relay(outbox, FakeInboxPort(), ScriptedSender(delivered())).relay(RELAY_LIMIT)
+            }
+
+        aborted.partial.claimed shouldBe 3
+        aborted.partial.delivered shouldBe 2
     }
 }
 
-private fun delivered(): DeliveryResult.Delivered =
-    DeliveryResult.Delivered(RELAY_NOW, MaskedTarget.mask("01012345678", relayPolicy(DeliveryMode.Live)))
-
 /**
- * `markDelivered` 가 던지는 port — 계수 계약(D-6F10-2)의 실패가 relay 를 지나 run 밖으로
- * 올라오는지 잰다. 나머지 동작은 [FakeOutboxPort] 에 위임한다(그 한 메서드만 바꿔치운다 —
- * 「더하기만 한 변이는 초록」의 반대로, 바꿔치운 행동이 test 에 보이게).
+ * `markDelivered` 가 [failAfterDelivered] 건 뒤에 던지는 port — 계수 계약(D-6F10-2)의 실패가
+ * relay 를 지나 run 밖으로 나가고 **그때까지의 집계가 실리는지** 잰다(PR #63 finding 4).
+ * 나머지 동작은 [FakeOutboxPort] 에 위임한다(그 한 메서드만 바꿔치운다 — 「더하기만 한 변이는
+ * 초록」의 반대로, 바꿔치운 행동이 test 에 보이게).
  */
 private class ThrowingOutboxPort(
-    private val delegate: FakeOutboxPort = FakeOutboxPort(pending = listOf(notificationRow("boom"))),
+    private val failAfterDelivered: Int = 0,
+    private val delegate: FakeOutboxPort =
+        FakeOutboxPort(
+            pending = (0..failAfterDelivered).map { notificationRow("boom-$it") },
+        ),
 ) : OutboxPort by delegate {
-    override fun markDelivered(transition: OutboxTransition.ToDelivered): Unit = error("전이가 행을 옮기지 못했다")
+    override fun markDelivered(transition: OutboxTransition.ToDelivered) {
+        if (delegate.delivered.size >= failAfterDelivered) error("전이가 행을 옮기지 못했다")
+        delegate.markDelivered(transition)
+    }
 }
-
-private fun relay(
-    outbox: OutboxPort,
-    inbox: FakeInboxPort,
-    sender: ScriptedSender,
-    leases: ConsumerLeasePort = GrantingLease(),
-    transactions: ConsumerTransactionPort = CountingTransactions(),
-    routes: RouteDirectory = SingleRouteDirectory(),
-    policy: NotificationDeliveryPolicyData = relayPolicy(DeliveryMode.Live),
-): RelayOutboxNotifications =
-    RelayOutboxNotifications(
-        outbox = outbox,
-        inbox = inbox,
-        dispatcher =
-            DispatchNotification(
-                routes = routes,
-                renderer = EchoRenderer(),
-                sender = sender,
-                policyData = policy,
-                environment = RuntimeEnvironment.Production,
-            ),
-        leases = leases,
-        transactions = transactions,
-        target = RELAY_TARGET,
-        environment = RuntimeEnvironment.Production,
-        policy = policy,
-    )

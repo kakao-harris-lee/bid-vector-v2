@@ -2,6 +2,7 @@ package bidvector.adapters.relay
 
 import bidvector.adapters.event.ConsumerTransactions
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 import bidvector.workflow.notification.RuntimeEnvironment
@@ -34,7 +35,52 @@ class RelayDatabaseTest : PersistenceTestSupport() {
                 },
             )
 
-        shouldThrow<IllegalStateException> { harness.relay.relay(RELAY_DB_LIMIT) }
+        val aborted = shouldThrow<RelayAborted> { harness.relay.relay(RELAY_DB_LIMIT) }
+
+        aborted.cause.shouldBeInstanceOf<IllegalStateException>()
+    }
+
+    /**
+     * **PR #63 finding 4 의 회귀 test** — 배치 중간에서 터지면 **그때까지의 집계가 예외에 실린다.**
+     *
+     * 리뷰가 든 모양 그대로다: 스물을 집고 **열셋째** 행의 T2 에서 터진다. 앞 판은 예외를 그대로
+     * 통과시켜 「열둘 전달·나머지 좌초」가 보고에도 로그에도 없었다 — 운영자가 보는 것은 사유
+     * 코드 한 줄이라, **집기도 전에** 터진 run 과 구별되지 않았다.
+     *
+     * 좌초 여덟의 구성을 가른다: 하나(열셋째)는 **발송된 뒤** 종단 전이를 못 한 행이고
+     * (at-most-once 가 감수하는 손실) 일곱은 손대지 않은 행이다. 다음 run 의 고아 격리가 여덟
+     * 전부를 태운다 — 그것이 이 집계가 로그에 있어야 하는 이유다.
+     *
+     * 상한을 [ROWS_IN_BATCH] 로 준다 — 공유 상한(`RELAY_DB_LIMIT` = 10)으로는 열셋째 행에
+     * 닿지 못한다(한 배치가 열 건이다).
+     *
+     * 주입은 **사건**에 건다 — 발송 수가 열셋이 된 **그 다음 경계 호출**이 그 행의 T2 다.
+     * 순번에 걸면 경계 호출 수를 바꾸는 변이에서 주입이 사라져 아래 단언이 돌지 않는다.
+     */
+    @Test
+    fun `배치 중간에서 터지면 그때까지의 집계가 예외에 실린다`() {
+        repeat(ROWS_IN_BATCH) { index -> insertPendingNotificationRow(dataSource(), "batch-%02d".format(index)) }
+        lateinit var harness: RelayHarness
+        harness =
+            RelayHarness(
+                dataSource(),
+                transactionsFor = { boundary ->
+                    CrashAfterDispatch(ConsumerTransactions(boundary)) {
+                        harness.sender.sentKeys().size == DISPATCHED_BEFORE_FAILURE
+                    }
+                },
+            )
+
+        val aborted = shouldThrow<RelayAborted> { harness.relay.relay(ROWS_IN_BATCH) }
+
+        aborted.partial.claimed shouldBe ROWS_IN_BATCH
+        aborted.partial.delivered shouldBe DISPATCHED_BEFORE_FAILURE - 1
+        aborted.cause.shouldBeInstanceOf<RelayWorkerDied>()
+        outboxStateCounts(dataSource()) shouldBe
+            mapOf(
+                "DELIVERED" to DISPATCHED_BEFORE_FAILURE - 1,
+                "CLAIMED" to ROWS_IN_BATCH - DISPATCHED_BEFORE_FAILURE + 1,
+            )
     }
 
     /**
@@ -56,7 +102,9 @@ class RelayDatabaseTest : PersistenceTestSupport() {
                 },
             )
 
-        shouldThrow<RelayWorkerDied> { harness.relay.relay(RELAY_DB_LIMIT) }
+        val aborted = shouldThrow<RelayAborted> { harness.relay.relay(RELAY_DB_LIMIT) }
+
+        aborted.cause.shouldBeInstanceOf<RelayWorkerDied>()
 
         harness.sender.sentKeys() shouldBe listOf("notification-crash-1")
         outboxStateCounts(dataSource()) shouldBe mapOf("CLAIMED" to 1)
@@ -141,3 +189,9 @@ class RelayDatabaseTest : PersistenceTestSupport() {
  * 지점이 순번으로만 표현된다). 크래시 주입은 순번을 쓰지 않는다(R1-L-4).
  */
 private const val T2_CALL_INDEX = 4
+
+/** 리뷰가 든 배치 크기 — 스물을 집는다. */
+private const val ROWS_IN_BATCH = 20
+
+/** 열셋째 행이 발송된 직후(그 행의 T2)에서 터진다 — 전달은 열둘에서 멈춘다. */
+private const val DISPATCHED_BEFORE_FAILURE = 13

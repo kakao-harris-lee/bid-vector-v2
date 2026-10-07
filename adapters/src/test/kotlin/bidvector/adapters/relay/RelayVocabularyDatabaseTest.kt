@@ -1,6 +1,8 @@
 package bidvector.adapters.relay
 
+import bidvector.adapters.event.outboxStateOf
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RuntimeEnvironment
@@ -28,7 +30,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
 
         report.skippedDuplicates shouldBe 1
         report.delivered shouldBe 0
-        stateOf(dataSource(), "dup-1") shouldBe "DELIVERED"
+        outboxStateOf(dataSource(), "dup-1") shouldBe "DELIVERED"
         harness.sender.sentKeys() shouldBe emptyList()
         // 키가 더 생기지 않는다 — 이미 있던 하나뿐이다.
         inboxKeyCount(dataSource()) shouldBe 1
@@ -42,7 +44,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
         val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.Completed>()
 
         report.failed shouldBe 1
-        stateOf(dataSource(), "suppressed-route-1") shouldBe "FAILED"
+        outboxStateOf(dataSource(), "suppressed-route-1") shouldBe "FAILED"
         harness.sender.sentKeys() shouldBe emptyList()
         inboxKeyCount(dataSource()) shouldBe 0
     }
@@ -55,7 +57,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
         val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.Completed>()
 
         report.failed shouldBe 1
-        stateOf(dataSource(), "rejected-1") shouldBe "FAILED"
+        outboxStateOf(dataSource(), "rejected-1") shouldBe "FAILED"
         harness.sender.sentKeys().size shouldBe 1
         inboxKeyCount(dataSource()) shouldBe 0
     }
@@ -69,7 +71,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
 
         report.isolated shouldBe 1
         report.unknownPayload shouldBe 0
-        stateOf(dataSource(), "unknown-1") shouldBe "ISOLATED"
+        outboxStateOf(dataSource(), "unknown-1") shouldBe "ISOLATED"
         inboxKeyCount(dataSource()) shouldBe 0
     }
 
@@ -89,8 +91,8 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
 
         report.orphansIsolated shouldBe 0
         report.delivered shouldBe 1
-        stateOf(dataSource(), "their-orphan") shouldBe "CLAIMED"
-        stateOf(dataSource(), "mine-1") shouldBe "DELIVERED"
+        outboxStateOf(dataSource(), "their-orphan") shouldBe "CLAIMED"
+        outboxStateOf(dataSource(), "mine-1") shouldBe "DELIVERED"
     }
 
     /**
@@ -113,10 +115,15 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
                 policy = relayNotificationPolicy(),
             )
 
-        val thrown = shouldThrow<IllegalStateException> { run.relay(RELAY_DB_LIMIT) }
+        // 행 처분 도중의 예외는 집계와 함께 올라온다(PR #63 finding 4) — 자리지킴의 사유는
+        // `cause` 에 그대로 있다(가려지지 않는다).
+        val aborted = shouldThrow<RelayAborted> { run.relay(RELAY_DB_LIMIT) }
 
-        thrown.message.orEmpty() shouldBe "배달 경로 구현이 없다 — OPEN-STR-12. relay 는 Live 환경에서만 이 자리에 닿는다"
+        aborted.cause.message.orEmpty() shouldBe
+            "배달 경로 구현이 없다 — OPEN-STR-12. relay 는 Live 환경에서만 이 자리에 닿는다"
+        aborted.partial.claimed shouldBe 1
+        aborted.partial.delivered shouldBe 0
         // 던지기 전에 claim 이 커밋됐다 = 경계를 세 참여자가 공유했다(T1 이 섰다).
-        stateOf(dataSource(), "assembly-1") shouldBe "CLAIMED"
+        outboxStateOf(dataSource(), "assembly-1") shouldBe "CLAIMED"
     }
 }

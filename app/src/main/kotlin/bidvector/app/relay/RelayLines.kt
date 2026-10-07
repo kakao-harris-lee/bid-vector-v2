@@ -1,5 +1,6 @@
 package bidvector.app.relay
 
+import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 
@@ -33,9 +34,15 @@ enum class RelayExitCode(
     FAILED(1),
 
     /**
-     * 실행은 끝났는데 **미완**이다(D-6F10-27 (7) 로 조건이 넓어졌다). 둘 중 하나다 —
-     * (a) 사유 불명으로 격리된 행이 있다(미지 payload) (b) **발송이 한 번도 성공하지 않았고
-     * 종단 실패가 있다**(`claimed > 0` 이고 `delivered == 0` 이고 `failed + isolated > 0`).
+     * 실행은 끝났는데 **미완**이다. 셋 중 하나다 — (a) 사유 불명으로 격리된 행이 있다(미지
+     * payload) (b) **고아를 하나라도 태웠다**(`orphansIsolated > 0` — PR #63 finding 2 로
+     * 더했다) (c) **발송이 한 번도 성공하지 않았고 종단 실패가 있다**(`claimed > 0` 이고
+     * `delivered == 0` 이고 `failed + isolated > 0`).
+     *
+     * (b) 를 더한 이유: 고아 격리는 **알림을 영구히 잃는 사건**이다(`ISOLATED` 에서 나가는
+     * 간선 0). 앞 판은 이 계수를 보지 않아 고아 50 을 태운 run 이 exit 0 이었고, 그것은 이
+     * 열거가 세는 사건들 가운데 **가장 센 것이 가장 약한 신호**를 내는 꼴이었다. 조건의
+     * 이력은 D-6F10-18 ⑧ → 27 ⑦ → 이 줄이다.
      *
      * (b) 의 문면을 술어 그대로 적는다(cr R-8) — 앞 판은 「집었는데 **전부** 거부·격리된」으로
      * 적어 **술어보다 좁았다.** 술어는 `delivered == 0` 만 보므로 「중복 다섯 + 거부 하나」 run
@@ -92,7 +99,10 @@ internal fun exitCodeOf(report: RelayReport): RelayExitCode =
  */
 private fun completedExitCodeOf(report: RelayReport.Completed): RelayExitCode {
     val nothingDelivered = report.claimed > 0 && report.delivered == 0 && report.failed + report.isolated > 0
-    return if (report.unknownPayload > 0 || nothingDelivered) {
+    // 고아 격리는 **알림을 영구히 잃는 사건**이다(PR #63 finding 2) — 앞 판은 이 계수를 보지
+    // 않아 고아 50 을 태운 run 이 exit 0 이었다. 격리는 되돌릴 간선이 없으므로 「끝났지만
+    // 미완」의 가장 센 사례다.
+    return if (report.unknownPayload > 0 || report.orphansIsolated > 0 || nothingDelivered) {
         RelayExitCode.INCOMPLETE
     } else {
         RelayExitCode.COMPLETE
@@ -135,4 +145,26 @@ private fun completedFields(report: RelayReport.Completed): String =
         "delivered=${report.delivered} skippedDuplicates=${report.skippedDuplicates} " +
         "failed=${report.failed} isolated=${report.isolated} unknownPayload=${report.unknownPayload}"
 
-internal fun relayFailureLine(causeCode: String): String = "relay failed cause=$causeCode"
+/**
+ * 실패 줄 — **그때까지의 집계를 함께 싣는다**(PR #63 finding 4). [partial] 이 null 이면 행
+ * 처분에 닿기도 전에 터진 것이라(예: 임대 획득 질의) 실을 계수가 없다.
+ *
+ * 계수를 싣는 이유: 운영자가 알아야 하는 것은 「터졌다」가 아니라 **얼마나 갔는가**다. 앞 판은
+ * 사유 코드만 남겨, 스물 집어 열둘 전달하고 열셋째에서 터진 run 과 집기도 전에 터진 run 이
+ * 로그에서 같아 보였다.
+ */
+internal fun relayFailureLine(
+    causeCode: String,
+    partial: RelayReport.Completed? = null,
+): String =
+    if (partial == null) {
+        "relay failed cause=$causeCode"
+    } else {
+        "relay failed cause=$causeCode ${completedFields(partial)}"
+    }
+
+/**
+ * 예외가 나르는 부분 집계 — [RelayAborted] 만 그것을 갖는다(순수 함수라 러너의 분기를 test 가
+ * 직접 칠 수 있다).
+ */
+internal fun partialOf(failure: Exception): RelayReport.Completed? = (failure as? RelayAborted)?.partial

@@ -3,16 +3,10 @@ package bidvector.app.evaluation
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
+import bidvector.app.relay.causeCodeOf
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
-import java.sql.SQLException
-
-private fun causeCodeOf(failure: Exception): String =
-    when (failure) {
-        is SQLException -> "${failure.javaClass.name}:sqlState=${failure.sqlState}"
-        else -> failure.javaClass.name
-    }
 
 /**
  * 일회성 평가 커밋 러너(D-6F10-18 ⑧, `OPEN-6A3-EVALUATION-COMMIT` 종결) —

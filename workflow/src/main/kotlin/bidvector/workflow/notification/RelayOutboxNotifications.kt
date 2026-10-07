@@ -106,8 +106,8 @@ sealed interface RelayReport {
  * **「전부 죽은 홀더의 것」은 아니다**(R1-M-1 이 반증, R2-L-4 로 문면 정정). advisory lock 을
  * 놓게 하는 것은 프로세스 사망이 아니라 **연결 단절**이므로, 프로세스가 살아 있는 홀더도
  * 임대를 잃는다 — 그 홀더가 아직 발송 중이면 그 행은 「살아 있는 남의 in-flight」다. 그래서
- * 이쪽은 [LeaseGuard] 로 네 지점에서 자기 임대를 되묻고, 그 확인 **밖에 남는 창**이 알려진
- * 제한 11 ⓐ·ⓑ 다.
+ * 이쪽은 [LeaseGuard] 로 네 지점에서 자기 임대를 되묻고, 그 확인 **밖에 남는 창**은 알려진
+ * 제한 15 가 센다.
  *
  * **환경 억제는 claim 자체를 하지 않는다**(ADR 0005 D-4 「억제는 기록 억제가 아니다」) — 행은
  * `PENDING` 으로 보존되고 상태 분포가 전후로 불변이다. claim 한 뒤 억제하면 어휘 밖 종단이
@@ -139,9 +139,10 @@ class RelayOutboxNotifications(
      * 않는다(격리도 하지 않는다: 격리는 단방향 종단이고, 보낼 수 없는 환경에서 남의 run 이
      * 남긴 행을 태울 이유가 없다).
      *
-     * **임대를 묻는 자리가 다섯이다**(D-6F10-31 ② 가 넷으로 늘렸고, cr T-1 이 격리 루프
-     * 안쪽을 더했다). 획득 직후 · 고아 목록을 읽기 전 · **고아마다 태우기 전** · claim 전 ·
-     * 행마다 발송 전. 어느 지점에서 잃어도 그 뒤 질의를 돌리지 않고 [RelayReport.LeaseLost]
+     * **임대를 묻는 자리가 넷이다.** 획득 직후(= 고아 목록을 읽기 전 — 둘 사이에 질의가
+     * 없다) · **고아마다 태우기 전** · claim 전 · 행마다 발송 전. 셈의 이력: D-6F10-31 ② 가
+     * 하나에서 넷으로, cr T-1 이 격리 루프 안쪽을 더해 다섯으로 적었는데 그 가운데 둘이
+     * **연속 중복**이라 PR #63 finding 7 로 하나를 걷어 넷이 됐다. 어느 지점에서 잃어도 그 뒤 질의를 돌리지 않고 [RelayReport.LeaseLost]
      * 로 멈춘다. 앞 판은 **행 루프 안 하나**였고 그때 열려 있던 것(verifier r2 probe V6c
      * 실측): 임대를 이미 잃은 relay 가 **새 홀더가 막 집은** `CLAIMED` 행을 고아로 읽어
      * 영구 격리하고, 집을 행이 0 이면 루프가 돌지 않아 guard 가 **한 번도 불리지 않고**
@@ -173,8 +174,9 @@ class RelayOutboxNotifications(
         limit: Int,
         guard: LeaseGuard,
     ): RelayReport {
-        // 고아 목록을 읽기 전 — 잃은 뒤 읽으면 새 홀더의 in-flight 행이 목록에 섞인다.
-        if (!guard.stillHeld()) return leaseLostBefore(orphansIsolated = 0)
+        // 획득 직후 검사(`relayUnderLease`)와 이 자리 사이에 질의가 없다 — 여기 있던 두 번째
+        // `stillHeld()` 는 **중복**이었다(PR #63 finding 7). 목록을 읽기 전의 보호는 그 검사가
+        // 이미 한다. 격리의 촘촘함은 아래 `isolateOrphans` 의 고아마다 검사가 진다.
         val isolation = isolateOrphans(guard)
         // claim 전 — 잃은 뒤 집으면 두 relay 가 같은 종류를 동시에 소비한다.
         return if (isolation.leaseHeld && guard.stillHeld()) {
@@ -194,12 +196,21 @@ class RelayOutboxNotifications(
         // 행마다 발송 **전에** 임대를 다시 묻는다(R1-M-1) — 거짓이면 남은 행을 건드리지
         // 않는다. 그 행들은 `CLAIMED` 에 남아 다음 run 의 고아 격리가 받는다(놓침).
         var leaseLost = false
-        for (row in rows) {
-            if (!guard.stillHeld()) {
-                leaseLost = true
-                break
+        try {
+            for (row in rows) {
+                if (!guard.stillHeld()) {
+                    leaseLost = true
+                    break
+                }
+                dispositions += settleRow(row)
             }
-            dispositions += settleRow(row)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: Exception,
+        ) {
+            // 그때까지의 집계를 **실어서** 올린다(PR #63 finding 4) — 앞 판은 예외를 그대로
+            // 통과시켜 「스물 집어 열둘 전달하고 열셋째에서 터졌다」가 어디에도 남지 않았다.
+            // 운영자가 알아야 하는 것은 「터졌다」가 아니라 **얼마나 갔고 얼마가 좌초했는가**다.
+            throw RelayAborted(reportOf(orphansIsolated, rows.size, dispositions), failure)
         }
         val report = reportOf(orphansIsolated, rows.size, dispositions)
         return if (leaseLost) RelayReport.LeaseLost(report) else report
@@ -351,6 +362,22 @@ class RelayOutboxNotifications(
         }
     }
 }
+
+/**
+ * 행 처분 **도중에** 터졌다 — 그때까지의 집계를 싣는다(PR #63 finding 4).
+ *
+ * [RelayReport.LeaseLost] 의 [RelayReport.LeaseLost.partial] 과 **같은 모양**이다: 끝까지 돌지
+ * 못한 run 의 계수. 둘을 값과 예외로 가른 이유는 처분이 다르기 때문이다 — 임대 상실은 run 이
+ * **정상적으로 멈춘** 것(다음 run 이 이어받는다)이고, 이쪽은 전이표나 port 계약이 깨진
+ * 것(코드가 틀렸다)이라 조용히 값으로 접으면 안 된다.
+ *
+ * [partial] 과 claim 수의 차이가 **좌초한 행 수**다 — 그 가운데 하나는 발송된 뒤 종단 전이를
+ * 못 한 행일 수 있고(at-most-once 가 감수하는 손실), 나머지는 손대지 않은 행이다.
+ */
+class RelayAborted(
+    val partial: RelayReport.Completed,
+    override val cause: Throwable,
+) : RuntimeException("relay 가 행 처분 도중 멈췄다 — 집계는 partial 에 있다", cause)
 
 /**
  * 고아 격리의 결과(cr T-1) — **몇 개를 태웠는가**와 **임대를 아직 쥐고 있는가**는 다른 축이다.

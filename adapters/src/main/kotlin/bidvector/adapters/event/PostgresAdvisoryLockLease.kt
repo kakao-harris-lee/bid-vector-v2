@@ -51,7 +51,7 @@ class PostgresAdvisoryLockLease(
                     }
                 }
             if (!acquired) return@use LeaseAttempt.Busy
-            heldOrRelease(connection, key) { LeaseAttempt.Held(body(LeaseGuard { stillHolding(connection) })) }
+            heldOrRelease(connection, key) { LeaseAttempt.Held(body(LeaseGuard { stillHolding(connection, key) })) }
         }
 
     /**
@@ -82,13 +82,7 @@ class PostgresAdvisoryLockLease(
 }
 
 /**
- * 임대를 **아직** 쥐고 있는가 — 임대 연결로 질의 하나를 돌려 본다(R1-M-1).
- *
- * 무엇을 재고 무엇을 못 재는가: 이 질의는 **연결이 살아 있는지**를 잰다. advisory lock 은
- * 연결이 끊기면 서버가 놓으므로, 연결이 죽었다 == 임대를 잃었다 이다. 반대로 연결이 살아
- * 있는데 잠금만 빼앗기는 경로는 PostgreSQL 에 없다(세션 잠금은 그 세션만 놓는다). 그래서
- * 이 한 줄이 「아직 배타적인가」의 충분한 답이다 — 다만 질의가 성공한 **그 순간**의 답이고,
- * 그 뒤 발송 중에 끊기는 창은 남는다(알려진 제한).
+ * 잠금을 놓는다 — 상세를 잃는 판단의 근거는 [PostgresAdvisoryLockLease] 의 `heldOrRelease` KDoc 이다.
  */
 private fun releaseQuietly(
     connection: java.sql.Connection,
@@ -106,9 +100,31 @@ private fun releaseQuietly(
     // 상세를 잃는다 — 그 판단의 근거는 `heldOrRelease` KDoc 이다.
 }
 
-private fun stillHolding(connection: java.sql.Connection): Boolean =
+/**
+ * 임대를 **아직** 쥐고 있는가 — `pg_locks` 에서 **자기 backend 가 그 키의 advisory 잠금을
+ * 들고 있는지** 직접 본다(PR #63 finding 3).
+ *
+ * 앞 판은 `SELECT 1` 로 **연결 생존**만 재고 「연결이 살아 있으면 잠금도 내 것」이라고 추론했다.
+ * 그 추론이 깨지는 자리: **transaction/statement 모드 pooler**(pgbouncer 등) 뒤에서는 클라이언트
+ * 연결이 그대로여도 질의마다 **다른 서버 backend** 에 붙는다. 그러면 ⓐ 잠금을 잡은 backend 가
+ * 반납되어 서버가 잠금을 놓고 ⓑ 이쪽의 `SELECT 1` 은 다른 backend 에서 성공하므로 **둘이 동시에
+ * `Held`** 를 받는다. 지금 질의는 그 상황에서 **거짓**을 낸다(내 backend 에 그 잠금이 없다).
+ *
+ * 그래도 pooler 를 **지원하지는 않는다**(알려진 제한 20) — 애초에 잠금을 잡은 질의와 이 질의가
+ * 다른 backend 로 가면 `pg_try_advisory_lock` 자체가 의미를 잃는다. 이 probe 가 하는 일은 그
+ * 어긋남을 **조용히 넘기지 않는** 것이고, 지금 배포는 직접 연결이다.
+ *
+ * bigint 키는 `classid`(상위 32비트)·`objid`(하위 32비트)로 나뉘고 세션 잠금은 `objsubid = 1`
+ * 이다 — 키를 상수로 쪼개 박지 않고 인자에서 계산한다(키가 2^32 를 넘는 날에도 맞다).
+ */
+private fun stillHolding(
+    connection: java.sql.Connection,
+    key: Long,
+): Boolean =
     try {
-        connection.prepareStatement(LEASE_LIVENESS).use { statement ->
+        connection.prepareStatement(LEASE_HELD_BY_SELF).use { statement ->
+            statement.setLong(1, key ushr Int.SIZE_BITS)
+            statement.setLong(2, key and LOW_32_BITS)
             statement.executeQuery().use { it.next() }
         }
     } catch (
@@ -143,4 +159,8 @@ private const val STRATEGY_EVENT_RELAY_LOCK_KEY = 6_110_002L
 
 private const val TRY_ADVISORY_LOCK = "SELECT pg_try_advisory_lock(?)"
 private const val ADVISORY_UNLOCK = "SELECT pg_advisory_unlock(?)"
-private const val LEASE_LIVENESS = "SELECT 1"
+private const val LOW_32_BITS = 0xFFFF_FFFFL
+
+private const val LEASE_HELD_BY_SELF =
+    "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() " +
+        "AND classid = ? AND objid = ? AND objsubid = 1"

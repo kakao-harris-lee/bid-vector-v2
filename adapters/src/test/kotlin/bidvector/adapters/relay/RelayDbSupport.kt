@@ -251,18 +251,6 @@ internal fun insertClaimedStrategyRow(
     forceOutboxState(dataSource, entryId, "CLAIMED")
 }
 
-/** 특정 entry 의 상태 한 개를 읽는다. */
-internal fun stateOf(
-    dataSource: DataSource,
-    entryId: String,
-): String? =
-    dataSource.connection.use { connection ->
-        connection.prepareStatement("SELECT state FROM outbox WHERE entry_id = ?").use { statement ->
-            statement.setString(1, entryId)
-            statement.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
-        }
-    }
-
 /** inbox 에 키를 미리 심는다 — `SkipDuplicate` 경로를 실 DB 로 재는 입력. */
 internal fun seedInboxKey(
     dataSource: DataSource,
