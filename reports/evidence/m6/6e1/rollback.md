@@ -92,16 +92,18 @@ git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로>
 | **①** | 신설 4건 제거 명령 | **exit 0** · 삭제 **4** |
 | **②** | `ci.yml` hunk 역적용(`2df1da3b` 격리) | **exit 0** — 거부 없음, 수동 경로 불필요 |
 | **③** | base 대조 · **트리 동일성** · 남의 줄 | **빈 출력** · base blob `279b64f3` == 복원 blob `279b64f3` · 신설 넷 전부 **없음** · 다른 레인 산출물 넷 전부 **남음** |
-| **④** | compile | **미실행 — 호스트 게이트**(`commands.md` 「호스트 게이트」 절) |
-| **⑤** | test | **미실행 — 같은 이유** |
-| **⑥** | 게이트(`check`·`qualityBaseline`) | **미실행 — 같은 이유** |
+| **④** | compile(`compileKotlin compileTestKotlin`) | **exit 0** (16s) |
+| **⑤** | test | **exit 0** — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4 |
+| **⑥** | 게이트(`check` · `qualityBaseline`) | **exit 0** (`check` 9m 23s · `qualityBaseline` 별도 exit 0 · `leakPatternGate` 실행 1회) |
 
-**갈음은 「HEAD 초록」이 아니라 트리 동일성으로만 했다** — ③ 의 blob SHA 대조가 그것이다. 되돌린
-`ci.yml` 이 base 와 **바이트 동일**하므로, 그 상태의 compile·test·게이트는 base `80dc33b3` 의 것과 같은
-트리에서 도는 것이고 `main` 은 그 자리에서 초록이다(PR #64 머지 상태). ④~⑥ 을 아직 **직접 돌리지
-못한 것은 사실로 남긴다** — 트리 동일성이 그 셋의 결과를 **예측**하게 해 주지만 실행을 대신하지는
-않는다. 호스트 문턱이 열리면 같은 clone 에서 셋을 돌려 이 표를 채운다.
+**갈음은 「HEAD 초록」이 아니라 트리 동일성으로 했고, 그 위에서 ④~⑥ 을 실제로 돌렸다.** ③ 의 blob
+SHA 대조가 되돌린 `ci.yml` 이 base 와 **바이트 동일**함을 보이고, ④~⑥ 은 그 트리에서 **직접 실행**한
+결과다 — 예측으로 대신하지 않았다.
 
-신설 넷은 전부 문서이므로 제거가 compile·test 에 닿지 않는다 — Kotlin 소스·build 파일·
-`config/quality` diff 가 **0** 이다(`checklist.md` 자기 점검). 그래서 ④~⑥ 의 위험은 `ci.yml` 한 파일에
-있고, 그 파일의 되돌림은 ③ 에서 **바이트 동일**로 확인됐다.
+되돌린 트리의 test 수는 되돌리지 않은 트리와 **같다**(350 클래스 · 2817 test). 이 slice 가 더한 것이
+문서 넷과 CI step 하나뿐이고 Kotlin 소스·build 파일·`config/quality` diff 가 **0** 이기 때문이다
+(`checklist.md` 자기 점검). 그래서 ④~⑥ 의 유일한 위험원은 `ci.yml` 이었고, 그 파일의 되돌림은 ③ 에서
+바이트 동일로 확인됐다.
+
+**실측 자리**: 버릴 clone 을 새로 떠서(`--no-hardlinks`) `9634498d` 를 체크아웃하고 ①~③ 을 다시 적용한
+뒤 그 트리에서 ④~⑥ 을 돌렸다 — 앞 라운드의 clone 을 재사용하지 않았다.

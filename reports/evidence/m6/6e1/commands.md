@@ -7,33 +7,80 @@ base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · 이 레인의 마지막 산�
 
 | 명령 | 문면 | 결과 |
 |---|---|---|
-| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | **미실행 — 호스트 게이트** |
-| `./gradlew --no-daemon qualityBaseline` | 같은 job | **미실행 — 호스트 게이트** |
-| `container` job 로컬 재현(S-21~S-25) | G-4 가 `ci.yml` 을 바꾸므로 전수 | **미실행 — 호스트 게이트** |
+| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | **exit 0** (9m 42s) |
+| `./gradlew --no-daemon qualityBaseline` | 같은 job | **exit 0** (13s) |
+| `container` job 로컬 재현(S-21a~S-25) | G-4 가 `ci.yml` 을 바꾸므로 그 job 의 `run` 블록을 순서대로 | **전 step exit 0** |
+
+`check` 의 핵심 결과 한 줄 — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4
+(`adapters` 137/900 · `app` 62/562 · `workflow` 51/425 · `build-logic` 27/279 · `procurement` 33/263 ·
+`decision` 24/184 · `shared-kernel` 8/89 · `strategy` 6/84 · `qualification` 2/31). e2e 는 기본 `check`
+안에서 돌았다(`adapters.e2e` 결과 파일 **7**) — 조건 애노테이션도 `Test.filter` 제외도 쓰지 않았고 이
+slice 가 더한 제외는 **0** 이다. `leakPatternGate`·`qualityBaseline` 은 `FROM-CACHE`·`UP-TO-DATE` 표시
+없이 **실행**됐다(evidence 전부를 담은 HEAD `99b4b4cd` 에서).
+
+종료 코드로 읽었다 — 출력을 `grep` 해 판단하거나 커밋과 한 줄로 묶지 않았다.
+
+### `container` job 재현 — step 별 종료 코드
+
+러너 env 와 `$GITHUB_ENV` 만 흉내내고 `run` 블록을 그 순서로 돌렸다(6B-2 와 같은 방식).
+**S-21**(ml-serving 이미지 빌드)은 계약 acceptance 가 `S-21a~S-25` 이므로 기존 이미지를 쓰고 생략했다.
+
+| step | 결과 |
+|---|---|
+| 자격 값 생성 둘(DB·운영자) | exit 0 |
+| S-21a 앱 배포물 빌드 · S-21b 앱 이미지 빌드 | exit 0 |
+| S-22a·S-22b 이미지 위생 게이트 · S-22c 거부 스모크 | exit 0 |
+| S-23 로컬 환경 기동(app+ml-serving+postgres healthy 수렴) | exit 0 |
+| **S-23b 컨테이너 스모크 — G-4 포함** | exit 0 |
+| S-23c 백업·복원·되돌림 리허설 | exit 0 |
+| S-24 실 Kotlin gateway ↔ 컨테이너의 실 Python 서버 | exit 0 |
+| S-25 정리(볼륨까지) | exit 0 · 남은 `bidvector` 컨테이너·볼륨 **0** |
+
+**G-4 블록이 실제로 돈 로그 줄**(S-23b 출력에서 그대로):
+
+```
+-- 여력 상한 세우기: begin → value → confirm (dry-run 200 의 전제) --
+-- 평가 dry-run 왕복: 200 · 본문 키 아홉 · outbox 행 수 전후 등식 (G-4) --
+dry-run 왕복 통과 — outbox 행 수 2 == 2 (쓰기 0)
+```
+
+S-23c 는 **G-4 가 전략을 한 번 더 쓴 뒤에도** 통과했다 — 리허설의 전략 등식이 값을 하드코딩하지 않고
+읽어 비교하기 때문이다(그 step 의 출력이 「(ii) 양성 — 같은 백업으로 다시 복원하자 `candidate_limit`/
+`revision` 이 돌아왔다」를 낸다).
+
+**스모크를 다시 돌려도 통과한다** — 같은 환경에서 S-23b 를 재실행했을 때도 exit 0 이고 그때의 등식은
+`outbox 행 수 8 == 8` 이었다(앞 실행이 남긴 행 때문에 수가 다르고, 재는 것은 절대 수가 아니라 **전후
+동일성**이다).
 
 **S-20(Python) 생략 사유**: Python 무변경 — Python 절반은 CI `ml-engine` job 이 정본이다(6D-1·6B-2·6D-2 와
 같은 처분).
 
-### 호스트 게이트 — 왜 돌리지 않았는가 (계약 D-6E1-3)
+### 호스트 — 3단 점검과 1회 예외 (계약 r2 `D-6E1-4`)
 
-3단 점검을 **별도 호출 셋으로** 돌린 실측이다.
+빌드·컨테이너 job 전마다 **별도 호출 셋**으로 돌렸다(`pgrep` · `free -m` · `ps … --sort=-rss`).
 
-| 점검 | 문턱 | 실측 | 판정 |
-|---|---|---|---|
-| `pgrep -af 'GradleWrapperMain\|GradleWorkerMain\|GradleDaemon'` | 다른 빌드 0 | 활성 worker 0, **유휴 고아 daemon 둘**(다른 프로젝트, PPID 1) | 통과 |
-| `free -m` available | ≥ 6 GB | **10.3 GB** | 통과 |
-| `free -m` Swap free | **≥ 2 GB** | **1.58 GB** | **미달 — 시작하지 않음** |
-| `ps -eo pid,rss,args --sort=-rss \| head -5` | 상위 확인 | 상위 둘이 다른 프로젝트의 유휴 JVM(각 약 2 GB RSS) | — |
+착수 시점의 실측이 `swap free 1.58 GB` 로 계약 `D-6E1-3` 의 2 GB 문턱 미달이었고, **swap 을 쥔 것이
+빌드가 아니라 상주 서비스**임을 per-process `VmSwap` 으로 확인했다(상위 여덟이 전부 상주 프로세스이고
+다른 프로젝트의 유휴 Gradle·Kotlin daemon 은 그 목록에 없다 — RAM 만 쥔다). 유휴 프로세스는 자기 swap
+페이지를 되불러오지 않아 **기다려도 문턱에 닿지 않으므로** waiter 를 취소하고 보고했다.
 
-swap 을 쥔 것은 **빌드가 아니라 이 호스트의 상주 서비스**다 — per-process `VmSwap` 상위는 MB 단위로
-558 · 497 · 411 · 211 · 204 · 175 · 169 · 151 이고 전부 상주 프로세스다. 다른 프로젝트의 유휴 Gradle·
-Kotlin daemon 은 그 목록에 **없다**(RAM 만 쥔다). 유휴 프로세스는 자기 swap 페이지를 되불러오지 않으므로
-**기다려도 문턱에 닿지 않는다** — waiter 를 걸었다가 그 사실을 확인하고 취소했다. 2026-10-07 의 1 GB
-허용은 1회 예외였고 사용자가 2 GB 규칙을 재확인했으므로 **레인이 스스로 예외를 적용하지 않았다.**
+**사용자 결정으로 이 slice 한정 1회 예외**(`D-6E1-4`): available ≥ 6 GB **그리고** swap free ≥ 1.5 GB
+면 Gradle·container job 을 **하나씩** 허용, swap free 1 GB 아래면 즉시 중단·보고.
 
-**아직 재지 못한 것**: `check`·`qualityBaseline` 의 종료 코드 · container job 에서 G-4 블록이 실제로 돈
-로그 줄 · G-4 의 동적 변이(기대 코드를 바꾸면 컨테이너 스모크가 RED) · rollback 실측 ④compile ⑤test
-⑥게이트. 승인이 오면 직렬로 돌린다.
+| 빌드 전 점검 | available | swap free | 활성 Gradle | 판정 |
+|---|---|---|---|---|
+| ① `check` | 14.2 GB | 1,599 MB | 0 | 진행 |
+| ② `qualityBaseline` | 13.4 GB | 1,678 MB | 0(남은 것은 내 `check` 의 TestKit daemon) | 진행 |
+| ③ container job 앞 구간 | 13.3 GB | 1,682 MB | 0 | 진행 |
+| ③ container job 뒤 구간 | 13.3 GB | 1,684 MB | 0 | 진행 |
+| rollback ④~⑥ | 13.2 GB | 1,685 MB | 0 | 진행 |
+
+**swap free 는 전 구간 1,599~1,686 MB 로 1 GB 중단 문턱에 닿지 않았다**(최저 1,599 MB). 무거운 작업은
+**항상 하나씩** 돌렸고 foreground 로만 띄웠다.
+
+**남은 Gradle daemon**: `check` 가 띄운 하나뿐이고(build-logic TestKit 의 계약 게이트 결정성 test 가
+띄운다 — `PWD` 가 `/tmp/bidvector-contract-gate-determinism…`) 그 **PID 만** 멈췄다.
+`./gradlew --stop` 은 쓰지 않았다.
 
 **differential / golden**: **N/A** — 문서 + CI step slice 라 산출 데이터가 없다(fixture 변경 0, 골든 변경 0).
 
@@ -163,10 +210,15 @@ exit $fails
 | **M1** | C-1 의 ⓐ 식별자 하나를 존재하지 않는 이름으로 교체(`WatchRulesTest` → `WatchRulesNotARealTest`) | E-2 RED | **RED** — `DIFF E-2 미등재 FQN ['bidvector.strategy.WatchRulesNotARealTest']`, exit 1. numstat `1 1` |
 | **M2** | runbook §3.2 의 종료 코드 **한 행 삭제**(`LEASE_BUSY` 3) | E-8 RED | **RED** — 기대 5 값, 실측 4 값, exit 1. numstat `0 1` |
 | **M3** | `ci.yml` 의 G-4 기대 키 한 칸 변경(`bidNowNoticeIds` → `bidNowNoticeIdsX`) | E-13 RED | **RED** — 기대·실측 문자열이 그 한 칸에서 갈림, exit 1. numstat `1 1` |
-| **M4** | G-4 블록의 기대 응답 코드를 바꾸면 컨테이너 스모크 RED | container job RED | **미실행 — 호스트 게이트**(위 절) |
+| **M4** | G-4 의 기대 응답 코드 **교체**(`200` → `201`, 실패 문면도 같이) | container 스모크 RED | **RED** — `스모크 실패: dry-run 이 201 이 아니다: 200`, step exit 1. numstat `1 1`. 실패 문면이 실제 200 응답 본문을 함께 내고 그 본문의 칸이 **아홉**이며 `maxActiveBids` 가 G-4 가 세운 `5` 다 |
 
-**음성 대조**: 세 변이를 복원한 뒤 같은 명령이 다시 `DIFF 0 · exit 0` 이다 — 변이가 게이트를 실제로
-움직였고 복원이 완전했다는 양방향 확인이다.
+**음성 대조**: M1~M3 을 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이고, M4 를 복원한 뒤
+같은 환경에서 S-23b 를 다시 돌리면 `exit 0` + `dry-run 왕복 통과` 다 — 변이가 게이트를 실제로 움직였고
+복원이 완전했다는 양방향 확인이다.
+
+**M4 가 「더하기」가 아니라 「바꿔치우기」인 근거**: 기대값을 지우거나 단언을 늘린 것이 아니라 그 한
+단언의 기대 코드를 **다른 값으로 교체**했다. 교체 뒤 스모크가 붉어졌으므로 그 단언이 실제로 응답 코드를
+읽고 있고, 통과가 「단언이 없어서」가 아니다.
 
 ## clean-tree 게이트
 
