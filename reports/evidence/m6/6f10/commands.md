@@ -258,3 +258,24 @@ cr T-4(대상 쪽 접기)는 **변이로 재지 않았다** — 오늘 커밋 �
 - cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → `--rerun-tasks` compile → `check`
 - exit: restore 0 · compile 0 · check **0**
 - 핵심 결과: **base 가 `b137c670` → `2865c9b8` 로 전진했다**(브랜치가 main 을 병합, `c3024eb8`) — 목록·셈·공유 파일 커밋 목록을 전부 새 base 로 다시 냈다. 복원 목록 73 · `D` 44 · `M` 29, 되돌린 경로의 base 대비 diff 빈 출력, 되돌리지 않은 일곱 경로는 HEAD 그대로. 세부는 `rollback.md`
+
+## 2026-10-07T14:10:00Z — 마무리 일괄: `check` 전건 · 변이 넷
+
+- cmd: `./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: 전건 통과(production 무변경, test·장부만). 라운드 중 세 번 붉었고 전부 게이트가 잡은 것이다 — ktlint import 순서 둘 · `sizeGate` 파일 500줄(커밋 E2E 의 DB 질의를 갈랐다) · ktlint 닫는 괄호 앞 빈 줄
+
+| 변이 | numstat | 결과 | 잡은 단언 |
+|---|---|---|---|
+| F3 잠금 probe 를 `SELECT 1` 로 되돌림 | 1/3 | **RED**(앞 라운드에서는 초록) | pooler 흉내 test |
+| F3b 자기 backend 조건만 걷음 | 1/1 | **RED**(앞 라운드에서는 초록) | 같은 test — finding 3 의 핵심이 그 조건이다 |
+| F4a 러너가 `partialOf` 를 버림 | 1/1 | **RED**(앞 라운드에서는 초록) | 커밋→relay 사슬 test 의 실패 줄 |
+| F6 `@Configuration` 한 줄 제거 | 0/1 | **RED**(앞 라운드에서는 초록) | production 조립의 guard 빈 단언 |
+
+넷 다 **앞 라운드에서 초록이던 변이**다 — 조치가 아무 소리도 내지 않던 자리를 그 소리가 나게 만든 것이 이 일괄의 전부다
+
+## 2026-10-07T14:30:00Z — 마무리 일괄: rollback 재실측 (버릴 clone, 실측 HEAD `d949da9d`)
+
+- cmd: 목록 재산출 → `git restore --source=<base> --staged --worktree -- "${P[@]}"` → `--rerun-tasks` compile → `check`
+- exit: restore 0 · compile 0 · check **0**
+- 핵심 결과: base `2865c9b8` 그대로. 복원 목록 76(새 test 파일 둘이 들어왔다) · `D` 46 · `M` 30, 되돌린 경로의 base 대비 diff 빈 출력, 남긴 일곱 경로는 HEAD 그대로, 「목록 ⊇ main 소스 변경」 밖 0. 세부는 `rollback.md`
