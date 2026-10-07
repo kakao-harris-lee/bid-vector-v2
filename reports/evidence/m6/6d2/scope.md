@@ -104,3 +104,9 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`; 공
 | **D-6D2-1** | **B-1~B-5 추천안으로 착수**(사용자 부재 중 자율 진행 — 정정 지시가 오면 그 시점 계약 갱신으로 반영): B-1 (a) 새 조립 인스턴스 = 재기동, 살아 있는 홀더는 Busy · B-2 (a) 전달·T2 사이 크래시 뒤 키 재발생은 **실측해 알려진 제한 + ADR 0005 §7 한 줄** · B-3 (a) 정책 버전 음성 대조는 경계(typed 등식 + 상수 교체 변이로 「읽고 있음」만 실측) · B-4 (a) Codex 없음 · B-5 (a) adapters e2e | 팀장 2026-10-07 |
 | **D-6D2-2** | **설계 검토 요지**(`_workspace/m6-6d2/01_design-review.md`, 세션 모델 직접): (0) 경계 — production 조립 기동(6F-10 자리)·실 발송·키 재발생(B-2)·정책 버전 변경(B-3)·OS 사망·임대 밖 동시성은 밖 · (1) 크래시는 **사건**에 걸고(순번 아님) 재기동은 **새 인스턴스 집합**, 수렴은 **고정점**(재재기동 보고 0 + 분포 Map 등식), 발송 계수는 두 조립 sender **합**, 격리는 production 보고 + DB(상태 강제 helper 금지), 재기동 **전** 중간 상태 단언, typed 등식은 저장 타입 읽어 복원·시딩 revision 비기본값, **relay 를 협력자 출처 그래프에 추가** · (2) 우회 12(주입 미호출 · 같은 인스턴스 · 상태 강제 · sender dedup · 무차별 등식 · 같은 참조 · 변이 미적용 · 투영 공백 · 호출 자리 초록 · R-5 교착 · 재기동 run 의 우연한 발송 · B-2 오독) 각각의 닫는 술어 · (2b) production public 표면 0, test seam 은 `PipelineAssembly` 생성자 기본값 production, 크래시 wrapper 는 정직한 조립 그래프에서 비-MAIN 으로 잡혀야 함(「경계로 처리」 행 실측) · (3) 과잉: Spring 두 번·OS kill·UNIQUE·seam; 미달: 로그·단일 run 중복만·CLAIMED 0 정의·revision 1·문자열만 | 설계 검토 |
 | **D-6D2-3** | **production 불변 규칙 + 호스트 규율**: `*/src/main/**`·migration·`.github/**`·`docker/**` diff 0, `internal` 완화 0 — seam 이 필요하면 멈추고 보고. 빌드 전 `pgrep`·`free -m`·`ps` **별도 호출**로 확인, **swap free < 2GB 면 시작하지 않고 보고**(사용자 2026-10-07 결정 — 6F-10 의 1GB 는 1회 예외). 게이트 결과는 종료 코드로, 커밋은 별도 호출로. 변이 전 커밋, 적용은 `git diff --numstat` 먼저. 커밋은 `git add <in_scope 경로>` 개별 인자만 | 6D-1 D-6D-3 · 6F-10 D-6F10-7 · 호스트 규칙 |
+
+## 계약 갱신 r2 (2026-10-07, 팀장 — 호스트 예외)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6D2-4** | **사용자 결정: swap 2GB 규칙 1회 예외 적용**(착수 실측 available 14.6GB · swap free 1.94GB · Gradle daemon 0). 이 slice 안에서 Gradle 은 available ≥ 6GB · swap free ≥ 1GB 면 **하나씩** 허용, swap free 1GB 아래면 즉시 중단·보고. 규칙 자체(2GB)는 유지 — 다음 slice 에는 적용되지 않는다 | 사용자 2026-10-07 |
