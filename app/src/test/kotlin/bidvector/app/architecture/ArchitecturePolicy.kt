@@ -61,6 +61,12 @@ class ArchitecturePolicy private constructor(
     /** D-6A3-17(a)③ — app 이 참조하면 안 되는 outbox 쓰기 타입 전수(구현 레인이 전수). */
     val outboxForbiddenTypes: List<String> get() = list("app.forbidden.outbox-types")
 
+    /** D-6F10-15 — dry-run 조립 클래스 집합(규칙의 **선택자**). */
+    val evaluationDryRunTypes: List<String> get() = list("app.evaluation.dry-run-types")
+
+    /** D-6F10-15 — 커밋 조립 클래스 집합(규칙의 **금지 대상**). */
+    val evaluationCommitTypes: List<String> get() = list("app.evaluation.commit-types")
+
     /** D-6A3-17(b) — `adapters.ml` 패키지. */
     val mlPackage: String get() = value("app.ml.package")
 

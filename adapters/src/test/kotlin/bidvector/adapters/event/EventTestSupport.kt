@@ -4,6 +4,8 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.event.NotificationEvidencePayload
+import bidvector.workflow.event.NotificationRequestedPayload
 import java.sql.Connection
 import javax.sql.DataSource
 
@@ -69,3 +71,19 @@ internal fun outboxStateOf(
             statement.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
         }
     }
+
+/**
+ * 알림 요청 payload 의 test 표본 — 종류별 claim·relay test 가 공유한다(§5 중복 금지). 값은
+ * 중요하지 않고 **종류가 `NotificationRequested` 라는 사실**이 중요한 자리가 쓴다.
+ */
+internal fun notificationRequestedFixture(
+    noticeId: String = "fixture-notice-000",
+    revision: Int = 1,
+): NotificationRequestedPayload =
+    NotificationRequestedPayload(
+        noticeId = noticeId,
+        bidNowReasons = emptyList(),
+        ladderPolicyVersion = PolicyVersion(EffectiveFrom.Initial, "fixture"),
+        strategyRevision = StrategyRevision(revision),
+        evidence = NotificationEvidencePayload.NotPredicted(reason = "CircuitOpen"),
+    )

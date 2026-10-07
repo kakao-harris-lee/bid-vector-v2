@@ -3,6 +3,8 @@ package bidvector.adapters.e2e
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.event.NotificationEvidencePayload
+import bidvector.workflow.event.OutboxConsumerKind
+import bidvector.workflow.notification.RelayReport
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
@@ -63,10 +65,18 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
 
         outboxIdempotencyKeys() shouldHaveSize 2
         outboxIdempotencyKeys().toSet() shouldHaveSize 1
-        assembly.relay() shouldBe 1
+        val report = assembly.relay().shouldBeInstanceOf<RelayReport.Completed>()
+
+        // 같은 멱등 키의 두 행 — 첫 행은 발송으로, 둘째 행은 **중복으로** DELIVERED 가 된다
+        // (D-6F10-12 어휘 해석표: 「같은 키가 이미 전달됨」도 DELIVERED). 6D-1 의 test relay
+        // 는 둘째 행의 상태를 바꾸지 않아 `CLAIMED` 에 좌초했다 — 그것이 이 slice 가 받은
+        // 인계이고, 이 단언의 반전이 그 좌초가 닫혔다는 증거다.
+        report.claimed shouldBe 2
+        report.delivered shouldBe 1
+        report.skippedDuplicates shouldBe 1
         inboxKeys() shouldHaveSize 1
         assembly.sender.callCount() shouldBe 1
-        outboxStates() shouldContainExactlyInAnyOrder listOf("DELIVERED", "CLAIMED")
+        outboxStates() shouldContainExactlyInAnyOrder listOf("DELIVERED", "DELIVERED")
     }
 
     /**
@@ -174,7 +184,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
     ) {
         try {
             boundary.inTransaction<Unit> {
-                JdbcOutboxPort(boundary).claim(1) shouldHaveSize 1
+                JdbcOutboxPort(boundary).claim(1, OutboxConsumerKind.NotificationRequested) shouldHaveSize 1
                 held.countDown()
                 releasedInTime.set(release.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 throw WorkerDiedHoldingRow()
@@ -188,7 +198,9 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
     }
 
     private fun claimEntryIds(boundary: TransactionBoundary): List<String> =
-        boundary.inTransaction { JdbcOutboxPort(boundary).claim(1) }.map { it.entryId.value }
+        boundary
+            .inTransaction { JdbcOutboxPort(boundary).claim(1, OutboxConsumerKind.NotificationRequested) }
+            .map { it.entryId.value }
 
     private fun assembly(
         script: MlFakeScript,

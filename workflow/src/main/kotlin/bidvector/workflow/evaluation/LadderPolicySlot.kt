@@ -1,5 +1,7 @@
 package bidvector.workflow.evaluation
 
+import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.PolicyVersion
 import java.math.BigDecimal
 
 private val THRESHOLD_MIN: BigDecimal = BigDecimal.ZERO
@@ -46,3 +48,19 @@ val EVALUATION_LADDER_POLICY_SLOT: LadderPolicySlot =
         forceBidProbabilityThreshold = BigDecimal("0.8"),
         forceBidMatchedThreshold = BigDecimal("0.7"),
     )
+
+/**
+ * 사다리 정책의 **버전 식별자** — `EvaluateCandidatesUseCase.reach` 가 `Resolution.Resolved`
+ * 에 싣는 값이고, **같은 인스턴스**가 알림 payload 의 `ladderPolicyVersion` 으로 간다
+ * (D-6F10-19).
+ *
+ * 왜 한 자리인가: 앞 판은 이 리터럴이 `reach()` 본문에 인라인돼 있었다. payload 가 같은
+ * 사실을 실어야 하는데 값을 두 자리에 적으면 한쪽만 바뀌어 **「판정에 쓰인 버전」과
+ * 「행에 적힌 버전」이 갈린다** — 그 둘이 갈리면 6D-2 의 재현 등식이 거짓을 말한다. 같은
+ * `val` 을 두 곳이 참조하면 갈릴 자리가 없다.
+ *
+ * 값 자체는 운영 값이 아니라 [EVALUATION_LADDER_POLICY_SLOT] 과 같은 legacy-behavior
+ * 자리표시자다(`OPEN-4B1-LADDER-THRESHOLDS` 가 운영 값을 정하면 함께 바뀐다).
+ */
+val EVALUATION_LADDER_POLICY_VERSION: PolicyVersion =
+    PolicyVersion(EffectiveFrom.Initial, "m4-4b2-legacy-behavior-2026-09-09")

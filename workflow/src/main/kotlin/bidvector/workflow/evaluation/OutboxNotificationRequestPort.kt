@@ -125,6 +125,11 @@ private fun NotificationRequest.toOutboxPayload(): NotificationRequestedPayload 
     NotificationRequestedPayload(
         noticeId = "${noticeId.number.value}-${noticeId.round.value}",
         bidNowReasons = verdict.reasons.map { it.toString() },
+        // D-6F10-19 — 판정이 지난 사다리 정책 버전과 전략 개정을 **값으로** 나른다(6D-2
+        // 재현 등식의 입력). 투영이 아니라 그 값 자체다: 둘 다 공개 생성자 값 타입이고
+        // `StrategyUpdated` payload 가 이미 같은 둘을 싣는다.
+        ladderPolicyVersion = ladderPolicyVersion,
+        strategyRevision = strategyRevision,
         evidence = evidence.toOutboxPayload(),
     )
 

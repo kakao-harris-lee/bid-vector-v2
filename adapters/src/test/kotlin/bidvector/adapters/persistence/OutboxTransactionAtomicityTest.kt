@@ -8,6 +8,7 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEventSink
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.Clock
@@ -130,7 +131,10 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
         countRawObservation() shouldBe 1L
         countOutboxByIdempotencyKey("strategy-updated-23") shouldBe 1L
         val restarted = TransactionBoundary(dataSource())
-        val claimed = restarted.inTransaction { JdbcOutboxPort(restarted).claim(10) }
+        val claimed =
+            restarted.inTransaction {
+                JdbcOutboxPort(restarted).claim(10, OutboxConsumerKind.StrategyUpdated)
+            }
         claimed.map { it.payload } shouldBe listOf(event)
     }
 }

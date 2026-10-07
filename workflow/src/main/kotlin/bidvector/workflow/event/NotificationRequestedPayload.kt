@@ -1,5 +1,8 @@
 package bidvector.workflow.event
 
+import bidvector.sharedkernel.PolicyVersion
+import bidvector.strategy.StrategyRevision
+
 /**
  * 알림 요청 판정의 outbox 투영(D-6F7-1·D-6F7-2·D-6F7-5) — `NotificationRequest`
  * (`bidvector.workflow.evaluation`)의 outbox payload 타입. 이 패키지에 두는 이유는
@@ -7,7 +10,15 @@ package bidvector.workflow.event
  * 의존 게이트(`EventAdapterDependencyTest`) 허용 루트 다섯에 `workflow.evaluation`이
  * 없어, payload가 거기 있으면 codec이 그것을 참조하는 순간 그 게이트가 막는다.
  *
- * **필드가 원시 타입뿐이다** — `Verdict.BidNow`·`BidNowReason`·`MlUnavailableReason`
+ * **[ladderPolicyVersion]·[strategyRevision] 은 6D-2 재현 등식의 입력이다(D-6F10-19).**
+ * 「이 판정이 어느 사다리 정책 버전과 어느 전략 개정으로 났는가」가 payload 에 없으면 저장된
+ * 행만으로는 판정을 재현할 수 없다(6D-1 C-4 가 인계한 자리). 두 값은 **투영이 아니라 그
+ * 값 자체**다 — `PolicyVersion`·`StrategyRevision` 은 `shared-kernel`·`strategy` 의 평범한
+ * 공개 값 타입이라 `workflow` 가 그대로 나를 수 있고(`StrategyUpdated` payload 가 이미 둘 다
+ * 싣는다), 원시 문자열로 접으면 `EffectiveFrom.Initial`↔`""` 변환이 payload 생성 쪽으로
+ * 새고 왕복 등식이 문자열 등식으로 약해진다.
+ *
+ * **나머지 필드가 원시 타입뿐인 이유는 다르다** — `Verdict.BidNow`·`BidNowReason`·`MlUnavailableReason`
  * (전부 `bidvector.decision`)을 이름으로 참조하지 않는다. `EventBoundaryTest`(이 패키지의
  * allow-list, `bidvector.decision` 밖)가 그것을 막을 뿐 아니라, 그 타입들의 생성자가
  * `decision` 모듈에 `internal`로 닫혀 있어 애초에 `workflow`가 재구성할 수 없다 — 이
@@ -22,6 +33,8 @@ package bidvector.workflow.event
 data class NotificationRequestedPayload(
     val noticeId: String,
     val bidNowReasons: List<String>,
+    val ladderPolicyVersion: PolicyVersion,
+    val strategyRevision: StrategyRevision,
     val evidence: NotificationEvidencePayload,
 )
 

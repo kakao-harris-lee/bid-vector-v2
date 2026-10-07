@@ -404,3 +404,46 @@ scheduler, it's just a lock."*라고 적어 **조사 노트의 서술 자체는 
 - **알림 채널의 구체 선택(Telegram/email/앱)을 이 ADR이 정하지 않는다** —
   `capability-map.md` NOTI 축과 `milestone-4.md`가 소유한다. 여기서 정한 것은 **전달
   메커니즘과 그 의미**다.
+
+---
+
+## 7. Addendum — M6/6F-10 outbox relay 가 이 ADR 에 더하는 것 (2026-10-06, 정본 `reports/evidence/m6/6f10/scope.md`)
+
+**D-1~D-11 은 바뀌지 않는다.** 6F-10 은 production relay 를 내면서 이 ADR 이 **열어 둔 자리 넷**에 답하고, 어휘 하나의 **뜻**을 정리한다.
+
+### 7.1 outbox 상태 어휘의 해석표 (D-6F10-12) — V6 CHECK 의 다섯 어휘는 그대로, 뜻을 셋으로
+
+4C-1 전이표(`Pending → Claimed → Delivered | Failed | Isolated`)와 D-3 의 at-most-once 아래에서 relay 의 결과 다섯(`Delivered`·`Rejected`·`Unknown`·
+route 수준 `Suppressed`·inbox `SkipDuplicate`)과 고아 `CLAIMED` 를 종단 셋에 이렇게 놓는다:
+
+| 종단 | 뜻 | 들어오는 것 |
+|---|---|---|
+| `DELIVERED` | 채널에 전달됐다 **또는** 같은 멱등 키의 알림이 이미 전달됐다(이 entry 의 의무가 이미 이행됨) | `Attempted(Delivered)` · `SkipDuplicate`(inbox 에 키가 있음) |
+| `FAILED` | 이 entry 로는 전달이 **일어나지 않았고 일어나지 않을 것**이다(재시도 없음 — D-3·D-11) | `Attempted(Rejected)` · route 수준 `Suppressed`(채널 비활성·route 없음) |
+| `ISOLATED` | 전달 여부가 **모호**하다 | `Attempted(Unknown)` · **고아 `CLAIMED`**(워커가 죽어 남은 행 — 재실행하지 않는다, §1.2) · relay 가 해독할 수 없는 payload(종류는 맞고 타입은 아닌 행 — kind 필터 뒤의 심층 방어, 계수로 공시) |
+
+**환경 수준 억제**(`NotificationDeliveryPolicyData.environmentModes[환경] != Live`)는 종단이 아니다 — relay 가 **claim 자체를 하지 않는다**(행은 `PENDING` 으로
+보존, D-4 「억제는 기록 억제가 아니다」). 이 표가 없으면 `SkipDuplicate`·`Suppressed` 가 어휘 밖에 서서 `CLAIMED` 에 좌초한다(6D-1 test relay 실측).
+
+### 7.2 `OPEN-OPS-10` ③ 「소비자 사망 후 작업 재가시화 시간」 — 알림 relay 축의 답
+
+**재가시화는 없다.** `CLAIMED` 에서 홀더가 죽은 행은 시간이 지나도 `PENDING` 으로 돌아가지 않고, lease 를 **새로** 잡은 다음 relay 가 **첫 claim 전에** 보는 그
+종류의 `CLAIMED` 전부를 고아로 **격리**한다(운영자 결정 A-1 (a), 2026-10-06). 그래서 시각 열(`claimed_at`)·TTL 이 없다(A-2 (a); 관측용 열은
+`OPEN-6F10-CLAIM-OBSERVABILITY`). ①②④ 는 이 addendum 이 답하지 않는다.
+
+### 7.3 `OPEN-ADR-12` — 첫 어댑터는 (a) PostgreSQL 세션 advisory lock, **알림 relay 소비자에 한정**
+
+relay 의 lease(D-10 port `ConsumerLeasePort`, `workflow` 소유)는 run 동안 쥔 **전용 연결**의 `pg_try_advisory_lock(kind 키)` 로 구현한다 — 홀더가 죽으면 연결이
+끊겨 서버가 놓는다(요구 ②; TCP 반개방은 서버 keepalive 까지 지연 — 알려진 제한). 파일 잠금(수집 축 D-6G-57)을 쓰지 않는 이유는 **고아 술어의 범위가 DB** 라
+다른 호스트의 relay 와 자물쇠 범위가 어긋나기 때문이다(지키는 것과 같은 범위에 건다). (b) Spring Integration JDBC lock registry 는 여전히 미조사이고, 수집 축은
+다른 답(파일 잠금)을 이미 갖는다 — `OPEN-ADR-12` 의 종결 여부는 운영자가 정한다. §6 「세션 advisory lock 의 운용 비용」은 6F-10 이 전용 연결 하나로 실측한다.
+
+### 7.4 claim 은 소비자(payload 종류) 단위다 (D-6F10-13)
+
+`OutboxPort.claim(limit, kind)` — relay 는 자기 종류(`NotificationRequested`)만 집고 그 종류의 고아만 격리한다. `StrategyUpdated`(전략 편집이 쓰는 행)는 **소비자가
+없어 `PENDING` 에 남는다** — `OPEN-6F10-STRATEGY-EVENT-CONSUMER`. 되돌릴 간선이 없는 상태 기계에서 남의 행을 집는 것은 곧 태우는 것이다.
+
+### 7.5 트랜잭션 모양 — at-most-once 의 귀결 (D-6F10-3)
+
+T1: `claim` 커밋 → 발송 → T2: 종단 전이 + inbox 기록(같은 트랜잭션, inbox 는 `Delivered` 뒤에만). T1 과 T2 사이의 크래시가 7.2 의 고아다. 발송 뒤 T2 가
+실패하면 행은 `CLAIMED` 로 남아 다음 run 이 격리한다 — 발송은 한 번 있었고 상태는 모호하므로 정직하다.

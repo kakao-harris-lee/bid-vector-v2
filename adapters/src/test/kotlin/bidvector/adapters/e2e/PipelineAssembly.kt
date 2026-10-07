@@ -3,10 +3,11 @@ package bidvector.adapters.e2e
 import bidvector.adapters.evaluation.JdbcCandidateSource
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.evaluation.RequestCapacityPort
-import bidvector.adapters.event.EventSql
+import bidvector.adapters.event.ConsumerTransactions
 import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcInboxPort
 import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.event.PostgresAdvisoryLockLease
 import bidvector.adapters.ml.GrpcBidPredictionGateway
 import bidvector.adapters.ml.GrpcEmbeddingGateway
 import bidvector.adapters.ml.JdbcCompetitionSampleSource
@@ -16,6 +17,7 @@ import bidvector.adapters.ml.testMlCallEffectivePolicy
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcOpeningResultRepository
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
+import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
 import bidvector.adapters.qualification.JdbcRequirementStore
 import bidvector.adapters.qualification.StoredRequirementLicenseGate
@@ -29,18 +31,13 @@ import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
 import bidvector.workflow.evaluation.OpportunityAnalysis
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
-import bidvector.workflow.event.IdempotencyKey
-import bidvector.workflow.event.InboxDecision
-import bidvector.workflow.event.NotificationRequestedPayload
-import bidvector.workflow.event.decideInbox
 import bidvector.workflow.notification.Channel
-import bidvector.workflow.notification.ContentRef
-import bidvector.workflow.notification.DeliveryOutcome
-import bidvector.workflow.notification.DeliveryResult
 import bidvector.workflow.notification.DispatchNotification
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
-import bidvector.workflow.notification.NotificationIntent
+import bidvector.workflow.notification.RelayOutboxNotifications
+import bidvector.workflow.notification.RelayReport
+import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RouteKey
 import bidvector.workflow.notification.RuntimeEnvironment
 import bidvector.workflow.strategy.OperatorId
@@ -133,6 +130,26 @@ internal class PipelineAssembly(
         )
 
     /**
+     * relay 의 커밋 경계는 **평가 경로와 다르다** — 평가는 요청 하나 = 트랜잭션 하나
+     * ([OwnTransactionConnectionSource])이고, relay 는 T1/T2 를 스스로 갈라야 하므로
+     * [TransactionBoundary] 를 쥔다(그 경계를 outbox·inbox·transactions 셋에 **같은 객체로**
+     * 넘긴다). 이 비대칭이 production 조립의 비대칭과 같다.
+     */
+    private val relayBoundary = TransactionBoundary(dataSource)
+
+    private val relayUseCase =
+        RelayOutboxNotifications(
+            outbox = JdbcOutboxPort(relayBoundary),
+            inbox = JdbcInboxPort(relayBoundary),
+            dispatcher = dispatcher,
+            leases = PostgresAdvisoryLockLease(dataSource),
+            transactions = ConsumerTransactions(relayBoundary),
+            target = RelayTarget(E2E_OWNER, E2E_CHANNEL),
+            environment = RuntimeEnvironment.Production,
+            policy = notificationPolicy,
+        )
+
+    /**
      * 요청 스코프 평가 — `EvaluationDryRunFactory` 와 달리 `RecordingNotificationRequestPort`
      * 가 아니라 **production `OutboxNotificationRequestPort`** 를 꽂는다. 그래서 알림 요청이
      * 실제 `outbox` 행으로 남고, 그 행이 relay 의 입력이 된다.
@@ -146,62 +163,21 @@ internal class PipelineAssembly(
     fun wiredCollaborators(): CollaboratorGraph = collaboratorGraph(listOf(useCase, dispatcher))
 
     /**
-     * test relay(축 ①의 마지막 구간) — `claim` → inbox 중복 제거 → `DispatchNotification` →
-     * fake sender → 종단 전이. 반환은 **실제로 발송까지 간 건수**다.
+     * **production relay**(6F-10 ⓐ) — 6D-1 이 이 자리에 두었던 test relay 를 교체했다.
+     * `claim` → inbox 판정 → `DispatchNotification` → 종단 전이 전부가 production
+     * [RelayOutboxNotifications] 의 것이고, 이 클래스가 바꿔 끼우는 것은 **발송 축 셋**
+     * (route·renderer·sender)뿐이다 — 실 채널이 없기 때문이다(`OPEN-STR-12`).
      *
-     * **종단 전이는 `OutboxPort.markDelivered` 가 아니라 production 전이 SQL 상수를 직접
-     * 실행한다.** `OutboxTransition.ToDelivered` 의 생성자가 `workflow` 의 `internal` 이라
-     * `adapters` 는 그 인자를 만들 수 없고(4C-2 `OPEN-4C2-MARK-UNEXERCISED`), 그 통로를
-     * 열어 해결하지 않는다는 것이 4C-2 가 명시한 결정이다. 사본이 아니라 production 과
-     * **같은 상수**를 쓴다(선례 `OutboxTransitionSqlTest`) — 전이표 자체의 거부는
-     * `OutboxTransitionTableTest`(workflow)와 `OutboxTransitionSqlTest`(adapters)가 각각
-     * 이미 잠근다. port 메서드 자신의 호출은 6F-10 이 받는다(알려진 제한).
+     * 사라진 것 둘: ① `EventSql.MARK_DELIVERED` 를 raw 로 실행하던 사본(종단 전이가 이제
+     * `OutboxPort.markDelivered` 를 지난다 — `OPEN-4C2-MARK-UNEXERCISED` 종결) ② inbox
+     * **선기록**(production 은 `Delivered` 뒤에만 기록한다 — 6D-1 이 인계한 좌초·키 소진
+     * 자리). 반환도 건수(Int)가 아니라 [RelayReport] 다.
+     *
+     * 환경이 `Production` 인 이유는 그것이 `DeliveryMode.Live` 인 유일한 환경이라서다 —
+     * 다른 환경에서는 relay 가 claim 자체를 하지 않는다(억제). sender 는 fake 라 외부 호출은
+     * 0 이다.
      */
-    fun relay(limit: Int = RELAY_CLAIM_LIMIT): Int {
-        var delivered = 0
-        outbox.claim(limit).forEach { row ->
-            if (decideInbox(inbox.hasProcessed(row.idempotencyKey)) == InboxDecision.Process) {
-                inbox.markProcessed(row.idempotencyKey)
-                if (dispatchFor(row.payload, row.idempotencyKey.value)) {
-                    markDelivered(row.entryId.value)
-                    delivered += 1
-                }
-            }
-        }
-        return delivered
-    }
-
-    /**
-     * 모르는 payload 는 **조용히 건너뛰지 않는다**(review L-3) — production codec 이 모르는
-     * `payload_type` 에 fail-closed 인 것과 같은 처분이다. 건너뛰면 relay 계수만 줄어 사유가
-     * 사라진다.
-     */
-    private fun dispatchFor(
-        payload: Any?,
-        idempotencyKey: String,
-    ): Boolean {
-        val requested =
-            payload as? NotificationRequestedPayload
-                ?: error("relay 가 모르는 outbox payload 를 받았다: ${payload?.let { it::class.qualifiedName }}")
-        val intent =
-            NotificationIntent(
-                idempotencyKey = IdempotencyKey(idempotencyKey),
-                owner = E2E_OWNER,
-                channel = E2E_CHANNEL,
-                contentRef = ContentRef(requested.noticeId),
-            )
-        val outcome = dispatcher.dispatch(intent)
-        return outcome is DeliveryOutcome.Attempted && outcome.result is DeliveryResult.Delivered
-    }
-
-    private fun markDelivered(entryId: String) {
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(EventSql.MARK_DELIVERED).use { statement ->
-                statement.setString(1, entryId)
-                check(statement.executeUpdate() == 1) { "DELIVERED 전이가 행을 옮기지 못했다: $entryId" }
-            }
-        }
-    }
+    fun relay(limit: Int = RELAY_CLAIM_LIMIT): RelayReport = relayUseCase.relay(limit)
 }
 
 private fun resolvedStrategyPolicy(at: Instant): Resolution.Resolved<StrategyPolicyData> {

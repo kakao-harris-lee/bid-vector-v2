@@ -25,12 +25,49 @@ package bidvector.workflow.event
 interface OutboxPort {
     fun register(envelope: EventEnvelope<*>): OutboxEntryId
 
-    /** `Pending`을 `Claimed`로 옮기며 최대 [limit]개의 원시 행을 반환한다 — claim 경합 제어는 4C-2. */
-    fun claim(limit: Int): List<ClaimedOutboxRow<*>>
+    /**
+     * [kind]인 `Pending`을 `Claimed`로 옮기며 최대 [limit]개의 원시 행을 반환한다 — claim
+     * 경합 제어는 4C-2(`FOR UPDATE SKIP LOCKED`).
+     *
+     * **[kind]를 받는다(D-6F10-13)** — 좁히지 않은 claim 은 소비자가 없는 종류
+     * ([OutboxConsumerKind.StrategyUpdated])까지 집고, 전이표에 `Claimed -> Pending`
+     * 간선이 없어 그 행은 격리밖에 못 간다. 「relay 가 조심한다」가 아니라 **질의가 집지
+     * 않는다**로 닫는다.
+     */
+    fun claim(
+        limit: Int,
+        kind: OutboxConsumerKind,
+    ): List<ClaimedOutboxRow<*>>
 
+    /**
+     * [kind]인 `Claimed` 행 전부를 **읽는다**(D-6F10-11 고아 판정의 입력) — 전이시키지
+     * 않는다. 격리는 호출부가 `transitionOutbox`를 지나 [markIsolated]로 한다.
+     *
+     * **고아 판정은 이 목록의 시각이 아니라 호출 시점의 구조로 성립한다** — lease 를
+     * **새로** 잡은 소비자가 **첫 [claim] 전에** 부르면, 그때 보이는 `Claimed`는 **그
+     * 홀더가 더 이상 lease 를 쥐지 않은** 행이다. 그래서 이 함수 자신은 「얼마나 오래
+     * `Claimed`였는가」를 알 필요가 없고 행도 그 값을 나르지 않는다([ClaimedOutboxRow]에
+     * claim 시각이 없다).
+     *
+     * **「전부 죽은 홀더가 남긴 것」은 아니다**(R2-L-4 정정) — lease 를 놓게 하는 것은
+     * 프로세스 사망이 아니라 연결 단절이므로, 아직 발송 중인 홀더의 행도 여기에 보일 수
+     * 있다. 그 창을 좁히는 것은 이 함수가 아니라 호출부의 [LeaseGuard] 재확인이다.
+     *
+     * 행을 잠그지 않는다 — 상호 배제는 [ConsumerLeasePort]가 지고, 여기서 잠그면 살아
+     * 있는 다른 소비자의 claim 트랜잭션과 교차 대기를 만든다.
+     */
+    fun claimedEntries(kind: OutboxConsumerKind): List<ClaimedOutboxRow<*>>
+
+    /**
+     * `Claimed`를 `Delivered`로 옮긴다. **갱신 계수 0 은 조용한 no-op 가 아니다**
+     * (D-6F10-2) — 구현은 행을 옮기지 못하면 던진다(fail-closed). 「전이표가 거부했다」와
+     * 「행이 이미 다른 상태다」는 다른 사실이고, 뒤쪽은 이 계약이 든다.
+     */
     fun markDelivered(transition: OutboxTransition.ToDelivered)
 
+    /** `Claimed`를 `Failed`로 옮긴다 — 계수 계약은 [markDelivered]와 같다. */
     fun markFailed(transition: OutboxTransition.ToFailed)
 
+    /** `Claimed`를 `Isolated`로 옮긴다 — 계수 계약은 [markDelivered]와 같다. */
     fun markIsolated(transition: OutboxTransition.ToIsolated)
 }

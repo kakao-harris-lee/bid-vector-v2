@@ -73,10 +73,21 @@ internal fun testStrategy(
             bidNowThreshold = BigDecimal("0.7"),
             reviewThreshold = BigDecimal("0.45"),
         ),
+    // M6/6F-10 — 개정 번호가 payload 에 실리므로 그 값을 고를 수 있어야 한다(값 두 축 ②).
+    revision: Int = 1,
 ): OperatorStrategy {
-    val result = validate(draft, StrategyRevision(1), strategyPolicy())
+    val result = validate(draft, StrategyRevision(revision), strategyPolicy())
     return (result as StrategyValidation.Valid).strategy
 }
+
+/** 사다리가 `Skip` 을 내는 분석 — 우선도가 review 임계(0.45) 아래다. */
+internal fun skipAnalysis(): MlAnalysisOutcome =
+    MlAnalysisOutcome.Analyzed(
+        priorityScore = UnitScore(BigDecimal("0.1")),
+        probabilityScore = null,
+        matchedScore = null,
+        evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+    )
 
 internal fun testNotice(
     number: String = "20260101001",
@@ -219,12 +230,18 @@ internal class FakeCapacityPort(
     }
 }
 
-internal class FakeNotificationRequestPort : NotificationRequestPort {
+/**
+ * [outcome] 은 **고를 수 있다**(M6/6F-10) — `reach` 가 port 반환값을 버리지 않는지 재려면
+ * `Failed` 를 돌려주는 fake 가 필요하다. 기본값은 `Requested` 라 기존 test 는 무변경이다.
+ */
+internal class FakeNotificationRequestPort(
+    private val outcome: NotificationRequestOutcome = NotificationRequestOutcome.Requested,
+) : NotificationRequestPort {
     val requested = mutableListOf<NotificationRequest>()
 
     override fun request(notification: NotificationRequest): NotificationRequestOutcome {
         requested += notification
-        return NotificationRequestOutcome.Requested
+        return outcome
     }
 }
 

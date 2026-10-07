@@ -340,5 +340,9 @@ class AppHttpDependencyGateTest {
 /**
  * 면제 목록의 크기 — 새 이름이 눈에 띄지 않게 늘지 않도록 못박는다(M-r3-2). 늘려야 하면 이
  * 숫자를 함께 고치게 되고, 그 커밋이 사유를 남긴다.
+ *
+ * **44 -> 46**(M6/6F-10 수정 라운드 2, cr R-2): relay 기동 거부 판정을 배선의 `require` 에서
+ * **순수 함수**로 뽑아 정책표 변이로 직접 칠 수 있게 했다 — 그 자리에 공개 표면 둘이
+ * 생겼다(`RelayBootDecision` 열거와 그 파일 facade).
  */
-private const val EXPECTED_EXEMPT_COUNT = 31
+private const val EXPECTED_EXEMPT_COUNT = 46

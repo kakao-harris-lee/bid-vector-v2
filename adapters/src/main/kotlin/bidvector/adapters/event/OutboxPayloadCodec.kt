@@ -6,6 +6,7 @@ import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyRevision
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
+import bidvector.workflow.event.OutboxConsumerKind
 import java.time.LocalDate
 
 /**
@@ -47,6 +48,22 @@ internal object OutboxPayloadCodec {
             else -> unknownPayloadType(payload)
         }
 
+    /**
+     * [OutboxConsumerKind] -> `payload_type` 매핑(D-6F10-13) — kind 는 `workflow` 의
+     * 어휘이고 저장 문자열은 이 object 의 것이다. 소진 `when` 이라 새 kind 가 생기면
+     * 컴파일이 깨진다.
+     *
+     * **같은 문자열로 가는 길이 둘이 됐다** — payload 클래스 기준([payloadTypeOf]의 다른
+     * 오버로드)과 kind 기준(이 함수). 한쪽만 고치는 표류는 타입이 막지 못하므로
+     * `OutboxPayloadCodecTest` 가 kind 마다 표본 payload 를 짝지어 두 길의 결과가 같다는
+     * **등식**을 잰다(알려진 제한의 잠금).
+     */
+    fun payloadTypeOf(kind: OutboxConsumerKind): String =
+        when (kind) {
+            OutboxConsumerKind.NotificationRequested -> NOTIFICATION_REQUESTED_TYPE
+            OutboxConsumerKind.StrategyUpdated -> STRATEGY_UPDATED_TYPE
+        }
+
     fun encode(payload: Any?): String =
         when (payload) {
             is StrategyEvent.StrategyUpdated -> encodeStrategyUpdated(payload)
@@ -67,33 +84,29 @@ internal object OutboxPayloadCodec {
     private fun unknownPayloadType(payload: Any?): Nothing =
         error("알 수 없는 outbox payload 타입이다: ${payload?.let { it::class.qualifiedName }}")
 
-    private fun encodeStrategyUpdated(event: StrategyEvent.StrategyUpdated): String {
-        // verifier r1 L-2 시정 — `if (… is On) … else ""`는 `EffectiveFrom`에 셋째 하위
-        // 타입이 생겨도 조용히 `Initial`처럼 인코딩한다(복원 쪽 fail-closed 규율의 반대
-        // 방향). 소진 `when`으로 바꿔 새 하위 타입이 생기면 컴파일이 깨지게 한다.
-        val effectiveFromField =
-            when (val effectiveFrom = event.policyVersion.effectiveFrom) {
-                EffectiveFrom.Initial -> ""
-                is EffectiveFrom.On -> effectiveFrom.date.toString()
-            }
-        return listOf(event.revision.value.toString(), effectiveFromField, event.policyVersion.source)
+    private fun encodeStrategyUpdated(event: StrategyEvent.StrategyUpdated): String =
+        (listOf(event.revision.value.toString()) + policyVersionFields(event.policyVersion))
             .joinToString(FIELD_SEPARATOR.toString()) { escapeFor(it, FIELD_SEPARATOR) }
-    }
 
     private fun decodeStrategyUpdated(payload: String): StrategyEvent.StrategyUpdated {
         val fields = splitEscapedFor(payload, FIELD_SEPARATOR)
         check(fields.size == STRATEGY_UPDATED_FIELD_COUNT) {
             "StrategyUpdated payload 형식이 아니다(필드 ${STRATEGY_UPDATED_FIELD_COUNT}개 기대): $payload"
         }
-        val revision = StrategyRevision(fields[0].toInt())
-        val effectiveFrom =
-            if (fields[1].isEmpty()) EffectiveFrom.Initial else EffectiveFrom.On(LocalDate.parse(fields[1]))
-        return StrategyEvent.StrategyUpdated(revision, PolicyVersion(effectiveFrom, fields[2]))
+        return StrategyEvent.StrategyUpdated(
+            StrategyRevision(fields[0].toInt()),
+            decodePolicyVersion(fields[1], fields[2]),
+        )
     }
 
     private fun encodeNotificationRequested(payload: NotificationRequestedPayload): String {
         val fields =
-            listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) + evidenceFieldsOf(payload.evidence)
+            listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) +
+                policyVersionFields(payload.ladderPolicyVersion) +
+                // `List + List`(연결)와 `List + String`(원소 추가)을 한 식에 섞지 않는다
+                // (cr L-10) — 가운데 항이 나중에 목록을 내는 함수로 바뀌면 뜻이 조용히 바뀐다.
+                listOf(payload.strategyRevision.value.toString()) +
+                evidenceFieldsOf(payload.evidence)
         return fields.joinToString(FIELD_SEPARATOR.toString()) { escapeFor(it, FIELD_SEPARATOR) }
     }
 
@@ -103,10 +116,18 @@ internal object OutboxPayloadCodec {
             "NotificationRequested payload 형식이 아니다(필드 ${NOTIFICATION_REQUESTED_FIELD_COUNT}개 기대, " +
                 "실제 ${fields.size}개): $payload"
         }
-        val noticeId = fields[0]
-        val bidNowReasons = if (fields[1].isEmpty()) emptyList() else splitEscapedFor(fields[1], LIST_SEPARATOR)
-        val evidence = decodeEvidence(fields.subList(2, NOTIFICATION_REQUESTED_FIELD_COUNT))
-        return NotificationRequestedPayload(noticeId, bidNowReasons, evidence)
+        val reasonsField = fields[REASONS_FIELD_INDEX]
+        return NotificationRequestedPayload(
+            noticeId = fields[NOTICE_ID_FIELD_INDEX],
+            bidNowReasons = if (reasonsField.isEmpty()) emptyList() else splitEscapedFor(reasonsField, LIST_SEPARATOR),
+            ladderPolicyVersion =
+                decodePolicyVersion(
+                    fields[LADDER_EFFECTIVE_FROM_FIELD_INDEX],
+                    fields[LADDER_SOURCE_FIELD_INDEX],
+                ),
+            strategyRevision = StrategyRevision(fields[STRATEGY_REVISION_FIELD_INDEX].toInt()),
+            evidence = decodeEvidence(fields.subList(EVIDENCE_FIRST_FIELD_INDEX, NOTIFICATION_REQUESTED_FIELD_COUNT)),
+        )
     }
 }
 
@@ -121,13 +142,39 @@ private const val STRATEGY_UPDATED_FIELD_COUNT = 3
 
 /**
  * `encodeNotificationRequested`가 내는 최상위 필드 수 — noticeId·bidNowReasons·
- * evidenceKind·(Diagnosed 열둘 | NotPredicted 하나, 안 쓰는 자리는 빈 문자열)·
- * excludedSamples. `decodeNotificationRequested`의 형식 검증 상수.
+ * ladderPolicyVersion 두 칸·strategyRevision·evidenceKind·(Diagnosed 열둘 | NotPredicted
+ * 하나, 안 쓰는 자리는 빈 문자열)·excludedSamples. `decodeNotificationRequested`의 형식 검증
+ * 상수.
+ *
+ * **M6/6F-10 D-6F10-19 — 17 → 20.** 새 칸 셋(`ladderPolicyVersion` 둘 + `strategyRevision`
+ * 하나)은 `bidNowReasons` **뒤·evidence 앞**(인덱스 2·3·4)에 들어간다. 꼬리에 붙이지 않는
+ * 이유는 아래 파생 상수 사슬이다 — evidence 블록이 목록의 **마지막 연속 구간**이어야
+ * [EVIDENCE_TRAILING_SLOT_INDEX] 가 「그 블록의 마지막 칸」이라는 뜻을 유지한다.
+ *
+ * 저장된 구행을 깨지 않는가: **깨뜨릴 구행이 없다**(D-6F10-16). `OutboxNotificationRequestPort`
+ * 를 참조하는 main 코드는 자기 파일뿐이었고 app 게이트가 그 참조를 금지한 채 초록이었다 —
+ * 어느 DB 에도 이 `payload_type` 행이 영속된 적이 없다(test 는 Testcontainers 일회성).
+ * 그래서 `payload_type` 토큰을 유지하고 구 디코더를 두지 않는다(없는 구행을 위한 죽은 코드).
  */
-private const val NOTIFICATION_REQUESTED_FIELD_COUNT = 17
+private const val NOTIFICATION_REQUESTED_FIELD_COUNT = 20
 
-/** noticeId·bidNowReasons(둘)을 뺀 나머지 — evidenceKind 1 + Diagnosed 필드 12 + 미사용 1 + excludedSamples/reason 1. */
-private const val EVIDENCE_FIELD_COUNT = NOTIFICATION_REQUESTED_FIELD_COUNT - 2
+/**
+ * `NotificationRequested` 최상위 칸의 자리 이름 — `encodeNotificationRequested` 가 내는 순서
+ * 그대로다. 인덱스를 리터럴로 쓰지 않는 이유는 매직 넘버 금지(v2-지침서 §5)만이 아니다:
+ * 칸이 늘면 **이 블록 하나만** 고치면 되고, evidence 블록의 시작이 여기서 **도출**되므로 둘이
+ * 어긋날 자리가 없다.
+ */
+private const val NOTICE_ID_FIELD_INDEX = 0
+private const val REASONS_FIELD_INDEX = 1
+private const val LADDER_EFFECTIVE_FROM_FIELD_INDEX = 2
+private const val LADDER_SOURCE_FIELD_INDEX = 3
+private const val STRATEGY_REVISION_FIELD_INDEX = 4
+
+/** evidence 블록이 시작하는 인덱스 — 위 다섯 칸 **바로 뒤**(도출, 손으로 세지 않는다). */
+private const val EVIDENCE_FIRST_FIELD_INDEX = STRATEGY_REVISION_FIELD_INDEX + 1
+
+/** evidence 블록의 칸 수 — evidenceKind 1 + Diagnosed 필드 12 + 미사용 1 + excludedSamples/reason 1. */
+private const val EVIDENCE_FIELD_COUNT = NOTIFICATION_REQUESTED_FIELD_COUNT - EVIDENCE_FIRST_FIELD_INDEX
 private const val EVIDENCE_KIND_DIAGNOSED = "DIAGNOSED"
 private const val EVIDENCE_KIND_NOT_PREDICTED = "NOT_PREDICTED"
 
@@ -136,6 +183,37 @@ private const val EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED = EVIDENCE_FIELD_COUNT 
 
 /** evidence 필드 목록의 마지막 칸 — Diagnosed 는 excludedSamples, NotPredicted 는 reason. */
 private const val EVIDENCE_TRAILING_SLOT_INDEX = EVIDENCE_FIELD_COUNT - 1
+
+/**
+ * `PolicyVersion` 을 **두 칸**으로 편다(`effectiveFrom`·`source`) — `StrategyUpdated` 와
+ * `NotificationRequested` 가 같은 모양을 쓰므로 한 자리에 둔다(§5 중복 금지).
+ *
+ * `effectiveFrom` 은 소진 `when` 이다. `if (… is On) … else ""` 로 쓰면 `EffectiveFrom` 에
+ * 셋째 하위 타입이 생겨도 조용히 `Initial` 처럼 인코딩한다(복원 쪽 fail-closed 규율의 반대
+ * 방향) — 소진 `when` 은 그 커밋에서 컴파일을 깨뜨린다.
+ */
+private fun policyVersionFields(version: PolicyVersion): List<String> {
+    val effectiveFromField =
+        when (val effectiveFrom = version.effectiveFrom) {
+            EffectiveFrom.Initial -> ""
+            is EffectiveFrom.On -> effectiveFrom.date.toString()
+        }
+    return listOf(effectiveFromField, version.source)
+}
+
+/** [policyVersionFields] 의 역함수 — 빈 `effectiveFrom` 칸이 `Initial` 이다. */
+private fun decodePolicyVersion(
+    effectiveFromField: String,
+    source: String,
+): PolicyVersion {
+    val effectiveFrom =
+        if (effectiveFromField.isEmpty()) {
+            EffectiveFrom.Initial
+        } else {
+            EffectiveFrom.On(LocalDate.parse(effectiveFromField))
+        }
+    return PolicyVersion(effectiveFrom, source)
+}
 
 private fun encodeReasons(reasons: List<String>): String =
     reasons.joinToString(LIST_SEPARATOR.toString()) { escapeFor(it, LIST_SEPARATOR) }

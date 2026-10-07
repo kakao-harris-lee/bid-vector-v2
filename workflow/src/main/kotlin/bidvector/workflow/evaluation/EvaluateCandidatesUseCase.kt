@@ -9,11 +9,11 @@ import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.Notice
 import bidvector.procurement.isBiddable
 import bidvector.qualification.LicenseVerdict
-import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.PriorityScore
+import bidvector.strategy.StrategyRevision
 import bidvector.strategy.WatchVerdict
 import bidvector.strategy.evaluate
 import bidvector.workflow.event.CorrelationId
@@ -268,6 +268,7 @@ class EvaluateCandidatesUseCase internal constructor(
                     reviewThreshold,
                     ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
                     PredictionEvidence.NotPredicted(outcome.reason),
+                    strategy.revision,
                 )
             }
 
@@ -285,6 +286,7 @@ class EvaluateCandidatesUseCase internal constructor(
                             matchedScore = outcome.matchedScore,
                         ),
                         outcome.evidence,
+                        strategy.revision,
                     )
             }
         }
@@ -362,6 +364,7 @@ class EvaluateCandidatesUseCase internal constructor(
         reviewThreshold: PriorityScore,
         ladderInput: LadderInput,
         evidence: PredictionEvidence,
+        strategyRevision: StrategyRevision,
     ): CandidateEvaluation.Reached {
         val ladderPolicy =
             Resolution.Resolved(
@@ -372,14 +375,51 @@ class EvaluateCandidatesUseCase internal constructor(
                     forceBidProbabilityThreshold = ladderPolicySlot.forceBidProbabilityThreshold,
                     forceBidMatchedThreshold = ladderPolicySlot.forceBidMatchedThreshold,
                 ),
-                PolicyVersion(EffectiveFrom.Initial, "m4-4b2-legacy-behavior-2026-09-09"),
+                EVALUATION_LADDER_POLICY_VERSION,
             )
         val verdict = judge(ladderInput, ladderPolicy)
-        if (verdict is Verdict.BidNow) {
-            notifications.request(NotificationRequest(notice.id, correlationId, verdict, evidence))
-        }
-        return CandidateEvaluation.Reached(notice.id, correlationId, verdict)
+        return CandidateEvaluation.Reached(
+            notice.id,
+            correlationId,
+            verdict,
+            notifications.requestFor(notice, correlationId, verdict, evidence, ladderPolicy.version, strategyRevision),
+        )
     }
+}
+
+/**
+ * **반환값을 버리지 않는다**(D-6F10-4) — 앞 판의 `reach` 는 `notifications.request(...)` 의
+ * 결과를 버렸고, 오늘 평가에 판정 기록 표가 없어(D-6F7-2) outbox 행이 판정의 **유일한 영속
+ * 흔적**이므로 그것은 판정이 흔적 없이 사라지는 길이었다.
+ *
+ * 정책 버전은 **판정에 쓴 것과 같은 인스턴스**다(`reach` 가 `Resolution.Resolved` 에 실은
+ * `version` 을 그대로 받는다) — payload 가 다른 자리에서 같은 값을 다시 짓지 않으므로 둘이
+ * 갈릴 자리가 없다.
+ *
+ * top-level 로 둔 이유는 크기 회피가 아니라 상태 부재다 — 이 함수는 port 하나와 인자만
+ * 쓴다(클래스당 함수 11개 한도, detekt `TooManyFunctions`; `watchVerdictDrop` 과 같은 처분).
+ */
+private fun NotificationRequestPort.requestFor(
+    notice: Notice,
+    correlationId: CorrelationId,
+    verdict: Verdict,
+    evidence: PredictionEvidence,
+    ladderPolicyVersion: PolicyVersion,
+    strategyRevision: StrategyRevision,
+): NotificationDisposition {
+    if (verdict !is Verdict.BidNow) return NotificationDisposition.NotApplicable
+    val requested =
+        request(
+            NotificationRequest(
+                noticeId = notice.id,
+                correlationId = correlationId,
+                verdict = verdict,
+                evidence = evidence,
+                ladderPolicyVersion = ladderPolicyVersion,
+                strategyRevision = strategyRevision,
+            ),
+        )
+    return NotificationDisposition.Requested(requested)
 }
 
 private fun notReached(
