@@ -148,6 +148,10 @@ SBOM_FORMAT="$(_policy_value sbom.format text)"
 REPORT_DIR="$(_policy_value report.dir text)"
 ALLOWLIST_FILE="$(_policy_value allowlist.file text)"
 ALLOWLIST_MAX_DAYS="$(_policy_value allowlist.max-days numeric)"
+# 설치 step 만 도구 핀을 보면, **이 게이트가 어느 스캐너로 판정했는가**는 아무도 잠그지 않는다
+# (호스트에 다른 판이 깔려 있으면 그대로 돈다). 판정 자신이 핀을 확인한다 — 요약에 판을 찍는 것과
+# 판으로 끊는 것은 다른 일이고, 재현 가능한 판정에 필요한 것은 후자다.
+TRIVY_PINNED_VERSION="$(_policy_value tool.trivy.version version)"
 
 # **양성 대조가 먼저다**(6C 의 세 라운드가 만든 규율). SBOM 이 비거나 패키지를 못 찾으면
 # 「차단 대상 0」은 공허하게 참이다 — 상시 초록 게이트가 되는 바로 그 경로(D-6C-5). 그래서
@@ -209,6 +213,11 @@ TRIVY_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.Version // "unknown
 VULN_DB_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.Version // "unknown"')"
 VULN_DB_UPDATED_AT="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.UpdatedAt // "unknown"')"
 VULN_DB_NEXT_UPDATE="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.NextUpdate // "unknown"')"
+
+if [ "$TRIVY_VERSION" != "$TRIVY_PINNED_VERSION" ]; then
+  echo "도는 trivy(${TRIVY_VERSION})가 정책이 핀한 판(${TRIVY_PINNED_VERSION})과 다르다 — 판정이 재현되지 않는다" >&2
+  exit 2
+fi
 
 SBOM_COMPONENTS="$(jq '[.components[]? | select(.type == "library" or .type == "operating-system")] | length' "$SBOM_FILE")"
 
