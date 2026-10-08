@@ -9,8 +9,9 @@
 # (하네스 「게이트 술어는 문자열이 아니라 구조로」).
 #
 # **SBOM 과 스캔은 같은 입력에서 나온다**(B-1 의 사유). 이미지에서 CycloneDX SBOM 을 먼저
-# 만들고, 스캔은 **그 SBOM 을 입력으로** 돈다 — 두 번 이미지를 읽으면 그 사이에 태그가
-# 다른 이미지를 가리킬 수 있고, 그러면 보관한 SBOM 이 판정한 대상과 다른 물건이 된다.
+# 만들고, 스캔은 **그 SBOM 을 입력으로** 돈다 — 보관본이 곧 판정 대상이라 둘이 갈릴 자리가
+# 구조적으로 없다. 잠금은 둘이다: 태그가 아니라 **이미지 ID** 로 SBOM 을 뜨고(아래), 스캔은
+# 그 SBOM 만 읽는다.
 #
 # 사용법: tools/vuln-scan-check.sh <image-ref> <image-kind> <policy-file>
 #   exit 0 = 통과 · 1 = 차단(미등재 finding / 만료·stale allowlist) · 2 = 정책·도구·사용법 오류
@@ -178,6 +179,8 @@ if ! docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
   echo "이미지를 로컬에서 찾지 못했다: ${IMAGE_REF}" >&2
   exit 2
 fi
+# 태그가 아니라 **이미지 ID(내용 주소)** 로 스캔한다 — 요약에 그 ID 를 싣는 것과 짝이다.
+# 태그는 실행 사이에 다른 바이트를 가리킬 수 있고, 그때 「무엇을 쟀는가」가 기록에서 사라진다.
 IMAGE_ID="$(docker image inspect "$IMAGE_REF" --format '{{.Id}}')"
 
 mkdir -p "$REPORT_DIR"
