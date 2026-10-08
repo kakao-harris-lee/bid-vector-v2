@@ -10,6 +10,20 @@ base `2deb5f9d` · 브랜치 `m6-6e2a/2026-10-08` · 이 레인의 마지막 산
 | `./gradlew --no-daemon qualityBaseline` | 같은 job | **exit 0** (13s, 전건 UP-TO-DATE) |
 | `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 **문면 그대로** 순서대로 | **전 step exit 0** |
 
+**라운드별 `check` 실측** — 이 slice 는 착수 뒤 두 번 더 돌았다. 각 라운드의 측정은 **그 라운드의 마지막
+산출물 커밋에서** 돌렸고, 양끝에서 HEAD 를 단언했다(공유 브랜치라 측정 중 팀장 커밋이 들어올 수 있다).
+
+| 라운드 | SHA | `check` | 핵심 결과 |
+|---|---|---|---|
+| 착수 구현 | `4ade8b51` | **exit 0** | 클래스 352 · test 2828 · 실패 0 · skip 4 |
+| 승인 전 일괄(D-6E2A-4) | `72f27528` | **exit 0**(9m 23s) | 입력이 문서·주석·test 정리라 산출물 수치 불변 |
+| PR #66 조치(D-6E2A-9) | `77eddf9b` | **exit 0**(9m) | 클래스 352 · test **2829** · 실패 0 · skip 4 — 늘어난 하나가 아래 음성 대조다 |
+
+PR #66 조치 라운드가 더한 test 하나는 **「역할로 읽은 표 모집단은 GRANT 없는 표를 놓친다」** 다.
+`information_schema.tables` 가 권한으로 걸러진 뷰라는 사실을 실측으로 고정한다 — 역할로 읽은 모집단에
+`flyway_schema_history` 가 **없고** 소유자로 읽으면 **있다**. 이 칸이 「변한 표 == {outbox}」 단언이
+admin 연결로 모집단을 읽는 이유이고, 그것이 없으면 그 선택은 근거 없는 취향과 구별되지 않는다.
+
 `check` 의 핵심 결과 한 줄 — 클래스 **352** · test **2828** · 실패 0 · 오류 0 · skip 4. 이 slice 가 더한
 것은 class 둘(`ProductionPoolRoleTest` 7 · `PooledLeaseFloorTest` 2)과 기존 class 의 test 둘이다.
 종료 코드로 읽었다 — 출력을 `grep` 해 판단하거나 커밋과 한 줄로 묶지 않았다. S-20 은 Python 무변경이라
@@ -24,6 +38,7 @@ base `2deb5f9d` · 브랜치 `m6-6e2a/2026-10-08` · 이 레인의 마지막 산
 | `check` r2 | exit 1 | **79 failed · 원인 셋** — ⓐ `com.zaxxer.hikari` 가 app 의 바깥 참조 허용 집합 밖 ⓑ fixture 초기화 **다섯 자리**가 production 빈으로 `TRUNCATE`(42501) ⓒ 풀 구현이 classpath 에 오자 `DataSourceAutoConfiguration` 이 **DB 없는 test 조립**에서 풀을 만들려 들어 컨텍스트가 깨짐 |
 | `check` r3 | exit 1 | ktlint 8건(KDoc 둘이 겹침) |
 | `check` r4 | exit 1 | 1 failed — `ALTER TABLE outbox ADD CONSTRAINT`(실패 주입 DDL)은 표 소유자만 가능 |
+| `check` @`50a0f053`(PR #66 조치) | exit 1 | ktlint 8건 — 새 KDoc 둘이 기존 KDoc 에 인접했다(`standard:kdoc`·`no-consecutive-comments` 계열). 승인 전 일괄에서 한 번 겪은 것과 **같은 계열**이고, KDoc 을 더하는 편집마다 되풀이된다 |
 
 **ⓑ·ⓒ 는 계약이 예고한 P-5 보다 넓었다** — 계약은 `ProductionAssemblyAuthAuditTest` 하나를 지목했고
 실제로는 fixture 자리가 여섯(`TRUNCATE` 다섯 + 실패 주입 DDL 하나)이었다. 전부 `app/src/test/**`
@@ -104,7 +119,9 @@ printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || 
 exit $fails
 ```
 
-**결과(HEAD `4ade8b51` 기준)**: `E-1`~`E-6` **전부 OK · DIFF 0 · exit 0 · OK 줄 6**.
+**결과**: `E-1`~`E-6` **전부 OK · DIFF 0 · exit 0 · OK 줄 6**. 문서를 고친 라운드마다 다시 돌렸다 —
+착수 `4ade8b51` · 승인 전 일괄 · **PR #66 조치 `77eddf9b`**(머리말·§6·§7·카탈로그 주석을 고친 뒤).
+블록은 **이 문서에 박힌 것을 그대로 떼어** 돌린다(문면에만 있고 블록에 없는 등식은 떼어 돌리면 사라진다).
 
 `E-1`·`E-4` 가 6E-1 `E-25` 의 **갱신분**이다. 그 등식은 「`SET ROLE` 0 · `NOLOGIN` · 접속 사용자 == DB
 소유자 · §3.6 이 **보호가 작동하지 않는다**고 말함」 넷을 쟀고, 이 slice 가 바꾼 것은 둘이다 — 역할 전환
