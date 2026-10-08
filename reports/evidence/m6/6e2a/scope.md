@@ -69,3 +69,11 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2A-2** | 구현 레인 완료 보고 수령(`_workspace/m6-6e2a/02_implementer_report.md`, 레인 HEAD `bb12794a`) → **레인 동결**, 판정 대상 SHA = 이 계약 갱신 커밋. 레인 실측: `check`·`qualityBaseline`·container job S-21a~S-25·rollback ⓪~⑥ exit 0, P-6 위생 1초 창 유지(스크립트 무편집). **계약 대비 어긋남 셋을 수령**: ① P-5 범위가 여섯 자리(TRUNCATE 다섯 + 실패 주입 DDL 하나)로 넓었다 — 전부 in_scope ② test 조립 `HttpTestApplication` 에서만 `DataSourceAutoConfiguration` 제외(풀 classpath 진입이 낳은 것; 출하 조립은 빈 개수 단언으로 잠금) — verifier 표적 ③ acceptance 변이 ⑤ 문면 정정: `expectedModules` 는 「등재 ⊆ 해석」이라 **등재 삭제는 초록**(M5a), 등재 좌표 바꿔치우기로 RED(M5b) — 등재형 게이트의 한계를 사실로. 코드 주석의 결정 ID 충돌(`D-6E2A-1`)은 `P-n`·`A-n` 인용으로 정정됨. 판정 레인: verifier(opus) + code-reviewer(sonnet) 병렬, 그 뒤 Codex(D-6E2A-1) | 팀장 |
+
+## 계약 갱신 r3 (2026-10-09, 팀장 — 판정 r1 수령 · 승인 전 일괄)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-3** | **verifier r1 `ready-for-review` @`32138c6f`**(`_workspace/m6-6e2a/03_verifier_r1.md`: acceptance 셋 exit 0 · 위생 1초 창 유지 · 바꿔치우기 변이 다섯 RED · adapters 전 suite 를 SET ROLE 풀로 재구성 실행 902 중 실패 10, production 경로 0) + code-review r1(high 0 · medium 3 · low 7). 재작업 0/5 | 팀장 |
+| **D-6E2A-4** | **승인 전 일괄 커밋(장부·low, 재검증 없음 — Codex 가 본다)**: cr M-1 `TransactionBoundary` 누출 경로(adapters main, in_scope 밖) → 신설 **`OPEN-6E2A-TX-BOUNDARY-LEAK-UNDER-POOL`** + runbook §2.6 제한 · cr M-2 `INITIALIZATION_FAIL_TIMEOUT_MS` 는 라이브러리 기본값과 같아 삭제 변이가 초록 → 변이표에 사실로 + runbook 의 「즉시 기동 실패」 약속을 그 조건으로 한정 · cr M-3 adapters 하네스가 소유자로 돈다 → 신설 **`OPEN-6E2A-ADAPTER-TESTS-RUN-AS-OWNER`**, 근거로 verifier 재구성 실측(902 중 10 실패 · production 경로 0) · low: cr L-1(adapters build 주석 모순) · L-3(finally 안 단언) · L-5(runbook 「빈 DB」 조건) · L-6(빈 부수효과 알려진 제한 문구) · vr L-1(§2.6 — `hikaricp.configurationFile` JVM 옵션으로 표 밖 값 변경 가능, 경계 밖) · vr L-2(값 획득 표에 `PersistenceProperties` 행 복원 + 실측) · vr L-3(§2.6 minimumIdle = 최대 크기, 유휴 10). cr L-2·L-4·L-7 은 checklist 알려진 제한 | 팀장 |
+| **D-6E2A-5** | 일괄 뒤 **Codex 심판 1회**(D-6E2A-1) — 범위 `2deb5f9d..<일괄 뒤 판정 SHA>` in_scope | 팀장 |
