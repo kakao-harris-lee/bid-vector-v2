@@ -25,30 +25,43 @@ evidence 까지 담아 ⑥ 의 `leakPatternGate` 가 이 slice 의 문서를 실
 **공유 파일은 둘로 갈린다 — 그 판정을 라운드마다 다시 내린다.**
 `git log --oneline 2deb5f9d..HEAD -- <파일>` 로 그 파일을 만진 커밋이 누구 것인지 본다.
 
-- **복원 목록 셋**(`ci.yml`·runbook·`docker/ml-serving.Dockerfile`) — 만진 커밋이 **전부 이 slice 의
-  것**이다. 그래서 hunk 격리가 필요 없고 위 단일 `git restore --source=<base>` 로 끝난다.
-- **`milestone-6.md`** — **다른 slice 들의 문단이 산다.** 전체 복원이나 range revert 는 **남의 줄을 함께
-  지운다.** 그래서 복원 목록에 **넣지 않고** 아래 hunk 절차로 지운다(프로젝트 선례 6E-1·6D-2·6G…).
+- **단일 restore 다섯**(`ci.yml`·두 정책 파일·`docker/ml-serving.Dockerfile`·`tools/vuln-scan-check.sh`)
+  — 만진 커밋이 **전부 이 slice 의 것**이다(`origin/main` 병합 뒤 재확인: 6E-2a 는 이 다섯을 **하나도**
+  건드리지 않았다 — `git log --no-merges 2deb5f9d..origin/main -- <파일>` 전부 0 커밋).
+- **`docs/runbook/m6-6e-operations.md`** — **병합으로 성질이 바뀌었다.** 6E-2a 가 이 파일을 세 커밋 만졌고
+  (머리말·§2.6·§6·§7), 그 줄들이 이제 내 브랜치에 있다. 전체 복원은 **남의 줄을 함께 지운다** →
+  복원 목록에서 빼고 아래 hunk 절차로 옮긴다.
+- **`milestone-6.md`** — 같은 이유(다른 slice 들의 문단이 산다). 아직 내 쪽 커밋은 없고, 팀장이 종결
+  문단을 **이 일괄 뒤에** 쓴다 — 그래서 해시를 박지 않고 실행 시점에 산출한다.
 
 앞 라운드까지 이 절은 「공유 파일에 다른 slice 의 줄이 없으니 hunk 격리가 필요 없다」고 적었다. 그 문장은
 **참인 채로 낡는 종류**였고, 자기 전환 조건(「다른 slice 가 같은 파일을 만지는 순간 hunk 로 바뀐다」)을
 함께 적어 둔 덕에 여기서 그 조건대로 고친다. `milestone-6.md` 가 그 전환을 발동시켰다.
 
-### 공유 파일 hunk 절차 — `milestone-6.md`
+### 공유 파일 hunk 절차 — runbook · `milestone-6.md`
 
-이 slice 의 착수·종결 문단만 **커밋 해시 역적용**으로 지운다. **해시를 문서에 박지 않는다** — 종결 문단은
-이 evidence 뒤에 붙고, 그 뒤로도 더 붙을 수 있다. 실행 시점에 산출한다:
+이 slice 의 줄만 **커밋 해시 역적용**으로 지운다. **해시를 문서에 박지 않는다** — 목록은 실행 시점에
+산출한다(종결 문단이 이 evidence 뒤에 붙고, 그 뒤로도 더 붙을 수 있다).
+
+**`^origin/main` 이 핵심이다.** 병합으로 6E-2a 의 커밋이 `2deb5f9d..HEAD` 안에 들어왔다 —
+`--no-merges` 만으로는 **남의 커밋까지 역적용**한다(실측: `--no-merges` 만 72 커밋 · `^origin/main` 을
+더하면 **37**, 내 것만).
 
 ```
-# 최신부터
-for sha in $(git log --no-merges --format=%h 2deb5f9d..HEAD -- milestone-6.md); do
-  git diff "$sha~1..$sha" -- milestone-6.md | git apply -R
+for f in docs/runbook/m6-6e-operations.md milestone-6.md; do
+  for sha in $(git log --no-merges --format=%h 2deb5f9d..HEAD ^origin/main -- "$f"); do   # 최신부터
+    git diff "$sha~1..$sha" -- "$f" | git apply -R
+  done
 done
 ```
 
-`git apply -R` 이 conflict 를 내면(다른 slice 의 문단과 삽입 지점이 인접한 경우) 수동으로 **이 slice 의
-문단만** 지운다 — 문단 자신이 자기를 가리키는 표지를 갖는다(「M6/6E-2b」). 확인은 **둘 다**: 내 문단이
-사라졌는가, 그리고 **남의 문단이 남았는가.**
+**그리고 병합 커밋의 충돌 해소분이 남는다.** 위 목록은 `--no-merges` 라 병합 커밋을 건너뛰는데, runbook
+머리말의 「둘이 빠졌고 …」 문단은 **내가 병합에서 쓴 것**이다. 그 문단은 손으로 지우고 6E-2a 의 문면
+(「커넥션 풀은 이 목록에서 빠졌다 …」)으로 되돌린다 — 그 원문은 `git show origin/main:<파일>` 에 있다.
+
+conflict 가 나면 수동으로 **이 slice 의 줄만** 지운다 — 내 문단은 자기 표지를 갖는다(§8 전체,
+「M6/6E-2b」, 「6E-2b」). 확인은 **둘 다**: 내 줄이 사라졌는가, **남의 줄이 남았는가**
+(6E-2a 표지: §2.6 의 풀 상수표 · §6 항목 17~19 · §7 의 「고치는 절에 맞는 블록」 문단).
 
 ## 명령
 
@@ -58,7 +71,6 @@ git restore --source=2deb5f9d --staged --worktree -- \
   config/quality/vuln-allowlist.properties \
   config/quality/vuln-policy.properties \
   docker/ml-serving.Dockerfile \
-  docs/runbook/m6-6e-operations.md \
   tools/vuln-scan-check.sh
 ```
 
@@ -85,8 +97,17 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 | ④ | `:app:compileKotlin :adapters:compileKotlin` | exit 0 |
 | ⑤⑥ | `./gradlew --no-daemon check` 전건 | exit 0 — `leakPatternGate` 포함 |
 
-**목록 등식도 기계로 확인했다** — `git diff --name-only <base>..HEAD -- . ':!reports/evidence'` 를
-**「복원 인자 ∪ hunk 처리 공유 파일」**과 `comm -23`·`comm -13` 로 양방향 대조한다. 「문서에 빠진 경로」와
+**목록 등식도 기계로 확인했다 — 다만 병합 뒤로 「범위 diff」를 쓸 수 없다.** `2deb5f9d..HEAD` 의 diff 는
+이제 **6E-2a 가 병합으로 들여온 경로 전부**를 담는다(내 것이 아니다). 그래서 이 slice 의 경로 집합을
+**내 쪽 비-병합 커밋에서** 뽑는다:
+
+```
+git log --no-merges --format=%h 2deb5f9d..HEAD ^origin/main \
+  | while read -r c; do git diff-tree --no-commit-id --name-only -r "$c"; done \
+  | sort -u | grep -v '^reports/evidence'
+```
+
+그 집합을 **「단일 restore 다섯 ∪ hunk 처리 공유 파일」**과 `comm -23`·`comm -13` 로 양방향 대조한다. 「문서에 빠진 경로」와
 「문서에만 있는 경로」를 **둘 다** 본다. 대조 집합이 복원 인자만이 아닌 것이 중요하다 — `milestone-6.md`
 는 되돌림 대상이면서 복원 목록에 없으므로, 복원 인자만 대조하면 **처리돼 있는데도 stale 로 읽힌다.**
 
