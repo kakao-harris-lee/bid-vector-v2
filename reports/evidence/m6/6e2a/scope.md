@@ -104,3 +104,9 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2A-10** | PR #66 조치 라운드 수령(`_workspace/m6-6e2a/05_implementer_pr66.md`, 레인 HEAD `c0921e62`; `check` @`77eddf9b` exit 0 · rollback ⓪~⑥ 실측 HEAD `1dce56ab`). #1 의 뿌리는 목록 낡음이 아니라 ⓪ pathspec 이 append-only 리뷰 기록을 삼킨 것 → `codex-review-*` 제외(사유와 함께). production main 변경 0 · 게이트 술어 변경 0. **레인 동결, 판정 SHA = 이 갱신 커밋 → verifier 표적 재검증**(test 넷 · rollback 유효성 · 문서 셋 · OPEN 등재) | 팀장 |
+
+## 계약 갱신 r8 (2026-10-09, 팀장 — 표적 재검증 수령 · L-4 · 종결 재확정)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-11** | **verifier 표적 재검증 `ready-for-review` @`48314303`**(`_workspace/m6-6e2a/06_verifier_targeted.md`: `check` exit 0 · rollback 유효 · test 수정 셋 변이로 RED 확인 · 문서 정정 확인) — low 하나(L-4: 새 음성 대조가 「admin 으로 읽는다」 선택을 잠그지 않음). L-4 조치 수령(`07_implementer_l4.md`, 레인 HEAD `c08f50de`): Order(2)·(3) 두 자리에 「모집단에 역할이 못 보는 표가 있다」 단언, 바꿔치우기 변이 M7(numstat 4/4) → exit 1 · 5 중 3 실패, `check` @`959bd760` exit 0, rollback 재실측 HEAD `b9f04cf4`. low 장부층이라 재검증 없이 수령(레인의 변이 실측이 근거). **종결 재확정**: verifier ready-for-review + Codex approve(@`2a393b62`, 그 뒤 변경은 test 견고성·문서·장부 — production main 은 KDoc 뿐) — 사용자 승인(머지)만 남는다. 재작업 0/5 | 팀장 |
