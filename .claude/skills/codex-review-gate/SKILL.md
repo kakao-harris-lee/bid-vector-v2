@@ -71,17 +71,27 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 쓰기 가능 범위가 폐기 예정인 worktree로 한정되므로 메인 저장소는 보호된다.
 
 ```bash
-CODEX_BIN=/Users/harris/.nvm/versions/node/v22.21.1/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다
-CODEX_PIN="0.154.0"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-09-11 갱신, 아래 참고)
+CODEX_BIN=/home/deploy/.nvm/versions/node/v24.12.0/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다(2026-10-09 WSL 호스트로 갱신)
+CODEX_PIN="0.160.1"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-10-09 갱신, 아래 참고)
 CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 2026-09-17) — `~/.codex/config.toml` 의 model 에 맡기지 않는다
 "$CODEX_BIN" --version | grep -qF "$CODEX_PIN" || {
   echo "codex 버전 불일치: $("$CODEX_BIN" --version) ≠ $CODEX_PIN — preflight 미충족, 리뷰 중단"
   exit 1
 }
 "$CODEX_BIN" --version   # 기록용 — 리뷰 메타데이터의 값은 여전히 raw-output 머리글이 정본
+# 사용자 config 의 MCP 서버·plugin 을 호출마다 끈다 — 목록은 config 에서 기계 산출(손 목록 금지).
+# `-c mcp_servers={}` 는 기존 표와 병합돼 아무것도 끄지 않는다(2026-10-09 M6/6E-2a r1 실측: serena 가 호출돼
+# worktree 에 .serena/ 를 만들어 오염 → 그 라운드 무효). config 파일은 고치지 않는다.
+CODEX_OFF=()
+while read -r k; do CODEX_OFF+=(-c "${k}.enabled=false"); done < <(
+  python3 -c 'import tomllib,os; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
+for t in ("mcp_servers","plugins"):
+    for n in d.get(t,{}): print(f"{t}.\"{n}\"")')
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
+  -c sandbox_workspace_write.network_access=false \
+  "${CODEX_OFF[@]}" \
   --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
   -o _workspace/{slice}/codex-verdict.json \
@@ -93,6 +103,8 @@ CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 20
 strict structured output은 모든 property가 required여야 하므로, `line`은 null 허용으로
 바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
 `codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
+
+**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다.
 
 **`model_reasoning_effort`는 반드시 `high`로 고정한다.** 생략하면 CLI 기본값에 의존해
 같은 base...head가 라운드마다 다른 effort로 리뷰되고, 판정이 갈릴 수 있다. M0/0A 3차
@@ -112,7 +124,9 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 결정으로만 하고 하네스 변경 이력(`docs/harness/change-history.md`)에 남긴다. 기록용 버전 값의 출처는 여전히
 `codex.raw-output.txt` 머리글이지 기억이 아니다.
 
-핀은 **0.154.0**(nvm 쪽, 사용 중인 최신)이다 — **2026-09-11 갱신**. 최초 핀 0.151.0 은 운영자 지정(2026-09-01)이었고 그 규칙이 값을 **「사용 중인 최신」**으로 정의했다. 2026-09-10 패키지 갱신으로 이 머신의
+**2026-10-09 갱신 — 핀 0.160.1, 바이너리 `/home/deploy/.nvm/versions/node/v24.12.0/bin/codex`(운영자 결정, M6/6E-2a).** 작업 호스트가 WSL 로 옮겨 앞 핀(Mac 경로 · 0.154.0)으로는 실행할 수 없고 이 머신의 유일한 바이너리가 0.160.1 이다. 근거는 2026-09-11 갱신과 같은 셋 — 핀 값으로 실행 불가 · 첫 적용 slice(6E-2a)의 선행 Codex 라운드 0 · 기록된 명시 결정. 모델 핀 `gpt-5.5` 는 유지(raw-output 머리글로 확인). 아래는 앞 갱신의 기록이다.
+
+핀은 **0.154.0**(nvm 쪽, 사용 중인 최신)이었다 — **2026-09-11 갱신**. 최초 핀 0.151.0 은 운영자 지정(2026-09-01)이었고 그 규칙이 값을 **「사용 중인 최신」**으로 정의했다. 2026-09-10 패키지 갱신으로 이 머신의
 유일한 바이너리가 0.154.0 이 되어 **0.151.0 으로는 돌릴 방법이 없다**(homebrew 0.148.0 은 사라졌다). 갱신
 근거 셋: (a) 핀 값으로 실행 불가 (b) 핀의 목적은 **같은 slice 의 라운드 간 판정 재현성**인데 첫 적용 대상
 (PR #5)은 선행 Codex 라운드가 0 이라 비교할 과거 판정이 없다 (c) 2026-09-01 핀이 막으려던 것은 **조용한**

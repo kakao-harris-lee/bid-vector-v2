@@ -38,7 +38,9 @@ dependencies {
 
     // D-3D-1 (a) — JDBC 직접 + Flyway(ADR 0004 D-1·D-2). `flyway-core`·`postgresql-driver`
     // 는 카탈로그에 버전이 없다 — Boot BOM 이 관리한다(app 의 관례와 같다, `app/build.gradle.kts`).
-    // HikariCP 는 넣지 않는다(측정된 필요 없음, 설계 검토 「구현 지침」).
+    // HikariCP 는 이 모듈의 **main** 에 넣지 않는다 — 풀은 조립(app)의 관심사이고 adapters 는
+    // 받은 `DataSource` 를 쓸 뿐이다. M6/6E-2a 가 **test** 에만 그 좌표를 더했다(아래
+    // `testImplementation(libs.hikaricp)` — 임대가 풀 위에서 성립하는지를 재는 하네스).
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
@@ -89,6 +91,10 @@ dependencies {
     // `RealServerIntegrationTest`가 `GenericContainer`로 `docker/ml-serving.Dockerfile`
     // 이미지를 띄운다(postgres 전용이 아닌 임의 이미지, gradle/libs.versions.toml 주석).
     testImplementation(libs.testcontainers.core)
+    // M6/6E-2a P-3 — 세션 advisory lock 은 「연결을 쥔다」는 성질에 기대므로 **풀의 반납·재사용
+    // 위에서** 돌지 않으면 그 성질을 재지 못한다. production 좌표가 아니라 이 모듈의 test 하네스
+    // (`PersistenceTestSupport.pooledDataSource`)가 쓰는 test 전용 선언이다.
+    testImplementation(libs.hikaricp)
 }
 
 // `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.

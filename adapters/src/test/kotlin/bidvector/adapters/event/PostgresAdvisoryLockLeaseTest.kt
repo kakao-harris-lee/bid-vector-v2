@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 class PostgresAdvisoryLockLeaseTest : PersistenceTestSupport() {
     @Test
     fun `임대를 쥔 동안 두 번째 획득은 Busy 이고 본문을 부르지 않는다`() {
-        val lease = PostgresAdvisoryLockLease(dataSource())
+        val lease = PostgresAdvisoryLockLease(pooledDataSource())
         var innerCalled = false
         var innerAttempt: LeaseAttempt<Unit>? = null
 
@@ -27,7 +27,7 @@ class PostgresAdvisoryLockLeaseTest : PersistenceTestSupport() {
             lease.withLease(KIND) {
                 // 같은 어댑터·같은 DataSource 지만 **다른 연결**이다 — 두 프로세스의 대역.
                 innerAttempt =
-                    PostgresAdvisoryLockLease(dataSource()).withLease(KIND) {
+                    PostgresAdvisoryLockLease(pooledDataSource()).withLease(KIND) {
                         innerCalled = true
                     }
                 "held"
@@ -40,7 +40,7 @@ class PostgresAdvisoryLockLeaseTest : PersistenceTestSupport() {
 
     @Test
     fun `본문이 끝나면 임대가 풀려 다음 획득이 성공한다`() {
-        val lease = PostgresAdvisoryLockLease(dataSource())
+        val lease = PostgresAdvisoryLockLease(pooledDataSource())
 
         lease.withLease(KIND) { "first" }.shouldBeInstanceOf<LeaseAttempt.Held<String>>()
         val second = lease.withLease(KIND) { "second" }
@@ -51,7 +51,7 @@ class PostgresAdvisoryLockLeaseTest : PersistenceTestSupport() {
     /** 본문이 던져도 임대가 남지 않는다 — 「홀더 사망 뒤 영구 점유」가 이 slice 의 최악이다. */
     @Test
     fun `본문이 예외로 끝나도 임대가 풀린다`() {
-        val lease = PostgresAdvisoryLockLease(dataSource())
+        val lease = PostgresAdvisoryLockLease(pooledDataSource())
 
         // `runCatching` 을 쓰지 않는다 — 무엇이든 삼켜 다른 실패를 감춘다(PR #62 review J).
         try {
@@ -68,11 +68,11 @@ class PostgresAdvisoryLockLeaseTest : PersistenceTestSupport() {
     /** D-6F10-13 — 종류마다 자물쇠가 다르다. 한 종류의 소비자가 다른 종류를 막지 않는다. */
     @Test
     fun `종류가 다르면 서로를 막지 않는다`() {
-        val lease = PostgresAdvisoryLockLease(dataSource())
+        val lease = PostgresAdvisoryLockLease(pooledDataSource())
         var otherKindHeld = false
 
         lease.withLease(OutboxConsumerKind.NotificationRequested) {
-            PostgresAdvisoryLockLease(dataSource())
+            PostgresAdvisoryLockLease(pooledDataSource())
                 .withLease(OutboxConsumerKind.StrategyUpdated) { otherKindHeld = true }
         }
 

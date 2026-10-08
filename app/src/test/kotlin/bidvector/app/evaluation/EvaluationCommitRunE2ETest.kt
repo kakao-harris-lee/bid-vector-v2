@@ -7,6 +7,7 @@ import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.adminDataSource
 import bidvector.app.collection.CollectionLog
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayExitCode
@@ -40,6 +41,8 @@ import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.StrategyRepository
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -74,6 +77,9 @@ private const val SEEDED_REVISION = 7
 
 /** 거동 축에서 올려 보는 개정. */
 private const val RAISED_REVISION = 11
+
+/** 최소 권한 역할에 GRANT 가 **하나도** 없는 표 — 권한으로 걸러지는 모집단의 증거다. */
+private const val NO_GRANT_TABLE = "flyway_schema_history"
 
 /**
  * **R1-H-1 의 답** — production 커밋 조립(`EvaluationCommitRun`)과 그 러너를 **실 DB 위에서
@@ -224,7 +230,7 @@ class EvaluationCommitRunE2ETest {
      */
     @BeforeEach
     fun resetRunState() {
-        clearOutbox(dataSource())
+        clearOutbox(adminDataSource(postgres))
         setStrategyRevision(dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
@@ -235,15 +241,25 @@ class EvaluationCommitRunE2ETest {
      * 「변한 표 == {outbox}」가 D-6F7-11 의 「도메인 write 만 커밋되고 outbox 행이 없다」가 오늘
      * 성립하지 않는다는 사실의 측정이다 — 오늘 평가에는 outbox 밖 write 가 없다. 판정 기록 표가
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
+     *
+     * **M6/6E-2a PR #66 — 표 목록은 admin 연결로 읽는다.** `information_schema.tables` 는 **권한으로
+     * 걸러진 뷰**다. 최소 권한 역할로 읽으면 그 역할에 GRANT 가 없는 표가 **목록에서 사라지고**,
+     * 「변한 표 == {outbox}」는 그런 표에 생긴 write 를 보지 못한 채 참이 된다 — 단언이 조용히 약해지는
+     * 형태다. 모집단을 소유자 연결로 읽어 그 사각을 닫는다(아래 음성 대조가 그 사각이 실재함을 잰다).
+     * 러너가 지나는 경로는 그대로 production 빈이다.
      */
     @Test
     @Order(2)
     fun `커밋 run 은 outbox 행을 남기고 변한 표는 outbox 하나이며 종료 코드가 0 이다`() {
-        val before = rowCountsByTable(dataSource())
+        val before = rowCountsByTable(adminDataSource(postgres))
+        // vr L-4 — **모집단이 소유자 뷰임을 이 자리에서 잠근다.** 아래 「변한 표 == {outbox}」는 모집단이
+        // 역할로 걸러져도 참이 되므로, 읽는 연결을 production 빈으로 되돌리는 변이가 초록이었다. 역할이
+        // 볼 수 없는 표가 이 집합에 **있어야** 한다고 요구하면 그 되돌림이 그 자리에서 붉다.
+        before.keys shouldContain NO_GRANT_TABLE
 
         val exitCodes = runCommitRunner()
 
-        val after = rowCountsByTable(dataSource())
+        val after = rowCountsByTable(adminDataSource(postgres))
         changedTables(before, after) shouldBe setOf("outbox")
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
@@ -329,6 +345,25 @@ class EvaluationCommitRunE2ETest {
     }
 
     /**
+     * **음성 대조 — 그 사각이 실재한다**(PR #66). 위 「변한 표」 단언이 admin 연결을 쓰는 이유를 말로만
+     * 두지 않는다: 같은 질의를 **production 빈**(= 최소 권한 역할)으로 돌리면 모집단에서 표가 빠지고,
+     * 빠지는 것 가운데 `flyway_schema_history` 가 있다 — 그 역할에 GRANT 가 **하나도 없는** 표다. 이
+     * 칸이 없으면 「admin 으로 읽는다」는 선택이 근거 없는 취향과 구별되지 않는다.
+     *
+     * 읽기만 하므로 순서에 영향을 주지 않는다.
+     */
+    @Test
+    @Order(5)
+    fun `역할로 읽은 표 모집단은 GRANT 없는 표를 놓친다 — 그래서 변한 표 단언은 admin 으로 읽는다`() {
+        val asOwner = rowCountsByTable(adminDataSource(postgres)).keys
+        val asRole = rowCountsByTable(dataSource()).keys
+
+        asRole shouldNotContain NO_GRANT_TABLE
+        asOwner shouldContain NO_GRANT_TABLE
+        (asRole - asOwner).shouldBeEmpty()
+    }
+
+    /**
      * ③ — **outbox 쓰기 실패 주입.** `NotificationRequested` payload 의 INSERT 를 거부하는
      * CHECK 제약을 걸어 `OutboxNotificationRequestPort` 가 `SQLException → Failed` 로 가게
      * 하고, 그 값이 `tallyOf` 를 지나 러너의 **비-0 종료 코드**로 올라오는지 잰다.
@@ -339,16 +374,18 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
-        blockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
-        val before = rowCountsByTable(dataSource())
+        blockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
+        val before = rowCountsByTable(adminDataSource(postgres))
+        // vr L-4 — 같은 잠금을 여기에도 둔다. 한 자리만 잠그면 **다른 자리만 되돌리는** 변이가 초록이다.
+        before.keys shouldContain NO_GRANT_TABLE
         try {
             val exitCodes = runCommitRunner()
 
             exitCodes shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
             // 행이 하나도 안 생겼다 = 쓰기가 실제로 거부됐다(주입이 들었다는 증거).
-            changedTables(before, rowCountsByTable(dataSource())).shouldBeEmpty()
+            changedTables(before, rowCountsByTable(adminDataSource(postgres))).shouldBeEmpty()
         } finally {
-            unblockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
+            unblockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
         }
     }
 
@@ -386,7 +423,7 @@ class EvaluationCommitRunE2ETest {
      * 시간순이 아니다(UUID) — 정렬로는 「그 run 의 행」을 고를 수 없다.
      */
     private fun runOnceAndTakePayload(): String {
-        clearOutbox(dataSource())
+        clearOutbox(adminDataSource(postgres))
         runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
         return notificationRows(dataSource()).single().payload
     }

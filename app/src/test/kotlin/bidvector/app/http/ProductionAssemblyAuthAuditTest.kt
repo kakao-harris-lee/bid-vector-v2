@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.app.adminDataSource
 import bidvector.app.productionApplication
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -101,11 +102,18 @@ class ProductionAssemblyAuthAuditTest {
 
     private val restTemplate: TestRestTemplate = TestRestTemplate()
 
-    /** D-6A1-40 — 매 test 시작 전 표를 비운다(테스트 간 행 격리, `TRUNCATE`는 append-only
-     * 불변식을 어기지 않는다 — production 코드가 아니라 test fixture 초기화다). */
+    /**
+     * D-6A1-40 — 매 test 시작 전 표를 비운다(테스트 간 행 격리, `TRUNCATE`는 append-only
+     * 불변식을 어기지 않는다 — production 코드가 아니라 test fixture 초기화다).
+     *
+     * **M6/6E-2a — 이 자리만 admin 연결이다.** production `DataSource` 는 이제 최소 권한 역할
+     * (`bidvector_app`)로 연결을 내주고 그 역할에는 `TRUNCATE` 권한이 **없다**(V15 GRANT 는
+     * SELECT·INSERT 뿐). 아래 조회들은 그대로 production 빈을 쓴다 — 역할이 읽을 수 있다는 것도
+     * 이 test 가 재는 사실이고, fixture 초기화만 권한 밖이라 자리를 옮긴다.
+     */
     @BeforeEach
     fun resetAudit() {
-        auditDataSource().connection.use { connection ->
+        adminDataSource(postgres).connection.use { connection ->
             connection.createStatement().use { it.execute("TRUNCATE TABLE api_request_audit") }
         }
     }

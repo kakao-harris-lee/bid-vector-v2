@@ -2,6 +2,7 @@ package bidvector.app.compatibility
 
 import com.github.kagkarlsson.scheduler.task.helper.Tasks
 import com.tngtech.archunit.core.importer.ClassFileImporter
+import com.zaxxer.hikari.HikariConfig
 import io.github.resilience4j.retry.Retry
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldNotBe
@@ -75,5 +76,12 @@ class BootCompatibilitySmokeTest {
     @Test
     fun `spring-boot-starter-web 이 DispatcherServlet 타입을 로드한다 — 서버를 띄우지 않는다`() {
         DispatcherServlet::class.java.name shouldNotBe null
+    }
+
+    // M6/6E-2a P-4 — 아홉째 채택 좌표(HikariCP). 설정 객체만 만든다 — 풀을 띄우지도 DB 에 붙지도
+    // 않는다(`Flyway 설정이 만들어진다` 항목과 같은 형태).
+    @Test
+    fun `HikariCP 가 설정 객체를 만든다 — 풀을 띄우지 않는다`() {
+        HikariConfig().apply { poolName = "compatibility-smoke" }.poolName shouldNotBe null
     }
 }
