@@ -1,6 +1,6 @@
 # M6/6E-2a — rollback 절차와 실측
 
-실측 HEAD: `1dce56ab`(PR #66 조치 라운드의 **마지막 산출물 커밋**) · base: `2deb5f9d`.
+실측 HEAD: `b9f04cf4`(표적 재검증 L-4 조치 라운드의 **마지막 산출물 커밋**) · base: `2deb5f9d`.
 
 실측 HEAD 와 판정 SHA 사이에 **되돌림 대상이 움직이지 않았는가**가 유효성의 기준이고, 그 확인은 아래
 「verifier 가 보는 등식」이 명령으로 낸다 — 「그 뒤에 움직인 경로가 무엇인가」를 **문면에 세어 적지
@@ -110,9 +110,10 @@ git rm -f -- \
 
 ## 확인 ①~⑥ — 임시 clone 실측
 
-임시 clone(HEAD `1dce56ab`)에서 위 명령을 **그대로** 돌렸다. PR #66 조치가 복원 집합의 파일 다섯과
-evidence 둘을 만졌고 ⓪ 의 pathspec 자체도 바뀌었으므로 **①~⑥ 을 다시 쟀다** — 앞 라운드의 실측을
-옮기지 않는다.
+임시 clone(HEAD `b9f04cf4`)에서 위 명령을 **그대로** 돌렸다. 표적 재검증 L-4 조치가 복원 집합의
+파일 둘(`EvaluationCommitRunE2ETest.kt` · `commands.md`)을 만졌으므로 **①~⑥ 을 다시 쟀다** — 앞 라운드의
+실측을 옮기지 않는다(그 라운드의 유효성 등식이 그 둘을 내놓아 **미검증**이 됐고, 그것이 재실측의
+방아쇠다).
 
 | # | 확인 | 실측 |
 |---|---|---|
@@ -121,7 +122,7 @@ evidence 둘을 만졌고 ⓪ 의 pathspec 자체도 바뀌었으므로 **①~�
 | ② | 되돌림 뒤 staged 상태의 D/M 수 | **D 5 · M 19** |
 | ③ | `git diff <base> -- <대상 전부>` | **0 줄**(빈 출력) |
 | ③' | base 대비 트리에 남은 것 | **여덟** — 전부 **slice 산출물이 아닌 것**이고 세 묶음으로 설명된다: 대상 밖 선언 넷(`scope.md` · 이 문서 · `codex-review-*` 둘) · **하네스 레인** 셋(`CLAUDE.md` · `.claude/skills/codex-review-gate/SKILL.md` · `docs/harness/change-history.md`) · **팀장 승인 문서** 하나(`milestone-6.md`). 수를 세어 외우지 말고, 위 하네스 산출 명령과 이 세 묶음으로 **설명되는지**를 본다 |
-| ④⑤⑥ | 되돌린 트리에서 `./gradlew --no-daemon check` | **exit 0**(9m 20s) — 컴파일·test·게이트 전건 |
+| ④⑤⑥ | 되돌린 트리에서 `./gradlew --no-daemon check` | **exit 0**(9m 23s) — 컴파일·test·게이트 전건 |
 
 **`milestone-6.md` 는 ⓪ pathspec에 없다** — 이 레인이 건드리지 않았고(착수·종결 문단은 팀장 레인) 그
 파일을 되돌려야 하면 위 「공유 파일 확인」의 루프가 내는 **커밋 해시로 hunk 를 격리해 최신부터
