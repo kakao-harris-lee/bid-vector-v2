@@ -4,7 +4,7 @@ base `2deb5f9d` · 브랜치 `m6-6e2b/2026-10-08`. 출력 전문은 싣지 않�
 명령을 다시 돌린다. **마지막 HEAD 의 게이트 결과 정본은 이 파일이 아니라 verifier 리포트와 PR 조치
 코멘트**다(evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다).
 
-아래 수치는 **산출물 HEAD `ebe8ebfc` 에 트리를 고정하고** 돌린 회차의 것이다. 측정 체인이 시작과 끝에서
+아래 수치는 **산출물 HEAD `ecbb4028` 에 트리를 고정하고** 돌린 회차의 것이다(승인 전 일괄, D-6E2B-8). 측정 체인이 시작과 끝에서
 HEAD 를 찍어 같음을 단언한다 — 시작 HEAD 를 읽는 것만으로는 「어느 트리를 쟀는가」가 닫히지 않는다.
 
 도구 실행 경로: `trivy` 는 CI `install trivy` step 과 같은 절차로 `$RUNNER_TEMP/bin` 에 깔고 PATH 에
@@ -44,16 +44,37 @@ HEAD 를 찍어 같음을 단언한다 — 시작 HEAD 를 읽는 것만으로�
 
 워크플로의 `run` step 을 **문면 그대로** 순서대로 실행했다(`actions/*` step 은 러너 전용이라 제외).
 
-### 2026-10-09 (HEAD `ebe8ebfc`)
+### 2026-10-09 (HEAD `ecbb4028`)
 - cmd: `install trivy` · S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-22d · S-22e · S-23 · S-23b · S-23c · S-24 · S-25
 - exit: **전부 0**
 - 핵심 결과: 새 step 셋을 포함해 `run` step 전수 통과. S-21 빌드 로그가 `ghcr.io/astral-sh/uv:0.9.22@sha256:2320e6c2…` 로 메타데이터를 읽는다(다이제스트 참조가 실제로 해석됐다).
 
-### S-22d·S-22e 의 요약 수치 — **어느 DB 로 판정했는가**(장부 L-2)
-- trivy `0.75.0` · 취약점 DB **version 2 · UpdatedAt `2026-10-07T07:38:55Z`(1일 전, 상한 7)**
-- Java DB **version 1 · UpdatedAt `2026-10-07T01:10:24Z`** — `app` 에서만 요구(`scan.java-db-required`), ml-serving 은 요구하지 않음
-- ml-serving: SBOM 구성요소 116(하한 80) · **분석 패키지 115(하한 80)** · finding 454 · 차단 후보 52 · 적용 52 · 미등재 0
-- app: SBOM 구성요소 225(하한 150) · **분석 패키지 224(하한 150)** · finding 50 · 차단 후보 15 · 적용 15 · 미등재 0
+### S-22d·S-22e 의 요약 수치 — **무엇을·어느 DB 로 판정했는가**(장부)
+
+**판정한 이미지 ID** — 이 회차가 슬롯을 끝까지 쥐고 **두 이미지를 이 워크트리에서 다시 빌드한 뒤** 잰 것:
+
+| kind | image_id |
+|---|---|
+| ml-serving | `sha256:b01c624446106a8335476e80a0be00f3dcc6e8e2a11eeeef30458b78fc2f3580` |
+| app | `sha256:aaeb25020f49752842006d81dd3bd47bf9ccd6206ece111b849283de00096d0e` |
+
+**ID 를 적는 이유는 실측으로 선다** — 이 호스트는 `bidvector/app:local`·`bidvector/ml-serving:local`
+태그를 레인끼리 공유한다. 2026-10-09 관측: 다른 레인의 트리에서 빌드하면 app 은 `sha256:a5edaf3e…` 가
+되고, 이 워크트리에서 다시 빌드하면 **다시 `aaeb2502…`** 가 된다(두 차례 왕복 확인). 즉 **app 의 ID 는
+어느 트리가 빌드했는지를 가르고 트리별로 재현된다.** 반면 ml-serving 은 두 트리에서 같은 `b01c6244…` 다
+(이 slice 의 uv 다이제스트 고정이 builder stage 만 바꾸므로 runtime layer 가 동일하다). 그래서 태그만
+적은 기록은 **무엇을 쟀는지 말하지 않는다** — 특히 app 쪽에서.
+
+**어느 DB 로** — trivy `0.75.0`:
+- 취약점 DB **version 2 · UpdatedAt `2026-10-08T15:33:46Z`(0일 전, 상한 7)** — 두 스캔 모두 같은 값
+- Java DB **version 1 · UpdatedAt `2026-10-08T16:14:37Z`(0일)** — `app` 에서만 요구,
+  ml-serving 회차에서는 `unknown`(요구하지 않으므로 받지 않는다 — kind 별 선언이 실제로 갈린다)
+- **캐시를 샌드박스 안 빈 디렉터리로 고정한 뒤의 값이다**(M-2). 앞 회차는 호스트 캐시의 1일 전 DB 를
+  재사용했는데, 지금은 실행마다 새로 받는다 — 「실행마다 받는다」가 구성으로 참이 됐다.
+
+**계수** —
+- ml-serving: SBOM 구성요소 116(하한 80) · **나열 패키지 115(하한 80)** · finding 454 · 차단 후보 52 · 적용 52 · 미등재 0
+- app: SBOM 구성요소 225(하한 150) · **나열 패키지 224(하한 150)** · finding 50 · 차단 후보 15 · 적용 15 · 미등재 0
 
 ### S-22f(SBOM 보관)
 러너 전용이라 로컬 재현 불가. 대신 ⓐ 워크플로가 YAML 로 파싱되고 ⓑ `path` glob 이 실제로 두 SBOM 에
@@ -61,13 +82,13 @@ HEAD 를 찍어 같음을 단언한다 — 시작 HEAD 를 읽는 것만으로�
 
 ## acceptance ② — Kotlin `check` job
 
-### 2026-10-09 (HEAD `ebe8ebfc`)
+### 2026-10-09 (HEAD `ecbb4028`)
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
 - 핵심 결과: 전건 통과(`leakPatternGate` 포함 — 이 slice 의 evidence 가 스캔 대상에 들어간다).
 - 이력: 앞 라운드에 같은 명령이 한 번 exit 1 을 냈다(`:app:test` 가 `java.io.EOFException`; 레인이 같은 워크트리에서 빌드를 겹쳐 띄운 실행 실수). 단일 빌드 재실행 exit 0.
 
-## 음성·양성 대조 (HEAD `ebe8ebfc`)
+## 음성·양성 대조 (HEAD `ecbb4028`) — 23건 전부 기대와 일치
 
 전부 **바꿔치우기**다. 변이마다 ⓐ 걸기 전 `git status --porcelain -- <in_scope>` 가 빈 출력임을 확인하고
 ⓑ `git diff --numstat` 으로 실제 변경을 수치로 확인한 뒤 돌렸고, 복원은 **사본 덮어쓰기**다
@@ -80,6 +101,7 @@ HEAD 를 찍어 같음을 단언한다 — 시작 HEAD 를 읽는 것만으로�
 | N1 | 루트 `.trivyignore` + 그 등재 삭제 (**r1 에서 exit 0 이던 공격**) | `0/3` | **1** | 그 CRITICAL 셋이 미등재 차단 대상으로 목록에 뜬다 |
 | N2 | 루트 `trivy.yaml`(`severity:[UNKNOWN]`) | — | **0** | `findings_total` 50 **불변** — 적대 설정이 판정을 못 바꾼다 |
 | N3 | `TRIVY_SEVERITY` 환경변수 | — | **2** | 변수 이름을 말하며 거부 |
+| N10 | `XDG_CACHE_HOME`·`HOME` 을 심은 채 실행(**신설 M-2**) | — | **0** | `findings_total` 50 **불변**, 그리고 심은 두 경로가 **빈 채로 남는다**(게이트가 그 자리를 쓰지 않는다). 통제군: 같은 경로로 raw trivy 를 돌리면 거기에 `trivy/` 가 생긴다 — 경로는 살아 있고 면역이 실재한다 |
 
 ### (나) 스캔 축 양성 대조 — 수정 라운드 1 이 닫은 축
 
@@ -92,6 +114,9 @@ HEAD 를 찍어 같음을 단언한다 — 시작 HEAD 를 읽는 것만으로�
 | N6b | `scan.min-packages.app=999`(입력 쪽 하한) | `1/1` | **2** | r1 에서는 exit 1 이었다 — cr M-5 로 **판정 불가 코드로 옮겼다** |
 | N7 | DB `UpdatedAt` 없는 shim | — | **2** | 갱신 시각을 읽지 못했다 |
 | N8 | DB `UpdatedAt` 2025-01-01 shim | — | **2** | 645일 전(상한 7일) |
+| N13 | DB `UpdatedAt` 이 **미래**(2027-12-01) shim (**신설 L-2**) | — | **2** | 음수 나이가 상한 비교를 그냥 통과하던 자리 |
+| N11 | `trivy image` 가 FATAL 로 죽는 shim (**신설 M-3**) | — | **2** | r1 에서는 **1**(차단)이었다 — DB 를 못 받은 것은 올리거나 등재할 일이 아니다 |
+| N12 | `scan.scanners=license`(열거값 안, `vuln` 없음) (**신설 L-1**) | `1/1` | **2** | 취약점 게이트가 취약점을 보지 않으면 판정이 공허하다 |
 
 ### r0 에서 세운 대조 재확인
 

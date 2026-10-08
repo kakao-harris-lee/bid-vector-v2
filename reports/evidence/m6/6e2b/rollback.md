@@ -1,6 +1,6 @@
 # M6/6E-2b — rollback
 
-실측 HEAD: `ebe8ebfc`(이 slice 의 **마지막 산출물 커밋**, 수정 라운드 1). 이 뒤의 커밋은 evidence 전용이다.
+실측 HEAD: `ecbb4028`(이 slice 의 **마지막 산출물 커밋**, 승인 전 일괄). 이 뒤의 커밋은 evidence 전용이다.
 앞 라운드 실측은 **옮기지 않고 매번 다시 낸다** — 되돌림 대상이 한 줄이라도 움직이면 아래 verifier
 술어가 그것을 미검증으로 판정한다(실제로 r0 에서 한 번 그렇게 됐다).
 
@@ -48,7 +48,7 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 되고 `OPEN-6C-IMAGE-VULN-SCAN` 이 다시 열린다. 비활성화만 원한다면 되돌리지 않고 `ci.yml` 의 S-22d·S-22e 두 step 만 빼도 된다 —
 그 경우 SBOM 보관(S-22f)이 올릴 파일이 없어 `if-no-files-found: error` 로 붉어지므로 셋을 함께 뺀다.
 
-## ①~⑥ 실측 (버릴 임시 clone, HEAD `ebe8ebfc`)
+## ①~⑥ 실측 (버릴 임시 clone, HEAD `ecbb4028`)
 
 | # | 무엇 | 결과 |
 |---|---|---|
@@ -77,7 +77,7 @@ base 의 baseline 과 어긋나 게이트를 붉히는가」(M4 에서 세 라�
 **그 사이에 되돌림 대상이 움직였는가**를 본다:
 
 ```
-git diff --name-only ebe8ebfc..<판정 SHA> -- \
+git diff --name-only ecbb4028..<판정 SHA> -- \
   .github/workflows/ci.yml config/quality/vuln-allowlist.properties \
   config/quality/vuln-policy.properties docker/ml-serving.Dockerfile \
   docs/runbook/m6-6e-operations.md tools/vuln-scan-check.sh
