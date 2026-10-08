@@ -20,11 +20,33 @@
 **되돌리지 않는 것** — `reports/evidence/m6/6e2b/**`(이 slice 의 증적) · 하네스 경로(`CLAUDE.md`·
 `.claude/**`) · 팀장 레인이 쓴 `scope.md`.
 
-**공유 파일에 다른 slice 의 줄이 없다.** `git log --oneline 2deb5f9d..HEAD -- <파일>` 로 확인했고
-그 파일들을 만진 커밋이 **전부 이 slice 의 것**임을 라운드마다 다시 확인한다(수정 라운드 1 에서
-`ci.yml`·runbook 에 커밋이 더 붙었고, 여전히 전부 이 slice 의 것이다). 그래서
-**커밋 해시 hunk 격리가 필요 없고** 단일 `git restore --source=<base>` 로 끝난다. 이 판정은 라운드마다
-다시 내린다 — 다른 slice 가 같은 파일을 만지는 순간 절차가 hunk 격리로 바뀐다.
+**공유 파일은 둘로 갈린다 — 그 판정을 라운드마다 다시 내린다.**
+`git log --oneline 2deb5f9d..HEAD -- <파일>` 로 그 파일을 만진 커밋이 누구 것인지 본다.
+
+- **복원 목록 셋**(`ci.yml`·runbook·`docker/ml-serving.Dockerfile`) — 만진 커밋이 **전부 이 slice 의
+  것**이다. 그래서 hunk 격리가 필요 없고 위 단일 `git restore --source=<base>` 로 끝난다.
+- **`milestone-6.md`** — **다른 slice 들의 문단이 산다.** 전체 복원이나 range revert 는 **남의 줄을 함께
+  지운다.** 그래서 복원 목록에 **넣지 않고** 아래 hunk 절차로 지운다(프로젝트 선례 6E-1·6D-2·6G…).
+
+앞 라운드까지 이 절은 「공유 파일에 다른 slice 의 줄이 없으니 hunk 격리가 필요 없다」고 적었다. 그 문장은
+**참인 채로 낡는 종류**였고, 자기 전환 조건(「다른 slice 가 같은 파일을 만지는 순간 hunk 로 바뀐다」)을
+함께 적어 둔 덕에 여기서 그 조건대로 고친다. `milestone-6.md` 가 그 전환을 발동시켰다.
+
+### 공유 파일 hunk 절차 — `milestone-6.md`
+
+이 slice 의 착수·종결 문단만 **커밋 해시 역적용**으로 지운다. **해시를 문서에 박지 않는다** — 종결 문단은
+이 evidence 뒤에 붙고, 그 뒤로도 더 붙을 수 있다. 실행 시점에 산출한다:
+
+```
+# 최신부터
+for sha in $(git log --no-merges --format=%h 2deb5f9d..HEAD -- milestone-6.md); do
+  git diff "$sha~1..$sha" -- milestone-6.md | git apply -R
+done
+```
+
+`git apply -R` 이 conflict 를 내면(다른 slice 의 문단과 삽입 지점이 인접한 경우) 수동으로 **이 slice 의
+문단만** 지운다 — 문단 자신이 자기를 가리키는 표지를 갖는다(「M6/6E-2b」). 확인은 **둘 다**: 내 문단이
+사라졌는가, 그리고 **남의 문단이 남았는가.**
 
 ## 명령
 
@@ -61,9 +83,15 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 | ④ | `:app:compileKotlin :adapters:compileKotlin` | exit 0 |
 | ⑤⑥ | `./gradlew --no-daemon check` 전건 | exit 0 — `leakPatternGate` 포함 |
 
-**목록 등식도 기계로 확인했다** — `git diff --name-only <base>..HEAD -- . ':!reports/evidence'` 와 위
-복원 인자 집합을 `comm -23`·`comm -13` 로 양방향 대조해 둘 다 빈 출력이었다. 「문서에 빠진 경로」와
-「문서에만 있는 경로」를 **둘 다** 본다.
+**목록 등식도 기계로 확인했다** — `git diff --name-only <base>..HEAD -- . ':!reports/evidence'` 를
+**「복원 인자 ∪ hunk 처리 공유 파일」**과 `comm -23`·`comm -13` 로 양방향 대조한다. 「문서에 빠진 경로」와
+「문서에만 있는 경로」를 **둘 다** 본다. 대조 집합이 복원 인자만이 아닌 것이 중요하다 — `milestone-6.md`
+는 되돌림 대상이면서 복원 목록에 없으므로, 복원 인자만 대조하면 **처리돼 있는데도 stale 로 읽힌다.**
+
+**빈 출력은 목록이 건전하다는 증거가 아니다.** 깨짐이 측정 **뒤에** 오는 경로가 있으면 목록은 이미
+낡았고 아직 읽히지 않았을 뿐이다. 그래서 등식을 낼 때 함께 묻는다 — **「내가 아무것도 커밋하지 않아도
+이 집합에 경로가 들어올 수 있는가?」** 이 slice 의 답은 **예**였다(`milestone-6.md` 는 in_scope 인데
+팀장이 쓴다). 그래서 그 경로의 처리를 위에 **미리** 적어 두었다.
 
 ⑥ 은 **evidence 네 문서가 전부 들어 있는 트리**에서 돌았다. 마지막 산출물 커밋이 evidence 커밋보다
 뒤에 왔기 때문인데(사유 문면 정정이 `config/` 와 evidence 를 함께 만졌다), 덕분에 되돌린 트리에서
