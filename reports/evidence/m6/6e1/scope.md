@@ -138,3 +138,9 @@ in_scope 경로 한정 `git restore --source=<base>`; 신설 파일은 제거; �
 |---|---|---|
 | **D-6E1-20** | **일괄 수령·동결.** C-1+checklist `ba6c25f1`(= rollback 실측 HEAD) · evidence `c8419916`(`09_implementer_batch.md`). **최종 집계 ⓐ13/ⓑ2/ⓒ46, 성립 범위 15/61**, 갈래 OPEN 신설 필요 17 / test 만 없음 4(ML-01·02 는 기존 홀더 `OPEN-ML-ANALYSIS-WIRING`). RT2-M-1·M-2·L-1·L-2 조치, **RT2-L-3 보강**(E-23 이 자리채움 여섯 류 + 20자 미만을 거부, M9 변이 RED — **술어 변경**). 등식 31 OK · 변이 M1·M8 자리 이동 재측정 RED · rollback ⓪~③ + `check` exit 0(container 생략: ci.yml 불변). 팀장 대조: 미커밋 0 · production diff 0 · `M` 둘 유효성 빈 출력 · daemon 0. **판정 SHA = 이 r11 커밋** | 레인 보고 · 팀장 대조 |
 | **D-6E1-21** | **표적 재검증 3(경량, 술어 변경 규칙)**: ① E-23 새 술어 — 자리채움 변이(`-`·`—`·`N/A`·`TBD`·`없음`·공백·19자) 전부 RED 인지 + 정상 ⓐ 13 행 초록 ② ML-01·02 강등과 COL-01 근거 문면 대조 ③ 등식 31 재실행 ④ 수치 일관(C-1·checklist·commands 13/2/46·17/4) ⑤ rollback ⓪ 등식 + `M` 둘 유효성 ⑥ `qualityBaseline` 1회(evidence 누출 게이트). 통과 → 종결 | 하네스 |
+
+## 계약 갱신 r12 (2026-10-08, 팀장 — 종결 판정)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6E1-22** | **표적 재검증 3 `ready-for-review` @`4d8ae582`, 새 high·medium 0**(`10_verifier_targeted3.md`): E-23 자리채움 변이 일곱 + 백틱·굵게 전부 RED(numstat 1 1 확인·복원), 기준·음성 대조 31 OK · ML-01/02 강등·COL-01 근거·STR-03 인용 문면 일치 · 수치 13/2/46·4·17·15/61 전부 일관 · rollback 등식·유효성 빈 출력 · production diff 0 · `qualityBaseline` exit 0 + `leakPatternGate --rerun` exit 0. RT3-L-1(20자 이상 자리채움은 통과 — 문자열 술어 한계, 공시됨) 등재. **6E-1 종결** — 재작업 **2/5**(not-ready 2: r1·표적 1). 다음: milestone 종결 문단 → push → PR → `/code-review` → 조치 → **머지는 사용자 결정** | 표적 재검증 3 |
