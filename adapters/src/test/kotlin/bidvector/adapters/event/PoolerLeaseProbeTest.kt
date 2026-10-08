@@ -34,7 +34,7 @@ private val LOCK_QUERY_MARKERS = listOf("advisory_lock", "advisory_unlock")
 class PoolerLeaseProbeTest : PersistenceTestSupport() {
     @Test
     fun `잠금과 생존 질의가 다른 backend 로 가면 임대를 잃은 것으로 판정한다`() {
-        val held = askStillHeld(poolerShaped(dataSource()))
+        val held = askStillHeld(poolerShaped(pooledDataSource()))
 
         held shouldBe false
     }
@@ -45,7 +45,7 @@ class PoolerLeaseProbeTest : PersistenceTestSupport() {
      */
     @Test
     fun `직접 연결에서는 쥐고 있다고 판정한다`() {
-        val held = askStillHeld(dataSource())
+        val held = askStillHeld(pooledDataSource())
 
         held shouldBe true
     }

@@ -89,6 +89,10 @@ dependencies {
     // `RealServerIntegrationTest`가 `GenericContainer`로 `docker/ml-serving.Dockerfile`
     // 이미지를 띄운다(postgres 전용이 아닌 임의 이미지, gradle/libs.versions.toml 주석).
     testImplementation(libs.testcontainers.core)
+    // M6/6E-2a P-3 — 세션 advisory lock 은 「연결을 쥔다」는 성질에 기대므로 **풀의 반납·재사용
+    // 위에서** 돌지 않으면 그 성질을 재지 못한다. production 좌표가 아니라 이 모듈의 test 하네스
+    // (`PersistenceTestSupport.pooledDataSource`)가 쓰는 test 전용 선언이다.
+    testImplementation(libs.hikaricp)
 }
 
 // `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.
