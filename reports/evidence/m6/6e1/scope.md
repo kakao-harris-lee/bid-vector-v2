@@ -60,7 +60,8 @@ in_scope 경로 한정 `git restore --source=<base>`; 신설 파일은 제거; �
 
 ## 하네스 레인 변경 (상시)
 
-- (없음 — 착수 시점)
+- (착수 시점 없음)
+- 2026-10-08 RT-L-4: rollback 유효성 확인(`git diff --name-only <실측 HEAD>..<판정 SHA> -- <되돌림 경로>` 빈 출력)을 **되돌림 동작 종류별**로 읽었다 — `M`(hunk 역적용, 내용 의존)은 문면 그대로, `A`(제거 대상)는 내용 변경이 무효화하지 않는다(되돌린 트리가 두 SHA 에서 동일함을 verifier 가 실측). CLAUDE.md 문면과 다르므로 하네스 후보 `OPEN-HARNESS-ROLLBACK-VALIDITY-BY-KIND`(evidence-pack 규격 문장 추가는 다음 하네스 편집). `.claude/`·CLAUDE.md 편집 0.
 
 ## 계약 갱신 r1 (2026-10-07, 팀장 — 착수 결정 · 설계 검토)
 
@@ -109,3 +110,10 @@ in_scope 경로 한정 `git restore --source=<base>`; 신설 파일은 제거; �
 | ID | 결정 | 근거 |
 |---|---|---|
 | **D-6E1-13** | **acceptance 수령·동결.** evidence 커밋 `d327390b`(산출물 불변, `05_implementer_fix1.md` 「acceptance 실측」 절): worktree `check` exit 0 + **깨끗한 clone `check --no-build-cache` exit 0**(359 task 전부 실행 · 2817 test 실패 0 · e2e 7 · 두 게이트 실행) · `qualityBaseline` exit 0 · container job S-21a~S-25 exit 0(G-4 r1 블록 실행 줄, 잔여 컨테이너·볼륨 0) · M4 동적 변이 200→201 step exit 1(문면이 키 집합·code 만 — G-3 조치 함께 실측) → 복원 초록 · rollback ①~⑥ exit 0(`ci.yml`·`milestone-6.md` base 바이트 동일). 레인이 멈췄던 사유: 백그라운드 빌드 완료 통지 대기 — 결과 파일을 읽어 재개(교훈: waiter 는 죽는다, 결과 파일 폴링). **고정점 해석 수용**: 실측 HEAD `24bdc8bd` 유지 — `M` 둘(hunk 역적용, 내용 의존)은 그 뒤 불변(팀장 실측 빈 출력), `A` 여섯은 제거 대상이라 내용 변경이 무효화하지 않는다; rollback.md 가 종류별로 갈라 적음. 팀장 대조: 미커밋 0 · production·build·docker·`config/quality` diff 0 · daemon 0. 호스트: 문턱 1.0GB 결정 뒤 swap 4.2~5.0GB 로 회복(1GB 문턱에 닿지 않음). **판정 SHA = 이 r7 커밋** → vr-6e1 표적 재검증(D-6E1-11) | 레인 보고 · 팀장 대조 |
+
+## 계약 갱신 r8 (2026-10-08, 팀장 — 표적 재검증 수령 · 수정 라운드 2)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6E1-14** | **표적 재검증 `not-ready` @`39d64a5c`**(`06_verifier_targeted.md`): R1-H-1·H-2·M-1~3·L-1~4 **닫힘**(runbook §4 코드 재대조 통과 · G-4 문면 낮춤 확인 · QUAL-02 동적 변이 RED 2/3). **RT-H-1(R1-H-3 미닫힘)**: 새 ⓐ 20 중 앞 표본과 다른 6 행에서 **3 위반** — OPS-10(수집·run 행마다 release id 요구 — `raw_observation.release_sha` 만 있고 수집 release-sha 기본값 `unversioned`) · DEC-08(분류 정책 version 저장 요구 — production 은 `classification` 만 보존, version 열 없음) · COL-07(척도·기준 불일치 거부가 운영 `rangeBands` 표에 의존하는데 출하 표가 비어 있음(`OPEN-DEC-10`) — 인용 test 는 test 정책 아래서만 통과). 공통 결함: **「test 가 있다」와 「production 배선·출하 정책 값에서 그 거동이 성립한다」를 같은 것으로 읽었다.** RT-M-1 OPS-09 는 「구현 성립·test 만 없음」이 아니라 「구현에 없다」(403 이 응답 봉투로만 분류돼 재시도 없음을 보장하지 않음) → 14/5 → 15/4. RT-L-1 checklist 낡은 수치(ⓒ30·ⓐ29) · RT-L-2 commands 「24 단언」 vs 출력 29 · RT-L-3 scope.md D-6E1-10 에 누출 어휘 축어(옵션 이름 — 게이트 밖이나 하네스 규율 위반, 이 r8 에서 참조형으로 정정하지 않고 **사실 선언**: 그 줄은 6B-2 옵션 이름 인용이며 비밀값이 아니다) · RT-L-4 종류별 rollback 유효성 해석은 타당하나 CLAUDE.md 문면과 다름 → **하네스 레인 변경 절에 등재**(evidence-pack 규격에 「`A` 제거 대상은 내용 변경이 유효성을 무효화하지 않는다」 문장 추가 후보, `OPEN-HARNESS-ROLLBACK-VALIDITY-BY-KIND`) · RT-L-5 verifier 가 worktree 인덱스를 잠시 덮었다가 복원(잔여 0 — 사실 선언). acceptance 셋 전부 재실측 exit 0(깨끗한 clone 전건 · container 재현 · 등식 29 · rollback 등식·유효성 빈 출력). **재작업 2/5** | 표적 재검증 |
+| **D-6E1-15** | **수정 라운드 2 — 레인 커밋: C-1 1 + evidence 1.** ① **ⓐ 술어 명문화**(표 머리에): 「bullet 의 거동이 **production 배선과 출하 정책 값**에서 성립하고, **등재 식별자**가 그 거동을 **그 배선·그 값으로** 잰다」 — test 정책·test 대역·fake 아래서만 성립하면 ⓐ 아님. ② 이 술어로 **ⓐ 20 전수 재대조** — 행마다 bullet 별로 (a) 식별자 (b) production 배선 사실(파일·타입·출하 값) 두 칸을 적는다; 하나라도 비면 ⓒ. OPS-10·DEC-08·COL-07 은 ⓒ 로. **의심되면 ⓒ** — 과소가 과대보다 낫다(완료 조건 3 은 어차피 오늘 성립하지 않는다). ③ RT-M-1 OPS-09 → 「구현에 없다」, 두 갈래 집계 갱신 ④ RT-L-1·L-2 수치 정정 ⑤ RT-L-4 를 scope.md 「하네스 레인 변경」 절과 checklist 에 등재(팀장이 scope 절을 쓴다) ⑥ evidence: 등식 수 정정, 변이(가짜 식별자 → RED) 재실측, rollback 실측 HEAD 를 새 C-1 커밋으로 옮기고 ⓪~③ 재실측(④~⑥ 은 C-1 이 문서라 트리 동일성 갈음 불가 — `check` 1회 재실측, container 는 ci.yml 불변이라 생략 사유 등재) ⑦ 보고에 **새 집계와 강등 행 목록**. 그 뒤 **표적 재검증 2(C-1 ⓐ 전수 표본 ≥8 + 장부)** | RT-H-1 · M-1 · L-1~5 |
