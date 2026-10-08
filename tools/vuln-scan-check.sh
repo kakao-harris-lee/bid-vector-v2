@@ -14,7 +14,8 @@
 # 그 SBOM 만 읽는다.
 #
 # 사용법: tools/vuln-scan-check.sh <image-ref> <image-kind> <policy-file>
-#   exit 0 = 통과 · 1 = 차단(미등재 finding / 만료·stale allowlist) · 2 = 정책·도구·사용법 오류
+#   exit 0 = 통과 · 1 = 차단(미등재 finding / 만료·stale allowlist)
+#        · 2 = 정책·도구·사용법 오류 **또는 판정 불가**(암묵 입력 발견 · 양성 대조 하한 미달 · DB 메타데이터 부재)
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
@@ -208,17 +209,24 @@ TRIVY_PINNED_VERSION="$(_policy_value tool.trivy.version version)"
 # 「차단 대상 0」은 공허하게 참이다 — 상시 초록 게이트가 되는 바로 그 경로(D-6C-5). 그래서
 # kind 별 하한을 정책이 정하고, 미달이면 **판정 불가로 실패**한다. 선언된 kind 전부가 이 키를
 # 가져야 한다 — 하나라도 없으면 그 kind 가 돌 때까지 구멍이 보이지 않으므로 여기서 전수 확인한다.
-_each_kind_has_min_packages() {
+_each_kind_has() { # <키 접두> <값 종류>
   local IFS=','
   local -a kinds
   read -r -a kinds <<< "$SCAN_KINDS"
   local k
   for k in "${kinds[@]}"; do
-    _policy_value "scan.min-packages.${k}" numeric >/dev/null
+    _policy_value "${1}.${k}" "$2" >/dev/null
   done
 }
-_each_kind_has_min_packages
+_each_kind_has scan.min-packages numeric
+_each_kind_has scan.min-analyzed-packages numeric
 MIN_PACKAGES="$(_policy_value "scan.min-packages.${IMAGE_KIND}" numeric)"
+# **스캔 쪽 하한**(D-6E2B-5 나②, code-review r1 H-1). 위 `min-packages` 는 SBOM **입력**의 구성요소
+# 수이고, 이것은 스캔이 **실제로 DB 와 맞춰 본 패키지 수**다. 둘은 다른 축이다 — SBOM 이 멀쩡해도
+# 스캔이 purl/distro 를 못 맞추거나 DB 가 안 실리면 `.Results` 가 비는데, 구성요소 수는 그대로다.
+# **finding 수 하한이 아니다**: 「취약점이 몇 건 이상이어야 한다」는 이미지가 정말 깨끗해지는 날
+# 거짓이 된다. 「분석한 패키지가 몇 개 이상이어야 한다」는 그날에도 참이다.
+MIN_ANALYZED_PACKAGES="$(_policy_value "scan.min-analyzed-packages.${IMAGE_KIND}" numeric)"
 
 if [ ! -f "$ALLOWLIST_FILE" ]; then
   echo "allowlist 파일이 없다: ${ALLOWLIST_FILE}(정책이 가리키는 파일은 실재해야 한다 — 부재를 '등재 0'으로 읽지 않는다)" >&2
@@ -304,12 +312,31 @@ if [ "$TRIVY_VERSION" != "$TRIVY_PINNED_VERSION" ]; then
 fi
 
 SBOM_COMPONENTS="$(jq '[.components[]? | select(.type == "library" or .type == "operating-system")] | length' "$SBOM_FILE")"
+# `--list-all-pkgs` 가 실은 **스캔이 실제로 분석한 패키지 목록**. 이것이 결과 쪽 양성 대조의 입력이다.
+ANALYZED_PACKAGES="$(jq '[.Results[]? | (.Packages // [])[]] | length' "$SCAN_FILE")"
 
 failures=0
 fail() { echo "취약점 게이트 위반: $1" >&2; failures=$((failures + 1)); }
 
+# **판정 불가는 차단이 아니다 — exit 2 다**(code-review r1 M-5). 앞 판은 하한 미달을 `fail`(exit 1)로
+# 보내면서 문면은 「판정 불가」라고 적었다. 운영자는 runbook §8.2 를 읽고 exit 1 을 보면 「올리거나
+# 등재하라」로 가는데, 실제로 할 일은 **스캐너가 왜 못 읽었는지 보는 것**이다. 종료 코드가 처방을
+# 가르는 유일한 축이므로 그 둘이 어긋나면 안 된다.
+_undecidable() {
+  echo "판정 불가: $1" >&2
+  echo "== 취약점 게이트 판정 불가(exit 2) — 이것은 「취약점이 있다」가 아니라 「재지 못했다」다 ==" >&2
+  exit 2
+}
+
+# 양성 대조 둘. **입력 쪽**(SBOM 구성요소)과 **결과 쪽**(스캔이 분석한 패키지)을 따로 센다 —
+# 앞 판은 입력 쪽만 있었고, 그래서 「이미지를 읽었는가」만 닫히고 「그 SBOM 에 DB 를 맞춰 봤는가」는
+# 열려 있었다. 그 구멍을 덮던 것은 allowlist stale 검사 하나뿐인데, 등재가 0 이 되는 날 사라진다.
 if ! [[ "$SBOM_COMPONENTS" =~ ^[0-9]+$ ]] || [ "$SBOM_COMPONENTS" -lt "$MIN_PACKAGES" ]; then
-  fail "SBOM 의 패키지 구성 요소 수(${SBOM_COMPONENTS})가 정책 하한(${MIN_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — 스캐너가 이 이미지를 읽지 못했을 수 있다(판정 불가: 이 상태에서 '차단 0' 은 공허하게 참이다)"
+  _undecidable "SBOM 의 패키지 구성 요소 수(${SBOM_COMPONENTS})가 정책 하한(${MIN_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — 스캐너가 이 이미지를 읽지 못했을 수 있다(이 상태에서 '차단 0' 은 공허하게 참이다)"
+fi
+
+if ! [[ "$ANALYZED_PACKAGES" =~ ^[0-9]+$ ]] || [ "$ANALYZED_PACKAGES" -lt "$MIN_ANALYZED_PACKAGES" ]; then
+  _undecidable "스캔이 분석한 패키지 수(${ANALYZED_PACKAGES})가 정책 하한(${MIN_ANALYZED_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — SBOM 은 멀쩡한데 결과가 비었다면 DB 가 안 실렸거나 purl/distro 를 못 맞춘 것이다(이 상태에서 '차단 0' 은 공허하게 참이다)"
 fi
 
 # 차단 후보 집합 — 정책이 정하는 severity 이고, `block.only-fixed` 가 참이면 **수정본이 있는
@@ -448,7 +475,7 @@ fi
 echo "-- 실측 요약 --"
 echo "정책=${POLICY_FILE} kind=${IMAGE_KIND} image_id=${IMAGE_ID}"
 echo "trivy=${TRIVY_VERSION} vuln-db-version=${VULN_DB_VERSION} vuln-db-updated-at=${VULN_DB_UPDATED_AT} vuln-db-next-update=${VULN_DB_NEXT_UPDATE}"
-echo "sbom=${SBOM_FILE}(구성요소 ${SBOM_COMPONENTS}, 하한 ${MIN_PACKAGES}) scan=${SCAN_FILE}"
+echo "sbom=${SBOM_FILE}(구성요소 ${SBOM_COMPONENTS}, 하한 ${MIN_PACKAGES}) scan=${SCAN_FILE}(분석 패키지 ${ANALYZED_PACKAGES}, 하한 ${MIN_ANALYZED_PACKAGES})"
 echo "findings_total=${TOTAL_FINDINGS} 차단후보(${BLOCK_SEVERITIES}, only-fixed=${BLOCK_ONLY_FIXED})=${CANDIDATE_COUNT} 판정단위[ID+패키지]=${CANDIDATE_KEY_COUNT} allowlist_전체=${allow_entry_count} 이_kind_적용=${allow_applied} 미등재=${BLOCKING_COUNT}"
 
 if [ "$failures" -gt 0 ]; then
