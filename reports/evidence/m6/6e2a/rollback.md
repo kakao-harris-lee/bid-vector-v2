@@ -1,6 +1,6 @@
 # M6/6E-2a — rollback 절차와 실측
 
-실측 HEAD: `(TBD — evidence 커밋 뒤 채운다)` · base: `2deb5f9d`.
+실측 HEAD: `75f0b022`(이 slice 의 **마지막 산출물 커밋** — 그 뒤에 움직인 경로는 이 문서 하나뿐이고 이 문서는 되돌림 대상이 아니다) · base: `2deb5f9d`.
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 목록은 손으로 쓰지 않고 ⓪ 가 산출한다 —
 **라운드마다 파일이 늘면 이 절차를 다시 돌린다.**
@@ -93,7 +93,20 @@ git rm -f -- \
 
 ## 확인 ①~⑥ — 임시 clone 실측
 
-(MEASURE)
+임시 clone(`--no-local`, HEAD `75f0b022`)에서 위 명령을 **그대로** 돌렸다.
+
+| # | 확인 | 실측 |
+|---|---|---|
+| ⓪ | 목록 기계 산출 · 문서 목록과의 양방향 차집합 | `A` **5** · `M` **19** · 그 밖 0 · 차집합 **M 0 · A 0** |
+| ① | `git restore` · `git rm` 종료 코드 | 둘 다 **exit 0** |
+| ② | 되돌림 뒤 staged 상태의 D/M 수 | **D 5 · M 19** |
+| ③ | `git diff <base> -- <대상 전부>` | **0 줄**(빈 출력) |
+| ③' | base 대비 트리에 남은 것 | **`scope.md` · `rollback.md` 둘뿐** — 위에서 대상 밖으로 선언한 바로 그 둘이다 |
+| ④⑤⑥ | 되돌린 트리에서 `./gradlew --no-daemon check` | **exit 0**(9m 36s) — 컴파일·test·게이트 전건 |
+
+④⑤⑥ 을 따로 쪼개지 않은 이유: `check` 가 그 셋을 모두 포함하고, 이 slice 가 닿은 게이트
+(`gateRegistrationGate`·`compatibilitySmoke`·`moduleDependencyGate`·전송 표면 게이트)가 전부 그 안에 있다.
+부분 게이트는 **안 돌린 것과 같게** 취급한다.
 
 **갈음의 기준은 「HEAD 초록」이 아니라 트리 동일성이다.** ③ 이 빈 출력이면 되돌린 트리는 base 트리에
 `scope.md`·`rollback.md` 둘(어느 게이트도 읽지 않는 문서)만 더한 것이고, ④⑤⑥ 은 그 사실 위에서
