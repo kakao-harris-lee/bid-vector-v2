@@ -297,13 +297,37 @@ sys.exit(1 if (bad_a or marked != listed) else 0)
 EQ23
 [ $? -eq 0 ] || fails=$((fails+1))
 
+# E-25 §3.6 「최소 권한 역할로 접속하지 않는다」 — 코드 사실 셋 **과 그 문면**을 함께
+# (RT4-L-1: 코드만 재면 문면이 반대로 뒤집혀도 초록이다. §3.6 이 「보호가 작동하지 않는다 · 지울 수
+#  있다」를 말하는지도 본다 — 둘 중 하나를 반전하면 RED.)
+setrole=$(grep -rl 'SET ROLE' --include=*.kt */src/main/kotlin 2>/dev/null | wc -l | tr -d ' ')
+nologin=$(grep -c '^CREATE ROLE bidvector_app NOLOGIN;$' adapters/src/main/resources/db/migration/V2__provenance_guard.sql | tr -d ' ')
+sameuser=$(python3 -c "
+import re, yaml
+d = yaml.safe_load(open('docker/compose.yaml', encoding='utf-8'))['services']
+pick = lambda x: re.match(r'\\\$\\{([A-Z_]+)', str(x)).group(1)
+app = pick(d['app']['environment']['BIDVECTOR_PERSISTENCE_USERNAME'])
+pg = pick(d['postgres']['environment']['POSTGRES_USER'])
+print('same' if app == pg else 'diff')")
+doc36=$(awk '/^### 3\.6 /{s=1} /^### 3\.7 /{s=0} s' $RB \
+  | grep -cE '그 보호는 작동하지 않는다|지울 수 있다' | tr -d ' ')
+eq "E-25 §3.6 코드 사실 셋 + 그 문면(보호 미작동·삭제 가능)" "0 1 same 2" "$setrole $nologin $sameuser $doc36"
+
 printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || echo 불일치)" "$fails"
 exit $fails
 ```
 
-**결과(PR #65 조치, HEAD `0aa96b56`)**: `E-1`~`E-25` **전부 OK · DIFF 0 · exit 0**. **OK 줄 32** 개다(앞 판이
+**결과(표적 4 조치, HEAD `2d70d979` 기준)**: `E-1`~`E-25` **전부 OK · DIFF 0 · exit 0**. **OK 줄 32** 개다 —
+**이 문서의 블록을 그대로 떼어 돌려 실측한 수**다(앞 판은 `E-25` 가 문면에만 있고 **블록에 들어가지
+않아** 떼어 돌리면 31 이었다 — verifier RT4-M-1. 원인은 앞 라운드의 패치 스크립트가 블록을 교체한 뒤
+다른 치환에서 예외로 끊겨 **쓰기 전에 전부 버려진 것**이고, 이번에는 블록을 **먼저 쓰고** 그 뒤 문면을
+고쳤다). 앞 판이
 「단언 24 개」로 적은 것은 블록의 `eq` 호출 수를 센 것이고 실제 출력은 그보다 많았다 — verifier RT-L-2.
 이제 세는 법을 고정한다: `bash <블록> | grep -c '^OK'` == **32**).
+
+`E-25` 는 **코드 사실만 재지 않는다**(RT4-L-1) — `SET ROLE` 0 · `NOLOGIN` 역할 · 접속 사용자 == DB
+소유자 **셋에 더해 §3.6 의 문면**이 「그 보호는 작동하지 않는다」·「지울 수 있다」를 말하는지 센다. 코드만
+재면 문면이 반대로 뒤집혀도 초록이기 때문이다(그 반전을 **M13** 이 실측한다).
 
 `E-23`·`E-24` 는 **r2 가 더한 것**이다 — ⓐ 술어 ②(production 배선·출하 값)의 기계로 잴 수 있는 부분을
 닫는다. `E-23` 은 ⓐ 행의 **production 칸이 비지 않음**을, `E-24` 는 「부분 측정(강함)」 표식 집합이 머리
