@@ -57,6 +57,7 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
+- 2026-10-09 `075c03b1` — `.claude/skills/codex-review-gate/SKILL.md` 바이너리·버전 핀 갱신(WSL 경로 · 0.160.1, 운영자 결정) + `docs/harness/change-history.md` 한 행. slice 산출물 아님 — rollback 은 되돌리지 않는다.
 
 ## 계약 갱신 r1 (2026-10-08, 팀장 — Codex 승인)
 
@@ -77,3 +78,9 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | **D-6E2A-3** | **verifier r1 `ready-for-review` @`32138c6f`**(`_workspace/m6-6e2a/03_verifier_r1.md`: acceptance 셋 exit 0 · 위생 1초 창 유지 · 바꿔치우기 변이 다섯 RED · adapters 전 suite 를 SET ROLE 풀로 재구성 실행 902 중 실패 10, production 경로 0) + code-review r1(high 0 · medium 3 · low 7). 재작업 0/5 | 팀장 |
 | **D-6E2A-4** | **승인 전 일괄 커밋(장부·low, 재검증 없음 — Codex 가 본다)**: cr M-1 `TransactionBoundary` 누출 경로(adapters main, in_scope 밖) → 신설 **`OPEN-6E2A-TX-BOUNDARY-LEAK-UNDER-POOL`** + runbook §2.6 제한 · cr M-2 `INITIALIZATION_FAIL_TIMEOUT_MS` 는 라이브러리 기본값과 같아 삭제 변이가 초록 → 변이표에 사실로 + runbook 의 「즉시 기동 실패」 약속을 그 조건으로 한정 · cr M-3 adapters 하네스가 소유자로 돈다 → 신설 **`OPEN-6E2A-ADAPTER-TESTS-RUN-AS-OWNER`**, 근거로 verifier 재구성 실측(902 중 10 실패 · production 경로 0) · low: cr L-1(adapters build 주석 모순) · L-3(finally 안 단언) · L-5(runbook 「빈 DB」 조건) · L-6(빈 부수효과 알려진 제한 문구) · vr L-1(§2.6 — `hikaricp.configurationFile` JVM 옵션으로 표 밖 값 변경 가능, 경계 밖) · vr L-2(값 획득 표에 `PersistenceProperties` 행 복원 + 실측) · vr L-3(§2.6 minimumIdle = 최대 크기, 유휴 10). cr L-2·L-4·L-7 은 checklist 알려진 제한 | 팀장 |
 | **D-6E2A-5** | 일괄 뒤 **Codex 심판 1회**(D-6E2A-1) — 범위 `2deb5f9d..<일괄 뒤 판정 SHA>` in_scope | 팀장 |
+
+## 계약 갱신 r4 (2026-10-09, 팀장 — 일괄 수령·동결 · Codex 요청)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-6** | 승인 전 일괄 수령(`_workspace/m6-6e2a/04_implementer_batch.md`, 레인 HEAD `8ad42495`; `check` @`72f27528` exit 0 · rollback ⓪~⑥ 재실측 exit 0, 실측 HEAD `72f27528`). 일괄이 연 것: rollback 의 「하네스 레인 커밋 0」 문면을 사실로(`075c03b1` 두 파일은 되돌리지 않는 경로) · cr M-2 는 사실 등재로만 닫힘(역할 멤버 아닌 사용자 기동 실패 칸은 **신설 `OPEN-6E2A-INIT-FAIL-PREDICATE`** 로 다음 slice). **레인 동결, 판정 SHA = 이 갱신 커밋 → Codex 심판 1회**(D-6E2A-1·5, 범위 `2deb5f9d..<이 커밋>` 의 in_scope; 하네스 커밋 `075c03b1` 은 위 절에 선언) | 팀장 |
