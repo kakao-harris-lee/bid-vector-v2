@@ -1,6 +1,6 @@
 # M6/6E-2a — rollback 절차와 실측
 
-실측 HEAD: `75f0b022`(이 slice 의 **마지막 산출물 커밋** — 그 뒤에 움직인 경로는 이 문서 하나뿐이고 이 문서는 되돌림 대상이 아니다) · base: `2deb5f9d`.
+실측 HEAD: `72f27528`(승인 전 일괄 뒤 이 slice 의 **마지막 산출물 커밋** — 그 뒤에 움직인 경로는 이 문서 하나뿐이고 이 문서는 되돌림 대상이 아니다) · base: `2deb5f9d`.
 
 되돌림 대상은 range 가 아니라 **in_scope 경로의 변경**이다. 목록은 손으로 쓰지 않고 ⓪ 가 산출한다 —
 **라운드마다 파일이 늘면 이 절차를 다시 돌린다.**
@@ -11,8 +11,16 @@
 - `reports/evidence/m6/6e2a/rollback.md`(이 문서) — 자기를 지우는 목록을 들면 대상이 라운드마다 움직여
   「실측 뒤 대상이 움직였는가」 확인이 영원히 깨진다.
 
-`CLAUDE.md`·`.claude/**` 는 **되돌리지 않는다**(하네스 레인). 이 range 의 하네스 레인 커밋은 **0** 이다
-(`git log --oneline 2deb5f9d..HEAD -- CLAUDE.md .claude/` 빈 출력).
+`CLAUDE.md`·`.claude/**`·`docs/harness/**` 는 **되돌리지 않는다**(하네스 레인). 이 range 의 하네스 레인
+커밋은 **1** 이다 — `075c03b1`(codex 리뷰 게이트의 바이너리·버전 핀 갱신, 운영자 결정). 착수 때는 0 이었고
+승인 전 일괄 사이에 들어왔다. 목록은 손으로 세지 않는다:
+
+```sh
+git log --oneline $BASE..HEAD -- CLAUDE.md .claude/ docs/harness/
+```
+
+그 커밋이 만지는 둘(`.claude/skills/codex-review-gate/SKILL.md` · `docs/harness/change-history.md`)은
+아래 ③' 의 잔여 목록에 **그대로 남는 것이 맞다** — slice 산출물이 아니고 in_scope 밖이다.
 
 ## ⓪ 복원 목록 — 기계 산출
 
@@ -93,24 +101,26 @@ git rm -f -- \
 
 ## 확인 ①~⑥ — 임시 clone 실측
 
-임시 clone(`--no-local`, HEAD `75f0b022`)에서 위 명령을 **그대로** 돌렸다.
+임시 clone(HEAD `72f27528`)에서 위 명령을 **그대로** 돌렸다. 승인 전 일괄이 복원 집합의 파일 넷
+(`adapters/build.gradle.kts` · `PersistenceWiring.kt` · `ProductionPoolRoleTest.kt` · runbook)과 evidence
+둘을 만졌으므로 **①~⑥ 을 다시 쟀다** — 앞 라운드의 실측을 옮기지 않는다.
 
 | # | 확인 | 실측 |
 |---|---|---|
-| ⓪ | 목록 기계 산출 · 문서 목록과의 양방향 차집합 | `A` **5** · `M` **19** · 그 밖 0 · 차집합 **M 0 · A 0** |
+| ⓪ | 목록 기계 산출 · 문서 목록과의 양방향 차집합 | `A` **5** · `M` **19** · 그 밖 0 · 차집합 **M 0 · A 0**(일괄이 파일을 늘리지 않아 집합은 그대로다) |
 | ① | `git restore` · `git rm` 종료 코드 | 둘 다 **exit 0** |
 | ② | 되돌림 뒤 staged 상태의 D/M 수 | **D 5 · M 19** |
 | ③ | `git diff <base> -- <대상 전부>` | **0 줄**(빈 출력) |
-| ③' | base 대비 트리에 남은 것 | **`scope.md` · `rollback.md` 둘뿐** — 위에서 대상 밖으로 선언한 바로 그 둘이다 |
-| ④⑤⑥ | 되돌린 트리에서 `./gradlew --no-daemon check` | **exit 0**(9m 36s) — 컴파일·test·게이트 전건 |
+| ③' | base 대비 트리에 남은 것 | **넷** — 대상 밖으로 선언한 `scope.md`·`rollback.md` 와 **하네스 레인 커밋 `075c03b1` 의 둘**(`.claude/skills/codex-review-gate/SKILL.md` · `docs/harness/change-history.md`). 앞 라운드에서는 둘이었고, 늘어난 둘이 곧 그 하네스 커밋이다 |
+| ④⑤⑥ | 되돌린 트리에서 `./gradlew --no-daemon check` | **exit 0**(9m 32s) — 컴파일·test·게이트 전건 |
 
 ④⑤⑥ 을 따로 쪼개지 않은 이유: `check` 가 그 셋을 모두 포함하고, 이 slice 가 닿은 게이트
 (`gateRegistrationGate`·`compatibilitySmoke`·`moduleDependencyGate`·전송 표면 게이트)가 전부 그 안에 있다.
 부분 게이트는 **안 돌린 것과 같게** 취급한다.
 
 **갈음의 기준은 「HEAD 초록」이 아니라 트리 동일성이다.** ③ 이 빈 출력이면 되돌린 트리는 base 트리에
-`scope.md`·`rollback.md` 둘(어느 게이트도 읽지 않는 문서)만 더한 것이고, ④⑤⑥ 은 그 사실 위에서
-**실제로 돌려** 확인했다.
+③' 의 넷(계약·이 문서·하네스 레인 둘 — 전부 slice 산출물이 아니다)만 더한 것이고, ④⑤⑥ 은 그 사실
+위에서 **실제로 돌려** 확인했다.
 
 ## verifier 가 보는 등식
 
