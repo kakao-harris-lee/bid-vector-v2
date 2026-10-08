@@ -88,10 +88,15 @@ spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-start
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 # readiness 그룹의 `db` 기여자(`DataSourceHealthContributorAutoConfiguration`)가 사는 자리 —
 # 실측(2026-09-26): actuator starter 의 의존 그래프에 없어 app 이 직접 선언해야 한다. **starter 가
-# 아니라 이 모듈**을 쓴다 — `spring-boot-starter-jdbc` 는 HikariCP 를 끌고 오고 D-6A1-18 이 그것을
-# 들이지 않기로 했다(`OPEN-6A1-CONNECTION-POOL`). 이 모듈의 선언 의존은 spring-jdbc·boot-sql·
-# boot-transaction 셋뿐이고 커넥션 풀이 없다(POM 실측).
+# 아니라 이 모듈**을 쓴다 — M6/6E-2a 가 풀을 들인 뒤에도 그대로다. 풀은 아래 `hikaricp` 좌표
+# **하나로** 들어오고, starter 는 그 밖에 spring-jdbc 자동설정 묶음을 함께 끌고 와 배선의 출처를
+# 가린다. 이 모듈의 선언 의존은 spring-jdbc·boot-sql·boot-transaction 셋뿐이다(POM 실측).
 spring-boot-jdbc = { module = "org.springframework.boot:spring-boot-jdbc" }
+# M6/6E-2a D-6E2A-1 — production `DataSource` 의 커넥션 풀(`OPEN-6A1-CONNECTION-POOL` 처분).
+# **starter 가 아니라 풀 좌표 단독**이다(위 `spring-boot-jdbc` 주석). 버전은 Boot BOM 이
+# 관리한다. 이 좌표는 `compatibilitySmoke.expectedModules` 에도 등재돼야 해석·컴파일·로드가
+# 실제로 재진다(app/build.gradle.kts).
+hikaricp = { module = "com.zaxxer:HikariCP" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test" }
 # Boot 4.1 모듈 재편(실측, 2026-09-19) — `TestRestTemplate`이 `spring-boot-test`에서
 # 이 좌표(`org.springframework.boot.resttestclient.TestRestTemplate`)로 옮겼다. 위

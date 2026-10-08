@@ -47,9 +47,11 @@ dependencies {
     implementation(libs.flyway.core)
     // `PersistenceWiring`이 production DataSource·migration을 처음 배선한다
     // (adapters의 관례와 같은 좌표, `implementation`은 전이되지 않아 app이 다시 선언해야
-    // 한다). D-6A1-18 — HikariCP는 들이지 않는다(`OPEN-6A1-CONNECTION-POOL`).
+    // 한다). D-6E2A-1 — 런타임 `DataSource`는 HikariCP 풀이고 migration만 비풀링
+    // `PGSimpleDataSource`를 지역에서 쓴다(두 좌표가 각자 그 자리를 진다).
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+    implementation(libs.hikaricp)
     // D-6A3-8 — evaluate()가 suspend(ADR 0010 D-2)라 동기 MVC 경계에
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
@@ -206,6 +208,8 @@ val compatibilitySmoke =
                 // D-6A2a-4 — 같은 이유. 관리 포트 health 축의 두 좌표.
                 "org.springframework.boot:spring-boot-starter-actuator",
                 "org.springframework.boot:spring-boot-jdbc",
+                // D-6E2A-1 — 등재하지 않으면 풀 좌표의 해석·컴파일·로드를 아무도 재지 않는다.
+                "com.zaxxer:HikariCP",
                 "com.github.kagkarlsson:db-scheduler",
                 "io.github.resilience4j:resilience4j-retry",
                 "io.micrometer:micrometer-core",
