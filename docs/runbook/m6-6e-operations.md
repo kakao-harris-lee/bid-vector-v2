@@ -264,7 +264,15 @@ outbox 의 상태 어휘는 `PENDING` · `CLAIMED` · `DELIVERED` · `FAILED` ·
 전부 거부된다.
 
 - **되돌릴 간선이 없다.** 격리된 행을 `PENDING` 으로 되돌리는 명령이 전이표에 없다.
-- **DELETE 권한도 없다.** 애플리케이션 역할은 outbox 행을 지울 수 없다(축9 권한 행렬).
+- **DELETE 권한은 「최소 권한 역할」에만 없고, 오늘 그 역할로 접속하지 않는다.** `outbox` 의 GRANT 는
+  `SELECT, INSERT, UPDATE` 뿐이지만 그 대상은 **`bidvector_app` 역할**이고, 그 역할은 마이그레이션이
+  **`NOLOGIN`** 으로 만든다 — 그 권한 경계는 **이미 인증된 세션이 `SET ROLE bidvector_app` 으로 전환할
+  때만** 작동한다. **그런데 `SET ROLE` 이 `*/src/main` 에 0 건이다**(test 지원 코드에만 있다). 앱은
+  `bidvector.persistence.username` 으로 접속하고, 출하 배포 모양(compose · CI `container` job)에서 그 값은
+  DB 를 소유한 **superuser** 와 같다. **그래서 오늘 그 보호는 작동하지 않는다** — 앱 세션은 outbox 행을
+  지울 수 있다. 운영 반입 시 **접속 역할을 `bidvector_app` 으로 바꾸거나 세션이 `SET ROLE` 을 하도록**
+  해야 이 절의 「되돌릴 수 없음」이 권한으로도 선다(`OPEN-6E1-APP-ROLE-NOT-ASSUMED`). 그때까지 이 절의
+  보호는 **전이표**(종단 셋에서 나가는 간선 0)와 **운영 규율** 둘뿐이다.
 - 그래서 격리는 **운영자가 손으로 수습할 수 없는 손실**이다. 할 수 있는 것은 ① 그 사건이
   일어났음을 아는 것(`INCOMPLETE` 2 + 마침 줄의 `orphansIsolated`) ② 같은 일이 다시 일어날 조건을
   없애는 것이다.
@@ -517,10 +525,13 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
 12. **RBAC·다중 사용자·TLS·네트워크 배치를 다루지 않는다**(`OPEN-6A-RBAC`). 단일 운영자 전용이다.
 13. **자격증명 원문 경계가 완전히 닫히지 않았다**(`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`) — 환경변수
     원문은 어딘가에 `String` 으로 존재해야 한다는 구조적 뿌리가 남아 있다.
-14. **CI 의 dry-run 왕복은 비공허하지 않다**(§5.3) — 후보 0 환경에서 돌므로 「쓰기 경로가 막혀 있다」를
+14. **최소 권한 역할로 접속하지 않는다**(§3.6, `OPEN-6E1-APP-ROLE-NOT-ASSUMED`) — `bidvector_app` 의
+    GRANT 표는 `NOLOGIN` 역할에 걸려 있고 `SET ROLE` 이 production 코드에 없으며, 출하 배포 모양의
+    접속 사용자는 DB 소유 superuser 와 같다. 권한 경계가 **문서상으로만** 선다.
+15. **CI 의 dry-run 왕복은 비공허하지 않다**(§5.3) — 후보 0 환경에서 돌므로 「쓰기 경로가 막혀 있다」를
     재지 못한다. 그 성질의 정본은 `DryRunCommitSeparationGateTest`(구조)이고, 비공허 측정은
     `OPEN-6E1-G4-NONVACUOUS` 로 ML 배선 뒤에 있다.
-15. **일반 운영 live read probe 를 실행한 적이 없다**(§5.4는 절차뿐) — 실행은 사용자 승인 대상이다.
+16. **일반 운영 live read probe 를 실행한 적이 없다**(§5.4는 절차뿐) — 실행은 사용자 승인 대상이다.
 
 ## 7. 이 문서의 표가 코드와 어긋나지 않는지 재는 법
 
