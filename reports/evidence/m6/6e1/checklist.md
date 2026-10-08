@@ -56,11 +56,12 @@ base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · 산출물 `C-1`·`C-2~C-5`·
 6. **`capability-map.md`·`regression-ledger.md` 를 고치지 않았다**(읽기만). C-1 이 드러낸 미구현은
    분류 변경 사유가 아니다 — 분류는 「V2 범위」이고 C-1 은 「측정 상태」다. 두 축을 섞지 않았다.
 
-### r1 에 신설한 OPEN 둘
+### 이 slice 가 신설한 OPEN 셋 (r1 둘 · PR #65 조치 하나)
 
 | OPEN | 무엇 | 소유·선행 |
 |---|---|---|
 | **`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`** | 승격 상태와 demote(또는 그와 등가인 release 선택 수단)가 생기는 slice. 오늘 release 는 추론 정책 version 에서 파생되는 런타임 상수이고, 레지스트리에 승격 저장소·demote 가 0 이며, 비현재 `EXACT` 는 실 serving 이 거부한다 — 그래서 「되돌림」의 수단이 **재배포뿐**이고 그 재배포 절차가 저장소에 없다 | ML 레인 · **운영자 결정 선행**(되돌림의 단위를 정책 값으로 둘 것인가 아티팩트로 둘 것인가) |
+| **`OPEN-6E1-APP-ROLE-NOT-ASSUMED`** | 앱이 **최소 권한 역할로 접속하지 않는다** — `bidvector_app` 의 GRANT 표는 `NOLOGIN` 역할에 걸려 있고 `SET ROLE` 이 production 코드에 0 이며, 출하 배포 모양의 접속 사용자는 DB 소유 superuser 와 같다. 권한 경계가 문서상으로만 선다 | 운영 반입(접속 역할 전환 또는 세션 `SET ROLE`) · 배포 환경 결정 동반 |
 | **`OPEN-6E1-G4-NONVACUOUS`** | CI dry-run 왕복을 **비공허**하게 만드는 것 — 후보 ≥ 1 과 `wouldNotifyNoticeIds` 가 비어 있지 않음을 전제 단언으로 두고 그 상태를 만드는 seed(결정적 seed 포함) | **ML 배선 뒤**(오늘 compose 의 app 은 ML 주소 변수를 두지 않아 판정이 후보를 승격시킬 수 없다) |
 
 ### C-1 의 판정이 틀릴 수 있는 자리 (verifier 표적 후보)
@@ -102,9 +103,12 @@ base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · 산출물 `C-1`·`C-2~C-5`·
 1.5 **rollback 유효성 등식의 「종류별」 해석은 하네스 규율의 해석 변경이다** — `scope.md` 「하네스 레인
    변경」 절에 등재됐다(verifier RT-L-4). `rollback.md` 안에서만 선언하면 다음 slice 가 같은 판단을
    재발명한다.
-2. **outbox 행 수 등식은 「전후가 같다」만 잰다.** dry-run 이 outbox 에 쓰고 같은 수를 지웠다면 통과한다
-   — 그 경로는 권한으로 닫혀 있다(E-14: 애플리케이션 역할에 outbox DELETE 권한이 없다)가, 등식 자체가
-   그것을 재지는 않는다.
+2. **outbox 행 수 등식은 「전후가 같다」만 잰다.** dry-run 이 outbox 에 쓰고 같은 수를 지웠다면 통과한다.
+   **그 경로가 권한으로 닫혀 있다고 적었던 것은 틀렸다**(PR #65 /code-review F2) — `outbox` 의 DELETE
+   미부여는 `bidvector_app` 역할에 걸려 있고 그 역할은 `NOLOGIN` 이며 `SET ROLE` 이 production 코드에
+   **0** 이다. 출하 배포 모양의 접속 사용자는 DB 소유 superuser 와 같아 **오늘 그 보호는 작동하지
+   않는다**(`OPEN-6E1-APP-ROLE-NOT-ASSUMED`, runbook §3.6·§6 제한 14). 지금 서는 보호는 전이표(종단 셋의
+   나가는 간선 0)와 운영 규율 둘이고, 등식 자체는 어느 쪽도 재지 않는다.
 3. **판정 내용 축은 이 왕복이 지지 않는다** — Kotlin E2E(`bidvector.app.http.EvaluationDryRunE2ETest`
    계열)가 진다. 이 왕복이 재는 것은 「endpoint 가 인증 뒤 200 을 내고 선언된 칸 아홉을 그대로 낸다」다.
 4. **r1 의 두 low 를 고쳤다** — 실패 문면이 본문 전문을 공개 CI 로그에 내던 것을 키 집합 + `code` 로
@@ -160,7 +164,8 @@ OPEN·후속 ID 가 `capability-map.md` §12/§14 에도 `milestone-6.md` OPEN �
 | `DEC-06` | 같은 공고를 두 경로로 흘려 판정·근거를 **대조** |
 | `OPS-01` | 홀더 **세션 강제 종료**에서의 lease 즉시 해제 |
 
-**r1 이 신설한 OPEN 둘**(`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`·`OPEN-6E1-G4-NONVACUOUS`)은 위 표와 다른
+**이 slice 가 신설한 OPEN 셋**(`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`·`OPEN-6E1-G4-NONVACUOUS`·
+`OPEN-6E1-APP-ROLE-NOT-ASSUMED`)은 위 표와 다른
 축이다 — 위는 capability 의 미구현이고, 둘은 **이 slice 가 만든 산출물의 한계**다(runbook §4 가 약속하지
 못하는 것 · CI 왕복이 재지 못하는 것). 계약 갱신에서 등재되기 전까지 이 문서가 그 둘의 유일한 자리다.
 

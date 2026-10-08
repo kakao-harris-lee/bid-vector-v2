@@ -1,7 +1,7 @@
 # M6/6E-1 — 실행 명령과 실측 (구현 레인)
 
 base `80dc33b3` · 브랜치 `m6-6e1/2026-10-07` · **수정 라운드 1**(D-6E1-9) 뒤.
-이 레인의 산출물 커밋 — runbook `57c571a7` · C-1 `427532a7` · `ci.yml` `2df1da3b`+`1dacc5d7`(공유) ·
+이 레인의 산출물 커밋(최신 라운드 기준) — runbook `9b179d57` · C-1 `ba6c25f1` · `ci.yml` `0aa96b56`(공유) ·
 C-6·C-7 `b0df65c6`.
 
 ## acceptance — CI 워크플로 job 명령 그대로
@@ -11,7 +11,7 @@ C-6·C-7 `b0df65c6`.
 | `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | exit 0 (9m 42s) | **exit 0** (22s — 아래 주의) |
 | `./gradlew --no-daemon check --no-build-cache` | 깨끗한 clone(`build/` 없음) — CI 러너와 같은 자리 | — | **exit 0** (11m 20s · **359 task 전부 executed**) |
 | `./gradlew --no-daemon qualityBaseline` | 같은 job | exit 0 (13s) | **exit 0** (7s, UP-TO-DATE) |
-| `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 순서대로 | 전 step exit 0 | **전 step exit 0** |
+| `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 순서대로 | 전 step exit 0 | **전 step exit 0**(PR #65 조치 뒤 재실행 — `ci.yml` 이 F3·F4·F6 으로 바뀌었다) |
 
 **worktree `check` 가 22s 인 이유와 그 공백을 메운 것**: r1 의 diff 가 문서와 `ci.yml` 뿐이라 Kotlin
 입력이 안 바뀌었고, 그래서 `:test` task 가 전부 `UP-TO-DATE` 로 앞 실행을 재사용했다(실행된 32 task 는
@@ -301,9 +301,9 @@ printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || 
 exit $fails
 ```
 
-**결과(r3, HEAD `ba6c25f1`)**: `E-1`~`E-24` **전부 OK · DIFF 0 · exit 0**. **OK 줄 31** 개다(앞 판이
+**결과(PR #65 조치, HEAD `0aa96b56`)**: `E-1`~`E-25` **전부 OK · DIFF 0 · exit 0**. **OK 줄 32** 개다(앞 판이
 「단언 24 개」로 적은 것은 블록의 `eq` 호출 수를 센 것이고 실제 출력은 그보다 많았다 — verifier RT-L-2.
-이제 세는 법을 고정한다: `bash <블록> | grep -c '^OK'` == **31**).
+이제 세는 법을 고정한다: `bash <블록> | grep -c '^OK'` == **32**).
 
 `E-23`·`E-24` 는 **r2 가 더한 것**이다 — ⓐ 술어 ②(production 배선·출하 값)의 기계로 잴 수 있는 부분을
 닫는다. `E-23` 은 ⓐ 행의 **production 칸이 비지 않음**을, `E-24` 는 「부분 측정(강함)」 표식 집합이 머리
@@ -328,7 +328,9 @@ exit $fails
 | **M6** | runbook §4.5 의 「여섯 개 전부」를 「일곱 개 전부」로 | E-20b RED | **RED** exit 1 · numstat `1 1` |
 | **M7** | C-7 의 `R-ASYNC-03` 판정을 「연결」→「미연결」로 | E-22c RED | **RED** exit 1 · numstat `1 1` |
 | **M8** | ⓐ 행 하나의 **production 배선 칸을 비운다**(`—`) | E-23 RED | **RED** exit 1 · numstat `1 1`. r3 에서 `DEC-04` 로 **자리를 바꿔** 재측정 — 앞 라운드는 `NOTI-03` 이었다 |
-| **M9**(r3) | 같은 칸을 **자리채움 `-` 로** 채운다 | E-23 RED | **RED** exit 1 — verifier RT2-L-3 이 「`-` 로 채운 변이가 **초록**」임을 찾았고 `E-23` 에 자리채움 거부(`—`·`-`·`–`·`x`·`?`·`n/a`·20자 미만)를 더해 닫았다 |
+| **M9** | 같은 칸을 **자리채움 `-` 로** 채운다 | E-23 RED | **RED** exit 1 — verifier RT2-L-3 이 「`-` 로 채운 변이가 **초록**」임을 찾았고 `E-23` 에 자리채움 거부(`—`·`-`·`–`·`x`·`?`·`n/a`·20자 미만)를 더해 닫았다 |
+| **M10**(PR #65) | `_edit_field` helper 의 `APPLIED` 기대값을 `PENDING` 으로 **교체** | container 스모크 RED | **RED** step exit 1 · 문면 `CANDIDATE_LIMIT confirm 뒤 state 가 APPLIED 가 아니다` — **첫 왕복에서 먼저 끊긴다** |
+| **M11**(PR #65) | 같은 교체 + **첫 왕복 호출 제거** | 같은 단언이 **둘째 왕복에서도** RED | **RED** step exit 1 · 문면 `MAX_ACTIVE_BIDS confirm 뒤 state 가 APPLIED 가 아니다` — F3 의 목적(「두 왕복 다 `APPLIED` 를 단언한다」)이 **둘째 왕복에서 실측됐다**. helper 가 한 코드 경로이므로 단언 하나가 둘을 덮는다 |
 
 **음성 대조**: 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이다 — 변이가 게이트를 실제로 움직였고
 복원이 완전했다. **M1·M8 은 r3 의 C-1 위에서 재측정**했고(둘 다 **앞 라운드와 다른 행**으로 자리를
@@ -372,5 +374,7 @@ git status --porcelain -- docs/runbook/m6-6e-operations.md .github/workflows/ci.
 **`ci.yml` 은 이 표의 대상이 아니다** — `leakPatternGate` 의 스캔 뿌리는 `reports/evidence/` 이고
 `ci.yml` 은 그 밖이다. 같은 명령을 `ci.yml` 에 대보면 **이 slice 가 더하지 않은 기존 한 줄**(자격 값을
 `$GITHUB_ENV` 로 넘기는 생성 step 의 변수 이름)이 걸린다 — 그 줄은 base 에 이미 있었고 G-4 블록이
-만든 것이 아니다(`git diff 80dc33b3..HEAD -- .github/workflows/ci.yml` 가 +55/-0 이고 그 줄은 그 55 에
-들지 않는다).
+만든 것이 아니다 — 그 수는 **라운드마다 바뀌므로 박아 적지 않는다**(F5, PR #65: 앞 판은 G-4 신설
+시점의 `+55/-0` 을 적어 둔 뒤 r1·PR #65 수정으로 낡았다). 판정 시점에
+`git diff --numstat 80dc33b3..HEAD -- .github/workflows/ci.yml` 로 산출한다. 그 줄이 이 slice 의
+추가분에 들지 않는다는 사실은 `git log -S` 가 보인다 — 그 줄을 들여온 커밋이 base 이전이다.
