@@ -126,7 +126,9 @@ testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-jun
 # testcontainers-bom:2.0.5 의 POM 을 직접 확인, `testcontainers-postgresql`과 달리 개명되지
 # 않았다). 버전은 Boot BOM 이 관리한다(위 postgresql 모듈과 같은 축).
 testcontainers-core = { module = "org.testcontainers:testcontainers" }
-# M3/3D — D-3D-1 (a) JDBC 직접 접근(HikariCP 없음, `PGSimpleDataSource`). 버전은 Boot BOM 관리.
+# M3/3D — D-3D-1 (a) JDBC 직접 접근(ORM 없음). 버전은 Boot BOM 관리. **M6/6E-2a 정정** — 「HikariCP
+# 없음」이었던 자리다. 지금 런타임 `DataSource` 는 위 `hikaricp` 풀이고, 이 드라이버 좌표는 그 풀과
+# migration 의 비풀링 `PGSimpleDataSource` 둘 다가 쓴다.
 postgresql-driver = { module = "org.postgresql:postgresql" }
 
 # 금지 가족마다 위반 fixture 를 컴파일하기 위한 좌표. app 의 **test** 에만 오르며 어떤 모듈도

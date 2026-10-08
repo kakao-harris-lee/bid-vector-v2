@@ -19,6 +19,7 @@ import java.sql.SQLException
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
@@ -71,11 +72,21 @@ class ProductionPoolRoleTest {
                     ).run()
         }
 
+        /**
+         * PR #66 — `boot()` 가 던지면 [context] 는 **초기화되지 않은 채** 남고, 그때 `context.close()`
+         * 가 `UninitializedPropertyAccessException` 을 내 **원래 기동 실패를 가린다**. 변이 M3(순서
+         * 뒤집기)이 정확히 그 모양을 만든다 — 진단에 필요한 것은 migrate/역할 쪽 예외다. 그래서
+         * 초기화 여부를 보고 닫고, 컨테이너는 **어느 쪽이든** 멈춘다(그러지 않으면 기동이 실패한
+         * 라운드마다 컨테이너가 샌다).
+         */
         @JvmStatic
         @AfterAll
         fun shutdown() {
-            context.close()
-            postgres.stop()
+            try {
+                if (::context.isInitialized) context.close()
+            } finally {
+                postgres.stop()
+            }
         }
     }
 
@@ -226,17 +237,21 @@ class ProductionPoolRoleTest {
         // **뒤쪽 실패만 보고되고** 앞 예외는 suppressed 로도 남지 않는다. 정리 결과는 값으로 받아
         // `finally` 밖에서 잰다.
         var allHeld = false
-        var terminated = false
+        var futures: List<Future<*>> = emptyList()
         try {
-            repeat(size) { workers.submit { holdOne(observed, held, release) } }
+            futures = List(size) { workers.submit { holdOne(observed, held, release) } }
             allHeld = held.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } finally {
+            // PR #66 — `finally` 에는 **던지지 않는 정리만** 둔다. 여기서 던지면 try 의 원래 예외가
+            // 사라진다(앞 판은 대기 측정을 여기서 했다). 측정은 전부 아래로 내렸다.
             release.countDown()
             workers.shutdown()
-            terminated = workers.awaitTermination(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         }
+        // PR #66 — `submit` 의 `Future` 를 버리면 워커 안에서 던진 예외(대여 실패·권한 거부)가 조용히
+        // 사라지고 증상이 「`held` 가 안 찼다 = 시간 초과」로만 보인다. 사유를 먼저 올린다.
+        futures.forEach { it.get(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
         allHeld shouldBe true
-        terminated shouldBe true
+        workers.awaitTermination(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS) shouldBe true
         observed.forEach { (user, pid) ->
             users += user
             pids += pid
