@@ -340,7 +340,7 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
-        blockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
+        blockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
         val before = rowCountsByTable(dataSource())
         try {
             val exitCodes = runCommitRunner()
@@ -349,7 +349,7 @@ class EvaluationCommitRunE2ETest {
             // 행이 하나도 안 생겼다 = 쓰기가 실제로 거부됐다(주입이 들었다는 증거).
             changedTables(before, rowCountsByTable(dataSource())).shouldBeEmpty()
         } finally {
-            unblockNotificationInserts(dataSource(), BLOCK_CONSTRAINT)
+            unblockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
         }
     }
 
