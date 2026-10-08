@@ -38,6 +38,23 @@ for tool in jq trivy docker; do
   fi
 done
 
+# **암묵 입력 차단 (가) — D-6E2B-5, verifier r1 H-1 · code-review r1 M-1.**
+# trivy 는 플래그 말고도 세 자리에서 설정을 받는다: cwd 의 `trivy.yaml`, cwd 의 `.trivyignore`,
+# 그리고 거의 모든 플래그에 대응하는 `TRIVY_*` 환경변수. 그 셋은 **만료일도 사유도 stale 검사도
+# 없는 둘째 면제 축**이고, 게이트가 받는 결과 집합에서 finding 을 지워 버리므로 미등재 검사도
+# stale 검사도 그것을 보지 못한다(r1 실측: 루트에 `.trivyignore` 한 줄이면 CRITICAL 셋이 사라지고
+# exit 0, `trivy.yaml` 의 `severity: [UNKNOWN]` 이면 findings_total 이 5 로 줄고 등재가 비면 초록).
+#
+# 환경변수는 **지우지 않고 거부한다.** 지우면 「누가 무엇을 주려 했는가」가 로그에서 사라지고,
+# 게이트가 조용히 다른 입력으로 돌아간다 — 이 slice 의 다른 거부들과 같은 선택이다(값을 지어내지
+# 않고 판정 불가를 선언한다). 이 스크립트는 `TRIVY_*` 를 **하나도 세우지 않으므로** 발견되는 것은
+# 전부 바깥에서 온 것이다.
+_trivy_env_names=( ${!TRIVY_@} )
+if [ "${#_trivy_env_names[@]}" -gt 0 ]; then
+  echo "TRIVY_* 환경변수가 설정돼 있다(${_trivy_env_names[*]}) — 이 게이트는 그것을 입력으로 받지 않는다. 면제 축은 allowlist 하나뿐이어야 한다(만료·사유·stale 이 걸린다)" >&2
+  exit 2
+fi
+
 # 정책 값 판독. `tools/image-hygiene-check.sh` 의 `_policy_value` 와 같은 설계다(중복 키·빈 값·
 # CRLF·값 모양을 전부 정책 오류로 끊는다 — 6C 의 세 라운드가 만든 규율). **셸 게이트가 둘이
 # 되면서 이 파서도 둘이 됐다** — 모집단 증가로 `OPEN-6C-POLICY-GATE-STRUCTURAL`(셸 정책 파싱을
@@ -184,16 +201,42 @@ fi
 IMAGE_ID="$(docker image inspect "$IMAGE_REF" --format '{{.Id}}')"
 
 mkdir -p "$REPORT_DIR"
-SBOM_FILE="${REPORT_DIR}/${IMAGE_KIND}-sbom.cdx.json"
-SCAN_FILE="${REPORT_DIR}/${IMAGE_KIND}-scan.json"
+# 산출물 경로를 **절대 경로로 굳힌다.** 아래에서 trivy 를 빈 임시 디렉터리에서 돌리므로 상대
+# 경로는 거기에 매달린다(code-review r1 L-4 가 지적한 「CWD 에 따라 산출물 자리가 달라진다」는
+# 축이 여기서 필연이 된다).
+REPORT_DIR_ABS="$(cd "$REPORT_DIR" && pwd)"
+SBOM_FILE="${REPORT_DIR_ABS}/${IMAGE_KIND}-sbom.cdx.json"
+SCAN_FILE="${REPORT_DIR_ABS}/${IMAGE_KIND}-scan.json"
+
+# **암묵 입력 차단 (가) 의 나머지 절반** — 환경변수는 위에서 거부했고, 파일 둘은 여기서 닫는다.
+# 잠금을 **둘 다** 건다(한쪽이 미래의 trivy 판에서 바뀌어도 다른 쪽이 남는다, 2026-10-09 실측으로
+# 각각 독립으로 성립함을 확인) —
+#   ① trivy 를 **빈 임시 디렉터리**에서 돌린다 → cwd 의 `trivy.yaml`·`.trivyignore` 가 없다
+#   ② 그래도 `--config`·`--ignorefile` 로 **빈 파일을 명시**한다 → 기본 탐색 자체가 일어나지 않는다
+# 적대 cwd(둘 다 심은 디렉터리)에서 ② 만으로도 finding 집합이 보존됨을 실측했다.
+TRIVY_SANDBOX="$(mktemp -d)"
+cleanup_sandbox() { rm -rf "$TRIVY_SANDBOX"; }
+trap cleanup_sandbox EXIT
+EMPTY_CONFIG="${TRIVY_SANDBOX}/empty-trivy.yaml"
+EMPTY_IGNOREFILE="${TRIVY_SANDBOX}/empty-trivyignore"
+: > "$EMPTY_CONFIG"
+: > "$EMPTY_IGNOREFILE"
+mkdir -p "${TRIVY_SANDBOX}/work"
+
+# 모든 trivy 호출이 이 함수를 지난다 — 잠금이 호출마다 손으로 반복되면 하나를 빠뜨리는 날이 온다.
+_trivy() {
+  ( cd "${TRIVY_SANDBOX}/work" && trivy --config "$EMPTY_CONFIG" "$@" )
+}
 
 echo "== 이미지 취약점 게이트: ${IMAGE_REF} (kind=${IMAGE_KIND}) =="
 
 # 취약점 DB 는 실행마다 받는다(B-5 (a)) — 새 CVE 로 붉어지는 것이 이 게이트의 목적이고,
-# 처방(상향 또는 만료 있는 등재)은 정책 파일에 있다. 받은 DB 의 버전·갱신 시각은 아래
-# 요약에 남긴다(어느 DB 로 판정했는가가 보이지 않으면 판정을 재현할 수 없다).
-trivy image \
-  --quiet \
+# 처방(상향 또는 만료 있는 등재)은 정책 파일에 있다. 받은 DB 의 버전·갱신 시각은 아래에서
+# **술어로** 쓴다(요약에만 싣고 끝내면 DB 가 없어도 초록이다 — code-review r1 M-2).
+#
+# `--quiet` 를 떼었다(code-review r1 L-2) — DB 가 오래됐다거나 층을 건너뛴다는 trivy 자신의
+# 경고가 CI 로그에 남아야 한다. 보고서는 `--output` 으로 파일에 가므로 판정 출력이 더러워지지 않는다.
+_trivy image \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
   --format "$SBOM_FORMAT" \
@@ -203,15 +246,20 @@ trivy image \
 # 스캔 입력은 **방금 만든 SBOM** 이다 — 이미지를 두 번 읽지 않으므로 보관한 SBOM 과 판정
 # 대상이 어긋날 자리가 없다. severity 로 미리 거르지 않는다: 보고서에는 전부 남기고 **차단
 # 판정만** 아래 jq 가 정책대로 좁힌다(필터를 CLI 에 걸면 정책과 실제 판정이 두 자리가 된다).
-trivy sbom \
-  --quiet \
+#
+# `--list-all-pkgs` 는 **스캔이 실제로 분석한 패키지 목록**을 결과에 싣는다(아래 스캔 쪽 하한의
+# 입력). 그것 없이는 `.Results` 에 취약점만 들어와, 「DB 와 맞춰 본 패키지가 0 개」와 「정말 깨끗함」을
+# 가를 수가 없다.
+_trivy sbom \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
+  --list-all-pkgs \
+  --ignorefile "$EMPTY_IGNOREFILE" \
   --format json \
   --output "$SCAN_FILE" \
   "$SBOM_FILE"
 
-TRIVY_VERSION_JSON="$(trivy version --format json)"
+TRIVY_VERSION_JSON="$(_trivy version --format json)"
 TRIVY_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.Version // "unknown"')"
 VULN_DB_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.Version // "unknown"')"
 VULN_DB_UPDATED_AT="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.UpdatedAt // "unknown"')"
