@@ -282,6 +282,7 @@ jobs:
         run: ./gradlew --no-daemon :app:bootJar
 
       - name: 앱 이미지 빌드 (S-21b)
+        id: build_app
         run: docker build -f docker/app.Dockerfile -t bidvector/app:local .
 
       # M6/6A-2a D-6A2a-7 — 정책 파일을 **인자로** 받는다(기본값 없음 — 어느 정책으로 판정했는지가
@@ -359,17 +360,36 @@ jobs:
       # 중요하다 — 베이스도 패키지 생태계도 서로 다르고, allowlist 키가 kind 를 성분으로 갖는
       # 이유가 그것이다. 판정 기준(차단 severity·수정본 유무·만료 상한)은 전부 정책 파일에 있다.
       - name: 이미지 취약점 게이트 — ml-serving (S-22d)
+        id: scan_ml
         run: ./tools/vuln-scan-check.sh bidvector/ml-serving:local ml-serving config/quality/vuln-policy.properties
 
+      # M6/6E-2b r1(code-review M-3) — **앞 이미지가 막아도 이 스캔은 돈다.** 조건이 없으면
+      # ml-serving 이 막는 순간 이 step 이 통째로 건너뛰어져 앱 쪽 판정을 같은 회차에 볼 수 없고,
+      # 수정 라운드가 둘로 쪼개진다(ml 고치고 → 그제야 앱의 미등재가 처음 보인다). runbook §8.1 의
+      # 「게이트가 막아도 SBOM 이 올라간다」도 그 경우 거짓이 된다.
+      #
+      # 다만 `always()` 가 아니라 **앱 이미지 빌드가 성공했을 때**다 — 이미지가 없으면 이 게이트는
+      # 「이미지를 찾지 못했다」로 끊기고, 그것은 원인(빌드 실패)을 가리키지 않는 둘째 빨강이다.
+      # job 의 실패 자체는 막은 step 이 그대로 진다.
       - name: 이미지 취약점 게이트 — 앱 (S-22e)
+        id: scan_app
+        if: ${{ !cancelled() && steps.build_app.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/app:local app config/quality/vuln-policy.properties
 
       # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
-      # `if: always()` 인 이유는 **게이트가 막았을 때가 곧 SBOM 이 필요한 때**이기 때문이다.
-      # 파일이 하나도 없으면 실패시킨다 — 빈 artifact 를 올리고 초록인 것은 보관하지 않은 것과
-      # 같다. major 는 위 `check` job 의 같은 액션과 맞춘다(v6 = Node 24 최소선, 그쪽 주석 참조).
+      # **게이트가 막았을 때가 곧 SBOM 이 필요한 때**이므로 스캔 실패에도 올린다.
+      #
+      # M6/6E-2b r1(code-review M-4) — 그러나 `always()` 는 **스캔과 무관한 실패마다 가짜 빨강을
+      # 하나 더** 만들었다. `install trivy`·S-21·S-21a/b·S-22a/b/c 중 무엇이 실패해도 이 step 이 돌고,
+      # `build/vuln-scan/` 이 비어 있으므로 `if-no-files-found: error` 로 또 붉어진다 — 로그를 처음
+      # 보는 사람이 둘 중 어느 쪽이 원인인지 한 번 더 추적해야 했다. 그래서 **스캔 step 이 실제로
+      # 돌았을 때만** 올린다(둘 다 `skipped` 면 올릴 것도 없다).
+      #
+      # `if-no-files-found: error` 는 유지한다 — 빈 artifact 를 올리고 초록인 것은 보관하지 않은 것과
+      # 같다. 남는 경우 하나(스캔이 SBOM 을 쓰기 **전에** exit 2 로 끊김 — 정책·환경 오류)는 가짜가
+      # 아니라 **관련된** 빨강이므로 그대로 둔다. major 는 위 `check` job 의 같은 액션과 맞춘다.
       - name: SBOM 보관 — CycloneDX, 이미지 둘 (S-22f)
-        if: always()
+        if: ${{ !cancelled() && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped') }}
         uses: actions/upload-artifact@v6
         with:
           name: sbom-cyclonedx
