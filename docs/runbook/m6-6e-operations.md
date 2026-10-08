@@ -191,12 +191,37 @@ service link 환경변수(`MANAGEMENT_SERVICE_HOST` 계열)가 **거부 대상�
 | 모든 API 요청이 500 인데 `readiness` 는 UP | DB 는 살아 있고 감사 쓰기만 실패 | 감사 표의 쓰기 권한·공간·제약을 본다. 앱 재기동은 답이 아니다 |
 | `readiness` 가 DOWN | DB 연결 자체가 끊김 | DB 를 먼저 살린다 |
 
-### 2.6 커넥션 풀이 없다 (`OPEN-6A1-CONNECTION-POOL`)
+### 2.6 커넥션 풀과 접속 역할 (M6/6E-2a — `OPEN-6A1-CONNECTION-POOL` 처분)
 
-`PGSimpleDataSource`(**비풀링**)로 배선돼 있다. 단일 운영자·저동시성에서는 오늘 문제가 없으나
-**이 상태로 운영에 나가지 않는다** — 풀 도입은 6E-2 이고, `milestone-6.md` 가 「여기서 닫혀야 운영
-반입이 가능하다」로 지목한 항목이다. 그때까지의 운영 가정: 동시 요청은 1, 배치 러너는 한 프로세스에
-하나(§1.3).
+런타임 `DataSource` 는 **HikariCP 풀 하나**이고, 그 풀이 만드는 **물리 연결마다**
+`SET ROLE bidvector_app` 이 돈다 — 앱이 DB 에 하는 모든 일은 그 최소 권한 역할의 GRANT 안에서만
+된다(§3.6). migration 은 그 역할의 권한 밖(`flyway_schema_history` 쓰기·DDL)이라 **풀을 지나지
+않는다**: 기동 시 소유자 자격으로 비풀링 연결을 하나 만들어 migrate 하고 바로 닫는다. 그래서
+기동 순서는 **migrate → 풀**이고, 어기면 역할이 아직 없어 첫 연결 초기화가 실패한다.
+
+| 값 | 오늘 | 왜 이 값인가 |
+|---|---|---|
+| 최대 크기 | 10 | 하한은 **2** — relay 가 세션 advisory lock 으로 연결 하나를 본문 내내 쥐므로 작업 연결이 따로 나와야 한다(1 이면 자기 자신을 기다린다). 10 은 Hikari 기본값이고 단일 운영자·일회성 러너에 여유가 있다 |
+| 연결 대여 제한 시간 | 10초 | 기본 30초는 한 요청이 그만큼 산다 |
+| 기동 시 첫 연결 실패 | **즉시 기동 실패** | 빈 풀로 뜨면 readiness 가 UP 인 채 모든 요청이 죽는다 |
+| 연결 초기화 SQL | `SET ROLE bidvector_app` | 물리 연결마다 1회. 풀 반납은 역할을 되돌리지 않는다 |
+| `application_name` | 앱 `bidvector-app` · migration `bidvector-migration` | `pg_stat_activity` 에서 둘을 가른다 |
+
+**설정 키가 아니다.** 이 값들은 코드 상수이고 환경변수·명령행으로 바꿀 수 없다 — 바꾸려면 코드를
+고쳐 재배포한다(운영 실측이 값을 요구하면 그때 설정 키로 올린다). 새 필수 환경변수는 **0** 이고
+compose·CI 는 그대로다.
+
+**전제 — 접속 사용자가 `bidvector_app` 의 멤버이거나 superuser 여야 `SET ROLE` 이 선다.** 출하 배포
+모양(compose · CI `container` job)에서 접속 사용자는 DB 를 소유한 superuser 다. 그 전제가 깨지면
+기동이 첫 연결 초기화에서 실패한다(조용히 소유자 권한으로 도는 일은 없다).
+
+세션을 보는 법:
+
+```
+select application_name, count(*) from pg_stat_activity where datname = current_database() group by 1 order by 1;
+```
+
+기동이 끝난 뒤 `bidvector-migration` 행은 **없어야** 한다 — 있으면 migration 연결이 닫히지 않은 것이다.
 
 ---
 
@@ -264,15 +289,18 @@ outbox 의 상태 어휘는 `PENDING` · `CLAIMED` · `DELIVERED` · `FAILED` ·
 전부 거부된다.
 
 - **되돌릴 간선이 없다.** 격리된 행을 `PENDING` 으로 되돌리는 명령이 전이표에 없다.
-- **DELETE 권한은 「최소 권한 역할」에만 없고, 오늘 그 역할로 접속하지 않는다.** `outbox` 의 GRANT 는
-  `SELECT, INSERT, UPDATE` 뿐이지만 그 대상은 **`bidvector_app` 역할**이고, 그 역할은 마이그레이션이
-  **`NOLOGIN`** 으로 만든다 — 그 권한 경계는 **이미 인증된 세션이 `SET ROLE bidvector_app` 으로 전환할
-  때만** 작동한다. **그런데 `SET ROLE` 이 `*/src/main` 에 0 건이다**(test 지원 코드에만 있다). 앱은
-  `bidvector.persistence.username` 으로 접속하고, 출하 배포 모양(compose · CI `container` job)에서 그 값은
-  DB 를 소유한 **superuser** 와 같다. **그래서 오늘 그 보호는 작동하지 않는다** — 앱 세션은 outbox 행을
-  지울 수 있다. 운영 반입 시 **접속 역할을 `bidvector_app` 으로 바꾸거나 세션이 `SET ROLE` 을 하도록**
-  해야 이 절의 「되돌릴 수 없음」이 권한으로도 선다(`OPEN-6E1-APP-ROLE-NOT-ASSUMED`). 그때까지 이 절의
-  보호는 **전이표**(종단 셋에서 나가는 간선 0)와 **운영 규율** 둘뿐이다.
+- **DELETE 권한이 없고, 앱이 실제로 그 역할로 접속한다**(M6/6E-2a). `outbox` 의 GRANT 는
+  `SELECT, INSERT, UPDATE` 뿐이고 그 대상은 **`bidvector_app` 역할**이다. 그 역할은 마이그레이션이
+  **`NOLOGIN`** 으로 만들므로 권한 경계는 세션이 그 역할로 전환할 때만 서는데, **이제 풀의 물리 연결마다
+  `SET ROLE bidvector_app` 이 돈다**(§2.6). 앱 세션이 `DELETE FROM outbox` 를 실행하면 DB 가
+  `42501`(권한 부족)로 **거부한다** — 출하 조립을 띄워 실측한 사실이다. 그래서 이 절의 「되돌릴 수
+  없음」은 **전이표**(종단 셋에서 나가는 간선 0)와 **권한** 둘로 선다(`OPEN-6E1-APP-ROLE-NOT-ASSUMED`
+  처분).
+- **그 보호가 막지 않는 것 — 자격 값은 그대로 앱에 있다.** 막는 것은 **앱 결함**이다: 정상 DML 경로가
+  GRANT 밖의 쓰기를 하면 DB 가 거부한다. 막지 않는 것은 **앱 프로세스 장악과 소유자 자격 값 유출**이다
+  — `bidvector.persistence.credential` 은 여전히 DB 소유자의 값이고, 세션은 `RESET ROLE` 로 그 권한을
+  되찾을 수 있다. 자격 분리(앱 전용 LOGIN 역할)와 migration 의 배포 단계 분리는 배치 결정이 선행한다
+  (`OPEN-6E2A-OWNER-CREDENTIAL-IN-APP`).
 - 그래서 격리는 **운영자가 손으로 수습할 수 없는 손실**이다. 할 수 있는 것은 ① 그 사건이
   일어났음을 아는 것(`INCOMPLETE` 2 + 마침 줄의 `orphansIsolated`) ② 같은 일이 다시 일어날 조건을
   없애는 것이다.
@@ -511,7 +539,8 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
    않는다**(계수와 열거값만).
 4. **큐 깊이를 재는 자리가 없다.** §3.6 의 질의가 유일한 수단이고 임계 판정은 사람이 한다
    (`OPEN-OPS-10`).
-5. **커넥션 풀이 없다**(§2.6, `OPEN-6A1-CONNECTION-POOL`).
+5. **풀 값이 설정 키가 아니다**(§2.6) — 풀은 들어왔고(6E-2a) 크기·제한 시간은 **코드 상수**다. 운영
+   실측으로 값을 바꾸려면 재배포가 필요하다.
 6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이다.
 7. **model rollback 의 수단이 재배포뿐이고 그 재배포 절차가 저장소에 없다**(§4.4·§4.5). 승격 상태·demote
    가 없고 비현재 `EXACT` 는 실 serving 이 거부한다 — 6D-1 의 정의는 fake 서버 위에서만 성립한다
@@ -525,9 +554,10 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
 12. **RBAC·다중 사용자·TLS·네트워크 배치를 다루지 않는다**(`OPEN-6A-RBAC`). 단일 운영자 전용이다.
 13. **자격증명 원문 경계가 완전히 닫히지 않았다**(`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`) — 환경변수
     원문은 어딘가에 `String` 으로 존재해야 한다는 구조적 뿌리가 남아 있다.
-14. **최소 권한 역할로 접속하지 않는다**(§3.6, `OPEN-6E1-APP-ROLE-NOT-ASSUMED`) — `bidvector_app` 의
-    GRANT 표는 `NOLOGIN` 역할에 걸려 있고 `SET ROLE` 이 production 코드에 없으며, 출하 배포 모양의
-    접속 사용자는 DB 소유 superuser 와 같다. 권한 경계가 **문서상으로만** 선다.
+14. **소유자 자격 값이 앱 환경에 남는다**(§2.6·§3.6, `OPEN-6E2A-OWNER-CREDENTIAL-IN-APP`) — 접속
+    역할 전환은 **앱 결함**을 DB 가 거부하게 만들지만, 접속 자격 자체는 DB 소유자의 것이고 세션은
+    `RESET ROLE` 로 그 권한을 되찾을 수 있다. 앱 전용 LOGIN 역할·migration 의 배포 단계 분리는
+    배치 환경 결정(M7)이 선행한다.
 15. **CI 의 dry-run 왕복은 비공허하지 않다**(§5.3) — 후보 0 환경에서 돌므로 「쓰기 경로가 막혀 있다」를
     재지 못한다. 그 성질의 정본은 `DryRunCommitSeparationGateTest`(구조)이고, 비공허 측정은
     `OPEN-6E1-G4-NONVACUOUS` 로 ML 배선 뒤에 있다.
