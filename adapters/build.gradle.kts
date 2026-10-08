@@ -38,7 +38,9 @@ dependencies {
 
     // D-3D-1 (a) — JDBC 직접 + Flyway(ADR 0004 D-1·D-2). `flyway-core`·`postgresql-driver`
     // 는 카탈로그에 버전이 없다 — Boot BOM 이 관리한다(app 의 관례와 같다, `app/build.gradle.kts`).
-    // HikariCP 는 넣지 않는다(측정된 필요 없음, 설계 검토 「구현 지침」).
+    // HikariCP 는 이 모듈의 **main** 에 넣지 않는다 — 풀은 조립(app)의 관심사이고 adapters 는
+    // 받은 `DataSource` 를 쓸 뿐이다. M6/6E-2a 가 **test** 에만 그 좌표를 더했다(아래
+    // `testImplementation(libs.hikaricp)` — 임대가 풀 위에서 성립하는지를 재는 하네스).
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)

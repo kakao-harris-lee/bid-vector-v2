@@ -51,6 +51,12 @@ open class PersistenceWiring {
      * 돌아오기 전에는 **존재할 수 없다** — 순서를 어기려면 이 함수를 고쳐야 하고, 고치면 빈 DB
      * 기동이 즉시 실패한다([APPLICATION_ROLE] 은 `V2` 가 만들므로 migrate 전에는 없고,
      * [CONNECTION_INIT_SQL] 이 그 자리에서 죽는다).
+     *
+     * **알려진 제한 — migration 이 `DataSource` 빈 생성의 부수효과라는 성질은 그대로다.** 사라진 것은
+     * **싱글턴 생성 순서 의존**이지 부수효과 자체가 아니다: `spring.main.lazy-initialization=true` 가
+     * 켜지거나 이 빈이 `@Lazy` 가 되면 migrate 시점이 그만큼 뒤로 따라 움직인다. 오늘 출하 조립에는
+     * 그 둘이 없고(설정 키 전수, runbook §1.4), 그 날이 오면 migration 을 기동 단계 밖으로 빼는 것이
+     * 답이지 이 자리를 더 조이는 것이 아니다.
      */
     @Bean
     open fun dataSource(properties: PersistenceProperties): DataSource {

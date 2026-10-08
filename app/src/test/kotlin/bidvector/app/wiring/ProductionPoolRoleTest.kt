@@ -222,14 +222,21 @@ class ProductionPoolRoleTest {
         val held = CountDownLatch(size)
         val workers = Executors.newFixedThreadPool(size)
         val observed = Collections.synchronizedList(mutableListOf<Pair<String, Int>>())
+        // cr L-3 — 정리와 판정을 섞지 않는다. `finally` 안에서 단언하면 try 안의 실패가 먼저 났을 때
+        // **뒤쪽 실패만 보고되고** 앞 예외는 suppressed 로도 남지 않는다. 정리 결과는 값으로 받아
+        // `finally` 밖에서 잰다.
+        var allHeld = false
+        var terminated = false
         try {
             repeat(size) { workers.submit { holdOne(observed, held, release) } }
-            held.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS) shouldBe true
+            allHeld = held.await(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } finally {
             release.countDown()
             workers.shutdown()
-            workers.awaitTermination(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS) shouldBe true
+            terminated = workers.awaitTermination(HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         }
+        allHeld shouldBe true
+        terminated shouldBe true
         observed.forEach { (user, pid) ->
             users += user
             pids += pid
