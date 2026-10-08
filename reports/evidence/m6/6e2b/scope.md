@@ -52,3 +52,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
+
+## 계약 갱신 r1 (2026-10-08, 팀장 — triage 결정)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-1** | 오늘의 수정 가능 HIGH/CRITICAL 67건(베이스 이미지 54 · jackson 10 · tomcat-embed-core CRITICAL 3)의 **상향은 후속 slice 6E-2c**(베이스 다이제스트 + tomcat·jackson 버전, `OPEN-6E2B-BASE-IMAGE-BUMP`·`OPEN-6E2B-DEPENDENCY-BUMP`). 이 slice 는 등재로 두되 **CRITICAL 등재 만료를 2026-10-31 로 단축**(HIGH 는 2026-12-31) — 6E-2c 가 늦어지면 게이트가 스스로 붉어진다 | 사용자 |
