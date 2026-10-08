@@ -252,6 +252,10 @@ class EvaluationCommitRunE2ETest {
     @Order(2)
     fun `커밋 run 은 outbox 행을 남기고 변한 표는 outbox 하나이며 종료 코드가 0 이다`() {
         val before = rowCountsByTable(adminDataSource(postgres))
+        // vr L-4 — **모집단이 소유자 뷰임을 이 자리에서 잠근다.** 아래 「변한 표 == {outbox}」는 모집단이
+        // 역할로 걸러져도 참이 되므로, 읽는 연결을 production 빈으로 되돌리는 변이가 초록이었다. 역할이
+        // 볼 수 없는 표가 이 집합에 **있어야** 한다고 요구하면 그 되돌림이 그 자리에서 붉다.
+        before.keys shouldContain NO_GRANT_TABLE
 
         val exitCodes = runCommitRunner()
 
@@ -372,6 +376,8 @@ class EvaluationCommitRunE2ETest {
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
         blockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
         val before = rowCountsByTable(adminDataSource(postgres))
+        // vr L-4 — 같은 잠금을 여기에도 둔다. 한 자리만 잠그면 **다른 자리만 되돌리는** 변이가 초록이다.
+        before.keys shouldContain NO_GRANT_TABLE
         try {
             val exitCodes = runCommitRunner()
 
