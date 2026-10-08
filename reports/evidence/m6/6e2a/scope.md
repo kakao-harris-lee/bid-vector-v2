@@ -57,3 +57,9 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
+
+## 계약 갱신 r1 (2026-10-08, 팀장 — Codex 승인)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-1** | **A-4 Codex 심판 허용**(사용자 「codex 심판 허용. 계속 진행해」 2026-10-08). 시점은 Phase 2.5 설계 검토 · Phase 4 verifier `ready-for-review` **뒤** 한 번(의미 있는 단위). 범위 = 이 slice 의 in_scope diff(`2deb5f9d..<판정 SHA>`). 종결 조건은 「verifier ready-for-review + Codex approve + 사용자 승인」. `request_changes` 두 수정 라운드 뒤 blocker 잔존 시 자동 반복 중단·보고 | 사용자 |
