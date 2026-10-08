@@ -228,8 +228,12 @@ _each_kind_has scan.min-packages numeric
 _each_kind_has scan.min-analyzed-packages numeric
 MIN_PACKAGES="$(_policy_value "scan.min-packages.${IMAGE_KIND}" numeric)"
 # **스캔 쪽 하한**(D-6E2B-5 나②, code-review r1 H-1). 위 `min-packages` 는 SBOM **입력**의 구성요소
-# 수이고, 이것은 스캔이 **실제로 DB 와 맞춰 본 패키지 수**다. 둘은 다른 축이다 — SBOM 이 멀쩡해도
-# 스캔이 purl/distro 를 못 맞추거나 DB 가 안 실리면 `.Results` 가 비는데, 구성요소 수는 그대로다.
+# 수이고, 이것은 **스캔 결과가 나열한 패키지 수**다. 둘은 다른 축이다 — SBOM 이 멀쩡해도 스캔이 서지
+# 않으면 `.Results` 가 비는데 구성요소 수는 그대로다.
+#
+# **과대 주장하지 않는다(verifier 표적 M-1)**: `--list-all-pkgs` 는 DB 매칭과 무관하게 목록을 싣는다.
+# 그래서 이 하한은 「결과가 통째로 빔」을 잡고 **「나열은 했는데 맞춰 보지 않음」은 못 잡는다**
+# (`OPEN-6E2B-OS-MATCH-PREDICATE`).
 # **finding 수 하한이 아니다**: 「취약점이 몇 건 이상이어야 한다」는 이미지가 정말 깨끗해지는 날
 # 거짓이 된다. 「분석한 패키지가 몇 개 이상이어야 한다」는 그날에도 참이다.
 MIN_ANALYZED_PACKAGES="$(_policy_value "scan.min-analyzed-packages.${IMAGE_KIND}" numeric)"
@@ -322,9 +326,8 @@ fi
 # 대상이 어긋날 자리가 없다. severity 로 미리 거르지 않는다: 보고서에는 전부 남기고 **차단
 # 판정만** 아래 jq 가 정책대로 좁힌다(필터를 CLI 에 걸면 정책과 실제 판정이 두 자리가 된다).
 #
-# `--list-all-pkgs` 는 **스캔이 실제로 분석한 패키지 목록**을 결과에 싣는다(아래 스캔 쪽 하한의
-# 입력). 그것 없이는 `.Results` 에 취약점만 들어와, 「DB 와 맞춰 본 패키지가 0 개」와 「정말 깨끗함」을
-# 가를 수가 없다.
+# `--list-all-pkgs` 는 스캔 결과가 **나열한** 패키지 목록을 싣는다(아래 스캔 쪽 하한의 입력). 그것
+# 없이는 `.Results` 에 취약점만 들어와 「결과가 통째로 비었다」와 「정말 깨끗함」을 가를 수가 없다.
 if ! _trivy sbom \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
@@ -352,7 +355,7 @@ if [ "$TRIVY_VERSION" != "$TRIVY_PINNED_VERSION" ]; then
 fi
 
 SBOM_COMPONENTS="$(jq '[.components[]? | select(.type == "library" or .type == "operating-system")] | length' "$SBOM_FILE")"
-# `--list-all-pkgs` 가 실은 **스캔이 실제로 분석한 패키지 목록**. 이것이 결과 쪽 양성 대조의 입력이다.
+# `--list-all-pkgs` 가 실은 **나열된** 패키지 목록(DB 매칭 여부와 무관). 결과 쪽 양성 대조의 입력이다.
 ANALYZED_PACKAGES="$(jq '[.Results[]? | (.Packages // [])[]] | length' "$SCAN_FILE")"
 
 failures=0
@@ -404,7 +407,7 @@ if ! [[ "$SBOM_COMPONENTS" =~ ^[0-9]+$ ]] || [ "$SBOM_COMPONENTS" -lt "$MIN_PACK
 fi
 
 if ! [[ "$ANALYZED_PACKAGES" =~ ^[0-9]+$ ]] || [ "$ANALYZED_PACKAGES" -lt "$MIN_ANALYZED_PACKAGES" ]; then
-  _undecidable "스캔이 분석한 패키지 수(${ANALYZED_PACKAGES})가 정책 하한(${MIN_ANALYZED_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — SBOM 은 멀쩡한데 결과가 비었다면 DB 가 안 실렸거나 purl/distro 를 못 맞춘 것이다(이 상태에서 '차단 0' 은 공허하게 참이다)"
+  _undecidable "스캔이 분석한 패키지 수(${ANALYZED_PACKAGES})가 정책 하한(${MIN_ANALYZED_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — 결과가 통째로 비었다(스캔이 서지 않았거나 SBOM 을 읽지 못했다). 이 상태에서 '차단 0' 은 공허하게 참이다"
 fi
 
 # 차단 후보 집합 — 정책이 정하는 severity 이고, `block.only-fixed` 가 참이면 **수정본이 있는
