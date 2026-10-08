@@ -8,7 +8,14 @@ FROM python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7
 
 # uv 바이너리만 뜯어 쓴다(설치 스크립트·curl 파이프 없음) — CI(`astral-sh/setup-uv@v7`)와
 # 같은 버전(0.9.22, .github/workflows/ci.yml)으로 고정해 두 축(이미지·CI)이 어긋나지 않게 한다.
-COPY --from=ghcr.io/astral-sh/uv:0.9.22 /uv /usr/local/bin/uv
+#
+# M6/6E-2b B-7 — **다이제스트까지 고정한다.** 태그만 적으면 `0.9.22` 가 가리키는 바이트가 뒤에
+# 바뀌어도 빌드가 조용히 따라간다(위 두 `FROM` 이 다이제스트를 적는 것과 같은 사유). 값은
+# 멀티플랫폼 index 의 다이제스트라 빌드 플랫폼 선택은 그대로 둔다(`docker buildx imagetools
+# inspect ghcr.io/astral-sh/uv:0.9.22`, 2026-10-08 실측). 이 stage 의 산출물은 wheel 뿐이고
+# uv 자체는 runtime 이미지에 들어가지 않으므로 취약점 게이트의 판정 대상은 아니다 — 여기서
+# 닫는 것은 **빌드 입력의 가변성**이다.
+COPY --from=ghcr.io/astral-sh/uv:0.9.22@sha256:2320e6c239737dc73cccce393a8bb89eba2383d17018ee91a59773df802c20e6 /uv /usr/local/bin/uv
 
 # `ml-engine/tools/generate_contracts.py` 의 `PROTO_ROOT`(parents[2]/contracts/proto)가
 # `contracts/proto` 를 `ml-engine/` 의 형제 디렉터리로 기대한다(setup.py 의 wheel 빌드 훅이
