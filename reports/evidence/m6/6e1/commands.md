@@ -270,11 +270,42 @@ eq "E-22c C-7 판정 분포 == 머리 집계(연결 43 · 미연결 18)" "미연
 [ -n "$c7h" ] || { printf 'DIFF E-22d C-7 머리 집계 행(61|43|18)을 찾지 못했다\n'; fails=$((fails+1)); }
 [ -n "$c7h" ] && printf 'OK   E-22d C-7 머리 집계 행 실재(61|43|18)\n'
 
+# E-23·E-24 C-1 의 r2 술어 — ⓐ 행은 production 칸이 비지 않는다 · 「강함」 표식 집합 == 머리 열거
+python3 - <<'EQ23'
+# -*- coding: utf-8 -*-
+import re, sys
+tr = open('reports/evidence/m6/6e1/acceptance-trace.md', encoding='utf-8').read()
+rows = [l for l in tr.splitlines() if re.match(r'^\| \*\*[A-Z]+-\d+\*\* \|', l)]
+bad_a, marked = [], set()
+for l in rows:
+    c = [x.strip() for x in l.split('|')]
+    cid, mark, prod = c[1].strip('*'), c[3], c[5]
+    if mark == 'ⓐ' and prod in ('', '—'):
+        bad_a.append(cid)
+    if '부분 측정(강함)' in l:
+        marked.add(cid)
+print('OK   E-23 ⓐ 행 전부 production 배선 칸이 채워져 있다' if not bad_a
+      else 'DIFF E-23 production 칸이 빈 ⓐ 행 %s' % bad_a)
+m = re.search(r'강한 행 (.+?) 은 「부분 측정\(강함\)」으로 표시했다', tr, re.S)
+listed = set(re.findall(r'`([A-Z]+-\d+)`', m.group(1))) if m else set()
+print('OK   E-24 「강함」 표식 집합 == 머리 열거 (%d)' % len(marked) if marked == listed
+      else 'DIFF E-24 표식만 %s · 열거만 %s' % (sorted(marked - listed), sorted(listed - marked)))
+sys.exit(1 if (bad_a or marked != listed) else 0)
+EQ23
+[ $? -eq 0 ] || fails=$((fails+1))
+
 printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || echo 불일치)" "$fails"
 exit $fails
 ```
 
-**결과(r1, HEAD `b0df65c6`)**: `E-1`~`E-22d` **전부 OK · DIFF 0 · exit 0**(단언 **24** 개).
+**결과(r2, HEAD `29bfa5f7`)**: `E-1`~`E-24` **전부 OK · DIFF 0 · exit 0**. **OK 줄 31** 개다(앞 판이
+「단언 24 개」로 적은 것은 블록의 `eq` 호출 수를 센 것이고 실제 출력은 그보다 많았다 — verifier RT-L-2.
+이제 세는 법을 고정한다: `bash <블록> | grep -c '^OK'` == **31**).
+
+`E-23`·`E-24` 는 **r2 가 더한 것**이다 — ⓐ 술어 ②(production 배선·출하 값)의 기계로 잴 수 있는 부분을
+닫는다. `E-23` 은 ⓐ 행의 **production 칸이 비지 않음**을, `E-24` 는 「부분 측정(강함)」 표식 집합이 머리
+열거와 같은지를 잰다. 술어 ②·③ 의 **내용**(그 식별자가 그 bullet 을 그 배선으로 재는가)은 기계로 닫히지
+않는다 — `checklist.md` 의 「틀릴 수 있는 자리」 1 이 그 사실을 적는다.
 모집단 실측 — 등재 test **349** · `ci.yml` step **25** · OPEN **298** / C-1 인용 — FQN **120** · step **2**
 · OPEN **20**.
 
@@ -293,9 +324,14 @@ exit $fails
 | **M5** | runbook §4.3 의 거부 코드 문면 교체(`UNSUPPORTED_RELEASE`→`UNSUPPORTED_REQUEST`) | E-18 RED | **RED** exit 1 · numstat `1 1` |
 | **M6** | runbook §4.5 의 「여섯 개 전부」를 「일곱 개 전부」로 | E-20b RED | **RED** exit 1 · numstat `1 1` |
 | **M7** | C-7 의 `R-ASYNC-03` 판정을 「연결」→「미연결」로 | E-22c RED | **RED** exit 1 · numstat `1 1` |
+| **M8**(r2) | ⓐ 행 하나(`NOTI-03`)의 **production 배선 칸을 비운다** | E-23 RED | **RED** — `DIFF E-23 production 칸이 빈 ⓐ 행 ['NOTI-03']`, exit 1 · numstat `1 1` |
 
-**음성 대조**: 여섯(M1·M2·M3·M5·M6·M7)을 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이다 —
-변이가 게이트를 실제로 움직였고 복원이 완전했다.
+**음성 대조**: 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이다 — 변이가 게이트를 실제로 움직였고
+복원이 완전했다. **M1·M8 은 r2 의 C-1(7 열) 위에서 재측정**했고 둘 다 RED 다.
+
+**M8 을 r2 에 더한 이유**: RT-H-1 의 결함은 「production 배선에서 성립하는가」를 묻지 않은 것이었고, 그
+술어를 문서에 적기만 하면 다음 라운드에 다시 비어도 초록이다. `E-23` 이 그 칸의 **존재**를 닫고 M8 이
+그 게이트가 실제로 움직임을 보인다. 칸의 **내용**이 사실인지는 기계가 아니라 verifier 가 본다.
 
 **M5·M6·M7 을 r1 에 더한 이유**: verifier r1 R1-H-1 이 지적한 결함 클래스가 「**문면이 코드와 어긋나도
 등식이 잡지 못한다**」였다(앞 판 E-15 는 선택자 상수만 재서 §4 의 산문을 못 봤다). 그래서 새 §4 의 등식을
