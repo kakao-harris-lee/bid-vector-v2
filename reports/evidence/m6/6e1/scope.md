@@ -103,3 +103,9 @@ in_scope 경로 한정 `git restore --source=<base>`; 신설 파일은 제거; �
 | ID | 결정 | 근거 |
 |---|---|---|
 | **D-6E1-12** | **사용자 결정: 이 slice 의 남은 빌드에 한해 swap 문턱 1.0GB**(available ≥ 6GB 유지, swap free 1GB 아래면 즉시 중단·보고; 6F-10 의 1회 예외와 같은 형태). D-6E1-4 의 1.5GB 를 대체하되 규칙(2GB)은 유지, 다음 slice 이월 없음. 순서: **레인이 acceptance 셋 + rollback ④~⑥ 을 먼저 실측해 commands·rollback 을 채운다(evidence 커밋, 산출물 불변) → 동결 → verifier 표적 재검증(D-6E1-11)**. 호스트 전체 무거운 빌드 1개 규칙 그대로(레인 → verifier 직렬) | 사용자 2026-10-08 |
+
+## 계약 갱신 r7 (2026-10-08, 팀장 — acceptance 수령·동결 · 표적 재검증 착수)
+
+| ID | 결정 | 근거 |
+|---|---|---|
+| **D-6E1-13** | **acceptance 수령·동결.** evidence 커밋 `d327390b`(산출물 불변, `05_implementer_fix1.md` 「acceptance 실측」 절): worktree `check` exit 0 + **깨끗한 clone `check --no-build-cache` exit 0**(359 task 전부 실행 · 2817 test 실패 0 · e2e 7 · 두 게이트 실행) · `qualityBaseline` exit 0 · container job S-21a~S-25 exit 0(G-4 r1 블록 실행 줄, 잔여 컨테이너·볼륨 0) · M4 동적 변이 200→201 step exit 1(문면이 키 집합·code 만 — G-3 조치 함께 실측) → 복원 초록 · rollback ①~⑥ exit 0(`ci.yml`·`milestone-6.md` base 바이트 동일). 레인이 멈췄던 사유: 백그라운드 빌드 완료 통지 대기 — 결과 파일을 읽어 재개(교훈: waiter 는 죽는다, 결과 파일 폴링). **고정점 해석 수용**: 실측 HEAD `24bdc8bd` 유지 — `M` 둘(hunk 역적용, 내용 의존)은 그 뒤 불변(팀장 실측 빈 출력), `A` 여섯은 제거 대상이라 내용 변경이 무효화하지 않는다; rollback.md 가 종류별로 갈라 적음. 팀장 대조: 미커밋 0 · production·build·docker·`config/quality` diff 0 · daemon 0. 호스트: 문턱 1.0GB 결정 뒤 swap 4.2~5.0GB 로 회복(1GB 문턱에 닿지 않음). **판정 SHA = 이 r7 커밋** → vr-6e1 표적 재검증(D-6E1-11) | 레인 보고 · 팀장 대조 |
