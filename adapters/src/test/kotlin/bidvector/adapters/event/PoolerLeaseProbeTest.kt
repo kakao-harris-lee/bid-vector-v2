@@ -34,18 +34,22 @@ private val LOCK_QUERY_MARKERS = listOf("advisory_lock", "advisory_unlock")
 class PoolerLeaseProbeTest : PersistenceTestSupport() {
     @Test
     fun `잠금과 생존 질의가 다른 backend 로 가면 임대를 잃은 것으로 판정한다`() {
-        val held = askStillHeld(poolerShaped(dataSource()))
+        val held = askStillHeld(poolerShaped(pooledDataSource()))
 
         held shouldBe false
     }
 
     /**
-     * **음성 대조** — 같은 질문을 직접 연결로 하면 쥐고 있다고 답한다. 이 칸이 없으면 위
-     * test 는 「probe 가 늘 거짓」인 구현에서도 초록이다.
+     * **음성 대조** — 같은 질문을 **잠금과 probe 가 같은 backend 로 가는** 모양에서 하면 쥐고 있다고
+     * 답한다. 이 칸이 없으면 위 test 는 「probe 가 늘 거짓」인 구현에서도 초록이다.
+     *
+     * PR #66 — 이름이 「직접 연결」이었는데, 대조되는 것은 **직접 연결이냐**가 아니라 **잠금을 잡은
+     * backend 에서 되묻느냐**다(두 쪽 다 같은 풀에서 연결을 받는다 — 갈리는 것은 질의가 어느 backend
+     * 로 가는가 하나다).
      */
     @Test
-    fun `직접 연결에서는 쥐고 있다고 판정한다`() {
-        val held = askStillHeld(dataSource())
+    fun `잠금과 생존 질의가 같은 backend 로 가면 쥐고 있다고 판정한다`() {
+        val held = askStillHeld(pooledDataSource())
 
         held shouldBe true
     }
@@ -72,7 +76,15 @@ private fun poolerShaped(source: DataSource): DataSource =
         arrayOf(DataSource::class.java),
         InvocationHandler { _, method, args ->
             if (method.name == "getConnection") {
-                splitConnection(source.connection, source.connection)
+                // PR #66 — 두 번째 대여가 던지면 **첫 연결이 샌다**. 비풀링에서는 소켓 하나였지만
+                // 풀에서는 그 자리가 영구 대여로 남아, 이 하네스가 재려던 것과 무관한 고갈을 만든다.
+                val holder = source.connection
+                try {
+                    splitConnection(holder, source.connection)
+                } catch (failure: Throwable) {
+                    holder.close()
+                    throw failure
+                }
             } else {
                 invoke(method, source, args)
             }

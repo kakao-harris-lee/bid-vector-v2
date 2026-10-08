@@ -127,7 +127,7 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
   32건 재생 FAIL 23·진짜 결함 0·오탐 1).
 
 **Codex 레인(`codex-review-gate`)**
-- 저장소 밖 clean worktree, `model_reasoning_effort=high`, `features.memories=false`, 바이너리 핀(0.154.0,
+- 저장소 밖 clean worktree, `model_reasoning_effort=high`, `features.memories=false`, 바이너리 핀(0.160.1 · WSL nvm 경로, 2026-10-09 갱신 · 호출마다 MCP·plugin·샌드박스 네트워크 비활성,
   라운드 도중 변경 금지), hooks 는 실행 실측, 종말 verdict 확인(방출 계수 = 앵커 ∩ 형태), 오프라인 Gradle 은
   RO 캐시 + `--no-daemon`(sandbox 소켓 금지로 시동 불가 — 정적 리뷰 + 사전 스모크 산출물).
 

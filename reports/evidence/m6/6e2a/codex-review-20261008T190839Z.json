@@ -1,0 +1,41 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "2deb5f9d2a72dcf19039013d6782b6400f0604bb",
+  "reviewed_head": "2a393b628fb00fa58740fd3330819baf8b7c0b03",
+  "findings": [],
+  "commands_run": [
+    "git rev-parse --verify 2deb5f9d2a72dcf19039013d6782b6400f0604bb && git rev-parse --verify 2a393b628fb00fa58740fd3330819baf8b7c0b03 && git status --short",
+    "git diff --name-status 2deb5f9d2a72dcf19039013d6782b6400f0604bb..2a393b628fb00fa58740fd3330819baf8b7c0b03",
+    "sed -n '1,220p' reports/evidence/m6/6e2a/scope.md",
+    "sed -n '1,240p' agent-workflow.md",
+    "sed -n '1,260p' milestone-6.md",
+    "sed -n '1,220p' docs/adr/0004-persistence-and-events.md",
+    "sed -n '1,260p' reports/evidence/m6/6e2a/commands.md",
+    "sed -n '1,260p' reports/evidence/m6/6e2a/checklist.md",
+    "sed -n '1,260p' reports/evidence/m6/6e2a/rollback.md",
+    "git diff --stat 2deb5f9d2a72dcf19039013d6782b6400f0604bb..2a393b628fb00fa58740fd3330819baf8b7c0b03 -- app adapters config/quality gradle/libs.versions.toml docs/runbook/m6-6e-operations.md reports/evidence/m6/6e2a",
+    "git diff 2deb5f9d2a72dcf19039013d6782b6400f0604bb..2a393b628fb00fa58740fd3330819baf8b7c0b03 -- app/src/main/kotlin/bidvector/app/wiring/PersistenceWiring.kt app/src/test/kotlin/bidvector/app/wiring/ProductionPoolRoleTest.kt adapters/src/test/kotlin/bidvector/adapters/event/PooledLeaseFloorTest.kt adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt",
+    "rg -n \"fun productionApplication|class BidVectorApplication|DataSourceAutoConfiguration|PersistenceWiring|spring.main.lazy|bidvector.persistence|Hikari|SET ROLE|RESET ROLE|@Bean.*DataSource|fun dataSource\" app/src/main app/src/test adapters/src/main adapters/src/test docker .github docs/runbook/m6-6e-operations.md",
+    "rg -n \"CREATE ROLE bidvector_app|GRANT .*bidvector_app|NOLOGIN|outbox|api_request_audit|ALTER DEFAULT PRIVILEGES|GRANT .*ALL|TRUNCATE\" adapters/src/main/resources/db/migration",
+    "rg -n \"<failure|<error|tests=\\\"[0-9]+\\\" failures=\\\"[1-9]|errors=\\\"[1-9]\" app/build/test-results adapters/build/test-results build 2>/dev/null",
+    "python3 - <<'PY'\nimport pathlib, xml.etree.ElementTree as ET\nfiles=list(pathlib.Path('.').glob('**/build/test-results/**/TEST-*.xml'))\ntests=failures=errors=skipped=0\nfor f in files:\n    root=ET.parse(f).getroot()\n    tests += int(root.attrib.get('tests', 0)); failures += int(root.attrib.get('failures',0)); errors += int(root.attrib.get('errors',0)); skipped += int(root.attrib.get('skipped',0))\nprint(f'classes={len(files)} tests={tests} failures={failures} errors={errors} skipped={skipped}')\nPY",
+    "sed -n '1,220p' app/build/test-results/test/TEST-bidvector.app.wiring.ProductionPoolRoleTest.xml",
+    "sed -n '1,160p' adapters/build/test-results/test/TEST-bidvector.adapters.event.PooledLeaseFloorTest.xml",
+    "jar tf app/build/libs/app.jar | grep -E 'BOOT-INF/lib/HikariCP-|BOOT-INF/lib/postgresql-|BOOT-INF/lib/flyway'",
+    "pgrep -af 'GradleWrapperMain|GradleWorkerMain' | grep -v pgrep || true",
+    "free -g",
+    "git diff --check 2deb5f9d2a72dcf19039013d6782b6400f0604bb..2a393b628fb00fa58740fd3330819baf8b7c0b03 -- app adapters config/quality docs/runbook gradle reports/evidence/m6/6e2a",
+    "./gradlew --offline --no-build-cache --no-daemon :app:compatibilitySmoke :app:test --tests bidvector.app.compatibility.BootCompatibilitySmokeTest --tests bidvector.app.packaging.BootJarRuntimeClasspathTest :settlement:moduleDependencyGate",
+    "git diff --name-only 72f27528..2a393b628fb00fa58740fd3330819baf8b7c0b03 -- <rollback target paths>",
+    "git diff --stat 2deb5f9d2a72dcf19039013d6782b6400f0604bb..2a393b628fb00fa58740fd3330819baf8b7c0b03 -- .claude/skills/codex-review-gate/SKILL.md docs/harness/change-history.md"
+  ],
+  "residual_risks": [
+    "Gradle 재실행은 sandbox에서 `Could not determine a usable wildcard IP for this machine`로 시작 전 실패했다. 대신 head의 test XML과 build reports를 대조했고 XML 합산은 failures=0/errors=0이었다.",
+    "Docker가 필요한 container job과 변이 5종은 이 sandbox에서 재현하지 못해 구현 레인의 evidence와 산출물 로그로 대조했다.",
+    "승인 범위 밖의 알려진 제한은 남아 있다: 앱 환경에 소유자 자격 값이 남고 `RESET ROLE`로 되돌릴 수 있는 경계, adapters 저장소 test 일부가 소유자 권한 하네스에서 도는 구조적 사각."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.160.1",
+    "model": "gpt-5.5 (reasoning effort: high)"
+  }
+}

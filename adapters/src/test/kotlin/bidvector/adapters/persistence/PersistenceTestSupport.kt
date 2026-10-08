@@ -4,6 +4,8 @@ import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.procurement.RawNoticeObservation
 import bidvector.sharedkernel.Resolution
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.BeforeEach
 import org.postgresql.ds.PGSimpleDataSource
@@ -30,6 +32,24 @@ internal const val TEST_RELEASE_SHA = "test-release"
 @Testcontainers(disabledWithoutDocker = false)
 abstract class PersistenceTestSupport {
     protected fun dataSource(): DataSource = adminDataSource
+
+    /**
+     * **풀 위에서 재는 자리**(M6/6E-2a P-3) — production 의 `DataSource` 는 HikariCP 풀이고,
+     * 세션 advisory lock 은 「연결을 쥔다」는 성질에 기댄다. 비풀링 `DataSource` 위에서만 재면
+     * 반납·재사용·재생성이 그 성질에 하는 일을 아무도 보지 못한다.
+     *
+     * **역할 전환(`connectionInitSql`)은 걸지 않는다** — 이 하네스의 시나리오는
+     * `pg_terminate_backend` 로 홀더 백엔드를 끊고 그것은 관리자 권한이다. 여기서 재는 축은
+     * 「풀 위에서 임대가 성립하는가」이고, 역할 축은 출하 조립을 띄우는 `ProductionPoolRoleTest`
+     * (app)가 진다.
+     */
+    protected fun pooledDataSource(): DataSource = pooledSource
+
+    /** 크기를 지정한 일회용 풀 — 하한 실측([bidvector.adapters.event.PooledLeaseFloorTest])이 쓴다. 호출자가 닫는다. */
+    protected fun newPool(
+        maximumPoolSize: Int,
+        connectionTimeoutMs: Long,
+    ): HikariDataSource = buildPool(maximumPoolSize, connectionTimeoutMs)
 
     /** 애플리케이션 역할로 전환한 커넥션 — `bidvector_app`은 LOGIN이 없어 `SET ROLE`로만 얻는다. */
     protected fun appConnection(): Connection =
@@ -97,6 +117,33 @@ abstract class PersistenceTestSupport {
                 user = container.username
                 password = container.password
             }
+
+        /**
+         * 공유 풀 — production 상수의 **사본이 아니다**. 이 수의 근거는 한 시나리오가 동시에 쥐는
+         * 연결(임대 1 + 트랜잭션 1 + 종료자 1)보다 넉넉하다는 것뿐이다. 하한 그 자체는
+         * [bidvector.adapters.event.PooledLeaseFloorTest] 가 자기 풀로 따로 잰다.
+         */
+        private const val POOLED_TEST_MAX_SIZE = 8
+        private const val POOLED_TEST_TIMEOUT_MS = 10_000L
+
+        private val pooledSource: HikariDataSource by lazy {
+            buildPool(POOLED_TEST_MAX_SIZE, POOLED_TEST_TIMEOUT_MS)
+        }
+
+        private fun buildPool(
+            maximumPoolSize: Int,
+            connectionTimeoutMs: Long,
+        ): HikariDataSource =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = container.jdbcUrl
+                    username = container.username
+                    password = container.password
+                    poolName = "persistence-test-pool-$maximumPoolSize"
+                    this.maximumPoolSize = maximumPoolSize
+                    connectionTimeout = connectionTimeoutMs
+                },
+            )
 
         init {
             Flyway

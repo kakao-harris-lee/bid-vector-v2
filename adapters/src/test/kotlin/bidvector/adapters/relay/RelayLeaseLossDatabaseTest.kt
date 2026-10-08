@@ -34,17 +34,17 @@ import javax.sql.DataSource
 class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
     @Test
     fun `임대 연결이 끊기면 남은 행을 건드리지 않고 LeaseLost 로 멈춘다`() {
-        insertPendingNotificationRow(dataSource(), "lease-a")
-        insertPendingNotificationRow(dataSource(), "lease-b")
+        insertPendingNotificationRow(pooledDataSource(), "lease-a")
+        insertPendingNotificationRow(pooledDataSource(), "lease-b")
 
         lateinit var harness: RelayHarness
         harness =
             RelayHarness(
-                dataSource(),
+                pooledDataSource(),
                 // 첫 행의 발송이 끝난 **직후**(그 행의 T2 경계에서) 임대 연결을 서버 쪽에서
                 // 끊는다 — 둘째 행의 임대 재확인이 거짓을 받게 되는 유일한 창이다.
                 transactionsFor = { boundary ->
-                    TerminateLeaseAfterFirstSend(ConsumerTransactions(boundary), dataSource()) {
+                    TerminateLeaseAfterFirstSend(ConsumerTransactions(boundary), pooledDataSource()) {
                         harness.sender.sentKeys().size
                     }
                 },
@@ -56,7 +56,7 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         report.partial.delivered shouldBe 1
         harness.sender.sentKeys().size shouldBe 1
         // 발송한 행은 종단으로, 남은 행은 CLAIMED 로.
-        outboxStateCounts(dataSource()) shouldBe mapOf("DELIVERED" to 1, "CLAIMED" to 1)
+        outboxStateCounts(pooledDataSource()) shouldBe mapOf("DELIVERED" to 1, "CLAIMED" to 1)
     }
 
     /**
@@ -76,14 +76,14 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
      */
     @Test
     fun `임대를 획득 직후에 잃으면 격리도 claim 도 하지 않는다`() {
-        insertPendingNotificationRow(dataSource(), "v6c-orphan")
-        forceOutboxState(dataSource(), "v6c-orphan", "CLAIMED")
-        insertPendingNotificationRow(dataSource(), "v6c-pending")
-        val before = outboxStateCounts(dataSource())
+        insertPendingNotificationRow(pooledDataSource(), "v6c-orphan")
+        forceOutboxState(pooledDataSource(), "v6c-orphan", "CLAIMED")
+        insertPendingNotificationRow(pooledDataSource(), "v6c-pending")
+        val before = outboxStateCounts(pooledDataSource())
 
         val harness =
             RelayHarness(
-                dataSource(),
+                pooledDataSource(),
                 leasesFor = { source -> TerminateLeaseOnAcquire(PostgresAdvisoryLockLease(source), source) },
             )
 
@@ -93,7 +93,7 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         report.partial.claimed shouldBe 0
         report.partial.delivered shouldBe 0
         harness.sender.sentKeys().shouldBeEmpty()
-        outboxStateCounts(dataSource()) shouldBe before
+        outboxStateCounts(pooledDataSource()) shouldBe before
     }
 
     /**
@@ -110,16 +110,16 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
      */
     @Test
     fun `고아를 태우는 도중 임대가 끊기면 격리가 멈추고 남은 CLAIMED 가 보존된다`() {
-        insertPendingNotificationRow(dataSource(), "burn-1")
-        forceOutboxState(dataSource(), "burn-1", "CLAIMED")
-        insertPendingNotificationRow(dataSource(), "burn-2")
-        forceOutboxState(dataSource(), "burn-2", "CLAIMED")
+        insertPendingNotificationRow(pooledDataSource(), "burn-1")
+        forceOutboxState(pooledDataSource(), "burn-1", "CLAIMED")
+        insertPendingNotificationRow(pooledDataSource(), "burn-2")
+        forceOutboxState(pooledDataSource(), "burn-2", "CLAIMED")
 
         val harness =
             RelayHarness(
-                dataSource(),
+                pooledDataSource(),
                 transactionsFor = { boundary ->
-                    TerminateLeaseAfterFirstIsolation(ConsumerTransactions(boundary), dataSource())
+                    TerminateLeaseAfterFirstIsolation(ConsumerTransactions(boundary), pooledDataSource())
                 },
             )
 
@@ -129,7 +129,7 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
         report.partial.claimed shouldBe 0
         harness.sender.sentKeys().shouldBeEmpty()
         // 하나만 태워지고 하나는 `CLAIMED` 에 남았다 — 다음 run 의 고아 격리가 받는다.
-        outboxStateCounts(dataSource()) shouldBe mapOf("ISOLATED" to 1, "CLAIMED" to 1)
+        outboxStateCounts(pooledDataSource()) shouldBe mapOf("ISOLATED" to 1, "CLAIMED" to 1)
     }
 
     /**
@@ -138,15 +138,15 @@ class RelayLeaseLossDatabaseTest : PersistenceTestSupport() {
      */
     @Test
     fun `임대가 유지되면 두 행을 끝까지 돈다 — 음성 대조`() {
-        insertPendingNotificationRow(dataSource(), "intact-a")
-        insertPendingNotificationRow(dataSource(), "intact-b")
+        insertPendingNotificationRow(pooledDataSource(), "intact-a")
+        insertPendingNotificationRow(pooledDataSource(), "intact-b")
 
-        val harness = RelayHarness(dataSource())
+        val harness = RelayHarness(pooledDataSource())
         val report = harness.relay.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.Completed>()
 
         report.claimed shouldBe 2
         report.delivered shouldBe 2
-        outboxStateCounts(dataSource()) shouldBe mapOf("DELIVERED" to 2)
+        outboxStateCounts(pooledDataSource()) shouldBe mapOf("DELIVERED" to 2)
     }
 }
 

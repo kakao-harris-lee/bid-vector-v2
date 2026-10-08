@@ -37,6 +37,7 @@ import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.strategy.toSnapshot
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -247,8 +248,15 @@ class RecordingStrategyEventSink : EventSink {
  * 스캔이 이 클래스의 패키지 `bidvector.app.http`와 그 하위만 본다). `StrategyReadController`·
  * `GlobalErrorHandler`는 같은 패키지의 main 소스라 스캔으로 자동 등록된다 — 이 클래스는
  * fake 의존과 필터 등록만 배선한다.
+ *
+ * **M6/6E-2a — `DataSourceAutoConfiguration` 을 끈다.** 커넥션 풀 구현이 classpath 에 오면서
+ * Boot 의 자동설정이 **`DataSource` 빈이 없는 조립에서** 스스로 풀을 만들려 든다(그 전에는 지원
+ * 풀 구현이 없어 조용히 물러나 있었다). 이 조립은 DB 가 없는 HTTP 층 전용이라 접속 정보가 없고,
+ * 자동설정은 「드라이버를 정할 수 없다」로 컨텍스트 기동을 깬다. 출하 조립은
+ * `PersistenceWiring` 의 빈이 있어 같은 자동설정이 물러난다(그 사실은
+ * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
 open class HttpTestApplication {
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
