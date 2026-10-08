@@ -105,16 +105,18 @@ git clone -q --no-hardlinks <이 worktree> <임시 경로> && cd <임시 경로>
 | **①** | 신설 6건 제거 명령 | **exit 0** · 삭제 **6** |
 | **②** | hunk 역적용 셋(`ci.yml` 둘 역순 · `milestone-6.md` 하나) | **전부 exit 0** — 거부 없음, 수동 경로 불필요 |
 | **③** | base 대조 · **트리 동일성** 둘 · 남의 줄 | **빈 출력** · `ci.yml` base `279b64f3` == 복원 `279b64f3` · `milestone-6.md` base `fc163048` == 복원 `fc163048` · 되돌린 evidence 디렉터리에 `scope.md`·`rollback.md` 둘만 남음 |
-| **④** | compile | **미실측(호스트)** — `commands.md` 「호스트」 절, swap free 1,421 MB < 1.5 GB |
-| **⑤** | test | **미실측(호스트)** |
-| **⑥** | 게이트(`check` · `qualityBaseline`) | **미실측(호스트)** |
+| **④** | compile(`compileKotlin compileTestKotlin`) | **exit 0** |
+| **⑤** | test | **exit 0** — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4(되돌리지 않은 트리와 같은 수) |
+| **⑥** | 게이트(`check` · `qualityBaseline`) | **exit 0** (`check` 9m 24s · 359 task 중 209 executed · `leakPatternGate`·`qualityBaseline` 둘 다 **실행** — 되돌린 뒤 남는 `rollback.md`·`scope.md` 를 스캔하고도 초록 · `qualityBaseline` 단독도 exit 0) |
 
-**r0 에서는 ④~⑥ 을 돌렸고 전부 exit 0 이었다**(compile · test 350 클래스/2817 · `check` 9m 18s +
-`qualityBaseline`, `leakPatternGate` 실행 1회). **그 결과로 r1 을 갈음하지 않는다** — r1 의 되돌림 목록이
-둘(C-6·C-7) 늘고 공유 파일이 하나(`milestone-6.md`) 늘었으므로 되돌린 트리가 r0 의 그것과 다르다.
-갈음은 「HEAD 초록」으로도, 「앞 라운드 초록」으로도 하지 않는다.
+**갈음을 쓰지 않았다** — r0 에서도 ④~⑥ 이 exit 0 이었지만 r1 의 되돌림 목록이 둘(C-6·C-7) 늘고 공유
+파일이 하나(`milestone-6.md`) 늘어 되돌린 트리가 r0 의 그것과 다르다. 그래서 **새 clone 에서 ①~⑥ 을
+다시 돌렸다**(사용자 결정 `D-6E1-12` 로 swap 문턱이 1.0 GB 로 내려간 뒤, 실측 시점 swap free 5.0 GB).
+「HEAD 초록」으로도 「앞 라운드 초록」으로도 갈음하지 않았다.
 
-**그래도 ③ 이 주는 것**: 두 공유 파일이 base 와 **바이트 동일**하고 제거 대상 여섯이 전부 문서다 —
-Kotlin·Python 소스·build 파일·`config/quality` diff **0**(`checklist.md` 자기 점검). 그래서 ④~⑥ 의
-위험원은 공유 파일 둘이고, 그 둘의 되돌림은 바이트 동일로 확인됐다. **이것은 예측이고 실행이 아니다** —
-호스트 문턱이 열리면 같은 clone 에서 셋을 돌려 이 표를 채운다.
+**③ 과 ⑤ 가 함께 말하는 것**: 두 공유 파일이 base 와 **바이트 동일**하고 제거 대상 여섯이 전부 문서다 —
+Kotlin·Python 소스·build 파일·`config/quality` diff **0**(`checklist.md` 자기 점검). 그 트리의 test 수가
+되돌리지 않은 트리와 **같다**(350 클래스 · 2817 test)는 것이 그 사실의 확인이다.
+
+**실측 자리**: 버릴 clone 을 새로 떠서(`--no-hardlinks`) `24bdc8bd` 를 체크아웃하고 ①~③ 을 적용한 뒤 그
+트리에서 ④~⑥ 을 돌렸다 — 앞 라운드의 clone 을 재사용하지 않았다.

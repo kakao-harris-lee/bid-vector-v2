@@ -8,20 +8,29 @@ C-6·C-7 `b0df65c6`.
 
 | 명령 | 문면 | r0 결과 | **r1 결과** |
 |---|---|---|---|
-| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | exit 0 (9m 42s) | **미실측(호스트)** |
-| `./gradlew --no-daemon qualityBaseline` | 같은 job | exit 0 (13s) | **미실측(호스트)** |
-| `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 순서대로 | 전 step exit 0 | **미실측(호스트)** |
+| `./gradlew --no-daemon check` | CI `check` job 문면 그대로 | exit 0 (9m 42s) | **exit 0** (22s — 아래 주의) |
+| `./gradlew --no-daemon check --no-build-cache` | 깨끗한 clone(`build/` 없음) — CI 러너와 같은 자리 | — | **exit 0** (11m 20s · **359 task 전부 executed**) |
+| `./gradlew --no-daemon qualityBaseline` | 같은 job | exit 0 (13s) | **exit 0** (7s, UP-TO-DATE) |
+| `container` job 로컬 재현(S-21a~S-25) | 그 job 의 `run` 블록을 순서대로 | 전 step exit 0 | **전 step exit 0** |
 
-**r1 미실측 사유**: 빌드 전 3단 점검(별도 호출)에서 available **14.2 GB**(통과) · 활성 Gradle **0**(통과) ·
-**Swap free 1,421 MB** 가 계약 `D-6E1-4` 의 1회 예외 문턱 1.5 GB **미달**이다. 세 차례 재확인에도 회복이
-없었고(swap 을 쥔 것은 빌드가 아니라 상주 서비스다 — 아래 「호스트」), 계약이 **「미달이면 「미실측」으로
-적고 보고한다」** 를 지시한다. 팀장이 호스트 회복 뒤 verifier 표적으로 돌린다.
+**worktree `check` 가 22s 인 이유와 그 공백을 메운 것**: r1 의 diff 가 문서와 `ci.yml` 뿐이라 Kotlin
+입력이 안 바뀌었고, 그래서 `:test` task 가 전부 `UP-TO-DATE` 로 앞 실행을 재사용했다(실행된 32 task 는
+게이트·보고 쪽이다). **`leakPatternGate` 는 `UP-TO-DATE` 표시 없이 실행됐다** — evidence 가 바뀌었으므로
+그 입력이 움직인 것이고, 이 slice 가 `check` 에서 실제로 건드리는 축이 그 하나다.
+그 재사용을 **갈음으로 쓰지 않았다** — 깨끗한 clone(`dff87ad4`, `build/` 없음)에서
+`check --no-build-cache` 를 겹쳐 돌려 **359 task 전부 executed** 를 실측했다(CI 러너는 캐시가 없다).
+그 run 의 핵심 결과 한 줄 — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4 ·
+`adapters.e2e` 결과 파일 **7** · `leakPatternGate`·`qualityBaseline` 둘 다 실행.
+**verifier r1 이 같은 형태로 실측한 수치와 같다.**
 
-**r1 이 바꾼 것과 acceptance 의 관계**: 이 라운드의 diff 는 **문서 넷과 `ci.yml` 의 주석·셸 단언**이다.
-Kotlin·Python 소스·build 파일·`config/quality` diff **0** 이므로 `check` 의 test 결과를 움직일 입력이
-없고, `check` 안에서 이 라운드에 닿는 것은 **evidence 를 훑는 `leakPatternGate`** 하나다 — 그 축은 참조형
-자기 점검으로 매치 0 을 실측했다(아래 「비밀값·좌표 자기 점검」). `ci.yml` 축은 container job 이 정본이고
-그것이 미실측이다 — **r0 의 초록으로 갈음하지 않는다.**
+**실측 자리**: 수정 라운드 1 의 HEAD(`dff87ad4`)와 그 직전 산출물 상태다. 사용자 결정으로 이 slice 의
+남은 빌드에 한해 swap 문턱이 **1.0 GB** 로 내려갔고(계약 `D-6E1-12`), 실측 시점의 호스트는 그 문턱을
+넉넉히 넘었다(아래 「호스트」 — swap free 4.2~5.0 GB). 앞 라운드에 적었던 「미실측(호스트)」는 이 절이
+대신한다.
+
+**r1 이 바꾼 것과 acceptance 의 관계**: 이 라운드의 diff 는 **문서 넷과 `ci.yml` 의 주석·셸 단언**이고
+Kotlin·Python 소스·build 파일·`config/quality` diff **0** 이다. `ci.yml` 축의 정본은 container job 이며
+**그것도 이 라운드에서 돌렸다**(아래 step 표) — r0 의 초록으로 갈음하지 않았다.
 
 **r0 `check` 의 핵심 결과 한 줄**(참고 — 판정 SHA 가 다르다) — 클래스 **350** · test **2817** · 실패 0 · 오류 0 · skip 4
 (`adapters` 137/900 · `app` 62/562 · `workflow` 51/425 · `build-logic` 27/279 · `procurement` 33/263 ·
@@ -48,13 +57,15 @@ slice 가 더한 제외는 **0** 이다. `leakPatternGate`·`qualityBaseline` �
 | S-24 실 Kotlin gateway ↔ 컨테이너의 실 Python 서버 | exit 0 |
 | S-25 정리(볼륨까지) | exit 0 · 남은 `bidvector` 컨테이너·볼륨 **0** |
 
-**G-4 블록이 실제로 돈 로그 줄**(S-23b 출력에서 그대로):
+**G-4 블록(r1 판)이 실제로 돈 로그 줄**(S-23b 출력에서 그대로):
 
 ```
 -- 여력 상한 세우기: begin → value → confirm (dry-run 200 의 전제) --
 -- 평가 dry-run 왕복: 200 · 본문 키 아홉 · outbox 행 수 전후 등식 (G-4) --
 dry-run 왕복 통과 — outbox 행 수 2 == 2 (쓰기 0)
 ```
+
+r1 이 더한 재조회 200 단언 둘도 같은 run 에서 통과했다(그 둘이 실패하면 상한 세우기 단계가 끊긴다).
 
 S-23c 는 **G-4 가 전략을 한 번 더 쓴 뒤에도** 통과했다 — 리허설의 전략 등식이 값을 하드코딩하지 않고
 읽어 비교하기 때문이다(그 step 의 출력이 「(ii) 양성 — 같은 백업으로 다시 복원하자 `candidate_limit`/
@@ -77,17 +88,23 @@ S-23c 는 **G-4 가 전략을 한 번 더 쓴 뒤에도** 통과했다 — 리�
 | r0 | `qualityBaseline` 전 | 13.4 GB | 1,678 MB | 0 | 진행 |
 | r0 | container 앞·뒤 구간 전 | 13.3 GB | 1,682 / 1,684 MB | 0 | 진행 |
 | r0 | rollback ④~⑥ 전 | 13.2 GB | 1,685 MB | 0 | 진행 |
-| **r1** | 수정 뒤 재실측 전 | **14.2 GB** | **1,421 MB** | **0** | **보류 — 1.5 GB 미달** |
+| r1 | 수정 직후(문턱 1.5 GB 시점) | 14.2 GB | 1,421 MB | 0 | 보류 — 미달 |
+| **r1** | `check` 전(문턱 **1.0 GB**, `D-6E1-12`) | **13.9 GB** | **4,751 MB** | **0** | 진행 |
+| **r1** | 깨끗한 clone `check` 전 | **12.8 GB** | **4,838 MB** | **0** | 진행 |
+| **r1** | container 앞·뒤 구간 전 | **13.4 / 13.3 GB** | **5,005 / 5,007 MB** | **0** | 진행 |
+| **r1** | rollback ④~⑥ 전 | **13.3 GB** | **5,008 MB** | **0** | 진행 |
 
-**swap 을 쥔 것은 빌드가 아니라 상주 서비스다** — per-process `VmSwap` 상위 여덟이 전부 상주 프로세스이고
-(MB 단위 558 · 497 · 411 · 211 · 204 · 175 · 169 · 151) 다른 프로젝트의 유휴 Gradle·Kotlin daemon 은 그
-목록에 없다(RAM 만 쥔다). 유휴 프로세스는 자기 swap 페이지를 되불러오지 않아 **기다려도 문턱에 닿지
-않는다** — r0 에서 waiter 를 걸었다가 그 사실을 확인하고 취소했다. **1회 예외를 레인이 또 낮춰 적용하지
-않았다**(1.5 GB 는 사용자 결정이고 1,421 MB 는 그 아래다).
+**r1 수정 직후에는 문턱 미달이었다.** swap 을 쥔 것은 빌드가 아니라 상주 서비스였고(per-process
+`VmSwap` 상위 여덟이 전부 상주 프로세스, MB 단위 558 · 497 · 411 · 211 · 204 · 175 · 169 · 151) 유휴
+프로세스는 자기 swap 페이지를 되불러오지 않아 기다려 닿는 값이 아니었다 — 레인이 문턱을 스스로 낮추지
+않고 보고했다. **사용자 결정으로 문턱이 1.0 GB 로 내려간 뒤**(`D-6E1-12`) 다시 점검했을 때 swap 이
+**4.7 GB 로 회복**해 있었고(상주 서비스 쪽에서 반납된 것) 그 뒤 전 구간 **4.2~5.0 GB** 로 중단선
+1.0 GB 에 닿지 않았다. 무거운 작업은 **항상 하나씩** foreground 로만 돌렸다.
 
-**남은 Gradle daemon**: r0 의 `check` 가 띄운 하나(build-logic TestKit 의 계약 게이트 결정성 test —
-`PWD` 가 `/tmp/bidvector-contract-gate-determinism…`)를 **그 PID 만** 멈췄다. `./gradlew --stop` 은 쓰지
-않았다. r1 은 빌드를 돌리지 않아 새로 생긴 daemon 이 없고, 현재 `pgrep` 0 건이다.
+**남은 Gradle daemon**: 전건 `check` 는 매번 하나를 남긴다(build-logic TestKit 의 계약 게이트 결정성
+test — `PWD` 가 `/tmp/bidvector-contract-gate-determinism…`). 라운드 끝에 `pgrep -af GradleDaemon` 으로
+확인하고 **그 PID 만** 멈췄다. `./gradlew --stop` 은 쓰지 않았다(같은 Gradle 버전의 다른 레인 daemon 을
+함께 멈춘다).
 
 **differential / golden**: **N/A** — 문서 + CI step slice 라 산출 데이터가 없다(fixture 변경 0, 골든 변경 0).
 
@@ -272,7 +289,7 @@ exit $fails
 | **M1** | C-1 의 ⓐ 식별자 하나를 존재하지 않는 이름으로 교체 | E-2 RED | **RED** exit 1 · numstat `1 1` |
 | **M2** | runbook §3.2 의 종료 코드 **한 행 삭제**(`LEASE_BUSY` 3) | E-8 RED | **RED** exit 1 · numstat `0 1` |
 | **M3** | `ci.yml` 의 G-4 기대 키 한 칸 변경 | E-13 RED | **RED** exit 1 · numstat `1 1` |
-| **M4** | G-4 의 기대 응답 코드 교체(`200`→`201`) | container 스모크 RED | **r0 에서 RED**(step exit 1, 실패 문면이 실제 코드를 낸다) · **r1 미실측(호스트)** |
+| **M4** | G-4 의 기대 응답 코드 교체(`200`→`201`, 실패 문면도 같이) | container 스모크 RED | **RED** — step **exit 1** · numstat `2 2` · 문면 `스모크 실패: dry-run 이 201 이 아니다: 200 키 [아홉 칸] code none`. **그 문면이 G-3 조치를 함께 실측한다** — 본문 전문이 아니라 키 집합과 `code` 만 나온다. 복원 뒤 같은 step 이 다시 exit 0(등식 `6 == 6`) |
 | **M5** | runbook §4.3 의 거부 코드 문면 교체(`UNSUPPORTED_RELEASE`→`UNSUPPORTED_REQUEST`) | E-18 RED | **RED** exit 1 · numstat `1 1` |
 | **M6** | runbook §4.5 의 「여섯 개 전부」를 「일곱 개 전부」로 | E-20b RED | **RED** exit 1 · numstat `1 1` |
 | **M7** | C-7 의 `R-ASYNC-03` 판정을 「연결」→「미연결」로 | E-22c RED | **RED** exit 1 · numstat `1 1` |
