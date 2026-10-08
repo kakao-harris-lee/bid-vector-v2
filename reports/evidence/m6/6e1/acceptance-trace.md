@@ -4,19 +4,24 @@
 **무엇이 재는가**를 하나씩 붙인다. 이 표가 없으면 `milestone-6.md` 완료 조건 3(「M0 필수 capability E2E 전체
 통과」)은 **판정 대상이 정의되지 않은 조건**이다 — 이 문서가 그 판정 대상이다.
 
-**r2 수정**: 표적 재검증 RT-H-1 이 r1 의 ⓐ 20 에서 새 표본 6 중 2~3 의 위반을 다시 찾았고, 공통 결함이
-**「test 가 있다」를 「production 배선·출하 정책 값에서 성립한다」로 읽은 것**이었다. 그래서 아래 **ⓐ 술어를
-명문화**하고 ⓐ 20 을 그 술어로 전수 재대조해 **다섯**(`COL-07`·`STR-02`·`ML-04`·`DEC-08`·`OPS-10`)을 ⓒ 로
-내렸다. 집계 이력은 ⓐ 29 → 20 → **15**, 성립 범위 31 → 22 → **17/61** 이다 — 완료 조건 3 의 결론
-(「오늘 성립하지 않는다」)은 세 라운드 모두 같다.
+**r3(승인 전 일괄) 수정**: 표적 재검증 2 가 **같은 사실에 술어 ② 를 다르게 적용한 것**을 찾았다 —
+`ML-04` 는 ⓒ 인데 `ML-01`·`ML-02` 는 ⓐ 였고, 세 행이 전부 「ml-serving 출하 이미지에서는 성립하고
+Kotlin 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정해 **제품 경로에 닿지 않는다**」는 같은 상태다.
+규칙 문단이 그 경우를 ⓐ 근거가 아니라고 적으므로 **`ML-01`·`ML-02` 를 ⓒ 로 내렸다**(RT2-M-1). `COL-01`
+둘째 bullet 은 「부재가 요구를 충족」형 근거임을 production 칸에 적고(RT2-M-2), `STR-03` 에 production
+HTTP 경로 식별자를 더했다(RT2-L-1).
+
+집계 이력은 ⓐ **29 → 20 → 15 → 13**, 성립 범위 **31 → 22 → 17 → 15/61** 이다 — 완료 조건 3 의 결론
+(「오늘 성립하지 않는다」)은 네 라운드 모두 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
+기준으로 적용한 것**이고, 그때마다 어느 bullet 이 비었는지를 행에 남겼다.
 
 ## 집계
 
 | 분류 | 건수 |
 |---|---:|
-| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **15** |
+| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **13** |
 | ⓑ 경계로 처리 — 잴 대상이 설계로 없다 | **2** |
-| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **44** |
+| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **46** |
 | **계** | **61** |
 
 | 축 | ⓐ | ⓑ | ⓒ | 계 |
@@ -24,20 +29,20 @@
 | COL | 3 | 1 | 4 | 8 |
 | STR | 2 | 0 | 8 | 10 |
 | QUAL | 3 | 0 | 4 | 7 |
-| ML | 3 | 0 | 4 | 7 |
+| ML | 1 | 0 | 6 | 7 |
 | DEC | 3 | 0 | 6 | 9 |
 | NOTI | 1 | 1 | 3 | 5 |
 | SET | 0 | 0 | 3 | 3 |
 | OPS | 0 | 0 | 12 | 12 |
-| **계** | **15** | **2** | **44** | **61** |
+| **계** | **13** | **2** | **46** | **61** |
 
-**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 15 건**, 잴 대상이 설계로
-없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 44 건**이다. 그래서 「M0 필수 capability E2E
-전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 15 + ⓑ 2 = 17 건이고, 그 범위를 이 표가 고정한다.
+**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 13 건**, 잴 대상이 설계로
+없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 46 건**이다. 그래서 「M0 필수 capability E2E
+전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 13 + ⓑ 2 = 15 건이고, 그 범위를 이 표가 고정한다.
 
-**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 44 건 가운데 대부분은 acceptance 의 여러 항목이 이미
+**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 46 건 가운데 대부분은 acceptance 의 여러 항목이 이미
 측정되고 있고 **한둘이 비어 있다**. 그 비어 있는 항목과 이미 측정되는 부분을 행마다 적었다. 부분 측정이
-강한 행 `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-06` · `DEC-08` · `SET-06` · `OPS-01` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
+강한 행 `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-01` · `ML-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-06` · `DEC-08` · `SET-06` · `OPS-01` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
 
 ## 분류 규칙 — 이 표를 재현하는 방법
 
@@ -49,7 +54,8 @@
 
 **② 가 이 표의 가장 비싼 술어다**(RT-H-1). test 가 **test 정책·fake·test 대역** 아래서만 성립시키는 거동은
 ⓐ 의 근거가 아니다 — 출하 정책의 그 표가 비어 있거나(`COL-07`), 그 데이터 축이 V2 에 없거나(`STR-02`),
-출하 조립이 그 포트를 자리지킴으로 고정하면(`ML-04`) 운영자는 그 거동을 보지 못한다. 그래서 ⓐ 행마다
+출하 조립이 그 포트를 자리지킴으로 고정하면(`ML-01`·`ML-02`·`ML-04` 셋이 그 경우다) 운영자는 그 거동을
+보지 못한다. 그래서 ⓐ 행마다
 **production 배선·출하 값 칸**을 따로 두고 파일·타입·출하 값의 **이름**으로 적는다. **의심되면 ⓒ** —
 과소가 과대보다 낫다.
 
@@ -88,7 +94,7 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 
 | capability | 이름 | 판정 | 재는 자리(등재 식별자) | **production 배선·출하 값** | 무엇을 재는가 / 무엇이 비었는가 | OPEN·후속 |
 |---|---|---|---|---|---|---|
-| **COL-01** | 당일 등록된 신규 공고를 자동으로 받는다 | ⓐ | `bidvector.adapters.koneps.KonepsOpenApiNoticeSourceTest` · `bidvector.app.wiring.CollectionWiringTest` · `bidvector.procurement.NoticeIdTest` · `bidvector.adapters.persistence.CleanMigrationCheckTest` · `bidvector.adapters.persistence.NoticeFindRoundTripTest` | `CollectionWiring`(`mode=once` 조건부)이 `KonepsOpenApiNoticeSource` 와 **출하 오퍼레이션 표**를 조립한다. 탈락 술어는 정책 표에 의존하지 않는다(`Canonicalize` 의 「번호 없음」·IDENTIFIER 탈락은 무조건이다). 차수 형식은 `notice_round` CHECK 가 DB 에서 닫고 조회 키가 그 값을 쓴다. | 탈락 회계는 `COL-01` 을 축어로 인용하는 test 둘이, KST 기준일은 「오늘은 KST 달력일이다 — UTC 날짜와 갈리는 시각에도」가 잰다. 제로패딩 차수의 「수집·저장·재조회 전 구간」은 세 층으로 닫힌다 — 타입 왕복(「원문 문자열 그대로 왕복한다」) · DB 의 `notice_round` 형식 CHECK · 그 차수를 **조회 키로 쓰는** 저장 왕복(키가 보존되지 않으면 find 가 빗나가 그 단언들이 붉어진다). | — |
+| **COL-01** | 당일 등록된 신규 공고를 자동으로 받는다 | ⓐ | `bidvector.adapters.koneps.KonepsOpenApiNoticeSourceTest` · `bidvector.app.wiring.CollectionWiringTest` · `bidvector.procurement.NoticeIdTest` · `bidvector.adapters.persistence.CleanMigrationCheckTest` · `bidvector.adapters.persistence.NoticeFindRoundTripTest` | `CollectionWiring`(`mode=once` 조건부)이 `KonepsOpenApiNoticeSource` 와 **출하 오퍼레이션 표**를 조립한다. 탈락 술어는 정책 표에 의존하지 않는다(`Canonicalize` 의 「번호 없음」·IDENTIFIER 탈락은 무조건이다). 차수 형식은 `notice_round` CHECK 가 DB 에서 닫고 조회 키가 그 값을 쓴다. **둘째 bullet 은 「부재가 요구를 충족」형 근거다**(verifier RT2-M-2) — `CollectionProperties` 의 `from`·`to` 가 **기본값 없는 필수 값**이라 「기준일 미지정으로 수집」하는 경로가 production 에 **없다**(미설정은 바인딩 실패 = 기동 거부). legacy 의 「미지정 시 UTC 로 전날」 결함 클래스가 설계로 생길 수 없고, 인용 test 가 재는 것은 **명시한 `to` 의 KST 상한**이다. | 탈락 회계는 `COL-01` 을 축어로 인용하는 test 둘이, KST 기준일은 「오늘은 KST 달력일이다 — UTC 날짜와 갈리는 시각에도」가 잰다. 제로패딩 차수의 「수집·저장·재조회 전 구간」은 세 층으로 닫힌다 — 타입 왕복(「원문 문자열 그대로 왕복한다」) · DB 의 `notice_round` 형식 CHECK · 그 차수를 **조회 키로 쓰는** 저장 왕복(키가 보존되지 않으면 find 가 빗나가 그 단언들이 붉어진다). | — |
 | **COL-02** | 어떤 공고가 얼마에 누구에게 낙찰됐는지 받는다 | ⓒ | — | — | 첫 bullet 「실 기초금액이 **없는** 개찰 pass 를 흘려도 저장된 기초금액이 덮이지 않는다」를 재는 자리가 없다 — `mayOverwrite` 규율은 **값이 있는** 관측의 권위 비교이고, 결측 재관측이 지우지 않음을 재는 test 는 발주기관·공고명 둘에만 있다(기초금액 축 0). 구현은 있고 **측정만 비어 있다** → test 신설. 부분 측정 — 권위 비교는 `bidvector.procurement.ResolvedBaseAmountTest`·`bidvector.adapters.persistence.PrecedenceParityTest`·`bidvector.adapters.persistence.PrecedenceMutationTest`, 예정가 파생은 `bidvector.procurement.NoticeTest`(「계산식은 없다」)·`bidvector.procurement.OpeningResultFactSlotsTest` 가 잰다. | **후속: test 신설** |
 | **COL-03** | 복수예비가격 15개와 추첨번호를 확보한다 | ⓒ | — | — | 셋째 bullet 「상세 조회가 429 로 **실패**해도 그 공고는 예비가격 없이 저장되고 나머지 수집은 계속되며 실패 건수·사유가 회계에 실린다」를 재는 자리가 없다 — 인용 가능한 429 test 는 전부 「연속 실패 뒤 **성공**(bounded retry)」이고 **재시도 소진 → 예가 없이 저장 → 계속**을 잇는 test 가 0 이다(verifier r1 R1-H-3). 구현은 있고 측정만 비어 있다 → test 신설. 부분 측정 — 저장분 0회·age-gate 건너뜀·넘긴 뒤 정확히 1회는 `bidvector.procurement.DetailFetchTest`, 15행 자식 저장은 `bidvector.adapters.persistence.OpeningReservePriceRepositoryTest`, 회계 항등식은 `bidvector.procurement.AccountingTest` 가 잰다. | **후속: test 신설** |
 | **COL-04** | 공고의 참가자격 원문과 게시 낙찰하한율을 확보한다 | ⓒ | — | — | 자격 수집 대상 집합의 **정렬**(감시 조건 매칭 공고가 마감 임박보다 앞선다)이 없다 — 요건을 채우는 경로 자체가 미정이다. 부분 측정(강함) — 업종제한 유무의 호출 0/1 은 `COL-04` 를 축어로 인용하는 `bidvector.procurement.PortsTest`, 재포함(부분 성공 → 다음 창)은 `bidvector.procurement.DetailFetchTest` 의 recheck-gate, 「요건 없음 vs 수집 실패」 구분은 `bidvector.adapters.koneps.KonepsLicenseLimitDocumentSourceTest`·`bidvector.adapters.qualification.StoredRequirementLicenseGateTest` 가 잰다. | `OPEN-6F5-EXTRACTION-FILL` |
@@ -98,7 +104,7 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **COL-08** | 업무구분 코드와 표시 라벨을 확보한다 | ⓐ | `bidvector.procurement.BusinessClassificationCanonicalizeTest` · `bidvector.adapters.persistence.NoticeBusinessClassificationPersistenceTest` · `bidvector.adapters.persistence.NoticeReconstructionTest` · `bidvector.adapters.koneps.KonepsSourceDivisionTest` | `CollectionWiring` 의 **출하 오퍼레이션 표가 대분류를 나른다**(응답에서 추측하지 않는다). 라벨은 원문 trim·공백은 `null`(`businessCategoryFrom` 의 「임의 라벨 금지」)이고 코드·라벨이 각자 열에 저장된다. 대분류 어휘 넷은 DB CHECK 가 닫는다. **코드→라벨 매핑 표가 production 에 존재하지 않으므로** 「매핑에 없는 코드」는 원문 그대로 보존된다. | 코드/라벨 분리 저장과 「응답에서 추측하지 않는다」, 어휘 밖 라벨의 DB 거부가 두 bullet 을 덮는다. | — |
 | **STR-01** | 내가 입찰할 만한 공고만 골라서 본다 (감시 조건) | ⓐ | `bidvector.strategy.WatchRulesTest` · `bidvector.buildlogic.ModuleDependencyPolicyTest` | `EvaluateCandidatesUseCase`(출하 조립)가 `WatchRules` 를 쓰고 전략은 `JdbcStrategyRepository`·`PinnedStrategyRepository` 가 낸다. 넷째 bullet 의 잠금은 test 가 아니라 **모듈 의존 계약**이다 — `strategy` 모듈이 ML 좌표를 참조할 수 없어 그 호출 경로가 컴파일되지 않는다. | `STR-01 1`~`STR-01 4` 를 축어로 인용하는 test 다섯이 네 bullet 과 1:1 로 붙는다. 넷째(「ML port 를 0회 호출」)는 그 test 가 결정성만 보므로 **실제 잠금은 모듈 의존 게이트**다 — `strategy` 모듈이 ML 좌표를 참조할 수 없어 호출 경로가 컴파일되지 않는다(verifier r1 R1-L-4). | — |
 | **STR-02** | 키워드 매칭 대상 텍스트 범위 제어 (오탐 차단) | ⓒ | — | — | 둘째 bullet 의 뒷절(「같은 키워드가 title 또는 **requirements** 에 있으면 후보다」)에 **대응할 데이터가 V2 에 없다** — 6F-4 결정 A 가 요건 원문 축을 싣지 않기로 하고 그 축소를 OPEN 으로 등재했다. 지역 매칭 대상은 공고명 + 공종 + 기관명 두 열이다. 부분 측정(강함) — 나머지 세 bullet 은 `STR-02 1`·`3`·`4` 를 축어로 인용하는 `bidvector.strategy.WatchRulesTest` 와 대상 텍스트 조립 `bidvector.strategy.WatchTextAssemblyTest` 가 production 조립의 `bidvector.adapters.evaluation.NoticeWatchSubjectPortTest` 경로 위에서 잰다. | `OPEN-6F4-STR02-REQUIREMENTS-AXIS` |
-| **STR-03** | 액션 임계치 편집 (즉시투찰 / 검토 / 보류 분기) | ⓐ | `bidvector.strategy.StrategyValidationTest` · `bidvector.decision.VerdictLadderPolicyDataTest` | production 쓰기 경로는 **편집 세션 하나**(`EditStrategyWorkflow` → `validate()`)이고 그 커널이 부등식을 거부한다. 출하 `VERDICT_LADDER_POLICY` 도 같은 부등식을 독립으로 거부한다(두 자리). | `STR-03 1`~`3` 축어 인용 넷. 「모든 경로」는 V2 의 쓰기 경로가 편집 세션 하나뿐이라 그 커널 검증이 전수다 — 사다리 정책 데이터도 같은 부등식을 독립으로 거부한다. | — |
+| **STR-03** | 액션 임계치 편집 (즉시투찰 / 검토 / 보류 분기) | ⓐ | `bidvector.strategy.StrategyValidationTest` · `bidvector.decision.VerdictLadderPolicyDataTest` · `bidvector.app.http.StrategyEditEndpointTest` | production 쓰기 경로는 **편집 세션 하나**(`EditStrategyWorkflow` → `validate()`)이고 그 커널이 부등식을 거부한다. 출하 `VERDICT_LADDER_POLICY` 도 같은 부등식을 독립으로 거부한다(두 자리). | `STR-03 1`~`3` 축어 인용 넷이 커널에서, 그리고 **production HTTP 경로에서 그 거부가 400 으로 나오는 것**을 endpoint test 가 잰다(verifier RT2-L-1 — 술어 ③ 은 그 배선에서 재기를 요구한다). 「모든 경로」는 V2 의 쓰기 경로가 편집 세션 하나뿐이라 그 둘이 전수다 — 출하 사다리 정책 데이터도 같은 부등식을 독립으로 거부한다. | — |
 | **STR-04** | 알림 범위 제어 (`notify_only_high_priority`) | ⓒ | — | — | 알림 범위를 좁히는 전략 필드가 **없다** — 편집 가능 필드 13 에 `notify_only_high_priority` 대응물이 없다. 「억제된 후보를 억제 사유와 함께 조회」할 자리도 없다. | `OPEN-6F3-BID-RECORD` |
 | **STR-06** | 추천 후보 수 상한 | ⓒ | — | — | 후보 **표시** 표면이 없다(운영자 API 에 후보·제안 목록 operation 0). `candidateLimit` 과 분석 예산(`OPPORTUNITY_POLICY` 의 embedding·prediction 예산)의 독립을 재는 자리도 없다. 부분 측정 — `bidvector.workflow.evaluation.OpportunityAnalysisTest` 가 예산의 출처가 정책 값임을 잰다. | **없음 — 신설 필요** |
 | **STR-07** | 전략을 저장하면 후보 목록이 갱신된다 | ⓒ | — | — | 후보 스냅숏과 `stale` 표시·재계산 디스패치가 **없다**. 부분 측정 — 「계산 중 저장은 채택되지 않는다」축은 `bidvector.app.wiring.StrategyEditExecutorRaceTest`(끼어든 커밋이면 값 제출 거부)와 요청당 전략 1회 읽기(`bidvector.app.wiring.EvaluationDryRunFactoryTest`)가 잰다. | **없음 — 신설 필요** |
@@ -113,8 +119,8 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **QUAL-05** | 판정 provenance (어떤 원문 → 어떤 규칙 → 어떤 결론) | ⓐ | `bidvector.qualification.LicenseEligibilityTest` · `bidvector.sharedkernel.PolicyTest` | 같은 경로. policy version 은 `EffectiveDatedPolicy` 의 **출하 엔트리**에서 오고 그 resolve 규약(기준일 이하 최대 엔트리 · 엔트리 없으면 소급 금지)이 production 공용이다. | 사유 파생은 `missingByGroup`(실제 미보유만) + 정책 version 봉투가, 어휘 version 의 시점 적용은 `EffectiveDatedPolicy` 의 「기준일 이하 최대 엔트리」·「엔트리 없으면 소급하지 않는다」가 잰다. | — |
 | **QUAL-08** | 지역 자격 | ⓒ | — | — | 구조화 지역제한 **필드**로 판정하는 자격 축이 없다. 전략의 지역 어휘는 watch rule 의 텍스트 매칭이고 acceptance 가 금지한 쪽이다 — 「지역 자격 없음」과 「지역 점수 낮음」을 가르는 결과 타입도 없다. | **없음 — 신설 필요** |
 | **QUAL-11** | 금액 capacity 게이트 (도급한도 / 시공능력평가액) | ⓒ | — | — | 금액 capacity 축이 **없다** — 운영자 보유액 필드도(프로필은 업종·면허·지역 셋만), 두 금액의 basis 대조도 없다. 부분 측정 — 마지막 무조건 bullet(「값 크기로 단위를 구분하는 경로가 없다」)은 `bidvector.sharedkernel.RateTest`·`bidvector.sharedkernel.CompileFailureHarnessTest` 가 타입으로 닫는다. | `OPEN-QUAL-09` · `OPEN-QUAL-10` |
-| **ML-01** | 투찰율 추천 타점과 시나리오 3후보 | ⓐ | `bidvector.adapters.contract.PredictionContractTest` · `bidvector.workflow.prediction.PredictionValueTest` · `bidvector.adapters.ml.SuccessShapeFailClosedTest` · `bidvector.adapters.ml.ResponseMappingTest` | ml-serving **출하 이미지**의 `ML_ENGINE_INFERENCE_POLICY=/app/policy/inference-v1.yaml` 위에서 응답 계약이 선다(정책 파일은 이미지에 구워진다). Kotlin 소비자 쪽 형태 검증도 production 코드다. **주의** — Kotlin 출하 조립은 `MlAnalysisPort` 를 `UnavailableMlAnalysis` 로 **고정**하므로(운영자 결정 1, architecture gate 가 그 클래스 집합을 잠근다) 이 응답이 **오늘 제품 경로에 닿지 않는다**(`OPEN-ML-ANALYSIS-WIRING`). | 3후보·순서·`bid_rate ≤ 1`·origin 전수와 「후보 2개면 계약 위반」이, 라벨 순서 어긋남의 `ContractViolation` 이 붙는다. 「bid/review/skip 을 담지 않는다」는 계약 타입에 그 칸이 없는 쪽으로 닫힌다. | — |
-| **ML-02** | 배우지 않은 공종에 답하지 않는다 (미학습 가드) | ⓐ | `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)` | 출하 `inference-v1.yaml` 의 임계가 정본이고 **정책 로더가 1 미만 임계를 거부**한다 — 설정으로 가드를 끌 수 없다는 bullet 이 그 거부로 선다. ML-01 과 같은 **주의**(제품 경로 미배선). | 재는 자리는 `ml-engine/tests/inference/test_availability.py` — 「표본 얕음」 둘(`TooFewObservations`·`TooFewRatioSamples`)의 구분, 게이트가 비율 게이트보다 먼저, 경계값 포함, **직접 호출도 게이트와 같은 판정**. 비활성화 불가는 `ml-engine/tests/inference/test_policy.py` 의 「임계 1 미만은 거부」가 닫는다. **주의** — GBM 축의 `min_category_rows=0` 은 정책이 거부하지 않는다(같은 파일의 test 가 그 사실을 고정한다). 그 축은 ML-05 몫이다. | — |
+| **ML-01** | 투찰율 추천 타점과 시나리오 3후보 | ⓒ | — | — | **제품 배선에서 성립하지 않는다** — Kotlin 출하 조립이 `MlAnalysisPort` 를 `UnavailableMlAnalysis` 로 **고정**하므로(운영자 결정 1, architecture gate 가 그 클래스 집합을 잠근다) 이 응답이 **오늘 제품 경로에 닿지 않는다**. 분류 규칙 ② 가 바로 이 경우를 ⓐ 근거가 아니라고 적으므로 `ML-04` 와 같은 처분이다(verifier RT2-M-1 — 앞 판은 같은 사실에 술어를 다르게 적용했다). 부분 측정(강함) — 3 후보·순서·`bid_rate ≤ 1`·origin 전수와 「후보 2개면 계약 위반」은 ml-serving **출하 이미지**의 정책 위에서 `bidvector.adapters.contract.PredictionContractTest`·`bidvector.workflow.prediction.PredictionValueTest`·`bidvector.adapters.ml.SuccessShapeFailClosedTest`·`bidvector.adapters.ml.ResponseMappingTest` 가 잰다 — **서비스 컴포넌트에서는 성립하고 제품 경로에만 미배선**이다. | `OPEN-ML-ANALYSIS-WIRING` |
+| **ML-02** | 배우지 않은 공종에 답하지 않는다 (미학습 가드) | ⓒ | — | — | **제품 배선에서 성립하지 않는다** — `ML-01`·`ML-04` 와 같은 사유(출하 조립의 `MlAnalysisPort` 고정)로 이 가드의 판정이 제품 경로에 닿지 않는다(verifier RT2-M-1). 부분 측정(강함) — 「표본 얕음」 둘(`TooFewObservations`·`TooFewRatioSamples`)의 구분, 게이트가 비율 게이트보다 먼저, 경계값 포함, **직접 호출도 게이트와 같은 판정**은 출하 `inference-v1.yaml` 위에서 `ml-engine/tests/inference/test_availability.py` 가, 「설정으로 비활성화할 수 없다」는 같은 디렉터리의 `test_policy.py` 「임계 1 미만은 거부」가 잰다(CI step 축어는 `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)`). **주의** — GBM 축의 `min_category_rows=0` 은 정책이 거부하지 않는다(그 축은 `ML-05` 몫). | `OPEN-ML-ANALYSIS-WIRING` |
 | **ML-03** | 불확실성·신뢰도 표시 | ⓐ | `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)` · `bidvector.workflow.evaluation.EvidenceLinesTest` · `bidvector.decision.priority.PriorityCompositionTest` | **그 고정 자체가 production 배선이다** — 출하 조립의 `MlAnalysisPort` 는 `UnavailableMlAnalysis` 이고, 그 아래의 거동(사유 있는 `Review(MlUnavailable)` · 확률 축 없는 성분 다섯)을 등재 식별자가 **그 배선으로** 잰다. 두 bullet 이 요구하는 것은 「없을 때 0 이 아니라 사유」와 「확률로 표기하지 않음」이라 이 배선에서 성립한다. | 「표본 부족이 confidence 0 이 아니라 사유 있는 측정 불가」는 `Unavailable`/`Absent` 타입과 「전부 Absent 면 0 이 아니라 Unavailable」이, 「가격 적합도로 명시하고 낙찰 확률로 표기하지 않는다」는 성분 다섯에 **확률 축이 없다**(`ComponentExhaustiveTest`)가 잰다. 조건부(`OPEN-ML-03`)는 타입 분리 쪽으로 이미 닫혀 있다. | — |
 | **ML-04** | 예정가 분포 추정 (4/15 추첨 + 계층 수축) | ⓒ | — | — | 둘째 bullet 「기관 표본이 임계 미만이면 **수축 가중치가 응답 근거에 실린다**」가 **제품 배선에서 성립하지 않는다** — Kotlin 출하 조립은 `MlAnalysisPort` 를 `UnavailableMlAnalysis` 로 **고정**하므로(운영자 결정 1, architecture gate 가 그 클래스 집합을 잠근다) `Predicted` 진단이 production 경로에서 생기지 않고, 그 공시 줄을 재는 골든은 `Predicted` evidence 를 전제한다. 부분 측정(강함) — 첫 bullet(`clean` 이외 provenance 가 분포 입력에 못 들어간다)은 출하 `inference-v1.yaml` 위에서 `ml-engine/tests/inference/test_distribution.py` 의 「비-clean provenance 는 제외되고 계수된다」가 잰다. | `OPEN-ML-ANALYSIS-WIRING` |
 | **ML-05** | 낙찰률 GBM (공종 × 금액대 × 발주기관) | ⓒ | — | — | 셋째 bullet 「학습 표본 정의가 바뀌면 `model_version` 이 올라간다」가 **구현에 없다** — `model_version` 이라는 축이 ml-engine 전체에 0 이다(아티팩트는 release/checksum 축으로 식별한다). 부분 측정(강함) — 피처 이름 **순서** 불일치 거부·피처 manifest 체크섬 불일치 거부·**재현성 칸 부재 거부**는 `ml-engine/tests/registry/test_artifact.py` 가, 학습 spec 은 `ml-engine/tests/training/test_spec.py`·`test_booster.py` 가 잰다(CI step 축어는 `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)`). | **없음 — 신설 필요** |
