@@ -287,7 +287,7 @@ EMPTY_CONFIG="${TRIVY_SANDBOX}/empty-trivy.yaml"
 EMPTY_IGNOREFILE="${TRIVY_SANDBOX}/empty-trivyignore"
 : > "$EMPTY_CONFIG"
 : > "$EMPTY_IGNOREFILE"
-mkdir -p "${TRIVY_SANDBOX}/work" "${TRIVY_SANDBOX}/cache"
+mkdir -p "${TRIVY_SANDBOX}/work" "${TRIVY_SANDBOX}/cache" "${TRIVY_SANDBOX}/modules"
 
 # **캐시도 샌드박스 안의 빈 디렉터리로 명시한다**(verifier 표적 M-2). env 잠금은 `TRIVY_` 접두 **열거**라
 # 같은 일을 하는 `XDG_CACHE_HOME`·`HOME` 이 남아 있었다 — 메타데이터는 신선한데 내용만 비운 DB 를 그
@@ -313,7 +313,20 @@ echo "== 이미지 취약점 게이트: ${IMAGE_REF} (kind=${IMAGE_KIND}) =="
 # trivy 자신의 치명 오류(DB 를 못 받음·이미지를 못 읽음)는 **차단이 아니라 판정 불가**다
 # (verifier 표적 M-3). `set -e` 아래 그대로 두면 trivy 의 코드 1 이 그대로 나가 runbook §8.2 의
 # 「1 = 차단 → 올리거나 등재하라」로 읽힌다 — cr M-5 가 하한 미달에서 고친 것과 같은 계열이다.
+# **WASM 모듈 디렉터리도 고정한다**(verifier 표적2 M-A). trivy 는 기본으로 `$HOME/.trivy/modules` 의
+# 모듈을 읽고, 모듈은 **post-scan 으로 결과를 고칠 수 있다** — 만료도 사유도 stale 도 없는 면제 축이고,
+# 캐시(M-2)와 같은 계열의 남은 경로다. 여기서도 열거가 아니라 **자리를 우리가 정한다**.
+#
+# 플래그를 `image` 에만 다는 이유는 **측정된 사실**이다(2026-10-09): `--module-dir` 는 `image` 만 받고
+# `sbom`·`version` 은 플래그 자체가 없다. 그리고 같은 쓰레기 모듈을 `$HOME` 에 심었을 때 **`image` 는
+# 읽고(`Reading a module...` 뒤 FATAL) `sbom` 은 읽지 않는다**(exit 0, 그 줄 없음). 즉 오늘 모듈 축은
+# `image` 에만 있고, 이 한 줄이 그 축 전부를 덮는다.
+#
+# **전환 조건**: 뒤 trivy 판이 `sbom` 에도 모듈을 붙이면 이 잠금은 그 자리를 덮지 못한다. 그때는 이 줄을
+# 옮기는 것이 아니라 **잠금을 `HOME` 쪽으로 올려야** 한다(모든 하위 명령을 한 번에 덮는 자리). 도구 판을
+# 올릴 때 `trivy sbom --help` 에 모듈 플래그가 생겼는지 함께 본다.
 if ! _trivy image \
+  --module-dir "${TRIVY_SANDBOX}/modules" \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
   --format "$SBOM_FORMAT" \
