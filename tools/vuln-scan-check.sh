@@ -238,7 +238,12 @@ CANDIDATE_COUNT="$(_count_lines "$CANDIDATES")"
 # (좌표 금지 — 키는 내용에서 뽑는다, leak-baseline 의 교훈). 구분자 `|` 는 세 성분 어디에도
 # 나타나지 않는다. 모양 위반·중복 키는 정책 오류이고, 만료·창 상한 위반과 stale 은 차단이다.
 TODAY="$(date -u +%Y-%m-%d)"
-TODAY_EPOCH="$(date -u -d "$TODAY" +%s)"
+# 날짜 산술은 GNU `date -d` 에 기댄다. BSD `date`(macOS 기본)에는 그 플래그가 없어 **만료 검사가
+# 통째로 서지 않는다** — 조용히 꺼지는 대신 여기서, 그 이름으로 끊는다.
+if ! TODAY_EPOCH="$(date -u -d "$TODAY" +%s 2>/dev/null)"; then
+  echo "이 게이트는 GNU date(-d 날짜 산술)를 요구한다 — 만료 검사가 그것 없이는 서지 않는다" >&2
+  exit 2
+fi
 MAX_EPOCH="$(date -u -d "$TODAY + ${ALLOWLIST_MAX_DAYS} days" +%s)"
 
 ALLOW_LINES="$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' "$ALLOWLIST_FILE" | grep -v '^#' | grep -v '^$' || true)"
