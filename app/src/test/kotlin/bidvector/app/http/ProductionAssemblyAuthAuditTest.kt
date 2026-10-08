@@ -9,9 +9,9 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.resttestclient.TestRestTemplate
-import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.http.HttpEntity
