@@ -58,6 +58,7 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 
 - (착수 시점 없음)
 - 2026-10-09 `075c03b1` — `.claude/skills/codex-review-gate/SKILL.md` 바이너리·버전 핀 갱신(WSL 경로 · 0.160.1, 운영자 결정) + `docs/harness/change-history.md` 한 행. slice 산출물 아님 — rollback 은 되돌리지 않는다.
+- 2026-10-09 `cbef2c06` — `.claude/skills/codex-review-gate/SKILL.md` 호출마다 MCP·plugin·샌드박스 네트워크 비활성(config 기계 산출) + change-history 한 행. Codex r1 무효(MCP 오염)에서 나옴. rollback 은 되돌리지 않는다.
 
 ## 계약 갱신 r1 (2026-10-08, 팀장 — Codex 승인)
 
@@ -84,3 +85,9 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2A-6** | 승인 전 일괄 수령(`_workspace/m6-6e2a/04_implementer_batch.md`, 레인 HEAD `8ad42495`; `check` @`72f27528` exit 0 · rollback ⓪~⑥ 재실측 exit 0, 실측 HEAD `72f27528`). 일괄이 연 것: rollback 의 「하네스 레인 커밋 0」 문면을 사실로(`075c03b1` 두 파일은 되돌리지 않는 경로) · cr M-2 는 사실 등재로만 닫힘(역할 멤버 아닌 사용자 기동 실패 칸은 **신설 `OPEN-6E2A-INIT-FAIL-PREDICATE`** 로 다음 slice). **레인 동결, 판정 SHA = 이 갱신 커밋 → Codex 심판 1회**(D-6E2A-1·5, 범위 `2deb5f9d..<이 커밋>` 의 in_scope; 하네스 커밋 `075c03b1` 은 위 절에 선언) | 팀장 |
+
+## 계약 갱신 r5 (2026-10-09, 팀장 — 종결)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-7** | **Codex r2 `approve`(0 finding)** @`2a393b62`(`codex-review-20261008T190839Z.json` · preflight 형제; 핀 0.160.1 · gpt-5.5 high · MCP 호출 0). r1 은 사용자 `~/.codex/config.toml` 의 MCP 서버(serena)가 호출돼 리뷰 worktree 에 `.serena/` 를 만들어 오염 → **무효·미저장**, worktree 재생성 뒤 r2. 잔여 위험(Codex 기록): container job·변이 다섯은 Codex 가 재현 못 함(verifier 실측이 정본) · 소유자 자격 값 · adapters 하네스 소유자 실행 — 셋 다 OPEN 으로 등재됨. **종결 조건 충족**: verifier ready-for-review + Codex approve — **사용자 승인(머지)만 남는다**. 재작업 0/5. milestone-6.md 착수·종결 문단은 이 갱신과 같은 커밋 | 팀장 |
