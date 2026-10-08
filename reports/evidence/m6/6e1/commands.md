@@ -280,7 +280,10 @@ bad_a, marked = [], set()
 for l in rows:
     c = [x.strip() for x in l.split('|')]
     cid, mark, prod = c[1].strip('*'), c[3], c[5]
-    if mark == 'ⓐ' and prod in ('', '—'):
+    # RT2-L-3 — 자리채움도 거부한다(`—`·`-`·`–`·`x`·`?`·`n/a` 류 · 20자 미만)
+    filler = prod.strip().strip('*`').lower()
+    if mark == 'ⓐ' and (filler in ('', '—', '-', '–', '─', 'x', '?', 'na', 'n/a', 'tbd', '없음')
+                        or len(filler) < 20):
         bad_a.append(cid)
     if '부분 측정(강함)' in l:
         marked.add(cid)
@@ -298,7 +301,7 @@ printf '\n등식 %s — DIFF %d\n' "$([ $fails -eq 0 ] && echo 전부 일치 || 
 exit $fails
 ```
 
-**결과(r2, HEAD `29bfa5f7`)**: `E-1`~`E-24` **전부 OK · DIFF 0 · exit 0**. **OK 줄 31** 개다(앞 판이
+**결과(r3, HEAD `ba6c25f1`)**: `E-1`~`E-24` **전부 OK · DIFF 0 · exit 0**. **OK 줄 31** 개다(앞 판이
 「단언 24 개」로 적은 것은 블록의 `eq` 호출 수를 센 것이고 실제 출력은 그보다 많았다 — verifier RT-L-2.
 이제 세는 법을 고정한다: `bash <블록> | grep -c '^OK'` == **31**).
 
@@ -324,10 +327,12 @@ exit $fails
 | **M5** | runbook §4.3 의 거부 코드 문면 교체(`UNSUPPORTED_RELEASE`→`UNSUPPORTED_REQUEST`) | E-18 RED | **RED** exit 1 · numstat `1 1` |
 | **M6** | runbook §4.5 의 「여섯 개 전부」를 「일곱 개 전부」로 | E-20b RED | **RED** exit 1 · numstat `1 1` |
 | **M7** | C-7 의 `R-ASYNC-03` 판정을 「연결」→「미연결」로 | E-22c RED | **RED** exit 1 · numstat `1 1` |
-| **M8**(r2) | ⓐ 행 하나(`NOTI-03`)의 **production 배선 칸을 비운다** | E-23 RED | **RED** — `DIFF E-23 production 칸이 빈 ⓐ 행 ['NOTI-03']`, exit 1 · numstat `1 1` |
+| **M8** | ⓐ 행 하나의 **production 배선 칸을 비운다**(`—`) | E-23 RED | **RED** exit 1 · numstat `1 1`. r3 에서 `DEC-04` 로 **자리를 바꿔** 재측정 — 앞 라운드는 `NOTI-03` 이었다 |
+| **M9**(r3) | 같은 칸을 **자리채움 `-` 로** 채운다 | E-23 RED | **RED** exit 1 — verifier RT2-L-3 이 「`-` 로 채운 변이가 **초록**」임을 찾았고 `E-23` 에 자리채움 거부(`—`·`-`·`–`·`x`·`?`·`n/a`·20자 미만)를 더해 닫았다 |
 
 **음성 대조**: 복원한 뒤 같은 등식 명령이 다시 `DIFF 0 · exit 0` 이다 — 변이가 게이트를 실제로 움직였고
-복원이 완전했다. **M1·M8 은 r2 의 C-1(7 열) 위에서 재측정**했고 둘 다 RED 다.
+복원이 완전했다. **M1·M8 은 r3 의 C-1 위에서 재측정**했고(둘 다 **앞 라운드와 다른 행**으로 자리를
+옮겼다 — `M1` 은 `QUAL-03`, `M8` 은 `DEC-04`) 둘 다 RED 다.
 
 **M8 을 r2 에 더한 이유**: RT-H-1 의 결함은 「production 배선에서 성립하는가」를 묻지 않은 것이었고, 그
 술어를 문서에 적기만 하면 다음 라운드에 다시 비어도 초록이다. `E-23` 이 그 칸의 **존재**를 닫고 M8 이
