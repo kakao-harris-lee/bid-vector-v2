@@ -7,6 +7,7 @@ import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.adminDataSource
 import bidvector.app.collection.CollectionLog
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayExitCode
@@ -224,7 +225,7 @@ class EvaluationCommitRunE2ETest {
      */
     @BeforeEach
     fun resetRunState() {
-        clearOutbox(dataSource())
+        clearOutbox(adminDataSource(postgres))
         setStrategyRevision(dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
@@ -386,7 +387,7 @@ class EvaluationCommitRunE2ETest {
      * 시간순이 아니다(UUID) — 정렬로는 「그 run 의 행」을 고를 수 없다.
      */
     private fun runOnceAndTakePayload(): String {
-        clearOutbox(dataSource())
+        clearOutbox(adminDataSource(postgres))
         runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
         return notificationRows(dataSource()).single().payload
     }

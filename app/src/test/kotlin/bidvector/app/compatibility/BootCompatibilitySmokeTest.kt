@@ -78,7 +78,7 @@ class BootCompatibilitySmokeTest {
         DispatcherServlet::class.java.name shouldNotBe null
     }
 
-    // D-6E2A-1 — 아홉째 채택 좌표(HikariCP). 설정 객체만 만든다 — 풀을 띄우지도 DB 에 붙지도
+    // M6/6E-2a P-4 — 아홉째 채택 좌표(HikariCP). 설정 객체만 만든다 — 풀을 띄우지도 DB 에 붙지도
     // 않는다(`Flyway 설정이 만들어진다` 항목과 같은 형태).
     @Test
     fun `HikariCP 가 설정 객체를 만든다 — 풀을 띄우지 않는다`() {

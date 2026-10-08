@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.app.adminDataSource
 import bidvector.app.productionApplication
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
@@ -113,18 +113,10 @@ class ProductionAssemblyAuthAuditTest {
      */
     @BeforeEach
     fun resetAudit() {
-        adminDataSource().connection.use { connection ->
+        adminDataSource(postgres).connection.use { connection ->
             connection.createStatement().use { it.execute("TRUNCATE TABLE api_request_audit") }
         }
     }
-
-    /** fixture 초기화 전용 소유자 연결 — 컨테이너 자격으로 직접 만든다(조립 빈이 아니다). */
-    private fun adminDataSource(): DataSource =
-        PGSimpleDataSource().apply {
-            setUrl(postgres.jdbcUrl)
-            user = postgres.username
-            password = postgres.password
-        }
 
     private fun url(path: String): String = "http://localhost:$port$path"
 

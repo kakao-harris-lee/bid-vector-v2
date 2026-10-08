@@ -19,7 +19,7 @@ import javax.sql.DataSource
 /**
  * DataSource·Flyway·전략 repository 조립(scope.md in_scope).
  *
- * **M6/6E-2a D-6E2A-1~3 — 런타임 연결과 migration 연결이 갈라졌다.** 런타임은 HikariCP 풀
+ * **M6/6E-2a P-1~P-3(운영자 결정 A-1~A-3) — 런타임 연결과 migration 연결이 갈라졌다.** 런타임은 HikariCP 풀
  * 하나이고 그 풀의 **물리 연결마다** [CONNECTION_INIT_SQL] 이 돌아 최소 권한 역할
  * ([APPLICATION_ROLE], `V2` 가 `NOLOGIN` 으로 만든다)로 전환된다. migration 은 그 역할이
  * 권한을 갖지 않는 일(`flyway_schema_history` 쓰기·DDL)이므로 **풀을 지나지 않고**

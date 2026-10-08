@@ -38,7 +38,7 @@ class BootJarRuntimeClasspathTest {
     }
 
     /**
-     * D-6E2A-1 — 런타임 `DataSource` 는 풀이다. 좌표 선언을 지우면 배포물에서 사라지고 기동이
+     * M6/6E-2a P-4 — 런타임 `DataSource` 는 풀이다. 좌표 선언을 지우면 배포물에서 사라지고 기동이
      * `NoClassDefFoundError` 로 죽는데, test 런타임 classpath 에는 다른 경로로 남을 수 있어
      * 조립 부팅 test 가 전부 초록인 채 `java -jar` 만 죽는 형태가 가능하다(kotlin-reflect 와
      * 같은 계열의 결함).

@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.adminDataSource
 import bidvector.procurement.Agency
 import bidvector.procurement.AgencyName
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
@@ -101,9 +102,14 @@ class EvaluationDryRunE2ETest {
     private fun dataSource(): DataSource = context.getBean(DataSource::class.java)
 
     /** D-6A1-40 관례 — 매 test 시작 전 이 slice가 건드리는 표를 비운다(test 간 행 격리). */
+    /**
+     * **M6/6E-2a P-5** — fixture 초기화만 소유자 연결이다. production `DataSource` 빈은 최소 권한
+     * 역할로 연결을 내주고 그 역할에는 `TRUNCATE` 권한이 없다. 조립이 실제로 하는 일(HTTP 왕복)은
+     * 그대로 production 빈을 지난다.
+     */
     @BeforeEach
     fun resetTables() {
-        dataSource().connection.use { connection ->
+        adminDataSource(postgres).connection.use { connection ->
             connection.createStatement().use {
                 it.execute(
                     "TRUNCATE TABLE notice, notice_audit, rejected_write, raw_observation, " +

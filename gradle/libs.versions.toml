@@ -92,7 +92,7 @@ spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-
 # **하나로** 들어오고, starter 는 그 밖에 spring-jdbc 자동설정 묶음을 함께 끌고 와 배선의 출처를
 # 가린다. 이 모듈의 선언 의존은 spring-jdbc·boot-sql·boot-transaction 셋뿐이다(POM 실측).
 spring-boot-jdbc = { module = "org.springframework.boot:spring-boot-jdbc" }
-# M6/6E-2a D-6E2A-1 — production `DataSource` 의 커넥션 풀(`OPEN-6A1-CONNECTION-POOL` 처분).
+# M6/6E-2a P-1(운영자 결정 A-1 (a)) — production `DataSource` 의 커넥션 풀(`OPEN-6A1-CONNECTION-POOL` 처분).
 # **starter 가 아니라 풀 좌표 단독**이다(위 `spring-boot-jdbc` 주석). 버전은 Boot BOM 이
 # 관리한다. 이 좌표는 `compatibilitySmoke.expectedModules` 에도 등재돼야 해석·컴파일·로드가
 # 실제로 재진다(app/build.gradle.kts).
