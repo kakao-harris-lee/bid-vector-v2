@@ -83,3 +83,10 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-6** | 수정 라운드 1 수령(`_workspace/m6-6e2b/05_implementer_fix1.md`, 레인 HEAD `e7033ab6`, 마지막 산출물 커밋 = rollback 실측 HEAD `ebe8ebfc`) → **레인 동결**, 판정 SHA = 이 갱신 커밋. 신설 정책 키 넷(그중 `scan.db.max-age-days` 상향은 낡은 DB 로 판정하겠다는 결정). 게이트 술어 변경이므로 **verifier 표적 재검증**: (가) 세 겹 잠금 각각 독립 · (나) 열거값·분석 패키지 하한·DB 메타데이터 술어의 음성 대조 · N5(스캐너 빈 결과 + allowlist 비움 → exit 2) 재현 · 이번 수정이 연 새 표면(정책 키 넷) · S-22e/S-22f 조건 · 종료 코드-runbook 일치 · acceptance(container job · `check`) 판정 SHA 실측 · rollback 유효성 | 팀장 |
+
+## 계약 갱신 r6 (2026-10-09, 팀장 — 표적 재검증 수령 · 승인 전 일괄)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-7** | **verifier 표적 재검증 `ready-for-review` @`1b89c70f`**(`_workspace/m6-6e2b/06_verifier_targeted.md`: container job·`check` exit 0 · r1 우회 닫힘 · 세 겹 잠금 각각 독립 · N5 exit 2 · 스크래치 루트 복원 출처 바이트 대조 부기). medium 셋 · low 둘 · 장부 하나. 재작업 1/5 유지 | 팀장 |
+| **D-6E2B-8** | **승인 전 일괄** — 아래 둘은 **게이트 술어 변경이라 표적 재검증 한 번**: **M-2** trivy 캐시를 샌드박스 안의 빈 `--cache-dir` 로 고정(실행마다 새 DB — `XDG_CACHE_HOME`·`HOME` 경유 캐시 심기 차단) · **M-3** trivy 자신의 치명 오류를 판정 불가(exit 2) 경로로 · L-1 `scan.scanners` 에 `vuln` 필수 · L-2 미래 시각 DB 는 판정 불가. **M-1** 분석 패키지 하한은 「DB 와 실제로 맞춘 패키지」를 재지 않는다(OS 판 불일치 시 finding 이 줄어도 통과) → 정책 주석·runbook §8.2·보고의 주장을 실제 거동으로 **좁히고** 신설 `OPEN-6E2B-OS-MATCH-PREDICATE` + 알려진 제한. 장부: 실측 이미지 ID 를 commands.md 에(app 은 worktree 를 가른다는 실측과 함께) · L-3(동결 뒤 `_workspace` 편집) 사실 등재 | 팀장 |
