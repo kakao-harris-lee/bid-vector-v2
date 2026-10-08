@@ -96,3 +96,10 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-9** | 승인 전 일괄 수령(`_workspace/m6-6e2b/07_implementer_batch.md`, 레인 HEAD `caf8ad64`, rollback 실측 HEAD `ecbb4028`). M-2 는 `--cache-dir` 를 샌드박스에 고정(열거 확장이 아니라 위치를 환경에서 빼앗음) · M-3·L-1·L-2 술어 · M-1 주장 좁힘 + `OPEN-6E2B-OS-MATCH-PREDICATE`(**6E-2c 전에 닫아야 할 항목** — 베이스 상향이 곧 배포판 변경·allowlist 비움의 위험 창). **레인 동결, 판정 SHA = 이 갱신 커밋 → 표적 재검증 2**(술어 변경). 장부 표적 하나: commands.md 의 「app ID 는 트리별로 재현된다」는 따뜻한 layer 캐시 아래 관측이라 재현성 주장이 미입증(팀장 지시 2026-10-09 는 「판정한 바이트」로만) — 등재 후 종결 전 정정 | 팀장 |
+
+## 계약 갱신 r8 (2026-10-09, 팀장 — 표적 재검증 2 수령 · 종결 일괄)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-10** | **verifier 표적 재검증 2 `ready-for-review` @`a7dc7735`**(`_workspace/m6-6e2b/08_verifier_targeted2.md`: container job·`check` exit 0, 새 DB 로 52/15 applied · 0 unlisted; M-2·M-3·L-1·L-2 닫힘, M-1 좁힘 확인, 회귀 0). medium 하나 **M-A**(trivy 가 `$HOME/.trivy/modules` 의 WASM 모듈을 기본으로 읽는다 — 모듈은 post-scan 으로 결과를 고칠 수 있어 만료·stale 없는 면제 축; 로드 경로 실측, end-to-end 미측정) · 장부 L-A(이미지 ID 재현성 주장 과대) | 팀장 |
+| **D-6E2B-11** | **종결 일괄**: M-A `--module-dir` 를 샌드박스의 빈 디렉터리로 고정 + 음성 대조(HOME 에 쓰레기 모듈 → 판정 불변; 대조군: 고정을 뺀 변이에서 로드됨) — 게이트 술어 변경이라 **M-A 한정 표적 재검증** · 레인이 보관한 장부 넷(이미지 ID 문면 → 「이 회차가 판정한 바이트」, 재현성 주장 철회 = L-A · rollback.md 에 `milestone-6.md` 공유 파일 hunk 절차(실행 시 산출) · 등식 문장 「복원 인자 ∪ hunk 처리 공유 파일」 · 「공유 파일에 다른 slice 줄 없음」 문장을 그 전환 조건대로 정정). milestone-6.md 착수·종결 문단은 팀장이 일괄 뒤 쓴다 | 팀장 |
