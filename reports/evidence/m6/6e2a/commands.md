@@ -18,6 +18,7 @@ base `2deb5f9d` · 브랜치 `m6-6e2a/2026-10-08` · 이 레인의 마지막 산
 | 착수 구현 | `4ade8b51` | **exit 0** | 클래스 352 · test 2828 · 실패 0 · skip 4 |
 | 승인 전 일괄(D-6E2A-4) | `72f27528` | **exit 0**(9m 23s) | 입력이 문서·주석·test 정리라 산출물 수치 불변 |
 | PR #66 조치(D-6E2A-9) | `77eddf9b` | **exit 0**(9m) | 클래스 352 · test **2829** · 실패 0 · skip 4 — 늘어난 하나가 아래 음성 대조다 |
+| 표적 재검증 L-4 조치 | `959bd760` | **exit 0**(8m 46s) | 단언 두 줄만 더했다(test 수 불변) |
 
 PR #66 조치 라운드가 더한 test 하나는 **「역할로 읽은 표 모집단은 GRANT 없는 표를 놓친다」** 다.
 `information_schema.tables` 가 권한으로 걸러진 뷰라는 사실을 실측으로 고정한다 — 역할로 읽은 모집단에
@@ -150,6 +151,18 @@ exit $fails
 **음성 대조**: 복원한 뒤 `:app:test`(표적) · `:app:compatibilitySmoke` · `:settlement:moduleDependencyGate`
 가 전부 다시 exit 0 이고 `git status --porcelain` 이 빈 출력이다 — 변이가 실제로 게이트를 움직였고 복원이
 완전했다.
+
+**M7(표적 재검증 L-4) — 「변한 표」 모집단을 역할 뷰로 되돌린다.** `EvaluationCommitRunE2ETest` 의
+Order(2)·(3) 이 읽는 `rowCountsByTable(adminDataSource(postgres))` **넷만** production 빈으로 바꾼다
+(Order(5) 음성 대조의 `asOwner` 는 그대로 — 그 칸은 사각의 **존재**를 재는 자리다). numstat **`4 4`**
+(바꿔치우기) · `:app:test --tests …EvaluationCommitRunE2ETest` **exit 1 · 5 중 3 실패**. 문면이 노린 그대로다 —
+`Collection should contain element "flyway_schema_history"` 가 Order(2)·(3) 에서 각각, 세 번째 실패는
+Order(4) 가 앞 칸의 선행 상태를 받지 못한 파급이다. 복원 뒤 같은 명령 **exit 0** · porcelain 빈 출력.
+
+**이 변이는 한 번 거짓으로 초록이었다 — 그 사실을 남긴다.** 첫 시도는 치환 대상 수를 **4 로 단정**했는데
+실제 출현은 **5**(Order(5) 포함)였고, 그 단정이 깨지면서 **치환이 아예 일어나지 않은 채** test 가 돌아
+「변이 exit 0」이 찍혔다. 적용 여부를 `git diff --numstat` 으로 **먼저** 보는 규율이 그 거짓을 잡았다 —
+변이의 초록은 적용 증거 없이는 아무 뜻이 없다.
 
 **술어가 닿지 않는 상수 하나 — 사실로 등재한다**(code-review r1 M-2). `INITIALIZATION_FAIL_TIMEOUT_MS`
 는 HikariCP 설정 객체의 **기본값과 같은 값**이다. 그래서 그 한 줄을 **지우는 변이는 초록**이고(거동이
