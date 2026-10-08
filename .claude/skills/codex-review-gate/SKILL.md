@@ -79,9 +79,19 @@ CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 20
   exit 1
 }
 "$CODEX_BIN" --version   # 기록용 — 리뷰 메타데이터의 값은 여전히 raw-output 머리글이 정본
+# 사용자 config 의 MCP 서버·plugin 을 호출마다 끈다 — 목록은 config 에서 기계 산출(손 목록 금지).
+# `-c mcp_servers={}` 는 기존 표와 병합돼 아무것도 끄지 않는다(2026-10-09 M6/6E-2a r1 실측: serena 가 호출돼
+# worktree 에 .serena/ 를 만들어 오염 → 그 라운드 무효). config 파일은 고치지 않는다.
+CODEX_OFF=()
+while read -r k; do CODEX_OFF+=(-c "${k}.enabled=false"); done < <(
+  python3 -c 'import tomllib,os; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
+for t in ("mcp_servers","plugins"):
+    for n in d.get(t,{}): print(f"{t}.\"{n}\"")')
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
+  -c sandbox_workspace_write.network_access=false \
+  "${CODEX_OFF[@]}" \
   --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
   -o _workspace/{slice}/codex-verdict.json \
@@ -93,6 +103,8 @@ CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 20
 strict structured output은 모든 property가 required여야 하므로, `line`은 null 허용으로
 바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
 `codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
+
+**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다.
 
 **`model_reasoning_effort`는 반드시 `high`로 고정한다.** 생략하면 CLI 기본값에 의존해
 같은 base...head가 라운드마다 다른 effort로 리뷰되고, 판정이 갈릴 수 있다. M0/0A 3차
