@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.resttestclient.TestRestTemplate
+import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.http.HttpEntity
@@ -101,14 +102,29 @@ class ProductionAssemblyAuthAuditTest {
 
     private val restTemplate: TestRestTemplate = TestRestTemplate()
 
-    /** D-6A1-40 — 매 test 시작 전 표를 비운다(테스트 간 행 격리, `TRUNCATE`는 append-only
-     * 불변식을 어기지 않는다 — production 코드가 아니라 test fixture 초기화다). */
+    /**
+     * D-6A1-40 — 매 test 시작 전 표를 비운다(테스트 간 행 격리, `TRUNCATE`는 append-only
+     * 불변식을 어기지 않는다 — production 코드가 아니라 test fixture 초기화다).
+     *
+     * **M6/6E-2a — 이 자리만 admin 연결이다.** production `DataSource` 는 이제 최소 권한 역할
+     * (`bidvector_app`)로 연결을 내주고 그 역할에는 `TRUNCATE` 권한이 **없다**(V15 GRANT 는
+     * SELECT·INSERT 뿐). 아래 조회들은 그대로 production 빈을 쓴다 — 역할이 읽을 수 있다는 것도
+     * 이 test 가 재는 사실이고, fixture 초기화만 권한 밖이라 자리를 옮긴다.
+     */
     @BeforeEach
     fun resetAudit() {
-        auditDataSource().connection.use { connection ->
+        adminDataSource().connection.use { connection ->
             connection.createStatement().use { it.execute("TRUNCATE TABLE api_request_audit") }
         }
     }
+
+    /** fixture 초기화 전용 소유자 연결 — 컨테이너 자격으로 직접 만든다(조립 빈이 아니다). */
+    private fun adminDataSource(): DataSource =
+        PGSimpleDataSource().apply {
+            setUrl(postgres.jdbcUrl)
+            user = postgres.username
+            password = postgres.password
+        }
 
     private fun url(path: String): String = "http://localhost:$port$path"
 
