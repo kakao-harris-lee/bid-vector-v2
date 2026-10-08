@@ -91,3 +91,10 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2A-7** | **Codex r2 `approve`(0 finding)** @`2a393b62`(`codex-review-20261008T190839Z.json` · preflight 형제; 핀 0.160.1 · gpt-5.5 high · MCP 호출 0). r1 은 사용자 `~/.codex/config.toml` 의 MCP 서버(serena)가 호출돼 리뷰 worktree 에 `.serena/` 를 만들어 오염 → **무효·미저장**, worktree 재생성 뒤 r2. 잔여 위험(Codex 기록): container job·변이 다섯은 Codex 가 재현 못 함(verifier 실측이 정본) · 소유자 자격 값 · adapters 하네스 소유자 실행 — 셋 다 OPEN 으로 등재됨. **종결 조건 충족**: verifier ready-for-review + Codex approve — **사용자 승인(머지)만 남는다**. 재작업 0/5. milestone-6.md 착수·종결 문단은 이 갱신과 같은 커밋 | 팀장 |
+
+## 계약 갱신 r6 (2026-10-09, 팀장 — PR #66 `/code-review` 수령·처분 · 조치 라운드)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-8** | **PR #66 `/code-review`**(리뷰어 다섯 → 20 후보 → 채점 80+ 넷 게시). 게시 넷: **#1** rollback 복원 목록 낡음(실측 뒤 Codex JSON 둘이 ⓪ pathspec 안에 생김 · 유효성 등식 비어 있지 않음) · **#2** milestone 결정 ID 범위(팀장, `6fdcd46a` 로 정정) · **#3** CLAUDE.md 색인 Codex 핀(팀장, `99f2067c` 로 정정) · **#4** `OPEN-6E2A-INIT-FAIL-PREDICATE` 미등재. 게시 문턱 아래(75 이하)지만 실재하는 것도 이 라운드에서 처분: rollback 「하네스 커밋 1」 손 개수 · runbook 머리말 「커넥션 풀」 약속 안 함 · runbook §7 등식 자리 목록 · toml 「HikariCP 없음」 주석 · `rowCountsByTable` 이 역할 아래 권한 필터 `information_schema` 를 읽어 D-6F7-11 단언이 GRANT 없는 표를 못 봄 · `ProductionPoolRoleTest` lateinit `@AfterAll` 가림 · `holdAllConcurrently` Future 버림 · `PoolerLeaseProbeTest` 두 번째 대여 실패 시 첫 연결 누출 · 음성 대조 이름 「직접 연결」 · commands.md 측정 SHA 가 일괄 전 | 팀장 |
+| **D-6E2A-9** | **조치 라운드(레인)**: #1 Codex 판정 JSON 은 append-only 리뷰 기록이라 **⓪ pathspec 에서 사유와 함께 제외**(scope.md·rollback.md 와 같은 취급) + 하네스 커밋 수는 명령 산출로만(숫자 박지 않음) + 머리말 문면 사실화 + 유효성 등식 재실행 · #4 checklist OPEN 처분표·runbook §6 등재 · 문서 셋(머리말·§7·toml) · test 넷(`rowCountsByTable` → admin 연결 · lateinit 가림 · Future 전파 · 누출·이름) · commands.md 에 일괄 뒤 `check`·등식 결과 기록. **out_scope 처분(코드 무편집)**: `ApiAuditStore` KDoc 낡음 → checklist 알려진 제한 · V2 시퀀스 GRANT 스냅샷이 역할 접속 뒤 런타임 위험이 됨(오늘 키는 전부 IDENTITY) → 알려진 제한 · 풀 반납 시 advisory unlock 실패의 잠금 잔존 → 알려진 제한. 조치 뒤 **test 변경 표적 재검증(verifier)** — Codex approve 는 `2a393b62` 기준이고 그 뒤 변경은 test 견고성·문서이므로 Codex 재심은 운영자 요청 시 | 팀장 |
