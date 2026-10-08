@@ -261,6 +261,15 @@ SCAN_FILE="${REPORT_DIR_ABS}/${IMAGE_KIND}-scan.json"
 #   ① trivy 를 **빈 임시 디렉터리**에서 돌린다 → cwd 의 `trivy.yaml`·`.trivyignore` 가 없다
 #   ② 그래도 `--config`·`--ignorefile` 로 **빈 파일을 명시**한다 → 기본 탐색 자체가 일어나지 않는다
 # 적대 cwd(둘 다 심은 디렉터리)에서 ② 만으로도 finding 집합이 보존됨을 실측했다.
+# **판정 불가는 차단이 아니다 — exit 2 다**(code-review r1 M-5). 운영자는 runbook §8.2 를 읽고 exit 1 을
+# 보면 「올리거나 등재하라」로 가는데, 재지 못한 경우에 할 일은 **스캐너가 왜 못 읽었는지 보는 것**이다.
+# 종료 코드가 처방을 가르는 유일한 축이므로 그 둘이 어긋나면 안 된다.
+_undecidable() {
+  echo "판정 불가: $1" >&2
+  echo "== 취약점 게이트 판정 불가(exit 2) — 이것은 「취약점이 있다」가 아니라 「재지 못했다」다 ==" >&2
+  exit 2
+}
+
 TRIVY_SANDBOX="$(mktemp -d)"
 cleanup_sandbox() { rm -rf "$TRIVY_SANDBOX"; }
 trap cleanup_sandbox EXIT
@@ -268,11 +277,19 @@ EMPTY_CONFIG="${TRIVY_SANDBOX}/empty-trivy.yaml"
 EMPTY_IGNOREFILE="${TRIVY_SANDBOX}/empty-trivyignore"
 : > "$EMPTY_CONFIG"
 : > "$EMPTY_IGNOREFILE"
-mkdir -p "${TRIVY_SANDBOX}/work"
+mkdir -p "${TRIVY_SANDBOX}/work" "${TRIVY_SANDBOX}/cache"
 
-# 모든 trivy 호출이 이 함수를 지난다 — 잠금이 호출마다 손으로 반복되면 하나를 빠뜨리는 날이 온다.
+# **캐시도 샌드박스 안의 빈 디렉터리로 명시한다**(verifier 표적 M-2). env 잠금은 `TRIVY_` 접두 **열거**라
+# 같은 일을 하는 `XDG_CACHE_HOME`·`HOME` 이 남아 있었다 — 메타데이터는 신선한데 내용만 비운 DB 를 그
+# 경로로 심으면 trivy 가 다운로드를 건너뛰고, DB 술어도 분석 하한도 전부 통과한 채 finding 만 0 이 된다
+# (실측). 열거를 늘리는 대신 **캐시 자리를 우리가 정한다**: 그러면 B-5 (a) 의 「실행마다 받는다」가
+# 술어가 아니라 **구성으로** 참이 되고, 바깥 캐시가 가리키는 자리가 아예 쓰이지 않는다.
+#
+# 대가: 게이트 실행마다 DB 를 새로 받는다(한 실행 안의 호출 셋은 같은 캐시를 공유하므로 한 번이다).
+# 그것이 이 축에서 맞는 비용이다 — 「받았다고 적힌 DB」와 「실제로 쓴 DB」가 갈릴 자리를 없앤다.
 _trivy() {
-  ( cd "${TRIVY_SANDBOX}/work" && trivy --config "$EMPTY_CONFIG" "$@" )
+  ( cd "${TRIVY_SANDBOX}/work" \
+    && trivy --config "$EMPTY_CONFIG" --cache-dir "${TRIVY_SANDBOX}/cache" "$@" )
 }
 
 echo "== 이미지 취약점 게이트: ${IMAGE_REF} (kind=${IMAGE_KIND}) =="
@@ -325,16 +342,6 @@ ANALYZED_PACKAGES="$(jq '[.Results[]? | (.Packages // [])[]] | length' "$SCAN_FI
 
 failures=0
 fail() { echo "취약점 게이트 위반: $1" >&2; failures=$((failures + 1)); }
-
-# **판정 불가는 차단이 아니다 — exit 2 다**(code-review r1 M-5). 앞 판은 하한 미달을 `fail`(exit 1)로
-# 보내면서 문면은 「판정 불가」라고 적었다. 운영자는 runbook §8.2 를 읽고 exit 1 을 보면 「올리거나
-# 등재하라」로 가는데, 실제로 할 일은 **스캐너가 왜 못 읽었는지 보는 것**이다. 종료 코드가 처방을
-# 가르는 유일한 축이므로 그 둘이 어긋나면 안 된다.
-_undecidable() {
-  echo "판정 불가: $1" >&2
-  echo "== 취약점 게이트 판정 불가(exit 2) — 이것은 「취약점이 있다」가 아니라 「재지 못했다」다 ==" >&2
-  exit 2
-}
 
 # **취약점 DB 메타데이터 술어 (D-6E2B-5 나③, code-review r1 M-2).** 앞 판은 세 값을 전부
 # `// "unknown"` 으로 떨어뜨려 요약에만 찍었다 — **DB 가 아예 없거나 갱신이 멎었어도 초록**이었다.
