@@ -64,3 +64,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-2** | 구현 레인 완료 보고 수령(`_workspace/m6-6e2b/02_implementer_report.md`, 레인 HEAD `95e738f7`) → **레인 동결**. 판정 대상 SHA = 이 계약 갱신 커밋. 레인 실측: container job 재현 · `check` · rollback ①~⑥ @`c4f22dd1` exit 0, `check` @`95e738f7` exit 0, 음성 대조 여섯 RED, 양성 1회. 판정 레인: verifier(opus) + code-reviewer(sonnet) 병렬 | 팀장 |
+
+## 계약 갱신 r3 (2026-10-09, 팀장 — 판정 SHA 이동)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-3** | 동결(r2) 뒤 레인 커밋 둘 — `1d019fa3`(allowlist 사유 문면을 D-6E2B-1 뒤 상태로; 팀장 r1 지시의 늦은 반영) · `cb413d9c`(rollback 재실측, 실측 HEAD `1d019fa3`). **동결 위반으로 사실 기록**, 이력 되쓰지 않음. 판정 SHA 를 이 갱신 커밋으로 올린다; verifier 는 `ae2a8397` 판정 위에 델타(사유 문면·evidence 한정 · 게이트 계수 불변 · rollback 유효성)를 더한다 | 팀장 |
