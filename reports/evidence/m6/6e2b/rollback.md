@@ -41,8 +41,8 @@ git restore --source=2deb5f9d --staged --worktree -- \
 ## 되돌린 뒤 남는 상태
 
 CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고, 이미지 위생(S-22a/b)과 나머지
-축은 그대로다. 완료 조건 8 은 **다시 절반**(secret scan 만)이 되고 `OPEN-6C-IMAGE-VULN-SCAN` 이 다시
-열린다. 비활성화만 원한다면 되돌리지 않고 `ci.yml` 의 S-22d·S-22e 두 step 만 빼도 된다 —
+축은 그대로다. 완료 조건 8 은 **다시 절반**(저장소 텍스트를 보는 기존 축만 — `leakPatternGate`)이
+되고 `OPEN-6C-IMAGE-VULN-SCAN` 이 다시 열린다. 비활성화만 원한다면 되돌리지 않고 `ci.yml` 의 S-22d·S-22e 두 step 만 빼도 된다 —
 그 경우 SBOM 보관(S-22f)이 올릴 파일이 없어 `if-no-files-found: error` 로 붉어지므로 셋을 함께 뺀다.
 
 ## ①~⑥ 실측 (버릴 임시 clone, HEAD `c4f22dd1`)
