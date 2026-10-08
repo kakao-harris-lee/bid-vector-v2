@@ -241,8 +241,7 @@ class EvaluationCommitRunE2ETest {
      * 「변한 표 == {outbox}」가 D-6F7-11 의 「도메인 write 만 커밋되고 outbox 행이 없다」가 오늘
      * 성립하지 않는다는 사실의 측정이다 — 오늘 평가에는 outbox 밖 write 가 없다. 판정 기록 표가
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
-     */
-    /**
+     *
      * **M6/6E-2a PR #66 — 표 목록은 admin 연결로 읽는다.** `information_schema.tables` 는 **권한으로
      * 걸러진 뷰**다. 최소 권한 역할로 읽으면 그 역할에 GRANT 가 없는 표가 **목록에서 사라지고**,
      * 「변한 표 == {outbox}」는 그런 표에 생긴 write 를 보지 못한 채 참이 된다 — 단언이 조용히 약해지는
@@ -342,18 +341,10 @@ class EvaluationCommitRunE2ETest {
     }
 
     /**
-     * ③ — **outbox 쓰기 실패 주입.** `NotificationRequested` payload 의 INSERT 를 거부하는
-     * CHECK 제약을 걸어 `OutboxNotificationRequestPort` 가 `SQLException → Failed` 로 가게
-     * 하고, 그 값이 `tallyOf` 를 지나 러너의 **비-0 종료 코드**로 올라오는지 잰다.
-     *
-     * 이 사슬의 가운데 고리(`tallyOf`)가 앞 판에서 미측정이었다 — `outcomeOf` 의 두 갈래를
-     * 뒤집는 변이가 전 test 초록이었다(cr L-2).
-     */
-    /**
-     * **음성 대조 — 그 사각이 실재한다.** 위 단언이 admin 연결을 쓰는 이유를 말로만 두지 않는다:
-     * 같은 질의를 **production 빈**(= 최소 권한 역할)으로 돌리면 모집단에서 표가 빠지고, 빠지는 것
-     * 가운데 `flyway_schema_history` 가 있다 — 그 역할에 GRANT 가 **하나도 없는** 표다. 이 칸이 없으면
-     * 「admin 으로 읽는다」는 선택이 근거 없는 취향과 구별되지 않는다.
+     * **음성 대조 — 그 사각이 실재한다**(PR #66). 위 「변한 표」 단언이 admin 연결을 쓰는 이유를 말로만
+     * 두지 않는다: 같은 질의를 **production 빈**(= 최소 권한 역할)으로 돌리면 모집단에서 표가 빠지고,
+     * 빠지는 것 가운데 `flyway_schema_history` 가 있다 — 그 역할에 GRANT 가 **하나도 없는** 표다. 이
+     * 칸이 없으면 「admin 으로 읽는다」는 선택이 근거 없는 취향과 구별되지 않는다.
      *
      * 읽기만 하므로 순서에 영향을 주지 않는다.
      */
@@ -368,6 +359,14 @@ class EvaluationCommitRunE2ETest {
         (asRole - asOwner).shouldBeEmpty()
     }
 
+    /**
+     * ③ — **outbox 쓰기 실패 주입.** `NotificationRequested` payload 의 INSERT 를 거부하는
+     * CHECK 제약을 걸어 `OutboxNotificationRequestPort` 가 `SQLException → Failed` 로 가게
+     * 하고, 그 값이 `tallyOf` 를 지나 러너의 **비-0 종료 코드**로 올라오는지 잰다.
+     *
+     * 이 사슬의 가운데 고리(`tallyOf`)가 앞 판에서 미측정이었다 — `outcomeOf` 의 두 갈래를
+     * 뒤집는 변이가 전 test 초록이었다(cr L-2).
+     */
     @Test
     @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
