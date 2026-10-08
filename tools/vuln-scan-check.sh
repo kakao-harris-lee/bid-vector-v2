@@ -324,6 +324,10 @@ done <<< "$ALLOW_LINES"
 # 치우기를 강제한다. 차단 후보 집합을 기준으로 재므로 `block.severities` 를 좁히면 그 바깥
 # severity 의 등재가 곧바로 stale 로 잡힌다.
 candidate_keys="$(printf '%s\n' "$CANDIDATES" | sed '/^[[:space:]]*$/d' | awk -F'|' '{print $1 "|" $2}' | sort -u)"
+# 요약에 **판정 단위(ID+패키지)의 수**를 따로 싣는다. 위 `CANDIDATE_COUNT` 는 수정판 문자열까지
+# 포함한 행 수라 같은 (ID, 패키지)가 여러 Result 에서 다른 수정판을 달면 둘이 갈린다 — 그때
+# 「후보 N 대 적용 N」을 기대하면 멀쩡한 통과가 어긋나 보인다. 적용 수와 비교할 짝은 이쪽이다.
+CANDIDATE_KEY_COUNT="$(_count_lines "$candidate_keys")"
 allow_applied=0
 for entry in "${allow_this_kind[@]:-}"; do
   [ -n "$entry" ] || continue
@@ -352,7 +356,7 @@ echo "-- 실측 요약 --"
 echo "정책=${POLICY_FILE} kind=${IMAGE_KIND} image_id=${IMAGE_ID}"
 echo "trivy=${TRIVY_VERSION} vuln-db-version=${VULN_DB_VERSION} vuln-db-updated-at=${VULN_DB_UPDATED_AT} vuln-db-next-update=${VULN_DB_NEXT_UPDATE}"
 echo "sbom=${SBOM_FILE}(구성요소 ${SBOM_COMPONENTS}, 하한 ${MIN_PACKAGES}) scan=${SCAN_FILE}"
-echo "findings_total=${TOTAL_FINDINGS} 차단후보(${BLOCK_SEVERITIES}, only-fixed=${BLOCK_ONLY_FIXED})=${CANDIDATE_COUNT} allowlist_전체=${allow_entry_count} 이_kind_적용=${allow_applied} 미등재=${BLOCKING_COUNT}"
+echo "findings_total=${TOTAL_FINDINGS} 차단후보(${BLOCK_SEVERITIES}, only-fixed=${BLOCK_ONLY_FIXED})=${CANDIDATE_COUNT} 판정단위[ID+패키지]=${CANDIDATE_KEY_COUNT} allowlist_전체=${allow_entry_count} 이_kind_적용=${allow_applied} 미등재=${BLOCKING_COUNT}"
 
 if [ "$failures" -gt 0 ]; then
   echo "== 취약점 게이트 실패: ${failures}건 ==" >&2
