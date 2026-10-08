@@ -90,3 +90,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 |---|---|---|
 | **D-6E2B-7** | **verifier 표적 재검증 `ready-for-review` @`1b89c70f`**(`_workspace/m6-6e2b/06_verifier_targeted.md`: container job·`check` exit 0 · r1 우회 닫힘 · 세 겹 잠금 각각 독립 · N5 exit 2 · 스크래치 루트 복원 출처 바이트 대조 부기). medium 셋 · low 둘 · 장부 하나. 재작업 1/5 유지 | 팀장 |
 | **D-6E2B-8** | **승인 전 일괄** — 아래 둘은 **게이트 술어 변경이라 표적 재검증 한 번**: **M-2** trivy 캐시를 샌드박스 안의 빈 `--cache-dir` 로 고정(실행마다 새 DB — `XDG_CACHE_HOME`·`HOME` 경유 캐시 심기 차단) · **M-3** trivy 자신의 치명 오류를 판정 불가(exit 2) 경로로 · L-1 `scan.scanners` 에 `vuln` 필수 · L-2 미래 시각 DB 는 판정 불가. **M-1** 분석 패키지 하한은 「DB 와 실제로 맞춘 패키지」를 재지 않는다(OS 판 불일치 시 finding 이 줄어도 통과) → 정책 주석·runbook §8.2·보고의 주장을 실제 거동으로 **좁히고** 신설 `OPEN-6E2B-OS-MATCH-PREDICATE` + 알려진 제한. 장부: 실측 이미지 ID 를 commands.md 에(app 은 worktree 를 가른다는 실측과 함께) · L-3(동결 뒤 `_workspace` 편집) 사실 등재 | 팀장 |
+
+## 계약 갱신 r7 (2026-10-09, 팀장 — 일괄 수령·동결 · 표적 재검증 2)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-9** | 승인 전 일괄 수령(`_workspace/m6-6e2b/07_implementer_batch.md`, 레인 HEAD `caf8ad64`, rollback 실측 HEAD `ecbb4028`). M-2 는 `--cache-dir` 를 샌드박스에 고정(열거 확장이 아니라 위치를 환경에서 빼앗음) · M-3·L-1·L-2 술어 · M-1 주장 좁힘 + `OPEN-6E2B-OS-MATCH-PREDICATE`(**6E-2c 전에 닫아야 할 항목** — 베이스 상향이 곧 배포판 변경·allowlist 비움의 위험 창). **레인 동결, 판정 SHA = 이 갱신 커밋 → 표적 재검증 2**(술어 변경). 장부 표적 하나: commands.md 의 「app ID 는 트리별로 재현된다」는 따뜻한 layer 캐시 아래 관측이라 재현성 주장이 미입증(팀장 지시 2026-10-09 는 「판정한 바이트」로만) — 등재 후 종결 전 정정 | 팀장 |
