@@ -213,6 +213,40 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # M6/6E-2b B-2 — 이미지 취약점 게이트가 `trivy` 를 실행 파일로 부른다(SBOM 생성 + 스캔).
+      # **`aquasecurity/trivy-action`·`setup-trivy` 를 쓰지 않는다.** 사유 둘 — ① 액션 안의 trivy
+      # 버전은 워크플로에 보이지 않아 정책 파일과 조용히 어긋나는 **둘째 버전 축**이 된다
+      # ② 2026-03-19 공급망 사고에서 **먼저 무너진 것이 바로 그 액션 태그들**이다(공식 권고
+      # GHSA-69fq-xp46-6x23 — 액션 태그 전부가 악성 커밋으로 force-push 됐고 바이너리 쪽 피해는
+      # 한 판에 그쳤다). `install buf` 선례대로 릴리스 바이너리를 직접 받는다.
+      #
+      # **체크섬 대조의 기준은 릴리스가 함께 내는 목록이 아니라 이 저장소에 핀한 값**이다.
+      # 자산이 뒤에 바뀌면 그 목록도 함께 바뀌므로 목록 대조만으로는 바뀐 것을 잡지 못한다.
+      # 버전·자산 이름·체크섬 셋 다 정책 파일이 정한다 — 워크플로에 숫자를 적지 않는다.
+      - name: install trivy
+        run: |
+          set -euo pipefail
+          policy=config/quality/vuln-policy.properties
+          version="$(sed -n 's/^tool\.trivy\.version=//p' "$policy")"
+          asset="$(sed -n 's/^tool\.trivy\.asset=//p' "$policy")"
+          pinned="$(sed -n 's/^tool\.trivy\.sha256=//p' "$policy")"
+          if [ -z "$version" ] || [ -z "$asset" ] || [ -z "$pinned" ]; then
+            echo "$policy 에서 tool.trivy.version/asset/sha256 을 전부 읽지 못했다" >&2
+            exit 1
+          fi
+          tmp="$(mktemp -d)"
+          curl -fsSL -o "$tmp/$asset" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${version}/${asset}"
+          printf '%s  %s\n' "$pinned" "$asset" > "$tmp/pinned.sha256"
+          ( cd "$tmp" && sha256sum -c pinned.sha256 )
+          tar -xzf "$tmp/$asset" -C "$tmp" trivy
+          mkdir -p "$RUNNER_TEMP/bin"
+          install -m 0755 "$tmp/trivy" "$RUNNER_TEMP/bin/trivy"
+          rm -rf "$tmp"
+          # PATH 등재는 다음 step 부터 듣는다 — 이 step 의 스모크는 절대 경로로 건다.
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/trivy" --version
+
       # M6/6A-2a r1(code-review LOW) — `::add-mask::` 를 먼저 붙인다. argv 축은 아래 주석대로
       # 닫혀 있지만, 더 실질적인 축은 **공개 워크플로 로그**다: 스모크의 `fail()` 이 앱 로그를
       # 찍고 Boot 의 바인딩 실패 보고는 속성 값을 문면에 낼 수 있다. 마스크는 그 경로를 값이
@@ -318,6 +352,30 @@ jobs:
             *) echo "거부 문면이 운반 이름공간 키를 말하지 않는다" >&2; _markers; exit 1 ;;
           esac
           echo "== 거부 스모크 통과(exit=${rc}) =="
+
+      # M6/6E-2b — 완료 조건 8 의 나머지 절반(`OPEN-6C-IMAGE-VULN-SCAN`, D-6C-5 「흉내만 낸
+      # 스캔은 상시 초록 게이트가 된다」). 위 S-22a/b 가 「무엇이 이미지에 들어 있나」를 쟀다면
+      # 이 둘은 **그 안의 패키지에 알려진 결함이 있는가**를 잰다. 두 이미지를 다 돌리는 것이
+      # 중요하다 — 베이스도 패키지 생태계도 서로 다르고, allowlist 키가 kind 를 성분으로 갖는
+      # 이유가 그것이다. 판정 기준(차단 severity·수정본 유무·만료 상한)은 전부 정책 파일에 있다.
+      - name: 이미지 취약점 게이트 — ml-serving (S-22d)
+        run: ./tools/vuln-scan-check.sh bidvector/ml-serving:local ml-serving config/quality/vuln-policy.properties
+
+      - name: 이미지 취약점 게이트 — 앱 (S-22e)
+        run: ./tools/vuln-scan-check.sh bidvector/app:local app config/quality/vuln-policy.properties
+
+      # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
+      # `if: always()` 인 이유는 **게이트가 막았을 때가 곧 SBOM 이 필요한 때**이기 때문이다.
+      # 파일이 하나도 없으면 실패시킨다 — 빈 artifact 를 올리고 초록인 것은 보관하지 않은 것과
+      # 같다. major 는 위 `check` job 의 같은 액션과 맞춘다(v6 = Node 24 최소선, 그쪽 주석 참조).
+      - name: SBOM 보관 — CycloneDX, 이미지 둘 (S-22f)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: sbom-cyclonedx
+          path: build/vuln-scan/*-sbom.cdx.json
+          retention-days: 90
+          if-no-files-found: error
 
       - name: 로컬 환경 기동 — app+ml-serving+postgres 가 healthy 로 수렴 (S-23)
         run: |
