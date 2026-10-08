@@ -456,7 +456,9 @@ while IFS= read -r line; do
     echo "allowlist 만료일이 실재하는 날짜가 아니다: '${entry_expiry}'" >&2
     exit 2
   fi
-  if [ "$entry_reason" = "$entry_value" ] || [ -z "${entry_reason// /}" ]; then
+  # r1(code-review L-7) — 스페이스만 지우면 **탭 하나뿐인 사유**가 통과한다. 이 파일의 다른 모양
+  # 검사들이 전부 허용 문자 집합으로 뒤집어 쓴 것과 어긋나던 한 자리다.
+  if [ "$entry_reason" = "$entry_value" ] || [ -z "${entry_reason//[[:space:]]/}" ]; then
     echo "allowlist 등재에 사유가 없다(만료일만 있는 등재는 등재가 아니다): '${entry_key}'" >&2
     exit 2
   fi
