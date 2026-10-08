@@ -430,28 +430,44 @@ jobs:
           _code() { printf '%s' "$1" | tail -n1; }
           _body() { printf '%s' "$1" | sed '$d'; }
 
-          before="$(_api_get /api/strategy)"
-          [ "$(_code "$before")" = "200" ] || fail "쓰기 전 GET /api/strategy 가 200 이 아니다"
-          revision="$(_body "$before" | jq -r '.revision')"
+          # F3(PR #65 /code-review) — 두 왕복이 같은 네 단계(begin → value → confirm → 반영 확인)를
+          # 거의 똑같이 적고 있었다. 한 helper 로 모은다. `$1` 필드 토큰 · `$2` `count` 값 ·
+          # `$3` 조회 본문의 확인 칸 이름. **기준 revision 은 산술로 짐작하지 않고 매번 다시 읽는다**
+          # (앞 왕복 수가 바뀔 때 조용히 409 로 떨어진다). 읽기 전에 코드를 단언한다 — 전송 오류면
+          # 본문이 빈 문자열이 되고 `jq` 가 출력 없이 exit 0 이라, 단언이 없으면 뒤 판정의 문면이
+          # 원인을 지운다(r1 cr G-4 와 같은 결함 클래스).
+          _edit_field() {
+            local field="$1" count="$2" view_key="$3" tag="$4"
+            local before seen begun session provided confirmed after
+            before="$(_api_get /api/strategy)"
+            [ "$(_code "$before")" = "200" ] || fail "$field 왕복 전 GET /api/strategy 가 200 이 아니다: $(_code "$before")"
+            seen="$(_body "$before" | jq -r '.revision')" || fail "$field 왕복 전 revision 판독 실패"
+            case "$seen" in ''|*[!0-9]*) fail "$field 왕복 전 revision 이 수가 아니다: [$seen]" ;; esac
 
-          printf '{"field":"CANDIDATE_LIMIT"}' > "$bodies/begin.json"
-          begun="$(_api_post /api/strategy/edit-sessions "$bodies/begin.json")"
-          [ "$(_code "$begun")" = "201" ] || fail "begin 이 201 이 아니다: $(_code "$begun")"
-          session="$(_body "$begun" | jq -r '.sessionId')"
-          [ -n "$session" ] && [ "$session" != "null" ] || fail "begin 응답에 sessionId 가 없다"
+            printf '{"field":"%s"}' "$field" > "$bodies/$tag-begin.json"
+            begun="$(_api_post /api/strategy/edit-sessions "$bodies/$tag-begin.json")"
+            [ "$(_code "$begun")" = "201" ] || fail "$field begin 이 201 이 아니다: $(_code "$begun")"
+            session="$(_body "$begun" | jq -r '.sessionId')" || fail "$field begin 응답 판독 실패"
+            [ -n "$session" ] && [ "$session" != "null" ] || fail "$field begin 응답에 sessionId 가 없다"
 
-          printf '{"commandId":"smoke-v1","field":"CANDIDATE_LIMIT","count":13}' > "$bodies/value.json"
-          provided="$(_api_post "/api/strategy/edit-sessions/$session/value" "$bodies/value.json")"
-          [ "$(_code "$provided")" = "200" ] || fail "value 가 200 이 아니다: $(_code "$provided")"
+            printf '{"commandId":"smoke-%s-v","field":"%s","count":%s}' "$tag" "$field" "$count" > "$bodies/$tag-value.json"
+            provided="$(_api_post "/api/strategy/edit-sessions/$session/value" "$bodies/$tag-value.json")"
+            [ "$(_code "$provided")" = "200" ] || fail "$field value 가 200 이 아니다: $(_code "$provided")"
 
-          printf '{"commandId":"smoke-c1","seenRevision":%s}' "$revision" > "$bodies/confirm.json"
-          confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/confirm.json")"
-          [ "$(_code "$confirmed")" = "200" ] || fail "confirm 이 200 이 아니다: $(_code "$confirmed")"
-          [ "$(_body "$confirmed" | jq -r '.state')" = "APPLIED" ] || fail "confirm 뒤 state 가 APPLIED 가 아니다"
+            printf '{"commandId":"smoke-%s-c","seenRevision":%s}' "$tag" "$seen" > "$bodies/$tag-confirm.json"
+            confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/$tag-confirm.json")"
+            [ "$(_code "$confirmed")" = "200" ] || fail "$field confirm 이 200 이 아니다: $(_code "$confirmed")"
+            # F3 — `APPLIED` 단언을 **두 왕복 다** 한다(앞 판은 첫 왕복에만 있었다). 200 만 보면
+            # 커널이 적용 없이 세션을 닫는 변이를 놓친다.
+            [ "$(_body "$confirmed" | jq -r '.state')" = "APPLIED" ] || fail "$field confirm 뒤 state 가 APPLIED 가 아니다"
 
-          after="$(_api_get /api/strategy)"
-          [ "$(_body "$after" | jq -r '.candidateLimit')" = "13" ] || fail "쓰기 값이 조회에 반영되지 않았다"
-          [ "$(_body "$after" | jq -r '.revision')" = "$((revision + 1))" ] || fail "revision 이 1 오르지 않았다"
+            after="$(_api_get /api/strategy)"
+            [ "$(_code "$after")" = "200" ] || fail "$field 반영 확인 GET /api/strategy 가 200 이 아니다: $(_code "$after")"
+            [ "$(_body "$after" | jq -r ".$view_key")" = "$count" ] || fail "$field 쓰기 값이 조회에 반영되지 않았다"
+            [ "$(_body "$after" | jq -r '.revision')" = "$((seen + 1))" ] || fail "$field 뒤 revision 이 1 오르지 않았다"
+          }
+
+          _edit_field CANDIDATE_LIMIT 13 candidateLimit cl
 
           echo "-- 무인증 쓰기 401 · 미선언 메서드 405 --"
           code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
@@ -478,29 +494,7 @@ jobs:
           # 전략을 읽으므로 상한이 없으면 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED` 로 fail-closed 다
           # (0 으로도 무한으로도 지어내지 않는다).
           echo "-- 여력 상한 세우기: begin → value → confirm (dry-run 200 의 전제) --"
-          printf '{"field":"MAX_ACTIVE_BIDS"}' > "$bodies/begin-max.json"
-          begun="$(_api_post /api/strategy/edit-sessions "$bodies/begin-max.json")"
-          [ "$(_code "$begun")" = "201" ] || fail "MAX_ACTIVE_BIDS begin 이 201 이 아니다: $(_code "$begun")"
-          session="$(_body "$begun" | jq -r '.sessionId')"
-          [ -n "$session" ] && [ "$session" != "null" ] || fail "MAX_ACTIVE_BIDS begin 응답에 sessionId 가 없다"
-
-          printf '{"commandId":"smoke-m1","field":"MAX_ACTIVE_BIDS","count":5}' > "$bodies/value-max.json"
-          provided="$(_api_post "/api/strategy/edit-sessions/$session/value" "$bodies/value-max.json")"
-          [ "$(_code "$provided")" = "200" ] || fail "MAX_ACTIVE_BIDS value 가 200 이 아니다: $(_code "$provided")"
-
-          # `revision + 2` 를 계산하지 않고 **다시 읽는다** — 낙관적 잠금의 기준값을 산술로 짐작하면
-          # 앞 왕복의 개수가 바뀔 때 조용히 409 로 떨어진다. 읽기 **전에** 코드를 단언한다(cr r1 G-4):
-          # 전송 오류면 본문이 빈 문자열이 되고 `jq -r '.revision'` 은 출력 없이 exit 0 이라, 단언이
-          # 없으면 confirm 본문이 깨져 「confirm 이 200 이 아니다: 400」 으로 **원인이 지워진다**.
-          seen_read="$(_api_get /api/strategy)"
-          [ "$(_code "$seen_read")" = "200" ] || fail "상한 confirm 전 GET /api/strategy 가 200 이 아니다: $(_code "$seen_read")"
-          seen="$(_body "$seen_read" | jq -r '.revision')"
-          printf '{"commandId":"smoke-m2","seenRevision":%s}' "$seen" > "$bodies/confirm-max.json"
-          confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/confirm-max.json")"
-          [ "$(_code "$confirmed")" = "200" ] || fail "MAX_ACTIVE_BIDS confirm 이 200 이 아니다: $(_code "$confirmed")"
-          max_read="$(_api_get /api/strategy)"
-          [ "$(_code "$max_read")" = "200" ] || fail "상한 반영 확인 GET /api/strategy 가 200 이 아니다: $(_code "$max_read")"
-          [ "$(_body "$max_read" | jq -r '.maxActiveBids')" = "5" ] || fail "여력 상한이 조회에 반영되지 않았다"
+          _edit_field MAX_ACTIVE_BIDS 5 maxActiveBids mab
 
           echo "-- 평가 dry-run 왕복: 200 · 본문 키 아홉 · outbox 행 수 전후 등식 (G-4) --"
           # DB 질의는 S-23c 리허설과 같은 형태다 — 컨테이너 **안**의 유닉스 소켓이고 공식 postgres
@@ -526,7 +520,8 @@ jobs:
           if [ "$(_code "$dry")" != "200" ]; then
             fail "dry-run 이 200 이 아니다: $(_code "$dry") 키 [$(_body "$dry" | jq -r 'keys|sort|join(",")' 2>/dev/null || echo parse-error)] code $(_body "$dry" | jq -r '.code // "none"' 2>/dev/null || echo parse-error)"
           fi
-          keys="$(_body "$dry" | jq -r 'keys | sort | join(",")')"
+          keys="$(_body "$dry" | jq -r 'keys | sort | join(",")')" \
+            || fail "dry-run 본문을 JSON 으로 읽지 못했다(키 집합 판정 불가)"
           dry_run_keys="bidNowNoticeIds,candidateCount,currentActiveBids,maxActiveBids,notReachedNoticeIds,reviewNoticeIds,skipNoticeIds,strategyRevision,wouldNotifyNoticeIds"
           [ "$keys" = "$dry_run_keys" ] || fail "dry-run 본문 키 집합이 openapi required 아홉과 다르다: [$keys]"
           [ "$(_body "$dry" | jq -r '.maxActiveBids')" = "5" ] || fail "dry-run 이 방금 세운 여력 상한을 읽지 않았다"
@@ -579,7 +574,9 @@ jobs:
 
       # M6/6B-2 D-6B2-1(A-2 (a)) — 완료 조건 7 의 「rollback/restore rehearsal 증거」를 매 PR 에
       # 실측으로 만든다. **이 자리인 이유는 앞 step 이 남긴 상태다**: S-23b 의 쓰기 왕복이
-      # `operator_strategy` 에 식별 가능한 행(`candidateLimit=13`·`revision+1`)을 남기고,
+      # `operator_strategy` 에 식별 가능한 행을 남기고 — **왕복이 둘이므로 종료 상태는
+      # `candidateLimit=13` · `max_active_bids=5` · `revision+2` 다**(F6, PR #65 /code-review: 앞 판은
+      # G-4 가 더한 둘째 왕복을 셈에 넣지 않아 `revision+1` 로 적혀 있었다) —
       # 리허설의 데이터 손실 축이 바로 그 값이 백업으로 돌아오는지를 잰다. 그 행이 없으면
       # 리허설은 「쓰기 왕복이 선행하지 않았다」로 끊는다 — step 순서가 단언으로 잠긴다.
       #
