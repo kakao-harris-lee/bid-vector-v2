@@ -227,6 +227,12 @@ MIN_PACKAGES="$(_policy_value "scan.min-packages.${IMAGE_KIND}" numeric)"
 # **finding 수 하한이 아니다**: 「취약점이 몇 건 이상이어야 한다」는 이미지가 정말 깨끗해지는 날
 # 거짓이 된다. 「분석한 패키지가 몇 개 이상이어야 한다」는 그날에도 참이다.
 MIN_ANALYZED_PACKAGES="$(_policy_value "scan.min-analyzed-packages.${IMAGE_KIND}" numeric)"
+DB_MAX_AGE_DAYS="$(_policy_value scan.db.max-age-days numeric)"
+# Java DB 는 jar 층을 다루는 kind 에서만 받아진다. 「전부 요구」로 두면 jar 가 없는 이미지가 못
+# 받은 DB 때문에 붉어지고, 「전부 생략」으로 두면 jar 를 보는 이미지가 DB 없이 조용히 초록이다.
+# 어느 kind 가 그것을 요구하는지는 **정책이 선언**한다.
+_each_kind_has scan.java-db-required bool
+JAVA_DB_REQUIRED="$(_policy_value "scan.java-db-required.${IMAGE_KIND}" bool)"
 
 if [ ! -f "$ALLOWLIST_FILE" ]; then
   echo "allowlist 파일이 없다: ${ALLOWLIST_FILE}(정책이 가리키는 파일은 실재해야 한다 — 부재를 '등재 0'으로 읽지 않는다)" >&2
@@ -305,6 +311,8 @@ TRIVY_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.Version // "unknown
 VULN_DB_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.Version // "unknown"')"
 VULN_DB_UPDATED_AT="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.UpdatedAt // "unknown"')"
 VULN_DB_NEXT_UPDATE="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.NextUpdate // "unknown"')"
+JAVA_DB_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.JavaDB.Version // "unknown"')"
+JAVA_DB_UPDATED_AT="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.JavaDB.UpdatedAt // "unknown"')"
 
 if [ "$TRIVY_VERSION" != "$TRIVY_PINNED_VERSION" ]; then
   echo "도는 trivy(${TRIVY_VERSION})가 정책이 핀한 판(${TRIVY_PINNED_VERSION})과 다르다 — 판정이 재현되지 않는다" >&2
@@ -327,6 +335,39 @@ _undecidable() {
   echo "== 취약점 게이트 판정 불가(exit 2) — 이것은 「취약점이 있다」가 아니라 「재지 못했다」다 ==" >&2
   exit 2
 }
+
+# **취약점 DB 메타데이터 술어 (D-6E2B-5 나③, code-review r1 M-2).** 앞 판은 세 값을 전부
+# `// "unknown"` 으로 떨어뜨려 요약에만 찍었다 — **DB 가 아예 없거나 갱신이 멎었어도 초록**이었다.
+# 바로 위에서 도구의 *판*은 exit 2 로 끊으면서 판정의 다른 절반인 *DB* 는 끊지 않는, 반쪽만 적용된
+# 논리였다. 「실행마다 받는다」(B-5 (a))가 참이려면 받은 것이 실재하고 최신인지를 게이트가 봐야 한다.
+_check_db_metadata() { # <라벨> <버전> <갱신 시각>
+  local label="$1" version="$2" updated="$3"
+  case "$version" in
+    '' | unknown | null)
+      _undecidable "${label} 의 버전을 읽지 못했다('${version}') — DB 가 실리지 않았을 수 있다. 이 상태의 '차단 0' 은 '깨끗하다'가 아니라 '맞춰 보지 않았다'다"
+      ;;
+  esac
+  case "$updated" in
+    '' | unknown | null)
+      _undecidable "${label} 의 갱신 시각을 읽지 못했다('${updated}')"
+      ;;
+  esac
+  local epoch age
+  if ! epoch="$(date -u -d "$updated" +%s 2>/dev/null)"; then
+    _undecidable "${label} 의 갱신 시각을 날짜로 읽지 못했다: '${updated}'"
+  fi
+  age=$(( ( $(date -u +%s) - epoch ) / 86400 ))
+  if [ "$age" -gt "$DB_MAX_AGE_DAYS" ]; then
+    _undecidable "${label} 이 ${age}일 전 것이다(정책 상한 ${DB_MAX_AGE_DAYS}일) — 새 CVE 를 못 보고 있다. 캐시를 비우고 다시 받거나 상류 공시 상태를 본다"
+  fi
+  printf '%s' "$age"
+}
+
+VULN_DB_AGE_DAYS="$(_check_db_metadata "취약점 DB" "$VULN_DB_VERSION" "$VULN_DB_UPDATED_AT")"
+JAVA_DB_AGE_SUMMARY="요구하지 않음"
+if [ "$JAVA_DB_REQUIRED" = "true" ]; then
+  JAVA_DB_AGE_SUMMARY="$(_check_db_metadata "Java DB" "$JAVA_DB_VERSION" "$JAVA_DB_UPDATED_AT")일"
+fi
 
 # 양성 대조 둘. **입력 쪽**(SBOM 구성요소)과 **결과 쪽**(스캔이 분석한 패키지)을 따로 센다 —
 # 앞 판은 입력 쪽만 있었고, 그래서 「이미지를 읽었는가」만 닫히고 「그 SBOM 에 DB 를 맞춰 봤는가」는
@@ -474,7 +515,8 @@ fi
 
 echo "-- 실측 요약 --"
 echo "정책=${POLICY_FILE} kind=${IMAGE_KIND} image_id=${IMAGE_ID}"
-echo "trivy=${TRIVY_VERSION} vuln-db-version=${VULN_DB_VERSION} vuln-db-updated-at=${VULN_DB_UPDATED_AT} vuln-db-next-update=${VULN_DB_NEXT_UPDATE}"
+echo "trivy=${TRIVY_VERSION} vuln-db-version=${VULN_DB_VERSION} vuln-db-updated-at=${VULN_DB_UPDATED_AT}(${VULN_DB_AGE_DAYS}일 전, 상한 ${DB_MAX_AGE_DAYS}) vuln-db-next-update=${VULN_DB_NEXT_UPDATE}"
+echo "java-db-required=${JAVA_DB_REQUIRED} java-db-version=${JAVA_DB_VERSION} java-db-updated-at=${JAVA_DB_UPDATED_AT}(${JAVA_DB_AGE_SUMMARY})"
 echo "sbom=${SBOM_FILE}(구성요소 ${SBOM_COMPONENTS}, 하한 ${MIN_PACKAGES}) scan=${SCAN_FILE}(분석 패키지 ${ANALYZED_PACKAGES}, 하한 ${MIN_ANALYZED_PACKAGES})"
 echo "findings_total=${TOTAL_FINDINGS} 차단후보(${BLOCK_SEVERITIES}, only-fixed=${BLOCK_ONLY_FIXED})=${CANDIDATE_COUNT} 판정단위[ID+패키지]=${CANDIDATE_KEY_COUNT} allowlist_전체=${allow_entry_count} 이_kind_적용=${allow_applied} 미등재=${BLOCKING_COUNT}"
 
