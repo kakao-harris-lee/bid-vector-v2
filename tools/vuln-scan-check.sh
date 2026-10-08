@@ -195,6 +195,12 @@ fi
 BLOCK_SEVERITIES="$(_policy_value block.severities enum-list "$TRIVY_SEVERITIES")"
 BLOCK_ONLY_FIXED="$(_policy_value block.only-fixed bool)"
 SCAN_SCANNERS="$(_policy_value scan.scanners enum-list "$TRIVY_SCANNERS")"
+# 취약점 게이트인데 `vuln` 이 빠지면 **판정할 것이 없다**(verifier 표적 L-1). 열거값 안에 있으므로
+# 모양 검사는 통과한다 — 「허용 값이다」와 「이 게이트에 쓸모가 있다」는 다른 질문이다.
+if ! _contains "$SCAN_SCANNERS" "vuln"; then
+  echo "정책 키 scan.scanners 에 'vuln' 이 없다(${SCAN_SCANNERS}) — 취약점 게이트가 취약점을 보지 않으면 판정이 공허하다" >&2
+  exit 2
+fi
 SCAN_PKG_TYPES="$(_policy_value scan.pkg-types enum-list "$TRIVY_PKG_TYPES")"
 SBOM_FORMAT="$(_policy_value sbom.format text)"
 REPORT_DIR="$(_policy_value report.dir text)"
@@ -300,12 +306,17 @@ echo "== 이미지 취약점 게이트: ${IMAGE_REF} (kind=${IMAGE_KIND}) =="
 #
 # `--quiet` 를 떼었다(code-review r1 L-2) — DB 가 오래됐다거나 층을 건너뛴다는 trivy 자신의
 # 경고가 CI 로그에 남아야 한다. 보고서는 `--output` 으로 파일에 가므로 판정 출력이 더러워지지 않는다.
-_trivy image \
+# trivy 자신의 치명 오류(DB 를 못 받음·이미지를 못 읽음)는 **차단이 아니라 판정 불가**다
+# (verifier 표적 M-3). `set -e` 아래 그대로 두면 trivy 의 코드 1 이 그대로 나가 runbook §8.2 의
+# 「1 = 차단 → 올리거나 등재하라」로 읽힌다 — cr M-5 가 하한 미달에서 고친 것과 같은 계열이다.
+if ! _trivy image \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
   --format "$SBOM_FORMAT" \
   --output "$SBOM_FILE" \
-  "$IMAGE_ID"
+  "$IMAGE_ID"; then
+  _undecidable "trivy 가 이미지에서 SBOM 을 만들지 못했다(취약점 DB 를 못 받았거나 이미지를 못 읽었다) — 올리거나 등재할 일이 아니다"
+fi
 
 # 스캔 입력은 **방금 만든 SBOM** 이다 — 이미지를 두 번 읽지 않으므로 보관한 SBOM 과 판정
 # 대상이 어긋날 자리가 없다. severity 로 미리 거르지 않는다: 보고서에는 전부 남기고 **차단
@@ -314,16 +325,20 @@ _trivy image \
 # `--list-all-pkgs` 는 **스캔이 실제로 분석한 패키지 목록**을 결과에 싣는다(아래 스캔 쪽 하한의
 # 입력). 그것 없이는 `.Results` 에 취약점만 들어와, 「DB 와 맞춰 본 패키지가 0 개」와 「정말 깨끗함」을
 # 가를 수가 없다.
-_trivy sbom \
+if ! _trivy sbom \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
   --list-all-pkgs \
   --ignorefile "$EMPTY_IGNOREFILE" \
   --format json \
   --output "$SCAN_FILE" \
-  "$SBOM_FILE"
+  "$SBOM_FILE"; then
+  _undecidable "trivy 가 SBOM 을 스캔하지 못했다(취약점 DB·Java DB 를 못 받았을 수 있다) — 올리거나 등재할 일이 아니다"
+fi
 
-TRIVY_VERSION_JSON="$(_trivy version --format json)"
+if ! TRIVY_VERSION_JSON="$(_trivy version --format json)"; then
+  _undecidable "trivy version 을 읽지 못했다 — 어느 도구·어느 DB 로 판정했는지를 기록할 수 없다"
+fi
 TRIVY_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.Version // "unknown"')"
 VULN_DB_VERSION="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.Version // "unknown"')"
 VULN_DB_UPDATED_AT="$(printf '%s' "$TRIVY_VERSION_JSON" | jq -r '.VulnerabilityDB.UpdatedAt // "unknown"')"
@@ -364,6 +379,11 @@ _check_db_metadata() { # <라벨> <버전> <갱신 시각>
     _undecidable "${label} 의 갱신 시각을 날짜로 읽지 못했다: '${updated}'"
   fi
   age=$(( ( $(date -u +%s) - epoch ) / 86400 ))
+  # 미래 시각이면 나이가 음수가 되어 상한 비교를 그냥 통과한다(verifier 표적 L-2). 메타데이터 위조나
+  # 시계 왜곡에서만 생기지만, **신선함을 재는 술어가 그 반대쪽으로 열려 있으면 술어가 아니다.**
+  if [ "$age" -lt 0 ]; then
+    _undecidable "${label} 의 갱신 시각이 미래다(${updated}) — 메타데이터가 위조됐거나 시계가 어긋났다"
+  fi
   if [ "$age" -gt "$DB_MAX_AGE_DAYS" ]; then
     _undecidable "${label} 이 ${age}일 전 것이다(정책 상한 ${DB_MAX_AGE_DAYS}일) — 새 CVE 를 못 보고 있다. 캐시를 비우고 다시 받거나 상류 공시 상태를 본다"
   fi
