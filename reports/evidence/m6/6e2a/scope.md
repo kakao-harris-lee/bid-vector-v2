@@ -63,3 +63,9 @@ in_scope 경로 한정 `git restore --source=2deb5f9d --staged --worktree -- <�
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2A-1** | **A-4 Codex 심판 허용**(사용자 「codex 심판 허용. 계속 진행해」 2026-10-08). 시점은 Phase 2.5 설계 검토 · Phase 4 verifier `ready-for-review` **뒤** 한 번(의미 있는 단위). 범위 = 이 slice 의 in_scope diff(`2deb5f9d..<판정 SHA>`). 종결 조건은 「verifier ready-for-review + Codex approve + 사용자 승인」. `request_changes` 두 수정 라운드 뒤 blocker 잔존 시 자동 반복 중단·보고 | 사용자 |
+
+## 계약 갱신 r2 (2026-10-09, 팀장 — 구현 수령·동결 · 판정 착수)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2A-2** | 구현 레인 완료 보고 수령(`_workspace/m6-6e2a/02_implementer_report.md`, 레인 HEAD `bb12794a`) → **레인 동결**, 판정 대상 SHA = 이 계약 갱신 커밋. 레인 실측: `check`·`qualityBaseline`·container job S-21a~S-25·rollback ⓪~⑥ exit 0, P-6 위생 1초 창 유지(스크립트 무편집). **계약 대비 어긋남 셋을 수령**: ① P-5 범위가 여섯 자리(TRUNCATE 다섯 + 실패 주입 DDL 하나)로 넓었다 — 전부 in_scope ② test 조립 `HttpTestApplication` 에서만 `DataSourceAutoConfiguration` 제외(풀 classpath 진입이 낳은 것; 출하 조립은 빈 개수 단언으로 잠금) — verifier 표적 ③ acceptance 변이 ⑤ 문면 정정: `expectedModules` 는 「등재 ⊆ 해석」이라 **등재 삭제는 초록**(M5a), 등재 좌표 바꿔치우기로 RED(M5b) — 등재형 게이트의 한계를 사실로. 코드 주석의 결정 ID 충돌(`D-6E2A-1`)은 `P-n`·`A-n` 인용으로 정정됨. 판정 레인: verifier(opus) + code-reviewer(sonnet) 병렬, 그 뒤 Codex(D-6E2A-1) | 팀장 |
