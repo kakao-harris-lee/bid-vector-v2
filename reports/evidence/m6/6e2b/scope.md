@@ -58,3 +58,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-1** | 오늘의 수정 가능 HIGH/CRITICAL 67건(베이스 이미지 54 · jackson 10 · tomcat-embed-core CRITICAL 3)의 **상향은 후속 slice 6E-2c**(베이스 다이제스트 + tomcat·jackson 버전, `OPEN-6E2B-BASE-IMAGE-BUMP`·`OPEN-6E2B-DEPENDENCY-BUMP`). 이 slice 는 등재로 두되 **CRITICAL 등재 만료를 2026-10-31 로 단축**(HIGH 는 2026-12-31) — 6E-2c 가 늦어지면 게이트가 스스로 붉어진다 | 사용자 |
+
+## 계약 갱신 r2 (2026-10-09, 팀장 — 구현 수령·동결 · 판정 착수)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-2** | 구현 레인 완료 보고 수령(`_workspace/m6-6e2b/02_implementer_report.md`, 레인 HEAD `95e738f7`) → **레인 동결**. 판정 대상 SHA = 이 계약 갱신 커밋. 레인 실측: container job 재현 · `check` · rollback ①~⑥ @`c4f22dd1` exit 0, `check` @`95e738f7` exit 0, 음성 대조 여섯 RED, 양성 1회. 판정 레인: verifier(opus) + code-reviewer(sonnet) 병렬 | 팀장 |
