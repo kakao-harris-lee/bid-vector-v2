@@ -62,7 +62,8 @@ fi
 # 검증된 게이트(6C)를 이 slice 의 범위 밖에서 건드리기 때문이다.
 _policy_value() {
   local key="$1"
-  local kind="${2:-text}" # text | numeric | list | bool | sha256 | version
+  local kind="${2:-text}" # text | numeric | list | enum-list | bool | sha256 | version
+  local allowed="${3:-}"  # enum-list 일 때 허용 값 집합(쉼표 구분)
   local matches
   matches="$(awk -v k="${key}=" 'index($0, k) == 1 { n++ } END { print n+0 }' "$POLICY_FILE")"
   if [ "$matches" -eq 0 ]; then
@@ -125,6 +126,31 @@ _policy_value() {
         esac
       done
       ;;
+    enum-list)
+      # **값 영역까지 본다**(verifier r1 M-1 (a) · code-review r1). `list` 는 허용 **문자**만 보므로
+      # `High,Critical` 같은 값이 통과하는데, 그것은 어떤 finding 과도 맞지 않아 **차단 후보가 0** 이
+      # 된다 — 게이트가 아무것도 판정하지 않으면서 초록이다. 오늘은 allowlist 67건의 stale 검사가
+      # 우연히 그물 노릇을 하지만, 이 slice 의 목표 상태(6E-2c 뒤 등재 0)에서는 그 그물이 사라진다.
+      # 그래서 도구의 열거값과 **같은 집합**을 정책 쪽에서도 요구한다.
+      if [ -z "$allowed" ]; then
+        echo "enum-list 검증에 허용 값 집합이 주어지지 않았다(스크립트 결함): ${key}" >&2
+        exit 2
+      fi
+      local IFS=','
+      local -a enum_items
+      read -r -a enum_items <<< "$raw"
+      if [ "${#enum_items[@]}" -lt 1 ]; then
+        echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
+        exit 2
+      fi
+      local enum_item
+      for enum_item in "${enum_items[@]}"; do
+        if ! _contains "$allowed" "$enum_item"; then
+          echo "정책 키 ${key} 의 원소 '${enum_item}' 가 도구의 허용 값(${allowed})에 없다 — 모양은 맞지만 어떤 finding 과도 맞지 않아 판정이 조용히 비게 된다" >&2
+          exit 2
+        fi
+      done
+      ;;
     text) ;;
     *)
       echo "알 수 없는 정책 값 종류 '${kind}'(스크립트 결함)" >&2
@@ -133,6 +159,13 @@ _policy_value() {
   esac
   printf '%s' "$raw"
 }
+
+# trivy 0.75.0 의 열거값. **도구가 정하는 집합이므로 여기 적는다** — 정책 파일에 두면 「정책이
+# 자기 검증 기준을 정하는」 꼴이 되어 검증이 공허해진다. 도구 판을 올릴 때 함께 본다
+# (`trivy image --help` 의 Allowed values).
+TRIVY_SEVERITIES="UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+TRIVY_SCANNERS="vuln,misconfig,secret,license"
+TRIVY_PKG_TYPES="os,library"
 
 # 줄 수를 셀 때 `printf '%s'`(개행 없음)를 쓰지 않는다 — `wc -l` 은 개행을 세므로 마지막 줄이
 # 빠져 **차단 대상 한 건이 0 으로 읽힌다**(게이트가 조용히 통과하는 방향의 off-by-one,
@@ -158,10 +191,10 @@ if ! _contains "$SCAN_KINDS" "$IMAGE_KIND"; then
   exit 2
 fi
 
-BLOCK_SEVERITIES="$(_policy_value block.severities list)"
+BLOCK_SEVERITIES="$(_policy_value block.severities enum-list "$TRIVY_SEVERITIES")"
 BLOCK_ONLY_FIXED="$(_policy_value block.only-fixed bool)"
-SCAN_SCANNERS="$(_policy_value scan.scanners list)"
-SCAN_PKG_TYPES="$(_policy_value scan.pkg-types list)"
+SCAN_SCANNERS="$(_policy_value scan.scanners enum-list "$TRIVY_SCANNERS")"
+SCAN_PKG_TYPES="$(_policy_value scan.pkg-types enum-list "$TRIVY_PKG_TYPES")"
 SBOM_FORMAT="$(_policy_value sbom.format text)"
 REPORT_DIR="$(_policy_value report.dir text)"
 ALLOWLIST_FILE="$(_policy_value allowlist.file text)"
