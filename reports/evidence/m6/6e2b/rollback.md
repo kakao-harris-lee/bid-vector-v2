@@ -40,41 +40,40 @@ evidence 까지 담아 ⑥ 의 `leakPatternGate` 가 이 slice 의 문서를 실
 
 ### 공유 파일 절차 — runbook · `milestone-6.md`
 
-**결론부터: 이 둘은 `origin/main` 판으로 복원한다. hunk 역적용은 실측에서 완결되지 않았다.**
+**복원 원천은 움직이는 ref 가 아니라 고정 SHA 다** — 이 브랜치에 **마지막으로 병합한 main 커밋**
+`b6d31b87`(PR #66, 6E-2a 종결). 앞 판은 `origin/main` 을 썼고, 그것이 LR-1 이었다.
 
 ```
-git restore --source=origin/main --staged --worktree -- \
+PIN=b6d31b87                      # 이 브랜치에 마지막으로 병합한 main 커밋
+FIRST=e2545ea5                    # 이 slice 의 **첫** 산출물 커밋
+
+git merge-base --is-ancestor "$PIN" HEAD   || { echo "핀이 이 브랜치의 조상이 아니다"; exit 1; }
+git merge-base --is-ancestor "$FIRST" "$PIN" && { echo "핀이 이 slice 를 담는다 — 복원이 아무것도 지우지 않는다"; exit 1; }
+
+git restore --source="$PIN" --staged --worktree -- \
   docs/runbook/m6-6e-operations.md milestone-6.md
 ```
 
-`origin/main` 은 **6E-2a 는 담고 6E-2b 는 담지 않는** 트리다(내 PR 이 머지되기 전까지). 그래서 이 복원의
-결과가 곧 「이 slice 만 걷어낸 상태」이고, **남의 줄은 구성상 보존된다** — 지울 수가 없다.
+**왜 고정 SHA 인가 — 움직이는 ref 는 두 방향으로 틀린다.**
+- **낡은 쪽**: fetch 하지 않았거나 PR #66 이전에 받은 clone 의 `origin/main` 은 6E-2a 를 담지 않는다.
+  그 ref 로 복원하면 **exit 0 인 채 6E-2a 의 줄(머리말·§2.6·§6 17~19·§7)을 지운다**(verifier 실측 A).
+  앞 판 문면은 전제를 「main 에 6E-2b 가 없다」 **하나만** 적었다 — 짝인 「6E-2a 를 담는다」가 없었다.
+- **앞선 쪽**: 그 사이 다른 slice 가 main 에 머지됐으면 그 slice 의 **문서 줄만 코드 없이 들여온다**
+  (verifier 실측 B). 앞 판은 이것을 「보존된다(맞는 거동)」고 적었는데, 보존이 아니라 **유입**이다.
 
-**실측(2026-10-09, 버릴 clone @`c4aa3b54`)**
-- 복원 뒤 runbook 이 `git show b6d31b87:<파일>` 과 **바이트 동일**(`cmp` 통과).
-- 내 표지(`6E-2b`·`OPEN-6E2B`) **0건** · §8 **0건** · 6E-2a 표지 **4건** · §6 항목 17~19 **3건**.
+고정 SHA 는 **둘을 함께 닫는다**. 핀이 가리키는 트리는 변하지 않으므로 덜 담지도, 더 담지도 않는다.
 
-**왜 hunk 가 아닌가 — 돌려 봤고 완결되지 않았다.** `git log --no-merges … ^origin/main -- <파일>` 로 낸
-목록을 최신부터 `git apply -R` 하면 **커밋 둘(`c4f22dd1`·`1eafab7e`)에서 conflict** 가 나고, 그 뒤 내
-줄이 **4건 남는다**(§8 포함). 사유 둘 —
-1. 같은 파일을 내 커밋 다섯이 층층이 만졌고 삽입 지점이 서로 인접하다(하네스가 이미 아는 함정).
-2. **병합 커밋의 충돌 해소분은 `--no-merges` 목록에 아예 없다** — runbook 머리말은 내가 병합에서 썼다.
+**단언 둘을 복원 **앞**에 둔다**(명령이 성공하면서 뜻을 잃는 경우를 막는다) —
+1. `PIN` 이 이 브랜치의 조상이다 → 그 트리가 실제로 이 이력의 일부다.
+2. `PIN` 이 이 slice 의 **첫** 산출물 커밋을 담지 않는다 → 복원이 실제로 이 slice 를 걷어낸다.
+   **첫** 커밋으로 재는 것이 요점이다. 늦은 커밋으로 재면 앞 커밋들을 담은 핀도 통과한다(실측 확인).
 
-**이 실패가 조용했다는 것이 더 중요하다.** 그 회차의 ①~⑥ 은 **전부 exit 0** 이었다 — 되돌리다 만 트리도
-컴파일되고 `check` 도 통과하기 때문이다. 잡아낸 것은 종료 코드가 아니라 **「내 줄이 사라졌는가」를 세는
-③e** 였다. 되돌림 검증에서 exit 코드만 보면 안 되는 이유가 이 한 줄에 있다.
-
-**`milestone-6.md` 도 같다.** 팀장이 이 일괄 **뒤에** 6E-2b 문단을 쓰므로 지금은 내 커밋이 없지만, 그때도
-`origin/main` 판에는 6E-2a 문단만 있다 — 같은 명령이 그대로 선다. **해시 목록이 필요 없다**(아직 없는
-커밋도 자동으로 덮는다).
-
-**전제와 그 한계**: 이 절차는 「`origin/main` 에 6E-2b 가 없다」에 기댄다. 내 PR 이 머지된 뒤의 되돌림은
-이 절차가 아니라 **그 PR 을 revert** 하는 일이다. 그리고 복원 시점의 `origin/main` 을 쓰므로, 그 사이
-다른 slice 가 이 파일들에 더한 줄은 **보존된다**(그것이 맞는 거동이다).
+**한계는 그대로다**: 이 절차는 「핀이 이 slice 를 담지 않는다」에 기댄다. 내 PR 이 머지된 뒤의 되돌림은
+이 절차가 아니라 **그 PR 의 revert** 다. 그때는 단언 2 가 **실패해서** 그 사실을 알려 준다 — 조용히
+아무것도 안 지우는 대신.
 
 확인은 **둘 다**: 내 줄이 사라졌는가(`6E-2b`·`OPEN-6E2B`·`^## 8\.` 가 0), **남의 줄이 남았는가**
 (6E-2a 표지 — §2.6 풀 상수표 · §6 항목 17~19 · §7 「고치는 절에 맞는 블록」 문단).
-
 
 ## 명령
 
@@ -125,13 +124,14 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 ## verifier 가 대조할 것
 
 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에 오므로 둘은 영원히 다르다).
-**그 사이에 되돌림 대상이 움직였는가**를 본다:
+**그 사이에 되돌림 대상이 움직였는가**를 본다 — 대상은 **일곱**이다(단일 restore 다섯 + 공유 둘):
 
 ```
-git diff --name-only cf608c9a..<판정 SHA> -- \
+git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   .github/workflows/ci.yml config/quality/vuln-allowlist.properties \
   config/quality/vuln-policy.properties docker/ml-serving.Dockerfile \
-  docs/runbook/m6-6e-operations.md tools/vuln-scan-check.sh
+  tools/vuln-scan-check.sh \
+  docs/runbook/m6-6e-operations.md milestone-6.md
 ```
 
 빈 출력이면 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.
