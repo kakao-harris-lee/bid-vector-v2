@@ -1,6 +1,6 @@
 # M6/6E-2b — rollback
 
-실측 HEAD: `cf608c9a`(종결 일괄). 마지막 **산출물** 커밋은 `1bdd7b79` 이고, `cf608c9a` 는 evidence
+실측 HEAD: `e6f15b74`(종결 일괄, `origin/main` 병합 뒤 재실측). 마지막 **산출물** 커밋은 `1bdd7b79` 이고, `cf608c9a` 는 evidence
 전용 커밋이라 **되돌림 대상 여섯의 내용이 둘에서 같다** — 그래서 뒤쪽에서 재고 그 SHA 를 적는다(clone 이
 evidence 까지 담아 ⑥ 의 `leakPatternGate` 가 이 slice 의 문서를 실제로 훑는다).
 앞 라운드 실측은 **옮기지 않고 매번 다시 낸다** — 되돌림 대상이 한 줄이라도 움직이면 아래 verifier
@@ -97,43 +97,30 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 되고 `OPEN-6C-IMAGE-VULN-SCAN` 이 다시 열린다. 비활성화만 원한다면 되돌리지 않고 `ci.yml` 의 S-22d·S-22e 두 step 만 빼도 된다 —
 그 경우 SBOM 보관(S-22f)이 올릴 파일이 없어 `if-no-files-found: error` 로 붉어지므로 셋을 함께 뺀다.
 
-## ①~⑥ 실측 (버릴 임시 clone, HEAD `cf608c9a`)
+## ①~⑥ 실측 (버릴 임시 clone, HEAD `e6f15b74`)
 
 | # | 무엇 | 결과 |
 |---|---|---|
-| ① | 복원 명령 | exit 0 |
-| ② | D/M 수 | **D 3 · M 3** (기계 산출 목록과 같다) |
-| ③ | `git diff 2deb5f9d -- <경로들>` | **0 줄** |
-| ③b | 되돌리지 않기로 한 evidence | 네 문서 전부 남아 있다 |
-| ③c | 하네스 경로 `git status --porcelain` | **0 줄**(HEAD 그대로) |
-| ③d | 되돌린 `ci.yml` 의 게이트 흔적 | **0 건** |
+| ① | 단일 restore 다섯 | exit 0 |
+| ①b | 공유 파일 둘을 `origin/main` 판으로 | exit 0 |
+| ② | D/M 수 | **D 3 · M 3** |
+| ③ | `git diff <base> -- <restore 다섯>` | **0 줄** |
+| ③e | **내 줄이 사라졌는가**(`6E-2b`·`OPEN-6E2B`) | **0건** |
+| ③e2 | **§8 이 사라졌는가** | **0건** |
+| ③f | **남의 줄이 남았는가**(6E-2a 표지) | **4건** — 보존 |
+| ③g | runbook 이 main 판과 바이트 동일(`cmp`) | **동일** |
+| ③b | 되돌리지 않기로 한 evidence | 네 문서 전부 남음 |
+| ③c | 하네스 경로 porcelain | **0 줄** |
+| ③d | 되돌린 `ci.yml` 의 게이트 흔적 | **0건** |
 | ④ | `:app:compileKotlin :adapters:compileKotlin` | exit 0 |
-| ⑤⑥ | `./gradlew --no-daemon check` 전건 | exit 0 — `leakPatternGate` 포함 |
+| ⑤⑥ | `./gradlew --no-daemon check` 전건 | exit 0 |
 
-**목록 등식도 기계로 확인했다 — 다만 병합 뒤로 「범위 diff」를 쓸 수 없다.** `2deb5f9d..HEAD` 의 diff 는
-이제 **6E-2a 가 병합으로 들여온 경로 전부**를 담는다(내 것이 아니다). 그래서 이 slice 의 경로 집합을
-**내 쪽 비-병합 커밋에서** 뽑는다:
+**등식**: 내 쪽 비-병합 커밋(`^origin/main`)의 경로 집합과 「restore 다섯 ∪ 공유 둘」을 양방향 대조해
+`milestone-6.md` 한 줄만 「문서에만」으로 남는다 — **아직 내 커밋이 없기 때문**이고(팀장이 뒤에 쓴다)
+절차는 그것까지 덮는다. 나머지는 빈 출력이다.
 
-```
-git log --no-merges --format=%h 2deb5f9d..HEAD ^origin/main \
-  | while read -r c; do git diff-tree --no-commit-id --name-only -r "$c"; done \
-  | sort -u | grep -v '^reports/evidence'
-```
-
-그 집합을 **「단일 restore 다섯 ∪ hunk 처리 공유 파일」**과 `comm -23`·`comm -13` 로 양방향 대조한다. 「문서에 빠진 경로」와
-「문서에만 있는 경로」를 **둘 다** 본다. 대조 집합이 복원 인자만이 아닌 것이 중요하다 — `milestone-6.md`
-는 되돌림 대상이면서 복원 목록에 없으므로, 복원 인자만 대조하면 **처리돼 있는데도 stale 로 읽힌다.**
-
-**빈 출력은 목록이 건전하다는 증거가 아니다.** 깨짐이 측정 **뒤에** 오는 경로가 있으면 목록은 이미
-낡았고 아직 읽히지 않았을 뿐이다. 그래서 등식을 낼 때 함께 묻는다 — **「내가 아무것도 커밋하지 않아도
-이 집합에 경로가 들어올 수 있는가?」** 이 slice 의 답은 **예**였다(`milestone-6.md` 는 in_scope 인데
-팀장이 쓴다). 그래서 그 경로의 처리를 위에 **미리** 적어 두었다.
-
-⑥ 은 **evidence 네 문서가 전부 들어 있는 트리**에서 돌았다. 마지막 산출물 커밋이 evidence 커밋보다
-뒤에 왔기 때문인데(사유 문면 정정이 `config/` 와 evidence 를 함께 만졌다), 덕분에 되돌린 트리에서
-`leakPatternGate` 가 이 slice 의 evidence 를 실제로 훑고 통과했다 — 「되돌리지 않기로 한 evidence 가
-base 의 baseline 과 어긋나 게이트를 붉히는가」(M4 에서 세 라운드 동안 거짓으로 적혔던 축)를 **이번에는
-갈음이 아니라 직접** 쟀다는 뜻이다.
+**앞 회차(hunk 절차)는 ①~⑥ 이 전부 exit 0 이면서 ③e 가 4 였다** — 되돌리다 만 트리도 컴파일되고
+`check` 도 통과한다. 그 한 칸이 없었으면 깨진 절차를 초록으로 보고했을 것이다.
 
 ## verifier 가 대조할 것
 
