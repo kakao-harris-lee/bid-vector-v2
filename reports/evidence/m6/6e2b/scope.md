@@ -109,3 +109,10 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-12** | 종결 일괄 수령(`_workspace/m6-6e2b/09_implementer_closure.md`): M-A `--module-dir` 샌드박스 고정(image 만 그 옵션을 받고 sbom 은 모듈을 읽지 않음 실측, 대조군 N14) · 장부 넷 · **origin/main(`b6d31b87`, PR #66) 병합 `67d3e787`**(runbook 충돌 둘, 두 slice 문면 보존). **rollback 절차 변경 수령**: 팀장이 지시한 공유 파일 hunk 역적용은 **실측에서 완료되지 않았다**(인접 삽입 지점 충돌 + 병합 커밋의 충돌 해소는 `--no-merges` 목록 밖 → 이 slice 의 줄 넷·§8 잔존, 그런데 ①~⑥ 은 전부 exit 0 — 「내 줄이 사라졌는가」 계수만이 잡았다). 대체: 공유 파일(runbook·milestone-6.md)을 **`origin/main` 에서 복원**(전제: main 에 6E-2b 가 없음; 머지 뒤 되돌림은 PR revert) — 재실측 HEAD `e6f15b74`, 이 slice 표지 0 · 6E-2a 표지 보존 · runbook 이 main 과 바이트 동일. 자기 경로 집합은 `^origin/main` non-merge 커밋으로 산출. 레인 동결, 판정 SHA = 이 갱신 커밋 → **표적 재검증 3**(M-A · 병합 결과 · 새 rollback 절차) | 팀장 |
+
+## 계약 갱신 r10 (2026-10-09, 팀장 — 표적 재검증 3 수령 · 장부 일괄)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-13** | **verifier 표적 재검증 3 `ready-for-review` @`c3aff379`**(`_workspace/m6-6e2b/10_verifier_targeted3.md`: container job·`check`·되돌린 트리 `check` exit 0 · M-A 닫힘(sbom·version 은 모듈 미독, 게이트의 trivy 호출 셋) · 병합 깨끗(runbook 외 전부 한 부모와 바이트 동일) · rollback 절차 실행: 이 slice 표지 0, 6E-2a 표지 보존). 장부 medium **LR-1**: 공유 파일 복원이 **움직이는 ref `origin/main`** 을 믿는다 — fetch 안 된(낡은) ref 면 exit 0 으로 6E-2a 줄을 지운다(실측) · L-2: 그 사이 다른 slice 가 main 에 머지됐으면 그 slice 의 문서 줄만 코드 없이 들어온다(실측) · L-1: 「verifier 가 대조할 것」 블록이 옛 실측 HEAD·경로 여섯 | 팀장 |
+| **D-6E2B-14** | **장부 일괄(레인)**: 복원 원천을 움직이는 ref 가 아니라 **이 브랜치에 마지막으로 병합한 main 커밋**(오늘 `b6d31b87`)으로 고정하고 그 SHA 를 rollback.md 에 적는다 — LR-1·L-2 를 함께 닫는다(낡은 ref 로 지우지도, 나중 slice 의 줄을 들이지도 않는다). 원천 SHA 가 브랜치의 조상이고 1bdd7b79 을 포함하지 않음을 실행 전 단언으로 · L-1 블록을 `e6f15b74`·대상 일곱으로 · rollback ①~⑥ 재실측(계수 포함). 하네스 PR #67 문면도 같은 방향으로 팀장이 갱신 | 팀장 |
