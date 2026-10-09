@@ -1,6 +1,6 @@
 # M6/6E-2b — rollback
 
-실측 HEAD: `fc8f373c`(PR #68 조치 — **되돌림 대상을 만진 마지막 커밋**이고, 팀장의
+실측 HEAD: `38fe42bb`(승인 전 일괄 — **되돌림 대상을 만진 마지막 커밋**이고, 팀장의
 `milestone-6.md` 종결 문단 뒤다). 마지막 **산출물** 커밋은 `1bdd7b79` 이고, `cf608c9a` 는 evidence
 전용 커밋이라 **되돌림 대상 여섯의 내용이 둘에서 같다** — 그래서 뒤쪽에서 재고 그 SHA 를 적는다(clone 이
 evidence 까지 담아 ⑥ 의 `leakPatternGate` 가 이 slice 의 문서를 실제로 훑는다).
@@ -101,7 +101,7 @@ CI `container` job 에서 `install trivy`·S-22d·S-22e·S-22f 가 사라지고,
 되고 `OPEN-6C-IMAGE-VULN-SCAN` 이 다시 열린다. 비활성화만 원한다면 되돌리지 않고 `ci.yml` 의 S-22d·S-22e 두 step 만 빼도 된다 —
 그 경우 SBOM 보관(S-22f)이 올릴 파일이 없어 `if-no-files-found: error` 로 붉어지므로 셋을 함께 뺀다.
 
-## ①~⑥ 실측 (버릴 임시 clone, HEAD `fc8f373c`)
+## ①~⑥ 실측 (버릴 임시 clone, HEAD `38fe42bb`)
 
 | # | 무엇 | 결과 |
 |---|---|---|
