@@ -112,6 +112,17 @@ _policy_value() {
         exit 2
       fi
       ;;
+    token)
+      # 원소 하나짜리 식별자(배포판 family·name). `list` 와 **같은 허용 문자 집합**을 쓴다 — 공백·
+      # 유니코드 공백·따옴표가 섞이면 정확 일치가 영원히 거짓이 되고, 그때 게이트는 닫히는 쪽으로
+      # 틀리지만 문면이 「배포판이 바뀌었다」를 말해 원인을 가린다. 모양에서 먼저 끊는다.
+      case "$raw" in
+        *[!A-Za-z0-9._+-]*)
+          echo "정책 키 ${key} 의 값이 허용 문자([A-Za-z0-9._+-])만으로 돼 있지 않다: '${raw}'" >&2
+          exit 2
+          ;;
+      esac
+      ;;
     list)
       # 허용 문자 집합으로 뒤집어 적는다(6C R5-1 과 같은 근거) — 공백·유니코드 공백·따옴표가
       # 한 술어로 함께 닫힌다. 원소에 뭔가 섞이면 그 원소의 판정이 조용히 꺼지는 것이 이 축이
@@ -261,6 +272,13 @@ DB_MAX_AGE_DAYS="$(_policy_value scan.db.max-age-days numeric)"
 # 어느 kind 가 그것을 요구하는지는 **정책이 선언**한다.
 _each_kind_has scan.java-db-required bool
 JAVA_DB_REQUIRED="$(_policy_value "scan.java-db-required.${IMAGE_KIND}" bool)"
+# **배포판 선언 (D-6E2C-1, `OPEN-6E2B-OS-MATCH-PREDICATE`)**. 위 두 하한이 못 잡는 축의 입력이다 —
+# 어느 배포판을 재고 있다고 **정책이 먼저 말하고**, 아래 술어가 스캔 결과와 정확히 대조한다.
+# kind 마다 선언을 요구한다(선언 없는 kind 가 돌 때까지 구멍이 보이지 않는다).
+_each_kind_has scan.os.family token
+_each_kind_has scan.os.name token
+EXPECTED_OS_FAMILY="$(_policy_value "scan.os.family.${IMAGE_KIND}" token)"
+EXPECTED_OS_NAME="$(_policy_value "scan.os.name.${IMAGE_KIND}" token)"
 
 if [ ! -f "$ALLOWLIST_FILE" ]; then
   echo "allowlist 파일이 없다: ${ALLOWLIST_FILE}(정책이 가리키는 파일은 실재해야 한다 — 부재를 '등재 0'으로 읽지 않는다)" >&2
@@ -451,6 +469,41 @@ if ! [[ "$ANALYZED_PACKAGES" =~ ^[0-9]+$ ]] || [ "$ANALYZED_PACKAGES" -lt "$MIN_
   _undecidable "스캔이 분석한 패키지 수(${ANALYZED_PACKAGES})가 정책 하한(${MIN_ANALYZED_PACKAGES}, kind=${IMAGE_KIND}) 미만이다 — 결과가 통째로 비었다(스캔이 서지 않았거나 SBOM 을 읽지 못했다). 이 상태에서 '차단 0' 은 공허하게 참이다"
 fi
 
+# **OS 매칭 술어 (D-6E2C-1 — `OPEN-6E2B-OS-MATCH-PREDICATE` 를 닫는다).** 바로 위 두 하한은
+# 「결과가 통째로 비었다」를 잡고 **「나열은 했는데 DB 와 맞춰 보지 않았다」는 못 잡는다**: SBOM 의
+# OS 판이 DB 와 어긋나면 trivy 는 경고만 내고 finding 이 468 → 한 자리로 주는데 나열 수는 그대로다
+# (6E-2b 실측). 그 구멍을 축 **둘**로 닫는다 — 하나로는 닫히지 않는다.
+#   ⓐ 스캔이 읽은 배포판(`.Metadata.OS`)이 **정책이 선언한 것과 정확히 같은가**
+#   ⓑ 그 배포판의 **OS 패키지 Result 가 실제로 하나 이상** 있는가(`Class=os-pkgs`, `Type=<family>`)
+# ⓐ 만 있으면 메타데이터는 맞는데 OS 층 분석이 통째로 빠진 결과가 통과하고, ⓑ 만 있으면 다른
+# 배포판으로 읽힌 결과가 자기 Result 를 갖고 통과한다.
+#
+# **정확 일치의 대가는 의도한 것이다**: debian point release 를 올리면(12.9 → 12.15) 이 값을 같은
+# 커밋에서 올려야 게이트가 선다. 베이스 상향이 정책 편집을 강제하는 것이 이 축의 목적이다 —
+# 「배포판이 바뀌었는데 아무도 모름」이 바로 위 실측에서 일어난 일이다.
+#
+# **차단이 아니라 판정 불가(exit 2)** 다. 처방이 「올리거나 등재하라」가 아니라 「무엇을 쟀는지
+# 보라」이기 때문이다(runbook §8.2 와 같은 갈래).
+if ! SCANNED_OS_FAMILY="$(jq -r '.Metadata.OS.Family // ""' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과에서 배포판 family 를 읽지 못했다(${SCAN_FILE}) — 파일이 온전하지 않다"
+fi
+if ! SCANNED_OS_NAME="$(jq -r '.Metadata.OS.Name // ""' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과에서 배포판 name 을 읽지 못했다(${SCAN_FILE}) — 파일이 온전하지 않다"
+fi
+if [ -z "$SCANNED_OS_FAMILY" ] || [ -z "$SCANNED_OS_NAME" ]; then
+  _undecidable "스캔 결과에 배포판 메타데이터(.Metadata.OS)가 없다(family='${SCANNED_OS_FAMILY}' name='${SCANNED_OS_NAME}') — OS 층을 아예 분석하지 않았다. 이 상태의 '차단 0' 은 '깨끗하다'가 아니라 '맞춰 보지 않았다'다"
+fi
+if [ "$SCANNED_OS_FAMILY" != "$EXPECTED_OS_FAMILY" ] || [ "$SCANNED_OS_NAME" != "$EXPECTED_OS_NAME" ]; then
+  _undecidable "스캔이 읽은 배포판(${SCANNED_OS_FAMILY}/${SCANNED_OS_NAME})이 정책 선언(${EXPECTED_OS_FAMILY}/${EXPECTED_OS_NAME}, kind=${IMAGE_KIND})과 다르다 — 베이스를 올렸다면 scan.os.family.${IMAGE_KIND}·scan.os.name.${IMAGE_KIND} 를 같은 커밋에서 올린다. 올리지 않았다면 스캐너가 다른 것을 읽었다"
+fi
+
+if ! OS_RESULT_COUNT="$(jq --arg family "$EXPECTED_OS_FAMILY" '[.Results[]? | select(.Class == "os-pkgs" and .Type == $family)] | length' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과에서 OS 패키지 Result 를 세지 못했다(${SCAN_FILE}) — 파일이 온전하지 않다"
+fi
+if ! [[ "$OS_RESULT_COUNT" =~ ^[0-9]+$ ]] || [ "$OS_RESULT_COUNT" -lt 1 ]; then
+  _undecidable "배포판 ${EXPECTED_OS_FAMILY} 의 OS 패키지 Result(Class=os-pkgs, Type=${EXPECTED_OS_FAMILY})가 결과에 없다(${OS_RESULT_COUNT}개) — 메타데이터는 맞는데 OS 층을 맞춰 보지 않았다"
+fi
+
 # 차단 후보 집합 — 정책이 정하는 severity 이고, `block.only-fixed` 가 참이면 **수정본이 있는
 # 것만**이다(B-3 (a) — 고칠 길이 없는 것으로 붉히면 상시 붉은 게이트가 된다). 판정 단위는
 # (취약점 ID, 패키지 이름)이고 allowlist 키와 같은 단위다.
@@ -599,6 +652,7 @@ echo "정책=${POLICY_FILE} kind=${IMAGE_KIND} image_id=${IMAGE_ID}"
 echo "trivy=${TRIVY_VERSION} vuln-db-version=${VULN_DB_VERSION} vuln-db-updated-at=${VULN_DB_UPDATED_AT}(${VULN_DB_AGE_DAYS}일 전, 상한 ${DB_MAX_AGE_DAYS}) vuln-db-next-update=${VULN_DB_NEXT_UPDATE}"
 echo "java-db-required=${JAVA_DB_REQUIRED} java-db-version=${JAVA_DB_VERSION} java-db-updated-at=${JAVA_DB_UPDATED_AT}(${JAVA_DB_AGE_SUMMARY})"
 echo "sbom=${SBOM_FILE}(구성요소 ${SBOM_COMPONENTS}, 하한 ${MIN_PACKAGES}) scan=${SCAN_FILE}(분석 패키지 ${ANALYZED_PACKAGES}, 하한 ${MIN_ANALYZED_PACKAGES})"
+echo "os=${SCANNED_OS_FAMILY}/${SCANNED_OS_NAME}(정책 선언 ${EXPECTED_OS_FAMILY}/${EXPECTED_OS_NAME}) os-pkgs-results=${OS_RESULT_COUNT}"
 echo "findings_total=${TOTAL_FINDINGS} 차단후보(${BLOCK_SEVERITIES}, only-fixed=${BLOCK_ONLY_FIXED})=${CANDIDATE_COUNT} 판정단위[ID+패키지]=${CANDIDATE_KEY_COUNT} allowlist_전체=${allow_entry_count} 이_kind_적용=${allow_applied} 미등재=${BLOCKING_COUNT}"
 
 if [ "$failures" -gt 0 ]; then
