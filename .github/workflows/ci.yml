@@ -329,10 +329,13 @@ jobs:
 
       # M6/6E-2b B-2 — 이미지 취약점 게이트가 `trivy` 를 실행 파일로 부른다(SBOM 생성 + 스캔).
       #
-      # **자리: 쓰는 step 바로 앞**(PR #68 /code-review M). 앞 판은 job 머리에 있었는데, 그러면
-      # **설치 실패 하나가 무관한 게이트 전부를 건너뛰게 한다** — S-21~S-22c(이미지 빌드·위생·거부
-      # 스모크)와 S-23~S-25(compose·스모크·백업 리허설·crosslang)는 trivy 와 아무 상관이 없다.
-      # 여기 두면 설치가 깨져도 그 축들은 그대로 돌고 판정이 남는다.
+      # **자리: 쓰는 step 바로 앞**(PR #68 /code-review M). 앞 판은 job 머리에 있어 설치 실패가
+      # 뒤 전부를 건너뛰게 했다. 이동으로 **실제로 살아나는 것은 S-21~S-22c**(이미지 빌드·위생·거부
+      # 스모크)다 — 그 셋은 trivy 와 무관하고 이제 설치가 깨져도 판정이 남는다.
+      #
+      # **S-23~S-24 는 여전히 건너뛴다**(verifier 표적4 M-1 실측). 그 step 들에는 `if` 가 없어 암묵
+      # `success()` 이고, 앞에서 job 이 실패하면 멈춘다 — 6E-2b 이전과 **같은 결합**이고 이 이동이
+      # 고치는 축이 아니다. 주석이 그것까지 살아난다고 적었던 것은 거짓이었고 여기서 좁힌다.
       # **`aquasecurity/trivy-action`·`setup-trivy` 를 쓰지 않는다.** 사유 둘 — ① 액션 안의 trivy
       # 버전은 워크플로에 보이지 않아 정책 파일과 조용히 어긋나는 **둘째 버전 축**이 된다
       # ② 2026-03-19 공급망 사고에서 **먼저 무너진 것이 바로 그 액션 태그들**이다(공식 권고
@@ -343,6 +346,7 @@ jobs:
       # 자산이 뒤에 바뀌면 그 목록도 함께 바뀌므로 목록 대조만으로는 바뀐 것을 잡지 못한다.
       # 버전·자산 이름·체크섬 셋 다 정책 파일이 정한다 — 워크플로에 숫자를 적지 않는다.
       - name: install trivy
+        id: install_trivy
         run: |
           set -euo pipefail
           policy=config/quality/vuln-policy.properties
@@ -407,7 +411,7 @@ jobs:
         #
         # **`scan_ml` 은 일부러 보지 않는다**(M-3 의 결정 유지) — ml-serving 이 막아도 앱 판정을 같은
         # 회차에서 봐야 수정 라운드가 둘로 쪼개지지 않는다. 두 스캔은 서로 독립이고, 앞 단계와만 묶인다.
-        if: ${{ !cancelled() && steps.build_app.outcome == 'success' && steps.hygiene_ml.outcome == 'success' && steps.hygiene_app.outcome == 'success' && steps.refusal_smoke.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_app.outcome == 'success' && steps.hygiene_ml.outcome == 'success' && steps.hygiene_app.outcome == 'success' && steps.refusal_smoke.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/app:local app config/quality/vuln-policy.properties
 
       # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
@@ -423,7 +427,10 @@ jobs:
       # 같다. 남는 경우 하나(스캔이 SBOM 을 쓰기 **전에** exit 2 로 끊김 — 정책·환경 오류)는 가짜가
       # 아니라 **관련된** 빨강이므로 그대로 둔다. major 는 위 `check` job 의 같은 액션과 맞춘다.
       - name: SBOM 보관 — CycloneDX, 이미지 둘 (S-22f)
-        if: ${{ !cancelled() && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped') }}
+        # **install 성공까지 본다**(verifier 표적4 M-1). 그러지 않으면 설치 실패 하나가 빨강 셋을
+        # 만든다 — install 자신 · 조건이 install 을 안 보던 S-22e(「trivy 가 필요하다」 exit 2) ·
+        # 올릴 파일이 없는 이 step. **원인 하나에 빨강 하나**가 맞다.
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped') }}
         uses: actions/upload-artifact@v6
         with:
           name: sbom-cyclonedx

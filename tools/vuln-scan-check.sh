@@ -388,9 +388,16 @@ if [ "$TRIVY_VERSION" != "$TRIVY_PINNED_VERSION" ]; then
   exit 2
 fi
 
-SBOM_COMPONENTS="$(jq '[.components[]? | select(.type == "library" or .type == "operating-system")] | length' "$SBOM_FILE")"
+# **판독 실패도 판정 불가다**(verifier 표적4 L-1). 앞 판은 `jq` 실패를 `set -e` 에 맡겨 **2 가 아닌
+# 코드**(잘린 JSON 에서 실측 5)로 나갔다 — fail-closed 이긴 하나 runbook §8.2 의 갈래 어디에도 없는
+# 코드라 운영자가 처방을 찾을 수 없다. 네 판독을 전부 감싼다.
+if ! SBOM_COMPONENTS="$(jq '[.components[]? | select(.type == "library" or .type == "operating-system")] | length' "$SBOM_FILE")"; then
+  _undecidable "SBOM 을 JSON 으로 읽지 못했다(${SBOM_FILE}) — 스캐너가 쓴 파일이 온전하지 않다"
+fi
 # `--list-all-pkgs` 가 실은 **나열된** 패키지 목록(DB 매칭 여부와 무관). 결과 쪽 양성 대조의 입력이다.
-ANALYZED_PACKAGES="$(jq '[.Results[]? | (.Packages // [])[]] | length' "$SCAN_FILE")"
+if ! ANALYZED_PACKAGES="$(jq '[.Results[]? | (.Packages // [])[]] | length' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과를 JSON 으로 읽지 못했다(${SCAN_FILE}) — 스캐너가 쓴 파일이 온전하지 않다"
+fi
 
 failures=0
 fail() { echo "취약점 게이트 위반: $1" >&2; failures=$((failures + 1)); }
@@ -447,16 +454,20 @@ fi
 # 차단 후보 집합 — 정책이 정하는 severity 이고, `block.only-fixed` 가 참이면 **수정본이 있는
 # 것만**이다(B-3 (a) — 고칠 길이 없는 것으로 붉히면 상시 붉은 게이트가 된다). 판정 단위는
 # (취약점 ID, 패키지 이름)이고 allowlist 키와 같은 단위다.
-CANDIDATES="$(jq -r \
+if ! CANDIDATES="$(jq -r \
   --argjson severities "$(printf '%s' "$BLOCK_SEVERITIES" | jq -R 'split(",")')" \
   --argjson onlyFixed "$BLOCK_ONLY_FIXED" '
     [ .Results[]? | (.Vulnerabilities // [])[]
       | select(.Severity as $s | $severities | index($s))
       | select(($onlyFixed | not) or ((.FixedVersion // "") != ""))
       | "\(.VulnerabilityID)|\(.PkgName)|\(.Severity)|\(.InstalledVersion // "")|\(.FixedVersion // "")"
-    ] | unique | .[]' "$SCAN_FILE")"
+    ] | unique | .[]' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과에서 차단 후보를 뽑지 못했다(${SCAN_FILE}) — 파일이 온전하지 않거나 모양이 다르다"
+fi
 
-TOTAL_FINDINGS="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' "$SCAN_FILE")"
+if ! TOTAL_FINDINGS="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' "$SCAN_FILE")"; then
+  _undecidable "스캔 결과의 finding 수를 읽지 못했다(${SCAN_FILE})"
+fi
 CANDIDATE_COUNT="$(_count_lines "$CANDIDATES")"
 
 # allowlist 판독. 키는 `allow|<kind>|<취약점 ID>|<패키지 이름>`, 값은 `<만료일> <사유>` 다
