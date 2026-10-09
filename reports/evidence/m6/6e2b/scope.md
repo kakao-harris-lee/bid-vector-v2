@@ -122,3 +122,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-15** | 장부 일괄 수령(레인 HEAD `c9cc2103`, rollback 실측 HEAD `c81f7d77`): 공유 파일 복원 원천을 `b6d31b87` 로 고정 + 실행 전 단언 둘(핀이 HEAD 의 조상 · 핀이 이 slice 의 **첫** 산출물 커밋 `e2545ea5` 를 포함하지 않음 — 계약 문면의 `1bdd7b79` 보다 강한 술어로 레인이 정정) · 이 slice 표지 0 · 6E-2a 표지 보존 · 핀과 바이트 동일 · L-1 블록 갱신. 산출물 무변경 · `check` exit 0. **종결 조건 충족**: verifier 표적 3 ready-for-review(+ 장부 일괄) — **사용자 승인(머지)만 남는다**. Codex 없음. 재작업 1/5. milestone-6.md 착수·종결 문단은 이 갱신과 같은 커밋 | 팀장 |
+
+## 계약 갱신 r12 (2026-10-09, 팀장 — PR #68 `/code-review` 수령·처분 · 조치 라운드)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-16** | **PR #68 `/code-review`**(리뷰어 다섯 → 후보 20 → 채점 80+ 하나 게시: rollback 실측 HEAD `c81f7d77` 뒤 팀장 종결 커밋이 `milestone-6.md` 를 움직여 미검증). 문턱 아래(75 이하)지만 실재해 이 라운드에서 처분: **산출물** — (A) `printf … \| grep -q` 가 `pipefail` 아래 파이프 버퍼를 넘으면 일치를 불일치로 읽는다(중복 키 검사는 열리는 쪽; ci.yml 이 같은 결함을 이미 한 번 고쳤다) · (F) `--ignorefile` 이 `trivy image` 호출에 없다 · (H) S-22e 조건이 앞선 위생 게이트·거부 스모크 실패를 보지 않는다 · (M) `install trivy` 가 S-21 앞이라 설치 실패가 무관한 container 게이트 전부를 건너뛰게 한다 — **(A)(F) 는 게이트 술어 변경이라 표적 재검증** · **문서·장부** — rollback.md 의 「`base..HEAD` 기계 산출」 문면(병합 뒤 6E-2a 경로까지 냄) · scope.md rollback 절의 폐기된 hunk 절차 · 하네스 레인 절(병합으로 들어온 6E-2a 하네스 커밋 셋 + 이 slice 가 낳은 PR #67·#69) · runbook §8.2 exit 2 전수 · §8.4.1 겹 수 · §6 신설 OPEN 다섯 등재 + 서명·push 축 OPEN ID · checklist 머리 HEAD · app 계수 불일치 · exit 1 처방 라우팅(§8.2→§8.5) · CRLF 주석 · `TRIVY_*` 자기 변수 주석 · Dockerfile uv 「두 축」 주석(이미지는 다이제스트, CI 는 태그) · **알려진 제한** — V-5 다이제스트 핀을 잠그는 술어 없음 · DB 다운로드 재시도 없음과 그 처방이 게이트 잠금으로 막혀 있음. milestone CRITICAL 계수(10)는 팀장이 이 커밋에서 정정 | 팀장 |
