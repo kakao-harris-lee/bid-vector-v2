@@ -69,7 +69,7 @@ fi
 # 검증된 게이트(6C)를 이 slice 의 범위 밖에서 건드리기 때문이다.
 _policy_value() {
   local key="$1"
-  local kind="${2:-text}" # text | numeric | list | enum-list | bool | sha256 | version
+  local kind="${2:-text}" # text | numeric | list | enum-list | bool | sha256 | version | ident
   local allowed="${3:-}"  # enum-list 일 때 허용 값 집합(쉼표 구분)
   local matches
   matches="$(awk -v k="${key}=" 'index($0, k) == 1 { n++ } END { print n+0 }' "$POLICY_FILE")"
@@ -112,7 +112,7 @@ _policy_value() {
         exit 2
       fi
       ;;
-    token)
+    ident)
       # 원소 하나짜리 식별자(배포판 family·name). `list` 와 **같은 허용 문자 집합**을 쓴다 — 공백·
       # 유니코드 공백·따옴표가 섞이면 정확 일치가 영원히 거짓이 되고, 그때 게이트는 닫히는 쪽으로
       # 틀리지만 문면이 「배포판이 바뀌었다」를 말해 원인을 가린다. 모양에서 먼저 끊는다.
@@ -275,10 +275,10 @@ JAVA_DB_REQUIRED="$(_policy_value "scan.java-db-required.${IMAGE_KIND}" bool)"
 # **배포판 선언 (D-6E2C-1, `OPEN-6E2B-OS-MATCH-PREDICATE`)**. 위 두 하한이 못 잡는 축의 입력이다 —
 # 어느 배포판을 재고 있다고 **정책이 먼저 말하고**, 아래 술어가 스캔 결과와 정확히 대조한다.
 # kind 마다 선언을 요구한다(선언 없는 kind 가 돌 때까지 구멍이 보이지 않는다).
-_each_kind_has scan.os.family token
-_each_kind_has scan.os.name token
-EXPECTED_OS_FAMILY="$(_policy_value "scan.os.family.${IMAGE_KIND}" token)"
-EXPECTED_OS_NAME="$(_policy_value "scan.os.name.${IMAGE_KIND}" token)"
+_each_kind_has scan.os.family ident
+_each_kind_has scan.os.name ident
+EXPECTED_OS_FAMILY="$(_policy_value "scan.os.family.${IMAGE_KIND}" ident)"
+EXPECTED_OS_NAME="$(_policy_value "scan.os.name.${IMAGE_KIND}" ident)"
 
 if [ ! -f "$ALLOWLIST_FILE" ]; then
   echo "allowlist 파일이 없다: ${ALLOWLIST_FILE}(정책이 가리키는 파일은 실재해야 한다 — 부재를 '등재 0'으로 읽지 않는다)" >&2
