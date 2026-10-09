@@ -116,3 +116,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 |---|---|---|
 | **D-6E2B-13** | **verifier 표적 재검증 3 `ready-for-review` @`c3aff379`**(`_workspace/m6-6e2b/10_verifier_targeted3.md`: container job·`check`·되돌린 트리 `check` exit 0 · M-A 닫힘(sbom·version 은 모듈 미독, 게이트의 trivy 호출 셋) · 병합 깨끗(runbook 외 전부 한 부모와 바이트 동일) · rollback 절차 실행: 이 slice 표지 0, 6E-2a 표지 보존). 장부 medium **LR-1**: 공유 파일 복원이 **움직이는 ref `origin/main`** 을 믿는다 — fetch 안 된(낡은) ref 면 exit 0 으로 6E-2a 줄을 지운다(실측) · L-2: 그 사이 다른 slice 가 main 에 머지됐으면 그 slice 의 문서 줄만 코드 없이 들어온다(실측) · L-1: 「verifier 가 대조할 것」 블록이 옛 실측 HEAD·경로 여섯 | 팀장 |
 | **D-6E2B-14** | **장부 일괄(레인)**: 복원 원천을 움직이는 ref 가 아니라 **이 브랜치에 마지막으로 병합한 main 커밋**(오늘 `b6d31b87`)으로 고정하고 그 SHA 를 rollback.md 에 적는다 — LR-1·L-2 를 함께 닫는다(낡은 ref 로 지우지도, 나중 slice 의 줄을 들이지도 않는다). 원천 SHA 가 브랜치의 조상이고 1bdd7b79 을 포함하지 않음을 실행 전 단언으로 · L-1 블록을 `e6f15b74`·대상 일곱으로 · rollback ①~⑥ 재실측(계수 포함). 하네스 PR #67 문면도 같은 방향으로 팀장이 갱신 | 팀장 |
+
+## 계약 갱신 r11 (2026-10-09, 팀장 — 장부 일괄 수령 · 종결)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-15** | 장부 일괄 수령(레인 HEAD `c9cc2103`, rollback 실측 HEAD `c81f7d77`): 공유 파일 복원 원천을 `b6d31b87` 로 고정 + 실행 전 단언 둘(핀이 HEAD 의 조상 · 핀이 이 slice 의 **첫** 산출물 커밋 `e2545ea5` 를 포함하지 않음 — 계약 문면의 `1bdd7b79` 보다 강한 술어로 레인이 정정) · 이 slice 표지 0 · 6E-2a 표지 보존 · 핀과 바이트 동일 · L-1 블록 갱신. 산출물 무변경 · `check` exit 0. **종결 조건 충족**: verifier 표적 3 ready-for-review(+ 장부 일괄) — **사용자 승인(머지)만 남는다**. Codex 없음. 재작업 1/5. milestone-6.md 착수·종결 문단은 이 갱신과 같은 커밋 | 팀장 |
