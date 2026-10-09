@@ -60,3 +60,16 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - exit: 1 · 1
 - 핵심 결과: ⓐ `expected:<["11.0.26"]> but was:<["11.0.24"]>` ⓑ `expected:<["2.21.7", "3.1.7"]> but was:<["3.1.7", "2.21.5"]>`. 둘 다 **그 축의 test 만** 붉었고 복원 뒤 `git diff --numstat` 이 빈 출력, HEAD 불변.
 - 알려진 제한: 기대값이 카탈로그에서 오므로 **카탈로그 값을 내리면 이 test 는 초록인 채로 하한이 내려간다**. 그 축을 지는 것은 취약점 게이트다(그 CVE 가 되살아나 exit 1). 이 test 가 지는 것은 「선언이 효과를 냈는가」 하나다.
+
+## E-4 — allowlist 비움 + 잔여 triage (D-6E2C-4)
+
+### 2026-10-09 · 상향 뒤 두 이미지 재스캔, 등재 0 (HEAD `c90f6c77` 양끝 단언)
+- cmd: 두 이미지 재빌드(`:app:bootJar` → `docker build` 둘) 뒤 `tools/vuln-scan-check.sh` 를 kind 별로
+- exit: 0 · 0
+- 핵심 결과: `allowlist_전체=0` 로 **둘 다 통과** — ml-serving 차단 후보 52 → 0(findings_total 468 → 284) · 앱 15 → 0(50 → 19). 양성 대조 넷(116/115 · 226/225)은 하한(80/80 · 150/150) 위 그대로라 `scan.min-*` 은 손대지 않는다.
+- 주의(측정 규율): 변이 라운드가 남긴 배포물은 **변이 상태로 빌드돼 있다**(`jackson-databind-2.21.5`). 이미지 빌드 전에 복원된 트리에서 `bootJar` 를 다시 떠 그 사실을 확인했다 — 소스 복원만으로는 산출물이 복원되지 않는다.
+
+### 2026-10-09 · 잔여 finding — **등재가 필요한 것은 0**
+- cmd: 두 스캔 결과를 severity × 수정판 유무로 집계
+- exit: 0
+- 핵심 결과: ml-serving CRITICAL 2 · HIGH 55 가 남지만 **수정판이 있는 것은 0**(`block.only-fixed=true` — 고칠 길 없는 것으로 붉히면 상시 붉은 게이트가 된다). 그 밖에 ml MEDIUM 5 · LOW 1, 앱 MEDIUM 2 가 수정판을 갖지만 차단 문턱(HIGH,CRITICAL) 아래다. 앱에는 HIGH/CRITICAL 이 **한 건도** 없다.
