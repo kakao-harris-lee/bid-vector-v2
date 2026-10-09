@@ -42,3 +42,21 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - cmd: `tools/vuln-scan-check.sh bidvector/ml-serving:local ml-serving …`(정책 `12.15`)
 - exit: 1
 - 핵심 결과: `os=debian/12.15(정책 선언 debian/12.15)` · 차단 후보 **52 → 0** · findings_total 468 → 284 · 나열 패키지 115 그대로 · 등재 52건이 전부 **stale** 로 붉다(E-4 가 걷는다). **나열 수가 그대로인 채 finding 이 준 조합**은 6E-2b 가 사람에게 맡겼던 신호인데, 이제 OS 매칭 술어가 그것이 진짜 해소임을 함께 증명한다.
+
+## E-3 — JVM 보안 하한 (D-6E2C-3)
+
+### 2026-10-09 · 좌표 실재 확인
+- cmd: Maven Central 의 `jackson-bom` 2.21.7 · `tools/jackson/jackson-bom` 3.1.7 · `tomcat-embed-core` 11.0.26 POM 조회
+- exit: 0 (HTTP 200 셋)
+- 핵심 결과: 세 좌표가 전부 실재 — 카탈로그에 적기 전에 확인했다.
+
+### 2026-10-09 · 하한이 해석에 닿는다 (HEAD `9a71e668` 양끝 단언)
+- cmd: `./gradlew --no-daemon :app:test --tests 'bidvector.app.packaging.*'`
+- exit: 0
+- 핵심 결과: 배포물 `BOOT-INF/lib` 가 tomcat-embed 셋 **11.0.24 → 11.0.26** · jackson2 **2.21.5 → 2.21.7**(dataformat-yaml 포함) · jackson3 **3.1.5 → 3.1.7**.
+
+### 2026-10-09 · 변이 둘 — 전부 **바꿔치우기**, 대조군은 실제 부모 커밋 `398398eb`
+- cmd: ⓐ `constraints { … }` 안의 tomcat 세 줄 제거(`git diff --numstat` `0 3`) ⓑ `platform(libs.jackson2.bom)` 한 줄 제거(`0 1`) — 각각 재빌드 후 같은 test
+- exit: 1 · 1
+- 핵심 결과: ⓐ `expected:<["11.0.26"]> but was:<["11.0.24"]>` ⓑ `expected:<["2.21.7", "3.1.7"]> but was:<["3.1.7", "2.21.5"]>`. 둘 다 **그 축의 test 만** 붉었고 복원 뒤 `git diff --numstat` 이 빈 출력, HEAD 불변.
+- 알려진 제한: 기대값이 카탈로그에서 오므로 **카탈로그 값을 내리면 이 test 는 초록인 채로 하한이 내려간다**. 그 축을 지는 것은 취약점 게이트다(그 CVE 가 되살아나 exit 1). 이 test 가 지는 것은 「선언이 효과를 냈는가」 하나다.
