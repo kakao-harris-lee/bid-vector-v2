@@ -175,6 +175,18 @@ _count_lines() {
   printf '%s\n' "$1" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]'
 }
 
+# **파이프 없는 멤버십 검사**(PR #68 /code-review A). `printf … | grep -qxF` 는 `set -o pipefail`
+# 아래에서 **일치를 불일치로 읽는다**: `grep -q` 가 첫 일치에서 즉시 나가며 파이프를 닫고, 그러면
+# `printf` 가 SIGPIPE(141)로 죽어 파이프라인 상태가 141 이 된다. 건초더미가 파이프 버퍼(64KB)를 넘고
+# 일치가 앞쪽에 있을 때 재현된다 — 실측: 668KB·첫 줄 일치에서 옛 형태는 「불일치」, here-string 은
+# 「일치」. **중복 키 검사에서는 이것이 게이트를 여는 쪽으로 틀린다**(중복을 못 보고 지난다).
+#
+# 같은 결함을 이 저장소의 `ci.yml` 이 이미 한 번 고쳤다(앱 로그 검사) — 그때의 처방과 같은 모양으로,
+# 파이프를 없앤다. here-string 은 임시 파일로 전달되므로 SIGPIPE 자체가 생기지 않는다.
+_in_lines() { # <찾을 줄> <건초더미(개행 구분 문자열)>
+  grep -qxF -- "$1" <<< "$2"
+}
+
 _contains() { # <쉼표 목록> <원소>
   local IFS=','
   local -a items
@@ -270,6 +282,8 @@ SCAN_FILE="${REPORT_DIR_ABS}/${IMAGE_KIND}-scan.json"
 # 각각 독립으로 성립함을 확인) —
 #   ① trivy 를 **빈 임시 디렉터리**에서 돌린다 → cwd 의 `trivy.yaml`·`.trivyignore` 가 없다
 #   ② 그래도 `--config`·`--ignorefile` 로 **빈 파일을 명시**한다 → 기본 탐색 자체가 일어나지 않는다
+#      — `--ignorefile` 은 **두 호출 모두**에 건다(PR #68 /code-review F: `sbom` 에만 있었다.
+#      `image` 도 `.trivyignore` 를 읽으므로 한쪽만 걸면 SBOM 생성 단계가 열려 있다)
 # 적대 cwd(둘 다 심은 디렉터리)에서 ② 만으로도 finding 집합이 보존됨을 실측했다.
 # **판정 불가는 차단이 아니다 — exit 2 다**(code-review r1 M-5). 운영자는 runbook §8.2 를 읽고 exit 1 을
 # 보면 「올리거나 등재하라」로 가는데, 재지 못한 경우에 할 일은 **스캐너가 왜 못 읽었는지 보는 것**이다.
@@ -327,6 +341,7 @@ echo "== 이미지 취약점 게이트: ${IMAGE_REF} (kind=${IMAGE_KIND}) =="
 # 올릴 때 `trivy sbom --help` 에 모듈 플래그가 생겼는지 함께 본다.
 if ! _trivy image \
   --module-dir "${TRIVY_SANDBOX}/modules" \
+  --ignorefile "$EMPTY_IGNOREFILE" \
   --scanners "$SCAN_SCANNERS" \
   --pkg-types "$SCAN_PKG_TYPES" \
   --format "$SBOM_FORMAT" \
@@ -453,7 +468,10 @@ MAX_EPOCH="$(date -u -d "$TODAY + ${ALLOWLIST_MAX_DAYS} days" +%s)"
 ALLOW_LINES="$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' "$ALLOWLIST_FILE" | grep -v '^#' | grep -v '^$' || true)"
 
 allow_entry_count=0
-allow_seen_keys=()
+# 배열 대신 **개행 구분 문자열**로 쌓는다 — 멤버십이 here-string 한 번으로 끝나고, 배열을 매번
+# `printf` 로 펴면서 파이프를 만들 일이 없다.
+allow_seen_keys_text=""
+allow_this_kind_text=""
 allow_this_kind=()
 while IFS= read -r line; do
   [ -n "$line" ] || continue
@@ -505,11 +523,11 @@ while IFS= read -r line; do
     echo "allowlist 등재에 사유가 없다(만료일만 있는 등재는 등재가 아니다): '${entry_key}'" >&2
     exit 2
   fi
-  if printf '%s\n' "${allow_seen_keys[@]:-}" | grep -qxF -- "$entry_key"; then
+  if _in_lines "$entry_key" "$allow_seen_keys_text"; then
     echo "allowlist 키가 중복 선언됐다(뒤 값이 앞 값을 조용히 덮는다): '${entry_key}'" >&2
     exit 2
   fi
-  allow_seen_keys+=("$entry_key")
+  allow_seen_keys_text+="${entry_key}"$'\n'
   allow_entry_count=$((allow_entry_count + 1))
 
   # 만료·창 상한은 kind 와 무관한 날짜 성질이라 **등재 전부**에 건다 — 한 번의 실행이 모든
@@ -522,6 +540,7 @@ while IFS= read -r line; do
 
   if [ "$f_kind" = "$IMAGE_KIND" ]; then
     allow_this_kind+=("${f_id}|${f_pkg}")
+    allow_this_kind_text+="${f_id}|${f_pkg}"$'\n'
   fi
 done <<< "$ALLOW_LINES"
 
@@ -537,7 +556,7 @@ CANDIDATE_KEY_COUNT="$(_count_lines "$candidate_keys")"
 allow_applied=0
 for entry in "${allow_this_kind[@]:-}"; do
   [ -n "$entry" ] || continue
-  if printf '%s\n' "$candidate_keys" | grep -qxF -- "$entry"; then
+  if _in_lines "$entry" "$candidate_keys"; then
     allow_applied=$((allow_applied + 1))
   else
     fail "allowlist 등재가 이 이미지의 차단 후보 어디에도 맞지 않는다(stale — 치워야 한다): allow|${IMAGE_KIND}|${entry}"
@@ -546,7 +565,7 @@ done
 
 BLOCKING="$(printf '%s\n' "$CANDIDATES" | sed '/^[[:space:]]*$/d' | while IFS= read -r row; do
   key="$(printf '%s' "$row" | awk -F'|' '{print $1 "|" $2}')"
-  if ! printf '%s\n' "${allow_this_kind[@]:-}" | grep -qxF -- "$key"; then
+  if ! _in_lines "$key" "$allow_this_kind_text"; then
     printf '%s\n' "$row"
   fi
 done)"
