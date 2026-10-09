@@ -151,3 +151,9 @@ in_scope 밖이며, 운영자 승인 아래 같은 range 에 있다:
 | ID | 결정 | 출처 |
 |---|---|---|
 | **D-6E2B-16** | **PR #68 `/code-review`**(리뷰어 다섯 → 후보 20 → 채점 80+ 하나 게시: rollback 실측 HEAD `c81f7d77` 뒤 팀장 종결 커밋이 `milestone-6.md` 를 움직여 미검증). 문턱 아래(75 이하)지만 실재해 이 라운드에서 처분: **산출물** — (A) `printf … \| grep -q` 가 `pipefail` 아래 파이프 버퍼를 넘으면 일치를 불일치로 읽는다(중복 키 검사는 열리는 쪽; ci.yml 이 같은 결함을 이미 한 번 고쳤다) · (F) `--ignorefile` 이 `trivy image` 호출에 없다 · (H) S-22e 조건이 앞선 위생 게이트·거부 스모크 실패를 보지 않는다 · (M) `install trivy` 가 S-21 앞이라 설치 실패가 무관한 container 게이트 전부를 건너뛰게 한다 — **(A)(F) 는 게이트 술어 변경이라 표적 재검증** · **문서·장부** — rollback.md 의 「`base..HEAD` 기계 산출」 문면(병합 뒤 6E-2a 경로까지 냄) · scope.md rollback 절의 폐기된 hunk 절차 · 하네스 레인 절(병합으로 들어온 6E-2a 하네스 커밋 셋 + 이 slice 가 낳은 PR #67·#69) · runbook §8.2 exit 2 전수 · §8.4.1 겹 수 · §6 신설 OPEN 다섯 등재 + 서명·push 축 OPEN ID · checklist 머리 HEAD · app 계수 불일치 · exit 1 처방 라우팅(§8.2→§8.5) · CRLF 주석 · `TRIVY_*` 자기 변수 주석 · Dockerfile uv 「두 축」 주석(이미지는 다이제스트, CI 는 태그) · **알려진 제한** — V-5 다이제스트 핀을 잠그는 술어 없음 · DB 다운로드 재시도 없음과 그 처방이 게이트 잠금으로 막혀 있음. milestone CRITICAL 계수(10)는 팀장이 이 커밋에서 정정 | 팀장 |
+
+## 계약 갱신 r13 (2026-10-09, 팀장 — 조치 라운드 수령·동결 · 표적 재검증 4)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-17** | PR #68 조치 라운드 수령(`_workspace/m6-6e2b/11_implementer_pr68.md`, 레인 HEAD `005c5fdb`, 마지막 산출물 커밋 = rollback 실측 HEAD `fc8f373c` — 팀장 milestone 정정 뒤). (A) 실재 확인: 고치기 전 부모 커밋은 큰 allowlist 의 중복 키를 0 으로, 고친 코드는 1 로 보고 · (F) 더 무거웠다: `image` 호출에 ignorefile 이 없으면 SBOM 자체가 CRITICAL 여섯을 잃고 판정이 그 SBOM 을 읽어 전파 — cwd 잠금 하나가 덮고 있었다 · (H)(M) ci.yml. 레인 자기 정정 셋(대조군이 측정 대상을 못 봄 ×2 · 표지 과광역 ×1) — 대조군은 **실제 부모 커밋**, 정확 축은 바이트 동일로. **레인 동결, 판정 SHA = 이 갱신 커밋 → 표적 재검증 4**(A·F 술어 변경 · H·M CI 조건 · rollback 재실측 유효성) | 팀장 |
