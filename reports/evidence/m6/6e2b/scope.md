@@ -103,3 +103,9 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 |---|---|---|
 | **D-6E2B-10** | **verifier 표적 재검증 2 `ready-for-review` @`a7dc7735`**(`_workspace/m6-6e2b/08_verifier_targeted2.md`: container job·`check` exit 0, 새 DB 로 52/15 applied · 0 unlisted; M-2·M-3·L-1·L-2 닫힘, M-1 좁힘 확인, 회귀 0). medium 하나 **M-A**(trivy 가 `$HOME/.trivy/modules` 의 WASM 모듈을 기본으로 읽는다 — 모듈은 post-scan 으로 결과를 고칠 수 있어 만료·stale 없는 면제 축; 로드 경로 실측, end-to-end 미측정) · 장부 L-A(이미지 ID 재현성 주장 과대) | 팀장 |
 | **D-6E2B-11** | **종결 일괄**: M-A `--module-dir` 를 샌드박스의 빈 디렉터리로 고정 + 음성 대조(HOME 에 쓰레기 모듈 → 판정 불변; 대조군: 고정을 뺀 변이에서 로드됨) — 게이트 술어 변경이라 **M-A 한정 표적 재검증** · 레인이 보관한 장부 넷(이미지 ID 문면 → 「이 회차가 판정한 바이트」, 재현성 주장 철회 = L-A · rollback.md 에 `milestone-6.md` 공유 파일 hunk 절차(실행 시 산출) · 등식 문장 「복원 인자 ∪ hunk 처리 공유 파일」 · 「공유 파일에 다른 slice 줄 없음」 문장을 그 전환 조건대로 정정). milestone-6.md 착수·종결 문단은 팀장이 일괄 뒤 쓴다 | 팀장 |
+
+## 계약 갱신 r9 (2026-10-09, 팀장 — 종결 일괄·main 병합 수령 · 표적 재검증 3)
+
+| ID | 결정 | 출처 |
+|---|---|---|
+| **D-6E2B-12** | 종결 일괄 수령(`_workspace/m6-6e2b/09_implementer_closure.md`): M-A `--module-dir` 샌드박스 고정(image 만 그 옵션을 받고 sbom 은 모듈을 읽지 않음 실측, 대조군 N14) · 장부 넷 · **origin/main(`b6d31b87`, PR #66) 병합 `67d3e787`**(runbook 충돌 둘, 두 slice 문면 보존). **rollback 절차 변경 수령**: 팀장이 지시한 공유 파일 hunk 역적용은 **실측에서 완료되지 않았다**(인접 삽입 지점 충돌 + 병합 커밋의 충돌 해소는 `--no-merges` 목록 밖 → 이 slice 의 줄 넷·§8 잔존, 그런데 ①~⑥ 은 전부 exit 0 — 「내 줄이 사라졌는가」 계수만이 잡았다). 대체: 공유 파일(runbook·milestone-6.md)을 **`origin/main` 에서 복원**(전제: main 에 6E-2b 가 없음; 머지 뒤 되돌림은 PR revert) — 재실측 HEAD `e6f15b74`, 이 slice 표지 0 · 6E-2a 표지 보존 · runbook 이 main 과 바이트 동일. 자기 경로 집합은 `^origin/main` non-merge 커밋으로 산출. 레인 동결, 판정 SHA = 이 갱신 커밋 → **표적 재검증 3**(M-A · 병합 결과 · 새 rollback 절차) | 팀장 |
