@@ -114,7 +114,7 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
 **rollback**
 - range revert 가 아니라 in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`. 목록은
   `git diff --name-status <base>..HEAD` 기계 산출, 라운드마다 재산출.
-- 공유 파일은 **머지 전이면 `origin/main` 에서 복원**(전제: main 에 이 slice 없음 · 머지 뒤 되돌림은 PR revert —
+- 공유 파일은 **머지 전이면 병합된 main 커밋 SHA(고정, 움직이는 `origin/main` 금지)에서 복원**(전제: 그 SHA 에 이 slice 없음 — 첫 산출물 커밋 미포함 단언 · 머지 뒤 되돌림은 PR revert —
   같은 복원이 머지 순간 아무것도 안 지우며 exit 0, 2026-10-09). 커밋 해시 hunk 격리(`git diff <sha>~1..<sha> -- <파일>
   | git apply -R`)는 끝까지 실행해 완료가 실측될 때만 — 병합 커밋의 충돌 해소 줄은 `--no-merges` 목록 밖이고 `--3way`
   도 자동 해소에 실패한다. 완료는 종료 코드가 아니라 **「내 표지 0 · 남의 표지 보존」 계수**로. 같은 slice 의 자기 이력은 착수 커밋 기준 단일 역적용 + 하네스 절
