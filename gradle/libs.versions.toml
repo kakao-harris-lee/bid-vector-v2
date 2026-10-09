@@ -15,6 +15,17 @@ junit = "6.1.3"
 kotest = "6.2.4"
 coroutines = "1.10.2"
 
+# M6/6E-2c D-6E2C-3 — **보안 하한**(`OPEN-6E2B-DEPENDENCY-BUMP`). Boot 4.1.1 BOM 이 관리하는 판
+# (tomcat 11.0.24 · jackson2 2.21.5 · jackson3 3.1.5)에 **수정판이 나와 있는** HIGH/CRITICAL 이
+# 걸려 있는데 **Boot 4.1.x 는 4.1.1 이 최신**이라 BOM 판 올림으로는 닫히지 않는다. Boot 판을
+# 올리는 것(4.2.0-M2)은 이 slice 의 범위 밖이므로, BOM 위에 **하한 셋**을 얹는다.
+#
+# 이 셋은 취향이 아니라 **게이트가 요구하는 값**이다 — `app/src/test` 가 배포물에서 해석 결과를
+# 재므로, 여기를 내리면 그 test 가 RED 다(값과 효과가 같은 자리에서 잠긴다).
+tomcat = "11.0.26"
+jackson2 = "2.21.7"
+jackson3 = "3.1.7"
+
 # ADR 0005 가 채택한 운영 라이브러리
 db-scheduler = "16.12.0"
 resilience4j = "2.4.0"
@@ -97,6 +108,15 @@ spring-boot-jdbc = { module = "org.springframework.boot:spring-boot-jdbc" }
 # 관리한다. 이 좌표는 `compatibilitySmoke.expectedModules` 에도 등재돼야 해석·컴파일·로드가
 # 실제로 재진다(app/build.gradle.kts).
 hikaricp = { module = "com.zaxxer:HikariCP" }
+# M6/6E-2c D-6E2C-3 — 보안 하한의 좌표. jackson 은 **가족 전체**를 한 선언으로 정렬해야 해
+# (core·databind·annotations·dataformat 이 각자 버전을 갖는다) BOM 을 `platform()` 으로 얹고,
+# tomcat 은 세 좌표뿐이라 `constraints` 로 하한만 건다. 둘 다 Boot BOM 을 **대체하지 않는다** —
+# Gradle 이 제약 가운데 높은 판을 고르므로 그 밖의 좌표는 Boot 가 관리하던 그대로다.
+jackson2-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson2" }
+jackson3-bom = { module = "tools.jackson:jackson-bom", version.ref = "jackson3" }
+tomcat-embed-core = { module = "org.apache.tomcat.embed:tomcat-embed-core", version.ref = "tomcat" }
+tomcat-embed-el = { module = "org.apache.tomcat.embed:tomcat-embed-el", version.ref = "tomcat" }
+tomcat-embed-websocket = { module = "org.apache.tomcat.embed:tomcat-embed-websocket", version.ref = "tomcat" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test" }
 # Boot 4.1 모듈 재편(실측, 2026-09-19) — `TestRestTemplate`이 `spring-boot-test`에서
 # 이 좌표(`org.springframework.boot.resttestclient.TestRestTemplate`)로 옮겼다. 위

@@ -79,6 +79,22 @@ dependencies {
     implementation(libs.spring.boot.jdbc)
 }
 
+// M6/6E-2c D-6E2C-3 — **보안 하한**(`OPEN-6E2B-DEPENDENCY-BUMP`). Boot 4.1.1 BOM 이 관리하는
+// tomcat 11.0.24 · jackson 2.21.5 / 3.1.5 에 수정판 있는 HIGH/CRITICAL 이 걸려 있고 **Boot 4.1.x 는
+// 4.1.1 이 최신**이라 BOM 판 올림으로는 닫히지 않는다. 지렛대는 둘뿐이다 — 이 모듈은
+// `io.spring.dependency-management` 를 적용하지 않으므로 `extra["tomcat.version"]` 같은 Boot 3 관례가
+// **무효**다(실측). jackson 은 가족 전체를 BOM 으로 정렬하고, tomcat 은 세 좌표에 하한만 건다.
+// 값은 전부 카탈로그에 있고 아래 `BootJarSecurityFloorTest` 가 **배포물에서** 그 효과를 잰다.
+dependencies {
+    implementation(platform(libs.jackson2.bom))
+    implementation(platform(libs.jackson3.bom))
+    constraints {
+        implementation(libs.tomcat.embed.core)
+        implementation(libs.tomcat.embed.el)
+        implementation(libs.tomcat.embed.websocket)
+    }
+}
+
 // sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
 // /build.gradle.kts` 주석과 같은 이유). 위 `dependencies {}` 가 추가로 그 상한에
 // 닿아, 관련 없는 나머지 배선(corpus 소비 test 전용 project 의존)을 별도 블록으로 나눈다
@@ -182,6 +198,15 @@ tasks.test {
     contractInput("openApiSpec", "bidvector.openapi.spec", settingsFile("openapi/bidvector-operator-api.yaml"))
 }
 
+// D-6E2C-3 — 하한의 **효과**를 test 가 잰다. 기대값은 카탈로그 한 자리에서 오고(매직 넘버 금지)
+// 실제 값은 배포물 `BOOT-INF/lib` 에서 온다 — 선언이 효과를 냈는지가 그 둘의 일치다. `tasks.test`
+// 를 따로 여는 것은 위 블록의 50줄 축을 건드리지 않기 위해서다(이 파일의 기존 관례).
+tasks.test {
+    systemProperty("bidvector.security.floor.tomcat", libs.versions.tomcat.get())
+    systemProperty("bidvector.security.floor.jackson2", libs.versions.jackson2.get())
+    systemProperty("bidvector.security.floor.jackson3", libs.versions.jackson3.get())
+}
+
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
 // 테스트가 잰다. 두 층을 한 명령으로 묶는다.
 val compatibilitySmokeTest =
@@ -216,6 +241,11 @@ val compatibilitySmoke =
                 "org.flywaydb:flyway-core",
                 "org.testcontainers:testcontainers-postgresql",
                 "com.tngtech.archunit:archunit-junit6",
+                // M6/6E-2c D-6E2C-3 — 보안 하한 셋의 좌표. 등재하지 않으면 그 해석을 아무도 재지
+                // 않고, 리포트에도 해석된 판이 남지 않는다.
+                "org.apache.tomcat.embed:tomcat-embed-core",
+                "com.fasterxml.jackson.core:jackson-databind",
+                "tools.jackson.core:jackson-databind",
                 // 카탈로그가 BOM 을 이기는지 — Boot 4.1.1 BOM 은 kotlin 2.3.21 / jupiter 6.0.3 을 관리한다.
                 "org.jetbrains.kotlin:kotlin-stdlib",
                 "org.junit.jupiter:junit-jupiter",
