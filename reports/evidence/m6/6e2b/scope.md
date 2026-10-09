@@ -47,11 +47,34 @@ CI `container` job 로컬 재현(S-21~S-25 + 새 step; 호스트 규율: pgrep·
 
 ## rollback
 
-신설 파일 제거 · `docker/ml-serving.Dockerfile` 은 `git restore --source=2deb5f9d` · 공유 파일(`ci.yml`·runbook·`milestone-6.md`)은 커밋 해시 hunk 역적용(실행 시 산출, 최신부터). 임시 clone 에서 ①~⑥ 실측(⑥ 게이트 = container job 재현).
+**정본은 `reports/evidence/m6/6e2b/rollback.md`** 이고 착수 때 적은 아래 문면은 그 뒤 두 번 바뀌었다.
+현행: **단일 restore 다섯**(`ci.yml` · 정책 둘 · `docker/ml-serving.Dockerfile` · `tools/vuln-scan-check.sh`,
+`git restore --source=2deb5f9d`) + **공유 둘**(`docs/runbook/m6-6e-operations.md` · `milestone-6.md`)은
+**이 브랜치에 마지막으로 병합한 main 커밋 `b6d31b87` 판으로 복원**하고, 그 앞에 단언 둘(핀이 브랜치의
+조상 · 핀이 이 slice 의 첫 산출물 커밋을 담지 않음)을 둔다. 임시 clone 에서 ①~⑥ 실측(⑥ 게이트 =
+container job 재현) + **표지 계수**(이 slice 0 · 6E-2a 보존).
+
+~~착수 문면: 신설 파일 제거 · Dockerfile 은 restore · 공유 파일은 커밋 해시 hunk 역적용~~ —
+**hunk 역적용은 실측에서 완결되지 않았다**(conflict 둘, 내 줄 4건 잔존). 폐기 사유는 rollback.md.
 
 ## 하네스 레인 변경 (상시)
 
-- (착수 시점 없음)
+착수 시점에는 없었다. 그 뒤 둘로 늘었다 — **병합으로 들어온 것**과 **이 slice 가 낳은 것**이다.
+
+**(1) `origin/main` 병합(PR #66)이 들여온 6E-2a 레인의 하네스 커밋 셋** — 이 slice 의 산출물이 아니고
+in_scope 밖이며, 운영자 승인 아래 같은 range 에 있다:
+
+| 커밋 | 경로 | 목적 |
+|---|---|---|
+| `99f2067c` | `CLAUDE.md` | 색인의 Codex 핀을 정본에 맞춤(0.160.1 · MCP 비활성) |
+| `cbef2c06` | `.claude/skills/codex-review-gate/SKILL.md` | 호출마다 MCP·plugin·샌드박스 네트워크 비활성 |
+| `075c03b1` | `.claude/skills/codex-review-gate/SKILL.md` | 바이너리·버전 핀 갱신(WSL 경로 · 0.160.1) |
+
+**(2) 이 slice 가 낳은 하네스 PR 둘** — 레인이 겪은 사고가 하네스 문면으로 올라간 것이고, **이 브랜치의
+커밋이 아니다**: **PR #67**(scratchpad 레인별 하위 디렉터리 · 슬롯 판정 두 표본과 `/proc` cwd 귀속) ·
+**PR #69**(공유 파일 되돌림 — 고정 핀과 단언 둘).
+
+되돌림은 이 둘을 **건드리지 않는다**(rollback.md 「되돌리지 않는 것」).
 
 ## 계약 갱신 r1 (2026-10-08, 팀장 — triage 결정)
 

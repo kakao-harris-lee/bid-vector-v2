@@ -11,7 +11,11 @@ evidence 까지 담아 ⑥ 의 `leakPatternGate` 가 이 slice 의 문서를 실
 
 ## 되돌리는 것 / 되돌리지 않는 것
 
-목록은 손으로 쓰지 않고 `git diff --name-status 2deb5f9d..HEAD` 에서 기계적으로 낸다
+목록은 손으로 쓰지 않고 기계적으로 낸다 — **다만 병합 뒤로 `git diff --name-status 2deb5f9d..HEAD` 는
+쓸 수 없다**(PR #68 /code-review). 그 범위는 병합이 들여온 6E-2a 경로를 전부 담는다. 이 slice 의 경로는
+**내 쪽 비-병합 커밋**에서 낸다 — `git log --no-merges --format=%h 2deb5f9d..HEAD ^b6d31b87` 로 커밋을
+고르고 각 커밋의 `git diff-tree --no-commit-id --name-only -r` 를 모은다(아래 「등식」 절의 명령).
+A/M 구분이 필요하면 그 집합을 base 와 대조한다
 (A = 삭제 대상, M = base 로 복원). **라운드마다 파일이 늘면 이 산출을 다시 돌린다.**
 
 | 상태 | 경로 |

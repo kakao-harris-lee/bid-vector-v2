@@ -50,14 +50,20 @@ done
 # 게이트가 조용히 다른 입력으로 돌아간다 — 이 slice 의 다른 거부들과 같은 선택이다(값을 지어내지
 # 않고 판정 불가를 선언한다). 이 스크립트는 `TRIVY_*` 를 **하나도 세우지 않으므로** 발견되는 것은
 # 전부 바깥에서 온 것이다.
+# `${!TRIVY_@}` 는 **이 스크립트 자신의 셸 변수도 본다** — `TRIVY_SANDBOX`·`TRIVY_VERSION`·
+# `TRIVY_PINNED_VERSION`·`TRIVY_SEVERITIES`·`TRIVY_SCANNERS`·`TRIVY_PKG_TYPES` 가 그 접두를 갖는다.
+# 그것들은 **이 검사보다 뒤에서** 처음 대입되므로 지금 시점에는 존재하지 않고, 그래서 여기서 걸리지
+# 않는다. 순서에 기대는 잠금이라는 뜻이다 — **이 검사를 아래로 옮기면 자기 변수에 걸려 항상 거부한다.**
 _trivy_env_names=( ${!TRIVY_@} )
 if [ "${#_trivy_env_names[@]}" -gt 0 ]; then
   echo "TRIVY_* 환경변수가 설정돼 있다(${_trivy_env_names[*]}) — 이 게이트는 그것을 입력으로 받지 않는다. 면제 축은 allowlist 하나뿐이어야 한다(만료·사유·stale 이 걸린다)" >&2
   exit 2
 fi
 
-# 정책 값 판독. `tools/image-hygiene-check.sh` 의 `_policy_value` 와 같은 설계다(중복 키·빈 값·
-# CRLF·값 모양을 전부 정책 오류로 끊는다 — 6C 의 세 라운드가 만든 규율). **셸 게이트가 둘이
+# 정책 값 판독. `tools/image-hygiene-check.sh` 의 `_policy_value` 와 같은 설계다(중복 키·빈 값·값 모양을
+# 전부 정책 오류로 끊는다 — 6C 의 세 라운드가 만든 규율). **CRLF 는 「거부」가 아니라 「절삭」이다**
+# (PR #68 /code-review): `tr -d '\r'` 로 캐리지 리턴을 **지우고**, 그 결과가 비면 그때 빈 값으로 끊는다.
+# 그래서 CRLF 가 섞인 정책 파일은 값이 살아 있으면 통과한다 — 「CRLF 를 정책 오류로 끊는다」가 아니다. **셸 게이트가 둘이
 # 되면서 이 파서도 둘이 됐다** — 모집단 증가로 `OPEN-6C-POLICY-GATE-STRUCTURAL`(셸 정책 파싱을
 # build-logic 타입 태스크로)에 등재한다. 지금 공유 라이브러리로 뽑지 않는 것은 그 추출이
 # 검증된 게이트(6C)를 이 slice 의 범위 밖에서 건드리기 때문이다.
