@@ -87,34 +87,54 @@ class BootJarSecurityFloorTest {
     }
 
     /**
-     * **jackson 은 고정 쌍이 아니라 배포물에 실제로 실린 가족을 잰다**(D-6E2C-8). `core`·`databind` 만
-     * 적으면 `jackson-dataformat-yaml` 처럼 같은 라인에서 함께 올라오는 좌표가 아무 술어 아래에도 없다.
+     * **jackson 은 두 축으로 잰다**(D-6E2C-8).
      *
-     * 대상은 **하한의 `major.minor.` 라인 위에 있는 가족 원소**다. 그 라인 밖의 jackson 좌표는 BOM 이
-     * **독자 판**으로 핀하므로(실측: 2.21.7 BOM 이 `jackson-annotations` 를 `2.21` 로 핀한다 — `2.21.7` 인
-     * annotations 자체가 없다) 카탈로그 하한과 비교할 대상이 아니다. 그것까지 하한으로 묶으면 test 가
-     * 오늘 바로 빨강이고 처방이 「단언 약화」가 된다. **대상 밖 원소는 실패 문면에 함께 실어** 조용히
-     * 빠지지 않게 한다. 그 좌표의 CVE 는 취약점 게이트가 진다.
+     * ⓐ **카탈로그가 하한을 선언한 좌표**(`jackson-core`·`jackson-databind`)는 **접두와 무관하게 항상
+     *    대상**이다. 실린 사본은 그 major 의 하한과 같아야 한다 — `jackson-databind-2.20.3.jar` 처럼
+     *    **minor 가 낮은 사본**은 `2.21.` 접두를 갖지 않으므로, 라인 접두만으로 대상을 고르면 조용히
+     *    빠진다(하한 미만인데 초록). major 가 있다면 전부 하한이고, **좌표가 통째로 빠지는 것은 허용**
+     *    한다(Boot 생태계가 Jackson 3 으로 수렴하는 날 그것은 바람직한 변화다).
+     * ⓑ **그 밖의 가족 원소**(`jackson-dataformat-yaml` 등)는 같은 `major.minor.` 라인 위에 있으면
+     *    하한과 같아야 한다. 라인 밖은 BOM 이 **독자 판**으로 핀하는 좌표라(실측: 2.21.7 BOM 이
+     *    `jackson-annotations` 를 `2.21` 로 핀한다) 카탈로그 하한과 비교할 대상이 아니다.
+     * ⓒ **대상 밖 원소는 통과할 때도 출력에 나열한다** — 실패 문면에만 적으면 초록인 회차에서 조용히
+     *    사라지고, 「무엇을 안 쟀는가」가 보이지 않는다.
+     *
+     * 안 재는 것(알려진 제한): core·databind **밖** 원소의 낮은 minor 사본과 독자 라인(annotations).
+     * 그 축은 취약점 게이트가 진다 — 그 jar 에 CVE 가 나면 스캔이 붉어진다.
      */
     @Test
-    fun `배포물의 jackson 가족이 major 별 보안 하한 라인 위에 있다`() {
-        val family =
-            bundledJarNames()
-                .filter { it.startsWith("jackson-") }
-                .mapNotNull { name -> splitArtifactVersion(name)?.let { name to it.second } }
-        withClue("배포물에 판을 읽을 수 있는 jackson 가족이 없다 — 빈 목록 위의 '위반 0' 은 공허하다") {
-            family.shouldNotBeEmpty()
+    fun `배포물의 jackson 가족이 보안 하한 판이다`() {
+        val names = bundledJarNames()
+        withClue("배포물의 BOOT-INF/lib 가 비어 있다 — 빈 목록 위의 '위반 0' 은 공허하다") {
+            names.shouldNotBeEmpty()
         }
+        val floors = mapOf("2" to floor("jackson2"), "3" to floor("jackson3"))
+        val declared = listOf("jackson-core", "jackson-databind")
 
-        listOf(floor("jackson2"), floor("jackson3")).forEach { expected ->
-            val line = expected.substringBeforeLast('.') + "."
-            val onLine = family.filter { (_, version) -> version.startsWith(line) }
-            val offFloor = onLine.filter { (_, version) -> version != expected }.map { it.first }
-            val offLine = (family - onLine.toSet()).map { it.first }
-            withClue("하한 $expected 라인($line) 위의 사본이 하한과 다르다: $offFloor · 이 라인 밖이라 대상이 아닌 것: $offLine") {
+        declared.forEach { artifact ->
+            val offFloor =
+                versionsOf(artifact, names)
+                    .filter { version -> floors[version.substringBefore('.')]?.equals(version) == false }
+            withClue("$artifact: 하한과 다른 사본이 실렸다(좌표가 빠지는 것은 허용, 어긋나는 것은 아니다): $offFloor") {
                 offFloor.shouldBeEmpty()
             }
         }
+
+        val offTarget = mutableListOf<String>()
+        names
+            .filter { it.startsWith("jackson-") }
+            .mapNotNull { name -> splitArtifactVersion(name)?.let { name to it } }
+            .filterNot { (_, split) -> split.first in declared }
+            .forEach { (name, split) ->
+                val onLine = floors.values.firstOrNull { split.second.startsWith(it.substringBeforeLast('.') + ".") }
+                if (onLine == null) {
+                    offTarget += name
+                } else {
+                    withClue("$name: 하한 $onLine 라인 위인데 하한과 다르다") { split.second shouldBe onLine }
+                }
+            }
+        println("[BootJarSecurityFloorTest] 대상 밖 jackson 가족 원소(이 test 가 재지 않는다 — 취약점 게이트가 진다): $offTarget")
     }
 
     /**
