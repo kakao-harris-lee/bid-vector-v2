@@ -248,9 +248,13 @@ val compatibilitySmoke =
                 "org.flywaydb:flyway-core",
                 "org.testcontainers:testcontainers-postgresql",
                 "com.tngtech.archunit:archunit-junit6",
-                // M6/6E-2c D-6E2C-3 — 보안 하한 셋의 좌표. 등재하지 않으면 그 해석을 아무도 재지
-                // 않고, 리포트에도 해석된 판이 남지 않는다.
+                // M6/6E-2c D-6E2C-3 — 보안 하한의 좌표. 등재하지 않으면 그 해석을 아무도 재지
+                // 않고, 리포트에도 해석된 판이 남지 않는다. **tomcat 은 셋 다 등재한다**(D-6E2C-8) —
+                // 하한을 세 좌표에 걸어 놓고 `core` 하나만 등재하면 나머지 둘의 해석은 이 축에서
+                // 빠진다(배포물 test 가 재긴 하지만, 그 둘은 다른 층이다).
                 "org.apache.tomcat.embed:tomcat-embed-core",
+                "org.apache.tomcat.embed:tomcat-embed-el",
+                "org.apache.tomcat.embed:tomcat-embed-websocket",
                 "com.fasterxml.jackson.core:jackson-databind",
                 "tools.jackson.core:jackson-databind",
                 // 카탈로그가 BOM 을 이기는지 — Boot 4.1.1 BOM 은 kotlin 2.3.21 / jupiter 6.0.3 을 관리한다.
