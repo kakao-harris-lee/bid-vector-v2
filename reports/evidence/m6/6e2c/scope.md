@@ -49,6 +49,23 @@
 
 단일 restore 경로는 in_scope 의 산출물 파일. 공유 파일(runbook·`milestone-6.md`)은 **이 브랜치에 마지막으로 병합한 main 커밋 SHA**(오늘은 base `e2232a75`)에서 복원 + 실행 전 단언 둘(PR #69 규칙). 완료는 계수(이 slice 표지 0 · 남의 표지 보존). 임시 clone 에서 ①~⑥.
 
+## 승인 전 일괄 (r2, 2026-10-10, 팀장) — D-6E2C-5
+
+verifier r1 **ready-for-review** @`a4d978ec`(evidence `cb9c715d`; `check --rerun-tasks` 전건 exit 0 · container 생략 근거 수용 · rollback 유효) · code-reviewer r1 새 high 없음. 재작업 계수 0/5(일괄은 계수 밖). 처분:
+
+| finding | 처분 | 층 |
+|---|---|---|
+| vr F-1 · cr M-1 (OS 술어는 배포판 **선언**을 강제할 뿐 DB 가 그 배포판을 **덮는지**는 재지 않는다 — 가짜 `99.0` 을 정책에 옮겨 적으면 exit 0, findings 284→6) | 문면을 술어만큼 좁힌다: runbook §8.2 의 사람 신호(「findings 급감 + 나열 수 불변」) 문단 복원 · §8.3.1 상향 절차의 정책 옮겨 적기 앞에 사전 확인(findings 총수 대조 · trivy 경고) · `OPEN-6E2B-OS-MATCH-PREDICATE` 를 **부분 해소**로 · 잔여를 `OPEN-6E2C-OS-DB-COVERAGE` 로 신설. **게이트 술어는 바꾸지 않는다**(EOSL 축은 이 재현을 잡지 못한다) | 산출물(문서) + evidence |
+| vr F-2 (ⓑ 는 `os-pkgs` Result 의 **실재**만 잰다 — 패키지를 비워도 통과) | 술어에 `(.Packages // []) | length > 0` — **게이트 술어 변경 → 표적 재검증** | 산출물(게이트) |
+| cr M-2 (§8.3.1 「1~3 어느 쪽도 조용히 지나가지 않는다」 — LABEL 은 어떤 게이트도 읽지 않는다) | 「1·3 은 게이트가, 2(LABEL)는 리뷰가 진다」로 정정 | 산출물(문서) |
+| vr F-3 (카탈로그 주석 「여기를 내리면 그 test 가 RED」 거짓) | 주석을 알려진 제한 5 와 같은 말로 | 산출물(주석) |
+| cr L-2 (`versionsOf` 가 정규식 밖 jar 이름 — classifier·`-SNAPSHOT` — 을 조용히 버림) · cr L-3 (jackson 단언이 Jackson 2 의 **존재**까지 고정) | 대상 좌표 접두의 jar 가 파싱되지 않으면 실패 · major 별 술어로 | 산출물(test) — 표적 재검증 |
+| cr L-1 (위생 정책 크기 주석의 원인 귀속 근거 없음 · 상한 여유 86%) | 원인 미상으로 적고 여유를 알려진 제한에 | 산출물(주석) + evidence |
+| vr F-4 (알려진 제한 4 「상류 재발행으로 무변경 PR 이 붉어짐」 — digest 핀이라 일어나지 않음) | 제한 4 를 실제 성질(상향 시 정책 동반 갱신 강제)로 재서술 | evidence |
+| cr L-4 · vr L-a · L-b | L-4 등재만 · E-2 과잉 주장 정정 · 정책 판 선례 엇갈림을 양쪽 다 인용 | evidence |
+
+acceptance(일괄 뒤 마지막 산출물 커밋에서): `check` · `qualityBaseline` · **container job 재현**(술어가 바뀌므로 생략 불가) · rollback ①~③ 재측정(④~⑥ 은 트리 동일성 갈음 가능). verifier 표적: F-2 술어 커밋 · test 커밋만.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
