@@ -124,7 +124,9 @@ class BootJarSecurityFloorTest {
      */
     private fun splitArtifactVersion(jarName: String): Pair<String, String>? {
         val tokens = jarName.removeSuffix(".jar").split('-')
-        val versionAt = tokens.indices.firstOrNull { it > 0 && tokens[it].firstOrNull()?.isDigit() == true } ?: return null
+        val versionAt =
+            tokens.indices.firstOrNull { it > 0 && tokens[it].firstOrNull()?.isDigit() == true }
+                ?: return null
         return tokens.take(versionAt).joinToString("-") to tokens.drop(versionAt).joinToString("-")
     }
 }
