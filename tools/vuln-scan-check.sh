@@ -474,9 +474,15 @@ fi
 # OS 판이 DB 와 어긋나면 trivy 는 경고만 내고 finding 이 468 → 한 자리로 주는데 나열 수는 그대로다
 # (6E-2b 실측). 그 구멍을 축 **둘**로 닫는다 — 하나로는 닫히지 않는다.
 #   ⓐ 스캔이 읽은 배포판(`.Metadata.OS`)이 **정책이 선언한 것과 정확히 같은가**
-#   ⓑ 그 배포판의 **OS 패키지 Result 가 실제로 하나 이상** 있는가(`Class=os-pkgs`, `Type=<family>`)
+#   ⓑ 그 배포판의 OS 패키지 Result 가 **패키지를 담은 채로** 하나 이상 있는가
+#      (`Class=os-pkgs`, `Type=<family>`, `Packages` 비지 않음)
 # ⓐ 만 있으면 메타데이터는 맞는데 OS 층 분석이 통째로 빠진 결과가 통과하고, ⓑ 만 있으면 다른
 # 배포판으로 읽힌 결과가 자기 Result 를 갖고 통과한다.
+#
+# **ⓑ 가 `Packages` 까지 보는 이유**(verifier r1 F-2): 앞 판은 Result 의 **존재**만 셌다. 그러면
+# 껍데기만 남은 os-pkgs Result — 패키지가 다른 Result 로 옮겨 간 결과 — 가 통과한다. 주석은
+# 「OS 층 분석이 통째로 빠진 결과가 통과」를 막는다고 적었는데 술어가 한 칸 모자랐다. 나열 하한이
+# 오늘은 그 형태를 우연히 잡지만, 그것은 **다른 축**이고 패키지가 어딘가로 옮겨지면 사라진다.
 #
 # **정확 일치의 대가는 의도한 것이다**: debian point release 를 올리면(12.9 → 12.15) 이 값을 같은
 # 커밋에서 올려야 게이트가 선다. 베이스 상향이 정책 편집을 강제하는 것이 이 축의 목적이다 —
@@ -497,11 +503,11 @@ if [ "$SCANNED_OS_FAMILY" != "$EXPECTED_OS_FAMILY" ] || [ "$SCANNED_OS_NAME" != 
   _undecidable "스캔이 읽은 배포판(${SCANNED_OS_FAMILY}/${SCANNED_OS_NAME})이 정책 선언(${EXPECTED_OS_FAMILY}/${EXPECTED_OS_NAME}, kind=${IMAGE_KIND})과 다르다 — 베이스를 올렸다면 scan.os.family.${IMAGE_KIND}·scan.os.name.${IMAGE_KIND} 를 같은 커밋에서 올린다. 올리지 않았다면 스캐너가 다른 것을 읽었다"
 fi
 
-if ! OS_RESULT_COUNT="$(jq --arg family "$EXPECTED_OS_FAMILY" '[.Results[]? | select(.Class == "os-pkgs" and .Type == $family)] | length' "$SCAN_FILE")"; then
+if ! OS_RESULT_COUNT="$(jq --arg family "$EXPECTED_OS_FAMILY" '[.Results[]? | select(.Class == "os-pkgs" and .Type == $family and (((.Packages // []) | length) > 0))] | length' "$SCAN_FILE")"; then
   _undecidable "스캔 결과에서 OS 패키지 Result 를 세지 못했다(${SCAN_FILE}) — 파일이 온전하지 않다"
 fi
 if ! [[ "$OS_RESULT_COUNT" =~ ^[0-9]+$ ]] || [ "$OS_RESULT_COUNT" -lt 1 ]; then
-  _undecidable "배포판 ${EXPECTED_OS_FAMILY} 의 OS 패키지 Result(Class=os-pkgs, Type=${EXPECTED_OS_FAMILY})가 결과에 없다(${OS_RESULT_COUNT}개) — 메타데이터는 맞는데 OS 층을 맞춰 보지 않았다"
+  _undecidable "배포판 ${EXPECTED_OS_FAMILY} 의 OS 패키지 Result(Class=os-pkgs, Type=${EXPECTED_OS_FAMILY}, 패키지 1개 이상)가 결과에 없다(${OS_RESULT_COUNT}개) — 메타데이터는 맞는데 OS 층을 맞춰 보지 않았다(Result 가 아예 없거나, 있어도 패키지가 비어 있다)"
 fi
 
 # 차단 후보 집합 — 정책이 정하는 severity 이고, `block.only-fixed` 가 참이면 **수정본이 있는
