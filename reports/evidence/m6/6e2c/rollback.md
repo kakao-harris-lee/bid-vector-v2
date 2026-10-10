@@ -1,6 +1,6 @@
 # M6/6E-2c — rollback
 
-실측 HEAD: `b7fb1b3c` — 이 slice 의 **마지막 산출물 커밋**이자 팀장이 고정한 판정 SHA 다. 목록도 결과도
+실측 HEAD: `8dea9917` — 이 slice 의 **마지막 산출물 커밋**이자 팀장이 고정한 판정 SHA 다. 목록도 결과도
 그 HEAD 에서 다시 낸다 — 실측은 옮겨 적지 않고 라운드마다 다시 돌린다.
 
 **전제 — 이 slice 는 아직 main 에 없다.** 머지 뒤의 되돌림은 그 PR 의 머지 커밋 revert 다. 아래 복원은
@@ -32,7 +32,7 @@ git merge-base --is-ancestor "$FIRST" "$PIN"  && exit 1   # 핀이 이 slice 를
 
 ## 되돌리는 것 / 되돌리지 않는 것
 
-목록은 손으로 쓰지 않는다 — `git diff --name-status e2232a75..b7fb1b3c` 에서 기계로 낸다(A = 삭제,
+목록은 손으로 쓰지 않는다 — `git diff --name-status e2232a75..8dea9917` 에서 기계로 낸다(A = 삭제,
 M = base 로 복원). **라운드마다 파일이 늘면 이 산출을 다시 돌린다.**
 
 | 상태 | 경로 |
@@ -40,13 +40,13 @@ M = base 로 복원). **라운드마다 파일이 늘면 이 산출을 다시 �
 | A (1) | `app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFloorTest.kt` |
 | M (12) | `app/build.gradle.kts` · `config/quality/gate-tests.properties` · `config/quality/image-hygiene-policy-app.properties` · `config/quality/image-hygiene-policy.properties` · `config/quality/vuln-allowlist.properties` · `config/quality/vuln-policy.properties` · `docker/app.Dockerfile` · `docker/ml-serving.Dockerfile` · `docs/runbook/m6-6e-operations.md` · `gradle/libs.versions.toml` · **`milestone-6.md`** · `tools/vuln-scan-check.sh` |
 
-등식 확인: 목록 ∖ `git diff --name-only e2232a75..b7fb1b3c`(evidence 제외) = **빈 출력**.
+등식 확인: 목록 ∖ `git diff --name-only e2232a75..8dea9917`(evidence 제외) = **빈 출력**.
 
 **되돌리지 않는 것** — `reports/evidence/m6/6e2c/**`(이 slice 의 증적, 팀장이 쓴 `scope.md` 포함) ·
 하네스 경로(`CLAUDE.md`·`.claude/**`, 이 range 에 커밋 **0**).
 
 **`milestone-6.md` 는 다른 slice 들의 문단이 사는 공유 파일**이라 복원이 그것을 지우지 않는지가 별도
-판정이다 — 아래 계수가 그 자리다. 이 파일이 목록에 드는 것은 종결 문단을 쓰는 커밋부터이고, **목록은
+판정이다 — 아래 계수가 그 자리다. 이 파일이 목록에 드는 것은 종결 문단을 담은 커밋부터이고, **목록은
 라운드마다 기계로 다시 산출**해야 한다(이 항목이 그 사유의 실례다).
 
 ## 명령
@@ -68,7 +68,7 @@ git rm --cached -- app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFl
 `docker build` 둘을 다시 돌린다.** 이 함정은 이 slice 의 변이 라운드에서 실제로 겪었다(복원한 소스 위에서
 옛 배포물이 그대로 이미지에 들어갔다).
 
-## 임시 clone 실측 ①~⑥ (실측 HEAD `b7fb1b3c`)
+## 임시 clone 실측 ①~⑥ (실측 HEAD `8dea9917`)
 
 | 축 | 결과 |
 |---|---|
@@ -98,7 +98,7 @@ git rm --cached -- app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFl
 움직였는가**를 본다 —
 
 ```
-git diff --name-only b7fb1b3c..<판정 SHA> -- <위 표의 A·M 경로 전부>
+git diff --name-only 8dea9917..<판정 SHA> -- <위 표의 A·M 경로 전부>
 ```
 
 빈 출력이면 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.

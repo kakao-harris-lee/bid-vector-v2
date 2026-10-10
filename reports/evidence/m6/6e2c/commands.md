@@ -120,3 +120,27 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - cmd: 임시 clone 에서 `git restore --source=e2232a75` (M 11) + `git rm`·`rm` (A 1)
 - exit: 0 · 0
 - 핵심 결과: 단언 둘 OK · 등식 빈 출력 · 되돌림 대상 diff **0 바이트** · **blob 동일 11/11** · 표지 `D-6E2C` **0** · 남의 표지 보존. ④~⑥ 갈음과 그 예외(evidence 를 읽는 `leakPatternGate` 는 직접 측정)는 rollback.md.
+
+## `/code-review` 조치 (D-6E2C-8) — acceptance @`8dea9917`(양끝 HEAD 단언, 시작 트리 clean)
+
+### 2026-10-10 · Kotlin `check` · `qualityBaseline`
+- cmd: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline`
+- exit: 0 · 0 (532s · 7s)
+- 핵심 결과: 350 중 **64 executed** — `:app:test`·`:app:detekt`·`:app:compatibilitySmoke` 가 실제로 돌았다.
+- **앞 회차는 exit 1 이었다**: `:app:detekt` 이 새 test 의 123자 줄을 `MaxLineLength` 로 끊었다. 표적 `:app:test` 는 detekt 를 포함하지 않아 그 결함을 볼 수 없다 — **표적만 돌린 것은 돌려 보지 않은 것과 같다**.
+
+### 2026-10-10 · CI `container` job 재현
+- cmd: 워크플로의 `jobs.container.steps[*].run` 을 ci.yml 에서 직접 읽어 순서대로 실행
+- exit: **16 step 전부 0** (총 ~2분 15초)
+- 핵심 결과: 이미지 ID 불변 — ml `sha256:911a9026…1e9c01` · app `sha256:4a3ad368…5cfbb4`.
+
+### 2026-10-10 · 하한 test 변이 여섯 — 대조군 = 부모 커밋 test
+- cmd: 배포물 `BOOT-INF/lib` 를 바꿔치우고 각각 새 test·부모 test 로(`:app:test` 실행 가드 통과)
+- exit: M1 숫자 꼬리 tomcat 새 **1**/부모 **0** · M2 timestamp 꼬리 jackson 새 **1**/부모 **0** · M3 가족 원소 `dataformat-yaml` 하한 미만 새 **1**/부모 **0** · M4 남의 artifact `jackson-core-utils` 새 **0**(오탐 없음) · M5 대상 좌표 전부 제거 새 **1** · M6 `BOOT-INF/lib` 99개 전부 제거 새 **1**
+- 핵심 결과: M1 은 `["11.0.26","11.0.24-1"]` 로 꼬리가 비교 집합에 들어옴을 보이고, M6 만이 **빈 목록 대조**를 실제로 태운다(M5 는 다른 jar 가 남아 비교로 붉어진다 — 둘을 한 변이로 묶으면 그 가드를 실측했다는 말이 거짓이 된다).
+- 복원: jar `cmp` 동일 · test 파일 porcelain 빈 출력 · HEAD 불변.
+
+### 2026-10-10 · rollback ①~③ 재측정 @`8dea9917`
+- cmd: 임시 clone 에서 `git restore --source=e2232a75`(M 12) + `git rm`·`rm`(A 1)
+- exit: 0 · 0
+- 핵심 결과: 단언 둘 OK · 등식 빈 출력 · 되돌림 대상 diff **0 바이트** · **blob 동일 12/12** · 표지 `D-6E2C` **0** · 공유 파일 `milestone-6.md` 가 base 와 **바이트 동일**이고 표지 계수가 base 자신의 수와 같다(`6E-2b` 2=2 · `6E-2a` 2=2 · `6F-` 103=103). ④~⑥ 은 트리 동일성 갈음 + `leakPatternGate` 직접 측정(이 slice evidence 매치 0).
