@@ -613,13 +613,19 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
     **라이브러리 기본 거동**에 얹혀 있고, 판올림이 그 기본값을 바꾸면 조용히 함께 바뀐다. 잠그려면
     「역할 멤버가 아닌 사용자로 출하 조립을 띄우면 기동이 실패한다」는 측정이 필요하다.
 
-20. **6E-2b 가 연 OPEN 다섯**(이미지 취약점 축) — `OPEN-6E2B-BASE-IMAGE-BUMP`(베이스 다이제스트 상향,
-    오늘 차단 후보 67 중 54) · `OPEN-6E2B-DEPENDENCY-BUMP`(JVM 의존 상향, 13 — tomcat-embed-core
-    CRITICAL 셋 포함) · `OPEN-6E2B-GRADLE-DEPENDENCY-VERIFICATION`(받아 온 바이트를 재는 것이 없다) ·
-    `OPEN-6E2B-TOOL-SIGNATURE-VERIFICATION`(cosign 부재로 서명 자체는 미검증) ·
-    **`OPEN-6E2B-OS-MATCH-PREDICATE`**(결과 쪽 하한이 「나열한」 패키지를 세지 「맞춰 본」 패키지를 세지
-    않는다 — §8.2). 앞 둘은 **6E-2c** 가 지고, 마지막 하나는 **그 상향 전에** 처리하는 것이 맞다
-    (베이스 상향이 배포판을 바꾸는 순간이 이 축의 위험 구간이다).
+20. **6E-2b 가 연 OPEN 다섯의 오늘 상태**(이미지 취약점 축) —
+    **해소 둘**: `OPEN-6E2B-BASE-IMAGE-BUMP`(베이스 둘 상향, 6E-2c D-6E2C-2) ·
+    `OPEN-6E2B-DEPENDENCY-BUMP`(JVM 보안 하한 셋, D-6E2C-3). 그 상향으로 차단 후보가 **67 → 0** 이 되고
+    allowlist 등재도 0 이 됐다.
+    **부분 해소 하나**: `OPEN-6E2B-OS-MATCH-PREDICATE` — 배포판 선언·실제의 정확 일치와 OS 패키지
+    Result 실재는 게이트가 지지만(D-6E2C-1), 「DB 가 그 배포판을 덮는가」는 재지 않는다(§8.2).
+    **잔여 둘**: `OPEN-6E2B-GRADLE-DEPENDENCY-VERIFICATION`(받아 온 바이트를 재는 것이 없다) ·
+    `OPEN-6E2B-TOOL-SIGNATURE-VERIFICATION`(cosign 부재로 서명 자체는 미검증).
+21. **6E-2c 가 연 OPEN 둘** — `OPEN-6E2C-OS-DB-COVERAGE`(위 부분 해소의 나머지 절반. 게이트로 닫으려면
+    스캐너 경고 **문자열**에 술어를 걸어야 해 두지 않았고, §8.2 의 사람 신호와 §8.3.1 의 사전 확인이
+    그 자리를 진다) · `OPEN-6E2C-BOOT-FLOOR-SUNSET`(Boot 가 tomcat 11.0.26 · jackson 2.21.7/3.1.7 이상을
+    BOM 으로 관리하는 판이 되면 카탈로그의 하한 셋을 걷는다 — 남겨 두면 BOM 보다 낮은 하한이 되어
+    판 올림을 조용히 막는 날이 온다).
 
 ## 7. 이 문서의 표가 코드와 어긋나지 않는지 재는 법
 
@@ -733,8 +739,14 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 
 정책의 `scan.os.family.<kind>`·`scan.os.name.<kind>` 는 스캔이 읽은 `.Metadata.OS` 와 **정확히** 일치해야
 한다. debian 의 point release 가 바뀌기만 해도(12.9 → 12.15) 게이트는 exit 2 로 끊는다. **이것은 번거로움이
-아니라 이 축의 목적**이다 — 「배포판이 바뀌었는데 아무도 모름」을 막는다. 상향 커밋은 그래서 늘 넷을 함께
-움직인다:
+아니라 이 축의 목적**이다 — 「배포판이 바뀌었는데 아무도 모름」을 막는다.
+
+**다만 이 강제는 `Name` 문자열이 바뀌는 배포판에서만 선다.** debian 은 point release 가 그 문자열이라 베이스를
+올리면 정책 편집이 강제된다. **ubuntu LTS 는 강제되지 않는다** — `24.04` 는 같은 태그의 새 index 로 패키지가
+통째로 바뀌어도 `Name` 이 그대로다(M6/6E-2c 의 앱 베이스 상향이 실제로 그 경우였고, 정책 편집 없이 통과했다).
+그쪽에서 베이스 교체를 잡는 것은 **위생 게이트의 layer 체인**(아래 3)이지 이 축이 아니다.
+
+상향 커밋은 그래서 늘 넷을 함께 움직인다(4 는 해당할 때):
 
 1. Dockerfile 의 `FROM`(stage 마다) — 다이제스트까지
 2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다)

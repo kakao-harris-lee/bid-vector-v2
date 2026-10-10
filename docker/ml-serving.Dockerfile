@@ -47,9 +47,10 @@ FROM python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9
 # 적는 자유 텍스트라 실제 `FROM`과 아무 것도 묶지 않는다(라벨만 남기고 FROM 을 떠 있는
 # 태그로 바꿔도 라벨은 그대로다, verifier r1 실측). 위생 게이트의 **구속력 있는** 베이스
 # 고정 판정은 `tools/image-hygiene-check.sh`가 이 이미지의 `RootFS.Layers` 앞부분을
-# `config/quality/image-hygiene-policy.properties`의 `base.image.layers`(고정 다이제스트의
-# 실제 layer 체인, 위조 불가 — 같은 바이트가 아니면 같은 다이제스트가 나올 수 없다)와
-# 대조하는 것이다.
+# `config/quality/image-hygiene-policy.properties`의 **`base.image.digest`**(게이트가 그것을
+# `docker buildx imagetools inspect` 로 풀어 실제 layer 체인을 파생한다, D-6C-10 ②)와
+# 대조하는 것이다. 위조 불가다 — 같은 바이트가 아니면 같은 다이제스트가 나올 수 없다.
+# (앞 판 주석은 `base.image.layers` 를 가리켰는데 그 키는 D-6C-10 에서 없어졌다.)
 LABEL org.bidvector.baseimage="python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258"
 
 # non-root — 위생 게이트 (1)이 `docker inspect` 의 `Config.User` 와 이미지 안 `id -u` 로
