@@ -1,6 +1,6 @@
 # M6/6E-2c — rollback
 
-실측 HEAD: `a4d978ec` — 이 slice 의 **마지막 산출물 커밋**이자 팀장이 고정한 판정 SHA 다. 목록도 결과도
+실측 HEAD: `c4656329` — 이 slice 의 **마지막 산출물 커밋**이자 팀장이 고정한 판정 SHA 다. 목록도 결과도
 그 HEAD 에서 다시 냈다(앞 라운드 실측을 옮기지 않는다).
 
 **전제 — 이 slice 는 아직 main 에 없다.** 머지 뒤의 되돌림은 그 PR 의 머지 커밋 revert 다. 아래 복원은
@@ -32,7 +32,7 @@ git merge-base --is-ancestor "$FIRST" "$PIN"  && exit 1   # 핀이 이 slice 를
 
 ## 되돌리는 것 / 되돌리지 않는 것
 
-목록은 손으로 쓰지 않는다 — `git diff --name-status e2232a75..a4d978ec` 에서 기계로 낸다(A = 삭제,
+목록은 손으로 쓰지 않는다 — `git diff --name-status e2232a75..c4656329` 에서 기계로 낸다(A = 삭제,
 M = base 로 복원). **라운드마다 파일이 늘면 이 산출을 다시 돌린다.**
 
 | 상태 | 경로 |
@@ -40,7 +40,7 @@ M = base 로 복원). **라운드마다 파일이 늘면 이 산출을 다시 �
 | A (1) | `app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFloorTest.kt` |
 | M (11) | `app/build.gradle.kts` · `config/quality/gate-tests.properties` · `config/quality/image-hygiene-policy-app.properties` · `config/quality/image-hygiene-policy.properties` · `config/quality/vuln-allowlist.properties` · `config/quality/vuln-policy.properties` · `docker/app.Dockerfile` · `docker/ml-serving.Dockerfile` · `docs/runbook/m6-6e-operations.md` · `gradle/libs.versions.toml` · `tools/vuln-scan-check.sh` |
 
-등식 확인: 목록 ∖ `git diff --name-only e2232a75..a4d978ec`(evidence 제외) = **빈 출력**.
+등식 확인: 목록 ∖ `git diff --name-only e2232a75..c4656329`(evidence 제외) = **빈 출력**.
 
 **되돌리지 않는 것** — `reports/evidence/m6/6e2c/**`(이 slice 의 증적, 팀장이 쓴 `scope.md` 포함) ·
 하네스 경로(`CLAUDE.md`·`.claude/**`, 이 range 에 커밋 **0**) · `milestone-6.md`(이 slice 가 만지지 않았다).
@@ -64,7 +64,7 @@ git rm --cached -- app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFl
 `docker build` 둘을 다시 돌린다.** 이 함정은 이 slice 의 변이 라운드에서 실제로 겪었다(복원한 소스 위에서
 옛 배포물이 그대로 이미지에 들어갔다).
 
-## 임시 clone 실측 ①~⑥ (실측 HEAD `a4d978ec`)
+## 임시 clone 실측 ①~⑥ (실측 HEAD `c4656329`)
 
 | 축 | 결과 |
 |---|---|
@@ -74,11 +74,17 @@ git rm --cached -- app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFl
 | ③ diff 빈 것 · 계수 | 되돌림 대상 `git diff` **0 바이트** · base 대비 **blob 동일 11/11** · A 파일 삭제 확인 · 이 slice 표지 `D-6E2C` **0** · 다른 slice 표지 보존(runbook `6E-2b` 4 · gate-tests `6G-2g` 1) · `reports/evidence/m6/6e2c/` 보존 |
 | ④ compile · ⑤ test · ⑥ 게이트 | **`check` 한 번으로 전부 exit 0 — tests 2838 · 실패 0 · skipped 4 · 9m36s** |
 
-**④~⑥ 은 앞 HEAD 에서 실측하고 트리 동일성으로 갈음했다.** 정책 판 상향 커밋(`04123b8c` → `a4d978ec`)이
-붙은 뒤 되돌린 트리를 다시 만들어, 앞서 완주시킨 트리와 **파일 단위로 전부 동일**함을 확인했다
-(`diff -rq --exclude=.git --exclude=build` 빈 출력). 두 커밋의 차이가 **되돌림 대상 파일 안**에 있으므로
-복원 뒤 두 트리가 같아지는 것은 구조적이고, 그것을 실측으로 확인한 것이다. 갈음의 근거는 「HEAD 가
-초록이다」가 아니라 **트리 동일성**이다.
+**④~⑥ 은 앞 HEAD 에서 실측하고 트리 동일성으로 갈음했다.** 승인 전 일괄이 붙은 뒤 되돌린 트리를 다시
+만들어, 앞서 `check` 를 완주시킨(2838 tests, 실패 0) 되돌린 트리와 대조했다 —
+`diff -rq --exclude=.git --exclude=build` 의 차이가 **`reports/evidence/m6/6e2c/` 안에만** 있고
+**산출물 경로는 blob 동일 11/11 + 신규 1 삭제**다. 산출물이 같으므로 ④ compile·⑤ test 는 그대로 옮겨진다.
+
+**⑥ 은 한 칸 더 본다.** 되돌림이 evidence 를 복원하지 않으므로 ⑥ 의 게이트 가운데 **그 차이를 실제로 읽는
+것이 하나 있다** — `leakPatternGate`(scanRoot = `reports/evidence`). 그래서 그 자리는 갈음하지 않고
+되돌린 트리에서 직접 쟀다: 이 slice 의 evidence 에 대한 참조형 스캔 **매치 0**(그 경로는 baseline 에도
+0건이라 새 매치가 곧 실패다). 나머지 게이트는 산출물만 읽으므로 트리 동일성으로 닫힌다.
+
+갈음의 근거는 「HEAD 가 초록이다」가 아니라 **트리 동일성 + 차이를 읽는 게이트의 직접 측정**이다.
 
 ## verifier 가 대조할 것
 
@@ -86,7 +92,7 @@ git rm --cached -- app/src/test/kotlin/bidvector/app/packaging/BootJarSecurityFl
 움직였는가**를 본다 —
 
 ```
-git diff --name-only a4d978ec..<판정 SHA> -- <위 표의 A·M 경로 전부>
+git diff --name-only c4656329..<판정 SHA> -- <위 표의 A·M 경로 전부>
 ```
 
 빈 출력이면 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.

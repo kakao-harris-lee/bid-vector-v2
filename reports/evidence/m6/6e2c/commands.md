@@ -92,3 +92,31 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/6e2c/`
 - exit: 0 (매치 있음)
 - 핵심 결과: 매치는 `tools/vuln-scan-check.sh` 의 **trivy 스캐너 열거값 한 줄**뿐이고 6E-2b 가 쓴 도구 어휘다. 이 slice 가 더했던 매치 다섯 줄은 정책 값 종류 이름을 `ident` 로 바꿔 **0** 이 됐다(그 개명이 그 목적이었다). `leakPatternGate` 의 scanRoot 는 `reports/evidence/` 뿐이라 CI 판정 대상은 evidence 쪽이고, 그쪽 매치는 0 이다.
+
+## 승인 전 일괄 (D-6E2C-5) — acceptance @`dc4984ff`(양끝 HEAD 단언, 시작 트리 clean)
+
+### 2026-10-10 · Kotlin `check` · `qualityBaseline`
+- cmd: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline`
+- exit: 0 · 0 (537s · 14s)
+- 핵심 결과: 359 중 **49 executed** — `:app:test` 와 `:leakPatternGate` 가 **둘 다 실제로 돌았다**(앞 회차와 달리 up-to-date 아님). 빌드 스크립트 변경이 설정 캐시를 무효화했고, 배포물이 이제 test 입력이라 그 축도 다시 섰다.
+
+### 2026-10-10 · CI `container` job 재현 (술어가 바뀌어 생략 불가)
+- cmd: 워크플로의 `jobs.container.steps[*].run` 을 ci.yml 에서 직접 읽어 순서대로 실행
+- exit: **16 step 전부 0** (총 ~2분 30초)
+- 핵심 결과: 바뀐 OS 술어를 S-22d·S-22e 가 실제로 탄다(둘 다 exit 0). 이미지 ID 는 앞 회차와 같다 — ml `sha256:911a9026…1e9c01` · app `sha256:4a3ad368…5cfbb4`.
+
+### 2026-10-10 · 게이트 술어 변이 (vr F-2 표적) — 대조군 = 부모 커밋 스크립트
+- cmd: replay 변이(os-pkgs Result 의 `Packages` 를 비우고 lang-pkgs 로 옮겨 나열 수 보존)를 부모판·새 판에 각각
+- exit: 부모판 **0** · 새 판 **2** · 새 판 + 무변조 **0**
+- 핵심 결과: 부모판이 같은 변이를 통과시켰고(나열 115·하한 80 — 하한은 안 걸린다) 새 판이 끊는다. 구멍이 실재했고 이 줄이 그것을 닫는다.
+
+### 2026-10-10 · 하한 test 변이 (cr L-2·L-3 표적) — 대조군 = 부모 커밋 test
+- cmd: 배포물 `BOOT-INF/lib` 를 바꿔치우고(① classifier jar 끼움 ② jackson 2 사본 전부 제거 ③ 하한 미만 사본 끼움) 각각 새 test·부모 test 로
+- exit: ① 새 **1** / 부모 **0** · ② 새 **0** / 부모 **1** · ③ 새 **1**
+- 핵심 결과: ① 조용히 버리던 이름을 이제 실패로 본다 ② 좌표가 빠지는 것(바람직한 변화)은 더 이상 RED 가 아니다 ③ 하한 미만 사본 보호는 그대로. 복원 실측 — jar `cmp` 동일 · test 파일 porcelain 빈 출력.
+- **측정 규율**: 첫 회차가 exit 0 이었는데 `:app:test` 가 **UP-TO-DATE** 였다(아무것도 안 돎). 배포물을 test 입력으로 선언한 뒤 다시 쟀고, 변이 runner 에 「돌았는가」 가드를 넣었다.
+
+### 2026-10-10 · rollback ①~③ 재측정 @`c4656329`
+- cmd: 임시 clone 에서 `git restore --source=e2232a75` (M 11) + `git rm`·`rm` (A 1)
+- exit: 0 · 0
+- 핵심 결과: 단언 둘 OK · 등식 빈 출력 · 되돌림 대상 diff **0 바이트** · **blob 동일 11/11** · 표지 `D-6E2C` **0** · 남의 표지 보존. ④~⑥ 갈음과 그 예외(evidence 를 읽는 `leakPatternGate` 는 직접 측정)는 rollback.md.

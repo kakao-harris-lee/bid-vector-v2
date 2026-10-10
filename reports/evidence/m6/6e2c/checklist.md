@@ -36,9 +36,19 @@
 4. **정확 일치의 대가 — 다만 「무변경 PR 이 붉어진다」는 아니다**(verifier r1 F-4 정정). `FROM` 이 다이제스트 핀이고 `.Metadata.OS` 는 그 이미지 내용에서 나오며 trivy 도 핀이라, **저장소를 건드리지 않고 배포판이 바뀔 경로가 없다.** 실제 성질은 그 반대다: **베이스를 올릴 때마다 정책 동반 갱신을 강제**한다(올리지 않으면 exit 2). 그 강제가 목적이고, 대가는 상향 커밋이 늘 넷을 함께 움직여야 한다는 것이다(runbook §8.3.1).
 5. **보안 하한의 기대값이 카탈로그에서 온다.** `BootJarSecurityFloorTest` 는 「선언이 효과를 냈는가」만 잰다 — 카탈로그 값을 내리면 그 test 는 초록인 채로 하한이 내려가고, 그 축을 지는 것은 취약점 게이트다(해당 CVE 가 되살아나 exit 1). 두 게이트가 짝으로만 닫힌다.
 6. **Boot 판을 올리지 않았다.** 4.1.x 는 4.1.1 이 최신이라 BOM 위에 하한을 얹는 형태다. Boot 4.2 가 안정판이 되면 이 세 하한은 BOM 과 겹쳐 **중복 선언**이 되므로 그때 걷는 것이 맞다(`OPEN-6E2C-BOOT-FLOOR-SUNSET`).
-7. **ml-serving 이미지가 크기 상한의 86% 다**(code-review r1 L-1). 상한 400,000,000 은 **재현되지 않는 113.7MB 기록 위에서** 고른 값이고(원인 미상), 실측은 343,090,786 이다. **의존 하나만 늘어도 S-22a 가 붉어진다** — 그때 상한을 올릴지 이미지를 줄일지는 정해져 있지 않다.
-8. **`compatibilitySmoke.expectedModules` 의 `tools.jackson.core:jackson-databind` 는 test 전용 fixture 로 충족된다**(code-review r1 L-4). 같은 파일이 `testImplementation(libs.jackson.databind)` 로 그 좌표를 이미 올리므로, 그 한 줄은 **production 그래프가 jackson 3 databind 를 해석한다는 것을 증명하지 않는다**. 나머지 둘(jackson 2 databind · tomcat-embed-core)은 test 전용 출처가 없다. 실제 잠금은 배포물을 여는 `BootJarSecurityFloorTest` 라 커버리지 구멍은 아니다.
-9. **6E-2b 의 알려진 제한 1~7·9 는 그대로 승계된다** — 서명 검증 부재 · 로컬 이미지만 잼 · DB 를 실행마다 받음 · 네트워크 의존 셋 · 셸 정책 파서 둘 · 두 셸 게이트의 자기 시험 부재 · 멀티아키 미대응.
+7. **기존 결함(이 slice 가 만든 것이 아니다) — 배포물을 여는 test 둘이 jar 내용 변경에 다시 돌지 않았다.**
+   `app/build.gradle.kts` 는 `dependsOn(bootJar)` 로 **순서만** 정하고 배포물의 내용을 `:app:test` 의 입력으로
+   선언하지 않았다. 그래서 `BOOT-INF/lib` 를 바꿔도 `:app:test` 가 UP-TO-DATE 로 건너뛰고 **아무것도 돌지 않은 채
+   exit 0** 이 난다. `BootJarRuntimeClasspathTest` 는 **선행 slice**(6F-8 회귀 방지)부터 그 선언 위에 있었고,
+   6E-2c 가 `BootJarSecurityFloorTest` 를 같은 자리에 얹으며 **그 약점을 물려받았다**. 승인 전 일괄에서 입력을
+   선언해 닫았다(D-6E2C-6 대상) — **발견 경로는 변이 측정이다**(첫 회차가 「exit 0」으로 나왔는데 보니 test 가
+   돌지 않았다).
+   **E-3 의 「변이 둘 RED」는 이 결함과 무관하게 성립했다**(실측 확인): 그 두 변이는 카탈로그·빌드 스크립트를
+   고쳐 **해석된 classpath**(`Test` task 의 선언된 입력)를 바꿨으므로 test 가 실제로 다시 돌았다 — 두 회차 로그
+   모두 `> Task :app:test` 가 UP-TO-DATE 없이 실행되고 `FAILED`(4 executed · 2 executed). 침묵이 아니었다.
+8. **ml-serving 이미지가 크기 상한의 86% 다**(code-review r1 L-1). 상한 400,000,000 은 **재현되지 않는 113.7MB 기록 위에서** 고른 값이고(원인 미상), 실측은 343,090,786 이다. **의존 하나만 늘어도 S-22a 가 붉어진다** — 그때 상한을 올릴지 이미지를 줄일지는 정해져 있지 않다.
+9. **`compatibilitySmoke.expectedModules` 의 `tools.jackson.core:jackson-databind` 는 test 전용 fixture 로 충족된다**(code-review r1 L-4). 같은 파일이 `testImplementation(libs.jackson.databind)` 로 그 좌표를 이미 올리므로, 그 한 줄은 **production 그래프가 jackson 3 databind 를 해석한다는 것을 증명하지 않는다**. 나머지 둘(jackson 2 databind · tomcat-embed-core)은 test 전용 출처가 없다. 실제 잠금은 배포물을 여는 `BootJarSecurityFloorTest` 라 커버리지 구멍은 아니다.
+10. **6E-2b 의 알려진 제한 1~7·9 는 그대로 승계된다** — 서명 검증 부재 · 로컬 이미지만 잼 · DB 를 실행마다 받음 · 네트워크 의존 셋 · 셸 정책 파서 둘 · 두 셸 게이트의 자기 시험 부재 · 멀티아키 미대응.
 
 ## OPEN (신규)
 
