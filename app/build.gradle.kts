@@ -158,14 +158,21 @@ fun Test.contractInput(
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
 tasks.test {
-    // `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
+    // `BootJarRuntimeClasspathTest`·`BootJarSecurityFloorTest` 가 배포물(`app.jar`)을 연다.
+    //
+    // **`dependsOn` 만으로는 모자란다**(M6/6E-2c 변이 실측): 그것은 순서만 정하고, 배포물의 **내용**은
+    // 이 task 의 입력이 아니었다. 그래서 jar 안을 바꿔도 `:app:test` 가 UP-TO-DATE 로 건너뛰고
+    // **아무것도 돌지 않은 채 exit 0** 이 난다 — 배포물을 여는 test 둘이 바로 그 입력에 걸려 있는데도.
+    // 실측에서 `BOOT-INF/lib` 에 classifier jar 를 끼우고 돌렸더니 31 task 전부 up-to-date 였다.
+    // `contractInput` 이 입력 선언과 system property 를 한 자리에서 붙인다(이 파일의 기존 관례).
     dependsOn(tasks.named("bootJar"))
-    systemProperty(
+    contractInput(
+        "bootJar",
         "bidvector.bootjar",
         layout.buildDirectory
             .file("libs/app.jar")
             .get()
-            .asFile.absolutePath,
+            .asFile,
     )
 
     contractInput(
