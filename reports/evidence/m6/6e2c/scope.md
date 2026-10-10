@@ -68,6 +68,8 @@ acceptance(일괄 뒤 마지막 산출물 커밋에서): `check` · `qualityBase
 
 **D-6E2C-6 (r3, 2026-10-10, 팀장 — 일괄 중 발견 수령).** 일괄의 변이 실측이 계약 표에 없던 기존 결함을 드러냈다 — 배포물을 여는 test 둘(`BootJarRuntimeClasspathTest` 선행 slice · `BootJarSecurityFloorTest`)이 `dependsOn(bootJar)` 로 **순서만** 걸려 jar **내용** 변경에 다시 돌지 않았다. `1103b56b` 가 배포물을 `:app:test` 의 입력으로 선언해 닫았다(`app/build.gradle.kts`, in_scope). E-3 의 변이 둘은 해석 classpath 를 바꿔 이 결함과 무관하게 실행됐음을 레인이 로그로 확인했다. 일괄 결과: 산출물 판정 SHA `c4656329` · evidence `fce7f743` · acceptance(check · qualityBaseline · container 16 step) exit 0 · 새 public 표면 0. **verifier 표적: `ca33a1ca`(술어) · `b814de24`(test 술어) · `1103b56b`(입력 선언 — jar 내용 변경 → `:app:test` 재실행, 양방향).**
 
+**D-6E2C-7 (r4, 2026-10-10, 팀장 — 종결).** verifier 표적 재검증 **ready-for-review** @`c4656329`(HEAD `bcb876bf`; `check --rerun-tasks` 359/359 · 2,840 tests exit 0 · F-2 재현 exit 2 · 입력 선언 양방향 실측 — 부모 `b814de24` 는 jar 변경에 UP-TO-DATE). 새 low 둘은 **등재**(라운드 없음): T-1 대상 artifact 접두를 가진 jar 이름 중 꼬리가 숫자로 시작하는 형태(`-2.21.5-1`·timestamp SNAPSHOT)가 artifact 오파싱으로 조용히 빠짐 · T-2 jackson major 2·3 밖 미검사. info: 손으로 위조한 `Packages`(`{x:1}`·`[null]`)는 통과 — 위협 모델 밖. 종결 문단 `milestone-6.md` 「6E-2c 착수·종결」. 공유 파일 `milestone-6.md` 가 이 커밋으로 rollback 목록에 든다 — rollback ①~③ 은 이 종결 커밋에서 재측정한다.
+
 ## 하네스 레인 변경 (상시)
 
-- (착수 시점 없음)
+- 없음 — `e2232a75..HEAD` 에 `.claude/`·`CLAUDE.md` 변경 0 (종결 시점 `git log --format=%h e2232a75..HEAD -- .claude CLAUDE.md` 빈 출력)
