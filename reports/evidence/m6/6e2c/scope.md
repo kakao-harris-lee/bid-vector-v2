@@ -70,6 +70,8 @@ acceptance(일괄 뒤 마지막 산출물 커밋에서): `check` · `qualityBase
 
 **D-6E2C-7 (r4, 2026-10-10, 팀장 — 종결).** verifier 표적 재검증 **ready-for-review** @`c4656329`(HEAD `bcb876bf`; `check --rerun-tasks` 359/359 · 2,840 tests exit 0 · F-2 재현 exit 2 · 입력 선언 양방향 실측 — 부모 `b814de24` 는 jar 변경에 UP-TO-DATE). 새 low 둘은 **등재**(라운드 없음): T-1 대상 artifact 접두를 가진 jar 이름 중 꼬리가 숫자로 시작하는 형태(`-2.21.5-1`·timestamp SNAPSHOT)가 artifact 오파싱으로 조용히 빠짐 · T-2 jackson major 2·3 밖 미검사. info: 손으로 위조한 `Packages`(`{x:1}`·`[null]`)는 통과 — 위협 모델 밖. 종결 문단 `milestone-6.md` 「6E-2c 착수·종결」. 공유 파일 `milestone-6.md` 가 이 커밋으로 rollback 목록에 든다 — rollback ①~③ 은 이 종결 커밋에서 재측정한다.
 
+**D-6E2C-8 (r5, 2026-10-10, 팀장 — PR #70 `/code-review` 조치).** 80점 이상 둘(H smoke 등재 누락 · I evidence 라운드 이력)과 그 아래 실재 확인분을 한 라운드로 묶는다. 산출물: ① `BootJarSecurityFloorTest` — jar 이름을 artifact 접두(`<artifact>-`)로 고른 뒤 나머지가 숫자로 시작하는 버전 모양이 아니면 실패(T-1 을 등재에서 수정으로 승격, 탐욕 정규식의 오분해) · 배포물 목록 비어 있지 않음 대조 · jackson 은 core·databind 고정 쌍 대신 배포물의 `jackson-` 가족 전체(major 별 하한) — **test 술어 변경 → 표적 재검증** ② `app/build.gradle.kts` smoke 에 `tomcat-embed-el`·`-websocket` 등재 ③ 문면: 술어 주석의 「OPEN 을 닫는다」→ 부분 해소 · 6E-2b 실측 수치 `454 → 6` 으로 통일 · 정책 주석의 ⓑ 를 「패키지를 담은 채로」 · 「베이스 상향이 정책 편집을 강제」를 release 문자열이 바뀌는 배포판(debian point release)으로 한정, ubuntu LTS 는 강제 안 됨 · `gate-tests.properties` 설명을 축별 술어로 · 게이트 스크립트의 「allowlist 67건」 낡은 문장 · ml Dockerfile 의 없어진 키 `base.image.layers` · runbook §6 OPEN 장부(해소 둘 · 부분 해소 · 신설 둘) ④ evidence 라운드 이력 문장 제거(최종 형태로만). **절차 누락 등재**: Phase 2.5 설계 검토를 착수 때 하지 않았다(팀장) — 소급 작성하지 않고 사실로 남긴다. 미결(사용자 결정): ml-serving 크기 상한 400MB 의 기준(113.7MB 가 macOS 측정 이상치일 가능성).
+
 ## 하네스 레인 변경 (상시)
 
 - 없음 — `e2232a75..HEAD` 에 `.claude/`·`CLAUDE.md` 변경 0 (종결 시점 `git log --format=%h e2232a75..HEAD -- .claude CLAUDE.md` 빈 출력)
