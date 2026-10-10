@@ -24,7 +24,7 @@
 - [x] 구현 diff 커밋됨 — `git status --porcelain -- <in_scope 개별 인자>` 빈 출력 · **양성 대조**: 변이·음성 대조마다 `git diff --numstat` 이 수치를 냈고 복원 뒤 빈 출력으로 돌아왔다(`checkout --` 은 전부 커밋 뒤에만 썼다)
 - [x] acceptance 전부 exit 0 — commands.md. 측정 체인이 **시작과 끝에서 HEAD 를 찍어 같음을 단언**한다
 - [x] 전건 게이트 — Kotlin `check` 전건 + `container` job 로컬 재현(부분 게이트로 줄이지 않았다)
-- [x] 정책 version 근거 — 판정 **값**이 바뀐 것은 베이스 digest·배포판 선언·JVM 하한이고 **스키마는 불변**이라 `policy.version` 을 올리지 않았다(새 키 `scan.os.*` 는 추가이고, 셸 파서가 kind 전수로 부재를 끊는다)
+- [x] 정책 version 근거 — **정정(이 문장의 앞 판은 틀렸다)**: `scan.os.*` 는 스키마 **추가**이므로 `vuln-policy.properties` 의 판을 **1 → 2** 로 올렸다(`contract-policy.properties` 선례 — 값 하나 바뀐 승인 태그에도 올렸다). `image-hygiene-policy*.properties` 는 digest **값**과 실측 주석만 바뀌어 **올리지 않는다** — 그 파일의 선례는 판을 **스키마**에 묶는다(판을 올린 세 커밋이 전부 스키마 변경이고, 키를 더하고도 안 올린 커밋이 있다). 저장소 안에서 두 선례가 엇갈리는 자리라 어느 쪽을 따랐는지 각 커밋 메시지에 남겼다. **알려진 제한**: 이 키를 읽는 게이트는 없다(실측) — 사람이 읽는 표시다
 - [x] 알려진 제한과 rollback — 아래 · rollback.md
 - [x] 비밀값 스캔 — 참조형으로 실행, 매치 0(commands.md)
 

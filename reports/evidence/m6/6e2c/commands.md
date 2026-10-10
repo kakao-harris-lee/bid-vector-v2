@@ -73,3 +73,21 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - cmd: 두 스캔 결과를 severity × 수정판 유무로 집계
 - exit: 0
 - 핵심 결과: ml-serving CRITICAL 2 · HIGH 55 가 남지만 **수정판이 있는 것은 0**(`block.only-fixed=true` — 고칠 길 없는 것으로 붉히면 상시 붉은 게이트가 된다). 그 밖에 ml MEDIUM 5 · LOW 1, 앱 MEDIUM 2 가 수정판을 갖지만 차단 문턱(HIGH,CRITICAL) 아래다. 앱에는 HIGH/CRITICAL 이 **한 건도** 없다.
+
+## acceptance — 판정 SHA `a4d978ec` (양끝 HEAD 단언)
+
+### 2026-10-10 · Kotlin `check` · `qualityBaseline`
+- cmd: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline`
+- exit: 0 · 0 (14s · 6s)
+- 핵심 결과: 350 actionable 중 31 executed · 1 from cache · 318 up-to-date — **전건 재실행이 아니다**. 입력이 바뀐 task 만 돌았고(앞 회차에서 `:leakPatternGate` 가 그래서 다시 돌아 통과), test task 는 입력이 바이트 동일이라 up-to-date 다. **독립 전건 실행은 verifier 몫**이다.
+
+### 2026-10-10 · CI `container` job 로컬 재현 (HEAD `04123b8c`, CJ-HEAD 양끝 단언)
+- cmd: 워크플로의 `jobs.container.steps[*].run` 을 **ci.yml 에서 직접 읽어** 순서대로 실행(손으로 옮겨 적지 않는다). `uses:` step 넷은 러너 전용이라 제외.
+- exit: **16 step 전부 0** (총 ~2분 30초)
+- 핵심 결과: 이미지 둘 재빌드 — ml-serving `sha256:911a9026…1e9c01` · app `sha256:4a3ad368…5cfbb4`. S-23 이 12s 에 healthy 수렴(베이스 상향이 깰 수 있던 자리 — compose healthcheck 이 이미지 안 `curl` 을 쓴다) · S-24 가 새 ml-serving 이미지로 통과(python 3.12 마이너 유지라 lock 재생성이 필요 없다는 판단의 실측).
+- **`a4d978ec` 에서 재실행하지 않은 근거**: `04123b8c..a4d978ec` 의 차이는 `config/quality/vuln-policy.properties` **한 파일**이고 그 내용은 `policy.version` 한 줄과 주석 여섯 줄뿐이다. 그 키를 읽는 게이트는 **없다** — `grep -rn 'policy\.version' tools/ .github/workflows/` 0건, build-logic 의 참조 넷은 전부 다른 정책 파일 자리다(`SizeGateTask`→size-policy · `MemberEffectClassification`→member-effects · `QualityPolicy` KDoc). 상향 뒤 취약점 게이트를 한 번 더 돌려 exit 0 을 확인했다. **최종 판정은 verifier 가 한다.**
+
+### 2026-10-10 · 비밀값 스캔 (참조형)
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/6e2c/`
+- exit: 0 (매치 있음)
+- 핵심 결과: 매치는 `tools/vuln-scan-check.sh` 의 **trivy 스캐너 열거값 한 줄**뿐이고 6E-2b 가 쓴 도구 어휘다. 이 slice 가 더했던 매치 다섯 줄은 정책 값 종류 이름을 `ident` 로 바꿔 **0** 이 됐다(그 개명이 그 목적이었다). `leakPatternGate` 의 scanRoot 는 `reports/evidence/` 뿐이라 CI 판정 대상은 evidence 쪽이고, 그쪽 매치는 0 이다.
