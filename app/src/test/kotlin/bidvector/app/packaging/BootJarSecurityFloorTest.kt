@@ -2,6 +2,7 @@ package bidvector.app.packaging
 
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -30,8 +31,8 @@ class BootJarSecurityFloorTest {
         System.getProperty("bidvector.security.floor.$name")
             ?: error("시스템 속성 'bidvector.security.floor.$name' 가 없다 — 빌드가 카탈로그 값을 넘긴다")
 
-    /** `jackson-core-2.21.7.jar` → 좌표 `jackson-core`, 판 `2.21.7`. 판은 숫자로 시작하고 `-` 를 담지 않는다. */
-    private val jarName = Regex("""^(?<artifact>.+)-(?<version>\d[^-]*)\.jar$""")
+    /** 판의 모양. 숫자로 시작하고, 그 뒤로는 판에 쓰이는 문자만 온다(classifier·타임스탬프 스냅숏 포함). */
+    private val versionShape = Regex("""^\d[A-Za-z0-9.+_-]*$""")
 
     private fun bundledJarNames(): List<String> =
         JarFile(bootJar).use { jar ->
@@ -47,51 +48,83 @@ class BootJarSecurityFloorTest {
     /**
      * 그 좌표로 실린 사본의 판 집합.
      *
-     * **분해되지 않는 이름을 조용히 버리지 않는다**(code-review r1 L-2). `mapNotNull` 만 쓰면
-     * `jackson-core-2.21.7-jdk8.jar` 같은 classifier 사본이 흔적 없이 사라져, 「하한 미만 사본이 함께
-     * 실려도 잡는다」는 이 test 의 약속이 **분해 가능한 이름 위에서만** 참이 된다 — 막으려던 바로 그
-     * 형태가 빠져나간다. 그래서 접두가 같은데 분해되지 않는 이름이 하나라도 있으면 그 자리에서 실패한다
-     * (「분해 실패」와 「부재」가 갈린다).
+     * **이름을 정규식으로 쪼개지 않고, 대상 접두로 고른 뒤 나머지를 판으로 읽는다.** 탐욕 정규식으로
+     * 쪼개면 `jackson-core-2.21.5-1.jar` 가 좌표 `jackson-core-2.21.5`·판 `1` 로 **분해에 성공**해 버려서,
+     * 대상과 좌표가 다르다는 이유로 조용히 빠진다 — 하한 미만 사본인데 초록이다. 접두로 고르면 그 이름은
+     * 판 `2.21.5-1` 로 읽혀 비교 집합에 들어온다.
+     *
+     * 나머지가 **숫자로 시작하지 않으면** 그것은 이 좌표의 판이 아니라 **다른 좌표**다
+     * (`jackson-core-utils-1.0.jar` → `utils-1.0`). 그런 이름은 대상이 아니므로 버린다 — 오탐을 만들지
+     * 않는다. 숫자로 시작하는데 판 모양을 벗어나는 이름만 **판독 실패**로 끊는다(조용히 버리면 아래
+     * 「하한 미만 사본 부재」가 그 이름 위에서 거짓이 된다).
      */
-    private fun versionsOf(artifact: String): Set<String> {
-        val names = bundledJarNames()
-        val unparsed = names.filter { it.startsWith("$artifact-") && jarName.matchEntire(it) == null }
-        withClue("$artifact: 분해되지 않는 jar 이름이 있다 — 판을 읽지 못하면 하한을 잴 수 없다: $unparsed") {
-            unparsed.shouldBeEmpty()
+    private fun versionsOf(
+        artifact: String,
+        names: List<String>,
+    ): Set<String> {
+        val prefix = "$artifact-"
+        val tails =
+            names
+                .filter { it.startsWith(prefix) }
+                .map { it.removePrefix(prefix).removeSuffix(".jar") }
+        val unreadable = tails.filter { it.first().isDigit() && !versionShape.matches(it) }
+        withClue("$artifact: 판으로 읽히지 않는 꼬리가 있다 — 읽지 못하면 하한을 잴 수 없다: $unreadable") {
+            unreadable.shouldBeEmpty()
         }
-        return names
-            .mapNotNull(jarName::matchEntire)
-            .filter { it.groups["artifact"]!!.value == artifact }
-            .map { it.groups["version"]!!.value }
-            .toSet()
+        return tails.filter { versionShape.matches(it) }.toSet()
     }
 
     @Test
     fun `배포물의 tomcat-embed 세 좌표가 보안 하한 판이다`() {
+        val names = bundledJarNames()
+        withClue("배포물의 BOOT-INF/lib 가 비어 있다 — 빈 목록 위의 '위반 0' 은 공허하다") {
+            names.shouldNotBeEmpty()
+        }
         val expected = setOf(floor("tomcat"))
         listOf("tomcat-embed-core", "tomcat-embed-el", "tomcat-embed-websocket").forEach { artifact ->
-            withClue(artifact) { versionsOf(artifact) shouldBe expected }
+            withClue(artifact) { versionsOf(artifact, names) shouldBe expected }
         }
     }
 
     /**
-     * **major 별 술어**(code-review r1 L-3). 「jackson 2 와 3 의 판 집합이 기대와 같다」로 쓰면 **Jackson 2 가
-     * 배포물에 있어야 한다**까지 잠긴다. Boot 생태계가 Jackson 3 으로 수렴해 2 가 그래프에서 빠지는 날 —
-     * 그것은 바람직한 변화인데 — 이 test 가 「보안 하한 위반」 문면으로 RED 가 되고, 눈에 보이는 처방이
-     * 단언을 **약화**하는 것이 된다. 그래서 「있다면 전부 하한이다」로 잰다: 하한 미만 사본은 그대로 RED,
-     * 좌표가 빠지는 것은 초록. (`OPEN-6E2C-BOOT-FLOOR-SUNSET` 과는 다른 항목이다.)
+     * **jackson 은 고정 쌍이 아니라 배포물에 실제로 실린 가족을 잰다**(D-6E2C-8). `core`·`databind` 만
+     * 적으면 `jackson-dataformat-yaml` 처럼 같은 라인에서 함께 올라오는 좌표가 아무 술어 아래에도 없다.
+     *
+     * 대상은 **하한의 `major.minor.` 라인 위에 있는 가족 원소**다. 그 라인 밖의 jackson 좌표는 BOM 이
+     * **독자 판**으로 핀하므로(실측: 2.21.7 BOM 이 `jackson-annotations` 를 `2.21` 로 핀한다 — `2.21.7` 인
+     * annotations 자체가 없다) 카탈로그 하한과 비교할 대상이 아니다. 그것까지 하한으로 묶으면 test 가
+     * 오늘 바로 빨강이고 처방이 「단언 약화」가 된다. **대상 밖 원소는 실패 문면에 함께 실어** 조용히
+     * 빠지지 않게 한다. 그 좌표의 CVE 는 취약점 게이트가 진다.
      */
     @Test
-    fun `배포물의 jackson 사본은 major 별로 보안 하한 판이다`() {
-        val floors = mapOf("2." to floor("jackson2"), "3." to floor("jackson3"))
-        listOf("jackson-core", "jackson-databind").forEach { artifact ->
-            val versions = versionsOf(artifact)
-            floors.forEach { (major, expected) ->
-                val offFloor = versions.filter { it.startsWith(major) && it != expected }
-                withClue("$artifact: major $major 사본이 하한 $expected 과 다르다(빠지는 것은 허용, 어긋나는 것은 아니다): $offFloor") {
-                    offFloor.shouldBeEmpty()
-                }
+    fun `배포물의 jackson 가족이 major 별 보안 하한 라인 위에 있다`() {
+        val family =
+            bundledJarNames()
+                .filter { it.startsWith("jackson-") }
+                .mapNotNull { name -> splitArtifactVersion(name)?.let { name to it.second } }
+        withClue("배포물에 판을 읽을 수 있는 jackson 가족이 없다 — 빈 목록 위의 '위반 0' 은 공허하다") {
+            family.shouldNotBeEmpty()
+        }
+
+        listOf(floor("jackson2"), floor("jackson3")).forEach { expected ->
+            val line = expected.substringBeforeLast('.') + "."
+            val onLine = family.filter { (_, version) -> version.startsWith(line) }
+            val offFloor = onLine.filter { (_, version) -> version != expected }.map { it.first }
+            val offLine = (family - onLine.toSet()).map { it.first }
+            withClue("하한 $expected 라인($line) 위의 사본이 하한과 다르다: $offFloor · 이 라인 밖이라 대상이 아닌 것: $offLine") {
+                offFloor.shouldBeEmpty()
             }
         }
+    }
+
+    /**
+     * `jackson-dataformat-yaml-2.21.7.jar` → (`jackson-dataformat-yaml`, `2.21.7`).
+     * **숫자로 시작하는 첫 토큰부터가 판**이다 — 그래서 `jackson-core-2.21.5-1.jar` 는 판 `2.21.5-1`(좌표
+     * `jackson-core`)로 읽히고, 탐욕 정규식처럼 좌표 `jackson-core-2.21.5`·판 `1` 로 오분해되지 않는다.
+     */
+    private fun splitArtifactVersion(jarName: String): Pair<String, String>? {
+        val tokens = jarName.removeSuffix(".jar").split('-')
+        val versionAt = tokens.indices.firstOrNull { it > 0 && tokens[it].firstOrNull()?.isDigit() == true } ?: return null
+        return tokens.take(versionAt).joinToString("-") to tokens.drop(versionAt).joinToString("-")
     }
 }
