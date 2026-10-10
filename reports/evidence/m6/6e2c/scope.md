@@ -66,6 +66,8 @@ verifier r1 **ready-for-review** @`a4d978ec`(evidence `cb9c715d`; `check --rerun
 
 acceptance(일괄 뒤 마지막 산출물 커밋에서): `check` · `qualityBaseline` · **container job 재현**(술어가 바뀌므로 생략 불가) · rollback ①~③ 재측정(④~⑥ 은 트리 동일성 갈음 가능). verifier 표적: F-2 술어 커밋 · test 커밋만.
 
+**D-6E2C-6 (r3, 2026-10-10, 팀장 — 일괄 중 발견 수령).** 일괄의 변이 실측이 계약 표에 없던 기존 결함을 드러냈다 — 배포물을 여는 test 둘(`BootJarRuntimeClasspathTest` 선행 slice · `BootJarSecurityFloorTest`)이 `dependsOn(bootJar)` 로 **순서만** 걸려 jar **내용** 변경에 다시 돌지 않았다. `1103b56b` 가 배포물을 `:app:test` 의 입력으로 선언해 닫았다(`app/build.gradle.kts`, in_scope). E-3 의 변이 둘은 해석 classpath 를 바꿔 이 결함과 무관하게 실행됐음을 레인이 로그로 확인했다. 일괄 결과: 산출물 판정 SHA `c4656329` · evidence `fce7f743` · acceptance(check · qualityBaseline · container 16 step) exit 0 · 새 public 표면 0. **verifier 표적: `ca33a1ca`(술어) · `b814de24`(test 술어) · `1103b56b`(입력 선언 — jar 내용 변경 → `:app:test` 재실행, 양방향).**
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
