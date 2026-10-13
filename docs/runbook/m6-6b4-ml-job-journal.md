@@ -1,0 +1,98 @@
+# M6/6B-4 운영 runbook — ML training job 저널 · 대기 큐 상한 · 재기동 처분 (초안 2026-10-13)
+
+대상은 **ml-serving 의 training job 하나**다(`TrainingJobService`). Kotlin 쪽 outbox/inbox·임대는
+다른 축이고(`m6-6e-operations.md` §3), 이 문서는 그것을 말하지 않는다.
+
+**이 문서가 약속하지 않는 것**은 §5 에 모아 둔다 — 특히 **볼륨 자체의 백업·손상 복구는 M7** 이다.
+
+## 1. 저널이 사는 자리
+
+| 축 | 값 |
+| --- | --- |
+| 파일 | `<ML_ENGINE_ARTIFACT_OUT_DIR>/_journal/jobs.json` 하나. 디렉터리 이름이 `_` 로 시작해 job 디렉터리(`uuid4`)와 충돌할 수 없다 |
+| 컨테이너 경로 | `/app/artifacts/_journal/jobs.json`(`docker/compose.yaml` 의 `ML_ENGINE_ARTIFACT_OUT_DIR`) |
+| 영속 | `docker/compose.yaml` 의 named volume `bidvector-ml-jobs` 가 `/app/artifacts` 를 든다 — **프로세스 재시작과 컨테이너 재생성 둘 다** 저널과 산출물이 남는다 |
+| 형식 | canonical JSON 한 덩이(`schema_version: job-journal-v1` + `jobs[]`). 추가 기록이 아니라 **전체 교체**다 |
+| 쓰기 | tmp → `fsync` → `os.replace` → 디렉터리 `fsync`. 어느 단계에서 끊겨도 남는 것은 **이전 상태 또는 새 상태**뿐이다 |
+| 쓰는 시점 | 기동 1회(처분 반영 + 쓰기 가능 확인) · job 적재 · 모든 상태 전이. 전이의 저널 쓰기는 저장소 잠금 **안**이고, 쓰기가 성공한 뒤에만 메모리가 바뀐다 |
+
+**저널만 영속시키지 않는 이유**: `SUCCEEDED` job 의 `artifact.uri` 는 `<ML_ENGINE_ARTIFACT_OUT_DIR>/<job_id>/`
+의 파일을 가리킨다. job 기록만 살리고 산출물을 휘발시키면 **없는 파일을 가리키는 기록**이 남는다. 그래서
+볼륨은 산출물 루트에 걸고 저널을 그 안에 둔다(D-6B4-2).
+
+## 2. 대기 큐 상한과 폐기
+
+- 「대기」는 플래그가 아니라 **상태**다: `ACCEPTED` = 워커가 아직 집지 않음, `RUNNING` = 실제로 실행 중.
+  대기 수는 저장소의 `ACCEPTED` 개수이고 어디에도 캐시하지 않는다.
+- 상한은 정책 값 `pending_queue_max`(`ml-engine/policy/serving-v1.yaml`, **잠정 4**). 값의 승인 지위와
+  근거는 `reports/evidence/m5/5e/policy-values.md` §1 — 승인된 큐 깊이 임계가 없어(`OPEN-OPS-03` 미결)
+  `job_workers` 의 네 배로 둔 **보수적 초기값**이다. 0·음수·키 누락은 로더가 거부한다(기동 거부).
+- 상한을 넘으면 **가장 오래된 대기 job**(`accepted_at`, 동률 `job_id`) 하나가
+  `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 로 끝난다(최신성 우선, 운영자 결정 2026-09-26 ③).
+  새로 들어온 job 은 대기로 남는다.
+- **`RUNNING`·종단 job 은 폐기 대상이 아니다.** 멱등 재사용(`idempotency_key` 재요청)은 적재가 아니므로
+  폐기도 일으키지 않는다.
+
+### 폐기를 **어떻게 아는가** — 오늘 전부
+
+| 채널 | 있는가 |
+| --- | --- |
+| `GetTrainingJob(job_id)` | **있다.** `state=FAILED` · `failure.code=JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED` · `failure.detail_code=PENDING_QUEUE_OVERFLOW`. job_id 를 쥔 쪽만 볼 수 있다 |
+| 서버 로그 | **있다.** 적재가 폐기를 일으키면 그 사실이 로그로 남는다 |
+| job 목록 조회 | 없다 — `ListTrainingJobs` RPC 가 없다(범위 밖) |
+| metric·경보 | 없다 — `OPEN-6B4-QUEUE-METRIC` |
+
+## 3. 재기동 처분 — **재개가 아니다**
+
+기동 때 저널을 읽고 다음을 한 번에 처분한 뒤 그 결과를 저널에 다시 쓴다. 그래서 **재재기동은 아무것도
+더 처분하지 않는다**(수렴 고정점).
+
+| 저널 속 상태 | 처분 |
+| --- | --- |
+| `RUNNING` | `FAILED(TRAINING_ERROR, RUNNER_LOST_ON_RESTART)`. **재실행하지 않는다** — 실행기와 취소 토큰이 사라졌고, 재실행은 중복 학습·산출물 덮어쓰기를 부른다 |
+| `ACCEPTED` | 대기 큐로 **재적재**(실행된 적이 없다). `accepted_at` 순서로 다시 집어넣고 **상한을 다시 적용**한다 — 저널이 상한보다 많은 대기를 들고 있으면 최고참부터 폐기한다 |
+| `ACCEPTED` 인데 그 `training_spec_version` 을 지금 코드가 모른다 | `FAILED(TRAINING_ERROR, TRAINING_SPEC_UNSUPPORTED_ON_RESTART)` — 영원히 대기로 남기지 않는다 |
+| 종단(`SUCCEEDED`·`FAILED`·`CANCELLED`) | 그대로 보존. 멱등 키도 보존되므로 같은 키 재요청은 **새 job 을 만들지 않는다** |
+
+기동 로그가 처분 계수 셋(`RUNNING 고아 처분` · `상한 초과 폐기` · `대기 재적재 대상`)을 낸다 — incident
+때 먼저 보는 줄이다.
+
+**NOT_READY 로 뜬 서버는 대기 job 을 집지 않는다.** 정책 preload 가 하나라도 깨지면 새 제출을
+`MODEL_NOT_READY` 로 거부하는 것과 같은 규율로 재적재도 하지 않는다. 대기 job 은 `ACCEPTED` 로 남고
+**정책을 고쳐 다시 기동**해야 집힌다(이 서버는 뒤늦게 READY 가 되지 않는다).
+
+## 4. 기동을 **거부하는** 저널 상태 — 값을 지어내지 않는다
+
+| 상태 | 결과 |
+| --- | --- |
+| 파일이 없다(첫 기동) | 정상. 빈 저장소로 시작하고 **그 자리에 저널을 한 번 쓴다**(쓰기 가능 확인) |
+| 디렉터리에 쓸 수 없다(볼륨 소유자·읽기 전용) | **기동 거부**(`ConfigError`). 조용히 비영속으로 뜨지 않는다 |
+| 파일이 깨졌다 / 잘렸다 / JSON 이 아니다 | **기동 거부** — 「없음」과 「깨짐」을 구분한다. 깨진 저널을 빈 저장소로 읽는 경로가 없다 |
+| `schema_version` 이 지원 밖 | **기동 거부** — 조용히 fallback 하지 않는다 |
+| 2C 조합·시각 불변식 위반(손으로 고친 파일 등) | **기동 거부** — 판독이 `JobRecord` 생성자를 지나므로 같은 규칙이 선다 |
+| 저널 경로가 디렉터리다 | **기동 거부** |
+| 이전 크래시가 남긴 `jobs.json.tmp` | 무해. 판독 대상이 아니고 다음 쓰기가 덮는다 |
+
+운영자가 깨진 저널을 만났을 때: **파일을 손으로 고치지 않는다.** 이 축은 비방어다(§5). job 기록을 버려도
+되는 상황이라면 그 파일을 **치우고**(백업해 두고) 다시 기동한다 — 그러면 첫 기동으로 처리된다. 치우기 전에
+`GetTrainingJob` 으로 쥐고 있던 job_id 들의 마지막 상태를 받아 둘 수 있다면 받아 둔다.
+
+## 5. 알려진 제한 — 이 문서가 약속하지 않는 것
+
+1. **볼륨 자체의 백업·손상 복구는 M7.** 이 slice 는 볼륨이 **살아 있는 동안**의 영속만 든다. 볼륨을 지우면
+   (`docker compose down -v`, CI S-25 가 그렇게 한다) job 기록도 산출물도 함께 사라진다.
+2. **다중 인스턴스 공유는 범위 밖.** 저널은 한 프로세스가 잠금 아래 쓰는 파일이다. 같은 볼륨에 두 ml-serving
+   을 올리면 서로의 쓰기를 덮는다 — 그 구성을 지원하지 않는다(5E 제한 6 유지).
+3. **저널을 직접 편집하는 주체는 비방어.** 판독이 불변식을 다시 세지만, 그것은 「조용히 받지 않는다」일 뿐
+   편집을 막는 장치가 아니다.
+4. **종단 job 이 영구 누적된다.** 전체 교체 형식이라 파일이 단조 증가한다. 보존 기간·정리 절차는 이 slice
+   밖이다 — `OPEN-6B4-JOURNAL-RETENTION`.
+5. **폐기·처분의 metric 이 없다**(`OPEN-6B4-QUEUE-METRIC`). 오늘 관측은 job 상태와 서버 로그 둘뿐이고,
+   job_id 를 쥔 쪽만 상태를 물을 수 있다.
+6. **저장소를 쓸 수 없을 때의 전용 실패 코드가 없다.** `StartTraining`·`CancelTrainingJob` 은 그 경우
+   `MODEL_NOT_READY` + `detail_code=JOB_STORE_UNAVAILABLE`(retryable)로 답한다 — 2A `FailureCode` 여덟에
+   그 뜻이 없고 이 slice 는 proto 를 바꾸지 않았다(`OPEN-6B4-STORE-UNAVAILABLE-CODE`).
+7. **취소 사유 `CANCELLED_BY_REQUEST` 는 여전히 생산되지 않는다.** 2C 조합 불변식이 `CANCELLED` 에
+   `failure` 설정을 금지하기 때문이다(`OPEN-6B4-CANCEL-REASON-UNREACHABLE`) — 이 slice 가 고치지 않았다.
+8. **출하 소비자가 0 이다.** `StartTraining` 을 부르는 production Kotlin 코드가 없다. 이 문서가 서술하는
+   것은 계약 안의 운영 안전성이고, 오늘 이 큐를 채울 수 있는 것은 직접 gRPC 호출뿐이다.

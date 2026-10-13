@@ -74,6 +74,11 @@ COPY ml-engine/policy /app/policy
 # 충분). `docker/compose.yaml` 의 healthcheck 가 이 둘을 부른다.
 COPY docker/probe/liveness.py docker/probe/readiness.py /app/probe/
 
+# `/app/artifacts` 는 job 산출물 루트이자 **job 저널**(`_journal/jobs.json`)의 자리다
+# (M6/6B-4 D-6B4-2). 디렉터리와 소유자가 **이미지에** 있어야 하는 이유 둘 — ① 서버가
+# 기동 시점에 이 자리에 저널을 쓰고, 쓸 수 없으면 부팅을 거부한다(조용한 비영속 금지)
+# ② `docker/compose.yaml` 이 이 경로에 named volume 을 걸 때 Docker 가 **이미지 경로의
+# 소유자**로 볼륨을 초기화한다. `chown -R /app` 이 이미 이 디렉터리를 덮는다.
 RUN mkdir -p /app/artifacts && chown -R mlserving:mlserving /app
 
 USER mlserving

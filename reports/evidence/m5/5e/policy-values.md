@@ -11,6 +11,7 @@
 | `max_concurrent_rpcs` | `32` | `maximum_concurrent_rpcs` — 초과 시 gRPC `RESOURCE_EXHAUSTED`(4D-1 이 백오프 재시도 대상으로 둠). `max_workers` 보다 커도 된다(큐잉) | 보수적 초기값 |
 | `shutdown_grace_seconds` | `10` | `server.stop(grace)` — 4D-1 `deadlineCeiling=5s` 의 두 배(진행 중 RPC 가 deadline 안에 끝나거나 취소되도록) | 4D-1 정책 값 파생 |
 | `job_workers` | `1` | training job 스레드 풀 — 학습은 LightGBM `num_threads=4`(5C-1 spec) 가 이미 코어를 쓰므로 동시 job 1 | 5C-1 spec 파생 |
+| `pending_queue_max` | `4` | **대기(`ACCEPTED`) job 수 상한**(M6/6B-4 B-2, 2026-10-13). 넘치면 `accepted_at` 최소인 대기 job 을 `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 로 폐기한다(최신성 우선, 운영자 결정 2026-09-26 ③). 값 근거: 승인된 큐 깊이 임계가 **없다**(`OPEN-OPS-03` 미결) — `job_workers: 1` 의 네 배로 둔다(한 job 이 도는 동안 넷까지 쌓임을 허용) | **잠정** — 보수적 초기값 + 측정 의무. `OPEN-OPS-03` 결정 시 재검토 |
 | `idempotency_key_max_chars` | `256` | 2C 문면 「test 파일이 임의 상한(256자)으로 규칙 존재를 문서화」 — 그 값 그대로 | 2C test 값 |
 | `embedding_text_max_chars` | `contract-policy.properties` `embedding.text.max-chars` 와 **같은 값**(구현 레인이 그 파일에서 읽어 옮기고, 경계 쌍 testdata 로 동일성 증명 — D-2D-6) | 2E ④ 정책 데이터 | Kotlin 정책 값 복제(두 파일 — 값 동일성은 test) |
 | `dataset_uri_schemes.0` | `file` | D-5C-8·D-5E-5 — `file://` 만. object storage 는 6C(`OPEN-2C-DATASET-URI-SCHEME`) | 계약 고정 |
@@ -21,7 +22,7 @@
 | --- | --- | --- |
 | `ML_ENGINE_BIND` | `host:port` | **없음**(미설정 = 부팅 거부) |
 | `ML_ENGINE_INFERENCE_POLICY` / `ML_ENGINE_TRAINING_POLICY` / `ML_ENGINE_EVALUATION_POLICY` / `ML_ENGINE_SERVING_POLICY` | 정책 YAML 경로 넷 | 없음 |
-| `ML_ENGINE_ARTIFACT_OUT_DIR` | job 산출물 루트(`file://`) | 없음 |
+| `ML_ENGINE_ARTIFACT_OUT_DIR` | job 산출물 루트(`file://`) **+ job 저널**(`_journal/jobs.json`, M6/6B-4 D-6B4-2 — 산출물과 job 기록이 같은 볼륨에 함께 산다) | 없음 |
 | `ML_ENGINE_CODE_VERSION` | 5C-1 `CodeVersion` 문자열(git 호출 없음 — 배포가 준다) | 없음 |
 
 ## §3 5A 환경 6 처분(5A `policy-values.md` #24~#26·#30 + 표 밖 둘)
@@ -35,11 +36,12 @@
 | (표 밖) | `ML_RELEASE_MANIFEST_DIR`·`ARCHIVE_DIR` | B 계보(승격 manifest) — 미이식 |
 
 ## §4 불변식(로더가 거부)
-전부 유한값 · `max_workers ≥ 1` · `max_concurrent_rpcs ≥ 1` · `shutdown_grace_seconds ≥ 0` · `job_workers ≥ 1` · `idempotency_key_max_chars ≥ 1` · `embedding_text_max_chars ≥ 1` · `dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자.
+전부 유한값 · `max_workers ≥ 1` · `max_concurrent_rpcs ≥ 1` · `shutdown_grace_seconds ≥ 0` · `job_workers ≥ 1` · `pending_queue_max ≥ 1` · `idempotency_key_max_chars ≥ 1` · `embedding_text_max_chars ≥ 1` · `dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자.
 
 ## change_history
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 표 등재(승인 대기) | D-5E-6·D-5E-7 |
 | 2026-09-16 잠정 승인 | 지위 「승인 대기」→「잠정 승인」(값·표 무변경, 재승인 조건 = M6 6C/6E 실측) | 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ⑤ |
+| 2026-10-13 M6/6B-4 | §1 에 `pending_queue_max: 4` 등재(잠정) · §2 `ML_ENGINE_ARTIFACT_OUT_DIR` 의 뜻에 job 저널 추가 · §4 에 `pending_queue_max ≥ 1` 추가 | 운영자 결정 B-2(2026-10-13) + 2026-09-26 ③. 값 근거는 여전히 보수적 초기값(`OPEN-OPS-03` 미결) |
 | 2026-09-15 구현 | `ml-engine/policy/serving-v1.yaml` 실물 작성(표 값 그대로) — `embedding_text_max_chars=4000`이 Kotlin `config/quality/contract-policy.properties`의 `embedding.text.max-chars=4000`과 일치함을 `tests/serving/test_policy_kotlin_parity.py`로 실측(D-2D-6 경계 쌍). `load_serving_policy`가 §4 불변식 전부(≥1 넷·`dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자)를 강제하는 것을 `tests/serving/test_serving_policy.py`로 확인 | D-5E-6 구현 완료, 값은 여전히 보수적 초기값(측정 의무 유지) |
