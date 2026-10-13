@@ -145,6 +145,39 @@ M-9 보충: JSON **문법** 오류는 이 변이가 건드리지 않는 갈래(`
 잡았다. M-5 는 음성 대조 test 자신(`parse_kotlin_edges` 가 지운 간선을 본다)도 함께 붉어진다 —
 기준 문면이 이미 바뀌었음을 그 test 가 알아차린 것이다.
 
+## D-6B4-3 잠금 커밋 뒤 재실측 (산출물 HEAD `18069139`)
+
+산출물 커밋 하나(`ReadinessGate` 전이 집합 잠금 test + 조립 근 NOT_READY test 의 의존 주석)가
+붙은 뒤의 측정이다. **그 커밋이 바꾼 것은 Python test 파일 둘뿐**이다.
+
+## 2026-10-14T (판정 SHA 18069139)
+- cmd: `uv run python -m pytest tests -q` (S-5)
+- exit: 0
+- 핵심 결과: **1517 passed**(476s) — 잠금 test 하나가 늘었다. 양끝 HEAD 동일
+
+## 2026-10-14T
+- cmd: `ml-engine` job 의 S-2·S-3·S-4·S-6·S-7·S-9·S-11 재실행(전부 가볍다 — 재사용 판단을 쓰지 않았다)
+- exit: 0 (일곱 전부)
+- 핵심 결과: ruff · mypy · import 계약 · 설계 래칫 · 재활용 출처(+양성 대조) · 버전 두 자리 · wheel 재수출
+
+### `check`·`container` job 의 재사용 판단
+
+- **`container` job: 재사용한다.** 근거는 기계 측정 —
+  `git diff --name-only 54bbef81..18069139 -- docker/ ml-engine/src ml-engine/policy ml-engine/pyproject.toml contracts/ tools/ config/ adapters/ app/ build-logic/ .github/`
+  가 **빈 출력**이다. 이미지 입력·compose·정책·계약·게이트 스크립트·워크플로가 한 글자도
+  바뀌지 않았으므로 S-21~S-25 의 입력이 동일하다. 바뀐 둘은 이미지에 들어가지 않는
+  `ml-engine/tests/**` 다(Dockerfile 이 `src`·`policy`·`tools` 만 복사한다).
+- **`check` job: 재사용하지 않고 다시 돌린다.** Kotlin 소스는 위 측정대로 무변경이지만
+  `leakPatternGate` 의 scanRoot 가 `reports/evidence` 라 **이 evidence 편집 자체가 그 게이트의
+  입력**이다. 그래서 evidence 커밋 뒤 그 HEAD 에서 다시 돌린다(결과 정본은 verifier 와
+  완료 보고 — evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다).
+
+## 변이 추가 — 열거 우회(D-6B4-3 잠금)
+
+| # | 변이 | numstat | RED |
+| --- | --- | --- | --- |
+| M-11 | `ReadinessGate` 에 **다른 이름**(`retry_preload`)으로 READY 복귀 경로를 되살림 | 4/0 | 1 — 새 전이 집합 test. **기존 `mark_ready` 이름 금지 test 는 초록으로 남았다**(열거만으로는 못 막는다는 실측) |
+
 ## rollback 실측
 
 `rollback.md` 참조(실측 HEAD · ①~⑥ 결과를 그 파일이 갖는다).
