@@ -63,15 +63,21 @@ class BootJarSecurityFloorTest {
         names: List<String>,
     ): Set<String> {
         val prefix = "$artifact-"
-        val tails =
+        val unreadable =
             names
                 .filter { it.startsWith(prefix) }
                 .map { it.removePrefix(prefix).removeSuffix(".jar") }
-        val unreadable = tails.filter { it.first().isDigit() && !versionShape.matches(it) }
+                .filter { it.first().isDigit() && !versionShape.matches(it) }
         withClue("$artifact: 판으로 읽히지 않는 꼬리가 있다 — 읽지 못하면 하한을 잴 수 없다: $unreadable") {
             unreadable.shouldBeEmpty()
         }
-        return tails.filter { versionShape.matches(it) }.toSet()
+        // **좌표는 `splitArtifactVersion` 으로 정확히 맞춘다.** 접두 일치만 쓰면 `jackson-core-2` 처럼
+        // 접두를 삼키는 다른 좌표가 이 집합에 섞인다.
+        return names
+            .mapNotNull(::splitArtifactVersion)
+            .filter { it.first == artifact }
+            .map { it.second }
+            .toSet()
     }
 
     @Test
@@ -90,10 +96,11 @@ class BootJarSecurityFloorTest {
      * **jackson 은 두 축으로 잰다**(D-6E2C-8).
      *
      * ⓐ **카탈로그가 하한을 선언한 좌표**(`jackson-core`·`jackson-databind`)는 **접두와 무관하게 항상
-     *    대상**이다. 실린 사본은 그 major 의 하한과 같아야 한다 — `jackson-databind-2.20.3.jar` 처럼
-     *    **minor 가 낮은 사본**은 `2.21.` 접두를 갖지 않으므로, 라인 접두만으로 대상을 고르면 조용히
-     *    빠진다(하한 미만인데 초록). major 가 있다면 전부 하한이고, **좌표가 통째로 빠지는 것은 허용**
-     *    한다(Boot 생태계가 Jackson 3 으로 수렴하는 날 그것은 바람직한 변화다).
+     *    대상**이다. 실린 판 집합이 **{jackson2 하한, jackson3 하한} 의 부분집합**이어야 한다 —
+     *    `jackson-databind-2.20.3.jar` 처럼 **minor 가 낮은 사본**은 `2.21.` 접두를 갖지 않으므로, 라인
+     *    접두만으로 대상을 고르면 조용히 빠진다(하한 미만인데 초록). 부분집합이라 **좌표가 통째로
+     *    빠지는 것은 허용**하고(Jackson 3 수렴은 바람직한 변화다) 하한 집합 밖의 판은 major 가 무엇이든
+     *    RED 다(`4.0.0` 처럼 하한을 선언하지 않은 major 도 포함).
      * ⓑ **그 밖의 가족 원소**(`jackson-dataformat-yaml` 등)는 같은 `major.minor.` 라인 위에 있으면
      *    하한과 같아야 한다. 라인 밖은 BOM 이 **독자 판**으로 핀하는 좌표라(실측: 2.21.7 BOM 이
      *    `jackson-annotations` 를 `2.21` 로 핀한다) 카탈로그 하한과 비교할 대상이 아니다.
@@ -113,10 +120,8 @@ class BootJarSecurityFloorTest {
         val declared = listOf("jackson-core", "jackson-databind")
 
         declared.forEach { artifact ->
-            val offFloor =
-                versionsOf(artifact, names)
-                    .filter { version -> floors[version.substringBefore('.')]?.equals(version) == false }
-            withClue("$artifact: 하한과 다른 사본이 실렸다(좌표가 빠지는 것은 허용, 어긋나는 것은 아니다): $offFloor") {
+            val offFloor = versionsOf(artifact, names) - floors.values.toSet()
+            withClue("$artifact: 하한 집합 ${floors.values} 밖의 사본이 실렸다(좌표가 빠지는 것은 허용, 어긋나는 것은 아니다): $offFloor") {
                 offFloor.shouldBeEmpty()
             }
         }
