@@ -1,0 +1,247 @@
+package bidvector.workflow.retention
+
+import bidvector.workflow.event.LeaseAttempt
+import bidvector.workflow.strategy.Clock
+import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import org.junit.jupiter.api.Test
+import java.time.Instant
+
+private val NOW = Instant.parse("2026-10-13T00:00:00Z")
+private val CUTOFF_AT_90_DAYS = Instant.parse("2026-07-15T00:00:00Z")
+
+private fun policy(batchSize: Int = 10) = RetentionPolicyData(retentionDays = 90, batchSize = batchSize)
+
+/**
+ * 호출을 기록하는 fake 저장소 — mock framework 를 쓰지 않는다(v2-지침서 §5: workflow test 는
+ * 값과 fake port 로).
+ *
+ * `purgeBatches`/`maskBatches` 는 **표별 응답 큐**다. 큐가 비면 0 을 돌려준다 — 「더 지울 것이
+ * 없다」. 큐를 쓰는 이유: 일괄 루프가 「가득 찬 일괄이면 한 번 더」를 실제로 하는지 재려면
+ * 응답이 호출마다 달라야 한다.
+ */
+private class FakeRetentionStore(
+    private val targets: List<RetentionTarget>,
+    private val stored: Set<String> = targets.map { it.table }.toSet(),
+    private val dependencies: Set<TableDependency> = emptySet(),
+    private val leaseBusy: Boolean = false,
+    private val purgeBatches: Map<String, MutableList<Int>> = emptyMap(),
+    private val maskBatches: Map<String, MutableList<MaskBatchCounts>> = emptyMap(),
+) : RetentionStorePort,
+    RetentionWriter {
+    val purgeCalls = mutableListOf<Pair<String, Instant>>()
+    val maskCalls = mutableListOf<Pair<String, Instant>>()
+    var leaseTaken = false
+
+    override fun classifiedTargets(): List<RetentionTarget> = targets
+
+    override fun storedTables(): Set<String> = stored
+
+    override fun dependencies(): Set<TableDependency> = dependencies
+
+    override fun <T> withExclusiveLease(body: (RetentionWriter) -> T): LeaseAttempt<T> {
+        if (leaseBusy) return LeaseAttempt.Busy
+        leaseTaken = true
+        return LeaseAttempt.Held(body(this))
+    }
+
+    override fun purge(
+        target: RetentionTarget,
+        cutoff: RetentionCutoff,
+        batchSize: Int,
+    ): Int {
+        purgeCalls += target.table to cutoff.instant
+        return purgeBatches[target.table]?.removeFirstOrNull() ?: 0
+    }
+
+    override fun mask(
+        target: RetentionTarget,
+        cutoff: RetentionCutoff,
+        batchSize: Int,
+    ): MaskBatchCounts {
+        maskCalls += target.table to cutoff.instant
+        return maskBatches[target.table]?.removeFirstOrNull() ?: MaskBatchCounts(0, 0)
+    }
+}
+
+/** P-3 — 보존 use case. 값과 fake port 로만 재고, 실제 SQL 축은 adapters test 가 진다. */
+class PurgeExpiredDataTest {
+    @Test
+    fun `분류 없는 표가 스키마에 있으면 아무것도 지우지 않는다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("notice", RetentionTreatment.PURGE)),
+                stored = setOf("notice", "v19_new_table"),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        outcome shouldBe
+            RetentionOutcome.Refused(
+                RetentionRefusal.UnclassifiedTables(
+                    missingClassification = setOf("v19_new_table"),
+                    missingFromSchema = emptySet(),
+                ),
+            )
+        store.leaseTaken shouldBe false
+        store.purgeCalls shouldBe emptyList()
+    }
+
+    @Test
+    fun `분류에만 있고 스키마에 없는 표도 거부한다 — 죽은 분류는 등식을 거짓으로 만든다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("notice", RetentionTreatment.PURGE),
+                        RetentionTarget("dropped_table", RetentionTreatment.PURGE),
+                    ),
+                stored = setOf("notice"),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        outcome shouldBe
+            RetentionOutcome.Refused(
+                RetentionRefusal.UnclassifiedTables(
+                    missingClassification = emptySet(),
+                    missingFromSchema = setOf("dropped_table"),
+                ),
+            )
+        store.purgeCalls shouldBe emptyList()
+    }
+
+    @Test
+    fun `FK 순환이면 실행하지 않는다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("a", RetentionTreatment.PURGE),
+                        RetentionTarget("b", RetentionTreatment.PURGE),
+                    ),
+                dependencies =
+                    setOf(
+                        TableDependency("a", "b", cascade = false),
+                        TableDependency("b", "a", cascade = false),
+                    ),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        outcome shouldBe RetentionOutcome.Refused(RetentionRefusal.CyclicDependencies(setOf("a", "b")))
+        store.leaseTaken shouldBe false
+    }
+
+    @Test
+    fun `임대를 못 쥐면 한 행도 건드리지 않는다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("notice", RetentionTreatment.PURGE)),
+                leaseBusy = true,
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        outcome shouldBe RetentionOutcome.LeaseBusy
+        store.purgeCalls shouldBe emptyList()
+    }
+
+    @Test
+    fun `제외 표와 cascade 표는 파기도 마스킹도 부르지 않는다 — 보고에는 분류로 실린다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("notice", RetentionTreatment.PURGE),
+                        RetentionTarget("inbox", RetentionTreatment.EXEMPT),
+                        RetentionTarget("operator_profile", RetentionTreatment.EXEMPT),
+                        RetentionTarget("notice_requirement_row", RetentionTreatment.CASCADE_WITH_PARENT),
+                    ),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        store.purgeCalls.map { it.first } shouldContainExactly listOf("notice")
+        store.maskCalls shouldBe emptyList()
+        val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
+        report.exempt shouldBe setOf("inbox", "operator_profile")
+        report.cascade shouldBe setOf("notice_requirement_row")
+    }
+
+    @Test
+    fun `cutoff 는 주입된 시계에서 보존 기간을 뺀 값으로 저장소에 내려간다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("notice", RetentionTreatment.PURGE),
+                        RetentionTarget("raw_observation", RetentionTreatment.MASK_PII),
+                    ),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        store.purgeCalls shouldContainExactly listOf("notice" to CUTOFF_AT_90_DAYS)
+        store.maskCalls shouldContainExactly listOf("raw_observation" to CUTOFF_AT_90_DAYS)
+        outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report.cutoff shouldBe CUTOFF_AT_90_DAYS
+    }
+
+    @Test
+    fun `가득 찬 일괄이면 한 번 더 돈다 — 백로그를 한 run 이 비운다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("notice", RetentionTreatment.PURGE)),
+                purgeBatches = mapOf("notice" to mutableListOf(10, 10, 3)),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy(batchSize = 10)).run()
+
+        store.purgeCalls.size shouldBe 3
+        val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
+        report.tallies.getValue("notice") shouldBe TableTally(purged = 23)
+        report.purgedTotal shouldBe 23
+    }
+
+    @Test
+    fun `파기는 자식 표부터 돈다 — 순서가 보고에도 실린다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("opening_result", RetentionTreatment.PURGE),
+                        RetentionTarget("opening_reserve_price", RetentionTreatment.PURGE),
+                    ),
+                dependencies =
+                    setOf(TableDependency("opening_reserve_price", "opening_result", cascade = false)),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
+
+        store.purgeCalls.map { it.first } shouldContainExactly listOf("opening_reserve_price", "opening_result")
+        outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report.deletionOrder shouldContainExactly
+            listOf("opening_reserve_price", "opening_result")
+    }
+
+    @Test
+    fun `마스킹 성공과 fail-closed 폐기는 따로 센다 — 일괄도 가득 차면 한 번 더`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("raw_observation", RetentionTreatment.MASK_PII)),
+                maskBatches =
+                    mapOf(
+                        "raw_observation" to
+                            mutableListOf(MaskBatchCounts(masked = 8, failClosed = 2), MaskBatchCounts(1, 0)),
+                    ),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy(batchSize = 10)).run()
+
+        store.maskCalls.size shouldBe 2
+        val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
+        report.tallies.getValue("raw_observation") shouldBe TableTally(masked = 9, maskFailClosed = 2)
+        report.maskedTotal shouldBe 9
+        report.maskFailClosedTotal shouldBe 2
+    }
+}
