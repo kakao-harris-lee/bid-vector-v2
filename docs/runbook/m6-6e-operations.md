@@ -42,7 +42,7 @@
 | `bidvector.snapshot-extract` | `SnapshotExtractionProperties` | 스냅숏 추출을 켤 때만 |
 | `bidvector.relay` | `RelayProperties` | relay 를 켤 때만 |
 
-### 1.3 러너 스위치 — `mode=once` 다섯
+### 1.3 러너 스위치 — `mode=once` 여섯
 
 러너는 **전부 기본 꺼짐**이고 `@ConditionalOnProperty(name = ["mode"], havingValue = "once")` 하나로만
 켜진다. 한 프로세스에 둘 이상을 켜면 **기동하지 않는다**(`OneShotRunnerGuard` — 임의의
@@ -55,6 +55,7 @@
 | `bidvector.snapshot-extract.mode=once` | 스냅숏 추출 |
 | `bidvector.evaluation.mode=once` | 평가 커밋(outbox 기록) |
 | `bidvector.relay.mode=once` | 알림 relay |
+| `bidvector.retention.mode=once` | 보존 파기·PII 마스킹(M6/6B-3 — 절차는 `m6-6b3-retention.md`) |
 
 러너를 하나도 켜지 않으면 **HTTP 표면만 뜬다**(운영자 API). 러너를 켤 때는 6G runbook §2 의 관례대로
 `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 으로 HTTP 표면을 끈다.
@@ -265,7 +266,7 @@ fixture 의 DDL 뿐). 남는 것은 구조적 사각이고, 새 표·새 DML 을
 
 ### 3.1 먼저 보는 것
 
-1. **종료 코드**(§3.2~§3.4). 0 이 아니면 그 값이 처방을 정한다.
+1. **종료 코드**(§3.2~§3.4, 보존 러너는 `m6-6b3-retention.md` §3). 0 이 아니면 그 값이 처방을 정한다.
 2. **마침 줄** — 러너는 끝에 계수를 실은 한 줄을 남긴다. 그 줄의 계수가 무엇이 일어났는지 말한다.
 3. **사유 토큰**(§3.5). 실패 줄에는 예외 메시지·SQL 상세·접속 문자열이 **없다** — 클래스 이름과
    SQLSTATE 5자리까지다.
