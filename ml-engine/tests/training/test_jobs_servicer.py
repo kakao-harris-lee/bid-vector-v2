@@ -12,7 +12,12 @@ from pathlib import Path
 import pytest
 
 from ml_engine.contracts import error_pb2, training_pb2
-from ml_engine.training.jobs.journal import JobJournal, JobSubmission
+from ml_engine.training.jobs.journal import (
+    JobJournal,
+    JobSubmission,
+    JournalFailed,
+    JournalFailureReason,
+)
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
@@ -197,6 +202,77 @@ def test_pending_discard_is_logged_with_job_id_and_reason(
     assert first.handle.job_id in message
     assert DetailCode.PENDING_QUEUE_OVERFLOW.value in message
     assert discarded.accepted_at.isoformat() in message
+
+
+# ---- cr M-3 — 저널을 쓸 수 없을 때의 wire 표면 둘 ----
+
+
+def _break_journal_writes(store: JobStore) -> None:
+    """저장소의 저널 쓰기를 `JournalFailed` 로 고정한다.
+
+    `chmod 0o500`(저장소 층 test 가 쓰는 기법)은 **root 러너에서 쓰기를 막지 못해** test
+    가 붉어진다. 여기서 재려는 것은 「쓰기가 실제로 실패할 수 있는가」(그것은
+    `tests/training/test_jobs_store.py::test_journal_write_failure_leaves_memory_unchanged`
+    가 실제 권한으로 잰다)가 아니라 **그 결과 타입이 wire 에 어떻게 닿는가**이므로,
+    결과 타입 경계에서 주입한다."""
+
+    def _always_failing(snapshot: object) -> JournalFailed:
+        return JournalFailed(JournalFailureReason.WRITE_FAILED, "주입된 쓰기 실패")
+
+    store._journal.write = _always_failing  # type: ignore[assignment,method-assign]
+
+
+def _assert_store_unavailable(failure: training_pb2.ApplicationFailure) -> None:
+    assert failure.code == error_pb2.FAILURE_CODE_MODEL_NOT_READY
+    assert failure.detail_code == "JOB_STORE_UNAVAILABLE"
+    assert failure.retryable is True
+
+
+def test_start_training_with_unwritable_journal_is_store_unavailable(
+    tmp_path: Path,
+) -> None:
+    """저널에 못 쓰면 요청을 **받지 않은** 것이다 — `MODEL_NOT_READY` +
+    `JOB_STORE_UNAVAILABLE`(retryable). 저장소에 job 도 남지 않는다."""
+    servicer, runner, store = _build_servicer(tmp_path)
+    _break_journal_writes(store)
+
+    response = servicer.StartTraining(_valid_request(), context=None)
+
+    assert response.WhichOneof("result") == "failure"
+    _assert_store_unavailable(response.failure)
+    assert store.pending_jobs() == ()
+    runner.shutdown(wait=True)
+
+
+def test_cancel_training_job_with_unwritable_journal_is_store_unavailable(
+    tmp_path: Path,
+) -> None:
+    """취소를 영속시키지 못했으면 「취소됐다」고 답하지 않는다 — 같은 실패 둘로 답하고
+    상태는 그대로다(메모리도 바뀌지 않았다)."""
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=4)
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=_NeverStartingRunner(),  # type: ignore[arg-type]
+        is_ready=lambda: True,
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+    started = servicer.StartTraining(_valid_request(), context=None)
+    job_id = started.handle.job_id
+    _break_journal_writes(store)
+
+    request = training_pb2.CancelTrainingJobRequest()
+    request.envelope.request_id = "r"
+    request.envelope.correlation_id = "c"
+    request.job_id = job_id
+    response = servicer.CancelTrainingJob(request, context=None)
+
+    assert response.WhichOneof("result") == "failure"
+    _assert_store_unavailable(response.failure)
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.ACCEPTED
 
 
 def test_start_training_returns_without_waiting_for_the_pipeline(
