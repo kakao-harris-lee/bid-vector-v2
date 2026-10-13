@@ -37,7 +37,7 @@
 
 ## in_scope / out_scope
 
-- in: `ml-engine/src/ml_engine/training/jobs/**` · `ml-engine/src/ml_engine/serving/policy*`·`ml-engine/policy/serving-v1.yaml` · `ml-engine/src/ml_engine/app/server.py`(조립) · `ml-engine/tests/**` · `contracts/proto/bidvector/ml/v1/training.proto`(**주석만**) · `docs/adr/0010-*.md`(D-8 개정 블록) · Kotlin `TrainingContractRules` 와 그 계약 test · `docker/compose.yaml`·`docker/ml-serving.Dockerfile`(볼륨·디렉터리) · `config/quality/image-hygiene-policy.properties`(재실측 주석만) · `reports/evidence/m5/5e/policy-values.md`(§1 행) · `docs/runbook/**` · `reports/evidence/m6/6b4/**` · `milestone-6.md`(팀장 문단).
+- in: `ml-engine/src/ml_engine/training/jobs/**` · `ml-engine/src/ml_engine/serving/policy*`·`ml-engine/policy/serving-v1.yaml` · `ml-engine/src/ml_engine/app/server.py`(조립) · `ml-engine/tests/**` · `contracts/proto/bidvector/ml/v1/training.proto`(**주석만**) · `docs/adr/0010-*.md`(D-8 개정 블록) · Kotlin `TrainingContractRules` 와 그 계약 test · `docker/compose.yaml`·`docker/ml-serving.Dockerfile`(볼륨·디렉터리) · `config/quality/image-hygiene-policy.properties`(재실측 주석만) · `reports/evidence/m5/5e/policy-values.md`(§1 행 · §2 아티팩트 루트 행 — D-6B4-2) · `docs/runbook/**` · `reports/evidence/m6/6b4/**` · `milestone-6.md`(팀장 문단).
 - out: proto 메시지·필드 변경(주석 외) · `ListTrainingJobs` RPC · Kotlin production 소비자 · 외부 큐·브로커 · 다중 인스턴스 · metric(로그 + 상태로만, metric 은 OPEN) · `OPEN-5E-CANCEL-GRANULARITY`.
 
 ## acceptance
@@ -47,6 +47,10 @@ CI 그대로: `ml-engine` job 전건(S-1~S-11) · `check` job(`./gradlew --no-da
 ## rollback
 
 in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` · 공유 파일(runbook·`milestone-6.md`·ADR·policy-values)은 병합된 main SHA 에서 복원(PR #69 규칙). 저널 형식은 새 파일이라 되돌림 뒤 남은 저널은 무시된다(인메모리로 복귀) — 그 사실을 rollback.md 에 적는다. 임시 clone 에서 ①~⑥.
+
+## 계약 갱신 이력
+
+**D-6B4-2 (r1, 2026-10-14, 팀장 — 구현 레인 착수 수령).** ① **저널 경로 = `<ML_ENGINE_ARTIFACT_OUT_DIR>/_journal/`, 볼륨은 `/app/artifacts` 전체**(B안). 새 env 0 → in_scope 밖 두 자리(`tools/image-hygiene-check.sh` PROBE_ENV · `RealServerIntegrationTest`) 무편집, 그리고 「재기동 뒤 job 기록은 남는데 `artifact.uri` 파일은 없다」 비정합이 함께 닫힌다(산출물과 기록이 한 볼륨). `ML_ENGINE_ARTIFACT_OUT_DIR` 의 뜻이 「job 산출물 + 저널 루트」로 넓어지므로 in_scope 에 `reports/evidence/m5/5e/policy-values.md` §2 해당 행을 더한다. ② `InMemoryJobStore` → `JobStore`(저널 **필수 인자** — 비영속 조립 갈래를 구성상 없앤다). ③ ACCEPTED 고아 재적재를 위해 저널 항목에 제출 payload(dataset uri · manifest_checksum · training_spec_version)를 함께 적는다(proto 변경 0). 정책 preload 가 NOT_READY 면 재적재하지 않고 ACCEPTED 로 두되, **READY 가 되는 시점에 재적재**(영구 정체 금지)하고 그동안도 상한 계수에 든다 — 알려진 제한 등재.
 
 ## 하네스 레인 변경 (상시)
 
