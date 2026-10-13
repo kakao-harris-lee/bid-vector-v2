@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 
 from ml_engine.contracts import error_pb2, training_pb2
 from ml_engine.training.jobs.journal import JobJournal, JobSubmission
@@ -14,6 +17,7 @@ from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
     DatasetRefInput,
+    DetailCode,
     EvaluationRefValue,
     PipelineOutcome,
 )
@@ -142,6 +146,57 @@ def test_start_training_reports_accepted_even_if_a_worker_starts_first(
     record = store.get(response.handle.job_id)
     assert record is not None
     assert record.state is JobState.RUNNING
+
+
+class _NeverStartingRunner:
+    """`submit` 이 아무것도 하지 않는다 — 제출한 job 이 전부 `ACCEPTED`(대기) 로 남아
+    상한 폐기를 결정적으로 일으킬 수 있다."""
+
+    def submit(
+        self, job_id: str, dataset_ref: DatasetRefInput, pipeline: object
+    ) -> None:
+        return None
+
+    def cancel(self, job_id: str) -> None:
+        return None
+
+
+def test_pending_discard_is_logged_with_job_id_and_reason(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """vr H-3 — 상한 폐기는 **폐기 시점에** 로그를 남긴다. `ListTrainingJobs`·metric 이
+    없으므로(scope out_scope) job_id 를 쥔 쪽 말고 폐기를 알 수 있는 채널은 서버 로그
+    하나다(runbook §2 「폐기를 어떻게 아는가」의 「서버 로그: 있다」 행).
+
+    통제군: 폐기가 없는 제출은 이 로그를 남기지 않는다."""
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=1)
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=_NeverStartingRunner(),  # type: ignore[arg-type]
+        is_ready=lambda: True,
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.servicer"):
+        first = servicer.StartTraining(
+            _valid_request(idempotency_key="idem-oldest"), context=None
+        )
+        assert [record.levelname for record in caplog.records] == []  # 통제군
+        servicer.StartTraining(
+            _valid_request(idempotency_key="idem-newest"), context=None
+        )
+
+    discarded = store.get(first.handle.job_id)
+    assert discarded is not None
+    assert discarded.state is JobState.FAILED
+    assert len(caplog.records) == 1
+    message = caplog.records[0].getMessage()
+    assert caplog.records[0].levelno == logging.WARNING
+    assert first.handle.job_id in message
+    assert DetailCode.PENDING_QUEUE_OVERFLOW.value in message
+    assert discarded.accepted_at.isoformat() in message
 
 
 def test_start_training_returns_without_waiting_for_the_pipeline(

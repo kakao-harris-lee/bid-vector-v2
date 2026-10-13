@@ -98,6 +98,22 @@ def _fill_store_unavailable(
     failure.detail_code = "JOB_STORE_UNAVAILABLE"
 
 
+def _log_discarded(outcome: Started) -> None:
+    """상한 폐기를 **폐기 시점에** 남긴다(vr H-3). `Started.discarded` 를 아무도 읽지
+    않으면 job_id 를 쥔 쪽 말고는 폐기를 알 방법이 없다 — `ListTrainingJobs` 도 metric 도
+    없고(scope out_scope, `OPEN-6B4-QUEUE-METRIC`), 워커가 뒤늦게 그 job 에 닿아 내는
+    `_NotStarted` info 는 폐기 시점도 사유도 아니며 재기동이 먼저 오면 그조차 없다.
+    runbook §2 「폐기를 어떻게 아는가」의 「서버 로그: 있다」 행이 이 자리다."""
+    for record in outcome.discarded:
+        _logger.warning(
+            "대기 큐 상한 초과로 대기 job 을 폐기했다 — job_id=%s accepted_at=%s 사유=%s",
+            record.job_id,
+            record.accepted_at.isoformat(),
+            # 2C 조합 불변식상 `FAILED` 는 `failure` 를 반드시 든다(`JobRecord.__post_init__`).
+            record.failure.detail_code if record.failure is not None else "UNKNOWN",
+        )
+
+
 def _to_timestamp(value: datetime) -> Timestamp:
     timestamp = Timestamp()
     timestamp.FromDatetime(value)
@@ -217,6 +233,7 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
         # 문면이 금지하는 값이다.
         current = self._store.get(outcome.record.job_id)
         if isinstance(outcome, Started):
+            _log_discarded(outcome)
             self._enqueue(outcome.record.job_id, request, spec)
         response.handle.job_id = outcome.record.job_id
         response.handle.state = _job_state_to_proto(
