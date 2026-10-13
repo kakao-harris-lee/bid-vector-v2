@@ -1,19 +1,29 @@
 # M6/6B-3 — commands
 
 base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6b3`.
-산출물 커밋 일곱(`c7ea5b7b` → `575674d2`). **판정 SHA 후보 `575674d2`**(마지막 산출물 커밋).
+산출물 커밋 아홉(`c7ea5b7b` → `5c622296`). **판정 SHA 후보 `5c622296`**(마지막 산출물 커밋).
+
+> **판정 SHA 가 한 번 움직였다.** `575674d2` 에서 동결을 보고한 뒤 팀장 지시(설계 수용 조건 —
+> test 셋)가 늦게 닿아 `1dfd0094`·`5c622296` 가 쌓였다. `575674d2`..`5c622296` 의 **production
+> 경로 diff 는 0**(`git diff --name-only 575674d2..5c622296 -- '*/src/main/*'` 빈 출력) — 늘어난
+> 것은 test 둘·수렴 test 하나·fixture 수정 하나·등재 둘이다.
 
 ## acceptance (CI `check` job 명령 그대로)
 
-판정 SHA 후보 `575674d2` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0).
+판정 SHA 후보 `5c622296` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0).
 
 | # | 명령 | 결과 |
 |---|---|---|
-| 1 | `./gradlew --no-daemon check` | **exit 0** · 1m58s · 62 task 실행 · test 합계 **2,911**(skipped 0) |
-| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 47s · 24 task 전부 실행 |
+| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 11m44s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,919** |
+| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 43s · 24 task 전부 실행 |
 
-같은 명령의 **차가운 전건 실행**(게이트가 내 파일을 처음 읽은 run)은 구현 중에 돌았다 —
-`check` exit 0 · 9m44s · 74 task 실행. 위 1 은 그 뒤 내용이 같은 트리에서의 재검증이다.
+**둘 다 `--rerun-tasks` 로 쟀다.** 이 slice 는 초록이 **캐시와 실행 순서에 의존하던 것**을 한 번
+실측했으므로(아래 「게이트가 실제로 막은 것」 넷째 줄), 판정의 근거를 「아무것도 캐시하지 않은
+run」으로 둔다. `qualityBaseline` 의 경우 그것 없이 부른 첫 호출이 **「33 actionable tasks: 33
+up-to-date」로 exit 0** 이었다 — 돌지 않은 게이트를 측정으로 세지 않았다.
+
+skipped **4** 는 선언된 제외 하나(`RealServerIntegrationTest` — `@EnabledIfSystemProperty`,
+`gate.tests.adapters.excluded` 등재)이고 **6B-3 의 신설 13 class 는 skipped 0** 이다.
 
 `--rerun-tasks` 를 붙인 이유: 그것 없이 부른 첫 호출이 **「33 actionable tasks: 33 up-to-date」로 exit 0**
 이었다 — 돌지 않은 게이트는 아무것도 막지 못하므로 그 초록을 측정으로 세지 않는다.
@@ -23,13 +33,13 @@ base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6
 
 ## test 수
 
-신설 test class 11 + 기존 class 에 더한 test 1 = **test 메서드 82**(skipped 0).
-`workflow.retention` 19 · `adapters.retention` 49 · `app.retention`·`app.wiring` 13 ·
-`CleanMigrationTriggerTest` 1.
+신설 test class 13 + 기존 class 에 더한 test 1 = **test 메서드 90**(그 13 class 의 skipped 0).
+`workflow.retention` 19 · `adapters.retention` 57 · `app.retention`·`app.wiring` 13 ·
+`CleanMigrationTriggerTest` 1. 되돌린 트리 2,829 + 90 = **2,919** — 등식이 닫힌다.
 
 ## 변이 실측 (바꿔치우기 — 적용 직후 `git diff --numstat` 로 교체를 확인, 산출물은 먼저 커밋)
 
-17 변이 · **15 KILLED · 2 SURVIVED**(아래 M-14a·M-14b, 사유를 밝힌다).
+20 변이 · **18 KILLED · 2 SURVIVED**(아래 M-14a·M-14b, 사유를 밝힌다).
 각 변이는 「적용 → 표적 test → `git checkout --` → `git status --porcelain` 빈 것 확인」 한 바퀴다.
 
 | # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test 수) |
@@ -46,11 +56,13 @@ base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6
 | M-9 | 트리거 관문 ③ 표지 일방향 무력화 | KILLED (3) — 둘째 마스킹·되돌림·원문 UPDATE |
 | M-10 | 트리거 관문 ④ 행 전체 비교 무력화 | KILLED (1) — 다른 열 끼워 넣기 |
 | M-11 | 트리거 이벤트에서 DELETE 제거 | KILLED (2) — 6B-3 하나 + **기존** `RawAppendOnlyTest` 하나 |
-| M-12 | 위상 정렬 결과 역순 | KILLED (3) |
+| M-12 | 위상 정렬 결과 역순 | KILLED (4) — 수렴 test 포함 |
 | M-13 | 임대 획득 실패를 무시 | KILLED (1) — 둘째 run |
 | M-14a | 마스킹 **조회**의 표지 필터 제거 | **SURVIVED** |
 | M-14b | 마스킹 **UPDATE** 의 표지 가드 제거 | **SURVIVED** |
 | M-14c | 위 둘을 **함께** 제거 | KILLED (1) — 「두 번째 run 은 0 행」 |
+| M-15 | `payload` 를 읽는 질의를 **있게** 만든다(도입형 — 「없음」을 잠그는 게이트는 그 형태로만 잰다) | KILLED (1) — 읽기 자리 0 |
+| M-16 | 보존 임대 키를 relay 키와 같게 | KILLED (2) — 임대 양방향 |
 
 **생존 둘의 뜻**(숨기지 않는다): 「이미 마스킹된 행 건너뜀」은 두 겹으로 막혀 있어 **하나만 지우면
 다른 하나가 덮는다.** 그래서 test 가 잠그는 것은 **건너뜀이라는 거동**이고 어느 구현이 그것을 하는지는
@@ -64,6 +76,7 @@ base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6
 | `AppHttpDependencyGateTest` 면제 수 래칫 | 새 app 표면 다섯을 면제에 등재하면서 그 수를 함께 고치지 않은 상태 — expected 46, was 51 |
 | detekt `ReturnCount`·`MatchingDeclarationName` | 판독 실패 경로가 섞인 함수 · 파일 이름과 단일 최상위 선언 불일치 |
 | ktlint (`when-entry-bracing` 등) | 형식 — 눌러 끄지 않고 구조를 고쳤다(`@Suppress` 추가 0) |
+| 전건 `check`(test 순서) | **fixture 가 TRUNCATE 목록 밖 공유 표를 오염시킨 것** — `provenance_authority` 에 심은 행이 다른 test 로 새어 `ProvenanceAuthoritySeedTest` 가 미지 provenance 로 터졌다. 앞선 전건 초록들은 그 test 가 **먼저** 돌아서였고, test class 둘이 늘자 순서가 바뀌어 드러났다 — **초록이 순서에 의존하고 있었다**. 심지 않는 쪽으로 고쳤다(`5c622296`) |
 
 ## D-6B3-1 ④ — 「마스킹이 읽는 키를 지우지 않는다」 실측
 
