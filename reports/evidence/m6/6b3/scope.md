@@ -28,7 +28,7 @@
 
 | ID | 무엇 | 공허함을 막는 술어 |
 |---|---|---|
-| **P-1** | **V18 마이그레이션** — ① `raw_observation`·`notice_audit` 에 `pii_masked_at TIMESTAMPTZ NULL` ② append-only 트리거 개정: DELETE 는 여전히 거부, UPDATE 는 **「`pii_masked_at` 이 NULL→값 한 번 · 마스킹 열(`payload`/`previous_row`) 말고 다른 열 불변 · 실행 역할이 앱 역할이 아님」** 일 때만 허용 ③ 그 밖 표는 GRANT 무변경 | 트리거 test: 앱 역할 UPDATE 거부 · 소유자라도 둘째 마스킹(값→값)·되돌림(값→NULL)·다른 열 변경 거부 · DELETE 거부 유지. `CleanMigration*Test` 등재 갱신(컬럼·트리거·가드 인자) |
+| **P-1** | **V18 마이그레이션**(D-6B3-1 로 `raw_observation` 한 표) — ① `raw_observation`·~~`notice_audit`~~ 에 `pii_masked_at TIMESTAMPTZ NULL` ② append-only 트리거 개정: DELETE 는 여전히 거부, UPDATE 는 **「`pii_masked_at` 이 NULL→값 한 번 · 마스킹 열(`payload`/`previous_row`) 말고 다른 열 불변 · 실행 역할이 앱 역할이 아님」** 일 때만 허용 ③ 그 밖 표는 GRANT 무변경 | 트리거 test: 앱 역할 UPDATE 거부 · 소유자라도 둘째 마스킹(값→값)·되돌림(값→NULL)·다른 열 변경 거부 · DELETE 거부 유지. `CleanMigration*Test` 등재 갱신(컬럼·트리거·가드 인자) |
 | **P-2** | **표 분류 레지스트리**(파기 / 마스킹 / 제외 + 기준 시각 열 + 파기 조건) — `CleanMigrationTest` 의 표 집합과 **집합 등식**(새 표가 생기면 분류 없이는 RED) | 등식 test + 변이(표 하나 분류 삭제 → RED, 미등재 표 추가 → RED) |
 | **P-3** | **보존 러너**(`mode=once`, 여섯째 러너) — 소유자 비풀링 연결 · 고정 `Clock` 주입 · 기준 시각 `now - 90일` · FK 순서(자식 → 부모) · 표별 일괄 크기 상한 · 표별 계수(파기 N · 마스킹 N · 건너뜀 N) 종료 보고 · 종료 코드·cause code 규약 | 경계 ±1초 생존/소멸 + 통제군(경계 안쪽 행 전부 생존) · outbox 미발송·임대 행 생존 · 제외 표 행 수 불변 · 러너 둘 동시 기동 시 하나만(임대 또는 가드) |
 | **P-4** | **마스킹 함수** — `payload`/`previous_row` 의 담당자 키(`ntceInsttOfcl*`·`dminsttOfcl*` 등 실측 키 전수)를 allow-list 반전으로 치환(개찰 축 `maskOpengCorpInfo` 관례 재사용), 형태가 다르면 **값 전체 폐기(fail-closed)** · 마스킹 실패 계수 | 키 하나라도 남으면 RED · 형태 불일치 fail-closed · 이미 마스킹된 행 건너뜀 |
@@ -51,6 +51,10 @@ CI `check` job 그대로: `./gradlew --no-daemon check` → `./gradlew --no-daem
 ## rollback
 
 in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` + 공유 파일은 병합된 main SHA 에서 복원(PR #69 규칙). **V18 이 적용된 DB 의 되돌림은 forward-fix**(새 V 로 트리거 원복 · 열 DROP) — 파기된 행·마스킹된 값은 백업 복원으로만 돌아온다(6B-2 runbook). 임시 clone 에서 ①~⑥.
+
+## 계약 갱신 이력
+
+**D-6B3-1 (r1, 2026-10-13, 팀장 — 구현 레인 preflight 수령).** ① **V18 의 트리거 완화는 `raw_observation` 한 표만**(`pii_masked_at` 도 그 표에만). 실측: `notice_audit.previous_row = to_jsonb(OLD notice)` 이고 `notice` 열에는 담당자 열이 없으며 담당자 키는 계약 레지스트리에 등재되지 않는다(`FieldContractTest` 기존 단언) — 담당자 PII 가 `notice_audit` 로 들어오는 경로가 구조적으로 없다. 완화하면 얻는 것 0 · append-only 계약의 구멍 하나. 대신 「`notice_audit` 마스킹 대상 0」을 **술어로 잠근다**: `previous_row` 키 집합 ⊆ `notice` 열 집합(DB 카탈로그 실측) · `notice` 열 이름에 담당자 꼴 없음 · 레지스트리 단언 참조. A-3 의 취지(PII 제거 · 표본 보존)는 그대로다. ② **`edit_session` 은 상태 무관 `created_at < cutoff`**(버려진 비종단 행은 그 부분집합 — A-4 포함, 세션 수명은 분·시간 단위이고 감사는 `operator_strategy_revision` 이 진다). ③ outbox 는 종단(`DELIVERED`·`ISOLATED`)만 · 기준 시각 매핑은 적재 시각 축(레인 preflight 표). ④ 분류 레지스트리 ↔ DB 카탈로그 집합 등식(`CleanMigrationTest` 축1 로 전이적으로 스키마 정본에 묶임) · FK 순서는 pg 카탈로그 런타임 위상 정렬(순환이면 실패) · `payload` 마스킹 allow-list = 계약 레지스트리 rawNames — **단 그 allow-list 가 `payload` 를 읽는 모든 소비자(스냅숏 추출·재정규화·6G 백테스트 경로)의 읽기 키 집합을 포함함을 기계 수집으로 실측**(마스킹이 PII 아닌 필드를 지워 표본을 깨지 않게).
 
 ## 하네스 레인 변경 (상시)
 
