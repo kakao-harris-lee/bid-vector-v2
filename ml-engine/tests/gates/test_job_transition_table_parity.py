@@ -13,6 +13,19 @@
 주석·문서는 텍스트라 파서가 문면 모양에 기댄다. 그래서 파서가 **못 읽으면 조용히 비는
 것이 아니라 붉어진다**(집합 등식 + 하한). 문면 모양을 바꾸려면 이 파서를 함께 고쳐야
 한다.
+
+**vr M-2 — 앞 판은 「제거」에 닫혀 있고 「다른 모양의 추가」에 열려 있었다.** 파서가 정해진
+문면 모양만 읽으므로 다른 모양으로 더한 간선이 등식에 들어오지 않았다(실측: proto 주석에
+들여쓰기 둘짜리 표 행 · 괄호 안 산문의 화살표 · ADR 의 백틱 없는 산문 · Kotlin 허용표의
+`Pair(…)` 형태 넷이 전부 초록). 이 판은 **닫힌 세계**다:
+
+- **proto·ADR** — 통치 구역(`JobState` enum 위 주석 블록 · D-8 절)의 `→` 는 **전부** 파서를
+  지나야 한다. 표 행도 아니고 「표에 없는 쌍」 예시도 아닌 자리에 `→` 가 있으면, 또는
+  괄호·백틱 밖에 `→` 가 있으면 **RED** 다(조용히 건너뛰지 않는다).
+- **Kotlin** — 허용표 블록의 `JOB_STATE_*` 언급 수가 파싱된 쌍 수의 정확히 두 배여야 한다
+  (`Pair(a, b)` 처럼 다른 모양으로 더하면 언급이 남아 RED). 술어(`isAllowedTransition`)가
+  그 데이터와 어긋나는 변이는 **Kotlin 쪽 5×5 전 쌍 진리표 test** 가 잡고, 여기서는 그
+  술어의 본문이 데이터 조회 하나임을 구조로 고정한다.
 """
 
 from __future__ import annotations
@@ -35,6 +48,11 @@ _KOTLIN_RULES_PATH = (
 _STATE_NAMES = frozenset(state.value for state in JobState)
 _EXPECTED_EDGE_COUNT = 6
 _DISCARD_EDGE = ("ACCEPTED", "FAILED")
+_ARROW = "→"
+_COUNTEREXAMPLE_MARKER = "표에 없는 쌍"
+# Kotlin 술어의 본문 — 데이터 조회 **하나**여야 한다(절을 더하는 변이는 여기서 붉어지고,
+# 데이터와 어긋나는 거동은 Kotlin 쪽 5×5 진리표 test 가 잡는다).
+_KOTLIN_PREDICATE_BODY = "(from to target) in allowedJobStateTransitions"
 
 type _Edges = frozenset[tuple[str, str]]
 
@@ -77,8 +95,35 @@ def python_edges() -> _Edges:
     )
 
 
+def kotlin_allow_block(text: str) -> str:
+    head = text.index("val allowedJobStateTransitions")
+    body = text[head:]
+    opened = body.index("setOf(")
+    return body[opened : body.index("\n    )", opened)]
+
+
+def kotlin_unaccounted_state_mentions(text: str) -> int:
+    """허용표 블록에서 **파싱된 쌍으로 설명되지 않는** 상태 언급 수(vr M-2 P1).
+    `Pair(JobState.JOB_STATE_CANCELLED, JobState.JOB_STATE_RUNNING)` 처럼 다른 모양으로
+    더하면 언급 둘이 남는다."""
+    block = kotlin_allow_block(text)
+    mentions = len(re.findall(r"JobState\.JOB_STATE_\w+", block))
+    pairs = re.findall(
+        r"JobState\.JOB_STATE_(\w+)\s+to\s+JobState\.JOB_STATE_(\w+)", block
+    )
+    return mentions - 2 * len(pairs)
+
+
+def kotlin_predicate_body(text: str) -> str:
+    """`isAllowedTransition` 의 본문(공백 정규화) — 절을 더한 변이(P1b)가 드러난다."""
+    head = text.index("internal fun isAllowedTransition(")
+    body = text[head:]
+    after = body[body.index("): Boolean =") + len("): Boolean =") :]
+    return " ".join(after[: after.index("\n\n")].split())
+
+
 def parse_kotlin_edges(text: str) -> _Edges:
-    head = text.index("private val allowedJobStateTransitions")
+    head = text.index("val allowedJobStateTransitions")
     body = text[head:]
     opened = body.index("setOf(")
     block = body[opened : body.index("\n    )", opened)]
@@ -105,6 +150,58 @@ def parse_proto_edges(text: str) -> _Edges:
         edges |= _parse_chain(head)
     assert edges, "proto 주석에서 간선을 하나도 읽지 못했다"
     return frozenset(edges)
+
+
+def governed_proto_lines(text: str) -> list[str]:
+    """`enum JobState {` **바로 위**의 주석 블록 — 전이표가 사는 통치 구역. 이 구역의
+    `→` 를 가진 줄은 전부 파서를 지나야 한다."""
+    lines = text.splitlines()
+    end = next(
+        index for index, line in enumerate(lines) if line.startswith("enum JobState {")
+    )
+    start = end
+    while start > 0 and lines[start - 1].startswith("//"):
+        start -= 1
+    assert start < end, "JobState 주석 블록을 찾지 못했다"
+    return lines[start:end]
+
+
+def _arrows_outside_backticks(text: str) -> int:
+    return re.sub(r"`[^`]*`", "", text).count(_ARROW)
+
+
+def unparsed_proto_arrow_lines(text: str) -> list[str]:
+    """통치 구역에서 **파서가 읽지 못한** `→` 줄(vr M-2 P2·P2b)."""
+    unparsed: list[str] = []
+    for line in governed_proto_lines(text):
+        if _ARROW not in line:
+            continue
+        if _COUNTEREXAMPLE_MARKER in line:
+            # 반례 예시 줄 — 화살표는 전부 백틱 안이어야 하고 그 스팬은 파싱된다.
+            if _arrows_outside_backticks(line) or not parse_proto_forbidden_pairs(line):
+                unparsed.append(line)
+            continue
+        match = re.match(r"^//   (?=\S)(.*)$", line)
+        if match is None:
+            unparsed.append(line)  # 표 행의 모양이 아닌 줄에 화살표가 있다
+            continue
+        head, _separator, rest = match.group(1).partition("(")
+        if _ARROW not in head or _ARROW in rest:
+            # 괄호 **안**의 화살표는 `_before_parenthesis` 가 버리므로 등식에 못 들어온다.
+            unparsed.append(line)
+    return unparsed
+
+
+def unparsed_adr_arrows(text: str) -> int:
+    """D-8 절에서 파서가 읽지 못한 `→` 개수(vr M-2 P3). 백틱 밖의 화살표와, 백틱 안이지만
+    괄호 뒤로 밀려 `_before_parenthesis` 가 버리는 화살표를 함께 센다."""
+    section = _adr_d8_section(text)
+    unparsed = _arrows_outside_backticks(section)
+    for span in re.findall(r"`([^`]*" + _ARROW + r"[^`]*)`", section):
+        _head, separator, rest = span.partition("(")
+        if separator:
+            unparsed += rest.count(_ARROW)
+    return unparsed
 
 
 def parse_proto_forbidden_pairs(text: str) -> _Edges:
@@ -176,6 +273,35 @@ def test_direct_accepted_to_succeeded_is_absent_in_all_four() -> None:
         assert ("FAILED", "RUNNING") not in edges, name
 
 
+# ---- 닫힌 세계(vr M-2) — 파서가 모르는 문면은 조용히 비지 않고 붉어진다 ----
+
+
+def test_every_arrow_in_the_governed_proto_block_is_parsed() -> None:
+    assert unparsed_proto_arrow_lines(_PROTO_PATH.read_text(encoding="utf-8")) == []
+
+
+def test_every_arrow_in_the_adr_d8_section_is_parsed() -> None:
+    assert unparsed_adr_arrows(_ADR_PATH.read_text(encoding="utf-8")) == 0
+
+
+def test_kotlin_allow_table_has_no_unaccounted_state_mentions() -> None:
+    assert (
+        kotlin_unaccounted_state_mentions(
+            _KOTLIN_RULES_PATH.read_text(encoding="utf-8")
+        )
+        == 0
+    )
+
+
+def test_kotlin_predicate_is_a_single_table_lookup() -> None:
+    """술어에 절을 더하는 변이(P1b)를 구조로 막는다 — 본문이 데이터 조회 하나다.
+    그 데이터와 거동이 어긋나는지는 Kotlin 쪽 5×5 진리표 test 가 잰다."""
+    assert (
+        kotlin_predicate_body(_KOTLIN_RULES_PATH.read_text(encoding="utf-8"))
+        == _KOTLIN_PREDICATE_BODY
+    )
+
+
 def test_proto_comment_counterexamples_are_not_allowed_edges() -> None:
     proto_text = _PROTO_PATH.read_text(encoding="utf-8")
     forbidden = parse_proto_forbidden_pairs(proto_text)
@@ -237,3 +363,74 @@ def test_chain_parser_rejects_malformed_text(text: str) -> None:
     """파서가 모르는 문면을 **조용히 건너뛰지 않는다** — 그러면 등식이 공허해진다."""
     with pytest.raises(AssertionError):
         _parse_chain(text)
+
+
+# ---- 닫힌 세계 술어의 음성 대조(vr M-2 P1~P3 재현) ----
+
+
+def test_governed_block_scanner_sees_a_shallow_indent_table_row() -> None:
+    """P2 — 들여쓰기 둘짜리 표 행은 앞 판 파서가 건너뛰었다."""
+    original = _PROTO_PATH.read_text(encoding="utf-8")
+    mutated = original.replace(
+        "enum JobState {", "//  FAILED → RUNNING\nenum JobState {", 1
+    )
+    assert mutated != original
+    assert unparsed_proto_arrow_lines(mutated) == ["//  FAILED → RUNNING"]
+
+
+def test_governed_block_scanner_sees_an_arrow_inside_parentheses() -> None:
+    """P2b — 표 들여쓰기의 산문이 괄호 안에 화살표를 숨겼다(`_before_parenthesis` 가
+    버리던 자리)."""
+    original = _PROTO_PATH.read_text(encoding="utf-8")
+    planted = "//   재시도 시 (FAILED → RUNNING) 도 허용한다"
+    mutated = original.replace("enum JobState {", f"{planted}\nenum JobState {{", 1)
+    assert mutated != original
+    assert unparsed_proto_arrow_lines(mutated) == [planted]
+
+
+def test_governed_block_scanner_ignores_an_arrow_outside_the_block() -> None:
+    """통치 구역 밖(다른 메시지의 주석)의 화살표는 이 등식의 대상이 아니다 — 범위가
+    무한히 넓어지지 않는다는 통제군."""
+    original = _PROTO_PATH.read_text(encoding="utf-8")
+    mutated = original + "\n// 딴 곳의 산문 FAILED → RUNNING\n"
+    assert unparsed_proto_arrow_lines(mutated) == []
+
+
+def test_adr_scanner_sees_a_plain_prose_arrow() -> None:
+    """P3 — 백틱 없는 산문의 화살표는 앞 판 파서가 보지 못했다."""
+    original = _ADR_PATH.read_text(encoding="utf-8")
+    mutated = original.replace(
+        "> 고아는 대기 큐로 재적재(실행된 적이 없다, 상한 적용).",
+        "> 고아는 대기 큐로 재적재(실행된 적이 없다, 상한 적용). FAILED → RUNNING 으로 "
+        "재시도할 수 있다.",
+        1,
+    )
+    assert mutated != original
+    assert unparsed_adr_arrows(mutated) == 1
+
+
+def test_kotlin_mention_counter_sees_a_pair_shaped_addition() -> None:
+    """P1 — `Pair(a, b)` 형태로 더한 간선은 ` to ` 정규식에 걸리지 않았다."""
+    original = _KOTLIN_RULES_PATH.read_text(encoding="utf-8")
+    mutated = original.replace(
+        "        JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_RUNNING,",
+        "        JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_RUNNING,\n"
+        "        Pair(JobState.JOB_STATE_CANCELLED, JobState.JOB_STATE_RUNNING),",
+        1,
+    )
+    assert mutated != original
+    assert parse_kotlin_edges(mutated) == parse_kotlin_edges(original)  # 집합은 그대로
+    assert kotlin_unaccounted_state_mentions(mutated) == 2  # 언급이 남는다
+
+
+def test_kotlin_predicate_scanner_sees_an_added_clause() -> None:
+    """P1b — 술어에 절을 더하면 본문이 데이터 조회 하나가 아니게 된다."""
+    original = _KOTLIN_RULES_PATH.read_text(encoding="utf-8")
+    mutated = original.replace(
+        "): Boolean = (from to target) in allowedJobStateTransitions",
+        "): Boolean = (from to target) in allowedJobStateTransitions ||\n"
+        "    from == JobState.JOB_STATE_FAILED",
+        1,
+    )
+    assert mutated != original
+    assert kotlin_predicate_body(mutated) != _KOTLIN_PREDICATE_BODY

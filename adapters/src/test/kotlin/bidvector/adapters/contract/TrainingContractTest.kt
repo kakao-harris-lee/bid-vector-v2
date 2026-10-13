@@ -260,6 +260,25 @@ class TrainingContractTest {
     }
 
     @Test
+    fun `5x5 전 쌍 진리표가 허용표 데이터와 정확히 일치한다`() {
+        // M6/6B-4 vr M-2 P1b — 쌍을 열거하는 test 는 `isAllowedTransition` 에 절을 하나
+        // 더하는 변이(`|| from == JOB_STATE_FAILED`)를 그 특정 쌍이 열거돼 있을 때만
+        // 잡는다. 전 쌍(5×5 = 25)을 **데이터에서 생성한 기대값**과 대조하면 술어와
+        // 데이터가 어긋나는 순간 어느 쌍에서든 붉어진다. 데이터가 Python `_TRANSITIONS`
+        // 와 같은지는 `tests/gates/test_job_transition_table_parity.py` 가 센다 —
+        // 둘을 이으면 술어 ↔ Python 표가 닫힌다.
+        val states =
+            JobState.entries.filter {
+                it != JobState.JOB_STATE_UNSPECIFIED && it != JobState.UNRECOGNIZED
+            }
+        states.size shouldBe 5
+        val pairs = states.flatMap { from -> states.map { target -> from to target } }
+        pairs.size shouldBe 25
+        pairs.filter { isAllowedTransition(it.first, it.second) }.toSet() shouldBe
+            allowedJobStateTransitions
+    }
+
+    @Test
     fun `역전이 RUNNING 에서 ACCEPTED 는 거부된다(변이 2)`() {
         isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_ACCEPTED) shouldBe false
     }
