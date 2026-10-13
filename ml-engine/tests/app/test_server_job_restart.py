@@ -204,7 +204,15 @@ def test_pending_job_with_unknown_spec_version_is_disposed(tmp_path: Path) -> No
 def test_not_ready_server_leaves_pending_jobs_pending(tmp_path: Path) -> None:
     """정책 preload 가 깨졌으면 job 을 돌리지 않는다(새 제출을 `MODEL_NOT_READY` 로
     거부하는 것과 같은 규율) — 대기 job 은 ACCEPTED 로 남아 **다음 기동**이 집는다.
-    알려진 제한: 이 서버는 뒤늦게 READY 가 되지 않는다."""
+
+    D-6B4-3 「영구 정체 금지」가 성립하는 근거는 **다음 기동이 유일한 READY 경로**라는
+    것이고, 그 사실 자체는
+    `tests/serving/test_readiness.py::test_not_ready_is_terminal_within_the_process`
+    가 공개 전이 집합으로 잠근다 — 프로세스 안에 READY 로 가는 길이 생기면 거기서 먼저
+    붉어지고, 그때 「그 시점에 재적재」 경로가 필요해진다.
+
+    대기 job 은 집히지 않는 동안에도 **상한 계수에 든다**(대기 수는 저장소의 ACCEPTED
+    개수이고 readiness 와 무관하다) — 아래 `pending_jobs()` 단언이 그 상태를 보인다."""
     broken_policy = tmp_path / "training-broken.yaml"
     broken_policy.write_text("version: [unclosed\n", encoding="utf-8")
     config = _config(tmp_path, training_policy_path=broken_policy)
