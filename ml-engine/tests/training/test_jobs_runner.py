@@ -1,13 +1,19 @@
 """RED — `ml_engine.training.jobs.runner`(scope.md ⑦, ADR 0010 §6 fork 금지·D-2D-7
 취소 카운터). fake `TrainingPipeline`(스레드 풀에서 실행)로 성공·실패·취소·크래시
-네 갈래를 전이표로 확인한다."""
+네 갈래를 전이표로 확인한다.
+
+M6/6B-4 Q-2 — `START` 는 **워커가 집는 순간**에 일어난다. 대기열에서 기다리는 job 이
+`ACCEPTED` 로 관측되는 것과, 집었을 때 이미 종단이면 파이프라인을 돌리지 않는 것을 함께
+잰다."""
 
 from __future__ import annotations
 
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+from ml_engine.training.jobs.journal import JobJournal, JobSubmission
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
@@ -20,8 +26,14 @@ from ml_engine.training.jobs.pipeline import (
     PipelineOutcome,
 )
 from ml_engine.training.jobs.runner import JobRunner
-from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
-from ml_engine.training.jobs.store import InMemoryJobStore, Started
+from ml_engine.training.jobs.state import (
+    JobEvent,
+    JobFailure,
+    JobFailureCode,
+    JobRecord,
+    JobState,
+)
+from ml_engine.training.jobs.store import JobStore, Started
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _DATASET_REF = DatasetRefInput(
@@ -85,15 +97,28 @@ class _CrashingPipeline:
         raise RuntimeError("분류되지 않은 크래시")
 
 
-def _new_job(store: InMemoryJobStore, key: str = "key-1") -> str:
-    started = store.start_or_reuse(key, "ds-1", accepted_at=_NOW)
+def _store(tmp_path: Path, *, pending_queue_max: int = 8) -> JobStore:
+    return JobStore(
+        journal=JobJournal(tmp_path / "journal"), pending_queue_max=pending_queue_max
+    )
+
+
+def _new_job(store: JobStore, key: str = "key-1", *, at: datetime = _NOW) -> str:
+    started = store.start_or_reuse(
+        key,
+        "ds-1",
+        accepted_at=at,
+        submission=JobSubmission(
+            dataset_uri="file:///x",
+            manifest_checksum="0" * 64,
+            training_spec_version="training-spec-v1",
+        ),
+    )
     assert isinstance(started, Started)
     return started.record.job_id
 
 
-def _wait_for_terminal(
-    store: InMemoryJobStore, job_id: str, *, timeout: float = 2.0
-) -> None:
+def _wait_for_terminal(store: JobStore, job_id: str, *, timeout: float = 2.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         record = store.get(job_id)
@@ -104,8 +129,8 @@ def _wait_for_terminal(
     raise AssertionError(f"job {job_id} 가 시간 안에 종료 상태에 도달하지 못함")
 
 
-def test_submit_transitions_to_running_then_succeeded() -> None:
-    store = InMemoryJobStore()
+def test_submit_transitions_to_running_then_succeeded(tmp_path: Path) -> None:
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=2)
     job_id = _new_job(store)
     runner.submit(job_id, _DATASET_REF, _SucceedingPipeline())
@@ -118,8 +143,8 @@ def test_submit_transitions_to_running_then_succeeded() -> None:
     runner.shutdown(wait=True)
 
 
-def test_submit_pipeline_failed_transitions_to_failed() -> None:
-    store = InMemoryJobStore()
+def test_submit_pipeline_failed_transitions_to_failed(tmp_path: Path) -> None:
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=2)
     job_id = _new_job(store)
     runner.submit(job_id, _DATASET_REF, _FailingPipeline())
@@ -132,9 +157,9 @@ def test_submit_pipeline_failed_transitions_to_failed() -> None:
     runner.shutdown(wait=True)
 
 
-def test_pipeline_crash_transitions_to_failed_runner_crashed() -> None:
+def test_pipeline_crash_transitions_to_failed_runner_crashed(tmp_path: Path) -> None:
     """설계 검토 우회 (13) — 예외로 죽어도 `RUNNING`에 영원히 머물지 않는다."""
-    store = InMemoryJobStore()
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=2)
     job_id = _new_job(store)
     runner.submit(job_id, _DATASET_REF, _CrashingPipeline())
@@ -147,9 +172,11 @@ def test_pipeline_crash_transitions_to_failed_runner_crashed() -> None:
     runner.shutdown(wait=True)
 
 
-def test_cancel_before_pipeline_checks_prevents_computation_start() -> None:
+def test_cancel_before_pipeline_checks_prevents_computation_start(
+    tmp_path: Path,
+) -> None:
     """D-2D-7 — 취소 뒤 계산 시작 카운터가 증가하지 않는다."""
-    store = InMemoryJobStore()
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=1)
     job_id = _new_job(store)
 
@@ -180,12 +207,12 @@ def test_cancel_before_pipeline_checks_prevents_computation_start() -> None:
     runner.shutdown(wait=True)
 
 
-def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_late_result() -> (
-    None
-):
+def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_late_result(
+    tmp_path: Path,
+) -> None:
     """`CancelTrainingJob`이 전이표로 먼저 `CANCELLED`를 확정한 뒤, 파이프라인이 뒤늦게
     성공으로 끝나도 재전이하지 않는다(멱등, 종료 상태 유지)."""
-    store = InMemoryJobStore()
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=1)
     job_id = _new_job(store)
 
@@ -200,7 +227,7 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
 
     runner.submit(job_id, _DATASET_REF, _SlowSucceedingPipeline())
 
-    # R2-4 — InMemoryJobStore.replace 는 production 호출자가 없어
+    # R2-4 — JobStore.replace 는 production 호출자가 없어
     # 제거됐다. 여기서도 두 단계(transition() 수동 계산 + replace())가 아니라
     # apply_transition 한 번으로 같은 결과(원자적 읽기·계산·쓰기)를 얻는다.
     cancelled = store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC))
@@ -214,9 +241,9 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
     runner.shutdown(wait=True)
 
 
-def test_cancel_all_signals_every_in_flight_cancel_token() -> None:
+def test_cancel_all_signals_every_in_flight_cancel_token(tmp_path: Path) -> None:
     """M-3 — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다."""
-    store = InMemoryJobStore()
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=4)
     release_event = threading.Event()
 
@@ -245,8 +272,156 @@ def test_cancel_all_signals_every_in_flight_cancel_token() -> None:
     runner.shutdown(wait=True)
 
 
-def test_cancel_all_with_no_in_flight_jobs_is_a_no_op() -> None:
-    store = InMemoryJobStore()
+def test_cancel_all_with_no_in_flight_jobs_is_a_no_op(tmp_path: Path) -> None:
+    store = _store(tmp_path)
     runner = JobRunner(store, max_workers=1)
     runner.cancel_all()  # 예외 없이 조용히 지나간다
     runner.shutdown(wait=True)
+
+
+# ---- M6/6B-4 Q-2 — 대기열에서 기다리는 job 은 ACCEPTED 다 ----
+
+
+def test_queued_job_stays_accepted_until_a_worker_picks_it_up(tmp_path: Path) -> None:
+    """앞 판은 `submit()` 안에서 곧바로 `RUNNING` 을 커밋해, `job_workers: 1` 에서
+    실행 대기열에 앉아 있는 job 이 `RUNNING` 으로 **관측됐다**. 이제 그 job 은
+    `ACCEPTED`(대기)이고 워커가 집을 때 `RUNNING` 이 된다."""
+    store = _store(tmp_path)
+    runner = JobRunner(store, max_workers=1)
+    release_event = threading.Event()
+    picked_up = threading.Event()
+
+    class _BlockingPipeline:
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineOutcome:
+            picked_up.set()
+            release_event.wait(timeout=5.0)
+            return _outcome()
+
+    first = _new_job(store, "key-first", at=_NOW)
+    second = _new_job(store, "key-second", at=_NOW + timedelta(seconds=1))
+    runner.submit(first, _DATASET_REF, _BlockingPipeline())
+    assert picked_up.wait(timeout=2.0)
+    runner.submit(second, _DATASET_REF, _SucceedingPipeline())
+
+    # 첫째가 워커를 쥐고 있는 동안 둘째는 대기다 — 상태가 그 사실을 말한다.
+    waiting = store.get(second)
+    assert waiting is not None
+    assert waiting.state is JobState.ACCEPTED
+    assert waiting.started_at is None
+    assert [job.record.job_id for job in store.pending_jobs()] == [second]
+
+    release_event.set()
+    _wait_for_terminal(store, first)
+    _wait_for_terminal(store, second)
+    runner.shutdown(wait=True)
+
+
+def test_discarded_pending_job_is_not_run_when_the_worker_reaches_it(
+    tmp_path: Path,
+) -> None:
+    """설계 검토 우회 (3) — 폐기된 대기 job 을 워커가 뒤늦게 집어도 **계산을 시작하지
+    않는다**(START 가 전이표에서 거부된다). 상태도 덮이지 않는다."""
+    store = _store(tmp_path)
+    runner = JobRunner(store, max_workers=1)
+    job_id = _new_job(store, "key-1")
+
+    class _CountingPipeline:
+        def __init__(self) -> None:
+            self.run_count = 0
+
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineOutcome:
+            self.run_count += 1
+            return _outcome()
+
+    discarded = store.apply_transition(
+        job_id,
+        JobEvent.FAIL,
+        at=datetime.now(UTC),
+        failure=JobFailure(
+            code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
+            retryable=True,
+            detail_code=DetailCode.PENDING_QUEUE_OVERFLOW.value,
+        ),
+    )
+    assert isinstance(discarded, JobRecord)
+
+    pipeline = _CountingPipeline()
+    runner.submit(job_id, _DATASET_REF, pipeline)
+    runner.shutdown(wait=True)
+
+    assert pipeline.run_count == 0
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert record.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+
+
+def test_cancel_before_pickup_prevents_the_pipeline_from_running(
+    tmp_path: Path,
+) -> None:
+    """대기 중 취소도 같은 자리에서 닫힌다 — `CancelTrainingJob` 이 `ACCEPTED →
+    CANCELLED` 를 커밋하면 워커는 그 job 을 돌리지 않는다."""
+    store = _store(tmp_path)
+    runner = JobRunner(store, max_workers=1)
+    job_id = _new_job(store, "key-1")
+    assert isinstance(
+        store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC)),
+        JobRecord,
+    )
+
+    class _CountingPipeline:
+        def __init__(self) -> None:
+            self.run_count = 0
+
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineOutcome:
+            self.run_count += 1
+            return _outcome()
+
+    pipeline = _CountingPipeline()
+    runner.submit(job_id, _DATASET_REF, pipeline)
+    runner.shutdown(wait=True)
+
+    assert pipeline.run_count == 0
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.CANCELLED
+
+
+def test_shutdown_cancels_queued_futures_and_leaves_them_pending(
+    tmp_path: Path,
+) -> None:
+    """종료가 대기열의 future 를 취소하면 그 job 은 **대기 상태로 남는다**(전이 없음) —
+    다음 기동이 재적재한다. 완료 콜백이 `CancelledError` 로 터지지도 않는다."""
+    store = _store(tmp_path)
+    runner = JobRunner(store, max_workers=1)
+    release_event = threading.Event()
+    picked_up = threading.Event()
+
+    class _BlockingPipeline:
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineCancelled:
+            picked_up.set()
+            release_event.wait(timeout=5.0)
+            return PipelineCancelled()
+
+    first = _new_job(store, "key-first", at=_NOW)
+    queued = _new_job(store, "key-queued", at=_NOW + timedelta(seconds=1))
+    runner.submit(first, _DATASET_REF, _BlockingPipeline())
+    assert picked_up.wait(timeout=2.0)
+    runner.submit(queued, _DATASET_REF, _SucceedingPipeline())
+
+    runner.shutdown(wait=False)
+    release_event.set()
+    time.sleep(0.2)
+
+    record = store.get(queued)
+    assert record is not None
+    assert record.state is JobState.ACCEPTED

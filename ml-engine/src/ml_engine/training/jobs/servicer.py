@@ -10,6 +10,7 @@ envelope·필드 검증은 이 모듈이 독립적으로 갖는다(`serving.stat
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -20,6 +21,7 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp  # type: ignore[import-untyped]
 
 from ml_engine.contracts import error_pb2, training_pb2, training_pb2_grpc
+from ml_engine.training.jobs.journal import JobSubmission, JournalFailed
 from ml_engine.training.jobs.pipeline import DatasetRefInput, TrainingPipeline
 from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.state import (
@@ -32,12 +34,14 @@ from ml_engine.training.jobs.state import (
     JobState,
     TransitionRejected,
 )
-from ml_engine.training.jobs.store import Conflict, InMemoryJobStore, Started
+from ml_engine.training.jobs.store import Conflict, JobStore, Started
 from ml_engine.training.spec import (
     TrainingSpec,
     UnsupportedTrainingSpec,
     resolve_training_spec,
 )
+
+_logger = logging.getLogger(__name__)
 
 _SHA256_HEX_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
@@ -78,6 +82,22 @@ def _fill_failure(
     failure.detail_code = detail_code.value
 
 
+def _fill_store_unavailable(
+    failure: training_pb2.ApplicationFailure, journal_failed: JournalFailed
+) -> None:
+    """저널(job 영속)에 쓰지 못했다 — 요청을 **받지 않은** 것이고 재시도 대상이다.
+
+    2A `FailureCode` 여덟에 「저장소를 쓸 수 없다」가 없다. 이 slice 는 proto 메시지·
+    enum 을 바꾸지 않으므로(out_scope) 그 중 뜻이 가장 가까운 `MODEL_NOT_READY`
+    (retryable, ADR 0010 §4 「프로세스는 살아 있고 계약이 정의한 상태」)에 얹고
+    `detail_code` 로 사유를 좁힌다 — 전용 코드 신설은 `OPEN-6B4-STORE-UNAVAILABLE-CODE`.
+    """
+    _logger.error("job 저널 쓰기 실패로 요청을 받지 못했다 — %s", journal_failed)
+    failure.code = error_pb2.FAILURE_CODE_MODEL_NOT_READY
+    failure.retryable = True
+    failure.detail_code = "JOB_STORE_UNAVAILABLE"
+
+
 def _to_timestamp(value: datetime) -> Timestamp:
     timestamp = Timestamp()
     timestamp.FromDatetime(value)
@@ -93,7 +113,7 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
     def __init__(
         self,
         *,
-        store: InMemoryJobStore,
+        store: JobStore,
         runner: JobRunner,
         is_ready: Callable[[], bool],
         pipeline_factory: Callable[[TrainingSpec], TrainingPipeline],
@@ -167,35 +187,52 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
             request.idempotency_key,
             request.dataset.dataset_id,
             accepted_at=datetime.now(UTC),
+            # 재기동 뒤 **대기 job 을 실제로 실행할 수 있도록** 제출 입력을 함께 적는다
+            # (M6/6B-4 Q-5 — 저널 항목의 일부, wire 메시지 변경 0).
+            submission=JobSubmission(
+                dataset_uri=request.dataset.uri,
+                manifest_checksum=request.dataset.manifest_checksum,
+                training_spec_version=request.training_spec_version,
+            ),
         )
         if isinstance(outcome, Conflict):
             response.failure.code = error_pb2.FAILURE_CODE_IDEMPOTENCY_CONFLICT
             response.failure.retryable = False
             response.failure.detail_code = "IDEMPOTENCY_CONFLICT"
             return response
+        if isinstance(outcome, JournalFailed):
+            _fill_store_unavailable(response.failure, outcome)
+            return response
         if isinstance(outcome, Started):
-            dataset_ref = DatasetRefInput(
+            self._enqueue(outcome.record.job_id, request, spec)
+        # R2-1 유지 — `start_or_reuse` 가 돌려준 스냅숏을 그대로 쓰지
+        # 않는다. 그 사이에 다른 writer(`CancelTrainingJob`)가 종단으로 옮겼거나, 워커가
+        # 이미 집어 `RUNNING` 이 됐을 수 있다. 저장소를 다시 읽어 **실제 최신 상태**로
+        # 응답한다(M6/6B-4 — 폐기로 `FAILED` 가 된 경우도 같은 자리에서 정직해진다).
+        current = self._store.get(outcome.record.job_id)
+        response.handle.job_id = outcome.record.job_id
+        response.handle.state = _job_state_to_proto(
+            current.state if current is not None else outcome.record.state
+        )
+        return response
+
+    def _enqueue(
+        self,
+        job_id: str,
+        request: training_pb2.StartTrainingRequest,
+        spec: TrainingSpec,
+    ) -> None:
+        """실행 대기열에 넣기만 한다 — `RUNNING` 전이는 워커가 집는 순간에 일어난다
+        (M6/6B-4 Q-2). 그래서 이 호출은 상태를 돌려줄 것이 없다."""
+        self._runner.submit(
+            job_id,
+            DatasetRefInput(
                 uri=request.dataset.uri,
                 manifest_checksum=request.dataset.manifest_checksum,
                 dataset_id=request.dataset.dataset_id,
-            )
-            submit_result = self._runner.submit(
-                outcome.record.job_id, dataset_ref, self._pipeline_factory(spec)
-            )
-            if isinstance(submit_result, TransitionRejected):
-                # R2-1 — CancelTrainingJob 이 이 START 전이보다 먼저
-                # 커밋된 경합(다른 writer 가 이미 종료 상태로 옮김). outcome.record
-                # 는 start_or_reuse 시점의 스냅샷(ACCEPTED)이라 그대로 쓰면 거짓
-                # 응답이 된다 — store 를 다시 읽어 실제 최신 상태로 응답한다.
-                current = self._store.get(outcome.record.job_id)
-                response.handle.job_id = outcome.record.job_id
-                response.handle.state = _job_state_to_proto(
-                    current.state if current is not None else outcome.record.state
-                )
-                return response
-        response.handle.job_id = outcome.record.job_id
-        response.handle.state = _job_state_to_proto(outcome.record.state)
-        return response
+            ),
+            self._pipeline_factory(spec),
+        )
 
     def GetTrainingJob(  # noqa: N802
         self,
@@ -265,6 +302,11 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
             response.failure.code = error_pb2.FAILURE_CODE_JOB_NOT_FOUND
             response.failure.retryable = False
             response.failure.detail_code = "JOB_NOT_FOUND"
+            return response
+        if isinstance(result, JournalFailed):
+            # 취소를 **영속시키지 못했다**. 메모리도 바뀌지 않았으므로 상태는 그대로다 —
+            # 「취소됐다」고 답하면 거짓이 된다(M6/6B-4 우회 (9)).
+            _fill_store_unavailable(response.failure, result)
             return response
         if isinstance(result, TransitionRejected):  # pragma: no cover — 표가 CANCEL 을
             # 모든 상태에 정의하므로 도달 불가(state.py `_TRANSITIONS`).

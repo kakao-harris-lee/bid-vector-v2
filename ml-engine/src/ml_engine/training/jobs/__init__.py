@@ -7,6 +7,16 @@ forbidden — `training/jobs/servicer.py`는 grpc 진입점 예외로 `ignore_im
 
 from __future__ import annotations
 
+from ml_engine.training.jobs.journal import (
+    JobJournal,
+    JobSubmission,
+    JournalAbsent,
+    JournalEntry,
+    JournalFailed,
+    JournalFailureReason,
+    JournalSnapshot,
+    JournalWritten,
+)
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
@@ -31,13 +41,18 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     JobState,
     TransitionRejected,
+    TransitionRejectionReason,
     transition,
 )
 from ml_engine.training.jobs.store import (
     Conflict,
-    InMemoryJobStore,
+    JobStore,
+    LoadedJobStore,
+    PendingJob,
+    RestartDisposition,
     Reused,
     Started,
+    load_job_store,
 )
 
 __all__ = [
@@ -49,19 +64,32 @@ __all__ = [
     "DetailCode",
     "EvaluationRefValue",
     "EvaluationReportReference",
-    "InMemoryJobStore",
     "JobEvent",
     "JobFailure",
     "JobFailureCode",
+    "JobJournal",
     "JobRecord",
     "JobState",
+    "JobStore",
+    "JobSubmission",
+    "JournalAbsent",
+    "JournalEntry",
+    "JournalFailed",
+    "JournalFailureReason",
+    "JournalSnapshot",
+    "JournalWritten",
+    "LoadedJobStore",
+    "PendingJob",
     "PipelineCancelled",
     "PipelineFailed",
     "PipelineOutcome",
+    "RestartDisposition",
     "Reused",
     "Started",
     "TrainingPipeline",
     "TransitionRejected",
+    "TransitionRejectionReason",
+    "load_job_store",
     "map_dataset_rejected",
     "map_dataset_unreadable",
     "map_holdout_rejected",

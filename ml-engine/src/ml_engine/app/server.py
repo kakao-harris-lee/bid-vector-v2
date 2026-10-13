@@ -13,9 +13,10 @@ import signal
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from types import FrameType
-from typing import NoReturn
+from typing import Final, NoReturn
 
 import grpc
 
@@ -41,20 +42,42 @@ from ml_engine.serving import (
 from ml_engine.serving import PolicyRejected as ServingPolicyRejected
 from ml_engine.serving import shutdown as serving_shutdown
 from ml_engine.training.booster import LightGbmTrainer
-from ml_engine.training.jobs.pipeline import TrainingPipeline
+from ml_engine.training.jobs.journal import JobJournal, JournalFailed
+from ml_engine.training.jobs.pipeline import (
+    DatasetRefInput,
+    DetailCode,
+    TrainingPipeline,
+)
 from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.servicer import TrainingJobServicer
-from ml_engine.training.jobs.store import InMemoryJobStore
+from ml_engine.training.jobs.state import (
+    JobEvent,
+    JobFailure,
+    JobFailureCode,
+)
+from ml_engine.training.jobs.store import JobStore, PendingJob, load_job_store
 from ml_engine.training.policy import PolicyRejected as TrainingPolicyRejected
 from ml_engine.training.policy import TrainingPolicy, load_training_policy
-from ml_engine.training.spec import TrainingSpec
+from ml_engine.training.spec import (
+    TrainingSpec,
+    UnsupportedTrainingSpec,
+    resolve_training_spec,
+)
 from ml_engine.training.train import CodeVersion
 
 _logger = logging.getLogger(__name__)
 
 
+_JOB_JOURNAL_DIR_NAME: Final[str] = "_journal"
+"""job 저널은 **job 산출물 루트 안**에 산다(M6/6B-4 D-6B4-2). 산출물과 job 기록이 같은
+볼륨에서 함께 살아야 재기동 뒤 `SUCCEEDED` job 의 `artifact.uri` 가 가리키는 파일이
+남는다 — 저널만 영속시키면 「기록은 있는데 그 기록이 가리키는 산출물은 없다」가 된다.
+`_` 접두라 job 디렉터리 이름(`uuid4`)과 충돌할 수 없다."""
+
+
 class ConfigError(Exception):
-    """환경 값 미설정 — 조용한 기본값 없음(D-5E-7)."""
+    """부팅 거부 — 환경 값 미설정, 또는 서버를 세울 수 없는 구성(조용한 기본값·조용한
+    초기화 없음, D-5E-7 · M6/6B-4 위협 모델 ⑤)."""
 
 
 @dataclass(frozen=True)
@@ -204,13 +227,102 @@ def _prediction_runtime(
     )
 
 
+def _job_journal(config: ServerConfig) -> JobJournal:
+    """저널 경로는 **설정에서만** 온다 — 이 함수와 `_build_servicers` 밖에서
+    `JobJournal`·`JobStore` 를 만들지 않는다(설계 검토 (2b), `tests/gates` 가 정적으로
+    센다)."""
+    return JobJournal(config.artifact_out_dir / _JOB_JOURNAL_DIR_NAME)
+
+
+def _resubmit(
+    store: JobStore,
+    runner: JobRunner,
+    pending: PendingJob,
+    pipeline_factory: Callable[[TrainingSpec], TrainingPipeline],
+) -> bool:
+    """대기 고아 하나를 실행 대기열에 다시 넣는다. 재기동한 코드가 그 저널 항목의
+    `training_spec_version` 을 더는 모르면 **영원히 대기로 남기지 않고** 처분한다
+    (설계 검토 우회 (7))."""
+    spec = resolve_training_spec(pending.submission.training_spec_version)
+    if isinstance(spec, UnsupportedTrainingSpec):
+        _logger.error(
+            "job_id=%s 재적재 불가 — training_spec_version=%s 를 모른다. 처분한다.",
+            pending.record.job_id,
+            pending.submission.training_spec_version,
+        )
+        store.apply_transition(
+            pending.record.job_id,
+            JobEvent.FAIL,
+            at=datetime.now(UTC),
+            failure=JobFailure(
+                code=JobFailureCode.TRAINING_ERROR,
+                retryable=True,
+                detail_code=DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value,
+            ),
+        )
+        return False
+    runner.submit(
+        pending.record.job_id,
+        DatasetRefInput(
+            uri=pending.submission.dataset_uri,
+            manifest_checksum=pending.submission.manifest_checksum,
+            dataset_id=pending.record.dataset_id,
+        ),
+        pipeline_factory(spec),
+    )
+    return True
+
+
+def _resume_pending_jobs(
+    store: JobStore, runner: JobRunner, preloaded: _Preloaded, config: ServerConfig
+) -> None:
+    """재기동 뒤 대기 job 을 `accepted_at` 순서로 다시 집어넣는다(Q-5).
+
+    **NOT_READY 로 뜬 서버는 집지 않는다** — 정책 preload 가 실패했으면 job 을 돌릴 수
+    없고(`TrainingJobServicer.is_ready` 가 새 제출을 `MODEL_NOT_READY` 로 거부하는 것과
+    같은 규율), 그 경우 대기 job 은 `ACCEPTED` 로 남아 **다음 기동**이 집는다(알려진
+    제한 — 이 서버는 뒤늦게 READY 가 되지 않는다)."""
+    pending = store.pending_jobs()
+    if not pending:
+        return
+    if any(not outcome.ok for outcome in _preload_outcomes(preloaded)):
+        _logger.warning(
+            "정책 preload 실패(NOT_READY) — 대기 job %d 개를 집지 않는다(다음 기동이 집는다)",
+            len(pending),
+        )
+        return
+    pipeline_factory = _training_pipeline_factory(preloaded, config)
+    resumed = sum(
+        1 for job in pending if _resubmit(store, runner, job, pipeline_factory)
+    )
+    _logger.info("대기 job 재적재 — 대상 %d · 재적재 %d", len(pending), resumed)
+
+
 def _build_servicers(
     gate: ReadinessGate,
     serving_policy: ServingPolicy,
     preloaded: _Preloaded,
     config: ServerConfig,
 ) -> tuple[Servicers, JobRunner]:
-    store = InMemoryJobStore()
+    """조립 근(D-5E-1) — 저장소·실행기·servicer 를 여기서 하나씩 만든다.
+
+    M6/6B-4 — 저장소는 저널에서 **복원**되고 고아는 처분된다. 판독·쓰기 불가는 조용한
+    빈 저장소가 아니라 **기동 거부**다(위협 모델 ⑤)."""
+    loaded = load_job_store(
+        journal=_job_journal(config),
+        pending_queue_max=serving_policy.pending_queue_max,
+        at=datetime.now(UTC),
+    )
+    if isinstance(loaded, JournalFailed):
+        _logger.error("job 저널 복원 실패 — 부팅 거부: %s", loaded)
+        raise ConfigError(f"job 저널 복원 실패: {loaded}")
+    store = loaded.store
+    _logger.info(
+        "job 저널 복원 — RUNNING 고아 처분 %d · 상한 초과 폐기 %d · 대기 재적재 대상 %d",
+        loaded.disposition.running_orphans_failed,
+        loaded.disposition.pending_over_limit_failed,
+        loaded.disposition.pending_requeued,
+    )
     runner = JobRunner(store, max_workers=serving_policy.job_workers)
     training_job_servicer = TrainingJobServicer(
         store=store,
@@ -233,6 +345,7 @@ def _build_servicers(
         embedding=embedding_servicer,
         training_job=training_job_servicer,
     )
+    _resume_pending_jobs(store, runner, preloaded, config)
     return servicers, runner
 
 

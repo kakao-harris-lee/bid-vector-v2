@@ -7,15 +7,29 @@
 `FAILED(TRAINING_ERROR, RUNNER_CRASHED)`로 전이한다(설계 검토 우회 (13) — `RUNNING`에
 영원히 머무는 job 방지). 예외 자체는 삼키지 않고 로그로 남긴다(`BLE` 없음, 구체 예외
 없이 `Exception`을 잡지만 이것은 **콜백 경계**이지 도메인 실패 분류가 아니다 — 파이프라인
-내부는 이미 결과 타입만 다루므로 여기 도달하는 예외는 전부 "분류되지 않은 크래시"다)."""
+내부는 이미 결과 타입만 다루므로 여기 도달하는 예외는 전부 "분류되지 않은 크래시"다).
+
+**M6/6B-4 Q-2 — `START` 전이는 워커가 실제로 집는 순간에 일어난다.** 앞 판은
+`submit()` 안에서 곧바로 `RUNNING` 을 커밋하고 **그 뒤에** `executor.submit` 을 불렀다 —
+`job_workers: 1` 에서 둘째 이후 job 은 record 가 `RUNNING` 인 채 실행 대기열에서
+기다렸으므로 **관측 가능한 상태가 실행을 뜻하지 않았다**(ACCEPTED 는 두 호출 사이 수 μs
+만 존재). 이제 `submit()` 은 대기열에 넣기만 하고 `_execute` 가 워커 스레드에서 START 를
+커밋한다 — `ACCEPTED` = 대기, `RUNNING` = 실행 중이 되어 「가장 오래된 대기 job」이
+`accepted_at` 으로 정의된다(ADR 0010 D-8 개정).
+
+집을 때 이미 대기가 아니면(폐기·취소로 종단에 갔다) 파이프라인을 **돌리지 않는다**
+(`_NotStarted`). 종료 중 대기열에서 취소된 future 도 전이를 만들지 않는다 — job 은
+`ACCEPTED` 로 남아 다음 기동이 재적재한다."""
 
 from __future__ import annotations
 
 import logging
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from ml_engine.training.jobs.journal import JournalFailed
 from ml_engine.training.jobs.pipeline import (
     CancelToken,
     DatasetRefInput,
@@ -34,16 +48,54 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     TransitionRejected,
 )
-from ml_engine.training.jobs.store import InMemoryJobStore
+from ml_engine.training.jobs.store import JobStore
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _NotStarted:
+    """워커가 집었을 때 이 job 이 더는 대기가 아니었다 — 파이프라인을 돌리지 않았다.
+    종단 전이도 만들지 않는다(이미 다른 writer 가 상태를 확정했다)."""
+
+    detail: str
+
+
+type _WorkerResult = PipelineOutcome | PipelineFailed | PipelineCancelled | _NotStarted
+
+
+def _log_terminal_transition(
+    job_id: str,
+    event: str,
+    result: JobRecord | TransitionRejected | JournalFailed | None,
+) -> None:
+    """종단 전이의 **세 가지 실패**를 각자의 뜻으로 남긴다. 저널 쓰기 실패는 거부와
+    다르다 — 메모리도 바뀌지 않았으므로 job 은 `RUNNING` 으로 남고, 다음 기동이 그것을
+    고아로 처분한다. 조용히 넘기면 그 사실을 아무도 모른다."""
+    if isinstance(result, TransitionRejected):
+        _logger.info(
+            "job_id=%s %s 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
+            job_id,
+            event,
+            result,
+        )
+    elif isinstance(result, JournalFailed):
+        _logger.error(
+            "job_id=%s %s 전이의 저널 쓰기 실패 — 상태가 반영되지 않았다(%s). "
+            "다음 기동이 이 job 을 고아로 처분한다.",
+            job_id,
+            event,
+            result,
+        )
+    elif result is None:  # pragma: no cover — 완료 콜백 앞에서 이미 걸러진다.
+        _logger.error("job_id=%s %s 전이 대상이 저장소에 없다", job_id, event)
 
 
 class JobRunner:
     """`store`에 있는 job 을 스레드 풀에서 실행한다. `cancel(job_id)`는 진행 중인
     실행의 `CancelToken`을 세운다 — 파이프라인이 다음 단계 경계에서 확인한다."""
 
-    def __init__(self, store: InMemoryJobStore, *, max_workers: int) -> None:
+    def __init__(self, store: JobStore, *, max_workers: int) -> None:
         if max_workers < 1:
             raise ValueError(f"max_workers 는 1 이상이어야 합니다: {max_workers}")
         self._store = store
@@ -53,44 +105,44 @@ class JobRunner:
 
     def submit(
         self, job_id: str, dataset_ref: DatasetRefInput, pipeline: TrainingPipeline
-    ) -> JobRecord | TransitionRejected:
-        """`job_id`를 `RUNNING`으로 전이하고 파이프라인을 스레드 풀에 제출한다.
+    ) -> None:
+        """대기 job 을 실행 대기열에 넣는다 — **상태는 바꾸지 않는다**(Q-2). `START`
+        전이는 워커가 이 job 을 실제로 집는 순간(`_execute`)에 일어나므로, 대기열에서
+        기다리는 동안 job 은 `ACCEPTED`(대기)이고 상한·폐기의 대상이다.
 
-        R2-1 — `_accept_or_reuse`가 `start_or_reuse`로 job 을 ACCEPTED
-        로 만든 뒤 이 메서드를 호출하는 사이, 다른 writer(`CancelTrainingJob`)가
-        먼저 CANCEL 을 커밋할 수 있다(경합에서 Cancel 이 이긴다). START
-        전이 거부를 `ValueError`로 던지면 그 StartTraining 호출 자체가 처리되지 않은
-        예외로 gRPC `UNKNOWN`이 된다 — **예외로 알리지 않는다.** 거부되면 파이프라인을
-        전혀 제출하지 않고 `TransitionRejected`를 돌려준다(호출자가 최신 상태를
-        다시 읽어 정직하게 응답한다)."""
-        started = self._store.apply_transition(
-            job_id, JobEvent.START, at=datetime.now(UTC)
-        )
-        if started is None:
-            raise KeyError(
-                f"알 수 없는 job_id: {job_id}"
-            )  # 구조적으로 불가능(방금 생성)
-        if isinstance(started, TransitionRejected):
-            _logger.info(
-                "job_id=%s START 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
-                job_id,
-                started,
-            )
-            return started
+        R2-1 의 경합(제출과 취소)은 이제 `submit` 이 아니라 `_execute`
+        안에서 판정된다 — 집었을 때 이미 종단이면 파이프라인을 돌리지 않는다. 그래서
+        이 메서드는 전이 결과를 돌려줄 것이 없다(호출자는 저장소를 다시 읽어 응답한다)."""
+        future = self._executor.submit(self._execute, job_id, dataset_ref, pipeline)
 
-        token = CancelToken()
-        with self._lock_tokens_guard:
-            self._cancel_tokens[job_id] = token
-
-        future = self._executor.submit(pipeline.run, dataset_ref, token)
-
-        def _callback(
-            done: Future[PipelineOutcome | PipelineFailed | PipelineCancelled],
-        ) -> None:
+        def _callback(done: Future[_WorkerResult]) -> None:
             self._on_done(job_id, done)
 
         future.add_done_callback(_callback)
-        return started
+
+    def _execute(
+        self, job_id: str, dataset_ref: DatasetRefInput, pipeline: TrainingPipeline
+    ) -> _WorkerResult:
+        """워커 스레드에서 돈다. `CancelToken` 을 **START 전이보다 먼저** 등록한다 —
+        그 사이에 도착한 `cancel(job_id)` 를 잃지 않기 위해서다(토큰을 나중에 등록하면
+        취소 요청이 조용히 사라지고 계산이 그대로 돈다)."""
+        token = CancelToken()
+        with self._lock_tokens_guard:
+            self._cancel_tokens[job_id] = token
+        started = self._store.apply_transition(
+            job_id, JobEvent.START, at=datetime.now(UTC)
+        )
+        if not isinstance(started, JobRecord):
+            with self._lock_tokens_guard:
+                self._cancel_tokens.pop(job_id, None)
+            _logger.info(
+                "job_id=%s 워커가 집었을 때 대기가 아니었다(폐기·취소·저널 실패) — "
+                "파이프라인을 돌리지 않는다: %s",
+                job_id,
+                started,
+            )
+            return _NotStarted(detail=str(started))
+        return pipeline.run(dataset_ref, token)
 
     def cancel(self, job_id: str) -> None:
         """진행 중인 job 의 `CancelToken`을 세운다 — job 이 실행 중이 아니면 no-op
@@ -109,13 +161,18 @@ class JobRunner:
         for token in tokens:
             token.cancel()
 
-    def _on_done(
-        self,
-        job_id: str,
-        future: Future[PipelineOutcome | PipelineFailed | PipelineCancelled],
-    ) -> None:
+    def _on_done(self, job_id: str, future: Future[_WorkerResult]) -> None:
         with self._lock_tokens_guard:
             self._cancel_tokens.pop(job_id, None)
+
+        if future.cancelled():
+            # `shutdown(wait=False)`가 대기열의 future 를 취소했다 — 집히지 않았으므로
+            # 전이가 없다(job 은 ACCEPTED 로 남아 다음 기동이 재적재한다). 여기서
+            # `future.exception()`을 부르면 `CancelledError`가 콜백 안에서 터진다.
+            _logger.info(
+                "job_id=%s 실행 전 종료로 취소됐다 — 대기 상태로 남는다", job_id
+            )
+            return
 
         if self._store.get(job_id) is None:
             _logger.error("job_id=%s 완료 콜백 도달 — 저장소에 없음", job_id)
@@ -141,17 +198,20 @@ class JobRunner:
                 job_id, JobFailureCode.TRAINING_ERROR, DetailCode.RUNNER_CRASHED
             )
             return
-        outcome = future.result()
+        self._dispatch(job_id, future.result())
 
+    def _dispatch(self, job_id: str, outcome: _WorkerResult) -> None:
+        """워커가 돌려준 네 갈래를 전이로 옮긴다."""
+        if isinstance(outcome, _NotStarted):
+            return  # 집었을 때 대기가 아니었다 — `_execute`가 이미 로그로 남겼다.
         if isinstance(outcome, PipelineCancelled):
             self._transition_cancelled(job_id)
         elif isinstance(outcome, PipelineFailed):
             self._transition_failed(job_id, outcome.code, outcome.detail_code)
         else:
-            # `Future`의 타입이 `PipelineOutcome | PipelineFailed | PipelineCancelled`
-            # 셋으로 닫혀 있어(`_callback`의 시그니처) mypy 가 이 분기를 `PipelineOutcome`
-            # 하나로 좁힌다 — 네 번째 갈래를 위한 `else` 를 남기면 `warn_unreachable`이
-            # 죽은 코드로 거부한다(실측).
+            # `_WorkerResult`가 넷으로 닫혀 있고 위 셋을 이미 걸렀으므로 mypy 가 이
+            # 분기를 `PipelineOutcome` 하나로 좁힌다 — 다섯 번째 갈래를 위한 `else`를
+            # 남기면 `warn_unreachable`이 죽은 코드로 거부한다(실측).
             self._transition_succeeded(job_id, outcome)
 
     def _transition_succeeded(self, job_id: str, outcome: PipelineOutcome) -> None:
@@ -176,12 +236,7 @@ class JobRunner:
             artifact=artifact,
             evaluation=evaluation,
         )
-        if isinstance(result, TransitionRejected):
-            _logger.info(
-                "job_id=%s SUCCEED 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
-                job_id,
-                result,
-            )
+        _log_terminal_transition(job_id, "SUCCEED", result)
 
     def _transition_failed(
         self, job_id: str, code: JobFailureCode, detail_code: DetailCode
@@ -190,20 +245,13 @@ class JobRunner:
         result = self._store.apply_transition(
             job_id, JobEvent.FAIL, at=datetime.now(UTC), failure=failure
         )
-        if isinstance(result, TransitionRejected):
-            _logger.info(
-                "job_id=%s FAIL 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
-                job_id,
-                result,
-            )
+        _log_terminal_transition(job_id, "FAIL", result)
 
     def _transition_cancelled(self, job_id: str) -> None:
         result = self._store.apply_transition(
             job_id, JobEvent.CANCEL, at=datetime.now(UTC)
         )
-        if isinstance(result, TransitionRejected):  # pragma: no cover — CANCEL 은 표에
-            # 모든 상태에 정의돼 있어(종료 상태는 멱등 no-op) 도달 불가.
-            _logger.error("job_id=%s CANCEL 전이 거부 — %s", job_id, result)
+        _log_terminal_transition(job_id, "CANCEL", result)
 
     def shutdown(self, *, wait: bool) -> None:
         self._executor.shutdown(wait=wait, cancel_futures=not wait)

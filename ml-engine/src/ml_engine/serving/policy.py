@@ -28,6 +28,7 @@ _SCALAR_KEYS: Final[frozenset[str]] = frozenset(
         "max_concurrent_rpcs",
         "shutdown_grace_seconds",
         "job_workers",
+        "pending_queue_max",
         "idempotency_key_max_chars",
         "embedding_text_max_chars",
     }
@@ -46,6 +47,7 @@ class ServingPolicy:
     max_concurrent_rpcs: int
     shutdown_grace_seconds: float
     job_workers: int
+    pending_queue_max: int
     idempotency_key_max_chars: int
     embedding_text_max_chars: int
     dataset_uri_schemes: tuple[str, ...]
@@ -63,6 +65,10 @@ class ServingPolicy:
             )
         if self.job_workers < 1:
             raise ValueError(f"job_workers 는 1 이상이어야 합니다: {self.job_workers}")
+        if self.pending_queue_max < 1:
+            raise ValueError(
+                f"pending_queue_max 는 1 이상이어야 합니다: {self.pending_queue_max}"
+            )
         if self.idempotency_key_max_chars < 1:
             raise ValueError(
                 "idempotency_key_max_chars 는 1 이상이어야 합니다: "
@@ -147,6 +153,9 @@ def load_serving_policy(path: Path) -> ServingPolicy | PolicyRejected:
                 raw.values["shutdown_grace_seconds"], "shutdown_grace_seconds"
             ),
             job_workers=_to_int(raw.values["job_workers"], "job_workers"),
+            pending_queue_max=_to_int(
+                raw.values["pending_queue_max"], "pending_queue_max"
+            ),
             idempotency_key_max_chars=_to_int(
                 raw.values["idempotency_key_max_chars"], "idempotency_key_max_chars"
             ),
