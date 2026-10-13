@@ -13,12 +13,14 @@ import 은 전부 top-level 이어야 한다(`tests/training/conftest.py` 의
 
 from __future__ import annotations
 
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from ml_engine.app import server
 from ml_engine.app.server import (
     _JOB_JOURNAL_DIR_NAME,
     ConfigError,
@@ -29,6 +31,7 @@ from ml_engine.app.server import (
     _preload,
     _preload_outcomes,
 )
+from ml_engine.contracts import training_pb2
 from ml_engine.serving import ReadinessGate
 from ml_engine.training.jobs import journal_file
 from ml_engine.training.jobs.journal import JobSubmission, JournalSnapshot
@@ -265,3 +268,91 @@ def test_second_boot_disposes_nothing_more(tmp_path: Path) -> None:
     assert record.state is JobState.FAILED
     assert store.pending_jobs() == ()
     assert isinstance(_job_journal(config), JobJournal)
+
+
+# ---- vr H-1 — 출하 정책 값이 **조립 근을 지나** 큐에 닿는다(값 slice 의 「운반」 축) ----
+
+
+class _BlockingPipeline:
+    """워커 하나를 붙잡아 둔다 — `job_workers: 1` 에서 대기 큐가 실제로 쌓이게 한다."""
+
+    def __init__(self, release: threading.Event) -> None:
+        self._release = release
+
+    def run(self, dataset_ref: object, cancel_token: object) -> object:
+        self._release.wait(timeout=20.0)
+        raise AssertionError("이 test 는 파이프라인 결과를 쓰지 않는다")
+
+
+def _start(servicer: object, key: str) -> training_pb2.StartTrainingResponse:
+    request = training_pb2.StartTrainingRequest()
+    request.envelope.request_id = f"req-{key}"
+    request.envelope.correlation_id = f"corr-{key}"
+    request.idempotency_key = key
+    request.dataset.uri = f"file://{_ML_ENGINE_ROOT / 'does-not-exist'}"
+    request.dataset.manifest_checksum = "a" * 64
+    request.dataset.dataset_id = "ds-queue"
+    request.training_spec_version = _KNOWN_SPEC_VERSION
+    response = servicer.StartTraining(request, context=None)  # type: ignore[attr-defined]
+    assert response.WhichOneof("result") == "handle", response
+    return response
+
+
+def test_shipped_pending_queue_max_reaches_the_queue_through_the_assembly_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """vr H-1 — 앞 판은 로더 결과로 **저장소를 직접** 만들어 상한 값을 재서, 조립 근의
+    `load_job_store(pending_queue_max=serving_policy.pending_queue_max)` 를 상수 1000 으로
+    바꿔치워도 전건이 초록이었다(운반 단계가 끊겨도 아무도 몰랐다).
+
+    여기서는 서버를 **조립 근으로 띄우고**(`_build_servicers`, 출하 `serving-v1.yaml`)
+    gRPC servicer 로 상한+1 개를 대기시킨다 — 최고참 대기 job 이
+    `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 가 되는지, RUNNING 은
+    폐기되지 않는지, 살아남은 대기 수가 정확히 상한인지를 함께 본다."""
+    release = threading.Event()
+
+    def _blocking_pipeline_factory(**_kwargs: object) -> object:
+        return lambda spec: _BlockingPipeline(release)
+
+    monkeypatch.setattr(server, "pipeline_factory", _blocking_pipeline_factory)
+
+    config = _config(tmp_path)
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    limit = preloaded.serving.pending_queue_max
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store
+    try:
+        running = _start(servicers.training_job, "idem-running").handle.job_id
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            record = store.get(running)
+            assert record is not None
+            if record.state is JobState.RUNNING:
+                break
+            time.sleep(0.01)
+        assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
+
+        waiting = [
+            _start(servicers.training_job, f"idem-wait-{index}").handle.job_id
+            for index in range(limit)
+        ]
+        assert [job.record.job_id for job in store.pending_jobs()] == waiting
+
+        overflow = _start(servicers.training_job, "idem-overflow").handle.job_id
+    finally:
+        release.set()
+        runner.shutdown(wait=False)
+
+    discarded = store.get(waiting[0])
+    assert discarded is not None
+    assert discarded.state is JobState.FAILED
+    assert discarded.failure is not None
+    assert discarded.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+    # RUNNING 은 폐기 대상이 아니고, 살아남은 대기 수는 정확히 상한이다.
+    assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
+    assert [job.record.job_id for job in store.pending_jobs()] == [
+        *waiting[1:],
+        overflow,
+    ]
