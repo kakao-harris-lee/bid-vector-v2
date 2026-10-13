@@ -46,7 +46,7 @@
    **E-3 의 「변이 둘 RED」는 이 결함과 무관하게 성립했다**(실측 확인): 그 두 변이는 카탈로그·빌드 스크립트를
    고쳐 **해석된 classpath**(`Test` task 의 선언된 입력)를 바꿨으므로 test 가 실제로 다시 돌았다 — 두 회차 로그
    모두 `> Task :app:test` 가 UP-TO-DATE 없이 실행되고 `FAILED`(4 executed · 2 executed). 침묵이 아니었다.
-8. **ml-serving 이미지가 크기 상한의 86% 다.** 상한 400,000,000 은 **재현되지 않는 113.7MB 기록 위에서** 고른 값이고(원인 미상), 실측은 343,090,786 이다. **의존 하나만 늘어도 S-22a 가 붉어진다** — 그때 상한을 올릴지 이미지를 줄일지는 정해져 있지 않다.
+8. **ml-serving 이미지가 크기 상한의 86% 다.** 상한 400,000,000 은 **재현되지 않는 113.7MB 기록 위에서** 고른 값이고(원인 미상), 실측은 343,090,786 이다. **사용자 결정(2026-10-13): 상한 400,000,000 유지** — 여유 14%, 의존 하나 늘면 S-22a 가 붉어질 수 있고 그때 다시 결정한다.
 9. **`compatibilitySmoke.expectedModules` 의 `tools.jackson.core:jackson-databind` 는 test 전용 fixture 로 충족된다.** 같은 파일이 `testImplementation(libs.jackson.databind)` 로 그 좌표를 이미 올리므로, 그 한 줄은 **production 그래프가 jackson 3 databind 를 해석한다는 것을 증명하지 않는다**. 나머지 넷(jackson 2 databind · tomcat-embed `core`·`el`·`websocket`)은 test 전용 출처가 없다. 실제 잠금은 배포물을 여는 `BootJarSecurityFloorTest` 라 커버리지 구멍은 아니다.
 10. **Phase 2.5 설계 검토를 착수 때 하지 않았다**(팀장 절차 누락). 이 slice 는 게이트 술어를 바꾸는
    계열이라 그 검토의 대상이었다 — 우회 열거와 값 획득 축을 착수 시점에 세웠다면 OS 술어의 절반
