@@ -52,6 +52,8 @@ in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` ·
 
 **D-6B4-2 (r1, 2026-10-14, 팀장 — 구현 레인 착수 수령).** ① **저널 경로 = `<ML_ENGINE_ARTIFACT_OUT_DIR>/_journal/`, 볼륨은 `/app/artifacts` 전체**(B안). 새 env 0 → in_scope 밖 두 자리(`tools/image-hygiene-check.sh` PROBE_ENV · `RealServerIntegrationTest`) 무편집, 그리고 「재기동 뒤 job 기록은 남는데 `artifact.uri` 파일은 없다」 비정합이 함께 닫힌다(산출물과 기록이 한 볼륨). `ML_ENGINE_ARTIFACT_OUT_DIR` 의 뜻이 「job 산출물 + 저널 루트」로 넓어지므로 in_scope 에 `reports/evidence/m5/5e/policy-values.md` §2 해당 행을 더한다. ② `InMemoryJobStore` → `JobStore`(저널 **필수 인자** — 비영속 조립 갈래를 구성상 없앤다). ③ ACCEPTED 고아 재적재를 위해 저널 항목에 제출 payload(dataset uri · manifest_checksum · training_spec_version)를 함께 적는다(proto 변경 0). 정책 preload 가 NOT_READY 면 재적재하지 않고 ACCEPTED 로 두되, **READY 가 되는 시점에 재적재**(영구 정체 금지)하고 그동안도 상한 계수에 든다 — 알려진 제한 등재.
 
+**D-6B4-3 (r2, 2026-10-14, 팀장 — 구현 완료 수령 · 동결).** ① D-6B4-2 ③ 의 「READY 가 되는 시점에 재적재」는 **「다음 기동이 집는다」**로 확정한다 — `ReadinessGate` 에는 NOT_READY → READY 프로세스 내 전이가 없다(M5 가 `mark_ready` 를 M-5 로 지웠고 「정책은 재로드하지 않는다 — 재시작만 preload 를 다시 돈다」). 재기동이 유일한 READY 경로이므로 정체의 상한은 재기동이다. 그 사실을 공개 표면 집합 등식 + 인자 없는 공개 메서드 전수 호출 test 로 잠갔다(`18069139` — 기존 이름 하나 금지 test 는 `retry_preload()` 변이에 초록이었다). 대기 job 은 그동안도 상한 계수에 든다. ② 산출물 판정 SHA `18069139` · evidence 끝 `a89f4a08`. acceptance: `ml-engine` 전건 exit 0(1,517 passed) · `check` exit 0 @a89f4a08 · `container` 16 step exit 0 @54bbef81(이미지 입력 무변경 근거로 재사용) · 변이 11 RED · 컨테이너 재생성 뒤 저널 생존 + 통제군. 새 OPEN 넷(`OPEN-6B4-CANCEL-REASON-UNREACHABLE` · `-STORE-UNAVAILABLE-CODE` · `-JOURNAL-RETENTION` · `-QUEUE-METRIC`). 검토: verifier(opus) · code-reviewer(sonnet) 병렬 → Codex 계약 심판 1회.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
