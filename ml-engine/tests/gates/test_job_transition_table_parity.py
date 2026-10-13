@@ -334,9 +334,7 @@ def test_proto_parser_sees_a_removed_table_row() -> None:
 
 def test_adr_parser_sees_a_removed_revision_block() -> None:
     original = _ADR_PATH.read_text(encoding="utf-8")
-    mutated = original.replace(
-        "`ACCEPTED → FAILED(WORKER_RESOURCE_EXHAUSTED)`", "그 간선"
-    )
+    mutated = original.replace("**`ACCEPTED → FAILED`**", "**그 간선**")
     assert mutated != original
     assert _DISCARD_EDGE not in parse_adr_edges(mutated)
 

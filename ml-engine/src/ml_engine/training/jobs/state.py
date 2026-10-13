@@ -46,9 +46,12 @@ _TRANSITIONS: MappingProxyType[tuple[JobState, JobEvent], JobState] = MappingPro
         (JobState.RUNNING, JobEvent.SUCCEED): JobState.SUCCEEDED,
         (JobState.RUNNING, JobEvent.FAIL): JobState.FAILED,
         # M6/6B-4 D-6B4-1(ADR 0010 D-8 개정) — 대기 job 을 실행 없이 끝내는 간선.
-        # 쓰이는 자리 둘: 대기 큐 상한 초과 폐기(`WORKER_RESOURCE_EXHAUSTED`)와 재기동
-        # 시 실행할 수 없는 대기 고아의 처분. 「실행했다」를 뜻하지 않으므로 `started_at`
-        # 은 미설정으로 남는다(`_apply_fail`이 record 의 값을 그대로 옮긴다).
+        # 쓰이는 자리 **셋**(계약 문면과 같은 목록, vr M-3): [1] 대기 큐 상한 초과 폐기
+        # (`WORKER_RESOURCE_EXHAUSTED`/`PENDING_QUEUE_OVERFLOW`) [2] 재기동 때 모르는
+        # spec 의 대기 고아 처분(`TRAINING_ERROR`/`TRAINING_SPEC_UNSUPPORTED_ON_RESTART`)
+        # [3] 워커가 집는 도중 START 커밋 전 크래시(`TRAINING_ERROR`/`RUNNER_CRASHED`).
+        # 「실행했다」를 뜻하지 않으므로 `started_at` 은 미설정으로 남는다(`_apply_fail`
+        # 이 record 의 값을 그대로 옮긴다).
         (JobState.ACCEPTED, JobEvent.FAIL): JobState.FAILED,
         (JobState.ACCEPTED, JobEvent.CANCEL): JobState.CANCELLED,
         (JobState.RUNNING, JobEvent.CANCEL): JobState.CANCELLED,

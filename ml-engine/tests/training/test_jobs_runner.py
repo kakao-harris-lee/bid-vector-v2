@@ -424,3 +424,39 @@ def test_shutdown_cancels_queued_futures_and_leaves_them_pending(
     record = store.get(queued)
     assert record is not None
     assert record.state is JobState.ACCEPTED
+
+
+# ---- vr M-3 — 계약 문면이 드는 세 번째 사유(START 커밋 전 크래시) ----
+
+
+def test_crash_before_the_start_commit_uses_the_accepted_to_failed_edge(
+    tmp_path: Path,
+) -> None:
+    """`ACCEPTED → FAILED` 간선의 세 번째 쓰임 — 워커가 집는 도중 `START` 를 커밋하기
+    **전에** 크래시하면 job 은 아직 대기이므로 완료 콜백의 `FAILED(TRAINING_ERROR,
+    RUNNER_CRASHED)` 가 이 간선으로 간다. 계약 문면(proto 주석 · ADR 0010 D-8 개정)이
+    이 사유를 들므로 실측으로 잠근다 — `started_at` 이 미설정인 것이 「실행된 적 없다」의
+    관측값이다."""
+    store = _store(tmp_path)
+    job_id = _new_job(store)
+    original = store.apply_transition
+
+    def _crash_on_start(
+        target_job_id: str, event: JobEvent, **kwargs: object
+    ) -> object:
+        if event is JobEvent.START:
+            raise RuntimeError("START 커밋 전 크래시 주입")
+        return original(target_job_id, event, **kwargs)  # type: ignore[arg-type]
+
+    store.apply_transition = _crash_on_start  # type: ignore[method-assign]
+    runner = JobRunner(store, max_workers=1)
+    runner.submit(job_id, _DATASET_REF, _SucceedingPipeline())
+    runner.shutdown(wait=True)
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert record.failure.code is JobFailureCode.TRAINING_ERROR
+    assert record.failure.detail_code == DetailCode.RUNNER_CRASHED.value
+    assert record.started_at is None  # 실행된 적이 없다
