@@ -19,6 +19,9 @@ private val allowedJobStateTransitions =
         JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_RUNNING,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_SUCCEEDED,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_FAILED,
+        // M6/6B-4 D-6B4-1 — 대기 큐 상한 초과로 가장 오래된 대기 job 을 폐기하는 간선
+        // (`JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED`, ADR 0010 D-8 개정).
+        JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_FAILED,
         JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_CANCELLED,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_CANCELLED,
     )

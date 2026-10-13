@@ -29,7 +29,6 @@ from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.state import (
     JobEvent,
     JobFailure,
-    JobFailureCode,
     JobRecord,
     JobState,
 )

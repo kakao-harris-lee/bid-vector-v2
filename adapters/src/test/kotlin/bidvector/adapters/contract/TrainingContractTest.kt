@@ -254,6 +254,7 @@ class TrainingContractTest {
         isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_RUNNING) shouldBe true
         isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_SUCCEEDED) shouldBe true
         isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_FAILED) shouldBe true
+        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe true
         isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_CANCELLED) shouldBe true
         isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_CANCELLED) shouldBe true
     }
@@ -271,9 +272,9 @@ class TrainingContractTest {
     }
 
     @Test
-    fun `ACCEPTED 에서 SUCCEEDED 나 FAILED 로 직행하는 전이는 거부된다`() {
+    fun `ACCEPTED 에서 SUCCEEDED 로 직행하는 전이는 거부된다`() {
+        // `ACCEPTED → FAILED` 는 M6/6B-4 D-6B4-1 로 **허용**된다(대기 큐 상한 폐기) — 위 허용표에 있다.
         isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_SUCCEEDED) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe false
     }
 
     // ---- SUCCEEDED/FAILED 조합 불변식 — CANCELLED 에 artifact 첨부 거부(우회 후보 3) ----
