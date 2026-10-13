@@ -41,7 +41,7 @@
 
 ## in_scope / out_scope
 
-- in: `adapters/src/main/resources/db/migration/V18__*.sql` · `adapters/src/main/kotlin/**`(보존 저장소 어댑터·마스킹) · `adapters/src/test/**` · `workflow/src/main/kotlin/**`·`workflow/src/test/**`(보존 use case·정책 값 — 필요 시) · `app/src/main/kotlin/**`(러너·배선) · `app/src/test/**` · `config/quality/gate-tests.properties` · `config/quality/*policy*.properties`(필요 시, 계약 갱신으로 확정) · `docs/runbook/**`(보존 절) · `reports/evidence/m6/6b3/**` · `milestone-6.md`(팀장 문단).
+- in: `adapters/src/main/resources/db/migration/V18__*.sql` · `adapters/src/main/kotlin/**`(보존 저장소 어댑터·마스킹) · `adapters/src/test/**` · `workflow/src/main/kotlin/**`·`workflow/src/test/**`(보존 use case·정책 값 — 필요 시) · `app/src/main/kotlin/**`(러너·배선) · `app/src/test/**` · `config/quality/gate-tests.properties` · `config/quality/architecture-policy.properties`(D-6B3-2 확정) · `docs/runbook/**`(보존 절) · `reports/evidence/m6/6b3/**` · `milestone-6.md`(팀장 문단).
 - out: 앱 역할 GRANT 확대 · 수집 시점 마스킹 · `inbox`·싱글턴·개정 이력·수집 원장 파기 · 운영/dev DB(`bid-vector-v2-dev` 55432) 실행 · pg_cron·파티셔닝 · 백업 보존 · `docker/**`·`ci.yml`(필요해지면 멈추고 계약 갱신).
 
 ## acceptance
@@ -55,6 +55,8 @@ in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` + 
 ## 계약 갱신 이력
 
 **D-6B3-1 (r1, 2026-10-13, 팀장 — 구현 레인 preflight 수령).** ① **V18 의 트리거 완화는 `raw_observation` 한 표만**(`pii_masked_at` 도 그 표에만). 실측: `notice_audit.previous_row = to_jsonb(OLD notice)` 이고 `notice` 열에는 담당자 열이 없으며 담당자 키는 계약 레지스트리에 등재되지 않는다(`FieldContractTest` 기존 단언) — 담당자 PII 가 `notice_audit` 로 들어오는 경로가 구조적으로 없다. 완화하면 얻는 것 0 · append-only 계약의 구멍 하나. 대신 「`notice_audit` 마스킹 대상 0」을 **술어로 잠근다**: `previous_row` 키 집합 ⊆ `notice` 열 집합(DB 카탈로그 실측) · `notice` 열 이름에 담당자 꼴 없음 · 레지스트리 단언 참조. A-3 의 취지(PII 제거 · 표본 보존)는 그대로다. ② **`edit_session` 은 상태 무관 `created_at < cutoff`**(버려진 비종단 행은 그 부분집합 — A-4 포함, 세션 수명은 분·시간 단위이고 감사는 `operator_strategy_revision` 이 진다). ③ outbox 는 종단(`DELIVERED`·`ISOLATED`)만 · 기준 시각 매핑은 적재 시각 축(레인 preflight 표). ④ 분류 레지스트리 ↔ DB 카탈로그 집합 등식(`CleanMigrationTest` 축1 로 전이적으로 스키마 정본에 묶임) · FK 순서는 pg 카탈로그 런타임 위상 정렬(순환이면 실패) · `payload` 마스킹 allow-list = 계약 레지스트리 rawNames — **단 그 allow-list 가 `payload` 를 읽는 모든 소비자(스냅숏 추출·재정규화·6G 백테스트 경로)의 읽기 키 집합을 포함함을 기계 수집으로 실측**(마스킹이 PII 아닌 필드를 지워 표본을 깨지 않게).
+
+**D-6B3-2 (r2, 2026-10-14, 팀장 — 구현 완료 수령 · 동결).** 산출물 판정 SHA `575674d2` · evidence 끝 `811925fb`. `config/quality/architecture-policy.properties` 를 in_scope 로 **확정**(tier·러너 참조자·로깅 사용자 등재 — 없으면 `ArchitectureGateTest` RED). acceptance(레인): check exit 0 · test 2,911 · qualityBaseline `--rerun-tasks` exit 0. 변이 17 중 15 KILLED · 2 SURVIVED(마스킹 건너뜀 이중 가드 — 쌍 변이는 RED, 알려진 제한 4). 면제 래칫 46→51. 새 OPEN 셋(`OPEN-6B3-OUTBOX-FAILED-RETENTION` · `-BLOAT-AFTER-FIRST-PURGE` · `-PARTIAL-COUNTS-ON-FAILURE`). TDD 순서 이탈(workflow 층) 자기신고. 검토 레인: verifier(opus) · code-reviewer(sonnet) · migration-reviewer · privacy-gate 병렬 → Codex 1회.
 
 ## 하네스 레인 변경 (상시)
 
