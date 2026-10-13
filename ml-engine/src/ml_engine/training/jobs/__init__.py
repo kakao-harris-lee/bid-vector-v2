@@ -8,7 +8,6 @@ forbidden — `training/jobs/servicer.py`는 grpc 진입점 예외로 `ignore_im
 from __future__ import annotations
 
 from ml_engine.training.jobs.journal import (
-    JobJournal,
     JobSubmission,
     JournalAbsent,
     JournalEntry,
@@ -17,6 +16,7 @@ from ml_engine.training.jobs.journal import (
     JournalSnapshot,
     JournalWritten,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,

@@ -23,7 +23,7 @@ _SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "ml_engine"
 
 _JOURNAL_CONSTRUCTION_SITES = frozenset({"app/server.py"})
 _STORE_CONSTRUCTION_SITES = frozenset({"training/jobs/store.py"})
-_ATOMIC_REPLACE_SITES = frozenset({"training/jobs/journal.py"})
+_ATOMIC_REPLACE_SITES = frozenset({"training/jobs/journal_file.py"})
 
 
 def _sources() -> dict[str, ast.Module]:

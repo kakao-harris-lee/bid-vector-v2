@@ -29,19 +29,20 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
 from ml_engine.training.jobs.journal import (
-    JobJournal,
     JobSubmission,
     JournalAbsent,
     JournalEntry,
     JournalFailed,
     JournalSnapshot,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
 from ml_engine.training.jobs.state import (
     ArtifactReference,
@@ -54,6 +55,8 @@ from ml_engine.training.jobs.state import (
     transition,
 )
 from ml_engine.training.jobs.state import JobState as _JobState
+
+_logger = logging.getLogger(__name__)
 
 _ACCEPTED = _JobState.ACCEPTED
 _RUNNING = _JobState.RUNNING
@@ -231,10 +234,21 @@ class JobStore:
         }
 
     def _commit(self, next_entries: dict[str, JournalEntry]) -> JournalFailed | None:
-        """저널에 **먼저** 쓰고, 성공했을 때만 메모리를 바꾼다(상태·저널 일치)."""
+        """저널에 **먼저** 쓰고, 성공했을 때만 메모리를 바꾼다(상태·저널 일치).
+
+        vr M-1 — 「교체됨, 내구성 미확인」(`durable=False`)도 **성공 쪽**이다. 교체는 이미
+        일어났으므로 메모리를 되돌리면 디스크와 갈라진다(거절했다고 답한 job 이 재기동 뒤
+        실행된다). 남는 위험은 전원 상실 시 이 교체가 사라질 수 있다는 것뿐이고, 그때
+        디스크에 남는 것은 **이전 상태**이므로 재기동 처분이 덮는다 — 그 사실을 로그로
+        남긴다(조용히 넘기면 아무도 모른다)."""
         written = self._journal.write(_snapshot(next_entries))
         if isinstance(written, JournalFailed):
             return written
+        if not written.durable:
+            _logger.error(
+                "저널 교체의 내구성을 확인하지 못했다 — 메모리는 커밋한다(디스크와 "
+                "갈라지지 않게). 전원 상실 시 이 전이가 사라질 수 있다."
+            )
         self._entry_by_id = next_entries
         return None
 

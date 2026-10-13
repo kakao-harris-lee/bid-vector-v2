@@ -42,7 +42,8 @@ from ml_engine.serving import (
 from ml_engine.serving import PolicyRejected as ServingPolicyRejected
 from ml_engine.serving import shutdown as serving_shutdown
 from ml_engine.training.booster import LightGbmTrainer
-from ml_engine.training.jobs.journal import JobJournal, JournalFailed
+from ml_engine.training.jobs.journal import JournalFailed
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     DatasetRefInput,
     DetailCode,

@@ -16,11 +16,11 @@ import pytest
 
 from ml_engine.serving.policy import ServingPolicy, load_serving_policy
 from ml_engine.training.jobs.journal import (
-    JobJournal,
     JobSubmission,
     JournalFailed,
     JournalSnapshot,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
 from ml_engine.training.jobs.state import (
     JobEvent,

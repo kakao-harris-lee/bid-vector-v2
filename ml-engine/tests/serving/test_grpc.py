@@ -23,7 +23,7 @@ from ml_engine.serving.grpc import Servicers, build_server, shutdown
 from ml_engine.serving.policy import ServingPolicy
 from ml_engine.serving.prediction import BidPredictionServicer
 from ml_engine.serving.readiness import PreloadOutcome, ReadinessGate
-from ml_engine.training.jobs.journal import JobJournal
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     TrainingPipeline,
 )

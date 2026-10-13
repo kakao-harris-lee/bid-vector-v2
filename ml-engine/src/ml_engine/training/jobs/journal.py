@@ -1,9 +1,10 @@
-"""`ml_engine.training.jobs.journal` — job 저장소의 파일 저널(M6/6B-4 Q-4). 저장소
-상태 **전체**를 canonical JSON 한 파일로 적고 **원자 교체**(tmp → `fsync` →
-`os.replace` → 디렉터리 `fsync`)로 갈아 끼운다 — 쓰기 도중 크래시는 「이전 상태 또는
-새 상태」만 남긴다(위협 모델 ⑤). 추가 기록(append)이 아니라 전체 교체를 쓰는 이유: 부분
-기록이 남을 창 자체를 없애기 때문이고, 이 서버의 job 수는 `job_workers: 1` 과 대기 상한
-아래에서 작다(알려진 제한 — 종단 job 의 보존·정리는 이 slice 밖, `OPEN-6B4-JOURNAL-RETENTION`).
+"""`ml_engine.training.jobs.journal` — job 저장소 저널의 **값 타입과 canonical JSON
+코덱**(M6/6B-4 Q-4). 이 모듈은 파일을 모른다 — 파일 하나의 소유자는 `journal_file`
+(`JobJournal`)이고, 그 선이 「저널 파일에 쓰는 자리는 한 모듈뿐」의 구조적 근거다(vr H-2).
+
+저장소 상태 **전체**를 한 덩이로 적는다(추가 기록이 아니라 전체 교체 — 부분 기록이 남을
+창 자체를 없앤다. 이 서버의 job 수는 `job_workers: 1` 과 대기 상한 아래에서 작다. 종단
+job 의 보존·정리는 이 slice 밖, `OPEN-6B4-JOURNAL-RETENTION`).
 
 **판독 실패는 조용한 빈 저장소가 아니다.** 「파일이 없다」(`JournalAbsent`, 첫 기동)와
 「읽었지만 뜻을 모른다」(`JournalFailed` + 닫힌 사유)를 다른 타입으로 돌려준다 — 호출자
@@ -11,8 +12,8 @@
 
 canonical JSON 관례는 저장소의 기존 자리들과 같다(`training.artifact_writer`·
 `evaluation.report`·`serving.runtime`): `sort_keys=True`, `separators=(",", ":")`,
-`allow_nan=False`. 시각은 ISO 8601 문자열이고 **tz 가 없으면 받지 않는다**(`accepted_at
-≤ started_at ≤ finished_at` 비교가 naive/aware 혼합에서 깨진다).
+`allow_nan=False`. 시각은 ISO 8601 문자열이고 **tz 가 없으면 받지 않는다** — 쓰기에서도
+거부한다(cr M-2: 앞 판은 판독 쪽에만 검사가 있어 못 읽는 바이트를 남겼다).
 
 판독은 `JobRecord`·`JobFailure`·`JobSubmission` 생성자를 그대로 지나므로 2C 조합 불변식과
 시각 불변식이 **판독에서도** 한 번 더 선다(저널을 손으로 고치는 주체는 비방어이지만,
@@ -21,13 +22,10 @@ canonical JSON 관례는 저장소의 기존 자리들과 같다(`training.artif
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from typing import Final
 
 from ml_engine.training.jobs.state import (
@@ -40,8 +38,6 @@ from ml_engine.training.jobs.state import (
 )
 
 JOURNAL_SCHEMA_VERSION: Final[str] = "job-journal-v1"
-_FILE_NAME: Final[str] = "jobs.json"
-_TMP_SUFFIX: Final[str] = ".tmp"
 
 type _JsonValue = (
     str | int | float | bool | list[_JsonValue] | dict[str, _JsonValue] | None
@@ -108,13 +104,18 @@ class JournalFailed:
 
 @dataclass(frozen=True)
 class JournalWritten:
+    """교체가 **일어났다**. `durable` 은 그 교체 자체가 디스크에 남은 것까지 확인했는가
+    (디렉터리 `fsync` 성공, vr M-1). `durable=False` 를 `JournalFailed` 로 뭉치면 호출자가
+    「쓰지 않았다」로 읽어 메모리를 되돌리고 **디스크=새 상태 · 메모리=옛 상태**로 갈라진다
+    — 거절했다고 답한 job 이 재기동 뒤 실행된다. 교체 뒤의 실패는 「받지 않았다」가 아니다."""
+
     byte_count: int
+    durable: bool
 
 
 class _RejectedError(Exception):
-    """판독·기록 실패를 조립 지점까지 나르는 **모듈 내부** 예외 — `read()`/
-    `decode_snapshot`/`encode_snapshot` 경계에서 결과 타입으로 바뀌어 밖으로는 예외가
-    새지 않는다."""
+    """판독·기록 실패를 나르는 **모듈 내부** 예외 — `read`/`decode_snapshot`/
+    `encode_snapshot` 경계에서 결과 타입으로 바뀌어 밖으로는 예외가 새지 않는다."""
 
     def __init__(self, reason: JournalFailureReason, detail: str) -> None:
         super().__init__(detail)
@@ -126,11 +127,10 @@ class _RejectedError(Exception):
 
 
 def _encode_timestamp(value: datetime | None) -> str | None:
-    """cr M-2 — tz 없는 시각은 **적지 않는다**. 모듈 docstring 이 「tz 가 없으면 받지
-    않는다」고 선언하지만 앞 판의 검사는 판독 쪽에만 있어서, 정상 쓰기 경로가 자기가 못
-    읽는 바이트를 남겼다(위협 모델 ⑤ 를 깼다). 되돌릴 수 있는 자리(쓰기 = 결과 타입)에서
-    막고 되돌릴 수 없는 자리(다음 기동의 `ConfigError` → 파일을 치우면 기록 전부 상실)로
-    미루지 않는다."""
+    """cr M-2 — tz 없는 시각은 **적지 않는다**. 앞 판의 검사는 판독 쪽에만 있어서 정상
+    쓰기 경로가 자기가 못 읽는 바이트를 남겼다(위협 모델 ⑤). 되돌릴 수 있는 자리(쓰기 =
+    결과 타입)에서 막고 되돌릴 수 없는 자리(다음 기동 거부 → 기록 전부 상실)로 미루지
+    않는다."""
     if value is None:
         return None
     if value.tzinfo is None:
@@ -198,8 +198,7 @@ def _encode_entry(entry: JournalEntry) -> _JsonValue:
 
 def encode_snapshot(snapshot: JournalSnapshot) -> bytes | JournalFailed:
     """canonical JSON 바이트 — 같은 스냅숏은 항상 같은 바이트. **판독할 수 없는 바이트를
-    만들지 않는다**(cr M-2): 불변식 위반은 예외가 아니라 결과 타입이다(`read` 쪽과 같은
-    모양)."""
+    만들지 않는다**(cr M-2): 불변식 위반은 결과 타입이다(`read` 쪽과 같은 모양)."""
     try:
         payload: _JsonValue = {
             "schema_version": JOURNAL_SCHEMA_VERSION,
@@ -329,9 +328,8 @@ def _decode_failure(fields: dict[str, _JsonValue], where: str) -> JobFailure | N
             JournalFailureReason.MALFORMED, f"{place}.code 가 닫힌 어휘 밖이다"
         ) from exc
     failure = JobFailure(code=code, detail_code=_text(nested, "detail_code", place))
-    # `retryable` 은 `code` 의 함수이므로(cr M-5, `state._RETRYABLE_BY_CODE`) 저널의 값은
-    # **파생값의 사본**이다. 형식은 그대로 두고(바이트 호환) 사본이 사상과 어긋나면
-    # 받지 않는다 — 다른 불변식들과 같은 규율(손으로 고친 파일을 조용히 받지 않는다).
+    # `retryable` 은 `code` 의 함수이므로(cr M-5) 저널의 값은 **파생값의 사본**이다. 형식은
+    # 그대로 두고(바이트 호환) 사본이 사상과 어긋나면 받지 않는다 — 다른 불변식과 같은 규율.
     if _flag(nested, "retryable", place) is not failure.retryable:
         raise _RejectedError(
             JournalFailureReason.INVARIANT_VIOLATED,
@@ -419,76 +417,3 @@ def decode_snapshot(payload: bytes) -> JournalSnapshot | JournalFailed:
         # `JobRecord`·`JobFailure`·`JobSubmission`·`JournalEntry` 생성자의 불변식 위반
         # (조합·시각·빈 문자열) — 판독에서도 같은 규칙이 선다.
         return JournalFailed(JournalFailureReason.INVARIANT_VIOLATED, str(exc))
-
-
-# ---- 파일 ----
-
-
-class JobJournal:
-    """저널 파일 하나를 소유한다. 경로는 **조립 근이 설정에서** 준다(설계 검토 (2b) —
-    이 클래스를 조립 근 밖에서 만들지 않는다, `tests/gates` 가 정적으로 센다)."""
-
-    def __init__(self, directory: Path) -> None:
-        self._directory = directory
-        self._path = directory / _FILE_NAME
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def read(self) -> JournalSnapshot | JournalAbsent | JournalFailed:
-        """「없음」·「깨짐」·스냅숏 셋으로 답한다. tmp 파일은 판독 대상이 아니다(원자
-        교체의 중간물이라 이전 크래시의 부분 쓰기가 남아 있을 수 있다)."""
-        try:
-            payload = self._path.read_bytes()
-        except FileNotFoundError:
-            return JournalAbsent()
-        except IsADirectoryError:
-            return JournalFailed(
-                JournalFailureReason.NOT_A_FILE, "저널 경로가 디렉터리다"
-            )
-        except OSError as exc:
-            return JournalFailed(
-                JournalFailureReason.READ_FAILED, f"저널을 읽지 못했다: {exc}"
-            )
-        return decode_snapshot(payload)
-
-    def write(self, snapshot: JournalSnapshot) -> JournalWritten | JournalFailed:
-        """원자 교체 — tmp 에 전부 쓰고 `fsync`, `os.replace` 로 갈아 끼운 뒤 디렉터리
-        까지 `fsync`(교체 자체가 디스크에 남도록). 어느 단계에서 끊겨도 기존 파일은
-        온전하다."""
-        payload = encode_snapshot(snapshot)
-        if isinstance(payload, JournalFailed):
-            return payload
-        temporary = self._path.with_name(self._path.name + _TMP_SUFFIX)
-        try:
-            self._directory.mkdir(parents=True, exist_ok=True)
-            _write_all(temporary, payload)
-            os.replace(temporary, self._path)
-            _fsync_directory(self._directory)
-        except OSError as exc:
-            with contextlib.suppress(OSError):
-                temporary.unlink()
-            return JournalFailed(
-                JournalFailureReason.WRITE_FAILED, f"저널을 쓰지 못했다: {exc}"
-            )
-        return JournalWritten(byte_count=len(payload))
-
-
-def _write_all(path: Path, payload: bytes) -> None:
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        offset = 0
-        while offset < len(payload):
-            offset += os.write(descriptor, payload[offset:])
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
-def _fsync_directory(directory: Path) -> None:
-    descriptor = os.open(directory, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)

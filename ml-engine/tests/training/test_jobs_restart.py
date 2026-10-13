@@ -9,19 +9,21 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from ml_engine.training.jobs import journal_file as journal_module
 from ml_engine.training.jobs.journal import (
-    JobJournal,
     JobSubmission,
     JournalFailed,
     JournalFailureReason,
     JournalSnapshot,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
 from ml_engine.training.jobs.state import (
     ArtifactReference,
@@ -353,3 +355,32 @@ def test_restart_rewrites_the_journal_with_the_disposed_state(tmp_path: Path) ->
     on_disk = _journal(tmp_path).read()
     assert isinstance(on_disk, JournalSnapshot)
     assert [entry.record.state for entry in on_disk.entries] == [JobState.FAILED]
+
+
+def test_directory_fsync_failure_keeps_disk_and_memory_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """vr M-1 — 교체 뒤 디렉터리 `fsync` 가 실패해도 디스크와 메모리가 갈라지지 않는다.
+
+    앞 판: 결과가 `JournalFailed(WRITE_FAILED)` 라 클라이언트는 `JOB_STORE_UNAVAILABLE`
+    (「받지 않았다」)을 받고 메모리 대기는 0 인데 **디스크에는 ACCEPTED 1** 이 남아,
+    거절했다고 답한 job 이 재기동 뒤 실행됐다(취소 경로도 같은 모양).
+
+    이제 교체가 끝난 뒤의 실패는 「교체됨, 내구성 미확인」이고 저장소는 메모리를 커밋하며
+    그 사실을 로그로 남긴다 — 디스크와 메모리가 같은 상태다."""
+    store = _first_boot(tmp_path)
+
+    def _boom(directory: Path) -> None:
+        raise OSError(5, "EIO 주입")
+
+    monkeypatch.setattr(journal_module, "_fsync_directory", _boom)
+    with caplog.at_level(logging.ERROR, logger="ml_engine.training.jobs.store"):
+        job_id = _submit(store, "key-1")
+    monkeypatch.undo()
+
+    assert [record.job_id for record in (store.get(job_id),) if record] == [job_id]
+    assert [job.record.job_id for job in store.pending_jobs()] == [job_id]
+    assert any("내구성" in record.getMessage() for record in caplog.records)
+
+    loaded = _restart(tmp_path)
+    assert [job.record.job_id for job in loaded.store.pending_jobs()] == [job_id]

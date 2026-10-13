@@ -29,7 +29,8 @@ from ml_engine.app.server import (
     _preload_outcomes,
 )
 from ml_engine.serving import ReadinessGate
-from ml_engine.training.jobs.journal import JobJournal, JobSubmission, JournalSnapshot
+from ml_engine.training.jobs.journal import JobSubmission, JournalSnapshot
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
 from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
 from ml_engine.training.jobs.store import JobStore, Started

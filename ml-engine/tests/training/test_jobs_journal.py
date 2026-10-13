@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from ml_engine.training.jobs import journal_file as journal_module
 from ml_engine.training.jobs.journal import (
     JOURNAL_SCHEMA_VERSION,
-    JobJournal,
     JobSubmission,
     JournalAbsent,
     JournalEntry,
@@ -25,6 +25,7 @@ from ml_engine.training.jobs.journal import (
     JournalSnapshot,
     JournalWritten,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.state import (
     ArtifactReference,
     EvaluationReportReference,
@@ -469,3 +470,37 @@ def test_naive_timestamp_bytes_would_not_be_readable(tmp_path: Path) -> None:
     result = journal.read()
     assert isinstance(result, JournalFailed)
     assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
+
+
+# ---- vr M-1 — 교체 **뒤**의 실패는 「쓰지 않았다」가 아니다 ----
+
+
+def test_directory_fsync_failure_is_written_but_not_durable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`os.replace` 가 끝난 뒤 디렉터리 `fsync` 가 실패하면 **교체는 이미 일어났다.**
+    그것을 `WRITE_FAILED` 로 답하면 호출자가 「쓰지 않았다」로 읽어 메모리를 되돌리고,
+    디스크=새 상태 · 메모리=옛 상태로 갈라진다(vr M-1 실측: 거절했다고 답한 job 이
+    재기동 뒤 실행된다). 「교체됨, 내구성 미확인」을 다른 값으로 돌려준다."""
+    journal = JobJournal(tmp_path / "journal")
+
+    def _boom(directory: Path) -> None:
+        raise OSError(5, "EIO 주입")
+
+    monkeypatch.setattr(journal_module, "_fsync_directory", _boom)
+    result = journal.write(_all_states_snapshot())
+    monkeypatch.undo()
+
+    assert isinstance(result, JournalWritten)
+    assert result.durable is False
+    # 교체가 일어났다는 실측 — 파일이 새 내용을 들고 있다.
+    loaded = journal.read()
+    assert isinstance(loaded, JournalSnapshot)
+    assert len(loaded.entries) == len(_all_states_snapshot().entries)
+
+
+def test_successful_write_is_durable(tmp_path: Path) -> None:
+    """통제군 — 정상 경로는 `durable=True` 다(위 test 가 상수를 재는 것이 아님)."""
+    result = JobJournal(tmp_path / "journal").write(JournalSnapshot(entries=()))
+    assert isinstance(result, JournalWritten)
+    assert result.durable is True

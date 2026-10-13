@@ -13,11 +13,11 @@ import pytest
 
 from ml_engine.contracts import error_pb2, training_pb2
 from ml_engine.training.jobs.journal import (
-    JobJournal,
     JobSubmission,
     JournalFailed,
     JournalFailureReason,
 )
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,

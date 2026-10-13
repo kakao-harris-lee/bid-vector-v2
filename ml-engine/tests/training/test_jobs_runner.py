@@ -13,7 +13,8 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from ml_engine.training.jobs.journal import JobJournal, JobSubmission
+from ml_engine.training.jobs.journal import JobSubmission
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
