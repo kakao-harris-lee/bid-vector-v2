@@ -241,7 +241,7 @@ class JobRunner:
     def _transition_failed(
         self, job_id: str, code: JobFailureCode, detail_code: DetailCode
     ) -> None:
-        failure = JobFailure(code=code, retryable=False, detail_code=detail_code.value)
+        failure = JobFailure(code=code, detail_code=detail_code.value)
         result = self._store.apply_transition(
             job_id, JobEvent.FAIL, at=datetime.now(UTC), failure=failure
         )

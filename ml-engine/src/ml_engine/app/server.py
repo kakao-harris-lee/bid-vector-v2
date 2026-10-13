@@ -256,7 +256,6 @@ def _resubmit(
             at=datetime.now(UTC),
             failure=JobFailure(
                 code=JobFailureCode.TRAINING_ERROR,
-                retryable=True,
                 detail_code=DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value,
             ),
         )

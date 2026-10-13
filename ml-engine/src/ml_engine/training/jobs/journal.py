@@ -310,11 +310,16 @@ def _decode_failure(fields: dict[str, _JsonValue], where: str) -> JobFailure | N
         raise _RejectedError(
             JournalFailureReason.MALFORMED, f"{place}.code 가 닫힌 어휘 밖이다"
         ) from exc
-    return JobFailure(
-        code=code,
-        retryable=_flag(nested, "retryable", place),
-        detail_code=_text(nested, "detail_code", place),
-    )
+    failure = JobFailure(code=code, detail_code=_text(nested, "detail_code", place))
+    # `retryable` 은 `code` 의 함수이므로(cr M-5, `state._RETRYABLE_BY_CODE`) 저널의 값은
+    # **파생값의 사본**이다. 형식은 그대로 두고(바이트 호환) 사본이 사상과 어긋나면
+    # 받지 않는다 — 다른 불변식들과 같은 규율(손으로 고친 파일을 조용히 받지 않는다).
+    if _flag(nested, "retryable", place) is not failure.retryable:
+        raise _RejectedError(
+            JournalFailureReason.INVARIANT_VIOLATED,
+            f"{place}.retryable 이 code 의 사상과 어긋난다",
+        )
+    return failure
 
 
 def _decode_submission(fields: dict[str, _JsonValue], where: str) -> JobSubmission:

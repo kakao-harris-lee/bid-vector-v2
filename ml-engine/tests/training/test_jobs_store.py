@@ -392,7 +392,6 @@ def test_pending_discard_transition_is_allowed_but_start_after_it_is_rejected(
         at=_NOW,
         failure=JobFailure(
             code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
-            retryable=True,
             detail_code=DetailCode.PENDING_QUEUE_OVERFLOW.value,
         ),
     )

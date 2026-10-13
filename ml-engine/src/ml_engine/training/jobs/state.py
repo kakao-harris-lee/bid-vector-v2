@@ -72,18 +72,49 @@ class JobFailureCode(StrEnum):
     WORKER_RESOURCE_EXHAUSTED = "WORKER_RESOURCE_EXHAUSTED"
 
 
+_RETRYABLE_BY_CODE: MappingProxyType[JobFailureCode, bool] = MappingProxyType(
+    {
+        JobFailureCode.DATASET_UNREADABLE: False,
+        JobFailureCode.DATASET_CHECKSUM_MISMATCH: False,
+        JobFailureCode.TRAINING_ERROR: False,
+        JobFailureCode.EVALUATION_ERROR: False,
+        JobFailureCode.CANCELLED_BY_REQUEST: False,
+        JobFailureCode.WORKER_RESOURCE_EXHAUSTED: True,
+    }
+)
+"""M6/6B-4 cr M-5 — `retryable` 의 **유일** 사상. `training.proto` 는 job failure 의
+`retryable` 을 「계약이 정하는 값 … application failure 의 `retryable` 과 대칭」이라 하고
+ADR 0010 은 application 층에서 코드별 사상(`MODEL_NOT_READY` 만 참)을 쓴다. 앞 판은 같은
+`TRAINING_ERROR` 가 자리에 따라 양쪽 값을 들었다(저장소 `_failed` 는 참, 실행기
+`_transition_failed` 는 거짓) — 그 대칭이 깨져 있었다.
+
+용량 고갈만 참이다: 대기 큐 상한 폐기는 나중에 다시 넣으면 들어갈 수 있다. 나머지는 같은
+입력을 다시 넣어도 같은 자리에서 실패하거나(dataset·checksum·학습·평가) 재시도의 대상이
+아니다(요청에 의한 취소). **재기동 처분**(`RUNNER_LOST_ON_RESTART` ·
+`TRAINING_SPEC_UNSUPPORTED_ON_RESTART`)은 `TRAINING_ERROR` 를 쓰므로 거짓이다 — 뒤쪽은
+같은 spec 재제출이 `UNSUPPORTED_TRAINING_SPEC`(비재시도)로 거부되므로 참이면 거짓말이었다
+(vr L-3). 앞쪽은 새 제출이면 돌 수 있으나 그것은 **새 job** 이고, 전용 코드 선택은
+`OPEN-6B4-STORE-UNAVAILABLE-CODE` 와 같은 축으로 남긴다(알려진 제한)."""
+
+
 @dataclass(frozen=True)
 class JobFailure:
     """2C `JobFailure` 값 타입 — `detail_code`는 닫힌 어휘(`DetailCode`, pipeline.py 소유)
-    문자열이다(자유 문자열 금지)."""
+    문자열이다(자유 문자열 금지).
+
+    `retryable` 은 **필드가 아니라 `code` 의 함수**다(cr M-5) — 호출자가 넣을 인자가 없어
+    자리마다 다른 값을 고르는 일이 구조적으로 불가능하다."""
 
     code: JobFailureCode
-    retryable: bool
     detail_code: str
 
     def __post_init__(self) -> None:
         if not self.detail_code:
             raise ValueError("detail_code 는 비어 있을 수 없습니다.")
+
+    @property
+    def retryable(self) -> bool:
+        return _RETRYABLE_BY_CODE[self.code]
 
 
 @dataclass(frozen=True)

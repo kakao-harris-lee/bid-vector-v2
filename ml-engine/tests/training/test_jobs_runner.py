@@ -342,7 +342,6 @@ def test_discarded_pending_job_is_not_run_when_the_worker_reaches_it(
         at=datetime.now(UTC),
         failure=JobFailure(
             code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
-            retryable=True,
             detail_code=DetailCode.PENDING_QUEUE_OVERFLOW.value,
         ),
     )

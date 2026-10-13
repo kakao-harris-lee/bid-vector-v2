@@ -78,7 +78,6 @@ def _entry(
             "finished_at": _LATER,
             "failure": JobFailure(
                 code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
-                retryable=True,
                 detail_code="PENDING_QUEUE_OVERFLOW",
             ),
         }
@@ -286,6 +285,25 @@ def test_unwritable_directory_is_write_failed(tmp_path: Path) -> None:
 
 
 # ---- 판독은 불변식을 다시 센다(저널을 손으로 고친 주체는 비방어이지만 조용히 받지 않는다) ----
+
+
+def test_retryable_inconsistent_with_the_code_is_failed(tmp_path: Path) -> None:
+    """cr M-5 — 저널의 `retryable` 은 `code` 의 **파생값 사본**이다. 손으로 뒤집은 사본을
+    조용히 받으면 판독한 기록이 사상과 다른 값을 들고 다닌다."""
+    journal = JobJournal(tmp_path / "journal")
+    assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
+    decoded = json.loads(journal.path.read_bytes())
+    flipped = 0
+    for job in decoded["jobs"]:
+        if job["failure"] is not None:
+            job["failure"]["retryable"] = not job["failure"]["retryable"]
+            flipped += 1
+    assert flipped == 1  # 통제군 — 실제로 뒤집었다
+    _write_raw(journal, json.dumps(decoded))
+    result = journal.read()
+    assert isinstance(result, JournalFailed)
+    assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
+    assert "retryable" in result.detail
 
 
 def test_record_combination_violation_is_failed(tmp_path: Path) -> None:

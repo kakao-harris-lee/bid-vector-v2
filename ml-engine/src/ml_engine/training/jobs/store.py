@@ -143,7 +143,7 @@ def _failed(
         record,
         JobEvent.FAIL,
         at=_finish_at(record, at),
-        failure=JobFailure(code=code, retryable=True, detail_code=detail_code.value),
+        failure=JobFailure(code=code, detail_code=detail_code.value),
     )
     if not isinstance(result, JobRecord):  # pragma: no cover — 호출자가 출발 상태를
         # 고르므로(ACCEPTED·RUNNING, 둘 다 표에 FAIL 이 있고 사유 제약도 만족) 도달 불가.

@@ -199,6 +199,9 @@ def test_pending_job_with_unknown_spec_version_is_disposed(tmp_path: Path) -> No
         record.failure.detail_code
         == DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value
     )
+    # vr L-3 — 같은 spec 재제출은 `UNSUPPORTED_TRAINING_SPEC`(비재시도)로 거부된다.
+    # 참을 실으면 거짓말이었다(cr M-5 의 코드별 사상이 거짓으로 고정한다).
+    assert record.failure.retryable is False
 
 
 def test_not_ready_server_leaves_pending_jobs_pending(tmp_path: Path) -> None:

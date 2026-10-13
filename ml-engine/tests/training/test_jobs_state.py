@@ -63,9 +63,7 @@ def _evaluation() -> EvaluationReportReference:
 
 
 def _failure() -> JobFailure:
-    return JobFailure(
-        code=JobFailureCode.TRAINING_ERROR, retryable=False, detail_code="X"
-    )
+    return JobFailure(code=JobFailureCode.TRAINING_ERROR, detail_code="X")
 
 
 # ---- 전이표(scope.md ④) ----
@@ -128,7 +126,6 @@ def test_pending_discard_sets_worker_resource_exhausted_without_started_at() -> 
         at=_LATER,
         failure=JobFailure(
             code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
-            retryable=True,
             detail_code="PENDING_QUEUE_OVERFLOW",
         ),
     )
@@ -151,7 +148,6 @@ def test_worker_resource_exhausted_from_running_is_rejected_with_reason() -> Non
         at=_LATER,
         failure=JobFailure(
             code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
-            retryable=True,
             detail_code="PENDING_QUEUE_OVERFLOW",
         ),
     )
@@ -277,4 +273,39 @@ def test_empty_dataset_id_is_rejected() -> None:
 
 def test_detail_code_empty_is_rejected() -> None:
     with pytest.raises(ValueError, match="detail_code"):
-        JobFailure(code=JobFailureCode.TRAINING_ERROR, retryable=False, detail_code="")
+        JobFailure(code=JobFailureCode.TRAINING_ERROR, detail_code="")
+
+
+# ---- cr M-5 — `retryable` 은 코드의 함수다(자리마다 고르는 값이 아니다) ----
+
+
+def test_retryable_is_a_function_of_the_failure_code() -> None:
+    """앞 판은 같은 `TRAINING_ERROR` 가 자리에 따라 양쪽 값을 들었다(저장소의 재기동
+    처분 `True` · 실행기의 파이프라인 실패 `False`). `training.proto` 는 job failure 의
+    `retryable` 을 「계약이 정하는 값 … application failure 의 `retryable` 과 대칭」이라
+    하고 ADR 0010 은 application 층에서 **코드별 사상**(`MODEL_NOT_READY` 만 참)을 쓴다 —
+    그 대칭대로 여기서도 코드 하나가 값 하나를 든다.
+
+    사상: 용량 고갈(`WORKER_RESOURCE_EXHAUSTED`)만 참이다. 나머지는 같은 입력을 다시
+    넣어도 같은 자리에서 실패하거나(dataset·checksum·학습·평가) 재시도의 대상이
+    아니다(요청에 의한 취소)."""
+    expected = {
+        JobFailureCode.DATASET_UNREADABLE: False,
+        JobFailureCode.DATASET_CHECKSUM_MISMATCH: False,
+        JobFailureCode.TRAINING_ERROR: False,
+        JobFailureCode.EVALUATION_ERROR: False,
+        JobFailureCode.CANCELLED_BY_REQUEST: False,
+        JobFailureCode.WORKER_RESOURCE_EXHAUSTED: True,
+    }
+    assert set(expected) == set(JobFailureCode)  # 전수 — 코드가 늘면 여기가 붉어진다
+    for code, retryable in expected.items():
+        assert JobFailure(code=code, detail_code="X").retryable is retryable
+
+
+def test_retryable_cannot_be_chosen_by_the_caller() -> None:
+    """사상이 **한 자리**라는 것의 구조적 근거 — 값을 넣을 인자가 없다(자리를 열거한
+    목록이 아니라 생성자 서명이 막는다)."""
+    with pytest.raises(TypeError):
+        JobFailure(  # type: ignore[call-arg]
+            code=JobFailureCode.TRAINING_ERROR, retryable=True, detail_code="X"
+        )

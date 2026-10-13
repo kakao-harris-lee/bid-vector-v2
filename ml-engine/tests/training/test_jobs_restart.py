@@ -215,6 +215,9 @@ def test_running_orphan_is_failed_with_runner_lost_detail(tmp_path: Path) -> Non
     assert record.failure is not None
     assert record.failure.code is JobFailureCode.TRAINING_ERROR
     assert record.failure.detail_code == DetailCode.RUNNER_LOST_ON_RESTART.value
+    # cr M-5 — `retryable` 은 코드의 함수다(`TRAINING_ERROR` 는 거짓). 앞 판은 저장소의
+    # 처분 경로가 무조건 참을 실어 같은 코드가 자리마다 다른 값을 들었다.
+    assert record.failure.retryable is False
     assert loaded.disposition.running_orphans_failed == 1
     assert loaded.store.pending_jobs() == ()  # 재적재 대상이 아니다
 
@@ -256,6 +259,7 @@ def test_accepted_orphans_over_the_limit_are_discarded_oldest_first(
         assert record.failure is not None
         assert record.failure.code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
         assert record.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+        assert record.failure.retryable is True  # 용량 고갈만 참(cr M-5)
 
 
 def test_restart_converges_second_restart_disposes_nothing(tmp_path: Path) -> None:
