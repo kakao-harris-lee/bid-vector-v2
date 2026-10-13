@@ -134,6 +134,14 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
   object/file storage 참조이고(`v2-지침서.md` §3.2 `adapters/` — training 전용 storage adapter), 그 참조를 누가 만드는가는
   M5 5C 소유.
 
+> **D-8 개정 (2026-10-13, M6/6B-4 D-6B4-1 — 운영자 결정 2026-09-26 ③ · 2026-10-13 B-1).** 전이표에 간선 하나를 더한다:
+> **`ACCEPTED → FAILED(WORKER_RESOURCE_EXHAUSTED)`** — 대기 큐가 상한(`serving-v1.yaml` 정책 값, 잠정 4)을 넘으면 가장
+> 오래된 대기 job(`accepted_at`, 동률 `job_id`)을 이 간선으로 끝낸다(최신성 우선). 함께 **ACCEPTED = 대기(워커 미집기) ·
+> RUNNING = 실행 중**으로 뜻을 고정한다(종전 구현은 executor 제출 전에 RUNNING 을 커밋해 RUNNING 이 실행을 뜻하지 않았다).
+> 전이표의 네 자리(이 절 · `training.proto` `JobState` 주석 · Python `_TRANSITIONS` · Kotlin `TrainingContractRules`)는 같은
+> 데이터이고 교차 등식 test 가 잠근다. 재기동은 **재개가 아니라 처분**이다 — RUNNING 고아는 `RUNNING → FAILED`, ACCEPTED
+> 고아는 대기 큐로 재적재(실행된 적이 없다, 상한 적용).
+
 ---
 
 ## 3. 대안 (요지 — 채택 근거는 §2 각 항)

@@ -19,7 +19,10 @@ option java_multiple_files = true;
 // 달리 미지 상태를 접지 않는다(fail-closed, common.proto 관례). **전이표(scope.md ④,
 // ADR 0010 D-8)**:
 //   ACCEPTED → RUNNING → SUCCEEDED | FAILED
+//   ACCEPTED → FAILED   (대기 큐 상한 초과로 가장 오래된 대기 job 을 폐기 —
+//                        `WORKER_RESOURCE_EXHAUSTED`, M6/6B-4 D-6B4-1 · ADR 0010 D-8 개정)
 //   ACCEPTED | RUNNING → CANCELLED
+//   ACCEPTED 는 **대기**(워커가 아직 집지 않음), RUNNING 은 워커가 실제로 실행 중이다.
 //   종료 상태(SUCCEEDED·FAILED·CANCELLED)에서 CancelTrainingJob 은 멱등 no-op(현재 상태
 //   반환, 오류 아님) — 새 전이가 아니다.
 // 표에 없는 쌍(예: `RUNNING → ACCEPTED`, `SUCCEEDED → RUNNING`)은 provider 가 만들지 않고
