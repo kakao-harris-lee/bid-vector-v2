@@ -24,7 +24,7 @@
   괄호·백틱 밖에 `→` 가 있으면 **RED** 다(조용히 건너뛰지 않는다).
 - **Kotlin** — 허용표 블록의 `JOB_STATE_*` 언급 수가 파싱된 쌍 수의 정확히 두 배여야 한다
   (`Pair(a, b)` 처럼 다른 모양으로 더하면 언급이 남아 RED). 술어(`isAllowedTransition`)가
-  그 데이터와 어긋나는 변이는 **Kotlin 쪽 5×5 전 쌍 진리표 test** 가 잡고, 여기서는 그
+  그 데이터와 어긋나는 변이는 **Kotlin 쪽 5x5 전 쌍 진리표 test** 가 잡고, 여기서는 그
   술어의 본문이 데이터 조회 하나임을 구조로 고정한다.
 """
 
@@ -51,7 +51,7 @@ _DISCARD_EDGE = ("ACCEPTED", "FAILED")
 _ARROW = "→"
 _COUNTEREXAMPLE_MARKER = "표에 없는 쌍"
 # Kotlin 술어의 본문 — 데이터 조회 **하나**여야 한다(절을 더하는 변이는 여기서 붉어지고,
-# 데이터와 어긋나는 거동은 Kotlin 쪽 5×5 진리표 test 가 잡는다).
+# 데이터와 어긋나는 거동은 Kotlin 쪽 5x5 진리표 test 가 잡는다).
 _KOTLIN_PREDICATE_BODY = "(from to target) in allowedJobStateTransitions"
 
 type _Edges = frozenset[tuple[str, str]]
@@ -295,7 +295,7 @@ def test_kotlin_allow_table_has_no_unaccounted_state_mentions() -> None:
 
 def test_kotlin_predicate_is_a_single_table_lookup() -> None:
     """술어에 절을 더하는 변이(P1b)를 구조로 막는다 — 본문이 데이터 조회 하나다.
-    그 데이터와 거동이 어긋나는지는 Kotlin 쪽 5×5 진리표 test 가 잰다."""
+    그 데이터와 거동이 어긋나는지는 Kotlin 쪽 5x5 진리표 test 가 잰다."""
     assert (
         kotlin_predicate_body(_KOTLIN_RULES_PATH.read_text(encoding="utf-8"))
         == _KOTLIN_PREDICATE_BODY
