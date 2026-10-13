@@ -400,3 +400,72 @@ def test_empty_submission_field_is_failed(tmp_path: Path) -> None:
     result = journal.read()
     assert isinstance(result, JournalFailed)
     assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
+
+
+# ---- cr M-2 — 자기가 못 읽는 바이트를 쓰지 않는다 ----
+
+
+def _naive_snapshot() -> JournalSnapshot:
+    """`accepted_at` 에 시간대가 없는 스냅숏 — 모듈 docstring 이 「tz 가 없으면 받지
+    않는다」고 선언하지만 앞 판의 검사는 **판독 쪽에만** 있었다."""
+    return JournalSnapshot(
+        entries=(
+            JournalEntry(
+                idempotency_key="key-naive",
+                record=JobRecord(
+                    job_id="job-naive",
+                    state=JobState.ACCEPTED,
+                    dataset_id="ds-1",
+                    accepted_at=datetime(2026, 1, 1),  # 의도된 naive
+                ),
+                submission=_submission(),
+            ),
+        )
+    )
+
+
+def test_timezone_naive_timestamp_is_refused_at_write(tmp_path: Path) -> None:
+    """되돌릴 수 있는 자리에서 막는다 — 쓰기는 결과 타입(`JournalFailed`)이고 요청은
+    거부되지만, 쓰고 나면 다음 기동의 `ConfigError` + 「파일을 치우고 다시 기동」 =
+    job 기록 전부 상실이다(위협 모델 ⑤ 를 정상 쓰기 경로가 깨던 자리)."""
+    journal = JobJournal(tmp_path / "journal")
+    result = journal.write(_naive_snapshot())
+    assert isinstance(result, JournalFailed)
+    assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
+    assert "시간대" in result.detail
+    # 파일 자체가 생기지 않는다 — tmp 교체 전에 거부한다.
+    assert not journal.path.exists()
+
+
+def test_naive_timestamp_bytes_would_not_be_readable(tmp_path: Path) -> None:
+    """음성 대조 — 앞 판이 쓰던 바이트(`value.isoformat()` 그대로)는 **판독 불가**다.
+    쓰기 거부가 지키는 것이 무엇인지 보인다."""
+    journal = JobJournal(tmp_path / "journal")
+    legacy_bytes = json.dumps(
+        {
+            "schema_version": JOURNAL_SCHEMA_VERSION,
+            "jobs": [
+                {
+                    "job_id": "job-naive",
+                    "state": "ACCEPTED",
+                    "dataset_id": "ds-1",
+                    "accepted_at": "2026-01-01T00:00:00",
+                    "started_at": None,
+                    "finished_at": None,
+                    "artifact": None,
+                    "evaluation": None,
+                    "failure": None,
+                    "idempotency_key": "key-naive",
+                    "submission": {
+                        "dataset_uri": "file:///tmp/ds",
+                        "manifest_checksum": "a" * 64,
+                        "training_spec_version": "v1",
+                    },
+                }
+            ],
+        }
+    )
+    _write_raw(journal, legacy_bytes)
+    result = journal.read()
+    assert isinstance(result, JournalFailed)
+    assert result.reason is JournalFailureReason.INVARIANT_VIOLATED

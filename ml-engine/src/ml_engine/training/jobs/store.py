@@ -200,6 +200,15 @@ def _require_positive(pending_queue_max: int) -> None:
         )
 
 
+def _require_aware(at: datetime, name: str) -> None:
+    """cr M-2 곁가지 — naive 시각을 **입구에서** 거부한다. 앞 판은 `_finish_at` 의
+    `max(at, record.accepted_at, …)` 와 `_pending_sorted` 의 정렬이 naive/aware 혼합에서
+    `TypeError` 를 던져, 결과 타입이 아니라 예외가 조립 근을 벗어났다. 시계는 호출자가
+    쥔 값이므로 `pending_queue_max` 와 같은 갈래(프로그래밍 오류)다."""
+    if at.tzinfo is None:
+        raise ValueError(f"{name} 에 시간대가 있어야 합니다: {at.isoformat()}")
+
+
 class JobStore:
     """잠금 하나 아래의 job 기록 + **필수** 저널. 저널 없는 갈래를 두지 않는다 —
     `journal=None` 을 받으면 「조용히 비영속으로 조립」 경로가 생긴다(위협 모델 ⑤).
@@ -245,6 +254,7 @@ class JobStore:
     ) -> Started | Reused | Conflict | JournalFailed:
         """판정(멱등)·적재·폐기·저널 쓰기를 **한 잠금** 아래 수행한다(설계 검토 우회
         (1)). 재사용·충돌은 적재가 아니라 저널을 쓰지 않는다."""
+        _require_aware(accepted_at, "accepted_at")
         with self._lock:
             existing = self._existing(idempotency_key)
             if existing is not None:
@@ -302,6 +312,7 @@ class JobStore:
         """읽기·`transition()`·저널 쓰기·커밋을 **한 잠금** 아래 원자적으로 수행한다
         (H-2 · 우회 (9)). `job_id`가 없으면 `None`. 종단 상태의 멱등 no-op 은 바뀌는
         것이 없어 저널을 쓰지 않는다 — 쓰기 실패가 그 호출을 깨뜨리지 않는다."""
+        _require_aware(at, "at")
         with self._lock:
             entry = self._entry_by_id.get(job_id)
             if entry is None:
@@ -333,6 +344,7 @@ def load_job_store(
     저널이 없으면(첫 기동) 빈 저장소로 시작하되 **저널을 한 번 쓴다** — 그 자리가 쓰기
     가능한지를 기동 시점에 확인한다(볼륨·소유자 잘못을 첫 job 제출까지 미루지 않는다)."""
     _require_positive(pending_queue_max)
+    _require_aware(at, "at")
     loaded = journal.read()
     if isinstance(loaded, JournalFailed):
         return loaded

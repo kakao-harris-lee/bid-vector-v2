@@ -112,8 +112,9 @@ class JournalWritten:
 
 
 class _RejectedError(Exception):
-    """판독 실패를 조립 지점까지 나르는 **모듈 내부** 예외 — `read()`/`decode_snapshot`
-    경계에서 결과 타입으로 바뀌어 밖으로는 예외가 새지 않는다."""
+    """판독·기록 실패를 조립 지점까지 나르는 **모듈 내부** 예외 — `read()`/
+    `decode_snapshot`/`encode_snapshot` 경계에서 결과 타입으로 바뀌어 밖으로는 예외가
+    새지 않는다."""
 
     def __init__(self, reason: JournalFailureReason, detail: str) -> None:
         super().__init__(detail)
@@ -125,7 +126,19 @@ class _RejectedError(Exception):
 
 
 def _encode_timestamp(value: datetime | None) -> str | None:
-    return None if value is None else value.isoformat()
+    """cr M-2 — tz 없는 시각은 **적지 않는다**. 모듈 docstring 이 「tz 가 없으면 받지
+    않는다」고 선언하지만 앞 판의 검사는 판독 쪽에만 있어서, 정상 쓰기 경로가 자기가 못
+    읽는 바이트를 남겼다(위협 모델 ⑤ 를 깼다). 되돌릴 수 있는 자리(쓰기 = 결과 타입)에서
+    막고 되돌릴 수 없는 자리(다음 기동의 `ConfigError` → 파일을 치우면 기록 전부 상실)로
+    미루지 않는다."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        raise _RejectedError(
+            JournalFailureReason.INVARIANT_VIOLATED,
+            f"시각에 시간대가 없다 — 저널에 적지 않는다: {value.isoformat()}",
+        )
+    return value.isoformat()
 
 
 def _encode_artifact(artifact: ArtifactReference | None) -> _JsonValue:
@@ -183,12 +196,17 @@ def _encode_entry(entry: JournalEntry) -> _JsonValue:
     }
 
 
-def encode_snapshot(snapshot: JournalSnapshot) -> bytes:
-    """canonical JSON 바이트 — 같은 스냅숏은 항상 같은 바이트."""
-    payload: _JsonValue = {
-        "schema_version": JOURNAL_SCHEMA_VERSION,
-        "jobs": [_encode_entry(entry) for entry in snapshot.entries],
-    }
+def encode_snapshot(snapshot: JournalSnapshot) -> bytes | JournalFailed:
+    """canonical JSON 바이트 — 같은 스냅숏은 항상 같은 바이트. **판독할 수 없는 바이트를
+    만들지 않는다**(cr M-2): 불변식 위반은 예외가 아니라 결과 타입이다(`read` 쪽과 같은
+    모양)."""
+    try:
+        payload: _JsonValue = {
+            "schema_version": JOURNAL_SCHEMA_VERSION,
+            "jobs": [_encode_entry(entry) for entry in snapshot.entries],
+        }
+    except _RejectedError as rejected:
+        return JournalFailed(rejected.reason, rejected.detail)
     return json.dumps(
         payload, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")
@@ -440,6 +458,8 @@ class JobJournal:
         까지 `fsync`(교체 자체가 디스크에 남도록). 어느 단계에서 끊겨도 기존 파일은
         온전하다."""
         payload = encode_snapshot(snapshot)
+        if isinstance(payload, JournalFailed):
+            return payload
         temporary = self._path.with_name(self._path.name + _TMP_SUFFIX)
         try:
             self._directory.mkdir(parents=True, exist_ok=True)

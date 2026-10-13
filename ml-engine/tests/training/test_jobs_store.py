@@ -30,7 +30,13 @@ from ml_engine.training.jobs.state import (
     JobState,
     TransitionRejected,
 )
-from ml_engine.training.jobs.store import Conflict, JobStore, Reused, Started
+from ml_engine.training.jobs.store import (
+    Conflict,
+    JobStore,
+    Reused,
+    Started,
+    load_job_store,
+)
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _SHIPPED_POLICY_PATH = (
@@ -426,3 +432,27 @@ def test_pending_jobs_are_ordered_by_accepted_at_then_job_id(tmp_path: Path) -> 
         third.record.job_id,
     ]
     assert pending[0].submission == _submission()
+
+
+# ---- cr M-2 곁가지 — naive 시각은 경계에서 거부한다(깊은 곳의 TypeError 금지) ----
+
+
+def test_naive_clock_is_rejected_at_the_store_entry_points(tmp_path: Path) -> None:
+    """앞 판은 `_finish_at` 의 `max(at, record.accepted_at, …)` 가 naive/aware 혼합에서
+    `TypeError` 를 던졌다 — 결과 타입이 아니라 **예외**가 조립 근을 벗어났다. 시계는
+    호출자가 쥔 값이므로 `pending_queue_max` 와 같은 갈래(프로그래밍 오류)로 입구에서
+    거부한다."""
+    naive = datetime(2026, 1, 1)  # 의도된 naive
+    store = _store(tmp_path)
+    job_id = _started(store, "key-1").record.job_id
+
+    with pytest.raises(ValueError, match="시간대"):
+        store.start_or_reuse(
+            "key-2", "ds-1", accepted_at=naive, submission=_submission()
+        )
+    with pytest.raises(ValueError, match="시간대"):
+        store.apply_transition(job_id, JobEvent.START, at=naive)
+    with pytest.raises(ValueError, match="시간대"):
+        load_job_store(
+            journal=JobJournal(tmp_path / "journal"), pending_queue_max=4, at=naive
+        )
