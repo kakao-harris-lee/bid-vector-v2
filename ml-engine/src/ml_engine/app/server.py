@@ -55,6 +55,7 @@ from ml_engine.training.jobs.state import (
     JobEvent,
     JobFailure,
     JobFailureCode,
+    JobRecord,
 )
 from ml_engine.training.jobs.store import JobStore, PendingJob, load_job_store
 from ml_engine.training.policy import PolicyRejected as TrainingPolicyRejected
@@ -246,12 +247,10 @@ def _resubmit(
     (설계 검토 우회 (7))."""
     spec = resolve_training_spec(pending.submission.training_spec_version)
     if isinstance(spec, UnsupportedTrainingSpec):
-        _logger.error(
-            "job_id=%s 재적재 불가 — training_spec_version=%s 를 모른다. 처분한다.",
-            pending.record.job_id,
-            pending.submission.training_spec_version,
-        )
-        store.apply_transition(
+        # cr L-1 · vr L-4 — 처분 전이의 **반환을 본다**. 저널 쓰기가 실패하면 job 은
+        # `ACCEPTED` 로 남으므로 「처분했다」는 로그가 거짓이 된다(손실은 없다 — 다음
+        # 기동이 다시 처분한다 — 그러나 로그가 사실과 어긋나면 incident 때 길을 잃는다).
+        disposed = store.apply_transition(
             pending.record.job_id,
             JobEvent.FAIL,
             at=datetime.now(UTC),
@@ -260,6 +259,20 @@ def _resubmit(
                 detail_code=DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value,
             ),
         )
+        if isinstance(disposed, JobRecord):
+            _logger.error(
+                "job_id=%s 재적재 불가 — training_spec_version=%s 를 모른다. 처분했다.",
+                pending.record.job_id,
+                pending.submission.training_spec_version,
+            )
+        else:
+            _logger.error(
+                "job_id=%s 재적재 불가 — training_spec_version=%s 를 모르는데 처분을 "
+                "영속시키지 못했다(%s). 대기로 남는다 — 다음 기동이 다시 처분한다.",
+                pending.record.job_id,
+                pending.submission.training_spec_version,
+                disposed,
+            )
         return False
     runner.submit(
         pending.record.job_id,

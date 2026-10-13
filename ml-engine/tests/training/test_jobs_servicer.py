@@ -369,6 +369,26 @@ def test_unsupported_dataset_uri_scheme_is_invalid_request(tmp_path: Path) -> No
     runner.shutdown(wait=True)
 
 
+def test_empty_dataset_id_is_invalid_request_not_an_escaping_exception(
+    tmp_path: Path,
+) -> None:
+    """cr L-5(선재) — 빈 `dataset.dataset_id` 는 `_validate_start` 를 지나 `JobRecord.
+    __post_init__` 의 `ValueError` 로 **핸들러를 벗어났다**(gRPC `UNKNOWN`). ADR 0010 D-3
+    의 application failure 층 규율대로 `INVALID_REQUEST` 로 답한다."""
+    servicer, runner, store = _build_servicer(tmp_path)
+    request = _valid_request()
+    request.dataset.dataset_id = ""
+
+    response = servicer.StartTraining(request, context=None)
+
+    assert response.WhichOneof("result") == "failure"
+    assert response.failure.code == error_pb2.FAILURE_CODE_INVALID_REQUEST
+    assert response.failure.detail_code == "DATASET_ID_EMPTY"
+    assert response.failure.retryable is False
+    assert store.pending_jobs() == ()
+    runner.shutdown(wait=True)
+
+
 def test_malformed_manifest_checksum_is_invalid_request(tmp_path: Path) -> None:
     servicer, runner, _store_unused = _build_servicer(tmp_path)
     request = _valid_request()

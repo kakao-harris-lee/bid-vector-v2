@@ -58,6 +58,11 @@ class _ValidationDetailCode(StrEnum):
     MANIFEST_CHECKSUM_INVALID = "MANIFEST_CHECKSUM_INVALID"
     REQUESTED_RELEASE_ID_UNSUPPORTED = "REQUESTED_RELEASE_ID_UNSUPPORTED"
     JOB_ID_EMPTY = "JOB_ID_EMPTY"
+    # cr L-5(선재 결함) — 빈 `dataset_id` 는 `JobRecord.__post_init__` 의 `ValueError` 로
+    # 핸들러를 벗어났다(gRPC `UNKNOWN`). application failure 층에서 거부한다(ADR 0010 D-3).
+    # `JOB_ID_EMPTY` 와 같이 `serving.status.ValidationDetailCode` 에는 없는 값이다
+    # (training 전용 필드의 검증이라 그 어휘가 들 자리가 아니다).
+    DATASET_ID_EMPTY = "DATASET_ID_EMPTY"
 
 
 def _envelope_violation(
@@ -193,6 +198,8 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
             return _ValidationDetailCode.DATASET_URI_SCHEME_UNSUPPORTED
         if not _SHA256_HEX_PATTERN.match(request.dataset.manifest_checksum):
             return _ValidationDetailCode.MANIFEST_CHECKSUM_INVALID
+        if not request.dataset.dataset_id.strip():
+            return _ValidationDetailCode.DATASET_ID_EMPTY
         return None
 
     def _accept_or_reuse(

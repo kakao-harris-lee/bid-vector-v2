@@ -13,6 +13,7 @@ import 은 전부 top-level 이어야 한다(`tests/training/conftest.py` 의
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import UTC, datetime
@@ -34,9 +35,15 @@ from ml_engine.app.server import (
 from ml_engine.contracts import training_pb2
 from ml_engine.serving import ReadinessGate
 from ml_engine.training.jobs import journal_file
-from ml_engine.training.jobs.journal import JobSubmission, JournalSnapshot
+from ml_engine.training.jobs.journal import (
+    JobSubmission,
+    JournalFailed,
+    JournalFailureReason,
+    JournalSnapshot,
+)
 from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
+from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
 from ml_engine.training.jobs.store import JobStore, Started
 from ml_engine.training.spec import TRAINING_SPECS
@@ -356,3 +363,40 @@ def test_shipped_pending_queue_max_reaches_the_queue_through_the_assembly_root(
         *waiting[1:],
         overflow,
     ]
+
+
+# ---- cr L-1 · vr L-4 — 처분의 반환을 버리지 않는다 ----
+
+
+def test_unpersisted_disposal_is_logged_as_unpersisted(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """앞 판의 `_resubmit` 은 처분 전이의 반환을 **버렸다** — 저널 쓰기가 실패하면 job 은
+    `ACCEPTED` 로 남는데 로그는 「처분한다」만 남겼다(다음 기동이 다시 처분하므로 손실은
+    없지만 로그가 사실과 어긋난다). 반환을 보고 로그를 가른다."""
+    config = _config(tmp_path)
+    store = JobStore(journal=_job_journal(config), pending_queue_max=4)
+    outcome = store.start_or_reuse(
+        "idem-unpersisted",
+        "ds-unpersisted",
+        accepted_at=_NOW,
+        submission=_submission("award-rate-gbm-training-v0-gone"),
+    )
+    assert isinstance(outcome, Started)
+    pending = store.pending_jobs()[0]
+
+    def _always_failing(snapshot: object) -> JournalFailed:
+        return JournalFailed(JournalFailureReason.WRITE_FAILED, "주입된 쓰기 실패")
+
+    store._journal.write = _always_failing  # type: ignore[assignment,method-assign]
+
+    with caplog.at_level(logging.ERROR, logger="ml_engine.app.server"):
+        resumed = server._resubmit(
+            store, JobRunner(store, max_workers=1), pending, lambda spec: None
+        )
+
+    assert resumed is False
+    record = store.get(pending.record.job_id)
+    assert record is not None
+    assert record.state is JobState.ACCEPTED  # 처분이 영속되지 않았다
+    assert any("영속" in entry.getMessage() for entry in caplog.records)
