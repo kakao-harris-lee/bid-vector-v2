@@ -280,12 +280,12 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "VALUES (1, '{}', false, '{}', '{}', '$at') ON CONFLICT (id) DO NOTHING",
             )
         },
-        TableSeed("provenance_authority") { tag, _ ->
-            listOf(
-                "INSERT INTO provenance_authority (provenance, authoritative) " +
-                    "VALUES ('RET_FIXTURE_$tag', false) ON CONFLICT (provenance) DO NOTHING",
-            )
-        },
+        // **심지 않는다.** 이 표는 `PersistenceTestSupport` 의 test 간 TRUNCATE 목록 밖이다
+        // (V2 migration 이 seed 하고 그 행이 운영 데이터다) — fixture 가 한 행을 더하면 그 행이
+        // **다른 test 로 새어 나간다**(`ProvenanceAuthoritySeedTest` 가 seed 를 열거와 대조하다가
+        // 미지 provenance 로 터진다, 실측). 제외 표의 「행 수 불변」 단언은 V2 seed 행이 있어
+        // 심지 않아도 공허하지 않다.
+        TableSeed("provenance_authority") { _, _ -> emptyList() },
         // Flyway 이력은 migrate 가 이미 채웠다 — 심지 않고 **행 수 불변**만 잰다(건드리면
         // `validate()` 가 깨지므로 fixture 가 손대지 않는 것 자체가 그 제외의 등재다).
         TableSeed("flyway_schema_history") { _, _ -> emptyList() },
