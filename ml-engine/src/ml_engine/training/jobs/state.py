@@ -45,6 +45,11 @@ _TRANSITIONS: MappingProxyType[tuple[JobState, JobEvent], JobState] = MappingPro
         (JobState.ACCEPTED, JobEvent.START): JobState.RUNNING,
         (JobState.RUNNING, JobEvent.SUCCEED): JobState.SUCCEEDED,
         (JobState.RUNNING, JobEvent.FAIL): JobState.FAILED,
+        # M6/6B-4 D-6B4-1(ADR 0010 D-8 개정) — 대기 job 을 실행 없이 끝내는 간선.
+        # 쓰이는 자리 둘: 대기 큐 상한 초과 폐기(`WORKER_RESOURCE_EXHAUSTED`)와 재기동
+        # 시 실행할 수 없는 대기 고아의 처분. 「실행했다」를 뜻하지 않으므로 `started_at`
+        # 은 미설정으로 남는다(`_apply_fail`이 record 의 값을 그대로 옮긴다).
+        (JobState.ACCEPTED, JobEvent.FAIL): JobState.FAILED,
         (JobState.ACCEPTED, JobEvent.CANCEL): JobState.CANCELLED,
         (JobState.RUNNING, JobEvent.CANCEL): JobState.CANCELLED,
         # 종료 상태 Cancel 은 멱등 no-op(현재 상태 그대로) — 새 전이가 아니라 표에
@@ -179,12 +184,22 @@ class JobRecord:
                 raise ValueError("finished_at 은 started_at 보다 앞일 수 없습니다.")
 
 
+class TransitionRejectionReason(StrEnum):
+    """거부 사유 닫힌 어휘 — 「표에 없다」와 「사유가 그 출발 상태에서 쓸 수 없다」를
+    구분한다(M6/6B-4 설계 검토 우회 (3)). 둘을 한 값으로 뭉치면 호출자의 로그가
+    (RUNNING, FAIL) 처럼 **표에 있는** 쌍을 「표에 없다」고 말한다."""
+
+    NOT_IN_TABLE = "NOT_IN_TABLE"
+    RESOURCE_EXHAUSTED_NOT_PENDING = "RESOURCE_EXHAUSTED_NOT_PENDING"
+
+
 @dataclass(frozen=True)
 class TransitionRejected:
-    """전이표에 없는 (state, event) 쌍 — 예외가 아니라 결과 타입."""
+    """전이가 성립하지 않았다 — 예외가 아니라 결과 타입. 사유는 `reason`(닫힌 어휘)."""
 
     from_state: JobState
     event: JobEvent
+    reason: TransitionRejectionReason = TransitionRejectionReason.NOT_IN_TABLE
 
 
 def _apply_start(record: JobRecord, new_state: JobState, at: datetime) -> JobRecord:
@@ -252,11 +267,27 @@ def transition(
 ) -> JobRecord | TransitionRejected:
     """유일 전이 진입점(설계 검토 (1)). 표에 없는 쌍은 `TransitionRejected`. 종료 상태의
     `CANCEL`은 멱등 no-op — `record`를 그대로 돌려준다(새 시각 대입 없음). 이벤트별
-    조립은 `_apply_*` 헬퍼로 나눈다(설계 래칫 함수 50줄)."""
+    조립은 `_apply_*` 헬퍼로 나눈다(설계 래칫 함수 50줄).
+
+    M6/6B-4 설계 검토 우회 (3) — `WORKER_RESOURCE_EXHAUSTED`(대기 큐 상한 폐기 사유)는
+    **대기(ACCEPTED)에서만** 쓸 수 있다. (RUNNING, FAIL) 쌍 자체는 표에 있으므로 전이표
+    만으로는 「워커가 이미 집은 job 을 큐가 넘쳐서 끝냈다」를 막지 못한다 — 그 한 조합을
+    여기서 닫는다(간선은 그대로 살아 있고, 다른 사유의 (RUNNING, FAIL)은 영향 없다)."""
     key = (record.state, event)
     new_state = _TRANSITIONS.get(key)
     if new_state is None:
         return TransitionRejected(from_state=record.state, event=event)
+
+    if (
+        failure is not None
+        and failure.code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
+        and record.state is not JobState.ACCEPTED
+    ):
+        return TransitionRejected(
+            from_state=record.state,
+            event=event,
+            reason=TransitionRejectionReason.RESOURCE_EXHAUSTED_NOT_PENDING,
+        )
 
     if record.state in _TERMINAL_STATES and event is JobEvent.CANCEL:
         return record

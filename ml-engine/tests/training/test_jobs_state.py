@@ -16,6 +16,7 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     JobState,
     TransitionRejected,
+    TransitionRejectionReason,
     transition,
 )
 
@@ -76,6 +77,8 @@ def _failure() -> JobFailure:
         (JobState.ACCEPTED, JobEvent.START, JobState.RUNNING),
         (JobState.RUNNING, JobEvent.SUCCEED, JobState.SUCCEEDED),
         (JobState.RUNNING, JobEvent.FAIL, JobState.FAILED),
+        # M6/6B-4 D-6B4-1 — 대기 큐 상한 초과 폐기(ADR 0010 D-8 개정).
+        (JobState.ACCEPTED, JobEvent.FAIL, JobState.FAILED),
         (JobState.ACCEPTED, JobEvent.CANCEL, JobState.CANCELLED),
         (JobState.RUNNING, JobEvent.CANCEL, JobState.CANCELLED),
     ],
@@ -101,7 +104,6 @@ def test_allowed_transitions(
     [
         (JobState.RUNNING, JobEvent.START),
         (JobState.ACCEPTED, JobEvent.SUCCEED),
-        (JobState.ACCEPTED, JobEvent.FAIL),
         (JobState.SUCCEEDED, JobEvent.START),
         (JobState.FAILED, JobEvent.START),
     ],
@@ -111,6 +113,65 @@ def test_disallowed_transitions_are_rejected(
 ) -> None:
     result = transition(_valid_record(from_state), event, at=_LATER)
     assert isinstance(result, TransitionRejected)
+
+
+# ---- M6/6B-4 — 대기 폐기 간선과 그 사유 제약(설계 검토 (2) 우회 3) ----
+
+
+def test_pending_discard_sets_worker_resource_exhausted_without_started_at() -> None:
+    """대기(ACCEPTED) job 은 실행된 적이 없다 — 폐기 뒤에도 `started_at` 이 없고
+    `finished_at` 만 선다(「실행했다」고 말하지 않는다)."""
+    record = _record(JobState.ACCEPTED)
+    result = transition(
+        record,
+        JobEvent.FAIL,
+        at=_LATER,
+        failure=JobFailure(
+            code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
+            retryable=True,
+            detail_code="PENDING_QUEUE_OVERFLOW",
+        ),
+    )
+    assert isinstance(result, JobRecord)
+    assert result.state is JobState.FAILED
+    assert result.started_at is None
+    assert result.finished_at == _LATER
+    assert result.failure is not None
+    assert result.failure.code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
+
+
+def test_worker_resource_exhausted_from_running_is_rejected_with_reason() -> None:
+    """설계 검토 우회 (3) — 폐기 사유는 **대기에서만** 쓸 수 있다. 워커가 이미 집은
+    job(RUNNING)을 「대기 큐가 넘쳐서」 끝내는 전이는 표에 (RUNNING, FAIL) 이 있어도
+    거부된다 — 그 사유로는 실행 중 job 을 끝낼 수 없다."""
+    record = _record(JobState.RUNNING, started_at=_NOW)
+    result = transition(
+        record,
+        JobEvent.FAIL,
+        at=_LATER,
+        failure=JobFailure(
+            code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
+            retryable=True,
+            detail_code="PENDING_QUEUE_OVERFLOW",
+        ),
+    )
+    assert isinstance(result, TransitionRejected)
+    assert result.reason is TransitionRejectionReason.RESOURCE_EXHAUSTED_NOT_PENDING
+
+
+def test_running_fail_with_other_code_is_still_allowed() -> None:
+    """같은 (RUNNING, FAIL) 쌍이 다른 사유로는 그대로 허용된다 — 위 거부가 간선 자체를
+    막지 않음을 통제군으로 확인한다."""
+    record = _record(JobState.RUNNING, started_at=_NOW)
+    result = transition(record, JobEvent.FAIL, at=_LATER, failure=_failure())
+    assert isinstance(result, JobRecord)
+    assert result.state is JobState.FAILED
+
+
+def test_table_miss_reports_not_in_table_reason() -> None:
+    result = transition(_valid_record(JobState.RUNNING), JobEvent.START, at=_LATER)
+    assert isinstance(result, TransitionRejected)
+    assert result.reason is TransitionRejectionReason.NOT_IN_TABLE
 
 
 @pytest.mark.parametrize(
