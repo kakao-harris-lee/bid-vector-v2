@@ -144,3 +144,26 @@ base `e2232a75` · 브랜치 `m6-6e2c/2026-10-09`. 출력 전문은 싣지 않�
 - cmd: 임시 clone 에서 `git restore --source=e2232a75`(M 12) + `git rm`·`rm`(A 1)
 - exit: 0 · 0
 - 핵심 결과: 단언 둘 OK · 등식 빈 출력 · 되돌림 대상 diff **0 바이트** · **blob 동일 12/12** · 표지 `D-6E2C` **0** · 공유 파일 `milestone-6.md` 가 base 와 **바이트 동일**이고 표지 계수가 base 자신의 수와 같다(`6E-2b` 2=2 · `6E-2a` 2=2 · `6F-` 103=103). ④~⑥ 은 트리 동일성 갈음 + `leakPatternGate` 직접 측정(이 slice evidence 매치 0).
+
+## jackson 하한 보정 — acceptance @`b838b4df`(양끝 HEAD 단언, 시작 트리 clean)
+
+### 2026-10-13 · Kotlin `check` · `qualityBaseline`
+- cmd: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline`
+- exit: 0 · 0 (561s · 7s)
+- 핵심 결과: 350 중 **46 executed**(`:app:test`·`:app:detekt` 실행).
+
+### 2026-10-13 · CI `container` job 재현
+- cmd: 워크플로의 `jobs.container.steps[*].run` 을 ci.yml 에서 직접 읽어 순서대로 실행
+- exit: **16 step 전부 0** (~2분 20초)
+- 핵심 결과: 이미지 ID 불변 — ml `sha256:911a9026…1e9c01` · app `sha256:4a3ad368…5cfbb4`.
+
+### 2026-10-13 · jackson 하한 변이 여섯 — 대조군 = `8dea9917` 의 test
+- cmd: 배포물 `BOOT-INF/lib` 를 바꿔치우고 새 test·부모 test 로(`:app:test` 실행 가드 통과)
+- exit: M7 낮은 minor `jackson-databind-2.20.3.jar` 새 **1**/부모 **0** · M3' 가족 원소 `dataformat-yaml-2.21.5` 새 **1** · M2' 숫자 꼬리 `2.21.8-…-3` 새 **1** · M4' 남의 artifact `jackson-core-utils-1.0` 새 **0**(오탐 없음) · M8 jackson 2 좌표 전부 제거 새 **0**(빠지는 것은 허용) · M9 하한 미선언 major `jackson-core-4.0.0` 새 **1**
+- 핵심 결과: **M7 이 보정의 표적**이다 — 낮은 minor 사본은 `2.21.` 접두를 갖지 않아 라인 규칙만으로는 대상 밖으로 분류돼 초록이었다(부모 exit 0). 부분집합 규칙이 그것과 **M9(하한 미선언 major)** 를 함께 닫는다. M8 은 좌표가 빠지는 것이 여전히 허용됨을 보인다.
+- 복원: jar `cmp` 동일 · test 파일 porcelain 빈 출력 · HEAD 불변.
+
+### 2026-10-13 · rollback ①~③ 재측정 @`b838b4df`
+- cmd: 임시 clone 에서 `git restore --source=e2232a75`(M 12) + `git rm`·`rm`(A 1)
+- exit: 0 · 0
+- 핵심 결과: 단언 둘 OK · 등식 빈 출력 · diff **0 바이트** · **blob 동일 12/12** · 표지 `D-6E2C` **0** · `milestone-6.md` 가 base 와 바이트 동일(표지 계수 `6E-2b` 2=2 · `6E-2a` 2=2 · `6F-` 103=103). ④~⑥ 트리 동일성 갈음 + `leakPatternGate` 직접 측정(이 slice evidence 매치 0).
