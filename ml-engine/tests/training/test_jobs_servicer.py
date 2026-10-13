@@ -91,15 +91,65 @@ def _valid_request(**overrides: object) -> training_pb2.StartTrainingRequest:
     return request
 
 
+class _SynchronousStartRunner:
+    """`submit` 이 워커를 흉내 내 **그 자리에서** START 를 커밋한다 — 「응답을 조립하기
+    전에 워커가 이미 job 을 집었다」를 경합 반복(400회)이 아니라 결정적으로 만든다.
+    `_accept_or_reuse` 가 저장소를 `_enqueue` **뒤에** 읽으면 handle 이 `RUNNING` 이 되고,
+    그것이 proto `StartTrainingResponse` 주석(「즉시 `ACCEPTED` 를 돌려준다」)과 어긋난다."""
+
+    def __init__(self, store: JobStore) -> None:
+        self._store = store
+        self.started: list[str] = []
+
+    def submit(
+        self, job_id: str, dataset_ref: DatasetRefInput, pipeline: object
+    ) -> None:
+        result = self._store.apply_transition(
+            job_id, JobEvent.START, at=datetime.now(UTC)
+        )
+        assert isinstance(result, JobRecord), result
+        self.started.append(job_id)
+
+    def cancel(self, job_id: str) -> None:  # servicer 가 취소 경로에서만 부른다
+        return None
+
+
+def test_start_training_reports_accepted_even_if_a_worker_starts_first(
+    tmp_path: Path,
+) -> None:
+    """proto `StartTrainingResponse` 주석 — `StartTraining` 은 **즉시 `ACCEPTED`** 를
+    돌려준다. 워커가 제출 직후 그 job 을 집어 `RUNNING` 을 커밋해도 응답 handle 은
+    `ACCEPTED` 다(저장소 읽기가 적재 직후·대기열 투입 **전**이라 결정적이다).
+
+    통제군: 같은 호출에서 워커가 실제로 집었다(`runner.started` · 저장소 상태 `RUNNING`)
+    — 이 probe 가 공허하지 않다는 증거다."""
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=4)
+    runner = _SynchronousStartRunner(store)
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=runner,  # type: ignore[arg-type]
+        is_ready=lambda: True,
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+
+    response = servicer.StartTraining(_valid_request(), context=None)
+
+    assert response.WhichOneof("result") == "handle"
+    assert response.handle.state == training_pb2.JOB_STATE_ACCEPTED
+    assert runner.started == [response.handle.job_id]
+    record = store.get(response.handle.job_id)
+    assert record is not None
+    assert record.state is JobState.RUNNING
+
+
 def test_start_training_returns_without_waiting_for_the_pipeline(
     tmp_path: Path,
 ) -> None:
     """RPC 는 학습을 기다리지 않는다 — 파이프라인이 붙잡혀 있어도 즉시 handle 로
-    답한다. 상태는 아직 종단이 아니다(대기이거나 실행 중).
-
-    M6/6B-4 — 응답 상태를 하나로 못 박지 않는다. `StartTraining` 은 저장소의 **최신**
-    상태를 싣고(앞 판의 R2-1 교훈), 워커가 이미 집었는지는 경합이라
-    고정값이 아니다. 「대기로 답한다」를 결정적으로 재는 것은 다음 test 다."""
+    답한다. 상태는 proto 주석대로 `ACCEPTED` 다(워커가 그 사이 집었더라도 — 위 test 가
+    그 경우를 결정적으로 잰다)."""
     release_event = threading.Event()
     servicer, runner, _store_unused = _build_servicer(
         tmp_path, pipeline=_BlockingThenSucceedingPipeline(release_event)
@@ -107,10 +157,7 @@ def test_start_training_returns_without_waiting_for_the_pipeline(
     response = servicer.StartTraining(_valid_request(), context=None)
     assert response.WhichOneof("result") == "handle"
     assert response.handle.job_id
-    assert response.handle.state in (
-        training_pb2.JOB_STATE_ACCEPTED,
-        training_pb2.JOB_STATE_RUNNING,
-    )
+    assert response.handle.state == training_pb2.JOB_STATE_ACCEPTED
     release_event.set()
     runner.shutdown(wait=True)
 
@@ -498,9 +545,12 @@ def test_cancel_wins_race_before_runner_start_transition_start_training_does_not
     **M6/6B-4 이후 그 경합의 자리가 바뀌었다.** `submit`은 더 이상 전이하지 않으므로
     (START 는 워커가 집는 순간) 이 창에서 깨질 것이 없고, 남는 요구는 **응답이 정직한가**
     하나다: `start_or_reuse` 가 돌려준 스냅숏(ACCEPTED)을 그대로 쓰면 이미 CANCELLED 인
-    job 을 ACCEPTED 라고 답한다. 저장소를 다시 읽어 응답하는 것을 여기서 잠근다
-    (`pipeline_factory` 호출 시점에 Cancel 을 끼워 순서를 결정론적으로 강제한다 —
-    threading 경합에 기대지 않는다)."""
+    job 을 ACCEPTED 라고 답한다. 저장소를 다시 읽어 응답하는 것을 여기서 잠근다.
+
+    Cancel 을 끼우는 자리는 **`start_or_reuse` 가 돌아온 직후**다(cr H-1 로 저장소 읽기가
+    `_enqueue` 앞으로 옮겨졌으므로 `pipeline_factory` 안은 더 이상 그 읽기보다 앞이
+    아니다) — threading 경합에 기대지 않고 「다른 writer 가 먼저 종단으로 옮겼다」를
+    결정론적으로 만든다."""
     store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=8)
     runner = JobRunner(store, max_workers=2)
 
@@ -519,24 +569,22 @@ def test_cancel_wins_race_before_runner_start_transition_start_training_does_not
         )
         if isinstance(outcome, Started):
             captured_job_id["job_id"] = outcome.record.job_id
+            # 다른 writer(`CancelTrainingJob`)가 이 창에서 이긴다 — servicer 가 저장소를
+            # 읽기 전에 종단으로 옮긴다.
+            cancelled = store.apply_transition(
+                outcome.record.job_id, JobEvent.CANCEL, at=datetime.now(UTC)
+            )
+            assert isinstance(cancelled, JobRecord)
+            assert cancelled.state is JobState.CANCELLED
         return outcome
 
     store.start_or_reuse = _capturing_start_or_reuse  # type: ignore[method-assign]
-
-    def _factory_that_wins_the_cancel_race(
-        spec: object,
-    ) -> _InstantSucceedingPipeline:
-        job_id = captured_job_id["job_id"]
-        result = store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC))
-        assert isinstance(result, JobRecord)
-        assert result.state is JobState.CANCELLED
-        return _InstantSucceedingPipeline()
 
     servicer = TrainingJobServicer(
         store=store,
         runner=runner,
         is_ready=lambda: True,
-        pipeline_factory=_factory_that_wins_the_cancel_race,  # type: ignore[arg-type]
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
         dataset_uri_schemes=frozenset({"file"}),
         idempotency_key_max_chars=256,
     )

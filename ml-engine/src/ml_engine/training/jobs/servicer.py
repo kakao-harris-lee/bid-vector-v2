@@ -203,13 +203,21 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
         if isinstance(outcome, JournalFailed):
             _fill_store_unavailable(response.failure, outcome)
             return response
+        # R2-1 유지 — `start_or_reuse` 가 돌려준 스냅숏을 그대로 쓰지 않는다. 그 사이에
+        # 다른 writer(`CancelTrainingJob`)가 종단으로 옮겼을 수 있다. 저장소를 다시 읽어
+        # **실제 최신 상태**로 응답한다(폐기로 `FAILED` 가 된 경우도 같은 자리에서
+        # 정직해진다).
+        #
+        # 이 읽기는 `_enqueue` **앞**이다(cr H-1, 팀장 결정 (a)). 뒤에 두면 워커가 그
+        # 사이 job 을 집어 `RUNNING` 을 커밋할 수 있고, 그러면 응답이 proto
+        # `StartTrainingResponse` 주석(「즉시 `ACCEPTED` 를 돌려준다」)을 깬다 — 실측
+        # `job_workers: 1` 에서 400회 중 1회. `start_or_reuse` 가 한 잠금 안에서 적재·
+        # 폐기·저널을 끝냈으므로 그 직후 상태는 결정적이고(`ACCEPTED`, 또는 시계 역행으로
+        # 자기 폐기된 `FAILED`), 빠지는 값은 「워커가 이미 집었는가」 하나 — 그것이 바로
+        # 문면이 금지하는 값이다.
+        current = self._store.get(outcome.record.job_id)
         if isinstance(outcome, Started):
             self._enqueue(outcome.record.job_id, request, spec)
-        # R2-1 유지 — `start_or_reuse` 가 돌려준 스냅숏을 그대로 쓰지
-        # 않는다. 그 사이에 다른 writer(`CancelTrainingJob`)가 종단으로 옮겼거나, 워커가
-        # 이미 집어 `RUNNING` 이 됐을 수 있다. 저장소를 다시 읽어 **실제 최신 상태**로
-        # 응답한다(M6/6B-4 — 폐기로 `FAILED` 가 된 경우도 같은 자리에서 정직해진다).
-        current = self._store.get(outcome.record.job_id)
         response.handle.job_id = outcome.record.job_id
         response.handle.state = _job_state_to_proto(
             current.state if current is not None else outcome.record.state
