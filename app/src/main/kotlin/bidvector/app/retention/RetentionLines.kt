@@ -27,11 +27,14 @@ internal fun retentionFinishLine(
 internal fun retentionRefusedLine(reason: RetentionRefusal): String =
     "retention refused reason=" +
         when (reason) {
-            is RetentionRefusal.UnclassifiedTables ->
+            is RetentionRefusal.UnclassifiedTables -> {
                 "UNCLASSIFIED_TABLES missingClassification=${reason.missingClassification.sorted()} " +
                     "missingFromSchema=${reason.missingFromSchema.sorted()}"
+            }
 
-            is RetentionRefusal.CyclicDependencies -> "CYCLIC_DEPENDENCIES tables=${reason.tables.sorted()}"
+            is RetentionRefusal.CyclicDependencies -> {
+                "CYCLIC_DEPENDENCIES tables=${reason.tables.sorted()}"
+            }
         } + " exit=${RetentionExitCode.REFUSED.name}(${RetentionExitCode.REFUSED.value})"
 
 internal fun retentionLeaseBusyLine(): String =

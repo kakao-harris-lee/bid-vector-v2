@@ -13,7 +13,7 @@ class DeletionOrderTest {
                 dependencies = setOf(TableDependency(child = "child", parent = "parent", cascade = false)),
             )
 
-        outcome shouldBe DeletionOrderOutcome.Ordered(listOf("child", "parent"))
+        outcome shouldBe DeletionOrder.Ordered(listOf("child", "parent"))
     }
 
     @Test
@@ -28,7 +28,7 @@ class DeletionOrderTest {
                     ),
             )
 
-        outcome shouldBe DeletionOrderOutcome.Ordered(listOf("c", "b", "a"))
+        outcome shouldBe DeletionOrder.Ordered(listOf("c", "b", "a"))
     }
 
     @Test
@@ -44,14 +44,14 @@ class DeletionOrderTest {
                     ),
             )
 
-        outcome shouldBe DeletionOrderOutcome.Ordered(listOf("notice", "qualification_text"))
+        outcome shouldBe DeletionOrder.Ordered(listOf("notice", "qualification_text"))
     }
 
     @Test
     fun `같은 깊이의 표는 입력 순서를 보존한다 — 실행마다 순서가 흔들리지 않는다`() {
         val outcome = deletionOrderOf(listOf("x", "y", "z"), emptySet())
 
-        outcome shouldBe DeletionOrderOutcome.Ordered(listOf("x", "y", "z"))
+        outcome shouldBe DeletionOrder.Ordered(listOf("x", "y", "z"))
     }
 
     @Test
@@ -66,6 +66,6 @@ class DeletionOrderTest {
                     ),
             )
 
-        outcome shouldBe DeletionOrderOutcome.Cyclic(setOf("a", "b"))
+        outcome shouldBe DeletionOrder.Cyclic(setOf("a", "b"))
     }
 }

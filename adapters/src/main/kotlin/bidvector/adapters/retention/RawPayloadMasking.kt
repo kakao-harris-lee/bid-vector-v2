@@ -49,20 +49,23 @@ internal fun maskRawPayload(
     payload: String,
     keptKeys: Set<String>,
 ): PayloadMaskOutcome {
-    val parsed =
-        try {
-            KonepsJsonParser.parse(payload, PAYLOAD_MAX_DEPTH)
-        } catch (
-            @Suppress("SwallowedException") malformed: JsonParseException,
-        ) {
-            // 판독 실패의 상세를 잃는다 — 그 문면에는 원문(= PII)이 실린다. 잃지 않는 것은
-            // 「이 행은 fail-closed 로 버렸다」는 사실이고 호출부가 그것을 계수로 올린다.
-            return PayloadMaskOutcome.FailClosed
-        }
-    val fields = (parsed as? JsonValue.JsonObject)?.fields ?: return PayloadMaskOutcome.FailClosed
+    val fields = flatObjectOrNull(payload) ?: return PayloadMaskOutcome.FailClosed
     val kept = fields.filter { (name, value) -> name in keptKeys && value.isScalar() }
     return PayloadMaskOutcome.Masked(JsonValue.JsonObject(kept, sourceText = "").render())
 }
+
+/**
+ * 판독 실패의 **상세를 잃는다** — 그 문면에는 원문(= PII)이 실린다. 잃지 않는 것은 「이 행은
+ * 판독할 수 없다」는 사실이고, 호출부가 그것을 fail-closed 계수로 올린다.
+ */
+private fun flatObjectOrNull(payload: String): Map<String, JsonValue>? =
+    try {
+        (KonepsJsonParser.parse(payload, PAYLOAD_MAX_DEPTH) as? JsonValue.JsonObject)?.fields
+    } catch (
+        @Suppress("SwallowedException") malformed: JsonParseException,
+    ) {
+        null
+    }
 
 private fun JsonValue.isScalar(): Boolean =
     when (this) {

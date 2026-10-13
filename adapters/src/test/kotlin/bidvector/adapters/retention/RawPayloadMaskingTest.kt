@@ -92,8 +92,8 @@ class RawPayloadMaskingTest {
 
     @Test
     fun `마스킹은 멱등이다 — 이미 마스킹된 값을 다시 넣어도 같은 값이다`() {
-        val once = (maskRawPayload("""{"bidNtceNo":"1","ntceInsttOfclNm":"NAME-FIXTURE"}""", KEPT)
-            as PayloadMaskOutcome.Masked).payload
+        val outcome = maskRawPayload("""{"bidNtceNo":"1","ntceInsttOfclNm":"NAME-FIXTURE"}""", KEPT)
+        val once = (outcome as PayloadMaskOutcome.Masked).payload
 
         maskRawPayload(once, KEPT) shouldBe PayloadMaskOutcome.Masked(once)
     }

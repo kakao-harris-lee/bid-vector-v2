@@ -66,6 +66,9 @@ sealed interface RetentionOutcome {
  * **기준 시각은 주입된 [Clock] 하나에서 나온다** — 표마다 `now()` 를 다시 묻지 않는다(한 run
  * 안에서 cutoff 가 표마다 다르면 「무엇이 90일인가」가 표마다 달라진다).
  *
+ * **계획과 실행이 갈려 있다**([planOf] → [sweepUnderLease]): 거부 사유는 임대를 쥐기 전에
+ * 결정되므로, 분류가 어긋난 run 은 자물쇠도 잡지 않고 한 행도 건드리지 않는다.
+ *
  * 실패를 삼키지 않는다 — 저장소 예외는 호출부(러너)로 올라가 정제된 원인 코드와 종료 코드가
  * 된다. 그때까지 커밋된 일괄은 그대로 남고 **다음 run 이 이어서 지운다**(cutoff 가 시각으로
  * 정해지므로 이어받기에 상태가 필요 없다).
@@ -75,12 +78,30 @@ class PurgeExpiredData(
     private val clock: Clock,
     private val policy: RetentionPolicyData,
 ) {
-    fun run(): RetentionOutcome {
-        val targets = store.classifiedTargets()
+    /** 거부와 실행 가능을 가르는 내부 값 — 최상위 타입을 늘리지 않는다. */
+    private sealed interface Plan {
+        data class Ready(
+            val targets: List<RetentionTarget>,
+            val purgeTargets: Map<String, RetentionTarget>,
+            val order: List<String>,
+        ) : Plan
+
+        data class Rejected(
+            val reason: RetentionRefusal,
+        ) : Plan
+    }
+
+    fun run(): RetentionOutcome =
+        when (val plan = planOf(store.classifiedTargets())) {
+            is Plan.Rejected -> RetentionOutcome.Refused(plan.reason)
+            is Plan.Ready -> sweepUnderLease(plan)
+        }
+
+    private fun planOf(targets: List<RetentionTarget>): Plan {
         val classified = targets.map { it.table }.toSet()
         val stored = store.storedTables()
         if (classified != stored) {
-            return RetentionOutcome.Refused(
+            return Plan.Rejected(
                 RetentionRefusal.UnclassifiedTables(
                     missingClassification = stored - classified,
                     missingFromSchema = classified - stored,
@@ -88,50 +109,48 @@ class PurgeExpiredData(
             )
         }
         val purgeTargets = targets.filter { it.treatment == RetentionTreatment.PURGE }
-        val order =
-            when (val outcome = deletionOrderOf(purgeTargets.map { it.table }, store.dependencies())) {
-                is DeletionOrderOutcome.Cyclic ->
-                    return RetentionOutcome.Refused(RetentionRefusal.CyclicDependencies(outcome.tables))
+        return when (val outcome = deletionOrderOf(purgeTargets.map { it.table }, store.dependencies())) {
+            is DeletionOrder.Cyclic -> {
+                Plan.Rejected(RetentionRefusal.CyclicDependencies(outcome.tables))
+            }
 
-                is DeletionOrderOutcome.Ordered -> outcome.tables
+            is DeletionOrder.Ordered -> {
+                Plan.Ready(targets, purgeTargets.associateBy { it.table }, outcome.tables)
             }
-        val cutoff = policy.cutoffFrom(clock.now())
-        val attempt =
-            store.withExclusiveLease { writer ->
-                sweep(writer, cutoff, order, purgeTargets.associateBy { it.table }, targets)
-            }
-        return when (attempt) {
-            is LeaseAttempt.Busy -> RetentionOutcome.LeaseBusy
-            is LeaseAttempt.Held ->
-                RetentionOutcome.Completed(
-                    RetentionReport(
-                        cutoff = cutoff.instant,
-                        deletionOrder = order,
-                        tallies = attempt.result,
-                        exempt = targets.filter { it.treatment == RetentionTreatment.EXEMPT }.map { it.table }.toSet(),
-                        cascade =
-                            targets
-                                .filter { it.treatment == RetentionTreatment.CASCADE_WITH_PARENT }
-                                .map { it.table }
-                                .toSet(),
-                    ),
-                )
         }
     }
+
+    private fun sweepUnderLease(plan: Plan.Ready): RetentionOutcome {
+        val cutoff = policy.cutoffFrom(clock.now())
+        return when (val attempt = store.withExclusiveLease { writer -> sweep(writer, cutoff, plan) }) {
+            is LeaseAttempt.Busy -> RetentionOutcome.LeaseBusy
+            is LeaseAttempt.Held -> RetentionOutcome.Completed(reportOf(cutoff, plan, attempt.result))
+        }
+    }
+
+    private fun reportOf(
+        cutoff: RetentionCutoff,
+        plan: Plan.Ready,
+        tallies: Map<String, TableTally>,
+    ): RetentionReport =
+        RetentionReport(
+            cutoff = cutoff.instant,
+            deletionOrder = plan.order,
+            tallies = tallies,
+            exempt = plan.targets.tablesWith(RetentionTreatment.EXEMPT),
+            cascade = plan.targets.tablesWith(RetentionTreatment.CASCADE_WITH_PARENT),
+        )
 
     private fun sweep(
         writer: RetentionWriter,
         cutoff: RetentionCutoff,
-        order: List<String>,
-        purgeTargets: Map<String, RetentionTarget>,
-        targets: List<RetentionTarget>,
+        plan: Plan.Ready,
     ): Map<String, TableTally> {
         val tallies = linkedMapOf<String, TableTally>()
-        for (table in order) {
-            val target = purgeTargets.getValue(table)
-            tallies[table] = TableTally(purged = purgeAll(writer, target, cutoff))
+        for (table in plan.order) {
+            tallies[table] = TableTally(purged = purgeAll(writer, plan.purgeTargets.getValue(table), cutoff))
         }
-        for (target in targets.filter { it.treatment == RetentionTreatment.MASK_PII }) {
+        for (target in plan.targets.filter { it.treatment == RetentionTreatment.MASK_PII }) {
             val counts = maskAll(writer, target, cutoff)
             tallies[target.table] = TableTally(masked = counts.masked, maskFailClosed = counts.failClosed)
         }
@@ -170,3 +189,6 @@ class PurgeExpiredData(
         }
     }
 }
+
+private fun List<RetentionTarget>.tablesWith(treatment: RetentionTreatment): Set<String> =
+    filter { it.treatment == treatment }.map { it.table }.toSet()

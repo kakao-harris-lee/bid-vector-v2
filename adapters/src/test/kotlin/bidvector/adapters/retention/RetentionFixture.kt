@@ -14,6 +14,11 @@ internal val NOW: Instant = Instant.parse("2026-10-14T00:00:00Z")
 internal val JUST_OLDER: Instant = NOW - RETENTION_ANCHOR - Duration.ofSeconds(1)
 internal val JUST_NEWER: Instant = NOW - RETENTION_ANCHOR + Duration.ofSeconds(1)
 
+/** `raw_observation` 의 열 목록 — fixture 세 자리가 같은 목록을 쓴다(사본 셋을 두지 않는다). */
+private const val RAW_OBSERVATION_COLUMNS =
+    "(observation_key, source_endpoint, payload, payload_fields, observed_at, " +
+        "release_sha, inserted_at)"
+
 /**
  * 보존 test 의 행 심기(P-3 경계·통제군) — **표마다 한 쌍**을 심는다.
  *
@@ -29,6 +34,7 @@ internal val JUST_NEWER: Instant = NOW - RETENTION_ANCHOR + Duration.ofSeconds(1
  * PII 값은 **형태를 흉내내지 않는다** — 담당자 키가 마스킹 뒤 사라지는지만 재므로 자리값이
  * 전화·전자우편 꼴일 필요가 없다(누출 스캔 어휘를 fixture 가 심지 않는다).
  */
+
 internal class RetentionFixture(
     private val dataSource: DataSource,
 ) {
@@ -57,7 +63,7 @@ internal class RetentionFixture(
         connection.createStatement().use { statement ->
             statement.execute(
                 "INSERT INTO raw_observation " +
-                    "(observation_key, source_endpoint, payload, payload_fields, observed_at, release_sha, inserted_at) " +
+                    "$RAW_OBSERVATION_COLUMNS " +
                     "VALUES ('ret-bad-$tag', 'NOTICE_LIST', 'NOT-JSON-AT-ALL', '{}'::jsonb, " +
                     "'$at', 'ret-test', '$at')",
             )
@@ -76,7 +82,7 @@ internal class RetentionFixture(
         connection.createStatement().use { statement ->
             statement.execute(
                 "INSERT INTO raw_observation " +
-                    "(observation_key, source_endpoint, payload, payload_fields, observed_at, release_sha, inserted_at) " +
+                    "$RAW_OBSERVATION_COLUMNS " +
                     "VALUES ('ret-fk', 'NOTICE_LIST', '{}', '{}'::jsonb, '$parentAt', 'ret-test', '$parentAt')",
             )
             statement.execute(
@@ -110,9 +116,10 @@ internal class RetentionFixture(
 
     fun payloadOf(observationKey: String): Pair<String, Boolean> =
         dataSource.connection.use { connection ->
-            connection.prepareStatement(
-                "SELECT payload, pii_masked_at IS NOT NULL AS masked FROM raw_observation WHERE observation_key = ?",
-            ).use { statement ->
+            val sql =
+                "SELECT payload, pii_masked_at IS NOT NULL AS masked " +
+                    "FROM raw_observation WHERE observation_key = ?"
+            connection.prepareStatement(sql).use { statement ->
                 statement.setString(1, observationKey)
                 statement.executeQuery().use { rs ->
                     check(rs.next()) { "행이 없다: $observationKey" }
@@ -158,7 +165,7 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         TableSeed("raw_observation") { tag, at ->
             listOf(
                 "INSERT INTO raw_observation " +
-                    "(observation_key, source_endpoint, payload, payload_fields, observed_at, release_sha, inserted_at) " +
+                    "$RAW_OBSERVATION_COLUMNS " +
                     "VALUES ('ret-$tag', 'NOTICE_LIST', '${OFFICER_FIXTURE_PAYLOAD.format(tag)}', " +
                     "'${KEPT_FIELDS_FIXTURE.format(tag)}'::jsonb, '$at', 'ret-test', '$at')",
             )

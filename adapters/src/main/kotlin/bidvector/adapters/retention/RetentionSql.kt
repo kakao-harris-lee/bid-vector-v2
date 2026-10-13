@@ -3,18 +3,6 @@ package bidvector.adapters.retention
 import java.sql.Connection
 
 /**
- * FK 한 간선 — 열 쌍까지 **순서대로** 싣는다. `information_schema` 경유 조회는 복합 FK 를
- * cross product 로 보여 주므로(`CleanMigrationTest` 축6 KDoc 의 실측) 쌍을 복원할 수 없다 —
- * `pg_constraint` 의 `conkey`/`confkey` 를 `WITH ORDINALITY` 로 펴서 짝을 그대로 얻는다.
- */
-internal data class ForeignKeyEdge(
-    val child: String,
-    val parent: String,
-    val cascade: Boolean,
-    val columnPairs: List<Pair<String, String>>,
-)
-
-/**
  * 스키마에 **실제로 있는** 표 — 분류 레지스트리와 집합 등식을 재는 쪽의 정본이다
  * (`CleanMigrationTest` 축1 과 같은 질의 — 그 test 가 이 집합을 `expectedTables` 에 다시
  * 묶으므로, 레지스트리는 전이적으로 스키마 스냅숏 래칫에 묶인다).

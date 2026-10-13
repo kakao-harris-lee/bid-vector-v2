@@ -87,7 +87,8 @@ class RetentionMaskingSweepTest : PersistenceTestSupport() {
                 PurgeExpiredData(JdbcRetentionStore(dataSource()), { NOW }, productionPolicy()).run()
             }
 
-        secondOutcome.shouldBeInstanceOf<LeaseAttempt.Held<RetentionOutcome>>()
+        secondOutcome
+            .shouldBeInstanceOf<LeaseAttempt.Held<RetentionOutcome>>()
             .result shouldBe RetentionOutcome.LeaseBusy
         // 둘째가 아무것도 하지 않았으므로 기한 넘은 원문은 아직 마스킹되지 않았다.
         fixture.payloadOf("ret-old").second shouldBe false

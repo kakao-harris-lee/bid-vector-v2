@@ -148,9 +148,12 @@ class RetentionSweepTest : PersistenceTestSupport() {
             rule.table to
                 when {
                     rule.table == "outbox" -> TWO_OUTBOX_ROWS_PURGED
+
                     rule.treatment == RetentionTreatment.PURGE -> ONE_ROW_PURGED
+
                     // 부모가 사라지면 FK ON DELETE CASCADE 로 함께 사라진다.
                     rule.treatment == RetentionTreatment.CASCADE_WITH_PARENT -> ONE_ROW_PURGED
+
                     else -> 0L
                 }
         }

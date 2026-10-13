@@ -83,7 +83,10 @@ class RetentionWiringTest {
     fun `mode 가 없으면 러너 빈이 없다 — 기본 꺼짐`() {
         withBoot { booted ->
             booted.failure shouldBe null
-            booted.context.getBeanNamesForType(ApplicationRunner::class.java).toList().shouldBeEmpty()
+            booted.context
+                .getBeanNamesForType(ApplicationRunner::class.java)
+                .toList()
+                .shouldBeEmpty()
         }
     }
 
@@ -91,7 +94,10 @@ class RetentionWiringTest {
     fun `mode 가 다른 값이면 러너 빈이 없다`() {
         withBoot("bidvector.retention.mode=dry-run") { booted ->
             booted.failure shouldBe null
-            booted.context.getBeanNamesForType(ApplicationRunner::class.java).toList().shouldBeEmpty()
+            booted.context
+                .getBeanNamesForType(ApplicationRunner::class.java)
+                .toList()
+                .shouldBeEmpty()
         }
     }
 
@@ -107,15 +113,24 @@ class RetentionWiringTest {
     @Test
     fun `소유자 연결은 빈이 아니다 — 컨텍스트에서 주입받을 자리가 없다`() {
         withBoot("bidvector.retention.mode=once") { booted ->
-            booted.context.getBeanNamesForType(DataSource::class.java).toList().shouldBeEmpty()
+            booted.context
+                .getBeanNamesForType(DataSource::class.java)
+                .toList()
+                .shouldBeEmpty()
         }
     }
 
     @Test
     fun `파기 능력도 빈이 아니다 — use case 와 저장소를 주입받을 자리가 없다`() {
         withBoot("bidvector.retention.mode=once") { booted ->
-            booted.context.getBeanNamesForType(PurgeExpiredData::class.java).toList().shouldBeEmpty()
-            booted.context.getBeanNamesForType(JdbcRetentionStore::class.java).toList().shouldBeEmpty()
+            booted.context
+                .getBeanNamesForType(PurgeExpiredData::class.java)
+                .toList()
+                .shouldBeEmpty()
+            booted.context
+                .getBeanNamesForType(JdbcRetentionStore::class.java)
+                .toList()
+                .shouldBeEmpty()
         }
     }
 

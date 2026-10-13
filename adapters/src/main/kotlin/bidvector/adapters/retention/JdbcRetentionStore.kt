@@ -25,6 +25,18 @@ private const val TRY_ADVISORY_LOCK = "SELECT pg_try_advisory_lock(?)"
 private const val ADVISORY_UNLOCK = "SELECT pg_advisory_unlock(?)"
 
 /**
+ * FK 한 간선 — 열 쌍까지 **순서대로** 싣는다. `information_schema` 경유 조회는 복합 FK 를
+ * cross product 로 보여 주므로(`CleanMigrationTest` 축6 KDoc 의 실측) 쌍을 복원할 수 없다 —
+ * `pg_constraint` 의 `conkey`/`confkey` 를 `WITH ORDINALITY` 로 펴서 짝을 그대로 얻는다.
+ */
+internal data class ForeignKeyEdge(
+    val child: String,
+    val parent: String,
+    val cascade: Boolean,
+    val columnPairs: List<Pair<String, String>>,
+)
+
+/**
  * [RetentionStorePort] JDBC 구현(M6/6B-3 P-3) — **소유자 비풀링 연결**로만 돈다(운영자 결정
  * A-1, `PersistenceWiring.migrateAsOwner` 선례). 런타임 풀은 `SET ROLE bidvector_app` 으로
  * 전환되고 그 역할에는 대상 표 어디에도 DELETE·UPDATE 권한이 없다 — 이 클래스에 풀을 넘기면
@@ -137,12 +149,16 @@ internal class JdbcRetentionWriter(
             var index = 1
             statement.setTimestamp(index++, Timestamp.from(cutoff.instant))
             when (val condition = rule.condition) {
-                PurgeCondition.TimeOnly -> Unit
-                is PurgeCondition.TerminalStates ->
+                PurgeCondition.TimeOnly -> {
+                    // 시각 술어 하나뿐이라 묶을 인자가 없다.
+                }
+
+                is PurgeCondition.TerminalStates -> {
                     statement.setArray(
                         index++,
                         connection.createArrayOf("text", condition.values.toTypedArray()),
                     )
+                }
             }
             statement.setInt(index, batchSize)
             statement.executeUpdate()
@@ -180,11 +196,13 @@ internal class JdbcRetentionWriter(
                         (rs.getArray("kept_keys").array as Array<*>).mapNotNull { it as? String }.toSet()
                     candidates +=
                         when (val outcome = maskRawPayload(rs.getString(rule.maskedColumn), keptKeys)) {
-                            is PayloadMaskOutcome.Masked ->
+                            is PayloadMaskOutcome.Masked -> {
                                 Triple(rs.getString(rule.keyColumn), outcome.payload, false)
+                            }
 
-                            PayloadMaskOutcome.FailClosed ->
+                            PayloadMaskOutcome.FailClosed -> {
                                 Triple(rs.getString(rule.keyColumn), PAYLOAD_MASK_FAIL_CLOSED, true)
+                            }
                         }
                 }
                 candidates

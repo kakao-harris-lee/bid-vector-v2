@@ -31,8 +31,7 @@ data class RetentionPolicyData(
      * 기준 시각 — [RetentionCutoff] 를 만드는 **유일한 경로**다. 호출부가 `now` 를 cutoff 로
      * 쓰는 길(= 전부 파기)이 타입으로 막힌다(설계 검토 (2b) 「보존 저장소 포트」 행).
      */
-    fun cutoffFrom(now: Instant): RetentionCutoff =
-        RetentionCutoff(now.minus(retentionDays.toLong(), ChronoUnit.DAYS))
+    fun cutoffFrom(now: Instant): RetentionCutoff = RetentionCutoff(now.minus(retentionDays.toLong(), ChronoUnit.DAYS))
 
     companion object {
         /** 하루보다 짧은 보존은 받지 않는다 — 위 KDoc 의 불변식. */

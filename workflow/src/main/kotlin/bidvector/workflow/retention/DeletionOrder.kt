@@ -4,15 +4,15 @@ package bidvector.workflow.retention
  * 파기 순서 도출의 결과 — 순환이면 **순서가 없다**는 것을 값으로 말한다(예외가 아니라 값:
  * 호출부가 「실행하지 않는다」로 옮긴다).
  */
-sealed interface DeletionOrderOutcome {
+sealed interface DeletionOrder {
     data class Ordered(
         val tables: List<String>,
-    ) : DeletionOrderOutcome
+    ) : DeletionOrder
 
     /** 순환에 걸린 표들 — 위상 정렬이 끝내지 못하고 남은 집합이다. */
     data class Cyclic(
         val tables: Set<String>,
-    ) : DeletionOrderOutcome
+    ) : DeletionOrder
 }
 
 /**
@@ -27,16 +27,16 @@ sealed interface DeletionOrderOutcome {
 internal fun deletionOrderOf(
     tables: List<String>,
     dependencies: Set<TableDependency>,
-): DeletionOrderOutcome {
+): DeletionOrder {
     val remaining = tables.toMutableList()
     val relevant = dependencies.filter { it.child in tables && it.parent in tables }
     val ordered = mutableListOf<String>()
     while (remaining.isNotEmpty()) {
         // 남은 표 가운데 「아직 남은 자식이 없는」 것부터 — 자식이 먼저 사라져야 부모를 지울 수 있다.
         val ready = remaining.filter { parent -> relevant.none { it.parent == parent && it.child in remaining } }
-        if (ready.isEmpty()) return DeletionOrderOutcome.Cyclic(remaining.toSet())
+        if (ready.isEmpty()) return DeletionOrder.Cyclic(remaining.toSet())
         ordered += ready
         remaining -= ready.toSet()
     }
-    return DeletionOrderOutcome.Ordered(ordered)
+    return DeletionOrder.Ordered(ordered)
 }
