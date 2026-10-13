@@ -1,0 +1,134 @@
+# M6/6B-4 완료 점검 — ML training job 영속 · 대기 큐 상한
+
+정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `54bbef81`. 실행 결과는
+`commands.md`, 되돌림은 `rollback.md`.
+
+## 산출물 Q-1 ~ Q-7 과 그 술어
+
+| ID | 무엇 | 공허함을 막는 술어의 실측 |
+| --- | --- | --- |
+| Q-1 | 계약 개정 — 전이표에 `ACCEPTED → FAILED` 하나 + `DetailCode` 셋 | 네 자리(Python 표 · Kotlin `setOf` · proto `JobState` 주석 · ADR 0010 D-8+개정) **기계 추출 집합 등식** + 간선 수 하한 + 이 간선이 네 자리 모두에 있음 + 파서별 음성 대조. 변이 M-4·M-5·M-6 이 각 자리에서 간선을 지웠을 때 전부 RED |
+| Q-2 | 명시 대기 큐 — `START` 를 워커가 집는 순간으로 | 워커가 하나이고 그 하나가 붙잡혀 있을 때 다음 제출의 **wire handle 이 `JOB_STATE_ACCEPTED`**(결정적) · 대기 5번째 제출이 최고참을 끝냄 · `RUNNING`·종단 비폐기 · 동률 `job_id` · 멱등 재사용 무폐기 · **래치 12 스레드 동시 제출에서 대기 정확히 4** · 폐기된 대기 job 을 워커가 뒤늦게 집어도 계산 0회. 변이 M-3·M-10 RED |
+| Q-3 | 상한 정책 값 | 출하 값이 승인 값(잠정)임을 단언하는 test + **그 값이 실제 폐기 시점을 정하는지** 잇는 test. 로더는 전수 fail-closed 이고 0·음수·키 누락을 거부. 변이 M-1(4→3)·M-2(4→5) 둘 다 RED |
+| Q-4 | 파일 저널 | 쓰기는 저장소 잠금 **안**이고 **저널 성공 뒤에만 메모리 변경**(쓰기 실패 주입에서 상태 불변·키 미선점 실측) · 원자 교체(크래시를 `fsync`·`os.replace` 두 자리에 주입해 이전 스냅숏이 온전히 읽힘) · canonical JSON 바이트 안정 · 「없음」과 「깨짐」이 다른 타입 · 판독이 2C 조합·시각 불변식을 다시 센다. 변이 M-7·M-8·M-9 RED |
+| Q-5 | 재기동 처분 | RUNNING 고아 → `FAILED(RUNNER_LOST_ON_RESTART)`(재개 아님) · ACCEPTED 고아 → `accepted_at` 순 재적재 + **상한 재적용**(저널이 상한보다 많이 들고 있을 때 최고참부터 폐기) · 모르는 spec 버전은 처분 · **수렴 고정점**(재재기동 처분 0) · 조립 근에서 실제로 집혀 종단까지 감 · 깨진 저널은 기동 거부 |
+| Q-6 | compose 볼륨 · Dockerfile | `container` job S-21~S-25 결과는 `commands.md` · 컨테이너 재생성 뒤 저널 생존 실측 |
+| Q-7 | runbook · checklist · OPEN 처분 | `docs/runbook/m6-6b4-ml-job-journal.md`(저널 자리·상한·폐기 관측 채널 전부·처분표·기동 거부 일곱·알려진 제한 여덟) · 이 파일 · 아래 OPEN 절 |
+
+## 위협 모델 ①~⑥ 대 실측
+
+| 방어 | 무엇이 그것을 막는가(구조) |
+| --- | --- |
+| ① 동시 존재 대기 ≤ 상한 | 대기 수 = 저장소의 `ACCEPTED` 개수(카운터 캐시 없음). 판정·적재·폐기·저널 쓰기가 한 잠금. 래치 실측 |
+| ② 폐기되는 것은 최고참 하나이고 사유가 상태로 남는다 | `accepted_at`(동률 `job_id`) 최소 하나만 끝내고 `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 로 조회된다. `started_at` 은 미설정으로 남아 「실행했다」고 말하지 않는다 |
+| ③ RUNNING·종단 비폐기 | 폐기 후보가 `ACCEPTED` 뿐 + `transition()` 이 **`WORKER_RESOURCE_EXHAUSTED` 를 ACCEPTED 출발에서만** 허용(그 쌍이 전이표에 있어도 거부, 닫힌 거부 사유로 구분) |
+| ④ 재기동 뒤 기록 보존 + 정해진 처분 | 저널 왕복 등가 + 처분표 + 수렴 고정점 |
+| ⑤ 크래시가 판독 불가 저널을 남기지 않음 · 남으면 기동 실패 | 원자 교체(두 자리 크래시 주입) + 「없음」/「깨짐」 분리 + 조립 근이 `ConfigError` 로 거부 |
+| ⑥ 네 자리 전이표가 같은 데이터 | 기계 추출 교차 등식 게이트 |
+
+## (2b) 새 public 표면 — 밖에 무엇을 허락하는가
+
+| 표면 | 밖에 허락하는 것 | 무엇이 좁히는가(실측) |
+| --- | --- | --- |
+| `JobJournal(디렉터리)` | 임의 디렉터리에 저널 쓰기 | **조립 근 한 자리에서만 생성**(AST 정적 test 가 전수) + 경로 인자에 문자열 리터럴 0 + 경로는 설정에서만. 음성 대조 넷(주입한 생성을 본다 · 주석·문자열의 같은 이름은 세지 않는다) |
+| `JobStore(journal=…, pending_queue_max=…)` | 저널 없는 저장소 · 상한 없는 저장소 | `journal` 이 **필수 키워드 인자**(비영속 갈래가 타입에 없다) · 상한 ≥1 생성자 거부 · **생성 자리는 `load_job_store` 하나**(AST test) |
+| `load_job_store(...) → LoadedJobStore \| JournalFailed` | 복원 실패를 조용히 넘기기 | 결과 타입이 닫혀 있고 조립 근이 `JournalFailed` 에서 기동을 거부(출하 정책 위에서 실측) |
+| `JobStore.pending_jobs()` | 대기 순서 조작 | 저장소 내부 상태에서 파생 — 외부 주입 자리 없음 |
+| `JobSubmission`(저널 항목) | job 실행 입력을 밖에서 바꾸기 | 저장소가 적재 시점에 받아 저널에만 적는다. wire 메시지 변경 0 |
+| 정책 키 `pending_queue_max` | 상한 값 | 로더 전수 fail-closed + ≥1 불변식 + 승인 표 등재 |
+| `DetailCode` 셋 · `TransitionRejectionReason` | 조회 시 사유 어휘 | 닫힌 StrEnum(자유 문자열 0) |
+| Kotlin `allowedJobStateTransitions` 간선 | 소비자 계약 기대값 | 데이터 + 교차 등식 게이트 |
+| `os.replace` 호출 자리 | 저장소 잠금 밖의 둘째 writer | AST test 가 **한 자리(저널 모듈)** 임을 전수 |
+
+「경계로 처리」 행의 **실측 목록**: 조립 근 밖의 `JobJournal`·`JobStore` 생성 **0** —
+`ml-engine/tests/gates/test_job_store_assembly_boundary.py` 가 `src/ml_engine` 전수를 AST 로
+센다(grep 이 아니라 구조: 주석·문자열의 같은 이름을 세지 않고 줄바꿈으로도 우회되지 않는다).
+
+## 설계 검토 우회 ①~⑨ 대응표
+
+| # | 우회 | 무엇이 막는가 |
+| --- | --- | --- |
+| 1 | 동시 제출 둘이 각자 「대기 4」를 보고 둘 다 적재 | 판정·적재·폐기·저널이 한 잠금 — 래치 12 스레드에서 대기 정확히 4, 폐기 8 |
+| 2 | 멱등 재사용이 새 job 으로 세어져 엉뚱한 폐기 | 재사용 경로는 적재가 없고 저널도 쓰지 않는다 — 재사용 5회 뒤 대기 둘 불변 |
+| 3 | 워커가 집기 직전의 job 을 폐기 | 집기(START)와 폐기가 같은 잠금 + 폐기 사유를 ACCEPTED 출발에서만 허용(구조). RUNNING 에 같은 사유를 쓰려는 전이는 닫힌 사유로 거부 |
+| 4 | 취소와 폐기 경합 | 같은 잠금 · 종단은 폐기 후보 아님 · 대기 중 취소 뒤 워커가 집어도 계산 0회 |
+| 5 | 상한 0·음수·누락 | 로더 fail-closed + 저장소 생성자 거부 |
+| 6 | 저널 부분 쓰기 → 다음 기동이 빈 저장소 | 원자 교체 + 「없음」/「깨짐」 분리 + 기동 거부 |
+| 7 | 재기동 시 ACCEPTED 고아가 상한보다 많음(이전 버전 저널) | 재적재에도 상한 적용(최고참부터 폐기, 계수 실측) + 모르는 spec 버전 처분 |
+| 8 | RUNNING 고아 재실행(중복 학습·산출물 덮어쓰기) | 재개 없음 — 처분만. 산출물 디렉터리 「존재하면 거부」 관례 무변경 |
+| 9 | 영속이 `apply_transition` 밖에서 일어나 H-2 재발 | 저널 쓰기가 잠금 안 + **쓰기 성공 뒤에만 커밋**(실패 주입으로 상태·저널 일치 실측) + `os.replace` 자리 AST 전수 |
+
+## 계약과 어긋나 판단이 필요했던 자리
+
+1. **저장소를 쓸 수 없을 때의 실패 코드가 2A 어휘에 없다.** 여덟 값 중 뜻이 가장 가까운
+   `MODEL_NOT_READY`(retryable) + `detail_code=JOB_STORE_UNAVAILABLE` 로 답한다. proto enum
+   변경은 out_scope 라 추가하지 않았다 → `OPEN-6B4-STORE-UNAVAILABLE-CODE`.
+2. **`StartTraining` 응답 상태를 하나로 못 박지 않았다.** 저장소의 **최신** 상태를 싣는다
+   (적재 시점 스냅숏을 쓰면 그 사이의 취소·폐기를 ACCEPTED 라고 답한다 — R2-1 교훈 유지).
+   워커가 이미 집었는지는 경합이라 고정값이 아니므로, 「대기로 답한다」는 **워커가 전부
+   바쁠 때**로 결정적으로 재는 test 를 따로 뒀다.
+3. **재기동 뒤 대기 고아를 실행하려면 제출 입력이 필요하다.** `JobRecord` 는 `dataset_id`
+   만 들고 uri·checksum·spec 버전을 모른다. 저널 항목에 `JobSubmission` 으로 함께 적었다 —
+   내부 영속 형식이고 wire 메시지 변경 0(D-6B4-2 ③).
+4. **`InMemoryJobStore` → `JobStore` 이름 변경.** 저널을 필수 인자로 받는 타입에 그 이름은
+   거짓이다. `journal=None` 갈래를 두지 않아 「조용히 비영속으로 조립」 경로가 구성상 없다.
+5. **계약 r1 ① 의 「READY 가 되는 시점에 재적재」는 이 프로세스 모델에 그 시점이 없다.**
+   `ReadinessGate` 의 전이는 기동 1회 판정 · `mark_not_ready` · `begin_shutdown` 셋이고
+   `mark_ready()` 는 M5 가 **M-5 로 일부러 지웠다**(「정책은 재로드하지 않는다 — 재시작만
+   preload 를 다시 돈다」). 그래서 구현은 「NOT_READY 로 뜨면 대기로 두고 **다음 기동**이
+   집는다」이고, 그 상태를 아래 알려진 제한 2 로 등재했다. 재preload 루프·`mark_ready` 부활은
+   M5 가 닫은 경로를 다시 여는 범위 밖 변경이라 하지 않았다 — 팀장 판단 대기.
+   「그동안도 상한 계수에 든다」는 이미 참이다(대기 수는 readiness 와 무관한 상태 계수).
+
+## 알려진 제한
+
+1. **볼륨이 살아 있는 동안의 영속만 든다.** 볼륨 자체의 백업·손상 복구는 M7
+   (`docker compose down -v` 는 저널과 산출물을 함께 지운다 — CI S-25 가 그렇게 한다).
+2. **NOT_READY 로 뜬 서버는 대기 job 을 집지 않는다.** 대기로 남고 다음 기동이 집는다. 이
+   프로세스는 뒤늦게 READY 가 되지 않는다(위 「판단이 필요했던 자리」 5).
+3. **종단 job 이 영구 누적된다.** 전체 교체 형식이라 파일이 단조 증가 →
+   `OPEN-6B4-JOURNAL-RETENTION`.
+4. **재기동 등가는 in-process 다.** 새 저장소 인스턴스가 같은 저널을 읽는 형태로 쟀다
+   (6D-2 가 Kotlin 에서 쓴 「in-JVM 등가」와 같은 한계 — 프로세스를 실제로 죽이지 않는다).
+   컨테이너 축의 실측은 `container` job 자리에서 별도로 한다.
+5. **다중 인스턴스 공유는 범위 밖**(5E 제한 6 유지) — 같은 볼륨에 둘을 올리면 서로의 쓰기를
+   덮는다.
+6. **저널을 직접 편집하는 주체는 비방어.** 판독이 불변식을 다시 세지만 편집을 막지는 않는다.
+7. **폐기·처분 metric 0.** 관측은 job 상태와 서버 로그 둘이고, job_id 를 쥔 쪽만 상태를 묻는다
+   → `OPEN-6B4-QUEUE-METRIC`.
+8. **출하 소비자 0.** `StartTraining` 을 부르는 production Kotlin 코드가 없다 — 이 slice 가
+   닫는 것은 계약 안의 운영 안전성이다.
+9. **`RUNNING` 종단 전이의 저널 쓰기가 실패하면 그 job 은 메모리에서 `RUNNING` 으로 남는다**
+   (상태·저널 일치를 지킨 결과다). 그 사실을 오류 로그로 남기고, **다음 기동이 고아로
+   처분한다** — 영원히 `RUNNING` 에 머무는 경로는 아니다.
+
+## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
+
+착수 시점 이후 추가된 파일 여덟 전부가 in_scope 안이다 —
+`ml-engine/src/ml_engine/training/jobs/journal.py`(`training/jobs/**`) ·
+`ml-engine/tests/**` 넷 · `docs/runbook/**` 하나 · `reports/evidence/m6/6b4/**` 둘.
+in_scope 밖 신규 0. 기계 산출 목록은 `rollback.md`.
+
+## OPEN
+
+### 수령하고 닫는 것
+
+| ID | 처분 |
+| --- | --- |
+| `OPEN-5E-JOB-PERSISTENCE` | **닫는 후보** — 파일 저널 + compose 볼륨으로 프로세스 재시작·컨테이너 재생성 둘 다 기록이 남고 고아는 정해진 처분을 받는다. 남는 것은 위 알려진 제한 1·3·5 |
+| `OPEN-5E-JOB-QUEUE-BOUND` | **닫는 후보** — 대기 큐가 상한을 갖고, `WORKER_RESOURCE_EXHAUSTED` 의 **생산 경로가 생겼다**(그 코드가 0회 생산이던 것이 이 slice 의 차단 사유 절반이었다) |
+
+### 신설
+
+| ID | 내용 | 소유 후보 |
+| --- | --- | --- |
+| `OPEN-6B4-CANCEL-REASON-UNREACHABLE` | `CANCELLED_BY_REQUEST` 가 구조적으로 생산 불가(2C 조합 불변식이 `CANCELLED` 에 실패 성분 설정을 금지) — 이 slice 가 고치지 않았다 | 계약 축(2C 개정 필요) |
+| `OPEN-6B4-STORE-UNAVAILABLE-CODE` | 2A `FailureCode` 여덟에 「저장소를 쓸 수 없다」가 없다 — 지금은 `MODEL_NOT_READY` + `detail_code` 로 얹는다 | 계약 축 |
+| `OPEN-6B4-JOURNAL-RETENTION` | 종단 job 보존 기간·정리 절차(전체 교체 형식의 단조 증가) | M7 운영 |
+| `OPEN-6B4-QUEUE-METRIC` | 대기 깊이·폐기·처분 계수의 metric·경보 | M7 관측(6F-10 `OPEN-6F10-CLAIM-OBSERVABILITY` 와 같은 모양) |
+
+### 입력이지만 수령은 아닌 것
+
+`OPEN-OPS-03`(큐 깊이 SLO 임계 미결) — 상한 **값**의 유일한 승인 근거 자리다. 결정되면
+`pending_queue_max` 를 재검토한다. `OPEN-5E-POLICY-VALUES`(잠정 승인)는 이 slice 가 키 하나를
+더해 표가 늘었으므로 같은 잠정 지위를 그대로 잇는다.
