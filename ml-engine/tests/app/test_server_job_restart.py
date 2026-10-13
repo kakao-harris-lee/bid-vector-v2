@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from ml_engine.app.server import (
+    _JOB_JOURNAL_DIR_NAME,
     ConfigError,
     ServerConfig,
     ServingPolicy,
@@ -29,6 +30,7 @@ from ml_engine.app.server import (
     _preload_outcomes,
 )
 from ml_engine.serving import ReadinessGate
+from ml_engine.training.jobs import journal_file
 from ml_engine.training.jobs.journal import JobSubmission, JournalSnapshot
 from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import DetailCode
@@ -115,28 +117,46 @@ def _wait_for_terminal(store: JobStore, job_id: str, *, timeout: float = 20.0) -
 # ---- 저널 자리(D-6B4-2) ----
 
 
+def _journal_files(config: ServerConfig) -> list[str]:
+    """산출물 루트 아래 **실제로 생긴 파일**을 센다. `JobJournal` 은 경로를 밖에 내주지
+    않으므로(vr H-2) 자리를 물어보는 대신 **쓰고 나서 디스크를 본다** — 앞 판의
+    `journal.path.parent.parent == artifact_out_dir` 보다 강한 관측이다(그 단언은 같은
+    상수 둘을 맞춰 보는 것이었고, 이것은 거동을 본다)."""
+    root = config.artifact_out_dir
+    return sorted(
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    )
+
+
+def _journal_file_path(config: ServerConfig) -> Path:
+    """test 가 **파일을 심을** 때만 쓰는 자리 계산 — production 상수 둘을 그대로 잇는다."""
+    return config.artifact_out_dir / _JOB_JOURNAL_DIR_NAME / journal_file._FILE_NAME
+
+
 def test_journal_lives_under_the_artifact_out_dir(tmp_path: Path) -> None:
     """저널은 **job 산출물 루트 안**에 있다 — 산출물과 job 기록이 같은 볼륨에서 함께
-    산다(그러지 않으면 재기동 뒤 `artifact.uri` 가 없는 파일을 가리킨다)."""
+    산다(그러지 않으면 재기동 뒤 `artifact.uri` 가 없는 파일을 가리킨다). 디렉터리 이름이
+    `_` 로 시작해 job 디렉터리(`uuid4`)와 충돌할 수 없다."""
     config = _config(tmp_path)
-    journal = _job_journal(config)
-    assert journal.path.parent.parent == config.artifact_out_dir
-    assert journal.path.parent.name.startswith("_")  # job_id(uuid4)와 충돌 불가
+    _assemble(config)
+    assert _journal_files(config) == [f"{_JOB_JOURNAL_DIR_NAME}/jobs.json"]
+    assert _JOB_JOURNAL_DIR_NAME.startswith("_")
 
 
 def test_boot_writes_the_journal_even_with_no_jobs(tmp_path: Path) -> None:
     """볼륨·소유자 잘못을 **첫 job 제출까지 미루지 않는다** — 기동이 그 자리에 쓴다."""
     config = _config(tmp_path)
+    assert not config.artifact_out_dir.exists()  # 기동 전에는 자리가 없다
     _assemble(config)
-    assert _job_journal(config).path.exists()
+    assert _journal_files(config) != []
 
 
 def test_unreadable_journal_refuses_to_boot(tmp_path: Path) -> None:
     """위협 모델 ⑤ — 깨진 저널에서 조용히 빈 저장소로 시작하지 않는다."""
     config = _config(tmp_path)
-    journal = _job_journal(config)
-    journal.path.parent.mkdir(parents=True)
-    journal.path.write_text("깨진 저널", encoding="utf-8")
+    broken = _journal_file_path(config)
+    broken.parent.mkdir(parents=True)
+    broken.write_text("깨진 저널", encoding="utf-8")
 
     preloaded = _preload(config)
     gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))

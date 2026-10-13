@@ -39,15 +39,15 @@ _TMP_SUFFIX: Final[str] = ".tmp"
 
 class JobJournal:
     """저널 파일 하나를 소유한다. 경로는 **조립 근이 설정에서** 준다(설계 검토 (2b) —
-    이 클래스를 조립 근 밖에서 만들지 않는다, `tests/gates` 가 정적으로 센다)."""
+    이 클래스를 조립 근 밖에서 만들지 않는다, `tests/gates` 가 정적으로 센다).
+
+    **경로를 밖에 내주지 않는다**(vr H-2) — `path` property 가 있던 자리다. 경로 객체를
+    얻을 수 있으면 어느 모듈이든 저장소 잠금 밖에서 그 파일에 쓸 수 있었다(둘째 writer).
+    공개 표면은 `read`·`write` 둘이고 그 집합 등식을 게이트가 센다."""
 
     def __init__(self, directory: Path) -> None:
         self._directory = directory
         self._path = directory / _FILE_NAME
-
-    @property
-    def path(self) -> Path:
-        return self._path
 
     def read(self) -> JournalSnapshot | JournalAbsent | JournalFailed:
         """「없음」·「깨짐」·스냅숏 셋으로 답한다. tmp 파일은 판독 대상이 아니다(원자

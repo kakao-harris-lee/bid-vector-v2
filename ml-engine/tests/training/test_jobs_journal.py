@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from ml_engine.training.jobs import journal_file as journal_module
+from ml_engine.training.jobs import journal_file
 from ml_engine.training.jobs.journal import (
     JOURNAL_SCHEMA_VERSION,
     JobSubmission,
@@ -118,9 +118,15 @@ def _all_states_snapshot() -> JournalSnapshot:
     )
 
 
+def _file(journal: JobJournal) -> Path:
+    """저널 파일 자리 — **production 표면에는 없다**(vr H-2: 경로 객체를 밖에 내주지 않아
+    둘째 writer 를 조립할 수 없다). test 는 모듈 private 이름으로 같은 자리를 계산한다."""
+    return journal._path
+
+
 def _write_raw(journal: JobJournal, text: str) -> None:
-    journal.path.parent.mkdir(parents=True, exist_ok=True)
-    journal.path.write_text(text, encoding="utf-8")
+    _file(journal).parent.mkdir(parents=True, exist_ok=True)
+    _file(journal).write_text(text, encoding="utf-8")
 
 
 # ---- 「없음」과 「깨짐」의 구분(위협 모델 ⑤) ----
@@ -143,8 +149,8 @@ def test_malformed_payload_is_failed_not_absent(tmp_path: Path) -> None:
 def test_truncated_payload_is_failed(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
     assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
-    full = journal.path.read_bytes()
-    journal.path.write_bytes(full[: len(full) // 2])
+    full = _file(journal).read_bytes()
+    _file(journal).write_bytes(full[: len(full) // 2])
     result = journal.read()
     assert isinstance(result, JournalFailed)
     assert result.reason is JournalFailureReason.MALFORMED
@@ -160,7 +166,7 @@ def test_unsupported_schema_version_is_failed(tmp_path: Path) -> None:
 
 def test_journal_path_is_a_directory_is_failed(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
-    journal.path.mkdir(parents=True)
+    _file(journal).mkdir(parents=True)
     result = journal.read()
     assert isinstance(result, JournalFailed)
     assert result.reason is JournalFailureReason.NOT_A_FILE
@@ -207,8 +213,8 @@ def test_payload_is_canonical_and_byte_stable(tmp_path: Path) -> None:
     snapshot = _all_states_snapshot()
     assert isinstance(first.write(snapshot), JournalWritten)
     assert isinstance(second.write(snapshot), JournalWritten)
-    payload = first.path.read_bytes()
-    assert payload == second.path.read_bytes()
+    payload = _file(first).read_bytes()
+    assert payload == _file(second).read_bytes()
     assert b", " not in payload and b": " not in payload
     decoded = json.loads(payload)
     assert decoded["schema_version"] == JOURNAL_SCHEMA_VERSION
@@ -221,8 +227,8 @@ def test_payload_is_canonical_and_byte_stable(tmp_path: Path) -> None:
 def test_successful_write_leaves_no_temporary_file(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
     assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
-    assert sorted(path.name for path in journal.path.parent.iterdir()) == [
-        journal.path.name
+    assert sorted(path.name for path in _file(journal).parent.iterdir()) == [
+        _file(journal).name
     ]
 
 
@@ -256,7 +262,9 @@ def test_leftover_temporary_file_does_not_break_read(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
     snapshot = _all_states_snapshot()
     assert isinstance(journal.write(snapshot), JournalWritten)
-    journal.path.with_name(journal.path.name + ".tmp").write_text("부분 쓰기 쓰레기")
+    _file(journal).with_name(_file(journal).name + ".tmp").write_text(
+        "부분 쓰기 쓰레기"
+    )
     loaded = journal.read()
     assert isinstance(loaded, JournalSnapshot)
     assert loaded == snapshot
@@ -264,7 +272,7 @@ def test_leftover_temporary_file_does_not_break_read(tmp_path: Path) -> None:
 
 def test_leftover_temporary_file_is_replaced_not_appended(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
-    temporary = journal.path.with_name(journal.path.name + ".tmp")
+    temporary = _file(journal).with_name(_file(journal).name + ".tmp")
     temporary.parent.mkdir(parents=True, exist_ok=True)
     temporary.write_text("x" * 5000)
     assert isinstance(journal.write(JournalSnapshot(entries=())), JournalWritten)
@@ -293,7 +301,7 @@ def test_retryable_inconsistent_with_the_code_is_failed(tmp_path: Path) -> None:
     조용히 받으면 판독한 기록이 사상과 다른 값을 들고 다닌다."""
     journal = JobJournal(tmp_path / "journal")
     assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     flipped = 0
     for job in decoded["jobs"]:
         if job["failure"] is not None:
@@ -310,7 +318,7 @@ def test_retryable_inconsistent_with_the_code_is_failed(tmp_path: Path) -> None:
 def test_record_combination_violation_is_failed(tmp_path: Path) -> None:
     journal = JobJournal(tmp_path / "journal")
     assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     for job in decoded["jobs"]:
         if job["state"] == "SUCCEEDED":
             job["artifact"] = None
@@ -326,7 +334,7 @@ def test_naive_timestamp_is_failed(tmp_path: Path) -> None:
         journal.write(JournalSnapshot(entries=(_entry("job-1", JobState.ACCEPTED),))),
         JournalWritten,
     )
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     decoded["jobs"][0]["accepted_at"] = "2026-01-01T00:00:00"
     _write_raw(journal, json.dumps(decoded))
     result = journal.read()
@@ -340,7 +348,7 @@ def test_unknown_state_value_is_failed(tmp_path: Path) -> None:
         journal.write(JournalSnapshot(entries=(_entry("job-1", JobState.ACCEPTED),))),
         JournalWritten,
     )
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     decoded["jobs"][0]["state"] = "ZOMBIE"
     _write_raw(journal, json.dumps(decoded))
     result = journal.read()
@@ -381,7 +389,7 @@ def test_missing_required_field_is_failed(tmp_path: Path) -> None:
         journal.write(JournalSnapshot(entries=(_entry("job-1", JobState.ACCEPTED),))),
         JournalWritten,
     )
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     del decoded["jobs"][0]["submission"]
     _write_raw(journal, json.dumps(decoded))
     result = journal.read()
@@ -395,7 +403,7 @@ def test_empty_submission_field_is_failed(tmp_path: Path) -> None:
         journal.write(JournalSnapshot(entries=(_entry("job-1", JobState.ACCEPTED),))),
         JournalWritten,
     )
-    decoded = json.loads(journal.path.read_bytes())
+    decoded = json.loads(_file(journal).read_bytes())
     decoded["jobs"][0]["submission"]["dataset_uri"] = ""
     _write_raw(journal, json.dumps(decoded))
     result = journal.read()
@@ -435,7 +443,7 @@ def test_timezone_naive_timestamp_is_refused_at_write(tmp_path: Path) -> None:
     assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
     assert "시간대" in result.detail
     # 파일 자체가 생기지 않는다 — tmp 교체 전에 거부한다.
-    assert not journal.path.exists()
+    assert not _file(journal).exists()
 
 
 def test_naive_timestamp_bytes_would_not_be_readable(tmp_path: Path) -> None:
@@ -487,7 +495,7 @@ def test_directory_fsync_failure_is_written_but_not_durable(
     def _boom(directory: Path) -> None:
         raise OSError(5, "EIO 주입")
 
-    monkeypatch.setattr(journal_module, "_fsync_directory", _boom)
+    monkeypatch.setattr(journal_file, "_fsync_directory", _boom)
     result = journal.write(_all_states_snapshot())
     monkeypatch.undo()
 

@@ -1,15 +1,30 @@
 """RED — job 저장소·저널의 **조립 경계**(M6/6B-4 설계 검토 (2b) 「경계로 처리」 행의
-실측 목록). 새 public 표면 둘이 밖에 허락하는 것을 구조로 좁힌다:
+실측 목록). 새 public 표면이 밖에 허락하는 것을 구조로 좁힌다:
 
 - `JobJournal(경로)` — 임의 디렉터리에 저널을 쓸 수 있다. 그래서 **조립 근에서만** 만들고
-  경로는 설정에서만 온다(문자열 리터럴 경로 0).
+  경로는 `ServerConfig` 필드에서만 온다.
 - `JobStore(...)` — 저널 없는 저장소가 생길 수 있다. `journal` 이 필수 인자라 타입으로
   이미 닫혀 있고, 그 위에 **생성 자리**를 `load_job_store` 하나로 좁힌다.
-- 원자 교체(`os.replace`)는 저널 모듈 한 자리뿐이다 — 둘째 writer 가 생기면 저장소 잠금
-  밖에서 파일이 바뀔 수 있다(우회 (9)와 같은 축).
+- **둘째 writer** — 저장소 잠금 밖에서 저널 파일이 바뀌면 상태와 디스크가 갈라진다
+  (우회 (9)와 같은 축).
 
-판정은 **AST** 로 한다(grep 이 아니다 — 주석·문자열에 같은 이름이 있어도, 줄바꿈으로
-쪼개도 같은 답이 나온다). 음성 대조를 함께 둬 스캐너가 실제로 생성을 본다는 것을 보인다.
+**vr H-2 / cr M-4 — 앞 판의 술어는 호출식의 「이름」에 걸려 있어 규약을 형식적으로 지키는
+스타일 하나로 열렸다**(실측: 별칭 import `JobJournal as _J` · `from os import replace as
+_swap` · `Path(a).replace(b)` · 모듈 상수 경유 리터럴 다섯이 모두 초록). 이 판의 술어는
+셋 모두 **구조**다:
+
+1. **심볼 해석** — 호출식의 이름이 아니라 그 이름이 가리키는 **정규화된 출처**
+   (`ml_engine.training.jobs.journal_file.JobJournal`)로 센다. 별칭·속성 접근·`from`
+   import 가 같은 답을 낸다.
+2. **닫힌 import 집합** — 저널 **파일 모듈**을 import 할 수 있는 모듈 자체를 집합 등식으로
+   닫는다(import-linter 계약을 쓸 수 없는 자리의 같은 층 — `pyproject.toml` 은 이 slice
+   in_scope 밖이다). 이름 하나를 더하려면 **이 게이트를 고쳐야** 한다.
+3. **경로를 밖에 내주지 않는다** — `JobJournal` 의 공개 표면 집합 등식(`path` property
+   없음). 경로 객체를 얻을 수 없으면 둘째 writer 를 조립할 수 없다.
+
+경계 밖(코드로 막지 않고 알려진 제한으로 적는다): **동적 접근**
+(`importlib.import_module` · `getattr(module, "JobJournal")`) — AST 는 import 문과 호출식을
+읽는다. 저널 파일을 **직접 편집하는 주체**는 애초에 비방어다(위협 모델).
 """
 
 from __future__ import annotations
@@ -19,55 +34,205 @@ from pathlib import Path
 
 import pytest
 
+from ml_engine.training.jobs.journal_file import JobJournal
+
 _SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "ml_engine"
 
-_JOURNAL_CONSTRUCTION_SITES = frozenset({"app/server.py"})
+_JOURNAL_FILE_MODULE = "ml_engine.training.jobs.journal_file"
+_JOURNAL_CLASS = f"{_JOURNAL_FILE_MODULE}.JobJournal"
+_STORE_CLASS = "ml_engine.training.jobs.store.JobStore"
+_SERVER_MODULE = "app/server.py"
+_JOURNAL_FILE_SOURCE = "training/jobs/journal_file.py"
+
+_JOURNAL_CONSTRUCTION_SITES = frozenset({_SERVER_MODULE})
 _STORE_CONSTRUCTION_SITES = frozenset({"training/jobs/store.py"})
-_ATOMIC_REPLACE_SITES = frozenset({"training/jobs/journal_file.py"})
+_JOURNAL_FILE_IMPORTERS = frozenset({"training/jobs/store.py", _SERVER_MODULE})
+
+# 저널이 사는 자리(`artifact_out_dir` 아래)에 닿을 수 있는 모듈들 — 이 범위 안에서
+# 파일계를 바꾸는 호출 자리를 닫는다. `adapters/`·`registry/` 는 산출물·스냅숏이라는 다른
+# 축이고 저널 경로를 알 방법이 없다(그 축은 이 slice 의 위협 모델 밖).
+_FS_SCOPE_PREFIXES = ("training/jobs/", "app/")
+_FS_MUTATION_SITES = frozenset(
+    {
+        _JOURNAL_FILE_SOURCE,
+        # 선재 — backtest 산출물 디렉터리 생성(저널과 무관). 자리가 늘면 이 집합이 붉어진다.
+        "app/backtest_cli.py",
+    }
+)
+
+# 파일계를 바꾸는 모듈 수준 함수(심볼 해석 뒤의 정규 이름).
+_FS_MUTATION_FUNCTIONS = frozenset(
+    {
+        "os.replace",
+        "os.rename",
+        "os.renames",
+        "os.link",
+        "os.symlink",
+        "os.remove",
+        "os.unlink",
+        "os.removedirs",
+        "os.rmdir",
+        "os.truncate",
+        "os.ftruncate",
+        "os.mkdir",
+        "os.makedirs",
+        "os.open",
+        "os.write",
+        "os.writev",
+        "shutil.move",
+        "shutil.copy",
+        "shutil.copy2",
+        "shutil.copyfile",
+        "shutil.copyfileobj",
+        "shutil.copytree",
+        "shutil.rmtree",
+    }
+)
+
+# `Path` 류 메서드 — 수신자의 타입을 AST 로는 모르므로 이름으로 센다. 다른 타입과 이름이
+# 겹치지 않는 것들은 **인자 모양을 보지 않는다**(`write_text(data, encoding=…)` 처럼
+# 키워드를 붙여 비껴가는 길을 남기지 않는다).
+_FS_MUTATION_METHODS_ANY_SHAPE = frozenset(
+    {
+        "unlink",
+        "write_bytes",
+        "write_text",
+        "touch",
+        "mkdir",
+        "rmdir",
+        "symlink_to",
+        "hardlink_to",
+    }
+)
+# 이름이 겹치는 둘만 모양으로 가른다: `Path.replace(target)`·`Path.rename(target)` 은
+# 위치 인자 **하나**, `str.replace("a", "b")` 는 둘, `datetime.replace(tzinfo=…)` 는
+# 키워드만, `dataclasses.replace(x, …)` 는 심볼 해석으로 모듈 함수다.
+_FS_MUTATION_METHODS_ONE_ARG = frozenset({"replace", "rename"})
+_RESOLVED_MODULE_PREFIXES = frozenset({"dataclasses", "os", "shutil", "os.path"})
 
 
-def _sources() -> dict[str, ast.Module]:
-    return {
-        path.relative_to(_SRC_ROOT).as_posix(): ast.parse(
-            path.read_text(encoding="utf-8")
+# ---- 심볼 해석 ----
+
+
+def module_dotted(relative: str) -> str:
+    """`training/jobs/store.py` → `ml_engine.training.jobs.store`."""
+    stem = relative.removesuffix(".py").removesuffix("/__init__")
+    return "ml_engine." + stem.replace("/", ".")
+
+
+def import_bindings(tree: ast.AST, own_module: str | None = None) -> dict[str, str]:
+    """모듈의 지역 이름 → **정규화된 출처**. `import a.b as z`·`from a.b import X as y`
+    를 전부 같은 모양으로 눕힌다 — 별칭이 술어를 비껴가지 못한다.
+
+    `own_module` 이 있으면 **그 모듈이 직접 정의한** 최상위 클래스·함수도 같은 모양으로
+    눕힌다(`store.py` 안의 `JobStore(...)` 가 자기 자신의 정규 이름으로 해석된다 —
+    정의한 자리를 import 한 자리와 같은 술어로 센다)."""
+    bound: dict[str, str] = {}
+    if own_module is not None and isinstance(tree, ast.Module):
+        for statement in tree.body:
+            if isinstance(
+                statement, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+            ):
+                bound[statement.name] = f"{own_module}.{statement.name}"
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname is not None:
+                    bound[alias.asname] = alias.name
+                else:
+                    root = alias.name.split(".")[0]
+                    bound[root] = root
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            for alias in node.names:
+                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return bound
+
+
+def resolve_callee(node: ast.expr, bound: dict[str, str]) -> str | None:
+    """호출식 → 정규 이름. 속성 사슬(`a.b.C`)은 뿌리를 바인딩으로 치환해 잇는다."""
+    parts: list[str] = []
+    current: ast.expr = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, ast.Name):
+        return None
+    parts.append(bound.get(current.id, current.id))
+    return ".".join(reversed(parts))
+
+
+def _sources() -> tuple[tuple[str, ast.Module], ...]:
+    return tuple(
+        (
+            path.relative_to(_SRC_ROOT).as_posix(),
+            ast.parse(path.read_text(encoding="utf-8")),
         )
         for path in sorted(_SRC_ROOT.rglob("*.py"))
         if "__pycache__" not in path.parts and "_generated" not in path.parts
-    }
-
-
-def _called_name(node: ast.Call) -> str | None:
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr
-    return None
-
-
-def construction_sites(tree: ast.Module, name: str) -> list[ast.Call]:
-    return [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and _called_name(node) == name
-    ]
-
-
-def _files_constructing(name: str) -> frozenset[str]:
-    return frozenset(
-        module for module, tree in _sources().items() if construction_sites(tree, name)
     )
 
 
-def _replace_sites() -> frozenset[str]:
+def construction_sites(
+    tree: ast.AST, qualified: str, bound: dict[str, str] | None = None
+) -> list[ast.Call]:
+    bindings = import_bindings(tree) if bound is None else bound
+
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and resolve_callee(node.func, bindings) == qualified
+    ]
+
+
+def files_constructing(qualified: str) -> frozenset[str]:
+    return frozenset(
+        module
+        for module, tree in _sources()
+        if construction_sites(
+            tree, qualified, import_bindings(tree, module_dotted(module))
+        )
+    )
+
+
+def modules_importing(target_module: str) -> frozenset[str]:
+    """`target_module` 에서 **무엇이든** 가져오는 모듈 집합.
+    `import ml_engine.training.jobs.journal_file as x` 도 같이 센다."""
     found: set[str] = set()
-    for module, tree in _sources().items():
+    for module, tree in _sources():
         for node in ast.walk(tree):
+            if (isinstance(node, ast.ImportFrom) and node.module == target_module) or (
+                isinstance(node, ast.Import)
+                and any(alias.name == target_module for alias in node.names)
+            ):
+                found.add(module)
+    return frozenset(found)
+
+
+def fs_mutation_sites(trees: tuple[tuple[str, ast.Module], ...]) -> frozenset[str]:
+    found: set[str] = set()
+    for module, tree in trees:
+        bound = import_bindings(tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            resolved = resolve_callee(node.func, bound)
+            if resolved in _FS_MUTATION_FUNCTIONS:
+                found.add(module)
+                continue
             if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "replace"
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "os"
+                resolved is not None
+                and "." in resolved
+                and resolved.rsplit(".", 1)[0] in _RESOLVED_MODULE_PREFIXES
+            ):
+                # 모듈 함수로 해석됐고 금지 집합 밖이다(`dataclasses.replace` 등).
+                continue
+            if not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr in _FS_MUTATION_METHODS_ANY_SHAPE or (
+                node.func.attr in _FS_MUTATION_METHODS_ONE_ARG
+                and len(node.args) == 1
+                and not node.keywords
             ):
                 found.add(module)
     return frozenset(found)
@@ -77,59 +242,231 @@ def _replace_sites() -> frozenset[str]:
 
 
 def test_job_journal_is_constructed_only_in_the_assembly_root() -> None:
-    assert _files_constructing("JobJournal") == _JOURNAL_CONSTRUCTION_SITES
+    assert files_constructing(_JOURNAL_CLASS) == _JOURNAL_CONSTRUCTION_SITES
 
 
 def test_job_store_is_constructed_only_by_the_loader() -> None:
-    assert _files_constructing("JobStore") == _STORE_CONSTRUCTION_SITES
+    assert files_constructing(_STORE_CLASS) == _STORE_CONSTRUCTION_SITES
 
 
-def test_atomic_replace_happens_in_one_place() -> None:
-    assert _replace_sites() == _ATOMIC_REPLACE_SITES
+def test_only_the_assembly_root_and_the_store_import_the_journal_file_module() -> None:
+    """닫힌 import 집합 — 저널 **파일** 모듈을 아는 모듈이 둘뿐이다. 별칭으로 가져오려면
+    먼저 import 해야 하고, 그 import 가 여기서 붉어진다."""
+    assert modules_importing(_JOURNAL_FILE_MODULE) == _JOURNAL_FILE_IMPORTERS
 
 
-def test_journal_path_never_comes_from_a_literal() -> None:
-    """경로는 설정에서만 온다 — 생성 인자 식 안에 문자열 리터럴이 있으면 그 자리가
-    저장소 밖에서 정해지지 않는다는 뜻이다(이미지·볼륨과 어긋날 수 있다)."""
-    for module, tree in _sources().items():
-        for call in construction_sites(tree, "JobJournal"):
-            literals = [
-                node
-                for argument in (*call.args, *(kw.value for kw in call.keywords))
-                for node in ast.walk(argument)
-                if isinstance(node, ast.Constant) and isinstance(node.value, str)
-            ]
-            assert not literals, (module, [node.value for node in literals])
+def test_filesystem_mutations_near_the_journal_happen_in_one_place() -> None:
+    """둘째 writer 축 — 저널에 닿을 수 있는 범위에서 파일계를 바꾸는 자리를 닫는다.
+    이름 하나(`os.replace`)가 아니라 **집합**이고, 심볼 해석이라 별칭도 같이 센다."""
+    scoped = tuple(
+        (module, tree)
+        for module, tree in _sources()
+        if module.startswith(_FS_SCOPE_PREFIXES)
+    )
+    assert scoped, "범위가 비었다 — 경로 접두가 낡았다"
+    assert fs_mutation_sites(scoped) == _FS_MUTATION_SITES
 
 
-# ---- 음성 대조 — 스캐너가 실제로 생성을 본다 ----
+def test_the_journal_does_not_expose_its_path() -> None:
+    """경로 객체를 밖에 내주지 않는다(vr H-2) — `path` property 가 있으면 어느 모듈이든
+    그 경로에 직접 쓸 수 있었다. 공개 표면을 **집합 등식**으로 닫는다(이름 하나 금지가
+    아니다 — 새 접근자가 생기면 이름과 무관하게 붉어진다)."""
+    public = {name for name in vars(JobJournal) if not name.startswith("_")}
+    assert public == {"read", "write"}
+
+
+def test_the_package_root_does_not_re_export_constructible_classes() -> None:
+    """패키지 뿌리 재수출은 `from ml_engine.training.jobs import JobJournal` 이라는
+    **둘째 획득 경로**였다(앞 판의 G1·G4 가 그 길로 갔다). 생성 가능한 둘을 뺀다."""
+    from ml_engine.training import jobs
+
+    assert "JobJournal" not in jobs.__all__
+    assert "JobStore" not in jobs.__all__
+    assert not hasattr(jobs, "JobJournal")
+    assert not hasattr(jobs, "JobStore")
+
+
+# ---- 값 축 — 경로는 `ServerConfig` 필드에서만 온다(cr M-4) ----
+
+
+def _server_config_fields(tree: ast.Module) -> frozenset[str]:
+    """`ServerConfig` 의 필드 이름을 **기계로** 뽑는다(손 목록 금지 — 필드가 바뀌면 같이
+    바뀐다)."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "ServerConfig":
+            return frozenset(
+                statement.target.id
+                for statement in node.body
+                if isinstance(statement, ast.AnnAssign)
+                and isinstance(statement.target, ast.Name)
+            )
+    raise AssertionError("app/server.py 에서 ServerConfig 를 찾지 못했다")
+
+
+def _module_string_constants(tree: ast.Module) -> dict[str, str]:
+    constants: dict[str, str] = {}
+    for statement in tree.body:
+        target: ast.expr | None = None
+        if isinstance(statement, ast.AnnAssign):
+            target = statement.target
+        elif isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+            target = statement.targets[0]
+        if (
+            isinstance(target, ast.Name)
+            and isinstance(statement, (ast.AnnAssign, ast.Assign))
+            and isinstance(statement.value, ast.Constant)
+            and isinstance(statement.value.value, str)
+        ):
+            constants[target.id] = statement.value.value
+    return constants
+
+
+def path_provenance_violations(tree: ast.Module) -> list[str]:
+    """`JobJournal(...)` 인자식의 **출처**를 본다. 다음 셋 중 하나라도 어긋나면 위반:
+
+    ① 설정 뿌리 — 인자식 안에 `<파라미터>.<ServerConfig 필드>` 가 있어야 한다(모듈 상수
+       하나를 끼워 넣은 G5 가 여기서 걸린다).
+    ② 조립 상수 — 그 밖의 이름은 모듈 수준 문자열 상수여야 하고, 그 값은 **상대 경로
+       한 조각**이어야 한다(`"/tmp/rogue"` 같은 절대 경로는 위반).
+    ③ 인라인 리터럴 금지.
+    """
+    config_fields = _server_config_fields(tree)
+    constants = _module_string_constants(tree)
+    violations: list[str] = []
+    for function in ast.walk(tree):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        parameters = {argument.arg for argument in function.args.args}
+        for call in construction_sites(function, _JOURNAL_CLASS, import_bindings(tree)):
+            arguments = [*call.args, *(keyword.value for keyword in call.keywords)]
+            nodes = [node for argument in arguments for node in ast.walk(argument)]
+            rooted = any(
+                isinstance(node, ast.Attribute)
+                and node.attr in config_fields
+                and isinstance(node.value, ast.Name)
+                and node.value.id in parameters
+                for node in nodes
+            )
+            if not rooted:
+                violations.append(f"{function.name}: 설정 뿌리 없음")
+            for node in nodes:
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    violations.append(f"{function.name}: 인라인 리터럴 {node.value!r}")
+                if isinstance(node, ast.Name) and node.id not in parameters:
+                    value = constants.get(node.id)
+                    if value is None:
+                        continue  # 호출 가능 이름(`Path` 등) — 문자열 상수가 아니다
+                    if "/" in value or value in {".", "..", ""}:
+                        violations.append(f"{function.name}: 조각 아님 {value!r}")
+    return violations
+
+
+def test_the_journal_path_comes_from_a_server_config_field() -> None:
+    assert path_provenance_violations(dict(_sources())[_SERVER_MODULE]) == []
+
+
+# ---- 음성 대조 — 스캐너가 실제로 심어 둔 우회를 본다 ----
 
 
 @pytest.mark.parametrize(
     "source",
     [
-        "from x import JobJournal\nj = JobJournal(Path('/tmp/anywhere'))\n",
-        "import x\nj = x.JobJournal(p)\n",
-        "def f():\n    return [JobJournal(p) for p in ps]\n",
+        # 앞 판이 놓친 별칭 경로(G1·G4)
+        f"from {_JOURNAL_FILE_MODULE} import JobJournal as _J\nj = _J(p)\n",
+        f"import {_JOURNAL_FILE_MODULE} as _m\nj = _m.JobJournal(p)\n",
+        "import ml_engine.training.jobs.journal_file\n"
+        "j = ml_engine.training.jobs.journal_file.JobJournal(p)\n",
+        f"from {_JOURNAL_FILE_MODULE} import JobJournal\n"
+        "def f():\n    return [JobJournal(q) for q in qs]\n",
     ],
 )
-def test_scanner_finds_injected_construction(source: str) -> None:
-    assert construction_sites(ast.parse(source), "JobJournal")
+def test_scanner_finds_aliased_construction(source: str) -> None:
+    assert construction_sites(ast.parse(source), _JOURNAL_CLASS)
+
+
+def test_scanner_ignores_a_same_named_class_from_elsewhere() -> None:
+    """심볼 해석의 값 — 같은 이름이라도 **다른 출처**면 이 경계의 대상이 아니다."""
+    source = "from somewhere.else_ import JobJournal\nj = JobJournal(p)\n"
+    assert not construction_sites(ast.parse(source), _JOURNAL_CLASS)
 
 
 def test_scanner_ignores_the_name_in_comments_and_strings() -> None:
-    """grep 과 달라지는 자리 — 주석·문자열의 같은 이름은 생성이 아니다."""
     source = '# JobJournal(p) 는 조립 근에서만 만든다\nname = "JobJournal(p)"\n'
-    assert not construction_sites(ast.parse(source), "JobJournal")
+    assert not construction_sites(ast.parse(source), _JOURNAL_CLASS)
 
 
-def test_literal_scanner_sees_a_hardcoded_path() -> None:
-    tree = ast.parse("j = JobJournal(Path('/var/lib/jobs'))\n")
-    call = construction_sites(tree, "JobJournal")[0]
-    literals = [
-        node
-        for argument in call.args
-        for node in ast.walk(argument)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-    ]
-    assert [node.value for node in literals] == ["/var/lib/jobs"]
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from os import replace as _swap\n_swap(a, b)\n",  # G3
+        "import os as _o\n_o.rename(a, b)\n",
+        "from pathlib import Path\nPath(a).replace(b)\n",  # G2
+        "p.rename(b)\n",
+        "p.write_bytes(data)\n",
+        'p.write_text(data, encoding="utf-8")\n',  # 키워드를 붙여도 센다
+        "p.mkdir(parents=True, exist_ok=True)\n",
+        "import shutil as _s\n_s.move(a, b)\n",
+    ],
+)
+def test_scanner_finds_injected_second_writers(source: str) -> None:
+    assert fs_mutation_sites((("probe.py", ast.parse(source)),)) == {"probe.py"}
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'name = text.replace("a", "b")\n',  # str.replace — 위치 인자 둘
+        "aware = value.replace(tzinfo=UTC)\n",  # datetime.replace — 키워드만
+        "import dataclasses\nnext_ = dataclasses.replace(entry, record=record)\n",
+        "import os.path\nhead = os.path.join(a, b)\n",
+    ],
+)
+def test_scanner_does_not_flag_unrelated_replace_calls(source: str) -> None:
+    """과잉 금지의 통제군 — 이 넷이 걸리면 게이트가 정상 코드를 막는다."""
+    assert fs_mutation_sites((("probe.py", ast.parse(source)),)) == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("extra_constant", "expected"),
+    [
+        # G5 — 모듈 상수 경유 절대 경로(앞 판은 리터럴 술어가 초록이었다)
+        ('_ROGUE: Final[str] = "/tmp/rogue"', ("설정 뿌리 없음", "조각 아님")),
+        # 상대 한 조각이어도 설정 뿌리가 없으면 위반이다
+        ('_ROGUE: Final[str] = "_journal"', ("설정 뿌리 없음",)),
+    ],
+)
+def test_provenance_scanner_rejects_a_rogue_path(
+    extra_constant: str, expected: tuple[str, ...]
+) -> None:
+    """조립 근의 인자식을 바꿔치운 문면에서 술어가 **다른 답**을 낸다(값 축 실측)."""
+    original = (_SRC_ROOT / _SERVER_MODULE).read_text(encoding="utf-8")
+    mutated = original.replace(
+        "    return JobJournal(config.artifact_out_dir / _JOB_JOURNAL_DIR_NAME)",
+        "    return JobJournal(_ROGUE)",
+    ).replace(
+        '_JOB_JOURNAL_DIR_NAME: Final[str] = "_journal"',
+        f'_JOB_JOURNAL_DIR_NAME: Final[str] = "_journal"\n{extra_constant}',
+    )
+    assert mutated != original
+    violations = path_provenance_violations(ast.parse(mutated))
+    for fragment in expected:
+        assert any(fragment in violation for violation in violations), (
+            fragment,
+            violations,
+        )
+
+
+def test_the_boundary_sets_are_not_vacuous() -> None:
+    """집합 등식이 「아무도 아무것도 안 한다」로 성립하지 않는다 — 각 집합의 원소가
+    실제로 그 일을 한다."""
+    sources = dict(_sources())
+    assert construction_sites(sources[_SERVER_MODULE], _JOURNAL_CLASS)
+    store_module = "training/jobs/store.py"
+    assert construction_sites(
+        sources[store_module],
+        _STORE_CLASS,
+        import_bindings(sources[store_module], module_dotted(store_module)),
+    )
+    assert fs_mutation_sites(
+        ((_JOURNAL_FILE_SOURCE, sources[_JOURNAL_FILE_SOURCE]),)
+    ) == {_JOURNAL_FILE_SOURCE}

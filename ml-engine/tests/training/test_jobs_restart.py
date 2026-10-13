@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from ml_engine.training.jobs import journal_file as journal_module
+from ml_engine.training.jobs import journal_file
 from ml_engine.training.jobs.journal import (
     JobSubmission,
     JournalFailed,
@@ -55,6 +55,12 @@ def _submission(spec_version: str = "training-spec-v1") -> JobSubmission:
 
 def _journal(tmp_path: Path) -> JobJournal:
     return JobJournal(tmp_path / "journal")
+
+
+def _journal_path(tmp_path: Path) -> Path:
+    """저널 파일 자리 — production 표면에는 없다(vr H-2). test 는 모듈 private 이름으로
+    같은 자리를 계산한다."""
+    return tmp_path / "journal" / journal_file._FILE_NAME
 
 
 def _first_boot(tmp_path: Path, *, pending_queue_max: int = 4) -> JobStore:
@@ -109,7 +115,7 @@ def test_absent_journal_loads_an_empty_store_and_writes_the_journal(
     assert loaded.store.pending_jobs() == ()
     assert loaded.disposition.running_orphans_failed == 0
     assert loaded.disposition.pending_over_limit_failed == 0
-    assert _journal(tmp_path).path.exists()
+    assert _journal_path(tmp_path).exists()
 
 
 def test_unwritable_journal_directory_fails_the_load(tmp_path: Path) -> None:
@@ -129,8 +135,8 @@ def test_unwritable_journal_directory_fails_the_load(tmp_path: Path) -> None:
 def test_unreadable_journal_is_not_an_empty_store(tmp_path: Path) -> None:
     """위협 모델 ⑤ — 판독 불가는 조용한 초기화가 아니라 **판정 불가**다."""
     journal = _journal(tmp_path)
-    journal.path.parent.mkdir(parents=True)
-    journal.path.write_text("깨진 저널")
+    _journal_path(tmp_path).parent.mkdir(parents=True)
+    _journal_path(tmp_path).write_text("깨진 저널")
     result = load_job_store(journal=journal, pending_queue_max=4, at=_RESTART_AT)
     assert isinstance(result, JournalFailed)
     assert result.reason is JournalFailureReason.MALFORMED
@@ -373,7 +379,7 @@ def test_directory_fsync_failure_keeps_disk_and_memory_together(
     def _boom(directory: Path) -> None:
         raise OSError(5, "EIO 주입")
 
-    monkeypatch.setattr(journal_module, "_fsync_directory", _boom)
+    monkeypatch.setattr(journal_file, "_fsync_directory", _boom)
     with caplog.at_level(logging.ERROR, logger="ml_engine.training.jobs.store"):
         job_id = _submit(store, "key-1")
     monkeypatch.undo()
