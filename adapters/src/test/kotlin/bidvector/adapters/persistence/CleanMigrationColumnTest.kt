@@ -40,6 +40,9 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("raw_observation", "observed_at", "timestamp with time zone", false),
             ColumnSpec("raw_observation", "release_sha", "text", false),
             ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false, true),
+            // M6/6B-3 P-1(운영자 결정 A-3) — PII 마스킹 표지. NULL 이 「아직 마스킹 안 됨」이고
+            // V18 트리거가 NULL → 값 한 번만 허용한다(값 → 값·값 → NULL 은 거부).
+            ColumnSpec("raw_observation", "pii_masked_at", "timestamp with time zone", true),
         )
 
     private val provenanceAuthorityColumns =
