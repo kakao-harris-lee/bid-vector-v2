@@ -9,11 +9,14 @@ import bidvector.workflow.retention.RetentionPolicyData
 import bidvector.workflow.retention.RetentionRefusal
 import bidvector.workflow.retention.RetentionTreatment
 import bidvector.workflow.strategy.Clock
+import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -109,6 +112,23 @@ class RetentionSweepTest : PersistenceTestSupport() {
         survivingOpeningResults() shouldContainExactlyInAnyOrder listOf("RET-new", "RET-fk")
     }
 
+    /**
+     * 우회 6 ⓑ 가 만드는 **대가의 수렴**을 잰다 — 가드가 남긴 부모가 영원히 남지 않는다.
+     * 자식이 기한을 넘는 시계로 한 번 더 돌면, 순서가 자식 → 부모라 **같은 run 안에서** 자식이
+     * 먼저 사라지고 부모 가드가 풀린다(두 run 이 더 필요하지 않다).
+     */
+    @Test
+    fun `남은 부모는 자식이 기한을 넘는 다음 run 에서 사라진다 — 수렴한다`() {
+        fixture.seedLateChild(parentAt = JUST_OLDER, childAt = JUST_NEWER)
+        sweepAt(NOW)
+        survivingOpeningResults() shouldContain "RET-fk"
+
+        sweepAt(NOW + Duration.ofSeconds(2))
+
+        survivingOpeningResults().shouldBeEmpty()
+        survivingReservePrices().shouldBeEmpty()
+    }
+
     @Test
     fun `파기 순서는 자식부터다 — 보고가 그 순서를 싣는다`() {
         val report = sweepAt(NOW).shouldBeInstanceOf<RetentionOutcome.Completed>().report
@@ -166,6 +186,8 @@ class RetentionSweepTest : PersistenceTestSupport() {
     private fun remainingOutboxEntries(): List<String> = queryColumn("SELECT entry_id FROM outbox")
 
     private fun survivingOpeningResults(): List<String> = queryColumn("SELECT notice_number FROM opening_result")
+
+    private fun survivingReservePrices(): List<String> = queryColumn("SELECT notice_number FROM opening_reserve_price")
 
     private fun createUnclassifiedTable() = execute("CREATE TABLE ret_unclassified (id INT PRIMARY KEY)")
 
