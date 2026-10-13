@@ -148,3 +148,91 @@ M-9 보충: JSON **문법** 오류는 이 변이가 건드리지 않는 갈래(`
 ## rollback 실측
 
 `rollback.md` 참조(실측 HEAD · ①~⑥ 결과를 그 파일이 갖는다).
+
+## acceptance — `container` job (S-21 ~ S-25, ci.yml 의 run step 순서대로)
+
+S-23b·S-23c·S-25 는 워크플로의 run 블록을 **파일에서 그대로 꺼내** 실행했다(손으로 옮겨 적지
+않는다). S-22f 는 CI 전용 artifact 업로드라 로컬에서는 SBOM 파일 생성 여부로 갈음한다.
+
+## 2026-10-14T
+- cmd: `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` (S-21)
+- exit: 0
+- 핵심 결과: 이미지 생성(15s)
+
+## 2026-10-14T
+- cmd: `./gradlew --no-daemon :app:bootJar` (S-21a)
+- exit: 0
+- 핵심 결과: 37 tasks up-to-date
+
+## 2026-10-14T
+- cmd: `docker build -f docker/app.Dockerfile -t bidvector/app:local .` (S-21b)
+- exit: 0
+- 핵심 결과: 이미지 생성
+
+## 2026-10-14T
+- cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local config/quality/image-hygiene-policy.properties` (S-22a)
+- exit: 0
+- 핵심 결과: 위생 게이트 통과 — 금지 import 5건 부재 · pid 1 uid 10001 · base layer 접두 일치 · 크기 상한 아래
+
+## 2026-10-14T
+- cmd: `./tools/image-hygiene-check.sh bidvector/app:local config/quality/image-hygiene-policy-app.properties` (S-22b)
+- exit: 0
+- 핵심 결과: 위생 게이트 통과
+
+## 2026-10-14T
+- cmd: S-22c 앱 이미지 거부 스모크(운반 이름공간을 조기에 거부)
+- exit: 0
+- 핵심 결과: 컨테이너 비-0 + 사유 표지 D-6A2a-10 + 거부 문면이 그 이름공간 키를 말함
+
+## 2026-10-14T
+- cmd: install trivy — 정책 파일의 버전·자산·핀 체크섬으로 받아 `sha256sum --strict -c`
+- exit: 0
+- 핵심 결과: 0.75.0, 체크섬 OK
+
+## 2026-10-14T
+- cmd: `./tools/vuln-scan-check.sh bidvector/ml-serving:local ml-serving config/quality/vuln-policy.properties` (S-22d)
+- exit: 0
+- 핵심 결과: 차단 후보 52 · 미등재 0 — 게이트 통과
+
+## 2026-10-14T
+- cmd: `./tools/vuln-scan-check.sh bidvector/app:local app config/quality/vuln-policy.properties` (S-22e)
+- exit: 0
+- 핵심 결과: 차단 후보 15 · 미등재 0 — 게이트 통과
+
+## 2026-10-14T
+- cmd: S-22f 갈음 — SBOM 파일 생성 확인(`build/vuln-scan/*-sbom.cdx.json`)
+- exit: 0
+- 핵심 결과: 2개(이미지 둘)
+
+## 2026-10-14T
+- cmd: `docker compose -f docker/compose.yaml up -d` + healthy 수렴 대기 (S-23)
+- exit: 0
+- 핵심 결과: app·ml-serving·postgres 세 서비스 healthy(15s) — **ml-serving 에 저널 볼륨이 붙은 뒤에도** 수렴
+
+## 2026-10-14T
+- cmd: S-23b 컨테이너 스모크(ci.yml run 블록 그대로, 230줄)
+- exit: 0
+- 핵심 결과: 프로브·집계 health·인증 경계·쓰기 왕복·dry-run 왕복·수집 꺼짐 전 절 통과
+
+## 2026-10-14T
+- cmd: `./tools/db-rehearsal.sh docker/compose.yaml postgres` (S-23c)
+- exit: 0
+- 핵심 결과: 복원 등식 10가지 · forward-fix · 음성·양성 대조 통과
+
+## 2026-10-14T
+- cmd: `docker compose -f docker/compose.yaml down -v` (S-25)
+- exit: 0
+- 핵심 결과: 볼륨 둘(pg-data · ml-jobs) + 네트워크 삭제
+
+### Q-6 전용 실측 — 컨테이너 재생성 뒤 저널 생존 (wire 를 지나서)
+
+| 단계 | 실측 |
+| --- | --- |
+| 기동 직후 볼륨 안 | `/app/artifacts/_journal/jobs.json` 존재 · 소유자 `mlserving:mlserving` · 모드 `0600` · 내용은 `jobs` 빈 배열 |
+| 기동 로그 | 처분 계수 세 줄값 `0 · 0 · 0` + `readiness=READY` |
+| `StartTraining` 한 건(존재하지 않는 dataset) | handle 반환 → 폴링에서 `JOB_STATE_FAILED` / `DATASET_UNREADABLE` / `NOT_FOUND` — 저널에 그 기록이 남음 |
+| `docker compose rm -sf ml-serving` → `up -d ml-serving` | 컨테이너 **id 가 바뀜**(진짜 재생성) · healthy 재수렴 |
+| 재생성 뒤 같은 `job_id` 조회 | **같은 상태·실패 코드·세부 사유** 반환 |
+| 재생성 뒤 처분 계수 | `0 · 0 · 0`(종단 job 이라 더 처분할 것이 없다 — 수렴) |
+| 멱등 키 보존 | 같은 멱등 키 재요청이 **같은 `job_id`** 를 돌려줌(새 job 0) |
+| **통제군** — `down -v` 로 볼륨을 지우고 다시 띄움 | 저널의 job 수 **1 → 0**. 생존을 만든 것이 볼륨임을 보인다(이미지도 코드도 그대로다) |
