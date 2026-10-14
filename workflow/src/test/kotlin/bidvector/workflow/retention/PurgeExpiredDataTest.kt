@@ -336,9 +336,10 @@ class PurgeExpiredDataTest {
         val aborted = shouldThrow<RetentionAborted> { PurgeExpiredData(store, Clock { NOW }, policy()).run() }
 
         aborted.cause shouldBe STORE_FAILURE
-        aborted.partial.purgedTotal shouldBe 10
-        aborted.partial.tallies.getValue("notice").purged shouldBe 10
-        aborted.partial.cutoff shouldBe CUTOFF_AT_90_DAYS
+        val partial = aborted.partial
+        partial.purgedTotal shouldBe 10
+        partial.tallies.getValue("notice").purged shouldBe 10
+        partial.cutoff shouldBe CUTOFF_AT_90_DAYS
     }
 
     /** 앞 표가 끝나고 **다음 작업**에서 죽은 run — 앞 표의 계수가 사라지지 않는다. */
