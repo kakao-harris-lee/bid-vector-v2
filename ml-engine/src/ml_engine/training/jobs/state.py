@@ -218,6 +218,27 @@ class JobRecord:
                 raise ValueError("finished_at 은 started_at 보다 앞일 수 없습니다.")
 
 
+_PENDING_FAILURE_REASONS: frozenset[tuple[JobFailureCode, str]] = frozenset(
+    {
+        (JobFailureCode.WORKER_RESOURCE_EXHAUSTED, "PENDING_QUEUE_OVERFLOW"),
+        (JobFailureCode.TRAINING_ERROR, "TRAINING_SPEC_UNSUPPORTED_ON_RESTART"),
+        (JobFailureCode.TRAINING_ERROR, "RUNNER_CRASHED"),
+    }
+)
+"""`ACCEPTED → FAILED` 간선의 **사유 전부**(cr M-3). 계약 문면 세 자리(`training.proto`
+`JobState` 주석 · ADR 0010 D-8 개정 블록 · 아래 전이표 주석)가 이 간선의 쓰임을 「정확히
+셋」이라 선언하는데, 앞 판은 셋 각각을 양성으로만 확인했고 **넷째가 생기는 것을 막는 술어가
+없었다** — 교차 등식 게이트는 간선 집합만 보고 사유는 보지 않는다.
+
+이제 집합이 선언 데이터이고 `transition()` 이 그 밖을 거부한다. 넷째 사유를 쓰려면 이 집합을
+고쳐야 하고, 그러면 문면 대조 게이트가 붉어진다. `detail_code` 를 문자열로 적는 이유는
+`DetailCode`(pipeline.py)가 이 모듈을 import 하기 때문이다 — 게이트가 각 문자열이 그 닫힌
+어휘의 값임을 단언한다.
+
+**대기 출발에만 걸린다**: 실행 중 실패(파이프라인 어휘 전체)는 `RUNNING → FAILED` 이고
+이 제약의 대상이 아니다. RUNNING 고아 처분(`RUNNER_LOST_ON_RESTART`)도 그쪽 간선이다."""
+
+
 class TransitionRejectionReason(StrEnum):
     """거부 사유 닫힌 어휘 — 「표에 없다」와 「사유가 그 출발 상태에서 쓸 수 없다」를
     구분한다(M6/6B-4 설계 검토 우회 (3)). 둘을 한 값으로 뭉치면 호출자의 로그가
@@ -225,6 +246,7 @@ class TransitionRejectionReason(StrEnum):
 
     NOT_IN_TABLE = "NOT_IN_TABLE"
     RESOURCE_EXHAUSTED_NOT_PENDING = "RESOURCE_EXHAUSTED_NOT_PENDING"
+    PENDING_FAILURE_REASON_UNLISTED = "PENDING_FAILURE_REASON_UNLISTED"
 
 
 @dataclass(frozen=True)
@@ -290,6 +312,32 @@ def _apply_cancel(record: JobRecord, new_state: JobState, at: datetime) -> JobRe
     )
 
 
+def _failure_reason_rejection(
+    record: JobRecord, event: JobEvent, failure: JobFailure | None
+) -> TransitionRejectionReason | None:
+    """사유 축의 두 닫힘(전이표가 상태 쌍만 보는 자리를 메운다). 표에 있는 쌍이어도 사유가
+    그 출발 상태에서 쓸 수 없으면 거부한다.
+
+    ① 설계 검토 우회 (3) — `WORKER_RESOURCE_EXHAUSTED`(대기 큐 상한 폐기)는 **대기에서만**.
+    (RUNNING, FAIL) 쌍 자체는 표에 있으므로 전이표만으로는 「워커가 이미 집은 job 을 큐가
+    넘쳐서 끝냈다」를 막지 못한다.
+
+    ② cr M-3 — 반대 방향: 대기 출발의 FAIL 은 **등재된 사유 셋**만 쓴다. 대기 job 은 실행된
+    적이 없으므로 실행 중에만 생길 수 있는 사유로 끝날 수 없고, 계약 문면의 「정확히 셋」이
+    여기서 닫힌다(넷째를 쓰려면 `_PENDING_FAILURE_REASONS` 를 고쳐야 한다)."""
+    if (
+        failure is not None
+        and failure.code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
+        and record.state is not JobState.ACCEPTED
+    ):
+        return TransitionRejectionReason.RESOURCE_EXHAUSTED_NOT_PENDING
+    if record.state is JobState.ACCEPTED and event is JobEvent.FAIL:
+        reason = None if failure is None else (failure.code, failure.detail_code)
+        if reason not in _PENDING_FAILURE_REASONS:
+            return TransitionRejectionReason.PENDING_FAILURE_REASON_UNLISTED
+    return None
+
+
 def transition(
     record: JobRecord,
     event: JobEvent,
@@ -301,26 +349,17 @@ def transition(
 ) -> JobRecord | TransitionRejected:
     """유일 전이 진입점(설계 검토 (1)). 표에 없는 쌍은 `TransitionRejected`. 종료 상태의
     `CANCEL`은 멱등 no-op — `record`를 그대로 돌려준다(새 시각 대입 없음). 이벤트별
-    조립은 `_apply_*` 헬퍼로 나눈다(설계 래칫 함수 50줄).
-
-    M6/6B-4 설계 검토 우회 (3) — `WORKER_RESOURCE_EXHAUSTED`(대기 큐 상한 폐기 사유)는
-    **대기(ACCEPTED)에서만** 쓸 수 있다. (RUNNING, FAIL) 쌍 자체는 표에 있으므로 전이표
-    만으로는 「워커가 이미 집은 job 을 큐가 넘쳐서 끝냈다」를 막지 못한다 — 그 한 조합을
-    여기서 닫는다(간선은 그대로 살아 있고, 다른 사유의 (RUNNING, FAIL)은 영향 없다)."""
+    조립은 `_apply_*` 헬퍼로, 사유 축의 거부는 `_failure_reason_rejection` 으로 나눈다
+    (설계 래칫 함수 50줄)."""
     key = (record.state, event)
     new_state = _TRANSITIONS.get(key)
     if new_state is None:
         return TransitionRejected(from_state=record.state, event=event)
 
-    if (
-        failure is not None
-        and failure.code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
-        and record.state is not JobState.ACCEPTED
-    ):
+    rejection = _failure_reason_rejection(record, event, failure)
+    if rejection is not None:
         return TransitionRejected(
-            from_state=record.state,
-            event=event,
-            reason=TransitionRejectionReason.RESOURCE_EXHAUSTED_NOT_PENDING,
+            from_state=record.state, event=event, reason=rejection
         )
 
     if record.state in _TERMINAL_STATES and event is JobEvent.CANCEL:

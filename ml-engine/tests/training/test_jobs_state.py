@@ -7,7 +7,9 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ml_engine.training.jobs.pipeline import DetailCode
 from ml_engine.training.jobs.state import (
+    _PENDING_FAILURE_REASONS,
     ArtifactReference,
     EvaluationReportReference,
     JobEvent,
@@ -66,6 +68,14 @@ def _failure() -> JobFailure:
     return JobFailure(code=JobFailureCode.TRAINING_ERROR, detail_code="X")
 
 
+def _pending_failure() -> JobFailure:
+    """대기 job 을 끝내는 **등재된** 사유 하나(cr M-3)."""
+    return JobFailure(
+        code=JobFailureCode.WORKER_RESOURCE_EXHAUSTED,
+        detail_code=DetailCode.PENDING_QUEUE_OVERFLOW.value,
+    )
+
+
 # ---- 전이표(scope.md ④) ----
 
 
@@ -91,7 +101,13 @@ def test_allowed_transitions(
     if event is JobEvent.SUCCEED:
         kwargs = {"artifact": _artifact(), "evaluation": _evaluation()}
     if event is JobEvent.FAIL:
-        kwargs = {"failure": _failure()}
+        # 대기(ACCEPTED) 출발의 FAIL 은 **등재된 사유**여야 한다(cr M-3) — 그 자리의 사유
+        # 집합이 계약 문면의 「정확히 셋」이다.
+        kwargs = {
+            "failure": _pending_failure()
+            if from_state is JobState.ACCEPTED
+            else _failure()
+        }
     result = transition(record, event, at=_LATER, **kwargs)
     assert isinstance(result, JobRecord)
     assert result.state is to_state
@@ -309,3 +325,74 @@ def test_retryable_cannot_be_chosen_by_the_caller() -> None:
         JobFailure(  # type: ignore[call-arg]
             code=JobFailureCode.TRAINING_ERROR, retryable=True, detail_code="X"
         )
+
+
+# ---- cr M-3 — `ACCEPTED → FAILED` 의 사유는 **정확히 셋**(닫는 술어) ----
+
+
+def test_pending_fail_reasons_are_exactly_three_and_closed_vocabulary() -> None:
+    """계약 문면(proto `JobState` 주석 · ADR 0010 D-8 개정 · `state.py` 주석)이 이 간선의
+    쓰임을 「정확히 셋」이라 선언한다. 앞 판은 셋 각각을 **양성**으로만 확인했고 넷째가
+    생기는 것을 막는 술어가 없었다 — 교차 등식은 간선 집합만 보고 사유는 보지 않는다."""
+    assert len(_PENDING_FAILURE_REASONS) == 3
+    for code, detail_code in _PENDING_FAILURE_REASONS:
+        assert code in set(JobFailureCode)
+        assert detail_code in {member.value for member in DetailCode}
+
+
+@pytest.mark.parametrize(
+    ("code", "detail_code"),
+    [
+        # RUNNING 고아 처분 사유 — 그 간선은 `RUNNING → FAILED` 이고 대기 출발이 아니다.
+        (JobFailureCode.TRAINING_ERROR, DetailCode.RUNNER_LOST_ON_RESTART.value),
+        # 실행 중에만 생길 수 있는 사유들
+        (JobFailureCode.DATASET_UNREADABLE, DetailCode.NOT_FOUND.value),
+        (JobFailureCode.EVALUATION_ERROR, DetailCode.ACCOUNTING_MISMATCH.value),
+        (JobFailureCode.TRAINING_ERROR, DetailCode.TRAINER_ERROR.value),
+    ],
+)
+def test_pending_fail_with_an_unlisted_reason_is_rejected(
+    code: JobFailureCode, detail_code: str
+) -> None:
+    """대기 job 은 **실행된 적이 없다** — 실행 중에만 생길 수 있는 사유로 끝낼 수 없다."""
+    result = transition(
+        _valid_record(JobState.ACCEPTED),
+        JobEvent.FAIL,
+        at=_LATER,
+        failure=JobFailure(code=code, detail_code=detail_code),
+    )
+    assert isinstance(result, TransitionRejected)
+    assert result.reason is TransitionRejectionReason.PENDING_FAILURE_REASON_UNLISTED
+
+
+@pytest.mark.parametrize("reason", sorted(_PENDING_FAILURE_REASONS))
+def test_each_listed_pending_reason_is_accepted(
+    reason: tuple[JobFailureCode, str],
+) -> None:
+    """통제군 — 위 거부가 간선 자체를 막지 않는다(등재된 셋은 전부 지나간다)."""
+    code, detail_code = reason
+    result = transition(
+        _valid_record(JobState.ACCEPTED),
+        JobEvent.FAIL,
+        at=_LATER,
+        failure=JobFailure(code=code, detail_code=detail_code),
+    )
+    assert isinstance(result, JobRecord)
+    assert result.state is JobState.FAILED
+    assert result.started_at is None  # 실행된 적이 없다
+
+
+def test_running_fail_is_not_restricted_to_the_pending_reason_set() -> None:
+    """통제군 — 사유 제약은 **대기 출발**에만 걸린다. 실행 중 실패는 그 집합 밖 사유로도
+    끝난다(파이프라인 실패 어휘 전체가 그 자리의 것이다)."""
+    result = transition(
+        _record(JobState.RUNNING, started_at=_NOW),
+        JobEvent.FAIL,
+        at=_LATER,
+        failure=JobFailure(
+            code=JobFailureCode.TRAINING_ERROR,
+            detail_code=DetailCode.TRAINER_ERROR.value,
+        ),
+    )
+    assert isinstance(result, JobRecord)
+    assert result.state is JobState.FAILED

@@ -35,7 +35,12 @@ from pathlib import Path
 
 import pytest
 
-from ml_engine.training.jobs.state import _TRANSITIONS, JobState
+from ml_engine.training.jobs.pipeline import DetailCode
+from ml_engine.training.jobs.state import (
+    _PENDING_FAILURE_REASONS,
+    _TRANSITIONS,
+    JobState,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PROTO_PATH = _REPO_ROOT / "contracts/proto/bidvector/ml/v1/training.proto"
@@ -432,3 +437,34 @@ def test_kotlin_predicate_scanner_sees_an_added_clause() -> None:
     )
     assert mutated != original
     assert kotlin_predicate_body(mutated) != _KOTLIN_PREDICATE_BODY
+
+
+# ---- cr M-3 — 「쓰이는 자리는 정확히 셋」을 문면과 잇는다 ----
+
+
+def detail_codes_named_in(text: str) -> frozenset[str]:
+    """`DetailCode` 닫힌 어휘의 값 중 이 문면이 **이름으로 든** 것들."""
+    return frozenset(member.value for member in DetailCode if member.value in text)
+
+
+def test_contract_text_names_exactly_the_listed_pending_reasons() -> None:
+    """`state._PENDING_FAILURE_REASONS` 는 `transition()` 이 강제하는 **런타임 집합**이고,
+    계약 문면 두 자리는 같은 셋을 이름으로 든다. 넷째를 코드에 더하면(집합을 고쳐야 한다)
+    이 등식이 붉어지고, 문면에만 더해도 붉어진다 — 양방향이다."""
+    listed = frozenset(detail for _code, detail in _PENDING_FAILURE_REASONS)
+    assert len(listed) == 3
+    proto_block = "\n".join(
+        governed_proto_lines(_PROTO_PATH.read_text(encoding="utf-8"))
+    )
+    adr_section = _adr_d8_section(_ADR_PATH.read_text(encoding="utf-8"))
+    assert detail_codes_named_in(proto_block) == listed
+    assert detail_codes_named_in(adr_section) == listed
+
+
+def test_pending_reason_scanner_sees_a_fourth_reason_in_the_text() -> None:
+    """음성 대조 — 문면에 넷째 사유를 더하면 등식이 깨진다."""
+    original = "\n".join(governed_proto_lines(_PROTO_PATH.read_text(encoding="utf-8")))
+    mutated = f"{original}\n//   [4] 산출물 디렉터리 충돌 — `OUTPUT_DIR_NOT_EMPTY`"
+    listed = frozenset(detail for _code, detail in _PENDING_FAILURE_REASONS)
+    assert detail_codes_named_in(original) == listed
+    assert detail_codes_named_in(mutated) != listed
