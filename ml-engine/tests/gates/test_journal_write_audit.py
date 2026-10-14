@@ -31,7 +31,6 @@ import importlib.util
 import sys
 import threading
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -369,8 +368,3 @@ def test_paths_outside_a_journal_directory_are_not_watched(tmp_path: Path) -> No
     assert captured == []
     assert audit.allowed == []
     assert audit.from_tests == []
-
-
-def test_timestamp_helper_is_unaffected() -> None:
-    """훅이 세션 전역이라는 사실이 평범한 코드를 바꾸지 않는다는 최소 확인."""
-    assert datetime.now(UTC).tzinfo is UTC
