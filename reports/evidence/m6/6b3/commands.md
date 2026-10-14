@@ -29,14 +29,27 @@ evidence 를 고치는 커밋이 또 HEAD 를 움직이므로, 그 커밋 뒤의
 | 9 | 같은 커밋: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 1m03s · **33 task 전부 실행** |
 | 10 | 같은 커밋: **S-20** `./tools/one-command-check.sh` | **exit 0** — Kotlin 전건 + Python 전건(**pytest 1,420 passed** 5m45s · wheel 재수출 1 passed) |
 | 11 | 같은 커밋: **container job 의 V18·V19 소비 자리**(S-23c) | **리허설 exit 0**. 머지가 `app/build.gradle.kts`·`docker/app.Dockerfile`·`gradle/libs.versions.toml` 를 바꿨으므로 **앱 jar·이미지를 다시 빌드**했다(둘 다 exit 0) · 전략 편집 왕복 200/201/200/200 · `down -v` exit 0 |
+| 12 | **r3c 문면 커밋 `0cf252c6`**: `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m09s · **350 task 전부 실행** · test 합계 **2,984** / fail 0 / skip 4 · 게이트 task 136(UP-TO-DATE **0**) |
+| 13 | 같은 커밋: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 21s · 24 task 전부 실행 |
+
+> **12·13 에서 S-20 과 container 를 다시 돌리지 않았다 — 그 사유를 적는다.** 이 커밋이 바꾼 것은
+> Kotlin 주석 셋과 문서 둘이고, 두 job 의 입력은 **한 바이트도 바뀌지 않았다**:
+> `git diff --name-only 8251113c..0cf252c6 -- ml-engine docker adapters/src/main/resources .github` 가
+> **빈 출력**이다(S-20 의 Python 절반과 container job 이 읽는 자리 전부). Kotlin 절반은 12·13 이 전건으로
+>다시 돌았다. 행 10·11 의 결과가 이 커밋에서도 유효한 근거가 그 빈 출력이다.
 
 > **8~11 은 main 을 들인 뒤의 측정이다**(머지 `8251113c`, 충돌 0). 측정 중 HEAD 불변(양끝 `8251113c`).
 >
-> **task 수가 350·24 → 359·33 으로 늘었다 — 측정 자리 때문이 아니라 트리가 바뀌었기 때문이다.**
-> 앞의 vr R2-F8 메모는 같은 코드에서 「갓 만든 clone 이냐」로 그 차이를 설명했는데, 이번 증가의 출처는
-> **머지로 들어온 main 의 변경**이다(`app/build.gradle.kts` · `BootJarSecurityFloorTest` · 이미지 위생·
-> 취약점 정책 파일). 같은 자리(이 worktree)에서 머지 전 350·24 → 머지 후 359·33 을 쟀다. test 합계도
-> 2,982 → **2,984** 로 둘 늘었고 그 둘은 main 이 더한 것이다(이 slice 의 test 수는 그대로다).
+> **task 수 350·24 → 359·33 의 출처를 잘못 적었다가 고쳤다.** 처음엔 「트리가 바뀌었기 때문」으로
+> 적었는데, 바로 다음 run(행 12·13, 같은 트리에 주석 커밋만 더한 상태)에서 **다시 350·24** 가 나왔다.
+> 두 run 의 task 이름 집합을 비교하니 차이는 **`:build-logic:*` 12 개**(`compileKotlin` ·
+> `generatePrecompiledScriptPluginAccessors` 등)뿐이고 **제품 task 와 게이트 task 는 한 개도 다르지
+> 않다**(게이트는 세 run 모두 136 · UP-TO-DATE 0). 즉 그 수는 **included build 가 더워졌는지**로
+> 움직인다 — vr R2-F8 메모의 설명(측정 자리)이 맞고 내 「트리」 설명이 틀렸다. 머지가 `libs.versions.toml`
+> 과 `app/build.gradle.kts` 를 바꿔 그 run 에서 build-logic 이 다시 돈 것이다.
+>
+> **트리가 바꾼 것은 test 수다**: 2,982 → **2,984**. 늘어난 둘은 main 이 더한 `BootJarSecurityFloorTest`
+> 의 test 둘이고(그 class 의 test 수 = 2, 실측) 이 slice 의 test 수는 그대로다.
 
 > **7 은 job 전체가 아니다 — 무엇을 돌리지 않았는지 적는다.** 돌린 것은 `app` 이미지 빌드(S-21a·b),
 > compose 기동, 전략 편집 왕복(S-23b 의 **쓰기 부분만** — 리허설의 데이터 손실 축이 원본에 식별 가능한

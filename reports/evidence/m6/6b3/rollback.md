@@ -1,8 +1,9 @@
 # M6/6B-3 — rollback
 
-**실측 HEAD: `8251113c`**(main 을 브랜치로 들인 **머지 커밋** — 부모는 `8686a41e` 와 고정된
-`ae9b2f52` 다. 앞 실측 @`9b4625c7` 은 옮기지 않고 전부 다시 냈다). 버릴 clone(`--no-local`)에서
-①~⑥ 을 그 커밋 위에서 돌렸다.
+**실측 HEAD: `0cf252c6`**(r3c 문면 커밋 — main 을 들인 머지 `8251113c` 뒤의 마지막 산출물 커밋.
+앞 실측 @`8251113c` 은 옮기지 않고 전부 다시 냈다: 그 커밋이 되돌림 대상 **넷**을 움직였으므로
+앞 실측은 그 순간 미검증이다 — 주석·문서만 바뀌어도 규칙은 같다). 버릴 clone(`--no-local`)에서
+①~⑥ 을 그 커밋 위에서 돌렸다. **복원 출처는 그대로 고정 `ae9b2f52`** 다(머지가 들어온 뒤의 규칙).
 
 > **복원 출처가 바뀌었다 — base 가 아니라 고정된 `ae9b2f52` 다.** PR #73 이 BEHIND 라 `--no-ff` 로
 > main 을 들였고(충돌 0), 그 뒤로 **공유 파일 둘이 양쪽 변경을 함께 담는다**
@@ -16,15 +17,15 @@
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 **아니다**(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 8251113c..<판정 SHA> -- <아래 1단계 목록 49>` 이 **빈 출력**이면 유효하다.
+> `git diff --name-only 0cf252c6..<판정 SHA> -- <아래 1단계 목록 49>` 이 **빈 출력**이면 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 산출물 경로 **49**. 목록은 손으로 쓰지 않고
-**`git diff --name-status ae9b2f52..8251113c`** 에서 기계로 내고 evidence 경로만 뺐다(A 41 = 삭제 대상,
+**`git diff --name-status ae9b2f52..0cf252c6`** 에서 기계로 내고 evidence 경로만 뺐다(A 41 = 삭제 대상,
 M 8 = `ae9b2f52` 로 복원). **머지 뒤에는 base 기준으로 내지 않는다** — base..머지 는 main 의 변경까지
 담으므로 목록이 이 slice 보다 넓어지고, 그 넓은 목록으로 복원하면 **남의 변경을 지운다**.
-`ae9b2f52..머지` 는 정확히 **이 slice 가 머지된 main 위에 더한 것**이다(base 가 `ae9b2f52` 의 조상이라
+`ae9b2f52..<실측 HEAD>` 는 정확히 **이 slice 가 머지된 main 위에 더한 것**이다(base 가 `ae9b2f52` 의 조상이라
 main 의 변경은 이미 그 안에 있다). **디렉터리로 접지 않는다** — 접으면 목록이 slice 가 만진 파일보다
 넓어진다.
 
@@ -41,7 +42,7 @@ PR #73 P7 의 `ForeignKeyEdgeIdentityTest.kt` 다(r3b 는 경로를 더하지 �
 **되돌리지 않는다**: `reports/evidence/m6/6b3/**` — 이 slice 의 evidence. 되돌리면 복구 상태가
 「일이 있었다」는 기록을 잃는다. 그 디렉터리를 남긴 채 게이트가 초록인지는 ⑥ 이 잰다.
 
-**하네스 경로 변경 0(이 slice 의 몫으로는)** — `git log --oneline ae9b2f52..8251113c -- CLAUDE.md .claude/`
+**하네스 경로 변경 0(이 slice 의 몫으로는)** — `git log --oneline ae9b2f52..0cf252c6 -- CLAUDE.md .claude/`
 빈 출력. `CLAUDE.md`·`.claude/**` 는 **main 이** 바꿨고(PR #72 codex 핀) 그 변경은 머지로 들어왔다 —
 목록 밖이므로 이 복원이 건드리지 않는다.
 
@@ -131,7 +132,7 @@ V18·V19 가 **적용된 DB** 는 위 명령으로 돌아오지 않는다. 되�
 | 이미 적용된 V18 의 마스킹 구멍 | 새 V 로 `raw_observation_append_only` 를 V3 의 `reject_mutation` 으로 재지정한다(열·제약·인덱스는 남겨도 무해 — 아무도 쓰지 않는다). **그 재지정이 함께 없애는 것 둘**(mig L-3): 적재의 **표지 관문**과 **`inserted_at` 소유** — 「세 입력이 적재자 손을 벗어난다」 가운데 둘이 그 한 줄에 달려 있다 |
 | cron | cron 줄 하나를 지운다(러너는 상주 루프가 아니다) |
 
-## ①~⑥ 실측 (버릴 clone, 실측 HEAD `8251113c` · 출처 `ae9b2f52`)
+## ①~⑥ 실측 (버릴 clone, 실측 HEAD `0cf252c6` · 출처 `ae9b2f52`)
 
 | # | 확인 | 결과 |
 |---|---|---|
@@ -142,8 +143,8 @@ V18·V19 가 **적용된 DB** 는 위 명령으로 돌아오지 않는다. 되�
 | ③b | **main 전용 경로를 건드리지 않았다** | 목록 밖 18 경로의 `git diff ae9b2f52` **0줄**(복원이 남의 변경 영역에 닿지 않는다) |
 | ③c | **내 표지 0 · main 표지 보존** | 내 표지 전부 0 — 게이트 등재의 `retention.` 0 · `MigrationLockTimeout` 0 · `ForeignKeyEdgeIdentity` 0 · 정책의 `RetentionWiring`·`app.retention.` 0 · 공유 runbook 의 `bidvector.retention` 0 과 「90일에 파기」 0 · `adapters/.../retention/` 파일 0. **main 의 표지는 그대로** — 게이트 등재의 `BootJarSecurityFloorTest` **2행** · 공유 runbook 의 6E-2c 문면 **7행** · 두 공유 파일의 blob 이 `ae9b2f52` 와 **동일** |
 | ③d | **트리 동일성** | 경로마다 찍은 줄로 — 수정 8 **전부 `same`**(blob SHA 가 `ae9b2f52` 와 같음 · `DIFF` 0) · 신설 **41** 전부 `LEFT` 없음(파일로 남지 않음) · base 와 다른 추적 파일은 `reports/evidence/m6/6b3/` **여섯**뿐(이 slice 의 evidence — 의도) |
-| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0**(32s) |
-| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0**(11m07s) |
+| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0**(15s) |
+| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0**(9m31s) |
 | ⑥ | **게이트가 초록이고 실제로 돌았다** | 같은 run 에서 게이트 task **136 수행** · 그 가운데 **UP-TO-DATE 0**(버릴 clone 은 `build/` 가 없어 캐시로 넘어가는 task 가 없다 — 「돌았다」가 수행 수로 보인다) |
 
 evidence 디렉터리를 남긴 채 `leakPatternGate` 가 초록이라 ⑥ 이 성립한다.
