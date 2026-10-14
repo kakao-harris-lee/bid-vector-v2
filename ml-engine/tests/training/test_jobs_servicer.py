@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -84,6 +84,16 @@ def _build_servicer(
         idempotency_key_max_chars=256,
     )
     return servicer, runner, store
+
+
+def _get_job(servicer: TrainingJobServicer, job_id: str) -> training_pb2.TrainingJob:
+    request = training_pb2.GetTrainingJobRequest()
+    request.envelope.request_id = "r"
+    request.envelope.correlation_id = "c"
+    request.job_id = job_id
+    response = servicer.GetTrainingJob(request, context=None)
+    assert response.WhichOneof("result") == "job", response
+    return response.job
 
 
 def _valid_request(**overrides: object) -> training_pb2.StartTrainingRequest:
@@ -788,3 +798,73 @@ def test_idempotent_reuse_carries_the_existing_jobs_current_state(
     assert again.handle.job_id == first.handle.job_id  # 새 job 을 만들지 않았다
     assert again.handle.state == training_pb2.JOB_STATE_RUNNING  # 현재 상태
     assert runner.started == [first.handle.job_id]  # 재사용은 적재가 아니다
+
+
+# ---- (D) 새 job 이 **자기 폐기**되는 경우의 응답 ----
+
+
+def test_start_training_reports_failed_when_the_new_job_is_its_own_overflow_victim(
+    tmp_path: Path,
+) -> None:
+    """proto `StartTrainingResponse` 의 「**새 job**: 즉시 `ACCEPTED`」는 **무조건이 아니다.**
+
+    폐기 대상은 `accepted_at`(동률 `job_id`) 최소인 대기 job 이고, 새 job 도 그 후보에 든다 —
+    동률에서 `job_id` 가 작거나(uuid4 라 1/2 확률) 시계가 역행하면 **방금 적재한 job 자신**이
+    폐기된다. 그때 응답은 `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 다 —
+    `Started.record` 가 커밋 뒤 기록이고 servicer 가 저장소를 다시 읽기 때문에 응답은
+    거짓말하지 않는다.
+
+    시계 역행으로 그 경우를 결정적으로 만든다(동률 + uuid4 순서에 기대지 않는다)."""
+    older = datetime(2026, 1, 1, tzinfo=UTC)
+    newer = older + timedelta(hours=1)
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=1)
+    submission = JobSubmission(
+        dataset_uri="file:///tmp/dataset",
+        manifest_checksum=_VALID_MANIFEST_CHECKSUM,
+        training_spec_version=_KNOWN_SPEC_VERSION,
+    )
+    assert isinstance(
+        store.start_or_reuse(
+            "idem-incumbent", "ds-1", accepted_at=newer, submission=submission
+        ),
+        Started,
+    )
+
+    # 다음 제출의 시계를 **기존 대기보다 앞으로** 고정한다(시계 역행) — 같은 저장소 위에서
+    # 새 job 이 최고참 대기가 된다. 동률 + `job_id` 순서(uuid4, 1/2 확률)에 기대지 않는다.
+    original_start_or_reuse = store.start_or_reuse
+
+    def _clock_regressed(
+        idempotency_key: str,
+        dataset_id: str,
+        *,
+        accepted_at: datetime,
+        submission: JobSubmission,
+    ) -> object:
+        return original_start_or_reuse(
+            idempotency_key, dataset_id, accepted_at=older, submission=submission
+        )
+
+    store.start_or_reuse = _clock_regressed  # type: ignore[method-assign]
+
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=_NeverStartingRunner(),  # type: ignore[arg-type]
+        is_ready=lambda: True,
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+    response = servicer.StartTraining(
+        _valid_request(idempotency_key="idem-self-discarded"), context=None
+    )
+
+    assert response.WhichOneof("result") == "handle"
+    assert response.handle.state == training_pb2.JOB_STATE_FAILED
+    job = _get_job(servicer, response.handle.job_id)
+    assert job.failure.code == training_pb2.JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED
+    assert job.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+    # 「실행했다」를 뜻하지 않는다 — `started_at` 은 미설정이다.
+    assert not job.HasField("started_at")
+    # 통제군 — 기존 대기 job 은 살아 있다(폐기된 것은 새 job 하나다).
+    assert len(store.pending_jobs()) == 1
