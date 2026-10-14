@@ -406,7 +406,9 @@ def test_restart_disposals_log_one_warning_per_job(
     로그를 남기지 않는다."""
     store = _first_boot(tmp_path, pending_queue_max=5)
     orphan = _submit(store, "key-orphan", at=_NOW)
-    assert isinstance(store.apply_transition(orphan, JobEvent.START, at=_NOW), JobRecord)
+    assert isinstance(
+        store.apply_transition(orphan, JobEvent.START, at=_NOW), JobRecord
+    )
     over_limit = [
         _submit(store, f"key-{index}", at=_NOW + timedelta(seconds=index + 1))
         for index in range(3)
