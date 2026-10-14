@@ -12,7 +12,7 @@ internal const val PUBLIC_TABLES_SQL =
 
 private const val FOREIGN_KEY_SQL =
     """
-    SELECT con.conname                        AS constraint_name,
+    SELECT con.oid                            AS constraint_oid,
            child_class.relname                AS child_table,
            parent_class.relname               AS parent_table,
            con.confdeltype                    AS delete_rule,
@@ -28,34 +28,41 @@ private const val FOREIGN_KEY_SQL =
       JOIN pg_attribute parent_att ON parent_att.attrelid = con.confrelid AND parent_att.attnum = ord.parent_attnum
      WHERE con.contype = 'f'
        AND con.connamespace = 'public'::regnamespace
-     ORDER BY con.conname, ord.n
+     ORDER BY con.oid, ord.n
     """
 
 /** `pg_constraint.confdeltype` 의 `ON DELETE CASCADE` 표기. */
 private const val CASCADE_DELETE_RULE = "c"
 
+/**
+ * 간선의 **동일성 키는 `pg_constraint.oid` 다**(PR #73 P7) — 제약 **이름**은 표 안에서만 유일하고
+ * 스키마 안에서는 겹칠 수 있다. 이름으로 묶으면 같은 이름의 FK 를 가진 두 표가 간선 하나로 접히고,
+ * 접히면서 **먼저 읽힌 간선의 머리(자식·부모·CASCADE 여부)가 덮여** 그 자식이 부모를 막지 못한다
+ * (설계 검토 우회 6 의 가드가 그 변에서 사라진다). `ORDER BY` 도 같은 이유로 oid 기준이다 — 이름
+ * 기준이면 동명 제약의 행이 섞여 열 쌍의 순서까지 어긋난다.
+ */
 internal fun readForeignKeyEdges(connection: Connection): List<ForeignKeyEdge> {
-    val pairsByConstraint = linkedMapOf<String, MutableList<Pair<String, String>>>()
-    val headerByConstraint = linkedMapOf<String, Triple<String, String, Boolean>>()
+    val pairsByConstraint = linkedMapOf<Long, MutableList<Pair<String, String>>>()
+    val headerByConstraint = linkedMapOf<Long, Triple<String, String, Boolean>>()
     connection.createStatement().use { statement ->
         statement.executeQuery(FOREIGN_KEY_SQL).use { rs ->
             while (rs.next()) {
-                val name = rs.getString("constraint_name")
-                headerByConstraint[name] =
+                val oid = rs.getLong("constraint_oid")
+                headerByConstraint[oid] =
                     Triple(
                         rs.getString("child_table"),
                         rs.getString("parent_table"),
                         rs.getString("delete_rule") == CASCADE_DELETE_RULE,
                     )
                 pairsByConstraint
-                    .getOrPut(name) { mutableListOf() }
+                    .getOrPut(oid) { mutableListOf() }
                     .add(rs.getString("child_column") to rs.getString("parent_column"))
             }
         }
     }
-    return headerByConstraint.map { (name, header) ->
+    return headerByConstraint.map { (oid, header) ->
         val (child, parent, cascade) = header
-        ForeignKeyEdge(child, parent, cascade, pairsByConstraint.getValue(name))
+        ForeignKeyEdge(child, parent, cascade, pairsByConstraint.getValue(oid))
     }
 }
 
