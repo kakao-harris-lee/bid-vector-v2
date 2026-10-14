@@ -134,16 +134,25 @@ run 블록은 ci.yml 을 파싱해 **파일에서 그대로 꺼내** 순서대�
 적어 **돌린 것처럼 보였다** — code-review 지적). 그 step 이 올리는 SBOM 은 S-22d·S-22e 가
 만든 파일이고, 그 둘의 exit 0 이 생성의 근거다.
 
-재사용하지 않았다 — `contracts/proto` 를 편집했고 그것이 ml-serving 이미지 입력이다. **이
-회차는 주석만 바뀐 proto 커밋(`6fc9ec16`) 뒤에 돌렸다** — Python 생성물은 주석을 싣지 않지만
-Kotlin(Java) 생성물은 javadoc 에 싣는다. 거동 변화 가능성이 0 에 가깝더라도 「이미지 입력
-무변경」을 근거로 쓸 수 없으므로 16 step 을 다시 돌렸다(vr r3d §6 의 열린 항목이 이 회차로
-닫힌다).
+재사용하지 않았다 — `contracts/proto` 를 편집했고 그것이 ml-serving·앱 이미지 입력이다.
+Python 생성물은 주석을 싣지 않지만 Kotlin(Java) 생성물은 javadoc 에 싣으므로, **주석만 바뀐
+proto 커밋도 「이미지 입력 무변경」을 근거로 쓸 수 없다**. 그 근거는 자기에게도 걸린다 —
+마지막 proto 주석 커밋(`20da6f6e`)이 앞 회차보다 뒤에 있으므로 앞 회차로 갈음하지 않고
+16 step 을 그 자리에서 다시 돌렸다. 실측 HEAD 는 `86f379de` 이고
+`git diff --name-only 20da6f6e..86f379de` 는 `reports/evidence/` 둘만 낸다(이미지 입력 무변경).
+갈음 금지는 문면만의 추론이 아니다: 이 회차의 S-21 에서 `COPY contracts/proto` 층이
+**CACHED 가 아니라 DONE** 으로 다시 돌았다 — 이미지 빌드 자신이 주석 변경을 입력 변경으로
+센다(그 뒤 층은 전부 재실행). vr r3d §6 의 열린 항목은 **이 회차로** 닫힌다.
+
+compose 프로젝트 이름만 `COMPOSE_PROJECT_NAME=m6b4r3e` 로 두어 레인을 격리했다(명령 문면은
+불변 · `tools/db-rehearsal.sh` 가 이름을 compose config 에서 읽어내므로 D-6B2-5 ② 가 이미
+허용하는 축이다). S-21a 의 Gradle 은 `--no-daemon` 이고 회차 뒤 새 daemon 은 남지 않았다.
 
 ## 2026-10-14T
 - cmd: `container` job 의 **run step 16** (일회성 자격 값 둘 · S-21 · S-21a · S-21b · S-22a ·
-  S-22b · S-22c · install trivy · S-22d · S-22e · S-23 · S-23b · S-23c · **S-24** · S-25)
-- exit: **16 step 전부 0**
+  S-22b · S-22c · install trivy · S-22d · S-22e · S-23 · S-23b · S-23c · **S-24** · S-25) —
+  실측 HEAD `86f379de`
+- exit: **16 step 전부 0**(요약 줄 `TOTAL steps=16 failed=0`)
 - 핵심 결과: 이미지 둘 빌드 · 위생·취약점 게이트 넷 · compose 세 서비스 healthy 수렴 ·
   컨테이너 스모크 · 백업·복원 리허설 · 실 Kotlin gateway ↔ 컨테이너 실 Python 서버(S-24) ·
   `down -v` 뒤 컨테이너·볼륨 0
@@ -151,7 +160,8 @@ Kotlin(Java) 생성물은 javadoc 에 싣는다. 거동 변화 가능성이 0 �
 ### Q-6 전용 실측 — 컨테이너 재생성 뒤 저널 생존
 
 아래 표는 실측 HEAD `54bbef81` 에서의 측정을 그대로 잇는다. 이 라운드는 `docker/**` 를 편집하지
-않았고 저널의 **자리·형식·볼륨 배선**도 바꾸지 않았다(바뀐 것은 판독 관용도·사유 집합·게이트다).
+않았고 저널의 **자리·형식·볼륨 배선**도 바꾸지 않았다(바뀐 것은 판독 관용도·사유 집합·기동 시
+시각 조정·게이트다).
 위 S-23~S-25 가 그 배선 위에서 다시 exit 0 이다.
 
 | 단계 | 실측 |
