@@ -38,7 +38,9 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 ## 2026-10-14T
 - cmd: `uv run python -m pytest tests -q` (S-5)
 - exit: 0
-- 핵심 결과: **1599 passed**(369s). 감사 훅이 세션 내내 켜져 있는 비용은 **A/B 대조로 확인**
+- 핵심 결과: **1599 passed**(360s). **전체 실행 세 번을 따로 더 돌려 exit 0/0/0**(1599 ·
+  1599 · 1599)을 확인했다 — vr r3b H-1(저널 tmp 이름 충돌 경합)이 전체 실행에서 3/3 붉었던
+  자리이고, 그 세 번은 다른 레인의 Gradle 빌드와 **경합하는 동안** 돌려 타이밍 여유를 줄였다. 감사 훅이 세션 내내 켜져 있는 비용은 **A/B 대조로 확인**
   됐다 — 훅 설치 한 줄만 주석 처리하면 `tests/app` 269 test 가 331.3초, 그대로 두면 384.0초
   (+15.9%, code-review r3 §4). 「닫는 것은 실행된 경로」의 대가다(checklist 판단 14)
 
@@ -82,6 +84,14 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 - 핵심 결과: BUILD SUCCESSFUL in 22s (측정, 게이트 아님)
 
 ### 수정 전 실패 이력(검증이 실제로 작동한 증거)
+
+## 2026-10-14T
+- cmd: `uv run python -m pytest tests/gates/test_journal_write_audit.py -q` 12회 반복
+  (`runner.shutdown(wait=False)` 판)
+- exit: 1 (**2/12**)
+- 핵심 결과: `ConfigError: job 저널 복원 실패: JournalFailed(WRITE_FAILED, "[Errno 2] No such
+  file or directory: '…/_journal/jobs.json.tmp' -> '…/_journal/jobs.json'")` — 같은 디렉터리의
+  두 writer 가 고정 tmp 이름을 다툰다(vr r3b H-1). `wait=True` 뒤 같은 반복 **0/20**
 
 ## 2026-10-14T
 - cmd: `./gradlew --no-daemon check --rerun-tasks` (Kotlin 헬퍼의 체인 줄바꿈 전)
