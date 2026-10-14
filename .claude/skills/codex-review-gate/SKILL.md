@@ -16,7 +16,7 @@ description: "Codex CLI로 base...head diff의 독립 리뷰를 clean worktree�
 > 전역 규약 `~/.claude/review-lane.md` §4 와 프로젝트 `CLAUDE.md` 운영자 지시 절이고, 레인 계약은
 > `~/.claude/agents/codex-reviewer.md` 다(범위 밖이 넘어오면 `SCOPE_EXCLUDED` 반환).
 
-codex CLI(로컬 `codex`, v0.151 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
+codex CLI(로컬 `codex`, 버전은 아래 `CODEX_PIN` 이 정본)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
 보존한다. 판정 계약과 리뷰 기준은 `CODEX-REVIEW.md`와 `agent-workflow.md` 4~5절이
 정의하며, 이 스킬은 실행 mechanics만 다룬다.
 
@@ -82,11 +82,31 @@ CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 20
 # 사용자 config 의 MCP 서버·plugin 을 호출마다 끈다 — 목록은 config 에서 기계 산출(손 목록 금지).
 # `-c mcp_servers={}` 는 기존 표와 병합돼 아무것도 끄지 않는다(2026-10-09 M6/6E-2a r1 실측: serena 가 호출돼
 # worktree 에 .serena/ 를 만들어 오염 → 그 라운드 무효). config 파일은 고치지 않는다.
-CODEX_OFF=()
-while read -r k; do CODEX_OFF+=(-c "${k}.enabled=false"); done < <(
-  python3 -c 'import tomllib,os; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
+# 키는 따옴표 없이 쓴다(2026-10-14, 0.162.1 실측: `mcp_servers."<name>".enabled` 는 새 -c 파서가
+# 따옴표를 키 일부로 보고 빈 서버 표를 만들어 config 로드에서 exit 1). 무따옴표 경로는 `.`·`=` 에서
+# 갈라지므로 이름은 허용 문자 집합(구성)으로만 받는다 — 밖이면 생성기가 거부하고, 그런 이름이 생기면
+# 스킬을 고친 뒤 돈다(`@` 는 무따옴표 경로로도 따옴표 config 키에 닿는다 — 2026-10-14 실측).
+# 생성 결과는 변수로 받는다: `while … done < <(python …) || …` 는 루프의 종료 코드만 보므로 python 이
+# 도중에 거부해도 가드가 안 걸리고 **앞 키만 담긴 부분 목록**으로 진행한다(PR #74 리뷰 실측).
+KEYS=$(python3 -c 'import tomllib,os,sys,re; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
 for t in ("mcp_servers","plugins"):
-    for n in d.get(t,{}): print(f"{t}.\"{n}\"")')
+    for n in d.get(t,{}):
+        if not re.fullmatch(r"[A-Za-z0-9_@-]+", n): sys.exit(f"config 이름이 허용 문자 밖 — 무따옴표 키 불가: {t}.{n}")
+        print(f"{t}.{n}")') || { echo "CODEX_OFF 생성 실패 — preflight 미충족"; exit 1; }
+CODEX_OFF=(); while read -r k; do [ -n "$k" ] && CODEX_OFF+=(-c "${k}.enabled=false"); done <<< "$KEYS"
+# 적용 확인(모델 호출 없음 · 세션·rollout 파일 생성 없음 — 단 ~/.codex 의 models_cache·logs sqlite 는
+# 갱신된다): JSON 의 서버별 `enabled` 불리언으로 판정한다. 표 텍스트를 grep 하면 args 에 「disabled」가
+# 든 켜진 서버를 놓치고, `mcp list` 자체가 실패하면(따옴표 키·config 파싱 실패·하위 명령 변경) 빈
+# 출력이라 PASS 로 끝난다 — 종료 코드와 구조로 닫는다. plugin 은 CLI 로 관측할 수 없다 — raw-output
+# 의 plugin·connector 도구 호출 계수로 갈음한다(0 이 아니면 라운드 무효).
+MCP_JSON=$(mktemp); trap 'rm -f "$MCP_JSON"' EXIT
+"$CODEX_BIN" mcp list --json "${CODEX_OFF[@]}" > "$MCP_JSON" || { echo "mcp list 실패 — preflight 미충족"; exit 1; }
+# `x["enabled"]` 로 읽는다 — 필드 이름이 바뀌면 KeyError 로 멈춘다(.get 은 None 이라 공허한 PASS).
+python3 -c 'import json,sys
+s=json.load(open(sys.argv[1]))
+bad=[x["name"] for x in s if x["enabled"]]
+if bad: sys.exit("enabled: "+",".join(bad))
+print(f"all {len(s)} MCP servers disabled (overrides={sys.argv[2]})")' "$MCP_JSON" "${#CODEX_OFF[@]}" || { echo "MCP 서버가 켜져 있다 — preflight 미충족"; exit 1; }
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
@@ -104,7 +124,7 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
 `codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
 
-**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다.
+**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다. **plugin·connector 도구 호출도 같은 방식으로 센다**(2026-10-14) — plugin override 는 `codex plugin list` 에 반영되지 않아 CLI 로 확인할 수 없으므로, 그 계수가 0 이 아니면 라운드 무효다. 네 계수는 preflight 키 목록(아래 「형제 파일」 문단 — 키의 정본)에 있다.
 
 **`model_reasoning_effort`는 반드시 `high`로 고정한다.** 생략하면 CLI 기본값에 의존해
 같은 base...head가 라운드마다 다른 effort로 리뷰되고, 판정이 갈릴 수 있다. M0/0A 3차
@@ -252,8 +272,21 @@ preflight 결과는 **레인 산출물**이다 — codex-reviewer 의 반환 보
 파일 `codex-review-<UTC>.preflight.json`**(같은 evidence 디렉터리, append-only, verdict 와
 같은 등재 커밋에 실린다)에 남긴다. 키: `traces`·`stage1_matches`·`stage1_total`·`cli_version`
 ·`hooks_events`·`hooks_stdout_bytes`·`leak_matches`·`leak_developer_region`·`emissions`
-·`premature_approves`·`gradle_executed`(코드 slice). 문서 slice 의 기존 C-행 관행은 그대로
+·`premature_approves`·`gradle_executed`(코드 slice) · `mcp_calls`·`plugin_calls`·`connector_calls`
+·`web_search_calls`(§4 도구 호출 계수, 2026-10-14) · `emission_note`(`emissions` 의 해설 — 조기 방출의
+위치와 인용 대상의 head 존재 실측, §6). 이 목록이 키의 정본이고 다른 절은 이 목록을 가리킨다.
+문서 slice 의 기존 C-행 관행은 그대로
 두고, 코드 slice 는 `commands.md` 에 라운드별 행을 등재하지 않는다(운영자 결정 2026-09-02).
+
+**인계 전 누출 스캔(2026-10-14).** preflight·verdict 두 파일은 `reports/evidence/**` 에 실려
+`leakPatternGate` 의 스캔 대상이다. 작성한 레인이 인계 **전에**
+`grep -ciE -f config/quality/leak-patterns.txt <두 파일>` 이 둘 다 0 인지 확인하고 그 사실을
+반환 보고에 적는다. 메모(`emission_note` 등)에 이 스킬 본문의 CLI 용어를 옮겨 적지 않는다 —
+사용량 블록은 「사용량 줄」로 쓴다(M6/6B-4 실측: 스킬 문면의 영어 표현이 메모로 복사돼 게이트를
+붉혔고, 이미 커밋된 append-only 파일을 고쳐야 했다). **0 이 아닐 때의 갈래**: preflight 는 레인이
+쓴 파일이므로 인계 전에 다시 쓴다(커밋 전이라 append-only 위반이 아니다). **verdict 는 codex 의
+출력이라 고칠 수 없다**(리뷰 JSON 수정 금지 · 덮어쓰기 금지) — 커밋하지 말고 멈춰 운영자에게
+보고한다. 처분(그 일치가 비밀값인지 · 게이트 baseline 등재 여부)은 운영자 결정이다.
 
 **`codex debug prompt-input`을 preflight 도구로 쓰지 마라** — memory 주입을 렌더하지 않아
 항상 「없음」이라고 답한다.
@@ -366,6 +399,12 @@ worktree 격리로 인해 영향받지 않는다.
   캡처 의미가 바뀌거나
   타임아웃이 나면 조기 verdict 가 저장될 수 있으므로, **`commands_run` 이 빈약한
   `approve` 는 판정이 아니라 미완 실행으로 취급**하고 재실행한다.
+- **조기 방출이 인용한 대상은 head 에서 존재를 실측한다(2026-10-14).** M6/6B-4 의 조기
+  `request_changes` 넷 중 셋은 명령 하나 돌기 전에 나왔고 head 에 없는 파일·심볼·줄 번호·
+  돌지 않은 스크립트 출력을 근거로 들었다(종말 판정은 codex 가 그것들을 찾아본 뒤 뺐다).
+  preflight 의 `emission_note` 에 조기 방출을 적을 때는 인용 대상마다 head 존재 여부를
+  `git cat-file -e`·`git grep` 으로 재고 그 결과를 함께 적는다 — 지어낸 근거를 「무시한
+  방출」로만 적으면 다음 라운드가 같은 이름을 실재하는 결함으로 오독할 수 있다.
 
 검증 실패 시 1회 재실행. 재실패 시 raw 출력을 보존하고 실패로 보고한다. JSON을 임의로
 보정·생성하지 않는다.
@@ -380,6 +419,9 @@ git worktree remove ../bid-vector-v2-review-{slice}
 
 기존 리뷰 파일은 절대 덮어쓰지 않는다. 재리뷰는 새 timestamp 파일로 저장한다 —
 리뷰 이력 자체가 감사 증적이다.
+
+**저장소 밖 잔여물도 지운다(2026-10-14).** codex 가 라운드 중 만든 캐시(M6/6B-4 실측:
+`/tmp/uv-cache`)는 리뷰 worktree 와 함께 레인이 지우고, 지운 경로를 반환 보고에 적는다.
 
 저장 전에 판정 JSON에 `reviewer: {cli_version, model}` 필드가 없으면 실측값으로 채워
 넣는다. 이 주입은 agent-workflow.md 4절 계약이 리뷰 레인에 위임한 메타데이터 기록이며,
