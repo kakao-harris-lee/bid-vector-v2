@@ -25,6 +25,18 @@ evidence 를 고치는 커밋이 또 HEAD 를 움직이므로, 그 커밋 뒤의
 | 5 | 같은 HEAD: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 19s |
 | 6 | **S-20** `./tools/one-command-check.sh` | **exit 0** — Kotlin 전건(위 4·5 뒤라 up-to-date) + Python 전건: ruff · mypy --strict · import-linter · **pytest 1,420 passed**(5m51s) · 설계 래칫 · 출처·버전 두 자리 대조 · wheel 빌드 후 재수출 1 passed |
 | 7 | **container job 의 V18·V19 소비 자리**(S-23c): compose `app`+`postgres` 기동 → 전략 편집 왕복 → `./tools/db-rehearsal.sh docker/compose.yaml postgres` → `down -v` | **리허설 exit 0**. 원본에 V1~V19 적용(이력 17행 · top **19**) · 백업 산출물 누출 스캔 0 · 복원 측정 10/10 일치 · 복원본 `validate` 통과 · **(i) forward-fix: 프로브가 V20·V21 로 올라가 top 21**(고정 V18/V19 였다면 충돌했다) · (ii) 음성 대조 붉음 → 재복원으로 값 복귀 |
+| 8 | **머지 커밋 `8251113c`**: `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m56s · **359 task 전부 실행** · test 합계 **2,984** / fail 0 / skip 4 · 게이트 task 136(UP-TO-DATE **0**) |
+| 9 | 같은 커밋: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 1m03s · **33 task 전부 실행** |
+| 10 | 같은 커밋: **S-20** `./tools/one-command-check.sh` | **exit 0** — Kotlin 전건 + Python 전건(**pytest 1,420 passed** 5m45s · wheel 재수출 1 passed) |
+| 11 | 같은 커밋: **container job 의 V18·V19 소비 자리**(S-23c) | **리허설 exit 0**. 머지가 `app/build.gradle.kts`·`docker/app.Dockerfile`·`gradle/libs.versions.toml` 를 바꿨으므로 **앱 jar·이미지를 다시 빌드**했다(둘 다 exit 0) · 전략 편집 왕복 200/201/200/200 · `down -v` exit 0 |
+
+> **8~11 은 main 을 들인 뒤의 측정이다**(머지 `8251113c`, 충돌 0). 측정 중 HEAD 불변(양끝 `8251113c`).
+>
+> **task 수가 350·24 → 359·33 으로 늘었다 — 측정 자리 때문이 아니라 트리가 바뀌었기 때문이다.**
+> 앞의 vr R2-F8 메모는 같은 코드에서 「갓 만든 clone 이냐」로 그 차이를 설명했는데, 이번 증가의 출처는
+> **머지로 들어온 main 의 변경**이다(`app/build.gradle.kts` · `BootJarSecurityFloorTest` · 이미지 위생·
+> 취약점 정책 파일). 같은 자리(이 worktree)에서 머지 전 350·24 → 머지 후 359·33 을 쟀다. test 합계도
+> 2,982 → **2,984** 로 둘 늘었고 그 둘은 main 이 더한 것이다(이 slice 의 test 수는 그대로다).
 
 > **7 은 job 전체가 아니다 — 무엇을 돌리지 않았는지 적는다.** 돌린 것은 `app` 이미지 빌드(S-21a·b),
 > compose 기동, 전략 편집 왕복(S-23b 의 **쓰기 부분만** — 리허설의 데이터 손실 축이 원본에 식별 가능한

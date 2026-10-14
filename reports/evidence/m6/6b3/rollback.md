@@ -1,21 +1,38 @@
 # M6/6B-3 — rollback
 
-**실측 HEAD: `9b4625c7`**(PR #73 라운드의 마지막 산출물 커밋 — 앞 실측 @`f92d4b55` 은 옮기지 않고
-전부 다시 냈다). 버릴 clone(`--no-local`)에서 ①~⑥ 을 그 커밋 위에서 돌렸다.
+**실측 HEAD: `8251113c`**(main 을 브랜치로 들인 **머지 커밋** — 부모는 `8686a41e` 와 고정된
+`ae9b2f52` 다. 앞 실측 @`9b4625c7` 은 옮기지 않고 전부 다시 냈다). 버릴 clone(`--no-local`)에서
+①~⑥ 을 그 커밋 위에서 돌렸다.
 
-> **왜 다시 쟀나.** PR #73 라운드가 되돌림 대상을 **여럿** 움직였고 경로도 하나 늘었다(P7 의
-> `ForeignKeyEdgeIdentityTest.kt`). 앞 실측은 그 순간 미검증이 된다 — 라운드마다 다시 내는 이유다.
-> 목록은 **48 → 49**(신설 40 → 41 · 수정 8 그대로).
+> **복원 출처가 바뀌었다 — base 가 아니라 고정된 `ae9b2f52` 다.** PR #73 이 BEHIND 라 `--no-ff` 로
+> main 을 들였고(충돌 0), 그 뒤로 **공유 파일 둘이 양쪽 변경을 함께 담는다**
+> (`config/quality/gate-tests.properties` · `docs/runbook/m6-6e-operations.md`). base 에서 복원하면
+> 그 두 파일에서 **main 의 변경까지 지운다** — 그래서 출처는 병합된 main 커밋 SHA 를 **고정값으로**
+> 쓴다(움직이는 `origin/main` 을 쓰지 않는다 — 다음 main 커밋이 붙는 순간 복원 결과가 달라진다).
+>
+> 그 전제 둘을 단언했다: ① `git merge-base --is-ancestor ae9b2f52 HEAD` **참**(머지가 실제로 들어왔다)
+> ② `git merge-base --is-ancestor <이 slice 의 첫 커밋> ae9b2f52` **거짓**(그 SHA 에 이 slice 가 없다 —
+> 없으면 복원이 이 slice 의 일부를 「원상」으로 되살린다).
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 **아니다**(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 9b4625c7..<판정 SHA> -- <아래 1단계 목록 49>` 이 **빈 출력**이면 유효하다.
+> `git diff --name-only 8251113c..<판정 SHA> -- <아래 1단계 목록 49>` 이 **빈 출력**이면 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 산출물 경로 **49**. 목록은 손으로 쓰지 않고
-`git diff --name-status e2232a75..9b4625c7` 에서 기계로 내고 evidence 경로만 뺐다(A 41 = 삭제 대상,
-M 8 = base 로 복원). **디렉터리로 접지 않는다** — 접으면 목록이 slice 가 만진 파일보다 넓어진다.
+**`git diff --name-status ae9b2f52..8251113c`** 에서 기계로 내고 evidence 경로만 뺐다(A 41 = 삭제 대상,
+M 8 = `ae9b2f52` 로 복원). **머지 뒤에는 base 기준으로 내지 않는다** — base..머지 는 main 의 변경까지
+담으므로 목록이 이 slice 보다 넓어지고, 그 넓은 목록으로 복원하면 **남의 변경을 지운다**.
+`ae9b2f52..머지` 는 정확히 **이 slice 가 머지된 main 위에 더한 것**이다(base 가 `ae9b2f52` 의 조상이라
+main 의 변경은 이미 그 안에 있다). **디렉터리로 접지 않는다** — 접으면 목록이 slice 가 만진 파일보다
+넓어진다.
+
+**main 전용 경로는 목록 밖이다**(실측): `git diff --name-only e2232a75..ae9b2f52` 의 20 경로 가운데
+목록과 교차하는 것은 **공유 파일 둘**뿐이고(위 두 파일) 나머지 18(`docker/**` · `app/build.gradle.kts` ·
+`BootJarSecurityFloorTest.kt` · `gradle/libs.versions.toml` · `tools/vuln-scan-check.sh` ·
+`milestone-6.md` · 하네스 파일 · 다른 slice 의 evidence)은 들어오지 않는다. 그 18 경로가 복원 뒤에도
+`ae9b2f52` 와 동일한지 ③b 가 센다.
 **목록은 라운드마다 실측 HEAD 에서 다시 낸다** — 34 → 40 → 48 → 48 → **49**. 마지막 증가 하나는
 PR #73 P7 의 `ForeignKeyEdgeIdentityTest.kt` 다(r3b 는 경로를 더하지 않고 두 파일의 내용만 바꿨고,
 그 앞 라운드는 파일 둘의 **이름만** 바꿨다 — 그 둘의 지금 이름은 `MigrationLockTimeoutTest` ·
@@ -24,7 +41,9 @@ PR #73 P7 의 `ForeignKeyEdgeIdentityTest.kt` 다(r3b 는 경로를 더하지 �
 **되돌리지 않는다**: `reports/evidence/m6/6b3/**` — 이 slice 의 evidence. 되돌리면 복구 상태가
 「일이 있었다」는 기록을 잃는다. 그 디렉터리를 남긴 채 게이트가 초록인지는 ⑥ 이 잰다.
 
-**하네스 경로 변경 0** — `git log --oneline e2232a75..35220afd -- CLAUDE.md .claude/` 빈 출력.
+**하네스 경로 변경 0(이 slice 의 몫으로는)** — `git log --oneline ae9b2f52..8251113c -- CLAUDE.md .claude/`
+빈 출력. `CLAUDE.md`·`.claude/**` 는 **main 이** 바꿨고(PR #72 codex 핀) 그 변경은 머지로 들어왔다 —
+목록 밖이므로 이 복원이 건드리지 않는다.
 
 ## 절차
 
@@ -52,31 +71,37 @@ forward-fix 마이그레이션을 한 배포로 함께** 한다(아래 「DB 는
 > 인덱스는 그대로 남은 채 「적용된 적 없다」고 적힌 DB** 가 된다 — 다음 배포의 새 V18 이 이미 있는
 > 객체와 충돌하고, 그 충돌은 기동 실패로만 보인다. 스키마와 장부가 조용히 어긋나는 쪽이 더 비싸다.
 
-### 1단계 — in_scope 산출물을 base 로 (경로는 **개별 인자**)
+### 1단계 — in_scope 산출물을 **고정된 `ae9b2f52`** 로 (경로는 **개별 인자**)
 
 ```
-git restore --source=e2232a75 --staged --worktree -- \
-  <위 기계 산출 48 경로>        # ⓑ 라면 V18·V19 두 경로를 뺀 46
+git restore --source=ae9b2f52 --staged --worktree -- \
+  <위 기계 산출 49 경로>        # ⓑ 라면 V18·V19 두 경로를 뺀 47
 ```
 
-`--source` 에 없는 경로(신설 40)는 삭제되므로 별도 `git rm` 이 필요 없다.
+`--source` 에 없는 경로(신설 41)는 삭제되므로 별도 `git rm` 이 필요 없다.
 `git checkout <base> -- <경로>` 는 쓰지 않는다 — base 에 없는 경로마다 pathspec 오류로 끊긴다.
 
-**아래 ①~⑥ 실측은 ⓐ 갈래다**(오늘의 상태 — 적용된 DB 가 없다). ⓑ 는 복원 목록이 46 이고 그
+**아래 ①~⑥ 실측은 ⓐ 갈래다**(오늘의 상태 — 적용된 DB 가 없다). ⓑ 는 복원 목록이 47 이고 그
 트리는 마이그레이션 파일 둘을 **그대로 가진** 채 코드만 base 인 상태라, test 가 그 파일들을 쓰는
 자리(`CleanMigration*` 장부)가 base 의 기대와 어긋나 붉는다 — 그것이 ⓑ 가 **되돌림만으로 끝나지
 않는다**는 사실의 표현이다(forward-fix 마이그레이션이 같은 배포에 들어가야 한다).
 
-### 머지 뒤라면 — 공유 파일의 복원 출처가 바뀐다
+### 공유 파일의 복원 출처 — **지금은 `ae9b2f52` 다**
 
-수정 8 가운데 일곱은 **다른 레인도 만지는 공유 파일**이다(라운드 2 가 `PersistenceTestSupport.kt` 를 더했다 — 이미지 태그를 `internal` 로 연 한 줄)(`config/quality/gate-tests.properties` ·
+수정 8 은 전부 **다른 레인도 만지는 공유 파일**이다(`config/quality/gate-tests.properties` ·
 `config/quality/architecture-policy.properties` · `docs/runbook/m6-6e-operations.md` ·
-`app/.../AppHttpDependencyGateTest.kt` · `CleanMigrationColumnTest.kt` · `CleanMigrationTriggerTest.kt`
-· `CleanMigrationCheckTest.kt`). **머지 전인 지금은** 이 브랜치에 그 파일들의 다른 레인 변경이 0 이라
-(이 slice 가 유일한 저자) base 복원이 정확하다 — ③d 의 blob 동일성이 그것을 실측한다.
-**머지 뒤에는** base 가 아니라 **병합된 main 커밋 SHA(고정값, 움직이는 `origin/main` 금지)** 에서
-복원한다(PR #69 규칙). 그 전제는 「그 SHA 에 이 slice 가 없다」이고, 머지 순간 그 복원은 아무것도
-지우지 않으며 exit 0 이다.
+`app/.../AppHttpDependencyGateTest.kt` · `CleanMigration{Check,Column,Trigger}Test.kt` ·
+`PersistenceTestSupport.kt`). 앞 라운드까지는 이 브랜치에 그 파일들의 **다른 레인 변경이 0** 이어서
+base 복원이 정확했다. **main 을 들인 지금은 아니다** — 둘(`gate-tests.properties` ·
+`m6-6e-operations.md`)이 main 의 변경을 함께 담고, base 복원은 그것을 **지운다**(PR #69 규칙).
+
+그래서 출처는 **병합된 main 커밋 SHA 고정값 `ae9b2f52`** 다. 「그 SHA 에 이 slice 가 없다」는 전제를
+단언했고(위 머리말 ②), 그 복원이 **main 의 줄을 하나도 지우지 않는다**는 것을 ③c 가 계수로 센다 —
+`BootJarSecurityFloorTest` 등재 2행 · 공유 runbook 의 6E-2c 문면 7행이 복원 뒤에도 그대로 있고,
+두 파일의 blob 이 `ae9b2f52` 와 **동일**하다. 완료 판정을 종료 코드가 아니라 **「내 표지 0 · 남의
+표지 보존」 계수**로 두는 이유가 이것이다.
+
+**PR 이 main 에 머지된 뒤**의 되돌림은 이 절차가 아니라 **PR revert** 다.
 
 ### DB 는 forward-fix 다 — 이 절차가 되돌리지 못하는 것
 
@@ -106,18 +131,19 @@ V18·V19 가 **적용된 DB** 는 위 명령으로 돌아오지 않는다. 되�
 | 이미 적용된 V18 의 마스킹 구멍 | 새 V 로 `raw_observation_append_only` 를 V3 의 `reject_mutation` 으로 재지정한다(열·제약·인덱스는 남겨도 무해 — 아무도 쓰지 않는다). **그 재지정이 함께 없애는 것 둘**(mig L-3): 적재의 **표지 관문**과 **`inserted_at` 소유** — 「세 입력이 적재자 손을 벗어난다」 가운데 둘이 그 한 줄에 달려 있다 |
 | cron | cron 줄 하나를 지운다(러너는 상주 루프가 아니다) |
 
-## ①~⑥ 실측 (버릴 clone, 실측 HEAD `9b4625c7`)
+## ①~⑥ 실측 (버릴 clone, 실측 HEAD `8251113c` · 출처 `ae9b2f52`)
 
 | # | 확인 | 결과 |
 |---|---|---|
 | ⓪ | 목록이 기계 산출과 같다 | 기계 **49** · 문서는 수를 적고 목록은 적지 않는다(두 벌을 두지 않는다) |
-| ① | 복원 명령이 선다 | `git restore` **exit 0** |
+| ① | 복원 명령이 선다 | `git restore --source=ae9b2f52` **exit 0** |
 | ② | 복원 규모 | `git status --porcelain` → **D 41 · M 8**(기계 목록의 A 41 · M 8 과 같다) |
-| ③ | 복원 경로가 base 와 같다 | `git diff e2232a75 -- <49>` 와 `git diff --cached e2232a75 -- <49>` **둘 다 0줄** |
-| ③c | **내 표지 0 · 남의 표지 보존** | 복원 뒤 내 표지 전부 0 — 게이트 등재의 `retention.` 행 0 · `MigrationLockTimeout` 등재 0 · `ForeignKeyEdgeIdentity` 등재 0 · 공유 runbook 의 「90일에 파기」 문면 0 · 아키텍처 정책의 `RetentionWiring`·`app.retention.` 0 · 공유 runbook 의 `bidvector.retention` 0 · `adapters/.../retention/` 디렉터리 파일 0. 같은 파일들의 **남의 표지는 그대로** — 게이트 등재의 `adapters.relay.` 행 4(HEAD 에서는 5 — 이 slice 가 더한 한 줄만 사라졌다) · `EvaluationCommit` 12 · 공유 runbook 의 relay 줄 18 |
-| ③d | **트리 동일성** | 경로마다 찍은 줄로 — 수정 8 **전부 `same`**(blob SHA 가 base 와 같음 · `DIFF` 0) · 신설 **41** 전부 `LEFT` 없음(파일로 남지 않음) · base 와 다른 추적 파일은 `reports/evidence/m6/6b3/` **여섯**뿐(이 slice 의 evidence — 의도) |
-| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0**(15s) |
-| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0**(9m39s) |
+| ③ | 복원 경로가 **머지된 main** 과 같다 | `git diff ae9b2f52 -- <49>` 와 `git diff --cached ae9b2f52 -- <49>` **둘 다 0줄** |
+| ③b | **main 전용 경로를 건드리지 않았다** | 목록 밖 18 경로의 `git diff ae9b2f52` **0줄**(복원이 남의 변경 영역에 닿지 않는다) |
+| ③c | **내 표지 0 · main 표지 보존** | 내 표지 전부 0 — 게이트 등재의 `retention.` 0 · `MigrationLockTimeout` 0 · `ForeignKeyEdgeIdentity` 0 · 정책의 `RetentionWiring`·`app.retention.` 0 · 공유 runbook 의 `bidvector.retention` 0 과 「90일에 파기」 0 · `adapters/.../retention/` 파일 0. **main 의 표지는 그대로** — 게이트 등재의 `BootJarSecurityFloorTest` **2행** · 공유 runbook 의 6E-2c 문면 **7행** · 두 공유 파일의 blob 이 `ae9b2f52` 와 **동일** |
+| ③d | **트리 동일성** | 경로마다 찍은 줄로 — 수정 8 **전부 `same`**(blob SHA 가 `ae9b2f52` 와 같음 · `DIFF` 0) · 신설 **41** 전부 `LEFT` 없음(파일로 남지 않음) · base 와 다른 추적 파일은 `reports/evidence/m6/6b3/` **여섯**뿐(이 slice 의 evidence — 의도) |
+| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0**(32s) |
+| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0**(11m07s) |
 | ⑥ | **게이트가 초록이고 실제로 돌았다** | 같은 run 에서 게이트 task **136 수행** · 그 가운데 **UP-TO-DATE 0**(버릴 clone 은 `build/` 가 없어 캐시로 넘어가는 task 가 없다 — 「돌았다」가 수행 수로 보인다) |
 
 evidence 디렉터리를 남긴 채 `leakPatternGate` 가 초록이라 ⑥ 이 성립한다.
