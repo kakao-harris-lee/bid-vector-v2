@@ -26,6 +26,11 @@ _swap` · `Path(a).replace(b)` · 모듈 상수 경유 리터럴 다섯이 모�
 
 - **동적 접근** — `importlib.import_module("…journal_file").JobJournal(...)` ·
   `getattr(module, "JobJournal")`. grimp 도 AST 도 import 문과 호출식을 읽는다.
+- **재수출의 모듈 속성 경유** — `import ml_engine.training.jobs.store as m` 뒤
+  `m.JobJournal(...)` + `# type: ignore[attr-defined]`. `modules_binding` 은 `ImportFrom` 의
+  이름만 보고, 생성 자리 해석은 그 호출을 `…store.JobJournal` 이라는 **다른 이름**으로 본다
+  (vr M-3 실측: ruff·mypy·lint-imports·게이트 전부 초록). `from …store import JobJournal`
+  형태는 닫혀 있다 → `OPEN-6B4-AUDIT-HOOK-HARDENING`.
 - **지역 재바인딩** — `factory = JobStore; factory(...)`. 생성 자리 술어는 호출식의 출처를
   해석하지, 값의 흐름을 따라가지 않는다.
 - **`type()` 경유** — `type(store)(journal=…, pending_queue_max=10**9)`. 이름이 등장하지
@@ -34,7 +39,7 @@ _swap` · `Path(a).replace(b)` · 모듈 상수 경유 리터럴 다섯이 모�
   둘과 묶여야 쓸모가 있고(저장소 인스턴스를 쥐어야 한다), production 에 그 자리는 없다.
 - **저널 파일을 직접 편집하는 주체** — 애초에 비방어다(위협 모델).
 
-**이 파일의 정적 술어는 「닫음」이 아니라 「좁힘」이다**: 위 넷은 정적으로 닫히지 않는다.
+**이 파일의 정적 술어는 「닫음」이 아니라 「좁힘」이다**: 위 다섯은 정적으로 닫히지 않는다.
 저널 파일에 **실제로 쓰는 자리**의 닫힘은 정적 이름 목록이 아니라 실행 시점 감사 훅
 (`tests/gates/test_journal_write_audit.py`)이 진다 — 그 파일이 무엇을 닫고 무엇을 못 닫는지
 적는다.
