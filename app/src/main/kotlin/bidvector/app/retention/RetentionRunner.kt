@@ -39,7 +39,7 @@ class RetentionRunner(
             try {
                 purge.run()
             } catch (failure: Exception) {
-                log.write(retentionFailureLine(causeCodeOf(failure)))
+                log.write(retentionFailureLine(causeCodeOf(unwrappedFailure(failure)), partialOf(failure)))
                 termination.terminate(RetentionExitCode.FAILED.value)
                 return
             }

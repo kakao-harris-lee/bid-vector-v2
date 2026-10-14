@@ -41,6 +41,8 @@ private class StubStore(
     private val purgeBatch: Int = 0,
     private val maskBatch: MaskBatchCounts = MaskBatchCounts(0, 0),
     private val thrown: Exception? = null,
+    /** 그 표의 파기에서만 터진다 — `null` 이면 첫 호출에서 터진다(앞 판 거동). */
+    private val thrownTable: String? = null,
 ) : RetentionStorePort,
     RetentionWriter {
     private var purgeServed = false
@@ -62,7 +64,7 @@ private class StubStore(
         cutoff: RetentionCutoff,
         batchSize: Int,
     ): Int {
-        thrown?.let { throw it }
+        if (thrownTable == null || thrownTable == target.table) thrown?.let { throw it }
         if (purgeServed) return 0
         purgeServed = true
         return purgeBatch
@@ -172,6 +174,32 @@ class RetentionRunnerTest {
 
         exitCodes shouldBe listOf(RetentionExitCode.FAILED.value)
         lines.last() shouldContain "sqlState=42P01"
+        lines.last() shouldNotContain LEAKY_MESSAGE
+    }
+
+    /**
+     * PR #73 P6 — **도중에 죽은 run 의 계수**. 일괄은 각자 커밋되므로 그때까지 지운 행은 돌아오지
+     * 않는다(백업 복원만이 경로다). 그 수가 실패 줄에 없으면 운영자는 「이미 몇 행이 사라졌나」를
+     * 로그에서 읽을 수 없다. 원 예외 메시지는 **여전히** 실리지 않는다 — 두 축이 한 줄에 공존한다.
+     */
+    @Test
+    fun `도중에 죽은 run 은 그때까지 커밋된 계수를 실패 줄에 싣는다`() {
+        runWith(
+            StubStore(
+                listOf(
+                    RetentionTarget("notice", RetentionTreatment.PURGE),
+                    RetentionTarget("opening_result", RetentionTreatment.PURGE),
+                ),
+                purgeBatch = 3,
+                thrown = SQLException(LEAKY_MESSAGE, "42P01"),
+                thrownTable = "opening_result",
+            ),
+        )
+
+        exitCodes shouldBe listOf(RetentionExitCode.FAILED.value)
+        lines.last() shouldContain "sqlState=42P01"
+        lines.last() shouldContain "purged=3"
+        lines.last() shouldContain "notice:purged=3"
         lines.last() shouldNotContain LEAKY_MESSAGE
     }
 

@@ -2,6 +2,7 @@ package bidvector.workflow.retention
 
 import bidvector.workflow.event.LeaseAttempt
 import bidvector.workflow.strategy.Clock
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -30,6 +31,10 @@ private class FakeRetentionStore(
     private val maskBatches: Map<String, MutableList<MaskBatchCounts>> = emptyMap(),
     /** 매 일괄이 **가득 찬 채 진척 0** 인 응답만 내는 모드(cr M-1) — 종료 보장을 재는 자리. */
     private val stuckBatch: Boolean = false,
+    /** 몇 번째 파기 호출에서 터지나(1 부터) — 「일괄 몇 개를 커밋한 뒤 죽은 run」을 만든다(PR #73 P6). */
+    private val throwOnPurgeCall: Int? = null,
+    /** 몇 번째 마스킹 호출에서 터지나(1 부터). */
+    private val throwOnMaskCall: Int? = null,
 ) : RetentionStorePort,
     RetentionWriter {
     val purgeCalls = mutableListOf<Pair<String, Instant>>()
@@ -54,6 +59,7 @@ private class FakeRetentionStore(
         batchSize: Int,
     ): Int {
         purgeCalls += target.table to cutoff.instant
+        if (purgeCalls.size == throwOnPurgeCall) throw STORE_FAILURE
         return purgeBatches[target.table]?.removeFirstOrNull() ?: 0
     }
 
@@ -64,10 +70,14 @@ private class FakeRetentionStore(
     ): MaskBatchCounts {
         maskCalls += target.table to cutoff.instant
         check(maskCalls.size <= RUNAWAY_CALL_LIMIT) { "마스킹 일괄 루프가 끝나지 않는다" }
+        if (maskCalls.size == throwOnMaskCall) throw STORE_FAILURE
         if (stuckBatch) return MaskBatchCounts(masked = 0, failClosed = 0, skipped = batchSize)
         return maskBatches[target.table]?.removeFirstOrNull() ?: MaskBatchCounts(0, 0)
     }
 }
+
+/** 저장소가 터지는 자리의 값 — 메시지는 로그 경로에 닿지 않는다(러너가 원인 코드로 정제한다). */
+private val STORE_FAILURE = IllegalStateException("저장소가 일괄 도중에 터졌다")
 
 /**
  * 끝나지 않는 루프를 **test 가 멈춘다** — 그 자리에 상한이 없으면 cr M-1 의 모양(임대와 소유자 연결을
@@ -307,5 +317,49 @@ class PurgeExpiredDataTest {
         val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
         report.maskSkippedTotal shouldBe 10
         report.maskedTotal shouldBe 0
+    }
+
+    /**
+     * PR #73 P6 — **되돌릴 수 없는 경로의 부분 계수**. 일괄은 각자 커밋되므로 run 이 도중에 죽어도
+     * 그때까지 지운 행은 돌아오지 않는다. 그 수를 예외와 함께 올리지 않으면 운영자는 「몇 행이 이미
+     * 사라졌나」를 **백업과 대조하는 수밖에** 없다. PR #63 의 relay 처방과 같은 모양이다.
+     */
+    @Test
+    fun `파기 도중에 터지면 그때까지 커밋된 계수를 실어 던진다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("notice", RetentionTreatment.PURGE)),
+                purgeBatches = mapOf("notice" to mutableListOf(10)),
+                throwOnPurgeCall = 2,
+            )
+
+        val aborted = shouldThrow<RetentionAborted> { PurgeExpiredData(store, Clock { NOW }, policy()).run() }
+
+        aborted.cause shouldBe STORE_FAILURE
+        aborted.partial.purgedTotal shouldBe 10
+        aborted.partial.tallies.getValue("notice").purged shouldBe 10
+        aborted.partial.cutoff shouldBe CUTOFF_AT_90_DAYS
+    }
+
+    /** 앞 표가 끝나고 **다음 작업**에서 죽은 run — 앞 표의 계수가 사라지지 않는다. */
+    @Test
+    fun `마스킹 도중에 터지면 앞 표의 파기 계수와 그 표의 커밋된 마스킹이 함께 실린다`() {
+        val store =
+            FakeRetentionStore(
+                targets =
+                    listOf(
+                        RetentionTarget("notice", RetentionTreatment.PURGE),
+                        RetentionTarget("raw_observation", RetentionTreatment.MASK_PII),
+                    ),
+                purgeBatches = mapOf("notice" to mutableListOf(3)),
+                maskBatches = mapOf("raw_observation" to mutableListOf(MaskBatchCounts(masked = 10, failClosed = 0))),
+                throwOnMaskCall = 2,
+            )
+
+        val aborted = shouldThrow<RetentionAborted> { PurgeExpiredData(store, Clock { NOW }, policy()).run() }
+
+        aborted.partial.purgedTotal shouldBe 3
+        aborted.partial.maskedTotal shouldBe 10
+        aborted.partial.deletionOrder shouldContainExactly listOf("notice")
     }
 }

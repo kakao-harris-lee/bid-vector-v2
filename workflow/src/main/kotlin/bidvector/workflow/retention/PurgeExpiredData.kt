@@ -48,6 +48,23 @@ sealed interface RetentionRefusal {
     ) : RetentionRefusal
 }
 
+/**
+ * 일괄 **몇 개를 커밋한 뒤** 멈춘 run (PR #73 P6) — 그때까지 지운 행은 돌아오지 않는다(백업 복원만이
+ * 경로다). 그 수를 예외에 실어 올리지 않으면 운영자는 「이미 몇 행이 사라졌나」를 로그에서 읽을 수
+ * 없고, 되돌릴 수 없는 경로에서 그 모름은 백업 대조로만 메워진다.
+ *
+ * [RetentionOutcome.Completed] 와 **같은 모양의 보고**를 싣는다([partial]). 둘을 값과 예외로 가른
+ * 이유는 처분이 다르기 때문이다 — 완료는 종료 코드로 끝나는 정상 run 이고, 이쪽은 저장소나 계약이
+ * 깨진 것(재시도 전에 원인을 봐야 한다)이라 값으로 접으면 조용해진다. PR #63 의 relay 처방
+ * (`RelayAborted`)과 같은 축이다.
+ *
+ * [partial] 의 계수는 **커밋된 일괄만** 센다 — 터진 일괄 자신은 롤백되므로 들어 있지 않다.
+ */
+class RetentionAborted(
+    val partial: RetentionReport,
+    override val cause: Throwable,
+) : RuntimeException("보존 run 이 일괄 도중에 멈췄다 — 집계는 partial 에 있다", cause)
+
 sealed interface RetentionOutcome {
     data class Completed(
         val report: RetentionReport,
@@ -149,23 +166,36 @@ class PurgeExpiredData(
             cascade = plan.targets.tablesWith(RetentionTreatment.CASCADE_WITH_PARENT),
         )
 
+    /**
+     * 계수를 **일괄마다 적는다**(PR #73 P6) — 저장소는 문장마다 자기 트랜잭션이라 한 일괄이 커밋된
+     * 뒤 다음 일괄이 터지면 **앞 일괄은 남는다**. 표별 합계를 끝에 한 번 적으면 그 run 의 계수가
+     * 통째로 사라지고, 되돌릴 수 없는 경로에서 「몇 행이 이미 사라졌나」가 로그 밖으로 나간다.
+     * 터진 일괄 자신은 롤백되므로 세지 않는다 — 콜백이 저장소 호출 **뒤에** 돈다.
+     */
     private fun sweep(
         writer: RetentionWriter,
         cutoff: RetentionCutoff,
         plan: Plan.Ready,
     ): Map<String, TableTally> {
+        val maskTargets = plan.targets.filter { it.treatment == RetentionTreatment.MASK_PII }
         val tallies = linkedMapOf<String, TableTally>()
-        for (table in plan.order) {
-            tallies[table] = TableTally(purged = purgeAll(writer, plan.purgeTargets.getValue(table), cutoff))
-        }
-        for (target in plan.targets.filter { it.treatment == RetentionTreatment.MASK_PII }) {
-            val counts = maskAll(writer, target, cutoff)
-            tallies[target.table] =
-                TableTally(
-                    masked = counts.masked,
-                    maskFailClosed = counts.failClosed,
-                    maskSkipped = counts.skipped,
-                )
+        plan.order.forEach { tallies[it] = TableTally() }
+        maskTargets.forEach { tallies[it.table] = TableTally() }
+        try {
+            for (table in plan.order) {
+                purgeAll(writer, plan.purgeTargets.getValue(table), cutoff) { removed ->
+                    tallies[table] = tallies.getValue(table).plusPurged(removed)
+                }
+            }
+            for (target in maskTargets) {
+                maskAll(writer, target, cutoff) { counts ->
+                    tallies[target.table] = tallies.getValue(target.table).plusMask(counts)
+                }
+            }
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: Exception,
+        ) {
+            throw RetentionAborted(reportOf(cutoff, plan, tallies.toMap()), failure)
         }
         return tallies
     }
@@ -178,12 +208,12 @@ class PurgeExpiredData(
         writer: RetentionWriter,
         target: RetentionTarget,
         cutoff: RetentionCutoff,
-    ): Int {
-        var total = 0
+        onBatch: (Int) -> Unit,
+    ) {
         while (true) {
             val removed = writer.purge(target, cutoff, policy.batchSize)
-            total += removed
-            if (removed < policy.batchSize) return total
+            onBatch(removed)
+            if (removed < policy.batchSize) return
         }
     }
 
@@ -203,22 +233,25 @@ class PurgeExpiredData(
         writer: RetentionWriter,
         target: RetentionTarget,
         cutoff: RetentionCutoff,
-    ): MaskBatchCounts {
-        var masked = 0
-        var failClosed = 0
-        var skipped = 0
+        onBatch: (MaskBatchCounts) -> Unit,
+    ) {
         while (true) {
             val counts = writer.mask(target, cutoff, policy.batchSize)
-            masked += counts.masked
-            failClosed += counts.failClosed
-            skipped += counts.skipped
+            onBatch(counts)
             val progressed = counts.masked + counts.failClosed > 0
-            if (counts.total < policy.batchSize || !progressed) {
-                return MaskBatchCounts(masked, failClosed, skipped)
-            }
+            if (counts.total < policy.batchSize || !progressed) return
         }
     }
 }
 
 private fun List<RetentionTarget>.tablesWith(treatment: RetentionTreatment): Set<String> =
     filter { it.treatment == treatment }.map { it.table }.toSet()
+
+private fun TableTally.plusPurged(removed: Int): TableTally = copy(purged = purged + removed)
+
+private fun TableTally.plusMask(counts: MaskBatchCounts): TableTally =
+    copy(
+        masked = masked + counts.masked,
+        maskFailClosed = maskFailClosed + counts.failClosed,
+        maskSkipped = maskSkipped + counts.skipped,
+    )
