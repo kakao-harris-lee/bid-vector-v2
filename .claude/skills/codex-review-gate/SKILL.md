@@ -82,11 +82,20 @@ CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 20
 # 사용자 config 의 MCP 서버·plugin 을 호출마다 끈다 — 목록은 config 에서 기계 산출(손 목록 금지).
 # `-c mcp_servers={}` 는 기존 표와 병합돼 아무것도 끄지 않는다(2026-10-09 M6/6E-2a r1 실측: serena 가 호출돼
 # worktree 에 .serena/ 를 만들어 오염 → 그 라운드 무효). config 파일은 고치지 않는다.
+# 키는 따옴표 없이 쓴다(2026-10-14, 0.162.1 실측: `mcp_servers."<name>".enabled` 는 새 -c 파서가
+# 따옴표를 키 일부로 보고 빈 서버 표를 만들어 config 로드에서 exit 1). 그래서 이름에 '.'·'"' 가
+# 있으면 경로가 갈라지므로 생성기가 거부한다 — 그런 이름이 생기면 스킬을 고친 뒤 돈다.
 CODEX_OFF=()
 while read -r k; do CODEX_OFF+=(-c "${k}.enabled=false"); done < <(
-  python3 -c 'import tomllib,os; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
+  python3 -c 'import tomllib,os,sys; d=tomllib.load(open(os.path.expanduser("~/.codex/config.toml"),"rb"))
 for t in ("mcp_servers","plugins"):
-    for n in d.get(t,{}): print(f"{t}.\"{n}\"")')
+    for n in d.get(t,{}):
+        if "." in n or "\"" in n: sys.exit(f"config 이름에 . 또는 \" — 무따옴표 키 불가: {t}.{n}")
+        print(f"{t}.{n}")') || { echo "CODEX_OFF 생성 실패 — preflight 미충족"; exit 1; }
+# 적용 확인: 같은 override 로 MCP 서버가 전부 disabled 인지 본다(모델 호출 없음). plugin 은 CLI 로
+# 관측할 수 없다 — raw-output 의 plugin·connector 도구 호출 계수로 갈음한다(0 이 아니면 라운드 무효).
+"$CODEX_BIN" mcp list "${CODEX_OFF[@]}" | grep -iv 'disabled' | grep -iE 'enabled' && {
+  echo "MCP 서버가 켜져 있다 — preflight 미충족"; exit 1; }
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
@@ -104,7 +113,7 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
 `codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
 
-**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다.
+**MCP·plugin·네트워크는 호출마다 끈다(2026-10-09).** 위 `CODEX_OFF` 가 config 의 `[mcp_servers.*]`·`[plugins.*]` 표 전부에 `enabled=false` 를 주고 `sandbox_workspace_write.network_access=false` 로 샌드박스 네트워크를 막는다. preflight 에서 raw-output 에 MCP 도구 호출이 0 인지 확인한다 — 하나라도 있으면 그 라운드는 무효(worktree 를 다시 만들고 재실행). 모델 쪽 웹 검색 도구를 끄는 키는 아직 확인되지 않았다 — raw-output 의 웹 검색 호출 수를 기록한다. **plugin·connector 도구 호출도 같은 방식으로 센다**(2026-10-14) — plugin override 는 `codex plugin list` 에 반영되지 않아 CLI 로 확인할 수 없으므로, 그 계수가 0 이 아니면 라운드 무효다. preflight 의 키: `mcp_calls`·`plugin_calls`·`connector_calls`·`web_search_calls`.
 
 **`model_reasoning_effort`는 반드시 `high`로 고정한다.** 생략하면 CLI 기본값에 의존해
 같은 base...head가 라운드마다 다른 effort로 리뷰되고, 판정이 갈릴 수 있다. M0/0A 3차
@@ -255,6 +264,16 @@ preflight 결과는 **레인 산출물**이다 — codex-reviewer 의 반환 보
 ·`premature_approves`·`gradle_executed`(코드 slice). 문서 slice 의 기존 C-행 관행은 그대로
 두고, 코드 slice 는 `commands.md` 에 라운드별 행을 등재하지 않는다(운영자 결정 2026-09-02).
 
+**인계 전 누출 스캔(2026-10-14).** preflight·verdict 두 파일은 `reports/evidence/**` 에 실려
+`leakPatternGate` 의 스캔 대상이다. 작성한 레인이 인계 **전에**
+`grep -ciE -f config/quality/leak-patterns.txt <두 파일>` 이 둘 다 0 인지 확인하고 그 사실을
+반환 보고에 적는다. 메모(`emission_note` 등)에 이 스킬 본문의 CLI 용어를 옮겨 적지 않는다 —
+사용량 블록은 「사용량 줄」로 쓴다(M6/6B-4 실측: 스킬 문면의 영어 표현이 메모로 복사돼 게이트를
+붉혔고, 이미 커밋된 append-only 파일을 고쳐야 했다).
+
+**라운드 뒤 정리.** codex 가 저장소 밖에 만든 캐시(예: `/tmp/uv-cache`)는 리뷰 worktree 와
+함께 레인이 지운다 — 지운 경로를 반환 보고에 적는다.
+
 **`codex debug prompt-input`을 preflight 도구로 쓰지 마라** — memory 주입을 렌더하지 않아
 항상 「없음」이라고 답한다.
 
@@ -366,6 +385,12 @@ worktree 격리로 인해 영향받지 않는다.
   캡처 의미가 바뀌거나
   타임아웃이 나면 조기 verdict 가 저장될 수 있으므로, **`commands_run` 이 빈약한
   `approve` 는 판정이 아니라 미완 실행으로 취급**하고 재실행한다.
+- **조기 방출이 인용한 대상은 head 에서 존재를 실측한다(2026-10-14).** M6/6B-4 의 조기
+  `request_changes` 넷 중 셋은 명령 하나 돌기 전에 나왔고 head 에 없는 파일·심볼·줄 번호·
+  돌지 않은 스크립트 출력을 근거로 들었다(종말 판정은 codex 가 그것들을 찾아본 뒤 뺐다).
+  preflight 의 `emission_note` 에 조기 방출을 적을 때는 인용 대상마다 head 존재 여부를
+  `git cat-file -e`·`git grep` 으로 재고 그 결과를 함께 적는다 — 지어낸 근거를 「무시한
+  방출」로만 적으면 다음 라운드가 같은 이름을 실재하는 결함으로 오독할 수 있다.
 
 검증 실패 시 1회 재실행. 재실패 시 raw 출력을 보존하고 실패로 보고한다. JSON을 임의로
 보정·생성하지 않는다.
