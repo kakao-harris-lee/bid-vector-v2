@@ -119,27 +119,36 @@ internal fun purgeSqlFor(
 }
 
 /**
- * 마스킹 후보 조회 — 남길 키를 **그 행의 투영 열 키 집합**으로 함께 읽는다
- * ([maskRawPayload] 의 allow-list 출처). `pii_masked_at IS NULL` 이 「이미 마스킹된 행
- * 건너뜀」을 질의 자체로 만든다.
+ * 마스킹 후보 조회 — **남길 키를 행에서 읽지 않는다**(D-6B3-5 ②). 그 집합은 계약 레지스트리가
+ * 정하므로(`keptRawNames`) 질의가 가져올 것은 키와 원문뿐이다. 앞 판은 그 행의 투영 열 키를
+ * allow-list 로 읽었고, 그래서 적재자가 투영에 심은 키가 남김 집합에 들어왔다(vr R2-F2(a)).
+ * `pii_masked_at IS NULL` 이 「이미 마스킹된 행 건너뜀」을 질의 자체로 만든다.
  */
 internal fun maskSelectSqlFor(rule: RetentionRule.MaskPii): String =
-    "SELECT ${quoteIdent(rule.keyColumn)}, ${quoteIdent(rule.rawColumn)}, " +
-        "ARRAY(SELECT jsonb_object_keys(${quoteIdent(rule.projectionColumn)})) AS kept_keys " +
+    "SELECT ${quoteIdent(rule.keyColumn)}, ${quoteIdent(rule.rawColumn)} " +
         "FROM ${quoteIdent(rule.table)} " +
         "WHERE ${quoteIdent(rule.insertedAtColumn)} < ? AND ${quoteIdent(rule.maskedAtColumn)} IS NULL " +
         "ORDER BY ${quoteIdent(rule.insertedAtColumn)} LIMIT ?"
 
 /**
- * 마스킹 문 — **두 열을 함께** 바꾼다(D-6B3-3 ①). 원문은 남김 집합으로 다시 쓴 값으로, 투영은
- * `jsonb - text[]`(지울 키 전수)로 줄인다. 투영을 jsonb 연산으로 줄이는 이유: 그 열은 이미
- * 정규화된 jsonb 이므로 다시 직렬화할 이유가 없고, 지울 키 밖의 값에 손이 닿지 않는다.
+ * 마스킹 문 — **두 열을 같은 allow-list 로** 줄인다(D-6B3-5 ②). 원문은 남김 집합으로 다시 쓴
+ * 값으로, 투영은 `jsonb_each` → `jsonb_object_agg` 로 **남길 키만** 모아 다시 세운다.
  *
- * 표지 열은 **DB 시계**가 찍는다(적재 시각 축과 같은 시계). `AND <표지> IS NULL` 은 트리거
- * ③(NULL → 값 한 번)과 같은 조건을 질의에도 두는 방어 심층이다.
+ * 앞 판은 투영을 `- <지울 키>` 라는 **deny-list** 로 줄였다. 그러면 지울 키 목록에 없는 키는 무엇이든
+ * 남으므로, 적재자가 담당자 키를 투영에 실으면 그 키가 그대로 남았다(vr R2-F2(a)). allow-list 는
+ * 「계약이 아는 키 가운데 업체 식별이 아닌 것」만 남기므로 그 경로가 닫힌다 — 지울 키 목록을 두
+ * 벌 두지도 않는다.
+ *
+ * 남길 키가 하나도 맞지 않으면 `jsonb_object_agg` 가 NULL 을 내므로 `coalesce` 로 빈 객체를 둔다
+ * (그 열은 `NOT NULL` 이고 V19 의 CHECK 가 객체를 요구한다).
+ *
+ * 표지 열은 **DB 시계**가 찍는다(적재 시각 축과 같은 시계). `AND <표지> IS NULL` 은 트리거의 표지
+ * 관문과 같은 조건을 질의에도 두는 방어 심층이다.
  */
 internal fun maskUpdateSqlFor(rule: RetentionRule.MaskPii): String =
     "UPDATE ${quoteIdent(rule.table)} SET ${quoteIdent(rule.rawColumn)} = ?, " +
-        "${quoteIdent(rule.projectionColumn)} = ${quoteIdent(rule.projectionColumn)} - ?::text[], " +
+        "${quoteIdent(rule.projectionColumn)} = (" +
+        "SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) " +
+        "FROM jsonb_each(${quoteIdent(rule.projectionColumn)}) AS e WHERE e.key = ANY (?)), " +
         "${quoteIdent(rule.maskedAtColumn)} = now() " +
         "WHERE ${quoteIdent(rule.keyColumn)} = ? AND ${quoteIdent(rule.maskedAtColumn)} IS NULL"

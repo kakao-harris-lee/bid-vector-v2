@@ -135,5 +135,5 @@ class OpeningCompanyInfoMaskingTest : PersistenceTestSupport() {
             }
         }
 
-    private fun retentionStore() = JdbcRetentionStore(dataSource(), RETENTION_REFERENCE_DATE)
+    private fun retentionStore() = JdbcRetentionStore(dataSource())
 }

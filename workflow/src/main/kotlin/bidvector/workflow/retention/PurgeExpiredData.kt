@@ -188,9 +188,16 @@ class PurgeExpiredData(
     }
 
     /**
-     * 끝나는 근거는 「일괄이 가득 차지 않았다」이고, 그 **가득 참은 후보 수로 센다**(cr L-5):
-     * UPDATE 가 0 행을 돌린 후보를 세지 않으면 일괄이 가득 찼는데도 루프가 끝나 그 run 이
-     * 백로그를 비우지 못한다. [MaskBatchCounts.total] 이 그 수다.
+     * 끝나는 근거 **둘**이다.
+     *
+     * ① 「일괄이 가득 차지 않았다」 — 가득 참은 **후보 수**로 센다(cr L-5): UPDATE 가 0 행을 돌린
+     * 후보를 세지 않으면 일괄이 가득 찼는데도 루프가 끝나 그 run 이 백로그를 비우지 못한다.
+     *
+     * ② **「진척이 없다」**(cr M-1) — 가득 찬 일괄인데 한 행도 처리하지 못했으면 다음 일괄도 같다
+     * (cutoff 가 run 시작에 고정되고 후보 순서가 `ORDER BY` 로 결정적이다). ① 만 두면 같은 후보가
+     * 반복해 `skipped` 로 돌아오는 상태에서 **임대와 소유자 연결을 쥔 채 영구히 돈다** — cron 이
+     * 끝나지 않는 프로세스를 얻고 그 뒤 모든 run 이 `LEASE_BUSY` 로 떨어져 파기까지 멈춘다.
+     * 조용한 미완보다 나쁜 실패 모양이라 그 가정을 코드 안에서 닫는다.
      */
     private fun maskAll(
         writer: RetentionWriter,
@@ -205,7 +212,10 @@ class PurgeExpiredData(
             masked += counts.masked
             failClosed += counts.failClosed
             skipped += counts.skipped
-            if (counts.total < policy.batchSize) return MaskBatchCounts(masked, failClosed, skipped)
+            val progressed = counts.masked + counts.failClosed > 0
+            if (counts.total < policy.batchSize || !progressed) {
+                return MaskBatchCounts(masked, failClosed, skipped)
+            }
         }
     }
 }

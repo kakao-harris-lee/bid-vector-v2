@@ -17,6 +17,14 @@
 -- · 함수 생성 · 트리거 교체) — 밀리초로 끝나고, `ALTER` + 트리거 교체의 원자성은 여기 남는다
 -- (교체 순간의 무방비 구간이 없다).
 
+-- **첫 문장은 잠금 대기의 상한이다**(mig M-1). 이 파일의 작업은 밀리초인데 창은 그렇지 않다:
+-- `ALTER TABLE` 의 `ACCESS EXCLUSIVE` 는 그 표에 열린 트랜잭션 뒤에 줄을 서고, **그 뒤에 오는
+-- 평범한 읽기까지 전부 같은 큐에 선다**(실측). 기본 `lock_timeout` 은 0 이고 Flyway 는 걸지
+-- 않으므로, 그 대기는 열린 트랜잭션의 길이만큼 무한하다 — 기동 부수효과이므로 곧 기동 정지다.
+-- 상한을 두면 같은 상황이 **실패**가 되고(기동 실패 → 긴 트랜잭션을 정리한 뒤 재시도) 되돌리기
+-- 어려운 경로에서 「정지」보다 싼 실패 모양이 된다. `SET LOCAL` 이라 이 트랜잭션에만 걸린다.
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE raw_observation
     ADD COLUMN pii_masked_at TIMESTAMPTZ;
 
@@ -33,12 +41,22 @@ ALTER TABLE raw_observation
 -- reject_mutation_except_masking — V3 `reject_mutation` 의 좁은 개정판.
 --
 --   ① DELETE 는 조건 없이 거부한다(append-only 의 본체 — 운영자 결정 A-3 「파기하지 않는다」).
---   ② INSERT 는 **표지가 NULL 일 때만** 지난다(vr F-4). 앱 역할의 INSERT GRANT 는 표 단위라
---      새 열도 포함하고, 마스킹 조회는 `pii_masked_at IS NULL` 만 보므로 표지를 미리 찍은 행은
---      영원히 마스킹되지 않으면서 계수에도 없다 — 표지를 쓰는 주체를 마스킹 주체로 닫는다.
---   ③ UPDATE 의 실행 역할은 **표 소유자(의 멤버)** 여야 한다(vr F-5 · mig L-1). 역할 **이름**을
---      거부하는 deny-list 였다면 뒤의 마이그레이션이 다른 역할에 UPDATE 를 주는 순간 열렸다 —
---      카탈로그(`pg_class.relowner`)에서 끌어온 allow-list 는 미래의 어떤 역할도 열거 없이 막는다.
+--   ② INSERT 는 **마스킹을 정하는 입력을 적재자에게 주지 않는다** — 둘을 본다.
+--      ⓐ 표지가 NULL 이어야 한다(vr F-4). 앱 역할의 INSERT GRANT 는 표 단위라 새 열도 포함하고,
+--         마스킹 조회는 `pii_masked_at IS NULL` 만 보므로 표지를 미리 찍은 행은 영원히 마스킹되지
+--         않으면서 계수에도 없다 — 표지를 쓰는 주체를 마스킹 주체로 닫는다.
+--      ⓑ **적재 시각은 DB 시계가 소유한다**(vr R2-F2(b)). `inserted_at` 이 `DEFAULT now()` 일
+--         뿐이었으므로 앱 역할이 `2999-01-01` 로 적재하면 그 행은 `inserted_at < cutoff` 에 영원히
+--         들지 않았다. 비소유자 적재에는 `now()` 를 **써 넣는다**(거부가 아니다: 트랜잭션 안에서
+--         `now()` 는 트랜잭션 시작 시각이라 긴 트랜잭션의 정상 적재를 허용 오차로 거부할 수 없다).
+--         출하 수집 경로는 그 열을 **쓰지 않으므로**(`Sql.INSERT_RAW_OBSERVATION` 의 열 여섯에
+--         없다 — 실측) 비용이 0 이다. 소유자에게는 강제하지 않는다 — 묵은 행을 심는 fixture·복원이
+--         그 자유에 기대고, 소유자 자격은 이 slice 의 비방어 경계다.
+--   ③ UPDATE 의 실행 역할은 **표 소유자(의 권한을 쓸 수 있는 역할)** 여야 한다(vr F-5 · mig L-1).
+--      역할 **이름**을 거부하는 deny-list 였다면 뒤의 마이그레이션이 다른 역할에 UPDATE 를 주는
+--      순간 열렸다 — 카탈로그(`pg_class.relowner`)에서 끌어온 allow-list 는 미래의 어떤 역할도
+--      열거 없이 막는다. 술어는 `'USAGE'` 다(mig L-3 — `'MEMBER'` 는 `NOINHERIT` 로 상속하지 않는
+--      멤버까지 통과시켜 더 넓었다). 출하 경로(소유자 직접 접속)는 그대로 지난다.
 --      GRANT 부재가 여전히 1차 방어이고 이것이 2차다.
 --   ④ 마스킹 표지가 NULL → 값으로 **한 번만** 간다. 값 → 값(두 번째 마스킹)·값 → NULL
 --      (되돌림)은 거부다 — 원문을 다시 써 넣는 경로가 그 둘이다.
@@ -60,10 +78,13 @@ BEGIN
             RAISE EXCEPTION '%.% 의 마스킹 표지는 적재가 찍지 않는다', TG_TABLE_SCHEMA, TG_TABLE_NAME
                 USING ERRCODE = 'P0001';
         END IF;
+        IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), 'USAGE') THEN
+            NEW.inserted_at := now();
+        END IF;
         RETURN NEW;
     END IF;
 
-    IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), 'MEMBER') THEN
+    IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), 'USAGE') THEN
         RAISE EXCEPTION '%.% 의 마스킹은 표 소유자만 한다', TG_TABLE_SCHEMA, TG_TABLE_NAME
             USING ERRCODE = 'P0001';
     END IF;
@@ -86,8 +107,8 @@ $masking$ LANGUAGE plpgsql;
 -- 트리거 이름은 그대로 둔다 — 이 표의 계약은 여전히 「추가 전용」이고, 바뀐 것은 그 계약의
 -- 예외 하나다. 바뀐 사실은 이름이 아니라 **함수 등재**(`CleanMigrationTriggerTest` 의
 -- 트리거 → 함수 쌍)와 거동 test 가 나른다. 이벤트에 INSERT 가 더해진 것도 같은 등재가 싣는다
--- (관문 ② — 적재마다 이 함수가 한 번 돈다. plpgsql 분기 둘이라 행당 비용은 마이크로초 단위이고,
--- 그 대가로 「표지를 쓰는 주체」가 닫힌다).
+-- (관문 ② — 적재마다 이 함수가 한 번 돈다. plpgsql 분기 셋이라 행당 비용은 마이크로초 단위이고,
+-- 그 대가로 마스킹을 정하는 입력 둘(표지·적재 시각)이 적재자 손을 벗어난다).
 DROP TRIGGER raw_observation_append_only ON raw_observation;
 
 CREATE TRIGGER raw_observation_append_only

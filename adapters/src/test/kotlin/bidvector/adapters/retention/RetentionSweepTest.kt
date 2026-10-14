@@ -255,6 +255,6 @@ class RetentionSweepTest : PersistenceTestSupport() {
             }
         }
 
-    /** 보존 저장소 — 지울 키의 해소를 어댑터가 하므로 **기준일만** 넘긴다(D-6F8-6 게이트). */
-    private fun retentionStore() = JdbcRetentionStore(dataSource(), RETENTION_REFERENCE_DATE)
+    /** 보존 저장소 — 지울·남길 키의 해소가 어댑터 안에서 끝나므로 **소유자 연결만** 넘긴다. */
+    private fun retentionStore() = JdbcRetentionStore(dataSource())
 }

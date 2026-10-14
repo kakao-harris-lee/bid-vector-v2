@@ -55,11 +55,11 @@ open class RetentionWiring {
         // 시계로 고르면 그 둘이 갈리는 날이 장부 밖이다.
         val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
         val policy = resolvedOrFail(RETENTION_POLICY.resolve(referenceDate), "보존 정책")
-        // 마스킹이 지울 키는 개념으로 선언되고 계약이 그 개념의 키를 안다(D-6B3-3 ①). **그 계약
-        // 레지스트리를 이 배선이 손에 쥐지 않는다** — 기준일만 넘기고 해소는 어댑터가 한다
-        // (D-6F8-6 게이트: 「원문 값 획득」의 허용 접근자는 수집 배선 둘뿐이고, 그 게이트가 이
-        // 자리를 실제로 막았다 — `commands.md`).
-        val store = JdbcRetentionStore(ownerDataSource(properties), referenceDate)
+        // 마스킹이 지울 키는 개념으로 선언되고 계약이 그 개념의 키를 안다. **이 배선은 그 계약
+        // 레지스트리도, 기준일도 넘기지 않는다** — 레지스트리는 D-6F8-6 게이트가 닫아 둔 「원문 값
+        // 획득」 표면이고(그 게이트가 이 자리를 실제로 막았다), 기준일은 마스킹 키 집합을 run
+        // 날짜에 묶는 입력이다(cr M-2). 유도는 전 개정 합집합이라 날짜가 필요 없다.
+        val store = JdbcRetentionStore(ownerDataSource(properties))
         val logger = LoggerFactory.getLogger(RetentionRunner::class.java)
         return RetentionRunner(
             purge = PurgeExpiredData(store, clock, policy),

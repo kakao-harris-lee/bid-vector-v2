@@ -1,6 +1,5 @@
 package bidvector.adapters.retention
 
-import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.workflow.event.LeaseAttempt
 import bidvector.workflow.retention.MaskBatchCounts
 import bidvector.workflow.retention.RetentionCutoff
@@ -11,7 +10,6 @@ import bidvector.workflow.retention.TableDependency
 import java.sql.Connection
 import java.sql.SQLException
 import java.sql.Timestamp
-import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
@@ -60,19 +58,19 @@ internal data class ForeignKeyEdge(
  */
 class JdbcRetentionStore internal constructor(
     private val owner: DataSource,
-    private val fieldContracts: KonepsFieldContractRegistry,
     private val rules: List<RetentionRule>,
 ) : RetentionStorePort {
     /**
-     * 유일한 공개 생성자 — **계약 레지스트리를 받지 않고 기준일을 받는다.** 받으면 조립(app)이 그
-     * 레지스트리를 손에 쥐게 되고, 그것이 D-6F8-6 게이트가 닫아 둔 「원문 값 획득」 표면이다
-     * (그 게이트가 이 자리를 실제로 막았다 — `commands.md`). 어느 키가 PII 인지 아는 일은
-     * **원문 키 매핑을 소유한 이 모듈**의 몫이고, 그래서 해소도 여기서 한다.
+     * 유일한 공개 생성자 — **소유자 연결 하나만 받는다.**
+     *
+     * 계약 레지스트리를 받지 않는 이유: 받으면 조립(app)이 그 레지스트리를 손에 쥐고, 그것이
+     * D-6F8-6 게이트가 닫아 둔 「원문 값 획득」 표면이다(그 게이트가 이 자리를 실제로 막았다).
+     * **기준일도 받지 않는다**(D-6B3-5 ②): 받으면 마스킹 키 집합이 run 날짜에 달리고, 묵은 행의
+     * 옛 키가 지울 집합 밖이 되는 날 그 PII 는 **영구**다(표지가 찍혀 다시 마스킹할 수 없다).
+     * 어느 키가 업체 식별인지 아는 일은 원문 키 매핑을 소유한 이 모듈의 몫이고, 그 유도는
+     * 정책 **전 개정의 합집합**이라 날짜 입력이 아예 없다.
      */
-    constructor(
-        owner: DataSource,
-        referenceDate: LocalDate,
-    ) : this(owner, retentionFieldContracts(referenceDate), RETENTION_TABLE_RULES)
+    constructor(owner: DataSource) : this(owner, RETENTION_TABLE_RULES)
 
     private val rulesByTable: Map<String, RetentionRule> = rules.associateBy { it.table }
 
@@ -113,7 +111,6 @@ class JdbcRetentionStore internal constructor(
                         connection = connection,
                         rulesByTable = rulesByTable,
                         edges = readForeignKeyEdges(connection),
-                        fieldContracts = fieldContracts,
                     )
                 LeaseAttempt.Held(body(writer))
             } finally {
@@ -162,7 +159,6 @@ internal class JdbcRetentionWriter(
     private val connection: Connection,
     private val rulesByTable: Map<String, RetentionRule>,
     private val edges: List<ForeignKeyEdge>,
-    private val fieldContracts: KonepsFieldContractRegistry,
 ) : RetentionWriter {
     override fun purge(
         target: RetentionTarget,
@@ -196,16 +192,21 @@ internal class JdbcRetentionWriter(
         batchSize: Int,
     ): MaskBatchCounts {
         val rule = ruleFor<RetentionRule.MaskPii>(target)
-        // 지울 키는 **개념을 계약에 물어** 얻는다(D-6B3-3 ①) — 일괄마다 한 번, 두 열이 같은 집합을 쓴다.
-        val removedKeys = maskedRawNamesOf(rule, fieldContracts)
+        // 남길 키는 **계약**이 정한다(D-6B3-5 ② — 행이 아니다) · 일괄마다 한 번 유도하고 두 열이
+        // 같은 집합을 쓴다. 문장도 루프 밖에서 한 번 준비한다(cr L-8 — 앞 판은 후보마다 다시 준비해
+        // 한 일괄에 1,000 회 준비 + 1,000 왕복이었다. 행별 실행은 그대로이므로 건너뜀 계수가 보존된다).
+        val keptKeys = rule.keptRawNames()
         var masked = 0
         var failClosed = 0
         var skipped = 0
-        for (candidate in maskCandidates(rule, cutoff, batchSize, removedKeys)) {
-            when {
-                !applyMask(rule, candidate, removedKeys) -> skipped++
-                candidate.failClosed -> failClosed++
-                else -> masked++
+        connection.prepareStatement(maskUpdateSqlFor(rule)).use { statement ->
+            val keptArray = connection.createArrayOf("text", keptKeys.toTypedArray())
+            for (candidate in maskCandidates(rule, cutoff, batchSize, keptKeys)) {
+                when {
+                    !applyMask(statement, keptArray, candidate) -> skipped++
+                    candidate.failClosed -> failClosed++
+                    else -> masked++
+                }
             }
         }
         return MaskBatchCounts(masked = masked, failClosed = failClosed, skipped = skipped)
@@ -233,7 +234,7 @@ internal class JdbcRetentionWriter(
         rule: RetentionRule.MaskPii,
         cutoff: RetentionCutoff,
         batchSize: Int,
-        removedKeys: Set<String>,
+        keptKeys: Set<String>,
     ): List<MaskCandidate> =
         connection.prepareStatement(maskSelectSqlFor(rule)).use { statement ->
             statement.setTimestamp(1, Timestamp.from(cutoff.instant))
@@ -241,11 +242,9 @@ internal class JdbcRetentionWriter(
             statement.executeQuery().use { rs ->
                 val candidates = mutableListOf<MaskCandidate>()
                 while (rs.next()) {
-                    val projectedKeys =
-                        (rs.getArray("kept_keys").array as Array<*>).mapNotNull { it as? String }.toSet()
                     val key = rs.getString(rule.keyColumn)
                     candidates +=
-                        when (val outcome = maskRawPayload(rs.getString(rule.rawColumn), projectedKeys - removedKeys)) {
+                        when (val outcome = maskRawPayload(rs.getString(rule.rawColumn), keptKeys)) {
                             is PayloadMaskOutcome.Masked -> {
                                 MaskCandidate(key, outcome.payload, failClosed = false)
                             }
@@ -259,19 +258,18 @@ internal class JdbcRetentionWriter(
             }
         }
 
+    /** 인자 순서는 `maskUpdateSqlFor` 의 문장 순서다 — 치환값 · **남길 키 배열** · 행 키. */
     private fun applyMask(
-        rule: RetentionRule.MaskPii,
+        statement: java.sql.PreparedStatement,
+        keptKeys: java.sql.Array,
         candidate: MaskCandidate,
-        removedKeys: Set<String>,
-    ): Boolean =
-        connection.prepareStatement(maskUpdateSqlFor(rule)).use { statement ->
-            // 인자 순서는 `maskUpdateSqlFor` 의 문장 순서다 — 치환값 · 지울 키 배열 · 행 키.
-            var index = 1
-            statement.setString(index++, candidate.replacement)
-            statement.setArray(index++, connection.createArrayOf("text", removedKeys.toTypedArray()))
-            statement.setString(index, candidate.key)
-            statement.executeUpdate() == 1
-        }
+    ): Boolean {
+        var index = 1
+        statement.setString(index++, candidate.replacement)
+        statement.setArray(index++, keptKeys)
+        statement.setString(index, candidate.key)
+        return statement.executeUpdate() == 1
+    }
 
     /**
      * 분류와 호출이 어긋나면 **구성 오류로 던진다** — 「파기 대상이 아닌 표를 파기해 달라」는

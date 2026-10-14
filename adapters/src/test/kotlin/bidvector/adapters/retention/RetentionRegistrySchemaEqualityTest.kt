@@ -103,8 +103,8 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
         rules.shouldNotBeEmpty()
 
         rules.forEach { rule ->
-            // 개념마다 계약이 없으면 `maskedRawNamesOf` 가 던진다 — 그 호출이 곧 단언이다.
-            val names = maskedRawNamesOf(rule, testFieldContracts())
+            // 개념마다 계약이 없으면 `removedRawNames` 가 던진다 — 그 호출이 곧 단언이다.
+            val names = rule.removedRawNames()
             (names.size >= rule.maskedConcepts.size) shouldBe true
         }
     }

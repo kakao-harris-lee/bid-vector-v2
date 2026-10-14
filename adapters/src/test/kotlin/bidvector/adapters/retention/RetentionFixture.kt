@@ -20,9 +20,9 @@ internal val JUST_OLDER: Instant = NOW - RETENTION_ANCHOR - Duration.ofSeconds(1
 internal val JUST_NEWER: Instant = NOW - RETENTION_ANCHOR + Duration.ofSeconds(1)
 
 /**
- * 계약 해소 기준일 — 보존 저장소의 **공개 생성자가 받는 값**이다(그 생성자는 계약 레지스트리를
- * 받지 않는다, D-6F8-6 게이트). test 가 별도 레지스트리를 만들지 않고 출하와 **같은 해소**를
- * 지난다는 뜻이기도 하다.
+ * 계약 해소 기준일 — **수집 정책을 해소하는 test** 가 쓴다(개찰 축 항목을 출하 매퍼로 만들 때).
+ * 보존 저장소는 이 값을 받지 않는다: 마스킹 키 집합이 run 날짜에 달리면 묵은 행의 옛 키가 지울 집합
+ * 밖이 되기 때문이고(cr M-2), 그래서 그 생성자에서 **인자를 없앴다**.
  */
 internal val RETENTION_REFERENCE_DATE: LocalDate = LocalDate.ofInstant(NOW, ZoneOffset.UTC)
 

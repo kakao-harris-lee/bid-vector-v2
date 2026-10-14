@@ -67,8 +67,16 @@ class RetentionRunner(
 }
 
 /**
- * 판독 실패가 하나라도 있으면 **미완**이다 — 그 행들은 원문을 잃었고(fail-closed 로 값 전체를
- * 버렸다) 그것은 상류 형태가 바뀌었다는 신호다. cron 이 0 으로 읽으면 그 신호가 사라진다.
+ * **미완의 두 꼴**(cr L-3 · M-1 처방 2).
+ *
+ * ⓐ 판독 실패 — 그 행들은 원문을 잃었고(fail-closed 로 값 전체를 버렸다) 그것은 상류 형태가 바뀌었다는
+ * 신호다. ⓑ **건너뜀** — 후보로 골랐는데 처리하지 못한 행이고, 그 run 이 백로그를 비우지 못했다는
+ * 뜻이다. 둘 중 하나라도 0 이 아니면 cron 이 **0 을 받지 않는다**(앞 판은 ⓑ 를 마침 줄에만 실어
+ * 종료 코드에 영향이 없었다).
  */
 internal fun exitCodeOf(report: RetentionReport): RetentionExitCode =
-    if (report.maskFailClosedTotal > 0) RetentionExitCode.INCOMPLETE else RetentionExitCode.COMPLETE
+    if (report.maskFailClosedTotal > 0 || report.maskSkippedTotal > 0) {
+        RetentionExitCode.INCOMPLETE
+    } else {
+        RetentionExitCode.COMPLETE
+    }

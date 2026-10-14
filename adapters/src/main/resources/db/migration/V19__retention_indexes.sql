@@ -35,14 +35,18 @@ CREATE INDEX raw_observation_pii_unmasked_idx
 --    `outbox` 는 **(상태, 적재 시각)** 복합이다 — 부분 술어(`WHERE state = 'DELIVERED'`)로 두면
 --    종단 집합이 바뀌는 날 인덱스가 조용히 쓰이지 않는다(그 집합은 레지스트리가 정한다).
 --    `notice_requirement_row` 는 파기 대상이 아니지만 **CASCADE 기한 가드**(D-6B3-3 ②)의
---    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다.
+--    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다. 그 부분질의는 **먼저
+--    `(notice_number, notice_round)` 로 조인**하므로 선행 열이 그 쌍이어야 쓰인다 — `created_at`
+--    단독 인덱스는 계획기가 고르지 않는다(cr L-2: 장부가 「가드를 돕는다」를 적고 있으면서 돕지
+--    못하는 모양이었다).
 -- =============================================================================
 CREATE INDEX notice_retention_cutoff_idx ON notice (created_at);
 CREATE INDEX opening_result_retention_cutoff_idx ON opening_result (created_at);
 CREATE INDEX opening_reserve_price_retention_cutoff_idx ON opening_reserve_price (created_at);
 CREATE INDEX qualification_text_retention_cutoff_idx ON qualification_text (created_at);
 CREATE INDEX notice_requirement_retention_cutoff_idx ON notice_requirement (created_at);
-CREATE INDEX notice_requirement_row_retention_cutoff_idx ON notice_requirement_row (created_at);
+CREATE INDEX notice_requirement_row_retention_cutoff_idx
+    ON notice_requirement_row (notice_number, notice_round, created_at);
 CREATE INDEX rejected_write_retention_cutoff_idx ON rejected_write (recorded_at);
 CREATE INDEX edit_session_retention_cutoff_idx ON edit_session (created_at);
 CREATE INDEX outbox_retention_cutoff_idx ON outbox (state, inserted_at);

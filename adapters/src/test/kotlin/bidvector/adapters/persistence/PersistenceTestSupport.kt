@@ -102,7 +102,12 @@ abstract class PersistenceTestSupport {
     }
 
     companion object {
-        private const val POSTGRES_IMAGE = "postgres:16.4"
+        /**
+         * 이미지 태그의 **유일한 자리**. `internal` 인 이유: V2 가 만드는 역할이 **클러스터 범위**라
+         * 「V18 직전」 상태를 공유 클러스터 안에 만들 수 없고, 그래서 그 창을 재는 test 가 자기
+         * 컨테이너를 띄운다(`V18LockTimeoutTest`) — 태그를 두 벌 두지 않기 위해 열어 둔다.
+         */
+        internal const val POSTGRES_IMAGE = "postgres:16.4"
 
         private val container: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
