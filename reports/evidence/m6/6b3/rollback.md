@@ -1,18 +1,22 @@
 # M6/6B-3 — rollback
 
-**실측 HEAD: `35220afd`**(승인 전 정리의 마지막 산출물 커밋 — 앞 실측 @`bc18d033` 은 옮기지 않고
+**실측 HEAD: `f92d4b55`**(r3b 문면 라운드의 마지막 산출물 커밋 — 앞 실측 @`35220afd` 은 옮기지 않고
 전부 다시 냈다). 버릴 clone(`--no-local`)에서 ①~⑥ 을 그 커밋 위에서 돌렸다.
+
+> **왜 다시 쟀나.** r3b 가 되돌림 대상 **둘**을 움직였다(V19 의 주석 한 문단 · 이 slice 의 runbook).
+> `git diff --name-only 35220afd..f92d4b55 -- <목록 48>` 이 그 두 줄을 뱉으므로 앞 실측은 그 순간
+> **미검증**이 되었다 — 주석 한 줄이어도 규칙은 같다. 목록 자체는 **48 그대로**다(경로 집합 불변).
 
 > verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 **아니다**(evidence 커밋은 언제나 뒤에 온다).
 > **그 사이에 되돌림 대상이 움직였는가**를 본다:
-> `git diff --name-only 35220afd..<판정 SHA> -- <아래 1단계 목록 48>` 이 **빈 출력**이면 유효하다.
+> `git diff --name-only f92d4b55..<판정 SHA> -- <아래 1단계 목록 48>` 이 **빈 출력**이면 유효하다.
 
 ## 되돌리는 것과 되돌리지 않는 것
 
 **되돌린다** — in_scope 산출물 경로 **48**. 목록은 손으로 쓰지 않고
-`git diff --name-status e2232a75..35220afd` 에서 기계로 내고 evidence 경로만 뺐다(A 40 = 삭제 대상,
+`git diff --name-status e2232a75..f92d4b55` 에서 기계로 내고 evidence 경로만 뺐다(A 40 = 삭제 대상,
 M 8 = base 로 복원). **디렉터리로 접지 않는다** — 접으면 목록이 slice 가 만진 파일보다 넓어진다.
-**목록은 라운드마다 실측 HEAD 에서 다시 낸다**(34 → 40 → 48, 이번도 **48**(파일 둘이 **이름만** 바뀌었다 — 잠금 창 test 와 투영 등식 test): 라운드 2 가 새 파일 일곱과
+**목록은 라운드마다 실측 HEAD 에서 다시 낸다**(34 → 40 → 48 → **48**(r3b 는 경로를 더하지 않았다 — 두 파일의 **내용만** 바뀌었다) · 앞 라운드에서는 파일 둘이 **이름만** 바뀌었다 — 잠금 창 test 와 투영 등식 test: 라운드 2 가 새 파일 일곱과
 수정 하나를 더했다 — 선언 둘(`FieldConceptPiiAxis.kt`·`RetentionMaskedKeys.kt`) · test 다섯
 (`FieldConceptPiiAxisTest`·`OpeningCompanyInfoMaskingTest`·`MaskingKeepSetSourceTest`·
 `InsertedAtOwnershipTest`·`V18LockTimeoutTest`) · 공유 하네스 `PersistenceTestSupport.kt`).
@@ -73,7 +77,7 @@ V18·V19 가 **적용된 DB** 는 위 명령으로 돌아오지 않는다. 되�
 | 이미 적용된 V18 의 마스킹 구멍 | 새 V 로 `raw_observation_append_only` 를 V3 의 `reject_mutation` 으로 재지정한다(열·제약·인덱스는 남겨도 무해 — 아무도 쓰지 않는다). **그 재지정이 함께 없애는 것 둘**(mig L-3): 적재의 **표지 관문**과 **`inserted_at` 소유** — 「세 입력이 적재자 손을 벗어난다」 가운데 둘이 그 한 줄에 달려 있다 |
 | cron | cron 줄 하나를 지운다(러너는 상주 루프가 아니다) |
 
-## ①~⑥ 실측 (버릴 clone, 실측 HEAD `35220afd`)
+## ①~⑥ 실측 (버릴 clone, 실측 HEAD `f92d4b55`)
 
 | # | 확인 | 결과 |
 |---|---|---|
@@ -81,20 +85,19 @@ V18·V19 가 **적용된 DB** 는 위 명령으로 돌아오지 않는다. 되�
 | ① | 복원 명령이 선다 | `git restore` **exit 0** |
 | ② | 복원 규모 | `git status --porcelain` → **D 40 · M 8**(기계 목록의 A 40 · M 8 과 같다) |
 | ③ | 복원 경로가 base 와 같다 | `git diff e2232a75 -- <48>` **빈 출력**(exit 0) · `git diff --cached` 도 빈 출력 |
-| ③c | **내 표지 0 · 남의 표지 보존** | 복원 뒤 내 표지 전부 0 — 게이트 등재의 `retention.` 행 0 · 잠금 창 test 등재 0 · 아키텍처 정책의 `RetentionWiring`·`app.retention.` 0 · 공유 runbook 의 보존 표지 0(`bidvector.retention` 설정 키 행까지) · `adapters/.../retention/` 디렉터리 파일 0. 같은 파일들의 **남의 표지는 그대로** — relay 등재 7 · `EvaluationCommit` 12 · 공유 runbook 의 relay 줄 17 · 설정 키 표 26 행 |
-| ③d | **트리 동일성** | 수정 8 **전부 blob SHA 가 base 와 같음**(다름 0) · 신설 40 **전부 파일로 남지 않음**(남음 0) · base 와 다른 추적 파일은 `reports/evidence/m6/6b3/` 넷뿐(이 slice 의 evidence — 의도) |
-| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0** |
-| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0** |
-| ⑥ | **게이트가 초록이고 실제로 돌았다** | 같은 run 에서 게이트 task **136 수행** · 그 가운데 **UP-TO-DATE 0** |
+| ③c | **내 표지 0 · 남의 표지 보존** | 복원 뒤 내 표지 전부 0 — 게이트 등재의 `retention.` 행 0 · `MigrationLockTimeout` 등재 0 · 아키텍처 정책의 `RetentionWiring`·`app.retention.` 0 · 공유 runbook 의 `bidvector.retention` 0 · `adapters/.../retention/` 디렉터리 파일 0. 같은 파일들의 **남의 표지는 그대로** — 게이트 등재의 `adapters.relay.` 행 4(HEAD 에서는 5 — 이 slice 가 더한 한 줄만 사라졌다) · `EvaluationCommit` 12 · 공유 runbook 의 relay 줄 18 |
+| ③d | **트리 동일성** | 경로마다 찍은 줄로 — 수정 8 **전부 `same`**(blob SHA 가 base 와 같음 · `DIFF` 0) · 신설 40 **전부 `LEFT` 없음**(파일로 남지 않음) · base 와 다른 추적 파일은 `reports/evidence/m6/6b3/` 넷뿐(이 slice 의 evidence — 의도) |
+| ④ | 되돌린 트리가 컴파일된다 | `./gradlew --no-daemon compileTestKotlin` **exit 0**(16s) |
+| ⑤ | test 가 초록 | `./gradlew --no-daemon check` **exit 0**(9m31s) |
+| ⑥ | **게이트가 초록이고 실제로 돌았다** | 같은 run 에서 게이트 task **136 수행** · 그 가운데 **UP-TO-DATE 0**(버릴 clone 은 `build/` 가 없어 캐시로 넘어가는 task 가 없다 — 「돌았다」가 수행 수로 보인다) |
 
 evidence 디렉터리를 남긴 채 `leakPatternGate` 가 초록이라 ⑥ 이 성립한다.
 
-> ③d 의 **자동 집계는 세 라운드 연속 틀렸다**(구동 스크립트의 색인 정렬 결함이 같은 자리에서 또 나왔다 —
-> 이번 출력은 「동일 0 · 다름 26 · 남음 2」). 같은 clone 에서 `git cat-file -e`/`git hash-object` 로
-> 경로마다 다시 센 값이 위 표의 숫자다. **스크립트를 고치지 않고 다시 센 것을 적는다** — 고친
-> 스크립트의 초록보다 손으로 센 수가 증거로 낫고, 그 결함이 두 라운드 연속 같은 자리에서 나왔다는
-> 사실 자체가 등재할 값이다. 세 번 같은 자리에서 틀렸다는 것은 **그 스크립트의 출력을 증거로 쓰지
-> 않는다**는 뜻으로 읽어야 한다.
+> ③d 의 **자동 집계는 세 라운드 연속 틀렸고**(구동 스크립트의 색인 정렬 결함) 그래서 **r3b 는 그
+> 스크립트를 아예 쓰지 않았다** — 처음부터 경로마다 `git rev-parse <base>:<경로>` 와
+> `git hash-object <경로>` 를 대조해 한 줄씩 찍었다(위 표의 「same 8 · DIFF 0」이 그 출력이다).
+> 앞 라운드들의 교훈을 그대로 적용한 것이고, 고친 스크립트의 초록보다 경로마다 찍힌 줄이 증거로
+> 낫다. 세 번 같은 자리에서 틀렸다는 것은 **그 스크립트의 출력을 증거로 쓰지 않는다**는 뜻이다.
 > ③c 의 「보존 줄」 느슨한 grep(8 → 6)도 같은 부류였다 — 「보존」은 그 공유 runbook 에서 다른 뜻으로도
 > 쓰이는 낱말이라 0 이 될 수 없다. 위 표의 ③c 는 **표지를 정확히 지목해** 다시 센 값이다.
 

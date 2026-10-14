@@ -12,6 +12,12 @@ base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6
 |---|---|---|
 | 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m10s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,978** / fail 0 · 게이트 task 136 수행 |
 | 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 22s · 24 task 전부 실행 |
+| 3 | r3b 문면 라운드 @`f92d4b55`: `./gradlew --no-daemon check` | **exit 0** · 9m22s · 350 task 중 **52 실행 · 298 up-to-date** · test 합계 **2,978** / fail 0 / skip 4 · 게이트 task 136(그 가운데 110 up-to-date) |
+
+> **3 은 `--rerun-tasks` 가 아니다.** r3b 는 술어를 바꾸지 않았고(주석·문서·evidence) 이 run 의 목적은
+> **바뀐 문면 위에서 게이트가 서는가**다(`leakPatternGate` 가 evidence 를 읽는다). 그래서 캐시를 지우지
+> 않고 **무엇이 다시 돌았는지**를 함께 적는다 — 52 task 가 실행됐고 그 가운데 게이트 26 이다. 판정의
+> 근거로 쓸 전건 실측은 위 1·2(`--rerun-tasks`)이고, 되돌린 트리의 전건 실측은 rollback ⑤⑥ 이다.
 
 > **task 수에 대하여**(vr R2-F8). 이 레인의 `--rerun-tasks` 실측은 **350 · 24** 이고 verifier r2 는 같은
 > 코드에서 **359 · 33** 을 쟀다. 차이는 측정 자리다 — verifier 는 **갓 만든 clone**(build 디렉터리 없음)에서
