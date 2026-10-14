@@ -122,6 +122,23 @@ class RetentionRunnerTest {
         lines.last() shouldContain "maskFailClosed=1"
     }
 
+    /**
+     * cr L-3 · M-1 처방 2 — **건너뜀도 미완이다.** `skipped` 는 「그 run 이 백로그를 비우지 못했다」는
+     * 뜻이고(후보로 골랐는데 처리하지 못한 행), 그것이 종료 코드에 없으면 cron 은 **0 을 받는다**.
+     */
+    @Test
+    fun `건너뛴 후보가 있으면 미완이다 — 그 run 은 백로그를 비우지 못했다`() {
+        runWith(
+            StubStore(
+                listOf(RetentionTarget("raw_observation", RetentionTreatment.MASK_PII)),
+                maskBatch = MaskBatchCounts(masked = 1, failClosed = 0, skipped = 2),
+            ),
+        )
+
+        exitCodes shouldBe listOf(RetentionExitCode.INCOMPLETE.value)
+        lines.last() shouldContain "maskSkipped=2"
+    }
+
     @Test
     fun `임대를 못 쥐면 사유를 남기고 다른 코드로 끝난다 — 기다리면 풀리는 상황이다`() {
         runWith(StubStore(listOf(RetentionTarget("notice", RetentionTreatment.PURGE)), leaseBusy = true))

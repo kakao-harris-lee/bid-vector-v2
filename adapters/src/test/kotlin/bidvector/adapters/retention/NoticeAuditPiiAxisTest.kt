@@ -49,13 +49,10 @@ class NoticeAuditPiiAxisTest : PersistenceTestSupport() {
         noticeColumns() shouldContainExactlyInAnyOrder NOTICE_SNAPSHOT_CLASSIFIED_COLUMNS
     }
 
-    /** 음성 대조 — 분류 목록에서 한 열을 빼면 등식이 깨진다(술어가 실제로 센다). */
-    @Test
-    fun `음성 대조 — 분류 목록이 한 열 적으면 등식이 깨진다`() {
-        val short = NOTICE_SNAPSHOT_CLASSIFIED_COLUMNS - NOTICE_SNAPSHOT_CLASSIFIED_COLUMNS.first()
-
-        (noticeColumns().toSet() == short) shouldBe false
-    }
+    // 「술어가 실제로 센다」의 음성 대조는 이 파일에 두지 않는다(cr L-1). 앞 판의
+    // `noticeColumns() != 분류 − 한 원소` 는 **집합이 비어 있지 않기만 하면 참**이라 아무 새 성질도
+    // 잠그지 않았다 — 위 등식이 이미 그 비교를 하고 있다. 실제로 재야 하는 것은 **열을 더한 스키마에서
+    // 등식이 RED 가 되는가**이고, 그것은 변이(V-3: `notice` 에 담당자 꼴 열 + 열 장부 한 줄)가 진다.
 
     /** 그 표가 **제외**라는 사실도 함께 센다 — 제외가 아니면 위 등식이 지키는 것이 바뀐다. */
     @Test

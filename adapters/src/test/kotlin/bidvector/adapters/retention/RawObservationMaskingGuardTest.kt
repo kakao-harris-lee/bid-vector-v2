@@ -22,6 +22,9 @@ private const val SEED_KEY = "ret-guard"
 /** 관문 ②가 **이름이 아니라 소유자**로 가르는지 재기 위해 트랜잭션 안에서 만드는 역할. */
 private const val THIRD_ROLE = "ret_guard_third_role"
 
+/** 소유자 역할의 **상속하지 않는** 멤버 — `USAGE` 와 `MEMBER` 술어가 갈리는 자리(mig L-3). */
+private const val NOINHERIT_MEMBER_ROLE = "ret_guard_noinherit_member"
+
 /**
  * P-1 — V18 이 append-only 계약에 낸 **단 하나의 구멍**이 그 모양대로만 열려 있는지 잰다.
  *
@@ -184,6 +187,44 @@ class RawObservationMaskingGuardTest : PersistenceTestSupport() {
 
         failure.sqlState shouldBe APPEND_ONLY_SQLSTATE
     }
+
+    /**
+     * **mig L-3** — 관문 ③ 의 술어는 `'USAGE'` 다(`'MEMBER'` 가 아니다). `NOINHERIT` 로 소유자 역할의
+     * 멤버가 된 역할은 소유자 권한을 **상속하지 않는데도** `'MEMBER'` 술어를 지났다. 권능이 같다는
+     * 반론은 「그 역할이 `SET ROLE` 로 소유자가 될 수 있다」인데, 그것은 **한 걸음 더**이고 관문은
+     * 좁은 쪽을 고르는 편이 싸다. 출하 경로(소유자 직접 접속)는 그대로 지난다.
+     */
+    @Test
+    fun `상속하지 않는 소유자 멤버의 마스킹 UPDATE 는 막힌다 — 술어가 USAGE 다`() {
+        val failure =
+            shouldThrow<PSQLException> {
+                owner { connection ->
+                    connection.createStatement().use { statement ->
+                        statement.execute("CREATE ROLE $NOINHERIT_MEMBER_ROLE NOINHERIT")
+                        statement.execute("GRANT ${ownerRoleName(connection)} TO $NOINHERIT_MEMBER_ROLE")
+                        statement.execute("GRANT SELECT, UPDATE ON raw_observation TO $NOINHERIT_MEMBER_ROLE")
+                        statement.execute("SET LOCAL ROLE $NOINHERIT_MEMBER_ROLE")
+                    }
+                    applyMasking(connection, "{}")
+                }
+            }
+
+        failure.sqlState shouldBe APPEND_ONLY_SQLSTATE
+    }
+
+    /** 그 표의 소유자 역할 이름 — 카탈로그에서 읽는다(test 가 역할 이름을 짓지 않는다). */
+    private fun ownerRoleName(connection: Connection): String =
+        connection
+            .createStatement()
+            .use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = 'raw_observation'::regclass",
+                    ).use { rs ->
+                        rs.next()
+                        rs.getString(1)
+                    }
+            }
 
     /**
      * vr F-4 — 표지를 **미리 찍은 INSERT**. 앱 역할의 INSERT GRANT 는 표 단위라 새 열도 포함하고,

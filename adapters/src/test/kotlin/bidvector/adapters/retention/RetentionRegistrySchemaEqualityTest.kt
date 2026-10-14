@@ -110,6 +110,31 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
     }
 
     /**
+     * **vr R2-F7 — CASCADE 가드는 한 단계뿐이다.** `guardsFor` 는 파기 대상 부모의 **직계** 자식 간선만
+     * 보므로, CASCADE 손자가 생기면 그 손자가 기한 안쪽이어도 부모 파기와 함께 사라진다. 또 CASCADE
+     * 자식이 `MaskPii` 로 분류돼 있으면 「파기하지 않고 마스킹만」인 표가 cascade 로 지워진다.
+     *
+     * 오늘 스키마에는 둘 다 없다(CASCADE 간선은 하나다). 그 **부재를 등식으로 잠근다** — 그런 간선이
+     * 들어오는 날 가드를 손보지 않고는 빌드를 지나지 못한다.
+     */
+    @Test
+    fun `CASCADE 손자와 마스킹 분류 CASCADE 자식이 없다 — 한 단계 가드가 성립하는 전제다`() {
+        val edges = dataSource().connection.use(::readForeignKeyEdges)
+        val cascadeChildren = edges.filter { it.cascade }.map { it.child }.toSet()
+        cascadeChildren.shouldNotBeEmpty()
+
+        val grandchildren = edges.filter { it.cascade && it.parent in cascadeChildren }.map { it.child }
+        grandchildren shouldBe emptyList()
+
+        val maskedCascadeChildren =
+            RETENTION_TABLE_RULES
+                .filterIsInstance<RetentionRule.MaskPii>()
+                .filter { it.table in cascadeChildren }
+                .map { it.table }
+        maskedCascadeChildren shouldBe emptyList()
+    }
+
+    /**
      * cascade 분류는 **카탈로그가 뒷받침해야 한다** — 「부모와 함께 사라진다」가 FK 의 성질이
      * 아니면 그 표는 아무도 지우지 않는 채로 분류만 받는다.
      */

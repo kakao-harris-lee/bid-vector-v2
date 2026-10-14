@@ -207,19 +207,12 @@ internal val OFFICER_FIXTURE_KEYS =
     )
 
 /**
- * 업체명 개념의 rawName 전수(운영자 결정 2026-10-14, D-6B3-3 ①) — **이름을 열거하지 않는다.**
- * 계약이 정본이므로 상류가 그 개념에 키를 더하면 fixture 도 함께 따라온다. 담당자 키와 다른
- * 점: 업체명은 계약에 **등재되어** 있어 `payload_fields` 투영에도 실린다. 그래서 마스킹이
- * 두 열을 모두 건드려야 사라진다.
+ * 업체 식별 개념의 rawName 전수 — **이름도, 개념도 열거하지 않는다**(D-6B3-5 ①). 선언은
+ * [COMPANY_IDENTITY_CONCEPTS] 한 자리이고 fixture 는 그것을 계약에 물어 키를 얻는다. 앞 판은 이
+ * 자리에 개념 둘을 따로 적어 두었고, 그래서 셋째 운반자(`opengCorpInfo`)가 선언에서 빠졌을 때
+ * **fixture 도 함께 빠져** 어느 test 도 그 누락을 보지 못했다.
  */
-internal val COMPANY_NAME_FIXTURE_KEYS: List<String> =
-    (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 14)) as Resolution.Resolved)
-        .value
-        .fieldContracts
-        .let { registry ->
-            setOf(FieldConcept.BID_COMPANY_NAME, FieldConcept.AWARD_COMPANY_NAME)
-                .flatMap { concept -> registry.contractsFor(concept).map { it.rawName.name } }
-        }
+internal val COMPANY_NAME_FIXTURE_KEYS: List<String> = rawNamesOfConcepts(COMPANY_IDENTITY_CONCEPTS).sorted()
 
 /** 업체명 자리값 — 마스킹 뒤 이 문자열이 남아 있으면 업체명이 남은 것이다. */
 internal const val COMPANY_NAME_FIXTURE_VALUE = "COMPANY-NAME-FIXTURE"

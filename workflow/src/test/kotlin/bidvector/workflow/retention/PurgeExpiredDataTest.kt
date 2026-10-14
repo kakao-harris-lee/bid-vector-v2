@@ -28,6 +28,8 @@ private class FakeRetentionStore(
     private val leaseBusy: Boolean = false,
     private val purgeBatches: Map<String, MutableList<Int>> = emptyMap(),
     private val maskBatches: Map<String, MutableList<MaskBatchCounts>> = emptyMap(),
+    /** 매 일괄이 **가득 찬 채 진척 0** 인 응답만 내는 모드(cr M-1) — 종료 보장을 재는 자리. */
+    private val stuckBatch: Boolean = false,
 ) : RetentionStorePort,
     RetentionWriter {
     val purgeCalls = mutableListOf<Pair<String, Instant>>()
@@ -61,9 +63,17 @@ private class FakeRetentionStore(
         batchSize: Int,
     ): MaskBatchCounts {
         maskCalls += target.table to cutoff.instant
+        check(maskCalls.size <= RUNAWAY_CALL_LIMIT) { "마스킹 일괄 루프가 끝나지 않는다" }
+        if (stuckBatch) return MaskBatchCounts(masked = 0, failClosed = 0, skipped = batchSize)
         return maskBatches[target.table]?.removeFirstOrNull() ?: MaskBatchCounts(0, 0)
     }
 }
+
+/**
+ * 끝나지 않는 루프를 **test 가 멈춘다** — 그 자리에 상한이 없으면 cr M-1 의 모양(임대와 소유자 연결을
+ * 쥔 채 영구히 도는 run)이 그대로 **빌드를 멈춘다**. 상한을 넘으면 실패로 끝나고 사유가 남는다.
+ */
+private const val RUNAWAY_CALL_LIMIT = 50
 
 /** P-3 — 보존 use case. 값과 fake port 로만 재고, 실제 SQL 축은 adapters test 가 진다. */
 class PurgeExpiredDataTest {
@@ -271,5 +281,31 @@ class PurgeExpiredDataTest {
         val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
         report.tallies.getValue("raw_observation") shouldBe TableTally(masked = 8, maskSkipped = 4)
         report.maskSkippedTotal shouldBe 4
+    }
+
+    /**
+     * cr M-1 — 종료 보장. `skipped` 칸이 생기면서 끝나는 근거가 「계수가 단조 감소한다」에서 **「모든
+     * 후보가 결국 후보 집합에서 빠진다」**로 바뀌었고, `skipped` 는 정확히 **빠지지 않은 후보**를 센다.
+     * 같은 후보가 반복해 돌아오면 `total == batchSize` 가 영원히 참이라 루프가 임대와 소유자 연결을
+     * 쥔 채 **영구히 돈다** — 조용한 미완보다 나쁜 실패 모양이다(cron 이 끝나지 않는 프로세스를 받고,
+     * 그 뒤 모든 run 이 `LEASE_BUSY` 로 떨어져 파기까지 멈춘다).
+     *
+     * 그래서 종료 조건에 **「진척이 없으면 끝낸다」**를 둔다: 가득 찬 일괄인데 한 행도 처리하지 못했다면
+     * cutoff 가 고정이고 후보 순서가 결정적이라 다음 일괄도 같다.
+     */
+    @Test
+    fun `가득 찬 일괄이 진척 0 이면 끝난다 — 임대를 쥔 채 영구히 돌지 않는다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("raw_observation", RetentionTreatment.MASK_PII)),
+                stuckBatch = true,
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy(batchSize = 10)).run()
+
+        store.maskCalls.size shouldBe 1
+        val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
+        report.maskSkippedTotal shouldBe 10
+        report.maskedTotal shouldBe 0
     }
 }
