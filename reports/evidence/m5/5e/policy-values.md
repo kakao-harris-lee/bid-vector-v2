@@ -43,5 +43,5 @@
 | --- | --- | --- |
 | 2026-09-16 착수 | 표 등재(승인 대기) | D-5E-6·D-5E-7 |
 | 2026-09-16 잠정 승인 | 지위 「승인 대기」→「잠정 승인」(값·표 무변경, 재승인 조건 = M6 6C/6E 실측) | 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ⑤ |
-| 2026-10-13 M6/6B-4 | §1 에 `pending_queue_max: 4` 등재(잠정) · §2 `ML_ENGINE_ARTIFACT_OUT_DIR` 의 뜻에 job 저널 추가 · §4 에 `pending_queue_max ≥ 1` 추가 | 운영자 결정 B-2(2026-10-13) + 2026-09-26 ③. 값 근거는 여전히 보수적 초기값(`OPEN-OPS-03` 미결) |
 | 2026-09-15 구현 | `ml-engine/policy/serving-v1.yaml` 실물 작성(표 값 그대로) — `embedding_text_max_chars=4000`이 Kotlin `config/quality/contract-policy.properties`의 `embedding.text.max-chars=4000`과 일치함을 `tests/serving/test_policy_kotlin_parity.py`로 실측(D-2D-6 경계 쌍). `load_serving_policy`가 §4 불변식 전부(≥1 넷·`dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자)를 강제하는 것을 `tests/serving/test_serving_policy.py`로 확인 | D-5E-6 구현 완료, 값은 여전히 보수적 초기값(측정 의무 유지) |
+| 2026-10-13 M6/6B-4 | §1 에 `pending_queue_max: 4` 등재(잠정) · §2 `ML_ENGINE_ARTIFACT_OUT_DIR` 의 뜻에 job 저널 추가 · §4 에 `pending_queue_max ≥ 1` 추가 | 운영자 결정 B-2(2026-10-13) + 2026-09-26 ③. 값 근거는 여전히 보수적 초기값(`OPEN-OPS-03` 미결) |
