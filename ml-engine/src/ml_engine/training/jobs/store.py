@@ -61,6 +61,15 @@ _logger = logging.getLogger(__name__)
 _ACCEPTED = _JobState.ACCEPTED
 _RUNNING = _JobState.RUNNING
 
+_TERMINAL_EVENTS: frozenset[JobEvent] = frozenset(
+    {JobEvent.SUCCEED, JobEvent.FAIL, JobEvent.CANCEL}
+)
+"""종단 시각(`finished_at`)을 쓰는 이벤트들 — 이 셋만 `_finish_at` 조정을 지난다.
+`START` 는 `started_at` 을 쓰고 그 불변식(`accepted_at ≤ started_at`)은 조정 대상이
+아니다(실행이 시작된 시각을 뒤로 밀면 「언제 집었는가」가 거짓이 된다 — 그 자리는 시계
+역행에서 `TransitionRejected` 가 아니라 `ValueError` 로 남고, 호출자는 워커 하나뿐이라
+저널의 미래 시각과 만나지 않는다. 알려진 제한으로 적는다)."""
+
 
 @dataclass(frozen=True)
 class Started:
@@ -330,7 +339,14 @@ class JobStore:
     ) -> JobRecord | TransitionRejected | JournalFailed | None:
         """읽기·`transition()`·저널 쓰기·커밋을 **한 잠금** 아래 원자적으로 수행한다
         (H-2 · 우회 (9)). `job_id`가 없으면 `None`. 종단 상태의 멱등 no-op 은 바뀌는
-        것이 없어 저널을 쓰지 않는다 — 쓰기 실패가 그 호출을 깨뜨리지 않는다."""
+        것이 없어 저널을 쓰지 않는다 — 쓰기 실패가 그 호출을 깨뜨리지 않는다.
+
+        **종단 시각은 `_finish_at` 으로 조정한다**(code-review B). 그러지 않으면 기동 시계가
+        저널의 `accepted_at` 보다 앞설 때(컨테이너 시계 보정·NTP 역행) `JobRecord` 의 시각
+        불변식이 `ValueError` 를 내고, 그 예외가 조립 근을 벗어나 **매 기동 실패**가 된다
+        (저널이 그대로 남으므로 재기동해도 같다). `_failed` 는 자기 자리에서 이미 조정하고
+        있었는데, `server._resubmit` 처럼 **이 메서드를 직접 부르는** 호출자는 그 조정을
+        지나지 않았다 — 조정을 호출자마다 반복하지 않고 **한 자리로** 모은다."""
         _require_aware(at, "at")
         with self._lock:
             entry = self._entry_by_id.get(job_id)
@@ -339,7 +355,7 @@ class JobStore:
             result = transition(
                 entry.record,
                 event,
-                at=at,
+                at=_finish_at(entry.record, at) if event in _TERMINAL_EVENTS else at,
                 artifact=artifact,
                 evaluation=evaluation,
                 failure=failure,

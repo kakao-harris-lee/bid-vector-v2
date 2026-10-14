@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -406,3 +406,46 @@ def test_unpersisted_disposal_is_logged_as_unpersisted(
     assert record is not None
     assert record.state is JobState.ACCEPTED  # 처분이 영속되지 않았다
     assert any("영속" in entry.getMessage() for entry in caplog.records)
+
+
+# ---- (B) 기동 시계가 저널의 accepted_at 보다 앞설 때 ----
+
+
+def test_unknown_spec_disposal_survives_a_clock_earlier_than_accepted_at(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """code-review B — `_resubmit` 의 spec 미지 처분이 `at=datetime.now(UTC)` 를 **조정 없이**
+    넘긴다. 기동 시계가 저널의 `accepted_at` 보다 앞서면(컨테이너 시계 보정·NTP 역행)
+    `JobRecord.__post_init__` 의 「`finished_at` 은 `accepted_at` 보다 앞일 수 없다」가
+    `ValueError` 를 내고, 그 예외가 `_resume_pending_jobs` 를 거쳐 조립 근을 벗어나 **매 기동
+    실패**가 된다(저널이 그대로 남아 있으므로 재기동해도 같다).
+
+    저장소의 `_failed` 는 같은 상황을 `_finish_at` 으로 조정해 피한다 — 이 자리만 그 조정을
+    지나지 않았다."""
+    config = _config(tmp_path)
+    # 저널의 `accepted_at` 을 **미래**로 둔다 = 기동 시계가 그보다 앞선 것과 같다.
+    future = datetime.now(UTC) + timedelta(days=1)
+    store = JobStore(journal=_job_journal(config), pending_queue_max=4)
+    outcome = store.start_or_reuse(
+        "idem-clock",
+        "ds-clock",
+        accepted_at=future,
+        submission=_submission("award-rate-gbm-training-v0-gone"),
+    )
+    assert isinstance(outcome, Started)
+    job_id = outcome.record.job_id
+
+    # 기동 — 처분이 일어나야 하고 예외가 새지 않아야 한다.
+    _gate, reloaded = _assemble(config)
+
+    record = reloaded.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert (
+        record.failure.detail_code
+        == DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value
+    )
+    # 시각 불변식은 지켜진다 — 조정으로 `accepted_at` 아래로 내려가지 않는다.
+    assert record.finished_at is not None
+    assert record.finished_at >= record.accepted_at
