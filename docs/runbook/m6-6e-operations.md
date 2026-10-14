@@ -78,6 +78,7 @@
 | `bidvector.opening-collection` | `mode` · `from` · `to` · `categories` · `sampling-seed` · `sample-size` · `calls-per-day` · `calls-total` · `run-state-dir` · `release-sha` |
 | `bidvector.snapshot-extract` | `mode` · `from` · `to` · `output-dir` · `snapshot-id` · `run-state-dir` |
 | `bidvector.relay` | `mode` · `environment` · `owner` · `channel` · `claim-limit` |
+| `bidvector.retention` | `mode` |
 
 ### 1.5 설정이 **기동을 거부하는** 조합 — 값을 지어내지 않는다
 

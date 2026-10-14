@@ -29,15 +29,25 @@
 ### 1.1 「공고 90일」이 원문까지 지우지는 않는다
 
 `raw_observation` 은 파기 대상이 아니다(A-3) — 6G 백테스트 표본을 남기기 위해서다. 그 표에서
-사라지는 것은 **담당자 키**(`payload` 안의 이름·전화·전자우편)와 **업체명 둘**(투찰업체명·최종낙찰
-업체명 — 운영자 결정 2026-10-14)이다. 업체명은 담당자 키와 달리 필드 계약에 등재되어 투영 열에도
-실리므로 마스킹이 **두 열**(`payload`·`payload_fields`)을 함께 줄인다. 남는 것은 그 행의
-`payload_fields` 가 등재한 키에서 업체명을 뺀 집합이다 — 6G 백테스트·스냅숏 추출·수집 축 조회가
-읽는 키 집합에 업체명이 없음을 기계 수집으로 확인했다(evidence).
+사라지는 것은 **담당자 키**(`payload` 안의 이름·전화·전자우편)와 **업체 식별을 나르는 등재 개념
+전부**(운영자 결정 2026-10-14)다. 그 개념은 셋이다 — 투찰업체명 · 최종낙찰업체명 · **개찰결과 목록의
+합성 문자열**(수집 시점 마스킹이 사업자등록번호·대표자명을 버리고 상호·투찰금액·투찰율을 남기므로
+상호가 그 안에 산다). 셋째는 앞 판에서 빠져 있었고, 그 누락은 **사후에 고칠 수 없다**(마스킹된 행은
+표지가 찍혀 둘째 마스킹이 거부된다) — 그래서 지금은 「어느 등재 개념이 업체 식별을 나르는가」가
+**한 자리에 선언되고 `FieldConcept` 전수와 분할 등식**이다. 새 개념은 분류 없이 빌드를 지나지 못한다.
+
+업체 식별 키는 담당자 키와 달리 필드 계약에 등재되어 투영 열에도 실리므로 마스킹이 **두 열**
+(`payload`·`payload_fields`)을 함께 줄인다. **남길 키의 출처는 계약 레지스트리**다(그 행의 투영 열이
+아니다) — 전 개정의 rawName 합집합에서 업체 식별을 뺀 집합이고, 그래서 ⓐ 적재자가 투영에 담당자 키를
+실어도 그 키는 남지 않고 ⓑ 계약이 개정돼 옛 키가 사라져도 묵은 행의 옛 키가 지울 집합에 그대로 남는다.
+6G 백테스트·스냅숏 추출·수집 축 조회가 읽는 키 집합에 업체 식별 개념이 없음을 기계 수집으로
+확인했다(evidence).
 
 마스킹은 **한 방향**이다: 표지(`pii_masked_at`)가 NULL 에서 값으로 한 번만 가고, 되돌리는 UPDATE 는
-DB 트리거가 거부한다. 적재가 그 표지를 **미리 찍을 수도 없다**(트리거의 INSERT 관문) — 찍힌 행은
-영원히 마스킹되지 않으면서 계수에도 없기 때문이다.
+DB 트리거가 거부한다. 마스킹을 정하는 **세 입력 전부가 적재자 손을 벗어나 있다**: 표지는 적재가 미리
+찍을 수 없고(INSERT 관문), 남길 키는 계약에서 오고, **적재 시각은 DB 시계가 소유한다**(비소유자 적재의
+`inserted_at` 은 트리거가 `now()` 로 바꿔 쓴다 — 미래 시각으로 마스킹 후보에서 영구히 빠지는 길을
+닫는다. 출하 수집 경로는 그 열을 쓰지 않으므로 비용이 0 이다).
 
 판독 깊이 상한은 **수집 상한과 같다**. 수집이 받아들인 원문을 마스킹이 「형태가 다르다」로 버리는
 일이 없게 두 값의 관계를 test 가 잠근다(상한을 넘는 원문만 fail-closed 다 — §3.1).
@@ -67,41 +77,57 @@ DB 트리거가 거부한다. 적재가 그 표지를 **미리 찍을 수도 없
 ### 1.3 V18·V19 적용 창 — 무엇이 얼마나 막히는가
 
 마이그레이션은 **기동의 부수효과**로 돈다(`DataSource` 빈 생성). 그래서 적용 창은 곧 기동 창이고,
-적용 전에 그 창의 모양을 알고 있어야 한다.
+적용 전에 그 창의 모양을 알고 있어야 한다. 아래 숫자는 **110만 행(`raw_observation` 36만 · 292MB)**
+에서 독립 레인이 실측한 값이다.
 
-| 파일 | 쥐는 잠금 | 막히는 것 | 비용 |
+| 파일 | 쥐는 잠금 | 막히는 것 | 창의 길이 |
 |---|---|---|---|
-| **V18** | `ACCESS EXCLUSIVE`(`raw_observation`) | 그 표의 읽기·쓰기 | **메타데이터 변경만** — 열 추가(nullable·DEFAULT 없음, 표 rewrite 없음) · CHECK `NOT VALID`(스캔 없음) · 함수·트리거 교체. 밀리초 |
-| **V19** | 표별 `SHARE`(인덱스 빌드) + `SHARE UPDATE EXCLUSIVE`(검증) | **쓰기만**(읽기는 지난다) | 인덱스 열 전수 스캔 — 표 크기에 비례. `raw_observation` 이 가장 크다 |
+| **V18** | `ACCESS EXCLUSIVE`(`raw_observation`) | 그 표의 읽기·쓰기 | 작업 자체는 **밀리초**(열 추가 nullable·DEFAULT 없음 → rewrite 없음 · CHECK `NOT VALID` → 스캔 없음 · 함수·트리거 교체). 그러나 **창 = 잠금 획득 대기 + 작업**이다: 그 표에 열린 트랜잭션이 하나라도 있으면 `ALTER TABLE` 이 큐에서 기다리고 **그 뒤의 평범한 읽기까지 전부 큐에 선다**. 그래서 첫 문장이 `SET LOCAL lock_timeout` 이다 — 대기가 길면 **실패**하고(기동 실패 → 재시도) 무한히 서지 않는다 |
+| **V19** | 표별 `SHARE`(인덱스 빌드) + `raw_observation` 에 `SHARE UPDATE EXCLUSIVE`(검증) | **쓰기만**(읽기는 지난다) | **열 표 전부가 V19 전 구간 동안** 막힌다 — 한 트랜잭션이라 잠금이 COMMIT 까지 유지된다(실측: 모든 빌드가 끝나고 트랜잭션만 열려 있는 동안에도 `INSERT INTO notice` 가 `lock_timeout` 을 소진했다). 제일 작은 표도 `raw_observation` 빌드가 끝날 때까지 쓰기가 막히므로 수집·relay·편집 세션이 전부 그 창에 든다. 순수 작업은 3M 행에서 1.7s |
 
 인덱스를 V18 에서 떼어낸 이유가 이 표다: 한 트랜잭션에 두면 V18 의 `ACCESS EXCLUSIVE` 가 빌드 내내
 유지되어 **읽기까지** 막힌다.
 
-**적용 전에 측정한다.** 소유자 연결로 크기를 재고, 그 수로 창을 가늠한다. 큰 표에서는 수집 cron 을
-멈춘 정비 창에 적용한다(읽기는 막히지 않으므로 조회 API 는 살아 있다).
+**한 트랜잭션의 다른 면**: 마지막 문장에서 실패하면 **인덱스 열 개가 전부 사라진다**(실측) — 재시도는
+전체 빌드 비용을 다시 낸다. 반쯤 적용된 상태나 invalid 인덱스가 남지 않는 것이 이득이고, 그 대가가
+이것이다.
+
+**적용 전 점검 셋.** 소유자 연결로 돈다.
 
 ```sql
+-- ⓐ 창의 길이를 가늠한다(표 크기).
 SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) AS size, reltuples::bigint AS approx_rows
   FROM pg_class
  WHERE relname IN ('raw_observation','notice','opening_result','opening_reserve_price','qualification_text',
                    'notice_requirement','notice_requirement_row','rejected_write','edit_session','outbox')
  ORDER BY pg_total_relation_size(oid) DESC;
+
+-- ⓑ **V19 를 실패시키는 유일한 조건** — 0 이 아니면 적용하지 않는다(그 행을 먼저 조사한다).
+--    0 이 아닌 채 적용하면 실패하는 것은 보존이 아니라 **앱 기동**이다.
+SELECT count(*) FROM raw_observation WHERE jsonb_typeof(payload_fields) <> 'object';
+
+-- ⓒ 긴 트랜잭션 — V18 의 잠금 대기를 만드는 쪽이다(읽기까지 큐에 세운다).
+SELECT pid, state, now() - xact_start AS age, left(query, 60) AS q
+  FROM pg_stat_activity WHERE xact_start IS NOT NULL ORDER BY xact_start;
 ```
 
-**`CONCURRENTLY` 를 쓰지 않는다 — 실측 때문이다.** `CREATE INDEX CONCURRENTLY` + 형제 `.sql.conf`
-(`executeInTransaction=false`)는 Flyway 아래에서 **영구히 대기한다**: Flyway 가 메타데이터 연결에
-트랜잭션을 열어 둔 채 마이그레이션을 다른 연결로 돌리고, `CONCURRENTLY` 는 동시 트랜잭션 전부가
-끝나기를 기다린다(Testcontainers 실측 — `idle in transaction` 인 Flyway 연결과 `Lock/virtualxid` 로
-막힌 마이그레이션이 14분간 그대로였다). `flyway.postgresql.transactional.lock=false` 로 풀리지만
-**Flyway 를 부르는 자리 넷이 전부** 그것을 알아야 하고, 하나라도 잊으면 거기서 실패가 아니라
-**정지**한다. 창을 줄이려고 더 나쁜 실패 모양을 사지 않았다.
+큰 표에서는 수집 cron 을 멈춘 정비 창에 적용한다(읽기는 막히지 않으므로 조회 API 는 살아 있다).
 
-V19 는 **한 트랜잭션**이라 실패하면 통째로 롤백된다 — invalid 인덱스나 반쯤 적용된 상태가 남지
-않는다(그래도 빌드가 invalid 인덱스 0 을 센다: `CleanMigrationIndexTest`).
+**`CONCURRENTLY` 를 쓰지 않는다 — 실측 때문이다.** `CREATE INDEX CONCURRENTLY` + 형제 `.sql.conf`
+(`executeInTransaction=false`)는 Flyway 아래에서 **끝나지 않았다**(Testcontainers 실측: `idle in
+transaction` 인 Flyway 메타데이터 연결과 `Lock/virtualxid` 로 막힌 마이그레이션이 14분간 그대로).
+
+메커니즘은 「동시 트랜잭션 전부를 기다린다」가 아니다 — **스냅숏을 쥔 트랜잭션**을 기다린다(독립 레인
+실측: advisory 잠금만 쥔 `idle in transaction` 은 `CONCURRENTLY` 를 막지 않았고, `REPEATABLE READ` 로
+스냅숏을 쥔 트랜잭션은 막았다). 즉 그 정지는 Flyway 의 메타데이터 연결이 **스냅숏을 쥐고** 있었다는
+뜻이다. `flyway.postgresql.transactional.lock=false` 로 풀리지만 **Flyway 를 부르는 자리 넷이 전부**
+그것을 알아야 하고, 하나라도 잊으면 거기서 실패가 아니라 **정지**한다. 실패한 `CONCURRENTLY` 는
+INVALID 인덱스를 남기므로(실측) 재시도에 정리가 따라붙는다. 창을 줄이려고 더 나쁜 실패 모양을 사지
+않았다.
 
 **CHECK 검증 실패**(`raw_observation_payload_fields_object`)는 재시도의 문제가 아니다 — 적용 **전에
-이미** 객체가 아닌 `payload_fields` 행이 있었다는 뜻이고, 그 행을 조사하는 것이 답이다(쓰기 경로는
-늘 평평한 객체를 쓴다). 멈추고 보고한다(§4).
+이미** 객체가 아닌 `payload_fields` 행이 있었다는 뜻이고(위 ⓑ 가 그것을 미리 센다), 그 행을 조사하는
+것이 답이다(쓰기 경로는 늘 평평한 객체를 쓴다). 멈추고 보고한다(§4).
 
 ## 2. 실행
 
@@ -109,17 +135,23 @@ V19 는 **한 트랜잭션**이라 실패하면 통째로 롤백된다 — inval
 프로세스에 켜면 **기동하지 않는다**(`OneShotRunnerGuard`).
 
 **자격 값은 환경변수로만 준다** — 명령행 인자로 적으면 `/proc/<pid>/cmdline` 에 들어가 같은 호스트의
-아무 사용자나 `ps` 로 읽고, 셸 이력과 cron 래퍼에도 남는다. 그 값은 **DB 소유자** 자격이고(트리거를
-DROP 할 수 있는 주체다) 이 절차가 그 사용을 매일 도는 cron 으로 만든다. 규약은
-`m6-6e-operations.md` §1.4 가 정본이다. `jdbc-url`·`username` 은 자격 값이 아니므로 인자로 두어도 된다.
+아무 사용자나 `ps` 로 읽는다. 그 값은 **DB 소유자** 자격이고(트리거를 DROP 할 수 있는 주체다) 이
+절차가 그 사용을 매일 도는 cron 으로 만든다. 규약은 `m6-6e-operations.md` §1.4 가 정본이다.
+`jdbc-url`·`username` 은 자격 값이 아니므로 인자로 두어도 된다.
 
-```
-SPRING_MAIN_WEB_APPLICATION_TYPE=none \
-BIDVECTOR_PERSISTENCE_CREDENTIAL=<소유자 자격 — 환경변수로만> \
-java -jar app.jar \
+**값을 셸 줄에 놓지도 않는다**(cr L-6) — 같은 줄에 `VAR=<값> java …` 로 쓰면 argv 는 깨끗해도 셸
+이력과 cron 래퍼 파일에 그대로 남는다(argv 를 거부한 사유의 절반이 그것이다). 래퍼가 자격을 **읽어
+export** 한다:
+
+```sh
+# /opt/bidvector/run-retention.sh — 값은 이 파일에도 적지 않는다(읽어 온다).
+set -eu
+BIDVECTOR_PERSISTENCE_CREDENTIAL="$(cat /etc/bidvector/owner.credential)"   # 0400, 운영자 소유
+export BIDVECTOR_PERSISTENCE_CREDENTIAL
+SPRING_MAIN_WEB_APPLICATION_TYPE=none exec java -jar /opt/bidvector/app.jar \
   --bidvector.retention.mode=once \
-  --bidvector.persistence.jdbc-url=<URL> \
-  --bidvector.persistence.username=<소유자>
+  --bidvector.persistence.jdbc-url="$BIDVECTOR_JDBC_URL" \
+  --bidvector.persistence.username="$BIDVECTOR_DB_OWNER"
 ```
 
 접속 사용자는 **표 소유자**여야 한다 — 파기는 런타임 풀을 지나지 않는다(A-1). 풀은 물리 연결마다
@@ -184,7 +216,7 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
 |---|---|---|---|
 | 0 | `COMPLETE` | 기한 지난 행이 처분되고 판독 실패가 없다 | 없음 |
 | 1 | `FAILED` | 실행이 예외로 끝났다 | 마침 줄의 `causeCode` 를 보고 §3.2 |
-| 2 | `INCOMPLETE` | 판독할 수 없는 원문이 있어 값 전체를 버렸다 | §3.1 |
+| 2 | `INCOMPLETE` | 판독할 수 없는 원문이 있어 값 전체를 버렸다(`maskFailClosed`), **또는 후보로 고른 행을 처리하지 못했다**(`maskSkipped`) | §3.1 |
 | 3 | `LEASE_BUSY` | 다른 보존 러너가 돌고 있다 | **장애가 아니다.** 다음 주기를 기다린다 |
 | 4 | `REFUSED` | 분류와 스키마가 어긋났거나 FK 에 순환이 있다. **한 행도 지우지 않았다** | §3.3 |
 
@@ -197,6 +229,14 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
 상류 응답 형태가 바뀌었다는 신호다 — 그 행들의 `payload` 는 판독되지 않아 **값 전체가 표지로
 대체**됐다(부분 치환을 하지 않는다). 수집 축(`KonepsJsonParser`·필드 계약)을 먼저 본다. 이미
 대체된 값은 돌아오지 않는다(§1.2).
+
+### 3.1b `maskSkipped` 가 0 이 아니면
+
+후보로 **골랐는데 처리하지 못한** 행이다(마스킹 UPDATE 가 0 행을 돌렸다). 그 run 은 백로그를 비우지
+못했고, 같은 일괄이 다음 run 에도 같은 모양으로 올 수 있다. 오늘 그 수가 0 이 아닐 구조적 경로는
+없다(`observation_key` 가 PK 이고 조회 술어가 `pii_masked_at IS NULL` 이다) — 그래서 0 이 아니면
+**스키마나 질의가 전제와 달라진 것**이고, 다음 run 을 돌리기 전에 그 행을 본다. 러너는 진척이 없는
+일괄에서 **루프를 끝낸다**(임대를 쥔 채 영구히 돌지 않는다).
 
 ### 3.2 `causeCode` 읽기
 
@@ -233,7 +273,8 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
    **`ON DELETE CASCADE` 자식도 같다**(운영자 결정 2026-10-14): 헤더 upsert 가 `created_at` 을
    유지하고 행은 새 `created_at` 을 받으므로 「120일 전 헤더 · 오늘 행」이 실재하고, 가드가 없으면
    cascade 가 기한 안쪽 행을 함께 지웠다. 자식이 기한을 넘을 때 둘이 함께 사라진다.
-3. **수집 시점 마스킹은 하지 않는다.** 원문은 90일 동안 담당자 PII 를 가진다(결정 문면 그대로).
+3. **수집 시점 마스킹은 하지 않는다.** 원문은 90일 동안 담당자 PII **와 업체 식별 키**를 가진다
+   (결정 문면 그대로 — §1.1 과 같은 문면이다, cr L-5).
 4. **백업 산출물 속 과거 행**은 이 절차의 밖이다(`m6-6b2-backup-restore.md` · M7).
 5. **시계는 신뢰 앵커다.** 호스트 시계가 미래로 틀어지면 cutoff 도 미래로 움직인다. 정책 값이
    0·음수를 거부하는 것까지가 이 slice 의 방어다.
@@ -247,5 +288,27 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
 9. **소유자 마스킹 UPDATE 는 키 제거가 아닌 임의 내용 주입도 통과한다**(표지만 찍고 `payload` 를
    그대로 두는 UPDATE 포함) — 소유자 자격을 가진 주체의 임의 SQL 은 비방어다
    (`OPEN-6E2A-OWNER-CREDENTIAL-IN-APP`). 출하 경로는 늘 치환값을 함께 쓴다.
-10. **적재마다 트리거 함수가 한 번 더 돈다**(INSERT 관문). 분기 둘이라 행당 비용은 마이크로초
-    단위이고, 그 대가로 「표지를 쓰는 주체」가 마스킹 주체로 닫힌다. 수집 처리량 실측은 M7 축이다.
+10. **적재마다 트리거 함수가 한 번 더 돈다**(INSERT 관문). 분기 셋이라 행당 비용은 마이크로초
+    단위이고, 그 대가로 마스킹을 정하는 입력 둘(표지·적재 시각)이 적재자 손을 벗어난다. 수집 처리량
+    실측은 M7 축이다.
+11. **`raw_observation` 을 쓰는 `SECURITY DEFINER` 함수를 더하지 않는다**(mig L-2). 그런 함수에
+    `EXECUTE` 를 주면 앱 역할이 그 안에서 소유자가 되어 **관문 ③ 밖**에서 원문을 쓸 수 있다. 이
+    저장소에는 이미 그 패턴의 선례가 있다(V2 의 audit 함수) — 마이그레이션 검토에서 이 줄을 본다.
+12. **소유자의 `TRUNCATE` 는 행 트리거 밖이다**(mig I-1). 「파기하지 않는다」는 행 트리거의 주장이고
+    `TRUNCATE raw_observation CASCADE` 는 그 밖에서 표를 비운다(앱 역할은 권한이 없어 거부된다).
+    V3 때부터의 성질이고 `OPEN-6E2A` 와 같은 축이다.
+13. **`outbox` 파기는 일괄마다 만료 행 전체를 다시 정렬한다**(mig L-1). 술어가 `state = ANY(배열)`
+    라 플래너가 인덱스 순서를 쓰지 못한다 — 종단 집합이 한 값인 동안은 `= ?` 로 쓰면 정렬이 사라지지만
+    집합 타입을 유지하는 한 이 모양은 구조적이다. 비용 축이고 거동은 같다.
+14. **마스킹된 `payload` 는 엄격 JSON 이 아닐 수 있다**(cr L-7). 재직렬화가 쓰는 render 는 escape 가
+    최소이고(제어문자를 그대로 낸다) 키 축만 안전하다(남길 키가 계약 rawName 이라 영문·숫자뿐이다).
+    오늘 그 열의 production 독자는 0 이므로 실해가 없다 — 6G 표본을 엄격 파서로 읽는 소비자가 생기면
+    그때는 고칠 수 없다(관문 ④). 공유 render 를 이 slice 에서 바꾸지 않은 이유는 호출부 둘이 더
+    있어서다.
+15. **`outbox` 의 `FAILED`·`ISOLATED` 영구 잔류의 PII 축은 아무도 재지 않는다**(privacy F-9). 오늘 그
+    행이 담는 것은 전략 개정 번호·정책 버전·공고 id·판정 사유·운영자 자신이고 **제3자 PII 0** 이다.
+    payload 타입이 늘고 그 타입이 제3자 이름을 담으면 그 행은 파기도 마스킹도 받지 않는다(타입 추가가
+    fail-closed 코드 변경을 요구하므로 사람이 그 자리를 지난다).
+16. **CASCADE 기한 가드는 한 단계다**(vr R2-F7). 파기 대상 부모의 **직계** CASCADE 자식만 본다 —
+    CASCADE 손자나 「마스킹만」으로 분류된 CASCADE 자식이 생기면 그 행은 기한 안쪽이어도 부모와 함께
+    사라진다. 오늘 스키마에 둘 다 없고 **그 부재를 빌드가 센다**(그런 간선이 들어오면 RED).
