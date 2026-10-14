@@ -127,6 +127,7 @@ class MaskingKeepsProjectedKeysTest : PersistenceTestSupport() {
     /** 평평한 JSON 객체의 키 집합 — 판독은 test 가 직접 한다(마스킹 함수를 거치지 않는다). */
     private fun keysOf(json: String): Set<String> =
         Regex("\"([^\"]+)\"\\s*:").findAll(json).map { it.groupValues[1] }.toSet()
+
     /** 보존 저장소 — 마스킹이 지울 키를 **계약**에 물으므로 레지스트리를 함께 받는다(D-6B3-3 ①). */
     private fun retentionStore() = JdbcRetentionStore(dataSource(), testFieldContracts())
 }

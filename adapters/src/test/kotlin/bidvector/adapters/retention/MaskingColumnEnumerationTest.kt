@@ -91,7 +91,10 @@ class MaskingColumnEnumerationTest : PersistenceTestSupport() {
     /** 마스킹 열·표지 열을 뺀 열 전수(이름, 자료형) — 집합의 출처는 카탈로그다. */
     private fun immutableColumns(): List<Pair<String, String>> {
         val excluded = rule.maskedColumns + rule.maskedAtColumn
-        val columns = mutableListOf<Pair<String, String>>()
+        return catalogColumns().filterNot { (name, _) -> name in excluded }
+    }
+
+    private fun catalogColumns(): List<Pair<String, String>> =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
@@ -99,13 +102,14 @@ class MaskingColumnEnumerationTest : PersistenceTestSupport() {
                         "WHERE table_schema = 'public' AND table_name = ? ORDER BY ordinal_position",
                 ).use { statement ->
                     statement.setString(1, rule.table)
-                    statement.executeQuery().use { rs ->
-                        while (rs.next()) {
-                            val name = rs.getString("column_name")
-                            if (name !in excluded) columns += name to rs.getString("data_type")
-                        }
-                    }
+                    statement.executeQuery().use(::readColumnRows)
                 }
+        }
+
+    private fun readColumnRows(rows: java.sql.ResultSet): List<Pair<String, String>> {
+        val columns = mutableListOf<Pair<String, String>>()
+        while (rows.next()) {
+            columns += rows.getString("column_name") to rows.getString("data_type")
         }
         return columns
     }

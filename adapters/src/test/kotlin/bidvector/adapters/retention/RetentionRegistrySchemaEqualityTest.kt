@@ -46,10 +46,13 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
                 val column =
                     when (rule) {
                         is RetentionRule.Purge -> rule.insertedAtColumn
+
                         is RetentionRule.MaskPii -> rule.insertedAtColumn
+
                         // CASCADE 자식도 기한 가드가 이 열을 읽는다(D-6B3-3 ②) — nullable 이면
                         // 그 자식은 가드에 걸리지 않고 부모와 함께 사라진다.
                         is RetentionRule.CascadeWithParent -> rule.insertedAtColumn
+
                         is RetentionRule.Exempt -> null
                     } ?: return@mapNotNull null
                 val observed = columns[rule.table to column]

@@ -25,11 +25,6 @@ private const val RETENTION_LOCK_KEY = 6_110_003L
 private const val TRY_ADVISORY_LOCK = "SELECT pg_try_advisory_lock(?)"
 private const val ADVISORY_UNLOCK = "SELECT pg_advisory_unlock(?)"
 
-/**
- * FK 한 간선 — 열 쌍까지 **순서대로** 싣는다. `information_schema` 경유 조회는 복합 FK 를
- * cross product 로 보여 주므로(`CleanMigrationTest` 축6 KDoc 의 실측) 쌍을 복원할 수 없다 —
- * `pg_constraint` 의 `conkey`/`confkey` 를 `WITH ORDINALITY` 로 펴서 짝을 그대로 얻는다.
- */
 /** 마스킹 후보 한 행 — 「판독했다」와 「판독할 수 없어 값을 버렸다」를 접지 않는다. */
 private data class MaskCandidate(
     val key: String,
@@ -37,6 +32,11 @@ private data class MaskCandidate(
     val failClosed: Boolean,
 )
 
+/**
+ * FK 한 간선 — 열 쌍까지 **순서대로** 싣는다. `information_schema` 경유 조회는 복합 FK 를
+ * cross product 로 보여 주므로(`CleanMigrationTest` 축6 KDoc 의 실측) 쌍을 복원할 수 없다 —
+ * `pg_constraint` 의 `conkey`/`confkey` 를 `WITH ORDINALITY` 로 펴서 짝을 그대로 얻는다.
+ */
 internal data class ForeignKeyEdge(
     val child: String,
     val parent: String,
@@ -239,9 +239,13 @@ internal class JdbcRetentionWriter(
                     val key = rs.getString(rule.keyColumn)
                     candidates +=
                         when (val outcome = maskRawPayload(rs.getString(rule.rawColumn), projectedKeys - removedKeys)) {
-                            is PayloadMaskOutcome.Masked -> MaskCandidate(key, outcome.payload, failClosed = false)
-                            PayloadMaskOutcome.FailClosed ->
+                            is PayloadMaskOutcome.Masked -> {
+                                MaskCandidate(key, outcome.payload, failClosed = false)
+                            }
+
+                            PayloadMaskOutcome.FailClosed -> {
                                 MaskCandidate(key, PAYLOAD_MASK_FAIL_CLOSED, failClosed = true)
+                            }
                         }
                 }
                 candidates
@@ -254,9 +258,11 @@ internal class JdbcRetentionWriter(
         removedKeys: Set<String>,
     ): Boolean =
         connection.prepareStatement(maskUpdateSqlFor(rule)).use { statement ->
-            statement.setString(1, candidate.replacement)
-            statement.setArray(2, connection.createArrayOf("text", removedKeys.toTypedArray()))
-            statement.setString(3, candidate.key)
+            // 인자 순서는 `maskUpdateSqlFor` 의 문장 순서다 — 치환값 · 지울 키 배열 · 행 키.
+            var index = 1
+            statement.setString(index++, candidate.replacement)
+            statement.setArray(index++, connection.createArrayOf("text", removedKeys.toTypedArray()))
+            statement.setString(index, candidate.key)
             statement.executeUpdate() == 1
         }
 
