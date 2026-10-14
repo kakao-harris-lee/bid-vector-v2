@@ -45,9 +45,12 @@ internal data class ForeignKeyEdge(
 
 /**
  * [RetentionStorePort] JDBC 구현(M6/6B-3 P-3) — **소유자 비풀링 연결**로만 돈다(운영자 결정
- * A-1, `PersistenceWiring.migrateAsOwner` 선례). 런타임 풀은 `SET ROLE bidvector_app` 으로
- * 전환되고 그 역할에는 대상 표 어디에도 DELETE·UPDATE 권한이 없다 — 이 클래스에 풀을 넘기면
- * 모든 파기가 권한 오류로 끝난다(그 오류가 곧 경계가 살아 있다는 증거다).
+ * A-1, `PersistenceWiring.migrateAsOwner` 선례). **경계는 그 소유자 연결이고 권한 표가 아니다**
+ * (PR #73 P1 정정): 런타임 풀이 전환하는 `bidvector_app` 은 V13 에서 `notice_requirement` ·
+ * `notice_requirement_row` 에 **DELETE 를 받았다**(헤더 upsert 가 행을 리셋한다). 이 클래스에 풀을
+ * 넘기면 그 두 표의 기한 지난 행은 **실제로 지워지고** 나머지 파기 대상에서만 42501 이 난다 —
+ * 「전부 권한 오류로 끝난다」가 아니라 **부분 파기**다. 마스킹 쪽은 그 역할이 `raw_observation` 에
+ * UPDATE 를 아예 받지 못했고(V2 는 SELECT·INSERT 만) V18 관문이 소유자 역할을 다시 요구한다.
  *
  * 이 클래스는 **빈이 아니다**: 배선의 `@Bean` 함수 안에서 지역 객체로 만들어 use case 에
  * 넘긴다(설계 검토 (2b) 「소유자 연결 팩토리」 행 — 컨텍스트에 소유자 연결을 주입받을 수

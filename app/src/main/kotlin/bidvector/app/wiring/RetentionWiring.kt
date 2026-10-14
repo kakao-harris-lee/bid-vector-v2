@@ -27,9 +27,12 @@ import java.time.ZoneOffset
  * 연결」을 주입받을 자리가 없다. `PersistenceWiring` 이 `migrateAsOwner` 의 소유자 연결을
  * 지역 객체로 두는 것과 같은 규율이고 같은 이유다.
  *
- * **런타임 풀을 쓰지 않는다**(운영자 결정 A-1): 풀의 물리 연결마다 `SET ROLE bidvector_app` 이
- * 돌고 그 역할에는 대상 표 어디에도 DELETE·UPDATE 권한이 없다. 그래서 풀을 넘기면 모든 파기가
- * 권한 오류로 끝난다 — 경계를 넓히는 대신 경계 밖(소유자 비풀링 연결)에서 돈다.
+ * **런타임 풀을 쓰지 않는다**(운영자 결정 A-1). 경계는 **이 소유자 연결 자체**다 — 권한 표가
+ * 대신 막아 주지 않는다(PR #73 P1 정정): `bidvector_app` 은 V13 에서 `notice_requirement` ·
+ * `notice_requirement_row` 에 **DELETE 를 받았고**(헤더 upsert 가 행을 리셋한다), 여러 표에
+ * UPDATE 도 갖는다. 그래서 풀을 넘기면 **그 두 표의 기한 지난 행은 실제로 지워지고** 나머지
+ * 표에서만 권한 오류(42501)로 끝난다 — 「전부 권한 오류」가 아니라 **부분 파기**다. 앞 판 문면은
+ * 그것을 「대상 표 어디에도 권한이 없다」고 적었고 그 문장은 거짓이었다.
  */
 @Configuration
 @Import(CollectionTerminationWiring::class)

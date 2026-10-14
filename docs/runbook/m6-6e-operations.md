@@ -354,6 +354,11 @@ outbox 의 상태 어휘는 `PENDING` · `CLAIMED` · `DELIVERED` · `FAILED` ·
 V2 에 없다(`OPEN-6F3-BID-RECORD`). 그래서 격리된 알림의 내용은 outbox 행의 `payload` 를 DB 로 직접
 읽는 것이 유일한 확인 수단이다.
 
+**그 확인 창은 상태에 따라 다르다**(M6/6B-3). `ISOLATED`·`FAILED` 행은 **남는다**(파기 대상에서 뺐다 —
+잃은 알림의 유일한 흔적이다). 반면 **`DELIVERED` 행은 90일에 파기된다** — 보낸 알림의 내용을 뒤늦게
+확인하려면 그 창 안에 해야 하고, 지난 것은 백업 복원이 유일한 경로다
+(`m6-6b3-retention.md` §1.2 · `m6-6b2-backup-restore.md`).
+
 ```
 select state, count(*) from outbox group by state order by state;
 select entry_id, correlation_id, occurred_at, payload_type from outbox where state = 'ISOLATED' order by occurred_at desc limit 20;
@@ -579,7 +584,10 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
    (`OPEN-OPS-10`).
 5. **풀 값이 설정 키가 아니다**(§2.6) — 풀은 들어왔고(6E-2a) 크기·제한 시간은 **코드 상수**다. 운영
    실측으로 값을 바꾸려면 재배포가 필요하다.
-6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이다.
+6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이고,
+   **그 흔적은 90일까지다** — M6/6B-3 부터 보존 러너가 `DELIVERED` outbox 행을 `inserted_at + 90일`
+   에 파기한다(`m6-6b3-retention.md`). 보내진 알림의 판정 흔적은 그래서 **영구가 아니다**(미발송
+   `FAILED`·`ISOLATED` 는 남는다 — 그쪽은 잃은 알림의 흔적이라 파기 대상에서 뺐다).
 7. **model rollback 의 수단이 재배포뿐이고 그 재배포 절차가 저장소에 없다**(§4.4·§4.5). 승격 상태·demote
    가 없고 비현재 `EXACT` 는 실 serving 이 거부한다 — 6D-1 의 정의는 fake 서버 위에서만 성립한다
    (`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`).

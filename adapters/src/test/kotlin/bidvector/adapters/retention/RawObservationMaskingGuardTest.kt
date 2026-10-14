@@ -250,9 +250,10 @@ class RawObservationMaskingGuardTest : PersistenceTestSupport() {
     }
 
     /**
-     * vr F-9 — 객체가 아닌 투영 열 한 행이 마스킹 조회 전체(`jsonb_object_keys`)를 매 run
-     * 실패시켰다. 그 행이 들어올 수 없게 **구조로** 닫는다(V19 CHECK) — 조회 쪽에서 피하면 그
-     * 행의 남김 집합이 조용히 비어 원문이 `{}` 가 된다.
+     * vr F-9 — 객체가 아닌 투영 열 한 행이 마스킹을 매 run 같은 자리에서 실패시킨다(지금 사유는
+     * 투영을 다시 세우는 `jsonb_each` 다 — 앞 판이 적었던 후보 조회의 `jsonb_object_keys` 는 라운드 2
+     * 에서 사라졌다). 그 행이 들어올 수 없게 **구조로** 닫는다(**V18 이 세우고 V19 가 검증하는**
+     * CHECK) — 질의 쪽에서 피하면 그 행의 남김 집합이 조용히 비어 원문이 `{}` 가 된다.
      */
     @Test
     fun `객체가 아닌 투영 열은 INSERT 가 거부한다 — 마스킹 조회를 매 run 실패시켰다`() {

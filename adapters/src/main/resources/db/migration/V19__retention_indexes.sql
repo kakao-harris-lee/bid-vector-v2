@@ -44,6 +44,10 @@ CREATE INDEX raw_observation_pii_unmasked_idx
 --    `api_request_audit` 는 `idx_api_request_audit_occurred_at`(V15)이 이미 진다.
 --    `outbox` 는 **(상태, 적재 시각)** 복합이다 — 부분 술어(`WHERE state = 'DELIVERED'`)로 두면
 --    종단 집합이 바뀌는 날 인덱스가 조용히 쓰이지 않는다(그 집합은 레지스트리가 정한다).
+--    **이 인덱스는 다른 slice 의 OPEN 에도 닿는다**(PR #73 low): `OPEN-6F10-CLAIM-INDEX` 는
+--    `claimedEntries`(`state = 'CLAIMED'`)가 어느 인덱스도 덮지 않아 순차 스캔이라는 등재였고,
+--    선행 열이 `state` 라 그 조회가 이제 이것을 쓸 수 있다. **그 OPEN 을 닫지는 않는다** — 닫을
+--    근거는 그 레인의 측정이고, 여기서는 「전제가 바뀌었다」만 남긴다.
 --    `notice_requirement_row` 는 파기 대상이 아니지만 **CASCADE 기한 가드**(D-6B3-3 ②)의
 --    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다. 선행 열을 조인 키로 둔 것은
 --    **정상 운영 규모**를 택한 선택이다(mig M-2 실측, 149만 행):

@@ -28,9 +28,11 @@ SET LOCAL lock_timeout = '5s';
 ALTER TABLE raw_observation
     ADD COLUMN pii_masked_at TIMESTAMPTZ;
 
--- 투영 열은 **객체**여야 한다(vr F-9) — 객체가 아닌 한 행이 섞이면 마스킹 후보 조회의
--- `jsonb_object_keys` 가 그 run 전체를 매 run 실패시킨다(같은 행에서). 조회 쪽에서 피하면 그 행의
--- 남김 집합이 조용히 비어 원문이 `{}` 가 되므로, 들어올 수 없게 **구조로** 닫는다.
+-- 투영 열은 **객체**여야 한다(vr F-9). 그 사유는 라운드 2 이후 **마스킹 UPDATE 쪽**이다 — 투영을
+-- allow-list 로 다시 세우는 문장이 `jsonb_each` 를 쓰고, 객체가 아닌 값에서 그 함수는 오류를 던진다
+-- (앞 판 문면은 후보 **조회**의 `jsonb_object_keys` 를 사유로 들었는데 그 질의는 이제 없다). 그 행
+-- 하나가 매 run 같은 자리에서 run 을 실패시키고, 질의 쪽에서 피하면 그 행의 남김 집합이 조용히 비어
+-- 원문이 `{}` 가 된다. 그래서 들어올 수 없게 **구조로** 닫는다.
 -- `NOT VALID` 는 **기존 행을 스캔하지 않는다**(메타데이터 변경, 짧은 잠금) — 검증은 V19 가
 -- `VALIDATE CONSTRAINT`(`SHARE UPDATE EXCLUSIVE`, 읽기·쓰기를 막지 않는다)로 뒤이어 한다.
 ALTER TABLE raw_observation

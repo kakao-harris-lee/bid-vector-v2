@@ -164,6 +164,9 @@ export** 한다:
 ```sh
 # /opt/bidvector/run-retention.sh — 값은 이 파일에도 적지 않는다(읽어 온다).
 set -eu
+# 자격이 **아닌** 두 값도 환경에서 읽는다 — `set -u` 아래에서 없는 변수를 참조하면 래퍼가 그
+# 줄에서 죽고 cron 로그에는 `unbound variable` 만 남는다(cr low).
+. /etc/bidvector/retention.env   # BIDVECTOR_JDBC_URL · BIDVECTOR_DB_OWNER (자격 값이 아니다)
 BIDVECTOR_PERSISTENCE_CREDENTIAL="$(cat /etc/bidvector/owner.credential)"   # 0400, 운영자 소유
 export BIDVECTOR_PERSISTENCE_CREDENTIAL
 SPRING_MAIN_WEB_APPLICATION_TYPE=none exec java -jar /opt/bidvector/app.jar \
@@ -172,9 +175,15 @@ SPRING_MAIN_WEB_APPLICATION_TYPE=none exec java -jar /opt/bidvector/app.jar \
   --bidvector.persistence.username="$BIDVECTOR_DB_OWNER"
 ```
 
-접속 사용자는 **표 소유자**여야 한다 — 파기는 런타임 풀을 지나지 않는다(A-1). 풀은 물리 연결마다
-`SET ROLE bidvector_app` 으로 전환되고 그 역할에는 대상 표 어디에도 DELETE·UPDATE 권한이 없다.
-풀로 돌리면 모든 파기가 권한 오류로 끝난다 — 그 오류가 경계가 살아 있다는 증거다.
+접속 사용자는 **표 소유자**여야 한다 — 파기는 런타임 풀을 지나지 않는다(A-1).
+
+**경계는 그 연결이고, 권한 표가 아니다**(PR #73 P1 정정). 앞 판은 「`bidvector_app` 에는 대상 표
+어디에도 DELETE·UPDATE 권한이 없어 풀로 돌리면 전부 권한 오류로 끝난다」고 적었고 그것은 **거짓**이다:
+V13 이 그 역할에 `notice_requirement` · `notice_requirement_row` 의 **DELETE** 를 주고(헤더 upsert 가
+행을 리셋한다) 여러 표의 UPDATE 도 준다. 풀로 돌리면 **그 두 표의 기한 지난 행은 실제로 지워지고**
+나머지 표에서만 42501 이 난다 — 「아무것도 안 지워진다」가 아니라 **부분 파기**이고, 그 상태는 파기
+수가 예상과 어긋난 채 끝난 run(§4.3)으로만 보인다. 마스킹 쪽은 그 역할이 `raw_observation` 에 UPDATE
+자체를 못 받았고(V2 는 SELECT·INSERT 만) V18 관문이 소유자 역할을 다시 요구한다.
 
 `pg_stat_activity.application_name` 에서 이 세션은 `bidvector-retention` 이다(앱 풀 `bidvector-app`·
 migration `bidvector-migration` 과 가른다).
@@ -335,6 +344,10 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
     행이 담는 것은 전략 개정 번호·정책 버전·공고 id·판정 사유·운영자 자신이고 **제3자 PII 0** 이다.
     payload 타입이 늘고 그 타입이 제3자 이름을 담으면 그 행은 파기도 마스킹도 받지 않는다(타입 추가가
     fail-closed 코드 변경을 요구하므로 사람이 그 자리를 지난다).
+16. **CASCADE 기한 가드는 한 단계다**(vr R2-F7). 파기 대상 부모의 **직계** CASCADE 자식만 본다 —
+    CASCADE 손자나 「마스킹만」으로 분류된 CASCADE 자식이 생기면 그 행은 기한 안쪽이어도 부모와 함께
+    사라진다. 오늘 스키마에 둘 다 없고 **그 부재를 빌드가 센다**(그런 간선이 들어오면 RED).
+
 17. **분할 등식은 개념 단위다 — rawName 단위가 아니다**(vr R3-F2). 업체 식별을 나르는 새 rawName 이
     **기존 비PII 개념 아래로** 등재되면 그 키는 남김 집합에 들어오고 아무것도 붉어지지 않는다
     (`opengCorpInfo` 가 바로 그 꼴이었다 — 합성 문자열이 기존 개념 아래 있었다). 오늘 계약 rawName
@@ -350,6 +363,17 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
     없는 절반). 계약 키의 **값**에 상호·이름을 넣으면 키 축 allow-list 로는 걸러지지 않는다. 값 축은
     **비방어**다(수집 시점 마스킹 부재와 같은 축 — 제한 3).
 
-16. **CASCADE 기한 가드는 한 단계다**(vr R2-F7). 파기 대상 부모의 **직계** CASCADE 자식만 본다 —
-    CASCADE 손자나 「마스킹만」으로 분류된 CASCADE 자식이 생기면 그 행은 기한 안쪽이어도 부모와 함께
-    사라진다. 오늘 스키마에 둘 다 없고 **그 부재를 빌드가 센다**(그런 간선이 들어오면 RED).
+20. **오늘 다시 저장된 헤더라도 자식이 0 이면 `created_at` 으로 파기된다**(PR #73 P8).
+    `notice_requirement` 의 기준 시각은 **헤더가 처음 생긴 때**이고 upsert 는 그 값을 갱신하지 않는다.
+    그래서 요건 재수집이 **행 0 으로 끝난**(상류가 `FAILED`·요건 부재) 헤더는 오늘 손댔어도 기한 안쪽
+    자식이 없어 가드를 지나고, 90일 지난 `created_at` 때문에 사라진다. 대가는 **KONEPS 재수집 한 번**
+    (그 공고를 다시 평가할 때 요건을 다시 받는다) — 데이터 손실이 아니라 호출 비용이고, 그래서
+    고치지 않았다. 재수집이 비싸지면 처분은 「기준 시각을 갱신한다」가 아니라 「행 0 헤더의 분류」다.
+
+21. **파기·마스킹 문장에는 잠금 대기 상한이 없다**(PR #73 P9 · `OPEN-6B3-PURGE-LOCK-TIMEOUT`).
+    마이그레이션 둘은 `SET LOCAL lock_timeout` 을 갖지만 보존 run 의 DELETE·UPDATE 는 기본값(0 =
+    무한)으로 돈다. 긴 트랜잭션이 대상 행을 쥐고 있으면 그 일괄이 **임대와 소유자 연결을 쥔 채**
+    기다리고, 그 사이 다음 cron run 은 `LEASE_BUSY`(3)로 끝난다 — 조용한 지연이고 §3 의 어느 코드도
+    「기다리는 중」을 말하지 않는다. 증상은 `pg_stat_activity` 에서 `bidvector-retention` 세션이
+    `wait_event_type = Lock` 으로 남아 있는 것이다(§1.3 ⓒ 의 질의가 그 자리도 보여 준다).
+

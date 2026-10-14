@@ -153,7 +153,7 @@ internal fun maskSelectSqlFor(rule: RetentionRule.MaskPii): String =
  * 정상 행의 결과를 바꾸지 않는다 — 무해한 조임이고, 그 무해함을 출하 경로 test 가 통제군으로 잰다.
  *
  * 남길 키가 하나도 맞지 않으면 `jsonb_object_agg` 가 NULL 을 내므로 `coalesce` 로 빈 객체를 둔다
- * (그 열은 `NOT NULL` 이고 V19 의 CHECK 가 객체를 요구한다).
+ * (그 열은 `NOT NULL` 이고 **V18 이 세운** CHECK 가 객체를 요구한다 — V19 는 그 제약을 `VALIDATE` 한다).
  *
  * 표지 열은 **DB 시계**가 찍는다(적재 시각 축과 같은 시계). `AND <표지> IS NULL` 은 트리거의 표지
  * 관문과 같은 조건을 질의에도 두는 방어 심층이다.

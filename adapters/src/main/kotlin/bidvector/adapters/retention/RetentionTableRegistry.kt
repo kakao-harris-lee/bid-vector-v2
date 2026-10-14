@@ -92,7 +92,7 @@ internal sealed interface RetentionRule {
     ) : RetentionRule {
         override val treatment: RetentionTreatment get() = RetentionTreatment.MASK_PII
 
-        /** V18 관문 ④가 불변 비교에서 **빼는 집합**과 같아야 하는 집합. */
+        /** V18 관문 **⑤**(행 전체 불변 비교)가 **빼는 집합**과 같아야 하는 집합 — ④ 는 표지 열의 한 번만 전이다. */
         val maskedColumns: Set<String> get() = setOf(rawColumn, projectionColumn)
     }
 

@@ -14,8 +14,9 @@ private const val REFUSED_EXIT_CODE = 4
  *   [LEASE_BUSY]  — 다른 보존 러너가 돌고 있다. 기다리면 풀린다(cron 주기가 겹친 것).
  *   [REFUSED]     — 분류 레지스트리와 스키마가 어긋났거나 FK 에 순환이 있다. **아무것도
  *                   지우지 않았다**. 마이그레이션·분류를 고쳐야 풀린다.
- *   [INCOMPLETE]  — 돌긴 돌았는데 판독할 수 없는 원문이 있어 값 전체를 버렸다. 운영자가
- *                   그 수를 봐야 한다(상류 형태 변화의 신호다).
+ *   [INCOMPLETE]  — 돌긴 돌았는데 **끝까지 처분하지 못한 행이 있다**. 사유 둘이 같은 코드로 온다:
+ *                   ⓐ 판독할 수 없는 원문이 있어 값 전체를 버렸다(상류 형태 변화의 신호) ·
+ *                   ⓑ 후보로 골랐는데 **건너뛴** 행이 있다(그 run 이 백로그를 비우지 못했다).
  *   [FAILED]      — 실행이 예외로 끝났다. 앞서 커밋된 일괄은 남고 다음 run 이 이어받는다.
  */
 enum class RetentionExitCode(
@@ -26,7 +27,7 @@ enum class RetentionExitCode(
     /** 예외로 끝났다 — 정제된 원인 코드만 로그에 남는다(메시지에 행 값이 실릴 수 있다). */
     FAILED(1),
 
-    /** fail-closed 로 버린 원문이 있다 — 파기·마스킹 자체는 돌았다. */
+    /** fail-closed 로 버린 원문이나 **건너뛴 후보**가 있다 — 파기·마스킹 자체는 돌았다. */
     INCOMPLETE(2),
 
     LEASE_BUSY(LEASE_BUSY_EXIT_CODE),
