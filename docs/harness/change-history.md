@@ -82,3 +82,4 @@
 | 2026-10-09 | **CLAUDE.md 색인의 Codex 핀을 정본(0.160.1)에 맞춤** — `075c03b1`·`cbef2c06` 이 정본만 고쳐 색인이 0.154.0 을 이고 있었다(같은 결함 클래스 3회차, PR #66 `/code-review` #3) | CLAUDE.md | 처방 재확인: 정본과 색인을 같은 커밋에서 |
 | 2026-10-09 | **머지 전 공유 파일 rollback 은 `origin/main` 복원, 머지 뒤는 PR revert, 완료는 계수로** — hunk 역적용은 끝까지 실행해 완료가 실측된 경우에만 | evidence-pack, CLAUDE.md | M6/6E-2b 실측: main 병합 뒤 hunk 역적용이 자기 줄을 남긴 채 ①~⑥ exit 0(병합 커밋 해소 줄은 `--no-merges` 밖) · 6E-2a 의 처방은 미실행 |
 | 2026-10-09 | **공유 파일 복원 원천을 움직이는 `origin/main` 이 아니라 병합된 main 커밋 SHA 로 고정** + 실행 전 단언 둘(조상 · 첫 산출물 커밋 미포함) | evidence-pack, CLAUDE.md | M6/6E-2b 표적 3 LR-1(낡은 ref 로 exit 0 삭제)·L-2(앞선 ref 로 남의 문서 줄 유입) 실측 — PR #67 규칙의 정정 |
+| 2026-10-14 | **Codex 심판 버전 핀 0.160.1 → 0.162.1** + 넷째 주입 표면 `~/.codex/AGENTS.md` preflight 기록 | codex-review-gate, CLAUDE.md | 2026-10-11 패키지 자동 갱신으로 핀 값 실행 불가(M6/6B-4 첫 라운드 preflight 미충족) · 운영자 결정 · 대상 slice 선행 Codex 라운드 0 · 정본과 색인을 같은 커밋에서 |
