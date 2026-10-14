@@ -60,34 +60,62 @@ internal fun readForeignKeyEdges(connection: Connection): List<ForeignKeyEdge> {
 }
 
 /**
+ * 식별자 인용(cr L-3) — 오늘 출처는 컴파일 상수(`RETENTION_TABLE_RULES`)와 pg 카탈로그
+ * (`pg_class.relname`)뿐이고 값은 전부 `?` 바인딩이라 주입 경로는 없다. 그래도 인용하는
+ * 이유: 대문자·특수문자 이름의 표가 들어오면 인용 없는 문장이 **구문 오류**가 되고, 그때
+ * 깨지는 것이 되돌릴 수 없는 경로의 문장이다.
+ */
+internal fun quoteIdent(name: String): String {
+    require(!name.contains('"')) { "식별자에 따옴표를 담을 수 없다: $name" }
+    return "\"$name\""
+}
+
+/**
+ * 부모를 지울 때 자식이 **막는가** — FK 간선 하나의 가드(설계 검토 우회 6).
+ *
+ * [inWindowColumn] 이 `null` 이면 자식 행이 **하나라도** 있으면 막는다(비-CASCADE 간선: 그
+ * 자식은 자기 기준으로 **먼저** 파기되므로 그 run 에 남은 행은 이미 기한 안쪽이다). 값이
+ * 있으면 **기한 안쪽 자식만** 막는다(CASCADE 간선: 자기 기준 파기가 없으므로 기한을 이 가드가
+ * 직접 본다 — 운영자 결정 2026-10-14, D-6B3-3 ②).
+ */
+internal data class ChildGuard(
+    val edge: ForeignKeyEdge,
+    val inWindowColumn: String?,
+)
+
+/**
  * 파기 문 — 일괄 상한을 `ctid` 부분질의로 건다. 상한을 **부분질의 안**에 두는 이유: 자식
  * 가드를 밖에 두면 「고른 n 행 가운데 지울 수 있는 것만」이 되어 한 run 이 일찍 멈춘다.
  *
- * [blockingChildren] — 부모를 지울 때 **막는** 자식(`ON DELETE CASCADE` 가 아닌 FK)이 아직
- * 있으면 그 부모 행은 이 run 에서 지우지 않는다(설계 검토 우회 6). 자식이 기한 안쪽이면 그
- * 자식은 살아야 하고(「기한 안쪽 행은 한 행도 사라지지 않는다」), 그래도 부모를 지우려 들면
- * FK 위반으로 run 전체가 중단된다 — 그 둘 사이에서 **부모를 남기는 쪽**을 고른다.
+ * cutoff 를 **CTE 한 자리**에 둔다 — 가드마다 `?` 를 늘리면 바인딩 순서가 문장 조립 순서에
+ * 묶이고, 그 둘이 어긋난 날 지워지는 것은 되돌릴 수 없다. 인자는 언제나 「cutoff · (상태 배열)
+ * · 일괄 상한」 셋뿐이다.
  */
 internal fun purgeSqlFor(
     rule: RetentionRule.Purge,
-    blockingChildren: List<ForeignKeyEdge>,
+    guards: List<ChildGuard>,
 ): String {
-    val conditions = mutableListOf("t.${rule.insertedAtColumn} < ?")
+    val table = quoteIdent(rule.table)
+    val cutoffColumn = "t.${quoteIdent(rule.insertedAtColumn)}"
+    val conditions = mutableListOf("$cutoffColumn < bound.cutoff")
     when (val condition = rule.condition) {
         PurgeCondition.TimeOnly -> Unit
-        is PurgeCondition.TerminalStates -> conditions += "t.${condition.column} = ANY (?)"
+        is PurgeCondition.TerminalStates -> conditions += "t.${quoteIdent(condition.column)} = ANY (?)"
     }
-    blockingChildren.forEachIndexed { index, edge ->
+    guards.forEachIndexed { index, guard ->
         val alias = "c$index"
         val join =
-            edge.columnPairs.joinToString(" AND ") { (childColumn, parentColumn) ->
-                "$alias.$childColumn = t.$parentColumn"
+            guard.edge.columnPairs.joinToString(" AND ") { (childColumn, parentColumn) ->
+                "$alias.${quoteIdent(childColumn)} = t.${quoteIdent(parentColumn)}"
             }
-        conditions += "NOT EXISTS (SELECT 1 FROM ${edge.child} $alias WHERE $join)"
+        val window =
+            guard.inWindowColumn?.let { column -> " AND $alias.${quoteIdent(column)} >= bound.cutoff" } ?: ""
+        conditions += "NOT EXISTS (SELECT 1 FROM ${quoteIdent(guard.edge.child)} $alias WHERE $join$window)"
     }
-    return "DELETE FROM ${rule.table} WHERE ctid IN (" +
-        "SELECT t.ctid FROM ${rule.table} t WHERE ${conditions.joinToString(" AND ")} " +
-        "ORDER BY t.${rule.insertedAtColumn} LIMIT ?)"
+    return "WITH bound AS (SELECT ?::timestamptz AS cutoff) " +
+        "DELETE FROM $table WHERE ctid IN (" +
+        "SELECT t.ctid FROM $table t, bound WHERE ${conditions.joinToString(" AND ")} " +
+        "ORDER BY $cutoffColumn LIMIT ?)"
 }
 
 /**
@@ -96,15 +124,22 @@ internal fun purgeSqlFor(
  * 건너뜀」을 질의 자체로 만든다.
  */
 internal fun maskSelectSqlFor(rule: RetentionRule.MaskPii): String =
-    "SELECT ${rule.keyColumn}, ${rule.maskedColumn}, " +
-        "ARRAY(SELECT jsonb_object_keys(${rule.keptKeySourceColumn})) AS kept_keys " +
-        "FROM ${rule.table} WHERE ${rule.insertedAtColumn} < ? AND ${rule.maskedAtColumn} IS NULL " +
-        "ORDER BY ${rule.insertedAtColumn} LIMIT ?"
+    "SELECT ${quoteIdent(rule.keyColumn)}, ${quoteIdent(rule.rawColumn)}, " +
+        "ARRAY(SELECT jsonb_object_keys(${quoteIdent(rule.projectionColumn)})) AS kept_keys " +
+        "FROM ${quoteIdent(rule.table)} " +
+        "WHERE ${quoteIdent(rule.insertedAtColumn)} < ? AND ${quoteIdent(rule.maskedAtColumn)} IS NULL " +
+        "ORDER BY ${quoteIdent(rule.insertedAtColumn)} LIMIT ?"
 
 /**
- * 마스킹 문 — 표지 열은 **DB 시계**가 찍는다(적재 시각 축과 같은 시계). `AND <표지> IS NULL`
- * 은 트리거 ③(NULL → 값 한 번)과 같은 조건을 질의에도 두는 방어 심층이다.
+ * 마스킹 문 — **두 열을 함께** 바꾼다(D-6B3-3 ①). 원문은 남김 집합으로 다시 쓴 값으로, 투영은
+ * `jsonb - text[]`(지울 키 전수)로 줄인다. 투영을 jsonb 연산으로 줄이는 이유: 그 열은 이미
+ * 정규화된 jsonb 이므로 다시 직렬화할 이유가 없고, 지울 키 밖의 값에 손이 닿지 않는다.
+ *
+ * 표지 열은 **DB 시계**가 찍는다(적재 시각 축과 같은 시계). `AND <표지> IS NULL` 은 트리거
+ * ③(NULL → 값 한 번)과 같은 조건을 질의에도 두는 방어 심층이다.
  */
 internal fun maskUpdateSqlFor(rule: RetentionRule.MaskPii): String =
-    "UPDATE ${rule.table} SET ${rule.maskedColumn} = ?, ${rule.maskedAtColumn} = now() " +
-        "WHERE ${rule.keyColumn} = ? AND ${rule.maskedAtColumn} IS NULL"
+    "UPDATE ${quoteIdent(rule.table)} SET ${quoteIdent(rule.rawColumn)} = ?, " +
+        "${quoteIdent(rule.projectionColumn)} = ${quoteIdent(rule.projectionColumn)} - ?::text[], " +
+        "${quoteIdent(rule.maskedAtColumn)} = now() " +
+        "WHERE ${quoteIdent(rule.keyColumn)} = ? AND ${quoteIdent(rule.maskedAtColumn)} IS NULL"

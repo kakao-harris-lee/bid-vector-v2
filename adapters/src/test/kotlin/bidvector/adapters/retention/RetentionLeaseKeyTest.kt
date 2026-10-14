@@ -29,7 +29,7 @@ class RetentionLeaseKeyTest : PersistenceTestSupport() {
     @Test
     fun `보존 임대를 쥔 채 relay 임대 전수를 동시에 쥘 수 있다 — 키가 겹치지 않는다`() {
         val attempt =
-            JdbcRetentionStore(dataSource()).withExclusiveLease {
+            retentionStore().withExclusiveLease {
                 OutboxConsumerKind.entries.map { kind ->
                     kind to PostgresAdvisoryLockLease(dataSource()).withLease(kind) { HELD }
                 }
@@ -49,7 +49,7 @@ class RetentionLeaseKeyTest : PersistenceTestSupport() {
     fun `relay 임대를 쥔 채 보존 임대를 쥘 수 있다`() {
         val attempt =
             PostgresAdvisoryLockLease(dataSource()).withLease(OutboxConsumerKind.NotificationRequested) {
-                JdbcRetentionStore(dataSource()).withExclusiveLease { HELD }
+                retentionStore().withExclusiveLease { HELD }
             }
 
         attempt.shouldBeHeld().shouldBeHeld() shouldBe HELD
@@ -64,4 +64,6 @@ class RetentionLeaseKeyTest : PersistenceTestSupport() {
     private companion object {
         const val HELD = "held"
     }
+    /** 보존 저장소 — 마스킹이 지울 키를 **계약**에 물으므로 레지스트리를 함께 받는다(D-6B3-3 ①). */
+    private fun retentionStore() = JdbcRetentionStore(dataSource(), testFieldContracts())
 }

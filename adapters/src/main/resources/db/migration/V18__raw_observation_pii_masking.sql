@@ -9,27 +9,44 @@
 -- 트리거 술어는 **열 이름 열거가 아니다**(설계 검토 (1)): 마스킹 열과 표지 열을 뺀 **행 전체**를
 -- jsonb 로 비교한다. V19 가 열을 더해도 그 열은 자동으로 「불변이어야 하는 열」에 들어간다 —
 -- 열거였다면 새 열이 조용히 변경 가능해진다.
+--
+-- **이 파일은 인덱스를 만들지 않는다**(mig H-1). `ALTER TABLE` 이 쥐는 `ACCESS EXCLUSIVE` 가
+-- Flyway 의 한 트랜잭션 안에서 전수 인덱스 빌드 내내 유지되면 적용 창이 「전수·전차단·기동중」이
+-- 된다(migrate 는 `DataSource` 빈 생성의 부수효과다). 인덱스는 V19 로 떼어냈고, 그래서 **이 파일의
+-- 문장은 전부 메타데이터 변경**이다(열 추가 nullable·DEFAULT 없음 · CHECK `NOT VALID`(스캔 없음)
+-- · 함수 생성 · 트리거 교체) — 밀리초로 끝나고, `ALTER` + 트리거 교체의 원자성은 여기 남는다
+-- (교체 순간의 무방비 구간이 없다).
 
 ALTER TABLE raw_observation
     ADD COLUMN pii_masked_at TIMESTAMPTZ;
 
--- 마스킹된 행만 추려 다음 run 이 건너뛸 수 있게 한다(부분 인덱스 — 아직 마스킹되지 않은 행이
--- 질의 대상이고, 그 집합은 시간이 가도 작게 유지된다).
-CREATE INDEX raw_observation_pii_unmasked_idx
-    ON raw_observation (inserted_at) WHERE pii_masked_at IS NULL;
+-- 투영 열은 **객체**여야 한다(vr F-9) — 객체가 아닌 한 행이 섞이면 마스킹 후보 조회의
+-- `jsonb_object_keys` 가 그 run 전체를 매 run 실패시킨다(같은 행에서). 조회 쪽에서 피하면 그 행의
+-- 남김 집합이 조용히 비어 원문이 `{}` 가 되므로, 들어올 수 없게 **구조로** 닫는다.
+-- `NOT VALID` 는 **기존 행을 스캔하지 않는다**(메타데이터 변경, 짧은 잠금) — 검증은 V19 가
+-- `VALIDATE CONSTRAINT`(`SHARE UPDATE EXCLUSIVE`, 읽기·쓰기를 막지 않는다)로 뒤이어 한다.
+ALTER TABLE raw_observation
+    ADD CONSTRAINT raw_observation_payload_fields_object
+        CHECK (jsonb_typeof(payload_fields) = 'object') NOT VALID;
 
 -- =============================================================================
--- reject_mutation_except_masking — V3 `reject_mutation` 의 좁은 개정판. **네 관문**을 전부
--- 지나야 UPDATE 가 선다. 하나라도 걸리면 V3 와 같은 ERRCODE(P0001)로 거부한다.
+-- reject_mutation_except_masking — V3 `reject_mutation` 의 좁은 개정판.
 --
 --   ① DELETE 는 조건 없이 거부한다(append-only 의 본체 — 운영자 결정 A-3 「파기하지 않는다」).
---   ② 실행 역할이 애플리케이션 역할이면 거부한다(A-1 「런타임 풀의 권한 경계 무변경」).
---      GRANT 가 이미 1차 방어이고(앱 역할에 UPDATE 권한이 없다) 이것이 2차다 — 뒤의 어느
---      마이그레이션이 실수로 UPDATE 를 주더라도 이 줄이 남는다.
---   ③ 마스킹 표지가 NULL → 값으로 **한 번만** 간다. 값 → 값(두 번째 마스킹)·값 → NULL
+--   ② INSERT 는 **표지가 NULL 일 때만** 지난다(vr F-4). 앱 역할의 INSERT GRANT 는 표 단위라
+--      새 열도 포함하고, 마스킹 조회는 `pii_masked_at IS NULL` 만 보므로 표지를 미리 찍은 행은
+--      영원히 마스킹되지 않으면서 계수에도 없다 — 표지를 쓰는 주체를 마스킹 주체로 닫는다.
+--   ③ UPDATE 의 실행 역할은 **표 소유자(의 멤버)** 여야 한다(vr F-5 · mig L-1). 역할 **이름**을
+--      거부하는 deny-list 였다면 뒤의 마이그레이션이 다른 역할에 UPDATE 를 주는 순간 열렸다 —
+--      카탈로그(`pg_class.relowner`)에서 끌어온 allow-list 는 미래의 어떤 역할도 열거 없이 막는다.
+--      GRANT 부재가 여전히 1차 방어이고 이것이 2차다.
+--   ④ 마스킹 표지가 NULL → 값으로 **한 번만** 간다. 값 → 값(두 번째 마스킹)·값 → NULL
 --      (되돌림)은 거부다 — 원문을 다시 써 넣는 경로가 그 둘이다.
---   ④ 마스킹 열(`payload`)과 표지 열을 뺀 행 전체가 **같아야** 한다 — 마스킹 UPDATE 에
---      다른 열 변경(`observed_at`·`source_endpoint`·`release_sha`…)을 끼워 넣지 못한다.
+--   ⑤ **마스킹 열 둘**(`payload`·`payload_fields`)과 표지 열을 뺀 행 전체가 **같아야** 한다 —
+--      마스킹 UPDATE 에 다른 열 변경(`observed_at`·`source_endpoint`·`release_sha`…)을 끼워 넣지
+--      못한다. 투영 열이 마스킹 열인 이유는 운영자 결정 2026-10-14(D-6B3-3 ①)다: 업체명은 계약에
+--      등재되어 그 열에도 실리므로, 그 열이 불변이면 업체명을 **구조적으로 지울 수 없다**.
+-- 하나라도 걸리면 V3 와 같은 ERRCODE(P0001)로 거부한다.
 -- =============================================================================
 CREATE FUNCTION reject_mutation_except_masking() RETURNS trigger AS $masking$
 BEGIN
@@ -38,8 +55,16 @@ BEGIN
             USING ERRCODE = 'P0001';
     END IF;
 
-    IF current_user = 'bidvector_app' THEN
-        RAISE EXCEPTION '%.% 의 마스킹은 애플리케이션 역할이 하지 않는다', TG_TABLE_SCHEMA, TG_TABLE_NAME
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.pii_masked_at IS NOT NULL THEN
+            RAISE EXCEPTION '%.% 의 마스킹 표지는 적재가 찍지 않는다', TG_TABLE_SCHEMA, TG_TABLE_NAME
+                USING ERRCODE = 'P0001';
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = TG_RELID), 'MEMBER') THEN
+        RAISE EXCEPTION '%.% 의 마스킹은 표 소유자만 한다', TG_TABLE_SCHEMA, TG_TABLE_NAME
             USING ERRCODE = 'P0001';
     END IF;
 
@@ -48,7 +73,8 @@ BEGIN
             USING ERRCODE = 'P0001';
     END IF;
 
-    IF (to_jsonb(OLD) - 'payload' - 'pii_masked_at') <> (to_jsonb(NEW) - 'payload' - 'pii_masked_at') THEN
+    IF (to_jsonb(OLD) - 'payload' - 'payload_fields' - 'pii_masked_at')
+        <> (to_jsonb(NEW) - 'payload' - 'payload_fields' - 'pii_masked_at') THEN
         RAISE EXCEPTION '%.% 의 마스킹 UPDATE는 마스킹 열 밖을 바꿀 수 없다', TG_TABLE_SCHEMA, TG_TABLE_NAME
             USING ERRCODE = 'P0001';
     END IF;
@@ -59,11 +85,13 @@ $masking$ LANGUAGE plpgsql;
 
 -- 트리거 이름은 그대로 둔다 — 이 표의 계약은 여전히 「추가 전용」이고, 바뀐 것은 그 계약의
 -- 예외 하나다. 바뀐 사실은 이름이 아니라 **함수 등재**(`CleanMigrationTriggerTest` 의
--- 트리거 → 함수 쌍)와 거동 test 가 나른다.
+-- 트리거 → 함수 쌍)와 거동 test 가 나른다. 이벤트에 INSERT 가 더해진 것도 같은 등재가 싣는다
+-- (관문 ② — 적재마다 이 함수가 한 번 돈다. plpgsql 분기 둘이라 행당 비용은 마이크로초 단위이고,
+-- 그 대가로 「표지를 쓰는 주체」가 닫힌다).
 DROP TRIGGER raw_observation_append_only ON raw_observation;
 
 CREATE TRIGGER raw_observation_append_only
-    BEFORE UPDATE OR DELETE ON raw_observation
+    BEFORE INSERT OR UPDATE OR DELETE ON raw_observation
     FOR EACH ROW EXECUTE FUNCTION reject_mutation_except_masking();
 
 -- GRANT 는 바뀌지 않는다(운영자 결정 A-1) — 어느 표에도 DELETE·UPDATE 를 새로 주지 않는다.

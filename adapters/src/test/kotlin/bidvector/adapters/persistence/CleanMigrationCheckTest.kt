@@ -43,7 +43,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "provenance_authority" to 1,
             "qualification_text" to 3,
             // F-7 운영자 결정 — payload 가 TEXT 로 바뀌며 `payload <> ''` CHECK 가 하나 늘었다.
-            "raw_observation" to 4,
+            // M6/6B-3(추가만) — 투영 열 형태 제약 하나(`jsonb_typeof(payload_fields) = 'object'`,
+            // V18 이 `NOT VALID` 로 세우고 V19 가 검증한다, vr F-9) → 5.
+            "raw_observation" to 5,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
             // 신규(추가만, D-4C2-2).

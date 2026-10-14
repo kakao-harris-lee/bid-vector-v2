@@ -1,5 +1,7 @@
 package bidvector.adapters.retention
 
+import bidvector.procurement.FieldConcept
+import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.workflow.retention.RetentionTarget
 import bidvector.workflow.retention.RetentionTreatment
 
@@ -73,16 +75,34 @@ internal sealed interface RetentionRule {
         val insertedAtColumn: String,
         val maskedAtColumn: String,
         val keyColumn: String,
-        val maskedColumn: String,
-        /** 남길 키를 **그 행 자신에게서** 얻는 열(아래 KDoc 「allow-list 의 출처」). */
-        val keptKeySourceColumn: String,
+        /** 원문 열 — 남김 집합으로 **반전 마스킹**한다(allow-list 밖은 전부 사라진다). */
+        val rawColumn: String,
+        /**
+         * 투영 열 — 남김 집합을 **그 행 자신에게서** 얻는 자리이면서 **자신도 마스킹 대상**이다
+         * (운영자 결정 2026-10-14, D-6B3-3 ①). 둘째가 아니면 업체명은 이 열에 영구히 남는다.
+         */
+        val projectionColumn: String,
+        /**
+         * 지우는 PII 를 **개념 축**으로 선언한다(rawName 열거가 아니다) — 상류가 그 개념에 키를
+         * 더하면 계약을 지나 자동으로 따라온다([maskedRawNamesOf]).
+         */
+        val maskedConcepts: Set<FieldConcept>,
     ) : RetentionRule {
         override val treatment: RetentionTreatment get() = RetentionTreatment.MASK_PII
+
+        /** V18 관문 ④가 불변 비교에서 **빼는 집합**과 같아야 하는 집합. */
+        val maskedColumns: Set<String> get() = setOf(rawColumn, projectionColumn)
     }
 
     data class CascadeWithParent(
         override val table: String,
         val parentTable: String,
+        /**
+         * 이 표에도 **기한 가드가 걸린다**(운영자 결정 2026-10-14, D-6B3-3 ② — vr F-3). 부모를
+         * 지우면 `ON DELETE CASCADE` 가 자식을 함께 지우므로, 기한 안쪽 자식이 있으면 부모를
+         * 남긴다. 그 판정에 쓰는 자식의 적재 시각 열이다(비-CASCADE 자식과 같은 성질).
+         */
+        val insertedAtColumn: String,
     ) : RetentionRule {
         override val treatment: RetentionTreatment get() = RetentionTreatment.CASCADE_WITH_PARENT
     }
@@ -116,8 +136,11 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
             insertedAtColumn = "inserted_at",
             maskedAtColumn = "pii_masked_at",
             keyColumn = "observation_key",
-            maskedColumn = "payload",
-            keptKeySourceColumn = "payload_fields",
+            rawColumn = "payload",
+            projectionColumn = "payload_fields",
+            // 운영자 결정 2026-10-14 — 업체명은 90일 결정의 대상이다. 담당자 키와 달리 이 둘은
+            // 계약에 **등재되어** 투영에 실리므로, 개념 축으로 빼지 않으면 남김 집합에 들어온다.
+            maskedConcepts = setOf(FieldConcept.BID_COMPANY_NAME, FieldConcept.AWARD_COMPANY_NAME),
         ),
         // --- 파기(결정 문면 「공고」) ---
         RetentionRule.Purge("notice", "created_at", PurgeCondition.TimeOnly),
@@ -135,16 +158,20 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
             condition =
                 PurgeCondition.TerminalStates(
                     column = "state",
-                    // V6 의 CHECK 어휘 다섯 가운데 **배달·격리**뿐이다. `FAILED` 도 종단이지만
-                    // 「미발송」이라 A-4 의 제외에 들어간다 — 그 행은 잃은 알림의 유일한 흔적이다
-                    // (알려진 제한: 그래서 영구 잔류한다).
-                    values = setOf("DELIVERED", "ISOLATED"),
+                    // V6 의 CHECK 어휘 다섯 가운데 **배달 하나**다(D-6B3-3 ③). `FAILED`·`ISOLATED`
+                    // 도 종단이지만 둘 다 **한 번도 보내지지 않은** 상태라 A-4 의 「미발송 제외」에
+                    // 들어간다 — 그 행은 잃은 알림의 유일한 흔적이다(알려진 제한: 영구 잔류).
+                    values = setOf("DELIVERED"),
                 ),
         ),
         // --- 파기(버려진 편집 세션, A-4 — `OPEN-6A2B-ABANDONED-SESSIONS` 를 닫는다) ---
         RetentionRule.Purge("edit_session", "created_at", PurgeCondition.TimeOnly),
-        // --- 부모와 함께 사라진다(FK ON DELETE CASCADE) ---
-        RetentionRule.CascadeWithParent("notice_requirement_row", parentTable = "notice_requirement"),
+        // --- 부모와 함께 사라진다(FK ON DELETE CASCADE) — 단 기한 안쪽 행은 부모를 남긴다 ---
+        RetentionRule.CascadeWithParent(
+            table = "notice_requirement_row",
+            parentTable = "notice_requirement",
+            insertedAtColumn = "created_at",
+        ),
         // --- 시간 기준 파기 대상 아님(A-4) ---
         RetentionRule.Exempt("notice_audit", ExemptReason.AUDIT_WITHOUT_PII),
         RetentionRule.Exempt("inbox", ExemptReason.IDEMPOTENCY_LEDGER),
@@ -157,3 +184,21 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
     )
 
 internal fun RetentionRule.asTarget(): RetentionTarget = RetentionTarget(table, treatment)
+
+/**
+ * 마스킹 규칙의 개념을 **계약을 지나** rawName 으로 편다(D-6B3-3 ①). 키 이름의 사본을 이
+ * 파일에 두지 않는다 — 상류가 그 개념에 키를 더하면 여기도 함께 따라온다.
+ *
+ * 계약이 없는 개념은 **구성 오류로 던진다**: 조용히 빈 집합이 되면 「업체명을 지운다」가
+ * 아무 일도 하지 않으면서 초록이다(공허의 가장 비싼 꼴 — 되돌릴 수 없는 경로에서).
+ */
+internal fun maskedRawNamesOf(
+    rule: RetentionRule.MaskPii,
+    contracts: KonepsFieldContractRegistry,
+): Set<String> {
+    val byConcept = rule.maskedConcepts.associateWith { contracts.contractsFor(it).map { c -> c.rawName.name } }
+    val empty = byConcept.filterValues { it.isEmpty() }.keys
+    require(empty.isEmpty()) { "마스킹 개념에 필드 계약이 없다: $empty" }
+    return byConcept.values.flatten().toSet()
+}
+

@@ -12,6 +12,7 @@ import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.BeforeEach
@@ -27,8 +28,11 @@ private val CUTOFF_EXACTLY_AT_OLDEST: Instant = JUST_OLDER + RETENTION_ANCHOR
 /** 파기 기대 행 수 변화 — 파기 대상은 한 쌍 가운데 하나(기한 넘은 쪽)만 사라진다. */
 private const val ONE_ROW_PURGED = -1L
 
-/** `outbox` 는 한 쌍마다 상태 다섯을 심고, 기한 넘은 쪽의 **종단 둘**만 사라진다. */
-private const val TWO_OUTBOX_ROWS_PURGED = -2L
+/**
+ * `outbox` 는 한 쌍마다 상태 다섯을 심고, 기한 넘은 쪽의 **`DELIVERED` 하나**만 사라진다
+ * (D-6B3-3 ③ — `ISOLATED` 는 미발송이라 A-4 의 「미발송 제외」에 든다).
+ */
+private const val ONE_OUTBOX_ROW_PURGED = -1L
 
 /**
  * P-3 — 보존 러너의 실 SQL 축(경계 ±1초 · 통제군 · 제외 표 불변 · FK 순서 · 분류 등식).
@@ -89,16 +93,22 @@ class RetentionSweepTest : PersistenceTestSupport() {
         fixture.countsByTable().getValue("raw_observation") shouldBe before.getValue("raw_observation")
     }
 
+    /**
+     * D-6B3-3 ③ — **`DELIVERED` 하나만** 사라진다. `ISOLATED` 는 종단이지만 **한 번도 보내지지
+     * 않은** 상태이고(relay 의 「알림을 영구히 잃는 사건」), A-4 의 문면이 미발송을 제외한다.
+     * `FAILED` 와 같은 자리다 — 그 행은 잃은 알림의 유일한 흔적이다.
+     */
     @Test
-    fun `outbox 는 기한 넘은 종단 둘만 사라진다 — 미발송·임대 중은 남는다`() {
+    fun `outbox 는 기한 넘은 DELIVERED 하나만 사라진다 — 미발송·격리·임대 중은 남는다`() {
         sweepAt(NOW)
 
-        // 기한 넘은 쪽에서 남은 상태 + 기한 안쪽의 다섯 전부.
+        // 기한 넘은 쪽에서 남은 상태 넷 + 기한 안쪽의 다섯 전부.
         remainingOutboxEntries() shouldContainExactlyInAnyOrder
             listOf(
                 "ret-old-PENDING",
                 "ret-old-CLAIMED",
                 "ret-old-FAILED",
+                "ret-old-ISOLATED",
             ) + OUTBOX_STATE_VOCABULARY.map { "ret-new-$it" }
     }
 
@@ -129,6 +139,36 @@ class RetentionSweepTest : PersistenceTestSupport() {
         survivingReservePrices().shouldBeEmpty()
     }
 
+    /**
+     * 운영자 결정 2026-10-14(D-6B3-3 ②, vr F-3) — **CASCADE 자식에도 기한 가드**. 헤더 upsert 는
+     * `created_at` 을 유지하고 행은 delete-then-insert 로 새 `created_at` 을 받으므로, 120일 전
+     * 생성된 헤더를 오늘 다시 저장하면 **행만 기한 안쪽**이 된다. 가드가 없으면
+     * `ON DELETE CASCADE` 가 그 행을 함께 지운다 — 방어 ②(「기한 안쪽 행은 한 행도 사라지지
+     * 않는다」)가 CASCADE 간선에서만 깨지는 자리였다.
+     */
+    @Test
+    fun `기한 안쪽 CASCADE 자식이 있으면 기한 넘은 부모를 남긴다 — 자식도 산다`() {
+        fixture.seedLateCascadeChild(parentAt = JUST_OLDER, childAt = JUST_NEWER)
+
+        val outcome = sweepAt(NOW)
+
+        outcome.shouldBeInstanceOf<RetentionOutcome.Completed>()
+        survivingRequirementRows() shouldContain "RET-cascade"
+        survivingRequirementHeaders() shouldContain "RET-cascade"
+    }
+
+    /** 수렴 — 그 자식이 기한을 넘는 run 에서 둘이 함께 사라진다(가드가 영구 잔류를 만들지 않는다). */
+    @Test
+    fun `기한 안쪽 CASCADE 자식이 기한을 넘으면 부모와 함께 사라진다 — 수렴한다`() {
+        fixture.seedLateCascadeChild(parentAt = JUST_OLDER, childAt = JUST_NEWER)
+        sweepAt(NOW)
+
+        sweepAt(NOW + Duration.ofSeconds(2))
+
+        survivingRequirementRows() shouldNotContain "RET-cascade"
+        survivingRequirementHeaders() shouldNotContain "RET-cascade"
+    }
+
     @Test
     fun `파기 순서는 자식부터다 — 보고가 그 순서를 싣는다`() {
         val report = sweepAt(NOW).shouldBeInstanceOf<RetentionOutcome.Completed>().report
@@ -157,7 +197,7 @@ class RetentionSweepTest : PersistenceTestSupport() {
     }
 
     private fun sweepAt(at: Instant): RetentionOutcome =
-        PurgeExpiredData(JdbcRetentionStore(dataSource()), Clock { at }, productionPolicy()).run()
+        PurgeExpiredData(retentionStore(), Clock { at }, productionPolicy()).run()
 
     /** **출하 정책 값**을 그대로 쓴다 — 이 자리가 값과 거동을 잇는다. */
     private fun productionPolicy(): RetentionPolicyData =
@@ -167,7 +207,7 @@ class RetentionSweepTest : PersistenceTestSupport() {
         RETENTION_TABLE_RULES.associate { rule ->
             rule.table to
                 when {
-                    rule.table == "outbox" -> TWO_OUTBOX_ROWS_PURGED
+                    rule.table == "outbox" -> ONE_OUTBOX_ROW_PURGED
 
                     rule.treatment == RetentionTreatment.PURGE -> ONE_ROW_PURGED
 
@@ -189,6 +229,12 @@ class RetentionSweepTest : PersistenceTestSupport() {
 
     private fun survivingReservePrices(): List<String> = queryColumn("SELECT notice_number FROM opening_reserve_price")
 
+    private fun survivingRequirementRows(): List<String> =
+        queryColumn("SELECT notice_number FROM notice_requirement_row")
+
+    private fun survivingRequirementHeaders(): List<String> =
+        queryColumn("SELECT notice_number FROM notice_requirement")
+
     private fun createUnclassifiedTable() = execute("CREATE TABLE ret_unclassified (id INT PRIMARY KEY)")
 
     private fun dropUnclassifiedTable() = execute("DROP TABLE ret_unclassified")
@@ -208,4 +254,6 @@ class RetentionSweepTest : PersistenceTestSupport() {
                 }
             }
         }
+    /** 보존 저장소 — 마스킹이 지울 키를 **계약**에 물으므로 레지스트리를 함께 받는다(D-6B3-3 ①). */
+    private fun retentionStore() = JdbcRetentionStore(dataSource(), testFieldContracts())
 }

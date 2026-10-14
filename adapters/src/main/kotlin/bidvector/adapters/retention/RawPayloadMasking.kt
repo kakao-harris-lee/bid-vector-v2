@@ -13,10 +13,15 @@ import bidvector.adapters.koneps.render
 internal const val PAYLOAD_MASK_FAIL_CLOSED = """{"pii_masked":"fail_closed"}"""
 
 /**
- * `payload` 는 KONEPS 항목 **하나**의 평평한 객체다 — 상한을 끄지 않고 저장된 원문을 읽는
- * 같은 자리(`adapters.snapshot` 의 `payload_fields` 판독)와 같은 값을 쓴다.
+ * 판독 깊이 상한 — **수집이 받아들인 깊이 이상**이어야 한다(cr M-1). 낮으면 「형태가 우리 것이
+ * 아니다」와 「우리가 받아들인 뒤 임의로 낮춘 상한을 넘었다」가 같은 처분(값 전체 폐기)을 받고,
+ * 그 폐기는 되돌릴 수 없다(트리거가 값→값 UPDATE 를 거부해 forward-fix 조차 없다).
+ *
+ * 두 상수의 **독립이 결함의 원인**이었으므로 그 독립을 test 가 센다(`RawPayloadMaskingTest` —
+ * 수집 정책 **전 entry** 의 `maxJsonDepth` 이상임을 단언한다). 여기서 정책을 직접 읽지 않는
+ * 이유는 이 함수가 **순수**라는 성질이다 — 기준일도 설정도 받지 않는다.
  */
-private const val PAYLOAD_MAX_DEPTH = 8
+internal const val PAYLOAD_MASK_MAX_DEPTH = 32
 
 /** [maskRawPayload] 의 결과 — 「마스킹했다」와 「판독할 수 없어 값을 버렸다」를 접지 않는다. */
 internal sealed interface PayloadMaskOutcome {
@@ -60,7 +65,7 @@ internal fun maskRawPayload(
  */
 private fun flatObjectOrNull(payload: String): Map<String, JsonValue>? =
     try {
-        (KonepsJsonParser.parse(payload, PAYLOAD_MAX_DEPTH) as? JsonValue.JsonObject)?.fields
+        (KonepsJsonParser.parse(payload, PAYLOAD_MASK_MAX_DEPTH) as? JsonValue.JsonObject)?.fields
     } catch (
         @Suppress("SwallowedException") malformed: JsonParseException,
     ) {

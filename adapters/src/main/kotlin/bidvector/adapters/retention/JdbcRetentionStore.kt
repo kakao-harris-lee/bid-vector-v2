@@ -1,5 +1,6 @@
 package bidvector.adapters.retention
 
+import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.workflow.event.LeaseAttempt
 import bidvector.workflow.retention.MaskBatchCounts
 import bidvector.workflow.retention.RetentionCutoff
@@ -29,6 +30,13 @@ private const val ADVISORY_UNLOCK = "SELECT pg_advisory_unlock(?)"
  * cross product 로 보여 주므로(`CleanMigrationTest` 축6 KDoc 의 실측) 쌍을 복원할 수 없다 —
  * `pg_constraint` 의 `conkey`/`confkey` 를 `WITH ORDINALITY` 로 펴서 짝을 그대로 얻는다.
  */
+/** 마스킹 후보 한 행 — 「판독했다」와 「판독할 수 없어 값을 버렸다」를 접지 않는다. */
+private data class MaskCandidate(
+    val key: String,
+    val replacement: String,
+    val failClosed: Boolean,
+)
+
 internal data class ForeignKeyEdge(
     val child: String,
     val parent: String,
@@ -51,9 +59,13 @@ internal data class ForeignKeyEdge(
  */
 class JdbcRetentionStore internal constructor(
     private val owner: DataSource,
+    private val fieldContracts: KonepsFieldContractRegistry,
     private val rules: List<RetentionRule>,
 ) : RetentionStorePort {
-    constructor(owner: DataSource) : this(owner, RETENTION_TABLE_RULES)
+    constructor(
+        owner: DataSource,
+        fieldContracts: KonepsFieldContractRegistry,
+    ) : this(owner, fieldContracts, RETENTION_TABLE_RULES)
 
     private val rulesByTable: Map<String, RetentionRule> = rules.associateBy { it.table }
 
@@ -89,7 +101,13 @@ class JdbcRetentionStore internal constructor(
         owner.connection.use { connection ->
             if (!tryLock(connection)) return@use LeaseAttempt.Busy
             try {
-                val writer = JdbcRetentionWriter(connection, rulesByTable, readForeignKeyEdges(connection))
+                val writer =
+                    JdbcRetentionWriter(
+                        connection = connection,
+                        rulesByTable = rulesByTable,
+                        edges = readForeignKeyEdges(connection),
+                        fieldContracts = fieldContracts,
+                    )
                 LeaseAttempt.Held(body(writer))
             } finally {
                 unlockQuietly(connection)
@@ -137,6 +155,7 @@ internal class JdbcRetentionWriter(
     private val connection: Connection,
     private val rulesByTable: Map<String, RetentionRule>,
     private val edges: List<ForeignKeyEdge>,
+    private val fieldContracts: KonepsFieldContractRegistry,
 ) : RetentionWriter {
     override fun purge(
         target: RetentionTarget,
@@ -144,8 +163,7 @@ internal class JdbcRetentionWriter(
         batchSize: Int,
     ): Int {
         val rule = ruleFor<RetentionRule.Purge>(target)
-        val blocking = edges.filter { it.parent == rule.table && !it.cascade }
-        return connection.prepareStatement(purgeSqlFor(rule, blocking)).use { statement ->
+        return connection.prepareStatement(purgeSqlFor(rule, guardsFor(rule))).use { statement ->
             var index = 1
             statement.setTimestamp(index++, Timestamp.from(cutoff.instant))
             when (val condition = rule.condition) {
@@ -171,38 +189,59 @@ internal class JdbcRetentionWriter(
         batchSize: Int,
     ): MaskBatchCounts {
         val rule = ruleFor<RetentionRule.MaskPii>(target)
+        // 지울 키는 **개념을 계약에 물어** 얻는다(D-6B3-3 ①) — 일괄마다 한 번, 두 열이 같은 집합을 쓴다.
+        val removedKeys = maskedRawNamesOf(rule, fieldContracts)
         var masked = 0
         var failClosed = 0
-        for ((key, replacement, isFailClosed) in maskCandidates(rule, cutoff, batchSize)) {
-            val applied = applyMask(rule, key, replacement)
-            if (!applied) continue
-            if (isFailClosed) failClosed++ else masked++
+        var skipped = 0
+        for (candidate in maskCandidates(rule, cutoff, batchSize, removedKeys)) {
+            when {
+                !applyMask(rule, candidate, removedKeys) -> skipped++
+                candidate.failClosed -> failClosed++
+                else -> masked++
+            }
         }
-        return MaskBatchCounts(masked = masked, failClosed = failClosed)
+        return MaskBatchCounts(masked = masked, failClosed = failClosed, skipped = skipped)
     }
+
+    /**
+     * 이 부모를 막는 자식 간선 전수. CASCADE 간선은 **기한 열까지** 싣는다(D-6B3-3 ②) — 그 열을
+     * 분류가 말하지 않으면 **구성 오류로 던진다**: 조용히 가드 없이 지나가면 기한 안쪽 자식이
+     * cascade 로 사라진다.
+     */
+    private fun guardsFor(rule: RetentionRule.Purge): List<ChildGuard> =
+        edges
+            .filter { it.parent == rule.table }
+            .map { edge -> ChildGuard(edge, if (edge.cascade) windowColumnOf(edge.child) else null) }
+
+    private fun windowColumnOf(childTable: String): String =
+        when (val childRule = rulesByTable[childTable]) {
+            is RetentionRule.CascadeWithParent -> childRule.insertedAtColumn
+            is RetentionRule.Purge -> childRule.insertedAtColumn
+            is RetentionRule.MaskPii -> childRule.insertedAtColumn
+            else -> error("CASCADE 자식의 기한 열을 분류가 말하지 않는다: $childTable")
+        }
 
     private fun maskCandidates(
         rule: RetentionRule.MaskPii,
         cutoff: RetentionCutoff,
         batchSize: Int,
-    ): List<Triple<String, String, Boolean>> =
+        removedKeys: Set<String>,
+    ): List<MaskCandidate> =
         connection.prepareStatement(maskSelectSqlFor(rule)).use { statement ->
             statement.setTimestamp(1, Timestamp.from(cutoff.instant))
             statement.setInt(2, batchSize)
             statement.executeQuery().use { rs ->
-                val candidates = mutableListOf<Triple<String, String, Boolean>>()
+                val candidates = mutableListOf<MaskCandidate>()
                 while (rs.next()) {
-                    val keptKeys =
+                    val projectedKeys =
                         (rs.getArray("kept_keys").array as Array<*>).mapNotNull { it as? String }.toSet()
+                    val key = rs.getString(rule.keyColumn)
                     candidates +=
-                        when (val outcome = maskRawPayload(rs.getString(rule.maskedColumn), keptKeys)) {
-                            is PayloadMaskOutcome.Masked -> {
-                                Triple(rs.getString(rule.keyColumn), outcome.payload, false)
-                            }
-
-                            PayloadMaskOutcome.FailClosed -> {
-                                Triple(rs.getString(rule.keyColumn), PAYLOAD_MASK_FAIL_CLOSED, true)
-                            }
+                        when (val outcome = maskRawPayload(rs.getString(rule.rawColumn), projectedKeys - removedKeys)) {
+                            is PayloadMaskOutcome.Masked -> MaskCandidate(key, outcome.payload, failClosed = false)
+                            PayloadMaskOutcome.FailClosed ->
+                                MaskCandidate(key, PAYLOAD_MASK_FAIL_CLOSED, failClosed = true)
                         }
                 }
                 candidates
@@ -211,12 +250,13 @@ internal class JdbcRetentionWriter(
 
     private fun applyMask(
         rule: RetentionRule.MaskPii,
-        key: String,
-        replacement: String,
+        candidate: MaskCandidate,
+        removedKeys: Set<String>,
     ): Boolean =
         connection.prepareStatement(maskUpdateSqlFor(rule)).use { statement ->
-            statement.setString(1, replacement)
-            statement.setString(2, key)
+            statement.setString(1, candidate.replacement)
+            statement.setArray(2, connection.createArrayOf("text", removedKeys.toTypedArray()))
+            statement.setString(3, candidate.key)
             statement.executeUpdate() == 1
         }
 

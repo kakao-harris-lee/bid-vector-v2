@@ -1,0 +1,56 @@
+-- M6/6B-3 — 보존 인덱스와 투영 열 형태 제약의 검증(mig H-1 · M-2 · vr F-9).
+--
+-- **왜 V18 과 갈라져 있나.** V18 의 첫 문장이 `ALTER TABLE … ADD COLUMN` 이고 그것이 쥐는
+-- `ACCESS EXCLUSIVE` 는 트랜잭션 끝까지 유지된다. 인덱스 빌드가 그 트랜잭션 안에 있으면 빌드 내내
+-- **SELECT 까지** 막히고, migrate 가 `DataSource` 빈 생성의 부수효과이므로 그 창은 곧 기동 블록이다
+-- (`raw_observation` 은 이 체계에서 가장 크고 영원히 자라는 표다 — A-3 이 파기 대상에서 뺐으므로
+-- 90일 상한이 없다). 갈라 두면 V18 은 메타데이터 변경만으로 밀리초에 끝나고, 이 파일이 쥐는 것은
+-- 인덱스 빌드의 `SHARE`(쓰기만 차단 · **읽기는 지난다**)와 검증의 `SHARE UPDATE EXCLUSIVE`
+-- (읽기·쓰기 모두 지난다)뿐이다.
+--
+-- **`CONCURRENTLY` 를 쓰지 않는 이유는 실측이다.** `CREATE INDEX CONCURRENTLY` + 형제
+-- `.sql.conf`(`executeInTransaction=false`) 조합은 **영구히 대기한다**: Flyway 는 메타데이터
+-- 연결에서 트랜잭션을 열어 둔 채(`flyway.postgresql.transactional.lock` 기본값) 마이그레이션을
+-- 다른 연결로 돌리고, `CONCURRENTLY` 는 동시 트랜잭션 전부가 끝나기를 기다린다 — 그 대기가
+-- 서로를 푸는 일이 없다(Testcontainers 실측: `pg_stat_activity` 에 `idle in transaction` 인 Flyway
+-- 메타데이터 연결과 `Lock/virtualxid` 로 막힌 이 마이그레이션이 14분간 그대로 있었다). 그 설정을
+-- 끄면 풀리지만 **Flyway 를 부르는 자리 넷이 전부** 그것을 알아야 하고, 하나라도 잊으면 거기서
+-- **실패가 아니라 정지**한다 — 적용 창을 줄이려고 더 나쁜 실패 모양을 사는 거래다. 남은 창
+-- (쓰기 차단)은 runbook §1.3 이 들고, 적용 전 측정 절차를 함께 둔다.
+--
+-- 이 파일은 **한 트랜잭션**이다(Flyway 기본). 실패하면 통째로 롤백되어 invalid 인덱스나 반쯤 적용된
+-- 상태가 남지 않는다 — `CONCURRENTLY` 가 남기는 잔해의 반대쪽 이득이다.
+
+-- =============================================================================
+-- ① 마스킹 후보 조회(`maskSelectSqlFor`) — 아직 마스킹되지 않은 행만 색인한다. 부분 인덱스라
+--    마스킹이 진행되면 작아진다(적용 순간에는 전수가 대상이다).
+-- =============================================================================
+CREATE INDEX raw_observation_pii_unmasked_idx
+    ON raw_observation (inserted_at) WHERE pii_masked_at IS NULL;
+
+-- =============================================================================
+-- ② 파기 cutoff 지원(mig M-2) — `purgeSqlFor` 는 `… WHERE <cutoff 열> < ? ORDER BY <cutoff 열>
+--    LIMIT ?` 다. 인덱스가 없으면 일괄마다 전수 스캔 + 정렬이고 그 스캔이 N/B 번 반복된다.
+--    `api_request_audit` 는 `idx_api_request_audit_occurred_at`(V15)이 이미 진다.
+--    `outbox` 는 **(상태, 적재 시각)** 복합이다 — 부분 술어(`WHERE state = 'DELIVERED'`)로 두면
+--    종단 집합이 바뀌는 날 인덱스가 조용히 쓰이지 않는다(그 집합은 레지스트리가 정한다).
+--    `notice_requirement_row` 는 파기 대상이 아니지만 **CASCADE 기한 가드**(D-6B3-3 ②)의
+--    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다.
+-- =============================================================================
+CREATE INDEX notice_retention_cutoff_idx ON notice (created_at);
+CREATE INDEX opening_result_retention_cutoff_idx ON opening_result (created_at);
+CREATE INDEX opening_reserve_price_retention_cutoff_idx ON opening_reserve_price (created_at);
+CREATE INDEX qualification_text_retention_cutoff_idx ON qualification_text (created_at);
+CREATE INDEX notice_requirement_retention_cutoff_idx ON notice_requirement (created_at);
+CREATE INDEX notice_requirement_row_retention_cutoff_idx ON notice_requirement_row (created_at);
+CREATE INDEX rejected_write_retention_cutoff_idx ON rejected_write (recorded_at);
+CREATE INDEX edit_session_retention_cutoff_idx ON edit_session (created_at);
+CREATE INDEX outbox_retention_cutoff_idx ON outbox (state, inserted_at);
+
+-- =============================================================================
+-- ③ V18 이 `NOT VALID` 로 세운 투영 열 형태 제약을 **검증한다**(vr F-9). 쓰기 경로
+--    (`ObservationPayloadCodec.encode`)는 늘 평평한 객체를 쓰므로 기존 행은 통과한다. 실패하면
+--    **그 전에 이미** 객체가 아닌 행이 있었다는 뜻이고, 그때는 재시도가 아니라 그 행을 조사하는
+--    것이 답이다(runbook §1.3).
+-- =============================================================================
+ALTER TABLE raw_observation VALIDATE CONSTRAINT raw_observation_payload_fields_object;

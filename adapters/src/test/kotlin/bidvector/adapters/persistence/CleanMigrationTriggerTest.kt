@@ -93,6 +93,39 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             TriggerSpec("notice_audit", "notice_audit_append_only") to "reject_mutation",
         )
 
+    /**
+     * **이벤트 집합도 등재한다**(수정 라운드 1). V18 이 `raw_observation` 의 트리거에 INSERT 를
+     * 더했다 — 표지(`pii_masked_at`)를 적재가 미리 찍지 못하게 하는 관문이 그 이벤트에만 산다
+     * (vr F-4). 이름·함수만 재면 그 관문이 **이벤트에서 빠지는 변경**이 장부 밖이고, 빠지면
+     * 표지를 찍은 행이 조용히 들어와 영원히 마스킹되지 않는다.
+     */
+    private val expectedAppendOnlyEvents =
+        mapOf(
+            TriggerSpec("raw_observation", "raw_observation_append_only") to setOf("INSERT", "UPDATE", "DELETE"),
+            TriggerSpec("notice_audit", "notice_audit_append_only") to setOf("UPDATE", "DELETE"),
+        )
+
+    @Test
+    fun `축7 부가 — append-only 트리거의 이벤트 집합이 등재와 같다`() {
+        val actual = mutableMapOf<TriggerSpec, MutableSet<String>>()
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT event_object_table, trigger_name, event_manipulation " +
+                            "FROM information_schema.triggers " +
+                            "WHERE trigger_schema = 'public' AND trigger_name LIKE '%append_only'",
+                    ).use { rs ->
+                        while (rs.next()) {
+                            val spec = TriggerSpec(rs.getString(1), rs.getString(2))
+                            actual.getOrPut(spec) { mutableSetOf() } += rs.getString(3)
+                        }
+                    }
+            }
+        }
+        actual shouldBe expectedAppendOnlyEvents
+    }
+
     @Test
     fun `축7 부가 — append-only 트리거가 부르는 함수가 등재와 같다`() {
         val actual = mutableMapOf<TriggerSpec, String>()

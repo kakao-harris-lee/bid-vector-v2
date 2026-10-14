@@ -1,7 +1,11 @@
 package bidvector.adapters.retention
 
+import bidvector.procurement.FieldConcept
+import bidvector.procurement.KONEPS_COLLECTION_POLICY
+import bidvector.sharedkernel.Resolution
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
@@ -99,6 +103,29 @@ internal class RetentionFixture(
         }
     }
 
+    /**
+     * 기한을 넘은 **헤더**와 기한 안쪽 **CASCADE 자식** 한 쌍(운영자 결정 2026-10-14, D-6B3-3 ②).
+     * 출하 경로에서 이 상태가 생긴다: 헤더 upsert 는 `created_at` 을 유지하고(`updated_at` 만
+     * 갱신) 행은 delete-then-insert 로 새 `created_at` 을 받는다 — 120일 전 생성된 헤더를 오늘
+     * 다시 저장하면 행만 기한 안쪽이 된다. `ON DELETE CASCADE` 가 가드 없이 그 행을 함께 지운다.
+     */
+    fun seedLateCascadeChild(
+        parentAt: Instant,
+        childAt: Instant,
+    ) = dataSource.connection.use { connection ->
+        connection.createStatement().use { statement ->
+            statement.execute(
+                "INSERT INTO notice_requirement (notice_number, notice_round, status, created_at, updated_at) " +
+                    "VALUES ('RET-cascade', '000', 'COLLECTED', '$parentAt', '$childAt')",
+            )
+            statement.execute(
+                "INSERT INTO notice_requirement_row " +
+                    "(notice_number, notice_round, serial_no, kind, created_at) " +
+                    "VALUES ('RET-cascade', '000', '1', 'UNPARSABLE', '$childAt')",
+            )
+        }
+    }
+
     fun countsByTable(): Map<String, Long> {
         val counts = linkedMapOf<String, Long>()
         dataSource.connection.use { connection ->
@@ -128,6 +155,19 @@ internal class RetentionFixture(
             }
         }
 
+    /** 투영 열의 문면 — 마스킹이 **두 열**을 건드리는지 재는 쪽이 읽는다(D-6B3-3 ①). */
+    fun payloadFieldsOf(observationKey: String): String =
+        dataSource.connection.use { connection ->
+            val sql = "SELECT payload_fields::text AS value FROM raw_observation WHERE observation_key = ?"
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, observationKey)
+                statement.executeQuery().use { rs ->
+                    check(rs.next()) { "행이 없다: $observationKey" }
+                    rs.getString("value")
+                }
+            }
+        }
+
     fun outboxStatesPresent(): Set<String> =
         dataSource.connection.use { connection ->
             connection.createStatement().use { statement ->
@@ -149,12 +189,50 @@ internal class TableSeed(
 /** `outbox.state` 의 CHECK 어휘 전수(V6) — 다섯을 다 심어 **둘만** 사라지는지 잰다. */
 internal val OUTBOX_STATE_VOCABULARY = listOf("PENDING", "CLAIMED", "DELIVERED", "FAILED", "ISOLATED")
 
-private const val OFFICER_FIXTURE_PAYLOAD =
-    """{"bidNtceNo":"RET-%s","bidNtceOrd":"000","ntceInsttOfclNm":"OFFICER-NAME-FIXTURE",""" +
-        """"ntceInsttOfclTelNo":"OFFICER-TEL-FIXTURE","ntceInsttOfclEmailAdrs":"OFFICER-MAIL-FIXTURE",""" +
-        """"dminsttOfclNm":"DEMAND-OFFICER-FIXTURE","nested":{"inner":"value"}}"""
+/** 담당자 키 — 필드 계약에 **등재되지 않는다**(D-3H-7). 자리값은 전화·전자우편 꼴을 흉내내지 않는다. */
+internal val OFFICER_FIXTURE_KEYS =
+    mapOf(
+        "ntceInsttOfclNm" to "OFFICER-NAME-FIXTURE",
+        "ntceInsttOfclTelNo" to "OFFICER-TEL-FIXTURE",
+        "ntceInsttOfclEmailAdrs" to "OFFICER-MAIL-FIXTURE",
+        "dminsttOfclNm" to "DEMAND-OFFICER-FIXTURE",
+    )
 
-private const val KEPT_FIELDS_FIXTURE = """{"bidNtceNo":"RET-%s","bidNtceOrd":"000"}"""
+/**
+ * 업체명 개념의 rawName 전수(운영자 결정 2026-10-14, D-6B3-3 ①) — **이름을 열거하지 않는다.**
+ * 계약이 정본이므로 상류가 그 개념에 키를 더하면 fixture 도 함께 따라온다. 담당자 키와 다른
+ * 점: 업체명은 계약에 **등재되어** 있어 `payload_fields` 투영에도 실린다. 그래서 마스킹이
+ * 두 열을 모두 건드려야 사라진다.
+ */
+internal val COMPANY_NAME_FIXTURE_KEYS: List<String> =
+    (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 14)) as Resolution.Resolved)
+        .value
+        .fieldContracts
+        .let { registry ->
+            setOf(FieldConcept.BID_COMPANY_NAME, FieldConcept.AWARD_COMPANY_NAME)
+                .flatMap { concept -> registry.contractsFor(concept).map { it.rawName.name } }
+        }
+
+/** 업체명 자리값 — 마스킹 뒤 이 문자열이 남아 있으면 업체명이 남은 것이다. */
+internal const val COMPANY_NAME_FIXTURE_VALUE = "COMPANY-NAME-FIXTURE"
+
+/** 계약 등재 키 둘(공고 식별자) — 마스킹 뒤에도 남아야 하는 축. */
+private fun identityFields(tag: String) = listOf(""""bidNtceNo":"RET-$tag"""", """"bidNtceOrd":"000"""")
+
+private fun companyFields() = COMPANY_NAME_FIXTURE_KEYS.map { """"$it":"$COMPANY_NAME_FIXTURE_VALUE"""" }
+
+/** 원문 — 담당자 키·업체명 키·중첩 값까지 담는다(마스킹이 지울 것과 남길 것이 섞여 있어야 한다). */
+private fun officerFixturePayload(tag: String): String =
+    (
+        identityFields(tag) +
+            OFFICER_FIXTURE_KEYS.map { (name, value) -> """"$name":"$value"""" } +
+            companyFields() +
+            listOf(""""nested":{"inner":"value"}""")
+    ).joinToString(separator = ",", prefix = "{", postfix = "}")
+
+/** 투영 — 계약 등재 키만이다(담당자 키는 없고 업체명은 **있다**). */
+private fun keptFieldsFixture(tag: String): String =
+    (identityFields(tag) + companyFields()).joinToString(separator = ",", prefix = "{", postfix = "}")
 
 /**
  * 표 전수 — **순서는 FK 순서**다(부모를 먼저 심는다). 이 목록의 표 집합이
@@ -166,8 +244,8 @@ internal val RETENTION_SEEDS: List<TableSeed> =
             listOf(
                 "INSERT INTO raw_observation " +
                     "$RAW_OBSERVATION_COLUMNS " +
-                    "VALUES ('ret-$tag', 'NOTICE_LIST', '${OFFICER_FIXTURE_PAYLOAD.format(tag)}', " +
-                    "'${KEPT_FIELDS_FIXTURE.format(tag)}'::jsonb, '$at', 'ret-test', '$at')",
+                    "VALUES ('ret-$tag', 'NOTICE_LIST', '${officerFixturePayload(tag)}', " +
+                    "'${keptFieldsFixture(tag)}'::jsonb, '$at', 'ret-test', '$at')",
             )
         },
         TableSeed("notice") { tag, at ->

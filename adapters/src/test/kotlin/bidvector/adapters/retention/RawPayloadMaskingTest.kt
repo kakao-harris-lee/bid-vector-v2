@@ -1,11 +1,19 @@
 package bidvector.adapters.retention
 
+import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 /** `payload_fields` 투영이 담은 키 — 실제 계약 키 이름(`RawObservation.kt`)을 쓴다. */
 private val KEPT = setOf("bidNtceNo", "bidNtceOrd")
+
+/**
+ * 중첩 깊이 — 수집 상한보다 **깊지 않게** 둔다(그 상한을 넘기면 폐기가 옳다). 상한보다 얕은
+ * 중첩이 판독되는 것을 재는 자리이고, 판독된 뒤 중첩 값은 남김 집합과 무관하게 빠진다.
+ */
+private const val DEEP_NESTING = 8
 
 /**
  * P-4 — 원문 마스킹은 **allow-list 반전**이다. 담당자 키를 열거하지 않으므로, 상류가 담당자
@@ -88,6 +96,30 @@ class RawPayloadMaskingTest {
     @Test
     fun `fail-closed 대체 값은 빈 문자열이 아니다 — payload CHECK 를 지난다`() {
         PAYLOAD_MASK_FAIL_CLOSED.isNotEmpty() shouldBe true
+    }
+
+    /**
+     * cr M-1 — 마스킹의 판독 깊이는 **수집이 받아들인 깊이 이상**이어야 한다. 낮으면 수집이
+     * 받아들여 저장한 원문이 「형태가 다르다」로 폐기되고(fail-closed), 그 폐기는 되돌릴 수 없다.
+     * 두 상수의 독립이 결함의 원인이었으므로 그 관계를 **전 entry** 에 대해 잠근다 — 정책이
+     * 상한을 올리는 날 이 test 가 먼저 붉어진다.
+     */
+    @Test
+    fun `마스킹 판독 깊이는 수집 상한 이상이다 — 받아들인 원문을 버리지 않는다`() {
+        KONEPS_HTTP_POLICY.entries.shouldNotBeEmpty()
+
+        KONEPS_HTTP_POLICY.entries.forEach { (_, policy) ->
+            (PAYLOAD_MASK_MAX_DEPTH >= policy.maxJsonDepth) shouldBe true
+        }
+    }
+
+    /** 수집 상한 깊이의 중첩이 있어도 **판독된다** — 폐기가 아니라 키 선별로 처리된다. */
+    @Test
+    fun `수집 상한 깊이의 중첩이 있어도 fail-closed 가 아니다`() {
+        val nested = "{\"a\":".repeat(DEEP_NESTING) + "1" + "}".repeat(DEEP_NESTING)
+
+        maskRawPayload("""{"bidNtceNo":"1","nested":$nested}""", KEPT) shouldBe
+            PayloadMaskOutcome.Masked("""{"bidNtceNo":"1"}""")
     }
 
     @Test

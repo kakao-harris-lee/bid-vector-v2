@@ -2,6 +2,7 @@ package bidvector.adapters.retention
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -46,7 +47,10 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
                     when (rule) {
                         is RetentionRule.Purge -> rule.insertedAtColumn
                         is RetentionRule.MaskPii -> rule.insertedAtColumn
-                        is RetentionRule.CascadeWithParent, is RetentionRule.Exempt -> null
+                        // CASCADE 자식도 기한 가드가 이 열을 읽는다(D-6B3-3 ②) — nullable 이면
+                        // 그 자식은 가드에 걸리지 않고 부모와 함께 사라진다.
+                        is RetentionRule.CascadeWithParent -> rule.insertedAtColumn
+                        is RetentionRule.Exempt -> null
                     } ?: return@mapNotNull null
                 val observed = columns[rule.table to column]
                 if (observed == TIMESTAMPTZ to false) null else "${rule.table}.$column=$observed"
@@ -78,12 +82,28 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
             RETENTION_TABLE_RULES
                 .filterIsInstance<RetentionRule.MaskPii>()
                 .flatMap { rule ->
-                    listOf(rule.keyColumn, rule.maskedColumn, rule.keptKeySourceColumn)
+                    (listOf(rule.keyColumn) + rule.maskedColumns)
                         .filterNot { (rule.table to it) in present }
                         .map { "${rule.table}.$it" }
                 }
 
         violations shouldBe emptyList()
+    }
+
+    /**
+     * **마스킹 개념이 계약에 닿는가**(D-6B3-3 ①) — 개념에 계약이 없으면 지울 키 집합이 조용히
+     * 비고, 「업체명을 지운다」가 아무 일도 하지 않으면서 초록이다. 이 test 는 그 공허를 잰다.
+     */
+    @Test
+    fun `마스킹 개념은 모두 계약 rawName 으로 풀린다 — 빈 집합이 아니다`() {
+        val rules = RETENTION_TABLE_RULES.filterIsInstance<RetentionRule.MaskPii>()
+        rules.shouldNotBeEmpty()
+
+        rules.forEach { rule ->
+            // 개념마다 계약이 없으면 `maskedRawNamesOf` 가 던진다 — 그 호출이 곧 단언이다.
+            val names = maskedRawNamesOf(rule, testFieldContracts())
+            (names.size >= rule.maskedConcepts.size) shouldBe true
+        }
     }
 
     /**
