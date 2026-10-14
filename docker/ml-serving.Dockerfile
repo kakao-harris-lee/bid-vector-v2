@@ -2,9 +2,12 @@
 # runtime 은 그 wheel + `serving` extra 만 설치한다(5A D-5A-0 (b) — 학습·DB 의존 부재는
 # `tools/image-hygiene-check.sh` 가 만든 이미지에서 실측한다, 텍스트가 아니라 구조로).
 #
-# 베이스는 다이제스트로 고정한다(2026-09-16 실측 `docker pull python:3.12.8-slim-bookworm`).
+# 베이스는 다이제스트로 고정한다(2026-10-09 실측 `docker buildx imagetools inspect
+# python:3.12.15-slim-bookworm` — 멀티플랫폼 index 의 다이제스트). M6/6E-2c D-6E2C-2 — 3.12.8
+# (debian 12.9)에서 올렸다: 6E-2b 가 등재한 OS finding 52 의 수정판이 전부 이 상향으로 들어온다.
+# python 마이너는 3.12 그대로다(`requires-python ==3.12.*` · cp312 동일 — uv.lock 재생성 없음).
 # `:latest`·미고정 태그는 쓰지 않는다(위생 게이트 (2)).
-FROM python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0 AS builder
+FROM python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS builder
 
 # uv 바이너리만 뜯어 쓴다(설치 스크립트·curl 파이프 없음) — CI(`astral-sh/setup-uv@v7`)와 같은
 # 버전(0.9.22)으로 맞춰 두 축(이미지·CI)이 어긋나지 않게 한다.
@@ -38,16 +41,17 @@ WORKDIR /src/ml-engine
 RUN uv build --wheel -o /wheels
 
 # ---- runtime ----
-FROM python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0 AS runtime
+FROM python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS runtime
 
 # D-6C-9(verifier r1 F-2) 이후 — 이 라벨은 **보조 정보**일 뿐이다. Dockerfile 이 손으로
 # 적는 자유 텍스트라 실제 `FROM`과 아무 것도 묶지 않는다(라벨만 남기고 FROM 을 떠 있는
 # 태그로 바꿔도 라벨은 그대로다, verifier r1 실측). 위생 게이트의 **구속력 있는** 베이스
 # 고정 판정은 `tools/image-hygiene-check.sh`가 이 이미지의 `RootFS.Layers` 앞부분을
-# `config/quality/image-hygiene-policy.properties`의 `base.image.layers`(고정 다이제스트의
-# 실제 layer 체인, 위조 불가 — 같은 바이트가 아니면 같은 다이제스트가 나올 수 없다)와
-# 대조하는 것이다.
-LABEL org.bidvector.baseimage="python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0"
+# `config/quality/image-hygiene-policy.properties`의 **`base.image.digest`**(게이트가 그것을
+# `docker buildx imagetools inspect` 로 풀어 실제 layer 체인을 파생한다, D-6C-10 ②)와
+# 대조하는 것이다. 위조 불가다 — 같은 바이트가 아니면 같은 다이제스트가 나올 수 없다.
+# (앞 판 주석은 `base.image.layers` 를 가리켰는데 그 키는 D-6C-10 에서 없어졌다.)
+LABEL org.bidvector.baseimage="python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258"
 
 # non-root — 위생 게이트 (1)이 `docker inspect` 의 `Config.User` 와 이미지 안 `id -u` 로
 # 실측한다(고정 UID/GID, 시스템 계정 범위).

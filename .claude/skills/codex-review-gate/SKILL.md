@@ -72,7 +72,7 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 
 ```bash
 CODEX_BIN=/home/deploy/.nvm/versions/node/v24.12.0/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다(2026-10-09 WSL 호스트로 갱신)
-CODEX_PIN="0.160.1"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-10-09 갱신, 아래 참고)
+CODEX_PIN="0.162.1"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-10-14 갱신, 아래 참고)
 CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 2026-09-17) — `~/.codex/config.toml` 의 model 에 맡기지 않는다
 "$CODEX_BIN" --version | grep -qF "$CODEX_PIN" || {
   echo "codex 버전 불일치: $("$CODEX_BIN" --version) ≠ $CODEX_PIN — preflight 미충족, 리뷰 중단"
@@ -123,6 +123,8 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 (다른 바이너리로 대체 실행하지 않는다). 업그레이드는 이 스킬의 핀 값을 고치는 명시적
 결정으로만 하고 하네스 변경 이력(`docs/harness/change-history.md`)에 남긴다. 기록용 버전 값의 출처는 여전히
 `codex.raw-output.txt` 머리글이지 기억이 아니다.
+
+**2026-10-14 갱신 — 핀 0.162.1(운영자 결정, M6/6B-4·6B-3).** 2026-10-11 패키지 자동 갱신으로 같은 경로의 유일한 바이너리가 0.162.1 이 되어 0.160.1 로는 실행할 수 없다(6B-4 첫 라운드 preflight 미충족으로 실측). 근거는 2026-09-11·2026-10-09 와 같다 — 핀 값으로 실행 불가 · 적용 대상 6B-4·6B-3 은 선행 Codex 라운드 0 이라 라운드 간 비교성 손실 없음 · 기록된 명시 결정. 같은 preflight 에서 **넷째 주입 표면 `~/.codex/AGENTS.md`**(호스트 전역 지시, 2026-09-25 생성)가 발견됐다 — `--disable memories`·`--ignore-rules` 로 막히지 않으므로 preflight 에서 그 파일의 존재·크기·이 저장소 언급 여부를 기록하고, 이 저장소를 언급하면 라운드를 멈춘다.
 
 **2026-10-09 갱신 — 핀 0.160.1, 바이너리 `/home/deploy/.nvm/versions/node/v24.12.0/bin/codex`(운영자 결정, M6/6E-2a).** 작업 호스트가 WSL 로 옮겨 앞 핀(Mac 경로 · 0.154.0)으로는 실행할 수 없고 이 머신의 유일한 바이너리가 0.160.1 이다. 근거는 2026-09-11 갱신과 같은 셋 — 핀 값으로 실행 불가 · 첫 적용 slice(6E-2a)의 선행 Codex 라운드 0 · 기록된 명시 결정. 모델 핀 `gpt-5.5` 는 유지(raw-output 머리글로 확인). 아래는 앞 갱신의 기록이다.
 
