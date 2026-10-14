@@ -217,14 +217,19 @@ jobs:
       - name: typecheck (W-3)
         run: npm run typecheck
 
+      # 그 1차 층의 **전제**를 잰다 — 실측에서 심볼릭 링크(U-3)와 `allowJs`(U-8)는 TS6059 를
+      # 내지 않았다. tsconfig 의 유효 옵션과 src 트리를 직접 단언한다.
+      - name: 컴파일 경계 전제 — src 트리·tsconfig (W-4)
+        run: npm run gate:src-tree
+
       # 어댑터 금지 게이트 2차 층(D-2) — 생성 타입과 OpenAPI 문서의 바이트 등식.
-      - name: OpenAPI 생성 타입 바이트 등식 (W-4)
+      - name: OpenAPI 생성 타입 바이트 등식 (W-5)
         run: npm run api:types:check
 
-      - name: vitest (W-5)
+      - name: vitest (W-6)
         run: npm run test
 
-      - name: build (W-6)
+      - name: build (W-7)
         run: npm run build
 
       # CI 전용 — 브라우저가 쓰는 **시스템 패키지** 설치(apt). 로컬 one-command 는 이 step 을
@@ -235,10 +240,10 @@ jobs:
       - name: Playwright 시스템 의존 설치 (CI 전용)
         run: npx playwright install-deps chromium
 
-      - name: Playwright chromium 설치 (W-7)
+      - name: Playwright chromium 설치 (W-8)
         run: npx playwright install chromium
 
-      - name: Playwright 스모크 (W-8)
+      - name: Playwright 스모크 (W-9)
         run: npm run test:e2e
 
   # M6/6C — 이미지 빌드·위생 게이트·실 서버 통합 test(D-6C-4). `check`·`ml-engine` 두

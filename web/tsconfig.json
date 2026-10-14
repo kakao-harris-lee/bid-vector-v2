@@ -1,12 +1,17 @@
 {
   // ADR 0011 D-3 — 어댑터 금지 게이트의 1차 층. `rootDir` 이 `src` 이고 `include` 가 `src`
-  // 뿐이라, 그 밖의 파일(legacy 프런트 소스)을 import 하면 프로그램에 들어오는 순간
-  // TS6059 로 컴파일이 거부된다. 이름 목록(eslint 금지 경로)은 별칭·심볼릭 링크 하나로
-  // 열리므로 1차 게이트로 쓰지 않는다.
+  // 뿐이라, 그 밖의 `.ts` 를 상대 경로·`paths` 별칭으로 import 하면 TS6059 로 거부된다
+  // (실측 U-1·U-2). 이름 목록(eslint 금지 경로)은 별칭 하나로 열리므로 1차 게이트로 쓰지
+  // 않는다.
   //
-  // `allowJs` 를 켜지 않는다 — 켜면 legacy `.js` 가 프로그램에 들어올 또 하나의 입구가 된다
-  // (설계 검토 U-8). `paths` 별칭도 두지 않는다 — 해석된 파일이 rootDir 밖이면 같은 TS6059
-  // 지만, 별칭 자체가 「rootDir 밖을 가리키는 짧은 이름」을 만드는 자리다(U-2).
+  // **이 설정만으로 닫히지 않는 것이 둘 있고, `scripts/check-src-tree.mjs`(CI W-4)가 그
+  // 전제를 잰다**: `src` 안의 심볼릭 링크는 링크 경로로 프로그램에 들어와 TS6059 가 나지
+  // 않고(U-3 실측), `allowJs` 를 켜면 rootDir 밖 `.js` 가 진단 없이 들어온다(U-8 실측).
+  // 그래서 `allowJs` 를 켜지 않고 `paths` 별칭도 두지 않는다 — 그 둘과 `rootDir`·`include`
+  // 는 **게이트가 단언하는 값**이다. 바꾸려면 게이트도 함께 바꿔야 한다.
+  //
+  // `// @ts-ignore`·`// @ts-nocheck` 는 TS6059 를 억제한다(U-4 실측) — 그 억제는 eslint
+  // `@typescript-eslint/ban-ts-comment`(W-2)가 막는다.
   //
   // `vite.config.ts`·`playwright.config.ts`·`scripts/**` 는 이 프로그램 밖이다(include 가
   // `src` 뿐). 그 파일들의 타입 검사는 7A 의 게이트가 아니다 — 게이트는 화면 코드가 계약

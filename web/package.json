@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "gate:src-tree": "node scripts/check-src-tree.mjs",
     "api:types": "openapi-typescript ../openapi/bidvector-operator-api.yaml -o src/api/generated/operator-api.ts",
     "api:types:check": "node scripts/check-api-types.mjs",
     "test": "vitest run",

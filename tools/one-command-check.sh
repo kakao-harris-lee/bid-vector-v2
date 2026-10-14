@@ -98,19 +98,22 @@ npm run lint
 _step "web — typecheck (W-3)"
 npm run typecheck
 
-_step "web — OpenAPI 생성 타입 바이트 등식 (W-4)"
+_step "web — 컴파일 경계 전제 (W-4)"
+npm run gate:src-tree
+
+_step "web — OpenAPI 생성 타입 바이트 등식 (W-5)"
 npm run api:types:check
 
-_step "web — vitest (W-5)"
+_step "web — vitest (W-6)"
 npm run test
 
-_step "web — build (W-6)"
+_step "web — build (W-7)"
 npm run build
 
-_step "web — Playwright chromium 설치 (W-7)"
+_step "web — Playwright chromium 설치 (W-8)"
 npx playwright install chromium
 
-_step "web — Playwright 스모크 (W-8)"
+_step "web — Playwright 스모크 (W-9)"
 npm run test:e2e
 
 _step "완료 — Kotlin 전건 + Python 전건 + web 전건 통과"
