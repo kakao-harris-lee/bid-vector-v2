@@ -1,112 +1,118 @@
 # M6/6B-3 — commands
 
 base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6b3`.
-산출물 커밋 아홉(`c7ea5b7b` → `5c622296`). **판정 SHA 후보 `5c622296`**(마지막 산출물 커밋).
-
-> **판정 SHA 가 한 번 움직였다.** `575674d2` 에서 동결을 보고한 뒤 팀장 지시(설계 수용 조건 —
-> test 셋)가 늦게 닿아 `1dfd0094`·`5c622296` 가 쌓였다. `575674d2`..`5c622296` 의 **production
-> 경로 diff 는 0**(`git diff --name-only 575674d2..5c622296 -- '*/src/main/*'` 빈 출력) — 늘어난
-> 것은 test 둘·수렴 test 하나·fixture 수정 하나·등재 둘이다.
+산출물 커밋 14. **판정 SHA 후보 `b252fa0c`**(마지막 산출물 커밋).
 
 ## acceptance (CI `check` job 명령 그대로)
 
-판정 SHA 후보 `5c622296` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0).
+판정 SHA 후보 `b252fa0c` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0).
 
 | # | 명령 | 결과 |
 |---|---|---|
-| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 11m44s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,919** |
-| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 43s · 24 task 전부 실행 |
+| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m23s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,948** / fail 0 |
+| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 24s · 24 task 전부 실행 |
 
-**둘 다 `--rerun-tasks` 로 쟀다.** 이 slice 는 초록이 **캐시와 실행 순서에 의존하던 것**을 한 번
-실측했으므로(아래 「게이트가 실제로 막은 것」 넷째 줄), 판정의 근거를 「아무것도 캐시하지 않은
-run」으로 둔다. `qualityBaseline` 의 경우 그것 없이 부른 첫 호출이 **「33 actionable tasks: 33
-up-to-date」로 exit 0** 이었다 — 돌지 않은 게이트를 측정으로 세지 않았다.
+**둘 다 `--rerun-tasks` 로 쟀다** — 앞 라운드에서 초록이 캐시·실행 순서에 의존하던 것을 한 번
+실측했으므로(그때 fixture 가 TRUNCATE 밖 공유 표를 오염시킨 것이 순서가 바뀌자 드러났다) 판정의
+근거를 「아무것도 캐시하지 않은 run」으로 둔다.
 
 skipped **4** 는 선언된 제외 하나(`RealServerIntegrationTest` — `@EnabledIfSystemProperty`,
-`gate.tests.adapters.excluded` 등재)이고 **6B-3 의 신설 13 class 는 skipped 0** 이다.
+`gate.tests.adapters.excluded` 등재)에서 온다(vr L-1 — 앞 판 evidence 는 「skipped 0」으로 적었고 그것은
+실측과 달랐다). **6B-3 의 test class 16 은 skipped 0** 이다.
 
-`--rerun-tasks` 를 붙인 이유: 그것 없이 부른 첫 호출이 **「33 actionable tasks: 33 up-to-date」로 exit 0**
-이었다 — 돌지 않은 게이트는 아무것도 막지 못하므로 그 초록을 측정으로 세지 않는다.
-
-`ml-engine` job 은 생략한다 — Python 산출물 0(`git diff --name-only e2232a75..HEAD -- ml-engine` 빈 출력).
-`container` job 도 생략한다 — `docker/**`·`ci.yml` 무편집(같은 질의 빈 출력), compose 스택에 닿는 변경이 없다.
+`ml-engine` job 은 생략한다 — Python 산출물 0(`git diff --name-only e2232a75..b252fa0c -- ml-engine`
+빈 출력). `container` job 도 생략한다 — `docker/**`·`ci.yml` 무편집(같은 질의 빈 출력).
 
 ## test 수
 
-신설 test class 13 + 기존 class 에 더한 test 1 = **test 메서드 90**(그 13 class 의 skipped 0).
-`workflow.retention` 19 · `adapters.retention` 57 · `app.retention`·`app.wiring` 13 ·
-`CleanMigrationTriggerTest` 1. 되돌린 트리 2,829 + 90 = **2,919** — 등식이 닫힌다.
+모듈 합계 **2,948**(adapters 986 · app 586 · workflow 446 · build-logic 279 · procurement 263 ·
+decision 184 · shared-kernel 89 · strategy 84 · qualification 31) · fail 0 · skipped 4.
 
-## 변이 실측 (바꿔치우기 — 적용 직후 `git diff --numstat` 로 교체를 확인, 산출물은 먼저 커밋)
+이 라운드가 더한 test 는 **29**(앞 라운드 끝 2,919 → 2,948 — 등식이 닫힌다): 신설 class 셋
+(`MaskingColumnEnumerationTest` 2 · `NoticeAuditPiiAxisTest` 5 · `CleanMigrationIndexTest` 2) +
+기존 class 에 더한 20 — 마스킹 축 셋에 7(실 SQL 4 · 투영 등식 1 · 순수 함수 2) · 트리거 가드에 6 ·
+파기 축에 2 · 트리거 장부 1 · 분류 등식 1 · use case 1 · 파기 순서 1 · 배선 운반 1.
+보존 패키지 전체는 class 11 · test 107 이다.
 
-20 변이 · **18 KILLED · 2 SURVIVED**(아래 M-14a·M-14b, 사유를 밝힌다).
-각 변이는 「적용 → 표적 test → `git checkout --` → `git status --porcelain` 빈 것 확인」 한 바퀴다.
+## 변이 실측 (바꿔치우기 — 적용 직후 `git diff --numstat` 로 교체를 확인, 산출물은 먼저 커밋했다)
 
-| # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test 수) |
+이 라운드 16 변이 · **16 KILLED · 0 SURVIVED**. 각 변이는 「적용 → 교체 확인 → 표적 test → 되돌림 →
+산출물 경로 `porcelain` 빈 것 확인」 한 바퀴다. 앞 라운드 20 변이(M-1~M-16)는 `rollback.md` 가
+가리키는 앞 evidence 와 같고, 그 가운데 거동이 바뀐 셋(M-2·M-3 의 outbox 축 · M-5)은 아래가 대체한다.
+
+| # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test) |
 |---|---|---|
-| M-1 | 경계 술어 `<` → `<=` | KILLED (1) — 통제군 test |
-| M-2 | 정책 보존 기간 90 → 89 | KILLED (4) — 경계·outbox·FK |
-| M-2w | 같은 변이, workflow 표적 | KILLED (1) — 「승인된 값은 90일」 |
-| M-3 | 정책 보존 기간 90 → 91 | KILLED (3) |
-| M-4 | 분류 ↔ 스키마 집합 등식 무력화 | KILLED (2) — 양방향 거부 둘 |
-| M-5 | 부모 파기의 자식 가드 제거 | KILLED (1) — 기한 안쪽 자식 |
-| M-6 | allow-list 반전 제거(전 키 보존) | KILLED (5) |
-| M-7 | fail-closed 제거(판독 실패를 빈 객체로) | KILLED (4) |
-| M-8 | 트리거 관문 ② 앱 역할 거부 무력화 | KILLED (1) — GRANT 를 준 뒤의 거부 |
-| M-9 | 트리거 관문 ③ 표지 일방향 무력화 | KILLED (3) — 둘째 마스킹·되돌림·원문 UPDATE |
-| M-10 | 트리거 관문 ④ 행 전체 비교 무력화 | KILLED (1) — 다른 열 끼워 넣기 |
-| M-11 | 트리거 이벤트에서 DELETE 제거 | KILLED (2) — 6B-3 하나 + **기존** `RawAppendOnlyTest` 하나 |
-| M-12 | 위상 정렬 결과 역순 | KILLED (4) — 수렴 test 포함 |
-| M-13 | 임대 획득 실패를 무시 | KILLED (1) — 둘째 run |
-| M-14a | 마스킹 **조회**의 표지 필터 제거 | **SURVIVED** |
-| M-14b | 마스킹 **UPDATE** 의 표지 가드 제거 | **SURVIVED** |
-| M-14c | 위 둘을 **함께** 제거 | KILLED (1) — 「두 번째 run 은 0 행」 |
-| M-15 | `payload` 를 읽는 질의를 **있게** 만든다(도입형 — 「없음」을 잠그는 게이트는 그 형태로만 잰다) | KILLED (1) — 읽기 자리 0 |
-| M-16 | 보존 임대 키를 relay 키와 같게 | KILLED (2) — 임대 양방향 |
+| V-1 | 배선의 정책을 `RetentionPolicyData(1일, 1_000)` 로 (verifier r1 재현) | **KILLED — 컴파일 거부**(`:app:compileKotlin` exit 1): 생성자가 `workflow` 의 `internal` 이다. 앞 판에서는 app 585 test 가 초록이었다 |
+| V-2 | 보존 임대 키를 relay 키와 같게 (verifier r1 재현) | KILLED (2) — 임대 양방향 |
+| V-3 | `notice` 에 담당자 꼴 열 추가 + 열 장부 한 줄 (verifier r1 재현) | KILLED (1) — 「`notice` 열 집합 == 분류가 아는 열 집합」 |
+| N-1 | 마스킹 **개념 집합을 비운다**(업체명이 남는다) | KILLED (6) — 두 열 각각 · 투영 등식 · 남김 집합 |
+| N-2 | 관문 ③ 을 역할 **이름** deny-list 로 되돌린다 | KILLED (1) — 제3 역할 거부 |
+| N-3 | INSERT 관문의 표지 검사를 무력화 | KILLED (1) — 표지를 찍은 적재 거부 |
+| N-4 | 투영 열 형태 CHECK 를 제거(V18 생성·V19 검증 **쌍**으로) | KILLED (2) — 비객체 적재 거부 · CHECK 수 장부 |
+| N-5 | 관문 ⑤ 에서 투영 열을 마스킹 열에서 뺀다(불변으로 되돌린다) | KILLED (6) — 두 열 마스킹이 전부 거부된다 |
+| N-6 | 관문 ⑤ 를 **열 하나 열거**로 바꾼다(행 전체 비교를 버린다) | KILLED (1) — 열 카탈로그 전수 열거가 다른 열의 가변성을 잡는다 |
+| N-7 | CASCADE 자식의 기한 가드를 제거(앞 판 거동) | KILLED (1) — 기한 안쪽 자식·헤더 생존 |
+| N-8 | outbox 파기 집합에 `ISOLATED` 를 되돌린다 | KILLED (1) — 미발송·격리 생존 |
+| N-9 | 일괄 종료 조건을 **계수한 수**로 되돌린다 | KILLED (1) — 가득 찬 일괄이 한 번 더 돈다 |
+| N-10 | 자기참조 간선을 순환에 되돌린다 | KILLED (1) — 그 표 하나로 run 전체가 멈추지 않는다 |
+| N-11 | 마스킹 판독 깊이를 수집 상한 밑으로(32 → 8) | KILLED (1) — 수집 상한과의 관계 |
+| N-12 | cutoff 인덱스 하나를 지운다 | KILLED (1) — 인덱스 장부(축9) |
+| N-13 | 배선이 **시스템 시계**로 정책을 고른다 + 뒤 날짜 entry 추가(운반 축) | KILLED (1) — 러너가 쥔 정책 == 해석값 |
 
-**생존 둘의 뜻**(숨기지 않는다): 「이미 마스킹된 행 건너뜀」은 두 겹으로 막혀 있어 **하나만 지우면
-다른 하나가 덮는다.** 그래서 test 가 잠그는 것은 **건너뜀이라는 거동**이고 어느 구현이 그것을 하는지는
-잠그지 않는다 — 쌍으로 지우면 RED 다(M-14c). 되돌릴 수 없음의 **DB 층 보장**은 이 둘과 무관하게
-트리거가 지고 그것은 M-9 가 독립으로 죽인다.
+> **되돌림 확인의 범위**: 변이 구동기가 매 바퀴 끝에 `git status --porcelain` 을 전역으로 봤고, 그
+> 출력에 `reports/evidence/m6/6b3/checklist.md` 한 줄이 남아 있었다 — **같은 시각에 이 레인이 그
+> evidence 파일을 편집하고 있었기 때문**이고 변이 파일의 되돌림과는 무관하다. 전 바퀴가 끝난 뒤
+> **산출물 경로 한정** `git status --porcelain -- <경로 개별 인자>` 가 빈 출력임을 따로 확인했다.
 
-## 게이트가 실제로 막은 것 (구현 중 받은 RED)
+## 게이트가 실제로 막은 것 (이 라운드에 받은 RED·정지)
 
-| 게이트 | 무엇을 막았나 |
+| 게이트·실측 | 무엇을 막았나 |
 |---|---|
-| `AppHttpDependencyGateTest` 면제 수 래칫 | 새 app 표면 다섯을 면제에 등재하면서 그 수를 함께 고치지 않은 상태 — expected 46, was 51 |
-| detekt `ReturnCount`·`MatchingDeclarationName` | 판독 실패 경로가 섞인 함수 · 파일 이름과 단일 최상위 선언 불일치 |
-| ktlint (`when-entry-bracing` 등) | 형식 — 눌러 끄지 않고 구조를 고쳤다(`@Suppress` 추가 0) |
-| 전건 `check`(test 순서) | **fixture 가 TRUNCATE 목록 밖 공유 표를 오염시킨 것** — `provenance_authority` 에 심은 행이 다른 test 로 새어 `ProvenanceAuthoritySeedTest` 가 미지 provenance 로 터졌다. 앞선 전건 초록들은 그 test 가 **먼저** 돌아서였고, test class 둘이 늘자 순서가 바뀌어 드러났다 — **초록이 순서에 의존하고 있었다**. 심지 않는 쪽으로 고쳤다(`5c622296`) |
+| **Flyway + `CREATE INDEX CONCURRENTLY`(정지)** | 계약 ⑥ 의 문면대로 `CONCURRENTLY` + 형제 `.sql.conf`(`executeInTransaction=false`)를 넣자 test 가 **끝나지 않았다**. `pg_stat_activity` 를 보니 Flyway **메타데이터 연결이 `idle in transaction`** 이고 마이그레이션 연결이 `Lock/virtualxid` 로 막혀 있었다(14분 뒤에도 그대로 — 서로를 푸는 일이 없다). `CONCURRENTLY` 는 동시 트랜잭션 전부가 끝나기를 기다리는데 Flyway 가 자기 연결로 하나를 열어 둔다. **적용 창을 줄이려던 조치가 「실패」가 아니라 「정지」를 사는 거래**였다 — V19 분리는 남기고 `CONCURRENTLY` 는 기각했다(checklist 알려진 제한 11) |
+| **`CollectionArchitectureGateTest`(D-6F8-6)** | 배선이 계약 레지스트리를 손에 쥐려 한 자리 — 그 게이트의 허용 **접근자 집합**은 수집 배선 둘이고 **집합 등식**이라 셋째가 끼면 두 test 가 함께 붉는다. 허용 목록에 한 줄 더하는 길을 **택하지 않고**, 해소를 원문 키 매핑을 소유한 모듈로 옮겨 닫았다 — 그래서 「원문 값 획득이 어디서 열리는가」의 답이 그대로다 |
+| CHECK 수 장부(축8) | 새 CHECK 제약 하나를 등재 없이 더한 상태 — expected 4, was 5 |
+| 인덱스 장부(축9, 이 slice 가 신설) | Flyway 자신의 보조 인덱스 하나가 등재 밖이었다 — 「우리가 만든 것」이 아니라 「있는 것」이 집합의 정의임을 그 자리에서 고쳤다 |
 
-## D-6B3-1 ④ — 「마스킹이 읽는 키를 지우지 않는다」 실측
+## D-6B3-3 ① — 「업체명을 지워도 소비자가 깨지지 않는가」 기계 수집
 
-**① 기계 수집 — `raw_observation.payload` 를 읽는 production 질의는 0 이다.**
-`raw_observation` 을 이름으로 부르는 production Kotlin 파일 전수를 모은 뒤(모듈 넷) 그 가운데
-투영 아닌 `payload` 를 SELECT 하는 자리를 골랐다 — 남은 한 건은 **다른 표의 다른 열**
-(`edit_session` 의 상태 열)이었다. 소비자는 전부 `payload_fields` 를 읽는다(스냅숏 추출·수집 축 조회).
+운영자 결정 전에 **먼저 실측했다**(계약이 요구한 순서). 결론: 업체명을 읽는 **저장 행 소비자가 0**
+이므로 「90일 안쪽만 읽는다」를 보일 필요가 없다.
 
-**② 포함의 다른 절반은 트리거가 진다.** 마스킹 UPDATE 는 `payload_fields` 를 바꿀 수 없다(마스킹
-열을 뺀 행 전체 비교, M-10 이 죽이는 관문) — 그 투영을 읽는 소비자는 마스킹에 **영향을 받을 수 없다**.
+| 축 | 질의 | 결과 |
+|---|---|---|
+| ⓐ 원문 열을 읽는 production 질의 | `RawPayloadProductionReaderTest`(기계 수집 + 공허·음성 대조) | **0** |
+| ⓑ 투영 열을 읽는 production 파일 | `grep -rln payload_fields adapters/src/main/kotlin workflow/src/main/kotlin app/src/main/kotlin` | 아홉 — 쓰기 경로 넷(투영 생성·키 유도·INSERT 문)·마스킹 둘·**읽기 셋** |
+| ⓒ 읽기 셋이 **어느 키**를 읽는가 | 수집 축 조회는 공고 식별자 둘뿐(이름의 출처가 계약 상수다) · 스냅숏 추출은 식별자 둘을 `->>` 로 꺼내고 나머지는 **개념으로** 읽는다 | 개념 축 전수 `grep -rh 'FieldConcept\.[A-Z_]*' adapters/src/main/kotlin --exclude-dir=retention -o \| sort -u` → **35 개념 · 업체명 개념 0** |
+| ⓓ ml-engine(백테스트·학습) | `grep -rn 'raw_observation\|payload_fields\|<업체명 raw 키 둘>' ml-engine/src ml-engine/tools ml-engine/policy` | **0 건** — 그 표를 전혀 읽지 않는다 |
+| ⓔ 업체명 raw 키를 읽는 production 자리 | 같은 질의를 Kotlin 에 | **수집 시점 한 자리** — 개찰완료 행의 **행 식별자**(`rowIdentifierRawKeys`)다. 그 값은 **HTTP 응답 필드**에서 읽히고 저장 행에서 다시 읽히지 않는다(`ObservationKeyDerivation.of` 의 호출자는 적재 경로 하나뿐). 90일 지난 행을 마스킹해도 그 경로에 닿지 않는다 |
 
-**③ 등식 test**(`MaskingKeepsProjectedKeysTest`): production 쓰기 경로로 쓴 행에서
-「마스킹 뒤 남은 키 집합 == 그 행의 투영 키 집합」. 손 fixture 가 아니라 실제 필드 계약 레지스트리가
-쓴 투영이라 등식의 양쪽이 모두 계약에서 나온다.
+**포함의 다른 절반도 다시 쟀다**: 마스킹은 이제 투영 열을 **바꾼다**(앞 판은 트리거가 그 열을
+불변으로 둬서 「소비자가 영향받을 수 없다」가 성립했다). 그래서 보장은 「투영이 불변」이 아니라
+**「투영에서 사라지는 키 == 업체명 둘 == 소비자가 읽지 않는 키」**이고, 그 등식을 production 쓰기
+경로 위의 test 가 센다(투영 키 − 업체명 == 마스킹 뒤 남은 키).
 
 ## 비밀값·누출 스캔
 
-`grep -rniE -f config/quality/leak-patterns.txt` 를 산출물·evidence 경로에 대해 돌린 결과는
-`qualityBaseline` 의 해당 게이트가 전건으로 포함한다(위 acceptance 2, exit 0). fixture 의 자리값은
-**형태를 흉내내지 않는다** — 담당자 키가 사라지는지만 재므로 전화·전자우편 꼴이 필요 없다.
+`grep -rniE -f config/quality/leak-patterns.txt` 를 **변경 파일 전수 + evidence + `_workspace`** 에
+손으로 돌렸다 — 나온 것은 ⓐ 설정 속성 이름 대입 ⓑ `architecture-policy.properties` 의 비밀 축
+**등재 키 이름** ⓒ 로그 무유출을 재는 test 의 자리값 라벨이고 **값은 하나도 없다**.
+`qualityBaseline` 의 해당 게이트는 **`reports/evidence` 디렉터리만** 본다(privacy F-4 — 앞 판은 그
+게이트가 산출물 경로까지 「전건으로 포함한다」고 적었고 그것은 성립하지 않는다). 산출물 경로의
+결과는 위의 손 실행이 정본이다.
+
+fixture 자리값은 **형태를 흉내내지 않는다** — 담당자 키·업체명이 사라지는지만 재므로 전화·전자우편
+꼴이 필요 없다.
 
 ## clean-tree
 
-`git status --porcelain -- <in_scope 경로 개별 인자>` → 빈 출력.
-**양성 대조 1회**(비파괴 절삭): 산출물 파일 하나의 끝 한 줄을 지운 상태에서 같은 질의가 그 파일을
-`M` 으로 냈고, 그 줄을 되돌린 뒤 다시 빈 출력이었다(`git checkout --` 를 쓰지 않는다 — 미커밋
-산출물을 함께 지운다).
+`git status --porcelain -- <in_scope 경로 개별 인자>` → 빈 출력(위 변이 절의 각주 참조 — 변이
+바퀴마다 같은 질의를 돌렸다). **양성 대조 1회**(비파괴 절삭): 산출물 파일 하나의 끝 한 줄을 지운
+상태에서 같은 질의가 그 파일을 `M` 으로 냈고, 되돌린 뒤 다시 빈 출력이었다(`git checkout --` 를
+쓰지 않는다 — 미커밋 산출물을 함께 지운다).
 
 ## DB 격리 단언
 
 이 slice 의 모든 DB 실행은 **Testcontainers** 위에서다(`PersistenceTestSupport` 의 공유 컨테이너,
-`postgres:16.4`). dev DB(`bid-vector-v2-dev`, 127.0.0.1:55432)·legacy DB 로의 접속은 **0** 이다 —
-test 어디에도 그 포트·이름·볼륨이 없고, 러너를 실제 DB 에 돌리지 않았다(운영 실행은 별도 승인).
+`postgres:16.4`). dev DB(`bid-vector-v2-dev`, 127.0.0.1:55432)·legacy DB 로의 접속은 **0** 이다.
+정지 사건을 진단할 때 들여다본 것도 그 **일회용 컨테이너**이고(`pg_stat_activity`), 진단 뒤 컨테이너를
+제거했다. 러너를 실제 DB 에 돌리지 않았다 — 운영 실행은 별도 승인 사항이다.
