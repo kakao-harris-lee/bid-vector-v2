@@ -142,9 +142,10 @@ A/B 대조(같은 clone, 훅 설치 한 줄만 주석 처리): `tests/app` 269 t
 - cmd: `./gradlew --no-daemon check --rerun-tasks` → `./gradlew --no-daemon qualityBaseline`
   → `./tools/one-command-check.sh` (S-20)
 - exit: **0 · 0 · 0**
-- 핵심 결과: BUILD SUCCESSFUL 10m 17s · **359 actionable tasks 전부 실행**(병합이 들여온 app
-  하한 test 로 task 수가 늘었다) · S-20 은 Kotlin 전건 + Python 전건을 한 명령으로 다시 돌아
-  1605 passed
+- 핵심 결과: BUILD SUCCESSFUL 10m 17s · **359 actionable tasks 전부 실행** · S-20 은 Kotlin
+  전건 + Python 전건을 한 명령으로 다시 돌아 1605 passed. 병합이 들여온 main 의 새 app
+  하한 test 가 이 회차에서 **실제로 돌았다**(그 test 클래스의 결과 XML: tests 2 · failures 0)
+  — task 수만 보고 판단하지 않았다
 
 ## acceptance — `container` job (S-21 ~ S-25)
 
