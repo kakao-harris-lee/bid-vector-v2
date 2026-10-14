@@ -134,7 +134,11 @@ run 블록은 ci.yml 을 파싱해 **파일에서 그대로 꺼내** 순서대�
 적어 **돌린 것처럼 보였다** — code-review 지적). 그 step 이 올리는 SBOM 은 S-22d·S-22e 가
 만든 파일이고, 그 둘의 exit 0 이 생성의 근거다.
 
-재사용하지 않았다 — `contracts/proto` 를 편집했고 그것이 Dockerfile 입력이다.
+재사용하지 않았다 — `contracts/proto` 를 편집했고 그것이 ml-serving 이미지 입력이다. **이
+회차는 주석만 바뀐 proto 커밋(`6fc9ec16`) 뒤에 돌렸다** — Python 생성물은 주석을 싣지 않지만
+Kotlin(Java) 생성물은 javadoc 에 싣는다. 거동 변화 가능성이 0 에 가깝더라도 「이미지 입력
+무변경」을 근거로 쓸 수 없으므로 16 step 을 다시 돌렸다(vr r3d §6 의 열린 항목이 이 회차로
+닫힌다).
 
 ## 2026-10-14T
 - cmd: `container` job 의 **run step 16** (일회성 자격 값 둘 · S-21 · S-21a · S-21b · S-22a ·

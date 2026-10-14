@@ -114,10 +114,12 @@ message TrainingJobHandle {
 //   - **새 job**: 즉시 `ACCEPTED`. 워커가 그 사이 job 을 집어도 응답은 `ACCEPTED` 다
 //     (provider 가 적재 직후·대기열 투입 전에 상태를 읽는다). **예외 하나** — 그 적재가
 //     대기 큐 상한을 넘겼고 폐기 대상(`accepted_at` 최소, 동률 `job_id`)이 **방금 적재한
-//     job 자신**이면 응답은 `FAILED` + `WORKER_RESOURCE_EXHAUSTED` /
-//     `PENDING_QUEUE_OVERFLOW` 다(동률이나 시계 역행에서 생긴다). 응답이 거짓말하지 않는
-//     쪽을 택한 것이고, 소비자는 이 경우 `started_at` 이 **미설정**인 것으로 「실행된 적
-//     없다」를 안다.
+//     job 자신**이면 `handle.state` 는 `JOB_STATE_FAILED` 다(동률이나 시계 역행에서
+//     생긴다). `TrainingJobHandle` 은 `job_id`·`state` 둘뿐이므로 **응답이 싣는 것은 그
+//     상태 하나**이고, 실패 코드와 사유(`JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED` ·
+//     `detail_code=PENDING_QUEUE_OVERFLOW`)는 `GetTrainingJob` 으로 얻는다. 응답이
+//     거짓말하지 않는 쪽을 택한 것이고, 소비자는 그 조회에서 `started_at` 이 **미설정**인
+//     것으로 「실행된 적 없다」를 안다.
 //   - **멱등 재사용**(같은 `idempotency_key`+같은 `dataset_id`): 적재가 아니므로 기존
 //     job 의 **현재 상태**를 싣는다 — `ACCEPTED`·`RUNNING`·종단 중 무엇이든 될 수 있다.
 //     소비자는 재시도 응답의 `state` 를 고정값으로 보지 않고 그대로 받는다.
