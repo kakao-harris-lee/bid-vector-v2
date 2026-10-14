@@ -55,7 +55,7 @@
 | 축 | 닫혔나 | 무엇이 남는가 |
 | --- | --- | --- |
 | 상대 import·모듈 앨리어스 | **닫힘** | grimp 가 절대 이름으로 정규화한다 |
-| 재수출 한 홉 경유 획득 | **부분 — `from …store import JobJournal` 은 닫힘, 모듈 속성은 OPEN** | `modules_binding` 은 `ImportFrom` 의 이름만 본다. `import …jobs.store as m` 뒤 `m.JobJournal(...)` + `# type: ignore[attr-defined]` 는 **초록**이다(vr M-3 A7b 실측: ruff·mypy·lint-imports·게이트 전부 통과). 생성 자리 해석을 런타임 객체 동일성으로 정규화하면 닫힌다 → `OPEN-6B4-AUDIT-HOOK-HARDENING` |
+| 재수출 한 홉 경유 획득 | **부분 — `from …store import JobJournal` 은 닫힘, 모듈 속성은 OPEN** | `modules_binding` 은 `ImportFrom` 의 이름만 본다. `import …jobs.store as m` 뒤 `m.JobJournal(...)` + `# type: ignore[attr-defined]` 는 **초록**이다(vr M-3 A7b 실측: ruff·mypy·lint-imports·게이트 전부 통과). 생성 자리 해석을 런타임 객체 동일성으로 정규화하면 닫힌다 → `OPEN-6B4-ASSEMBLY-BOUNDARY-HARDENING` |
 | 지역 재바인딩(`factory = JobStore`) | **열림** | 생성 자리 술어는 값의 흐름을 따라가지 않는다 |
 | `type(store)(...)` | **열림** | 이름이 등장하지 않는다 |
 | private 속성(`store._journal`) | **열림** | 위 둘과 묶여야 쓸모가 있고 production 에 그 자리는 없다 |
@@ -187,7 +187,11 @@
    (6D-2 가 Kotlin 에서 쓴 「in-JVM 등가」와 같은 한계 — 프로세스를 실제로 죽이지 않는다).
    컨테이너 축의 실측은 `container` job 자리에서 별도로 한다.
 5. **다중 인스턴스 공유는 범위 밖**(5E 제한 6 유지) — 같은 볼륨에 둘을 올리면 서로의 쓰기를
-   덮는다.
+   덮는다. 덮는 것만이 아니다: 저널의 **tmp 이름이 고정**(`jobs.json.tmp`)이라 같은 디렉터리의
+   두 writer 는 **서로의 원자 교체를 깨뜨린다** — 한쪽의 `os.replace` 가 다른 쪽 tmp 를 가져가
+   `ENOENT` 가 되고, 기동 경로라면 `ConfigError` 로 거부된다(vr r3b H-1 이 test 경합으로 실측했다 —
+   같은 프로세스의 두 저장소에서도 같은 일이 난다). 한 프로세스에 저장소가 하나라는 전제가
+   이 고정 이름을 받치고 있다.
 6. **저널을 직접 편집하는 주체는 비방어.** 판독이 불변식을 다시 세지만 편집을 막지는 않는다.
 7. **폐기·처분 metric 0.** 관측은 job 상태와 서버 로그 둘이고, job_id 를 쥔 쪽만 상태를 묻는다
    → `OPEN-6B4-QUEUE-METRIC`.
@@ -246,7 +250,10 @@
    열거 + 대문자 상태 이름이라 `⇢`·`↦`·`➔`·`—>` · 소문자(`failed → running`) · **연결 글자
    없는 산문**(「FAILED 에서 RUNNING 으로 되돌리는 재시도도 허용」) · 마크다운 표
    (`| FAILED | RUNNING |`)가 초록이다. 게이트 docstring 의 「마크다운 표가 함께 닫힌다」는
-   그만큼 과하다(이 라운드에 문면을 좁혔다). **권위 있는 표는 블록 안 바이트 등식으로 닫혀
+   그만큼 과했고, **승인 전 일괄의 뒤 배치에서 좁혔다**(vr r3b L-9 — 앞 배치는 이 문면을
+   좁혔다고 적었지만 그 치환이 실제로 적용되지 않아 parity 게이트 파일은 무편집이었다.
+   커밋 `dfca2394` 의 제목이 「vr M-2」를 든 것도 그 때문이고, 그 커밋의 실제 편집은 조립
+   경계 파일 하나뿐이다 — 이력은 되쓰지 않고 사실을 여기 적는다). **권위 있는 표는 블록 안 바이트 등식으로 닫혀
    있어 기계 산출물에는 영향이 없고**, 남는 위험은 사람이 읽는 거짓 문장 하나다. 유니코드
    화살표 문자 부류로 바꾸고 「상태 이름 둘(대소문자 무시)」로 넓히는 것이 처방이며 거짓
    양성 실측이 선행 조건이다.
@@ -306,7 +313,8 @@ in_scope 는 `docs/adr/0010-*.md` 를 **「D-8 개정 블록」**으로 적는�
 | `OPEN-6B4-STORE-UNAVAILABLE-CODE` | 2A `FailureCode` 여덟에 「저장소를 쓸 수 없다」가 없다 — 지금은 `MODEL_NOT_READY` + `detail_code` 로 얹는다 | 계약 축 |
 | `OPEN-6B4-JOURNAL-RETENTION` | 종단 job 보존 기간·정리 절차(전체 교체 형식의 단조 증가) | M7 운영 |
 | `OPEN-6B4-QUEUE-METRIC` | 대기 깊이·폐기·처분 계수의 metric·경보 | M7 관측(6F-10 `OPEN-6F10-CLAIM-OBSERVABILITY` 와 같은 모양) |
-| `OPEN-6B4-AUDIT-HOOK-HARDENING` | 감사 훅의 경화 틈 — 실행되는데도 놓치는 다섯(dir_fd 상대 이름 · `chdir` · `exec` 프레임 · `os.system` · `os.chmod`) · 부분 문자열 경로 술어(상대 경로 누락 · `*_journal` 오탐) · subprocess 분기의 `tests/` 거짓 양성 · 재수출 **모듈 속성** 경유 획득(`m.JobJournal(...)` + `type: ignore`) · 판정 범위(맨 뒤 test 이후 · 부분 실행) | 게이트 경화 축(다음 게이트형 slice) |
+| `OPEN-6B4-AUDIT-HOOK-HARDENING` | **감사 훅** 축 — 실행되는데도 놓치는 다섯(dir_fd 상대 이름 · `chdir` · `exec` 프레임 · `os.system` · `os.chmod`) · 부분 문자열 경로 술어(상대 경로 누락 · `*_journal` 오탐) · subprocess 분기의 `tests/` 거짓 양성 · 판정 범위(맨 뒤 test 이후 · 부분 실행) · 「누출 훅 금지」 술어가 호출식 철자와 `tests/` 범위에 걸림(계수 shim 이 처방) | 게이트 경화 축(다음 게이트형 slice) |
+| `OPEN-6B4-ASSEMBLY-BOUNDARY-HARDENING` | **조립 경계** 축 — 재수출의 **모듈 속성** 경유 획득(`import …store as m` 뒤 `m.JobJournal(...)` + `type: ignore`)이 전 acceptance 초록이다(vr M-3). 생성 자리 해석을 런타임 객체 동일성으로 정규화하면 닫힌다. 같은 표의 「열림」 넷(지역 재바인딩 · `type()` · private 속성 · 동적 접근)과 같은 축이다 | 게이트 경화 축 |
 | `OPEN-6B4-TRANSITION-PROSE-GATE` | 전이표 **블록 밖** 금지 술어가 연결 글자 열거 — 유니코드 화살표 부류 + 「상태 이름 둘(대소문자 무시)」로 넓히기(거짓 양성 실측 선행) · 반례 블록 복원(제한 18) | 계약 문면 축 |
 
 ### 입력이지만 수령은 아닌 것

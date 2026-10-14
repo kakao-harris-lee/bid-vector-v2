@@ -30,7 +30,7 @@ _swap` · `Path(a).replace(b)` · 모듈 상수 경유 리터럴 다섯이 모�
   `m.JobJournal(...)` + `# type: ignore[attr-defined]`. `modules_binding` 은 `ImportFrom` 의
   이름만 보고, 생성 자리 해석은 그 호출을 `…store.JobJournal` 이라는 **다른 이름**으로 본다
   (vr M-3 실측: ruff·mypy·lint-imports·게이트 전부 초록). `from …store import JobJournal`
-  형태는 닫혀 있다 → `OPEN-6B4-AUDIT-HOOK-HARDENING`.
+  형태는 닫혀 있다 → `OPEN-6B4-ASSEMBLY-BOUNDARY-HARDENING`.
 - **지역 재바인딩** — `factory = JobStore; factory(...)`. 생성 자리 술어는 호출식의 출처를
   해석하지, 값의 흐름을 따라가지 않는다.
 - **`type()` 경유** — `type(store)(journal=…, pending_queue_max=10**9)`. 이름이 등장하지

@@ -117,8 +117,18 @@ def test_only_conftest_installs_an_audit_hook() -> None:
     """**감사 훅은 제거할 수 없다.** test 본문에서 설치하면 세션이 끝날 때까지 남고 그 뒤의
     모든 감사 이벤트가 그 훅까지 지난다 — cr M-1 실측: 변이 test 여섯이 남긴 훅으로 `open`
     이벤트가 1.17us → 5.19us(약 4.4배)가 됐고, 누출된 훅들이 세션 끝까지 자기 목록에 계속
-    적었다. 설치 자리를 `tests/` 전수에서 **하나**로 닫는다(열거가 아니라 집합 등식 —
-    새 설치가 어디에 생기든 붉어진다)."""
+    적었다. 설치 자리를 `tests/` 전수에서 **하나**로 센다.
+
+    **이 술어가 잡는 범위**(vr r3b L-8, 실측): `tests/**` 안의 `….addaudithook(...)` 라는
+    **호출식 철자**다. 그래서 `getattr(sys, "addaudithook")(h)` · `from sys import
+    addaudithook as add_hook` · `sys.__dict__["addaudithook"](h)` · `tests/` **밖**(예 `src/`
+    모듈)에서 설치하고 test 가 import 하는 길은 **놓친다**. 계수 shim(설치 직후
+    `sys.addaudithook` 을 감싸 이후 설치를 세는 것)이 그 축의 처방이고 이 라운드는 넣지
+    않았다 — `OPEN-6B4-AUDIT-HOOK-HARDENING`.
+
+    **놓쳐도 판정은 무너지지 않는다**: 감사 훅은 서로 독립이라 누출 훅이 전역 기록기를 끄거나
+    위반을 지울 수 없다. 영향은 시간 비용과 소음이고, **같은 기록기의 중복 설치**는 아래
+    런타임 계수가 구조적으로 잡는다."""
     assert _audit_hook_install_sites() == {"conftest.py"}
 
 
