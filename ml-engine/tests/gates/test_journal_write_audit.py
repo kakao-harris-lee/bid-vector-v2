@@ -27,8 +27,11 @@ verifier r2 가 심은 여섯이 전부 그 목록을 지나갔다 — builtin `
 
 from __future__ import annotations
 
+import ast
 import importlib.util
+import shutil
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -88,6 +91,56 @@ def test_the_classification_predicate_is_measurable(writer: str, bucket: str) ->
     assert len(getattr(audit, bucket)) == 1
     others = {"allowed", "violations", "from_tests", "unattributed"} - {bucket}
     assert all(getattr(audit, name) == [] for name in others)
+
+
+# ---- 훅은 하나뿐이다 — test 가 세션에 훅을 남기지 않는다(cr M-1) ----
+
+
+def _audit_hook_install_sites() -> frozenset[str]:
+    """`tests/**` 에서 `sys.addaudithook(...)` 를 **호출하는** 파일(AST)."""
+    tests_root = _ML_ENGINE_ROOT / "tests"
+    found: set[str] = set()
+    for path in sorted(tests_root.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "addaudithook"
+            ):
+                found.add(path.relative_to(tests_root).as_posix())
+    return frozenset(found)
+
+
+def test_only_conftest_installs_an_audit_hook() -> None:
+    """**감사 훅은 제거할 수 없다.** test 본문에서 설치하면 세션이 끝날 때까지 남고 그 뒤의
+    모든 감사 이벤트가 그 훅까지 지난다 — cr M-1 실측: 변이 test 여섯이 남긴 훅으로 `open`
+    이벤트가 1.17us → 5.19us(약 4.4배)가 됐고, 누출된 훅들이 세션 끝까지 자기 목록에 계속
+    적었다. 설치 자리를 `tests/` 전수에서 **하나**로 닫는다(열거가 아니라 집합 등식 —
+    새 설치가 어디에 생기든 붉어진다)."""
+    assert _audit_hook_install_sites() == {"conftest.py"}
+
+
+def test_the_conftest_hook_is_installed_exactly_once(
+    journal_write_audit: JournalWriteAudit,
+) -> None:
+    """런타임 쪽 계수 — 저널을 겨눈 쓰기 **한 번**이 기록 **한 줄**을 만든다. conftest 의
+    훅이 두 번 설치됐다면 같은 이벤트가 두 줄이 된다."""
+    probe_dir = Path(tempfile.mkdtemp(prefix="bidvector-audit-once-"))
+    try:
+        journal_dir = probe_dir / _JOB_JOURNAL_DIR_NAME
+        journal_dir.mkdir()
+        before = len(journal_write_audit.from_tests)
+        (journal_dir / "jobs.json").write_bytes(b"{}")
+        recorded = journal_write_audit.from_tests[before:]
+    finally:
+        shutil.rmtree(probe_dir, ignore_errors=True)
+
+    # `Path.write_bytes` 는 `open` 이벤트 하나를 낸다 — 훅이 하나면 기록도 하나다.
+    assert len(recorded) == 1, recorded
+    assert recorded[0].event == "open"
+    assert recorded[0].writer.startswith("tests/")
 
 
 # ---- 실행 경로 — 조립 근으로 띄운 서버의 저널 쓰기는 전부 한 모듈에서 온다 ----
@@ -196,7 +249,14 @@ def test_no_journal_write_violation_in_the_whole_session(
     journal_write_audit: JournalWriteAudit,
 ) -> None:
     """세션 전체의 안전망 — 이 test 보다 **앞서** 돈 경로의 위반도 여기서 드러난다.
-    (뒤에 도는 경로는 `pytest_sessionfinish` 가 세션 종료 코드로 잡는다.)"""
+
+    **이 test 뒤에 생기는 위반은 판정되지 않는다.** 수집 순서로 맨 뒤에 두는 것이 할 수 있는
+    전부다(`pytest_sessionfinish` 는 대안이 아니다 — 그 자리에서 `session.exitstatus` 를 바꿔도
+    종료 코드가 0 으로 남는다, conftest 주석의 실측). 그래서 session fixture teardown · 남은
+    워커 스레드 · `atexit` 쓰기는 이 축 밖이다. 또 `-x` 로 앞에서 멈추거나 `-k`·부분 경로로
+    이 test 가 수집되지 않으면 **판정 자체가 없다** — acceptance 는 `pytest tests` 전건이라
+    영향이 없지만, 부분 실행으로 「초록」을 말할 때 이 축은 꺼져 있다(`OPEN-6B4-AUDIT-HOOK-
+    HARDENING`)."""
     assert journal_write_audit.violations == []
 
 
@@ -283,30 +343,19 @@ def test_audit_hook_catches_each_second_writer_variant(
     journal_dir.mkdir()
     target = journal_dir / "jobs.json"
     staged = tmp_path / "staged"
+
+    before_unattributed = len(journal_write_audit.unattributed)
+    before_violations = len(journal_write_audit.violations)
     module = _load_variant(tmp_path, name, source)
 
-    seen: list[str] = []
-    probe = JournalWriteAudit()
-
-    def _recording_hook(event: str, args: tuple[object, ...]) -> None:
-        if event not in {"open", "os.rename", "shutil.move", "os.mkdir"}:
-            return
-        before = len(probe.unattributed) + len(probe.from_tests) + len(probe.violations)
-        probe.hook(event, args)
-        if (
-            len(probe.unattributed) + len(probe.from_tests) + len(probe.violations)
-            > before
-        ):
-            seen.append(event)
-
-    sys.addaudithook(_recording_hook)
     module.write(target, staged)  # type: ignore[attr-defined]
 
+    seen = journal_write_audit.unattributed[before_unattributed:]
     assert seen, f"{name}: 저널을 겨눈 쓰기 이벤트가 하나도 나오지 않았다"
     assert target.read_bytes()  # 통제군 — 실제로 썼다
     # 심은 모듈은 저장소 밖이라 production writer 가 아니다(미귀속). production 모듈에서
     # 같은 이벤트가 오면 위반이 되는 것은 위 술어 test 가 보인다.
-    assert journal_write_audit.violations == []
+    assert journal_write_audit.violations[before_violations:] == []
 
 
 def test_subprocess_is_a_known_limit_but_the_intent_is_visible(
