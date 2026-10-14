@@ -1,19 +1,22 @@
 #!/usr/bin/env node
-// ADR 0011 D-3 — **컴파일 경계의 전제**를 잰다. 실측으로 열린 구멍 둘을 닫는 자리다
-// (설계 검토 U-3·U-8 행의 기대가 실측과 달랐다):
+// ADR 0011 D-3 — **컴파일 경계의 전제**를 잰다. 두 가지를 닫는다:
 //
-//   U-3 심볼릭 링크: `web/src` 안의 링크가 legacy 파일을 가리키면 tsc 는 **링크 경로**로
-//       파일을 프로그램에 넣는다 — rootDir 밖이 아니므로 TS6059 가 나지 않는다(실측:
-//       typecheck exit 0). 「preserveSymlinks 기본값이면 실제 경로로 보니 RED」는 성립하지
-//       않았다.
-//   U-8 `allowJs`: 켜고 rootDir 밖 legacy `.js` 를 import 하면 TS6059 가 **나지 않는다**
-//       (실측: typecheck exit 0). 즉 그 방어는 「켜지 않는다」는 약속뿐이고, 약속은 게이트가
-//       아니다.
+//   ① 실측으로 열려 있던 우회 하나(설계 검토 U-3 행의 기대가 실측과 달랐다).
+//      `web/src` 안의 심볼릭 링크가 legacy 파일을 가리키면 tsc 는 **링크 경로**로 파일을
+//      프로그램에 넣는다 — rootDir 밖이 아니므로 TS6059 가 나지 않는다(실측: typecheck
+//      exit 0 · lint exit 0). 「preserveSymlinks 기본값이면 실제 경로로 보니 RED」는
+//      성립하지 않았다.
+//   ② tsconfig 의 네 값(rootDir · include · allowJs · paths)은 **경계 자신의 전제**다.
+//      하나만 바꾸면 TS6059 가 날 자리가 없어지는데, typecheck 는 자기 전제가 사라진 것을
+//      보지 못한다(초록으로 보인다). 그 넷을 단언한다 — 참고로 `allowJs` 를 켠 채 rootDir
+//      밖 `.js` 를 import 하면 TS6059 는 **난다**(U-8 실측). 켜지 않는 이유는 그 입구를
+//      아예 두지 않는 것이고, 여기서 단언하는 이유는 「켜지 않는다」가 약속에 그치지 않게
+//      하는 것이다.
 //
-// 그래서 **tsconfig 의 유효 옵션을 컴파일러 자신의 API 로 읽어** 경계를 여는 손잡이 넷
-// (rootDir · include · allowJs · paths)을 단언하고, 프로그램 파일 전부가 realpath 기준으로
-// `src` 안인지 본다. 열거하는 것은 legacy 경로 이름이 아니라 **이 게이트 자신의 전제**다 —
-// 우회하려면 이 스크립트를 바꿔야 하고, 그 변경은 diff 에 남는다.
+// 읽는 방식이 중요하다 — JSON 을 정규식으로 긁지 않고 **컴파일러 자신의 API**로 유효 옵션을
+// 얻는다(`extends` 사슬·기본값까지 컴파일러가 보는 그대로). 열거하는 것은 legacy 경로 이름이
+// 아니라 이 게이트 자신의 전제다 — 우회하려면 이 스크립트를 바꿔야 하고 그 변경은 diff 에
+// 남는다.
 import { readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,9 +54,9 @@ if (include === undefined || include.length !== 1 || include[0] !== 'src') {
   failures.push(`include 가 ["src"] 가 아니다: ${JSON.stringify(config.include)}`);
 }
 
-// ③ allowJs — 켜면 rootDir 밖 .js 가 진단 없이 들어온다(U-8 실측).
+// ③ allowJs — legacy `.js` 가 프로그램에 들어올 입구를 아예 두지 않는다(U-8).
 if (parsed.options.allowJs === true) {
-  failures.push('allowJs 가 켜져 있다 — rootDir 밖 .js 가 진단 없이 프로그램에 들어온다(U-8)');
+  failures.push('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다(U-8)');
 }
 
 // ④ paths 별칭 — rootDir 밖을 가리키는 짧은 이름을 만드는 자리(U-2). 지금은 별칭이 없고,

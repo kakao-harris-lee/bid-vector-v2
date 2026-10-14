@@ -4,11 +4,13 @@
   // (실측 U-1·U-2). 이름 목록(eslint 금지 경로)은 별칭 하나로 열리므로 1차 게이트로 쓰지
   // 않는다.
   //
-  // **이 설정만으로 닫히지 않는 것이 둘 있고, `scripts/check-src-tree.mjs`(CI W-4)가 그
-  // 전제를 잰다**: `src` 안의 심볼릭 링크는 링크 경로로 프로그램에 들어와 TS6059 가 나지
-  // 않고(U-3 실측), `allowJs` 를 켜면 rootDir 밖 `.js` 가 진단 없이 들어온다(U-8 실측).
-  // 그래서 `allowJs` 를 켜지 않고 `paths` 별칭도 두지 않는다 — 그 둘과 `rootDir`·`include`
-  // 는 **게이트가 단언하는 값**이다. 바꾸려면 게이트도 함께 바꿔야 한다.
+  // **이 설정만으로 닫히지 않는 것이 있고, `scripts/check-src-tree.mjs`(CI W-4)가 그 전제를
+  // 잰다**: `src` 안의 심볼릭 링크는 **링크 경로**로 프로그램에 들어와 TS6059 가 나지 않는다
+  // (U-3 실측 — typecheck exit 0). 그리고 이 파일의 네 값(`rootDir`·`include`·`allowJs`·
+  // `paths`)은 **경계 자신의 전제**다 — 하나만 바꾸면 TS6059 가 날 자리가 사라지는데
+  // typecheck 는 자기 전제가 사라진 것을 보지 못한다. 그래서 W-4 가 그 넷을 단언한다
+  // (`allowJs` 를 켠 채 rootDir 밖 `.js` 를 import 하면 TS6059 는 **난다** — U-8 실측,
+  // 켜지 않는 이유는 그 입구를 아예 두지 않는 것이다).
   //
   // `// @ts-ignore`·`// @ts-nocheck` 는 TS6059 를 억제한다(U-4 실측) — 그 억제는 eslint
   // `@typescript-eslint/ban-ts-comment`(W-2)가 막는다.

@@ -217,8 +217,9 @@ jobs:
       - name: typecheck (W-3)
         run: npm run typecheck
 
-      # 그 1차 층의 **전제**를 잰다 — 실측에서 심볼릭 링크(U-3)와 `allowJs`(U-8)는 TS6059 를
-      # 내지 않았다. tsconfig 의 유효 옵션과 src 트리를 직접 단언한다.
+      # 그 1차 층의 **전제**를 잰다 — 실측에서 `src` 안 심볼릭 링크는 TS6059 를 내지 않았고
+      # (U-3), rootDir·include·allowJs·paths 가 바뀌면 TS6059 가 날 자리 자체가 사라지는데
+      # typecheck 는 그것을 보지 못한다. tsconfig 의 유효 옵션과 src 트리를 직접 단언한다.
       - name: 컴파일 경계 전제 — src 트리·tsconfig (W-4)
         run: npm run gate:src-tree
 
