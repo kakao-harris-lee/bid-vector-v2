@@ -75,4 +75,5 @@ internal fun partialOf(failure: Exception): RetentionReport? = (failure as? Rete
  * `causeCode=…RetentionAborted` 가 되어 42P01 이 로그에서 빠졌고 기존 test 가 그 자리에서 붉었다).
  * 포장이 아니거나 안쪽이 `Exception` 이 아니면 받은 예외를 그대로 쓴다.
  */
-internal fun unwrappedFailure(failure: Exception): Exception = (failure as? RetentionAborted)?.cause as? Exception ?: failure
+internal fun unwrappedFailure(failure: Exception): Exception =
+    (failure as? RetentionAborted)?.cause as? Exception ?: failure
