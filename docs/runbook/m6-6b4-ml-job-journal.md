@@ -41,6 +41,7 @@
 | --- | --- |
 | `GetTrainingJob(job_id)` | **있다.** `state=FAILED` · `failure.code=JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED` · `failure.detail_code=PENDING_QUEUE_OVERFLOW` · `failure.retryable=true`(용량 고갈만 참 — `retryable` 은 코드의 함수다, cr M-5). job_id 를 쥔 쪽만 볼 수 있다 |
 | 서버 로그 | **있다.** 적재가 폐기를 일으키면 폐기된 job 마다 `WARNING` 한 줄 — `job_id` · `accepted_at` · 사유(`PENDING_QUEUE_OVERFLOW`). 폐기 **시점**에 남는다(워커가 뒤늦게 그 job 에 닿아 내는 `INFO` 와 다르다 — 그쪽은 시점도 사유도 아니고 재기동이 먼저 오면 아예 없다) |
+| 서버 로그 — **재기동 처분** | **있다.** 처분된 job 마다 `WARNING` 한 줄 — `job_id` · `accepted_at` · 사유(`RUNNER_LOST_ON_RESTART` 또는 `PENDING_QUEUE_OVERFLOW`). 기동 로그의 **계수 세 줄**(고아 처분 · 상한 초과 폐기 · 재적재 대상)은 그 위에 요약으로 남는다. spec 미지 처분은 재적재 단계에서 `ERROR` 한 줄(job_id · 모르는 `training_spec_version`) |
 | job 목록 조회 | 없다 — `ListTrainingJobs` RPC 가 없다(범위 밖) |
 | metric·경보 | 없다 — `OPEN-6B4-QUEUE-METRIC` |
 

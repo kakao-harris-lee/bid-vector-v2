@@ -205,6 +205,21 @@ def _fail_running_orphans(
     return tuple(orphans)
 
 
+def _log_disposals(disposed: tuple[JobRecord, ...], what: str) -> None:
+    """재기동 처분을 **job 마다** 남긴다(code-review 문서 축). 앞 판은 계수 세 줄만 남겨
+    job_id 를 쥔 쪽 말고는 어느 job 이 어떤 사유로 처분됐는지 알 방법이 없었다 —
+    `ListTrainingJobs` 도 metric 도 없다(`servicer._log_discarded` 와 같은 갈래)."""
+    for record in disposed:
+        _logger.warning(
+            "재기동 처분 — %s: job_id=%s accepted_at=%s 사유=%s",
+            what,
+            record.job_id,
+            record.accepted_at.isoformat(),
+            # 2C 조합 불변식상 `FAILED` 는 `failure` 를 반드시 든다.
+            record.failure.detail_code if record.failure is not None else "UNKNOWN",
+        )
+
+
 def _require_positive(pending_queue_max: int) -> None:
     if pending_queue_max < 1:
         raise ValueError(
@@ -390,6 +405,8 @@ def load_job_store(
     )
     orphans = _fail_running_orphans(entries, at=at)
     discarded = _discard_pending_overflow(entries, pending_queue_max, at=at)
+    _log_disposals(orphans, "RUNNING 고아")
+    _log_disposals(discarded, "대기 상한 초과")
     written = journal.write(_snapshot(entries))
     if isinstance(written, JournalFailed):
         return written

@@ -390,3 +390,50 @@ def test_directory_fsync_failure_keeps_disk_and_memory_together(
 
     loaded = _restart(tmp_path)
     assert [job.record.job_id for job in loaded.store.pending_jobs()] == [job_id]
+
+
+# ---- 재기동 처분도 **job 마다** 로그를 남긴다(code-review 문서 축) ----
+
+
+def test_restart_disposals_log_one_warning_per_job(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """상한 폐기는 폐기 시점에 job 마다 WARNING 을 남긴다(`servicer._log_discarded`).
+    **재기동 처분**은 계수 세 줄만 남겨, job_id 를 쥔 쪽 말고는 어느 job 이 어떤 사유로
+    처분됐는지 알 방법이 없었다 — `ListTrainingJobs` 도 metric 도 없다.
+
+    처분된 job 마다 job_id · accepted_at · 사유를 남긴다. 통제군: 처분이 없는 기동은 이
+    로그를 남기지 않는다."""
+    store = _first_boot(tmp_path, pending_queue_max=5)
+    orphan = _submit(store, "key-orphan", at=_NOW)
+    assert isinstance(store.apply_transition(orphan, JobEvent.START, at=_NOW), JobRecord)
+    over_limit = [
+        _submit(store, f"key-{index}", at=_NOW + timedelta(seconds=index + 1))
+        for index in range(3)
+    ]
+
+    with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.store"):
+        loaded = _restart(tmp_path, pending_queue_max=1)
+
+    assert loaded.disposition.running_orphans_failed == 1
+    assert loaded.disposition.pending_over_limit_failed == 2
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 3  # 고아 하나 + 상한 초과 둘
+
+    orphan_lines = [line for line in messages if orphan in line]
+    assert len(orphan_lines) == 1
+    assert DetailCode.RUNNER_LOST_ON_RESTART.value in orphan_lines[0]
+    assert _NOW.isoformat() in orphan_lines[0]
+
+    for discarded_job_id in over_limit[:2]:
+        lines = [line for line in messages if discarded_job_id in line]
+        assert len(lines) == 1
+        assert DetailCode.PENDING_QUEUE_OVERFLOW.value in lines[0]
+
+    # 통제군 — 더 처분할 것이 없는 재기동은 조용하다(수렴).
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.store"):
+        again = _restart(tmp_path, pending_queue_max=1)
+    assert again.disposition.running_orphans_failed == 0
+    assert again.disposition.pending_over_limit_failed == 0
+    assert caplog.records == []
