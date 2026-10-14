@@ -139,6 +139,12 @@ internal fun maskSelectSqlFor(rule: RetentionRule.MaskPii): String =
  * 「계약이 아는 키 가운데 업체 식별이 아닌 것」만 남기므로 그 경로가 닫힌다 — 지울 키 목록을 두
  * 벌 두지도 않는다.
  *
+ * **값 모양도 같은 규칙으로 거른다**(vr R3-F1 · mig M-1 · priv F-10): 중첩 객체·배열 값은 버린다 —
+ * `maskRawPayload` 의 `isScalar` 와 글자대로 같은 뜻이다. 키 축만 보던 앞 판에서는 적재자가 **계약 키
+ * 이름 아래** 중첩 객체를 심으면 그 값이 원문에서는 사라지고 투영에는 **남았다**(표지가 찍히므로
+ * 영구). 출하 쓰기 경로는 평평한 문자열·`null` 만 쓰므로(`ObservationPayloadCodec.encode`) 이 절은
+ * 정상 행의 결과를 바꾸지 않는다 — 무해한 조임이고, 그 무해함을 출하 경로 test 가 통제군으로 잰다.
+ *
  * 남길 키가 하나도 맞지 않으면 `jsonb_object_agg` 가 NULL 을 내므로 `coalesce` 로 빈 객체를 둔다
  * (그 열은 `NOT NULL` 이고 V19 의 CHECK 가 객체를 요구한다).
  *
@@ -149,6 +155,7 @@ internal fun maskUpdateSqlFor(rule: RetentionRule.MaskPii): String =
     "UPDATE ${quoteIdent(rule.table)} SET ${quoteIdent(rule.rawColumn)} = ?, " +
         "${quoteIdent(rule.projectionColumn)} = (" +
         "SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) " +
-        "FROM jsonb_each(${quoteIdent(rule.projectionColumn)}) AS e WHERE e.key = ANY (?)), " +
+        "FROM jsonb_each(${quoteIdent(rule.projectionColumn)}) AS e " +
+        "WHERE e.key = ANY (?) AND jsonb_typeof(e.value) NOT IN ('object', 'array')), " +
         "${quoteIdent(rule.maskedAtColumn)} = now() " +
         "WHERE ${quoteIdent(rule.keyColumn)} = ? AND ${quoteIdent(rule.maskedAtColumn)} IS NULL"

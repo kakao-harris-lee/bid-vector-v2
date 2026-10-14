@@ -47,6 +47,20 @@ class MaskingKeepsProjectedKeysTest : PersistenceTestSupport() {
             (setOf("bidNtceNo", "bidNtceOrd") + COMPANY_NAME_FIXTURE_KEYS)
     }
 
+    /**
+     * **통제군 — 출하 행은 이 라운드의 값 축 조임에 영향받지 않는다**(cr L-5 ⓒ · 값 형태 술어 추가의
+     * 무해함). 쓰기 경로가 평평한 문자열·`null` 만 쓰므로 마스킹 뒤 **두 열의 키 집합이 같다** —
+     * 그 전제가 지금까지 어디에서도 술어가 아니었다.
+     */
+    @Test
+    fun `출하 경로 행은 마스킹 뒤 두 열의 키 집합이 같다 — 값 축 조임이 무해하다`() {
+        val key = appendThroughProductionPath()
+
+        sweepFarInTheFuture()
+
+        keysOf(payloadOf(key.value)) shouldBe projectedKeysOf(key.value)
+    }
+
     @Test
     fun `같은 행에서 담당자 키는 사라진다 — 계약에 등재되지 않아 투영에 없다`() {
         val key = appendThroughProductionPath()
