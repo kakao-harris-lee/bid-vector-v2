@@ -22,22 +22,38 @@ _swap` · `Path(a).replace(b)` · 모듈 상수 경유 리터럴 다섯이 모�
 3. **경로를 밖에 내주지 않는다** — `JobJournal` 의 공개 표면 집합 등식(`path` property
    없음). 경로 객체를 얻을 수 없으면 둘째 writer 를 조립할 수 없다.
 
-경계 밖(코드로 막지 않고 알려진 제한으로 적는다): **동적 접근**
-(`importlib.import_module` · `getattr(module, "JobJournal")`) — AST 는 import 문과 호출식을
-읽는다. 저널 파일을 **직접 편집하는 주체**는 애초에 비방어다(위협 모델).
+**경계 밖 — 코드로 막지 않고 알려진 제한으로 적는다**(vr L-5, 실측 목록):
+
+- **동적 접근** — `importlib.import_module("…journal_file").JobJournal(...)` ·
+  `getattr(module, "JobJournal")`. grimp 도 AST 도 import 문과 호출식을 읽는다.
+- **지역 재바인딩** — `factory = JobStore; factory(...)`. 생성 자리 술어는 호출식의 출처를
+  해석하지, 값의 흐름을 따라가지 않는다.
+- **`type()` 경유** — `type(store)(journal=…, pending_queue_max=10**9)`. 이름이 등장하지
+  않는다.
+- **private 속성 접근** — `store._journal` 로 이미 만들어진 저널 객체를 꺼내는 길. 위
+  둘과 묶여야 쓸모가 있고(저장소 인스턴스를 쥐어야 한다), production 에 그 자리는 없다.
+- **저널 파일을 직접 편집하는 주체** — 애초에 비방어다(위협 모델).
+
+**이 파일의 정적 술어는 「닫음」이 아니라 「좁힘」이다**: 위 넷은 정적으로 닫히지 않는다.
+저널 파일에 **실제로 쓰는 자리**의 닫힘은 정적 이름 목록이 아니라 실행 시점 감사 훅
+(`tests/gates/test_journal_write_audit.py`)이 진다 — 그 파일이 무엇을 닫고 무엇을 못 닫는지
+적는다.
 """
 
 from __future__ import annotations
 
 import ast
+from functools import cache
 from pathlib import Path
 
+import grimp
 import pytest
 
 from ml_engine.training.jobs.journal_file import JobJournal
 
 _SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "ml_engine"
 
+_ROOT_PACKAGE = "ml_engine"
 _JOURNAL_FILE_MODULE = "ml_engine.training.jobs.journal_file"
 _JOURNAL_CLASS = f"{_JOURNAL_FILE_MODULE}.JobJournal"
 _STORE_CLASS = "ml_engine.training.jobs.store.JobStore"
@@ -47,6 +63,18 @@ _JOURNAL_FILE_SOURCE = "training/jobs/journal_file.py"
 _JOURNAL_CONSTRUCTION_SITES = frozenset({_SERVER_MODULE})
 _STORE_CONSTRUCTION_SITES = frozenset({"training/jobs/store.py"})
 _JOURNAL_FILE_IMPORTERS = frozenset({"training/jobs/store.py", _SERVER_MODULE})
+# 이름을 자기 이름 공간에 들이는 모듈(정의 포함) — 재수출 경유 획득을 닫는다(cr L-1).
+_JOURNAL_NAME_BINDERS = frozenset(
+    {_JOURNAL_FILE_SOURCE, "training/jobs/store.py", _SERVER_MODULE}
+)
+_STORE_NAME_BINDERS = frozenset(
+    {
+        "training/jobs/store.py",
+        "training/jobs/runner.py",
+        "training/jobs/servicer.py",
+        _SERVER_MODULE,
+    }
+)
 
 # 저널이 사는 자리(`artifact_out_dir` 아래)에 닿을 수 있는 모듈들 — 이 범위 안에서
 # 파일계를 바꾸는 호출 자리를 닫는다. `adapters/`·`registry/` 는 산출물·스냅숏이라는 다른
@@ -195,16 +223,42 @@ def files_constructing(qualified: str) -> frozenset[str]:
     )
 
 
+@cache
+def _import_graph() -> grimp.ImportGraph:
+    """**grimp** 의 import 그래프(import-linter 의 의존 — 이미 설치돼 있다).
+
+    vr H-1 — 앞 판은 손으로 짠 해석기로 import 문을 읽어 `ImportFrom.level`(상대 import)을
+    버렸다. `from .journal_file import JobJournal as RogueJournal` 하나로 생성 자리 술어와
+    닫힌 import 집합이 **둘 다** 열렸다(ruff·format·mypy·lint-imports·게이트 전부 초록).
+    grimp 는 상대 import 를 절대 이름으로 정규화하므로 그 틈이 구조적으로 닫힌다 — 모듈
+    앨리어스(`import … as _jf`)도 같은 간선으로 본다."""
+    return grimp.build_graph(_ROOT_PACKAGE)
+
+
 def modules_importing(target_module: str) -> frozenset[str]:
-    """`target_module` 에서 **무엇이든** 가져오는 모듈 집합.
-    `import ml_engine.training.jobs.journal_file as x` 도 같이 센다."""
+    """`target_module` 을 **직접** import 하는 모듈 집합(grimp). 상대·앨리어스·`from`
+    형태가 모두 같은 답을 낸다."""
+    return frozenset(
+        module.removeprefix(f"{_ROOT_PACKAGE}.").replace(".", "/") + ".py"
+        for module in _import_graph().find_modules_that_directly_import(target_module)
+    )
+
+
+def modules_binding(name: str) -> frozenset[str]:
+    """그 이름을 자기 이름 공간에 **들이는** 모듈 집합(import 또는 정의).
+
+    cr L-1 — 심볼 해석은 한 홉이라 `from …store import JobJournal as _J`(저장소가 자기
+    이름 공간에 들인 이름의 재수출)는 생성 자리 집합에도 닫힌 import 집합에도 들어오지
+    않았다. 실제로 막던 것은 `mypy --strict` 의 `implicit_reexport=False` 이고, 그것은
+    `# type: ignore[attr-defined]` 한 줄로 지나간다(`type: ignore` 예산 게이트 없음).
+    이 집합 등식은 그 플래그에 기대지 않는다."""
     found: set[str] = set()
     for module, tree in _sources():
         for node in ast.walk(tree):
-            if (isinstance(node, ast.ImportFrom) and node.module == target_module) or (
-                isinstance(node, ast.Import)
-                and any(alias.name == target_module for alias in node.names)
-            ):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and any(alias.name == name for alias in node.names)
+            ) or (isinstance(node, ast.ClassDef) and node.name == name):
                 found.add(module)
     return frozenset(found)
 
@@ -251,8 +305,17 @@ def test_job_store_is_constructed_only_by_the_loader() -> None:
 
 def test_only_the_assembly_root_and_the_store_import_the_journal_file_module() -> None:
     """닫힌 import 집합 — 저널 **파일** 모듈을 아는 모듈이 둘뿐이다. 별칭으로 가져오려면
-    먼저 import 해야 하고, 그 import 가 여기서 붉어진다."""
+    먼저 import 해야 하고, 그 import 가 여기서 붉어진다. 판정은 **grimp 의 import
+    그래프**이므로 상대 import·모듈 앨리어스가 같은 답을 낸다(vr H-1)."""
     assert modules_importing(_JOURNAL_FILE_MODULE) == _JOURNAL_FILE_IMPORTERS
+
+
+def test_the_journal_and_store_names_are_bound_only_where_expected() -> None:
+    """재수출 경유 획득을 닫는다(cr L-1) — `from …store import JobJournal` 처럼 **한 홉
+    건너** 이름을 얻는 길은 import 그래프의 대상 모듈이 `store` 라서 위 집합에 안 걸린다.
+    이름을 들이는 모듈 자체를 집합 등식으로 센다(mypy 의 재수출 플래그에 기대지 않는다)."""
+    assert modules_binding("JobJournal") == _JOURNAL_NAME_BINDERS
+    assert modules_binding("JobStore") == _STORE_NAME_BINDERS
 
 
 def test_filesystem_mutations_near_the_journal_happen_in_one_place() -> None:
@@ -267,12 +330,23 @@ def test_filesystem_mutations_near_the_journal_happen_in_one_place() -> None:
     assert fs_mutation_sites(scoped) == _FS_MUTATION_SITES
 
 
-def test_the_journal_does_not_expose_its_path() -> None:
+def test_the_journal_does_not_expose_its_path(tmp_path: Path) -> None:
     """경로 객체를 밖에 내주지 않는다(vr H-2) — `path` property 가 있으면 어느 모듈이든
     그 경로에 직접 쓸 수 있었다. 공개 표면을 **집합 등식**으로 닫는다(이름 하나 금지가
-    아니다 — 새 접근자가 생기면 이름과 무관하게 붉어진다)."""
-    public = {name for name in vars(JobJournal) if not name.startswith("_")}
-    assert public == {"read", "write"}
+    아니다 — 새 접근자가 생기면 이름과 무관하게 붉어진다).
+
+    cr L-2 — 클래스 dict 만 보면 `__init__` 에서 `self.path = self._path` 로 **인스턴스
+    속성**을 내주는 길이 남는다. 인스턴스를 만들어 그 쪽 표면까지 센다."""
+    assert {name for name in vars(JobJournal) if not name.startswith("_")} == {
+        "read",
+        "write",
+    }
+    instance = JobJournal(tmp_path / "journal")
+    assert {name for name in vars(instance) if not name.startswith("_")} == set()
+    assert {name for name in dir(instance) if not name.startswith("_")} == {
+        "read",
+        "write",
+    }
 
 
 def test_the_package_root_does_not_re_export_constructible_classes() -> None:
