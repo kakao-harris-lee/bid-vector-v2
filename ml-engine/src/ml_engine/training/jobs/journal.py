@@ -23,6 +23,7 @@ canonical JSON 관례는 저장소의 기존 자리들과 같다(`training.artif
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -36,6 +37,8 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     JobState,
 )
+
+_logger = logging.getLogger(__name__)
 
 JOURNAL_SCHEMA_VERSION: Final[str] = "job-journal-v1"
 
@@ -329,11 +332,16 @@ def _decode_failure(fields: dict[str, _JsonValue], where: str) -> JobFailure | N
         ) from exc
     failure = JobFailure(code=code, detail_code=_text(nested, "detail_code", place))
     # `retryable` 은 `code` 의 함수이므로(cr M-5) 저널의 값은 **파생값의 사본**이다. 형식은
-    # 그대로 두고(바이트 호환) 사본이 사상과 어긋나면 받지 않는다 — 다른 불변식과 같은 규율.
+    # 그대로 둔다(바이트 호환). 사본이 사상과 어긋나면 **파생값이 이기고 경고를 남긴다** —
+    # 거부가 아니다(cr M-2): 사상을 한 줄 고치는 순간 그 전에 쓰인 모든 저널이 판독 불가가
+    # 되고(`schema_version` 은 그대로라 형식 불일치로도 보이지 않는다) 그 처방은 「파일을
+    # 치우고 다시 기동」 = 기록 전부 상실이다. 판독 불변식은 조합·시각처럼 **권위 있는
+    # 데이터**에만 세운다 — 파생값은 다시 계산하면 된다.
     if _flag(nested, "retryable", place) is not failure.retryable:
-        raise _RejectedError(
-            JournalFailureReason.INVARIANT_VIOLATED,
-            f"{place}.retryable 이 code 의 사상과 어긋난다",
+        _logger.warning(
+            "%s.retryable 사본이 code 의 사상과 어긋난다 — 파생값(%s)을 쓴다(사본 무시)",
+            place,
+            failure.retryable,
         )
     return failure
 

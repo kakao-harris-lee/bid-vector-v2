@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import stat
 from datetime import UTC, datetime
@@ -296,9 +297,17 @@ def test_unwritable_directory_is_write_failed(tmp_path: Path) -> None:
 # ---- 판독은 불변식을 다시 센다(저널을 손으로 고친 주체는 비방어이지만 조용히 받지 않는다) ----
 
 
-def test_retryable_inconsistent_with_the_code_is_failed(tmp_path: Path) -> None:
-    """cr M-5 — 저널의 `retryable` 은 `code` 의 **파생값 사본**이다. 손으로 뒤집은 사본을
-    조용히 받으면 판독한 기록이 사상과 다른 값을 들고 다닌다."""
+def test_retryable_copy_mismatch_loses_to_the_derived_value(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """cr M-2 — 저널의 `retryable` 은 `code` 의 **파생값 사본**이고 권위는 `code` 다. 사본이
+    어긋나면 **파생값이 이기고 경고를 남긴다** — 기동 거부가 아니다.
+
+    앞 판은 `INVARIANT_VIOLATED` 로 거부했고, 그러면 사상(`_RETRYABLE_BY_CODE`)을 한 줄
+    고치는 순간 그 전에 쓰인 **모든 저널이 판독 불가**가 된다(`schema_version` 은 그대로라
+    형식 불일치로도 보이지 않는다). 그때 운영자가 만나는 처방은 「파일을 치우고 다시 기동」
+    = job 기록 전부 상실이다 — 되돌릴 수 있는 불일치(다시 계산하면 된다)를 되돌릴 수 없는
+    자리로 보냈다. 판독 불변식은 조합·시각처럼 **권위 있는 데이터**에만 세운다."""
     journal = JobJournal(tmp_path / "journal")
     assert isinstance(journal.write(_all_states_snapshot()), JournalWritten)
     decoded = json.loads(_file(journal).read_bytes())
@@ -309,10 +318,68 @@ def test_retryable_inconsistent_with_the_code_is_failed(tmp_path: Path) -> None:
             flipped += 1
     assert flipped == 1  # 통제군 — 실제로 뒤집었다
     _write_raw(journal, json.dumps(decoded))
-    result = journal.read()
-    assert isinstance(result, JournalFailed)
-    assert result.reason is JournalFailureReason.INVARIANT_VIOLATED
-    assert "retryable" in result.detail
+
+    with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.journal"):
+        result = journal.read()
+
+    assert isinstance(result, JournalSnapshot)
+    failures = [
+        entry.record.failure
+        for entry in result.entries
+        if entry.record.failure is not None
+    ]
+    assert len(failures) == 1
+    stored = next(
+        job["failure"]["retryable"]
+        for job in decoded["jobs"]
+        if job["failure"] is not None
+    )
+    # 파생값이 이긴다 — 디스크의 뒤집힌 사본이 아니라 `code` 의 사상이 기록에 실린다.
+    assert failures[0].retryable is not stored
+    assert failures[0].retryable is (
+        failures[0].code is JobFailureCode.WORKER_RESOURCE_EXHAUSTED
+    )
+    assert any("retryable" in record.getMessage() for record in caplog.records)
+
+
+def test_old_format_journal_with_stale_retryable_still_boots(tmp_path: Path) -> None:
+    """같은 축의 조립 근 쪽 관측 — 구판 사본을 든 저널로도 **기동한다**(기록을 잃지 않는다).
+    `load_job_store` 는 `ConfigError` 의 원인인 `JournalFailed` 를 돌려주지 않는다."""
+    journal = JobJournal(tmp_path / "journal")
+    legacy = json.dumps(
+        {
+            "schema_version": JOURNAL_SCHEMA_VERSION,
+            "jobs": [
+                {
+                    "job_id": "job-legacy",
+                    "state": "FAILED",
+                    "dataset_id": "ds-1",
+                    "accepted_at": _NOW.isoformat(),
+                    "started_at": None,
+                    "finished_at": _LATER.isoformat(),
+                    "artifact": None,
+                    "evaluation": None,
+                    "failure": {
+                        "code": "TRAINING_ERROR",
+                        # 구판이 적던 값 — 지금 사상은 거짓이다.
+                        "retryable": True,
+                        "detail_code": "RUNNER_LOST_ON_RESTART",
+                    },
+                    "idempotency_key": "key-legacy",
+                    "submission": {
+                        "dataset_uri": "file:///tmp/ds",
+                        "manifest_checksum": "a" * 64,
+                        "training_spec_version": "v1",
+                    },
+                }
+            ],
+        }
+    )
+    _write_raw(journal, legacy)
+    snapshot = journal.read()
+    assert isinstance(snapshot, JournalSnapshot)
+    assert snapshot.entries[0].record.failure is not None
+    assert snapshot.entries[0].record.failure.retryable is False
 
 
 def test_record_combination_violation_is_failed(tmp_path: Path) -> None:
