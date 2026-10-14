@@ -42,7 +42,7 @@ decision 184 · shared-kernel 89 · strategy 84 · qualification 31) · fail 0 �
 
 | # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test) |
 |---|---|---|
-| V-1 | 배선의 정책을 `RetentionPolicyData(1일, 1_000)` 로 (verifier r1 재현) | **KILLED — 컴파일 거부**(`:app:compileKotlin` exit 1): 생성자가 `workflow` 의 `internal` 이다. 앞 판에서는 app 585 test 가 초록이었다 |
+| V-1 | 배선의 정책을 `RetentionPolicyData(1일, 1_000)` 로 (verifier r1 재현) | **KILLED — 컴파일 거부**(`:app:compileKotlin`). 컴파일러 문면: 「Cannot access 'constructor(retentionDays: Int, batchSize: Int)…': it is internal in 'bidvector.workflow.retention.RetentionPolicyData'」. 앞 판에서는 같은 변이가 app test 전건을 초록으로 지났다 |
 | V-2 | 보존 임대 키를 relay 키와 같게 (verifier r1 재현) | KILLED (2) — 임대 양방향 |
 | V-3 | `notice` 에 담당자 꼴 열 추가 + 열 장부 한 줄 (verifier r1 재현) | KILLED (1) — 「`notice` 열 집합 == 분류가 아는 열 집합」 |
 | N-1 | 마스킹 **개념 집합을 비운다**(업체명이 남는다) | KILLED (6) — 두 열 각각 · 투영 등식 · 남김 집합 |
