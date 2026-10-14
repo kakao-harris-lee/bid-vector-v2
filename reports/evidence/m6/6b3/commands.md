@@ -1,16 +1,21 @@
 # M6/6B-3 — commands
 
 base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6b3`.
-산출물 커밋 14. **판정 SHA 후보 `b252fa0c`**(마지막 산출물 커밋).
+산출물 커밋 18. **판정 SHA 후보 `bc18d033`**(수정 라운드 2 의 마지막 산출물 커밋).
 
 ## acceptance (CI `check` job 명령 그대로)
 
-판정 SHA 후보 `b252fa0c` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0).
+판정 SHA 후보 `bc18d033` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0 — 두 명령의 끝에서
+`git rev-parse` 가 같은 SHA 를 냈다).
 
 | # | 명령 | 결과 |
 |---|---|---|
-| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m23s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,948** / fail 0 |
-| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 24s · 24 task 전부 실행 |
+| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m19s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,973** / fail 0 · 게이트 task 136 수행 |
+| 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 22s · 24 task 전부 실행 |
+
+> **task 수에 대하여**(vr R2-F8). 이 레인의 `--rerun-tasks` 실측은 **350 · 24** 이고 verifier r2 는 같은
+> 코드에서 **359 · 33** 을 쟀다. 차이는 측정 자리다 — verifier 는 **갓 만든 clone**(build 디렉터리 없음)에서
+> 돌리므로 `:build-logic` 계열 task 가 더 실행된다. 숫자를 맞추지 않고 **어디서 쟀는지와 함께** 적는다.
 
 **둘 다 `--rerun-tasks` 로 쟀다** — 앞 라운드에서 초록이 캐시·실행 순서에 의존하던 것을 한 번
 실측했으므로(그때 fixture 가 TRUNCATE 밖 공유 표를 오염시킨 것이 순서가 바뀌자 드러났다) 판정의
@@ -25,71 +30,93 @@ skipped **4** 는 선언된 제외 하나(`RealServerIntegrationTest` — `@Enab
 
 ## test 수
 
-모듈 합계 **2,948**(adapters 986 · app 586 · workflow 446 · build-logic 279 · procurement 263 ·
+모듈 합계 **2,973**(adapters 1,009 · app 587 · workflow 447 · build-logic 279 · procurement 263 ·
 decision 184 · shared-kernel 89 · strategy 84 · qualification 31) · fail 0 · skipped 4.
 
-이 라운드가 더한 test 는 **29**(앞 라운드 끝 2,919 → 2,948 — 등식이 닫힌다): 신설 class 셋
-(`MaskingColumnEnumerationTest` 2 · `NoticeAuditPiiAxisTest` 5 · `CleanMigrationIndexTest` 2) +
-기존 class 에 더한 20 — 마스킹 축 셋에 7(실 SQL 4 · 투영 등식 1 · 순수 함수 2) · 트리거 가드에 6 ·
-파기 축에 2 · 트리거 장부 1 · 분류 등식 1 · use case 1 · 파기 순서 1 · 배선 운반 1.
-보존 패키지 전체는 class 11 · test 107 이다.
+이 라운드가 더한 test 는 **25**(라운드 1 끝 2,948 → 2,973): 신설 class 다섯
+(`FieldConceptPiiAxisTest` 7 · `OpeningCompanyInfoMaskingTest` 4 · `MaskingKeepSetSourceTest` 5 ·
+`InsertedAtOwnershipTest` 4 · `V18LockTimeoutTest` 1 = 21) + 기존 class 에 더한 5(가드의 `NOINHERIT` 1 ·
+CHECK 장부의 `convalidated` 1 · 분류 등식의 CASCADE 깊이 1 · use case 의 진척 0 종료 1 · 러너의 건너뜀 1)
+− **지운 1**(공허한 음성 대조, cr L-1). 보존 패키지와 그 장부 전체는 class 21 · test 164 다.
 
-## 변이 실측 (바꿔치우기 — 적용 직후 `git diff --numstat` 로 교체를 확인, 산출물은 먼저 커밋했다)
+## SQL 축 선행 실측 (버릴 컨테이너 · Gradle 없음)
 
-이 라운드 16 변이 · **16 KILLED · 0 SURVIVED**. 각 변이는 「적용 → 교체 확인 → 표적 test → 되돌림 →
-산출물 경로 `porcelain` 빈 것 확인」 한 바퀴다. 앞 라운드 20 변이(M-1~M-16)는 `rollback.md` 가
-가리키는 앞 evidence 와 같고, 그 가운데 거동이 바뀐 셋(M-2·M-3 의 outbox 축 · M-5)은 아래가 대체한다.
+빌드 슬롯을 다른 레인이 쥔 동안, V18·V19 변경의 **SQL 축만** 따로 쟀다 — 버릴 `postgres:16.4`
+컨테이너(이름 하나, **포트 publish 없음**, 끝에 제거)에 migration **사본**으로 V1~V19 를 psql 로 적용하고
+probe 했다. worktree 는 손대지 않았다(사본은 scratchpad). 이 실측이 Gradle test 를 갈음하지는 않는다 —
+하는 일은 **GREEN run 전에 SQL 문법·거동을 확인해 슬롯을 두 번 쓰지 않는 것**이다.
 
-| # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test) |
-|---|---|---|
-| V-1 | 배선의 정책을 `RetentionPolicyData(1일, 1_000)` 로 (verifier r1 재현) | **KILLED — 컴파일 거부**(`:app:compileKotlin`). 컴파일러 문면: 「Cannot access 'constructor(retentionDays: Int, batchSize: Int)…': it is internal in 'bidvector.workflow.retention.RetentionPolicyData'」. 앞 판에서는 같은 변이가 app test 전건을 초록으로 지났다 |
-| V-2 | 보존 임대 키를 relay 키와 같게 (verifier r1 재현) | KILLED (2) — 임대 양방향 |
-| V-3 | `notice` 에 담당자 꼴 열 추가 + 열 장부 한 줄 (verifier r1 재현) | KILLED (1) — 「`notice` 열 집합 == 분류가 아는 열 집합」 |
-| N-1 | 마스킹 **개념 집합을 비운다**(업체명이 남는다) | KILLED (6) — 두 열 각각 · 투영 등식 · 남김 집합 |
-| N-2 | 관문 ③ 을 역할 **이름** deny-list 로 되돌린다 | KILLED (1) — 제3 역할 거부 |
-| N-3 | INSERT 관문의 표지 검사를 무력화 | KILLED (1) — 표지를 찍은 적재 거부 |
-| N-4 | 투영 열 형태 CHECK 를 제거(V18 생성·V19 검증 **쌍**으로) | KILLED (2) — 비객체 적재 거부 · CHECK 수 장부 |
-| N-5 | 관문 ⑤ 에서 투영 열을 마스킹 열에서 뺀다(불변으로 되돌린다) | KILLED (6) — 두 열 마스킹이 전부 거부된다 |
-| N-6 | 관문 ⑤ 를 **열 하나 열거**로 바꾼다(행 전체 비교를 버린다) | KILLED (1) — 열 카탈로그 전수 열거가 다른 열의 가변성을 잡는다 |
-| N-7 | CASCADE 자식의 기한 가드를 제거(앞 판 거동) | KILLED (1) — 기한 안쪽 자식·헤더 생존 |
-| N-8 | outbox 파기 집합에 `ISOLATED` 를 되돌린다 | KILLED (1) — 미발송·격리 생존 |
-| N-9 | 일괄 종료 조건을 **계수한 수**로 되돌린다 | KILLED (1) — 가득 찬 일괄이 한 번 더 돈다 |
-| N-10 | 자기참조 간선을 순환에 되돌린다 | KILLED (1) — 그 표 하나로 run 전체가 멈추지 않는다 |
-| N-11 | 마스킹 판독 깊이를 수집 상한 밑으로(32 → 8) | KILLED (1) — 수집 상한과의 관계 |
-| N-12 | cutoff 인덱스 하나를 지운다 | KILLED (1) — 인덱스 장부(축9) |
-| N-13 | 배선이 **시스템 시계**로 정책을 고른다 + 뒤 날짜 entry 추가(운반 축) | KILLED (1) — 러너가 쥔 정책 == 해석값 |
-
-> **되돌림 확인의 범위**: 변이 구동기가 매 바퀴 끝에 `git status --porcelain` 을 전역으로 봤고, 그
-> 출력에 `reports/evidence/m6/6b3/checklist.md` 한 줄이 남아 있었다 — **같은 시각에 이 레인이 그
-> evidence 파일을 편집하고 있었기 때문**이고 변이 파일의 되돌림과는 무관하다. 전 바퀴가 끝난 뒤
-> **산출물 경로 한정** `git status --porcelain -- <경로 개별 인자>` 가 빈 출력임을 따로 확인했다.
-
-## 게이트가 실제로 막은 것 (이 라운드에 받은 RED·정지)
-
-| 게이트·실측 | 무엇을 막았나 |
+| probe | 결과 |
 |---|---|
-| **Flyway + `CREATE INDEX CONCURRENTLY`(정지)** | 계약 ⑥ 의 문면대로 `CONCURRENTLY` + 형제 `.sql.conf`(`executeInTransaction=false`)를 넣자 test 가 **끝나지 않았다**. `pg_stat_activity` 를 보니 Flyway **메타데이터 연결이 `idle in transaction`** 이고 마이그레이션 연결이 `Lock/virtualxid` 로 막혀 있었다(14분 뒤에도 그대로 — 서로를 푸는 일이 없다). `CONCURRENTLY` 는 동시 트랜잭션 전부가 끝나기를 기다리는데 Flyway 가 자기 연결로 하나를 열어 둔다. **적용 창을 줄이려던 조치가 「실패」가 아니라 「정지」를 사는 거래**였다 — V19 분리는 남기고 `CONCURRENTLY` 는 기각했다(checklist 알려진 제한 11) |
-| **`CollectionArchitectureGateTest`(D-6F8-6)** | 배선이 계약 레지스트리를 손에 쥐려 한 자리 — 그 게이트의 허용 **접근자 집합**은 수집 배선 둘이고 **집합 등식**이라 셋째가 끼면 두 test 가 함께 붉는다. 허용 목록에 한 줄 더하는 길을 **택하지 않고**, 해소를 원문 키 매핑을 소유한 모듈로 옮겨 닫았다 — 그래서 「원문 값 획득이 어디서 열리는가」의 답이 그대로다 |
-| CHECK 수 장부(축8) | 새 CHECK 제약 하나를 등재 없이 더한 상태 — expected 4, was 5 |
-| 인덱스 장부(축9, 이 slice 가 신설) | Flyway 자신의 보조 인덱스 하나가 등재 밖이었다 — 「우리가 만든 것」이 아니라 「있는 것」이 집합의 정의임을 그 자리에서 고쳤다 |
+| V1~V19 적용(패치된 V18·V19 포함) | **17 파일 전부 ok** — `SET LOCAL lock_timeout` 첫 문장도, 새 INSERT 분기도, 복합 인덱스도 적용된다 |
+| `SET LOCAL` 의 범위 | 트랜잭션 안에서 `5s` · **커밋 뒤 0 으로 돌아온다**(Flyway 가 이 파일을 트랜잭션에서 돌리므로 이 마이그레이션에만 걸린다) |
+| 투영 열 형태 제약 | `convalidated=true` — V19 의 `VALIDATE` 가 실제로 검증까지 끝낸다(mig M-2 의 장부가 재는 값) |
+| 앱 역할이 `inserted_at='2999-01-01'` 로 적재 | **그 값이 남지 않는다**(DB 시계가 덮는다 — ③) |
+| 앱 역할이 표지를 찍은 적재 | **거부**(「마스킹 표지는 적재가 찍지 않는다」) |
+| 소유자가 `inserted_at='2020-01-01'` 로 적재 | **그대로 남는다** — fixture·복원이 기대는 음성 대조 |
+| 제3 역할 + UPDATE GRANT 로 마스킹 | **거부**(「마스킹은 표 소유자만 한다」) |
+| `NOINHERIT` 소유자 멤버로 마스킹 | `pg_has_role` 이 **USAGE=false · MEMBER=true** 인 상태에서 **거부** — 술어를 `'USAGE'` 로 좁힌 효과를 그 자리에서 실측했다(mig L-3) |
+| allow-list 투영 문장(② 의 새 SQL 그대로) | 담당자 키·업체 식별 키·미지 키가 **모두 빠지고** 남길 키만 남는다 |
 
-## D-6B3-3 ① — 「업체명을 지워도 소비자가 깨지지 않는가」 기계 수집
+## RED 먼저 (이 라운드)
 
-운영자 결정 전에 **먼저 실측했다**(계약이 요구한 순서). 결론: 업체명을 읽는 **저장 행 소비자가 0**
-이므로 「90일 안쪽만 읽는다」를 보일 필요가 없다.
+앞 라운드의 이탈(「test 를 먼저 썼으나 RED 를 별도 run 으로 재지 않았다」)을 반복하지 않았다. 새 술어의
+test 를 **구현 전에** 돌려 실패를 받았다.
+
+표적(새 술어 + 바뀐 장부) 한 번에: **14 test FAILED**(adapters 12 · workflow 1 · app 1).
+공허·통제군 쪽은 같은 run 에서 **초록**이었다 — 그래서 이 RED 는 「술어가 아무것도 못 본다」가 아니다.
+
+| RED 한 자리 | 왜 붉었나 |
+|---|---|
+| `FieldConceptPiiAxisTest` 2/7 | 마스킹 집합이 선언 집합과 **다르다**(둘 대 셋) · 지울 집합이 선언의 rawName 과 다르다. 분할·서로소·공허 대조 다섯은 초록(선언 자체는 완전했다) |
+| `OpeningCompanyInfoMaskingTest` 2/4 | 출하 수집 경로로 심은 개찰 행에서 합성 키가 **두 열에 그대로 남는다**. 공허 대조(그 키가 실제로 실린다)와 기한 안쪽 음성 대조는 초록 |
+| `MaskingKeepSetSourceTest` 3/5 | 투영에 심은 담당자 키·미지 키가 **두 열에 남는다**(남김 집합이 행에서 왔다). 공허 대조와 등재 키 생존은 초록 |
+| `InsertedAtOwnershipTest` 2/4 | 앱 역할의 2999 적재가 **그 시각을 그대로 갖고** 마스킹 후보에서 빠진다. 공허 대조와 소유자 음성 대조는 초록 |
+| `RawObservationMaskingGuardTest` 1/16 | `NOINHERIT` 소유자 멤버의 마스킹 UPDATE 가 **지난다**(술어가 `MEMBER` 였다) |
+| `CleanMigrationIndexTest` 1/2 | 자식 가드 인덱스의 **정의**가 장부와 다르다(열 하나 대 셋) |
+| `V18LockTimeoutTest` 1/1 | 충돌 잠금 아래에서 V18 이 **기다렸다가 성공**했다 — 「예외가 던져지지 않았다」. 잠금을 35s 쥐고 놓는 설계라 41.9s 에 **끝났다**(무한 대기로 빌드를 멎게 하지 않는다) |
+| `PurgeExpiredDataTest` 1/11 | 가득 찬 일괄이 진척 0 일 때 루프가 끝나지 않아 호출 상한에 걸렸다 |
+| `RetentionRunnerTest` 1/7 | 건너뜀이 있는 run 이 종료 코드 **0** 을 냈다 |
+
+> **틀린 사유의 RED 를 한 번 받았고 그것을 고쳤다.** 잠금 창 test 를 처음에는 공유 클러스터의 **두
+> 번째 데이터베이스**에 V1~V17 을 적용해 만들려 했는데, V2 가 만드는 역할이 **클러스터 범위**라
+> 「role "bidvector_app" already exists」로 깨졌다 — 붉기는 했지만 재려던 성질과 무관한 실패다.
+> 격리 단위를 데이터베이스에서 **클러스터**로 바꿔(자기 컨테이너) 다시 쟀고, 그 뒤의 RED 가 위 표의
+> 「기다렸다가 성공」이다.
+
+구현 뒤 같은 표적이 전부 초록이고, 각 술어가 **실제로 그 성질을 잠그는지**는 아래 변이 표가 따로 잰다
+(RED 한 번은 「그때 그 코드에서 실패했다」만 말한다 — 변이는 「지금 이 코드에서 그 성질을 지운다」를 잰다).
+
+## D-6B3-5 ③ — 「수집 경로가 적재 시각을 쓰는가」 먼저 실측했다
+
+조치(비소유자 적재에 DB 시계 강제)를 고르기 **전에** 쟀다 — 출하 경로가 그 열을 쓰면 강제가 정상
+적재를 바꾼다.
+
+| 질의 | 결과 |
+|---|---|
+| `grep -c inserted_at adapters/…/persistence/Sql.kt` | **0** — 그 파일의 어느 문장도 그 열을 쓰지 않는다 |
+| `raw_observation` INSERT 의 열 목록 | **여섯**(관측 키·엔드포인트·원문·투영·관측 시각·배포 식별자) — `inserted_at` 이 없고 `DEFAULT now()` 가 찍는다 |
+| `grep -rn inserted_at adapters/src/main/kotlin` | 보존 레지스트리(기준 시각 열 선언)와 **읽기 쪽 `ORDER BY`**(relay·스냅숏)뿐. `raw_observation` 에 그 열을 쓰는 production 문장 **0** |
+
+그래서 강제의 비용이 0 이다. **거부가 아니라 덮어쓰기**를 고른 이유도 이 실측에 있다: 트랜잭션 안에서
+`now()` 는 트랜잭션 시작 시각이라, 허용 오차로 거부하면 **긴 트랜잭션의 정상 적재**가 걸린다(수집은
+트랜잭션 경계 안에서 적재한다). 소유자에게는 강제하지 않는다 — 묵은 행을 심는 fixture·복원 절차가 그
+자유에 기대고, 그 자격은 이 slice 의 비방어 경계다(음성 대조 test 가 그 경계를 잠근다).
+
+## D-6B3-5 ① — 업체 식별 **개념 셋** 기준으로 소비자 비용을 다시 쟀다
+
+앞 라운드의 ⓒ·ⓓ 를 **셋째 운반자(`OPENING_COMPANY_INFO`)를 포함해** 다시 돌렸다. 결론은 같다 —
+저장 행에서 업체 식별을 읽는 소비자가 0 이므로 「90일 안쪽만 읽는다」를 보일 필요가 없다.
 
 | 축 | 질의 | 결과 |
 |---|---|---|
-| ⓐ 원문 열을 읽는 production 질의 | `RawPayloadProductionReaderTest`(기계 수집 + 공허·음성 대조) | **0** |
-| ⓑ 투영 열을 읽는 production 파일 | `grep -rln payload_fields adapters/src/main/kotlin workflow/src/main/kotlin app/src/main/kotlin` | 아홉 — 쓰기 경로 넷(투영 생성·키 유도·INSERT 문)·마스킹 둘·**읽기 셋** |
-| ⓒ 읽기 셋이 **어느 키**를 읽는가 | 수집 축 조회는 공고 식별자 둘뿐(이름의 출처가 계약 상수다) · 스냅숏 추출은 식별자 둘을 `->>` 로 꺼내고 나머지는 **개념으로** 읽는다 | 개념 축 전수 `grep -rh 'FieldConcept\.[A-Z_]*' adapters/src/main/kotlin --exclude-dir=retention -o \| sort -u` → **35 개념 · 업체명 개념 0** |
-| ⓓ ml-engine(백테스트·학습) | `grep -rn 'raw_observation\|payload_fields\|<업체명 raw 키 둘>' ml-engine/src ml-engine/tools ml-engine/policy` | **0 건** — 그 표를 전혀 읽지 않는다 |
-| ⓔ 업체명 raw 키를 읽는 production 자리 | 같은 질의를 Kotlin 에 | **수집 시점 한 자리** — 개찰완료 행의 **행 식별자**(`rowIdentifierRawKeys`)다. 그 값은 **HTTP 응답 필드**에서 읽히고 저장 행에서 다시 읽히지 않는다(`ObservationKeyDerivation.of` 의 호출자는 적재 경로 하나뿐). 90일 지난 행을 마스킹해도 그 경로에 닿지 않는다 |
+| ⓒ 소비자가 읽는 개념 | `grep -rhoE 'FieldConcept\.[A-Z_]+' adapters/src/main/kotlin --exclude-dir=retention \| sed … \| sort -u` | **35 개념** · 업체 식별 **세 개념 모두 0 회**(각각 `grep -cx`) |
+| ⓓ ml-engine(백테스트·학습) | `grep -rn 'raw_observation\|payload_fields\|<업체 식별 raw 키 셋>' ml-engine/{src,tools,policy,tests}` | **0 건** |
+| ⓔ 합성 문자열 키의 production 참조 전수 | 같은 질의를 Kotlin 에 | **수집 경로와 계약 선언뿐**이다 — 수집 시점 마스킹(성분 폐기)·매퍼·소스·계수 주석, 그리고 계약의 rawName 선언. **저장 행을 읽는 자리 0** |
 
-**포함의 다른 절반도 다시 쟀다**: 마스킹은 이제 투영 열을 **바꾼다**(앞 판은 트리거가 그 열을
-불변으로 둬서 「소비자가 영향받을 수 없다」가 성립했다). 그래서 보장은 「투영이 불변」이 아니라
-**「투영에서 사라지는 키 == 업체명 둘 == 소비자가 읽지 않는 키」**이고, 그 등식을 production 쓰기
-경로 위의 test 가 센다(투영 키 − 업체명 == 마스킹 뒤 남은 키).
+그래서 이 라운드의 조치(키 전체 삭제)는 6G 표본의 **읽히는 축**을 건드리지 않는다. 스냅숏 추출이
+개찰결과 목록 행에서 읽는 것은 진행구분·참가자수뿐이고 투찰금액·투찰율은 개찰완료 축의 다른 개념에서
+온다(ⓒ 의 35 가 그 사실을 센다).
 
 ## 비밀값·누출 스캔
 
