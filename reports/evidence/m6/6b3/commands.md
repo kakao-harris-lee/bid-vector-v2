@@ -1,16 +1,16 @@
 # M6/6B-3 — commands
 
 base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6b3`.
-산출물 커밋 18. **판정 SHA 후보 `bc18d033`**(수정 라운드 2 의 마지막 산출물 커밋).
+산출물 커밋 21. **판정 SHA 후보 `35220afd`**(승인 전 정리의 마지막 산출물 커밋).
 
 ## acceptance (CI `check` job 명령 그대로)
 
-판정 SHA 후보 `bc18d033` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0 — 두 명령의 끝에서
+판정 SHA 후보 `35220afd` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0 — 두 명령의 끝에서
 `git rev-parse` 가 같은 SHA 를 냈다).
 
 | # | 명령 | 결과 |
 |---|---|---|
-| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m19s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,973** / fail 0 · 게이트 task 136 수행 |
+| 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m10s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,978** / fail 0 · 게이트 task 136 수행 |
 | 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 22s · 24 task 전부 실행 |
 
 > **task 수에 대하여**(vr R2-F8). 이 레인의 `--rerun-tasks` 실측은 **350 · 24** 이고 verifier r2 는 같은
@@ -25,19 +25,15 @@ skipped **4** 는 선언된 제외 하나(`RealServerIntegrationTest` — `@Enab
 `gate.tests.adapters.excluded` 등재)에서 온다(vr L-1 — 앞 판 evidence 는 「skipped 0」으로 적었고 그것은
 실측과 달랐다). **6B-3 의 test class 16 은 skipped 0** 이다.
 
-`ml-engine` job 은 생략한다 — Python 산출물 0(`git diff --name-only e2232a75..b252fa0c -- ml-engine`
+`ml-engine` job 은 생략한다 — Python 산출물 0(`git diff --name-only e2232a75..35220afd -- ml-engine`
 빈 출력). `container` job 도 생략한다 — `docker/**`·`ci.yml` 무편집(같은 질의 빈 출력).
 
 ## test 수
 
-모듈 합계 **2,973**(adapters 1,009 · app 587 · workflow 447 · build-logic 279 · procurement 263 ·
-decision 184 · shared-kernel 89 · strategy 84 · qualification 31) · fail 0 · skipped 4.
-
-이 라운드가 더한 test 는 **25**(라운드 1 끝 2,948 → 2,973): 신설 class 다섯
-(`FieldConceptPiiAxisTest` 7 · `OpeningCompanyInfoMaskingTest` 4 · `MaskingKeepSetSourceTest` 5 ·
-`InsertedAtOwnershipTest` 4 · `V18LockTimeoutTest` 1 = 21) + 기존 class 에 더한 5(가드의 `NOINHERIT` 1 ·
-CHECK 장부의 `convalidated` 1 · 분류 등식의 CASCADE 깊이 1 · use case 의 진척 0 종료 1 · 러너의 건너뜀 1)
-− **지운 1**(공허한 음성 대조, cr L-1). 보존 패키지와 그 장부 전체는 class 21 · test 164 다.
+모듈 합계 **2,978** · fail 0 · skipped 4. 앞 판정(`bc18d033`)의 같은 명령도 exit 0 이었고 2,973 이었다 —
+승인 전 정리가 더한 **5** 가 그 차이다: 투영 열 값 축 셋(중첩 값이 두 열에서 사라짐 + 공허 대조) ·
+출하 경로 통제군 하나(두 열의 키 집합 등식) · **V19 잠금 창** 하나. 보존 패키지와 그 장부 전체는
+class 21 · test 169 다.
 
 ## SQL 축 선행 실측 (버릴 컨테이너 · Gradle 없음)
 
@@ -58,7 +54,7 @@ probe 했다. worktree 는 손대지 않았다(사본은 scratchpad). 이 실측
 | `NOINHERIT` 소유자 멤버로 마스킹 | `pg_has_role` 이 **USAGE=false · MEMBER=true** 인 상태에서 **거부** — 술어를 `'USAGE'` 로 좁힌 효과를 그 자리에서 실측했다(mig L-3) |
 | allow-list 투영 문장(② 의 새 SQL 그대로) | 담당자 키·업체 식별 키·미지 키가 **모두 빠지고** 남길 키만 남는다 |
 
-## RED 먼저 (이 라운드)
+## RED 먼저 — 라운드 2
 
 앞 라운드의 이탈(「test 를 먼저 썼으나 RED 를 별도 run 으로 재지 않았다」)을 반복하지 않았다. 새 술어의
 test 를 **구현 전에** 돌려 실패를 받았다.
@@ -86,6 +82,92 @@ test 를 **구현 전에** 돌려 실패를 받았다.
 
 구현 뒤 같은 표적이 전부 초록이고, 각 술어가 **실제로 그 성질을 잠그는지**는 아래 변이 표가 따로 잰다
 (RED 한 번은 「그때 그 코드에서 실패했다」만 말한다 — 변이는 「지금 이 코드에서 그 성질을 지운다」를 잰다).
+
+## 변이 실측 — 라운드 1 (16 중 **16 KILLED**)
+
+> **이 두 절은 한 번 사라졌다가 복원됐다.** 라운드 2 의 evidence 편집에서 내가 「`## test 수` 부터
+> `## SQL 축` 까지」를 슬라이스로 바꿔 쓰는 스크립트를 돌렸고, 그 범위 안에 있던 라운드 1 변이 표와
+> 게이트 표가 함께 지워진 채 커밋됐다(`b28dc012`). 승인 전 정리에서 `git show` 로 라운드 1 판을 꺼내
+> 복원하고, 라운드 2 표는 변이 로그에서 다시 썼다. **증거가 조용히 줄어든 사건**이라 그 사실 자체를
+> 남긴다 — 범위를 지정해 덮어쓰는 편집은 그 범위 안의 다른 절을 보지 않는다.
+
+
+바꿔치우기다 — 적용 직후 `git diff --numstat` 로 교체를 확인하고 산출물은 먼저 커밋했다.
+
+라운드 1 의 16 변이 · **16 KILLED · 0 SURVIVED**. 각 변이는 「적용 → 교체 확인 → 표적 test → 되돌림 →
+산출물 경로 `porcelain` 빈 것 확인」 한 바퀴다. 앞 라운드 20 변이(M-1~M-16)는 `rollback.md` 가
+가리키는 앞 evidence 와 같고, 그 가운데 거동이 바뀐 셋(M-2·M-3 의 outbox 축 · M-5)은 아래가 대체한다.
+
+| # | 무엇을 바꿔치웠나 | 결과 (FAIL 한 test) |
+|---|---|---|
+| V-1 | 배선의 정책을 `RetentionPolicyData(1일, 1_000)` 로 (verifier r1 재현) | **KILLED — 컴파일 거부**(`:app:compileKotlin`). 컴파일러 문면: 「Cannot access 'constructor(retentionDays: Int, batchSize: Int)…': it is internal in 'bidvector.workflow.retention.RetentionPolicyData'」. 앞 판에서는 같은 변이가 app test 전건을 초록으로 지났다 |
+| V-2 | 보존 임대 키를 relay 키와 같게 (verifier r1 재현) | KILLED (2) — 임대 양방향 |
+| V-3 | `notice` 에 담당자 꼴 열 추가 + 열 장부 한 줄 (verifier r1 재현) | KILLED (1) — 「`notice` 열 집합 == 분류가 아는 열 집합」 |
+| N-1 | 마스킹 **개념 집합을 비운다**(업체명이 남는다) | KILLED (6) — 두 열 각각 · 투영 등식 · 남김 집합 |
+| N-2 | 관문 ③ 을 역할 **이름** deny-list 로 되돌린다 | KILLED (1) — 제3 역할 거부 |
+| N-3 | INSERT 관문의 표지 검사를 무력화 | KILLED (1) — 표지를 찍은 적재 거부 |
+| N-4 | 투영 열 형태 CHECK 를 제거(V18 생성·V19 검증 **쌍**으로) | KILLED (2) — 비객체 적재 거부 · CHECK 수 장부 |
+| N-5 | 관문 ⑤ 에서 투영 열을 마스킹 열에서 뺀다(불변으로 되돌린다) | KILLED (6) — 두 열 마스킹이 전부 거부된다 |
+| N-6 | 관문 ⑤ 를 **열 하나 열거**로 바꾼다(행 전체 비교를 버린다) | KILLED (1) — 열 카탈로그 전수 열거가 다른 열의 가변성을 잡는다 |
+| N-7 | CASCADE 자식의 기한 가드를 제거(앞 판 거동) | KILLED (1) — 기한 안쪽 자식·헤더 생존 |
+| N-8 | outbox 파기 집합에 `ISOLATED` 를 되돌린다 | KILLED (1) — 미발송·격리 생존 |
+| N-9 | 일괄 종료 조건을 **계수한 수**로 되돌린다 | KILLED (1) — 가득 찬 일괄이 한 번 더 돈다 |
+| N-10 | 자기참조 간선을 순환에 되돌린다 | KILLED (1) — 그 표 하나로 run 전체가 멈추지 않는다 |
+| N-11 | 마스킹 판독 깊이를 수집 상한 밑으로(32 → 8) | KILLED (1) — 수집 상한과의 관계 |
+| N-12 | cutoff 인덱스 하나를 지운다 | KILLED (1) — 인덱스 장부(축9) |
+| N-13 | 배선이 **시스템 시계**로 정책을 고른다 + 뒤 날짜 entry 추가(운반 축) | KILLED (1) — 러너가 쥔 정책 == 해석값 |
+
+> **되돌림 확인의 범위**: 변이 구동기가 매 바퀴 끝에 `git status --porcelain` 을 전역으로 봤고, 그
+> 출력에 `reports/evidence/m6/6b3/checklist.md` 한 줄이 남아 있었다 — **같은 시각에 이 레인이 그
+> evidence 파일을 편집하고 있었기 때문**이고 변이 파일의 되돌림과는 무관하다. 전 바퀴가 끝난 뒤
+> **산출물 경로 한정** `git status --porcelain -- <경로 개별 인자>` 가 빈 출력임을 따로 확인했다.
+
+## 변이 실측 — 라운드 2 (13 중 **12 KILLED · 통제군 1 GREEN**)
+
+각 변이는 「적용 → `git diff --numstat` 으로 교체 확인 → 표적 test → 되돌림 → **해당 경로** porcelain
+빈 것 확인」 한 바퀴다(13/13 이 `revert-clean: yes`). **라운드 1 의 생존 둘이 이번에 죽는다** —
+R-8 이 vr R2-F3 의 생존 변이이고 R-9 가 mig M-2(r2) 의 생존 변이다.
+
+| # | 무엇을 바꿔치웠나 | 결과 |
+|---|---|---|
+| R-1 | 개찰 합성 개념을 **비PII 로 오분류**(선언 자체는 완전한 채) | KILLED — 분할 등식은 초록인데 **거동 test** 가 잡는다(두 열에 남는다). 라운드 2 의 핵심 사각이 그 조합이었다 |
+| R-2 | 마스킹 집합을 레지스트리에서 **따로 열거**(앞 판 모양) | KILLED — 집합 등식 + 개찰 거동 |
+| R-3 | 투영 열을 **deny-list** 로 줄인다(앞 판 모양) | KILLED — 심은 담당자 키·미지 키가 남는다 |
+| R-4 | 지울 키를 **마지막 개정 하나**로 풀고 그 개정에서 합성 계약을 뺀다 | KILLED — 묵은 행의 옛 키가 지울 집합 밖이 되는 축(cr M-2)을 **양쪽으로** 쟀다 |
+| R-4c | **통제군** — 개정만 건드리고 합집합은 유지 | **GREEN**(초록이어야 한다) — R-4 의 RED 가 「개정을 건드려서」가 아니라 **「합집합을 버려서」**임을 가른다 |
+| R-5 | 비소유자 적재의 **적재 시각 강제 제거** | KILLED — 2999 적재가 그 시각을 갖고 후보에서 빠진다 |
+| R-6 | 진척 0 종료 조건 제거(앞 판 모양) | KILLED — 호출 상한에 걸린다(영구 루프의 모양) |
+| R-7 | 건너뜀을 종료 코드에서 뺀다 | KILLED — 미완이 0 으로 내려간다 |
+| R-8 | 인덱스 **이름은 같고 열이 다르다** | KILLED — 장부가 정의를 보므로(그 앞 판은 이름만 봐서 **생존**했다) |
+| R-9 | V19 의 `VALIDATE CONSTRAINT` 한 줄 삭제 | KILLED — `convalidated` 단언이 잡는다(앞 판은 CHECK **개수**만 세서 생존했다). 비객체 적재 거부는 `NOT VALID` 가 이미 지므로 거동으로는 영원히 안 보이던 자리다 |
+| R-10 | 관문 ③ 술어를 `'MEMBER'` 로 되돌린다 | KILLED — `NOINHERIT` 소유자 멤버가 지난다 |
+| R-11 | **CASCADE 손자** 간선을 더한다(V20) | KILLED — 한 단계 가드의 전제(손자 부재)가 등식으로 잠겨 있다 |
+| R-12 | 새 `FieldConcept` 를 **분류 없이** 더한다 | KILLED — 분할 등식(라운드 2 의 중심 게이트) |
+
+**변이가 없는 자리 하나**: `SET LOCAL lock_timeout`(V18) 삭제는 변이 표에 없다 — 그 삭제는 잠금 창
+test 를 **RED 로 만들고**(위 「RED 먼저」의 마지막 줄이 그 상태의 실측이다) 그래서 구현 전 RED 가 그
+변이의 역할을 겸한다. 승인 전 정리의 V19 쪽도 같은 꼴이다.
+
+## RED 먼저 — 승인 전 정리 (산출물 커밋 둘)
+
+두 산출물 변경 각각에 **구현 전 RED** 를 받았다. 변이 표를 따로 두지 않는다 — 두 조치 모두 「그 줄을
+지우면」이 곧 RED 상태이고 그 상태를 **먼저 실측**했기 때문이다.
+
+| 커밋 | RED (조치 전) | GREEN (조치 뒤) |
+|---|---|---|
+| **A** `a6559df0` 투영 열 값 축 | 앱 역할이 `{"bidNtceNo":{"prcbdrNm":…}}` 를 심은 행에서 **투영 test 하나만** 붉다. 같은 run 에서 원문 쪽·공허 대조·출하 통제군은 **초록** — 비대칭(원문은 버리고 투영은 남긴다)을 정확히 집었다 | 보존 패키지 전건 초록 |
+| **B** `dd059a3a` V19 잠금 상한 | 쓰기 홀더(`ROW EXCLUSIVE`) 아래에서 V19 가 **기다렸다가 성공**했다 — 「예외가 던져지지 않았다」, **37.8s**(홀더가 35s 뒤 놓는다). V18 쪽 test 는 같은 run 에서 초록(비대칭의 확인) | **8.3s 에 55P03 으로 실패** → 해제 → 재시도 성공(V18 12.5s 와 같은 모양) |
+
+## 게이트가 실제로 막은 것 (라운드별)
+
+| 게이트·실측 | 무엇을 막았나 |
+|---|---|
+| **Flyway + `CREATE INDEX CONCURRENTLY`(정지)** | 계약 ⑥ 문면대로 `CONCURRENTLY` + `.sql.conf` 를 넣자 test 가 **끝나지 않았다**(14분). Flyway 메타데이터 연결이 **스냅숏을 쥔** 채였고(vr R2-F5 가 메커니즘을 좁혔다) 그래서 `CONCURRENTLY` 가 기다렸다. 기각하고 V19 분리로 읽기 차단만 없앴다 |
+| **`CollectionArchitectureGateTest`(D-6F8-6)** | 배선이 계약 레지스트리를 쥐려 한 자리 — 허용 **접근자 집합**이 수집 배선 둘이고 **집합 등식**이라 셋째가 끼면 두 test 가 함께 붉는다. 허용 목록을 넓히지 않고 해소를 어댑터로 옮겨 닫았다 |
+| CHECK 수 장부(축8) | 새 CHECK 제약 하나를 등재 없이 더한 상태 |
+| 인덱스 장부(축9, 이 slice 가 신설) | Flyway 자신의 보조 인덱스가 등재 밖 · 라운드 3 에서는 자식 인덱스 정의 변경 |
+| `ktlint`·`detekt` | 매달린 KDoc · `when` 분기 괄호 · 인자 번호 리터럴 · 중첩 깊이 · 빈 줄 — 전부 **구조로** 고쳤다(`@Suppress` 추가 0) |
+| 전건 `check`(test 순서) | fixture 가 TRUNCATE 목록 밖 공유 표를 오염시킨 것 — 초록이 **실행 순서에 의존**하고 있었다(라운드 1) |
 
 ## D-6B3-5 ③ — 「수집 경로가 적재 시각을 쓰는가」 먼저 실측했다
 
