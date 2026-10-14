@@ -1,6 +1,6 @@
 # M6/6B-4 실행 명령과 종료 코드
 
-정본: `scope.md`. 판정 SHA(산출물 마지막) `f8f59593`. 명령 앞뒤로 HEAD 를 단언하고, 측정
+정본: `scope.md`. 판정 SHA(산출물 마지막) `20da6f6e`. 명령 앞뒤로 HEAD 를 단언하고, 측정
 중에는 커밋하지 않는다. 출력 전문은 싣지 않는다(핵심 결과 한 줄) — 감사자는 명령을 다시 돈다.
 
 **마지막 HEAD 의 게이트 결과 정본은 이 파일이 아니다** — evidence 는 자기 마지막 커밋의
@@ -8,7 +8,7 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 
 ## acceptance — `ml-engine` job 전건 (`.github/workflows/ci.yml`)
 
-양끝 HEAD 동일(`f8f59593`). `working-directory: ml-engine`.
+양끝 HEAD 동일(`20da6f6e`). `working-directory: ml-engine`.
 
 ## 2026-10-14T
 - cmd: `uv sync --frozen --all-extras` (S-1)
@@ -38,7 +38,7 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 ## 2026-10-14T
 - cmd: `uv run python -m pytest tests -q` (S-5)
 - exit: 0
-- 핵심 결과: **1603 passed**(462s). 앞 라운드에 전체 실행 **세 번을 따로 더 돌려 exit
+- 핵심 결과: **1605 passed**(360s). 앞 라운드에 전체 실행 **세 번을 따로 더 돌려 exit
   0/0/0**(1599 셋)을 확인했다 — vr r3b H-1(저널 tmp 이름 충돌 경합)이 전체 실행에서 3/3
   붉었던 자리이고, 그 세 번은 다른 레인의 Gradle 빌드와 **경합하는 동안** 돌려 타이밍 여유를
   줄였다.
@@ -74,7 +74,7 @@ A/B 대조(같은 clone, 훅 설치 한 줄만 주석 처리): `tests/app` 269 t
 ## 2026-10-14T
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL in 10m 16s (359 tasks executed). **proto 를 편집했으므로**
+- 핵심 결과: BUILD SUCCESSFUL in 10m 27s (350 tasks executed). **proto 를 편집했으므로**
   다시 돌렸다(`--rerun-tasks`). Kotlin 이 ADR 렌더링 블록을 읽어 5x5 진리표를 대조하는 경로가
   컴파일·통과한다
 
@@ -183,6 +183,13 @@ Kotlin(Java) 생성물은 javadoc 에 싣는다. 거동 변화 가능성이 0 �
 | vr H-1 | 상대 import·모듈 앨리어스·재수출 경유 | 아래 A1·A2·A6 |
 | vr H-2 · cr M-1 | 여섯 갈래 둘째 writer | 아래 F1~F6·F7 |
 | vr M-1 | 글리프·배치·Kotlin 데이터 | 아래 PR·AD·K |
+
+## RED 선행 실측 — r3d 일괄
+
+| finding | RED 로 측정한 것 | 결과 |
+| --- | --- | --- |
+| **M-4** `START` 미조정 | **아는 spec** 의 대기 job 을 미래 `accepted_at` 으로 두고 재적재 | `ValueError: started_at 은 accepted_at 보다 앞일 수 없습니다.` → `_on_done` 이 크래시로 받아 `RUNNER_CRASHED` 오진. 조정 뒤 집혀서 돌고 사유가 `RUNNER_CRASHED` 아님 · `started_at >= accepted_at` |
+| **L-13** 처분 로그 자리 | 기동 1회 쓰기 불가(`chmod 0o500`) 상태로 기동 | 수정 전 「처분됐다」 WARNING 1 → 수정 뒤 **0**(영속 안 된 처분을 적지 않는다). 통제군: 쓸 수 있게 되면 같은 처분이 로그와 함께 일어난다 |
 
 ## 비밀값 어휘 스캔
 
