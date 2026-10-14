@@ -32,7 +32,7 @@
   "leak_note": "주입 표지 넷(MEMORY_SUMMARY · memories/MEMORY.md · bid_vector_db · kis_unified_sts) raw 전체 0. 실행 전 worktree 에 _workspace·bid-vector symlink·AGENTS.md 부재 실측.",
   "emissions": 5,
   "premature_approves": 0,
-  "emission_note": "앵커(직전 줄 codex) ∩ 형태(reviewed_base·reviewed_head·findings) — raw 101·103·105·197·4726행. 101·103·105 는 첫 exec(106행) 전, 197 은 exec 2개 뒤의 조기 방출이고 넷 다 request_changes. 이 조기 방출의 finding 은 head 에 없는 대상을 인용했다 — ml-engine/.../jobs/orchestrator.py · TrainingJobOrchestrator · max_queue_depth · test_dry_run_records_validated_event_without_enqueueing · ADR 0010 401·434행(파일은 207행) · 실행된 적 없는 명령 결과(`/tmp/check_dry_run.py`, /tmp 에 부재). 레인이 head worktree 에서 rg·ls 로 전부 부재를 실측했다. codex 자신도 4240행에서 dry_run|max_queue_depth|TrainingJobSettings 를 rg 로 찾고 종말 판정에서 뺐다. 4726 이 종말 방출, 4729 는 tokens used 뒤 CLI 재출력이라 세지 않음. --output-schema 하의 알려진 조기 방출 거동이 이번에는 실행 전 근거를 지어낸 형태로 나타났다는 관측.",
+  "emission_note": "앵커(직전 줄 codex) ∩ 형태(reviewed_base·reviewed_head·findings) — raw 101·103·105·197·4726행. 101·103·105 는 첫 exec(106행) 전, 197 은 exec 2개 뒤의 조기 방출이고 넷 다 request_changes. 이 조기 방출의 finding 은 head 에 없는 대상을 인용했다 — ml-engine/.../jobs/orchestrator.py · TrainingJobOrchestrator · max_queue_depth · test_dry_run_records_validated_event_without_enqueueing · ADR 0010 401·434행(파일은 207행) · 실행된 적 없는 명령 결과(`/tmp/check_dry_run.py`, /tmp 에 부재). 레인이 head worktree 에서 rg·ls 로 전부 부재를 실측했다. codex 자신도 4240행에서 dry_run|max_queue_depth|TrainingJobSettings 를 rg 로 찾고 종말 판정에서 뺐다. 4726 이 종말 방출, 4729 는 사용량 줄 뒤 CLI 재출력이라 세지 않음. --output-schema 하의 알려진 조기 방출 거동이 이번에는 실행 전 근거를 지어낸 형태로 나타났다는 관측.",
   "terminal_verdict_match": true,
   "terminal_verdict_note": "종말 JSON(4726행)과 -o 저장물을 jq -S 정규화 비교 — 동일(approve · findings 0).",
   "commands_run_count": 22,
