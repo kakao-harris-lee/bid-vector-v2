@@ -10,16 +10,16 @@ import contract.bidvector.ml.v1.TrainingJob
 /**
  * `TrainingJobService` 계약이 요구하는 거부 규칙(전이표·조합 불변식·timestamp
  * 순서·dataset_id 일치·fail-closed enum·checksum 정규형)을 순수 함수로 문서화·고정한다
- * (`TrainingContractTest`·`test_training_contract.py` 양쪽에서 대칭으로 검증,
- * `ContractFractionRules.kt`와 같은 관례 — `TrainingContractTest.kt`의 500줄 한도를
- * 넘기지 않도록 분리했다, v2-지침서.md §5). 실제 Kotlin validation 구현은 아직 없다.
- */
-/**
- * 전이표 **데이터**. `internal` 인 이유는 `TrainingContractTest` 가 5×5 전 쌍 진리표를 이
- * 데이터와 대조하기 때문이다(M6/6B-4 vr M-2 P1b — `isAllowedTransition` 에 절을 하나
- * 더해(`|| from == JOB_STATE_FAILED`) 데이터와 어긋나게 만드는 변이는 **쌍을 열거한**
- * test 로는 잡히지 않았다. 전 쌍 대조는 자리마다 다른 답이 나오면 바로 붉어진다).
- * 데이터 자체가 Python `_TRANSITIONS` 와 같은지는 교차 등식 게이트가 센다.
+ * (`TrainingContractTest`·`TrainingTransitionTableTest`·`test_training_contract.py` 에서
+ * 대칭으로 검증, `ContractFractionRules.kt`와 같은 관례 — `TrainingContractTest.kt`의
+ * 500줄 한도를 넘기지 않도록 분리했다, v2-지침서.md §5). 실제 Kotlin validation 구현은
+ * 아직 없다.
+ *
+ * 아래 전이표는 **데이터**이고 `internal` 이다 — `TrainingTransitionTableTest` 가 5x5 전 쌍
+ * 진리표를 이 데이터와 대조하기 때문이다(M6/6B-4 vr M-2 P1b: `isAllowedTransition` 에 절을
+ * 하나 더해(`|| from == JOB_STATE_FAILED`) 데이터와 어긋나게 만드는 변이는 **쌍을 열거한**
+ * test 로는 잡히지 않았다. 전 쌍 대조는 자리마다 다른 답이 나오면 바로 붉어진다). 데이터
+ * 자체가 Python `_TRANSITIONS` 와 같은지는 교차 등식 게이트가 센다.
  */
 internal val allowedJobStateTransitions =
     setOf(

@@ -250,23 +250,16 @@ class TrainingContractTest {
     // ---- 전이표에 있는 쌍만 허용 — 표 밖 전이는 consumer 가 거부(순수 함수, scope.md ④) ----
 
     @Test
-    fun `전이표에 있는 쌍은 전부 허용된다`() {
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_RUNNING) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_SUCCEEDED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_FAILED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_CANCELLED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_CANCELLED) shouldBe true
-    }
-
-    @Test
-    fun `5x5 전 쌍 진리표가 허용표 데이터와 정확히 일치한다`() {
-        // M6/6B-4 vr M-2 P1b — 쌍을 열거하는 test 는 `isAllowedTransition` 에 절을 하나
-        // 더하는 변이(`|| from == JOB_STATE_FAILED`)를 그 특정 쌍이 열거돼 있을 때만
-        // 잡는다. 전 쌍(5×5 = 25)을 **데이터에서 생성한 기대값**과 대조하면 술어와
-        // 데이터가 어긋나는 순간 어느 쌍에서든 붉어진다. 데이터가 Python `_TRANSITIONS`
-        // 와 같은지는 `tests/gates/test_job_transition_table_parity.py` 가 센다 —
-        // 둘을 이으면 술어 ↔ Python 표가 닫힌다.
+    fun `전이표 5x5 전 쌍이 허용표 데이터와 정확히 일치한다`() {
+        // M6/6B-4 vr M-2 P1b — 앞 판은 **쌍을 열거**했다(허용 6 · 거부 5 = 11/25). 그래서
+        // `isAllowedTransition` 에 절을 하나 더하는 변이(`|| from == JOB_STATE_FAILED`)가
+        // 열거되지 않은 쌍에서는 잡히지 않았다. 전 쌍을 **데이터에서 생성한 기대값**과
+        // 대조하면 술어와 데이터가 어긋나는 순간 어느 쌍에서든 붉어진다 — 열거를 구조로
+        // 바꾼 것이고, 앞 판이 이름으로 들던 쌍(역전이 `RUNNING→ACCEPTED` · 종료 상태
+        // 이탈 셋 · 직행 `ACCEPTED→SUCCEEDED`)은 이 25 쌍의 부분집합이다.
+        // 데이터가 Python `_TRANSITIONS` 와 같은지는
+        // `ml-engine/tests/gates/test_job_transition_table_parity.py` 가 센다 — 둘을
+        // 이으면 술어 ↔ Python 표가 닫힌다.
         val states =
             JobState.entries.filter {
                 it != JobState.JOB_STATE_UNSPECIFIED && it != JobState.UNRECOGNIZED
@@ -276,24 +269,9 @@ class TrainingContractTest {
         pairs.size shouldBe 25
         pairs.filter { isAllowedTransition(it.first, it.second) }.toSet() shouldBe
             allowedJobStateTransitions
-    }
-
-    @Test
-    fun `역전이 RUNNING 에서 ACCEPTED 는 거부된다(변이 2)`() {
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_ACCEPTED) shouldBe false
-    }
-
-    @Test
-    fun `종료 상태에서 나가는 전이는 전부 거부된다`() {
-        isAllowedTransition(JobState.JOB_STATE_SUCCEEDED, JobState.JOB_STATE_RUNNING) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_FAILED, JobState.JOB_STATE_CANCELLED) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_CANCELLED, JobState.JOB_STATE_RUNNING) shouldBe false
-    }
-
-    @Test
-    fun `ACCEPTED 에서 SUCCEEDED 로 직행하는 전이는 거부된다`() {
-        // `ACCEPTED → FAILED` 는 M6/6B-4 D-6B4-1 로 **허용**된다(대기 큐 상한 폐기) — 위 허용표에 있다.
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_SUCCEEDED) shouldBe false
+        // 공허함 방지 — 허용이 전부도 0 도 아니다(`ACCEPTED→FAILED` 는 D-6B4-1 로 허용).
+        allowedJobStateTransitions.size shouldBe 6
+        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe true
     }
 
     // ---- SUCCEEDED/FAILED 조합 불변식 — CANCELLED 에 artifact 첨부 거부(우회 후보 3) ----
