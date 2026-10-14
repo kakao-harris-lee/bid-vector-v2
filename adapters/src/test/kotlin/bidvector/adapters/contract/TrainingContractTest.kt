@@ -250,30 +250,25 @@ class TrainingContractTest {
     // ---- 전이표에 있는 쌍만 허용 — 표 밖 전이는 consumer 가 거부(순수 함수, scope.md ④) ----
 
     @Test
-    fun `전이표에 있는 쌍은 전부 허용된다`() {
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_RUNNING) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_SUCCEEDED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_FAILED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_CANCELLED) shouldBe true
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_CANCELLED) shouldBe true
-    }
+    fun `전이표 5x5 전 쌍이 ADR 의 렌더링 블록과 정확히 일치한다`() {
+        // M6/6B-4 vr M-1 — 기대값의 **출처**가 ADR 의 렌더링 블록이다(그 블록은 Python
+        // `_TRANSITIONS` 에서 렌더링한 바이트와 등식이다). 앞 판은 자기 허용표를 기대값으로
+        // 썼고, 그래서 데이터를 바꾸는 변이가 이 축까지 초록으로 지나갔다. 이제 ① 허용표
+        // 데이터와 ② 술어의 25쌍 거동이 **둘 다** 그 블록과 대조된다.
+        val rendered = renderedTransitionTableFromAdr()
+        rendered.size shouldBe 6
+        allowedJobStateTransitions shouldBe rendered
 
-    @Test
-    fun `역전이 RUNNING 에서 ACCEPTED 는 거부된다(변이 2)`() {
-        isAllowedTransition(JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_ACCEPTED) shouldBe false
-    }
-
-    @Test
-    fun `종료 상태에서 나가는 전이는 전부 거부된다`() {
-        isAllowedTransition(JobState.JOB_STATE_SUCCEEDED, JobState.JOB_STATE_RUNNING) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_FAILED, JobState.JOB_STATE_CANCELLED) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_CANCELLED, JobState.JOB_STATE_RUNNING) shouldBe false
-    }
-
-    @Test
-    fun `ACCEPTED 에서 SUCCEEDED 나 FAILED 로 직행하는 전이는 거부된다`() {
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_SUCCEEDED) shouldBe false
-        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe false
+        val states =
+            JobState.entries.filter {
+                it != JobState.JOB_STATE_UNSPECIFIED && it != JobState.UNRECOGNIZED
+            }
+        states.size shouldBe 5
+        val pairs = states.flatMap { from -> states.map { target -> from to target } }
+        pairs.size shouldBe 25
+        pairs.filter { isAllowedTransition(it.first, it.second) }.toSet() shouldBe rendered
+        // 공허함 방지 — 이 slice 가 더한 간선이 실제로 허용된다.
+        isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe true
     }
 
     // ---- SUCCEEDED/FAILED 조합 불변식 — CANCELLED 에 artifact 첨부 거부(우회 후보 3) ----

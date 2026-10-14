@@ -1,0 +1,503 @@
+"""RED — 조립 근의 job 저널 배선(M6/6B-4 Q-4·Q-5). `_build_servicers` 가 저널에서
+저장소를 복원하고, 고아를 처분하고, 대기 job 을 실행 대기열에 **다시 넣는** 것을 실
+출하 정책 위에서 확인한다.
+
+`server.run()`(SIGTERM 배선, main thread 전용)은 부르지 않는다 — `test_server.py`·
+`test_server_prediction.py` 와 같은 관례로 조립 조각만 이어붙인다.
+
+import 은 전부 top-level 이어야 한다(`tests/training/conftest.py` 의
+`pytest_collection_finish` 가 `ml_engine.training.*` 를 `sys.modules` 에서 지우므로,
+함수 안에서 import 하면 `isinstance` 가 조용히 거짓이 된다 — `test_server.py` 머리
+주석의 함정).
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from ml_engine.app import server
+from ml_engine.app.server import (
+    _JOB_JOURNAL_DIR_NAME,
+    ConfigError,
+    ServerConfig,
+    ServingPolicy,
+    _build_servicers,
+    _job_journal,
+    _preload,
+    _preload_outcomes,
+)
+from ml_engine.contracts import training_pb2
+from ml_engine.serving import ReadinessGate
+from ml_engine.training.jobs import journal_file
+from ml_engine.training.jobs.journal import (
+    JobSubmission,
+    JournalFailed,
+    JournalFailureReason,
+    JournalSnapshot,
+)
+from ml_engine.training.jobs.journal_file import JobJournal
+from ml_engine.training.jobs.pipeline import DetailCode
+from ml_engine.training.jobs.runner import JobRunner
+from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
+from ml_engine.training.jobs.store import JobStore, Started
+from ml_engine.training.spec import TRAINING_SPECS
+
+_ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
+_INFERENCE_POLICY = _ML_ENGINE_ROOT / "policy" / "inference-v1.yaml"
+_TRAINING_POLICY = _ML_ENGINE_ROOT / "policy" / "training-v1.yaml"
+_EVALUATION_POLICY = _ML_ENGINE_ROOT / "policy" / "evaluation-v1.yaml"
+_SERVING_POLICY = _ML_ENGINE_ROOT / "policy" / "serving-v1.yaml"
+
+_NOW = datetime(2026, 1, 1, tzinfo=UTC)
+_KNOWN_SPEC_VERSION = next(iter(TRAINING_SPECS))
+
+
+def _config(
+    tmp_path: Path, *, training_policy_path: Path | None = None
+) -> ServerConfig:
+    return ServerConfig(
+        bind="127.0.0.1:0",
+        inference_policy_path=_INFERENCE_POLICY,
+        training_policy_path=training_policy_path or _TRAINING_POLICY,
+        evaluation_policy_path=_EVALUATION_POLICY,
+        serving_policy_path=_SERVING_POLICY,
+        artifact_out_dir=tmp_path / "artifacts",
+        code_version="sha-6b4-test",
+    )
+
+
+def _submission(spec_version: str) -> JobSubmission:
+    return JobSubmission(
+        # 실제로 없는 dataset — 재적재가 **일어났는지**를 보려는 것이므로 파이프라인은
+        # dataset 판독에서 정직하게 실패해도 된다(종단에 도달하는 것이 관측값이다).
+        dataset_uri=f"file://{_ML_ENGINE_ROOT / 'does-not-exist'}",
+        manifest_checksum="a" * 64,
+        training_spec_version=spec_version,
+    )
+
+
+def _seed_pending_job(
+    config: ServerConfig,
+    *,
+    spec_version: str,
+    running: bool = False,
+    accepted_at: datetime = _NOW,
+) -> str:
+    """첫 기동이 남긴 저널을 만든다(= 재기동 직전 상태). `running=True` 면 워커가 집은
+    뒤 프로세스가 죽은 자리 — 그 전이도 **같은 store 인스턴스**로 해야 저널에 남는다."""
+    store = JobStore(journal=_job_journal(config), pending_queue_max=4)
+    outcome = store.start_or_reuse(
+        "idem-restart",
+        "ds-restart",
+        accepted_at=accepted_at,
+        submission=_submission(spec_version),
+    )
+    assert isinstance(outcome, Started)
+    if running:
+        assert isinstance(
+            store.apply_transition(
+                outcome.record.job_id, JobEvent.START, at=accepted_at
+            ),
+            JobRecord,
+        )
+    return outcome.record.job_id
+
+
+def _assemble(config: ServerConfig) -> tuple[ReadinessGate, JobStore]:
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store  # 조립된 실물을 그대로 본다
+    runner.shutdown(wait=True)
+    return gate, store
+
+
+def _wait_for_terminal(store: JobStore, job_id: str, *, timeout: float = 20.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        record = store.get(job_id)
+        assert record is not None
+        if record.state in (JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED):
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"job {job_id} 가 시간 안에 종단에 도달하지 못함")
+
+
+# ---- 저널 자리(D-6B4-2) ----
+
+
+def _journal_files(config: ServerConfig) -> list[str]:
+    """산출물 루트 아래 **실제로 생긴 파일**을 센다. `JobJournal` 은 경로를 밖에 내주지
+    않으므로(vr H-2) 자리를 물어보는 대신 **쓰고 나서 디스크를 본다** — 앞 판의
+    `journal.path.parent.parent == artifact_out_dir` 보다 강한 관측이다(그 단언은 같은
+    상수 둘을 맞춰 보는 것이었고, 이것은 거동을 본다)."""
+    root = config.artifact_out_dir
+    return sorted(
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    )
+
+
+def _journal_file_path(config: ServerConfig) -> Path:
+    """test 가 **파일을 심을** 때만 쓰는 자리 계산 — production 상수 둘을 그대로 잇는다."""
+    return config.artifact_out_dir / _JOB_JOURNAL_DIR_NAME / journal_file._FILE_NAME
+
+
+def test_journal_lives_under_the_artifact_out_dir(tmp_path: Path) -> None:
+    """저널은 **job 산출물 루트 안**에 있다 — 산출물과 job 기록이 같은 볼륨에서 함께
+    산다(그러지 않으면 재기동 뒤 `artifact.uri` 가 없는 파일을 가리킨다). 디렉터리 이름이
+    `_` 로 시작해 job 디렉터리(`uuid4`)와 충돌할 수 없다."""
+    config = _config(tmp_path)
+    _assemble(config)
+    assert _journal_files(config) == [f"{_JOB_JOURNAL_DIR_NAME}/jobs.json"]
+    assert _JOB_JOURNAL_DIR_NAME.startswith("_")
+
+
+def test_boot_writes_the_journal_even_with_no_jobs(tmp_path: Path) -> None:
+    """볼륨·소유자 잘못을 **첫 job 제출까지 미루지 않는다** — 기동이 그 자리에 쓴다."""
+    config = _config(tmp_path)
+    assert not config.artifact_out_dir.exists()  # 기동 전에는 자리가 없다
+    _assemble(config)
+    assert _journal_files(config) != []
+
+
+def test_unreadable_journal_refuses_to_boot(tmp_path: Path) -> None:
+    """위협 모델 ⑤ — 깨진 저널에서 조용히 빈 저장소로 시작하지 않는다."""
+    config = _config(tmp_path)
+    broken = _journal_file_path(config)
+    broken.parent.mkdir(parents=True)
+    broken.write_text("깨진 저널", encoding="utf-8")
+
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    with pytest.raises(ConfigError):
+        _build_servicers(gate, preloaded.serving, preloaded, config)
+
+
+# ---- 재기동 처분과 재적재 ----
+
+
+def test_running_orphan_is_disposed_on_boot(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    job_id = _seed_pending_job(config, spec_version=_KNOWN_SPEC_VERSION, running=True)
+
+    _gate, store = _assemble(config)
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert record.failure.detail_code == DetailCode.RUNNER_LOST_ON_RESTART.value
+
+
+def test_pending_job_is_resumed_and_reaches_a_terminal_state(tmp_path: Path) -> None:
+    """ACCEPTED 고아는 **재적재된다** — 조립 근이 저널의 제출 입력으로 파이프라인을
+    다시 만들어 넣고, 워커가 집어 종단까지 간다(여기서는 dataset 이 없어 정직하게
+    실패한다 — 재적재가 일어났다는 관측값은 「종단에 도달함」이다)."""
+    config = _config(tmp_path)
+    job_id = _seed_pending_job(config, spec_version=_KNOWN_SPEC_VERSION)
+
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store
+    try:
+        _wait_for_terminal(store, job_id)
+    finally:
+        runner.shutdown(wait=True)
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    # 재기동 처분(RUNNER_LOST_ON_RESTART)이 아니라 **실행된 뒤의** 실패다.
+    assert record.failure.detail_code != DetailCode.RUNNER_LOST_ON_RESTART.value
+    assert record.started_at is not None
+
+
+def test_pending_job_with_unknown_spec_version_is_disposed(tmp_path: Path) -> None:
+    """설계 검토 우회 (7) — 이전 버전 저널의 대기 job 을 영원히 대기로 남기지 않는다."""
+    config = _config(tmp_path)
+    job_id = _seed_pending_job(config, spec_version="award-rate-gbm-training-v0-gone")
+
+    _gate, store = _assemble(config)
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert (
+        record.failure.detail_code
+        == DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value
+    )
+    # vr L-3 — 같은 spec 재제출은 `UNSUPPORTED_TRAINING_SPEC`(비재시도)로 거부된다.
+    # 참을 실으면 거짓말이었다(cr M-5 의 코드별 사상이 거짓으로 고정한다).
+    assert record.failure.retryable is False
+
+
+def test_not_ready_server_leaves_pending_jobs_pending(tmp_path: Path) -> None:
+    """정책 preload 가 깨졌으면 job 을 돌리지 않는다(새 제출을 `MODEL_NOT_READY` 로
+    거부하는 것과 같은 규율) — 대기 job 은 ACCEPTED 로 남아 **다음 기동**이 집는다.
+
+    D-6B4-3 「영구 정체 금지」가 성립하는 근거는 **다음 기동이 유일한 READY 경로**라는
+    것이고, 그 사실 자체는
+    `tests/serving/test_readiness.py::test_not_ready_is_terminal_within_the_process`
+    가 공개 전이 집합으로 잠근다 — 프로세스 안에 READY 로 가는 길이 생기면 거기서 먼저
+    붉어지고, 그때 「그 시점에 재적재」 경로가 필요해진다.
+
+    대기 job 은 집히지 않는 동안에도 **상한 계수에 든다**(대기 수는 저장소의 ACCEPTED
+    개수이고 readiness 와 무관하다) — 아래 `pending_jobs()` 단언이 그 상태를 보인다."""
+    broken_policy = tmp_path / "training-broken.yaml"
+    broken_policy.write_text("version: [unclosed\n", encoding="utf-8")
+    config = _config(tmp_path, training_policy_path=broken_policy)
+    job_id = _seed_pending_job(config, spec_version=_KNOWN_SPEC_VERSION)
+
+    _gate, store = _assemble(config)
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.ACCEPTED
+    assert [job.record.job_id for job in store.pending_jobs()] == [job_id]
+
+    on_disk = _job_journal(config).read()
+    assert isinstance(on_disk, JournalSnapshot)
+    assert [entry.record.state for entry in on_disk.entries] == [JobState.ACCEPTED]
+
+
+def test_second_boot_disposes_nothing_more(tmp_path: Path) -> None:
+    """수렴 — 한 번 처분한 뒤 재재기동은 아무것도 더 처분하지 않는다."""
+    config = _config(tmp_path)
+    job_id = _seed_pending_job(config, spec_version="award-rate-gbm-training-v0-gone")
+    _assemble(config)
+    _gate, store = _assemble(config)
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert store.pending_jobs() == ()
+    assert isinstance(_job_journal(config), JobJournal)
+
+
+# ---- vr H-1 — 출하 정책 값이 **조립 근을 지나** 큐에 닿는다(값 slice 의 「운반」 축) ----
+
+
+class _BlockingPipeline:
+    """워커 하나를 붙잡아 둔다 — `job_workers: 1` 에서 대기 큐가 실제로 쌓이게 한다."""
+
+    def __init__(self, release: threading.Event) -> None:
+        self._release = release
+
+    def run(self, dataset_ref: object, cancel_token: object) -> object:
+        self._release.wait(timeout=20.0)
+        raise AssertionError("이 test 는 파이프라인 결과를 쓰지 않는다")
+
+
+def _start(servicer: object, key: str) -> training_pb2.StartTrainingResponse:
+    request = training_pb2.StartTrainingRequest()
+    request.envelope.request_id = f"req-{key}"
+    request.envelope.correlation_id = f"corr-{key}"
+    request.idempotency_key = key
+    request.dataset.uri = f"file://{_ML_ENGINE_ROOT / 'does-not-exist'}"
+    request.dataset.manifest_checksum = "a" * 64
+    request.dataset.dataset_id = "ds-queue"
+    request.training_spec_version = _KNOWN_SPEC_VERSION
+    response = servicer.StartTraining(request, context=None)  # type: ignore[attr-defined]
+    assert response.WhichOneof("result") == "handle", response
+    return response
+
+
+def test_shipped_pending_queue_max_reaches_the_queue_through_the_assembly_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """vr H-1 — 앞 판은 로더 결과로 **저장소를 직접** 만들어 상한 값을 재서, 조립 근의
+    `load_job_store(pending_queue_max=serving_policy.pending_queue_max)` 를 상수 1000 으로
+    바꿔치워도 전건이 초록이었다(운반 단계가 끊겨도 아무도 몰랐다).
+
+    여기서는 서버를 **조립 근으로 띄우고**(`_build_servicers`, 출하 `serving-v1.yaml`)
+    gRPC servicer 로 상한+1 개를 대기시킨다 — 최고참 대기 job 이
+    `FAILED(WORKER_RESOURCE_EXHAUSTED, PENDING_QUEUE_OVERFLOW)` 가 되는지, RUNNING 은
+    폐기되지 않는지, 살아남은 대기 수가 정확히 상한인지를 함께 본다."""
+    release = threading.Event()
+
+    def _blocking_pipeline_factory(**_kwargs: object) -> object:
+        return lambda spec: _BlockingPipeline(release)
+
+    monkeypatch.setattr(server, "pipeline_factory", _blocking_pipeline_factory)
+
+    config = _config(tmp_path)
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    limit = preloaded.serving.pending_queue_max
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store
+    try:
+        running = _start(servicers.training_job, "idem-running").handle.job_id
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            record = store.get(running)
+            assert record is not None
+            if record.state is JobState.RUNNING:
+                break
+            time.sleep(0.01)
+        assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
+
+        waiting = [
+            _start(servicers.training_job, f"idem-wait-{index}").handle.job_id
+            for index in range(limit)
+        ]
+        assert [job.record.job_id for job in store.pending_jobs()] == waiting
+
+        overflow = _start(servicers.training_job, "idem-overflow").handle.job_id
+
+        # 단언은 **놓아주기 전**에 한다(vr r3b H-1 과 같은 축). `release.set()` 뒤에는 첫
+        # 워커가 파이프라인을 끝내며 그 job 을 종단으로 옮기므로, 아래 「RUNNING 은 폐기
+        # 대상이 아니다」가 경합으로 깨질 수 있다 — 재는 것은 **폐기 시점의 상태**이니 그
+        # 시점에 읽는다.
+        discarded = store.get(waiting[0])
+        assert discarded is not None
+        assert discarded.state is JobState.FAILED
+        assert discarded.failure is not None
+        assert discarded.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+        # RUNNING 은 폐기 대상이 아니고, 살아남은 대기 수는 정확히 상한이다.
+        assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
+        assert [job.record.job_id for job in store.pending_jobs()] == [
+            *waiting[1:],
+            overflow,
+        ]
+    finally:
+        release.set()
+        # 워커를 기다린다 — 끝나지 않은 워커가 test 보다 오래 살면 사라진 `tmp_path` 의
+        # 저널을 겨눈다(같은 고정 tmp 이름이라 다른 writer 와 서로를 깨뜨린다).
+        runner.shutdown(wait=True)
+
+
+# ---- cr L-1 · vr L-4 — 처분의 반환을 버리지 않는다 ----
+
+
+def test_unpersisted_disposal_is_logged_as_unpersisted(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """앞 판의 `_resubmit` 은 처분 전이의 반환을 **버렸다** — 저널 쓰기가 실패하면 job 은
+    `ACCEPTED` 로 남는데 로그는 「처분한다」만 남겼다(다음 기동이 다시 처분하므로 손실은
+    없지만 로그가 사실과 어긋난다). 반환을 보고 로그를 가른다."""
+    config = _config(tmp_path)
+    store = JobStore(journal=_job_journal(config), pending_queue_max=4)
+    outcome = store.start_or_reuse(
+        "idem-unpersisted",
+        "ds-unpersisted",
+        accepted_at=_NOW,
+        submission=_submission("award-rate-gbm-training-v0-gone"),
+    )
+    assert isinstance(outcome, Started)
+    pending = store.pending_jobs()[0]
+
+    def _always_failing(snapshot: object) -> JournalFailed:
+        return JournalFailed(JournalFailureReason.WRITE_FAILED, "주입된 쓰기 실패")
+
+    store._journal.write = _always_failing  # type: ignore[assignment,method-assign]
+
+    with caplog.at_level(logging.ERROR, logger="ml_engine.app.server"):
+        resumed = server._resubmit(
+            store, JobRunner(store, max_workers=1), pending, lambda spec: None
+        )
+
+    assert resumed is False
+    record = store.get(pending.record.job_id)
+    assert record is not None
+    assert record.state is JobState.ACCEPTED  # 처분이 영속되지 않았다
+    assert any("영속" in entry.getMessage() for entry in caplog.records)
+
+
+# ---- (B) 기동 시계가 저널의 accepted_at 보다 앞설 때 ----
+
+
+def test_unknown_spec_disposal_survives_a_clock_earlier_than_accepted_at(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """code-review B — `_resubmit` 의 spec 미지 처분이 `at=datetime.now(UTC)` 를 **조정 없이**
+    넘긴다. 기동 시계가 저널의 `accepted_at` 보다 앞서면(컨테이너 시계 보정·NTP 역행)
+    `JobRecord.__post_init__` 의 「`finished_at` 은 `accepted_at` 보다 앞일 수 없다」가
+    `ValueError` 를 내고, 그 예외가 `_resume_pending_jobs` 를 거쳐 조립 근을 벗어나 **매 기동
+    실패**가 된다(저널이 그대로 남아 있으므로 재기동해도 같다).
+
+    저장소의 `_failed` 는 같은 상황을 `_finish_at` 으로 조정해 피한다 — 이 자리만 그 조정을
+    지나지 않았다."""
+    config = _config(tmp_path)
+    # 저널의 `accepted_at` 을 **미래**로 둔다 = 기동 시계가 그보다 앞선 것과 같다.
+    future = datetime.now(UTC) + timedelta(days=1)
+    store = JobStore(journal=_job_journal(config), pending_queue_max=4)
+    outcome = store.start_or_reuse(
+        "idem-clock",
+        "ds-clock",
+        accepted_at=future,
+        submission=_submission("award-rate-gbm-training-v0-gone"),
+    )
+    assert isinstance(outcome, Started)
+    job_id = outcome.record.job_id
+
+    # 기동 — 처분이 일어나야 하고 예외가 새지 않아야 한다.
+    _gate, reloaded = _assemble(config)
+
+    record = reloaded.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    assert (
+        record.failure.detail_code
+        == DetailCode.TRAINING_SPEC_UNSUPPORTED_ON_RESTART.value
+    )
+    # 시각 불변식은 지켜진다 — 조정으로 `accepted_at` 아래로 내려가지 않는다.
+    assert record.finished_at is not None
+    assert record.finished_at >= record.accepted_at
+
+
+# ---- (M-4) 기동 시계가 재적재 대상의 accepted_at 보다 앞설 때 ----
+
+
+def test_requeued_job_with_a_future_accepted_at_runs_instead_of_crashing(
+    tmp_path: Path,
+) -> None:
+    """vr r3d M-4 — **아는 spec** 의 대기 job 이 저널에 미래 `accepted_at` 으로 남아 있으면,
+    재적재된 워커의 `START` 가 `accepted_at ≤ started_at` 불변식에서 `ValueError` 를 냈다.
+    `_on_done` 이 그것을 크래시로 받아 job 이 `FAILED(TRAINING_ERROR, RUNNER_CRASHED)` 로
+    끝난다 — **실행되지 않았는데 「러너가 크래시했다」는 오진**이다(계약 사유 [3] 의 문면
+    안이라 위반은 아니지만 사실이 아니다). 같은 일이 프로세스 안에서도 난다(제출 뒤 워커가
+    집기 전에 NTP 가 뒤로 밀면).
+
+    결정: `START` 도 `max(at, accepted_at)` 로 조정한다 — 「언제 집었는가」가 역행 폭만큼
+    앞당겨지지만 `started_at = accepted_at` 은 크래시보다 **덜 거짓**이다.
+
+    여기서는 dataset 이 없어 파이프라인이 정직하게 실패하는 것이 관측값이다 — 중요한 것은
+    **집혀서 돌았다**는 것(`started_at` 설정)과 사유가 `RUNNER_CRASHED` 가 **아니라는** 것이다."""
+    config = _config(tmp_path)
+    future = datetime.now(UTC) + timedelta(days=1)
+    job_id = _seed_pending_job(
+        config, spec_version=_KNOWN_SPEC_VERSION, accepted_at=future
+    )
+
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store
+    try:
+        _wait_for_terminal(store, job_id)
+    finally:
+        runner.shutdown(wait=True)
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    # 오진이 아니다 — 러너가 크래시한 것이 아니라 파이프라인이 dataset 에서 실패했다.
+    assert record.failure.detail_code != DetailCode.RUNNER_CRASHED.value
+    assert record.failure.detail_code != DetailCode.RUNNER_LOST_ON_RESTART.value
+    # 집혀서 돌았다 — 조정으로 `started_at` 이 `accepted_at` 아래로 내려가지 않는다.
+    assert record.started_at is not None
+    assert record.started_at >= record.accepted_at
