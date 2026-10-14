@@ -250,16 +250,15 @@ class TrainingContractTest {
     // ---- 전이표에 있는 쌍만 허용 — 표 밖 전이는 consumer 가 거부(순수 함수, scope.md ④) ----
 
     @Test
-    fun `전이표 5x5 전 쌍이 허용표 데이터와 정확히 일치한다`() {
-        // M6/6B-4 vr M-2 P1b — 앞 판은 **쌍을 열거**했다(허용 6 · 거부 5 = 11/25). 그래서
-        // `isAllowedTransition` 에 절을 하나 더하는 변이(`|| from == JOB_STATE_FAILED`)가
-        // 열거되지 않은 쌍에서는 잡히지 않았다. 전 쌍을 **데이터에서 생성한 기대값**과
-        // 대조하면 술어와 데이터가 어긋나는 순간 어느 쌍에서든 붉어진다 — 열거를 구조로
-        // 바꾼 것이고, 앞 판이 이름으로 들던 쌍(역전이 `RUNNING→ACCEPTED` · 종료 상태
-        // 이탈 셋 · 직행 `ACCEPTED→SUCCEEDED`)은 이 25 쌍의 부분집합이다.
-        // 데이터가 Python `_TRANSITIONS` 와 같은지는
-        // `ml-engine/tests/gates/test_job_transition_table_parity.py` 가 센다 — 둘을
-        // 이으면 술어 ↔ Python 표가 닫힌다.
+    fun `전이표 5x5 전 쌍이 ADR 의 렌더링 블록과 정확히 일치한다`() {
+        // M6/6B-4 vr M-1 — 기대값의 **출처**가 ADR 의 렌더링 블록이다(그 블록은 Python
+        // `_TRANSITIONS` 에서 렌더링한 바이트와 등식이다). 앞 판은 자기 허용표를 기대값으로
+        // 썼고, 그래서 데이터를 바꾸는 변이가 이 축까지 초록으로 지나갔다. 이제 ① 허용표
+        // 데이터와 ② 술어의 25쌍 거동이 **둘 다** 그 블록과 대조된다.
+        val rendered = renderedTransitionTableFromAdr()
+        rendered.size shouldBe 6
+        allowedJobStateTransitions shouldBe rendered
+
         val states =
             JobState.entries.filter {
                 it != JobState.JOB_STATE_UNSPECIFIED && it != JobState.UNRECOGNIZED
@@ -267,10 +266,8 @@ class TrainingContractTest {
         states.size shouldBe 5
         val pairs = states.flatMap { from -> states.map { target -> from to target } }
         pairs.size shouldBe 25
-        pairs.filter { isAllowedTransition(it.first, it.second) }.toSet() shouldBe
-            allowedJobStateTransitions
-        // 공허함 방지 — 허용이 전부도 0 도 아니다(`ACCEPTED→FAILED` 는 D-6B4-1 로 허용).
-        allowedJobStateTransitions.size shouldBe 6
+        pairs.filter { isAllowedTransition(it.first, it.second) }.toSet() shouldBe rendered
+        // 공허함 방지 — 이 slice 가 더한 간선이 실제로 허용된다.
         isAllowedTransition(JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_FAILED) shouldBe true
     }
 

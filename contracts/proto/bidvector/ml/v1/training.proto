@@ -16,24 +16,33 @@ option java_package = "contract.bidvector.ml.v1";
 option java_multiple_files = true;
 
 // job 상태 — legacy 5값(`queued`/`running`/`completed`/`failed`/`cancelled`, 조사 01 (d))과
-// 달리 미지 상태를 접지 않는다(fail-closed, common.proto 관례). **전이표(scope.md ④,
-// ADR 0010 D-8)**:
-//   ACCEPTED → RUNNING → SUCCEEDED | FAILED
-//   ACCEPTED → FAILED   (대기 job 이 **실행되지 못한 채** 끝나는 간선. 쓰이는 자리는
-//                        정확히 셋이다, M6/6B-4 D-6B4-1 · ADR 0010 D-8 개정:
-//                        [1] 대기 큐 상한 초과로 가장 오래된 대기 job 을 폐기 —
-//                            `WORKER_RESOURCE_EXHAUSTED` / `PENDING_QUEUE_OVERFLOW`
-//                        [2] 재기동 때 그 job 의 training_spec_version 을 지금 코드가
-//                            모른다 — `TRAINING_ERROR` /
-//                            `TRAINING_SPEC_UNSUPPORTED_ON_RESTART`
-//                        [3] 워커가 집는 도중 START 커밋 **전에** 크래시 —
-//                            `TRAINING_ERROR` / `RUNNER_CRASHED`)
-//   ACCEPTED | RUNNING → CANCELLED
-//   ACCEPTED 는 **대기**(워커가 아직 집지 않음), RUNNING 은 워커가 실제로 실행 중이다.
-//   종료 상태(SUCCEEDED·FAILED·CANCELLED)에서 CancelTrainingJob 은 멱등 no-op(현재 상태
-//   반환, 오류 아님) — 새 전이가 아니다.
-// 표에 없는 쌍(예: `RUNNING → ACCEPTED`, `SUCCEEDED → RUNNING`)은 provider 가 만들지 않고
-// consumer 가 거부한다(관측 가능한 거부 — `data-dictionary.md` §2.2).
+// 달리 미지 상태를 접지 않는다(fail-closed, common.proto 관례).
+//
+// **전이표(scope.md ④, ADR 0010 D-8)는 아래 블록이고, 그 블록은 Python 의 실행되는 표
+// (`training.jobs.state._TRANSITIONS`)에서 렌더링한 바이트와 등식이다** — 손으로 한 줄을
+// 고치거나 더하면 화살표 철자·들여쓰기와 무관하게 게이트가 붉어진다. 같은 게이트가 이 파일의
+// **블록 밖**에서 상태 쌍을 잇는 문면(화살표류 글자 + 상태 이름 둘)을 금지한다.
+// transition-table-begin
+//   ACCEPTED → CANCELLED
+//   ACCEPTED → FAILED
+//   ACCEPTED → RUNNING
+//   RUNNING → CANCELLED
+//   RUNNING → FAILED
+//   RUNNING → SUCCEEDED
+// transition-table-end
+// 블록에 없는 쌍은 provider 가 만들지 않고 consumer 가 거부한다(관측 가능한 거부 —
+// `data-dictionary.md` §2.2). 상태의 뜻: ACCEPTED 는 **대기**(워커가 아직 집지 않음),
+// RUNNING 은 워커가 실제로 실행 중이다. 종료 상태(SUCCEEDED·FAILED·CANCELLED)에서
+// CancelTrainingJob 은 멱등 no-op(현재 상태 반환, 오류 아님) — 새 전이가 아니다.
+//
+// `ACCEPTED` 에서 `FAILED` 로 가는 간선은 대기 job 이 **실행되지 못한 채** 끝나는 자리이고,
+// 쓰이는 사유는 **정확히 셋**이다(M6/6B-4 D-6B4-1 · ADR 0010 D-8 개정). 넷째는 런타임 닫힌
+// 집합(`state._PENDING_FAILURE_REASONS`)이 거부하고, 이 목록과 그 집합의 등식을 게이트가 센다:
+//   [1] 대기 큐 상한 초과로 가장 오래된 대기 job 을 폐기 —
+//       `WORKER_RESOURCE_EXHAUSTED` / `PENDING_QUEUE_OVERFLOW`
+//   [2] 재기동 때 그 job 의 training_spec_version 을 지금 코드가 모른다 —
+//       `TRAINING_ERROR` / `TRAINING_SPEC_UNSUPPORTED_ON_RESTART`
+//   [3] 워커가 집는 도중 START 커밋 **전에** 크래시 — `TRAINING_ERROR` / `RUNNER_CRASHED`
 enum JobState {
   JOB_STATE_UNSPECIFIED = 0;
   JOB_STATE_ACCEPTED = 1;
