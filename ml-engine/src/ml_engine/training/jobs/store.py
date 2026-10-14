@@ -61,15 +61,6 @@ _logger = logging.getLogger(__name__)
 _ACCEPTED = _JobState.ACCEPTED
 _RUNNING = _JobState.RUNNING
 
-_TERMINAL_EVENTS: frozenset[JobEvent] = frozenset(
-    {JobEvent.SUCCEED, JobEvent.FAIL, JobEvent.CANCEL}
-)
-"""종단 시각(`finished_at`)을 쓰는 이벤트들 — 이 셋만 `_finish_at` 조정을 지난다.
-`START` 는 `started_at` 을 쓰고 그 불변식(`accepted_at ≤ started_at`)은 조정 대상이
-아니다(실행이 시작된 시각을 뒤로 밀면 「언제 집었는가」가 거짓이 된다 — 그 자리는 시계
-역행에서 `TransitionRejected` 가 아니라 `ValueError` 로 남고, 호출자는 워커 하나뿐이라
-저널의 미래 시각과 만나지 않는다. 알려진 제한으로 적는다)."""
-
 
 @dataclass(frozen=True)
 class Started:
@@ -137,9 +128,16 @@ def _pending_sorted(entries: dict[str, JournalEntry]) -> list[JournalEntry]:
     )
 
 
-def _finish_at(record: JobRecord, at: datetime) -> datetime:
-    """종단 시각 — `accepted_at ≤ started_at ≤ finished_at`(D-2C-5)을 지킨다. 시계가
-    역행한 입력(비방어)에서도 불변식이 깨지지 않도록 기록값 아래로 내려가지 않는다."""
+def _clamped_at(record: JobRecord, at: datetime) -> datetime:
+    """전이 시각 — `accepted_at ≤ started_at ≤ finished_at`(D-2C-5)을 지킨다. 시계가
+    역행한 입력에서도 불변식이 깨지지 않도록 **기록값 아래로 내려가지 않는다**.
+
+    vr r3d M-4 — 앞 판은 종단 이벤트에만 걸었고 `START` 를 비켜 갔다. 그래서 저널에 미래
+    `accepted_at` 으로 남은 대기 job 을 재적재하면(또는 제출 뒤 워커가 집기 전에 NTP 가 뒤로
+    밀면) `START` 가 `ValueError` 를 내고 `_on_done` 이 그것을 크래시로 받아
+    `FAILED(TRAINING_ERROR, RUNNER_CRASHED)` 로 끝났다 — **실행되지 않았는데 「러너가
+    크래시했다」는 오진**이다. 운영자 결정: `START` 도 조정한다(`max(at, accepted_at)`).
+    「언제 집었는가」가 역행 폭만큼 앞당겨지지만 그것이 크래시보다 **덜 거짓**이다."""
     floor = record.started_at if record.started_at is not None else record.accepted_at
     return max(at, record.accepted_at, floor)
 
@@ -154,7 +152,7 @@ def _failed(
     result = transition(
         record,
         JobEvent.FAIL,
-        at=_finish_at(record, at),
+        at=_clamped_at(record, at),
         failure=JobFailure(code=code, detail_code=detail_code.value),
     )
     if not isinstance(result, JobRecord):  # pragma: no cover — 호출자가 출발 상태를
@@ -208,7 +206,10 @@ def _fail_running_orphans(
 def _log_disposals(disposed: tuple[JobRecord, ...], what: str) -> None:
     """재기동 처분을 **job 마다** 남긴다(code-review 문서 축). 앞 판은 계수 세 줄만 남겨
     job_id 를 쥔 쪽 말고는 어느 job 이 어떤 사유로 처분됐는지 알 방법이 없었다 —
-    `ListTrainingJobs` 도 metric 도 없다(`servicer._log_discarded` 와 같은 갈래)."""
+    `ListTrainingJobs` 도 metric 도 없다(`servicer._log_discarded` 와 같은 갈래).
+
+    호출 자리는 **저널 쓰기가 성공한 뒤**다(vr r3d L-13) — 처분이 영속되지 않았는데
+    「처분됐다」고 적으면 거짓이다."""
     for record in disposed:
         _logger.warning(
             "재기동 처분 — %s: job_id=%s accepted_at=%s 사유=%s",
@@ -228,7 +229,7 @@ def _require_positive(pending_queue_max: int) -> None:
 
 
 def _require_aware(at: datetime, name: str) -> None:
-    """cr M-2 곁가지 — naive 시각을 **입구에서** 거부한다. 앞 판은 `_finish_at` 의
+    """cr M-2 곁가지 — naive 시각을 **입구에서** 거부한다. 앞 판은 `_clamped_at` 의
     `max(at, record.accepted_at, …)` 와 `_pending_sorted` 의 정렬이 naive/aware 혼합에서
     `TypeError` 를 던져, 결과 타입이 아니라 예외가 조립 근을 벗어났다. 시계는 호출자가
     쥔 값이므로 `pending_queue_max` 와 같은 갈래(프로그래밍 오류)다."""
@@ -356,7 +357,8 @@ class JobStore:
         (H-2 · 우회 (9)). `job_id`가 없으면 `None`. 종단 상태의 멱등 no-op 은 바뀌는
         것이 없어 저널을 쓰지 않는다 — 쓰기 실패가 그 호출을 깨뜨리지 않는다.
 
-        **종단 시각은 `_finish_at` 으로 조정한다**(code-review B). 그러지 않으면 기동 시계가
+        **전이 시각은 `_clamped_at` 으로 조정한다**(code-review B · vr r3d M-4 — `START` 도
+        같은 조정을 지나 `started_at = max(at, accepted_at)` 이 된다). 그러지 않으면 기동 시계가
         저널의 `accepted_at` 보다 앞설 때(컨테이너 시계 보정·NTP 역행) `JobRecord` 의 시각
         불변식이 `ValueError` 를 내고, 그 예외가 조립 근을 벗어나 **매 기동 실패**가 된다
         (저널이 그대로 남으므로 재기동해도 같다). `_failed` 는 자기 자리에서 이미 조정하고
@@ -370,7 +372,7 @@ class JobStore:
             result = transition(
                 entry.record,
                 event,
-                at=_finish_at(entry.record, at) if event in _TERMINAL_EVENTS else at,
+                at=_clamped_at(entry.record, at),
                 artifact=artifact,
                 evaluation=evaluation,
                 failure=failure,
@@ -405,11 +407,14 @@ def load_job_store(
     )
     orphans = _fail_running_orphans(entries, at=at)
     discarded = _discard_pending_overflow(entries, pending_queue_max, at=at)
-    _log_disposals(orphans, "RUNNING 고아")
-    _log_disposals(discarded, "대기 상한 초과")
     written = journal.write(_snapshot(entries))
     if isinstance(written, JournalFailed):
         return written
+    # 로그는 **쓰기가 성공한 뒤**다(vr r3d L-13). 앞 판은 쓰기 앞에서 불러서, 기동 1회 쓰기가
+    # 실패해 `ConfigError` 로 기동이 거부되는 경우에도 「처분됐다」 줄이 이미 나가 있었다 —
+    # 처분은 영속되지 않았고 다음 기동이 같은 job 을 다시 처분하며 같은 줄을 또 낸다.
+    _log_disposals(orphans, "RUNNING 고아")
+    _log_disposals(discarded, "대기 상한 초과")
     if not written.durable:
         # cr L-3 — 기동 1회 쓰기도 같은 갈래를 본다(앞 판은 `_commit` 만 로그를 남겨
         # 이 자리가 조용했고, runbook 의 「내구성 미확인을 로그로 남긴다」가 무조건으로

@@ -439,3 +439,36 @@ def test_restart_disposals_log_one_warning_per_job(
     assert again.disposition.running_orphans_failed == 0
     assert again.disposition.pending_over_limit_failed == 0
     assert caplog.records == []
+
+
+def test_no_disposal_log_when_the_boot_write_is_refused(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """vr r3d L-13 — 처분 로그는 **영속된 뒤**에만 나간다. 기동 1회 쓰기가 실패하면 그 처분은
+    저장되지 않고 조립 근이 기동을 거부하므로(「처분됐다」가 거짓이 된다), 그 경우 줄이
+    하나도 없어야 한다. 다음 기동이 같은 job 을 다시 처분하며 같은 줄을 또 내는 것도 막는다."""
+    store = _first_boot(tmp_path)
+    orphan = _submit(store, "key-orphan")
+    assert isinstance(
+        store.apply_transition(orphan, JobEvent.START, at=_NOW), JobRecord
+    )
+
+    directory = tmp_path / "journal"
+    directory.chmod(0o500)
+    try:
+        with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.store"):
+            refused = load_job_store(
+                journal=_journal(tmp_path), pending_queue_max=4, at=_RESTART_AT
+            )
+    finally:
+        directory.chmod(0o700)
+
+    assert isinstance(refused, JournalFailed)
+    assert caplog.records == []  # 「처분됐다」를 적지 않았다
+
+    # 통제군 — 쓸 수 있게 되면 같은 처분이 로그와 함께 일어난다.
+    with caplog.at_level(logging.WARNING, logger="ml_engine.training.jobs.store"):
+        loaded = _restart(tmp_path)
+    assert loaded.disposition.running_orphans_failed == 1
+    assert len(caplog.records) == 1
+    assert orphan in caplog.records[0].getMessage()

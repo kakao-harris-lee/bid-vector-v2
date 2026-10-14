@@ -83,7 +83,11 @@ def _submission(spec_version: str) -> JobSubmission:
 
 
 def _seed_pending_job(
-    config: ServerConfig, *, spec_version: str, running: bool = False
+    config: ServerConfig,
+    *,
+    spec_version: str,
+    running: bool = False,
+    accepted_at: datetime = _NOW,
 ) -> str:
     """첫 기동이 남긴 저널을 만든다(= 재기동 직전 상태). `running=True` 면 워커가 집은
     뒤 프로세스가 죽은 자리 — 그 전이도 **같은 store 인스턴스**로 해야 저널에 남는다."""
@@ -91,13 +95,15 @@ def _seed_pending_job(
     outcome = store.start_or_reuse(
         "idem-restart",
         "ds-restart",
-        accepted_at=_NOW,
+        accepted_at=accepted_at,
         submission=_submission(spec_version),
     )
     assert isinstance(outcome, Started)
     if running:
         assert isinstance(
-            store.apply_transition(outcome.record.job_id, JobEvent.START, at=_NOW),
+            store.apply_transition(
+                outcome.record.job_id, JobEvent.START, at=accepted_at
+            ),
             JobRecord,
         )
     return outcome.record.job_id
@@ -449,3 +455,49 @@ def test_unknown_spec_disposal_survives_a_clock_earlier_than_accepted_at(
     # 시각 불변식은 지켜진다 — 조정으로 `accepted_at` 아래로 내려가지 않는다.
     assert record.finished_at is not None
     assert record.finished_at >= record.accepted_at
+
+
+# ---- (M-4) 기동 시계가 재적재 대상의 accepted_at 보다 앞설 때 ----
+
+
+def test_requeued_job_with_a_future_accepted_at_runs_instead_of_crashing(
+    tmp_path: Path,
+) -> None:
+    """vr r3d M-4 — **아는 spec** 의 대기 job 이 저널에 미래 `accepted_at` 으로 남아 있으면,
+    재적재된 워커의 `START` 가 `accepted_at ≤ started_at` 불변식에서 `ValueError` 를 냈다.
+    `_on_done` 이 그것을 크래시로 받아 job 이 `FAILED(TRAINING_ERROR, RUNNER_CRASHED)` 로
+    끝난다 — **실행되지 않았는데 「러너가 크래시했다」는 오진**이다(계약 사유 [3] 의 문면
+    안이라 위반은 아니지만 사실이 아니다). 같은 일이 프로세스 안에서도 난다(제출 뒤 워커가
+    집기 전에 NTP 가 뒤로 밀면).
+
+    결정: `START` 도 `max(at, accepted_at)` 로 조정한다 — 「언제 집었는가」가 역행 폭만큼
+    앞당겨지지만 `started_at = accepted_at` 은 크래시보다 **덜 거짓**이다.
+
+    여기서는 dataset 이 없어 파이프라인이 정직하게 실패하는 것이 관측값이다 — 중요한 것은
+    **집혀서 돌았다**는 것(`started_at` 설정)과 사유가 `RUNNER_CRASHED` 가 **아니라는** 것이다."""
+    config = _config(tmp_path)
+    future = datetime.now(UTC) + timedelta(days=1)
+    job_id = _seed_pending_job(
+        config, spec_version=_KNOWN_SPEC_VERSION, accepted_at=future
+    )
+
+    preloaded = _preload(config)
+    gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
+    assert isinstance(preloaded.serving, ServingPolicy)
+    servicers, runner = _build_servicers(gate, preloaded.serving, preloaded, config)
+    store = servicers.training_job._store
+    try:
+        _wait_for_terminal(store, job_id)
+    finally:
+        runner.shutdown(wait=True)
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.FAILED
+    assert record.failure is not None
+    # 오진이 아니다 — 러너가 크래시한 것이 아니라 파이프라인이 dataset 에서 실패했다.
+    assert record.failure.detail_code != DetailCode.RUNNER_CRASHED.value
+    assert record.failure.detail_code != DetailCode.RUNNER_LOST_ON_RESTART.value
+    # 집혀서 돌았다 — 조정으로 `started_at` 이 `accepted_at` 아래로 내려가지 않는다.
+    assert record.started_at is not None
+    assert record.started_at >= record.accepted_at
