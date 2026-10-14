@@ -111,8 +111,10 @@ class JournalWriteAudit:
         try:
             self._classify(event, args)
         except (TypeError, ValueError, AttributeError, OSError, IndexError):
-            # 훅에서 예외가 새면 **감사 대상 연산 자체가 깨진다**. 분류 실패는 조용히
-            # 넘기지 않고 미귀속으로 적는다.
+            # 훅에서 예외가 새면 **감사 대상 연산 자체가 깨진다**. 그래서 삼키되, 분류 실패를
+            # 조용히 넘기지 않고 **위반으로** 적는다(`capture()` 와 무관하게 전역 목록으로 —
+            # 분류가 깨진 이벤트를 통과시키면 게이트가 조용히 비어 버린다, fail-closed).
+            # cr L-6 ③ — 앞 주석은 「미귀속으로 적는다」였고 코드와 어긋났다.
             self.violations.append(
                 JournalWriteEvent(event=event, path="<분류 실패>", writer="")
             )

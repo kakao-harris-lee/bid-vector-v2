@@ -35,6 +35,7 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     JobState,
 )
+from ml_engine.training.jobs.store import LoadedJobStore, load_job_store
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _LATER = datetime(2026, 1, 1, 1, tzinfo=UTC)
@@ -380,6 +381,15 @@ def test_old_format_journal_with_stale_retryable_still_boots(tmp_path: Path) -> 
     assert isinstance(snapshot, JournalSnapshot)
     assert snapshot.entries[0].record.failure is not None
     assert snapshot.entries[0].record.failure.retryable is False
+
+    # docstring 이 말하는 자리를 실제로 지난다(cr L-6 ① — 앞 판은 `read()` 만 불렀다):
+    # 조립 근이 기동을 거부하는 원인(`JournalFailed`)이 나오지 않고 저장소가 복원된다.
+    loaded = load_job_store(journal=journal, pending_queue_max=4, at=_LATER)
+    assert isinstance(loaded, LoadedJobStore)
+    record = loaded.store.get("job-legacy")
+    assert record is not None
+    assert record.failure is not None
+    assert record.failure.retryable is False
 
 
 def test_record_combination_violation_is_failed(tmp_path: Path) -> None:
