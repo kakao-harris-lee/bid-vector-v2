@@ -119,12 +119,14 @@ internal fun renderedTransitionTableFromAdr(): Set<Pair<JobState, JobState>> {
     val end = lines.indexOfFirst { it.contains("transition-table-end") }
     require(begin >= 0 && end > begin) { "ADR 에서 전이표 블록 마커를 찾지 못했다: $adr" }
     val rowPattern = Regex("^- `([A-Z]+) \u2192 ([A-Z]+)`$")
-    return lines.subList(begin + 1, end).map { line ->
-        val match = rowPattern.matchEntire(line.trim())
-        require(match != null) { "렌더링 블록의 줄 모양이 아니다: $line" }
-        val (left, right) = match.destructured
-        JobState.valueOf("JOB_STATE_$left") to JobState.valueOf("JOB_STATE_$right")
-    }.toSet()
+    return lines
+        .subList(begin + 1, end)
+        .map { line ->
+            val match = rowPattern.matchEntire(line.trim())
+            require(match != null) { "렌더링 블록의 줄 모양이 아니다: $line" }
+            val (left, right) = match.destructured
+            JobState.valueOf("JOB_STATE_$left") to JobState.valueOf("JOB_STATE_$right")
+        }.toSet()
 }
 
 private val sha256HexPattern = Regex("^[0-9a-f]{64}$")
