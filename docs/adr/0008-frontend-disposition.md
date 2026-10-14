@@ -121,6 +121,10 @@ FastAPI의 OpenAPI 스키마에서 생성된다.** (재현: `commands.md` **C-5.
 > **개정 2026-10-03.** 판정 자리가 **M6 6A → M7 7A** 로 옮겨졌다. 6A 는 2026-09-16 운영자 결정(API 전용)으로 범위가
 > 좁혀져 이 판정을 하지 않았다(미이행). 1~3 의 물음과 3 의 게이트는 그대로이고, 7A 가 화면 다섯의 데이터 요구표로 1·2 를
 > 대조하며 3 은 R-1(어댑터 없음)로 닫힌다.
+>
+> **7A 판정 2026-10-14.** 1·2 의 답은 `docs/discovery/m7-screen-data-requirements.md`(V2 계약은 전략 편집만 덮고, 덮지 못하는
+> 요구는 거의 전부 V2 가 누락한 capability — legacy 전용은 목록 이원화 하나). 3 의 게이트는 `docs/adr/0011-web-frontend-stack.md`
+> D-3(`rootDir` 컴파일 경계 + 생성 타입 check 모드).
 
 ### D-5. 화면을 전제하는 capability의 acceptance는 UI 없이도 관찰 가능해야 한다
 
