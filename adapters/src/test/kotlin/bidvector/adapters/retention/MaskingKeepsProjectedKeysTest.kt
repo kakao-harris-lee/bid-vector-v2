@@ -128,6 +128,6 @@ class MaskingKeepsProjectedKeysTest : PersistenceTestSupport() {
     private fun keysOf(json: String): Set<String> =
         Regex("\"([^\"]+)\"\\s*:").findAll(json).map { it.groupValues[1] }.toSet()
 
-    /** 보존 저장소 — 마스킹이 지울 키를 **계약**에 물으므로 레지스트리를 함께 받는다(D-6B3-3 ①). */
-    private fun retentionStore() = JdbcRetentionStore(dataSource(), testFieldContracts())
+    /** 보존 저장소 — 지울 키의 해소를 어댑터가 하므로 **기준일만** 넘긴다(D-6F8-6 게이트). */
+    private fun retentionStore() = JdbcRetentionStore(dataSource(), RETENTION_REFERENCE_DATE)
 }

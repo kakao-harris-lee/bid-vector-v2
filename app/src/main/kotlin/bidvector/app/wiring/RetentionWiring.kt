@@ -4,7 +4,6 @@ import bidvector.adapters.retention.JdbcRetentionStore
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.retention.RetentionRunner
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.workflow.retention.PurgeExpiredData
 import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.strategy.Clock
@@ -56,9 +55,11 @@ open class RetentionWiring {
         // 시계로 고르면 그 둘이 갈리는 날이 장부 밖이다.
         val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
         val policy = resolvedOrFail(RETENTION_POLICY.resolve(referenceDate), "보존 정책")
-        // 마스킹이 지울 키는 **개념**으로 선언되고 계약이 그 개념의 키를 안다(D-6B3-3 ①).
-        val contracts = resolvedOrFail(KONEPS_COLLECTION_POLICY.resolve(referenceDate), "수집 정책").fieldContracts
-        val store = JdbcRetentionStore(ownerDataSource(properties), contracts)
+        // 마스킹이 지울 키는 개념으로 선언되고 계약이 그 개념의 키를 안다(D-6B3-3 ①). **그 계약
+        // 레지스트리를 이 배선이 손에 쥐지 않는다** — 기준일만 넘기고 해소는 어댑터가 한다
+        // (D-6F8-6 게이트: 「원문 값 획득」의 허용 접근자는 수집 배선 둘뿐이고, 그 게이트가 이
+        // 자리를 실제로 막았다 — `commands.md`).
+        val store = JdbcRetentionStore(ownerDataSource(properties), referenceDate)
         val logger = LoggerFactory.getLogger(RetentionRunner::class.java)
         return RetentionRunner(
             purge = PurgeExpiredData(store, clock, policy),

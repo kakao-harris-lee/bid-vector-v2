@@ -6,6 +6,7 @@ import bidvector.sharedkernel.Resolution
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import javax.sql.DataSource
 
 /**
@@ -17,6 +18,13 @@ internal val RETENTION_ANCHOR: Duration = Duration.ofDays(90)
 internal val NOW: Instant = Instant.parse("2026-10-14T00:00:00Z")
 internal val JUST_OLDER: Instant = NOW - RETENTION_ANCHOR - Duration.ofSeconds(1)
 internal val JUST_NEWER: Instant = NOW - RETENTION_ANCHOR + Duration.ofSeconds(1)
+
+/**
+ * 계약 해소 기준일 — 보존 저장소의 **공개 생성자가 받는 값**이다(그 생성자는 계약 레지스트리를
+ * 받지 않는다, D-6F8-6 게이트). test 가 별도 레지스트리를 만들지 않고 출하와 **같은 해소**를
+ * 지난다는 뜻이기도 하다.
+ */
+internal val RETENTION_REFERENCE_DATE: LocalDate = LocalDate.ofInstant(NOW, ZoneOffset.UTC)
 
 /** `raw_observation` 의 열 목록 — fixture 세 자리가 같은 목록을 쓴다(사본 셋을 두지 않는다). */
 private const val RAW_OBSERVATION_COLUMNS =

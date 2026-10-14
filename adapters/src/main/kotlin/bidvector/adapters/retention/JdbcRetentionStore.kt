@@ -11,6 +11,7 @@ import bidvector.workflow.retention.TableDependency
 import java.sql.Connection
 import java.sql.SQLException
 import java.sql.Timestamp
+import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
@@ -62,10 +63,16 @@ class JdbcRetentionStore internal constructor(
     private val fieldContracts: KonepsFieldContractRegistry,
     private val rules: List<RetentionRule>,
 ) : RetentionStorePort {
+    /**
+     * 유일한 공개 생성자 — **계약 레지스트리를 받지 않고 기준일을 받는다.** 받으면 조립(app)이 그
+     * 레지스트리를 손에 쥐게 되고, 그것이 D-6F8-6 게이트가 닫아 둔 「원문 값 획득」 표면이다
+     * (그 게이트가 이 자리를 실제로 막았다 — `commands.md`). 어느 키가 PII 인지 아는 일은
+     * **원문 키 매핑을 소유한 이 모듈**의 몫이고, 그래서 해소도 여기서 한다.
+     */
     constructor(
         owner: DataSource,
-        fieldContracts: KonepsFieldContractRegistry,
-    ) : this(owner, fieldContracts, RETENTION_TABLE_RULES)
+        referenceDate: LocalDate,
+    ) : this(owner, retentionFieldContracts(referenceDate), RETENTION_TABLE_RULES)
 
     private val rulesByTable: Map<String, RetentionRule> = rules.associateBy { it.table }
 

@@ -1,9 +1,12 @@
 package bidvector.adapters.retention
 
 import bidvector.procurement.FieldConcept
+import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsFieldContractRegistry
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.retention.RetentionTarget
 import bidvector.workflow.retention.RetentionTreatment
+import java.time.LocalDate
 
 /**
  * 시간 기준 파기에서 빠지는 사유(운영자 결정 A-4) — **열거이고, 열거라야 한다**: 「왜 안
@@ -184,6 +187,24 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
     )
 
 internal fun RetentionRule.asTarget(): RetentionTarget = RetentionTarget(table, treatment)
+
+/**
+ * 보존이 쓰는 필드 계약 레지스트리 — **해소가 이 모듈 안에서 끝난다.**
+ *
+ * 조립(app)이 이 레지스트리를 손에 쥐지 않게 하는 이유: 그것이 D-6F8-6 게이트가 닫아 둔 「원문 값
+ * 획득」 표면이고(허용 접근자는 수집 배선 둘뿐이다), 보존이 거기 셋째로 끼면 그 게이트의 뜻이
+ * 「수집 축에서만 열린다」에서 「조립 아무 데서나 열린다」로 넓어진다 — **그 게이트가 이 자리를
+ * 실제로 막았다**(`commands.md`). 어느 키가 PII 인지 아는 일은 원문 키 매핑을 소유한 이 모듈의
+ * 몫이므로 기준일만 받고 해소는 여기서 한다.
+ *
+ * 해소 실패를 **지어내지 않는다**: 그 날짜에 정책이 적용되지 않으면 던진다(빈 레지스트리로 접으면
+ * 지울 키가 조용히 0 이 되어 「업체명을 지운다」가 아무 일도 안 하면서 초록이다).
+ */
+internal fun retentionFieldContracts(referenceDate: LocalDate): KonepsFieldContractRegistry =
+    when (val resolution = KONEPS_COLLECTION_POLICY.resolve(referenceDate)) {
+        is Resolution.Resolved -> resolution.value.fieldContracts
+        is Resolution.NotApplicable -> error("수집 정책이 $referenceDate 에 적용되지 않는다: ${resolution.reason}")
+    }
 
 /**
  * 마스킹 규칙의 개념을 **계약을 지나** rawName 으로 편다(D-6B3-3 ①). 키 이름의 사본을 이
