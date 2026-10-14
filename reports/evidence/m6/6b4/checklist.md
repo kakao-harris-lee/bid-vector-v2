@@ -1,6 +1,6 @@
 # M6/6B-4 완료 점검 — ML training job 영속 · 대기 큐 상한
 
-정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `<r2 마지막 산출물 커밋>`. 실행 결과는
+정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `86ee999a`. 실행 결과는
 `commands.md`, 되돌림은 `rollback.md`.
 
 ## 산출물 Q-1 ~ Q-7 과 그 술어

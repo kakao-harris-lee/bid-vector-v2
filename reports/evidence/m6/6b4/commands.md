@@ -8,27 +8,27 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 
 ## acceptance — `ml-engine` job 전건 (`.github/workflows/ci.yml`)
 
-양끝 HEAD `e118ced7` 동일. `working-directory: ml-engine`.
+양끝 HEAD 동일(`86ee999a`). `working-directory: ml-engine`.
 
-## 2026-10-14T (판정 SHA e118ced7)
+## 2026-10-14T
 - cmd: `uv sync --frozen --all-extras` (S-1)
 - exit: 0
 - 핵심 결과: lock 그대로 해소(34 packages)
 
 ## 2026-10-14T
-- cmd: S-1b serving extras 분리 — `uv sync --frozen --extra serving --no-dev` + 금지 패키지 다섯 import 시도 + dev 복구
+- cmd: S-1b serving extras 분리 + 금지 패키지 다섯 import 시도 + dev 복구
 - exit: 0
 - 핵심 결과: 금지 패키지 전부 import 불가
 
 ## 2026-10-14T
 - cmd: `uv run ruff check .` + `uv run ruff format --check .` (S-2)
 - exit: 0
-- 핵심 결과: 228 files already formatted
+- 핵심 결과: 230 files already formatted
 
 ## 2026-10-14T
 - cmd: `uv run mypy --strict src/ml_engine` (S-3)
 - exit: 0
-- 핵심 결과: 99 source files, no issues(저널 모듈 분리로 하나 늘었다)
+- 핵심 결과: 99 source files, no issues
 
 ## 2026-10-14T
 - cmd: `uv run lint-imports` (S-4)
@@ -38,7 +38,8 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 ## 2026-10-14T
 - cmd: `uv run python -m pytest tests -q` (S-5)
 - exit: 0
-- 핵심 결과: **1563 passed**(338s) — r1 수정이 46 개를 더했다
+- 핵심 결과: **1598 passed**(409s). 감사 훅이 세션 내내 켜져 있어 `tests/app` 이 330s → 408s
+  로 늘었다(약 25% — 「닫는 것은 실행된 경로」의 비용, checklist 판단 14)
 
 ## 2026-10-14T
 - cmd: `uv run python tools/design_ratchet.py --check` (S-6)
@@ -46,17 +47,17 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 - 핵심 결과: allowlist 밖 위반 0
 
 ## 2026-10-14T
-- cmd: S-7 재활용 출처 두 자리 대조 + 양성 대조(어긋난 evidence 가 실패해야 한다)
+- cmd: S-7 재활용 출처 두 자리 대조 + 양성 대조
 - exit: 0
-- 핵심 결과: 본 검사 위반 0 · 양성 대조가 기대대로 불일치 29건을 내며 실패
+- 핵심 결과: 위반 0 · 양성 대조가 기대대로 실패
 
 ## 2026-10-14T
 - cmd: S-9 Python 버전 두 자리 대조
 - exit: 0
-- 핵심 결과: `.python-version` 과 `requires-python` 둘 다 3.12
+- 핵심 결과: 둘 다 3.12
 
 ## 2026-10-14T
-- cmd: `uv build --wheel -o /tmp/ml-engine-wheel` + `pytest tests/gates/test_wheel_reexport.py -q` (S-11)
+- cmd: `uv build --wheel` + `pytest tests/gates/test_wheel_reexport.py -q` (S-11)
 - exit: 0
 - 핵심 결과: 1 passed — 설치본에서 재수출 성립
 
@@ -65,173 +66,146 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 ## 2026-10-14T
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL in 10m 51s (350 tasks executed). proto 주석·Kotlin 계약 test 를
-  편집했으므로 `--rerun-tasks` 로 돌렸다
+- 핵심 결과: BUILD SUCCESSFUL in 10m 36s (350 tasks executed). proto 주석·ADR·Kotlin 계약
+  test 를 편집했으므로 `--rerun-tasks`. Kotlin 이 ADR 렌더링 블록을 읽어 5x5 진리표를 대조하는
+  경로가 컴파일·통과한다
 
 ## 2026-10-14T
-- cmd: `./gradlew --no-daemon qualityBaseline`
+- cmd: `./gradlew --no-daemon qualityBaseline --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL in 6s (측정, 게이트 아님)
+- 핵심 결과: BUILD SUCCESSFUL in 22s (측정, 게이트 아님)
 
 ### 수정 전 실패 이력(검증이 실제로 작동한 증거)
 
 ## 2026-10-14T
-- cmd: `./gradlew --no-daemon check --rerun-tasks` (Kotlin 5x5 진리표 test 를 **새 파일**로 둔 판)
+- cmd: `./gradlew --no-daemon check --rerun-tasks` (Kotlin 헬퍼의 체인 줄바꿈 전)
 - exit: 1
-- 핵심 결과: 두 게이트가 차례로 잡았다 — ① `:adapters:sizeGate` 「파일 500 줄 한도 초과 1건
-  (517 줄)」 ② 분리 뒤 `GateRegistrationGateTask` 「게이트 등재 장부에 없는 test 클래스다」.
-  ②의 장부(`config/quality/gate-tests.properties`)는 이 slice in_scope 밖이라 계약을 넓히지
-  않고, 진리표가 열거를 **흡수**하도록 바꿔 495줄로 줄였다(새 클래스·장부 편집 0)
+- 핵심 결과: `:adapters:ktlintTestSourceSetCheck` 가 `standard:chain-method-continuation` 둘을
+  잡았다 — 고친 뒤 통과
 
 ## 2026-10-14T
-- cmd: `uv run python tools/design_ratchet.py --check` (저널 모듈 분리 전)
+- cmd: `uv run python tools/design_ratchet.py --check` (cr M-3 가드를 `transition()` 안에 둔 판)
 - exit: 1
-- 핵심 결과: `file_loc_band: training/jobs/journal.py = 21`(515줄) — allowlist 등재 대신 파일
-  접근을 `journal_file.py` 로 떼어내 418 + 116 줄로 내렸다
+- 핵심 결과: `functions_over_soft_limit: state.py = 1`(함수 50줄) — 사유 축 거부를
+  `_failure_reason_rejection` 헬퍼로 빼내 통과
 
 ## 2026-10-14T
-- cmd: `uv run ruff check src tests` (닫힌 세계 게이트 작성 직후)
-- exit: 1
-- 핵심 결과: RUF002/003 모호 문자 셋 — 고쳐 통과. **앞 커밋에서 `| tail -2` 로 종료 코드를
-  가린 채 커밋한 사실**을 이 자리에 남긴다(「게이트 결과는 종료 코드로」 규율 위반, 별도
-  커밋으로 정정)
+- cmd: 세션 전역 감사 단언을 `pytest_sessionfinish` 로 두고 위반을 주입
+- exit: **0**
+- 핵심 결과: 메시지는 찍히는데 **종료 코드가 0** 이다(「게이트 결과는 종료 코드로」 규율 위반).
+  수집 순서를 바꿔 전역 단언을 맨 뒤 test 로 돌린 뒤 같은 주입에서 **exit 1** 을 확인했다
+
+## acceptance — `container` job (S-21 ~ S-25)
+
+run 블록은 ci.yml 을 파싱해 **파일에서 그대로 꺼내** 순서대로 실행했다(`uses:` step 넷은
+로컬 툴체인이 그 자리라 건너뜀, `COMPOSE_PROJECT_NAME=m6b4r2`). 재사용하지 않았다 —
+`contracts/proto`·`ml-engine/src` 를 편집했고 둘 다 Dockerfile 입력이다.
+
+## 2026-10-14T
+- cmd: `container` job 16 run step(S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · install trivy ·
+  S-22d · S-22e · S-22f · S-23 · S-23b · S-23c · **S-24** · S-25 + 일회성 자격 값 둘)
+- exit: **16 step 전부 0**
+- 핵심 결과: 이미지 둘 빌드 · 위생·취약점 게이트 넷 · compose 세 서비스 healthy 수렴 ·
+  컨테이너 스모크 · 백업·복원 리허설 · 실 Kotlin gateway ↔ 컨테이너 실 Python 서버(S-24) ·
+  `down -v` 뒤 컨테이너·볼륨 0
+
+### Q-6 전용 실측 — 컨테이너 재생성 뒤 저널 생존
+
+아래 표는 실측 HEAD `54bbef81` 에서의 측정을 그대로 잇는다. 이 라운드는 `docker/**` 를 편집하지
+않았고 저널의 **자리·형식·볼륨 배선**도 바꾸지 않았다(바뀐 것은 판독 관용도·사유 집합·게이트다).
+위 S-23~S-25 가 그 배선 위에서 다시 exit 0 이다.
+
+| 단계 | 실측 |
+| --- | --- |
+| 기동 직후 볼륨 안 | `/app/artifacts/_journal/jobs.json` 존재 · 소유자 `mlserving:mlserving` · 모드 `0600` · 내용은 `jobs` 빈 배열 |
+| 기동 로그 | 처분 계수 세 줄값 `0 · 0 · 0` + `readiness=READY` |
+| `StartTraining` 한 건(존재하지 않는 dataset) | handle 반환 → 폴링에서 `JOB_STATE_FAILED` / `DATASET_UNREADABLE` / `NOT_FOUND` |
+| `docker compose rm -sf ml-serving` → `up -d ml-serving` | 컨테이너 **id 가 바뀜**(진짜 재생성) · healthy 재수렴 |
+| 재생성 뒤 같은 `job_id` 조회 | **같은 상태·실패 코드·세부 사유** 반환 |
+| 멱등 키 보존 | 같은 멱등 키 재요청이 **같은 `job_id`** 를 돌려줌(새 job 0) |
+| **통제군** — `down -v` 로 볼륨을 지우고 다시 띄움 | 저널의 job 수 **1 → 0**. 생존을 만든 것이 볼륨임을 보인다 |
 
 ## RED 선행 실측 (TDD)
 
 | finding | RED 로 측정한 것 | 결과 |
 | --- | --- | --- |
-| cr H-1 | 동기 START runner + 붙잡힌 파이프라인에서 handle 단언 | `assert 2 == 1`(RUNNING) 둘 |
-| vr H-3 | 폐기 뒤 caplog 레코드 수 | `assert 0 == 1` |
-| cr M-5 · vr L-3 | 전수 사상 · 「호출자가 고를 수 없다」 · detail_code 빈 값 | 셋 fail(서명·인자) |
-| cr M-2 | tz 없는 스냅숏 쓰기 | `JournalWritten(byte_count=439)` 로 통과(= 못 읽는 바이트를 썼다) |
-| cr M-2 곁가지 | naive 시각으로 저장소 입구 호출 | `TypeError: can't compare offset-naive and offset-aware datetimes` |
-| vr M-1 | 디렉터리 `fsync` 실패 주입 | 저널 층 `durable` 속성 부재 2 · 저장소 층 `JournalFailed(WRITE_FAILED)` 1 |
-| vr H-2 · cr M-4 | 새 조립 경계 게이트 전건 | 6 fail(생성 자리 해석 · import 집합 · 파일계 집합 · `path` 표면 · 뿌리 재수출 · 공허함 대조) |
-| vr H-1 | 조립 근으로 띄운 서버에서 상한+1 대기 | 새 test 가 조립 근 배선을 지난다(아래 V8 변이가 그 검출력) |
-| cr L-1 · vr L-4 | 처분의 저널 쓰기 실패 주입 | 「영속」 문구 부재 |
-| cr L-5 | 빈 `dataset.dataset_id` | `ValueError: dataset_id 는 비어 있을 수 없습니다.`(핸들러 이탈) |
+| cr M-2 | 사본 뒤집기 · 구판 저널 기동 | `JournalFailed(INVARIANT_VIOLATED, '… retryable 이 code 의 사상과 어긋난다')` 둘 |
+| cr M-3 | 사유 집합 import | 선언 데이터 부재로 collection error |
+| cr M-4 | 멱등 재사용 handle 상태 | (거동은 선재 — 문면과 test 가 없었다. 아래 변이로 검출력 확인) |
+| vr H-1 | 상대 import·모듈 앨리어스·재수출 경유 | 아래 A1·A2·A6 |
+| vr H-2 · cr M-1 | 여섯 갈래 둘째 writer | 아래 F1~F6·F7 |
+| vr M-1 | 글리프·배치·Kotlin 데이터 | 아래 PR·AD·K |
 
 ## 비밀값 어휘 스캔
 
-패턴은 파일을 참조해 돌린다(어휘를 이 문서에 축어로 적지 않는다). 대상은 slice 산출물 경로와
-이 evidence 디렉터리.
+패턴은 파일을 참조해 돌린다(어휘를 이 문서에 축어로 적지 않는다).
 
 ## 2026-10-14T
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m6/6b4/`
 - exit: 1
 - 핵심 결과: 매치 없음 = 통과
 
-## 2026-10-14T
-- cmd: `grep -rniE -f config/quality/leak-patterns.txt <산출물 경로들>`
-- exit: 0
-- 핵심 결과: 매치는 전부 기존 어휘 계열(취소 신호 타입 이름·compose 의 `${VAR:?}` 참조)이고 새
-  비밀값은 0. **구속력 있는 판정은 이 grep 이 아니라 `check` 안의 `leakPatternGate`** 이고(그
-  scanRoot 는 `reports/evidence`), 위 `check` exit 0 이 그 결과다.
-
 ## clean-tree 게이트
 
 ## 2026-10-14T
 - cmd: `git status --porcelain -- <in_scope 경로 개별 인자>`
 - exit: 0
-- 핵심 결과: 빈 출력
+- 핵심 결과: 빈 출력. 측정 중 남은 산출물 없음(감사 게이트 초안이 만든 `ml-engine/build/_journal`
+  디렉터리는 gitignore 대상이었지만 치웠다)
 
-## 2026-10-14T
-- cmd: 양성 대조 — in_scope 파일 하나에 줄을 덧붙인 뒤 같은 명령, 그 뒤 **비파괴 절삭**으로 복원
-  (`checkout --` 쓰지 않는다)
-- exit: 0
-- 핵심 결과: 해당 파일이 ` M` 으로 잡힘 → 복원 뒤 다시 빈 출력
+## 변이 실측 — 바꿔치우기, 적용은 `git diff --numstat` 으로 확인
 
-## 변이 실측 — 바꿔치우기(더하기 아님), 적용은 `git diff --numstat` 으로 확인
+전부 **커밋된 트리** 위에서 심고 `git checkout -- <경로>` 로 되돌렸으며, 매 변이 뒤
+`git status --porcelain` 빈 출력을 확인했다(미커밋 산출물을 함께 지우지 않도록 **변이 전에
+커밋**한다 — 이 라운드에 한 번 어겨 cr M-3 작업을 잃고 다시 썼다).
 
-전부 커밋된 트리 위에서 심고 `git checkout -- .` 로 되돌렸으며, 매 변이 뒤 `git status
---porcelain` 빈 출력을 확인했다.
+### vr H-1 — 조립 경계: 손 해석기에서 grimp 그래프로
 
-### 열거 술어로도 닫히던 자리(요약)
+| # | 심은 것(production) | numstat | 앞 판 | 이 판 |
+| --- | --- | --- | --- | --- |
+| A1 | `servicer.py` 에 `from .journal_file import JobJournal as RogueJournal` + 생성 | 9/0 | **초록**(전 acceptance) | **RED 2** — import 집합 · 이름 바인딩 집합 |
+| A2 | `from ml_engine.training.jobs import journal_file as _jf` + `_jf.JobJournal(...)` | 9/0 | RED 1 | **RED 2** — 생성 자리 · import 집합 |
+| A6 | `from …store import JobJournal as _J`(재수출 한 홉, `# type: ignore` 동반) | 9/0 | mypy 만 막았다 | **RED 1** — 이름 바인딩 집합(mypy exit 0 확인) |
+| A3 | `factory = JobStore; factory(...)`(지역 재바인딩) | 6/0 | 초록 | **초록 — 알려진 제한으로 등재**(checklist 경계 밖 표) |
 
-| # | 변이 | numstat | RED |
+### vr H-2 · cr M-1 — 둘째 writer: 이름 목록에서 감사 훅으로
+
+| # | 쓰는 방식 | 앞 판 | 이 판 |
 | --- | --- | --- | --- |
-| M-1 | 정책 값 `pending_queue_max` 4 → **3** | 1/1 | 2 — 승인 값 · 값이 폐기 시점에 닿는지 |
-| M-2 | 같은 값 4 → **5** | 1/1 | 같은 2 |
-| M-3 | 상한 판정 off-by-one | 1/1 | 8 |
-| M-4~M-6 | Python 표 · Kotlin 허용표 · proto 표 행에서 간선 제거 | 각 0/1 | 5 · 4 · 3 — 교차 등식 |
-| M-7 | 저널 쓰기 **전에** 메모리 커밋 | 1/1 | 1 |
-| M-8 | 원자 교체를 직접 쓰기로 | 1/3 | 4 |
-| M-9 | 깨진 저널을 「없음」으로 | 2/2 | 6 |
-| M-10 | `START` 를 다시 `submit()` 안으로 | 1/0 | 10 |
-| M-11 | `ReadinessGate` 에 다른 이름으로 READY 복귀 | 4/0 | 1 |
+| F1 | builtin `open(<저널 경로>, "w")` | **초록** | **포착** |
+| F2 | `(<경로>).open("w")` | **초록** | **포착** |
+| F3 | `Path.replace(staged, <경로>)`(비결합, 위치 둘) | **초록** | **포착** |
+| F4 | `staged.replace(target=<경로>)`(키워드) | **초록** | **포착** |
+| F5 | private writer 재사용(`os.open` + `os.write`) | **초록** | **포착** |
+| F6 | `shutil.move` | RED(이름 목록) | **포착** |
+| F7 | `subprocess.run(["mv", …])` | **초록** | **의도만 포착**(자식이 쓴다 — 알려진 제한) |
+| **PROD** | `store._commit` 안에서 builtin `open` 으로 저널을 덮어쓴다(= 실제로 실행되는 production 둘째 writer) | — | **RED** — 실행 경로 test 가 위반으로 잡는다 |
 
-### 이름 술어에서는 **초록이던** 우회 — 구조 술어로 바꾼 뒤 RED
+F1~F7 은 버릴 모듈에 심어 **이벤트 포착**을 센다(그 모듈은 `src/` 밖이라 production writer 로
+분류되지 않는다). production 분류가 위반이 되는 것은 PROD 행과 술어 단독 test 가 보인다.
 
-| # | 변이(괄호는 **이름·리터럴 술어** 아래의 결과) | numstat | 구조 술어에서 RED 가 되는 test |
+### vr M-1 — 전이표: 글리프에서 렌더링 바이트로
+
+| # | 심은 것 | 앞 판 | 이 판 |
 | --- | --- | --- | --- |
-| V8 | 조립 근의 `pending_queue_max=serving_policy.…` → 상수 `1000` (**저장소를 직접 만드는 test 아래: 전건 초록**) | 1/1 | 1 — 조립 근 운반 test |
-| G1 | `servicer.py` 에 `JobJournal as _J` 별칭 생성 (**초록**) | 3/0 | 2 — 생성 자리 해석 · import 집합 |
-| G2 | `runner.py` 에 `Path.replace` 둘째 writer (**초록**) | 3/0 | 1 — 파일계 집합 |
-| G3 | `runner.py` 에 `from os import replace as _swap` (**초록**) | 4/0 | 1 — 파일계 집합 |
-| G4 | `runner.py` 에 `JobStore as _S` 로 상한 10^9 저장소 생성 (**초록**) | 2/0 | 1 — 생성 자리 해석 |
-| G5 | 조립 근의 경로를 모듈 상수(절대 경로) 경유로 (**리터럴 술어 초록**) | 2/1 | 1 — 값 축(설정 뿌리·조각) |
-| G6 | 패키지 뿌리에 `JobJournal` 재수출 되살림(둘째 획득 경로) | 1/0 | 1 — 뿌리 재수출 집합 |
-| G7 | `JobJournal.path` property 되살림 | 4/0 | 1 — 공개 표면 집합 등식 |
-| P1 | Kotlin 허용표에 `Pair(CANCELLED, RUNNING)` (**초록**) | 1/0 | 2 — 언급 수 등식 · 그 음성 대조 |
-| P1b | `isAllowedTransition` 에 `\|\| from == FAILED` 절 추가 (**초록**) | 1/1 | 1 — 술어 본문 고정(+ Kotlin 5x5 진리표) |
-| P2 | proto 주석에 들여쓰기 둘짜리 `//  FAILED → RUNNING` (**초록**) | 1/0 | 4 — 통치 구역 닫힌 세계 + 음성 대조 |
-| P2b | proto 표 들여쓰기 산문 `(FAILED → RUNNING)` (**초록**) | 1/0 | 4 — 같은 자리 |
-| P3 | ADR D-8 에 백틱 없는 `FAILED → RUNNING` 산문 (**초록**) | 1/1 | 2 — 백틱 밖 화살표 계수 + 음성 대조 |
-| V-M3 | `_fill_store_unavailable` 두 분기 제거 | 2/4 | 2 — `JOB_STORE_UNAVAILABLE` wire test |
+| PR1·PR2 | 블록 안 `->` · `⟶` | **초록** | **RED** — 렌더링 바이트 등식 |
+| PR3 | enum 값 주석의 전이 주장 | **초록** | **RED** — 블록 밖 금지 |
+| PR4 | 빈 줄로 떨어진 단락 | **초록** | **RED** — 블록 밖 금지 |
+| AD1·AD2·AD3 | ADR 블록 안 `->` · `&rarr;` · `⇒` | **초록** | **RED** — 렌더링 바이트 등식 |
+| AD4 | `---` 뒤 재개정 절 | **초록** | **RED** — 블록 밖 금지 |
+| AD6 | 블록 밖 마크다운 표 | **초록** | **RED** — 블록 밖 금지 |
+| K1 | 허용표 한 행 `//` + 별칭 행 추가 | **초록**(Python·Gradle 둘 다) | **RED 둘 다** — Python 게이트 3 fail(렌더링 등식·주석 행 대조·언급 수) · Gradle `TrainingContractTest` 의 ADR 대조 fail |
+| K2 | 블록 뒤 집합 산술(`) - setOf(…) + setOf(…)`) | **초록**(Python·Gradle 둘 다) | Python 게이트는 **초록**(산술이 파싱 블록 밖이다) · **Gradle RED** — ADR 파생 기대값과 런타임 값이 다르다. 두 층의 합성이 닫는 자리다 |
+| PY | Python `_TRANSITIONS` 에 간선 추가 | — | **RED** — 두 문면 등식(권위가 Python 표다) |
 
-G1~G7 은 각각 **의도한 게이트 하나**에서 떨어졌다(import 오류가 아니다 — FAILED 목록을 확인).
-P2·P2b 에서는 음성 대조 test 들도 함께 붉어진다: 그 test 가 **이미 변이된 문면 위에** 또
-심으므로 측정 목록이 둘이 된다(기준 문면이 바뀐 것을 알아차린 것이고, 1차 술어
-`test_every_arrow_in_the_governed_proto_block_is_parsed` 가 먼저 떨어진다).
+### cr M-3 · M-2 · M-4 축
+
+| # | 변이 | 결과 |
+| --- | --- | --- |
+| R1 | `_PENDING_FAILURE_REASONS` 에 넷째 쌍 추가 | **RED 3** — 문면 등식 둘 + 크기 단언 |
+| R2 | 문면에 넷째 사유만 추가 | **RED** — 같은 등식(양방향) |
+| R3 | `_decode_failure` 를 다시 거부로 | **RED 2** — 사본 불일치·구판 저널 기동 |
 
 ## rollback 실측
 
-`rollback.md` 참조(실측 HEAD `e118ced7` · ①~⑥ 결과를 그 파일이 갖는다).
-
-## acceptance — `container` job (S-21 ~ S-25, ci.yml 의 run step 순서대로)
-
-run 블록은 **파일에서 그대로 꺼내** 순서대로 실행했다(손으로 옮겨 적지 않는다) — ci.yml 을
-파싱해 `container` job 의 step 을 차례로 돌리고, 러너의 `$GITHUB_ENV`·`$GITHUB_PATH`·
-`$RUNNER_TEMP` 를 파일·디렉터리로 흉내 냈다. `uses:` step 셋(checkout·setup-java·
-setup-gradle)은 로컬 툴체인이 이미 그 자리라 건너뛴다.
-
-**이 job 은 재사용하지 않고 전부 다시 돌렸다** — `contracts/proto` 와 `ml-engine/src` 를 편집했고 둘 다 Dockerfile 의 입력이다.
-
-**16 step 전부 exit 0**(요약 — 아래 목록이 실행 순서다):
-
-| # | step | exit |
-| --- | --- | --- |
-| 1·2 | DB 접속 값 · 운영자 자격 값 생성(일회성) | 0 |
-| S-21 | `docker build -f docker/ml-serving.Dockerfile` | 0 |
-| S-21a | `./gradlew --no-daemon :app:bootJar` | 0 |
-| S-21b | `docker build -f docker/app.Dockerfile` | 0 |
-| S-22a·S-22b | 이미지 위생 게이트 둘(ml-serving · app) | 0 |
-| S-22c | 앱 이미지 거부 스모크(운반 이름공간 조기 거부) | 0 |
-| — | install trivy(정책 파일의 핀 체크섬으로 받아 `sha256sum --strict -c`) | 0 |
-| S-22d·S-22e | 이미지 취약점 게이트 둘 | 0 |
-| S-22f | SBOM 보관(CycloneDX, 이미지 둘) | 0 |
-| S-23 | `docker compose up -d` + healthy 수렴(app·ml-serving·postgres) | 0 |
-| S-23b | 컨테이너 스모크(준비 상태·인증 경계·health 격리·수집 꺼짐) | 0 |
-| S-23c | 백업·복원·되돌림 리허설 | 0 |
-| **S-24** | **실 Kotlin gateway ↔ 컨테이너의 실 Python 서버**(`RealServerIntegrationTest`) | 0 |
-| S-25 | `docker compose down -v` | 0 |
-
-S-24 는 **이 문서에 항목이 빠져 있던 자리**다(vr §4) — 목록을 손으로 적는 대신 ci.yml 의 step
-목록 자체를 돌리므로 빠질 자리가 없다.
-
-### Q-6 전용 실측 — 컨테이너 재생성 뒤 저널 생존 (wire 를 지나서)
-
-아래 표는 실측 HEAD `54bbef81` 에서의 측정을 그대로 잇는다. 이 라운드는 `docker/**` 를 편집하지
-않았고 저널의 **자리·형식·볼륨 배선**도 바꾸지 않았다(바뀐 것은 모듈 분할·쓰기 결과 타입·
-게이트다). 위 S-23~S-25 가 그 배선 위에서 다시 exit 0 이다.
-
-| 단계 | 실측 |
-| --- | --- |
-| 기동 직후 볼륨 안 | `/app/artifacts/_journal/jobs.json` 존재 · 소유자 `mlserving:mlserving` · 모드 `0600` · 내용은 `jobs` 빈 배열 |
-| 기동 로그 | 처분 계수 세 줄값 `0 · 0 · 0` + `readiness=READY` |
-| `StartTraining` 한 건(존재하지 않는 dataset) | handle 반환 → 폴링에서 `JOB_STATE_FAILED` / `DATASET_UNREADABLE` / `NOT_FOUND` — 저널에 그 기록이 남음 |
-| `docker compose rm -sf ml-serving` → `up -d ml-serving` | 컨테이너 **id 가 바뀜**(진짜 재생성) · healthy 재수렴 |
-| 재생성 뒤 같은 `job_id` 조회 | **같은 상태·실패 코드·세부 사유** 반환 |
-| 재생성 뒤 처분 계수 | `0 · 0 · 0`(종단 job 이라 더 처분할 것이 없다 — 수렴) |
-| 멱등 키 보존 | 같은 멱등 키 재요청이 **같은 `job_id`** 를 돌려줌(새 job 0) |
-| **통제군** — `down -v` 로 볼륨을 지우고 다시 띄움 | 저널의 job 수 **1 → 0**. 생존을 만든 것이 볼륨임을 보인다(이미지도 코드도 그대로다) |
+`rollback.md` 참조(실측 HEAD · ①~⑥ 결과를 그 파일이 갖는다).
