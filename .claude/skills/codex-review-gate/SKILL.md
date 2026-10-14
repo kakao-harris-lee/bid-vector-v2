@@ -99,13 +99,14 @@ CODEX_OFF=(); while read -r k; do [ -n "$k" ] && CODEX_OFF+=(-c "${k}.enabled=fa
 # 든 켜진 서버를 놓치고, `mcp list` 자체가 실패하면(따옴표 키·config 파싱 실패·하위 명령 변경) 빈
 # 출력이라 PASS 로 끝난다 — 종료 코드와 구조로 닫는다. plugin 은 CLI 로 관측할 수 없다 — raw-output
 # 의 plugin·connector 도구 호출 계수로 갈음한다(0 이 아니면 라운드 무효).
-MCP_JSON=$(mktemp)
+MCP_JSON=$(mktemp); trap 'rm -f "$MCP_JSON"' EXIT
 "$CODEX_BIN" mcp list --json "${CODEX_OFF[@]}" > "$MCP_JSON" || { echo "mcp list 실패 — preflight 미충족"; exit 1; }
+# `x["enabled"]` 로 읽는다 — 필드 이름이 바뀌면 KeyError 로 멈춘다(.get 은 None 이라 공허한 PASS).
 python3 -c 'import json,sys
 s=json.load(open(sys.argv[1]))
-bad=[x["name"] for x in s if x.get("enabled")]
+bad=[x["name"] for x in s if x["enabled"]]
 if bad: sys.exit("enabled: "+",".join(bad))
-print(f"all {len(s)} MCP servers disabled")' "$MCP_JSON" || { echo "MCP 서버가 켜져 있다 — preflight 미충족"; exit 1; }
+print(f"all {len(s)} MCP servers disabled (overrides={sys.argv[2]})")' "$MCP_JSON" "${#CODEX_OFF[@]}" || { echo "MCP 서버가 켜져 있다 — preflight 미충족"; exit 1; }
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
