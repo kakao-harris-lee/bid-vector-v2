@@ -1,6 +1,6 @@
 # M6/6B-4 완료 점검 — ML training job 영속 · 대기 큐 상한
 
-정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `86ee999a`. 실행 결과는
+정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `dfca2394`. 실행 결과는
 `commands.md`, 되돌림은 `rollback.md`.
 
 ## 산출물 Q-1 ~ Q-7 과 그 술어
@@ -55,12 +55,16 @@
 | 축 | 닫혔나 | 무엇이 남는가 |
 | --- | --- | --- |
 | 상대 import·모듈 앨리어스 | **닫힘** | grimp 가 절대 이름으로 정규화한다 |
-| 재수출 한 홉 경유 획득 | **닫힘** | 이름 바인딩 집합 등식(mypy 플래그에 기대지 않는다) |
+| 재수출 한 홉 경유 획득 | **부분 — `from …store import JobJournal` 은 닫힘, 모듈 속성은 OPEN** | `modules_binding` 은 `ImportFrom` 의 이름만 본다. `import …jobs.store as m` 뒤 `m.JobJournal(...)` + `# type: ignore[attr-defined]` 는 **초록**이다(vr M-3 A7b 실측: ruff·mypy·lint-imports·게이트 전부 통과). 생성 자리 해석을 런타임 객체 동일성으로 정규화하면 닫힌다 → `OPEN-6B4-AUDIT-HOOK-HARDENING` |
 | 지역 재바인딩(`factory = JobStore`) | **열림** | 생성 자리 술어는 값의 흐름을 따라가지 않는다 |
 | `type(store)(...)` | **열림** | 이름이 등장하지 않는다 |
 | private 속성(`store._journal`) | **열림** | 위 둘과 묶여야 쓸모가 있고 production 에 그 자리는 없다 |
 | 동적 접근(`importlib`·`getattr`) | **열림** | AST·grimp 는 import 문과 호출식을 읽는다 |
-| 저널 파일 쓰기(철자 무관) | **닫힘 — 실행된 경로에 한정** | 감사 훅이 잡는다. **실행되지 않는 코드 경로**는 못 본다 |
+| 저널 파일 쓰기(철자 무관) | **대체로 닫힘 — 실행된 경로에 한정, 다섯 갈래 OPEN** | 감사 훅이 흔한 쓰기 열한 갈래를 잡는다(F1~F4 · F7 · H1~H5 · H8). **실행되지 않는 코드 경로**는 못 보고, 실행되는데도 놓치는 다섯이 실측됐다 — dir_fd + 상대 이름 · `chdir` 뒤 상대 경로 · `exec` 로 만든 프레임(미귀속) · `os.system` · `os.chmod`(둘은 감사 이벤트 집합 밖) → `OPEN-6B4-AUDIT-HOOK-HARDENING` |
+| 감사 훅의 경로 술어 | **OPEN** | 인자 문자열의 **부분 문자열**이라 ① 상대 경로를 놓치고 ② `*_journal` 로 끝나는 무관한 디렉터리를 잡는다(오탐). `abspath` + 경로 **성분** 비교로 둘이 함께 닫힌다(cr L-2) → 같은 OPEN |
+| 감사 훅의 subprocess 분기 | **OPEN(거짓 양성)** | `record()` 가 subprocess 를 writer 판정 **앞에서** 무조건 위반으로 적는다 — 앞으로 저널 경로를 자식에게 넘기는 **test** 를 쓰면 세션 전역 게이트가 붉어진다(`tests/` 예외를 그 분기 앞으로 옮기면 닫힌다, cr L-1) → 같은 OPEN |
+| 감사 판정의 **실행 범위** | **OPEN** | 판정은 세션 **맨 뒤 test** 다. 그 뒤에 생기는 위반(session fixture teardown · 남은 워커 스레드 · `atexit` 쓰기)은 판정되지 않고, `-x` 로 앞에서 멈추거나 `-k`·부분 경로(`pytest tests/<dir>`)로 그 test 가 수집되지 않으면 **판정 자체가 없다**(실측 exit 0). acceptance 는 `pytest tests` 전건이라 영향 0 → 같은 OPEN |
+| 블록 밖 전이 주장 금지 | **좁힘(닫음 아님)** | 연결 글자 15개 열거 + 대문자 상태 이름이라 `⇢`·`↦`·`➔`·`—>` · 소문자 · **연결 글자 없는 산문** · 마크다운 표를 놓친다(vr M-2 · cr L-3 실측). 권위 있는 표는 바이트 등식으로 닫혀 **기계 산출물에는 영향이 없고**, 남는 위험은 사람이 읽는 거짓 문장 하나다 → `OPEN-6B4-TRANSITION-PROSE-GATE` |
 | 다른 프로세스의 쓰기(`subprocess`) | **열림** | 훅은 자식 생성(argv 에 저널 경로)을 **의도**로 적지만, 자식 안에서 경로를 조립하면 보이지 않는다 |
 | 저널 파일을 직접 편집하는 주체 | 비방어 | 위협 모델이 처음부터 제외한다 |
 
@@ -76,7 +80,7 @@
 | 6 | 저널 부분 쓰기 → 다음 기동이 빈 저장소 | 원자 교체 + 「없음」/「깨짐」 분리 + 기동 거부 |
 | 7 | 재기동 시 ACCEPTED 고아가 상한보다 많음(이전 버전 저널) | 재적재에도 상한 적용(최고참부터 폐기, 계수 실측) + 모르는 spec 버전 처분 |
 | 8 | RUNNING 고아 재실행(중복 학습·산출물 덮어쓰기) | 재개 없음 — 처분만. 산출물 디렉터리 「존재하면 거부」 관례 무변경 |
-| 9 | 영속이 `apply_transition` 밖에서 일어나 H-2 재발 | 저널 쓰기가 잠금 안 + **쓰기 성공 뒤에만 커밋**(실패 주입으로 상태·저널 일치 실측) + **파일계 변경 자리 집합 등식**(심볼 해석) + **경로를 밖에 내주지 않음**(`path` 표면 제거) + 저널 파일 모듈의 닫힌 import 집합 |
+| 9 | 영속이 `apply_transition` 밖에서 일어나 H-2 재발 | 저널 쓰기가 잠금 안 + **쓰기 성공 뒤에만 커밋**(실패 주입으로 상태·저널 일치 실측) + **실행 시점 감사 훅**(저널을 겨눈 쓰기의 호출 프레임 — **닫음을 주장하는 것은 이것뿐**이고 실행된 경로에 한정이다). 정적 자리 집합(심볼 해석)·`path` 비노출·저널 파일 모듈의 닫힌 import 집합은 **좁힘**이다(vr L-2: 앞 문면은 정적 집합 등식을 막는 장치로 들었다) |
 
 ## 계약과 어긋나 판단이 필요했던 자리
 
@@ -101,7 +105,9 @@
    부수 결정 둘: 재기동 처분(`RUNNER_LOST_ON_RESTART`)이 `TRAINING_ERROR` 를 쓰므로
    `retryable=false` 가 된다(새 제출이면 돌 수 있으나 그것은 **새 job** 이다 — 전용 코드 선택은
    `OPEN-6B4-STORE-UNAVAILABLE-CODE` 와 같은 축으로 남긴다). 저널의 `retryable` 은 파생값의
-   **사본**이라 형식을 그대로 두고 사상과 어긋나면 `INVARIANT_VIOLATED` 로 거부한다.
+   **사본**이라 형식을 그대로 둔다 — 사본이 사상과 어긋날 때의 처분은 **판단 11**(파생값 승리 +
+   경고)이다(vr L-1: 앞 문면은 여기서 「`INVARIANT_VIOLATED` 로 거부한다」고 적어 판단 11 과
+   모순됐다 — 그 거부는 cr M-2 로 철회됐다).
 
 6. **`ACCEPTED → FAILED` 간선의 사유 목록을 문면 쪽에 맞춰 넓혔다.** 문면 둘(ADR·proto 주석)은
    `WORKER_RESOURCE_EXHAUSTED` 하나만 말했는데 구현은 같은 간선을 셋에 쓴다(상한 폐기 · 재기동
@@ -225,6 +231,35 @@
    `GetTrainingJob`(`store.get`)·`pending_jobs` 가 막힌다. `job_workers: 1` · 대기 상한 4 에서
    문제 되지 않지만 처리량 상한의 자리다.
 
+16. **감사 훅의 경화 틈 — `OPEN-6B4-AUDIT-HOOK-HARDENING`.** 「실행된 경로에서는 철자 무관
+   닫힘」이 다섯 갈래에서 성립하지 않는다(실행되는데도 위반 0): ① 디렉터리 fd + 상대 이름
+   (`os.open("jobs.json", …, dir_fd=fd)`) ② `os.chdir(_journal)` 뒤 상대 경로 ③ `exec` 로 만든
+   프레임(미귀속으로 분류) ④ `os.system` ⑤ `os.chmod`(뒤 둘은 감사 이벤트 집합 밖). 더해
+   경로 술어가 부분 문자열이라 상대 경로를 놓치고 `*_journal` 디렉터리를 잡으며(cr L-2),
+   subprocess 분기가 `tests/` 예외를 받지 않아 **거짓 양성**이 될 수 있고(cr L-1), 판정이 세션
+   맨 뒤 test 라 그 뒤(teardown · 남은 워커 스레드 · `atexit`)와 부분 실행(`-x` · `-k` ·
+   `pytest tests/<dir>`)에서는 판정이 없다. 오늘 production 에 이런 자리는 없다
+   (`journal_file` 의 디렉터리 fd 는 `fsync` 용 `O_RDONLY` 다) — **일부러 그렇게 쓰지 않으면
+   생기지 않는 형태**라 차단하지 않고 등재한다. 싼 처방은 verifier r3 §4 M-1 에 있다.
+
+17. **전이표 「블록 밖 금지」는 좁힘이다 — `OPEN-6B4-TRANSITION-PROSE-GATE`.** 연결 글자 15개
+   열거 + 대문자 상태 이름이라 `⇢`·`↦`·`➔`·`—>` · 소문자(`failed → running`) · **연결 글자
+   없는 산문**(「FAILED 에서 RUNNING 으로 되돌리는 재시도도 허용」) · 마크다운 표
+   (`| FAILED | RUNNING |`)가 초록이다. 게이트 docstring 의 「마크다운 표가 함께 닫힌다」는
+   그만큼 과하다(이 라운드에 문면을 좁혔다). **권위 있는 표는 블록 안 바이트 등식으로 닫혀
+   있어 기계 산출물에는 영향이 없고**, 남는 위험은 사람이 읽는 거짓 문장 하나다. 유니코드
+   화살표 문자 부류로 바꾸고 「상태 이름 둘(대소문자 무시)」로 넓히는 것이 처방이며 거짓
+   양성 실측이 선행 조건이다.
+
+18. **반례 문면과 그 test 가 사라졌다**(cr L-4, 등재). 앞 판 proto 주석은 「표에 없는 쌍(예:
+   …)」을 들고 게이트가 그 쌍의 부재를 따로 단언했다(`parse_proto_forbidden_pairs`). 제한 17 의
+   「블록 밖 금지」가 **그 문장을 쓸 수 없게 만들어** 문면과 test 가 함께 제거됐다. 그 검사가
+   재던 것은 지금 `test_rendered_table_is_not_vacuous` 의 두 단언
+   (`("ACCEPTED","SUCCEEDED")`·`("FAILED","RUNNING")` 부재)이 **권위 있는 표 쪽에서** 진다 —
+   잃은 것은 소비자가 읽는 **문서의 반례**다. 되찾으려면 `transition-counterexamples-begin/end`
+   블록을 하나 더 렌더링하고 허용 표와 서로소임을 단언하면 되고, 이 라운드는 술어를 바꾸지
+   않기로 한 범위라 등재만 한다.
+
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
 착수 시점 이후 추가된 파일 **열넷** 전부가 in_scope 안이다 — r2 가 더한 둘은
@@ -232,13 +267,27 @@
 `ml-engine/tests/gates/test_journal_write_audit.py` 이고 둘 다 `ml-engine/tests/**` 다. 그 밖은 —
 `ml-engine/src/ml_engine/training/jobs/journal.py`·`journal_file.py`(`training/jobs/**`) ·
 `ml-engine/tests/**` 다섯 · `docs/runbook/**` 하나 · `reports/evidence/m6/6b4/**` 넷.
-in_scope 밖 신규 **0**. 기계 대조 — `git diff --name-status <base>..HEAD` 의 35 경로를
+in_scope 밖 신규 **0**. 기계 대조 — `git diff --name-status <base>..HEAD` 의 경로 전수를
 in_scope 패턴에 넣어 매치 없는 줄을 출력하게 했고 출력이 비었다(`rollback.md` 에 같은 측정).
 
 이 라운드가 **만들었다가 커밋 전에 지운** 파일 하나를 명시한다:
 `adapters/src/test/kotlin/bidvector/adapters/contract/TrainingTransitionTableTest.kt` — 새 test
 클래스가 `config/quality/gate-tests.properties`(in_scope 밖) 등재를 요구해서 접었고, 이력에
 들어가지 않았다(`git log --all -- <그 경로>` 빈 출력). 위 「판단이 필요했던 자리」 8 참고.
+
+## 계약 심판 안내 — ADR 편집 범위(vr L-7)
+
+in_scope 는 `docs/adr/0010-*.md` 를 **「D-8 개정 블록」**으로 적는데, 이 slice 의 편집은 그 블록
+밖 **원 D-8 bullet** 한 줄에도 닿았다. 그 bullet 이 전이 사슬(`ACCEPTED → RUNNING → …`)을 산문
+으로 들고 있었고, 이 라운드가 세운 **「블록 밖 전이 주장 금지」** 술어가 그 문장을 허용하지
+않는다 — 그래서 사슬을 렌더링 블록으로 옮기고 bullet 은 그 블록을 가리키게 고쳤다. **뜻은
+보존된다**(취소가 두 비종료 상태에서 가능하다는 단서까지 유지). 되돌리면 그 술어가 자기 파일에서
+붉어지므로 필요한 이동이고, 범위가 문면보다 넓다는 사실만 여기 적는다(Codex 계약 심판이 D-8 절
+전체를 보도록).
+
+같은 절의 다른 변경 둘도 같은 이유다 — 개정 블록의 `**`ACCEPTED → FAILED`**` 를 「`ACCEPTED`
+에서 `FAILED` 로 가는 간선」으로, 「RUNNING 고아는 `RUNNING → FAILED`」를 「RUNNING 고아는
+`FAILED` 로 처분한다(그 쪽 간선)」로. 전이 **데이터**는 렌더링 블록 여섯 줄이 유일한 자리다.
 
 ## OPEN
 
@@ -257,6 +306,8 @@ in_scope 패턴에 넣어 매치 없는 줄을 출력하게 했고 출력이 비
 | `OPEN-6B4-STORE-UNAVAILABLE-CODE` | 2A `FailureCode` 여덟에 「저장소를 쓸 수 없다」가 없다 — 지금은 `MODEL_NOT_READY` + `detail_code` 로 얹는다 | 계약 축 |
 | `OPEN-6B4-JOURNAL-RETENTION` | 종단 job 보존 기간·정리 절차(전체 교체 형식의 단조 증가) | M7 운영 |
 | `OPEN-6B4-QUEUE-METRIC` | 대기 깊이·폐기·처분 계수의 metric·경보 | M7 관측(6F-10 `OPEN-6F10-CLAIM-OBSERVABILITY` 와 같은 모양) |
+| `OPEN-6B4-AUDIT-HOOK-HARDENING` | 감사 훅의 경화 틈 — 실행되는데도 놓치는 다섯(dir_fd 상대 이름 · `chdir` · `exec` 프레임 · `os.system` · `os.chmod`) · 부분 문자열 경로 술어(상대 경로 누락 · `*_journal` 오탐) · subprocess 분기의 `tests/` 거짓 양성 · 재수출 **모듈 속성** 경유 획득(`m.JobJournal(...)` + `type: ignore`) · 판정 범위(맨 뒤 test 이후 · 부분 실행) | 게이트 경화 축(다음 게이트형 slice) |
+| `OPEN-6B4-TRANSITION-PROSE-GATE` | 전이표 **블록 밖** 금지 술어가 연결 글자 열거 — 유니코드 화살표 부류 + 「상태 이름 둘(대소문자 무시)」로 넓히기(거짓 양성 실측 선행) · 반례 블록 복원(제한 18) | 계약 문면 축 |
 
 ### 입력이지만 수령은 아닌 것
 

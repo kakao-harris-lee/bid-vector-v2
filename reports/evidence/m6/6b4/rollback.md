@@ -1,6 +1,6 @@
 # M6/6B-4 되돌림
 
-실측 HEAD: `86ee999ae633f9514f9b5266a7c3f405f746ac41` (이 slice 의 **마지막 산출물 커밋**)
+실측 HEAD: `dfca239478d883ef87cf21a761388f83674132fa` (이 slice 의 **마지막 산출물 커밋**)
 
 base: `e2232a75`. 브랜치 `m6-6b4/2026-10-13`.
 
@@ -26,16 +26,17 @@ git diff --name-status e2232a75..HEAD
 **라운드마다 파일이 늘면 이 절차를 다시 돌린다.** 목록이 낡는 것이 이 결함의 실제 원인이다.
 base 가 움직이면(rebase·흡수 병합) 재산출 기준도 함께 움직인다.
 
-실측 HEAD(`86ee999a`)에서의 산출: **38 경로** — `A` 14(삭제 대상) · `M` 24(base 로 복원).
+실측 HEAD(`dfca2394`)에서의 산출: **38 경로** — `A` 14(삭제 대상) · `M` 24(base 로 복원).
 `A` 열넷: 저널 값·코덱 모듈 하나 · 저널 **파일** 모듈 하나 · Python test 일곱(감사 훅의
 술어·기록 모듈과 그 게이트 test 둘 포함) · runbook 하나 · 이 slice 의 evidence 넷.
 `M` 스물넷: Kotlin 계약 규칙·계약 test · proto · docker 둘 · ADR · 정책 YAML · Python src 여섯 ·
 Python test 여덟(`tests/conftest.py` 포함) · `policy-values.md`.
 
-**앞 라운드(실측 HEAD `e118ced7`)의 목록은 35 였다.** 늘어난 셋은 `tests/journal_audit.py` ·
-`tests/gates/test_journal_write_audit.py`(둘 다 신규 `A`)와 `tests/conftest.py`(감사 훅 설치,
-`M`)이고 전부 in_scope(`ml-engine/tests/**`) 안이다. 「라운드마다 재산출」을 이 자리에서 실제로
-돌린 결과다 — 앞 실측을 옮기지 않았다.
+**앞 측정(실측 HEAD `86ee999a`)의 목록도 38 이었다** — 승인 전 일괄 배치는 새 파일을 만들지
+않았고(기존 test·evidence 편집만) 경로 집합이 그대로다. 그보다 앞(`e118ced7`)은 35 였고 늘어난
+셋은 `tests/journal_audit.py` · `tests/gates/test_journal_write_audit.py`(둘 다 신규 `A`)와
+`tests/conftest.py`(감사 훅 설치, `M`)로 전부 in_scope(`ml-engine/tests/**`) 안이다.
+「라운드마다 재산출」을 이 자리에서 실제로 돌린 결과다 — 앞 실측을 옮기지 않았다.
 
 **이 slice 의 evidence 디렉터리도 되돌림 대상에 넣는다**(`reports/evidence/m6/6b4/**`). 남겨
 두면 base 의 누출 어휘 baseline 에 없는 문서가 트리에 남아 `leakPatternGate` 가 붉어진다
@@ -44,13 +45,15 @@ Python test 여덟(`tests/conftest.py` 포함) · `policy-values.md`.
 ## 명령 — in_scope 경로 한정(range revert 가 아니다)
 
 ```
-git restore --source=e2232a75 --staged --worktree -- <위 목록의 35 경로를 개별 인자로>
-git commit -m "revert(m6-6b4): in_scope 경로를 base 로 되돌림" -- <같은 35 경로>
+git restore --source=e2232a75 --staged --worktree -- <위 목록의 경로를 개별 인자로>
+git commit -m "revert(m6-6b4): in_scope 경로를 base 로 되돌림" -- <같은 목록>
 ```
 
 **복원과 커밋이 한 쌍이다** — 미커밋 복원은 `contracts/` 의 작업 트리를 더럽혀 `contractGate`
 를 붉힌다(아래 ⑥ 보완 경로의 실측).
 
+- **경로 수를 이 블록에 적지 않는다**(vr L-6: 앞 판은 「30 경로」·「35 경로」가 목록과
+  어긋났다). 수는 위 산출 절에만 적고, 명령은 그 목록을 가리킨다.
 - 목록을 변수 하나에 담지 않는다(pathspec 이 하나가 되어 아무것도 매치하지 않는다).
 - `git checkout <base> -- <경로>` 를 쓰지 않는다 — base 에 없는 경로마다 pathspec 오류로
   exit 1 이고 아무것도 적용되지 않는다.
@@ -87,10 +90,10 @@ git rev-parse HEAD^{tree}        # 되돌린 트리
 git rev-parse e2232a75^{tree}    # base 트리
 ```
 
-실측: 둘 다 `c8d8f211c7d25c8b708c2393d8792ce0fc084360` — **같은 트리**. 앞 세 라운드(실측 HEAD
-`54bbef81`·`18069139`·`e118ced7`)의 되돌린 트리도 같은 해시였고, 그 트리에서 ④~⑥ 을 **실제로 돌려** 아래
-값을 얻었다. 네 라운드의 되돌린 트리가 같은 객체이므로 그 결과가 그대로 유효하다(종료 코드를
-옮긴 것이 아니라 **대상 트리가 동일**). 되돌림이 덮는 경로가 늘었어도(35 → 38) 늘어난 경로가
+실측: 둘 다 `c8d8f211c7d25c8b708c2393d8792ce0fc084360` — **같은 트리**. 앞 네 측정(실측 HEAD
+`54bbef81`·`18069139`·`e118ced7`·`86ee999a`)의 되돌린 트리도 같은 해시였고, 그 트리에서 ④~⑥ 을 **실제로 돌려** 아래
+값을 얻었다. 다섯 측정의 되돌린 트리가 같은 객체이므로 그 결과가 그대로 유효하다(종료 코드를
+옮긴 것이 아니라 **대상 트리가 동일**). 되돌림이 덮는 경로가 늘었어도(35 → 38, 이번 배치는 무변) 늘어난 경로가
 `A` 라서 되돌린 트리는 바뀌지 않는다 — 그 사실이 해시 일치로 다시 보인다.
 
 앞 라운드에서 그 트리에 대해 실측한 값 — `mypy --strict src/ml_engine` **exit 0**(97 files,
@@ -114,7 +117,7 @@ git commit -m "revert(m6-6b4): in_scope 경로를 base 로 되돌림" -- <같은
 
 커밋 뒤 `git status --porcelain` **빈 출력** · 되돌린 트리 해시 = base 트리 해시
 (`c8d8f211…`) · Kotlin `check` **exit 0**. 갈음의 판정은 「HEAD 가 초록」이 아니라
-**트리 동일성**이고, 그 해시 일치가 그것이다. 이 보완 단계는 **네 라운드 모두에서** 실제로
+**트리 동일성**이고, 그 해시 일치가 그것이다. 이 보완 단계는 **다섯 측정 모두에서** 실제로
 실행했다(각각 exit 0).
 
 `contracts/` 를 만지는 slice 의 되돌림은 전부 이 단계를 필요로 한다 — 복원만 하고 `check` 를

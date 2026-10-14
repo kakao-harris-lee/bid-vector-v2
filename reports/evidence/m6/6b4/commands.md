@@ -8,7 +8,7 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 
 ## acceptance — `ml-engine` job 전건 (`.github/workflows/ci.yml`)
 
-양끝 HEAD 동일(`86ee999a`). `working-directory: ml-engine`.
+양끝 HEAD 동일. `working-directory: ml-engine`.
 
 ## 2026-10-14T
 - cmd: `uv sync --frozen --all-extras` (S-1)
@@ -38,8 +38,9 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 ## 2026-10-14T
 - cmd: `uv run python -m pytest tests -q` (S-5)
 - exit: 0
-- 핵심 결과: **1598 passed**(409s). 감사 훅이 세션 내내 켜져 있어 `tests/app` 이 330s → 408s
-  로 늘었다(약 25% — 「닫는 것은 실행된 경로」의 비용, checklist 판단 14)
+- 핵심 결과: **1599 passed**(369s). 감사 훅이 세션 내내 켜져 있는 비용은 **A/B 대조로 확인**
+  됐다 — 훅 설치 한 줄만 주석 처리하면 `tests/app` 269 test 가 331.3초, 그대로 두면 384.0초
+  (+15.9%, code-review r3 §4). 「닫는 것은 실행된 경로」의 대가다(checklist 판단 14)
 
 ## 2026-10-14T
 - cmd: `uv run python tools/design_ratchet.py --check` (S-6)
@@ -62,6 +63,11 @@ post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 
 - 핵심 결과: 1 passed — 설치본에서 재수출 성립
 
 ## acceptance — `check` job
+
+**승인 전 일괄 배치(이 문서의 마지막 갱신)에서는 다시 돌리지 않았다** — 그 배치가 바꾼 것은
+`ml-engine/tests/**` 와 이 evidence 뿐이고 **Kotlin·proto 변경이 0** 이다(기계 확인:
+`git diff --name-only <계약 r4>..HEAD | grep -cE '\.(kt|proto)$'` → 0). 아래 값은 산출물
+판정 SHA 직전의 실측이고, 그 뒤 Kotlin 입력은 한 글자도 바뀌지 않았다.
 
 ## 2026-10-14T
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
