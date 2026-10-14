@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 완료 조건 1(milestone-6.md 「새 checkout/clean database 에서 one-command
-# build/test 가능」). Kotlin 전건 + Python 전건을 **한 명령**으로 순차 실행한다.
+# build/test 가능」). Kotlin 전건 + Python 전건 + web 전건을 **한 명령**으로 순차 실행한다.
 #
-# 내부 명령은 `.github/workflows/ci.yml` 의 두 job(`check`·`ml-engine`)이 돌리는 명령
+# 내부 명령은 `.github/workflows/ci.yml` 의 세 job(`check`·`ml-engine`·`web`)이 돌리는 명령
 # **그대로**다(하네스 2026-09-12 「부분 게이트를 전건 대신 돌리지 않는다 — 정본은 CI
 # 워크플로 job 이 돌리는 명령 그대로이고, 줄일 수 있는 단위는 게이트가 아니라 job」) —
 # 새 축약·새 플래그를 만들지 않는다. CI 전용 step(체크아웃·툴체인 설치·아티팩트
@@ -81,4 +81,36 @@ trap 'rm -rf "$ONE_COMMAND_WHEEL_DIR"' EXIT
 uv build --wheel -o "$ONE_COMMAND_WHEEL_DIR"
 uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 
-_step "완료 — Kotlin 전건 + Python 전건 통과"
+# ---- web(web job, working-directory: web) ----
+# M7/7A — ci.yml `web` job 의 명령을 순서까지 그대로 둔다. 뺀 CI 전용 step 은 둘이다:
+# 체크아웃·setup-node(툴체인 설치)와 `npx playwright install-deps chromium`(브라우저가 쓰는
+# 시스템 패키지 설치 — apt 를 건드리므로 로컬에서 돌릴 것이 아니다). 브라우저 자체 설치
+# (W-7)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
+# 조건 1 이고, 그래서 job 쪽도 그 두 명령을 나눠 두었다(축약·새 플래그를 만들지 않는다).
+cd "$REPO_ROOT/web"
+
+_step "web — install (W-1)"
+npm ci
+
+_step "web — eslint (W-2)"
+npm run lint
+
+_step "web — typecheck (W-3)"
+npm run typecheck
+
+_step "web — OpenAPI 생성 타입 바이트 등식 (W-4)"
+npm run api:types:check
+
+_step "web — vitest (W-5)"
+npm run test
+
+_step "web — build (W-6)"
+npm run build
+
+_step "web — Playwright chromium 설치 (W-7)"
+npx playwright install chromium
+
+_step "web — Playwright 스모크 (W-8)"
+npm run test:e2e
+
+_step "완료 — Kotlin 전건 + Python 전건 + web 전건 통과"

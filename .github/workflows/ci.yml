@@ -179,6 +179,68 @@ jobs:
           uv build --wheel -o /tmp/ml-engine-wheel
           uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 
+  # M7/7A — `web/` 골격의 게이트(ADR 0011 D-5). 위 두 job 의 명령은 이 slice 에서 무편집이고
+  # 소스 겹침은 **0**이다(`web/**` 는 Gradle 모듈도 Python 패키지도 아니다) — 그래서 별도
+  # job 하나다(하네스 2026-09-12 「줄일 수 있는 단위는 게이트가 아니라 job」).
+  #
+  # 단계 ID 는 `W-n` 이다. M6 완료 조건의 `S-n` 등록부에 새 번호를 끼우지 않는다 — 그 번호는
+  # M6 문서가 조건별로 가리키는 좌표라, 뒤에서 늘리면 그 참조가 가리키는 집합이 조용히 바뀐다.
+  #
+  # build 가 test 뒤인 것은 Playwright 스모크가 **빌드 산출물**을 `vite preview` 로 띄우기
+  # 때문이다(dev server 가 아니다 — 그래야 번들이 실제로 뜨는지를 잰다).
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      # `web/.nvmrc`(ADR 0011 D-1 — Node 의 정본)를 읽어 버전을 고정한다. 워크플로에 숫자를
+      # 적지 않는다(`buf`·`.python-version` 과 같은 이유). v5 부터 Node 24(`using: node24`
+      # 실측, v4 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major).
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `npm ci` 는 잠금 파일 밖 해석을 하지 않는다 — 잠금 파일과 `package.json` 이 어긋나면
+      # 설치 자체가 실패한다(D-1 「CI 는 npm ci」).
+      - name: install (W-1)
+        run: npm ci
+
+      - name: eslint (W-2)
+        run: npm run lint
+
+      # 어댑터 금지 게이트 1차 층(D-3) — rootDir 밖 파일이 프로그램에 들어오면 TS6059.
+      - name: typecheck (W-3)
+        run: npm run typecheck
+
+      # 어댑터 금지 게이트 2차 층(D-2) — 생성 타입과 OpenAPI 문서의 바이트 등식.
+      - name: OpenAPI 생성 타입 바이트 등식 (W-4)
+        run: npm run api:types:check
+
+      - name: vitest (W-5)
+        run: npm run test
+
+      - name: build (W-6)
+        run: npm run build
+
+      # CI 전용 — 브라우저가 쓰는 **시스템 패키지** 설치(apt). 로컬 one-command 는 이 step 을
+      # 빼고 바로 아래 브라우저 설치부터 돈다(그 스크립트의 머리 주석 「CI 전용 step(체크아웃·
+      # 툴체인 설치·아티팩트 업로드)만 뺀다」). 브라우저 설치와 **두 명령으로 나눈 이유**가
+      # 이것이다 — 한 명령(`install --with-deps`)이면 로컬이 같은 명령을 쓸 수 없어 축약·새
+      # 플래그가 생긴다.
+      - name: Playwright 시스템 의존 설치 (CI 전용)
+        run: npx playwright install-deps chromium
+
+      - name: Playwright chromium 설치 (W-7)
+        run: npx playwright install chromium
+
+      - name: Playwright 스모크 (W-8)
+        run: npm run test:e2e
+
   # M6/6C — 이미지 빌드·위생 게이트·실 서버 통합 test(D-6C-4). `check`·`ml-engine` 두
   # job 의 명령은 위에서 무편집이다 — 이 job이 컨테이너 축 전부를 진다(하네스 2026-09-12
   # 「줄일 수 있는 단위는 게이트가 아니라 job」). 소스 겹침은 `docker/`·`tools/*.sh`·이
