@@ -1,0 +1,39 @@
+{
+  // ADR 0011 D-3 — 어댑터 금지 게이트의 1차 층. `rootDir` 이 `src` 이고 `include` 가 `src`
+  // 뿐이라, 그 밖의 파일(legacy 프런트 소스)을 import 하면 프로그램에 들어오는 순간
+  // TS6059 로 컴파일이 거부된다. 이름 목록(eslint 금지 경로)은 별칭·심볼릭 링크 하나로
+  // 열리므로 1차 게이트로 쓰지 않는다.
+  //
+  // `allowJs` 를 켜지 않는다 — 켜면 legacy `.js` 가 프로그램에 들어올 또 하나의 입구가 된다
+  // (설계 검토 U-8). `paths` 별칭도 두지 않는다 — 해석된 파일이 rootDir 밖이면 같은 TS6059
+  // 지만, 별칭 자체가 「rootDir 밖을 가리키는 짧은 이름」을 만드는 자리다(U-2).
+  //
+  // `vite.config.ts`·`playwright.config.ts`·`scripts/**` 는 이 프로그램 밖이다(include 가
+  // `src` 뿐). 그 파일들의 타입 검사는 7A 의 게이트가 아니다 — 게이트는 화면 코드가 계약
+  // 밖에서 데이터 모양을 얻는 경로를 막는 것이고, 그 경로는 `src` 안에만 있다.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+
+    "rootDir": "src",
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}

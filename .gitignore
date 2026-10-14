@@ -56,3 +56,14 @@ ml-engine/.contracts-generated/
 /.kotlin/
 /*/.kotlin/
 !gradle/wrapper/gradle-wrapper.jar
+
+# M7/7A — `web/` 의 로컬 산출물(ADR 0011 D-1·D-5). Gradle 쪽과 같은 이유로 **앵커한다** —
+# 앵커 없는 `dist/`·`node_modules/` 는 경로 어디에서나 매치한다. 자리는 하나(`/web/`)뿐이다.
+# `test-results/`·`playwright-report/`·`blob-report/` 는 Playwright 가 실행마다 새로 쓴다
+# (reporter·trace). 반대로 생성 타입(`web/src/api/generated/`)은 **커밋 대상**이다 — CI 의
+# 바이트 등식이 보는 것이 그 커밋본이다(D-2).
+/web/node_modules/
+/web/dist/
+/web/test-results/
+/web/playwright-report/
+/web/blob-report/

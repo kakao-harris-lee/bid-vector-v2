@@ -1,0 +1,25 @@
+import { describe, expect, it } from 'vitest';
+
+import { screenRoutes, screenSlots } from './routes';
+
+// 7A 가 만든 것은 「화면 자리 여섯」이다. 그 여섯이 맞는지만 잠근다 — 화면 동작 test 는 7E.
+const EXPECTED_PATHS = [
+  '/start',
+  '/',
+  '/notices/:noticeId',
+  '/bids',
+  '/results',
+  '/inbox',
+] as const;
+
+describe('화면 자리 표', () => {
+  it('경로가 여섯, 순서까지 요구표의 화면 구분과 같다', () => {
+    expect(screenSlots.map((slot) => slot.path)).toEqual([...EXPECTED_PATHS]);
+  });
+
+  it('라우터는 표에서 파생한다 — 경로 집합이 표와 같고 id 가 겹치지 않는다', () => {
+    expect(screenRoutes.map((route) => route.path)).toEqual([...EXPECTED_PATHS]);
+    const ids = screenRoutes.map((route) => route.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

@@ -1,0 +1,31 @@
+import type { RouteObject } from 'react-router';
+
+import { ScreenPlaceholder } from './ScreenPlaceholder';
+
+/**
+ * 화면 자리의 정본 표. 라우터는 이 표에서 파생한다 — 경로를 두 곳에 적지 않는다.
+ *
+ * 화면 다섯(A~E)과 알림함은 `docs/discovery/m7-screen-data-requirements.md` 의 화면
+ * 구분을 따른다. 7A 는 **자리만** 만든다(설계 검토 (3) 과잉 금지) — 화면 동작·상태
+ * 관리·디자인 시스템은 7E 다.
+ */
+export interface ScreenSlot {
+  readonly id: string;
+  readonly path: string;
+  readonly label: string;
+}
+
+export const screenSlots: readonly ScreenSlot[] = [
+  { id: 'onboarding', path: '/start', label: 'A 시작하기' },
+  { id: 'home', path: '/', label: 'B 오늘의 공고' },
+  { id: 'worksheet', path: '/notices/:noticeId', label: 'C 공고 워크시트' },
+  { id: 'bid-box', path: '/bids', label: 'D 내 입찰함' },
+  { id: 'results', path: '/results', label: 'E 결과 확인' },
+  { id: 'inbox', path: '/inbox', label: '알림함' },
+];
+
+export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({
+  id: slot.id,
+  path: slot.path,
+  element: <ScreenPlaceholder slot={slot} />,
+}));
