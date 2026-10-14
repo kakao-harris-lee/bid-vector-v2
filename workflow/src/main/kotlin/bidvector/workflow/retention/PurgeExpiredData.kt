@@ -58,7 +58,11 @@ sealed interface RetentionRefusal {
  * 깨진 것(재시도 전에 원인을 봐야 한다)이라 값으로 접으면 조용해진다. PR #63 의 relay 처방
  * (`RelayAborted`)과 같은 축이다.
  *
- * [partial] 의 계수는 **커밋된 일괄만** 센다 — 터진 일괄 자신은 롤백되므로 들어 있지 않다.
+ * [partial] 의 정확도는 **두 축에서 다르다**(vr R3c-L2). 파기는 일괄 하나가 DELETE 문장 하나이고
+ * 터진 문장은 통째로 롤백되므로 **정확하다**. 마스킹은 일괄 안에서 **행마다 UPDATE** 를 돌리고
+ * autocommit 이라 행마다 커밋되는데 계수는 일괄이 끝난 뒤 더해지므로, 일괄 도중에 터지면 그 일괄에서
+ * 이미 커밋된 행이 수에서 **빠진다** — 최대 `batchSize − 1` 만큼의 **하한**이다. 정확한 수는 로그가
+ * 아니라 표지 열(`pii_masked_at IS NOT NULL`)이고 runbook §3.4 가 그 질의를 든다.
  */
 class RetentionAborted(
     val partial: RetentionReport,
@@ -170,7 +174,10 @@ class PurgeExpiredData(
      * 계수를 **일괄마다 적는다**(PR #73 P6) — 저장소는 문장마다 자기 트랜잭션이라 한 일괄이 커밋된
      * 뒤 다음 일괄이 터지면 **앞 일괄은 남는다**. 표별 합계를 끝에 한 번 적으면 그 run 의 계수가
      * 통째로 사라지고, 되돌릴 수 없는 경로에서 「몇 행이 이미 사라졌나」가 로그 밖으로 나간다.
-     * 터진 일괄 자신은 롤백되므로 세지 않는다 — 콜백이 저장소 호출 **뒤에** 돈다.
+     *
+     * **콜백이 저장소 호출 뒤에 도는 것이 파기에서는 정확하고 마스킹에서는 하한이다**(vr R3c-L2):
+     * 파기 일괄은 DELETE 문장 하나라 터지면 통째로 롤백되지만, 마스킹 일괄은 행마다 커밋되므로
+     * 도중에 터진 일괄의 커밋된 행들이 계수에서 빠진다([RetentionAborted] KDoc 에 그 폭).
      */
     private fun sweep(
         writer: RetentionWriter,

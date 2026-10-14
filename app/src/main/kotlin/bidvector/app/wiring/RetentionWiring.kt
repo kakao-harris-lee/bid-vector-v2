@@ -28,11 +28,13 @@ import java.time.ZoneOffset
  * 지역 객체로 두는 것과 같은 규율이고 같은 이유다.
  *
  * **런타임 풀을 쓰지 않는다**(운영자 결정 A-1). 경계는 **이 소유자 연결 자체**다 — 권한 표가
- * 대신 막아 주지 않는다(PR #73 P1 정정): `bidvector_app` 은 V13 에서 `notice_requirement` ·
- * `notice_requirement_row` 에 **DELETE 를 받았고**(헤더 upsert 가 행을 리셋한다), 여러 표에
- * UPDATE 도 갖는다. 그래서 풀을 넘기면 **그 두 표의 기한 지난 행은 실제로 지워지고** 나머지
- * 표에서만 권한 오류(42501)로 끝난다 — 「전부 권한 오류」가 아니라 **부분 파기**다. 앞 판 문면은
- * 그것을 「대상 표 어디에도 권한이 없다」고 적었고 그 문장은 거짓이었다.
+ * 대신 막아 주지 않는다(PR #73 P1 · vr R3c-L1 정정). `bidvector_app` 은 V13 에서
+ * `notice_requirement` · `notice_requirement_row` 의 **DELETE** 를 받았고 여러 표에 UPDATE 도 갖는다
+ * (「대상 표 어디에도 권한이 없다」는 거짓이다). 그래도 풀을 넘긴 run 이 **그 두 표를 지우지는
+ * 못한다** — 분류 등식이 `information_schema.tables` 를 상대로 서므로 그 역할에 보이지 않는
+ * `flyway_schema_history` 때문에 **계획 단계에서 `REFUSED`** 가 되고, 그 관문을 지나도 파기 순서의
+ * 첫 표(`notice`)에서 42501 이 먼저 난다(저장소 KDoc 에 실측). 그 두 겹은 거동의 부산물이라
+ * 분류·순서가 바뀌면 사라진다 — 보장은 이 배선이 소유자 연결만 넘긴다는 사실 하나다.
  */
 @Configuration
 @Import(CollectionTerminationWiring::class)

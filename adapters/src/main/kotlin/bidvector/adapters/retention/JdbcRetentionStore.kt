@@ -45,12 +45,21 @@ internal data class ForeignKeyEdge(
 
 /**
  * [RetentionStorePort] JDBC 구현(M6/6B-3 P-3) — **소유자 비풀링 연결**로만 돈다(운영자 결정
- * A-1, `PersistenceWiring.migrateAsOwner` 선례). **경계는 그 소유자 연결이고 권한 표가 아니다**
- * (PR #73 P1 정정): 런타임 풀이 전환하는 `bidvector_app` 은 V13 에서 `notice_requirement` ·
- * `notice_requirement_row` 에 **DELETE 를 받았다**(헤더 upsert 가 행을 리셋한다). 이 클래스에 풀을
- * 넘기면 그 두 표의 기한 지난 행은 **실제로 지워지고** 나머지 파기 대상에서만 42501 이 난다 —
- * 「전부 권한 오류로 끝난다」가 아니라 **부분 파기**다. 마스킹 쪽은 그 역할이 `raw_observation` 에
- * UPDATE 를 아예 받지 못했고(V2 는 SELECT·INSERT 만) V18 관문이 소유자 역할을 다시 요구한다.
+ * A-1, `PersistenceWiring.migrateAsOwner` 선례). **경계는 그 소유자 연결이다** — 권한 표가 그것을
+ * 대신 지키지는 않는다(PR #73 P1 · vr R3c-L1 정정). 사실 관계: 런타임 풀이 전환하는 `bidvector_app`
+ * 은 V13 에서 `notice_requirement` · `notice_requirement_row` 에 **DELETE 를 받았다**(헤더 upsert 가
+ * 행을 리셋한다). 그러나 이 클래스에 풀을 넘긴 run 이 **그 두 표를 지우지는 못한다** — 앞 판 KDoc 이
+ * 적었던 「부분 파기」는 권한만 보고 결과를 추론한 문장이었고 실측과 다르다:
+ *
+ *  ① 계획 단계에서 끝난다 — 분류 등식의 상대가 `information_schema.tables` 이고 그 뷰는 **권한 없는
+ *    표를 숨긴다**. 그 역할에 `flyway_schema_history` 가 보이지 않아 `UnclassifiedTables` 로 거부되고
+ *    **한 행도 지우지 않는다**.
+ *  ② 그 관문을 지나도 파기 순서의 **첫 표가 `notice`** 다(파기 대상 중 그 표를 참조하는 자식이 없다).
+ *    그 역할에 `notice` 의 DELETE 가 없으므로 42501 이 요건 두 표에 닿기 전에 난다.
+ *
+ * 두 겹은 **거동의 부산물**이라 분류 등식이나 삭제 순서가 바뀌면 사라진다 — 그래서 남는 보장은
+ * 배선이 소유자 연결만 넘긴다는 사실 하나다. 마스킹 축은 별개로 닫혀 있다(그 역할은 `raw_observation`
+ * 에 UPDATE 를 아예 받지 못했고 — V2 는 SELECT·INSERT 만 — V18 관문이 소유자 역할을 다시 요구한다).
  *
  * 이 클래스는 **빈이 아니다**: 배선의 `@Bean` 함수 안에서 지역 객체로 만들어 use case 에
  * 넘긴다(설계 검토 (2b) 「소유자 연결 팩토리」 행 — 컨텍스트에 소유자 연결을 주입받을 수
