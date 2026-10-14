@@ -31,6 +31,19 @@ evidence 를 고치는 커밋이 또 HEAD 를 움직이므로, 그 커밋 뒤의
 | 11 | 같은 커밋: **container job 의 V18·V19 소비 자리**(S-23c) | **리허설 exit 0**. 머지가 `app/build.gradle.kts`·`docker/app.Dockerfile`·`gradle/libs.versions.toml` 를 바꿨으므로 **앱 jar·이미지를 다시 빌드**했다(둘 다 exit 0) · 전략 편집 왕복 200/201/200/200 · `down -v` exit 0 |
 | 12 | **r3c 문면 커밋 `0cf252c6`**: `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m09s · **350 task 전부 실행** · test 합계 **2,984** / fail 0 / skip 4 · 게이트 task 136(UP-TO-DATE **0**) |
 | 13 | 같은 커밋: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 21s · 24 task 전부 실행 |
+| 14 | **둘째 머지 커밋 `3f4512e9`**(고정 `4f2b45b3` 를 들였다): `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m04s · **350 task 전부 실행** · test 합계 **2,981** / fail 0 / skip 4 · 게이트 task 136(UP-TO-DATE **0**) |
+| 15 | 같은 커밋: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 20s · 24 task 전부 실행 |
+| 16 | 같은 커밋: **S-20** `./tools/one-command-check.sh` | **exit 0** — Kotlin 전건 + Python 전건: **pytest 1,605 passed**(5m45s · 6B-4 가 185 개를 더했다) · wheel 재수출 1 passed |
+| 17 | 같은 커밋: **container job**(S-21·S-21a·S-21b·S-23 일부·S-23c·S-25) | 전부 **exit 0** — **ml-serving 이미지 빌드**(6B-4 가 그 Dockerfile 과 compose 를 바꿨다) · 앱 jar·이미지 · `postgres`+`app`+**`ml-serving` 셋 다 healthy**(6B-4 가 더한 job 산출물 볼륨의 소유자 초기화가 기동에서 드러나는 자리다) · 전략 편집 왕복 200/201/200/200 · **리허설 exit 0**(복원 10/10 · 복원본 validate 통과 · 프로브 V20·V21 · 데이터 손실 축 음성→양성) · `down -v` exit 0 |
+
+> **14~17 은 둘째 머지 뒤의 측정이다**(`3f4512e9`, 충돌 0 · 측정 중 HEAD 불변). 이번에는 **container 도
+> 돌렸다** — 6B-4 가 `docker/compose.yaml` 과 `docker/ml-serving.Dockerfile` 을 바꿨고 그 둘이 그 job 의
+> 입력이다. 돌리지 않은 것은 여전히 ⓐ trivy 부재로 불가한 취약점 게이트와 ⓑ S-23b 의 나머지 스모크다.
+>
+> **test 수가 2,984 → 2,981 로 셋 줄었다 — 6B-4 의 몫이다.** 그 머지의 Kotlin 델타는 `TrainingContractRules.kt`
+> 와 `TrainingContractTest.kt` 둘뿐이고, 그 class 의 case 가 **43 → 40** 으로 줄었다(규칙을 옆 파일로 옮긴
+> 재구성). 이 slice 의 test 수는 그대로다. Python 쪽은 1,420 → **1,605** 로 185 늘었고 그것도 6B-4 것이다.
+> task 수는 350·24 로 **머지 전과 같다** — included build 가 이미 더워져 있었다(행 12·13 과 같은 자리).
 
 > **12·13 에서 S-20 과 container 를 다시 돌리지 않았다 — 그 사유를 적는다.** 이 커밋이 바꾼 것은
 > Kotlin 주석 셋과 문서 둘이고, 두 job 의 입력은 **한 바이트도 바뀌지 않았다**:
