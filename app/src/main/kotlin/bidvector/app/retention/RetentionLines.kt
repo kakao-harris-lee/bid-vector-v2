@@ -18,9 +18,10 @@ internal fun retentionFinishLine(
     exitCode: RetentionExitCode,
 ): String =
     "retention finish cutoff=${report.cutoff} purged=${report.purgedTotal} masked=${report.maskedTotal} " +
-        "maskFailClosed=${report.maskFailClosedTotal} " +
+        "maskFailClosed=${report.maskFailClosedTotal} maskSkipped=${report.maskSkippedTotal} " +
         "tables=[${report.tallies.entries.joinToString(" ") { (table, tally) ->
-            "$table:purged=${tally.purged},masked=${tally.masked},failClosed=${tally.maskFailClosed}"
+            "$table:purged=${tally.purged},masked=${tally.masked},failClosed=${tally.maskFailClosed}," +
+                "skipped=${tally.maskSkipped}"
         }}] exempt=${report.exempt.sorted()} cascade=${report.cascade.sorted()} " +
         "exit=${exitCode.name}(${exitCode.value})"
 

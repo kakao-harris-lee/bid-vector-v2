@@ -244,4 +244,32 @@ class PurgeExpiredDataTest {
         report.maskedTotal shouldBe 9
         report.maskFailClosedTotal shouldBe 2
     }
+
+    /**
+     * cr L-5 — 일괄의 **가득 참은 후보 수로** 센다. 0 행을 돌린 후보(`skipped`)를 세지 않으면
+     * 일괄이 가득 찼는데도 루프가 끝나 그 run 이 백로그를 비우지 못한다. 아래 첫 일괄은
+     * 계수(masked+failClosed)가 상한보다 작지만 **후보 수는 상한과 같다** — 그래서 한 번 더 돈다.
+     */
+    @Test
+    fun `건너뛴 후보도 일괄을 채운다 — 그 run 이 백로그를 비운다`() {
+        val store =
+            FakeRetentionStore(
+                targets = listOf(RetentionTarget("raw_observation", RetentionTreatment.MASK_PII)),
+                maskBatches =
+                    mapOf(
+                        "raw_observation" to
+                            mutableListOf(
+                                MaskBatchCounts(masked = 6, failClosed = 0, skipped = 4),
+                                MaskBatchCounts(masked = 2, failClosed = 0, skipped = 0),
+                            ),
+                    ),
+            )
+
+        val outcome = PurgeExpiredData(store, Clock { NOW }, policy(batchSize = 10)).run()
+
+        store.maskCalls.size shouldBe 2
+        val report = outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report
+        report.tallies.getValue("raw_observation") shouldBe TableTally(masked = 8, maskSkipped = 4)
+        report.maskSkippedTotal shouldBe 4
+    }
 }

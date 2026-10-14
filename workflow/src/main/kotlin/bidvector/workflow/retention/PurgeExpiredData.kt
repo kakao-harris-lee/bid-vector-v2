@@ -4,11 +4,12 @@ import bidvector.workflow.event.LeaseAttempt
 import bidvector.workflow.strategy.Clock
 import java.time.Instant
 
-/** 표별 계수 — 파기·마스킹·fail-closed 를 한 숫자로 접지 않는다(처방이 다르다). */
+/** 표별 계수 — 파기·마스킹·fail-closed·건너뜀을 한 숫자로 접지 않는다(처방이 다르다). */
 data class TableTally(
     val purged: Int = 0,
     val masked: Int = 0,
     val maskFailClosed: Int = 0,
+    val maskSkipped: Int = 0,
 )
 
 /**
@@ -26,6 +27,7 @@ data class RetentionReport(
     val purgedTotal: Int get() = tallies.values.sumOf { it.purged }
     val maskedTotal: Int get() = tallies.values.sumOf { it.masked }
     val maskFailClosedTotal: Int get() = tallies.values.sumOf { it.maskFailClosed }
+    val maskSkippedTotal: Int get() = tallies.values.sumOf { it.maskSkipped }
 }
 
 /** 실행하지 않은 사유 — 둘 다 **처방이 다르다**(한쪽은 마이그레이션, 한쪽은 재실행). */
@@ -76,7 +78,13 @@ sealed interface RetentionOutcome {
 class PurgeExpiredData(
     private val store: RetentionStorePort,
     private val clock: Clock,
-    private val policy: RetentionPolicyData,
+    /**
+     * **이 조립의 유일한 정책 값**이다(vr F-1 운반). 읽기만 하는 표면으로 공개한다 — 출하 배선이
+     * 러너에 넘긴 값이 실제로 이 use case 에 닿았는지 `RetentionWiringTest` 가 그 자리에서 재야
+     * 하고, 그 등식이 없으면 배선이 보존 1일로 바뀌어도 app test 전건이 초록이었다.
+     * 밖에서 **만들** 수는 없다([RetentionPolicyData] 의 생성자가 이 모듈의 `internal`).
+     */
+    val policy: RetentionPolicyData,
 ) {
     /** 거부와 실행 가능을 가르는 내부 값 — 최상위 타입을 늘리지 않는다. */
     private sealed interface Plan {
@@ -152,7 +160,12 @@ class PurgeExpiredData(
         }
         for (target in plan.targets.filter { it.treatment == RetentionTreatment.MASK_PII }) {
             val counts = maskAll(writer, target, cutoff)
-            tallies[target.table] = TableTally(masked = counts.masked, maskFailClosed = counts.failClosed)
+            tallies[target.table] =
+                TableTally(
+                    masked = counts.masked,
+                    maskFailClosed = counts.failClosed,
+                    maskSkipped = counts.skipped,
+                )
         }
         return tallies
     }
@@ -174,6 +187,11 @@ class PurgeExpiredData(
         }
     }
 
+    /**
+     * 끝나는 근거는 「일괄이 가득 차지 않았다」이고, 그 **가득 참은 후보 수로 센다**(cr L-5):
+     * UPDATE 가 0 행을 돌린 후보를 세지 않으면 일괄이 가득 찼는데도 루프가 끝나 그 run 이
+     * 백로그를 비우지 못한다. [MaskBatchCounts.total] 이 그 수다.
+     */
     private fun maskAll(
         writer: RetentionWriter,
         target: RetentionTarget,
@@ -181,11 +199,13 @@ class PurgeExpiredData(
     ): MaskBatchCounts {
         var masked = 0
         var failClosed = 0
+        var skipped = 0
         while (true) {
             val counts = writer.mask(target, cutoff, policy.batchSize)
             masked += counts.masked
             failClosed += counts.failClosed
-            if (counts.total < policy.batchSize) return MaskBatchCounts(masked, failClosed)
+            skipped += counts.skipped
+            if (counts.total < policy.batchSize) return MaskBatchCounts(masked, failClosed, skipped)
         }
     }
 }

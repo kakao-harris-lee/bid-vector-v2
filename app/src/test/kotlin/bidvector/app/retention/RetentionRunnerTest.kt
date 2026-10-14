@@ -2,9 +2,11 @@ package bidvector.app.retention
 
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.event.LeaseAttempt
 import bidvector.workflow.retention.MaskBatchCounts
 import bidvector.workflow.retention.PurgeExpiredData
+import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.retention.RetentionCutoff
 import bidvector.workflow.retention.RetentionPolicyData
 import bidvector.workflow.retention.RetentionStorePort
@@ -19,6 +21,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
 import java.sql.SQLException
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 private val NOW = Instant.parse("2026-10-14T00:00:00Z")
 private const val RETENTION_DAYS = 90
@@ -85,12 +89,16 @@ class RetentionRunnerTest {
 
     private fun runWith(store: StubStore) {
         RetentionRunner(
-            purge = PurgeExpiredData(store, { NOW }, RetentionPolicyData(RETENTION_DAYS, batchSize = 10)),
-            retentionDays = RETENTION_DAYS,
+            // 정책 값을 **만들지 않는다** — 생성자가 `workflow` 의 `internal` 이다(cr M-2 · vr F-1).
+            // 이 자리에서 90일을 흉내낼 수 없다는 것이 그 벽의 실측이기도 하다.
+            purge = PurgeExpiredData(store, { NOW }, productionPolicy()),
             log = CollectionLog { lines += it },
             termination = CollectionTermination { exitCodes += it },
         ).run(DefaultApplicationArguments())
     }
+
+    private fun productionPolicy(): RetentionPolicyData =
+        (RETENTION_POLICY.resolve(LocalDate.ofInstant(NOW, ZoneOffset.UTC)) as Resolution.Resolved).value
 
     @Test
     fun `파기만 하고 판독 실패가 없으면 0 이다`() {

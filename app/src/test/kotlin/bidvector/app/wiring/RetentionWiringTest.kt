@@ -2,7 +2,9 @@ package bidvector.app.wiring
 
 import bidvector.adapters.retention.JdbcRetentionStore
 import bidvector.app.retention.RetentionRunner
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.retention.PurgeExpiredData
+import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.retention.RetentionCutoff
 import bidvector.workflow.strategy.Clock
 import com.tngtech.archunit.core.importer.ClassFileImporter
@@ -15,6 +17,8 @@ import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.function.Supplier
 import javax.sql.DataSource
 
@@ -28,6 +32,13 @@ private const val RETENTION_CUTOFF_TYPE = "bidvector.workflow.retention.Retentio
  */
 private val OWNER_CONNECTION_HOLDERS =
     listOf("bidvector.app.wiring.PersistenceWiring", "bidvector.app.wiring.RetentionWiring")
+
+/**
+ * 배선이 정책을 고르는 기준일 — 아래 [RetentionWiringTest] 가 띄우는 컨텍스트의 시계가
+ * `Instant.EPOCH` 이므로 배선은 그 날로 해소한다(배선이 시스템 시계를 쓰지 않는다는 것이
+ * cr L-4 의 조치이고, 이 상수가 그 사실에 기댄다).
+ */
+private val BOOT_DATE: LocalDate = LocalDate.ofInstant(Instant.EPOCH, ZoneOffset.UTC)
 
 /**
  * M6/6B-3 P-3 — 보존 배선의 켜짐 조건과 **표면**.
@@ -107,6 +118,24 @@ class RetentionWiringTest {
             booted.failure shouldBe null
             booted.context.getBeanNamesForType(RetentionRunner::class.java).size shouldBe 1
             booted.context.getBeanNamesForType(ApplicationRunner::class.java).size shouldBe 1
+        }
+    }
+
+    /**
+     * **vr F-1(운반)** — 출하 배선이 조립한 러너가 쥔 정책이 `RETENTION_POLICY` 해석값과 **같다**.
+     *
+     * 이 등식이 없을 때 배선을 보존 1일로 바꾼 변이(V-1)가 app test 전건을 초록으로 지났다:
+     * 값→거동(경계 ±1초)은 adapters 쪽에서 `productionPolicy()` 를 **직접** 넣어 재므로 배선을
+     * 우회하고, 러너 test 는 stub 이고, 배선 test 는 조립만 봤다 — 되돌릴 수 없는 파기 경로의
+     * 지배 값에 아무 술어도 걸려 있지 않았다. 이제 조립 안의 정책 값은 **한 벌**이고
+     * (`RetentionRunner` 가 보존 기간을 따로 받지 않는다) 그 한 벌을 여기서 센다.
+     */
+    @Test
+    fun `러너가 쥔 정책은 승인된 보존 정책 해석값이다 — 배선이 값을 바꿀 수 없다`() {
+        withBoot("bidvector.retention.mode=once") { booted ->
+            val runner = booted.context.getBean(RetentionRunner::class.java)
+
+            runner.purge.policy shouldBe (RETENTION_POLICY.resolve(BOOT_DATE) as Resolution.Resolved).value
         }
     }
 

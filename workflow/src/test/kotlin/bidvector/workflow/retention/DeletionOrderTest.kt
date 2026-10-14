@@ -54,6 +54,26 @@ class DeletionOrderTest {
         outcome shouldBe DeletionOrder.Ordered(listOf("x", "y", "z"))
     }
 
+    /**
+     * cr L-6 — 자기참조 FK(`parent_id` 꼴)는 **순환이 아니다**. 순환으로 세면 그 표 하나 때문에
+     * run 전체가 `REFUSED` 가 되어 **아무것도 지우지 않고** 조용히 멈춘다. 같은 표 안의 순서는
+     * 자식 가드(`NOT EXISTS`)가 진다.
+     */
+    @Test
+    fun `자기참조 간선은 순환이 아니다 — 그 표 하나 때문에 run 전체가 멈추지 않는다`() {
+        val outcome =
+            deletionOrderOf(
+                tables = listOf("tree", "leaf"),
+                dependencies =
+                    setOf(
+                        TableDependency("tree", "tree", cascade = false),
+                        TableDependency("leaf", "tree", cascade = false),
+                    ),
+            )
+
+        outcome shouldBe DeletionOrder.Ordered(listOf("leaf", "tree"))
+    }
+
     @Test
     fun `순환은 순서가 없다 — 걸린 표 집합을 값으로 돌려준다`() {
         val outcome =

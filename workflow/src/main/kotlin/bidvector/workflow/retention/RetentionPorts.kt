@@ -37,12 +37,21 @@ data class TableDependency(
     val cascade: Boolean,
 )
 
-/** 마스킹 한 일괄의 계수 — 성공과 **fail-closed 폐기**를 하나로 접지 않는다(설계 검토 우회 10). */
+/**
+ * 마스킹 한 일괄의 계수 — 성공과 **fail-closed 폐기**를 하나로 접지 않는다(설계 검토 우회 10).
+ *
+ * [skipped] — 후보로 골랐는데 UPDATE 가 0 행을 돌린 수(cr L-5). 이 칸이 없으면 일괄 종료
+ * 조건(「처리한 수 < 일괄 상한」)이 **계수한 수**로 내려가, 그런 후보가 섞인 일괄은 가득 찼는데도
+ * 루프가 끝나 그 run 이 백로그를 비우지 못한다. P-3 의 「표별 계수(파기 N · 마스킹 N ·
+ * 건너뜀 N)」가 요구하는 칸이기도 하다.
+ */
 data class MaskBatchCounts(
     val masked: Int,
     val failClosed: Int,
+    val skipped: Int = 0,
 ) {
-    val total: Int get() = masked + failClosed
+    /** 이 일괄이 **후보로 처리한** 수 — 종료 조건은 이 값으로 본다(계수한 수가 아니다). */
+    val total: Int get() = masked + failClosed + skipped
 }
 
 /**

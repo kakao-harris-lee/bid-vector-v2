@@ -8,10 +8,12 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * P-5 — 보존 정책 값. 이 test 는 **값이 승인된 값인가**만 본다(90일·일괄 하한). 「그 값이
- * 실제 DELETE 술어에 닿는가」는 DB 위에서 잰다
- * (`bidvector.adapters.retention.RetentionBoundaryTest` — 거기서는 경계 ±1초를 **test 자신의
- * 90일 앵커**로 세우므로 정책 값을 89·91 로 바꾸면 RED 가 된다).
+ * P-5 — 보존 정책 값. 이 test 는 **값이 승인된 값인가**만 본다(90일·일괄 하한).
+ *
+ * 「그 값이 실제 DELETE 술어에 닿는가」는 DB 위에서 잰다 — `RetentionSweepTest`(경계 ±1초와
+ * 통제군)와 `RetentionMaskingSweepTest` 다. 거기서 경계는 **test 자신의 90일 앵커**로 서므로 정책
+ * 값을 89·91 로 바꾸면 RED 가 된다(cr L-1 — 앞 판은 저장소에 **없는** test 클래스를 그 실측 자리로
+ * 가리켰다). 「출하 배선이 읽은 값이 러너에 닿는가」는 `RetentionWiringTest` 가 잰다(vr F-1).
  */
 class RetentionPolicyDataTest {
     @Test

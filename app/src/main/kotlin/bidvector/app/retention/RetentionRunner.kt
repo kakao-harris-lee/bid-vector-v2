@@ -23,14 +23,18 @@ import org.springframework.boot.ApplicationRunner
  * 값)이 실릴 수 있어 원 예외를 로그 경로에 올리지 않는다.
  */
 class RetentionRunner(
-    private val purge: PurgeExpiredData,
-    private val retentionDays: Int,
+    /**
+     * **보존 기간을 따로 받지 않는다**(vr F-1 운반). 조립 안에 정책 값이 두 벌 있으면 로그가
+     * 말하는 보존 기간과 실제로 지우는 cutoff 가 갈릴 수 있고, 그 둘이 갈려도 아무 test 도
+     * 지나지 않았다. 지금은 값이 **한 벌**이고 그 한 벌을 `RetentionWiringTest` 가 센다.
+     */
+    internal val purge: PurgeExpiredData,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
     @Suppress("TooGenericExceptionCaught")
     override fun run(args: ApplicationArguments) {
-        log.write(retentionStartLine(retentionDays))
+        log.write(retentionStartLine(purge.policy.retentionDays))
         val outcome =
             try {
                 purge.run()

@@ -13,8 +13,15 @@ import java.time.temporal.ChronoUnit
  * [MINIMUM_RETENTION_DAYS] 는 **정책 값이 아니라 불변식**이다(설계 검토 우회 4): 보존 기간이
  * 0·음수면 cutoff 가 현재나 미래가 되어 「기한 안쪽 행은 한 행도 사라지지 않는다」가 즉시
  * 거짓이 된다. 그 입력은 받지 않는다 — 생성이 실패한다.
+ *
+ * **생성자와 `copy` 가 이 모듈의 `internal` 이다**(설계 검토 (2b) 「정책 값 객체」 행 — cr M-2).
+ * 공개 생성자였을 때 그 하한(1일)이 곧 보장의 하한이었다: `adapters`·`app` 어디서든
+ * `RETENTION_POLICY.resolve(…).value.copy(retentionDays = 1)` 한 줄로 1일 cutoff 를 만들 수 있고,
+ * 그 줄이 출하 배선에 들어가도 app test 전건이 초록이었다(vr F-1 의 V-1). 지금은 그 줄이
+ * **컴파일되지 않는다** — 모듈 밖에서 이 값을 얻는 경로는 [RETENTION_POLICY] 해소 하나다.
  */
-data class RetentionPolicyData(
+@ConsistentCopyVisibility
+data class RetentionPolicyData internal constructor(
     val retentionDays: Int,
     val batchSize: Int,
 ) {
@@ -28,10 +35,13 @@ data class RetentionPolicyData(
     }
 
     /**
-     * 기준 시각 — [RetentionCutoff] 를 만드는 **유일한 경로**다. 호출부가 `now` 를 cutoff 로
-     * 쓰는 길(= 전부 파기)이 타입으로 막힌다(설계 검토 (2b) 「보존 저장소 포트」 행).
+     * 기준 시각 — [RetentionCutoff] 를 만드는 **유일한 경로**이고, 그 경로가 이 모듈의
+     * `internal` 이다(vr F-6). 공개였을 때는 `cutoffFrom(now + 3650일)` 이 app 모듈에서
+     * 컴파일·실행됐다 — cutoff **생성자**에 걸린 술어가 값 **획득 경로**에는 걸려 있지 않아,
+     * ArchUnit 의 「생성자 호출자 0」이 초록인 채로 임의 cutoff 가 만들어졌다.
      */
-    fun cutoffFrom(now: Instant): RetentionCutoff = RetentionCutoff(now.minus(retentionDays.toLong(), ChronoUnit.DAYS))
+    internal fun cutoffFrom(now: Instant): RetentionCutoff =
+        RetentionCutoff(now.minus(retentionDays.toLong(), ChronoUnit.DAYS))
 
     companion object {
         /** 하루보다 짧은 보존은 받지 않는다 — 위 KDoc 의 불변식. */

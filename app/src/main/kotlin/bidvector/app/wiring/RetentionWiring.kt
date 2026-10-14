@@ -4,6 +4,7 @@ import bidvector.adapters.retention.JdbcRetentionStore
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.retention.RetentionRunner
+import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.workflow.retention.PurgeExpiredData
 import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.strategy.Clock
@@ -14,6 +15,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * 일회성 보존 배선(M6/6B-3 P-3) — **`bidvector.retention.mode=once` 일 때만** 이 설정 전체가
@@ -50,12 +52,16 @@ open class RetentionWiring {
         clock: Clock,
         termination: CollectionTermination,
     ): RetentionRunner {
-        val policy = resolvedOrFail(RETENTION_POLICY.resolve(LocalDate.now()), "보존 정책")
-        val purge = PurgeExpiredData(JdbcRetentionStore(ownerDataSource(properties)), clock, policy)
+        // 정책 해소도 **주입된 시계**로 한다(cr L-4) — 러너가 시계를 받으면서 정책만 시스템
+        // 시계로 고르면 그 둘이 갈리는 날이 장부 밖이다.
+        val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
+        val policy = resolvedOrFail(RETENTION_POLICY.resolve(referenceDate), "보존 정책")
+        // 마스킹이 지울 키는 **개념**으로 선언되고 계약이 그 개념의 키를 안다(D-6B3-3 ①).
+        val contracts = resolvedOrFail(KONEPS_COLLECTION_POLICY.resolve(referenceDate), "수집 정책").fieldContracts
+        val store = JdbcRetentionStore(ownerDataSource(properties), contracts)
         val logger = LoggerFactory.getLogger(RetentionRunner::class.java)
         return RetentionRunner(
-            purge = purge,
-            retentionDays = policy.retentionDays,
+            purge = PurgeExpiredData(store, clock, policy),
             log = CollectionLog { logger.info(it) },
             termination = termination,
         )

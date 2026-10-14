@@ -29,7 +29,10 @@ internal fun deletionOrderOf(
     dependencies: Set<TableDependency>,
 ): DeletionOrder {
     val remaining = tables.toMutableList()
-    val relevant = dependencies.filter { it.child in tables && it.parent in tables }
+    // 자기참조 간선(`child == parent`)은 **순서의 문제가 아니다**(cr L-6) — 같은 표 안의 순서는
+    // 자식 가드가 진다. 순환으로 세면 그 표 하나가 자기 때문에 영원히 ready 가 못 되어 run
+    // 전체가 `REFUSED` 가 되고, 아무것도 지우지 않는 그 상태가 조용하다.
+    val relevant = dependencies.filter { it.child in tables && it.parent in tables && it.child != it.parent }
     val ordered = mutableListOf<String>()
     while (remaining.isNotEmpty()) {
         // 남은 표 가운데 「아직 남은 자식이 없는」 것부터 — 자식이 먼저 사라져야 부모를 지울 수 있다.
