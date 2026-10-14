@@ -42,7 +42,7 @@ verifier(opus) · code-reviewer(sonnet, 병렬) — `web` 골격과 CI job. 문�
 
 ## 계약 갱신 이력
 
-(착수 시점 없음)
+**D-7A-1 (r1, 2026-10-15, 팀장 — 구현 수령 · 동결).** 문서 셋(세션 모델 단독): 요구표 `80812682` · ADR 0011 `bbd76aba` · 조건 3 조정안 `4ec0fee4`(운영자 결정 Q-1~Q-3 대기). `web` 골격(구현 레인): 산출물 판정 SHA **`dd33d4bb`** · evidence `e13041cc`. 설계 검토 정정 둘 수용 — ① **U-3(`src` 안 파일 심볼릭 링크)은 tsc 가 링크 경로로 프로그램에 넣어 TS6059 가 나지 않는다**(실측 — 설계 검토의 기대가 틀렸고 구멍이 열려 있었다) → 새 step W-4 `scripts/check-src-tree.mjs`(컴파일러 API 로 유효 tsconfig 의 `rootDir`·`include`·`allowJs`·`paths` 단언 + `src` 안 링크 0 + 프로그램 파일 realpath 가 `src` 안)가 닫는다 ② U-8 1차 측정 오염(probe 주석이 `@ts-nocheck` 지시어로 읽힘) → 정정 커밋 `dd33d4bb`. `@ts-ignore`·`@ts-nocheck` 는 TS6059 를 억제하므로 `ban-ts-comment` 가 진다(U-4). TypeScript 5.9.3 고정(typescript-eslint·openapi-typescript peer 교집합). 레인 acceptance: `web` job W-1~W-9 전부 exit 0 · `tools/one-command-check.sh` exit 0 · evidence HEAD 에서 check exit 0. 검토: verifier(opus) · code-reviewer(sonnet) 병렬.
 
 ## 하네스 레인 변경 (상시)
 
