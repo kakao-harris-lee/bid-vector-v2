@@ -233,7 +233,7 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
         #
         # 이 읽기는 `_enqueue` **앞**이다(cr H-1, 팀장 결정 (a)). 뒤에 두면 워커가 그
         # 사이 job 을 집어 `RUNNING` 을 커밋할 수 있고, 그러면 응답이 proto
-        # `StartTrainingResponse` 주석(「즉시 `ACCEPTED` 를 돌려준다」)을 깬다 — 실측
+        # `StartTrainingResponse` 주석(「**새 job** 은 즉시 `ACCEPTED`」)을 깬다 — 실측
         # `job_workers: 1` 에서 400회 중 1회. `start_or_reuse` 가 한 잠금 안에서 적재·
         # 폐기·저널을 끝냈으므로 그 직후 상태는 결정적이고(`ACCEPTED`, 또는 시계 역행으로
         # 자기 폐기된 `FAILED`), 빠지는 값은 「워커가 이미 집었는가」 하나 — 그것이 바로

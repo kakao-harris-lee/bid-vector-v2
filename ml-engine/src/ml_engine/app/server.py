@@ -230,9 +230,10 @@ def _prediction_runtime(
 
 
 def _job_journal(config: ServerConfig) -> JobJournal:
-    """저널 경로는 **설정에서만** 온다 — 이 함수와 `_build_servicers` 밖에서
-    `JobJournal`·`JobStore` 를 만들지 않는다(설계 검토 (2b), `tests/gates` 가 정적으로
-    센다)."""
+    """저널 경로는 **설정에서만** 온다 — `JobJournal` 을 만드는 자리는 이 함수 하나다
+    (설계 검토 (2b), `tests/gates` 가 심볼 해석으로 센다). `JobStore` 는 여기서도
+    `_build_servicers` 에서도 만들지 않는다 — 그 생성 자리는 `store.load_job_store` 하나이고
+    조립 근은 그 함수를 부른다."""
     return JobJournal(config.artifact_out_dir / _JOB_JOURNAL_DIR_NAME)
 
 

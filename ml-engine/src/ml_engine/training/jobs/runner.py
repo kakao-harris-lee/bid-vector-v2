@@ -55,8 +55,13 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class _NotStarted:
-    """워커가 집었을 때 이 job 이 더는 대기가 아니었다 — 파이프라인을 돌리지 않았다.
-    종단 전이도 만들지 않는다(이미 다른 writer 가 상태를 확정했다)."""
+    """워커가 집었을 때 **START 전이가 성립하지 않았다** — 파이프라인을 돌리지 않았다.
+    종단 전이도 만들지 않는다.
+
+    두 갈래를 함께 덮는다: ① 다른 writer 가 이미 상태를 확정했다(폐기·취소 — `transition`
+    이 거부하거나 멱등 no-op) ② **저널 쓰기가 실패했다**(`JournalFailed`) — 그때 job 은
+    `ACCEPTED` 로 남고 그 프로세스 안에서 다시 집히지 않으며 다음 기동이 재적재한다.
+    `detail` 이 그 둘을 구분해 적는다(`_execute` 가 info 로그로도 남긴다)."""
 
     detail: str
 

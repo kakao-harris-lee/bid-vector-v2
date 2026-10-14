@@ -27,8 +27,14 @@ internal val allowedJobStateTransitions =
         JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_RUNNING,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_SUCCEEDED,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_FAILED,
-        // M6/6B-4 D-6B4-1 — 대기 큐 상한 초과로 가장 오래된 대기 job 을 폐기하는 간선
-        // (`JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED`, ADR 0010 D-8 개정).
+        // M6/6B-4 D-6B4-1 — 대기 job 이 **실행되지 못한 채** 끝나는 간선. 쓰이는 사유는
+        // **정확히 셋**이다(ADR 0010 D-8 개정 · `training.proto` `JobState` 주석):
+        // [1] 대기 큐 상한 초과 폐기 — `JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED` /
+        //     `PENDING_QUEUE_OVERFLOW`
+        // [2] 재기동 때 모르는 `training_spec_version` —
+        //     `JOB_FAILURE_CODE_TRAINING_ERROR` / `TRAINING_SPEC_UNSUPPORTED_ON_RESTART`
+        // [3] 워커가 집는 도중 START 커밋 전 크래시 —
+        //     `JOB_FAILURE_CODE_TRAINING_ERROR` / `RUNNER_CRASHED`
         JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_FAILED,
         JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_CANCELLED,
         JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_CANCELLED,
