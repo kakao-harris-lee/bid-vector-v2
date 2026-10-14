@@ -1,0 +1,22 @@
+{
+  "traces": 6,
+  "stage1_matches": 0,
+  "stage1_total": 16,
+  "cli_version": "codex-cli 0.162.1",
+  "hooks_events": 0,
+  "hooks_stdout_bytes": 0,
+  "leak_matches": 8,
+  "leak_developer_region": 0,
+  "emissions": 1,
+  "premature_approves": 0,
+  "gradle_executed": false,
+  "notes": [
+    "~/.codex/AGENTS.md present, 733 bytes, repo mentions 0",
+    "~/.codex/hooks.json absent",
+    "attempt 0 aborted at config load (exit 1, no model call): 0.162.1 -c parser keeps quotes in mcp_servers.\"name\" keys -> invalid transport; rerun with bare dotted keys (codex mcp list shows all 3 servers disabled)",
+    "MCP tool calls 0; web search calls 0",
+    "bubblewrap not on PATH warning; codex sandbox probe in worktree: write outside -> Read-only file system, network -> DNS fail",
+    "lane pre-smoke at dd408852: check --offline --no-build-cache --no-daemon exit 0 (tests 2987, skipped 4, fail 0); qualityBaseline exit 0",
+    "leak_matches counted over whole raw-output (codex-read file text); developer region (lines 1-100) injection patterns 0"
+  ]
+}

@@ -77,6 +77,77 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
         actual shouldContainExactlyInAnyOrder expectedTriggers
     }
 
+    /**
+     * **M6/6B-3 P-1 — append-only 트리거가 부르는 함수를 등재한다.** 이름만 재는 위 test 는
+     * 이 slice 가 `raw_observation_append_only` 의 **몸통을 바꾼 것**(V18: DELETE 는 여전히
+     * 거부, 마스킹 UPDATE 하나만 허용)을 보지 못한다 — 같은 이름이 다른 함수를 가리켜도
+     * 집합이 그대로다. 함수 이름을 쌍으로 두면 그 교체가 장부에 **보인다**.
+     *
+     * 대상을 둘로 좁힌 이유: 이 slice 가 계약을 바꾼 트리거가 그 둘(그중 하나)이다. 나머지
+     * 26 개의 함수 등재는 이 slice 가 만지지 않는 축이라 더하지 않는다(가드 인자 축은 아래
+     * test 가 이미 그 26 개 가운데 값 가드 전부를 다른 방식으로 잠근다).
+     */
+    private val expectedAppendOnlyFunctions =
+        mapOf(
+            TriggerSpec("raw_observation", "raw_observation_append_only") to "reject_mutation_except_masking",
+            TriggerSpec("notice_audit", "notice_audit_append_only") to "reject_mutation",
+        )
+
+    /**
+     * **이벤트 집합도 등재한다**(수정 라운드 1). V18 이 `raw_observation` 의 트리거에 INSERT 를
+     * 더했다 — 표지(`pii_masked_at`)를 적재가 미리 찍지 못하게 하는 관문이 그 이벤트에만 산다
+     * (vr F-4). 이름·함수만 재면 그 관문이 **이벤트에서 빠지는 변경**이 장부 밖이고, 빠지면
+     * 표지를 찍은 행이 조용히 들어와 영원히 마스킹되지 않는다.
+     */
+    private val expectedAppendOnlyEvents =
+        mapOf(
+            TriggerSpec("raw_observation", "raw_observation_append_only") to setOf("INSERT", "UPDATE", "DELETE"),
+            TriggerSpec("notice_audit", "notice_audit_append_only") to setOf("UPDATE", "DELETE"),
+        )
+
+    @Test
+    fun `축7 부가 — append-only 트리거의 이벤트 집합이 등재와 같다`() {
+        val actual = mutableMapOf<TriggerSpec, MutableSet<String>>()
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT event_object_table, trigger_name, event_manipulation " +
+                            "FROM information_schema.triggers " +
+                            "WHERE trigger_schema = 'public' AND trigger_name LIKE '%append_only'",
+                    ).use { rs ->
+                        while (rs.next()) {
+                            val spec = TriggerSpec(rs.getString(1), rs.getString(2))
+                            actual.getOrPut(spec) { mutableSetOf() } += rs.getString(3)
+                        }
+                    }
+            }
+        }
+        actual shouldBe expectedAppendOnlyEvents
+    }
+
+    @Test
+    fun `축7 부가 — append-only 트리거가 부르는 함수가 등재와 같다`() {
+        val actual = mutableMapOf<TriggerSpec, String>()
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT c.relname AS table_name, t.tgname, p.proname FROM pg_trigger t " +
+                            "JOIN pg_class c ON c.oid = t.tgrelid " +
+                            "JOIN pg_proc p ON p.oid = t.tgfoid " +
+                            "WHERE NOT t.tgisinternal AND t.tgname LIKE '%_append_only'",
+                    ).use { rs ->
+                        while (rs.next()) {
+                            actual[TriggerSpec(rs.getString("table_name"), rs.getString("tgname"))] =
+                                rs.getString("proname")
+                        }
+                    }
+            }
+        }
+        actual shouldBe expectedAppendOnlyFunctions
+    }
+
     // P-1 — 동반 컬럼 목록이 트리거 정의(함수 인자) 한 자리에 있다.
     // 값 컬럼마다 그 축의 라벨 짝(통화·과세·provenance detail·origin 등) 전부가 여기 있어야
     // 한다 — 새 라벨 컬럼을 추가하고 이 목록에 넣는 것을 잊으면 이 test가 잡는다.

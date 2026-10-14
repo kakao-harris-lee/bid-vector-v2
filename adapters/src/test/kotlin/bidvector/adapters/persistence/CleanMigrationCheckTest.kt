@@ -43,7 +43,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "provenance_authority" to 1,
             "qualification_text" to 3,
             // F-7 운영자 결정 — payload 가 TEXT 로 바뀌며 `payload <> ''` CHECK 가 하나 늘었다.
-            "raw_observation" to 4,
+            // M6/6B-3(추가만) — 투영 열 형태 제약 하나(`jsonb_typeof(payload_fields) = 'object'`,
+            // V18 이 `NOT VALID` 로 세우고 V19 가 검증한다, vr F-9) → 5.
+            "raw_observation" to 5,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
             // 신규(추가만, D-4C2-2).
@@ -259,6 +261,32 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         }
         return bodies
     }
+
+    /**
+     * **mig M-2 — `NOT VALID` 와 검증된 제약을 개수가 구별하지 못한다.** 위 축8 은 `pg_constraint` 의
+     * CHECK **개수**를 세고 `NOT VALID` 제약도 그 개수에 든다. 그래서 V19 의
+     * `ALTER TABLE … VALIDATE CONSTRAINT` 한 줄을 지워도 개수는 그대로이고 비객체 적재도 그대로
+     * 거부된다(그 거부는 `NOT VALID` 가 이미 진다) — 그 줄이 지는 주장은 **「기존 행에 비객체가
+     * 없다」**이고, 깨끗한 test DB 에는 기존 행이 없어 **거동으로는 영원히 실측되지 않는다**.
+     * 그래서 장부가 유일한 잠금 자리다.
+     */
+    @Test
+    fun `축8 부가 — 투영 열 형태 제약은 검증까지 끝났다 (NOT VALID 로 남지 않는다)`() {
+        convalidatedOf("raw_observation_payload_fields_object") shouldBe true
+    }
+
+    private fun convalidatedOf(constraintName: String): Boolean =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement("SELECT convalidated FROM pg_constraint WHERE conname = ?")
+                .use { statement ->
+                    statement.setString(1, constraintName)
+                    statement.executeQuery().use { rs ->
+                        check(rs.next()) { "제약이 없다: $constraintName" }
+                        rs.getBoolean(1)
+                    }
+                }
+        }
 
     /** D-6F5-21 — [queryCheckBodies]와 같은 조회를 **표 하나로 좁힌다**(집합 등식 대상). */
     private fun queryCheckBodiesForTable(tableName: String): List<String> {

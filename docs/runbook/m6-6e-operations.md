@@ -42,7 +42,7 @@
 | `bidvector.snapshot-extract` | `SnapshotExtractionProperties` | 스냅숏 추출을 켤 때만 |
 | `bidvector.relay` | `RelayProperties` | relay 를 켤 때만 |
 
-### 1.3 러너 스위치 — `mode=once` 다섯
+### 1.3 러너 스위치 — `mode=once` 여섯
 
 러너는 **전부 기본 꺼짐**이고 `@ConditionalOnProperty(name = ["mode"], havingValue = "once")` 하나로만
 켜진다. 한 프로세스에 둘 이상을 켜면 **기동하지 않는다**(`OneShotRunnerGuard` — 임의의
@@ -55,6 +55,7 @@
 | `bidvector.snapshot-extract.mode=once` | 스냅숏 추출 |
 | `bidvector.evaluation.mode=once` | 평가 커밋(outbox 기록) |
 | `bidvector.relay.mode=once` | 알림 relay |
+| `bidvector.retention.mode=once` | 보존 파기·PII 마스킹(M6/6B-3 — 절차는 `m6-6b3-retention.md`) |
 
 러너를 하나도 켜지 않으면 **HTTP 표면만 뜬다**(운영자 API). 러너를 켤 때는 6G runbook §2 의 관례대로
 `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 으로 HTTP 표면을 끈다.
@@ -77,6 +78,7 @@
 | `bidvector.opening-collection` | `mode` · `from` · `to` · `categories` · `sampling-seed` · `sample-size` · `calls-per-day` · `calls-total` · `run-state-dir` · `release-sha` |
 | `bidvector.snapshot-extract` | `mode` · `from` · `to` · `output-dir` · `snapshot-id` · `run-state-dir` |
 | `bidvector.relay` | `mode` · `environment` · `owner` · `channel` · `claim-limit` |
+| `bidvector.retention` | `mode` |
 
 ### 1.5 설정이 **기동을 거부하는** 조합 — 값을 지어내지 않는다
 
@@ -265,7 +267,7 @@ fixture 의 DDL 뿐). 남는 것은 구조적 사각이고, 새 표·새 DML 을
 
 ### 3.1 먼저 보는 것
 
-1. **종료 코드**(§3.2~§3.4). 0 이 아니면 그 값이 처방을 정한다.
+1. **종료 코드**(§3.2~§3.4, 보존 러너는 `m6-6b3-retention.md` §3). 0 이 아니면 그 값이 처방을 정한다.
 2. **마침 줄** — 러너는 끝에 계수를 실은 한 줄을 남긴다. 그 줄의 계수가 무엇이 일어났는지 말한다.
 3. **사유 토큰**(§3.5). 실패 줄에는 예외 메시지·SQL 상세·접속 문자열이 **없다** — 클래스 이름과
    SQLSTATE 5자리까지다.
@@ -351,6 +353,11 @@ outbox 의 상태 어휘는 `PENDING` · `CLAIMED` · `DELIVERED` · `FAILED` ·
 **놓친 알림의 회수 경로가 오늘 없다.** capability 명세는 앱 알림함(DB)이 내구성을 진다고 하지만 그 표가
 V2 에 없다(`OPEN-6F3-BID-RECORD`). 그래서 격리된 알림의 내용은 outbox 행의 `payload` 를 DB 로 직접
 읽는 것이 유일한 확인 수단이다.
+
+**그 확인 창은 상태에 따라 다르다**(M6/6B-3). `ISOLATED`·`FAILED` 행은 **남는다**(파기 대상에서 뺐다 —
+잃은 알림의 유일한 흔적이다). 반면 **`DELIVERED` 행은 90일에 파기된다** — 보낸 알림의 내용을 뒤늦게
+확인하려면 그 창 안에 해야 하고, 지난 것은 백업 복원이 유일한 경로다
+(`m6-6b3-retention.md` §1.2 · `m6-6b2-backup-restore.md`).
 
 ```
 select state, count(*) from outbox group by state order by state;
@@ -577,7 +584,10 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
    (`OPEN-OPS-10`).
 5. **풀 값이 설정 키가 아니다**(§2.6) — 풀은 들어왔고(6E-2a) 크기·제한 시간은 **코드 상수**다. 운영
    실측으로 값을 바꾸려면 재배포가 필요하다.
-6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이다.
+6. **판정·투찰 기록 표가 없다**(`OPEN-6F3-BID-RECORD`). outbox 행이 판정의 유일한 영속 흔적이고,
+   **그 흔적은 90일까지다** — M6/6B-3 부터 보존 러너가 `DELIVERED` outbox 행을 `inserted_at + 90일`
+   에 파기한다(`m6-6b3-retention.md`). 보내진 알림의 판정 흔적은 그래서 **영구가 아니다**(미발송
+   `FAILED`·`ISOLATED` 는 남는다 — 그쪽은 잃은 알림의 흔적이라 파기 대상에서 뺐다).
 7. **model rollback 의 수단이 재배포뿐이고 그 재배포 절차가 저장소에 없다**(§4.4·§4.5). 승격 상태·demote
    가 없고 비현재 `EXACT` 는 실 serving 이 거부한다 — 6D-1 의 정의는 fake 서버 위에서만 성립한다
    (`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`).

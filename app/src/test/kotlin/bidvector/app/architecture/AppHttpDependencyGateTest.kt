@@ -344,5 +344,10 @@ class AppHttpDependencyGateTest {
  * **44 -> 46**(M6/6F-10 수정 라운드 2, cr R-2): relay 기동 거부 판정을 배선의 `require` 에서
  * **순수 함수**로 뽑아 정책표 변이로 직접 칠 수 있게 했다 — 그 자리에 공개 표면 둘이
  * 생겼다(`RelayBootDecision` 열거와 그 파일 facade).
+ *
+ * **46 -> 51**(M6/6B-3 P-3): 보존 러너 레인이 생겼다 — 배선 하나(`RetentionWiring`, ① 층)와
+ * 러너 레인 넷(`RetentionRunner`·그 파일 facade·종료 코드 열거·로그 줄 facade, ③ 층).
+ * 다섯 모두 **HTTP 로 닿지 않는 자리**다: 러너는 cron 이 프로세스로 돌리고, 컨트롤러·② 층이
+ * 그 타입을 참조하면 의존 방향 규칙이 붉어진다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 46
+private const val EXPECTED_EXEMPT_COUNT = 51
