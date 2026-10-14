@@ -1,11 +1,19 @@
 # M6/6B-3 — commands
 
 base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6b3`.
-산출물 커밋 21. **판정 SHA 후보 `35220afd`**(승인 전 정리의 마지막 산출물 커밋).
+**판정 SHA 의 정본은 이 파일이 아니라 `scope.md` 의 현행 계약 개정이다**(PR #73 P3). 라운드가
+붙을 때마다 마지막 산출물 커밋이 움직이므로 여기 적힌 해시는 반드시 낡는다 — 앞 판은 `35220afd` 를
+「판정 SHA 후보」로 적은 채 두 라운드를 더 받았다. 아래 acceptance 행은 각자 **어느 HEAD 에서
+돌았는지**를 적고(그것은 낡지 않는 측정 사실이다), 산출물 커밋 수는 세지 않는다
+(`git log --oneline e2232a75..HEAD -- <in_scope>` 가 그 수의 정본이다).
+
+**마지막 HEAD 의 결과 정본은 이 파일이 아니다** — verifier 판정과 PR 조치 코멘트다(하네스 규율).
+evidence 를 고치는 커밋이 또 HEAD 를 움직이므로, 그 커밋 뒤의 `check` 결과를 여기 적으려는 시도는
+커밋을 하나 더 낳는다.
 
 ## acceptance (CI `check` job 명령 그대로)
 
-판정 SHA 후보 `35220afd` 에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0 — 두 명령의 끝에서
+`35220afd`(승인 전 정리의 마지막 산출물 커밋)에서 **양끝 HEAD 를 단언하고** 돌렸다(측정 중 커밋 0 — 두 명령의 끝에서
 `git rev-parse` 가 같은 SHA 를 냈다).
 
 | # | 명령 | 결과 |
@@ -13,6 +21,19 @@ base `e2232a75` · 브랜치 `m6-6b3/2026-10-13` · worktree `bid-vector-v2-m6-6
 | 1 | `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 10m10s · **350 task 전부 실행**(캐시·up-to-date 0) · test 합계 **2,978** / fail 0 · 게이트 task 136 수행 |
 | 2 | `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 22s · 24 task 전부 실행 |
 | 3 | r3b 문면 라운드 @`f92d4b55`: `./gradlew --no-daemon check` | **exit 0** · 9m22s · 350 task 중 **52 실행 · 298 up-to-date** · test 합계 **2,978** / fail 0 / skip 4 · 게이트 task 136(그 가운데 110 up-to-date) |
+| 4 | PR #73 라운드 @`9b4625c7`: `./gradlew --no-daemon check --rerun-tasks` | **exit 0** · 9m55s · **350 task 전부 실행** · test 합계 **2,982** / fail 0 / skip 4 · 게이트 task 136(UP-TO-DATE **0**) |
+| 5 | 같은 HEAD: `./gradlew --no-daemon qualityBaseline --rerun-tasks` | **exit 0** · 19s |
+| 6 | **S-20** `./tools/one-command-check.sh` | **exit 0** — Kotlin 전건(위 4·5 뒤라 up-to-date) + Python 전건: ruff · mypy --strict · import-linter · **pytest 1,420 passed**(5m51s) · 설계 래칫 · 출처·버전 두 자리 대조 · wheel 빌드 후 재수출 1 passed |
+| 7 | **container job 의 V18·V19 소비 자리**(S-23c): compose `app`+`postgres` 기동 → 전략 편집 왕복 → `./tools/db-rehearsal.sh docker/compose.yaml postgres` → `down -v` | **리허설 exit 0**. 원본에 V1~V19 적용(이력 17행 · top **19**) · 백업 산출물 누출 스캔 0 · 복원 측정 10/10 일치 · 복원본 `validate` 통과 · **(i) forward-fix: 프로브가 V20·V21 로 올라가 top 21**(고정 V18/V19 였다면 충돌했다) · (ii) 음성 대조 붉음 → 재복원으로 값 복귀 |
+
+> **7 은 job 전체가 아니다 — 무엇을 돌리지 않았는지 적는다.** 돌린 것은 `app` 이미지 빌드(S-21a·b),
+> compose 기동, 전략 편집 왕복(S-23b 의 **쓰기 부분만** — 리허설의 데이터 손실 축이 원본에 식별 가능한
+> 행을 요구한다. 실측: 그 행이 없으면 리허설이 그 축을 돌지 않고 멈춘다), S-23c, S-25 정리다. 돌리지
+> **않은** 것과 사유: ⓐ 이미지 취약점 게이트(S-22d·e) — 이 호스트에 `trivy` 가 없다(설치는 네트워크
+> 작업이고 이 slice 밖이다) ⓑ ml-serving 이미지 빌드와 S-24 실 서버 test — 이 slice 가 그 입력을
+> 바꾸지 않았다(Python·proto·gateway 무편집) ⓒ S-23b 의 나머지 스모크(인증 경계·health 격리·수집
+> 꺼짐) — 같은 사유. **ⓐ~ⓒ 는 CI 에서 돌고, 이 라운드가 바꾼 입력을 읽는 자리는 7 이 전부다.**
+> 자격 값은 실행 안에서 만들고 `curl --config -` 로만 흘렸다(argv·파일에 두지 않는다 — ci.yml 과 같은 형태).
 
 > **3 은 `--rerun-tasks` 가 아니다.** r3b 는 술어를 바꾸지 않았고(주석·문서·evidence) 이 run 의 목적은
 > **바뀐 문면 위에서 게이트가 서는가**다(`leakPatternGate` 가 evidence 를 읽는다). 그래서 캐시를 지우지
@@ -31,8 +52,15 @@ skipped **4** 는 선언된 제외 하나(`RealServerIntegrationTest` — `@Enab
 `gate.tests.adapters.excluded` 등재)에서 온다(vr L-1 — 앞 판 evidence 는 「skipped 0」으로 적었고 그것은
 실측과 달랐다). **6B-3 의 test class 16 은 skipped 0** 이다.
 
-`ml-engine` job 은 생략한다 — Python 산출물 0(`git diff --name-only e2232a75..35220afd -- ml-engine`
-빈 출력). `container` job 도 생략한다 — `docker/**`·`ci.yml` 무편집(같은 질의 빈 출력).
+**앞 판의 생략 사유는 거짓이었다**(PR #73 P4/P5). 「`docker/**`·`ci.yml` 무편집이므로 `container` job
+생략」은 **이 slice 가 그 job 의 입력을 바꿨다는 사실을 가린다** — `tools/db-rehearsal.sh` 가
+`adapters/.../db/migration/V*.sql` 를 복사해 돌고, 거기서 **프로브 버전을 최대 버전 + 1·+ 2 로
+도출**한다. V18·V19 가 들어오면 그 수가 움직이고, 앞 판(PR #61 전)처럼 프로브가 고정이면 리허설이
+「more than one migration」으로 붉는다. 그래서 **돌렸다**(아래 4·5).
+
+`ml-engine` job 은 여전히 생략한다 — 사유는 **Python 산출물 0**이고(`git diff --name-only
+e2232a75..HEAD -- ml-engine` 빈 출력) 그 job 의 입력은 그 디렉터리뿐이다. 다만 S-20 이 그 job 의
+명령 전수를 다시 돌리므로(아래 4) 이 라운드에는 **실측으로도 지났다**.
 
 ## test 수
 

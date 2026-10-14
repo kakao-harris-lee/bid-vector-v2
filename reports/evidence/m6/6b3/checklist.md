@@ -1,12 +1,14 @@
 # M6/6B-3 — checklist
 
-base `e2232a75` · 산출물 커밋 14 · acceptance·변이 실측은 `commands.md` · 되돌림은 `rollback.md`.
+base `e2232a75` · acceptance·변이 실측은 `commands.md` · 되돌림은 `rollback.md`.
+**커밋 수를 적지 않는다**(PR #73 low) — 라운드마다 늘어 반드시 낡는다. 정본은 기계 산출이다:
+`git log --oneline e2232a75..HEAD -- <in_scope>`.
 
 ## 리뷰 요청 조건
 
 | 조건 | 상태 |
 |---|---|
-| 구현 diff 가 커밋되어 base/head 고정 | 산출물 커밋 14 · in_scope 밖 변경 0. **in_scope 와 대조**: 이 라운드가 만든 새 파일 다섯(`V19__retention_indexes.sql` · `NoticeAuditSnapshotAxis.kt` · `CleanMigrationIndexTest.kt` · `MaskingColumnEnumerationTest.kt` · `NoticeAuditPiiAxisTest.kt`)이 전부 in_scope 경로 안이다(V19 는 D-6B3-3 ⑥ 이 열었다) |
+| 구현 diff 가 커밋되어 base/head 고정 | in_scope 밖 변경 0. **in_scope 와 대조는 라운드마다 다시 한다** — 목록을 손으로 적지 않고 `git diff --name-status <앞 라운드 끝>..HEAD` 의 `A` 행을 본다(그 목록을 적어 두면 다음 라운드에 낡는다). base..HEAD 누적은 신설 41 · 수정 8 이고 전부 in_scope 안이다. **PR #73 라운드가 만든 새 파일은 하나** — `ForeignKeyEdgeIdentityTest.kt`(adapters test, in_scope) |
 | 관련 test/lint/type/architecture/contract 통과 | `check --rerun-tasks` exit 0 · `qualityBaseline --rerun-tasks` exit 0(`commands.md`) |
 | 변경된 fixture·정책 version 의 근거 | 정책 값 `RETENTION_POLICY`(90일·일괄 상한)의 출처는 운영자 결정 2026-09-26 ② + `scope.md` A-1~A-4 이고 그 문면이 `source` 에 적혀 있다. fixture 의 업체명 키는 **계약에서 읽어** 심는다(이름을 fixture 가 짓지 않는다) · PII 자리값은 형태를 흉내내지 않는다 |
 | 알려진 제한과 rollback·비활성화 | 아래 「알려진 제한」 · `rollback.md` |
@@ -30,19 +32,19 @@ verifier 11 + code-review 10 + migration 5 + privacy 6 전수. 「무엇이 막�
 | vr F-8 (low) 자식 가드의 수렴 미실측 | 둘째 run 단언 신설(비-CASCADE·CASCADE 각각) | 수렴 test 둘 | N-7 |
 | vr F-9 (low) 비객체 투영 열이 run 을 실패시킨다 | **CHECK 제약**으로 들어올 수 없게(V18 `NOT VALID` + V19 검증) — 조회에서 피하면 그 행의 남김 집합이 조용히 빈다 | 가드 test(비객체 INSERT 거부) + CHECK 수 장부 | N-4 |
 | vr F-10 (low) `payload` 읽기 0 이 수동 수집 | 기계 수집 test(공허 대조 둘 + 음성 대조) | `RawPayloadProductionReaderTest` | M-15(앞 라운드) |
-| vr F-11 (비방어) 소유자의 임의 내용 주입 | 등재만 — 소유자 임의 SQL 은 비방어 축 | runbook 알려진 제한 9 | — |
+| vr F-11 (비방어) 소유자의 임의 내용 주입 | 등재만 — 소유자 임의 SQL 은 비방어 축 | runbook §5-9 | — |
 | vr L-1·L-2·L-3 (장부) | `commands.md` skipped 수 정정 · (2b) 의 cutoff 행을 실측과 맞춤(이제 참이다) · 소유자 연결 행에 「`OPEN-6E2A` 와 같은 축」 명시 | 이 문서 | — |
 | cr H-1 (high) `ISOLATED` 파기 | 파기 집합을 **`DELIVERED` 하나**로(D-6B3-3 ③) + test 이름과 거동을 맞춘다 | 상태 다섯 심고 **하나만** 사라짐 | N-8 |
 | cr M-1 (medium) 판독 깊이 < 수집 상한 | 깊이를 수집 상한 이상으로 두고 그 **관계를 전 entry 에 대해** 잠근다 | `RawPayloadMaskingTest` 둘(관계 + 깊은 중첩이 폐기되지 않음) | N-11 |
 | cr M-2 (medium) 정책 생성자·`copy` 공개 | `internal constructor` + `@ConsistentCopyVisibility` | 컴파일(app test 가 정책을 **만들 수 없다**) | V-1 |
-| cr M-3 (medium) `notice_audit` 사유가 PII 축만 답한다 | 사유를 사실로 다시 쓴다(파기된 `notice` 스냅숏이 창 밖에 남고 표가 무한히 자란다) + 알려진 제한·새 OPEN | runbook §1.1 · 알려진 제한 8 · FK 부재 test | — |
+| cr M-3 (medium) `notice_audit` 사유가 PII 축만 답한다 | 사유를 사실로 다시 쓴다(파기된 `notice` 스냅숏이 창 밖에 남고 표가 무한히 자란다) + 알려진 제한·새 OPEN | runbook §1.1 · runbook §5-8 · FK 부재 test | — |
 | cr L-1 없는 test 클래스를 가리킴 | 실측 자리를 실존 test 로 정정 | — | — |
-| cr L-2 표지만 찍는 UPDATE 통과 | **막지 않고 실측**한다(막으면 치환값이 원문과 같은 행에서 run 이 fail-stuck 이다) | 가드 test(그 성질을 잰다) · runbook 알려진 제한 9 | — |
+| cr L-2 표지만 찍는 UPDATE 통과 | **막지 않고 실측**한다(막으면 치환값이 원문과 같은 행에서 run 이 fail-stuck 이다) | 가드 test(그 성질을 잰다) · runbook §5-9 | — |
 | cr L-3 식별자 인용 없음 | `quoteIdent`(따옴표가 든 이름은 거부) | 전 문장이 그것을 지난다 | — |
 | cr L-4 배선이 시스템 시계로 정책 해소 | 주입된 시계로 해소 | 배선 test(기준일이 시계에서 온다) | N-13 |
 | cr L-5 일괄 종료가 계수한 수 | 종료 조건을 **후보 수**로(건너뜀 계수 신설, P-3 의 「건너뜀 N」) | use case test(가득 찬 일괄이 한 번 더 돈다) | N-9 |
 | cr L-6 자기참조 FK → run 전체 `REFUSED` | 자기참조 간선을 순환에서 제외 | `DeletionOrderTest` | N-10 |
-| mig H-1 (high) 적용 창이 전수·전차단·기동중 | 인덱스를 **V19 로 분리** — V18 은 메타데이터 변경만(밀리초), V19 는 `SHARE`(읽기는 지난다). `CONCURRENTLY` 는 **실측으로 기각**(아래 알려진 제한 11) + 적용 창·크기 측정 절차 등재 | runbook §1.3 · 인덱스 장부 | N-12 |
+| mig H-1 (high) 적용 창이 전수·전차단·기동중 | 인덱스를 **V19 로 분리** — V18 은 메타데이터 변경만(밀리초), V19 는 `SHARE`(읽기는 지난다). `CONCURRENTLY` 는 **실측으로 기각**(이 checklist 제한 11) + 적용 창·크기 측정 절차 등재 | runbook §1.3 · 인덱스 장부 | N-12 |
 | mig M-1 (medium) forward-fix 서술 누락 | 되돌림 목록에 고아 함수 DROP · V19 객체 DROP · **표지 소실과 재적용 시 fail-closed 표식 소실** | runbook §1.2 · `rollback.md` | — |
 | mig M-2 (medium) 파기 축 인덱스 부재 | cutoff 인덱스 아홉(V19) — `outbox` 는 (상태, 적재 시각) 복합으로(부분 술어면 종단 집합이 바뀌는 날 조용히 안 쓰인다) | 인덱스 장부 | N-12 |
 | mig L-1 관문 ② 문자열 | vr F-5 와 같은 조치 | 같음 | N-2 |
@@ -66,29 +68,29 @@ verifier 8 + code-review 10 + migration 5(+info 3) + privacy 4 전수. 변이 �
 | **cr M-1** `maskAll` 이 진척 0 에서 영구히 돈다 | 종료 조건에 **「진척 없으면 끝낸다」** · `skipped > 0` → `INCOMPLETE` | 가득 찬 일괄이 진척 0 인 fake 로 **루프가 끝남**을 잰다(상한을 둬서 test 가 멈춘다) + 러너 종료 코드 | R-6 · R-7 |
 | **cr M-2** 지울 키를 run 날짜 계약으로 푼다 | 전 개정 **합집합**으로 — 기준일 입력을 코드 경로에서 **없앴다**(저장소 생성자의 `referenceDate` 제거) | 지울 집합 == 개념의 전 개정 rawName · 남길 집합 == 계약 전수 − 지울 키. **오늘 정책 entry 가 하나라 날짜 차이가 거동으로 안 보인다** — 그래서 이 축은 구조(날짜 입력의 부재)로 닫고 변이로 양쪽을 쟀다 | R-4 |
 | **mig M-1** 적용 창 서술이 틀리고 사전 점검이 모자라다 | §1.3 을 **「열 표 전부가 V19 전 구간 동안 쓰기 차단」**으로 · 실패 시 인덱스 열 개가 함께 롤백(재시도 = 전체 비용) · V18 의 창 = 잠금 대기 + 작업(대기 중 읽기까지 큐에 선다) · 사전 점검에 **비객체 투영 세기**(V19 를 데이터 때문에 실패시키는 조건 — 「유일」이라고 적었던 것은 r3b 에서 고쳤다, 진행 중인 쓰기도 실패시킨다)와 **열린 트랜잭션** 추가 | runbook §1.3(문서 축) · 비객체 세기는 V19 의 CHECK 검증이 거동으로 진다 | R-9 |
-| **mig M-1(선택)** V18 의 무한 대기 | **V18 첫 문장 `SET LOCAL lock_timeout`** — 대기가 길면 「정지」가 아니라 **「실패」**(기동 실패 → 재시도) | **`MigrationLockTimeoutTest`(거동)** — 이 칸은 라운드 1 에 「없다 · 문서 축으로만」이었고 그 판단이 틀렸다(라운드 2 에서 뒤집었다, 알려진 제한 13) | RED 먼저(라운드 2) |
+| **mig M-1(선택)** V18 의 무한 대기 | **V18 첫 문장 `SET LOCAL lock_timeout`** — 대기가 길면 「정지」가 아니라 **「실패」**(기동 실패 → 재시도) | **`MigrationLockTimeoutTest`(거동)** — 이 칸은 라운드 1 에 「없다 · 문서 축으로만」이었고 그 판단이 틀렸다(라운드 2 에서 뒤집었다 — 이 checklist 제한 13) | RED 먼저(라운드 2) |
 | **mig M-2** `VALIDATE CONSTRAINT` 가 어느 test 와도 구별되지 않는다 | 축8 에 **`convalidated` 단언** | 그 제약이 `NOT VALID` 로 남아 있으면 RED(깨끗한 test DB 에서는 거동으로 영원히 안 보이는 성질이라 장부가 유일한 자리다) | R-9 |
 | **vr R2-F3** 인덱스 장부가 (표, 이름) 문자열 | 장부를 **(표, 이름, 열 목록+부분 술어)** 로 | 같은 이름 · 다른 열 변이가 RED | R-8 |
-| **vr R2-F7** CASCADE 가드가 한 단계 | 오늘 **부재를 등식으로 잠근다**(CASCADE 손자 0 · 마스킹 분류 CASCADE 자식 0) + 알려진 제한 16 | 카탈로그 FK 전수에서 그 두 집합이 빈 것 + 공허 대조(CASCADE 간선이 적어도 하나) | R-11 |
+| **vr R2-F7** CASCADE 가드가 한 단계 | 오늘 **부재를 등식으로 잠근다**(CASCADE 손자 0 · 마스킹 분류 CASCADE 자식 0) + runbook §5-16 | 카탈로그 FK 전수에서 그 두 집합이 빈 것 + 공허 대조(CASCADE 간선이 적어도 하나) | R-11 |
 | **cr L-2** 자식 가드가 쓸 수 없는 인덱스 모양 | 그 인덱스를 **`(notice_number, notice_round, created_at)`** 로(가드가 조인하는 선행 열을 앞에 둔다) + V19 주석을 실측과 맞춤 | 인덱스 장부의 정의 열 | R-8 |
 | **cr L-1** 공허한 음성 대조 | 그 test 를 **지웠다** — 「열을 더하면 등식이 RED」는 변이가 진다 | V-3(앞 라운드) 재실행 | — |
 | **cr L-3** `skipped` 가 종료 코드·runbook 에 없다 | `INCOMPLETE` 로 올리고 runbook §3 표·§3.1b 처방 | 러너 test | R-7 |
 | **cr L-4** 설정 키 전수 표에 보존이 없다 | 6e §1.4 에 `bidvector.retention | mode` 한 행 | 문서 축 | — |
-| **cr L-5** 알려진 제한 3 이 업체명을 빼놓았다 | §5-3 을 §1.1 과 같은 문면으로 | 문서 축 | — |
+| **cr L-5** runbook §5-3 이 업체명을 빼놓았다 | §5-3 을 §1.1 과 같은 문면으로 | 문서 축 | — |
 | **cr L-6** 자격 템플릿이 셸 이력을 만든다 | 래퍼가 **읽어 export** 하는 모양으로(값이 셸 줄에 없다) | 문서 축 | — |
-| **cr L-7** 마스킹된 `payload` 가 엄격 JSON 이 아닐 수 있다 | 알려진 제한 14 — 공유 render 를 이 slice 에서 바꾸지 않은 이유(호출부 둘)까지 적는다 | 문서 축 | — |
+| **cr L-7** 마스킹된 `payload` 가 엄격 JSON 이 아닐 수 있다 | runbook §5-14 — 공유 render 를 이 slice 에서 바꾸지 않은 이유(호출부 둘)까지 적는다 | 문서 축 | — |
 | **cr L-8** 일괄 안에서 문장을 행마다 준비한다 | 문장을 **루프 밖으로** 올린다(행별 1/0 을 그대로 쓰므로 `skipped` 계수가 보존된다) | 기존 마스킹 test 전건(거동 불변) | — |
-| **mig L-1** outbox 파기가 일괄마다 재정렬 | 알려진 제한 13(집합 타입을 유지하는 한 구조적) | 문서 축 | — |
-| **mig L-2** 관문 ③ 은 소유자 소유 `SECURITY DEFINER` 안에서 만족된다 | 알려진 제한 11 — 「그런 함수를 더하지 않는다」를 마이그레이션 검토가 보는 자리에 | 문서 축 | — |
+| **mig L-1** outbox 파기가 일괄마다 재정렬 | runbook §5-13(집합 타입을 유지하는 한 구조적) | 문서 축 | — |
+| **mig L-2** 관문 ③ 은 소유자 소유 `SECURITY DEFINER` 안에서 만족된다 | runbook §5-11 — 「그런 함수를 더하지 않는다」를 마이그레이션 검토가 보는 자리에 | 문서 축 | — |
 | **mig L-3** `MEMBER` 가 `USAGE` 보다 넓다 | 관문 ③ 술어를 **`USAGE`** 로 좁힌다(출하 경로는 그대로 지난다) | 가드 test 전건(제3 역할·앱 역할 거부 · 소유자 통과) | R-13 |
-| **mig I-1** 소유자 `TRUNCATE` | 알려진 제한 12 | 문서 축 | — |
+| **mig I-1** 소유자 `TRUNCATE` | runbook §5-12 | 문서 축 | — |
 | **vr R2-F4** 창이 「표별」로 읽힌다 | mig M-1 과 같은 조치(§1.3 전면) | 문서 축 | — |
 | **vr R2-F5** `CONCURRENTLY` 기각 사유가 과잉 일반화 | 메커니즘을 **「스냅숏을 쥔 트랜잭션이 막는다」**로 좁히고 INVALID 잔해를 적는다(기각 판정 자체는 유지 — 독립 레인도 수용) | 문서 축 | — |
 | **vr R2-F6** 시계 주입이 (2b) 에 없다 | (2b) `RetentionCutoff` 행에 「시계 주입은 비방어 — 같은 효과」 | 이 문서 | — |
 | **vr R2-F8** task 수 | `commands.md` 를 이 라운드 실측으로 다시 적는다 | 이 문서 | — |
 | **privacy F-7** 개념 PII 분류에 게이트가 없다 | 분할 등식(위 F-6 과 같은 조치) | 같음 | R-12 |
 | **privacy F-8** §2.2 질의가 술어를 문자열로 복제 | 「절차 변경 때 §1 표 ↔ §2.2 질의 대조」를 **리뷰 요청 조건**에 등재 | 이 문서 | — |
-| **privacy F-9** outbox 영구 잔류의 PII 축을 아무도 재지 않는다 | 알려진 제한 15(오늘 제3자 PII 0 · 타입 추가는 fail-closed 코드 변경을 요구한다) | 문서 축 | — |
+| **privacy F-9** outbox 영구 잔류의 PII 축을 아무도 재지 않는다 | runbook §5-15(오늘 제3자 PII 0 · 타입 추가는 fail-closed 코드 변경을 요구한다) | 문서 축 | — |
 
 ## 검토 r3 의 지목 ↔ 무엇이 막는가 (대응표)
 
@@ -101,18 +103,36 @@ code-review APPROVE)한 뒤의 **승인 전 정리**다. 산출물 변경은 **�
 | **cr M-1 · mig L-1** V19 에 잠금 상한이 없다 | V19 첫 문장 `SET LOCAL lock_timeout`(**커밋 B**) | 쓰기 홀더(`ROW EXCLUSIVE`) 아래에서 **55P03 으로 빠르게 실패**하고 풀린 뒤 재시도가 선다. RED 37.8s(기다렸다) → GREEN 8.3s |
 | **mig M-2** 자식 인덱스 사유가 측정과 반대 | 사유를 **실측 수로** 다시 쓰고 복합 인덱스는 유지(해시 안티 조인 규모에서는 `created_at` 단독이 더 싸고, 중첩 루프 규모에서는 복합이 index-only 를 준다 · 첫 실행에서 더 느린 쪽을 택했다는 사실까지 적는다) | 장부·주석(문서 축). 거짓 문장을 **지웠다**는 것이 조치의 본체다. 수치는 **두 레인 재현의 합집합**으로 넓혔다(mig r3b L-1) — 복합 93~143ms 대 `created_at` 단독 66~82ms, 즉 **1.2~2.2배**. 앞 판의 `1.3~1.5배` 는 한 레인 한 번의 폭이었다 |
 | **vr R3-F3** 장부가 접근 방법을 빠뜨린다 | 정의 비교를 `USING` 부터로 — 접근 방법까지 본다 | `USING hash` 변이가 이제 RED(해시는 범위 술어에 쓰이지 못해 「cutoff 질의를 지원한다」가 조용히 거짓이 된다) |
-| **vr R3-F2** 분할이 개념 단위다 | 알려진 제한 17 + 선언 옆 KDoc — 새 rawName 이 **기존 비PII 개념 아래로** 들어오면 붉어지지 않는다(오늘 그런 키 0) | 등재(문서 축). 닫으려면 분할을 계약 행 단위로 내려야 하고 그것은 범위 밖이다 |
-| **cr L-1 · privacy F-11** 자유텍스트 분류가 가정이다 | 알려진 제한 18 + **`OPEN-6B3-FREE-TEXT-PII-AXIS`**(운영 첫 실행 전 실물 표본 패턴 판독으로 재확인) | 등재 |
-| **privacy F-10 의 나머지 절반** 값에 심은 상호 | 알려진 제한 19 — **값 축은 비방어**(키 축 allow-list 로 닫히지 않는다) | 등재 |
+| **vr R3-F2** 분할이 개념 단위다 | runbook §5-17 + 선언 옆 KDoc — 새 rawName 이 **기존 비PII 개념 아래로** 들어오면 붉어지지 않는다(오늘 그런 키 0) | 등재(문서 축). 닫으려면 분할을 계약 행 단위로 내려야 하고 그것은 범위 밖이다 |
+| **cr L-1 · privacy F-11** 자유텍스트 분류가 가정이다 | runbook §5-18 + **`OPEN-6B3-FREE-TEXT-PII-AXIS`**(운영 첫 실행 전 실물 표본 패턴 판독으로 재확인) | 등재 |
+| **privacy F-10 의 나머지 절반** 값에 심은 상호 | runbook §5-19 — **값 축은 비방어**(키 축 allow-list 로 닫히지 않는다) | 등재 |
 | **mig L-2** 패배한 설계를 주장하는 KDoc 둘 | 둘 다 고쳤다 — 「allow-list 출처는 그 행」(없다고 단언한 경로가 실제로 있었다) · 투영 열 KDoc 의 앞 절 | 세 문면이 서로 모순이던 상태가 사라졌다 |
 | **mig L-3** 트리거 재지정이 잃는 것 하나가 빠졌다 | runbook §1.2 와 rollback 비활성화 표에 **둘**(표지 관문 · `inserted_at` 소유)을 적는다 | 등재 — 비활성화를 고르는 사람이 보는 자리다 |
 | **cr L-2** 자기 종료 불변식이 산문에만 있다 | 상한 셋에 각자 이름 · 불변식을 **코드가 센다**(`require`) · `join` 결과를 `check` 로(**커밋 B**) | 불변식 위반이 test 시작에서 멈춘다 |
 | **cr L-3** 컨테이너 둘이 동시에 산다 | 그 test KDoc 에 비용을 적는다(메서드마다 클러스터 하나 · 공유 컨테이너와 **하나만** 겹친다 · 이 호스트의 earlyoom 이력)(**커밋 B**) | 등재 |
 | **cr L-4** test 이름·KDoc 이 대체된 설계를 가리킨다 | `MaskingKeepsContractKeysTest` 로 이름을 바꾸고 등식을 **계약 남김 집합** 기준으로 다시 쓴다(재는 값은 같되 전제가 참) | 그 등식 — 앞 판의 초록은 **우연**이었다(두 식의 값이 우연히 같았다) |
 | **cr L-5** 두 열의 남김 술어가 다르다 | 커밋 A 가 ⓑ(술어를 같게)와 ⓒ(출하 경로에서 키 집합 등식) **둘 다** | 위 A 행과 같다 |
-| **cr L-6** 적재 시각 덮어쓰기가 조용하다 | 알려진 제한 10 에 붙인다 — 뜻을 담아 그 열을 쓰는 적재자가 생기면 값이 오류도 계수도 없이 사라진다 | 등재 |
-| **vr R3b-L1** 장부가 「잠금 상한을 재는 test 가 없다」고 말한다(거짓이 되었다) | 알려진 제한 13 을 **거동 test 가 있고 남는 한계는 값이다**로 다시 쓴다 · r1 대응표의 같은 칸도 고친다 · 게이트 표의 라운드 1 실측 수(`expected 4, was 5`)를 되살린다 | 등재(문서·장부 축). 술어 변경 없음 |
+| **cr L-6** 적재 시각 덮어쓰기가 조용하다 | runbook §5-10 에 붙인다 — 뜻을 담아 그 열을 쓰는 적재자가 생기면 값이 오류도 계수도 없이 사라진다 | 등재 |
+| **vr R3b-L1** 장부가 「잠금 상한을 재는 test 가 없다」고 말한다(거짓이 되었다) | 이 checklist 제한 13 을 **거동 test 가 있고 남는 한계는 값이다**로 다시 쓴다 · r1 대응표의 같은 칸도 고친다 · 게이트 표의 라운드 1 실측 수(`expected 4, was 5`)를 되살린다 | 등재(문서·장부 축). 술어 변경 없음 |
 | **mig r3b L-1** V19 의 실패 모양·점검 처방·실패 뒤 상태가 runbook 에 없다 | §1.3 V19 행에 **55P03 기동 실패**(평범한 INSERT 하나로 충분) · ⓒ 를 「긴 트랜잭션 사냥」이 아니라 **쓰기 멈춘 창**으로 · §4.6 「55P03 → 쓰기 멈추고 재시도 · repair 불필요」 · **V18 실패 후 상태 ≠ V19 실패 후 상태**(mig I-1) · 장부 수치를 두 레인 합집합으로 | 등재(문서 축). 거동은 `MigrationLockTimeoutTest` 가 이미 진다 — 이 라운드는 **그 거동을 읽는 법**을 적었다 |
+
+## PR #73 `/code-review` 의 지목 ↔ 무엇이 막는가 (대응표)
+
+Codex 심판은 **approve · 지적 0**(`codex-review-*.json`, 팀장이 등재). 아래는 `/code-review` 가 올린
+항목으로 **80점 이상은 없었지만 사실로 확인된** 것들이다. 산출물 변경 **둘**은 각자 커밋이다.
+
+| 지목 | 조치 | 무엇이 막는가 |
+|---|---|---|
+| **P7** FK 간선을 `conname` 으로 묶는다 — 제약 이름은 스키마 안에서 유일하지 않다 | 키와 `ORDER BY` 를 **`pg_constraint.oid`** 로(**커밋 P7**) | 같은 이름의 FK 를 가진 자식 둘(한쪽은 복합)을 심은 test — 앞 판은 `expected:<2> but was:<1>`. 열 쌍 순서까지 같은 test 가 잠근다 |
+| **P6** 도중에 죽은 run 의 부분 계수가 사라진다 | 계수를 **일괄마다** 적고 `RetentionAborted` 에 실어 던진다 · 러너 실패 줄이 그것을 **마침 줄과 같은 어휘로** 싣는다(**커밋 P6**) | workflow 둘(파기 도중·마스킹 도중) + app 하나(실패 줄에 `purged=3`). 원인 코드는 **포장을 벗겨** 뽑는다 — 첫 판에서 42P01 이 사라졌고 기존 test 가 붉었다 |
+| **P1** 「`bidvector_app` 은 대상 표 어디에도 DELETE·UPDATE 가 없다」가 거짓 | 세 자리(저장소 KDoc · 배선 KDoc · runbook §2)를 **사실로** 다시 쓴다 — V13 이 `notice_requirement`·`notice_requirement_row` 의 DELETE 를 준다 | 문서 축. **경계는 소유자 연결이고 권한 표가 아니다** — 풀로 돌리면 전부 실패가 아니라 **부분 파기**다(그 상태는 파기 수가 예상과 어긋난 run 으로만 보인다) |
+| **P2** rollback 에 갈래가 없다 | **0단계**를 둔다 — ⓐ 적용된 DB 없음(지금): 그대로 · ⓑ 적용됨: 복원 목록에서 **V18·V19 를 빼고** forward-fix 를 같은 배포로 | `rollback.md`. `flyway repair` 가 답이 아닌 이유까지 적는다(이력만 고치고 DDL 은 남아 **「적용된 적 없다」고 적힌 스키마**가 된다) |
+| **P3** `commands.md` 의 판정 SHA 가 낡았다 | 판정 SHA 의 정본을 **`scope.md` 의 현행 계약**으로 돌리고, 커밋 수를 세지 않는다 | 라운드마다 낡는 좌표를 지웠다. **마지막 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트**라는 문장도 같은 자리에 |
+| **P4/P5** S-20 과 container job 을 돌리지 않고 「`docker/**`·`ci.yml` 무편집」으로 생략했다 | 둘 다 **실제로 돌리고** 결과를 적는다(`commands.md`) — 생략 사유는 거짓이었다(`db-rehearsal.sh` 가 V18·V19 를 소비한다) | 실측 기록 |
+| **P8** 오늘 저장된 헤더도 자식 0 이면 파기된다 | runbook §5-20 등재 — 대가는 **KONEPS 재수집 한 번**(데이터 손실이 아니다) | 등재. 고치지 않은 사유까지(기준 시각 갱신은 「행 0 헤더의 분류」 문제로 돌아간다) |
+| **P9** 파기 문장에 잠금 대기 상한이 없다 | runbook §5-21 + **`OPEN-6B3-PURGE-LOCK-TIMEOUT`** | 등재. 값의 선택이 운영 측정을 선행 조건으로 갖는다(기다림을 실패로 바꾸면 백로그가 남는다) |
+| **P10** 공유 runbook 이 「outbox 가 판정의 유일한 영속 흔적」이라고 말한다 | §6-6 과 §3.6 에 **그 흔적은 90일까지**를 적는다(`DELIVERED` 는 파기 · 미발송은 남는다) | 문서 축. 보낸 알림의 내용 확인에 **창이 있다**는 사실이 운영자에게 보인다 |
+| **low** 낡은 test 이름 · 관문 번호 ④→⑤ · CHECK 출처(V19→V18) · `jsonb_object_keys` 사유 · 종료 코드 KDoc 의 건너뜀 · 래퍼의 `set -u` 미설정 변수 · 게이트 등재 알파벳 자리 · runbook §5 번호 순서 · 「알려진 제한 N」 이 어느 목록인지 · V19 색인이 `OPEN-6F10-CLAIM-INDEX` 에 닿는 사실 · checklist 의 낡은 커밋 수·새 파일 목록 | 전부 처리 | 문서·장부 축. 번호 참조는 이제 **「이 checklist 제한 N」 또는 「runbook §5-N」** 으로만 적는다 |
 
 ## 설계 검토 (2) 우회 ↔ 무엇이 막는가
 
@@ -174,12 +194,21 @@ code-review APPROVE)한 뒤의 **승인 전 정리**다. 산출물 변경은 **�
 
 ## 알려진 제한
 
+> **두 목록이 있다**(PR #73 low). 아래는 **이 checklist 의 제한**이고, runbook 의 §5 목록은 번호가
+> 다르다(같은 번호가 다른 항목을 가리킨다). 그래서 이 문서의 참조는 전부 「이 checklist 제한 N」
+> 또는 「runbook §5-N」으로 적는다 — 번호만 적힌 참조는 둘 중 어느 것인지 읽는 사람이 알 수 없다.
+
 1. **`outbox` 의 `FAILED`·`ISOLATED` 행은 영구히 남는다** — 둘 다 종단이지만 **미발송**이라 A-4 의
    제외에 들어간다. `ISOLATED` 는 알림을 영구히 잃은 사건의 유일한 흔적이고 운영 조사 경로가 그
    행을 읽는다. 그 행 수가 자라면 처분이 결정 축이다(`OPEN-6B3-OUTBOX-UNSENT-RETENTION`).
 2. **기한 안쪽 자식이 있는 부모는 그 run 에서 남는다**(우회 6 의 대가, CASCADE 간선 포함). 자식이
    기한을 넘는 다음 run 에서 함께 사라지고 그 수렴을 test 가 잰다.
-3. **실패한 run 의 부분 계수는 로그에 남지 않는다** — 예외는 원인 코드와 종료 코드로만 나간다.
+3. **실패한 run 의 부분 계수는 이제 실패 줄에 실린다**(PR #73 P6 — 앞 판의 이 자리는 「남지 않는다」였고
+   그것이 `OPEN-6B3-PARTIAL-COUNTS-ON-FAILURE` 의 내용이었다). 일괄은 각자 커밋되므로 도중에 죽은 run 이
+   지운 행은 돌아오지 않고, 그 수가 `RetentionAborted` 에 실려 러너의 실패 줄에 **마침 줄과 같은 어휘로**
+   찍힌다. **남는 한계는 창의 끝**이다: 터진 **그 일괄**의 수는 없다(롤백됐으므로 0 이 맞다) — 그러나
+   「그 일괄이 몇 행을 지우려 했나」는 알 수 없고, 저장소가 커밋 **직후** 죽으면 그 일괄은 세어지지 않은
+   채 커밋돼 있을 수 있다(계수와 커밋이 원자적이지 않다 — 그 창은 일괄 하나다).
 4. **「이미 마스킹된 행 건너뜀」은 두 겹이고 각각을 단독으로 잠그는 test 가 없다**(M-14a·M-14b 생존).
    test 가 잠그는 것은 거동이고, 되돌릴 수 없음의 DB 층 보장은 트리거가 독립으로 진다(M-9).
 5. **`payload` 읽기 자리 0 의 술어는 SQL 문자열을 본다** — 질의가 다른 형태로 조립되면 그 술어의
@@ -252,9 +281,10 @@ code-review APPROVE)한 뒤의 **승인 전 정리**다. 산출물 변경은 **�
 
 | ID | 내용 |
 |---|---|
-| `OPEN-6B3-OUTBOX-UNSENT-RETENTION` | `FAILED`·`ISOLATED` outbox 행의 처분(알려진 제한 1) — 운영자 결정 축. 앞 라운드의 `OPEN-6B3-OUTBOX-FAILED-RETENTION` 을 `ISOLATED` 까지 넓혀 대체한다 |
+| `OPEN-6B3-OUTBOX-UNSENT-RETENTION` | `FAILED`·`ISOLATED` outbox 행의 처분(runbook §5-1 · 이 checklist 제한 1) — 운영자 결정 축. 앞 라운드의 `OPEN-6B3-OUTBOX-FAILED-RETENTION` 을 `ISOLATED` 까지 넓혀 대체한다 |
 | `OPEN-6B3-BLOAT-AFTER-FIRST-PURGE` | 첫 실행이 90일 백로그를 지운 뒤의 부풀음·`VACUUM` 운영 반입(M7 축) |
-| `OPEN-6B3-PARTIAL-COUNTS-ON-FAILURE` | 실패한 run 의 부분 계수 보고(알려진 제한 3) |
-| `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` | `notice_audit` 의 무한 증가와 창 밖 스냅숏 보존(알려진 제한 8, cr M-3) — 보존 자체가 운영자 결정 축 |
-| `OPEN-6B3-INDEX-WINDOW` | V19 의 쓰기 차단 창(알려진 제한 11) — 큰 표에서 `CONCURRENTLY` 가 필요해지면 Flyway 잠금 전략을 함께 바꾸는 결정이 선행한다 |
+| `OPEN-6B3-PARTIAL-COUNTS-ON-FAILURE` | **닫힘**(PR #73 P6) — 부분 계수가 `RetentionAborted` 에 실려 러너의 실패 줄에 찍힌다. 남는 창은 「터진 일괄 하나」뿐이고 그것은 이 checklist 제한 3 이 든다 |
+| `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` | `notice_audit` 의 무한 증가와 창 밖 스냅숏 보존(runbook §5-8 · 이 checklist 제한 8, cr M-3) — 보존 자체가 운영자 결정 축 |
+| `OPEN-6B3-INDEX-WINDOW` | V19 의 쓰기 차단 창(이 checklist 제한 11) — 큰 표에서 `CONCURRENTLY` 가 필요해지면 Flyway 잠금 전략을 함께 바꾸는 결정이 선행한다 |
+| `OPEN-6B3-PURGE-LOCK-TIMEOUT` | **파기·마스킹 문장에 잠금 대기 상한이 없다**(PR #73 P9). 마이그레이션 둘은 `SET LOCAL lock_timeout` 을 갖지만 run 의 DELETE·UPDATE 는 기본값(무한)으로 돈다 — 긴 트랜잭션이 대상 행을 쥐면 그 일괄이 **임대와 소유자 연결을 쥔 채** 기다리고 다음 cron run 은 `LEASE_BUSY` 로 끝난다. 상한을 그냥 두면 「기다렸다」가 「실패했다」가 되어 그 run 이 백로그를 비우지 못하므로, **값의 선택이 운영 측정을 선행 조건으로 갖는다**(cron 주기 · 긴 트랜잭션의 실제 길이). 증상은 runbook §5-21 이 든다 |
 | `OPEN-6B3-FREE-TEXT-PII-AXIS` | **자유텍스트 개념의 비PII 분류는 가정이다**(cr L-1 · privacy F-11). 공고명·적용기준내용·시공능력요건·업무분류라벨은 상류가 쓰는 자유 문자열이고, 그 분류는 「키가 담기로 한 것」을 근거로 한다 — 값의 내용을 측정한 적이 없다. **운영 첫 실행 전에** 실물 표본에 연락처·사람 이름 꼴 패턴 판독을 돌려 그 분류를 재확인한다(그 뒤에는 그 문자열이 영구히 남는다 — `raw_observation` 은 파기 대상이 아니고 마스킹은 키로 고른다) |
