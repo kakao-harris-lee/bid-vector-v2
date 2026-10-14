@@ -755,3 +755,36 @@ def test_cancel_wins_race_before_runner_start_transition_start_training_does_not
     assert record is not None
     assert record.state is JobState.CANCELLED  # 상태 오염 없음(verifier 확인 사항)
     runner.shutdown(wait=True)
+
+
+# ---- cr M-4 — 멱등 재사용 경로의 handle 상태 ----
+
+
+def test_idempotent_reuse_carries_the_existing_jobs_current_state(
+    tmp_path: Path,
+) -> None:
+    """proto `StartTrainingResponse` 주석의 「즉시 `ACCEPTED`」는 **새 job 경로**의 보증이다.
+    같은 멱등 키 재요청(= 멱등 키의 설계 용도인 client 재시도)은 적재가 아니므로 기존 job 의
+    **현재 상태**를 싣는다 — 첫 제출 뒤 워커가 집었으면 `RUNNING` 이다.
+
+    거동 자체는 선재이고 Kotlin fake servicer 의 재사용 갈래(`setState(existingJob.state)`)와
+    같다. 앞 판은 이 자리를 잠그는 test 가 없어 문면이 무조건으로 읽혔다(cr M-4)."""
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=4)
+    runner = _SynchronousStartRunner(store)
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=runner,  # type: ignore[arg-type]
+        is_ready=lambda: True,
+        pipeline_factory=lambda spec: _InstantSucceedingPipeline(),  # type: ignore[arg-type,return-value]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+
+    first = servicer.StartTraining(_valid_request(), context=None)
+    assert first.handle.state == training_pb2.JOB_STATE_ACCEPTED  # 새 job
+
+    again = servicer.StartTraining(_valid_request(), context=None)
+
+    assert again.handle.job_id == first.handle.job_id  # 새 job 을 만들지 않았다
+    assert again.handle.state == training_pb2.JOB_STATE_RUNNING  # 현재 상태
+    assert runner.started == [first.handle.job_id]  # 재사용은 적재가 아니다
