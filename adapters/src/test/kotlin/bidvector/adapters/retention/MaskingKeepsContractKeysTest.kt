@@ -18,25 +18,28 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * D-6B3-1 ④ — 「마스킹이 PII 아닌 필드를 지워 표본을 깨지 않는다」를 **production 쓰기 경로
+ * D-6B3-1 ④ — 「마스킹이 **계약 등재 키**를 지워 표본을 깨지 않는다」를 **production 쓰기 경로
  * 위에서** 잰다. 손으로 심은 fixture 가 아니라 `JdbcRawObservationStore` 가 실제 필드 계약
  * 레지스트리로 쓴 행을 쓴다 — 등식의 양쪽이 모두 실제 계약에서 나온다.
  *
- * 등식의 기준이 **「업체명을 뺀 남김 집합」**으로 다시 세워졌다(운영자 결정 2026-10-14,
- * D-6B3-3 ①): 업체명 둘은 계약에 등재되어 투영에 실리지만 남김 집합 밖이고, 그래서 마스킹은
- * `payload` 와 `payload_fields` **둘 다** 에서 그 키를 지운다. 소비자 포함 술어는 그 기준으로
- * 잰다 — 6G 백테스트·스냅숏 추출·재정규화의 읽기 키 집합에 업체명이 없음을 기계 수집으로
- * 확인했다(`RawPayloadProductionReaderTest` 와 개념 축 수집, evidence).
+ * **기준은 계약에서 유도한 남김 집합**(`keptRawNames()`)이다(cr L-4). 앞 이름·앞 KDoc 은 기준을
+ * 「그 행의 투영 키」로 적었고 그 전제는 D-6B3-5 ② 가 **뒤집었다** — 그때도 등식은 초록이었지만
+ * 그것은 **우연**이었다(심은 행의 등재 키가 계약 합집합의 부분집합이라 두 식의 값이 같았다).
+ * 지금은 재는 값이 같되 전제가 참이다.
+ *
+ * 업체 식별 개념 셋은 계약에 등재되어 투영에 실리지만 남김 집합 **밖**이고, 그래서 마스킹은 두 열
+ * 모두에서 그 키를 지운다. 소비자 포함 술어는 그 기준으로 쟀다(evidence 의 개념 축 수집).
  */
-class MaskingKeepsProjectedKeysTest : PersistenceTestSupport() {
+class MaskingKeepsContractKeysTest : PersistenceTestSupport() {
     @Test
-    fun `마스킹 뒤 남은 키 집합은 투영 키에서 업체명을 뺀 집합과 같다 — 읽는 키를 지우지 않는다`() {
+    fun `마스킹 뒤 남은 키 집합은 그 행의 키와 계약 남김 집합의 교집합이다 — 읽는 키를 지우지 않는다`() {
         val key = appendThroughProductionPath()
         val projected = projectedKeysOf(key.value)
+        val keptByContract = RETENTION_TABLE_RULES.filterIsInstance<RetentionRule.MaskPii>().single().keptRawNames()
 
         sweepFarInTheFuture().shouldBeInstanceOf<RetentionOutcome.Completed>().report.maskedTotal shouldBe 1
 
-        keysOf(payloadOf(key.value)) shouldBe projected - COMPANY_NAME_FIXTURE_KEYS.toSet()
+        keysOf(payloadOf(key.value)) shouldBe (projected intersect keptByContract)
     }
 
     @Test

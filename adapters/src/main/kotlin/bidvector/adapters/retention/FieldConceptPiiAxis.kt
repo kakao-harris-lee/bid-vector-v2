@@ -36,6 +36,14 @@ internal val COMPANY_IDENTITY_CONCEPTS: Set<FieldConcept> =
  * 자연인 축(담당자 이름·전화·전자우편 · 사업자등록번호 · 대표자명)은 **계약에 등재되지 않는다**
  * (D-3H-7) — 그래서 이 목록에도, 위 목록에도 없다. 그 부재는 `FieldContractTest` 와 마스킹의
  * allow-list 반전이 함께 진다.
+ *
+ * **이 분류가 보지 않는 것 둘**(알려진 제한으로 등재 — runbook 17·18).
+ * ① **값의 내용**: 아래 자유텍스트 개념 넷(공고명·적용기준내용·시공능력요건·업무분류라벨)은 상류가
+ * 쓰는 자유 문자열이다. 「그 키가 담기로 한 것」은 사람 이름도 상호도 아니지만 담겨 **들어오면**
+ * 그 문자열은 영구히 남는다(`raw_observation` 은 파기 대상이 아니고 마스킹은 키로 고른다) — 측정이
+ * 아니라 **가정**이고 `OPEN-6B3-FREE-TEXT-PII-AXIS` 가 운영 첫 실행 전 재확인을 건다.
+ * ② **rawName 단위**: 분할은 개념 단위라, 업체 식별을 나르는 새 키가 **기존 비PII 개념 아래로**
+ * 등재되면 아무것도 붉어지지 않는다(`opengCorpInfo` 가 그 꼴이었다). 오늘 그런 키는 없다.
  */
 internal val NON_PII_CONCEPTS: Set<FieldConcept> =
     setOf(

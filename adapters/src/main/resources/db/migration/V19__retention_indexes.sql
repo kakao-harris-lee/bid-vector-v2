@@ -45,10 +45,16 @@ CREATE INDEX raw_observation_pii_unmasked_idx
 --    `outbox` 는 **(상태, 적재 시각)** 복합이다 — 부분 술어(`WHERE state = 'DELIVERED'`)로 두면
 --    종단 집합이 바뀌는 날 인덱스가 조용히 쓰이지 않는다(그 집합은 레지스트리가 정한다).
 --    `notice_requirement_row` 는 파기 대상이 아니지만 **CASCADE 기한 가드**(D-6B3-3 ②)의
---    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다. 그 부분질의는 **먼저
---    `(notice_number, notice_round)` 로 조인**하므로 선행 열이 그 쌍이어야 쓰인다 — `created_at`
---    단독 인덱스는 계획기가 고르지 않는다(cr L-2: 장부가 「가드를 돕는다」를 적고 있으면서 돕지
---    못하는 모양이었다).
+--    `NOT EXISTS … AND created_at >= cutoff` 부분질의가 그 열을 읽는다. 선행 열을 조인 키로 둔 것은
+--    **정상 운영 규모**를 택한 선택이다(mig M-2 실측, 149만 행):
+--      · 만료 부모가 적을 때(cutoff 179일 · 부모 444) 계획기는 **중첩 루프 안티 조인**을 고르고 이
+--        복합 인덱스가 **index-only scan** 을 준다(4.5~7.0ms · 자식 PK 경유 4.1~5.6ms 와 비슷).
+--      · 만료 부모가 많을 때(cutoff 90일 · 부모 ≈ 4만 — **첫 운영 실행**) 계획기는 **해시 안티 조인**을
+--        고르고 그때 필요한 것은 「`created_at >= cutoff` 인 자식 전부」라 **`created_at` 선행 인덱스가
+--        더 맞는 도구**다(75~82ms 대 이 복합의 97~126ms — 복합은 자식 전수 스캔으로 내려간다).
+--    즉 **첫 실행에서는 1.3~1.5배 느린 쪽**이고 그 뒤 매일의 run 에서는 비슷하거나 낫다. 일괄당 수십
+--    ms 차이라 거동은 어느 쪽이든 옳다 — 앞 판 주석이 적었던 「`created_at` 단독은 계획기가 고르지
+--    않는다」는 **측정으로 거짓**이었고(실제로 쓰인다) 그 문장을 지운다.
 -- =============================================================================
 CREATE INDEX notice_retention_cutoff_idx ON notice (created_at);
 CREATE INDEX opening_result_retention_cutoff_idx ON opening_result (created_at);
