@@ -51,6 +51,17 @@ class DetailCode(StrEnum):
     RUNNER_CRASHED = "RUNNER_CRASHED"
     ARTIFACT_WRITE_REJECTED = "ARTIFACT_WRITE_REJECTED"
     REPORT_CANONICALIZATION_REJECTED = "REPORT_CANONICALIZATION_REJECTED"
+    # M6/6B-4 신설 — 대기 큐 상한 폐기와 재기동 고아 처분(Q-1). 셋 다 job 이 **실행
+    # 되지 못한** 사유다(파이프라인 안의 실패가 아니다).
+    PENDING_QUEUE_OVERFLOW = "PENDING_QUEUE_OVERFLOW"
+    """대기 큐가 상한을 넘어 최고참 대기 job 을 끝냈다 — `WORKER_RESOURCE_EXHAUSTED`."""
+
+    RUNNER_LOST_ON_RESTART = "RUNNER_LOST_ON_RESTART"
+    """재기동 전에 RUNNING 이던 job — 실행기가 사라졌고 **재개하지 않는다**(처분)."""
+
+    TRAINING_SPEC_UNSUPPORTED_ON_RESTART = "TRAINING_SPEC_UNSUPPORTED_ON_RESTART"
+    """재기동한 코드가 그 저널 항목의 `training_spec_version` 을 더는 모른다 — 대기
+    고아를 영원히 대기로 남기지 않고 처분한다(설계 검토 우회 (7) 「이전 버전 저널」)."""
 
 
 @dataclass(frozen=True)

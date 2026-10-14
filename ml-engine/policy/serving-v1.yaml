@@ -5,6 +5,11 @@ max_workers: 8
 max_concurrent_rpcs: 32
 shutdown_grace_seconds: 10
 job_workers: 1
+# M6/6B-4 B-2 — 대기(ACCEPTED) job 수 상한. 넘치면 가장 오래된 대기 job 을
+# FAILED(WORKER_RESOURCE_EXHAUSTED) 로 폐기한다(최신성 우선, 운영자 결정 2026-09-26 ③).
+# 잠정값 — 승인된 큐 깊이 임계가 없다(OPEN-OPS-03 미결). job_workers: 1 의 네 배로
+# 둔다(policy-values.md §1).
+pending_queue_max: 4
 idempotency_key_max_chars: 256
 embedding_text_max_chars: 4000
 dataset_uri_schemes.0: file

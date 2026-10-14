@@ -124,8 +124,8 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 
 `milestone-2.md` 2C 의 양자택일에서 **별도 job API** 를 택한다.
 
-- `TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob }` — 전부 unary. 전이표: `ACCEPTED → RUNNING →
-  SUCCEEDED | FAILED` 와 `ACCEPTED | RUNNING → CANCELLED`(취소는 두 비종료 상태 모두에서). 표에 없는 전이는 거부
+- `TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob }` — 전부 unary. 전이표는 이 절 끝의
+  **렌더링 블록**이고(취소는 두 비종료 상태 모두에서 가능하다), 블록에 없는 전이는 거부
   (`data-dictionary.md` §2.2 관례와 같은 형태 — 전이표는 계약 주석과 provider test 가 갖는다, 2C ④·⑤ 와 동일 표기).
 - Kotlin 이 **주기 조회**한다(ADR 0003 D-5). 조회 주기는 `ADR 0005` 의 DB 기반 스케줄러가 든다 — 브로커 없음.
 - 서버 스트리밍 push 는 불채택 — 장시간 연결은 「동기 RPC 로 붙잡지 않는다」(ADR 0003 D-4)의 취지를 형태만 바꿔 어긴다.
@@ -133,6 +133,37 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 - `StartTraining` 입력은 **immutable dataset reference + manifest checksum** 이다. ml-engine 은 DB 를 모르므로 dataset 은
   object/file storage 참조이고(`v2-지침서.md` §3.2 `adapters/` — training 전용 storage adapter), 그 참조를 누가 만드는가는
   M5 5C 소유.
+
+> **D-8 개정 (2026-10-13, M6/6B-4 D-6B4-1 — 운영자 결정 2026-09-26 ③ · 2026-10-13 B-1. 사유 목록 보정 2026-10-14,
+> verifier r1 M-3 — 문면은 사유 하나만 말했는데 구현은 같은 간선을 셋에 썼다. 결정: 문면을 구현에 맞춘다).**
+> 전이표에 간선 하나를 더한다 — **`ACCEPTED` 에서 `FAILED` 로** 가는 간선이다. 대기 job 이 **실행되지 못한 채**
+> 끝나는 자리이고, 쓰이는 사유는 **정확히 셋**이다(넷째는 런타임 닫힌 집합
+> `training.jobs.state._PENDING_FAILURE_REASONS` 가 거부하고, 이 목록과 그 집합의 등식을 게이트가 센다).
+> [1] 대기 큐가 상한(`serving-v1.yaml` 정책 값, 잠정 4)을 넘어 가장 오래된 대기 job(`accepted_at`, 동률 `job_id`)을
+> 폐기할 때 — `JOB_FAILURE_CODE_WORKER_RESOURCE_EXHAUSTED` · `detail_code=PENDING_QUEUE_OVERFLOW`(최신성 우선).
+> [2] 재기동 때 그 job 의 `training_spec_version` 을 지금 코드가 모를 때 — `JOB_FAILURE_CODE_TRAINING_ERROR` ·
+> `detail_code=TRAINING_SPEC_UNSUPPORTED_ON_RESTART`(영원히 대기로 남기지 않는다).
+> [3] 워커가 그 job 을 집는 도중 `START` 를 커밋하기 **전에** 크래시했을 때 — `JOB_FAILURE_CODE_TRAINING_ERROR` ·
+> `detail_code=RUNNER_CRASHED`.
+> 함께 **ACCEPTED = 대기(워커 미집기) · RUNNING = 실행 중**으로 뜻을 고정한다(종전 구현은 executor 제출 전에 RUNNING 을
+> 커밋해 RUNNING 이 실행을 뜻하지 않았다).
+> 전이표의 네 자리(이 절 · `training.proto` `JobState` 주석 · Python `_TRANSITIONS` · Kotlin `TrainingContractRules`)는 같은
+> 데이터다 — 앞 둘은 Python 표에서 **렌더링한 바이트와 등식**이고, Kotlin 은 그 렌더링 블록을 읽어 자기 허용표·술어를
+> 대조한다(텍스트 regex 가 아니라 실행값). 재기동은 **재개가 아니라 처분**이다 — RUNNING 고아는 `FAILED` 로 처분하고
+> (그 쪽 간선이다), ACCEPTED 고아는 대기 큐로 재적재한다(실행된 적이 없다, 상한 적용).
+
+전이표 — **아래 블록은 Python `training.jobs.state._TRANSITIONS` 에서 렌더링한 바이트와 등식이다.** 손으로 한 줄을
+고치거나 더하면 화살표 철자·표 모양과 무관하게 게이트가 붉어지고, Kotlin 계약 test 는 이 블록을 읽어 자기 허용표를
+대조한다. 이 파일의 **블록 밖**에서 상태 쌍을 잇는 문면(화살표류 글자 + 상태 이름 둘)도 같은 게이트가 금지한다.
+
+<!-- transition-table-begin -->
+- `ACCEPTED → CANCELLED`
+- `ACCEPTED → FAILED`
+- `ACCEPTED → RUNNING`
+- `RUNNING → CANCELLED`
+- `RUNNING → FAILED`
+- `RUNNING → SUCCEEDED`
+<!-- transition-table-end -->
 
 ---
 

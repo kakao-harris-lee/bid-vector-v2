@@ -75,3 +75,39 @@ def error_pb2(generated_stub_path: Path):
     from bidvector.ml.v1 import error_pb2 as module
 
     return module
+
+
+# ---- 저널 쓰기 감사 훅(M6/6B-4 vr H-2 · cr M-1) ----
+#
+# 술어와 기록은 `tests/journal_audit.py` 가 가진다(이름이 유일해야 한다 — `import conftest`
+# 는 `tests/training/conftest.py` 로도 해석돼 모호하다, 실측). 이 파일은 **설치**와 **수집
+# 순서**만 진다: 감사 훅은 제거할 수 없으므로 세션 시작에 한 번 설치하고, 세션 전역 단언
+# test 를 맨 뒤로 돌린다.
+
+from journal_audit import (  # noqa: E402 — 위 생성 블록 뒤여야 한다
+    JOURNAL_WRITE_AUDIT,
+    WHOLE_SESSION_AUDIT_TEST,
+    JournalWriteAudit,
+)
+
+sys.addaudithook(JOURNAL_WRITE_AUDIT.hook)
+
+
+@pytest.fixture(scope="session")
+def journal_write_audit() -> JournalWriteAudit:
+    """세션 내내 켜져 있는 감사 훅의 기록(`tests/gates/test_journal_write_audit.py`)."""
+    return JOURNAL_WRITE_AUDIT
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """세션 전역 감사 단언을 **맨 뒤로** 돌린다.
+
+    그 test 가 제 자리(`tests/gates/`)에서 돌면 **그 시점까지**의 위반만 본다 — 뒤에 도는
+    `tests/serving`·`tests/training` 에서 생긴 위반은 이미 지나간 test 를 붉힐 수 없다.
+    `pytest_sessionfinish` 는 대안이 아니다: 그 자리에서 `session.exitstatus` 를 바꿔도
+    **종료 코드가 0 으로 남는다**(실측 — 메시지는 찍히고 exit 0). 「게이트 결과는 종료
+    코드로」 규율대로, 판정은 수집 순서를 바꿔 **보통의 test 실패**로 만든다."""
+    tail = [item for item in items if item.name == WHOLE_SESSION_AUDIT_TEST]
+    for item in tail:
+        items.remove(item)
+    items.extend(tail)

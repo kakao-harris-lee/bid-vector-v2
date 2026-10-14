@@ -7,6 +7,7 @@ from __future__ import annotations
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import grpc
 import pytest
@@ -22,12 +23,13 @@ from ml_engine.serving.grpc import Servicers, build_server, shutdown
 from ml_engine.serving.policy import ServingPolicy
 from ml_engine.serving.prediction import BidPredictionServicer
 from ml_engine.serving.readiness import PreloadOutcome, ReadinessGate
+from ml_engine.training.jobs.journal_file import JobJournal
 from ml_engine.training.jobs.pipeline import (
     TrainingPipeline,
 )
 from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.servicer import TrainingJobServicer
-from ml_engine.training.jobs.store import InMemoryJobStore
+from ml_engine.training.jobs.store import JobStore
 
 
 def _policy(**overrides: object) -> ServingPolicy:
@@ -37,6 +39,7 @@ def _policy(**overrides: object) -> ServingPolicy:
         max_concurrent_rpcs=4,
         shutdown_grace_seconds=1.0,
         job_workers=1,
+        pending_queue_max=4,
         idempotency_key_max_chars=256,
         embedding_text_max_chars=1000,
         dataset_uri_schemes=("file",),
@@ -68,7 +71,7 @@ class _BlockingStore:
 def _build_real_servicers(
     policy: ServingPolicy, gate: ReadinessGate, store: object
 ) -> Servicers:
-    runner = JobRunner(InMemoryJobStore(), max_workers=1)
+    runner = JobRunner(store, max_workers=1)  # type: ignore[arg-type]
 
     def _factory(spec: object) -> TrainingPipeline:
         raise AssertionError("test 는 job 을 시작하지 않는다")
@@ -88,10 +91,10 @@ def _build_real_servicers(
     )
 
 
-def test_build_server_registers_three_services_and_serves() -> None:
+def test_build_server_registers_three_services_and_serves(tmp_path: Path) -> None:
     policy = _policy()
     gate = _gate()
-    store = InMemoryJobStore()
+    store = JobStore(journal=JobJournal(tmp_path / "journal"), pending_queue_max=4)
     servicers = _build_real_servicers(policy, gate, store)
     server = build_server(policy, servicers)
     port = server.add_insecure_port("127.0.0.1:0")

@@ -1,0 +1,39 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "e2232a75232df9a0fdb9cda468edce7f43fe860b",
+  "reviewed_head": "eb4c44a88e328cbb4f196ef557bf635d31e6da11",
+  "findings": [],
+  "commands_run": [
+    "pwd; git status --short; git rev-parse --verify <base>; git rev-parse --verify <head>; git rev-parse HEAD; git merge-base <base> <head>",
+    "git diff --stat <base>..<head>; git diff --name-status <base>..<head>; git ls-files --others --exclude-standard",
+    "rg -n \"JSON|verdict|reviewed_base|D-8|6B-4|acceptance|max_queue|dry_run|dry-run|TrainingContractRules\" agent-workflow.md v2-지침서.md milestone-6.md docs/adr/0010-ml-call-budget-and-training-transport.md reports/evidence/m6/6b4 -S",
+    "git diff --unified=80 <base>..<head> -- contracts/proto/bidvector/ml/v1/training.proto docs/adr/0010-ml-call-budget-and-training-transport.md",
+    "nl -ba docs/adr/0010-ml-call-budget-and-training-transport.md",
+    "sed -n '1,260p' ml-engine/src/ml_engine/training/jobs/state.py",
+    "sed -n '1,620p' ml-engine/src/ml_engine/training/jobs/store.py",
+    "sed -n '1,340p' ml-engine/src/ml_engine/training/jobs/runner.py",
+    "sed -n '1,260p' ml-engine/src/ml_engine/training/jobs/servicer.py",
+    "sed -n '1,380p' ml-engine/src/ml_engine/app/server.py",
+    "sed -n '1,260p' adapters/src/test/kotlin/bidvector/adapters/contract/TrainingContractRules.kt",
+    "sed -n '1,260p' adapters/src/test/kotlin/bidvector/adapters/contract/TrainingContractTest.kt",
+    "rg -n \"transition-table-begin|transition-table-end|ACCEPTED →|RUNNING →|RUNNING.*FAILED|ACCEPTED.*FAILED\" contracts/proto/bidvector/ml/v1/training.proto docs/adr/0010-ml-call-budget-and-training-transport.md ml-engine/tests/gates adapters/src/test/kotlin -S",
+    "sed -n '1,520p' ml-engine/tests/gates/test_job_transition_table_parity.py",
+    "pgrep -af 'GradleWrapperMain|GradleWorkerMain' | grep -v pgrep",
+    "free -g",
+    "UV_CACHE_DIR=/tmp/uv-cache uv run --offline pytest tests/gates/test_job_transition_table_parity.py tests/training/test_jobs_state.py tests/training/test_jobs_store.py tests/training/test_jobs_servicer.py tests/app/test_server_job_restart.py",
+    "PYTHONPATH=src python3 -m pytest tests/gates/test_job_transition_table_parity.py tests/training/test_jobs_state.py tests/training/test_jobs_store.py tests/training/test_jobs_servicer.py tests/app/test_server_job_restart.py",
+    "git diff --check <base>..<head> -- contracts/proto/bidvector/ml/v1/training.proto docs/adr/0010-ml-call-budget-and-training-transport.md",
+    "git diff --name-status 20da6f6ee1c9cbc40d342338659c65034ddcea36..eb4c44a88e328cbb4f196ef557bf635d31e6da11",
+    "python3 text parser comparing proto and ADR transition-table blocks",
+    "git status --short --ignored=matching"
+  ],
+  "residual_risks": [
+    "Gradle/Kotlin tests were not executed because the review request states Gradle cannot start in this sandbox; Kotlin behavior was reviewed statically.",
+    "Python pytest could not be re-run in this sandbox: `uv run --offline` could not use the default cache under the read-only home directory, and with a writable cache it lacked cached `grpcio`; direct `python3 -m pytest` then failed because `hypothesis` is not installed. I proceeded with static contract/code inspection and lightweight text checks.",
+    "Review scope was limited to the requested contract-file judgment and consistency with the named implementation paths; unrelated implementation quality was not assessed."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.162.1",
+    "model": "gpt-5.5 (reasoning effort: high)"
+  }
+}

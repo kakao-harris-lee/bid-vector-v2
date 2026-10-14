@@ -19,6 +19,7 @@ max_workers: 8
 max_concurrent_rpcs: 32
 shutdown_grace_seconds: 10
 job_workers: 1
+pending_queue_max: 4
 idempotency_key_max_chars: 256
 embedding_text_max_chars: 4000
 dataset_uri_schemes.0: file
@@ -38,6 +39,16 @@ def test_shipped_policy_loads() -> None:
     assert result.dataset_uri_schemes == ("file",)
 
 
+def test_shipped_pending_queue_max_is_the_approved_value(tmp_path: Path) -> None:
+    """M6/6B-4 B-2 — 출하 값은 **4**다(`policy-values.md` §1, 잠정). 이 값이 바뀌면
+    여기서 먼저 붉어진다 — 값을 바꾸려면 승인 표를 같이 고쳐야 한다는 뜻이다.
+    `tests/training/test_jobs_store.py::test_shipped_policy_value_reaches_the_queue`
+    가 이 값이 **실제 폐기 시점**을 정하는 것까지 잇는다."""
+    result = load_serving_policy(_SHIPPED_POLICY_PATH)
+    assert isinstance(result, ServingPolicy)
+    assert result.pending_queue_max == 4
+
+
 def test_valid_policy_round_trips(tmp_path: Path) -> None:
     result = load_serving_policy(_write(tmp_path, _VALID_YAML))
     assert isinstance(result, ServingPolicy)
@@ -45,6 +56,7 @@ def test_valid_policy_round_trips(tmp_path: Path) -> None:
     assert result.max_concurrent_rpcs == 32
     assert result.shutdown_grace_seconds == 10
     assert result.job_workers == 1
+    assert result.pending_queue_max == 4
     assert result.idempotency_key_max_chars == 256
     assert result.embedding_text_max_chars == 4000
 
@@ -56,6 +68,8 @@ def test_valid_policy_round_trips(tmp_path: Path) -> None:
         "max_concurrent_rpcs: 0",
         "shutdown_grace_seconds: -1",
         "job_workers: 0",
+        "pending_queue_max: 0",
+        "pending_queue_max: -1",
         "idempotency_key_max_chars: 0",
         "embedding_text_max_chars: 0",
     ],
@@ -109,11 +123,12 @@ def test_unknown_key_is_rejected(tmp_path: Path) -> None:
     assert isinstance(result, PolicyRejected)
 
 
-def test_missing_required_key_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize("missing_key", ["job_workers", "pending_queue_max"])
+def test_missing_required_key_is_rejected(tmp_path: Path, missing_key: str) -> None:
     lines = [
         line
         for line in _VALID_YAML.strip().splitlines()
-        if not line.startswith("job_workers")
+        if not line.startswith(missing_key)
     ]
     result = load_serving_policy(_write(tmp_path, "\n".join(lines)))
     assert isinstance(result, PolicyRejected)
