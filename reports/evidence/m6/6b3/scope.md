@@ -64,6 +64,8 @@ in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` + 
 
 **D-6B3-5 (r5, 2026-10-14, 팀장 — 검토 r2 수령 · 수정 라운드 2, 재작업 2/5).** 검토 r2: verifier not-ready(R2-F1 high) · privacy fail(F-6 high = 같은 결함) · code-review APPROVE(medium 2) · migration approve(medium 2). 팀장 결정(운영자 결정 「업체명 마스킹」의 범위 안 — 새 운영자 결정 없음): ① **업체 식별 개념 집합을 한 자리에 선언**하고 `OPENING_COMPANY_INFO`(`opengCorpInfo`)를 포함, 마스킹 집합 == 그 집합 · **`FieldConcept` 전수 ↔ PII 분류(업체 식별 / 비PII) 분할 등식**으로 새 개념이 분류 없이 들어올 수 없게(privacy F-7) — 키 전체를 지운다. ② **남길 키는 행이 아니라 계약 레지스트리에서** — 수집 계약 전 개정(`KONEPS_COLLECTION_POLICY.entries`)의 합집합에서 업체 식별 개념을 뺀 rawName 집합(D-6B3-1 ④ 문면 복귀 · vr R2-F2 · cr M-2), `referenceDate` 의존 제거. ③ **`inserted_at` 은 DB 시계가 소유** — 앱 역할이 미래 시각으로 마스킹 대상에서 빠질 수 없게(vr R2-F2), 수집 경로가 그 열을 쓰는지 먼저 실측. ④ `maskAll` 은 진척 0 이면 끝나고 `skipped > 0` 은 `INCOMPLETE`(cr M-1) · ⑤ V18 첫 문장 `SET LOCAL lock_timeout`, runbook 적용 창은 V19 한 트랜잭션 = 열 표 동시 쓰기 차단 · 적용 전 비객체 `payload_fields`·긴 트랜잭션 점검(mig M-1 · vr R2-F4) · `convalidated` 단언(mig M-2) · ⑥ low·장부층 일괄(vr R2-F3·F5~F8 · cr L-1~L-8 · mig L-1~L-3 · privacy F-8·F-9).
 
+**D-6B3-6 (r6, 2026-10-14, 팀장 — 수정 라운드 2 수령 · 동결).** 산출물 판정 SHA **`bc18d033`** · evidence `b28dc012`. RED 먼저 커밋(`2d9996e3`, 실패 14 · 공허 대조 초록). ⑤ `lock_timeout` 은 문자열 술어가 아니라 **거동 test**(별 컨테이너에서 경합 잠금 → V18 이 `55P03` 으로 빨리 실패 · 재시도 성공; 변이 RED 41.9s). `inserted_at` 은 비소유자 INSERT 를 DB 시계로 덮어씀(수집 경로가 그 열을 안 씀 — 실측). 남길 키 = 수집 계약 전 개정 합집합(저장소 생성자가 날짜를 받지 않음 — 오늘은 개정 하나라 관측 차이 없음, 구조로 닫음). 새 파일 일곱 모두 in_scope. 레인 acceptance: check `--rerun-tasks` exit 0(2,973 test · fail 0 · skipped 4) · qualityBaseline 0 · 변이 13 중 12 KILLED + 대조 1 · rollback 48 경로 재실측. 재작업 2/5. 표적 재검증: verifier · privacy(r2 fail 축) · migration(V18 변경) · code-review(r2 medium 둘) 병렬.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
