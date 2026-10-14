@@ -1,14 +1,18 @@
 # M6/6B-4 실행 명령과 종료 코드
 
-정본: `scope.md`. 판정 SHA(산출물 마지막) `20da6f6e`. 명령 앞뒤로 HEAD 를 단언하고, 측정
-중에는 커밋하지 않는다. 출력 전문은 싣지 않는다(핵심 결과 한 줄) — 감사자는 명령을 다시 돈다.
+정본: `scope.md`. 판정 SHA **`7ee29347`**(main `ae9b2f52` 병합 커밋 — PR #71 이 main 보다
+뒤처져 머지가 막혔다). 코드·계약 산출물의 마지막 변경은 `20da6f6e` 이고 그 뒤는 장부 커밋과
+이 병합이다. **병합 뒤 세 job 전건을 다시 돌렸다**(각 절의 「병합 커밋」 항목). 명령 앞뒤로
+HEAD 를 단언하고, 측정 중에는 커밋하지 않는다. 출력 전문은 싣지 않는다(핵심 결과 한 줄) —
+감사자는 명령을 다시 돈다.
 
 **마지막 HEAD 의 게이트 결과 정본은 이 파일이 아니다** — evidence 는 자기 마지막 커밋의
 post-state 를 담을 수 없다. 그 자리는 verifier 리포트와 PR 조치 코멘트다.
 
 ## acceptance — `ml-engine` job 전건 (`.github/workflows/ci.yml`)
 
-양끝 HEAD 동일(`20da6f6e`). `working-directory: ml-engine`.
+양끝 HEAD 동일. `working-directory: ml-engine`(job 의 `defaults.run` — 이 기본값을 빼면
+S-1 부터 떨어진다).
 
 ## 2026-10-14T
 - cmd: `uv sync --frozen --all-extras` (S-1)
@@ -69,6 +73,14 @@ A/B 대조(같은 clone, 훅 설치 한 줄만 주석 처리): `tests/app` 269 t
 - exit: 0
 - 핵심 결과: 1 passed — 설치본에서 재수출 성립
 
+## 2026-10-14T — 병합 커밋 `7ee29347`
+- cmd: `ml-engine` job 의 **run step 10 전건**(S-1 · S-1b · S-2 · S-3 · S-4 · S-5 · S-6 ·
+  S-7 · S-9 · S-11) — ci.yml 을 파싱해 파일에서 그대로 꺼냈다
+- exit: **10 step 전부 0**
+- 핵심 결과: S-5 **1605 passed**(350.74s) — main 의 6E-2C·하네스 핀을 들인 트리에서도 같은
+  수. 첫 시도는 내 실행기가 job 의 `working-directory` 기본값을 무시해 S-1 이 exit 2 였다
+  (저장소가 아니라 실행기 결함 — 고친 뒤가 위 결과)
+
 ## acceptance — `check` job
 
 ## 2026-10-14T
@@ -126,6 +138,14 @@ A/B 대조(같은 clone, 훅 설치 한 줄만 주석 처리): `tests/app` 269 t
 - 핵심 결과: 메시지는 찍히는데 **종료 코드가 0** 이다(「게이트 결과는 종료 코드로」 규율 위반).
   수집 순서를 바꿔 전역 단언을 맨 뒤 test 로 돌린 뒤 같은 주입에서 **exit 1** 을 확인했다
 
+## 2026-10-14T — 병합 커밋 `7ee29347`
+- cmd: `./gradlew --no-daemon check --rerun-tasks` → `./gradlew --no-daemon qualityBaseline`
+  → `./tools/one-command-check.sh` (S-20)
+- exit: **0 · 0 · 0**
+- 핵심 결과: BUILD SUCCESSFUL 10m 17s · **359 actionable tasks 전부 실행**(병합이 들여온 app
+  하한 test 로 task 수가 늘었다) · S-20 은 Kotlin 전건 + Python 전건을 한 명령으로 다시 돌아
+  1605 passed
+
 ## acceptance — `container` job (S-21 ~ S-25)
 
 run 블록은 ci.yml 을 파싱해 **파일에서 그대로 꺼내** 순서대로 실행했다. `uses:` step 은
@@ -134,35 +154,37 @@ run 블록은 ci.yml 을 파싱해 **파일에서 그대로 꺼내** 순서대�
 적어 **돌린 것처럼 보였다** — code-review 지적). 그 step 이 올리는 SBOM 은 S-22d·S-22e 가
 만든 파일이고, 그 둘의 exit 0 이 생성의 근거다.
 
-재사용하지 않았다 — `contracts/proto` 를 편집했고 그것이 ml-serving·앱 이미지 입력이다.
-Python 생성물은 주석을 싣지 않지만 Kotlin(Java) 생성물은 javadoc 에 싣으므로, **주석만 바뀐
-proto 커밋도 「이미지 입력 무변경」을 근거로 쓸 수 없다**. 그 근거는 자기에게도 걸린다 —
-마지막 proto 주석 커밋(`20da6f6e`)이 앞 회차보다 뒤에 있으므로 앞 회차로 갈음하지 않고
-16 step 을 그 자리에서 다시 돌렸다. 실측 HEAD 는 `86f379de` 이고
-`git diff --name-only 20da6f6e..86f379de` 는 `reports/evidence/` 둘만 낸다(이미지 입력 무변경).
-갈음 금지는 문면만의 추론이 아니다: 이 회차의 S-21 에서 `COPY contracts/proto` 층이
-**CACHED 가 아니라 DONE** 으로 다시 돌았다 — 이미지 빌드 자신이 주석 변경을 입력 변경으로
-센다(그 뒤 층은 전부 재실행). vr r3d §6 의 열린 항목은 **이 회차로** 닫힌다.
+재사용하지 않았다 — 근거 둘이 각각 독립이다. ① `contracts/proto` 를 편집했고 그것이
+ml-serving·앱 이미지 입력이다. Python 생성물은 주석을 싣지 않지만 Kotlin(Java) 생성물은
+javadoc 에 싣으므로 **주석만 바뀐 proto 커밋도 「이미지 입력 무변경」을 근거로 쓸 수 없다** —
+문면만의 추론이 아니다: S-21 에서 `COPY contracts/proto` 층이 **CACHED 가 아니라 DONE** 으로
+다시 돌았고 그 뒤 층이 전부 재실행이다(이미지 빌드 자신이 주석 변경을 입력 변경으로 센다).
+② main 병합이 이미지 입력을 **직접** 바꿨다(아래 기계 판정). vr r3d §6 의 열린 항목은 이
+재실행으로 닫힌다.
 
-compose 프로젝트 이름만 `COMPOSE_PROJECT_NAME=m6b4r3e` 로 두어 레인을 격리했다(명령 문면은
-불변 · `tools/db-rehearsal.sh` 가 이름을 compose config 에서 읽어내므로 D-6B2-5 ② 가 이미
-허용하는 축이다). S-21a 의 Gradle 은 `--no-daemon` 이고 회차 뒤 새 daemon 은 남지 않았다.
+compose 프로젝트 이름만 `COMPOSE_PROJECT_NAME` 으로 갈라 레인을 격리했다(명령 문면은 불변 ·
+`tools/db-rehearsal.sh` 가 이름을 compose config 에서 읽어내므로 D-6B2-5 ② 가 이미 허용하는
+축이다). S-21a 의 Gradle 은 `--no-daemon` 이고 회차 뒤 새 daemon 은 남지 않았다.
 
-## 2026-10-14T
+## 2026-10-14T — 병합 커밋 `7ee29347`
 - cmd: `container` job 의 **run step 16** (일회성 자격 값 둘 · S-21 · S-21a · S-21b · S-22a ·
-  S-22b · S-22c · install trivy · S-22d · S-22e · S-23 · S-23b · S-23c · **S-24** · S-25) —
-  실측 HEAD `86f379de`
+  S-22b · S-22c · install trivy · S-22d · S-22e · S-23 · S-23b · S-23c · **S-24** · S-25)
 - exit: **16 step 전부 0**(요약 줄 `TOTAL steps=16 failed=0`)
 - 핵심 결과: 이미지 둘 빌드 · 위생·취약점 게이트 넷 · compose 세 서비스 healthy 수렴 ·
   컨테이너 스모크 · 백업·복원 리허설 · 실 Kotlin gateway ↔ 컨테이너 실 Python 서버(S-24) ·
-  `down -v` 뒤 컨테이너·볼륨 0
+  `down -v` 뒤 컨테이너·볼륨 0(별도 `--filter` 계수도 0)
+- 이미지 입력 기계 판정: `git diff --name-only 20da6f6e..7ee29347` 에 Dockerfile 둘 ·
+  `app/build.gradle.kts` · `gradle/libs.versions.toml` · 위생·취약점 정책 넷 · 취약점 스캔
+  스크립트가 있다 — 위생 게이트는 main 의 6E-2C 상한으로 ml-serving 을 다시 재 통과했다
+  (측정값 < 상한)
 
 ### Q-6 전용 실측 — 컨테이너 재생성 뒤 저널 생존
 
-아래 표는 실측 HEAD `54bbef81` 에서의 측정을 그대로 잇는다. 이 라운드는 `docker/**` 를 편집하지
-않았고 저널의 **자리·형식·볼륨 배선**도 바꾸지 않았다(바뀐 것은 판독 관용도·사유 집합·기동 시
-시각 조정·게이트다).
-위 S-23~S-25 가 그 배선 위에서 다시 exit 0 이다.
+아래 표는 실측 HEAD `54bbef81` 에서의 측정을 그대로 잇는다. 이 라운드가 바꾼 것은 판독
+관용도·사유 집합·기동 시 시각 조정·게이트이고 저널의 **자리·형식·볼륨 배선**은 그대로다.
+main 병합이 `docker/ml-serving.Dockerfile` 을 함께 바꾸지만 그것은 **베이스 이미지 다이제스트
+상향**(6E-2C)이고 저널 디렉터리·소유자·볼륨 선언을 건드리지 않는다 — 그 상향 위에서 위생
+게이트(다이제스트 대조)와 S-23~S-25 가 그 배선 위에서 다시 exit 0 이다.
 
 | 단계 | 실측 |
 | --- | --- |
