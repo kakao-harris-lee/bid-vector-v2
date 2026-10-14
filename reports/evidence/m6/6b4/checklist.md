@@ -1,16 +1,16 @@
 # M6/6B-4 완료 점검 — ML training job 영속 · 대기 큐 상한
 
-정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `e118ced7`. 실행 결과는
+정본 계약 `scope.md`(결정 ID `D-6B4-N`). 판정 SHA(산출물 마지막) `<r2 마지막 산출물 커밋>`. 실행 결과는
 `commands.md`, 되돌림은 `rollback.md`.
 
 ## 산출물 Q-1 ~ Q-7 과 그 술어
 
 | ID | 무엇 | 공허함을 막는 술어의 실측 |
 | --- | --- | --- |
-| Q-1 | 계약 개정 — 전이표에 `ACCEPTED → FAILED` 하나 + `DetailCode` 셋 | 네 자리(Python 표 · Kotlin `setOf` · proto `JobState` 주석 · ADR 0010 D-8+개정) **기계 추출 집합 등식** + 간선 수 하한 + 이 간선이 네 자리 모두에 있음 + 파서별 음성 대조. **닫힌 세계**: proto 통치 구역·ADR D-8 절의 `→` 가 전부 파서를 지나야 하고(괄호 안·백틱 밖·표 모양 밖은 RED), Kotlin 허용표의 `JOB_STATE_*` 언급 수 = 쌍 수 × 2, 술어 본문은 데이터 조회 하나로 고정. Kotlin 쪽은 **5x5 전 쌍 진리표**를 허용표 데이터에서 생성해 대조. 변이 M-4~M-6(간선 제거) · P1·P1b·P2·P2b·P3(다른 모양 추가) 전부 RED |
+| Q-1 | 계약 개정 — 전이표에 `ACCEPTED → FAILED` 하나 + `DetailCode` 셋 | proto·ADR 의 표 블록이 Python `_TRANSITIONS` **렌더링 바이트와 등식**이고(파서가 문면을 읽는 대신 생성물과 대조 — 화살표 철자·들여쓰기·표 모양에 의존하지 않는다), 두 파일 **전체**에서 블록 밖의 전이 주장(연결 글자 + 상태 이름 둘)을 금지한다. Kotlin 은 `//` 주석 줄을 지운 뒤 파싱 + 언급 수 등식 + 술어 본문 고정, 그리고 **Kotlin test 가 ADR 블록을 직접 읽어** 허용표·5x5 진리표를 대조한다(기대값 출처가 Python 표 — 새 데이터 파일 0). 사유 축은 런타임 닫힌 집합과 문면의 양방향 등식. 변이 전건 RED: 간선 제거 넷 · 다른 모양 추가(P1·P1b·P2·P2b·P3) · 글리프·배치(PR1~PR4·AD1~AD4·AD6) · Kotlin 주석 행·산술·`forNumber`(K1~K5) |
 | Q-2 | 명시 대기 큐 — `START` 를 워커가 집는 순간으로 | **wire handle 은 언제나 `JOB_STATE_ACCEPTED`** 다(proto 문면 「즉시 ACCEPTED」 — 저장소 읽기를 대기열 투입 **앞**에 두어 결정적이고, 워커가 그 사이 집어 `RUNNING` 을 커밋해도 응답은 ACCEPTED 임을 동기 START runner 로 재며 통제군으로 워커가 실제로 집었음을 함께 단언) · 대기 5번째 제출이 최고참을 끝냄 · `RUNNING`·종단 비폐기 · 동률 `job_id` · 멱등 재사용 무폐기 · **래치 12 스레드 동시 제출에서 대기 정확히 4** · 폐기된 대기 job 을 워커가 뒤늦게 집어도 계산 0회 · **폐기 시점 WARNING 로그**(job_id·accepted_at·사유)와 통제군. 변이 M-3·M-10 RED |
 | Q-3 | 상한 정책 값 | **값 축**: 출하 값이 승인 값(잠정)임 + 그 값이 실제 폐기 시점을 정함. **운반 축**: 조립 근(`_build_servicers`)으로 띄운 서버에 gRPC 로 상한+1 개를 대기시켜(워커 하나를 붙잡아) 최고참이 `PENDING_QUEUE_OVERFLOW` 가 되고 RUNNING 은 폐기되지 않으며 살아남은 대기 수가 정확히 상한임을 단언. 로더는 전수 fail-closed 이고 0·음수·키 누락을 거부. 변이 M-1(4→3)·M-2(4→5)·**V8(조립 근 상수화)** 전부 RED |
-| Q-4 | 파일 저널 | 쓰기는 저장소 잠금 **안**이고 **저널 성공 뒤에만 메모리 변경**(쓰기 실패 주입에서 상태 불변·키 미선점 실측) · 원자 교체(크래시를 `fsync`·`os.replace` 두 자리에 주입해 이전 스냅숏이 온전히 읽힘) · canonical JSON 바이트 안정 · 「없음」과 「깨짐」이 다른 타입 · 판독이 2C 조합·시각 불변식을 다시 센다 · **자기가 못 읽는 바이트를 쓰지 않는다**(tz 없는 시각은 쓰기에서 결과 타입으로 거부 + 그 바이트가 판독 불가임을 음성 대조) · **`os.replace` 가 경계**(앞에서 끊기면 `JournalFailed`, 뒤에서 끊기면 `JournalWritten(durable=False)` 이고 저장소는 메모리를 커밋해 디스크와 갈라지지 않는다 — EIO 주입 실측). 변이 M-7·M-8·M-9 RED |
+| Q-4 | 파일 저널 | 쓰기는 저장소 잠금 **안**이고 **저널 성공 뒤에만 메모리 변경**(쓰기 실패 주입에서 상태 불변·키 미선점 실측) · 원자 교체(크래시를 `fsync`·`os.replace` 두 자리에 주입해 이전 스냅숏이 온전히 읽힘) · canonical JSON 바이트 안정 · 「없음」과 「깨짐」이 다른 타입 · 판독이 2C 조합·시각 불변식을 다시 센다(파생값 사본은 **권위가 아니라** 편의값이라 어긋나면 파생값이 이기고 경고만 남긴다 — 사상을 고쳐도 구판 저널이 판독 불가가 되지 않는다) · **자기가 못 읽는 바이트를 쓰지 않는다**(tz 없는 시각은 쓰기에서 결과 타입으로 거부 + 그 바이트가 판독 불가임을 음성 대조) · **`os.replace` 가 경계**(앞에서 끊기면 `JournalFailed`, 뒤에서 끊기면 `JournalWritten(durable=False)` 이고 저장소는 메모리를 커밋해 디스크와 갈라지지 않는다 — EIO 주입 실측). 변이 M-7·M-8·M-9 RED |
 | Q-5 | 재기동 처분 | RUNNING 고아 → `FAILED(RUNNER_LOST_ON_RESTART)`(재개 아님) · ACCEPTED 고아 → `accepted_at` 순 재적재 + **상한 재적용**(저널이 상한보다 많이 들고 있을 때 최고참부터 폐기) · 모르는 spec 버전은 처분 · **수렴 고정점**(재재기동 처분 0) · 조립 근에서 실제로 집혀 종단까지 감 · 깨진 저널은 기동 거부 |
 | Q-6 | compose 볼륨 · Dockerfile | `container` job S-21~S-25 결과는 `commands.md` · 컨테이너 재생성 뒤 저널 생존 실측 |
 | Q-7 | runbook · checklist · OPEN 처분 | `docs/runbook/m6-6b4-ml-job-journal.md`(저널 자리·메모리 커밋 시점·상한·폐기 관측 채널 전부·처분표 두 단계·기동 거부 여덟·알려진 제한 아홉) · 이 파일 · 아래 OPEN 절 |
@@ -30,7 +30,7 @@
 
 | 표면 | 밖에 허락하는 것 | 무엇이 좁히는가(실측) |
 | --- | --- | --- |
-| `JobJournal(디렉터리)` | 임의 디렉터리에 저널 쓰기 | **조립 근 한 자리에서만 생성** — 술어는 이름이 아니라 **심볼 해석**이다(별칭 import·속성 사슬·`from` import 가 같은 답). 경로는 **`ServerConfig` 필드에 뿌리를 둔 식**이어야 하고(필드 목록은 기계 추출) 나머지 이름은 모듈 수준 문자열 상수이면서 **상대 경로 한 조각**이어야 한다(절대 경로 상수 경유 금지). 음성 대조: 별칭 생성 넷을 본다 · 같은 이름 다른 출처는 세지 않는다 · 주석·문자열은 세지 않는다 |
+| `JobJournal(디렉터리)` | 임의 디렉터리에 저널 쓰기 | **조립 근 한 자리에서만 생성**(심볼 해석 — 별칭·속성 사슬·`from` import 가 같은 답) + **닫힌 import 집합**(grimp 그래프 — 상대 import·모듈 앨리어스를 정규화한다, vr H-1) + **이름 바인딩 집합**(재수출 한 홉 경유 획득, cr L-1) + 경로는 **`ServerConfig` 필드에 뿌리를 둔 식**이어야 하고 나머지 이름은 모듈 수준 상수이면서 **상대 경로 한 조각**이어야 한다. 음성 대조: 상대 import·모듈 앨리어스·재수출 경유를 전부 본다 |
 | `JobJournal` 의 **공개 표면** | 저널 경로 객체를 얻어 잠금 밖에서 쓰기 | `path` property 를 **없앴다**. 공개 이름 집합 등식 `{read, write}` — 새 접근자가 생기면 이름과 무관하게 RED |
 | 저널 **파일 모듈**(`training/jobs/journal_file`) | 파일계 호출을 아무 모듈에서나 | **닫힌 import 집합** — 이 모듈을 import 할 수 있는 모듈이 둘(저장소·조립 근)뿐이다. 이름 하나를 더하려면 게이트를 고쳐야 한다(`pyproject.toml` import-linter 계약이 in_scope 밖이라 같은 층을 게이트 test 로 세웠다) |
 | `JobStore(journal=…, pending_queue_max=…)` | 저널 없는 저장소 · 상한 없는 저장소 | `journal` 이 **필수 키워드 인자**(비영속 갈래가 타입에 없다) · 상한 ≥1 생성자 거부 · **생성 자리는 `load_job_store` 하나**(심볼 해석) · 시각은 입구에서 tz 필수 |
@@ -42,14 +42,27 @@
 | `DetailCode` 셋 · `TransitionRejectionReason` | 조회 시 사유 어휘 | 닫힌 StrEnum(자유 문자열 0) |
 | `JobFailure.retryable` | 자리마다 다른 값 | **필드가 아니다** — `code` 의 함수(파생 property). 넣을 인자가 없어 구조적으로 갈라질 수 없고, 전수 사상 test + 저널 사본 일치 검사가 잠근다 |
 | Kotlin `allowedJobStateTransitions` 간선 | 소비자 계약 기대값 | 데이터 + 교차 등식 게이트 + Kotlin 5x5 전 쌍 진리표(술어 ↔ 데이터) |
-| **파일계를 바꾸는 호출 자리** | 저장소 잠금 밖의 둘째 writer | 저널에 닿을 수 있는 범위(`training/jobs/**`·`app/**`)에서 **집합 등식**. 심볼 해석이라 별칭(`from os import replace as _swap`)도 세고, 이름이 겹치지 않는 메서드는 인자 모양을 보지 않아 키워드로 비껴갈 수 없다. 과잉 금지 통제군 넷(`str.replace`·`datetime.replace(tzinfo=)`·`dataclasses.replace`·`os.path.join`) |
+| **저널 파일에 쓰는 자리** | 저장소 잠금 밖의 둘째 writer | **실행 시점 감사 훅**(`sys.addaudithook`, 세션 내내)이 닫는다 — 저널 디렉터리를 겨눈 쓰기 이벤트의 호출 프레임이 production 모듈이면서 `journal_file` 이 아니면 위반이다. 철자에 의존하지 않는다(`open` 하나가 builtin·`io.open`·`Path.open`·`os.open` 을, `os.rename` 하나가 `os.replace`·`Path.replace`·`shutil.move` 를 덮는다). 정적 이름 집합은 **좁힘**으로만 남기고 「닫음」이라 부르지 않는다(vr H-2 · cr M-1 — 그 목록은 `open(…, "w")` 를 비롯한 여섯을 통과시켰다) |
+| `JobFailure` 의 **사유 조합** | 계약 문면보다 넓은 쓰임(넷째 사유) | `ACCEPTED` 출발 `FAIL` 의 (code, detail) 쌍을 **런타임 닫힌 집합**(`state._PENDING_FAILURE_REASONS`, 셋)이 거부한다 + 그 집합과 proto·ADR 문면의 `DetailCode` 등식(양방향). 정적 AST 로는 보이지 않는 자리(`runner._transition_failed` 는 코드·사유를 인자로 받는다)까지 덮는다 |
 
 「경계로 처리」 행의 **실측 목록**: 조립 근 밖의 `JobJournal`·`JobStore` 생성 **0** · 저널 파일
-모듈을 아는 모듈 **2** · 파일계 변경 자리 **2**(저널 파일 모듈 하나 + 선재 backtest 디렉터리
-생성 하나). `ml-engine/tests/gates/test_job_store_assembly_boundary.py` 가 `src/ml_engine`
-전수를 AST 로 센다 — grep 이 아니고(주석·문자열의 같은 이름을 세지 않는다), **이름도 아니다**
-(심볼 해석이라 별칭·재수출로 우회되지 않는다). 경계 밖(알려진 제한): 동적 접근
-(`importlib.import_module`·`getattr`) — AST 는 import 문과 호출식을 읽는다.
+모듈을 import 하는 모듈 **2**(grimp) · 이름을 바인딩하는 모듈 `JobJournal` **3** / `JobStore`
+**4** · 조립 근으로 띄운 서버의 제출·폐기·취소·재기동 경로에서 저널을 쓴 모듈 **1**(감사 훅,
+허용 ≥ 5건).
+
+**경계 밖 — 실측 목록**(vr L-5. 「별칭으로 우회되지 않는다」 같은 과대 주장을 걷어낸다):
+
+| 축 | 닫혔나 | 무엇이 남는가 |
+| --- | --- | --- |
+| 상대 import·모듈 앨리어스 | **닫힘** | grimp 가 절대 이름으로 정규화한다 |
+| 재수출 한 홉 경유 획득 | **닫힘** | 이름 바인딩 집합 등식(mypy 플래그에 기대지 않는다) |
+| 지역 재바인딩(`factory = JobStore`) | **열림** | 생성 자리 술어는 값의 흐름을 따라가지 않는다 |
+| `type(store)(...)` | **열림** | 이름이 등장하지 않는다 |
+| private 속성(`store._journal`) | **열림** | 위 둘과 묶여야 쓸모가 있고 production 에 그 자리는 없다 |
+| 동적 접근(`importlib`·`getattr`) | **열림** | AST·grimp 는 import 문과 호출식을 읽는다 |
+| 저널 파일 쓰기(철자 무관) | **닫힘 — 실행된 경로에 한정** | 감사 훅이 잡는다. **실행되지 않는 코드 경로**는 못 본다 |
+| 다른 프로세스의 쓰기(`subprocess`) | **열림** | 훅은 자식 생성(argv 에 저널 경로)을 **의도**로 적지만, 자식 안에서 경로를 조립하면 보이지 않는다 |
+| 저널 파일을 직접 편집하는 주체 | 비방어 | 위협 모델이 처음부터 제외한다 |
 
 ## 설계 검토 우회 ①~⑨ 대응표
 
@@ -70,9 +83,9 @@
 1. **저장소를 쓸 수 없을 때의 실패 코드가 2A 어휘에 없다.** 여덟 값 중 뜻이 가장 가까운
    `MODEL_NOT_READY`(retryable) + `detail_code=JOB_STORE_UNAVAILABLE` 로 답한다. proto enum
    변경은 out_scope 라 추가하지 않았다 → `OPEN-6B4-STORE-UNAVAILABLE-CODE`.
-2. **`StartTraining` 응답 상태는 `ACCEPTED` 로 못 박았다.** proto `StartTrainingResponse`
-   주석이 「즉시 `ACCEPTED` 를 돌려준다」이고, 저장소를 **대기열 투입 앞에서** 읽으면 그
-   문면이 참이 된다(`start_or_reuse` 가 한 잠금 안에서 적재·폐기·저널을 끝냈으므로 그 직후
+2. **`StartTraining` 응답 상태는 **새 job 경로에서** `ACCEPTED` 로 못 박았다**(한정은 판단
+   13). proto `StartTrainingResponse` 주석이 「즉시 `ACCEPTED` 를 돌려준다」이고, 저장소를
+   **대기열 투입 앞에서** 읽으면 그 문면이 새 job 경로에서 참이 된다(`start_or_reuse` 가 한 잠금 안에서 적재·폐기·저널을 끝냈으므로 그 직후
    상태는 결정적이다). R2-1 이 막던 「다른 writer 가 먼저 종단으로 옮겼다」는 그 읽기가 그대로
    덮는다 — 빠지는 값은 「워커가 이미 집었는가」 하나이고 그것이 문면이 금지하는 값이다.
    문면 개정(선택지 b)이 아니라 순서 되돌림(선택지 a)을 골랐다(운영자 결정).
@@ -117,7 +130,34 @@
    job 을 전부 다시 돌렸고 위생 게이트도 통과했으나, 정책 파일의 값·주석을 바꿀 근거는 없다 —
    계약 문면 정리는 팀장 몫으로 남긴다(verifier r1 §4 지적).
 
-11. **「READY 가 되는 시점」은 이 프로세스 모델에 없다 — 운영자 결정 (A)(D-6B4-3): 그 시점은
+11. **파생값 사본의 불일치는 파생값 승리 + 경고다(기동 거부가 아니다).** 저널의
+   `retryable` 은 `code` 의 파생값 **사본**이고 권위는 `code` 다. 앞 판은 어긋나면
+   `INVARIANT_VIOLATED` 로 거부했는데, 그러면 사상을 한 줄 고치는 순간 **그 전에 쓰인 모든
+   저널이 판독 불가**가 되고(`schema_version` 은 그대로라 형식 불일치로도 보이지 않는다) 그
+   처방은 「파일을 치우고 다시 기동」 = 기록 전부 상실이다. 되돌릴 수 있는 불일치를 되돌릴 수
+   없는 자리로 보내지 않는다 — 판독 불변식은 조합·시각처럼 **권위 있는 데이터**에만 세운다
+   (cr M-2). runbook §4 에 「손으로 고친 파일」과 **다른 행**으로 적었다.
+
+12. **「쓰이는 자리는 정확히 셋」을 런타임에 닫았다.** 문면이 「정확히 셋」이라 선언하는데
+   앞 판은 셋 각각을 **양성**으로만 확인했고 넷째를 막는 술어가 0 이었다. 사유 집합을
+   `state._PENDING_FAILURE_REASONS` 로 선언하고 `transition()` 이 그 밖을 거부한다 — AST 로
+   생산 자리를 세는 대신 런타임으로 간 이유는 `runner._transition_failed` 가 코드·사유를
+   **인자로 받기** 때문이다(정적으로 보이지 않는다). 문면과의 등식은 양방향이다(cr M-3).
+
+13. **`StartTraining` 의 「즉시 `ACCEPTED`」는 새 job 경로의 보증이다.** 멱등 재사용은 적재가
+   아니므로 기존 job 의 **현재 상태**를 싣는다(`RUNNING` 일 수 있다). 거동은 선재이고 Kotlin
+   fake servicer 의 재사용 갈래와 같다 — 고친 것은 **문면**이고(proto 주석만), 재사용 handle
+   상태를 잠그는 test 를 더했다(cr M-4). 판단 2 의 「문면이 참이 된다」는 **새 job 경로에서**
+   참이다.
+
+14. **둘째 writer 축의 「닫음」은 정적 술어가 아니라 실행 시점 감사 훅이 진다.** 이름 집합은
+   스물 넘는 이름을 들었어도 `open(…, "w")` 를 비롯한 여섯을 통과시켰다 — 파이썬에서 파일을
+   쓰는 가장 흔한 형태가 목록 밖에 남는 것이 이 축의 성질이다(이름을 더하면 다음 이름이
+   남는다). `sys.addaudithook` 은 철자와 무관하게 이벤트를 내므로 그 성질이 사라진다. 대가는
+   **실행된 경로만 본다**는 것이고(세션 비용은 `tests/app` 에서 약 25% 증가 — 330초 → 408초),
+   그 한계를 위 경계 표에 적었다. 정적 술어는 「좁힘」으로 남긴다(vr H-2 · cr M-1).
+
+15. **「READY 가 되는 시점」은 이 프로세스 모델에 없다 — 운영자 결정 (A)(D-6B4-3): 그 시점은
    **다음 기동**이다.**
    `ReadinessGate` 의 전이는 기동 1회 판정 · `mark_not_ready` · `begin_shutdown` 셋이고
    `mark_ready()` 는 M5 가 **M-5 로 일부러 지웠다**(「정책은 재로드하지 않는다 — 재시작만
@@ -166,11 +206,30 @@
 
 12. **`retryable` 의 코드별 사상은 재기동 처분을 `false` 로 만든다.** `RUNNER_LOST_ON_RESTART`
    는 같은 입력을 새 job 으로 다시 넣으면 돌 수 있으나 `TRAINING_ERROR` 의 사상이 `false` 다 —
-   전용 코드를 고르는 문제로 남긴다(`OPEN-6B4-STORE-UNAVAILABLE-CODE` 와 같은 축).
+   2C ⑥ 「재시도 가치가 있는가」와 어긋난다. 전용 코드를 고르는 문제로 남긴다
+   (`OPEN-6B4-STORE-UNAVAILABLE-CODE` 와 같은 축). **사상 표 자체는 Python 코드에만 있다**
+   (vr L-3): proto 는 「계약이 정하는 값 … application failure 와 대칭」이라고만 하고 표가
+   없으며 Kotlin 규칙도 0 이다. 문면으로 올릴지는 계약 심판 축의 결정이고 이 slice 는 하지
+   않았다.
+
+13. **`_fsync_directory` 는 leaf 만 `fsync` 한다**(cr L-6). 첫 기동의 `mkdir(parents=True)` 가
+   `artifacts/` 와 `artifacts/_journal/` 둘을 만들면 **부모** 디렉터리 엔트리는 내구화되지
+   않는다 — 첫 기동 + 전원 상실 한정이고, 그 경우 다음 기동은 「파일 없음」(첫 기동)으로
+   처리한다.
+
+14. **`JobStore.__init__` 는 `entries` 의 대기 수를 상한과 대조하지 않는다**(cr L-7). 상한
+   적용은 `load_job_store` 에만 있다. 생성 자리가 한 곳으로 좁혀져 오늘 도달 불가지만, 그
+   불변식이 타입·생성자 쪽에 없다는 사실은 적어 둔다(생성 자리 술어가 느슨해지면 함께 열린다).
+
+15. **`_commit` 은 저장소 잠금을 쥔 채 `fsync` 둘과 `os.replace` 를 돈다**(cr L-8). 그동안
+   `GetTrainingJob`(`store.get`)·`pending_jobs` 가 막힌다. `job_workers: 1` · 대기 상한 4 에서
+   문제 되지 않지만 처리량 상한의 자리다.
 
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
-착수 시점 이후 추가된 파일 **열둘** 전부가 in_scope 안이다 —
+착수 시점 이후 추가된 파일 **열넷** 전부가 in_scope 안이다 — r2 가 더한 둘은
+`ml-engine/tests/journal_audit.py`(감사 훅의 술어·기록)와
+`ml-engine/tests/gates/test_journal_write_audit.py` 이고 둘 다 `ml-engine/tests/**` 다. 그 밖은 —
 `ml-engine/src/ml_engine/training/jobs/journal.py`·`journal_file.py`(`training/jobs/**`) ·
 `ml-engine/tests/**` 다섯 · `docs/runbook/**` 하나 · `reports/evidence/m6/6b4/**` 넷.
 in_scope 밖 신규 **0**. 기계 대조 — `git diff --name-status <base>..HEAD` 의 35 경로를
