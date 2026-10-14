@@ -66,6 +66,8 @@ in_scope 경로 한정 `git restore --source=e2232a75 --staged --worktree --` + 
 
 **D-6B3-6 (r6, 2026-10-14, 팀장 — 수정 라운드 2 수령 · 동결).** 산출물 판정 SHA **`bc18d033`** · evidence `b28dc012`. RED 먼저 커밋(`2d9996e3`, 실패 14 · 공허 대조 초록). ⑤ `lock_timeout` 은 문자열 술어가 아니라 **거동 test**(별 컨테이너에서 경합 잠금 → V18 이 `55P03` 으로 빨리 실패 · 재시도 성공; 변이 RED 41.9s). `inserted_at` 은 비소유자 INSERT 를 DB 시계로 덮어씀(수집 경로가 그 열을 안 씀 — 실측). 남길 키 = 수집 계약 전 개정 합집합(저장소 생성자가 날짜를 받지 않음 — 오늘은 개정 하나라 관측 차이 없음, 구조로 닫음). 새 파일 일곱 모두 in_scope. 레인 acceptance: check `--rerun-tasks` exit 0(2,973 test · fail 0 · skipped 4) · qualityBaseline 0 · 변이 13 중 12 KILLED + 대조 1 · rollback 48 경로 재실측. 재작업 2/5. 표적 재검증: verifier · privacy(r2 fail 축) · migration(V18 변경) · code-review(r2 medium 둘) 병렬.
 
+**D-6B3-7 (r7, 2026-10-14, 팀장 — 검토 r3 · 승인 전 일괄 · r3b 수령 · PR 단계).** 검토 r3: verifier ready-for-review · privacy pass-with-notes · migration approve · code-review APPROVE. 승인 전 일괄의 술어 변경 둘 — (A) `a6559df0` 투영 열 값도 스칼라만(원문과 대칭) · (B) `dd059a3a` V19 `SET LOCAL lock_timeout` + 거동 test(`MigrationLockTimeoutTest`) — 표적 r3b: verifier ready-for-review · migration approve(실 Flyway · 149만 행). 장부: `OPEN-6B3-FREE-TEXT-PII-AXIS`(자유 텍스트 개념의 비PII 분류는 가정 — **운영 첫 실행 전 실표본 판독**) · 값 축(허용 키의 스칼라 값 속 상호)은 비방어 등재. r3b 문면: V19 주석만 `057e6f95`(비주석 줄 0 — 팀장 확인) · runbook·evidence `f92d4b55`. **최종 산출물 SHA `f92d4b55`** · evidence `5d0f9a75`(rollback 재실측 @`f92d4b55` — r3b 가 되돌림 대상 둘을 움직여 재측정). evidence 사고 1건(라운드 2 편집이 commands.md 라운드 1 표를 지움 → `fac7a0a6` 에서 복원, 사실 등재). 재작업 2/5. 다음: PR → Codex 1회(V18·V19 마이그레이션 · 파기·마스킹 — 되돌리기 어려운 경로, 운영자 승인 A-5) → `/code-review` → CI → 머지(사용자 사전 승인).
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
