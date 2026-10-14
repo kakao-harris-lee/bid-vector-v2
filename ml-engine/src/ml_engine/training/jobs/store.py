@@ -238,9 +238,14 @@ class JobStore:
 
         vr M-1 — 「교체됨, 내구성 미확인」(`durable=False`)도 **성공 쪽**이다. 교체는 이미
         일어났으므로 메모리를 되돌리면 디스크와 갈라진다(거절했다고 답한 job 이 재기동 뒤
-        실행된다). 남는 위험은 전원 상실 시 이 교체가 사라질 수 있다는 것뿐이고, 그때
-        디스크에 남는 것은 **이전 상태**이므로 재기동 처분이 덮는다 — 그 사실을 로그로
-        남긴다(조용히 넘기면 아무도 모른다)."""
+        실행된다).
+
+        남는 위험은 전원 상실 시 그 교체가 사라지는 것이고, **전이와 적재에서 결과가 다르다**
+        (vr L-2 — 앞 문면은 「재기동 처분이 덮는다」로 뭉뚱그렸다): 기존 job 의 전이라면
+        디스크에 **이전 상태**가 남아 재기동 처분이 덮지만, 방금 적재한 **새 job** 은 이전
+        상태에 없으므로 처분이 아니라 **소실**이다(`ACCEPTED` 를 응답했는데 재기동 뒤
+        `JOB_NOT_FOUND` 이고, 같은 멱등 키 재제출은 새 job 을 만든다). 그래서 조용히 넘기지
+        않고 오류로 남긴다."""
         written = self._journal.write(_snapshot(next_entries))
         if isinstance(written, JournalFailed):
             return written
@@ -372,6 +377,14 @@ def load_job_store(
     written = journal.write(_snapshot(entries))
     if isinstance(written, JournalFailed):
         return written
+    if not written.durable:
+        # cr L-3 — 기동 1회 쓰기도 같은 갈래를 본다(앞 판은 `_commit` 만 로그를 남겨
+        # 이 자리가 조용했고, runbook 의 「내구성 미확인을 로그로 남긴다」가 무조건으로
+        # 읽혔다).
+        _logger.error(
+            "기동 시 저널 쓰기의 내구성을 확인하지 못했다 — 처분 결과가 전원 상실 시 "
+            "사라질 수 있다(다음 기동이 같은 처분을 다시 한다)."
+        )
     return LoadedJobStore(
         store=JobStore(
             journal=journal,
