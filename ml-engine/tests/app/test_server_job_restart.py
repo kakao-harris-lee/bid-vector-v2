@@ -348,21 +348,27 @@ def test_shipped_pending_queue_max_reaches_the_queue_through_the_assembly_root(
         assert [job.record.job_id for job in store.pending_jobs()] == waiting
 
         overflow = _start(servicers.training_job, "idem-overflow").handle.job_id
+
+        # 단언은 **놓아주기 전**에 한다(vr r3b H-1 과 같은 축). `release.set()` 뒤에는 첫
+        # 워커가 파이프라인을 끝내며 그 job 을 종단으로 옮기므로, 아래 「RUNNING 은 폐기
+        # 대상이 아니다」가 경합으로 깨질 수 있다 — 재는 것은 **폐기 시점의 상태**이니 그
+        # 시점에 읽는다.
+        discarded = store.get(waiting[0])
+        assert discarded is not None
+        assert discarded.state is JobState.FAILED
+        assert discarded.failure is not None
+        assert discarded.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
+        # RUNNING 은 폐기 대상이 아니고, 살아남은 대기 수는 정확히 상한이다.
+        assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
+        assert [job.record.job_id for job in store.pending_jobs()] == [
+            *waiting[1:],
+            overflow,
+        ]
     finally:
         release.set()
-        runner.shutdown(wait=False)
-
-    discarded = store.get(waiting[0])
-    assert discarded is not None
-    assert discarded.state is JobState.FAILED
-    assert discarded.failure is not None
-    assert discarded.failure.detail_code == DetailCode.PENDING_QUEUE_OVERFLOW.value
-    # RUNNING 은 폐기 대상이 아니고, 살아남은 대기 수는 정확히 상한이다.
-    assert store.get(running).state is JobState.RUNNING  # type: ignore[union-attr]
-    assert [job.record.job_id for job in store.pending_jobs()] == [
-        *waiting[1:],
-        overflow,
-    ]
+        # 워커를 기다린다 — 끝나지 않은 워커가 test 보다 오래 살면 사라진 `tmp_path` 의
+        # 저널을 겨눈다(같은 고정 tmp 이름이라 다른 writer 와 서로를 깨뜨린다).
+        runner.shutdown(wait=True)
 
 
 # ---- cr L-1 · vr L-4 — 처분의 반환을 버리지 않는다 ----

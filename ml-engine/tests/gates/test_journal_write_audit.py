@@ -229,13 +229,21 @@ def test_every_journal_write_on_the_live_paths_comes_from_the_journal_module(
         servicers.training_job.CancelTrainingJob(cancel, context=None)
     finally:
         release.set()
-        runner.shutdown(wait=False)
+        # **`wait=True` 여야 한다**(vr r3b H-1). `wait=False` 로 놓아주면 첫 runner 의 워커가
+        # 아직 살아 있고, 차단이 풀린 파이프라인이 끝나며 **옛 저장소**가 저널을 쓴다. 그
+        # 사이 아래에서 같은 디렉터리에 둘째 저장소를 띄우므로 두 writer 가 **같은 tmp
+        # 이름**(`jobs.json.tmp`)을 쓰고, 한쪽의 `os.replace` 가 다른 쪽 tmp 를 가져가
+        # `ENOENT` 로 기동이 거부된다(격리 실행 2/12 · 전체 실행 3/3 실패 실측).
+        # `release` 가 이미 set 이라 막히지 않는다.
+        runner.shutdown(wait=True)
 
     # 재기동 — 고아 처분과 재적재가 저널에 다시 쓴다.
     reloaded_servicers, reloaded_runner = _build_servicers(
         gate, preloaded.serving, preloaded, config
     )
-    reloaded_runner.shutdown(wait=False)
+    # 같은 이유로 여기도 기다린다 — 재적재된 job 의 워커가 test 보다 오래 살면 그 쓰기가
+    # 사라진 `tmp_path` 를 겨눈다(그리고 다음 test 의 기록에 섞인다).
+    reloaded_runner.shutdown(wait=True)
     assert reloaded_servicers.training_job._store.get(running) is not None
 
     assert len(journal_write_audit.allowed) - before_allowed >= 5  # 공허하지 않다
