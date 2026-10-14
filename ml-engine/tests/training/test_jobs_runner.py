@@ -242,7 +242,12 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
 
 
 def test_cancel_all_signals_every_in_flight_cancel_token(tmp_path: Path) -> None:
-    """M-3 — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다."""
+    """M-3 — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다.
+
+    **결정적이다**: 토큰 등록이 `submit()` 안에서(호출 스레드에서) 일어나므로 제출 루프가
+    끝난 시점에 세 토큰이 모두 등록돼 있다. 앞 판은 등록이 워커 스레드의 `_execute` 안에
+    있어서 `cancel_all()` 이 **아직 등록되지 않은** 토큰을 못 보는 경합이었고, 저널 쓰기의
+    `fsync` 가 워커에게 시간을 벌어 준 덕에 우연히 통과했다."""
     store = _store(tmp_path)
     runner = JobRunner(store, max_workers=4)
     release_event = threading.Event()
@@ -264,12 +269,69 @@ def test_cancel_all_signals_every_in_flight_cancel_token(tmp_path: Path) -> None
     for job_id, pipeline in zip(job_ids, pipelines, strict=True):
         runner.submit(job_id, _DATASET_REF, pipeline)
 
+    # 등록 동기 — 제출이 끝나면 세 토큰이 이미 거기 있다(경합에 기대지 않는다).
+    assert sorted(runner._cancel_tokens) == sorted(job_ids)
+
     runner.cancel_all()
     release_event.set()
 
     for pipeline in pipelines:
         assert pipeline.saw_cancelled.wait(timeout=2.0)
     runner.shutdown(wait=True)
+
+
+def test_cancel_all_reaches_a_job_still_waiting_in_the_executor_queue(
+    tmp_path: Path,
+) -> None:
+    """**종료 경로의 회귀**(code-review A, `27f9f081` M-3 이후). `cancel_all()` 은 등록된
+    토큰만 세운다. 토큰 등록이 워커 스레드의 `_execute` 로 옮겨간 뒤에는, `cancel_all()` 과
+    `shutdown(wait=False)` **사이에** 워커가 집는 job 이 **새 토큰**을 받아 취소 신호를 잃고
+    파이프라인을 끝까지 돌린다 — 그 스레드가 프로세스 종료를 붙잡는다.
+
+    결정적으로 재현한다: 워커 하나를 첫 job 으로 묶어 두고 둘째 job 을 **실행기 대기열에**
+    남긴 상태에서 `cancel_all()` 을 부른다. 둘째 job 의 파이프라인이 나중에 돌 때 **취소된
+    토큰**을 받아야 한다."""
+    store = _store(tmp_path)
+    runner = JobRunner(store, max_workers=1)
+    picked_up = threading.Event()
+    release_event = threading.Event()
+
+    class _OccupyingPipeline:
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineCancelled:
+            picked_up.set()
+            release_event.wait(timeout=5.0)
+            return PipelineCancelled()
+
+    class _RecordingPipeline:
+        def __init__(self) -> None:
+            self.ran = threading.Event()
+            self.saw_cancelled = False
+
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineCancelled:
+            self.saw_cancelled = cancel_token.is_cancelled()
+            self.ran.set()
+            return PipelineCancelled()
+
+    occupied = _new_job(store, "key-occupied")
+    queued_pipeline = _RecordingPipeline()
+    queued = _new_job(store, "key-queued", at=_NOW + timedelta(seconds=1))
+
+    runner.submit(occupied, _DATASET_REF, _OccupyingPipeline())
+    assert picked_up.wait(timeout=5.0)  # 워커 하나가 묶였다
+    runner.submit(queued, _DATASET_REF, queued_pipeline)  # 대기열에 남는다
+
+    runner.cancel_all()
+    release_event.set()
+    runner.shutdown(wait=True)
+
+    assert queued_pipeline.ran.wait(timeout=5.0)  # 통제군 — 실제로 돌았다
+    assert queued_pipeline.saw_cancelled, (
+        "실행기 대기열에 있던 job 이 취소 신호를 잃었다 — 새 토큰을 받았다"
+    )
 
 
 def test_cancel_all_with_no_in_flight_jobs_is_a_no_op(tmp_path: Path) -> None:

@@ -112,8 +112,20 @@ class JobRunner:
 
         R2-1 의 경합(제출과 취소)은 이제 `submit` 이 아니라 `_execute`
         안에서 판정된다 — 집었을 때 이미 종단이면 파이프라인을 돌리지 않는다. 그래서
-        이 메서드는 전이 결과를 돌려줄 것이 없다(호출자는 저장소를 다시 읽어 응답한다)."""
-        future = self._executor.submit(self._execute, job_id, dataset_ref, pipeline)
+        이 메서드는 전이 결과를 돌려줄 것이 없다(호출자는 저장소를 다시 읽어 응답한다).
+
+        **`CancelToken` 은 여기서**(호출 스레드에서, `executor.submit` **전에**) 만들어
+        등록한다. 등록을 워커 스레드의 `_execute` 로 옮기면 종료 경로가 샌다(code-review A):
+        `cancel_all()` 은 등록된 토큰만 세우므로, `cancel_all()` 과 `shutdown(wait=False)`
+        **사이에** 워커가 집는 job 은 새 토큰을 받아 취소 신호를 잃고 파이프라인을 끝까지
+        돌린다 — 그 스레드가 프로세스 종료를 붙잡는다. 제출 시점에 등록하면 **대기열에 있는
+        job 까지** `cancel_all` 의 사정권에 든다."""
+        token = CancelToken()
+        with self._lock_tokens_guard:
+            self._cancel_tokens[job_id] = token
+        future = self._executor.submit(
+            self._execute, job_id, dataset_ref, pipeline, token
+        )
 
         def _callback(done: Future[_WorkerResult]) -> None:
             self._on_done(job_id, done)
@@ -121,14 +133,15 @@ class JobRunner:
         future.add_done_callback(_callback)
 
     def _execute(
-        self, job_id: str, dataset_ref: DatasetRefInput, pipeline: TrainingPipeline
+        self,
+        job_id: str,
+        dataset_ref: DatasetRefInput,
+        pipeline: TrainingPipeline,
+        token: CancelToken,
     ) -> _WorkerResult:
-        """워커 스레드에서 돈다. `CancelToken` 을 **START 전이보다 먼저** 등록한다 —
-        그 사이에 도착한 `cancel(job_id)` 를 잃지 않기 위해서다(토큰을 나중에 등록하면
-        취소 요청이 조용히 사라지고 계산이 그대로 돈다)."""
-        token = CancelToken()
-        with self._lock_tokens_guard:
-            self._cancel_tokens[job_id] = token
+        """워커 스레드에서 돈다. 토큰은 `submit` 이 **제출 전에** 만들어 등록한 것을 그대로
+        쓴다 — 새로 만들면 그 사이에 도착한 `cancel(job_id)`·`cancel_all()` 을 잃는다
+        (code-review A). 그래서 START 전이보다 먼저 등록된 상태가 보장된다."""
         started = self._store.apply_transition(
             job_id, JobEvent.START, at=datetime.now(UTC)
         )
