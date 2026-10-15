@@ -48,6 +48,15 @@ verifier(opus) · code-reviewer(sonnet, 병렬) — `web` 골격과 CI job. 문�
 
 **D-7A-3 (r3, 2026-10-15, 팀장 — 검토 r2 수령 · 수정 라운드 2 수령 · 동결, 재작업 2/5).** 검토 r2: verifier not-ready(H-3 **워커 하위 빌드**가 경계 플러그인 밖 — 화면 코드 두 줄로 legacy 가 워커 chunk 에, 실제 경로 · M-3 등재 = 이름 출현 · M-4 `file:` 의존 · M-5 지정자 문자열) · code-review REQUEST_CHANGES(G-1 = M-3 · G-2 경고가 lint 를 붉히지 않음). 팀장 결정: `worker.plugins` 등재 · **카나리 빌드**(실제 설정으로 밖 파일을 끄는 메인·워커 probe 가 경계 오류로 실패해야 통과 — 활성을 실측) · W-4 등재 단언은 직접 원소 형태로 좁힌 빠른 선검사 · 잠금 파일 `resolved` 전수 레지스트리 + `.npmrc` `install-links` 0 · 집합 등식은 해석된 모듈 실경로 기준 · `--max-warnings 0`. ADR 0011 D-3 갱신 `e6292534`. 라우트 자리 문면 정정(다섯 → 여섯, 이 커밋). 산출물 판정 SHA **`6ef2773b`** · evidence `406ce130`. 레인 acceptance: `web` job W-1~W-10 · one-command · evidence HEAD check 전부 exit 0. 남은 알려진 제한: CSS `@import`·`url()` 자산 · 문자열 조립 전역 접근 · 하드 링크. 표적 재검증: verifier · code-reviewer.
 
+**D-7A-4 (r4, 2026-10-15, 팀장 — 검토 r3·r4·r5 수령 · 승인 전 배치 셋 수령 · 리뷰 요청 동결, 재작업 2/5 유지).** 검토 r3·r4·r5 는
+전부 verifier **ready-for-review**(high 0)였고, 남은 지적은 승인 전 배치로 닫았다. 게이트 술어를 바꾼 배치마다 표적 재검증을 붙였다.
+- **r3 배치**: 번들 그래프 층의 클라이언트 사용처 등식 · W-4 해석 실패 fail-open 제거 · 허용 뿌리 W-6 잠금 · 잠금 파일 fail-closed · inBundle 부모 출처 · 카나리 통과 조건에 이 실행의 fixture 실경로 · 탐침 무작위.
+- **r4 배치**: 정적 ∪ 동적 간선 · `src` 안 비 TS 스크립트 0 · 패키지 정체 식별 · 설치 경로 집합 · 레지스트리 origin 일치.
+- **r5 계열 진단과 팀장 결정**: 「호출 자리는 하나」 계열이 r2~r5 에 걸쳐 다시 열렸다. 열린 사례의 능력은 전부 이미 등재된 손 HTTP 였고, legacy 유입 경계는 r2 뒤 다시 열리지 않았다. 그래서 게이트 주장을 **legacy 파일 유입 0 · 클라이언트 패키지(정체 기준) 사용처 == {`src/api/client.ts`}** 까지로 좁히고, 「유일한 호출 경로」는 보조 lint·리뷰 소관으로 내린다(ADR 0011 D-3 `a1966b2c`). M-10·M-11 은 알려진 제한으로 등재하고, 싼 구조 후보 둘(`index.html` 스크립트 집합 등식 · 의존 키 승인 목록)은 7E 에서 다시 본다.
+- 마무리 배치는 문면과 위반 사유 문구만 바꿨다(판정 로직 무변경 — 팀장이 비주석 diff 로 확인).
+- **리뷰 요청 대상**: 마지막 산출물 **`f2ad4fab`** · evidence `321c5637`. 레인 acceptance: `web` job W-1~W-10 exit 0 · rollback ①~⑥ 을 `f2ad4fab` 에서 직접 실측 · evidence HEAD 에서 `check` exit 0.
+- **남은 알려진 제한**: 카나리를 알아채는 설정 일반 · 네트워크 전역 의도적 우회(계산된 이름·`Reflect`·`index.html` 인라인·다른 HTTP 패키지의 동적 import·vendoring 사본) · CSS `@import`·`url()` 자산 · 하드 링크 · 클라이언트 미사용 시 번들 등식이 공허하게 참.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
