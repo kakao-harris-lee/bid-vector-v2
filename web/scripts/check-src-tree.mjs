@@ -17,8 +17,13 @@
 //      있었다. 대상이 리터럴이 아닌 동적 import 는 「어느 모듈인지 게이트가 볼 수 없다」이므로
 //      같은 자리에서 막는다.
 //
-// 그리고 번들 그래프 경계(H-1)를 지키는 Vite 플러그인이 `vite.config.ts` 에 **등재**됐는지
-// AST 로 본다(⑥) — grep 이 아니라 구문이다.
+// 그리고 번들 그래프 경계(H-1)를 지키는 Vite 플러그인이 `vite.config.ts` 의 **두 자리**(메인
+// `plugins` · `worker.plugins`)에 **원소로 등재**됐는지 AST 로 본다(⑥) — grep 도 아니고 「이름이
+// 배열 안에 나타난다」도 아니다.
+//
+// **이 ⑥ 은 빠른 선행 검사다 — 「실수로 떼어낸 것」을 잡는다.** 플러그인이 실제로 **활성**인지는
+// 설정 문법으로 증명되지 않으므로(조건식·spread·`apply` 등 형태가 끝없다) **카나리 빌드**(W-8)가
+// 직접 잰다: 고정 probe 가 web 밖 파일을 끌어오는 빌드를 돌려 경계 오류로 **실패해야** 통과다.
 //
 // 읽는 방식: JSON 을 정규식으로 긁지 않고 **컴파일러 자신의 API**로 유효 옵션·프로그램·import 를
 // 얻는다. 열거하는 것은 legacy 경로 이름이 아니라 이 게이트 자신의 전제다.
@@ -241,21 +246,71 @@ if (!existsSync(viteConfigPath)) {
     }
   }
 
-  const registered = new Set();
-  const visitConfig = (node) => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === 'plugins' &&
-      ts.isArrayLiteralExpression(node.initializer)
-    ) {
-      const collect = (inner) => {
-        if (ts.isIdentifier(inner)) {
-          registered.add(inner.text);
+  // 세는 것은 「이름이 배열 안에 나타나는가」가 아니라 **배열의 직접 원소가 그 플러그인의
+  // 호출인가**다(code-review r2 G-1). 조건식·spread·중첩 인자 안의 언급은 등재로 세지 않는다 —
+  // `cond ? false : boundary()` 한 줄로 경계를 끈 채 「등재됨」을 출력하던 자리다.
+  //
+  // 그리고 **두 자리**를 본다: 메인 `plugins` 와 `worker.plugins`(워커는 별도 Rollup 빌드 —
+  // verifier r2 H-3).
+  const arrayLiteralOf = (initializer) => {
+    if (ts.isArrayLiteralExpression(initializer)) {
+      return initializer;
+    }
+    if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+      if (ts.isArrayLiteralExpression(initializer.body)) {
+        return initializer.body;
+      }
+      if (ts.isBlock(initializer.body)) {
+        for (const statement of initializer.body.statements) {
+          if (
+            ts.isReturnStatement(statement) &&
+            statement.expression !== undefined &&
+            ts.isArrayLiteralExpression(statement.expression)
+          ) {
+            return statement.expression;
+          }
         }
-        ts.forEachChild(inner, collect);
-      };
-      collect(node.initializer);
+      }
+    }
+    return undefined;
+  };
+
+  const hasBoundaryElement = (initializer) => {
+    const array = arrayLiteralOf(initializer);
+    if (array === undefined) {
+      return false;
+    }
+    return array.elements.some(
+      (element) =>
+        ts.isCallExpression(element) &&
+        ts.isIdentifier(element.expression) &&
+        boundaryBindings.has(element.expression.text),
+    );
+  };
+
+  // `worker` 속성의 범위를 먼저 모아 두고, 그 안의 `plugins` 와 밖의 `plugins` 를 가른다.
+  const workerRanges = [];
+  const collectWorkerRanges = (node) => {
+    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === 'worker') {
+      workerRanges.push([node.pos, node.end]);
+    }
+    ts.forEachChild(node, collectWorkerRanges);
+  };
+  collectWorkerRanges(viteSource);
+  const insideWorker = (node) =>
+    workerRanges.some(([start, end]) => node.pos >= start && node.end <= end);
+
+  let mainRegistered = false;
+  let workerRegistered = false;
+  const visitConfig = (node) => {
+    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === 'plugins') {
+      if (hasBoundaryElement(node.initializer)) {
+        if (insideWorker(node)) {
+          workerRegistered = true;
+        } else {
+          mainRegistered = true;
+        }
+      }
     }
     ts.forEachChild(node, visitConfig);
   };
@@ -263,8 +318,15 @@ if (!existsSync(viteConfigPath)) {
 
   if (boundaryBindings.size === 0) {
     fail(`vite.config.ts 가 ${boundaryPluginSpecifier} 를 import 하지 않는다`);
-  } else if (![...boundaryBindings].some((name) => registered.has(name))) {
-    fail('vite.config.ts 의 plugins 배열에 번들 그래프 경계 플러그인이 없다');
+  } else {
+    if (!mainRegistered) {
+      fail('vite.config.ts 의 plugins 배열에 번들 그래프 경계 플러그인 **호출**이 없다');
+    }
+    if (!workerRegistered) {
+      fail(
+        'vite.config.ts 의 worker.plugins 에 번들 그래프 경계 플러그인 **호출**이 없다 — 워커는 별도 Rollup 빌드다',
+      );
+    }
   }
 }
 
@@ -274,5 +336,5 @@ console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · web/ 심볼릭 링크 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}} · 비리터럴 동적 import 0 · ` +
-    `번들 그래프 경계 플러그인 등재됨.`,
+    `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );

@@ -13,6 +13,12 @@ import { moduleGraphBoundary } from './scripts/module-graph-boundary.mjs';
 // 하려는 것이고, 설정 파일이 둘이면 그 둘이 어긋날 자리가 생긴다.
 export default defineConfig({
   plugins: [react(), tailwindcss(), moduleGraphBoundary({ webRoot: import.meta.dirname })],
+  // **워커는 별도 Rollup 빌드다**(verifier r2 H-3). Vite 는 워커를 하위 빌드로 묶고 그 빌드는
+  // `worker.plugins` 만 쓴다(기본 빈 목록) — 메인 그래프에는 `src/w.ts?worker_file…` 하나만
+  // 보이므로 메인 쪽 플러그인은 그것을 `src` 안으로 본다. 그래서 화면 코드 두 줄(Vite 문서의
+  // 표준 워커 관용구)로 web 밖 파일이 워커 chunk 에 실렸다. 같은 경계를 여기에도 등재한다 —
+  // W-4 가 **두 자리 모두**를 단언하고, 활성 자체는 카나리 빌드(W-8)가 잰다.
+  worker: { plugins: () => [moduleGraphBoundary({ webRoot: import.meta.dirname })] },
   server: { port: 5173, strictPort: true },
   preview: { port: 4173, strictPort: true },
   build: { outDir: 'dist', emptyOutDir: true },
