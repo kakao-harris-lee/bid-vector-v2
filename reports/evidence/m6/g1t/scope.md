@@ -52,7 +52,16 @@ Codex 없음(되돌리기 어려운 경로 아님).
 
 ## 계약 갱신 이력
 
-(착수)
+**D-G1T-1 (2026-10-16, 팀장 — 착수 preflight 수령).**
+- **T-2 처분 (b)+(c).** 실측 결과 production 은 429 재시도가 소진되면 **그 실행을 멈춘다**(`QuotaExhausted` halt · 남은 표본은
+  `notAttempted` — D-6G-11·D-6G-44 K6, 기존 test 가 멈춤을 단언). 6G 는 canonical 승격을 하지 않는다(D-6G-1). 그래서 capability map
+  COL-03 셋째 bullet 의 「나머지 수집은 계속」은 V2 가 의도적으로 바꾼 거동과 어긋난다. 명세-구현 불일치이고 결함이 아니다.
+  - T-2 는 **두 실행 시나리오**로 쓴다. 실행 1: 429 소진 → 그 공고는 raw 만 남고 축 미완 → halt 에 `notAttempted` → 회계에
+    `quotaExceeded`·`truncationCause`. 실행 2(쿼터 해제): 시도 원장이 미완 축을 이어받아 남은 수집이 계속된다.
+  - 추적표 COL-03 행은 ⓐ 로 올리지 않는다. 「test 성립 · bullet 문면 갱신 필요(운영자 확인)」로 남긴다. capability map 문면 갱신은 팀장이
+    운영자 확인 뒤 별도로 한다. 이 slice 는 capability map 을 건드리지 않는다.
+- **in_scope 추가**: `config/quality/gate-tests.properties` — 새 test 클래스 FQN 등재만 한다(모듈 키 아래 한 줄씩, 값·정책 version 변경
+  없음). `gateRegistrationGate` 의 양방향 등식 때문에 필요하다.
 
 ## 하네스 레인 변경 (상시)
 
