@@ -84,6 +84,30 @@ jobs:
         with:
           version: "0.9.22"
 
+      # M7/7A(code-review r1 F-3) — S-20 이 이제 web 레인 전건(`npm ci` → … → Playwright
+      # 스모크)까지 돈다. 그 job 에 Node 툴체인이 없으면 러너 이미지의 Node 로 돌아 **같은
+      # 게이트를 두 다른 툴체인에서 재는** 상태가 되고(ADR 0011 D-1 「Node 는 web/.nvmrc 가
+      # 정본」이 이 job 에서만 성립하지 않는다), 이미지 Node 가 바뀌는 날 이 변경과 무관한
+      # 이유로 붉어진다. 선례가 같은 파일에 있다 — S-20 이 Python 전건을 품게 된 라운드에
+      # setup-python·setup-uv 를 바로 위에 더했다.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # CI 전용 — 브라우저의 시스템 패키지(apt). `web` job 과 같은 사유이고, S-20 이 그 job 과
+      # 같은 Playwright 스모크를 돌리므로 같은 전제가 필요하다. 「필요 없다」고 적는 대신
+      # 명시한다(러너 이미지에 무엇이 들어 있는지는 이 저장소가 통제하지 않는다).
+      - name: Playwright 시스템 의존 설치 (CI 전용, S-20 의 web 절 전제)
+        working-directory: web
+        run: |
+          # 잠금 파일이 고정한 Playwright 로 돌린다 — 워크플로에 버전 숫자를 적지 않는다
+          # (`buf`·`.python-version` 과 같은 원칙). S-20 이 같은 `npm ci` 를 다시 돌리지만
+          # 두 번째는 설치본이 이미 맞아 몇 초다.
+          npm ci
+          npx playwright install-deps chromium
+
       - name: one-command-check.sh — 완료 조건 1 (S-20)
         run: ./tools/one-command-check.sh
 
@@ -246,6 +270,17 @@ jobs:
 
       - name: Playwright 스모크 (W-9)
         run: npm run test:e2e
+
+      # code-review r1 F-7 — CI reporter 는 `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한
+      # 줄만 남기고 trace·스크린샷을 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure`
+      # 가 쓰이지 않았다). 위 두 job 과 같은 major 로 실패 때만 올린다.
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: web-playwright
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
 
   # M6/6C — 이미지 빌드·위생 게이트·실 서버 통합 test(D-6C-4). `check`·`ml-engine` 두
   # job 의 명령은 위에서 무편집이다 — 이 job이 컨테이너 축 전부를 진다(하네스 2026-09-12
