@@ -158,6 +158,26 @@ function collectLinks(directory, depth) {
 }
 collectLinks(webRoot, 0);
 
+// ③b `src` 안에 **TS 프로그램이 보지 못하는 스크립트**를 두지 않는다(verifier r4 M-8 처방 ③).
+// `allowJs` 가 꺼져 있으므로 `src/*.js` 는 tsc 의 프로그램에 아예 들어오지 않는다 — 그 파일의
+// `import('openapi-fetch')` 는 TS 층의 집합 등식에도, 네트워크 금지 린트의 `files` 에도 걸리지
+// 않았다(실측). 파일 종류로 그 사각을 없앤다. 번들 층은 그 파일을 보지만, 한 층이 아예 보지
+// 못하는 자리를 남기지 않는다.
+const NON_TS_SCRIPT = /\.(js|mjs|cjs|jsx)$/;
+function collectNonTsScripts(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collectNonTsScripts(full);
+      continue;
+    }
+    if (entry.isFile() && NON_TS_SCRIPT.test(entry.name)) {
+      fail(`src 안에 TS 프로그램이 보지 못하는 스크립트가 있다: ${relative(webRoot, full)}`);
+    }
+  }
+}
+collectNonTsScripts(srcDir);
+
 // ④ 프로그램 **전수**(import·files·reference 로 끌려 들어온 파일 포함).
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
 const programFiles = program.getSourceFiles();
@@ -475,7 +495,7 @@ finishIfFailed();
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}} · 비리터럴 동적 import 0 · ` +
+    `paths 없음 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 비 TS 스크립트 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );

@@ -80,6 +80,16 @@ export const API_CALL_SITE = 'src/api/client.ts';
  * 이 층에서 셀 수 없다: 7A 의 `apiClient` 는 아직 아무도 쓰지 않아 트리셰이킹으로 그래프에
  * 들어오지 않는다. 그 방향은 W-4 의 TS 쪽 등식이 진다.
  */
+/**
+ * 그래프에서 이 모듈을 끌어온 자리 전부 — **정적 간선과 동적 간선의 합집합**(verifier r4 M-8).
+ * Rollup 의 `importers` 는 정적 간선만 담고 동적 `import()` 는 `dynamicImporters` 에 따로 있다.
+ * 정적만 세던 동안, TS 가 보지 않는 파일(`src/*.js` · `index.html` 인라인 스크립트)의 동적
+ * `import('openapi-fetch')` 가 다섯 게이트를 모두 지났다(실측).
+ */
+export function graphImporters(info) {
+  return [...(info?.importers ?? []), ...(info?.dynamicImporters ?? [])];
+}
+
 export function apiImporterViolation(importerRealPath, { apiPackageDir, callSitePath }) {
   if (apiPackageDir !== undefined && isInsideRoot(importerRealPath, apiPackageDir)) {
     return undefined;
@@ -143,7 +153,7 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
 
         // 이 모듈이 클라이언트 패키지 안이면, 그것을 **패키지 밖에서** 끌어온 자리를 전수로 본다.
         if (apiPackageDir !== undefined && isInsideRoot(realPath, apiPackageDir)) {
-          for (const importer of this.getModuleInfo(rawId)?.importers ?? []) {
+          for (const importer of graphImporters(this.getModuleInfo(rawId))) {
             const importerClass = classifyModuleId(importer);
             let importerReal;
             if (importerClass.kind === 'file') {

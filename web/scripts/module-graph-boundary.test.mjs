@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   apiImporterViolation,
   boundaryRoots,
+  graphImporters,
   classifyModuleId,
   isInsideRoot,
   stripQuery,
@@ -108,5 +109,19 @@ describe('클라이언트 패키지의 importer 판정', () => {
       '/repo/web/src/api/other.ts',
     );
     expect(apiImporterViolation('/repo/web/src/hand.ts', opts)).toBe('/repo/web/src/hand.ts');
+  });
+});
+
+describe('그래프의 importer 수집', () => {
+  it('정적 간선과 동적 간선을 합쳐 센다', () => {
+    expect(
+      graphImporters({ importers: ['/a.ts'], dynamicImporters: ['/b.js'] }),
+    ).toEqual(['/a.ts', '/b.js']);
+  });
+
+  it('한쪽이 없거나 모듈 정보가 없어도 빈 배열로 떨어진다', () => {
+    expect(graphImporters({ importers: ['/a.ts'] })).toEqual(['/a.ts']);
+    expect(graphImporters({ dynamicImporters: ['/b.js'] })).toEqual(['/b.js']);
+    expect(graphImporters(undefined)).toEqual([]);
   });
 });
