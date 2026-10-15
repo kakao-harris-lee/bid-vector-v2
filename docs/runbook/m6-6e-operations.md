@@ -923,7 +923,9 @@ docker build -f docker/app.Dockerfile -t bidvector/app:local .
 ```
 
 띄운 채로 화면을 보려면 같은 환경변수를 주고 직접 올린다(스크립트가 쓰는 기본값과 같은 이름들이다 —
-**포트 기본값의 정본은 그 스크립트 하나**이고 compose·Caddyfile 은 `${VAR:?}` 로 요구만 한다):
+**포트 기본값의 정본은 그 스크립트 하나**다. compose 가 `${VAR:?}` 로 요구하고, Caddyfile 은 기본값을
+적지 않는다 — 다만 Caddyfile 의 그 참조 자신은 fail-closed 가 아니어서 **compose 를 거치지 않고 이미지를
+bare 로 띄우면 Caddy 자기 기본값으로 뜬다**. 그 경우는 프록시가 web 에 닿지 못하는 것으로 드러난다):
 
 ```
 export BIDVECTOR_PG_USER=... BIDVECTOR_PG_DB=... BIDVECTOR_PG_PASSWORD=...

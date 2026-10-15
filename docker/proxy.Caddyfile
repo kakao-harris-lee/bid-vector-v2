@@ -18,7 +18,9 @@
 }
 
 # 도메인은 환경변수이고 **기본값은 `localhost`** 다 — 운영 도메인 값을 저장소에 두지 않는다.
-# 포트는 기본값이 없다(fail-closed, `web.Caddyfile` 과 같은 규율).
+# 포트에는 기본값을 적지 않는다(그 자리는 `tools/local-tls-smoke.sh` 하나). 값을 요구하는 것은
+# compose 의 `${BIDVECTOR_PROXY_HTTPS_PORT:?}` 이고, **이 참조 자신은 fail-closed 가 아니다** —
+# `web.Caddyfile` 의 같은 자리 주석에 실측이 있다.
 https://{$BIDVECTOR_PROXY_DOMAIN:localhost}:{$BIDVECTOR_PROXY_HTTPS_PORT} {
 	# 로컬 CA — Caddy 가 **실행 시** 발급한다. 저장소에 키도 인증서도 없고, 컨테이너를 다시
 	# 만들면 새로 생긴다(볼륨을 붙이지 않는다 — 잔여 0). 신뢰 방법은 runbook 의 7F-local 절.

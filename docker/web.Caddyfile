@@ -17,9 +17,14 @@
 	auto_https off
 }
 
-# **기본값이 없다**(fail-closed). 값이 없으면 주소가 `:` 로 적응 실패해 컨테이너가 뜨지
-# 않는다 — `docker/app.Dockerfile`·`compose.yaml` 의 `${VAR:?}` 규율과 같다. 포트 기본값의
-# 자리는 `tools/local-tls-smoke.sh` 한 곳이다.
+# 포트 기본값의 자리는 **`tools/local-tls-smoke.sh` 한 곳**이고 여기에는 기본값을 적지 않는다.
+#
+# **이 참조 자신이 fail-closed 는 아니다**(2026-10-16 실측) — 값이 없으면 Caddy 는 적응 실패가
+# 아니라 **자기 기본값 `:443`** 으로 떨어지고 컨테이너는 그대로 뜬다(비-root 로도 뜬다: docker 의
+# 기본 capability 집합에 특권 포트 bind 가 있다). 그래서 **값을 요구하는 것은 compose** 다 —
+# `${BIDVECTOR_WEB_PORT:?}` 가 컨테이너를 만들기 전에 끊는다. 그 둘을 거치지 않는 경우(bare
+# `docker run`)에 남는 상태는 「엉뚱한 포트에 떴다」이고, 그것은 프록시가 web 에 닿지 못하는
+# 것으로 스모크 (B) 에서 드러난다.
 :{$BIDVECTOR_WEB_PORT} {
 	root * /srv
 	encode zstd gzip
