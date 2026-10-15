@@ -82,7 +82,17 @@ verifier(opus) + code-reviewer(sonnet) 병렬. verifier 표적: 우회 ①~⑨ �
 
 ## 계약 갱신 이력
 
-(착수)
+**D-7D-1 (2026-10-16, 팀장 — 착수 중 경로 갱신).**
+- 인증 값·포트·정책·use case 를 `workflow` 에 둔다. `app.http` 와 `adapters` 가 둘 다 이름으로 불러야 하는데, 의존 게이트상 공유할 수 있는
+  자리는 `bidvector.workflow.*` 뿐이다(`EditSessionRepository` 선례). 산출물 1~6 은 그대로이고 늘어난 것은 경로뿐이다.
+- **in_scope 추가**:
+  - `workflow/src/{main,test}/kotlin/bidvector/workflow/access/**`
+  - `config/quality/architecture-policy.properties`(새 키 · 표면 · 주입 · 허용 목록)
+  - `gradle/libs.versions.toml` · `adapters/build.gradle.kts` · `app/build.gradle.kts`(해시 라이브러리 좌표 · compatibilitySmoke 등재)
+  - `adapters` 의 `CleanMigration*Test` 다섯(표·열·CHECK·인덱스·권한 행렬 등식)
+  - `RetentionTableRegistry`(새 표 둘의 보존 분류)
+- **게이트 설정(`architecture-policy.properties`)을 바꾸므로** 그 변경은 verifier 의 표적 재검증 대상이다. 허용 목록을 넓히는 줄마다 근거를
+  evidence 에 적는다.
 
 ## 하네스 레인 변경 (상시)
 
