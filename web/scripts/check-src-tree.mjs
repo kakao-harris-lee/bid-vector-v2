@@ -7,17 +7,21 @@
 //      거짓 보증 — 실측으로 확인했다).
 //   ② tsconfig 의 네 값(rootDir·include·allowJs·paths) — 경계 자신의 전제다. 하나만 바꾸면
 //      TS6059 가 날 자리가 사라지는데 typecheck 는 자기 전제의 소실을 보지 못한다.
-//   ③ **프로그램 전수**가 `web/src` ∪ `web/node_modules` 안인가 — verifier r1 H-2. `.d.ts` 는
+//   ④ **프로그램 전수**가 `web/src` ∪ `web/node_modules` 안인가 — verifier r1 H-2. `.d.ts` 는
 //      TS6059 의 대상이 아니라서 밖의 선언 파일을 `import type` 하면 게이트 넷이 모두 초록이었다.
 //      루트 이름(`parsed.fileNames`)이 아니라 `ts.createProgram(...).getSourceFiles()` 를 본다 —
 //      import 로 끌려온 파일·`files`·triple-slash reference·`src` 안 링크가 한 술어로 닫힌다.
-//   ④ 호출 자리 집합 등식 — code-review r1 F-2. **증명 범위는 「클라이언트 패키지를 끌어오는
+//   ⑤ 호출 자리 집합 등식 — code-review r1 F-2. **증명 범위는 「클라이언트 패키지를 끌어오는
 //      자리 == 한 자리」까지이고 「서버 호출 경로가 하나뿐」은 아니다**(7A 검토 r5).
 //      `openapi-fetch` 를 import 하는 파일 집합이
 //      `{src/api/client.ts}` 와 **같아야** 한다. eslint 의 `no-restricted-imports` 는 정적
 //      import 만 보므로 리터럴 동적 `import('openapi-fetch')` 로 손 계약 클라이언트를 만들 수
 //      있었다. 대상이 리터럴이 아닌 동적 import 는 「어느 모듈인지 게이트가 볼 수 없다」이므로
 //      같은 자리에서 막는다.
+//
+// 본문의 번호는 실행 순서다 — ① 기준점 · ② tsconfig 유효 옵션 · ③ `web/` 링크 · ③b `src` 안
+// 비 TS 스크립트 · ④ 프로그램 전수 · ⑤ 집합 등식 · ⑦ 잠금 출처 · ⑥ 플러그인 등재(PR #75 리뷰 P
+// — 머리와 본문이 어긋나 있었다).
 //
 // 그리고 번들 그래프 경계(H-1)를 지키는 Vite 플러그인이 `vite.config.ts` 의 **두 자리**(메인
 // `plugins` · `worker.plugins`)에 **원소로 등재**됐는지 AST 로 본다(⑥) — grep 도 아니고 「이름이

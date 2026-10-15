@@ -6,7 +6,10 @@
   //
   // **이 설정만으로 닫히지 않는 것이 있고, `scripts/check-src-tree.mjs`(CI W-4)가 그 전제를
   // 잰다**: `src` 안의 심볼릭 링크는 **링크 경로**로 프로그램에 들어와 TS6059 가 나지 않는다
-  // (U-3 실측 — typecheck exit 0). 그리고 이 파일의 네 값(`rootDir`·`include`·`allowJs`·
+  // (U-3 실측 — typecheck exit 0). **TS6059 는 경로 성분이 아니라 접두로 비교한다** — `src` 의
+  // 이름을 접두로 공유하는 이웃(`web/src-legacy/x.ts`)을 import 하면 TS6059 가 **나지 않는다**
+  // (실측: typecheck exit 0). 그 자리를 받는 것은 W-4 의 프로그램 전수 검사다(성분 단위 비교 —
+  // 같은 변이에서 exit 1, PR #75 리뷰 Q). 그리고 이 파일의 네 값(`rootDir`·`include`·`allowJs`·
   // `paths`)은 **경계 자신의 전제**다 — 하나만 바꾸면 TS6059 가 날 자리가 사라지는데
   // typecheck 는 자기 전제가 사라진 것을 보지 못한다. 그래서 W-4 가 그 넷을 단언한다
   // (`allowJs` 를 켠 채 rootDir 밖 `.js` 를 import 하면 TS6059 는 **난다** — U-8 실측,
