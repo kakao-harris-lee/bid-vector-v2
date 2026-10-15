@@ -146,6 +146,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 공고 검색(STR-16 검색 절반) — 읽기 전용, 마감 임박 순
+         * @description 수집된 공고를 **감시 조건과 무관하게** 조회한다(M7/7C ①). 쓰기 경로가 없고 전략을 바꾸지 않는다.
+         *     **금액 범위의 basis 는 기초금액이다**(`amountMin`/`amountMax` — `Basis.BASE_AMOUNT`, 원 단위, 부가세 **포함**(`INCLUSIVE`), 운영자 선언 provenance). 감시 경로의 예산 한계값과 **같은 규약**이라 같은 쌍이 두 경로에서 같은 답을 낸다. 추정가격과 비교하지 않는다. 금액 범위를 주면 **비교가 성립하는 기초금액을 가진 공고만** 남는다 — 금액이 없거나 과세가 다르거나 provenance 가 선언되지 않은 공고는 결과에서 빠진다(0 으로 간주하지 않는다). 금액 범위를 주지 않으면 그 공고들도 모두 나온다.
+         *     **빈 결과의 두 뜻은 `X-Result-State` 가 가른다** — 수집된 공고가 아직 없는 것과 조건이 좁은 것이 다른 값이다. 마지막 페이지 뒤를 물으면 본문은 비지만 `X-Total-Count` 가 1 이상이고 상태는 `MATCHED` 다.
+         *     `q`·`agency` 는 **리터럴 부분 일치**다(대소문자 무시). `%`·`_`·`\` 는 와일드카드가 아니라 그대로 찾을 글자다. 상한을 넘는 `size`·길이·역전된 범위·형식 오류는 조용히 절삭·변환하지 않고 400 이다(어느 입력이 틀렸는지는 응답에 싣지 않는다).
+         */
+        get: operations["searchNotices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -245,6 +268,22 @@ export interface components {
             expiresAt: string;
             strategyRevision?: number | null;
             baseRevision?: number | null;
+        };
+        NoticeSummary: {
+            noticeNumber: string;
+            noticeRound: string;
+            status: string;
+            title?: string | null;
+            demandAgencyName?: string | null;
+            noticeAgencyName?: string | null;
+            /** Format: int64 */
+            baseAmountWon?: number | null;
+            baseAmountCurrency?: string | null;
+            baseAmountBasis?: string | null;
+            baseAmountVatTreatment?: string | null;
+            baseAmountProvenance?: string | null;
+            /** Format: date-time */
+            deadlineAt?: string | null;
         };
         ErrorBody: {
             /** @enum {string} */
@@ -805,6 +844,74 @@ export interface operations {
                 };
             };
             /** @description 내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    searchNotices: {
+        parameters: {
+            query?: {
+                /** @description 공고명·공고번호 부분 일치(리터럴, 대소문자 무시). 공백만이면 조건이 아니다. */
+                q?: string;
+                /** @description 수요기관명·공고기관명 부분 일치(리터럴, 대소문자 무시). */
+                agency?: string;
+                /** @description 기초금액 하한(원, 이상). basis·과세·provenance 규약은 operation description. */
+                amountMin?: number;
+                /** @description 기초금액 상한(원, 이하). `amountMin` 보다 작으면 400 이다. */
+                amountMax?: number;
+                /** @description 마감 하한(이상). 마감이 없는 공고는 이 조건이 있으면 빠진다. */
+                deadlineFrom?: string;
+                /** @description 마감 상한(이하). `deadlineFrom` 보다 앞서면 400 이다. */
+                deadlineTo?: string;
+                /** @description 0 기반 페이지 번호. */
+                page?: number;
+                /** @description 페이지 크기. 상한을 넘으면 절삭이 아니라 400 이다. */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 조건에 맞는 공고 요약 배열(마감 임박 순 — 마감 없는 공고는 뒤). 전체 건수는 `X-Total-Count`, 빈 결과의 두 뜻은 `X-Result-State` 가 나른다. */
+            200: {
+                headers: {
+                    /** @description 조건에 맞는 **전체** 건수(이 페이지의 길이가 아니다). */
+                    "X-Total-Count": number;
+                    /** @description MATCHED(조건에 맞는 공고가 있다 — 이 페이지가 비어 있어도 전체 건수가 1 이상) | NO_MATCH(수집된 공고는 있으나 조건에 맞는 것이 없다) | NOTHING_COLLECTED(수집된 공고가 아직 하나도 없다) */
+                    "X-Result-State": "MATCHED" | "NO_MATCH" | "NOTHING_COLLECTED";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeSummary"][];
+                };
+            };
+            /** @description 질의 값이 유효하지 않다 — 텍스트 길이 상한 초과, 정수·시각 형식 오류, 음수 금액, 역전된 금액·마감 범위, 음수 `page`, 범위 밖 `size`. 어느 입력이 틀렸는지는 싣지 않는다(편집 경로의 `STRATEGY_VALUE_INVALID` 와 같은 관례). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;
