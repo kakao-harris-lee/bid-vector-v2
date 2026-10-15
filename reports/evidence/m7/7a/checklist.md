@@ -1,7 +1,7 @@
 # M7/7A checklist — P-5(`web/` 골격)·P-6(one-command)
 
 - 계약: 같은 디렉터리의 `scope.md`. 설계 검토: `_workspace/m7-7a/01_design-review.md`(우회 표 U-1~U-8).
-- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `332777e2`.
+- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `cedfbb54`.
 - 명령과 종료 코드는 `commands.md`, 되돌림은 `rollback.md`.
 - 문서 산출물(P-1~P-4)은 세션 모델 레인 소관이라 이 문서에 넣지 않는다.
 
@@ -12,11 +12,11 @@
 | 컴파일 경계 | `tsconfig` `rootDir`·`include`(W-3) | rootDir 밖 `.ts`·`.js` 의 상대 경로·별칭 import → TS6059 | 구성 |
 | 프로그램 전수 | W-4 (`ts.createProgram(...).getSourceFiles()`) | import·`files`·triple-slash·`src` 안 링크로 끌려온 **모든** 파일(선언 파일 포함)이 `src`∪`node_modules` 안인가 | 컴파일러 API |
 | 경계의 전제 | W-4 (`lstat`·realpath·유효 옵션·AST) | `src` 자체가 링크인가 · `rootDir`·`include`·`allowJs`·`paths` 가 바뀌었나 · `web/` 안 링크(설치본·산출물 제외) · 경계 플러그인이 두 자리에 **원소로** 등재됐나(**빠른 선행 검사** — 활성은 카나리가 잰다) | 컴파일러 API + 파일시스템 |
-| 호출 자리 집합 — TS | W-4 (`ts.resolveModuleName` → realpath) | `openapi-fetch` 로 **해석되는** import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0 · **해석되지 않는 bare 지정자는 위반**(별칭+주변 선언이 그 형태다) | 집합 등식 |
-| 호출 자리 집합 — 번들 | 경계 플러그인(W-7, 메인·워커) | 클라이언트 패키지를 **패키지 밖에서** 끌어온 importer 전수가 `src/api/client.ts` 하나인가. Vite 의 실제 해석을 쓰므로 `resolve.alias`·접미 지정자도 같은 술어에 걸린다 | 집합 등식 |
+| 호출 자리 집합 — TS **프로그램 안** | W-4 (`ts.resolveModuleName` → 해석된 모듈의 **패키지 이름**) | 클라이언트 패키지로 해석되는 import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0 · 해석되지 않는 bare 지정자는 위반 · **`src` 안 비 TS 스크립트 0**(그 파일은 tsc 프로그램에도 네트워크 린트에도 들어오지 않았다) | 집합 등식 — **이 층은 TS 프로그램만 본다** |
+| 호출 자리 집합 — **번들 전수** | 경계 플러그인(W-7, 메인·워커) | 클라이언트 패키지(식별은 **패키지 이름**)를 패키지 밖에서 끌어온 간선 전수 — **정적 `importers` ∪ 동적 `dynamicImporters`** — 가 `src/api/client.ts` 하나인가. Vite 의 실제 해석을 쓰므로 `resolve.alias`·접미 지정자·TS 밖 파일(`index.html` 인라인)도 같은 술어에 걸린다 | 집합 등식 |
 | **번들 모듈 그래프** | Vite 플러그인 `buildEnd` — 메인 `plugins` **와** `worker.plugins` 두 자리(W-7) | 번들이 실제로 읽은 모듈 전수가 `src`∪`node_modules`∪`index.html` 안인가. 워커는 **별도 Rollup 빌드**라 등재가 두 자리다 | 그래프 단언 |
 | **경계의 활성** | 카나리 빌드(W-8) | 실제 `vite.config.ts` 로 빌드를 돌려 web 밖 파일을 끌어온 probe 가 **경계 오류로 거부되는가** — 메인·워커 둘 다 | 효과 측정 |
-| node_modules 의 출처 | W-4 (잠금 파일·`.npmrc`) | `packages[*].resolved` 전수가 레지스트리 URL 인가 · `link:true`·`file:` 판 0 · `install-links` 설정 없음 | 정본 대조 |
+| node_modules 의 출처 | W-4 (잠금 파일·`.npmrc`) | 등록부가 있고 비지 않음 · `packages[*].resolved` 전수가 **레지스트리 origin**(`https://registry.npmjs.org/`) · `link:true`·`file:`·git 0 · `inBundle` 은 **부모 출처**로 센다 · 클라이언트 패키지의 **설치 경로 집합이 하나**(npm 별칭 0) · `install-links` 설정 없음 | 정본 대조 |
 | 생성 타입 등식 | W-5 | 커밋본 ↔ OpenAPI 재생성본 바이트 등식 | 바이트 비교 |
 | 보조(실수 잡기) | eslint(W-2) | 직접 네트워크 호출·HTTP 패키지 import·ts 지시어 억제·훅 규칙 | 린트 — **의도적 우회는 리뷰 소관** |
 
@@ -65,6 +65,8 @@
 | R-1 | `resolve.alias: { '@oa': 'openapi-fetch' }` + `src` 안 `declare module '@oa'` → 호출 자리 밖에서 손 경로 호출 | 0 | **1**(「지정자를 해석할 수 없다: … → @oa」) | 0 | RED — **build 도 1**(번들 그래프의 집합 등식: 「호출 자리(src/api/client.ts) 밖에서 끌어온다」) |
 | R-1b | 같은 시도를 **워커 파일 안에서** | 0 | **1** | 0 | RED — 워커 그래프의 플러그인 인스턴스가 같은 등식을 센다 |
 | H-1 | `boundaryRoots` 에 legacy 뿌리 한 줄 + `…?raw` import | 0 | **1** | 0 | RED — **W-6 도 1**(허용 뿌리 집합 등식). 뿌리를 넓혀도 build 는 초록이므로 이 둘이 그 변경을 보는 층이다 |
+| V-1 | `src/legacy-call.js`(+`.d.ts`)의 **동적** `import('openapi-fetch')` → 손 경로 호출 | 0 | **1**(「src 안에 TS 프로그램이 보지 못하는 스크립트가 있다」) | 0 | RED — **build 도 1**(동적 간선: `legacy-call.js → …/openapi-fetch/dist/index.mjs`) |
+| V-4 | npm 별칭 의존 `of2@npm:openapi-fetch` + `import createClient from 'of2'` | 2(곁가지) | **1** 두 사유(「설치돼 있다(별칭 의존): node_modules/of2」 · 「호출 자리 밖에서 import 한다: src/_aliased.ts」) | 0 | RED — **build 도 1**. 식별이 디렉터리 이름이 아니라 **패키지 이름**이라 별칭 디렉터리도 클라이언트로 센다 |
 
 ### 3.2 번들 모듈 그래프 (build 단계) — 메인과 **워커** 둘
 
@@ -78,6 +80,7 @@
 | **P-1** | `src/w.ts` 가 밖을 glob 하고 `new Worker(new URL('./w.ts', import.meta.url), { type: 'module' })` | **1** | 0 |
 | **P-1b** | 같은 워커 파일을 `import W from './w.ts?worker'` | **1** | 0 |
 | **P-1c** | P-1 을 실제 legacy `frontend/src/shared/api/*.ts` 로 | **1** | 0 |
+| V-2 | `index.html` 인라인 스크립트의 **동적** `import('openapi-fetch')`(src 무변경) | **1** | 0 — W-4 는 TS 프로그램만 본다(그 문면을 출력에 적었다) |
 | N-9 | `web/public/` 안 디렉터리 링크 → legacy | 0 | **1** |
 | N-8 | `src/index.css` 의 `@import` 로 밖 CSS | 0 | 0 | **열림 — §4** |
 
@@ -147,6 +150,8 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 | H-2b | 뿌리 항목(`""`) 제거 | **1** |
 | H-3a | `inBundle: true` 항목 + 부모가 `file:` | **1**(부모·자식 두 사유) |
 | H-3b | `inBundle: true` 항목 + 부모가 레지스트리 URL | **0** — npm 의 정상 모양을 막지 않는다(출처는 부모가 정한다) |
+| L-10 | `resolved: https://codeload.github.com/…/tar.gz/<sha>`(비레지스트리 https tarball) | **1** — 술어가 `https://` 접두가 아니라 **origin 일치**다 |
+| V-4 | npm 별칭 의존 항목(`name: openapi-fetch` · `resolved` 는 그 tarball) | **1** — 설치 경로 집합 등식(별칭 항목의 `version` 에는 실제 판이 들어가 `npm:` 정규식은 이 자리에서 결코 맞지 않는다) |
 
 ## 4. 알려진 제한 (열린 자리와 그 조건)
 
@@ -165,12 +170,14 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
   (허용 뿌리는 집합 등식으로 — 뿌리에 한 줄을 더하면 다른 층은 보지 못하고 W-6 만 깨진다, 실측),
   카나리(W-8)가 **활성**을 빌드로 잰다. 측정으로 각 층이 혼자 잡는 자리가 갈린다(§3.2b) — 특히 **플러그인 본문을
   비우는 수정은 W-4·W-6 가 아니라 카나리가 잡는다**. 카나리가 잡는 것은 **우연히 끈 형태**
-  (조건식·덮어쓰기·중복 키·`apply`·본문 비우기)이고, 통과 조건에 「**이 실행의** fixture 실경로가
-  오류 문면에 있다」를 둬 같은 이름·같은 문면을 내는 **가짜 플러그인**도 가른다(실측). 다만
-  **카나리를 알아채는 설정**(`process.argv` 로 카나리 실행만 다르게 구성하는 형태)은 이 층으로
-  닫히지 않는다 — 자기 검사는 언제나 특례로 갈 수 있다. 그 형태는 **리뷰 소관**이고, 탐침
-  이름·자리를 실행마다 무작위로 두고 「쓰기 여부」 축을 없앤 것(임시 `outDir`)은 그 폭을 줄이는
-  조치일 뿐 닫는 것이 아니다.
+  (조건식·덮어쓰기·중복 키·`apply`·본문 비우기)다. 통과 조건의 「**이 실행의** fixture 실경로가
+  오류 문면에 있다」가 주장하는 것은 두 가지까지다 — 경계가 **다른 사유로** 낸 오류를 통과로 읽지
+  않는다 · **탐침 id 에만 반응하는**(경로를 적지 않는) 가짜를 가른다. **탐침 경로를 그대로 적어
+  주는 가짜는 가르지 못한다**(실측).
+- **카나리를 알아채는 설정 일반은 리뷰 소관이다.** 실측된 형태 넷: `process.argv` 분기 · 빌드
+  옵션 모양으로 가르기(`rollupOptions.input` 이 문자열인지 · `outDir` 위치) · 탐침 이름 접두에
+  반응 · 같은 이름의 가짜 플러그인이 그 경로를 그대로 적어 `this.error`. 무작위 nonce 와 임시
+  `outDir` 은 그 폭을 줄이는 조치일 뿐 닫는 것이 아니다 — 자기 검사는 언제나 특례로 갈 수 있다.
 - **환경변수 킬 스위치**: `cond ? false : boundary()` 형태는 W-4 가 모양으로 잡는다. 카나리는 빌드와
   **같은 환경**에서 돌므로, 그 스위치가 CI 에서 켜져 있으면 카나리도 함께 RED 가 된다(실측: 스위치가
   꺼진 실행에서는 카나리가 정상 통과 — 그때 잡는 것은 W-4 다).
@@ -179,6 +186,11 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 - **tsconfig `types`/`typeRoots`** 로 끌어오는 선언도 이제 프로그램 전수 검사의 대상이다(U-9·N-1 과
   같은 술어). `types` 가 가리킬 수 있는 `node_modules` 안 패키지는 허용 뿌리 안이고, 그 출처는 잠금
   파일 소관이다.
+- **번들 층의 등식은 클라이언트를 아무도 쓰지 않으면 공허하게 참이다**(설계대로). 7A 의
+  `apiClient` 는 어디서도 import 되지 않아 그래프에 없고, 실리지 않은 코드에 대해 단언할 것이
+  없다. 반대 방향(「`client.ts` 가 import 한다」)은 W-4 의 TS 등식이 진다. 7E 가 `apiClient` 를
+  화면에 연결한 뒤에는 「그 패키지가 그래프에 있고 간선 집합이 정확히 `{client.ts}`」로 조일 수
+  있다 — 그때 조이는 것이 이 항의 후속이다.
 - **의존 패키지 취약점 스캔 없음** — `OPEN-7A-WEB-DEPENDENCY-SCAN`(7F). 이 slice 는 `npm ci` 가 잠금
   파일 밖을 해석하지 않고 `engine-strict=true` 로 선언 범위 밖 Node 에서 설치가 멈추는 것까지 본다
   (양성 대조: `engines.node` 를 범위 밖으로 바꾸면 `npm ci` exit 1 · 되돌리면 0).
