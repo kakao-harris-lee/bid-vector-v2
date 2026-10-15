@@ -143,8 +143,8 @@ class NoticeSearchParametersTest {
         val undeclared = BaseAmount(1500L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.Undeclared)
 
         compareKnownVat(requireNotNull(bound), comparable).shouldBeInstanceOf<Fact.Known<Int>>()
-        compareKnownVat(requireNotNull(bound), otherVat).shouldBeInstanceOf<Fact.Absent<Int>>()
-        compareKnownVat(requireNotNull(bound), undeclared).shouldBeInstanceOf<Fact.Absent<Int>>()
+        compareKnownVat(requireNotNull(bound), otherVat).shouldBeInstanceOf<Fact.Absent>()
+        compareKnownVat(requireNotNull(bound), undeclared).shouldBeInstanceOf<Fact.Absent>()
     }
 
     @Test
