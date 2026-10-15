@@ -63,9 +63,41 @@ export function violatesBoundary(realPath, allowedRoots) {
   return !allowedRoots.some((root) => isInsideRoot(realPath, root));
 }
 
-/** 허용 뿌리: `web/src` · `web/node_modules` · 진입 문서 `web/index.html` 하나. */
+/** 생성 타입 클라이언트 패키지와 그 **유일한** 호출 자리(ADR 0011 D-2·D-3). */
+export const API_CLIENT_PACKAGE = 'openapi-fetch';
+export const API_CALL_SITE = 'src/api/client.ts';
+
+/**
+ * 클라이언트 패키지의 모듈을 **패키지 밖에서** 끌어오는 importer 가 승인된 호출 자리인가.
+ * 패키지 내부끼리의 import 는 세지 않는다(그 패키지의 자기 구현이다).
+ *
+ * 왜 이 층에도 두는가(verifier r3 M-7): W-4 의 TS 쪽 집합 등식은 `ts.resolveModuleName` 이
+ * 해석하지 못하는 지정자 — `resolve.alias` 로 붙인 이름 + `src` 안 주변 선언
+ * (`declare module '@oa'`) — 을 세지 못한다. 그 별칭을 실제로 해석하는 것은 **Vite** 뿐이므로
+ * Vite 의 그래프에서 같은 등식을 한 번 더 센다. 별칭이든 접미 지정자든 같은 술어에 걸린다.
+ *
+ * 방향은 하나뿐이다 — 「승인 자리 밖에서 끌어오지 않는다」. 반대 방향(「승인 자리가 끌어온다」)은
+ * 이 층에서 셀 수 없다: 7A 의 `apiClient` 는 아직 아무도 쓰지 않아 트리셰이킹으로 그래프에
+ * 들어오지 않는다. 그 방향은 W-4 의 TS 쪽 등식이 진다.
+ */
+export function apiImporterViolation(importerRealPath, { apiPackageDir, callSitePath }) {
+  if (apiPackageDir !== undefined && isInsideRoot(importerRealPath, apiPackageDir)) {
+    return undefined;
+  }
+  if (importerRealPath === callSitePath) {
+    return undefined;
+  }
+  return importerRealPath;
+}
+
+/**
+ * 허용 뿌리 — **집합 등식으로 `module-graph-boundary.test.mjs` 가 잠근다**(code-review r3 H-1).
+ * 여기 한 줄을 더하면 경계의 **범위**가 조용히 넓어지고 다른 층은 그것을 보지 못한다(실측:
+ * legacy 뿌리 한 줄 + `?raw` import → 다섯 층 전부 초록 · dist 에 원문). 그래서 이 함수의
+ * 반환 집합 자체가 test 의 단언 대상이다.
+ */
 export function boundaryRoots(webRootReal) {
-  const roots = [resolve(webRootReal, 'src')];
+  const roots = [resolve(webRootReal, 'src'), resolve(webRootReal, 'index.html')];
   const nodeModules = resolve(webRootReal, 'node_modules');
   if (existsSync(nodeModules)) {
     roots.push(realpathSync(nodeModules));
@@ -79,8 +111,13 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
     buildEnd() {
       const webRootReal = realpathSync(webRoot);
       const allowedRoots = boundaryRoots(webRootReal);
-      const entryHtml = resolve(webRootReal, 'index.html');
       const offenders = [];
+
+      // 집합 등식(ADR 0011 D-2)을 이 그래프에서도 센다 — 메인·워커 각각의 하위 빌드에서.
+      const apiPackageRoot = resolve(webRootReal, 'node_modules', API_CLIENT_PACKAGE);
+      const apiPackageDir = existsSync(apiPackageRoot) ? realpathSync(apiPackageRoot) : undefined;
+      const callSitePath = resolve(webRootReal, API_CALL_SITE);
+      const apiOffenders = [];
 
       for (const rawId of this.getModuleIds()) {
         const { kind, path } = classifyModuleId(rawId);
@@ -99,8 +136,32 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
           offenders.push(`${rawId} → 디스크에 없는 절대 경로(분류 불가)`);
           continue;
         }
-        if (realPath !== entryHtml && violatesBoundary(realPath, allowedRoots)) {
+        if (violatesBoundary(realPath, allowedRoots)) {
           offenders.push(`${rawId} → ${realPath}`);
+          continue;
+        }
+
+        // 이 모듈이 클라이언트 패키지 안이면, 그것을 **패키지 밖에서** 끌어온 자리를 전수로 본다.
+        if (apiPackageDir !== undefined && isInsideRoot(realPath, apiPackageDir)) {
+          for (const importer of this.getModuleInfo(rawId)?.importers ?? []) {
+            const importerClass = classifyModuleId(importer);
+            let importerReal;
+            if (importerClass.kind === 'file') {
+              try {
+                importerReal = realpathSync(importerClass.path);
+              } catch {
+                importerReal = undefined;
+              }
+            }
+            if (importerReal === undefined) {
+              apiOffenders.push(`${importer} → 해석 불가(어느 파일인지 알 수 없다)`);
+              continue;
+            }
+            const violation = apiImporterViolation(importerReal, { apiPackageDir, callSitePath });
+            if (violation !== undefined) {
+              apiOffenders.push(`${violation} → ${rawId}`);
+            }
+          }
         }
       }
 
@@ -108,6 +169,14 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         this.error(
           `번들 모듈 그래프가 web/src·web/node_modules·index.html 밖 파일을 담았다 (ADR 0011 D-3):\n` +
             offenders.map((line) => `  - ${line}`).join('\n'),
+        );
+      }
+
+      if (apiOffenders.length > 0) {
+        this.error(
+          `번들 모듈 그래프에서 ${API_CLIENT_PACKAGE} 를 호출 자리(${API_CALL_SITE}) 밖에서 끌어온다 ` +
+            `— 집합 등식이 깨졌다 (ADR 0011 D-2):\n` +
+            apiOffenders.map((line) => `  - ${line}`).join('\n'),
         );
       }
     },

@@ -189,35 +189,66 @@ const apiPackageDir = existsSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
   ? realpathSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
   : undefined;
 
-const importsApiClient = (specifier, containingFile) => {
+// 판정은 세 갈래다 — `client` · `other` · `unresolved`. **해석 실패를 지정자 문자열 비교로
+// 돌리지 않는다**(verifier r3 M-7): 그 fail-open 때문에 `resolve.alias` 로 붙인 이름 + `src` 안
+// 주변 선언(`declare module '@oa'`)이 집합 등식을 통째로 지나갔다 — 문자열 `'@oa'` 는
+// `'openapi-fetch'` 와 다르고, 그 별칭을 실제로 해석하는 것은 Vite 뿐이다(그래서 같은 등식을
+// 번들 그래프 경계에서도 센다).
+const classifyApiSpecifier = (specifier, containingFile) => {
   const resolved = ts.resolveModuleName(
     specifier,
     containingFile,
     parsed.options,
     ts.sys,
   ).resolvedModule;
-  if (resolved !== undefined && apiPackageDir !== undefined) {
-    let resolvedReal;
-    try {
-      resolvedReal = realpathSync(resolved.resolvedFileName);
-    } catch {
-      resolvedReal = resolved.resolvedFileName;
-    }
-    if (resolvedReal === apiPackageDir || resolvedReal.startsWith(apiPackageDir + sep)) {
-      return true;
-    }
+  if (resolved === undefined) {
+    return 'unresolved';
+  }
+  if (apiPackageDir === undefined) {
+    return 'other';
+  }
+  let resolvedReal;
+  try {
+    resolvedReal = realpathSync(resolved.resolvedFileName);
+  } catch {
+    resolvedReal = resolved.resolvedFileName;
+  }
+  return resolvedReal === apiPackageDir || resolvedReal.startsWith(apiPackageDir + sep)
+    ? 'client'
+    : 'other';
+};
+
+// 해석되지 않은 지정자 중 **허용하는 것은 하나**다: `src` 안에 그 파일이 실제로 있는 경로
+// 지정자(`./index.css` 처럼 tsc 가 타입을 모르는 것, `?raw` 같은 접미가 붙은 것). 근거는 그
+// 파일이 **번들 모듈 그래프 경계**(메인·워커)의 전수 대상이라는 것 — 같은 파일을 두 층이 본다.
+// 반대로 **bare 지정자**가 해석되지 않으면 모름이고, 모르는 것은 통과시키지 않는다.
+const unresolvedIsFileInSrc = (specifier, containingFile) => {
+  if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
     return false;
   }
-  // 해석에 실패했으면(설치 전·오타) 지정자 문자열로 보수적으로 센다 — 모르는 것을 통과시키지
-  // 않는다.
-  return specifier === API_CLIENT_PACKAGE || specifier.startsWith(`${API_CLIENT_PACKAGE}/`);
+  const withoutQuery = specifier.split('?')[0];
+  let candidateReal;
+  try {
+    candidateReal = realpathSync(resolve(dirname(containingFile), withoutQuery));
+  } catch {
+    return false;
+  }
+  return candidateReal === srcReal || candidateReal.startsWith(srcReal + sep);
 };
 
 const apiImporters = new Set();
 for (const { sourceFile, name } of inSrcFiles) {
   for (const imported of ts.preProcessFile(sourceFile.text, true, true).importedFiles) {
-    if (importsApiClient(imported.fileName, sourceFile.fileName)) {
+    const verdict = classifyApiSpecifier(imported.fileName, sourceFile.fileName);
+    if (verdict === 'client') {
       apiImporters.add(name);
+    } else if (
+      verdict === 'unresolved' &&
+      !unresolvedIsFileInSrc(imported.fileName, sourceFile.fileName)
+    ) {
+      fail(
+        `지정자를 해석할 수 없다(어느 모듈인지 게이트가 볼 수 없다): ${name} → ${imported.fileName}`,
+      );
     }
   }
 
