@@ -1,9 +1,14 @@
 # M7/7A checklist — P-5(`web/` 골격)·P-6(one-command)
 
 - 계약: 같은 디렉터리의 `scope.md`. 설계 검토: `_workspace/m7-7a/01_design-review.md`(우회 표 U-1~U-8).
-- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `cedfbb54`.
+- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `f2ad4fab`.
 - 명령과 종료 코드는 `commands.md`, 되돌림은 `rollback.md`.
 - 문서 산출물(P-1~P-4)은 세션 모델 레인 소관이라 이 문서에 넣지 않는다.
+- **이 게이트 셋이 증명하는 범위**(ADR 0011 D-3 · 7A 검토 r5): ① legacy **파일** 유입 0(프로그램
+  전수 · 번들 그래프 · 잠금 출처) ② 「클라이언트 패키지(**정체** 기준)를 끌어오는 자리 ==
+  {`src/api/client.ts`}」. **「서버를 부르는 경로가 그것 하나뿐」은 증명하지 않는다** — 브라우저가
+  HTTP 를 낼 길은 전역·다른 의존·외부 URL·`index.html` 처럼 여럿이고, 그 주장은 보조 lint 와 리뷰
+  소관이다(§4 의 알려진 제한).
 
 ## 1. 게이트의 층 — 무엇이 어디서 닫히는가
 
@@ -13,12 +18,12 @@
 | 프로그램 전수 | W-4 (`ts.createProgram(...).getSourceFiles()`) | import·`files`·triple-slash·`src` 안 링크로 끌려온 **모든** 파일(선언 파일 포함)이 `src`∪`node_modules` 안인가 | 컴파일러 API |
 | 경계의 전제 | W-4 (`lstat`·realpath·유효 옵션·AST) | `src` 자체가 링크인가 · `rootDir`·`include`·`allowJs`·`paths` 가 바뀌었나 · `web/` 안 링크(설치본·산출물 제외) · 경계 플러그인이 두 자리에 **원소로** 등재됐나(**빠른 선행 검사** — 활성은 카나리가 잰다) | 컴파일러 API + 파일시스템 |
 | 호출 자리 집합 — TS **프로그램 안** | W-4 (`ts.resolveModuleName` → 해석된 모듈의 **패키지 이름**) | 클라이언트 패키지로 해석되는 import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0 · 해석되지 않는 bare 지정자는 위반 · **`src` 안 비 TS 스크립트 0**(그 파일은 tsc 프로그램에도 네트워크 린트에도 들어오지 않았다) | 집합 등식 — **이 층은 TS 프로그램만 본다** |
-| 호출 자리 집합 — **번들 전수** | 경계 플러그인(W-7, 메인·워커) | 클라이언트 패키지(식별은 **패키지 이름**)를 패키지 밖에서 끌어온 간선 전수 — **정적 `importers` ∪ 동적 `dynamicImporters`** — 가 `src/api/client.ts` 하나인가. Vite 의 실제 해석을 쓰므로 `resolve.alias`·접미 지정자·TS 밖 파일(`index.html` 인라인)도 같은 술어에 걸린다 | 집합 등식 |
+| 호출 자리 집합 — **번들 전수** | 경계 플러그인(W-7, 메인·워커) | 클라이언트 패키지(식별은 **패키지 이름**)를 패키지 밖에서 끌어온 간선 전수 — **정적 `importers` ∪ 동적 `dynamicImporters`** — 가 `src/api/client.ts` 하나인가. Vite 의 실제 해석을 쓰므로 `resolve.alias`·접미 지정자·TS 밖 파일(`index.html` 인라인)의 **그 패키지 import** 도 같은 술어에 걸린다 — 다만 그 파일의 **직접 `fetch`·외부 URL import** 는 어느 층의 대상도 아니다(§4) | 집합 등식 |
 | **번들 모듈 그래프** | Vite 플러그인 `buildEnd` — 메인 `plugins` **와** `worker.plugins` 두 자리(W-7) | 번들이 실제로 읽은 모듈 전수가 `src`∪`node_modules`∪`index.html` 안인가. 워커는 **별도 Rollup 빌드**라 등재가 두 자리다 | 그래프 단언 |
 | **경계의 활성** | 카나리 빌드(W-8) | 실제 `vite.config.ts` 로 빌드를 돌려 web 밖 파일을 끌어온 probe 가 **경계 오류로 거부되는가** — 메인·워커 둘 다 | 효과 측정 |
 | node_modules 의 출처 | W-4 (잠금 파일·`.npmrc`) | 등록부가 있고 비지 않음 · `packages[*].resolved` 전수가 **레지스트리 origin**(`https://registry.npmjs.org/`) · `link:true`·`file:`·git 0 · `inBundle` 은 **부모 출처**로 센다 · 클라이언트 패키지의 **설치 경로 집합이 하나**(npm 별칭 0) · `install-links` 설정 없음 | 정본 대조 |
 | 생성 타입 등식 | W-5 | 커밋본 ↔ OpenAPI 재생성본 바이트 등식 | 바이트 비교 |
-| 보조(실수 잡기) | eslint(W-2) | 직접 네트워크 호출·HTTP 패키지 import·ts 지시어 억제·훅 규칙 | 린트 — **의도적 우회는 리뷰 소관** |
+| 보조(실수 잡기) | eslint(W-2) | 직접 네트워크 호출·HTTP 패키지 정적 import·ts 지시어 억제·훅 규칙 | 린트 — **대상은 `src` 의 `.ts`·`.tsx` 뿐**이고 의도적 우회는 리뷰 소관 |
 
 **왜 아래 두 층이 따로 필요한가**: 게이트를 전부 **TS 프로그램**에 걸면 번들의 입력인
 **Vite/Rollup 모듈 그래프**는 비어 있는 채 남는다 — 두 그래프는 다른 집합이다(§3.2 N-4~N-7).
@@ -129,6 +134,16 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 | U-6c | 생성물 삭제 | 1 (사유가 다른 메시지) |
 | — | 되돌린 뒤 · 같은 명령 연속 2회 | 0 · 0 — 두 번 새로 생성한 산출물이 서로·커밋본과 바이트 동일 |
 
+### 3.4b 클라이언트 패키지 사용처 — 다른 유입 모양 (r5 재현)
+
+| # | 변이 | 막은 층 |
+|---|---|---|
+| G-1 / G-2 | `src` 에서 `import.meta.glob('../node_modules/openapi-fetch/…')` eager / lazy | **build**(정적 / 동적 간선) |
+| W-1 | 워커 파일 안 lazy glob → 동적 import | **build**(워커 그래프의 동적 간선) |
+| X-1 | `src` 안 re-export `export { default as cc } from 'openapi-fetch'` | **W-4**(집합 등식) |
+| H-3 | `index.html` 인라인 **비리터럴** 동적 import | 어느 층도 아니지만 런타임에서 bare 지정자가 해석되지 않아 기능하지 않는다(참고 — 「비리터럴 동적 import 0」은 `src` 한정 단언이다) |
+| 잠금 origin | `registry.npmjs.org.evil` · `…@evil.example` · 대소문자 · `:443` · 자격 포함 | 전부 **W-4 1**(origin 접두 뒤의 `/` 가 호스트 확장을 막는다 · 뒤 둘은 fail-closed 쪽 오탐) |
+
 ### 3.5 `node_modules` 의 출처 (W-4 — 잠금 파일·`.npmrc`)
 
 | # | 변이 | typecheck | W-4 | build |
@@ -152,6 +167,7 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 | H-3b | `inBundle: true` 항목 + 부모가 레지스트리 URL | **0** — npm 의 정상 모양을 막지 않는다(출처는 부모가 정한다) |
 | L-10 | `resolved: https://codeload.github.com/…/tar.gz/<sha>`(비레지스트리 https tarball) | **1** — 술어가 `https://` 접두가 아니라 **origin 일치**다 |
 | V-4 | npm 별칭 의존 항목(`name: openapi-fetch` · `resolved` 는 그 tarball) | **1** — 설치 경로 집합 등식(별칭 항목의 `version` 에는 실제 판이 들어가 `npm:` 정규식은 이 자리에서 결코 맞지 않는다) |
+| L-13 | 같은 위반의 **사유 분리**(판정은 그대로) — 중첩 사본 `node_modules/react/node_modules/openapi-fetch` · 별칭 `node_modules/of2` · 둘 다 `node_modules/foo/node_modules/of3` | **1 · 1 · 1**, 사유가 각각 「중첩 사본」·「별칭 디렉터리」·「중첩 사본 + 별칭 디렉터리」로 나온다 |
 
 ## 4. 알려진 제한 (열린 자리와 그 조건)
 
@@ -160,9 +176,23 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
   **자산 파일**이 dist 에 실린다(verifier r2 L-6 실측). 번들 그래프 플러그인은 CSS `@import`·`url()`
   을 모듈 id 로 보지 않는다. ADR 0011 D-4 「복사하지 않는다」의 리뷰 대상으로 둔다 — `web/public/`
   쪽 링크는 W-4 가 막는다(N-9).
+- **`index.html` 인라인 스크립트와 외부 URL 은 어느 게이트의 대상도 아니다**(r5 M-10 실측).
+  진입 문서의 인라인 `<script type="module">` 안의 평문 `fetch('/legacy/…')` 와
+  `import('https://esm.sh/openapi-fetch@…')` 는 다섯 게이트가 모두 초록이고 dist 에 그 호출이
+  남는다 — 린트의 대상은 `src` 의 `.ts`·`.tsx` 뿐이고, 외부 URL 은 번들 **그래프에 들어오지
+  않아** 간선이 없다. 우회 형태가 아니라 **대상 밖**이다. 구조로 줄일 싼 후보(`index.html` 의
+  `<script>` 집합 등식)는 「유일」을 증명하지 않으므로 7A 에서 하지 않고 **7E 가 화면을 올릴 때
+  다시 본다**(팀장 결정).
+- **다른 HTTP 의존·vendoring 사본은 집합 등식 밖이다**(r5 M-11 실측). 집합 등식은
+  `openapi-fetch` 의 **정체**에 걸려 있다. 새 의존(`axios` 등)을 더해 **동적** `import()` 로 쓰면
+  다섯 게이트가 초록이다(`no-restricted-imports` 는 `import()` 식을 보지 않고, 그 이름 목록은 ADR
+  이 스스로 1차 게이트로 쓰지 않는다고 적은 열거다). 다른 패키지 안에 vendoring 된 사본도 그
+  패키지 이름으로 식별된다. 싼 후보(`dependencies` 키 집합의 승인 목록 등식)도 같은 이유로 7E 로
+  미룬다.
 - **전역 네트워크 표면의 의도적 우회.** 계산으로 만든 이름(`globalThis['fe'+'tch']`)·
   `Reflect.get(window,'fetch')` 는 보조 층을 지난다(실측). 이 층의 주장은 「실수로 쓴 직접 호출을
-  잡는다」까지이고 그 문면이 eslint 설정 머리 주석에 그대로 있다. 반대 방향의 대가도 적는다 —
+  잡는다」까지이고 그 문면이 eslint 설정 머리 주석에 그대로 있다. **대상 범위도 그 주석에 적었다** —
+  `src` 의 `.ts`·`.tsx` 뿐이다(그래서 위 두 항이 그 밖이다). 반대 방향의 대가도 적는다 —
   속성 이름 술어는 **오탐**을 낸다(네트워크와 무관한 `.fetch` 멤버도 걸린다, 실측). 그때는 그 줄에
   `eslint-disable-next-line` 을 달고 리뷰로 간다.
 - **플러그인·게이트 스크립트 자체의 수정.** 층이 셋이다: W-4 가 **등재**를 AST 로 보고(배열의 직접

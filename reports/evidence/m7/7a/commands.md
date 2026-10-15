@@ -6,7 +6,7 @@
 
 우회 실측의 명령·종료 코드·판정은 `checklist.md` §3 의 표에 둔다 — 같은 사실을 두 자리에 적지 않는다.
 
-## acceptance — `web` job 전 step 그대로 · 산출물 HEAD `cedfbb54`
+## acceptance — `web` job 전 step 그대로 · 산출물 HEAD `f2ad4fab`
 
 작업 디렉터리는 `web/`(job 의 `defaults.run.working-directory`와 같다). 뺀 CI 전용 step 은 둘 —
 `actions/checkout`·`actions/setup-node`(툴체인 설치)와 `npx playwright install-deps chromium`
@@ -17,7 +17,7 @@
 | W-1 | `npm ci` | 0 | 229 packages |
 | W-2 | `npm run lint --max-warnings 0` | 0 | 소스·게이트 스크립트·설정·e2e 전부를 본다 · errors 0 · **warnings 0**(경고가 쌓이지 않는 것이 불변식이다) |
 | W-3 | `npm run typecheck` | 0 | 진단 0 |
-| W-4 | `npm run gate:src-tree` | 0 | src 는 web/ 안 실디렉터리 · 네 옵션 단언 통과 · web/ 링크 0(**설치본·빌드·실행 산출물 제외**) · 프로그램 파일 전수가 src·node_modules 안 · `openapi-fetch` **패키지 이름 기준** 집합 등식 성립(TS 프로그램 한정 — 해석되지 않는 bare 지정자 0 · `src` 안 비 TS 스크립트 0) · 비리터럴 동적 import 0 · 잠금 등록부 존재·비지 않음·뿌리 항목 있음 + 출처 전수 **레지스트리 origin** + 클라이언트 설치 경로 집합 하나 · `.npmrc` 에 `install-links` 없음 · 경계 플러그인이 `plugins`·`worker.plugins` 두 자리에 원소로 등재됨 |
+| W-4 | `npm run gate:src-tree` | 0 | src 는 web/ 안 실디렉터리 · 네 옵션 단언 통과 · web/ 링크 0(**설치본·빌드·실행 산출물 제외**) · 프로그램 파일 전수가 src·node_modules 안 · `openapi-fetch` **패키지 이름 기준** 사용처 집합 등식 성립(TS 프로그램 한정 — 해석되지 않는 bare 지정자 0 · `src` 안 비 TS 스크립트 0 · 이 층이 증명하는 것은 「그 패키지를 끌어오는 자리」까지다) · 비리터럴 동적 import 0 · 잠금 등록부 존재·비지 않음·뿌리 항목 있음 + 출처 전수 **레지스트리 origin** + 클라이언트 설치 경로 집합 하나 · `.npmrc` 에 `install-links` 없음 · 경계 플러그인이 `plugins`·`worker.plugins` 두 자리에 원소로 등재됨 |
 | W-5 | `npm run api:types:check` | 0 | 커밋본과 재생성본 바이트 동일(30879) |
 | W-6 | `npm run test` | 0 | 2 files · 15 tests passed(라우트 표 + 판정 술어 네 갈래 + 허용 뿌리 집합 등식 + importer 판정 + **정적·동적 간선 합집합**) |
 | W-7 | `npm run build` | 0 | 152 modules · 메인·워커 두 경계 통과(그 안에서 클라이언트 패키지의 **정적·동적 간선** 집합 등식도 센다) |
@@ -47,17 +47,17 @@
 
 | 확인 | 결과 |
 |---|---|
-| `git diff --name-only d930d54c..cedfbb54 -- ml-engine` | 0행 → `ml-engine` job 입력 무변경 |
-| `git diff --name-only d930d54c..cedfbb54 -- docker contracts tools/{image-hygiene,db-*,vuln-scan,contract-crosslang-smoke}.sh config/quality app adapters shared-kernel` | 0행 → `container` job 입력 무변경 |
-| `git diff --name-only d930d54c..cedfbb54 -- '*.kt' '*.kts' '*.py' '*.proto'` | 0행 → 컴파일 대상 소스 무변경 |
-| `git diff --numstat d930d54c..cedfbb54 -- .github/workflows/ci.yml` | `111 0` · hunk 둘(`web` job 신설 · `check` job 의 툴체인 step 둘) — **삭제 0** 이므로 다른 job 의 줄은 지워진 것도 바뀐 것도 없다 |
+| `git diff --name-only d930d54c..f2ad4fab -- ml-engine` | 0행 → `ml-engine` job 입력 무변경 |
+| `git diff --name-only d930d54c..f2ad4fab -- docker contracts tools/{image-hygiene,db-*,vuln-scan,contract-crosslang-smoke}.sh config/quality app adapters shared-kernel` | 0행 → `container` job 입력 무변경 |
+| `git diff --name-only d930d54c..f2ad4fab -- '*.kt' '*.kts' '*.py' '*.proto'` | 0행 → 컴파일 대상 소스 무변경 |
+| `git diff --numstat d930d54c..f2ad4fab -- .github/workflows/ci.yml` | `111 0` · hunk 둘(`web` job 신설 · `check` job 의 툴체인 step 둘) — **삭제 0** 이므로 다른 job 의 줄은 지워진 것도 바뀐 것도 없다 |
 
-## rollback 실측 — 저장소 밖 임시 clone, HEAD `cedfbb54`
+## rollback 실측 — 저장소 밖 임시 clone, HEAD `f2ad4fab`
 
 | cmd | exit | 핵심 결과 |
 |---|---|---|
 | `git restore --source=d930d54c --staged --worktree -- <in_scope 경로 개별 인자>` | 0 | A 27 → D 27 · M 4 · base 대비 diff 0행 · `web/` 사라짐 |
-| 되돌린 트리에서 `./gradlew --no-daemon check` | 0 | BUILD SUCCESSFUL in 9m 44s · 359 tasks · `leakPatternGate` 실제 실행(갈음 없이 직접 실측) |
+| 되돌린 트리에서 `./gradlew --no-daemon check` | 0 | BUILD SUCCESSFUL in 9m 30s · 359 tasks · `leakPatternGate` 실제 실행(갈음 없이 직접 실측) |
 
 자세한 전제·목록·술어는 `rollback.md`.
 
