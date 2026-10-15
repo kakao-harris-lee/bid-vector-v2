@@ -1,0 +1,99 @@
+# M7/7F-local — 로컬 패키징 프로필(scope.md 산출물 3). **기존 `docker/compose.yaml` 을 고치지
+# 않고 덧쓰기 파일로 더한다**:
+#
+#     docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml ...
+#
+# 그래서 CI `container` job 의 기존 step 들(기본 파일 하나만 쓰는 S-23·S-23b·S-23c)은 **명령도
+# 거동도 그대로**다 — app 의 루프백 publish 에 기대는 그 스모크를 이 slice 가 깨지 않는다.
+# 이 프로필에서만 publish 가 프록시 하나로 줄어든다.
+#
+# 프로젝트 이름을 여기에도 적는다 — 값은 기본 파일과 **같다**(덧쓰기는 무해하다). 이 파일이
+# 실수로 혼자 쓰이는 경우에도 프로젝트가 디렉터리 basename(`docker`)으로 떨어지지 않게
+# 한다(기본 파일의 `name:` 주석이 적은 사고 경로).
+name: bidvector-v2
+
+services:
+  # 우회 ① — 내부 서비스의 host publish 를 **비운다**. `!override` 가 없으면 compose 는
+  # 목록을 병합해(덧붙여) 기본 파일의 publish 가 그대로 남는다.
+  app:
+    ports: !override []
+
+  # 이 프로필의 스모크는 ml-serving 을 띄우지 않는다(상류가 아니다). 그래도 비워 둔다 —
+  # 전 서비스 `up` 으로 띄우는 사람에게도 「프록시 하나만 host 포트를 연다」가 참이어야 한다.
+  ml-serving:
+    ports: !override []
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    image: bidvector/web:local
+    environment:
+      # 값이 하나도 이 파일에 없다 — `${VAR:?}` 참조뿐이다(기본 파일의 `app` 과 같은 규율).
+      BIDVECTOR_WEB_PORT: ${BIDVECTOR_WEB_PORT:?BIDVECTOR_WEB_PORT 환경변수가 필요합니다 — tools/local-tls-smoke.sh 가 기본값을 갖는다}
+    security_opt:
+      - no-new-privileges:true
+    # host 포트를 열지 않는다(`ports` 없음) — 소비자는 프록시 하나이고 compose 내부망의
+    # 서비스 이름으로 붙는다.
+    healthcheck:
+      # 기본 파일의 app·ml-serving 과 같은 선택 — `docker compose ps` 의 healthy 가
+      # 「요청을 받아도 되는가」를 뜻하게 한다. `curl` 은 이 베이스에 이미 있다(2026-10-16
+      # 실측) — 도구를 더 설치하지 않는다.
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - -o
+        - /dev/null
+        - http://127.0.0.1:${BIDVECTOR_WEB_PORT:?}/
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  proxy:
+    build:
+      context: ..
+      dockerfile: docker/proxy.Dockerfile
+    image: bidvector/proxy:local
+    environment:
+      # 도메인은 **호스트 환경에 있으면 그대로 전달**하고 없으면 전달하지 않는다(그때 쓰이는
+      # 기본값 `localhost` 의 자리는 `docker/proxy.Caddyfile` 하나다 — 같은 기본값을 두 파일에
+      # 적지 않는다). 운영 도메인 값은 저장소에 없다.
+      - BIDVECTOR_PROXY_DOMAIN
+      - BIDVECTOR_PROXY_HTTPS_PORT=${BIDVECTOR_PROXY_HTTPS_PORT:?BIDVECTOR_PROXY_HTTPS_PORT 환경변수가 필요합니다}
+      # **상류는 둘뿐이고, 관리 포트는 그 둘에 없다**(우회 ②의 구속력 있는 자리). 스모크가
+      # 해석된 설정에서 이 둘을 구조로 단언한다.
+      - BIDVECTOR_PROXY_APP_UPSTREAM=app:${BIDVECTOR_APP_PORT:?BIDVECTOR_APP_PORT 환경변수가 필요합니다}
+      - BIDVECTOR_PROXY_WEB_UPSTREAM=web:${BIDVECTOR_WEB_PORT:?}
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      # **이 프로필에서 host 포트를 여는 유일한 자리**이고, 루프백에만 연다. 컨테이너 안
+      # 리스너도 같은 포트다(`proxy.Caddyfile` 이 같은 변수를 읽는다) — 두 수가 어긋날 자리를
+      # 만들지 않는다.
+      - "127.0.0.1:${BIDVECTOR_PROXY_HTTPS_PORT:?}:${BIDVECTOR_PROXY_HTTPS_PORT:?}"
+    healthcheck:
+      # **로컬 CA 를 신뢰한 요청**이 성립하는지를 healthy 의 뜻으로 둔다(`-k` 가 아니다) —
+      # 그러면 「리스너가 떴다」가 아니라 「실행 시 발급이 끝나고 그 체인으로 검증된다」가
+      # healthy 다. `--resolve` 는 도메인이 실 이름일 때도 자기 자신을 가리키게 한다.
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - -o
+        - /dev/null
+        - --cacert
+        - /data/caddy/pki/authorities/local/root.crt
+        - --resolve
+        - ${BIDVECTOR_PROXY_DOMAIN:-localhost}:${BIDVECTOR_PROXY_HTTPS_PORT:?}:127.0.0.1
+        - https://${BIDVECTOR_PROXY_DOMAIN:-localhost}:${BIDVECTOR_PROXY_HTTPS_PORT:?}/
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s

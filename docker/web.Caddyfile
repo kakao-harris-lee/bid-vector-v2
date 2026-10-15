@@ -1,0 +1,33 @@
+# M7/7F-local — web 정적 서버 설정. `docker/web.Dockerfile` 이 이미지에 굽는다(bind mount 가
+# 아니다 — 뜬 컨테이너의 설정과 저장소의 파일이 갈라질 자리를 만들지 않는다).
+#
+# 이 서비스는 **host 포트를 열지 않는다**. 로컬 패키징 프로필에서 host 포트를 여는 것은 프록시
+# 하나이고(`docker/compose.local-tls.yaml`), TLS 도 프록시가 끝낸다 — 여기 오는 것은 compose
+# 내부망의 평문 요청뿐이다.
+{
+	# 설정을 바꿀 수 있는 표면을 이 컨테이너에 두지 않는다.
+	admin off
+	# 설정 자동 저장을 끈다. 이것이 꺼져야 **쓰기 가능한 디렉터리가 하나도 필요 없고**,
+	# `/srv` 를 런타임 사용자가 고칠 수 없는 root 소유로 둘 수 있다(`docker/app.Dockerfile`
+	# 이 `--chown` 을 쓰지 않는 것과 같은 선택 — 침해된 프로세스가 배포물을 재기동 뒤에도
+	# 남는 형태로 고치지 못한다).
+	persist_config off
+	# 아래 주소는 이름 없이 포트뿐이라 애초에 자동 TLS 대상이 아니다. 명시해 둔다 — 뒤에
+	# 주소에 이름이 붙는 편집이 조용히 인증서 발급·80 bind 를 켜지 않게.
+	auto_https off
+}
+
+# **기본값이 없다**(fail-closed). 값이 없으면 주소가 `:` 로 적응 실패해 컨테이너가 뜨지
+# 않는다 — `docker/app.Dockerfile`·`compose.yaml` 의 `${VAR:?}` 규율과 같다. 포트 기본값의
+# 자리는 `tools/local-tls-smoke.sh` 한 곳이다.
+:{$BIDVECTOR_WEB_PORT} {
+	root * /srv
+	encode zstd gzip
+
+	# SPA — react-router 의 클라이언트 라우트(`/no-such-page` 같은 자리 표 밖 주소까지)는
+	# 서버에 파일이 없다. 없는 경로는 셸로 돌린다. `/api/**` 와 관리 경로는 **프록시가 먼저
+	# 처리해 이 서비스에 닿지 않으므로**, 이 fallback 이 API 404 를 셸 200 으로 바꾸는 일은
+	# 없다(그 분기의 정본은 `docker/proxy.Caddyfile` 의 handle 세 블록이다).
+	try_files {path} /index.html
+	file_server
+}
