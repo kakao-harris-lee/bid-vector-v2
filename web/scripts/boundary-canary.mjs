@@ -3,21 +3,34 @@
 //
 // 왜 필요한가: W-4 의 등재 단언은 설정의 **문법**을 본다. 그런데 플러그인을 비활성으로 만드는
 // 형태는 끝없다(조건식 · spread 로 덮어쓰기 · 같은 키 중복 · `apply: 'serve'` · 객체 spread 로
-// `buildEnd` 덮어쓰기 · 참조만 하고 호출 안 함 …). 측정으로 그 여덟 형태가 전부 W-4 를 지나는
-// 것을 봤다. **「안 돌린 게이트는 아무것도 막지 못한다」**의 다른 얼굴이다 — 그래서 이 카나리는
-// 설정을 읽지 않고 **빌드를 돌려** 경계가 실제로 거부하는지 본다.
+// `buildEnd` 덮어쓰기 · 참조만 하고 호출 안 함 · **본문 비우기**). 측정으로 그 형태들이 W-4 를
+// 지나면서 경계를 끄는 것을 봤다. **「안 돌린 게이트는 아무것도 막지 못한다」**의 다른 얼굴이다 —
+// 그래서 이 카나리는 설정을 읽지 않고 **빌드를 돌려** 경계가 실제로 거부하는지 본다.
 //
 // 어떻게: 저장소의 **실제 `vite.config.ts`** 로 Vite 의 `build()` 를 프로그램으로 부른다. 입력은
 // 이 스크립트가 만든 probe 둘이고, 둘 다 **web 밖 임시 디렉터리**의 fixture 를 import 한다 —
 //   ① 메인 그래프: probe 자신이 fixture 를 import 한다.
 //   ② 워커 그래프: probe 가 `new Worker(new URL('./…', import.meta.url))` 로 워커를 띄우고,
 //      그 워커 파일이 fixture 를 import 한다(워커는 별도 Rollup 빌드 — vr r2 H-3).
-// 두 빌드가 **경계 플러그인의 오류로 실패**해야 통과다. 하나라도 성공하면 그 그래프의 경계가
-// 꺼져 있다는 뜻이므로 exit 1.
 //
-// probe 는 `web/src` 안에 잠깐 쓰고 **반드시** 지운다(성공·실패·예외 무관). 빌드는 `write: false`
-// 라 `dist/` 를 건드리지 않는다.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+// **통과 조건 셋**(code-review r3 H-4 · verifier r3 M-6 ③): 빌드가 실패하고 · 그 오류가 경계
+// 플러그인에서 왔고(이름은 Vite 의 래퍼 플러그인에 감싸여 올라오므로 `error.plugin` 이 아니라
+// **문면**에서 찾는다, 실측) · **그 오류가 바로 이 실행의 fixture 실경로를 적는다**. 셋째 조건이
+// 없으면 「같은 이름·같은 문면을 내는 가짜 플러그인」이나 플러그인이 **다른 사유로** 낸 오류를
+// 통과로 읽는다(실측으로 그 둘을 봤다).
+//
+// 그리고 **probe 이름·자리와 fixture 이름·자리는 실행마다 무작위**다(M-6 ③) — 탐침을 알아보고
+// 특례로 처리하는 설정을 어렵게 한다. 빌드는 `write: false` 대신 **임시 `outDir`** 에 쓴다:
+// 「쓰기 여부」로 카나리와 실빌드를 가르던 축(M-6 ①)을 없애고, 저장소의 `dist/` 는 건드리지 않는다.
+//
+// 남는 자리: 설정이 `process.argv` 를 읽어 카나리 실행만 다르게 구성하는 형태(M-6 ②)는 이 층으로
+// 닫히지 않는다 — 자기 검사는 언제나 특례로 갈 수 있다. 그 형태는 리뷰 소관이고 checklist 의
+// 알려진 제한에 등재돼 있다.
+//
+// probe 는 `finally` 에서 **반드시** 지운다(성공·실패·예외 무관). 강제 종료로 남으면 typecheck·
+// W-4·clean-tree 가 받아낸다(fail-closed).
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,24 +41,24 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = resolve(webRoot, 'src');
 const configFile = resolve(webRoot, 'vite.config.ts');
 
-// 경계 플러그인이 내는 오류라는 것을 문면으로 확인한다 — 다른 이유로 실패한 빌드를 통과로 읽지
-// 않는다(이름은 플러그인의 `name` 과 같은 값이다).
 const BOUNDARY_PLUGIN_NAME = 'bidvector:module-graph-boundary';
-const BOUNDARY_MESSAGE = '번들 모듈 그래프가';
 
-const PROBE_MAIN = resolve(srcDir, '__boundary_canary_main.ts');
-const PROBE_WORKER = resolve(srcDir, '__boundary_canary_worker.ts');
+const nonce = randomBytes(5).toString('hex');
+const probeDir = resolve(srcDir, `__boundary_canary_${nonce}`);
+const probeMain = join(probeDir, `main_${nonce}.ts`);
+const probeWorker = join(probeDir, `worker_${nonce}.ts`);
 
 const fixtureDir = mkdtempSync(join(tmpdir(), 'bidvector-boundary-canary-'));
-const fixtureFile = join(fixtureDir, 'outside.ts');
+const fixtureFile = join(fixtureDir, `outside_${nonce}.ts`);
+const fixtureReal = join(realpathSync(fixtureDir), `outside_${nonce}.ts`);
+const outDir = mkdtempSync(join(tmpdir(), 'bidvector-boundary-canary-out-'));
 
 const failures = [];
 
 function cleanup() {
-  for (const path of [PROBE_MAIN, PROBE_WORKER]) {
-    rmSync(path, { force: true });
-  }
+  rmSync(probeDir, { recursive: true, force: true });
   rmSync(fixtureDir, { recursive: true, force: true });
+  rmSync(outDir, { recursive: true, force: true });
 }
 
 async function expectBoundaryRejection(label) {
@@ -56,8 +69,9 @@ async function expectBoundaryRejection(label) {
       root: webRoot,
       logLevel: 'silent',
       build: {
-        write: false,
-        rollupOptions: { input: PROBE_MAIN },
+        outDir,
+        emptyOutDir: true,
+        rollupOptions: { input: probeMain },
       },
     });
   } catch (caught) {
@@ -70,32 +84,40 @@ async function expectBoundaryRejection(label) {
     );
     return;
   }
-  const text = `${error.message ?? ''} ${error.plugin ?? ''}`;
-  if (!text.includes(BOUNDARY_MESSAGE) && !text.includes(BOUNDARY_PLUGIN_NAME)) {
+
+  const message = String(error.message ?? error);
+  if (!message.includes(BOUNDARY_PLUGIN_NAME)) {
     failures.push(
-      `${label}: 빌드는 실패했지만 경계 플러그인의 오류가 아니다 — 다른 이유로 실패한 빌드를 통과로 읽지 않는다: ${String(error.message ?? error).slice(0, 200)}`,
+      `${label}: 빌드는 실패했지만 경계 플러그인의 오류가 아니다 — 다른 이유로 실패한 빌드를 통과로 읽지 않는다: ${message.slice(0, 200)}`,
+    );
+    return;
+  }
+  if (!message.includes(fixtureReal) && !message.includes(fixtureFile)) {
+    failures.push(
+      `${label}: 경계 플러그인이 멈추기는 했지만 **이 실행의 fixture 를 거부한 것이 아니다**(오류에 그 실경로가 없다) — 같은 이름·같은 문면을 내는 다른 플러그인일 수 있다: ${message.slice(0, 200)}`,
     );
   }
 }
 
 try {
-  writeFileSync(fixtureFile, "export const OUTSIDE = 'BOUNDARY_CANARY_OUTSIDE';\n");
+  mkdirSync(probeDir, { recursive: true });
+  writeFileSync(fixtureFile, `export const OUTSIDE = 'BOUNDARY_CANARY_${nonce}';\n`);
 
   // ① 메인 그래프
   writeFileSync(
-    PROBE_MAIN,
+    probeMain,
     `import { OUTSIDE } from ${JSON.stringify(fixtureFile)};\nexport const probe = OUTSIDE;\n`,
   );
   await expectBoundaryRejection('메인 그래프');
 
   // ② 워커 그래프 — probe 자신은 src 안만 import 하고, 워커 파일이 밖을 끌어온다.
   writeFileSync(
-    PROBE_WORKER,
+    probeWorker,
     `import { OUTSIDE } from ${JSON.stringify(fixtureFile)};\nself.postMessage(OUTSIDE);\n`,
   );
   writeFileSync(
-    PROBE_MAIN,
-    "export const probe = new Worker(new URL('./__boundary_canary_worker.ts', import.meta.url), { type: 'module' });\n",
+    probeMain,
+    `export const probe = new Worker(new URL('./worker_${nonce}.ts', import.meta.url), { type: 'module' });\n`,
   );
   await expectBoundaryRejection('워커 그래프');
 } finally {
@@ -107,10 +129,12 @@ if (failures.length > 0) {
   for (const line of failures) {
     console.error(`  - ${line}`);
   }
-  console.error('  고치는 법: vite.config.ts 의 plugins·worker.plugins 등재를 되살린다.');
+  console.error(
+    '  고치는 법: vite.config.ts 의 plugins·worker.plugins 등재와 플러그인 본문을 되살린다.',
+  );
   process.exitCode = 1;
 } else {
   console.log(
-    '번들 그래프 경계가 활성이다: 메인·워커 두 그래프에서 web 밖 파일을 끌어온 빌드가 경계 오류로 거부됐다.',
+    '번들 그래프 경계가 활성이다: 메인·워커 두 그래프에서 **이 실행의** fixture 실경로를 경계 플러그인이 거부했다.',
   );
 }
