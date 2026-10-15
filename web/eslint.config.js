@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -35,6 +36,12 @@ export default tseslint.config(
   },
   js.configs.recommended,
   tseslint.configs.recommended,
+  // 훅 규칙 — legacy 에는 lint 레인이 아예 없었다(조사 §1.1). 7A 의 골격에는 훅을 쓰는 코드가
+  // 아직 없지만, 7E 가 컴포넌트를 쓰기 **전에** 규칙이 자리에 있어야 한다(팀장 결정, 이월 항목).
+  //
+  // `configs.flat[…]` 을 쓴다 — 같은 이름의 `configs['recommended-latest']` 는 **eslintrc 형**
+  // (`plugins` 가 배열)이라 flat config 에서 설정 오류(exit 2)를 낸다. 실측으로 가린 자리다.
+  reactHooks.configs.flat['recommended-latest'],
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     languageOptions: { globals: globals.browser },
