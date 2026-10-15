@@ -33,6 +33,8 @@ import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 
+import { packageNameOf } from './module-graph-boundary.mjs';
+
 const webRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 const tsconfigPath = resolve(webRoot, 'tsconfig.json');
 const srcDir = resolve(webRoot, 'src');
@@ -40,6 +42,10 @@ const nodeModulesDir = resolve(webRoot, 'node_modules');
 const boundaryPluginSpecifier = './scripts/module-graph-boundary.mjs';
 const API_CALL_SITE = 'src/api/client.ts';
 const API_CLIENT_PACKAGE = 'openapi-fetch';
+// 「레지스트리 URL」을 origin 으로 고정한다(verifier r4 L-10) — `https://` 접두만 보던 동안
+// `https://codeload.github.com/<x>/tar.gz/<sha>` 같은 비레지스트리 tarball 이 지나갔다(실측).
+// 사설 레지스트리로 옮기는 날 이 값을 바꾸는 것이 그 결정의 자리다.
+const REGISTRY_ORIGIN = 'https://registry.npmjs.org/';
 
 // 링크 검사에서 건너뛰는 자리 — 설치본과 빌드·실행 산출물(모두 `.gitignore` 대상).
 const LINK_SCAN_SKIP = new Set([
@@ -205,9 +211,9 @@ for (const sourceFile of programFiles) {
 // 문자열로 세면 `import cc from '../node_modules/openapi-fetch'` 같은 상대 경로 한 줄로 집합
 // 등식이 열렸다(실측: 게이트 넷 exit 0). 해석 결과가 `node_modules/openapi-fetch/` 안이면 —
 // 지정자가 패키지 이름이든 서브패스든 상대 경로든 — 같은 자리에 센다.
-const apiPackageDir = existsSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
-  ? realpathSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
-  : undefined;
+// 식별은 **패키지 이름**이다 — 디렉터리 이름이 아니다(verifier r4 M-9). npm 별칭 의존
+// (`"of2": "npm:openapi-fetch@^0.17.0"`)은 같은 코드를 `node_modules/of2` 에 설치하고, 디렉터리
+// 접두로 비교하던 동안 두 층이 모두 그것을 클라이언트 패키지로 보지 못했다(실측).
 
 // 판정은 세 갈래다 — `client` · `other` · `unresolved`. **해석 실패를 지정자 문자열 비교로
 // 돌리지 않는다**(verifier r3 M-7): 그 fail-open 때문에 `resolve.alias` 로 붙인 이름 + `src` 안
@@ -224,16 +230,13 @@ const classifyApiSpecifier = (specifier, containingFile) => {
   if (resolved === undefined) {
     return 'unresolved';
   }
-  if (apiPackageDir === undefined) {
-    return 'other';
-  }
   let resolvedReal;
   try {
     resolvedReal = realpathSync(resolved.resolvedFileName);
   } catch {
     resolvedReal = resolved.resolvedFileName;
   }
-  return resolvedReal === apiPackageDir || resolvedReal.startsWith(apiPackageDir + sep)
+  return packageNameOf(resolvedReal, { stopAt: webRoot }) === API_CLIENT_PACKAGE
     ? 'client'
     : 'other';
 };
@@ -351,12 +354,42 @@ if (!existsSync(lockPath)) {
       fail(`잠금 파일 항목에 resolved 가 없다(출처 불명): ${name}`);
       continue;
     }
-    if (!entry.resolved.startsWith('https://')) {
-      fail(`잠금 파일 항목의 출처가 레지스트리 URL 이 아니다: ${name} → ${entry.resolved}`);
+    if (!entry.resolved.startsWith(REGISTRY_ORIGIN)) {
+      fail(
+        `잠금 파일 항목의 출처가 레지스트리(${REGISTRY_ORIGIN})가 아니다: ${name} → ${entry.resolved}`,
+      );
     }
     if (typeof entry.version === 'string' && /^(file:|link:|git|github:|npm:)/.test(entry.version)) {
       fail(`잠금 파일 항목의 버전이 레지스트리 판이 아니다: ${name} → ${entry.version}`);
     }
+  }
+
+  // 클라이언트 패키지가 **한 자리에만** 설치돼 있는가 — 집합 등식(verifier r4 M-9).
+  // npm 별칭 항목은 `name` 필드로 실제 패키지를 밝히고, `resolved` 는 그 tarball 을 가리킨다.
+  // 둘 중 어느 쪽으로든 같은 패키지인 항목을 모아 경로 집합이 하나인지 본다 — 별칭 의존은
+  // `package.json`·잠금 diff 에 한 줄로 남지만, 게이트 없이는 그 한 줄이 집합 등식을 열었다.
+  const apiInstallPaths = new Set();
+  for (const [name, entry] of Object.entries(lockPackages ?? {})) {
+    if (name === '') {
+      continue;
+    }
+    const byName = entry?.name === API_CLIENT_PACKAGE;
+    const byTarball =
+      typeof entry?.resolved === 'string' && entry.resolved.includes(`/${API_CLIENT_PACKAGE}/-/`);
+    if (byName || byTarball) {
+      apiInstallPaths.add(name);
+    }
+  }
+  const expectedInstallPath = `node_modules/${API_CLIENT_PACKAGE}`;
+  for (const installPath of apiInstallPaths) {
+    if (installPath !== expectedInstallPath) {
+      fail(
+        `${API_CLIENT_PACKAGE} 가 ${expectedInstallPath} 밖에도 설치돼 있다(별칭 의존): ${installPath}`,
+      );
+    }
+  }
+  if (!apiInstallPaths.has(expectedInstallPath)) {
+    fail(`${API_CLIENT_PACKAGE} 가 ${expectedInstallPath} 에 설치돼 있지 않다 — 집합 등식이 깨졌다`);
   }
 }
 

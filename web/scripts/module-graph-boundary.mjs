@@ -9,8 +9,8 @@
 //
 // 이 플러그인이 `vite.config.ts` 에 등재돼 있는지는 W-4(`check-src-tree.mjs`)가 AST 로 본다 —
 // 조용히 떼어내면 게이트가 멈춘다. 아래 순수 함수들은 `*.test.mjs` 가 직접 잠근다(W-6).
-import { existsSync, realpathSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 
 /** `?raw`·`?worker`·`?html-proxy` 같은 접미를 떼어 파일 경로만 남긴다. */
 export function stripQuery(id) {
@@ -90,6 +90,46 @@ export function graphImporters(info) {
   return [...(info?.importers ?? []), ...(info?.dynamicImporters ?? [])];
 }
 
+/**
+ * 그 파일이 속한 **패키지의 이름** — 위로 올라가며 `name` 이 있는 첫 `package.json` 을 읽는다
+ * (패키지 안쪽의 `dist/package.json` 처럼 `name` 없는 것은 지나친다).
+ *
+ * 왜 이름인가(verifier r4 M-9): 디렉터리 이름으로 식별하면 npm 별칭 의존
+ * (`"of2": "npm:openapi-fetch@^0.17.0"`)이 **같은 코드**를 `node_modules/of2` 에 설치해 두 층이
+ * 모두 그것을 클라이언트 패키지로 보지 못했다(실측: 다섯 게이트 0 · dist 에 손 경로). 정체는
+ * 디렉터리 이름이 아니라 그 패키지가 선언한 이름이다.
+ */
+export function packageOf(filePath, { stopAt, readJson } = {}) {
+  let current = dirname(filePath);
+  const limit = stopAt ?? sep;
+  for (let depth = 0; depth < 64; depth += 1) {
+    const manifest = join(current, 'package.json');
+    const parsed = readJson ? readJson(manifest) : readManifest(manifest);
+    if (parsed !== undefined && typeof parsed.name === 'string' && parsed.name.length > 0) {
+      return { dir: current, name: parsed.name };
+    }
+    const parent = dirname(current);
+    if (parent === current || current === limit) {
+      return undefined;
+    }
+    current = parent;
+  }
+  return undefined;
+}
+
+/** 이름만 필요한 자리를 위한 얇은 포장. */
+export function packageNameOf(filePath, options) {
+  return packageOf(filePath, options)?.name;
+}
+
+function readManifest(manifestPath) {
+  try {
+    return JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
 export function apiImporterViolation(importerRealPath, { apiPackageDir, callSitePath }) {
   if (apiPackageDir !== undefined && isInsideRoot(importerRealPath, apiPackageDir)) {
     return undefined;
@@ -124,8 +164,7 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
       const offenders = [];
 
       // 집합 등식(ADR 0011 D-2)을 이 그래프에서도 센다 — 메인·워커 각각의 하위 빌드에서.
-      const apiPackageRoot = resolve(webRootReal, 'node_modules', API_CLIENT_PACKAGE);
-      const apiPackageDir = existsSync(apiPackageRoot) ? realpathSync(apiPackageRoot) : undefined;
+      // 식별은 디렉터리 이름이 아니라 **패키지 이름**이다(r4 M-9).
       const callSitePath = resolve(webRootReal, API_CALL_SITE);
       const apiOffenders = [];
 
@@ -152,7 +191,9 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         }
 
         // 이 모듈이 클라이언트 패키지 안이면, 그것을 **패키지 밖에서** 끌어온 자리를 전수로 본다.
-        if (apiPackageDir !== undefined && isInsideRoot(realPath, apiPackageDir)) {
+        const owningPackage = packageOf(realPath, { stopAt: webRootReal });
+        if (owningPackage?.name === API_CLIENT_PACKAGE) {
+          const apiPackageDir = owningPackage.dir;
           for (const importer of graphImporters(this.getModuleInfo(rawId))) {
             const importerClass = classifyModuleId(importer);
             let importerReal;
