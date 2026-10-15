@@ -273,7 +273,16 @@ jobs:
       - name: vitest (W-6)
         run: npm run test
 
-      - name: build (W-7)
+      # **게이트 test 가 실제로 돌았는가**(verifier r6 M-12). 앞선 판은 `vite.config.ts` 의
+      # `include` 리터럴을 AST 로 찾는 문자열 단언이었는데, `test.exclude` 한 줄 · 미끼 속성 ·
+      # `describe.skip` · `package.json` 의 CLI 경로 필터가 모두 그것을 지나면서 게이트 test 를
+      # 수집에서 뺐다(실측). 이 step 은 **W-6 와 같은 명령**(`npm run test`)에 JSON reporter 를
+      # 붙여 돌려 등록부(`web/config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 ·
+      # failed 0 인지 본다 — 선례는 `config/quality/gate-tests.properties` 다.
+      - name: 게이트 test 실행 확인 (W-7)
+        run: npm run gate:tests
+
+      - name: build (W-8)
         run: npm run build
 
       # **경계가 활성인지 직접 잰다**(verifier r2 M-3 · code-review r2 G-1). W-4 의 등재 단언은
@@ -281,7 +290,7 @@ jobs:
       # spread 로 덮어쓰기 · 같은 키 중복 · `apply: 'serve'` · 객체 spread 로 `buildEnd` 덮어쓰기 ·
       # 참조만 하고 호출 안 함). 카나리는 **실제 `vite.config.ts` 로 빌드를 돌려** 경계 오류로
       # 실패해야 통과한다 — 메인 그래프와 워커 그래프 둘 다.
-      - name: 번들 경계 카나리 — 활성 측정 (W-8)
+      - name: 번들 경계 카나리 — 활성 측정 (W-9)
         run: npm run gate:boundary-canary
 
       # CI 전용 — 브라우저가 쓰는 **시스템 패키지** 설치(apt). 로컬 one-command 는 이 step 을
@@ -292,10 +301,10 @@ jobs:
       - name: Playwright 시스템 의존 설치 (CI 전용)
         run: npx playwright install-deps chromium
 
-      - name: Playwright chromium 설치 (W-9)
+      - name: Playwright chromium 설치 (W-10)
         run: npx playwright install chromium
 
-      - name: Playwright 스모크 (W-10)
+      - name: Playwright 스모크 (W-11)
         id: web-smoke
         run: npm run test:e2e
 

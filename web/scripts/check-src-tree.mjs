@@ -538,36 +538,13 @@ if (!existsSync(viteConfigPath)) {
   };
   visitConfig(viteSource);
 
-  // 게이트 test 가 **수집되는가**(PR #75 리뷰 B). 판정 술어를 잠그는 test 를 vitest 의 `include`
-  // 에서 빼면 W-6 는 그 파일을 아예 보지 않고 **조용히 초록**이 된다 — 선례는 같은 저장소의
-  // `config/quality/gate-tests.properties`(게이트 test 가 실제로 돌았는지 따로 단언한다).
-  // 그래서 파일 존재와 `test.include` 원소를 둘 다 AST 로 단언한다.
-  const gateTestRelative = 'scripts/module-graph-boundary.test.mjs';
-  if (!existsSync(resolve(webRoot, gateTestRelative))) {
-    fail(`번들 경계 판정 술어를 잠그는 test 가 없다: ${gateTestRelative}`);
-  }
-  const gateTestGlob = 'scripts/**/*.test.mjs';
-  let gateTestCollected = false;
-  const visitTestInclude = (node) => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === 'include' &&
-      ts.isArrayLiteralExpression(node.initializer) &&
-      node.initializer.elements.some(
-        (element) => ts.isStringLiteralLike(element) && element.text === gateTestGlob,
-      )
-    ) {
-      gateTestCollected = true;
-    }
-    ts.forEachChild(node, visitTestInclude);
-  };
-  visitTestInclude(viteSource);
-  if (!gateTestCollected) {
-    fail(
-      `vite.config.ts 의 test.include 에 ${gateTestGlob} 가 없다 — 게이트 test 가 수집되지 않으면 W-6 는 조용히 초록이다`,
-    );
-  }
+  // 게이트 test 의 **수집 여부는 여기서 보지 않는다**(verifier r6 M-12). 앞선 판은 `vite.config.ts`
+  // 의 AST 에서 `include` 리터럴을 찾았는데, 그 술어는 자기가 막겠다고 한 형태의 거울상을 못
+  // 막았다 — `test.exclude` 한 줄 · 같은 리터럴을 담은 **미끼** 속성 · `describe.skip` ·
+  // `package.json` 의 CLI 경로 필터가 모두 그것을 지나면서 test 를 수집에서 뺐다(실측). 수집은
+  // **실행 결과**로만 선다: `scripts/check-gate-tests.mjs`(W-7)가 W-6 의 명령에 JSON reporter 를
+  // 붙여 돌려 등록부(`config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 · failed 0
+  // 인지 본다.
 
   if (boundaryBindings.size === 0) {
     fail(`vite.config.ts 가 ${boundaryPluginSpecifier} 를 import 하지 않는다`);

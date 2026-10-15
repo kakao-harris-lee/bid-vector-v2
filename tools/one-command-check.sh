@@ -86,7 +86,7 @@ uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 # M7/7A — ci.yml `web` job 의 명령을 순서까지 그대로 둔다. 뺀 CI 전용 step 은 둘이다:
 # 체크아웃·setup-node(툴체인 설치)와 `npx playwright install-deps chromium`(브라우저가 쓰는
 # 시스템 패키지 설치 — apt 를 건드리므로 로컬에서 돌릴 것이 아니다). 브라우저 자체 설치
-# (W-9)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
+# (W-10)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
 # 조건 1 이고, 그래서 job 쪽도 그 두 명령을 나눠 두었다(축약·새 플래그를 만들지 않는다).
 # **그 「e2e 까지」는 브라우저의 시스템 패키지가 이미 있는 장비를 전제한다**(PR #75 리뷰 V) —
 # 없는 장비에서는 이 스크립트가 아니라 `npx playwright install-deps chromium`(apt·sudo)이
@@ -115,16 +115,19 @@ npm run api:types:check
 _step "web — vitest (W-6)"
 npm run test
 
-_step "web — build (W-7)"
+_step "web — 게이트 test 실행 확인 (W-7)"
+npm run gate:tests
+
+_step "web — build (W-8)"
 npm run build
 
-_step "web — 번들 경계 카나리 (W-8)"
+_step "web — 번들 경계 카나리 (W-9)"
 npm run gate:boundary-canary
 
-_step "web — Playwright chromium 설치 (W-9)"
+_step "web — Playwright chromium 설치 (W-10)"
 npx playwright install chromium
 
-_step "web — Playwright 스모크 (W-10)"
+_step "web — Playwright 스모크 (W-11)"
 npm run test:e2e
 
 _step "완료 — Kotlin 전건 + Python 전건 + web 전건 통과"

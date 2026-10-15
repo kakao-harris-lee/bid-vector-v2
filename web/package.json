@@ -18,6 +18,7 @@
     "api:types": "openapi-typescript ../openapi/bidvector-operator-api.yaml -o src/api/generated/operator-api.ts",
     "api:types:check": "node scripts/check-api-types.mjs",
     "test": "vitest run",
+    "gate:tests": "node scripts/check-gate-tests.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
