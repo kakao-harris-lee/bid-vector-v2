@@ -160,7 +160,8 @@ class DryRunCommitParityTest {
         val payload = notificationRows(adminDataSource(postgres)).single().payload
         bidNow.reasons.flatMap { it.toString().split(", ") }.forEach { payload shouldContain it }
         payload shouldContain "${candidate.id.number.value}-${candidate.id.round.value}"
-        payload shouldContain SEEDED_REVISION.toString()
+        // 개정 번호도 **dry-run 경로가 읽은 값**에서 뽑는다 — 두 경로가 다른 스냅샷을 보면 갈린다.
+        payload shouldContain dryRun.strategy.revision.value.toString()
         payload shouldContain EVALUATION_LADDER_POLICY_VERSION.source
     }
 
