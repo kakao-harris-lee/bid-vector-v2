@@ -150,8 +150,11 @@ echo "$ps_out" | grep -q "proxy:.*healthy" || { echo "$ps_out" >&2; fail "app·w
 # 아래 모든 https 요청이 이 체인으로 검증된다(`-k` 를 쓰지 않는다 — 그러면 TLS 가 서 있는지
 # 아닌지를 구분하지 못한다).
 _step "로컬 CA 뿌리 인증서 반출(프록시가 실행 시 발급한 것)"
-"${COMPOSE[@]}" exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$CA"
-[ -s "$CA" ] || fail "로컬 CA 뿌리 인증서를 읽지 못했다"
+# `|| fail` 로 받는다 — 그러지 않으면 `set -e` 가 이 줄에서 즉사해 **무엇이 없었는지**가
+# 문면에 남지 않는다(실측: TLS 를 뺀 변이에서 cat 의 오류 한 줄만 남았다).
+"${COMPOSE[@]}" exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$CA" \
+  || fail "로컬 CA 뿌리 인증서를 꺼내지 못했다 — 이 프로필에서 TLS 가 서지 않았다"
+[ -s "$CA" ] || fail "로컬 CA 뿌리 인증서가 비었다"
 openssl x509 -in "$CA" -noout -subject >/dev/null || fail "반출한 파일이 인증서가 아니다"
 
 # ---- helper ----
