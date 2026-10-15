@@ -257,6 +257,14 @@ jobs:
       - name: build (W-7)
         run: npm run build
 
+      # **경계가 활성인지 직접 잰다**(verifier r2 M-3 · code-review r2 G-1). W-4 의 등재 단언은
+      # 설정의 문법을 보는 선행 검사이고, 플러그인을 비활성으로 만드는 형태는 끝없다(조건식 ·
+      # spread 로 덮어쓰기 · 같은 키 중복 · `apply: 'serve'` · 객체 spread 로 `buildEnd` 덮어쓰기 ·
+      # 참조만 하고 호출 안 함). 카나리는 **실제 `vite.config.ts` 로 빌드를 돌려** 경계 오류로
+      # 실패해야 통과한다 — 메인 그래프와 워커 그래프 둘 다.
+      - name: 번들 경계 카나리 — 활성 측정 (W-8)
+        run: npm run gate:boundary-canary
+
       # CI 전용 — 브라우저가 쓰는 **시스템 패키지** 설치(apt). 로컬 one-command 는 이 step 을
       # 빼고 바로 아래 브라우저 설치부터 돈다(그 스크립트의 머리 주석 「CI 전용 step(체크아웃·
       # 툴체인 설치·아티팩트 업로드)만 뺀다」). 브라우저 설치와 **두 명령으로 나눈 이유**가
@@ -265,10 +273,10 @@ jobs:
       - name: Playwright 시스템 의존 설치 (CI 전용)
         run: npx playwright install-deps chromium
 
-      - name: Playwright chromium 설치 (W-8)
+      - name: Playwright chromium 설치 (W-9)
         run: npx playwright install chromium
 
-      - name: Playwright 스모크 (W-9)
+      - name: Playwright 스모크 (W-10)
         run: npm run test:e2e
 
       # code-review r1 F-7 — CI reporter 는 `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한
