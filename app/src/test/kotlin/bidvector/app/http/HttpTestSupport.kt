@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.EvaluationDryRunFactory
+import bidvector.app.wiring.NoticeSearchQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
@@ -23,6 +24,10 @@ import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.notice.NoticeSearchCriteria
+import bidvector.workflow.notice.NoticeSearchPage
+import bidvector.workflow.notice.NoticeSearchPort
+import bidvector.workflow.notice.NoticeSearchState
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -173,6 +178,23 @@ private class UnreachableLicenseGatePort : LicenseGatePort {
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
+/**
+ * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
+ * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
+ * 아니라 `bidvector.adapters.persistence.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
+ * 여기서 재는 것은 **HTTP 층이 조건을 어떻게 만들고 결과를 어떤 응답으로 옮기는가**다.
+ */
+class FakeNoticeSearchPort : NoticeSearchPort {
+    @Volatile var page: NoticeSearchPage = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NOTHING_COLLECTED)
+
+    @Volatile var lastCriteria: NoticeSearchCriteria? = null
+
+    override fun search(criteria: NoticeSearchCriteria): NoticeSearchPage {
+        lastCriteria = criteria
+        return page
+    }
+}
+
 class RecordingAuditSink {
     val records: MutableList<ApiAuditRecord> = Collections.synchronizedList(mutableListOf())
 
@@ -314,6 +336,14 @@ open class HttpTestApplication {
             correlationIds = correlationIdFactory,
             clock = clock,
         )
+
+    @Bean
+    open fun fakeNoticeSearchPort(): FakeNoticeSearchPort = FakeNoticeSearchPort()
+
+    /** D-6A2b-8 — `NoticeSearchController` 는 포트가 아니라 조회기를 받는다(출하 조립과 같은 형태). */
+    @Bean
+    open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
+        NoticeSearchQuery(fakeNoticeSearchPort)
 
     @Bean
     open fun operatorCredentialFilterRegistration(): FilterRegistrationBean<OperatorCredentialFilter> =

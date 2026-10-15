@@ -26,6 +26,15 @@ class InvalidEditRequestException(
 ) : RuntimeException(message)
 
 /**
+ * 공고 검색 질의의 형식·범위 오류(M7/7C ①) — 400 `INVALID_REQUEST`. 메시지는 거부 사유
+ * 어휘(`NoticeSearchRejection`)를 진단용으로 나르고 **응답에는 실리지 않는다**(아래
+ * [ErrorMapping] 이 고정 문구로만 옮긴다 — 어느 입력이 틀렸는지는 싣지 않는다).
+ */
+class InvalidNoticeSearchException(
+    message: String,
+) : RuntimeException(message)
+
+/**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
  * [OperatorCredentialFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
@@ -128,6 +137,11 @@ object ErrorMapping {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
+            // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
+            is InvalidNoticeSearchException -> {
+                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            }
+
             // D-6A3-19 — 비JSON·빈 본문은 컨트롤러의 명시 검증에 닿기 전에 Jackson 이 던진다.
             is HttpMessageNotReadableException -> {
                 ErrorCode.INVALID_REQUEST to "요청 본문을 읽을 수 없다"
@@ -211,6 +225,7 @@ class GlobalErrorHandler {
         InvalidEvaluationRequestException::class,
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
+        InvalidNoticeSearchException::class,
     )
     fun badRequest(
         exception: Throwable,
