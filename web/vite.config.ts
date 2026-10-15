@@ -19,8 +19,14 @@ export default defineConfig({
   // 표준 워커 관용구)로 web 밖 파일이 워커 chunk 에 실렸다. 같은 경계를 여기에도 등재한다 —
   // W-4 가 **두 자리 모두**를 단언하고, 활성 자체는 카나리 빌드(W-8)가 잰다.
   worker: { plugins: () => [moduleGraphBoundary({ webRoot: import.meta.dirname })] },
-  server: { port: 5173, strictPort: true },
-  preview: { port: 4173, strictPort: true },
+  // **host 를 리터럴 IP 로 고정한다**(PR #75 CI RED). Vite 의 기본 host 는 `localhost` 이고, 그
+  // 이름이 `::1` 로 먼저 해석되는 장비에서는 서버가 **IPv6 에만** 뜬다. Playwright 의 webServer 는
+  // `http://127.0.0.1:4173` 을 기다리므로 그 조합에서 60s 뒤 「Timed out waiting」으로 죽는다
+  // (CI 의 `web` W-10 과 `check` S-20 이 같은 사유로 함께 붉었다). 리터럴 IP 는 이름 해석을 타지
+  // 않으므로 해석 순서와 무관하게 같은 주소에 뜬다 — `playwright.config.ts` 의 `url`·`baseURL` 과
+  // 같은 값이다.
+  server: { host: '127.0.0.1', port: 5173, strictPort: true },
+  preview: { host: '127.0.0.1', port: 4173, strictPort: true },
   build: { outDir: 'dist', emptyOutDir: true },
   test: {
     // 7A 의 단위 test 는 라우트 표처럼 DOM 이 필요 없는 것뿐이다 — jsdom 을 의존에 들이지
