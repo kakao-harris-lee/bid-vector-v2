@@ -68,7 +68,7 @@ git restore --source=77850903 --staged --worktree -- \
 | ③ | in_scope 의 base 대비 diff | 빈 출력(0줄) — 복원된 경로가 base 와 **바이트 동일**. 트리 전체로 넓혀도 base 대비 남는 파일은 `reports/evidence/m7/7f/scope.md` **하나**다(일부러 되돌리지 않는 계약 문서) |
 | ④ | compile | **N/A — 컴파일 대상 소스 변경 0.** `git diff --name-only 77850903..HEAD -- '*.kt' '*.kts' '*.py' '*.proto' '*.ts' '*.tsx'` 가 빈 출력이다. ③ 과 합치면 되돌린 트리의 컴파일 입력은 base 와 동일하다(트리 동일성으로 갈음한다 — 「HEAD 초록」이 아니다) |
 | ⑤ | test | 같은 사유로 N/A — test 입력(소스·fixture) 변경 0 |
-| ⑥ | 게이트 | **base 와 같은 판정**(아래 두 축). 두 축으로 잰다 — (ⓐ) **컨테이너 축**: 이 slice 가 닿는 게이트는 `container` job 이고, 되돌린 트리에서 그 job 의 입력(`ci.yml`·`docker/**`·`tools/**`)이 ③ 로 base 와 바이트 동일하므로 판정이 base 와 같다. (ⓑ) **되돌리지 않는 evidence 축**: `reports/evidence/` 를 읽는 게이트는 `leakPatternGate` 하나다. 그 게이트가 보는 입력을 **참조형 패턴 스캔으로 직접 재서 매치 0** 을 확인했고(commands.md 의 비밀값 스캔 둘째 명령), 게이트의 판정은 **baseline 밖의 새 매치**이므로 매치 0 에서는 붉어질 자리가 없다. 되돌린 트리는 그보다 파일이 **줄어든** 집합이고 거기 남는 evidence 파일은 `scope.md` 하나인데 게이트가 그 이름을 제외 목록에 둔다 — 즉 되돌린 트리의 게이트 입력은 base 와 같다. **그 게이트의 Gradle 실행 자체는 다른 레인의 Gradle 세션과 빌드 lock 경합으로 이 시점에 큐에 남았다**(호스트 규율상 끼어들지 않는다) — 마지막 HEAD 의 게이트 결과 정본은 애초에 verifier 와 PR 조치 코멘트다 |
+| ⑥ | 게이트 | **초록 — 되돌린 트리에서 직접 돌렸다.** 축이 둘이다. (ⓐ) **evidence 축**: `reports/evidence/` 를 읽는 게이트는 `leakPatternGate` 하나이고, 되돌린 트리에서 그것을 실행해 `> Task :leakPatternGate` · `BUILD SUCCESSFUL` 을 받았다(되돌리지 않는 evidence 가 게이트를 붉히지 않는다는 확인). (ⓑ) **컨테이너 축**: 이 slice 가 닿는 게이트는 `container` job 이고, 되돌린 트리에서 그 job 의 입력(`ci.yml`·`docker/**`·`tools/**`)이 ③ 으로 base 와 바이트 동일하므로 판정이 base 와 같다 — 트리 동일성으로 갈음하며 「HEAD 초록」으로 갈음하지 않는다 |
 
 ## 정리 뒤 잔여
 

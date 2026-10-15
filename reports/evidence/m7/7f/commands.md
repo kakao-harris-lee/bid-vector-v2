@@ -126,6 +126,17 @@
 - 핵심 결과: 매치 없음 — `leakPatternGate` 의 입력에 새 어휘가 없다. 패턴 어휘는 이 문서에 축어로
   적지 않는다(참조형 명령만 둔다).
 
+## 2026-10-16 — `leakPatternGate`(evidence 를 읽는 유일한 게이트)
+
+- cmd: `./gradlew --no-daemon leakPatternGate` — **되돌린 트리**(rollback.md 의 임시 clone)에서
+- exit: 0
+- 핵심 결과: `> Task :leakPatternGate` · `BUILD SUCCESSFUL` — 되돌리지 않는 evidence 가 게이트를
+  붉히지 않는다(rollback ⑥ ⓐ).
+- cmd: 같은 명령 — **이 worktree 의 evidence 내용**에서
+- exit: 0
+- 핵심 결과: 같은 판정. **이 커밋 자신의 post-state 에서의 결과는 여기 적을 수 없다**(적으려면 커밋이
+  하나 더 필요하고 그 커밋이 다시 같은 줄을 요구한다) — 그 한 칸은 verifier 와 PR 조치 코멘트가 갖는다.
+
 ## 2026-10-16 — rollback 실측
 
 - `rollback.md` 의 명령을 임시 clone 에서 **실제로** 돌렸다 — 종료 코드·D/M 수·diff 공백·④~⑥ 은 그
