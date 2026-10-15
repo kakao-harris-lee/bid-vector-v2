@@ -292,6 +292,22 @@ if (!existsSync(lockPath)) {
   } catch (caught) {
     fail(`package-lock.json 을 읽지 못했다: ${caught.message}`);
   }
+  // **등록부가 있고 비지 않았다**를 먼저 단언한다(code-review r3 H-2 · verifier r3 L-7) —
+  // 전수 단언은 대상이 0 건이면 공허하게 참이다. `lockfileVersion: 1`(npm 6 형: `packages`
+  // 없음)과 `packages: {}` 둘 다 그 자리였다(실측: 둘 다 exit 0). 이 저장소에 같은 클래스의
+  // 선례가 있다 — `leakPatternGate` 는 패턴이 0 건이면 멈춘다.
+  const lockVersion = typeof lock?.lockfileVersion === 'number' ? lock.lockfileVersion : 0;
+  if (lockVersion < 2) {
+    fail(`package-lock.json 의 lockfileVersion 이 2 미만이다(${lockVersion}) — packages 등록부가 없다`);
+  }
+  const lockPackages = lock?.packages;
+  if (typeof lockPackages !== 'object' || lockPackages === null) {
+    fail('package-lock.json 에 packages 등록부가 없다');
+  } else if (Object.keys(lockPackages).length === 0) {
+    fail('package-lock.json 의 packages 등록부가 비었다 — 전수 단언이 공허하게 통과한다');
+  } else if (!Object.prototype.hasOwnProperty.call(lockPackages, '')) {
+    fail('package-lock.json 의 packages 에 뿌리 항목("")이 없다');
+  }
   for (const [name, entry] of Object.entries(lock?.packages ?? {})) {
     if (name === '') {
       continue; // 뿌리 항목 자신 — `resolved` 가 없는 것이 정상이다.
@@ -301,6 +317,17 @@ if (!existsSync(lockPath)) {
       continue;
     }
     if (typeof entry.resolved !== 'string') {
+      // bundled dependency 는 `resolved` 가 없는 것이 npm 의 **정상 모양**이다(code-review r3
+      // H-3) — 그 파일은 부모 패키지의 tarball 안에 들어 있으므로 출처는 **부모**가 정한다.
+      // 그래서 부모 항목이 레지스트리 URL 인지로 센다. 부모를 못 찾으면 모름이고 위반이다.
+      if (entry.inBundle === true) {
+        const parentName = name.slice(0, name.lastIndexOf('/node_modules/'));
+        const parent = name.includes('/node_modules/') ? lockPackages?.[parentName] : undefined;
+        if (typeof parent?.resolved !== 'string' || !parent.resolved.startsWith('https://')) {
+          fail(`inBundle 항목의 부모 출처를 확인할 수 없다: ${name}`);
+        }
+        continue;
+      }
       fail(`잠금 파일 항목에 resolved 가 없다(출처 불명): ${name}`);
       continue;
     }
