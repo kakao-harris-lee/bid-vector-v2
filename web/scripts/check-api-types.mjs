@@ -17,6 +17,9 @@ const committedPath = resolve(webRoot, 'src', 'api', 'generated', 'operator-api.
 const workDir = mkdtempSync(join(tmpdir(), 'bidvector-api-types-'));
 const regeneratedPath = join(workDir, 'operator-api.ts');
 
+// 실패 경로에서도 임시 디렉터리를 치운다(code-review r1 F-5) — `process.exit()` 는 `finally` 를
+// 건너뛰므로 즉시 나가지 않고 **종료 코드만 세운 뒤** 정리까지 끝내고 자연 종료한다. 같은 클래스를
+// 이 저장소가 한 번 고쳤다(`tools/one-command-check.sh` 의 wheel 디렉터리).
 try {
   execFileSync(
     process.execPath,
@@ -32,20 +35,22 @@ try {
     console.error(
       `생성 타입이 커밋되어 있지 않다: ${committedPath}\n  고치는 법: web/ 에서 \`npm run api:types\``,
     );
-    process.exit(1);
+    process.exitCode = 1;
   }
 
-  if (!committed.equals(regenerated)) {
-    console.error(
-      '생성 타입이 OpenAPI 문서와 어긋난다 — 커밋본과 재생성본의 바이트가 다르다.\n' +
-        `  커밋본: ${committedPath} (${committed.byteLength} bytes)\n` +
-        `  재생성: ${schemaPath} 기준 (${regenerated.byteLength} bytes)\n` +
-        '  고치는 법: web/ 에서 `npm run api:types` 뒤 생성물을 커밋한다.',
-    );
-    process.exit(1);
+  if (committed !== undefined) {
+    if (committed.equals(regenerated)) {
+      console.log(`생성 타입이 OpenAPI 문서와 바이트까지 같다 (${committed.byteLength} bytes).`);
+    } else {
+      console.error(
+        '생성 타입이 OpenAPI 문서와 어긋난다 — 커밋본과 재생성본의 바이트가 다르다.\n' +
+          `  커밋본: ${committedPath} (${committed.byteLength} bytes)\n` +
+          `  재생성: ${schemaPath} 기준 (${regenerated.byteLength} bytes)\n` +
+          '  고치는 법: web/ 에서 `npm run api:types` 뒤 생성물을 커밋한다.',
+      );
+      process.exitCode = 1;
+    }
   }
-
-  console.log(`생성 타입이 OpenAPI 문서와 바이트까지 같다 (${committed.byteLength} bytes).`);
 } finally {
   rmSync(workDir, { recursive: true, force: true });
 }

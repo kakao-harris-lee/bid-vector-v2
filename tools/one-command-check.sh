@@ -85,8 +85,12 @@ uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 # M7/7A — ci.yml `web` job 의 명령을 순서까지 그대로 둔다. 뺀 CI 전용 step 은 둘이다:
 # 체크아웃·setup-node(툴체인 설치)와 `npx playwright install-deps chromium`(브라우저가 쓰는
 # 시스템 패키지 설치 — apt 를 건드리므로 로컬에서 돌릴 것이 아니다). 브라우저 자체 설치
-# (W-7)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
+# (W-8)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
 # 조건 1 이고, 그래서 job 쪽도 그 두 명령을 나눠 두었다(축약·새 플래그를 만들지 않는다).
+#
+# CI 에서 이 스크립트를 돌리는 `check` job 에는 그 두 CI 전용 step(setup-node · install-deps)이
+# **그 job 안에** 있다(code-review r1 F-3) — 여기서 빼는 것은 「로컬에서 하지 않는다」는 뜻이고
+# 「CI 에서 없다」는 뜻이 아니다.
 cd "$REPO_ROOT/web"
 
 _step "web — install (W-1)"

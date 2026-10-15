@@ -29,3 +29,13 @@ export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({
   path: slot.path,
   element: <ScreenPlaceholder slot={slot} />,
 }));
+
+/**
+ * 알 수 없는 URL 자리(code-review r1 F-10). **화면 자리 표에는 넣지 않는다** — 이것은 화면이
+ * 아니라 「셸이 모든 URL 에서 뜬다」를 참으로 만드는 자리다.
+ */
+export const fallbackRoute: RouteObject = {
+  id: 'not-found',
+  path: '*',
+  element: <ScreenPlaceholder slot={{ id: 'not-found', path: '*', label: '없는 주소' }} />,
+};

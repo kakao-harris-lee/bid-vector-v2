@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { screenRoutes, screenSlots } from './routes';
+import { fallbackRoute, screenRoutes, screenSlots } from './routes';
 
 // 7A 가 만든 것은 「화면 자리 여섯」이다. 그 여섯이 맞는지만 잠근다 — 화면 동작 test 는 7E.
 const EXPECTED_PATHS = [
@@ -21,5 +21,10 @@ describe('화면 자리 표', () => {
     expect(screenRoutes.map((route) => route.path)).toEqual([...EXPECTED_PATHS]);
     const ids = screenRoutes.map((route) => route.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('없는 주소 자리는 표 **밖**에 있고 catch-all 이다', () => {
+    expect(fallbackRoute.path).toBe('*');
+    expect(screenSlots.map((slot) => slot.path)).not.toContain('*');
   });
 });
