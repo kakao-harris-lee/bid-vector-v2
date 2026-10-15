@@ -11,8 +11,9 @@ import tseslint from 'typescript-eslint';
 // **이 층이 무엇인지 정확히 적는다(verifier r1 M-1 · code-review r1 F-4).** 브라우저 전역의
 // 네트워크 표면은 구조로 닫을 층이 마땅치 않다(타입 lib 에서 DOM 을 뺄 수 없다). 그래서 아래
 // 규칙들은 **실수로 쓴 직접 호출을 잡는 보조 층**이고 **의도적 우회는 리뷰 소관**이다 —
-// 계산으로 만든 이름(`globalThis['fe'+'tch']`)·`Reflect.get(window,'fetch')` 같은 형태는 막지
-// 못한다(실측 · 알려진 제한에 등재). 「스타일 하나로 열리지 않는다」는 주장을 이 자리에 쓰지
+// 계산으로 만든 이름(`globalThis['fe'+'tch']`)·별칭 변수(`const k = 'fetch'; window[k]`)·**반사
+// API 일반**(`Reflect.get(window,'fetch')` · `Object.getOwnPropertyDescriptor(window,'fetch')` 등)·
+// 구조 분해의 따옴표·계산 키는 막지 못한다(실측 · 알려진 제한에 등재 — verifier r7 L-15). 「스타일 하나로 열리지 않는다」는 주장을 이 자리에 쓰지
 // 않는다 — 그 주장이 서는 자리는 아래 셋이고 전부 여기가 아니다: `openapi-fetch` import 집합
 // 등식과 비리터럴 동적 import 금지(W-4, 컴파일러 API) · 번들에 들어오는 파일 경계(Vite 플러그인,
 // 모듈 그래프) · 프로그램 파일 경계(W-4 전수).
@@ -104,7 +105,10 @@ export default tseslint.config(
           selector: `MemberExpression[computed=true] > TemplateLiteral > TemplateElement[value.raw=/^(${NETWORK_MEMBERS.join('|')})$/]`,
           message: restrictedMessage,
         },
-        // ④ 구조 분해 — `const { fetch: f } = <무엇이든>`. 소유자를 보지 않는다.
+        // ④ 구조 분해 — `const { fetch: f } = <무엇이든>`. 소유자를 보지 않는다. **키가 식별자일
+        //    때만** 걸린다(verifier r7 L-15 실측) — 따옴표 키 `{ 'fetch': k }` · 계산 키
+        //    `{ ['fetch']: h }` · 템플릿 키는 지나간다. 같은 리터럴의 다른 표기이고, 이 층의
+        //    주장 범위(실수로 쓴 직접 호출)를 넘지 않으므로 알려진 제한에 등재한다.
         {
           selector: `ObjectPattern > Property[key.name=/^(${NETWORK_MEMBERS.join('|')})$/]`,
           message: restrictedMessage,
