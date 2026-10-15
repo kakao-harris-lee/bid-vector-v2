@@ -1,115 +1,278 @@
 #!/usr/bin/env node
-// ADR 0011 D-3 — **컴파일 경계의 전제**를 잰다. 두 가지를 닫는다:
+// ADR 0011 D-3 — **컴파일 경계와 그 전제**를 잰다. 이 게이트가 닫는 것은 넷이다:
 //
-//   ① 실측으로 열려 있던 우회 하나(설계 검토 U-3 행의 기대가 실측과 달랐다).
-//      `web/src` 안의 심볼릭 링크가 legacy 파일을 가리키면 tsc 는 **링크 경로**로 파일을
-//      프로그램에 넣는다 — rootDir 밖이 아니므로 TS6059 가 나지 않는다(실측: typecheck
-//      exit 0 · lint exit 0). 「preserveSymlinks 기본값이면 실제 경로로 보니 RED」는
-//      성립하지 않았다.
-//   ② tsconfig 의 네 값(rootDir · include · allowJs · paths)은 **경계 자신의 전제**다.
-//      하나만 바꾸면 TS6059 가 날 자리가 없어지는데, typecheck 는 자기 전제가 사라진 것을
-//      보지 못한다(초록으로 보인다). 그 넷을 단언한다 — 참고로 `allowJs` 를 켠 채 rootDir
-//      밖 `.js` 를 import 하면 TS6059 는 **난다**(U-8 실측). 켜지 않는 이유는 그 입구를
-//      아예 두지 않는 것이고, 여기서 단언하는 이유는 「켜지 않는다」가 약속에 그치지 않게
-//      하는 것이다.
+//   ① 기준점 자체(`web/src`)가 링크가 아니고 `web/` 안인가 — code-review r1 F-1. 기준점을
+//      realpath 로 먼저 풀어 쓰면 「링크가 가리키는 디렉터리의 파일이 그 디렉터리 안에 있다」는
+//      **항진명제**가 되고, 게이트는 그 상태에서 「링크 0」을 적극적으로 보고한다(초록보다 나쁜
+//      거짓 보증 — 실측으로 확인했다).
+//   ② tsconfig 의 네 값(rootDir·include·allowJs·paths) — 경계 자신의 전제다. 하나만 바꾸면
+//      TS6059 가 날 자리가 사라지는데 typecheck 는 자기 전제의 소실을 보지 못한다.
+//   ③ **프로그램 전수**가 `web/src` ∪ `web/node_modules` 안인가 — verifier r1 H-2. `.d.ts` 는
+//      TS6059 의 대상이 아니라서 밖의 선언 파일을 `import type` 하면 게이트 넷이 모두 초록이었다.
+//      루트 이름(`parsed.fileNames`)이 아니라 `ts.createProgram(...).getSourceFiles()` 를 본다 —
+//      import 로 끌려온 파일·`files`·triple-slash reference·`src` 안 링크가 한 술어로 닫힌다.
+//   ④ 호출 자리 집합 등식 — code-review r1 F-2. `openapi-fetch` 를 import 하는 파일 집합이
+//      `{src/api/client.ts}` 와 **같아야** 한다. eslint 의 `no-restricted-imports` 는 정적
+//      import 만 보므로 리터럴 동적 `import('openapi-fetch')` 로 손 계약 클라이언트를 만들 수
+//      있었다. 대상이 리터럴이 아닌 동적 import 는 「어느 모듈인지 게이트가 볼 수 없다」이므로
+//      같은 자리에서 막는다.
 //
-// 읽는 방식이 중요하다 — JSON 을 정규식으로 긁지 않고 **컴파일러 자신의 API**로 유효 옵션을
-// 얻는다(`extends` 사슬·기본값까지 컴파일러가 보는 그대로). 열거하는 것은 legacy 경로 이름이
-// 아니라 이 게이트 자신의 전제다 — 우회하려면 이 스크립트를 바꿔야 하고 그 변경은 diff 에
-// 남는다.
-import { readdirSync, realpathSync } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
+// 그리고 번들 그래프 경계(H-1)를 지키는 Vite 플러그인이 `vite.config.ts` 에 **등재**됐는지
+// AST 로 본다(⑥) — grep 이 아니라 구문이다.
+//
+// 읽는 방식: JSON 을 정규식으로 긁지 않고 **컴파일러 자신의 API**로 유효 옵션·프로그램·import 를
+// 얻는다. 열거하는 것은 legacy 경로 이름이 아니라 이 게이트 자신의 전제다.
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const webRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 const tsconfigPath = resolve(webRoot, 'tsconfig.json');
 const srcDir = resolve(webRoot, 'src');
-const srcReal = realpathSync(srcDir);
+const nodeModulesDir = resolve(webRoot, 'node_modules');
+const boundaryPluginSpecifier = './scripts/module-graph-boundary.mjs';
+const API_CALL_SITE = 'src/api/client.ts';
+const API_CLIENT_PACKAGE = 'openapi-fetch';
+
+// 링크 검사에서 건너뛰는 자리 — 설치본과 빌드·실행 산출물(모두 `.gitignore` 대상).
+const LINK_SCAN_SKIP = new Set([
+  'node_modules',
+  'dist',
+  'test-results',
+  'playwright-report',
+  'blob-report',
+]);
 
 const failures = [];
 
+function fail(line) {
+  failures.push(line);
+}
+
+function finishIfFailed() {
+  if (failures.length > 0) {
+    console.error('컴파일 경계 전제가 깨졌다 (ADR 0011 D-3):');
+    for (const line of failures) {
+      console.error(`  - ${line}`);
+    }
+    process.exit(1);
+  }
+}
+
+// ① 기준점 — realpath 를 쓰기 **전에** 잰다.
+let srcReal;
+try {
+  if (lstatSync(srcDir).isSymbolicLink()) {
+    fail('web/src 자체가 심볼릭 링크다 — 그러면 아래 모든 단언이 항진명제가 된다');
+  }
+  srcReal = realpathSync(srcDir);
+  if (srcReal !== resolve(webRoot, 'src')) {
+    fail(`web/src 의 실제 경로가 web/ 안이 아니다: ${srcReal}`);
+  }
+} catch (error) {
+  fail(`web/src 를 해석하지 못했다: ${error.message}`);
+}
+finishIfFailed();
+
+const allowedRoots = [srcReal];
+if (existsSync(nodeModulesDir)) {
+  allowedRoots.push(realpathSync(nodeModulesDir));
+}
+
+function insideAllowedRoots(candidate) {
+  return allowedRoots.some((root) => candidate === root || candidate.startsWith(root + sep));
+}
+
+// ② tsconfig 의 유효 옵션.
 const { config, error } = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 if (error !== undefined) {
-  console.error(`tsconfig.json 을 읽지 못했다: ${ts.flattenDiagnosticMessageText(error.messageText, ' ')}`);
-  process.exit(1);
+  fail(`tsconfig.json 을 읽지 못했다: ${ts.flattenDiagnosticMessageText(error.messageText, ' ')}`);
+  finishIfFailed();
 }
 const parsed = ts.parseJsonConfigFileContent(config, ts.sys, webRoot, undefined, tsconfigPath);
-if (parsed.errors.length > 0) {
-  for (const diagnostic of parsed.errors) {
-    console.error(`tsconfig 진단: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`);
+for (const diagnostic of parsed.errors) {
+  fail(`tsconfig 진단: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`);
+}
+finishIfFailed();
+
+if (parsed.options.rootDir === undefined) {
+  fail('rootDir 이 없다 — 경계가 선언되지 않았다');
+} else {
+  // 없는 디렉터리를 가리키면 ENOENT 가 스택 트레이스로 올라가 「무엇이 깨졌는지」를 말하지
+  // 못했다(code-review r1 F-8).
+  try {
+    if (realpathSync(parsed.options.rootDir) !== srcReal) {
+      fail(`rootDir 이 web/src 가 아니다: ${parsed.options.rootDir}`);
+    }
+  } catch (caught) {
+    fail(`rootDir 을 해석하지 못했다(${parsed.options.rootDir}): ${caught.message}`);
   }
-  process.exit(1);
 }
 
-// ① rootDir 이 src 그대로인가 — 경계 자체.
-if (parsed.options.rootDir === undefined || realpathSync(parsed.options.rootDir) !== srcReal) {
-  failures.push(`rootDir 이 web/src 가 아니다: ${String(parsed.options.rootDir)}`);
-}
-
-// ② include 가 src 하나인가 — 다른 디렉터리를 프로그램에 더하는 자리.
 const include = Array.isArray(config.include) ? config.include : undefined;
 if (include === undefined || include.length !== 1 || include[0] !== 'src') {
-  failures.push(`include 가 ["src"] 가 아니다: ${JSON.stringify(config.include)}`);
+  fail(`include 가 ["src"] 가 아니다: ${JSON.stringify(config.include)}`);
 }
 
-// ③ allowJs — legacy `.js` 가 프로그램에 들어올 입구를 아예 두지 않는다(U-8).
 if (parsed.options.allowJs === true) {
-  failures.push('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다(U-8)');
+  fail('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다');
 }
 
-// ④ paths 별칭 — rootDir 밖을 가리키는 짧은 이름을 만드는 자리(U-2). 지금은 별칭이 없고,
-//    필요해지면 이 단언을 「src 안만 가리킨다」로 좁혀 고친다.
 if (parsed.options.paths !== undefined && Object.keys(parsed.options.paths).length > 0) {
-  failures.push(`paths 별칭이 있다: ${Object.keys(parsed.options.paths).join(', ')}`);
+  fail(`paths 별칭이 있다: ${Object.keys(parsed.options.paths).join(', ')}`);
 }
 
-// ⑤ src 안의 심볼릭 링크 0 (U-3). 링크는 디렉터리든 파일이든 걸린다 — 소스 트리에 링크를 둘
-//    이유가 없고, 링크 하나가 rootDir 경계를 통째로 무력화한다.
-function collectSymlinks(directory) {
+// ③ `web/` 안의 심볼릭 링크 0 — `src` 만이 아니라 `public/`·진입 문서까지 본다(verifier r1 L-3).
+function collectLinks(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (LINK_SCAN_SKIP.has(entry.name)) {
+      continue;
+    }
     const full = join(directory, entry.name);
     if (entry.isSymbolicLink()) {
       let pointsTo = '(해석 불가)';
       try {
         pointsTo = realpathSync(full);
       } catch {
-        /* 끊어진 링크 — 가리키는 곳을 못 적어도 링크라는 사실로 이미 실패다 */
+        /* 끊어진 링크 — 링크라는 사실로 이미 실패다 */
       }
-      failures.push(`src 안에 심볼릭 링크가 있다: ${full} → ${pointsTo}`);
+      fail(`web/ 안에 심볼릭 링크가 있다: ${relative(webRoot, full)} → ${pointsTo}`);
       continue;
     }
     if (entry.isDirectory()) {
-      collectSymlinks(full);
+      collectLinks(full);
     }
   }
 }
-collectSymlinks(srcDir);
+collectLinks(webRoot);
 
-// ⑥ 프로그램 파일 전부가 realpath 기준 src 안인가 — `files`·`include` 로 밖의 파일을 끌어온
-//    경우를 ①~④ 와 무관하게 잡는다.
-for (const fileName of parsed.fileNames) {
-  let real;
+// ④ 프로그램 **전수**(import·files·reference 로 끌려 들어온 파일 포함).
+const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
+const programFiles = program.getSourceFiles();
+const inSrcFiles = [];
+for (const sourceFile of programFiles) {
+  let realPath;
   try {
-    real = realpathSync(fileName);
+    realPath = realpathSync(sourceFile.fileName);
   } catch {
-    failures.push(`프로그램 파일을 해석하지 못했다: ${fileName}`);
+    fail(`프로그램 파일을 해석하지 못했다: ${sourceFile.fileName}`);
     continue;
   }
-  if (!real.startsWith(srcReal + sep)) {
-    failures.push(`프로그램 파일이 src 밖을 가리킨다: ${fileName} → ${real}`);
+  if (!insideAllowedRoots(realPath)) {
+    fail(`프로그램 파일이 web/src·web/node_modules 밖이다: ${sourceFile.fileName} → ${realPath}`);
+    continue;
+  }
+  if (realPath.startsWith(srcReal + sep)) {
+    inSrcFiles.push({ sourceFile, name: `src/${relative(srcReal, realPath).split(sep).join('/')}` });
   }
 }
 
-if (failures.length > 0) {
-  console.error('src 트리·컴파일 경계 전제가 깨졌다 (ADR 0011 D-3):');
-  for (const line of failures) {
-    console.error(`  - ${line}`);
+// ⑤ 호출 자리 집합 등식 + 비리터럴 동적 import 금지.
+const apiImporters = new Set();
+for (const { sourceFile, name } of inSrcFiles) {
+  for (const imported of ts.preProcessFile(sourceFile.text, true, true).importedFiles) {
+    if (
+      imported.fileName === API_CLIENT_PACKAGE ||
+      imported.fileName.startsWith(`${API_CLIENT_PACKAGE}/`)
+    ) {
+      apiImporters.add(name);
+    }
   }
-  process.exit(1);
+
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      !(node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0]))
+    ) {
+      fail(`동적 import 대상이 리터럴이 아니다(어느 모듈인지 게이트가 볼 수 없다): ${name}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 }
+
+for (const importer of apiImporters) {
+  if (importer !== API_CALL_SITE) {
+    fail(`${API_CLIENT_PACKAGE} 를 호출 자리 밖에서 import 한다: ${importer}`);
+  }
+}
+if (!apiImporters.has(API_CALL_SITE)) {
+  fail(
+    `${API_CLIENT_PACKAGE} 의 호출 자리(${API_CALL_SITE})가 그것을 import 하지 않는다 — 집합 등식이 깨졌다`,
+  );
+}
+
+// ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
+const viteConfigPath = resolve(webRoot, 'vite.config.ts');
+if (!existsSync(resolve(webRoot, 'scripts', 'module-graph-boundary.mjs'))) {
+  fail('번들 그래프 경계 플러그인 파일이 없다: scripts/module-graph-boundary.mjs');
+}
+if (!existsSync(viteConfigPath)) {
+  fail('vite.config.ts 가 없다');
+} else {
+  const viteSource = ts.createSourceFile(
+    viteConfigPath,
+    readFileSync(viteConfigPath, 'utf8'),
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  const boundaryBindings = new Set();
+  for (const statement of viteSource.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== boundaryPluginSpecifier
+    ) {
+      continue;
+    }
+    const clause = statement.importClause;
+    if (clause?.name !== undefined) {
+      boundaryBindings.add(clause.name.text);
+    }
+    if (clause?.namedBindings !== undefined && ts.isNamedImports(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
+        boundaryBindings.add(element.name.text);
+      }
+    }
+  }
+
+  const registered = new Set();
+  const visitConfig = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'plugins' &&
+      ts.isArrayLiteralExpression(node.initializer)
+    ) {
+      const collect = (inner) => {
+        if (ts.isIdentifier(inner)) {
+          registered.add(inner.text);
+        }
+        ts.forEachChild(inner, collect);
+      };
+      collect(node.initializer);
+    }
+    ts.forEachChild(node, visitConfig);
+  };
+  visitConfig(viteSource);
+
+  if (boundaryBindings.size === 0) {
+    fail(`vite.config.ts 가 ${boundaryPluginSpecifier} 를 import 하지 않는다`);
+  } else if (![...boundaryBindings].some((name) => registered.has(name))) {
+    fail('vite.config.ts 의 plugins 배열에 번들 그래프 경계 플러그인이 없다');
+  }
+}
+
+finishIfFailed();
 
 console.log(
-  `컴파일 경계 전제 성립: rootDir=src · include=["src"] · allowJs 꺼짐 · paths 없음 · src 심볼릭 링크 0 · 프로그램 파일 ${parsed.fileNames.length} 전부 src 안.`,
+  `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
+    `paths 없음 · web/ 심볼릭 링크 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `src·node_modules 안 · ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}} · 비리터럴 동적 import 0 · ` +
+    `번들 그래프 경계 플러그인 등재됨.`,
 );
