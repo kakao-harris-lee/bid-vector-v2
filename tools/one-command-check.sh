@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # 완료 조건 1(milestone-6.md 「새 checkout/clean database 에서 one-command
-# build/test 가능」). Kotlin 전건 + Python 전건을 **한 명령**으로 순차 실행한다.
+# build/test 가능」). Kotlin 전건 + Python 전건 + web 전건을 **한 명령**으로 순차 실행한다.
 #
-# 내부 명령은 `.github/workflows/ci.yml` 의 두 job(`check`·`ml-engine`)이 돌리는 명령
+# 내부 명령은 `.github/workflows/ci.yml` 의 세 job(`check`·`ml-engine`·`web`)이 돌리는 명령
 # **그대로**다(하네스 2026-09-12 「부분 게이트를 전건 대신 돌리지 않는다 — 정본은 CI
 # 워크플로 job 이 돌리는 명령 그대로이고, 줄일 수 있는 단위는 게이트가 아니라 job」) —
-# 새 축약·새 플래그를 만들지 않는다. CI 전용 step(체크아웃·툴체인 설치·아티팩트
-# 업로드)만 뺀다 — 그 나머지 게이트 명령은 순서까지 ci.yml 과 같다.
+# 새 축약·새 플래그를 만들지 않는다. CI 전용 step(체크아웃·툴체인 설치·**브라우저 시스템
+# 패키지 설치(apt)**·아티팩트 업로드)만 뺀다 — 그 나머지 게이트 명령은 순서까지 ci.yml 과 같다
+# (PR #75 리뷰 F — apt step 이 열거에서 빠져 있었다).
 #
 # 각 단계 실패를 삼키지 않는다(우회 (5)) — `set -euo pipefail` + 파이프 미사용(각 명령을
 # 독립 스텝으로 실행, `PIPESTATUS` 확인이 필요한 파이프가 없다).
@@ -81,4 +82,52 @@ trap 'rm -rf "$ONE_COMMAND_WHEEL_DIR"' EXIT
 uv build --wheel -o "$ONE_COMMAND_WHEEL_DIR"
 uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 
-_step "완료 — Kotlin 전건 + Python 전건 통과"
+# ---- web(web job, working-directory: web) ----
+# M7/7A — ci.yml `web` job 의 명령을 순서까지 그대로 둔다. 뺀 CI 전용 step 은 둘이다:
+# 체크아웃·setup-node(툴체인 설치)와 `npx playwright install-deps chromium`(브라우저가 쓰는
+# 시스템 패키지 설치 — apt 를 건드리므로 로컬에서 돌릴 것이 아니다). 브라우저 자체 설치
+# (W-10)는 **여기 있다** — 새 checkout 에서 이 스크립트 하나로 e2e 까지 돌 수 있어야 완료
+# 조건 1 이고, 그래서 job 쪽도 그 두 명령을 나눠 두었다(축약·새 플래그를 만들지 않는다).
+# **그 「e2e 까지」는 브라우저의 시스템 패키지가 이미 있는 장비를 전제한다**(PR #75 리뷰 V) —
+# 없는 장비에서는 이 스크립트가 아니라 `npx playwright install-deps chromium`(apt·sudo)이
+# 먼저 필요하다. 그 전제는 evidence 의 알려진 제한에 등재돼 있다.
+#
+# CI 에서 이 스크립트를 돌리는 `check` job 에는 그 두 CI 전용 step(setup-node · install-deps)이
+# **그 job 안에** 있다(code-review r1 F-3) — 여기서 빼는 것은 「로컬에서 하지 않는다」는 뜻이고
+# 「CI 에서 없다」는 뜻이 아니다.
+cd "$REPO_ROOT/web"
+
+_step "web — install (W-1)"
+npm ci
+
+_step "web — eslint (W-2)"
+npm run lint
+
+_step "web — typecheck (W-3)"
+npm run typecheck
+
+_step "web — 컴파일 경계 전제 (W-4)"
+npm run gate:src-tree
+
+_step "web — OpenAPI 생성 타입 바이트 등식 (W-5)"
+npm run api:types:check
+
+_step "web — vitest (W-6)"
+npm run test
+
+_step "web — 게이트 test 실행 확인 (W-7)"
+npm run gate:tests
+
+_step "web — build (W-8)"
+npm run build
+
+_step "web — 번들 경계 카나리 (W-9)"
+npm run gate:boundary-canary
+
+_step "web — Playwright chromium 설치 (W-10)"
+npx playwright install chromium
+
+_step "web — Playwright 스모크 (W-11)"
+npm run test:e2e
+
+_step "완료 — Kotlin 전건 + Python 전건 + web 전건 통과"

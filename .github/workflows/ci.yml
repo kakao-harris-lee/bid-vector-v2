@@ -84,10 +84,45 @@ jobs:
         with:
           version: "0.9.22"
 
+      # M7/7A(code-review r1 F-3) — S-20 이 이제 web 레인 전건(`npm ci` → … → Playwright
+      # 스모크)까지 돈다. 그 job 에 Node 툴체인이 없으면 러너 이미지의 Node 로 돌아 **같은
+      # 게이트를 두 다른 툴체인에서 재는** 상태가 되고(ADR 0011 D-1 「Node 는 web/.nvmrc 가
+      # 정본」이 이 job 에서만 성립하지 않는다), 이미지 Node 가 바뀌는 날 이 변경과 무관한
+      # 이유로 붉어진다. 선례가 같은 파일에 있다 — S-20 이 Python 전건을 품게 된 라운드에
+      # setup-python·setup-uv 를 바로 위에 더했다.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # CI 전용 — 브라우저의 시스템 패키지(apt). `web` job 과 같은 사유이고, S-20 이 그 job 과
+      # 같은 Playwright 스모크를 돌리므로 같은 전제가 필요하다. 「필요 없다」고 적는 대신
+      # 명시한다(러너 이미지에 무엇이 들어 있는지는 이 저장소가 통제하지 않는다).
+      # 한 step 에 둘을 묶지 않는다(PR #75 리뷰 H) — 원인 하나에 빨강 하나다. 앞은 레지스트리
+      # 의존, 뒤는 apt 의존이고 실패 사유가 다르다.
+      #
+      # `npm ci` 를 여기서 한 번 돌리는 이유는 **잠금 파일이 고정한 Playwright** 로 시스템 의존을
+      # 설치하기 위해서다(워크플로에 버전 숫자를 적지 않는다 — `buf`·`.python-version` 과 같은
+      # 원칙). S-20 이 같은 명령을 다시 돌리고, `npm ci` 는 **`node_modules` 를 지우고 다시
+      # 설치한다** — 두 번째가 빠른 것은 설치본이 남아서가 아니라 **npm 캐시와 setup-node 캐시**
+      # 때문이다(PR #75 리뷰 E 문면 정정).
+      - name: web 설치 — 잠금 파일 고정판 (CI 전용, S-20 의 web 절 전제)
+        working-directory: web
+        run: npm ci
+
+      - name: Playwright 시스템 의존 설치 (CI 전용, S-20 의 web 절 전제)
+        working-directory: web
+        run: npx playwright install-deps chromium
+
       - name: one-command-check.sh — 완료 조건 1 (S-20)
         run: ./tools/one-command-check.sh
 
       # v5 는 Node 24 를 예비 지원만 하고 기본은 여전히 Node 20 이라 v6 이 최소선이다.
+      # M7/7A(PR #75 리뷰 G) — S-20 이 web 스모크까지 돌리므로 그 trace 도 **이 step 에 얹는다**
+      # (새 step 을 만들지 않는다). `web` job 과 조건이 다른 이유를 적는다: 거기서는 업로드 조건이
+      # **스모크 step 하나**라 「파일 0 건」이 곧 신호이고(`if-no-files-found: error`), 여기서는
+      # 깨진 step 이 Kotlin·Python 일 수도 있어 **0 건이 정상**이다 — 그래서 기본 동작(경고)을 쓴다.
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -95,6 +130,7 @@ jobs:
           path: |
             build/reports/quality-baseline/
             */build/reports/
+            web/test-results/
           retention-days: 14
 
   # M5/5A — Python ML engine CI(2D D-2D-4 (a) · ADR 0009 D-6 「CI 가 확인한다」). Kotlin `check`
@@ -178,6 +214,117 @@ jobs:
         run: |
           uv build --wheel -o /tmp/ml-engine-wheel
           uv run python -m pytest tests/gates/test_wheel_reexport.py -q
+
+  # M7/7A — `web/` 골격의 게이트(ADR 0011 D-5). 별도 job 하나로 둔다(하네스 2026-09-12 「줄일 수
+  # 있는 단위는 게이트가 아니라 job」). **사실 관계를 정확히 적는다**(PR #75 리뷰 D): `ml-engine`·
+  # `container` job 은 이 slice 에서 무편집이지만 `check` job 은 **편집했다** — S-20 이 web 레인
+  # 전건을 품게 되어 그 job 에 Node 툴체인과 Playwright 시스템 의존 step 을 더했다. 소스 겹침도
+  # 0 이 아니다: `web/**` 는 Gradle 모듈도 Python 패키지도 아니지만, `check` job 이 S-20 을 통해
+  # **같은 web 명령을 다시 돌린다**(그 이중 실행 비용은 checklist 의 알려진 제한에 등재).
+  #
+  # 단계 ID 는 `W-n` 이다. M6 완료 조건의 `S-n` 등록부에 새 번호를 끼우지 않는다 — 그 번호는
+  # M6 문서가 조건별로 가리키는 좌표라, 뒤에서 늘리면 그 참조가 가리키는 집합이 조용히 바뀐다.
+  #
+  # build 가 test 뒤인 것은 Playwright 스모크가 **빌드 산출물**을 `vite preview` 로 띄우기
+  # 때문이다(dev server 가 아니다 — 그래야 번들이 실제로 뜨는지를 잰다).
+  web:
+    runs-on: ubuntu-latest
+    # M7/7A(PR #75 리뷰 J) — `container` job 과 같은 사유로 상한을 둔다. 이 job 의 네트워크 의존은
+    # 셋이다(npm 레지스트리 · Playwright 브라우저 CDN · apt). 하나가 멈추면 기본 6시간까지 러너를
+    # 쥔다. 실측 소요는 분 단위라 넉넉히 잡는다.
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      # `web/.nvmrc`(ADR 0011 D-1 — Node 의 정본)를 읽어 버전을 고정한다. 워크플로에 숫자를
+      # 적지 않는다(`buf`·`.python-version` 과 같은 이유). v5 부터 Node 24(`using: node24`
+      # 실측, v4 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major).
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `npm ci` 는 잠금 파일 밖 해석을 하지 않는다 — 잠금 파일과 `package.json` 이 어긋나면
+      # 설치 자체가 실패한다(D-1 「CI 는 npm ci」).
+      - name: install (W-1)
+        run: npm ci
+
+      - name: eslint (W-2)
+        run: npm run lint
+
+      # 어댑터 금지 게이트 1차 층(D-3) — rootDir 밖 파일이 프로그램에 들어오면 TS6059.
+      - name: typecheck (W-3)
+        run: npm run typecheck
+
+      # 그 1차 층의 **전제**를 잰다 — 실측에서 `src` 안 심볼릭 링크는 TS6059 를 내지 않았고
+      # (U-3), rootDir·include·allowJs·paths 가 바뀌면 TS6059 가 날 자리 자체가 사라지는데
+      # typecheck 는 그것을 보지 못한다. tsconfig 의 유효 옵션과 src 트리를 직접 단언한다.
+      - name: 컴파일 경계 전제 — src 트리·tsconfig (W-4)
+        run: npm run gate:src-tree
+
+      # 어댑터 금지 게이트 2차 층(D-2) — 생성 타입과 OpenAPI 문서의 바이트 등식.
+      - name: OpenAPI 생성 타입 바이트 등식 (W-5)
+        run: npm run api:types:check
+
+      - name: vitest (W-6)
+        run: npm run test
+
+      # **게이트 test 가 실제로 돌았는가**(verifier r6 M-12). 앞선 판은 `vite.config.ts` 의
+      # `include` 리터럴을 AST 로 찾는 문자열 단언이었는데, `test.exclude` 한 줄 · 미끼 속성 ·
+      # `describe.skip` · `package.json` 의 CLI 경로 필터가 모두 그것을 지나면서 게이트 test 를
+      # 수집에서 뺐다(실측). 이 step 은 **W-6 와 같은 명령**(`npm run test`)에 JSON reporter 를
+      # 붙여 돌려 등록부(`web/config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 ·
+      # failed 0 인지 본다 — 선례는 `config/quality/gate-tests.properties` 다.
+      - name: 게이트 test 실행 확인 (W-7)
+        run: npm run gate:tests
+
+      - name: build (W-8)
+        run: npm run build
+
+      # **경계가 활성인지 직접 잰다**(verifier r2 M-3 · code-review r2 G-1). W-4 의 등재 단언은
+      # 설정의 문법을 보는 선행 검사이고, 플러그인을 비활성으로 만드는 형태는 끝없다(조건식 ·
+      # spread 로 덮어쓰기 · 같은 키 중복 · `apply: 'serve'` · 객체 spread 로 `buildEnd` 덮어쓰기 ·
+      # 참조만 하고 호출 안 함). 카나리는 **실제 `vite.config.ts` 로 빌드를 돌려** 경계 오류로
+      # 실패해야 통과한다 — 메인 그래프와 워커 그래프 둘 다.
+      - name: 번들 경계 카나리 — 활성 측정 (W-9)
+        run: npm run gate:boundary-canary
+
+      # CI 전용 — 브라우저가 쓰는 **시스템 패키지** 설치(apt). 로컬 one-command 는 이 step 을
+      # 빼고 바로 아래 브라우저 설치부터 돈다(그 스크립트의 머리 주석 「CI 전용 step(체크아웃·
+      # 툴체인 설치·아티팩트 업로드)만 뺀다」). 브라우저 설치와 **두 명령으로 나눈 이유**가
+      # 이것이다 — 한 명령(`install --with-deps`)이면 로컬이 같은 명령을 쓸 수 없어 축약·새
+      # 플래그가 생긴다.
+      - name: Playwright 시스템 의존 설치 (CI 전용)
+        run: npx playwright install-deps chromium
+
+      - name: Playwright chromium 설치 (W-10)
+        run: npx playwright install chromium
+
+      - name: Playwright 스모크 (W-11)
+        id: web-smoke
+        run: npm run test:e2e
+
+      # code-review r1 F-7 — CI reporter 는 `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한
+      # 줄만 남기고 trace·스크린샷을 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure`
+      # 가 쓰이지 않았다). 위 두 job 과 같은 major 다.
+      #
+      # 조건은 **스모크가 실제로 실패했을 때**로 좁힌다(PR #75 리뷰 G · in-file 선례 PR #68 M-4) —
+      # `failure()` 는 앞 어느 step 이 깨져도 참이라 trace 가 있을 수 없는 실패(예: `npm ci`)에서도
+      # 돌았다. 그리고 `if-no-files-found: error` 를 **유지한다**: 스모크가 실패했는데 산출물이
+      # 0 건이면 그 자체가 신호다 — 이번 PR 의 RED 가 그 경우였다(webServer 가 뜨지 않아 test 가
+      # 한 번도 돌지 못했고 trace 가 없었다). 그 상태를 조용히 넘기지 않고 업로드 step 의 빨강으로
+      # 표시한다.
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() && steps.web-smoke.outcome == 'failure' }}
+        with:
+          name: web-playwright
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: error
 
   # M6/6C — 이미지 빌드·위생 게이트·실 서버 통합 test(D-6C-4). `check`·`ml-engine` 두
   # job 의 명령은 위에서 무편집이다 — 이 job이 컨테이너 축 전부를 진다(하네스 2026-09-12

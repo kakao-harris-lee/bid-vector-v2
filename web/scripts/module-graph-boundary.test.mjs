@@ -1,0 +1,127 @@
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  apiImporterViolation,
+  boundaryRoots,
+  graphImporters,
+  classifyModuleId,
+  isInsideRoot,
+  stripQuery,
+  violatesBoundary,
+} from './module-graph-boundary.mjs';
+
+// W-4 는 플러그인이 두 자리에 **등재**됐는지만 본다(빠른 선행 검사). 플러그인이 **활성**인지는
+// 카나리 빌드(W-8)가 직접 재고, 판정 자체(무엇을 위반으로 보는가)는 이 test 가 잠근다.
+const SRC = '/repo/web/src';
+const NODE_MODULES = '/repo/web/node_modules';
+const ROOTS = [SRC, NODE_MODULES];
+
+describe('모듈 그래프 경계 판정', () => {
+  it('접미 쿼리를 떼고 파일 경로만 남긴다', () => {
+    expect(stripQuery('/repo/web/src/a.ts?worker')).toBe('/repo/web/src/a.ts');
+    expect(stripQuery('/repo/web/src/a.ts?raw&x=1')).toBe('/repo/web/src/a.ts');
+    expect(stripQuery('/repo/web/src/a.ts')).toBe('/repo/web/src/a.ts');
+  });
+
+  it('뒤에 파일이 없는 플러그인 공급 모듈만 가상으로 센다', () => {
+    expect(classifyModuleId('\0commonjsHelpers.js').kind).toBe('virtual');
+    expect(classifyModuleId('\0vite/modulepreload-polyfill.js').kind).toBe('virtual');
+    expect(classifyModuleId('virtual:tailwind').kind).toBe('virtual');
+  });
+
+  it('절대 경로는 파일 id 다 — POSIX 와 Windows 드라이브 형 둘 다', () => {
+    expect(classifyModuleId('/repo/web/src/main.tsx')).toEqual({
+      kind: 'file',
+      path: '/repo/web/src/main.tsx',
+    });
+    // Windows 형을 가상 바구니에 넣으면 그 플랫폼에서 게이트가 공허하게 통과한다.
+    expect(classifyModuleId('C:/repo/web/src/x.ts').kind).toBe('file');
+    expect(classifyModuleId('C:\\repo\\web\\src\\x.ts').kind).toBe('file');
+    // Rollup 의 가상 접두가 붙은 **실파일** id(commonjs 변환)도 파일로 본다.
+    expect(classifyModuleId('\0/repo/web/node_modules/react/index.js?commonjs-module')).toEqual({
+      kind: 'file',
+      path: '/repo/web/node_modules/react/index.js',
+    });
+  });
+
+  it('해석되지 않은 상대 경로는 위반으로 센다 — 모르는 것은 통과시키지 않는다', () => {
+    expect(classifyModuleId('../legacy-fe/side.ts').kind).toBe('relative');
+    expect(classifyModuleId('./x.ts').kind).toBe('relative');
+  });
+
+  it('뿌리 경계는 경로 성분 단위다 — 이름이 접두로 겹치는 이웃은 안쪽이 아니다', () => {
+    expect(isInsideRoot('/repo/web/src/a.ts', SRC)).toBe(true);
+    expect(isInsideRoot(SRC, SRC)).toBe(true);
+    expect(isInsideRoot('/repo/web/src-legacy/a.ts', SRC)).toBe(false);
+  });
+
+  it('허용 뿌리 밖 파일은 위반이고 안쪽은 아니다', () => {
+    expect(violatesBoundary('/repo/web/src/api/client.ts', ROOTS)).toBe(false);
+    expect(violatesBoundary('/repo/web/node_modules/react/index.js', ROOTS)).toBe(false);
+    expect(violatesBoundary('/repo/bid-vector/frontend/src/shared/lib.ts', ROOTS)).toBe(true);
+    expect(violatesBoundary('/repo/web/legacy-fe/side.ts', ROOTS)).toBe(true);
+  });
+});
+
+// 경계의 **범위**(허용 뿌리)는 여기서 집합 등식으로 잠근다(code-review r3 H-1). 뿌리에 한 줄을
+// 더하면 다른 다섯 층은 그것을 보지 못하고(실측: legacy 뿌리 + `?raw` → 전부 초록 · dist 에
+// 원문) 이 test 만 깨진다 — 「판정 술어와 허용 뿌리를 함께 바꿔야 한다」가 그래서 참이 된다.
+const WEB_ROOT = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+
+describe('경계의 허용 뿌리', () => {
+  it('설치본이 있는 실제 트리에서 집합이 정확히 셋이다', () => {
+    const expected = new Set([
+      resolve(WEB_ROOT, 'src'),
+      resolve(WEB_ROOT, 'index.html'),
+      realpathSync(resolve(WEB_ROOT, 'node_modules')),
+    ]);
+    expect(existsSync(resolve(WEB_ROOT, 'node_modules'))).toBe(true);
+    expect(new Set(boundaryRoots(WEB_ROOT))).toEqual(expected);
+  });
+
+  it('설치본이 없는 트리에서는 src 와 진입 문서 둘뿐이다', () => {
+    const bare = resolve(WEB_ROOT, 'scripts');
+    expect(new Set(boundaryRoots(bare))).toEqual(
+      new Set([resolve(bare, 'src'), resolve(bare, 'index.html')]),
+    );
+  });
+});
+
+describe('클라이언트 패키지의 importer 판정', () => {
+  const opts = {
+    apiPackageDir: '/repo/web/node_modules/openapi-fetch',
+    callSitePath: '/repo/web/src/api/client.ts',
+  };
+
+  it('승인된 호출 자리와 패키지 내부 import 는 위반이 아니다', () => {
+    expect(apiImporterViolation('/repo/web/src/api/client.ts', opts)).toBeUndefined();
+    expect(
+      apiImporterViolation('/repo/web/node_modules/openapi-fetch/dist/index.js', opts),
+    ).toBeUndefined();
+  });
+
+  it('그 밖의 자리는 위반이다 — 같은 디렉터리의 이웃도', () => {
+    expect(apiImporterViolation('/repo/web/src/api/other.ts', opts)).toBe(
+      '/repo/web/src/api/other.ts',
+    );
+    expect(apiImporterViolation('/repo/web/src/hand.ts', opts)).toBe('/repo/web/src/hand.ts');
+  });
+});
+
+describe('그래프의 importer 수집', () => {
+  it('정적 간선과 동적 간선을 합쳐 센다', () => {
+    expect(
+      graphImporters({ importers: ['/a.ts'], dynamicImporters: ['/b.js'] }),
+    ).toEqual(['/a.ts', '/b.js']);
+  });
+
+  it('한쪽이 없거나 모듈 정보가 없어도 빈 배열로 떨어진다', () => {
+    expect(graphImporters({ importers: ['/a.ts'] })).toEqual(['/a.ts']);
+    expect(graphImporters({ dynamicImporters: ['/b.js'] })).toEqual(['/b.js']);
+    expect(graphImporters(undefined)).toEqual([]);
+  });
+});

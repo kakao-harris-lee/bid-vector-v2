@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+
+/* Tailwind v4 CSS-first — 설정 파일(`tailwind.config.*`·`postcss.config.*`) 을 두지 않는다.
+   디자인 토큰·폰트 스택은 7E 가 화면과 함께 정한다. 7A 는 셸이 뜨는 데 필요한 것만 둔다. */
