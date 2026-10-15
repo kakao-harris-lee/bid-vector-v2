@@ -24,9 +24,9 @@ import tseslint from 'typescript-eslint';
 // `eslint-disable-next-line` 을 달고 리뷰로 간다 — 규칙을 넓히지 않는다.
 const API_CALL_SITE = 'src/api/client.ts';
 
-// 네트워크 표면의 이름과 소유자 — 아래 두 규칙이 이 둘의 **구성**으로 만들어진다.
+// 네트워크 표면의 이름 — 아래 네 선택자가 이 목록의 **구성**으로 만들어진다(소유자는 열거하지
+// 않는다).
 const NETWORK_MEMBERS = ['fetch', 'XMLHttpRequest', 'sendBeacon', 'EventSource', 'WebSocket'];
-const NETWORK_OWNERS = ['window', 'globalThis', 'self', 'navigator'];
 
 const restrictedMessage =
   '서버 호출은 src/api/client.ts 의 생성 타입 클라이언트(openapi-fetch)로만 한다 — ADR 0011 D-2.';
@@ -87,21 +87,31 @@ export default tseslint.config(
       // `document.defaultView?.`·지역 별명 `const w = window`) 같은 술어에 걸린다.
       'no-restricted-syntax': [
         'error',
+        // ① 점 접근 — 소유자와 무관하게 **속성 이름**으로 잡는다.
         ...NETWORK_MEMBERS.map((name) => ({
           selector: `MemberExpression[property.name='${name}']`,
           message: restrictedMessage,
         })),
+        // ② 리터럴 계산 접근 — **소유자를 열거하지 않는다**(verifier r6 L-14). 앞선 판은
+        //    소유자 × 이름이라 목록 밖 소유자(`globalThis.window['fetch']` ·
+        //    `document.defaultView!['fetch']` · `top`·`parent`·`frames`)가 전부 초록이었다(실측).
+        {
+          selector: `MemberExpression[computed=true][property.value=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+          message: restrictedMessage,
+        },
+        // ③ 템플릿 리터럴 형태(`x[\`fetch\`]`) — 같은 접근의 다른 표기.
+        {
+          selector: `MemberExpression[computed=true] > TemplateLiteral > TemplateElement[value.raw=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+          message: restrictedMessage,
+        },
+        // ④ 구조 분해 — `const { fetch: f } = <무엇이든>`. 소유자를 보지 않는다.
+        {
+          selector: `ObjectPattern > Property[key.name=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+          message: restrictedMessage,
+        },
       ],
-      // 리터럴 계산 접근(`window['fetch']`)은 위 선택자에 안 걸리므로 여기서 받는다. 손으로
-      // 열거하지 않고 **소유자 × 이름의 구성**으로 만든다(PR #75 리뷰 O) — 손 열거는 비대칭을
-      // 낳았고(`self.XMLHttpRequest` 누락이 r2 의 지적이었다) 이름을 하나 더해도 대칭이 유지되지
-      // 않았다. 이제 다섯 이름이 네 소유자 전부에 대해 같은 규칙을 받는다.
-      'no-restricted-properties': [
-        'error',
-        ...NETWORK_OWNERS.flatMap((object) =>
-          NETWORK_MEMBERS.map((property) => ({ object, property, message: restrictedMessage })),
-        ),
-      ],
+      // `no-restricted-properties`(소유자 × 이름)는 **걷었다**(verifier r6 L-14) — 위 ②③④ 가 소유자를
+      // 보지 않으므로 그 열거가 필요 없고, 열거는 목록 밖 소유자를 남겼다.
       'no-restricted-imports': [
         'error',
         {
