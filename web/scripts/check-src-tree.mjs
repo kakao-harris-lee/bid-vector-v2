@@ -64,15 +64,24 @@ function fail(line) {
   failures.push(line);
 }
 
+// 종료는 **`process.exitCode` 로** 한다(PR #75 리뷰 R · 다른 두 스크립트와 같게) — `process.exit()`
+// 는 보류 중인 출력 쓰기를 끊을 수 있다. 전제가 깨진 자리에서는 `true` 를 돌려 호출자가 아래
+// 단계를 건너뛰게 한다(아래 단계는 그 전제를 쓰므로 그냥 두면 스택 트레이스로 죽는다).
 function finishIfFailed() {
-  if (failures.length > 0) {
-    console.error('컴파일 경계 전제가 깨졌다 (ADR 0011 D-3):');
-    for (const line of failures) {
-      console.error(`  - ${line}`);
-    }
-    process.exit(1);
+  if (failures.length === 0) {
+    return false;
   }
+  console.error('컴파일 경계 전제가 깨졌다 (ADR 0011 D-3):');
+  for (const line of failures) {
+    console.error(`  - ${line}`);
+  }
+  process.exitCode = 1;
+  return true;
 }
+
+// 본문을 함수에 담아 그 `return` 으로 조기 종료한다 — 줄은 그대로 두고(들여쓰기를 바꾸면 템플릿
+// 리터럴의 내용이 바뀐다) 바깥만 감싼다.
+function run() {
 
 // ① 기준점 — realpath 를 쓰기 **전에** 잰다.
 let srcReal;
@@ -87,7 +96,7 @@ try {
 } catch (error) {
   fail(`web/src 를 해석하지 못했다: ${error.message}`);
 }
-finishIfFailed();
+if (finishIfFailed()) return;
 
 const allowedRoots = [srcReal];
 if (existsSync(nodeModulesDir)) {
@@ -102,13 +111,13 @@ function insideAllowedRoots(candidate) {
 const { config, error } = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 if (error !== undefined) {
   fail(`tsconfig.json 을 읽지 못했다: ${ts.flattenDiagnosticMessageText(error.messageText, ' ')}`);
-  finishIfFailed();
+  if (finishIfFailed()) return;
 }
 const parsed = ts.parseJsonConfigFileContent(config, ts.sys, webRoot, undefined, tsconfigPath);
 for (const diagnostic of parsed.errors) {
   fail(`tsconfig 진단: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`);
 }
-finishIfFailed();
+if (finishIfFailed()) return;
 
 if (parsed.options.rootDir === undefined) {
   fail('rootDir 이 없다 — 경계가 선언되지 않았다');
@@ -348,8 +357,10 @@ if (!existsSync(lockPath)) {
       if (entry.inBundle === true) {
         const parentName = name.slice(0, name.lastIndexOf('/node_modules/'));
         const parent = name.includes('/node_modules/') ? lockPackages?.[parentName] : undefined;
-        if (typeof parent?.resolved !== 'string' || !parent.resolved.startsWith('https://')) {
-          fail(`inBundle 항목의 부모 출처를 확인할 수 없다: ${name}`);
+        // 부모 출처도 **같은 결정 자리**를 쓴다(PR #75 리뷰 C) — `https://` 접두만 보면 부모가
+        // 비레지스트리 tarball 일 때 bundled 자식이 지나갔다.
+        if (typeof parent?.resolved !== 'string' || !parent.resolved.startsWith(REGISTRY_ORIGIN)) {
+          fail(`inBundle 항목의 부모 출처가 레지스트리(${REGISTRY_ORIGIN})가 아니다: ${name}`);
         }
         continue;
       }
@@ -523,6 +534,37 @@ if (!existsSync(viteConfigPath)) {
   };
   visitConfig(viteSource);
 
+  // 게이트 test 가 **수집되는가**(PR #75 리뷰 B). 판정 술어를 잠그는 test 를 vitest 의 `include`
+  // 에서 빼면 W-6 는 그 파일을 아예 보지 않고 **조용히 초록**이 된다 — 선례는 같은 저장소의
+  // `config/quality/gate-tests.properties`(게이트 test 가 실제로 돌았는지 따로 단언한다).
+  // 그래서 파일 존재와 `test.include` 원소를 둘 다 AST 로 단언한다.
+  const gateTestRelative = 'scripts/module-graph-boundary.test.mjs';
+  if (!existsSync(resolve(webRoot, gateTestRelative))) {
+    fail(`번들 경계 판정 술어를 잠그는 test 가 없다: ${gateTestRelative}`);
+  }
+  const gateTestGlob = 'scripts/**/*.test.mjs';
+  let gateTestCollected = false;
+  const visitTestInclude = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'include' &&
+      ts.isArrayLiteralExpression(node.initializer) &&
+      node.initializer.elements.some(
+        (element) => ts.isStringLiteralLike(element) && element.text === gateTestGlob,
+      )
+    ) {
+      gateTestCollected = true;
+    }
+    ts.forEachChild(node, visitTestInclude);
+  };
+  visitTestInclude(viteSource);
+  if (!gateTestCollected) {
+    fail(
+      `vite.config.ts 의 test.include 에 ${gateTestGlob} 가 없다 — 게이트 test 가 수집되지 않으면 W-6 는 조용히 초록이다`,
+    );
+  }
+
   if (boundaryBindings.size === 0) {
     fail(`vite.config.ts 가 ${boundaryPluginSpecifier} 를 import 하지 않는다`);
   } else {
@@ -537,7 +579,7 @@ if (!existsSync(viteConfigPath)) {
   }
 }
 
-finishIfFailed();
+if (finishIfFailed()) return;
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
@@ -545,3 +587,6 @@ console.log(
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
+}
+
+run();
