@@ -56,7 +56,15 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
 
 ## 계약 갱신 이력
 
-(착수)
+**D-7F-1 (2026-10-16, 팀장 — 구현 보고 수령).**
+- **CI 편입 승인**: 스모크를 `container` job 의 마지막 step(S-26)으로 둔다. `tools/one-command-check.sh` 는 바꾸지 않았다(축어 대상은
+  check·ml-engine·web 세 job).
+- **경로 정정**: runbook 은 `docs/runbooks/` 가 아니라 실재하는 `docs/runbook/`(`m6-6e-operations.md` §9).
+- **compose 는 덧쓰기 파일**(`docker/compose.local-tls.yaml`)로 확장한다. 기본 파일과 기존 step 은 바꾸지 않는다.
+- **미달 하나를 이 slice 에서 닫는다**: 산출물 1 은 「6C 기준(고정 태그·non-root·금지 패키지 0)」을 요구한다. web·proxy 이미지는 아직 금지
+  패키지·취약점 판정을 받지 않는다. 그래서 `config/quality/` 의 이미지 kind 별 정책 파일(기존 app·ml-serving 의 kind 정책과 같은 형태)을
+  in_scope 에 더하고, 두 이미지를 기존 위생·취약점 스크립트에 태운다. 게이트 설정이므로 verifier 표적 재검증 대상이다. 허용·예외 줄마다
+  근거를 적는다.
 
 ## 하네스 레인 변경 (상시)
 
