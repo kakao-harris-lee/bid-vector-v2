@@ -84,8 +84,20 @@ class OpeningQuotaHaltResumptionTest {
         port.quotaFromReservePriceCall = 1
 
         val first = collect()
+        assertHaltedWithoutReservePrices(first)
 
-        val halt = requireNotNull(first.halted) { "쿼터 소진은 그 실행을 멈춰야 한다" }
+        val blockedNotice = port.reservePriceCalls.last()
+        val callsBefore = port.reservePriceCalls.size
+
+        // 쿼터가 풀린 **다음 실행** — 원장을 심지 않는다. 실행 1 이 적은 줄이 그대로 입력이다.
+        port.reservePriceQuotaExhausted = false
+        val second = collect()
+        assertResumedOnlyBlockedAxis(second, first, blockedNotice, callsBefore)
+    }
+
+    /** 실행 1 — 멈춤(사유·손대지 않은 수) · 그 공고의 예가 결측 · 회계에 실린 사유와 429 관측 수. */
+    private fun assertHaltedWithoutReservePrices(report: OpeningCollectionReport) {
+        val halt = requireNotNull(report.halted) { "쿼터 소진은 그 실행을 멈춰야 한다" }
         halt.truncationCause shouldBe TruncationCause.QuotaExhausted
         // 쿼터는 KONEPS 의 거절이다 — 우리 승인 상한(예산)과 같은 칸에 접지 않는다.
         halt.budgetLimit shouldBe null
@@ -107,21 +119,20 @@ class OpeningQuotaHaltResumptionTest {
         axisConclusionsFor(SourceEndpoint.RESERVE_PRICE_DETAIL)
             .last()
             .shouldBeInstanceOf<AttemptOutcome.Refused>()
+    }
 
-        val blockedNotice = port.reservePriceCalls.last()
-        val reservePriceCallsBefore = port.reservePriceCalls.size
-
-        // 쿼터가 풀린 **다음 실행** — 원장을 심지 않는다. 실행 1 이 적은 줄이 그대로 입력이다.
-        port.reservePriceQuotaExhausted = false
-        val second = collect()
-
+    /** 실행 2 — 이어받는 것은 **그 공고의 미완 축**뿐이고, 표본은 다시 뽑지 않는다. */
+    private fun assertResumedOnlyBlockedAxis(
+        second: OpeningCollectionReport,
+        first: OpeningCollectionReport,
+        blockedNotice: NoticeId,
+        callsBefore: Int,
+    ) {
         second.halted shouldBe null
-        // 이어받는 것은 **그 공고의 미완 축**뿐이다 — 끝난 축은 다시 부르지 않는다.
-        port.reservePriceCalls.drop(reservePriceCallsBefore) shouldContainExactly listOf(blockedNotice)
+        port.reservePriceCalls.drop(callsBefore) shouldContainExactly listOf(blockedNotice)
         rawCount(SourceEndpoint.RESERVE_PRICE_DETAIL) shouldBe SAMPLE_SIZE
         port.openingCompleteCalls.size shouldBe SAMPLE_SIZE
         port.baseAmountCalls.size shouldBe SAMPLE_SIZE
-        // 표본은 다시 뽑지 않는다 — 두 실행이 같은 표본을 본다.
         sampleList.confirmCount shouldBe 1
         second.sample.selected shouldContainExactly first.sample.selected
     }
@@ -166,9 +177,7 @@ private class QuotaScriptedOpeningPort(
         return axisBatch(evidence, RESERVE_PRICE_AXIS)
     }
 
-    override fun fetchOpeningCompleteResults(
-        evidence: DetailFetchDecision.Fetch,
-    ): SourceBatch<RawNoticeObservation> {
+    override fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> {
         openingCompleteCalls += evidence.noticeId
         return axisBatch(evidence, SourceEndpoint.OPENING_COMPLETE)
     }
