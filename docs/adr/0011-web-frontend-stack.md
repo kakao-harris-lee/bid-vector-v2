@@ -52,8 +52,9 @@ Playwright · eslint**. Node 는 `web/.nvmrc` 가 정본(작성 시점 호스트
 - **브라우저 네트워크 전역은 보조 층이다**: `fetch`·`XMLHttpRequest`·`EventSource`·`WebSocket`·`sendBeacon` 직접 사용 금지 lint 는
   **실수로 쓴 직접 호출을 잡는 층**이고 의도적 우회(별칭 변수·문자열 조립·`Reflect`)를 닫지 않는다 — DOM 타입에서 그 전역을 뺄 수
   없어 구조로 닫을 층이 없다. 의도적 우회는 리뷰 소관이고 알려진 제한으로 등재한다(7A 검토 r1).
-- 게이트는 `web` CI job 이 돈다(typecheck · 생성 check). 둘 다 **음성 대조**를 evidence 에 남긴다(legacy 경로 import 한 줄 →
-  RED · OpenAPI 한 줄 변경 후 미생성 → RED).
+- 게이트는 `web` CI job 이 돈다 — typecheck · src-tree(프로그램 전수 · 링크 · 집합 등식 · 잠금 출처 · 플러그인 등재) · 생성 check ·
+  번들 그래프(메인·워커) · 카나리(경계 활성). 층마다 **음성 대조**를 evidence 에 남긴다(어느 층이 무엇을 잡는지는
+  `reports/evidence/m7/7a/checklist.md` 의 게이트 층 표가 정본).
 
 ### D-4. legacy 를 참고하는 범위
 
