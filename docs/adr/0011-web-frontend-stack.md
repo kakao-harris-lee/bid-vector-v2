@@ -35,11 +35,19 @@ Playwright · eslint**. Node 는 `web/.nvmrc` 가 정본(작성 시점 호스트
 
 ### D-3. 어댑터 금지 게이트 — 구조로 닫는다 (`ADR 0008` D-4 ③)
 
-- **legacy 소스 import 0**: `web/tsconfig` 의 `rootDir` 을 `web/src` 로 두어 그 밖 파일을 import 하면 **컴파일 오류**(TS6059)다.
-  legacy 프런트는 npm 패키지가 아니므로 닿는 경로는 상대 경로 import 뿐이고, 그 경로를 컴파일러가 막는다 — 이름 목록(eslint
-  금지 경로)은 별칭·심볼릭 링크 하나로 열리므로 1차 게이트로 쓰지 않는다.
-- **API 모양의 손 정의 0**: D-2 의 생성 타입 + 타입 클라이언트가 유일한 호출 경로라, legacy 의 응답 모양을 흉내 내려면 계약
-  문서를 바꿔야 하고 그 변경은 계약 test(`OpenApiContractTest` 계열)가 V2 구현과 대조한다.
+- **legacy 소스 유입 0 — 두 그래프를 각각 닫는다**(7A 검토 r1 정정). 화면 코드가 닿는 그래프는 둘이고 게이트도 둘이다:
+  ① **TS 프로그램** — `rootDir: src` 는 출발점일 뿐이다(TS6059 는 선언 파일·심볼릭 링크 경로에 걸리지 않는다 — 실측). 그래서
+  `web` job 의 src-tree 게이트가 `ts.createProgram(...).getSourceFiles()` **전수**의 realpath 가 `web/src` ∪ `web/node_modules`
+  안임과 `web/src` 자체가 링크가 아님을 단언한다. ② **Vite/Rollup 모듈 그래프** — `import.meta.glob`·`?raw`·`?worker`·
+  `resolve.alias`·HTML `<script>` 는 tsc 를 거치지 않으므로, 빌드 플러그인이 `buildEnd` 에서 모듈 id 전수의 realpath 가
+  `web/src` ∪ `web/node_modules` ∪ `web/index.html` 안임을 단언한다(그 플러그인의 등록 자체는 src-tree 게이트가 확인). 이름 목록
+  (eslint 금지 경로)은 1차 게이트로 쓰지 않는다.
+- **API 모양의 손 정의 0**: D-2 의 생성 타입 + 타입 클라이언트가 유일한 호출 경로다. 그 「유일」은 src-tree 게이트의 **집합 등식**
+  으로 선다 — `openapi-fetch` 를 import 하는 파일 집합(정적 + 리터럴 동적 `import()`) == {`src/api/client.ts`}, 비리터럴 동적
+  `import()` 는 `src` 에서 0. legacy 의 응답 모양을 흉내 내려면 계약 문서를 바꿔야 하고 그 변경은 계약 test 가 V2 구현과 대조한다.
+- **브라우저 네트워크 전역은 보조 층이다**: `fetch`·`XMLHttpRequest`·`EventSource`·`WebSocket`·`sendBeacon` 직접 사용 금지 lint 는
+  **실수로 쓴 직접 호출을 잡는 층**이고 의도적 우회(별칭 변수·문자열 조립·`Reflect`)를 닫지 않는다 — DOM 타입에서 그 전역을 뺄 수
+  없어 구조로 닫을 층이 없다. 의도적 우회는 리뷰 소관이고 알려진 제한으로 등재한다(7A 검토 r1).
 - 게이트는 `web` CI job 이 돈다(typecheck · 생성 check). 둘 다 **음성 대조**를 evidence 에 남긴다(legacy 경로 import 한 줄 →
   RED · OpenAPI 한 줄 변경 후 미생성 → RED).
 
