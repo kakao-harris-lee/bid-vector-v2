@@ -3,7 +3,9 @@ import createClient from 'openapi-fetch';
 import type { paths } from './generated/operator-api';
 
 /**
- * 서버를 부르는 **유일한** 자리(ADR 0011 D-2·D-3).
+ * 생성 타입 클라이언트를 만드는 **승인된 자리**(ADR 0011 D-2·D-3) — 게이트가 증명하는 것은
+ * 「클라이언트 패키지를 끌어오는 자리 == 이 파일」까지다. 「서버를 부르는 경로가 이것 하나뿐」은
+ * 보조 lint 와 리뷰 소관이다(7A 검토 r5).
  *
  * 타입 인자가 생성 타입(`paths`)이라, 계약에 없는 operation·경로·요청/응답 모양을 부르면
  * 컴파일되지 않는다. 경로 문자열을 손으로 적는 fetch 래퍼를 두지 않는다 — 그것이 legacy 가

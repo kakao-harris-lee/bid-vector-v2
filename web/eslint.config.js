@@ -3,8 +3,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// ADR 0011 D-2·D-3 — 서버를 부르는 자리는 생성 타입으로 타입이 매겨진 클라이언트
-// (`src/api/client.ts`) 하나다.
+// ADR 0011 D-2·D-3 — 서버 호출은 생성 타입으로 타입이 매겨진 클라이언트(`src/api/client.ts`)로
+// 한다. **이 블록의 대상은 `src` 의 `.ts`·`.tsx` 뿐이다** — `index.html` 의 인라인 스크립트와
+// `src` 밖 파일은 아예 린트 대상이 아니다(7A 검토 r5 M-10: 인라인 평문 `fetch` 는 우회 형태가
+// 아니라 **대상 밖**이다). 그 범위는 checklist 의 알려진 제한에 등재돼 있다.
 //
 // **이 층이 무엇인지 정확히 적는다(verifier r1 M-1 · code-review r1 F-4).** 브라우저 전역의
 // 네트워크 표면은 구조로 닫을 층이 마땅치 않다(타입 lib 에서 DOM 을 뺄 수 없다). 그래서 아래

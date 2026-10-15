@@ -11,7 +11,9 @@
 //      TS6059 의 대상이 아니라서 밖의 선언 파일을 `import type` 하면 게이트 넷이 모두 초록이었다.
 //      루트 이름(`parsed.fileNames`)이 아니라 `ts.createProgram(...).getSourceFiles()` 를 본다 —
 //      import 로 끌려온 파일·`files`·triple-slash reference·`src` 안 링크가 한 술어로 닫힌다.
-//   ④ 호출 자리 집합 등식 — code-review r1 F-2. `openapi-fetch` 를 import 하는 파일 집합이
+//   ④ 호출 자리 집합 등식 — code-review r1 F-2. **증명 범위는 「클라이언트 패키지를 끌어오는
+//      자리 == 한 자리」까지이고 「서버 호출 경로가 하나뿐」은 아니다**(7A 검토 r5).
+//      `openapi-fetch` 를 import 하는 파일 집합이
 //      `{src/api/client.ts}` 와 **같아야** 한다. eslint 의 `no-restricted-imports` 는 정적
 //      import 만 보므로 리터럴 동적 `import('openapi-fetch')` 로 손 계약 클라이언트를 만들 수
 //      있었다. 대상이 리터럴이 아닌 동적 import 는 「어느 모듈인지 게이트가 볼 수 없다」이므로
@@ -383,8 +385,19 @@ if (!existsSync(lockPath)) {
   const expectedInstallPath = `node_modules/${API_CLIENT_PACKAGE}`;
   for (const installPath of apiInstallPaths) {
     if (installPath !== expectedInstallPath) {
+      // 사유를 갈라 적는다(verifier r5 L-13) — 중첩 판 분기도 같은 술어로 멈추는데(fail-closed 는
+      // 맞다) 문면이 「별칭 의존」이라고만 말하면 진단이 어긋난다. 판정은 그대로다.
+      const nested = installPath.lastIndexOf('/node_modules/') > 0;
+      const aliasDirectory = !installPath.endsWith(`/${API_CLIENT_PACKAGE}`);
+      const reason = nested
+        ? aliasDirectory
+          ? '중첩 사본 + 별칭 디렉터리'
+          : '중첩 사본'
+        : aliasDirectory
+          ? '별칭 디렉터리'
+          : '같은 이름의 다른 자리';
       fail(
-        `${API_CLIENT_PACKAGE} 가 ${expectedInstallPath} 밖에도 설치돼 있다(별칭 의존): ${installPath}`,
+        `${API_CLIENT_PACKAGE} 가 ${expectedInstallPath} 밖에도 설치돼 있다(${reason}): ${installPath}`,
       );
     }
   }

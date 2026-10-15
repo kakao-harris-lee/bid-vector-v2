@@ -63,7 +63,14 @@ export function violatesBoundary(realPath, allowedRoots) {
   return !allowedRoots.some((root) => isInsideRoot(realPath, root));
 }
 
-/** 생성 타입 클라이언트 패키지와 그 **유일한** 호출 자리(ADR 0011 D-2·D-3). */
+/**
+ * 생성 타입 클라이언트 패키지와 그 **승인된 사용처**(ADR 0011 D-2·D-3).
+ *
+ * 이 게이트가 증명하는 범위: 「클라이언트 패키지(정체 기준)를 끌어오는 자리 == 이 한 자리」.
+ * 「서버를 부르는 경로가 그것 하나뿐」은 **증명하지 않는다** — 브라우저가 HTTP 를 낼 길은
+ * 전역·다른 의존·외부 URL·`index.html` 처럼 여럿이고, 그 주장은 보조 lint 와 리뷰 소관이다
+ * (7A 검토 r5 · checklist 의 알려진 제한).
+ */
 export const API_CLIENT_PACKAGE = 'openapi-fetch';
 export const API_CALL_SITE = 'src/api/client.ts';
 
