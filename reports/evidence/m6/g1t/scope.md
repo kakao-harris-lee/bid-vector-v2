@@ -60,6 +60,9 @@ Codex 없음(되돌리기 어려운 경로 아님).
     `quotaExceeded`·`truncationCause`. 실행 2(쿼터 해제): 시도 원장이 미완 축을 이어받아 남은 수집이 계속된다.
   - 추적표 COL-03 행은 ⓐ 로 올리지 않는다. 「test 성립 · bullet 문면 갱신 필요(운영자 확인)」로 남긴다. capability map 문면 갱신은 팀장이
     운영자 확인 뒤 별도로 한다. 이 slice 는 capability map 을 건드리지 않는다.
+- **D-G1T-2 (2026-10-16, 운영자 승인 「고쳐줘」).** capability map COL-03 셋째 bullet 을 V2 거동에 맞춘다. 실행은 멈추고, 다음 실행이 미완 축을
+  이어받아 계속한다. 개정 블록도 함께 둔다. 문면은 팀장이 직접 고쳤다(`docs/discovery/capability-map.md` COL-03 절만 in_scope 에 더한다).
+  그 결과 T-2 가 성립하면 추적표 COL-03 행을 **ⓐ** 로 올린다(D-G1T-1 의 「갱신 대기」를 대신한다).
 - **in_scope 추가**: `config/quality/gate-tests.properties` — 새 test 클래스 FQN 등재만 한다(모듈 키 아래 한 줄씩, 값·정책 version 변경
   없음). `gateRegistrationGate` 의 양방향 등식 때문에 필요하다.
 
