@@ -175,13 +175,43 @@ for (const sourceFile of programFiles) {
 }
 
 // ⑤ 호출 자리 집합 등식 + 비리터럴 동적 import 금지.
+//
+// 세는 기준은 지정자 **문자열**이 아니라 **해석된 모듈의 realpath** 다(verifier r2 M-5).
+// 문자열로 세면 `import cc from '../node_modules/openapi-fetch'` 같은 상대 경로 한 줄로 집합
+// 등식이 열렸다(실측: 게이트 넷 exit 0). 해석 결과가 `node_modules/openapi-fetch/` 안이면 —
+// 지정자가 패키지 이름이든 서브패스든 상대 경로든 — 같은 자리에 센다.
+const apiPackageDir = existsSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
+  ? realpathSync(resolve(nodeModulesDir, API_CLIENT_PACKAGE))
+  : undefined;
+
+const importsApiClient = (specifier, containingFile) => {
+  const resolved = ts.resolveModuleName(
+    specifier,
+    containingFile,
+    parsed.options,
+    ts.sys,
+  ).resolvedModule;
+  if (resolved !== undefined && apiPackageDir !== undefined) {
+    let resolvedReal;
+    try {
+      resolvedReal = realpathSync(resolved.resolvedFileName);
+    } catch {
+      resolvedReal = resolved.resolvedFileName;
+    }
+    if (resolvedReal === apiPackageDir || resolvedReal.startsWith(apiPackageDir + sep)) {
+      return true;
+    }
+    return false;
+  }
+  // 해석에 실패했으면(설치 전·오타) 지정자 문자열로 보수적으로 센다 — 모르는 것을 통과시키지
+  // 않는다.
+  return specifier === API_CLIENT_PACKAGE || specifier.startsWith(`${API_CLIENT_PACKAGE}/`);
+};
+
 const apiImporters = new Set();
 for (const { sourceFile, name } of inSrcFiles) {
   for (const imported of ts.preProcessFile(sourceFile.text, true, true).importedFiles) {
-    if (
-      imported.fileName === API_CLIENT_PACKAGE ||
-      imported.fileName.startsWith(`${API_CLIENT_PACKAGE}/`)
-    ) {
+    if (importsApiClient(imported.fileName, sourceFile.fileName)) {
       apiImporters.add(name);
     }
   }
