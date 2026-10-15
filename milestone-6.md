@@ -741,6 +741,30 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 - security/secret scan 통과
 - verifier 최종 `ready-for-review` 와 사용자 release 승인 (Codex 최종 리뷰는 운영자가 요청하면 추가)
 
+> **운영자 결정 2026-10-15 — 조건 1 의 확장과 조건 3 의 조정.**
+>
+> **조건 1(one-command).** M7/7A(PR #75)부터 `tools/one-command-check.sh` 가 Kotlin 전건 · Python 전건에 더해 **`web` 레인
+> 전건**(`ci.yml` `web` job 과 같은 명령·같은 순서)을 돈다. 조건 1 은 그 확장된 스크립트로 잰다. 「새 checkout 에서 e2e 까지」는
+> Playwright 가 쓰는 시스템 패키지가 있는 장비를 전제한다(CI 는 `install-deps` 로 깔고, 로컬은 그 step 을 돌리지 않는다 — 7A
+> checklist 알려진 제한). `web` job 을 main 의 필수 status check 로 등록하는 것은 **보류**한다 — 필수 job `check` 의 S-20 이 같은
+> 명령을 돈다.
+>
+> **조건 3(M0 필수 capability E2E).** `V2 필수` 61 을 7A 조정안(`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`)의
+> 세 갈래로 가른다. 운영자 답: Q-1 구조 승인 · Q-2 (b) · Q-3 (b).
+> - **조건 3 의 판정 대상 = 성립 15 + G1 9.** 성립: ⓐ 13 · ⓑ 2. G1(M6 에서 닫는다): COL-02 · COL-03 · DEC-06 · OPS-01 ·
+>   DEC-05 · DEC-02 · DEC-10 · ML-01 · SET-01. 이 아홉이 닫혀야 조건 3 이 성립한다. 7B 착수 전 M6 잔여 slice 로 닫는다.
+> - **Q-2 (b) — DEC-03 은 G1 에서 G2 로 내린다**(G1 10 → 9, G2 12 → 13). 화면 C 는 **게시 하한율만** 근거로 쓰고 「법정 하한율
+>   미해석」을 표시한다(DEC-04 의 정직 명세 규율). 해석기 자체는 `OPEN-DEC-10` 이 계속 든다. DEC-10(게시 하한율 신뢰 게이트)은
+>   G1 에 남는다. 화면 C 가 게시 하한율만 근거로 쓰므로 그 신뢰 게이트가 오히려 중심이다.
+> - **Q-3 (b) — QUAL-08 · QUAL-11 은 G2.** M7 은 입력만 받고 화면은 「이 축은 아직 판정하지 않음」으로 표시한다. 판정 축은 후속이다.
+> - **G2 13 은 M7 완료 조건이 잰다**(`milestone-7.md` 완료 조건): STR-16 · STR-06 · STR-07 · QUAL-02 · QUAL-08 · QUAL-11 · STR-02 ·
+>   STR-08 · NOTI-10 · NOTI-04 · SET-02 · COL-04 · DEC-03. 조정안이 선언한 규칙 예외 다섯(COL-04 · DEC-02 · QUAL-08 · QUAL-11 ·
+>   STR-02 — STR-02 는 6F-5-b 종속)은 그대로 승인한다.
+> - **G3 24 는 조건 3 에서 빼고** OPEN 묶음 둘(`OPEN-M6-RESIDUAL-OPS` · `OPEN-M6-RESIDUAL-ML-LIFECYCLE`)로 등재해 7F 또는 별
+>   마일스톤에서 판정한다. ML-02 · ML-04 는 G1 의 ML 배선 slice 가 acceptance 에 재판정을 넣는다.
+> - 계: 성립 15 + G1 9 + G2 13 + G3 24 = 61.
+> - 이 결정은 조건 3 의 문면을 바꾸지 않고 **판정 대상을 정한다**. 수집 실행이나 외부 호출을 새로 허용하는 것이 아니다.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
