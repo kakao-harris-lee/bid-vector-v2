@@ -1,7 +1,7 @@
 # M7/7A checklist — P-5(`web/` 골격)·P-6(one-command)
 
 - 계약: 같은 디렉터리의 `scope.md`. 설계 검토: `_workspace/m7-7a/01_design-review.md`(우회 표 U-1~U-8).
-- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `6ef2773b`.
+- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `332777e2`.
 - 명령과 종료 코드는 `commands.md`, 되돌림은 `rollback.md`.
 - 문서 산출물(P-1~P-4)은 세션 모델 레인 소관이라 이 문서에 넣지 않는다.
 
@@ -12,7 +12,8 @@
 | 컴파일 경계 | `tsconfig` `rootDir`·`include`(W-3) | rootDir 밖 `.ts`·`.js` 의 상대 경로·별칭 import → TS6059 | 구성 |
 | 프로그램 전수 | W-4 (`ts.createProgram(...).getSourceFiles()`) | import·`files`·triple-slash·`src` 안 링크로 끌려온 **모든** 파일(선언 파일 포함)이 `src`∪`node_modules` 안인가 | 컴파일러 API |
 | 경계의 전제 | W-4 (`lstat`·realpath·유효 옵션·AST) | `src` 자체가 링크인가 · `rootDir`·`include`·`allowJs`·`paths` 가 바뀌었나 · `web/` 안 링크(설치본·산출물 제외) · 경계 플러그인이 두 자리에 **원소로** 등재됐나(**빠른 선행 검사** — 활성은 카나리가 잰다) | 컴파일러 API + 파일시스템 |
-| 호출 자리 집합 | W-4 (`ts.resolveModuleName` → realpath) | `openapi-fetch` 로 **해석되는** import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0. 지정자 문자열이 아니라 해석 결과로 센다 | 집합 등식 |
+| 호출 자리 집합 — TS | W-4 (`ts.resolveModuleName` → realpath) | `openapi-fetch` 로 **해석되는** import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0 · **해석되지 않는 bare 지정자는 위반**(별칭+주변 선언이 그 형태다) | 집합 등식 |
+| 호출 자리 집합 — 번들 | 경계 플러그인(W-7, 메인·워커) | 클라이언트 패키지를 **패키지 밖에서** 끌어온 importer 전수가 `src/api/client.ts` 하나인가. Vite 의 실제 해석을 쓰므로 `resolve.alias`·접미 지정자도 같은 술어에 걸린다 | 집합 등식 |
 | **번들 모듈 그래프** | Vite 플러그인 `buildEnd` — 메인 `plugins` **와** `worker.plugins` 두 자리(W-7) | 번들이 실제로 읽은 모듈 전수가 `src`∪`node_modules`∪`index.html` 안인가. 워커는 **별도 Rollup 빌드**라 등재가 두 자리다 | 그래프 단언 |
 | **경계의 활성** | 카나리 빌드(W-8) | 실제 `vite.config.ts` 로 빌드를 돌려 web 밖 파일을 끌어온 probe 가 **경계 오류로 거부되는가** — 메인·워커 둘 다 | 효과 측정 |
 | node_modules 의 출처 | W-4 (잠금 파일·`.npmrc`) | `packages[*].resolved` 전수가 레지스트리 URL 인가 · `link:true`·`file:` 판 0 · `install-links` 설정 없음 | 정본 대조 |
@@ -30,7 +31,7 @@
 | P-5 「`web` job 명령 그대로 로컬 exit 0」 | W-1~W-10 을 순서대로 그대로 실행해 전부 exit 0(`commands.md`). CI 전용 step 둘(checkout·setup-node, `install-deps`)은 로컬에서 성립하지 않아 뺐고 그 둘은 게이트가 아니다 |
 | P-5 「생성 타입 check 모드 음성 대조」 | §3.4 세 행 — OpenAPI 한 줄 변경 · 생성물 손 편집 · 생성물 삭제 전부 exit 1, 되돌린 뒤 exit 0. 실패 경로가 임시 디렉터리를 남기지 않는 것도 실측(0 → 0) |
 | P-5 「legacy 경로·타입 import 0(게이트)」 | §3 의 **U-1~U-9 · N-1·N-2 · N-4~N-9 · P-1\* · F-1·F-2 · O-5 · G-3 전부 RED**. 통제군 행(변이 없는 트리 · 되돌린 트리)이 같은 명령에서 exit 0 인 것과 짝으로 읽는다. **열린 자리는 §4 에 등재**(CSS `@import`·`url()` 자산 · 계산된 전역 이름 · 하드 링크) |
-| P-5 「화면 구현 없음(빈 셸 + 라우트 자리 다섯)」 | 자리 여섯(화면 다섯 + 알림함)의 빈 셸 + 자리 표 **밖**의 없는 주소 자리. 질의·상태·디자인 토큰 0. 단위 test 가 경로 여섯·순서·id 중복 0·catch-all 이 표 밖임을 잠그고, e2e 가 알 수 없는 주소에서도 셸이 뜨는 것을 잰다 |
+| P-5 「화면 구현 없음(빈 셸 + 라우트 자리 여섯 — 화면 A~E 다섯 + 알림함, 그리고 없는 주소 자리)」 | 자리 여섯(화면 다섯 + 알림함)의 빈 셸 + 자리 표 **밖**의 없는 주소 자리. 질의·상태·디자인 토큰 0. 단위 test 가 경로 여섯·순서·id 중복 0·catch-all 이 표 밖임을 잠그고, e2e 가 알 수 없는 주소에서도 셸이 뜨는 것을 잰다 |
 | P-6 「S-20 exit 0」 | `tools/one-command-check.sh` exit 0(`commands.md`). web 절 명령은 job 과 순서까지 같고, CI 에서 그 스크립트를 돌리는 `check` job 에 Node 툴체인과 브라우저 시스템 의존을 더했다 — 같은 게이트를 두 다른 툴체인에서 재던 상태를 끝낸다 |
 
 ## 3. 우회 실측
@@ -61,6 +62,9 @@
 | O-5b | 서브패스 `openapi-fetch/dist/index.js` | 0 | **1** | 0 | RED |
 | O-5c | 승인된 호출 자리가 그 import 를 잃음 | 0 | **1** | 0 | RED — 등식의 반대 방향(「하나뿐」이 아니라 「하나는 있다」) |
 | G-4 | 건너뛰기 이름을 **링크 이름으로**(`src/dist` → legacy) | 0 | **1** | 0 | RED, 사유가 「web/ 안에 심볼릭 링크가 있다: src/dist」로 정확해졌다 |
+| R-1 | `resolve.alias: { '@oa': 'openapi-fetch' }` + `src` 안 `declare module '@oa'` → 호출 자리 밖에서 손 경로 호출 | 0 | **1**(「지정자를 해석할 수 없다: … → @oa」) | 0 | RED — **build 도 1**(번들 그래프의 집합 등식: 「호출 자리(src/api/client.ts) 밖에서 끌어온다」) |
+| R-1b | 같은 시도를 **워커 파일 안에서** | 0 | **1** | 0 | RED — 워커 그래프의 플러그인 인스턴스가 같은 등식을 센다 |
+| H-1 | `boundaryRoots` 에 legacy 뿌리 한 줄 + `…?raw` import | 0 | **1** | 0 | RED — **W-6 도 1**(허용 뿌리 집합 등식). 뿌리를 넓혀도 build 는 초록이므로 이 둘이 그 변경을 보는 층이다 |
 
 ### 3.2 번들 모듈 그래프 (build 단계) — 메인과 **워커** 둘
 
@@ -99,6 +103,8 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 | 워커만 제거 | `worker.plugins` 만 떼어냄 | **1** | **1**(워커 사례) | 둘 다 |
 | 본문 무력화 | 플러그인 `buildEnd` 를 `return;` 으로 무력화 | 0 | **1**(두 사례 모두) | **카나리** (W-6 단위 test 는 순수 술어만 잠그므로 0 — 이것이 카나리가 필요한 이유다) |
 | 제거 세 형태 | `plugins` 에서 제거 / import 제거 / 파일 삭제 | **1·1·1** | — | W-4 |
+| H-4a | 경계 플러그인이 **무관한 사유**로 멈춘다(`this.error('무관한 사유로…')`) | 0 | **1** | **카나리** — 「경계 플러그인이 멈추기는 했지만 이 실행의 fixture 를 거부한 것이 아니다」 |
+| H-4b | 경계를 끄고 **같은 이름·같은 문면**의 가짜 플러그인이 탐침 id 에 반응 | 0 | **1** | **카나리** — 가짜는 이 실행의 **무작위 fixture 실경로**를 적을 수 없다 |
 
 ### 3.3 호출 자리·전역 네트워크 표면 (보조 층)
 
@@ -130,6 +136,17 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
 
 이 행이 ④ 의 전제(「`node_modules` 안은 레지스트리에서 온 것」)를 재는 자리다 — typecheck·build 는
 이 변이를 **보지 못한다**(둘 다 0).
+
+전수 단언은 **대상이 0 건이면 공허하게 참**이므로 등록부 자체를 먼저 단언한다(같은 저장소의
+`leakPatternGate` 가 패턴 0 건에서 멈추는 것과 같은 꼴):
+
+| # | 변이 | W-4 |
+|---|---|---|
+| L-7 | `lockfileVersion: 1`(npm 6 형 — `packages` 없음, `dependencies` 만) | **1**(두 사유: 버전 · 등록부 부재) |
+| H-2a | `packages: {}` | **1**(「전수 단언이 공허하게 통과한다」) |
+| H-2b | 뿌리 항목(`""`) 제거 | **1** |
+| H-3a | `inBundle: true` 항목 + 부모가 `file:` | **1**(부모·자식 두 사유) |
+| H-3b | `inBundle: true` 항목 + 부모가 레지스트리 URL | **0** — npm 의 정상 모양을 막지 않는다(출처는 부모가 정한다) |
 
 ## 4. 알려진 제한 (열린 자리와 그 조건)
 
