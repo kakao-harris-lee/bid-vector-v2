@@ -14,6 +14,10 @@
 세션 질의를 든다. 남은 것은 「값이 설정 키가 아니다」로 §6 제한 5), **이미지 SBOM·CVE 스캔**은 6E-2b 가
 (§8). 병합 트리에서 둘 다 참이라 둘 다 뺀다.
 
+**「TLS·네트워크 배치」는 절반만 빠진다**(M7/7F-local, §9) — 들어온 것은 **로컬 패키징**이다: web 정적
+이미지 · 리버스 프록시 한 자리 · 프록시가 실행 시 발급하는 로컬 TLS. **운영 TLS 는 그대로 약속 밖**이다
+(실 도메인·공개 DNS·인증서 수명·갱신은 7F 본편의 운영자 승인 사항). RBAC 도 그대로 약속 밖이다.
+
 ---
 
 ## 1. 기동과 설정
@@ -877,3 +881,122 @@ trivy 는 공식 릴리스 바이너리를 직접 받는다 — 버전 · 자산
 6. **OS 매칭 술어는 「배포판이 바뀌었다」를 강제할 뿐 「DB 가 그 배포판을 덮는다」를 보증하지 않는다**
    (`OPEN-6E2C-OS-DB-COVERAGE`). §8.2 의 사람 신호와 §8.3.1 의 사전 확인이 그 절반을 진다.
 
+
+## 9. 로컬 패키징 — web 정적 이미지 · 리버스 프록시 · 로컬 TLS (M7/7F-local)
+
+이 절은 **로컬에서 재현되는 것만** 적는다. 실 도메인·공개 DNS·운영 인증서는 7F 본편이고, 그
+전까지 「운영에 올리는 절차」는 이 저장소에 없다(§9.5 제한 1).
+
+### 9.1 무엇이 어디서 도는가
+
+로컬 프로필은 **기본 compose 파일을 고치지 않고 덧쓰기 파일 하나를 더해** 만든다 —
+`-f docker/compose.yaml -f docker/compose.local-tls.yaml`. 그래서 CI `container` job 의 기존
+step 들(기본 파일 하나만 쓰는 기동·스모크·리허설)은 명령도 거동도 그대로다.
+
+| 자리 | 무엇을 든다 |
+|---|---|
+| `docker/web.Dockerfile` · `docker/web.Caddyfile` | web 정적 이미지. 번들을 **이미지 안에서** 만든다(`npm ci` → `vite build`) — `docker build` 한 번으로 이미지가 나온다. 베이스 둘 다 다이제스트 고정, non-root(uid 10001), `/srv` 는 root 소유 읽기 전용 |
+| `docker/proxy.Dockerfile` · `docker/proxy.Caddyfile` | 리버스 프록시. 경로 규칙 셋 · 보안 헤더 · `tls internal`(실행 시 발급) · 접근 로그에서 헤더 삭제 |
+| `docker/compose.local-tls.yaml` | 덧쓰기 — `web`·`proxy` 를 더하고 `app`·`ml-serving` 의 host publish 를 **비운다**(`!override []`) |
+| `tools/local-tls-smoke.sh` | 올리고 재고 **반드시 내린다**(`down -v` + 잔여 0 계수). CI `container` job 의 S-26 이 같은 스크립트를 돈다 |
+
+**host 포트를 여는 것은 프록시 하나**이고 루프백(`127.0.0.1`)에만 연다. app·postgres·web·
+ml-serving 은 compose 내부망에만 있다.
+
+### 9.2 올리는 법
+
+한 명령이 올리고 재고 내린다 — 평소 쓰는 경로다:
+
+```
+./tools/local-tls-smoke.sh
+```
+
+**전제 하나** — `bidvector/app:local` 이미지가 있어야 한다(이 스크립트는 Gradle 을 돌리지 않는다).
+없으면 스크립트가 그 자리에서 다음 둘을 알려주고 멈춘다:
+
+```
+./gradlew --no-daemon :app:bootJar
+docker build -f docker/app.Dockerfile -t bidvector/app:local .
+```
+
+띄운 채로 화면을 보려면 같은 환경변수를 주고 직접 올린다(스크립트가 쓰는 기본값과 같은 이름들이다 —
+**포트 기본값의 정본은 그 스크립트 하나**이고 compose·Caddyfile 은 `${VAR:?}` 로 요구만 한다):
+
+```
+export BIDVECTOR_PG_USER=... BIDVECTOR_PG_DB=... BIDVECTOR_PG_PASSWORD=...
+export BIDVECTOR_APP_PORT=18080 BIDVECTOR_APP_MANAGEMENT_PORT=18081
+export BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/$BIDVECTOR_PG_DB
+export BIDVECTOR_APP_OPERATOR_CREDENTIAL=... BIDVECTOR_APP_CANDIDATE_CAP=1000
+export BIDVECTOR_WEB_PORT=18090 BIDVECTOR_PROXY_HTTPS_PORT=18443
+docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml up -d proxy
+# 내릴 때 (볼륨까지)
+docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml down -v
+```
+
+`up -d proxy` 하나로 의존(app → postgres, web)이 함께 뜬다. **ml-serving 은 뜨지 않는다** — 이
+프로필의 상류가 아니다(그 이미지 빌드를 로컬 패키징의 전제로 만들지 않는다).
+
+도메인은 환경변수고 **기본값은 `localhost`** 다(기본값의 자리는 `docker/proxy.Caddyfile` 하나).
+운영 도메인 값은 저장소에 없다 — 다른 이름으로 띄우려면 `BIDVECTOR_PROXY_DOMAIN` 을 내보낸다.
+
+### 9.3 로컬 CA 를 신뢰하는 법
+
+프록시가 **실행 시** 로컬 CA 와 인증서를 만든다(저장소에 키도 인증서도 없다). 뿌리 인증서를 꺼낸다:
+
+```
+docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml \
+  exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > /tmp/bidvector-local-root.crt
+```
+
+- **curl**: `--cacert /tmp/bidvector-local-root.crt` 를 붙인다. 스모크가 쓰는 형태와 같다 —
+  `-k` 를 쓰지 않는다(그러면 TLS 가 서 있는지 없는지를 구분하지 못한다).
+- **브라우저**: 그 파일을 OS·브라우저의 신뢰 저장소에 「신뢰하는 루트 인증 기관」으로 넣는다.
+  명령은 OS 마다 다르고 **이 문서는 그 명령을 대신 돌리지 않는다** — 사람의 신뢰 저장소를 바꾸는
+  일이라 각자 확인하고 넣는다.
+- **다시 띄우면 달라진다** — 프록시에 볼륨을 붙이지 않았으므로 컨테이너를 다시 만들면 CA 가 새로
+  생긴다(잔여 0 의 대가다). 그래서 브라우저 신뢰 저장소에 넣은 뿌리는 재기동 뒤 낡는다. 오래
+  쓰려면 `/data` 에 named volume 을 붙이는 선택이 있지만, 그러면 「내린 뒤 잔여 0」이 깨지므로
+  **그 선택은 이 프로필의 기본이 아니다.**
+
+### 9.4 경로 규칙 — 무엇이 어디로 가고 무엇이 막히나
+
+| 요청 | 어디로 | 왜 |
+|---|---|---|
+| `/` · 그 밖의 모든 경로 | web 정적 → 없으면 셸(`/index.html`) | react-router 의 클라이언트 라우트가 서버에 파일이 없다 |
+| `/api/**` | app 의 **API 포트** | 경로를 자르지 않고 그대로 넘긴다(openapi 의 경로가 `/api/...` 다) |
+| `/actuator*` | 프록시가 404 | 명시적 차단. **구속력 있는 차단은 상류 집합**이다 — 이 프록시의 상류는 web 과 app API 포트 둘뿐이고 관리 포트는 상류가 아니다 |
+| 평문 http | 거부 | https 리스너 하나만 열린다. 평문 리스너가 없어 핸드셰이크에서 끊긴다 |
+
+응답 헤더는 프록시 한 자리에서 정한다(`defer` 로 상류 값을 덮는다): `X-Content-Type-Options` ·
+`Referrer-Policy` · `X-Frame-Options` · 번들이 실제로 쓰는 출처에 맞춘 최소 CSP. `Server` 는 지운다.
+
+**접근 로그에서 요청·응답 헤더를 지운다.** Caddy 는 기본 로그에서 표준 인증 헤더 둘을 가리지만 이
+스택의 운영자 자격은 **custom 헤더**로 오므로 기본값으로는 평문으로 남는다(실측). 헤더 하나를
+열거해 지우는 대신 헤더 객체 전체를 지워 뒤에 늘어나는 헤더도 자동으로 로그 밖에 둔다. 요청 URI·
+상태·소요는 남으므로 진단은 그대로 된다.
+
+설계 검토(scope.md (2))의 우회 다섯은 스모크가 각각 잰다 — ① publish 표면 구조 + host 거부(양성
+대조: 내부망에서는 통한다) ② 관리 경로 404 + 관리 표지 부재(양성 대조: 내부 관리 포트는 그 표지를
+낸다) ③ 정규화 변형 여덟 ④ 평문 ⑤ 두 이미지의 `Config.User` 와 **실제로 도는 프로세스 uid 전부**.
+우회마다 **그것을 바꿔치우는 변이**에서 스모크가 붉어지는지 실측했다(evidence 의 우회 표).
+
+### 9.5 알려진 제한 — 이 절이 약속하지 않는 것
+
+1. **운영 TLS 가 아니다.** 로컬 CA 는 공개 신뢰 기점이 아니고, 실 도메인·공개 DNS·인증서 수명·
+   갱신·만료 알림은 전부 7F 본편이다. 이 프로필을 외부에 노출하지 않는다(publish 는 루프백뿐이다).
+2. **HSTS 를 보내지 않는다.** HSTS 는 포트가 아니라 **host 단위**로 걸려 `localhost` 에 한 번
+   보내면 그 브라우저의 모든 localhost 평문 개발 서버가 함께 막히고, 되돌리려면 브라우저 설정을
+   손대야 한다. 게다가 로컬 CA 는 운영 신뢰 기점이 아니라 HSTS 가 지킬 대상도 없다. 운영 도메인에서
+   켜는 것이 그 자리이고, 로컬에서 이 헤더가 **없음**을 스모크가 단언한다.
+3. **CSP 는 번들이 쓰는 출처에 맞춘 최소이지만, 「브라우저 실행에서 위반 0」은 아직 재지 않는다.**
+   스모크는 셸과 번들 자산이 https 로 200 임을 재고, 실제 렌더에서의 CSP 위반은 브라우저가 필요하다
+   — 그 축은 화면이 들어오는 7E 의 스모크 자리다.
+4. **위생·취약점 게이트가 이 두 이미지를 보지 않는다.** `tools/image-hygiene-check.sh` ·
+   `tools/vuln-scan-check.sh` 는 이미지 kind 별 **정책 파일**을 요구하고 그 파일들은 이 slice 의
+   범위 밖(`config/quality/`)이다. 그래서 non-root 는 스모크가 직접 재고(§9.4 ⑤), 베이스 고정은
+   Dockerfile 의 다이제스트가 든다 — **그러나 「금지 패키지 0」과 CVE 판정은 이 두 이미지에 대해
+   아직 아무것도 재지 않는다.** 등재 자리는 운영자 결정 사항이다.
+5. **인증서는 컨테이너 수명이다**(§9.3 마지막 항목).
+6. **read_only 루트·capability 축소를 적용하지 않았다** — 두 서비스 다 `no-new-privileges` 까지다.
+7. **캐시 정책을 정하지 않았다.** 정적 응답에 `Cache-Control` 을 두지 않았다 — 운영 도메인·CDN
+   선택과 함께 갈 판단이다.
