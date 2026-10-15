@@ -17,6 +17,9 @@ import tseslint from 'typescript-eslint';
 //
 // 멤버 표기는 **소유자를 열거하지 않는다** — `window.fetch` 를 적은 손이 `self.XMLHttpRequest` 를
 // 빠뜨린 것이 열거의 성질을 보인 실측이라, 술어를 속성 이름 쪽으로 돌렸다(`no-restricted-syntax`).
+// 그 대가는 **오탐**이다(code-review r2 G-6): 속성 이름이 같으면 네트워크와 무관한 멤버도 걸린다
+// (실측 — `const cache = { fetch: (k) => k }; cache.fetch('x')` 가 lint 1). 그때는 그 줄에
+// `eslint-disable-next-line` 을 달고 리뷰로 간다 — 규칙을 넓히지 않는다.
 const API_CALL_SITE = 'src/api/client.ts';
 
 const restrictedMessage =

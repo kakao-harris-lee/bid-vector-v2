@@ -24,8 +24,34 @@ export function stripQuery(id) {
  * 파일로 들어오는 경로는 전부 남는다(플러그인이 내용을 직접 공급하는 가상 모듈은
  * `vite.config.ts` 의 영역이고 diff 에 남는다).
  */
-export function isNonFileId(id) {
-  return id.includes('\0') || !id.startsWith(sep);
+export function isAbsoluteFilePath(path) {
+  return path.startsWith(sep) || path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+/**
+ * 모듈 id 를 세 갈래로 가른다(code-review r2 G-5 — 기본 방향이 **열림**이면 안 된다).
+ *
+ * - `file`: 디스크의 파일(절대 경로). Rollup 의 가상 접두 `\0` 가 붙은 실파일 id
+ *   (`\0/abs/x.js?commonjs-exports` 같은 commonjs 변환 모듈)도 여기다 — realpath 로 경계를 잰다.
+ * - `relative`: 해석되지 않은 상대 경로. Rollup 은 보통 절대 경로로 해석해 넣으므로 이 갈래가
+ *   나오면 **모르는 것**이고, 모르는 것은 통과시키지 않는다(위반으로 센다).
+ * - `virtual`: 뒤에 파일이 없는 플러그인 공급 모듈(`\0commonjsHelpers.js` ·
+ *   `\0vite/modulepreload-polyfill.js` — 깨끗한 빌드에서 실측된 둘). 내용이 `vite.config.ts` 의
+ *   플러그인에서 오므로 legacy **파일**을 실어 올 수 없고 그 플러그인은 diff 에 남는다.
+ *
+ * 이전 판은 「절대 경로가 아니면 건너뛴다」여서 Windows 드라이브 형 id 와 상대 경로가 모두
+ * 건너뛰기 바구니에 들어갔다 — 게이트가 공허하게 통과할 수 있는 형태였다.
+ */
+export function classifyModuleId(rawId) {
+  const noQuery = stripQuery(rawId);
+  const path = noQuery.startsWith('\0') ? noQuery.slice(1) : noQuery;
+  if (isAbsoluteFilePath(path)) {
+    return { kind: 'file', path };
+  }
+  if (path === '.' || path === '..' || path.startsWith('./') || path.startsWith('../')) {
+    return { kind: 'relative', path };
+  }
+  return { kind: 'virtual', path };
 }
 
 export function isInsideRoot(candidate, root) {
@@ -57,15 +83,20 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
       const offenders = [];
 
       for (const rawId of this.getModuleIds()) {
-        const id = stripQuery(rawId);
-        if (isNonFileId(id)) {
+        const { kind, path } = classifyModuleId(rawId);
+        if (kind === 'virtual') {
+          continue;
+        }
+        if (kind === 'relative') {
+          offenders.push(`${rawId} → 해석되지 않은 상대 경로(어느 파일인지 알 수 없다)`);
           continue;
         }
         let realPath;
         try {
-          realPath = realpathSync(id);
+          realPath = realpathSync(path);
         } catch {
-          // 디스크에 없는 절대 경로 id — 파일이 아니므로 legacy 파일을 실어 올 수 없다.
+          // 절대 경로인데 디스크에 없다 — 분류할 수 없으므로 통과시키지 않는다(fail-closed).
+          offenders.push(`${rawId} → 디스크에 없는 절대 경로(분류 불가)`);
           continue;
         }
         if (realPath !== entryHtml && violatesBoundary(realPath, allowedRoots)) {

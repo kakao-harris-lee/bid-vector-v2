@@ -130,12 +130,17 @@ if (parsed.options.paths !== undefined && Object.keys(parsed.options.paths).leng
 }
 
 // ③ `web/` 안의 심볼릭 링크 0 — `src` 만이 아니라 `public/`·진입 문서까지 본다(verifier r1 L-3).
-function collectLinks(directory) {
+// 건너뛰는 자리(설치본·빌드·실행 산출물)는 아래 집합이고, 성공 문면도 그 예외를 적는다
+// (code-review r2 G-3 — `node_modules` 안에는 `.bin/*` 링크가 실제로 여럿 있다).
+// 건너뛰기는 **링크 판정 뒤**, 그리고 `web/` 깊이 1 의 **실디렉터리**에만 적용한다
+// (code-review r2 G-4) — 이름만 보고 먼저 건너뛰면 그 이름을 링크 이름으로 써서 열거를 지나간다
+// (`src/dist` → legacy). 그 형태도 ④ 전수가 받아내지만 사유 문면이 덜 정확해진다.
+function collectLinks(directory, depth) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (LINK_SCAN_SKIP.has(entry.name)) {
+    const full = join(directory, entry.name);
+    if (!entry.isSymbolicLink() && depth === 0 && LINK_SCAN_SKIP.has(entry.name)) {
       continue;
     }
-    const full = join(directory, entry.name);
     if (entry.isSymbolicLink()) {
       let pointsTo = '(해석 불가)';
       try {
@@ -147,11 +152,11 @@ function collectLinks(directory) {
       continue;
     }
     if (entry.isDirectory()) {
-      collectLinks(full);
+      collectLinks(full, depth + 1);
     }
   }
 }
-collectLinks(webRoot);
+collectLinks(webRoot, 0);
 
 // ④ 프로그램 **전수**(import·files·reference 로 끌려 들어온 파일 포함).
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
@@ -412,7 +417,7 @@ finishIfFailed();
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · web/ 심볼릭 링크 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `paths 없음 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}} · 비리터럴 동적 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
