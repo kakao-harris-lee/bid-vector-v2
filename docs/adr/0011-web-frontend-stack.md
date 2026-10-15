@@ -40,10 +40,14 @@ Playwright · eslint**. Node 는 `web/.nvmrc` 가 정본(작성 시점 호스트
   `web` job 의 src-tree 게이트가 `ts.createProgram(...).getSourceFiles()` **전수**의 realpath 가 `web/src` ∪ `web/node_modules`
   안임과 `web/src` 자체가 링크가 아님을 단언한다. ② **Vite/Rollup 모듈 그래프** — `import.meta.glob`·`?raw`·`?worker`·
   `resolve.alias`·HTML `<script>` 는 tsc 를 거치지 않으므로, 빌드 플러그인이 `buildEnd` 에서 모듈 id 전수의 realpath 가
-  `web/src` ∪ `web/node_modules` ∪ `web/index.html` 안임을 단언한다(그 플러그인의 등록 자체는 src-tree 게이트가 확인). 이름 목록
-  (eslint 금지 경로)은 1차 게이트로 쓰지 않는다.
+  `web/src` ∪ `web/node_modules` ∪ `web/index.html` 안임을 단언한다. **워커는 별도 Rollup 빌드**라 같은 플러그인을 `worker.plugins`
+  에도 둔다(7A 검토 r2 실측 — 메인 그래프만 보면 워커 관용구 두 줄로 legacy 가 워커 chunk 에 실린다). 플러그인이 **실제로 활성**인지는
+  설정 속 이름의 출현이 아니라 **카나리 빌드**가 잰다 — 실제 설정으로 밖 파일을 끌어들이는 고정 probe(메인·워커)를 빌드해 경계 오류로
+  실패해야 통과한다. ③ **`node_modules` 의 출처** — `node_modules` 는 허용 뿌리이므로 그 안이 레지스트리 패키지뿐임을 잠금 파일에서
+  단언한다(`resolved` 전수가 레지스트리 URL · `file:`·`link:`·git 0). 이름 목록(eslint 금지 경로)은 1차 게이트로 쓰지 않는다.
 - **API 모양의 손 정의 0**: D-2 의 생성 타입 + 타입 클라이언트가 유일한 호출 경로다. 그 「유일」은 src-tree 게이트의 **집합 등식**
-  으로 선다 — `openapi-fetch` 를 import 하는 파일 집합(정적 + 리터럴 동적 `import()`) == {`src/api/client.ts`}, 비리터럴 동적
+  으로 선다 — `openapi-fetch` 로 **해석되는**(지정자 문자열이 아니라 해석된 모듈 실경로 기준) import 를 가진 파일 집합(정적 + 리터럴
+  동적 `import()`) == {`src/api/client.ts`}, 비리터럴 동적
   `import()` 는 `src` 에서 0. legacy 의 응답 모양을 흉내 내려면 계약 문서를 바꿔야 하고 그 변경은 계약 test 가 V2 구현과 대조한다.
 - **브라우저 네트워크 전역은 보조 층이다**: `fetch`·`XMLHttpRequest`·`EventSource`·`WebSocket`·`sendBeacon` 직접 사용 금지 lint 는
   **실수로 쓴 직접 호출을 잡는 층**이고 의도적 우회(별칭 변수·문자열 조립·`Reflect`)를 닫지 않는다 — DOM 타입에서 그 전역을 뺄 수
