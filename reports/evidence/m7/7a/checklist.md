@@ -1,7 +1,7 @@
 # M7/7A checklist — P-5(`web/` 골격)·P-6(one-command)
 
 - 계약: 같은 디렉터리의 `scope.md`. 설계 검토: `_workspace/m7-7a/01_design-review.md`(우회 표 U-1~U-8).
-- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `f2ad4fab`.
+- base `d930d54c` · 브랜치 `m7-7a/2026-10-14` · 이 문서가 담는 마지막 산출물 커밋 `2201d3ca`.
 - 명령과 종료 코드는 `commands.md`, 되돌림은 `rollback.md`.
 - 문서 산출물(P-1~P-4)은 세션 모델 레인 소관이라 이 문서에 넣지 않는다.
 - **이 게이트 셋이 증명하는 범위**(ADR 0011 D-3 · 7A 검토 r5): ① legacy **파일** 유입 0(프로그램
@@ -14,7 +14,7 @@
 
 | 층 | 자리 | 닫는 것 | 성질 |
 |---|---|---|---|
-| 컴파일 경계 | `tsconfig` `rootDir`·`include`(W-3) | rootDir 밖 `.ts`·`.js` 의 상대 경로·별칭 import → TS6059 | 구성 |
+| 컴파일 경계 | `tsconfig` `rootDir`·`include`(W-3) | rootDir 밖 `.ts`·`.js` 의 상대 경로·별칭 import → TS6059. **TS6059 는 접두 비교다** — `src` 를 접두로 공유하는 이웃(`web/src-legacy/x.ts`)에는 나지 않고(실측: typecheck 0) 그 자리는 W-4 의 프로그램 전수(성분 단위 비교)가 받는다(실측: exit 1) | 구성 |
 | 프로그램 전수 | W-4 (`ts.createProgram(...).getSourceFiles()`) | import·`files`·triple-slash·`src` 안 링크로 끌려온 **모든** 파일(선언 파일 포함)이 `src`∪`node_modules` 안인가 | 컴파일러 API |
 | 경계의 전제 | W-4 (`lstat`·realpath·유효 옵션·AST) | `src` 자체가 링크인가 · `rootDir`·`include`·`allowJs`·`paths` 가 바뀌었나 · `web/` 안 링크(설치본·산출물 제외) · 경계 플러그인이 두 자리에 **원소로** 등재됐나(**빠른 선행 검사** — 활성은 카나리가 잰다) | 컴파일러 API + 파일시스템 |
 | 호출 자리 집합 — TS **프로그램 안** | W-4 (`ts.resolveModuleName` → 해석된 모듈의 **패키지 이름**) | 클라이언트 패키지로 해석되는 import 집합 == `{src/api/client.ts}` · 비리터럴 동적 import 0 · 해석되지 않는 bare 지정자는 위반 · **`src` 안 비 TS 스크립트 0**(그 파일은 tsc 프로그램에도 네트워크 린트에도 들어오지 않았다) | 집합 등식 — **이 층은 TS 프로그램만 본다** |
@@ -36,7 +36,7 @@
 | P-5 「`web` job 명령 그대로 로컬 exit 0」 | W-1~W-10 을 순서대로 그대로 실행해 전부 exit 0(`commands.md`). CI 전용 step 둘(checkout·setup-node, `install-deps`)은 로컬에서 성립하지 않아 뺐고 그 둘은 게이트가 아니다 |
 | P-5 「생성 타입 check 모드 음성 대조」 | §3.4 세 행 — OpenAPI 한 줄 변경 · 생성물 손 편집 · 생성물 삭제 전부 exit 1, 되돌린 뒤 exit 0. 실패 경로가 임시 디렉터리를 남기지 않는 것도 실측(0 → 0) |
 | P-5 「legacy 경로·타입 import 0(게이트)」 | §3 의 **U-1~U-9 · N-1·N-2 · N-4~N-9 · P-1\* · F-1·F-2 · O-5 · G-3 전부 RED**. 통제군 행(변이 없는 트리 · 되돌린 트리)이 같은 명령에서 exit 0 인 것과 짝으로 읽는다. **열린 자리는 §4 에 등재**(CSS `@import`·`url()` 자산 · 계산된 전역 이름 · 하드 링크) |
-| P-5 「화면 구현 없음(빈 셸 + 라우트 자리 여섯 — 화면 A~E 다섯 + 알림함, 그리고 없는 주소 자리)」 | 자리 여섯(화면 다섯 + 알림함)의 빈 셸 + 자리 표 **밖**의 없는 주소 자리. 질의·상태·디자인 토큰 0. 단위 test 가 경로 여섯·순서·id 중복 0·catch-all 이 표 밖임을 잠그고, e2e 가 알 수 없는 주소에서도 셸이 뜨는 것을 잰다 |
+| P-5 「화면 구현 없음(빈 셸 + 라우트 자리 여섯 — 화면 A~E 다섯 + 알림함, 그리고 없는 주소 자리)」 | 자리 여섯(화면 다섯 + 알림함)의 빈 셸 + 자리 표 **밖**의 없는 주소 자리. 질의·상태·디자인 토큰 0. 단위 test 가 경로 여섯·순서·id 중복 0·catch-all 이 표 밖임을 잠그고, e2e 가 알 수 없는 주소에서도 셸이 뜨는 것을 잰다. **오류 경계는 셸 라우트가 아니라 그 안의 경로 없는 자식**에 있다 — 셸 라우트에 두면 자식 throw 가 셸을 갈아치운다(구판에서 RED 를 실측했고 `AppRoot.test.tsx` 가 그 자리를 잠근다, PR #75 리뷰 A) |
 | P-6 「S-20 exit 0」 | `tools/one-command-check.sh` exit 0(`commands.md`). web 절 명령은 job 과 순서까지 같고, CI 에서 그 스크립트를 돌리는 `check` job 에 Node 툴체인과 브라우저 시스템 의존을 더했다 — 같은 게이트를 두 다른 툴체인에서 재던 상태를 끝낸다 |
 
 ## 3. 우회 실측
@@ -221,6 +221,24 @@ P-1 계열이 r2 의 high 였다: Vite 는 워커를 **별도 Rollup 빌드**로
   없다. 반대 방향(「`client.ts` 가 import 한다」)은 W-4 의 TS 등식이 진다. 7E 가 `apiClient` 를
   화면에 연결한 뒤에는 「그 패키지가 그래프에 있고 간선 집합이 정확히 `{client.ts}`」로 조일 수
   있다 — 그때 조이는 것이 이 항의 후속이다.
+- **CI 에서 web 레인이 두 번 돈다**(PR #75 리뷰 W). `web` job 이 W-1~W-10 을 돌고, `check` job 의
+  S-20 이 같은 명령을 다시 돈다(완료 조건 1 이 one-command 를 CI 에서 직접 재기 때문이다). 비용은
+  설치·빌드·브라우저 다운로드가 두 번이고, 그 대가로 「one-command 가 실제로 성립한다」가 CI 에서
+  측정된다. 줄이려면 완료 조건 1 의 측정 자리를 옮기는 결정이 필요하다 — 7A 에서 하지 않는다.
+- **`check` job 의 web 설치가 실패하면 S-20 의 Kotlin·Python 전건까지 건너뛴다**(PR #75 리뷰 L).
+  `one-command-check.sh` 는 `set -euo pipefail` 로 web 절의 `npm ci` 실패에서 멈추는데, 그 절이
+  **스크립트 끝**에 있어 앞의 Kotlin·Python 은 이미 돌았다 — 반대로 `check` job 에 새로 둔
+  **설치 step 둘**(`npm ci`·`install-deps`)은 S-20 **앞**이라 거기서 실패하면 S-20 자체가 돌지
+  않는다(네트워크·apt 의존이 Kotlin 게이트의 전제가 된 셈이다). 같은 job 안이라 빨강은 보이지만
+  원인과 범위를 혼동하지 않도록 등재한다.
+- **one-command 의 「새 checkout 에서 e2e 까지」는 브라우저 시스템 패키지가 있는 장비 전제**다
+  (PR #75 리뷰 V). 없는 장비에서는 `npx playwright install-deps chromium`(apt·sudo)이 먼저
+  필요하고, 그 step 은 CI 전용으로 빼 두었다(스크립트 머리에 같은 전제를 적었다).
+- **스모크 실패에 산출물이 0 건인 경우**(PR #75 리뷰 G). `web` job 의 trace 업로드는 조건을
+  스모크 step 하나로 좁히고 `if-no-files-found: error` 를 유지한다 — 이번 PR 의 RED 처럼
+  webServer 가 뜨지 않아 test 가 한 번도 돌지 못하면 trace 가 0 건이고, 그 상태는 조용히 넘기지
+  않고 업로드 step 의 빨강으로 표시된다. `check` job 쪽은 깨진 step 이 Kotlin·Python 일 수도
+  있어 0 건이 정상이므로 기본(경고) 동작을 쓴다.
 - **의존 패키지 취약점 스캔 없음** — `OPEN-7A-WEB-DEPENDENCY-SCAN`(7F). 이 slice 는 `npm ci` 가 잠금
   파일 밖을 해석하지 않고 `engine-strict=true` 로 선언 범위 밖 Node 에서 설치가 멈추는 것까지 본다
   (양성 대조: `engines.node` 를 범위 밖으로 바꾸면 `npm ci` exit 1 · 되돌리면 0).
