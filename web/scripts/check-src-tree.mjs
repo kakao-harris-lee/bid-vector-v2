@@ -210,6 +210,54 @@ if (!apiImporters.has(API_CALL_SITE)) {
   );
 }
 
+// ⑦ 허용 뿌리 `node_modules` 의 **출처**를 잠금 파일에서 본다(verifier r2 M-4).
+//
+// ④ 는 `node_modules` 안을 허용 뿌리로 둔다 — 그 전제는 「거기 있는 것은 레지스트리에서 온
+// 패키지다」이고, `file:` 의존 한 줄 + `.npmrc` 의 `install-links` 한 줄이면 web 밖 디렉터리의
+// **사본**이 `node_modules` 안에 실디렉터리로 들어온다(실측: 그 상태에서 게이트 넷 전부 exit 0 ·
+// dist 에 밖 코드). 그래서 `npm ci` 가 따르는 정본인 잠금 파일을 같은 층에서 단언한다.
+const lockPath = resolve(webRoot, 'package-lock.json');
+if (!existsSync(lockPath)) {
+  fail('package-lock.json 이 없다 — `npm ci` 의 정본이 없으면 node_modules 의 출처를 알 수 없다');
+} else {
+  let lock;
+  try {
+    lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+  } catch (caught) {
+    fail(`package-lock.json 을 읽지 못했다: ${caught.message}`);
+  }
+  for (const [name, entry] of Object.entries(lock?.packages ?? {})) {
+    if (name === '') {
+      continue; // 뿌리 항목 자신 — `resolved` 가 없는 것이 정상이다.
+    }
+    if (entry.link === true) {
+      fail(`잠금 파일 항목이 로컬 링크다: ${name}`);
+      continue;
+    }
+    if (typeof entry.resolved !== 'string') {
+      fail(`잠금 파일 항목에 resolved 가 없다(출처 불명): ${name}`);
+      continue;
+    }
+    if (!entry.resolved.startsWith('https://')) {
+      fail(`잠금 파일 항목의 출처가 레지스트리 URL 이 아니다: ${name} → ${entry.resolved}`);
+    }
+    if (typeof entry.version === 'string' && /^(file:|link:|git|github:|npm:)/.test(entry.version)) {
+      fail(`잠금 파일 항목의 버전이 레지스트리 판이 아니다: ${name} → ${entry.version}`);
+    }
+  }
+}
+
+// `install-links` 는 `file:` 의존을 **복사**로 바꿔 realpath 검사를 지나가게 만드는 손잡이다 —
+// 그 한 줄이 들어오면 멈춘다.
+const npmrcPath = resolve(webRoot, '.npmrc');
+if (existsSync(npmrcPath)) {
+  for (const line of readFileSync(npmrcPath, 'utf8').split('\n')) {
+    if (/^\s*install-links\s*=/.test(line)) {
+      fail(`web/.npmrc 에 install-links 설정이 있다: ${line.trim()}`);
+    }
+  }
+}
+
 // ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
 const viteConfigPath = resolve(webRoot, 'vite.config.ts');
 if (!existsSync(resolve(webRoot, 'scripts', 'module-graph-boundary.mjs'))) {
