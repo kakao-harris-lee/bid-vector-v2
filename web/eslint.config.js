@@ -24,6 +24,10 @@ import tseslint from 'typescript-eslint';
 // `eslint-disable-next-line` 을 달고 리뷰로 간다 — 규칙을 넓히지 않는다.
 const API_CALL_SITE = 'src/api/client.ts';
 
+// 네트워크 표면의 이름과 소유자 — 아래 두 규칙이 이 둘의 **구성**으로 만들어진다.
+const NETWORK_MEMBERS = ['fetch', 'XMLHttpRequest', 'sendBeacon', 'EventSource', 'WebSocket'];
+const NETWORK_OWNERS = ['window', 'globalThis', 'self', 'navigator'];
+
 const restrictedMessage =
   '서버 호출은 src/api/client.ts 의 생성 타입 클라이언트(openapi-fetch)로만 한다 — ADR 0011 D-2.';
 
@@ -83,25 +87,20 @@ export default tseslint.config(
       // `document.defaultView?.`·지역 별명 `const w = window`) 같은 술어에 걸린다.
       'no-restricted-syntax': [
         'error',
-        { selector: "MemberExpression[property.name='fetch']", message: restrictedMessage },
-        {
-          selector: "MemberExpression[property.name='XMLHttpRequest']",
+        ...NETWORK_MEMBERS.map((name) => ({
+          selector: `MemberExpression[property.name='${name}']`,
           message: restrictedMessage,
-        },
-        { selector: "MemberExpression[property.name='sendBeacon']", message: restrictedMessage },
-        { selector: "MemberExpression[property.name='EventSource']", message: restrictedMessage },
-        { selector: "MemberExpression[property.name='WebSocket']", message: restrictedMessage },
+        })),
       ],
-      // 리터럴 계산 접근(`window['fetch']`)은 위 선택자에 안 걸리므로 남겨 둔다.
+      // 리터럴 계산 접근(`window['fetch']`)은 위 선택자에 안 걸리므로 여기서 받는다. 손으로
+      // 열거하지 않고 **소유자 × 이름의 구성**으로 만든다(PR #75 리뷰 O) — 손 열거는 비대칭을
+      // 낳았고(`self.XMLHttpRequest` 누락이 r2 의 지적이었다) 이름을 하나 더해도 대칭이 유지되지
+      // 않았다. 이제 다섯 이름이 네 소유자 전부에 대해 같은 규칙을 받는다.
       'no-restricted-properties': [
         'error',
-        { object: 'window', property: 'fetch', message: restrictedMessage },
-        { object: 'window', property: 'XMLHttpRequest', message: restrictedMessage },
-        { object: 'globalThis', property: 'fetch', message: restrictedMessage },
-        { object: 'globalThis', property: 'XMLHttpRequest', message: restrictedMessage },
-        { object: 'self', property: 'fetch', message: restrictedMessage },
-        { object: 'self', property: 'XMLHttpRequest', message: restrictedMessage },
-        { object: 'navigator', property: 'sendBeacon', message: restrictedMessage },
+        ...NETWORK_OWNERS.flatMap((object) =>
+          NETWORK_MEMBERS.map((property) => ({ object, property, message: restrictedMessage })),
+        ),
       ],
       'no-restricted-imports': [
         'error',
