@@ -77,14 +77,17 @@ _cleanup() {
   # **잔여 0 을 종료 경로에서 센다**(성공·실패 무관). `down -v` 가 지우는 것은 이 프로젝트
   # 라벨이 붙은 것뿐이다 — 다른 프로젝트의 볼륨은 애초에 대상이 아니다(6B-2 이름 충돌 교훈).
   local left_c left_v left_n
-  left_c="$(docker ps -aq --filter "label=com.docker.compose.project=${PROJECT:-}" 2>/dev/null || true)"
-  left_v="$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJECT:-}" 2>/dev/null || true)"
-  left_n="$(docker network ls -q --filter "label=com.docker.compose.project=${PROJECT:-}" 2>/dev/null || true)"
+  # PROJECT 가 없으면(preflight 가 그 전에 멈춘 경우) 셈을 돌리지 않는다 — 빈 값으로 필터를 걸면
+  # 무엇을 세는지가 불분명해진다.
+  [ -n "${PROJECT:-}" ] || return "$rc"
+  left_c="$(docker ps -aq --filter "label=com.docker.compose.project=${PROJECT}" 2>/dev/null || true)"
+  left_v="$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJECT}" 2>/dev/null || true)"
+  left_n="$(docker network ls -q --filter "label=com.docker.compose.project=${PROJECT}" 2>/dev/null || true)"
   if [ -n "$left_c$left_v$left_n" ]; then
     echo "정리 뒤 잔여가 있다 — 컨테이너[$(printf '%s' "$left_c" | tr '\n' ' ')] 볼륨[$(printf '%s' "$left_v" | tr '\n' ' ')] 네트워크[$(printf '%s' "$left_n" | tr '\n' ' ')]" >&2
     exit 1
   fi
-  echo "잔여 0 — 컨테이너·볼륨·네트워크(프로젝트 ${PROJECT:-?})"
+  echo "잔여 0 — 컨테이너·볼륨·네트워크(프로젝트 ${PROJECT})"
   return "$rc"
 }
 
@@ -184,9 +187,12 @@ _auth_body_code() {
 }
 _tail_code() { printf '%s' "$1" | tail -n1; }
 _drop_code() { printf '%s' "$1" | sed '$d'; }
-# 평문: 같은 포트에 http 로 던진다. 전송 자체가 끊기는 것이 정상이다.
-_plain_code() { local o; o="$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "http://${DOMAIN}:${PORT}$1" 2>/dev/null)" || o="transport-error"; printf '%s' "$o"; }
-_plain_body() { local o; o="$(curl -sS --max-time 5 "http://${DOMAIN}:${PORT}$1" 2>/dev/null)" || o=""; printf '%s' "$o"; }
+# 평문: **같은 주소의 같은 포트**에 http 로 던진다(`--resolve` 로 주소를 고정한다 — 이름이 `::1` 로
+# 먼저 풀리는 장비에서 「연결 자체가 안 됐다」가 「평문이 거부됐다」로 읽히면 그 단언은 공허해진다).
+# 남는 공허 축 하나는 「리스너가 죽어서 전송 오류」인데, 그것은 같은 실행의 (B)·(C) 가 https 로
+# 200/401 을 받은 뒤이므로 성립하지 않는다 — 순서가 그 역할을 한다.
+_plain_code() { local o; o="$(curl -sS --max-time 5 --resolve "${DOMAIN}:${PORT}:127.0.0.1" -o /dev/null -w '%{http_code}' "http://${DOMAIN}:${PORT}$1" 2>/dev/null)" || o="transport-error"; printf '%s' "$o"; }
+_plain_body() { local o; o="$(curl -sS --max-time 5 --resolve "${DOMAIN}:${PORT}:127.0.0.1" "http://${DOMAIN}:${PORT}$1" 2>/dev/null)" || o=""; printf '%s' "$o"; }
 
 # 관리 표면의 표지. 이 문자열이 프록시를 지난 어떤 응답에도 없어야 한다.
 MGMT_MARKER='"status":"UP"'
