@@ -75,8 +75,8 @@ legacy 경로」로만 적는다. legacy 의 화면 분할(opportunities/project
 
 ### D-5. CI 와 one-command
 
-`web` job 하나가 `npm ci` → lint → typecheck → 생성 check → vitest → build → Playwright 스모크를 순서대로 돈다(작성 시점 화면이
-없으므로 스모크는 셸이 뜨는지 하나). `tools/one-command-check.sh`(M6 완료 조건 1)가 같은 명령을 포함한다 — 줄일 수 있는 단위는
+`web` job 하나가 `npm ci` → lint → typecheck → src-tree → 생성 check → vitest → build → 카나리 → 브라우저 설치 → Playwright
+스모크를 순서대로 돈다(W-1~W-10, 이름과 명령의 정본은 `ci.yml`. 작성 시점 화면이 없으므로 스모크는 셸이 뜨는지 하나). `tools/one-command-check.sh`(M6 완료 조건 1)가 같은 명령을 포함한다 — 줄일 수 있는 단위는
 job 이다(하네스 2026-09-12).
 
 ### D-6. 비밀값과 번들

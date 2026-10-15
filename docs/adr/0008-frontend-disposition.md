@@ -11,6 +11,7 @@
   직접 물어 받았다. 기록의 **정본**은 `milestone-0.md` 「승인에 드는 것」의 ADR 행이며,
   같은 승인의 다른 대상(활성 `OPEN` 이월)은 `docs/discovery/capability-map.md` §14다.
 - **개정 2026-10-03** — D-1·D-3·D-4 에 개정 블록, §5 `OPEN-ADR-09` 해소(`milestone-7.md`, PR #55 와 함께).
+- **개정 2026-10-14** — D-4 개정 블록에 7A 판정(요구표 · ADR 0011 D-3 포인터, PR #75 와 함께).
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **8** (React UI 재사용/재작성/후속 여부)
 - **legacy 기준 commit**: `ed4b06c`
@@ -124,7 +125,9 @@ FastAPI의 OpenAPI 스키마에서 생성된다.** (재현: `commands.md` **C-5.
 >
 > **7A 판정 2026-10-14.** 1·2 의 답은 `docs/discovery/m7-screen-data-requirements.md`(V2 계약은 전략 편집만 덮고, 덮지 못하는
 > 요구는 거의 전부 V2 가 누락한 capability — legacy 전용은 목록 이원화 하나). 3 의 게이트는 `docs/adr/0011-web-frontend-stack.md`
-> D-3(`rootDir` 컴파일 경계 + 생성 타입 check 모드).
+> D-3 — 두 그래프(TS 프로그램 · Vite/Rollup 번들, 메인·워커)를 각각 닫는 legacy 파일 유입 0 · 클라이언트 패키지 사용처 등식 ·
+> 생성 타입 바이트 등식 · 카나리로 잰 경계 활성. 「서버를 부르는 경로가 하나뿐」은 그 게이트가 증명하지 않고 리뷰 소관이다
+> (층 목록과 범위의 정본은 ADR 0011 D-3).
 
 ### D-5. 화면을 전제하는 capability의 acceptance는 UI 없이도 관찰 가능해야 한다
 
