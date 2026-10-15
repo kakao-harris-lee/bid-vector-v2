@@ -1,6 +1,6 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.persistence.JdbcNoticeSearch
+import bidvector.adapters.notice.JdbcNoticeSearch
 import bidvector.workflow.notice.NoticeSearchPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

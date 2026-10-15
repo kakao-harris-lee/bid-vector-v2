@@ -1,5 +1,8 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.notice
 
+import bidvector.adapters.persistence.JdbcNoticeRepository
+import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.Sql
 import bidvector.procurement.Agency
 import bidvector.procurement.AgencyCode
 import bidvector.procurement.AgencyName

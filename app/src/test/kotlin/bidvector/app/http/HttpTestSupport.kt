@@ -181,7 +181,7 @@ private class UnreachableLicenseGatePort : LicenseGatePort {
 /**
  * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
  * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
- * 아니라 `bidvector.adapters.persistence.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
+ * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
  * 여기서 재는 것은 **HTTP 층이 조건을 어떻게 만들고 결과를 어떤 응답으로 옮기는가**다.
  */
 class FakeNoticeSearchPort : NoticeSearchPort {

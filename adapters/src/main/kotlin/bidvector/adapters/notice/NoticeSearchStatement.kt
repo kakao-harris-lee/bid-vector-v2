@@ -1,5 +1,6 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.notice
 
+import bidvector.adapters.persistence.Sql
 import bidvector.procurement.ProvenanceKind
 import bidvector.sharedkernel.export
 import bidvector.workflow.notice.NoticeAmountBound

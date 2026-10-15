@@ -1,4 +1,4 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.notice
 
 import bidvector.procurement.ProvenanceKind
 import bidvector.workflow.notice.NoticeSearchLimits

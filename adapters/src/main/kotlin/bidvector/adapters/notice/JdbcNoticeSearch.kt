@@ -1,5 +1,7 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.notice
 
+import bidvector.adapters.persistence.reconstructNotice
+import bidvector.adapters.persistence.toNoticeRow
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
