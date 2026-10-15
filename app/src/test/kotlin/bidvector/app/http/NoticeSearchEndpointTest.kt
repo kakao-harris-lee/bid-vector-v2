@@ -33,7 +33,7 @@ import java.time.Instant
 
 /**
  * `GET /api/notices` 의 HTTP 층 거동 — 조건 조립·헤더·거부 상태 코드. 실 질의 거동은
- * `bidvector.adapters.persistence.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다.
+ * `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다.
  *
  * 설계 검토 (2) 의 우회 ①(자격증명 없이 호출)은 `OperatorAuthenticationTest` 의 **기계
  * 전수**가 이미 이 경로를 포함하지만(등록된 모든 매핑을 거둔다), 이 endpoint 가 실제로 그
@@ -120,7 +120,9 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
 
     @Test
     fun `우회 ① — 자격증명이 없으면 401 이고 본문은 ErrorBody 다`() {
-        val response = restTemplate.getForEntity(url("/api/notices"), Map::class.java) as ResponseEntity<Map<String, Any?>>
+        val response =
+            restTemplate.getForEntity(url("/api/notices"), Map::class.java)
+                as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 401
         response.body?.get("code") shouldBe ErrorCode.UNAUTHENTICATED
