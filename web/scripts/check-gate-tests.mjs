@@ -17,7 +17,7 @@
 // 남는 자리: 이 스크립트나 그 step 을 지우는 것, 등록부에서 줄을 빼는 것은 **리뷰 소관**이다
 // (등재된 「게이트 스크립트 자체의 수정」 부류 — diff 에 남는다).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,9 +74,27 @@ try {
     }
     const files = Array.isArray(report?.testResults) ? report.testResults : [];
     for (const relative of registered) {
-      const entry = files.find(
-        (file) => typeof file.name === 'string' && file.name.replaceAll('\\', '/').endsWith(relative),
-      );
+      // 식별은 **절대 경로 등식**이다(verifier r7 M-13). 접미 일치로 찾던 동안, 실제 파일을
+      // `exclude` 로 빼고 **같은 접미의 다른 파일**(`scripts/x/scripts/<같은 이름>` ·
+      // `scripts/xscripts/<같은 이름>`)을 두면 그 다른 파일의 결과가 「등록부의 게이트 test」로
+      // 읽혔다 — r6 M-12 가 닫은 `exclude` 형태가 파일 하나로 되살아났다(실측).
+      let expected;
+      try {
+        expected = realpathSync(resolve(webRoot, relative));
+      } catch {
+        // 등록부의 파일이 디스크에 없다 — 위의 존재 검사가 이미 사유를 적었다.
+        continue;
+      }
+      const entry = files.find((file) => {
+        if (typeof file.name !== 'string') {
+          return false;
+        }
+        try {
+          return realpathSync(resolve(webRoot, file.name)) === expected;
+        } catch {
+          return false;
+        }
+      });
       if (entry === undefined) {
         failures.push(
           `게이트 test 가 W-6 의 수집에 없다: ${relative} — 수집에서 빠진 test 는 아무것도 막지 못한다`,
