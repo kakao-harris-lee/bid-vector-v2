@@ -77,6 +77,19 @@ Codex 없음(되돌리기 어려운 경로 아님).
 - 이 range 의 팀장 커밋(`91c1718c`·`3cc30d49`·`b4ca492c`)은 계약과 capability map(D-G1T-2, in_scope)이다. **하네스 파일(`.claude/**`·
   `CLAUDE.md`) 변경은 없다.**
 
+**D-G1T-4 (2026-10-16, 팀장 — 검토 r1 수령, 재작업 1/5).** verifier r1 은 not-ready 였다(B-1: COL-03 ⓐ 는 거짓 성립). code-review 는
+REQUEST_CHANGES 였다(H-1 COL-02 문면 · H-2 COL-03). 운영자 결정은 두 가지다.
+- **COL-03 은 ⓒ 로 돌린다.** 6G 의 유일한 production 호출부가 조회 가치 술어에 상수를 넘겨 age-gate·recheck-gate 가 출하 경로에서 발화하지
+  않는다(verifier 변이 N-5·N-5b). 둘째 bullet 은 미성립이다. 남은 일은 **출하 경로에 age-gate 를 실제로 배선하는 production 수정**이고,
+  G1 후속 slice 로 등재한다. COL-03 은 「측정만 없음」이 아니게 됐다. 첫째 bullet 의 근거는 시도 원장(T-2 실행 2 · 원장 test)으로 고쳐
+  적는다. 셋째 bullet(개정)은 T-2 가 성립시킨다.
+- **COL-02 는 문면을 재관측으로 개정하고 ⓐ 로 둔다.** 개정 블록은 팀장이 capability map 에 썼다. V2 의 개찰 수집은 공고 행에 쓰지 않는다.
+- COL-03 셋째 bullet 문구를 실측에 맞췄다. 「시도 안 함」 수는 멈춤 보고에, 사유·429 수는 회계에 실린다(verifier M-a).
+- 수정 라운드 대상: 추적표 COL-03 행(ⓒ · 후속) · 집계(ⓐ 16 · ⓒ 43 · COL 축 · 성립 18/61) · 낡은 수 둘 · T-4 종료 대기 · T-3 빈 목록 단언 ·
+  T-3 상한 계층 경계 문면 · COL-03 행의 어댑터 측 인용 · capability map 역방향 좌표 실측 · 후속 등재(6E-1 checklist 수치 · milestone-6 G1
+  처분 변화).
+- 동결 뒤 레인 커밋 `a5a0b56d`(checklist 변이 표 보강)가 있었다. evidence 만 바뀌었고 이번 라운드에 포함한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(이 slice 의 range 에 `.claude/**`·`CLAUDE.md` 변경 0).
