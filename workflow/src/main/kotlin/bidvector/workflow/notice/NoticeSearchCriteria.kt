@@ -171,29 +171,31 @@ private val NOTICE_SEARCH_REJECTIONS: List<(NoticeSearchParameters) -> NoticeSea
     )
 
 private fun amountInverted(parameters: NoticeSearchParameters): Boolean {
-    val min = parameters.amountMinWon.parsedWon() ?: return false
-    val max = parameters.amountMaxWon.parsedWon() ?: return false
-    return min > max
+    val min = parameters.amountMinWon.parsedWon()
+    val max = parameters.amountMaxWon.parsedWon()
+    return min != null && max != null && min > max
 }
 
 private fun deadlineInverted(parameters: NoticeSearchParameters): Boolean {
-    val from = parameters.deadlineFrom.parsedInstant() ?: return false
-    val to = parameters.deadlineTo.parsedInstant() ?: return false
-    return from.isAfter(to)
+    val from = parameters.deadlineFrom.parsedInstant()
+    val to = parameters.deadlineTo.parsedInstant()
+    return from != null && to != null && from.isAfter(to)
 }
 
 private fun sizeOutOfRange(parameters: NoticeSearchParameters): Boolean {
-    val size = parameters.size.parsedInt() ?: return false
-    return size < 1 || size > NoticeSearchLimits.MAX_PAGE_SIZE
+    val size = parameters.size.parsedInt()
+    return size != null && (size < 1 || size > NoticeSearchLimits.MAX_PAGE_SIZE)
 }
 
 private fun amountBoundOrNull(
     min: Long?,
     max: Long?,
-): NoticeAmountBound? {
-    if (min == null && max == null) return null
-    return NoticeAmountBound(min?.let(::declaredBaseAmount), max?.let(::declaredBaseAmount))
-}
+): NoticeAmountBound? =
+    if (min == null && max == null) {
+        null
+    } else {
+        NoticeAmountBound(min?.let(::declaredBaseAmount), max?.let(::declaredBaseAmount))
+    }
 
 /** 한계값의 구성 — 감시 경로와 같은 통화·과세·provenance(`NoticeSearchLimits`). */
 private fun declaredBaseAmount(won: Long): BaseAmount =
@@ -203,28 +205,3 @@ private fun declaredBaseAmount(won: Long): BaseAmount =
         NoticeSearchLimits.AMOUNT_VAT_TREATMENT,
         NoticeSearchLimits.AMOUNT_PROVENANCE,
     )
-
-private fun String?.searchTextOrNull(): SearchText? = this?.trim()?.takeIf { it.isNotEmpty() }?.let(::SearchText)
-
-private fun String?.tooLong(): Boolean = this != null && length > NoticeSearchLimits.MAX_TEXT_LENGTH
-
-private fun String?.blankOrNull(): Boolean = this == null || isBlank()
-
-private fun String?.parsedWon(): Long? = this?.trim()?.takeIf { it.isNotEmpty() }?.toLongOrNull()
-
-private fun String?.notInteger(): Boolean = !blankOrNull() && parsedWon() == null
-
-private fun String?.negative(): Boolean = (parsedWon() ?: 0L) < 0L
-
-private fun String?.parsedInt(): Int? = this?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
-
-private fun String?.notInteger32(): Boolean = !blankOrNull() && parsedInt() == null
-
-/**
- * ISO-8601 순간만 받는다. `Instant.parse` 의 실패를 `runCatching` 으로 접는 이유는 결과
- * 타입으로 되돌리기 위함이다 — 이 모듈 밖으로 예외가 나가지 않는다.
- */
-private fun String?.parsedInstant(): Instant? =
-    this?.trim()?.takeIf { it.isNotEmpty() }?.let { raw -> runCatching { Instant.parse(raw) }.getOrNull() }
-
-private fun String?.notInstant(): Boolean = !blankOrNull() && parsedInstant() == null
