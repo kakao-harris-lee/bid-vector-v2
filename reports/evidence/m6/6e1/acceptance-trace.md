@@ -11,22 +11,22 @@ Kotlin 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정해 **제�
 둘째 bullet 은 「부재가 요구를 충족」형 근거임을 production 칸에 적고(RT2-M-2), `STR-03` 에 production
 HTTP 경로 식별자를 더했다(RT2-L-1).
 
-집계 이력은 ⓐ **29 → 20 → 15 → 13 → 17**, 성립 범위 **31 → 22 → 17 → 15 → 19/61** 이다(마지막 걸음은 M6/G1-T 가 test 를 **신설**해 올린 것이고, 앞 네 걸음처럼 같은 술어를 다시 적용한 것이 아니다) — 완료 조건 3 의 결론
-(「오늘 성립하지 않는다」)은 네 라운드 모두 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
+집계 이력은 ⓐ **29 → 20 → 15 → 13 → 16**, 성립 범위 **31 → 22 → 17 → 15 → 18/61** 이다(마지막 걸음은 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼 같은 술어를 다시 적용한 것이 아니다 — 그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다) — 완료 조건 3 의 결론
+(「오늘 성립하지 않는다」)은 **다섯 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
 기준으로 적용한 것**이고, 그때마다 어느 bullet 이 비었는지를 행에 남겼다.
 
 ## 집계
 
 | 분류 | 건수 |
 |---|---:|
-| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **17** |
+| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **16** |
 | ⓑ 경계로 처리 — 잴 대상이 설계로 없다 | **2** |
-| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **42** |
+| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **43** |
 | **계** | **61** |
 
 | 축 | ⓐ | ⓑ | ⓒ | 계 |
 |---|---:|---:|---:|---:|
-| COL | 5 | 1 | 2 | 8 |
+| COL | 4 | 1 | 3 | 8 |
 | STR | 2 | 0 | 8 | 10 |
 | QUAL | 3 | 0 | 4 | 7 |
 | ML | 1 | 0 | 6 | 7 |
@@ -34,13 +34,13 @@ HTTP 경로 식별자를 더했다(RT2-L-1).
 | NOTI | 1 | 1 | 3 | 5 |
 | SET | 0 | 0 | 3 | 3 |
 | OPS | 1 | 0 | 11 | 12 |
-| **계** | **17** | **2** | **42** | **61** |
+| **계** | **16** | **2** | **43** | **61** |
 
-**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 17 건**, 잴 대상이 설계로
-없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 42 건**이다. 그래서 「M0 필수 capability E2E
-전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 17 + ⓑ 2 = 19 건이고, 그 범위를 이 표가 고정한다.
+**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 16 건**, 잴 대상이 설계로
+없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 43 건**이다. 그래서 「M0 필수 capability E2E
+전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 16 + ⓑ 2 = 18 건이고, 그 범위를 이 표가 고정한다.
 
-**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 46 건 가운데 대부분은 acceptance 의 여러 항목이 이미
+**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 43 건 가운데 대부분은 acceptance 의 여러 항목이 이미
 측정되고 있고 **한둘이 비어 있다**. 그 비어 있는 항목과 이미 측정되는 부분을 행마다 적었다. 부분 측정이
 강한 행 `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-01` · `ML-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-08` · `SET-06` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
 
@@ -75,14 +75,18 @@ HTTP 경로 식별자를 더했다(RT2-L-1).
 없으므로 **CI step 이름**이 식별자이고 재는 모듈 경로는 본문에 적는다. 두 집합과의 대조 명령은
 `reports/evidence/m6/6e1/commands.md` 「문서 등식」 절의 `E-1`~`E-3` 이다.
 
-## 후속이 **test 신설**이었던 ⓒ — 0 건 (M6/G1-T 가 넷을 닫았다)
+## 후속이 **test 신설**이었던 ⓒ — 0 건 (M6/G1-T 가 셋을 닫고, 하나는 처분이 바뀌었다)
 
-구현은 성립하고 **측정만** 비어 있던 행 넷이다 — `COL-02` · `COL-03` · `DEC-06` · `OPS-01`. M6/G1-T 가 그 넷의
-빈 bullet 을 각각 test 로 닫아 **ⓐ** 로 올렸고(각 행의 「재는 자리」 칸이 신설 식별자를 든다), 그 test 들은
-production 속성을 바꿔치운 변이에서 RED 임을 함께 실측했다(`reports/evidence/m6/g1t/checklist.md`).
-`COL-03` 은 셋째 bullet 의 **문면이 V2 거동과 어긋나** 있었고 운영자 승인으로 capability map 을 먼저 개정한 뒤
-그 문면을 잰다. 이 절은 비어 있지만 지우지 않는다 — 어느 행이 어떤 사유로 올라왔는지가 완료 조건 3 의 처분
-이력이다.
+구현은 성립하고 **측정만** 비어 있다고 분류된 행 넷이었다 — `COL-02` · `COL-03` · `DEC-06` · `OPS-01`.
+M6/G1-T 가 셋(`COL-02`·`DEC-06`·`OPS-01`)의 빈 bullet 을 test 로 닫아 **ⓐ** 로 올렸고(각 행의 「재는 자리」
+칸이 신설 식별자를 든다), 그 test 들은 production 속성을 바꿔치운 변이에서 RED 임을 함께 실측했다
+(`reports/evidence/m6/g1t/checklist.md`).
+
+`COL-03` 은 **처분 자체가 바뀌었다**. 셋째 bullet 은 운영자 승인으로 capability map 을 개정한 뒤 신설 test 가
+성립시켰지만, 같은 라운드의 검토가 **둘째 bullet 이 출하 배선에서 미성립**임을 변이로 실측했다(6G 호출부가
+조회 가치 술어에 상수를 넘긴다). 그래서 `COL-03` 은 「측정만 없음」이 아니라 **production 수정이 선행하는 ⓒ**
+이고, 후속은 test 가 아니라 출하 경로 age-gate 배선이다. 이 절은 비어 있지만 지우지 않는다 — 어느 행이 어떤
+사유로 올라오고 내려갔는지가 완료 조건 3 의 처분 이력이다.
 
 ## OPEN·후속이 **들고 있지 않은** 미구현 — 17 건
 
@@ -97,8 +101,8 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | capability | 이름 | 판정 | 재는 자리(등재 식별자) | **production 배선·출하 값** | 무엇을 재는가 / 무엇이 비었는가 | OPEN·후속 |
 |---|---|---|---|---|---|---|
 | **COL-01** | 당일 등록된 신규 공고를 자동으로 받는다 | ⓐ | `bidvector.adapters.koneps.KonepsOpenApiNoticeSourceTest` · `bidvector.app.wiring.CollectionWiringTest` · `bidvector.procurement.NoticeIdTest` · `bidvector.adapters.persistence.CleanMigrationCheckTest` · `bidvector.adapters.persistence.NoticeFindRoundTripTest` | `CollectionWiring`(`mode=once` 조건부)이 `KonepsOpenApiNoticeSource` 와 **출하 오퍼레이션 표**를 조립한다. 탈락 술어는 정책 표에 의존하지 않는다(`Canonicalize` 의 「번호 없음」·IDENTIFIER 탈락은 무조건이다). 차수 형식은 `notice_round` CHECK 가 DB 에서 닫고 조회 키가 그 값을 쓴다. **둘째 bullet 은 「부재가 요구를 충족」형 근거다**(verifier RT2-M-2) — `CollectionProperties` 의 `from`·`to` 가 **기본값 없는 필수 값**이라 「기준일 미지정으로 수집」하는 경로가 production 에 **없다**(미설정은 바인딩 실패 = 기동 거부). legacy 의 「미지정 시 UTC 로 전날」 결함 클래스가 설계로 생길 수 없고, 인용 test 가 재는 것은 **명시한 `to` 의 KST 상한**이다. | 탈락 회계는 `COL-01` 을 축어로 인용하는 test 둘이, KST 기준일은 「오늘은 KST 달력일이다 — UTC 날짜와 갈리는 시각에도」가 잰다. 제로패딩 차수의 「수집·저장·재조회 전 구간」은 세 층으로 닫힌다 — 타입 왕복(「원문 문자열 그대로 왕복한다」) · DB 의 `notice_round` 형식 CHECK · 그 차수를 **조회 키로 쓰는** 저장 왕복(키가 보존되지 않으면 find 가 빗나가 그 단언들이 붉어진다). | — |
-| **COL-02** | 어떤 공고가 얼마에 누구에게 낙찰됐는지 받는다 | ⓐ | `bidvector.adapters.persistence.BaseAmountMergeGuardTest` · `bidvector.adapters.persistence.PrecedenceParityTest` · `bidvector.adapters.persistence.PrecedenceMutationTest` · `bidvector.procurement.ResolvedBaseAmountTest` · `bidvector.procurement.NoticeTest` · `bidvector.procurement.OpeningResultFactSlotsTest` | 공고 행의 유일한 production write 경로는 `JdbcNoticeRepository`(`NoticeRepository` 의 유일한 구현 — `PersistenceWiring` 이 조립하고 `CollectNoticesUseCase` 가 부른다)이고, 그 안의 `mergeNoticeRow` 가 금액 축의 가드를 적용한다. 출하 권위 표는 `IS_AUTHORITATIVE`(참은 `PUBLISHED`·`OPERATOR_DECLARED` 둘)이고 같은 판정이 V2 마이그레이션의 provenance 가드 트리거에도 서 있다(parity test 가 두 자리를 대조한다). 개찰 축의 파생 기초금액은 `JdbcOpeningResultRepository` 의 자기 fact 로 간다. | 첫 bullet(실 기초금액이 없는 재관측이 저장된 기초금액을 덮지 않는다)을 **M6/G1-T 신설 test** 가 persist 경로로 잰다 — 값이 실린 insert → 아무 값도 없는 개찰 pass(`Unchanged`, write 자체가 없다) → 예정가만 실은 개찰 pass(행은 갱신되고 기초금액 열은 그대로) 세 걸음, 그리고 권위 있는 재관측에는 교체된다는 대조. 둘째 bullet(낙찰가·사정률만 있는 개찰 행이 기초금액을 배출하지 않고 예정가를 파생값 + provenance 로 신고한다)은 `NoticeTest`(「계산식은 없다」)·`OpeningResultFactSlotsTest`, 값이 실린 유입의 권위 비교는 `ResolvedBaseAmountTest` 와 두 precedence test 가 잰다. **알려진 제한** — V2 는 개찰 축을 공고 행의 기초금액 열에 쓰지 않는다(그 분리가 이 경계의 구조적 답이다). 그래서 신설 test 가 지키는 자리는 공고 행의 write 가드이고, 개찰 pass 가 그 열에 **닿는 경로가 생기면** 이 행을 다시 본다. | — |
-| **COL-03** | 복수예비가격 15개와 추첨번호를 확보한다 | ⓐ | `bidvector.workflow.collection.OpeningQuotaHaltResumptionTest` · `bidvector.procurement.DetailFetchTest` · `bidvector.adapters.persistence.OpeningReservePriceRepositoryTest` · `bidvector.procurement.AccountingTest` | 상세 조회의 유일한 production 경로는 `CollectOpeningResultsUseCase`(6G 갈래 — `OpeningCollectionWiring` 이 `bidvector.opening-collection.mode=once` 에서 조립한다)이고, 출하 게이트 값은 `KONEPS_COLLECTION_POLICY` 의 `DetailFetchGates`(age-gate 24h · recheck 48h · 축 재호출 상한 3)다. 429 소진을 `QuotaExhausted` 로 접는 자리는 어댑터의 `KonepsTruncationCause` 이고 429 관측 수는 `KonepsResilientCall` 이 센다. 15행 자식 저장은 `JdbcOpeningResultRepository` 다. **G1-T 실측 사실 하나** — 그 production 호출부는 조회 가치 술어에 `alreadyHeld=false`·`lastCheckedAt=null` 상수를 넘긴다(이어 돌기를 시도 원장이 지기 때문이다). 그래서 age-gate·recheck-gate 는 오늘 출하 경로에서 발화하지 않는다 — 이 사실이 앞 두 bullet 의 판정에 걸리는지는 이 행의 **재판정** 문제이고, G1-T 는 사실만 적고 6E-1 의 판정을 바꾸지 않았다. | 셋째 bullet 은 2026-10-16 **운영자 승인으로 V2 거동에 맞춰 개정**됐다(「그 실행은 멈추고 다음 실행이 미완 축을 이어받는다」 — capability-map 의 개정 블록). 그 문면을 **M6/G1-T 신설 test** 가 한 사슬로 잰다 — 소진 시 멈춤(사유·손대지 않은 수·반쪽 아님) · 그 공고의 예비가격 결측 · 회계에 실린 사유와 429 관측 수 · 쿼터를 푼 다음 실행이 **그 축만** 이어받음(원장을 심지 않고 한 use case 를 두 번 돌린다). 앞 두 bullet(저장분 0회 · age-gate 건너뜀 · 넘긴 뒤 정확히 1회)은 `DetailFetchTest`, 15행 자식 저장은 `OpeningReservePriceRepositoryTest`, 회계 항등식은 `AccountingTest` 가 잰다. | — |
+| **COL-02** | 어떤 공고가 얼마에 누구에게 낙찰됐는지 받는다 | ⓐ | `bidvector.adapters.persistence.BaseAmountMergeGuardTest` · `bidvector.adapters.persistence.PrecedenceParityTest` · `bidvector.adapters.persistence.PrecedenceMutationTest` · `bidvector.procurement.ResolvedBaseAmountTest` · `bidvector.procurement.NoticeTest` · `bidvector.procurement.OpeningResultFactSlotsTest` | 공고 행의 유일한 production write 경로는 `JdbcNoticeRepository`(`NoticeRepository` 의 유일한 구현 — `PersistenceWiring` 이 조립하고 `CollectNoticesUseCase` 가 부른다)이고, 그 안의 `mergeNoticeRow` 가 금액 축의 가드를 적용한다. 출하 권위 표는 `IS_AUTHORITATIVE`(참은 `PUBLISHED`·`OPERATOR_DECLARED` 둘)이고 같은 판정이 V2 마이그레이션의 provenance 가드 트리거에도 서 있다(parity test 가 두 자리를 대조한다). 개찰 축의 파생 기초금액은 `JdbcOpeningResultRepository` 의 자기 fact 로 간다. | 첫 bullet 은 **2026-10-16 운영자 승인으로 「개찰 pass」에서 「재관측(어느 수집 경로든)」으로 개정**됐다(capability-map 의 개정 블록 — V2 의 개찰 수집은 공고 행에 쓰지 않는다). 그 개정된 문면을 **M6/G1-T 신설 test** 가 persist 경로로 잰다 — 값이 실린 insert → 아무 값도 없는 개찰 pass(`Unchanged`, write 자체가 없다) → 예정가만 실은 개찰 pass(행은 갱신되고 기초금액 열은 그대로) 세 걸음, 그리고 권위 있는 재관측에는 교체된다는 대조. 둘째 bullet(낙찰가·사정률만 있는 개찰 행이 기초금액을 배출하지 않고 예정가를 파생값 + provenance 로 신고한다)은 `NoticeTest`(「계산식은 없다」)·`OpeningResultFactSlotsTest`, 값이 실린 유입의 권위 비교는 `ResolvedBaseAmountTest` 와 두 precedence test 가 잰다. **알려진 제한** — V2 는 개찰 축을 공고 행의 기초금액 열에 쓰지 않는다(그 분리가 이 경계의 구조적 답이다). 그래서 신설 test 가 지키는 자리는 공고 행의 write 가드이고, 개찰 pass 가 그 열에 **닿는 경로가 생기면** 이 행을 다시 본다. | — |
+| **COL-03** | 복수예비가격 15개와 추첨번호를 확보한다 | ⓒ | — | — | **둘째 bullet 이 미성립이다.** 6G 의 **유일한** production 호출부가 조회 가치 술어에 `alreadyHeld=false`·`openingObservedAt=null`·`lastCheckedAt=null` 을 **상수로** 넘기므로 age-gate·recheck-gate 판정이 출하 경로에서 만들어질 수 없다 — 그래서 「age-gate 미만이면 조회하지 않고 `backoff_skipped` 로 계수된다」는 거동이 출하 배선에 없다(verifier r1 변이 실측: 두 게이트를 꺼도 739 test 중 붉은 것은 술어 test 둘뿐이고, 출하 게이트 값을 24h/48h 에서 10만 h 로 바꿔도 거동 test 는 0 이다). production 의 `backoff_skipped` 는 rate limiter 의 허가 거부만 센다. **후속은 test 가 아니라 production 수정**이다. **첫째 bullet 은 성립하되 다른 기구로** — 저장분 재수집 0회를 내는 것은 조회 가치 술어가 아니라 시도 원장·원문 존재로 판정하는 이어 돌기이고, 그 거동을 재는 것은 `bidvector.workflow.collection.OpeningQuotaHaltResumptionTest` 의 실행 2(끝난 축을 다시 부르지 않는다)와 `bidvector.workflow.collection.CollectOpeningResultsUseCaseTest`·`bidvector.procurement.CollectionAttemptLedgerTest` 다(앞 판이 근거로 적었던 `bidvector.procurement.DetailFetchTest` 는 술어 test 이고 이 귀속이 틀렸다). **셋째 bullet(2026-10-16 개정)은 성립한다** — M6/G1-T 신설 `bidvector.workflow.collection.OpeningQuotaHaltResumptionTest` 가 네 고리를 한 사슬로 잰다(소진 시 멈춤·「시도 안 함」 수는 멈춤 보고 · 사유와 429 수는 회계 원장 · 쿼터 해제 뒤 다음 실행의 이어받기). 그 고리의 **어댑터 측**(429 가 재시도를 소진해 `QuotaExhausted` 로 접히는 자리)은 `bidvector.adapters.koneps.KonepsOpenApiNoticeSourceTest` 가 잰다. 15행 자식 저장은 `bidvector.adapters.persistence.OpeningReservePriceRepositoryTest`, 회계 항등식은 `bidvector.procurement.AccountingTest` 가 잰다. | **후속: 출하 경로 age-gate 배선 — G1 후속 production slice**(6G 호출부가 술어에 실제 관측값을 넘기고 건너뛴 건수를 세는 자리를 만든다) |
 | **COL-04** | 공고의 참가자격 원문과 게시 낙찰하한율을 확보한다 | ⓒ | — | — | 자격 수집 대상 집합의 **정렬**(감시 조건 매칭 공고가 마감 임박보다 앞선다)이 없다 — 요건을 채우는 경로 자체가 미정이다. 부분 측정(강함) — 업종제한 유무의 호출 0/1 은 `COL-04` 를 축어로 인용하는 `bidvector.procurement.PortsTest`, 재포함(부분 성공 → 다음 창)은 `bidvector.procurement.DetailFetchTest` 의 recheck-gate, 「요건 없음 vs 수집 실패」 구분은 `bidvector.adapters.koneps.KonepsLicenseLimitDocumentSourceTest`·`bidvector.adapters.qualification.StoredRequirementLicenseGateTest` 가 잰다. | `OPEN-6F5-EXTRACTION-FILL` |
 | **COL-05** | 공고와 개찰 결과가 같은 사업으로 묶인다 | ⓑ | — | — | V2 에 「사업(project)」 집계 개체가 **없다** — 동일성은 `NoticeId`(공고번호+차수) 하나이고 제목 기반 휴리스틱 매칭 코드가 production 에 0 이다. 셋째 bullet 은 잴 대상이 존재하지 않고, 앞 둘은 식별자 동일성이 구조로 보장한다(부분 측정 `bidvector.procurement.NoticeIdTest`·`bidvector.adapters.persistence.NoticeVersioningTest`). | — |
 | **COL-06** | 수집이 무엇을 얼마나 놓쳤는지 알 수 있다 (수집 회계) | ⓐ | `bidvector.procurement.AccountingTest` · `bidvector.adapters.koneps.KonepsOpenApiNoticeSourceTest` · `bidvector.adapters.persistence.CleanMigrationCheckTest` | 같은 배선. 항등식은 **두 층이 다 출하 경로**다 — 회계 값 생성 시점의 불변식과 마이그레이션의 CHECK. `truncated`↔`truncationCause` 짝도 생성 시점 불변식이다. | `received = normalized + duplicate + dropped` 항등식은 생성 시점·DB CHECK 두 층이, `totalCount` 부재 + 같은 쪽 반복의 유한 종료는 `truncated` 로 잰다. | — |
@@ -133,7 +137,7 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **DEC-03** | 법정 낙찰하한율 해석 (우선순위 + 적용 범위) | ⓒ | — | — | 법정 하한율 **해석기**가 없다 — 기관 유형×시행일×추정가격 구간을 하한율로 바꾸는 versioned policy 와 그 적용 범위 묶음이 production 에 0 이다. `FloorUnmeasurableReason` 에 `FloorRateUnresolved`·`FloorModelNotApplicable` **사유만** 있고 그 값을 만드는 자리가 없다(하한율은 호출부가 준다). 부분 측정 — 소급 금지·시행일 경계 축은 `bidvector.sharedkernel.PolicyTest` 의 `EffectiveDatedPolicy` 가 일반형으로 잰다. | `OPEN-DEC-10` |
 | **DEC-04** | 하한 미달 빈도 표시와 판정 불가 사유 (정직 명세) | ⓐ | `bidvector.decision.FloorShortfallKernelTest` · `bidvector.sharedkernel.RateArithmeticTest` | 출하 `FLOOR_SHORTFALL_POLICY`(경계 비교 어휘 · 최소 표본 · 개연 밴드)가 커널 입력이고 `Frequency` 와 `Unmeasurable` 이 **타입으로** 갈린다 — 「0.0 과 판정 불가의 구분」이 값이 아니라 타입에서 온다. | 경계 등가 비미달(strictly-greater)·149/150/151 표본 경계·밴드 밖 표본의 분모 제외와 그로 인한 `Unmeasurable` 전이·`Frequency` 가 (분자, 분모) 묶음이고 `policyVersion` 이 함께 남는 것 — 다섯 bullet 전부가 한 클래스에 있다. | — |
 | **DEC-05** | 투찰가 메뉴 3안 (recommended / aggressive / safe) | ⓒ | — | — | 투찰가 **메뉴** 타입이 없다 — (태도, 리스크 노트, 근거) 세 칸을 요구하는 옵션 타입도, 「밴드 붕괴」 상태도 production 에 없다. 부분 측정 — 세 후보의 순서 강제는 `bidvector.workflow.prediction.PredictionValueTest`, 역전 응답의 `ContractViolation` 은 `bidvector.adapters.ml.SuccessShapeFailClosedTest` 가 잰다. | **없음 — 신설 필요** |
-| **DEC-06** | bid_now / review / skip 액션 결정과 근거 (reason code) | ⓐ | `bidvector.app.evaluation.DryRunCommitParityTest` · `bidvector.adapters.event.OutboxPayloadCodecTest` · `bidvector.decision.MlUnavailableReasonTest` · `bidvector.workflow.evaluation.NotificationReasonSerializationTest` · `bidvector.decision.VerdictLadderTest` · `bidvector.decision.VerdictLadderPropertyTest` · `bidvector.workflow.evaluation.EvidenceLinesTest` · `bidvector.app.architecture.DryRunCommitSeparationGateTest` | 평가 진입점은 둘이다 — `EvaluationWiring` 이 내는 `EvaluationDryRunFactory`(`EvaluationDryRunController` 의 유일한 진입)와, `bidvector.evaluation.mode=once` 에서만 올라오는 `EvaluationCommitWiring.evaluationCommitRun`(→ `EvaluationCommitRun`, 알림 port 가 production `OutboxNotificationRequestPort`). 신설 test 는 그 **두 조립 메서드를 각각 부른다**. 출하 값은 `EVALUATION_LADDER_POLICY_VERSION` · 전략 행의 임계와 여력 상한 · `bidvector.evaluation.commit.current-active-bids` 다. | 넷째 bullet(같은 공고를 어느 경로로 평가해도 액션과 근거가 같다)을 **M6/G1-T 신설 test** 가 두 진입점을 각각 불러 잰다 — 돌려준 판정 목록의 값 등식(액션 · reason code · 알림 처분)과, 커밋 경로가 **실제로 저장한** payload 가 dry-run 쪽 판정의 사유 문자열·공고 식별자·전략 개정·사다리 정책 버전을 나른다는 등식 둘(기대값을 dry-run 결과에서 뽑는다). 나머지 셋은 (코드, payload) 영속·재렌더링 `OutboxPayloadCodecTest`, 소진 검사 `MlUnavailableReasonTest`·`NotificationReasonSerializationTest`, 사다리 분기 `VerdictLadderTest`·`VerdictLadderPropertyTest`, 문구 자동 추종 `EvidenceLinesTest`, 조립 분리 `DryRunCommitSeparationGateTest` 가 잰다. acceptance 가 드는 셋째 경로 백테스트는 V2 에서 액션을 만들지 않는다(Python 백테스트는 투찰율 전략과 채점만 낸다). | — |
+| **DEC-06** | bid_now / review / skip 액션 결정과 근거 (reason code) | ⓐ | `bidvector.app.evaluation.DryRunCommitParityTest` · `bidvector.adapters.event.OutboxPayloadCodecTest` · `bidvector.decision.MlUnavailableReasonTest` · `bidvector.workflow.evaluation.NotificationReasonSerializationTest` · `bidvector.decision.VerdictLadderTest` · `bidvector.decision.VerdictLadderPropertyTest` · `bidvector.workflow.evaluation.EvidenceLinesTest` · `bidvector.app.architecture.DryRunCommitSeparationGateTest` | 평가 진입점은 둘이다 — `EvaluationWiring` 이 내는 `EvaluationDryRunFactory`(`EvaluationDryRunController` 의 유일한 진입)와, `bidvector.evaluation.mode=once` 에서만 올라오는 `EvaluationCommitWiring.evaluationCommitRun`(→ `EvaluationCommitRun`, 알림 port 가 production `OutboxNotificationRequestPort`). 신설 test 는 그 **두 조립 메서드를 각각 부른다**. 출하 값은 `EVALUATION_LADDER_POLICY_VERSION` · 전략 행의 임계와 여력 상한 · `bidvector.evaluation.commit.current-active-bids` 다. | 넷째 bullet(같은 공고를 어느 경로로 평가해도 액션과 근거가 같다)을 **M6/G1-T 신설 test** 가 두 진입점을 각각 불러 잰다 — 돌려준 판정 목록의 값 등식(액션 · reason code · 알림 처분)과, 커밋 경로가 **실제로 저장한** payload 가 dry-run 쪽 판정의 사유 문자열·공고 식별자·전략 개정·사다리 정책 버전을 나른다는 등식 둘(기대값을 dry-run 결과에서 뽑는다). 나머지 셋은 (코드, payload) 영속·재렌더링 `OutboxPayloadCodecTest`, 소진 검사 `MlUnavailableReasonTest`·`NotificationReasonSerializationTest`, 사다리 분기 `VerdictLadderTest`·`VerdictLadderPropertyTest`, 문구 자동 추종 `EvidenceLinesTest`, 조립 분리 `DryRunCommitSeparationGateTest` 가 잰다. **경계** — 신설 test 는 **후보 상한 계층보다 아래**에서 비교한다: use case 가 돌려준 판정과 커밋 경로가 저장한 payload 를 보고, 그 위에서 일회 러너(`candidateCap` 계수·종료 코드)와 dry-run 컨트롤러(응답 조립·409 거부)가 하는 가공은 이 등식 밖이다. 그 두 층은 `bidvector.app.evaluation.EvaluationCommitRunnerTest`·`bidvector.app.http.EvaluationDryRunControllerTest` 가 각자 잰다. acceptance 가 드는 셋째 경로 백테스트는 V2 에서 액션을 만들지 않는다(Python 백테스트는 투찰율 전략과 채점만 낸다). | — |
 | **DEC-08** | 기초금액 provenance 분류 | ⓒ | — | — | 넷째 bullet 「분류에 사용된 정책 version 이 결과와 **함께 저장**된다」가 **구현에 없다**(verifier RT-H-1) — `ProvenanceEvidence.policyVersion` 은 메모리 타입에만 있고 그 KDoc 이 「저장 자리를 이 타입이 정하지 않는다」고 적으며, 유일한 production 호출부가 분류만 취해 근거를 버리고 마이그레이션에 그 version 을 담는 칸이 **0** 이다. 인용했던 `PrecedenceLabelColumnTest` 는 provenance detail **위조 거부**이지 version 저장이 아니다. 부분 측정(강함) — first-match 우선, 복구 추정치와 원본 참조의 분리, 15행 중 하나라도 결손이면 `RESERVE_PRICE_MISSING` 은 `bidvector.decision.ProvenanceRulesTest`·`bidvector.workflow.evaluation.SampleEligibilityTest` 가 출하 `ProvenancePolicyData` 위에서 잰다. | **없음 — 신설 필요** |
 | **DEC-09** | rate scale 정규화 (percent ↔ fraction) | ⓐ | `bidvector.sharedkernel.RateTest` · `bidvector.sharedkernel.RateArithmeticTest` · `bidvector.sharedkernel.CompileFailureHarnessTest` · `bidvector.sharedkernel.RegressionExampleTest` | `Rate` 의 internal 생성자와 **단위를 이름으로 요구하는 공개 경로 둘**이 production 전역 제약이고, 교차 축 대입이 **컴파일되지 않는다**. 「모든 소비 경로가 같은 해석」은 표현이 하나(정규 fraction)뿐이라는 구조에서 온다. | 「단위 선언 없이는 `Rate` 가 만들어지지 않는다 — 공개 경로가 이름이 단위인 둘뿐」 + 교차 축 대입이 **컴파일되지 않는다**(2·12) + 「변환은 생성 지점 한 곳뿐이고 크기로 추측하지 않는다」. 모든 소비 경로의 같은 해석은 `fraction` 고정 + 단일 생성 지점이 구조로 진다. | — |
 | **DEC-10** | 게시 낙찰하한율 신뢰 게이트 | ⓒ | — | — | 게시 하한율의 **계수**(`floor_implausible`)가 없고, 게이트에 걸린 값과 안 걸린 값을 다른 타입으로 가르는 자리도 없다. 부분 측정 — 개연 밴드 판정(밴드 안 수용 · 아래/위 모두 사유와 함께 거부 · 경계 포함)은 `bidvector.decision.FloorOverrideValidationTest` 가 전수로 잰다. | **없음 — 신설 필요** |
