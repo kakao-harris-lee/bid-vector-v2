@@ -36,14 +36,15 @@ class LeaseHolderTerminationTest : PersistenceTestSupport() {
 
         val held =
             holder.withLease(KIND) {
-                // 서버 쪽에서 홀더 백엔드를 끊는다 — 프로세스는 살아 있고 본문도 아직 돈다.
+                // 서버 쪽에서 홀더 백엔드를 끊고 **끝난 것까지 확인한다** — 프로세스는 살아 있고
+                // 본문도 아직 돈다.
                 terminated = terminateLeaseHolderBackends(pooledDataSource())
-                // 같은 어댑터·**다른 연결** — 다른 프로세스의 대역(기다리지 않는 한 번의 시도).
+                // 같은 어댑터·**다른 연결** — 다른 프로세스의 대역(재시도 없는 한 번의 시도).
                 next = PostgresAdvisoryLockLease(pooledDataSource()).withLease(KIND) { "다음 세션" }
                 "홀더 본문"
             }
 
-        // 끊을 대상이 `pg_locks` 에 실제로 있었다 — 임대가 **DB 세션**에 걸려 있다는 사실이다.
+        // 끊을 대상이 `pg_locks` 에 실제로 있었고 그 세션이 **끝났다** — 임대가 DB 세션에 걸려 있다.
         terminated shouldBe 1
         next.shouldBeInstanceOf<LeaseAttempt.Held<String>>().result shouldBe "다음 세션"
         // 홀더 본문의 결과는 끊김에 덮이지 않는다(해제 실패를 삼키는 자리의 거동).
@@ -71,21 +72,35 @@ class LeaseHolderTerminationTest : PersistenceTestSupport() {
 private val KIND = OutboxConsumerKind.NotificationRequested
 
 /**
- * 알림 종류의 advisory 잠금을 쥔 백엔드를 끊고 **끊은 수**를 돌려준다. bigint 키는
- * `classid`(상위 32비트)·`objid`(하위 32비트)로 나뉘고 이 키는 2^32 미만이라 `classid` 가 0 이다.
+ * 백엔드가 **실제로 끝날 때까지 기다리는** 상한. 다음 임대 시도의 재시도가 아니다 — 획득은 끝까지
+ * 한 번이고(음성 대조와 같은 모양), 이 값은 **끊김이 서버에 반영되기를** 기다리는 시간이다.
+ */
+private const val TERMINATE_WAIT_MS = 5_000
+
+/**
+ * 알림 종류의 advisory 잠금을 쥔 백엔드를 끊고 **끝난 것이 확인된 수**를 돌려준다.
+ *
+ * **두 인자 형태를 쓴다.** 한 인자 `pg_terminate_backend(pid)` 는 신호만 보내고 즉시 참을 돌려주므로,
+ * 다음 임대 시도가 **서버가 그 세션을 정리하기 전에** 들어가면 `Busy` 를 받아 간헐적으로 붉어진다 —
+ * 그 간헐은 구현의 결함이 아니라 끊김을 기다리지 않은 측정의 결함이다. 두 인자 형태는
+ * [TERMINATE_WAIT_MS] 까지 기다려 **끝났는가**를 참/거짓으로 돌려주고, 이 함수는 참만 센다.
+ *
+ * bigint 키는 `classid`(상위 32비트)·`objid`(하위 32비트)로 나뉘고 이 키는 2^32 미만이라
+ * `classid` 가 0 이다.
  */
 private fun terminateLeaseHolderBackends(dataSource: DataSource): Int =
     dataSource.connection.use { connection ->
         connection
             .prepareStatement(
-                "SELECT pg_terminate_backend(pid) FROM pg_locks " +
+                "SELECT pg_terminate_backend(pid, ?) FROM pg_locks " +
                     "WHERE locktype = 'advisory' AND classid = 0 AND objid = ? AND objsubid = 1",
             ).use { statement ->
-                statement.setLong(1, NOTIFICATION_RELAY_LOCK_KEY)
+                statement.setInt(1, TERMINATE_WAIT_MS)
+                statement.setLong(2, NOTIFICATION_RELAY_LOCK_KEY)
                 statement.executeQuery().use { rs ->
-                    var count = 0
-                    while (rs.next()) count++
-                    count
+                    var terminated = 0
+                    while (rs.next()) if (rs.getBoolean(1)) terminated++
+                    terminated
                 }
             }
     }

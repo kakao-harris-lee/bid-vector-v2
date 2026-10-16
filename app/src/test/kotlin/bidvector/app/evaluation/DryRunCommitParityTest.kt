@@ -42,6 +42,7 @@ import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -158,6 +159,8 @@ class DryRunCommitParityTest {
 
         // ② 커밋 경로가 저장한 payload 가 dry-run 쪽 판정의 근거를 나른다.
         val payload = notificationRows(adminDataSource(postgres)).single().payload
+        // 사유 목록이 **비어 있지 않다** — 비면 아래 `forEach` 가 아무것도 대조하지 않고 통과한다.
+        bidNow.reasons.shouldNotBeEmpty()
         bidNow.reasons.flatMap { it.toString().split(", ") }.forEach { payload shouldContain it }
         payload shouldContain "${candidate.id.number.value}-${candidate.id.round.value}"
         // 개정 번호도 **dry-run 경로가 읽은 값**에서 뽑는다 — 두 경로가 다른 스냅샷을 보면 갈린다.
