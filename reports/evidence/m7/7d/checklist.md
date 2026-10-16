@@ -257,3 +257,10 @@ java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식
     이다(`commands.md`).
 12. **`web` job 의 Playwright 시스템 의존 설치 step 은 이 장비에서 exit 1** 이다(apt 권한). 브라우저
     자체는 설치돼 있어 W-10·W-11 은 돌았고, CI 에서는 그 step 이 러너 권한으로 선다.
+13. **다른 패키지의 KDoc 한 줄이 옛 이름을 현재형으로 가리킨다.** 필터가 `OperatorCredentialFilter`
+    → `RequestAuthenticationFilter` 로 바뀌면서, 감사 행 타입(`adapters/audit`)의 KDoc 이 말하는
+    「subject 라벨을 정하는 자리」가 이제 그 이름이 아니다. 그 파일은 인증 패키지가 아니라 이
+    slice 의 in_scope 밖이고, **지금 고치면 rollback 복원 목록이 늘어 실측 HEAD 가 낡는다** —
+    그래서 고치지 않고 등재한다(한 낱말짜리 후속). 코드 참조가 아니라 산문이므로 컴파일·게이트에
+    걸리지 않는다. 역방향 좌표 점검(`grep -rn '<stem>:[0-9]'`)은 **0 건**이다 — 이 slice 가 편집한
+    파일을 `file:line` 으로 가리키는 곳이 저장소에 없다.
