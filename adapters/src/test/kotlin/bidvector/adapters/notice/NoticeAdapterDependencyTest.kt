@@ -77,23 +77,39 @@ class NoticeAdapterDependencyTest {
     }
 
     /**
-     * 쓰기 표면 부재의 **구조** 단언 — 검색 어댑터의 상수 풀에 `notice` 표 쓰기 경로
-     * (`JdbcNoticeRepository`·`Sql.INSERT_NOTICE`·`Sql.UPDATE_NOTICE`)의 이름이 **없다**.
-     * SQL 문면을 grep 하는 것이 아니라 컴파일러가 실제로 만든 참조를 본다 — 이름을 바꿔도
-     * 그 타입을 쓰는 순간 좌표가 상수 풀에 나타난다.
+     * **보조 그물**(verifier r1 F-1 뒤 문면을 좁혔다) — 검색 어댑터 class 하나의 상수 풀에
+     * 공고 저장소 타입 이름이 없다는 것만 잰다.
+     *
+     * **이 술어가 닫지 못하는 것**(실측): `Sql.*` 는 `const val` 이라 컴파일러가 SQL 본문을
+     * 인라인해 **상수 이름이 상수 풀에 남지 않는다.** 원시 DML 문자열도, 같은 패키지의 다른
+     * class 파일도 이 술어 밖이다. 그래서 「이름을 바꿔도 잡힌다」는 **거짓이었다** — 쓰기
+     * 부재를 실제로 지는 것은 `JdbcNoticeSearchTest` 가 재는 **읽기 전용 트랜잭션**이고,
+     * 이 test 는 저장소 타입을 이름으로 쥐는 가장 흔한 형태만 막는 그물로 남는다.
      */
     @Test
-    fun `검색 어댑터의 상수 풀에 공고 쓰기 경로 좌표가 없다`() {
+    fun `검색 어댑터의 상수 풀에 공고 저장소 타입 이름이 없다 — 보조 그물`() {
         val classFile = File("build/classes/kotlin/main/bidvector/adapters/notice/JdbcNoticeSearch.class")
         check(classFile.isFile) {
             "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
         }
 
-        val output = javapOutput(classFile)
+        javapOutput(classFile).contains("JdbcNoticeRepository") shouldBe false
+    }
 
-        output.contains("JdbcNoticeRepository") shouldBe false
-        output.contains("INSERT_NOTICE") shouldBe false
-        output.contains("UPDATE_NOTICE") shouldBe false
+    /**
+     * **읽기 전용 트랜잭션을 실제로 여는가**(F-1 처방의 배선 축) — 거동은
+     * `JdbcNoticeSearchTest` 가 실 DB 로 재고, 이 test 는 어댑터가 그 함수를 **부른다**는
+     * 사실을 컴파일된 상수 풀로 잰다(`JdbcCandidateSource` 의 `biddableStatuses` 참조 단언과
+     * 같은 형태). 호출을 지우면 이름이 상수 풀에서 사라져 RED 다.
+     */
+    @Test
+    fun `검색 어댑터는 읽기 전용 트랜잭션 함수를 참조한다`() {
+        val classFile = File("build/classes/kotlin/main/bidvector/adapters/notice/JdbcNoticeSearch.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+        }
+
+        javapOutput(classFile).contains("beginReadOnlySearchTransaction") shouldBe true
     }
 }
 

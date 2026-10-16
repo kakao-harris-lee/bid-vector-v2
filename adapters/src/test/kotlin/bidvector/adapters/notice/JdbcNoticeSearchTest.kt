@@ -25,11 +25,14 @@ import bidvector.workflow.notice.NoticeSearchParameters
 import bidvector.workflow.notice.NoticeSearchRequest
 import bidvector.workflow.notice.NoticeSearchState
 import bidvector.workflow.notice.parseNoticeSearchParameters
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.sql.SQLException
 import java.time.Instant
 
 /**
@@ -241,6 +244,44 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
 
         tooNarrow.totalCount shouldBe 0L
         tooNarrow.state shouldBe NoticeSearchState.NO_MATCH
+    }
+
+    /**
+     * **쓰기 부재의 구조 잠금**(verifier r1 F-1) — 검색이 여는 트랜잭션에서는 DML 셋이 전부
+     * **DB 에 막힌다.** 이름·문면 게이트가 아니라 연결 설정이 지므로, 어댑터에 쓰기를 넣는
+     * 변이는 이름을 무엇으로 바꾸든 이 test 에서 실패한다.
+     */
+    @Test
+    fun `검색이 여는 트랜잭션에서는 INSERT·UPDATE·DELETE 가 DB 에 막힌다`() {
+        val writes =
+            listOf(
+                "INSERT INTO notice (notice_number, notice_round, status, observation_key) " +
+                    "VALUES ('X-1', '000', 'Open', 'k')",
+                "UPDATE notice SET status = 'Closed'",
+                "DELETE FROM notice",
+            )
+
+        writes.forEach { sql ->
+            val failure =
+                shouldThrow<SQLException> {
+                    dataSource().connection.use { connection ->
+                        connection.beginReadOnlySearchTransaction()
+                        connection.createStatement().use { statement -> statement.executeUpdate(sql) }
+                    }
+                }
+            (failure.message ?: "") shouldContain "read-only transaction"
+        }
+    }
+
+    /**
+     * 음성 대조 — 같은 DML 이 **읽기 전용을 걸지 않은** 연결에서는 통과한다. 위 test 가
+     * 공허하게 참이 되는 회귀(예: DML 자체가 문법 오류라 늘 던지는 경우)를 막는다.
+     */
+    @Test
+    fun `같은 DELETE 는 읽기 전용이 아닌 연결에서는 통과한다 — 음성 대조`() {
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement -> statement.executeUpdate("DELETE FROM notice") }
+        }
     }
 
     /**

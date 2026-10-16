@@ -27,6 +27,11 @@ import javax.sql.DataSource
  * 질의는 최대 셋이고 **한 커넥션**에서 돈다: 전체 건수 → (건수가 1 이상일 때만) 페이지 →
  * (건수가 0 일 때만) 「수집된 공고가 하나라도 있는가」. 셋째 질의가 빈 결과의 두 뜻을
  * 가르고, 비어 있지 않은 답에서는 돌지 않는다.
+ *
+ * **쓰기 부재는 이름 게이트가 아니라 연결이 진다**(verifier r1 F-1) — 이 어댑터가 여는 것은
+ * [beginReadOnlySearchTransaction] 의 **읽기 전용 트랜잭션**이라 그 안에서는 어떤 DML 도
+ * DB 가 거부한다. 쓰기를 넣으려면 술어나 이름이 아니라 이 트랜잭션 설정을 바꿔야 하고,
+ * 그것은 실 DB test 가 잡는다.
  */
 class JdbcNoticeSearch(
     private val dataSource: DataSource,
@@ -34,11 +39,17 @@ class JdbcNoticeSearch(
     override fun search(criteria: NoticeSearchCriteria): NoticeSearchPage {
         val statement = noticeSearchStatement(criteria)
         return dataSource.connection.use { connection ->
-            val total = connection.countMatches(statement)
-            if (total == 0L) {
-                NoticeSearchPage(emptyList(), 0L, connection.emptyReason())
-            } else {
-                NoticeSearchPage(connection.readPage(statement, criteria), total, NoticeSearchState.MATCHED)
+            connection.beginReadOnlySearchTransaction()
+            try {
+                val total = connection.countMatches(statement)
+                if (total == 0L) {
+                    NoticeSearchPage(emptyList(), 0L, connection.emptyReason())
+                } else {
+                    NoticeSearchPage(connection.readPage(statement, criteria), total, NoticeSearchState.MATCHED)
+                }
+            } finally {
+                // 읽기만 한 트랜잭션이라 되돌릴 것이 없다 — 열어 둔 채 반납하지 않으려고 닫는다.
+                connection.rollback()
             }
         }
     }
@@ -71,6 +82,23 @@ class JdbcNoticeSearch(
 
     private fun ResultSet.rowId(): NoticeId =
         NoticeId(NoticeNumber(getString("notice_number")), NoticeRound(getString("notice_round")))
+}
+
+/**
+ * 검색이 쓰는 **읽기 전용 트랜잭션**을 연다(verifier r1 F-1 처방) — 이 연결에서 실행되는
+ * `INSERT`·`UPDATE`·`DELETE` 는 **DB 가** `read-only transaction` 오류로 거부한다.
+ *
+ * `Connection.setReadOnly(true)` 가 아니라 **문장으로** 거는 이유: 드라이버의 `readOnlyMode`
+ * 설정에 따라 autocommit 연결에서 아무 일도 하지 않을 수 있다. 문장은 그 설정과 무관하게
+ * 이 트랜잭션에 걸린다. `autoCommit = false` 가 먼저여야 문장이 트랜잭션 **안**에 들어간다
+ * (autocommit 에서는 자기 문장 하나로 끝나 다음 질의에 효력이 없다).
+ *
+ * 스냅숏 축은 열어 둔다 — 격리 수준은 기본값이라 세 질의가 한 순간을 보지 않는다(알려진
+ * 제한, `REPEATABLE READ` 를 같은 문장에 더하면 닫힌다).
+ */
+internal fun Connection.beginReadOnlySearchTransaction() {
+    autoCommit = false
+    createStatement().use { statement -> statement.execute("SET TRANSACTION READ ONLY") }
 }
 
 /** 값 목록을 1번 자리부터 순서대로 바인딩하고 **다음 빈 자리**를 돌려준다. */
