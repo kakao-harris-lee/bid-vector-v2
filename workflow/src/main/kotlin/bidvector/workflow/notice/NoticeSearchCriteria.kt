@@ -112,6 +112,7 @@ sealed interface NoticeSearchRequest {
  */
 enum class NoticeSearchRejection {
     TEXT_TOO_LONG,
+    TEXT_CONTROL_CHARACTER,
     AMOUNT_NOT_INTEGER,
     AMOUNT_NEGATIVE,
     AMOUNT_RANGE_INVERTED,
@@ -130,6 +131,12 @@ enum class NoticeSearchRejection {
  *
  * 공백만인 텍스트는 **조건 없음**이다(빈 `q` 경계값) — 「아무것도 안 맞는다」가 조용히
  * 성립하지 않게 한다(D-6F4-8 과 같은 뿌리).
+ *
+ * **제어 문자는 거부한다**(verifier r1 F-2) — PostgreSQL 의 `text` 는 `U+0000` 을 담을 수
+ * 없어 그 질의가 바인딩 단계에서 예외가 되고, 계약이 400 을 선언한 입력이 500 으로 나갔다.
+ * 「DB 가 거부하는 값을 거부 규칙표가 먼저 거부한다」로 닫는다 — `U+0000` 하나를 특별히
+ * 적는 대신 **제어 문자 전부**를 거부한다(열거를 늘리지 않는 쪽). 양끝 공백류는 trim 이
+ * 먼저 걷어내므로 「공백만인 질의」는 여전히 조건 없음이다.
  */
 fun parseNoticeSearchParameters(parameters: NoticeSearchParameters): NoticeSearchRequest {
     val rejection = NOTICE_SEARCH_REJECTIONS.firstNotNullOfOrNull { rule -> rule(parameters) }
@@ -156,6 +163,12 @@ fun parseNoticeSearchParameters(parameters: NoticeSearchParameters): NoticeSearc
 private val NOTICE_SEARCH_REJECTIONS: List<(NoticeSearchParameters) -> NoticeSearchRejection?> =
     listOf(
         { p -> NoticeSearchRejection.TEXT_TOO_LONG.takeIf { p.text.tooLong() || p.agencyText.tooLong() } },
+        {
+            p ->
+            NoticeSearchRejection.TEXT_CONTROL_CHARACTER.takeIf {
+                p.text.hasControlCharacter() || p.agencyText.hasControlCharacter()
+            }
+        },
         { p -> NoticeSearchRejection.AMOUNT_NOT_INTEGER.takeIf { p.amountMinWon.notInteger() } },
         { p -> NoticeSearchRejection.AMOUNT_NOT_INTEGER.takeIf { p.amountMaxWon.notInteger() } },
         { p -> NoticeSearchRejection.AMOUNT_NEGATIVE.takeIf { p.amountMinWon.negative() } },

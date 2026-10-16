@@ -103,6 +103,31 @@ class NoticeSearchParametersTest {
         criteria.deadlineFrom shouldBe Instant.parse("2026-10-20T00:00:00Z")
     }
 
+    /**
+     * verifier r1 F-2 — PostgreSQL `text` 가 담을 수 없는 `U+0000` 이 질의로 들어오면 계약이
+     * 400 을 선언한 입력이 바인딩 예외(500)로 나갔다. 규칙표가 먼저 거부한다.
+     */
+    @Test
+    fun `제어 문자가 든 텍스트는 거부다 — NUL 포함`() {
+        rejection(NoticeSearchParameters(text = "\u0000")) shouldBe NoticeSearchRejection.TEXT_CONTROL_CHARACTER
+        rejection(NoticeSearchParameters(text = "도로\u0000포장")) shouldBe
+            NoticeSearchRejection.TEXT_CONTROL_CHARACTER
+        rejection(NoticeSearchParameters(agencyText = "조달\u0000청")) shouldBe
+            NoticeSearchRejection.TEXT_CONTROL_CHARACTER
+        rejection(NoticeSearchParameters(text = "도로\u0001포장")) shouldBe
+            NoticeSearchRejection.TEXT_CONTROL_CHARACTER
+        rejection(NoticeSearchParameters(text = "도로\t포장")) shouldBe NoticeSearchRejection.TEXT_CONTROL_CHARACTER
+    }
+
+    /** 위 규칙이 「공백만인 질의는 조건 없음」을 깨지 않는다 — 양끝 공백류는 trim 이 먼저 걷는다. */
+    @Test
+    fun `공백류만 있는 텍스트는 제어 문자 규칙에 걸리지 않는다`() {
+        val criteria = accepted(NoticeSearchParameters(text = "\t\n ", agencyText = "\u000B"))
+
+        criteria.text shouldBe null
+        criteria.agencyText shouldBe null
+    }
+
     @Test
     fun `형식이 틀린 값은 조용히 변환되지 않고 거부다`() {
         rejection(NoticeSearchParameters(amountMinWon = "1.5")) shouldBe NoticeSearchRejection.AMOUNT_NOT_INTEGER

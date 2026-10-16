@@ -13,6 +13,12 @@ import java.time.Instant
 /** 공백만이면 조건이 아니다 — 「아무것도 안 맞는다」가 조용히 성립하지 않게 한다. */
 internal fun String?.searchTextOrNull(): SearchText? = this?.trim()?.takeIf { it.isNotEmpty() }?.let(::SearchText)
 
+/**
+ * 제어 문자(ISO control — `U+0000`~`U+001F`·`U+007F`~`U+009F`)가 **trim 뒤에도** 남는가.
+ * 양끝의 공백류 제어 문자(탭·개행 …)는 trim 이 걷으므로 「공백만인 질의」는 걸리지 않는다.
+ */
+internal fun String?.hasControlCharacter(): Boolean = this != null && trim().any(Char::isISOControl)
+
 internal fun String?.tooLong(): Boolean = this != null && length > NoticeSearchLimits.MAX_TEXT_LENGTH
 
 internal fun String?.blankOrNull(): Boolean = this == null || isBlank()

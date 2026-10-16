@@ -237,6 +237,21 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
         errorOf("?deadlineFrom=2026-11-01").statusCode.value() shouldBe 400
     }
 
+    /**
+     * verifier r1 F-2 — `U+0000` 은 PostgreSQL `text` 가 담을 수 없어 바인딩에서 예외가 됐고
+     * 계약이 400 을 선언한 입력이 500 으로 나갔다. 여기서는 **포트에 닿기 전에** 400 이 되는
+     * 것을 잰다(실 DB 위의 회귀는 `NoticeSearchProductionE2ETest`).
+     */
+    @Test
+    fun `제어 문자가 든 질의는 400 이고 포트에 닿지 않는다`() {
+        val response = errorOf("?q=%00")
+
+        response.statusCode.value() shouldBe 400
+        response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+        errorOf("?agency=%01").statusCode.value() shouldBe 400
+        notices.lastCriteria shouldBe null
+    }
+
     @Test
     fun `거부된 질의는 포트에 닿지 않는다 — 읽기조차 일어나지 않는다`() {
         errorOf("?size=100000").statusCode.value() shouldBe 400
