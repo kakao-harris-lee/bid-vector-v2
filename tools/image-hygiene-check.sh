@@ -141,6 +141,10 @@ REQUIRED_EXECUTABLES=""
 FORBIDDEN_DEPENDENCY_COORDINATES=""
 DEPENDENCY_LAYER_PATH=""
 DEPENDENCY_LAYER_MIN_ENTRIES=""
+CONTENT_PATH=""
+CONTENT_MIN_ENTRIES=""
+REQUIRED_CONTENT_PATTERNS=""
+FORBIDDEN_CONTENT_PATTERNS=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -185,6 +189,32 @@ case "$RUNTIME_KIND" in
       -e BIDVECTOR_EVALUATION_CANDIDATECAP=1
     )
     ;;
+  caddy-site)
+    # M7/7F-local — web 정적 이미지와 리버스 프록시 이미지가 **같은 갈래**를 쓴다. 판정 형태가
+    # 같고 값만 다르기 때문이다(정책 파일이 둘: `-web`·`-proxy`). 갈래를 둘로 쪼개면 같은 코드가
+    # 두 벌이 되고, 한 자리의 교정이 다른 자리를 놓친다.
+    FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
+    REQUIRED_EXECUTABLES="$(_policy_value required.executables list)"
+    CONTENT_PATH="$(_policy_value content.path text)"
+    CONTENT_MIN_ENTRIES="$(_policy_value content.min-entries numeric)"
+    REQUIRED_CONTENT_PATTERNS="$(_policy_value required.content.patterns list)"
+    FORBIDDEN_CONTENT_PATTERNS="$(_policy_value forbidden.content.patterns list)"
+    # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
+    # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
+    # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
+    #
+    # **상류 주소는 RFC 5737 TEST-NET-1**(192.0.2.0/24 — 문서·예시 전용으로 예약돼 어디로도
+    # 라우팅되지 않는다). 프록시 설정은 상류 값이 **비면 적응 오류로 즉사**해 (1) 의 프로세스
+    # 표집 창이 사라지므로 값이 있어야 하고, 그 값이 실재하는 주소면 게이트가 남의 포트를
+    # 두드리게 된다. 라우팅되지 않는 주소는 둘 다 피한다 — 어느 상류로도 요청하지 않는다.
+    PROBE_ENV=(
+      -e BIDVECTOR_WEB_PORT=18090
+      -e BIDVECTOR_PROXY_HTTPS_PORT=18443
+      -e BIDVECTOR_PROXY_DOMAIN=localhost
+      -e BIDVECTOR_PROXY_APP_UPSTREAM=192.0.2.1:18080
+      -e BIDVECTOR_PROXY_WEB_UPSTREAM=192.0.2.1:18090
+    )
+    ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(정책 오류 — 스크립트의 갈래와 정책이 어긋났다)" >&2
     exit 2
@@ -195,6 +225,64 @@ failures=0
 fail() {
   echo "위생 위반: $1" >&2
   failures=$((failures + 1))
+}
+
+# 「금지 실행 파일」·「필수 실행 파일」 두 축은 **kind 둘이 공유**한다(jvm-app · caddy-site).
+# 판정 형태를 복사하지 않는다 — 복사본은 한 자리의 교정을 다른 자리에서 놓친다(6C 가 같은
+# 계열의 결함을 세 라운드에 걸쳐 낸 자리다). 갈라지는 것은 **사유 문면**뿐이라 인자로 받는다.
+#
+# 셸 조회 축은 한 번만 재고 결과를 전역에 둔다(같은 이미지에 대해 두 번 물을 이유가 없다).
+SHELL_PROBE_AVAILABLE=""
+FORBIDDEN_EXECUTABLE_COUNT=0
+REQUIRED_EXECUTABLE_COUNT=0
+_ensure_shell_probe() {
+  # `[ … ] && return 0` 형태를 쓰지 않는다 — AND-OR 목록의 비-0 과 `set -e` 의 상호작용을
+  # 독자가 따져야 하는 자리를 만들지 않는다(같은 사유로 이 저장소의 수치 비교도 독립 `if` 다).
+  if [ -n "$SHELL_PROBE_AVAILABLE" ]; then
+    return 0
+  fi
+  if docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
+    SHELL_PROBE_AVAILABLE=true
+  else
+    SHELL_PROBE_AVAILABLE=false
+    fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
+  fi
+}
+
+# **축이 둘이다**(2026-09-26 변이 ⑦ 실측): `--version` 실행 시도 하나로는 `serialver` 를 놓쳤다 —
+# JDK 베이스에 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가 "부재"로 읽었다. 그래서
+# PATH 조회 축을 더하고, 그 축은 셸이 필요하므로 셸 부재는 **판정 불가로 실패**한다.
+_check_forbidden_executables() { # <쉼표 목록> <사유 꼬리말>
+  local list="$1" hint="$2" tool
+  local -a arr
+  IFS=',' read -r -a arr <<< "$list"
+  _ensure_shell_probe
+  for tool in "${arr[@]}"; do
+    if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
+      fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — ${hint}"
+    elif [ "$SHELL_PROBE_AVAILABLE" = true ] \
+      && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+      fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — ${hint}"
+    fi
+  done
+  FORBIDDEN_EXECUTABLE_COUNT="${#arr[@]}"
+}
+
+# 금지 축과 같은 PATH 조회를 쓰므로 셸이 없으면 판정 불가다 — 그 경우 축을 건너뛰지 않고
+# 「판정 불가」 사유를 남긴다(조용한 통과를 만들지 않는다).
+_check_required_executables() { # <쉼표 목록> <사유 꼬리말>
+  local list="$1" hint="$2" tool
+  local -a arr
+  IFS=',' read -r -a arr <<< "$list"
+  _ensure_shell_probe
+  for tool in "${arr[@]}"; do
+    if [ "$SHELL_PROBE_AVAILABLE" != true ]; then
+      fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
+    elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+      fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — ${hint}"
+    fi
+  done
+  REQUIRED_EXECUTABLE_COUNT="${#arr[@]}"
 }
 
 echo "== 이미지 위생 게이트: ${IMAGE_REF} =="
@@ -347,32 +435,12 @@ case "$RUNTIME_KIND" in
     # 를 놓쳤다** — JDK 베이스에 그 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가
     # "부재"로 읽었다. 그래서 PATH 조회 축을 더한다. 그 축은 셸이 필요하므로 **셸 존재를 먼저
     # 확인하고, 없으면 판정 불가로 실패**한다(조용한 통과를 만들지 않는다 — 6C 의 교훈).
-    IFS=',' read -r -a executable_array <<< "$FORBIDDEN_EXECUTABLES"
-    shell_probe_available=true
-    if ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
-      shell_probe_available=false
-      fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
-    fi
-    for tool in "${executable_array[@]}"; do
-      if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
-        fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — JRE 가 아니라 JDK 베이스일 수 있다"
-      elif [ "$shell_probe_available" = true ] \
-        && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
-        fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — JRE 가 아니라 JDK 베이스일 수 있다"
-      fi
-    done
+    # 두 축의 판정은 **공유 helper** 가 든다(M7/7F-local 의 caddy-site 와 같은 코드) — 문면의
+    # 사유만 이 kind 의 것이다. 축이 둘인 이유(변이 ⑦)는 helper 머리 주석에 있다.
+    _check_forbidden_executables "$FORBIDDEN_EXECUTABLES" "JRE 가 아니라 JDK 베이스일 수 있다"
 
-    # ①' **필수** 실행 파일 존재(Open Question 2). 금지 축과 같은 PATH 조회를
-    # 쓰므로 셸이 없으면 판정 불가다 — 위에서 이미 `fail` 로 끊었고, 여기서는 그 경우 축을
-    # 건너뛰지 않고 「판정 불가」 사유를 한 번 더 남긴다(조용한 통과를 만들지 않는다).
-    IFS=',' read -r -a required_array <<< "$REQUIRED_EXECUTABLES"
-    for tool in "${required_array[@]}"; do
-      if [ "$shell_probe_available" != true ]; then
-        fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
-      elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
-        fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — compose healthcheck 가 이것으로 준비 상태를 묻는다"
-      fi
-    done
+    # ①' **필수** 실행 파일 존재(Open Question 2).
+    _check_required_executables "$REQUIRED_EXECUTABLES" "compose healthcheck 가 이것으로 준비 상태를 묻는다"
 
     # ② 풀린 의존 layer 에 test 전용 좌표 0(D-6A2a-7 ②). **주 잠금은 Gradle 구조**(`bootJar`
     # 는 `runtimeClasspath` 만 담는다)이고 이 검사는 그것이 이미지까지 이어졌는지 재는 보조다.
@@ -391,7 +459,41 @@ case "$RUNTIME_KIND" in
         fi
       done
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 필수-실행파일-검사=${#required_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    ;;
+  caddy-site)
+    # ① 금지 실행 파일 — 이 kind 의 「금지」는 **빌더 누출과 베이스 교체**를 잡는 축이다. web
+    # 이미지의 런타임 stage 에 node·npm 이 보이면 multi-stage 경계가 깨졌거나 베이스가 빌더
+    # 이미지로 바뀐 것이고, 컴파일러가 보이면 런타임 이미지가 빌드 이미지가 된 것이다. 판정은
+    # 이름 대조가 아니라 **실행·PATH 조회**다(jvm-app 과 같은 helper).
+    _check_forbidden_executables "$FORBIDDEN_EXECUTABLES" "빌더 단계가 런타임으로 샜거나 베이스가 바뀌었을 수 있다"
+
+    # ①' 필수 실행 파일 — compose 의 두 healthcheck 가 이미지 안 `curl` 로 묻는다(app 과 같은
+    # 사유: 베이스 상향으로 사라지면 증상이 「healthy 로 수렴하지 않음」이라 원인이 보이지 않는다).
+    _check_required_executables "$REQUIRED_EXECUTABLES" "compose healthcheck 가 이것으로 준비 상태를 묻는다"
+
+    # ② 이미지가 **싣고 있는 내용**. jvm-app 의 의존 layer 축과 같은 형태다 — **양성 대조가
+    # 먼저**다: 목록이 비거나 경로가 틀리면 아래 「위반 0」이 공허하게 참이 된다. 그래서 파일
+    # 수 하한을 먼저 요구하고, 그 뒤에 필수·금지 패턴을 본다.
+    CONTENT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "$CONTENT_PATH" -type f 2>/dev/null || true)"
+    CONTENT_ENTRIES="$(printf '%s\n' "$CONTENT_LISTING" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    IFS=',' read -r -a required_content_array <<< "$REQUIRED_CONTENT_PATTERNS"
+    IFS=',' read -r -a forbidden_content_array <<< "$FORBIDDEN_CONTENT_PATTERNS"
+    if ! [[ "$CONTENT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$CONTENT_ENTRIES" -lt "$CONTENT_MIN_ENTRIES" ]; then
+      fail "내용 경로(${CONTENT_PATH})의 파일 수(${CONTENT_ENTRIES})가 정책 하한(${CONTENT_MIN_ENTRIES}) 미만이다 — 경로가 틀렸거나 COPY 가 비었거나 목록 도구가 없다(판정 불가)"
+    else
+      for pat in "${required_content_array[@]}"; do
+        if ! printf '%s\n' "$CONTENT_LISTING" | grep -qF -- "$pat"; then
+          fail "필수 내용 '${pat}' 이 ${CONTENT_PATH} 에 없다 — 이미지가 자기 역할의 입력을 싣지 않았다"
+        fi
+      done
+      for pat in "${forbidden_content_array[@]}"; do
+        if printf '%s\n' "$CONTENT_LISTING" | grep -qiF -- "$pat"; then
+          fail "금지 내용 '${pat}' 이 ${CONTENT_PATH} 에 있다"
+        fi
+      done
+    fi
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
