@@ -655,18 +655,26 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
 
 ### 8.1 무엇이 어디서 도는가
 
-CI `container` job 이 두 이미지를 만든 뒤 위생 게이트(S-22a/b)에 이어 **취약점 게이트**를 돈다 —
-`S-22d`(ml-serving) · `S-22e`(앱). 둘 다 같은 스크립트 `tools/vuln-scan-check.sh` 에 이미지 참조 ·
-이미지 kind · 정책 파일 `config/quality/vuln-policy.properties` 를 인자로 준다. 기본값은 없다 —
-**어느 정책으로 판정했는지가 명령에 보인다**(위생 게이트와 같은 규율).
+CI `container` job 이 이미지를 만든 뒤 위생 게이트에 이어 **취약점 게이트**를 돈다. **대상은 넷이다**
+(M7/7F-local D-7F-1 로 둘에서 늘었다) — 위생 `S-22a`(ml-serving) · `S-22b`(앱) · `S-22b2`(web) ·
+`S-22b3`(프록시), 취약점 `S-22d`(ml-serving) · `S-22e`(앱) · `S-22e2`(web) · `S-22e3`(프록시). 넷 다
+같은 스크립트 `tools/vuln-scan-check.sh` 에 이미지 참조 · 이미지 kind · 정책 파일
+`config/quality/vuln-policy.properties` 를 인자로 준다. 기본값은 없다 — **어느 정책으로 판정했는지가
+명령에 보인다**(위생 게이트와 같은 규율).
+
+**위생 쪽 정책 파일은 이미지마다 하나**다(`image-hygiene-policy{,-app,-web,-proxy}.properties`).
+web·proxy 두 파일은 같은 갈래(`runtime.kind=caddy-site`)를 쓰고 **값만** 다르다 — 판정 형태가 같은
+것을 두 벌로 만들지 않는다. 그 갈래의 「금지」는 **빌더 누출·베이스 교체**(실행 파일 축)와 **싣고
+있는 내용**(web: 소스맵·소스·`.env` 부재 · proxy: 키·인증서 재료 부재)이다.
 
 게이트는 이미지에서 CycloneDX SBOM 을 먼저 만들고, **그 SBOM 을 입력으로** 스캔한다. 이미지를 두 번
 읽지 않으므로 보관한 SBOM 과 판정 대상이 어긋날 자리가 없다.
 
-**두 스캔은 서로를 막지 않는다** — ml-serving 이 막아도 앱 스캔은 돈다(앱 이미지 빌드가 성공했다면).
-한 회차에서 두 이미지의 판정을 다 보기 위해서다. 그러지 않으면 수정 라운드가 둘로 쪼개진다.
+**스캔들은 서로를 막지 않는다** — ml-serving 이 막아도 앱 스캔은 돈다(앱 이미지 빌드가 성공했다면).
+한 회차에서 이미지들의 판정을 다 보기 위해서다. 그러지 않으면 수정 라운드가 쪼개진다. web·proxy 의
+조건은 **자기 빌드·자기 위생**만 본다(다른 이미지의 스캔을 보지 않는다 — 같은 사유의 더 좁은 형태).
 
-SBOM 둘은 `S-22f` 가 artifact `sbom-cyclonedx` 로 올린다(보존 90일). **스캔이 막아도 올라가고,
+SBOM 넷은 `S-22f` 가 artifact `sbom-cyclonedx` 로 올린다(보존 90일). **스캔이 막아도 올라가고,
 스캔이 아예 돌지 않은 회차에는 올리지 않는다** — 뒷부분이 중요하다: 빌드가 실패해 스캔까지 가지도
 못한 회차에 「SBOM 없음」으로 한 번 더 붉히면, 로그를 처음 보는 사람이 원인을 한 칸 더 쫓아야 한다.
 
@@ -996,11 +1004,14 @@ docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml \
 3. **CSP 는 번들이 쓰는 출처에 맞춘 최소이지만, 「브라우저 실행에서 위반 0」은 아직 재지 않는다.**
    스모크는 셸과 번들 자산이 https 로 200 임을 재고, 실제 렌더에서의 CSP 위반은 브라우저가 필요하다
    — 그 축은 화면이 들어오는 7E 의 스모크 자리다.
-4. **위생·취약점 게이트가 이 두 이미지를 보지 않는다.** `tools/image-hygiene-check.sh` ·
-   `tools/vuln-scan-check.sh` 는 이미지 kind 별 **정책 파일**을 요구하고 그 파일들은 이 slice 의
-   범위 밖(`config/quality/`)이다. 그래서 non-root 는 스모크가 직접 재고(§9.4 ⑤), 베이스 고정은
-   Dockerfile 의 다이제스트가 든다 — **그러나 「금지 패키지 0」과 CVE 판정은 이 두 이미지에 대해
-   아직 아무것도 재지 않는다.** 등재 자리는 운영자 결정 사항이다.
+4. **위생·취약점 게이트는 이 두 이미지를 본다**(D-7F-1 로 닫혔다 — 앞 판의 제한이 아니다).
+   `config/quality/image-hygiene-policy-web.properties`·`-proxy.properties` 와
+   `config/quality/vuln-policy.properties` 의 kind 둘(`web`·`proxy`)이 그 자리이고, CI 의 네 step
+   (`S-22b2`·`S-22b3`·`S-22e2`·`S-22e3`)이 매 PR 에 돈다(§8.1). **남는 한 칸**: `apk`(패키지 관리자)는
+   금지 목록에 **없다** — 런타임 사용자가 시스템 경로에 쓸 수 없고 `no-new-privileges` 가 걸려 설치가
+   성립하지 않으며, 그 도구를 지우면 보통 패키지 DB 까지 지워져 **취약점 스캐너가 OS 패키지를
+   열거하지 못한다**(그 상태의 「차단 0」은 맞춰 보지 않았다는 뜻이다). 사유는 두 정책 파일의 같은
+   자리에 적혀 있다.
 5. **인증서는 컨테이너 수명이다**(§9.3 마지막 항목).
 6. **read_only 루트·capability 축소를 적용하지 않았다** — 두 서비스 다 `no-new-privileges` 까지다.
 7. **캐시 정책을 정하지 않았다.** 정적 응답에 `Cache-Control` 을 두지 않았다 — 운영 도메인·CDN
