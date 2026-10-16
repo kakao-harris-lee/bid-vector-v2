@@ -76,14 +76,28 @@ class BrowserAccessWorkflow(
         clear: ClearPassphrase,
     ): SignInOutcome {
         val now = clock.now()
-        val account = accounts.byLogin(login) ?: return SignInOutcome.Refused
-        if (isLocked(account, now)) return SignInOutcome.Refused
-        if (!hasher.verify(clear, account.hash)) {
-            registerFailure(account, now)
-            return SignInOutcome.Refused
+        val account = accounts.byLogin(login)
+        // 거부의 갈래 셋(계정 부재·잠금·불일치)이 **같은 결과**라 한 표로 둔다 — 반환 자리가
+        // 하나뿐이라 「한 갈래만 다르게 끝내는」 편집이 눈에 띈다.
+        return when {
+            account == null -> {
+                SignInOutcome.Refused
+            }
+
+            isLocked(account, now) -> {
+                SignInOutcome.Refused
+            }
+
+            !hasher.verify(clear, account.hash) -> {
+                registerFailure(account, now)
+                SignInOutcome.Refused
+            }
+
+            else -> {
+                accounts.clearFailures(account.id)
+                SignInOutcome.Granted(issue(account.id, now))
+            }
         }
-        accounts.clearFailures(account.id)
-        return SignInOutcome.Granted(issue(account.id, now))
     }
 
     /**
@@ -97,11 +111,25 @@ class BrowserAccessWorkflow(
         demand: CsrfDemand,
     ): AccessVerdict {
         val now = clock.now()
-        val session = sessions.byDigest(key.digest()) ?: return AccessVerdict.Denied
-        if (!isLive(session, now)) return AccessVerdict.Denied
-        if (!csrfSatisfied(session, demand)) return AccessVerdict.Denied
-        sessions.touch(session.digest, now, idleDeadline(now, session.absoluteExpiresAt))
-        return AccessVerdict.Granted(session.account, key.deriveStamp())
+        val session = sessions.byDigest(key.digest())
+        return when {
+            session == null -> {
+                AccessVerdict.Denied
+            }
+
+            !isLive(session, now) -> {
+                AccessVerdict.Denied
+            }
+
+            !csrfSatisfied(session, demand) -> {
+                AccessVerdict.Denied
+            }
+
+            else -> {
+                sessions.touch(session.digest, now, idleDeadline(now, session.absoluteExpiresAt))
+                AccessVerdict.Granted(session.account, key.deriveStamp())
+            }
+        }
     }
 
     /**
@@ -110,9 +138,10 @@ class BrowserAccessWorkflow(
      */
     fun describe(key: BrowserSessionKey): SessionDescription? {
         val now = clock.now()
-        val session = sessions.byDigest(key.digest()) ?: return null
-        if (!isLive(session, now)) return null
-        return SessionDescription(key.deriveStamp(), session.absoluteExpiresAt)
+        return sessions
+            .byDigest(key.digest())
+            ?.takeIf { isLive(it, now) }
+            ?.let { SessionDescription(key.deriveStamp(), it.absoluteExpiresAt) }
     }
 
     /** 로그아웃 — **서버 쪽 폐기**다(쿠키를 지우는 것으로 끝내지 않는다). */
