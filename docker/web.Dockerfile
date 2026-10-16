@@ -7,7 +7,7 @@
 #     docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml build web
 #
 # 베이스 둘 다 다이제스트로 고정한다(2026-10-16 실측 `docker buildx imagetools inspect
-# node:24.12.0-slim` · `caddy:2.11.4` — 멀티플랫폼 index 의 다이제스트). `:latest`·미고정
+# node:24.12.0-slim` · `caddy:2.11.7` — 멀티플랫폼 index 의 다이제스트). `:latest`·미고정
 # 태그는 쓰지 않는다(6C 위생 기준 (2)).
 FROM node:24.12.0-slim@sha256:7326fb2dbdce998edd72140946851be64ef4a643e8715e138ca467e8e9d92c99 AS builder
 
@@ -46,11 +46,11 @@ COPY web/src ./src
 RUN npm run build
 
 # ---- runtime ----
-FROM caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52 AS runtime
+FROM caddy:2.11.7@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af AS runtime
 
 # 이 라벨은 **보조 정보**다(D-6C-9) — 손으로 적는 자유 텍스트라 위 `FROM` 과 아무 것도 묶지
 # 않는다. 구속력 있는 베이스 고정은 위 다이제스트 자신이다.
-LABEL org.bidvector.baseimage="caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52"
+LABEL org.bidvector.baseimage="caddy:2.11.7@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af"
 
 # non-root — 고정 UID/GID, 시스템 계정 범위(app·ml-serving 이미지와 같은 10001). 베이스가
 # alpine 이라 busybox `addgroup`/`adduser` 다.

@@ -3,11 +3,11 @@
 # 자리를 만들지 않는다).
 #
 # 베이스는 web 이미지의 runtime 과 **같은 다이제스트**다(2026-10-16 실측 `docker buildx
-# imagetools inspect caddy:2.11.4`) — 고정해야 하는 베이스가 하나로 줄고, 두 이미지가 서로
+# imagetools inspect caddy:2.11.7`) — 고정해야 하는 베이스가 하나로 줄고, 두 이미지가 서로
 # 다른 Caddy 판으로 갈라지지 않는다.
-FROM caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
+FROM caddy:2.11.7@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af
 
-LABEL org.bidvector.baseimage="caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52"
+LABEL org.bidvector.baseimage="caddy:2.11.7@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af"
 
 # non-root — app·ml-serving·web 이미지와 같은 고정 UID/GID.
 #
