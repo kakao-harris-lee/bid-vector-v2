@@ -156,6 +156,11 @@ class ArchitecturePolicy private constructor(
     val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
     val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")
 
+    /** M7/7D — 제시된 비밀 문구 타입과 그것을 참조해도 되는 production 클래스. */
+    val passphraseTypes: List<String> get() = list("app.secret.passphrase-types")
+
+    val passphraseReferencers: List<String> get() = list("app.secret.passphrase-referencers")
+
     /** (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
     val collectionPackage: String get() = value("workflow.collection.package")
     val collectionAllowedProcurementTypes: List<String> get() = list("workflow.collection.allowed-procurement-types")

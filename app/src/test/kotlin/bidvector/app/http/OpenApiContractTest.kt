@@ -89,7 +89,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     @Test
     fun `D-6A1-20 ⓑ — 계약의 모든 속성 정의가 평탄한 형태(허용 목록)만 쓴다`() {

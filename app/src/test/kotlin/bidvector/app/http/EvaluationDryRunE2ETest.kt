@@ -122,7 +122,7 @@ class EvaluationDryRunE2ETest {
     }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
 
     private fun post(
         currentActiveBids: Int,

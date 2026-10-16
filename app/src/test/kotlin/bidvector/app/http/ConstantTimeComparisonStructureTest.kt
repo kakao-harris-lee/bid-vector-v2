@@ -89,7 +89,7 @@ class ConstantTimeComparisonStructureTest {
 /**
  * `Intrinsics.areEqual`을 정당하게 남기는 class 파일 이름(`nameWithoutExtension`) → 근거.
  * **자격증명 비교를 담지 않는 class만** 올린다 — 새 항목을 더할 때마다 그 class가
- * [OperatorCredentialFilter]의 자격증명 값(`expectedCredential`·`presented`)을 참조하지
+ * [OperatorCredentialAuthenticator]의 자격증명 값(`expectedCredential`·`presented`)을 참조하지
  * 않는지 javap으로 확인한다. 이름 접두사가 아니라 **종류**(data class 자동 equals 또는
  * sealed 싱글턴 참조 동일성)로 가른 목록이다.
  */

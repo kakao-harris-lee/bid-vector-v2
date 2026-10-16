@@ -27,7 +27,7 @@ class InvalidEditRequestException(
 
 /**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
- * [OperatorCredentialFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
+ * [RequestAuthenticationFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
  * 정적으로 들고 있지 않는다).
  */
@@ -156,7 +156,7 @@ object ErrorMapping {
  * 3자 이스케이프만 하는 최소 JSON 직렬화(D-6A1-9/19의 정신과 같은 축 — 이 파일이 유일한
  * 오류 형태 생성 경로이듯, 이 함수가 servlet Filter 층(Spring MVC 진입 전)에서 [ErrorBody]를
  * 응답에 싣는 유일한 통로다). Filter 층은 Spring의 `HttpMessageConverter` 파이프라인 밖이라
- * (`OperatorCredentialFilter`의 401, `RequestAuditFilter`의 fail-closed 500) Jackson을
+ * (`RequestAuthenticationFilter`의 401, `RequestAuditFilter`의 fail-closed 500) Jackson을
  * 직접 부르지 않고 고정 세 필드짜리 이 함수로 충분하다 — 컨트롤러 응답과
  * [GlobalErrorHandler](이 파일 아래)는 Spring이 이미 배선한 JSON 변환을 그대로 쓴다.
  */

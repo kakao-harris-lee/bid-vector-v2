@@ -195,6 +195,30 @@ class AppHttpDependencyGateTest {
     }
 
     /**
+     * M7/7D — **제시된 비밀 문구 타입을 참조하는 production 클래스 집합**이 등재된 집합과 같다.
+     *
+     * 자격증명 축과 **키를 나눈** 이유: 합치면 한쪽 사유로 등재된 이름이 다른 쪽 타입도 함께
+     * 열어 준다. 뿌리가 셋인 이유: 그 값은 use case(workflow)·해시 어댑터(adapters)·HTTP 와
+     * 명령(app) 셋을 지나고, 한 뿌리만 보면 나머지 둘에 새 보유자가 생겨도 조용하다.
+     *
+     * 이 집합은 `hashInput()` 호출자의 **상한**이다(참조 ⊇ 호출) — 원문을 꺼낼 수 있는 자리가
+     * 늘면 목록을 늘리지 않고는 초록이 되지 않는다.
+     */
+    @Test
+    fun `비밀 문구 타입을 참조하는 production 클래스 집합은 등재된 집합과 같다 — 집합 등식`() {
+        collectionRules.observedReferencers(
+            production,
+            listOf(
+                "${policy.packageRoot}.app",
+                "${policy.packageRoot}.workflow",
+                "${policy.packageRoot}.adapters",
+            ),
+            policy.passphraseTypes.toSet(),
+            policy.depth(DepthAxis.PASSPHRASE),
+        ) shouldBe policy.passphraseReferencers.toSet()
+    }
+
+    /**
      * D-6A2b-50 — ② 층 workflow 허용 목록의 두 성질.
      *
      * ① **능력 포트를 담지 않는다.** 계약 문면이 요구한 「구조 분류로 도출」이 이 단언이다 —
@@ -349,5 +373,12 @@ class AppHttpDependencyGateTest {
  * 러너 레인 넷(`RetentionRunner`·그 파일 facade·종료 코드 열거·로그 줄 facade, ③ 층).
  * 다섯 모두 **HTTP 로 닿지 않는 자리**다: 러너는 cron 이 프로세스로 돌리고, 컨트롤러·② 층이
  * 그 타입을 참조하면 의존 방향 규칙이 붉어진다.
+ *
+ * **51 -> 60**(M7/7D): 브라우저 인증이 셋을 더했다 — ① 층 넷(`BrowserAccessWiring` ·
+ * `AccountCommandWiring` 과 그 설정 타입 둘: `AccountCommandProperties`·`AccessCookieProperties`),
+ * ② 층 하나(`BrowserAccessExecutor` — 컨트롤러·필터가 받는 실행기이고 HTTP 층 허용 목록에도
+ * 있다), ③ 층 넷(계정 명령 레인: 러너·로그 출구·종료 자리·모드 열거). 명령 레인은 HTTP 로
+ * 닿지 않는다 — 컨트롤러·② 층이 그 타입을 참조하면 의존 방향 규칙이 붉어지고, 쓰기는 소유자
+ * 연결로만 선다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 51
+private const val EXPECTED_EXEMPT_COUNT = 60

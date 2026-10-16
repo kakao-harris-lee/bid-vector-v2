@@ -121,7 +121,7 @@ class ProductionAssemblyAuthAuditTest {
     private fun url(path: String): String = "http://localhost:$port$path"
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
 
     /** production 조립이 실제로 만든 `DataSource` bean — `PersistenceWiring`이 유일한 조립 지점. */
     private fun auditDataSource(): DataSource = context.getBean(DataSource::class.java)

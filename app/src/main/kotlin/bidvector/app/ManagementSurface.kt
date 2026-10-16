@@ -18,7 +18,7 @@ import org.springframework.core.env.MapPropertySource
  * 관리 표면(D-6A2a-4) — health 를 **API 포트가 아닌 별도 관리 포트**에 내고, 그 포트에 health
  * 말고 아무것도 두지 않는다.
  *
- * 같은 포트에 두면 [bidvector.app.http.OperatorCredentialFilter] 에 경로 예외가 필요해지고,
+ * 같은 포트에 두면 [bidvector.app.http.RequestAuthenticationFilter] 에 경로 예외가 필요해지고,
  * 경로 예외는 정규화(`..`·`;`·인코딩·후행 `/`) 우회의 문이다(D-6A1-21 이 디스패치 한 가지로
  * audit·인증 우회를 실측한 계열). 포트 분리는 그것을 **구성으로** 닫는다 — API 포트에는
  * actuator 가 아예 없고(자격증명을 줘도 404), 관리 포트에는 health 말고 아무것도 없다.

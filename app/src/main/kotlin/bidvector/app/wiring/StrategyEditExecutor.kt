@@ -120,7 +120,7 @@ class StrategyEditExecutor(
 
     private companion object {
         /**
-         * 단일 운영자 토큰(6A-1 운영자 결정 ②) — 라벨은 `OperatorCredentialFilter` 가 audit
+         * 단일 운영자 토큰(6A-1 운영자 결정 ②) — 라벨은 `OperatorCredentialAuthenticator` 가 audit
          * 주체로 적는 값과 같다. 그 파일은 이 slice 에서 **무편집**이라(D-6A2b-5) 상수를
          * 공유하도록 옮기지 않았다 — 두 값이 같다는 것은 문면이 아니라 실 조립 E2E 가
          * 잰다(audit 행의 subject == outbox 봉투의 actor).

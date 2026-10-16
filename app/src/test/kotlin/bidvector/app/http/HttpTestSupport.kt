@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
@@ -315,9 +316,37 @@ open class HttpTestApplication {
             clock = clock,
         )
 
+    /** 7D — 세션 경로의 이중체 조립(실 DB 없이 쿠키·CSRF 거동만 잰다). */
     @Bean
-    open fun operatorCredentialFilterRegistration(): FilterRegistrationBean<OperatorCredentialFilter> =
-        FilterRegistrationBean(OperatorCredentialFilter(OperatorCredential.of(TEST_CREDENTIAL))).apply {
+    open fun browserAccessTransaction(clock: FixedClock): InMemoryBrowserAccessTransaction =
+        InMemoryBrowserAccessTransaction(clock)
+
+    @Bean
+    open fun browserAccessExecutor(
+        browserAccessTransaction: InMemoryBrowserAccessTransaction,
+    ): BrowserAccessExecutor = BrowserAccessExecutor(browserAccessTransaction)
+
+    /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
+    @Bean
+    open fun sessionCookieWriter(): SessionCookieWriter =
+        SessionCookieWriter(secure = true, absoluteWindow = TEST_ACCESS_POLICY.absoluteWindow)
+
+    /**
+     * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.
+     * 순서까지 출하와 같게 둔다(자격 헤더 먼저).
+     */
+    @Bean
+    open fun requestAuthenticationFilterRegistration(
+        browserAccessExecutor: BrowserAccessExecutor,
+    ): FilterRegistrationBean<RequestAuthenticationFilter> =
+        FilterRegistrationBean(
+            RequestAuthenticationFilter(
+                listOf(
+                    OperatorCredentialAuthenticator(OperatorCredential.of(TEST_CREDENTIAL)),
+                    BrowserSessionAuthenticator(browserAccessExecutor),
+                ),
+            ),
+        ).apply {
             urlPatterns = listOf("/*")
             order = Ordered.HIGHEST_PRECEDENCE + 1
         }

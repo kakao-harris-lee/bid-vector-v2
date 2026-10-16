@@ -59,7 +59,7 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     private fun postDryRun(body: Map<String, Any?>): ResponseEntity<Map<String, Any?>> {
         @Suppress("UNCHECKED_CAST")

@@ -45,7 +45,7 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
 
     private fun headers(): HttpHeaders =
         HttpHeaders().apply {
-            set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL)
+            set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL)
             contentType = MediaType.APPLICATION_JSON
         }
 

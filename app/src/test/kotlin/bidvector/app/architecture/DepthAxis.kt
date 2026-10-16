@@ -42,4 +42,7 @@ enum class DepthAxis(
 
     /** 운영자 자격증명 타입을 참조하는 클래스 집합. */
     OPERATOR_CREDENTIAL("operator-credential"),
+
+    /** 제시된 비밀 문구 타입을 참조하는 클래스 집합(M7/7D). */
+    PASSPHRASE("passphrase"),
 }

@@ -1,6 +1,6 @@
 package bidvector.app.management
 
-import bidvector.app.http.OperatorCredentialFilter
+import bidvector.app.http.OperatorCredentialAuthenticator
 import bidvector.app.productionApplication
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -116,7 +116,7 @@ class ManagementHealthSurfaceTest {
     private fun api(path: String): String = "http://localhost:$apiPort$path"
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
 
     @Suppress("UNCHECKED_CAST")
     private fun bodyOf(url: String): ResponseEntity<Map<String, Any?>> =
