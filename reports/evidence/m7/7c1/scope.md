@@ -82,6 +82,21 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 - 병렬 레인 7D 도 `architecture-policy.properties` · `gate-tests.properties` · 의존 게이트 면제 수를 만진다. 머지 순서에 따라 뒤 PR 이
   충돌을 정리하고 면제 수를 다시 센다.
 
+**D-7C1-2 (2026-10-17, 팀장 — 검토 r1 수령 · 승인 전 배치 수령 · 동결).**
+- verifier r1 은 ready-for-review(high 0)였다. code-reviewer r1 은 REQUEST_CHANGES 였다(H-1 container job 미측정 — verifier 가 판정 대상에서
+  16 step 실패 0 으로 측정해 닫힘).
+- 배치에서 닫은 것:
+  - F-1: 검색 연결을 읽기 전용 트랜잭션 문장으로 열고, 실 DB 에서 쓰기 거부를 확인했다.
+  - F-2: 제어 문자를 거부한다(400).
+  - M-2·L-4: LIKE 이스케이프를 `!` 로 바꿨다. `standard_conforming_strings=off` 에서도 실측했다.
+  - low 셋: 반복 매개변수 400 · 엄격한 정수 · 과세 불변식.
+  - 장부: 알려진 제한 다섯과 evidence 교정.
+- F-1·F-2·이스케이프·반복 판정은 술어·거동 변경이므로 표적 재검증 대상이다.
+- 판정 대상은 산출물 `431b2ad3` · evidence `41f77f07` 다.
+- 레인이 이 계약의 새 test 수를 바로잡은 커밋 `469f273d`(다섯 → 여섯, 이후 r2 의 실 DB E2E 로 일곱)를 수용한다. 계약 파일은 팀장
+  소유이지만 사실 교정이라 되돌리지 않는다.
+- 세 질의의 스냅숏 축(`REPEATABLE READ`)은 알려진 제한으로 둔다(단일 운영자 조회, 7E 에서 재판단).
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0 — `config/quality/**` 는 위 계약 갱신으로 in_scope 다).
