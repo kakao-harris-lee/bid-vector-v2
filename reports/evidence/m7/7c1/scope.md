@@ -62,8 +62,24 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 
 ## 계약 갱신 이력
 
-(착수)
+**D-7C1-1 (2026-10-16, 팀장 — 구현 수령 · 동결).** 판정 대상은 산출물 `37e00fc0` · evidence `c0a78854` 다.
+- **in_scope 확장을 수용한다**(acceptance 가 서려면 필요했다):
+  - `config/quality/architecture-policy.properties`(HTTP 표면 등식 · 층 분류 · 주입 표면 · 포트 호출 쌍 · 제한 층 허용 패키지에
+    `bidvector.workflow.notice` 를 열고 읽기 포트는 `app.http.denied-types` 로 다시 막음)
+  - `config/quality/gate-tests.properties`(새 test 다섯)
+  - `app` 의 기존 게이트 test 둘의 **데이터만**(의존 게이트 면제 수 51 → 53 · `Intrinsics.areEqual` 허용 목록 한 항목). 술어는 무편집이다.
+  - 어댑터 패키지 `bidvector.adapters.notice` 신설과 그 의존 게이트
+  - 이 넷은 게이트 설정·데이터이므로 verifier 표적이다. 넓힌 줄마다 근거가 evidence 에 있는지 본다.
+- 계약이 요구한 선언을 수령했다:
+  - 금액 basis 는 기초금액(타입으로 선언)이다.
+  - 비교할 수 없거나 금액이 없는 공고는 결과에서 빠진다.
+  - `size` 상한은 100 이고, 넘으면 400 이다.
+  - 빈 결과의 두 뜻은 헤더 `X-Result-State` 로 가른다(본문이 배열이라서다).
+- `provenanceLabel` 이 `private` → `internal` 이 됐다(같은 wire 어휘 재사용, 모듈 밖으로 나가지 않음).
+- 마지막 HEAD(`c0a78854`)의 Kotlin `check` 재실측은 호스트 메모리 문턱 때문에 레인이 못 했다. verifier 가 잰다.
+- 병렬 레인 7D 도 `architecture-policy.properties` · `gate-tests.properties` · 의존 게이트 면제 수를 만진다. 머지 순서에 따라 뒤 PR 이
+  충돌을 정리하고 면제 수를 다시 센다.
 
 ## 하네스 레인 변경 (상시)
 
-- (착수 시점 없음)
+- 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0 — `config/quality/**` 는 위 계약 갱신으로 in_scope 다).
