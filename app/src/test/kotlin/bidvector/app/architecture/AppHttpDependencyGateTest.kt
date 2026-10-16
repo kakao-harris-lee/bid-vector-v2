@@ -349,5 +349,10 @@ class AppHttpDependencyGateTest {
  * 러너 레인 넷(`RetentionRunner`·그 파일 facade·종료 코드 열거·로그 줄 facade, ③ 층).
  * 다섯 모두 **HTTP 로 닿지 않는 자리**다: 러너는 cron 이 프로세스로 돌리고, 컨트롤러·② 층이
  * 그 타입을 참조하면 의존 방향 규칙이 붉어진다.
+ *
+ * **51 -> 53**(M7/7C ①): 공고 검색 경로가 생겼다 — 배선 하나(`NoticeSearchWiring`, ① 층)와
+ * 조회기 하나(`NoticeSearchQuery`, ② 층). 조회기는 컨트롤러가 받는 자리라 HTTP 층의 허용
+ * 클래스 목록에도 함께 올랐고(그 등식은 「면제는 세 층으로 갈리고…」 test 가 잰다), 읽기
+ * 포트는 여전히 제한 층이 직접 받을 수 없다(`app.http.denied-types`).
  */
-private const val EXPECTED_EXEMPT_COUNT = 51
+private const val EXPECTED_EXEMPT_COUNT = 53

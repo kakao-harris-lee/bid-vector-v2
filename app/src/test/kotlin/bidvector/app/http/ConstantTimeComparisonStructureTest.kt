@@ -81,6 +81,7 @@ class ConstantTimeComparisonStructureTest {
                 "EditSessionResponse",
                 "EditFieldTokensKt",
                 "EditSessionResponseKt",
+                "NoticeSummaryResponse",
             )
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
@@ -113,6 +114,8 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "필드 토큰 표의 sealed 싱글턴 when 소진과 토큰→필드 Map 조회(javap 확인: 자격증명 좌표 0)",
         "EditSessionResponseKt" to
             "상태·거부 사유 sealed 싱글턴 when 소진(javap 확인: 자격증명 좌표 0) — 값 비교가 아니라 객체 동일성",
+        "NoticeSummaryResponse" to
+            "공고 요약 응답 값 객체(data class) 자동 생성 equals — 공고번호·차수·상태·공고명·기관명·기초금액·마감뿐, 자격증명 값 없음",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"

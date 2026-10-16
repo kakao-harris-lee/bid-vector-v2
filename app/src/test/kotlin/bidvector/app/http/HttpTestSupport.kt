@@ -177,7 +177,6 @@ private class UnreachableLicenseGatePort : LicenseGatePort {
     override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
 }
 
-/** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
 /**
  * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
  * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
@@ -195,6 +194,7 @@ class FakeNoticeSearchPort : NoticeSearchPort {
     }
 }
 
+/** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
 class RecordingAuditSink {
     val records: MutableList<ApiAuditRecord> = Collections.synchronizedList(mutableListOf())
 
