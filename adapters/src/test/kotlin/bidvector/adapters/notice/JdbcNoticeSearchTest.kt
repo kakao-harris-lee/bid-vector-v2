@@ -131,6 +131,52 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
         search(NoticeSearchParameters(text = "%")).totalCount shouldBe 1L
     }
 
+    /**
+     * 이스케이프 문자 자신(`!`)과 역슬래시가 **리터럴로** 검색된다(verifier r1 L-4 처방 뒤).
+     * 역슬래시는 더 이상 이스케이프 문자가 아니라 보통 글자다.
+     */
+    @Test
+    fun `느낌표와 역슬래시는 리터럴로 찾는다`() {
+        insert("N-1", title = "긴급! 도로 포장", offsetSeconds = 1)
+        insert("N-2", title = "경로 C:\\공사\\자료", offsetSeconds = 2)
+        insert("N-3", title = "보통 공고", offsetSeconds = 3)
+
+        labels(NoticeSearchParameters(text = "!")) shouldContainExactly listOf("N-1")
+        labels(NoticeSearchParameters(text = "\\")) shouldContainExactly listOf("N-2")
+        labels(NoticeSearchParameters(text = "!%")) shouldHaveSize 0
+    }
+
+    /**
+     * **이스케이프가 세션 설정에 기대지 않는다**(L-4 의 실제 축). `standard_conforming_strings`
+     * 를 데이터베이스 수준에서 꺼서 **새 연결이 그 설정을 물려받게** 한 뒤 같은 검색을 돌린다.
+     * 역슬래시 이스케이프였다면 `ESCAPE '\'` 의 문자열이 닫히지 않아 질의가 예외로 깨졌다
+     * (측정). 느낌표는 SQL 문자열에서 아무 뜻이 없어 그대로 돈다.
+     */
+    @Test
+    fun `standard_conforming_strings 가 꺼져도 검색이 돈다`() {
+        insert("N-1", title = "도로 포장", offsetSeconds = 1)
+        val database = dataSource().connection.use { it.catalog }
+
+        setDatabaseStandardConformingStrings(database, "off")
+        try {
+            labels(NoticeSearchParameters(text = "포장")) shouldContainExactly listOf("N-1")
+            labels(NoticeSearchParameters(text = "100%")) shouldHaveSize 0
+        } finally {
+            setDatabaseStandardConformingStrings(database, "on")
+        }
+    }
+
+    private fun setDatabaseStandardConformingStrings(
+        database: String,
+        value: String,
+    ) {
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("ALTER DATABASE \"$database\" SET standard_conforming_strings = $value")
+            }
+        }
+    }
+
     @Test
     fun `우회 ⑤ — 주입 문자열은 값이라 표가 그대로 남는다`() {
         insert("N-1", title = "정상 공고", offsetSeconds = 1)

@@ -40,15 +40,22 @@ internal data class NoticeSearchStatement(
 )
 
 /**
- * `LIKE`/`ILIKE` 의 이스케이프 문자. PostgreSQL 기본값과 같은 역슬래시를 **명시**한다 —
- * 기본값에 기대면 `standard_conforming_strings` 같은 설정 변화가 조용히 뜻을 바꾼다.
+ * `LIKE`/`ILIKE` 의 이스케이프 문자 — **역슬래시가 아니다**(verifier r1 L-4 / code-reviewer
+ * M-2).
+ *
+ * 앞 판은 PostgreSQL 기본값과 같은 역슬래시를 「명시해서」 설정 변화를 막는다고 적었는데,
+ * **명시한 리터럴 자체가 그 설정에 기댄다**: `standard_conforming_strings = off` 세션에서는
+ * SQL 문자열 안의 `\` 가 다시 escape 로 읽혀 `ESCAPE '\'` 가 **문자열 종료 실패**로 깨진다
+ * (실측 — q 가 있는 질의 전부가 예외). 느낌표는 SQL 문자열 리터럴에서 아무 뜻이 없어 그
+ * 설정과 무관하다 — 축이 사라진다.
  */
-internal const val NOTICE_SEARCH_LIKE_ESCAPE: String = "\\"
+internal const val NOTICE_SEARCH_LIKE_ESCAPE: String = "!"
 
 /**
  * 부분 일치 패턴 — 운영자가 적은 **리터럴**을 감싸고, 그 안의 와일드카드(`%`·`_`)와
- * 이스케이프 문자 자신(`\`)을 글자로 바꾼다(역슬래시를 **먼저** 바꾼다 — 나중에 바꾸면
- * 앞서 넣은 이스케이프를 다시 이스케이프해 뜻이 어긋난다).
+ * 이스케이프 문자 자신(`!`)을 글자로 바꾼다(이스케이프 문자를 **먼저** 바꾼다 — 나중에
+ * 바꾸면 앞서 넣은 이스케이프를 다시 이스케이프해 뜻이 어긋난다). 역슬래시는 이제 보통
+ * 글자라 그대로 지난다.
  */
 internal fun noticeSearchContainsPattern(literal: String): String {
     val escaped =

@@ -60,19 +60,23 @@ class NoticeSearchStatementTest {
 
     @Test
     fun `우회 ② — 와일드카드와 이스케이프 문자는 글자로 바뀐다`() {
-        noticeSearchContainsPattern("%") shouldBe "%\\%%"
-        noticeSearchContainsPattern("_") shouldBe "%\\_%"
-        noticeSearchContainsPattern("\\") shouldBe "%\\\\%"
-        noticeSearchContainsPattern("100%_할인") shouldBe "%100\\%\\_할인%"
-        // 역슬래시를 먼저 바꾸지 않으면 `\%` 가 `\\%`(리터럴 역슬래시 + 와일드카드)가 된다.
-        noticeSearchContainsPattern("\\%") shouldBe "%\\\\\\%%"
+        noticeSearchContainsPattern("%") shouldBe "%!%%"
+        noticeSearchContainsPattern("_") shouldBe "%!_%"
+        noticeSearchContainsPattern("!") shouldBe "%!!%"
+        noticeSearchContainsPattern("100%_할인") shouldBe "%100!%!_할인%"
+        // 이스케이프 문자를 먼저 바꾸지 않으면 `!%` 가 `!!%`(리터럴 느낌표 + 와일드카드)가 된다.
+        noticeSearchContainsPattern("!%") shouldBe "%!!!%%"
+        // 역슬래시는 이제 보통 글자다 — 이스케이프되지 않고 그대로 지난다.
+        noticeSearchContainsPattern("\\") shouldBe "%\\%"
     }
 
     @Test
-    fun `문면이 ESCAPE 절을 명시한다 — 기본값에 기대지 않는다`() {
+    fun `문면이 ESCAPE 절을 명시하고 그 글자가 설정과 무관하다`() {
         val statement = statementOf(NoticeSearchParameters(text = "가", agencyText = "나"))
 
-        statement.clause shouldContain "ILIKE ? ESCAPE '\\'"
+        // 역슬래시였으면 `standard_conforming_strings = off` 에서 문자열이 닫히지 않는다(L-4).
+        statement.clause shouldNotContain "ESCAPE '\\'"
+        statement.clause shouldContain "ILIKE ? ESCAPE '!'"
         statement.clause shouldContain "notice_title"
         statement.clause shouldContain "notice_number"
         statement.clause shouldContain "demand_agency_name"
