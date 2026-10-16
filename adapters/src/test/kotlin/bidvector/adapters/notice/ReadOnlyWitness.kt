@@ -71,7 +71,9 @@ private fun witnessedConnection(
                     witnessedStatement(method.invoke(delegate, *arguments) as Statement, delegate, witness)
                 }
 
-                else -> method.invoke(delegate, *arguments)
+                else -> {
+                    method.invoke(delegate, *arguments)
+                }
             }
         },
     ) as Connection
