@@ -71,12 +71,15 @@ class RequestAuthenticationFilter(
             return
         }
 
+        // `filterIsInstance` 를 쓰지 않는다 — reified inline 이라 stdlib(`_Sequences.kt`)의 람다
+        // 클래스가 이 모듈 아카이브에 복사되고 `jarContentGate` 가 「게이트를 통과한 소스가
+        // 아니다」로 끊는다(실측 — `ManagementSurface` 가 같은 자리에서 같은 이유로 `as?` 를 쓴다).
+        // `firstNotNullOfOrNull` 의 람다는 이 파일의 것이고, **첫 통과에서 멈춘다**(자격 헤더가
+        // 통과하면 세션 조회 트랜잭션이 아예 열리지 않는다).
         val granted =
-            authenticators
-                .asSequence()
-                .map { it.authenticate(httpRequest) }
-                .filterIsInstance<AuthenticationResult.Authenticated>()
-                .firstOrNull()
+            authenticators.firstNotNullOfOrNull {
+                it.authenticate(httpRequest) as? AuthenticationResult.Authenticated
+            }
 
         if (granted == null) {
             httpRequest.setAttribute(AUDIT_SUBJECT_ATTRIBUTE, UNAUTHENTICATED_SUBJECT)
