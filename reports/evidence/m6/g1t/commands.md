@@ -2,7 +2,7 @@
 
 출력 전문을 붙이지 않는다 — 핵심 결과는 한 줄이고 감사자는 명령을 다시 돌린다. 라운드 이력 절을 두지
 않는다. **마지막 HEAD 의 게이트 결과 정본은 verifier 와 PR 조치 코멘트**다 — 이 표는 그 직전(마지막
-산출물 커밋 `40dded85`)까지를 담는다.
+산출물 커밋 `4bf953d1`)까지를 담는다.
 
 변이 실측의 바꿔치기·판정은 `checklist.md` §2 의 표에 둔다 — 같은 사실을 두 자리에 적지 않는다.
 
@@ -11,14 +11,17 @@
 별도 호출로 먼저 보고, 무거운 두 실행은 **잠금을 획득한 뒤 하한을 다시** 쟀다(대기 중에는 앞 레인의
 빌드가 메모리를 쥐고 있어 시작 전 수치가 무의미하다). 00:30~03:00 창 밖에서만 돌렸다.
 
-## acceptance — `check` job 의 Kotlin 명령 그대로 · 산출물 HEAD `40dded85`
+## acceptance — `check` job 의 Kotlin 명령 그대로 · 산출물 HEAD `4bf953d1`(수정 라운드 1)
 
 | cmd | exit | 핵심 결과 |
 |---|---|---|
-| `./gradlew --no-daemon check` | **0** | BUILD SUCCESSFUL 8분 59초 · 492 task — 컴파일·ktlint·detekt·CPD·sizeGate·typeShape·testShape·게이트 등재/실행·architecture·contract·누출·compatibilitySmoke + test 전건(신설 넷 포함) |
+| `./gradlew --no-daemon check` | **0** | BUILD SUCCESSFUL 9분 02초 · 492 task — 컴파일·ktlint·detekt·CPD·sizeGate·typeShape·testShape·게이트 등재/실행·architecture·contract·누출·compatibilitySmoke + test 전건. 신설 넷의 XML: T-1 2/0 · T-2 1/0 · T-3 1/0 · T-4 2/0(tests/failures) |
 | `./gradlew --no-daemon qualityBaseline` | **0** | 측정 task(게이트가 아니다) — 리포트 생성 |
-| 잠금 안 하한 재측정 | — | available 7068MB · swap free 6196MB |
-| 실행 전·후 HEAD | — | `40dded85` == `40dded85`(측정 창에서 트리가 움직이지 않았다) |
+| 잠금 안 하한 재측정 | — | available 16656MB · swap free 6925MB |
+| 실행 전·후 HEAD | — | `4bf953d1` == `4bf953d1`(측정 창에서 트리가 움직이지 않았다) |
+
+착수 라운드(산출물 `40dded85`)의 같은 두 명령도 exit 0 이었다(`check` 8분 59초 · 492 task). 이 표는 **수정
+라운드 1 의 실측**으로 바꿔 적는다 — 같은 자리에 두 회차를 쌓지 않는다.
 
 `web`·`ml-engine`·`container` job 은 생략했다(scope.md acceptance 문면) — **입력 변경 0** 을 path-limited
 diff 로 보였다: `git diff --name-only 77850903..HEAD -- ml-engine web docker openapi contracts .github
@@ -44,17 +47,47 @@ ml-contract` 가 **빈 출력**이다. 그 세 job 의 명령을 순차로 묶�
 
 변이 아래의 RED 와 그때 함께 붉은 등재 test 는 `checklist.md` §2 가 든다.
 
+## 수정 라운드 1 — 고친 test 둘과 그 변이
+
+| 측정 | cmd | exit | 핵심 결과 |
+|---|---|---|---|
+| 통제군 | 두 모듈의 `ktlintTestSourceSetCheck`·`detekt`·`sizeGate` + T-4·T-3 표적 실행 | 0 | BUILD SUCCESSFUL **40초** · T-4 2/0 · T-3 1/0 |
+| M-4 강화판 | 변이 → `:adapters:test` 임대 3 클래스 | 1 | **8 중 1 실패(T-4 뿐)** · `terminated == 1` 은 통과 → RED 가 세션 종료 축에서 난다 |
+| M-3 재확인 | 변이 → `:app:test` 평가 둘 | 1 | **8 중 1 실패(T-3 뿐)** |
+
+변이는 **잠금을 쥔 뒤** 넣었다(대기 중 워크트리가 더러운 창을 없앤다) · 사본 복원 + `cmp` 바이트 동일 ·
+복원 뒤 porcelain 빈 출력. 판정 표는 `checklist.md` §2-1 이 든다.
+
+## capability-map 역방향 좌표 — 이 라운드 실측
+
+이 range 는 `docs/discovery/capability-map.md` 를 편집했다(팀장 레인, COL-02·COL-03 두 블록 — `13 4`,
+3564 → 3573 줄). 그 파일을 `파일:줄` 로 가리키는 인용을 저장소 전수로 쟀다.
+
+| 측정 | 결과 |
+|---|---|
+| `grep -rn 'capability-map\(\.md\)\?:[0-9]'`(md·kt·kts·properties·yaml·py, build 제외) | **41 건** |
+| 그중 **살아 있는 문서** | **1 좌표**(`fixtures/manifest.yaml` 의 `capability-map.md:164`, 같은 좌표가 두 줄에 걸쳐 인용된다) |
+| 나머지 | **종결된 slice 의 evidence 39 건** |
+| 첫 편집 줄(238) 아래를 가리키는 인용 | **34 건** — 전부 evidence 경로이고 **+9 밀렸다**(238~272 구간을 가리키는 인용은 0) |
+| 살아 있는 인용의 영향 | **없음** — `:164` 는 편집 지점보다 **위**다 |
+
+밀린 34 건은 **고치지 않는다**: 종결된 slice 의 기록을 되쓰지 않는다는 규율이고, 그 사실을 여기 선언으로
+남긴다. 앞 라운드의 역방향 검사는 stem 셋(`acceptance-trace`·`gate-tests`·`6e1`)만 훑어 이 파일이 빠져
+있었다(검토 r1 L-2) — 절차의 누락이었고 결과는 무결이다.
+
 ## 문서 등식 — 추적표 편집 뒤 6E-1 의 `E-1`~`E-25` 재실행
 
 6E-1 `commands.md` 의 등식 블록을 그대로 추출해 돌렸다(종료 코드가 DIFF 수다).
 
 | 측정 | 결과 |
 |---|---|
-| 편집 뒤 | OK **28** · DIFF **4** · exit 4 |
+| 편집 뒤(수정 라운드 1 의 COL-03 ⓒ 복귀·집계 재산출까지 반영) | OK **28** · DIFF **4** · exit 4 |
 | **base `77850903` 에서 같은 스크립트** | **같은 DIFF 넷** · exit 4 — 다른 slice 의 drift 이고 이 편집이 만든 것이 아니다 |
 | 이 slice 가 거는 등식 | `E-1`(행 수) · `E-2`(식별자 ⊆ 등재 장부) · `E-3`(OPEN ID) · `E-23`(ⓐ 행의 production 칸) · `E-24`(「강함」 표식 == 머리 열거, 18) **전부 OK** |
 
 DIFF 넷(`E-19`·`E-20a`·`E-20b`·`E-25`)은 runbook·`tools/`·compose 축이고 이 slice 의 in_scope 밖이다.
+집계는 등식이 재지 않으므로(6E-1 설계) 표 61 행의 표식을 **기계로 세어** 대조했다 — ⓐ 16 · ⓑ 2 · ⓒ 43
+이고 축 표 여덟 행이 전부 맞는다.
 
 ## 비밀값 스캔 — 참조형
 
@@ -75,4 +108,5 @@ DIFF 넷(`E-19`·`E-20a`·`E-20b`·`E-25`)은 runbook·`tools/`·compose 축이�
 
 편집한 두 파일(등재 장부·추적표)을 가리키는 `파일:줄` 인용을 저장소 전체에서 찾았다 —
 `acceptance-trace`·`gate-tests`·`6e1` 세 stem 으로 `*.md`·`*.kt`·`*.properties`·`*.kts` 를 훑어 **0 건**.
+이 range 가 편집한 **세 번째 파일**(`capability-map.md`, 팀장 레인)의 실측은 위 전용 절에 있다.
 evidence 본문에도 이 slice 가 편집하는 파일의 줄 번호를 쓰지 않았다(FQN·절 제목·결정 ID 로 가리킨다).

@@ -1,13 +1,15 @@
 # M6/G1-T checklist — 변이 실측과 알려진 제한
 
-## 1. 산출물 — 신설 test 넷과 각자 닫은 bullet
+## 1. 산출물 — 신설 test 넷과 각자 잰 bullet
 
-| ID | capability | 잰 bullet(개정 뒤 문면) | test FQN |
+**bullet 둘이 이 라운드에 개정됐다**(운영자 승인, capability map 의 개정 블록 — 팀장이 썼다): COL-02 첫째는 「개찰 pass」 → 「**재관측**(어느 수집 경로든)」, COL-03 셋째는 V2 거동(멈춤 + 다음 실행의 이어받기)으로. 아래 「잰 bullet」 칸은 **개정 뒤 문면**이다. 셋째 열의 괄호는 그 capability 행의 현재 판정이다 — test 가 성립해도 그 행의 **다른** bullet 이 비면 행은 ⓒ 로 남는다(COL-03 이 그 경우다).
+
+| ID | capability(행 판정) | 잰 bullet(개정 뒤 문면) | test FQN |
 |---|---|---|---|
-| T-1 | COL-02 | 실 기초금액이 없는 재관측이 **저장된 기초금액을 덮지 않는다** | `bidvector.adapters.persistence.BaseAmountMergeGuardTest` |
-| T-2 | COL-03 | 429 소진 → 그 공고는 예가 없이 남고 **그 실행은 멈추며** 사유가 회계에 실리고 **다음 실행이 이어받는다** | `bidvector.workflow.collection.OpeningQuotaHaltResumptionTest` |
-| T-3 | DEC-06 | 같은 공고를 **어느 경로로 평가해도** 액션과 근거가 같다 | `bidvector.app.evaluation.DryRunCommitParityTest` |
-| T-4 | OPS-01 | 홀더를 **강제 종료**하면 lease 가 즉시 해제된다 | `bidvector.adapters.event.LeaseHolderTerminationTest` |
+| T-1 | COL-02 (**ⓐ**) | 실 기초금액이 없는 **재관측**이 저장된 기초금액을 덮지 않는다 | `bidvector.adapters.persistence.BaseAmountMergeGuardTest` |
+| T-2 | COL-03 (**ⓒ** — 둘째 bullet 이 출하 배선에서 미성립) | 429 소진 → 그 공고는 예가 없이(원문만) 남고 **그 실행은 멈추며** 「시도 안 함」 수는 멈춤 보고에 · 사유와 429 수는 회계에 실리고 **다음 실행이 미완 축을 이어받는다** | `bidvector.workflow.collection.OpeningQuotaHaltResumptionTest` |
+| T-3 | DEC-06 (**ⓐ**) | 같은 공고를 **어느 경로로 평가해도** 액션과 근거가 같다 | `bidvector.app.evaluation.DryRunCommitParityTest` |
+| T-4 | OPS-01 (**ⓐ**) | 홀더를 **강제 종료**하면 lease 가 즉시 해제된다 | `bidvector.adapters.event.LeaseHolderTerminationTest` |
 
 네 클래스를 `gateRegistrationGate` 의 등재 장부에 함께 올렸다(모듈 키 아래 한 줄씩, 값·정책 version
 무변경). 등재하지 않으면 그 등식(`모집단 ∖ 제외 == 등재`)이 붉고, 추적표의 「등재 식별자」 어휘도
@@ -29,6 +31,19 @@
 | M-2c | 절단된 배치의 **회계를 원장에 적지 않는다**(halt 회계 누락) | `1 1` | T-2 의 회계 단언(사유·429 관측 수) | **없음** — `:workflow:test` **450 중 1 실패(T-2 뿐)** | 같은 전건 450 초록 |
 | M-3 | 커밋 조립 메서드가 use case 에 넘기는 **분석 예산**(전략의 후보 상한 → 0) | `1 1` | T-3(기대 `Reached`+BidNow, 실제 `NotReached`+예산 소진) | **없음** — 평가 5 클래스 **19 test 중 1 실패**. 커밋 E2E 는 `EvaluationCommitRun` 을 **손으로** 조립해 그 값을 리터럴로 넘기므로 조립 메서드의 값 선택을 보지 못한다 | T-3 1/1 |
 | M-4 | 임대 판정 자리를 **DB 세션 advisory lock → 프로세스 범위 집합**으로(해제도 같은 집합) | `9 7` | T-4(기대 `Held`, 실제 `Busy`) | **없음** — 임대·relay 5 클래스 **14 test 중 1 실패**. 추적표가 OPS-01 근거로 드는 `PostgresAdvisoryLockLeaseTest` 는 **전건 초록** — 프로세스 범위 배제도 그 네 단언을 만족한다 | T-4 2/2 |
+
+### 2-1. 수정 라운드 1 — 고친 test 둘의 변이 재확인
+
+검토 r1 이 test 둘을 고치게 했다(T-4 는 종료를 **기다리는** 형태로, T-3 은 사유 목록 **비어 있지 않음**
+단언 추가). 고친 뒤 같은 성질이 여전히 변이에서 붉는지 다시 쟀다.
+
+| 고친 test | 변이 | numstat | RED | 함께 붉은 등재 test |
+|---|---|---|---|---|
+| T-4(두 인자 종료 대기) | **M-4 강화판** — advisory lock 은 **유지**하고 프로세스 범위 집합을 판정 앞에 둔다(해제도 그 집합에서) | `5 1` | T-4 의 `Held` 단언. `terminated == 1` 은 **통과한다** — 즉 RED 가 「끊을 대상이 없다」가 아니라 **세션 종료 축**에서 나온다 | **없음** — 임대 3 클래스 **8 중 1** |
+| T-3(빈 목록 거부) | M-3 — 커밋 조립이 use case 에 넘기는 분석 예산 0 | `1 1` | T-3 의 ① 판정 목록 등식 | **없음** — **8 중 1** |
+
+통제군: 두 수정 뒤 표적 실행이 **BUILD SUCCESSFUL 40초**(두 모듈의 ktlint·detekt·sizeGate 포함) ·
+T-4 2/0 · T-3 1/0. 두 변이 모두 **잠금을 쥔 뒤** 넣고 사본 복원 + `cmp` 바이트 동일 + porcelain 빈 출력.
 
 **T-2 의 변이가 셋인 이유**(계약 D-G1T-1 지시): 그 bullet 은 **네 고리의 사슬**이라 고리마다 바꿔치울
 자리가 다르다 — 멈춤(M-2a) · 다음 실행의 이어받기(M-2b) · halt 회계(M-2c). 세 변이의 셈이 말하는 것은
@@ -54,11 +69,17 @@ advisory lock 을 쓰는 동안에는 깰 수 없다. 깨는 유일한 길은 **
   있는지 본다(쉼표는 wire 구분자라 탈출되고, 그 형식의 정본은 어댑터의 어휘 골든이며 디코더는 그 모듈
   `internal` 이라 `app` 에서 부를 수 없다). 개정 번호는 자릿수가 긴 값으로 심어 다른 칸의 숫자와 우연히
   겹치지 않게 했다.
-- **COL-03 의 앞 두 bullet** — 6G production 호출부는 조회 가치 술어에 `alreadyHeld=false`·
-  `lastCheckedAt=null` 상수를 넘긴다(이어 돌기를 시도 원장이 진다). 그래서 age-gate·recheck-gate 는
-  오늘 출하 경로에서 **발화하지 않는다**. 이 사실을 추적표 COL-03 의 production 칸에 적었고, 그것이 ⓐ
-  술어 ②(출하 배선에서 성립하는가)에 걸리는지는 **그 행의 재판정** 문제다 — G1-T 는 사실만 적고 6E-1 의
-  판정을 바꾸지 않았다(계약은 T-2 성립 시 ⓐ 로 올리라고 정한다). **보고 항목**이다.
+- **COL-03 은 ⓒ 다(운영자 결정 D-G1T-4)** — 6G 의 유일한 production 호출부가 조회 가치 술어에
+  `alreadyHeld=false`·`lastCheckedAt=null` 을 상수로 넘겨 age-gate·recheck-gate 가 출하 경로에서
+  **발화하지 않는다**. 검토 라운드가 변이로 실측했다 — 두 게이트를 꺼도 붉는 것은 술어 test 둘뿐이고,
+  출하 게이트 값을 24h/48h 에서 10만 h 로 바꿔도 거동 test 는 0 이다. 둘째 bullet 이 미성립이므로 행은
+  ⓒ 로 남고, **후속은 test 가 아니라 출하 경로 age-gate 배선(G1 후속 production slice)** 이다. T-2 가
+  성립시키는 것은 셋째 bullet 이고, 첫째 bullet 은 **다른 기구**(시도 원장 이어 돌기)로 성립한다.
+- **T-3 은 후보 상한 계층보다 아래에서 비교한다** — 등식의 대상은 use case 가 돌려준 판정과 커밋 경로가
+  저장한 payload 다. 그 **위**에서 일회 러너(`candidateCap` 계수·종료 코드)와 dry-run 컨트롤러(응답
+  조립·후보 상한 초과 거부)가 하는 가공은 이 등식 밖이고, 그 두 층은 각자의 test 가 진다
+  (`EvaluationCommitRunnerTest`·`EvaluationDryRunControllerTest`). 그래서 T-3 이 닫는 것은 「두 조립이
+  같은 판정을 만든다」이고 「두 **표면**이 같은 응답을 낸다」가 아니다.
 
 ## 4. 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
@@ -66,7 +87,17 @@ advisory lock 을 쓰는 동안에는 깰 수 없다. 깨는 유일한 길은 **
 정본, `rollback.md` 가 그 목록을 든다). in_scope 밖 새 파일은 없다. 수정 파일 둘(등재 장부·추적표)은
 계약이 든 범위이고, 등재 장부는 D-G1T-1 이 더한 자리다.
 
-## 5. 리뷰 요청 조건
+## 5. 후속 — 이 slice 가 만들지 않고 **등재만** 하는 것
+
+| ID | 사실 | 소관 |
+|---|---|---|
+| F-1 | **6E-1 `checklist.md` 의 수치가 추적표와 어긋난다** — 그 문서는 ⓐ 13 · ⓒ 46 으로 적혀 있고, 추적표는 이 라운드 뒤 ⓐ 16 · ⓒ 43 이다. 같은 slice 의 두 문서가 다른 수를 든다 | **팀장 후속**(6E-1 장부 갱신) |
+| F-2 | **`milestone-6.md` 결정 블록의 G1 처분이 바뀌었다** — COL-03 은 「측정만 없음 → test 신설」로 등재돼 있는데, 이 라운드의 실측으로 **「출하 배선 필요(production 수정 선행)」** 이 됐다. 완료 조건 3 의 G1 셈(9)도 그 분류에 기대고 있다 | **팀장 후속**(milestone 문서) |
+
+둘 다 이 slice 의 in_scope 밖 문서다(`milestone-6.md` 는 계약이 명시적으로 금지한다). 고치지 않고 사실로만
+남긴다.
+
+## 6. 리뷰 요청 조건
 
 | 항목 | 상태 |
 |---|---|
