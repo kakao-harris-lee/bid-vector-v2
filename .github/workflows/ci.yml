@@ -402,6 +402,20 @@ jobs:
         id: build_app
         run: docker build -f docker/app.Dockerfile -t bidvector/app:local .
 
+      # M7/7F-local(D-7F-1) — 로컬 패키징의 두 이미지. **여기서 명시적으로 빌드하는 이유**는
+      # 아래 위생·취약점 게이트가 이미지를 먼저 요구하기 때문이다(S-26 의 스모크는 그 뒤에 선다).
+      # 스모크도 `compose build web proxy` 를 돌리지만 같은 태그·같은 Dockerfile·같은 컨텍스트라
+      # 그 시점에는 캐시 적중으로 끝난다 — 빌드 **정의**는 compose 한 자리이고 갈라지지 않는다.
+      # 번들은 이미지 안에서 만들어지므로(`docker/web.Dockerfile` 의 builder stage) 이 job 에
+      # setup-node 가 필요 없다.
+      - name: web 이미지 빌드 (S-21c)
+        id: build_web
+        run: docker build -f docker/web.Dockerfile -t bidvector/web:local .
+
+      - name: 프록시 이미지 빌드 (S-21d)
+        id: build_proxy
+        run: docker build -f docker/proxy.Dockerfile -t bidvector/proxy:local .
+
       # M6/6A-2a D-6A2a-7 — 정책 파일을 **인자로** 받는다(기본값 없음 — 어느 정책으로 판정했는지가
       # 명령에 보인다). 두 이미지의 「금지」 판정이 서로 다르다: ml-serving 은 Python `import`,
       # 앱은 JVM 구조(컴파일 도구 실행 불가 + 풀린 의존 layer 의 test 전용 좌표 0).
@@ -412,6 +426,19 @@ jobs:
       - name: 이미지 위생 게이트 — 앱 (S-22b)
         id: hygiene_app
         run: ./tools/image-hygiene-check.sh bidvector/app:local config/quality/image-hygiene-policy-app.properties
+
+      # M7/7F-local(D-7F-1) — 같은 스크립트·같은 공통 술어(태그·실 프로세스 uid·베이스 layer
+      # 체인·크기)에 두 이미지를 더 태운다. 「금지」 판정만 갈라지고 그 갈래는 정책 파일의
+      # `runtime.kind` 가 고른다 — 두 정책이 같은 갈래(`caddy-site`)를 쓰고 **값만** 다르다
+      # (판정 형태가 같은 것을 두 벌로 만들지 않는다). 정책 파일을 **인자로** 받는 관례도
+      # 그대로다 — 어느 정책으로 판정했는지가 명령에 보인다.
+      - name: 이미지 위생 게이트 — web (S-22b2)
+        id: hygiene_web
+        run: ./tools/image-hygiene-check.sh bidvector/web:local config/quality/image-hygiene-policy-web.properties
+
+      - name: 이미지 위생 게이트 — 프록시 (S-22b3)
+        id: hygiene_proxy
+        run: ./tools/image-hygiene-check.sh bidvector/proxy:local config/quality/image-hygiene-policy-proxy.properties
 
       # M6/6A-2a r2 D-6A2a-14 — verifier r2 F-1r 이 **출하 이미지에서** 쓴 환경변수 그대로를 컨테이너
       # 축에 고정한다. 그 한 줄이 r1 결함 셋을 전부 다시 열었으므로, 「뜬 이미지가 그것을 거부한다」를
@@ -561,7 +588,29 @@ jobs:
         if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_app.outcome == 'success' && steps.hygiene_ml.outcome == 'success' && steps.hygiene_app.outcome == 'success' && steps.refusal_smoke.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/app:local app config/quality/vuln-policy.properties
 
+      # M7/7F-local(D-7F-1) — 같은 스크립트에 두 이미지를 더 태운다. 정책은 **한 파일**이고
+      # kind 별 키(하한 둘·배포판 둘·Java DB 여부)를 갖는다 — 선언 없는 kind 는 그 kind 가 돌 때까지
+      # 구멍이 보이지 않으므로 스크립트가 **전수 확인**한다(그래서 kind 를 더하면 키도 함께 더해야
+      # 하고, 빠뜨리면 네 kind 전부가 그 자리에서 멈춘다 — fail-closed).
+      #
+      # 조건은 **자기 축만** 본다(앞 이미지들의 스캔을 보지 않는다, PR #68 M-3 의 결정과 같은 방향):
+      # 한 이미지가 막아도 나머지 판정을 같은 회차에서 봐야 수정 라운드가 쪼개지지 않는다. 다만
+      # **자기 빌드·자기 위생이 성공했을 때**다 — 이미 위생 축에서 거부된 이미지의 취약점 판정은
+      # 뜻이 흐리다(같은 job 의 S-22e 가 그 사유로 조건을 가진 것과 같은 형태).
+      - name: 이미지 취약점 게이트 — web (S-22e2)
+        id: scan_web
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web.outcome == 'success' && steps.hygiene_web.outcome == 'success' }}
+        run: ./tools/vuln-scan-check.sh bidvector/web:local web config/quality/vuln-policy.properties
+
+      - name: 이미지 취약점 게이트 — 프록시 (S-22e3)
+        id: scan_proxy
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_proxy.outcome == 'success' && steps.hygiene_proxy.outcome == 'success' }}
+        run: ./tools/vuln-scan-check.sh bidvector/proxy:local proxy config/quality/vuln-policy.properties
+
       # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
+      # M7/7F-local(D-7F-1) — 담는 이미지가 넷이 됐다(web·proxy 추가). 경로 glob 은 그대로이고
+      # 스캔 스크립트가 kind 별 파일 이름을 쓰므로 배선 변경이 없다 — 바뀐 것은 조건의 「어느
+      # 스캔이든 돌았는가」에 새 둘이 들어간 것뿐이다.
       # **게이트가 막았을 때가 곧 SBOM 이 필요한 때**이므로 스캔 실패에도 올린다.
       #
       # M6/6E-2b r1(code-review M-4) — 그러나 `always()` 는 **스캔과 무관한 실패마다 가짜 빨강을
@@ -573,11 +622,11 @@ jobs:
       # `if-no-files-found: error` 는 유지한다 — 빈 artifact 를 올리고 초록인 것은 보관하지 않은 것과
       # 같다. 남는 경우 하나(스캔이 SBOM 을 쓰기 **전에** exit 2 로 끊김 — 정책·환경 오류)는 가짜가
       # 아니라 **관련된** 빨강이므로 그대로 둔다. major 는 위 `check` job 의 같은 액션과 맞춘다.
-      - name: SBOM 보관 — CycloneDX, 이미지 둘 (S-22f)
+      - name: SBOM 보관 — CycloneDX, 이미지 넷 (S-22f)
         # **install 성공까지 본다**(verifier 표적4 M-1). 그러지 않으면 설치 실패 하나가 빨강 셋을
         # 만든다 — install 자신 · 조건이 install 을 안 보던 S-22e(「trivy 가 필요하다」 exit 2) ·
         # 올릴 파일이 없는 이 step. **원인 하나에 빨강 하나**가 맞다.
-        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped') }}
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped' || steps.scan_web.outcome != 'skipped' || steps.scan_proxy.outcome != 'skipped') }}
         uses: actions/upload-artifact@v6
         with:
           name: sbom-cyclonedx
