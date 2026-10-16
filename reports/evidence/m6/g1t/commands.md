@@ -91,6 +91,15 @@ DIFF 넷(`E-19`·`E-20a`·`E-20b`·`E-25`)은 runbook·`tools/`·compose 축이�
 집계는 등식이 재지 않으므로(6E-1 설계) 표 61 행의 표식을 **기계로 세어** 대조했다 — ⓐ 16 · ⓑ 2 · ⓒ 43
 이고 축 표 여덟 행이 전부 맞는다.
 
+## 표식 라운드 — evidence HEAD 의 누출 게이트
+
+산출물이 문서뿐이라 전건 `check` 는 다시 돌리지 않았다(직전 산출물 `4bf953d1` 에서 exit 0 실측). 지시대로
+그 라운드의 **evidence HEAD 에서 누출 게이트만** 돌렸다.
+
+| cmd | exit | 핵심 결과 |
+|---|---|---|
+| `./gradlew --no-daemon leakPatternGate` @ evidence HEAD | **0** | 13초 |
+
 ## 비밀값 스캔 — 참조형
 
 | cmd | exit | 판정 |
