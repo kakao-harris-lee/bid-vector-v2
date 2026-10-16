@@ -65,7 +65,9 @@ class OperatorSessionController(
                     )
             }
 
-            is SignInOutcome.Refused -> unauthenticated(request)
+            is SignInOutcome.Refused -> {
+                unauthenticated(request)
+            }
         }
     }
 

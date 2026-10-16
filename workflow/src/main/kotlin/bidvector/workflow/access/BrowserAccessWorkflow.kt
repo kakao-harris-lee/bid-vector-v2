@@ -176,7 +176,10 @@ class BrowserAccessWorkflow(
         demand: CsrfDemand,
     ): Boolean =
         when (demand) {
-            CsrfDemand.Exempt -> true
+            CsrfDemand.Exempt -> {
+                true
+            }
+
             is CsrfDemand.Required -> {
                 val presented = demand.presented
                 presented != null && session.csrfDigest.matches(presented.digest())
