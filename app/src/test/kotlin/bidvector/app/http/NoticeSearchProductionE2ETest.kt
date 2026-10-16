@@ -182,6 +182,18 @@ class NoticeSearchProductionE2ETest {
         response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
     }
 
+    /**
+     * verifier r2 R2-M-2 — 출하 조립에서도 잘못된 퍼센트 인코딩이 400 이다(앞 판은 500).
+     * 디코딩은 서블릿 컨테이너가 하므로 이 갈림은 **실제 컨테이너가 붙은 자리**에서 재야 한다.
+     */
+    @Test
+    fun `잘못된 UTF-8 질의는 출하 조립에서도 400 이다`() {
+        val response = errorOf("?q=a%FFb")
+
+        response.statusCode.value() shouldBe 400
+        response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+    }
+
     @Test
     fun `수집 전에는 빈 본문 + 수집 전 사유다`() {
         val response = search("")

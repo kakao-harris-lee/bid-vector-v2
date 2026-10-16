@@ -893,7 +893,7 @@ export interface operations {
                     "application/json": components["schemas"]["NoticeSummary"][];
                 };
             };
-            /** @description 질의 값이 유효하지 않다 — 텍스트 길이 상한 초과, 텍스트의 제어 문자(U+0000 포함), 정수·시각 형식 오류(정수 칸의 앞뒤 공백·`+` 부호 포함), 음수 금액, 역전된 금액·마감 범위, 음수 `page`, 범위 밖 `size`, 같은 매개변수의 반복. 어느 입력이 틀렸는지는 싣지 않는다(편집 경로의 `STRATEGY_VALUE_INVALID` 와 같은 관례). code: INVALID_REQUEST */
+            /** @description 질의 값이 유효하지 않다 — 텍스트 길이 상한 초과, 텍스트의 제어 문자(U+0000 포함), 정수·시각 형식 오류(정수 칸의 앞뒤 공백·`+` 부호 포함), 음수 금액, 역전된 금액·마감 범위, 음수 `page`, 범위 밖 `size`, 같은 매개변수의 반복, **잘못된 퍼센트 인코딩** (UTF-8 로 디코딩되지 않는 바이트열). 어느 입력이 틀렸는지는 싣지 않는다(편집 경로의 `STRATEGY_VALUE_INVALID` 와 같은 관례). code: INVALID_REQUEST */
             400: {
                 headers: {
                     [name: string]: unknown;

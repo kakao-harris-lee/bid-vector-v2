@@ -15,6 +15,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
+import java.nio.charset.MalformedInputException
 
 /**
  * 편집 요청의 형식 오류(D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
@@ -148,7 +149,12 @@ object ErrorMapping {
             }
 
             else -> {
-                null
+                // 디코딩 실패는 **타입이 아니라 원인 사슬**로 가른다(아래 술어의 KDoc).
+                if (throwable.isMalformedRequestEncoding()) {
+                    ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+                } else {
+                    null
+                }
             }
         }
 
@@ -165,6 +171,26 @@ object ErrorMapping {
             else -> null
         }
 }
+
+/** 원인 사슬 추적 상한 — 순환·자기참조 사슬에서도 끝나게 한다. */
+private const val MAX_CAUSE_DEPTH = 10
+
+/**
+ * 요청의 **디코딩 실패**인가(verifier r2 R2-M-2) — 잘못된 퍼센트 인코딩(`?q=a%FFb`·고립
+ * 서로게이트)은 서블릿이 질의 매개변수를 디코딩하는 순간 깨지고, 컨트롤러 본문에 닿기 전이라
+ * 그 안에서 막을 수 없다. 계약은 형식 오류에 400 을 선언하는데 폴백으로 떨어지면 500 이었다.
+ *
+ * 판정은 **원인 사슬**로 한다 — 컨테이너가 던지는 래퍼 타입(서블릿 구현의 좌표)을 이 층이
+ * 이름 붙이지 않는다: 허용 패키지 밖이고, 컨테이너를 바꾸면 그 이름이 사라진다. 사슬에
+ * 디코딩 실패가 있으면 그것이 사실이다.
+ *
+ * **이 갈래는 이 endpoint 전용이 아니다** — 어느 경로든 잘못된 퍼센트 인코딩은 이제 400 이다
+ * (405·406 과 같은 전송 층 사실이라 operation 문면에 매달지 않는다, evidence 에 등재).
+ */
+internal fun Throwable.isMalformedRequestEncoding(): Boolean =
+    generateSequence(this) { previous -> previous.cause.takeIf { it !== previous } }
+        .take(MAX_CAUSE_DEPTH)
+        .any { it is MalformedInputException }
 
 /**
  * 3자 이스케이프만 하는 최소 JSON 직렬화(D-6A1-9/19의 정신과 같은 축 — 이 파일이 유일한
@@ -258,11 +284,21 @@ class GlobalErrorHandler {
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception, request)
 
+    /**
+     * 매핑표 밖의 모든 [Throwable] — 500 이다. **예외 하나**: 요청 디코딩 실패는 클라이언트
+     * 입력 오류라 400 으로 간다(verifier r2 R2-M-2). 같은 술어를 [ErrorMapping] 이 코드·문구에
+     * 쓰므로 상태와 코드가 갈라지지 않는다.
+     */
     @ExceptionHandler(Throwable::class)
     fun fallback(
         exception: Throwable,
         request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
+    ): ResponseEntity<ErrorBody> =
+        if (exception.isMalformedRequestEncoding()) {
+            respond(HttpStatus.BAD_REQUEST, exception, request)
+        } else {
+            respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
+        }
 
     private fun respond(
         status: HttpStatus,

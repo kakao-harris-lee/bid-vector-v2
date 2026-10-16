@@ -272,6 +272,42 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
         get("?unknown=1&unknown=2").statusCode.value() shouldBe 200
     }
 
+    /**
+     * verifier r2 R2-M-2 — 잘못된 퍼센트 인코딩은 서블릿이 질의를 디코딩하는 순간 깨져
+     * 컨트롤러 본문에 닿지 못한다. 폴백으로 떨어지면 클라이언트 입력 오류가 500 이 된다.
+     */
+    @Test
+    fun `잘못된 UTF-8 질의는 500 이 아니라 400 이다`() {
+        val malformedByte = errorOf("?q=a%FFb")
+        malformedByte.statusCode.value() shouldBe 400
+        malformedByte.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+
+        // 고립 서로게이트의 UTF-8 인코딩 — 바이트는 유효 범위지만 문자로 디코딩되지 않는다.
+        errorOf("?q=a%ED%A0%80b").statusCode.value() shouldBe 400
+        errorOf("?agency=%FF").statusCode.value() shouldBe 400
+        notices.lastCriteria shouldBe null
+    }
+
+    /**
+     * **다른 operation 의 거동은 바뀌지 않았다 — 측정으로 남긴다.** 매핑표에 더한 갈래는
+     * 경로를 가리지 않지만, 디코딩은 **질의 매개변수를 읽을 때** 일어난다. 오늘 다른
+     * operation 은 질의 매개변수를 하나도 읽지 않으므로(경로 변수·본문뿐) 잘못된 인코딩이
+     * 붙어도 예외 자체가 나지 않는다 — 200 그대로다. 그래서 그 operation 들의 계약 문면에
+     * 400 을 더할 이유가 없다(자기 문면을 바꾸지 않는다는 계약도 지킨다).
+     */
+    @Test
+    fun `다른 경로는 질의를 읽지 않아 거동이 그대로다 — 잘못된 인코딩이 붙어도 200`() {
+        val response =
+            restTemplate.exchange(
+                URI.create(url("/api/strategy?probe=%FF")),
+                HttpMethod.GET,
+                HttpEntity<Void>(authorizedHeaders()),
+                Map::class.java,
+            ) as ResponseEntity<Map<String, Any?>>
+
+        response.statusCode.value() shouldBe 200
+    }
+
     @Test
     fun `숫자 칸의 공백과 더하기 부호는 거부다`() {
         errorOf("?amountMin=%205").statusCode.value() shouldBe 400
