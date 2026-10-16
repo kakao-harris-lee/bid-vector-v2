@@ -1,6 +1,6 @@
 # M7/7C① — rollback
 
-실측 HEAD: `37e00fc04beca6487de197299f54c6cffbcf3511` (이 slice 의 **마지막 산출물 커밋**)
+실측 HEAD: `431b2ad3df6f3fc690cd424ef9cb6ded8dffe60a` (이 slice 의 **마지막 산출물 커밋** — r2 수정 라운드 뒤)
 
 전제: 이 slice 는 아직 `main` 에 없다(브랜치 `m7-7c1/2026-10-16`). 그래서 공유 파일도 **base
 `77850903`**(이 브랜치를 만든 고정 SHA — 움직이는 `origin/main` 이 아니다)에서 복원한다. 실행 전
@@ -10,13 +10,13 @@
 
 ## 되돌림 목록 (기계 산출)
 
-`git diff --name-status 77850903..37e00fc0` 에서 `reports/evidence/m7/7c1/` 를 뺀 것이 전부다
-(**A 14 · M 11**). **라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의
+`git diff --name-status 77850903..431b2ad3` 에서 `reports/evidence/m7/7c1/` 를 뺀 것이 전부다
+(**A 15 · M 11**). **라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의
 실제 원인이다.
 
-- `A`(base 에 없음 → 복원이 삭제한다) 14: `workflow` 의 조건 타입·파싱·포트와 그 test, `adapters`
+- `A`(base 에 없음 → 복원이 삭제한다) 15: `workflow` 의 조건 타입·파싱·포트와 그 test, `adapters`
   의 질의 조립·JDBC 어댑터와 그 test 셋(의존 게이트 포함), `app` 의 컨트롤러·조회기·wiring 과
-  그 test 둘.
+  그 test 셋(r2 가 실 DB E2E 를 더했다).
 - `M`(base 내용으로 되돌린다) 11: `adapters` 의 SQL 상수 파일, `app` 의 오류 매핑·전략 응답·test
   하네스와 게이트 test 둘(면제 수 · 비교 허용 목록), 게이트 계약 둘(`architecture-policy`·
   `gate-tests`), 계약 문서, 생성 타입, 추적표.
@@ -28,7 +28,7 @@
 ## 명령
 
 ```
-git restore --source=77850903 --staged --worktree -- <위 25 경로를 개별 인자로>
+git restore --source=77850903 --staged --worktree -- <위 26 경로를 개별 인자로>
 ```
 
 `--source` 에 없는 경로는 삭제되므로 신규 파일에 `git rm` 이 따로 필요 없다. 신규 파일마다
@@ -42,18 +42,19 @@ pathspec 오류를 내는 `git checkout <base> -- <경로>` 는 쓰지 않는다
 조회기를 요구하므로 기동이 **실패**하고(조용히 열린 채 남지 않는다) 전략 조회·편집·dry-run 은
 그대로 남는다. 계약 문서에서 operation 하나를 지우고 생성 타입을 재생성하면 web 쪽 표면도 닫힌다.
 
-## ①~⑥ 실측 (임시 clone, HEAD `37e00fc0`)
+## ①~⑥ 실측 (임시 clone, HEAD `431b2ad3`)
 
 | # | 무엇 | 결과 |
 |---|---|---|
 | ① | 복원 명령 종료 코드 | exit 0 |
-| ② | 상태 계수 | `D 14 · M 11` — 기계 목록의 A 14 · M 11 과 일치 |
+| ② | 상태 계수 | `D 15 · M 11` — 기계 목록의 A 15 · M 11 과 일치 |
 | ③ | base 대비 diff(되돌린 경로들) | 빈 출력 |
 | ④ | 되돌린 트리의 compile | `./gradlew --no-daemon check` 안에서 모듈 11 의 `compileKotlin` 이 돌았다 |
 | ⑤ | 되돌린 트리의 test | 같은 명령 안에서 모듈 10 의 `test` 가 돌았다 |
 | ⑥ | 되돌린 트리의 게이트 | 같은 명령이 게이트 전건을 든다(의존·크기·계약·등재·누출·detekt·ktlint …) |
 
-**한 명령 결과**: `flock … ./gradlew --no-daemon check` **exit 0**(BUILD SUCCESSFUL, 실패·오류 0).
+**한 명령 결과**: `flock … ./gradlew --no-daemon check` **exit 0**(BUILD SUCCESSFUL, 실패·오류 0 —
+모듈 11 의 `compileKotlin`, 모듈 10 의 `test`, 게이트 태스크 176 줄이 그 안에서 돌았다).
 게이트가 초록이라 보완 경로를 실행할 일이 없었다.
 
 **남의 줄 보존 / 내 표지 0 계수**(종료 코드가 아니라 계수로 판정한다):
@@ -65,7 +66,7 @@ pathspec 오류를 내는 `git checkout <base> -- <경로>` 는 쓰지 않는다
 ## 실측 유효성 대조 (verifier 용)
 
 ```
-git diff --name-only 37e00fc0..<판정 SHA> -- <위 25 경로>
+git diff --name-only 431b2ad3..<판정 SHA> -- <위 26 경로>
 ```
 
 빈 출력이면 이 실측이 유효하다(evidence 커밋은 언제나 마지막 산출물 커밋 뒤에 오므로 「실측

@@ -101,6 +101,50 @@ acceptance 는 `.github/workflows/ci.yml` 의 `check` job 과 `web` job 이 돌�
 - 핵심 결과: 되돌린 트리가 컴파일·test·게이트 전부 통과(④⑤⑥ 한 명령이 셋을 든다).
   ①②③ 과 보존 계수는 `rollback.md`.
 
+## r2 수정 라운드 (verifier r1 F-1·F-2 · low · 장부)
+
+### 2026-10-16T18:20Z — 변이 여섯 (적용 → 표적 재실행 → 사본 복원)
+
+적용 직후 `git diff --numstat` 의 삭제 줄 ≥ 1, 복원 직후 빈 출력. 대응표는 `checklist.md`.
+
+- cmd: 변이별 `flock … ./gradlew --no-daemon :adapters:test …` (셋) · `:workflow:test …` (둘) · `:app:test …` (하나)
+- exit: 여섯 전부 1
+- 핵심 결과: 읽기 전용 문장·호출, 제어 문자 규칙, 이스케이프 글자, 반복 판정, 정수 술어를
+  각각 바꿔치우니 의도한 test 가 RED 가 됐다(복원 뒤 전부 GREEN).
+
+### 2026-10-16T18:50Z — acceptance: `check` job + `web` job (마지막 산출물 커밋 `431b2ad3`)
+
+- cmd: `flock … ./tools/one-command-check.sh`
+- exit: 0
+- 핵심 결과: 단계 24 전부 통과 — Kotlin `check` 게이트 전건 · Python 1605 passed · web
+  W-1~W-11(생성 타입 바이트 등식 통과 · 게이트 test 실행 확인 · Playwright 2 passed).
+
+### 2026-10-16T18:54Z — `container` job (L-1, 같은 커밋)
+
+- cmd: ci.yml `container` job 의 **run 블록 16 개를 파일에서 꺼내 순서대로** 실행(`uses:` 셋은
+  CI 전용이라 제외, job 수준 `env:` 와 `$GITHUB_ENV`·`$GITHUB_PATH` 는 러너와 같게 흉내냈다).
+  compose 프로젝트 이름만 레인용으로 갈랐다(`COMPOSE_PROJECT_NAME`, 6B-4 선례).
+- exit: 0
+- 핵심 결과: `TOTAL steps=16 failed=0` — 이미지 둘 빌드 · 위생·취약점 게이트 · 거부 스모크 ·
+  healthy 수렴 · 컨테이너 스모크(dry-run 왕복, 쓰기 0) · 백업·복원 리허설 · 실 서버 교차언어 ·
+  정리 뒤 이 레인 이름의 컨테이너 0 · 볼륨 0. verifier r1 A3 이 앞 산출물 SHA 에서 같은
+  결과(`failed=0`)를 냈고, 이 줄은 **마지막 산출물 커밋에서 레인이 다시 잰 것**이다.
+
+### 2026-10-16T18:56Z — rollback ①~⑥ 재실측
+
+- cmd: 임시 clone 에서 복원 명령 + `flock … ./gradlew --no-daemon check`
+- exit: 둘 다 0
+- 핵심 결과: `D 15 · M 11`(기계 목록과 일치) · base 대비 diff 빈 출력 · 되돌린 트리 전건 초록.
+  자세한 계수는 `rollback.md`.
+
+### 전건이 r2 에서 잡은 것 (수정 뒤 위 결과)
+
+- 반복 매개변수 판정이 app 모듈에 **새 바깥 패키지**를 들여 전송 표면 게이트가 붉었다 →
+  이미 쓰는 서블릿 타입으로 같은 사실을 읽게 바꿨다(게이트 허용 집합을 넓히지 않았다).
+- 제어 문자 거부가 서면서 문면 등식 test 의 `U+0000` 표본이 조건 조립까지 오지 못했다 →
+  표본을 이스케이프 글자가 섞인 값으로 바꿨다.
+- ktlint 둘(규칙표 람다 형식 · test import 순서).
+
 ## 마지막 HEAD 의 게이트 결과
 
 이 문서의 명령 표는 **evidence 커밋 직전까지**를 담는다. 마지막 HEAD(이 문서를 담은 커밋)의
