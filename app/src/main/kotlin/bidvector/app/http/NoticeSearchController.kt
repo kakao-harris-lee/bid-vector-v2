@@ -7,8 +7,8 @@ import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchParameters
 import bidvector.workflow.notice.NoticeSearchRequest
 import bidvector.workflow.notice.parseNoticeSearchParameters
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseEntity
-import org.springframework.util.MultiValueMap
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -51,9 +51,9 @@ class NoticeSearchController(
         @RequestParam(required = false) deadlineTo: String?,
         @RequestParam(required = false) page: String?,
         @RequestParam(required = false) size: String?,
-        @RequestParam allValues: MultiValueMap<String, String>,
+        request: HttpServletRequest,
     ): ResponseEntity<List<NoticeSummaryResponse>> {
-        rejectRepeated(allValues)
+        rejectRepeated(request)
         val parameters =
             NoticeSearchParameters(
                 text = q,
@@ -77,11 +77,13 @@ class NoticeSearchController(
      * 않는다. 계약에 없는 조용한 결합이라 400 으로 끊는다.
      *
      * 판정 대상은 **계약이 든 이름들**이다 — 알 수 없는 매개변수는 지금처럼 무시한다(그
-     * 거동은 바꾸지 않는다). `MultiValueMap` 은 같은 이름의 **원문 값 목록**을 그대로
-     * 들고 있어 합쳐지기 전의 사실을 본다.
+     * 거동은 바꾸지 않는다). 서블릿 요청의 `getParameterValues` 가 같은 이름의 **원문 값
+     * 목록**을 그대로 들고 있어 합쳐지기 전의 사실을 본다. `MultiValueMap` 을 쓰지 않는
+     * 이유는 그것이 app 모듈에 **새 바깥 패키지**를 들이기 때문이다(전송 표면 게이트가
+     * 기본 거부다) — 이미 이 층이 쓰는 서블릿 타입으로 같은 사실을 읽는다.
      */
-    private fun rejectRepeated(allValues: MultiValueMap<String, String>) {
-        val repeated = DECLARED_PARAMETERS.filter { name -> (allValues[name]?.size ?: 0) > 1 }
+    private fun rejectRepeated(request: HttpServletRequest) {
+        val repeated = DECLARED_PARAMETERS.filter { name -> (request.getParameterValues(name)?.size ?: 0) > 1 }
         if (repeated.isNotEmpty()) {
             throw InvalidNoticeSearchException("같은 매개변수가 반복됐다: $repeated")
         }

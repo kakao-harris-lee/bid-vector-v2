@@ -163,12 +163,7 @@ fun parseNoticeSearchParameters(parameters: NoticeSearchParameters): NoticeSearc
 private val NOTICE_SEARCH_REJECTIONS: List<(NoticeSearchParameters) -> NoticeSearchRejection?> =
     listOf(
         { p -> NoticeSearchRejection.TEXT_TOO_LONG.takeIf { p.text.tooLong() || p.agencyText.tooLong() } },
-        {
-            p ->
-            NoticeSearchRejection.TEXT_CONTROL_CHARACTER.takeIf {
-                p.text.hasControlCharacter() || p.agencyText.hasControlCharacter()
-            }
-        },
+        { p -> NoticeSearchRejection.TEXT_CONTROL_CHARACTER.takeIf { p.hasControlCharacterText() } },
         { p -> NoticeSearchRejection.AMOUNT_NOT_INTEGER.takeIf { p.amountMinWon.notInteger() } },
         { p -> NoticeSearchRejection.AMOUNT_NOT_INTEGER.takeIf { p.amountMaxWon.notInteger() } },
         { p -> NoticeSearchRejection.AMOUNT_NEGATIVE.takeIf { p.amountMinWon.negative() } },
@@ -182,6 +177,9 @@ private val NOTICE_SEARCH_REJECTIONS: List<(NoticeSearchParameters) -> NoticeSea
         { p -> NoticeSearchRejection.SIZE_NOT_INTEGER.takeIf { p.size.notInteger32() } },
         { p -> NoticeSearchRejection.SIZE_OUT_OF_RANGE.takeIf { sizeOutOfRange(p) } },
     )
+
+private fun NoticeSearchParameters.hasControlCharacterText(): Boolean =
+    text.hasControlCharacter() || agencyText.hasControlCharacter()
 
 private fun amountInverted(parameters: NoticeSearchParameters): Boolean {
     val min = parameters.amountMinWon.parsedWon()
