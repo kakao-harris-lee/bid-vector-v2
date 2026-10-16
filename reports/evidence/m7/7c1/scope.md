@@ -66,7 +66,9 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 - **in_scope 확장을 수용한다**(acceptance 가 서려면 필요했다):
   - `config/quality/architecture-policy.properties`(HTTP 표면 등식 · 층 분류 · 주입 표면 · 포트 호출 쌍 · 제한 층 허용 패키지에
     `bidvector.workflow.notice` 를 열고 읽기 포트는 `app.http.denied-types` 로 다시 막음)
-  - `config/quality/gate-tests.properties`(새 test 다섯)
+  - `config/quality/gate-tests.properties`(새 test — **r2 에서 일곱**: workflow 1 · adapters 3 · app 3. r1 수령 시점의
+    「다섯」은 `NoticeAdapterDependencyTest` 가 뒤에 더해진 것을 빠뜨린 수였고[verifier r1 L-9], r2 가 실 DB E2E 를
+    하나 더 세웠다)
   - `app` 의 기존 게이트 test 둘의 **데이터만**(의존 게이트 면제 수 51 → 53 · `Intrinsics.areEqual` 허용 목록 한 항목). 술어는 무편집이다.
   - 어댑터 패키지 `bidvector.adapters.notice` 신설과 그 의존 게이트
   - 이 넷은 게이트 설정·데이터이므로 verifier 표적이다. 넓힌 줄마다 근거가 evidence 에 있는지 본다.
