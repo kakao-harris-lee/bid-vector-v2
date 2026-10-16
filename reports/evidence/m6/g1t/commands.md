@@ -60,16 +60,17 @@ ml-contract` 가 **빈 출력**이다. 그 세 job 의 명령을 순차로 묶�
 
 ## capability-map 역방향 좌표 — 이 라운드 실측
 
-이 range 는 `docs/discovery/capability-map.md` 를 편집했다(팀장 레인, COL-02·COL-03 두 블록 — `13 4`,
-3564 → 3573 줄). 그 파일을 `파일:줄` 로 가리키는 인용을 저장소 전수로 쟀다.
+이 range 는 `docs/discovery/capability-map.md` 를 편집했다(팀장 레인, **COL-02·COL-03 두 절** — `13 4`,
+파일이 아홉 줄 길어졌다). 그 파일을 `파일:줄` 로 가리키는 인용을 저장소 전수로 쟀다. **이 표는 좌표를
+값으로 적지 않는다** — 그 자체가 낡는 좌표가 되기 때문이고, 자리는 절 이름으로 가리킨다.
 
 | 측정 | 결과 |
 |---|---|
 | `grep -rn 'capability-map\(\.md\)\?:[0-9]'`(md·kt·kts·properties·yaml·py, build 제외) | **41 건** |
-| 그중 **살아 있는 문서** | **1 좌표**(`fixtures/manifest.yaml` 의 `capability-map.md:164`, 같은 좌표가 두 줄에 걸쳐 인용된다) |
+| 그중 **살아 있는 문서** | **1 좌표** — `fixtures/manifest.yaml` 이 **STR-16 절**을 가리킨다(같은 좌표가 두 줄에 걸쳐 인용된다) |
 | 나머지 | **종결된 slice 의 evidence 39 건** |
-| 첫 편집 줄(238) 아래를 가리키는 인용 | **34 건** — 전부 evidence 경로이고 **+9 밀렸다**(238~272 구간을 가리키는 인용은 0) |
-| 살아 있는 인용의 영향 | **없음** — `:164` 는 편집 지점보다 **위**다 |
+| 편집한 첫 절(**COL-02**)보다 아래를 가리키는 인용 | **34 건** — 전부 evidence 경로이고 **+9 밀렸다**(두 절 **사이**를 가리키는 인용은 0 이라 +4 구간은 비어 있다) |
+| 살아 있는 인용의 영향 | **없음** — STR-16 절은 편집한 두 절보다 **위**다 |
 
 밀린 34 건은 **고치지 않는다**: 종결된 slice 의 기록을 되쓰지 않는다는 규율이고, 그 사실을 여기 선언으로
 남긴다. 앞 라운드의 역방향 검사는 stem 셋(`acceptance-trace`·`gate-tests`·`6e1`)만 훑어 이 파일이 빠져
@@ -119,5 +120,8 @@ DIFF 넷(`E-19`·`E-20a`·`E-20b`·`E-25`)은 runbook·`tools/`·compose 축이�
 
 편집한 두 파일(등재 장부·추적표)을 가리키는 `파일:줄` 인용을 저장소 전체에서 찾았다 —
 `acceptance-trace`·`gate-tests`·`6e1` 세 stem 으로 `*.md`·`*.kt`·`*.properties`·`*.kts` 를 훑어 **0 건**.
-이 range 가 편집한 **세 번째 파일**(`capability-map.md`, 팀장 레인)의 실측은 위 전용 절에 있다.
+이 range 가 편집한 나머지 둘(`capability-map.md`·`milestone-6.md`, 팀장 레인)의 실측은 위 전용 절에 있다.
+**이 evidence 자신**도 편집 대상 파일의 좌표를 쓰지 않는다 — 다섯 stem(`acceptance-trace`·`gate-tests`·
+`6e1`·`capability-map`·`milestone-6`)으로 `reports/evidence/m6/g1t/` 를 훑어 **전부 0 건**이다(검토 r2 L-2
+조치 — 앞 판은 역방향 실측을 적으면서 그 문장 안에 좌표를 축어로 남겼다).
 evidence 본문에도 이 slice 가 편집하는 파일의 줄 번호를 쓰지 않았다(FQN·절 제목·결정 ID 로 가리킨다).
