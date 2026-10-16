@@ -66,6 +66,17 @@ Codex 없음(되돌리기 어려운 경로 아님).
 - **in_scope 추가**: `config/quality/gate-tests.properties` — 새 test 클래스 FQN 등재만 한다(모듈 키 아래 한 줄씩, 값·정책 version 변경
   없음). `gateRegistrationGate` 의 양방향 등식 때문에 필요하다.
 
+**D-G1T-3 (2026-10-16, 팀장 — 구현 수령 · 동결).**
+- 판정 대상은 산출물 `40dded85` · evidence `855c287d` 이다.
+- 6E-1 추적표의 **집계 갱신을 수용한다**(ⓐ 13→17 · ⓒ 46→42 · 성립 범위 15→19/61 · 축 표 · 「부분 측정(강함)」 열거 · 「후속이 test 신설인
+  ⓒ」 절). 네 행만 바꾸면 그 문서가 자기와 어긋나기 때문이다. 6E-1 등식 재실행에서 남은 DIFF 넷(E-19·E-20a·E-20b·E-25)은 base 에서도
+  같다(이 slice 밖의 drift).
+- **COL-03 ⓐ 의 전제를 verifier 표적으로 넘긴다**: 6G production 호출부가 조회 가치 술어에 상수(`alreadyHeld=false`·`lastCheckedAt=null`)를
+  넘겨 age-gate·recheck-gate 가 출하 경로에서 발화하지 않는다(구현 레인 실측). COL-03 앞 두 bullet 이 ⓐ 술어 ②(출하 배선에서 성립)를
+  만족하는지 판정 결과에 따라 COL-03 을 ⓐ 로 둘지 정한다.
+- 이 range 의 팀장 커밋(`91c1718c`·`3cc30d49`·`b4ca492c`)은 계약과 capability map(D-G1T-2, in_scope)이다. **하네스 파일(`.claude/**`·
+  `CLAUDE.md`) 변경은 없다.**
+
 ## 하네스 레인 변경 (상시)
 
-- (착수 시점 없음)
+- 없음(이 slice 의 range 에 `.claude/**`·`CLAUDE.md` 변경 0).
