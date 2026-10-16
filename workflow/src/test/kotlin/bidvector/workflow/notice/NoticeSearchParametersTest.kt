@@ -6,8 +6,8 @@ import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
-import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.Resolution
+import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.compareKnownVat
 import bidvector.sharedkernel.export
 import bidvector.strategy.STRATEGY_POLICY
