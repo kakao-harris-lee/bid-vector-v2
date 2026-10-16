@@ -1,0 +1,95 @@
+# M7/7D 되돌림
+
+**실측 HEAD: `12221080`**(이 slice 의 마지막 산출물 커밋). ①~⑥ 을 그 커밋을 체크아웃한 임시
+clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과도 이 HEAD 에서 다시 냈다.
+**라운드가 더 붙으면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
+
+**forward-fix 가 정본이다**(계약 「rollback」, 6B-2 runbook 관례). 마이그레이션은 되돌리기 어려운
+경로다 — V20 이 만든 표를 지우는 새 마이그레이션을 쓰지 않는다. 되돌림은 두 경우로 갈린다.
+
+## 전제 (머지 **전**을 가정한다)
+
+- 복원 기준 SHA 는 **`77850903` 고정**(움직이는 `origin/main` 을 쓰지 않는다). 단언 넷:
+  - `git merge-base --is-ancestor 77850903 12221080` → exit 0 (base 가 실측 HEAD 의 조상).
+  - `git log --oneline 77850903..12221080 --merges` → **빈 출력**(이 브랜치에 main 병합이 없다).
+    그래서 공유 파일의 복원 기준도 base 하나다.
+  - **복원 집합의 첫 커밋은 `ed0f45ba`** 다(기계 산출:
+    `git log --oneline --reverse 77850903..<HEAD> -- <복원 경로들> | head -1`).
+    `git merge-base --is-ancestor ed0f45ba 77850903` → exit 1 (base 가 그 커밋을 포함하지 않는다).
+  - `git branch -r --contains ed0f45ba` → 빈 출력 (main 에 이 slice 없음).
+- 이 range 에 **다른 slice 의 커밋이 없다** — 그래서 공유 파일(`config/quality/**`·
+  `openapi/**`·`web/src/**`)을 hunk 로 격리할 필요가 없고, 경로 한정 복원이 남의 줄을 떨어뜨릴 수
+  없다. 병렬 레인 7C① 도 같은 파일 셋을 만지지만 **그 커밋은 이 브랜치에 없다**(머지 순서에 따라
+  뒤 PR 이 충돌을 정리한다 — 계약 「검토 레인」).
+- 하네스 경로(`CLAUDE.md`·`.claude/**`)는 **되돌리지 않는다**. 이 range 의 그 경로 커밋은
+  **0 건**이다(`git log --oneline 77850903..12221080 -- CLAUDE.md .claude/` 빈 출력 — 실측).
+
+## ① 머지 전 — in_scope 경로 한정 복원
+
+### 복원 목록 — 기계 산출
+
+```
+git diff --name-status 77850903..12221080 -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence/m7/7d'
+```
+실측 HEAD 에서 **A 30 · M 44 · R 1**(합 75 행 · 복원 경로 76 — R 은 두 경로 모두 넘긴다).
+A(신규)는 복원 명령이 삭제하고 M(수정)은 base 내용으로 되돌린다 — `--source` 에 없는 경로는
+삭제되므로 신규 파일에 별도 `git rm` 이 필요 없다. **`git checkout <base> -- <경로>` 는 쓰지
+않는다**(base 에 없는 경로마다 pathspec 오류로 exit 1 이고 아무것도 적용되지 않는다).
+파일 이름을 여기 나열하지 않는다 — 목록은 위 명령이 정본이고, 손으로 옮긴 목록이 낡는다.
+
+**전체 변경 − 복원 목록 = `reports/evidence/m7/7d/**` 뿐**(`comm -23` 실측). 그 밖의 경로가
+나오면 목록이 낡은 것이다. 실측 시점에 그 디렉터리에서 커밋돼 있던 것은 `scope.md` 하나이고,
+나머지 넷은 이 문서를 담는 커밋이 더한다.
+
+### 복원 명령
+
+```
+git restore --source=77850903 --staged --worktree -- <위 목록의 경로들을 개별 인자로>
+```
+
+### 되돌리지 않는 것
+
+- `reports/evidence/m7/7d/**` — 이 slice 의 기록이다. 복원 집합에서 **빼는 이유 둘**: (a) evidence 는
+  일이 되었음을 남기는 기록이고 되돌림 대상이 아니다 (b) 넣으면 뒤따르는 evidence 커밋이 「실측
+  HEAD 이후 되돌림 대상이 움직였는가」 술어를 **구조적으로** 깨뜨린다(그 커밋은 언제나 마지막
+  산출물 커밋 뒤에 온다). 아래 ⑥ 에서 **evidence 를 남긴 채** 게이트가 초록인 것을 실측했다 —
+  이 slice 는 누출 baseline 에 아무 줄도 더하지 않는다(그 짝이 어긋나는 M4 의 형태가 여기 없다).
+- `CLAUDE.md`·`.claude/**` — 하네스 레인(위 전제의 실측: 이 range 에 0 건).
+
+### ①~⑥ 실측 (임시 clone, 실측 HEAD `12221080`)
+
+| 축 | 결과 |
+| --- | --- |
+| ① 복원 명령 | exit 0 |
+| ② 되돌린 수 | 스테이징 **D 30 · M 44 · R 1** (A 였던 30 이 삭제로 바뀐다) |
+| ③ 복원 경로의 base 대비 diff | **빈 출력** |
+| ③b 남은 차이(base 트리 **전수** 대비) | `reports/evidence/m7/7d/` 뿐 — 되돌리기로 한 것은 전부 돌아갔다 |
+| ④ compile (`app`·`adapters`·`workflow`·`shared-kernel` 의 `compileTestKotlin`) | exit 0 |
+| ⑤ test (`:workflow:test` · `:app:test` · `:shared-kernel:test`) | exit 0 |
+| ⑥ 게이트 17(`sizeGate`·`jarContentGate`·`gateRegistrationGate`·`gateExecutionGate`·`leakPatternGate`·`contractGate`·`memberEffectGate` 등) | exit 0 |
+
+**갈음하지 않았다 — 다만 트리 동일성도 함께 쟀다.** 같은 clone 에서 evidence 까지 포함해
+복원하면 트리가 base 와 **파일 SHA 까지 같다**(복원 트리 해시 = base 트리 해시, 전수 diff 0 행).
+그 상태의 ④⑤⑥ 도 전부 exit 0 이었다. 즉 이 slice 의 되돌림은 「대충 돌아간 트리」가 아니라
+**base 그 자체**이고, evidence 를 남긴 판에서도 같은 게이트가 선다.
+
+## ② 머지 뒤 — PR revert + 개발 DB 재생성
+
+머지 뒤에는 ① 의 복원이 **아무것도 지우지 않으면서 exit 0** 을 낸다(의미가 뒤집힌다). 그때의
+절차는 셋이다.
+
+1. 그 PR 의 **머지 커밋 revert**. 코드·계약·화면이 함께 돌아간다.
+2. **개발 DB 재생성** — V20 이 이미 적용된 DB 는 revert 로 돌아오지 않는다(Flyway community 에
+   undo 가 없다). 개발 환경은 볼륨을 지우고 다시 migrate 한다. 운영 DB 는 **지우지 않는다** —
+   표 둘이 남아 있어도 코드가 그것을 읽지 않으므로 해가 없고(계정 행이 있으면 그 행만 남는다),
+   정리는 forward-fix 마이그레이션의 일이다.
+3. 되돌린 뒤 기존 운영자 자격 헤더 경로가 **그대로 선다** — 그 경로는 이 slice 가 바꾸지 않았고
+   (라벨·헤더 이름·거부 모양 전부 무편집) 세션 경로만 사라진다.
+
+## ③ 비활성화 — 되돌리지 않고 세션 경로만 끄는 길
+
+코드를 되돌리지 않고 세션 인증만 끄려면 **배선 하나**를 뺀다(`BrowserAccessWiring` 의
+`browserAccessExecutor` 빈). 그러면 조립이 `BrowserSessionAuthenticator` 를 만들 수 없어
+기동이 실패한다 — **조용히 열리는 것이 아니라 뜨지 않는다**(fail-closed). 운영에서 세션만 끄고
+기존 자격 헤더로 돌아가려면 그 배선과 필터 등록의 두 번째 경로를 함께 뺀 판을 배포한다.
+계정 명령 레인은 설정(`bidvector.account.mode`)이 없으면 애초에 조립되지 않는다.
