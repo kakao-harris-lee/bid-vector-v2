@@ -94,6 +94,22 @@ verifier(opus) + code-reviewer(sonnet) 병렬. verifier 표적: 우회 ①~⑨ �
 - **게이트 설정(`architecture-policy.properties`)을 바꾸므로** 그 변경은 verifier 의 표적 재검증 대상이다. 허용 목록을 넓히는 줄마다 근거를
   evidence 에 적는다.
 
+**D-7D-2 (2026-10-16, 팀장 — 구현 수령 · 동결).** 판정 대상은 산출물 `12221080` · evidence `a4611af8` 다.
+- **in_scope 추가를 수용한다**(레인 보고 「계약 r1 목록 밖」 여섯):
+  - `config/quality/gate-tests.properties`(FQN 여섯)
+  - `PersistenceTestSupport`·`RetentionFixture`(새 표 둘)
+  - `app` architecture test 넷(새 비밀값 축 키 · 면제 수)
+  - KDoc 이름 반영 넷 · 상수·필터 이름 반영뿐인 기존 app test 열셋 · `RetentionWiringTest`
+  - `web/vite.config.ts`(vitest 환경의 절대 기준 주소)
+  - 게이트 test·설정 데이터는 verifier 표적이다.
+- **새 의존**: `at.favre.lib:bcrypt:0.10.2`(+ 전이 `at.favre.lib:bytes`). 근거는 어댑터 KDoc 에 있다. `compatibilitySmoke` 에 등재됐다.
+- **로컬에서 못 잰 축 둘**:
+  - container job 의 trivy 설치 실패 → 취약점 게이트 둘
+  - web job 의 Playwright 시스템 의존 step(apt 권한)
+  - 둘 다 **PR CI 가 정본**이다.
+- 변이 ④(만료)는 두 기제가 지켜 단독 변이가 초록이고, 둘을 함께 걷어야 RED 다. 심층 방어로 등재했다.
+- 남은 알려진 제한은 13 이다(checklist 5절). 후속 하나: `adapters/audit` KDoc 의 옛 필터 이름.
+
 ## 하네스 레인 변경 (상시)
 
-- (착수 시점 없음)
+- 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
