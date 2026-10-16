@@ -42,9 +42,11 @@
 | `JdbcNoticeSearch`(adapters) | `notice` 표 **SELECT 3** (건수 · 페이지 · 「하나라도 수집됐는가」) | join 없음(원문 관측·감사·개찰 표에 닿지 않는다). 질의가 실제로 읽는 열 집합을 `ResultSetMetaData` 로 실측해 `notice` 선언 열과 등식으로 잠갔다 |
 | `NoticeSummaryResponse`(DTO) | 공고번호·차수·상태·공고명·기관명 둘·기초금액(basis·통화·과세·provenance 포함)·마감 | 원시 관측·감사·투찰자·연락처 칸이 **없다**(키 집합 등식 + 어휘 교집합 공집합) |
 | `NoticeSearchCriteria`·`SearchText`·`NoticeAmountBound`(workflow) | 검증을 지난 조건을 나른다 | 생성 경로가 파싱 하나뿐(`internal constructor` + `@ConsistentCopyVisibility`) — 패턴 문자열이 조건으로 들어와 질의에 닿는 자리가 없다 |
+| `Sql.NOTICE_COLUMNS` 의 가시성(`private` → `internal object` 안의 `const val`, verifier r1 L-10) | **adapters 모듈 안에서만** 열 목록을 읽는 것 | 모듈 밖으로 나가지 않는다(`internal object` 의 멤버다). 같은 열거의 두 번째 사본을 두지 않으려고 연 자리이고, 복원 경로(`toNoticeRow`·`reconstructNotice`)가 같은 목록을 전제한다 |
+| `beginReadOnlySearchTransaction`(adapters, verifier r1 F-1 처방) | 검색이 쓰는 **읽기 전용 트랜잭션**을 여는 것 | `internal` 이라 adapters 모듈 안이다. 이 함수가 여는 트랜잭션에서는 DML 이 DB 에 막힌다(실 DB test) |
 | `InvalidNoticeSearchException`(app.http) | 400 `INVALID_REQUEST` 로 옮겨지는 거부 | 메시지가 응답에 실리지 않는다(매핑표가 고정 문구만 낸다) |
 
-위 일곱 밖에 **새 public 표면은 없다**(새 설정 키·새 환경변수·새 마이그레이션·새 표·새 쓰기 경로 0).
+위 밖에 **새 public 표면은 없다**(새 설정 키·새 환경변수·새 마이그레이션·새 표·새 쓰기 경로 0).
 
 ## 4. 쓰기·마이그레이션 0 확인
 
@@ -66,7 +68,7 @@
 | 파일 | 왜 필수인가 |
 |---|---|
 | `config/quality/architecture-policy.properties` | HTTP 표면 실측이 handler 집합 **등식**이라 새 컨트롤러가 목록에 없으면 RED. 같은 이유로 ① 층(wiring)·② 층(조회기)·주입 표면·포트 호출 쌍이 각자 등식·부분집합 술어를 가진다. 제한 층 허용 패키지에 `bidvector.workflow.notice` 를 **열고**, 그 안의 읽기 포트는 거부 타입으로 **다시 판다** |
-| `config/quality/gate-tests.properties` | 등재 게이트가 「모듈의 test 모집단 ∖ 제외 == 등재」 등식이라 새 test 다섯이 목록에 없으면 RED |
+| `config/quality/gate-tests.properties` | 등재 게이트가 「모듈의 test 모집단 ∖ 제외 == 등재」 등식이라 새 test 일곱(workflow 1 · adapters 3 · app 3)이 목록에 없으면 RED |
 | `app` 의 기존 게이트 test 둘(의존 게이트 · 비교 구조 게이트) | **술어는 무편집이고 데이터만 움직였다**: 의존 게이트의 면제 수 고정값(51 → 53, 근거 문단 동반)과 `Intrinsics.areEqual` 허용 목록 한 항목(공고 요약 응답의 data class 자동 `equals`, 개별 근거 동반). 둘 다 **집합·수 등식**이라 값을 늘린 사실이 목록에 남는다 — 전건 `check` 가 이 둘을 잡아서 알게 됐고, 수정 뒤 표적 재실행과 전건 재실행 둘 다 초록이다 |
 
 이 갱신들은 **새 권한을 열지 않는다** — 허용 목록에 더한 것은 이 slice 가 만든 타입뿐이고,

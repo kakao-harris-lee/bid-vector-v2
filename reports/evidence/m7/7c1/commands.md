@@ -58,11 +58,16 @@ acceptance 는 `.github/workflows/ci.yml` 의 `check` job 과 `web` job 이 돌�
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 산출물 경로들> reports/evidence/m7/7c1/`
 - exit: 0
-- 핵심 결과: 매치 **1건** — 계약 문서의 보안 스킴 선언 한 줄(6A-1 이 세운 자격증명 헤더 선언,
-  이 slice 가 만들지 않았고 문면도 바꾸지 않았다). `leakPatternGate` 의 스캔 루트는
-  `reports/evidence` 라 그 줄은 게이트의 대상 밖이고, evidence 와 새 코드에서는 **0건**이다.
-  패턴 어휘는 이 문서에 축어로 적지 않는다 — 참조형으로만 실행한다. 육안 확인: 응답 스키마에
-  연락처·사업자 정보 칸이 없고 공고 요약은 공개 공고 필드뿐이다.
+- 핵심 결과: **비밀값 0**. 스캔 경로는 이 slice 가 만진 산출물 경로 전부와
+  `reports/evidence/m7/7c1/` 다. 패턴에 걸리는 줄은 있고 전부 **값이 아니라 낱말**이다 —
+  파일 다섯에 열 줄이며 그 가운데 **이 slice 가 추가한 줄은 셋**이다(verifier r1 L-2 가
+  「새 코드 0건」 오기를 지적했다): 실 DB E2E test 의 컨테이너 자격 설정 둘(기존 E2E test
+  들과 같은 고정 문구이고 운영 값이 아니다)과 전략 응답 KDoc 이 인용한 함수 이름 하나.
+  나머지 일곱은 이 slice 가 만들지 않은 기존 줄이다(계약 문서의 보안 스킴 선언 · 비교 구조
+  게이트 · 게이트 계약의 비밀값 절). `leakPatternGate` 의 스캔 루트는 `reports/evidence`
+  라 그 줄들은 게이트 대상 밖이고, **evidence 안에서는 0건**이다. 패턴 어휘는 이 문서에
+  축어로 적지 않는다 — 참조형으로만 실행한다. 육안 확인: 응답 스키마에 연락처·사업자 정보
+  칸이 없고 공고 요약은 공개 공고 필드뿐이다.
 
 ## 2026-10-15T23:13Z — clean-tree 게이트
 
