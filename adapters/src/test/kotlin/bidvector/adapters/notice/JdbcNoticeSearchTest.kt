@@ -26,8 +26,10 @@ import bidvector.workflow.notice.NoticeSearchRequest
 import bidvector.workflow.notice.NoticeSearchState
 import bidvector.workflow.notice.parseNoticeSearchParameters
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -316,6 +318,40 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
                     }
                 }
             (failure.message ?: "") shouldContain "read-only transaction"
+        }
+    }
+
+    /**
+     * **검색의 모든 문장이 그 트랜잭션 안에서 돈다**(verifier r2 R2-M-1). 앞 판은 ⓐ 함수를
+     * 직접 불러 「그 연결에서는 DML 이 막힌다」와 ⓑ 상수 풀에 이름이 있다만 쟀고, 그래서
+     * 호출을 건수 질의 **뒤로** 옮기거나 호출 **앞에** 쓰기를 끼우는 변이가 둘 다 초록이었다.
+     *
+     * 여기서는 기록 프록시로 `search()` 가 실행한 문장을 전수로 거두고, **읽기 전용을 켜는
+     * 문장 하나를 빼면 전부 `transaction_read_only=on` 에서 돌았는지**를 단언한다. 경로
+     * 셋(맞음 · 조건이 좁음 · 조건 없음)을 모두 지난다.
+     */
+    @Test
+    fun `search 의 모든 문장이 읽기 전용 트랜잭션 안에서 돈다 — 경로 셋`() {
+        insert("N-1", title = "도로 포장", offsetSeconds = 1)
+
+        listOf(
+            NoticeSearchParameters(),
+            NoticeSearchParameters(text = "포장"),
+            NoticeSearchParameters(text = "없는낱말"),
+        ).forEach { parameters ->
+            val witness = ReadOnlyWitness()
+            val criteria =
+                parseNoticeSearchParameters(parameters)
+                    .shouldBeInstanceOf<NoticeSearchRequest.Accepted>()
+                    .criteria
+
+            JdbcNoticeSearch(witnessedDataSource(dataSource(), witness)).search(criteria)
+
+            withClue("조건=$parameters 관측=${witness.observed}") {
+                witness.queries().shouldNotBeEmpty()
+                witness.statementsOutsideReadOnly() shouldBe emptyList()
+                witness.queries().all { !it.autoCommit } shouldBe true
+            }
         }
     }
 
