@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 
+import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
 
 /**
@@ -29,6 +30,17 @@ export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({
   path: slot.path,
   element: <ScreenPlaceholder slot={slot} />,
 }));
+
+/**
+ * 로그인 자리(M7/7D). **화면 자리 표에는 넣지 않는다** — 화면 다섯(A~E)과 알림함은 요구표의
+ * 화면 구분이고, 이것은 그 구분 밖의 **인증 자리**다(`fallbackRoute` 와 같은 이유로 표 밖이다).
+ * 셸의 전역 탐색에도 뜨지 않는다(`AppShell` 은 자리 표에서만 링크를 만든다).
+ */
+export const loginRoute: RouteObject = {
+  id: 'login',
+  path: '/login',
+  element: <LoginScreen />,
+};
 
 /**
  * 알 수 없는 URL 자리(code-review r1 F-10). **화면 자리 표에는 넣지 않는다** — 이것은 화면이

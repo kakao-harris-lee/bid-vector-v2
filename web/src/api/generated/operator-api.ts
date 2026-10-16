@@ -146,6 +146,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 지금 내 세션 — CSRF 값 재전달(M7/7D)
+         * @description 화면이 새로 뜰 때 CSRF 값을 다시 받는 자리다. 읽기 메서드라 CSRF 를 요구하지 않는다. 쿠키가 없거나 세션이 살아 있지 않으면 404 다 — 이 요청은 이미 인증을 지났고(쿠키 또는 운영자 자격 헤더), 없는 것은 자격이 아니라 **브라우저 세션이라는 자원**이다.
+         */
+        get: operations["readSession"];
+        put?: never;
+        /**
+         * 로그인 — 세션 쿠키 발급(M7/7D)
+         * @description **무인증으로 열리는 유일한 operation 이다**(기본 거부 필터의 허용 목록 하나). 성공하면 `Set-Cookie` 로 `bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/)을 내고, 본문으로 CSRF 값을 준다 — 그 값은 세션 값에서 단방향으로 유도된 것이라 새어도 세션이 되지 않는다. 로그인은 **늘 새 값을 발급하고 그 계정의 기존 세션을 폐기한다**(세션 고정 방어). 로그인 CSRF 대책은 둘이다: 이 operation 은 `application/json` 만 받으므로 교차 사이트 HTML form 이 닿지 못하고(preflight 없는 form 은 그 Content-Type 을 쓸 수 없다), 발급 쿠키가 `SameSite=Strict` 다.
+         */
+        post: operations["signIn"];
+        /**
+         * 로그아웃 — 서버 쪽 세션 폐기(M7/7D)
+         * @description **서버 쪽 폐기가 본체**이고 쿠키 삭제가 뒤따른다(쿠키만 지우면 그 값으로 다시 통한다). 상태를 바꾸는 메서드라 CSRF 헤더를 요구한다. 쿠키가 없는 요청(운영자 자격 헤더 경로)도 같은 204 다 — 멱등이고 「세션이 있었는지」를 응답으로 알리지 않는다.
+         */
+        delete: operations["signOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -167,6 +195,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SignInRequest: {
+            loginName: string;
+            passphrase: string;
+        };
+        SessionResponse: {
+            csrf: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         StrategyReadResponse: {
             revision: number;
             focusCategories: string[];
@@ -805,6 +842,149 @@ export interface operations {
                 };
             };
             /** @description 내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 살아 있는 세션 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description 인증 실패(사유 구분 없음). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 브라우저 세션이 없다. code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    signIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInRequest"];
+            };
+        };
+        responses: {
+            /** @description 세션 발급 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description 요청 본문 형식 오류(알 수 없는 키·빈 값 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 로그인 실패 — 계정 부재·비밀 문구 불일치·연속 실패 잠금을 **구분하지 않는다**(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 폐기 완료(본문 없음) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 인증 실패 — 쿠키 없음·폐기·만료·CSRF 불일치를 **구분하지 않는다**. code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;
