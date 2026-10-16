@@ -252,6 +252,34 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
         notices.lastCriteria shouldBe null
     }
 
+    /**
+     * verifier r1 L-3 — Spring 은 `q=a&q=b` 를 값 하나 `"a,b"` 로 합쳐 넘긴다. 쉼표가 든
+     * 리터럴 검색과 구별되지 않는 조용한 결합이라 계약에서 끊는다.
+     */
+    @Test
+    fun `같은 매개변수를 두 번 보내면 400 이고 포트에 닿지 않는다`() {
+        val response = errorOf("?q=a&q=b")
+
+        response.statusCode.value() shouldBe 400
+        response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+        errorOf("?page=0&page=1").statusCode.value() shouldBe 400
+        notices.lastCriteria shouldBe null
+
+        // 서로 다른 매개변수 둘은 반복이 아니다 — 술어가 과잉 차단하지 않는다.
+        notices.page = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NO_MATCH)
+        get("?q=a&agency=b").statusCode.value() shouldBe 200
+        // 알 수 없는 매개변수의 반복은 그대로 무시한다(거동 무변경).
+        get("?unknown=1&unknown=2").statusCode.value() shouldBe 200
+    }
+
+    @Test
+    fun `숫자 칸의 공백과 더하기 부호는 거부다`() {
+        errorOf("?amountMin=%205").statusCode.value() shouldBe 400
+        errorOf("?amountMin=%2B5").statusCode.value() shouldBe 400
+        errorOf("?page=%2B1").statusCode.value() shouldBe 400
+        errorOf("?size=%2010").statusCode.value() shouldBe 400
+    }
+
     @Test
     fun `거부된 질의는 포트에 닿지 않는다 — 읽기조차 일어나지 않는다`() {
         errorOf("?size=100000").statusCode.value() shouldBe 400

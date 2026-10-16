@@ -23,13 +23,21 @@ internal fun String?.tooLong(): Boolean = this != null && length > NoticeSearchL
 
 internal fun String?.blankOrNull(): Boolean = this == null || isBlank()
 
-internal fun String?.parsedWon(): Long? = this?.trim()?.takeIf { it.isNotEmpty() }?.toLongOrNull()
+/**
+ * 정수 칸이 받는 **유일한** 형태(verifier r1 L-5) — 선택적 `-` 와 숫자뿐이다. 앞뒤 공백과
+ * `+` 부호는 받지 않는다: `toLongOrNull` 은 `+5` 를 받아들이고 trim 은 `" 5"` 를 지워,
+ * 계약이 `integer` 라 적은 칸이 조용히 넓어져 있었다. 거동 차이는 없었지만 「무엇이
+ * 유효한 입력인가」가 계약 문서와 구현에서 달랐다.
+ */
+private val DECIMAL_INTEGER = Regex("^-?[0-9]+$")
+
+internal fun String?.parsedWon(): Long? = this?.takeIf(DECIMAL_INTEGER::matches)?.toLongOrNull()
 
 internal fun String?.notInteger(): Boolean = !blankOrNull() && parsedWon() == null
 
 internal fun String?.negative(): Boolean = (parsedWon() ?: 0L) < 0L
 
-internal fun String?.parsedInt(): Int? = this?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+internal fun String?.parsedInt(): Int? = this?.takeIf(DECIMAL_INTEGER::matches)?.toIntOrNull()
 
 internal fun String?.notInteger32(): Boolean = !blankOrNull() && parsedInt() == null
 

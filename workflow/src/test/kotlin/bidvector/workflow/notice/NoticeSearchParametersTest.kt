@@ -7,13 +7,21 @@ import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.VatTreatment
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.compareKnownVat
 import bidvector.sharedkernel.export
+import bidvector.strategy.STRATEGY_POLICY
+import bidvector.strategy.StrategyDraft
+import bidvector.strategy.StrategyPolicyData
+import bidvector.strategy.StrategyRevision
+import bidvector.strategy.StrategyValidation
+import bidvector.strategy.validate
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * [parseNoticeSearchParameters] — 계약이 선언한 경계 전부를 **HTTP 없이** 잰다(순수 함수).
@@ -170,6 +178,33 @@ class NoticeSearchParametersTest {
         compareKnownVat(requireNotNull(bound), comparable).shouldBeInstanceOf<Fact.Known<Int>>()
         compareKnownVat(requireNotNull(bound), otherVat).shouldBeInstanceOf<Fact.Absent>()
         compareKnownVat(requireNotNull(bound), undeclared).shouldBeInstanceOf<Fact.Absent>()
+    }
+
+    @Test
+    fun `숫자 칸은 공백과 더하기 부호를 받지 않는다`() {
+        rejection(NoticeSearchParameters(amountMinWon = " 5")) shouldBe NoticeSearchRejection.AMOUNT_NOT_INTEGER
+        rejection(NoticeSearchParameters(amountMaxWon = "+5")) shouldBe NoticeSearchRejection.AMOUNT_NOT_INTEGER
+        rejection(NoticeSearchParameters(page = "+1")) shouldBe NoticeSearchRejection.PAGE_NOT_INTEGER
+        rejection(NoticeSearchParameters(size = " 10")) shouldBe NoticeSearchRejection.SIZE_NOT_INTEGER
+        // 공백만인 값은 여전히 「없음」이다(거동 무변경).
+        accepted(NoticeSearchParameters(amountMinWon = "  ")).amount shouldBe null
+    }
+
+    /**
+     * code-reviewer r1 L-4 — 한계값의 과세·provenance 가 **감시 경로가 요구하는 그 값**인지를
+     * 전략 커널의 검증으로 직접 잰다(상수끼리의 비교가 아니다). 검색이 다른 규약으로 바뀌면
+     * 같은 값이 전략 한계값으로서 거부되므로 이 단언이 붉어진다.
+     */
+    @Test
+    fun `한계값은 전략 커널이 예산 한계로 받아들이는 구성이다`() {
+        val bound = requireNotNull(accepted(NoticeSearchParameters(amountMinWon = "1000")).amount).min
+        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
+
+        val draft = StrategyDraft(focusCategories = listOf("CAT-1"), minBudget = bound)
+
+        val result = validate(draft, StrategyRevision(1), policy)
+
+        result.shouldBeInstanceOf<StrategyValidation.Valid>()
     }
 
     @Test

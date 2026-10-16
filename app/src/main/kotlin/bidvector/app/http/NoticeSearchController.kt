@@ -8,6 +8,7 @@ import bidvector.workflow.notice.NoticeSearchParameters
 import bidvector.workflow.notice.NoticeSearchRequest
 import bidvector.workflow.notice.parseNoticeSearchParameters
 import org.springframework.http.ResponseEntity
+import org.springframework.util.MultiValueMap
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -17,6 +18,13 @@ const val TOTAL_COUNT_HEADER = "X-Total-Count"
 
 /** 빈 결과의 두 뜻 — 추적표 STR-16 「"조건에 맞는 것이 없다"와 "아직 수집되지 않았다"」. */
 const val RESULT_STATE_HEADER = "X-Result-State"
+
+/**
+ * 계약이 든 질의 매개변수 이름 — 반복 거부의 판정 대상이다. 문서와의 등식은
+ * `OpenApiNoticeSearchContractTest` 의 「문서가 든 질의 매개변수 전수」가 잰다.
+ */
+private val DECLARED_PARAMETERS =
+    listOf("q", "agency", "amountMin", "amountMax", "deadlineFrom", "deadlineTo", "page", "size")
 
 /**
  * 공고 검색 endpoint(M7/7C ①, STR-16 검색 절반) — **읽기 전용**이다. 컨트롤러는
@@ -43,7 +51,9 @@ class NoticeSearchController(
         @RequestParam(required = false) deadlineTo: String?,
         @RequestParam(required = false) page: String?,
         @RequestParam(required = false) size: String?,
+        @RequestParam allValues: MultiValueMap<String, String>,
     ): ResponseEntity<List<NoticeSummaryResponse>> {
+        rejectRepeated(allValues)
         val parameters =
             NoticeSearchParameters(
                 text = q,
@@ -58,6 +68,22 @@ class NoticeSearchController(
         return when (val parsed = parseNoticeSearchParameters(parameters)) {
             is NoticeSearchRequest.Rejected -> throw InvalidNoticeSearchException(parsed.reason.name)
             is NoticeSearchRequest.Accepted -> respond(notices.search(parsed.criteria))
+        }
+    }
+
+    /**
+     * 같은 매개변수를 두 번 보내면 거부한다(verifier r1 L-3) — Spring 은 `q=a&q=b` 를 값
+     * 하나 `"a,b"` 로 합쳐 넘기므로, **리터럴 검색어에 쉼표가 들어간 질의**와 구별되지
+     * 않는다. 계약에 없는 조용한 결합이라 400 으로 끊는다.
+     *
+     * 판정 대상은 **계약이 든 이름들**이다 — 알 수 없는 매개변수는 지금처럼 무시한다(그
+     * 거동은 바꾸지 않는다). `MultiValueMap` 은 같은 이름의 **원문 값 목록**을 그대로
+     * 들고 있어 합쳐지기 전의 사실을 본다.
+     */
+    private fun rejectRepeated(allValues: MultiValueMap<String, String>) {
+        val repeated = DECLARED_PARAMETERS.filter { name -> (allValues[name]?.size ?: 0) > 1 }
+        if (repeated.isNotEmpty()) {
+            throw InvalidNoticeSearchException("같은 매개변수가 반복됐다: $repeated")
         }
     }
 
