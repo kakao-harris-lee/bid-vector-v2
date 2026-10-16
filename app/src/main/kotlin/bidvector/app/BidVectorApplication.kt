@@ -12,8 +12,8 @@ import bidvector.app.http.RequestAuditFilter
 import bidvector.app.http.RequestAuthenticationFilter
 import bidvector.app.http.SessionCookieWriter
 import bidvector.app.wiring.BrowserAccessExecutor
-import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.access.BrowserAccessPolicyData
+import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.strategy.Clock
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter
 import org.springframework.boot.autoconfigure.SpringBootApplication

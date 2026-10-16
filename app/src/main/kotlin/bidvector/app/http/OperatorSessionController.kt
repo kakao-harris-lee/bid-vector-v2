@@ -53,7 +53,7 @@ class OperatorSessionController(
                 ClearPassphrase.wrap(payload.requiredNonBlankText("passphrase")),
             )
         return when (outcome) {
-            is SignInOutcome.Granted ->
+            is SignInOutcome.Granted -> {
                 ResponseEntity
                     .status(HttpStatus.CREATED)
                     .header(HttpHeaders.SET_COOKIE, cookies.issued(outcome.session.key))
@@ -63,6 +63,7 @@ class OperatorSessionController(
                             expiresAt = outcome.session.absoluteExpiresAt.toString(),
                         ),
                     )
+            }
 
             is SignInOutcome.Refused -> unauthenticated(request)
         }
