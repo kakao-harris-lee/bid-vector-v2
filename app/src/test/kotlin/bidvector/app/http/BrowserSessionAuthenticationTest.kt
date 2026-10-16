@@ -139,7 +139,8 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
         val routes =
             handlerMapping.handlerMethods.entries
                 .flatMap { (info, _) ->
-                    val methods = info.methodsCondition.methods.map { it.name }.ifEmpty { listOf("GET") }
+                    val declared = info.methodsCondition.methods.map { it.name }
+                    val methods = declared.ifEmpty { listOf("GET") }
                     val paths =
                         info.pathPatternsCondition
                             ?.patterns

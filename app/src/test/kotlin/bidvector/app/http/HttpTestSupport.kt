@@ -322,9 +322,8 @@ open class HttpTestApplication {
         InMemoryBrowserAccessTransaction(clock)
 
     @Bean
-    open fun browserAccessExecutor(
-        browserAccessTransaction: InMemoryBrowserAccessTransaction,
-    ): BrowserAccessExecutor = BrowserAccessExecutor(browserAccessTransaction)
+    open fun browserAccessExecutor(transaction: InMemoryBrowserAccessTransaction): BrowserAccessExecutor =
+        BrowserAccessExecutor(transaction)
 
     /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
     @Bean
