@@ -37,7 +37,9 @@ class NoticeSearchStatementTest {
                 "100%_할인",
                 "'; DROP TABLE notice; --",
                 "' OR 1=1 --",
-                "\u0000",
+                // `U+0000` 은 더 이상 이 자리에 올 수 없다 — 파싱이 제어 문자를 먼저 거부한다
+                // (verifier r1 F-2). 대신 이스케이프 글자가 섞인 표본을 둔다.
+                "!%_\\",
             )
 
         val clauses = probes.map { probe -> statementOf(NoticeSearchParameters(text = probe)).clause }.toSet()
