@@ -246,6 +246,8 @@ val compatibilitySmoke =
                 "io.github.resilience4j:resilience4j-retry",
                 "io.micrometer:micrometer-core",
                 "org.flywaydb:flyway-core",
+                // M7/7D — 등재하지 않으면 이 의존의 해석·컴파일·로드를 아무도 재지 않는다.
+                "at.favre.lib:bcrypt",
                 "org.testcontainers:testcontainers-postgresql",
                 "com.tngtech.archunit:archunit-junit6",
                 // M6/6E-2c D-6E2C-3 — 보안 하한의 좌표. 등재하지 않으면 그 해석을 아무도 재지

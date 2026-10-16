@@ -359,6 +359,22 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "VALUES (1, '{}', false, '{}', '{}', '$at') ON CONFLICT (id) DO NOTHING",
             )
         },
+        // M7/7D — 계정은 제외 표이고 세션은 파기 대상이다. 세션이 계정을 FK 로 참조하므로
+        // **계정 먼저**다(목록 순서가 적용 순서다, `notice_requirement` → `…_row` 와 같은 자리).
+        TableSeed("account") { tag, at ->
+            listOf(
+                "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
+                    "VALUES ('ret-$tag', 'ret-fixture-hash-value', '$at', '$at', 0)",
+            )
+        },
+        TableSeed("browser_session") { tag, at ->
+            listOf(
+                "INSERT INTO browser_session (session_digest, account_id, csrf_digest, created_at, " +
+                    " last_used_at, idle_expires_at, absolute_expires_at) " +
+                    "SELECT 'ret-$tag', id, 'ret-csrf-$tag', '$at', '$at', '$at', '$at' " +
+                    "FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
         // **심지 않는다.** 이 표는 `PersistenceTestSupport` 의 test 간 TRUNCATE 목록 밖이다
         // (V2 migration 이 seed 하고 그 행이 운영 데이터다) — fixture 가 한 행을 더하면 그 행이
         // **다른 test 로 새어 나간다**(`ProvenanceAuthoritySeedTest` 가 seed 를 열거와 대조하다가

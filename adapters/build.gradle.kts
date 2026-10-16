@@ -54,6 +54,14 @@ dependencies {
     testImplementation(libs.kotlin.compilerEmbeddable)
 }
 
+// M7/7D — 비밀 문구 해시 한 의존(bcrypt). 채택 근거는 `access/BcryptPassphraseHasher.kt` KDoc.
+// Spring 좌표를 쓰지 않는 것이 이 모듈의 바깥 참조 허용 집합(Spring 0건)을 지키는 조건이다.
+// **별도 블록인 이유는 크기 축이다** — 위 `dependencies {}` 람다가 이미 50줄 한도에 닿아 있어
+// 한 줄을 더하면 `sizeGate` 가 붉어진다(실측 52줄). 이 파일의 기존 관례와 같은 분할이다.
+dependencies {
+    implementation(libs.bcrypt)
+}
+
 // sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties). 위
 // `dependencies {}` 가 추가로 그 상한에 닿아, 관련 없는 두 번째 배선(gRPC 계약
 // 셋)을 별도 블록으로 나눈다 — Gradle 은 같은 스크립트 안 `dependencies {}` 를 여러 번

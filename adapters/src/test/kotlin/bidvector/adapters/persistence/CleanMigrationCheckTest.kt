@@ -76,6 +76,10 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // 신규(추가만, D-6A1-7). V15__api_audit.sql: status_code 범위 1 +
             // duration_ms>=0 1 = 2.
             "api_request_audit" to 2,
+            // M7/7D(추가만). V20: account 는 login_name<>''·passphrase_hash<>''·failed_attempts>=0,
+            // browser_session 은 session_digest<>''·csrf_digest<>''·유휴<=절대 셋이다.
+            "account" to 3,
+            "browser_session" to 3,
         )
 
     @Test
