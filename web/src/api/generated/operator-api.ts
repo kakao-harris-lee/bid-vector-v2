@@ -161,7 +161,7 @@ export interface paths {
         put?: never;
         /**
          * 로그인 — 세션 쿠키 발급(M7/7D)
-         * @description **무인증으로 열리는 유일한 operation 이다**(기본 거부 필터의 허용 목록 하나). 성공하면 `Set-Cookie` 로 `bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/)을 내고, 본문으로 CSRF 값을 준다 — 그 값은 세션 값에서 단방향으로 유도된 것이라 새어도 세션이 되지 않는다. 로그인은 **늘 새 값을 발급하고 그 계정의 기존 세션을 폐기한다**(세션 고정 방어). 로그인 CSRF 대책은 둘이다: 이 operation 은 `application/json` 만 받으므로 교차 사이트 HTML form 이 닿지 못하고(preflight 없는 form 은 그 Content-Type 을 쓸 수 없다), 발급 쿠키가 `SameSite=Strict` 다.
+         * @description **무인증으로 열리는 유일한 operation 이다**(기본 거부 필터의 허용 목록 하나). 성공하면 `Set-Cookie` 로 `__Host-bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/·Domain 없음)을 내고, 본문으로 CSRF 값을 준다 — 그 값은 세션 값에서 단방향으로 유도된 것이라 새어도 세션이 되지 않는다. 로그인은 **늘 새 값을 발급하고 그 계정의 기존 세션을 폐기한다**(세션 고정 방어). 로그인 CSRF 대책은 둘이다: 이 operation 은 `application/json` 만 받으므로 교차 사이트 HTML form 이 닿지 못하고(preflight 없는 form 은 그 Content-Type 을 쓸 수 없다), 발급 쿠키가 `SameSite=Strict` 다.
          */
         post: operations["signIn"];
         /**

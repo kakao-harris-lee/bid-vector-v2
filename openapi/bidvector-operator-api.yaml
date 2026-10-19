@@ -487,7 +487,7 @@ paths:
       summary: 로그인 — 세션 쿠키 발급(M7/7D)
       description: >-
         **무인증으로 열리는 유일한 operation 이다**(기본 거부 필터의 허용 목록 하나). 성공하면
-        `Set-Cookie` 로 `bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/)을 내고, 본문으로
+        `Set-Cookie` 로 `__Host-bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/·Domain 없음)을 내고, 본문으로
         CSRF 값을 준다 — 그 값은 세션 값에서 단방향으로 유도된 것이라 새어도 세션이 되지 않는다.
         로그인은 **늘 새 값을 발급하고 그 계정의 기존 세션을 폐기한다**(세션 고정 방어).
         로그인 CSRF 대책은 둘이다: 이 operation 은 `application/json` 만 받으므로 교차 사이트
@@ -610,10 +610,14 @@ components:
       in: header
       name: X-Operator-Credential
     # M7/7D — 브라우저 경로. 쿠키는 `HttpOnly` 라 화면 스크립트가 읽지 않는다(브라우저가 싣는다).
+    # 이름의 `__Host-` 접두는 브라우저가 `Secure`·`Path=/`·`Domain` 없음을 **강제**하게 해서
+    # 하위·형제 도메인이 같은 이름을 덮어쓰지 못하게 한다(쿠키 그림자 방어). 접두는 `Secure` 와
+    # 한 몸이라 **로컬 http 개발 실행에서만** 접두 없는 `bidvector_session` 을 쓴다 — 운영 반입은
+    # 접두 이름이 정본이고 이 문서는 그것을 적는다.
     browserSession:
       type: apiKey
       in: cookie
-      name: bidvector_session
+      name: __Host-bidvector_session
     # 상태를 바꾸는 메서드에서 **세션 경로와 함께** 요구된다(읽기 메서드는 면제).
     operatorCsrf:
       type: apiKey

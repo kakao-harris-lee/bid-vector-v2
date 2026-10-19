@@ -258,13 +258,13 @@ class ProductionBrowserAccessTest {
         response.statusCode.value() shouldBe 201
         val setCookie = requireNotNull(response.headers.getFirst(HttpHeaders.SET_COOKIE)) { "Set-Cookie 가 없다" }
         return ProductionSession(
-            cookie = setCookie.substringAfter("${SessionCookieWriter.NAME}=").substringBefore(";"),
+            cookie = setCookie.substringAfter("${SessionCookieWriter.HOST_PREFIXED_NAME}=").substringBefore(";"),
             stamp = response.body?.get("csrf") as? String ?: "",
         )
     }
 
     private fun cookieOnly(session: ProductionSession): HttpHeaders =
-        HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.NAME}=${session.cookie}") }
+        HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=${session.cookie}") }
 
     /** 쿠키 + CSRF + JSON — 세션 경로로 쓰기 endpoint 를 부르는 자리. */
     private fun editPost(

@@ -18,12 +18,16 @@ import jakarta.servlet.http.HttpServletRequest
  *
  * 쿠키 값은 읽는 즉시 `BrowserSessionKey` 로 감싼다 — 이 클래스에 raw 문자열이 머무는 필드가
  * 없고(`OperatorCredential` 과 같은 규율), 세션 비교는 저장된 해시와 use case 가 한다.
+ *
+ * 쿠키 **판독기를 받는다**(code-review r2 M-3) — 이름이 설정(`Secure`)에 달려 있어 정적으로 알
+ * 수 없다. 쓰는 쪽과 읽는 쪽이 같은 객체를 보므로 두 이름이 갈릴 수 없다.
  */
 class BrowserSessionAuthenticator(
     private val access: BrowserAccessExecutor,
+    private val cookies: SessionCookieWriter,
 ) : RequestAuthenticator {
     override fun authenticate(request: HttpServletRequest): AuthenticationResult {
-        val key = SessionCookieWriter.read(request) ?: return AuthenticationResult.Denied
+        val key = cookies.read(request) ?: return AuthenticationResult.Denied
         return when (val verdict = access.authenticate(key, demandOf(request))) {
             is AccessVerdict.Granted -> AuthenticationResult.Authenticated(subjectOf(verdict.account))
             is AccessVerdict.Denied -> AuthenticationResult.Denied

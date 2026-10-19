@@ -1,9 +1,11 @@
 package bidvector.app.http
 
+import bidvector.workflow.access.BrowserSessionKey
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -49,14 +51,49 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
 
         response.statusCode.value() shouldBe 201
         val setCookie = response.headers.getFirst(HttpHeaders.SET_COOKIE) ?: ""
-        setCookie shouldContain "${SessionCookieWriter.NAME}="
+        setCookie shouldContain "${SessionCookieWriter.HOST_PREFIXED_NAME}="
         setCookie shouldContain "HttpOnly"
         setCookie shouldContain "Secure"
         setCookie shouldContain "SameSite=Strict"
         setCookie shouldContain "Path=/"
         setCookie shouldContain "Max-Age=${TEST_ACCESS_POLICY.absoluteWindow.seconds}"
+        // `__Host-` 접두의 전제 — `Domain` 이 **없어야** 브라우저가 그 이름을 받는다.
+        setCookie shouldNotContain "Domain="
         (response.body?.get("csrf") as? String)?.isNotBlank() shouldBe true
         response.body?.keys shouldBe setOf("csrf", "expiresAt")
+    }
+
+    /**
+     * code-review r2 M-3 — **쿠키 그림자**. 형제 서브도메인을 쥔 공격자가 같은 이름의 쿠키를
+     * 심으면 브라우저는 둘을 함께 보내고, 앞 판은 이름 → 쿠키 맵으로 접어 **마지막 값이**
+     * 이겼다(순서는 브라우저가 정한다). 둘 이상이면 거부한다 — 최악이 「로그인으로 돌아감」이다.
+     */
+    @Test
+    fun `같은 이름의 쿠키가 둘이면 거부한다 — 그림자 쿠키는 조용한 탈취가 아니라 401 이다`() {
+        val session = sessionFrom(signIn().headers.getFirst(HttpHeaders.SET_COOKIE))
+        val name = SessionCookieWriter.HOST_PREFIXED_NAME
+        val shadowed =
+            HttpHeaders().apply {
+                set(HttpHeaders.COOKIE, "$name=${session.cookie}; $name=forged-shadow-cookie-value")
+            }
+
+        exchange("/api/strategy", HttpMethod.GET, headers = shadowed).statusCode.value() shouldBe 401
+    }
+
+    /**
+     * 접두는 `Secure` 와 한 몸이다 — 로컬 http 개발(`cookie-secure=false`)에서 접두 이름을 쓰면
+     * 브라우저가 그 쿠키를 버린다. 그래서 그 실행에서만 평문 이름이고, **두 이름이 섞이지 않는다**
+     * (쓰는 쪽과 읽는 쪽이 같은 객체의 같은 값을 본다).
+     */
+    @Test
+    fun `로컬 http 설정에서는 접두 없는 이름이고 Secure 도 붙지 않는다`() {
+        val local = SessionCookieWriter(secure = false, absoluteWindow = TEST_ACCESS_POLICY.absoluteWindow)
+
+        local.name shouldBe SessionCookieWriter.PLAIN_NAME
+        val issued = local.issued(BrowserSessionKey("local-http-test-session-value"))
+        issued shouldContain "${SessionCookieWriter.PLAIN_NAME}="
+        issued shouldNotContain "Secure"
+        issued shouldNotContain "Domain="
     }
 
     @Test
@@ -279,7 +316,7 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
         }
 
     private fun cookieOnly(session: SessionHandle): HttpHeaders =
-        HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.NAME}=${session.cookie}") }
+        HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=${session.cookie}") }
 
     private fun cookieAndStamp(session: SessionHandle): HttpHeaders =
         cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }
@@ -303,7 +340,7 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
         stamp: String? = null,
     ): SessionHandle {
         val raw = requireNotNull(setCookie) { "Set-Cookie 가 없다" }
-        val value = raw.substringAfter("${SessionCookieWriter.NAME}=").substringBefore(";")
+        val value = raw.substringAfter("${SessionCookieWriter.HOST_PREFIXED_NAME}=").substringBefore(";")
         return SessionHandle(value, stamp ?: "")
     }
 

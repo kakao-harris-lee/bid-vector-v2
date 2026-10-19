@@ -81,7 +81,7 @@ class OperatorSessionController(
     @GetMapping
     fun current(request: HttpServletRequest): ResponseEntity<Any> {
         // 쿠키가 없는 것과 세션이 살아 있지 않은 것은 **같은 404** 다 — 한 식으로 접는다.
-        val description = SessionCookieWriter.read(request)?.let { access.describe(it) }
+        val description = cookies.read(request)?.let { access.describe(it) }
         return description?.let { ResponseEntity.ok<Any>(it.toResponse()) } ?: sessionAbsent(request)
     }
 
@@ -91,7 +91,7 @@ class OperatorSessionController(
      */
     @DeleteMapping
     fun signOut(request: HttpServletRequest): ResponseEntity<Void> {
-        SessionCookieWriter.read(request)?.let { access.signOut(it) }
+        cookies.read(request)?.let { access.signOut(it) }
         return ResponseEntity
             .noContent()
             .header(HttpHeaders.SET_COOKIE, cookies.cleared())

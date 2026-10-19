@@ -98,12 +98,13 @@ open class BidVectorApplication {
     open fun requestAuthenticationFilterRegistration(
         properties: OperatorCredentialProperties,
         browserAccessExecutor: BrowserAccessExecutor,
+        sessionCookieWriter: SessionCookieWriter,
     ): FilterRegistrationBean<RequestAuthenticationFilter> =
         FilterRegistrationBean(
             RequestAuthenticationFilter(
                 listOf(
                     OperatorCredentialAuthenticator(OperatorCredential.of(properties.value)),
-                    BrowserSessionAuthenticator(browserAccessExecutor),
+                    BrowserSessionAuthenticator(browserAccessExecutor, sessionCookieWriter),
                 ),
             ),
         ).apply {

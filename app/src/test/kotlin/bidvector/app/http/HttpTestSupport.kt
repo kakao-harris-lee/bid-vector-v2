@@ -337,12 +337,13 @@ open class HttpTestApplication {
     @Bean
     open fun requestAuthenticationFilterRegistration(
         browserAccessExecutor: BrowserAccessExecutor,
+        sessionCookieWriter: SessionCookieWriter,
     ): FilterRegistrationBean<RequestAuthenticationFilter> =
         FilterRegistrationBean(
             RequestAuthenticationFilter(
                 listOf(
                     OperatorCredentialAuthenticator(OperatorCredential.of(TEST_CREDENTIAL)),
-                    BrowserSessionAuthenticator(browserAccessExecutor),
+                    BrowserSessionAuthenticator(browserAccessExecutor, sessionCookieWriter),
                 ),
             ),
         ).apply {
