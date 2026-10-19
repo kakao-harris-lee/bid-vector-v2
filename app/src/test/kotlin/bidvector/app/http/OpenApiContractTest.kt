@@ -2,7 +2,9 @@ package bidvector.app.http
 
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.strategy.StrategyViolation
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -10,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.yaml.snakeyaml.constructor.DuplicateKeyException
 import org.springframework.http.ResponseEntity
 
 /**
@@ -272,6 +275,46 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
         response.body?.containsKey("minBudgetWon") shouldBe true
         response.body?.get("minBudgetWon") shouldBe null
+    }
+
+    /**
+     * code-review r3 Q3 — **로더가 중복 키를 거부한다**(계약 D-7D-6). 양성 대조다: 실제 계약
+     * 문서가 아니라 **합성 문서**로 재서, 「거부한다」가 문서의 현재 상태와 무관하게 성립함을
+     * 보인다. 이 가드가 없으면 뒤 값이 조용히 이기고, 선언을 **더하는** 변이가 초록이 된다
+     * (수정 r2 의 M27 이 그랬다).
+     */
+    @Test
+    fun `로더는 중복 키를 거부한다 — 뒤 값이 조용히 이기지 않는다`() {
+        val duplicated =
+            """
+            paths:
+              /a:
+                get:
+                  security: []
+                  security:
+                    - operatorCredential: []
+            """.trimIndent()
+        val single =
+            """
+            paths:
+              /a:
+                get:
+                  security:
+                    - operatorCredential: []
+            """.trimIndent()
+
+        shouldThrow<DuplicateKeyException> { parseOpenApiSpec(duplicated) }
+        // 중복만 뺀 같은 모양은 그대로 읽힌다 — 거부가 구문이나 들여쓰기 탓이 아니다.
+        parseOpenApiSpec(single) shouldNotBe null
+    }
+
+    /**
+     * 실제 계약 문서에 중복 키가 **없다**(위 가드가 그것을 지킨다). 이 단언이 붉으면 문서를
+     * 고치라는 뜻이고, 위 양성 대조와 함께 보면 「가드가 산다」와 「문서가 통과한다」가 갈린다.
+     */
+    @Test
+    fun `계약 문서 자체가 중복 키 없이 읽힌다`() {
+        spec.keys.isNotEmpty() shouldBe true
     }
 
     /**
