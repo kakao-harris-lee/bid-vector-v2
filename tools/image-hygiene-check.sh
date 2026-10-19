@@ -178,6 +178,7 @@ KEYMAT_SCAN_PATHS=""
 KEYMAT_EXCLUDE_PREFIXES=""
 KEYMAT_PATTERNS=""
 KEYMAT_MIN_ENTRIES=""
+KEYMAT_CONTENT_MAX_BYTES=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -239,6 +240,7 @@ case "$RUNTIME_KIND" in
     KEYMAT_EXCLUDE_PREFIXES="$(_policy_value keymaterial.exclude-prefixes pathlist)"
     KEYMAT_PATTERNS="$(_policy_value keymaterial.patterns list)"
     KEYMAT_MIN_ENTRIES="$(_policy_value keymaterial.min-entries numeric)"
+    KEYMAT_CONTENT_MAX_BYTES="$(_policy_value keymaterial.content.max-bytes numeric)"
     # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
     # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
     # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
@@ -533,36 +535,73 @@ case "$RUNTIME_KIND" in
         fi
       done
     fi
-    # ②' **키·인증서 재료는 넓게 찾는다**(검토 r1 F-2). 앞 판은 위 `content.path` 한 자리만 봤고,
-    # `tls internal` 이 실제로 CA 를 두는 자리(`/data/caddy/pki/...`)에 키를 구운 이미지가 초록이었다
-    # — 이미지에 미리 구운 CA 는 이 위협의 가장 그럴듯한 형태인데 그 자리를 보지 않았다.
-    # 범위는 **이미지 파일시스템 전체**이고, `-xdev` 가 런타임 마운트(proc·sys·dev)를 밖에 둔다.
+    # ②' **키·인증서 재료는 넓게 찾는다**(검토 r1 F-2, r2 에서 네 군데 보강).
+    # 앞 판은 위 `content.path` 한 자리만 봤고, `tls internal` 이 실제로 CA 를 두는 자리
+    # (`/data/caddy/pki/...`)에 키를 구운 이미지가 초록이었다. 범위는 **이미지 파일시스템 전체**
+    # 이고 `-xdev` 가 런타임 마운트(proc·sys·dev)를 밖에 둔다.
+    #
+    # r2 가 닫은 넷 — ⓐ 제외 접두 집합을 **아래 상수와의 등식**으로 잠근다(정책만 고쳐 표적
+    # 제외를 끼워 넣지 못한다) ⓑ 접두 비교는 **리터럴**이다(정규식이면 `.`·`+` 가 조용히 넓힌다)
+    # ⓒ 이름 일치는 **끝 고정**이다(부분 일치면 `xterm.keyboard` 류가 거짓 차단이 된다)
+    # ⓓ 이름 열거 위에 **내용 한 겹**을 덮는다(확장자를 바꿔 숨기는 편집을 잡는다).
     IFS=',' read -r -a keymat_scan_paths <<< "$KEYMAT_SCAN_PATHS"
     IFS=',' read -r -a keymat_exclude_array <<< "$KEYMAT_EXCLUDE_PREFIXES"
     IFS=',' read -r -a keymat_pattern_array <<< "$KEYMAT_PATTERNS"
+
+    # ⓐ 제외는 **닫힌 집합**이다. 정책이 선언한 값이 이 상수와 글자 그대로 같아야 한다 —
+    # 제외를 넓히려면 정책이 아니라 **게이트 자신**을 고쳐야 하고 그 편집은 이 줄에 남는다.
+    # 두 자리만 허용하는 사유: 베이스가 싣는 **공개** 신뢰 기점(공개 뿌리 인증서 모음)이고
+    # 비밀값이 아니다. `/etc/ssl/` 통째가 아니라 `certs/` 로 좁힌 것은 그 형제인
+    # `/etc/ssl/private/` 가 이 계열 배포판에서 **개인키의 표준 자리**이기 때문이다(r2 cr R2-1).
+    KEYMAT_ALLOWED_EXCLUDE_PREFIXES="/etc/ssl/certs/,/usr/share/ca-certificates/"
+    if [ "$KEYMAT_EXCLUDE_PREFIXES" != "$KEYMAT_ALLOWED_EXCLUDE_PREFIXES" ]; then
+      fail "키 재료 제외 접두가 허용 집합과 다르다 — 정책[${KEYMAT_EXCLUDE_PREFIXES}] 허용[${KEYMAT_ALLOWED_EXCLUDE_PREFIXES}](제외를 넓히려면 게이트를 고친다)"
+    fi
+
     KEYMAT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${keymat_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
     KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
-    # 선언된 접두를 뺀다 — 베이스가 싣는 **공개** 신뢰 기점(시스템 CA 번들)은 비밀값이 아니다.
+    # ⓑ 접두 제거는 **리터럴 비교**(`index(...)==1`)다 — `grep -v "^$pre"` 는 BRE 라
+    # `/opt/v1.2/` 같은 접두가 `/opt/v1X2/` 까지 지운다(제외가 조용히 넓어지는 fail-open).
     for pre in "${keymat_exclude_array[@]}"; do
-      KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -v -- "^${pre}" || true)"
+      KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | awk -v p="$pre" 'index($0, p) != 1')"
     done
     KEYMAT_ENTRIES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
-    # **양성 대조는 제외를 적용한 뒤에 센다.** 그래야 「제외 접두를 넓혀 축을 꺼 버리는」 편집이
-    # 여기서 끊긴다 — `/` 하나를 제외로 넣으면 남는 파일이 0 이 되어 판정 불가가 된다.
+    # 양성 대조는 제외를 적용한 **뒤에** 센다 — 통째로 넓히는 편집(`/`)이 여기서 판정 불가가
+    # 된다. 표적 제외(`/data/` 하나 추가)는 이 수를 거의 줄이지 않으므로 **ⓐ 등식**이 잡는다.
     if ! [[ "$KEYMAT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$KEYMAT_ENTRIES" -lt "$KEYMAT_MIN_ENTRIES" ]; then
       fail "키·인증서 재료 탐색의 대상 파일 수(${KEYMAT_ENTRIES})가 정책 하한(${KEYMAT_MIN_ENTRIES}) 미만이다 — 범위(${KEYMAT_SCAN_PATHS})가 틀렸거나 제외 접두가 너무 넓거나 목록 도구가 없다(판정 불가)"
     else
+      # ⓒ 이름 축 — **끝 고정**. 패턴은 확장자이므로 경로의 끝에서만 센다.
       KEYMAT_HITS=""
       for pat in "${keymat_pattern_array[@]}"; do
-        hit="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -iF -- "$pat" || true)"
+        suffix="$(printf '%s' "$pat" | sed 's/[].[^$*\\/]/\\&/g')"
+        hit="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -iE -- "${suffix}\$" || true)"
         [ -z "$hit" ] || KEYMAT_HITS="${KEYMAT_HITS}${hit}"$'\n'
       done
+      # ⓓ 내용 축 — 이름이 무엇이든 PEM 개인키는 **머리 줄이 고정**이다. 이름 열거 밖으로
+      # 나가는 편집(확장자를 떼거나 바꾸는 것)을 이 겹이 받는다. 공개 번들은 머리 줄이 달라
+      # 걸리지 않으므로 이 축에는 제외가 필요 없다.
+      #
+      # **종료 코드로는 「돌았는가」를 가릴 수 없다** — `find`는 읽을 수 없는 디렉터리 하나만
+      # 있어도 1 을 내고, `grep -l` 도 `-exec … +` 묶음 중 하나가 비면 1 을 낸다. 그래서
+      # 「훑은 파일 수」를 **따로 세어** 그것을 양성 대조로 쓴다. 셸·find 가 없으면 그 수가 0 이
+      # 되어 판정 불가로 끊긴다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면 BusyBox find 가
+      # `invalid number` 로 끊어 **탐침 전체가 조용히 0건**이 됐다 — 그 사고를 이 축이 잡는다).
+      keymat_scan_argv="$(printf '%s ' "${keymat_scan_paths[@]}")"
+      KEYMAT_CONTENT_SCANNED="$(docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | wc -l" 2>/dev/null | tr -d '[:space:]' || true)"
+      if ! [[ "${KEYMAT_CONTENT_SCANNED:-0}" =~ ^[0-9]+$ ]] || [ "${KEYMAT_CONTENT_SCANNED:-0}" -lt "$KEYMAT_MIN_ENTRIES" ]; then
+        fail "키 재료 내용 축이 훑은 파일 수(${KEYMAT_CONTENT_SCANNED:-0})가 하한(${KEYMAT_MIN_ENTRIES}) 미만이다 — 이미지에 셸·find 가 없거나 탐침이 끊겼다(판정 불가)"
+      fi
+      KEYMAT_CONTENT_HITS="$(docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c -exec grep -lE '^-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----' {} + 2>/dev/null" 2>/dev/null || true)"
+      [ -z "$KEYMAT_CONTENT_HITS" ] || KEYMAT_HITS="${KEYMAT_HITS}${KEYMAT_CONTENT_HITS}"$'\n'
       KEYMAT_HITS="$(printf '%s' "$KEYMAT_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
       if [ -n "$KEYMAT_HITS" ]; then
         fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$KEYMAT_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
       fi
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-패턴=${#keymat_pattern_array[@]}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=훑음${KEYMAT_CONTENT_SCANNED}건"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
