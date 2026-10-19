@@ -85,15 +85,28 @@ report="$(
       if (blank || ind > block_indent) { if (job != "") scan_refs(line); next }
       inblock = 0
     }
+    # ① YAML 앵커·별칭. 별칭 줄에는 텍스트가 없어 참조가 **보이지 않는다**(워크플로 수준 `env:`
+    # 에 앵커를 두고 `if: *별칭` 으로 쓰면 매달린 참조가 통째로 숨는다 — r4 vr R4-M2 ⓐ).
+    # 따옴표 밖의 `&이름`·`*이름` 토큰이 보이면 읽지 못하는 표기로 정지한다.
+    line ~ /(^|[ \t[{,])[&*][A-Za-z0-9_-]+([ \t\]},]|$)/ { unsupported("YAML 앵커·별칭 — 별칭이 가리키는 값을 이 검사가 풀지 못한다") }
     /^jobs:[ \t]*$/ { injobs = 1; job = ""; next }
     injobs && ind == 0 && !blank { injobs = 0; job = "" }
     injobs && ind == 2 && body ~ /^[A-Za-z0-9_.-]+:$/ {
       job = body; sub(/:$/, "", job); njobs++
       step_key_indent = -1; next
     }
+    # ② `jobs:` 아래 들여쓰기 2 의 줄인데 job 머리 패턴이 아니면 정지한다. 따옴표 친 job 키
+    # (`"container":`)가 job 머리로 인식되지 않으면 그 job 의 줄이 **앞 job 에 합쳐져**, 남의
+    # id 를 가리키는 매달린 조건이 정의된 것처럼 보인다(r4 vr R4-M2 ⓑ).
+    injobs && ind == 2 && !blank { unsupported("jobs: 아래 들여쓰기 2 의 줄이 job 머리 형태가 아니다(따옴표 친 job 키 등)") }
     job == "" { next }
     {
       scan_refs(line)
+      # ③ 동적 색인 `steps[format(…)]` 처럼 **정적으로 읽을 수 없는** 색인은 통과가 아니라 정지다.
+      # 머리 주석이 「범위 밖」으로 적던 자리인데, 그날이 왔음을 알리는 장치가 없었다(cr R4-2).
+      if (line ~ /steps\[/ && line !~ /steps\[ *["\047][A-Za-z0-9_-]+["\047] *\]/) {
+        unsupported("동적 색인 steps[…] — 정적으로 읽을 수 없는 표기")
+      }
       if (body ~ /^- /) {
         if (body ~ /^- *\{/) { unsupported("흐름 매핑 step(- {…}) — 이 검사가 읽지 못하는 표기") }
         step_key_indent = ind + 2
