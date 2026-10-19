@@ -364,6 +364,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # M7/7F-local(검토 r2 R2-H1) — **이 워크플로 자신의 `if:` 가 없는 step id 를 가리키는지**
+      # 먼저 잰다. r1 이 빌드 step 둘을 하나로 합치면서 취약점 게이트 둘의 조건이 옛 id 를 그대로
+      # 가리켰고, 없는 step 의 `outcome` 은 null 이라 두 게이트가 **매 실행 조용히 skipped** 였다
+      # (실패가 아니라 부재라 job 은 초록이었다). 가장 앞에 두어 비싼 step 앞에서 끊는다.
+      - name: 워크플로 step 참조 검사 — 매달린 steps.<id> 0 (S-20z)
+        id: workflow_step_refs
+        run: ./tools/workflow-step-refs-check.sh .github/workflows/ci.yml
+
       # M6/6A-2a r1(code-review LOW) — `::add-mask::` 를 먼저 붙인다. argv 축은 아래 주석대로
       # 닫혀 있지만, 더 실질적인 축은 **공개 워크플로 로그**다: 스모크의 `fail()` 이 앱 로그를
       # 찍고 Boot 의 바인딩 실패 보고는 속성 값을 문면에 낼 수 있다. 마스크는 그 경로를 값이
@@ -601,12 +609,12 @@ jobs:
       # 뜻이 흐리다(같은 job 의 S-22e 가 그 사유로 조건을 가진 것과 같은 형태).
       - name: 이미지 취약점 게이트 — web (S-22e2)
         id: scan_web
-        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web.outcome == 'success' && steps.hygiene_web.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web_proxy.outcome == 'success' && steps.hygiene_web.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/web:local web config/quality/vuln-policy.properties
 
       - name: 이미지 취약점 게이트 — 프록시 (S-22e3)
         id: scan_proxy
-        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_proxy.outcome == 'success' && steps.hygiene_proxy.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web_proxy.outcome == 'success' && steps.hygiene_proxy.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/proxy:local proxy config/quality/vuln-policy.properties
 
       # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
