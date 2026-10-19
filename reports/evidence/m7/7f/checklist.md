@@ -4,8 +4,8 @@
 
 | 산출물 | 자리 | 무엇이 그것을 재는가 |
 |---|---|---|
-| 1 web 정적 이미지 | `docker/web.Dockerfile`(+dockerignore) · `docker/web.Caddyfile` | 스모크 (B) 셸·번들 자산·SPA fallback · (H) non-root. 베이스 둘 다 다이제스트 고정, 금지 패키지는 아래 「알려진 제한 4」 |
-| 2 리버스 프록시 | `docker/proxy.Dockerfile`(+dockerignore) · `docker/proxy.Caddyfile` | 스모크 (A)(A3) 상류·publish 구조 · (C) `/api` 왕복 · (D) 헤더 · (E)(F) 관리 경로 · (G) 평문 · (I) 로그 |
+| 1 web 정적 이미지 | `docker/web.Dockerfile`(+dockerignore) · `docker/web.Caddyfile` | 스모크 (B) 셸·번들 자산·SPA fallback · (H) non-root · **위생 게이트 `S-22b2`**(금지 패키지·필수 도구·싣고 있는 내용) · **취약점 게이트 `S-22e2`**. 베이스 둘 다 다이제스트 고정 |
+| 2 리버스 프록시 | `docker/proxy.Dockerfile`(+dockerignore) · `docker/proxy.Caddyfile` | 스모크 (A)(A3) 상류·publish 구조 · (C) `/api` 왕복 · (D) 헤더 · (E)(F) 관리 경로 · (G) 평문 · (I) 로그 · **위생 `S-22b3`**(키·인증서 재료 부재 포함) · **취약점 `S-22e3`** |
 | 3 compose 확장 | `docker/compose.local-tls.yaml`(덧쓰기 — 기본 파일 무변경) | `docker compose config` 로 병합 결과를 스모크가 직접 읽는다((A)) |
 | 4 스모크 | `tools/local-tls-smoke.sh` | 자기 자신. CI `container` job 의 S-26 이 같은 스크립트를 돈다 |
 | 5 runbook 절 | `docs/runbook/m6-6e-operations.md` §9(+ 머리의 「약속하지 않는 것」 갱신) | 절 안의 모든 명령이 실재하는 진입점이다 — 실행 경로는 스모크와 같다 |
@@ -74,10 +74,11 @@
    같은 출처의 JS 하나·CSS 하나뿐이며, CSS 에 `url(...)`·`@font-face` 가 0 이다(JS 안의 외부 주소는
    오류 문면 문자열이고 불러오는 자원이 아니다). 그래서 `'self'` 축만으로 충분하고 `img-src data:`·
    `font-src` 는 7E 를 위한 여유다.
-4. **위생·취약점 게이트가 이 두 이미지를 보지 않는다.** 두 스크립트는 이미지 kind 별 **정책 파일**을
-   요구하고 그 파일들의 자리(`config/quality/`)는 이 slice 의 in_scope 밖이다. 그래서 non-root 는
-   스모크가 직접 재고 베이스 고정은 Dockerfile 의 다이제스트가 들지만, **「금지 패키지 0」과 CVE 판정은
-   아직 아무것도 재지 않는다.** → 아래 OPEN.
+4. **위생·취약점 게이트가 이 두 이미지를 본다**(D-7F-1·2 로 닫혔다 — 앞 판의 제한이 아니다).
+   CI 의 네 step 이 매 PR 에 돌고, 남는 칸은 둘이다: ⓐ `apk` 가 금지 목록에 없다(사유는 아래 예외 절)
+   ⓑ **allowlist 등재 8줄**(만료 2026-12-15) — caddy 바이너리의 Go toolchain·모듈 4건은 상류 재빌드가
+   있어야 사라진다. 만료가 오면 다시 판단해야 하고, 상류가 먼저 고치면 등재가 stale 로 붉어져 스스로
+   치워진다(실측).
 5. **인증서는 컨테이너 수명이다** — 볼륨을 붙이지 않았으므로 재생성 때마다 CA 가 바뀌고, 브라우저
    신뢰 저장소에 넣은 뿌리는 낡는다(잔여 0 의 대가, runbook §9.3).
 6. **read_only 루트·capability 축소를 적용하지 않았다** — 두 서비스 다 `no-new-privileges` 까지다.
@@ -87,9 +88,60 @@
 9. **덧쓰기 파일은 `!override` 를 아는 compose 를 요구한다**(v2.24 이후). 낮은 판에서는 파싱이 그 자리에서
    실패한다 — publish 가 조용히 남지는 않는다.
 
-## OPEN
+## 후속 — 날짜가 붙은 것
 
-- **`OPEN`(운영자 결정 필요)** — web·proxy 이미지의 위생·취약점 게이트 등재. 정책 파일 둘이
-  `config/quality/` 에 필요하고 그 자리는 이 계약의 in_scope 밖이다. 등재하면 CI `container` job 의
-  게이트가 넷에서 여섯으로 늘고(위생 2 · 스캔 2 추가), 베이스가 alpine·debian 둘로 갈려 allowlist 키의
-  kind 성분도 둘 늘어난다. 이 slice 는 등재하지 않고 제한 4 로 남겼다.
+- **2026-12-15**: web·proxy 의 allowlist 등재 8줄이 만료된다(D-7F-2, 운영자 승인). 그때의 선택은 셋
+  이고 **날짜를 옮기는 것은 결정이지 정비가 아니다**(6E-2b 의 문면): ⓐ 베이스를 다시 올려 해소
+  ⓑ 남아 있으면 사유·기한을 다시 판단 ⓒ 상류가 이미 고쳤으면 등재가 stale 로 붉어지므로 치운다.
+- **첫 CI 실행**: `container` job 의 소요가 `timeout-minutes: 30` 에 얼마나 다가가는지 본다. 이
+  장비의 3분 36초는 전부 더운 캐시의 수라 러너의 수를 대신하지 못한다(step 여섯이 늘었다).
+
+## D-7F-1 — web·proxy 이미지의 위생·취약점 게이트 (운영자 결정으로 in_scope 추가)
+
+계약 산출물 1 의 「6C 기준(고정 태그·non-root·**금지 패키지 0**)」을 OPEN 으로 넘기지 않고 이 slice 에서
+닫는다. 자리와 판정은 기존 두 이미지와 **같은 스크립트·같은 공통 술어**이고, 갈라지는 것은 「금지」뿐이다.
+
+| 자리 | 무엇 |
+|---|---|
+| `config/quality/image-hygiene-policy-web.properties` · `-proxy.properties` | 이미지별 위생 정책. 둘은 **같은 갈래**(`runtime.kind=caddy-site`)를 쓰고 값만 다르다 — 판정 형태가 같은 것을 두 벌로 만들지 않는다 |
+| `config/quality/vuln-policy.properties` | 취약점 정책은 **한 파일**이고 kind 별 키를 갖는다. kind 둘(`web`·`proxy`)과 그 하한·배포판·Java DB 선언을 더했다 |
+| `tools/image-hygiene-check.sh` | 새 갈래 `caddy-site` 추가. 「금지/필수 실행 파일」 두 축은 **공유 helper** 로 뽑아 `jvm-app` 분기도 그것을 쓴다(복사본 제거 — 문면·거동 보존) |
+| `.github/workflows/ci.yml` | 이미지 빌드 `S-21c`·`S-21d` · 위생 `S-22b2`·`S-22b3` · 취약점 `S-22e2`·`S-22e3`. 번호는 위치 단조로 넣었고 기존 번호를 재배치하지 않았다. 스캔 둘은 SBOM 업로드 **앞**이라 넷 다 올라간다 |
+
+**「금지」의 뜻**(이 갈래에서) — ⓐ **빌더 누출·베이스 교체**: `node,npm,npx,yarn,pnpm,gcc,cc,make` 가
+실행되거나 PATH 에 있으면 위반(실행 시도 + PATH 조회 **두 축** — 변이 ⑦ 의 사유 그대로) ⓑ **싣고 있는
+내용**: web 은 `/srv` 에 소스맵·소스·`.env`·설치본이 없어야 하고, proxy 는 `/etc/caddy` 에 키·인증서
+재료가 없어야 한다(계약의 「저장소에 키·인증서 없음」을 이미지 축에서 다시 잠근다). 두 축 모두
+**양성 대조가 먼저**다 — 파일 수 하한을 먼저 요구해 「목록이 비어 위반 0」을 막는다.
+
+**예외 하나와 근거** — `apk`(패키지 관리자)를 금지 목록에 **넣지 않았다**. ⓐ 런타임 사용자(uid 10001)가
+시스템 경로에 쓸 수 없고 compose 가 `no-new-privileges` 로 띄워 설치가 성립하지 않는다 ⓑ 그 도구를
+지우면 패키지 DB 까지 지워지는 것이 보통이고, 그러면 **취약점 스캐너가 OS 패키지를 열거하지 못한다** —
+그 상태의 「차단 0」은 깨끗하다는 뜻이 아니라 맞춰 보지 않았다는 뜻이다(`scan.os.family` 축이 판정
+불가로 끊는다). 위생을 위해 스캔을 눈멀게 하는 거래는 하지 않는다. 사유는 두 정책 파일에도 적혀 있다.
+
+### 실측 (2026-10-17, 베이스 상향 뒤)
+
+| 축 | 결과 |
+|---|---|
+| 위생 web | exit 0 — 금지-실행파일 8 · 필수 1 · `/srv` 파일수 3(하한 2) · 필수내용 1 · 금지내용 5 · `Config.User=bidvector` 실프로세스 uid [10001] · base-layer 접두 일치 · 크기 상한 이내 |
+| 위생 proxy | exit 0 — 같은 축 · `/etc/caddy` 파일수 1(하한 1) |
+| 취약점 web·proxy | exit 0 — 차단 후보 4 · 판정단위 4 · **이 kind 적용 4 · 미등재 0** |
+| 베이스 상향 효과 | `caddy:2.11.4` 차단 후보 **21** → `2.11.7` **4**(stdlib 3 · golang.org/x/net 1). 상향은 Dockerfile 둘과 정책 둘의 네 자리를 같은 묶음에서 올렸다 — 어긋나면 base-layer 축이 붉어진다 |
+| allowlist | 8줄(4건 × kind 둘), 만료 2026-12-15, 운영자 승인(D-7F-2). 사유는 「무엇을 하면 없어지는가」(상류 재빌드) |
+| `container` job 전건 | **23 step 전부 exit 0**(step 여섯이 늘었다). 이 장비 소요 3분 36초(더운 캐시) |
+
+### 음성 대조 다섯 — 게이트가 실제로 막는다
+
+| 바꿔치운 것 | 결과 |
+|---|---|
+| web 런타임에 빌더의 `node` 복사(금지 패키지 투입) | exit 1 — 「금지 실행 파일 'node' 이 PATH 에 있다」 + 크기 상한 초과 |
+| 위생 정책에서 `runtime.kind` 제거 | exit 2 — 「정책 키를 읽지 못했다」(fail-closed) |
+| `scan.kinds` 에서 `proxy` 제거 | exit 2 — 「kind 가 scan.kinds 에 없다」(fail-closed) |
+| allowlist 등재 하나 제거 | exit 1 — 「미등재 finding 1건」 |
+| allowlist 만료를 과거로 | exit 1 — 「등재가 만료됐다」 |
+| 어느 finding 과도 맞지 않는 가짜 등재 | exit 1 — 「stale — 치워야 한다」 |
+
+변이는 전부 사본에서 복원했고(`git checkout --` 미사용) 복원 뒤 잔여 0 을 확인했다(allowlist 는
+사본과 바이트 동일, 나머지는 `git diff --numstat` 빈 출력). **도구 부재도 조용한 통과가 아니다** —
+trivy 가 PATH 에 없는 상태의 스캔은 exit 2(판정 불가)였다.
