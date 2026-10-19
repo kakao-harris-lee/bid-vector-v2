@@ -207,6 +207,49 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
         access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
     }
 
+    /**
+     * verifier r1 F5 — **계정 간 격리**. 실패 계수·잠금 문장의 `WHERE id = ?` 를 무력화해(전 계정에
+     * 적용) 돌려도 access 전 test 가 초록이었다. 지금 코드는 맞지만 그 사실을 잠그는 test 가
+     * 없었다 — R-2 가 다수 계정을 전제하므로 이 축은 행이 둘이 되는 날 조용히 깨질 자리다.
+     */
+    @Test
+    fun `한 계정의 실패·잠금이 다른 계정에 닿지 않는다 — 계정 간 격리`() {
+        createAccount()
+        val other = LoginName("adapter-test-operator-other")
+        insertSecondAccount(other)
+
+        repeat(POLICY.maxFailedAttempts) {
+            access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
+        }
+
+        lockedUntilOf(LOGIN) shouldNotBe null
+        failedAttemptsOf(other) shouldBe 0
+        lockedUntilOf(other) shouldBe null
+        // 잠긴 쪽은 올바른 값에도 거부되고, 다른 계정은 그대로 들어온다.
+        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
+        access()
+            .inSignInScope { it.signIn(other, ClearPassphrase.wrap(SECOND)) }
+            .shouldBeInstanceOf<SignInOutcome.Granted>()
+    }
+
+    /**
+     * 같은 축의 반대 방향 — **성공의 초기화**도 자기 계정에만 닿는다(확정 문장의 `WHERE id = ?`).
+     */
+    @Test
+    fun `한 계정의 성공이 다른 계정의 실패 계수를 비우지 않는다`() {
+        createAccount()
+        val other = LoginName("adapter-test-operator-other")
+        insertSecondAccount(other)
+        repeat(2) {
+            access().inSignInScope { it.signIn(other, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
+        }
+
+        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
+            .shouldBeInstanceOf<SignInOutcome.Granted>()
+
+        failedAttemptsOf(other) shouldBe 2
+    }
+
     @Test
     fun `모르는 세션 해시는 조회되지 않는다 — 다른 계정의 세션도 자기 해시로만 산다`() {
         createAccount()
@@ -260,6 +303,24 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
 
     private fun revokedCount(): Int =
         queryStrings("SELECT COUNT(*) FROM browser_session WHERE revoked_at IS NOT NULL").single().toInt()
+
+    /**
+     * 둘째 계정은 **저장소 직접**으로 심는다 — 부트스트랩 use case 는 「이미 있으면 거부」라
+     * 둘째를 만들지 않는다(산출물 2). 쓰는 경로는 production 의 소유자 연결 저장소 그대로다.
+     */
+    private fun insertSecondAccount(login: LoginName) {
+        val boundary = TransactionBoundary(dataSource())
+        boundary.inTransaction {
+            JdbcAccountProvisioningStore(boundary)
+                .insert(login, hasher.hash(ClearPassphrase.wrap(SECOND)), clock.now())
+        }
+    }
+
+    private fun failedAttemptsOf(login: LoginName): Int =
+        queryStrings("SELECT failed_attempts FROM account WHERE login_name = '${login.value}'").single().toInt()
+
+    private fun lockedUntilOf(login: LoginName): Instant? =
+        timestampOrNull("SELECT locked_until FROM account WHERE login_name = '${login.value}'")
 
     private fun failedAttempts(): Int = queryStrings("SELECT failed_attempts FROM account").single().toInt()
 
