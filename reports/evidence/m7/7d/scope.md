@@ -110,6 +110,23 @@ verifier(opus) + code-reviewer(sonnet) 병렬. verifier 표적: 우회 ①~⑨ �
 - 변이 ④(만료)는 두 기제가 지켜 단독 변이가 초록이고, 둘을 함께 걷어야 RED 다. 심층 방어로 등재했다.
 - 남은 알려진 제한은 13 이다(checklist 5절). 후속 하나: `adapters/audit` KDoc 의 옛 필터 이름.
 
+**D-7D-3 (2026-10-19, 팀장 — 수정 r1 수령 · 동결).** 판정 대상은 마지막 산출물 `b8541a80` · evidence `2ddb5f21` 다. 입력은 code-reviewer
+r1(REQUEST_CHANGES: H-1 · M-1~M-3 · low 여섯)이다. 그 리포트 파일과 verifier r1 의 판정은 2026-10-17 세션 종료로 남지 않았다. 그래서 검토는
+verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 연다.
+- **닫힘을 수령한 것(레인 실측)**: H-1 `5aa11166`(원자 갱신 · 조건부 초기화 · 스냅숏에서 계수 필드 제거) · M-1 `0d309f42`(긴 문구 →
+  같은 경로의 401) · M-3 `34a398d2`(CSRF 스킴 선언 · 개방 경로 집합 등식) · M-2 `ed5b47bf`+`b8541a80`(로그인 문장별 트랜잭션 · 검증 중
+  커넥션 미보유). 변이 여덟은 모두 RED 였다.
+- **in_scope 추가를 수용한다**: `adapters` 의 `AccessConcurrencyTest`(신설) · `config/quality/architecture-policy.properties` 의
+  `app.adapter.member-call-pairs` 한 줄. 게이트 설정 데이터이므로 verifier 표적이다.
+- **알려진 제한**: 14~17 신설을 수용한다 — 긴 문구 거동 변화 · 검증 중 잠긴 계정의 올바른 로그인 거부 · 로그인 세 단계 사이 비원자(모두
+  「세션 없음」 쪽) · 아래 게이트 데이터 형식. 제한 7 의 정정도 수용한다.
+- **반입 조건(7F 본편)**: 프록시의 `/api/session` 유량 제한. M-2 로 풀 고갈 증폭은 사라졌지만 CPU 축(동시 로그인 N 건 = KDF N 회)은
+  남는다. 7F-local 계약 D-7F-3 에도 후보로 적었다.
+- **후속(이 slice 밖)**: `app.adapter.member-call-pairs` 는 목록 구분자와 서술자 구분자가 같은 쉼표다. 그래서 매개변수가 둘 이상인 어댑터
+  멤버를 적을 수 없고, 로그인 경계는 람다 하나를 받는 `inSignInScope` 로 두었다. 게이트 데이터 형식을 고치는 별도 slice 로 남긴다.
+- cr r1 의 low 여섯은 문면이 남지 않았다. 「새로고침 뒤 CSRF 재획득 경로 없음」은 레인이 `GET /api/session` 의 재유도로 이미 구현돼
+  있다고 보고했다. cr r2 가 전건 리뷰로 low 를 다시 낸다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
