@@ -145,6 +145,16 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
   적중 기록 — 레인은 acceptance 의 `:workflow:test` 를 `--rerun-tasks` 또는 캐시 없이 한 번 더 잰다).
 - 수정 뒤 verifier 표적 r2(F1~F4 · cr M-1·M-3 · 게이트 등식) + code-reviewer 표적. rollback ①~⑥ 은 새 마지막 산출물 커밋에서.
 
+**D-7D-5 (2026-10-19, 팀장 — 수정 r2 수령 · 동결).** 판정 대상은 마지막 산출물 `e3b0b4d3` · evidence `4b526a7a` 다.
+- **in_scope 추가를 수용한다**: 신규 `adapters` 의 `JdbcSignInCompletion.kt` · `app` test `AccountCommandRunnerTest.kt`. 기존 파일 편집
+  `StrategyEditController.kt` · `StrategyEditExecutor.kt` · `StrategyEditExecutorRaceTest.kt` 도 수용한다. 이 셋은 6A-2b 소관이지만 결함(F2,
+  세션 경로의 행위자 귀속)은 7D 가 만든 것이라 여기서 닫는다.
+- **알려진 제한 16 은 정정으로 바꾼다**: 「세션 없는 쪽으로만 치우친다」는 거짓이었다(F1 이 권한이 새는 반례를 실 DB 에서 재현). 18~24 신설을
+  수용한다. 그중 하나는 「OpenAPI 로더가 중복 YAML 키를 조용히 받아들인다」이다 — 문서에 선언을 **더하는** 변이는 앞으로 판정 근거로 쓰지
+  않는다(M27 이 그래서 초록이었고, 교체 변이 M27b 로 RED 를 확인했다).
+- **후속(이 slice 밖)**: `OwnTransactionConnectionSource` 의 명시 롤백(L-7) · 7E 가 `ensureCsrf()` 를 붙이는 자리(L-1).
+- 검토: verifier 표적 r2 + code-reviewer 표적 r3.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
