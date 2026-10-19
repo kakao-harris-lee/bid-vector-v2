@@ -162,6 +162,20 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   정책 로더 변경이 필요하다(이 slice 밖).
 - 검토: verifier 표적 r4 + code-reviewer 표적 r4. 둘 다 high·medium 0 이면 PR.
 
+**D-7F-9 (2026-10-20, 팀장 — 검토 r4 수령: verifier ready-for-review · code-reviewer APPROVE).** 재작업 **4/5** — 이번 배치 뒤에도 medium
+이 남으면 계속 돌리지 않고 운영자에게 PR 로 갈지 판단을 묻는다.
+- **닫는 것(작은 배치)**
+  - **vr R4-M1 = cr R4-1**: 이름 축의 파일 목록도 root 로 걷는다. 그래도 `find` 의 권한 오류가 나면 판정 불가(exit 2)다. 음성 대조: `/root/.cert/client.p12`
+    (0600 · 디렉터리 700) → 1.
+  - **vr R4-M2 + cr R4-2**: 참조 검사가 읽지 못하는 표기를 0 으로 통과시키는 자리 셋 — YAML 앵커·별칭(따옴표 밖의 `&`·`*`) · `jobs:` 아래
+    들여쓰기 2 의 줄 중 job 머리 패턴이 아닌 것(따옴표 친 job 키 등) · 동적 색인(`steps[` 뒤가 리터럴 문자열이 아닌 것). 셋 다 exit 2.
+  - **cr R4-3**: DANGLING 문면에 행 번호를 싣는다(수집 범위는 좁히지 않는다). **R4-4**: runbook §9.5 의 「세 번」을 실측 수로. **R4-5**: 내용 축
+    매처의 양성 대조(매 실행 알려진 표본 하나가 적중하는지). **R4-7**: 「읽지 못한 파일」 가지의 주석을 실제 역할대로. **R4-8**: step 항목 들여쓰기를
+    `steps:` 키 기준으로.
+- **알려진 제한으로 등재**: cr R4-6(내용 축의 파일당 프로세스 수 — 성능 기록). vr R4-M2(a)는 Actions 의 앵커 지원 여부를 실측하지 않았지만,
+  지원 여부와 무관하게 exit 2 로 막으므로 판정에 영향이 없다.
+- 배치 뒤 verifier 표적 r5 + code-reviewer 표적 r5.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
