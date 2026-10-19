@@ -27,13 +27,23 @@ export function LoginScreen() {
     event.preventDefault();
     setPending(true);
     setFailed(false);
-    const { data } = await apiClient.POST('/api/session', { body: { loginName, passphrase } });
-    setPending(false);
-    if (data === undefined) {
+    // 비-2xx 는 던지지 않지만 **네트워크 실패는 던진다**(code-review r2 L-2). 앞 판은 그 경우
+    // `setPending(false)` 에 닿지 못해 버튼이 영구히 비활성으로 굳고 실패 문면도 뜨지 않았다.
+    // 실패의 **모양은 하나**로 둔다 — 사유를 나누지 않는 규율은 서버와 같다.
+    let csrf: string | null;
+    try {
+      const { data } = await apiClient.POST('/api/session', { body: { loginName, passphrase } });
+      csrf = data?.csrf ?? null;
+    } catch {
+      csrf = null;
+    } finally {
+      setPending(false);
+    }
+    if (csrf === null) {
       setFailed(true);
       return;
     }
-    rememberCsrf(data.csrf);
+    rememberCsrf(csrf);
     // 입력값을 상태에 남기지 않는다 — 다음 렌더에 그 값이 DOM 에 머물 이유가 없다.
     setPassphrase('');
     await navigate('/');

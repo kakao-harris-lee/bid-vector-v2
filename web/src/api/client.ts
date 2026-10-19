@@ -21,7 +21,12 @@ import type { paths } from './generated/operator-api';
  *    그 전제가 깨지는 날 조용히 자격을 밖으로 내보낸다(그 변이에서 test 가 RED 다).
  *  · **CSRF**: 상태를 바꾸는 요청에만 헤더를 붙인다. 값은 **메모리에만** 둔다 — `localStorage`
  *    에 두면 XSS 가 그 값을 영구히 읽을 수 있고, 세션 쿠키가 `HttpOnly` 인 이득이 줄어든다.
- *    새로 뜬 화면은 `GET /api/session` 으로 값을 다시 받는다(서버가 세션 값에서 유도한다).
+ *    **새로고침하면 그 값이 사라진다** — 그리고 지금 web 에는 그것을 다시 받는 호출이 **없다**
+ *    (code-review r2 L-1). 서버 쪽은 서 있다: `GET /api/session` 이 쥔 쿠키에서 stamp 를 다시
+ *    유도해 돌려주고 GET 은 CSRF 면제다. 붙이는 것은 **첫 쓰기 화면을 들이는 slice(7E)** 의
+ *    일이다 — 지금 상태 변경을 하는 화면이 0 이라 깨지는 것이 없고, 그때가 되면 이 모듈에
+ *    `ensureCsrf()`(없으면 조회 → 기억) 하나를 두고 `onRequest` 가 그것을 기다리면 된다.
+ *    알려진 제한으로 등재돼 있다.
  */
 export const apiClient = createClient<paths>({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? '/',

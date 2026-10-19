@@ -44,6 +44,17 @@ function stubResponse(status: number, body: unknown): () => void {
   return () => apiClient.eject(middleware);
 }
 
+/** 네트워크 실패를 흉내 낸다 — 미들웨어가 던지면 `apiClient.POST` 가 그대로 던진다. */
+function stubThrow(): () => void {
+  const middleware = {
+    onRequest(): never {
+      throw new TypeError('Failed to fetch');
+    },
+  };
+  apiClient.use(middleware);
+  return () => apiClient.eject(middleware);
+}
+
 /** shipped 라우트 트리를 그대로 `/login` 에서 띄운다 — 화면 자리의 배선까지 함께 잰다. */
 async function renderLogin(container: HTMLElement): Promise<void> {
   const router = createMemoryRouter(appRoutes, { initialEntries: ['/login'] });
@@ -126,6 +137,21 @@ describe('로그인 화면 (7D)', () => {
 
     const failure = container.querySelector('[data-testid="login-failure"]');
     expect(failure?.textContent ?? '').toContain('로그인에 실패했습니다');
+    expect(hasCsrf()).toBe(false);
+  });
+
+  /**
+   * code-review r2 L-2 — 네트워크 실패에서 `apiClient.POST` 는 **던진다**. 앞 판은 그 경로에서
+   * `setPending(false)` 에 닿지 못해 버튼이 영구히 비활성으로 굳고 실패 문면도 뜨지 않았다.
+   */
+  it('네트워크 실패에서도 버튼이 풀리고 실패 문면 하나가 보인다', async () => {
+    ejectStub = stubThrow();
+    await renderLogin(container);
+
+    await submit(container, 'right-passphrase-value');
+
+    expect(container.querySelector('[data-testid="login-failure"]')).not.toBeNull();
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
     expect(hasCsrf()).toBe(false);
   });
 
