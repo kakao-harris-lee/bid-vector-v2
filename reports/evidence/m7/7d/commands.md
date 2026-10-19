@@ -243,7 +243,88 @@ Dockerfile·compose 를 건드리지 않았고**(산출물 경로는 Kotlin·Ope
 - 이 판정의 대상은 **산출물 경로**다(evidence 를 포함한 판정은 이 문서를 담는 커밋의 post-state
   라 담을 수 없다 — 정본은 verifier 와 PR 조치 코멘트, 이 문서 머리말).
 
+
+## 2026-10-19 (KST) verifier r1 · code-review r2 수정 라운드 (r3) — 표적 실측
+
+지적을 **지적별 커밋**으로 닫고 그때마다 표적 test 를 돌렸다. 호스트 점검 셋은 매 빌드 전 별도
+호출로 먼저 봤고, 모든 Gradle·npm 명령은 `flock` 안이다(호출마다 잡고 놓았다).
+
+- F1 + cr M-1 뒤: `:workflow:test --tests '*access*'` · `:adapters:test --tests 'bidvector.adapters.access.*'`
+  · `:app:test`(세션 인증·출하 조립) — exit 0 · 동시성 6 · 저장 12 · 권한 9 · use case 13
+- F2 뒤: `:app:test`(출하 브라우저 접근·전략 편집 E2E·실행기 경합·편집 endpoint·의존 게이트) — exit 0
+- F3 뒤: `:app:test --tests '*AccountCommandRunnerTest*'` — exit 0 · 6
+- F4 + L-8 뒤: `:app:test --tests '*OpenApiContractTest*'` — exit 0 · 13
+- cr M-3 뒤: 세션 인증 18 · 출하 10 · 계약 13 · HTTP 표면 7 — exit 0
+- F5 · F6 뒤: `:adapters:test --tests 'bidvector.adapters.access.*'` — exit 0 · 동시성 6 · 권한 10 · 저장 14
+- L-2 · L-1 뒤: web `lint` · `typecheck` · `test`(5 파일 28) — 전부 exit 0
+
+## 2026-10-19 (KST) acceptance — r3
+
+**한 번의 깨끗한 측정이다.** 앞선 시도에서 **같은 로그 파일에 두 acceptance 묶음이 겹쳐 써서**
+종료 코드가 섞였다(앞 묶음이 아직 돌고 있는데 새 묶음이 그 파일을 잘랐다 — NUL 바이트로 드러났다).
+그 측정은 **버리고** 두 묶음을 모두 정지시킨 뒤 로그 이름을 새로 잡아 다시 돌렸다.
+
+| 명령 | exit |
+| --- | --- |
+| `./gradlew --no-daemon check` | **0** (350 tasks) |
+| `./gradlew --no-daemon qualityBaseline` | **0** |
+| `./gradlew --no-daemon --no-build-cache :workflow:test --rerun-tasks` | **0** (vr r1 F10 — 17 tasks **전부 executed**, 캐시 적중 0 · access use case 13 + 부트스트랩 4 포함 57 class) |
+| `./tools/one-command-check.sh` (S-20) | **0** — Kotlin 전건 + Python 전건 + web 전건(Playwright 2 passed) |
+
+`container` job 은 이 라운드에서 다시 돌리지 않았다 — 마이그레이션 **파일은 무편집**이고
+Dockerfile·compose·빌드 파일도 그대로다. app 코드는 바뀌었으나 r2 에서 그 job 을 이미 한 번 더
+쟀고(verifier r1 §5), 남은 두 축(trivy)은 등재된 제한대로 PR CI 가 정본이다.
+
+**전건이 세 번 붉었고 그때마다 고쳤다** — 표적 실행만으로는 보이지 않는 축이라 사실로 적는다:
+ⓐ `ktlint` 둘(F1 이 남긴 빈 줄 · F5 test 의 체이닝) ⓑ `detekt` 셋(`MaxLineLength` 하나 ·
+`ReturnCount` 둘) ⓒ **`ConstantTimeComparisonStructureTest`** — `__Host-` 수정이 중복 판정에
+쓴 `it.name == name` 이 `Intrinsics.areEqual` 로 컴파일돼 이 패키지의 허용 목록에 걸렸다.
+목록을 넓히지 않고 이름 → 쿠키 **묶음** 조회로 바꿨다(비교 대상이 비밀은 아니지만 목록은 넓어진
+만큼 다음 사람에게 느슨해진다).
+
+## 2026-10-19 (KST) 변이 실측 (r3)
+
+같은 방법이다 — **바꿔치우기**, 사본 대조로 교체임을 계수, 복원은 사본에서, 기준선을 먼저 실측
+(여덟 표적 전부 exit 0 · 실패 0). 종료 코드 1 = RED.
+
+| id | 자리 | numstat | exit |
+| --- | --- | --- | --- |
+| M22 | F1 — 확정의 자격 조건 제거(항진식으로) | 1/1 | 1 |
+| M23 | cr M-1 — 확정의 첫 문장을 잠그지 않는 SELECT 로 | 2/3 | 1 |
+| M24 | F2 — 행위자를 인증 주체 대신 상수로 | 1/1 | 1 |
+| M25 | F3 — 빈 초기값 거부를 걷어냄 | 1/1 | 1 |
+| M26 | F4 — 읽기 operation 에 무인증 선언을 심음 | 1/0 | 1 |
+| M27 | L-8 — operation 에 자격 헤더 **없는** 요구를 덧붙임 | 3/0 | **0** — 아래 주 |
+| M27b | L-8 — operation 하나에서 자격 헤더 대안 **한 줄을 제거** | 0/1 | 1 |
+| M28 | cr M-3 — 쿠키 이름의 접두를 걷어냄 | 1/1 | 1 |
+| M29 | cr M-3 — 중복 쿠키 거부를 「마지막 값이 이긴다」로 | 1/2 | 1 |
+| M30 | F5 — 실패 계수 문장의 계정 한정 제거(전 계정 적용) | 1/1 | 1 |
+| M31 | F6 — 열 GRANT 를 적재 시각으로 넓힘 | 1/1 | 1 |
+| M32 | L-3 — 세션 부재 404 문구를 경로 404 문구로 | 1/1 | 1 |
+| M33 | L-2 — 로그인 화면의 네트워크 실패 처리를 걷어냄 | 3/9 | 1 |
+
+**M27 이 초록인 것은 게이트의 공백이 아니라 변이가 틀린 것이었다.** 그 변이는 이미 `security:`
+키가 있는 operation 에 **둘째 `security:` 키를 더했고**, SnakeYAML 이 중복 키에서 뒤 값을
+살리므로 원래 선언이 이겼다 — 문서가 바뀌지 않았다(더하기 변이가 초록이 되는 전형이다).
+**진짜 교체**로 다시 쟀다(M27b: 자격 헤더 대안 한 줄 제거) → RED. 이 라운드가 남긴 작은 관찰
+하나: 이 문서의 로더는 **중복 키를 조용히 받아들인다**(계약 밖이라 등재만 한다).
+
+- M28 이 test 여덟을 한꺼번에 붉히는 것은 쿠키 이름이 그 class 의 거의 모든 왕복에 들어가기
+  때문이다(이름이 갈리면 판독이 전부 실패한다).
+- 변이 뒤 복원은 `git status --porcelain -- <변이 파일 여덟>` **빈 출력**으로 확인했다.
+
+## 2026-10-19 (KST) 비밀값 스캔 (r3)
+
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0 = 통과)
+- 산출물 경로: 매치는 전부 정당하고 육안 확인했다 — HTML 표준 속성값 · OpenAPI 표준 보안 스킴
+  타입 · KDF 라이브러리의 긴-입력 전략 타입 이름 둘 · 기존 `DataSource` 속성 대입 한 줄 ·
+  test 고정 문구(전부 `…-test-fixture-…`). 값·자격·해시 문면은 0.
+
+## 2026-10-19 (KST) clean-tree 판정 (r3)
+
+- cmd: `git status --porcelain -- <산출물 in_scope 경로들을 개별 인자로>` · exit 0 · **빈 출력**
+
 ## 크기 게이트
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
-- 핵심 결과(r2 재측정): 산출물 **+5255 / −117 줄** 대 evidence **+692 줄** — evidence ≤ 산출물.
+- 핵심 결과(r3 재측정): 산출물 **+6059 / −144 줄** 대 evidence **+866 줄** — evidence ≤ 산출물.

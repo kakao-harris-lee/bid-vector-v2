@@ -55,6 +55,25 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 | 긴 비밀 문구의 **거부 모양** | `AccessStorePersistenceTest` 「한계를 넘는 긴…」·「긴 비밀 문구의 로그인은…」 · `ProductionBrowserAccessTest` 「한계를 넘는 긴…401…」 | 긴 입력 전략을 던지는 쪽(옛 기본값)으로(M17) | **RED**(M17) |
 | 로그인이 **커넥션을 쥐지 않는다** | `AccessConcurrencyTest` 「로그인의 느린 검증은 커넥션을 쥐지 않는다 — 풀이 하나여도…」 | 로그인 경계를 한 트랜잭션(옛 모양)으로(M18) | **RED**(M18) |
 | 재발급의 **폐기가 실 DB 에서 선다** | `AccessStorePersistenceTest` 「로그인 재발급은 앞 세션을 폐기한다 — 포트 한 호출이다」 | 폐기 문장의 계정 바인딩을 무관한 값으로(M19) | **RED**(M19) |
+
+**verifier r1 · code-review r2 수정 라운드가 더한 축**(`commands.md` r3 절이 정본)
+
+| 축 | test | 변이 | 변이 아래 |
+| --- | --- | --- | --- |
+| **교체 중 로그인**(F1) | `AccessConcurrencyTest` 「비밀 문구 교체 중이던 옛 값 로그인은…」 · `BrowserAccessWorkflowTest` 「검증 도중 자격이 바뀌면…」 | 확정의 자격 조건 제거(M22) | **RED**(M22) |
+| **동시 로그인의 세션 수**(cr M-1) | `AccessConcurrencyTest` 「동시 로그인 둘이어도 살아 있는 세션은 하나다」 | 확정의 첫 문장을 잠그지 않는 SELECT 로(M23) | **RED**(M23) |
+| **행위자 귀속**(F2) | `ProductionBrowserAccessTest` 「세션 경로의 편집도 감사 주체와 이벤트 행위자가 같다」 | 행위자를 상수로(M24) | **RED**(M24) |
+| **계정 명령의 빈 값**(F3) | `AccountCommandRunnerTest` 여섯 | 빈 초기값 거부 제거(M25) | **RED**(M25) |
+| **문서 등식의 범위**(F4 · L-8) | `OpenApiContractTest` 넷 | 읽기 op 에 무인증 선언(M26) / 자격 헤더 대안 한 줄 제거(M27b) | **RED**(M26 · M27b) |
+| **쿠키 그림자**(cr M-3) | `BrowserSessionAuthenticationTest` 「…접두…」·「같은 이름의 쿠키가 둘이면 거부한다」 | 접두 제거(M28) / 마지막-승으로(M29) | **RED**(M28 · M29) |
+| **계정 간 격리**(F5) | `AccessStorePersistenceTest` 「한 계정의 실패·잠금이…」·「한 계정의 성공이…」 | 계수 문장의 계정 한정 제거(M30) | **RED**(M30) |
+| **적재 시각 열 권한**(F6) | `AccessPrivilegeTest` 「두 표의 적재 시각을 바꿀 수 없다」 | 열 GRANT 를 넓힘(M31) | **RED**(M31) |
+| **404 문구**(L-3) | `BrowserSessionAuthenticationTest` 「기존 운영자 자격 헤더 경로는…」 | 문구를 경로 404 로(M32) | **RED**(M32) |
+| **로그인 화면의 네트워크 실패**(L-2) | `LoginScreen.test.tsx` 「네트워크 실패에서도 버튼이 풀리고…」 | try/catch/finally 제거(M33) | **RED**(M33) |
+
+**M27 의 초록은 변이가 틀린 것이었다** — 이미 `security:` 를 가진 operation 에 **둘째 키**를
+더해 SnakeYAML 이 원래 선언을 살렸다(문서가 바뀌지 않았다). 진짜 교체(M27b)는 RED 다.
+「더하기만 한 변이는 초록이 된다」를 이 라운드가 한 번 더 실측했다.
 | 문서의 **CSRF 선언**(상태 변경 전수) | `OpenApiContractTest` 「문서가 무인증으로 여는…집합 등식」·「그 밖의 상태 변경 operation 은…쿠키 단독 대안 0」 | operation 하나에서 CSRF 요구 제거(M20) / 로그인의 무인증 선언 제거(M21) | **RED**(M20 · M21) |
 
 ### 아홉을 **구조로** 닫은 자리 (문자열 술어가 아닌 층)
@@ -114,7 +133,8 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 | --- | --- | --- |
 | `NewBrowserSession` 생성자 | **세션 한 벌을 만든다** | **차단** — `internal`. 모듈 밖 0, 모듈 안 호출자 = `signIn` 하나 |
 | `AccountSnapshot` · `BrowserSessionSnapshot` 생성자 | 스냅숏을 짓는다 | 낮음 — 지어도 포트가 반환한 값이 아니면 판정에 들어가지 않는다(저장 층이 만드는 읽기 모델). r2: `AccountSnapshot` 에서 **실패 계수 필드를 뺐다**(읽어서 더하는 형태의 자리를 없앤다) |
-| `AccountStorePort.registerFailure` · `.clearFailures`(r2 서명 변경) | 실패 하나를 **올린다** / 잠겨 있지 않을 때만 비우고 비웠는지를 돌려준다 | 중간 — 포트를 쥔 주체만(app 은 `app.port-call.ports` 로 직접 호출이 막혀 있다). 서명이 「이 값으로 둔다」가 아니라 「올린다」라 절대값 쓰기가 표면에 없다 |
+| `AccountStorePort.registerFailure` | 실패 하나를 **올린다**(상한에 닿으면 잠근다) | 중간 — 포트를 쥔 주체만(app 은 `app.port-call.ports` 로 직접 호출이 막혀 있다). 서명이 「이 값으로 둔다」가 아니라 「올린다」라 절대값 쓰기가 표면에 없다 |
+| `SignInCompletionPort.complete`(r3 신설) | **성공한 로그인의 확정** — 계정 행 잠금 + 자격·잠금 조건 + 폐기 + 등록 | 높음 → **조건이 표면에 있다**: 호출자가 `verified` 를 주어야 하고 그것이 행의 현재 자격과 다르면 아무것도 쓰이지 않는다. 두 표에 걸친 단위라 어느 한쪽 저장 포트에도 두지 않았다 — 그 경계가 곧 F1 의 자리였다 |
 | `BrowserAccessWorkflow(...)` 생성자 | use case 를 조립한다 | 중간 — 포트 **구현**을 쥐어야 한다. app 은 포트를 쥐지 못한다(의존 게이트 + port-call 게이트) |
 | `.signIn` | 올바른 비밀 문구로만 세션 발급 | 설계된 표면 — 잠금·계수·재발급이 함께 돈다 |
 | `.authenticate` · `.describe` · `.signOut` | **이미 세션 값을 쥔** 호출자의 판정·조회·폐기 | 낮음 — 인자가 그 값이다(새 권한을 만들지 않는다) |
@@ -127,9 +147,10 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 
 | 표면 | 밖에 허락하는 것 | 등급·닫는 자리 |
 | --- | --- | --- |
-| `JdbcAccountStore(ConnectionSource)` | 계정 읽기·실패 계수 갱신 | 중간 — `ConnectionSource` 는 `sealed` 이고 구현이 `internal` 이라 모듈 밖에서 임의 연결을 공급할 수 없다 |
+| `JdbcAccountStore(ConnectionSource)` | 계정 읽기·실패 계수 **올리기** | 중간 — **정정**(verifier r1 F9): 앞 판은 「`sealed` + `internal` 이라 모듈 밖에서 임의 연결을 공급할 수 없다」고 적었는데 정확하지 않다. `TransactionBoundary(DataSource)` 가 **public** 이고 그 자신이 `ConnectionSource` 다. `sealed` 가 막는 것은 **새 구현**이지 기존 구현의 인스턴스화가 아니다 — 실제 방어는 `DataSource` 를 쥘 수 있는 주체(소유자 자격)와 DB GRANT 이고, 그것은 기존 저장소들과 같은 관례다 |
+| `JdbcSignInCompletion(ConnectionSource)` | **로그인 확정 한 트랜잭션**(자격 조건 · 계정 행 잠금 · 폐기 · 등록) | 높음 → 조건으로 닫는다 — 이 타입을 쥐어도 `NewBrowserSession` 을 만들 수 없고(`internal` 생성자), 만들어도 **검증 때 읽은 자격이 그대로일 때만** 행이 된다. 쓰는 열은 V20 의 GRANT 와 짝이다 |
 | `JdbcAccountProvisioningStore(...)` | **계정 INSERT · 해시 UPDATE** | 높음 — 같은 이유로 연결을 쥔 주체만. 앱 역할로는 두 문장이 42501 이다(실측) |
-| `JdbcBrowserSessionStore(...)` | 세션 행 쓰기·조회 | 중간 — `openReplacing()` 의 인자를 만들 수 없다(`internal` 생성자). r2: 폐기와 등록이 **한 메서드**라 「폐기 없이 여는」 호출이 표면에 없다 |
+| `JdbcBrowserSessionStore(...)` | 세션 **조회·갱신·폐기**(여는 문장은 없다) | 낮음 — r3 에서 **여는 서명이 사라졌다**(F1): 등록은 자격 조건·폐기와 한 트랜잭션이어야 해서 확정 어댑터가 진다. 이 타입만으로는 세션을 만들 수 없다 |
 | `BcryptPassphraseHasher(Int)` | 해시·검증 | 낮음 — 입력을 받아 값을 낸다(저장하지 않는다) |
 | `SecureBrowserSessionKeySource()` | 난수 세션 값 발급 | 낮음 — 값만 만든다(저장은 포트의 일). **주입 자리는 `internal` 주 생성자**라 난수원을 밖에서 못 꽂는다 |
 | `BrowserAccessTransaction` · `AccountProvisioningTransaction` (interface) | use case 를 트랜잭션 안에서 대여 | 설계된 경계 — 저장소·연결을 돌려주는 공개 경로가 없다 |
@@ -231,6 +252,7 @@ SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$NEXT" \
 | `app.surface.api.filters` | `OperatorCredentialFilter` → `RequestAuthenticationFilter` | 같은 자리의 **이름 변경**이다 — 등록되는 필터가 기본 거부 하나라는 사실은 그대로이고, 그 클래스가 더 이상 `Filter` 가 아니어서 이름이 바뀌었다 |
 | `app.adapter.member-call-pairs` | `+BrowserAccessExecutor\|BrowserAccessTransaction\|inTransaction\|Function1` | 편집 실행기의 같은 형태(경계의 유일 메서드). 서술자까지 적어 오버로드가 같은 자리로 접히지 않게 한다 |
 | `app.adapter.member-call-pairs`(r2) | `+BrowserAccessExecutor\|BrowserAccessTransaction\|inSignInScope\|Function1` | 로그인만 문장별 트랜잭션으로 도는 자리의 **유일 호출자**를 못박는다(fail-closed). 쌍 하나 외에는 아무도 그 느슨한 경계로 들어올 수 없다 |
+| `app.port-call.ports`(r3) | `+SignInCompletionPort` · **허용 쌍 0** | 여섯째 포트. F1 이 만든 자리라 **부분 호출을 막는 것이 요점**이다 — app 이 그 단위의 일부만 부를 수 있으면 트랜잭션 경계가 다시 열린다. 넓히는 변경이 아니라 좁히는 변경이다 |
 | `app.port-call.ports` | `+접근 포트 다섯` · **허용 쌍 0** | **넓히는 변경이 아니라 좁히는 변경이다** — app production 의 어느 클래스도 이 포트의 메서드를 직접 부르지 못하게 못박는다 |
 | 자격증명 참조자 키(`…operator-credential-referencers`) | 이름 변경 하나 | 위 필터 이름 변경의 같은 축(집합 크기 불변) |
 | 비밀값 축의 새 키 쌍(`…passphrase-types`·`…passphrase-referencers`) + `collection.depth.passphrase` | **새 키 셋** | 원문 비밀 문구 타입의 보유자 집합을 등식으로 잠근다(자격증명 축과 **키를 나눠** 한쪽 사유가 다른 쪽을 열지 않게) |
@@ -252,8 +274,13 @@ SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$NEXT" \
       이 문서에 축어로 적지 않는다
 - [x] 알려진 제한과 rollback — 아래 5절과 `rollback.md`(r2 에서 **실측 HEAD 를 다시 냈다**)
 - [x] code-review r1 의 blocker/medium 넷(H-1·M-1·M-2·M-3) — 지적별 커밋 + 지적별 변이 실측
-      (`commands.md` r2 절). low 여섯은 리포트가 유실돼 축어를 받지 못했다 — 받으면 그 자리에서
-      처리하거나 「알려진 제한」으로 등재한다
+      (`commands.md` r2 절). low 여섯은 리포트가 유실돼 축어를 받지 못했다 — code-reviewer r2 가
+      전건으로 다시 냈고 그 결과를 아래 줄이 받는다
+- [x] verifier r1(not-ready: F1 high · F2~F4 medium · F5~F10 low) · code-review r2(APPROVE:
+      M-1~M-3 · L-1~L-9) — 계약 D-7D-4 의 「수정 r2 에서 닫는 것」 전부를 지적별 커밋으로 닫고
+      지적별 변이로 쟀다(`commands.md` r3 절). 등재로 간 것은 제한 18~24 다
+- [x] vr F10 — acceptance 의 `:workflow:test` 를 **캐시 없이** 한 번 더 쟀다
+      (`--no-build-cache --rerun-tasks`, 17 tasks 전부 executed · 캐시 적중 0)
 
 ## 5. 알려진 제한
 
@@ -320,14 +347,53 @@ SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$NEXT" \
     다른 요청이 상한을 채우면, 늦게 끝난 그 성공은 세션을 받지 못한다. 반대로 하면 늦은 성공
     하나가 방금 걸린 잠금을 푸는 길이 되므로 이쪽을 골랐다 — 사용자에게는 「잠긴 동안의 시도」와
     같은 401 이고, 잠금이 풀린 뒤 다시 로그인하면 된다.
-16. **로그인의 세 단계는 서로 원자가 아니다**(M-2 의 대가). 조회·갱신·발급이 각자 트랜잭션이라,
-    중간에 프로세스가 죽으면 ⓐ 실패 계수만 오르거나 ⓑ 계수만 비워지고 세션이 없거나 ⓒ 앞
-    세션만 폐기된 상태가 남을 수 있다. 셋 다 **다시 로그인하면 해소**되고 권한이 새지 않는다
-    (세션이 없는 쪽으로만 치우친다). 반대로 **한 커밋이어야 안전한 쌍**(폐기+등록 · 계수+잠금)은
-    포트 한 호출 안에 묶여 있어 이 느슨함의 영향을 받지 않는다.
+16. **로그인의 단계는 서로 원자가 아니다**(M-2 의 대가) — **r3 정정.** 앞 판은 「세션이 없는
+    쪽으로만 치우친다」고 적었고 **그 문장은 거짓이었다**(verifier r1 F1이 반례를 실 DB 에서
+    재현했다): 자격 확인과 세션 등록이 다른 트랜잭션이면, 비밀 문구 교체와 겹친 옛 값 로그인이
+    교체 **뒤에** 세션을 받고 그 세션이 교체의 「전부 폐기」를 지나 **유일하게 살아남았다**.
+    치우침이 아니라 **권한이 새는** 방향이었다. 지금은 확정이 한 트랜잭션이고 그 첫 문장이
+    자격 조건과 행 잠금을 함께 지므로 그 창이 없다. 남는 느슨함은 **조회·검증·확정 사이**뿐이고,
+    거기서 프로세스가 죽으면 실패 계수만 오르거나 아무 일도 없다 — 둘 다 다시 로그인하면
+    해소되고 세션은 생기지 않는다(**이쪽은 실제로 「세션 없음」 방향이다**).
 17. **게이트 설정이 매개변수 둘 이상인 어댑터 멤버를 표현하지 못한다.**
     `app.adapter.member-call-pairs` 는 **목록 구분자와 서술자 구분자가 같은 쉼표**라
     `signIn(LoginName, ClearPassphrase)` 같은 쌍을 적을 수 없다(적으면 항목 둘로 쪼개진다).
     그래서 로그인 경계의 서명을 람다 하나 받는 형태로 뒀다 — 거동에는 영향이 없지만, 「서명을
     고정해 오용을 막는다」는 선택지가 이 게이트의 데이터 형식 때문에 닫혀 있다. 구분자를
     가르는 것은 이 slice 의 in_scope 밖이라 **후속 제안**으로 남긴다.
+
+### verifier r1 · code-review r2 가 남긴 제한 일곱 (r3 등재)
+
+18. **감사가 계정을 가리키지 않는 자리가 있다**(vr F8). 감사 행은 subject·method·path·status·
+    duration·correlation 뿐이고 본문·쿠키·헤더는 남지 않는다(의도한 설계). 다만 **로그인 성공
+    행의 subject 는 `unauthenticated`** 다 — 그 시점에 주체가 없기 때문인데, 결과적으로 「어느
+    계정이 언제 로그인했는지」가 감사에 남지 않는다. 잠금 발생과 비밀 문구 교체도 감사 행이
+    없다(교체는 명령 로그 한 줄뿐). 계정이 하나인 지금은 해가 작다 — 감사 확장은 후속이다.
+19. **만료된 세션은 로그아웃할 수 없다**(cr L-4). `DELETE /api/session` 은 허용 목록 밖이라
+    필터가 먼저 401 을 내고 컨트롤러가 돌지 않는다 → 쿠키 삭제 헤더도 나가지 않아 죽은 쿠키가
+    `Max-Age` 까지 브라우저에 남는다. 그 값으로는 아무것도 못 하므로 **보안 피해는 없다**.
+    서버 쪽을 고치려면 허용 목록을 둘로 늘려야 해서 하지 않는다 — 화면(7E)이 401 을 받으면
+    로그인으로 보내고 기억한 CSRF 를 비우는 것이 실질 해소다.
+20. **쿠키를 든 요청은 커넥션을 두 번 얻는다**(cr L-5). 필터의 인증 트랜잭션(조회 + 유휴 시한
+    밀기)과 컨트롤러의 트랜잭션이 각각 열린다. 제한 3 은 **세션 행 갱신**만 적었고 이 축은
+    적지 않았다. 단일 운영자 부하에서는 비용이 없지만 다수 사용자 전환 때 밀기 주기와 함께 본다.
+    자격 헤더 경로가 먼저라 기계 호출은 이 비용을 지지 않는다.
+21. **원문 비밀 문구가 객체 수명 내내 힙에 남는다**(cr L-6). 해시기는 **사본**만 지우고
+    `ClearPassphrase` 자신을 지우는 경로가 없다. 명령 쪽은 설정 값이 `String` 이라 컨텍스트
+    수명 내내 살고 Spring `Environment` 에도 남는다. 노출 경로는 닫혀 있다(`toString()` 가림 ·
+    `data class` 회피 · 관리 포트에 actuator 없음) — JSON 본문에서 온 `String` 은 어차피 지울
+    수 없으므로 실익이 작다.
+22. **`OwnTransactionConnectionSource` 에 예외 시 명시 롤백이 없다**(cr L-7, 기존 코드).
+    블록이 던지면 `use {}` 가 `close()` 만 하고 열린 트랜잭션의 처분이 풀·드라이버에 달린다
+    (HikariCP 는 반납 시, pgjdbc 는 close 에서 롤백하므로 **오늘은 안전**하다). 로그인 확정이
+    **한 블록에 세 문장**을 넣는 새 소비자라 그 암묵 의존이 전보다 비싸다 — 이 slice 밖의
+    파일이라 등재하고, `TransactionBoundary` 와 같은 `committed` 플래그 형태로 맞추는 것은 후속.
+23. **잠금 해제 뒤 첫 주기의 실효 시도가 상한보다 적을 수 있다**(cr L-9). 잠글 때 계수를 0 으로
+    비우는데 실패 기록 문장 자체에는 잠금 조건이 없어서, 잠금 직전에 시작해 **늦게 끝난 실패**가
+    그 0 을 1 로 올린다. 그러면 해제 뒤 남는 시도가 5 가 아니라 4 다. 거동은 **더 엄격한**
+    방향이라 고치지 않는다(조건을 더하면 문장이 한 겹 복잡해진다). 제한 15(늦은 **성공**)는
+    이 축을 덮지 않는다.
+24. **문서 로더가 중복 키를 조용히 받아들인다**(r3 변이 실측의 부산물). 계약 YAML 에 같은 키가
+    둘 있으면 SnakeYAML 이 뒤 값을 살리고 경고가 없다. 이 slice 의 문서에는 중복이 없고 계약
+    밖이라 고치지 않는다 — 다만 「문서에 선언을 **더하는**」 종류의 변이가 그 때문에 조용히
+    초록이 될 수 있다는 사실을 적는다(M27 이 그랬다).
