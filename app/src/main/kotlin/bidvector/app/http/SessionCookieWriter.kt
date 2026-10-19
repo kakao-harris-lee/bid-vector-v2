@@ -1,6 +1,7 @@
 package bidvector.app.http
 
 import bidvector.workflow.access.BrowserSessionKey
+import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseCookie
 import java.time.Duration
@@ -62,7 +63,11 @@ class SessionCookieWriter(
      * `__Host-` 접두가 1차 방어이고 이것이 2차다(접두를 쓸 수 없는 로컬 http 에서도 선다).
      */
     fun read(request: HttpServletRequest): BrowserSessionKey? {
-        val candidates = request.cookies?.filter { it.name == name }.orEmpty()
+        // 이름 비교를 `==` 로 쓰지 않는다 — 그 자리는 `Intrinsics.areEqual` 로 컴파일되고
+        // `ConstantTimeComparisonStructureTest` 가 이 패키지에서 그것을 허용 목록으로 가둔다.
+        // 비교 대상이 비밀이 아니라 **쿠키 이름**이지만, 목록을 넓히는 대신 이름 → 쿠키 **묶음**
+        // 조회로 같은 일을 한다(그 조회가 중복 판정에 필요한 묶음을 그대로 준다).
+        val candidates = request.cookies?.groupBy(Cookie::getName)?.get(name).orEmpty()
         if (candidates.size != 1) return null
         return candidates
             .single()
