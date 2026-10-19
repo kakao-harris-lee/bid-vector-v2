@@ -332,23 +332,34 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * **다른 operation 의 거동은 바뀌지 않았다 — 측정으로 남긴다.** 매핑표에 더한 갈래는
-     * 경로를 가리지 않지만, 디코딩은 **질의 매개변수를 읽을 때** 일어난다. 오늘 다른
-     * operation 은 질의 매개변수를 하나도 읽지 않으므로(경로 변수·본문뿐) 잘못된 인코딩이
-     * 붙어도 예외 자체가 나지 않는다 — 200 그대로다. 그래서 그 operation 들의 계약 문면에
-     * 400 을 더할 이유가 없다(자기 문면을 바꾸지 않는다는 계약도 지킨다).
+     * **다른 경로의 거동은 바뀌지 않았다 — 대표 셋으로 측정한다**(verifier r3 R3-L-4). 매핑표에
+     * 더한 갈래는 경로를 가리지 않지만, 디코딩은 **질의 매개변수를 읽을 때** 일어난다. 앞 판은
+     * 인증된 다른 operation 한 경로만 쟀다.
+     *
+     * 넓힌 대표는 셋이다.
+     *  - **개방 경로**(자격증명 필터 **앞**) — 필터는 헤더만 보고 매개변수를 읽지 않으므로 두
+     *    부류 어느 꼴이 붙어도 **401** 이다. 디코딩 갈래가 인증 판정을 앞질러 400 을 내지
+     *    않는다(그랬다면 자격증명 없이도 질의 형식을 탐침할 수 있다는 뜻이다).
+     *  - **인증된 다른 operation** — 질의를 하나도 읽지 않으므로(경로 변수·본문뿐) 예외 자체가
+     *    나지 않아 **200** 그대로다. 그래서 그 operation 들의 계약 문면에 400 을 더할 이유가
+     *    없다(자기 문면을 바꾸지 않는다는 계약도 지킨다).
+     *  - **없는 경로** — 전역 갈래가 **404** 를 400 으로 바꾸지 않는다.
      */
     @Test
-    fun `다른 경로는 질의를 읽지 않아 거동이 그대로다 — 잘못된 인코딩이 붙어도 200`() {
-        val response =
-            restTemplate.exchange(
-                URI.create(url("/api/strategy?probe=%FF")),
-                HttpMethod.GET,
-                HttpEntity<Void>(authorizedHeaders()),
-                Map::class.java,
-            ) as ResponseEntity<Map<String, Any?>>
+    fun `다른 경로는 질의를 읽지 않아 거동이 그대로다 — 개방 경로·인증 경로·없는 경로`() {
+        val malformed = listOf("%FF", "%G1")
 
-        response.statusCode.value() shouldBe 200
+        malformed.forEach { probe ->
+            withClue("개방 경로 probe=$probe") {
+                rawGet(port, "/api/notices?q=$probe", credential = null).status shouldBe 401
+                rawGet(port, "/api/strategy?probe=$probe", credential = null).status shouldBe 401
+            }
+            withClue("인증 경로 probe=$probe") {
+                rawGet(port, "/api/strategy?probe=$probe", TEST_CREDENTIAL).status shouldBe 200
+                rawGet(port, "/api/no-such-operation?probe=$probe", TEST_CREDENTIAL).status shouldBe 404
+            }
+        }
+        notices.lastCriteria shouldBe null
     }
 
     @Test
