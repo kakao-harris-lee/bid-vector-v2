@@ -64,7 +64,11 @@ class SessionCookieWriter(
     fun read(request: HttpServletRequest): BrowserSessionKey? {
         val candidates = request.cookies?.filter { it.name == name }.orEmpty()
         if (candidates.size != 1) return null
-        return candidates.single().value?.takeIf { it.isNotBlank() }?.let { BrowserSessionKey(it) }
+        return candidates
+            .single()
+            .value
+            ?.takeIf { it.isNotBlank() }
+            ?.let { BrowserSessionKey(it) }
     }
 
     private fun build(

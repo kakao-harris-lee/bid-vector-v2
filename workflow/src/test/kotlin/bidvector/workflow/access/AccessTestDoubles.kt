@@ -81,11 +81,12 @@ class InMemoryAccountStore(
         verified: PassphraseHash,
         now: Instant,
     ): Boolean {
-        if (snapshot.hash.encoded != verified.encoded) return false
-        if (snapshot.lockedUntil?.isAfter(now) == true) return false
-        attempts = 0
-        snapshot = AccountSnapshot(snapshot.id, snapshot.hash, null)
-        return true
+        val claimable = snapshot.hash.encoded == verified.encoded && snapshot.lockedUntil?.isAfter(now) != true
+        if (claimable) {
+            attempts = 0
+            snapshot = AccountSnapshot(snapshot.id, snapshot.hash, null)
+        }
+        return claimable
     }
 
     /** 운영자 명령의 교체를 흉내 낸다 — 자격 조건이 실제로 갈리는 상황을 use case test 가 만든다. */

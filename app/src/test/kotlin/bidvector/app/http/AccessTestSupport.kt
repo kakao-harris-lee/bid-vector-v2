@@ -116,11 +116,12 @@ class MutableAccountStore(
         verified: PassphraseHash,
         now: Instant,
     ): Boolean {
-        if (hash.encoded != verified.encoded) return false
-        if (snapshot.lockedUntil?.isAfter(now) == true) return false
-        attempts = 0
-        snapshot = AccountSnapshot(snapshot.id, hash, null)
-        return true
+        val claimable = hash.encoded == verified.encoded && snapshot.lockedUntil?.isAfter(now) != true
+        if (claimable) {
+            attempts = 0
+            snapshot = AccountSnapshot(snapshot.id, hash, null)
+        }
+        return claimable
     }
 
     fun reset() {

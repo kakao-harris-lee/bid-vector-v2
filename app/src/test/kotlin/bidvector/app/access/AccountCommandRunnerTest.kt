@@ -46,8 +46,7 @@ private class StubProvisioningStore : AccountProvisioningPort {
         login: LoginName,
         hash: PassphraseHash,
         at: Instant,
-    ): AccountId =
-        AccountId(rows.size + 1L).also { rows[login.value] = it to hash }
+    ): AccountId = AccountId(rows.size + 1L).also { rows[login.value] = it to hash }
 
     override fun replaceHash(
         login: LoginName,

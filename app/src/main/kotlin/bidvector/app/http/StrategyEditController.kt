@@ -61,8 +61,13 @@ class StrategyEditController(
         val payload = body.requireObject()
         val field = payload.field()
         return executor
-            .provideValue(actorOf(request), sessionIdOf(sessionId), payload.commandId(), field, payload.editValue(field))
-            .toResponse(request)
+            .provideValue(
+                actorOf(request),
+                sessionIdOf(sessionId),
+                payload.commandId(),
+                field,
+                payload.editValue(field),
+            ).toResponse(request)
     }
 
     @PostMapping("/{sessionId}/confirm")
