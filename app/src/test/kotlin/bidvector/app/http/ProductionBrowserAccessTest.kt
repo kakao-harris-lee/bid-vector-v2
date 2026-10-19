@@ -39,8 +39,9 @@ private const val LONG_PASSPHRASE_BYTES = 100
  * 둘을 합쳐야 우회 ⑧(평문 저장 0)·감사 주체 규약·무회귀가 실측된다.
  *
  * 계정 행은 **admin 연결로 직접** 심는다 — 운영자 명령(`AccountCommandRunner`)은 끝나면
- * 프로세스를 종료하므로 test 가 그것을 부팅할 수 없다(그 명령 자체는
- * `adapters` 의 `AccountProvisioningIntegrationTest` 가 실 DB 로 잰다). 해시는 **실물**
+ * 프로세스를 종료하므로 test 가 그것을 부팅할 수 없다. 그 명령의 축은 둘로 나뉘어 있다:
+ * 저장 경로(생성·교체·세션 폐기)는 `adapters` 의 `AccountStorePersistenceTest` 가 실 DB 로,
+ * 러너 자신(로그 줄·종료 코드·빈 값 거부)은 `AccountCommandRunnerTest` 가 잰다. 해시는 **실물**
  * [BcryptPassphraseHasher] 가 만든다.
  */
 class ProductionBrowserAccessTest {

@@ -100,6 +100,14 @@ open class AccountCommandWiring {
  * 바인딩이 기동을 실패시킨다(`OperatorCredentialProperties`·`PersistenceProperties` 와 같은
  * 규율: 지어내지 않고 fail-fast).
  *
+ * **빈 값도 누락과 같다**(verifier r1 F3). 앞 판은 「누락이면 실패한다」고만 적었고 빈 문자열은
+ * **그대로 바인딩됐다** — `--…initial-value="$INITIAL"` 에서 변수를 빠뜨린 실행이 **빈 비밀
+ * 문구로 계정을 만들고** `result=created`·exit 0 을 냈다. HTTP 는 빈 값을 400 으로 막으므로
+ * 우회가 아니라 **잠금**(운영자가 다시는 로그인하지 못한다)이고, 계정은 이미 있으므로 다시
+ * 만들 수도 없다. 아래 두 `require` 가 그 실행을 **기동 실패**(비-0 종료)로 떨어뜨린다.
+ *
+ * 실패 문면에 **값을 싣지 않는다** — 길이도 적지 않는다(짧은 값의 길이는 그 자체가 신호다).
+ *
  * **`data class` 가 아니다** — 합성 `toString()` 이 [initialValue] 원문을 그대로 낸다
  * (바인딩 실패 분석기·actuator 환경 노출이 그 문면을 로그로 낸다, D-6A2a-13 ①).
  * 이름에 스캔 어휘를 쓰지 않는다(D-6A1-19 가 모든 설정 키로 일반화) — `initial-value`.
@@ -109,4 +117,9 @@ class AccountCommandProperties(
     val mode: AccountCommandMode,
     val login: String,
     val initialValue: String,
-)
+) {
+    init {
+        require(login.isNotBlank()) { "bidvector.account.login 이 비어 있다" }
+        require(initialValue.isNotBlank()) { "bidvector.account.initial-value 가 비어 있다" }
+    }
+}
