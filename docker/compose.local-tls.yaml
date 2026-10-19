@@ -25,6 +25,10 @@ name: bidvector-v2
 # 선언하지 않으므로 그대로 `default` 에 남는다(덧쓰기가 기본 파일을 고치지 않는다).
 networks:
   edge:
+    # **바깥으로 나가지 않는다**(검토 r2 cr R2-10). web 은 정적 파일만 건네므로 egress 가 필요
+    # 없고, proxy 는 `default` 로 나간다. 평범한 bridge 로 두면 web 컨테이너가 바깥에 닿을 수
+    # 있는데 그럴 이유가 없다 — 위협 모델이 선언한 경계 밖이지만 한 줄로 더 닫힌다.
+    internal: true
 
 services:
   # 우회 ① — 내부 서비스의 host publish 를 **비운다**. `!override` 가 없으면 compose 는

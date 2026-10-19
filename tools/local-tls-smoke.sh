@@ -282,6 +282,11 @@ net_verdict="$(printf '%s' "$ports_json" | jq -r '
   ] | join(" · ")')" \
   || fail "해석된 설정에서 망 집합을 읽지 못했다(망 분리를 재지 못한다)"
 [ -z "$net_verdict" ] || fail "망 분리가 깨졌다 — $net_verdict"
+# `edge` 는 **바깥으로 나가지 않는다**(cr R2-10). 선언만 두고 재지 않으면 지우는 편집이 조용히
+# 지나간다 — r1 의 `no-new-privileges` 와 같은 자리다.
+edge_internal="$(printf '%s' "$ports_json" | jq -r '(.networks.edge.internal // false) | tostring')" \
+  || fail "해석된 설정에서 edge 망의 internal 을 읽지 못했다"
+[ "$edge_internal" = "true" ] || fail "edge 망이 internal 이 아니다: $edge_internal — web 이 바깥으로 나갈 수 있다"
 echo "  망: web=[$(printf '%s' "$ports_json" | jq -r '(.services.web.networks // {}) | keys | join(",")')] app=[$(printf '%s' "$ports_json" | jq -r '(.services.app.networks // {}) | keys | join(",")')] proxy=[$(printf '%s' "$ports_json" | jq -r '(.services.proxy.networks // {}) | keys | join(",")')]"
 
 # ⓑ **설정**: web 의 적응된 설정에 상류(`dial`)가 0 이다 — (A3) 과 같은 축을 한 칸 옆 파일에도
