@@ -12,8 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
-import org.yaml.snakeyaml.constructor.DuplicateKeyException
 import org.springframework.http.ResponseEntity
+import org.yaml.snakeyaml.constructor.DuplicateKeyException
 
 /**
  * 우회 (6) 폐쇄 — D-6A1-8(수작성 단일 출처) · D-6A1-20(대조 깊이). 경로 이름만 보지 않고
