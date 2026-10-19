@@ -28,6 +28,12 @@ private const val SECOND = "adapter-test-fixture-passphrase-two"
 /** 실 KDF 를 쓰되 느리지 않게 — 정책 최소 비용(값의 축은 정책 test 가 잰다). */
 private const val TEST_HASH_COST = 10
 
+/**
+ * bcrypt 블록 입력의 한계(72바이트)를 **넘는** 길이. 값을 직접 적는 대신 한계보다 길다는
+ * 사실만 쓰면 되므로 넉넉히 잡는다 — 이 수가 재는 것은 「한계 위에서 무슨 일이 일어나는가」다.
+ */
+private const val LONG_PASSPHRASE_BYTES = 100
+
 private val POLICY =
     BrowserAccessPolicyData(
         idleWindow = Duration.ofMinutes(30),
@@ -70,6 +76,28 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
         hasher.verify(ClearPassphrase.wrap(FIRST), first) shouldBe true
         hasher.verify(ClearPassphrase.wrap(FIRST), second) shouldBe true
         hasher.verify(ClearPassphrase.wrap(SECOND), first) shouldBe false
+    }
+
+    @Test
+    fun `한계를 넘는 긴 비밀 문구도 해시·검증이 왕복한다 — 거부도 절단도 아니다`() {
+        val long = "x".repeat(LONG_PASSPHRASE_BYTES)
+        val longWithDifferentTail = long.dropLast(1) + "y"
+
+        val stored = hasher.hash(ClearPassphrase.wrap(long))
+
+        hasher.verify(ClearPassphrase.wrap(long), stored) shouldBe true
+        // 절단 전략이었다면 앞 72바이트가 같은 이 값이 통과한다 — 통과하면 유효 강도가 잘린 것이다.
+        hasher.verify(ClearPassphrase.wrap(longWithDifferentTail), stored) shouldBe false
+        hasher.verify(ClearPassphrase.wrap(FIRST), stored) shouldBe false
+    }
+
+    @Test
+    fun `긴 비밀 문구의 로그인은 예외가 아니라 보통의 거부다`() {
+        createAccount()
+
+        val long = ClearPassphrase.wrap("y".repeat(LONG_PASSPHRASE_BYTES))
+
+        access().inTransaction { it.signIn(LOGIN, long) } shouldBe SignInOutcome.Refused
     }
 
     @Test

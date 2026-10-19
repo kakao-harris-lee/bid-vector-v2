@@ -28,6 +28,9 @@ private const val SESSION_PATH = "/api/session"
 private const val LOGIN_NAME = "production-assembly-operator"
 private const val PASSPHRASE = "production-assembly-fixture-passphrase"
 
+/** bcrypt 블록 입력의 한계(72바이트)를 **넘는** 길이 — 그 위에서 거부의 모양이 같은지 잰다. */
+private const val LONG_PASSPHRASE_BYTES = 100
+
 /**
  * M7/7D — **출하 조립**에서 브라우저 인증을 잰다(실 DB · 실 KDF · 실 필터 등록).
  *
@@ -181,6 +184,19 @@ class ProductionBrowserAccessTest {
         val refused = exchange(SESSION_PATH, HttpMethod.POST, jsonHeaders(), loginBody("wrong-passphrase-value"))
 
         refused.statusCode.value() shouldBe 401
+        failedAttempts() shouldBe 1
+    }
+
+    @Test
+    fun `한계를 넘는 긴 비밀 문구도 401 이다 — 500 이 아니고 실패 계수도 보통처럼 오른다`() {
+        val long = "z".repeat(LONG_PASSPHRASE_BYTES)
+
+        val refused = exchange(SESSION_PATH, HttpMethod.POST, jsonHeaders(), loginBody(long))
+
+        // 앞 판은 여기서 500 이었다(KDF 라이브러리의 strict 전략이 던졌다) — 상태 코드가 갈리면
+        // 그 자체가 「이 입력은 다르게 처리된다」는 신호이고, 거부의 모양을 하나로 둔 규율이 깨진다.
+        refused.statusCode.value() shouldBe 401
+        refused.body?.get("code") shouldBe "UNAUTHENTICATED"
         failedAttempts() shouldBe 1
     }
 
