@@ -324,7 +324,58 @@ Dockerfile·compose·빌드 파일도 그대로다. app 코드는 바뀌었으�
 
 - cmd: `git status --porcelain -- <산출물 in_scope 경로들을 개별 인자로>` · exit 0 · **빈 출력**
 
+
+## 2026-10-20 (KST) 마지막 배치 (r4) — 표적 실측
+
+계약 D-7D-6 의 여섯을 지적별 커밋으로 닫았다. 호스트 점검 셋은 매 빌드 전 별도 호출로 먼저
+봤고(6G 창 00:30~03:00 을 지나 03:09 부터 시작했다), 모든 Gradle·npm 명령은 `flock` 안이다.
+
+- 중복 키 거부 뒤: `:app:test --tests '*OpenApi*ContractTest*' --tests '*ProductionHttpSurfaceTest*'`
+  — exit 0 · 계약 15 · dry-run 9 · 편집 세션 4 · HTTP 표면 7(로더를 쓰는 네 class 전부)
+- 대기 상한·결정적 test 뒤: `:workflow:test` + `:adapters:test`(access 전수) + `:app:test`(세션
+  인증·출하 조립) — exit 0 · 동시성 7 · 저장 15 · 권한 10 · 세션 18 · 출하 10 · use case 13
+
+## 2026-10-20 (KST) acceptance — r4
+
+| 명령 | exit |
+| --- | --- |
+| `./gradlew --no-daemon check` | **0** |
+| `./gradlew --no-daemon qualityBaseline` | **0** |
+| `./gradlew --no-daemon --no-build-cache :workflow:test --rerun-tasks` | **0** (17 tasks **전부 executed**, 캐시 적중 0) |
+| `./tools/one-command-check.sh` (S-20) | **0** — Kotlin + Python + web 전건 |
+
+`container` job 은 다시 돌리지 않았다 — 이 배치는 마이그레이션·Dockerfile·compose·빌드 파일을
+건드리지 않았고(바뀐 것은 Kotlin·OpenAPI 문서·evidence 뿐) verifier r2 가 판정 트리에서 그 job 을
+이미 한 번 더 쟀다. trivy 둘은 등재된 로컬 제한이고 PR CI 가 정본이다.
+
+## 2026-10-20 (KST) 변이 실측 (r4)
+
+기준선 세 표적 전부 exit 0 · 실패 0. 종료 코드 1 = RED.
+
+| id | 자리 | numstat | 결과 |
+| --- | --- | --- | --- |
+| **R-M23a** | 확정 첫 문장을 잠그지 않는 SELECT 로 — **10회 반복** | 2/3 | **검출 10/10 (100%)** · 매 실행 exit 1 |
+| R-L2b | 대기 상한 호출 제거 | 0/1 | **exit 124**(시한 초과) — 거부가 아니라 **끝나지 않는다** |
+| R-L2a | 시한 초과를 거부로 접지 않고 재던짐 | 1/2 | 1 |
+| R-DUP | 계약 문서에 중복 키를 **더함** | 3/0 | 1 |
+| R-R22 | 확정이 실패 계수를 비우지 않음(자기 대입) | 1/1 | 1 |
+
+- **R-M23a 가 이 배치의 핵심 수치다.** verifier r2 는 같은 변이를 단발 test 로 재서 1회차 초록 ·
+  20회 검출률 14~15/20 을 봤다. 결정적 test(계정 행을 먼저 잠그고 로그인을 세운다) 아래에서는
+  **10/10** 이다 — 기다리는 자리가 분명해 스레드 경합의 운에 기대지 않는다.
+- **R-L2b 는 종료 코드가 아니라 「끝나지 않음」이 증거다.** 대기 상한을 걷으면 그 test 는 거부를
+  받지 못하고 잠금이 풀릴 때까지 선다. 240초 시한으로 끊어 exit 124 로 기록했다 — 상한이
+  그 test 를 **성립시키는** 조건이라는 뜻이다.
+- **R-DUP 은 「더하기」 변이다.** 중복 키 거부가 들어가기 전이라면 이 변이는 초록이었다(수정 r2 의
+  M27 이 그랬다). 이제 RED 이므로 그 변이 종류가 판정 근거로 **복원**됐다 — 제한 24 가 닫힌다.
+- 변이 뒤 복원은 `git status --porcelain -- <변이 파일 셋>` **빈 출력**으로 확인했다.
+
+## 2026-10-20 (KST) 비밀값 스캔 · clean-tree (r4)
+
+- `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
+- `git status --porcelain` · **빈 출력**
+
 ## 크기 게이트
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
-- 핵심 결과(r3 재측정): 산출물 **+6059 / −144 줄** 대 evidence **+866 줄** — evidence ≤ 산출물.
+- 핵심 결과(r4 재측정): 산출물 **+6314 / −149 줄** 대 evidence **+1055 줄** — evidence ≤ 산출물.
