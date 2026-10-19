@@ -27,26 +27,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-COMPOSE=(docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml)
-
-# ---- 값: 있으면 그대로 쓰고 없으면 이 자리에서 만든다 ----
-# **이미 설정된 값을 덮지 않는다**: CI 는 자격 값을 job 안에서 만들어 `::add-mask::` 로
-# 가려 두었고, 여기서 새 값을 지으면 그 가림 밖의 값이 하나 생긴다. 포트 기본값의 자리는
-# 이 스크립트 하나다(Caddyfile·compose 는 `${VAR:?}` 로 요구만 한다).
-export BIDVECTOR_PG_USER="${BIDVECTOR_PG_USER:-bidvector_local}"
-export BIDVECTOR_PG_DB="${BIDVECTOR_PG_DB:-bidvector_local}"
-export BIDVECTOR_PG_PASSWORD="${BIDVECTOR_PG_PASSWORD:-$(openssl rand -hex 20)}"
-export BIDVECTOR_APP_PORT="${BIDVECTOR_APP_PORT:-18080}"
-export BIDVECTOR_APP_MANAGEMENT_PORT="${BIDVECTOR_APP_MANAGEMENT_PORT:-18081}"
-export BIDVECTOR_APP_JDBC_URL="${BIDVECTOR_APP_JDBC_URL:-jdbc:postgresql://postgres:5432/${BIDVECTOR_PG_DB}}"
-export BIDVECTOR_APP_OPERATOR_CREDENTIAL="${BIDVECTOR_APP_OPERATOR_CREDENTIAL:-$(openssl rand -hex 24)}"
-export BIDVECTOR_APP_CANDIDATE_CAP="${BIDVECTOR_APP_CANDIDATE_CAP:-1000}"
-export BIDVECTOR_WEB_PORT="${BIDVECTOR_WEB_PORT:-18090}"
-export BIDVECTOR_PROXY_HTTPS_PORT="${BIDVECTOR_PROXY_HTTPS_PORT:-18443}"
-# 도메인은 **여기서 반드시 export 한다** — compose 는 이 변수를 통과시킬 뿐이라(기본값의
-# 정본은 `docker/proxy.Caddyfile`), 아래 curl 이 쓰는 이름과 컨테이너가 받는 이름이 한
-# 실행 안에서 같은 값임이 이 한 줄로 보장된다.
-export BIDVECTOR_PROXY_DOMAIN="${BIDVECTOR_PROXY_DOMAIN:-localhost}"
+# 값·compose 호출의 기본값은 **`tools/local-tls-env.sh` 한 자리**다(cr M-5 — 빌드를 compose
+# 한 자리로 모으면서 값도 한 자리로 뺐다). ci.yml 의 빌드 step 과 이 스모크가 같은 조각을 읽는다.
+# shellcheck source=tools/local-tls-env.sh
+. "$REPO_ROOT/tools/local-tls-env.sh"
+COMPOSE=("${BIDVECTOR_LOCAL_TLS_COMPOSE[@]}")
 
 DOMAIN="$BIDVECTOR_PROXY_DOMAIN"
 PORT="$BIDVECTOR_PROXY_HTTPS_PORT"
@@ -129,8 +114,31 @@ done
 trap _cleanup EXIT
 
 # ---- 빌드·기동 ----
-_step "빌드: web·proxy 이미지(compose 의 build 정의)"
-"${COMPOSE[@]}" build web proxy
+_step "빌드: web·proxy 이미지(단일 진입점 tools/local-tls-build.sh) + **게이트가 판정한 이미지와 같은가**"
+# cr M-5 — 앞선 step 들(위생·취약점 게이트)이 판정한 것은 **빌드 전에 이미 있던 태그**다.
+# 여기서 다시 빌드하므로, 재빌드가 캐시를 놓쳐 다른 바이트가 나오면 **판정한 이미지와 실행하는
+# 이미지가 다르다.** 빌드 전후의 이미지 ID 를 재어 등식을 단언한다.
+pre_ids=""
+for img in bidvector/web:local bidvector/proxy:local; do
+  pre_ids="${pre_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}' 2>/dev/null || echo none);"
+done
+./tools/local-tls-build.sh
+post_ids=""
+for img in bidvector/web:local bidvector/proxy:local; do
+  post_ids="${post_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}');"
+done
+case "$pre_ids" in
+  *=none\;*)
+    # 이 실행이 태그를 처음 만든 경우다(로컬에서 단독 실행). 비교할 앞 판정이 없으므로 등식을
+    # 주장하지 않고 **그 사실을 적는다** — CI 에서는 빌드 step 이 앞서므로 아래 등식 가지를 탄다.
+    echo "  빌드 전 태그가 없었다(이 실행이 처음 만들었다) — 등식 비교 대상 없음: $post_ids"
+    ;;
+  *)
+    [ "$pre_ids" = "$post_ids" ] \
+      || fail "재빌드로 이미지 ID 가 바뀌었다 — 게이트가 판정한 바이트와 스모크가 실행하는 바이트가 다르다: 전[$pre_ids] 후[$post_ids]"
+    echo "  이미지 ID 등식 성립(게이트가 판정한 것과 같은 바이트): $post_ids"
+    ;;
+esac
 
 _step "기동: proxy(의존으로 app·postgres·web 이 함께 뜬다)"
 "${COMPOSE[@]}" up -d proxy

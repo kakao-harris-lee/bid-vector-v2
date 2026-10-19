@@ -402,19 +402,21 @@ jobs:
         id: build_app
         run: docker build -f docker/app.Dockerfile -t bidvector/app:local .
 
-      # M7/7F-local(D-7F-1) — 로컬 패키징의 두 이미지. **여기서 명시적으로 빌드하는 이유**는
-      # 아래 위생·취약점 게이트가 이미지를 먼저 요구하기 때문이다(S-26 의 스모크는 그 뒤에 선다).
-      # 스모크도 `compose build web proxy` 를 돌리지만 같은 태그·같은 Dockerfile·같은 컨텍스트라
-      # 그 시점에는 캐시 적중으로 끝난다 — 빌드 **정의**는 compose 한 자리이고 갈라지지 않는다.
+      # M7/7F-local(D-7F-1, cr M-5 로 r1 에서 고침) — 로컬 패키징의 두 이미지. **여기서 먼저
+      # 빌드하는 이유**는 아래 위생·취약점 게이트가 이미지를 요구하기 때문이다(S-26 의 스모크는
+      # 그 뒤에 선다).
+      #
+      # 앞 판은 여기서 `docker build -f … -t bidvector/web:local .` 를 직접 돌렸다 — 태그·컨텍스트·
+      # Dockerfile 을 ci.yml 에 **다시 적는 둘째 정의**였고, 주석은 「정의는 compose 한 자리」라고
+      # 적었지만 코드는 그렇지 않았다. 이제 두 호출자(이 step 과 스모크)가 같은 진입점을 지나므로
+      # 정의가 실제로 한 자리다. 스모크는 그 위에 **빌드 전후 이미지 ID 등식**을 단언한다 —
+      # 재빌드가 캐시를 놓치면 게이트가 판정한 바이트와 실행하는 바이트가 갈리기 때문이다.
+      #
       # 번들은 이미지 안에서 만들어지므로(`docker/web.Dockerfile` 의 builder stage) 이 job 에
       # setup-node 가 필요 없다.
-      - name: web 이미지 빌드 (S-21c)
-        id: build_web
-        run: docker build -f docker/web.Dockerfile -t bidvector/web:local .
-
-      - name: 프록시 이미지 빌드 (S-21d)
-        id: build_proxy
-        run: docker build -f docker/proxy.Dockerfile -t bidvector/proxy:local .
+      - name: web·프록시 이미지 빌드 (S-21c)
+        id: build_web_proxy
+        run: ./tools/local-tls-build.sh
 
       # M6/6A-2a D-6A2a-7 — 정책 파일을 **인자로** 받는다(기본값 없음 — 어느 정책으로 판정했는지가
       # 명령에 보인다). 두 이미지의 「금지」 판정이 서로 다르다: ml-serving 은 Python `import`,
