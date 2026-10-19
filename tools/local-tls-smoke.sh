@@ -508,8 +508,10 @@ for img_svc in "bidvector/web:local web" "bidvector/proxy:local proxy"; do
   set -- $img_svc
   img="$1"; svc="$2"
   cfg_user="$(docker image inspect "$img" --format '{{.Config.User}}')"
+  # `root:root`·`root:0` 형태도 root 다 — 앞 판은 `0:*` 만 보고 `root:*` 를 놓쳤다(vr F-7).
+  # 실프로세스 uid 축이 뒤에서 잡으므로 판정은 붉었지만 **첫 칸의 문면이 틀렸다**.
   case "$cfg_user" in
-    ""|root|0|0:*) fail "$img 의 Config.User 가 root/미지정이다: '$cfg_user'" ;;
+    ""|root|0|0:*|root:*) fail "$img 의 Config.User 가 root/미지정이다: '$cfg_user'" ;;
   esac
   cid="$("${COMPOSE[@]}" ps -q "$svc")"
   [ -n "$cid" ] || fail "$svc 컨테이너 id 를 읽지 못했다"
