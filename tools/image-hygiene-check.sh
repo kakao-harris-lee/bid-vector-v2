@@ -100,6 +100,35 @@ _policy_value() {
         esac
       done
       ;;
+    pathlist)
+      # `list` 와 같은 축이되 **경로를 담는 키 전용**으로 `/` 하나만 더 받는다(M7/7F-local F-2 의
+      # 탐색 범위·제외 접두). 전역 집합을 넓히지 않는 이유는 위 문단 그대로다 — `/` 를 모든 키에
+      # 허용하면 `forbidden.executables` 같은 이름 키가 경로를 받아도 조용히 통과한다. 종류를
+      # 나누면 **어느 키가 경로인지**가 호출부에 보이고, 집합을 넓히는 편집은 이 줄에 남는다.
+      local IFS=','
+      local -a path_items
+      read -r -a path_items <<< "$raw"
+      if [ "${#path_items[@]}" -lt 1 ]; then
+        echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
+        exit 2
+      fi
+      local path_item
+      for path_item in "${path_items[@]}"; do
+        case "$path_item" in
+          '' | *[!A-Za-z0-9._+/-]*)
+            echo "정책 키 ${key} 의 원소가 허용 문자([A-Za-z0-9._+/-])만으로 돼 있지 않다 — 그 원소의 판정이 조용히 꺼진다: '${raw}'" >&2
+            exit 2
+            ;;
+        esac
+        case "$path_item" in
+          /*) ;;
+          *)
+            echo "정책 키 ${key} 의 원소가 절대 경로가 아니다 — 상대 경로는 컨테이너 작업 디렉터리에 따라 다른 곳을 가리킨다: '${path_item}'" >&2
+            exit 2
+            ;;
+        esac
+      done
+      ;;
     text) ;;
     *)
       echo "알 수 없는 정책 값 종류 '${kind}'(스크립트 결함)" >&2
@@ -145,6 +174,10 @@ CONTENT_PATH=""
 CONTENT_MIN_ENTRIES=""
 REQUIRED_CONTENT_PATTERNS=""
 FORBIDDEN_CONTENT_PATTERNS=""
+SECRET_MATERIAL_SCAN_PATHS=""
+SECRET_MATERIAL_EXCLUDE_PREFIXES=""
+SECRET_MATERIAL_PATTERNS=""
+SECRET_MATERIAL_MIN_ENTRIES=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -199,6 +232,13 @@ case "$RUNTIME_KIND" in
     CONTENT_MIN_ENTRIES="$(_policy_value content.min-entries numeric)"
     REQUIRED_CONTENT_PATTERNS="$(_policy_value required.content.patterns list)"
     FORBIDDEN_CONTENT_PATTERNS="$(_policy_value forbidden.content.patterns list)"
+    # 검토 r1 F-2 — 키·인증서 재료는 **싣고 있는 내용 축과 다른 범위**를 갖는다. 그 축은
+    # 「서브되는 트리에 무엇이 있나」를 묻느라 좁고, 키는 그 트리 밖(`/data`·`/config`)에 구워도
+    # 똑같이 사고다. 그래서 범위·제외·패턴·하한을 **따로 선언**한다.
+    SECRET_MATERIAL_SCAN_PATHS="$(_policy_value secret.material.scan-paths pathlist)"
+    SECRET_MATERIAL_EXCLUDE_PREFIXES="$(_policy_value secret.material.exclude-prefixes pathlist)"
+    SECRET_MATERIAL_PATTERNS="$(_policy_value secret.material.patterns list)"
+    SECRET_MATERIAL_MIN_ENTRIES="$(_policy_value secret.material.min-entries numeric)"
     # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
     # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
     # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
@@ -493,7 +533,36 @@ case "$RUNTIME_KIND" in
         fi
       done
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건"
+    # ②' **키·인증서 재료는 넓게 찾는다**(검토 r1 F-2). 앞 판은 위 `content.path` 한 자리만 봤고,
+    # `tls internal` 이 실제로 CA 를 두는 자리(`/data/caddy/pki/...`)에 키를 구운 이미지가 초록이었다
+    # — 이미지에 미리 구운 CA 는 이 위협의 가장 그럴듯한 형태인데 그 자리를 보지 않았다.
+    # 범위는 **이미지 파일시스템 전체**이고, `-xdev` 가 런타임 마운트(proc·sys·dev)를 밖에 둔다.
+    IFS=',' read -r -a secret_scan_paths <<< "$SECRET_MATERIAL_SCAN_PATHS"
+    IFS=',' read -r -a secret_exclude_array <<< "$SECRET_MATERIAL_EXCLUDE_PREFIXES"
+    IFS=',' read -r -a secret_pattern_array <<< "$SECRET_MATERIAL_PATTERNS"
+    SECRET_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${secret_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
+    SECRET_CANDIDATES="$(printf '%s\n' "$SECRET_LISTING" | sed '/^[[:space:]]*$/d')"
+    # 선언된 접두를 뺀다 — 베이스가 싣는 **공개** 신뢰 기점(시스템 CA 번들)은 비밀값이 아니다.
+    for pre in "${secret_exclude_array[@]}"; do
+      SECRET_CANDIDATES="$(printf '%s\n' "$SECRET_CANDIDATES" | grep -v -- "^${pre}" || true)"
+    done
+    SECRET_ENTRIES="$(printf '%s\n' "$SECRET_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    # **양성 대조는 제외를 적용한 뒤에 센다.** 그래야 「제외 접두를 넓혀 축을 꺼 버리는」 편집이
+    # 여기서 끊긴다 — `/` 하나를 제외로 넣으면 남는 파일이 0 이 되어 판정 불가가 된다.
+    if ! [[ "$SECRET_ENTRIES" =~ ^[0-9]+$ ]] || [ "$SECRET_ENTRIES" -lt "$SECRET_MATERIAL_MIN_ENTRIES" ]; then
+      fail "키·인증서 재료 탐색의 대상 파일 수(${SECRET_ENTRIES})가 정책 하한(${SECRET_MATERIAL_MIN_ENTRIES}) 미만이다 — 범위(${SECRET_MATERIAL_SCAN_PATHS})가 틀렸거나 제외 접두가 너무 넓거나 목록 도구가 없다(판정 불가)"
+    else
+      SECRET_HITS=""
+      for pat in "${secret_pattern_array[@]}"; do
+        hit="$(printf '%s\n' "$SECRET_CANDIDATES" | grep -iF -- "$pat" || true)"
+        [ -z "$hit" ] || SECRET_HITS="${SECRET_HITS}${hit}"$'\n'
+      done
+      SECRET_HITS="$(printf '%s' "$SECRET_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
+      if [ -n "$SECRET_HITS" ]; then
+        fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$SECRET_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
+      fi
+    fi
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${SECRET_ENTRIES}(하한 ${SECRET_MATERIAL_MIN_ENTRIES}) 키재료-패턴=${#secret_pattern_array[@]}건"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
