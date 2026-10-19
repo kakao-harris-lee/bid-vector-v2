@@ -224,7 +224,8 @@ pub_host_ip="$(printf '%s' "$ports_json" | jq -r '.services.proxy.ports[0].host_
 # 두 서비스의 `no-new-privileges` — 선언해 두고 **아무것도 재지 않으면** 지우는 편집이 조용히
 # 지나간다(cr L-3). (A)가 이미 해석된 설정을 읽고 있으므로 같은 자리에서 본다.
 for svc in web proxy; do
-  nnp="$(printf '%s' "$ports_json" | jq -r --arg s "$svc" '[(.services[$s].security_opt // [])[] | select(. == "no-new-privileges:true")] | length')"
+  nnp="$(printf '%s' "$ports_json" | jq -r --arg s "$svc" '[(.services[$s].security_opt // [])[] | select(. == "no-new-privileges:true")] | length')" \
+    || fail "$svc 의 security_opt 를 해석된 설정에서 읽지 못했다"
   [ "$nnp" = "1" ] || fail "$svc 에 security_opt no-new-privileges:true 가 없다(해석된 설정 기준)"
 done
 # **해석된 설정에 관리 포트가 상류로 실려 있지 않다**(우회 ② 의 구조 축). app 서비스의
@@ -265,7 +266,8 @@ net_verdict="$(printf '%s' "$ports_json" | jq -r '
     (if (($w - ($w - $a)) | length) > 0 then "web 과 app 이 망을 공유한다: \($w - ($w - $a) | join(","))" else empty end),
     (if (($w - $p) | length) > 0 then "프록시가 web 의 망에 없다: \($w - $p | join(","))" else empty end),
     (if (($a - $p) | length) > 0 then "프록시가 app 의 망에 없다: \($a - $p | join(","))" else empty end)
-  ] | join(" · ")')"
+  ] | join(" · ")')" \
+  || fail "해석된 설정에서 망 집합을 읽지 못했다(망 분리를 재지 못한다)"
 [ -z "$net_verdict" ] || fail "망 분리가 깨졌다 — $net_verdict"
 echo "  망: web=[$(printf '%s' "$ports_json" | jq -r '(.services.web.networks // {}) | keys | join(",")')] app=[$(printf '%s' "$ports_json" | jq -r '(.services.app.networks // {}) | keys | join(",")')] proxy=[$(printf '%s' "$ports_json" | jq -r '(.services.proxy.networks // {}) | keys | join(",")')]"
 
@@ -274,9 +276,11 @@ echo "  망: web=[$(printf '%s' "$ports_json" | jq -r '(.services.web.networks /
 # 공허하게 참이 된다).
 web_adapted="$("${COMPOSE[@]}" exec -T web caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null)" \
   || fail "web 설정을 적응하지 못했다(상류 집합을 재지 못한다)"
-web_handlers="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("handler")) | .handler] | length')"
+web_handlers="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("handler")) | .handler] | length')" \
+  || fail "web 의 적응된 설정에서 handler 수를 읽지 못했다(상류 단언이 공허해진다)"
 [ "${web_handlers:-0}" -gt 0 ] || fail "web 의 적응된 설정에 handler 가 0 이다(양성 대조 실패 — 아래 상류 단언이 공허하다)"
-web_dials="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("dial")) | .dial] | unique | join(",")')"
+web_dials="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("dial")) | .dial] | unique | join(",")')" \
+  || fail "web 의 적응된 설정에서 상류 집합을 읽지 못했다"
 [ -z "$web_dials" ] || fail "web 의 상류 집합이 비어 있지 않다: [$web_dials] — web 은 정적 서버이고 어떤 상류도 갖지 않는다"
 echo "  web handler $web_handlers · 상류 0"
 
