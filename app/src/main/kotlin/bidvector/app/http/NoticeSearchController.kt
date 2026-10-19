@@ -10,7 +10,6 @@ import bidvector.workflow.notice.parseNoticeSearchParameters
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /** 전체 건수 — 페이지 길이와 다른 값이다(legacy `GET /projects/` 가 남긴 채택 가능한 계약 형태). */
@@ -35,35 +34,30 @@ private val DECLARED_PARAMETERS =
  * 받아 순수 파싱([parseNoticeSearchParameters])이 **명시** 검증한다(D-6A3-19 와 같은 규율).
  * 거부는 [InvalidNoticeSearchException] 하나로 400 `INVALID_REQUEST` 가 된다(오류 형태를
  * 만드는 자리는 `ErrorBody.kt` 하나다 — 이 컨트롤러는 `ErrorBody` 를 짓지 않는다).
+ *
+ * **질의를 읽는 자리는 [readDeclaredParameters] 하나다**(verifier r3 R3-M-1). `@RequestParam`
+ * 으로 받으면 그 읽기가 **핸들러 바깥**(프레임워크의 인자 해석)에서 일어나, 잘못된 퍼센트
+ * 인코딩처럼 **읽기 자체가 깨지는** 입력이 전역 폴백(500)으로 샜다. 읽기를 이 안으로 들이면
+ * 그 실패를 같은 거부 하나로 옮길 수 있고, 다른 경로의 거동을 건드리지 않는다.
  */
 @RestController
 class NoticeSearchController(
     private val notices: NoticeSearchQuery,
 ) {
-    @Suppress("LongParameterList")
     @GetMapping("/api/notices")
-    fun search(
-        @RequestParam(required = false) q: String?,
-        @RequestParam(required = false) agency: String?,
-        @RequestParam(required = false) amountMin: String?,
-        @RequestParam(required = false) amountMax: String?,
-        @RequestParam(required = false) deadlineFrom: String?,
-        @RequestParam(required = false) deadlineTo: String?,
-        @RequestParam(required = false) page: String?,
-        @RequestParam(required = false) size: String?,
-        request: HttpServletRequest,
-    ): ResponseEntity<List<NoticeSummaryResponse>> {
-        rejectRepeated(request)
+    fun search(request: HttpServletRequest): ResponseEntity<List<NoticeSummaryResponse>> {
+        val values = readDeclaredParameters(request)
+        rejectRepeated(values)
         val parameters =
             NoticeSearchParameters(
-                text = q,
-                agencyText = agency,
-                amountMinWon = amountMin,
-                amountMaxWon = amountMax,
-                deadlineFrom = deadlineFrom,
-                deadlineTo = deadlineTo,
-                page = page,
-                size = size,
+                text = values.first("q"),
+                agencyText = values.first("agency"),
+                amountMinWon = values.first("amountMin"),
+                amountMaxWon = values.first("amountMax"),
+                deadlineFrom = values.first("deadlineFrom"),
+                deadlineTo = values.first("deadlineTo"),
+                page = values.first("page"),
+                size = values.first("size"),
             )
         return when (val parsed = parseNoticeSearchParameters(parameters)) {
             is NoticeSearchRequest.Rejected -> throw InvalidNoticeSearchException(parsed.reason.name)
@@ -72,22 +66,41 @@ class NoticeSearchController(
     }
 
     /**
-     * 같은 매개변수를 두 번 보내면 거부한다(verifier r1 L-3) — Spring 은 `q=a&q=b` 를 값
-     * 하나 `"a,b"` 로 합쳐 넘기므로, **리터럴 검색어에 쉼표가 들어간 질의**와 구별되지
-     * 않는다. 계약에 없는 조용한 결합이라 400 으로 끊는다.
+     * 계약이 든 이름들의 **원문 값 목록** — 이 요청의 질의를 읽는 **유일한 자리**다.
      *
-     * 판정 대상은 **계약이 든 이름들**이다 — 알 수 없는 매개변수는 지금처럼 무시한다(그
-     * 거동은 바꾸지 않는다). 서블릿 요청의 `getParameterValues` 가 같은 이름의 **원문 값
-     * 목록**을 그대로 들고 있어 합쳐지기 전의 사실을 본다. `MultiValueMap` 을 쓰지 않는
-     * 이유는 그것이 app 모듈에 **새 바깥 패키지**를 들이기 때문이다(전송 표면 게이트가
-     * 기본 거부다) — 이미 이 층이 쓰는 서블릿 타입으로 같은 사실을 읽는다.
+     * 서블릿 컨테이너는 질의 전체를 한 번에 해석한다. 그래서 `%` 뒤에 16진 두 자리가 없는 꼴이나
+     * UTF-8 로 디코딩되지 않는 바이트열이 **어느 매개변수에 있든**(계약 밖 이름이어도) 이 읽기가
+     * 깨진다. 계약은 그 입력에 400 을 선언하므로 여기서 거부로 옮긴다 — 컨테이너가 던지는 타입을
+     * 이 층이 이름으로 들지 않는다(서블릿 구현의 좌표이고, HTTP 층의 바깥 참조 허용 밖이라
+     * 전송 표면 게이트가 실측으로 막는다). **자리가 술어다**: 이 호출이 실패했다는 것이 곧 질의
+     * 해석이 실패했다는 사실이다.
+     *
+     * 잡는 타입은 실측한 가장 좁은 JDK 상위 타입이다. 컨테이너가 다른 부류를 던지게 바뀌면 출하
+     * 조립 E2E 가 그 꼴을 500 으로 잡아 붉어진다(그 회귀는 숨지 않는다).
      */
-    private fun rejectRepeated(request: HttpServletRequest) {
-        val repeated = DECLARED_PARAMETERS.filter { name -> (request.getParameterValues(name)?.size ?: 0) > 1 }
+    private fun readDeclaredParameters(request: HttpServletRequest): Map<String, List<String>> =
+        try {
+            DECLARED_PARAMETERS.associateWith { name -> request.getParameterValues(name)?.toList().orEmpty() }
+        } catch (failure: IllegalStateException) {
+            throw InvalidNoticeSearchException("질의를 해석할 수 없다", failure)
+        }
+
+    /**
+     * 같은 매개변수를 두 번 보내면 거부한다(verifier r1 L-3) — 값 둘을 하나로 합치면 **리터럴
+     * 검색어에 쉼표가 들어간 질의**와 구별되지 않는다. 계약에 없는 조용한 결합이라 400 으로 끊는다.
+     *
+     * 판정 대상은 **계약이 든 이름들**이다 — 알 수 없는 매개변수는 지금처럼 무시한다(그 거동은
+     * 바꾸지 않는다). 서블릿 요청의 값 목록이 합쳐지기 전의 사실을 들고 있다.
+     */
+    private fun rejectRepeated(values: Map<String, List<String>>) {
+        val repeated = values.filterValues { it.size > 1 }.keys
         if (repeated.isNotEmpty()) {
             throw InvalidNoticeSearchException("같은 매개변수가 반복됐다: $repeated")
         }
     }
+
+    /** 값이 없으면 `null` — `@RequestParam(required = false)` 이 주던 것과 같은 모양이다. */
+    private fun Map<String, List<String>>.first(name: String): String? = this[name]?.firstOrNull()
 
     private fun respond(page: NoticeSearchPage): ResponseEntity<List<NoticeSummaryResponse>> =
         ResponseEntity
