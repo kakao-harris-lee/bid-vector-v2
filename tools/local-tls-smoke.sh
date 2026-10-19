@@ -138,16 +138,19 @@ _step "기동: proxy(의존으로 app·postgres·web 이 함께 뜬다)"
 _step "healthy 수렴 대기: app·web·proxy"
 for _ in $(seq 1 40); do
   ps_out="$("${COMPOSE[@]}" ps --format '{{.Service}}: {{.Status}}')"
-  if echo "$ps_out" | grep -q "app:.*healthy" \
-    && echo "$ps_out" | grep -q "web:.*healthy" \
-    && echo "$ps_out" | grep -q "proxy:.*healthy"; then
+  # 괄호를 **리터럴로** 둔다(BRE) — `.*healthy` 는 `(unhealthy)` 의 `un`+`healthy` 에도 맞아
+  # 「수렴에 실패했다」가 확정되는 순간을 「수렴했다」로 읽는다(cr M-1 실측). `(healthy)` 는
+  # `(unhealthy)` 를 포함하지 않으므로 그 칸이 닫힌다.
+  if echo "$ps_out" | grep -q "app:.*(healthy)" \
+    && echo "$ps_out" | grep -q "web:.*(healthy)" \
+    && echo "$ps_out" | grep -q "proxy:.*(healthy)"; then
     echo "$ps_out"
     break
   fi
   sleep 3
 done
 ps_out="$("${COMPOSE[@]}" ps --format '{{.Service}}: {{.Status}}')"
-echo "$ps_out" | grep -q "proxy:.*healthy" || { echo "$ps_out" >&2; fail "app·web·proxy 가 제한 시간 안에 healthy 로 수렴하지 않았다"; }
+echo "$ps_out" | grep -q "proxy:.*(healthy)" || { echo "$ps_out" >&2; fail "app·web·proxy 가 제한 시간 안에 healthy 로 수렴하지 않았다"; }
 
 # 로컬 CA 의 뿌리 인증서를 컨테이너에서 꺼낸다 — **실행 시 발급된 것**이고 저장소에는 없다.
 # 아래 모든 https 요청이 이 체인으로 검증된다(`-k` 를 쓰지 않는다 — 그러면 TLS 가 서 있는지

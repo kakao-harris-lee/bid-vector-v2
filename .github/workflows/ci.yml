@@ -640,9 +640,12 @@ jobs:
           for i in $(seq 1 30); do
             ps_out="$(docker compose -f docker/compose.yaml ps --format '{{.Service}}: {{.Status}}')"
             echo "$ps_out"
-            if echo "$ps_out" | grep -q "app:.*healthy" \
-              && echo "$ps_out" | grep -q "ml-serving:.*healthy" \
-              && echo "$ps_out" | grep -q "postgres:.*healthy"; then
+            # 괄호 리터럴(BRE) — `.*healthy` 는 `(unhealthy)` 의 `un`+`healthy` 에도 맞아
+            # 「수렴에 실패했다」가 확정되는 순간을 「수렴했다」로 읽는다. M7/7F-local 이 이
+            # 형태를 복제했다가 cr M-1 로 잡혀 두 자리를 같은 커밋에서 고쳤다.
+            if echo "$ps_out" | grep -q "app:.*(healthy)" \
+              && echo "$ps_out" | grep -q "ml-serving:.*(healthy)" \
+              && echo "$ps_out" | grep -q "postgres:.*(healthy)"; then
               exit 0
             fi
             sleep 3
