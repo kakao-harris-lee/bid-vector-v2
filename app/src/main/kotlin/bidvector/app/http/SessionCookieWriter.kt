@@ -63,10 +63,15 @@ class SessionCookieWriter(
      * `__Host-` 접두가 1차 방어이고 이것이 2차다(접두를 쓸 수 없는 로컬 http 에서도 선다).
      */
     fun read(request: HttpServletRequest): BrowserSessionKey? {
-        // 이름 비교를 `==` 로 쓰지 않는다 — 그 자리는 `Intrinsics.areEqual` 로 컴파일되고
-        // `ConstantTimeComparisonStructureTest` 가 이 패키지에서 그것을 허용 목록으로 가둔다.
-        // 비교 대상이 비밀이 아니라 **쿠키 이름**이지만, 목록을 넓히는 대신 이름 → 쿠키 **묶음**
-        // 조회로 같은 일을 한다(그 조회가 중복 판정에 필요한 묶음을 그대로 준다).
+        // **비교는 그대로 일어난다**(code-review r3 L-1 정정) — `groupBy` 가 만든 `HashMap` 의
+        // `get` 이 `String.equals` 를 돈다. 앞 판의 주석은 「`==` 를 쓰지 않는다」라고만 적어
+        // 「비교를 피했다」로 읽혔는데, 실제로 바뀐 것은 **비교의 자리**다(우리 코드 → JDK 안).
+        //
+        // 모양을 바꾼 이유는 보안이 아니라 **구조 게이트**다: `==` 는 `Intrinsics.areEqual` 로
+        // 컴파일되고 `ConstantTimeComparisonStructureTest` 가 이 패키지에서 그 심볼을 개별 근거가
+        // 붙은 허용 목록으로 가둔다. 비교 대상이 **쿠키 이름**이라 상수 시간이 필요한 자리가
+        // 애초에 아니지만, 그렇다고 목록을 넓히면 그만큼 다음 사람에게 느슨해진다. 묶음 조회는
+        // 중복 판정에 필요한 묶음을 그대로 주므로 코드가 오히려 짧다.
         val candidates =
             request.cookies
                 ?.groupBy(Cookie::getName)
