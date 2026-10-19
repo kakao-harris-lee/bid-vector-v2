@@ -152,6 +152,16 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   S-20z 범위 밖 — 오늘 `needs` 없음) · cr R3-10(이미지당 세 번 훑음 — 성능 기록만).
 - 수정 뒤 verifier 표적 r4. 판정이 high·medium 0 이면 PR 로 간다.
 
+**D-7F-8 (2026-10-20, 팀장 — 마지막 배치 수령 · 동결).** 판정 대상은 마지막 산출물 `ee7f6fda` · evidence `5487dbe3` 다.
+- **참조 검사는 fail-closed 갈래로 갔다**: 저장소의 YAML 파서(`pyyaml`)는 `ml-engine` job 의 uv 환경에만 있고, 이 검사가 도는 `container`
+  job 에는 없다. 새 의존 없이(awk) 가되, 읽지 못하는 표기(블록 스칼라 `if:` · 흐름 매핑 step)는 통과가 아니라 exit 2 다. id 는 step 항목
+  자리에서만 세고, 참조는 job 안의 모든 줄에서 찾는다.
+- **레인이 찾은 결함 하나를 기록한다**: `docker image inspect --format` 은 없는 이미지에 빈 줄을 찍고 실패한다. 그래서 `… || echo none` 이
+  개행 섞인 값을 냈고, r1 이 둔 「태그 없음」 가지가 한 번도 타지 않았다(R3-5 수정에서 함께 닫혔다).
+- 자리 후속(D-7F-6 ⓐ)은 그대로다. 제외 목록이 게이트 상수 + 정책 둘 세 자리에 사는 구조도 유지한다 — 등식으로 잠겨 있고, 한 자리로 모으려면
+  정책 로더 변경이 필요하다(이 slice 밖).
+- 검토: verifier 표적 r4 + code-reviewer 표적 r4. 둘 다 high·medium 0 이면 PR.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
