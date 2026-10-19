@@ -68,7 +68,7 @@ report="$(
         name = hit
         sub(/^steps/, "", name)
         gsub(/[].[ "\047]/, "", name)
-        if (name != "") { refs[job "\t" name] = 1; nrefs++ }
+        if (name != "") { if (!((job "\t" name) in refs)) refs[job "\t" name] = NR; nrefs++ }
       }
     }
     function unsupported(what) { printf "UNSUPPORTED\t%s\t%d\n", what, NR; bad = 1 }
@@ -93,7 +93,7 @@ report="$(
     injobs && ind == 0 && !blank { injobs = 0; job = "" }
     injobs && ind == 2 && body ~ /^[A-Za-z0-9_.-]+:$/ {
       job = body; sub(/:$/, "", job); njobs++
-      step_key_indent = -1; next
+      step_key_indent = -1; steps_key_indent = -1; next
     }
     # ② `jobs:` 아래 들여쓰기 2 의 줄인데 job 머리 패턴이 아니면 정지한다. 따옴표 친 job 키
     # (`"container":`)가 job 머리로 인식되지 않으면 그 job 의 줄이 **앞 job 에 합쳐져**, 남의
@@ -107,7 +107,11 @@ report="$(
       if (line ~ /steps\[/ && line !~ /steps\[ *["\047][A-Za-z0-9_-]+["\047] *\]/) {
         unsupported("동적 색인 steps[…] — 정적으로 읽을 수 없는 표기")
       }
-      if (body ~ /^- /) {
+      # `steps:` 키를 만나면 그 아래 목록만 step 항목으로 본다(r4 cr R4-8). 앞 판은 job 안의
+      # **어떤** `- ` 항목으로도 창이 갱신돼, `with:`·`env:` 아래 중첩 목록이 생기면 그 뒤의 진짜
+      # `id:` 가 창 밖으로 밀려 **정의를 놓치고 거짓 DANGLING** 이 났다(fail-closed 이지만 오답).
+      if (body ~ /^steps:[ \t]*$/) { steps_key_indent = ind; step_key_indent = -1 }
+      if (body ~ /^- / && steps_key_indent >= 0 && ind == steps_key_indent + 2) {
         if (body ~ /^- *\{/) { unsupported("흐름 매핑 step(- {…}) — 이 검사가 읽지 못하는 표기") }
         step_key_indent = ind + 2
         if (body ~ /^- +id: *["\047]?[A-Za-z0-9_-]+["\047]? *$/) {
@@ -128,7 +132,7 @@ report="$(
     END {
       for (k in refs) {
         split(k, a, "\t")
-        if (!(k in defined)) printf "DANGLING\t%s\t%s\n", a[1], a[2]
+        if (!(k in defined)) printf "DANGLING\t%s\t%s\t%d\n", a[1], a[2], refs[k]
       }
       printf "COUNT\t%d\t%d\t%d\t%d\n", njobs, nids, nrefs, bad
     }
@@ -150,7 +154,7 @@ if [ "$njobs" -lt "$MIN_JOBS" ] || [ "$nids" -lt "$MIN_IDS" ] || [ "$nrefs" -lt 
   exit 2
 fi
 
-dangling="$(printf '%s\n' "$report" | awk -F'\t' '$1=="DANGLING" {printf "  job %s 의 식이 없는 step id 를 가리킨다: %s\n", $2, $3}' | sort)"
+dangling="$(printf '%s\n' "$report" | awk -F'\t' '$1=="DANGLING" {printf "  %s행: job %s 의 식이 없는 step id 를 가리킨다: %s\n", $4, $2, $3}' | sort -n)"
 if [ -n "$dangling" ]; then
   echo "워크플로 step 참조 위반 — 없는 id 를 가리키는 조건은 **실패가 아니라 영원한 skip** 이다:" >&2
   printf '%s\n' "$dangling" >&2
