@@ -120,7 +120,12 @@ _step "빌드: web·proxy 이미지(단일 진입점 tools/local-tls-build.sh) +
 # 이미지가 다르다.** 빌드 전후의 이미지 ID 를 재어 등식을 단언한다.
 pre_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do
-  pre_ids="${pre_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}' 2>/dev/null || echo none);"
+  # `docker image inspect --format` 는 없는 이미지에 **빈 줄을 찍고** 실패한다. 그래서
+  # `… || echo none` 은 `"\nnone"` 을 내고, `none` 을 보려던 술어가 개행 때문에 맞지 않았다
+  # (r1 이 둔 `*=none;` 가지도 같은 이유로 한 번도 타지 않았다 — 2026-10-19 실측). 값을 먼저
+  # 받아 개행을 털고, 비었으면 그때 `none` 으로 적는다.
+  img_id="$(docker image inspect "$img" --format '{{.Id}}' 2>/dev/null | tr -d '\n' || true)"
+  pre_ids="${pre_ids}${img}=${img_id:-none};"
 done
 # **앞선 빌드 step 이 남긴 기록**(cr R2-6). 있으면 「그때 만든 바이트」와 「지금 태그가 가리키는
 # 바이트」의 등식을 먼저 본다 — 그 사이에 아무도 태그를 바꾸지 않았다는 전제가 여기서 측정이
@@ -128,7 +133,11 @@ done
 # 재빌드 전후 등식만 남는다.
 ID_RECORD="build/local-tls/built-image-ids.txt"
 recorded_ids=""
-if [ -f "$ID_RECORD" ]; then
+# **태그가 아예 없는 경우는 대조 대상이 아니다**(cr R3-5). `docker image prune` 뒤처럼 기록만 남고
+# 이미지가 사라진 로컬 상태에서 대조하면 「그 사이에 태그가 바뀌었다」로 끊기는데, 그것은 사실이
+# 아니다 — 바뀐 것이 아니라 **없어진 것**이고 바른 처방은 바로 다음 줄이 하는 빌드다. CI 는
+# S-21c 가 앞서므로 이 가지에 닿지 않는다.
+if [ -f "$ID_RECORD" ] && [ "${pre_ids#*=none;}" = "$pre_ids" ]; then
   recorded_ids="$(tr '\n' ';' < "$ID_RECORD")"
   if [ "$recorded_ids" != "$pre_ids" ]; then
     fail "앞선 빌드가 기록한 이미지와 지금 태그가 가리키는 이미지가 다르다 — 그 사이에 태그가 바뀌었고, 게이트가 판정한 바이트는 지금 실행할 바이트가 아니다: 기록[$recorded_ids] 현재[$pre_ids]"
@@ -138,7 +147,7 @@ fi
 ./tools/local-tls-build.sh
 post_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do
-  post_ids="${post_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}');"
+  post_ids="${post_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}' | tr -d '\n');"
 done
 case "$pre_ids" in
   *=none\;*)
