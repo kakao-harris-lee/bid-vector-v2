@@ -229,6 +229,11 @@ SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$NEXT" \
 - 이 명령은 **소유자 연결**로 돈다(앱 역할은 `account` 에 INSERT 가 없다). 그래서
   `bidvector.persistence.*` 값이 함께 필요하다(평소 기동과 같은 값).
 - 러너는 프로세스당 하나다 — 수집·중계 모드와 함께 켜면 기동이 실패한다(`OneShotRunnerGuard`).
+- **`bidvector.access.cookie-secure` 를 바꾸면 쿠키 이름이 바뀌므로 살아 있는 세션이 전부
+  무효가 된다**(code-review r3 L-4) — 운영자는 다시 로그인하면 된다. 접두(`__Host-`)는 `Secure`
+  와 한 몸이라 그 설정을 따라가기 때문이다. **보안 피해는 없다**(방향이 fail-closed 다: 이름이
+  갈리면 401 이고 권한이 새지 않는다). 7F 가 TLS 를 들이며 이 값을 만질 가능성이 높으니 그 반입
+  절차에도 같은 줄을 둔다 — 없으면 「로그인이 다 풀렸다」가 원인 불명으로 보인다.
 - 값을 **argv 로 넘기지 않는다** — 그러면 프로세스 표에 보인다. 위 두 줄처럼 환경변수
   (`BIDVECTOR_ACCOUNT_INITIAL_VALUE`)로 준다. Spring 의 relaxed binding 이 같은 키를 읽는다
   (6C 의 서비스 키 관례와 같은 축).
