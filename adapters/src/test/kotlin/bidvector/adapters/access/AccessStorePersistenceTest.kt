@@ -41,6 +41,7 @@ private val POLICY =
         maxFailedAttempts = 5,
         lockWindow = Duration.ofMinutes(15),
         hashCost = TEST_HASH_COST,
+        lockWait = Duration.ofMillis(500),
     )
 
 /** 밀 수 있는 시계 — 만료·폐기 시각을 실 DB 에서 재려면 시간을 통제해야 한다. */

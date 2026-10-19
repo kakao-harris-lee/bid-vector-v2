@@ -29,6 +29,16 @@ internal object AccessSql {
             "WHERE id = ?"
 
     /**
+     * 확정 트랜잭션의 **대기 상한**(code-review r3 L-2) — 이 문장 뒤의 잠금 대기가 상한을 넘으면
+     * PostgreSQL 이 `55P03`(lock_not_available)로 끊고, 호출부는 그것을 **로그인 거부**로 읽는다.
+     *
+     * `SET LOCAL` 대신 `set_config(..., true)` 를 쓰는 이유는 **바인딩**이다 — 유틸리티 문장인
+     * `SET` 은 매개변수를 받지 않아 값을 문자열로 이어 붙여야 하고, 그러면 정책 값이 SQL 문면에
+     * 섞인다. 셋째 인자 `true` 가 「이 트랜잭션 안에서만」이다.
+     */
+    const val SET_LOCAL_LOCK_WAIT = "SELECT set_config('lock_timeout', ?, true)"
+
+    /**
      * 로그인 확정의 **첫 문장** — 성공의 초기화이면서 동시에 그 트랜잭션의 **잠금과 조건**이다.
      *
      *  · `passphrase_hash = ?` — 검증 때 읽은 자격이 **아직 그 자격일 때만**(verifier r1 F1).

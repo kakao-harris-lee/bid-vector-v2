@@ -93,6 +93,7 @@ class AccountProvisioningTest {
                     maxFailedAttempts = 5,
                     lockWindow = Duration.ofMinutes(15),
                     hashCost = 12,
+                    lockWait = Duration.ofMillis(500),
                 ),
         )
     }

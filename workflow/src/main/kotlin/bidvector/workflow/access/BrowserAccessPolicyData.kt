@@ -23,6 +23,17 @@ data class BrowserAccessPolicyData(
     val lockWindow: Duration,
     /** bcrypt cost(2^cost 회) — 느리게 만드는 값 자체가 방어다. */
     val hashCost: Int,
+    /**
+     * 로그인 확정이 **계정 행 잠금을 기다리는 상한**(code-review r3 L-2). 넘으면 그 로그인은
+     * 거부다 — 커넥션을 쥔 채 무한정 기다리지 않는다.
+     *
+     * 왜 상한이 필요한가: 확정의 첫 문장이 계정 행을 잠그고, 그 잠금은 운영자 명령(비밀 문구
+     * 교체)과도 겹친다. 오늘의 보유 시간은 「빠른 문장 셋」이지만(KDF 는 전부 잠금 **밖**이다),
+     * 소유자 트랜잭션이 예상 밖으로 길어지면 **모든 로그인이 커넥션을 쥔 채 대기**해 풀이 마른다
+     * — M-2 가 없앤 증폭이 다른 입구로 돌아오는 형태다. 상한을 두면 그 경우가 대기가 아니라
+     * **빠른 실패**(401)가 된다.
+     */
+    val lockWait: Duration,
 ) {
     init {
         require(idleWindow.isPositive()) { "idleWindow 는 양수여야 한다: $idleWindow" }
@@ -40,6 +51,8 @@ data class BrowserAccessPolicyData(
         require(hashCost in MIN_HASH_COST..MAX_HASH_COST) {
             "hashCost 는 $MIN_HASH_COST..$MAX_HASH_COST 안이어야 한다: $hashCost"
         }
+        require(lockWait.isPositive()) { "lockWait 는 양수여야 한다: $lockWait" }
+        require(lockWait <= MAX_LOCK_WAIT) { "lockWait 는 $MAX_LOCK_WAIT 를 넘을 수 없다: $lockWait" }
     }
 
     private companion object {
@@ -53,6 +66,12 @@ data class BrowserAccessPolicyData(
         /** 10 미만은 2026년 장비에서 너무 빠르고, 16 초과는 요청 하나가 초 단위로 길어진다. */
         const val MIN_HASH_COST = 10
         const val MAX_HASH_COST = 16
+
+        /**
+         * 이 상한을 넘기면 「빠른 실패」라는 말이 무의미해진다 — 그만큼 커넥션을 쥔다.
+         * 잠금 보유가 빠른 문장 셋뿐이므로 실제 값은 이보다 훨씬 작다.
+         */
+        val MAX_LOCK_WAIT: Duration = Duration.ofSeconds(5)
     }
 }
 
@@ -72,6 +91,7 @@ val BROWSER_ACCESS_POLICY: EffectiveDatedPolicy<BrowserAccessPolicyData> =
                         maxFailedAttempts = 5,
                         lockWindow = Duration.ofMinutes(15),
                         hashCost = 12,
+                        lockWait = Duration.ofMillis(500),
                     ),
             ),
     )

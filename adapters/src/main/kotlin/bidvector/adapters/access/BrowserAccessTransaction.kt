@@ -83,7 +83,7 @@ class JdbcBrowserAccessTransaction(
         BrowserAccessWorkflow(
             accounts = JdbcAccountStore(connections),
             sessions = JdbcBrowserSessionStore(connections),
-            completion = JdbcSignInCompletion(connections),
+            completion = JdbcSignInCompletion(connections, policy.lockWait),
             hasher = hasher,
             keys = keys,
             clock = clock,
