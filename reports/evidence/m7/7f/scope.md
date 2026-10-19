@@ -128,6 +128,15 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   - **runbook 한 줄(cr 권고)**: 망 분리가 닫은 것은 web 경로뿐이다. proxy→app 관리 포트의 방어는 설정층 둘((A3) 상류 등식 · (E) 404)이다.
 - 수정 뒤 verifier 표적 r3(R2-H1 구조 검사 · 키 재료 · rollback) + code-reviewer 표적 r3.
 
+**D-7F-6 (2026-10-19, 팀장 — 수정 r2 수령 · 동결).** 판정 대상은 마지막 산출물 `d492ca9e` · evidence `3f2df512` 다.
+- **in_scope 추가를 수용한다**: `tools/workflow-step-refs-check.sh`(S-20z). R2-H1 의 재발을 구조로 막는 검사다. 복원 목록은 17 → 18 이다.
+- container job 은 `if:` 를 평가하는 재생으로 ran 23 · skipped 0 이다(S-20z 추가로 22 → 23, base 16 대비 +7).
+- **자리 후속 둘(이 slice 밖)**: ⓐ 워크플로 참조 검사는 워크플로 전체를 보므로 `check` job(= `one-command-check.sh` 축어 경로)이 더
+  맞는 자리다. 그 두 파일이 in_scope 밖이라 이번에는 `container` job 맨 앞에 두었다. ⓑ R2-6 은 `tools/vuln-scan-check.sh` 가 기록하는
+  이미지 ID 를 쓰는 편이 더 정확하다. 그 파일도 in_scope 밖이라 빌드 기록 방식으로 닫았다.
+- **레인이 잡은 사고 하나를 기록한다**: 내용 탐지 첫 판의 `find -size -1M` 을 BusyBox 가 거부해 탐침 전체가 조용히 0건이었다. 종료 코드로는
+  가려지지 않아 「훑은 파일 수」를 양성 대조로 세게 했다.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
