@@ -24,6 +24,14 @@ cd "$REPO_ROOT"
   exit 2
 }
 
+# 도구 preflight — **env 조각을 읽기 전에** 본다. 그 조각은 compose 의 `${VAR:?}` 를 만족시키려고
+# `openssl rand` 를 돌리므로(빌드는 그 값을 쓰지 않지만 compose 가 값을 요구한다), `openssl` 이
+# 없는 호스트에서는 대입 안의 명령 치환이 실패해 **문면 없이 즉사**한다. 스모크에는 같은
+# preflight 가 있는데 이 진입점에는 없었다(검토 r2 cr R2-8).
+for t in docker openssl; do
+  command -v "$t" >/dev/null 2>&1 || { echo "$t 가 필요하다 — 이 진입점은 compose 로 두 이미지를 굽고, 값 조각이 openssl 로 자리값을 만든다" >&2; exit 2; }
+done
+
 # shellcheck source=tools/local-tls-env.sh
 . "$REPO_ROOT/tools/local-tls-env.sh"
 
