@@ -158,7 +158,10 @@ for _ in $(seq 1 40); do
   sleep 3
 done
 ps_out="$("${COMPOSE[@]}" ps --format '{{.Service}}: {{.Status}}')"
-echo "$ps_out" | grep -q "proxy:.*(healthy)" || { echo "$ps_out" >&2; fail "app·web·proxy 가 제한 시간 안에 healthy 로 수렴하지 않았다"; }
+# 최종 관문의 술어는 **proxy 하나**다 — `up -d proxy` 의 `depends_on: service_healthy` 때문에
+# app·web 이 healthy 가 아니면 proxy 가 애초에 서지 않으므로 사실상 셋을 함께 재지만, 문면이
+# 술어보다 넓으면 실패했을 때 **무엇이 측정됐는지**가 어긋난다(cr L-8).
+echo "$ps_out" | grep -q "proxy:.*(healthy)" || { echo "$ps_out" >&2; fail "proxy 가 제한 시간 안에 healthy 로 수렴하지 않았다(app·web 은 depends_on: service_healthy 로 그 앞에 선다 — 위 ps 출력이 어느 단계에서 멈췄는지 가리킨다)"; }
 
 # 로컬 CA 의 뿌리 인증서를 컨테이너에서 꺼낸다 — **실행 시 발급된 것**이고 저장소에는 없다.
 # 아래 모든 https 요청이 이 체인으로 검증된다(`-k` 를 쓰지 않는다 — 그러면 TLS 가 서 있는지
