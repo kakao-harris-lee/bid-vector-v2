@@ -134,8 +134,8 @@ acceptance 는 `.github/workflows/ci.yml` 의 `check` job 과 `web` job 이 돌�
 
 - cmd: 임시 clone 에서 복원 명령 + `flock … ./gradlew --no-daemon check`
 - exit: 둘 다 0
-- 핵심 결과: `D 15 · M 11`(기계 목록과 일치) · base 대비 diff 빈 출력 · 되돌린 트리 전건 초록.
-  자세한 계수는 `rollback.md`.
+- 핵심 결과: 복원 뒤 상태 계수가 그 시점 기계 목록과 일치 · base 대비 diff 빈 출력 · 되돌린
+  트리 전건 초록. **수는 `rollback.md` 가 갖는다**(D-7C1-4 ⓑ — 이 문서는 수를 적지 않는다).
 
 ### 전건이 r2 에서 잡은 것 (수정 뒤 위 결과)
 
@@ -281,7 +281,7 @@ app 쪽 둘은 재설계 뒤 마지막 산출물 커밋 `2705d828` 에서 **새�
 
 ### 2026-10-19T06:58Z — clean-tree 게이트
 
-- cmd: `git status --porcelain -- <in_scope 27 경로 개별 인자>`
+- cmd: `git status --porcelain -- <in_scope 경로 개별 인자 — 목록은 `rollback.md` 의 기계 산출>`
 - exit: 0
 - 핵심 결과: 빈 출력. **양성 대조 1회** — in_scope 파일 하나 끝에 빈 줄을 하나 붙이니 같은
   명령이 그 파일을 ` M` 으로 잡았고, 심기 전 사본에서 `head -n <원래 줄수>` 로 절삭 복원해 다시
@@ -291,18 +291,18 @@ app 쪽 둘은 재설계 뒤 마지막 산출물 커밋 `2705d828` 에서 **새�
 
 - cmd: 버릴 clone 에서 복원 명령 + `flock … ./gradlew --no-daemon check`
 - exit: 둘 다 0
-- 핵심 결과: 경로 **27**(A 16 · M 11) · 복원 뒤 `D 16 · M 11` · base 대비 diff 빈 출력 ·
-  되돌린 트리 전건 초록(BUILD SUCCESSFUL in 9m 22s, 모듈 11 compile · 모듈 10 test).
-  r2 판 목록의 구멍(`ReadOnlyWitness.kt` 누락)은 기계 산출을 다시 돌려 닫혔다. 이 판은
-  **재설계로 산출물 커밋이 하나 더 생겨 유효성을 잃었고**, 아래에서 다시 쟀다.
+- 핵심 결과: 복원 뒤 상태 계수가 기계 목록과 일치 · base 대비 diff 빈 출력 · 되돌린 트리 전건
+  초록(BUILD SUCCESSFUL in 9m 22s, 모듈 11 compile · 모듈 10 test). r2 판 목록의
+  구멍(`ReadOnlyWitness.kt` 누락)은 기계 산출을 다시 돌려 닫혔다. 이 판은 **재설계로 산출물
+  커밋이 더 생겨 유효성을 잃었고**, 아래에서 다시 쟀다.
 
-### 2026-10-19T06:17Z — rollback ①~⑥ 재실측 (실측 HEAD `2705d828`)
+### 2026-10-19T06:17Z — rollback ①~⑥ 재실측 (실측 HEAD `2705d828` — STR-16 **전** 판)
 
 - cmd: 같은 절차를 새 clone 에서
 - exit: 둘 다 0
-- 핵심 결과: 경로 **27**(A 16 · M 11 — 재설계가 새 파일을 만들지 않아 목록이 그대로다) ·
-  복원 뒤 `D 16 · M 11` · base 대비 diff 빈 출력 · 되돌린 트리 전건 초록(BUILD SUCCESSFUL in 9m 24s, 모듈 11 compile · 모듈 10 test). 자세한 계수는
-  `rollback.md`.
+- 핵심 결과: 복원 뒤 상태 계수가 기계 목록과 일치(재설계가 새 파일을 만들지 않아 목록이
+  그대로였다) · base 대비 diff 빈 출력 · 되돌린 트리 전건 초록(BUILD SUCCESSFUL in 9m 24s).
+  이 판도 **STR-16 산출물 커밋이 뒤에 와서** 유효성을 잃었고, 아래 r5 에서 다시 쟀다.
 
 ### 2026-10-19T06:30Z — acceptance: `check` job + `web` job (마지막 산출물 커밋 `2705d828`)
 
@@ -316,6 +316,30 @@ app 쪽 둘은 재설계 뒤 마지막 산출물 커밋 `2705d828` 에서 **새�
   으로 갈랐다). 이 라운드는 컨트롤러·오류 매핑표를 바꿔 **이미지 축에 닿는다**.
 - exit: 0
 - 핵심 결과: `TOTAL steps=16 failed=0` — 이미지 둘 빌드 · 위생·취약점 게이트 · 거부 스모크 · healthy 수렴 · 컨테이너 스모크 · 백업·복원 리허설(측정 10가지 일치, 누출 0) · 실 서버 교차언어 · 정리 뒤 이 레인 이름의 컨테이너 0 · 볼륨 0.
+
+## r5 라운드 (D-7C1-4 — 추적표 STR-16) — `2620afe7`
+
+### 2026-10-19T10:36Z — 추적표가 닿는 게이트 확인
+
+- cmd: `grep -rln 'acceptance-trace' --include=*.kt …` · `grep -rn 'reports/evidence' --include=*.kt`
+- exit: 0
+- 핵심 결과: 추적표를 **읽는** test 는 없다. 다만 누출 패턴 게이트가 `reports/evidence/` **트리
+  전체**를 스캔 입력으로 들므로 이 파일 변경은 **그 게이트에 닿는다** — 그래서 아래에서 Kotlin
+  전건 종료 코드를 쟀다. 추가한 줄의 패턴 일치는 0 이고 능력 행 수도 그대로다.
+
+### 2026-10-19T10:41Z — rollback ①~⑥ 재실측 (실측 HEAD `2620afe7`)
+
+- cmd: 버릴 clone 에서 복원 명령 + `flock … ./gradlew --no-daemon check`
+- exit: 둘 다 0
+- 핵심 결과: 복원 뒤 상태 계수가 기계 목록과 일치하고, **`comm` 대조에서 양쪽 전용 줄이 0**
+  이다(수가 아니라 집합이 같다는 증명). base 대비 diff 빈 출력 · 되돌린 트리 전건 초록(BUILD
+  SUCCESSFUL in 9m 46s, 모듈 11 compile · 모듈 10 test · 태스크 줄 443). **수는 `rollback.md`.**
+
+### 2026-10-19T10:5xZ — Kotlin 전건 (게이트에 닿아서)
+
+- cmd: `flock … ./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(23s, 태스크 줄 443 · 모듈 10 test). 바뀐 파일이 누출 패턴 게이트의 스캔 입력이라 그 태스크(`leakPatternGate`)가 이 실행에서 실제로 돌았고 초록이다. 추적표는 **문서**라 컴파일·test 에는 닿지 않는다 — 게이트만 다시 잰 이유다.
 
 ## 마지막 HEAD 의 게이트 결과
 
