@@ -174,10 +174,10 @@ CONTENT_PATH=""
 CONTENT_MIN_ENTRIES=""
 REQUIRED_CONTENT_PATTERNS=""
 FORBIDDEN_CONTENT_PATTERNS=""
-SECRET_MATERIAL_SCAN_PATHS=""
-SECRET_MATERIAL_EXCLUDE_PREFIXES=""
-SECRET_MATERIAL_PATTERNS=""
-SECRET_MATERIAL_MIN_ENTRIES=""
+KEYMAT_SCAN_PATHS=""
+KEYMAT_EXCLUDE_PREFIXES=""
+KEYMAT_PATTERNS=""
+KEYMAT_MIN_ENTRIES=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -235,10 +235,10 @@ case "$RUNTIME_KIND" in
     # 검토 r1 F-2 — 키·인증서 재료는 **싣고 있는 내용 축과 다른 범위**를 갖는다. 그 축은
     # 「서브되는 트리에 무엇이 있나」를 묻느라 좁고, 키는 그 트리 밖(`/data`·`/config`)에 구워도
     # 똑같이 사고다. 그래서 범위·제외·패턴·하한을 **따로 선언**한다.
-    SECRET_MATERIAL_SCAN_PATHS="$(_policy_value secret.material.scan-paths pathlist)"
-    SECRET_MATERIAL_EXCLUDE_PREFIXES="$(_policy_value secret.material.exclude-prefixes pathlist)"
-    SECRET_MATERIAL_PATTERNS="$(_policy_value secret.material.patterns list)"
-    SECRET_MATERIAL_MIN_ENTRIES="$(_policy_value secret.material.min-entries numeric)"
+    KEYMAT_SCAN_PATHS="$(_policy_value keymaterial.scan-paths pathlist)"
+    KEYMAT_EXCLUDE_PREFIXES="$(_policy_value keymaterial.exclude-prefixes pathlist)"
+    KEYMAT_PATTERNS="$(_policy_value keymaterial.patterns list)"
+    KEYMAT_MIN_ENTRIES="$(_policy_value keymaterial.min-entries numeric)"
     # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
     # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
     # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
@@ -537,32 +537,32 @@ case "$RUNTIME_KIND" in
     # `tls internal` 이 실제로 CA 를 두는 자리(`/data/caddy/pki/...`)에 키를 구운 이미지가 초록이었다
     # — 이미지에 미리 구운 CA 는 이 위협의 가장 그럴듯한 형태인데 그 자리를 보지 않았다.
     # 범위는 **이미지 파일시스템 전체**이고, `-xdev` 가 런타임 마운트(proc·sys·dev)를 밖에 둔다.
-    IFS=',' read -r -a secret_scan_paths <<< "$SECRET_MATERIAL_SCAN_PATHS"
-    IFS=',' read -r -a secret_exclude_array <<< "$SECRET_MATERIAL_EXCLUDE_PREFIXES"
-    IFS=',' read -r -a secret_pattern_array <<< "$SECRET_MATERIAL_PATTERNS"
-    SECRET_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${secret_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
-    SECRET_CANDIDATES="$(printf '%s\n' "$SECRET_LISTING" | sed '/^[[:space:]]*$/d')"
+    IFS=',' read -r -a keymat_scan_paths <<< "$KEYMAT_SCAN_PATHS"
+    IFS=',' read -r -a keymat_exclude_array <<< "$KEYMAT_EXCLUDE_PREFIXES"
+    IFS=',' read -r -a keymat_pattern_array <<< "$KEYMAT_PATTERNS"
+    KEYMAT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${keymat_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
+    KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
     # 선언된 접두를 뺀다 — 베이스가 싣는 **공개** 신뢰 기점(시스템 CA 번들)은 비밀값이 아니다.
-    for pre in "${secret_exclude_array[@]}"; do
-      SECRET_CANDIDATES="$(printf '%s\n' "$SECRET_CANDIDATES" | grep -v -- "^${pre}" || true)"
+    for pre in "${keymat_exclude_array[@]}"; do
+      KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -v -- "^${pre}" || true)"
     done
-    SECRET_ENTRIES="$(printf '%s\n' "$SECRET_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    KEYMAT_ENTRIES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
     # **양성 대조는 제외를 적용한 뒤에 센다.** 그래야 「제외 접두를 넓혀 축을 꺼 버리는」 편집이
     # 여기서 끊긴다 — `/` 하나를 제외로 넣으면 남는 파일이 0 이 되어 판정 불가가 된다.
-    if ! [[ "$SECRET_ENTRIES" =~ ^[0-9]+$ ]] || [ "$SECRET_ENTRIES" -lt "$SECRET_MATERIAL_MIN_ENTRIES" ]; then
-      fail "키·인증서 재료 탐색의 대상 파일 수(${SECRET_ENTRIES})가 정책 하한(${SECRET_MATERIAL_MIN_ENTRIES}) 미만이다 — 범위(${SECRET_MATERIAL_SCAN_PATHS})가 틀렸거나 제외 접두가 너무 넓거나 목록 도구가 없다(판정 불가)"
+    if ! [[ "$KEYMAT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$KEYMAT_ENTRIES" -lt "$KEYMAT_MIN_ENTRIES" ]; then
+      fail "키·인증서 재료 탐색의 대상 파일 수(${KEYMAT_ENTRIES})가 정책 하한(${KEYMAT_MIN_ENTRIES}) 미만이다 — 범위(${KEYMAT_SCAN_PATHS})가 틀렸거나 제외 접두가 너무 넓거나 목록 도구가 없다(판정 불가)"
     else
-      SECRET_HITS=""
-      for pat in "${secret_pattern_array[@]}"; do
-        hit="$(printf '%s\n' "$SECRET_CANDIDATES" | grep -iF -- "$pat" || true)"
-        [ -z "$hit" ] || SECRET_HITS="${SECRET_HITS}${hit}"$'\n'
+      KEYMAT_HITS=""
+      for pat in "${keymat_pattern_array[@]}"; do
+        hit="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -iF -- "$pat" || true)"
+        [ -z "$hit" ] || KEYMAT_HITS="${KEYMAT_HITS}${hit}"$'\n'
       done
-      SECRET_HITS="$(printf '%s' "$SECRET_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
-      if [ -n "$SECRET_HITS" ]; then
-        fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$SECRET_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
+      KEYMAT_HITS="$(printf '%s' "$KEYMAT_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
+      if [ -n "$KEYMAT_HITS" ]; then
+        fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$KEYMAT_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
       fi
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${SECRET_ENTRIES}(하한 ${SECRET_MATERIAL_MIN_ENTRIES}) 키재료-패턴=${#secret_pattern_array[@]}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-패턴=${#keymat_pattern_array[@]}건"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
