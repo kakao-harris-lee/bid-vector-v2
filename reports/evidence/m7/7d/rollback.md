@@ -1,8 +1,9 @@
 # M7/7D 되돌림
 
-**실측 HEAD: `12221080`**(이 slice 의 마지막 산출물 커밋). ①~⑥ 을 그 커밋을 체크아웃한 임시
-clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과도 이 HEAD 에서 다시 냈다.
-**라운드가 더 붙으면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이 결함의 실제 원인이다.
+**실측 HEAD: `b8541a80`**(이 slice 의 마지막 산출물 커밋 — code-review r1 수정 라운드까지 포함).
+①~⑥ 을 그 커밋을 체크아웃한 임시 clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과도
+이 HEAD 에서 다시 냈다. **라운드가 더 붙으면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이
+결함의 실제 원인이다(r2 에서 실제로 늘었다: 신규 파일 하나·경로 하나).
 
 **forward-fix 가 정본이다**(계약 「rollback」, 6B-2 runbook 관례). 마이그레이션은 되돌리기 어려운
 경로다 — V20 이 만든 표를 지우는 새 마이그레이션을 쓰지 않는다. 되돌림은 두 경우로 갈린다.
@@ -10,8 +11,8 @@ clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과�
 ## 전제 (머지 **전**을 가정한다)
 
 - 복원 기준 SHA 는 **`77850903` 고정**(움직이는 `origin/main` 을 쓰지 않는다). 단언 넷:
-  - `git merge-base --is-ancestor 77850903 12221080` → exit 0 (base 가 실측 HEAD 의 조상).
-  - `git log --oneline 77850903..12221080 --merges` → **빈 출력**(이 브랜치에 main 병합이 없다).
+  - `git merge-base --is-ancestor 77850903 b8541a80` → exit 0 (base 가 실측 HEAD 의 조상).
+  - `git log --oneline 77850903..b8541a80 --merges` → **빈 출력**(이 브랜치에 main 병합이 없다).
     그래서 공유 파일의 복원 기준도 base 하나다.
   - **복원 집합의 첫 커밋은 `ed0f45ba`** 다(기계 산출:
     `git log --oneline --reverse 77850903..<HEAD> -- <복원 경로들> | head -1`).
@@ -22,24 +23,25 @@ clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과�
   없다. 병렬 레인 7C① 도 같은 파일 셋을 만지지만 **그 커밋은 이 브랜치에 없다**(머지 순서에 따라
   뒤 PR 이 충돌을 정리한다 — 계약 「검토 레인」).
 - 하네스 경로(`CLAUDE.md`·`.claude/**`)는 **되돌리지 않는다**. 이 range 의 그 경로 커밋은
-  **0 건**이다(`git log --oneline 77850903..12221080 -- CLAUDE.md .claude/` 빈 출력 — 실측).
+  **0 건**이다(`git log --oneline 77850903..b8541a80 -- CLAUDE.md .claude/` 빈 출력 — 실측).
 
 ## ① 머지 전 — in_scope 경로 한정 복원
 
 ### 복원 목록 — 기계 산출
 
 ```
-git diff --name-status 77850903..12221080 -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence/m7/7d'
+git diff --name-status 77850903..b8541a80 -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence/m7/7d'
 ```
-실측 HEAD 에서 **A 30 · M 44 · R 1**(합 75 행 · 복원 경로 76 — R 은 두 경로 모두 넘긴다).
+실측 HEAD 에서 **A 31 · M 44 · R 1**(합 76 행 · 복원 경로 77 — R 은 두 경로 모두 넘긴다).
+r1 대비 A 가 하나 늘었다(동시성 test 파일 신설) — 목록을 손으로 옮기지 않는 이유가 이것이다.
 A(신규)는 복원 명령이 삭제하고 M(수정)은 base 내용으로 되돌린다 — `--source` 에 없는 경로는
 삭제되므로 신규 파일에 별도 `git rm` 이 필요 없다. **`git checkout <base> -- <경로>` 는 쓰지
 않는다**(base 에 없는 경로마다 pathspec 오류로 exit 1 이고 아무것도 적용되지 않는다).
 파일 이름을 여기 나열하지 않는다 — 목록은 위 명령이 정본이고, 손으로 옮긴 목록이 낡는다.
 
-**전체 변경 − 복원 목록 = `reports/evidence/m7/7d/**` 뿐**(`comm -23` 실측). 그 밖의 경로가
-나오면 목록이 낡은 것이다. 실측 시점에 그 디렉터리에서 커밋돼 있던 것은 `scope.md` 하나이고,
-나머지 넷은 이 문서를 담는 커밋이 더한다.
+**전체 변경 − 복원 목록 = `reports/evidence/m7/7d/**` 뿐**(실측 — 복원 뒤 base 대비 전수
+`git diff --name-only` 의 경로 뿌리가 그 디렉터리 하나다). 그 밖의 경로가 나오면 목록이 낡은
+것이다.
 
 ### 복원 명령
 
@@ -56,22 +58,24 @@ git restore --source=77850903 --staged --worktree -- <위 목록의 경로들을
   이 slice 는 누출 baseline 에 아무 줄도 더하지 않는다(그 짝이 어긋나는 M4 의 형태가 여기 없다).
 - `CLAUDE.md`·`.claude/**` — 하네스 레인(위 전제의 실측: 이 range 에 0 건).
 
-### ①~⑥ 실측 (임시 clone, 실측 HEAD `12221080`)
+### ①~⑥ 실측 (임시 clone, 실측 HEAD `b8541a80`)
 
 | 축 | 결과 |
 | --- | --- |
 | ① 복원 명령 | exit 0 |
-| ② 되돌린 수 | 스테이징 **D 30 · M 44 · R 1** (A 였던 30 이 삭제로 바뀐다) |
+| ② 되돌린 수 | 스테이징 **D 31 · M 44 · R 1** (A 였던 31 이 삭제로 바뀐다) |
 | ③ 복원 경로의 base 대비 diff | **빈 출력** |
-| ③b 남은 차이(base 트리 **전수** 대비) | `reports/evidence/m7/7d/` 뿐 — 되돌리기로 한 것은 전부 돌아갔다 |
-| ④ compile (`app`·`adapters`·`workflow`·`shared-kernel` 의 `compileTestKotlin`) | exit 0 |
-| ⑤ test (`:workflow:test` · `:app:test` · `:shared-kernel:test`) | exit 0 |
-| ⑥ 게이트 17(`sizeGate`·`jarContentGate`·`gateRegistrationGate`·`gateExecutionGate`·`leakPatternGate`·`contractGate`·`memberEffectGate` 등) | exit 0 |
+| ③b 남은 차이(base 트리 **전수** 대비) | `reports/evidence/` 뿐 — 되돌리기로 한 것은 전부 돌아갔다 |
+| ④⑤⑥ 복원 트리의 전건 `check` | exit 0 · 359 actionable tasks — 컴파일·test·게이트가 한 명령 안에 있다 |
+
+r2 에서 ④⑤⑥ 을 **쪼개지 않고 전건 `check` 하나**로 쟀다. 쪼갠 판은 어느 게이트가 그 목록에
+들었는지를 손으로 적어야 하고, 그 목록이 곧 낡는다 — `check` 는 CI 의 job 명령 그대로이고
+게이트 집합이 그 안에서 스스로 정해진다(하네스 「부분 게이트는 안 돌린 것과 같다」).
 
 **갈음하지 않았다 — 다만 트리 동일성도 함께 쟀다.** 같은 clone 에서 evidence 까지 포함해
-복원하면 트리가 base 와 **파일 SHA 까지 같다**(복원 트리 해시 = base 트리 해시, 전수 diff 0 행).
-그 상태의 ④⑤⑥ 도 전부 exit 0 이었다. 즉 이 slice 의 되돌림은 「대충 돌아간 트리」가 아니라
-**base 그 자체**이고, evidence 를 남긴 판에서도 같은 게이트가 선다.
+복원하면 트리가 base 와 **파일 SHA 까지 같다**(base 대비 전수 diff **0 행** — r2 재실측).
+위 ④⑤⑥ 은 바로 그 상태에서 돌렸다. 즉 이 slice 의 되돌림은 「대충 돌아간 트리」가 아니라
+**base 그 자체**다.
 
 ## ② 머지 뒤 — PR revert + 개발 DB 재생성
 

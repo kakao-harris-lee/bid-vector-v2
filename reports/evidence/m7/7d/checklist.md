@@ -46,6 +46,17 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 | 쿠키의 교차 출처 전송 | `client.test.ts` 「쿠키를 교차 출처로 보내지 않는다 — include 가 아니다」 | `credentials` 를 `'include'` 로(M12) | **RED**(M12) |
 | 화면의 CSRF 헤더 | `client.test.ts` 「상태를 바꾸는 요청에는 기억한 CSRF 값을 붙인다」 | 면제 판정을 상수 참으로(M13) | **RED**(M13) |
 
+**code-review r1 수정 라운드가 더한 다섯 축**(같은 방법으로 실측 — `commands.md` r2 절이 정본)
+
+| 축 | test | 변이 | 변이 아래 |
+| --- | --- | --- | --- |
+| 실패 계수의 **원자성** | `AccessConcurrencyTest` 「동시 실패 K 건은 계수를 K 올린다」 | 계수 증가를 읽은 값에서 계산한 절대값으로(M14) | **RED**(M14) |
+| 늦게 끝난 요청이 **잠금을 지우지 않는다** | 같은 클래스 「늦게 끝난 실패는…」·「늦게 끝난 성공은…」 | 상한 아래 잠금 보존 → NULL 덮어쓰기(M15) / 성공 초기화의 잠금 조건 제거(M16) | **RED**(M15 · M16) |
+| 긴 비밀 문구의 **거부 모양** | `AccessStorePersistenceTest` 「한계를 넘는 긴…」·「긴 비밀 문구의 로그인은…」 · `ProductionBrowserAccessTest` 「한계를 넘는 긴…401…」 | 긴 입력 전략을 던지는 쪽(옛 기본값)으로(M17) | **RED**(M17) |
+| 로그인이 **커넥션을 쥐지 않는다** | `AccessConcurrencyTest` 「로그인의 느린 검증은 커넥션을 쥐지 않는다 — 풀이 하나여도…」 | 로그인 경계를 한 트랜잭션(옛 모양)으로(M18) | **RED**(M18) |
+| 재발급의 **폐기가 실 DB 에서 선다** | `AccessStorePersistenceTest` 「로그인 재발급은 앞 세션을 폐기한다 — 포트 한 호출이다」 | 폐기 문장의 계정 바인딩을 무관한 값으로(M19) | **RED**(M19) |
+| 문서의 **CSRF 선언**(상태 변경 전수) | `OpenApiContractTest` 「문서가 무인증으로 여는…집합 등식」·「그 밖의 상태 변경 operation 은…쿠키 단독 대안 0」 | operation 하나에서 CSRF 요구 제거(M20) / 로그인의 무인증 선언 제거(M21) | **RED**(M20 · M21) |
+
 ### 아홉을 **구조로** 닫은 자리 (문자열 술어가 아닌 층)
 
 - **세션 식별자는 해시로만 저장된다 — 타입이 진다.** 저장 포트의 서명이 `BrowserSessionDigest`
@@ -63,6 +74,17 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 - **꽂힌 인증 경로를 실측으로 잠근다.** 기본 거부 필터가 인증 경로를 **구성으로** 받으므로
   (계약 설계 검토 (1)), 그 자리는 「다른 몸통을 꽂을 수 있다」는 뜻이다. 출하 조립에 실제로
   꽂힌 인증기 집합을 `ProductionBrowserAccessTest` 가 순서까지 등식으로 잰다.
+- **실패 계수는 스냅숏에 없다**(r2, H-1). 「읽어서 더한 값을 되쓰는」 형태가 다시 서려면 포트의
+  읽기 모델에 그 값이 있어야 하는데, 그 필드를 **없앴다**. 계수의 계산은 SQL 한 문장 안에만
+  있고, 그 문장이 상한·잠금을 같은 조건으로 가른다.
+- **문서의 무인증 집합이 필터 상수와 등식이다**(r2, M-3). 「어느 operation 이 CSRF 를
+  선언했는가」를 이름 목록으로 세지 않는다 — 문서에서 그 자리를 모아 `OPEN_ROUTES` 와 양방향
+  으로 견주고, 「상태를 바꾸는 메서드」의 정의도 production 상수의 **여집합**으로 받는다.
+  목록을 두 벌 두면 그 둘이 갈린다.
+- **느슨한 경계의 호출자가 하나로 못박힌다**(r2, M-2). 로그인만 문장별 트랜잭션으로 도는 자리
+  (`inSignInScope`)는 use case 를 빌려주는 열린 모양이지만, 그것을 부를 수 있는 쌍이
+  `app.adapter.member-call-pairs` 에 **하나**뿐이다(fail-closed) — 다른 긴 작업이 그 자리로
+  들어오려면 게이트 설정을 먼저 바꿔야 한다.
 
 ## 2. (2b) 값 획득 축 — 새 public 표면 전수
 
@@ -91,7 +113,8 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 | 표면 | 밖에 허락하는 것 | 등급·닫는 자리 |
 | --- | --- | --- |
 | `NewBrowserSession` 생성자 | **세션 한 벌을 만든다** | **차단** — `internal`. 모듈 밖 0, 모듈 안 호출자 = `signIn` 하나 |
-| `AccountSnapshot` · `BrowserSessionSnapshot` 생성자 | 스냅숏을 짓는다 | 낮음 — 지어도 포트가 반환한 값이 아니면 판정에 들어가지 않는다(저장 층이 만드는 읽기 모델) |
+| `AccountSnapshot` · `BrowserSessionSnapshot` 생성자 | 스냅숏을 짓는다 | 낮음 — 지어도 포트가 반환한 값이 아니면 판정에 들어가지 않는다(저장 층이 만드는 읽기 모델). r2: `AccountSnapshot` 에서 **실패 계수 필드를 뺐다**(읽어서 더하는 형태의 자리를 없앤다) |
+| `AccountStorePort.registerFailure` · `.clearFailures`(r2 서명 변경) | 실패 하나를 **올린다** / 잠겨 있지 않을 때만 비우고 비웠는지를 돌려준다 | 중간 — 포트를 쥔 주체만(app 은 `app.port-call.ports` 로 직접 호출이 막혀 있다). 서명이 「이 값으로 둔다」가 아니라 「올린다」라 절대값 쓰기가 표면에 없다 |
 | `BrowserAccessWorkflow(...)` 생성자 | use case 를 조립한다 | 중간 — 포트 **구현**을 쥐어야 한다. app 은 포트를 쥐지 못한다(의존 게이트 + port-call 게이트) |
 | `.signIn` | 올바른 비밀 문구로만 세션 발급 | 설계된 표면 — 잠금·계수·재발급이 함께 돈다 |
 | `.authenticate` · `.describe` · `.signOut` | **이미 세션 값을 쥔** 호출자의 판정·조회·폐기 | 낮음 — 인자가 그 값이다(새 권한을 만들지 않는다) |
@@ -106,11 +129,12 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 | --- | --- | --- |
 | `JdbcAccountStore(ConnectionSource)` | 계정 읽기·실패 계수 갱신 | 중간 — `ConnectionSource` 는 `sealed` 이고 구현이 `internal` 이라 모듈 밖에서 임의 연결을 공급할 수 없다 |
 | `JdbcAccountProvisioningStore(...)` | **계정 INSERT · 해시 UPDATE** | 높음 — 같은 이유로 연결을 쥔 주체만. 앱 역할로는 두 문장이 42501 이다(실측) |
-| `JdbcBrowserSessionStore(...)` | 세션 행 쓰기·조회 | 중간 — `open()` 의 인자를 만들 수 없다(`internal` 생성자) |
+| `JdbcBrowserSessionStore(...)` | 세션 행 쓰기·조회 | 중간 — `openReplacing()` 의 인자를 만들 수 없다(`internal` 생성자). r2: 폐기와 등록이 **한 메서드**라 「폐기 없이 여는」 호출이 표면에 없다 |
 | `BcryptPassphraseHasher(Int)` | 해시·검증 | 낮음 — 입력을 받아 값을 낸다(저장하지 않는다) |
 | `SecureBrowserSessionKeySource()` | 난수 세션 값 발급 | 낮음 — 값만 만든다(저장은 포트의 일). **주입 자리는 `internal` 주 생성자**라 난수원을 밖에서 못 꽂는다 |
 | `BrowserAccessTransaction` · `AccountProvisioningTransaction` (interface) | use case 를 트랜잭션 안에서 대여 | 설계된 경계 — 저장소·연결을 돌려주는 공개 경로가 없다 |
-| `JdbcBrowserAccessTransaction(...)` · `JdbcAccountProvisioningTransaction(...)` | 경계 조립 | 중간 — `TransactionBoundary`(즉 `DataSource`)를 쥔 주체만. 요청 경로와 명령 경로가 **다른 타입**이라 서로 주입될 수 없다 |
+| `JdbcBrowserAccessTransaction(...)` · `JdbcAccountProvisioningTransaction(...)` | 경계 조립 | 중간 — `TransactionBoundary`(즉 `DataSource`)를 쥔 주체만. 요청 경로와 명령 경로가 **다른 타입**이라 서로 주입될 수 없다. r2: 앞엣것이 `DataSource` 를 하나 더 받는다(로그인의 문장별 공급원) — **같은 풀**이고, 그 공급원 타입은 `internal` 이라 밖에서 다른 것을 꽂을 수 없다 |
+| `BrowserAccessTransaction.inSignInScope`(r2) | **문장별 트랜잭션** 아래에서 use case 를 빌린다 | 중간 → **쌍으로 닫는다** — 호출자가 `app.adapter.member-call-pairs` 에 하나뿐이다(fail-closed). 원자성이 필요한 묶음은 포트 한 호출 안이라 이 느슨함이 쪼갤 쌍이 없다 |
 
 ### app
 
@@ -195,6 +219,7 @@ java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식
 | `app.surface.api.handlers` | `+OperatorSessionController` | 출하 조립에 실제로 꽂힌 handler 집합의 실측값 |
 | `app.surface.api.filters` | `OperatorCredentialFilter` → `RequestAuthenticationFilter` | 같은 자리의 **이름 변경**이다 — 등록되는 필터가 기본 거부 하나라는 사실은 그대로이고, 그 클래스가 더 이상 `Filter` 가 아니어서 이름이 바뀌었다 |
 | `app.adapter.member-call-pairs` | `+BrowserAccessExecutor\|BrowserAccessTransaction\|inTransaction\|Function1` | 편집 실행기의 같은 형태(경계의 유일 메서드). 서술자까지 적어 오버로드가 같은 자리로 접히지 않게 한다 |
+| `app.adapter.member-call-pairs`(r2) | `+BrowserAccessExecutor\|BrowserAccessTransaction\|inSignInScope\|Function1` | 로그인만 문장별 트랜잭션으로 도는 자리의 **유일 호출자**를 못박는다(fail-closed). 쌍 하나 외에는 아무도 그 느슨한 경계로 들어올 수 없다 |
 | `app.port-call.ports` | `+접근 포트 다섯` · **허용 쌍 0** | **넓히는 변경이 아니라 좁히는 변경이다** — app production 의 어느 클래스도 이 포트의 메서드를 직접 부르지 못하게 못박는다 |
 | 자격증명 참조자 키(`…operator-credential-referencers`) | 이름 변경 하나 | 위 필터 이름 변경의 같은 축(집합 크기 불변) |
 | 비밀값 축의 새 키 쌍(`…passphrase-types`·`…passphrase-referencers`) + `collection.depth.passphrase` | **새 키 셋** | 원문 비밀 문구 타입의 보유자 집합을 등식으로 잠근다(자격증명 축과 **키를 나눠** 한쪽 사유가 다른 쪽을 열지 않게) |
@@ -214,7 +239,10 @@ java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식
 - [x] 정책 version 의 근거 — `policy-values.md` §1(정책 데이터의 `source` 가 그 문서를 가리킨다)
 - [x] 비밀값 스캔 — 패턴 파일 참조형으로 산출물·evidence 경로에 실행(`commands.md`). 어휘를
       이 문서에 축어로 적지 않는다
-- [x] 알려진 제한과 rollback — 아래 5절과 `rollback.md`
+- [x] 알려진 제한과 rollback — 아래 5절과 `rollback.md`(r2 에서 **실측 HEAD 를 다시 냈다**)
+- [x] code-review r1 의 blocker/medium 넷(H-1·M-1·M-2·M-3) — 지적별 커밋 + 지적별 변이 실측
+      (`commands.md` r2 절). low 여섯은 리포트가 유실돼 축어를 받지 못했다 — 받으면 그 자리에서
+      처리하거나 「알려진 제한」으로 등재한다
 
 ## 5. 알려진 제한
 
@@ -240,6 +268,11 @@ java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식
    상한을 두는 층(역프록시·IP 단위 제한)은 이 slice 에 없다 — 없는 로그인 식별자로 쏘는 요청은
    계수에도 닿지 않는다(해시 검증 전에 끝난다). 그 층은 반입 형태(7F)의 일이고, 지금 없는 것이
    이 slice 의 방어를 무르게 하지는 않는다(추측은 계정 계수가, 쿠키 위조는 256비트 난수가 막는다).
+   **r2 정정** — 「무르게 하지 않는다」가 한 축에서 틀렸었다: 로그인이 검증 내내 풀 커넥션을 쥐고
+   있었으므로, 유량 제한이 없는 상태에서 그 경로가 **다른 모든 요청을 굶길 수 있었다**. 그 증폭은
+   M-2 가 없앴다(커넥션을 쥐는 시간이 문장 하나의 길이다). 남는 것은 CPU 축이다 — 동시 로그인
+   N 건이 N 번의 KDF 를 돌리는 것 자체는 이 slice 가 막지 않는다. **7F 프록시의 `/api/session`
+   유량 제한을 운영 반입 조건으로** 두자는 것이 이 레인의 제안이고, 계약에 적는 것은 팀장 몫이다.
 8. **비밀 문구 교체 경로는 운영자 명령 하나다.** 화면·endpoint 가 없다(가입·재설정 메일은
    R-2 범위 밖). 계약 산출물 3 의 「비밀번호가 바뀌면 그 계정 세션 전부 폐기」를 실제로 촉발할
    경로가 그것뿐이라 명령에 두 번째 모드를 뒀다 — 범위 판단이므로 완료 보고에 밝힌다.
@@ -264,3 +297,26 @@ java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식
     그래서 고치지 않고 등재한다(한 낱말짜리 후속). 코드 참조가 아니라 산문이므로 컴파일·게이트에
     걸리지 않는다. 역방향 좌표 점검(`grep -rn '<stem>:[0-9]'`)은 **0 건**이다 — 이 slice 가 편집한
     파일을 `file:line` 으로 가리키는 곳이 저장소에 없다.
+
+### code-review r1 수정 라운드가 더한 제한 넷
+
+14. **긴 비밀 문구가 이제 거부되지 않고 쓰인다**(M-1 의 거동 변화). 한계를 넘는 입력은 SHA-512 로
+    접혀 KDF 에 들어가므로, 운영자가 72바이트를 넘는 문구로 계정을 만들 수 있고 그 문구로
+    로그인한다. 앞 판에서는 **만들 수도 쓸 수도 없었다**(명령이 예외로 죽고 로그인이 500 이었다).
+    절단이 아니므로 입력 전체가 결과에 들어간다. 한계 **아래** 입력의 해시 문면과 검증 결과는
+    바뀌지 않는다(전략이 길이 검사를 먼저 하고 그 아래면 입력을 그대로 넘긴다 — 실측).
+15. **검증 중에 잠긴 계정의 올바른 로그인은 거부된다**(H-1 의 선택). 느린 검증이 도는 사이에
+    다른 요청이 상한을 채우면, 늦게 끝난 그 성공은 세션을 받지 못한다. 반대로 하면 늦은 성공
+    하나가 방금 걸린 잠금을 푸는 길이 되므로 이쪽을 골랐다 — 사용자에게는 「잠긴 동안의 시도」와
+    같은 401 이고, 잠금이 풀린 뒤 다시 로그인하면 된다.
+16. **로그인의 세 단계는 서로 원자가 아니다**(M-2 의 대가). 조회·갱신·발급이 각자 트랜잭션이라,
+    중간에 프로세스가 죽으면 ⓐ 실패 계수만 오르거나 ⓑ 계수만 비워지고 세션이 없거나 ⓒ 앞
+    세션만 폐기된 상태가 남을 수 있다. 셋 다 **다시 로그인하면 해소**되고 권한이 새지 않는다
+    (세션이 없는 쪽으로만 치우친다). 반대로 **한 커밋이어야 안전한 쌍**(폐기+등록 · 계수+잠금)은
+    포트 한 호출 안에 묶여 있어 이 느슨함의 영향을 받지 않는다.
+17. **게이트 설정이 매개변수 둘 이상인 어댑터 멤버를 표현하지 못한다.**
+    `app.adapter.member-call-pairs` 는 **목록 구분자와 서술자 구분자가 같은 쉼표**라
+    `signIn(LoginName, ClearPassphrase)` 같은 쌍을 적을 수 없다(적으면 항목 둘로 쪼개진다).
+    그래서 로그인 경계의 서명을 람다 하나 받는 형태로 뒀다 — 거동에는 영향이 없지만, 「서명을
+    고정해 오용을 막는다」는 선택지가 이 게이트의 데이터 형식 때문에 닫혀 있다. 구분자를
+    가르는 것은 이 slice 의 in_scope 밖이라 **후속 제안**으로 남긴다.

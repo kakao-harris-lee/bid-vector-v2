@@ -175,7 +175,75 @@ qualityBaseline` · `./tools/one-command-check.sh`). 앞의 둘은 그 job 의 s
 - 이 판정의 대상은 **산출물 경로**다. evidence 디렉터리를 포함한 판정은 그 마지막 커밋의
   post-state 라 이 문서가 담을 수 없다 — **정본은 verifier 와 PR 조치 코멘트**다(이 문서 머리말).
 
+
+## 2026-10-19 (KST) code-review r1 수정 라운드 — 표적 실측
+
+지적 넷(H-1 · M-1 · M-2 · M-3)을 **지적별 커밋**으로 고치고, 그때마다 표적 test 를 돌렸다.
+호스트 점검 셋(다른 레인의 Gradle · 가용 메모리 · 상위 RSS)은 매 빌드 전 **별도 호출**로 먼저
+봤고, 모든 Gradle 명령은 `flock` 안이다(레인 넷 병렬 — 이 라운드에는 한 번에 열 분 넘게 lock 을
+쥐지 않으려고 **호출마다** 잡고 놓았다).
+
+- cmd: `./gradlew :workflow:test --tests '*access*' :adapters:test --tests 'bidvector.adapters.access.*' :app:test --tests '*BrowserSessionAuthenticationTest*' --tests '*ProductionBrowserAccessTest*' --tests '*OpenApiContractTest*' --tests '*OperatorAuthenticationTest*'`
+- exit: 0
+- 핵심 결과: H-1·M-1·M-3 의 새 test 포함 전부 통과 — 동시성 3 · 저장 11 · 권한 9 · 계약 11 · 세션 16 · 운영자 4 · use case 16
+
+- cmd: 같은 형태로 M-2 뒤(게이트 test 넷과 기존 쓰기 E2E 를 더해서)
+- exit: 0
+- 핵심 결과: 동시성 4(풀 축 추가) · 의존/구조 게이트 21+13+24 · 감사 4 · 전략 편집 E2E 6 전부 통과
+
+## 2026-10-19 (KST) acceptance — `check` job (r2)
+
+- cmd: `./gradlew --no-daemon check` · exit **0**
+- cmd: `./gradlew --no-daemon qualityBaseline` · exit **0**
+- cmd: `./tools/one-command-check.sh` (S-20) · exit **0** — Kotlin 전건 + Python 전건 + web
+  전건(W-1~W-11, Playwright 스모크 2 passed 포함)
+
+`container` job 은 이 라운드에서 다시 돌리지 않았다 — 이 라운드의 변경이 **마이그레이션·
+Dockerfile·compose 를 건드리지 않았고**(산출물 경로는 Kotlin·OpenAPI·게이트 설정뿐) r1 에서
+그 job 의 결과와 알려진 제한(도구 설치 실패 둘)이 이미 등재돼 있다. 의존은 더하지 않았다.
+
+## 2026-10-19 (KST) 변이 실측 (r2)
+
+같은 방법이다 — **바꿔치우기**, 사본 대조(`git diff --no-index --numstat`)로 교체임을 계수,
+복원은 사본에서. 이 라운드는 **변이 전 기준선을 같은 스크립트가 먼저 돌려** 그 전제를 실측했다
+(네 표적 전부 exit 0 · 실패 0). 종료 코드 1 = RED.
+
+| id | 자리 | numstat | exit |
+| --- | --- | --- | --- |
+| M14 | 계수 증가 → 읽은 값에서 계산한 절대값 | 1/1 | 1 |
+| M15 | 상한 아래 잠금 보존 → NULL 덮어쓰기 | 1/1 | 1 |
+| M16 | 성공 초기화의 잠금 조건 제거(무조건 비움) | 1/1 | 1 |
+| M17 | 긴 입력 전략 → 던지는 쪽(옛 기본값) | 1/1 | 1 |
+| M18 | 로그인 경계를 문장별 → 한 트랜잭션(옛 모양) | 2/1 | 1 |
+| M19 | 재발급의 기존 세션 폐기를 무관한 계정으로 | 1/1 | 1 |
+| M20 | 상태 변경 operation 하나에서 CSRF 요구 제거(기본 상속) | 0/4 | 1 |
+| M21 | 로그인의 무인증 선언 제거(열린 집합이 필터와 갈림) | 0/1 | 1 |
+
+- M20·M21 의 numstat 이 `0/N` 인 것은 **삭제 변이**이기 때문이다. 이 둘이 닫는 결함이 「선언이
+  없다」라서, 더하기가 아니라 **빼기**가 그 결함의 재현이다(초록이 되는 더하기 변이와 다르다).
+- M14 는 동시성 test 셋을 한꺼번에 붉힌다 — 절대값 쓰기는 H-1 의 세 축(계수·늦은 실패·늦은
+  성공) 전부의 공통 원인이다.
+- 변이 뒤 복원은 `git status --porcelain -- <변이 파일 다섯>` **빈 출력**으로 확인했다.
+
+## 2026-10-19 (KST) 비밀값 스캔 (r2)
+
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/`
+- exit: 1 — **매치 0 = 통과**
+- cmd: 같은 명령을 이 라운드가 바꾼 **산출물 경로**에
+- exit: 0 — 매치는 전부 정당하고 육안 확인했다: 채택한 KDF 라이브러리의 **긴-입력 전략 타입
+  이름 둘**(API 이름이다 — 값이 아니다) · 채택 근거 문단의 JDK 클래스 이름 하나 · OpenAPI 표준
+  보안 스킴 타입 · 기존 Testcontainers 고정값 줄(이 라운드 밖). 값·자격·해시 문면은 0.
+- 그 API 이름 둘은 **이 문서에 축어로 적지 않는다** — evidence 는 `leakPatternGate` 의 스캔
+  대상이고, 적는 순간 그 게이트가 붉어진다(소스 트리는 그 게이트의 scanRoot 가 아니다).
+
+## 2026-10-19 (KST) clean-tree 판정 (r2)
+
+- cmd: `git status --porcelain -- <산출물 in_scope 경로들을 개별 인자로>`
+- exit: 0 · **빈 출력** — 지적 넷의 수정이 전부 커밋돼 base/head 가 고정됐다
+- 이 판정의 대상은 **산출물 경로**다(evidence 를 포함한 판정은 이 문서를 담는 커밋의 post-state
+  라 담을 수 없다 — 정본은 verifier 와 PR 조치 코멘트, 이 문서 머리말).
+
 ## 크기 게이트
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
-- 핵심 결과: 산출물 **+4563 / −117 줄** 대 evidence **약 560 줄** — evidence ≤ 산출물.
+- 핵심 결과(r2 재측정): 산출물 **+5255 / −117 줄** 대 evidence **+692 줄** — evidence ≤ 산출물.
