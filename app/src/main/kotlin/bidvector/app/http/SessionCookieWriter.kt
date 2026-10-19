@@ -67,7 +67,11 @@ class SessionCookieWriter(
         // `ConstantTimeComparisonStructureTest` 가 이 패키지에서 그것을 허용 목록으로 가둔다.
         // 비교 대상이 비밀이 아니라 **쿠키 이름**이지만, 목록을 넓히는 대신 이름 → 쿠키 **묶음**
         // 조회로 같은 일을 한다(그 조회가 중복 판정에 필요한 묶음을 그대로 준다).
-        val candidates = request.cookies?.groupBy(Cookie::getName)?.get(name).orEmpty()
+        val candidates =
+            request.cookies
+                ?.groupBy(Cookie::getName)
+                ?.get(name)
+                .orEmpty()
         if (candidates.size != 1) return null
         return candidates
             .single()
