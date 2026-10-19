@@ -145,6 +145,178 @@ acceptance 는 `.github/workflows/ci.yml` 의 `check` job 과 `web` job 이 돌�
   표본을 이스케이프 글자가 섞인 값으로 바꿨다.
 - ktlint 둘(규칙표 람다 형식 · test import 순서).
 
+## r2 후속 라운드 (verifier r2 R2-M-1 · R2-M-2) — `1346cbc7` · `28ff8e19` · `91c14e9d`
+
+이 라운드는 **레인 교대로 명령 기록이 남지 않았다**(세션이 끊겨 다른 레인이 이어받았다).
+그 HEAD 의 측정을 지어내지 않고 **verifier r3 의 것을 가리킨다** — `91c14e9d` 에서
+`./tools/one-command-check.sh` exit 0(Kotlin `check` BUILD SUCCESSFUL · pytest 1605 passed ·
+생성 타입 바이트 등식 · vitest 17 · Playwright 2)와 `container` job 16 run 블록 `failed=0` 이다.
+
+- `1346cbc7` — R2-M-2: 잘못된 퍼센트 인코딩을 400 으로(원인 사슬 술어 + 폴백 갈래).
+- `28ff8e19` — R2-M-1: 기록 프록시로 「검색의 모든 문장이 읽기 전용 트랜잭션 안에서 돈다」를 잠금.
+- `91c14e9d` — ktlint(`when` 분기 중괄호).
+
+verifier r3 가 이 셋을 대상으로 변이 열(a·b·c·c2·x·y·z·w·m1~m4)을 쟀고, 그 가운데 y·z·w 가
+초록이어서 R3-L-1 로, 이스케이프 문법 오류가 500 이어서 R3-M-1 로 남았다.
+
+## r3 후속 라운드 (verifier r3 R3-M-1 · R3-L-1 · R3-L-4) — `00e6544d` · `487e24ec` · `9820c508` · `8bcb3ee7` · `2705d828`
+
+뒤 둘(`8bcb3ee7`·`2705d828`)은 **R3-M-1 의 재설계와 그 뒷마무리**다 — 전건 `check` 가 첫 구현을
+**두 번** 되돌렸고(아래 04:38·05:55 줄), 그때마다 게이트를 넓히는 대신 설계를 바꿨다. 아래
+04:0x 줄들은 첫 구현 시점의 측정이고, 05:45·06:05 줄이 같은 표적을 다시 잰다.
+
+### 2026-10-19T03:56Z — RED 먼저 (R3-M-1, 수정 전 HEAD)
+
+- cmd: `flock … ./gradlew --no-daemon :app:test --tests '…NoticeSearchEndpointTest' --rerun`
+- exit: 1
+- 핵심 결과: 15 tests, 1 failed — 새 test 가 `?q=%` 에서 `expected:<400> but was:<500>`.
+  이 꼴은 `URI.create` 가 먼저 거부하므로 소켓으로 원문을 보내야 서버까지 간다(그래서 test
+  하네스에 소켓 GET 을 하나 뒀다).
+
+### 2026-10-19T04:03Z — GREEN (첫 구현: 원인 사슬 술어)
+
+- cmd: 같은 명령
+- exit: 0
+- 핵심 결과: 15 tests, 0 failed. 첫 구현은 원인 사슬에서 **디코딩 실패 계열 둘**을 보는
+  것이었고, 두 부류가 모두 400 이 됐다.
+
+### 2026-10-19T04:38Z — 전건이 그 구현을 되돌렸다 (설계가 바뀐 자리)
+
+- cmd: `flock … ./tools/one-command-check.sh`
+- exit: **1**
+- 핵심 결과: 전송 표면 게이트가 붉었다 — `bidvector.app.http.ErrorBodyKt -> java.io`(모듈별
+  바깥 참조는 허용 패키지 집합 안뿐, 기본 거부). 디코딩 실패 계열 하나가 `java.io` 에 살아서
+  HTTP 층이 그 **이름**을 들 수 없었다. 허용 패키지에 `java.io` 를 더하는 길이 있었지만 그러면
+  app 모듈 전체가 그 패키지를 참조할 수 있게 된다 — 게이트를 넓히는 대신 **읽는 자리를 옮겼다**
+  (verifier r3 가 제시한 첫 처방: 「매개변수 접근을 한 자리로 모아 그 자리의 실패를 400 으로」).
+  바뀐 뒤에는 바깥 참조가 0 이고, 전역 오류 경로는 r2 이전으로 돌아갔으며(폴백은 다시 500 만
+  낸다), 거부는 이 operation 하나에만 닿는다.
+
+### 2026-10-19T04:08Z — 실 DB E2E(출하 조립 + 실 PostgreSQL)
+
+- cmd: `flock … ./gradlew --no-daemon :app:test --tests '…NoticeSearchProductionE2ETest' --rerun`
+- exit: 0
+- 핵심 결과: 6 tests, 0 failed — 두 부류 11 꼴이 모두 400 이고 **감사 행 11 개가 전부 400** 이다
+  (앞 판은 문법 꼴이 500 이었고 감사 행도 500 이었다).
+
+### 2026-10-19T04:12Z — 어댑터 test(R3-L-1) · 두 모듈 lint
+
+- cmd: `flock … ./gradlew --no-daemon :adapters:test --tests '…JdbcNoticeSearchTest' --rerun :app:ktlintCheck :adapters:ktlintCheck :app:detekt :adapters:detekt`
+- exit: 0
+- 핵심 결과: 17 tests, 0 failed. 처음에는 ktlint 가 붉었고(여러 줄 `when` 분기 사이 빈 줄),
+  억제 없이 형식을 고쳐 다시 초록이 됐다. 음성 대조의 쓰기를 `status` 변경으로 두었을 때는
+  `guard_notice_status` 가 거부해 **막힌 쓰기**가 됐다 — 우회 재현이 되지 않으므로 값을 바꾸지
+  않는 쓰기로 바꿨다(그 트리거의 존재 자체가 이 자리의 측정이다).
+
+### 2026-10-19T04:20Z — 생성 타입 재생성
+
+- cmd: `flock … npm run api:types` (web)
+- exit: 0
+- 핵심 결과: 생성물 1 줄(400 description) — OpenAPI 문면 변경과 바이트 등식.
+
+### 2026-10-19T05:45Z — 재설계 뒤 표적 재실행
+
+- cmd: `flock … ./gradlew --no-daemon :app:test --tests '…NoticeSearchEndpointTest' --tests
+  '…NoticeSearchProductionE2ETest' --tests '…OpenApiNoticeSearchContractTest' --tests
+  '…TransportSurfaceGateTest' --rerun :app:ktlintCheck :app:detekt`
+- exit: 0
+- 핵심 결과: 15 + 6 + 6 + 19 tests, 0 failed. **전송 표면 게이트를 표적에 넣었다** — 이 라운드의
+  설계를 되돌린 게이트라서 표적 재검증 대상이다. 중간에 detekt `SwallowedException` 이 한 번
+  붉었고, 잡은 실패를 거부에 **원인으로 달아** 억제 없이 고쳤다(응답에는 닿지 않는다).
+
+### 2026-10-19T05:55Z — 전건이 그 원인 전달 방식도 되돌렸다
+
+- cmd: `flock … ./tools/one-command-check.sh`
+- exit: **1**
+- 핵심 결과: 원인을 **생성자 매개변수**로 받자 주입 표면 게이트 둘이 붉었다 —
+  「`InvalidNoticeSearchException` 이 주입받는다 → `java.lang.Throwable`」과 주입 표면 집합
+  등식. 그 게이트는 app class 의 **생성자 매개변수**를 주입 표면으로 읽으므로, 예외의 cause 도
+  주입으로 보인다. 주입 허용 목록에 `Throwable` 을 올리는 대신 **`initCause` 로 달았다** —
+  생성자는 문구 하나만 받고, 게이트 계약은 여전히 한 줄도 넓히지 않았다.
+
+### 2026-10-19T06:05Z — 그 수정의 표적 재검증
+
+- cmd: `flock … ./gradlew --no-daemon :app:test --tests '…NoticeSearchEndpointTest' --tests
+  '…AppHttpDependencyGateTest' --tests '…TransportSurfaceGateTest' --rerun :app:detekt
+  :app:ktlintCheck`
+- exit: 0
+- 핵심 결과: 15 + 20 + 19 tests, 0 failed · detekt·ktlint 초록. 주입 표면 집합 등식이 다시 성립한다(`Throwable` 이 그 집합에 들어가지 않는다).
+
+### 2026-10-19T04:17Z~ · 06:0xZ — 변이 아홉 (버릴 clone, 적용 → 표적 재실행 → 복원)
+
+적용 직후 `git diff --numstat` 과 복원 직후 빈 출력을 매번 찍었다. 대응표는 `checklist.md`.
+음성 대조(무변경)는 두 표적 모두 exit 0 이다.
+
+| 변이 | 표적 | exit | 삭제 줄 | 복원 |
+|---|---|---|---|---|
+| m5 읽기를 번역 밖으로(= 핸들러 밖 읽기로 되돌림) | app 둘 | **1**(4 failed) | 5 | 빈 출력 |
+| m6 읽기 실패를 빈 값으로 삼킴 | app 둘 | **1**(4 failed) | 1 | 빈 출력 |
+| y `prepareCall` 로 먼저 쓰기 | adapters | **1** | 1 | 빈 출력 |
+| z `unwrap` 원 연결로 먼저 쓰기 | adapters | **1** | 1 | 빈 출력 |
+| w 문구를 SQL 주석으로 단 쓰기 | adapters | **1** | 1 | 빈 출력 |
+| w′ w + 면제를 옛 부분 문자열로 | adapters | **1** | 4 | 빈 출력 |
+| y′ y + 지문 단언을 항진식으로 | adapters | **0**(의도) | 1 | 빈 출력 |
+
+y·z·w 는 처음에 **삽입** 꼴로도 한 번 쟀고(셋 다 exit 1), 「바꿔치우기」 규율에 맞춰 같은
+우회를 한 줄 치환으로 다시 재어 위 표에 적었다. y′ 가 **초록**인 것이 이 배치의 핵심 역대조다
+— 지문 단언 한 줄을 무력화하면 `prepareCall` 우회가 다시 지나간다.
+
+adapters 쪽 다섯은 `9820c508` 에서 쟀고, R3-M-1 재설계 뒤 커밋 둘은 그 셋
+(`JdbcNoticeSearch.kt`·`ReadOnlyWitness.kt`·`JdbcNoticeSearchTest.kt`)을 건드리지 않았다
+(`git diff --name-only 9820c508..2705d828 -- <셋>` 빈 출력) — 그래서 그 측정이 유효하다.
+app 쪽 둘은 재설계 뒤 마지막 산출물 커밋 `2705d828` 에서 **새로** 쟀다(앞 판의 m5·m6 는
+사라진 술어를 겨눴다).
+
+### 2026-10-19T06:58Z — 비밀값 스캔
+
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt <이 배치가 만진 경로들>` · 같은 명령을
+  `reports/evidence/m7/7c1/` 에
+- exit: 0
+- 핵심 결과: **이 배치가 더한 줄 가운데 걸리는 줄 0**(`git diff 7faf1e3b..2705d828` 의 `+` 줄만
+  걸러 같은 패턴으로 다시 돌렸다 — 0 행). evidence 안에서도 0 이다. 파일 단위로는 기존 줄
+  일곱이 여전히 걸리는데 전부 **값이 아니라 낱말**이고 이 배치가 만든 줄이 아니다. 패턴 어휘는
+  이 문서에 축어로 적지 않는다.
+- 같은 자리에서 **낡는 좌표**도 쟀다 — evidence 네 파일에 `<파일>:<줄번호>` 꼴 **0 건**이고,
+  역방향 파급(`grep -rn '<stem>:[0-9]'` 를 `reports/`·`docs/` 에)도 0 건이다.
+
+### 2026-10-19T06:58Z — clean-tree 게이트
+
+- cmd: `git status --porcelain -- <in_scope 27 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: 빈 출력. **양성 대조 1회** — in_scope 파일 하나 끝에 빈 줄을 하나 붙이니 같은
+  명령이 그 파일을 ` M` 으로 잡았고, 심기 전 사본에서 `head -n <원래 줄수>` 로 절삭 복원해 다시
+  빈 출력이 됐다(비파괴, `git checkout --` 미사용).
+
+### 2026-10-19T04:28Z — rollback ①~⑥ (실측 HEAD `9820c508` — 재설계 **전** 판)
+
+- cmd: 버릴 clone 에서 복원 명령 + `flock … ./gradlew --no-daemon check`
+- exit: 둘 다 0
+- 핵심 결과: 경로 **27**(A 16 · M 11) · 복원 뒤 `D 16 · M 11` · base 대비 diff 빈 출력 ·
+  되돌린 트리 전건 초록(BUILD SUCCESSFUL in 9m 22s, 모듈 11 compile · 모듈 10 test).
+  r2 판 목록의 구멍(`ReadOnlyWitness.kt` 누락)은 기계 산출을 다시 돌려 닫혔다. 이 판은
+  **재설계로 산출물 커밋이 하나 더 생겨 유효성을 잃었고**, 아래에서 다시 쟀다.
+
+### 2026-10-19T06:17Z — rollback ①~⑥ 재실측 (실측 HEAD `2705d828`)
+
+- cmd: 같은 절차를 새 clone 에서
+- exit: 둘 다 0
+- 핵심 결과: 경로 **27**(A 16 · M 11 — 재설계가 새 파일을 만들지 않아 목록이 그대로다) ·
+  복원 뒤 `D 16 · M 11` · base 대비 diff 빈 출력 · 되돌린 트리 전건 초록(BUILD SUCCESSFUL in 9m 24s, 모듈 11 compile · 모듈 10 test). 자세한 계수는
+  `rollback.md`.
+
+### 2026-10-19T06:30Z — acceptance: `check` job + `web` job (마지막 산출물 커밋 `2705d828`)
+
+- cmd: `flock … ./tools/one-command-check.sh`
+- exit: 0
+- 핵심 결과: 단계 24 전부 통과 — Kotlin `check`(게이트 전건) · `qualityBaseline` · Python 1605 passed · web(생성 타입 바이트 등식 · vitest 17 · Playwright 2). 스크립트 마지막 줄이 「Kotlin 전건 + Python 전건 + web 전건 통과」다.
+
+### 2026-10-19T06:47Z — `container` job (출하 jar 가 바뀌었다)
+
+- cmd: ci.yml `container` job 의 run 블록 16 개를 순서대로 실행(compose 프로젝트 이름만 레인용
+  으로 갈랐다). 이 라운드는 컨트롤러·오류 매핑표를 바꿔 **이미지 축에 닿는다**.
+- exit: 0
+- 핵심 결과: `TOTAL steps=16 failed=0` — 이미지 둘 빌드 · 위생·취약점 게이트 · 거부 스모크 · healthy 수렴 · 컨테이너 스모크 · 백업·복원 리허설(측정 10가지 일치, 누출 0) · 실 서버 교차언어 · 정리 뒤 이 레인 이름의 컨테이너 0 · 볼륨 0.
+
 ## 마지막 HEAD 의 게이트 결과
 
 이 문서의 명령 표는 **evidence 커밋 직전까지**를 담는다. 마지막 HEAD(이 문서를 담은 커밋)의
