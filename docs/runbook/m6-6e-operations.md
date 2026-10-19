@@ -918,6 +918,13 @@ app·postgres·ml-serving). **둘 다에 붙는 것은 proxy 하나**다. web �
 앞 판은 web 도 app 과 같은 망에 있어서 `web.Caddyfile` 에 `reverse_proxy app:<관리포트>` 한 블록이면
 프록시 https 로 관리 표면이 무인증 200 으로 나왔다(실측) — 그 자리를 망으로 닫았다. 스모크 (A4) 가
 축 셋(망 교집합 공집합 · web 의 상류 수 0 · web→app 실제 연결 불가, 각각 양성 대조 동반)을 잰다.
+`edge` 는 `internal: true` 라 web 은 바깥으로도 나가지 않는다(스모크가 그 값을 단언한다).
+
+**망으로 닫은 것은 web 경로뿐이다.** proxy 는 app 과 같은 망에 있어야 하고(그것이 프록시의 일이다),
+관리 포트는 app 과 **같은 컨테이너·같은 IP** 에 있으므로 망으로는 가를 수 없다 — (A4) ⓒ 의 양성
+대조가 `proxy → app 관리 포트 200` 으로 그 사실을 증명한다. 그 경로의 방어는 앞으로도 **설정층
+둘**이다: (A3) 의 상류 집합 등식(적응된 설정의 `dial` 이 web·app API 포트 둘뿐)과 (E) 의 응답층
+404. 구조가 아니라 설정이라는 사실을 여기 적어 둔다(검토 r2 cr O-2).
 
 **전제 하나** — 덧쓰기 파일이 `!override` 로 publish 를 비우므로 **그 태그를 아는 compose** 가 필요하다
 (Compose v2.24 이후). 더 낮은 판에서는 그 자리에서 파싱이 실패한다 — 조용히 publish 가 남지 않는다.
@@ -958,6 +965,11 @@ docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml down -v
 ```
 ./tools/local-tls-build.sh
 ```
+
+**web·proxy 의 입력(Dockerfile·Caddyfile·번들)을 고친 뒤에는 이 빌드를 먼저 돌린다.** 스모크는
+「앞선 빌드가 만든 바이트 == 지금 태그 == 재빌드 결과」를 단언하므로, 입력을 고치고 스모크만
+돌리면 그 등식에서 먼저 끊긴다(「재빌드로 이미지 ID 가 바뀌었다 …」). CI 에서는 S-21c 가 앞서
+있어 늘 성립하는 단언이고, 깨지는 것은 **로컬에서 빌드를 건너뛸 때**다(검토 r2 vr R2-L1).
 
 `up -d proxy` 하나로 의존(app → postgres, web)이 함께 뜬다. **ml-serving 은 뜨지 않는다** — 이
 프로필의 상류가 아니다(그 이미지 빌드를 로컬 패키징의 전제로 만들지 않는다).
