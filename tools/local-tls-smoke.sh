@@ -477,12 +477,13 @@ for path in / /api/strategy; do
     # 401 을 냈을 것이고 401 은 아래 허용 집합 밖이라 붉어진다). 이 한 칸이 우회 ④ 의 선택
     # 「거부」가 실제로 어떻게 보이는지다.
     transport-error|400) ;;
+    # **3xx 는 허용하지 않는다**(vr F-4). 설계 검토 ④ 는 「리다이렉트 또는 거부(**하나로**)」이고
+    # 이 구현이 고른 하나는 「거부」다(`proxy.Caddyfile` 의 `auto_https disable_redirects` —
+    # 평문 리스너 자체를 만들지 않는다). 허용 집합에 3xx 를 남겨 두면 같은 포트에
+    # `listener_wrappers { http_redirect }` 를 더해 **선택을 바꾸는 편집**이 조용히 지나간다
+    # (앞 판에서 그 변이가 exit 0 이었다). 선택을 바꾸려면 Caddyfile 과 이 줄을 함께 고쳐야 한다.
     301|302|307|308)
-      # 리다이렉트로 끝나는 구성도 허용 범위이지만(설계 검토 ④ 「리다이렉트 또는 거부」),
-      # 그 목적지는 https 여야 한다.
-      loc="$(curl -sS --max-time 5 -o /dev/null -w '%{redirect_url}' "http://${DOMAIN}:${PORT}$path" 2>/dev/null)" || loc=""
-      case "$loc" in https://*) ;; *) fail "평문 $path 의 리다이렉트 목적지가 https 가 아니다: [$loc]" ;; esac
-      ;;
+      fail "평문 $path 가 $code 로 리다이렉트됐다 — 이 구현이 고른 우회 ④ 의 선택은 「거부」다(리다이렉트로 바꾸려면 Caddyfile 과 이 술어를 함께 고친다)" ;;
     *) fail "평문 $path 가 $code 로 응답했다 — 평문이 거부되지 않는다" ;;
   esac
   echo "  평문 $path -> $code"
