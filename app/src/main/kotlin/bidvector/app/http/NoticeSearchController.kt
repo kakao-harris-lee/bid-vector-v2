@@ -82,7 +82,7 @@ class NoticeSearchController(
         try {
             DECLARED_PARAMETERS.associateWith { name -> request.getParameterValues(name)?.toList().orEmpty() }
         } catch (failure: IllegalStateException) {
-            throw InvalidNoticeSearchException("질의를 해석할 수 없다", failure)
+            throw InvalidNoticeSearchException("질의를 해석할 수 없다").apply { initCause(failure) }
         }
 
     /**

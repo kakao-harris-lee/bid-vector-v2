@@ -30,13 +30,14 @@ class InvalidEditRequestException(
  * 어휘(`NoticeSearchRejection`)를 진단용으로 나르고 **응답에는 실리지 않는다**(아래
  * [ErrorMapping] 이 고정 문구로만 옮긴다 — 어느 입력이 틀렸는지는 싣지 않는다).
  *
- * [cause] 는 질의를 **읽다가** 깨진 경우(잘못된 퍼센트 인코딩)의 원래 실패다 — 로그에만 남고
- * 응답에는 닿지 않는다(같은 매핑표가 고정 문구만 낸다).
+ * **생성자는 문구 하나만 받는다.** 질의를 **읽다가** 깨진 경우의 원래 실패는 `initCause` 로
+ * 단다 — 생성자 매개변수로 받으면 주입 표면 게이트가 「이 class 가 `Throwable` 을 주입받는다」로
+ * 읽어 그 이름을 주입 허용 목록에 올려야 한다(이 class 는 주입 대상이 아니다, 실측). 원인은
+ * 어느 쪽으로 달든 응답에 닿지 않는다 — 같은 매핑표가 고정 문구만 낸다.
  */
 class InvalidNoticeSearchException(
     message: String,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)
+) : RuntimeException(message)
 
 /**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
