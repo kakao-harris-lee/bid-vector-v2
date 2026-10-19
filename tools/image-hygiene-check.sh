@@ -555,6 +555,7 @@ case "$RUNTIME_KIND" in
     # 두 자리만 허용하는 사유: 베이스가 싣는 **공개** 신뢰 기점(공개 뿌리 인증서 모음)이고
     # 비밀값이 아니다. `/etc/ssl/` 통째가 아니라 `certs/` 로 좁힌 것은 그 형제인
     # `/etc/ssl/private/` 가 이 계열 배포판에서 **개인키의 표준 자리**이기 때문이다(r2 cr R2-1).
+    keymat_scan_argv_pre="$(printf '%s ' "${keymat_scan_paths[@]}")"
     KEYMAT_ALLOWED_EXCLUDE_PREFIXES="/etc/ssl/certs/,/usr/share/ca-certificates/"
     # 종료 코드 분류(이 스크립트의 관례): **1 = 이미지가 기준을 어겼다**, **2 = 정책·환경이
     # 틀려 판정할 수 없다**. 제외 집합이 어긋난 것은 이미지의 잘못이 아니라 **정책의 잘못**이므로
@@ -565,7 +566,25 @@ case "$RUNTIME_KIND" in
       exit 2
     fi
 
-    KEYMAT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${keymat_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
+    # **이름 축 목록도 root 로 걷는다**(r4 vr R4-M1 = cr R4-1). r3 은 내용 축에만 `--user 0` 을
+    # 달았고 이 목록은 이미지의 실행 사용자로 돌았다 — 그래서 `/root` 처럼 **0700 인 디렉터리
+    # 안은 열거조차 되지 않았고**, 그 오류는 `2>/dev/null` 로 사라졌다. PEM 이면 내용 축이
+    # 받지만 **PEM 이 아닌 키 컨테이너**(`.p12`·`.pfx`·`.jks`·`.der`)는 두 축을 다 빠져나갔다.
+    # 두 축의 모집단을 같게 만든다.
+    #
+    # 권한 오류를 **삼키지 않는다** — `find` 의 stderr 를 따로 받아 한 줄이라도 있으면 판정
+    # 불가다. root 로 도는 이상 오늘은 비지만, 비어 있음이 **측정된** 사실이어야 한다.
+    # `--tmpfs /tmp` 를 붙이는 이유: stderr 를 받는 파일이 **스캔 대상 안에 있으면 find 가 그것까지
+    # 센다**(실측 — 대상 수가 하나 늘었다. 계측기가 측정을 흔든 자리다). tmpfs 는 다른 마운트라
+    # `-xdev` 가 알아서 건너뛴다.
+    KEYMAT_LISTING_RAW="$(docker run --rm --user 0 --tmpfs /tmp --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+      "find ${keymat_scan_argv_pre} -xdev -type f 2>/tmp/_keymat_find_err | sed 's|^|F\t|'; [ -s /tmp/_keymat_find_err ] && sed 's|^|E\t|' /tmp/_keymat_find_err; exit 0" 2>&1 || true)"
+    KEYMAT_LIST_ERRORS="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^E\t//p')"
+    if [ -n "$KEYMAT_LIST_ERRORS" ]; then
+      echo "키 재료 이름 축의 목록에서 오류가 났다(판정 불가) — root 로 걷는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_LIST_ERRORS" | tr '\n' ' ')]" >&2
+      exit 2
+    fi
+    KEYMAT_LISTING="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^F\t//p')"
     KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
     # ⓑ 접두 제거는 **리터럴 비교**(`index(...)==1`)다 — `grep -v "^$pre"` 는 BRE 라
     # `/opt/v1.2/` 같은 접두가 `/opt/v1X2/` 까지 지운다(제외가 조용히 넓어지는 fail-open).
@@ -601,7 +620,7 @@ case "$RUNTIME_KIND" in
       # 종료 코드로는 「돌았는가」를 가릴 수 없다 — `find` 는 읽을 수 없는 디렉터리 하나로도 1 을
       # 내고 `grep -l` 도 묶음이 비면 1 을 낸다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면
       # BusyBox find 가 `invalid number` 로 끊어 탐침 전체가 조용히 0건이 됐다).
-      keymat_scan_argv="$(printf '%s ' "${keymat_scan_paths[@]}")"
+      keymat_scan_argv="$keymat_scan_argv_pre"
       KEYMAT_CONTENT_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
         "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | while IFS= read -r f; do
            if head -c 1 \"\$f\" >/dev/null 2>&1; then
