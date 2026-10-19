@@ -58,6 +58,18 @@ class AccessPrivilegeTest : PersistenceTestSupport() {
         refused("UPDATE account SET updated_at = now()")
     }
 
+    /**
+     * verifier r1 F6 — **적재 시각 열**. 열 GRANT 를 `created_at` 쪽으로 넓혀도 이 class 가
+     * 초록이었다(그 열을 쏘는 문장이 없었다). `browser_session.created_at` 은 보존·파기(6B-3)의
+     * **cutoff 축**이라, 앱 결함이 그 값을 다시 쓰면 파기 대상이 영원히 미래로 밀린다.
+     * `account.created_at` 은 계정이 언제 생겼는지의 유일한 기록이다.
+     */
+    @Test
+    fun `앱 역할은 두 표의 적재 시각을 바꿀 수 없다 — 보존 cutoff 와 생성 기록`() {
+        refused("UPDATE account SET created_at = now()")
+        refused("UPDATE browser_session SET created_at = now()")
+    }
+
     @Test
     fun `앱 역할은 실패 계수와 잠금만 갱신할 수 있다 — 요청 경로가 필요한 두 열`() {
         allowed("UPDATE account SET failed_attempts = 3, locked_until = now() + interval '15 minutes'")
