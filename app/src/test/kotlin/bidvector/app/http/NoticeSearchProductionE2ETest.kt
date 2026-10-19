@@ -23,6 +23,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -193,6 +194,36 @@ class NoticeSearchProductionE2ETest {
         response.statusCode.value() shouldBe 400
         response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
     }
+
+    /**
+     * verifier r3 R3-M-1 — 출하 조립에서 잘못된 퍼센트 인코딩의 **두 부류**(이스케이프 문법
+     * 오류 · UTF-8 로 디코딩되지 않는 바이트열)가 모두 400 이고 **감사 행도 400** 이다. 앞
+     * 판은 문법 오류 쪽이 500 `INTERNAL_ERROR` 였고 감사 행도 500 이었다(verifier r3 탐침).
+     *
+     * 문법이 틀린 꼴은 `URI` 가 만들지 못하므로 [rawGet] 으로 원문 그대로 보낸다. 감사 행은
+     * `resetTables` 가 매 test 앞에서 비우므로 이 test 의 요청과 1:1 이다.
+     */
+    @Test
+    fun `잘못된 퍼센트 인코딩 두 부류는 출하 조립에서 400 이고 감사 행도 400 이다`() {
+        val queries =
+            listOf("?q=%", "?q=a%", "?q=%2", "?q=%G1", "?q=a%G1b", "?q=%%", "?agency=%G1", "?foo=%G1") +
+                listOf("?q=a%FFb", "?q=%ED%A0%80", "?agency=%FF")
+
+        val statuses = queries.map { query -> rawGet(port, "/api/notices$query", TEST_CREDENTIAL_VALUE).status }
+
+        withClue(queries.zip(statuses).toString()) { statuses.toSet() shouldBe setOf(400) }
+        auditStatusCodes() shouldBe List(queries.size) { 400 }
+    }
+
+    /** 감사 표의 상태 코드를 기록 순서대로 — 응답 상태와 1:1 인지 본다. */
+    private fun auditStatusCodes(): List<Int> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT status_code FROM api_request_audit ORDER BY id").use { rows ->
+                    generateSequence { if (rows.next()) rows.getInt("status_code") else null }.toList()
+                }
+            }
+        }
 
     @Test
     fun `수집 전에는 빈 본문 + 수집 전 사유다`() {

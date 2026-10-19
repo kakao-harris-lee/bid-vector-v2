@@ -19,7 +19,9 @@ import bidvector.sharedkernel.VatTreatment
 import bidvector.workflow.notice.NoticeSearchLimits
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchState
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -286,6 +288,47 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
         errorOf("?q=a%ED%A0%80b").statusCode.value() shouldBe 400
         errorOf("?agency=%FF").statusCode.value() shouldBe 400
         notices.lastCriteria shouldBe null
+    }
+
+    /**
+     * verifier r3 R3-M-1 — 앞 판은 **디코딩 실패 한 부류만** 400 이었다. `%` 뒤에 16진 두 자리가
+     * 없는 **이스케이프 문법 오류**(`%` · `a%` · `%2` · `%G1` · `%%`)는 디코더가 다른 부류의
+     * 예외를 내서 폴백 500 으로 떨어졌다 — 계약 문면이 「잘못된 퍼센트 인코딩 → 400」인데 가장
+     * 기본적인 꼴이 500 이었다.
+     *
+     * 이 꼴들은 `URI.create` 가 먼저 거부하므로 [rawGet] 으로 **원문 그대로** 보낸다. 매개변수를
+     * 가리지 않는다 — 계약이 든 이름(`q`·`agency`)과 계약 밖 이름(`foo`), 이름 쪽(`%G1=a`)까지
+     * 같은 사실 하나로 400 이다(파싱은 질의 전체 단위다).
+     */
+    @Test
+    fun `이스케이프 문법이 틀린 질의도 500 이 아니라 400 이다 — 디코딩 실패와 같은 부류다`() {
+        val syntaxBroken =
+            listOf("?q=%", "?q=a%", "?q=%2", "?q=%G1", "?q=a%G1b", "?q=%%", "?agency=%G1", "?foo=%G1", "?%G1=a")
+        val undecodable = listOf("?q=a%FFb", "?q=%ED%A0%80", "?agency=%FF", "?%FF=a")
+
+        (syntaxBroken + undecodable).forEach { query ->
+            val response = rawGet(port, "/api/notices$query", TEST_CREDENTIAL)
+
+            withClue(query) {
+                response.status shouldBe 400
+                response.body shouldContain """"code":"${ErrorCode.INVALID_REQUEST}""""
+            }
+        }
+        notices.lastCriteria shouldBe null
+    }
+
+    /**
+     * 음성 대조 — 겹 인코딩(`%25FF`)은 **유효한** 퍼센트 인코딩이라 리터럴 `%FF` 검색이 된다.
+     * 위 test 가 「`%` 가 들어가면 무조건 400」으로 넓어지는 회귀를 막는다.
+     */
+    @Test
+    fun `유효한 퍼센트 인코딩은 그대로 조건이 된다 — 음성 대조`() {
+        notices.page = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NO_MATCH)
+
+        val response = rawGet(port, "/api/notices?q=%25FF", TEST_CREDENTIAL)
+
+        response.status shouldBe 200
+        notices.lastCriteria?.text?.value shouldBe "%FF"
     }
 
     /**

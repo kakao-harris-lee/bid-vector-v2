@@ -15,7 +15,8 @@ import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
-import java.nio.charset.MalformedInputException
+import java.io.CharConversionException
+import java.nio.charset.CharacterCodingException
 
 /**
  * 편집 요청의 형식 오류(D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
@@ -176,13 +177,18 @@ object ErrorMapping {
 private const val MAX_CAUSE_DEPTH = 10
 
 /**
- * 요청의 **디코딩 실패**인가(verifier r2 R2-M-2) — 잘못된 퍼센트 인코딩(`?q=a%FFb`·고립
- * 서로게이트)은 서블릿이 질의 매개변수를 디코딩하는 순간 깨지고, 컨트롤러 본문에 닿기 전이라
- * 그 안에서 막을 수 없다. 계약은 형식 오류에 400 을 선언하는데 폴백으로 떨어지면 500 이었다.
+ * 요청의 **디코딩 실패**인가(verifier r2 R2-M-2 · r3 R3-M-1) — 잘못된 퍼센트 인코딩은 서블릿이
+ * 질의 매개변수를 디코딩하는 순간 깨지고, 컨트롤러 본문에 닿기 전이라 그 안에서 막을 수 없다.
+ * 계약은 형식 오류에 400 을 선언하는데 폴백으로 떨어지면 500 이었다.
  *
  * 판정은 **원인 사슬**로 한다 — 컨테이너가 던지는 래퍼 타입(서블릿 구현의 좌표)을 이 층이
  * 이름 붙이지 않는다: 허용 패키지 밖이고, 컨테이너를 바꾸면 그 이름이 사라진다. 사슬에
  * 디코딩 실패가 있으면 그것이 사실이다.
+ *
+ * **가르는 사실은 하나 — 「요청 바이트를 문자로 옮기지 못했다」** 이고, JDK 는 그 사실을 두
+ * 계열로 나눠 던진다([isRequestDecodingFailure]). 앞 판은 그 가운데 **문자 집합 계열 하나만**
+ * 봐서, `%` 뒤에 16진 두 자리가 없는 이스케이프 **문법** 오류(`%` · `%2` · `%G1` · `%%`)가
+ * 폴백 500 으로 남아 있었다(verifier r3 탐침). 두 계열을 함께 보면 그 갈림이 사라진다.
  *
  * **이 갈래는 이 endpoint 전용이 아니다** — 어느 경로든 잘못된 퍼센트 인코딩은 이제 400 이다
  * (405·406 과 같은 전송 층 사실이라 operation 문면에 매달지 않는다, evidence 에 등재).
@@ -190,7 +196,22 @@ private const val MAX_CAUSE_DEPTH = 10
 internal fun Throwable.isMalformedRequestEncoding(): Boolean =
     generateSequence(this) { previous -> previous.cause.takeIf { it !== previous } }
         .take(MAX_CAUSE_DEPTH)
-        .any { it is MalformedInputException }
+        .any { it.isRequestDecodingFailure() }
+
+/**
+ * 바이트를 문자로 옮기지 못한 실패의 **두 계열** — 더 넓은 `IOException` 으로 삼키지 않는다
+ * (그 안에는 연결 끊김·저장소 오류처럼 클라이언트 입력 오류가 아닌 것이 산다).
+ */
+private fun Throwable.isRequestDecodingFailure(): Boolean =
+    when (this) {
+        // 문자 집합 디코딩 실패 — `%FF` 처럼 UTF-8 로 읽히지 않는 바이트열, 고립 서로게이트.
+        is CharacterCodingException -> true
+
+        // 퍼센트 이스케이프 문법 실패 — `%` 뒤에 16진 두 자리가 없다(끝남 · 비16진).
+        is CharConversionException -> true
+
+        else -> false
+    }
 
 /**
  * 3자 이스케이프만 하는 최소 JSON 직렬화(D-6A1-9/19의 정신과 같은 축 — 이 파일이 유일한
