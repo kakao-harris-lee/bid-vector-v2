@@ -122,6 +122,19 @@ pre_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do
   pre_ids="${pre_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}' 2>/dev/null || echo none);"
 done
+# **앞선 빌드 step 이 남긴 기록**(cr R2-6). 있으면 「그때 만든 바이트」와 「지금 태그가 가리키는
+# 바이트」의 등식을 먼저 본다 — 그 사이에 아무도 태그를 바꾸지 않았다는 전제가 여기서 측정이
+# 된다(앞 판은 그 전제를 가정만 했다). 로컬 단독 실행에는 기록이 없을 수 있고, 그때는 아래
+# 재빌드 전후 등식만 남는다.
+ID_RECORD="build/local-tls/built-image-ids.txt"
+recorded_ids=""
+if [ -f "$ID_RECORD" ]; then
+  recorded_ids="$(tr '\n' ';' < "$ID_RECORD")"
+  if [ "$recorded_ids" != "$pre_ids" ]; then
+    fail "앞선 빌드가 기록한 이미지와 지금 태그가 가리키는 이미지가 다르다 — 그 사이에 태그가 바뀌었고, 게이트가 판정한 바이트는 지금 실행할 바이트가 아니다: 기록[$recorded_ids] 현재[$pre_ids]"
+  fi
+  echo "  빌드 기록 ↔ 현재 태그 등식 성립(게이트가 판정한 바이트가 그대로다)"
+fi
 ./tools/local-tls-build.sh
 post_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do

@@ -37,6 +37,16 @@ done
 
 "${BIDVECTOR_LOCAL_TLS_COMPOSE[@]}" build web proxy
 
+# 만든 바이트를 **기록으로 남긴다**(검토 r2 cr R2-6). 스모크의 등식이 원래 말하려던 명제는
+# 「게이트가 판정한 바이트 == 스모크가 실행하는 바이트」인데, 앞 판이 실제로 잰 것은 「스모크가
+# 다시 빌드해도 태그가 안 바뀐다」였다. 둘은 *빌드 step 과 스모크 사이에서 아무도 그 태그를
+# 바꾸지 않는다* 는 전제에서만 같고, 그 전제는 코드에 없었다. 이 기록이 그 전제를 **측정**으로
+# 바꾼다 — 스모크가 자기 재빌드 **전에** 이 파일을 읽어 현재 태그와 대조한다.
+BIDVECTOR_LOCAL_TLS_ID_FILE="${REPO_ROOT}/build/local-tls/built-image-ids.txt"
+mkdir -p "$(dirname "$BIDVECTOR_LOCAL_TLS_ID_FILE")"
+: > "$BIDVECTOR_LOCAL_TLS_ID_FILE"
 for img in bidvector/web:local bidvector/proxy:local; do
-  printf '%s %s\n' "$img" "$(docker image inspect "$img" --format '{{.Id}}')"
+  id="$(docker image inspect "$img" --format '{{.Id}}')"
+  printf '%s %s\n' "$img" "$id"
+  printf '%s=%s\n' "$img" "$id" >> "$BIDVECTOR_LOCAL_TLS_ID_FILE"
 done
