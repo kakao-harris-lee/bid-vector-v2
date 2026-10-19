@@ -218,6 +218,12 @@ pub_count="$(printf '%s' "$ports_json" | jq -r '.services.proxy.ports | length')
 [ "$pub_count" = "1" ] || fail "프록시가 여는 host 포트가 하나가 아니다: $pub_count"
 pub_host_ip="$(printf '%s' "$ports_json" | jq -r '.services.proxy.ports[0].host_ip')"
 [ "$pub_host_ip" = "127.0.0.1" ] || fail "프록시 publish 가 루프백이 아니다: $pub_host_ip"
+# 두 서비스의 `no-new-privileges` — 선언해 두고 **아무것도 재지 않으면** 지우는 편집이 조용히
+# 지나간다(cr L-3). (A)가 이미 해석된 설정을 읽고 있으므로 같은 자리에서 본다.
+for svc in web proxy; do
+  nnp="$(printf '%s' "$ports_json" | jq -r --arg s "$svc" '[(.services[$s].security_opt // [])[] | select(. == "no-new-privileges:true")] | length')"
+  [ "$nnp" = "1" ] || fail "$svc 에 security_opt no-new-privileges:true 가 없다(해석된 설정 기준)"
+done
 # **해석된 설정에 관리 포트가 상류로 실려 있지 않다**(우회 ② 의 구조 축). app 서비스의
 # `MANAGEMENT_SERVER_PORT` 선언 하나만 그 값을 든다.
 # 술어는 **숫자 경계가 있는 등식**이다(cr L-2). 부분 문자열(`contains`)이면 관리 포트 8080 이
