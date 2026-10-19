@@ -171,6 +171,15 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
   vr r2 low 둘(경로를 섞은 편집의 행위자 가드 거부 — 의도된 거동 · `__Host-` 쿠키의 실 브라우저·TLS 측정 — 7F 반입 때).
 - 배치 뒤 verifier 표적 r3(결정적 test · 중복 키 · lock_timeout · rollback). high·medium 0 이면 PR.
 
+**D-7D-7 (2026-10-20, 팀장 — 마지막 배치 수령 · 동결).** 판정 대상은 마지막 산출물 `d73b91c6` · evidence `f7b347fc` 다.
+- **결정적 동시성 test 를 수령한다**: test 가 다른 커넥션으로 계정 행을 먼저 잠그고(커밋 없이) 그 상태에서 로그인을 세운다. 잠그지 않는 확정
+  변이(R-M23a)는 10회 반복에서 10/10 RED 다.
+- **대기 상한 값(`lockWait`)을 정책 데이터(`BrowserAccessPolicyData`)에 둔 선택을 수용한다**: 이 값이 바꾸는 것은 운영자에게 보이는 거동(기다릴지
+  거부할지)이라 효력일과 함께 움직인다. 환경마다 달라야 할 요구가 생기면 설정 키로 올린다. D-7D-6 의 「설정 값」 문면은 이 뜻으로 읽는다.
+- **제한 24 는 닫혔다**(OpenAPI 로더가 중복 키를 거부한다 — 「더하기」 변이 R-DUP 이 RED). 제한 25~28 신설을 수용한다.
+- 7F 반입 절차의 `cookie-secure` 한 줄은 7F 본편 계약으로 넘긴다.
+- 검토: verifier 표적 r3 + code-reviewer 표적 r4. 둘 다 high·medium 0 이면 PR.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
