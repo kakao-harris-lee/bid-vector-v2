@@ -72,12 +72,21 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
     fun `같은 이름의 쿠키가 둘이면 거부한다 — 그림자 쿠키는 조용한 탈취가 아니라 401 이다`() {
         val session = sessionFrom(signIn().headers.getFirst(HttpHeaders.SET_COOKIE))
         val name = SessionCookieWriter.HOST_PREFIXED_NAME
-        val shadowed =
+        // 유효 쿠키를 **뒤에** 두는 순서가 결정적이다 — 「마지막 값이 이긴다」면 이 요청은
+        // 200 이고(앞 판이 그랬다), fail-closed 면 401 이다. 두 순서를 다 잰다.
+        val forgedFirst =
+            HttpHeaders().apply {
+                set(HttpHeaders.COOKIE, "$name=forged-shadow-cookie-value; $name=${session.cookie}")
+            }
+        val validFirst =
             HttpHeaders().apply {
                 set(HttpHeaders.COOKIE, "$name=${session.cookie}; $name=forged-shadow-cookie-value")
             }
 
-        exchange("/api/strategy", HttpMethod.GET, headers = shadowed).statusCode.value() shouldBe 401
+        exchange("/api/strategy", HttpMethod.GET, headers = forgedFirst).statusCode.value() shouldBe 401
+        exchange("/api/strategy", HttpMethod.GET, headers = validFirst).statusCode.value() shouldBe 401
+        // 그림자가 섞이지 않은 같은 쿠키는 그대로 통한다 — 거부가 쿠키 자체 탓이 아니다.
+        exchange("/api/strategy", HttpMethod.GET, headers = cookieOnly(session)).statusCode.value() shouldBe 200
     }
 
     /**
@@ -259,7 +268,10 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
 
         exchange("/api/strategy", HttpMethod.GET, headers = headers).statusCode.value() shouldBe 200
         // 그 경로에는 브라우저 세션이 없다 — 「지금 내 세션」은 404 다(401 이 아니다: 인증은 지났다).
-        exchange(SESSION_PATH, HttpMethod.GET, headers = headers).statusCode.value() shouldBe 404
+        val absent = exchange(SESSION_PATH, HttpMethod.GET, headers = headers)
+        absent.statusCode.value() shouldBe 404
+        // 없는 것은 경로가 아니라 **자원**이다(code-review r2 L-3) — 문구가 그것을 말한다.
+        absent.body?.get("message") shouldBe "브라우저 세션이 없다"
     }
 
     @Test
