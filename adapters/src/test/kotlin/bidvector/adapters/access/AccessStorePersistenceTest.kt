@@ -139,6 +139,20 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
     }
 
     @Test
+    fun `로그인 재발급은 앞 세션을 폐기한다 — 폐기와 등록이 포트 한 호출이다`() {
+        createAccount()
+        val first = signIn()
+
+        val second = signIn()
+
+        revokedCount() shouldBe 1
+        access().inTransaction { it.authenticate(first.key, CsrfDemand.Exempt) } shouldBe AccessVerdict.Denied
+        access()
+            .inTransaction { it.authenticate(second.key, CsrfDemand.Exempt) }
+            .shouldBeInstanceOf<AccessVerdict.Granted>()
+    }
+
+    @Test
     fun `폐기 시각은 처음 값이 남는다 — 두 번째 로그아웃이 덮지 않는다`() {
         createAccount()
         val issued = signIn()
