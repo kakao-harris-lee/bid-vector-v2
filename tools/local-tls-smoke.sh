@@ -229,6 +229,52 @@ expected_dials="$(printf '%s\n%s\n' "app:${BIDVECTOR_APP_PORT}" "web:${BIDVECTOR
 [ "$dials" = "$expected_dials" ] || fail "프록시 상류 집합이 기대와 다르다: [$dials] 기대 [$expected_dials]"
 echo "  상류 집합 = [$dials]"
 
+_step "(A4) 우회 ② — web 은 app 과 **다른 망**이고 상류를 하나도 갖지 않는다(검토 r1 F-1)"
+# 앞 판의 구멍: 「관리 포트는 프록시의 상류가 아니다」만 구조였고, web 도 Caddy 이며 app 과
+# 같은 망에 있었다 — web 설정에 `reverse_proxy app:<관리포트>` 한 블록이면 프록시 https 로
+# 관리 표면이 나왔고 (A3)·(E)·위생 어느 것도 붉어지지 않았다. 축을 셋으로 닫는다.
+#
+# ⓐ **망**: 해석된 설정에서 web 의 망 집합과 app 의 망 집합이 겹치지 않고, 프록시만 둘 다에 있다.
+net_verdict="$(printf '%s' "$ports_json" | jq -r '
+  ((.services.web.networks   // {}) | keys) as $w |
+  ((.services.app.networks   // {}) | keys) as $a |
+  ((.services.proxy.networks // {}) | keys) as $p |
+  [ (if ($w | length) == 0 then "web 의 망 선언이 비었다" else empty end),
+    (if ($a | length) == 0 then "app 의 망 선언이 비었다" else empty end),
+    (if (($w - ($w - $a)) | length) > 0 then "web 과 app 이 망을 공유한다: \($w - ($w - $a) | join(","))" else empty end),
+    (if (($w - $p) | length) > 0 then "프록시가 web 의 망에 없다: \($w - $p | join(","))" else empty end),
+    (if (($a - $p) | length) > 0 then "프록시가 app 의 망에 없다: \($a - $p | join(","))" else empty end)
+  ] | join(" · ")')"
+[ -z "$net_verdict" ] || fail "망 분리가 깨졌다 — $net_verdict"
+echo "  망: web=[$(printf '%s' "$ports_json" | jq -r '(.services.web.networks // {}) | keys | join(",")')] app=[$(printf '%s' "$ports_json" | jq -r '(.services.app.networks // {}) | keys | join(",")')] proxy=[$(printf '%s' "$ports_json" | jq -r '(.services.proxy.networks // {}) | keys | join(",")')]"
+
+# ⓑ **설정**: web 의 적응된 설정에 상류(`dial`)가 0 이다 — (A3) 과 같은 축을 한 칸 옆 파일에도
+# 건다. 양성 대조로 적응 결과가 실제 handler 를 담고 있는지 먼저 본다(빈 JSON 이면 「상류 0」이
+# 공허하게 참이 된다).
+web_adapted="$("${COMPOSE[@]}" exec -T web caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null)" \
+  || fail "web 설정을 적응하지 못했다(상류 집합을 재지 못한다)"
+web_handlers="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("handler")) | .handler] | length')"
+[ "${web_handlers:-0}" -gt 0 ] || fail "web 의 적응된 설정에 handler 가 0 이다(양성 대조 실패 — 아래 상류 단언이 공허하다)"
+web_dials="$(printf '%s' "$web_adapted" | jq -r '[.. | objects | select(has("dial")) | .dial] | unique | join(",")')"
+[ -z "$web_dials" ] || fail "web 의 상류 집합이 비어 있지 않다: [$web_dials] — web 은 정적 서버이고 어떤 상류도 갖지 않는다"
+echo "  web handler $web_handlers · 상류 0"
+
+# ⓒ **실제 연결**: web 컨테이너에서 app 의 두 포트에 닿지 않는다. **양성 대조 둘**을 함께 돌린다
+# — 같은 탐침이 (1) web 자기 포트에서는 200 을 받고(도구가 동작한다) (2) proxy 에서는 app 에
+# 닿는다(그 포트가 실제로 살아 있다). 그러지 않으면 「닿지 않는다」가 공허해진다.
+web_self="$("${COMPOSE[@]}" exec -T web curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${BIDVECTOR_WEB_PORT}/")" \
+  || fail "web 컨테이너 안에서 자기 포트를 묻지 못했다(양성 대조 실패 — 탐침 자체가 동작하지 않는다)"
+[ "$web_self" = "200" ] || fail "web 자기 포트가 200 이 아니다: $web_self(양성 대조)"
+proxy_to_app="$("${COMPOSE[@]}" exec -T proxy curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "http://app:${BIDVECTOR_APP_MANAGEMENT_PORT}/actuator/health")" \
+  || fail "프록시에서 app 관리 포트에 닿지 못했다(양성 대조 실패 — 아래 거부 단언이 공허하다)"
+[ "$proxy_to_app" = "200" ] || fail "프록시→app 관리 포트가 200 이 아니다: $proxy_to_app(양성 대조)"
+for p in "$BIDVECTOR_APP_PORT" "$BIDVECTOR_APP_MANAGEMENT_PORT"; do
+  if "${COMPOSE[@]}" exec -T web curl -sS --max-time 5 -o /dev/null "http://app:${p}/" >/dev/null 2>&1; then
+    fail "web 컨테이너에서 app:${p} 에 닿았다 — 망 분리가 실효가 없다(web 설정 한 줄로 관리 표면이 열린다)"
+  fi
+done
+echo "  web→app 두 포트 연결 불가 · 양성 대조(web 자기 200 · proxy→app 관리 200)"
+
 _step "(A2) 우회 ① — host 에서 app·web 포트에 직접 닿지 않는다(양성 대조: 내부망에서는 닿는다)"
 for p in "$BIDVECTOR_APP_PORT" "$BIDVECTOR_APP_MANAGEMENT_PORT" "$BIDVECTOR_WEB_PORT"; do
   if _port_listening "$p"; then

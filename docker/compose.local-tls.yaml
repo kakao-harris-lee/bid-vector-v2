@@ -12,6 +12,20 @@
 # 한다(기본 파일의 `name:` 주석이 적은 사고 경로).
 name: bidvector-v2
 
+# 우회 ② 를 **구조로** 닫는 자리(검토 r1 F-1). 앞 판은 「프록시의 상류 집합에 관리 포트가
+# 없다」만 구조였고, web 도 Caddy 이며 app 과 같은 내부망에 있었다 — `web.Caddyfile` 에
+# `reverse_proxy app:<관리포트>` 한 블록을 넣으면 프록시 https 로 관리 표면이 그대로 나왔고
+# 게이트는 하나도 붉어지지 않았다(실측). 그래서 **web 이 app 에 닿을 수 없게** 망을 가른다.
+#
+#   edge     : proxy ↔ web            (정적 번들을 건네는 자리)
+#   default  : proxy ↔ app·postgres   (기본 파일의 서비스가 쓰는 그 망)
+#
+# proxy 만 둘 다에 붙는다. web 은 `edge` 하나뿐이라 `app` 이라는 이름이 **해석되지도 않는다** —
+# 설정에 무엇을 적어도 거기서 관리 포트로 가는 길이 없다. 기본 파일의 서비스는 `networks:` 를
+# 선언하지 않으므로 그대로 `default` 에 남는다(덧쓰기가 기본 파일을 고치지 않는다).
+networks:
+  edge:
+
 services:
   # 우회 ① — 내부 서비스의 host publish 를 **비운다**. `!override` 가 없으면 compose 는
   # 목록을 병합해(덧붙여) 기본 파일의 publish 가 그대로 남는다.
@@ -33,6 +47,12 @@ services:
       BIDVECTOR_WEB_PORT: ${BIDVECTOR_WEB_PORT:?BIDVECTOR_WEB_PORT 환경변수가 필요합니다 — tools/local-tls-smoke.sh 가 기본값을 갖는다}
     security_opt:
       - no-new-privileges:true
+    # **`edge` 하나뿐이다**(F-1). 이 서비스는 정적 파일만 건네므로 app·postgres 에 닿을 이유가
+    # 없고, 닿을 길도 두지 않는다. 스모크가 ⓐ 해석된 설정에서 망 교집합이 공집합임 ⓑ web 의
+    # 적응된 설정에 상류가 0 임 ⓒ web 컨테이너에서 app 이 실제로 닿지 않음(양성 대조 동반)을
+    # 각각 단언한다.
+    networks:
+      - edge
     # host 포트를 열지 않는다(`ports` 없음) — 소비자는 프록시 하나이고 compose 내부망의
     # 서비스 이름으로 붙는다.
     healthcheck:
@@ -68,6 +88,11 @@ services:
       - BIDVECTOR_PROXY_WEB_UPSTREAM=web:${BIDVECTOR_WEB_PORT:?}
     security_opt:
       - no-new-privileges:true
+    # **둘 다에 붙는 유일한 서비스**(F-1). 상류가 두 망에 갈려 있으므로 프록시만이 둘을 잇는다.
+    # `default` 를 여기 명시하면 compose 의 암묵 attach 가 꺼지므로 두 이름을 모두 적는다.
+    networks:
+      - edge
+      - default
     depends_on:
       app:
         condition: service_healthy
