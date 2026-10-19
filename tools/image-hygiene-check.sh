@@ -179,6 +179,7 @@ KEYMAT_EXCLUDE_PREFIXES=""
 KEYMAT_PATTERNS=""
 KEYMAT_MIN_ENTRIES=""
 KEYMAT_CONTENT_MAX_BYTES=""
+KEYMAT_CONTENT_MIN_SCANNED=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -241,6 +242,7 @@ case "$RUNTIME_KIND" in
     KEYMAT_PATTERNS="$(_policy_value keymaterial.patterns list)"
     KEYMAT_MIN_ENTRIES="$(_policy_value keymaterial.min-entries numeric)"
     KEYMAT_CONTENT_MAX_BYTES="$(_policy_value keymaterial.content.max-bytes numeric)"
+    KEYMAT_CONTENT_MIN_SCANNED="$(_policy_value keymaterial.content.min-scanned numeric)"
     # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
     # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
     # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
@@ -554,8 +556,13 @@ case "$RUNTIME_KIND" in
     # 비밀값이 아니다. `/etc/ssl/` 통째가 아니라 `certs/` 로 좁힌 것은 그 형제인
     # `/etc/ssl/private/` 가 이 계열 배포판에서 **개인키의 표준 자리**이기 때문이다(r2 cr R2-1).
     KEYMAT_ALLOWED_EXCLUDE_PREFIXES="/etc/ssl/certs/,/usr/share/ca-certificates/"
+    # 종료 코드 분류(이 스크립트의 관례): **1 = 이미지가 기준을 어겼다**, **2 = 정책·환경이
+    # 틀려 판정할 수 없다**. 제외 집합이 어긋난 것은 이미지의 잘못이 아니라 **정책의 잘못**이므로
+    # 2 다(r3 cr R3-8). 문면에 **어느 정책 파일인가**를 넣는다 — 같은 값이 세 자리(게이트 상수 +
+    # 정책 둘)에 살아서, 둘이 어긋나면 그 kind 가 돌 때까지 보이지 않는다(cr R3-9).
     if [ "$KEYMAT_EXCLUDE_PREFIXES" != "$KEYMAT_ALLOWED_EXCLUDE_PREFIXES" ]; then
-      fail "키 재료 제외 접두가 허용 집합과 다르다 — 정책[${KEYMAT_EXCLUDE_PREFIXES}] 허용[${KEYMAT_ALLOWED_EXCLUDE_PREFIXES}](제외를 넓히려면 게이트를 고친다)"
+      echo "키 재료 제외 접두가 게이트의 허용 집합과 다르다(판정 불가) — 정책 ${POLICY_FILE}[${KEYMAT_EXCLUDE_PREFIXES}] 허용[${KEYMAT_ALLOWED_EXCLUDE_PREFIXES}]: 제외를 넓히려면 정책이 아니라 게이트를 고친다" >&2
+      exit 2
     fi
 
     KEYMAT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "${keymat_scan_paths[@]}" -xdev -type f 2>/dev/null || true)"
@@ -582,26 +589,47 @@ case "$RUNTIME_KIND" in
       # 나가는 편집(확장자를 떼거나 바꾸는 것)을 이 겹이 받는다. 공개 번들은 머리 줄이 달라
       # 걸리지 않으므로 이 축에는 제외가 필요 없다.
       #
-      # **종료 코드로는 「돌았는가」를 가릴 수 없다** — `find`는 읽을 수 없는 디렉터리 하나만
-      # 있어도 1 을 내고, `grep -l` 도 `-exec … +` 묶음 중 하나가 비면 1 을 낸다. 그래서
-      # 「훑은 파일 수」를 **따로 세어** 그것을 양성 대조로 쓴다. 셸·find 가 없으면 그 수가 0 이
-      # 되어 판정 불가로 끊긴다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면 BusyBox find 가
-      # `invalid number` 로 끊어 **탐침 전체가 조용히 0건**이 됐다 — 그 사고를 이 축이 잡는다).
+      # **root 로 읽는다**(r3 vr R3-M1). 앞 판은 이미지의 실행 사용자로 돌아서 개인키의 관례
+      # 권한인 root 소유 `0600` 파일에 `Permission denied` 가 났고, 그 오류는 `2>/dev/null` 로
+      # 사라졌다 — 즉 **가장 그럴듯한 권한의 키를 못 읽고 초록**이었다. 읽기 전용 검사 컨테이너
+      # 이고 `no-new-privileges` 는 그대로 둔다.
+      #
+      # **양성 대조는 「목록 수」가 아니라 「실제로 읽은 수」다.** 목록만 세면 읽기 실패가 그대로
+      # 통과한다(그것이 R3-M1 이었다). 그래서 파일마다 한 바이트를 실제로 읽어 보고 읽힌 것과
+      # 못 읽은 것을 갈라 센다 — 못 읽은 것이 하나라도 있으면 **판정 불가**다.
+      #
+      # 종료 코드로는 「돌았는가」를 가릴 수 없다 — `find` 는 읽을 수 없는 디렉터리 하나로도 1 을
+      # 내고 `grep -l` 도 묶음이 비면 1 을 낸다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면
+      # BusyBox find 가 `invalid number` 로 끊어 탐침 전체가 조용히 0건이 됐다).
       keymat_scan_argv="$(printf '%s ' "${keymat_scan_paths[@]}")"
-      KEYMAT_CONTENT_SCANNED="$(docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
-        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | wc -l" 2>/dev/null | tr -d '[:space:]' || true)"
-      if ! [[ "${KEYMAT_CONTENT_SCANNED:-0}" =~ ^[0-9]+$ ]] || [ "${KEYMAT_CONTENT_SCANNED:-0}" -lt "$KEYMAT_MIN_ENTRIES" ]; then
-        fail "키 재료 내용 축이 훑은 파일 수(${KEYMAT_CONTENT_SCANNED:-0})가 하한(${KEYMAT_MIN_ENTRIES}) 미만이다 — 이미지에 셸·find 가 없거나 탐침이 끊겼다(판정 불가)"
+      KEYMAT_CONTENT_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | while IFS= read -r f; do
+           if head -c 1 \"\$f\" >/dev/null 2>&1; then
+             printf 'R\\n'
+             grep -lE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' \"\$f\" 2>/dev/null | sed 's/^/H\\t/'
+           else
+             printf 'U\\t%s\\n' \"\$f\"
+           fi
+         done" 2>/dev/null || true)"
+      KEYMAT_CONTENT_SCANNED="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | grep -c '^R$' || true)"
+      KEYMAT_UNREADABLE="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^U\t//p')"
+      KEYMAT_CONTENT_HITS="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^H\t//p')"
+      if [ -n "$KEYMAT_UNREADABLE" ]; then
+        echo "키 재료 내용 축이 읽지 못한 파일이 있다(판정 불가) — root 로 읽는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_UNREADABLE" | tr '\n' ' ')]" >&2
+        exit 2
       fi
-      KEYMAT_CONTENT_HITS="$(docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
-        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c -exec grep -lE '^-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----' {} + 2>/dev/null" 2>/dev/null || true)"
+      # 이 하한은 **자기 모집단**(크기 상한만 건 전체 수)의 것이다 — 이름 축의 하한을 빌려 쓰면
+      # 제외가 늘어 그쪽이 내려갈 때 이 축의 바닥도 조용히 함께 내려간다(r3 cr R3-7).
+      if ! [[ "${KEYMAT_CONTENT_SCANNED:-0}" =~ ^[0-9]+$ ]] || [ "${KEYMAT_CONTENT_SCANNED:-0}" -lt "$KEYMAT_CONTENT_MIN_SCANNED" ]; then
+        fail "키 재료 내용 축이 **실제로 읽은** 파일 수(${KEYMAT_CONTENT_SCANNED:-0})가 하한(${KEYMAT_CONTENT_MIN_SCANNED}) 미만이다 — 이미지에 셸·find 가 없거나 탐침이 끊겼다(판정 불가)"
+      fi
       [ -z "$KEYMAT_CONTENT_HITS" ] || KEYMAT_HITS="${KEYMAT_HITS}${KEYMAT_CONTENT_HITS}"$'\n'
       KEYMAT_HITS="$(printf '%s' "$KEYMAT_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
       if [ -n "$KEYMAT_HITS" ]; then
         fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$KEYMAT_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
       fi
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=훑음${KEYMAT_CONTENT_SCANNED}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=읽음${KEYMAT_CONTENT_SCANNED}건(하한 ${KEYMAT_CONTENT_MIN_SCANNED})·못읽음0"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
