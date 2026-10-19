@@ -615,14 +615,20 @@ case "$RUNTIME_KIND" in
       #
       # **양성 대조는 「목록 수」가 아니라 「실제로 읽은 수」다.** 목록만 세면 읽기 실패가 그대로
       # 통과한다(그것이 R3-M1 이었다). 그래서 파일마다 한 바이트를 실제로 읽어 보고 읽힌 것과
-      # 못 읽은 것을 갈라 센다 — 못 읽은 것이 하나라도 있으면 **판정 불가**다.
+      # 못 읽은 것을 갈라 센다.
+      #
+      # **역할 구분**(r4 cr R4-7): root 로 도는 이상 일반 이미지에서 못 읽는 파일은 사실상 없다
+      # (실측 0). 그러니 「못 읽음 → 판정 불가」는 **주된 방어가 아니라 backstop** 이고, 이 축의
+      # 실제 방어는 아래 **`content.min-scanned` 하한**과 **매처 표본**이다. 하한을 손대는 사람이
+      # 무엇이 걸리는지 알도록 여기 적어 둔다.
       #
       # 종료 코드로는 「돌았는가」를 가릴 수 없다 — `find` 는 읽을 수 없는 디렉터리 하나로도 1 을
       # 내고 `grep -l` 도 묶음이 비면 1 을 낸다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면
       # BusyBox find 가 `invalid number` 로 끊어 탐침 전체가 조용히 0건이 됐다).
       keymat_scan_argv="$keymat_scan_argv_pre"
       KEYMAT_CONTENT_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
-        "find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | while IFS= read -r f; do
+        "printf '%s\\n' '-----BEGIN PRIVATE KEY-----' > /keymat-probe-sample; \
+         find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | while IFS= read -r f; do
            if head -c 1 \"\$f\" >/dev/null 2>&1; then
              printf 'R\\n'
              grep -lE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' \"\$f\" 2>/dev/null | sed 's/^/H\\t/'
@@ -630,9 +636,21 @@ case "$RUNTIME_KIND" in
              printf 'U\\t%s\\n' \"\$f\"
            fi
          done" 2>/dev/null || true)"
-      KEYMAT_CONTENT_SCANNED="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | grep -c '^R$' || true)"
+      # 심어 둔 표본도 읽히므로 하나 뺀다 — 이 수가 「**이미지의** 파일 중 실제로 읽은 수」를
+      # 뜻해야 정책 주석의 실측치와 같은 것을 가리킨다.
+      KEYMAT_CONTENT_READ_RAW="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | grep -c '^R$' || true)"
+      KEYMAT_CONTENT_SCANNED="$(( KEYMAT_CONTENT_READ_RAW > 0 ? KEYMAT_CONTENT_READ_RAW - 1 : 0 ))"
       KEYMAT_UNREADABLE="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^U\t//p')"
-      KEYMAT_CONTENT_HITS="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^H\t//p')"
+      KEYMAT_CONTENT_HITS_ALL="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^H\t//p')"
+      # **매처 자신의 양성 대조**(r4 cr R4-5). 앞 판의 양성 대조는 「`find` 가 돌았고 N 개를
+      # 읽었다」까지만 증명했다 — `grep` 이 없거나 정규식이 깨지면 적중 0 이 되고 읽은 수는 그대로라
+      # 통과한다. 그래서 탐침 안에서 **알려진 표본 하나를 심어** 매처가 그것을 반드시 집는지 센다
+      # (폐기되는 컨테이너 레이어라 이미지는 불변이다). 못 집으면 매처가 죽은 것이므로 판정 불가다.
+      if ! printf '%s\n' "$KEYMAT_CONTENT_HITS_ALL" | grep -qx -- "/keymat-probe-sample"; then
+        echo "키 재료 내용 축의 매처가 심어 둔 표본을 집지 못했다(판정 불가) — grep 이 없거나 식이 깨졌다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다" >&2
+        exit 2
+      fi
+      KEYMAT_CONTENT_HITS="$(printf '%s\n' "$KEYMAT_CONTENT_HITS_ALL" | grep -vx -- "/keymat-probe-sample" || true)"
       if [ -n "$KEYMAT_UNREADABLE" ]; then
         echo "키 재료 내용 축이 읽지 못한 파일이 있다(판정 불가) — root 로 읽는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_UNREADABLE" | tr '\n' ' ')]" >&2
         exit 2
