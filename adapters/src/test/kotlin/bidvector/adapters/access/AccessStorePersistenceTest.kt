@@ -252,6 +252,27 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
         failedAttemptsOf(other) shouldBe 2
     }
 
+    /**
+     * verifier r2 R2-2 — **성공이 실 DB 의 실패 계수를 비우는가.** 앞 판은 fake 위의 use case
+     * test 뿐이었다. 그 공백이 실제로 드러난 적이 있다: 확정 문장을 SELECT 로 바꾼 변이가
+     * **초기화까지 없앴는데** 동시성 test 말고는 아무것도 붉지 않았다.
+     */
+    @Test
+    fun `성공한 로그인이 실 DB 의 실패 계수와 잠금을 비운다`() {
+        createAccount()
+        repeat(POLICY.maxFailedAttempts - 1) {
+            access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
+        }
+        failedAttempts() shouldBe POLICY.maxFailedAttempts - 1
+
+        access()
+            .inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
+            .shouldBeInstanceOf<SignInOutcome.Granted>()
+
+        failedAttempts() shouldBe 0
+        lockedUntil() shouldBe null
+    }
+
     @Test
     fun `모르는 세션 해시는 조회되지 않는다 — 다른 계정의 세션도 자기 해시로만 산다`() {
         createAccount()
