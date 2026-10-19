@@ -42,6 +42,12 @@ https://{$BIDVECTOR_PROXY_DOMAIN:localhost}:{$BIDVECTOR_PROXY_HTTPS_PORT} {
 
 	# 응답 헤더. `defer` 로 **상류 응답을 덮어쓴다** — app 쪽 Spring Security 가 같은 이름을
 	# 자기 값으로 보내면 두 값이 실리거나 상류 값이 이기므로, 한 자리에서 정해지게 한다.
+	#
+	# **정직한 상태(검토 r2)**: 오늘 그 상류 거동은 **실재하지 않는다**. 내부망에서 app 의
+	# `/api/strategy` 응답 헤더를 직접 떠 보면 아래 네 이름도 `Server` 도 하나도 없다(실측).
+	# 그래서 `defer` 를 떼어도 프록시 응답은 이름마다 1개로 똑같고, 스모크의 「이름당 1개」
+	# 축은 오늘 아무것도 운동시키지 못한다 — 그 축의 값은 **app 이 뒷날 보안 헤더를 켜는
+	# 변경에 대한 회귀 가드**다. `defer` 자체의 필요성은 아직 측정되지 않았다.
 	header {
 		defer
 		-Server
