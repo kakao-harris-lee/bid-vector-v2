@@ -34,6 +34,17 @@ class InvalidEditRequestException(
 const val CORRELATION_ID_ATTRIBUTE = "bidvector.http.correlationId"
 const val AUDIT_SUBJECT_ATTRIBUTE = "bidvector.http.subject"
 
+/**
+ * 인증된 주체 — **필터가 적은 값**이다(요청이 보낸 값이 아니다, verifier r1 F2). 감사 행의
+ * subject 와 **같은 속성**을 읽으므로 둘이 갈릴 수 없다: 갈리게 하려면 필터 한 자리를 고쳐야
+ * 하고 그러면 두 값이 함께 움직인다.
+ *
+ * 속성이 없는 경로는 없다(기본 거부 필터가 허용·거부 양쪽에서 적는다) — 그래도 기본값은
+ * 「신원 없음」으로 둔다(없는 것을 운영자로 올리지 않는다).
+ */
+internal fun HttpServletRequest.authenticatedSubject(): String =
+    getAttribute(AUDIT_SUBJECT_ATTRIBUTE) as? String ?: RequestAuthenticationFilter.UNAUTHENTICATED_SUBJECT
+
 internal fun HttpServletRequest.correlationIdOrUnknown(): String =
     getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
 

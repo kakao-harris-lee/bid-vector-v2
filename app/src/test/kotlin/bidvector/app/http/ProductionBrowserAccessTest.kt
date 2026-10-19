@@ -98,6 +98,9 @@ class ProductionBrowserAccessTest {
             connection.createStatement().use { statement ->
                 statement.execute("TRUNCATE TABLE browser_session")
                 statement.execute("TRUNCATE TABLE api_request_audit")
+                // 세션 경로의 편집 축(F2)이 이 셋을 쓴다 — 비우지 않으면 revision·outbox 대조가
+                // 실행 순서에 의존한다(`StrategyEditProductionE2ETest` 와 같은 목록).
+                statement.execute("TRUNCATE TABLE edit_session, outbox, operator_strategy, operator_strategy_revision")
                 statement.execute("DELETE FROM account")
             }
             connection
@@ -201,6 +204,37 @@ class ProductionBrowserAccessTest {
     }
 
     @Test
+    fun `세션 경로의 편집도 감사 주체와 이벤트 행위자가 같다 — 계정을 가리킨다`() {
+        val session = signIn()
+        val expected = "account:${accountId()}"
+
+        val begun = editPost("/api/strategy/edit-sessions", """{"field":"CANDIDATE_LIMIT"}""", session, 201)
+        val sessionId = begun["sessionId"] as String
+        editPost(
+            "/api/strategy/edit-sessions/$sessionId/value",
+            """{"commandId":"v1","field":"CANDIDATE_LIMIT","count":11}""",
+            session,
+            200,
+        )
+        editPost(
+            "/api/strategy/edit-sessions/$sessionId/confirm",
+            """{"commandId":"c1","seenRevision":0}""",
+            session,
+            200,
+        )
+
+        // 앞 판은 outbox 행위자가 상수 `operator` 였다 — 같은 요청의 두 기록이 다른 사람을
+        // 가리켰고, 7E 화면이 쓸 경로가 바로 이쪽이다.
+        queryStrings("SELECT actor_kind FROM outbox").single() shouldBe "OPERATOR"
+        queryStrings("SELECT actor_detail FROM outbox").single() shouldBe expected
+        // 로그인 요청 자신의 감사 행은 `unauthenticated` 다(그 시점에 주체가 없다) — 대조는
+        // **편집 요청들**의 주체 집합이다.
+        queryStrings(
+            "SELECT DISTINCT subject FROM api_request_audit WHERE path LIKE '/api/strategy/edit-sessions%'",
+        ).toSet() shouldBe setOf(expected)
+    }
+
+    @Test
     fun `기존 운영자 자격 헤더 경로는 그대로다 — 무회귀`() {
         val headers =
             HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
@@ -230,6 +264,19 @@ class ProductionBrowserAccessTest {
 
     private fun cookieOnly(session: ProductionSession): HttpHeaders =
         HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.NAME}=${session.cookie}") }
+
+    /** 쿠키 + CSRF + JSON — 세션 경로로 쓰기 endpoint 를 부르는 자리. */
+    private fun editPost(
+        path: String,
+        json: String,
+        session: ProductionSession,
+        expectedStatus: Int,
+    ): Map<String, Any?> {
+        val headers = cookieAndStamp(session).apply { contentType = MediaType.APPLICATION_JSON }
+        val response = exchange(path, HttpMethod.POST, headers, json)
+        response.statusCode.value() shouldBe expectedStatus
+        return response.body ?: emptyMap()
+    }
 
     private fun cookieAndStamp(session: ProductionSession): HttpHeaders =
         cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }

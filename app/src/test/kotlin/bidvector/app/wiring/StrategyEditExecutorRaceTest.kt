@@ -18,6 +18,7 @@ import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.CommandId
+import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.CommandResult
 import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionId
@@ -132,6 +133,9 @@ private class DirectStrategyEditTransaction(
  * 그 값의 revision 을 기준으로 심었다. 두 읽기 사이에 다른 커밋이 끼면 기준은 새 revision 이
  * 되고 draft 는 낡은 값이라, 확인이 통과하며 앞 세션의 변경이 409 없이 사라졌다.
  */
+/** 행위자는 이제 인증 주체에서 온다 — 이 test 는 그 값의 축을 재지 않으므로 고정값 하나를 쓴다. */
+private val RACE_ACTOR = OperatorId("race-test-operator")
+
 class StrategyEditExecutorRaceTest {
     private val sessions = RaceSessionRepository()
     private val events = RaceEventSink()
@@ -149,10 +153,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { strategyOf(StrategyDraft(candidateLimit = 13), revision = 1) },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACTOR,
                 started.session.id,
                 CommandId("race-value"),
                 EditableField.MaxActiveBids,
@@ -180,10 +185,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { error("이 대조에서는 값이 바뀌지 않는다") },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACTOR,
                 started.session.id,
                 CommandId("plain-value"),
                 EditableField.MaxActiveBids,

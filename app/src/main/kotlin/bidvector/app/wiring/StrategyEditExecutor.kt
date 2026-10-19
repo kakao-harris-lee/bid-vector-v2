@@ -33,17 +33,25 @@ import java.util.UUID
  * 모든 쓰기가 한 트랜잭션이다(D-6A2b-3) — 전략 저장·outbox 등록·세션 전진이 함께
  * 커밋되거나 함께 롤백된다.
  *
- * 행위자는 **상수**다(D-6A2b-5, 우회 (8)) — 요청에서 받지 않으므로 HTTP 로
- * [Actor.System] 을 만들 길이 없다. 값은 인증 필터가 audit 주체로 적는 라벨과 같다.
+ * 행위자는 **인증 판정의 결과**다(verifier r1 F2) — 요청 본문·헤더가 아니라 기본 거부 필터가
+ * 적은 주체를 컨트롤러가 그대로 넘긴다. 받는 타입이 [OperatorId] 이고 이 클래스가 [Actor.Operator]
+ * 로만 감싸므로 **HTTP 로 [Actor.System] 을 만들 길은 여전히 없다**(우회 (8)).
+ *
+ * 앞 판은 상수 `operator` 하나였다. 그래서 세션(쿠키) 경로로 들어온 편집의 outbox 행위자가
+ * `operator` 인데 감사 주체는 `account:<id>` 였다 — 같은 요청의 두 기록이 서로 다른 사람을
+ * 가리켰다. 둘이 **같은 속성**에서 오므로 이제 갈릴 수 없다.
  */
 class StrategyEditExecutor(
     private val transaction: StrategyEditTransaction,
     private val strategyPolicy: Resolution.Resolved<StrategyPolicyData>,
 ) {
     /** 세션 id 는 **서버가** 만든다(D-6A2b-1, 우회 (4)) — 요청이 고르면 남의 세션을 겨냥할 자리가 생긴다. */
-    fun begin(field: EditableField): BeginOutcome =
+    fun begin(
+        actor: OperatorId,
+        field: EditableField,
+    ): BeginOutcome =
         transaction.inTransaction { workflow ->
-            workflow.begin(EditSessionId(UUID.randomUUID().toString()), OPERATOR.id, field)
+            workflow.begin(EditSessionId(UUID.randomUUID().toString()), actor, field)
         }
 
     /**
@@ -68,6 +76,7 @@ class StrategyEditExecutor(
      * 방어) 이 앞선 거부는 판정을 바꾸지 않고 **사유를 HTTP 로 옮길 자리**를 만든다.
      */
     fun provideValue(
+        actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         field: EditableField,
@@ -86,47 +95,54 @@ class StrategyEditExecutor(
                     // 다시 읽은 값을 쓰면 두 읽기 사이의 커밋이 기준을 새 값으로 밀어
                     // 낡은 draft 가 통과한다.
                     val command =
-                        EditCommand.ProvideValue(commandId, sessionId, OPERATOR, field, draft, current.revision)
+                        EditCommand.ProvideValue(
+                            commandId,
+                            sessionId,
+                            Actor.Operator(actor),
+                            field,
+                            draft,
+                            current.revision,
+                        )
                     ProvideValueOutcome.Processed(workflow.provideValue(command))
                 }
             }
         }
 
     fun confirm(
+        actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         seenRevision: StrategyRevision,
     ): CommandResult =
         transaction.inTransaction { workflow ->
-            workflow.confirm(EditCommand.Confirm(commandId, sessionId, OPERATOR, seenRevision))
+            workflow.confirm(EditCommand.Confirm(commandId, sessionId, Actor.Operator(actor), seenRevision))
         }
 
     fun requestEdit(
+        actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         field: EditableField,
     ): CommandResult =
         transaction.inTransaction { workflow ->
-            workflow.requestEdit(EditCommand.RequestEdit(commandId, sessionId, OPERATOR, field))
+            workflow.requestEdit(EditCommand.RequestEdit(commandId, sessionId, Actor.Operator(actor), field))
         }
 
     fun cancel(
+        actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
     ): CommandResult =
         transaction.inTransaction { workflow ->
-            workflow.cancel(EditCommand.Cancel(commandId, sessionId, OPERATOR, CancellationReason.OperatorRequested))
+            workflow.cancel(
+                EditCommand.Cancel(
+                    commandId,
+                    sessionId,
+                    Actor.Operator(actor),
+                    CancellationReason.OperatorRequested,
+                ),
+            )
         }
-
-    private companion object {
-        /**
-         * 단일 운영자 토큰(6A-1 운영자 결정 ②) — 라벨은 `OperatorCredentialAuthenticator` 가 audit
-         * 주체로 적는 값과 같다. 그 파일은 이 slice 에서 **무편집**이라(D-6A2b-5) 상수를
-         * 공유하도록 옮기지 않았다 — 두 값이 같다는 것은 문면이 아니라 실 조립 E2E 가
-         * 잰다(audit 행의 subject == outbox 봉투의 actor).
-         */
-        val OPERATOR = Actor.Operator(OperatorId("operator"))
-    }
 }
 
 /**
