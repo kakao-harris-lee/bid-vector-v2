@@ -220,9 +220,13 @@ pub_host_ip="$(printf '%s' "$ports_json" | jq -r '.services.proxy.ports[0].host_
 [ "$pub_host_ip" = "127.0.0.1" ] || fail "프록시 publish 가 루프백이 아니다: $pub_host_ip"
 # **해석된 설정에 관리 포트가 상류로 실려 있지 않다**(우회 ② 의 구조 축). app 서비스의
 # `MANAGEMENT_SERVER_PORT` 선언 하나만 그 값을 든다.
+# 술어는 **숫자 경계가 있는 등식**이다(cr L-2). 부분 문자열(`contains`)이면 관리 포트 8080 이
+# API 포트 18080 과 프록시 상류 `app:18080` 에도 맞아 **스모크가 거짓 실패**한다 — runbook §9.2
+# 가 포트 재정의를 권하므로 운영자가 실제로 밟는 자리다(fail-closed 라 보안 구멍은 아니지만
+# 「게이트가 틀린 답을 낸다」는 같은 등급의 결함이다).
 mgmt_refs="$(printf '%s' "$ports_json" \
   | jq -r --arg p "$BIDVECTOR_APP_MANAGEMENT_PORT" \
-    '[.services | to_entries[] | . as $s | (.value.environment // {}) | to_entries[] | select((.value|tostring) | contains($p)) | "\($s.key).\(.key)"] | sort | join(",")')"
+    '[.services | to_entries[] | . as $s | (.value.environment // {}) | to_entries[] | select((.value|tostring) | test("(^|[^0-9])" + $p + "([^0-9]|$)")) | "\($s.key).\(.key)"] | sort | join(",")')"
 [ "$mgmt_refs" = "app.MANAGEMENT_SERVER_PORT" ] \
   || fail "관리 포트 값을 든 설정 자리가 app.MANAGEMENT_SERVER_PORT 하나가 아니다: [$mgmt_refs]"
 
