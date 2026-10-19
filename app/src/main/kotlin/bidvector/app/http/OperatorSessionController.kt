@@ -106,7 +106,10 @@ class OperatorSessionController(
     private fun sessionAbsent(request: HttpServletRequest): ResponseEntity<Any> =
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
-            .body(ErrorBody(ErrorCode.NOT_FOUND, "요청한 경로가 없다", request.correlationIdOrUnknown()))
+            // 없는 것은 **경로가 아니라 자원**이다(code-review r2 L-3) — 경로 404 의 문구를
+            // 재사용하면 운영자가 로그에서 「주소를 잘못 쳤다」로 오독한다. 고정 문구라 노출
+            // 축에는 변화가 없다.
+            .body(ErrorBody(ErrorCode.NOT_FOUND, "브라우저 세션이 없다", request.correlationIdOrUnknown()))
 }
 
 /**
