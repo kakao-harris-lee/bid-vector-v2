@@ -90,7 +90,11 @@ class InMemorySessionStore : BrowserSessionStorePort {
 
     val openCount: Int get() = rows.size
 
-    override fun open(session: NewBrowserSession) {
+    override fun openReplacing(
+        session: NewBrowserSession,
+        revokedAt: Instant,
+    ) {
+        revokeAllOf(session.account, revokedAt)
         rows[session.digest.hex] =
             BrowserSessionSnapshot(
                 digest = session.digest,

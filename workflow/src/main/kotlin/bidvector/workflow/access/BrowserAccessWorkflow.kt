@@ -161,16 +161,18 @@ class BrowserAccessWorkflow(
     /**
      * 로그인은 늘 **새 값**을 발급하고 그 계정의 기존 세션을 전부 폐기한다 — 제시된 쿠키를
      * 승격시키는 경로가 아예 없으므로 세션 고정(우회 ⑤)이 구조로 성립하지 않는다.
+     *
+     * 폐기와 발급은 포트 **한 호출**이다([BrowserSessionStorePort.openReplacing]) — 로그인이
+     * 문장마다 제 트랜잭션을 여는 경계 아래에서도 그 둘이 쪼개지지 않게 하는 자리다.
      */
     private fun issue(
         account: AccountId,
         now: Instant,
     ): IssuedSession {
-        sessions.revokeAllOf(account, now)
         val key = keys.newKey()
         val stamp = key.deriveStamp()
         val absoluteExpiresAt = now.plus(policy.absoluteWindow)
-        sessions.open(
+        sessions.openReplacing(
             NewBrowserSession(
                 digest = key.digest(),
                 account = account,
@@ -179,6 +181,7 @@ class BrowserAccessWorkflow(
                 idleExpiresAt = idleDeadline(now, absoluteExpiresAt),
                 absoluteExpiresAt = absoluteExpiresAt,
             ),
+            revokedAt = now,
         )
         return IssuedSession(key, stamp, absoluteExpiresAt)
     }

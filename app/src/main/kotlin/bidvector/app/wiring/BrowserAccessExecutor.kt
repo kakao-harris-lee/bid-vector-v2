@@ -22,8 +22,10 @@ import bidvector.workflow.access.SignInOutcome
  * (인자가 그 값이다). 세션을 만드는 길은 [signIn] 하나다 — use case 쪽 `NewBrowserSession` 의
  * `internal` 생성자가 그 사실을 타입으로 든다.
  *
- * 로그인 한 번이 한 트랜잭션이다 — 실패 계수 갱신·기존 세션 폐기·새 세션 등록이 함께
- * 커밋되거나 함께 롤백된다(반쯤 발급된 세션이 남지 않는다).
+ * **로그인만 경계가 다르다**(code-review r1 M-2) — 느린 KDF 검증이 풀 커넥션을 쥐지 않도록
+ * 문장마다 제 트랜잭션으로 돈다([BrowserAccessTransaction.signIn]). 한 커밋이 필요한 묶음은
+ * 포트 한 호출 안에 있어(기존 세션 폐기 + 새 세션 등록 · 실패 계수와 잠금) 반쯤 발급된
+ * 세션이 남지 않는다.
  */
 class BrowserAccessExecutor(
     private val transaction: BrowserAccessTransaction,
@@ -31,7 +33,7 @@ class BrowserAccessExecutor(
     fun signIn(
         login: LoginName,
         clear: ClearPassphrase,
-    ): SignInOutcome = transaction.inTransaction { it.signIn(login, clear) }
+    ): SignInOutcome = transaction.inSignInScope { it.signIn(login, clear) }
 
     fun authenticate(
         key: BrowserSessionKey,

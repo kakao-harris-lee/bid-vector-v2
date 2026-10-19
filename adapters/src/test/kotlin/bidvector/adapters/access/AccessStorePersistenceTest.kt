@@ -97,7 +97,7 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
 
         val long = ClearPassphrase.wrap("y".repeat(LONG_PASSPHRASE_BYTES))
 
-        access().inTransaction { it.signIn(LOGIN, long) } shouldBe SignInOutcome.Refused
+        access().inSignInScope { it.signIn(LOGIN, long) } shouldBe SignInOutcome.Refused
     }
 
     @Test
@@ -162,9 +162,9 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
 
         revokedCount() shouldBe 1
         access().inTransaction { it.authenticate(issued.key, CsrfDemand.Exempt) } shouldBe AccessVerdict.Denied
-        access().inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
+        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
         access()
-            .inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) }
+            .inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) }
             .shouldBeInstanceOf<SignInOutcome.Granted>()
     }
 
@@ -181,16 +181,16 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
         createAccount()
 
         repeat(POLICY.maxFailedAttempts - 1) {
-            access().inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
+            access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
         }
         failedAttempts() shouldBe POLICY.maxFailedAttempts - 1
         lockedUntil() shouldBe null
 
-        access().inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
+        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(SECOND)) } shouldBe SignInOutcome.Refused
 
         failedAttempts() shouldBe 0
         lockedUntil() shouldBe clock.now().plus(POLICY.lockWindow)
-        access().inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
+        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
     }
 
     @Test
@@ -208,6 +208,7 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
     private fun access(): JdbcBrowserAccessTransaction =
         JdbcBrowserAccessTransaction(
             transactions = TransactionBoundary(dataSource()),
+            dataSource = dataSource(),
             hasher = hasher,
             keys = SecureBrowserSessionKeySource(),
             clock = clock,
@@ -227,7 +228,7 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
 
     private fun signIn(): IssuedSession =
         access()
-            .inTransaction { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
+            .inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
             .shouldBeInstanceOf<SignInOutcome.Granted>()
             .session
 

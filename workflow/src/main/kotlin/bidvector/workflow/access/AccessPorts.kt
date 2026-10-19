@@ -73,7 +73,20 @@ interface AccountProvisioningPort {
  * 서명이 없으므로 「세션 식별자는 해시로만 저장」이 문장이 아니라 타입으로 선다.
  */
 interface BrowserSessionStorePort {
-    fun open(session: NewBrowserSession)
+    /**
+     * 새 세션을 열면서 **그 계정의 기존 세션을 같은 호출에서 폐기한다** — 구현은 둘을 한
+     * 트랜잭션에 담는다.
+     *
+     * 두 효과가 한 서명인 이유(code-review r1 M-2): 로그인이 느린 검증 동안 커넥션을 쥐지
+     * 않으려고 **문장마다 제 트랜잭션**을 열게 되면서, 폐기와 발급이 따로 커밋될 수 있는
+     * 자리가 생겼다. 따로 커밋되면 동시 로그인 둘이 서로의 폐기를 비껴가 **한 계정에 살아
+     * 있는 세션이 둘** 남는다(재발급의 뜻이 사라진다). 한 호출로 묶으면 호출부가 어느
+     * 경계 아래에 있든 그 둘은 쪼개지지 않고, 「폐기 없이 여는」 상태가 이 포트의 표면에 없다.
+     */
+    fun openReplacing(
+        session: NewBrowserSession,
+        revokedAt: Instant,
+    )
 
     fun byDigest(digest: BrowserSessionDigest): BrowserSessionSnapshot?
 

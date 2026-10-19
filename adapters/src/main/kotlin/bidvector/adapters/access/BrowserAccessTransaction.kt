@@ -1,5 +1,7 @@
 package bidvector.adapters.access
 
+import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.access.AccountProvisioning
 import bidvector.workflow.access.BrowserAccessPolicyData
@@ -10,17 +12,42 @@ import bidvector.workflow.access.PassphraseHasher
 import bidvector.workflow.strategy.Clock
 import java.security.SecureRandom
 import java.util.Base64
+import javax.sql.DataSource
 
 /**
- * 브라우저 접근 use case 를 **한 트랜잭션 안에서** 빌려주는 경계(`StrategyEditTransaction` 과
- * 같은 형태·같은 이유). 호출부는 use case 하나만 받고, 그 use case 가 쥔 포트(계정·세션
- * 저장소)는 이 경계 밖으로 나가지 않는다.
+ * 브라우저 접근 use case 를 빌려주는 경계(`StrategyEditTransaction` 과 같은 형태·같은 이유).
+ * 호출부는 use case 하나만 받고, 그 use case 가 쥔 포트(계정·세션 저장소)는 이 경계 밖으로
+ * 나가지 않는다.
+ *
+ * **빌려주는 자리가 둘**이고 다른 것은 커밋 경계뿐이다 — 짧은 경로는 블록 하나가 한 커밋이고,
+ * 로그인은 문장마다 제 트랜잭션이다(아래 [inSignInScope] 의 사유).
  *
  * 인터페이스가 `adapters` 에 사는 이유도 같다 — `app` 은 `adapters` 를 볼 수 있지만 그 반대는
  * 없다(v2-지침서 §3.1).
  */
 interface BrowserAccessTransaction {
+    /** 짧은 경로(요청 인증·세션 조회·로그아웃) — 호출 하나가 한 커밋이다. */
     fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T
+
+    /**
+     * 로그인 전용 — **느린 KDF 검증이 커넥션을 쥐지 않는다**(code-review r1 M-2).
+     *
+     * 앞 판은 로그인도 [inTransaction] 을 지났다. 그러면 계정 조회부터 갱신까지가 한
+     * 트랜잭션이고, 그 한가운데의 bcrypt(~300ms) 동안 **풀 커넥션 하나가 묶인다** — 무인증
+     * 으로 닿을 수 있는 유일한 endpoint 가 그 경로라, 동시 로그인 요청 열 건이면 풀(10)이
+     * 비고 **인증된 요청까지 함께 멈춘다**. 요청 자체의 유량 제한은 이 slice 밖이다.
+     *
+     * 그래서 로그인만 **문장마다 제 트랜잭션**으로 돈다: 조회(커넥션 빌림→반납) → 검증
+     * (커넥션 없음) → 원자 갱신(빌림→반납). 커넥션을 쥐는 시간이 KDF 가 아니라 문장 하나의
+     * 길이로 줄어든다. 한 커밋이 필요한 묶음은 포트 **한 호출** 안에 있다
+     * ([bidvector.workflow.access.BrowserSessionStorePort.openReplacing] · 실패 계수와 잠금의
+     * 한 문장 갱신) — 경계가 느슨해져도 쪼개질 수 있는 쌍이 남지 않는다.
+     *
+     * **이 자리를 부를 수 있는 호출자는 하나**다 — `app.adapter.member-call-pairs` 가
+     * (호출자, 선언 타입, 메서드, 서술자) 넷으로 못박는다(fail-closed). 그래서 로그인 아닌
+     * 긴 작업이 이 느슨한 경계로 들어오려면 게이트 설정을 먼저 바꿔야 한다.
+     */
+    fun <T> inSignInScope(action: (BrowserAccessWorkflow) -> T): T
 }
 
 /** 운영자 명령 경로의 같은 경계 — **다른 타입**이라 요청 경로가 이것을 주입받을 수 없다. */
@@ -35,18 +62,27 @@ interface AccountProvisioningTransaction {
  */
 class JdbcBrowserAccessTransaction(
     private val transactions: TransactionBoundary,
+    dataSource: DataSource,
     private val hasher: PassphraseHasher,
     private val keys: BrowserSessionKeySource,
     private val clock: Clock,
     private val policy: BrowserAccessPolicyData,
 ) : BrowserAccessTransaction {
-    override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T =
-        transactions.inTransaction { action(assemble()) }
+    /**
+     * 로그인 전용 공급원 — **호출 하나가 트랜잭션 하나**다(`JdbcStrategyRepository` 의
+     * `DataSource` 생성자와 같은 선택). `internal` 이라 이 모듈 밖에서는 만들 수 없다.
+     */
+    private val perStatement: ConnectionSource = OwnTransactionConnectionSource(dataSource)
 
-    private fun assemble(): BrowserAccessWorkflow =
+    override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T =
+        transactions.inTransaction { action(assemble(transactions)) }
+
+    override fun <T> inSignInScope(action: (BrowserAccessWorkflow) -> T): T = action(assemble(perStatement))
+
+    private fun assemble(connections: ConnectionSource): BrowserAccessWorkflow =
         BrowserAccessWorkflow(
-            accounts = JdbcAccountStore(transactions),
-            sessions = JdbcBrowserSessionStore(transactions),
+            accounts = JdbcAccountStore(connections),
+            sessions = JdbcBrowserSessionStore(connections),
             hasher = hasher,
             keys = keys,
             clock = clock,

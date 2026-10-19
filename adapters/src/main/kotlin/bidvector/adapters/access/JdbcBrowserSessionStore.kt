@@ -22,8 +22,21 @@ import java.time.Instant
 class JdbcBrowserSessionStore(
     private val connections: ConnectionSource,
 ) : BrowserSessionStorePort {
-    override fun open(session: NewBrowserSession) {
+    /**
+     * 폐기와 등록이 **한 커넥션 블록**이다 — `ConnectionSource` 의 어느 구현 아래에서도 그
+     * 블록 하나가 트랜잭션 하나다(경계가 주인이면 ambient 트랜잭션, 호출이 주인이면 그 호출의
+     * 트랜잭션). 두 문장을 포트의 두 호출로 두면 로그인 경계 아래에서 따로 커밋될 수 있다.
+     */
+    override fun openReplacing(
+        session: NewBrowserSession,
+        revokedAt: Instant,
+    ) {
         connections.withConnection { connection ->
+            connection.prepareStatement(AccessSql.REVOKE_ACCOUNT_SESSIONS).use { statement ->
+                statement.setTimestamp(1, Timestamp.from(revokedAt))
+                statement.setLong(2, session.account.value)
+                statement.executeUpdate()
+            }
             connection.prepareStatement(AccessSql.INSERT_BROWSER_SESSION).use { statement ->
                 var index = 1
                 statement.setString(index++, session.digest.hex)

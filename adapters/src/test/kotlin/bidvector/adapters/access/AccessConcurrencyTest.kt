@@ -13,12 +13,14 @@ import bidvector.workflow.access.SignInOutcome
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 
 private val ACCOUNT = LoginName("concurrent-access-test-operator")
 private const val RIGHT = "concurrent-access-test-fixture-value"
@@ -139,11 +141,36 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
         sessionCount() shouldBe 0
     }
 
+    @Test
+    fun `로그인의 느린 검증은 커넥션을 쥐지 않는다 — 풀이 하나여도 다른 질의가 지난다`() {
+        createAccount()
+
+        newPool(SINGLE_CONNECTION_POOL, POOL_TIMEOUT_MS).use { pool ->
+            val gated = GatedPassphraseHasher(hasher)
+            val slot = SignInSlot()
+            val late = startSignIn(gated, RIGHT, slot, pool)
+            gated.awaitEntry()
+
+            // 검증 한가운데다. 앞 판은 여기서 트랜잭션이 열린 채였고 풀의 **유일한** 커넥션이
+            // 묶여 있었다 — 이 질의가 `connectionTimeout` 을 넘겨 실패했다. 무인증으로 닿는
+            // 로그인이 인증된 요청까지 굶기는 형태다.
+            queryOne(pool, "SELECT 1") shouldBe "1"
+
+            gated.release()
+            late.join(JOIN_TIMEOUT_SECONDS * MILLIS_PER_SECOND)
+            slot.value.shouldBeInstanceOf<SignInOutcome.Granted>()
+        }
+    }
+
     // --- 조립·동시 실행 헬퍼 ---------------------------------------------------
 
-    private fun access(hasher: PassphraseHasher): JdbcBrowserAccessTransaction =
+    private fun access(
+        hasher: PassphraseHasher,
+        source: DataSource = dataSource(),
+    ): JdbcBrowserAccessTransaction =
         JdbcBrowserAccessTransaction(
-            transactions = TransactionBoundary(dataSource()),
+            transactions = TransactionBoundary(source),
+            dataSource = source,
             hasher = hasher,
             keys = SecureBrowserSessionKeySource(),
             clock = clock,
@@ -153,7 +180,8 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
     private fun signIn(
         hasher: PassphraseHasher,
         value: String,
-    ): SignInOutcome = access(hasher).inTransaction { it.signIn(ACCOUNT, ClearPassphrase.wrap(value)) }
+        source: DataSource = dataSource(),
+    ): SignInOutcome = access(hasher, source).inSignInScope { it.signIn(ACCOUNT, ClearPassphrase.wrap(value)) }
 
     /** 결과를 스레드 밖으로 내는 자리 — 단언은 `join` 뒤에 본체 스레드가 한다. */
     private class SignInSlot {
@@ -165,7 +193,8 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
         hasher: PassphraseHasher,
         value: String,
         slot: SignInSlot = SignInSlot(),
-    ): Thread = Thread { slot.value = signIn(hasher, value) }.also { it.start() }
+        source: DataSource = dataSource(),
+    ): Thread = Thread { slot.value = signIn(hasher, value, source) }.also { it.start() }
 
     /**
      * 같은 순간에 출발시킨다 — 한 문 뒤에 다른 문이 서면 「동시」가 아니라 순차이고, 그 위에서는
@@ -214,6 +243,20 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
             }
         }
 
+    /** 풀에서 커넥션을 빌려 한 값을 읽는다 — **빌릴 수 있는가** 자체가 이 test 의 측정이다. */
+    private fun queryOne(
+        source: DataSource,
+        sql: String,
+    ): String =
+        source.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(sql).use { rs ->
+                    check(rs.next()) { "행이 없다: $sql" }
+                    rs.getString(1)
+                }
+            }
+        }
+
     private fun queryStrings(sql: String): List<String> {
         val values = mutableListOf<String>()
         dataSource().connection.use { connection ->
@@ -228,5 +271,12 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
+
+        /** 하나다 — 「쥐고 있으면 아무도 못 쓴다」를 모호함 없이 재는 유일한 크기다. */
+        const val SINGLE_CONNECTION_POOL = 1
+
+        /** 쥐고 있으면 이 시간 뒤 실패한다. KDF 한 번(수십 ms)보다 충분히 길다 — 이 시간이 짧아
+         *  실패하는 것이 아니라 **커넥션이 묶여 있어** 실패하는 것임을 분명히 한다. */
+        const val POOL_TIMEOUT_MS = 3_000L
     }
 }

@@ -49,16 +49,22 @@ class InMemoryBrowserAccessTransaction(
     val sessions: MutableSessionStore = MutableSessionStore()
     val keys: SequentialKeySource = SequentialKeySource()
 
-    override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T =
-        action(
-            BrowserAccessWorkflow(
-                accounts = accounts,
-                sessions = sessions,
-                hasher = FakeHasher(),
-                keys = keys,
-                clock = clock,
-                policy = TEST_ACCESS_POLICY,
-            ),
+    override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T = action(workflow())
+
+    /**
+     * 이 이중체에는 커넥션이 없으므로 로그인도 같은 use case 를 지난다 — 경계의 **차이**(문장마다
+     * 제 트랜잭션)는 실 DB 위에서만 보이고, 그 축은 `AccessConcurrencyTest` 가 잰다.
+     */
+    override fun <T> inSignInScope(action: (BrowserAccessWorkflow) -> T): T = action(workflow())
+
+    private fun workflow(): BrowserAccessWorkflow =
+        BrowserAccessWorkflow(
+            accounts = accounts,
+            sessions = sessions,
+            hasher = FakeHasher(),
+            keys = keys,
+            clock = clock,
+            policy = TEST_ACCESS_POLICY,
         )
 
     /** Spring 컨텍스트가 test 사이에 재사용되므로 상태를 매 test 전에 비운다. */
@@ -124,7 +130,11 @@ class MutableSessionStore : BrowserSessionStorePort {
     /** 저장된 **해시 키** 전부 — 「평문이 저장되지 않는다」를 HTTP 층에서도 볼 수 있게 낸다. */
     val storedKeys: Set<String> get() = rows.keys.toSet()
 
-    override fun open(session: NewBrowserSession) {
+    override fun openReplacing(
+        session: NewBrowserSession,
+        revokedAt: Instant,
+    ) {
+        revokeAllOf(session.account, revokedAt)
         rows[session.digest.hex] =
             BrowserSessionSnapshot(
                 digest = session.digest,
