@@ -112,6 +112,22 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   인용으로 게이트가 붉어져 교정했다(`67d1cae1`). 이력은 되쓰지 않았다.
 - 검토: verifier 표적 r2(F-1·F-2·헤더·M-5 이미지 ID 등식·F-4·jvm-app 보존·rollback 17) + code-reviewer 표적 r2.
 
+**D-7F-5 (2026-10-19, 팀장 — 검토 r2 수령: verifier not-ready · code-reviewer APPROVE).** 재작업 2/5.
+- r1 지적 일곱은 닫혔다(vr r2 실측). container job 의 base run step 은 **16** 이다(17 은 중간 상태였다).
+- **수정 r2 에서 닫는 것**
+  - **vr R2-H1(high) — 매달린 step id**: S-22e2·S-22e3 의 `if:` 가 없어진 id(`build_web`·`build_proxy`)를 가리킨다. 그래서 web·proxy 취약점
+    게이트가 매 CI 실행에서 건너뛰어지고 SBOM 도 올라가지 않는다. 조건을 현재 id 로 고친다. 재발은 **구조로** 막는다 — job 안의 `if:` 가
+    가리키는 모든 `steps.<id>` 가 그 job 에 정의된 id 인지 재는 검사를 CI 에 둔다(새 도구를 들이지 않는 작은 검사를 우선). 매달린 id 를 심은
+    변이가 RED 여야 한다. evidence 의 「S-22e2 exit 0」은 `if:` 를 평가하지 않는 재생에서 나왔으므로, 재생 하네스가 `if:` 를 평가하게 고치고
+    「건너뛴 step 0」을 함께 적는다.
+  - **cr R2-1 · R2-2 · R2-3 · R2-4 · R2-5(=vr R2-L2) — 키 재료 검사**: 제외 접두를 `/etc/ssl/certs/` 로 좁힌다. 확장자 열거에 더해 PEM 머리 줄
+    **내용** 탐지를 한 겹 둔다. 경로 일치는 끝 고정으로, 제외 접두는 리터럴 비교로 한다. 제외 목록은 선언된 집합과의 **등식**으로 잠가 표적
+    제외(`/data/` 하나 추가)도 붉게 한다. 음성 대조: `/etc/ssl/private/` 의 키 → 1 · 확장자 없는 PEM 키 → 1 · `/data/` 제외 추가 → 1.
+  - **low**: vr R2-L1(runbook 에 「입력을 고쳤으면 `local-tls-build.sh` 를 먼저」) · cr R2-6(「게이트가 본 바이트 = 실행 바이트」 전제를 코드에) ·
+    R2-7(인자 처리) · R2-8(도구 preflight) · R2-9(jq 대입 실패 문면) · R2-10(`edge` 를 `internal: true` 로 — 스모크 초록일 때만, 아니면 제한).
+  - **runbook 한 줄(cr 권고)**: 망 분리가 닫은 것은 web 경로뿐이다. proxy→app 관리 포트의 방어는 설정층 둘((A3) 상류 등식 · (E) 404)이다.
+- 수정 뒤 verifier 표적 r3(R2-H1 구조 검사 · 키 재료 · rollback) + code-reviewer 표적 r3.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
