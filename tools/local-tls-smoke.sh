@@ -431,19 +431,25 @@ for path in \
   ! _has_mgmt_marker "$body" || fail "정규화 우회 $path 가 관리 표지를 냈다(code=$code)"
   ! _has_mgmt_marker "$(_drop_code "$auth_out")" \
     || fail "인증된 정규화 우회 $path 가 관리 표지를 냈다(code=$auth_code)"
-  for c in "$code" "$auth_code"; do
+  # **코드와 본문을 짝으로 본다**(cr M-4). 앞 판은 코드는 응답마다 따로 보면서 본문은 둘을
+  # 이어 붙인 하나로 봐서, 「무인증이 셸 아닌 200 을 냈고 인증 쪽이 셸을 냈다」가 통과했다.
+  for who in 무인증 인증; do
+    case "$who" in
+      무인증) c="$code"; b="$body" ;;
+      인증)   c="$auth_code"; b="$(_drop_code "$auth_out")" ;;
+    esac
     case "$c" in
       200)
         # 200 이면 셸이어야 한다(web 정적) — app 이나 관리 표면의 200 이면 안 된다.
-        case "$body$(_drop_code "$auth_out")" in
+        case "$b" in
           *'id="root"'*) ;;
-          *) fail "정규화 우회 $path 가 셸이 아닌 200 을 냈다" ;;
+          *) fail "정규화 우회 $path 의 $who 응답이 셸이 아닌 200 을 냈다" ;;
         esac
         ;;
       # 401·403 은 app 의 **API 포트**가 받아 인증 경계에서 끊은 것이다(그 포트에 관리 표면이
       # 없다는 것은 기존 컨테이너 스모크가 재는 사실이고, 위 표지 단언이 여기서 다시 잰다).
       400|401|403|404|301|308) ;;
-      *) fail "정규화 우회 $path 의 응답 코드가 예상 밖이다: $c" ;;
+      *) fail "정규화 우회 $path 의 $who 응답 코드가 예상 밖이다: $c" ;;
     esac
   done
   echo "  $path -> 무인증 $code · 인증 $auth_code"
