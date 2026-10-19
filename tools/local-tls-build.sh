@@ -16,6 +16,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# 인자를 받지 않는다 — 한 호출이 두 이미지를 **함께** 굽는다. 조용히 무시하면
+# `./tools/local-tls-build.sh web` 을 「web 만 다시 굽는다」로 믿은 사람에게 아무 말도 하지
+# 않는다(검토 r2 cr R2-7).
+[ "$#" -eq 0 ] || {
+  echo "사용법: $0 (인자를 받지 않는다 — web·proxy 두 이미지를 함께 굽는다)" >&2
+  exit 2
+}
+
 # shellcheck source=tools/local-tls-env.sh
 . "$REPO_ROOT/tools/local-tls-env.sh"
 
