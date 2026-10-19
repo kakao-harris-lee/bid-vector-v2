@@ -19,6 +19,12 @@ internal data class ObservedStatement(
 )
 
 /**
+ * 읽기 전용을 켜는 문장 — 면제의 **등식 기준**이다. 어댑터의 같은 문면과 값이 같아야 하고,
+ * 어댑터가 문면을 바꾸면 면제가 성립하지 않아 이 witness 를 쓰는 test 가 먼저 붉어진다.
+ */
+internal const val BEGIN_READ_ONLY_SQL = "SET TRANSACTION READ ONLY"
+
+/**
  * 검색 어댑터가 받는 `DataSource` 를 감싸, 연결이 **문장을 만들 때마다** 그 순간의 읽기 전용
  * 상태를 같은 연결에서 직접 물어 기록한다(verifier r2 가 처방한 기록 프록시 형태).
  *
@@ -32,11 +38,17 @@ internal data class ObservedStatement(
 internal class ReadOnlyWitness {
     val observed: MutableList<ObservedStatement> = mutableListOf()
 
-    /** 읽기 전용을 **켜는** 문장 자신 — 그 하나만 `ro=off` 에서 실행되는 것이 정상이다. */
-    fun statementsOutsideReadOnly(): List<ObservedStatement> =
-        observed.filterNot { it.readOnly || it.sql.contains("SET TRANSACTION READ ONLY") }
+    /**
+     * 면제는 **하나**다 — 관측된 **첫** 문장이 [BEGIN_READ_ONLY_SQL] 과 **정확히 같을 때** 그
+     * 하나뿐이다(위치 + 등식). 앞 판은 「그 문구를 포함하면」이라는 **부분 문자열** 면제였고,
+     * 그래서 그 문구를 **SQL 주석으로 단 쓰기**(`UPDATE …` 뒤에 그 문구를 주석으로 붙인 문장)가
+     * 면제됐다(verifier r3 변이 w). 포함이 아니라 등식이라 주석으로는 더 이상 면제되지 않는다.
+     */
+    private fun exemptCount(): Int = if (observed.firstOrNull()?.sql == BEGIN_READ_ONLY_SQL) 1 else 0
 
-    fun queries(): List<ObservedStatement> = observed.filterNot { it.sql.contains("SET TRANSACTION READ ONLY") }
+    fun statementsOutsideReadOnly(): List<ObservedStatement> = observed.drop(exemptCount()).filterNot { it.readOnly }
+
+    fun queries(): List<ObservedStatement> = observed.drop(exemptCount())
 }
 
 internal fun witnessedDataSource(

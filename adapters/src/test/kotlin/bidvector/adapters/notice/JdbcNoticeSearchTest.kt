@@ -31,6 +31,7 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -108,6 +109,32 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
     }
 
     private fun agencyOf(name: String) = Agency(code = AgencyCode.of(name), name = AgencyName.of(name))
+
+    /**
+     * `notice` 표의 **쓰기 흔적**(verifier r3 R3-L-1 처방) — 행마다 `xmin`(그 행을 만든 트랜잭션)
+     * 과 `ctid`(물리 자리)를 거둔다. INSERT·DELETE 는 행 집합을, UPDATE 는 같은 행의 `xmin`·
+     * `ctid` 를 바꾸므로 **어떤 JDBC API 로 쓰든** 이 목록이 달라진다. 호출 이름을 열거하는
+     * 그물(프록시가 무엇을 가로채는가)과 달리 이 단언은 결과 쪽에서 닫는다.
+     */
+    private fun noticeWriteFingerprint(): List<String> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT notice_number, notice_round, xmin::text AS xmin, ctid::text AS ctid " +
+                            "FROM notice ORDER BY notice_number, notice_round",
+                    ).use { rows ->
+                        generateSequence {
+                            if (rows.next()) {
+                                "${rows.getString("notice_number")}/${rows.getString("notice_round")}" +
+                                    "@${rows.getString("xmin")}:${rows.getString("ctid")}"
+                            } else {
+                                null
+                            }
+                        }.toList()
+                    }
+            }
+        }
 
     @Test
     fun `조건이 없으면 수집된 공고가 마감 임박 순으로 나온다 — 마감 없는 공고는 뒤다`() {
@@ -327,8 +354,15 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
      * 호출을 건수 질의 **뒤로** 옮기거나 호출 **앞에** 쓰기를 끼우는 변이가 둘 다 초록이었다.
      *
      * 여기서는 기록 프록시로 `search()` 가 실행한 문장을 전수로 거두고, **읽기 전용을 켜는
-     * 문장 하나를 빼면 전부 `transaction_read_only=on` 에서 돌았는지**를 단언한다. 경로
+     * 첫 문장 하나를 빼면 전부 `transaction_read_only=on` 에서 돌았는지**를 단언한다. 경로
      * 셋(맞음 · 조건이 좁음 · 조건 없음)을 모두 지난다.
+     *
+     * **호출 이름만으로는 닫히지 않는다**(verifier r3 R3-L-1). 프록시는 `prepareStatement`·
+     * `createStatement` 만 가로채므로 `prepareCall` 로 쓰거나 `unwrap` 으로 원 연결을 꺼내
+     * 쓰면 기록 자체가 남지 않는다 — 가로채는 이름을 늘리는 것은 끝이 없는 열거다. 그래서
+     * **DB 쪽 결과**를 함께 단언한다: search 전후로 `notice` 표의 쓰기 흔적
+     * ([noticeWriteFingerprint])이 같다. 어떤 API 로 쓰든 흔적은 남으므로 그 셋이 한 번에
+     * 닫힌다.
      */
     @Test
     fun `search 의 모든 문장이 읽기 전용 트랜잭션 안에서 돈다 — 경로 셋`() {
@@ -340,6 +374,7 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
             NoticeSearchParameters(text = "없는낱말"),
         ).forEach { parameters ->
             val witness = ReadOnlyWitness()
+            val before = noticeWriteFingerprint()
             val criteria =
                 parseNoticeSearchParameters(parameters)
                     .shouldBeInstanceOf<NoticeSearchRequest.Accepted>()
@@ -351,19 +386,40 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
                 witness.queries().shouldNotBeEmpty()
                 witness.statementsOutsideReadOnly() shouldBe emptyList()
                 witness.queries().all { !it.autoCommit } shouldBe true
+                noticeWriteFingerprint() shouldBe before
             }
         }
     }
 
     /**
-     * 음성 대조 — 같은 DML 이 **읽기 전용을 걸지 않은** 연결에서는 통과한다. 위 test 가
-     * 공허하게 참이 되는 회귀(예: DML 자체가 문법 오류라 늘 던지는 경우)를 막는다.
+     * 음성 대조 — 같은 DML 이 **읽기 전용을 걸지 않은** 연결에서는 통과하고, 그 쓰기를 위
+     * test 의 지문이 **실제로 본다**. 둘 다 없으면 위 test 가 공허하게 참이 될 수 있다(DML 이
+     * 늘 던져서 초록이거나, 지문이 쓰기에 둔감해서 초록이거나).
+     *
+     * UPDATE 를 먼저 거는 이유는 **행 수도 값도 그대로인 쓰기**이기 때문이다 — 열에 자기 값을
+     * 다시 넣으면 값 가드(`guard_notice_status` 등)가 「축이 안 바뀌었다」로 지나가지만 행
+     * 버전은 새로 생긴다. 지문이 행 수나 값만 본다면 이 단계에서 붉어진다(`xmin`·`ctid` 축이
+     * 사는지 재는 자리다).
      */
     @Test
-    fun `같은 DELETE 는 읽기 전용이 아닌 연결에서는 통과한다 — 음성 대조`() {
+    fun `같은 DML 은 읽기 전용이 아닌 연결에서는 통과하고 지문이 그 쓰기를 본다 — 음성 대조`() {
+        insert("N-1", title = "도로 포장", offsetSeconds = 1)
+        val beforeUpdate = noticeWriteFingerprint()
+
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate(VALUE_NEUTRAL_WRITE)
+            }
+        }
+        val afterUpdate = noticeWriteFingerprint()
+
+        afterUpdate shouldHaveSize beforeUpdate.size
+        afterUpdate shouldNotBe beforeUpdate
+
         dataSource().connection.use { connection ->
             connection.createStatement().use { statement -> statement.executeUpdate("DELETE FROM notice") }
         }
+        noticeWriteFingerprint() shouldBe emptyList()
     }
 
     /**
@@ -394,3 +450,12 @@ class JdbcNoticeSearchTest : PersistenceTestSupport() {
         actual shouldBe expected
     }
 }
+
+/**
+ * **값을 바꾸지 않는 쓰기** — 열에 자기 값을 다시 넣는다. `notice` 의 값 가드들은 「축이
+ * 바뀌었는가」로 판정하므로 이 문장은 통과하고(verifier r3 재현에서 `status = 'Closed'` 는
+ * `guard_notice_status` 가 거부했다 — 그것은 쓰기 시도가 **막힌** 것이지 우회가 아니다),
+ * 그러면서도 새 행 버전을 만들어 `xmin`·`ctid` 를 바꾼다. 「쓰기가 있었는가」를 값이 아니라
+ * 행 버전으로 재는 지문의 감도를 이 문장 하나로 잰다.
+ */
+internal const val VALUE_NEUTRAL_WRITE = "UPDATE notice SET notice_number = notice_number"
