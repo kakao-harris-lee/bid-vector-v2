@@ -244,7 +244,8 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
             access().inSignInScope { it.signIn(other, ClearPassphrase.wrap(FIRST)) } shouldBe SignInOutcome.Refused
         }
 
-        access().inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
+        access()
+            .inSignInScope { it.signIn(LOGIN, ClearPassphrase.wrap(FIRST)) }
             .shouldBeInstanceOf<SignInOutcome.Granted>()
 
         failedAttemptsOf(other) shouldBe 2
