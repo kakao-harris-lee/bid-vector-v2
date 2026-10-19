@@ -78,6 +78,30 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   - 쓸모없어진 등재는 게이트가 붉히므로, 상류가 먼저 고치면 그 자리에서 치운다.
 - 직접 빌드(xcaddy)와 전역 `scan.pkg-types` 축소는 택하지 않았다.
 
+**D-7F-3 (2026-10-19, 팀장 — 검토 r1 수령: verifier not-ready · code-reviewer APPROVE).**
+- **in_scope 명시 등재(cr M-6)**: `tools/image-hygiene-check.sh` · `config/quality/**`. D-7F-1 이 정책 파일 자리만 말하고 스크립트는
+  이름으로 들지 않았다 — 이번 판에 경로로 등재한다. 기존 kind(`jvm-app`) 판정 코드의 helper 치환은 verifier r1 이 base↔HEAD 바이트
+  동일 출력·같은 종료 코드(세 조합)로 보존을 실측했다. 이 파일을 다시 고치면 같은 등식을 재실측한다.
+- **수정 라운드 r1 에서 닫는 것**
+  - **F-1(high) — web 경유 관리 경로**: 구조로 닫는다. 덧쓰기 compose 에서 네트워크를 갈라 web 이 app 에 닿지 못하게 한다(proxy 만 두
+    네트워크). 스모크는 「web 컨테이너에서 app 이 해석·접속되지 않는다」를 양성 대조(같은 탐침이 proxy 에서는 닿는다)와 함께 단언하고,
+    web 설정에도 (A3) 과 같은 상류 집합 단언을 건다. verifier 의 변이(web 에 `/healthz` → app reverse_proxy)가 RED 여야 한다.
+  - **F-2(medium) — 키 재료 탐색 범위**: proxy 위생의 키·인증서 재료 부재를 `/etc/caddy` 한 자리가 아니라 Caddy 의 데이터·설정 자리
+    (`/data`·`/config` 포함)까지 — 가능하면 이미지 파일시스템 전체로. 음성 대조: `/data/caddy/pki/...` 에 구운 키 → exit 1.
+  - **헤더(cr M-2·M-3 · vr F-3)**: `/api/**` 응답도 잰다 · 이름마다 정확히 1개 · `Server` 부재 · 값은 등식(CSP 는 완화 어휘 금지
+    구성 또는 전체 등식, Referrer-Policy·X-Frame-Options 값).
+  - **cr M-1**: `(healthy)` 괄호 포함 술어로 — 기존 `ci.yml` S-23 의 같은 형태도 같은 커밋에서(ci.yml container job 은 in_scope).
+  - **cr M-4**: (F) 는 응답 코드와 본문을 쌍으로 판정.
+  - **cr M-5**: 이미지 빌드 정의를 compose 한 자리로 — CI S-21c·S-21d 를 compose build 로 바꾸고, 게이트가 판정한 이미지 ID 와 스모크가
+    실행한 이미지 ID 의 등식을 단언한다.
+  - **vr F-4**: 우회 ④ 는 계약이 「리다이렉트 또는 거부(하나로)」라 적었다 — 지금 구현이 고른 하나만 통과하도록 스모크를 좁힌다.
+  - **low 중 바로 닫는 것**: cr L-1=vr F-6(정책 주석 순서) · cr L-2(관리 포트 등식) · cr L-3(`no-new-privileges` 단언) · cr L-8(문면) ·
+    vr F-7(`root:root` 포함).
+- **알려진 제한으로 등재(닫지 않음)**: vr F-5(web 등재 하나의 만료가 app·ml-serving 스캔까지 붉힌다 — runbook 에 문면) · cr L-4(XFF,
+  앱이 forwarded 헤더를 읽지 않아 오늘 영향 0 → 7F 본편 반입 조건) · cr L-5(HTTP/3 광고) · cr L-6(번들 인라인 env 경계) · cr L-7(캐시
+  키 전제). 7D 검토에서 나온 「`/api/session` 유량 제한」은 7F 본편 반입 조건 후보로만 적는다(이 slice 범위 밖).
+- 게이트 술어를 바꾸므로 수정 뒤 verifier 표적 재검증 r2. rollback ①~⑥ 은 새 마지막 산출물 커밋에서 다시 잰다.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
