@@ -273,6 +273,76 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         response.body?.containsKey("minBudgetWon") shouldBe true
         response.body?.get("minBudgetWon") shouldBe null
     }
+
+    /**
+     * code-review r1 M-3 — **문서가 선언하는 무인증 자리와 구현의 허용 목록이 같은 집합인가.**
+     *
+     * 이 축을 operation 이름 목록으로 적지 않는다(그런 목록에는 종점이 없다) — 문서에서
+     * `security: []` 인 상태 변경 operation 을 **모아서** 필터 상수와 등식으로 본다. 새 operation
+     * 을 무인증으로 열면 여기가 붉고, 필터의 목록만 늘려도 붉다.
+     */
+    @Test
+    fun `문서가 무인증으로 여는 상태 변경 operation 집합은 기본 거부 필터의 허용 목록과 같다`() {
+        val openInDocument = stateChangingSecurity().filterValues { it?.isEmpty() == true }.keys
+
+        openInDocument shouldBe RequestAuthenticationFilter.OPEN_ROUTES
+    }
+
+    /**
+     * code-review r1 M-3 — **그 밖의 상태 변경 operation 은 전부 CSRF 스킴을 쿠키 경로와 묶어
+     * 선언한다.** 문서의 기본 요구에는 `browserSession` 단독 대안이 있어서(읽기의 기본값),
+     * 그것을 물려받은 쓰기 operation 은 「쿠키만 있으면 된다」고 말한다 — 구현은 그 반대다.
+     *
+     * 상태를 바꾸는 메서드의 정의를 **production 상수의 여집합**으로 받는다
+     * ([BrowserSessionAuthenticator.CSRF_EXEMPT_METHODS]) — 목록을 두 벌 두면 그 둘이 갈린다.
+     */
+    @Test
+    fun `그 밖의 상태 변경 operation 은 쿠키 경로에 CSRF 스킴을 묶어 선언한다 — 쿠키 단독 대안 0`() {
+        val offenders =
+            stateChangingSecurity()
+                .filterKeys { it !in RequestAuthenticationFilter.OPEN_ROUTES }
+                .filterNot { (_, requirement) -> bindsCsrfToSession(requirement) }
+                .keys
+
+        offenders shouldBe emptySet()
+    }
+
+    /** 쿠키 경로를 쓰려면 CSRF 를 함께 요구해야 하고, 쿠키 **단독** 대안이 있으면 안 된다. */
+    private fun bindsCsrfToSession(requirement: List<Map<String, Any?>>?): Boolean {
+        val alternatives = requirement.orEmpty().map { it.keys }
+        return alternatives.contains(setOf(SESSION_SCHEME, CSRF_SCHEME)) &&
+            !alternatives.contains(setOf(SESSION_SCHEME))
+    }
+
+    /**
+     * 상태를 바꾸는 operation 의 **유효 보안 요구** — operation 자신의 선언이 없으면 문서 최상위
+     * 기본을 물려받는다(OpenAPI 3 의 규칙 그대로). 키는 필터의 경로 키와 같은 모양이다.
+     */
+    private fun stateChangingSecurity(): Map<String, List<Map<String, Any?>>?> {
+        val paths = spec["paths"] as Map<String, Any?>
+        val fallback = spec["security"] as? List<Map<String, Any?>>
+        return paths.entries
+            .flatMap { (path, item) ->
+                val pathItem = item as Map<String, Any?>
+                pathItem.keys
+                    .filter { it in OPENAPI_METHODS }
+                    .filterNot { it.uppercase() in BrowserSessionAuthenticator.CSRF_EXEMPT_METHODS }
+                    .map { method ->
+                        val operation = pathItem[method] as Map<String, Any?>
+                        "${method.uppercase()} $path" to
+                            ((operation["security"] as? List<Map<String, Any?>>) ?: fallback)
+                    }
+            }.toMap()
+    }
+
+    private companion object {
+        /** OpenAPI 3 path item 의 메서드 고정 필드 — `parameters`·`summary` 같은 형제와 가른다. */
+        val OPENAPI_METHODS =
+            setOf("get", "put", "post", "delete", "options", "head", "patch", "trace")
+
+        const val SESSION_SCHEME = "browserSession"
+        const val CSRF_SCHEME = "operatorCsrf"
+    }
 }
 
 /**

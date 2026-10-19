@@ -18,6 +18,12 @@ info:
     두 축을 함께 잰다.
 servers:
   - url: /
+# 기본 인증 요구 — **읽기 operation 의 기본값**이다. 상태를 바꾸는 operation 은 이 기본을 쓰지
+# 않는다(code-review r1 M-3): 여기에는 쿠키 경로만으로 통과하는 대안이 있어서, 그것을 그대로
+# 물려받으면 문서가 「쿠키만 있으면 쓰기도 된다」고 말한다 — 구현은 그 반대다(세션 경로의 상태
+# 변경은 `X-Operator-Csrf` 를 요구한다). 그래서 그 operation 들은 각자 `operatorCsrf` 를 묶은
+# 요구를 선언하고, 무인증으로 열리는 자리는 `security: []` 로 **명시**한다.
+# `OpenApiContractTest` 가 그 두 집합을 기본 거부 필터의 허용 목록과 양방향 등식으로 잰다.
 security:
   - operatorCredential: []
   - browserSession: []
@@ -53,6 +59,10 @@ paths:
     post:
       operationId: evaluateDryRun
       summary: 평가 dry-run(D-6A3-1·6 — 외부 effect 없음, outbox 미접촉)
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -114,6 +124,10 @@ paths:
         만들므로 「같은 id 에 이미 비종단 세션」 가드에 HTTP 로 닿을 길이 없다. 그 코드는
         use case 의 전수 `when` 을 총(total)으로 유지하려고 남아 있을 뿐이고, 도달 불가는
         알려진 제한으로 등재돼 있다. 버려진 세션의 처분은 `OPEN-6A2B-ABANDONED-SESSIONS`.
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -213,6 +227,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -278,6 +296,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -343,6 +365,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -402,6 +428,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
