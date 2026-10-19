@@ -905,11 +905,19 @@ step 들(기본 파일 하나만 쓰는 기동·스모크·리허설)은 명령�
 |---|---|
 | `docker/web.Dockerfile` · `docker/web.Caddyfile` | web 정적 이미지. 번들을 **이미지 안에서** 만든다(`npm ci` → `vite build`) — `docker build` 한 번으로 이미지가 나온다. 베이스 둘 다 다이제스트 고정, non-root(uid 10001), `/srv` 는 root 소유 읽기 전용 |
 | `docker/proxy.Dockerfile` · `docker/proxy.Caddyfile` | 리버스 프록시. 경로 규칙 셋 · 보안 헤더 · `tls internal`(실행 시 발급) · 접근 로그에서 헤더 삭제 |
-| `docker/compose.local-tls.yaml` | 덧쓰기 — `web`·`proxy` 를 더하고 `app`·`ml-serving` 의 host publish 를 **비운다**(`!override []`) |
+| `docker/compose.local-tls.yaml` | 덧쓰기 — `web`·`proxy` 를 더하고 `app`·`ml-serving` 의 host publish 를 **비운다**(`!override []`). **망을 둘로 가른다**(아래) |
+| `tools/local-tls-env.sh` · `tools/local-tls-build.sh` | 값 기본값과 이미지 빌드의 **단일 출처**. CI 의 S-21c 와 스모크가 **둘 다** 이 빌드 진입점을 지난다 |
 | `tools/local-tls-smoke.sh` | 올리고 재고 **반드시 내린다**(`down -v` + 잔여 0 계수). CI `container` job 의 S-26 이 같은 스크립트를 돈다 |
 
 **host 포트를 여는 것은 프록시 하나**이고 루프백(`127.0.0.1`)에만 연다. app·postgres·web·
 ml-serving 은 compose 내부망에만 있다.
+
+**망이 둘이다**(검토 r1 vr F-1 로 들어온 구조) — `edge`(proxy ↔ web)와 `default`(proxy ↔
+app·postgres·ml-serving). **둘 다에 붙는 것은 proxy 하나**다. web 은 정적 파일만 건네므로 app 에 닿을
+이유가 없고, 닿을 길도 두지 않는다: web 컨테이너에서는 `app` 이라는 이름이 **해석되지 않는다**.
+앞 판은 web 도 app 과 같은 망에 있어서 `web.Caddyfile` 에 `reverse_proxy app:<관리포트>` 한 블록이면
+프록시 https 로 관리 표면이 무인증 200 으로 나왔다(실측) — 그 자리를 망으로 닫았다. 스모크 (A4) 가
+축 셋(망 교집합 공집합 · web 의 상류 수 0 · web→app 실제 연결 불가, 각각 양성 대조 동반)을 잰다.
 
 **전제 하나** — 덧쓰기 파일이 `!override` 로 publish 를 비우므로 **그 태그를 아는 compose** 가 필요하다
 (Compose v2.24 이후). 더 낮은 판에서는 그 자리에서 파싱이 실패한다 — 조용히 publish 가 남지 않는다.
@@ -930,20 +938,25 @@ ml-serving 은 compose 내부망에만 있다.
 docker build -f docker/app.Dockerfile -t bidvector/app:local .
 ```
 
-띄운 채로 화면을 보려면 같은 환경변수를 주고 직접 올린다(스크립트가 쓰는 기본값과 같은 이름들이다 —
-**포트 기본값의 정본은 그 스크립트 하나**다. compose 가 `${VAR:?}` 로 요구하고, Caddyfile 은 기본값을
-적지 않는다 — 다만 Caddyfile 의 그 참조 자신은 fail-closed 가 아니어서 **compose 를 거치지 않고 이미지를
-bare 로 띄우면 Caddy 자기 기본값으로 뜬다**. 그 경우는 프록시가 web 에 닿지 못하는 것으로 드러난다):
+띄운 채로 화면을 보려면 **같은 값 조각을 읽어** 직접 올린다. 값 기본값의 정본은
+`tools/local-tls-env.sh` **하나**이고(compose 는 `${VAR:?}` 로 요구만 하고, Caddyfile 은 포트 기본값을
+적지 않는다), 아래처럼 그 조각을 `source` 하면 스크립트와 같은 값으로 뜬다 — 이미 내보낸 값은 덮지
+않으므로 필요한 것만 먼저 export 하면 된다. 다만 Caddyfile 의 포트 참조 자신은 fail-closed 가 아니어서
+**compose 를 거치지 않고 이미지를 bare 로 띄우면 Caddy 자기 기본값으로 뜬다**(그 경우는 프록시가 web 에
+닿지 못하는 것으로 드러난다):
 
 ```
-export BIDVECTOR_PG_USER=... BIDVECTOR_PG_DB=... BIDVECTOR_PG_PASSWORD=...
-export BIDVECTOR_APP_PORT=18080 BIDVECTOR_APP_MANAGEMENT_PORT=18081
-export BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/$BIDVECTOR_PG_DB
-export BIDVECTOR_APP_OPERATOR_CREDENTIAL=... BIDVECTOR_APP_CANDIDATE_CAP=1000
-export BIDVECTOR_WEB_PORT=18090 BIDVECTOR_PROXY_HTTPS_PORT=18443
+. tools/local-tls-env.sh
 docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml up -d proxy
 # 내릴 때 (볼륨까지)
 docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml down -v
+```
+
+이미지만 다시 굽고 싶으면 **빌드 진입점 하나**를 쓴다(CI 의 S-21c 가 돌리는 것과 같은 명령이다 —
+빌드 정의가 compose 한 자리에 있다는 뜻이 이것이다):
+
+```
+./tools/local-tls-build.sh
 ```
 
 `up -d proxy` 하나로 의존(app → postgres, web)이 함께 뜬다. **ml-serving 은 뜨지 않는다** — 이
@@ -1016,3 +1029,24 @@ docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml \
 6. **read_only 루트·capability 축소를 적용하지 않았다** — 두 서비스 다 `no-new-privileges` 까지다.
 7. **캐시 정책을 정하지 않았다.** 정적 응답에 `Cache-Control` 을 두지 않았다 — 운영 도메인·CDN
    선택과 함께 갈 판단이다.
+8. **allowlist 만료의 폭발 반경은 kind 하나가 아니다**(검토 r1 vr F-5). 만료 검사는 kind 를 가리지
+   않으므로, `web` 등재 한 줄이 만료되면 **그날 네 스캔(ml-serving·app·web·proxy)이 모두 exit 1** 이
+   된다(실측). §8.4 의 만료일이 다가오면 그것은 web·proxy 만의 일이 아니다 — 처리는 §8.5 그대로이고,
+   **날짜를 미루는 것은 결정이지 정비가 아니다**.
+9. **프록시가 `X-Forwarded-For` 를 신뢰 경계로 다루지 않는다**(검토 r1 cr L-4). `trusted_proxies` 와
+   `header_up X-Forwarded-For {remote_host}` 가 없어 Caddy 는 **클라이언트가 보낸 XFF 뒤에 덧붙인다**.
+   오늘 영향은 0 이다 — `app/`·`adapters/` 에 forward-headers·`X-Forwarded`·`RemoteAddr` 참조가 하나도
+   없다(실측). 다만 프록시는 새 신뢰 경계이므로, **앱이 클라이언트 주소를 읽기 시작하기 전** 또는
+   7F 본편 반입 전 중 먼저 오는 쪽에서 닫는다.
+10. **HTTP/3 를 광고하지만 UDP 를 publish 하지 않는다**(검토 r1 cr L-5). Caddy 는 기본으로 `Alt-Svc`
+    로 h3 를 알리는데 이 프로필의 publish 는 tcp 하나다 — 브라우저는 h3 를 시도했다가 h1/h2 로
+    폴백한다. 기능 영향은 없고 첫 연결에 왕복 하나가 더 붙을 수 있다. 운영에서 h3 를 쓸지는 실 host
+    와 함께 갈 판단이라 로컬에서 프로토콜을 고정하지 않았다.
+11. **web 위생의 「싣고 있는 내용」 축은 파일 *내용*을 보지 않는다**(검토 r1 cr L-6).
+    `forbidden.content.patterns` 는 `find` 가 낸 **경로 목록**에 대한 매칭이다. 그래서 vite 가
+    `import.meta.env.VITE_*` 를 번들 **안에** 인라인하면 `.env` 패턴으로는 잡히지 않는다. 그 축을 닫는
+    것은 빌드 입력을 줄이는 쪽(`web/` 의 env 사용 규율)이지 이 게이트가 아니다. 키·인증서 재료만은
+    다른 축이 **파일시스템 전체**에서 따로 본다(§8.1).
+12. **위생 게이트의 셸 프로브 캐시는 이미지 키를 갖지 않는다**(검토 r1 cr L-7). 한 호출이 이미지
+    하나만 판정하므로 오늘은 맞지만, **그 전제가 코드가 아니라 호출 관례에 있다**. 한 호출에서 두
+    이미지를 보게 바꾸는 날 이 캐시부터 고친다.
