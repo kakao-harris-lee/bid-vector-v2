@@ -187,19 +187,30 @@ test 도 고쳤다: 앞 판은 마지막에 절대 창 길이를 한 번에 밀�
 
 ```
 # ① 계정 생성(한 번) — 계정이 하나라도 있으면 거부하고 exit 1 이다
-java -jar app.jar   --bidvector.account.mode=create   --bidvector.account.login=<로그인 식별자>   --bidvector.account.initial-value="$INITIAL"      # 값은 환경에서 온다(파일·argv 에 두지 않는다)
+SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$INITIAL" \
+  java -jar app.jar --bidvector.account.mode=create --bidvector.account.login=<로그인 식별자>
 
 # ② 비밀 문구 교체 — 그 계정의 세션을 전부 폐기한다(같은 트랜잭션)
-java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식별자>   --bidvector.account.initial-value="$NEXT"
+SPRING_MAIN_WEB_APPLICATION_TYPE=none BIDVECTOR_ACCOUNT_INITIAL_VALUE="$NEXT" \
+  java -jar app.jar --bidvector.account.mode=rotate --bidvector.account.login=<식별자>
 ```
 
-- 세 설정 키 모두 **기본값이 없다** — 누락이면 바인딩이 기동을 실패시킨다.
+- **`SPRING_MAIN_WEB_APPLICATION_TYPE=none` 은 선택이 아니다**(code-review r2 M-2 · 이 저장소의
+  일회 러너 절차 전부가 쓴다). 러너는 `ApplicationRunner` 라 **컨텍스트가 완전히 뜬 뒤**에 돌고,
+  web 타입을 끄지 않으면 둘 중 하나가 난다: 서비스가 떠 있으면 `server.port` 바인딩 실패로
+  **명령 자체를 못 돌리고**, 서비스를 내리고 돌리면 명령이 도는 수 초 동안 **무인증
+  `POST /api/session` 을 포함한 API 표면이 운영 포트에 뜬다**(아직 계정이 없거나, 교체 직전의
+  옛 해시로 열려 있는 상태에서). 끄면 **서비스를 내리지 않고도** 돌릴 수 있다.
+
+- 세 설정 키 모두 **기본값이 없고 빈 값도 거부한다** — 누락·공백이면 설정 객체가 서지 않아
+  기동이 실패한다(비-0 종료). 변수를 빠뜨린 실행이 **빈 비밀 문구로 계정을 만들던** 자리다
+  (verifier r1 F3).
 - 이 명령은 **소유자 연결**로 돈다(앱 역할은 `account` 에 INSERT 가 없다). 그래서
   `bidvector.persistence.*` 값이 함께 필요하다(평소 기동과 같은 값).
 - 러너는 프로세스당 하나다 — 수집·중계 모드와 함께 켜면 기동이 실패한다(`OneShotRunnerGuard`).
-- `--bidvector.account.initial-value=` 를 argv 로 넘기면 그 값이 프로세스 표에 보인다.
-  운영 실행은 환경변수(`BIDVECTOR_ACCOUNT_INITIAL_VALUE`)로 준다 — Spring 의 relaxed binding 이
-  같은 키를 읽는다(6C 의 서비스 키 관례와 같은 축).
+- 값을 **argv 로 넘기지 않는다** — 그러면 프로세스 표에 보인다. 위 두 줄처럼 환경변수
+  (`BIDVECTOR_ACCOUNT_INITIAL_VALUE`)로 준다. Spring 의 relaxed binding 이 같은 키를 읽는다
+  (6C 의 서비스 키 관례와 같은 축).
 
 ## 3c. 게이트 설정 변경 — 줄마다의 근거 (계약 D-7D-1 요구)
 
