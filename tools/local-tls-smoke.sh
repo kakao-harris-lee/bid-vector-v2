@@ -319,24 +319,71 @@ code="$(_auth_code /api/strategy)"
 [ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
 
 # ---- (D) 보안 헤더 ----
-_step "(D) 보안 헤더 — 셋 · CSP · HSTS 부재(로컬 선택)"
+_step "(D) 보안 헤더 — 값 등식 · 이름마다 1개 · Server·HSTS 부재 · **/api 응답도 같다**"
+# 앞 판은 `/` 하나에서 **존재만** 보았다(값 단언은 `nosniff` 와 CSP 접두뿐). 그래서
+# `Referrer-Policy unsafe-url`·`X-Frame-Options ALLOWALL`·CSP 에 `'unsafe-inline'` 을 넣어도
+# 초록이었다(vr F-3 실측). 세 칸을 닫는다 — 값 등식 · 이름당 1개 · `/api/**` 응답.
+#
+# 기대값은 `docker/proxy.Caddyfile` 의 선언과 **글자 그대로** 같다. 정본이 둘이 되는 대가를
+# 지불하는 대신, 값을 바꾸는 편집은 두 자리를 함께 고쳐야 하므로 diff 에 드러난다.
+EXPECT_XCTO="nosniff"
+EXPECT_REFERRER="no-referrer"
+EXPECT_XFO="DENY"
+EXPECT_CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+# `grep -c` 는 **0건일 때 종료 코드 1** 이고 이 스크립트는 `pipefail` 이라, 그대로 쓰면 「헤더가
+# 없다」가 단언 실패가 아니라 **문면 없는 즉사**가 된다(실측). 0 을 정상 값으로 받는다.
+_hdr_count() {
+  local n
+  n="$(printf '%s' "$1" | grep -ci "^$2:" || true)"
+  printf '%s' "${n:-0}" | tr -d '[:space:]'
+}
+_hdr_value() {
+  local v
+  v="$(printf '%s' "$1" | grep -i "^$2:" || true)"
+  printf '%s' "$v" | head -n1 | sed 's/^[^:]*: *//' | tr -d '\r'
+}
+
+_check_headers() {
+  local what="$1" blob="$2" h n csp got
+  [ -n "$blob" ] || fail "$what 의 응답 헤더를 읽지 못했다"
+  # **이름마다 정확히 1개.** 상류(app)가 같은 이름을 보낼 때 `defer` 가 덮는 대신 덧붙이는
+  # 퇴행이 생기면 값만 보는 술어(첫 줄만 읽는다)로는 보이지 않는다.
+  for h in X-Content-Type-Options Referrer-Policy X-Frame-Options Content-Security-Policy; do
+    n="$(_hdr_count "$blob" "$h")"
+    [ "$n" = "1" ] \
+      || fail "$what 의 $h 가 정확히 1개가 아니다: ${n}개(0=부재 · 2 이상=상류 값과 겹쳤다, defer 가 덮지 못한다)"
+  done
+  got="$(_hdr_value "$blob" X-Content-Type-Options)"
+  [ "$got" = "$EXPECT_XCTO" ] || fail "$what 의 X-Content-Type-Options 값이 선언과 다르다: [$got]"
+  got="$(_hdr_value "$blob" Referrer-Policy)"
+  [ "$got" = "$EXPECT_REFERRER" ] || fail "$what 의 Referrer-Policy 값이 선언과 다르다: [$got]"
+  got="$(_hdr_value "$blob" X-Frame-Options)"
+  [ "$got" = "$EXPECT_XFO" ] || fail "$what 의 X-Frame-Options 값이 선언과 다르다: [$got]"
+  # CSP 는 두 겹이다 — **전체 등식**과 **완화 어휘 금지**. 등식만 두면 기대값까지 함께 고치는
+  # 편집이 지나가고, 금지 어휘만 두면 목록 밖의 약화가 지나간다.
+  csp="$(_hdr_value "$blob" Content-Security-Policy)"
+  [ "$csp" = "$EXPECT_CSP" ] || fail "$what 의 CSP 가 선언과 다르다: [$csp]"
+  case "$csp" in
+    *unsafe-inline*|*unsafe-eval*|*"http://"*|*"https://"*|*'*'*)
+      fail "$what 의 CSP 에 완화 어휘가 들어왔다: [$csp]" ;;
+  esac
+  # `-Server` 로 지우기로 한 헤더의 **부재**. 앞 판에는 단언이 없었다.
+  n="$(_hdr_count "$blob" Server)"
+  [ "$n" = "0" ] || fail "$what 응답에 Server 헤더가 ${n}개 남아 있다 — -Server 가 듣지 않는다"
+  # 로컬 TLS 에서는 HSTS 를 보내지 않는다(`proxy.Caddyfile` 의 사유 — host 단위로 걸려 다른
+  # localhost 평문 개발 서버까지 막는다). 실수로 켜지면 여기서 붉어진다.
+  n="$(_hdr_count "$blob" Strict-Transport-Security)"
+  [ "$n" = "0" ] || fail "$what 응답에 HSTS 가 실렸다 — localhost 에 HSTS 를 보내지 않는다"
+}
+
 hdrs="$(_hdrs /)"
-[ -n "$hdrs" ] || fail "응답 헤더를 읽지 못했다"
-_hdr_has() { printf '%s' "$hdrs" | grep -qi "^$1:" ; }
-_hdr_val() { printf '%s' "$hdrs" | grep -i "^$1:" | head -n1 | sed 's/^[^:]*: *//' | tr -d '\r'; }
-for h in X-Content-Type-Options Referrer-Policy X-Frame-Options Content-Security-Policy; do
-  _hdr_has "$h" || fail "응답에 $h 헤더가 없다"
-done
-[ "$(_hdr_val X-Content-Type-Options)" = "nosniff" ] || fail "X-Content-Type-Options 값이 nosniff 가 아니다"
-case "$(_hdr_val Content-Security-Policy)" in
-  *"default-src 'none'"*) ;;
-  *) fail "CSP 가 default-src 'none' 으로 시작하지 않는다" ;;
-esac
-# 로컬 TLS 에서는 HSTS 를 보내지 않는다(`proxy.Caddyfile` 의 사유 — host 단위로 걸려 다른
-# localhost 평문 개발 서버까지 막는다). 실수로 켜지면 여기서 붉어진다.
-if _hdr_has Strict-Transport-Security; then
-  fail "로컬 프로필 응답에 HSTS 가 실렸다 — localhost 에 HSTS 를 보내지 않는다"
-fi
+_check_headers "/" "$hdrs"
+# **`/api/**` 가 상류(app)가 같은 이름을 보내는 유일한 경로**다 — `header { defer }` 가 상류를
+# 덮는다는 주석의 주장을 실제로 재는 자리는 여기뿐이고, 앞 판에는 그 단언이 없었다(cr M-2).
+api_hdrs="$(_hdrs /api/strategy)"
+_check_headers "/api/strategy" "$api_hdrs"
+echo "  / · /api/strategy 둘 다 — 네 헤더 값 등식 · 각 1개 · Server 0 · HSTS 0"
 
 # ---- (E) 우회 ② — 관리 경로 ----
 _step "(E) 우회 ② — 관리 경로가 프록시를 지나지 못한다(양성 대조: 내부 관리 포트는 UP 을 낸다)"
