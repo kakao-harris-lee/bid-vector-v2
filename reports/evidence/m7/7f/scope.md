@@ -102,6 +102,16 @@ docker build·compose up·Gradle 은 모두 `flock ~/.local/bid-vector-build.loc
   키 전제). 7D 검토에서 나온 「`/api/session` 유량 제한」은 7F 본편 반입 조건 후보로만 적는다(이 slice 범위 밖).
 - 게이트 술어를 바꾸므로 수정 뒤 verifier 표적 재검증 r2. rollback ①~⑥ 은 새 마지막 산출물 커밋에서 다시 잰다.
 
+**D-7F-4 (2026-10-19, 팀장 — 수정 r1 수령 · 동결).** 판정 대상은 마지막 산출물 `9f4e3385` · evidence `67d1cae1` 다.
+- **in_scope 추가를 수용한다**: `tools/local-tls-build.sh` · `tools/local-tls-env.sh`. cr M-5 를 닫으면서 빌드 진입점과 환경 해석을 한 자리로
+  모은 파일이다. rollback 복원 목록은 15 → 17 이 됐다.
+- **D-7F-3 의 cr M-5 문면 정정**: 「S-21c·S-21d 를 compose build 로」는 실제로 **두 step 이 진입점 하나(S-21c)로 합쳐지고 S-21d 가 없어진**
+  것으로 읽는다. 그래서 container job 의 run step 은 22 다(base 16 대비 +6).
+- **레인이 보고한 관찰 둘을 기록한다**: ⓐ 「헤더 이름당 1개」 축은 오늘 아무것도 운동시키지 않는다 — app 이 그 네 이름을 보내지 않아
+  `defer` 를 떼도 초록이다. 회귀 가드로만 둔다. ⓑ 저작 중 키 재료 축의 이름이 스캔 어휘와 겹쳐 개명했고(`9f4e3385`), evidence 한 줄의 축어
+  인용으로 게이트가 붉어져 교정했다(`67d1cae1`). 이력은 되쓰지 않았다.
+- 검토: verifier 표적 r2(F-1·F-2·헤더·M-5 이미지 ID 등식·F-4·jvm-app 보존·rollback 17) + code-reviewer 표적 r2.
+
 ## 하네스 레인 변경 (상시)
 
 - (착수 시점 없음)
