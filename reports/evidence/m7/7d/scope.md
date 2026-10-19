@@ -155,6 +155,22 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
 - **후속(이 slice 밖)**: `OwnTransactionConnectionSource` 의 명시 롤백(L-7) · 7E 가 `ensureCsrf()` 를 붙이는 자리(L-1).
 - 검토: verifier 표적 r2 + code-reviewer 표적 r3.
 
+**D-7D-6 (2026-10-20, 팀장 — 검토 수령: verifier r2 ready-for-review · code-reviewer r3 APPROVE).** 재작업 3/5. 마지막 배치 뒤 PR 로 간다.
+- container job 재생의 skipped 7 은 `uses:` 4 + trivy 3(등재된 로컬 제한, PR CI 가 정본)이다 — 매달린 조건이 아니다.
+- **마지막 배치에서 닫는 것**
+  - **vr r2 medium — 동시 로그인 회귀 test 가 확률적이다**: 잠금을 걷은 변이가 1회차 초록이었고 20회 검출률은 14~15/20 이다. 래치로 두 확정을
+    같은 순간에 세우는 **결정적** test 로 바꾼다(반복 루프는 보조로만). 잠그지 않는 확정 변이(R-M23a)가 **매 실행** RED 여야 한다 — 같은 변이를
+    여러 번 돌려 검출률 100% 를 적는다.
+  - **cr r3 권고 — OpenAPI 로더의 중복 키**: 로더를 중복 키 거부로 바꾼다(`ArchitecturePolicy` 의 `duplicateKeys` 가드가 같은 함정을 닫은 선례다).
+    그러면 제한 24 는 닫히고 「더하기 변이」가 판정 근거로 돌아온다. 중복 키를 심은 변이가 RED 여야 한다.
+  - **cr r3 L-1**: 쿠키 조회 주석을 사실대로(상수 시간 성질은 그대로이고, 바뀐 것은 구조 게이트 술어를 지나는 모양이다).
+  - **cr r3 L-2**: 로그인 확정의 행 잠금에 `lock_timeout` 을 설정 값으로 둔다(커넥션을 쥔 채 무한 대기하지 않게). 시한 초과는 로그인 거부로.
+  - **vr r2 low**: 성공 로그인이 실 DB 의 실패 계수를 비우는 test.
+  - **cr r3 L-4**: `cookie-secure` 를 뒤집으면 쿠키 이름이 바뀌어 전 세션이 무효가 된다 — runbook 과 7F 반입 절차에 한 줄.
+- **알려진 제한으로 등재**: cr r3 L-3(자격 해시를 동시성 토큰으로 씀 — 거동은 정확) · cr r3 L-5(`account:` 접두 규약의 공유 상수 — 감사 확장 slice) ·
+  vr r2 low 둘(경로를 섞은 편집의 행위자 가드 거부 — 의도된 거동 · `__Host-` 쿠키의 실 브라우저·TLS 측정 — 7F 반입 때).
+- 배치 뒤 verifier 표적 r3(결정적 test · 중복 키 · lock_timeout · rollback). high·medium 0 이면 PR.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
