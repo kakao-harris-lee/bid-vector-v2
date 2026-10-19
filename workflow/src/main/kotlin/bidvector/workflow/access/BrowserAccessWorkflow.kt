@@ -60,6 +60,7 @@ class SessionDescription(
 class BrowserAccessWorkflow(
     private val accounts: AccountStorePort,
     private val sessions: BrowserSessionStorePort,
+    private val completion: SignInCompletionPort,
     private val hasher: PassphraseHasher,
     private val keys: BrowserSessionKeySource,
     private val clock: Clock,
@@ -71,11 +72,12 @@ class BrowserAccessWorkflow(
      * 잠금 확인이 해시 검증보다 **앞**이다: 잠긴 동안에는 올바른 값에도 거부해야 하고,
      * 그 사이의 시도는 계수를 더 올리지 않는다(잠금 창이 겹겹이 길어지지 않는다).
      *
-     * **읽은 뒤의 상태 변화를 전제한다**(code-review r1 H-1). 해시 검증은 느리고, 그 사이에
-     * 다른 요청이 계수를 올리거나 잠금을 걸 수 있다 — 그래서 이 함수가 읽은 스냅숏은 **조기
-     * 거부의 입력**일 뿐이고, 계수·잠금을 바꾸는 두 자리는 포트의 **조건부 한 갱신**이다.
-     * 성공 경로도 그 갱신의 결과를 보고 끝낸다: 비우지 못했다면 검증 중에 잠긴 것이므로
-     * 거부한다(늦은 성공 하나가 방금 걸린 잠금을 풀지 않는다).
+     * **읽은 뒤의 상태 변화를 전제한다**(code-review r1 H-1 · verifier r1 F1). 해시 검증은 느리고,
+     * 그 사이에 다른 요청이 계수를 올리거나 잠금을 걸 수 있고 **운영자가 비밀 문구를 교체할 수도
+     * 있다**. 그래서 이 함수가 읽은 스냅숏은 **조기 거부의 입력**일 뿐이고, 상태를 바꾸는 두
+     * 자리는 포트의 **조건부 갱신**이다. 성공 경로는 확정 포트의 결과를 보고 끝낸다: 자격이
+     * 바뀌었거나 잠겼으면 거부한다(늦은 성공 하나가 방금 걸린 잠금을 풀지 않고, **교체된
+     * 비밀 문구의 옛 값이 교체 뒤에 세션을 받지 않는다**).
      */
     fun signIn(
         login: LoginName,
@@ -100,11 +102,7 @@ class BrowserAccessWorkflow(
             }
 
             else -> {
-                if (accounts.clearFailures(account.id, now)) {
-                    SignInOutcome.Granted(issue(account.id, now))
-                } else {
-                    SignInOutcome.Refused
-                }
+                issue(account, now)?.let { SignInOutcome.Granted(it) } ?: SignInOutcome.Refused
             }
         }
     }
@@ -162,28 +160,34 @@ class BrowserAccessWorkflow(
      * 로그인은 늘 **새 값**을 발급하고 그 계정의 기존 세션을 전부 폐기한다 — 제시된 쿠키를
      * 승격시키는 경로가 아예 없으므로 세션 고정(우회 ⑤)이 구조로 성립하지 않는다.
      *
-     * 폐기와 발급은 포트 **한 호출**이다([BrowserSessionStorePort.openReplacing]) — 로그인이
-     * 문장마다 제 트랜잭션을 여는 경계 아래에서도 그 둘이 쪼개지지 않게 하는 자리다.
+     * 자격 확인·실패 초기화·폐기·등록은 포트 **한 호출**이다([SignInCompletionPort.complete]) —
+     * 그 안에서 한 트랜잭션이고, **검증 때 읽은 자격이 그대로일 때만** 성립한다. `null` 은
+     * 「그 사이에 자격이 바뀌었거나 잠겼다」이고 호출부는 그것을 거부로 읽는다.
+     *
+     * 발급 값은 조건이 성립하기 **전에** 만든다 — 성립하지 않으면 그 값은 어디에도 저장되지
+     * 않고 버려진다(난수 하나를 버리는 비용이 조건 판정을 뒤로 미루는 것보다 싸다).
      */
     private fun issue(
-        account: AccountId,
+        account: AccountSnapshot,
         now: Instant,
-    ): IssuedSession {
+    ): IssuedSession? {
         val key = keys.newKey()
         val stamp = key.deriveStamp()
         val absoluteExpiresAt = now.plus(policy.absoluteWindow)
-        sessions.openReplacing(
-            NewBrowserSession(
-                digest = key.digest(),
-                account = account,
-                csrfDigest = stamp.digest(),
-                startedAt = now,
-                idleExpiresAt = idleDeadline(now, absoluteExpiresAt),
-                absoluteExpiresAt = absoluteExpiresAt,
-            ),
-            revokedAt = now,
-        )
-        return IssuedSession(key, stamp, absoluteExpiresAt)
+        val opened =
+            completion.complete(
+                NewBrowserSession(
+                    digest = key.digest(),
+                    account = account.id,
+                    csrfDigest = stamp.digest(),
+                    startedAt = now,
+                    idleExpiresAt = idleDeadline(now, absoluteExpiresAt),
+                    absoluteExpiresAt = absoluteExpiresAt,
+                ),
+                verified = account.hash,
+                at = now,
+            )
+        return if (opened) IssuedSession(key, stamp, absoluteExpiresAt) else null
     }
 
     private fun isLocked(

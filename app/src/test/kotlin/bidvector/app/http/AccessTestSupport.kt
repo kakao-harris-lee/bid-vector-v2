@@ -16,6 +16,7 @@ import bidvector.workflow.access.LoginName
 import bidvector.workflow.access.NewBrowserSession
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.PassphraseHasher
+import bidvector.workflow.access.SignInCompletionPort
 import bidvector.workflow.strategy.Clock
 import java.time.Duration
 import java.time.Instant
@@ -48,6 +49,7 @@ class InMemoryBrowserAccessTransaction(
     val accounts: MutableAccountStore = MutableAccountStore(FakeHasher().hash(ClearPassphrase.wrap(TEST_PASSPHRASE)))
     val sessions: MutableSessionStore = MutableSessionStore()
     val keys: SequentialKeySource = SequentialKeySource()
+    private val completion = MutableSignInCompletion(accounts, sessions)
 
     override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T = action(workflow())
 
@@ -61,6 +63,7 @@ class InMemoryBrowserAccessTransaction(
         BrowserAccessWorkflow(
             accounts = accounts,
             sessions = sessions,
+            completion = completion,
             hasher = FakeHasher(),
             keys = keys,
             clock = clock,
@@ -108,10 +111,12 @@ class MutableAccountStore(
         }
     }
 
-    override fun clearFailures(
-        account: AccountId,
+    /** 확정 이중체가 쓰는 자리 — 실물에서는 조건부 UPDATE 한 문장이다(자격·잠금·행 잠금). */
+    fun claim(
+        verified: PassphraseHash,
         now: Instant,
     ): Boolean {
+        if (hash.encoded != verified.encoded) return false
         if (snapshot.lockedUntil?.isAfter(now) == true) return false
         attempts = 0
         snapshot = AccountSnapshot(snapshot.id, hash, null)
@@ -130,11 +135,8 @@ class MutableSessionStore : BrowserSessionStorePort {
     /** 저장된 **해시 키** 전부 — 「평문이 저장되지 않는다」를 HTTP 층에서도 볼 수 있게 낸다. */
     val storedKeys: Set<String> get() = rows.keys.toSet()
 
-    override fun openReplacing(
-        session: NewBrowserSession,
-        revokedAt: Instant,
-    ) {
-        revokeAllOf(session.account, revokedAt)
+    /** 확정 이중체가 폐기 뒤에 부른다 — 포트 표면에는 없다. */
+    fun put(session: NewBrowserSession) {
         rows[session.digest.hex] =
             BrowserSessionSnapshot(
                 digest = session.digest,
@@ -199,6 +201,23 @@ private fun BrowserSessionSnapshot.with(
         absoluteExpiresAt = absoluteExpiresAt,
         revokedAt = revokedAt,
     )
+
+/** 로그인 확정의 이중체 — 실물의 한 트랜잭션을 단일 스레드 순서로 흉내 낸다. */
+class MutableSignInCompletion(
+    private val accounts: MutableAccountStore,
+    private val sessions: MutableSessionStore,
+) : SignInCompletionPort {
+    override fun complete(
+        session: NewBrowserSession,
+        verified: PassphraseHash,
+        at: Instant,
+    ): Boolean {
+        if (!accounts.claim(verified, at)) return false
+        sessions.revokeAllOf(session.account, at)
+        sessions.put(session)
+        return true
+    }
+}
 
 /** 발급 값을 셀 수 있는 난수원 — 「로그인마다 새 값」을 HTTP 응답에서 단언할 수 있게 한다. */
 class SequentialKeySource : BrowserSessionKeySource {

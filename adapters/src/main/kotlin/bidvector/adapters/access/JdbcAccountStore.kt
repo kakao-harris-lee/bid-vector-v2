@@ -11,7 +11,9 @@ import java.sql.Timestamp
 import java.time.Instant
 
 /**
- * 요청 경로의 계정 저장소 — **읽기와 실패 계수 갱신만 한다.** 계정을 만들거나 해시를 바꾸는
+ * 요청 경로의 계정 저장소 — **읽기와 실패 계수 올리기만 한다.** 성공의 초기화는 여기 없다
+ * (verifier r1 F1 뒤 [JdbcSignInCompletion] 의 한 트랜잭션으로 옮겼다 — 자격 조건·행 잠금과
+ * 떨어질 수 없는 문장이다). 계정을 만들거나 해시를 바꾸는
  * 메서드가 이 클래스에 없고([AccountStorePort] 의 서명에도 없다), 같은 경계를 V20 의 열 단위
  * GRANT 가 한 겹 더 진다.
  *
@@ -47,18 +49,6 @@ class JdbcAccountStore(
         }
     }
 
-    override fun clearFailures(
-        account: AccountId,
-        now: Instant,
-    ): Boolean =
-        connections.withConnection { connection ->
-            connection.prepareStatement(AccessSql.CLEAR_ACCOUNT_FAILURES).use { statement ->
-                statement.setLong(1, account.value)
-                statement.setTimestamp(2, Timestamp.from(now))
-                // `RETURNING` 이 행을 내면 비운 것이다 — 0 행이면 지금 잠겨 있다.
-                statement.executeQuery().use { rs -> rs.next() }
-            }
-        }
 }
 
 /**

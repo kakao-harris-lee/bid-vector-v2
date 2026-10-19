@@ -40,7 +40,7 @@ interface BrowserAccessTransaction {
      * 그래서 로그인만 **문장마다 제 트랜잭션**으로 돈다: 조회(커넥션 빌림→반납) → 검증
      * (커넥션 없음) → 원자 갱신(빌림→반납). 커넥션을 쥐는 시간이 KDF 가 아니라 문장 하나의
      * 길이로 줄어든다. 한 커밋이 필요한 묶음은 포트 **한 호출** 안에 있다
-     * ([bidvector.workflow.access.BrowserSessionStorePort.openReplacing] · 실패 계수와 잠금의
+     * ([bidvector.workflow.access.SignInCompletionPort.complete] 의 세 문장 · 실패 계수와 잠금의
      * 한 문장 갱신) — 경계가 느슨해져도 쪼개질 수 있는 쌍이 남지 않는다.
      *
      * **이 자리를 부를 수 있는 호출자는 하나**다 — `app.adapter.member-call-pairs` 가
@@ -83,6 +83,7 @@ class JdbcBrowserAccessTransaction(
         BrowserAccessWorkflow(
             accounts = JdbcAccountStore(connections),
             sessions = JdbcBrowserSessionStore(connections),
+            completion = JdbcSignInCompletion(connections),
             hasher = hasher,
             keys = keys,
             clock = clock,

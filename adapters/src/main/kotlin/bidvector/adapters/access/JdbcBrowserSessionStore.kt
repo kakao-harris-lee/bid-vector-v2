@@ -16,40 +16,13 @@ import java.time.Instant
  * 이 클래스에 원문이 닿을 길이 없고, 따라서 「해시로만 저장」이 코드 규율이 아니라 타입의
  * 성질이다.
  *
- * 세션을 **만드는** 입력([NewBrowserSession])은 `workflow` 의 `internal` 생성자라 이 어댑터가
- * 스스로 지을 수 없다 — 받은 것을 그대로 행으로 옮긴다.
+ * **여는 문장이 여기 없다**(verifier r1 F1 뒤) — 세션 등록은 자격 조건·기존 세션 폐기와 한
+ * 트랜잭션이어야 해서 [JdbcSignInCompletion] 이 그 셋을 진다. 이 클래스가 지는 것은 조회와
+ * 살아 있는 세션의 갱신·폐기뿐이다.
  */
 class JdbcBrowserSessionStore(
     private val connections: ConnectionSource,
 ) : BrowserSessionStorePort {
-    /**
-     * 폐기와 등록이 **한 커넥션 블록**이다 — `ConnectionSource` 의 어느 구현 아래에서도 그
-     * 블록 하나가 트랜잭션 하나다(경계가 주인이면 ambient 트랜잭션, 호출이 주인이면 그 호출의
-     * 트랜잭션). 두 문장을 포트의 두 호출로 두면 로그인 경계 아래에서 따로 커밋될 수 있다.
-     */
-    override fun openReplacing(
-        session: NewBrowserSession,
-        revokedAt: Instant,
-    ) {
-        connections.withConnection { connection ->
-            connection.prepareStatement(AccessSql.REVOKE_ACCOUNT_SESSIONS).use { statement ->
-                statement.setTimestamp(1, Timestamp.from(revokedAt))
-                statement.setLong(2, session.account.value)
-                statement.executeUpdate()
-            }
-            connection.prepareStatement(AccessSql.INSERT_BROWSER_SESSION).use { statement ->
-                var index = 1
-                statement.setString(index++, session.digest.hex)
-                statement.setLong(index++, session.account.value)
-                statement.setString(index++, session.csrfDigest.hex)
-                statement.setTimestamp(index++, Timestamp.from(session.startedAt))
-                statement.setTimestamp(index++, Timestamp.from(session.idleExpiresAt))
-                statement.setTimestamp(index, Timestamp.from(session.absoluteExpiresAt))
-                statement.executeUpdate()
-            }
-        }
-    }
-
     override fun byDigest(digest: BrowserSessionDigest): BrowserSessionSnapshot? =
         connections.withConnection { connection ->
             connection.prepareStatement(AccessSql.SELECT_BROWSER_SESSION).use { statement ->

@@ -68,19 +68,21 @@ class AccountProvisioningTest {
             .shouldBeInstanceOf<SignInOutcome.Granted>()
             .session
 
-    private fun workflow(): BrowserAccessWorkflow =
-        BrowserAccessWorkflow(
-            accounts =
-                InMemoryAccountStore(
-                    knownLogin = LOGIN,
-                    snapshot =
-                        AccountSnapshot(
-                            AccountId(1),
-                            requireNotNull(provisioning.hashOf(LOGIN)) { "계정이 없다" },
-                            null,
-                        ),
-                ),
+    private fun workflow(): BrowserAccessWorkflow {
+        val accounts =
+            InMemoryAccountStore(
+                knownLogin = LOGIN,
+                snapshot =
+                    AccountSnapshot(
+                        AccountId(1),
+                        requireNotNull(provisioning.hashOf(LOGIN)) { "계정이 없다" },
+                        null,
+                    ),
+            )
+        return BrowserAccessWorkflow(
+            accounts = accounts,
             sessions = sessions,
+            completion = InMemorySignInCompletion(accounts, sessions),
             hasher = hasher,
             keys = CountingKeySource(),
             clock = clock,
@@ -93,4 +95,5 @@ class AccountProvisioningTest {
                     hashCost = 12,
                 ),
         )
+    }
 }

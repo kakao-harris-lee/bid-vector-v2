@@ -64,22 +64,25 @@ class AccessPrivilegeTest : PersistenceTestSupport() {
     }
 
     /**
-     * H-1 뒤의 두 문장은 모양이 다르다 — 갱신식이 **같은 행의 열을 읽고**(`failed_attempts + 1`)
-     * 하나는 `RETURNING` 으로 열을 되돌린다. 둘 다 UPDATE 권한 말고 **SELECT 권한**을 함께
-     * 요구하므로, 앞 test 의 절대값 UPDATE 가 통과한다고 해서 이 둘이 통과한다는 보장이 없다.
-     * 그래서 production 문장을 그대로 쏜다(상수를 가져와 쓴다 — 사본을 두지 않는다).
+     * H-1·F1 뒤의 두 문장은 모양이 다르다 — 갱신식이 **같은 행의 열을 읽고**(`failed_attempts + 1`),
+     * 조건이 **자격 해시 열을 읽으며**(F1), 하나는 `RETURNING` 으로 열을 되돌린다. 셋 다 UPDATE
+     * 권한 말고 **SELECT 권한**을 함께 요구하므로, 앞 test 의 절대값 UPDATE 가 통과한다고 해서
+     * 이 둘이 통과한다는 보장이 없다. 그래서 production 문장을 그대로 쏜다(상수를 가져와 쓴다 —
+     * 사본을 두지 않는다). 잠금 수단을 `SELECT … FOR UPDATE` 로 바꾸면 이 자리가 먼저 붉어진다
+     * (그 구문은 표 단위 UPDATE 권한을 요구하고 앱 역할에는 열 단위뿐이다).
      */
     @Test
-    fun `앱 역할은 계수 증가·조건부 초기화 문장을 그대로 돌릴 수 있다 — 갱신식의 열 읽기 포함`() {
+    fun `앱 역할은 계수 증가·확정 문장을 그대로 돌릴 수 있다 — 갱신식·조건의 열 읽기 포함`() {
         allowedPrepared(AccessSql.REGISTER_ACCOUNT_FAILURE) { statement ->
             statement.setInt(1, 5)
             statement.setInt(2, 5)
             statement.setTimestamp(3, Timestamp.from(Instant.parse("2026-10-16T00:15:00Z")))
             statement.setLong(4, probeAccountId())
         }
-        allowedPrepared(AccessSql.CLEAR_ACCOUNT_FAILURES) { statement ->
+        allowedPrepared(AccessSql.CLAIM_ACCOUNT_FOR_SIGN_IN) { statement ->
             statement.setLong(1, probeAccountId())
-            statement.setTimestamp(2, Timestamp.from(Instant.parse("2026-10-16T00:00:00Z")))
+            statement.setString(2, "not-a-real-hash-value")
+            statement.setTimestamp(3, Timestamp.from(Instant.parse("2026-10-16T00:00:00Z")))
         }
     }
 

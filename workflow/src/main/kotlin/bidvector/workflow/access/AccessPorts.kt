@@ -32,17 +32,34 @@ interface AccountStorePort {
         lockUntil: Instant,
     )
 
+}
+
+/**
+ * 로그인 성공의 **확정** — 계정과 세션 **두 표에 걸친 한 단위**라 어느 한쪽 저장 포트에도 두지
+ * 않는다. 그 경계가 곧 결함의 자리였다(verifier r1 F1): 자격 확인과 세션 등록이 서로 다른
+ * 트랜잭션이면 그 사이에 비밀 문구 교체가 끼어들어, **옛 값으로 시작한 로그인이 교체 뒤에
+ * 세션을 받는다**(그리고 그 세션이 교체의 「전부 폐기」를 지나 유일하게 살아남는다).
+ */
+interface SignInCompletionPort {
     /**
-     * 성공했을 때 실패 계수·잠금을 비운다(같은 이유로 갱신 시각을 받지 않는다) — **[now] 기준
-     * 으로 잠겨 있지 않을 때만** 비우고, 비웠으면 `true` 다.
+     * 한 트랜잭션에서 ⓐ 계정 행을 **잠그며** 실패 계수·잠금을 비우고 ⓑ 그 계정의 기존 세션을
+     * 폐기하고 ⓒ [session] 을 등록한다.
      *
-     * 조건이 있는 이유도 H-1 이다: 느린 검증이 도는 사이에 다른 요청이 상한을 채워 잠글 수
-     * 있고, 그때 무조건 비우면 **늦게 끝난 성공 하나가 방금 걸린 잠금을 푼다**. `false` 는
-     * 「비우지 않았다 = 지금 잠겨 있다」이고 호출부는 그 로그인을 거부한다.
+     * ⓐ 는 **[verified] 가 아직 그 계정의 자격이고, [at] 기준으로 잠겨 있지 않을 때만** 성립한다.
+     * 성립하지 않으면 **아무것도 쓰지 않고** `false` 다 — 호출부는 그 로그인을 거부한다.
+     *
+     * 자격 비교는 코드가 아니라 **행 조건**이다. 제시값이 섞이지 않고(양쪽 다 이미 저장된 자격)
+     * 그래서 이것은 인증이 아니라 **판 확인**이다 — 상수 시간이 필요한 자리가 아니고,
+     * [PassphraseHash] 에 비교를 더하지 않아도 되는 이유이기도 하다.
+     *
+     * ⓐ 가 거는 행 잠금이 **동시 로그인 둘과 비밀 문구 교체를 이 단위와 직렬화한다**
+     * (code-review r2 M-1): 뒤에 선 쪽은 잠금이 풀린 뒤 **새 스냅숏**으로 ⓑ 를 돌아 앞사람이
+     * 방금 연 세션을 보고 폐기한다. 한 계정에 살아 있는 세션은 늘 하나다.
      */
-    fun clearFailures(
-        account: AccountId,
-        now: Instant,
+    fun complete(
+        session: NewBrowserSession,
+        verified: PassphraseHash,
+        at: Instant,
     ): Boolean
 }
 
@@ -71,23 +88,12 @@ interface AccountProvisioningPort {
 /**
  * 세션 저장 — **받는 세션 식별 타입이 [BrowserSessionDigest] 하나다.** 쿠키 원문을 받는
  * 서명이 없으므로 「세션 식별자는 해시로만 저장」이 문장이 아니라 타입으로 선다.
+ *
+ * **여는 서명이 여기 없다**(verifier r1 F1 뒤). 세션을 만드는 쓰기는 자격 확인·기존 세션 폐기와
+ * 한 트랜잭션이어야 하므로 [SignInCompletionPort] 하나가 그 셋을 진다 — 이 포트에 `open` 이
+ * 남아 있으면 그 단위를 비껴가는 길이 표면에 다시 생긴다.
  */
 interface BrowserSessionStorePort {
-    /**
-     * 새 세션을 열면서 **그 계정의 기존 세션을 같은 호출에서 폐기한다** — 구현은 둘을 한
-     * 트랜잭션에 담는다.
-     *
-     * 두 효과가 한 서명인 이유(code-review r1 M-2): 로그인이 느린 검증 동안 커넥션을 쥐지
-     * 않으려고 **문장마다 제 트랜잭션**을 열게 되면서, 폐기와 발급이 따로 커밋될 수 있는
-     * 자리가 생겼다. 따로 커밋되면 동시 로그인 둘이 서로의 폐기를 비껴가 **한 계정에 살아
-     * 있는 세션이 둘** 남는다(재발급의 뜻이 사라진다). 한 호출로 묶으면 호출부가 어느
-     * 경계 아래에 있든 그 둘은 쪼개지지 않고, 「폐기 없이 여는」 상태가 이 포트의 표면에 없다.
-     */
-    fun openReplacing(
-        session: NewBrowserSession,
-        revokedAt: Instant,
-    )
-
     fun byDigest(digest: BrowserSessionDigest): BrowserSessionSnapshot?
 
     fun touch(
@@ -129,7 +135,7 @@ interface BrowserSessionKeySource {
  * **실패 계수를 싣지 않는다**(code-review r1 H-1). 계수를 스냅숏으로 내보내면 「읽어서 더한
  * 값을 되쓰는」 형태가 다시 설 자리가 생긴다 — 그 계산은 [AccountStorePort.registerFailure]
  * 의 한 갱신 안에만 있다. 여기 남는 [lockedUntil] 은 **검증 전 조기 거부**에만 쓰이고,
- * 판정의 정본은 [AccountStorePort.clearFailures] 의 조건이다(심층 방어의 바깥 겹).
+ * 판정의 정본은 [SignInCompletionPort.complete] 의 조건이다(심층 방어의 바깥 겹).
  */
 class AccountSnapshot(
     val id: AccountId,
@@ -141,6 +147,7 @@ class AccountSnapshot(
  * 새 세션 한 벌 — **생성자가 `internal` 이다.** 이 모듈 밖에서는 세션을 만들 수 없고, 이
  * 모듈 안에서 만드는 자리는 [BrowserAccessWorkflow.signIn] 하나다((2b) 「로그인 use case 밖에서
  * 세션을 만들 수 있으면 없던 권한」의 폐쇄 — `EditSession` 의 `internal constructor` 선례).
+ * 만들어도 [SignInCompletionPort] 의 자격 조건을 지나야 행이 된다.
  */
 class NewBrowserSession internal constructor(
     val digest: BrowserSessionDigest,

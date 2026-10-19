@@ -73,13 +73,43 @@ class InMemoryAccountStore(
         }
     }
 
-    override fun clearFailures(
-        account: AccountId,
+    /**
+     * 확정 포트의 fake 가 쓰는 자리 — 실물에서는 이것이 조건부 UPDATE 한 문장이다(자격 조건 ·
+     * 잠금 조건 · 행 잠금이 한 자리에 있다).
+     */
+    fun claim(
+        verified: PassphraseHash,
         now: Instant,
     ): Boolean {
+        if (snapshot.hash.encoded != verified.encoded) return false
         if (snapshot.lockedUntil?.isAfter(now) == true) return false
         attempts = 0
         snapshot = AccountSnapshot(snapshot.id, snapshot.hash, null)
+        return true
+    }
+
+    /** 운영자 명령의 교체를 흉내 낸다 — 자격 조건이 실제로 갈리는 상황을 use case test 가 만든다. */
+    fun replaceHash(next: PassphraseHash) {
+        snapshot = AccountSnapshot(snapshot.id, next, snapshot.lockedUntil)
+    }
+}
+
+/**
+ * 로그인 확정의 fake — 실물의 **한 트랜잭션**을 단일 스레드 순서로 흉내 낸다. 직렬화 자체는
+ * 여기서 재지 못한다(실 DB test 가 잰다) — 여기서 재는 것은 **조건**이다.
+ */
+class InMemorySignInCompletion(
+    private val accounts: InMemoryAccountStore,
+    private val sessions: InMemorySessionStore,
+) : SignInCompletionPort {
+    override fun complete(
+        session: NewBrowserSession,
+        verified: PassphraseHash,
+        at: Instant,
+    ): Boolean {
+        if (!accounts.claim(verified, at)) return false
+        sessions.revokeAllOf(session.account, at)
+        sessions.put(session)
         return true
     }
 }
@@ -90,11 +120,8 @@ class InMemorySessionStore : BrowserSessionStorePort {
 
     val openCount: Int get() = rows.size
 
-    override fun openReplacing(
-        session: NewBrowserSession,
-        revokedAt: Instant,
-    ) {
-        revokeAllOf(session.account, revokedAt)
+    /** 확정 fake 가 폐기 뒤에 부른다 — 포트 표면에는 없다(실물에서 여는 자리는 확정 하나다). */
+    fun put(session: NewBrowserSession) {
         rows[session.digest.hex] =
             BrowserSessionSnapshot(
                 digest = session.digest,

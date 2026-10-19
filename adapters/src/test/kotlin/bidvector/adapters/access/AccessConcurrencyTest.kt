@@ -25,12 +25,16 @@ import javax.sql.DataSource
 private val ACCOUNT = LoginName("concurrent-access-test-operator")
 private const val RIGHT = "concurrent-access-test-fixture-value"
 private const val WRONG = "concurrent-access-test-fixture-value-other"
+private const val NEXT = "concurrent-access-test-fixture-value-rotated"
 
 /** 실 KDF 를 쓰되 느리지 않게 — 이 test 가 재는 축은 비용이 아니라 **동시성**이다. */
 private const val CONCURRENCY_HASH_COST = 10
 
 /** 상한보다 작다 — 「계수가 K 올랐다」를 잠금과 섞이지 않게 재려면 상한 아래여야 한다. */
 private const val SIMULTANEOUS_FAILURES = 4
+
+/** 둘이면 충분하다 — 「직렬화가 없으면 둘이 산다」를 재는 데 더 많은 스레드가 보태는 것이 없다. */
+private const val SIMULTANEOUS_LOGINS = 2
 
 private const val JOIN_TIMEOUT_SECONDS = 60L
 
@@ -162,6 +166,39 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
         }
     }
 
+    @Test
+    fun `비밀 문구 교체 중이던 옛 값 로그인은 교체 뒤에 세션을 받지 못한다`() {
+        createAccount()
+        val gated = GatedPassphraseHasher(hasher)
+        val outcome = SignInSlot()
+        val late = startSignIn(gated, RIGHT, outcome)
+        gated.awaitEntry()
+
+        // 옛 값의 검증이 도는 사이에 운영자가 교체한다 — 교체는 그 계정의 세션도 전부 폐기한다.
+        rotateTo(NEXT) shouldBe ProvisionOutcome.Rotated
+        gated.release()
+        late.join(JOIN_TIMEOUT_SECONDS * MILLIS_PER_SECOND)
+
+        // 앞 판은 여기서 Granted 였고, 그 세션이 교체의 「전부 폐기」를 지나 **유일하게 살아
+        // 있는** 세션이 됐다 — 옛 비밀 문구를 쥔 쪽이 교체 뒤에도 들어오는 길이다.
+        outcome.value shouldBe SignInOutcome.Refused
+        liveSessionCount() shouldBe 0
+        signIn(hasher, NEXT).shouldBeInstanceOf<SignInOutcome.Granted>()
+    }
+
+    @Test
+    fun `동시 로그인 둘이어도 살아 있는 세션은 하나다 — 확정이 계정 행에서 줄 선다`() {
+        createAccount()
+
+        val outcomes = inParallel(SIMULTANEOUS_LOGINS) { signIn(hasher, RIGHT) }
+
+        outcomes.size shouldBe SIMULTANEOUS_LOGINS
+        outcomes.all { it is SignInOutcome.Granted } shouldBe true
+        // 앞 판은 둘이었다 — 두 트랜잭션의 폐기 문장이 서로의 등록을 스냅숏 밖에 두고 지나갔다.
+        liveSessionCount() shouldBe 1
+        sessionCount() shouldBe SIMULTANEOUS_LOGINS
+    }
+
     // --- 조립·동시 실행 헬퍼 ---------------------------------------------------
 
     private fun access(
@@ -221,13 +258,23 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
         return results.toList()
     }
 
-    private fun createAccount() {
+    private fun provisioning(): JdbcAccountProvisioningTransaction =
         JdbcAccountProvisioningTransaction(
             transactions = TransactionBoundary(dataSource()),
             hasher = hasher,
             clock = clock,
-        ).inTransaction { it.create(ACCOUNT, ClearPassphrase.wrap(RIGHT)) } shouldBe ProvisionOutcome.Created
+        )
+
+    private fun createAccount() {
+        provisioning().inTransaction { it.create(ACCOUNT, ClearPassphrase.wrap(RIGHT)) } shouldBe
+            ProvisionOutcome.Created
     }
+
+    private fun rotateTo(value: String): ProvisionOutcome =
+        provisioning().inTransaction { it.rotate(ACCOUNT, ClearPassphrase.wrap(value)) }
+
+    private fun liveSessionCount(): Int =
+        queryStrings("SELECT COUNT(*) FROM browser_session WHERE revoked_at IS NULL").single().toInt()
 
     private fun failedAttempts(): Int = queryStrings("SELECT failed_attempts FROM account").single().toInt()
 

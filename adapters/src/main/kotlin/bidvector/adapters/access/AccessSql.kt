@@ -29,13 +29,22 @@ internal object AccessSql {
             "WHERE id = ?"
 
     /**
-     * 성공의 초기화 — **잠겨 있지 않을 때만** 비운다. 검증이 도는 사이에 다른 요청이 상한을
-     * 채웠다면 이 문장은 0 행을 바꾸고, 호출부는 그것을 「지금 잠겨 있다」로 읽어 거부한다
-     * (늦게 끝난 성공 하나가 방금 걸린 잠금을 푸는 자리를 없앤다).
+     * 로그인 확정의 **첫 문장** — 성공의 초기화이면서 동시에 그 트랜잭션의 **잠금과 조건**이다.
+     *
+     *  · `passphrase_hash = ?` — 검증 때 읽은 자격이 **아직 그 자격일 때만**(verifier r1 F1).
+     *    느린 KDF 가 도는 사이에 교체가 커밋되면 이 조건이 깨져 0 행이고, 그 로그인은 세션을
+     *    받지 못한다. 비교가 코드가 아니라 **행 조건**이라 제시값이 섞이지 않는다.
+     *  · `locked_until …` — 그 사이에 잠기지 않았을 때만(code-review r1 H-1 의 조건 그대로).
+     *  · `UPDATE … WHERE id` 가 거는 **행 잠금**이 동시 로그인 둘과 비밀 문구 교체를 이 단위와
+     *    직렬화한다(code-review r2 M-1). 뒤에 선 쪽은 READ COMMITTED 재평가로 바뀐 행을 다시
+     *    보고, 통과하면 **새 스냅숏**으로 폐기 문장을 돌아 앞사람의 세션을 본다.
+     *  · 잠그는 수단이 `SELECT … FOR UPDATE` 가 아니라 이 UPDATE 인 것은 **권한** 때문이다 —
+     *    앱 역할의 `account` 권한은 SELECT + 두 열의 UPDATE 뿐이고, 이 문장은 그 두 열만 쓴다.
      */
-    const val CLEAR_ACCOUNT_FAILURES =
+    const val CLAIM_ACCOUNT_FOR_SIGN_IN =
         "UPDATE account SET failed_attempts = 0, locked_until = NULL " +
-            "WHERE id = ? AND (locked_until IS NULL OR locked_until <= ?) RETURNING id"
+            "WHERE id = ? AND passphrase_hash = ? AND (locked_until IS NULL OR locked_until <= ?) " +
+            "RETURNING id"
 
     const val SELECT_ACCOUNT_EXISTS = "SELECT EXISTS (SELECT 1 FROM account)"
 

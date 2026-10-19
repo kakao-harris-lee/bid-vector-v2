@@ -22,6 +22,26 @@ private val POLICY =
     )
 
 /**
+ * 검증 **도중에** 저장된 자격이 바뀌는 상황을 단일 스레드로 만든다 — 실 DB 의 교체 경합과 같은
+ * 조건을 use case 층에서 재기 위한 seam 이다(verifier r1 F1).
+ */
+private class RotatingHasher(
+    private val delegate: PassphraseHasher,
+    private val duringVerify: () -> Unit,
+) : PassphraseHasher {
+    override fun hash(clear: ClearPassphrase): PassphraseHash = delegate.hash(clear)
+
+    override fun verify(
+        clear: ClearPassphrase,
+        hash: PassphraseHash,
+    ): Boolean {
+        val verified = delegate.verify(clear, hash)
+        duringVerify()
+        return verified
+    }
+}
+
+/**
  * 7D 우회 ③④⑤⑥ 의 **use case 층** 측정 — HTTP 없이 거동만 본다(쿠키·CSRF 헤더의 HTTP 형태는
  * `app` 의 test 가 잰다). 이중체는 값과 fake port 뿐이다(mock framework 0).
  */
@@ -36,8 +56,10 @@ class BrowserAccessWorkflowTest {
             snapshot = AccountSnapshot(AccountId(1), hasher.hash(ClearPassphrase.wrap(RIGHT)), null),
         )
 
+    private val completion = InMemorySignInCompletion(accounts, sessions)
+
     private fun workflow(): BrowserAccessWorkflow =
-        BrowserAccessWorkflow(accounts, sessions, hasher, keys, clock, POLICY)
+        BrowserAccessWorkflow(accounts, sessions, completion, hasher, keys, clock, POLICY)
 
     private fun signIn(value: String = RIGHT): SignInOutcome = workflow().signIn(LOGIN, ClearPassphrase.wrap(value))
 
@@ -150,6 +172,18 @@ class BrowserAccessWorkflowTest {
     @Test
     fun `모르는 로그인 식별자는 거부한다 — 계정을 지어내지 않는다`() {
         workflow().signIn(LoginName("someone-else"), ClearPassphrase.wrap(RIGHT)) shouldBe SignInOutcome.Refused
+    }
+
+    @Test
+    fun `검증 도중 자격이 바뀌면 올바른 값이어도 세션을 받지 못한다 — 확정의 조건`() {
+        val rotating =
+            RotatingHasher(hasher) { accounts.replaceHash(hasher.hash(ClearPassphrase.wrap(WRONG))) }
+        val workflow =
+            BrowserAccessWorkflow(accounts, sessions, completion, rotating, keys, clock, POLICY)
+
+        workflow.signIn(LOGIN, ClearPassphrase.wrap(RIGHT)) shouldBe SignInOutcome.Refused
+
+        sessions.openCount shouldBe 0
     }
 
     @Test
