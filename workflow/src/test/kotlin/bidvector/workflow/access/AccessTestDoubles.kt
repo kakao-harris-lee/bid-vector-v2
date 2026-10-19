@@ -44,25 +44,43 @@ class CountingKeySource(
     }
 }
 
+/**
+ * 계수는 **이 사본 안에서만** 산다(스냅숏에 없다, H-1) — 포트 서명이 「올린다」이므로 fake 도
+ * 같은 모양으로 올린다. 동시성 자체는 여기서 재지 못한다(실 DB test 가 잰다).
+ */
 class InMemoryAccountStore(
     private val knownLogin: LoginName,
     private var snapshot: AccountSnapshot,
 ) : AccountStorePort {
+    /** 올라간 계수의 이력 — 「상한까지 몇 번 셌나」를 use case test 가 단언한다. */
     val recordedFailures: MutableList<Int> = mutableListOf()
+    private var attempts: Int = 0
 
     override fun byLogin(login: LoginName): AccountSnapshot? = snapshot.takeIf { login.value == knownLogin.value }
 
-    override fun recordFailure(
+    override fun registerFailure(
         account: AccountId,
-        attempts: Int,
-        lockedUntil: Instant?,
+        attemptLimit: Int,
+        lockUntil: Instant,
     ) {
-        recordedFailures += attempts
-        snapshot = AccountSnapshot(snapshot.id, snapshot.hash, attempts, lockedUntil)
+        val next = attempts + 1
+        recordedFailures += next
+        if (next >= attemptLimit) {
+            attempts = 0
+            snapshot = AccountSnapshot(snapshot.id, snapshot.hash, lockUntil)
+        } else {
+            attempts = next
+        }
     }
 
-    override fun clearFailures(account: AccountId) {
-        snapshot = AccountSnapshot(snapshot.id, snapshot.hash, 0, null)
+    override fun clearFailures(
+        account: AccountId,
+        now: Instant,
+    ): Boolean {
+        if (snapshot.lockedUntil?.isAfter(now) == true) return false
+        attempts = 0
+        snapshot = AccountSnapshot(snapshot.id, snapshot.hash, null)
+        return true
     }
 }
 

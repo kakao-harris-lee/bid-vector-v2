@@ -10,10 +10,32 @@ package bidvector.adapters.access
  */
 internal object AccessSql {
     const val SELECT_ACCOUNT_BY_LOGIN =
-        "SELECT id, passphrase_hash, failed_attempts, locked_until FROM account WHERE login_name = ?"
+        "SELECT id, passphrase_hash, locked_until FROM account WHERE login_name = ?"
 
-    const val UPDATE_ACCOUNT_FAILURE =
-        "UPDATE account SET failed_attempts = ?, locked_until = ? WHERE id = ?"
+    /**
+     * 실패 하나 — **한 문장**이다(code-review r1 H-1). 계수는 애플리케이션이 읽어 둔 값이 아니라
+     * **행의 현재 값**에서 오르므로, 느린 검증을 각자 도느라 같은 값을 읽은 동시 요청 K 건이
+     * 계수를 K 올린다(행 잠금이 UPDATE 를 줄 세우고 READ COMMITTED 가 뒤 문장에 갱신된 행을
+     * 보인다).
+     *
+     * 상한에 닿은 그 문장이 잠금까지 싣고 계수를 비운다 — 비우지 않으면 잠금이 풀린 직후의
+     * 한 번이 다시 잠근다(잠금 창이 겹겹이 길어진다). **상한 아래면 `locked_until` 은 자기 값을
+     * 유지한다**: 절대값 `NULL` 을 쓰던 자리가 「늦게 끝난 실패가 막 걸린 잠금을 지우는」 창이었다.
+     */
+    const val REGISTER_ACCOUNT_FAILURE =
+        "UPDATE account SET " +
+            "failed_attempts = CASE WHEN failed_attempts + 1 >= ? THEN 0 ELSE failed_attempts + 1 END, " +
+            "locked_until = CASE WHEN failed_attempts + 1 >= ? THEN ? ELSE locked_until END " +
+            "WHERE id = ?"
+
+    /**
+     * 성공의 초기화 — **잠겨 있지 않을 때만** 비운다. 검증이 도는 사이에 다른 요청이 상한을
+     * 채웠다면 이 문장은 0 행을 바꾸고, 호출부는 그것을 「지금 잠겨 있다」로 읽어 거부한다
+     * (늦게 끝난 성공 하나가 방금 걸린 잠금을 푸는 자리를 없앤다).
+     */
+    const val CLEAR_ACCOUNT_FAILURES =
+        "UPDATE account SET failed_attempts = 0, locked_until = NULL " +
+            "WHERE id = ? AND (locked_until IS NULL OR locked_until <= ?) RETURNING id"
 
     const val SELECT_ACCOUNT_EXISTS = "SELECT EXISTS (SELECT 1 FROM account)"
 

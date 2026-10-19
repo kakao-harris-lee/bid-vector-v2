@@ -70,6 +70,12 @@ class BrowserAccessWorkflow(
      *
      * 잠금 확인이 해시 검증보다 **앞**이다: 잠긴 동안에는 올바른 값에도 거부해야 하고,
      * 그 사이의 시도는 계수를 더 올리지 않는다(잠금 창이 겹겹이 길어지지 않는다).
+     *
+     * **읽은 뒤의 상태 변화를 전제한다**(code-review r1 H-1). 해시 검증은 느리고, 그 사이에
+     * 다른 요청이 계수를 올리거나 잠금을 걸 수 있다 — 그래서 이 함수가 읽은 스냅숏은 **조기
+     * 거부의 입력**일 뿐이고, 계수·잠금을 바꾸는 두 자리는 포트의 **조건부 한 갱신**이다.
+     * 성공 경로도 그 갱신의 결과를 보고 끝낸다: 비우지 못했다면 검증 중에 잠긴 것이므로
+     * 거부한다(늦은 성공 하나가 방금 걸린 잠금을 풀지 않는다).
      */
     fun signIn(
         login: LoginName,
@@ -89,13 +95,16 @@ class BrowserAccessWorkflow(
             }
 
             !hasher.verify(clear, account.hash) -> {
-                registerFailure(account, now)
+                accounts.registerFailure(account.id, policy.maxFailedAttempts, now.plus(policy.lockWindow))
                 SignInOutcome.Refused
             }
 
             else -> {
-                accounts.clearFailures(account.id)
-                SignInOutcome.Granted(issue(account.id, now))
+                if (accounts.clearFailures(account.id, now)) {
+                    SignInOutcome.Granted(issue(account.id, now))
+                } else {
+                    SignInOutcome.Refused
+                }
             }
         }
     }
@@ -172,19 +181,6 @@ class BrowserAccessWorkflow(
             ),
         )
         return IssuedSession(key, stamp, absoluteExpiresAt)
-    }
-
-    private fun registerFailure(
-        account: AccountSnapshot,
-        now: Instant,
-    ) {
-        val attempts = account.failedAttempts + 1
-        if (attempts >= policy.maxFailedAttempts) {
-            // 잠그면서 계수를 비운다 — 그러지 않으면 잠금이 풀린 직후의 한 번이 다시 잠근다.
-            accounts.recordFailure(account.id, 0, now.plus(policy.lockWindow))
-        } else {
-            accounts.recordFailure(account.id, attempts, null)
-        }
     }
 
     private fun isLocked(

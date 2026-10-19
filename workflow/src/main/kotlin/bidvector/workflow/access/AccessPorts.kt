@@ -15,19 +15,35 @@ interface AccountStorePort {
     fun byLogin(login: LoginName): AccountSnapshot?
 
     /**
-     * 실패 계수를 올리고, 상한에 닿았으면 잠금 해제 시각을 싣는다.
+     * 실패 하나를 적는다 — 계수를 **하나 올리고**, 그 올린 값이 [attemptLimit] 에 닿으면 같은
+     * 갱신에서 [lockUntil] 까지 싣는다.
+     *
+     * **「올린다」이지 「이 값으로 둔다」가 아니다**(code-review r1 H-1). 읽은 값에 더해 절대값을
+     * 쓰면 ⓐ 동시 실패 K 건이 전부 같은 값을 읽어 계수가 1 만 오르고 ⓑ 느린 검증 뒤에 늦게
+     * 끝난 요청이 그 사이 걸린 잠금을 덮어 지운다. 구현은 두 효과를 **한 문장**에 담아 그
+     * 창을 없앤다 — 상한 아래면 잠금 열은 자기 값을 유지해야 한다.
      *
      * **갱신 시각을 받지 않는다** — V20 의 앱 역할은 `account` 의 `updated_at` 에 UPDATE 권한이
      * 없다(그 열은 운영자 명령의 사건을 적는다). 서명에 없으면 그 열을 쓰는 코드가 생길 수 없다.
      */
-    fun recordFailure(
+    fun registerFailure(
         account: AccountId,
-        attempts: Int,
-        lockedUntil: Instant?,
+        attemptLimit: Int,
+        lockUntil: Instant,
     )
 
-    /** 성공했을 때 실패 계수·잠금을 비운다(같은 이유로 갱신 시각을 받지 않는다). */
-    fun clearFailures(account: AccountId)
+    /**
+     * 성공했을 때 실패 계수·잠금을 비운다(같은 이유로 갱신 시각을 받지 않는다) — **[now] 기준
+     * 으로 잠겨 있지 않을 때만** 비우고, 비웠으면 `true` 다.
+     *
+     * 조건이 있는 이유도 H-1 이다: 느린 검증이 도는 사이에 다른 요청이 상한을 채워 잠글 수
+     * 있고, 그때 무조건 비우면 **늦게 끝난 성공 하나가 방금 걸린 잠금을 푼다**. `false` 는
+     * 「비우지 않았다 = 지금 잠겨 있다」이고 호출부는 그 로그인을 거부한다.
+     */
+    fun clearFailures(
+        account: AccountId,
+        now: Instant,
+    ): Boolean
 }
 
 /**
@@ -94,17 +110,19 @@ interface BrowserSessionKeySource {
     fun newKey(): BrowserSessionKey
 }
 
-/** 계정 한 행의 읽기 스냅숏 — 저장 층이 만든다(해시 문면은 [PassphraseHasher] 만 읽는다). */
+/**
+ * 계정 한 행의 읽기 스냅숏 — 저장 층이 만든다(해시 문면은 [PassphraseHasher] 만 읽는다).
+ *
+ * **실패 계수를 싣지 않는다**(code-review r1 H-1). 계수를 스냅숏으로 내보내면 「읽어서 더한
+ * 값을 되쓰는」 형태가 다시 설 자리가 생긴다 — 그 계산은 [AccountStorePort.registerFailure]
+ * 의 한 갱신 안에만 있다. 여기 남는 [lockedUntil] 은 **검증 전 조기 거부**에만 쓰이고,
+ * 판정의 정본은 [AccountStorePort.clearFailures] 의 조건이다(심층 방어의 바깥 겹).
+ */
 class AccountSnapshot(
     val id: AccountId,
     val hash: PassphraseHash,
-    val failedAttempts: Int,
     val lockedUntil: Instant?,
-) {
-    init {
-        require(failedAttempts >= 0) { "실패 계수는 음수일 수 없다: $failedAttempts" }
-    }
-}
+)
 
 /**
  * 새 세션 한 벌 — **생성자가 `internal` 이다.** 이 모듈 밖에서는 세션을 만들 수 없고, 이

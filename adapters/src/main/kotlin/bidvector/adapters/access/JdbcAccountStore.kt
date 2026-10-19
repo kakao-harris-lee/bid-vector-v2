@@ -1,7 +1,6 @@
 package bidvector.adapters.access
 
 import bidvector.adapters.persistence.ConnectionSource
-import bidvector.adapters.persistence.setNullableTimestamp
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountStorePort
@@ -29,29 +28,37 @@ class JdbcAccountStore(
             }
         }
 
-    override fun recordFailure(
+    override fun registerFailure(
         account: AccountId,
-        attempts: Int,
-        lockedUntil: Instant?,
-    ) = updateFailureState(account, attempts, lockedUntil)
-
-    override fun clearFailures(account: AccountId) = updateFailureState(account, 0, null)
-
-    private fun updateFailureState(
-        account: AccountId,
-        attempts: Int,
-        lockedUntil: Instant?,
+        attemptLimit: Int,
+        lockUntil: Instant,
     ) {
         connections.withConnection { connection ->
-            connection.prepareStatement(AccessSql.UPDATE_ACCOUNT_FAILURE).use { statement ->
+            connection.prepareStatement(AccessSql.REGISTER_ACCOUNT_FAILURE).use { statement ->
                 var index = 1
-                statement.setInt(index++, attempts)
-                statement.setNullableTimestamp(index++, lockedUntil)
+                // 상한이 두 번 바인딩되는 것은 두 열이 **같은 조건**으로 갈리기 때문이다 —
+                // 한 문장 안에서 계수와 잠금이 따로 판정되면 그 둘이 어긋날 수 있다.
+                statement.setInt(index++, attemptLimit)
+                statement.setInt(index++, attemptLimit)
+                statement.setTimestamp(index++, Timestamp.from(lockUntil))
                 statement.setLong(index, account.value)
                 statement.executeUpdate()
             }
         }
     }
+
+    override fun clearFailures(
+        account: AccountId,
+        now: Instant,
+    ): Boolean =
+        connections.withConnection { connection ->
+            connection.prepareStatement(AccessSql.CLEAR_ACCOUNT_FAILURES).use { statement ->
+                statement.setLong(1, account.value)
+                statement.setTimestamp(2, Timestamp.from(now))
+                // `RETURNING` 이 행을 내면 비운 것이다 — 0 행이면 지금 잠겨 있다.
+                statement.executeQuery().use { rs -> rs.next() }
+            }
+        }
 }
 
 /**
@@ -110,6 +117,5 @@ private fun ResultSet.toAccountSnapshot(): AccountSnapshot =
     AccountSnapshot(
         id = AccountId(getLong("id")),
         hash = PassphraseHash(getString("passphrase_hash")),
-        failedAttempts = getInt("failed_attempts"),
         lockedUntil = getTimestamp("locked_until")?.toInstant(),
     )

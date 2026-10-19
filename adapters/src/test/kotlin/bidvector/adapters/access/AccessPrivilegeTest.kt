@@ -4,7 +4,10 @@ import bidvector.adapters.persistence.PersistenceTestSupport
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.sql.PreparedStatement
 import java.sql.SQLException
+import java.sql.Timestamp
+import java.time.Instant
 
 /** PostgreSQL 권한 거부 — 이 코드로 떨어지는 것이 「권한이 없다」의 실측이다. */
 private const val INSUFFICIENT_PRIVILEGE = "42501"
@@ -60,6 +63,26 @@ class AccessPrivilegeTest : PersistenceTestSupport() {
         allowed("UPDATE account SET failed_attempts = 3, locked_until = now() + interval '15 minutes'")
     }
 
+    /**
+     * H-1 뒤의 두 문장은 모양이 다르다 — 갱신식이 **같은 행의 열을 읽고**(`failed_attempts + 1`)
+     * 하나는 `RETURNING` 으로 열을 되돌린다. 둘 다 UPDATE 권한 말고 **SELECT 권한**을 함께
+     * 요구하므로, 앞 test 의 절대값 UPDATE 가 통과한다고 해서 이 둘이 통과한다는 보장이 없다.
+     * 그래서 production 문장을 그대로 쏜다(상수를 가져와 쓴다 — 사본을 두지 않는다).
+     */
+    @Test
+    fun `앱 역할은 계수 증가·조건부 초기화 문장을 그대로 돌릴 수 있다 — 갱신식의 열 읽기 포함`() {
+        allowedPrepared(AccessSql.REGISTER_ACCOUNT_FAILURE) { statement ->
+            statement.setInt(1, 5)
+            statement.setInt(2, 5)
+            statement.setTimestamp(3, Timestamp.from(Instant.parse("2026-10-16T00:15:00Z")))
+            statement.setLong(4, probeAccountId())
+        }
+        allowedPrepared(AccessSql.CLEAR_ACCOUNT_FAILURES) { statement ->
+            statement.setLong(1, probeAccountId())
+            statement.setTimestamp(2, Timestamp.from(Instant.parse("2026-10-16T00:00:00Z")))
+        }
+    }
+
     @Test
     fun `앱 역할은 세션의 소유 계정·CSRF 해시·절대 시한을 바꿀 수 없다`() {
         refused("UPDATE browser_session SET account_id = 999999")
@@ -113,4 +136,27 @@ class AccessPrivilegeTest : PersistenceTestSupport() {
             connection.rollback()
         }
     }
+
+    private fun allowedPrepared(
+        sql: String,
+        bind: (PreparedStatement) -> Unit,
+    ) {
+        appConnection().use { connection ->
+            connection.prepareStatement(sql).use { statement ->
+                bind(statement)
+                statement.execute()
+            }
+            connection.rollback()
+        }
+    }
+
+    private fun probeAccountId(): Long =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT id FROM account WHERE login_name = 'privilege-probe'").use { rs ->
+                    check(rs.next()) { "탐침 계정 행이 없다" }
+                    rs.getLong(1)
+                }
+            }
+        }
 }

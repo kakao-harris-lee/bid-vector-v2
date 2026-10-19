@@ -33,7 +33,7 @@ class BrowserAccessWorkflowTest {
     private val accounts =
         InMemoryAccountStore(
             knownLogin = LOGIN,
-            snapshot = AccountSnapshot(AccountId(1), hasher.hash(ClearPassphrase.wrap(RIGHT)), 0, null),
+            snapshot = AccountSnapshot(AccountId(1), hasher.hash(ClearPassphrase.wrap(RIGHT)), null),
         )
 
     private fun workflow(): BrowserAccessWorkflow =

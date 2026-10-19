@@ -83,24 +83,38 @@ class FakeHasher : PassphraseHasher {
 class MutableAccountStore(
     private val hash: PassphraseHash,
 ) : AccountStorePort {
-    private var snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, 0, null)
+    private var snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, null)
+    private var attempts = 0
 
     override fun byLogin(login: LoginName): AccountSnapshot? = snapshot.takeIf { login.value == TEST_LOGIN }
 
-    override fun recordFailure(
+    override fun registerFailure(
         account: AccountId,
-        attempts: Int,
-        lockedUntil: Instant?,
+        attemptLimit: Int,
+        lockUntil: Instant,
     ) {
-        snapshot = AccountSnapshot(snapshot.id, hash, attempts, lockedUntil)
+        val next = attempts + 1
+        if (next >= attemptLimit) {
+            attempts = 0
+            snapshot = AccountSnapshot(snapshot.id, hash, lockUntil)
+        } else {
+            attempts = next
+        }
     }
 
-    override fun clearFailures(account: AccountId) {
-        snapshot = AccountSnapshot(snapshot.id, hash, 0, null)
+    override fun clearFailures(
+        account: AccountId,
+        now: Instant,
+    ): Boolean {
+        if (snapshot.lockedUntil?.isAfter(now) == true) return false
+        attempts = 0
+        snapshot = AccountSnapshot(snapshot.id, hash, null)
+        return true
     }
 
     fun reset() {
-        snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, 0, null)
+        snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, null)
+        attempts = 0
     }
 }
 

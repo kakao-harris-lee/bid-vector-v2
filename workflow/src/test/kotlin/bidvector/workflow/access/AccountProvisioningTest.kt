@@ -77,7 +77,6 @@ class AccountProvisioningTest {
                         AccountSnapshot(
                             AccountId(1),
                             requireNotNull(provisioning.hashOf(LOGIN)) { "계정이 없다" },
-                            0,
                             null,
                         ),
                 ),
