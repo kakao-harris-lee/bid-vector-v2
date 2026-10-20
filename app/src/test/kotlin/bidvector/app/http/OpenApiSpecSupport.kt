@@ -5,10 +5,14 @@ import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 /**
- * D-6A3-20 — `OpenApiContractTest`·`OpenApiDryRunContractTest`·`OpenApiEditSessionContractTest`
- * 가 공유하는 YAML 로딩·스키마 조회 헬퍼(sizeGate 분리, `PredictionContractTest`→
- * `PredictionAdditiveContractTest` 선례와 같은 이유 — 파일당 500줄 한도, v2-지침서 §5).
- * 세 test class 가 같은 코드를 복제하지 않도록 여기 한 곳에 모은다(v2-지침서 §5 「중복 금지」).
+ * D-6A3-20 — `OpenApiContractTest`·`OpenApiDryRunContractTest`·`OpenApiEditSessionContractTest`·
+ * **`ProductionHttpSurfaceTest`** 가 공유하는 YAML 로딩·스키마 조회 헬퍼(sizeGate 분리,
+ * `PredictionContractTest`→`PredictionAdditiveContractTest` 선례와 같은 이유 — 파일당 500줄 한도,
+ * v2-지침서 §5). **네** test class 가 같은 코드를 복제하지 않도록 여기 한 곳에 모은다
+ * (v2-지침서 §5 「중복 금지」).
+ *
+ * 수를 정확히 적는 이유(code-review r4 L-5): 이 KDoc 은 「이 로더를 바꾸면 무엇이 영향을 받나」를
+ * 보러 오는 자리다. 셋이라고 적혀 있으면 영향 범위를 과소평가하게 된다.
  */
 @Suppress("UNCHECKED_CAST")
 internal fun loadOpenApiSpec(): Map<String, Any?> {
