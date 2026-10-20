@@ -122,6 +122,14 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 - **추적표 STR-16 에 `NoticeSearchProductionE2ETest` 를 넣는다.** 그 파일이 되돌림 대상이므로 산출물 커밋으로 넣고, rollback ①~⑥ 과 실측
   HEAD 를 그 커밋에서 다시 낸 뒤 evidence 를 마지막에 둔다. 그다음 verifier 표적 r4.
 
+**D-7C1-5 (2026-10-20, 팀장 — verifier r4 수령 · PR).** 판정 대상은 산출물 `2620afe7` · evidence `eb27bea4` 다. verifier r4 는
+ready-for-review(blocker·high·medium 0)이고 재작업은 3/5 를 썼다. PR 로 간다.
+- **low 둘은 알려진 제한으로 둔다(이 slice 에서 고치지 않는다)**: ⓐ R4-L-1 — 읽기 전용 증인의 무쓰기 지문은 공고 표 하나만 본다. 다른 표에
+  쓰는 의도적 회피는 test 를 지나지만, 읽기 전용 트랜잭션 안의 쓰기는 DB 가 거부한다. ⓑ R4-L-2 — R3-L-4 test 의 KDoc 「전역 갈래가 되돌아오면
+  붉어진다」는 재지 않는 주장이다(주석층). 고치면 되돌림 대상 test 파일이 움직이므로 후속 정리로 넘긴다.
+- main 이 `416b828e`(PR #77)로 움직였다. 이 브랜치와 겹치는 파일은 `config/quality/gate-tests.properties` · 추적표 둘이고 `git merge-tree`
+  는 충돌 0 이다. 판정은 PR CI(머지 커밋)가 정본이다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0 — `config/quality/**` 는 위 계약 갱신으로 in_scope 다).
