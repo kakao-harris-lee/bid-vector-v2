@@ -203,6 +203,14 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
 - 제한 29~32 신설을 수용한다. cr r4 L-1 의 잔여(`Contended` 를 기록하는 소비자가 아직 없다)는 7F 본편·감사 확장의 후속으로 둔다.
 - 검토: verifier 표적 r4 + code-reviewer 표적 r5.
 
+**D-7D-10 (2026-10-20, 팀장 — code-reviewer r5 수령 · 운영자 결정).** code-reviewer r5 는 APPROVE 이고 medium 1(test 하네스 한정)이 남았다.
+**운영자 결정: 마지막 1회(재작업 5/5)로 고치고 PR.** 배치는 verifier r4 판정을 받은 뒤 그 지적과 합쳐 한 번에 보낸다.
+- **닫는 것**: cr r5 M-1 — `@Timeout` 이 발동하면 비데몬 스레드와 계정 행 잠금이 남아 다음 `@BeforeEach TRUNCATE account` 가 상한 없이 막힌다.
+  잠금 홀더를 **자기 종료**로 둔다(선례 `MigrationLockTimeoutTest` 의 `requireSelfTerminating()`). 상한 제거 변이를 class 전체 실행으로 돌려도
+  뒤 test 가 막히지 않고 시한 안에 붉어져야 한다. cr r5 L-1(`Contended` 단언) · L-2(이름)도 같이 닫는다.
+- **알려진 제한**: cr r5 L-3(상한 공급원이 쓰지 않는 조립에도 들어감 — 죽은 배선).
+- 이번 뒤에는 더 돌리지 않는다. verifier 표적 확인에서 남는 것은 제한으로 등재하고 PR 로 간다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
