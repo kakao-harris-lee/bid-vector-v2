@@ -100,6 +100,35 @@ _policy_value() {
         esac
       done
       ;;
+    pathlist)
+      # `list` 와 같은 축이되 **경로를 담는 키 전용**으로 `/` 하나만 더 받는다(M7/7F-local F-2 의
+      # 탐색 범위·제외 접두). 전역 집합을 넓히지 않는 이유는 위 문단 그대로다 — `/` 를 모든 키에
+      # 허용하면 `forbidden.executables` 같은 이름 키가 경로를 받아도 조용히 통과한다. 종류를
+      # 나누면 **어느 키가 경로인지**가 호출부에 보이고, 집합을 넓히는 편집은 이 줄에 남는다.
+      local IFS=','
+      local -a path_items
+      read -r -a path_items <<< "$raw"
+      if [ "${#path_items[@]}" -lt 1 ]; then
+        echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
+        exit 2
+      fi
+      local path_item
+      for path_item in "${path_items[@]}"; do
+        case "$path_item" in
+          '' | *[!A-Za-z0-9._+/-]*)
+            echo "정책 키 ${key} 의 원소가 허용 문자([A-Za-z0-9._+/-])만으로 돼 있지 않다 — 그 원소의 판정이 조용히 꺼진다: '${raw}'" >&2
+            exit 2
+            ;;
+        esac
+        case "$path_item" in
+          /*) ;;
+          *)
+            echo "정책 키 ${key} 의 원소가 절대 경로가 아니다 — 상대 경로는 컨테이너 작업 디렉터리에 따라 다른 곳을 가리킨다: '${path_item}'" >&2
+            exit 2
+            ;;
+        esac
+      done
+      ;;
     text) ;;
     *)
       echo "알 수 없는 정책 값 종류 '${kind}'(스크립트 결함)" >&2
@@ -141,6 +170,16 @@ REQUIRED_EXECUTABLES=""
 FORBIDDEN_DEPENDENCY_COORDINATES=""
 DEPENDENCY_LAYER_PATH=""
 DEPENDENCY_LAYER_MIN_ENTRIES=""
+CONTENT_PATH=""
+CONTENT_MIN_ENTRIES=""
+REQUIRED_CONTENT_PATTERNS=""
+FORBIDDEN_CONTENT_PATTERNS=""
+KEYMAT_SCAN_PATHS=""
+KEYMAT_EXCLUDE_PREFIXES=""
+KEYMAT_PATTERNS=""
+KEYMAT_MIN_ENTRIES=""
+KEYMAT_CONTENT_MAX_BYTES=""
+KEYMAT_CONTENT_MIN_SCANNED=""
 PROBE_ENV=()
 case "$RUNTIME_KIND" in
   python-serving)
@@ -185,6 +224,41 @@ case "$RUNTIME_KIND" in
       -e BIDVECTOR_EVALUATION_CANDIDATECAP=1
     )
     ;;
+  caddy-site)
+    # M7/7F-local — web 정적 이미지와 리버스 프록시 이미지가 **같은 갈래**를 쓴다. 판정 형태가
+    # 같고 값만 다르기 때문이다(정책 파일이 둘: `-web`·`-proxy`). 갈래를 둘로 쪼개면 같은 코드가
+    # 두 벌이 되고, 한 자리의 교정이 다른 자리를 놓친다.
+    FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
+    REQUIRED_EXECUTABLES="$(_policy_value required.executables list)"
+    CONTENT_PATH="$(_policy_value content.path text)"
+    CONTENT_MIN_ENTRIES="$(_policy_value content.min-entries numeric)"
+    REQUIRED_CONTENT_PATTERNS="$(_policy_value required.content.patterns list)"
+    FORBIDDEN_CONTENT_PATTERNS="$(_policy_value forbidden.content.patterns list)"
+    # 검토 r1 F-2 — 키·인증서 재료는 **싣고 있는 내용 축과 다른 범위**를 갖는다. 그 축은
+    # 「서브되는 트리에 무엇이 있나」를 묻느라 좁고, 키는 그 트리 밖(`/data`·`/config`)에 구워도
+    # 똑같이 사고다. 그래서 범위·제외·패턴·하한을 **따로 선언**한다.
+    KEYMAT_SCAN_PATHS="$(_policy_value keymaterial.scan-paths pathlist)"
+    KEYMAT_EXCLUDE_PREFIXES="$(_policy_value keymaterial.exclude-prefixes pathlist)"
+    KEYMAT_PATTERNS="$(_policy_value keymaterial.patterns list)"
+    KEYMAT_MIN_ENTRIES="$(_policy_value keymaterial.min-entries numeric)"
+    KEYMAT_CONTENT_MAX_BYTES="$(_policy_value keymaterial.content.max-bytes numeric)"
+    KEYMAT_CONTENT_MIN_SCANNED="$(_policy_value keymaterial.content.min-scanned numeric)"
+    # 두 이미지가 요구하는 환경을 **합집합**으로 준다 — 각 이미지는 자기 것만 읽고 나머지는
+    # 무시한다(쓰이지 않는 env 를 Caddy 가 문제 삼지 않는다). 포트는 위생 게이트 전용 부팅값이고
+    # 업무 정책 값이 아니다(위 두 kind 와 같은 근거).
+    #
+    # **상류 주소는 RFC 5737 TEST-NET-1**(192.0.2.0/24 — 문서·예시 전용으로 예약돼 어디로도
+    # 라우팅되지 않는다). 프록시 설정은 상류 값이 **비면 적응 오류로 즉사**해 (1) 의 프로세스
+    # 표집 창이 사라지므로 값이 있어야 하고, 그 값이 실재하는 주소면 게이트가 남의 포트를
+    # 두드리게 된다. 라우팅되지 않는 주소는 둘 다 피한다 — 어느 상류로도 요청하지 않는다.
+    PROBE_ENV=(
+      -e BIDVECTOR_WEB_PORT=18090
+      -e BIDVECTOR_PROXY_HTTPS_PORT=18443
+      -e BIDVECTOR_PROXY_DOMAIN=localhost
+      -e BIDVECTOR_PROXY_APP_UPSTREAM=192.0.2.1:18080
+      -e BIDVECTOR_PROXY_WEB_UPSTREAM=192.0.2.1:18090
+    )
+    ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(정책 오류 — 스크립트의 갈래와 정책이 어긋났다)" >&2
     exit 2
@@ -195,6 +269,64 @@ failures=0
 fail() {
   echo "위생 위반: $1" >&2
   failures=$((failures + 1))
+}
+
+# 「금지 실행 파일」·「필수 실행 파일」 두 축은 **kind 둘이 공유**한다(jvm-app · caddy-site).
+# 판정 형태를 복사하지 않는다 — 복사본은 한 자리의 교정을 다른 자리에서 놓친다(6C 가 같은
+# 계열의 결함을 세 라운드에 걸쳐 낸 자리다). 갈라지는 것은 **사유 문면**뿐이라 인자로 받는다.
+#
+# 셸 조회 축은 한 번만 재고 결과를 전역에 둔다(같은 이미지에 대해 두 번 물을 이유가 없다).
+SHELL_PROBE_AVAILABLE=""
+FORBIDDEN_EXECUTABLE_COUNT=0
+REQUIRED_EXECUTABLE_COUNT=0
+_ensure_shell_probe() {
+  # `[ … ] && return 0` 형태를 쓰지 않는다 — AND-OR 목록의 비-0 과 `set -e` 의 상호작용을
+  # 독자가 따져야 하는 자리를 만들지 않는다(같은 사유로 이 저장소의 수치 비교도 독립 `if` 다).
+  if [ -n "$SHELL_PROBE_AVAILABLE" ]; then
+    return 0
+  fi
+  if docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
+    SHELL_PROBE_AVAILABLE=true
+  else
+    SHELL_PROBE_AVAILABLE=false
+    fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
+  fi
+}
+
+# **축이 둘이다**(2026-09-26 변이 ⑦ 실측): `--version` 실행 시도 하나로는 `serialver` 를 놓쳤다 —
+# JDK 베이스에 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가 "부재"로 읽었다. 그래서
+# PATH 조회 축을 더하고, 그 축은 셸이 필요하므로 셸 부재는 **판정 불가로 실패**한다.
+_check_forbidden_executables() { # <쉼표 목록> <사유 꼬리말>
+  local list="$1" hint="$2" tool
+  local -a arr
+  IFS=',' read -r -a arr <<< "$list"
+  _ensure_shell_probe
+  for tool in "${arr[@]}"; do
+    if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
+      fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — ${hint}"
+    elif [ "$SHELL_PROBE_AVAILABLE" = true ] \
+      && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+      fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — ${hint}"
+    fi
+  done
+  FORBIDDEN_EXECUTABLE_COUNT="${#arr[@]}"
+}
+
+# 금지 축과 같은 PATH 조회를 쓰므로 셸이 없으면 판정 불가다 — 그 경우 축을 건너뛰지 않고
+# 「판정 불가」 사유를 남긴다(조용한 통과를 만들지 않는다).
+_check_required_executables() { # <쉼표 목록> <사유 꼬리말>
+  local list="$1" hint="$2" tool
+  local -a arr
+  IFS=',' read -r -a arr <<< "$list"
+  _ensure_shell_probe
+  for tool in "${arr[@]}"; do
+    if [ "$SHELL_PROBE_AVAILABLE" != true ]; then
+      fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
+    elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+      fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — ${hint}"
+    fi
+  done
+  REQUIRED_EXECUTABLE_COUNT="${#arr[@]}"
 }
 
 echo "== 이미지 위생 게이트: ${IMAGE_REF} =="
@@ -347,32 +479,12 @@ case "$RUNTIME_KIND" in
     # 를 놓쳤다** — JDK 베이스에 그 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가
     # "부재"로 읽었다. 그래서 PATH 조회 축을 더한다. 그 축은 셸이 필요하므로 **셸 존재를 먼저
     # 확인하고, 없으면 판정 불가로 실패**한다(조용한 통과를 만들지 않는다 — 6C 의 교훈).
-    IFS=',' read -r -a executable_array <<< "$FORBIDDEN_EXECUTABLES"
-    shell_probe_available=true
-    if ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
-      shell_probe_available=false
-      fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
-    fi
-    for tool in "${executable_array[@]}"; do
-      if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
-        fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — JRE 가 아니라 JDK 베이스일 수 있다"
-      elif [ "$shell_probe_available" = true ] \
-        && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
-        fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — JRE 가 아니라 JDK 베이스일 수 있다"
-      fi
-    done
+    # 두 축의 판정은 **공유 helper** 가 든다(M7/7F-local 의 caddy-site 와 같은 코드) — 문면의
+    # 사유만 이 kind 의 것이다. 축이 둘인 이유(변이 ⑦)는 helper 머리 주석에 있다.
+    _check_forbidden_executables "$FORBIDDEN_EXECUTABLES" "JRE 가 아니라 JDK 베이스일 수 있다"
 
-    # ①' **필수** 실행 파일 존재(Open Question 2). 금지 축과 같은 PATH 조회를
-    # 쓰므로 셸이 없으면 판정 불가다 — 위에서 이미 `fail` 로 끊었고, 여기서는 그 경우 축을
-    # 건너뛰지 않고 「판정 불가」 사유를 한 번 더 남긴다(조용한 통과를 만들지 않는다).
-    IFS=',' read -r -a required_array <<< "$REQUIRED_EXECUTABLES"
-    for tool in "${required_array[@]}"; do
-      if [ "$shell_probe_available" != true ]; then
-        fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
-      elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
-        fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — compose healthcheck 가 이것으로 준비 상태를 묻는다"
-      fi
-    done
+    # ①' **필수** 실행 파일 존재(Open Question 2).
+    _check_required_executables "$REQUIRED_EXECUTABLES" "compose healthcheck 가 이것으로 준비 상태를 묻는다"
 
     # ② 풀린 의존 layer 에 test 전용 좌표 0(D-6A2a-7 ②). **주 잠금은 Gradle 구조**(`bootJar`
     # 는 `runtimeClasspath` 만 담는다)이고 이 검사는 그것이 이미지까지 이어졌는지 재는 보조다.
@@ -391,7 +503,200 @@ case "$RUNTIME_KIND" in
         fi
       done
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 필수-실행파일-검사=${#required_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    ;;
+  caddy-site)
+    # ① 금지 실행 파일 — 이 kind 의 「금지」는 **빌더 누출과 베이스 교체**를 잡는 축이다. web
+    # 이미지의 런타임 stage 에 node·npm 이 보이면 multi-stage 경계가 깨졌거나 베이스가 빌더
+    # 이미지로 바뀐 것이고, 컴파일러가 보이면 런타임 이미지가 빌드 이미지가 된 것이다. 판정은
+    # 이름 대조가 아니라 **실행·PATH 조회**다(jvm-app 과 같은 helper).
+    _check_forbidden_executables "$FORBIDDEN_EXECUTABLES" "빌더 단계가 런타임으로 샜거나 베이스가 바뀌었을 수 있다"
+
+    # ①' 필수 실행 파일 — compose 의 두 healthcheck 가 이미지 안 `curl` 로 묻는다(app 과 같은
+    # 사유: 베이스 상향으로 사라지면 증상이 「healthy 로 수렴하지 않음」이라 원인이 보이지 않는다).
+    _check_required_executables "$REQUIRED_EXECUTABLES" "compose healthcheck 가 이것으로 준비 상태를 묻는다"
+
+    # ② 이미지가 **싣고 있는 내용**. jvm-app 의 의존 layer 축과 같은 형태다 — **양성 대조가
+    # 먼저**다: 목록이 비거나 경로가 틀리면 아래 「위반 0」이 공허하게 참이 된다. 그래서 파일
+    # 수 하한을 먼저 요구하고, 그 뒤에 필수·금지 패턴을 본다.
+    CONTENT_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint find "$IMAGE_REF" "$CONTENT_PATH" -type f 2>/dev/null || true)"
+    CONTENT_ENTRIES="$(printf '%s\n' "$CONTENT_LISTING" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    IFS=',' read -r -a required_content_array <<< "$REQUIRED_CONTENT_PATTERNS"
+    IFS=',' read -r -a forbidden_content_array <<< "$FORBIDDEN_CONTENT_PATTERNS"
+    if ! [[ "$CONTENT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$CONTENT_ENTRIES" -lt "$CONTENT_MIN_ENTRIES" ]; then
+      fail "내용 경로(${CONTENT_PATH})의 파일 수(${CONTENT_ENTRIES})가 정책 하한(${CONTENT_MIN_ENTRIES}) 미만이다 — 경로가 틀렸거나 COPY 가 비었거나 목록 도구가 없다(판정 불가)"
+    else
+      for pat in "${required_content_array[@]}"; do
+        if ! printf '%s\n' "$CONTENT_LISTING" | grep -qF -- "$pat"; then
+          fail "필수 내용 '${pat}' 이 ${CONTENT_PATH} 에 없다 — 이미지가 자기 역할의 입력을 싣지 않았다"
+        fi
+      done
+      for pat in "${forbidden_content_array[@]}"; do
+        if printf '%s\n' "$CONTENT_LISTING" | grep -qiF -- "$pat"; then
+          fail "금지 내용 '${pat}' 이 ${CONTENT_PATH} 에 있다"
+        fi
+      done
+    fi
+    # ②' **키·인증서 재료는 넓게 찾는다**(검토 r1 F-2, r2 에서 네 군데 보강).
+    # 앞 판은 위 `content.path` 한 자리만 봤고, `tls internal` 이 실제로 CA 를 두는 자리
+    # (`/data/caddy/pki/...`)에 키를 구운 이미지가 초록이었다. 범위는 **이미지 파일시스템 전체**
+    # 이고 `-xdev` 가 런타임 마운트(proc·sys·dev)를 밖에 둔다.
+    #
+    # r2 가 닫은 넷 — ⓐ 제외 접두 집합을 **아래 상수와의 등식**으로 잠근다(정책만 고쳐 표적
+    # 제외를 끼워 넣지 못한다) ⓑ 접두 비교는 **리터럴**이다(정규식이면 `.`·`+` 가 조용히 넓힌다)
+    # ⓒ 이름 일치는 **끝 고정**이다(부분 일치면 `xterm.keyboard` 류가 거짓 차단이 된다)
+    # ⓓ 이름 열거 위에 **내용 한 겹**을 덮는다(확장자를 바꿔 숨기는 편집을 잡는다).
+    IFS=',' read -r -a keymat_scan_paths <<< "$KEYMAT_SCAN_PATHS"
+    IFS=',' read -r -a keymat_exclude_array <<< "$KEYMAT_EXCLUDE_PREFIXES"
+    IFS=',' read -r -a keymat_pattern_array <<< "$KEYMAT_PATTERNS"
+
+    # ⓐ 제외는 **닫힌 집합**이다. 정책이 선언한 값이 이 상수와 글자 그대로 같아야 한다 —
+    # 제외를 넓히려면 정책이 아니라 **게이트 자신**을 고쳐야 하고 그 편집은 이 줄에 남는다.
+    # 두 자리만 허용하는 사유: 베이스가 싣는 **공개** 신뢰 기점(공개 뿌리 인증서 모음)이고
+    # 비밀값이 아니다. `/etc/ssl/` 통째가 아니라 `certs/` 로 좁힌 것은 그 형제인
+    # `/etc/ssl/private/` 가 이 계열 배포판에서 **개인키의 표준 자리**이기 때문이다(r2 cr R2-1).
+    keymat_scan_argv_pre="$(printf '%s ' "${keymat_scan_paths[@]}")"
+    KEYMAT_ALLOWED_EXCLUDE_PREFIXES="/etc/ssl/certs/,/usr/share/ca-certificates/"
+    # 종료 코드 분류(이 스크립트의 관례): **1 = 이미지가 기준을 어겼다**, **2 = 정책·환경이
+    # 틀려 판정할 수 없다**. 제외 집합이 어긋난 것은 이미지의 잘못이 아니라 **정책의 잘못**이므로
+    # 2 다(r3 cr R3-8). 문면에 **어느 정책 파일인가**를 넣는다 — 같은 값이 세 자리(게이트 상수 +
+    # 정책 둘)에 살아서, 둘이 어긋나면 그 kind 가 돌 때까지 보이지 않는다(cr R3-9).
+    if [ "$KEYMAT_EXCLUDE_PREFIXES" != "$KEYMAT_ALLOWED_EXCLUDE_PREFIXES" ]; then
+      echo "키 재료 제외 접두가 게이트의 허용 집합과 다르다(판정 불가) — 정책 ${POLICY_FILE}[${KEYMAT_EXCLUDE_PREFIXES}] 허용[${KEYMAT_ALLOWED_EXCLUDE_PREFIXES}]: 제외를 넓히려면 정책이 아니라 게이트를 고친다" >&2
+      exit 2
+    fi
+
+    # **이름 축 목록도 root 로 걷는다**(r4 vr R4-M1 = cr R4-1). r3 은 내용 축에만 `--user 0` 을
+    # 달았고 이 목록은 이미지의 실행 사용자로 돌았다 — 그래서 `/root` 처럼 **0700 인 디렉터리
+    # 안은 열거조차 되지 않았고**, 그 오류는 `2>/dev/null` 로 사라졌다. PEM 이면 내용 축이
+    # 받지만 **PEM 이 아닌 키 컨테이너**(`.p12`·`.pfx`·`.jks`·`.der`)는 두 축을 다 빠져나갔다.
+    # 두 축의 모집단을 같게 만든다.
+    #
+    # 권한 오류를 **삼키지 않는다** — `find` 의 stderr 를 목록과 **한 흐름에서 접두로 갈라** 받는다.
+    # 한 줄이라도 있으면 판정 불가다. root 로 도는 이상 오늘은 비지만, 비어 있음이 **측정된**
+    # 사실이어야 한다.
+    #
+    # **임시 파일도 `--tmpfs` 도 쓰지 않는다**(r5 vr R5-M1). r4 는 stderr 를 `/tmp` 의 파일로 받고
+    # 그 파일이 스캔 대상 안에 들어 자기 계수가 되는 것을 `--tmpfs /tmp` 로 막았는데, **tmpfs 마운트는
+    # 그 아래 이미지 내용을 덮는다** — 그래서 `/tmp` 에 구운 키가 이름 축에서 통째로 사라졌다(실측:
+    # `/tmp/client.p12` 비-PEM → 0). 계측기를 스캔 밖으로 빼려다 **스캔을 가린** 자리다. fd 로 가르면
+    # 파일도 마운트도 없어 둘 다 생기지 않는다.
+    #
+    # 바깥 중괄호의 `4>&1` 이 fd 4 를 진짜 stdout 에 묶고, 안쪽 중괄호의 `2>&1 |` 가 find 의 stderr 만
+    # 파이프로 보낸다. 목록은 `F`, 오류는 `E` 접두로 각각 fd 4 에 직접 쓴다.
+    KEYMAT_LISTING_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+      "{ { find ${keymat_scan_argv_pre} -xdev -type f | sed 's|^|F\t|' >&4; \
+           find ${keymat_scan_argv_pre} -xdev -type l -exec sh -c 'for l; do printf \"L\t%s\t%s\n\" \"\$l\" \"\$(readlink -f \"\$l\" 2>/dev/null)\"; done' _ {} + >&4; \
+         } 2>&1 | sed 's|^|E\t|' >&4; } 4>&1" 2>&1 || true)"
+    KEYMAT_LIST_ERRORS="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^E\t//p')"
+    if [ -n "$KEYMAT_LIST_ERRORS" ]; then
+      echo "키 재료 이름 축의 목록에서 오류가 났다(판정 불가) — root 로 걷는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_LIST_ERRORS" | tr '\n' ' ')]" >&2
+      exit 2
+    fi
+    # 일반 파일과 **심볼릭 링크의 이름**을 함께 센다(r5 vr R5-L2) — 이름이 `.p12` 로 드러난 링크도
+    # 이름 축의 대상이다. 다만 링크가 **제외 대상을 가리키면** 그것은 그 대상의 다른 이름일 뿐이다
+    # (실측: `/etc/ssl/cert.pem`·`/etc/ssl1.1/cert.pem` 은 공개 CA 번들을 가리키는 링크다). 그래서
+    # 링크는 **자기 경로와 가리키는 곳 둘 다** 제외에 걸리지 않을 때만 후보로 남긴다.
+    KEYMAT_LISTING="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^F\t//p')"
+    keymat_link_keep=""
+    while IFS="$(printf '\t')" read -r _tag _lpath _ltarget; do
+      [ -n "${_lpath:-}" ] || continue
+      _drop=0
+      for pre in "${keymat_exclude_array[@]}"; do
+        case "$_ltarget" in "$pre"*) _drop=1 ;; esac
+      done
+      [ "$_drop" = "1" ] || keymat_link_keep="${keymat_link_keep}${_lpath}"$'\n'
+    done <<< "$(printf '%s\n' "$KEYMAT_LISTING_RAW" | grep '^L	' || true)"
+    KEYMAT_FILE_ONLY="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
+    KEYMAT_CANDIDATES="$(printf '%s\n%s\n' "$KEYMAT_LISTING" "$keymat_link_keep" | sed '/^[[:space:]]*$/d')"
+    # 하한이 재는 모집단은 **일반 파일만**이다. 링크는 이름 축의 대상으로 더해지지만(R5-L2) 그 수는
+    # 베이스의 busybox applet 수에 따라 크게 흔들린다 — 하한을 그 합에 걸면 「스캔했는가」가 아니라
+    # 「베이스가 그대로인가」를 재게 되고, 하한의 선언된 도출(제외 뒤 일반 파일의 70%)과도 모집단이
+    # 어긋난다(R3-7 이 지적한 그 함정). 그래서 하한은 일반 파일 쪽에만 건다.
+    KEYMAT_FILE_CANDIDATES="$KEYMAT_FILE_ONLY"
+    # ⓑ 접두 제거는 **리터럴 비교**(`index(...)==1`)다 — `grep -v "^$pre"` 는 BRE 라
+    # `/opt/v1.2/` 같은 접두가 `/opt/v1X2/` 까지 지운다(제외가 조용히 넓어지는 fail-open).
+    for pre in "${keymat_exclude_array[@]}"; do
+      KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | awk -v p="$pre" 'index($0, p) != 1')"
+      KEYMAT_FILE_CANDIDATES="$(printf '%s\n' "$KEYMAT_FILE_CANDIDATES" | awk -v p="$pre" 'index($0, p) != 1')"
+    done
+    KEYMAT_ENTRIES="$(printf '%s\n' "$KEYMAT_FILE_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    KEYMAT_ALL_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    # 양성 대조는 제외를 적용한 **뒤에** 센다 — 통째로 넓히는 편집(`/`)이 여기서 판정 불가가
+    # 된다. 표적 제외(`/data/` 하나 추가)는 이 수를 거의 줄이지 않으므로 **ⓐ 등식**이 잡는다.
+    if ! [[ "$KEYMAT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$KEYMAT_ENTRIES" -lt "$KEYMAT_MIN_ENTRIES" ]; then
+      fail "키·인증서 재료 탐색의 대상 파일 수(${KEYMAT_ENTRIES})가 정책 하한(${KEYMAT_MIN_ENTRIES}) 미만이다 — 범위(${KEYMAT_SCAN_PATHS})가 틀렸거나 제외 접두가 너무 넓거나 목록 도구가 없다(판정 불가)"
+    else
+      # ⓒ 이름 축 — **끝 고정**. 패턴은 확장자이므로 경로의 끝에서만 센다.
+      KEYMAT_HITS=""
+      for pat in "${keymat_pattern_array[@]}"; do
+        suffix="$(printf '%s' "$pat" | sed 's/[].[^$*\\/]/\\&/g')"
+        hit="$(printf '%s\n' "$KEYMAT_CANDIDATES" | grep -iE -- "${suffix}\$" || true)"
+        [ -z "$hit" ] || KEYMAT_HITS="${KEYMAT_HITS}${hit}"$'\n'
+      done
+      # ⓓ 내용 축 — 이름이 무엇이든 PEM 개인키는 **머리 줄이 고정**이다. 이름 열거 밖으로
+      # 나가는 편집(확장자를 떼거나 바꾸는 것)을 이 겹이 받는다. 공개 번들은 머리 줄이 달라
+      # 걸리지 않으므로 이 축에는 제외가 필요 없다.
+      #
+      # **root 로 읽는다**(r3 vr R3-M1). 앞 판은 이미지의 실행 사용자로 돌아서 개인키의 관례
+      # 권한인 root 소유 `0600` 파일에 `Permission denied` 가 났고, 그 오류는 `2>/dev/null` 로
+      # 사라졌다 — 즉 **가장 그럴듯한 권한의 키를 못 읽고 초록**이었다. 읽기 전용 검사 컨테이너
+      # 이고 `no-new-privileges` 는 그대로 둔다.
+      #
+      # **양성 대조는 「목록 수」가 아니라 「실제로 읽은 수」다.** 목록만 세면 읽기 실패가 그대로
+      # 통과한다(그것이 R3-M1 이었다). 그래서 파일마다 한 바이트를 실제로 읽어 보고 읽힌 것과
+      # 못 읽은 것을 갈라 센다.
+      #
+      # **역할 구분**(r4 cr R4-7): root 로 도는 이상 일반 이미지에서 못 읽는 파일은 사실상 없다
+      # (실측 0). 그러니 「못 읽음 → 판정 불가」는 **주된 방어가 아니라 backstop** 이고, 이 축의
+      # 실제 방어는 아래 **`content.min-scanned` 하한**과 **매처 표본**이다. 하한을 손대는 사람이
+      # 무엇이 걸리는지 알도록 여기 적어 둔다.
+      #
+      # 종료 코드로는 「돌았는가」를 가릴 수 없다 — `find` 는 읽을 수 없는 디렉터리 하나로도 1 을
+      # 내고 `grep -l` 도 묶음이 비면 1 을 낸다(2026-10-19 실측: 크기 단위를 `-1M` 로 쓰면
+      # BusyBox find 가 `invalid number` 로 끊어 탐침 전체가 조용히 0건이 됐다).
+      keymat_scan_argv="$keymat_scan_argv_pre"
+      KEYMAT_CONTENT_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+        "printf '%s\\n' '-----BEGIN PRIVATE KEY-----' > /keymat-probe-sample; \
+         find ${keymat_scan_argv} -xdev -type f -size -${KEYMAT_CONTENT_MAX_BYTES}c 2>/dev/null | while IFS= read -r f; do
+           if head -c 1 \"\$f\" >/dev/null 2>&1; then
+             printf 'R\\n'
+             grep -lE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' \"\$f\" 2>/dev/null | sed 's/^/H\\t/'
+           else
+             printf 'U\\t%s\\n' \"\$f\"
+           fi
+         done" 2>/dev/null || true)"
+      # 심어 둔 표본도 읽히므로 하나 뺀다 — 이 수가 「**이미지의** 파일 중 실제로 읽은 수」를
+      # 뜻해야 정책 주석의 실측치와 같은 것을 가리킨다.
+      KEYMAT_CONTENT_READ_RAW="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | grep -c '^R$' || true)"
+      KEYMAT_CONTENT_SCANNED="$(( KEYMAT_CONTENT_READ_RAW > 0 ? KEYMAT_CONTENT_READ_RAW - 1 : 0 ))"
+      KEYMAT_UNREADABLE="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^U\t//p')"
+      KEYMAT_CONTENT_HITS_ALL="$(printf '%s\n' "$KEYMAT_CONTENT_RAW" | sed -n 's/^H\t//p')"
+      # **매처 자신의 양성 대조**(r4 cr R4-5). 앞 판의 양성 대조는 「`find` 가 돌았고 N 개를
+      # 읽었다」까지만 증명했다 — `grep` 이 없거나 정규식이 깨지면 적중 0 이 되고 읽은 수는 그대로라
+      # 통과한다. 그래서 탐침 안에서 **알려진 표본 하나를 심어** 매처가 그것을 반드시 집는지 센다
+      # (폐기되는 컨테이너 레이어라 이미지는 불변이다). 못 집으면 매처가 죽은 것이므로 판정 불가다.
+      if ! printf '%s\n' "$KEYMAT_CONTENT_HITS_ALL" | grep -qx -- "/keymat-probe-sample"; then
+        echo "키 재료 내용 축의 매처가 심어 둔 표본을 집지 못했다(판정 불가) — grep 이 없거나 식이 깨졌다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다" >&2
+        exit 2
+      fi
+      KEYMAT_CONTENT_HITS="$(printf '%s\n' "$KEYMAT_CONTENT_HITS_ALL" | grep -vx -- "/keymat-probe-sample" || true)"
+      if [ -n "$KEYMAT_UNREADABLE" ]; then
+        echo "키 재료 내용 축이 읽지 못한 파일이 있다(판정 불가) — root 로 읽는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_UNREADABLE" | tr '\n' ' ')]" >&2
+        exit 2
+      fi
+      # 이 하한은 **자기 모집단**(크기 상한만 건 전체 수)의 것이다 — 이름 축의 하한을 빌려 쓰면
+      # 제외가 늘어 그쪽이 내려갈 때 이 축의 바닥도 조용히 함께 내려간다(r3 cr R3-7).
+      if ! [[ "${KEYMAT_CONTENT_SCANNED:-0}" =~ ^[0-9]+$ ]] || [ "${KEYMAT_CONTENT_SCANNED:-0}" -lt "$KEYMAT_CONTENT_MIN_SCANNED" ]; then
+        fail "키 재료 내용 축이 **실제로 읽은** 파일 수(${KEYMAT_CONTENT_SCANNED:-0})가 하한(${KEYMAT_CONTENT_MIN_SCANNED}) 미만이다 — 이미지에 셸·find 가 없거나 탐침이 끊겼다(판정 불가)"
+      fi
+      [ -z "$KEYMAT_CONTENT_HITS" ] || KEYMAT_HITS="${KEYMAT_HITS}${KEYMAT_CONTENT_HITS}"$'\n'
+      KEYMAT_HITS="$(printf '%s' "$KEYMAT_HITS" | sed '/^[[:space:]]*$/d' | sort -u)"
+      if [ -n "$KEYMAT_HITS" ]; then
+        fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$KEYMAT_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
+      fi
+    fi
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES})·링크포함${KEYMAT_ALL_CANDIDATES} 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=읽음${KEYMAT_CONTENT_SCANNED}건(하한 ${KEYMAT_CONTENT_MIN_SCANNED})·못읽음0"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2

@@ -26,6 +26,20 @@ class InvalidEditRequestException(
 ) : RuntimeException(message)
 
 /**
+ * 공고 검색 질의의 형식·범위 오류(M7/7C ①) — 400 `INVALID_REQUEST`. 메시지는 거부 사유
+ * 어휘(`NoticeSearchRejection`)를 진단용으로 나르고 **응답에는 실리지 않는다**(아래
+ * [ErrorMapping] 이 고정 문구로만 옮긴다 — 어느 입력이 틀렸는지는 싣지 않는다).
+ *
+ * **생성자는 문구 하나만 받는다.** 질의를 **읽다가** 깨진 경우의 원래 실패는 `initCause` 로
+ * 단다 — 생성자 매개변수로 받으면 주입 표면 게이트가 「이 class 가 `Throwable` 을 주입받는다」로
+ * 읽어 그 이름을 주입 허용 목록에 올려야 한다(이 class 는 주입 대상이 아니다, 실측). 원인은
+ * 어느 쪽으로 달든 응답에 닿지 않는다 — 같은 매핑표가 고정 문구만 낸다.
+ */
+class InvalidNoticeSearchException(
+    message: String,
+) : RuntimeException(message)
+
+/**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
  * [RequestAuthenticationFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
@@ -139,6 +153,11 @@ object ErrorMapping {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
+            // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
+            is InvalidNoticeSearchException -> {
+                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            }
+
             // D-6A3-19 — 비JSON·빈 본문은 컨트롤러의 명시 검증에 닿기 전에 Jackson 이 던진다.
             is HttpMessageNotReadableException -> {
                 ErrorCode.INVALID_REQUEST to "요청 본문을 읽을 수 없다"
@@ -222,6 +241,7 @@ class GlobalErrorHandler {
         InvalidEvaluationRequestException::class,
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
+        InvalidNoticeSearchException::class,
     )
     fun badRequest(
         exception: Throwable,
@@ -254,6 +274,16 @@ class GlobalErrorHandler {
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception, request)
 
+    /**
+     * 매핑표 밖의 모든 [Throwable] — 500 이다.
+     *
+     * **요청 디코딩 실패는 여기까지 오지 않는다**(verifier r2 R2-M-2 · r3 R3-M-1). 잘못된 퍼센트
+     * 인코딩은 서블릿이 질의 매개변수를 **읽는 순간** 깨지는데, 그 읽기를 컨트롤러가 자기 안의 한
+     * 자리로 모아 [InvalidNoticeSearchException] 으로 옮긴다 — 매핑표가 그것을 400 으로 받는다.
+     * 앞 판은 이 자리에서 원인 사슬을 뒤져 400 을 냈고, 그러려면 디코딩 실패 예외 계열을 이 층이
+     * **이름으로** 들어야 했다(그 이름은 HTTP 층의 바깥 참조 허용 밖이다 — 전송 표면 게이트가
+     * 실측으로 막았다). 읽는 자리에서 옮기면 그 이름이 필요 없고, 영향 범위도 그 경로 하나다.
+     */
     @ExceptionHandler(Throwable::class)
     fun fallback(
         exception: Throwable,

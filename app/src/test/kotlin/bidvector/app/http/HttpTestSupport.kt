@@ -4,6 +4,7 @@ import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
+import bidvector.app.wiring.NoticeSearchQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
@@ -24,6 +25,10 @@ import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.notice.NoticeSearchCriteria
+import bidvector.workflow.notice.NoticeSearchPage
+import bidvector.workflow.notice.NoticeSearchPort
+import bidvector.workflow.notice.NoticeSearchState
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -44,6 +49,7 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.core.Ordered
+import java.net.Socket
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Collections
@@ -105,6 +111,42 @@ abstract class HttpIntegrationTestBase {
 
     protected fun url(path: String): String = "http://localhost:$port$path"
 }
+
+/** [rawGet] 이 돌려주는 것 — 상태 줄의 코드와 본문 전문이다(헤더는 이 자리가 재는 축이 아니다). */
+data class RawHttpResponse(
+    val status: Int,
+    val body: String,
+)
+
+/**
+ * 질의 **원문 그대로** 를 보내는 GET — `?q=%G1` 처럼 퍼센트 이스케이프 **문법**이 틀린 꼴은
+ * `URI.create` 가 먼저 `URISyntaxException` 으로 거부해 서버까지 가지 못한다(실측). 재려는 것은
+ * 「서버가 그 바이트열을 받았을 때 무슨 상태 코드를 내는가」라서 `RestTemplate`·`URI` 를 끼우지
+ * 않고 소켓에 직접 쓴다. 바이트는 ISO-8859-1 로 옮긴다 — 요청 줄은 모두 ASCII 이고, 이 함수가
+ * 보내려는 것은 **이미 퍼센트 인코딩된 문자열의 바이트 그대로** 이기 때문이다.
+ *
+ * [credential] 이 `null` 이면 자격증명 헤더를 **아예 붙이지 않는다**(개방 경로 측정용).
+ */
+fun rawGet(
+    port: Int,
+    target: String,
+    credential: String?,
+): RawHttpResponse =
+    Socket("localhost", port).use { socket ->
+        val credentialLine =
+            // main 통합: 7D 가 그 상수를 인증기 쪽으로 옮겼다(필터 → 인증기 이름 변경). 값은 같다.
+            credential?.let { "${OperatorCredentialAuthenticator.CREDENTIAL_HEADER}: $it\r\n" } ?: ""
+        val request = "GET $target HTTP/1.1\r\nHost: localhost\r\n${credentialLine}Connection: close\r\n\r\n"
+        socket.getOutputStream().apply {
+            write(request.toByteArray(Charsets.ISO_8859_1))
+            flush()
+        }
+        val text = socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+        RawHttpResponse(
+            status = text.substringAfter(' ').substringBefore(' ').toInt(),
+            body = text.substringAfter("\r\n\r\n"),
+        )
+    }
 
 /** [bidvector.strategy.validate]를 지나 만든 유효한 fixture — `OperatorStrategy`를 직접 짓지 않는다. */
 fun freshStrategy(revision: Int = 1): OperatorStrategy {
@@ -171,6 +213,23 @@ private class UnreachableWatchSubjectPort : WatchSubjectPort {
 
 private class UnreachableLicenseGatePort : LicenseGatePort {
     override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
+}
+
+/**
+ * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
+ * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
+ * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
+ * 여기서 재는 것은 **HTTP 층이 조건을 어떻게 만들고 결과를 어떤 응답으로 옮기는가**다.
+ */
+class FakeNoticeSearchPort : NoticeSearchPort {
+    @Volatile var page: NoticeSearchPage = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NOTHING_COLLECTED)
+
+    @Volatile var lastCriteria: NoticeSearchCriteria? = null
+
+    override fun search(criteria: NoticeSearchCriteria): NoticeSearchPage {
+        lastCriteria = criteria
+        return page
+    }
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
@@ -330,9 +389,23 @@ open class HttpTestApplication {
     open fun sessionCookieWriter(): SessionCookieWriter =
         SessionCookieWriter(secure = true, absoluteWindow = TEST_ACCESS_POLICY.absoluteWindow)
 
+    /** 7C ① — 공고 검색의 이중체. */
+    @Bean
+    open fun fakeNoticeSearchPort(): FakeNoticeSearchPort = FakeNoticeSearchPort()
+
+    /** D-6A2b-8 — `NoticeSearchController` 는 포트가 아니라 조회기를 받는다(출하 조립과 같은 형태). */
+    @Bean
+    open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
+        NoticeSearchQuery(fakeNoticeSearchPort)
+
     /**
      * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.
      * 순서까지 출하와 같게 둔다(자격 헤더 먼저).
+     *
+     * **main 통합**: 7C ① 쪽은 여기에 옛 `operatorCredentialFilterRegistration` 을 두고 있었는데,
+     * 7D 가 그 필터를 기본 거부 등록 하나로 **대체**했다(`OperatorCredentialFilter` →
+     * `RequestAuthenticationFilter`, 자격 헤더 경로는 인증기로 그 안에 산다). 등록은 여전히
+     * 하나이고 자격 헤더 경로도 그대로다 — 합집합에서 사라진 축이 없다.
      */
     @Bean
     open fun requestAuthenticationFilterRegistration(

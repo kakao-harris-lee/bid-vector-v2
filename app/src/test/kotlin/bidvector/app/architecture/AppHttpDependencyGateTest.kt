@@ -374,11 +374,20 @@ class AppHttpDependencyGateTest {
  * 다섯 모두 **HTTP 로 닿지 않는 자리**다: 러너는 cron 이 프로세스로 돌리고, 컨트롤러·② 층이
  * 그 타입을 참조하면 의존 방향 규칙이 붉어진다.
  *
- * **51 -> 60**(M7/7D): 브라우저 인증이 셋을 더했다 — ① 층 넷(`BrowserAccessWiring` ·
+ * **51 -> 53**(M7/7C ①): 공고 검색 경로가 생겼다 — 배선 하나(`NoticeSearchWiring`, ① 층)와
+ * 조회기 하나(`NoticeSearchQuery`, ② 층). 조회기는 컨트롤러가 받는 자리라 HTTP 층의 허용
+ * 클래스 목록에도 함께 올랐고(그 등식은 「면제는 세 층으로 갈리고…」 test 가 잰다), 읽기
+ * 포트는 여전히 제한 층이 직접 받을 수 없다(`app.http.denied-types`).
+ *
+ * **53 -> 62**(M7/7D): 브라우저 인증이 아홉을 더했다 — ① 층 넷(`BrowserAccessWiring` ·
  * `AccountCommandWiring` 과 그 설정 타입 둘: `AccountCommandProperties`·`AccessCookieProperties`),
  * ② 층 하나(`BrowserAccessExecutor` — 컨트롤러·필터가 받는 실행기이고 HTTP 층 허용 목록에도
  * 있다), ③ 층 넷(계정 명령 레인: 러너·로그 출구·종료 자리·모드 열거). 명령 레인은 HTTP 로
  * 닿지 않는다 — 컨트롤러·② 층이 그 타입을 참조하면 의존 방향 규칙이 붉어지고, 쓰기는 소유자
  * 연결로만 선다.
+ *
+ * **main 통합(7C ① + 7D)**: 두 레인이 같은 상수를 각자 51 에서 올렸다(7C ① 은 둘, 7D 는 아홉).
+ * 합집합은 **62** 다 — 어느 쪽 면제도 지우지 않는다. 이 수는 관측과 등식이라, 틀리면 그 test 가
+ * 먼저 붉어진다(수를 합으로 「계산」한 것이 아니라 합집합을 **선언**하고 등식이 검산한다).
  */
-private const val EXPECTED_EXEMPT_COUNT = 60
+private const val EXPECTED_EXEMPT_COUNT = 62
