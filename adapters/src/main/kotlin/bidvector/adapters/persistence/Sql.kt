@@ -23,7 +23,12 @@ internal object Sql {
         ON CONFLICT (observation_key) DO NOTHING
         """
 
-    private const val NOTICE_COLUMNS =
+    /**
+     * `notice` 의 열 목록 — 복원([toNoticeRow]·[reconstructNotice])이 이 목록을 전제한다.
+     * `private` 이 아닌 이유는 공고 검색([NoticeSearchSql])이 **같은 목록**을 써야 하기
+     * 때문이다(같은 열거의 두 번째 사본을 두지 않는다 — 열이 어긋나면 복원이 깨진다).
+     */
+    const val NOTICE_COLUMNS =
         """
         status, business_category_code, business_category_label,
         base_amount_won, base_amount_currency, base_amount_vat, base_amount_provenance, base_amount_provenance_detail,
