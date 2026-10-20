@@ -79,16 +79,24 @@ class JdbcBrowserAccessTransaction(
 
     override fun <T> inSignInScope(action: (BrowserAccessWorkflow) -> T): T = action(assemble(perStatement))
 
-    private fun assemble(connections: ConnectionSource): BrowserAccessWorkflow =
-        BrowserAccessWorkflow(
-            accounts = JdbcAccountStore(connections),
+    /**
+     * 계정 행을 잠그는 문장은 **전부** 대기 상한 아래 선다(code-review r4 M-1) — 확정뿐 아니라
+     * 실패 계수 갱신도 그렇다. 세션 저장소는 그 상한을 받지 않는다: 그 문장들은 로그인 scope 가
+     * 아니라 요청 인증·로그아웃 경로의 것이고, 거기서 시한 초과를 거부로 접는 어휘가 아직 없다
+     * (그 축은 이 slice 의 범위 밖이다).
+     */
+    private fun assemble(connections: ConnectionSource): BrowserAccessWorkflow {
+        val bounded = SignInConnections(connections, policy.lockWait)
+        return BrowserAccessWorkflow(
+            accounts = JdbcAccountStore(bounded),
             sessions = JdbcBrowserSessionStore(connections),
-            completion = JdbcSignInCompletion(connections, policy.lockWait),
+            completion = JdbcSignInCompletion(bounded),
             hasher = hasher,
             keys = keys,
             clock = clock,
             policy = policy,
         )
+    }
 }
 
 /**

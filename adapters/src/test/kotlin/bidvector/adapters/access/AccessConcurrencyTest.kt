@@ -247,6 +247,34 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
     }
 
     /**
+     * **틀린 비밀 문구 경로도 상한 아래 선다**(code-review r4 M-1). 그 경로는 자격 없이 누구나
+     * 칠 수 있는데, 앞 판에서는 상한이 확정 문장에만 있어 실패 계수 갱신이 **무한정** 기다렸다 —
+     * 상한이 필요했던 이유(기다리는 쪽이 커넥션을 쥔 채 서 있어 풀이 마른다)가 더 싼 입구로
+     * 남아 있었다.
+     *
+     * 계정 행을 쥔 채 틀린 문구로 로그인하면 지금은 **끝난다**: 계수를 올리지 못한 채 거부다
+     * (계수를 못 올리는 것은 안전한 방향 — 잠금이 늦어질 뿐 권한이 새지 않는다).
+     */
+    @Test
+    fun `계정 행이 잠겨 있으면 틀린 비밀 문구도 대기 상한 안에 끝난다 — 무한 대기가 아니다`() {
+        createAccount()
+
+        holdingAccountRowLock {
+            val started = System.nanoTime()
+            val outcome = signIn(hasher, WRONG)
+            val waited = Duration.ofNanos(System.nanoTime() - started)
+
+            outcome shouldBe SignInOutcome.Refused
+            (waited < CONCURRENCY_POLICY.lockWait.plus(LOCK_WAIT_SLACK)) shouldBe true
+        }
+
+        // 잠금 아래에서는 계수를 올리지 못했다. 잠금이 풀린 뒤의 같은 실패는 정상대로 오른다.
+        failedAttempts() shouldBe 0
+        signIn(hasher, WRONG) shouldBe SignInOutcome.Refused
+        failedAttempts() shouldBe 1
+    }
+
+    /**
      * 동시 로그인의 **결과**를 잰다. 출발은 장벽으로 맞춘다 — 두 스레드가 난수 발급 자리
      * ([BarrierKeySource])에서 서로를 기다렸다가 **같은 순간** 확정으로 들어간다. 그 자리를 고른
      * 이유는 확정 호출 **직전**이라 사이에 느린 일(KDF)이 없기 때문이다.

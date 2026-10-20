@@ -17,10 +17,12 @@ import java.time.Instant
  * 메서드가 이 클래스에 없고([AccountStorePort] 의 서명에도 없다), 같은 경계를 V20 의 열 단위
  * GRANT 가 한 겹 더 진다.
  *
- * [ConnectionSource] 를 받는다 — 트랜잭션의 주인은 호출부다(`JdbcStrategyRepository` 관례).
+ * [SignInConnections] 를 받는다 — 트랜잭션의 주인은 호출부이고(`JdbcStrategyRepository` 관례),
+ * 그 공급원이 **빌린 커넥션마다 대기 상한을 씌운다**(code-review r4 M-1). 실패 계수 갱신도 계정
+ * 행을 잠그는 문장이라 그 상한이 필요하다 — 그쪽은 **자격 없이 칠 수 있는 경로**다.
  */
-class JdbcAccountStore(
-    private val connections: ConnectionSource,
+internal class JdbcAccountStore(
+    private val connections: SignInConnections,
 ) : AccountStorePort {
     override fun byLogin(login: LoginName): AccountSnapshot? =
         connections.withConnection { connection ->
@@ -35,7 +37,11 @@ class JdbcAccountStore(
         attemptLimit: Int,
         lockUntil: Instant,
     ) {
-        connections.withConnection { connection ->
+        // **경합이면 계수를 올리지 못한 채 끝난다**(code-review r4 M-1). 이 문장도 계정 행을
+        // 잠그므로 대기 상한 아래 선다 — 그 상한을 넘기면 `null` 이고, 여기서는 그것을 그대로
+        // 흘린다. 안전한 방향이다: 계수를 못 올리면 잠금이 **늦어질 뿐** 권한이 새지 않는다
+        // (반대로 여기서 예외를 올리면 틀린 비밀 문구 하나가 500 이 된다).
+        connections.withBoundedConnection { connection ->
             connection.prepareStatement(AccessSql.REGISTER_ACCOUNT_FAILURE).use { statement ->
                 var index = 1
                 // 상한이 두 번 바인딩되는 것은 두 열이 **같은 조건**으로 갈리기 때문이다 —

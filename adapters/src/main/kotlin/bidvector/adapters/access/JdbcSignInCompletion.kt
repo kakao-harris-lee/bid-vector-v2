@@ -1,24 +1,25 @@
 package bidvector.adapters.access
 
-import bidvector.adapters.persistence.ConnectionSource
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.access.NewBrowserSession
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.SignInCompletionPort
 import java.sql.Connection
-import java.sql.SQLException
 import java.sql.Timestamp
-import java.time.Duration
 import java.time.Instant
 
 /**
  * 로그인 확정의 **한 트랜잭션**(verifier r1 F1 · code-review r2 M-1).
  *
- * 문장 셋이 한 [ConnectionSource.withConnection] 블록 안에 있다 — 로그인 경로의 공급원은
+ * 문장 셋이 한 [SignInConnections.withBoundedConnection] 블록 안에 있다 — 로그인 경로의 공급원은
  * 「호출 하나 = 트랜잭션 하나」라 이 블록이 곧 한 커밋이다.
  *
- *  0. [AccessSql.SET_LOCAL_LOCK_WAIT] — 이 트랜잭션의 **잠금 대기 상한**(code-review r3 L-2).
- *     넘으면 PostgreSQL 이 끊고 그 로그인은 거부다 — 커넥션을 쥔 채 무한정 기다리지 않는다.
+ * **`internal` 이다**(code-review r4 M-1 뒤) — 받는 타입이 이 패키지의 좁은 공급원이라 모듈 밖에
+ * 조립할 수 없다. 표면이 그만큼 줄었다.
+ *
+ *  0. 대기 상한 — [SignInConnections] 가 빌려주는 커넥션마다 먼저 씌운다(code-review r3 L-2 ·
+ *     r4 M-1). 넘으면 PostgreSQL 이 끊고 그 로그인은 거부다 — 커넥션을 쥔 채
+ *     무한정 기다리지 않는다.
  *  1. [AccessSql.CLAIM_ACCOUNT_FOR_SIGN_IN] — 계정 행을 **잠그며** 실패 계수·잠금을 비운다.
  *     자격이 검증 때와 다르거나 지금 잠겨 있으면 0 행이고, 그때는 **아무것도 쓰지 않고** 끝난다.
  *  2. [AccessSql.REVOKE_ACCOUNT_SESSIONS] — 그 계정의 살아 있는 세션 전부를 폐기한다.
@@ -29,44 +30,23 @@ import java.time.Instant
  * 비껴가 유일하게 살아남는」 상태가 된다. 1 을 먼저 두면 그 경우가 조건 불성립으로 떨어지고,
  * 겹치지 않는 경우에는 잠금이 두 쪽을 줄 세운다 — 한 기제가 두 결함을 함께 닫는다.
  */
-class JdbcSignInCompletion(
-    private val connections: ConnectionSource,
-    private val lockWait: Duration,
+internal class JdbcSignInCompletion(
+    private val connections: SignInConnections,
 ) : SignInCompletionPort {
     override fun complete(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
     ): Boolean =
-        try {
-            connections.withConnection { connection ->
-                applyLockWait(connection)
-                if (!claimAccount(connection, session.account, verified, at)) {
-                    false
-                } else {
-                    revokeLiveSessions(connection, session.account, at)
-                    insertSession(connection, session)
-                    true
-                }
+        connections.withBoundedConnection { connection ->
+            if (!claimAccount(connection, session.account, verified, at)) {
+                false
+            } else {
+                revokeLiveSessions(connection, session.account, at)
+                insertSession(connection, session)
+                true
             }
-        } catch (failure: SQLException) {
-            // 대기 상한을 넘긴 것만 **거부**로 접는다 — 그 밖의 DB 오류는 그대로 올린다
-            // (삼키면 「로그인이 안 된다」가 원인 없이 반복된다). 판정은 SQLState 로 한다.
-            if (failure.sqlState != LOCK_NOT_AVAILABLE) throw failure
-            false
-        }
-
-    /**
-     * 이 트랜잭션 안에서만 사는 대기 상한. 잠금을 기다리는 쪽이 **커넥션을 쥔 채** 무한정 서
-     * 있지 않게 한다(code-review r3 L-2) — 상한을 넘으면 PostgreSQL 이 끊고 위의 `catch` 가
-     * 그것을 거부로 읽는다.
-     */
-    private fun applyLockWait(connection: Connection) {
-        connection.prepareStatement(AccessSql.SET_LOCAL_LOCK_WAIT).use { statement ->
-            statement.setString(1, "${lockWait.toMillis()}ms")
-            statement.executeQuery().use { rs -> rs.next() }
-        }
-    }
+        } ?: false
 
     private fun claimAccount(
         connection: Connection,
@@ -108,10 +88,5 @@ class JdbcSignInCompletion(
             statement.setTimestamp(index, Timestamp.from(session.absoluteExpiresAt))
             statement.executeUpdate()
         }
-    }
-
-    private companion object {
-        /** PostgreSQL 이 `lock_timeout` 초과에 내는 SQLState — 「지금은 못 잡는다」의 표준 신호다. */
-        const val LOCK_NOT_AVAILABLE = "55P03"
     }
 }
