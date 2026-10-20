@@ -476,3 +476,47 @@ Dockerfile·compose·빌드 파일도 그대로다. app 코드는 바뀌었으�
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
 - 핵심 결과(r6 재측정): 산출물 **+6489 / −149 줄** 대 evidence **+1295 줄** — evidence ≤ 산출물.
+
+## 2026-10-21 (KST) main 통합
+
+main 이 #78(7C ① 공고 검색)·#79(7F-local)로 움직여 판정 트리와 갈라졌다. **rebase 하지
+않았다**(판정 SHA 가 바뀐다) — 머지 커밋 **`5ef68d48`** 로 해소했다(부모: 판정 트리
+`5cc1f8a6` · `origin/main` `842acd1a`). **의미 합집합**이고 산출물 거동은 바꾸지 않았다.
+
+| 충돌 파일 | 해소 |
+| --- | --- |
+| `openapi/bidvector-operator-api.yaml` | 같은 자리의 형제 path 둘. `/api/session`(7D)은 HEAD 블록, `/api/notices`(7C ①)는 main 블록을 **각각 통째로** 둔다(두 블록 모두 자기 쪽과 바이트 동일 · `components` 는 정확한 합집합: schemas 13 · securitySchemes 3 · 추가·누락 0). `searchNotices` 는 전역 `security` 를 물려받아 7D 의 OpenAPI 등식 넷을 그대로 만족한다 — 손대지 않았다 |
+| `web/src/api/generated/operator-api.ts` | 손으로 고치지 않고 해소된 openapi 에서 **재생성**(`npm run api:types`) · `api:types:check` 바이트 등식 **exit 0** |
+| `AppHttpDependencyGateTest.kt` | 두 레인이 같은 51 에서 각자 올렸다(7C ① → 53 · 7D → 60). 합집합 **62** + KDoc 사슬 재배열. 이 수는 관측과의 등식이라 틀리면 그 test 가 먼저 붉어진다 |
+| `HttpTestSupport.kt` | 7D 의 빈 넷 + 7C ① 의 빈 둘의 합집합. main 의 옛 `operatorCredentialFilterRegistration` 은 7D 가 기본 거부 등록 하나로 **대체**한 자리라 제거(자격 헤더 경로는 인증기로 그 안에 산다 — 등록은 여전히 하나) |
+| `config/quality/architecture-policy.properties` | 목록 넷 합집합. **새로 생긴 줄은 「main 통합」 사유 주석 셋뿐이고 목록 항목은 한 줄도 새로 들어오지 않았다** |
+| `config/quality/gate-tests.properties` | 14 키 전부 합집합(편차 0) |
+
+- **게이트 설정 검산(기계)**: 두 properties 의 키별 값 집합이 `ours ∪ theirs` 와 같은지 쟀다.
+  gate-tests 는 **편차 0**. architecture-policy 의 유일한 비합집합은 `OperatorCredentialFilter`
+  를 이름으로 적은 항목 넷(`app.secret.operator-credential-referencers` ·
+  `app.surface.api.filters` · `collection.transport.holders.http-response` ·
+  `collection.transport.member-surface`)이고 모두 **7D 가 지운 class** 를 가리킨다. 같은 키에
+  7D 의 대체 항목(`RequestAuthenticationFilter` · `OperatorCredentialAuthenticator`)이 이미 서
+  있어 **잃은 축이 없다** — 관측 집합 등식이라 없는 class 를 남기면 오히려 RED 다.
+- **자동 머지가 남긴 의미 충돌 하나**: main 의 새 test 셋(`NoticeSearchEndpointTest` ·
+  `OpenApiNoticeSearchContractTest` · `NoticeSearchProductionE2ETest`)이 인용하는
+  `OperatorCredentialFilter.CREDENTIAL_HEADER` 가 7D 에서 `OperatorCredentialAuthenticator`
+  로 옮겨갔다. 이름만 옮겼다(값·거동 동일) — 그대로 두면 합친 트리가 컴파일되지 않는다.
+
+| 명령 | exit |
+| --- | --- |
+| `./gradlew --no-daemon check` | **0** (BUILD SUCCESSFUL in 9m 56s) |
+| `./tools/one-command-check.sh` | **0** (Kotlin 전건 · pytest **1605** · vitest **28** · Playwright 2 · 생성 타입 바이트 등식) |
+| `container` job 전건 재생(**`if:` 평가**) | **ran 23 · skipped 0 · failed 0** (uses-only 4 · 257s) |
+
+`container` 재생은 **판정 트리로 앱 이미지를 먼저 빌드**해 돌렸고(S-21a·b), 끝난 뒤 네
+`:local` 태그를 **재생 전 이미지로 되돌렸다** — `bidvector/app:local` = `94382c1026cf`(되돌림
+확인). 재생이 지난 자리 중 이 통합이 실제로 거는 축 둘: S-23b(컨테이너 스모크의 **인증 경계**)
+와 S-26(로컬 패키징 스모크의 `/api` **401**) — 7D 의 기본 거부 필터와 7F 의 프록시가 합친
+트리에서 함께 선다.
+
+- 크기 게이트 재측정(기준선이 `origin/main` 으로 바뀌었다): 산출물 **+6506 / −153** 대
+  evidence **+1390** — evidence ≤ 산출물(앞 측정 `77850903..df5fd39f` 는 +6489 / −149 였고,
+  차이는 이 머지의 충돌 해소분이다).
+- `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
