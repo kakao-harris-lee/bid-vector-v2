@@ -180,6 +180,20 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
 - 7F 반입 절차의 `cookie-secure` 한 줄은 7F 본편 계약으로 넘긴다.
 - 검토: verifier 표적 r3 + code-reviewer 표적 r4. 둘 다 high·medium 0 이면 PR.
 
+**D-7D-8 (2026-10-20, 팀장 — 검토 수령: verifier r3 ready-for-review(0/0) · code-reviewer r4 REQUEST_CHANGES(M 1)).** 재작업 4/5.
+- **닫는 것**
+  - **cr r4 M-1 — 대기 상한이 반쪽이다**: 상한이 `complete()`(올바른 문구)에만 걸렸다. 같은 계정 행을 잠그는 `registerFailure()`(틀린 문구 —
+    **자격 없이 칠 수 있는 경로**)는 여전히 무한 대기한다. 그래서 cr r3 L-2 를 낸 이유(커넥션을 쥔 채 대기 → 풀 고갈)가 더 싼 입구로 남는다.
+    상한을 `inSignInScope` 의 연결 래퍼로 올려 그 scope 의 모든 문장을 덮는다. 회귀 test: 계정 행을 잠근 채 **틀린** 문구 로그인이 상한 안에
+    끝난다(지금은 끝나지 않는다).
+  - **vr r3 R3-1**: 상한 test 에 JUnit `@Timeout` — 상한이 사라지면 CI 가 360 분이 아니라 test 시한에 붉어진다.
+  - **cr r4 L-1**: 잠금 대기 초과(55P03)를 삼키는 자리 — 경합과 오타가 구별되게 최소한 감사/로그에 사유를 남긴다(값·비밀 없이).
+  - **cr r4 L-5**: `OpenApiSpecSupport` KDoc 의 소비자 수(넷).
+- **알려진 제한·후속**: vr r3 R3-2(결정적 test 는 쪼갠 트랜잭션 변이를 못 잡고 장벽 test 가 잡는다 — 두 test 의 역할로 등재) · cr r4 L-2(`lockWait`
+  는 배포 설정으로 못 바꾼다 — 수용한 대가) · cr r4 L-3(제한 22 의 상시화) · cr r4 L-4(`SharedKernelCorpusConformanceTest` 의 다른 YAML 로더에도
+  같은 중복 키 함정 — 이 slice 밖, 후속).
+- 배치 뒤 verifier 표적 r4 + code-reviewer 표적 r5. high·medium 0 이면 PR.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
