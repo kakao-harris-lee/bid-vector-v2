@@ -18,6 +18,7 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
+import org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
@@ -52,6 +53,11 @@ private val LOCK_WAIT_SLACK: Duration = Duration.ofSeconds(5)
  * `timeout-minutes` 가 없어 CI 기본값은 360분이라, 그 회귀가 6시간 뒤에야 드러난다
  * (verifier r3 R3-1). JUnit 시한을 달아 **즉시 붉어지게** 한다 — 정상 경로는 상한(500ms) + KDF
  * 몇 번이라 이 값의 발끝에도 닿지 않는다.
+ *
+ * **`SEPARATE_THREAD` 가 아니면 소용이 없다**(변이로 실측했다). JUnit 의 기본 시한 모드는
+ * `SAME_THREAD` 이고, 그것은 test 가 **돌아온 뒤에** 걸린 시간을 보는 사후 판정이다 — 블록된
+ * JDBC 호출은 돌아오지 않으므로 영원히 판정되지 않는다. 별도 스레드 모드는 시한이 지나면
+ * 본체가 끝나기를 기다리지 않고 실패로 **끊는다**.
  */
 private const val LOCK_TEST_TIMEOUT_SECONDS = 30L
 
@@ -236,7 +242,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
      * 같은 측정이 code-review r3 L-2(대기 상한)의 회귀 test 이기도 하다 — 상한이 없으면 이
      * test 는 거부가 아니라 **영원히 멈춘다**.
      */
-    @Timeout(LOCK_TEST_TIMEOUT_SECONDS)
+    @Timeout(value = LOCK_TEST_TIMEOUT_SECONDS, unit = TimeUnit.SECONDS, threadMode = SEPARATE_THREAD)
     @Test
     fun `계정 행이 잠겨 있으면 로그인은 대기 상한 안에 거부된다 — 확정은 그 잠금을 얻어야 한다`() {
         createAccount()
@@ -265,7 +271,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
      * 계정 행을 쥔 채 틀린 문구로 로그인하면 지금은 **끝난다**: 계수를 올리지 못한 채 거부다
      * (계수를 못 올리는 것은 안전한 방향 — 잠금이 늦어질 뿐 권한이 새지 않는다).
      */
-    @Timeout(LOCK_TEST_TIMEOUT_SECONDS)
+    @Timeout(value = LOCK_TEST_TIMEOUT_SECONDS, unit = TimeUnit.SECONDS, threadMode = SEPARATE_THREAD)
     @Test
     fun `계정 행이 잠겨 있으면 틀린 비밀 문구도 대기 상한 안에 끝난다 — 무한 대기가 아니다`() {
         createAccount()
