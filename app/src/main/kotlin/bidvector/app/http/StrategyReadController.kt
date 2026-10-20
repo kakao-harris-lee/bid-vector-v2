@@ -107,8 +107,12 @@ data class StrategyReadResponse(
  * (`adapters.persistence`, Kotlin `internal`은 모듈 범위라 `app`에서 보이지 않는다)를
  * 재사용할 수 없어 이 slice가 자체 라벨을 갖는다 — 알려진 제한(중복, 재사용 후보였으나
  * 모듈 경계가 막았다).
+ *
+ * **M7/7C ① — `internal` 이다.** 공고 요약 응답(`NoticeSearchController`)도 같은 wire 어휘를
+ * 써야 하고, 두 자리가 각자 `when` 을 쓰면 라벨이 갈릴 수 있다 — 같은 낱말의 두 번째 사본을
+ * 두지 않는다(`EditSessionState.token()` 이 같은 이유로 `internal` 인 것과 같은 갈래).
  */
-private fun provenanceLabel(provenance: Provenance): String =
+internal fun provenanceLabel(provenance: Provenance): String =
     when (provenance) {
         is Provenance.Published -> "PUBLISHED"
         Provenance.DerivedFromOpening -> "DERIVED_FROM_OPENING"
