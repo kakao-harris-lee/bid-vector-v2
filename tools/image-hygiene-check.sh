@@ -572,26 +572,56 @@ case "$RUNTIME_KIND" in
     # 받지만 **PEM 이 아닌 키 컨테이너**(`.p12`·`.pfx`·`.jks`·`.der`)는 두 축을 다 빠져나갔다.
     # 두 축의 모집단을 같게 만든다.
     #
-    # 권한 오류를 **삼키지 않는다** — `find` 의 stderr 를 따로 받아 한 줄이라도 있으면 판정
-    # 불가다. root 로 도는 이상 오늘은 비지만, 비어 있음이 **측정된** 사실이어야 한다.
-    # `--tmpfs /tmp` 를 붙이는 이유: stderr 를 받는 파일이 **스캔 대상 안에 있으면 find 가 그것까지
-    # 센다**(실측 — 대상 수가 하나 늘었다. 계측기가 측정을 흔든 자리다). tmpfs 는 다른 마운트라
-    # `-xdev` 가 알아서 건너뛴다.
-    KEYMAT_LISTING_RAW="$(docker run --rm --user 0 --tmpfs /tmp --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
-      "find ${keymat_scan_argv_pre} -xdev -type f 2>/tmp/_keymat_find_err | sed 's|^|F\t|'; [ -s /tmp/_keymat_find_err ] && sed 's|^|E\t|' /tmp/_keymat_find_err; exit 0" 2>&1 || true)"
+    # 권한 오류를 **삼키지 않는다** — `find` 의 stderr 를 목록과 **한 흐름에서 접두로 갈라** 받는다.
+    # 한 줄이라도 있으면 판정 불가다. root 로 도는 이상 오늘은 비지만, 비어 있음이 **측정된**
+    # 사실이어야 한다.
+    #
+    # **임시 파일도 `--tmpfs` 도 쓰지 않는다**(r5 vr R5-M1). r4 는 stderr 를 `/tmp` 의 파일로 받고
+    # 그 파일이 스캔 대상 안에 들어 자기 계수가 되는 것을 `--tmpfs /tmp` 로 막았는데, **tmpfs 마운트는
+    # 그 아래 이미지 내용을 덮는다** — 그래서 `/tmp` 에 구운 키가 이름 축에서 통째로 사라졌다(실측:
+    # `/tmp/client.p12` 비-PEM → 0). 계측기를 스캔 밖으로 빼려다 **스캔을 가린** 자리다. fd 로 가르면
+    # 파일도 마운트도 없어 둘 다 생기지 않는다.
+    #
+    # 바깥 중괄호의 `4>&1` 이 fd 4 를 진짜 stdout 에 묶고, 안쪽 중괄호의 `2>&1 |` 가 find 의 stderr 만
+    # 파이프로 보낸다. 목록은 `F`, 오류는 `E` 접두로 각각 fd 4 에 직접 쓴다.
+    KEYMAT_LISTING_RAW="$(docker run --rm --user 0 --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c \
+      "{ { find ${keymat_scan_argv_pre} -xdev -type f | sed 's|^|F\t|' >&4; \
+           find ${keymat_scan_argv_pre} -xdev -type l -exec sh -c 'for l; do printf \"L\t%s\t%s\n\" \"\$l\" \"\$(readlink -f \"\$l\" 2>/dev/null)\"; done' _ {} + >&4; \
+         } 2>&1 | sed 's|^|E\t|' >&4; } 4>&1" 2>&1 || true)"
     KEYMAT_LIST_ERRORS="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^E\t//p')"
     if [ -n "$KEYMAT_LIST_ERRORS" ]; then
       echo "키 재료 이름 축의 목록에서 오류가 났다(판정 불가) — root 로 걷는데도 막혔다면 이 축의 「적중 0」은 깨끗하다는 뜻이 아니다: [$(printf '%s' "$KEYMAT_LIST_ERRORS" | tr '\n' ' ')]" >&2
       exit 2
     fi
+    # 일반 파일과 **심볼릭 링크의 이름**을 함께 센다(r5 vr R5-L2) — 이름이 `.p12` 로 드러난 링크도
+    # 이름 축의 대상이다. 다만 링크가 **제외 대상을 가리키면** 그것은 그 대상의 다른 이름일 뿐이다
+    # (실측: `/etc/ssl/cert.pem`·`/etc/ssl1.1/cert.pem` 은 공개 CA 번들을 가리키는 링크다). 그래서
+    # 링크는 **자기 경로와 가리키는 곳 둘 다** 제외에 걸리지 않을 때만 후보로 남긴다.
     KEYMAT_LISTING="$(printf '%s\n' "$KEYMAT_LISTING_RAW" | sed -n 's/^F\t//p')"
-    KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
+    keymat_link_keep=""
+    while IFS="$(printf '\t')" read -r _tag _lpath _ltarget; do
+      [ -n "${_lpath:-}" ] || continue
+      _drop=0
+      for pre in "${keymat_exclude_array[@]}"; do
+        case "$_ltarget" in "$pre"*) _drop=1 ;; esac
+      done
+      [ "$_drop" = "1" ] || keymat_link_keep="${keymat_link_keep}${_lpath}"$'\n'
+    done <<< "$(printf '%s\n' "$KEYMAT_LISTING_RAW" | grep '^L	' || true)"
+    KEYMAT_FILE_ONLY="$(printf '%s\n' "$KEYMAT_LISTING" | sed '/^[[:space:]]*$/d')"
+    KEYMAT_CANDIDATES="$(printf '%s\n%s\n' "$KEYMAT_LISTING" "$keymat_link_keep" | sed '/^[[:space:]]*$/d')"
+    # 하한이 재는 모집단은 **일반 파일만**이다. 링크는 이름 축의 대상으로 더해지지만(R5-L2) 그 수는
+    # 베이스의 busybox applet 수에 따라 크게 흔들린다 — 하한을 그 합에 걸면 「스캔했는가」가 아니라
+    # 「베이스가 그대로인가」를 재게 되고, 하한의 선언된 도출(제외 뒤 일반 파일의 70%)과도 모집단이
+    # 어긋난다(R3-7 이 지적한 그 함정). 그래서 하한은 일반 파일 쪽에만 건다.
+    KEYMAT_FILE_CANDIDATES="$KEYMAT_FILE_ONLY"
     # ⓑ 접두 제거는 **리터럴 비교**(`index(...)==1`)다 — `grep -v "^$pre"` 는 BRE 라
     # `/opt/v1.2/` 같은 접두가 `/opt/v1X2/` 까지 지운다(제외가 조용히 넓어지는 fail-open).
     for pre in "${keymat_exclude_array[@]}"; do
       KEYMAT_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | awk -v p="$pre" 'index($0, p) != 1')"
+      KEYMAT_FILE_CANDIDATES="$(printf '%s\n' "$KEYMAT_FILE_CANDIDATES" | awk -v p="$pre" 'index($0, p) != 1')"
     done
-    KEYMAT_ENTRIES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    KEYMAT_ENTRIES="$(printf '%s\n' "$KEYMAT_FILE_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    KEYMAT_ALL_CANDIDATES="$(printf '%s\n' "$KEYMAT_CANDIDATES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
     # 양성 대조는 제외를 적용한 **뒤에** 센다 — 통째로 넓히는 편집(`/`)이 여기서 판정 불가가
     # 된다. 표적 제외(`/data/` 하나 추가)는 이 수를 거의 줄이지 않으므로 **ⓐ 등식**이 잡는다.
     if ! [[ "$KEYMAT_ENTRIES" =~ ^[0-9]+$ ]] || [ "$KEYMAT_ENTRIES" -lt "$KEYMAT_MIN_ENTRIES" ]; then
@@ -666,7 +696,7 @@ case "$RUNTIME_KIND" in
         fail "키·인증서 재료가 이미지에 구워져 있다: [$(printf '%s' "$KEYMAT_HITS" | tr '\n' ' ')] — 이 스택의 로컬 CA 는 실행 시 만들어지고 이미지에 구워지지 않는다"
       fi
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES}) 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=읽음${KEYMAT_CONTENT_SCANNED}건(하한 ${KEYMAT_CONTENT_MIN_SCANNED})·못읽음0"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${FORBIDDEN_EXECUTABLE_COUNT}건 필수-실행파일-검사=${REQUIRED_EXECUTABLE_COUNT}건 내용경로=${CONTENT_PATH} 파일수=${CONTENT_ENTRIES}(하한 ${CONTENT_MIN_ENTRIES}) 필수내용-검사=${#required_content_array[@]}건 금지내용-검사=${#forbidden_content_array[@]}건 키재료-대상=${KEYMAT_ENTRIES}(하한 ${KEYMAT_MIN_ENTRIES})·링크포함${KEYMAT_ALL_CANDIDATES} 키재료-이름패턴=${#keymat_pattern_array[@]}건 키재료-제외=${#keymat_exclude_array[@]}건(등식 고정) 키재료-내용축=읽음${KEYMAT_CONTENT_SCANNED}건(하한 ${KEYMAT_CONTENT_MIN_SCANNED})·못읽음0"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
