@@ -494,7 +494,7 @@ main 이 #78(7C ① 공고 검색)·#79(7F-local)로 움직여 판정 트리와 
 
 - **게이트 설정 검산(기계)**: 두 properties 의 키별 값 집합이 `ours ∪ theirs` 와 같은지 쟀다.
   gate-tests 는 **편차 0**. architecture-policy 의 유일한 비합집합은 `OperatorCredentialFilter`
-  를 이름으로 적은 항목 넷(`app.secret.operator-credential-referencers` ·
+  를 이름으로 적은 항목 넷(운영자 자격 참조자 목록 키(architecture-policy `:665`) ·
   `app.surface.api.filters` · `collection.transport.holders.http-response` ·
   `collection.transport.member-surface`)이고 모두 **7D 가 지운 class** 를 가리킨다. 같은 키에
   7D 의 대체 항목(`RequestAuthenticationFilter` · `OperatorCredentialAuthenticator`)이 이미 서
