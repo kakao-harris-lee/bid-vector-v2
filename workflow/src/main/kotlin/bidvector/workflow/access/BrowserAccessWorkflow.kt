@@ -174,7 +174,7 @@ class BrowserAccessWorkflow(
         val key = keys.newKey()
         val stamp = key.deriveStamp()
         val absoluteExpiresAt = now.plus(policy.absoluteWindow)
-        val opened =
+        val written =
             completion.complete(
                 NewBrowserSession(
                     digest = key.digest(),
@@ -187,7 +187,13 @@ class BrowserAccessWorkflow(
                 verified = account.hash,
                 at = now,
             )
-        return if (opened) IssuedSession(key, stamp, absoluteExpiresAt) else null
+        // **소진 `when`** — 거부의 사유가 늘면 컴파일이 이 자리를 먼저 가리킨다. 밖으로 나가는
+        // 결과는 셋 다 같지만(401 하나), 그 사실을 이름을 지워서가 아니라 **여기서 접어서**
+        // 만든다. 관측이 필요해지면 붙일 자리도 여기 하나다(code-review r4 L-1).
+        return when (written) {
+            SignInWrite.Applied -> IssuedSession(key, stamp, absoluteExpiresAt)
+            SignInWrite.CredentialMoved, SignInWrite.Contended -> null
+        }
     }
 
     private fun isLocked(

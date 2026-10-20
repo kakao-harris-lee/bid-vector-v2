@@ -17,6 +17,7 @@ import bidvector.workflow.access.NewBrowserSession
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.PassphraseHasher
 import bidvector.workflow.access.SignInCompletionPort
+import bidvector.workflow.access.SignInWrite
 import bidvector.workflow.strategy.Clock
 import java.time.Duration
 import java.time.Instant
@@ -213,11 +214,11 @@ class MutableSignInCompletion(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
-    ): Boolean {
-        if (!accounts.claim(verified, at)) return false
+    ): SignInWrite {
+        if (!accounts.claim(verified, at)) return SignInWrite.CredentialMoved
         sessions.revokeAllOf(session.account, at)
         sessions.put(session)
-        return true
+        return SignInWrite.Applied
     }
 }
 

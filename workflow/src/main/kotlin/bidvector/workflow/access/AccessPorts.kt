@@ -39,13 +39,31 @@ interface AccountStorePort {
  * 트랜잭션이면 그 사이에 비밀 문구 교체가 끼어들어, **옛 값으로 시작한 로그인이 교체 뒤에
  * 세션을 받는다**(그리고 그 세션이 교체의 「전부 폐기」를 지나 유일하게 살아남는다).
  */
+sealed interface SignInWrite {
+    /** 세션이 열렸다. */
+    data object Applied : SignInWrite
+
+    /** 검증 때 읽은 자격이 더 이상 그 계정의 자격이 아니거나, 그 사이에 잠겼다. */
+    data object CredentialMoved : SignInWrite
+
+    /**
+     * **경합** — 계정 행 잠금을 대기 상한 안에 얻지 못했다(code-review r4 L-1). 거부의 결과는
+     * 다른 갈래와 같은 401 이지만, 사유가 「틀린 비밀 문구」와 **섞이지 않게** 이름을 남긴다.
+     * 아직 이 이름을 기록하는 소비자는 없다 — 저장 층은 로그를 쓸 수 없고, 받는 자리는 관측이
+     * 가능한 위층이다(알려진 제한으로 등재).
+     */
+    data object Contended : SignInWrite
+}
+
 interface SignInCompletionPort {
     /**
      * 한 트랜잭션에서 ⓐ 계정 행을 **잠그며** 실패 계수·잠금을 비우고 ⓑ 그 계정의 기존 세션을
      * 폐기하고 ⓒ [session] 을 등록한다.
      *
      * ⓐ 는 **[verified] 가 아직 그 계정의 자격이고, [at] 기준으로 잠겨 있지 않을 때만** 성립한다.
-     * 성립하지 않으면 **아무것도 쓰지 않고** `false` 다 — 호출부는 그 로그인을 거부한다.
+     * 성립하지 않으면 **아무것도 쓰지 않고** [SignInWrite.CredentialMoved] 다 — 호출부는 그
+     * 로그인을 거부한다. 계정 행 잠금을 대기 상한 안에 얻지 못하면 [SignInWrite.Contended] 이고,
+     * 그것도 거부지만 **사유가 다르다**(code-review r4 L-1).
      *
      * 자격 비교는 코드가 아니라 **행 조건**이다. 제시값이 섞이지 않고(양쪽 다 이미 저장된 자격)
      * 그래서 이것은 인증이 아니라 **판 확인**이다 — 상수 시간이 필요한 자리가 아니고,
@@ -59,7 +77,7 @@ interface SignInCompletionPort {
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
-    ): Boolean
+    ): SignInWrite
 }
 
 /**

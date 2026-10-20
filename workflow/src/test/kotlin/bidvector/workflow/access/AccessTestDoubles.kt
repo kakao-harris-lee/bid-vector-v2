@@ -107,11 +107,11 @@ class InMemorySignInCompletion(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
-    ): Boolean {
-        if (!accounts.claim(verified, at)) return false
+    ): SignInWrite {
+        if (!accounts.claim(verified, at)) return SignInWrite.CredentialMoved
         sessions.revokeAllOf(session.account, at)
         sessions.put(session)
-        return true
+        return SignInWrite.Applied
     }
 }
 

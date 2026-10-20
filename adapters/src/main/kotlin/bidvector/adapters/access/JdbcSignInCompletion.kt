@@ -4,6 +4,7 @@ import bidvector.workflow.access.AccountId
 import bidvector.workflow.access.NewBrowserSession
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.SignInCompletionPort
+import bidvector.workflow.access.SignInWrite
 import java.sql.Connection
 import java.sql.Timestamp
 import java.time.Instant
@@ -18,7 +19,7 @@ import java.time.Instant
  * 조립할 수 없다. 표면이 그만큼 줄었다.
  *
  *  0. 대기 상한 — [SignInConnections] 가 빌려주는 커넥션마다 먼저 씌운다(code-review r3 L-2 ·
- *     r4 M-1). 넘으면 PostgreSQL 이 끊고 그 로그인은 거부다 — 커넥션을 쥔 채
+ *     r4 M-1). 넘으면 PostgreSQL 이 끊고 그 로그인은 [SignInWrite.Contended] 다 — 커넥션을 쥔 채
  *     무한정 기다리지 않는다.
  *  1. [AccessSql.CLAIM_ACCOUNT_FOR_SIGN_IN] — 계정 행을 **잠그며** 실패 계수·잠금을 비운다.
  *     자격이 검증 때와 다르거나 지금 잠겨 있으면 0 행이고, 그때는 **아무것도 쓰지 않고** 끝난다.
@@ -37,16 +38,16 @@ internal class JdbcSignInCompletion(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
-    ): Boolean =
+    ): SignInWrite =
         connections.withBoundedConnection { connection ->
             if (!claimAccount(connection, session.account, verified, at)) {
-                false
+                SignInWrite.CredentialMoved
             } else {
                 revokeLiveSessions(connection, session.account, at)
                 insertSession(connection, session)
-                true
+                SignInWrite.Applied
             }
-        } ?: false
+        } ?: SignInWrite.Contended
 
     private fun claimAccount(
         connection: Connection,
