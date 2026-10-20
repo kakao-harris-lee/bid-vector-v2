@@ -194,6 +194,15 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
   같은 중복 키 함정 — 이 slice 밖, 후속).
 - 배치 뒤 verifier 표적 r4 + code-reviewer 표적 r5. high·medium 0 이면 PR.
 
+**D-7D-9 (2026-10-20, 팀장 — 작은 배치 수령 · 동결).** 판정 대상은 마지막 산출물 `75cce8b6` · evidence `f075a9d8` 다.
+- **M-1 처방으로 `ConnectionSource` 래퍼 대신 access 패키지의 좁은 타입(`SignInConnections`)을 둔 선택을 수용한다.** `ConnectionSource` 는
+  sealed 라 같은 패키지(`adapters.persistence`, in_scope 밖)에서만 구현할 수 있다. 효과는 같고(로그인 scope 의 모든 문장이 대기 상한 아래),
+  어댑터 둘이 `internal` 로 좁아졌다. in_scope 추가: `adapters/.../access/SignInConnections.kt`.
+- **`@Timeout` 은 `SEPARATE_THREAD` 여야 한다**: 기본 `SAME_THREAD` 는 돌아온 뒤에 재는 사후 판정이라, 블록된 JDBC 호출을 끊지 못한다. 변이
+  짝(R-R31a 240초 멈춤 · R-R31b 30초 RED)이 그 차이다.
+- 제한 29~32 신설을 수용한다. cr r4 L-1 의 잔여(`Contended` 를 기록하는 소비자가 아직 없다)는 7F 본편·감사 확장의 후속으로 둔다.
+- 검토: verifier 표적 r4 + code-reviewer 표적 r5.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
