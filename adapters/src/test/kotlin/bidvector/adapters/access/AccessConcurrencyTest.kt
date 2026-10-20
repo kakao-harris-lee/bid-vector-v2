@@ -61,6 +61,26 @@ private val LOCK_WAIT_SLACK: Duration = Duration.ofSeconds(5)
  */
 private const val LOCK_TEST_TIMEOUT_SECONDS = 30L
 
+private const val MILLIS_PER_SECOND = 1_000L
+
+/**
+ * 홀더가 잠금을 쥐는 **상한**. 정상 경로의 대기(상한 500ms + KDF 한 번)보다 넉넉히 길어야
+ * 「상한에 걸려 거부됐다」와 「홀더가 먼저 놓아 통과했다」가 구별되고, [LOCK_TEST_TIMEOUT_SECONDS]
+ * 보다는 짧아야 **시한이 스레드를 버리기 전에** 잠금이 풀린다. 그 두 부등식을
+ * [requireSelfTerminating] 이 코드로 센다(`MigrationLockTimeoutTest` 와 같은 관례 — 산문에만
+ * 두면 값이 바뀔 때 조용히 깨진다).
+ */
+private const val LOCK_HOLD_MS = 10_000L
+
+private fun requireSelfTerminating() {
+    require(LOCK_HOLD_MS > CONCURRENCY_POLICY.lockWait.toMillis()) {
+        "홀더가 대기 상한보다 먼저 놓으면 「상한에 걸렸다」를 「통과했다」와 가를 수 없다"
+    }
+    require(LOCK_HOLD_MS < LOCK_TEST_TIMEOUT_SECONDS * MILLIS_PER_SECOND) {
+        "홀더가 시한보다 늦게 놓으면 버려진 스레드가 잠금을 쥔 채 남아 다음 test 가 막힌다"
+    }
+}
+
 /**
  * 두 스레드를 **난수 발급 자리에서** 만나게 하는 장벽. 그 자리를 고른 이유는 확정 호출
  * **직전**이라 사이에 느린 일(KDF)이 없다는 것이다 — 둘이 같은 순간 확정으로 들어간다.
@@ -341,20 +361,33 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
     ): SignInOutcome = access(hasher, source, keys).inSignInScope { it.signIn(ACCOUNT, ClearPassphrase.wrap(value)) }
 
     /**
-     * 계정 행을 **잡은 채** [action] 을 돌린다 — 커밋하지 않으므로 그 잠금은 블록이 끝날 때까지
-     * 산다. 잡는 문장은 production 과 같은 열만 쓴다(값을 바꾸지 않는 자기 대입이라 행의 내용은
-     * 그대로이고, 잠금만 선다).
+     * 계정 행을 **잡은 채** [action] 을 돌린다. 잡는 문장은 production 과 같은 열만 쓴다(값을
+     * 바꾸지 않는 자기 대입이라 행의 내용은 그대로이고, 잠금만 선다).
+     *
+     * **홀더가 스스로 끝난다**(code-review r5 M-1 · verifier r4 R4-1 — `requireSelfTerminating`
+     * 의 선례와 같은 축). 앞 판은 잠금 해제를 `finally` 에만 기댔는데, 그 `finally` 는 **test
+     * 스레드가 살아 있을 때만** 돈다. `@Timeout(SEPARATE_THREAD)` 가 시한에 걸린 본체를 **버리면**
+     * 그 스레드는 non-daemon 으로 남아 커밋하지 않은 잠금을 쥔 채 서 있고, 다음 test 의
+     * `TRUNCATE account` 가 그 뒤에서 막힌다 — class 단위(=CI 형태)에서 「30초 FAILED 한 줄 →
+     * 420초 행」이 되던 자리다.
+     *
+     * 그래서 상한을 **서버에** 건다: 홀더의 트랜잭션이 [LOCK_HOLD_MS] 넘게 유휴면 PostgreSQL 이
+     * 그 백엔드를 끝내고 잠금을 놓는다. 이제 test 스레드가 어떻게 되든 잠금은 유한 시간 안에
+     * 풀린다. 그 뒤 `rollback` 은 이미 끊긴 연결에서 던질 수 있으므로 결과를 보지 않는다 —
+     * 여기서 재는 것은 잠금 수명이지 이 호출의 성패가 아니다.
      */
     private fun holdingAccountRowLock(action: () -> Unit) {
+        requireSelfTerminating()
         dataSource().connection.use { connection ->
             connection.autoCommit = false
             connection.createStatement().use {
+                it.execute("SET LOCAL idle_in_transaction_session_timeout = '${LOCK_HOLD_MS}ms'")
                 it.executeUpdate("UPDATE account SET failed_attempts = failed_attempts")
             }
             try {
                 action()
             } finally {
-                connection.rollback()
+                runCatching { connection.rollback() }
             }
         }
     }
@@ -456,8 +489,6 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
     }
 
     private companion object {
-        const val MILLIS_PER_SECOND = 1_000L
-
         /** 하나다 — 「쥐고 있으면 아무도 못 쓴다」를 모호함 없이 재는 유일한 크기다. */
         const val SINGLE_CONNECTION_POOL = 1
 
