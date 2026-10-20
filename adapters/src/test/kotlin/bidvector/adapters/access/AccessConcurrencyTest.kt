@@ -17,6 +17,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
@@ -45,6 +46,14 @@ private const val CONCURRENT_LOGIN_ROUNDS = 5
 
 /** 대기 상한 위의 여유 — KDF 한 번과 왕복 몇 번이 그 안에 든다. */
 private val LOCK_WAIT_SLACK: Duration = Duration.ofSeconds(5)
+
+/**
+ * 상한이 사라지면 이 test 는 **끝나지 않는다**(실측: 변이 아래에서 exit 124). `check` job 에
+ * `timeout-minutes` 가 없어 CI 기본값은 360분이라, 그 회귀가 6시간 뒤에야 드러난다
+ * (verifier r3 R3-1). JUnit 시한을 달아 **즉시 붉어지게** 한다 — 정상 경로는 상한(500ms) + KDF
+ * 몇 번이라 이 값의 발끝에도 닿지 않는다.
+ */
+private const val LOCK_TEST_TIMEOUT_SECONDS = 30L
 
 /**
  * 두 스레드를 **난수 발급 자리에서** 만나게 하는 장벽. 그 자리를 고른 이유는 확정 호출
@@ -227,6 +236,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
      * 같은 측정이 code-review r3 L-2(대기 상한)의 회귀 test 이기도 하다 — 상한이 없으면 이
      * test 는 거부가 아니라 **영원히 멈춘다**.
      */
+    @Timeout(LOCK_TEST_TIMEOUT_SECONDS)
     @Test
     fun `계정 행이 잠겨 있으면 로그인은 대기 상한 안에 거부된다 — 확정은 그 잠금을 얻어야 한다`() {
         createAccount()
@@ -255,6 +265,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
      * 계정 행을 쥔 채 틀린 문구로 로그인하면 지금은 **끝난다**: 계수를 올리지 못한 채 거부다
      * (계수를 못 올리는 것은 안전한 방향 — 잠금이 늦어질 뿐 권한이 새지 않는다).
      */
+    @Timeout(LOCK_TEST_TIMEOUT_SECONDS)
     @Test
     fun `계정 행이 잠겨 있으면 틀린 비밀 문구도 대기 상한 안에 끝난다 — 무한 대기가 아니다`() {
         createAccount()
