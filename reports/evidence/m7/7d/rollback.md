@@ -1,11 +1,11 @@
 # M7/7D 되돌림
 
-**실측 HEAD: `75cce8b6`**(이 slice 의 마지막 **산출물** 커밋). 그 뒤의 evidence 커밋은
+**실측 HEAD: `df5fd39f`**(이 slice 의 마지막 **산출물** 커밋). 그 뒤의 evidence 커밋은
 `reports/evidence/m7/7d/**` 만 만지므로 복원 집합 밖이다.
 ①~⑥ 을 그 커밋을 체크아웃한 임시 clone(저장소 밖)에서 **전부 실제로 실행**했다. 목록도 결과도
 이 HEAD 에서 다시 냈다. **라운드가 더 붙으면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이
 결함의 실제 원인이다(r2 에서 신규 하나·경로 하나, r3 에서 신규 둘·경로 넷, r4 에서 경로 하나,
-r5 에서 신규 하나가 더 늘었다).
+r5 에서 신규 하나가 더 늘었다. r6 은 test 한 파일만 고쳐 목록이 그대로다).
 
 **forward-fix 가 정본이다**(계약 「rollback」, 6B-2 runbook 관례). 마이그레이션은 되돌리기 어려운
 경로다 — V20 이 만든 표를 지우는 새 마이그레이션을 쓰지 않는다. 되돌림은 두 경우로 갈린다.
@@ -13,8 +13,8 @@ r5 에서 신규 하나가 더 늘었다).
 ## 전제 (머지 **전**을 가정한다)
 
 - 복원 기준 SHA 는 **`77850903` 고정**(움직이는 `origin/main` 을 쓰지 않는다). 단언 넷:
-  - `git merge-base --is-ancestor 77850903 75cce8b6` → exit 0 (base 가 실측 HEAD 의 조상).
-  - `git log --oneline 77850903..75cce8b6 --merges` → **빈 출력**(이 브랜치에 main 병합이 없다).
+  - `git merge-base --is-ancestor 77850903 df5fd39f` → exit 0 (base 가 실측 HEAD 의 조상).
+  - `git log --oneline 77850903..df5fd39f --merges` → **빈 출력**(이 브랜치에 main 병합이 없다).
     그래서 공유 파일의 복원 기준도 base 하나다.
   - **복원 집합의 첫 커밋은 `ed0f45ba`** 다(기계 산출:
     `git log --oneline --reverse 77850903..<HEAD> -- <복원 경로들> | head -1`).
@@ -25,18 +25,18 @@ r5 에서 신규 하나가 더 늘었다).
   없다. 병렬 레인 7C① 도 같은 파일 셋을 만지지만 **그 커밋은 이 브랜치에 없다**(머지 순서에 따라
   뒤 PR 이 충돌을 정리한다 — 계약 「검토 레인」).
 - 하네스 경로(`CLAUDE.md`·`.claude/**`)는 **되돌리지 않는다**. 이 range 의 그 경로 커밋은
-  **0 건**이다(`git log --oneline 77850903..75cce8b6 -- CLAUDE.md .claude/` 빈 출력 — 실측).
+  **0 건**이다(`git log --oneline 77850903..df5fd39f -- CLAUDE.md .claude/` 빈 출력 — 실측).
 
 ## ① 머지 전 — in_scope 경로 한정 복원
 
 ### 복원 목록 — 기계 산출
 
 ```
-git diff --name-status 77850903..75cce8b6 -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence/m7/7d'
+git diff --name-status 77850903..df5fd39f -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence/m7/7d'
 ```
 실측 HEAD 에서 **A 34 · M 47 · R 1**(합 82 행 · 복원 경로 83 — R 은 두 경로 모두 넘긴다).
-r4 대비 A 가 하나 늘었다(로그인 scope 의 커넥션 공급원 신설) — 목록을 손으로 옮기지 않는
-이유가 이것이다.
+r5 와 같다 — 마지막 배치는 test 한 파일만 고쳤다. 그래도 기계로 다시 냈다(옮겨 적은 목록이
+낡는 것이 이 결함의 실제 원인이다).
 A(신규)는 복원 명령이 삭제하고 M(수정)은 base 내용으로 되돌린다 — `--source` 에 없는 경로는
 삭제되므로 신규 파일에 별도 `git rm` 이 필요 없다. **`git checkout <base> -- <경로>` 는 쓰지
 않는다**(base 에 없는 경로마다 pathspec 오류로 exit 1 이고 아무것도 적용되지 않는다).
@@ -61,7 +61,7 @@ git restore --source=77850903 --staged --worktree -- <위 목록의 경로들을
   이 slice 는 누출 baseline 에 아무 줄도 더하지 않는다(그 짝이 어긋나는 M4 의 형태가 여기 없다).
 - `CLAUDE.md`·`.claude/**` — 하네스 레인(위 전제의 실측: 이 range 에 0 건).
 
-### ①~⑥ 실측 (임시 clone, 실측 HEAD `75cce8b6`)
+### ①~⑥ 실측 (임시 clone, 실측 HEAD `df5fd39f`)
 
 | 축 | 결과 |
 | --- | --- |
@@ -74,9 +74,9 @@ git restore --source=77850903 --staged --worktree -- <위 목록의 경로들을
 r4 재실측에서도 같은 모양이다. 라운드마다 실측 HEAD 와 목록이 움직였다 — 그래서 이 절은 옮겨
 적은 수가 아니라 그 HEAD 에서 다시 낸 기계 산출이다.
 
-**`comm` 대조(r5)**: `base..HEAD` 의 비-evidence 변경 경로 − 복원 목록 = **0 행**이고, 복원 목록
+**`comm` 대조(r6)**: `base..HEAD` 의 비-evidence 변경 경로 − 복원 목록 = **0 행**이고, 복원 목록
 밖 변경의 경로 뿌리는 `reports/evidence` **하나**다. 즉 복원 집합이 산출물 전체를 덮는다.
-**유효성 술어**: `git diff --name-only 75cce8b6..HEAD -- <복원 83 경로>` 가 **빈 출력** —
+**유효성 술어**: `git diff --name-only df5fd39f..HEAD -- <복원 83 경로>` 가 **빈 출력** —
 실측 뒤에 되돌림 대상이 움직이지 않았다.
 
 r2 에서 ④⑤⑥ 을 **쪼개지 않고 전건 `check` 하나**로 쟀다. 쪼갠 판은 어느 게이트가 그 목록에
@@ -84,7 +84,7 @@ r2 에서 ④⑤⑥ 을 **쪼개지 않고 전건 `check` 하나**로 쟀다. �
 게이트 집합이 그 안에서 스스로 정해진다(하네스 「부분 게이트는 안 돌린 것과 같다」).
 
 **갈음하지 않았다 — 다만 트리 동일성도 함께 쟀다.** 같은 clone 에서 evidence 까지 포함해
-복원하면 트리가 base 와 **파일 SHA 까지 같다**(base 대비 전수 diff **0 행** — r5 재실측).
+복원하면 트리가 base 와 **파일 SHA 까지 같다**(base 대비 전수 diff **0 행** — r6 재실측).
 위 ④⑤⑥ 은 바로 그 상태에서 돌렸다. 즉 이 slice 의 되돌림은 「대충 돌아간 트리」가 아니라
 **base 그 자체**다.
 

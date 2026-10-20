@@ -427,7 +427,52 @@ Dockerfile·compose·빌드 파일도 그대로다. app 코드는 바뀌었으�
 - `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
 - `git status --porcelain` · **빈 출력**
 
+
+## 2026-10-21 (KST) 마지막 재작업 배치 (r6) — cr r5 M-1
+
+계약 D-7D-10 의 한 건을 닫았다. 호스트 점검 셋은 빌드 전 별도 호출로 먼저 봤고, 모든 Gradle
+명령은 `flock` 안이다. **6G 창(00:30~03:00) 앞 00:20 이후에는 새 무거운 단계를 시작하지 않도록
+래퍼에 시각 게이트를 두었다** — acceptance 는 00:03 에 끝나 그 게이트에 걸리지 않았다.
+
+### 증명 — 전부 **class 전체** 필터다
+
+앞 라운드가 단일 test 필터로 잰 것이 이 결함을 가렸다. CI 가 도는 형태는 class 전체다.
+
+| 축 | 결과 |
+| --- | --- |
+| (a) 무변이 class 전체 **3회** | exit 0 · 30s · 21s · 20s |
+| (b) 상한 적용 제거(R-LW) | **exit 1 · 40.5s** · tests=8 · 붉은 둘(잠금 test 둘) |
+| (b) 실패 계수 갱신만 상한 없는 공급원으로(R-M1a) | **exit 1 · 33.9s** · tests=8 · 붉은 하나(틀린 문구 test) |
+| (c) 변이 아래 다음 test 의 행 | **없다** — 두 변이 모두 `tests=8`, 즉 class 의 여덟이 **전부 돌았다** |
+
+**exit 124 가 하나도 없다.** 앞 판은 같은 변이가 class 전체에서 「30초 FAILED 한 줄 → 420초 행」
+이었다 — 시한이 끊은 스레드가 non-daemon 으로 남아 커밋하지 않은 `account` 행 잠금을 쥐었고,
+다음 test 의 `TRUNCATE account` 가 그 뒤에서 막혔다. 홀더에 서버 쪽 시한
+(`idle_in_transaction_session_timeout`)을 걸어 **test 스레드가 어떻게 되든 잠금이 유한 시간 안에
+풀리게** 했다(`MigrationLockTimeoutTest.requireSelfTerminating()` 과 같은 축이고, 두 부등식도
+같은 방식으로 코드가 센다).
+
+**정정**: 커밋 `8696ff67` 의 「상한을 지우는 회귀가 30초에 붉어진다」는 **단일 test 필터에서만**
+참이었다. class 단위에서는 성립하지 않았고, 그 사실을 여기와 새 커밋 본문에 적는다(히스토리는
+다시 쓰지 않는다).
+
+## 2026-10-21 (KST) acceptance — r6
+
+| 명령 | exit |
+| --- | --- |
+| `./gradlew --no-daemon check` | **0** |
+| `./gradlew --no-daemon qualityBaseline` | **0** |
+| `./gradlew --no-daemon --no-build-cache :workflow:test --rerun-tasks` | **0** |
+| `./tools/one-command-check.sh` | **0** |
+
+`container` job 은 다시 돌리지 않았다 — 이 배치는 test 한 파일만 고쳤다.
+
+## 2026-10-21 (KST) 비밀값 스캔 · clean-tree (r6)
+
+- `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
+- `git status --porcelain` · **빈 출력**
+
 ## 크기 게이트
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
-- 핵심 결과(r5 재측정): 산출물 **+6458 / −149 줄** 대 evidence **+1185 줄** — evidence ≤ 산출물.
+- 핵심 결과(r6 재측정): 산출물 **+6489 / −149 줄** 대 evidence **+1295 줄** — evidence ≤ 산출물.
