@@ -1,0 +1,85 @@
+# M7/7F-local — 리버스 프록시 설정. `docker/proxy.Dockerfile` 이 이미지에 굽는다.
+#
+# 이 프로필에서 **host 포트를 여는 것은 이 서비스 하나**다(`docker/compose.local-tls.yaml` 이
+# app·ml-serving 의 publish 를 비운다). app·postgres·web 은 compose 내부망에만 있다.
+#
+# 위협 모델(scope.md (0)): 막는 것은 ① 내부 서비스의 host 직접 노출 ② 관리 경로가 프록시를
+# 지나는 것 ③ 경로 정규화 우회 ④ 평문 ⑤ root 실행. 막지 않는 것은 운영 TLS·인증서 수명
+# (7F 본편)과 DDoS.
+{
+	admin off
+	persist_config off
+	# 평문 리다이렉트 리스너를 만들지 않는다 — 이 프록시는 **https 리스너 하나**만 연다.
+	# 우회 ④ 의 선택은 「리다이렉트」가 아니라 **「거부」**다: 평문 리스너가 없으므로 평문
+	# 요청은 TLS 핸드셰이크에서 끊기고, 어떤 경로도 평문으로 응답되지 않는다. 비-root 로
+	# 돌기 때문에 80 을 bind 할 수도 없다(두 사유가 같은 방향이다). 운영 도메인에서의
+	# 80 리다이렉트 여부는 실 host 와 함께 정할 일이다(7F 본편).
+	auto_https disable_redirects
+}
+
+# 도메인은 환경변수이고 **기본값은 `localhost`** 다 — 운영 도메인 값을 저장소에 두지 않는다.
+# 포트에는 기본값을 적지 않는다(그 자리는 `tools/local-tls-smoke.sh` 하나). 값을 요구하는 것은
+# compose 의 `${BIDVECTOR_PROXY_HTTPS_PORT:?}` 이고, **이 참조 자신은 fail-closed 가 아니다** —
+# `web.Caddyfile` 의 같은 자리 주석에 실측이 있다.
+https://{$BIDVECTOR_PROXY_DOMAIN:localhost}:{$BIDVECTOR_PROXY_HTTPS_PORT} {
+	# 로컬 CA — Caddy 가 **실행 시** 발급한다. 저장소에 키도 인증서도 없고, 컨테이너를 다시
+	# 만들면 새로 생긴다(볼륨을 붙이지 않는다 — 잔여 0). 신뢰 방법은 runbook 의 7F-local 절.
+	tls internal
+
+	# 접근 로그에서 **헤더를 지운다.** Caddy 는 `Authorization`·`Cookie` 를 가리지만 이
+	# 스택의 운영자 자격은 **custom 헤더**로 오므로 기본 로그에 평문으로 남는다(실측).
+	# 필드 하나를 열거해 지우는 대신 헤더 객체 전체를 지운다 — 뒤에 헤더가 늘어도 자동으로
+	# 로그 밖이다(열거가 아니라 구성). 요청 URI·상태·소요는 남으므로 진단은 그대로 된다.
+	log {
+		format filter {
+			wrap console
+			fields {
+				request>headers delete
+				resp_headers delete
+			}
+		}
+	}
+
+	# 응답 헤더. `defer` 로 **상류 응답을 덮어쓴다** — app 쪽 Spring Security 가 같은 이름을
+	# 자기 값으로 보내면 두 값이 실리거나 상류 값이 이기므로, 한 자리에서 정해지게 한다.
+	#
+	# **정직한 상태(검토 r2)**: 오늘 그 상류 거동은 **실재하지 않는다**. 내부망에서 app 의
+	# `/api/strategy` 응답 헤더를 직접 떠 보면 아래 네 이름도 `Server` 도 하나도 없다(실측).
+	# 그래서 `defer` 를 떼어도 프록시 응답은 이름마다 1개로 똑같고, 스모크의 「이름당 1개」
+	# 축은 오늘 아무것도 운동시키지 못한다 — 그 축의 값은 **app 이 뒷날 보안 헤더를 켜는
+	# 변경에 대한 회귀 가드**다. `defer` 자체의 필요성은 아직 측정되지 않았다.
+	header {
+		defer
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		# web 번들이 실제로 쓰는 출처에 맞춘 최소 CSP — 같은 출처의 스크립트·스타일
+		# (vite 가 내는 해시 파일 둘)과 CSS 안의 data: 이미지, 같은 출처 fetch(`/api/**`,
+		# `src/api/client.ts` 의 baseUrl 이 `/`)뿐이다. 바깥 출처·inline·eval 은 없다.
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		# **HSTS 를 로컬에서 보내지 않는다.** HSTS 는 포트가 아니라 **host 단위**로 걸리므로
+		# `localhost` 에 한 번 보내면 그 브라우저의 모든 localhost 평문 개발 서버가 함께
+		# 막힌다(되돌리려면 브라우저 설정을 손대야 한다). 게다가 로컬 CA 는 운영 신뢰 기점이
+		# 아니라서 HSTS 가 지킬 대상도 없다. 운영 도메인에서 켜는 것이 이 자리이고, 그
+		# 판단은 실 host 와 함께 간다(7F 본편). 로컬에서 이 헤더가 **없음**을
+		# `tools/local-tls-smoke.sh` 가 단언한다 — 실수로 켜지면 붉어진다.
+	}
+
+	# 관리 경로는 프록시를 지나지 못한다. **구속력 있는 차단은 이 블록이 아니라 상류 집합**
+	# 이다: 이 프록시의 상류는 web 과 app 의 **API 포트** 둘뿐이고 관리 포트는 상류가 아니다
+	# (`compose.local-tls.yaml` 의 env 둘, 스모크가 구조로 단언한다). 이 블록은 그 위에
+	# 덧대는 명시적 404 다 — 없으면 `/actuator/health` 가 SPA fallback 으로 200 셸을 받아
+	# 「무엇이 막았는가」가 응답에서 사라진다.
+	handle /actuator* {
+		respond 404
+	}
+
+	handle /api/* {
+		reverse_proxy {$BIDVECTOR_PROXY_APP_UPSTREAM}
+	}
+
+	handle {
+		reverse_proxy {$BIDVECTOR_PROXY_WEB_UPSTREAM}
+	}
+}

@@ -1,0 +1,17 @@
+# M7/7F-local — 빌드 컨텍스트는 **web 번들을 만드는 입력만** 담는다. `docker/app.Dockerfile`
+# 의 dockerignore 와 같은 방향이다(전부 빼고 정본 COPY 들을 다시 넣는다) — 소스·evidence·
+# `.git`·`bid-vector` symlink·리뷰 노트·비밀 파일이 새로 생겨도 자동으로 컨텍스트 밖이다.
+#
+# `web/node_modules`·`web/dist` 도 `**` 가 이미 뺀다(다시 넣지 않는다) — 호스트의 설치본·
+# 빌드 산출물이 이미지 안 설치본을 가리지 않는다.
+**
+!web/package.json
+!web/package-lock.json
+!web/.npmrc
+!web/.nvmrc
+!web/index.html
+!web/vite.config.ts
+!web/tsconfig.json
+!web/scripts/**
+!web/src/**
+!docker/web.Caddyfile
