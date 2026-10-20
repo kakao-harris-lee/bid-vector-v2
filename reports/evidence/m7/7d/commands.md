@@ -375,7 +375,59 @@ Dockerfile·compose·빌드 파일도 그대로다. app 코드는 바뀌었으�
 - `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
 - `git status --porcelain` · **빈 출력**
 
+
+## 2026-10-20 (KST) 작은 배치 (r5) — 표적 실측
+
+계약 D-7D-8 의 넷을 지적별 커밋으로 닫았다. 호스트 점검 셋은 매 빌드 전 별도 호출로 먼저 봤고
+모든 Gradle 명령은 `flock` 안이다.
+
+- M-1 뒤: `:adapters:test`(access 전수) + `:workflow:test`(access) — exit 0
+- L-1 뒤: 같은 둘 + `:app:test`(세션 인증·출하 조립) — exit 0 · 동시성 8 · 저장 15 · 권한 10 ·
+  세션 18 · 출하 10 · use case 13 · 계약 15/9/4
+
+## 2026-10-20 (KST) acceptance — r5
+
+| 명령 | exit |
+| --- | --- |
+| `./gradlew --no-daemon check` | **0** |
+| `./gradlew --no-daemon qualityBaseline` | **0** |
+| `./gradlew --no-daemon --no-build-cache :workflow:test --rerun-tasks` | **0** (17 tasks 전부 executed) |
+| `./tools/one-command-check.sh` | **0** |
+
+`container` job 은 다시 돌리지 않았다 — 이 배치는 마이그레이션·Dockerfile·compose·빌드 파일을
+건드리지 않았다(바뀐 것은 Kotlin·KDoc·evidence 뿐).
+
+## 2026-10-20 (KST) 변이 실측 (r5)
+
+**단일 test 필터로 쟀다.** 앞선 시도에서 class 전체로 재니 시한에 끊긴 test 가 **계정 행 잠금을
+쥔 채 버려져** 뒤 test 들이 막혔고, 결과가 Gradle 시한(exit 124)으로 뭉개졌다. 한 test 만 돌리면
+그 간섭이 없다 — 그래서 변이마다 **대조군 test** 를 함께 돌려 「그 변이가 무엇을 붉히는가」를
+가렸다.
+
+| id | 자리 | numstat | 결과 |
+| --- | --- | --- | --- |
+| R-M1a | 실패 계수 갱신을 상한 없는 공급원으로 되돌림 | 1/1 | **exit 1** · `TimeoutException`(틀린 문구 test) |
+| R-M1a 대조 | 같은 변이, **올바른 문구** test | — | exit 0 — 확정 경로는 영향 없음(변이가 정확히 한 자리를 짚는다) |
+| R-R31b | 상한 적용 제거(@Timeout `SEPARATE_THREAD` **있음**) | 1/0 | **exit 1** · `TimeoutException` — 30초에 끊긴다 |
+| R-R31a | 같은 제거(@Timeout **없음**, 앞 판) | 1/0 | **exit 124** — Gradle 시한까지 멈춘다 |
+
+**R-R31a/b 의 짝이 이 배치의 핵심 수치다.** 같은 회귀가 시한 모드 하나로 「240초 멈춤」과
+「30초 RED」로 갈린다 — vr r3 R3-1 이 노린 것이 실제로 성립함을 그 둘이 함께 보인다.
+
+**그 과정에서 내 수정의 결함을 변이가 잡았다.** 처음 단 `@Timeout(30)` 은 **아무것도 끊지
+못했다**(R-M1a 가 JUnit 시한이 아니라 Gradle 시한에 걸렸다). JUnit 의 기본 시한 모드
+`SAME_THREAD` 는 test 가 **돌아온 뒤에** 걸린 시간을 보는 사후 판정이라, 블록된 JDBC 호출처럼
+돌아오지 않는 본체에는 판정이 닿지 않는다. `SEPARATE_THREAD` 로 고쳐 다시 쟀다 — 그 보강이
+없었다면 「시한이 붙어 있다」는 사실만 남고 거동은 앞 판 그대로였을 것이다.
+
+복원 뒤 `git status --porcelain -- <변이 파일 셋>` **빈 출력**.
+
+## 2026-10-20 (KST) 비밀값 스캔 · clean-tree (r5)
+
+- `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7d/` · exit **1**(매치 0)
+- `git status --porcelain` · **빈 출력**
+
 ## 크기 게이트
 
 - cmd: `git diff --numstat 77850903..HEAD -- . ':!CLAUDE.md' ':!.claude' ':!reports/evidence'`
-- 핵심 결과(r4 재측정): 산출물 **+6314 / −149 줄** 대 evidence **+1055 줄** — evidence ≤ 산출물.
+- 핵심 결과(r5 재측정): 산출물 **+6458 / −149 줄** 대 evidence **+1185 줄** — evidence ≤ 산출물.
