@@ -211,6 +211,18 @@ verifier r1(전건)과 code-reviewer r2(전건 + 네 지적 표적)를 새로 �
 - **알려진 제한**: cr r5 L-3(상한 공급원이 쓰지 않는 조립에도 들어감 — 죽은 배선).
 - 이번 뒤에는 더 돌리지 않는다. verifier 표적 확인에서 남는 것은 제한으로 등재하고 PR 로 간다.
 
+**D-7D-11 (2026-10-21, 팀장 — 마지막 배치 수령 · 동결).** verifier r4 는 ready-for-review(high·medium 0)이고, 그 low R4-1 은
+cr r5 M-1 과 뿌리가 같았다(단일 test 필터에서만 30초 RED, class 전체에서는 420초 행). 배치는 둘을 한 번에 닫았다.
+판정 대상은 산출물 `df5fd39f` · evidence `708ad517` 이다.
+- **닫음**: 잠금 커넥션에 `SET LOCAL idle_in_transaction_session_timeout` 을 걸어 홀더가 스스로 끝난다. 두 부등식(보유 > 대기 상한 ·
+  보유 < test 시한)은 `requireSelfTerminating()` 이 코드로 센다. class 전체에서 무변이 3회 초록, 상한 제거 변이·실패 계수 공급원
+  되돌림 변이가 각각 유한 시간(40.5초·33.9초)에 RED, 여덟 test 가 전부 돈다(exit 124 0).
+- `8696ff67` 의 「30초에 붉어진다」는 단일 필터에서만 참이었다. 정정은 `df5fd39f` 본문과 evidence 에 있다(히스토리 미수정).
+- **D-7D-10 수정**: cr r5 L-1 · L-2 는 닫지 않고 제한으로 돌린다(마지막 회차를 M-1 하나로 좁힘). 알려진 제한 33~36:
+  33 `Contended` 이름 변이는 거동이 같아 초록(진단용 이름) · 34 `SignInConnections` 이름이 좁다(후속 정리) ·
+  35 죽은 배선(cr r5 L-3) · 36 `check` job 의 `timeout-minutes` 부재(워크플로, 범위 밖 후속).
+- 재작업 5/5 소진. 남은 것은 verifier 표적 확인 1회이고, 거기서 나오는 것은 제한으로 등재하고 PR 로 간다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음(range 에 `.claude/**`·`CLAUDE.md` 변경 0).
