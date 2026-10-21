@@ -285,3 +285,19 @@ test 가 아니라 컴파일이 잡았고, M1·M5′ 가 그 test 들의 비공�
    고지 의무가 값과 함께 표면 경계까지 이동하게 하려는 것이고, `init` 이 부분 집합을 거부한다.
 4. DEC-04 의 빈자리(출하 정책 표)는 이 slice 가 **만들지 않았다** — 값이 운영자 승인 대상이고
    (`minAssessmentSamples` 150 의 근거 문자열 포함) 이 slice 의 산출물이 아니다.
+
+### 수정 라운드 1 (팀장 지시, 2026-10-21)
+
+- **STR-03 production 칸 이름 정정**(판정 불변). 실재 경로: `bidvector.decision.VerdictLadderPolicyData`
+  의 `init`(`reviewThreshold <= bidNowThreshold`) + 출하 선언 `bidvector.workflow.evaluation.
+  EVALUATION_LADDER_POLICY_SLOT`(`LadderPolicySlot`) → `EvaluateCandidatesUseCase`. 집계 머리에
+  「이름 정정, 판정 불변」을 한 줄 남겼다 — 집계는 움직이지 않는다(ⓐ 15 는 `DEC-04` 한 행의 결과).
+- **D-G1DEC05-1 의 `app` 조항**: 쓰지 않았다(위 D-G1DEC05-2 실측). 계약 쪽 삭제는 팀장 소관.
+- DEC-05 행의 빈 자리 설명에 「출하 정본이 읽기를 미정으로 두므로 오늘 production 값에서는 밴드
+  붕괴·하한 binding 이 발화하지 않는다」가 이미 들어 있다(`BidMenuPolicyDataTest` 가 고정).
+
+### acceptance 1회차 (판정 SHA 아님)
+
+`3acc38c5` 에서 `./gradlew --no-daemon check` **exit 0**(10분 44초, 360 task). 시작·끝 HEAD 동일.
+`leakPatternGate`·`gateRegistrationGate`·`sizeGate` 전부 task 그래프에 들어가 돌았다.
+이 회차 뒤 위 수정 라운드가 들어갔으므로 **판정 SHA 는 그다음 커밋**이고 acceptance 를 재측정했다.
