@@ -452,6 +452,157 @@ slice 의 되돌리기 어려운 경로와 섞을 이유가 없다.
 
 ---
 
-## Phase 2 — 구현 (팀장 승인 뒤)
+## Phase 1.5 — Phase 2 정정 (설계 변경, 팀장 승인 2026-10-22)
 
-(미착수)
+구현 중에 **설계 두 곳이 틀렸다는 것이 드러났다.** Phase 1 설계 절을 고쳐 쓰지 않고 여기에
+따로 적는다 — 무엇이 어떻게 바뀌었는지가 보여야 한다.
+
+### 정정 ① — 공고 스냅샷은 **서버가 뜬다**(요청이 싣지 않는다)
+
+- **Phase 1 설계**: 초안 명령이 공고 스냅샷을 싣고 그대로 저장한다.
+- **무엇이 틀렸나**: 그러면 운영자가 「그때 하한율이 이랬다」를 **나중에 지어낼 수 있다.**
+  스냅샷을 얼리는 목적 자체가 「그때 그 금액을 정한 근거」를 증거로 남기는 것인데, 그 값을
+  요청이 들고 오면 증거이기를 그친다. 설계 검토 (0)의 **위협 ③「초안 스냅샷 변조」가 바로
+  이것**이고, Phase 1 설계는 그 위협을 적어 두고도 열어 둔 채였다.
+- **정정**: `NoticeSnapshotQueryPort` 를 두고 workflow 가 공고에서 뜬다. 요청 DTO 에 스냅샷
+  자리가 **없다**. 공고를 뜰 수 없으면(없거나 6B-3 으로 파기) 초안을 만들지 않고 409
+  (`NOTICE_SNAPSHOT_UNAVAILABLE`)다 — 빈 스냅샷을 지어내지 않는다.
+
+### 정정 ② — 스냅샷은 공고 **판 번호**를 싣는다(차수가 아니라)
+
+- **Phase 1 설계**: `snapshot_notice_revision TEXT CHECK (~ '^[0-9]{3}$')` — 공고 **차수**.
+- **무엇이 틀렸나**: 차수는 건의 `NoticeKey` 가 이미 들고 있어 **같은 사실이 두 자리**에
+  있었고, 더 나쁘게는 **「정정됐다」는 사실이 보이지 않았다.** 공고가 정정되면
+  `notice.revision` 이 오르는데 차수는 그대로다 — 스냅샷을 얼린 이유의 절반이 사라진다.
+- **정정**: `snapshot_notice_revision BIGINT CHECK (>= 1)`(= `notice.revision`). 도메인 필드는
+  `NoticeSnapshot.noticeRevisionNumber` 이고 `Provenance.Published.noticeRevision`(차수)과
+  **다른 축**임을 KDoc 이 적는다.
+
+### 정정 ③ — operation 열둘 → **열넷**(13 경로)
+
+`await-opening` 을 독립 operation 으로 두었고 `outcome` 과 `outcome-correction` 을 따로 셌다.
+Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2026-10-22(범위 축소 없음).
+
+## Phase 2 — 구현 (팀장 승인 뒤, 계약 r2 D-7B-1)
+
+### 1. 판정 대상 SHA
+
+| 커밋 | 내용 |
+|---|---|
+| `f62f104c` | 산출물 1 — 도메인 · workflow · V21 · 영속 |
+| `c81ee05b` | 산출물 2 — HTTP 경계 · 조립 · 서버 스냅샷(변이 실측 뒤 보강) |
+| (이 커밋) | 문서 · evidence |
+
+base `bee7c36f`. 변경 목록은 `git diff --name-status bee7c36f..HEAD` 기계 산출이다.
+
+### 2. 변이 표 — 9/9 적발
+
+각 변이를 적용 → 표적 test 실행 → **되돌린다**(스크립트가 `.bak` 로 복원하고, 복원 뒤
+`git status` 로 잔여 0 을 확인했다). 기대는 전부 RED 다.
+
+| # | 변이 | 표적 | 결과 |
+|---|---|---|---|
+| ① | `SELECT_CASE_BY_ID` 에서 `account_id = ?` 제거 | `BidCaseOwnershipTest` | **RED** — 「남의 건은 id 를 알아도 읽히지 않는다」 외 1 |
+| ② | 소급 판정을 상수 `false` 로 | `BidInvariantsTest` | **RED** — 「소급 표시는 출발 상태가 정한다」 외 1 |
+| ③ | 전이표에 금지 전이 추가(`WON → SKIP`) | `BidTransitionTableTest` | **RED**(보강 뒤 — 아래 ⑴) |
+| ④ | 다음 확인 시점을 `Watching` 에서 `None` 으로 | `NextCheckpointTest` | **RED** — 「전 상태에서 답이 나오고 종류가 기대와 같다」 |
+| ⑤ | `asReal()` 이 페이퍼도 통과시키게 | `BidInvariantsTest` | **RED** — 「페이퍼 건은 실투찰로 좁혀지지 않는다」 |
+| ⑥ | 보관 기간 정책 3년 → 1년 | `EvidenceRetentionPolicyTest` | **RED**(보강 뒤 — 아래 ⑵) |
+| ⑦ | 타임라인 append-only 트리거 제거 | `CleanMigrationTriggerTest` | **RED** — 3 test |
+| ⑧ | 「건너뜀 ⇒ 사유」 CHECK 제거 | `CleanMigrationCheckTest` | **RED** |
+| ⑨ | `bid_case` GRANT 를 표 단위 UPDATE 로 확대 | `BidCaseOwnershipTest` · `CleanMigrationPrivilegeTest` | **RED** — 2 test |
+
+**⑴·⑵ 는 첫 측정에서 GREEN 이었다 — 그것이 이 라운드의 실질 소득이다.**
+
+- **⑴ 전이표 전수 test 가 순환이었다.** 「표에 있으면 허용 · 없으면 거부」를 재는 두 test 가
+  **둘 다 `BID_TRANSITIONS` 를 읽었다.** 그래서 표에 금지 전이 한 줄을 더하면 test 가 그 줄을
+  따라가며 초록을 유지했다(실측: `WON → SKIP` 추가 후 전건 초록). 정본을 코드 밖에 한 벌 더
+  두는 것 말고는 고칠 방법이 없다 — `ux-journey-research.md` §6.1 에서 손으로 옮긴 골든 목록
+  (30 행)을 두고 표와 **집합 등식**으로 맞댄다. 재측정 RED.
+- **⑵ 출하 정책 값을 아무도 읽지 않았다.** `BidCaseWorkflowTest` 는 정책을 **주입해서**
+  날짜 산술을 재므로 출하 상수를 1년으로 바꿔도 전건 초록이었다. 운영자가 정한 값(R-5 3년)이
+  코드에 실제로 들어 있는지는 그 상수를 직접 읽는 자리가 있어야 잡힌다 —
+  `EvidenceRetentionPolicyTest` 신설. 재측정 RED.
+
+**래칫이 등재 없이는 초록이 되지 않는다는 것도 실측했다**: V21 을 넣고 등재 전에 돌린 첫
+실행에서 스키마 래칫 여섯 파일의 **12 test 가 전부 붉었다**(표 목록 · 컬럼 · 인덱스 · CHECK ·
+트리거 · 권한 행렬 · FK · UNIQUE · 보존 집합 등식). 등재는 그 붉은 것을 하나씩 끈 것이다.
+
+### 3. 넓힌 게이트 줄과 근거
+
+| 파일 | 키 | 변경 | 근거 |
+|---|---|---|---|
+| `config/quality/architecture-policy.properties` | `layer.domain`(:44) | `+bidding` | 새 domain 모듈. 이 값이 층 판정·모집단 단언의 **단일 출처**이고, 빠뜨리면 모듈이 어느 층도 아니게 된다 |
+| 〃 | `app.injection.domain-port-roots`(:608) | `+bidvector.bidding` | controller 생성자가 bidding 타입을 이름 부른다(「이 저장소가 이름 붙인 계약의 뿌리」) |
+| 〃 | `collection.reflection.roots`(:1356) | `+bidvector.bidding` | **판정 대상 뿌리**다. 빠뜨리면 새 모듈의 반사가 조용히 안 재진다 |
+| `config/quality/gate-tests.properties` | `gate.tests.bidding`(신설) | test 3 | 모듈 신설. 없으면 `gateRegistrationGate` 양방향 등식에서 즉시 붉다 |
+| 〃 | `gate.tests.workflow` | +2 | `BidCaseWorkflowTest` · `EvidenceRetentionPolicyTest`(⑵ 의 산물) |
+| 〃 | `gate.tests.adapters` | +1 | `BidCaseOwnershipTest` — 실 DB 소유 경계 |
+| `settings.gradle.kts` | `include(...)` | `+bidding` | ADR 0006 D-2 되살림 |
+
+**넓히지 않은 것**: `collection.external.allowed-packages.*` 는 application·adapters·app 층
+키라 domain 모듈 신설과 무관하다. `module.expected-source-sets` 도 그대로다(`main,test`).
+
+### 4. 설계 검토 (2b) — 값 획득 축
+
+새 public 표면이 밖에 허락하는 것:
+
+| 표면 | 밖에서 할 수 있는 것 | 닫은 방법 |
+|---|---|---|
+| `bidding.applyCommand` | 전이 판정을 **계산**할 수 있다 | 계산 결과로 **저장에 닿지 못한다** — 저장 포트가 받는 `AppliedTransition` 이 `workflow` 의 `internal constructor` 다 |
+| `BidCaseStorePort` | — | `app` 은 이 타입의 빈을 받지 않는다. controller 는 `BidCaseWorkflow` 하나만 받는다(`BidCaseWiring`) |
+| `RealBidCase` | 실투찰 전용 자리에 값을 넘긴다 | `internal constructor` + `asReal()` 이 페이퍼에 `null` — 좁히기를 건너뛴 코드는 컴파일되지 않는다 |
+| HTTP 요청 DTO | 금액 · 시각 · 사유를 보낸다 | **provenance · 메뉴 참조 · retroactive · evidenceRetainUntil · 공고 스냅샷 · accountId · caseVersion 자리가 없다** |
+
+- **「전이 use case 밖에서 건 상태를 바꾸는 경로」 0** — `bid_case` 의 UPDATE 문장은
+  `JdbcBidCaseStore.updateCaseState` 하나이고, 그 호출자는 `applyTransition` 뿐이다.
+  권한 층이 한 겹 더 진다(열 단위 GRANT: `account_id` · 공고 키 · `bid_kind` 는 UPDATE 불가).
+- **「주체 없이 부르는 포트」 0** — `BidCaseStorePort` 의 전 메서드 첫 인자가 `AccountId` 다.
+  예외는 `NoticeDeadlineQueryPort` · `NoticeSnapshotQueryPort` 둘이고, **공고는 사용자 소유
+  데이터가 아니기 때문**이며 그 사유를 각 포트 KDoc 이 적는다(적지 않으면 「빠뜨린 필터」와
+  구별되지 않는다).
+
+### 5. BID-01 추적 행 (6E-1 술어로)
+
+| capability | 분류 | 판정 | 무엇이 재는가 | 비어 있는 항목 |
+|---|---|---|---|---|
+| **BID-01** | `V2 필수` | **ⓐ** | 상태·전이: `BidTransitionTableTest`(골든 등식 + 전수 182 쌍) · 스냅샷 불변: `BidCaseOwnershipTest`「초안 수정은 새 행을 쌓고」 + append-only 트리거 · 다음 확인 시점: `NextCheckpointTest`(전 상태) · 소급 표시: `BidInvariantsTest` + `BidCaseOwnershipTest`「소급 확인이 기록과 소급 표시를 남긴다」 · 페이퍼/실 분리: `BidInvariantsTest` + `BidCaseOwnershipTest`「목록은 종류로 갈린다」 · 건은 하나: `BidCaseOwnershipTest` · 보관 기한: `EvidenceRetentionPolicyTest` + workflow test | 없음 — 단 **production 배선에서 성립**하는지는 7E 화면이 붙어야 끝까지 보인다(아래 알려진 제한 ②와 같은 축) |
+
+6E-1 의 `acceptance-trace.md` 집계는 **다시 세지 않았다**(남의 slice 의 동결 evidence).
+그 파일에는 모수 이동(61 → 62)을 적은 **날짜 붙은 교차 참조 한 줄**만 넣었다.
+
+### 6. 알려진 제한
+
+1. **`PRICE_RECEIVED` 는 오늘 도달 불가** — 진입 명령(`RECEIVE_PRICE_MENU`)이 `SYSTEM` 전용이고
+   그 호출자가 출하 경로에 없다(DEC-05 메뉴는 ML-01 · 7C② 대기). 어휘 · CHECK · 전이표 행은
+   두었다(나중에 CHECK 어휘를 늘리는 둘째 마이그레이션을 피한다).
+2. **자동 전이의 시스템 호출자 부재** — SET-01 대사 결과 · SET-02 개찰 · 리마인드 도달.
+   사용자 입력 경로는 열려 있다(§6.1 「사용자가 나라장터에서 보고 오거나 입력한다」).
+3. **PDF 저장소 없음** — `evidence_ref` 가 가리킬 실체가 저장소 안에 없다. 완화 둘:
+   형태 제한(공백 불가 · 128자 상한 · `toString()` 가림)과 문면 고정(「이 **참조**를 언제까지
+   보관하는가」). 보관 기한 **집행**은 저장소 slice 가 연다.
+4. **다수 사업자 격리 · 가입 · `operator_profile`/`operator_strategy` 계정 단위 전환**은 범위
+   밖이다(운영자 결정 2026-10-21 — 별 slice).
+5. **화면 없음** — 7E 소관. 이 slice 의 응답 형태는 `BidCaseResponse` 가 고정한다.
+
+### 7. acceptance 실측
+
+`ci.yml` 의 job 명령 그대로다. 결과는 아래에 실행 시각과 함께 적는다.
+
+| 항목 | 명령 | 결과 |
+|---|---|---|
+| `check` job | `./gradlew check` | (기록) |
+| `web` job W-5 | `npm run api:types:check` | (기록) |
+| `web` job W-2·3·6·8 | `npm run lint` · `typecheck` · `test` · `build` | (기록) |
+| `container` job | `if:` 평가 재생 — 마이그레이션이 있어 **생략 불가**(app 이미지가 V21 을 싣는다) | (기록) |
+| `ml-engine` job | 입력 변경 0 → **생략** | 해당 없음 |
+| 백업·복원 리허설 | `tools/db-rehearsal.sh`(역할·권한 행렬 포함) | (기록) |
+
+**호스트 규율**: 모든 무거운 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고,
+점검 셋(pgrep · `free -m` · `ps`)을 **별도 호출로 먼저** 봤다(available 15.3GB · swap free
+7.0GB · 다른 레인의 유휴 daemon 1 — 그 PID 는 건드리지 않았다). **00:30~03:00(6G 수집 창)에는
+무거운 작업을 시작하지 않았다.**
+
+### 8. rollback 실측
+
+`rollback.md` 경우 ①(머지 전)의 ⓐ~ⓑ 를 마지막 산출물 커밋에서 실측한다. (기록)

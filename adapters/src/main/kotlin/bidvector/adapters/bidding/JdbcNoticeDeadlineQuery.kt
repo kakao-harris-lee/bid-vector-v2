@@ -2,11 +2,11 @@ package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.connectionSourceOf
-import javax.sql.DataSource
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
 import java.time.Instant
+import javax.sql.DataSource
 
 /**
  * 공고 마감 조회 — **라이브 값**이다(초안 스냅샷의 사본이 아니다).

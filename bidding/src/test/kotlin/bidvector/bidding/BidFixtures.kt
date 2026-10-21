@@ -82,7 +82,7 @@ internal fun case(
     kind: BidKind = BidKind.REAL,
 ) = BidCase(
     id = BidCaseId(1L),
-    notice = NoticeKey("R26BK01654006", NoticeRound.of("000")),
+    notice = NoticeKey("R00TEST0000001", NoticeRound.of("000")),
     kind = kind,
     state = state,
     caseVersion = 0,

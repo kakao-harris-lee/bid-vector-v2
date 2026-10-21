@@ -16,6 +16,7 @@ import bidvector.bidding.asReal
 import bidvector.bidding.isOverdue
 import bidvector.bidding.isReconciliationCandidate
 import bidvector.bidding.nextCheckpoint
+import bidvector.bidding.tag
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Clock
@@ -132,15 +133,10 @@ class BidCaseWorkflow(
         actor: BidActor,
     ): BidCommandResult {
         val case = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
-        val snapshot =
-            snapshots.snapshot(case.notice, clock.now())
-                ?: return BidCommandResult.NoticeSnapshotUnavailable
-        return command(
-            account,
-            caseId,
-            BidCommand.DraftBid(BidDraft(amount, presentedAt, snapshot)),
-            actor,
-        )
+        val snapshot = snapshots.snapshot(case.notice, clock.now())
+        return snapshot
+            ?.let { command(account, caseId, BidCommand.DraftBid(BidDraft(amount, presentedAt, it)), actor) }
+            ?: BidCommandResult.NoticeSnapshotUnavailable
     }
 
     /**
@@ -160,14 +156,27 @@ class BidCaseWorkflow(
         val now = clock.now()
         val resolved = resolveRetention(command)
         val outcome = applyCommand(case.state, resolved, actor.kind, now)
-        if (outcome is TransitionOutcome.Rejected) return BidCommandResult.Processed(outcome)
+        return when (outcome) {
+            is TransitionOutcome.Rejected -> BidCommandResult.Processed(outcome)
+            is TransitionOutcome.Accepted -> persist(account, case, resolved, outcome, actor, now)
+        }
+    }
 
-        val accepted = outcome as TransitionOutcome.Accepted
+    /** 받아들여진 전이를 저장한다 — 저장 단계의 경합은 전이표 거부와 **다른 갈래**다. */
+    @Suppress("LongParameterList")
+    private fun persist(
+        account: AccountId,
+        case: BidCase,
+        command: BidCommand,
+        accepted: TransitionOutcome.Accepted,
+        actor: BidActor,
+        now: Instant,
+    ): BidCommandResult {
         val applied =
             AppliedTransition(
                 caseId = case.id,
                 expectedVersion = case.caseVersion,
-                command = resolved.tag,
+                command = command.tag,
                 fromState = case.state,
                 next = accepted.next,
                 effect = accepted.effect,

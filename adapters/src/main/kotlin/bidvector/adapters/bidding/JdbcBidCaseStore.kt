@@ -2,7 +2,6 @@ package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.connectionSourceOf
-import javax.sql.DataSource
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
@@ -18,8 +17,10 @@ import bidvector.workflow.bidding.OpenCaseResult
 import bidvector.workflow.bidding.TimelineEntry
 import bidvector.workflow.bidding.TransitionWrite
 import java.sql.Connection
+import java.sql.PreparedStatement
 import java.sql.Timestamp
 import java.time.Instant
+import javax.sql.DataSource
 
 /**
  * 입찰 건 저장소(V21) — **모든 문장이 `account_id` 로 좁혀진다**([BiddingSql]).
@@ -76,14 +77,7 @@ class JdbcBidCaseStore(
     override fun load(
         account: AccountId,
         caseId: BidCaseId,
-    ): BidCase? =
-        connections.withConnection { connection ->
-            connection.prepareStatement(BiddingSql.SELECT_CASE_BY_ID).use { statement ->
-                statement.setLong(1, account.value)
-                statement.setLong(2, caseId.value)
-                statement.executeQuery().use { rs -> if (rs.next()) BidCaseRow.toCase(rs) else null }
-            }
-        }
+    ): BidCase? = connections.withConnection { connection -> selectById(connection, account, caseId) }
 
     override fun list(
         account: AccountId,
@@ -92,10 +86,12 @@ class JdbcBidCaseStore(
     ): List<BidCase> =
         connections.withConnection { connection ->
             connection.prepareStatement(BiddingSql.SELECT_CASES).use { statement ->
-                statement.setLong(1, account.value)
-                statement.setString(2, kind.name)
-                statement.setString(3, state?.name)
-                statement.setString(4, state?.name)
+                var index = 1
+                statement.setLong(index++, account.value)
+                statement.setString(index++, kind.name)
+                // 같은 값을 두 번 바인딩한다 — `?::text IS NULL OR state = ?::text` 의 두 자리다.
+                statement.setString(index++, state?.name)
+                statement.setString(index, state?.name)
                 statement.executeQuery().use { rs ->
                     buildList { while (rs.next()) add(BidCaseRow.toCase(rs)) }
                 }
@@ -108,8 +104,9 @@ class JdbcBidCaseStore(
     ): List<TimelineEntry> =
         connections.withConnection { connection ->
             connection.prepareStatement(BiddingSql.SELECT_TIMELINE).use { statement ->
-                statement.setLong(1, account.value)
-                statement.setLong(2, caseId.value)
+                var index = 1
+                statement.setLong(index++, account.value)
+                statement.setLong(index, caseId.value)
                 statement.executeQuery().use { rs ->
                     buildList {
                         while (rs.next()) {
@@ -170,12 +167,17 @@ class JdbcBidCaseStore(
         applied: AppliedTransition,
     ) {
         when (val effect = applied.effect) {
-            TransitionEffect.None -> Unit
-            is TransitionEffect.DraftWritten ->
-                BidEffectWriter.insertDraft(connection, account, applied.caseId, effect.draft)
+            TransitionEffect.None -> {
+                // 부수 산출이 없는 전이 — 건의 상태와 타임라인 한 줄만 남는다.
+            }
 
-            is TransitionEffect.RecordWritten ->
+            is TransitionEffect.DraftWritten -> {
+                BidEffectWriter.insertDraft(connection, account, applied.caseId, effect.draft)
+            }
+
+            is TransitionEffect.RecordWritten -> {
                 BidEffectWriter.insertRecord(connection, account, applied.caseId, effect.record)
+            }
         }
     }
 
@@ -187,11 +189,8 @@ class JdbcBidCaseStore(
         at: Instant,
     ): BidCase? =
         connection.prepareStatement(BiddingSql.INSERT_CASE).use { statement ->
-            statement.setLong(1, account.value)
-            statement.setString(2, notice.noticeNumber)
-            statement.setString(3, notice.noticeRound.value)
-            statement.setString(4, kind.name)
-            statement.setTimestamp(5, Timestamp.from(at))
+            val next = statement.bindCaseKey(account, notice, kind)
+            statement.setTimestamp(next, Timestamp.from(at))
             statement.executeQuery().use { rs -> if (rs.next()) BidCaseRow.toCase(rs) else null }
         }
 
@@ -201,8 +200,9 @@ class JdbcBidCaseStore(
         caseId: BidCaseId,
     ): BidCase? =
         connection.prepareStatement(BiddingSql.SELECT_CASE_BY_ID).use { statement ->
-            statement.setLong(1, account.value)
-            statement.setLong(2, caseId.value)
+            var index = 1
+            statement.setLong(index++, account.value)
+            statement.setLong(index, caseId.value)
             statement.executeQuery().use { rs -> if (rs.next()) BidCaseRow.toCase(rs) else null }
         }
 
@@ -213,10 +213,7 @@ class JdbcBidCaseStore(
         kind: BidKind,
     ): BidCase? =
         connection.prepareStatement(BiddingSql.SELECT_CASE_BY_KEY).use { statement ->
-            statement.setLong(1, account.value)
-            statement.setString(2, notice.noticeNumber)
-            statement.setString(3, notice.noticeRound.value)
-            statement.setString(4, kind.name)
+            statement.bindCaseKey(account, notice, kind)
             statement.executeQuery().use { rs -> if (rs.next()) BidCaseRow.toCase(rs) else null }
         }
 
@@ -278,18 +275,44 @@ class JdbcBidCaseStore(
     }
 }
 
-/** `Connection` 하나를 트랜잭션 경계로 쓴다 — 전이 셋(건·타임라인·부수 산출)이 함께 서거나 함께 없다. */
+/**
+ * 건의 키 넷(계정 · 공고번호 · 차수 · 종류)을 **한 자리에서** 바인딩한다 — 두 문장
+ * (`INSERT_CASE` · `SELECT_CASE_BY_KEY`)이 같은 앞부분을 쓰므로 순서가 갈리면 조용히
+ * 엉뚱한 건을 집는다. 다음에 쓸 인덱스를 돌려준다.
+ */
+private fun PreparedStatement.bindCaseKey(
+    account: AccountId,
+    notice: NoticeKey,
+    kind: BidKind,
+): Int {
+    var index = 1
+    setLong(index++, account.value)
+    setString(index++, notice.noticeNumber)
+    setString(index++, notice.noticeRound.value)
+    setString(index++, kind.name)
+    return index
+}
+
+/**
+ * `Connection` 하나를 트랜잭션 경계로 쓴다 — 전이 셋(건 · 타임라인 · 부수 산출)이 함께 서거나
+ * 함께 없다.
+ *
+ * **`catch` 를 두지 않는다**(`TransactionBoundary` 와 같은 관례, detekt
+ * `TooGenericExceptionCaught` · v2-지침서 §5 「business control flow 에 exception 을 쓰지
+ * 않는다」) — [block] 이 어떤 예외로 실패하든 그대로 전파시키고, `finally` 가 **커밋 여부를
+ * 플래그로 보고** 커밋되지 않았을 때만 롤백한다.
+ */
 internal fun <T> Connection.inTransaction(block: () -> T): T {
     val previous = autoCommit
     autoCommit = false
-    return try {
+    var committed = false
+    try {
         val result = block()
         commit()
-        result
-    } catch (failure: Throwable) {
-        rollback()
-        throw failure
+        committed = true
+        return result
     } finally {
+        if (!committed) rollback()
         autoCommit = previous
     }
 }

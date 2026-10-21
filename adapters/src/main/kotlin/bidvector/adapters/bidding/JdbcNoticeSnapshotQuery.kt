@@ -2,7 +2,6 @@ package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.connectionSourceOf
-import javax.sql.DataSource
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.NoticeSnapshot
 import bidvector.sharedkernel.BaseAmount
@@ -16,6 +15,7 @@ import bidvector.sharedkernel.VatTreatment
 import bidvector.workflow.bidding.NoticeSnapshotQueryPort
 import java.sql.ResultSet
 import java.time.Instant
+import javax.sql.DataSource
 
 /**
  * 초안이 얼릴 공고 스냅샷을 **서버가 뜬다** — 요청이 실어 오지 않는다(위협 ③ 차단면).
@@ -58,42 +58,53 @@ class JdbcNoticeSnapshotQuery(
             baseAmount = baseAmount(round),
         )
 
-    /** 하한율은 값과 출처가 **짝**이다(V1 의 CHECK 와 같은 축) — 한쪽만 있으면 `null` 이다. */
+    /**
+     * 하한율은 값과 출처가 **짝**이다(V1 의 CHECK 와 같은 축) — 한쪽만 있으면 `null` 이다.
+     * 출처 어휘는 좁게 받는다(모르는 어휘는 `null`).
+     */
     private fun ResultSet.floorRate(round: NoticeRound): FloorRate? {
-        val fraction = getBigDecimal("floor_rate_fraction") ?: return null
-        val kind = getString("floor_rate_origin_kind") ?: return null
+        val fraction = getBigDecimal("floor_rate_fraction")
         val origin =
-            when (kind) {
+            when (getString("floor_rate_origin_kind")) {
                 "NOTICE_VALUE" -> FloorRateOrigin.NoticeValue(round)
-                else -> return null
+                else -> null
             }
-        return FloorRate(Rate.ofFraction(fraction), origin)
+        return if (fraction == null || origin == null) null else FloorRate(Rate.ofFraction(fraction), origin)
     }
 
     /**
-     * 기초금액 — provenance 어휘를 **좁게** 복원한다. 모르는 어휘는 `null` 이다(스냅샷에
-     * 「출처 모름」 금액을 싣느니 금액을 비운다 — basis 없는 금액을 만들지 않는다).
+     * 기초금액 — 네 성분이 **모두** 있을 때만 값을 낸다. provenance 어휘도 좁게 복원하고,
+     * 모르는 어휘면 금액 자체를 비운다 — basis · 출처 없는 금액을 스냅샷에 싣느니 「없음」이 낫다.
      */
     private fun ResultSet.baseAmount(round: NoticeRound): BaseAmount? {
-        val won = getBigDecimal("base_amount_won") ?: return null
-        val currencyName = getString("base_amount_currency") ?: return null
-        val vatName = getString("base_amount_vat") ?: return null
-        val provenance =
-            when (getString("base_amount_provenance")) {
-                "Published" -> Provenance.Published(round)
-                "DerivedFromOpening" -> Provenance.DerivedFromOpening
-                "CopiedFromBaseAmount" -> Provenance.CopiedFromBaseAmount
-                "OperatorDeclared" -> Provenance.OperatorDeclared
-                "Undeclared" -> Provenance.Undeclared
-                else -> return null
-            }
+        val won = getBigDecimal("base_amount_won")
+        val currencyName = getString("base_amount_currency")
+        val vatName = getString("base_amount_vat")
+        val provenance = provenanceOf(getString("base_amount_provenance"), round)
+        // 네 성분 중 하나라도 비면 금액을 내지 않는다 — 「전부 있는가」를 한 자리에서 센다.
+        val parts = listOf(won, currencyName, vatName, provenance)
+        if (parts.any { it == null }) return null
         return BaseAmount(
-            won = won.longValueExact(),
-            currency = Currency.valueOf(currencyName),
-            vatTreatment = VatTreatment.valueOf(vatName),
-            provenance = provenance,
+            won = requireNotNull(won).longValueExact(),
+            currency = Currency.valueOf(requireNotNull(currencyName)),
+            vatTreatment = VatTreatment.valueOf(requireNotNull(vatName)),
+            provenance = requireNotNull(provenance),
         )
     }
+
+    /** 어휘 → provenance 룩업. 모르는 값은 `null` 이다(지어내지 않는다). */
+    private fun provenanceOf(
+        token: String?,
+        round: NoticeRound,
+    ): Provenance? =
+        when (token) {
+            "Published" -> Provenance.Published(round)
+            "DerivedFromOpening" -> Provenance.DerivedFromOpening
+            "CopiedFromBaseAmount" -> Provenance.CopiedFromBaseAmount
+            "OperatorDeclared" -> Provenance.OperatorDeclared
+            "Undeclared" -> Provenance.Undeclared
+            else -> null
+        }
 
     private companion object {
         const val SELECT_SNAPSHOT =

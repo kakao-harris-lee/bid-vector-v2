@@ -34,16 +34,13 @@ open class BidCaseWiring {
     }
 
     @Bean
-    open fun bidCaseStore(dataSource: DataSource): BidCaseStorePort =
-        JdbcBidCaseStore(dataSource)
+    open fun bidCaseStore(dataSource: DataSource): BidCaseStorePort = JdbcBidCaseStore(dataSource)
 
     @Bean
-    open fun noticeDeadlineQuery(dataSource: DataSource): NoticeDeadlineQueryPort =
-        JdbcNoticeDeadlineQuery(dataSource)
+    open fun noticeDeadlineQuery(dataSource: DataSource): NoticeDeadlineQueryPort = JdbcNoticeDeadlineQuery(dataSource)
 
     @Bean
-    open fun noticeSnapshotQuery(dataSource: DataSource): NoticeSnapshotQueryPort =
-        JdbcNoticeSnapshotQuery(dataSource)
+    open fun noticeSnapshotQuery(dataSource: DataSource): NoticeSnapshotQueryPort = JdbcNoticeSnapshotQuery(dataSource)
 
     /**
      * controller 가 받는 **단 하나의 협력자**다 — 저장소 · `ConnectionSource` 를 돌려주는

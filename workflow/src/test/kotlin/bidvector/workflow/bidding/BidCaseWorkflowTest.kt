@@ -43,7 +43,7 @@ class BidCaseWorkflowTest {
     private val now = Instant.parse("2026-10-21T04:00:00Z")
     private val mine = AccountId(1L)
     private val other = AccountId(2L)
-    private val notice = NoticeKey("R26BK01654006", NoticeRound.of("000"))
+    private val notice = NoticeKey("R00TEST0000001", NoticeRound.of("000"))
     private val deadline = now.plusSeconds(1800)
 
     private fun policy() =

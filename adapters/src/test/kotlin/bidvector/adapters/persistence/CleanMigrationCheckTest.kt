@@ -89,7 +89,7 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             //    + reason 공백 + case_version>=0 + actor_kind enum + actor 짝 + 사유 필수(둘)
             //    + 소급 출처 제한.
             //  · bid_draft 13 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
-            //    + draft_seq>=0 + 스냅샷 판 형식 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3).
+            //    + draft_seq>=0 + 스냅샷 판 번호 하한 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3).
             //  · bid_record 10 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
             //    + record_seq>=0 + evidence_ref 공백 + 증빙 짝 + memo 공백.
             "bid_case" to 11,

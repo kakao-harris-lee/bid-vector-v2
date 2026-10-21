@@ -3,11 +3,11 @@ package bidvector.app.http
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
+import bidvector.bidding.BidMemo
 import bidvector.bidding.BidOutcome
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.BidSubmission
 import bidvector.bidding.EvidenceRef
-import bidvector.bidding.BidMemo
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SkipReason
 import bidvector.bidding.SubmittedBidAmount
@@ -38,7 +38,10 @@ internal object BidCaseRequests {
 
     fun openCase(body: JsonNode): Pair<NoticeKey, BidKind> {
         val payload = body.requireObject().requireKnownKeys(setOf("noticeNumber", "noticeRound", "bidKind"))
-        return NoticeKey(payload.requiredNonBlankText("noticeNumber"), NoticeRound.of(payload.requiredNonBlankText("noticeRound"))) to
+        return NoticeKey(
+            payload.requiredNonBlankText("noticeNumber"),
+            NoticeRound.of(payload.requiredNonBlankText("noticeRound")),
+        ) to
             payload.enumOf("bidKind", BidKind.entries)
     }
 
@@ -110,7 +113,16 @@ internal object BidCaseRequests {
             memo = payload.optionalNonBlankText("memo")?.let(::BidMemo),
         )
     }
+}
 
+/**
+ * 경로 · 질의 · **주체** 읽기 — 본문 읽기(`BidCaseRequests`)와 가른다.
+ *
+ * 가른 이유는 detekt 의 object 함수 상한(11)이지만, 경계 자체는 의미가 있다: 이쪽은
+ * **요청 봉투**(path · query · 인증 필터가 적은 속성)를 읽고 저쪽은 **본문**을 읽는다.
+ * 주체가 본문 읽기와 같은 자리에 있으면 「본문에서 주체를 받는」 변경이 눈에 덜 띈다.
+ */
+internal object BidCaseRouting {
     fun bidKind(raw: String?): BidKind =
         BidKind.entries.firstOrNull { it.name == raw }
             ?: throw InvalidEditRequestException("bidKind 는 ${BidKind.entries.joinToString("·") { it.name }} 중 하나다")
@@ -144,7 +156,7 @@ internal object BidCaseRequests {
     private const val ACCOUNT_SUBJECT_PREFIX = "account:"
 }
 
-/** 초안 요청이 실어 오는 것 — 공고 스냅샷의 나머지는 서버가 공고에서 뜬다. */
+/** 초안 요청이 실어 오는 것 — 공고 스냅샷은 **서버가 뜨므로** 여기 없다(위협 ③). */
 internal data class DraftInput(
     val amount: SubmittedBidAmount,
     val presentedAt: Instant,

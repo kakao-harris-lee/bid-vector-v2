@@ -45,7 +45,10 @@ class NextCheckpointTest {
         for (state in ALL_STATES) {
             val checkpoint = nextCheckpoint(state, deadline, expected)
             when (val kind = expectedKind.getValue(state.tag)) {
-                null -> checkpoint shouldBe NextCheckpoint.None
+                null -> {
+                    checkpoint shouldBe NextCheckpoint.None
+                }
+
                 else -> {
                     checkpoint.shouldBeInstanceOf<NextCheckpoint.At>()
                     checkpoint.kind shouldBe kind

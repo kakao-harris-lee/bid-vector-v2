@@ -46,7 +46,7 @@ internal object BidEffectWriter {
             statement.setObject(index++, base?.won)
             statement.setString(index++, base?.currency?.name)
             statement.setString(index++, base?.vatTreatment?.name)
-            statement.setString(index, base?.provenance?.let { it::class.simpleName })
+            statement.setString(index, base?.provenance?.let(::provenanceToken))
             statement.executeUpdate()
         }
     }
@@ -110,6 +110,21 @@ internal object BidEffectWriter {
             statement.setLong(1, account.value)
             statement.setLong(2, caseId.value)
             statement.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else null }
+        }
+
+    /**
+     * provenance → 저장 어휘. **반사(`it::class.simpleName`)를 쓰지 않는다** — 타입 이름을
+     * 값으로 꺼내면 클래스 이름을 바꾸는 순간 저장된 값의 뜻이 조용히 달라지고, 그 경로는
+     * 수집 아키텍처 게이트가 막는 자리이기도 하다(`collection.reflection.*`).
+     */
+    private fun provenanceToken(provenance: bidvector.sharedkernel.Provenance): String =
+        when (provenance) {
+            is bidvector.sharedkernel.Provenance.Published -> "Published"
+            bidvector.sharedkernel.Provenance.DerivedFromOpening -> "DerivedFromOpening"
+            is bidvector.sharedkernel.Provenance.FilledFromBudgetKey -> "FilledFromBudgetKey"
+            bidvector.sharedkernel.Provenance.CopiedFromBaseAmount -> "CopiedFromBaseAmount"
+            bidvector.sharedkernel.Provenance.OperatorDeclared -> "OperatorDeclared"
+            bidvector.sharedkernel.Provenance.Undeclared -> "Undeclared"
         }
 
     private fun floorOriginKind(origin: bidvector.sharedkernel.FloorRateOrigin): String =

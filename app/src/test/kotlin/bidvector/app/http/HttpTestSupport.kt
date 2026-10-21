@@ -5,6 +5,9 @@ import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
+import bidvector.workflow.bidding.BidCaseWorkflow
+import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
+import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
@@ -397,6 +400,29 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /** 7B — 입찰 건의 이중체(실 DB 없이 운반 층 거동만 잰다). */
+    @Bean
+    open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
+
+    /**
+     * controller 가 받는 **단 하나의 협력자** — 출하 조립(`BidCaseWiring`)과 같은 형태다.
+     * 저장소를 controller 에 직접 주지 않는다.
+     */
+    @Bean
+    open fun bidCaseWorkflow(
+        inMemoryBidCaseStore: InMemoryBidCaseStore,
+        clock: FixedClock,
+    ): BidCaseWorkflow =
+        BidCaseWorkflow(
+            cases = inMemoryBidCaseStore,
+            deadlines = { keys -> keys.associateWith { clock.now().plusSeconds(1800) } },
+            snapshots = { _, takenAt -> fixedNoticeSnapshot(takenAt) },
+            clock = clock,
+            retentionPolicy =
+                EVIDENCE_RETENTION_POLICY.resolve(LocalDate.now())
+                    as Resolution.Resolved<EvidenceRetentionPolicyData>,
+        )
 
     /**
      * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.

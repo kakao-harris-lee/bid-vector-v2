@@ -81,127 +81,130 @@ private val OUTCOME_TARGETS =
 private fun rows(
     from: List<BidStateTag>,
     command: BidCommandTag,
-    rule: TransitionRule,
-): List<Pair<TransitionKey, TransitionRule>> = from.map { TransitionKey(it, command) to rule }
+    targets: Set<BidStateTag>,
+    actors: Set<ActorKind>,
+): Map<TransitionKey, TransitionRule> = from.associate { TransitionKey(it, command) to TransitionRule(targets, actors) }
+
+/** 나중에 ↔ 관심. 되돌리기는 리마인드 도달(시스템)로도 일어날 수 있다. */
+private val DEFER_ROWS =
+    rows(
+        listOf(BidStateTag.WATCHING, BidStateTag.PRICE_RECEIVED),
+        BidCommandTag.DEFER,
+        setOf(BidStateTag.DEFERRED),
+        USER_ONLY,
+    ) +
+        rows(
+            listOf(BidStateTag.DEFERRED),
+            BidCommandTag.RESUME,
+            setOf(BidStateTag.WATCHING),
+            USER_OR_SYSTEM,
+        )
+
+/** 투찰가 메뉴 수령 — **시스템만**(운영자가 「받았다」를 지어낼 수 없다). 오늘 호출자는 없다. */
+private val PRICE_MENU_ROWS =
+    rows(
+        listOf(BidStateTag.WATCHING, BidStateTag.DEFERRED),
+        BidCommandTag.RECEIVE_PRICE_MENU,
+        setOf(BidStateTag.PRICE_RECEIVED),
+        SYSTEM_ONLY,
+    )
+
+/** 초안 만들기·수정 — 수정도 같은 명령이고 출발 상태가 `BID_PLANNED` 인 것이 다를 뿐이다. */
+private val DRAFT_ROWS =
+    rows(PRE_SUBMISSION, BidCommandTag.DRAFT_BID, setOf(BidStateTag.BID_PLANNED), USER_ONLY)
+
+/** 「제출함」·기록 갱신·소급 확인 — 셋이 한 명령이고 **출발 상태가 가른다**. */
+private val RECORD_ROWS =
+    rows(
+        listOf(
+            BidStateTag.BID_PLANNED,
+            BidStateTag.BID_RECORDED,
+            BidStateTag.DEADLINE_PASSED_UNRECORDED,
+        ),
+        BidCommandTag.RECORD_BID,
+        setOf(BidStateTag.BID_RECORDED),
+        USER_ONLY,
+    )
+
+/** 개찰 축 — 오늘은 운영자가 입력하고, SET-02 가 서면 같은 행을 시스템이 쓴다. */
+private val OPENING_ROWS =
+    rows(
+        listOf(BidStateTag.BID_RECORDED),
+        BidCommandTag.AWAIT_OPENING,
+        setOf(BidStateTag.AWAITING_OPENING),
+        USER_OR_SYSTEM,
+    ) +
+        rows(
+            listOf(BidStateTag.AWAITING_OPENING),
+            BidCommandTag.RECORD_OPENING_FIRST,
+            setOf(BidStateTag.OPENED_PROVISIONAL_FIRST),
+            USER_OR_SYSTEM,
+        ) +
+        rows(
+            listOf(BidStateTag.AWAITING_OPENING),
+            BidCommandTag.RECORD_OPENING_OUT_OF_RANK,
+            setOf(BidStateTag.OPENED_OUT_OF_RANK),
+            USER_OR_SYSTEM,
+        ) +
+        rows(
+            listOf(BidStateTag.OPENED_PROVISIONAL_FIRST),
+            BidCommandTag.ENTER_QUALIFICATION_REVIEW,
+            setOf(BidStateTag.UNDER_QUALIFICATION_REVIEW),
+            USER_ONLY,
+        )
+
+/** 결과 기록과 **정정**(§6.1 「사용자 정정」) — 정정은 사용자만이고 사유가 필수다. */
+private val OUTCOME_ROWS =
+    rows(
+        listOf(
+            BidStateTag.OPENED_PROVISIONAL_FIRST,
+            BidStateTag.OPENED_OUT_OF_RANK,
+            BidStateTag.UNDER_QUALIFICATION_REVIEW,
+        ),
+        BidCommandTag.RECORD_OUTCOME,
+        OUTCOME_TARGETS,
+        USER_OR_SYSTEM,
+    ) +
+        rows(
+            OUTCOME_TARGETS.toList(),
+            BidCommandTag.CORRECT_OUTCOME,
+            OUTCOME_TARGETS,
+            USER_ONLY,
+        )
+
+/** 종료 가지 둘 — 건너뜀(종단)과 마감 지남(소급 입구 하나가 남는다). */
+private val EXIT_ROWS =
+    rows(PRE_SUBMISSION, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED), USER_ONLY) +
+        rows(
+            PRE_SUBMISSION,
+            BidCommandTag.MARK_DEADLINE_PASSED,
+            setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            USER_OR_SYSTEM,
+        )
 
 /**
  * **전이표 — 이 slice 의 정본.** 금지 전이는 「표에 없는 것」이라 구조로 거부된다
  * (`InvalidTransition`), 금지 목록을 따로 들지 않는다.
  *
- * 「보류」 상태가 없는 것과 마찬가지로, 여기 없는 `(상태, 명령)` 쌍 **182** 는 전부 거부다
- * (14 상태 × 13 명령 = 182 쌍 중 표가 든 것만 허용 — `BidTransitionTableTest` 가 전수로 잰다).
+ * 묶음을 `+` 로 잇는다 — `buildMap {}` 람다 하나로 몰면 그 람다가 **함수 50줄 한도**에 걸린다
+ * (`CleanMigrationColumnTest` 가 같은 이유로 테이블별 리스트를 `+` 로 잇는다).
  *
  * **종단은 [BidStateTag.SKIPPED] 하나뿐이다.** `DEADLINE_PASSED_UNRECORDED` 는 여정의 종료
- * 가지이지만 Q-11(소급 무기한)이 `RECORD_BID` 한 간선을 남긴다. 낙찰 · 패찰 · 유찰 셋은
- * `CORRECT_OUTCOME` 으로 서로 오간다(§6.1 「사용자 정정」).
+ * 가지이지만 Q-11(소급 무기한)이 `RECORD_BID` 한 간선을 남긴다. 낙찰·패찰·유찰 셋은
+ * `CORRECT_OUTCOME` 으로 서로 오간다.
  *
- * **`SYSTEM` 행에 오늘 호출자가 없다**(SET-01 · SET-02 · DEC 메뉴는 범위 밖, 알려진 제한 ②).
+ * **`SYSTEM` 행에 오늘 호출자가 없다**(SET-01·SET-02·DEC 메뉴는 범위 밖, 알려진 제한 ②).
  * 사용자 입력 경로는 열려 있다 — §6.1 이 *"「몇 위였나」는 사용자가 나라장터에서 보고 오거나
  * 입력해야 한다"* 라 적는다.
+ *
+ * 이 표가 §6.1 과 같은지는 `BidTransitionTableTest` 의 **골든 목록**이 집합 등식으로 잰다 —
+ * 표에서 도출한 전수만으로는 표의 변화를 잡지 못한다(변이 ③ 실측).
  */
 val BID_TRANSITIONS: Map<TransitionKey, TransitionRule> =
-    buildMap {
-        // 나중에 ↔ 관심
-        putAll(
-            rows(
-                listOf(BidStateTag.WATCHING, BidStateTag.PRICE_RECEIVED),
-                BidCommandTag.DEFER,
-                TransitionRule(setOf(BidStateTag.DEFERRED), USER_ONLY),
-            ),
-        )
-        put(
-            TransitionKey(BidStateTag.DEFERRED, BidCommandTag.RESUME),
-            TransitionRule(setOf(BidStateTag.WATCHING), USER_OR_SYSTEM),
-        )
+    DEFER_ROWS + PRICE_MENU_ROWS + DRAFT_ROWS + RECORD_ROWS + OPENING_ROWS + OUTCOME_ROWS + EXIT_ROWS
 
-        // 투찰가 메뉴 수령 — 시스템만(운영자가 「받았다」를 지어낼 수 없다)
-        putAll(
-            rows(
-                listOf(BidStateTag.WATCHING, BidStateTag.DEFERRED),
-                BidCommandTag.RECEIVE_PRICE_MENU,
-                TransitionRule(setOf(BidStateTag.PRICE_RECEIVED), SYSTEM_ONLY),
-            ),
-        )
-
-        // 초안 만들기 · 수정
-        putAll(
-            rows(
-                PRE_SUBMISSION,
-                BidCommandTag.DRAFT_BID,
-                TransitionRule(setOf(BidStateTag.BID_PLANNED), USER_ONLY),
-            ),
-        )
-
-        // 「제출함」 · 기록 갱신 · 소급 확인 — 셋이 한 명령이고 출발 상태가 가른다
-        putAll(
-            rows(
-                listOf(
-                    BidStateTag.BID_PLANNED,
-                    BidStateTag.BID_RECORDED,
-                    BidStateTag.DEADLINE_PASSED_UNRECORDED,
-                ),
-                BidCommandTag.RECORD_BID,
-                TransitionRule(setOf(BidStateTag.BID_RECORDED), USER_ONLY),
-            ),
-        )
-
-        put(
-            TransitionKey(BidStateTag.BID_RECORDED, BidCommandTag.AWAIT_OPENING),
-            TransitionRule(setOf(BidStateTag.AWAITING_OPENING), USER_OR_SYSTEM),
-        )
-        put(
-            TransitionKey(BidStateTag.AWAITING_OPENING, BidCommandTag.RECORD_OPENING_FIRST),
-            TransitionRule(setOf(BidStateTag.OPENED_PROVISIONAL_FIRST), USER_OR_SYSTEM),
-        )
-        put(
-            TransitionKey(BidStateTag.AWAITING_OPENING, BidCommandTag.RECORD_OPENING_OUT_OF_RANK),
-            TransitionRule(setOf(BidStateTag.OPENED_OUT_OF_RANK), USER_OR_SYSTEM),
-        )
-        put(
-            TransitionKey(
-                BidStateTag.OPENED_PROVISIONAL_FIRST,
-                BidCommandTag.ENTER_QUALIFICATION_REVIEW,
-            ),
-            TransitionRule(setOf(BidStateTag.UNDER_QUALIFICATION_REVIEW), USER_ONLY),
-        )
-
-        // 결과 기록 — 셋 중 하나를 payload 가 고른다
-        putAll(
-            rows(
-                listOf(
-                    BidStateTag.OPENED_PROVISIONAL_FIRST,
-                    BidStateTag.OPENED_OUT_OF_RANK,
-                    BidStateTag.UNDER_QUALIFICATION_REVIEW,
-                ),
-                BidCommandTag.RECORD_OUTCOME,
-                TransitionRule(OUTCOME_TARGETS, USER_OR_SYSTEM),
-            ),
-        )
-        // 결과 정정 — 사용자만, 사유 필수(타입이 진다)
-        putAll(
-            rows(
-                OUTCOME_TARGETS.toList(),
-                BidCommandTag.CORRECT_OUTCOME,
-                TransitionRule(OUTCOME_TARGETS, USER_ONLY),
-            ),
-        )
-
-        // 종료 가지 둘
-        putAll(
-            rows(
-                PRE_SUBMISSION,
-                BidCommandTag.SKIP,
-                TransitionRule(setOf(BidStateTag.SKIPPED), USER_ONLY),
-            ),
-        )
-        putAll(
-            rows(
-                PRE_SUBMISSION,
-                BidCommandTag.MARK_DEADLINE_PASSED,
-                TransitionRule(setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED), USER_OR_SYSTEM),
-            ),
-        )
-    }
+/** 부수 산출이 없는 전이 — 상태만 바뀌고 초안·기록은 쓰이지 않는다. */
+private fun BidState.alone(): Pair<BidState, TransitionEffect> = this to TransitionEffect.None
 
 /** payload 가 고르는 도착 상태 — `when` 전수라 명령을 더하면 답 없이는 컴파일되지 않는다. */
 private fun targetOf(
@@ -210,32 +213,36 @@ private fun targetOf(
     retroactive: Boolean,
 ): Pair<BidState, TransitionEffect> =
     when (command) {
-        is BidCommand.Defer -> BidState.Deferred(command.remindAt) to TransitionEffect.None
-        BidCommand.Resume -> BidState.Watching to TransitionEffect.None
-        is BidCommand.ReceivePriceMenu -> BidState.PriceReceived to TransitionEffect.None
+        is BidCommand.Defer -> BidState.Deferred(command.remindAt).alone()
+        BidCommand.Resume -> BidState.Watching.alone()
+        is BidCommand.ReceivePriceMenu -> BidState.PriceReceived.alone()
         is BidCommand.DraftBid -> BidState.BidPlanned to TransitionEffect.DraftWritten(command.draft)
-        is BidCommand.RecordBid ->
-            BidState.BidRecorded to
-                TransitionEffect.RecordWritten(
-                    BidRecordEntry(
-                        submission = command.submission,
-                        confirmedAt = now,
-                        retroactive = retroactive,
-                        evidenceRetainUntil = command.evidenceRetainUntil,
-                    ),
-                )
-
-        is BidCommand.AwaitOpening -> BidState.AwaitingOpening(command.openingAt) to TransitionEffect.None
-        BidCommand.RecordOpeningFirst -> BidState.OpenedProvisionalFirst to TransitionEffect.None
-        BidCommand.RecordOpeningOutOfRank -> BidState.OpenedOutOfRank to TransitionEffect.None
-        is BidCommand.EnterQualificationReview ->
-            BidState.UnderQualificationReview(command.documentDueAt) to TransitionEffect.None
-
-        is BidCommand.RecordOutcome -> command.outcome.toState() to TransitionEffect.None
-        is BidCommand.CorrectOutcome -> command.outcome.toState() to TransitionEffect.None
-        is BidCommand.Skip -> BidState.Skipped(command.reason) to TransitionEffect.None
-        BidCommand.MarkDeadlinePassed -> BidState.DeadlinePassedUnrecorded to TransitionEffect.None
+        is BidCommand.RecordBid -> recordTarget(command, now, retroactive)
+        is BidCommand.AwaitOpening -> BidState.AwaitingOpening(command.openingAt).alone()
+        BidCommand.RecordOpeningFirst -> BidState.OpenedProvisionalFirst.alone()
+        BidCommand.RecordOpeningOutOfRank -> BidState.OpenedOutOfRank.alone()
+        is BidCommand.EnterQualificationReview -> BidState.UnderQualificationReview(command.documentDueAt).alone()
+        is BidCommand.RecordOutcome -> command.outcome.toState().alone()
+        is BidCommand.CorrectOutcome -> command.outcome.toState().alone()
+        is BidCommand.Skip -> BidState.Skipped(command.reason).alone()
+        BidCommand.MarkDeadlinePassed -> BidState.DeadlinePassedUnrecorded.alone()
     }
+
+/** 기록 전이의 도착과 산출 — 서버가 정하는 둘(확인 시각 · 소급)을 여기서 싣는다. */
+private fun recordTarget(
+    command: BidCommand.RecordBid,
+    now: Instant,
+    retroactive: Boolean,
+): Pair<BidState, TransitionEffect> =
+    BidState.BidRecorded to
+        TransitionEffect.RecordWritten(
+            BidRecordEntry(
+                submission = command.submission,
+                confirmedAt = now,
+                retroactive = retroactive,
+                evidenceRetainUntil = command.evidenceRetainUntil,
+            ),
+        )
 
 /** 타임라인에 남길 사유 — 건너뜀 · 정정만 값을 갖는다(나머지는 사유 열이 비는 것이 정상이다). */
 private fun reasonOf(command: BidCommand): TransitionReason? =
@@ -263,19 +270,33 @@ fun applyCommand(
     val rule =
         BID_TRANSITIONS[TransitionKey(current.tag, command.tag)]
             ?: return TransitionOutcome.Rejected(RejectionReason.InvalidTransition)
-    if (actor !in rule.actors) {
-        return TransitionOutcome.Rejected(RejectionReason.ActorNotPermitted)
-    }
-    val retroactive =
-        current.tag == BidStateTag.DEADLINE_PASSED_UNRECORDED &&
-            command.tag == BidCommandTag.RECORD_BID
+    val retroactive = isRetroactive(current, command)
+    // payload 가 고르는 도착은 **순수 계산**이라 주체 판정보다 먼저 구해도 부수효과가 없다.
     val (next, effect) = targetOf(command, now, retroactive)
-    if (next.tag !in rule.allowedTargets) {
-        return TransitionOutcome.Rejected(RejectionReason.TargetNotAllowed)
-    }
-    return TransitionOutcome.Accepted(next, effect, retroactive, reasonOf(command))
+    return actorRejection(rule, actor)
+        ?: targetRejection(rule, next)
+        ?: TransitionOutcome.Accepted(next, effect, retroactive, reasonOf(command))
 }
 
+/** 소급 판정 — 출발이 「마감 지남(미확인)」인 기록만 소급이다(Q-11). */
+private fun isRetroactive(
+    current: BidState,
+    command: BidCommand,
+): Boolean =
+    current.tag == BidStateTag.DEADLINE_PASSED_UNRECORDED &&
+        command.tag == BidCommandTag.RECORD_BID
+
+private fun actorRejection(
+    rule: TransitionRule,
+    actor: ActorKind,
+): TransitionOutcome.Rejected? =
+    if (actor in rule.actors) null else TransitionOutcome.Rejected(RejectionReason.ActorNotPermitted)
+
+private fun targetRejection(
+    rule: TransitionRule,
+    next: BidState,
+): TransitionOutcome.Rejected? =
+    if (next.tag in rule.allowedTargets) null else TransitionOutcome.Rejected(RejectionReason.TargetNotAllowed)
+
 /** 나가는 간선이 0 인 상태 — 표에서 **도출한다**(별도 목록을 두면 표와 갈린다). */
-fun isTerminal(state: BidStateTag): Boolean =
-    BID_TRANSITIONS.keys.none { it.from == state }
+fun isTerminal(state: BidStateTag): Boolean = BID_TRANSITIONS.keys.none { it.from == state }

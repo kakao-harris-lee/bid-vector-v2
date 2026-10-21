@@ -3,7 +3,6 @@ package bidvector.adapters.bidding
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCommand
-import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
@@ -11,6 +10,7 @@ import bidvector.bidding.BidSubmission
 import bidvector.bidding.EvidenceRef
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SkipReason
+import bidvector.bidding.SubmittedBidAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
@@ -220,9 +220,11 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         seedNotice(key)
         val opened = workflow.open(mine, key, BidKind.REAL)
 
-        workflow.draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
+        workflow
+            .draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
-        workflow.draft(mine, opened.case.id, amount(2_000_000L), now, BidActor.User(mine))
+        workflow
+            .draft(mine, opened.case.id, amount(2_000_000L), now, BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
 
         dataSource().connection.use { connection ->

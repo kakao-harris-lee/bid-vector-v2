@@ -51,28 +51,41 @@ fun nextCheckpoint(
         BidState.Watching,
         BidState.PriceReceived,
         BidState.BidPlanned,
-        -> at(noticeDeadlineAt, CheckpointKind.DEADLINE)
+        -> {
+            at(noticeDeadlineAt, CheckpointKind.DEADLINE)
+        }
 
-        is BidState.Deferred -> NextCheckpoint.At(state.remindAt, CheckpointKind.REMINDER)
+        is BidState.Deferred -> {
+            NextCheckpoint.At(state.remindAt, CheckpointKind.REMINDER)
+        }
 
         // 개찰일시를 아직 모른다 — 운영자가 `AWAIT_OPENING` 으로 적으면 그때 생긴다.
-        BidState.BidRecorded -> NextCheckpoint.None
+        BidState.BidRecorded -> {
+            NextCheckpoint.None
+        }
 
-        is BidState.AwaitingOpening -> NextCheckpoint.At(state.openingAt, CheckpointKind.OPENING)
+        is BidState.AwaitingOpening -> {
+            NextCheckpoint.At(state.openingAt, CheckpointKind.OPENING)
+        }
 
         BidState.OpenedProvisionalFirst,
         BidState.OpenedOutOfRank,
-        -> at(outcomeNoticeExpectedAt, CheckpointKind.NOTICE_EXPECTED)
+        -> {
+            at(outcomeNoticeExpectedAt, CheckpointKind.NOTICE_EXPECTED)
+        }
 
-        is BidState.UnderQualificationReview ->
+        is BidState.UnderQualificationReview -> {
             NextCheckpoint.At(state.documentDueAt, CheckpointKind.DOCUMENT_DUE)
+        }
 
         BidState.Won,
         BidState.Lost,
         BidState.FailedOrRebid,
         is BidState.Skipped,
         BidState.DeadlinePassedUnrecorded,
-        -> NextCheckpoint.None
+        -> {
+            NextCheckpoint.None
+        }
     }
 
 private fun at(

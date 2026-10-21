@@ -14,9 +14,8 @@ import org.junit.jupiter.api.Test
  * 같은 집합이 아니면 전수가 조용히 줄어든다.
  */
 class BidTransitionTableTest {
-    private val OUTCOMES =
+    private val outcomes =
         setOf(BidStateTag.WON, BidStateTag.LOST, BidStateTag.FAILED_OR_REBID)
-
 
     /**
      * **표와 독립인 골든 목록** — `ux-journey-research.md` §6.1 의 상태 기계와 계약 r2 의
@@ -61,12 +60,12 @@ class BidTransitionTableTest {
                 BidCommandTag.ENTER_QUALIFICATION_REVIEW,
                 setOf(BidStateTag.UNDER_QUALIFICATION_REVIEW),
             ),
-            Triple(BidStateTag.OPENED_PROVISIONAL_FIRST, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
-            Triple(BidStateTag.OPENED_OUT_OF_RANK, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
-            Triple(BidStateTag.UNDER_QUALIFICATION_REVIEW, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
-            Triple(BidStateTag.WON, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
-            Triple(BidStateTag.LOST, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
-            Triple(BidStateTag.FAILED_OR_REBID, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.OPENED_PROVISIONAL_FIRST, BidCommandTag.RECORD_OUTCOME, outcomes),
+            Triple(BidStateTag.OPENED_OUT_OF_RANK, BidCommandTag.RECORD_OUTCOME, outcomes),
+            Triple(BidStateTag.UNDER_QUALIFICATION_REVIEW, BidCommandTag.RECORD_OUTCOME, outcomes),
+            Triple(BidStateTag.WON, BidCommandTag.CORRECT_OUTCOME, outcomes),
+            Triple(BidStateTag.LOST, BidCommandTag.CORRECT_OUTCOME, outcomes),
+            Triple(BidStateTag.FAILED_OR_REBID, BidCommandTag.CORRECT_OUTCOME, outcomes),
             Triple(BidStateTag.WATCHING, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
             Triple(BidStateTag.DEFERRED, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
             Triple(BidStateTag.PRICE_RECEIVED, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
