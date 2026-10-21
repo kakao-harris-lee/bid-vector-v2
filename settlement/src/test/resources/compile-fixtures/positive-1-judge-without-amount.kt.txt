@@ -1,0 +1,11 @@
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.OperatorTradeName
+import bidvector.settlement.decideAwardLookup
+import bidvector.settlement.judgeAwardOutcome
+
+fun positiveJudgeWithoutAmount() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val lookup = decideAwardLookup(OperatorTradeName.Declared("GasangMarine"), policy)
+    judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("GasangMarine"), policy)
+}
