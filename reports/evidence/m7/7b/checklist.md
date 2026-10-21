@@ -1,0 +1,457 @@
+# M7/7B — 입찰 건 모듈(`bidding`) · BID-01 등재 · V21 — evidence
+
+계약: `reports/evidence/m7/7b/scope.md`(커밋 `faaaa105`). base `bee7c36f`.
+
+---
+
+## Phase 1 — 설계 (코드·마이그레이션 쓰기 전, 팀장 답 대기)
+
+읽은 정본: `ux-journey-research.md` §6.1(:183-228) · `adr/0006-gradle-modules.md` D-2·D-2.1(:60,71-94) ·
+`decisions-2026-09-07.md` Q-7·Q-11·Q-12(:20-25,32) · `m7-screen-data-requirements.md` 7B 행(:51-109,149) ·
+`capability-map.md` OPEN-ADR-14(:3102)·§0.6(:120-131)·§10(:2831-2856)·STR-16 블록(:715-760)·활성 집계(:2962) ·
+`milestone-7.md` R-2·R-5(:88-108). 선례: V20 · V9 · V12 · V3 · V16 · `RetentionTableRegistry` ·
+`CleanMigration*Test` · `workflow/strategy`(Transition·TransitionOutcome·Actor) · `BrowserAccessPolicyData` ·
+`RequestAuthenticationFilter` · `architecture-policy.properties` · `gate-tests.properties`.
+
+### 1. 상태 집합
+
+§6.1 의 어휘를 그대로 쓴다. **「보류」는 없다** — 「나중에(리마인드 시각)」와 「건너뜀(사유)」로 갈린다.
+「후보(제안됨/검색됨)」는 **영속 상태가 아니다**: pull 모델(§0.7 — 「내 입찰함은 사용자가 담은 것만 담는다」)
+에서 건은 사용자가 담는 순간 태어난다. 그래서 첫 영속 상태는 `WATCHING` 이다.
+
+| # | 상태 | 어휘(DB) | 종단 | 다음 확인 시점 |
+|---|---|---|---|---|
+| 1 | 관심 | `WATCHING` | 아니다 | 마감 |
+| 2 | 나중에 | `DEFERRED` | 아니다 | 리마인드(필수) |
+| 3 | 투찰가 받음 | `PRICE_RECEIVED` | 아니다 | 마감 |
+| 4 | 투찰 예정(초안) | `BID_PLANNED` | 아니다 | 마감 |
+| 5 | 투찰 기록됨 | `BID_RECORDED` | 아니다 | 개찰일시, 없으면 「없음」 |
+| 6 | 개찰 대기 | `AWAITING_OPENING` | 아니다 | 개찰일시(필수) |
+| 7 | 개찰됨·잠정 1위 | `OPENED_PROVISIONAL_FIRST` | 아니다 | 서류 기한, 없으면 「없음」 |
+| 8 | 개찰됨·순위 밖 | `OPENED_OUT_OF_RANK` | 아니다 | 통보 예정일, 없으면 「없음」 |
+| 9 | 적격심사 중 | `UNDER_QUALIFICATION_REVIEW` | 아니다 | 서류 기한(필수) |
+| 10 | 낙찰 | `WON` | 정정만 | 「없음」 |
+| 11 | 패찰 | `LOST` | 정정만 | 「없음」 |
+| 12 | 유찰·재공고 | `FAILED_OR_REBID` | 정정만 | 「없음」 |
+| 13 | 건너뜀 | `SKIPPED` | **그렇다** | 「없음」 |
+| 14 | 마감 지남(미확인) | `DEADLINE_PASSED_UNRECORDED` | **아니다** | 「없음」 |
+
+**계약 문면과의 차이 둘 — 보고 대상.**
+
+- 계약은 *"종료 가지는 건너뜀과 마감 지남(미확인)이다"* 라 적는다. 그런데 Q-11 이 **소급 확인을 무기한**
+  허용하므로 `DEADLINE_PASSED_UNRECORDED` 에는 **나가는 간선이 정확히 하나**(소급 기록) 있어야 한다.
+  그래서 이 상태는 「여정의 종료 가지」이되 **전이표의 종단은 아니다**. 둘이 같은 말이 아님을 전이표가
+  구조로 적는다(`terminal` 술어 = 나가는 간선 0 → `SKIPPED` 하나뿐).
+- §6.1 은 낙찰/패찰/유찰을 *"자동(SET-01) + 사용자 정정"* 이라 적는다. 정정을 두지 않으면 잘못 들어온
+  결과가 영구히 굳는다. 그래서 10~12 끼리의 `CORRECT_OUTCOME` 전이를 두되 **사유를 필수**로 하고
+  타임라인에 남긴다(원본을 덮어쓰지 않는다 — `.claude/rules/kotlin-service.md` 「확정 금액 정정」과 같은 축).
+
+### 2. 전이표 (상태 × 명령 → 다음 상태 · 필수 인자 · 허용 주체)
+
+선언적 표 하나다. **금지 전이는 표에 없는 것**이라 구조로 거부된다(중첩 분기 0).
+
+| 현재 | 명령 | 다음 | 필수 인자 | 주체 |
+|---|---|---|---|---|
+| (없음) | `ADD_TO_BID_BOX` | `WATCHING` | 공고 키 · `bidKind` | User |
+| `WATCHING` · `PRICE_RECEIVED` | `DEFER` | `DEFERRED` | `remindAt` | User |
+| `DEFERRED` | `RESUME` | `WATCHING` | — | User · System(리마인드 도달) |
+| `WATCHING` · `DEFERRED` | `RECEIVE_PRICE_MENU` | `PRICE_RECEIVED` | 메뉴 참조 | System(DEC) |
+| `WATCHING` · `DEFERRED` · `PRICE_RECEIVED` | `DRAFT_BID` | `BID_PLANNED` | 금액(원·basis·provenance) · `presentedAt` · 공고 스냅샷 | User |
+| `BID_PLANNED` | `REVISE_DRAFT` | `BID_PLANNED` | 위와 같음 | User |
+| `BID_PLANNED` | `RECORD_BID` | `BID_RECORDED` | 금액 · `submittedAt` | User |
+| `DEADLINE_PASSED_UNRECORDED` | `RECORD_BID_RETROACTIVELY` | `BID_RECORDED` | 금액 · `submittedAt` | User |
+| `BID_RECORDED` | `UPDATE_BID_RECORD` | `BID_RECORDED` | 금액 · `submittedAt` | User |
+| `BID_RECORDED` | `AWAIT_OPENING` | `AWAITING_OPENING` | `openingAt` | User · System |
+| `AWAITING_OPENING` | `RECORD_OPENING_FIRST` | `OPENED_PROVISIONAL_FIRST` | — | User · System(SET-02) |
+| `AWAITING_OPENING` | `RECORD_OPENING_OUT_OF_RANK` | `OPENED_OUT_OF_RANK` | — | User · System(SET-02) |
+| `OPENED_PROVISIONAL_FIRST` | `ENTER_QUALIFICATION_REVIEW` | `UNDER_QUALIFICATION_REVIEW` | `documentDueAt` | User |
+| `OPENED_PROVISIONAL_FIRST` · `OPENED_OUT_OF_RANK` · `UNDER_QUALIFICATION_REVIEW` | `RECORD_OUTCOME` | `WON` · `LOST` · `FAILED_OR_REBID` | 결과 | User · System(SET-01) |
+| `WON` · `LOST` · `FAILED_OR_REBID` | `CORRECT_OUTCOME` | `WON` · `LOST` · `FAILED_OR_REBID` | 결과 · **사유** | User |
+| `WATCHING` · `DEFERRED` · `PRICE_RECEIVED` · `BID_PLANNED` | `SKIP` | `SKIPPED` | **사유** | User |
+| `WATCHING` · `DEFERRED` · `PRICE_RECEIVED` · `BID_PLANNED` | `MARK_DEADLINE_PASSED` | `DEADLINE_PASSED_UNRECORDED` | — | User · System(시각 판정) |
+
+**자동 전이의 호출자가 이 slice 에 없다**(SET-01·SET-02·DEC 메뉴가 범위 밖). 표에는 행이 있고 HTTP 는
+**사용자 명령만** 연다 — 그래서 `RECEIVE_PRICE_MENU` 는 오늘 도달 불가다(알려진 제한 ①). 어휘를 지금
+두는 이유는 나중에 CHECK 어휘를 늘리는 마이그레이션(되돌리기 어려운 경로)을 한 번 더 만들지 않기
+위해서다. §6.1 이 이미 이 상태를 적는다.
+
+### 3. 다음 확인 시점 — 「비어 있지 않음」을 세 겹으로
+
+- **타입**: `sealed interface NextCheckpoint { data class At(at, kind); data object None }` — nullable 이
+  아니다. `kind` 는 `DEADLINE · OPENING · DOCUMENT_DUE · NOTICE_EXPECTED · REMINDER`.
+- **순수 함수**: `nextCheckpoint(case, now): NextCheckpoint` 는 상태 sealed 에 대한 `when` 전수라
+  **상태를 더하면 답을 주지 않고는 컴파일되지 않는다**. 저장하지 않는다(파생값을 영속화하면 드리프트가
+  생긴다 — 「서버가 한 시각 기준으로 판정」과도 맞는다).
+- **CHECK**: 함수가 전역(total)이려면 **입력이 상태별로 보장**돼야 한다. 그것을 DB 가 진다 —
+  `state <> 'DEFERRED' OR remind_at IS NOT NULL` 등(아래 §5). 즉 타입이 출력을, CHECK 가 입력을 막고,
+  속성 test 가 전 상태에 대해 전역성을 증명한다.
+- `None` 은 **종단·종료 가지에서만** 나오고 「없음」으로 명시 표시된다(빈 값이 아니다).
+
+### 4. 페이퍼/실 분리 — 구조로
+
+- `BidKind` 는 sealed(`Real`/`Paper`)이고 **모든 목록 포트의 필수 인자**다. 둘을 함께 내는 operation 이
+  **없다**(서명에 자리가 없다).
+- SET-02 후보 술어는 `fun reconciliationCandidate(case: RealBidCase): Boolean` 이다. `RealBidCase` 는
+  `internal constructor` 이고 좁히기 함수(`BidCase.asReal(): RealBidCase?`)로만 얻는다 — 페이퍼 건을 그
+  자리에 **넘길 수 없다**(`AppliedStrategy` 선례와 같은 폐쇄). 술어 본문은 `state is BidState.BidRecorded`.
+- 대사 **실행**은 SET 소유다. 이 slice 는 술어와 그 술어를 읽는 응답 필드(`reconciliationCandidate`)까지.
+
+### 5. 표 설계 (V21) — DDL 초안
+
+번호는 D-6A1-12 대로 PR 직전 재확인한다(착수 시점 main 최대 `V20`, 병행 레인 중 마이그레이션을 만드는
+것은 이 slice 뿐). 표 넷이다. 모든 사용자 소유 표에 `account_id BIGINT NOT NULL REFERENCES account(id)`.
+
+#### 5.1 `bid_case` — 건
+
+```sql
+CREATE TABLE bid_case (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account_id BIGINT NOT NULL REFERENCES account (id),
+
+    -- 공고 키는 **사본**이다(FK 를 두지 않는다 — §5.5 근거).
+    notice_number TEXT NOT NULL CHECK (notice_number <> ''),
+    notice_round  TEXT NOT NULL CHECK (notice_round ~ '^[0-9]{3}$'),
+
+    bid_kind TEXT NOT NULL CHECK (bid_kind IN ('REAL', 'PAPER')),
+    state    TEXT NOT NULL CHECK (state IN (
+        'WATCHING','DEFERRED','PRICE_RECEIVED','BID_PLANNED','BID_RECORDED',
+        'AWAITING_OPENING','OPENED_PROVISIONAL_FIRST','OPENED_OUT_OF_RANK',
+        'UNDER_QUALIFICATION_REVIEW','WON','LOST','FAILED_OR_REBID',
+        'SKIPPED','DEADLINE_PASSED_UNRECORDED')),   -- 'ON_HOLD'(보류)는 어휘에 없다
+    case_version INT NOT NULL CHECK (case_version >= 0),
+
+    -- 「다음 확인 시점」의 입력 축
+    remind_at                  TIMESTAMPTZ,
+    opening_at                 TIMESTAMPTZ,
+    document_due_at            TIMESTAMPTZ,
+    outcome_notice_expected_at TIMESTAMPTZ,
+
+    skip_reason TEXT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL,
+
+    -- 「같은 공고에 기록이 여러 번 갱신돼도 건은 하나다」 + 페이퍼/실 분리
+    UNIQUE (account_id, notice_number, notice_round, bid_kind),
+
+    CHECK (state <> 'DEFERRED'                   OR remind_at       IS NOT NULL),
+    CHECK (state <> 'AWAITING_OPENING'           OR opening_at      IS NOT NULL),
+    CHECK (state <> 'UNDER_QUALIFICATION_REVIEW' OR document_due_at IS NOT NULL),
+    CHECK (state <> 'SKIPPED'                    OR (skip_reason IS NOT NULL AND skip_reason <> '')),
+    CHECK (state =  'SKIPPED'                    OR skip_reason IS NULL)
+);
+CREATE INDEX bid_case_owner_idx ON bid_case (account_id, bid_kind, state);
+```
+
+#### 5.2 `bid_case_transition` — 타임라인(append-only)
+
+```sql
+CREATE TABLE bid_case_transition (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    case_id    BIGINT NOT NULL REFERENCES bid_case (id),
+    account_id BIGINT NOT NULL REFERENCES account (id),   -- 소유 필터를 이 표에서도 구조로
+
+    case_version INT NOT NULL CHECK (case_version >= 0),
+    from_state TEXT,                                      -- 생성 전이만 NULL
+    to_state   TEXT NOT NULL,
+    command    TEXT NOT NULL,                             -- 전이표 명령 어휘
+
+    actor_kind   TEXT NOT NULL CHECK (actor_kind IN ('USER', 'SYSTEM')),
+    actor_detail TEXT CHECK (actor_detail <> ''),
+    CHECK ((actor_kind = 'SYSTEM') = (actor_detail IS NOT NULL)),  -- USER 의 주체는 account_id
+
+    reason      TEXT CHECK (reason <> ''),   -- 사유. **메모 본문은 여기 들어오지 않는다**
+    retroactive BOOLEAN NOT NULL,            -- Q-11 소급 표시
+
+    occurred_at TIMESTAMPTZ NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    UNIQUE (case_id, case_version),
+    CHECK (command NOT IN ('SKIP', 'CORRECT_OUTCOME') OR reason IS NOT NULL)
+);
+CREATE INDEX bid_case_transition_case_idx ON bid_case_transition (case_id, case_version);
+
+CREATE TRIGGER bid_case_transition_append_only
+    BEFORE UPDATE OR DELETE ON bid_case_transition
+    FOR EACH ROW EXECUTE FUNCTION reject_mutation();      -- V3 의 함수를 재사용
+REVOKE TRUNCATE ON bid_case_transition FROM PUBLIC;
+```
+
+#### 5.3 `bid_draft` — 투찰 예정 초안(append-only, 스냅샷 사본)
+
+수정은 **새 행**(`draft_seq+1`)이다 — 그래서 스냅샷 불변이 *문장*이 아니라 **UPDATE 권한의 부재와
+트리거**가 진다.
+
+```sql
+CREATE TABLE bid_draft (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    case_id    BIGINT NOT NULL REFERENCES bid_case (id),
+    account_id BIGINT NOT NULL REFERENCES account (id),
+    draft_seq  INT NOT NULL CHECK (draft_seq >= 0),
+    UNIQUE (case_id, draft_seq),
+
+    -- 금액: 원 단위 + basis + provenance (§6 — 메뉴 값 위장 금지)
+    amount_won      NUMERIC(20, 0) NOT NULL CHECK (amount_won BETWEEN 0 AND 9223372036854775807),
+    amount_currency TEXT NOT NULL,
+    amount_vat      TEXT NOT NULL,
+    amount_provenance TEXT NOT NULL CHECK (amount_provenance IN ('OPERATOR_ENTERED', 'PRICE_MENU')),
+    chosen_option_ref TEXT CHECK (chosen_option_ref <> ''),
+    CHECK ((amount_provenance = 'PRICE_MENU') = (chosen_option_ref IS NOT NULL)),
+
+    presented_at TIMESTAMPTZ NOT NULL,
+
+    -- 공고 스냅샷 — **사본**이다(공고가 정정돼도 바뀌지 않는다)
+    snapshot_notice_revision          BIGINT NOT NULL CHECK (snapshot_notice_revision >= 1),
+    snapshot_taken_at                 TIMESTAMPTZ NOT NULL,
+    snapshot_deadline_at              TIMESTAMPTZ,
+    snapshot_floor_rate_fraction      NUMERIC,
+    snapshot_floor_rate_origin_kind   TEXT,
+    snapshot_floor_rate_origin_detail TEXT,
+    snapshot_base_amount_won          NUMERIC(20, 0),
+    snapshot_base_amount_currency     TEXT,
+    snapshot_base_amount_vat          TEXT,
+    snapshot_base_amount_provenance   TEXT,
+    CHECK ((snapshot_floor_rate_fraction IS NULL) = (snapshot_floor_rate_origin_kind IS NULL)),
+    CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_currency IS NULL)),
+    CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_vat IS NULL)),
+    CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_provenance IS NULL)),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER bid_draft_append_only BEFORE UPDATE OR DELETE ON bid_draft
+    FOR EACH ROW EXECUTE FUNCTION reject_mutation();
+REVOKE TRUNCATE ON bid_draft FROM PUBLIC;
+```
+
+#### 5.4 `bid_record` — 투찰 기록(append-only)
+
+```sql
+CREATE TABLE bid_record (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    case_id    BIGINT NOT NULL REFERENCES bid_case (id),
+    account_id BIGINT NOT NULL REFERENCES account (id),
+    record_seq INT NOT NULL CHECK (record_seq >= 0),
+    UNIQUE (case_id, record_seq),
+
+    amount_won      NUMERIC(20, 0) NOT NULL CHECK (amount_won BETWEEN 0 AND 9223372036854775807),
+    amount_currency TEXT NOT NULL,
+    amount_vat      TEXT NOT NULL,
+    amount_basis    TEXT NOT NULL,
+
+    submitted_at TIMESTAMPTZ NOT NULL,            -- 제출 시각(운영자 진술)
+    confirmed_at TIMESTAMPTZ NOT NULL,            -- 확인 시각 — **초안 시각과 따로 남는다**
+    draft_id BIGINT REFERENCES bid_draft (id),    -- 기본값이 된 초안(소급 확인이면 NULL 가능)
+    retroactive BOOLEAN NOT NULL,                 -- Q-11
+
+    draw_numbers INT[],                           -- 추첨번호(opening_result 관례)
+
+    evidence_ref          TEXT CHECK (evidence_ref <> ''),  -- 증빙 **참조**(식별자)
+    evidence_retain_until DATE,                             -- R-5 3년, 정책이 계산
+    CHECK ((evidence_ref IS NULL) = (evidence_retain_until IS NULL)),
+
+    memo TEXT,                                    -- 자유 텍스트 — 로그·audit 노출 0
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER bid_record_append_only BEFORE UPDATE OR DELETE ON bid_record
+    FOR EACH ROW EXECUTE FUNCTION reject_mutation();
+REVOKE TRUNCATE ON bid_record FROM PUBLIC;
+```
+
+**사업자번호·대표자명 슬롯이 없다** — 넷 어디에도 그 열을 만들지 않는다(산출물 8).
+
+#### 5.5 `notice` FK 를 두지 않는 이유 — **발견**
+
+`bid_case` 가 `notice(notice_number, notice_round)` 를 FK 로 참조하면 **6B-3 보존 파기와 충돌한다**:
+`RETENTION_TABLE_RULES` 가 `notice` 를 `Purge(TimeOnly)` 로 분류하므로, 살아 있는 건이 가리키는 공고를
+지우려 할 때 ⓐ RESTRICT 로 파기 sweep 자체가 실패하거나 ⓑ CASCADE 를 걸면 **운영자의 투찰 기록이 함께
+사라진다**. 둘 다 받아들일 수 없다. 그래서 공고 키는 **사본**이고(스냅샷 사본 결정과 같은 축), 공고가
+파기된 뒤에도 건과 기록은 남는다. `bid_draft` 의 스냅샷이 그때 필요한 값(마감·하한율·basis)을 이미 싣는다.
+
+#### 5.6 GRANT — 열 단위(7D 관례)
+
+```sql
+GRANT SELECT, INSERT ON bid_case TO bidvector_app;
+GRANT UPDATE (state, case_version, remind_at, opening_at, document_due_at,
+              outcome_notice_expected_at, skip_reason, updated_at) ON bid_case TO bidvector_app;
+
+GRANT SELECT, INSERT ON bid_case_transition TO bidvector_app;   -- append-only: UPDATE 없음
+GRANT SELECT, INSERT ON bid_draft           TO bidvector_app;
+GRANT SELECT, INSERT ON bid_record          TO bidvector_app;
+```
+
+- `bid_case` 의 UPDATE 는 **전이가 실제로 바꾸는 열에만** 있다 — 앱 역할은 `account_id`·`notice_number`·
+  `notice_round`·`bid_kind`·`created_at` 을 **바꿀 수 없다**(건의 소유자와 대상 공고를 갈아끼우는 길이 없다).
+- 나머지 셋은 INSERT·SELECT 뿐이고 **DELETE·TRUNCATE 는 어느 표에도 없다**.
+
+#### 5.7 보존 분류
+
+`RetentionRegistrySchemaEqualityTest` 가 스키마와 집합 등식을 요구하므로 네 표를 모두 등재한다. 새
+`ExemptReason.OPERATOR_BID_HISTORY` 하나(사유: 투찰 기록은 정산·증빙의 근거이고 수명이 시간이 아니라
+R-5 3년 정책과 운영자 결정이 정한다). **파기 실행은 범위 밖**이고 그 사실을 사유 KDoc 에 적는다.
+
+### 6. 초안 금액 입력 형태 — 메뉴 값 위장 금지 (산출물 6)
+
+투찰가 메뉴(DEC-05)는 출하 경로에 없다(ML-01·7C② 대기). 그래서:
+
+- 금액 provenance 어휘는 **둘**이다 — `OPERATOR_ENTERED`(운영자가 직접 적은 값) · `PRICE_MENU`(메뉴
+  산출에서 고른 안, `chosen_option_ref` 동반 필수).
+- **HTTP 요청 DTO 에 provenance·chosenOptionRef 필드가 없다.** use case 가 `OPERATOR_ENTERED` 를 상수로
+  싣는다. 그래서 운영자 입력이 메뉴 값으로 보이는 경로는 **요청으로 표현할 수 없다**(위장이 타입·스키마
+  층에서 불가능하다 — 문장으로 금지하는 것이 아니다).
+- `PRICE_MENU` 어휘를 지금 두는 이유는 CHECK 어휘를 나중에 늘리는 둘째 마이그레이션을 피하기 위해서다.
+  **오늘 그 값을 쓰는 경로는 0** 이고, 게이트 test 가 그 0 을 단언한다(「요청 DTO 에 provenance 자리가
+  없다」 + 「HTTP 로 만들어진 draft 의 provenance 는 전부 `OPERATOR_ENTERED`」).
+- 응답은 provenance 를 **그대로 내보낸다** — 화면(7E)이 「운영자 입력」과 「추천 메뉴에서 고름」을
+  구별해 표시할 수 있어야 한다. 구별을 지우면 그것이 곧 위장이다.
+
+### 7. 모듈·패키지 배치와 게이트 등재 지점
+
+| 자리 | 내용 |
+|---|---|
+| `settings.gradle.kts` | `include(...)` 에 `"bidding"` 추가 + 「아홉 … 보류한다」 주석 교체(되살림 사유·`OPEN-ADR-14` 종결) |
+| `bidding/build.gradle.kts` | `bidvector.kotlin-conventions`, `implementation(project(":shared-kernel"))` 만(`strategy` 사본) |
+| `bidding/src/main/kotlin/bidvector/bidding/` | `BidState.kt` · `BidCommand.kt` · `BidTransitionTable.kt` · `BidCase.kt` · `BidDraft.kt` · `BidRecord.kt` · `NextCheckpoint.kt` · `BidKind.kt` · `ReconciliationCandidate.kt` · `ModuleBoundaryAnchor.kt` |
+| `workflow/.../workflow/bidding/` | `BiddingPorts.kt` · `BidCaseWorkflow.kt` · `TransitionGuards.kt` · `TransitionOutcome.kt` · `BidActor.kt` · `EvidenceRetentionPolicyData.kt` |
+| `adapters/.../adapters/bidding/` | `JdbcBidCaseStore.kt` · `BidCaseSql.kt` · `BidCaseRow.kt` |
+| `app/.../app/http/` | `BidCaseController.kt` · `BidCaseRequests.kt` · `BidCaseResponses.kt` |
+| `adapters/.../db/migration/V21__bid_case.sql` | 위 DDL |
+
+**게이트 등재 지점**(넓히는 줄마다 근거를 PR 본문·evidence 에 적는다):
+
+| 파일 | 키 | 변경 | 근거 |
+|---|---|---|---|
+| `config/quality/architecture-policy.properties` | `layer.domain`(:44) | `+bidding` | 새 domain 모듈. 이 값이 층 판정·모집단 단언의 단일 출처다 |
+| 〃 | `app.injection.domain-port-roots`(:606) | `+bidvector.bidding` | 「이 저장소가 이름 붙인 계약의 뿌리」 — controller 생성자가 bidding 타입을 이름 부른다 |
+| 〃 | `collection.reflection.roots`(:1351) | `+bidvector.bidding` | **판정 대상 뿌리**다. 빠뜨리면 새 모듈의 반사가 조용히 안 재진다 |
+| `config/quality/gate-tests.properties` | `gate.tests.bidding`(신설) · `gate.tests.workflow` · `gate.tests.adapters` · `gate.tests.app` | 새 test class 전수 | `gateRegistrationGate` 가 **양방향 등식**이라 등재 없이는 즉시 붉다 |
+| `build-logic` | `ModuleDependencyPolicyTest` · `DomainSourceReferenceFixtureTest` | 필요 시 모듈 이름 | 대부분 properties 에서 도출되므로 실측 후 최소로 |
+| `openapi/bidvector-operator-api.yaml` + `web/src/api/generated/operator-api.ts` | — | 새 operation + `npm run api:types` 재생성 | W-5 바이트 등식 |
+
+`config/quality` 는 병렬 레인과 겹치는 파일이다 — **자기 키·자기 줄만** 고치고 팀장에게 알린다.
+
+### 8. operation 목록 (화면 C · D 최소)
+
+전부 **기본 거부 필터 아래**다(`OPEN_ROUTES` 에 새 줄 0 — 무인증 경로 0). 상태 변경은 CSRF 를 요구한다.
+경로 하나당 명령 하나는 `edit-sessions` 선례를 따른다.
+
+| operationId | method · path | 용도 |
+|---|---|---|
+| `listBidCases` | GET `/api/bid-cases` | 내 입찰함 — `kind` **필수**, 상태 탭, 다음 확인 시점, 지난 일정 경고 |
+| `readBidCase` | GET `/api/bid-cases/{caseId}` | 건 단건(초안·기록 최신 포함, `reconciliationCandidate`) |
+| `readBidCaseTimeline` | GET `/api/bid-cases/{caseId}/timeline` | 타임라인(시각·주체·사유·소급 표시) |
+| `addBidCase` | POST `/api/bid-cases` | 관심 담기 |
+| `deferBidCase` | POST `/api/bid-cases/{caseId}/defer` | 나중에(리마인드 시각 필수) |
+| `resumeBidCase` | POST `/api/bid-cases/{caseId}/resume` | 나중에 해제 |
+| `skipBidCase` | POST `/api/bid-cases/{caseId}/skip` | 건너뜀(사유 필수) |
+| `draftBidCase` | POST `/api/bid-cases/{caseId}/draft` | 초안 만들기·수정 |
+| `recordBidCase` | POST `/api/bid-cases/{caseId}/record` | 「제출함」 기록·갱신·**소급 확인**(소급 여부는 서버가 판정) |
+| `recordBidCaseOpening` | POST `/api/bid-cases/{caseId}/opening` | 개찰 결과 입력(잠정 1위 / 순위 밖) |
+| `enterQualificationReview` | POST `/api/bid-cases/{caseId}/qualification-review` | 적격심사 중(서류 기한) |
+| `recordBidCaseOutcome` | POST `/api/bid-cases/{caseId}/outcome` | 낙찰·패찰·유찰 기록 및 정정(정정은 사유 필수) |
+
+열둘이다. 줄일 수 있는 자리는 `opening`·`qualification-review`·`outcome` 을 명령 판별자 하나의
+`/transitions` 로 합치는 것인데, `edit-sessions` 선례가 경로당 명령 하나라 **합치지 않기를 권한다**
+(합치면 OpenAPI 스키마가 oneOf 로 커지고 CSRF·감사 단위가 흐려진다). 팀장이 수를 줄이라면
+`qualification-review` 를 7C 로 미루는 것이 가장 싸다(화면 D 의 「1순위 서류 기한 카드」가 늦어진다).
+
+### 9. R-2 남은 절반 — 판정 (산출물 5)
+
+**물음**: `operator_profile`(V12) · `operator_strategy`(V9) 의 `CHECK (id = 1)` 을 계정 단위로 옮기는 일을
+같은 V21 / 별 V22 / 별 slice 중 어디에 두는가.
+
+**범위 실측**(읽기로 확인한 것):
+
+- 두 표만 바뀌지 않는다. `operator_strategy_revision` 의 **PK 가 `revision` 전역 단일**이라 계정 단위가
+  되려면 PK 를 `(account_id, revision)` 로 바꿔야 한다 — 열 추가가 아니라 **키 변경**이다.
+- `V16` 이 두 표에 같은 열을 더해 둔 상태라 둘을 함께 손대야 한다.
+- 소비자: `adapters/strategy` · `adapters/profile` · `workflow/strategy`(`EditStrategyWorkflow`·
+  `StrategyValidation`) · `app/http`(`StrategyReadController`·`StrategyEditController`) · `RETENTION_TABLE_RULES`
+  의 `Exempt(SINGLETON_SETTING)` 둘 · `CleanMigrationCheckTest` 의 기대 CHECK 수(`operator_strategy` 15 등) ·
+  `CleanMigrationPrivilegeTest` 의 권한 행렬.
+- **진짜 걸림돌은 열이 아니라 식별자 모델이다.** `edit_session.operator_id` 는 `TEXT`(`OperatorId`)이고
+  `account.id` 는 `BIGINT` 다. 전략을 계정 단위로 만들면 **「`OperatorId` 가 `account.id` 인가」를 먼저
+  답해야** 하고, 그 답은 7D 의 audit 주체 어휘(`account:<id>` vs `operator`)와 `OperatorCredentialAuthenticator`
+  (기존 운영자 자격 헤더 경로)까지 건드린다. 그것은 표 변경이 아니라 **R-2 의 식별자 결정**이다.
+
+**판정: 별 slice 를 권한다**(같은 V21 아님, 별 V22 도 아님).
+
+1. 범위가 「열 추가」가 아니라 **식별자 모델 결정 + 키 변경 + 기존 라이브 경로 전면**이다. 이 slice 의
+   되돌리기 어려운 경로(새 표 넷)와 섞으면 검토 표면이 두 배가 되고, verifier 가 둘을 한 라운드에 본다.
+2. 건드리는 코드가 전부 **기존** 경로(`workflow/strategy`·`adapters/strategy`·`app/http`)이고 병렬 레인
+   (w-dec05 · w-c03)과 충돌 위험이 크다. 이 slice 의 in_scope 는 「신설」이다.
+3. **지연 비용이 낮다.** 두 표는 각각 한 행이고 per-account 질의 표면이 **0** 이라, 계정이 둘이 되기
+   전까지 노출이 없다. R-2 가 막으려는 것(「남의 데이터가 보이는 전환」)은 **새 표 넷**에서 실질이 있고,
+   그 넷은 이 slice 가 처음부터 `account_id` 로 세운다 — R-2 (c) 의 본문은 그대로 이행된다.
+4. **되돌리기**: 별 slice 면 그 마이그레이션 하나만 revert 된다. 같은 V21 에 섞으면 7B 를 되돌릴 때
+   전략·프로필 표까지 함께 흔들린다(forward-fix 정본인 경로에서 특히 나쁘다).
+
+**반대 근거(정직하게 적는다)**: `milestone-7.md` R-2 판단 문단이 *"7B 가 새 표를 세울 때 함께"* 라고
+적는다. 위 판정은 그 문면을 **미루는** 것이므로 팀장(필요하면 운영자) 승인이 필요하다. 승인되면
+`milestone-7.md` 그 줄에 「2026-10-21: 식별자 모델 결정이 선행이라 별 slice 로 분리」를 한 줄 적는다.
+
+**검토했으나 권하지 않는 중간안**: V21 에서 두 표에 `account_id` 를 **추가만** 하고 `CHECK (id = 1)` 은
+남기기. 열은 생기지만 **읽는 코드가 없는 죽은 열**이 되고, 진짜 일(키 변경·식별자 결정)은 그대로 남는다.
+죽은 열은 다음 사람에게 「이미 계정 단위다」라고 거짓 신호를 준다.
+
+### 10. BID-01 추적표 행 여부 (산출물 1 마지막 줄)
+
+**판정**: `reports/evidence/m6/6e1/acceptance-trace.md` 의 **집계는 고치지 않는다.** 대신 둘을 한다.
+
+1. 그 파일에 **날짜 붙은 교차 참조 한 줄**을 더한다 — 「2026-10-21: BID-01 등재로 `V2 필수` 모수가
+   61 → 62 가 됐다. 그 행은 `reports/evidence/m7/7b/` 에 있다」. 이것 없이 두면 그 문서의 전제
+   (*"`V2 필수` 61 전건"*)가 조용히 거짓이 된다.
+2. **BID-01 의 추적 행 자체는 이 slice 의 evidence 에 적는다** — 같은 술어(ⓐ/ⓑ/ⓒ)로, 「무엇이 재는가」에
+   이 slice 가 만드는 test 식별자를 적는다.
+
+근거: ⓐ 6E-1 의 표는 그 slice 의 동결된 evidence 이고 그 집계(ⓐ16/ⓑ2/ⓒ43)는 2026-10-07 의 판정이다 —
+7B 가 남의 evidence 집계를 다시 셈하는 것은 레인 경계를 넘는다. ⓑ 그 파일은 병렬 레인이 함께 만질 수
+있는 자리라 집계 재작성은 충돌 비용이 크다. ⓒ 그래도 모수가 움직인 사실은 어딘가 적혀야 하고, 한 줄
+교차 참조가 가장 싸다. `capability-map.md` §10 의 「2026-10-21 집계 변경」 블록에도 모수 이동(95 → 96,
+`V2 필수` 61 → 62)을 명시한다.
+
+### 11. PDF 저장소가 범위 밖이어도 되는가
+
+**결론: 범위 밖이 맞다.** 단 완화 둘을 함께 넣는다.
+
+범위 밖인 이유 — 저장소를 지금 만들면 ⓐ 파일 업로드라는 새 표면(크기·형식·바이러스·경로 탈출)과
+ⓑ 바이트 저장 위치 결정(DB `bytea` / 파일시스템 / 객체 저장소)과 ⓒ 백업·복원 리허설 범위 확장
+(`tools/db-rehearsal.sh` 는 **DB 만** 든다)과 ⓓ 3년 파기 실행(6B-3 의 90일·표 단위 축과 **다른 축**이라
+보존 레지스트리를 파일까지 확장해야 한다)이 한꺼번에 딸려 온다. 넷은 각자 설계 검토가 필요하고, 이
+slice 의 되돌리기 어려운 경로와 섞을 이유가 없다.
+
+**범위 밖으로 둘 때 남는 위험과 완화**:
+
+- 위험 ①: `evidence_ref` 가 가리킬 실체가 오늘 없어 **자유 텍스트 사실상 메모**가 된다 → 파일명에
+  개인·사업자 정보가 흘러들 수 있다. 완화: 길이 상한 + 공백 불가 + **로그·audit 노출 0**(메모와 같은
+  취급), 그리고 응답 외 어디에도 싣지 않는다.
+- 위험 ②: `evidence_retain_until` 이 실체 없는 대상에 걸린다. 완화: 문면을 「이 **참조**를 언제까지
+  보관하는가」로 못박는다(파일을 언제 지우는가가 아니다). 저장소 slice 가 열리면 같은 날짜를 파일
+  파기 기한으로 승계한다.
+- 둘 다 **알려진 제한**으로 등재한다.
+
+`evidence_ref` 자체를 빼는 안은 권하지 않는다 — §6.1 acceptance 가 「증빙 참조」를 투찰 기록의 구성요소로
+적으므로 빼면 acceptance 미달이다.
+
+### 12. 알려진 제한 (Phase 1 시점)
+
+1. `PRICE_RECEIVED` 는 오늘 도달 불가다 — 진입 명령(`RECEIVE_PRICE_MENU`)의 호출자가 출하 경로에 없다
+   (DEC-05 메뉴는 ML-01 · 7C② 대기). 어휘·CHECK·전이표 행은 둔다.
+2. 자동 전이(SET-01 대사 결과 · SET-02 개찰 · 리마인드 도달)의 **시스템 호출자가 이 slice 에 없다.**
+   사용자 입력 경로는 열려 있다(§6.1 :175-176 — 「몇 위였나」는 사용자가 보고 오거나 입력한다).
+3. PDF 저장소 없음 — §11 의 위험 ①②.
+4. 다수 사업자 격리 수준 · 가입 · `operator_profile`/`operator_strategy` 의 계정 단위 전환(§9) 은 범위 밖.
+
+### 13. 팀장 답을 기다리는 항목
+
+1. **§9 R-2 남은 절반 — 별 slice 분리 승인**(`milestone-7.md` 문면을 미루는 것이라 승인이 필요하다).
+2. **§10 추적표 처리 — 6E-1 에 교차 참조 한 줄 + 7B evidence 에 행**(그 파일은 병렬 레인과 겹친다).
+3. **§8 operation 열둘** — 그대로 둘지, `qualification-review` 를 7C 로 미룰지.
+4. **§1 의 차이 둘**(`DEADLINE_PASSED_UNRECORDED` 비종단 · `CORRECT_OUTCOME` 신설) 확인.
+5. **§5.5** — `notice` FK 부재(보존 파기 충돌 회피) 확인.
+
+---
+
+## Phase 2 — 구현 (팀장 승인 뒤)
+
+(미착수)
