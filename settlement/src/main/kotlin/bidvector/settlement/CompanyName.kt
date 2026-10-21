@@ -70,9 +70,21 @@ sealed interface CompanyNameNormalization {
  * NBSP 류를 **일부러** 빼므로 그것만으로는 부족하다는 실측까지 포함한다). 공백 넷 리터럴로
  * 옮기면 전각 공백이 낀 표기를 놓쳐 거짓 「패찰」을 낸다.
  *
- * **③ 의 알려진 제한**: legacy 는 `casefold()` 이고 Kotlin 에는 대응이 없다. 한글·ASCII 상호
- * 에서는 `lowercase()` 와 결과가 같고 `ß` → `ss` 류 특수 접힘만 갈린다. `java.util.Locale` 은
- * domain 의 금지 표면이라 인자 없는 `lowercase()`(locale 비의존)를 쓴다.
+ * **③ 의 알려진 제한**: legacy 는 `casefold()` 이고 Kotlin 에는 대응이 없다. 여기서는
+ * **ASCII `A`~`Z` 만** 접는다 — 상호는 한글(대소문자 없음)과 라틴 코드가 섞이는 축이고,
+ * `qualification` 의 면허명 키가 같은 사유로 같은 선택을 했다(`LicensePolicy.stripAndLowercase`).
+ * 비-ASCII 라틴 대문자(`À`·`Ç` 등)와 `ß` → `ss` 류 특수 접힘은 접지 않는다. 실데이터에서 이
+ * 차이가 실제로 나타나는지는 `OPEN-SET-03` 과 같은 축(실수집 상호 확인)이다.
+ *
+ * **왜 stdlib 한 줄이 아니라 loop 인가**(전건 `check` 실측): `filterNot`·`lowercase()` 는
+ * 각각 `java.lang.Appendable` 과 `java.util.Locale.ROOT` 에 닿고 **둘 다 domain 허용 목록
+ * 밖**이라 `ArchitectureGateTest` 가 잡는다. 인자 없는 `lowercase()` 도 바이트코드에서는
+ * `Locale.ROOT` 를 읽는다 — 「locale 비의존이니 안전」은 **틀린 추론**이었고 이 slice 의 첫
+ * 전건 `check` 가 그것을 두 위반으로 실측했다. `CharArray` 직접 조립 + `String(CharArray,
+ * Int, Int)` 생성자만 쓰면 그 표면에 닿지 않는다(같은 파일의 `qualification` 선례가 그 실측을
+ * 이미 적고 있다). `Char.isWhitespace()` 는 이 표면을 건드리지 않는다.
+ *
+ * 세 단계를 **한 loop 로 합치지 않는다** — 단계마다 따로 변이해 RED 를 확인할 수 있어야 한다.
  *
  * 토큰 목록은 [policy] 가 나른다 — 이 함수 안에 상수로 두지 않는다.
  */
@@ -80,18 +92,45 @@ fun normalizeCompanyName(
     rawName: String,
     policy: AwardMatchingPolicyData,
 ): CompanyNameNormalization {
-    val withoutWhitespace = rawName.filterNot { it.isWhitespace() }
+    val withoutWhitespace = stripWhitespace(rawName)
     var text = withoutWhitespace
     for (token in policy.legalEntityTokens) {
         text = text.replace(token, "")
     }
-    val normalized = text.lowercase()
+    val normalized = lowercaseAscii(text)
     return if (normalized.isEmpty()) {
         CompanyNameNormalization.Empty
     } else {
         CompanyNameNormalization.Normalized(NormalizedCompanyName.of(normalized))
     }
 }
+
+/** 공백 제거(①) — `Char.isWhitespace()` 가 legacy `\s` 와 같은 집합이다. */
+private fun stripWhitespace(value: String): String {
+    val chars = CharArray(value.length)
+    var count = 0
+    for (index in value.indices) {
+        val char = value[index]
+        if (!char.isWhitespace()) {
+            chars[count] = char
+            count++
+        }
+    }
+    return String(chars, 0, count)
+}
+
+/** ASCII 소문자화(③) — 길이가 변하지 않는다(특수 접힘 없음, 위 KDoc 의 알려진 제한). */
+private fun lowercaseAscii(value: String): String {
+    val chars = CharArray(value.length)
+    for (index in value.indices) {
+        val char = value[index]
+        chars[index] = if (char in 'A'..'Z') char + ASCII_CASE_OFFSET else char
+    }
+    return String(chars, 0, value.length)
+}
+
+/** `'A'`(65) → `'a'`(97). `qualification` 의 같은 상수와 값이 같지만 모듈 경계를 넘지 않는다. */
+private const val ASCII_CASE_OFFSET = 32
 
 /**
  * 운영자 상호의 **상태** — 「미설정」이 빈 문자열이나 `null` 이 아니라 값이다.
