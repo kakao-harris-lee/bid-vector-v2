@@ -1,6 +1,8 @@
 package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.connectionSourceOf
+import javax.sql.DataSource
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
@@ -32,6 +34,9 @@ import java.time.Instant
 class JdbcBidCaseStore(
     private val connections: ConnectionSource,
 ) : BidCaseStorePort {
+    /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
+    constructor(dataSource: DataSource) : this(connectionSourceOf(dataSource))
+
     override fun open(
         account: AccountId,
         notice: NoticeKey,

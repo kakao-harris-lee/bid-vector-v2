@@ -128,3 +128,20 @@ interface BidCaseStorePort {
 fun interface NoticeDeadlineQueryPort {
     fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, Instant>
 }
+
+/**
+ * 초안이 얼릴 **공고 스냅샷을 서버가 뜬다** — 요청이 실어 오지 않는다.
+ *
+ * 이것이 위협 ③(초안 스냅샷 변조)의 차단면이다: 스냅샷을 요청 본문으로 받으면 운영자가
+ * 「그때 하한율이 이랬다」를 **나중에 지어낼 수 있고**, 그러면 얼린 값이 증거이기를 그친다.
+ * 요청 DTO 에 스냅샷 자리가 없고(`BidCaseRequests`) 이 포트만이 값을 낸다.
+ *
+ * 공고가 없거나 이미 파기됐으면 `null` 이고, 그때는 초안을 만들지 않는다 — 스냅샷 없는
+ * 초안은 §6.1 의 acceptance 를 만족하지 못한다.
+ */
+fun interface NoticeSnapshotQueryPort {
+    fun snapshot(
+        notice: bidvector.bidding.NoticeKey,
+        takenAt: Instant,
+    ): bidvector.bidding.NoticeSnapshot?
+}

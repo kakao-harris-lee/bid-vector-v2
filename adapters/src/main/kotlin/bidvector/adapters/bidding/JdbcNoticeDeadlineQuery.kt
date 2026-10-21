@@ -1,6 +1,8 @@
 package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.connectionSourceOf
+import javax.sql.DataSource
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
@@ -22,6 +24,9 @@ import java.time.Instant
 class JdbcNoticeDeadlineQuery(
     private val connections: ConnectionSource,
 ) : NoticeDeadlineQueryPort {
+    /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
+    constructor(dataSource: DataSource) : this(connectionSourceOf(dataSource))
+
     override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, Instant> {
         if (notices.isEmpty()) return emptyMap()
         val keys = notices.toList()

@@ -405,7 +405,7 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "amount_vat, amount_provenance, presented_at, snapshot_notice_revision, " +
                     "snapshot_taken_at, created_at) " +
                     "SELECT id, account_id, 0, 1000, 'KRW', 'INCLUSIVE', 'OPERATOR_ENTERED', '$at', " +
-                    "'000', '$at', '$at' FROM bid_case WHERE notice_number = 'ret-notice-$tag'",
+                    "1, '$at', '$at' FROM bid_case WHERE notice_number = 'ret-notice-$tag'",
             )
         },
         TableSeed("bid_record") { tag, at ->

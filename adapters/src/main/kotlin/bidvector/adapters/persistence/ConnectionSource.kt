@@ -1,6 +1,7 @@
 package bidvector.adapters.persistence
 
 import java.sql.Connection
+import javax.sql.DataSource
 
 /**
  * 커넥션을 빌려주는 경계(D-4C2-1 갈래 b, scope.md ②) — `DataSource`를 직접 갖지 않는
@@ -87,3 +88,10 @@ internal class OwnTransactionConnectionSource(
             result
         }
 }
+
+/**
+ * `DataSource` → [ConnectionSource] 의 **공개 진입점**. 구현([DataSourceConnectionSource])은
+ * `internal` 로 둔 채 조립(`app`)이 쓸 수 있는 자리만 연다 — 조립이 커넥션 획득 방식을
+ * 고르는 것이 아니라 `DataSource` 를 건네기만 한다.
+ */
+fun connectionSourceOf(dataSource: DataSource): ConnectionSource = DataSourceConnectionSource(dataSource)

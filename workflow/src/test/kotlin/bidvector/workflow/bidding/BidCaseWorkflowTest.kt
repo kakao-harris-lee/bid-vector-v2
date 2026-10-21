@@ -56,6 +56,16 @@ class BidCaseWorkflowTest {
         BidCaseWorkflow(
             cases = store,
             deadlines = { keys -> keys.associateWith { deadline } },
+            // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
+            snapshots = { _, takenAt ->
+                bidvector.bidding.NoticeSnapshot(
+                    noticeRevisionNumber = 1L,
+                    takenAt = takenAt,
+                    deadlineAt = deadline,
+                    floorRate = null,
+                    baseAmount = null,
+                )
+            },
             clock = { now },
             retentionPolicy = policy(),
         )

@@ -182,7 +182,9 @@ CREATE TABLE bid_draft (
     presented_at TIMESTAMPTZ NOT NULL,
 
     -- 공고 스냅샷(사본, 불변). 판 번호가 없으면 「어느 판을 보고 정했는가」를 되짚을 수 없다.
-    snapshot_notice_revision TEXT NOT NULL CHECK (snapshot_notice_revision ~ '^[0-9]{3}$'),
+    -- 공고 **판 번호**(`notice.revision`) — 정정될 때마다 오르는 카운터다. 차수
+    -- (`notice_round`)는 건이 이미 들고 있어 여기 다시 싣지 않는다.
+    snapshot_notice_revision BIGINT NOT NULL CHECK (snapshot_notice_revision >= 1),
     snapshot_taken_at TIMESTAMPTZ NOT NULL,
     snapshot_deadline_at TIMESTAMPTZ,
     snapshot_floor_rate_fraction NUMERIC,

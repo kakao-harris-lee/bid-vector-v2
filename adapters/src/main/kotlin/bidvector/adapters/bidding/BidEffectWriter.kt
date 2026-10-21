@@ -37,7 +37,7 @@ internal object BidEffectWriter {
             statement.setString(index++, provenance)
             statement.setString(index++, chosenOption)
             statement.setTimestamp(index++, Timestamp.from(draft.presentedAt))
-            statement.setString(index++, snapshot.noticeRevision.value)
+            statement.setLong(index++, snapshot.noticeRevisionNumber)
             statement.setTimestamp(index++, Timestamp.from(snapshot.takenAt))
             statement.setTimestamp(index++, snapshot.deadlineAt?.let(Timestamp::from))
             statement.setBigDecimal(index++, snapshot.floorRate?.rate?.fraction)

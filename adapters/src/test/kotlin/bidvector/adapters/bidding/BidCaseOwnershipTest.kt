@@ -1,9 +1,9 @@
 package bidvector.adapters.bidding
 
-import bidvector.adapters.persistence.DataSourceConnectionSource
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCommand
+import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
@@ -11,7 +11,6 @@ import bidvector.bidding.BidSubmission
 import bidvector.bidding.EvidenceRef
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SkipReason
-import bidvector.bidding.SubmittedBidAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
@@ -50,13 +49,14 @@ import java.time.Period
  */
 class BidCaseOwnershipTest : PersistenceTestSupport() {
     private val now = Instant.parse("2026-10-21T04:00:00Z")
-    private val store = JdbcBidCaseStore(DataSourceConnectionSource(dataSource()))
-    private val deadlines = JdbcNoticeDeadlineQuery(DataSourceConnectionSource(dataSource()))
+    private val store = JdbcBidCaseStore(dataSource())
+    private val deadlines = JdbcNoticeDeadlineQuery(dataSource())
 
     private val workflow =
         BidCaseWorkflow(
             cases = store,
             deadlines = deadlines,
+            snapshots = JdbcNoticeSnapshotQuery(dataSource()),
             clock = { now },
             retentionPolicy =
                 Resolution.Resolved(
@@ -216,21 +216,29 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
     @Test
     fun `초안 수정은 새 행을 쌓고 앞 스냅샷을 바꾸지 않는다`() {
         val mine = account("own-i")
-        val opened = workflow.open(mine, notice("own-7"), BidKind.REAL)
+        val key = notice("own-7")
+        seedNotice(key)
+        val opened = workflow.open(mine, key, BidKind.REAL)
 
-        workflow.command(mine, opened.case.id, draftCommand(1_000_000L), BidActor.User(mine))
-        workflow.command(mine, opened.case.id, draftCommand(2_000_000L), BidActor.User(mine))
+        workflow.draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
+            .shouldBeInstanceOf<BidCommandResult.Processed>()
+        workflow.draft(mine, opened.case.id, amount(2_000_000L), now, BidActor.User(mine))
+            .shouldBeInstanceOf<BidCommandResult.Processed>()
 
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "SELECT draft_seq, amount_won FROM bid_draft WHERE case_id = ? ORDER BY draft_seq",
+                    "SELECT draft_seq, amount_won, snapshot_notice_revision, amount_provenance " +
+                        "FROM bid_draft WHERE case_id = ? ORDER BY draft_seq",
                 ).use { statement ->
                     statement.setLong(1, opened.case.id.value)
                     statement.executeQuery().use { rs ->
                         rs.next()
                         rs.getInt("draft_seq") shouldBe 0
                         rs.getLong("amount_won") shouldBe 1_000_000L
+                        // 스냅샷은 **서버가 뜬 공고의 판 번호**다 — 요청이 실어 온 값이 아니다.
+                        rs.getLong("snapshot_notice_revision") shouldBe 1L
+                        rs.getString("amount_provenance") shouldBe "OPERATOR_ENTERED"
                         rs.next()
                         rs.getInt("draft_seq") shouldBe 1
                         rs.getLong("amount_won") shouldBe 2_000_000L
@@ -240,27 +248,50 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         }
     }
 
-    private fun draftCommand(won: Long) =
-        BidCommand.DraftBid(
-            bidvector.bidding.BidDraft(
-                amount =
-                    SubmittedBidAmount(
-                        won,
-                        Currency.KRW,
-                        VatTreatment.INCLUSIVE,
-                        BidAmountOrigin.OperatorEntered,
-                    ),
-                presentedAt = now,
-                snapshot =
-                    bidvector.bidding.NoticeSnapshot(
-                        noticeRevision = NoticeRound.of("000"),
-                        takenAt = now,
-                        deadlineAt = now.plusSeconds(1800),
-                        floorRate = null,
-                        baseAmount = null,
-                    ),
-            ),
-        )
+    @Test
+    fun `공고를 뜰 수 없으면 초안을 만들지 않는다 — 빈 스냅샷을 지어내지 않는다`() {
+        val mine = account("own-m")
+        // 공고를 심지 않는다(6B-3 파기 뒤와 같은 상태).
+        val opened = workflow.open(mine, notice("own-11"), BidKind.REAL)
+
+        workflow.draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine)) shouldBe
+            BidCommandResult.NoticeSnapshotUnavailable
+        store.load(mine, opened.case.id)!!.state shouldBe BidState.Watching
+    }
+
+    private fun amount(won: Long) =
+        SubmittedBidAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, BidAmountOrigin.OperatorEntered)
+
+    /** 공고 한 건 — `notice` 는 `raw_observation` 을 FK 로 참조하므로 그 행이 먼저다. */
+    private fun seedNotice(key: NoticeKey) {
+        val observationKey = "obs-${key.noticeNumber}"
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO raw_observation (observation_key, source_endpoint, payload, " +
+                        "payload_fields, observed_at, release_sha, inserted_at) " +
+                        "VALUES (?, 'NOTICE_LIST', '{}', '{}'::jsonb, ?, 'test', ?)",
+                ).use { statement ->
+                    statement.setString(1, observationKey)
+                    statement.setTimestamp(2, Timestamp.from(now))
+                    statement.setTimestamp(3, Timestamp.from(now))
+                    statement.executeUpdate()
+                }
+            connection
+                .prepareStatement(
+                    "INSERT INTO notice (notice_number, notice_round, status, observation_key, " +
+                        "deadline_at, created_at, updated_at) VALUES (?, ?, 'OPEN', ?, ?, ?, ?)",
+                ).use { statement ->
+                    statement.setString(1, key.noticeNumber)
+                    statement.setString(2, key.noticeRound.value)
+                    statement.setString(3, observationKey)
+                    statement.setTimestamp(4, Timestamp.from(now.plusSeconds(1800)))
+                    statement.setTimestamp(5, Timestamp.from(now))
+                    statement.setTimestamp(6, Timestamp.from(now))
+                    statement.executeUpdate()
+                }
+        }
+    }
 
     // --- 권한·트리거(append-only) ----------------------------------------------
 
@@ -268,7 +299,6 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
     fun `앱 역할은 타임라인 초안 기록을 고치거나 지울 수 없다`() {
         val mine = account("own-j")
         val opened = workflow.open(mine, notice("own-8"), BidKind.REAL)
-        workflow.command(mine, opened.case.id, draftCommand(1_000_000L), BidActor.User(mine))
 
         val statements =
             listOf(

@@ -42,7 +42,7 @@ internal fun submittedAmount(origin: BidAmountOrigin = BidAmountOrigin.OperatorE
 
 internal fun snapshot() =
     NoticeSnapshot(
-        noticeRevision = NoticeRound.of("000"),
+        noticeRevisionNumber = 1L,
         takenAt = T0,
         deadlineAt = T0.plusSeconds(1800),
         floorRate = null,

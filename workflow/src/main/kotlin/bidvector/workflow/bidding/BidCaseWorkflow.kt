@@ -3,11 +3,13 @@ package bidvector.workflow.bidding
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
+import bidvector.bidding.BidDraft
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NextCheckpoint
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.RejectionReason
+import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.TransitionOutcome
 import bidvector.bidding.applyCommand
 import bidvector.bidding.asReal
@@ -45,6 +47,13 @@ sealed interface BidCommandResult {
 
     /** 그 사이에 다른 전이가 끼었다. */
     data object VersionConflict : BidCommandResult
+
+    /**
+     * 초안을 만들려는데 공고를 뜰 수 없다(없거나 이미 파기됐다). **스냅샷 없는 초안을 만들지
+     * 않는다** — §6.1 의 acceptance 가 초안에 공고 스냅샷을 요구하고, 비워 두면 「그때 그
+     * 금액을 정한 근거」가 빈 채로 남는다.
+     */
+    data object NoticeSnapshotUnavailable : BidCommandResult
 }
 
 /**
@@ -61,6 +70,7 @@ sealed interface BidCommandResult {
 class BidCaseWorkflow(
     private val cases: BidCaseStorePort,
     private val deadlines: NoticeDeadlineQueryPort,
+    private val snapshots: NoticeSnapshotQueryPort,
     private val clock: Clock,
     private val retentionPolicy: Resolution.Resolved<EvidenceRetentionPolicyData>,
 ) {
@@ -106,6 +116,31 @@ class BidCaseWorkflow(
     ): List<TimelineEntry>? {
         cases.load(account, caseId) ?: return null
         return cases.timeline(account, caseId)
+    }
+
+    /**
+     * 초안 만들기 · 수정 — **스냅샷은 서버가 뜬다**(요청이 실어 오지 않는다, 위협 ③).
+     *
+     * 순서가 중요하다: 소유 확인(load)이 **먼저**다. 그래야 남의 건의 공고를 스냅샷으로 떠
+     * 보는 일조차 일어나지 않는다(존재 여부가 타이밍으로도 새지 않는다).
+     */
+    fun draft(
+        account: AccountId,
+        caseId: BidCaseId,
+        amount: SubmittedBidAmount,
+        presentedAt: Instant,
+        actor: BidActor,
+    ): BidCommandResult {
+        val case = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
+        val snapshot =
+            snapshots.snapshot(case.notice, clock.now())
+                ?: return BidCommandResult.NoticeSnapshotUnavailable
+        return command(
+            account,
+            caseId,
+            BidCommand.DraftBid(BidDraft(amount, presentedAt, snapshot)),
+            actor,
+        )
     }
 
     /**

@@ -99,6 +99,11 @@ object ErrorCode {
     const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
     const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+
+    // M7/7B — 입찰 건. 전이 거부는 409 이고 코드가 사유를 가른다(상태 코드가 아니라 본문).
+    // `NOTICE_SNAPSHOT_UNAVAILABLE` 은 초안을 만들려는데 공고를 뜰 수 없는 경우다 —
+    // 스냅샷 없는 초안을 만들지 않는다(§6.1 acceptance).
+    const val NOTICE_SNAPSHOT_UNAVAILABLE = "NOTICE_SNAPSHOT_UNAVAILABLE"
 }
 
 /**

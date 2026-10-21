@@ -377,7 +377,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("bid_draft", "amount_provenance", "text", false),
             ColumnSpec("bid_draft", "chosen_option_ref", "text", true),
             ColumnSpec("bid_draft", "presented_at", "timestamp with time zone", false),
-            ColumnSpec("bid_draft", "snapshot_notice_revision", "text", false),
+            ColumnSpec("bid_draft", "snapshot_notice_revision", "bigint", false),
             ColumnSpec("bid_draft", "snapshot_taken_at", "timestamp with time zone", false),
             ColumnSpec("bid_draft", "snapshot_deadline_at", "timestamp with time zone", true),
             ColumnSpec("bid_draft", "snapshot_floor_rate_fraction", "numeric", true),

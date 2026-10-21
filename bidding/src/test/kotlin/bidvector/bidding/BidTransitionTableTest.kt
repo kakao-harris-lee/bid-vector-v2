@@ -14,6 +14,119 @@ import org.junit.jupiter.api.Test
  * 같은 집합이 아니면 전수가 조용히 줄어든다.
  */
 class BidTransitionTableTest {
+    private val OUTCOMES =
+        setOf(BidStateTag.WON, BidStateTag.LOST, BidStateTag.FAILED_OR_REBID)
+
+
+    /**
+     * **표와 독립인 골든 목록** — `ux-journey-research.md` §6.1 의 상태 기계와 계약 r2 의
+     * 전이표를 손으로 옮긴 것이다. `BID_TRANSITIONS` 에서 **도출하지 않는다.**
+     *
+     * 이게 없으면 아래 전수 test 둘이 **순환**이다: 둘 다 `BID_TRANSITIONS` 를 읽어
+     * 「표에 있으면 허용, 없으면 거부」를 재므로, 표에 금지 전이 한 줄을 더해도 두 test 가
+     * 그 줄을 따라가며 초록을 유지한다(변이 ③ 실측 — 이 목록을 넣기 전에는 `WON → SKIP` 을
+     * 더해도 전건 초록이었다). 정본을 코드 밖에 한 벌 더 두어야 표의 **변화 자체**가 잡힌다.
+     */
+    private val goldenTransitions: Set<Triple<BidStateTag, BidCommandTag, Set<BidStateTag>>> =
+        setOf(
+            Triple(BidStateTag.WATCHING, BidCommandTag.DEFER, setOf(BidStateTag.DEFERRED)),
+            Triple(BidStateTag.PRICE_RECEIVED, BidCommandTag.DEFER, setOf(BidStateTag.DEFERRED)),
+            Triple(BidStateTag.DEFERRED, BidCommandTag.RESUME, setOf(BidStateTag.WATCHING)),
+            Triple(BidStateTag.WATCHING, BidCommandTag.RECEIVE_PRICE_MENU, setOf(BidStateTag.PRICE_RECEIVED)),
+            Triple(BidStateTag.DEFERRED, BidCommandTag.RECEIVE_PRICE_MENU, setOf(BidStateTag.PRICE_RECEIVED)),
+            Triple(BidStateTag.WATCHING, BidCommandTag.DRAFT_BID, setOf(BidStateTag.BID_PLANNED)),
+            Triple(BidStateTag.DEFERRED, BidCommandTag.DRAFT_BID, setOf(BidStateTag.BID_PLANNED)),
+            Triple(BidStateTag.PRICE_RECEIVED, BidCommandTag.DRAFT_BID, setOf(BidStateTag.BID_PLANNED)),
+            Triple(BidStateTag.BID_PLANNED, BidCommandTag.DRAFT_BID, setOf(BidStateTag.BID_PLANNED)),
+            Triple(BidStateTag.BID_PLANNED, BidCommandTag.RECORD_BID, setOf(BidStateTag.BID_RECORDED)),
+            Triple(BidStateTag.BID_RECORDED, BidCommandTag.RECORD_BID, setOf(BidStateTag.BID_RECORDED)),
+            Triple(
+                BidStateTag.DEADLINE_PASSED_UNRECORDED,
+                BidCommandTag.RECORD_BID,
+                setOf(BidStateTag.BID_RECORDED),
+            ),
+            Triple(BidStateTag.BID_RECORDED, BidCommandTag.AWAIT_OPENING, setOf(BidStateTag.AWAITING_OPENING)),
+            Triple(
+                BidStateTag.AWAITING_OPENING,
+                BidCommandTag.RECORD_OPENING_FIRST,
+                setOf(BidStateTag.OPENED_PROVISIONAL_FIRST),
+            ),
+            Triple(
+                BidStateTag.AWAITING_OPENING,
+                BidCommandTag.RECORD_OPENING_OUT_OF_RANK,
+                setOf(BidStateTag.OPENED_OUT_OF_RANK),
+            ),
+            Triple(
+                BidStateTag.OPENED_PROVISIONAL_FIRST,
+                BidCommandTag.ENTER_QUALIFICATION_REVIEW,
+                setOf(BidStateTag.UNDER_QUALIFICATION_REVIEW),
+            ),
+            Triple(BidStateTag.OPENED_PROVISIONAL_FIRST, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.OPENED_OUT_OF_RANK, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.UNDER_QUALIFICATION_REVIEW, BidCommandTag.RECORD_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.WON, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.LOST, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.FAILED_OR_REBID, BidCommandTag.CORRECT_OUTCOME, OUTCOMES),
+            Triple(BidStateTag.WATCHING, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
+            Triple(BidStateTag.DEFERRED, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
+            Triple(BidStateTag.PRICE_RECEIVED, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
+            Triple(BidStateTag.BID_PLANNED, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED)),
+            Triple(
+                BidStateTag.WATCHING,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+                setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            ),
+            Triple(
+                BidStateTag.DEFERRED,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+                setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            ),
+            Triple(
+                BidStateTag.PRICE_RECEIVED,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+                setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            ),
+            Triple(
+                BidStateTag.BID_PLANNED,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+                setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            ),
+        )
+
+    @Test
+    fun `전이표가 §6_1 골든 목록과 정확히 같다 — 행을 더하거나 빼면 여기서 잡힌다`() {
+        val actual =
+            BID_TRANSITIONS.entries
+                .map { (key, rule) -> Triple(key.from, key.command, rule.allowedTargets) }
+                .toSet()
+        actual shouldContainExactlyInAnyOrder goldenTransitions
+    }
+
+    @Test
+    fun `표 밖 주체 조합도 골든과 같다 — 시스템 전용 하나와 사용자 전용 집합`() {
+        val systemOnly =
+            BID_TRANSITIONS.entries
+                .filter { it.value.actors == setOf(ActorKind.SYSTEM) }
+                .map { it.key.command }
+                .toSet()
+        systemOnly shouldContainExactlyInAnyOrder listOf(BidCommandTag.RECEIVE_PRICE_MENU)
+
+        val userAndSystem =
+            BID_TRANSITIONS.entries
+                .filter { it.value.actors == setOf(ActorKind.USER, ActorKind.SYSTEM) }
+                .map { it.key.command }
+                .toSet()
+        userAndSystem shouldContainExactlyInAnyOrder
+            listOf(
+                BidCommandTag.RESUME,
+                BidCommandTag.AWAIT_OPENING,
+                BidCommandTag.RECORD_OPENING_FIRST,
+                BidCommandTag.RECORD_OPENING_OUT_OF_RANK,
+                BidCommandTag.RECORD_OUTCOME,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+            )
+    }
+
     @Test
     fun `모집단 — 대표값 목록이 꼬리표 전수와 같다`() {
         ALL_STATES.map { it.tag } shouldContainExactlyInAnyOrder BidStateTag.entries
