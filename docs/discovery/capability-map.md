@@ -1449,6 +1449,14 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
   (**`OPEN-DEC-07` 활성**, 라운드 7 복원).
 - **산출 시점** (운영자 결정 2026-08-26): 추천 투찰가 산출은 **on-demand**다 — legacy의 파이프라인 배치 산출을
   채택하지 않는다(§0.7 상호작용 모델).
+- **V2 구현 자리 (M6/G1-DEC05)**: binding 기록은 `bidvector.decision.menu.BindingConstraint` 다 —
+  「후보 비율이 정했다」·「게시 하한이 정했다」·「하한율 읽기가 미정이라 재지 못했다」가 **서로
+  다른 값**이고, `BidMenuOption.binding` 이 그 값을 나른다. 뒤 둘을 한 값으로 접으면 미결이
+  「제약 없음」으로 위장되므로 접지 않는다. 하한 자리의 basis 교차는 `shared-kernel` 의
+  `AppliedFloor`(생성 경로는 `BaseAmount.appliedFloorFrom(BidRate)` 하나)가 타입으로 막는다 —
+  앞 판의 `roundedWith(floor: BigDecimal?)` 은 예정가격 기준 값도 그 자리에 받았다.
+  **하한 제약은 율 축에서만 건다** — 게시 하한율은 예정가격 기준이고 추천 투찰율은 기초금액
+  기준이라 「하한율 × 기초금액」은 §DEC-12 A5 가 폐기한 basis 혼합이다.
 
 ### DEC-03 · 법정 낙찰하한율 해석 (우선순위 + 적용 범위)
 
@@ -1543,6 +1551,16 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
 - **Acceptance scenario**
   - 옵션마다 (태도, 리스크 노트, 근거)가 필수다 — 값만 있고 근거 없는 옵션을 만들 수 없다.
   - 밴드가 붕괴한 경우(상한 ≤ 하한)가 상태로 명시되며 "정상 3안"으로 위장되지 않는다.
+- **V2 구현 자리 (M6/G1-DEC05)**: `decision` 모듈 `bidvector.decision.menu` — `BidMenuOption`
+  (다섯 인자 필수 + `internal` 생성자, 모듈 밖 생성 경로 0) · `BidMenuOutcome`(정상 3안 ·
+  밴드 붕괴 · 판정 불가 · 값 출처 부재의 sealed 넷) · `composeBidMenu` 순수 커널 ·
+  `BID_MENU_POLICY` 출하 정본. legacy 매직 셋에 대응하는 **스프레드 슬롯을 두지 않았다** —
+  메뉴는 받은 후보 셋을 태도에 대응시킬 뿐이라 그 수치가 필요 없다(폐기 지시의 집행이자
+  신설 정책 수치 0). 라벨 대응(`conservative`↔`safe`, `base`↔`recommended`)은 `workflow` 의
+  `BidRateCandidates.toStanceRates()` 한 자리에 선언한다. **배선·표면은 아직 없다** —
+  소비자는 M7 7C ②, 후보 비율의 출하 출처는 `OPEN-ML-ANALYSIS-WIRING` 종속이다
+  (`reports/evidence/m6/6e1/acceptance-trace.md` DEC-05 행).
+- **동반 OPEN**: 게시 하한율을 투찰율 하한으로 읽을 것인가(`OPEN-DEC05-FLOOR-RATE-READING`, 신설).
 
 ### DEC-06 · bid_now / review / skip 액션 결정과 근거 (reason code)
 
@@ -2959,7 +2977,7 @@ scout 노트에 있다.)
 
 ## 12. OPEN 결정 목록
 
-**활성 45건** (G1 3 / G2 **7** / G3 **14** / G4 **8** / G5 7 / G6 **6**). 각 항목은 `결정 필요 사항` /
+**활성 48건** (G1 3 / G2 **7** / G3 **14** / G4 **8** / G5 7 / G6 **6** / M6 잔여·메뉴 **3**). 각 항목은 `결정 필요 사항` /
 `선택지` / `출처`를 갖는다. 항목을 해소할 때는 결정 근거(누가, 언제, 무엇으로)를 함께
 기록하는 것을 규약으로 하며, 위반 사례가 발견되면 이 절을 갱신한다.
 
@@ -2991,6 +3009,14 @@ scout 노트에 있다.)
 그 하위 질문을 받던 OPEN이 같은 라운드에 닫힌 형태이며, 이대로 두면 활성 OPEN 수가 실제
 미결을 **과소 계상**한다(`milestone-0.md` 완료 조건이 이 수를 게이트로 쓴다). 신설 사유는
 §12.1에 있다. **신설은 임의 해소의 반대 방향이며 A2 위반이 아니다.**
+
+**M6/G1-DEC05 가 3건을 신설했다**(45 → **48**, 2026-10-21) — `OPEN-M6-RESIDUAL-OPS` ·
+`OPEN-M6-RESIDUAL-ML-LIFECYCLE`(둘 다 §14.3) 은 **운영자 결정 2026-10-15 이 지시한 등재**다
+(조건 3 에서 G3 24 를 빼고 OPEN 묶음 둘로 옮긴다 — `milestone-6.md` 완료 조건 아래 결정 블록이
+등재 주체를 「G1 의 첫 M6 잔여 slice 착수 계약」으로 지목했고 이 slice 가 그 첫 slice 다).
+`OPEN-DEC05-FLOOR-RATE-READING` 은 **신설 미결**이다 — 투찰가 메뉴 커널이 게시 하한율을 하드
+제약으로 읽을지가 값이 아니라 도메인 판단이라, 구현이 그 자리를 임의 해석으로 메우는 대신
+활성 OPEN 으로 올리고 커널을 fail-closed 로 뒀다. **신설은 임의 해소의 반대 방향이다.**
 
 **M1 slice 1A 가 1건을 더 신설했다**(44 → **45**) — `OPEN-ADR-15`(G6), 이 문서가
 `milestone-1.md` 를 가리키는 좌표의 일괄 교체. 1A 의 편집이 그 파일의 줄 번호를 밀어 **이 문서의
@@ -3528,6 +3554,9 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-3E-ROW-ORDER-STABILITY` (M3/3E 신설, 2026-09-08) | **응답 안 행 순서가 호출 사이에 안정적인가 — 문서가 선언하지 않는다.** 3E 는 raw 저장 키의 행 구별에 **값 우선 · 부재 시 응답 안 위치**를 쓴다(D-3E-1a). 값이 있으면 순서와 무관하지만, **순번이 부재한 행**은 위치가 유일한 구별 축이라 KONEPS 가 같은 응답을 다른 순서로 주면 재수집이 그 행을 새 raw 관측으로 남긴다(raw 는 append-only 감사라 canonical 오염은 아니다). 3E 는 **그 미지에 기대지 않도록** 설계했다 — 순번 부재 행은 canonical 로 승격하지 않으므로(D-3E-1b (a), 운영자 승인) 순서가 흔들려도 canonical 이 흔들리지 않는다. **닫히는 조건**: 같은 공고를 반복 조회해 행 순서의 안정성을 관측하거나 조달청 문의. 닫히면 순번 부재 행의 승격 여부를 재검토할 수 있다(그때 raw 감사 기록이 소급 승격의 재료다) | **운영 관측 뒤**(M4 4B 또는 M6) | 운영자 | **정본**(이 행) · 3E scope OPEN 표는 포인터 |
 | `OPEN-3E-RESERVE-FLAG-MISMATCH` (M3/3E 신설, 2026-09-08) | **예비가격파일존재여부 플래그가 상세 조회 결과와 어긋난다.** 실측(운영자 승인 아래 읽기 전용 호출, 2026-09-01~09-07 창 8건): 개찰결과 목록의 `rsrvtnPrceFileExistnceYn` 이 `Y` 인데 예비가격 상세 조회가 `totalCount=0` 인 사례가 **8건 중 2건**. `COL-03` 의 조회 가치 술어(「예비가격이 이미 있으면 상세 호출 0회」)가 이 플래그를 입력으로 쓰려던 후보였는데(3B-2 가 등재), **플래그를 믿고 건너뛰면 있는 행을 놓치고 믿고 부르면 빈 응답에 쿼터를 쓴다.** 3E 는 이 플래그를 술어 입력으로 **쓰지 않는다**. 근거 절 `policy-values.md` §1.9.7. **닫히는 조건**: 표본을 넓힌 관측으로 어긋남의 빈도·조건을 알아내거나, 조달청 문서·문의로 플래그의 뜻을 확정 | **운영 관측 뒤**(M4 수집 배선 또는 M6) | 운영자 | **정본**(이 행) · 3E checklist 는 포인터 |
 | ~~`OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP`~~ (M3/3B-2 신설, 2026-09-08) | **문서가 선언한 최대 메시지 크기와 legacy 페이지 크기가 맞지 않을 수 있다.** 낙찰정보서비스 23 오퍼레이션 전부가 최대 메시지 사이즈·평균 응답 시간·초당 최대 트랜잭션을 같은 값으로 문면에 적는데(값은 `policy-values.md` §1.9.3), legacy 는 목록 페이지 크기를 그보다 큰 응답이 나올 수 있는 값으로 둔다. 한 페이지가 상한을 넘으면 **잘린 응답**이 오고 그것이 parse 실패인지 부분 응답인지는 관측이 없다. 3B-2 는 페이지 크기를 정책값으로 두고 보수적 초기값을 쓴다 | ~~**운영 관측 뒤**(M6 이전)~~ | M6 6G-2f(닫힘) | **닫혔다 — 운영 관측(2026-10-03, M6/6G-2f D-6G2f-15)**: 같은 창을 `numOfRows=100` 과 `999` 로 받아 앞 100 항목 바이트 동일·키 집합 동일(19)·빈 값 0, 999 행 응답 742,122 B 를 정상 수신(resultCode 00, total 1.8~2.8 s). 문서의 최대 메시지 크기는 실제 제약이 아니다. 페이지 크기는 설정값(기본 999, `bidvector.koneps.opening.rows-per-page`)으로 갔다 — 운영자 결정 2026-10-03 |
+| `OPEN-M6-RESIDUAL-OPS` (M6/G1-DEC05 신설, 2026-10-21) | **M6 잔여 — 운영·전략 축 15.** 7A 조정안(`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`) G3 표의 운영 축이고, 운영자 결정 2026-10-15(`milestone-6.md` 완료 조건 아래 결정 블록)이 **조건 3 의 판정 대상에서 빼고 OPEN 묶음으로 등재**하라고 정했다. 그 결정 블록은 등재 주체를 「G1 의 첫 M6 잔여 slice 착수 계약」으로 지목했고, 이 slice 가 그 첫 slice 다. 목록(조정안 G3 표가 정본): `STR-04` · `STR-09` · `STR-10` · `NOTI-01` · `OPS-02` · `OPS-03` · `OPS-04` · `OPS-05` · `OPS-07` · `OPS-08` · `OPS-09` · `OPS-10` · `OPS-11` · `OPS-12` · `OPS-13`. 각 행이 무엇이 비었는지는 추적표가 적는다 | **M7 7F(운영 반입) 또는 별 마일스톤** | 운영자 | **정본**(이 행) · 조정안 G3 표·`milestone-6.md` 결정 블록은 포인터 |
+| `OPEN-M6-RESIDUAL-ML-LIFECYCLE` (M6/G1-DEC05 신설, 2026-10-21) | **M6 잔여 — ML 수명주기·분류 version 5.** 위 항목과 같은 결정·같은 등재 근거다. 목록: `ML-05`(낙찰률 GBM) · `ML-07`(승격 게이트) · `ML-08`(아티팩트 무결성·서명·롤아웃) · `SET-06`(정산 성숙도 → 평가 창 embargo) · `DEC-08`(분류 정책 version 저장). **G3 24 가운데 두 묶음에 들지 않는 넷**은 따로 산다 — `ML-02`·`ML-04` 는 G1 의 ML 배선 slice 가 acceptance 에 재판정을 넣고(결정 블록 문면), `QUAL-04`·`COL-07` 은 이미 홀더가 있다(`COL-07` 은 `OPEN-DEC-10`). 15 + 5 + 4 = 24 로 조정안 G3 계와 같다 | **M7 7F(운영 반입) 또는 별 마일스톤** | 운영자 | **정본**(이 행) · 조정안 G3 표는 포인터 |
+| `OPEN-DEC05-FLOOR-RATE-READING` (M6/G1-DEC05 신설, 2026-10-21) | **게시 낙찰하한율을 투찰율의 하한으로 읽을 것인가 — 그리고 경계 등가(투찰율 == 하한율)는 허용인가.** 왜 결정이 필요한가: 게시 하한율은 **예정가격 기준** 율이고 추천 투찰율은 **기초금액 기준**이라(§1.4.2 · DEC-04 분류 근거) 두 축을 잇는 정직한 다리는 임계 사정률(`투찰율 ÷ 하한율`) 하나뿐이다. 임계가 1 미만이면 그 후보는 실현 사정률이 1 이상인 어떤 추첨에서도 하한 미달이므로 「하한율을 투찰율 하한으로 읽는다」는 **해석**이 성립할 수 있으나, 그 승격 여부는 값이 아니라 도메인 판단이다. **수치 결정이 아니다** — 선택지는 (a) 읽지 않는다(현 출하값, `FloorRateReading.Undecided`) (b) 읽되 경계 등가 허용(`AtOrAbove`) (c) 읽되 경계 등가 불허(`StrictlyAbove`). 함의: (a) 에서는 하한 binding·밴드 붕괴가 production 에서 발화하지 않는다(그 사실을 `BidMenuPolicyDataTest` 가 고정한다). (c) 는 허용 구간이 열려 있어 **최소 원소가 없으므로** 하한 아래 후보를 올릴 자리가 없고 사유 있는 실패가 된다(엡실론을 지어내지 않는다). 커널은 (a) 에서 **fail-closed** 다 — 제약을 적용한 「척」하지 않고 binding 을 `FloorRateReadingUndecided` 로 싣는다. 반올림 모드는 이 항목이 아니라 `OPEN-DIC-10` 소유다 | **운영자 결정** — 결정되면 `BID_MENU_POLICY` 의 `floorRateReading` 갱신 | 운영자 | **정본**(이 행) · `decision/src/main/kotlin/bidvector/decision/menu/BidMenuPolicyData.kt` KDoc 은 포인터 |
 | `OPEN-4B5-COMPETITIVENESS` (M4/4B-5 신설, 2026-09-10) | **V2 는 「투찰 시장 평균」 fact 를 수집·정의한 적이 없다.** `deriveCompetitiveness`(scope.md ⑤, legacy `bid_recommendation.py:111-124` 4밴드 .95/.75/.50/.25)가 필요로 하는 `marketAverage` 값도, 그것을 표현할 shared-kernel `Basis` 축도 없다 — 실측: `Basis` enum 여섯종(BASE_AMOUNT·ESTIMATED·YEGA·BID·ALLOCATED_BUDGET·AWARD)에 시장평균 없음 · `Money` 스케일 곱 연산은 `BaseAmount.times(BidRate)` 하나뿐 · `compareKnownVat` 는 같은 타입 쌍만 비교. 4B-5 가 D-4B5-4 「없으면 멈추고 보고」로 멈췄고, 처분(계약 갱신 2026-09-10 #1)은 상수 `competitivenessNotCollected(): Absent(MarketAverageMissing)` — 4B-4 재정규화가 나머지 넷 성분으로 priority 를 세운다. `DerivationPolicyData` 에도 competitiveness 필드를 두지 않았다(소비자 없는 필드 금지) | **시장 평균 fact 의 정의·수집은 M3 후속**(개찰 결과 집계 축) · **shared-kernel `Basis` 확장 결정은 별도 slice** | 운영자 | **정본**(이 행) — `reports/evidence/m4/4b5/scope.md` 「계약 갱신 — 2026-09-10」 절·`checklist.md` 는 포인터 |
 | ~~`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`~~ (M4/4C-2 verifier r2 M-3 신설, 2026-09-10 → **M3/3G 종결, 사용자 승인 2026-09-10**) | 3D 의 권한 test 둘(`provenance_authority`·`notice_audit`)이 `information_schema.role_table_grants`(역할 **직접** 부여만)를 술어로 써서 `GRANT ... TO PUBLIC` 경유로 `bidvector_app` 이 실제로 행사할 수 있는 초과 권한을 못 본다(4C-2 verifier r2 실측, `PROBE-PUB … OK rows=1`). **닫는 방법**: M3/3G 가 4C-2 의 `has_table_privilege`(직접·PUBLIC·상속 해소) 술어를 `public` 의 **전 BASE TABLE**로 전수화한 유효 권한 행렬 test 하나로 옛 술어 둘을 대체했다 — 테이블 목록은 DB 에서 발견하고(손으로 적은 목록 순회 금지) 기대 행렬과 키 집합·값을 둘 다 일치시킨다. mutation 넷(PUBLIC 경유 초과·역할 직접 초과·부족·미선언 신규 테이블)으로 게이트가 실제로 낙제함을 실측했고, verifier r1 이 mutation 여섯(신규 테이블은 실 마이그레이션으로 재현)으로 독립 재확인해 `ready-for-review`다. **사용자 승인 2026-09-10 으로 닫혔다.** 잔여는 래칫 밖 표면(`OPEN-3G-NONTABLE-PRIVILEGE-SURFACES` — 시퀀스 셋·VIEW·구체화뷰)이며 **같은 갈래의 별도 항목**으로 산다. 정본은 `reports/evidence/m3/3g/scope.md`·`milestone-3.md` Slice 3G 절 | — | — | **정본**(이 행) · `reports/evidence/m4/4c2/checklist.md` 「인계」는 옛 포인터, `milestone-3.md` Slice 3G 절이 현재 서술 |
 

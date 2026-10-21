@@ -11,17 +11,25 @@ Kotlin 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정해 **제�
 둘째 bullet 은 「부재가 요구를 충족」형 근거임을 production 칸에 적고(RT2-M-2), `STR-03` 에 production
 HTTP 경로 식별자를 더했다(RT2-L-1).
 
-집계 이력은 ⓐ **29 → 20 → 15 → 13 → 16**, 성립 범위 **31 → 22 → 17 → 15 → 18/61** 이다(마지막 걸음은 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼 같은 술어를 다시 적용한 것이 아니다 — 그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다) — 완료 조건 3 의 결론
-(「오늘 성립하지 않는다」)은 **다섯 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
+집계 이력은 ⓐ **29 → 20 → 15 → 13 → 16 → 15**, 성립 범위 **31 → 22 → 17 → 15 → 18 → 17/61** 이다 — 완료 조건 3 의 결론
+(「오늘 성립하지 않는다」)은 **여섯 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
 기준으로 적용한 것**이고, 그때마다 어느 bullet 이 비었는지를 행에 남겼다.
+
+**두 종류의 걸음을 구별한다.** 다섯째(`13 → 16`)는 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼
+같은 술어를 다시 적용한 것이 아니다(그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다).
+**여섯째(`16 → 15`)는 다시 「같은 술어를 적용한 것」이다** — M6/G1-DEC05 가 `DEC-04` 의 ⓐ 근거를 기계로
+확인했더니 production 칸이 **실재하지 않는 이름**(`FLOOR_SHORTFALL_POLICY`)을 들고 있었다. 구현도 test 도
+바뀌지 않았고, **술어 ② 가 처음부터 비어 있던 것을 이제 본 것**이다. 같은 훑기에서 ⓐ 16 행의 인용 이름을
+전수로 확인했고 부재는 둘이었다(`DEC-04` · `STR-03`). `STR-03` 은 실체가 다른 이름으로 **있어** 이름 오기이므로
+판정을 건드리지 않았다(그 행의 이름 정정은 이 slice 밖 — 팀장 보고).
 
 ## 집계
 
 | 분류 | 건수 |
 |---|---:|
-| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **16** |
+| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **15** |
 | ⓑ 경계로 처리 — 잴 대상이 설계로 없다 | **2** |
-| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **43** |
+| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **44** |
 | **계** | **61** |
 
 | 축 | ⓐ | ⓑ | ⓒ | 계 |
@@ -30,19 +38,19 @@ HTTP 경로 식별자를 더했다(RT2-L-1).
 | STR | 2 | 0 | 8 | 10 |
 | QUAL | 3 | 0 | 4 | 7 |
 | ML | 1 | 0 | 6 | 7 |
-| DEC | 4 | 0 | 5 | 9 |
+| DEC | 3 | 0 | 6 | 9 |
 | NOTI | 1 | 1 | 3 | 5 |
 | SET | 0 | 0 | 3 | 3 |
 | OPS | 1 | 0 | 11 | 12 |
-| **계** | **16** | **2** | **43** | **61** |
+| **계** | **15** | **2** | **44** | **61** |
 
-**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 16 건**, 잴 대상이 설계로
-없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 43 건**이다. 그래서 「M0 필수 capability E2E
-전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 16 + ⓑ 2 = 18 건이고, 그 범위를 이 표가 고정한다.
+**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 15 건**, 잴 대상이 설계로
+없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 44 건**이다. 그래서 「M0 필수 capability E2E
+전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 15 + ⓑ 2 = 17 건이고, 그 범위를 이 표가 고정한다.
 
 **ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 43 건 가운데 대부분은 acceptance 의 여러 항목이 이미
 측정되고 있고 **한둘이 비어 있다**. 그 비어 있는 항목과 이미 측정되는 부분을 행마다 적었다. 부분 측정이
-강한 행 `COL-03` · `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-01` · `ML-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-08` · `SET-06` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
+강한 행 `COL-03` · `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-01` · `ML-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-02` · `DEC-04` · `DEC-05` · `DEC-08` · `SET-06` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
 
 ## 분류 규칙 — 이 표를 재현하는 방법
 
@@ -94,7 +102,11 @@ M6/G1-T 가 셋(`COL-02`·`DEC-06`·`OPS-01`)의 빈 bullet 을 test 로 닫아 
 capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. 완료 조건 3 이 가리지 못하는 자리이므로
 **OPEN 신설이 필요하다** — 이 slice 는 신설하지 않고 보고한다(OPEN 에스컬레이션, `checklist.md`).
 
-`STR-06` · `STR-07` · `STR-10` · `STR-16` · `QUAL-08` · `ML-05` · `ML-07` · `ML-08` · `DEC-02` · `DEC-05` · `DEC-08` · `DEC-10` · `SET-06` · `OPS-08` · `OPS-09` · `OPS-10` · `OPS-13`
+`STR-06` · `STR-07` · `STR-10` · `STR-16` · `QUAL-08` · `ML-05` · `ML-07` · `ML-08` · `DEC-08` · `DEC-10` · `SET-06` · `OPS-08` · `OPS-09` · `OPS-10` · `OPS-13`
+
+**M6/G1-DEC05 가 둘을 뺐다** — `DEC-02` · `DEC-05` 는 이 slice 가 홀더를 달았다(`OPEN-ML-ANALYSIS-WIRING` ·
+`OPEN-DEC05-FLOOR-RATE-READING` · M7 7C ②, capability-map §14.3 등재). 남은 **15** 는 그대로다. `DEC-04` 는 이
+목록의 대상이 아니다 — 이번에 ⓒ 로 내려왔지만 후속이 OPEN 이 아니라 **출하 정책 표 신설**이다.
 
 ## 표
 
@@ -133,10 +145,10 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **ML-07** | 모델 승격 게이트 (사전 선언 판정식 + 검정력 공시) | ⓒ | — | — | 셋째 bullet 이 요구하는 「**effective date**·승인 근거를 가진 정책 산출물」에서 **effective date 칸이 없다**(`ml-engine/policy/evaluation-v1.yaml` 은 `version` 만 있다), 다섯째 bullet 「정책 version 이 바뀌면 이전 판정과 이후 판정이 구분된다」를 재는 자리도 없다(verifier r1 R1-H-3). 부분 측정(강함) — `NotEvaluable(reason)` 이 `Passed` 가 될 수 없는 **타입**이고 `required_row_count` 를 함께 내는 것, 성숙한 창이 없으면 `NO_EVALUABLE_WINDOW` 가 안정성 판정보다 먼저 이기는 것, **공개 진입점에 맨 임계 파라미터가 없는 것**(CLI·환경변수·요청 어느 경로로도 완화 못 한다)은 `ml-engine/tests/evaluation/test_verdict.py` 가 잰다. | **없음 — 신설 필요** |
 | **ML-08** | 아티팩트 무결성·서명·릴리스 롤아웃 | ⓒ | — | — | **서명(signing) 축이 없다** — 레지스트리에 서명 생성·검증 코드가 0 이라 「서명 키가 산출물·로그에 남지 않는다」가 공허하게만 참이다. 부분 측정 — 「검증 안 함 ≠ 통과」는 `ml-engine/tests/registry/test_artifact.py` 의 「검증된 바이트 인자를 요구한다」·체크섬 불일치 거부가, 「예약 학습이 릴리스를 만들지 않는다」는 `ml-engine/tests/training/test_residual_release.py` 계열이 잰다(CI step `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)`). | **없음 — 신설 필요** |
 | **DEC-01** | 투찰 기준금액 해석과 provenance 표시 | ⓐ | `bidvector.procurement.ResolvedBaseAmountTest` · `bidvector.procurement.CollectionPolicyTest` · `bidvector.sharedkernel.MoneyTest` · `bidvector.sharedkernel.UndeclaredProvenanceTest` · `bidvector.adapters.contract.ContractRoundTripTest` | 출하 `KONEPS_COLLECTION_POLICY` 의 **기초금액 해석 순서**(bssamt 우선 + 배정예산 폴백 둘)가 정본이고, 폴백은 `FallbackFromBudget` **타입으로만** 조립된다(다른 출처 값은 그 자리에 컴파일되지 않는다). `Undeclared` provenance 는 파생을 전부 `Unmeasurable` 로 막는다. | 폴백이 표시되는 쪽(`FallbackFromBudget` 은 `FilledFromBudgetKey` 가 아니면 거부 · 해석 순서 P-3), basis 미표기 금액의 구분(`Undeclared` 면 파생이 전부 `Unmeasurable`), 금액+provenance 한 값 이동(`UNSPECIFIED` provenance 는 wire 에서 거부)이 세 bullet 과 붙는다. | — |
-| **DEC-02** | 추천 투찰가 산정과 제약(clamp) 적용 | ⓒ | — | — | 첫 bullet 「최종 추천가가 **어느 제약에 binding 됐는지가 결과에 실린다**」가 **구현에 없다** — `roundedWith` 는 성공 경로에서 `Derived<BidAmount>` 만 내고 어느 제약이 걸렸는지의 기록 칸이 없다(하한 미달은 `ROUNDED_BELOW_FLOOR` **실패 사유**로만 나타난다). 부분 측정 — 둘째 bullet(반올림이 하한 미만을 조용히 내지 않는다)은 `DEC-02 무조건 acceptance` 를 축어로 인용하는 `bidvector.sharedkernel.ArithmeticTest`, 셋째(basis 교차 금지)는 `bidvector.sharedkernel.CompileFailureHarnessTest`(1·11)가 잰다. 잠정(`OPEN-DEC-03`) 항목은 예규 확인 뒤 재결정 대상이라 세지 않는다. | **없음 — 신설 필요** |
+| **DEC-02** | 추천 투찰가 산정과 제약(clamp) 적용 | ⓒ | — | — | **M6/G1-DEC05 가 첫 bullet 을 「구현에 없다」에서 「있다」로 바꿨다** — `bidvector.decision.menu.BindingConstraint` 가 「후보 비율이 정했다」·「게시 하한이 정했다」·「하한율 읽기가 미정이라 재지 못했다」를 **서로 다른 값**으로 가르고 `BidMenuOption.binding` 이 그 값을 나른다(`bidvector.decision.menu.BidMenuKernelTest` 의 binding 네 test — 두 제약을 한 값으로 접는 변이가 RED). 그럼에도 **ⓐ 가 아니다**: 술어 ② 가 빈다 — 이 결과를 내는 자리가 **출하 배선에 없고**(메뉴를 만드는 production 소비자 0, 표면은 M7 7C ②), 후보 비율의 출하 출처가 ML 하나인데 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정한다. 둘째 bullet 도 술어 ② 가 빈다 — 출하 경로의 유일한 `roundedWith` 호출(`PredictionFacts.kt` budgetCapture)이 하한 인자를 주지 않는다(`floor = null`). 부분 측정(강함) — 둘째(반올림이 하한 미만을 조용히 내지 않는다)는 `bidvector.sharedkernel.ArithmeticTest`(적용 하한 경계 포함), 셋째(basis 교차 금지)는 `bidvector.sharedkernel.CompileFailureHarnessTest`(1·11·**14** — 하한 자리의 날 `BigDecimal` 거부)가 잰다. 잠정(`OPEN-DEC-03`) 항목은 예규 확인 뒤 재결정 대상이라 세지 않는다. | `OPEN-ML-ANALYSIS-WIRING`(값 출처) · M7 7C ②(소비자) |
 | **DEC-03** | 법정 낙찰하한율 해석 (우선순위 + 적용 범위) | ⓒ | — | — | 법정 하한율 **해석기**가 없다 — 기관 유형×시행일×추정가격 구간을 하한율로 바꾸는 versioned policy 와 그 적용 범위 묶음이 production 에 0 이다. `FloorUnmeasurableReason` 에 `FloorRateUnresolved`·`FloorModelNotApplicable` **사유만** 있고 그 값을 만드는 자리가 없다(하한율은 호출부가 준다). 부분 측정 — 소급 금지·시행일 경계 축은 `bidvector.sharedkernel.PolicyTest` 의 `EffectiveDatedPolicy` 가 일반형으로 잰다. | `OPEN-DEC-10` |
-| **DEC-04** | 하한 미달 빈도 표시와 판정 불가 사유 (정직 명세) | ⓐ | `bidvector.decision.FloorShortfallKernelTest` · `bidvector.sharedkernel.RateArithmeticTest` | 출하 `FLOOR_SHORTFALL_POLICY`(경계 비교 어휘 · 최소 표본 · 개연 밴드)가 커널 입력이고 `Frequency` 와 `Unmeasurable` 이 **타입으로** 갈린다 — 「0.0 과 판정 불가의 구분」이 값이 아니라 타입에서 온다. | 경계 등가 비미달(strictly-greater)·149/150/151 표본 경계·밴드 밖 표본의 분모 제외와 그로 인한 `Unmeasurable` 전이·`Frequency` 가 (분자, 분모) 묶음이고 `policyVersion` 이 함께 남는 것 — 다섯 bullet 전부가 한 클래스에 있다. | — |
-| **DEC-05** | 투찰가 메뉴 3안 (recommended / aggressive / safe) | ⓒ | — | — | 투찰가 **메뉴** 타입이 없다 — (태도, 리스크 노트, 근거) 세 칸을 요구하는 옵션 타입도, 「밴드 붕괴」 상태도 production 에 없다. 부분 측정 — 세 후보의 순서 강제는 `bidvector.workflow.prediction.PredictionValueTest`, 역전 응답의 `ContractViolation` 은 `bidvector.adapters.ml.SuccessShapeFailClosedTest` 가 잰다. | **없음 — 신설 필요** |
+| **DEC-04** | 하한 미달 빈도 표시와 판정 불가 사유 (정직 명세) | ⓒ | — | — | **M6/G1-DEC05 정정(D-G1DEC05-1) — 앞 판의 ⓐ 근거가 실재하지 않는 이름을 들었다.** production 칸이 「출하 `FLOOR_SHORTFALL_POLICY`」를 커널 입력으로 적었는데, **그 이름의 선언이 저장소에 없다**(기계 확인: `*/src/main` + `config/quality` 전수 grep 0건. 같은 훑기에서 ⓐ 16 행의 나머지 인용 이름은 전부 실재했고, `STR-03` 의 `VERDICT_LADDER_POLICY` 하나가 더 부재였다 — 그쪽은 실체가 `VerdictLadderPolicyData` + `EVALUATION_LADDER_POLICY_SLOT` 으로 **있으므로 이름 오기**이고 판정은 건드리지 않았다). `FloorShortfallPolicyData` 의 소비자는 **conformance 실행기와 kernel test 뿐**이라 커널의 거동이 **출하 정책 값에서 성립하지 않는다** — 술어 ② 가 빈다. 부분 측정(강함) — 다섯 bullet 의 거동 자체는 `bidvector.decision.FloorShortfallKernelTest` · `bidvector.sharedkernel.RateArithmeticTest` 가 test 정책 위에서 전수로 잰다(경계 등가 비미달·149/150/151 표본 경계·밴드 밖 표본의 분모 제외와 `Unmeasurable` 전이·`Frequency` 가 (분자, 분모) 묶음이고 `policyVersion` 이 함께 남는 것). 비어 있는 것은 **출하 정본 표 하나**다. | **없음 — 후속: 출하 정책 표 신설** |
+| **DEC-05** | 투찰가 메뉴 3안 (recommended / aggressive / safe) | ⓒ | — | — | **M6/G1-DEC05 가 두 무조건 bullet 을 구조로 세웠다** — ① 「근거 없는 옵션을 만들 수 없다」: `bidvector.decision.menu.BidMenuOption` 은 (태도, 리스크 노트, 근거) 다섯 인자 전부가 필수이고 생성자가 `internal` 이라 **모듈 밖 생성 경로가 0** 이다(`bidvector.decision.menu.MenuCompileFailureHarnessTest` fixture 1·2 — 생성자를 여는 변이가 RED). ② 「밴드 붕괴가 '정상 3안'으로 위장되지 않는다」: `BidMenuOutcome.BandCollapsed` 가 `Offered` 와 **다른 타입**이고 `when` 이 전수다(`bidvector.decision.menu.BidMenuKernelTest` 의 밴드 붕괴 셋). 리스크 노트는 DEC-04 커널의 판정 봉투를 그대로 싣고 낙찰 확률을 실을 칸이 없다. 그럼에도 **ⓐ 가 아니다**: 술어 ②③ 이 빈다 — 메뉴를 만드는 **production 소비자가 0**(출하 HTTP 표면 넷 중 금액을 내는 것이 없다. 표면은 M7 7C ②)이고, 후보 비율의 출하 출처가 ML 하나인데 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정한다(ML 없이 서는 대체 출처 없음 — 발주처 밴드 축이 V2 에 0, 공사 floor 앵커는 예정가 basis 라 금액 축에서 불성립). 출하 정본이 하한율 읽기를 미정으로 두므로(`OPEN-DEC05-FLOOR-RATE-READING`) **오늘 production 값에서는 밴드 붕괴·하한 binding 이 발화하지 않는다** — `bidvector.decision.menu.BidMenuPolicyDataTest` 가 그 사실을 고정한다. 부분 측정(강함) — 세 후보의 순서 강제는 `bidvector.workflow.prediction.PredictionValueTest`, 라벨 대응은 `bidvector.workflow.prediction.StanceRateMappingTest`, 역전 응답의 `ContractViolation` 은 `bidvector.adapters.ml.SuccessShapeFailClosedTest` 가 잰다. | `OPEN-ML-ANALYSIS-WIRING`(값 출처) · `OPEN-DEC05-FLOOR-RATE-READING`(읽기 결정) · M7 7C ②(소비자) |
 | **DEC-06** | bid_now / review / skip 액션 결정과 근거 (reason code) | ⓐ | `bidvector.app.evaluation.DryRunCommitParityTest` · `bidvector.adapters.event.OutboxPayloadCodecTest` · `bidvector.decision.MlUnavailableReasonTest` · `bidvector.workflow.evaluation.NotificationReasonSerializationTest` · `bidvector.decision.VerdictLadderTest` · `bidvector.decision.VerdictLadderPropertyTest` · `bidvector.workflow.evaluation.EvidenceLinesTest` · `bidvector.app.architecture.DryRunCommitSeparationGateTest` | 평가 진입점은 둘이다 — `EvaluationWiring` 이 내는 `EvaluationDryRunFactory`(`EvaluationDryRunController` 의 유일한 진입)와, `bidvector.evaluation.mode=once` 에서만 올라오는 `EvaluationCommitWiring.evaluationCommitRun`(→ `EvaluationCommitRun`, 알림 port 가 production `OutboxNotificationRequestPort`). 신설 test 는 그 **두 조립 메서드를 각각 부른다**. 출하 값은 `EVALUATION_LADDER_POLICY_VERSION` · 전략 행의 임계와 여력 상한 · `bidvector.evaluation.commit.current-active-bids` 다. | 넷째 bullet(같은 공고를 어느 경로로 평가해도 액션과 근거가 같다)을 **M6/G1-T 신설 test** 가 두 진입점을 각각 불러 잰다 — 돌려준 판정 목록의 값 등식(액션 · reason code · 알림 처분)과, 커밋 경로가 **실제로 저장한** payload 가 dry-run 쪽 판정의 사유 문자열·공고 식별자·전략 개정·사다리 정책 버전을 나른다는 등식 둘(기대값을 dry-run 결과에서 뽑는다). 나머지 셋은 (코드, payload) 영속·재렌더링 `OutboxPayloadCodecTest`, 소진 검사 `MlUnavailableReasonTest`·`NotificationReasonSerializationTest`, 사다리 분기 `VerdictLadderTest`·`VerdictLadderPropertyTest`, 문구 자동 추종 `EvidenceLinesTest`, 조립 분리 `DryRunCommitSeparationGateTest` 가 잰다. **경계** — 신설 test 는 **후보 상한 계층보다 아래**에서 비교한다: use case 가 돌려준 판정과 커밋 경로가 저장한 payload 를 보고, 그 위에서 일회 러너(`candidateCap` 계수·종료 코드)와 dry-run 컨트롤러(응답 조립·409 거부)가 하는 가공은 이 등식 밖이다. 그 두 층은 `bidvector.app.evaluation.EvaluationCommitRunnerTest`·`bidvector.app.http.EvaluationDryRunControllerTest` 가 각자 잰다. acceptance 가 드는 셋째 경로 백테스트는 V2 에서 액션을 만들지 않는다(Python 백테스트는 투찰율 전략과 채점만 낸다). | — |
 | **DEC-08** | 기초금액 provenance 분류 | ⓒ | — | — | 넷째 bullet 「분류에 사용된 정책 version 이 결과와 **함께 저장**된다」가 **구현에 없다**(verifier RT-H-1) — `ProvenanceEvidence.policyVersion` 은 메모리 타입에만 있고 그 KDoc 이 「저장 자리를 이 타입이 정하지 않는다」고 적으며, 유일한 production 호출부가 분류만 취해 근거를 버리고 마이그레이션에 그 version 을 담는 칸이 **0** 이다. 인용했던 `PrecedenceLabelColumnTest` 는 provenance detail **위조 거부**이지 version 저장이 아니다. 부분 측정(강함) — first-match 우선, 복구 추정치와 원본 참조의 분리, 15행 중 하나라도 결손이면 `RESERVE_PRICE_MISSING` 은 `bidvector.decision.ProvenanceRulesTest`·`bidvector.workflow.evaluation.SampleEligibilityTest` 가 출하 `ProvenancePolicyData` 위에서 잰다. | **없음 — 신설 필요** |
 | **DEC-09** | rate scale 정규화 (percent ↔ fraction) | ⓐ | `bidvector.sharedkernel.RateTest` · `bidvector.sharedkernel.RateArithmeticTest` · `bidvector.sharedkernel.CompileFailureHarnessTest` · `bidvector.sharedkernel.RegressionExampleTest` | `Rate` 의 internal 생성자와 **단위를 이름으로 요구하는 공개 경로 둘**이 production 전역 제약이고, 교차 축 대입이 **컴파일되지 않는다**. 「모든 소비 경로가 같은 해석」은 표현이 하나(정규 fraction)뿐이라는 구조에서 온다. | 「단위 선언 없이는 `Rate` 가 만들어지지 않는다 — 공개 경로가 이름이 단위인 둘뿐」 + 교차 축 대입이 **컴파일되지 않는다**(2·12) + 「변환은 생성 지점 한 곳뿐이고 크기로 추측하지 않는다」. 모든 소비 경로의 같은 해석은 `fraction` 고정 + 단일 생성 지점이 구조로 진다. | — |
