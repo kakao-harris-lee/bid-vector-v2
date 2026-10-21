@@ -1,0 +1,12 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuDisclosure
+import bidvector.decision.menu.BidMenuOption
+import bidvector.decision.menu.BidMenuOutcome
+import bidvector.sharedkernel.PolicyVersion
+
+fun forgedMenuTypo(
+    option: BidMenuOption,
+    version: PolicyVersion,
+): BidMenuOutcome.Offered =
+    BidMenuOutcome.OfferedTypo(option, option, option, BidMenuDisclosure.entries.toSet(), version)
