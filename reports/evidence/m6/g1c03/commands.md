@@ -35,4 +35,13 @@
 
 ## acceptance
 
-(배선이 끝난 뒤 채운다 — `check` · container job 재생 · rollback ①~⑥.)
+| cmd | exit | 핵심 결과 |
+|---|---|---|
+| `./gradlew --no-daemon check`(1차, 2026-10-21 22:12~22:22) | **1** | 10분 07초 · 172 task. 실패 **둘** — ① ktlint 「Needless blank line(s)」(helper 를 걷어낸 자리, 코드 변경 없이 해소) ② `OpeningBudgetE2ETest` 의 끊긴 축 이어 걷기(659 중 1) = checklist §3-2 의 재판정 대상 |
+
+`web`·`ml-engine` job 은 생략한다 — **입력 변경 0** 을 path-limited diff 로 보였다:
+`git diff --name-only bee7c36f -- ml-engine web docker openapi contracts .github ml-contract` 가 **빈 출력**이다.
+`container` job 은 app 이미지 입력(`app/**`)이 바뀌었으므로 `if:` 를 평가하는 재생으로 돌린다 — 재생 전
+`bidvector/app:local` 은 `94382c1026cf` 이고, 끝나면 그 id 로 **태그를 되돌린다**(레인끼리 공유하는 태그).
+
+(판정 뒤 재실행분과 container 재생·rollback 은 여기에 이어 적는다.)
