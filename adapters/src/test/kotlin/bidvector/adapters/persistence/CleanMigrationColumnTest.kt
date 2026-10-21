@@ -311,6 +311,24 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
     // 구분한다.
     private val operatorProfileColumns =
         listOf(
+            // M7/7D V20(추가만) — 평문 열이 없다: 비밀 문구는 bcrypt 문면, 세션 식별자와 CSRF 는
+            // SHA-256 hex 다. `created_at` 만 DB 가 찍고(보존 기준 시각 축) 나머지 시각은
+            // 애플리케이션의 시계가 정한다(세션 판정의 입력이라 test 가 그 시계를 민다).
+            ColumnSpec("account", "id", "bigint", false),
+            ColumnSpec("account", "login_name", "text", false),
+            ColumnSpec("account", "passphrase_hash", "text", false),
+            ColumnSpec("account", "created_at", "timestamp with time zone", false),
+            ColumnSpec("account", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("account", "failed_attempts", "integer", false),
+            ColumnSpec("account", "locked_until", "timestamp with time zone", true),
+            ColumnSpec("browser_session", "session_digest", "text", false),
+            ColumnSpec("browser_session", "account_id", "bigint", false),
+            ColumnSpec("browser_session", "csrf_digest", "text", false),
+            ColumnSpec("browser_session", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("browser_session", "last_used_at", "timestamp with time zone", false),
+            ColumnSpec("browser_session", "idle_expires_at", "timestamp with time zone", false),
+            ColumnSpec("browser_session", "absolute_expires_at", "timestamp with time zone", false),
+            ColumnSpec("browser_session", "revoked_at", "timestamp with time zone", true),
             ColumnSpec("operator_profile", "id", "smallint", false),
             ColumnSpec("operator_profile", "business_types", "ARRAY", false),
             ColumnSpec("operator_profile", "licenses_declared", "boolean", false),

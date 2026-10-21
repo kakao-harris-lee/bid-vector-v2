@@ -18,7 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * `HttpTestApplication`에 임시 `@RestController`(새 경로)를 추가해 재실행하면, 그 새
  * 경로도 무자격 401 대조에 자동으로 들어간다(수동 재현, evidence checklist에 기록).
  *
- * 우회 (4) — [OperatorCredentialFilter]의 비교는 `MessageDigest.isEqual`만 쓴다
+ * 우회 (4) — [OperatorCredentialAuthenticator]의 비교는 `MessageDigest.isEqual`만 쓴다
  * (`ConstantTimeComparisonStructureTest`가 구조로 잠근다, 이 test는 기능만 본다).
  */
 @SpringBootTest(
@@ -62,7 +62,7 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
 
     @Test
     fun `올바른 자격증명이면 통과한다`() {
-        val headers = HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+        val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
         val response =
             restTemplate.exchange(url("/api/strategy"), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
         response.statusCode.value() shouldBe 200
@@ -70,7 +70,7 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
 
     @Test
     fun `자격증명이 없든 틀리든 사유를 나누지 않는다`() {
-        val wrongHeaders = HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, "wrong-value") }
+        val wrongHeaders = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, "wrong-value") }
 
         val missing = restTemplate.getForEntity(url("/api/strategy"), Map::class.java)
         val wrong =
@@ -85,7 +85,7 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
 
     @Test
     fun `401 응답에 자격증명 값이 실리지 않는다`() {
-        val headers = HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, "wrong-value") }
+        val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, "wrong-value") }
         val response =
             restTemplate.exchange(url("/api/strategy"), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
         (response.body ?: "").contains("wrong-value") shouldBe false

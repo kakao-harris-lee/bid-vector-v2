@@ -1,34 +1,34 @@
 package bidvector.app.http
 
-import jakarta.servlet.Filter
-import jakarta.servlet.FilterChain
-import jakarta.servlet.ServletRequest
-import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
-import jakarta.servlet.http.HttpServletResponse
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
 /**
- * 단일 운영자 자격증명 필터(운영자 결정 ②, D-6A1-6) — 값은 환경변수 주입,
+ * 단일 운영자 자격증명 **인증 경로**(운영자 결정 ②, D-6A1-6) — 값은 환경변수 주입,
  * 기본값 없음(생성자가 빈 값을 거부한다 — 조립 시점에 이미 실패한다, `bidvector.persistence`
  * 관례와 같은 fail-fast). 실패는 401이고 사유를 나누지 않는다(없음/틀림을 구분하지 않는다
  * — 구분하면 자격증명 존재 자체를 흘린다).
  *
- * **우회 (1) — 이 필터는 경로 이름을 모른다.** 등록(`BidVectorApplication`)이 urlPatterns를
- * 모든 경로(와일드카드 하나)로 명시해 어떤 새 endpoint도 이 필터 밖에서 태어나지 않는다
- * (허용 목록이 아니라 기본 거부).
+ * **M7/7D — 이 클래스는 더 이상 `Filter` 가 아니다.** 7D 가 두 번째 인증 경로(세션 쿠키)를
+ * 더하면서, 「모든 경로 기본 거부」는 [RequestAuthenticationFilter] 한 등록이 지고 이 클래스는
+ * 그 등록이 구성으로 받는 경로 하나가 됐다(계약 설계 검토 (1) 「열거가 아니라 구성」). 바뀐
+ * 것은 **누가 체인에 꽂히는가**이고, 아래 자격증명 비교의 규율과 [OperatorCredential] 타입은
+ * 그대로다 — 이름이 `…Filter` 로 남으면 필터가 아닌 것을 필터라 부르게 된다.
  *
- * **우회 (4)(D-6A1-43) — 비교는 [OperatorCredential.matches] 하나뿐이고, 이 필터는 raw
- * `String`을 아예 다루지 않는다.** 「필터는 그 타입만 다룬다. 환경변수에서 읽는 자리에서
- * 곧바로 감싼다」 — 생성자가 [OperatorCredential]만 받는다. 필터가 `String` 생성자
- * 인자를 받아 **내부에서** 감싸면, raw 문자열이
- * 생성자 매개변수로 필터 class 안에 순간적으로 존재해 「그 값을 다시 꺼내 이웃 패키지의
- * 새 비교 함수로 넘긴다」는 형태의 재도입이 가능하다(MUT-A3 재현 — 이 슬라이스
- * 착수 재검증에서 실측: `private val rawExpected: String = expectedCredential` 필드를
+ * **우회 ⑦ — 이 경로는 endpoint 이름을 모른다.** 기본 거부의 자리가 등록 하나라서, 새
+ * endpoint 가 어느 인증 경로에도 걸리지 않고 열리는 상태가 구성상 존재하지 않는다.
+ *
+ * **우회 (4)(D-6A1-43) — 비교는 [OperatorCredential.matches] 하나뿐이고, 이 클래스는 raw
+ * `String`을 아예 다루지 않는다.** 「이 경로는 그 타입만 다룬다. 환경변수에서 읽는 자리에서
+ * 곧바로 감싼다」 — 생성자가 [OperatorCredential]만 받는다. 생성자가 `String` 인자를 받아
+ * **내부에서** 감싸면, raw 문자열이
+ * 생성자 매개변수로 이 class 안에 순간적으로 존재해 「그 값을 다시 꺼내 이웃 패키지의
+ * 새 비교 함수로 넘긴다」는 형태의 재도입이 가능하다(MUT-A3 재현 — 6A-2b 착수
+ * 재검증에서 실측: `private val rawExpected: String = expectedCredential` 필드를
  * 새로 만들고 이웃 패키지 `==` 함수에 넘기니 전건 `check`가 초록이었다). **환경변수를 읽는
  * 조립 지점(`BidVectorApplication`·`HttpTestSupport`)에서 [OperatorCredential.of]로 즉시
- * 감싸면 필터 class 안에는 애초에 raw 문자열이 존재하지 않는다** — 재도입하려면 이 필터의
+ * 감싸면 이 class 안에는 애초에 raw 문자열이 존재하지 않는다** — 재도입하려면 이
  * 생성자 시그니처와 조립 지점 둘 다 고쳐야 하고, 그것은 더 이상 「한 줄 이동」이 아니다.
  * `MessageDigest.isEqual`을 직접 호출하는 규율을 `ConstantTimeComparisonStructureTest`
  * (게이트)로만 지키면, 그 게이트는 파일 하나 → 이름 하나 →
@@ -37,46 +37,25 @@ import java.security.MessageDigest
  *
  * 이름에 스캔 어휘를 쓰지 않는다(D-6A1-9, D-6A1-19가 모든 설정 키로 일반화) — `Credential`.
  */
-class OperatorCredentialFilter(
+class OperatorCredentialAuthenticator(
     private val expected: OperatorCredential,
-) : Filter {
-    override fun doFilter(
-        request: ServletRequest,
-        response: ServletResponse,
-        chain: FilterChain,
-    ) {
-        val httpRequest = request as HttpServletRequest
-        val httpResponse = response as HttpServletResponse
-        val presented = httpRequest.getHeader(CREDENTIAL_HEADER)
-
-        if (presented == null || !expected.matches(OperatorCredential.wrap(presented))) {
-            httpRequest.setAttribute(AUDIT_SUBJECT_ATTRIBUTE, "unauthenticated")
-            writeUnauthenticated(httpRequest, httpResponse)
-            return
-        }
-
-        httpRequest.setAttribute(AUDIT_SUBJECT_ATTRIBUTE, "operator")
-        chain.doFilter(request, response)
-    }
-
-    /**
-     * DispatcherServlet 밖(Spring MVC 진입 전)이라 [GlobalErrorHandler]를 지나지 않는다 —
-     * 이 필터 자신이 [ErrorBody] 형태로 직접 응답한다(`toJson`, D-6A1-9 스캔 어휘 회피와
-     * 같은 파일이 유일한 오류 형태 생성 경로라는 불변식을 지킨다).
-     */
-    private fun writeUnauthenticated(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-    ) {
-        val correlationId = request.getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
-        response.status = HttpServletResponse.SC_UNAUTHORIZED
-        response.contentType = "application/json"
-        response.characterEncoding = "UTF-8"
-        response.writer.write(ErrorMapping.unauthenticated(correlationId).toJson())
+) : RequestAuthenticator {
+    override fun authenticate(request: HttpServletRequest): AuthenticationResult {
+        val presented = request.getHeader(CREDENTIAL_HEADER)
+        // 없음과 틀림을 **한 식**으로 접는다 — 두 경우가 같은 결과이고(D-6A1-6), 반환 자리를
+        // 하나로 두면 「한쪽만 고치는」 편집이 생길 수 없다.
+        val matches = presented != null && expected.matches(OperatorCredential.wrap(presented))
+        return if (matches) AuthenticationResult.Authenticated(OPERATOR_SUBJECT) else AuthenticationResult.Denied
     }
 
     companion object {
         const val CREDENTIAL_HEADER = "X-Operator-Credential"
+
+        /**
+         * audit 주체 라벨 — 6A-1 과 **같은 값**이다(무회귀). 세션 경로의 라벨은
+         * `account:<id>` 이고, 그 둘과 「신원 없음」 하나가 주체 어휘 전부다(V20 주석).
+         */
+        const val OPERATOR_SUBJECT = "operator"
     }
 }
 

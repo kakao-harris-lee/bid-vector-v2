@@ -5,9 +5,14 @@ import bidvector.adapters.audit.ApiAuditStore
 import bidvector.adapters.evaluation.UuidCorrelationIdFactory
 import bidvector.adapters.strategy.SystemClock
 import bidvector.app.http.ApiAuditRecord
+import bidvector.app.http.BrowserSessionAuthenticator
 import bidvector.app.http.OperatorCredential
-import bidvector.app.http.OperatorCredentialFilter
+import bidvector.app.http.OperatorCredentialAuthenticator
 import bidvector.app.http.RequestAuditFilter
+import bidvector.app.http.RequestAuthenticationFilter
+import bidvector.app.http.SessionCookieWriter
+import bidvector.app.wiring.BrowserAccessExecutor
+import bidvector.workflow.access.BrowserAccessPolicyData
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.strategy.Clock
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter
@@ -66,7 +71,7 @@ import javax.sql.DataSource
         ComponentScan.Filter(type = FilterType.ANNOTATION, classes = [SpringBootApplication::class]),
     ],
 )
-@EnableConfigurationProperties(OperatorCredentialProperties::class)
+@EnableConfigurationProperties(OperatorCredentialProperties::class, AccessCookieProperties::class)
 open class BidVectorApplication {
     @Bean
     open fun clock(): Clock = SystemClock()
@@ -78,23 +83,54 @@ open class BidVectorApplication {
     open fun apiAuditStore(dataSource: DataSource): ApiAuditStore = ApiAuditStore(dataSource)
 
     /**
-     * `RequestAuditFilter`가 부르는 sink — [ApiAuditRecord](app/http, HTTP 어휘) →
-     * [ApiAuditRow](adapters/audit, 저장 어휘) 변환은 이 조립 지점 하나가 진다(두 타입을
-     * 합치지 않는다 — app이 adapters의 저장 행 형태를 몰라도 되게 한다).
+     * **모든 경로 기본 거부의 등록 하나**(M7/7D 산출물 4) — 인증 경로 둘이 **이 한 등록**에서
+     * 판정된다(설계 검토 (1) 「열거가 아니라 구성」). 그래서 「한쪽 경로만 지나는 endpoint」나
+     * 「어느 경로에도 안 걸리고 열린 endpoint」라는 상태가 조립상 존재하지 않는다.
+     *
+     * 순서는 **자격 헤더 먼저**다: 그 경로는 DB 에 닿지 않으므로, 기계·배치 호출이 세션 조회
+     * 트랜잭션을 열지 않고 끝난다(거동은 순서와 무관하다 — 둘 다 거부면 401 하나다).
      *
      * **D-6A1-43** — 환경변수를 읽는 이 자리에서 곧바로 [OperatorCredential.of]로 감싼다.
-     * 그 뒤로는 [OperatorCredentialFilter]도, 이 조립 메서드도 raw 자격증명 문자열을
+     * 그 뒤로는 [OperatorCredentialAuthenticator]도, 이 조립 메서드도 raw 자격증명 문자열을
      * 다시 다루지 않는다(`properties.value`는 이 한 줄에서만 참조된다).
      */
     @Bean
-    open fun operatorCredentialFilterRegistration(
+    open fun requestAuthenticationFilterRegistration(
         properties: OperatorCredentialProperties,
-    ): FilterRegistrationBean<OperatorCredentialFilter> =
-        FilterRegistrationBean(OperatorCredentialFilter(OperatorCredential.of(properties.value))).apply {
+        browserAccessExecutor: BrowserAccessExecutor,
+        sessionCookieWriter: SessionCookieWriter,
+    ): FilterRegistrationBean<RequestAuthenticationFilter> =
+        FilterRegistrationBean(
+            RequestAuthenticationFilter(
+                listOf(
+                    OperatorCredentialAuthenticator(OperatorCredential.of(properties.value)),
+                    BrowserSessionAuthenticator(browserAccessExecutor, sessionCookieWriter),
+                ),
+            ),
+        ).apply {
             urlPatterns = listOf("/*")
             order = Ordered.HIGHEST_PRECEDENCE + 1
         }
 
+    /**
+     * 세션 쿠키를 쓰는 빈 — **이 자리에 있는 이유는 패키지 방향**이다(`BrowserAccessWiring` 의
+     * 주석): `app.wiring` 이 `app.http` 를 이름 부르면 두 패키지가 순환한다. 조립 근은 이미
+     * `app.http` 를 한 방향으로 참조한다.
+     *
+     * 정책 값(절대 창)과 환경 값(Secure 여부)이 **다른 출처**에서 온다 — 앞은 versioned
+     * policy, 뒤는 설정 키다.
+     */
+    @Bean
+    open fun sessionCookieWriter(
+        properties: AccessCookieProperties,
+        resolvedBrowserAccessPolicy: BrowserAccessPolicyData,
+    ): SessionCookieWriter = SessionCookieWriter(properties.cookieSecure, resolvedBrowserAccessPolicy.absoluteWindow)
+
+    /**
+     * `RequestAuditFilter`가 부르는 sink — [ApiAuditRecord](app/http, HTTP 어휘) →
+     * [ApiAuditRow](adapters/audit, 저장 어휘) 변환은 이 조립 지점 하나가 진다(두 타입을
+     * 합치지 않는다 — app이 adapters의 저장 행 형태를 몰라도 되게 한다).
+     */
     @Bean
     open fun requestAuditFilterRegistration(
         clock: Clock,
@@ -132,13 +168,24 @@ open class BidVectorApplication {
  * 문자열화해 로그·응답에 낼 수 있다 — 컴파일러가 합성하는 `data class`의 `toString()`이
  * 그 경로로 자격증명 원문을 흘린다(D-6A1-43의 (2b) 값 획득 축 전수에서 이 타입이 누락돼
  * 있었다). 그래서 **`data class`가 아니다** — `equals`/`hashCode`/`copy`/구조 분해도
- * 같이 사라지지만 이 타입은 [OperatorCredentialFilter]에 생성 직후 한 번 읽히고 버려질
+ * 같이 사라지지만 이 타입은 [OperatorCredentialAuthenticator]에 생성 직후 한 번 읽히고 버려질
  * 뿐이라 필요하지 않다. 재정의하지 않은 `Any.toString()`(클래스명@해시코드)을 그대로
  * 쓴다 — [OperatorCredential]과 같은 근거.
  */
 @ConfigurationProperties(prefix = "operator.credential")
 class OperatorCredentialProperties(
     val value: String,
+)
+
+/**
+ * 쿠키의 **환경 값** 하나(정책 값이 아니다 — 정책은 `BROWSER_ACCESS_POLICY` 가 든다).
+ * 기본이 `true` 인 이유: 기본값을 「안전한 쪽」에 두면 설정을 잊은 배포가 http 로 쿠키를
+ * 흘리지 않는다. 로컬 http 개발 실행만 `bidvector.access.cookie-secure=false` 로 내린다
+ * (운영 TLS 는 7F).
+ */
+@ConfigurationProperties(prefix = "bidvector.access")
+class AccessCookieProperties(
+    val cookieSecure: Boolean = true,
 )
 
 /**

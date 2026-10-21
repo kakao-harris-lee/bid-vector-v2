@@ -62,7 +62,7 @@ class OpenApiNoticeSearchContractTest : HttpIntegrationTestBase() {
     }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     private fun rowsOf(query: String): List<Map<String, Any?>> =
         (

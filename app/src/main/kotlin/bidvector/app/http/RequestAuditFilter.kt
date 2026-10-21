@@ -13,7 +13,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * 전 요청 audit(D-6A1-7, 운영자 결정 ③) — [OperatorCredentialFilter]보다 **바깥**에
+ * 전 요청 audit(D-6A1-7, 운영자 결정 ③) — [RequestAuthenticationFilter]보다 **바깥**에
  * 등록해(`BidVectorApplication`) 인증 실패·예외에서도 행이 생기게 한다(우회 (2)). 요청
  * correlation id의 **유일한 발급점**이기도 하다 — [CORRELATION_ID_ATTRIBUTE]에 심어
  * 필터 체인·[GlobalErrorHandler]가 공유한다.

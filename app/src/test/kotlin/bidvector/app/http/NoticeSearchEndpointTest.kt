@@ -65,7 +65,7 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
     }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     /**
      * **`URI` 로 넘긴다** — `String` URL 은 `RestTemplate` 이 URI 템플릿으로 보고 다시

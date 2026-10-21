@@ -112,7 +112,7 @@ class ProductionHttpSurfaceTest {
         accept: MediaType? = null,
     ): HttpHeaders =
         HttpHeaders().apply {
-            set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
+            set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
             contentType?.let { this.contentType = it }
             accept?.let { this.accept = listOf(it) }
         }

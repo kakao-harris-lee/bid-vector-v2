@@ -102,7 +102,7 @@ class StrategyEditProductionE2ETest {
 
     private fun headers(): HttpHeaders =
         HttpHeaders().apply {
-            set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
+            set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
             contentType = MediaType.APPLICATION_JSON
         }
 

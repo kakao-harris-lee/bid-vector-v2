@@ -82,10 +82,19 @@ class CollectionDepthGateTest {
             DepthAxis.SERVICE_KEY -> referencers(listOf(appRoot()), setOf(policy.serviceKeyType), depth)
             DepthAxis.LOGGING -> referencers(listOf(appRoot()), policy.loggingTypes.toSet(), depth)
             DepthAxis.OPERATOR_CREDENTIAL -> credentialReferencers(depth)
+            DepthAxis.PASSPHRASE -> passphraseReferencers(depth)
         }
 
     private fun credentialReferencers(depth: ReferenceCollection): Set<String> =
         referencers(listOf(appRoot()), policy.operatorCredentialTypes.toSet(), depth)
+
+    /** M7/7D — 뿌리가 셋이다(값·use case · 해시 어댑터 · HTTP·명령). */
+    private fun passphraseReferencers(depth: ReferenceCollection): Set<String> =
+        referencers(
+            listOf(appRoot(), "${policy.packageRoot}.workflow", "${policy.packageRoot}.adapters"),
+            policy.passphraseTypes.toSet(),
+            depth,
+        )
 
     private fun reflectionPairs(depth: ReferenceCollection): Set<String> =
         CollectionArchitectureRules(depth)

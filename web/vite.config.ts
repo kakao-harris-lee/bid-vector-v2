@@ -29,6 +29,11 @@ export default defineConfig({
   preview: { host: '127.0.0.1', port: 4173, strictPort: true },
   build: { outDir: 'dist', emptyOutDir: true },
   test: {
+    // M7/7D — **test 에서만** API 기준 주소를 절대 URL 로 둔다. 브라우저는 상대 주소(`/`)를
+    // 문서 기준으로 풀지만 Node·jsdom 의 `Request` 는 **절대 URL 을 요구한다**(실측:
+    // `ERR_INVALID_URL input: '/api/session'`). production 번들의 기본값은 그대로 상대 주소다
+    // (`client.ts` 의 `VITE_API_BASE_URL ?? '/'`) — 이 값은 vitest 프로세스에만 실린다.
+    env: { VITE_API_BASE_URL: 'http://localhost' },
     // 7A 의 단위 test 는 라우트 표처럼 DOM 이 필요 없는 것뿐이다 — jsdom 을 의존에 들이지
     // 않는다. 화면 렌더 test 는 7E 가 환경과 함께 들인다.
     environment: 'node',

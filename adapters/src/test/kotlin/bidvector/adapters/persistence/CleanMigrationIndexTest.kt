@@ -52,6 +52,11 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("operator_strategy_revision", "operator_strategy_revision_pkey", "USING btree (revision)"),
             IndexSpec("operator_profile", "operator_profile_pkey", "USING btree (id)"),
             IndexSpec("api_request_audit", "api_request_audit_pkey", "USING btree (id)"),
+            // M7/7D(추가만). V20 — 세션 PK 는 쿠키 값의 **해시**이고, 계정의 UNIQUE 제약이
+            // 자기 인덱스를 함께 만든다(축5 의 등재 하나와 같은 자리).
+            IndexSpec("account", "account_pkey", "USING btree (id)"),
+            IndexSpec("account", "account_login_name_key", "USING btree (login_name)"),
+            IndexSpec("browser_session", "browser_session_pkey", "USING btree (session_digest)"),
             IndexSpec("notice_requirement", "notice_requirement_pkey", "USING btree (notice_number, notice_round)"),
             IndexSpec(
                 "notice_requirement_row",
@@ -98,6 +103,8 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("rejected_write", "rejected_write_retention_cutoff_idx", "USING btree (recorded_at)"),
             IndexSpec("edit_session", "edit_session_retention_cutoff_idx", "USING btree (created_at)"),
             IndexSpec("outbox", "outbox_retention_cutoff_idx", "USING btree (state, inserted_at)"),
+            // M7/7D — 세션도 파기 대상이다(보존 분류 PURGE) — 그 cutoff 질의를 받는다.
+            IndexSpec("browser_session", "browser_session_retention_cutoff_idx", "USING btree (created_at)"),
         )
 
     @Test

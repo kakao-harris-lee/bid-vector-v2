@@ -111,7 +111,7 @@ class NoticeSearchProductionE2ETest {
     }
 
     private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
 
     @Suppress("UNCHECKED_CAST")
     private fun search(query: String): ResponseEntity<List<Map<String, Any?>>> =

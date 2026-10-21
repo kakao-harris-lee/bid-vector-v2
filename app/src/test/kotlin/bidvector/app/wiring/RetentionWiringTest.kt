@@ -26,12 +26,22 @@ private const val OWNER_DATA_SOURCE_TYPE = "org.postgresql.ds.PGSimpleDataSource
 private const val RETENTION_CUTOFF_TYPE = "bidvector.workflow.retention.RetentionCutoff"
 
 /**
- * **소유자 권한 연결을 쥐어도 되는 자리**(설계 검토 (2b) 「소유자 연결 팩토리」) — 둘뿐이다.
- * 하나는 migration(`PersistenceWiring.migrateAsOwner`), 하나는 보존(`RetentionWiring`)이다.
- * 셋째가 생기면 이 등식이 붉어진다.
+ * **소유자 권한 연결을 쥐어도 되는 자리**(설계 검토 (2b) 「소유자 연결 팩토리」) — **셋**이다.
+ * migration(`PersistenceWiring.migrateAsOwner`) · 보존(`RetentionWiring`) · 계정 명령
+ * (`AccountCommandWiring`, M7/7D)이다. 넷째가 생기면 이 등식이 붉어진다.
+ *
+ * **셋째의 근거**: 계정 생성과 비밀 문구 교체는 **앱 역할이 권한을 갖지 않는 일**이다(V20 의
+ * 열 단위 GRANT — 앱 역할은 `account` 에 INSERT 가 없고 해시 열에 UPDATE 가 없다). 그래서 그
+ * 명령만 소유자 연결로 돌고, 그 배선은 **조건부**다(`bidvector.account.mode` 가 없으면 설정
+ * 자체가 올라오지 않는다 — 평소 기동에는 이 자리가 존재하지 않는다). 연결은 `PersistenceWiring`
+ * 과 같은 관례로 **지역 객체**이고 빈으로 노출되지 않는다.
  */
 private val OWNER_CONNECTION_HOLDERS =
-    listOf("bidvector.app.wiring.PersistenceWiring", "bidvector.app.wiring.RetentionWiring")
+    listOf(
+        "bidvector.app.wiring.PersistenceWiring",
+        "bidvector.app.wiring.RetentionWiring",
+        "bidvector.app.wiring.AccountCommandWiring",
+    )
 
 /**
  * 배선이 정책을 고르는 기준일 — 아래 [RetentionWiringTest] 가 띄우는 컨텍스트의 시계가
@@ -164,7 +174,7 @@ class RetentionWiringTest {
     }
 
     @Test
-    fun `소유자 연결 타입을 참조하는 production 클래스는 배선 둘뿐이다`() {
+    fun `소유자 연결 타입을 참조하는 production 클래스는 등재된 배선뿐이다`() {
         val holders =
             productionClasses()
                 .filter { candidate ->

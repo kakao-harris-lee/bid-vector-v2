@@ -41,12 +41,23 @@ class InvalidNoticeSearchException(
 
 /**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
- * [OperatorCredentialFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
+ * [RequestAuthenticationFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
  * 정적으로 들고 있지 않는다).
  */
 const val CORRELATION_ID_ATTRIBUTE = "bidvector.http.correlationId"
 const val AUDIT_SUBJECT_ATTRIBUTE = "bidvector.http.subject"
+
+/**
+ * 인증된 주체 — **필터가 적은 값**이다(요청이 보낸 값이 아니다, verifier r1 F2). 감사 행의
+ * subject 와 **같은 속성**을 읽으므로 둘이 갈릴 수 없다: 갈리게 하려면 필터 한 자리를 고쳐야
+ * 하고 그러면 두 값이 함께 움직인다.
+ *
+ * 속성이 없는 경로는 없다(기본 거부 필터가 허용·거부 양쪽에서 적는다) — 그래도 기본값은
+ * 「신원 없음」으로 둔다(없는 것을 운영자로 올리지 않는다).
+ */
+internal fun HttpServletRequest.authenticatedSubject(): String =
+    getAttribute(AUDIT_SUBJECT_ATTRIBUTE) as? String ?: RequestAuthenticationFilter.UNAUTHENTICATED_SUBJECT
 
 internal fun HttpServletRequest.correlationIdOrUnknown(): String =
     getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
@@ -175,7 +186,7 @@ object ErrorMapping {
  * 3자 이스케이프만 하는 최소 JSON 직렬화(D-6A1-9/19의 정신과 같은 축 — 이 파일이 유일한
  * 오류 형태 생성 경로이듯, 이 함수가 servlet Filter 층(Spring MVC 진입 전)에서 [ErrorBody]를
  * 응답에 싣는 유일한 통로다). Filter 층은 Spring의 `HttpMessageConverter` 파이프라인 밖이라
- * (`OperatorCredentialFilter`의 401, `RequestAuditFilter`의 fail-closed 500) Jackson을
+ * (`RequestAuthenticationFilter`의 401, `RequestAuditFilter`의 fail-closed 500) Jackson을
  * 직접 부르지 않고 고정 세 필드짜리 이 함수로 충분하다 — 컨트롤러 응답과
  * [GlobalErrorHandler](이 파일 아래)는 Spring이 이미 배선한 JSON 변환을 그대로 쓴다.
  */

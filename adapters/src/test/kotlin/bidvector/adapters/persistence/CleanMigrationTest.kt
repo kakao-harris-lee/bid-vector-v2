@@ -53,6 +53,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "notice_requirement_row",
             // 스키마 스냅샷 래칫 예외(D-6A1-7, 추가만). V15__api_audit.sql.
             "api_request_audit",
+            // 스키마 스냅샷 래칫 예외(M7/7D, 추가만). V20__account_browser_session.sql.
+            "account",
+            "browser_session",
         )
 
     @Test
@@ -62,16 +65,26 @@ class CleanMigrationTest : PersistenceTestSupport() {
     }
 
     // =========================================================================
-    // 축 5 — UNIQUE(PK 밖의 별도 UNIQUE는 없다 — 전부 PK 하나로 유일성을 진다)
+    // 축 5 — UNIQUE(PK 밖의 UNIQUE 는 등재된 하나뿐이다)
+    //
+    // **공집합이 아니라 등재 집합이다**(M7/7D). V20 까지 이 축은 공집합이었고 그 문장은 「유일성은
+    // 전부 PK 하나가 진다」였다 — `account.login_name` 이 그 예외다: 계정 표는 R-2 로 **다수 계정을
+    // 전제**하므로 PK(식별자)와 로그인 식별자가 다른 축이고, 둘째 계정이 같은 로그인 이름을 갖는
+    // 상태는 표 층에서 불가능해야 한다.
+    //
+    // UNIQUE **인덱스**로 두면 이 질의(`table_constraints`)에 안 잡혀 축이 조용히 통과한다 —
+    // 그 길을 고르지 않고 제약으로 두고 이 목록에 등재한다.
     // =========================================================================
+    private val expectedUniqueConstraints = setOf("account_login_name_key")
+
     @Test
-    fun `축5 UNIQUE — PK 밖의 별도 UNIQUE 제약은 없다`() {
+    fun `축5 UNIQUE — PK 밖의 UNIQUE 제약은 등재된 하나뿐이다`() {
         val uniqueOutsidePk =
             queryStrings(
                 "SELECT constraint_name FROM information_schema.table_constraints " +
                     "WHERE table_schema='public' AND constraint_type='UNIQUE'",
             )
-        uniqueOutsidePk shouldBe emptySet()
+        uniqueOutsidePk shouldBe expectedUniqueConstraints
     }
 
     // =========================================================================
@@ -106,6 +119,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "notice_requirement_row" to setOf("notice_number", "notice_round", "serial_no"),
             // 애플리케이션이 발급하지 않는다(GENERATED ALWAYS AS IDENTITY, D-6A1-7).
             "api_request_audit" to setOf("id"),
+            // M7/7D — 계정은 IDENTITY, 세션은 **쿠키 값의 해시**가 키다(평문을 담는 열이 없다).
+            "account" to setOf("id"),
+            "browser_session" to setOf("session_digest"),
         )
 
     @Test
@@ -160,6 +176,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             FkSpec("notice_requirement_row", "notice_number", "notice_requirement", "notice_round"),
             FkSpec("notice_requirement_row", "notice_round", "notice_requirement", "notice_number"),
             FkSpec("notice_requirement_row", "notice_round", "notice_requirement", "notice_round"),
+            // M7/7D — 세션은 계정을 참조한다(단일 컬럼 FK, CASCADE 없음: 계정을 지우는 경로가
+            // 아직 없고, 생기면 세션 폐기가 그 경로의 일이다).
+            FkSpec("browser_session", "account_id", "account", "id"),
         )
 
     @Test

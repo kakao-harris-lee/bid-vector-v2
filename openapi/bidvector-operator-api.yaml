@@ -18,8 +18,15 @@ info:
     두 축을 함께 잰다.
 servers:
   - url: /
+# 기본 인증 요구 — **읽기 operation 의 기본값**이다. 상태를 바꾸는 operation 은 이 기본을 쓰지
+# 않는다(code-review r1 M-3): 여기에는 쿠키 경로만으로 통과하는 대안이 있어서, 그것을 그대로
+# 물려받으면 문서가 「쿠키만 있으면 쓰기도 된다」고 말한다 — 구현은 그 반대다(세션 경로의 상태
+# 변경은 `X-Operator-Csrf` 를 요구한다). 그래서 그 operation 들은 각자 `operatorCsrf` 를 묶은
+# 요구를 선언하고, 무인증으로 열리는 자리는 `security: []` 로 **명시**한다.
+# `OpenApiContractTest` 가 그 두 집합을 기본 거부 필터의 허용 목록과 양방향 등식으로 잰다.
 security:
   - operatorCredential: []
+  - browserSession: []
 paths:
   /api/strategy:
     get:
@@ -52,6 +59,10 @@ paths:
     post:
       operationId: evaluateDryRun
       summary: 평가 dry-run(D-6A3-1·6 — 외부 effect 없음, outbox 미접촉)
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -113,6 +124,10 @@ paths:
         만들므로 「같은 id 에 이미 비종단 세션」 가드에 HTTP 로 닿을 길이 없다. 그 코드는
         use case 의 전수 `when` 을 총(total)으로 유지하려고 남아 있을 뿐이고, 도달 불가는
         알려진 제한으로 등재돼 있다. 버려진 세션의 처분은 `OPEN-6A2B-ABANDONED-SESSIONS`.
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -212,6 +227,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -277,6 +296,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -342,6 +365,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -401,6 +428,10 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -446,6 +477,117 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
           description: "내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/session:
+    post:
+      operationId: signIn
+      summary: 로그인 — 세션 쿠키 발급(M7/7D)
+      description: >-
+        **무인증으로 열리는 유일한 operation 이다**(기본 거부 필터의 허용 목록 하나). 성공하면
+        `Set-Cookie` 로 `__Host-bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/·Domain 없음)을 내고, 본문으로
+        CSRF 값을 준다 — 그 값은 세션 값에서 단방향으로 유도된 것이라 새어도 세션이 되지 않는다.
+        로그인은 **늘 새 값을 발급하고 그 계정의 기존 세션을 폐기한다**(세션 고정 방어).
+        로그인 CSRF 대책은 둘이다: 이 operation 은 `application/json` 만 받으므로 교차 사이트
+        HTML form 이 닿지 못하고(preflight 없는 form 은 그 Content-Type 을 쓸 수 없다),
+        발급 쿠키가 `SameSite=Strict` 다.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "201":
+          description: 세션 발급
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: "요청 본문 형식 오류(알 수 없는 키·빈 값 포함). code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: >-
+            로그인 실패 — 계정 부재·비밀 문구 불일치·연속 실패 잠금을 **구분하지 않는다**(D-6A1-6).
+            code: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    get:
+      operationId: readSession
+      summary: 지금 내 세션 — CSRF 값 재전달(M7/7D)
+      description: >-
+        화면이 새로 뜰 때 CSRF 값을 다시 받는 자리다. 읽기 메서드라 CSRF 를 요구하지 않는다.
+        쿠키가 없거나 세션이 살아 있지 않으면 404 다 — 이 요청은 이미 인증을 지났고(쿠키 또는
+        운영자 자격 헤더), 없는 것은 자격이 아니라 **브라우저 세션이라는 자원**이다.
+      responses:
+        "200":
+          description: 살아 있는 세션
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          description: "인증 실패(사유 구분 없음). code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "브라우저 세션이 없다. code: NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      operationId: signOut
+      summary: 로그아웃 — 서버 쪽 세션 폐기(M7/7D)
+      description: >-
+        **서버 쪽 폐기가 본체**이고 쿠키 삭제가 뒤따른다(쿠키만 지우면 그 값으로 다시 통한다).
+        상태를 바꾸는 메서드라 CSRF 헤더를 요구한다. 쿠키가 없는 요청(운영자 자격 헤더 경로)도
+        같은 204 다 — 멱등이고 「세션이 있었는지」를 응답으로 알리지 않는다.
+      security:
+        - operatorCredential: []
+        - browserSession: []
+          operatorCsrf: []
+      responses:
+        "204":
+          description: 폐기 완료(본문 없음)
+        "401":
+          description: >-
+            인증 실패 — 쿠키 없음·폐기·만료·CSRF 불일치를 **구분하지 않는다**. code: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR"
           content:
             application/json:
               schema:
@@ -617,7 +759,45 @@ components:
       type: apiKey
       in: header
       name: X-Operator-Credential
+    # M7/7D — 브라우저 경로. 쿠키는 `HttpOnly` 라 화면 스크립트가 읽지 않는다(브라우저가 싣는다).
+    # 이름의 `__Host-` 접두는 브라우저가 `Secure`·`Path=/`·`Domain` 없음을 **강제**하게 해서
+    # 하위·형제 도메인이 같은 이름을 덮어쓰지 못하게 한다(쿠키 그림자 방어). 접두는 `Secure` 와
+    # 한 몸이라 **로컬 http 개발 실행에서만** 접두 없는 `bidvector_session` 을 쓴다 — 운영 반입은
+    # 접두 이름이 정본이고 이 문서는 그것을 적는다.
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: __Host-bidvector_session
+    # 상태를 바꾸는 메서드에서 **세션 경로와 함께** 요구된다(읽기 메서드는 면제).
+    operatorCsrf:
+      type: apiKey
+      in: header
+      name: X-Operator-Csrf
   schemas:
+    # M7/7D — 로그인 요청. 두 키뿐이고 알려진 키 밖은 400 이다(D-6A2b-25 와 같은 규율).
+    SignInRequest:
+      type: object
+      required:
+        - loginName
+        - passphrase
+      properties:
+        loginName:
+          type: string
+        passphrase:
+          type: string
+    # M7/7D — 세션 응답. 평탄하다(중첩 object 속성 없음). `csrf` 는 세션 값에서 유도된 값이고
+    # `expiresAt` 는 **절대 만료** 시각이다(유휴 만료는 서버가 민다 — 화면이 알 필요가 없다).
+    SessionResponse:
+      type: object
+      required:
+        - csrf
+        - expiresAt
+      properties:
+        csrf:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
     # D-6A1-20 ⓑ — 평탄하다는 것을 이 스키마 자신이 단언한다: 모든 속성이 string·integer·
     # number·array<string> 중 하나이고 중첩 object 속성이 없다(`OpenApiContractTest`가
     # 이 문서에서 object 타입 속성이 새로 생기면 실패하도록 재확인한다).

@@ -39,6 +39,12 @@ json-schema-validator = "1.5.9"
 # 이미 있는 버전(3.0.7 도 있으나 3.0.5 로 고정 — 스모크 확인).
 pdfbox = "3.0.5"
 
+# M7/7D — 비밀 문구 해시(bcrypt). 최신 안정판이고 전이 의존은 `at.favre.lib:bytes` 하나다.
+# 채택 근거(JDK 의 비밀 문구용 KDF 는 PBKDF2 뿐이고 그것은 salt 형식·반복 수·문면 인코딩을
+# 직접 정의해야 한다 · spring-security-crypto 는 adapters 층에 Spring 을 들인다)는
+# `adapters/src/main/kotlin/bidvector/adapters/access/BcryptPassphraseHasher.kt` 의 KDoc 이 든다.
+bcrypt = "0.10.2"
+
 # OPEN-ADR-07 — mutation 도구는 미결이다. 좌표만 등재하고 어느 모듈에도 적용하지 않는다.
 pitest-plugin = "1.19.0"
 pitest = "1.30.0"
@@ -187,6 +193,7 @@ resilience4j-timelimiter = { module = "io.github.resilience4j:resilience4j-timel
 # 따라 networknt 를 쓴다).
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
 
 # OPEN-ADR-07 이 닫힐 때까지 좌표만 든다. gradle-pitest-plugin 의 기본 PIT 는 1.22.1 이라
 # 적용 slice 는 pitestVersion 을 반드시 명시해야 한다.

@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
 import bidvector.app.wiring.StrategyEditExecutor
@@ -133,7 +134,8 @@ fun rawGet(
 ): RawHttpResponse =
     Socket("localhost", port).use { socket ->
         val credentialLine =
-            credential?.let { "${OperatorCredentialFilter.CREDENTIAL_HEADER}: $it\r\n" } ?: ""
+            // main 통합: 7D 가 그 상수를 인증기 쪽으로 옮겼다(필터 → 인증기 이름 변경). 값은 같다.
+            credential?.let { "${OperatorCredentialAuthenticator.CREDENTIAL_HEADER}: $it\r\n" } ?: ""
         val request = "GET $target HTTP/1.1\r\nHost: localhost\r\n${credentialLine}Connection: close\r\n\r\n"
         socket.getOutputStream().apply {
             write(request.toByteArray(Charsets.ISO_8859_1))
@@ -373,6 +375,21 @@ open class HttpTestApplication {
             clock = clock,
         )
 
+    /** 7D — 세션 경로의 이중체 조립(실 DB 없이 쿠키·CSRF 거동만 잰다). */
+    @Bean
+    open fun browserAccessTransaction(clock: FixedClock): InMemoryBrowserAccessTransaction =
+        InMemoryBrowserAccessTransaction(clock)
+
+    @Bean
+    open fun browserAccessExecutor(transaction: InMemoryBrowserAccessTransaction): BrowserAccessExecutor =
+        BrowserAccessExecutor(transaction)
+
+    /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
+    @Bean
+    open fun sessionCookieWriter(): SessionCookieWriter =
+        SessionCookieWriter(secure = true, absoluteWindow = TEST_ACCESS_POLICY.absoluteWindow)
+
+    /** 7C ① — 공고 검색의 이중체. */
     @Bean
     open fun fakeNoticeSearchPort(): FakeNoticeSearchPort = FakeNoticeSearchPort()
 
@@ -381,9 +398,28 @@ open class HttpTestApplication {
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
 
+    /**
+     * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.
+     * 순서까지 출하와 같게 둔다(자격 헤더 먼저).
+     *
+     * **main 통합**: 7C ① 쪽은 여기에 옛 `operatorCredentialFilterRegistration` 을 두고 있었는데,
+     * 7D 가 그 필터를 기본 거부 등록 하나로 **대체**했다(`OperatorCredentialFilter` →
+     * `RequestAuthenticationFilter`, 자격 헤더 경로는 인증기로 그 안에 산다). 등록은 여전히
+     * 하나이고 자격 헤더 경로도 그대로다 — 합집합에서 사라진 축이 없다.
+     */
     @Bean
-    open fun operatorCredentialFilterRegistration(): FilterRegistrationBean<OperatorCredentialFilter> =
-        FilterRegistrationBean(OperatorCredentialFilter(OperatorCredential.of(TEST_CREDENTIAL))).apply {
+    open fun requestAuthenticationFilterRegistration(
+        browserAccessExecutor: BrowserAccessExecutor,
+        sessionCookieWriter: SessionCookieWriter,
+    ): FilterRegistrationBean<RequestAuthenticationFilter> =
+        FilterRegistrationBean(
+            RequestAuthenticationFilter(
+                listOf(
+                    OperatorCredentialAuthenticator(OperatorCredential.of(TEST_CREDENTIAL)),
+                    BrowserSessionAuthenticator(browserAccessExecutor, sessionCookieWriter),
+                ),
+            ),
+        ).apply {
             urlPatterns = listOf("/*")
             order = Ordered.HIGHEST_PRECEDENCE + 1
         }

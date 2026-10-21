@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.workflow.strategy.EditSessionId
+import bidvector.workflow.strategy.OperatorId
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -23,8 +24,10 @@ import tools.jackson.databind.JsonNode
  * `EditSessionResponse.kt` 한 자리씩이고 전수 `when` 이라 새 사유·새 필드가 생기면
  * 컴파일이 누락을 잡는다.
  *
- * 인증은 이 클래스가 알지 못한다 — 경로가 `/api` 하위라 6A-1 의 필터 체인이 그대로 덮는다
- * (D-6A2b-5, 필터 두 파일 무편집). 행위자도 받지 않는다(실행기의 상수, 우회 (8)).
+ * 인증은 이 클래스가 **판정하지 않는다** — 경로가 `/api` 하위라 기본 거부 필터가 그대로 덮는다.
+ * 다만 그 판정의 **결과**(주체)는 여기서 실행기로 넘긴다(verifier r1 F2): 감사 행과 이벤트 봉투가
+ * 같은 사람을 가리키려면 둘이 같은 자리에서 와야 한다. 요청 본문·헤더에서 받지 않으므로
+ * 행위자를 위조할 길은 없다(우회 (8)).
  */
 @RestController
 @RequestMapping("/api/strategy/edit-sessions")
@@ -36,7 +39,9 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> =
-        executor.begin(body.requireObject().requireKnownKeys(setOf("field")).field()).toResponse(request)
+        executor
+            .begin(actorOf(request), body.requireObject().requireKnownKeys(setOf("field")).field())
+            .toResponse(request)
 
     @GetMapping("/{sessionId}")
     fun view(
@@ -56,8 +61,13 @@ class StrategyEditController(
         val payload = body.requireObject()
         val field = payload.field()
         return executor
-            .provideValue(sessionIdOf(sessionId), payload.commandId(), field, payload.editValue(field))
-            .toResponse(request)
+            .provideValue(
+                actorOf(request),
+                sessionIdOf(sessionId),
+                payload.commandId(),
+                field,
+                payload.editValue(field),
+            ).toResponse(request)
     }
 
     @PostMapping("/{sessionId}/confirm")
@@ -67,7 +77,9 @@ class StrategyEditController(
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val payload = body.requireObject().requireKnownKeys(setOf("commandId", "seenRevision"))
-        return executor.confirm(sessionIdOf(sessionId), payload.commandId(), payload.seenRevision()).toResponse(request)
+        return executor
+            .confirm(actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.seenRevision())
+            .toResponse(request)
     }
 
     @PostMapping("/{sessionId}/edit")
@@ -77,7 +89,9 @@ class StrategyEditController(
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val payload = body.requireObject().requireKnownKeys(setOf("commandId", "field"))
-        return executor.requestEdit(sessionIdOf(sessionId), payload.commandId(), payload.field()).toResponse(request)
+        return executor
+            .requestEdit(actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.field())
+            .toResponse(request)
     }
 
     @PostMapping("/{sessionId}/cancel")
@@ -87,9 +101,15 @@ class StrategyEditController(
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val payload = body.requireObject().requireKnownKeys(setOf("commandId"))
-        return executor.cancel(sessionIdOf(sessionId), payload.commandId()).toResponse(request)
+        return executor.cancel(actorOf(request), sessionIdOf(sessionId), payload.commandId()).toResponse(request)
     }
 }
+
+/**
+ * 행위자 — 기본 거부 필터가 적은 **인증 주체** 그대로다(감사 행이 읽는 바로 그 값). 자격 헤더
+ * 경로는 `operator`, 세션 경로는 `account:<id>` 다.
+ */
+private fun actorOf(request: HttpServletRequest): OperatorId = OperatorId(request.authenticatedSubject())
 
 /**
  * 경로 변수 → [EditSessionId]. 빈 값은 [EditSessionId] 의 생성 불변식이 `IllegalArgumentException`

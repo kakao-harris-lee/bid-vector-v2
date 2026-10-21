@@ -36,6 +36,13 @@ internal enum class ExemptReason {
      * 이 표에서도 재서 「구멍이 하나뿐」임을 잠근다).
      */
     AUDIT_WITHOUT_PII,
+
+    /**
+     * 계정 그 자체(M7/7D) — 「90일 지난 행 삭제」가 **로그인을 불가능하게 만든다**. 계정의 수명은
+     * 시간이 아니라 운영자의 결정이 정하고, 그 결정 경로(탈퇴·파기)는 다수 사업자 마일스톤이
+     * 연다(R-2 의 `후속`). 세션은 이 표와 달리 파기 대상이다 — 지워도 다시 로그인하면 된다.
+     */
+    ACCOUNT_IDENTITY,
 }
 
 /** 파기 술어의 추가 조건 — 「시각만」과 「시각 + 종단 상태」 둘뿐이다. */
@@ -171,6 +178,10 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         ),
         // --- 파기(버려진 편집 세션, A-4 — `OPEN-6A2B-ABANDONED-SESSIONS` 를 닫는다) ---
         RetentionRule.Purge("edit_session", "created_at", PurgeCondition.TimeOnly),
+        // --- 파기(M7/7D 브라우저 세션) — 폐기·만료된 행이 영구히 쌓일 이유가 없다. 지워도
+        //     잃는 것은 「그 세션이 있었다」는 사실뿐이고 요청 이력은 `api_request_audit` 가 든다.
+        //     기준 시각은 DB 가 적재 때 찍는 `created_at` 이다(A-2 의 적재 시각 축).
+        RetentionRule.Purge("browser_session", "created_at", PurgeCondition.TimeOnly),
         // --- 부모와 함께 사라진다(FK ON DELETE CASCADE) — 단 기한 안쪽 행은 부모를 남긴다 ---
         RetentionRule.CascadeWithParent(
             table = "notice_requirement_row",
@@ -185,6 +196,7 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         RetentionRule.Exempt("operator_profile", ExemptReason.SINGLETON_SETTING),
         RetentionRule.Exempt("operator_strategy_revision", ExemptReason.REVISION_HISTORY),
         RetentionRule.Exempt("provenance_authority", ExemptReason.REFERENCE_DATA),
+        RetentionRule.Exempt("account", ExemptReason.ACCOUNT_IDENTITY),
         RetentionRule.Exempt("flyway_schema_history", ExemptReason.SCHEMA_HISTORY),
     )
 

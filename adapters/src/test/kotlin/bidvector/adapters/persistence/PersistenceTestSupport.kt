@@ -90,11 +90,15 @@ abstract class PersistenceTestSupport {
                 // (명시 나열 없이 CASCADE로 정합, 다른 자식 표와 다른 점 — 명시 대상은 아니다).
                 // api_request_audit도 같은 이유로 더한다(D-6A1-7, 추가만) — 감사
                 // 행이 test 간에 새어 나가면 「요청당 정확히 한 행」 대조가 실행 순서에 의존한다.
+                // account·browser_session 도 같은 이유로 더한다(M7/7D, 추가만) — 계정·세션 행이
+                // test 간에 새어 나가면 「계정 없음」·「세션 하나」 대조가 실행 순서에 의존한다.
+                // 세션은 account 를 FK 로 참조하므로 CASCADE 가 함께 비운다(명시로도 적는다).
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
                         "qualification_text, collection_run, raw_observation, outbox, inbox, " +
                         "edit_session, operator_strategy, operator_strategy_revision, " +
-                        "operator_profile, notice_requirement, api_request_audit " +
+                        "operator_profile, notice_requirement, api_request_audit, " +
+                        "browser_session, account " +
                         "RESTART IDENTITY CASCADE",
                 )
             }

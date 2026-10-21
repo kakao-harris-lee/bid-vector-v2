@@ -27,6 +27,7 @@ import bidvector.workflow.strategy.EditSessionSnapshot
 import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EditableField
 import bidvector.workflow.strategy.EventSink
+import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.RejectionReason
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.strategy.TransitionOutcome
@@ -125,6 +126,9 @@ private class DirectStrategyEditTransaction(
         )
 }
 
+/** 행위자는 이제 인증 주체에서 온다 — 이 test 는 그 값의 축을 재지 않으므로 고정값 하나를 쓴다. */
+private val RACE_ACTOR = OperatorId("race-test-operator")
+
 /**
  * D-6A2b-28 회귀 — **기준 revision 은 draft 를 만든 그 읽기에서 온다.**
  *
@@ -149,10 +153,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { strategyOf(StrategyDraft(candidateLimit = 13), revision = 1) },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACTOR,
                 started.session.id,
                 CommandId("race-value"),
                 EditableField.MaxActiveBids,
@@ -180,10 +185,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { error("이 대조에서는 값이 바뀌지 않는다") },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACTOR,
                 started.session.id,
                 CommandId("plain-value"),
                 EditableField.MaxActiveBids,

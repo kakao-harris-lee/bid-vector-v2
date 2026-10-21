@@ -3,7 +3,7 @@ import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-rou
 
 import { AppShell } from './AppShell';
 import { RouteError } from './RouteError';
-import { fallbackRoute, screenRoutes } from './routes';
+import { fallbackRoute, loginRoute, screenRoutes } from './routes';
 
 // 경로 없는 레이아웃 라우트 하나가 셸을 들고, 화면 자리들이 그 자식이다. 알 수 없는 URL 은
 // 자리 표 밖의 `fallbackRoute` 가 받는다(code-review r1 F-10).
@@ -21,7 +21,11 @@ export const appRoutes: RouteObject[] = [
       {
         id: 'shell-boundary',
         errorElement: <RouteError />,
-        children: [...screenRoutes, fallbackRoute],
+        // 로그인 자리는 화면 자리들 **뒤**, catch-all **앞**이다. 순서는 라우팅 판정에 영향이
+        // 없지만(react-router 는 구체성으로 고른다) `AppRoot.test.tsx` 의 「잎 하나만 던지게
+        // 바꿔치운다」가 **색인 0** 을 쓴다 — 그 잎이 화면 자리로 남아야 그 test 가 재는 것이
+        // 셸↔경계의 자리 그대로다.
+        children: [...screenRoutes, loginRoute, fallbackRoute],
       },
     ],
   },
