@@ -207,10 +207,17 @@ internal class FakeSampleListLedger : SampleListLedger {
  */
 internal val POLICY_RETRY_LIMIT = COLLECTION_POLICY.detailFetchGates.axisRetryLimit
 
-/** 조회 가치 술어의 게이트 시간 — 같은 이유로 test 가 값을 다시 적지 않는다(M6/G1-C03). */
-internal val POLICY_AGE_GATE_HOURS = COLLECTION_POLICY.detailFetchGates.ageGateHours
+/**
+ * **합성 정책**의 재조회 창(M6/G1-C03) — 출하 값은 0 이다(D-G1C03-2). 「창이 서면 어떻게 되는가」는
+ * 출하 값으로는 잴 수 없으므로 test 가 자기 값을 세운다. 이것은 출하 값의 **복사가 아니라** 합성
+ * 입력이고, 기대값은 수가 아니라 **스윕 시각과 창의 대소 관계**에만 의존한다(`policy-values.md` 의
+ * fixture 규율 `numeric_discipline.synthetic_policy_inputs` 와 같은 형태).
+ */
+internal const val SYNTHETIC_RECHECK_GATE_HOURS = 8L
 
-internal val POLICY_RECHECK_GATE_HOURS = COLLECTION_POLICY.detailFetchGates.recheckGateHours
+/** 출하 정책에서 창만 합성값으로 바꾼 게이트 — age·재호출 상한은 출하 값 그대로다. */
+internal val SYNTHETIC_RECHECK_GATES =
+    COLLECTION_POLICY.detailFetchGates.copy(recheckGateHours = SYNTHETIC_RECHECK_GATE_HOURS)
 
 internal class OpeningFixture(
     sampleSize: Int,
@@ -218,6 +225,11 @@ internal class OpeningFixture(
     attemptSeed: List<CollectionAttempt> = emptyList(),
     /** 적재가 실패하는 축(D-6G-58 ⓑ) — 없으면 전 축이 적재된다. */
     rawFailsOn: SourceEndpoint? = null,
+    /**
+     * 조회 가치 술어의 게이트 — 기본값은 **출하 정책**이다. 창이 선 판을 재는 test 만 합성값
+     * ([SYNTHETIC_RECHECK_GATES])을 넣는다(출하 값으로는 그 거동이 서지 않는다).
+     */
+    gates: DetailFetchGates = COLLECTION_POLICY.detailFetchGates,
 ) {
     val sampleList = FakeSampleListLedger()
     val attempts = FakeAttemptLedger(attemptSeed)
@@ -244,7 +256,7 @@ internal class OpeningFixture(
             runs = runs,
             sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), SampleSize(sampleSize)),
             policyFor = { COLLECTION_POLICY },
-            gates = COLLECTION_POLICY.detailFetchGates,
+            gates = gates,
             collectedAxes = collectedAxes,
             sampleList = sampleList,
             attempts = attempts,

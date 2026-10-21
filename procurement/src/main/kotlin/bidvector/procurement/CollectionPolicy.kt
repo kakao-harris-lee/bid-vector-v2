@@ -317,7 +317,8 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
     EffectiveDatedPolicy(
         source =
             "reports/evidence/m3/3a/policy-values.md 「운영자 승인 2026-09-07」 절 — " +
-                "「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)",
+                "「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6) · " +
+                "재조회 창 0 은 「운영자 결정 2026-10-22, D-G1C03-2」",
         entries =
             listOf(
                 EffectiveFrom.Initial to
@@ -337,8 +338,21 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         // `axisRetryLimit` 은 6G-2d D-6G2d-8 ⓒ 의 **잠정값**이다 — `policy-values.md`
                         // 의 운영자 승인 표(P-1~P-6)에 이 축이 아직 없고, 계약이 든 「예: 3회」를
                         // 옮겼다. 실수집 뒤 재호출 분포를 보고 정한다(`OPEN-6G2D-AXIS-RETRY-LIMIT`).
+                        //
+                        // `recheckGateHours = 0` — **운영자 결정 2026-10-22, D-G1C03-2**(앞 값 48 은
+                        // `policy-values.md` P-5 의 legacy 이식 「측정 전 잠정」이었다). 0 은 「이 경로에
+                        // 재조회 창을 두지 않는다」는 **결정**이지 미설정이 아니다. 근거: V2 에서
+                        // legacy 창의 표적(「조회했으나 비어 있었다」)은 이미 빈 응답이 **정착**이라 다시
+                        // 부르지 않는다. 그래서 창이 실제로 무는 자리는 **미완이라 이어 걸어야 하는 축**
+                        // 하나뿐이고, 거기서 창은 이어 돌기와 싸운다 — 쪽 중간에 끊긴 축이 다음 기동에
+                        // 재개되지 않고, 끊길 확률이 쪽 수(= 참가자 수)에 비례해 **결손이 참가자 많은
+                        // 공고에 몰린다**(D-6G-58 의 보증을 재는 E2E 가 그것을 잡았다).
+                        //
+                        // 창을 되살리려면 「끊긴 걷기는 창을 열지 않는다」를 **쓰기 시점 어휘**로 가르는
+                        // 설계가 먼저다(원장 형식 변경 = 별 slice). 지금 코드로 값만 올리면 그 상관이
+                        // 되살아난다. age-gate 24h 와 축 재호출 상한 3 은 그대로다.
                         detailFetchGates =
-                            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3),
+                            DetailFetchGates(ageGateHours = 24, recheckGateHours = 0, axisRetryLimit = 3),
                         // policy-values.md §1.4 authoritative — "YYYY-MM-DD HH:MM:SS"(항목크기
                         // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
                         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),

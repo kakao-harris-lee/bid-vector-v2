@@ -361,7 +361,7 @@ class CollectOpeningResultsUseCase(
             noticeId = picked.id,
             noticeKeyHash = keyOf(picked.id).value,
             alreadyHeld = axis in resumption.done[picked.id].orEmpty(),
-            openingObservedAt = picked.openingAt,
+            openingObservedAt = picked.openingAnchor.observedAt(),
             lastCheckedAt = resumption.lastChecked[picked.id]?.get(axis),
             now = clock.now(),
             gates = gates,

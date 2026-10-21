@@ -14,8 +14,6 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
-import java.time.Duration
-import java.time.Instant
 
 /**
  * D-6G-1·11 — 6G 수집 갈래의 계약. 개찰결과 목록을 **공고일 축**으로 걸어 표본틀을 만들고,
@@ -256,7 +254,7 @@ class CollectOpeningResultsUseCaseTest {
             OpeningFixture(
                 sampleSize = 1,
                 collectedAxes = FakeCollectedAxisStore(setOf(axis)),
-                attemptSeed = syntheticServiceKeys().map { shortWalkOn(it, axis, BEFORE_RECHECK_WINDOW) },
+                attemptSeed = syntheticServiceKeys().map { shortWalkOn(it, axis) },
             )
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
 
@@ -441,22 +439,14 @@ private fun syntheticServiceKeys(): List<String> =
 private fun shortWalkOn(
     key: String,
     axis: SourceEndpoint,
-    at: Instant = COLLECTION_NOW,
 ) = CollectionAttempt(
     key,
     axis,
     AttemptOutcome.Failed("SHORT_WALK"),
-    at,
+    COLLECTION_NOW,
     AttemptKind.AXIS,
     walk = COLLECTION_NOW,
 )
-
-/**
- * 재조회 창 **밖**의 시각(M6/G1-C03) — 「원장이 미완이면 다시 부른다」는 **무엇이 결정하는가**(원장이지
- * 원문 행이 아니다)를 재는 명제이고, 「얼마나 빨리 다시 부르는가」는 재조회 게이트의 명제다. 창 안에서
- * 심으면 두 명제가 한 test 에 겹쳐 이 test 가 게이트의 값에 따라 붉어진다.
- */
-private val BEFORE_RECHECK_WINDOW: Instant = COLLECTION_NOW.minus(Duration.ofHours(POLICY_RECHECK_GATE_HOURS + 1))
 
 /**
  * 결정적 실패의 결말 줄(D-6G2d-8 ⓒ · 17) — 다시 불러도 같은 답이 온다. 코드는 **실제로 확정인 셋**
