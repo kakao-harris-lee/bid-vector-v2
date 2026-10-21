@@ -80,6 +80,8 @@ data class OpeningCollectionReport(
     /** 확정 표본인데 이번 표본틀에서 보이지 않은 공고 수 — 표본을 바꾸지 않고 사실만 센다(D-6G-39). */
     val sampleUnseen: Int,
     val halted: OpeningCollectionHalt?,
+    /** 조회 가치 술어가 **부르지 않기로 한** 축의 사유별 수(M6/G1-C03) — 회계의 한 칸이 잃는 사유다. */
+    val skipped: DetailSkipCounts,
 )
 
 /**
@@ -177,12 +179,18 @@ class CollectOpeningResultsUseCase(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
     ): OpeningCollectionReport {
+        val startedAt = clock.now()
         val framing = framer.frame(range, sources)
         if (framing.halt != null) {
-            return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt)
+            return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt, NO_SKIPS)
         }
         val framed = samples.resolve(framing, scopeOf(range, sources))
-        return fanOut(framing, framed.sample, framed.unseen)
+        val skips = DetailSkipTally()
+        val report = fanOut(framing, framed.sample, framed.unseen, skips)
+        // 건너뜀도 회계에 **남는다**(M6/G1-C03) — 남기지 않으면 「수집이 줄었는데 오류는 0」이 되어
+        // 조용한 결측과 구별되지 않는다(멈춘 실행도 그때까지의 건너뜀을 싣는다).
+        skips.recordInto(runs, CollectionReferenceDate(executionDay()), startedAt, clock.now())
+        return report
     }
 
     /** 이번 설정이 말하는 표본틀의 범위 — 확정 파일이 싣고, 이후 실행이 대조한다(D-6G-50). */
@@ -196,13 +204,14 @@ class CollectOpeningResultsUseCase(
         framing: Framing,
         sample: SampleOutcome,
         sampleUnseen: Int,
+        skips: DetailSkipTally,
     ): OpeningCollectionReport {
         val byKey = framing.candidates.associateBy { it.candidate.key }
-        val done = alreadyCollectedAxes(sample.selected.map { byKey.getValue(it).id })
+        val resumption = resumptionOf(sample.selected.map { byKey.getValue(it).id })
         var detailCalls = 0
         for ((index, key) in sample.selected.withIndex()) {
             val picked = byKey.getValue(key)
-            when (val step = fetchDetails(picked, done[picked.id].orEmpty())) {
+            when (val step = fetchDetails(picked, resumption, skips)) {
                 is DetailStep.Done -> {
                     detailCalls += step.calls
                 }
@@ -217,11 +226,19 @@ class CollectOpeningResultsUseCase(
                         detailCalls + step.calls,
                         sampleUnseen,
                         halt,
+                        skips.counts(),
                     )
                 }
             }
         }
-        return OpeningCollectionReport(framing.candidates.size, sample, detailCalls, sampleUnseen, halted = null)
+        return OpeningCollectionReport(
+            framing.candidates.size,
+            sample,
+            detailCalls,
+            sampleUnseen,
+            halted = null,
+            skipped = skips.counts(),
+        )
     }
 
     /**
@@ -233,40 +250,52 @@ class CollectOpeningResultsUseCase(
      *
      * 이미 끝난 축은 **예산에서도 빼고 부르지도 않는다**(③ 이어 돌기) — 멈췄다 다시 돌 때 같은 호출을
      * 두 번 쓰지 않는다. 남은 축이 없으면 예산을 한 번도 묻지 않는다.
+     *
+     * **거르는 자리는 술어 하나다**(M6/G1-C03). 앞 판은 여기서 끝난 축을 걸러내고 남은 축에만 상수를
+     * 넘겼다 — 판정의 자리가 둘이라 출하 게이트가 꺼져도 아무 test 가 붉지 않았다.
      */
     private fun fetchDetails(
         picked: Candidate,
-        alreadyDone: Set<DetailAxis>,
+        resumption: Resumption,
+        skips: DetailSkipTally,
     ): DetailStep {
         // 상한 판정은 **관문**이 한다(D-6G-47) — 여기서 걸음 단위로 미리 세면 셈의 출처가 둘이
         // 되고, 걸음 단위 근사(받은 페이지)와 관문의 시도 수가 갈린다. 거부는 절단 사유로 온다.
-        val remaining = detailAxesFor(picked.source.division).filterNot { it in alreadyDone }
-        return runAxes(picked, remaining, settledBefore = alreadyDone.isNotEmpty())
+        val held = resumption.done[picked.id].orEmpty()
+        return runAxes(picked, resumption, skips, settledBefore = held.isNotEmpty())
     }
 
     private fun runAxes(
         picked: Candidate,
-        axes: List<DetailAxis>,
+        resumption: Resumption,
+        skips: DetailSkipTally,
         settledBefore: Boolean,
     ): DetailStep {
         var calls = 0
         var settledAny = settledBefore
-        var index = 0
-        while (index < axes.size) {
-            val axis = axes[index]
-            val batch = axis.fetch(picked.source.port, fetchEvidence(picked.id))
-            calls++
-            batch.items.forEach(rawObservations::append)
-            // **적재 뒤에** 축의 결말을 적는다(D-6G-58 ⓑ). 적재 전에 적으면 적재가 실패하거나 그
-            // 사이에 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시 부르지 않는다.
-            val outcome = attemptOutcomeOf(batch.accounting)
-            // 걷기의 이름은 **언제나** 적는다(D-6G2d-4). 항목이 0 이었다는 것은 결말 어휘가 말한다 —
-            // 걷기 부재로 말하면 「걷기를 모르는 옛 줄」과 같은 값이 되어 판독이 그 차이를 잃는다.
-            attempts.append(axisConclusion(picked, axis, outcome, clock.now(), batch.observedAt))
-            recordDetailRun(batch, axis)
-            if (outcome.isSettled) settledAny = true
-            haltOf(batch.accounting.truncationCause, settledAny)?.let { return DetailStep.Halted(it, calls) }
-            index++
+        for (axis in detailAxesFor(picked.source.division)) {
+            // 네 결과를 전수 분기한다 — `else` 가 없으므로 술어에 결과가 하나 늘면 컴파일이 여기를
+            // 가리킨다. 강제 캐스트는 「건너뜀이 없다」는 가정이었고, 그 가정이 게이트를 껐다.
+            when (val decision = decideFetch(picked, axis, resumption)) {
+                is DetailFetchDecision.Skip -> skips.record(axis.endpoint, decision.reason)
+
+                is DetailFetchDecision.Fetch -> {
+                    val batch = axis.fetch(picked.source.port, decision)
+                    calls++
+                    batch.items.forEach(rawObservations::append)
+                    // **적재 뒤에** 축의 결말을 적는다(D-6G-58 ⓑ). 적재 전에 적으면 적재가 실패하거나 그
+                    // 사이에 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시 부르지 않는다.
+                    val outcome = attemptOutcomeOf(batch.accounting)
+                    // 걷기의 이름은 **언제나** 적는다(D-6G2d-4). 항목이 0 이었다는 것은 결말 어휘가 말한다 —
+                    // 걷기 부재로 말하면 「걷기를 모르는 옛 줄」과 같은 값이 되어 판독이 그 차이를 잃는다.
+                    attempts.append(axisConclusion(picked, axis, outcome, clock.now(), batch.observedAt))
+                    recordDetailRun(batch, axis)
+                    if (outcome.isSettled) settledAny = true
+                    haltOf(batch.accounting.truncationCause, settledAny)?.let {
+                        return DetailStep.Halted(it, calls)
+                    }
+                }
+            }
         }
         return DetailStep.Done(calls)
     }
@@ -288,7 +317,7 @@ class CollectOpeningResultsUseCase(
      * 존재는 **원장 이전** 실행의 흔적에만 쓴다: 잘린 걷기도 행을 남기므로 「행이 있다 = 다 받았다」가
      * 아니고, 그렇게 읽으면 그 축은 영영 다시 불리지 않아 결측이 조용해진다.
      */
-    private fun alreadyCollectedAxes(ids: List<NoticeId>): Map<NoticeId, Set<DetailAxis>> {
+    private fun resumptionOf(ids: List<NoticeId>): Resumption {
         val out = mutableMapOf<NoticeId, MutableSet<DetailAxis>>()
         DetailAxis.entries.forEach { axis ->
             collectedAxes.alreadyCollected(axis.endpoint, ids).forEach { id ->
@@ -297,11 +326,13 @@ class CollectOpeningResultsUseCase(
         }
         // **앞 라운드를 먼저 닫는다**(D-6G2d-42) — 그 뒤에 이어 돌기를 물어야 상한이 크래시 라운드를
         // 센다. 순서가 뒤집히면 이번 실행이 그 축을 다시 부르고 상한은 여전히 0 이다.
-        interruptedRounds.close()
-        // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
-        val resumptions = attempts.read().axisResumptions(axisRetryLimit())
+        val closedNow = interruptedRounds.close()
+        // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다. 두 물음
+        // (끝났는가 · 마지막으로 건드린 때)이 **같은 판독**을 쓴다(원장은 파일이고 두 번 읽지 않는다).
+        val history = attempts.read()
+        val resumptions = history.axisResumptions(axisRetryLimit())
         ids.forEach { id ->
-            val known = resumptions[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
+            val known = resumptions[keyOf(id).value].orEmpty()
             DetailAxis.entries.forEach { axis ->
                 when (known[axis.endpoint]) {
                     true -> out.getOrPut(id) { mutableSetOf() }.add(axis)
@@ -314,20 +345,27 @@ class CollectOpeningResultsUseCase(
                 }
             }
         }
-        return out
+        return Resumption(out, lastCheckedOf(ids, history.axisLastObservedAt(), closedNow))
     }
 
-    /** 조회 가치 술어를 거친 증거 — 6G 는 처음 받는 공고들이라 항상 `Fetch` 다(술어를 우회하지 않는다). */
-    private fun fetchEvidence(id: NoticeId): DetailFetchDecision.Fetch =
+    /**
+     * 조회 가치 술어를 거친 결정(M6/G1-C03) — **관측값을 넘긴다.** 앞 판은 세 인자를 상수로 넘기고
+     * 결과를 강제 캐스트해, 술어는 옳은데 출하 경로에서 게이트가 발화하지 않았다.
+     */
+    private fun decideFetch(
+        picked: Candidate,
+        axis: DetailAxis,
+        resumption: Resumption,
+    ): DetailFetchDecision =
         decideDetailFetch(
-            noticeId = id,
-            noticeKeyHash = NoticeKeyHash.of(id.number.value, id.round.value).value,
-            alreadyHeld = false,
-            openingObservedAt = null,
-            lastCheckedAt = null,
+            noticeId = picked.id,
+            noticeKeyHash = keyOf(picked.id).value,
+            alreadyHeld = axis in resumption.done[picked.id].orEmpty(),
+            openingObservedAt = picked.openingAt,
+            lastCheckedAt = resumption.lastChecked[picked.id]?.get(axis),
             now = clock.now(),
             gates = gates,
-        ) as DetailFetchDecision.Fetch
+        )
 
     /**
      * 예산이 세는 「날」은 **실행 날짜**이지 조회 대상 공고일이 아니다. 조회일을 쓰면 공고일 슬롯을 넘길
@@ -342,6 +380,30 @@ class CollectOpeningResultsUseCase(
      */
     private fun axisRetryLimit(): Int = gates.axisRetryLimit
 }
+
+/** 이어 돌기의 두 답(M6/G1-C03) — 끝난 축과, 그 축을 마지막으로 건드린 때. 한 판독에서 함께 나온다. */
+private class Resumption(
+    val done: Map<NoticeId, Set<DetailAxis>>,
+    val lastChecked: Map<NoticeId, Map<DetailAxis, Instant>>,
+)
+
+/**
+ * 원장의 (공고 키, 끝점) 표를 이번 표본의 (공고, 축) 표로 옮긴다 — 키를 짓는 자리는 그대로 하나다.
+ * **이번 실행이 닫은 라운드는 뺀다**(`closedNow`) — 그 줄의 시각은 「닫은 때」라 관측이 아니다.
+ */
+private fun lastCheckedOf(
+    ids: List<NoticeId>,
+    byKeyAndEndpoint: Map<String, Map<SourceEndpoint, Instant>>,
+    closedNow: Map<String, Set<SourceEndpoint>>,
+): Map<NoticeId, Map<DetailAxis, Instant>> =
+    ids.associateWith { id ->
+        val key = keyOf(id).value
+        val byEndpoint = byKeyAndEndpoint[key].orEmpty() - closedNow[key].orEmpty()
+        DetailAxis.entries.mapNotNull { axis -> byEndpoint[axis.endpoint]?.let { axis to it } }.toMap()
+    }.filterValues { it.isNotEmpty() }
+
+/** 아무것도 건너뛰지 않은 실행의 값 — 표본틀에서 멈춘 실행은 술어를 한 번도 부르지 않는다. */
+private val NO_SKIPS = DetailSkipCounts(ageGate = 0, recheckGate = 0)
 
 /**
  * 멈춤의 관측(D-6G-59) — `partialNotice` 는 추측이 아니라 **본 것**이다: 이 공고의 축 중 하나라도
@@ -382,49 +444,6 @@ private fun axisConclusion(
         kind = AttemptKind.AXIS,
         walk = walk,
     )
-
-/**
- * **결말 없이 끝난 라운드를 닫는 자리**(D-6G2d-42) — 재개의 **첫 걸음**이라 수집 흐름과 분리한다.
- *
- * 적재와 결말 사이에서 죽은 걷기는 의도·호출 줄만 남긴다. 그 라운드를 `AXIS Failed` 로 닫으면 상한이
- * 그것을 **라운드 하나**로 세고, 쪽이 여럿인 축도 한 쪽 축과 같은 기동에서 멈춘다(앞 판은 꼬리의 호출
- * 줄을 세어 참가자 수와 결측을 상관시켰다).
- *
- * 걷기 식별자는 그 라운드의 **마지막 호출 시각**이다 — 배치를 끝내지 못했으므로 배치의 관측 시각이
- * 없고, 그 라운드가 남긴 원문 행은 이 결말이 `Failed` 라 **어차피 쓰이지 않는다**(축이 미완이므로 그
- * 공고는 `incomplete_axis` 다). 형식 version 을 올려 라운드 표지를 두는 길도 있었으나, 그러면 승인
- * 문서의 「형식 version 2 부터」가 낡고 얻는 것은 **쓰이지 않는 칸의 정확한 이름**뿐이다.
- *
- * 닫는 것은 **재개하는 쪽의 일**이다: 죽은 실행은 아무것도 적지 못하고, 다음 실행만이 「앞 라운드가
- * 끝나지 않았다」를 안다.
- */
-private class InterruptedRoundCloser(
-    private val attempts: AttemptLedger,
-    private val now: () -> Instant,
-) {
-    fun close() {
-        attempts.read().interruptedRounds().forEach { (noticeKey, byAxis) ->
-            byAxis.forEach { (axis, lastCall) ->
-                attempts.append(
-                    CollectionAttempt(
-                        noticeKey = noticeKey,
-                        axis = axis,
-                        outcome = AttemptOutcome.Failed(INTERRUPTED_ROUND),
-                        at = now(),
-                        kind = AttemptKind.AXIS,
-                        walk = lastCall,
-                    ),
-                )
-            }
-        }
-    }
-}
-
-/**
- * 중단된 라운드의 결말 코드(D-6G2d-42) — 「이 라운드는 결말을 적지 못했다」이고, 절단 사유가 아니다
- * (그 사유들은 `failureOf` 가 분류한다). 일시 실패이므로 상한이 세고 그 축은 상한 미만에서 다시 불린다.
- */
-private const val INTERRUPTED_ROUND = "INTERRUPTED"
 
 private sealed interface DetailStep {
     data class Done(

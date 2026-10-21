@@ -233,6 +233,24 @@ class AttemptHistory(
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> conclusionOf(lines.last()) } }
 
     /**
+     * (공고, 축)마다 **그 축을 마지막으로 관측한 때**(M6/G1-C03) — 재조회 게이트가 읽는 값이다.
+     *
+     * [axisConclusions] 와 같은 줄을 보되 **다른 칸**을 읽는다. 걷기 식별자(`walk`)가 아니라 결말을 적은
+     * 시각(`at`)인 이유: 게이트가 묻는 것은 「그 응답이 가리키는 걷기가 언제였나」가 아니라 「우리가 이 축을
+     * 마지막으로 본 때가 언제인가」이고, 끊긴 라운드를 닫는 줄처럼 걷기 시각이 관측 시각이 아닌 줄도 있다.
+     *
+     * **관문 거부는 빼고 센다**(D-6G2d-16 과 같은 이유) — 우리 속도 보호·승인 상한은 호출이 나가지 않은
+     * 것이고 원천의 쿼터 거절은 계정 단위 사고다. 셋 다 **그 축에 대한 관측이 아니므로** 재조회 창을 열면
+     * 안 된다: 열면 쿼터가 풀린 다음 실행이 미완 축을 이어받지 못하고 창이 닫힐 때까지 기다린다.
+     *
+     * 결말 줄만 본다 — 의도·호출 줄까지 세면 한 걷기의 쪽 수만큼 시각이 흔들리고, 게이트의 창이 그 공고의
+     * 참가자 수에 따라 달라진다(비랜덤 결측의 같은 함정).
+     */
+    fun axisLastObservedAt(): Map<String, Map<SourceEndpoint, Instant>> =
+        byNoticeAndAxis { it.kind == AttemptKind.AXIS && it.outcome !is AttemptOutcome.Refused }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> lines.last().at } }
+
+    /**
      * **이어 돌기의 답**(D-6G-58 · D-6G2d-8 ⓑⓒ) — (공고, 축)마다 `true` 면 다시 부르지 않는다.
      *
      * 항목이 **없다**는 것은 세 번째 답이다: 그 (공고, 축)에 원장 줄이 하나도 없으므로 원장 시대

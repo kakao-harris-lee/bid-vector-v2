@@ -185,6 +185,37 @@ class CollectionAttemptLedgerTest {
     }
 
     /**
+     * **M6/G1-C03 — 재조회 창을 여는 것은 관측뿐이다.** 관문 거부(속도 보호·승인 상한·원천 쿼터)는
+     * 그 축에 대한 관측이 아니므로(D-6G2d-16) 「마지막으로 본 때」를 옮기지 않는다. 옮기면 쿼터로
+     * 멈춘 실행 뒤에 다음 실행이 미완 축을 이어받지 못하고 창이 닫힐 때까지 기다린다 — 재호출 상한이
+     * 같은 이유로 거부를 세지 않는 것과 한 규칙이다.
+     */
+    @Test
+    fun `관문 거부는 마지막 관측 시각을 옮기지 않는다`() {
+        val key = "0".repeat(64)
+        val history =
+            AttemptHistory(
+                listOf(
+                    settled("2026-09-24T01:00:00Z", key, AXIS, AttemptOutcome.Failed("SHORT_WALK")),
+                    settled("2026-09-24T05:00:00Z", key, AXIS, AttemptOutcome.Refused("QUOTA_EXHAUSTED")),
+                ),
+            )
+
+        history.axisLastObservedAt().getValue(key) shouldBe
+            mapOf(AXIS to Instant.parse("2026-09-24T01:00:00Z"))
+    }
+
+    /** 관측이 하나도 없는 (공고, 축)은 **항목 자체가 없다** — 창이 열린 적 없는 것과 같은 값이다. */
+    @Test
+    fun `거부만 있는 축은 마지막 관측 시각을 갖지 않는다`() {
+        val key = "0".repeat(64)
+        val history =
+            AttemptHistory(listOf(settled("2026-09-24T05:00:00Z", key, AXIS, AttemptOutcome.Refused("DAILY"))))
+
+        history.axisLastObservedAt() shouldBe emptyMap()
+    }
+
+    /**
      * D-6G-58 — (공고, 축)에 줄이 여럿이면 **마지막**이 이긴다. 앞 실행이 실패로 닫은 축을 이번
      * 실행이 받으면 완료이고, 앞 실행이 받은 축을 이번 실행이 짧게 걸었으면 다시 불려야 한다.
      */

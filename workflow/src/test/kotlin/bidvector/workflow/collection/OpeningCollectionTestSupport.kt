@@ -207,6 +207,11 @@ internal class FakeSampleListLedger : SampleListLedger {
  */
 internal val POLICY_RETRY_LIMIT = COLLECTION_POLICY.detailFetchGates.axisRetryLimit
 
+/** 조회 가치 술어의 게이트 시간 — 같은 이유로 test 가 값을 다시 적지 않는다(M6/G1-C03). */
+internal val POLICY_AGE_GATE_HOURS = COLLECTION_POLICY.detailFetchGates.ageGateHours
+
+internal val POLICY_RECHECK_GATE_HOURS = COLLECTION_POLICY.detailFetchGates.recheckGateHours
+
 internal class OpeningFixture(
     sampleSize: Int,
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
@@ -220,6 +225,12 @@ internal class OpeningFixture(
     val runs = RecordingRunStore()
     val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION, attempts)
     val service = ScriptedOpeningPort(BusinessDivision.SERVICE, attempts)
+
+    /**
+     * 스윕 사이에 시각을 옮기는 자리(M6/G1-C03) — 게이트는 **시간의 함수**라 고정 시계로는 「밑에서
+     * 0, 넘긴 뒤 1」을 잴 수 없다. 기본값은 다른 판들이 쓰던 그 시각 그대로다.
+     */
+    var now: java.time.Instant = COLLECTION_NOW
 
     private val sources =
         listOf(
@@ -237,7 +248,7 @@ internal class OpeningFixture(
             collectedAxes = collectedAxes,
             sampleList = sampleList,
             attempts = attempts,
-            clock = Clock { COLLECTION_NOW },
+            clock = Clock { now },
         )
 
     private var from: LocalDate? = null
@@ -281,6 +292,9 @@ internal class OpeningFixture(
     fun plan(): SampleOutcome = useCase.plan(range(), sources).sample
 
     fun hashOf(id: NoticeId): String = NoticeKeyHash.of(id.number.value, id.round.value).value
+
+    /** 이 실행 상태가 기록한 건너뜀의 합 — 속도 보호의 허가 거부와 **같은 칸**이다(G1-C03 설계 2-2). */
+    fun backoffSkipped(): Int = runs.recorded.sumOf { (accounting, _) -> accounting.backoffSkipped }
 
     private fun portFor(division: BusinessDivision): ScriptedOpeningPort =
         when (division) {

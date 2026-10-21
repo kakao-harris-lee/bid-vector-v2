@@ -11,8 +11,10 @@ import bidvector.procurement.RawObservationStore
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.noticeIdIn
+import bidvector.procurement.openingInstantIn
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.strategy.Clock
+import java.time.Instant
 import java.time.LocalDate
 
 /** 표본틀 한 벌 — 후보와, 다 만들지 못했으면 그 사유. */
@@ -31,6 +33,12 @@ internal class Candidate(
     val id: NoticeId,
     val candidate: SampleCandidate,
     val source: OpeningCollectionSource,
+    /**
+     * 개찰 일시(M6/G1-C03) — 조회 가치 술어의 age-gate 앵커다. 모르면 `null` 이고 그 처분은 술어를
+     * 부르는 자리가 **하나로 선언**한다(조용한 조회 금지). 표본 **선택**에는 들지 않는다: 결과를 보기
+     * 전에 표본을 확정한다는 계약(우회 ⑦)은 그대로이고, 이 값은 뽑힌 뒤 「언제 부를까」에만 쓴다.
+     */
+    val openingAt: Instant?,
 )
 
 /** 슬롯 하나의 끝 — 멈춤 사유와 「끝까지 읽었는가」. 둘은 다른 축이다(절단은 멈춤이 아니다). */
@@ -136,6 +144,7 @@ internal class OpeningSampleFramer(
                         id,
                         SampleCandidate(keyOf(id), source.division, referenceDate.date),
                         source,
+                        openingInstantIn(observation, policy),
                     )
             }
         }
