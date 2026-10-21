@@ -80,6 +80,22 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // browser_session 은 session_digest<>''·csrf_digest<>''·유휴<=절대 셋이다.
             "account" to 3,
             "browser_session" to 3,
+            // M7/7B 신규(추가만). V21__bid_case.sql — 실측값이고 내역은 다음과 같다.
+            //  · bid_case 11 = 존재 가드 셋(notice_number·notice_round 형식·skip_reason) +
+            //    bid_kind enum + state enum(열넷) + case_version>=0 + 상태별 필수 다섯
+            //    (나중에⇒리마인드 · 건너뜀⇒사유 · 사유는 건너뜀에만 · 개찰 대기⇒개찰일시 ·
+            //    심사 중⇒서류 기한).
+            //  · bid_case_transition 10 = 존재 가드 넷(from_state·to_state·command·actor_detail)
+            //    + reason 공백 + case_version>=0 + actor_kind enum + actor 짝 + 사유 필수(둘)
+            //    + 소급 출처 제한.
+            //  · bid_draft 13 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + draft_seq>=0 + 스냅샷 판 형식 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3).
+            //  · bid_record 10 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + record_seq>=0 + evidence_ref 공백 + 증빙 짝 + memo 공백.
+            "bid_case" to 11,
+            "bid_case_transition" to 10,
+            "bid_draft" to 13,
+            "bid_record" to 10,
         )
 
     @Test

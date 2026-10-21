@@ -105,6 +105,31 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("outbox", "outbox_retention_cutoff_idx", "USING btree (state, inserted_at)"),
             // M7/7D — 세션도 파기 대상이다(보존 분류 PURGE) — 그 cutoff 질의를 받는다.
             IndexSpec("browser_session", "browser_session_retention_cutoff_idx", "USING btree (created_at)"),
+            // M7/7B — V21 입찰 건 넷. PK 넷 + UNIQUE 넷(제약이 만든 인덱스) + 질의 인덱스 셋.
+            // `bid_case_owner_idx` 의 **선두 열이 `account_id`** 다 — 소유 필터가 색인의 첫
+            // 축이라 그 필터를 빠뜨린 질의는 느린 것으로도 드러난다.
+            // 자식 셋에는 보존 cutoff 인덱스가 없다 — 시간 기준 파기 대상이 아니기 때문이다
+            // (RetentionTableRegistry 의 `OPERATOR_BID_HISTORY`).
+            IndexSpec("bid_case", "bid_case_pkey", "USING btree (id)"),
+            IndexSpec(
+                "bid_case",
+                "bid_case_account_id_notice_number_notice_round_bid_kind_key",
+                "USING btree (account_id, notice_number, notice_round, bid_kind)",
+            ),
+            IndexSpec("bid_case", "bid_case_owner_idx", "USING btree (account_id, bid_kind, state)"),
+            IndexSpec("bid_case_transition", "bid_case_transition_pkey", "USING btree (id)"),
+            IndexSpec(
+                "bid_case_transition",
+                "bid_case_transition_case_id_case_version_key",
+                "USING btree (case_id, case_version)",
+            ),
+            IndexSpec("bid_case_transition", "bid_case_transition_case_idx", "USING btree (case_id, case_version)"),
+            IndexSpec("bid_draft", "bid_draft_pkey", "USING btree (id)"),
+            IndexSpec("bid_draft", "bid_draft_case_id_draft_seq_key", "USING btree (case_id, draft_seq)"),
+            IndexSpec("bid_draft", "bid_draft_case_idx", "USING btree (case_id, draft_seq)"),
+            IndexSpec("bid_record", "bid_record_pkey", "USING btree (id)"),
+            IndexSpec("bid_record", "bid_record_case_id_record_seq_key", "USING btree (case_id, record_seq)"),
+            IndexSpec("bid_record", "bid_record_case_idx", "USING btree (case_id, record_seq)"),
         )
 
     @Test

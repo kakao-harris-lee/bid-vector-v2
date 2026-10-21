@@ -56,6 +56,11 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 스키마 스냅샷 래칫 예외(M7/7D, 추가만). V20__account_browser_session.sql.
             "account",
             "browser_session",
+            // 스키마 스냅샷 래칫 예외(M7/7B, 추가만). V21__bid_case.sql — 입찰 건 넷.
+            "bid_case",
+            "bid_case_transition",
+            "bid_draft",
+            "bid_record",
         )
 
     @Test
@@ -75,7 +80,17 @@ class CleanMigrationTest : PersistenceTestSupport() {
     // UNIQUE **인덱스**로 두면 이 질의(`table_constraints`)에 안 잡혀 축이 조용히 통과한다 —
     // 그 길을 고르지 않고 제약으로 두고 이 목록에 등재한다.
     // =========================================================================
-    private val expectedUniqueConstraints = setOf("account_login_name_key")
+    private val expectedUniqueConstraints =
+        setOf(
+            "account_login_name_key",
+            // M7/7B — 건은 (계정, 공고, 종류) 하나당 하나다(§6.1 「건은 하나다」). 나머지 셋은
+            // append-only 표의 순번 유일성이고, 전이 쪽은 **낙관적 잠금의 둘째 겹**이다
+            // (같은 판에 두 전이가 들어오면 여기서 걸린다).
+            "bid_case_account_id_notice_number_notice_round_bid_kind_key",
+            "bid_case_transition_case_id_case_version_key",
+            "bid_draft_case_id_draft_seq_key",
+            "bid_record_case_id_record_seq_key",
+        )
 
     @Test
     fun `축5 UNIQUE — PK 밖의 UNIQUE 제약은 등재된 하나뿐이다`() {
@@ -122,6 +137,11 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 계정은 IDENTITY, 세션은 **쿠키 값의 해시**가 키다(평문을 담는 열이 없다).
             "account" to setOf("id"),
             "browser_session" to setOf("session_digest"),
+            // M7/7B — 넷 다 IDENTITY 다(애플리케이션이 식별자를 발급하지 않는다).
+            "bid_case" to setOf("id"),
+            "bid_case_transition" to setOf("id"),
+            "bid_draft" to setOf("id"),
+            "bid_record" to setOf("id"),
         )
 
     @Test
@@ -179,6 +199,20 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 세션은 계정을 참조한다(단일 컬럼 FK, CASCADE 없음: 계정을 지우는 경로가
             // 아직 없고, 생기면 세션 폐기가 그 경로의 일이다).
             FkSpec("browser_session", "account_id", "account", "id"),
+            // M7/7B — 사용자 소유 표 넷이 전부 계정을 참조한다(R-2). 자식 셋은 건을 참조하고,
+            // 기록은 기본값으로 삼은 초안을 참조한다(소급 확인이면 null).
+            //
+            // **`notice` 를 참조하는 FK 가 이 목록에 없는 것이 설계다** — 6B-3 이 `notice` 를
+            // Purge(TimeOnly) 로 두므로 FK 를 걸면 파기 sweep 이 실패하거나(RESTRICT) 운영자의
+            // 투찰 기록이 공고와 함께 사라진다(CASCADE). 공고 키와 스냅샷은 사본이다(V21 머리말).
+            FkSpec("bid_case", "account_id", "account", "id"),
+            FkSpec("bid_case_transition", "case_id", "bid_case", "id"),
+            FkSpec("bid_case_transition", "account_id", "account", "id"),
+            FkSpec("bid_draft", "case_id", "bid_case", "id"),
+            FkSpec("bid_draft", "account_id", "account", "id"),
+            FkSpec("bid_record", "case_id", "bid_case", "id"),
+            FkSpec("bid_record", "account_id", "account", "id"),
+            FkSpec("bid_record", "draft_id", "bid_draft", "id"),
         )
 
     @Test
