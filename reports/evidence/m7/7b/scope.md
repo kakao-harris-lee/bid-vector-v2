@@ -181,7 +181,30 @@ run-state · collection worktree 무접촉. `bidvector/app:local` 태그는 레�
 
 ## 계약 갱신 이력
 
-(없음)
+**D-7B-1 (2026-10-21, 팀장 — Phase 1 설계 수령 · 운영자 결정).** 설계는 evidence `8a27db79` 다.
+- **운영자 결정 — R-2 남은 절반은 별 slice 로 미룬다.** 7B 는 새 표에만 `account_id` 를 둔다. `operator_profile` · `operator_strategy` 의
+  `CHECK (id = 1)` 이전은 식별자 모델을 먼저 정해야 한다(`edit_session.operator_id` TEXT 와 `account.id` BIGINT 가 같은가, audit 주체 어휘 ·
+  자격 헤더 인증기와의 관계). 그 결정과 `operator_strategy_revision` 키 변경은 별 slice 가 맡는다. 이 PR 이 `milestone-7.md` R-2 판단 문단의
+  「7B 가 새 표를 세울 때 함께」를 이 결정으로 고쳐 적는다(in_scope 추가: `milestone-7.md` R-2 문단). 중간안(열만 추가하고 CHECK 유지)은
+  채택하지 않는다.
+- **수용한 설계**:
+  - 상태 14 · 전이표 하나(상태 × 명령 → 다음 · 필수 인자 · 허용 주체). 「후보」는 영속 상태가 아니다.
+  - V21 표 넷: `bid_case` · `bid_case_transition`(append-only) · `bid_draft`(수정 = 새 행) · `bid_record`(append-only). 전부 `account_id`
+    NOT NULL FK. 열 단위 UPDATE 는 전이가 바꾸는 열에만 준다. DELETE · TRUNCATE 0.
+  - **`notice` FK 를 두지 않는다**: 6B-3 보존 파기(`notice` = Purge(TimeOnly))와 충돌하기 때문이다 — RESTRICT 면 sweep 이 실패하고, CASCADE 면
+    운영자 기록이 사라진다. 공고 키와 스냅샷은 사본으로 둔다. rollback.md · runbook 에 이 이유를 적는다.
+  - 다음 확인 시점: 출력은 sealed(`At`/`None`), 입력은 CHECK, 전역성은 속성 test. 파생값은 저장하지 않는다.
+  - **초안 금액 provenance**: 요청 DTO 에 provenance · 메뉴 참조 필드가 없다. use case 가 `OPERATOR_ENTERED` 를 싣고 응답이 그대로 내보낸다.
+    `PRICE_MENU` 는 어휘만 있고 오늘 도달할 수 없다(알려진 제한, 7C② 가 연다).
+  - `DEADLINE_PASSED_UNRECORDED` 는 소급 확인(Q-11)으로 나가는 간선이 있어 종단이 아니다(진짜 종단은 `SKIPPED`).
+  - `CORRECT_OUTCOME` 신설(사유 필수 · 원본을 덮어쓰지 않음 · 타임라인에 남음).
+  - operation 열둘. 경로당 명령 하나(`edit-sessions` 선례).
+  - BID-01 의 추적표 처리: `acceptance-trace.md` 집계는 고치지 않는다. 날짜 붙은 교차 참조 한 줄(모수 61 → 62, 행은 7B evidence)만 넣고, 행은
+    같은 술어로 7B evidence 에 둔다. capability map §10 은 95 → 96 · `V2 필수` 61 → 62 다.
+  - PDF 저장소는 범위 밖이다. `evidence_ref` 는 제한된 형태이고 로그 · audit 노출 0 이다. 보관 기한은 「참조의 보관」으로 문면을 고정한다.
+  - 보존 분류: 새 `ExemptReason.OPERATOR_BID_HISTORY` 로 네 표를 등재한다(파기 실행은 범위 밖).
+- 알려진 제한 넷(evidence): `PRICE_RECEIVED` 도달 불가 · 자동 전이의 시스템 호출자 부재 · PDF 저장소 · 다수 사업자.
+- Phase 2(TDD)로 간다.
 
 ## 하네스 레인 변경 (상시)
 
