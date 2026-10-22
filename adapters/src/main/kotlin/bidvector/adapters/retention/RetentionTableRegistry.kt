@@ -43,6 +43,18 @@ internal enum class ExemptReason {
      * 연다(R-2 의 `후속`). 세션은 이 표와 달리 파기 대상이다 — 지워도 다시 로그인하면 된다.
      */
     ACCOUNT_IDENTITY,
+
+    /**
+     * 계정의 **현재 설정값**(M7/7C④ — 사업 정보 · 시평액). 「90일 지난 행 삭제」가 운영자가 신고한
+     * 현재 값을 지운다 — 상호가 사라지면 SET-01 대사가 「판정 안 함」으로 떨어진다.
+     *
+     * 보존 기간 값을 **두지 않는다**: 이 행의 수명은 시간이 아니라 **소유 계정의 수명**과 같다
+     * (계정이 있는 동안 현재 값이 있어야 한다). 그래서 기준 시각 열로 자르는 규칙이 성립하지 않고,
+     * 파기 경로는 계정과 함께 열린다 — 탈퇴 파기는 R-2 의 `후속`(다수 사업자 마일스톤)이 연다
+     * ([ACCOUNT_IDENTITY] 와 같은 축). [SINGLETON_SETTING] 과 다른 이유는 이 표가 싱글턴이 아니라
+     * 계정당 한 행(또는 여러 행)이기 때문이다.
+     */
+    ACCOUNT_SETTING,
 }
 
 /** 파기 술어의 추가 조건 — 「시각만」과 「시각 + 종단 상태」 둘뿐이다. */
@@ -197,6 +209,9 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         RetentionRule.Exempt("operator_strategy_revision", ExemptReason.REVISION_HISTORY),
         RetentionRule.Exempt("provenance_authority", ExemptReason.REFERENCE_DATA),
         RetentionRule.Exempt("account", ExemptReason.ACCOUNT_IDENTITY),
+        // --- M7/7C④ 계정 사업 정보 둘 — 현재 설정값이고 수명은 계정이 정한다.
+        RetentionRule.Exempt("account_business_profile", ExemptReason.ACCOUNT_SETTING),
+        RetentionRule.Exempt("account_construction_capacity", ExemptReason.ACCOUNT_SETTING),
         RetentionRule.Exempt("flyway_schema_history", ExemptReason.SCHEMA_HISTORY),
     )
 

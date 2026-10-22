@@ -105,6 +105,14 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("outbox", "outbox_retention_cutoff_idx", "USING btree (state, inserted_at)"),
             // M7/7D — 세션도 파기 대상이다(보존 분류 PURGE) — 그 cutoff 질의를 받는다.
             IndexSpec("browser_session", "browser_session_retention_cutoff_idx", "USING btree (created_at)"),
+            // M7/7C④ — V22 계정 사업 정보 둘. PK 둘뿐이고 **선두 열이 `account_id`** 다(소유 필터가
+            // 색인의 첫 축). 보존 cutoff 인덱스가 없다 — 시간 기준 파기 대상이 아니다(`ACCOUNT_SETTING`).
+            IndexSpec("account_business_profile", "account_business_profile_pkey", "USING btree (account_id)"),
+            IndexSpec(
+                "account_construction_capacity",
+                "account_construction_capacity_pkey",
+                "USING btree (account_id, license_name)",
+            ),
         )
 
     @Test

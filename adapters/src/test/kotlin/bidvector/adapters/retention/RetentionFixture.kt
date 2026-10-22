@@ -375,6 +375,21 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "FROM account WHERE login_name = 'ret-$tag'",
             )
         },
+        // M7/7C④ — 계정 사업 정보 둘. 전부 제외 표(`ACCOUNT_SETTING`)이고 「행 수 불변」을 재려면
+        // 행이 있어야 한다. 계정을 FK 로 참조하므로 **계정 뒤**다. 값은 합성이다(실값 0).
+        TableSeed("account_business_profile") { tag, at ->
+            listOf(
+                "INSERT INTO account_business_profile (account_id, nara_registration, nara_registered_fields, " +
+                    "updated_at) SELECT id, 'UNANSWERED', '{}', '$at' FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
+        TableSeed("account_construction_capacity") { tag, at ->
+            listOf(
+                "INSERT INTO account_construction_capacity (account_id, license_name, amount_won, " +
+                    "assessment_year, updated_at) SELECT id, 'ret-license-$tag', 1, 2026, '$at' " +
+                    "FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
         // **심지 않는다.** 이 표는 `PersistenceTestSupport` 의 test 간 TRUNCATE 목록 밖이다
         // (V2 migration 이 seed 하고 그 행이 운영 데이터다) — fixture 가 한 행을 더하면 그 행이
         // **다른 test 로 새어 나간다**(`ProvenanceAuthoritySeedTest` 가 seed 를 열거와 대조하다가

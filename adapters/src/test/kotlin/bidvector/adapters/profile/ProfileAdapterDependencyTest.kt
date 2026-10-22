@@ -16,10 +16,17 @@ import java.io.File
  * 넓히지 않는다 — 이 test는 그것들과 별개다). `bidvector.adapters.profile` 자신은 이
  * 패키지의 클래스끼리(`JdbcOperatorProfileRepository` → `OperatorProfileRow`) 서로
  * 참조할 수 있어야 하므로 포함한다.
+ *
+ * M7/7C④(추가만) — V22 어댑터(`JdbcBusinessProfileStore`)가 사업 정보 port 와 값 타입
+ * ([bidvector.workflow.profile])·주체 식별자(`bidvector.workflow.access.AccountId`)를 본다.
+ * `workflow.access` 는 패키지 전체가 아니라 그 식별자 하나 때문에 열지만, 이 술어의 단위가 패키지라
+ * 루트로 적는다(형제 dependency test 들과 같은 단위).
  */
 private val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
+        "bidvector.workflow.profile",
+        "bidvector.workflow.access",
         "bidvector.qualification",
         "bidvector.strategy",
         "bidvector.adapters.persistence",

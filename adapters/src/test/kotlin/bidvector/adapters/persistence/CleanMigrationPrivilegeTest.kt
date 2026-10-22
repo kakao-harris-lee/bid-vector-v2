@@ -289,6 +289,30 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                     references = false,
                     trigger = false,
                 ),
+            // M7/7C④ 계정 사업 정보 둘 — `update` 가 `false` 인 것은 권한이 없다는 뜻이 아니라 **열
+            // 단위**라는 뜻이다(`browser_session` 과 같은 자리). 열 집합은 `JdbcBusinessProfileStoreTest`
+            // 가 `column_privileges` 로 정확히 잰다 — 소유자 열(`account_id`)이 그 집합 밖이다.
+            // 시평액만 DELETE 가 있다(현재 값 목록에서 면허 하나를 빼는 일). TRUNCATE 는 둘 다 없다.
+            "account_business_profile" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "account_construction_capacity" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = true,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
         )
 
     @Test

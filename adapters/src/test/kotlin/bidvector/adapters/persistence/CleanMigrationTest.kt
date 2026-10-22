@@ -56,6 +56,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 스키마 스냅샷 래칫 예외(M7/7D, 추가만). V20__account_browser_session.sql.
             "account",
             "browser_session",
+            // 스키마 스냅샷 래칫 예외(M7/7C④, 추가만). V22__account_business_profile.sql — 계정 사업 정보 둘.
+            "account_business_profile",
+            "account_construction_capacity",
         )
 
     @Test
@@ -122,6 +125,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 계정은 IDENTITY, 세션은 **쿠키 값의 해시**가 키다(평문을 담는 열이 없다).
             "account" to setOf("id"),
             "browser_session" to setOf("session_digest"),
+            // M7/7C④ — 키의 **선두가 소유 계정**이다. 사업 정보는 계정당 한 행, 시평액은 계정 × 면허명.
+            "account_business_profile" to setOf("account_id"),
+            "account_construction_capacity" to setOf("account_id", "license_name"),
         )
 
     @Test
@@ -179,6 +185,10 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 세션은 계정을 참조한다(단일 컬럼 FK, CASCADE 없음: 계정을 지우는 경로가
             // 아직 없고, 생기면 세션 폐기가 그 경로의 일이다).
             FkSpec("browser_session", "account_id", "account", "id"),
+            // M7/7C④ — 사용자 소유 표 둘이 계정을 참조한다(R-2). CASCADE 없음(계정을 지우는 경로가
+            // 아직 없다 — 생기면 이 행들의 파기가 그 경로의 일이다, `ACCOUNT_SETTING`).
+            FkSpec("account_business_profile", "account_id", "account", "id"),
+            FkSpec("account_construction_capacity", "account_id", "account", "id"),
         )
 
     @Test
