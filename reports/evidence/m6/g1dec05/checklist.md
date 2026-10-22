@@ -301,3 +301,57 @@ test 가 아니라 컴파일이 잡았고, M1·M5′ 가 그 test 들의 비공�
 `3acc38c5` 에서 `./gradlew --no-daemon check` **exit 0**(10분 44초, 360 task). 시작·끝 HEAD 동일.
 `leakPatternGate`·`gateRegistrationGate`·`sizeGate` 전부 task 그래프에 들어가 돌았다.
 이 회차 뒤 위 수정 라운드가 들어갔으므로 **판정 SHA 는 그다음 커밋**이고 acceptance 를 재측정했다.
+
+### acceptance 2회차 — 판정 SHA `2f577304`
+
+`./gradlew --no-daemon check` **exit 0**(32초, 360 task 중 32 executed · 328 up-to-date). 시작·끝 HEAD 동일.
+
+**32초 초록을 그대로 적지 않았다.** 이 회차의 변경은 Markdown 뿐이라 test task 가 전부 up-to-date 였고,
+그것이 「문서만 바꾼 변이가 UP-TO-DATE 로 건너뛰어 초록」인지 확인했다 — `acceptance-trace.md` ·
+`capability-map.md` 를 **런타임에 읽는 test 는 0**(전부 KDoc 인용. `readText`/`getResource`/`inputs` 와 같은
+줄에 오는 일치 0)이고 어느 `.kts` 에도 입력 선언이 없다. 그래서 up-to-date 는 정직하다 —
+**그리고 같은 이유로 `check` 는 이 slice 의 문서 편집을 전혀 재지 않는다.** `:leakPatternGate` 는
+up-to-date 가 아니라 **executed** 목록에 있었고 초록이다(evidence 커밋 뒤 재실행 요건 충족).
+
+### 문서 등식 — `check` 밖이라 손으로 돌렸다
+
+`check` 에 문서 독자가 없으므로 `6e1/commands.md` 의 E-23·E-24 를 직접 돌렸다(Gradle 밖 shell).
+
+| 등식 | 결과 |
+|---|---|
+| 행 수 · 판정 분포 | **61 행 · ⓐ 15 · ⓑ 2 · ⓒ 44** — 이 문서가 고친 집계표와 일치 |
+| **E-23** ⓐ 행은 production 칸이 비지 않는다(자리채움 거부 포함) | **OK** — `DEC-04` 가 ⓐ 에서 빠져 성립한다 |
+| **E-24** 「부분 측정(강함)」 표식 집합 == 머리 열거 | **OK** — 양쪽 **22** |
+
+### rollback ①~⑦ 실측 (판정 SHA `2f577304`, base `bee7c36f`)
+
+6G 수집 창(00:30~03:00 KST)을 피해 **2026-10-22 05:4x KST** 에 돌렸다 — `cron-6g.log` 의
+`day21 END 01:54:48 exit=2`(쿼터 정지, day20 과 같은 모양) 확인 뒤. 전 명령 `flock` 직렬화.
+
+| 단계 | 내용 | 결과 |
+|---|---|---|
+| ① | 복원 목록 ⊇ `git diff --name-only bee7c36f..HEAD`(evidence 제외) | **OK — 누락 0** |
+| ② | `git restore --source=bee7c36f` (M 7) + 새 경로 삭제 (A 24) | 적용 |
+| ③ | 되돌린 경로의 `git diff` 가 빈 출력 | **OK** |
+| ④ | `compileKotlin compileTestKotlin` | **exit 0** (17초) |
+| ⑤ | `:decision:test :shared-kernel:test :workflow:test` | **exit 0** (13초) |
+| ⑥ | `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** (9분 17초) |
+| ⑦ | `git restore --source=HEAD -- .` 로 트리 복귀 | **OK — worktree 깨끗** |
+
+HEAD 는 전 구간 `2f577304` 로 불변이다(시작·끝 둘 다 찍었다).
+
+**④⑤⑥ 을 생략하지 않은 이유**: ③ 은 **복원한 경로 집합만** base 와 대조하므로 목록에 빠진 파일은
+정의상 검사 밖이고 구조적으로 0 줄이 나온다 — 그 누락은 ④ 컴파일만 본다(6G-2d 두 번 실측).
+① 의 ⊇ 등식을 **되돌리기 전에** 먼저 돌리는 것도 같은 이유다.
+
+**캐시 정직성**: ⑤ 의 세 `:test` 는 **FROM-CACHE**, `sizeGate` 일부는 UP-TO-DATE 였다. 이것은 공허한
+초록이 **아니다** — 캐시 키가 맞았다는 것은 되돌린 트리의 입력이 slice 이전 상태와 **바이트 동일**이라는
+뜻이고, rollback 이 증명하려는 것이 바로 그 동일성이다. 다만 「test 가 다시 돌았다」고는 적지 않는다.
+⑥ 에서는 **실제로 실행된** 것이 있다 — 손댄 세 모듈의 `sizeGate`, `gateRegistrationGate` **전 모듈**,
+그리고 `leakPatternGate`. 그중 `gateRegistrationGate` 의 초록이 **되돌린 `gate-tests.properties` 가
+되돌린 test 클래스 모집단과 양방향으로 맞는다**는 뜻이라, 게이트 등재의 복원 완전성을 잰다.
+
+**부수 관측(이 slice 소관 아님)**: `kotlin-compiler-embeddable` 이 빌드 classpath 에 있다는 KGP 경고가
+전 프로젝트에 뜬다. 이 slice 가 `decision` 에 그 의존을 더했으므로 의심받을 자리인데, **④ 는 되돌린
+트리**(그 의존이 없는 상태)에서 돌았고 거기서도 같은 경고가 났다 — **base 거동이고 이 slice 가 만든 것이
+아니다**(출처는 `build-logic` 의 buildscript classpath).
