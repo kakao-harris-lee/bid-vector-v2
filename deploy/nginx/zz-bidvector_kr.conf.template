@@ -1,0 +1,73 @@
+# M7/7F 본편 — host nginx 에 놓는 bidvector site 조각(D-7F2-2, 설계 (A)). **템플릿**이다:
+# `tools/prod-nginx-render.sh` 가 이중 밑줄로 감싼 자리 둘(도메인·상류 포트)을 채워 host 에 놓을 파일을 만든다(이 저장소에
+# 도메인·포트 값은 없다). 배치·`nginx -t`·reload 는 운영자 수작업이다(runbook 「host nginx」).
+#
+# **파일 이름이 거동이다.** 이 host 의 443 에는 `default_server` 가 없어서, SNI 가 없거나 모르는
+# 이름의 443 요청은 `sites-enabled/*` 의 include 순서(이름 정렬)상 **첫 443 server** 가 받는다.
+# 이 파일이 기존 site 파일보다 앞에 정렬되면 그 기본 대상이 bidvector 로 바뀐다 — 기존 site 의
+# 거동을 바꾸는 사고다. 그래서 이름을 `zz-` 로 시작해 맨 뒤에 정렬되게 한다. 이 불변을
+# `tools/prod-nginx-check.sh` 가 「조각을 넣기 전후로 SNI 없음·기존 이름의 응답이 같다」로 잰다.
+#
+# 443 은 **IPv4 만** 듣는다. 기존 site 는 IPv6 443 을 듣지 않으므로, 여기서 `[::]:443` 을 열면 그
+# 주소족의 유일한 443 server 가 되어 기존 이름까지 이 site 가 받는다. AAAA 레코드도 두지 않는다
+# (runbook DNS 체크리스트).
+
+# `/api/session` 유량 제한(7D 반입 조건, D-7F2-1 Q-3) — **클라이언트 주소 단위**. 존 이름에
+# `bidvector_v2_` 접두를 붙여 같은 http 문맥의 다른 site 와 겹치지 않게 한다. 로그인은 사람이
+# 하는 동작이라 분당 10 회 + 버스트 5 는 정상 사용을 막지 않고, 동시 KDF 폭주는 막는다.
+limit_req_zone $binary_remote_addr zone=bidvector_v2_session:10m rate=10r/m;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __BIDVECTOR_DOMAIN__;
+
+    # certbot webroot(HTTP-01). 발급·갱신 때만 쓰인다 — 경로는 runbook 의 certbot 명령과 같다.
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/bidvector-v2-acme;
+        default_type text/plain;
+    }
+
+    # 평문은 https 로 보낸다(D-7F2-1 Q-2) — 다른 응답을 두지 않는다.
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---- 443 (인증서가 생긴 뒤) ----
+# 위까지가 첫 발급 전에 놓는 부분이다(`tools/prod-nginx-render.sh --http-only` 가 이 줄 앞에서 자른다) —
+# 아래 server 는 인증서 파일을 요구하므로 certbot 첫 발급 전에는 `nginx -t` 를 통과하지 못한다.
+server {
+    listen 443 ssl;
+    server_name __BIDVECTOR_DOMAIN__;
+
+    # certbot 의 표준 배치 경로. 파일은 certbot 이 만들고 갱신한다(운영자 수작업으로 설치).
+    ssl_certificate     /etc/letsencrypt/live/__BIDVECTOR_DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__BIDVECTOR_DOMAIN__/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # 버전만 감춘다 — 응답의 `Server: nginx` 이름은 남는다(제거 모듈 없음, 알려진 제한).
+    server_tokens off;
+    # app 의 요청 본문은 작은 JSON 뿐이다.
+    client_max_body_size 1m;
+
+    # 상류는 compose 가 루프백에만 publish 한 proxy 하나다(평문 구간이 host 루프백 안 — 알려진 제한).
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    # 클라이언트가 보낸 X-Forwarded-For 를 **덧붙이지 않고 덮어쓴다**(7F-local 제한 11, cr L-4).
+    # 관례인 `$proxy_add_x_forwarded_for` 는 위조 값을 앞에 남기므로 쓰지 않는다.
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+
+    location = /api/session {
+        limit_req zone=bidvector_v2_session burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:__BIDVECTOR_UPSTREAM_PORT__;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:__BIDVECTOR_UPSTREAM_PORT__;
+    }
+}
