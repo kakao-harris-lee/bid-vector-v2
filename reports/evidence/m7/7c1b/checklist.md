@@ -182,3 +182,97 @@ base `bee7c36f`. 이 절의 좌표는 둘로 나뉜다. Phase 2 에서 **편집�
 - **Q3** QUAL-02 면허 축 조각을 포함할지 정해 주십시오.
 - **Q4** 평가 use case 의 게이트 함수 추출(거동이 같은 리팩터)을 승인해 주십시오. 거절하면 대안은 제안 use case 가 `EvaluateCandidatesUseCase` 를 쓰지 않고 같은 도메인 함수(`isBiddable`·`WatchRules.evaluate`·`LicenseGatePort`)를 직접 엮는 것입니다. 이 경우 「드롭 순서」가 두 벌이 됩니다.
 - 경로 이름은 `GET /api/suggestions`(operationId `listSuggestions`)로 잠정합니다. 바꿀 이름이 있으면 알려 주십시오.
+
+---
+
+## 1. 팀장 결정 D-7C1B-1 의 반영 (Phase 2)
+
+| 결정 | 반영 |
+|---|---|
+| P1 동기 계산 · 마이그레이션 0 | `ListSuggestionsUseCase` 가 조회마다 값싼 게이트 셋만 돈다. 새 마이그레이션·새 표·새 설정 키 0 |
+| P2 기존 읽기 기본 security | `listSuggestions` 는 `security` 를 적지 않는다(문서 기본값). 기본 거부 필터 아래에서 태어나고 `SuggestionEndpointTest` 가 401 을 직접 잰다 |
+| P3 평탄 카드 + 12 속성 등식 + 신선도 헤더 | `SuggestedNotice` = `NoticeSummary` 12 속성(같은 정의) + 면허 축 셋. 등식은 `OpenApiSuggestionContractTest`. 헤더 넷(개정·계산 시각·총수·결과 상태) |
+| P4 소비자 쪽 값 비교(1회 재계산 뒤 409) | 전략·프로필을 고정 → 게이트 → 다시 읽어 값 등식. 두 번 연속 다르면 409 `STRATEGY_CHANGED_DURING_COMPUTATION` |
+| Q1 (a) F-1 은 별 slice | 이 slice 는 dry-run·커밋 조립을 건드리지 않았다. 제안 목록은 상한을 게이트 **뒤**에만 적용한다(아래 2 절 M1). F-1 의 현 거동은 특성화 test 가 고정한다 |
+| Q2 STR-07 은 의도 둘을 재는 test 로 판정 | capability map 문면은 무편집. 추적표 STR-07 에 「스냅샷 없는 설계」를 적고 ⓐ 로 판정했다(근거 test 는 그 행). **이 판정은 검토 대상으로 표시한다** — 표의 규칙은 「의심되면 ⓒ」이고, ⓐ 는 Q2 승인에 기댄다 |
+| Q3 면허 실값만 · 지역·실적은 판정 없음 | `licenseVerdict`·`licenseUncertainReason` 은 `LicenseVerdict` 값을 옮길 뿐이다. `unjudgedAxes` 는 7C④ 와 같은 어휘(`QUAL_08_REGION`·`QUAL_11_CONSTRUCTION_CAPACITY`)이고, 선언 표는 `SUGGESTION_UNJUDGED_AXES` 하나다 |
+| Q4 특성화 먼저 · 추출은 별 refactor 커밋 | 특성화 test 커밋이 원래 코드 위에서 초록(4/4)인 것을 확인한 뒤, 추출 커밋을 따로 넣었다. 추출 뒤 workflow 전 test 486 초록 |
+| `@JsonUnwrapped` 확인 | **쓰지 않았다(보고 항목).** 그 애노테이션은 `com.fasterxml.jackson.annotation` 패키지라 app 의 바깥 참조 허용 목록(모듈별 정확 패키지 등식)을 넓혀야 한다. 대신 **인터페이스 위임**(`NoticeCard by summary`)으로 같은 결과를 냈다. 직렬화가 평탄하다는 것은 응답 키 집합 등식(`SuggestionEndpointTest`·`OpenApiSuggestionContractTest`)이 잰다. `@JsonUnwrapped` 자체의 Jackson 3 거동은 재지 않았다 |
+
+## 2. 변이 표 (각각 바꿔치우기 → 표적 재실행 → 사본 복원)
+
+numstat 의 삭제 줄이 1 이상이어야 바꿔치우기다. M5·M8 은 줄을 지우기만 했다(더하기 0). 복원 뒤 `git status` 는 빈 출력이었다.
+
+| # | 변이 | 막는 것 | RED 로 잰 test |
+|---|---|---|---|
+| M1 | 표시 상한을 게이트 **앞** 후보 목록에 적용(F-1 결합 이식) | STR-06 독립 · 굶김 | `ListSuggestionsUseCaseTest` STR-06 둘 |
+| M2 | 계산 뒤 비교를 항진식으로(`false &&`) | STR-07 계산 중 변경 불채택 | `ListSuggestionsUseCaseTest` STR-07 넷 전부 |
+| M3 | 비교를 전략 개정 번호만으로 | 쓰기 쪽 규율(개정 +1)에 기대지 않음 · 프로필 비교 | 「개정이 같아도 값이 바뀌면」 · 「프로필이 바뀌어도」 |
+| M4 | 표시 상한을 적용하지 않음 | 상한은 전략 값 | use case STR-06 · `SuggestionEndpointTest` 표시 상한 |
+| M5 | `WATCH_NOT_CONFIGURED` 갈래 삭제 | 빈 결과의 뜻 | use case 빈 결과의 뜻 |
+| M6 | 재시도를 두 번으로 | 1회 재계산 뒤 409 | use case 409 |
+| M7 | 미결 사유를 늘 `null` 로 | 면허 축 값을 싣는다(지어내지도 버리지도 않는다) | 계약 어휘 등식 · endpoint 카드 |
+| M8 | 계약의 `SuggestedNotice.deadlineAt` 에서 `format` 삭제 | 같은 카드 형태 | 계약 「같은 정의」 등식 |
+| M9 | use case 가 첫 읽은 입력을 캐시(`by lazy`) | 저장 뒤 옛 결과가 안 보임 · 모든 편집 경로 | `SuggestionProductionE2ETest` STR-07 ① · ② (출하 조립 + 실 DB) |
+
+## 3. (2b) 값 획득 축 — 새 public 표면 전수
+
+| 새 표면 | 밖에 허락하는 것 | 허락하지 않는 것(구조) |
+|---|---|---|
+| `GET /api/suggestions` | 인증된 운영자의 제안 목록 읽기 | 쓰기 없음. 질의 매개변수를 읽지 않는다(계약 밖 이름·틀린 이스케이프도 200 — endpoint test). 미선언 메서드 405 · 406 은 기존 전수 test 가 덮는다 |
+| `ListSuggestionsUseCase`(workflow) | `list()` 하나 | 쓰기 포트를 받지 않는다(`StrategyReader`·`OperatorProfilePort`·후보 원천·감시·면허). HTTP 층은 이 타입을 직접 받지 못한다(`app.http.denied-types`) — 조회기 경유만 |
+| `Suggestion`·`SuggestionList`(workflow) | 결과 값 | 생성자가 `internal` 이다. `Suggestion` 은 `Ineligible` 을 거부한다 |
+| `SuggestionState`·`UnjudgedQualificationAxis`·`SUGGESTION_UNJUDGED_AXES` | 어휘 | 값만 있다 |
+| `StrategyChangedDuringComputationException` | 409 로 옮겨지는 실패 | 메시지는 응답에 실리지 않는다(매핑표의 고정 문구) |
+| `screenCandidate`·`CandidateScreening`(workflow, **internal**) | 모듈 안 공용 게이트 셋 | 모듈 밖으로 나가지 않는다 |
+| `SuggestionQuery`(app.wiring) | use case 위임 하나 | ② 층 허용 목록 등재 |
+| `SuggestionWiring`(app.wiring) | 기존 빈으로 use case 조립 | 새 어댑터·새 설정 키 0 |
+| `NoticeCard`(app.http) | 카드 속성 열둘의 읽기 | 행위 없음. `NoticeSummaryResponse` 가 구현한다(속성 `override` 만, 매핑 무변경) |
+| `SuggestedNoticeResponse`(app.http) | 응답 직렬화 | 생성자 `private`, 만드는 길은 `from(Suggestion)` 하나. data class 가 아니다(자동 `equals` 없음) |
+| `ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION` | 409 코드 | 계약 `ErrorBody.code` 열거에 등재 |
+
+## 4. 게이트 계약 — 데이터만 움직였다 (술어 무편집)
+
+| 파일 | 무엇을 | 왜 |
+|---|---|---|
+| `config/quality/architecture-policy.properties` | HTTP 허용 패키지(`workflow.suggestion`) · HTTP 허용 클래스·② 층(`SuggestionQuery`) · ① 층(`SuggestionWiring`) · ② 층 workflow 타입(use case·결과) · 주입 표면(`SuggestionQuery`·use case·`NoticeSummaryResponse`) · HTTP 거부 타입(use case) · API 표면 handler(`SuggestionController`) | 전부 집합 **등식**이라 새 타입이 목록에 없으면 RED. 거부 타입은 넓힌 것을 다시 판다 |
+| `config/quality/gate-tests.properties` | test 다섯 등재(workflow 2 · app 3) | 등재 게이트가 「모집단 ∖ 제외 == 등재」 |
+| app 의 의존 게이트 test | 면제 수 62 → 64(근거 문단 동반) | ① 층 하나 + ② 층 하나 |
+
+첫 전건 `check` 가 잡은 것 넷은 이렇게 고쳤다.
+- detekt `ComplexInterface`: 근거를 적고 억제했다.
+- `Intrinsics.areEqual`: 미결 사유의 `when` 을 `is` 로 바꿔 **허용 목록을 늘리지 않았다**.
+- 주입 표면 · 면제 수: 위 표.
+
+## 5. 쓰기·마이그레이션 0 확인
+
+- 새 SQL 0. 새 어댑터 파일 0(`adapters/` 변경 없음).
+- `adapters/src/main/resources/db/migration/` 무변경.
+- 평가 use case 의 변경은 refactor 하나다. 거동 불변이고, 특성화 test 와 기존 평가 test 전건이 증거다.
+
+## 6. 알려진 제한
+
+1. **F-1 이 남아 있다** — dry-run·커밋의 `analysisBudget = candidateLimit` 결합과 「값싼 필터 앞 절단」. 별 slice 다. STR-06 은 ⓒ 이다.
+2. **비교와 응답 전송 사이에 커밋된 저장**은 그 응답에 반영되지 않는다. `X-Strategy-Revision` 이 그것을 드러내고, 화면은 저장 뒤 다시 조회한다.
+3. **계산 중 변경의 실 DB 경쟁 재현은 없다** — 끼어드는 시점을 결정적으로 만들 수 없어서, use case test(가짜 reader)가 재고 E2E 는 저장 뒤 조회만 잰다.
+4. **A-B-A 변경은 보지 못한다** — 계산 중에 바뀌었다가 같은 값으로 돌아오면 비교가 같다고 본다. 그 사이 면허 게이트가 중간 값을 읽었을 수 있다(프로필은 게이트가 후보마다 읽는다).
+5. **면허 게이트는 후보마다 2 질의**(요건·프로필)다. 프로필 고정 래퍼로 줄이는 제안(§0.3)은 하지 않았다. 실측: 출하 조립 + 실 PostgreSQL 에서 통과 후보 200 건 조회 한 번이 184 ms 다(관측값 한 번, 단언 아님 — `SuggestionProductionE2ETest` 의 표준 출력).
+6. **스캔 상한 초과는 목록 전체를 409 로 막는다** — 조용히 자르지 않는 대가다. 운영 값은 `BIDVECTOR_APP_CANDIDATE_CAP`(이 slice 는 그 값을 읽지 않았다).
+7. **`unjudgedAxes` 선언 표가 7C④ 병합 뒤 둘이 된다** — 이름만 맞췄다. 병합 시 하나로 합친다.
+8. **`Ineligible` 은 제안에서 빠지므로** 「❌ + 무엇이 없어서」는 이 목록에 나타나지 않는다. `OPEN-6A3-EVALUATION-DETAIL` 그대로다.
+9. **전략이 계정 단위가 되면**(R-2 남은 절반) 이 operation 은 계정 전용 축으로 옮겨야 한다.
+10. **참가신청 마감·쪽 넘김은 없다**(7C① 제한 1 과 같은 뿌리 · 짧은 목록 전제).
+11. **컨테이너 스모크가 `/api/suggestions` 를 부르지 않는다** — 7C① 제한 11 과 같다.
+
+## 7. 추적표
+
+`reports/evidence/m6/6e1/acceptance-trace.md` 를 고쳤다.
+- STR-06: ⓒ 유지 + F-1 홀더.
+- STR-07: ⓒ → **ⓐ**(Q2). 집계 16 → 17.
+- QUAL-02: ⓒ 유지 + 부분 측정 추가.
+
+capability map 은 **무편집**이다(Q2 「acceptance 문면은 고치지 말 것」).
+
+## 8. 하네스 레인 변경
+
+`git log --oneline bee7c36f..HEAD -- CLAUDE.md .claude/` → **없음**.
