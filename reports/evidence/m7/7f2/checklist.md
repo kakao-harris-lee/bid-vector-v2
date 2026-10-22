@@ -295,3 +295,117 @@ runbook 에서 「확인 → 없으면 설정」 순서로 둔다. WSL 재시작
 
 `477236fc` 의 이 절 첫 판은 host 실측 표에 공존 서비스의 이름·인증서 디렉터리·상류 포트를 적었다. D-7F2-2 는 그 셋을 저장소·
 evidence·커밋에 남기지 않도록 정했다. 그래서 이 커밋에서 문면을 「기존 site」로 바꿨다. 이력 처리는 팀장 답을 기다린다.
+
+## §1 Phase 2 — 구현과 측정 (D-7F2-2, 2026-10-22)
+
+### 1.1 산출물
+
+| 산출물 | 자리 | 무엇이 그것을 재는가 |
+|---|---|---|
+| 1 운영 compose | `docker/compose.prod.yaml`(셋째 덧쓰기, 프로젝트 `bidvector-v2-prod`) · `docker/prod.env.template` · `tools/prod-env.sh` | `tools/prod-env-keys-check.sh`(템플릿 == compose 참조 집합) · `tools/prod-proxy-sites-check.sh` (S3) |
+| 2 TLS·인증서 (재정의: certbot + host nginx) | `deploy/nginx/zz-bidvector_kr.conf.template` · `tools/prod-nginx-render.sh`(`zz-` 강제 · `--http-only`) · `tools/prod-cert-check.sh` | `tools/prod-nginx-check.sh` N1~N9 |
+| 2' proxy site 분리 | `docker/proxy.site.caddy`(공유 본문) · `docker/proxy.Caddyfile`(로컬) · `docker/proxy.Caddyfile.prod`(운영) · Dockerfile·dockerignore · 위생 정책(내용 하한 1→3) | `tools/prod-proxy-sites-check.sh` (S1)(S2) · 로컬 adapt JSON 분리 전후 바이트 동일 |
+| 3 넘겨받은 조건 | 아래 1.4 | — |
+| 4 반입·되돌림·헬스 | `tools/prod-release.sh` · `tools/prod-deploy.sh` · `tools/prod-rollback.sh` · `tools/prod-health.sh`(셋 다 기본 dry-run) | 개발 host 리허설(1.5) |
+| 5 runbook | `docs/runbook/m7-7f-production.md`(신규) · 6E §9 연결 + 7F-local 이월 제한 19·20 | 절 안의 명령은 위 진입점뿐이다 |
+| CI | `container` job 끝에 S-27(키 등식) · S-27b(site·compose 구조) · S-27c(nginx 하네스, 대역 host 설정) | `tools/workflow-step-refs-check.sh` 통과 · container job step 27 → 30 |
+
+**설계에서 바뀐 것 둘**(구현 중 발견): ⓐ 프로젝트 이름을 `bidvector-v2-prod` 로 갈랐다 — 운영 host 가 개발 host 라 개발 레인의
+`bidvector-v2` 스택 `down -v` 가 운영 DB 볼륨을 지울 수 있었다. 루프백 포트도 개발 스모크 기본값(18443)을 피해 runbook 권장
+28443. ⓑ 반입 묶음은 tar 가 아니라 **release 태그 + manifest** 다 — 같은 기계라 이미지 운반이 없다(runbook 제한 6).
+
+### 1.2 측정 결과
+
+| 축 | 결과 |
+|---|---|
+| 로컬 site 보존 | 분리 전 `docker/proxy.Caddyfile`(base) 과 분리 뒤 이미지의 로컬 site 를 같은 env 로 adapt → JSON **바이트 동일**(5,549 B, sha256 앞 16자리 같음) |
+| `prod-proxy-sites-check` | exit 0 — 하위 라우트 4 등식 · HSTS 핸들러 1 · 운영 TLS 앱 없음 · h1 · Host 일치 1 · 도메인 비면 `domain-not-set.invalid` · compose: 프로젝트 이름 · publish proxy 1 루프백 1 · 기본 서비스 4 · ml profile · mem_limit·restart 전부 · `:local` 0 · 망 분리 |
+| `prod-env-keys-check` | exit 0 — 키 18 |
+| `prod-nginx-check`(대역) | exit 0 — 불변 3표지 · 첫 발급 전 판 · N2~N9 |
+| `prod-nginx-check`(host 설정 사본) | exit 0 — 인증서 지시어 경로 2 · 기존 이름 2 · **불변 5표지** · 첫 발급 전 판 · N2~N9. 사본은 종료 시 삭제(실행 뒤 임시 디렉터리 0) |
+| 위생 게이트(release 안에서) | app·web·proxy·ml-serving 넷 exit 0 — proxy 는 새 정책(내용 하한 3 · 필수 셋) |
+| 취약점 게이트 proxy | **exit 1 — 이 slice 와 무관한 새 finding**: 아래 1.6 |
+
+`prod-proxy-sites-check` 의 첫 실행은 붉었다 — Caddy 가 같은 조건의 `header` 지시어 둘을 **한 라우트의 핸들러 둘**로 합쳐서
+「HSTS 라우트를 뺀다」가 공유 본문의 헤더까지 뺐다. 비교 단위를 핸들러로 바꿨다(스크립트 주석에 실측 근거).
+
+### 1.3 변이 표 — 바꿔치우기, 전부 사본에서 복원(복원 뒤 `cmp` 동일)
+
+| 변이 | 바꾼 것 | 결과 |
+|---|---|---|
+| **M1 앞 정렬**(팀장 필수) | 하네스의 조각 파일 이름 `zz-bidvector_kr` → `bidvector_kr` | **대역 exit 1 · host 설정 사본 exit 1** — 「조각을 넣자 기존 응답이 바뀌었다」(SNI 없는 443 의 인증서 표지가 바뀜) + 「테스트 도메인이 SNI 없는 요청과 같은 인증서를 받았다」 |
+| M2 XFF 덧붙이기 | 템플릿 `X-Forwarded-For $remote_addr` → `$proxy_add_x_forwarded_for` | exit 1 — N9 「nginx 가 위조 XFF 를 상류로 보냈다」 |
+| M3 유량 제한 제거 | `limit_req` 줄 삭제 | exit 1 — N7 「분포가 기대와 다르다: 200 ×10」 |
+| M4 버전 노출 | 버전 표시 끄기 지시어를 켬 | exit 1 — N4 「Server 헤더가 이름만이 아니다」 |
+| M5 리다이렉트 제거 | 80 의 301 → 상류 프록시 | exit 1 — N2 「80 리다이렉트가 기대와 다르다」 |
+| M6 X-Real-IP 덮어쓰기 제거 | `proxy_set_header X-Real-IP` 줄 삭제 | exit 1 — N6 「nginx 경유에서 위조 값이 상류에 닿았다」 |
+| K1~K4 키 집합 | 템플릿 키 하나 삭제 · 죽은 키 추가 · 템플릿에 값 · compose 에 `$NAME` 표기 | 1 · 1 · 1 · **2**(못 읽는 표기는 판정 불가) |
+| R1 렌더 이름 | 출력 이름 `bidvector_kr` | exit 1 — 「zz- 로 시작해야 한다」 |
+| D1 태그 옮김 | 리허설 중 `proxy:<rel1>` 을 다른 이미지로 | deploy exit 1 — 「ID 가 manifest 와 다르다」 |
+| D2 env 권한 | env 파일 0644 | deploy exit 1 — 「0600 이 아니다」 |
+| D3 마이그레이션을 넘는 되돌림 | 현재 release manifest 에 마이그레이션 한 줄 추가 | rollback **exit 3** — 멈춤 + 반입 직전 백업 경로 표시 |
+
+**M2 의 첫 실측은 초록이었다** — 그때 하네스는 끝에서 끝(echo 가 Caddy 뒤)만 쟀고, Caddy 가 신뢰하지 않는 출처의 XFF 를 스스로
+버려서 nginx 의 결함이 가려졌다. 그래서 nginx 의 출력 자체를 재는 N9(조각 상류를 루프백 echo 로 바꾼 판)를 더했고 M2 가 붉어졌다.
+반대로 **M6 은 N6 이 잡았다** — Caddy 는 `X-Real-IP` 를 통과시키므로 그 헤더에서는 nginx 의 덮어쓰기가 유일한 겹이다(runbook 제한 3).
+
+**하네스 결함 둘을 측정이 드러냈다**: 인증서 지시어 재작성이 두 번째 단계에서 자기 결과를 다시 바꿔 **같은 server 블록이 다른
+인증서**를 내 N1 이 붉었다(멱등으로 고침 — 불변 단언이 실제로 민감하다는 양성 증거이기도 하다). host 설정에서는 sites-enabled 의
+절대 경로 링크를 host 에서 그대로 따라가 기존 이름을 0 으로 셌다 — 「기존 이름 0 이면 판정 불가(exit 2)」 하한이 그것을 멈췄고,
+링크를 사본 안 경로로 옮겨 읽게 고쳤다(host 원본은 `cp` 한 번 외에 읽지 않는다).
+
+### 1.4 7F-local 이 넘긴 반입 조건 — 처분
+
+| 항목 | 처분 | 측정 |
+|---|---|---|
+| cr L-4 XFF | **닫힘** | nginx 덮어쓰기(N9) + Caddy 가 신뢰하지 않는 XFF 를 버림(N6 직접 접속) — 두 겹 각각 측정 |
+| cr L-5 h3 광고 | **닫힘(구조)** | 운영 site 는 평문 h1(S2 `protocols ["h1"]`) — TLS 리스너가 없어 h3 광고 자체가 없다. nginx 는 h3 를 켜지 않는다 |
+| cr L-6 번들 인라인 env | **설계 처분 유지 · 검사 미구현** | Phase 1 안의 「빌드 단계 단언」을 만들지 않았다 — `web/` 빌드 입력은 이 slice 의 in_scope 밖이고 입력 env 는 여전히 하나(`VITE_API_BASE_URL`). 반입 조건으로 남긴다 |
+| cr L-7 캐시 키 | 범위 밖 유지 | — |
+| vr F-5 만료 결합 | **release preflight 로 닫힘** | 가장 이른 allowlist 만료 < 14일이면 `prod-release.sh` 가 멈춘다(오늘 53일) |
+| 7D `/api/session` 유량 제한 | **닫힘(nginx)** | N7 — 분당 10 + 버스트 5, 버스트 10 중 6 통과·4 429, 다른 경로 무제한. Caddy 동시 연결 상한((a))은 **만들지 않았다**: nginx 가 클라이언트 단위로 닫았고, 남는 루프백 직접 경로는 host 프로세스뿐이라 runbook 제한 3·4 로 둔다 |
+| 7D 제한 6 쿠키 Secure | **닫힘(구조)** | env 파일은 compose 보간에만 쓰이고 app 이 받는 env 는 compose 가 이름으로 고른 것뿐 — 그 설정을 바꾸는 길이 없다. 키 집합 등식이 env 파일에 키를 더하는 것을 거부한다 |
+
+### 1.5 반입 리허설 (개발 host, 외부 effect 0)
+
+프로젝트 `w7f2-prodrehearsal` · 루프백 28443 · env 파일은 scratch(0600, 자리값 — 자격 값은 실행마다 생성) · 상태 디렉터리 scratch.
+release 출처는 `--source-tag`(기존 `:local` 이미지에 태그만 더함 — 이 worktree 가 빌드한 app 이 아니다) · `--accept-no-vuln-scan`.
+
+| 단계 | 결과 |
+|---|---|
+| release rel1 dry-run → apply | 0 → 0 · 위생 넷 OK · manifest(커밋 · 이미지 ID 넷 · 마이그레이션 18 · `vuln=not-run`) |
+| deploy rel1 dry-run → apply | 0 → 0 · 첫 반입이라 백업 대상 없음 · 네 서비스 `(healthy)` · `prod-health` OK |
+| release rel2 → deploy rel2 | 0 · **반입 직전 DB 백업 생성**(`backups/index` 1줄) · previous=rel1 |
+| rollback dry-run → apply | 0 → 0 · 「마이그레이션 차이 0」 → rel1 로 재반입(백업 1개 더) · current=rel1 |
+| D1·D2·D3 | 위 변이 표 |
+| 인증 GET 300건(8 병렬) | 200 ×300 |
+| 정리 | `down -v` 뒤 컨테이너·볼륨·네트워크 0 · 리허설 태그 삭제 · `:local` 넷의 ID 전후 동일 |
+
+메모리 실측(`docker stats`, 기동 직후 → 부하 뒤): app 277 → 265MiB(상한 1.5GiB) · postgres 48 → 58MiB(1GiB) · proxy 11 → 16MiB
+(128MiB) · web 14 → 11MiB(64MiB). **승인안을 그대로 확정**한다 — 빈 DB·짧은 부하의 수라 상한을 낮출 근거가 아니다(runbook §9).
+
+### 1.6 막힌 것 · 결정 필요
+
+1. **취약점 게이트 — 새 finding(이 slice 와 무관)**: `CVE-2026-111943`(Go stdlib 1.26.8, caddy 바이너리 안, HIGH, 수정판 있음)이
+   오늘 DB 에 들어왔다. **base 의 `bidvector/proxy:local` 도 같은 결과(exit 1 · 미등재 1)** 다 — web 도 같은 caddy 베이스라
+   main 의 `container` job S-22e2·S-22e3 가 지금 붉다. 상류 caddy 의 새 판(2.11.8 이후)은 레지스트리에 없다. 선택은 D-7F-2 와
+   같은 형태(allowlist 등재 kind 둘 × 1 = 2줄, 운영자 승인) 또는 대기다. 이 slice 는 allowlist 를 바꾸지 않았다.
+2. **`container` job 전건 재생 · 로컬 스모크(S-26)**: 둘 다 `bidvector/*:local` 태그를 **다시 굽는다**(S-21·S-21b·S-21c). 팀장
+   지시(다른 레인의 재생 태그를 덮지 않는다)와 충돌해 돌리지 않았다. 대신 잰 것: 로컬 site adapt 바이트 동일 · 위생 넷 ·
+   새 step 셋(S-27~S-27c)을 레인 태그 이미지로 실행.
+3. **리허설의 vuln 게이트**는 `--accept-no-vuln-scan` 으로 건너뛰었다 — host 에 trivy 가 PATH 에 없다(앞 레인의 재생 임시
+   디렉터리에만 있다). 운영 release 전 설치가 runbook §1.5 다.
+
+### 1.7 알려진 제한 (등재)
+
+runbook `m7-7f-production.md` §10 이 정본이다: ① 응답의 `Server: nginx` 이름 노출(팀장 지시로 등재) ② nginx → proxy 루프백 평문
+구간(팀장 지시로 등재) ③ 루프백 직접 접속 경로(유량 제한 밖 · `X-Real-IP` 통과) ④ 유량 제한은 클라이언트 주소 단위 ⑤ DB 를
+넘는 되돌림 미자동화 ⑥ 태그 + manifest 반입(같은 기계 전제 · `prune -a` 위험) ⑦ certbot·LE 는 운영자 수작업에서 처음 실측.
+더해서 이 evidence 에만: ⑧ cr L-6 검사 미구현(1.4) ⑨ 하네스는 IPv4 만 잰다(IPv6 443 을 여는 변이는 잡지 못한다 — 조각과
+runbook 이 「IPv4 만」을 선언으로 지킨다) ⑩ 리허설 app 이미지의 출처는 이 worktree 가 아니다.
+
+### 1.8 레인 교훈
+
+- **두 겹 방어는 겹마다 따로 재야 한다** — 끝에서 끝 측정은 바깥 겹이 안쪽 결함을 가린다(M2 첫 실측 초록).
+- **`pgrep -f <패턴>` 대기 루프는 자기 명령줄에 그 패턴이 있어 영원히 자기를 찾는다** — 이 레인의 대기 루프 둘이 그래서
+  끝나지 않았다(작업 도구로 정지). 대기는 flock 으로 한다.
