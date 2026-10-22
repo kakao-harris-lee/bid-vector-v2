@@ -1,0 +1,31 @@
+package bidvector.workflow.profile
+
+/**
+ * 운영자 사업 정보 입력의 경계값(M7/7C④) — **선언 한 자리**다. 값 타입의 `init` 과 V22 의 CHECK 가
+ * 같은 값을 쓰고, 둘이 갈리면 `JdbcBusinessProfileStoreTest` 의 경계 test 가 붉어진다(한쪽만 고치면
+ * 「앱은 받는데 DB 가 거부」 또는 그 반대가 생긴다).
+ *
+ * 값은 **도출이 아니라 선언**이다 — 상호 100자 · 금액 상한 1,000조 원은 실데이터에서 잰 한계가 아니라
+ * 「정상 입력은 넉넉히 들고 비정상 입력(붙여넣기 사고 · 자릿수 실수)은 거른다」는 운영 상한이다.
+ * 연도 하한 2000 도 같은 성격이다(그보다 오래된 평가액은 입력 실수로 본다).
+ */
+object ProfileInputPolicy {
+    /** 상호 길이 상한 — **코드포인트 수**(DB `char_length` 와 같은 단위). */
+    const val TRADE_NAME_MAX_CODE_POINTS: Int = 100
+
+    /** 시평액 행의 면허명 길이 상한 — 코드포인트 수. */
+    const val LICENSE_NAME_MAX_CODE_POINTS: Int = 100
+
+    /** 시평액 상한(원). 하한은 0 초과다 — 0 은 「모름」의 기본값으로 흘러들기 쉬운 값이라 받지 않는다. */
+    const val CAPACITY_AMOUNT_MAX_WON: Long = 1_000_000_000_000_000L
+
+    /** 시평액 기준 연도의 범위(양 끝 포함). */
+    const val ASSESSMENT_YEAR_MIN: Int = 2000
+    const val ASSESSMENT_YEAR_MAX: Int = 2100
+
+    /** 한 계정이 둘 수 있는 시평액 행 수 상한 — use case 가 쓰기 전에 잰다(표에는 행 수 CHECK 가 없다). */
+    const val CAPACITY_ROWS_MAX: Int = 50
+}
+
+/** 코드포인트 수 — 서로게이트 쌍 하나를 한 글자로 센다(DB `char_length` 와 같은 단위). */
+internal fun String.codePointLength(): Int = codePointCount(0, length)
