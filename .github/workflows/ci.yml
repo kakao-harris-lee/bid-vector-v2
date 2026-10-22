@@ -950,3 +950,17 @@ jobs:
       # `check`·`ml-engine`·`web` 세 job 이고 이 job(컨테이너 축)은 애초에 그 안에 없다.
       - name: 로컬 패키징 스모크 — web 셸 · /api 401 · 우회 ①~⑤ (S-26)
         run: ./tools/local-tls-smoke.sh
+
+      # M7/7F 본편(D-7F2-2) — 운영 프로필의 구조 게이트 셋. **자리가 S-26 뒤인 이유**: ① S-21c 가 구운
+      # proxy 이미지(로컬·운영 두 site 가 함께 구워진 바이트)를 그대로 판정한다 ② 앞선 판정이 이미 다
+      # 나온 뒤라 여기서 붉어져도 한 회차의 판정이 줄지 않는다 ③ 기존 step 번호를 재배치하지 않는다.
+      # 셋 다 운영 host 에 닿지 않는다 — S-27c 는 저장소의 **대역** host 설정(`deploy/nginx/test-fixture/`)으로
+      # 돈다(운영 host 의 실제 설정으로 도는 것은 runbook 의 배치 전 검증이다).
+      - name: 운영 env 키 집합 등식 — 템플릿 == compose 참조 (S-27)
+        run: ./tools/prod-env-keys-check.sh
+
+      - name: 운영 proxy site 등식 · 운영 compose 구조 (S-27b)
+        run: ./tools/prod-proxy-sites-check.sh --proxy-image bidvector/proxy:local
+
+      - name: host nginx 조각 — 기존 site 불변 · 새 거동 (대역 host 설정) (S-27c)
+        run: ./tools/prod-nginx-check.sh --proxy-image bidvector/proxy:local
