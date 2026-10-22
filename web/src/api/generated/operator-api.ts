@@ -197,6 +197,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 제안 목록(STR-06·STR-07) — 현재 전략의 감시를 통과한 후보, 읽기 전용, 마감 임박 순
+         * @description 열린 공고 가운데 **현재 전략의 감시 조건을 통과하고 면허 자격이 미달이 아닌** 공고를 낸다 (M7/7C①b). 쓰기 경로가 없고 전략을 바꾸지 않는다. 질의 매개변수가 없다.
+         *     **조회가 곧 계산이다** — 영속 스냅샷이 없으므로 낡을 대상이 없다. 계산에 쓴 전략과 프로필을 계산이 끝난 뒤 현재 값과 비교해 다르면 그 결과를 버리고 한 번 다시 계산한다. 또 다르면 409 (`STRATEGY_CHANGED_DURING_COMPUTATION`)다 — 계산 중에 바뀐 전략의 결과를 채택하지 않는다. `X-Strategy-Revision` 은 이 결과를 계산한 전략 개정이다.
+         *     **표시 상한은 전략의 `candidateLimit` 이고 계산 예산과 독립이다**(STR-06). 계산은 열린 후보 전부 (운영 설정의 스캔 상한 이내 — 넘으면 409 `CANDIDATE_CAP_EXCEEDED`, 조용히 자르지 않는다)에 게이트를 돌린 **뒤** 마감 임박 순으로 앞에서부터 상한만큼 낸다. 상한이 미설정이면 자르지 않는다. `X-Total-Count` 는 자르기 전 통과 건수다.
+         *     **자격은 면허 축만 판정한다.** `licenseVerdict` 는 `ELIGIBLE`·`UNCERTAIN`(미결 — 미보유가 아니다) 둘이고, 지역·실적 자격은 판정하지 않는다 — `unjudgedAxes` 가 그 축을 늘 싣는다.
+         */
+        get: operations["listSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -322,9 +345,30 @@ export interface components {
             /** Format: date-time */
             deadlineAt?: string | null;
         };
+        SuggestedNotice: {
+            noticeNumber: string;
+            noticeRound: string;
+            status: string;
+            title?: string | null;
+            demandAgencyName?: string | null;
+            noticeAgencyName?: string | null;
+            /** Format: int64 */
+            baseAmountWon?: number | null;
+            baseAmountCurrency?: string | null;
+            baseAmountBasis?: string | null;
+            baseAmountVatTreatment?: string | null;
+            baseAmountProvenance?: string | null;
+            /** Format: date-time */
+            deadlineAt?: string | null;
+            /** @enum {string} */
+            licenseVerdict: "ELIGIBLE" | "UNCERTAIN";
+            /** @enum {string|null} */
+            licenseUncertainReason?: "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED" | null;
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+        };
         ErrorBody: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE";
             message: string;
             correlationId: string;
         };
@@ -1092,6 +1136,61 @@ export interface operations {
                 };
             };
             /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listSuggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 제안 배열(마감 임박 순). 신선도는 `X-Strategy-Revision`·`X-Computed-At`, 총수는 `X-Total-Count`, 빈 결과의 뜻은 `X-Result-State` 가 나른다. */
+            200: {
+                headers: {
+                    /** @description 이 결과를 계산한 전략 개정 번호. */
+                    "X-Strategy-Revision": number;
+                    /** @description 계산 시각(ISO-8601 instant, 원값). */
+                    "X-Computed-At": string;
+                    /** @description 게이트를 통과한 **전체** 건수(표시 상한을 적용하기 전). */
+                    "X-Total-Count": number;
+                    /** @description MATCHED(통과가 1 건 이상) | NO_OPEN_NOTICES(입찰 가능한 열린 공고가 없다) | WATCH_NOT_CONFIGURED(감시 조건이 설정되지 않아 어떤 공고도 통과하지 않는다) | NO_MATCH(열린 공고는 있으나 통과가 없다) */
+                    "X-Result-State": "MATCHED" | "NO_OPEN_NOTICES" | "WATCH_NOT_CONFIGURED" | "NO_MATCH";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedNotice"][];
+                };
+            };
+            /** @description 자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 계산하는 동안 전략 또는 프로필이 두 번 연속 바뀌었다(code: STRATEGY_CHANGED_DURING_COMPUTATION) 또는 후보 스캔이 상한 초과(code: CANDIDATE_CAP_EXCEEDED) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;

@@ -116,21 +116,23 @@ class NoticeSearchController(
  *
  * 원시 관측·감사 행·개찰 축·투찰자 이름은 **이 타입에 자리가 없다** — `Notice` 가 그 값을
  * 갖고 있지 않고(검색 질의도 `notice` 표만 읽는다), 키 집합 등식 test 가 그 사실을 잠근다.
+ *
+ * 속성은 [NoticeCard] 다 — 제안 목록(M7/7C①b)이 같은 카드를 이 값에 위임해 낸다.
  */
 data class NoticeSummaryResponse(
-    val noticeNumber: String,
-    val noticeRound: String,
-    val status: String,
-    val title: String?,
-    val demandAgencyName: String?,
-    val noticeAgencyName: String?,
-    val baseAmountWon: Long?,
-    val baseAmountCurrency: String?,
-    val baseAmountBasis: String?,
-    val baseAmountVatTreatment: String?,
-    val baseAmountProvenance: String?,
-    val deadlineAt: String?,
-) {
+    override val noticeNumber: String,
+    override val noticeRound: String,
+    override val status: String,
+    override val title: String?,
+    override val demandAgencyName: String?,
+    override val noticeAgencyName: String?,
+    override val baseAmountWon: Long?,
+    override val baseAmountCurrency: String?,
+    override val baseAmountBasis: String?,
+    override val baseAmountVatTreatment: String?,
+    override val baseAmountProvenance: String?,
+    override val deadlineAt: String?,
+) : NoticeCard {
     companion object {
         fun from(notice: Notice): NoticeSummaryResponse {
             val base =
