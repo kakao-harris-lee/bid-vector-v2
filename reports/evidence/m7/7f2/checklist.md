@@ -291,10 +291,9 @@ runbook 에서 「확인 → 없으면 설정」 순서로 둔다. WSL 재시작
 더함: `deploy/nginx/zz-bidvector_kr.conf`(템플릿) · nginx 하네스 스크립트(`tools/prod-nginx-check.sh`). 바뀜:
 `docker/compose.acme-test.yaml` → certbot·Pebble 탐침용(성립 시). 운영 site 의 Caddy 는 ACME 대신 루프백 평문 리스너.
 
-#### 문면 교정 기록 (D-7F2-2)
+#### 이력 재작성 (D-7F2-3)
 
-`477236fc` 의 이 절 첫 판은 host 실측 표에 공존 서비스의 이름·인증서 디렉터리·상류 포트를 적었다. D-7F2-2 는 그 셋을 저장소·
-evidence·커밋에 남기지 않도록 정했다. 그래서 이 커밋에서 문면을 「기존 site」로 바꿨다. 이력 처리는 팀장 답을 기다린다.
+이 절의 첫 판에 있던 공존 서비스 식별자를 팀장 지시로 unpushed 이력에서 지웠다(재작성 뒤 base 이후 `git log -p` 계수 0).
 
 ## §1 Phase 2 — 구현과 측정 (D-7F2-2, 2026-10-22)
 

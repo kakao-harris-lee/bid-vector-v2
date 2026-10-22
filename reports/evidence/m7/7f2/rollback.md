@@ -1,6 +1,7 @@
 # M7/7F 본편 — rollback
 
-**실측 HEAD: 5d0be00c** (Phase 2 의 마지막 산출물 커밋). 아래 목록과 ①~⑥ 은 그 HEAD 에서 낸 것이다.
+**실측 HEAD: ec953f03** (Phase 2 의 마지막 산출물 커밋). ①~⑥ 은 이력 재작성(D-7F2-3) 전의 같은 커밋에서 냈고, 재작성 전후 그 커밋의
+트리는 바이트 동일하다(`git diff` 0줄) — 트리 동일성으로 갈음한다.
 
 **전제 둘** — ① 이 브랜치는 base `bee7c36f` 이후 main 을 병합하지 않았다(`git log --oneline bee7c36f..HEAD --merges`
 빈 출력). ② 공유 파일(ci.yml · 위생 정책 · Dockerfile 둘 · 6E runbook · proxy 설정)은 이 range 에서 이 slice 의 커밋만
