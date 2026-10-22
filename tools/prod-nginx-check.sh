@@ -237,8 +237,31 @@ _nginx_up() {
 }
 
 # 기존 이름 — 사본의 server_name 에서 걷는다(하네스 자신의 조각 제외). 출력에는 번호만 싣는다.
+# 사본의 sites-enabled 항목은 host 와 같은 **절대 경로 링크**(/etc/nginx/sites-available/…)일 수 있다 —
+# 컨테이너 안에서는 사본을 가리키지만 host 에서 그대로 따라가면 **host 의 원본**을 읽는다. 그래서 링크 대상을
+# 사본 안의 경로로 옮겨 읽는다(host 원본은 cp 한 번 외에는 읽지 않는다).
+_enabled_files() {
+  local f target
+  for f in "$CONF"/sites-enabled/* "$CONF"/conf.d/*.conf; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    if [ -L "$f" ]; then
+      target="$(readlink "$f")"
+      case "$target" in
+        /etc/nginx/*) printf '%s\n' "$CONF/${target#/etc/nginx/}" ;;
+        /*) _die "사본 밖을 가리키는 링크가 있다 — 이 하네스가 읽지 않는 배치(판정 불가)" 2 ;;
+        *) printf '%s\n' "$(dirname "$f")/$target" ;;
+      esac
+    else
+      printf '%s\n' "$f"
+    fi
+  done
+}
 _existing_names() {
-  grep -rhoE '^[[:space:]]*server_name[[:space:]]+[^;]+;' "$CONF/sites-enabled/" "$CONF/conf.d/" 2>/dev/null \
+  local files
+  files="$(_enabled_files)" || return 2
+  [ -n "$files" ] || return 0
+  # shellcheck disable=SC2086
+  grep -hoE '^[[:space:]]*server_name[[:space:]]+[^;]+;' $files 2>/dev/null \
     | sed -E 's/^[[:space:]]*server_name[[:space:]]+//; s/;$//' | tr ' ' '\n' \
     | sed '/^$/d' | grep -vx '_' | grep -vxF "$TEST_DOMAIN" | grep -v '[*~]' | sort -u || true
 }
@@ -276,7 +299,7 @@ _snapshot() {
 # ---- 단계 1: 조각 없음 ---------------------------------------------------------------------------
 _step "단계 1 — 사본 그대로(조각 없음)"
 ncerts="$(_rewrite_certs)" || _die "인증서 지시어를 바꾸지 못했다(판정 불가)" 2
-NAMES="$(_existing_names)"
+NAMES="$(_existing_names)" || _die "활성 site 목록을 읽지 못했다(판정 불가)" 2
 echo "  인증서 지시어 경로 ${ncerts}개 · 기존 이름 $(printf '%s\n' "$NAMES" | grep -c . || true)개"
 [ -n "$NAMES" ] || _die "기존 이름이 0 개다 — 불변 단언이 공허하다(양성 대조 실패, 판정 불가)" 2
 _nginx_up || _die "조각 없는 사본이 이미 뜨지 않는다 — 기준을 잴 수 없다(판정 불가)" 2
