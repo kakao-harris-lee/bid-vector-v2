@@ -51,7 +51,17 @@ flock ~/.local/bid-vector-build.lock ./gradlew --no-daemon \
 
 ## 3. 변이 실측
 
-스크립트 둘(scratchpad)이 돌렸다. 각 회차: 사본 백업 → 치환 → `git diff --numstat` 확인 →
+변이 스크립트는 세션 scratchpad 에 뒀고, **그 디렉터리는 레인 공용이라 뒤에 다른 레인이 같은
+이름(`mutate.py`)으로 덮어썼다**(2026-10-22 16:35 실측). 그래서 **스크립트 파일은 재현 경로가
+아니다** — 재현의 정본은 `checklist.md` §2 의 「무엇을 바꿔치웠나」 칸이다. 그 칸은 치환 전후
+문자열을 산문으로 적으므로 스크립트 없이 손으로 되풀이할 수 있다. 측정 기록 자체(회차별 numstat ·
+RED 목록 · 복원 확인)는 같은 표에 있다.
+
+같은 사유로 **이 slice 의 판정은 공용 이름 로그에 기대지 않는다** — acceptance 와 rollback 의
+exit·HEAD 는 회차마다 고유한 작업 출력에서 읽었고, HEAD 양 끝 비교는 로그를 나중에 다시 읽는
+방식이 아니라 **측정 명령 안에서** 수행했다.
+
+스크립트 둘이 돌렸다. 각 회차: 사본 백업 → 치환 → `git diff --numstat` 확인 →
 `:settlement:test` → JUnit XML 에서 실패 수집 → 사본에서 복원 → `git status --porcelain -- settlement`
 빈 출력 확인. 결과 표는 `checklist.md` §2.
 
