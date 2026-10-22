@@ -277,7 +277,9 @@ class CollectOpeningResultsUseCase(
             // 네 결과를 전수 분기한다 — `else` 가 없으므로 술어에 결과가 하나 늘면 컴파일이 여기를
             // 가리킨다. 강제 캐스트는 「건너뜀이 없다」는 가정이었고, 그 가정이 게이트를 껐다.
             when (val decision = decideFetch(picked, axis, resumption)) {
-                is DetailFetchDecision.Skip -> skips.record(axis.endpoint, decision.reason)
+                is DetailFetchDecision.Skip -> {
+                    skips.record(axis.endpoint, decision.reason)
+                }
 
                 is DetailFetchDecision.Fetch -> {
                     val batch = axis.fetch(picked.source.port, decision)
@@ -396,11 +398,14 @@ private fun lastCheckedOf(
     byKeyAndEndpoint: Map<String, Map<SourceEndpoint, Instant>>,
     closedNow: Map<String, Set<SourceEndpoint>>,
 ): Map<NoticeId, Map<DetailAxis, Instant>> =
-    ids.associateWith { id ->
-        val key = keyOf(id).value
-        val byEndpoint = byKeyAndEndpoint[key].orEmpty() - closedNow[key].orEmpty()
-        DetailAxis.entries.mapNotNull { axis -> byEndpoint[axis.endpoint]?.let { axis to it } }.toMap()
-    }.filterValues { it.isNotEmpty() }
+    ids
+        .associateWith { id ->
+            val key = keyOf(id).value
+            val byEndpoint = byKeyAndEndpoint[key].orEmpty() - closedNow[key].orEmpty()
+            DetailAxis.entries
+                .mapNotNull { axis -> byEndpoint[axis.endpoint]?.let { axis to it } }
+                .toMap()
+        }.filterValues { it.isNotEmpty() }
 
 /** 아무것도 건너뛰지 않은 실행의 값 — 표본틀에서 멈춘 실행은 술어를 한 번도 부르지 않는다. */
 private val NO_SKIPS = DetailSkipCounts(ageGate = 0, recheckGate = 0)

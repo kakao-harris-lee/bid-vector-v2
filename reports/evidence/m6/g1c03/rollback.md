@@ -25,11 +25,11 @@ git restore --source=bee7c36f --staged --worktree -- \
   reports/evidence/m6/6e1/acceptance-trace.md
 rm workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/DetailSkipTally.kt \
-   workflow/src/main/kotlin/bidvector/workflow/collection/InterruptedRounds.kt \
+   workflow/src/main/kotlin/bidvector/workflow/collection/InterruptedRoundCloser.kt \
    workflow/src/test/kotlin/bidvector/workflow/collection/OpeningDetailFetchGateTest.kt
 ```
 
-`InterruptedRounds.kt` 는 **옮긴 파일**이다 — 되돌리면 그 내용이 수집 use case 파일 안으로 함께 돌아온다
+`InterruptedRoundCloser.kt` 는 **옮긴 파일**이다 — 되돌리면 그 내용이 수집 use case 파일 안으로 함께 돌아온다
 (그 파일을 `bee7c36f` 로 되돌리는 위 줄이 그것을 한다). 새 파일로 남겨 두면 같은 타입이 두 벌이 된다.
 
 ## 2. 되돌림 뒤 상태

@@ -30,6 +30,5 @@ internal sealed interface OpeningAnchor {
 internal fun OpeningAnchor.observedAt(): Instant? =
     when (this) {
         is OpeningAnchor.Observed -> at
-
         OpeningAnchor.NotCarriedByFrame -> null
     }

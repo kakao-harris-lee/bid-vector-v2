@@ -41,9 +41,7 @@ internal class DetailSkipTally {
     ) {
         when (reason) {
             DetailFetchSkipReason.AlreadyHeld -> return
-
             is DetailFetchSkipReason.AgeGateNotPassed -> ageGate++
-
             is DetailFetchSkipReason.RecheckGateNotPassed -> recheckGate++
         }
         byAxis[endpoint] = (byAxis[endpoint] ?: 0) + 1
