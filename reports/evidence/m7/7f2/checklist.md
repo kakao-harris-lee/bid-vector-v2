@@ -181,3 +181,117 @@ CDN·정적 캐시 정책(7F-local 제한 7 유지) · caddy 자체 빌드 · �
 health,cert-check}.sh` · 키 집합·site 등식 검사 스크립트 · `tools/local-tls-smoke.sh`(분리 반영 시) · `docs/runbook/m7-7f-production.md`
 · `docs/runbook/m6-6e-operations.md` §9 · 필요 시 `.github/workflows/ci.yml` `container` job · `config/quality/**`(Pebble 이미지를
 게이트에 태울 경우) · `reports/evidence/m7/7f2/**`.
+
+### 0.8 수정 설계 (D-7F2-1 — R-3 host = 이 WSL, host nginx 공존)
+
+**host 사실(읽기 전용 실측, 2026-10-22 KST — `/etc/nginx` 쓰기·reload 0)**
+
+| 사실 | 출처 |
+|---|---|
+| nginx 1.24.0(Ubuntu 패키지 `nginx`·`nginx-common` 1.24.0-2ubuntu7.18), systemd | `nginx -v` · `dpkg -l` |
+| `sites-enabled` = `default`(80 `default_server`, 443 줄은 주석) · **기존 공개 site 파일 하나**(80 → 301, 443 `ssl` server 둘 — 하나는 루프백 상류로 프록시, 하나는 301). 내용은 저장소에 옮기지 않는다 | `/etc/nginx/sites-enabled/*` |
+| **443 에 `default_server` 가 없다** → SNI 없음·모르는 이름의 443 요청은 **include 순서상 첫 443 server** 가 받는다(오늘 = 기존 site) | 같은 파일들 · `nginx.conf` 의 `include /etc/nginx/sites-enabled/*;` |
+| 기존 site 의 인증서는 수동 발급 상용 인증서(경로 미기재), certbot 미설치, `/etc/letsencrypt` 없음 | 같은 파일 · `which certbot` |
+| `stream` 은 **동적 모듈**로 빌드됐지만 모듈 파일이 설치돼 있지 않다(`/usr/lib/nginx/modules` 없음, `modules-enabled` 비어 있음). `http_realip`·`http_v2` 는 내장 | `nginx -V` |
+| 메모리 22,016 MiB · swap 8,192 MiB · 16 코어. earlyoom 활성, `--prefer '^(java)$'`, `--avoid` 에 `postgres`·`caddy`·`nginx` | `free -m` · `/etc/default/earlyoom` |
+| app 이미지에 JVM 메모리 플래그가 없다 → 힙 상한이 컨테이너 한도(없으면 host RAM)의 기본 비율로 정해진다 | `docker/app.Dockerfile`(`MaxRAM`·`Xmx`·`JAVA_TOOL_OPTIONS` grep 0) |
+
+**설계 변경(두 안 공통)**: bidvector compose 는 0.0.0.0:80·443 을 **publish 하지 않는다**. proxy 하나만 **루프백 고포트**에
+publish(7F-local 과 같은 모양, 포트 값만 운영 env). 0.3-1 의 「0.0.0.0:443 publish」를 철회한다.
+
+#### (A) host nginx 가 TLS 종단 → 루프백 Caddy (권고)
+
+- **host 쪽 변경**: 새 site 파일 하나(기존 site 파일 무변경). 80: `bidvector.kr` 의 `/.well-known/acme-challenge/` 만 webroot,
+  나머지 301 https. 443: `bidvector.kr` 의 `ssl` server 가 `http://127.0.0.1:<proxy 포트>` 로 프록시. 인증서는 certbot(webroot,
+  HTTP-01) — 설치·첫 발급·갱신 타이머·`deploy-hook` 의 `nginx` reload 는 운영자 수작업.
+- **기존 site 무손상의 핵심 함정**: 443 에 `default_server` 가 없으므로 새 파일 이름이 기존 site 파일 이름 보다 **앞에** 정렬되면
+  (`bidvector_kr` 이 그렇다) SNI 없는/모르는 이름의 443 요청 기본 대상이 기존 site → bidvector 로 **바뀐다**. 파일 이름을
+  기존 site 뒤로 정렬되게 둔다(예 `zz-bidvector_kr`) — 기존 site 파일을 건드리지 않고 기존 기본 대상을 보존. 검증: 아래 nginx 하네스가
+  「SNI 없음 → 기존 site 대역」 「기존 이름 → 기존 site 대역」을 변경 전후 동일로 단언.
+- **7F-local 방어 중 Caddy 에 남는 것**: 상류 집합 둘·`/actuator*` 404·경로 정규화 우회 방어(접두 미절삭)·망 분리(web↛app)·
+  접근 로그 헤더 삭제·보안 헤더(`defer` 덮어쓰기)·HSTS(Caddy 가 붙이고 nginx 는 통과). **nginx 로 옮겨 가는 것**: TLS·인증서·
+  평문 처리(이제 「거부」가 아니라 80 → 301, Q-2 답). **새로 생기는 것**: nginx 가 자기 `Server` 헤더를 붙인다 —
+  버전 표시 끄기 지시어로 버전만 지울 수 있고 이름은 남는다(제거 모듈 없음, 제한 등재). Caddy 의 TLS 는 운영 site 에서 꺼지고
+  루프백 평문 리스너가 된다(구간이 host 루프백 안이라 수용, 대신 publish 가 `127.0.0.1` 임을 스모크가 단언).
+- **L-4 XFF 신뢰 경계**: nginx 기본 관례(`$proxy_add_x_forwarded_for`)는 클라이언트가 보낸 값 뒤에 덧붙인다 → **쓰지 않는다**.
+  nginx 가 `X-Forwarded-For $remote_addr`·`X-Real-IP $remote_addr` 로 **덮어쓰고**, Caddy 는 그 값을 신뢰하되 신뢰 출처를
+  compose 의 host 쪽 게이트웨이 대역으로 한정(publish 가 루프백뿐이라 그 대역으로 들어오는 것은 host 프로세스뿐). 남는 경계:
+  **host 위의 모든 프로세스**(WSL2 의 localhost 전달로 Windows 쪽 프로세스 포함)는 Caddy 에 직접 붙어 XFF 를 위조할 수 있다 —
+  app 이 오늘 그 값을 읽지 않으므로 영향 0, 제한 등재.
+- **Q-3 유량 제한**: (A) 에서는 nginx `limit_req`(키 `$binary_remote_addr`, `location = /api/session`)가 **클라이언트 단위**
+  제한을 플러그인 없이 준다 — Caddy 동시 연결 상한((a))보다 7D 의 위협에 더 맞는다. 권고: nginx `limit_req` 를 주, Caddy 동시
+  연결 상한을 보조(루프백 직접 접속 경로 대비). 존 선언은 site 파일 머리(http 문맥)에 둔다 — 존 이름은 기존 site 과 겹치지 않게
+  접두를 단다.
+- **ACME 산출물 재정의**: 계약 산출물 2 의 「프록시(Caddy)의 ACME」는 (A) 에서 「certbot + nginx」가 된다. 저장소가 드는 것은
+  설정 조각·검증·runbook·`prod-cert-check.sh`(443 에서 `bidvector.kr` 인증서 잔여일 — 판독 자리가 nginx 로 바뀔 뿐)까지.
+  Pebble 탐침은 「certbot 컨테이너 ↔ Pebble ↔ nginx 대역」으로 바꿔 Phase 2 에서 성립 여부를 판정한다.
+
+#### (B) nginx `stream` SNI passthrough → Caddy 가 ACME 유지
+
+- **침습도(높음)**: ⓐ `stream` 모듈 **패키지 설치**(`libnginx-mod-stream` 상당 — host 패키지 변경) + `load_module` ⓑ 443 을
+  stream 이 쥐어야 하므로 **기존 site 의 `listen 443 ssl` 두 줄을 루프백 내부 포트로 옮겨야 한다**(기존 site 파일 수정) ⓒ 그러면
+  기존 site 이 보는 클라이언트 주소가 127.0.0.1 이 된다 — 보존하려면 `proxy_protocol` + `set_real_ip_from` 을 기존 site 블록에 넣어야
+  한다(추가 수정) ⓓ 모르는 SNI 의 기본 경로를 기존 site 으로 명시해야 오늘 거동이 유지된다.
+- **챌린지**: TLS-ALPN-01 은 바이트 통과라 **동작한다**(ALPN `acme-tls/1` 이 그대로 Caddy 에 닿는다). HTTP-01 은 80 이 평문이라
+  SNI 가 없어 stream 으로 가를 수 없다 → 80 은 nginx `http` 에 남고, `bidvector.kr` 의 challenge 경로만 Caddy 루프백 http 포트로
+  프록시 + 나머지 301. 즉 (B) 도 80 에 nginx server 블록이 필요하다.
+- **이점**: 7F-local 의 Caddy TLS·헤더·HSTS·ACME 가 그대로. **대가**: 운영자의 파일럿(기존 site)의 설정과 패키지를 바꾼다 —
+  지시 「절대 깨면 안 됩니다」와 정면으로 부딪힌다.
+
+#### 권고: (A)
+
+기존 site 파일·패키지 무변경, 변경 단위가 「새 파일 하나 + `nginx -t` + reload」로 되돌림이 파일 삭제 + reload 다. (B) 의 이점(ACME 를
+Caddy 가 쥠)은 기존 site 의 listen·클라이언트 주소·패키지를 바꾸는 대가에 비해 작다. (A) 에서 잃는 것은 「Caddy 가 TLS 를 쥔다」는
+7F-local 의 구조 하나와 `Server: nginx` 이름 노출이다.
+
+#### nginx 조각의 검증 방법 (host `/etc/nginx` 쓰기 0)
+
+- 저장소에 `deploy/nginx/zz-bidvector_kr.conf`(템플릿, 도메인·포트는 치환 자리) 하나.
+- **컨테이너 하네스**: host 와 같은 판(nginx 1.24, 다이제스트 고정) 컨테이너에 ⓐ host 의 `nginx.conf`·`sites-enabled/*`
+  **읽기 전용 사본**(인증서 경로는 자체 서명 대역으로 치환 — 실 인증서 파일은 복사하지 않는다) ⓑ 새 조각을 넣고 `nginx -t`
+  ⓒ 기존 site 상류 대역 + 루프백 Caddy(운영 프로필, `bidvector.test`)를 띄워 **변경 전후 동일**: SNI 없음 → 기존 site · 기존 이름
+  → 기존 site · `www` → 301. **새 거동**: `bidvector.test` 80 → 301(challenge 경로 제외) · 443 → web 셸 200 · `/api/*` 401 ·
+  `/actuator*` 404 · 위조 XFF 가 상류에 닿지 않음 · `/api/session` 버스트 → 429 · 헤더 등식.
+- host 사본을 쓰는 이유: 실제 host 설정과의 결합(특히 default 대상)을 재려면 대역이 아니라 그 설정이어야 한다. 사본은
+  실행 중 임시 디렉터리에만 두고 저장소·evidence 에 넣지 않는다(기존 site 설정은 우리 것이 아니다).
+- runbook 운영자 절차: 파일 배치 → `sudo nginx -t` → 실패면 파일 제거로 끝 → 성공이면 `systemctl reload nginx` → 기존 site
+  확인(위 동일 단언의 host 판) → bidvector 확인. 되돌림 = 파일 제거 + `nginx -t` + reload.
+
+#### WSL 운영자 수작업 (runbook 에 추가)
+
+Windows 쪽 inbound 80·443 을 WSL 로 넘기는 단계(포트 포워딩 또는 WSL 네트워킹 모드 설정 + Windows 방화벽)와 공유기/외부
+방화벽 포워딩. 기존 site 이 이미 공개 중이므로 **그 경로가 이미 있을 가능성이 높다** — 운영자가 확인만 하면 되는지, 새로 여는지는
+runbook 에서 「확인 → 없으면 설정」 순서로 둔다. WSL 재시작 시 IP 변동·포워딩 소실도 확인 항목.
+
+#### 메모리 — 위험과 mem_limit 안
+
+- **위험**: 운영 app 은 JVM 이고 이 host 의 earlyoom 은 **`java` 를 먼저 죽인다**(`--prefer '^(java)$'`). 개발 Gradle 빌드·다른
+  세션의 큰 프로세스가 메모리를 밀어 올리면 **운영 app 이 첫 희생자**다(2026-09-24·09-30 사고 계열 — `~/.claude/CLAUDE.md`).
+  `restart: unless-stopped` 가 복구하지만 그 사이 사이트가 502 다.
+- **mem_limit 안(Phase 2 리허설에서 RSS 실측 뒤 확정)**: app 1.5 GiB + `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70`(env, 이미지
+  무변경) · postgres 1 GiB · proxy 128 MiB · web 64 MiB · ml-serving(기본 미기동) 1 GiB. 합 약 2.7 GiB(ml 제외).
+- **운영자 판단 후보(이 slice 는 바꾸지 않는다)**: ⓐ earlyoom 대상에서 운영 app 을 가를 방법은 프로세스 이름뿐이라 `java`
+  전체를 avoid 로 옮기면 Gradle 보호까지 꺼진다 — 권고하지 않는다 ⓑ 개발 빌드 쪽 한도(Gradle `-Xmx`·workers)를 낮추는 것이
+  현실적 ⓒ 운영 반입 뒤 「무거운 빌드 전 확인 셋」에 운영 app 의 여유를 더하는 문면을 전역 지침에 넣을지.
+
+#### 이전 질문 답의 반영
+
+| Q | 반영 |
+|---|---|
+| Q-2 80 | (A): nginx 80 블록이 301 + certbot webroot challenge. Caddy 는 80 과 무관 |
+| Q-3 | (a) Caddy 동시 연결 상한 지금 + **nginx `limit_req`**(주) 지금, (c) app 레벨은 후속 후보 |
+| Q-4 | 종료 코드 + 로그 + runbook, 외부 발송 0 |
+| Q-5 | ml-serving 은 profile 뒤(기본 미기동), 이미지는 번들 포함 |
+| Q-6 | 빈 DB 반입. legacy `bid_vector_*` 컨테이너·볼륨은 읽지도 지우지도 않는다 — 반입 preflight 는 이름 교차만 본다(우리 프로젝트 이름 `bidvector-v2` 접두와 겹치지 않음) |
+| Q-7 | HSTS `max-age=86400`, includeSubDomains·preload 없음 — Caddy 가 붙임 |
+| Q-8 | 도메인은 host env 파일 + runbook 만, 테스트는 `bidvector.test` |
+
+#### in_scope 변경(0.7 대비)
+
+더함: `deploy/nginx/zz-bidvector_kr.conf`(템플릿) · nginx 하네스 스크립트(`tools/prod-nginx-check.sh`). 바뀜:
+`docker/compose.acme-test.yaml` → certbot·Pebble 탐침용(성립 시). 운영 site 의 Caddy 는 ACME 대신 루프백 평문 리스너.
+
+#### 문면 교정 기록 (D-7F2-2)
+
+`477236fc` 의 이 절 첫 판은 host 실측 표에 공존 서비스의 이름·인증서 디렉터리·상류 포트를 적었다. D-7F2-2 는 그 셋을 저장소·
+evidence·커밋에 남기지 않도록 정했다. 그래서 이 커밋에서 문면을 「기존 site」로 바꿨다. 이력 처리는 팀장 답을 기다린다.
