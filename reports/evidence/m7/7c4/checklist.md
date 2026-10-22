@@ -252,3 +252,38 @@ CSRF 는 구조적으로 덮인다(POST 는 면제 집합 밖, F7). 다만 **전
 - **B1** STR-06 은 7A 조정안상 7C① 홀더인데 7C① evidence 에 흔적이 없다(0.9).
 - **B2** 전략과 프로필이 업종·지역어를 이중 저장한다(F12). UX 가 없애라고 한 구조다. 이 slice 는 고치지 않는다 — 별
   slice 또는 R-2 별 slice 와 묶을 후보다.
+
+## §1 팀장 결정 D-7C4-1 (2026-10-22) — 수령
+
+- §0 설계 전부 승인: P1 (b) 새 표 둘 · V12 무변경 · 체크리스트 무저장, P2 세션 전용, P3 잠정 V22, P4, P5 POST + CSRF 절 단위
+  교체, `unjudgedAxes` + 아키텍처 test.
+- **R1 — (나)를 고쳐 두 단계로**: 2a = main `bee7c36f` 위에서 공유 전수 test 에 닿지 않는 층(도메인 타입 · port · 체크리스트
+  판정 표 · V22 · persistence 어댑터와 그 test · CleanMigration* 등재). HTTP · OpenAPI · `AccountScopedRoutes` 는 손대지 않는다.
+  2b = 7B 동결 SHA(팀장 통보) 위로 rebase 한 뒤 HTTP · OpenAPI · 등재 · 생성 타입. 7B 머지 뒤 main 으로 다시 rebase.
+  `BidCaseRouting.accountOf` 공용화는 2b 의 별 커밋(refactor, 동작 무변경)으로 하고 rollback 목록에 넣는다.
+- Q1 8항목 승인(공사일 때만 시평액) · Q2 승인(면허별 시평액 + 기준연도, QUAL-10 수행실적 범위 밖 — 추적표 QUAL-11 행에 기록) ·
+  Q3 승인 · Q4 `ACCOUNT_SETTING` 승인(보존 기간 값을 지어내지 않고 계정 수명과 같다는 근거를 적는다) · Q5 승인(알려진 제한에
+  적는다) · Q6 정정 수용(401 로 적고 scope.md 문면을 이 레인이 고친다).
+- B1 STR-06 은 팀장이 따로 추적, B2 이중 저장은 알려진 제한 + 후속 후보로만.
+
+### 해석 기록 — 「공사 업종일 때만」을 무엇으로 재는가
+
+V12 업종(`business_types`)은 자유 텍스트 `CategoryCode` 라 「공사인가」를 기계로 가를 수 없다
+(`strategy/.../Text.kt:4-6` — 정규화 없는 평범한 값, `JdbcOperatorProfileRepositoryTest` 의
+`OPEN-6F6-CATEGORY-CODE-NORMALIZATION`). 닫힌 어휘로 「공사로 입찰한다」를 신고하는 자리는 **나라장터 등록분야**
+(`NaraRegistrationField.CONSTRUCTION`)뿐이다. 그래서 `CONSTRUCTION_CAPACITY` 항목의 적용 조건을 「등록분야에 공사가 있다」로
+구현했다. 결과: 나라장터 준비를 아직 답하지 않은 계정에는 시평액 항목이 나오지 않는다(그 계정은 `NARA_READINESS` 가 미완으로
+남는다). 팀장 확인 필요 항목으로 보고에 올린다.
+
+## §2 Phase 2a — 구현 (main `bee7c36f` 위)
+
+### 알려진 제한 (2a 시점)
+
+1. **동시 편집 시 마지막 쓰기 승리 — 단일 운영자 전제**(D-7C4-1 Q5). 절 교체 · 시평액 upsert 에 동시성 토큰이 없다.
+2. **전략과 프로필의 이중 저장**(B2) — 업종(V12 `business_types` ↔ 전략 `focusCategories`) · 지역어(V12 `region_terms` ↔ 전략
+   `focusRegionTerms`). UX §6.2 A 가 없애라고 한 구조이고 이 slice 는 고치지 않는다 — 후속 후보(R-2 별 slice 와 묶을 수 있다).
+3. **V12 는 아직 싱글턴이다** — 계정이 둘이 되면 업종 · 면허 · 지역어가 공유된다(V9 전략과 같은 기존 노출, R-2 남은 절반).
+4. **입력만 선 축 둘**(QUAL-08 소재지 · QUAL-11 시평액) — 판정 없음. `UnjudgedQualificationAxis` 와
+   `ProfileJudgementIsolationTest` 가 그 사실을 잠근다.
+5. **나라장터 자기 신고값의 진위는 확인하지 않는다**(위협 모델 「방어하지 않음」).
+6. **HTTP 표면 없음(2a)** — 2b 에서 선다. 그때까지 production 의 어느 경로도 V22 표에 쓰지 않는다.
