@@ -216,15 +216,16 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 9. 메모리
 
-| 서비스 | `mem_limit` | 비고 |
-|---|---|---|
-| app | `1536m` | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` |
-| postgres | `1g` | |
-| proxy | `128m` | |
-| web | `64m` | |
-| ml-serving | `1g` | 기본 미기동(`--profile ml`) |
+| 서비스 | `mem_limit` | 리허설 실측(2026-10-22) | 비고 |
+|---|---|---|---|
+| app | `1536m` | 기동 직후 277MiB · 인증 GET 300건(8 병렬) 뒤 265MiB | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` — 힙 상한 약 1.05GiB |
+| postgres | `1g` | 48 → 58MiB | **빈 DB** 의 수다 — 데이터가 쌓이면 늘어난다 |
+| proxy | `128m` | 11 → 16MiB | |
+| web | `64m` | 14 → 11MiB | |
+| ml-serving | `1g` | 재지 않았다(기본 미기동) | `--profile ml` 로 띄울 때 먼저 잰다 |
 
-값은 반입 리허설의 RSS 실측으로 정했다(evidence `reports/evidence/m7/7f2/checklist.md`).
+실측은 빈 DB · 짧은 부하라 **상한을 낮출 근거가 아니다**. 승인된 안을 그대로 두고, 운영 중 `docker stats`
+로 다시 본다. 앱 힙이 상한에 닿으면 컨테이너가 OOM 으로 재시작한다(`restart: unless-stopped`).
 
 **위험**: 이 host 의 earlyoom 은 `--prefer '^(java)$'` 다. 개발 Gradle 빌드·다른 세션의 큰 프로세스가 메모리를
 밀어 올리면 운영 app 이 먼저 죽는다 — `restart: unless-stopped` 가 되살리지만 그 사이 사이트는 502 다.
@@ -239,7 +240,12 @@ app 여유를 더하는 문면.
 1. **응답에 `Server: nginx` 이름이 보인다** — 버전은 감추지만 이름을 지우는 모듈이 없다.
 2. **nginx → proxy 구간은 평문**이다 — host 루프백 안이고 publish 가 `127.0.0.1` 뿐이라는 전제(`tools/prod-proxy-sites-check.sh` 가 단언).
 3. **host 위의 모든 프로세스는 proxy 에 직접 붙을 수 있다** — WSL2 의 localhost 전달로 Windows 쪽 프로세스도
-   포함된다. 그 경로는 nginx 의 유량 제한을 지나지 않는다. app 이 오늘 XFF 를 읽지 않아 주소 위조의 영향은 0 이다.
+   포함된다. 그 경로는 nginx 의 유량 제한을 지나지 않는다. 주소 헤더는 둘이 다르게 다뤄진다(하네스 실측):
+   Caddy 는 신뢰하지 않는 출처의 `X-Forwarded-For` 를 **스스로 버리고** 접속 주소로 바꾸지만, `X-Real-IP` 는
+   **그대로 통과시킨다**. 그래서 nginx 경로에서는 nginx 의 덮어쓰기가 `X-Real-IP` 위조를 막는 유일한 겹이고,
+   루프백 직접 접속자는 `X-Real-IP` 를 위조할 수 있다. app 이 오늘 두 헤더 모두 읽지 않아 영향은 0 이다 —
+   app 이 클라이언트 주소를 읽기 시작하면 Caddy 의 `trusted_proxies` 와 `X-Real-IP` 처리를 함께 정한다.
+   또 그 결과 app 이 보는 `X-Forwarded-For` 는 클라이언트가 아니라 compose 망의 게이트웨이 주소다.
 4. **유량 제한은 클라이언트 주소 단위**다 — 같은 공인 IP 뒤의 여러 사용자는 한 몫을 나눠 쓴다. app 레벨 제한은 후속 후보.
 5. **DB 를 넘는 되돌림은 자동화하지 않는다**(§7.2).
 6. **반입 묶음은 tar 가 아니라 태그 + manifest** 다 — 운영 host 가 개발 host 와 같은 기계라서다. 다른 host 로
