@@ -1,14 +1,30 @@
 # M7/7C⑤-0 — 실행한 명령과 결과
 
-base `a61ddff1` · **판정 SHA(마지막 산출물 커밋) `662129a0`** · 브랜치 `m7-7c5p/2026-10-23`.
+base **`54e2c5e2`**(main — g1c03 머지 뒤 rebase, D-7C5P-11 ⑥) · **판정 SHA(마지막 산출물 커밋)
+`a2d4724b`** · 브랜치 `m7-7c5p/2026-10-23`. rebase 로 앞 라운드 SHA 는 모두 바뀌었다 — 그 전 이력은
+로컬 브랜치 `m7-7c5p/pre-rebase-2026-10-23`(= 옛 `9eb3e225`)에 남겨 두었다.
 모든 Gradle·docker 명령은 `flock ~/.local/bid-vector-build.lock` 아래 직렬로 돌았다(호스트 공유).
 종료 코드는 각 명령에서 직접 찍었다 — 파이프 `grep` 으로 판정하지 않았다.
 
 ## 1. acceptance — Kotlin `check` job
 
-| 명령 | 결과 |
+| 명령 | 자리 | 결과 |
+|---|---|---|
+| `./gradlew --no-daemon check` | **버릴 clone**(판정 SHA `a2d4724b`, build 출력 없음 = runner 와 같은 상태) | **exit 0** · `BUILD SUCCESSFUL in 9m 51s` |
+
+**찬 트리에서 재는 이유**: 같은 명령을 작업 트리에서 돌리면 **19 초에 초록**이 나온다(431 task 중
+369 가 UP-TO-DATE). 입력이 같으니 틀린 초록은 아니지만, 그 초록은 「게이트가 이 트리를 봤다」와
+「게이트를 안 돌렸다」를 구별하지 못한다. 그래서 판정은 clone 에서 잰 것으로 한다.
+
+clone 실행의 내역(443 task): 실행 **242** · FROM-CACHE 135 · NO-SOURCE 38 · UP-TO-DATE 15 ·
+SKIPPED 13. `:adapters:test`(실 DB)와 `:app:test` 은 이 clone 에서 **실행**됐고, `:procurement:test`·
+`:workflow:test` 은 **FROM-CACHE** 다 — 같은 입력이 이 레인의 작업 트리에서 이미 실행돼 초록이었던
+것이고(아래 두 줄), 캐시 적중은 실행이 아니라 **입력 동일성**의 표시다.
+
+| 그 둘이 **실행**된 자리(모듈 내용은 판정 SHA 와 같다) | 결과 |
 |---|---|
-| `./gradlew --no-daemon check` (판정 SHA `662129a0`) | **exit 0** · `BUILD SUCCESSFUL in 9m 47s` |
+| `:procurement:test` + detekt 넷 — procurement 내용은 그 뒤 바뀌지 않았다 | **exit 0** · `BUILD SUCCESSFUL in 9m 33s` |
+| `:workflow:test`(+ `sizeGate`·detekt·ktlint·`gateRegistrationGate`) — test 분할 **뒤**, 판정 SHA 의 workflow 내용 | **exit 0** · `BUILD SUCCESSFUL in 29s` |
 
 `.github/workflows/ci.yml` 의 `check` job 이 드는 게이트 전부가 이 한 명령 안이다 — 컴파일 ·
 ktlint · detekt · sizeGate · cpd · domainDependencyGate · architecture test · contractGate ·
@@ -31,6 +47,7 @@ jarContentGate · gateRegistrationGate · gateExecutionGate · kover · compatib
 | `AppHttpDependencyGateTest` 면제 집합·크기 | 미분류 app 클래스 · 면제 수 | ① 층·③ 층 분류 + 래칫 62→65(설정 타입은 넣지 않았다) |
 | `jarContentGate` | inline 비교자 클래스가 stdlib 소스로 찍혔다 | 이름 있는 `Comparator`(이미 이 저장소의 관례) |
 | `detekt` 파일당 함수·return 수 · `sizeGate` 파일 500줄 | 한 파일 16 함수 · test 756줄 | **책임 셋**으로 분할(production·test 같은 경계) + 금액 조립 셋을 하나로 |
+| `:workflow:sizeGate`(rebase 뒤 라운드) | use case test **501 줄**(한도 500) | 대역·고정 값·원장 줄 짓기를 support 로 **책임 분할**(test 358 · support 187) — 줄 수를 맞추려 자른 것이 아니라 이 패키지가 이미 쓰는 경계다 |
 
 ## 2. `container` job 전체 (D-7C5P-9)
 
@@ -46,121 +63,103 @@ jarContentGate · gateRegistrationGate · gateExecutionGate · kover · compatib
 | run step 결과 | **success 23 · failure 0** (각 step 종료 코드 0) |
 | uses step | 4 — runner 전용, 실행하지 않고 `if:` 평가만 기록 |
 | skipped | **0** — `scan_app`·`scan_web`·`scan_proxy` 의 `if:` 셋이 모두 참으로 평가돼 실행·성공 |
-| JOB | **success** |
+| JOB | **success** (판정 SHA `a2d4724b` 에서 재생, `REPLAY_EXIT=0`) |
 
 이미지 태그 기록과 복원(실행 전 ID 를 적고 끝나서 되돌린다):
 
 | 태그 | 실행 전 | 실행 후 | 조치 |
 |---|---|---|---|
-| app | `94382c10` | `6faa81e1` | 실행 전 ID 로 복원(exit 0) |
-| web | `85517138` | `fc8869f6` | 실행 전 ID 로 복원(exit 0) |
+| app | `94382c10` | `e22ad177` | 실행 전 ID 로 복원(exit 0, 복원 뒤 ID 재확인) |
+| web | `85517138` | `fc8869f6` | 실행 전 ID 로 복원(exit 0, 복원 뒤 ID 재확인) |
 | proxy | `d93e25e0` | 변화 없음 | 불필요 |
 | ml-serving | `326e9da3` | 변화 없음 | 불필요 |
 
 정리 확인: compose 컨테이너 **0** · 볼륨 **0**. 6G dev DB 컨테이너는 **손대지 않았고** 실행 전후로 Up
 상태 그대로다. app 이미지 ID 가 바뀐 것이 「이 slice 의 변경이 실제로 배포물에 닿는다」의 실측이다.
 
-## 3. 변이 실측 — 바꿔치우기 14건
+## 3. 변이 실측 — 바꿔치우기 21건 + 음성 대조 1건
 
 **RED 를 별 라운드로 관측하지 못했다**(사실 선언): test 와 구현을 함께 썼고 첫 실행이 초록이었다.
-그래서 test 강도는 **변이**가 진다. 변이는 전부 **바꿔치우기**이고(더하기만 한 변이는 초록으로
-지나간다) 음성 대조 하나를 함께 돌렸다. 변이 전에 산출물이 커밋돼 있다 — 되돌림이
-`git checkout --` 이라 미커밋 산출물을 함께 지운다.
+그래서 test 강도는 **변이**가 진다. 변이는 전부 **바꿔치우기**다(더하기만 한 변이는 초록으로
+지나간다). 산출물은 변이 전에 커밋돼 있다 — 되돌림이 `git checkout --` 이라 미커밋 산출물을 함께
+지운다. 음성 대조는 `--rerun` 으로 돌린다: 적중 캐시의 초록은 **실행이 아니다**.
 
-| 변이 | 기대 | 관측 | 붉어진 자리 |
-|---|---|---|---|
-| M0b 비교자 개명(선언 + 호출부) — **음성 대조** | GREEN | **GREEN** | 거동 0 이면 초록이다(suite 가 무관한 이유로 붉지 않다) |
-| M1 걷기를 원장이 아니라 행 시각으로 고른다 | RED | **RED** | 걷기 선택 test · use case 걷기 test |
-| M2 부재인 셈을 0 으로 적재한다 | RED | **RED** | 사상 표 test(부재·공백·음수·해석 불가) |
-| M3 금액의 소수부를 깎는다 | RED | **RED** | 사상 표 test · 1위 축 투찰금액 |
-| M4 멱등 술어를 항진식으로 | RED | **RED** | 멱등 술어 test · use case 둘째 실행 test |
-| M5 추첨번호 축을 비우지 않는다 | RED | **RED** | 추첨번호 부재 test(D-7C5P-2) |
-| M6b 1위 축의 전부-아니면-무를 없앤다 | RED | **RED** | `상호를 얻지 못한 투찰 행이 있으면 1위 축을 비운다` |
-| M7 마스킹 표지 제외를 없앤다 | RED | **RED** | 실 DB 마스킹 제외 test |
-| M8 보존 창 하한을 무력화한다 | RED | **RED** | 실 DB 보존 창 test |
-| M9 확정 표본 필터를 없앤다 | RED | **RED** | 표본 밖 test · 계수 항등식 test |
-| M10 canonical 저장소 생성을 한 걸음 옮긴다 | RED | **RED** | 생성 자리 등식 test |
-| M11 로그 줄의 두 계수를 맞바꾼다 | RED | **RED** | 러너 줄 배선 test |
-| M12b 축 선언에 계약에 없는 축을 넣는다 | RED | **RED** | `선언한 축은 그 개념의 계약 presentIn 안이다` |
-| M13 domain 이 로케일을 끌어온다 | RED | **RED** | `ArchitectureGateTest` domain 순수성 |
+판정 SHA `a2d4724b` 에서 **22/22 기대와 일치**(어긋남 0 · 패치 실패 0 — 전수 21 건 한 번 + 아래
+`MR2-1c` 한 건을 필터를 넓혀 따로). 표의 패치·붉어진 test 는 로그에서 **기계로** 뽑았다(손 전사 없음).
 
-**1라운드의 어긋남 셋과 그 원인**(숨기지 않는다 — 둘은 측정의 결함이었고 하나는 패치의 결함이었다).
+| 변이 | 패치 한 줄 | 기대 | 관측 | 붉어진 test |
+|---|---|---|---|---|
+| M0b 음성 대조 — 비교자 개명(선언 + 호출부, 거동 0) | `ordered.sortedWith(LATEST_OBSERVATION…` → `ordered.sortedWith(OBSERVATION_RECENC…` (+1) | GREEN | GREEN | — |
+| MR2-1 결말 부재를 하나로 접는다 — 상세 축도 행 시각으로 물러선다 | `conclusion == null && endpoint in OPE…` → `(줄 삭제)` | RED | RED | `OpeningPromotionWalkTest > 결말 없는 상세 축의 행은 승격하지 않는다 — 원장 줄이 없어도 마찬가지다`<br>`OpeningPromotionWalkTest > 걷기 선택은 축과 결말로 갈린다`<br>`OpeningPromotionWalkTest > 결말 없는 상세 축이 있어도 목록 축은 물러서서 승격된다` |
+| MR2-1b 상세 축 거울에 목록 축을 넣는다(수집 DetailAxis 와 등식 깨기) | `SourceEndpoint.RESERVE_PRICE_DETAIL, …` → `SourceEndpoint.OPENING_RESULT_LIST, S…` | RED | RED | `OpeningPromotionWalkTest > 결말 없는 상세 축의 행은 승격하지 않는다 — 원장 줄이 없어도 마찬가지다`<br>`OpeningPromotionWalkTest > 원장 줄이 없는 목록 축은 가장 늦은 관측으로 물러선다`<br>`OpeningPromotionWalkTest > 걷기 선택은 축과 결말로 갈린다` |
+| MR2-1c 거울에서 A값 축을 뺀다 — 승격 거동 불변, 등식만 깨진다 | `SourceEndpoint.BID_PRICE_FORMULA_A,` → `(줄 삭제)` | RED | RED | `PromoteOpeningAxisClassTest > 승격의 상세 축 집합은 수집 팬아웃의 DetailAxis 와 같다`<br>`OpeningPromotionAxisParityTest > 승격의 상세 축 집합은 추출의 공사 기대 축 집합과 같다`<br>`OpeningPromotionAxisParityTest > 공사가 아니면 추출의 기대 축이 더 작다 — 승격이 더 엄한 쪽이다` |
+| Mleak 실패 줄에 원 예외 메시지를 싣는다 | `log.write(failureLine(causeCode))` → `log.write(failureLine(failure.message…` | RED | RED | `OpeningPromotionRunnerLockTest > 읽기가 던지면 사유 코드만 로그에 남고 원 메시지는 새지 않는다` |
+| Mord 비교자의 2차 키 방향을 뒤집는다 | `left.first.ordinal.compareTo(right.fi…` → `right.first.ordinal.compareTo(left.fi…` | RED | RED | `OpeningPromotionRankOneTest > 같은 시각이면 축 열거 순서가 앞선 축이 이긴다` |
+| MF2 빈 선택 축을 맵에 남긴다 | `}.takeIf { it.isNotEmpty() }?.let { e…` → `}.let { endpoint to it }` | RED | RED | `OpeningPromotionWalkTest > 빈 응답으로 끝난 축은 0 행이다`<br>`OpeningPromotionWalkTest > 결말 없는 상세 축의 행은 승격하지 않는다 — 원장 줄이 없어도 마찬가지다`<br>`OpeningPromotionWalkTest > 원장이 가리킨 걷기의 행이 읽기 집합에 없으면 던지지 않는다` |
+| Mtrim 문자열 슬롯의 trim 을 없앤다 | `readingsOf(concept).firstOrNull()?.te…` → `readingsOf(concept).firstOrNull()?.te…` | RED | RED | `OpeningPromotionTest > 둘러싼 공백은 문자열 슬롯에 실리지 않는다` |
+| Mlock 러너의 잠금 래퍼를 벗긴다 | `underRunStateLock(runState, "opening-…` → `promoteOrFail()` | RED | RED | `OpeningPromotionRunnerLockTest > 다른 프로세스가 자물쇠를 들고 있으면 승격을 거부한다 — 읽기도 쓰기도 0`<br>`OpeningPromotionRunnerLockTest > 거부한 실행은 마침 줄도 건너뜀 줄도 남기지 않는다` |
+| M1 걷기를 원장이 아니라 행 시각으로 고른다 | `conclusion == null && endpoint in OPE…` → `observedAtValues.isEmpty() -> AxisWal…` | RED | RED | `OpeningPromotionWalkTest > 빈 응답으로 끝난 축은 0 행이다`<br>`OpeningPromotionWalkTest > 결말 없는 상세 축의 행은 승격하지 않는다 — 원장 줄이 없어도 마찬가지다`<br>`OpeningPromotionWalkTest > 걷기 선택은 축과 결말로 갈린다` |
+| M2 부재인 셈을 0 으로 적재한다 | `?.toIntOrNull() ?.takeIf { it >= 0 }` → `?.toIntOrNull() ?: 0` | RED | RED | `OpeningPromotionTest > 키가 없으면 슬롯이 부재다`<br>`OpeningPromotionTest > 음수 셈은 부재다`<br>`OpeningPromotionTest > 해석되지 않는 값은 부재이고 0 이 아니다` |
+| M3 금액의 소수부를 깎는다 | `?.stripTrailingZeros() ?.takeIf { it.…` → `?.let { whole -> runCatching { whole.…` | RED | RED | `OpeningPromotionTest > 소수부가 섞인 금액은 깎지 않고 부재다`<br>`OpeningPromotionRankOneTest > 투찰금액의 소수부는 1위 축에서도 깎이지 않는다` |
+| M4 멱등 술어를 항진식으로 | `): Boolean = stored == null || promot…` → `): Boolean = true` | RED | RED | `OpeningPromotionRankOneTest > 승격은 저장된 관측보다 늦을 때만 쓴다`<br>`PromoteOpeningResultsUseCaseTest > 같은 입력 두 번이면 둘째 실행은 쓰지 않는다`<br>`OpeningPromotionAssemblyTest > 출하 조립이 원문을 canonical 로 올리고 둘째 실행은 행을 움직이지 않는다` |
+| M5 추첨번호 축을 비우지 않는다 | `drawNumbers = DrawNumberObservation.N…` → `drawNumbers = DrawNumberObservation.R…` | RED | RED | `OpeningPromotionTest > 추첨번호 축은 원문에 번호가 있어도 승격되지 않는다` |
+| M6 1위 축의 전부-아니면-무를 없앤다 | `return if (rows.isEmpty() || candidat…` → `return if (rows.isEmpty()) {` | RED | RED | `OpeningPromotionRankOneTest > 상호를 얻지 못한 투찰 행이 있으면 1위 축을 비운다` |
+| M7 마스킹 표지 제외를 없앤다 | `AND pii_masked_at IS NULL` → `(줄 삭제)` | RED | RED | `OpeningPromotionRepositoryTest > 마스킹된 원문은 승격 대상에서 빠지고 수가 공시된다` |
+| M8 보존 창 하한을 무력화한다 | `AND inserted_at >= ?` → `AND (inserted_at >= ? OR TRUE)` | RED | RED | `OpeningPromotionRepositoryTest > 보존 창보다 오래된 원문은 승격 대상에서 빠지고 수가 공시된다` |
+| M9 확정 표본 필터를 없앤다 | `if (hash !in sample.keys) {` → `if (false) {` | RED | RED | `PromoteOpeningResultsUseCaseTest > 표본 밖 공고는 승격하지 않는다`<br>`PromoteOpeningResultsUseCaseTest > 사유별 계수의 합은 읽은 묶음 수와 같다`<br>`OpeningPromotionAssemblyTest > 표본 밖 공고는 출하 조립에서도 승격되지 않는다` |
+| M10 canonical 저장소 생성을 한 걸음 옮긴다 | `results = JdbcOpeningResultRepository…` → `results = canonicalOpeningResultsOf(d…` (+1) | RED | RED | `OpeningPromotionWiringTest > canonical 개찰 저장소를 만드는 production 자리는 승격 배선 하나다` |
+| M11 로그 줄의 두 계수를 맞바꾼다 | `"promoted=${report.promoted} " + "ski…` → `"promoted=${report.skippedUnchanged} …` | RED | RED | `OpeningPromotionRunnerTest > 계수마다 다른 수를 주면 줄의 칸이 그 수를 그대로 싣는다` |
+| M12 축 선언에 계약에 없는 축을 넣는다 | `private val PARTICIPANT_COUNT_AXES = …` → `private val PARTICIPANT_COUNT_AXES = …` | RED | RED | `OpeningPromotionRankOneTest > 선언한 축은 그 개념의 계약 presentIn 안이다` |
+| M13 domain 이 로케일을 끌어온다 | `when (textOf(FieldConcept.DRAW_FLAG))…` → `when (textOf(FieldConcept.DRAW_FLAG)?…` | RED | RED | `ArchitectureGateTest > 도메인 모듈이 허용 목록 밖을 보지 않는다` |
 
-- **M0 음성 대조는 패치가 틀렸다**: 선언만 개명하고 호출부 둘을 남겨 **컴파일이 깨졌다**. 「거동 0」이
-  아니라 「빌드 0」이었으므로 음성 대조가 아니었다 — 선언과 호출부를 함께 바꾸는 M0b 로 다시 쟀다.
-- **M6·M12 는 결함이 아니라 필터 빗나감**: 그 두 방어의 test 가 파일 분할로
-  `OpeningPromotionRankOneTest` 로 옮겨갔는데 1라운드 필터가 `OpeningPromotionTest` 만 돌렸다.
-  필터를 승격 test 전수로 넓혀 다시 쟀고(M6b·M12b) 붉어진 test 이름을 함께 기록했다.
-- 교훈: **변이의 필터는 파일 분할을 따라가야 한다.** 좁은 필터로 초록을 받으면 「방어가 없다」와
-  「재지 않았다」가 같은 값이 된다.
+**측정의 함정 셋 — 이 slice 가 실측으로 배운 것**
 
-## 3b. 검토 r1 수정 뒤 재측정 (D-7C5P-10)
+- 음성 대조의 패치가 선언만 바꾸고 호출부를 남기면 **컴파일이 깨진다**. 그때 받은 초록은 「거동 0」이
+  아니라 「빌드 0」이다 — 선언과 호출부를 함께 바꾸는 패치로 다시 쟀다.
+- **변이의 필터는 파일·패키지 분할을 따라가야 한다.** 좁은 필터의 초록은 「방어가 없다」와 「재지
+  않았다」를 같은 값으로 만든다. 앞 라운드에서 test 가 다른 클래스로 옮겨가 두 변이가 헛초록이었고,
+  이 라운드에서는 등식 test 가 `adapters.snapshot` 패키지로 가 필터를 거기까지 넓혔다.
+- **통제군은 `--rerun` 이다.** 첫 실행에서 통제군이 `:procurement:test=0` 으로 초록이었는데, 그 초록이
+  실행인지 캐시 적중인지 구별되지 않았다 — 통제군만 `--rerun` 으로 다시 쟀다.
 
-| 재는 것 | 자리 | 결과 |
-|---|---|---|
-| acceptance | 산출물 SHA `73f31710` | `./gradlew --no-daemon check` **exit 0** · 9m33s |
-| 변이 전수 | 같은 SHA | **18/18 기대와 일치** — 바꿔치우기 17 RED + 음성 대조 1 GREEN |
-| 회귀 test 의 구판 RED | 버릴 clone `662129a0` + **새 test 만** 얹음 | 셋 FAILED(아래) |
-| container job | 같은 SHA | JOB success(§2) |
-| rollback ①~⑥ | 같은 SHA | §4 |
+## 3b. 회귀 test 가 구판에서 RED 인가 (R2-1)
 
-**회귀 test 가 구판에서 RED 인가** — 수정 전 코드에 새 test 파일만 얹어 쟀다. 순수 층 쌍은 F1·F2 를
-고치며 서명이 바뀌어 구판에 얹히지 않으므로, 같은 결함을 **use case 층**에서 재는 쌍으로 쟀다.
+구판은 **`7c2167c7`**(R2-1 수정 직전 트리)다. 팀장이 지목한 `73f31710` 은 그 **rebase 이전 등가**이고
+그 커밋은 g1c03 머지 **전**이라, 새 test 파일이 쓰는 `INTERRUPTED_ROUND` 가 없어 거기서는 컴파일되지
+않는다 — 같은 트리의 rebase 등가에서 쟀다(rebase 이전 이력은 로컬 브랜치
+`m7-7c5p/pre-rebase-2026-10-23` 에 남겨 두었다).
 
-```
-git clone --no-hardlinks <worktree> clone && cd clone && git checkout 662129a0
-cp <새 workflow use case test> <새 procurement 사상 표 test> 제자리에
-./gradlew --no-daemon :workflow:test --tests '*PromoteOpeningResultsUseCaseTest' --rerun
-./gradlew --no-daemon :procurement:test --tests 'bidvector.procurement.OpeningPromotionTest' --rerun
-```
+use case 층은 생성자가 바뀌지 않아 **출하 test 파일을 그대로** 얹었다(support 파일과 함께). 순수 층은
+이 수정으로 `promoteOpeningResult` 서명이 바뀌어 출하 test 가 구판에 얹히지 않으므로, **구판 서명으로
+쓴 탐침**으로 같은 사실을 쟀다.
 
-| 회귀 test | 구판 결과 |
+| 재는 것(층) | 구판 결과 |
 |---|---|
-| `결말 없이 끊긴 상세 축의 행은 승격하지 않는다`(F1) | **FAILED** |
-| `원장 걷기의 행이 창 밖이고 끊긴 재걷기 행만 남아도 실행이 던지지 않는다`(F2) | **FAILED** |
-| `둘러싼 공백은 문자열 슬롯에 실리지 않는다`(trim) | **FAILED** |
+| `원장 줄이 하나도 없는 상세 축의 행은 승격하지 않는다`(use case, 출하 test 그대로) | **FAILED** |
+| `결말 없는 상세 축의 행은 승격하지 않는다`(순수, 구판 서명 탐침) | **FAILED** |
 
-F3·CR HIGH(잠금)와 확정 부재는 **결함이 아니라 미측정**이었으므로 구판 RED 가 없다 — 그 강도는
-변이 `Mlock`(앞 라운드에서 GREEN 이던 것이 이제 RED)과 확정 축 변이가 진다.
+CR MEDIUM-2(비교자 주석)·LOW-2(러너 실패 경로)는 **결함이 아니라 문면·미측정**이었으므로 구판 RED 가
+없다 — 그 강도는 변이 `Mord`·`Mleak` 가 진다(§3).
 
-## 3c. 변이 재현 명령 (L2)
+## 3c. 변이 재현 명령
 
 변이는 스크립트 하나가 돌린다 — **적용 → 좁은 task 실행 → `git checkout --` 로 되돌림**을 변이마다
 반복하고, 패치는 「정확히 한 번 출현」을 요구해 빗나간 패치가 조용히 지나가지 않는다. 산출물이 먼저
-커밋돼 있어야 한다(되돌림이 미커밋 산출물을 함께 지운다).
+커밋돼 있어야 한다. 결과표(§3)는 그 로그에서 기계로 뽑는다.
 
-필터는 **분할 뒤 클래스 전수**다(1라운드의 교훈):
+필터는 **분할 뒤 클래스·패키지 전수**다:
 
 ```
 :procurement:test --tests 'bidvector.procurement.OpeningPromotion*'
-:workflow:test    --tests 'bidvector.workflow.collection.PromoteOpeningResultsUseCaseTest'
-:adapters:test    --tests 'bidvector.adapters.persistence.OpeningPromotion*'
+:workflow:test    --tests 'bidvector.workflow.collection.PromoteOpening*'
+:adapters:test    --tests 'bidvector.adapters.persistence.OpeningPromotion*' \
+                  --tests 'bidvector.adapters.snapshot.OpeningPromotionAxisParityTest'
 :app:test         --tests 'bidvector.app.collection.OpeningPromotion*' \
                   --tests 'bidvector.app.wiring.OpeningPromotionWiringTest'
 ```
 
-| 변이 | 바꿔치우는 것 | 결과 |
-|---|---|---|
-| M0b 음성 대조 | 비교자 이름(선언 + 호출부) | GREEN(기대 GREEN) |
-| MF1 | 끊긴 걷기 갈래를 없앤다 | RED |
-| MF2 | 빈 선택 축을 맵에 남긴다 | RED |
-| Mtrim | 문자열 슬롯의 trim | RED |
-| Mlock | 러너의 잠금 래퍼 | **RED**(앞 라운드 GREEN → 닫혔다) |
-| M1 | 걷기를 행 시각으로 | RED |
-| M2 | 부재인 셈을 0 으로 | RED |
-| M3 | 금액 소수부 절삭 | RED |
-| M4 | 멱등 술어를 항진식으로 | RED |
-| M5 | 추첨번호 축을 채운다 | RED |
-| M6 | 1위 축 전부-아니면-무 제거 | RED |
-| M7 | 마스킹 표지 제외 제거 | RED |
-| M8 | 보존 창 하한 무력화 | RED |
-| M9 | 확정 표본 필터 제거 | RED |
-| M10 | 저장소 생성을 한 걸음 옮김 | RED |
-| M11 | 로그 두 계수 맞바꿈 | RED |
-| M12 | 축 선언에 계약에 없는 축 | RED |
-| M13 | domain 이 로케일을 끌어옴 | RED |
-
-붉어진 test 이름은 변이마다 기록했다 — 「붉었다」만으로는 그 방어를 쟀다는 증거가 아니다.
+통제군에만 `--rerun` 을 붙인다: RED 를 기대하는 변이는 캐시 적중이 와도 초록이 되어 **어긋남으로
+드러나지만**, 통제군의 초록은 그 구별이 없다.
 
 ## 4. rollback ①~⑥ 실측
 
@@ -176,6 +175,13 @@ F3·CR HIGH(잠금)와 확정 부재는 **결함이 아니라 미측정**이었�
 
 ## 5. 호스트 규율
 
-모든 라운드 전에 점검 셋을 **별도 호출로 먼저** 돌렸다 — `pgrep -af 'java.*[Gg]radle'`(java 만 센다:
-남의 bash 대기 루프를 세면 오탐이다) · `free -m` · `ps -eo pid,rss,args --sort=-rss | head`.
-available 6GB 이상 · swap free 2GB 이상에서만 시작했고, 00:30~03:00 KST 에는 시작하지 않았다.
+모든 라운드 전에 점검 셋을 **별도 호출로 먼저** 돌렸다 — `pgrep -af java`(java 만 센다: 남의 bash
+대기 루프를 세면 오탐이다) · `free -m` · `ps -eo pid,rss,args --sort=-rss | head`. available 6GB 이상 ·
+swap free 2GB 이상에서만 시작했고, 00:30~03:00 KST 에는 시작하지 않았다.
+
+이 라운드의 무거운 실행 여섯(찬 acceptance · 변이 전수 · 변이 하나 · 구판 RED · rollback ①~⑥ ·
+container 재생)은 **한 자물쇠에 줄 세워** 돌았다(`flock ~/.local/bid-vector-build.lock`). 다른 레인의
+빌드가 자물쇠를 들고 있던 동안에는 큐에서 기다렸고, 기다리는 사이에 자리를 비우지 않고 로그 꼬리를
+직접 읽었다. 중간에 한 번 **낡은 트리를 돌던 내 빌드를 내가 멈췄다**(자물쇠를 오래 쥐고 있었고 결과가
+쓸모없었다) — 멈춘 뒤 적용돼 있던 변이 패치 한 줄을 `git checkout --` 로 되돌리고 트리가 깨끗한지
+확인한 다음 다시 세웠다.
