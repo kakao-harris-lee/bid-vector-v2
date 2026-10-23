@@ -929,6 +929,16 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 | 백업·복원 리허설(S-23c) | 같은 자리 | **통과** — Flyway top 21 · 복원본 `validate` · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복 |
 | `check` job — S-20 `one-command-check.sh` | 같은 자리 | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 바이트 등식(99658 bytes) · Playwright 2 passed |
 
+### 7.2 수정 라운드 1 재실측 (판정 판 — 마지막 산출물 커밋 「style … 앱 역할 마감 test」, base `998b59dd`)
+
+| 항목 | 결과 |
+|---|---|
+| `check` job — Kotlin `./gradlew --no-daemon :adapters:test --rerun check --continue` | **exit 0** · 16m10s(07:08–07:24) |
+| `check` job — S-20 `one-command-check.sh` | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100113 bytes)」(생성 타입 재생성 포함) · Playwright 2 passed |
+| `container` job 재생 | **run step 23 중 21 성공 · 2 실패** — 실패 둘은 S-22e2(web) · S-22e3(proxy) 이미지 취약점 게이트이고 **이 slice 와 무관한 외부 원인**이다: Trivy DB 갱신(2026-10-23T19:15Z)이 새로 잡은 `CVE-2026-111497`(brotli-libs, HIGH, alpine 3.23.6 베이스, 수정판 있음). 같은 job 이 04:13 에는 통과했다. main CI 에도 같은 실패가 온다 — 처방(별 chore PR)은 팀장에게 올렸다. 그 두 step 이 막은 뒤 step 을 재려고 하네스에 「기록된 채로 이어 가는 실패」를 그 두 step 에만 걸고 다시 돌렸다 |
+| 백업·복원 리허설(S-23c, 위 재생 안) | **통과** — Flyway top 21 · 복원본 `validate` · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복(V21 의 새 열 · 제약을 실은 판) |
+| S-23 · S-23b · S-24 · S-26 | 전부 성공 · 이미지 태그는 재생 전 ID 로 복원(등식 확인) |
+
 **재생 하네스의 첫 시도는 하네스 탓으로 멈췄다**: `GITHUB_PATH` 를 흉내 내지 않아 `install trivy` 가 unbound 변수로 끝났다. 하네스를
 고쳐 다시 돌린 것이 위 결과다(산출물 변경 없음).
 
@@ -959,6 +969,11 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 ① exit 0 · ② D 47 · M 32 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 633 → **0** · main 표지 3 보존 · 되돌린 트리 객체 =
 `998b59dd` 트리 · ④⑤⑥ `check` **exit 0**(9m42s). (측정 스크립트의 「전」 줄과 ③ 이 옛 base 를 보고 있어 그 두 줄만 `998b59dd` 기준으로
 다시 냈다 — 되돌린 트리 자체는 스크립트와 무관하게 `rollback.md` 의 HEAD 판 명령이 만든 것이다.)
+
+**수정 라운드 1 재실측(판정 판)** — clone 을 마지막 산출물 커밋(「style … 앱 역할 마감 test」)에 세웠다: 변경 A 59 · M 31 →
+① exit 0 · ② D 59 · M 31 · 그 밖 0 · ③ base(`998b59dd`)와 diff 0 줄 · untracked 0 · 내 표지 737 → **0** · main 표지 3 보존 · 되돌린 트리 객체
+= `998b59dd` 트리(`83461186…`). ④⑤⑥ 의 clone `check` 는 exit 0 이었지만 **162 task 전부 build cache 적중**이라 실행이 아니다 — 그래서
+결과로 세지 않고 **트리 동일성으로 갈음**한다: 같은 트리 객체에서 04:08 의 clone `check` 가 **실제로 실행해** exit 0(9m42s)이었다.
 
 **첫 시도는 무효였고 그 사실이 절차의 결함을 드러냈다.** clone 을 산출물 커밋에 세우고 **그 커밋 판의** `rollback.md` 를 읽었더니,
 base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛 base(`a61ddff1`)를 가리켰고, 복원이 **main 의 변경까지** 되돌렸다
