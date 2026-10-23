@@ -513,6 +513,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | 9 문서 — milestone-7 R-5 닫음 · milestone-6 예외 줄 · runbook · 리허설 | `milestone-7.md` · `milestone-6.md` · `docs/runbook/m6-6b3-retention.md` | §7 `db-rehearsal.sh` | 출하 |
 | **D-7B-2 (계약 갱신으로 추가)** typed `AccountId` 운반 · 라벨 파싱 0 | `AuthenticatedAccount.kt`(속성 키 · 접근자) · `AuthenticationResult.Authenticated.account` · 필터가 판정 전에 지우고 다시 적음 · `BidCaseRouting.accountOf` 삭제 | `AuthenticatedAccountTest`(라벨 위조 불변 · 속성 부재 null · 미리 놓인 속성 소거 · 세션 E2E · 자격 헤더 401) · `AccountCarrierStructureTest`(javap 집합 등식 셋 + 양성 대조) · 변이 ⑭ | 출하 |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
+| (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
 
 ### 1. 판정 대상 커밋
@@ -754,6 +755,10 @@ base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계
    `InMemoryBidCaseStore` 와 workflow test 의 Fake 를 **값** 비교로 고쳤다. production(`JdbcBidCaseStore`)은 SQL 의
    `account_id = ?` 라 무관하다.
 3. (§2) append-only test 가 초안 · 기록 행을 심지 않아 트리거 층을 재지 못했다 — 변이 ⑪g.
+4. **OpenAPI 생성 타입이 문서와 어긋나 있었다.** 수정 라운드(맨 위 배열 응답 · 감싸개 스키마 둘 삭제 · `NOTICE_SNAPSHOT_UNAVAILABLE`)
+   에서 문서만 고치고 `npm run api:types` 를 다시 돌리지 않았다. Kotlin `check` 는 이 등식을 재지 않으므로 초록이었고,
+   `one-command-check.sh` 의 W-5 가 잡았다(커밋본 99636 바이트 · 재생성 99658 바이트). 재생성해 커밋했다 — 타입 선언만
+   바뀌었고 web 코드에 그 타입을 쓰는 자리는 없다.
 
 **옛 「D-7B-2」 표기.** 공유 test 모집단 분리(2026-10-22 팀장 결정 (b))를 test 주석 · evidence 에서 「계약 r2 D-7B-2」로
 불렀는데, 그 이름은 `scope.md` 에 없었고 이번 계약 D-7B-2 와 겹쳤다. 주석 · evidence 를 「팀장 결정 2026-10-22 (b)」로 고쳤다.
@@ -811,16 +816,23 @@ base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계
 
 ### 7. acceptance 실측
 
-`ci.yml` 의 job 명령 그대로다. 결과는 아래에 실행 시각과 함께 적는다.
+`ci.yml` 의 job 명령 그대로다. 로그는 레인 scratchpad 에 있고 여기에는 결과 한 줄씩만 적는다.
 
-| 항목 | 명령 | 결과 |
-|---|---|---|
-| `check` job | `./gradlew check` | (기록) |
-| `web` job W-5 | `npm run api:types:check` | (기록) |
-| `web` job W-2·3·6·8 | `npm run lint` · `typecheck` · `test` · `build` | (기록) |
-| `container` job | `if:` 평가 재생 — 마이그레이션이 있어 **생략 불가**(app 이미지가 V21 을 싣는다) | (기록) |
-| `ml-engine` job | 입력 변경 0 → **생략** | 해당 없음 |
-| 백업·복원 리허설 | `tools/db-rehearsal.sh`(역할·권한 행렬 포함) | (기록) |
+| 항목 | 명령 | 자리 | 결과 |
+|---|---|---|---|
+| `check` job — Kotlin | `./gradlew --no-daemon check --continue` | 「요청 값 test …」 커밋 | **exit 0** · 13m23s(23:28–23:42) · 새 test 셋 6/5/4 실행 · 실패 0(XML 확인) |
+| `check` job — S-20 | `./tools/one-command-check.sh`(Kotlin `check` · `qualityBaseline` · Python 전건 · web 전건) | 「OpenAPI 생성 타입 재생성 …」 커밋 | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(99658 bytes)」 · Playwright 2 passed. 같은 명령이 한 커밋 앞(evidence 커밋)에서는 **W-5 에서 exit 1**(§3.4 발견 4) |
+| `web` job | W-1~W-11(S-20 의 web 절이 같은 명령을 돈다) | 위와 같음 | 위와 같음 |
+| `container` job | `ci.yml` 의 `container` step 전부를 job env · `GITHUB_ENV` · `GITHUB_PATH` · step `if:` 평가와 함께 순서대로 재생 | evidence 커밋(「약속↔출하 표 …」) | **JOB SUCCESS** — run step 24 전부 성공(S-20z · S-21~S-21c · S-22a~e3 · S-23 · S-23b · S-23c · S-24 · S-25 · S-26), `uses:` 셋은 해당 없음. 이미지 태그는 재생 전 ID 로 복원(등식 확인) |
+| 백업·복원 리허설 | `tools/db-rehearsal.sh`(container job S-23c) | 위와 같음 | **통과** — Flyway 이력 top **21** · 복원본 `validate` 통과 · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복 |
+| `ml-engine` job | 입력 변경 0 | — | 생략(S-20 이 Python 전건을 따로 돌렸다) |
+
+**재생 하네스의 첫 시도는 하네스 탓으로 멈췄다**: `GITHUB_PATH` 를 흉내 내지 않아 `install trivy` 가 unbound 변수로 끝났다. 하네스를
+고쳐 다시 돌린 것이 위 결과다(산출물 변경 없음).
+
+**container 재생 뒤의 변경**: 생성 타입 재생성(타입 선언 파일 하나)은 재생 **뒤**다. web 번들의 입력이지만 타입 선언이라 산출 JS 가 바뀌지
+않는다고 보고 container 를 다시 돌리지 않았다 — 같은 파일을 담은 트리의 web 빌드 · Playwright 는 S-20 이 돌렸다. 이 판단을 verifier
+표적으로 남긴다.
 
 **호스트 규율**: 모든 무거운 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고, 점검 셋(pgrep · `free -m` · `ps`)을
 **별도 호출로 먼저** 봤다. 락을 얻은 순간 available ≥ 6GB · swap free ≥ 2GB 를 다시 재고 그 값을 로그 첫 줄에 남겼으며(미달이면
@@ -828,4 +840,20 @@ base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계
 
 ### 8. rollback 실측
 
-`rollback.md` 경우 ①(머지 전)의 ⓐ~ⓑ 를 마지막 산출물 커밋에서 실측한다. (기록)
+`rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
+`cd` 대상만 clone 으로 바꿨다.
+
+| 단계 | 「append-only test …」 커밋(④⑤⑥ 실측) | 「OpenAPI 생성 타입 재생성 …」 커밋(마지막 산출물) |
+|---|---|---|
+| 전 — 변경 종류 · 수 | A · M 뿐 · A 47 · M 32 | 같음 |
+| ① 명령 exit | 0 | 0 |
+| ② 결과 | D 47 · M 32 · 그 밖 0 | 같음 |
+| ③ base 와 diff · untracked | 0 줄 · 0 | 0 줄 · 0 |
+| 내 표지 · 남의 표지 | 614 → **0**(base 0) · main 의 vuln-allowlist 줄 3 보존 | 633 → **0** · 3 보존 |
+| 되돌린 트리 객체 | `0aef0adc…` = base 트리 | `0aef0adc…` = base 트리 |
+| ④⑤⑥ `./gradlew --no-daemon check` | **exit 0**(9m59s) | **트리 동일성으로 갈음** — 되돌린 트리 객체가 왼쪽과 같다 |
+
+**첫 시도는 무효였고 그 사실이 절차의 결함을 드러냈다.** clone 을 산출물 커밋에 세우고 **그 커밋 판의** `rollback.md` 를 읽었더니,
+base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛 base(`a61ddff1`)를 가리켰고, 복원이 **main 의 변경까지** 되돌렸다
+(③ diff 7277 줄). 거기서 멈추고 문면을 HEAD 판에서 읽게 고쳐 다시 쟀다. 머지 전 되돌림을 실제로 할 사람도 **HEAD 의 문면**을
+읽으므로 측정이 그쪽에 맞는 것이 맞다.
