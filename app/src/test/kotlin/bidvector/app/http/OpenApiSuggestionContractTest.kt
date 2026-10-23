@@ -177,7 +177,9 @@ class OpenApiSuggestionContractTest : HttpIntegrationTestBase() {
         licenseGate.verdictFor = { LicenseVerdict.Eligible(emptySet()) }
         val eligible = get().body?.single() ?: error("본문이 비었다")
 
-        properties.enumOf("licenseUncertainReason") shouldBe emittedReasons.toSet()
+        // `null` 은 `ELIGIBLE` 카드가 실제로 내는 값이다 — 어휘 등식은 그것까지 포함해 잰다(cr L-2).
+        eligible["licenseUncertainReason"] shouldBe null
+        properties.enumOf("licenseUncertainReason") shouldBe emittedReasons.toSet() + eligible["licenseUncertainReason"]
         properties.enumOf("licenseVerdict") shouldBe setOf("UNCERTAIN", eligible["licenseVerdict"])
         (properties["unjudgedAxes"] as Map<String, Any?>).let { (it["items"] as Map<String, Any?>)["enum"] } shouldBe
             SUGGESTION_UNJUDGED_AXES.map { it.name }

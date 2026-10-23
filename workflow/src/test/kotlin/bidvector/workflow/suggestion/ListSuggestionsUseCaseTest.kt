@@ -54,6 +54,20 @@ class ListSuggestionsUseCaseTest {
         override fun current(): ProfileFacts? = values[minOf(readCount++, values.lastIndex)]
     }
 
+    /** [flip] 전에는 [initial], 뒤에는 [next] 를 낸다 — 판정 **도중** 프로필 저장의 대역. */
+    private class FlippingProfilePort(
+        private val initial: ProfileFacts?,
+        private val next: ProfileFacts?,
+    ) : OperatorProfilePort {
+        private var flipped = false
+
+        fun flip() {
+            flipped = true
+        }
+
+        override fun current(): ProfileFacts? = if (flipped) next else initial
+    }
+
     private fun strategy(
         candidateLimit: Int? = null,
         revision: Int = 1,
@@ -199,13 +213,34 @@ class ListSuggestionsUseCaseTest {
     }
 
     @Test
-    fun `STR-07 — 계산 중 프로필이 바뀌어도 그 결과를 채택하지 않는다`() {
+    fun `STR-07 — 계산 중 프로필이 바뀌면 옛 프로필로 판정한 결과를 채택하지 않고 새 프로필로 다시 판정한다`() {
         val declared = ProfileFacts(emptySet(), OperatorLicenses.Declared(emptyList()), emptyList())
-        val profiles = SequenceProfilePort(listOf(null, declared))
+        val profiles = FlippingProfilePort(initial = null, next = declared)
+        // 게이트는 프로필을 보고 판정한다 — 미선언이면 미달, 선언이면 충족. 첫 판정 직후 프로필이 바뀐다.
+        val licenseGate =
+            FakeLicenseGatePort { _ ->
+                val verdict =
+                    if (profiles.current() == null) {
+                        LicenseVerdict.Ineligible(mapOf(RequirementGroupId.Ungrouped to emptySet()))
+                    } else {
+                        LicenseVerdict.Eligible(emptySet())
+                    }
+                profiles.flip()
+                verdict
+            }
 
-        useCase(SequenceStrategyReader(listOf(strategy())), listOf(first), profiles = profiles).list()
+        val result =
+            useCase(
+                SequenceStrategyReader(listOf(strategy())),
+                listOf(first),
+                licenseGate = licenseGate,
+                profiles = profiles,
+            ).list()
 
-        profiles.readCount shouldBe 4
+        // 첫 시도를 채택했다면 빈 목록(옛 프로필 → 미달)이다. 새 프로필의 판정만 나와야 한다.
+        result.ids() shouldBe listOf(first.id)
+        result.suggestions.single().license shouldBe LicenseVerdict.Eligible(emptySet())
+        licenseGate.calledFor shouldBe listOf(first.id, first.id)
     }
 
     @Test

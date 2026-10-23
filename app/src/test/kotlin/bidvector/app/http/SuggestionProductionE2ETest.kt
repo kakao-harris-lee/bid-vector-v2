@@ -48,11 +48,13 @@ private const val E2E_CANDIDATE_CAP = 200
  *    다음 조회가 새 개정·새 결과다.
  *  ② **「모든 편집 경로」를 구조로 덮는다** — 워크플로를 거치지 않고 개정도 올리지 않는 **수동 SQL** 로 전략
  *    값을 바꿔도 다음 조회가 새 값으로 계산된다. 판정이 쓰기 쪽의 규율(무효화 호출·이벤트·개정 +1)을 보지
- *    않고 읽힌 값만 보기 때문이다. 계산 **중** 변경의 불채택은 시점을 결정적으로 끼울 수 있는
- *    `ListSuggestionsUseCaseTest` 가 잰다.
+ *    않고 읽힌 값만 보기 때문이다.
+ *  ③ **계산 중 저장된 결과는 채택하지 않는다** — [SuggestionE2EProbes] 가 출하 조립의 `strategyRepository`
+ *    빈을 감싸, 그 GET 의 N 번째 `load()` 직후 실 SQL 로 전략을 바꾼다(수정 라운드 1, cr H-1).
  *
- * 덧붙여 계산 예산(스캔 상한) 초과는 조용히 자르지 않고 409 이고, 상한까지 채운 조회 한 번의 소요를 남긴다
- * (P1 비용 실측 — 단언이 아니라 관측값, `System.out`).
+ * 덧붙여 GET 한 번의 읽기 문장 수(`5 + 2n + h`, cr M-2)를 단언하고, 마감 임박 순서와 표시 상한이 마감
+ * 임박 쪽을 남기는 것(cr M-3)을 잰다. 계산 예산(스캔 상한) 초과는 조용히 자르지 않고 409 이고, 상한까지
+ * 채운 조회 한 번의 소요를 남긴다(관측값, `System.out`).
  */
 @Suppress("UNCHECKED_CAST")
 class SuggestionProductionE2ETest {
@@ -67,6 +69,7 @@ class SuggestionProductionE2ETest {
                 .withPassword("bidvector_test_only")
                 .also { it.start() }
 
+        private val probes = SuggestionE2EProbes()
         private lateinit var context: ConfigurableApplicationContext
         private var port: Int = 0
 
@@ -75,6 +78,7 @@ class SuggestionProductionE2ETest {
         fun boot() {
             context =
                 productionApplication()
+                    .initializers(probes.initializer())
                     .properties(
                         mapOf(
                             "server.port" to "0",
@@ -112,7 +116,8 @@ class SuggestionProductionE2ETest {
             connection.createStatement().use {
                 it.execute(
                     "TRUNCATE TABLE notice, notice_audit, raw_observation, operator_strategy, " +
-                        "operator_strategy_revision, edit_session, outbox, api_request_audit CASCADE",
+                        "operator_strategy_revision, edit_session, outbox, api_request_audit, " +
+                        "notice_requirement CASCADE",
                 )
             }
         }
@@ -162,6 +167,7 @@ class SuggestionProductionE2ETest {
     private fun insertNotice(
         number: String,
         title: String,
+        deadlineAt: Instant = deadline,
     ): NoticeId {
         val policy = KONEPS_COLLECTION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved
         val fieldContracts = policy.value.fieldContracts
@@ -181,7 +187,7 @@ class SuggestionProductionE2ETest {
                 estimatedAmount = null,
                 allocatedBudget = null,
                 floorRate = null,
-                deadlineAt = deadline,
+                deadlineAt = deadlineAt,
                 openingScheduledAt = null,
                 raw = observation,
                 title = NoticeTitle.of(title),
@@ -192,6 +198,48 @@ class SuggestionProductionE2ETest {
 
     private fun ResponseEntity<List<Map<String, Any?>>>.numbers(): List<Any?> =
         body.orEmpty().map { it["noticeNumber"] }
+
+    /** 소유자 연결로 SQL 하나 — 워크플로·개정 규율을 거치지 않는 쓰기의 대역이자 fixture 자리. */
+    private fun adminUpdate(sql: String): Int =
+        adminDataSource(postgres).connection.use { connection ->
+            connection.createStatement().use { it.executeUpdate(sql) }
+        }
+
+    private fun setRequiredKeywordBySql(term: String) {
+        adminUpdate("UPDATE operator_strategy SET required_keyword_terms = ARRAY['$term'] WHERE id = 1") shouldBe 1
+    }
+
+    /** 요건 **헤더** 한 행 — 면허 게이트의 요건 조회가 행 질의를 하나 더 하게 만드는 조건(`JdbcRequirementStore.find`). */
+    private fun insertRequirementHeader(id: NoticeId) {
+        val sql =
+            "INSERT INTO notice_requirement (notice_number, notice_round, status) " +
+                "VALUES ('${id.number.value}', '${id.round.value}', 'FAILED')"
+        adminUpdate(sql) shouldBe 1
+    }
+
+    /** 무장한 GET 한 번의 읽기 문장을 표별로 센다. */
+    private fun selectCountsOfOneGet(): Pair<ResponseEntity<List<Map<String, Any?>>>, Map<String, Int>> {
+        probes.statements.arm()
+        val response = suggestions()
+        return response to probes.statements.disarm().selectCountsByTable()
+    }
+
+    /**
+     * 기대 문장 수 — 입력 읽기 2(전략·프로필) + 후보 스캔 1 + 감시 통과 후보마다 2(요건 헤더·프로필)
+     * + 그 가운데 요건 헤더가 있는 후보마다 1(요건 행) + 계산 뒤 비교 2(전략·프로필). 감시를 통과하지
+     * 못한 후보는 0 이다(면허 게이트까지 가지 않는다).
+     */
+    private fun expectedSelects(
+        watchPassed: Int,
+        withHeader: Int,
+    ): Map<String, Int> =
+        buildMap {
+            put("operator_strategy", 2)
+            put("operator_profile", 2 + watchPassed)
+            put("notice", 1)
+            if (watchPassed > 0) put("notice_requirement", watchPassed)
+            if (withHeader > 0) put("notice_requirement_row", withHeader)
+        }
 
     @Test
     fun `STR-07 ① — 편집 세션으로 저장하면 다음 조회가 새 개정으로 계산되고 옛 결과가 보이지 않는다`() {
@@ -219,17 +267,79 @@ class SuggestionProductionE2ETest {
         confirmRequiredKeyword("포장", seenRevision = 0)
         suggestions().numbers() shouldBe listOf("PAVE-1")
 
-        adminDataSource(postgres).connection.use { connection ->
-            connection.createStatement().use {
-                val sql = "UPDATE operator_strategy SET required_keyword_terms = ARRAY['하수'] WHERE id = 1"
-                it.executeUpdate(sql) shouldBe 1
-            }
-        }
+        setRequiredKeywordBySql("하수")
 
         val after = suggestions()
         // 개정은 그대로다(쓰기 쪽이 아무 규율도 지키지 않았다) — 그래도 결과는 새 값이다.
         after.headers.getFirst(STRATEGY_REVISION_HEADER) shouldBe "1"
         after.numbers() shouldBe listOf("SEWER-1")
+    }
+
+    @Test
+    fun `STR-07 ③ — 계산 중 전략이 실 SQL 로 바뀌면 첫 결과를 버리고 새 값으로 다시 계산한다`() {
+        insertNotice("PAVE-1", "도로 포장 공사")
+        insertNotice("SEWER-1", "하수관로 정비")
+        confirmRequiredKeyword("포장", seenRevision = 0)
+
+        probes.strategy.arm(mapOf(1 to { setRequiredKeywordBySql("하수") }))
+        val response = suggestions()
+        val loads = probes.strategy.disarm()
+
+        response.statusCode.value() shouldBe 200
+        response.numbers() shouldBe listOf("SEWER-1")
+        // 시도 1(고정 1 · 비교 1, 다름) + 시도 2(고정 1 · 비교 1, 같음) — 감싼 빈이 제안 경로의 그 reader 다.
+        loads shouldBe 4
+    }
+
+    @Test
+    fun `STR-07 ③ — 다시 계산하는 동안에도 실 SQL 로 바뀌면 409 로 끝내고 낡은 결과를 내지 않는다`() {
+        insertNotice("PAVE-1", "도로 포장 공사")
+        insertNotice("SEWER-1", "하수관로 정비")
+        confirmRequiredKeyword("포장", seenRevision = 0)
+
+        probes.strategy.arm(mapOf(1 to { setRequiredKeywordBySql("하수") }, 3 to { setRequiredKeywordBySql("정비") }))
+        val response = errorOfSuggestions()
+        val loads = probes.strategy.disarm()
+
+        response.statusCode.value() shouldBe 409
+        response.body?.get("code") shouldBe ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION
+        loads shouldBe 4
+    }
+
+    @Test
+    fun `GET 한 번의 읽기 문장 수는 5 + 2n + h 다(n 감시 통과 · h 그 가운데 요건 헤더 보유)`() {
+        confirmRequiredKeyword("포장", seenRevision = 0)
+        val passing = (1..3).map { insertNotice("PAVE-$it", "포장 $it") }
+        val notPassing = (1..2).map { insertNotice("SEWER-$it", "하수관로 $it") }
+
+        val (headerless, headerlessCounts) = selectCountsOfOneGet()
+        headerless.body?.size shouldBe 3
+        headerlessCounts shouldBe expectedSelects(watchPassed = 3, withHeader = 0)
+        headerlessCounts.values.sum() shouldBe 5 + 2 * 3
+
+        // 헤더는 통과 후보 하나와 비통과 후보 하나에 — 비통과 쪽은 문장을 늘리지 않는다.
+        insertRequirementHeader(passing.first())
+        insertRequirementHeader(notPassing.first())
+        val (mixed, mixedCounts) = selectCountsOfOneGet()
+        mixed.body?.size shouldBe 3
+        mixedCounts shouldBe expectedSelects(watchPassed = 3, withHeader = 1)
+        mixedCounts.values.sum() shouldBe 5 + 2 * 3 + 1
+    }
+
+    @Test
+    fun `마감 임박 순으로 내고 표시 상한은 마감 임박 쪽을 남긴다`() {
+        confirmRequiredKeyword("포장", seenRevision = 0)
+        val now = Instant.now()
+        insertNotice("D30", "포장 D+30", now.plus(Duration.ofDays(30)))
+        insertNotice("D01", "포장 D+1", now.plus(Duration.ofDays(1)))
+        insertNotice("D10", "포장 D+10", now.plus(Duration.ofDays(10)))
+
+        suggestions().numbers() shouldBe listOf("D01", "D10", "D30")
+
+        adminUpdate("UPDATE operator_strategy SET candidate_limit = 2 WHERE id = 1") shouldBe 1
+        val limited = suggestions()
+        limited.numbers() shouldBe listOf("D01", "D10")
+        limited.headers.getFirst(TOTAL_COUNT_HEADER) shouldBe "3"
     }
 
     @Test

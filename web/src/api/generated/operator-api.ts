@@ -363,7 +363,7 @@ export interface components {
             /** @enum {string} */
             licenseVerdict: "ELIGIBLE" | "UNCERTAIN";
             /** @enum {string|null} */
-            licenseUncertainReason?: "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED" | null;
+            licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
             unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
         };
         ErrorBody: {
