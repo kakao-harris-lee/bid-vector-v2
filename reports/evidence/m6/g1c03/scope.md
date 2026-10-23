@@ -133,6 +133,12 @@ Codex 없음(되돌리기 어려운 경로 아님 — 마이그레이션 0).
     적는다.
 - 사소한 lint(빈 줄) 수정은 수용한다.
 
+**D-G1C03-3 (2026-10-23, 팀장 — 검토 r1 수령 · 승인 전 일괄 배치).** 판정 대상 산출물 `26beba76` · evidence `7ba7bbf3`. verifier r1
+ready-for-review(blocker·high 0, medium 3 · low 5) · code-reviewer r1 APPROVE(medium 3 장부 · low 8). 배치 하나로 닫는다 — 코드·test: 기준 시각
+선언의 배선을 구조로 잠금(F-1) · 끊긴 라운드 제외 범위 test 와 잠복 시나리오 처분(F-2) · AXIS 필터·ageGate 계수·마침 줄 사유·멈춘 실행 기록
+test(L-1·L-2·F-4·F-5) · 정리(L-4·L-5·L-6·L-7·F-6). 장부: rollback 의 `git rm`(F-3) · M-1~M-3 · L-3 · L-8·F-7 · evidence 크기(F-8). 배치 뒤
+새 마지막 산출물 커밋에서 check·변이·rollback 재실측, F-1·F-2·F-3 은 verifier 표적 재검증.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
