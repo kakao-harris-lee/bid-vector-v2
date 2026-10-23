@@ -25,6 +25,12 @@ import java.nio.file.Files
  * (private 생성자). 모듈 밖에서 임의 문자열을 「정규화된 상호」로 승격할 수 없다.
  * fixture 3 — `copy()` 도 같은 가시성으로 닫힌다(`@ConsistentCopyVisibility`) — fixture 2 를
  * 우회하는 두 번째 길.
+ * fixture 4 — 조회 관문 `AwardLookupDecision.Lookup` 의 유일한 생성 경로는 `decideAwardLookup`
+ * 이다(`internal` 생성자). 모듈 밖에서 아무 문자열을 정규화해 `Lookup` 을 직접 만들어 판정에
+ * 넣는 길 — 「미설정이면 판정하지 않는다」를 호출부 성실성으로 되돌리는 길 — 이 닫힌다.
+ * fixture 5 — `Lookup.copy()` 로 운영자 상호를 바꿔치우는 길도 같은 가시성으로 닫힌다.
+ * fixture 6 — 확정 판정 `SettledAwardOutcome.Won` 을 모듈 밖에서 만들어(금액 비교 따위로)
+ * 기록에 넣는 길이 닫힌다. 양성 쌍둥이는 판정 함수를 거친 기록이다.
  *
  * fixture 의 상호는 전부 가상이고 **ASCII 로만** 적는다(컴파일러 소스 인코딩에 기대지 않는다).
  */
@@ -61,6 +67,39 @@ class CompileFailureHarnessTest {
     fun `3-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment("3-normalized-name-copy-bypass-typo", PRIVATE_IN)
     }
+
+    @Test
+    fun `4 조회 관문 Lookup 직접 생성은 모듈 밖에서 컴파일되지 않고 관문 경유는 컴파일된다`() {
+        assertNegativeFails("4-lookup-direct-construction", INTERNAL_IN)
+        assertPositiveCompiles("1-judge-without-amount")
+    }
+
+    @Test
+    fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment("4-lookup-direct-construction-typo", INTERNAL_IN)
+    }
+
+    @Test
+    fun `5 조회 관문 Lookup copy 는 모듈 밖에서 컴파일되지 않는다`() {
+        assertNegativeFails("5-lookup-copy-bypass", INTERNAL_IN)
+        assertPositiveCompiles("1-judge-without-amount")
+    }
+
+    @Test
+    fun `5-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment("5-lookup-copy-bypass-typo", INTERNAL_IN)
+    }
+
+    @Test
+    fun `6 확정 판정 Won 은 모듈 밖에서 만들어지지 않고 판정 경유 기록은 컴파일된다`() {
+        assertNegativeFails("6-won-direct-construction", INTERNAL_IN)
+        assertPositiveCompiles("6-won-via-judge")
+    }
+
+    @Test
+    fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment("6-won-direct-construction-typo", INTERNAL_IN)
+    }
 }
 
 /**
@@ -68,6 +107,9 @@ class CompileFailureHarnessTest {
  * `internal` 을 가르지 못해 `internal` 퇴행이 초록이 된다(6F-4-w r1 HIGH 실측).
  */
 private const val PRIVATE_IN = "it is private in"
+
+/** `internal` 생성자의 진단 조각 — `private` 과 갈린다(위와 같은 사유). */
+private const val INTERNAL_IN = "it is internal in"
 
 /** 인자 수 계약의 진단 조각. 실제 컴파일러 출력으로 고정했다(evidence `commands.md`). */
 private const val TOO_MANY_ARGUMENTS = "too many arguments for 'fun judgeAwardOutcome("

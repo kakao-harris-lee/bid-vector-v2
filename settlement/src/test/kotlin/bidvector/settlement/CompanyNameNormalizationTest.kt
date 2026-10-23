@@ -1,6 +1,7 @@
 package bidvector.settlement
 
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -66,6 +67,26 @@ class CompanyNameNormalizationTest {
     fun `소문자화가 대소문자 차이를 흡수한다`() {
         normalizedValueOf("(주)Garang Marine") shouldBe "garangmarine"
         normalizedValueOf("가상해양기술 CO") shouldBe normalizedValueOf("가상해양기술 co")
+    }
+
+    /**
+     * 토큰은 **접두·접미에서만** 지운다(계약 문면 — legacy 의 전역 `str.replace` 와 의도적으로
+     * 다르다). 상호 중간의 토큰은 남아, 「가상주식회사건설」은 「가상건설」과 다른 회사다.
+     */
+    @Test
+    fun `상호 중간의 법인 표기 토큰은 지우지 않는다`() {
+        normalizedValueOf("가상주식회사건설") shouldBe "가상주식회사건설"
+        normalizedValueOf("가상(주)건설") shouldBe "가상(주)건설"
+        normalizedValueOf("가상유한회사건설") shouldBe "가상유한회사건설"
+        normalizedValueOf("가상주식회사건설") shouldNotBe normalizedValueOf("가상건설")
+    }
+
+    /** 양 끝에 토큰이 겹쳐 있으면 남은 것이 없을 때까지 지운다 — 앞뒤 동시·순서 무관. */
+    @Test
+    fun `양 끝에 겹친 토큰은 모두 지운다`() {
+        normalizedValueOf("주식회사가상해양기술주식회사") shouldBe "가상해양기술"
+        normalizedValueOf("(주)주식회사가상해양기술") shouldBe "가상해양기술"
+        normalizedValueOf("가상해양기술(주)㈜") shouldBe "가상해양기술"
     }
 
     /** 법인 표기만 남는 상호는 값이 아니라 **사유 있는 결말**이다(`false` 로 접지 않는다). */

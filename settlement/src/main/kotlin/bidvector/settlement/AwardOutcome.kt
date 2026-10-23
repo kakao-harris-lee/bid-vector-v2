@@ -44,26 +44,56 @@ sealed interface AwardOutcome {
 /**
  * 확정 판정 둘 — 상호 정규화 **정확매치**만으로 갈린다. 금액은 어느 쪽에도 실리지 않는다:
  * 같은 개찰에 같은 투찰가를 낸 서로 다른 업체가 실존하는 도메인이라(legacy
- * `award_verification.py:127-128` 의 사유) 금액 근접은 낙찰의 근거가 될 수 없다.
+ * `award_verification.py:121-123` 의 사유) 금액 근접은 낙찰의 근거가 될 수 없다.
+ *
+ * **두 값의 생성자는 `internal` 이다** — 확정 판정을 만드는 길은 [judgeAwardOutcome] 하나다.
+ * 모듈 밖에서 금액 비교 따위로 [Won] 을 직접 만들어 [recordAwardOutcome] 에 넣는 길이
+ * 컴파일되지 않는다(`CompileFailureHarnessTest` fixture 6). 값은 상태가 없어 같은 종류끼리
+ * 같다 — 동등성은 종류로만 선다.
  */
 sealed interface SettledAwardOutcome : AwardOutcome {
     /** 정규화된 운영자 상호 == 정규화된 낙찰자 상호. */
-    data object Won : SettledAwardOutcome
+    class Won internal constructor() : SettledAwardOutcome {
+        override fun equals(other: Any?): Boolean = other is Won
+
+        override fun hashCode(): Int = WON_HASH
+
+        override fun toString(): String = "Won"
+    }
 
     /** 낙찰자 상호가 확정됐고 운영자 상호와 다르다. */
-    data object Lost : SettledAwardOutcome
+    class Lost internal constructor() : SettledAwardOutcome {
+        override fun equals(other: Any?): Boolean = other is Lost
+
+        override fun hashCode(): Int = LOST_HASH
+
+        override fun toString(): String = "Lost"
+    }
 }
+
+private const val WON_HASH = 1
+
+private const val LOST_HASH = 2
 
 /**
  * 외부 조회·판정의 **관문**. [Lookup] 만이 정규화된 운영자 상호를 나르므로, 운영자 상호가
- * 미설정인 상태에서는 조회 호출에 넘길 값 자체가 존재하지 않는다 — 「미설정이면 외부 조회도
- * 하지 않는다」가 호출부의 성실성이 아니라 타입으로 선다.
+ * 미설정인 상태에서는 조회 호출에 넘길 값 자체가 존재하지 않는다.
  *
- * [judgeAwardOutcome] 의 첫 인자 타입이 이 타입이라 **판정에 닿으려면 이 술어를 지나야 한다.**
+ * **[Lookup] 의 생성자는 `internal` 이고 `copy()` 도 같은 가시성이다** — 유일한 생성 경로는
+ * [decideAwardLookup] 이다. 모듈 밖에서 `normalizeCompanyName` 으로 아무 문자열을 정규화해
+ * [Lookup] 을 직접 만들거나 `copy` 로 운영자 상호를 바꿔치우는 길이 컴파일되지 않는다
+ * (`CompileFailureHarnessTest` fixture 4·5). 그래서 「판정에 닿으려면 이 술어를 지나야 한다」가
+ * 타입으로 선다.
+ *
+ * [Lookup] 은 운영자 상호를 정규화한 **정책도 함께 나른다** — [judgeAwardOutcome] 은 결과 쪽
+ * 상호를 그 정책으로 정규화하므로, 서로 다른 정책으로 접힌 두 상호가 한 판정에서 비교될 길이
+ * 없다.
  */
 sealed interface AwardLookupDecision {
-    data class Lookup(
+    @ConsistentCopyVisibility
+    data class Lookup internal constructor(
         val operator: NormalizedCompanyName,
+        val policy: AwardMatchingPolicyData,
     ) : AwardLookupDecision
 
     data class Skip(
@@ -84,6 +114,10 @@ sealed interface RecordedAwardOutcome {
  * 기록 시도의 결말 — [AlreadySettled] 는 **기존 값을 그대로 돌려준다**. 새 값을 나르는 자리가
  * 없으므로 호출부가 덮어쓸 값을 얻지 못한다(legacy 의 멱등 조건
  * `record.award_outcome is None`, `award_notifications.py:186-191`).
+ *
+ * 기록과 새 판정이 어긋나도(기록 `Won`, 오늘 판정 `Lost`) 이 결말은 그 사실을 따로 알리지
+ * 않는다. 새 판정은 호출부가 넘긴 값이라 호출부가 이미 쥐고 있고, [AlreadySettled.kept] 와
+ * 비교하면 어긋남이 드러난다 — 어긋남을 세고 경보를 낼지는 영속화 소비 slice 몫이다.
  */
 sealed interface AwardOutcomeRecording {
     data class Recorded(

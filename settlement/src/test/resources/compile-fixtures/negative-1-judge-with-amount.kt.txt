@@ -7,5 +7,5 @@ import bidvector.settlement.judgeAwardOutcome
 fun negativeJudgeWithAmount() {
     val policy = AwardMatchingPolicyData(listOf("Co"))
     val lookup = decideAwardLookup(OperatorTradeName.Declared("GasangMarine"), policy)
-    judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("GasangMarine"), policy, 1000000L)
+    judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("GasangMarine"), 1000000L)
 }

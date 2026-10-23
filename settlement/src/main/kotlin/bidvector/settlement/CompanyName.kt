@@ -57,18 +57,24 @@ sealed interface CompanyNameNormalization {
  * 상호 정규화 — legacy `normalize_company_name`
  * (`app/services/award_verification.py:96-107`)의 **세 단계를 그 순서대로** 옮긴다.
  *
- * ① 공백 제거 → ② 법인 표기 토큰 제거 → ③ 소문자화.
+ * ① 공백 제거 → ② 법인 표기 토큰 제거(**접두·접미만**) → ③ 소문자화.
  *
  * **순서가 거동을 가른다.** capability map 문면(「법인 접두·접미 토큰 제거 + 공백 제거 +
  * casefold」)은 단계의 **열거**이고 순서를 주장하지 않는데, 공백 제거가 먼저여야
- * 「주식 회사 가상해양기술」이 토큰 제거에 닿는다. 그래서 문면이 아니라 legacy 순서를 구현한다.
+ * 「주식 회사 가상해양기술」이 토큰 제거에 닿는다. 그래서 순서는 legacy 를 따른다.
  *
- * **① 의 공백 집합**: legacy 는 `re.sub(r"\s+", "", …)` 다. Python `str` 정규식의 `\s` 는
- * 유니코드 공백 전체(전각 공백 `U+3000`·NBSP `U+00A0` 등)를 매치하고, Kotlin
- * `Char.isWhitespace()` 가 정확히 그 집합이라는 실측은 이 저장소에 이미 있다
- * (`qualification/…/LicensePolicy.kt` 의 `_KEY_NOISE_RE` 주석 — `Character.isWhitespace` 단독은
- * NBSP 류를 **일부러** 빼므로 그것만으로는 부족하다는 실측까지 포함한다). 공백 넷 리터럴로
- * 옮기면 전각 공백이 낀 표기를 놓쳐 거짓 「패찰」을 낸다.
+ * **② 의 위치 — legacy 와 의도적으로 다르다.** legacy 는 `str.replace` 라 토큰이 상호 **중간**에
+ * 있어도 지워 「가상주식회사건설」과 「가상건설」을 같은 회사로 판정한다(거짓 낙찰 방향).
+ * 여기서는 계약 문면 「접두·접미」대로 양 끝에서만 지우고, 더 지울 것이 없을 때까지 되풀이한다
+ * (「(주)주식회사가상」처럼 끝에 토큰이 겹친 표기는 legacy 와 같은 값으로 접힌다). 중간 토큰이
+ * 남는 쪽의 오차는 거짓 「패찰」이고, 그 방향이 이 커널이 고르는 안전한 쪽이다.
+ *
+ * **① 의 공백 집합**: legacy 는 `re.sub(r"\s+", "", …)` 다. Kotlin `Char.isWhitespace()` 는 그
+ * Python `\s` 에서 **U+0085(NEL) 하나를 뺀 부분집합**이다(BMP 전수 대조 29 대 28, Kotlin 에만
+ * 있는 글자 0) — 전각 공백 `U+3000`·NBSP `U+00A0` 은 양쪽 다 든다. 차이는 그 글자가 남아
+ * 거짓 「패찰」 쪽으로만 난다. 공백 넷 리터럴로 옮기면 전각 공백이 낀 표기를 놓쳐 같은 방향의
+ * 오차가 훨씬 커진다. zero-width 글자(U+200B 등)·전각 라틴·NFD 한글·괄호 혼용 표기(`(주）`)도
+ * 정규화하지 않는다 — 모두 거짓 「패찰」 쪽이고 실수집 상호 확인(`OPEN-SET-03`)과 같은 축이다.
  *
  * **③ 의 알려진 제한**: legacy 는 `casefold()` 이고 Kotlin 에는 대응이 없다. 여기서는
  * **ASCII `A`~`Z` 만** 접는다 — 상호는 한글(대소문자 없음)과 라틴 코드가 섞이는 축이고,
@@ -93,11 +99,8 @@ fun normalizeCompanyName(
     policy: AwardMatchingPolicyData,
 ): CompanyNameNormalization {
     val withoutWhitespace = stripWhitespace(rawName)
-    var text = withoutWhitespace
-    for (token in policy.legalEntityTokens) {
-        text = text.replace(token, "")
-    }
-    val normalized = lowercaseAscii(text)
+    val withoutTokens = stripEdgeTokens(withoutWhitespace, policy.legalEntityTokens)
+    val normalized = lowercaseAscii(withoutTokens)
     return if (normalized.isEmpty()) {
         CompanyNameNormalization.Empty
     } else {
@@ -105,7 +108,33 @@ fun normalizeCompanyName(
     }
 }
 
-/** 공백 제거(①) — `Char.isWhitespace()` 가 legacy `\s` 와 같은 집합이다. */
+/**
+ * 법인 표기 토큰 제거(②) — 양 끝에서만, 더 지울 것이 없을 때까지. 토큰은 비어 있을 수 없으므로
+ * (`AwardMatchingPolicyData` 불변식) 매 회차 길이가 줄거나 loop 가 끝난다.
+ */
+private fun stripEdgeTokens(
+    value: String,
+    tokens: List<String>,
+): String {
+    var text = value
+    var changed = true
+    while (changed) {
+        changed = false
+        for (token in tokens) {
+            if (text.startsWith(token)) {
+                text = text.substring(token.length)
+                changed = true
+            }
+            if (text.endsWith(token)) {
+                text = text.substring(0, text.length - token.length)
+                changed = true
+            }
+        }
+    }
+    return text
+}
+
+/** 공백 제거(①) — `Char.isWhitespace()`, legacy `\s` 에서 U+0085 하나를 뺀 부분집합(위 KDoc). */
 private fun stripWhitespace(value: String): String {
     val chars = CharArray(value.length)
     var count = 0
@@ -138,11 +167,18 @@ private const val ASCII_CASE_OFFSET = 32
  * 운영자 상호 입력 칸은 아직 없다(7C ④ 소관, 이 slice 는 마이그레이션을 만들지 않는다) —
  * 그래서 오늘 production 이 만들 수 있는 값은 [NotDeclared] 뿐이고, 그 사실이 추적표
  * SET-01 행의 빈 자리 하나다.
+ *
+ * 「상호 없음」을 나타내는 길은 [NotDeclared] 하나다 — 빈·공백만 문자열로는 [Declared] 를
+ * 만들 수 없다(그 입력이 「설정은 됐으나 정규화 뒤 빈」 사유로 새지 않는다).
  */
 sealed interface OperatorTradeName {
     data class Declared(
         val rawName: String,
     ) : OperatorTradeName {
+        init {
+            require(rawName.isNotBlank()) { "Declared 상호는 비어 있을 수 없다 — 미설정은 NotDeclared 다" }
+        }
+
         override fun toString(): String = REDACTED_TRADE_NAME
     }
 
@@ -151,12 +187,20 @@ sealed interface OperatorTradeName {
 
 /**
  * 결과 쪽(낙찰자) 상호의 **상태**. [NotPublished] 는 「낙찰자가 아니다」가 아니라 「낙찰자
- * 상호가 공개되지 않았다」다 — 이 구별이 접히면 미기록이 패찰이 된다.
+ * 상호가 공개되지 않았다」다 — 이 구별이 접히면 미기록이 패찰이 된다. 빈·공백만 문자열로는
+ * [Published] 를 만들 수 없다(「공개 안 됨」의 길은 [NotPublished] 하나다).
+ *
+ * [Published] 의 필드는 상호 하나뿐이다 — 금액·수치 필드가 더해지면 판정이 그것을 읽을 길이
+ * 생기므로, 필드 집합을 test(`AwardMatchingKernelTest`)가 등식으로 고정한다.
  */
 sealed interface AwardWinnerTradeName {
     data class Published(
         val rawName: String,
     ) : AwardWinnerTradeName {
+        init {
+            require(rawName.isNotBlank()) { "Published 상호는 비어 있을 수 없다 — 미공개는 NotPublished 다" }
+        }
+
         override fun toString(): String = REDACTED_TRADE_NAME
     }
 

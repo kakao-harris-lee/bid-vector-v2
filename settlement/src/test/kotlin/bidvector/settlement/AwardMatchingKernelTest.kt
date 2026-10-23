@@ -4,6 +4,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.lang.reflect.Modifier
 
 /**
  * SET-01 acceptance 네 줄을 커널에서 잰다. 상호는 전부 **가상**이다.
@@ -19,14 +21,14 @@ class AwardMatchingKernelTest {
     private fun judge(
         operator: OperatorTradeName,
         winner: AwardWinnerTradeName,
-    ): AwardOutcome = judgeAwardOutcome(decideAwardLookup(operator, policy), winner, policy)
+    ): AwardOutcome = judgeAwardOutcome(decideAwardLookup(operator, policy), winner)
 
     @Test
     fun `법인 표기가 달라도 같은 회사면 낙찰이다`() {
         judge(
             OperatorTradeName.Declared("주식회사 가상해양기술"),
             AwardWinnerTradeName.Published("(주)가상해양기술"),
-        ) shouldBe SettledAwardOutcome.Won
+        ) shouldBe SettledAwardOutcome.Won()
     }
 
     /**
@@ -39,7 +41,7 @@ class AwardMatchingKernelTest {
         judge(
             OperatorTradeName.Declared("(주)가상해양기술"),
             AwardWinnerTradeName.Published("(주)가상토목건설"),
-        ) shouldBe SettledAwardOutcome.Lost
+        ) shouldBe SettledAwardOutcome.Lost()
     }
 
     @Test
@@ -99,4 +101,82 @@ class AwardMatchingKernelTest {
         AwardWinnerTradeName.Published(rawName).toString() shouldNotContain rawName
         normalizedNameOf(rawName, policy).toString() shouldNotContain rawName
     }
+
+    /**
+     * 「정확매치만」 — 한쪽이 다른 쪽의 **접두·접미·부분 문자열**인 쌍은 전부 패찰이다. 비교를
+     * 접두·포함 비교로 느슨하게 하면 운영자 「가상」이 결과 「가상건설」을 낙찰로 판정한다(가장
+     * 해로운 방향). 양방향 모두 잰다.
+     */
+    @Test
+    fun `한쪽이 다른 쪽의 접두 접미 부분 문자열이어도 패찰이다`() {
+        val pairs =
+            listOf(
+                "가상" to "가상건설",
+                "건설" to "가상건설",
+                "가상건설" to "가상건설기술",
+                "상건" to "가상건설",
+            )
+        pairs.forEach { (left, right) ->
+            judge(OperatorTradeName.Declared(left), AwardWinnerTradeName.Published(right)) shouldBe
+                SettledAwardOutcome.Lost()
+            judge(OperatorTradeName.Declared(right), AwardWinnerTradeName.Published(left)) shouldBe
+                SettledAwardOutcome.Lost()
+        }
+    }
+
+    /**
+     * 판정은 **관문을 만든 정책 하나**로 두 상호를 정규화한다 — 시그니처에 정책 인자가 없다.
+     * 「협동조합 가상해양」과 「가상해양」은 출하 정책(그 토큰 없음)으로는 다른 회사이고, 그
+     * 토큰을 가진 정책으로는 같은 회사다. 운영자 쪽만 다른 정책으로 접고 결과 쪽을 출하 정책으로
+     * 접는 조합은 호출할 수 없다.
+     */
+    @Test
+    fun `판정은 관문을 만든 정책 하나로 양쪽을 정규화한다`() {
+        val cooperative = AwardMatchingPolicyData(legalEntityTokens = listOf("협동조합"))
+        val operator = OperatorTradeName.Declared("협동조합 가상해양")
+        val winner = AwardWinnerTradeName.Published("가상해양")
+
+        val shippedLookup = decideAwardLookup(operator, policy)
+        shippedLookup.shouldBeInstanceOf<AwardLookupDecision.Lookup>()
+        shippedLookup.policy shouldBe policy
+        judgeAwardOutcome(shippedLookup, winner) shouldBe SettledAwardOutcome.Lost()
+
+        val cooperativeLookup = decideAwardLookup(operator, cooperative)
+        cooperativeLookup.shouldBeInstanceOf<AwardLookupDecision.Lookup>()
+        cooperativeLookup.policy shouldBe cooperative
+        judgeAwardOutcome(cooperativeLookup, winner) shouldBe SettledAwardOutcome.Won()
+    }
+
+    /** 「상호 없음」의 길은 `NotDeclared`·`NotPublished` 하나씩이다 — 빈·공백만 상호는 만들어지지 않는다. */
+    @Test
+    fun `빈 상호와 공백만 상호는 입력 값으로 만들어지지 않는다`() {
+        listOf("", "   ", "\t\n", "　").forEach { blank ->
+            assertThrows<IllegalArgumentException> { OperatorTradeName.Declared(blank) }
+            assertThrows<IllegalArgumentException> { AwardWinnerTradeName.Published(blank) }
+        }
+    }
+
+    /**
+     * 금액이 판정에 들어올 길을 **입력 타입의 모양**으로 닫는다 — 판정에 닿는 값 셋의 인스턴스
+     * 필드 집합이 정확히 아래와 같다. 결과 쪽 입력에 기본값 있는 금액 필드를 더하는 변경은 판정
+     * 함수의 인자 수를 바꾸지 않아 컴파일 하네스를 지나므로, 이 등식이 그 자리를 진다.
+     */
+    @Test
+    fun `판정에 닿는 입력 타입의 필드 집합은 상호와 정책뿐이다`() {
+        instanceFieldsOf(AwardWinnerTradeName.Published::class.java) shouldBe mapOf("rawName" to String::class.java)
+        instanceFieldsOf(OperatorTradeName.Declared::class.java) shouldBe mapOf("rawName" to String::class.java)
+        instanceFieldsOf(AwardLookupDecision.Lookup::class.java) shouldBe
+            mapOf(
+                "operator" to NormalizedCompanyName::class.java,
+                "policy" to AwardMatchingPolicyData::class.java,
+            )
+        instanceFieldsOf(NormalizedCompanyName::class.java) shouldBe mapOf("value" to String::class.java)
+        instanceFieldsOf(SettledAwardOutcome.Won::class.java) shouldBe emptyMap()
+        instanceFieldsOf(SettledAwardOutcome.Lost::class.java) shouldBe emptyMap()
+    }
+
+    private fun instanceFieldsOf(type: Class<*>): Map<String, Class<*>> =
+        type.declaredFields
+            .filterNot { Modifier.isStatic(it.modifiers) || it.isSynthetic }
+            .associate { it.name to it.type }
 }

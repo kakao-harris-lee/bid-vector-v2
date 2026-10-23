@@ -5,8 +5,9 @@ package bidvector.settlement
  * *"운영자 상호가 미설정이면 판정하지 않고 외부 조회도 하지 않는다"*).
  *
  * 술어를 `Boolean` 으로 두면 호출부가 무시할 수 있다. 여기서는 산출이 [AwardLookupDecision]
- * 이고 조회에 쓸 정규화 상호를 [AwardLookupDecision.Lookup] 만 나르므로, 미설정 상태에서는
- * 조회 호출을 **조립할 값이 없다**. 실제 조회 경로는 이 slice 에 없다(소비 slice 몫).
+ * 이고 조회에 쓸 정규화 상호를 [AwardLookupDecision.Lookup] 만 나르며, 그 값을 만드는 길이 이
+ * 함수 하나다(생성자 `internal`) — 미설정 상태에서는 조회 호출을 **조립할 값이 없다**. 실제
+ * 조회 경로는 이 slice 에 없다(소비 slice 몫).
  */
 fun decideAwardLookup(
     operator: OperatorTradeName,
@@ -24,7 +25,7 @@ fun decideAwardLookup(
                 }
 
                 is CompanyNameNormalization.Normalized -> {
-                    AwardLookupDecision.Lookup(normalization.name)
+                    AwardLookupDecision.Lookup(normalization.name, policy)
                 }
             }
         }
@@ -38,17 +39,22 @@ fun decideAwardLookup(
  * 채택하지 않는다 — 인자가 **아예 없으면** 코드로 강제된다. 금액을 더한 호출이 컴파일되지
  * 않는다는 사실은 `CompileFailureHarnessTest` fixture 1 이 잰다.
  *
+ * **정책도 받지 않는다** — 결과 쪽 상호는 [AwardLookupDecision.Lookup] 이 나르는 정책, 곧
+ * 운영자 상호를 정규화한 바로 그 정책으로 정규화한다. 서로 다른 토큰 목록으로 접힌 두 상호를
+ * 비교해 거짓 낙찰을 내는 길이 시그니처에 없다.
+ *
+ * 비교는 **정확매치**다 — 한쪽이 다른 쪽의 접두·접미·부분 문자열이어도 패찰이다.
+ *
  * 운영자 축 검사가 결과 축보다 **먼저**다(legacy 순서) — 둘 다 없으면 「판정 안 함」이지
  * 「미기록」이 아니다.
  */
 fun judgeAwardOutcome(
     lookup: AwardLookupDecision,
     winner: AwardWinnerTradeName,
-    policy: AwardMatchingPolicyData,
 ): AwardOutcome =
     when (lookup) {
         is AwardLookupDecision.Skip -> AwardOutcome.NotJudged(lookup.reason)
-        is AwardLookupDecision.Lookup -> judgeAgainstWinner(lookup.operator, winner, policy)
+        is AwardLookupDecision.Lookup -> judgeAgainstWinner(lookup.operator, winner, lookup.policy)
     }
 
 private fun judgeAgainstWinner(
@@ -68,7 +74,7 @@ private fun judgeAgainstWinner(
                 }
 
                 is CompanyNameNormalization.Normalized -> {
-                    if (normalization.name == operator) SettledAwardOutcome.Won else SettledAwardOutcome.Lost
+                    if (normalization.name == operator) SettledAwardOutcome.Won() else SettledAwardOutcome.Lost()
                 }
             }
         }
