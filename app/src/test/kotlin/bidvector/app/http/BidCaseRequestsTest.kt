@@ -1,7 +1,5 @@
 package bidvector.app.http
 
-import bidvector.bidding.BidMemo
-import bidvector.bidding.EvidenceRef
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -62,8 +60,11 @@ class BidCaseRequestsTest {
         """{"amountWon":1000000,"vatTreatment":"INCLUSIVE","submittedAt":"2026-10-23T00:00:00Z",$extra}"""
 
     private companion object {
-        /** `EvidenceRef.MAX_LENGTH` · `BidMemo.MAX_LENGTH` — 도메인 상수를 직접 읽는다. */
-        const val EVIDENCE_LIMIT = EvidenceRef.MAX_LENGTH
-        const val MEMO_LIMIT = BidMemo.MAX_LENGTH
+        /**
+         * `EvidenceRef` · `BidMemo` 의 길이 상한(도메인 companion 이 private 이라 값을 옮겨 적는다).
+         * 도메인이 상한을 올리면 「넘는 값」이 정상이 되어 위 거부 test 가 붉어진다 — 어긋남이 숨지 않는다.
+         */
+        const val EVIDENCE_LIMIT = 128
+        const val MEMO_LIMIT = 2000
     }
 }
