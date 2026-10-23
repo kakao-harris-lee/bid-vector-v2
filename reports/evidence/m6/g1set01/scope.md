@@ -122,6 +122,19 @@ Codex 없음.
   - evidence 크기 게이트 초과 해소(산출물 이하로).
 - **④ 재측정**: check · 변이(신규 포함, 통제군 `--rerun`) · rollback ①~⑥(base `54e2c5e2`) · container 재생 → 동결, 판정 SHA(산출물·evidence) 보고.
 
+**D-G1SET01-2 (2026-10-23, 팀장 — 검토 r2 수령: verifier not-ready H-1r2(재작업 2/5) · CR REQUEST_CHANGES N-1, 일괄 배치).** 판정 대상 산출물 `61c156c3`.
+- **CR N-1 — 낙찰/패찰 구별을 잠근다.** `Won() shouldNotBe Lost()` 양방향 · `hashCode`/`toString` 구별 test 한 묶음 + 변이 한 행(두 값을 같게 만드는
+  `equals` 본문 바꿔치우기 → RED). X1·X2·N5 의 RED 가 이 등식에 기대는 사실을 변이표에 적는다.
+- **verifier H-1r2 — 낙찰자 쪽 정책 동반을 잠근다.** 검증자가 확인한 사례: `decideAwardLookup(Declared("가상해양"), 협동조합 토큰 정책)` 대
+  `Published("협동조합 가상해양")` → `Won`. 「판정이 출하 정책으로 낙찰자를 정규화」 변이 RED 실측.
+- **verifier M-1r2 = CR N-3**: `Lost` 생성자 `internal` 을 fixture 6 과 같은 음성·양성 쌍 + 변이 한 행으로 잠근다.
+- **CR N-2**: `stripWhitespace` 에 U+0085 를 더해 legacy 공백 집합과 맞춘다(test 동반). 「부분집합」 제한 문면은 그에 맞춰 정정.
+- **장부층**: verifier L-1(Java 호출자는 `internal` 을 우회 — 저장소 Java 원본 0, 제한 등재) · L-2(container run 23 + uses 4, 새 이미지 ID 는
+  app·web 둘 — 문면 정정, 재재생 불필요) · L-3(「의도된 어긋남」 분류의 근거는 D-G1SET01-1 ② 로 인용) · CR Q-1r2(정책 **출처**는 열려 있음 —
+  제한 + `OPEN-SET-03` 옆 한 줄) · CR N-3 문면.
+- main 이 움직이지 않았으면 rebase 없이 마지막 산출물 커밋에서 check · 변이(통제군 `--rerun`) · rollback ①~⑥(base `54e2c5e2`) 재측정 → 동결.
+  container 는 app 입력(settlement)이 바뀌므로 재생기로 다시 잰다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
