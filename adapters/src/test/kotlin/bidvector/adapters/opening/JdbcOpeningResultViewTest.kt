@@ -17,9 +17,9 @@ import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservationKey
 import bidvector.procurement.ObservedBidAmount
+import bidvector.procurement.OpeningPromotionOutcome
 import bidvector.procurement.OpeningRankOneBid
 import bidvector.procurement.OpeningRankOneOutcome
-import bidvector.procurement.OpeningPromotionOutcome
 import bidvector.procurement.OpeningResult
 import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
