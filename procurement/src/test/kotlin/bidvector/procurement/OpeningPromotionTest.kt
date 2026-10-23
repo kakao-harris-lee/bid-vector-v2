@@ -166,6 +166,22 @@ class OpeningPromotionTest {
     }
 
     @Test
+    fun `둘러싼 공백은 문자열 슬롯에 실리지 않는다`() {
+        // code-review r1 MEDIUM — 진행구분은 3값 라벨 비교에, 업체명은 대사의 일치 판정에 쓰인다.
+        // 공백 하나로 어긋나지 않도록 사상이 trim 한다(공백만인 값은 이미 부재다).
+        val result =
+            promotedResult(
+                groupOf(
+                    axisRow(SourceEndpoint.OPENING_RESULT_LIST, WALK_A, mapOf("progrsDivCdNm" to " 개찰완료 ")),
+                    axisRow(SourceEndpoint.OPENING_AWARD_LIST, WALK_A, mapOf("bidwinnrNm" to "\t낙찰업체\n")),
+                ),
+            )
+
+        result.progressDivision shouldBe "개찰완료"
+        result.finalAwardCompanyName shouldBe "낙찰업체"
+    }
+
+    @Test
     fun `해석되지 않는 값은 부재이고 0 이 아니다`() {
         val result =
             promotedResult(

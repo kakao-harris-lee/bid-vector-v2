@@ -7,6 +7,7 @@ import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
 import bidvector.procurement.NOTICE_ROUND_RAW_KEY
 import bidvector.procurement.NoticeId
+import bidvector.procurement.NoticeAxisLedger
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservationKey
 import bidvector.procurement.OpeningPromotionOutcome
@@ -72,10 +73,11 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
         target: NoticeId,
         collectedSince: Instant = Instant.EPOCH,
         conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
+        interruptedAxes: Set<SourceEndpoint> = emptySet(),
     ): OpeningPromotionOutcome {
         val read = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(collectedSince)
         val group = read.groups.single { it.noticeId == target }
-        return promoteOpeningResult(group, conclusions, policy)
+        return promoteOpeningResult(group, NoticeAxisLedger(conclusions, interruptedAxes), policy)
     }
 
     private fun persist(outcome: OpeningPromotionOutcome.Promotable) =
@@ -234,6 +236,21 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
             .shouldBeInstanceOf<OpeningRankOneOutcome.Determined>()
             .bid
             .bidderName shouldBe SENTINEL_BIDDER
+    }
+
+    @Test
+    fun `잠정 1위만 심어도 확정 낙찰 세 칸은 canonical 에서 부재다`() {
+        val notice = id("PROMO-DB-010")
+        seed(notice, SourceEndpoint.OPENING_COMPLETE, rankOneFields() + mapOf("bidprcAmt" to "900,000"))
+
+        val outcome = readAndPromote(notice).shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
+        persist(outcome)
+        val stored = requireNotNull(find(notice))
+
+        stored.openingRankOne.shouldBeInstanceOf<OpeningRankOneOutcome.Determined>()
+        stored.finalAwardAmount.shouldBeNull()
+        stored.finalAwardCompanyName.shouldBeNull()
+        stored.winningRate.shouldBeNull()
     }
 
     @Test

@@ -61,12 +61,15 @@ internal fun succeededAt(walk: Instant): AxisConclusion = AxisConclusion(Attempt
 internal fun promote(
     group: OpeningAxisGroup,
     conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
-): OpeningPromotionOutcome = promoteOpeningResult(group, conclusions, PROMOTION_POLICY)
+    interruptedAxes: Set<SourceEndpoint> = emptySet(),
+): OpeningPromotionOutcome =
+    promoteOpeningResult(group, NoticeAxisLedger(conclusions, interruptedAxes), PROMOTION_POLICY)
 
 internal fun promotedResult(
     group: OpeningAxisGroup,
     conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
+    interruptedAxes: Set<SourceEndpoint> = emptySet(),
 ): OpeningResult =
-    promote(group, conclusions)
+    promote(group, conclusions, interruptedAxes)
         .shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
         .result

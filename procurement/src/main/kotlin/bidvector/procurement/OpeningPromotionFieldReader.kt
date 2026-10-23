@@ -33,7 +33,13 @@ internal class FieldReader(
     private val policy: KonepsCollectionPolicyData,
     private val round: NoticeRound,
 ) {
-    fun textOf(concept: FieldConcept): String? = readingsOf(concept).firstOrNull()?.text
+    /**
+     * 문자열 슬롯은 **trim 해서** 낸다(code-review r1 MEDIUM). `readingsOf` 가 공백만인 값을 이미
+     * 부재로 걸러 내므로 trim 뒤 빈 문자열이 되는 경우는 없다. 비대칭이면 진행구분 라벨 비교(3값
+     * 열거)와 업체명 일치(대사)가 선행·후행 공백 하나로 어긋난다 — 공고 축 `NoticeTitle.of` 도
+     * trim 하는 관례다.
+     */
+    fun textOf(concept: FieldConcept): String? = readingsOf(concept).firstOrNull()?.text?.trim()
 
     fun countOf(concept: FieldConcept): Int? =
         readingsOf(concept)

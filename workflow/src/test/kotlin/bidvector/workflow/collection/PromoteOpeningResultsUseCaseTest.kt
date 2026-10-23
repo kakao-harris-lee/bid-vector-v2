@@ -165,6 +165,19 @@ private fun axisLine(
         walk = walk,
     )
 
+/** 결말을 적지 못한 라운드의 줄들 — 관문이 호출 **전에** 의도를, 호출 뒤에 결말을 적는다(D-6G-61). */
+private fun openRoundLines(
+    id: NoticeId,
+    endpoint: SourceEndpoint,
+    at: Instant,
+): List<CollectionAttempt> {
+    val key = NoticeKeyHash.of(id.number.value, id.round.value).value
+    return listOf(
+        CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, at, AttemptKind.PENDING, null),
+        CollectionAttempt(key, endpoint, AttemptOutcome.Succeeded, at, AttemptKind.HTTP, null),
+    )
+}
+
 /**
  * M7/7C⑤-0 — 승격 use case. 수집 경로를 건드리지 않고(외부 호출 0 · 원문 쓰기 0 · 원장 쓰기 0),
  * 범위는 확정 표본이며(D-7C5P-6) 같은 입력 두 번에 행이 움직이지 않는다(D-7C5P-4).
@@ -365,6 +378,46 @@ class PromoteOpeningResultsUseCaseTest {
         useCaseOf(source, sampleListOf(id), RecordingResultRepository(), attempts).promote()
 
         attempts.appended.size shouldBe 0
+    }
+
+    @Test
+    fun `결말 없이 끊긴 상세 축의 행은 승격하지 않는다`() {
+        // verifier r1 F1 회귀. 원장에 의도·호출 줄만 있고 AXIS 결말이 없다 — 반쪽 원문이다.
+        val id = noticeId("PROMOTE-016")
+        val repository = RecordingResultRepository()
+        val truncated =
+            RowSpec(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, mapOf("plnprc" to "100", "compnoRsrvtnPrceSno" to "1"))
+        val source = ScriptedRawAxisSource(OpeningRawAxisRead(listOf(groupOf(id, truncated))))
+        val attempts = FakeAttemptLedger(openRoundLines(id, SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A))
+
+        val report = reportOf(useCaseOf(source, sampleListOf(id), repository, attempts).promote())
+
+        report.promoted shouldBe 0
+        report.noUsableAxis shouldBe 1
+        repository.persistCalls.size shouldBe 0
+    }
+
+    @Test
+    fun `원장 걷기의 행이 창 밖이고 끊긴 재걷기 행만 남아도 실행이 던지지 않는다`() {
+        // verifier r1 F2 회귀. 결말은 WALK_A 를 가리키는데 읽기 집합에는 WALK_B 행만 있다.
+        val id = noticeId("PROMOTE-017")
+        val repository = RecordingResultRepository()
+        val source =
+            ScriptedRawAxisSource(
+                OpeningRawAxisRead(
+                    listOf(groupOf(id, RowSpec(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_B, mapOf("plnprc" to "100")))),
+                ),
+            )
+        val attempts =
+            FakeAttemptLedger(
+                listOf(axisLine(id, SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, AttemptOutcome.Succeeded)) +
+                    openRoundLines(id, SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_B),
+            )
+
+        val report = reportOf(useCaseOf(source, sampleListOf(id), repository, attempts).promote())
+
+        report.noUsableAxis shouldBe 1
+        repository.persistCalls.size shouldBe 0
     }
 
     @Test

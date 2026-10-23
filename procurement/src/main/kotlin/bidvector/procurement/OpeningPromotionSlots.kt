@@ -74,7 +74,7 @@ private fun reservePriceRowOf(
     round: NoticeRound,
 ): OpeningReservePriceRow? {
     val one = readerOf(SourceEndpoint.RESERVE_PRICE_DETAIL, row, policy, round)
-    val sequence = one.textOf(FieldConcept.RESERVE_PRICE_SEQUENCE)?.trim()
+    val sequence = one.textOf(FieldConcept.RESERVE_PRICE_SEQUENCE)
     if (sequence.isNullOrEmpty()) return null
     return OpeningReservePriceRow(
         sequenceNumber = sequence,
@@ -97,7 +97,7 @@ private fun reservePriceRowOf(
  * 플래그 두 글자에 로케일 의존 대소문자 접기를 쓸 이유도 없다.
  */
 private fun FieldReader.drawFlagOf(): Boolean? =
-    when (textOf(FieldConcept.DRAW_FLAG)?.trim()) {
+    when (textOf(FieldConcept.DRAW_FLAG)) {
         "Y", "y" -> true
         "N", "n" -> false
         else -> null
@@ -131,7 +131,7 @@ private fun rankOneCandidateOf(
     round: NoticeRound,
 ): Pair<Int?, OpeningRankOneBid>? {
     val one = readerOf(SourceEndpoint.OPENING_COMPLETE, row, policy, round)
-    val name = one.textOf(FieldConcept.BID_COMPANY_NAME)?.trim()
+    val name = one.textOf(FieldConcept.BID_COMPANY_NAME)
     return if (name.isNullOrEmpty()) {
         null
     } else {

@@ -49,6 +49,32 @@ class OpeningPromotionRankOneTest {
     }
 
     @Test
+    fun `잠정 1위가 실려도 확정 낙찰 세 칸은 부재다`() {
+        // 위협 모델 첫 항목(잠정 → 확정 오염). 구조는 이중으로 닫혀 있다 — 확정 축의 슬롯 선언이
+        // 낙찰 목록 하나이고, 계약 `presentIn` 이 다시 거른다. 그 성질을 값으로 잰다.
+        val result =
+            promotedResult(
+                groupOf(
+                    axisRow(
+                        SourceEndpoint.OPENING_COMPLETE,
+                        WALK_A,
+                        mapOf(
+                            "prcbdrNm" to "일위업체",
+                            "opengRank" to "1",
+                            "bidprcAmt" to "900,000",
+                            "bidprcrt" to "90.0",
+                        ),
+                    ),
+                ),
+            )
+
+        result.openingRankOne.shouldBeInstanceOf<OpeningRankOneOutcome.Determined>()
+        result.finalAwardAmount.shouldBeNull()
+        result.finalAwardCompanyName.shouldBeNull()
+        result.winningRate.shouldBeNull()
+    }
+
+    @Test
     fun `순위 1 이 둘이면 동값을 깨지 않는다`() {
         val result =
             promotedResult(
