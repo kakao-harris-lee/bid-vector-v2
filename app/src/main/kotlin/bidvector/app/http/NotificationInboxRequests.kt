@@ -40,9 +40,15 @@ private fun JsonNode.requireKnownKeys(allowed: Set<String>): JsonNode {
     return this
 }
 
-/** 문자열 칸 하나 — 없음·비문자열·공백을 각각 거부한다(강제 변환 0). */
+/**
+ * 문자열 칸 하나 — 없음·JSON `null`·비문자열·공백을 각각 거부한다(강제 변환 0).
+ *
+ * `null` 을 **부재와 같이** 다루는 것은 기존 판독기의 규율이다(`"kind": null` 을 「안 보냄」과
+ * 다르게 다루면 호출자가 둘을 구별할 이유가 없는데 진단만 갈린다).
+ */
 private fun JsonNode.requiredText(key: String): String {
-    val node = get(key) ?: throw InvalidNotificationRequestException("$key 가 없다")
+    val node = get(key)
+    if (node == null || node.isNull) throw InvalidNotificationRequestException("$key 가 없다")
     if (!node.isString) throw InvalidNotificationRequestException("$key 는 문자열이어야 한다")
     val value = node.stringValue()
     if (value.isBlank()) throw InvalidNotificationRequestException("$key 는 빈 문자열일 수 없다")
