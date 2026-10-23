@@ -79,9 +79,52 @@ exit 0 · `npm ci` 265 packages · `operator-api.ts` **+314 줄 · 삭제 0**. �
 확장끼리는 그 검사를 지나지 못한다). 세 helper 에 접두를 붙여 고쳤다 — 예외 타입을 갈라 둔
 판단은 유지한다(어느 표면이 거부했는가가 진단이고, 이름 충돌은 이름으로 끝난다).
 
-## (기록) — 어댑터·app test r2 (위 수정 넷 뒤 재측정)
+## 2026-10-23T04:05Z — 어댑터·app test r2 (위 수정 넷 뒤 재측정) — **전부 통과**
 
-같은 명령 둘을 한 번에 돌린다. 결과: (기록)
+```
+./gradlew --no-daemon \
+  :adapters:test --tests 'bidvector.adapters.notificationinbox.*' \
+                 --tests 'bidvector.adapters.persistence.CleanMigration*' \
+                 --tests 'bidvector.adapters.retention.*' \
+  :app:test --tests 'bidvector.app.http.SessionAccountTest' \
+            --tests 'bidvector.app.http.OpenApiNotificationInboxContractTest'
+```
+
+`BUILD SUCCESSFUL` · exit 0. **종료 코드만 믿지 않고 class 별 계수를 결과 XML 에서 센다**:
+
+| class | tests / skipped / failures / errors |
+|---|---|
+| `NotificationInboxConcurrencyTest` | 2 / 0 / **0** / 0 |
+| `NotificationInboxPersistenceTest` | 27 / 0 / **0** / 0 |
+| `NotificationInboxPrivacyTest` | 9 / 0 / **0** / 0 (r1 의 DDL 결함이 닫혔다) |
+| `NotificationInboxPrivilegeTest` | 7 / 0 / **0** / 0 |
+| `CleanMigrationTest` | 5 / 0 / 0 / 0 |
+| `CleanMigrationColumnTest` | 3 / 0 / **0** / 0 (r1 RED → 등재 뒤 통과) |
+| `CleanMigrationIndexTest` | 2 / 0 / **0** / 0 (r1 RED → 등재 뒤 통과) |
+| `CleanMigrationCheckTest` | 10 / 0 / 0 / 0 |
+| `CleanMigrationPrivilegeTest` | 1 / 0 / 0 / 0 |
+| `CleanMigrationTriggerTest` | 4 / 0 / 0 / 0 |
+| `RetentionRegistrySchemaEqualityTest` | 12 / 0 / 0 / 0 |
+| `SessionAccountTest` | 5 / 0 / **0** / 0 (r1 컴파일 실패 → 이름 수정 뒤 통과) |
+| `OpenApiNotificationInboxContractTest` | 14 / 0 / **0** / 0 |
+
+**skip 0** 이다 — 통과를 비활성으로 산 자리가 없다.
+
+## 2026-10-23T04:10Z — 빌드 없이 미리 잰 정적 확인 넷 (빌드 슬롯 절약)
+
+락 대기가 길어 **다음 라운드를 태우기 전에** 게이트 술어를 손으로 재현했다. 초록을 미리 주장한
+것이 아니라 **붉을 자리를 먼저 찾으려** 돌린 것이고, 넷 다 통과라 재측정이 한 번에 끝났다.
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| 평탄 속성 게이트 | 계약 test 의 허용 목록 술어를 그대로 재현해 **property 정의 전수** 17 스키마에 적용 | 위반 0 |
+| 계정 전용 선언 | operation 셋이 **자기 `security` 를 선언**하는지(전역 기본을 물려받으면 문서가 거짓) | GET=`{browserSession}` · POST 둘=`{browserSession, operatorCsrf}` · 자격 헤더 대안 0 |
+| 응답·요청 키 집합 | 계약 test 의 **리터럴 기대 집합을 test 소스에서 읽어** YAML 과 대조 | 넷 다 일치 · `properties == required` |
+| 어휘 등식 | YAML enum ↔ **Kotlin enum 소스**에서 읽은 집합 | 종류·detail 둘 다 일치 · 요청 kind == 항목 kind |
+
+**약속한 grep 도 함께 돌렸다**(D-7C3-2 전건) — 주체 문자열을 **파싱하는** 자리는
+`SessionAccount.kt` **하나**다. 나머지 일치는 KDoc 언급이거나 **짓는** 쪽(세션 인증기의
+`subjectOf`)이다. 그래서 7B 접근자로의 교체는 **파일 삭제 + 호출 한 줄 치환**으로 끝난다.
 
 ## (기록) — 변이 (적용 → 표적 재실행 → 사본 복원)
 
