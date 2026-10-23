@@ -5,9 +5,6 @@ import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
-import bidvector.workflow.bidding.BidCaseWorkflow
-import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
-import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
@@ -21,6 +18,9 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import bidvector.workflow.bidding.BidCaseWorkflow
+import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
+import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort

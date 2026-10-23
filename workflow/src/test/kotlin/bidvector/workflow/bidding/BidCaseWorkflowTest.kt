@@ -369,12 +369,24 @@ private class FakeBidCaseStore : BidCaseStorePort {
         account: AccountId,
         applied: AppliedTransition,
     ): TransitionWrite {
-        val row = rows[applied.caseId.value]?.takeIf { it.account == account } ?: return TransitionWrite.CaseNotFound
-        if (interleaveBeforeApply) {
+        val row = rows[applied.caseId.value]?.takeIf { it.account == account }
+        if (row != null && interleaveBeforeApply) {
             row.case = row.case.copy(caseVersion = row.case.caseVersion + 1)
             interleaveBeforeApply = false
         }
-        if (row.case.caseVersion != applied.expectedVersion) return TransitionWrite.VersionConflict
+        return if (row == null) {
+            TransitionWrite.CaseNotFound
+        } else if (row.case.caseVersion != applied.expectedVersion) {
+            TransitionWrite.VersionConflict
+        } else {
+            append(row, applied)
+        }
+    }
+
+    private fun append(
+        row: Row,
+        applied: AppliedTransition,
+    ): TransitionWrite {
         val nextVersion = row.case.caseVersion + 1
         row.case = row.case.copy(state = applied.next, caseVersion = nextVersion)
         row.timeline +=
