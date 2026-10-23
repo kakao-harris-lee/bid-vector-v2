@@ -61,3 +61,16 @@ rm workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
 | ④ | 기준 시각 선언을 관측값으로 바꾼다(결측이 조용히 호출로 가는 길의 거울상) |
 | ⑤ | 건너뜀을 세지 않는다 |
 | ⑥ | 옛 원장을 읽지 못하게 한다 |
+
+## 4. 실측 (2026-10-23)
+
+실측 HEAD: `26beba76`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| ① | 명령 exit | **0** |
+| ② | 바뀐 경로 수 | M 15 · D 4 — §1 목록과 같다 |
+| ③ | 되돌린 트리 ↔ base `a61ddff1` | `git diff --cached --name-status a61ddff1` 가 이 slice 의 evidence 넷(A)만 낸다 — 산출물 경로 차이 **0**, main 쪽 변경(`vuln-allowlist.properties`)은 그대로 남는다 |
+| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(10:48~10:58, 359 task). 트리 동일성으로 갈음하지 않고 직접 돌렸다 — 남는 evidence 넷이 텍스트 게이트의 입력이라 base 트리와 같지 않기 때문이다 |
+
+원장 형식이 바뀌지 않았으므로 「새 코드가 쓴 원장을 옛 코드가 읽는가」는 §2 대로 형식 하나의 물음이다.

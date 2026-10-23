@@ -40,8 +40,24 @@
 | `./gradlew --no-daemon check`(1차, 2026-10-21 22:12~22:22) | **1** | 10분 07초 · 172 task. 실패 **둘** — ① ktlint 「Needless blank line(s)」(helper 를 걷어낸 자리, 코드 변경 없이 해소) ② `OpeningBudgetE2ETest` 의 끊긴 축 이어 걷기(659 중 1) = checklist §3-2 의 재판정 대상 |
 
 `web`·`ml-engine` job 은 생략한다 — **입력 변경 0** 을 path-limited diff 로 보였다:
-`git diff --name-only bee7c36f -- ml-engine web docker openapi contracts .github ml-contract` 가 **빈 출력**이다.
+`git diff --name-only bee7c36f -- ml-engine web docker openapi contracts .github ml-contract` 가 **빈 출력**이다
+(rebase 뒤 base `a61ddff1` 로 다시 재도 빈 출력, 2026-10-23).
 `container` job 은 app 이미지 입력(`app/**`)이 바뀌었으므로 `if:` 를 평가하는 재생으로 돌린다 — 재생 전
 `bidvector/app:local` 은 `94382c1026cf` 이고, 끝나면 그 id 로 **태그를 되돌린다**(레인끼리 공유하는 태그).
 
-(판정 뒤 재실행분과 container 재생·rollback 은 여기에 이어 적는다.)
+## 판정 뒤 재실행 (2026-10-23, base `a61ddff1` 위로 rebase 한 산출물 HEAD `26beba76`)
+
+점검 셋은 매번 별도 호출로 먼저 봤다(가장 늦은 10:36: available 14,418MB · swap free 7,434MB). 전부 잠금 아래다.
+
+| cmd | exit | 핵심 결과 |
+|---|---|---|
+| `./gradlew --no-daemon check`(07:56) | **0** | 350 task 중 31 실행 · 나머지 up-to-date |
+| 같은 명령 `--rerun-tasks`(07:58~08:10) | **0** | 350 task **전부 실행** · 11분 46초. `qualityBaseline` 은 이 그래프 안에서 돈다 |
+| `container` job 재생 — `.github/workflows/ci.yml` 의 step 을 순서대로, `if:` 를 앞 결과로 평가(10:31~10:36, HEAD `fd60ce1b` = 산출물 트리 동일) | **0** | 27 step: run 24 **success** · runner 전용 `uses` 4(미실행, `if:` 는 평가) · **skipped 0**. 조건부 넷(`scan_app` · `scan_web` · `scan_proxy` · SBOM)의 `if:` 가 참으로 평가됐다 |
+| 변이 ①~⑥ + 통제군(10:36~10:46) | **0**(스크립트) | 여섯 전부 RED · 통제군 exit 0 · 772 중 실패 0 — 판정 표는 `checklist.md` §4-1 |
+
+container 재생 뒤 공유 태그를 재생 전 id 로 되돌렸다(app `94382c1026cf` · web `855171383f43`; proxy `d93e25e04ec8` ·
+ml-serving `326e9da38043` 은 재생이 같은 id 를 냈다). 10:15 에 시작한 앞 재생은 lead 세션 중단으로 step 13 에서
+끊겼다 — 그 결과는 쓰지 않았고, 그 재생이 남긴 위생 검사 컨테이너 하나를 지운 뒤 처음부터 다시 돌렸다.
+
+rollback 실측은 `rollback.md` §4.
