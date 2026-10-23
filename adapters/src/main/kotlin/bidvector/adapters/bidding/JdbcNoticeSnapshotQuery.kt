@@ -92,12 +92,12 @@ class JdbcNoticeSnapshotQuery(
         )
     }
 
-    /** 어휘 → provenance 룩업. 모르는 값은 `null` 이다(지어내지 않는다). */
+    /** 저장 어휘 → provenance 룩업. 모르는 값은 `null` 이다(지어내지 않는다). */
     private fun provenanceOf(
-        token: String?,
+        code: String?,
         round: NoticeRound,
     ): Provenance? =
-        when (token) {
+        when (code) {
             "Published" -> Provenance.Published(round)
             "DerivedFromOpening" -> Provenance.DerivedFromOpening
             "CopiedFromBaseAmount" -> Provenance.CopiedFromBaseAmount

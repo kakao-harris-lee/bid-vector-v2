@@ -103,7 +103,7 @@ internal object BidCaseRow {
     }
 
     /** 금액 출처 ↔ 두 열. 짝이 깨진 행은 CHECK 를 지나오지 못한다. */
-    fun originTokens(amount: SubmittedBidAmount): Pair<String, String?> =
+    fun originCodes(amount: SubmittedBidAmount): Pair<String, String?> =
         when (val origin = amount.origin) {
             BidAmountOrigin.OperatorEntered -> "OPERATOR_ENTERED" to null
             is BidAmountOrigin.PriceMenu -> "PRICE_MENU" to origin.chosenOption.value
@@ -119,7 +119,7 @@ internal object BidCaseRow {
             else -> error("알 수 없는 금액 출처 어휘: $provenance")
         }
 
-    fun actorKind(token: String): ActorKind = ActorKind.valueOf(token)
+    fun actorKind(code: String): ActorKind = ActorKind.valueOf(code)
 
     private fun <T : Any> required(
         value: T?,

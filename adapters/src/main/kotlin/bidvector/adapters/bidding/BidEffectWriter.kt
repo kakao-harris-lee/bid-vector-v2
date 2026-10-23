@@ -23,7 +23,7 @@ internal object BidEffectWriter {
         draft: BidDraft,
     ) {
         val seq = nextSeq(connection, BiddingSql.NEXT_DRAFT_SEQ, account, caseId)
-        val (provenance, chosenOption) = BidCaseRow.originTokens(draft.amount)
+        val (provenance, chosenOption) = BidCaseRow.originCodes(draft.amount)
         val snapshot = draft.snapshot
         val base = snapshot.baseAmount?.export()
         connection.prepareStatement(BiddingSql.INSERT_DRAFT).use { statement ->
@@ -46,7 +46,7 @@ internal object BidEffectWriter {
             statement.setObject(index++, base?.won)
             statement.setString(index++, base?.currency?.name)
             statement.setString(index++, base?.vatTreatment?.name)
-            statement.setString(index, base?.provenance?.let(::provenanceToken))
+            statement.setString(index, base?.provenance?.let(::provenanceCode))
             statement.executeUpdate()
         }
     }
@@ -59,7 +59,7 @@ internal object BidEffectWriter {
     ) {
         val seq = nextSeq(connection, BiddingSql.NEXT_RECORD_SEQ, account, caseId)
         val submission = record.submission
-        val (provenance, chosenOption) = BidCaseRow.originTokens(submission.amount)
+        val (provenance, chosenOption) = BidCaseRow.originCodes(submission.amount)
         connection.prepareStatement(BiddingSql.INSERT_RECORD).use { statement ->
             var index = 1
             statement.setLong(index++, caseId.value)
@@ -117,7 +117,7 @@ internal object BidEffectWriter {
      * 값으로 꺼내면 클래스 이름을 바꾸는 순간 저장된 값의 뜻이 조용히 달라지고, 그 경로는
      * 수집 아키텍처 게이트가 막는 자리이기도 하다(`collection.reflection.*`).
      */
-    private fun provenanceToken(provenance: bidvector.sharedkernel.Provenance): String =
+    private fun provenanceCode(provenance: bidvector.sharedkernel.Provenance): String =
         when (provenance) {
             is bidvector.sharedkernel.Provenance.Published -> "Published"
             bidvector.sharedkernel.Provenance.DerivedFromOpening -> "DerivedFromOpening"
