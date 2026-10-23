@@ -37,6 +37,15 @@ data class BidCaseView(
     val reconciliationCandidate: Boolean,
 )
 
+/**
+ * 담기의 결과 — 새로 담았는가([created])를 버리지 않는다(계약 D-7B-3). 화면은 「담겼습니다」와
+ * 「이미 담긴 건입니다」를 가르고, HTTP 는 201 과 200 으로 가른다.
+ */
+data class OpenedCase(
+    val view: BidCaseView,
+    val created: Boolean,
+)
+
 /** [BidCaseWorkflow.command] 의 결과 — 건 부재는 [TransitionOutcome] 밖의 사유다. */
 sealed interface BidCommandResult {
     data class Processed(
@@ -67,6 +76,12 @@ sealed interface BidCommandResult {
  * 증빙 보관 기한은 여기서 **정책으로 푼다**(R-5 3년) — 도메인이 날짜 산술의 기준일을 지어내지
  * 않는다. 기한은 **제출 시각의 KST 달력일**에서 센다(확인 시각이 아니다 — 소급 확인이면 확인이
  * 몇 달 뒤일 수 있고, 그러면 같은 투찰의 증빙이 언제 확인했느냐에 따라 다른 날 만료된다).
+ *
+ * **마감은 서버가 판정한다**(계약 D-7B-3 결정 ①, Q-11). 마감 전 상태의 건을 읽거나 그 건에 명령이
+ * 오면, 마감이 지났을 때 **시스템 주체**로 `MARK_DEADLINE_PASSED` 를 먼저 적용하고(타임라인에
+ * 시스템 주체로 남는다) 요청을 이어서 판정한다. 그래서 마감 뒤의 「제출함」은 소급 기록이 된다.
+ * 마감은 공고의 지금 값을 쓰고, 공고가 없으면(6B-3 파기) 담을 때 적은 **사본**을 쓴다. 사용자가
+ * 부르는 「마감 지남」 operation 은 열지 않는다.
  */
 class BidCaseWorkflow(
     private val cases: BidCaseStorePort,
@@ -75,28 +90,35 @@ class BidCaseWorkflow(
     private val clock: Clock,
     private val retentionPolicy: Resolution.Resolved<EvidenceRetentionPolicyData>,
 ) {
-    /** 관심 담기 — 이미 있으면 그 건을 돌려준다(같은 공고에 건은 하나다). */
+    /** 관심 담기 — 이미 있으면 그 건을 돌려준다(같은 공고에 건은 하나다). 그 갈래를 버리지 않는다. */
     fun open(
         account: AccountId,
         notice: NoticeKey,
         kind: BidKind,
-    ): BidCaseView {
+    ): OpenedCase {
         val now = clock.now()
-        val result = cases.open(account, notice, kind, now)
-        val case =
-            when (result) {
-                is OpenCaseResult.Opened -> result.case
-                is OpenCaseResult.AlreadyOpen -> result.case
+        val noticeDeadline = deadlines.deadlines(setOf(notice))[notice]
+        return when (val result = cases.open(account, notice, kind, now, noticeDeadline)) {
+            is OpenCaseResult.Opened -> {
+                OpenedCase(view(result.case, effectiveDeadline(result.case, noticeDeadline), now), created = true)
             }
-        return view(case, deadlineOf(case), now)
+
+            is OpenCaseResult.AlreadyOpen -> {
+                val case = settleDeadline(account, result.case, noticeDeadline, now)
+                OpenedCase(view(case, effectiveDeadline(case, noticeDeadline), now), created = false)
+            }
+        }
     }
 
     fun read(
         account: AccountId,
         caseId: BidCaseId,
     ): BidCaseView? {
-        val case = cases.load(account, caseId) ?: return null
-        return view(case, deadlineOf(case), clock.now())
+        val now = clock.now()
+        val loaded = cases.load(account, caseId) ?: return null
+        val noticeDeadline = noticeDeadlineOf(loaded)
+        val case = settleDeadline(account, loaded, noticeDeadline, now)
+        return view(case, effectiveDeadline(case, noticeDeadline), now)
     }
 
     /** 내 입찰함 — [kind] 가 **필수**라 페이퍼와 실투찰이 한 목록에 들 수 없다. */
@@ -106,16 +128,22 @@ class BidCaseWorkflow(
         state: BidStateTag?,
     ): List<BidCaseView> {
         val now = clock.now()
-        val found = cases.list(account, kind, state)
+        val found = cases.list(account, kind, null)
         val byNotice = deadlines.deadlines(found.map { it.notice }.toSet())
-        return found.map { view(it, byNotice[it.notice], now) }
+        // 마감 판정이 상태를 바꿀 수 있으므로 **판정 뒤에** 상태 탭으로 거른다 — 먼저 거르면 「관심」
+        // 탭에 마감이 지난 건이 남는다.
+        return found
+            .map { settleDeadline(account, it, byNotice[it.notice], now) }
+            .filter { state == null || it.state.tag == state }
+            .map { view(it, effectiveDeadline(it, byNotice[it.notice]), now) }
     }
 
     fun timeline(
         account: AccountId,
         caseId: BidCaseId,
     ): List<TimelineEntry>? {
-        cases.load(account, caseId) ?: return null
+        val loaded = cases.load(account, caseId) ?: return null
+        settleDeadline(account, loaded, noticeDeadlineOf(loaded), clock.now())
         return cases.timeline(account, caseId)
     }
 
@@ -132,8 +160,11 @@ class BidCaseWorkflow(
         presentedAt: Instant,
         actor: BidActor,
     ): BidCommandResult {
-        val case = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
-        val snapshot = snapshots.snapshot(case.notice, clock.now())
+        val loaded = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
+        val now = clock.now()
+        // 마감 판정이 먼저다 — 마감이 지난 건에 초안을 만들지 않는다(전이표가 거부한다).
+        val case = settleDeadline(account, loaded, noticeDeadlineOf(loaded), now)
+        val snapshot = snapshots.snapshot(case.notice, now)
         return snapshot
             ?.let { command(account, caseId, BidCommand.DraftBid(BidDraft(amount, presentedAt, it)), actor) }
             ?: BidCommandResult.NoticeSnapshotUnavailable
@@ -152,8 +183,9 @@ class BidCaseWorkflow(
         command: BidCommand,
         actor: BidActor,
     ): BidCommandResult {
-        val case = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
+        val loaded = cases.load(account, caseId) ?: return BidCommandResult.CaseNotFound
         val now = clock.now()
+        val case = settleDeadline(account, loaded, noticeDeadlineOf(loaded), now)
         val resolved = resolveRetention(command)
         val outcome = applyCommand(case.state, resolved, actor.kind, now)
         return when (outcome) {
@@ -211,7 +243,32 @@ class BidCaseWorkflow(
             .ofInstant(submittedAt, EVIDENCE_RETENTION_ZONE)
             .plus(retentionPolicy.value.retainFor)
 
-    private fun deadlineOf(case: BidCase): Instant? = deadlines.deadlines(setOf(case.notice))[case.notice]
+    /**
+     * **마감 판정**(결정 ①) — 마감이 지났고 전이표가 시스템 주체의 `MARK_DEADLINE_PASSED` 를 그 상태에서
+     * 허락하면(마감 전 상태 넷) 먼저 적용하고 다시 읽는다. 허락하지 않는 상태(이미 기록됨 · 종결 등)는
+     * 그대로다. 경합으로 저장이 실패해도 다시 읽은 값을 쓴다 — 다른 전이가 이긴 것이다.
+     */
+    private fun settleDeadline(
+        account: AccountId,
+        case: BidCase,
+        noticeDeadline: Instant?,
+        now: Instant,
+    ): BidCase {
+        val deadline = effectiveDeadline(case, noticeDeadline) ?: return case
+        if (!now.isAfter(deadline)) return case
+        val outcome = applyCommand(case.state, BidCommand.MarkDeadlinePassed, DEADLINE_ACTOR.kind, now)
+        if (outcome !is TransitionOutcome.Accepted) return case
+        persist(account, case, BidCommand.MarkDeadlinePassed, outcome, DEADLINE_ACTOR, now)
+        return cases.load(account, case.id) ?: case
+    }
+
+    private fun noticeDeadlineOf(case: BidCase): Instant? = deadlines.deadlines(setOf(case.notice))[case.notice]
+
+    /** 공고의 지금 마감이 정본이고, 공고가 없으면(파기) 담을 때 적은 사본을 쓴다. */
+    private fun effectiveDeadline(
+        case: BidCase,
+        noticeDeadline: Instant?,
+    ): Instant? = noticeDeadline ?: case.deadlineAt
 
     private fun view(
         case: BidCase,
@@ -233,5 +290,8 @@ class BidCaseWorkflow(
  * 「표에 없다」와 「도착이 범위 밖이다」는 사용자에게 같은 일(그 전이는 안 된다)이고,
  * 「주체 종류가 아니다」는 다른 일이다.
  */
+/** 마감 판정의 시스템 주체 — 타임라인의 `actor_detail` 로 남는 **경로 이름**이다. */
+internal val DEADLINE_ACTOR: BidActor.System = BidActor.System("deadline-check")
+
 fun RejectionReason.isForbiddenTransition(): Boolean =
     this == RejectionReason.InvalidTransition || this == RejectionReason.TargetNotAllowed

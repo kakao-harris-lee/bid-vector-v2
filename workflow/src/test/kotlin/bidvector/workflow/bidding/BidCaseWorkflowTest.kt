@@ -278,7 +278,9 @@ class BidCaseWorkflowTest {
         val store = FakeBidCaseStore()
         val first = workflow(store).open(mine, notice, BidKind.REAL)
         val second = workflow(store).open(mine, notice, BidKind.REAL)
-        second.case.id shouldBe first.case.id
+        second.view.case.id shouldBe first.view.case.id
+        first.created shouldBe true
+        second.created shouldBe false
         store.countOf(mine) shouldBe 1
     }
 
@@ -317,9 +319,11 @@ private class FakeBidCaseStore : BidCaseStorePort {
         notice: NoticeKey,
         kind: BidKind,
         state: BidState,
+        deadlineAt: Instant? = null,
     ): BidCase {
         val id = BidCaseId(nextId++)
-        val case = BidCase(id, notice, kind, state, caseVersion = 0, outcomeNoticeExpectedAt = null)
+        val case =
+            BidCase(id, notice, kind, state, caseVersion = 0, outcomeNoticeExpectedAt = null, deadlineAt = deadlineAt)
         rows[id.value] = Row(account, case)
         return case
     }
@@ -336,13 +340,14 @@ private class FakeBidCaseStore : BidCaseStorePort {
         notice: NoticeKey,
         kind: BidKind,
         at: Instant,
+        deadlineAt: Instant?,
     ): OpenCaseResult {
         val existing =
             rows.values.firstOrNull {
                 it.account.value == account.value && it.case.notice == notice && it.case.kind == kind
             }
         if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
-        return OpenCaseResult.Opened(seed(account, notice, kind, BidState.Watching))
+        return OpenCaseResult.Opened(seed(account, notice, kind, BidState.Watching, deadlineAt))
     }
 
     override fun load(

@@ -87,11 +87,16 @@ data class TimelineEntry(
  * 없다(§6.1 「같은 목록에 섞이지 않는다」).
  */
 interface BidCaseStorePort {
+    /**
+     * 건을 담는다 — [deadlineAt] 은 그때의 **공고 마감 사본**이다(계약 D-7B-3 결정 ①). 이미 있는
+     * 건이면 그 건을 돌려주고 사본을 고치지 않는다.
+     */
     fun open(
         account: AccountId,
         notice: NoticeKey,
         kind: BidKind,
         at: Instant,
+        deadlineAt: Instant?,
     ): OpenCaseResult
 
     /** 남의 건이면 `null` — 존재 여부를 흘리지 않는다. */
