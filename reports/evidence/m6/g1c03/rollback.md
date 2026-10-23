@@ -4,14 +4,18 @@
 
 산출물만 되돌린다(evidence 는 남긴다 — 되돌린 사실의 기록이다). 경로 목록은 기계 산출이다.
 
+**base 는 `a61ddff1`** 이다 — 계약의 `bee7c36f` 위에서 시작했고 2026-10-23 main(PR #81) 위로 rebase 했다. 두 base 사이의
+차이는 `config/quality/vuln-allowlist.properties` 한 파일이라(이 slice 의 경로가 아니다) 아래 경로들의 되돌림 내용은 어느
+base 로 해도 같다(`git diff --name-only bee7c36f a61ddff1` = 그 한 줄). 다만 목록 산출은 `bee7c36f..HEAD` 로 하면 main 의 그
+파일이 섞이므로 새 base 로 한다.
+
 ```bash
-git diff --name-status bee7c36f..HEAD        # 전체 목록
-git restore --source=bee7c36f --staged --worktree -- \
+git diff --name-status a61ddff1..HEAD        # 전체 목록
+git restore --source=a61ddff1 --staged --worktree -- \
   config/quality/architecture-policy.properties \
   config/quality/gate-tests.properties \
   procurement/src/main/kotlin/bidvector/procurement/CollectionAttemptLedger.kt \
   procurement/src/main/kotlin/bidvector/procurement/CollectionPolicy.kt \
-  procurement/src/main/kotlin/bidvector/procurement/NoticeIdentity.kt \
   procurement/src/test/kotlin/bidvector/procurement/CollectionAttemptLedgerTest.kt \
   procurement/src/test/kotlin/bidvector/procurement/CollectionPolicyTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt \
@@ -30,7 +34,7 @@ rm workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
 ```
 
 `InterruptedRoundCloser.kt` 는 **옮긴 파일**이다 — 되돌리면 그 내용이 수집 use case 파일 안으로 함께 돌아온다
-(그 파일을 `bee7c36f` 로 되돌리는 위 줄이 그것을 한다). 새 파일로 남겨 두면 같은 타입이 두 벌이 된다.
+(그 파일을 `a61ddff1` 로 되돌리는 위 줄이 그것을 한다). 새 파일로 남겨 두면 같은 타입이 두 벌이 된다.
 
 ## 2. 되돌림 뒤 상태
 
