@@ -28,9 +28,11 @@ internal sealed interface OpeningAnchor {
 
 /**
  * **조회 가치 술어로 가는 유일한 길**(M6/G1-C03) — 기준 시각을 nullable 시각이 아니라 후보가 나르는
- * **선언째** 받는다. 수집 use case 는 후보를 넘길 뿐 기준 시각을 넘기는 인자가 없으므로, 「호출부가
- * 상수를 넘긴다」(G1-T 가 거짓으로 판정한 자리)를 짓는 자리가 이 함수 안 하나뿐이고 거기를 test 가
- * [OpeningAnchor.Observed] 로 잰다(출하 표본틀은 그것을 싣지 않아 use case 층에서는 잴 수 없다).
+ * **선언째** 받는다. 수집 use case 는 후보를 넘길 뿐 기준 시각을 넘기는 인자가 없다. 다른 두 길 — 술어를
+ * 다른 자리에서 직접 부르기, 후보를 다른 선언으로 다시 짓기 — 은 아키텍처 게이트가 닫는다(술어 파일을 참조하는
+ * 자리는 이 파일 하나, 후보를 짓는 자리는 표본틀 하나 — `architecture-policy.properties` 의
+ * `collection.detail-fetch-predicate` · `collection.opening-candidate`). 그래서 「호출부가 상수를 넘긴다」(G1-T 가
+ * 거짓으로 판정한 자리)를 짓는 자리가 이 함수 안 하나뿐이고, 거기를 test 가 [OpeningAnchor.Observed] 로 잰다.
  *
  * 싣지 않는 경로는 **age 판정을 하지 않는다**(건너뛰는 것은 판정이지 호출이 아니다). 소진 `when` 이라
  * 갈래가 하나 늘면 컴파일이 이 자리를 가리킨다.

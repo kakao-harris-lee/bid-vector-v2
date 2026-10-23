@@ -293,6 +293,56 @@ class CollectionArchitectureRules(
                 .because(reason),
         )
 
+    /**
+     * M6/G1-C03 (D-G1C03-5) — [type] 의 생성자를 부르거나 생성자 참조(`::T`)를 짓는 [root] 안의 클래스 집합은
+     * [allowedCallers] 의 부분집합이다. 타입 참조로는 못 가른다 — 그 타입은 여러 자리가 **나르지만** 짓는 자리는
+     * 하나여야 하는 경우에 쓴다(타입 자신은 제외).
+     */
+    fun constructorMustBeCalledOnlyBy(
+        root: String,
+        type: String,
+        allowedCallers: Set<String>,
+        reason: String,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that(isOutside(allowedCallers))
+                .and()
+                .resideInAPackage("$root..")
+                .should(construct(type))
+                .because(reason),
+        )
+
+    /** [roots] 아래에서 [type] 을 짓는 클래스의 최상위 이름 집합 — 허용 집합과 같아야 한다. */
+    fun observedConstructorCallers(
+        classes: JavaClasses,
+        roots: List<String>,
+        type: String,
+    ): Set<String> =
+        classes
+            .filter { inRoots(it, roots) }
+            .filter { it.constructionsOf(type).isNotEmpty() }
+            .map { it.outermostClassName() }
+            .toSet()
+
+    private fun construct(type: String): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$type 를 짓는다") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.constructionsOf(type).forEach { events.add(SimpleConditionEvent.satisfied(item, it.describe())) }
+            }
+        }
+
+    private fun JavaClass.constructionsOf(type: String): List<JavaAccess<*>> =
+        if (outermostClassName() == type) {
+            emptyList()
+        } else {
+            (constructorCallsFromSelf.toList() + constructorReferencesFromSelf.toList())
+                .filter { it.targetOwner.name == type }
+        }
+
     private fun isOutside(allowed: Set<String>) =
         object : com.tngtech.archunit.base.DescribedPredicate<JavaClass>("허용 집합 밖 클래스 (${allowed.size}종)") {
             override fun test(target: JavaClass): Boolean = target.outermostClassName() !in allowed
