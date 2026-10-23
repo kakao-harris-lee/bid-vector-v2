@@ -55,11 +55,17 @@ fun resolveOpeningResultView(
 ): OpeningResultView =
     when (facts) {
         NoticeOpeningFacts.NoticeAbsent -> OpeningResultView.NoticeAbsent
-        is NoticeOpeningFacts.Present ->
-            facts.canonical?.let { canonical ->
-                OpeningResultView.Observed(policy.progressOf(canonical.progressLabel), canonical.figures)
-            } ?: facts.viewWithoutCanonical(now)
+        is NoticeOpeningFacts.Present -> facts.view(now, policy)
     }
+
+/** 공고 행이 있을 때의 갈래 — canonical 이 있으면 관측값, 없으면 데이터 상태([viewWithoutCanonical]). */
+private fun NoticeOpeningFacts.Present.view(
+    now: Instant,
+    policy: OpeningProgressPolicyData,
+): OpeningResultView =
+    canonical?.let { found ->
+        OpeningResultView.Observed(policy.progressOf(found.progressLabel), found.figures)
+    } ?: viewWithoutCanonical(now)
 
 private fun NoticeOpeningFacts.Present.viewWithoutCanonical(now: Instant): OpeningResultView =
     when {

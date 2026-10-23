@@ -58,19 +58,25 @@ fun parseOpeningResultQuery(
     return OpeningResultQueryRequest.Accepted(NoticeId(number, round))
 }
 
-/** 값 객체에 닿기 전에 끊는 사유들 — 순서가 곧 우선순위다(부재 → 제어 문자 → 길이). */
+/**
+ * 값 객체에 닿기 전에 끊는 사유들 — 순서가 곧 우선순위다(부재 → 제어 문자 → 길이).
+ *
+ * 술어를 먼저 **이름 붙여** 둔다: 두 칸을 함께 보는 조건이라 분기 줄에 그대로 쓰면 읽는 사람이
+ * 「무엇을 보는 조건인가」를 매번 다시 읽어야 한다. 널 검사 앞에서 계산해도 안전하다
+ * (`hasControlCharacter` 는 수신자 널을 스스로 접고, 길이는 널이면 0 으로 센다).
+ */
 private fun rejectionOf(
     noticeNumber: String?,
     noticeRound: String?,
-): OpeningResultQueryRejection? =
-    when {
+): OpeningResultQueryRejection? {
+    val hasControlCharacter = noticeNumber.hasControlCharacter() || noticeRound.hasControlCharacter()
+    val exceedsLength =
+        (noticeNumber?.length ?: 0) > MAX_NOTICE_KEY_LENGTH || (noticeRound?.length ?: 0) > MAX_NOTICE_KEY_LENGTH
+    return when {
         noticeNumber == null -> OpeningResultQueryRejection.NOTICE_NUMBER_MISSING
         noticeRound == null -> OpeningResultQueryRejection.NOTICE_ROUND_MISSING
-        noticeNumber.hasControlCharacter() || noticeRound.hasControlCharacter() ->
-            OpeningResultQueryRejection.TEXT_CONTROL_CHARACTER
-
-        noticeNumber.length > MAX_NOTICE_KEY_LENGTH || noticeRound.length > MAX_NOTICE_KEY_LENGTH ->
-            OpeningResultQueryRejection.TEXT_TOO_LONG
-
+        hasControlCharacter -> OpeningResultQueryRejection.TEXT_CONTROL_CHARACTER
+        exceedsLength -> OpeningResultQueryRejection.TEXT_TOO_LONG
         else -> null
     }
+}

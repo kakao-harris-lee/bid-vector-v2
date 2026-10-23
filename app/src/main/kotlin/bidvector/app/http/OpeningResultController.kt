@@ -47,10 +47,12 @@ class OpeningResultController(
             )
         return when (parsed) {
             is OpeningResultQueryRequest.Rejected -> rejectQuery(parsed.reason.name)
-            is OpeningResultQueryRequest.Accepted ->
-                OpeningResultResponse.of(parsed.id, openingResults.read(parsed.id))
+            is OpeningResultQueryRequest.Accepted -> respond(parsed.id)
         }
     }
+
+    private fun respond(id: NoticeId): OpeningResultResponse =
+        OpeningResultResponse.of(id, openingResults.read(id))
 
     /**
      * 거부 하나를 만드는 **유일한 자리** — 400 `INVALID_REQUEST` 다. 핸들러가 `throw` 를 직접 쓰지
@@ -142,14 +144,17 @@ private fun stateTokenOf(view: OpeningResultView): String =
         OpeningResultView.NotOpenedYet -> "NOT_OPENED_YET"
         OpeningResultView.NotCollected -> "NOT_COLLECTED"
         OpeningResultView.ObservedNotPromoted -> "OBSERVED_NOT_PROMOTED"
-        is OpeningResultView.Observed ->
-            when (view.progress) {
-                OpeningProgress.OPENED -> "OPENED"
-                OpeningProgress.FAILED_BID -> "FAILED_BID"
-                OpeningProgress.REBID -> "REBID"
-                OpeningProgress.UNRECOGNIZED -> "PROGRESS_UNRECOGNIZED"
-                OpeningProgress.ABSENT -> "PROGRESS_ABSENT"
-            }
+        is OpeningResultView.Observed -> progressTokenOf(view.progress)
+    }
+
+/** 진행구분 축의 토큰 — 갈래가 둘인 상태 축을 **축마다 한 함수**로 가른다(소진 `when` 둘). */
+private fun progressTokenOf(progress: OpeningProgress): String =
+    when (progress) {
+        OpeningProgress.OPENED -> "OPENED"
+        OpeningProgress.FAILED_BID -> "FAILED_BID"
+        OpeningProgress.REBID -> "REBID"
+        OpeningProgress.UNRECOGNIZED -> "PROGRESS_UNRECOGNIZED"
+        OpeningProgress.ABSENT -> "PROGRESS_ABSENT"
     }
 
 private fun rankOneTokenOf(rankOne: ProvisionalRankOne): String =
