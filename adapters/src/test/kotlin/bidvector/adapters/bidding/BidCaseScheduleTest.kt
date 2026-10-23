@@ -153,12 +153,17 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val copied = now.plusSeconds(3 * HOUR)
         seedNotice(key, copied)
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         correctNoticeDeadline(key, now.plusSeconds(HOUR / 2))
 
         now = now.plusSeconds(HOUR)
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
         // 사본은 담을 때의 값 그대로다 — 판정이 사본을 보지 않았다는 뜻이다(사본은 아직 2시간 남았다).
         deadlineCopy(caseId.value) shouldBe copied
     }
@@ -170,12 +175,17 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-h")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         correctNoticeDeadline(key, now.plusSeconds(3 * HOUR))
 
         now = now.plusSeconds(2 * HOUR)
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.WATCHING
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.WATCHING
     }
 
     @Test
