@@ -377,22 +377,22 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
     }
 
     /**
-     * **두 slice 를 잇는 자리**(7C⑤-0 승격 → 7C⑤-a 조회). canonical 행을 test 가 직접 심지 않고
-     * **승격 경로가 쓴다** — 그래서 ⓐ 승격이 저장하는 진행구분 라벨과 이 조회의 정책 열거가 같은
-     * 어휘인지 ⓑ 승격이 저장한 투찰자 상호가 이 조회를 지나지 못하는지가 함께 측정된다.
+     * 원문 두 축을 심고 **승격 경로가** canonical 을 쓰게 한다 — 이 test 의 fixture 가 승격 그
+     * 자체다(손으로 짠 canonical 을 쓰면 두 slice 의 맞물림을 재지 못한다).
      *
-     * 라벨을 **앞뒤 공백과 함께** 심는다: 승격이 trim 해서 저장하고(그쪽 계약) 이 조회는 리터럴로
-     * 비교한다(이쪽 계약) — 둘 중 한쪽이 바뀌면 이 test 가 먼저 붉어진다.
+     * 라벨을 **앞뒤 공백과 함께** 넘길 수 있게 열어 둔다: 승격이 trim 해서 저장하고(그쪽 계약)
+     * 이 조회는 리터럴로 비교한다(이쪽 계약) — 호출부가 그 비대칭을 입력으로 준다.
      */
-    @Test
-    fun `승격 경로가 쓴 행을 이 조회가 개찰완료로 읽고 상호는 지나지 못한다`() {
-        seedNotice()
-        val walk = T1
+    private fun promoteViaProductionPath(
+        progressLabel: String,
+        bidderName: String,
+        walk: Instant = T1,
+    ) {
         appendRawObservation(
             RawNoticeObservation.of(
                 fields =
                     mapOf(
-                        RawKey("progrsDivCdNm") to "  개찰완료  ",
+                        RawKey("progrsDivCdNm") to progressLabel,
                         RawKey("prtcptCnum") to "7",
                         NOTICE_NUMBER_RAW_KEY to id.number.value,
                         NOTICE_ROUND_RAW_KEY to id.round.value,
@@ -406,7 +406,7 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
             RawNoticeObservation.of(
                 fields =
                     mapOf(
-                        RawKey("prcbdrNm") to SENTINEL_COMPANY,
+                        RawKey("prcbdrNm") to bidderName,
                         RawKey("opengRank") to "1",
                         NOTICE_NUMBER_RAW_KEY to id.number.value,
                         NOTICE_ROUND_RAW_KEY to id.round.value,
@@ -416,8 +416,7 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
                 sourceDivision = null,
             ),
         )
-        val policy =
-            (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 23)) as Resolution.Resolved).value
+        val policy = (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 23)) as Resolution.Resolved).value
         val group = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(Instant.EPOCH).groups.single()
         val conclusions =
             listOf(SourceEndpoint.OPENING_RESULT_LIST, SourceEndpoint.OPENING_COMPLETE)
@@ -426,6 +425,18 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
             promoteOpeningResult(group, conclusions, policy)
                 .shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
         JdbcOpeningResultRepository(dataSource()).persist(promoted.result, promoted.observationKey)
+    }
+
+    /**
+     * **두 slice 를 잇는 자리**(7C⑤-0 승격 → 7C⑤-a 조회). canonical 행을 test 가 직접 심지 않고
+     * 승격 경로가 쓰므로, ⓐ 승격이 저장하는 진행구분 라벨과 이 조회의 정책 열거가 같은 어휘인지
+     * ⓑ 승격이 저장한 투찰자 상호가 이 조회를 지나지 못하는지가 함께 측정된다. 두 slice 중 한쪽이
+     * 어휘를 바꾸면 이 test 가 먼저 붉어진다.
+     */
+    @Test
+    fun `승격 경로가 쓴 행을 이 조회가 개찰완료로 읽고 상호는 지나지 못한다`() {
+        seedNotice()
+        promoteViaProductionPath(progressLabel = "  개찰완료  ", bidderName = SENTINEL_COMPANY)
 
         val facts = present(view().lookup(id))
         val canonical = requireNotNull(facts.canonical)
