@@ -28,13 +28,13 @@ const val NOTIFICATION_UNREAD_COUNT_HEADER = "X-Unread-Count"
  * 진단이라(응답은 구별하지 않는다) 알림함 거부가 편집 어휘로 나가면 그 진단이 거짓이 된다.
  * 규칙은 같고 어휘만 다르다.
  */
-private fun JsonNode.requireObjectBody(): JsonNode {
+private fun JsonNode.requireInboxObjectBody(): JsonNode {
     if (!isObject) throw InvalidNotificationRequestException("요청 본문이 JSON object 가 아니다")
     return this
 }
 
 /** 알려진 키 밖은 거부한다 — 조용히 무시하면 오탈자가 성공으로 보인다(D-6A2b-25 관례). */
-private fun JsonNode.requireKnownKeys(allowed: Set<String>): JsonNode {
+private fun JsonNode.requireKnownInboxKeys(allowed: Set<String>): JsonNode {
     val unknown = propertyNames().filterNot { it in allowed }.sorted()
     if (unknown.isNotEmpty()) throw InvalidNotificationRequestException("알 수 없는 본문 키: $unknown")
     return this
@@ -46,7 +46,7 @@ private fun JsonNode.requireKnownKeys(allowed: Set<String>): JsonNode {
  * `null` 을 **부재와 같이** 다루는 것은 기존 판독기의 규율이다(`"kind": null` 을 「안 보냄」과
  * 다르게 다루면 호출자가 둘을 구별할 이유가 없는데 진단만 갈린다).
  */
-private fun JsonNode.requiredText(key: String): String {
+private fun JsonNode.requiredInboxText(key: String): String {
     val node = get(key)
     if (node == null || node.isNull) throw InvalidNotificationRequestException("$key 가 없다")
     if (!node.isString) throw InvalidNotificationRequestException("$key 는 문자열이어야 한다")
@@ -72,8 +72,8 @@ sealed interface NotificationTargetResult {
  * 이 층에서 다시 적지 않는다(두 벌이 되면 갈린다).
  */
 private fun JsonNode.noticeId(): NoticeId {
-    val number = requiredText("noticeNumber")
-    val round = requiredText("noticeRound")
+    val number = requiredInboxText("noticeNumber")
+    val round = requiredInboxText("noticeRound")
     return runCatching { NoticeId(NoticeNumber.of(number), NoticeRound.of(round)) }
         .getOrElse { failure ->
             throw InvalidNotificationRequestException("공고 키 형식이 아니다").apply { initCause(failure) }
@@ -82,20 +82,20 @@ private fun JsonNode.noticeId(): NoticeId {
 
 /** 종류 어휘 밖의 문자열은 거부다 — `valueOf` 의 예외를 쓰지 않고 어휘 전수에서 찾는다. */
 private fun JsonNode.notificationKind(): NotificationKind {
-    val token = requiredText("kind")
+    val token = requiredInboxText("kind")
     return NotificationKind.entries.firstOrNull { it.name == token }
         ?: throw InvalidNotificationRequestException("알 수 없는 kind 토큰: $token")
 }
 
 /** 읽음 처리(단건) — 신원은 「종류 + 공고 쌍」이다. 계정·시각 칸은 **허용 키에 없다**. */
 fun JsonNode.parseNotificationReadTarget(): NotificationTargetResult {
-    val body = requireObjectBody().requireKnownKeys(ITEM_TARGET_KEYS)
+    val body = requireInboxObjectBody().requireKnownInboxKeys(ITEM_TARGET_KEYS)
     return NotificationTargetResult.Item(NotificationItemKey(body.notificationKind(), body.noticeId()))
 }
 
 /** 읽음 처리(공고 묶음 전체) — 종류 축만 없는 같은 모양이다. */
 fun JsonNode.parseNoticeReadTarget(): NotificationTargetResult {
-    val body = requireObjectBody().requireKnownKeys(NOTICE_TARGET_KEYS)
+    val body = requireInboxObjectBody().requireKnownInboxKeys(NOTICE_TARGET_KEYS)
     return NotificationTargetResult.Notice(body.noticeId())
 }
 
