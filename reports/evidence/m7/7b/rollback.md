@@ -72,7 +72,7 @@ class ColumnSpec` 을 되살리고, ⓑ 의 `BidCaseColumnSpecs.kt` 삭제는 to
 
 경우 ①의 ⓐ~ⓒ 를 버릴 clone 에서 실측했다(결과는 `checklist.md` §8).
 
-실측 HEAD: 「append-only test 가 초안·기록 행을 심는다」 커밋(①~⑥) · 「OpenAPI 생성 타입 재생성」 커밋(①~③, ④~⑥ 은 되돌린 트리
-객체 동일성으로 갈음). 판정 SHA 와의 사이에 되돌림 대상 경로가 움직였는지는 `git diff --name-only <실측 HEAD>..<판정 SHA> --`
+실측 HEAD: 「OpenAPI 생성 타입 재생성」 커밋(`998b59dd` 위 rebase 판, ①~⑥ 전부 — 동결 판). 앞 base(`56bb7474`) 위의 두 실측은
+`checklist.md` §8 에 이력으로 남는다. 판정 SHA 와의 사이에 되돌림 대상 경로가 움직였는지는 `git diff --name-only <실측 HEAD>..<판정 SHA> --`
 (이 문서가 되돌리는 경로)로 본다. 둘째 실측 HEAD 뒤로 움직이는 것은 evidence 파일뿐이고, 그 파일들은 이 slice 가 **새로 만든(`A`)**
 것이라 ⓑ 가 내용과 무관하게 통째로 지운다 — 되돌린 트리는 바뀌지 않는다. `M` 경로가 그 사이에 하나라도 움직이면 다시 잰다.

@@ -827,9 +827,18 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 | `check` job — Kotlin | `./gradlew --no-daemon check --continue` | 「요청 값 test …」 커밋 | **exit 0** · 13m23s(23:28–23:42) · 새 test 셋 6/5/4 실행 · 실패 0(XML 확인) |
 | `check` job — S-20 | `./tools/one-command-check.sh`(Kotlin `check` · `qualityBaseline` · Python 전건 · web 전건) | 「OpenAPI 생성 타입 재생성 …」 커밋 | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(99658 bytes)」 · Playwright 2 passed. 같은 명령이 한 커밋 앞(evidence 커밋)에서는 **W-5 에서 exit 1**(§3.4 발견 4) |
 | `web` job | W-1~W-11(S-20 의 web 절이 같은 명령을 돈다) | 위와 같음 | 위와 같음 |
-| `container` job | `ci.yml` 의 `container` step 전부를 job env · `GITHUB_ENV` · `GITHUB_PATH` · step `if:` 평가와 함께 순서대로 재생 | evidence 커밋(「약속↔출하 표 …」) | **JOB SUCCESS** — run step 24 전부 성공(S-20z · S-21~S-21c · S-22a~e3 · S-23 · S-23b · S-23c · S-24 · S-25 · S-26), `uses:` 셋은 해당 없음. 이미지 태그는 재생 전 ID 로 복원(등식 확인) |
+| `container` job | `ci.yml` 의 `container` step 전부를 job env · `GITHUB_ENV` · `GITHUB_PATH` · step `if:` 평가와 함께 순서대로 재생 | evidence 커밋(「약속↔출하 표 …」) | **JOB SUCCESS** — `run` step 23 전부 성공(S-20z · 값 생성 둘 · S-21~S-21c · S-22a~e3 · trivy 설치 · S-23 · S-23b · S-23c · S-24 · S-25 · S-26), `uses:` 넷은 해당 없음. 이미지 태그는 재생 전 ID 로 복원(등식 확인) |
 | 백업·복원 리허설 | `tools/db-rehearsal.sh`(container job S-23c) | 위와 같음 | **통과** — Flyway 이력 top **21** · 복원본 `validate` 통과 · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복 |
 | `ml-engine` job | 입력 변경 0 | — | 생략(S-20 이 Python 전건을 따로 돌렸다) |
+
+### 7.1 `998b59dd` 위 재실측 (동결 판)
+
+| 항목 | 자리 | 결과 |
+|---|---|---|
+| `check` job — Kotlin `:adapters:test --rerun check --continue` | evidence 커밋 「rebase(998b59dd) 반영 …」 | **exit 0** · 13m33s · `adapters` · `app` · `workflow` · `settlement` test 와 `leakPatternGate` 실행(나머지 모듈은 입력 불변 UP-TO-DATE) |
+| `container` job 재생 | 같은 자리 | **JOB SUCCESS** — `run` step 23 / 23 성공 · 이미지 태그 복원 등식 |
+| 백업·복원 리허설(S-23c) | 같은 자리 | **통과** — Flyway top 21 · 복원본 `validate` · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복 |
+| `check` job — S-20 `one-command-check.sh` | 같은 자리 | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 바이트 등식(99658 bytes) · Playwright 2 passed |
 
 **재생 하네스의 첫 시도는 하네스 탓으로 멈췄다**: `GITHUB_PATH` 를 흉내 내지 않아 `install trivy` 가 unbound 변수로 끝났다. 하네스를
 고쳐 다시 돌린 것이 위 결과다(산출물 변경 없음).
@@ -856,6 +865,11 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 | 내 표지 · 남의 표지 | 614 → **0**(base 0) · main 의 vuln-allowlist 줄 3 보존 | 633 → **0** · 3 보존 |
 | 되돌린 트리 객체 | `0aef0adc…` = base 트리 | `0aef0adc…` = base 트리 |
 | ④⑤⑥ `./gradlew --no-daemon check` | **exit 0**(9m59s) | **트리 동일성으로 갈음** — 되돌린 트리 객체가 왼쪽과 같다 |
+
+**`998b59dd` 위 재실측(동결 판)** — clone 을 「OpenAPI 생성 타입 재생성 …」 커밋(rebase 뒤)에 세웠다: 변경 A 47 · M 32 →
+① exit 0 · ② D 47 · M 32 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 633 → **0** · main 표지 3 보존 · 되돌린 트리 객체 =
+`998b59dd` 트리 · ④⑤⑥ `check` **exit 0**(9m42s). (측정 스크립트의 「전」 줄과 ③ 이 옛 base 를 보고 있어 그 두 줄만 `998b59dd` 기준으로
+다시 냈다 — 되돌린 트리 자체는 스크립트와 무관하게 `rollback.md` 의 HEAD 판 명령이 만든 것이다.)
 
 **첫 시도는 무효였고 그 사실이 절차의 결함을 드러냈다.** clone 을 산출물 커밋에 세우고 **그 커밋 판의** `rollback.md` 를 읽었더니,
 base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛 base(`a61ddff1`)를 가리켰고, 복원이 **main 의 변경까지** 되돌렸다
