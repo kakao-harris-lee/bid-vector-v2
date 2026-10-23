@@ -266,7 +266,7 @@ class ProductionHttpSurfaceTest {
         val postPaths = mappings().filterValues { "POST" in it }.keys
         postPaths.shouldNotBeEmpty()
 
-        // **모집단을 판정으로 가른다**(M7/7B, 계약 r2 D-7B-2 조건 1) — 경로 문자열을 손으로
+        // **모집단을 판정으로 가른다**(M7/7B, 팀장 결정 2026-10-22 (b) 조건 1) — 경로 문자열을 손으로
         // 적지 않는다. 인증 경로가 둘이고(자격 헤더 · 세션) 계정을 내는 것은 세션뿐이라,
         // 어떤 매핑은 자격 헤더로 닿지 않는다. **어느 축이 닿는지는 실제 401 이 말해 준다.**
         val session = signIn()

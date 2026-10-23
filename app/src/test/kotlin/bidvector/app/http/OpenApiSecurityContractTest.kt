@@ -79,7 +79,7 @@ class OpenApiSecurityContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * **계정 전용 operation 은 자격 헤더 대안을 적지 않는다**(M7/7B, 계약 r2 D-7B-2 의 문서 쪽).
+     * **계정 전용 operation 은 자격 헤더 대안을 적지 않는다**(M7/7B, 팀장 결정 2026-10-22 (b) 의 문서 쪽).
      *
      * 위 test 가 막는 것은 「문서가 구현보다 **좁아지는**」 것이다 — 필터가 자격 헤더를 받는데
      * 문서가 안 적으면 기계 호출자가 막힌 줄 안다. 입찰함은 그 전제가 **반대**다: 자격 헤더

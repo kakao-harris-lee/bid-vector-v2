@@ -566,7 +566,7 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 | 〃 | `app.http.denied-types` | `+` 저장·조회 포트 셋 | 패키지를 열었으므로 **포트만 다시 닫는다** — controller 가 받는 것은 use case 하나다(D-6A2b-8) |
 | 〃 | `app.injection.allowed-types` | `+4` | `BidCaseWorkflow`(두 controller 의 단 하나의 협력자) + 응답·요청 **값 타입** 셋(이 게이트는 data class 생성자 인자도 주입으로 센다) |
 
-### 3.1 공유 게이트 test 변경 — `ProductionHttpSurfaceTest` (계약 r2 D-7B-2)
+### 3.1 공유 게이트 test 변경 — `ProductionHttpSurfaceTest` (팀장 결정 2026-10-22 (b) — 계약 r2 의 D-7B-2 와 다른 것)
 
 **무엇이 충돌했나.** 그 test 는 `X-Operator-Credential` 하나로 **등록된 POST 매핑 전수**가
 같은 모양(415/400/400)으로 본문을 거부하는지 잰다. 그런데 입찰함은 **계정 전용**이다 —
