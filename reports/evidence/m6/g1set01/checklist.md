@@ -308,10 +308,11 @@ fixture 의 상호는 전부 가상이고 **ASCII 로만** 적었다 — 컴파�
     `grep -rn '<지운 심볼>'` 로 **심볼 이름의** 역방향 파급을 본다(좌표 규율은 심볼 이름을 잡지 못한다).
 12. **모듈 밖 오버로드**(verifier V92) — 모듈 밖에서 금액을 넷째 인자로 받는 같은 이름 함수를 선언하는
     것은 언어가 막지 않는다. 그 함수는 커널을 거치지 않으므로 확정 판정을 만들 수 없다(fixture 6·7).
-13. **`internal` 은 Kotlin 의 경계다**(verifier L-1r2) — 바이트코드에서는 public 이라 모듈 밖 **Java** 소스는
-    `new SettledAwardOutcome.Won()`·`new AwardLookupDecision.Lookup(…)` 를 컴파일·실행할 수 있다(검증자 실측). 저장소
-    main 의 `.java` 는 0 이고 그것을 막는 게이트는 없다 — Java 소스가 생기면 이 잠금을 다시 본다. (Kotlin 의
-    `@Suppress("INVISIBLE_*")` 우회는 `allWarningsAsErrors` 가 막는다.)
+13. **`internal` 은 Kotlin 의 경계다**(verifier L-1r2 · CR P-1 정정) — 바이트코드에서는 public 이라 Java 컴파일러는
+    `new SettledAwardOutcome.Won()`·`new AwardLookupDecision.Lookup(…)` 를 받는다(검증자 실측). **저장소 안의 Java 소스는
+    이미 막혀 있다** — convention plugin 이 `java.setSrcDirs(emptyList())` 로 1차 봉쇄하고 `sourceLanguageGate`(허용
+    확장자 `kt`·`kts`·`md`, `check` 에 배선)가 `src/` 의 다른 언어 파일을 실패로 만든다. 남는 것은 **저장소 밖 JVM
+    소비자**뿐이다. (Kotlin 의 `@Suppress("INVISIBLE_*")` 우회는 `allWarningsAsErrors` 가 막는다.)
 14. **정책의 출처는 열려 있다**(CR Q-1r2) — 커널은 넘어온 정책을 양쪽에 같게 쓸 뿐, 그것이 출하
     `AWARD_MATCHING_POLICY` 의 해석값인지는 묻지 않는다(`*PolicyData` 의 public 생성자는 저장소 관례). 호출부
     test 의 몫이고 `OPEN-SET-03` 과 같은 축이다 — capability map SET-01 절이 같은 문장을 갖는다.
@@ -416,7 +417,7 @@ gets  java.util.Locale.ROOT               ← text.lowercase()
 | S-2 | verifier H-1r2 — 「정책 동반」 test 가 결과 쪽을 잠그지 않음(Y8 생존) | **고침** — 토큰이 **낙찰자 상호에만** 있는 사례 → `Won` | 변이 N9(검증자 Y8 과 같은 모양) |
 | S-3 | verifier M-1r2 · CR N-3 — `Lost` 생성자 `internal` 미잠금(Y7 생존) | **고침** — fixture 7(음성 · 오타 변이, 양성은 fixture 6 공유) | 변이 N7b |
 | S-4 | CR N-2 — U+0085 퇴화 상호가 미기록 대신 낙찰 | **고침** — `stripWhitespace` 에 U+0085, 공백 집합이 legacy 와 같아짐 · §3-6 문면 정정 | test · 변이 N10 |
-| S-5 | verifier L-1r2 — Java 호출자는 `internal` 을 우회 | **등재**(§3-13) | — |
+| S-5 | verifier L-1r2 — Java 호출자는 `internal` 을 우회 | **등재**(§3-13, r3 CR P-1 로 범위 정정 — 저장소 안 Java 는 게이트가 막는다) | — |
 | S-6 | verifier L-2r2 — container 문장 둘(run 수 · 새 이미지 ID) | **ledger** — r2 재생의 실측으로 다시 적었다(commands §4) | 재생 결과 |
 | S-7 | verifier L-3r2 — `intentional` 분류의 근거 | **ledger** — D-G1SET01-1 ② 인용(§3-8) | — |
 | S-8 | CR Q-1r2 — 정책의 출처는 열려 있다 | **등재**(§3-14 + capability map SET-01 절) | — |

@@ -1,13 +1,13 @@
 # M6/G1-SET01 rollback — in_scope 경로 한정 복원
 
-**실측 HEAD: `dee96d41`**(이 slice 의 **마지막 산출물 커밋**, 검토 r2 뒤). base 는
-`54e2c5e2`(계약 D-G1SET01-1). 아래 ①~⑥ 은 그 커밋을 체크아웃한 **임시 clone** 에서 2026-10-23 에 실제로 돌린
+**실측 HEAD: `7b34b4ee`**(이 slice 의 **마지막 산출물 커밋**, 승인 전 일괄 · rebase 뒤). base 는
+`56bb7474`(계약 D-G1SET01-3). 아래 ①~⑥ 은 그 커밋을 체크아웃한 **임시 clone** 에서 2026-10-23 에 실제로 돌린
 결과다. 뒤따르는 evidence 커밋은 되돌림 대상이 아니다 — verifier 의 대조 술어는
-`git diff --name-only dee96d41..<판정 SHA> -- <아래 복원 경로들>` 이 **빈 출력**인가다.
+`git diff --name-only 7b34b4ee..<판정 SHA> -- <아래 복원 경로들>` 이 **빈 출력**인가다.
 
 ## 되돌리는 것 — 기계 산출 목록
 
-목록은 `git diff --name-status 54e2c5e2..HEAD` 에서 내고 라운드마다 재산출한다.
+목록은 `git diff --name-status 56bb7474..HEAD` 에서 내고 라운드마다 재산출한다.
 
 | 상태 | 경로 | 처분 |
 |---|---|---|
@@ -33,7 +33,7 @@
 이다).
 
 ```sh
-git restore --source=54e2c5e2 --staged --worktree -- \
+git restore --source=56bb7474 --staged --worktree -- \
   settlement \
   config/quality/gate-tests.properties \
   docs/discovery/capability-map.md \
@@ -43,20 +43,20 @@ git restore --source=54e2c5e2 --staged --worktree -- \
 경로는 개별 인자로 넘긴다. hunk 역적용은 쓰지 않는다 — 공유 파일을 base 트리에서 통째로 가져오므로
 남의 줄을 떨어뜨릴 수 없다(③-b 가 잰다). `--source` 에 없는 신규 파일은 이 명령이 지운다(②).
 
-## 실측 — 임시 clone(`dee96d41`)에서 ①~⑥
+## 실측 — 임시 clone(`7b34b4ee`)에서 ①~⑥
 
 | # | 무엇 | 결과 |
 |---|---|---|
-| 전제 | base 가 HEAD 의 조상 · 이 slice 의 첫 산출물 커밋(`e7537f7d`)이 base 에 없음 | 실행 전 단언 — 둘 다 **OK** |
+| 전제 | base 가 HEAD 의 조상 · 이 slice 의 첫 산출물 커밋(`0c827959`)이 base 에 없음 | 실행 전 단언 — 둘 다 **OK** |
 | ① | 복원 명령 종료 코드 | **0** |
 | ② | 그 명령이 낸 변경 수 | **A 1 · D 27 · M 4** |
 | ③ | base 대비 복원 경로 diff | **0 줄** |
-| ③-t | **트리 동일성** — evidence 디렉터리를 index 에서 뺀 트리 == base 트리 | `a5e62fa38b28` == `a5e62fa38b28` |
+| ③-t | **트리 동일성** — evidence 디렉터리를 index 에서 뺀 트리 == base 트리 | `0aef0adc61e0` == `0aef0adc61e0` |
 | ③-a | 내 표지 0 — 새 키 · 추적표·capability map 의 `M6/G1-SET01` | **0 · 0 · 0** |
 | ③-a | `settlement` main `.kt` 수 · `src/test` | **1**(`ModuleBoundaryAnchor.kt`) · **없음** |
-| ③-b | 남의 표지 보존 — 공유 파일 줄 수 == base | 907 == 907 · 3585 == 3585 · 181 == 181 |
+| ③-b | 남의 표지 보존 — 공유 파일 줄 수 == base | 918 == 918 · 3595 == 3595 · 181 == 181 |
 | ③-c | 되돌리지 않는 것이 남는가 | evidence 넷 — 남는다 |
-| ④⑤⑥ | 복원한 트리에서 전건 `check`(컴파일 · test · 게이트, `leakPatternGate` 포함) | **exit 0** · BUILD SUCCESSFUL **30초** · 359 task(202 실행 · 157 캐시) · HEAD 끝 `dee96d41` — 짧은 이유: 복원 트리가 r1 에서 잰 복원 트리와 **같은 트리**(`a5e62fa38b28`)라 무거운 출력이 캐시에서 왔다. 그 트리의 캐시 없는 실행은 r1(10분 3초 · 224 실행 · 135 캐시) |
+| ④⑤⑥ | 복원한 트리에서 전건 `check`(컴파일 · test · 게이트, `leakPatternGate` 포함) | **exit 0** · BUILD SUCCESSFUL **9분 52초** · 359 task(215 실행 · 144 캐시) · HEAD 끝 `7b34b4ee` |
 
 **③-b 가 줄 수인 이유**: 「내 줄이 사라졌다」(③-a)만 재면 남의 줄까지 떨어뜨린 복원도 통과한다. 두 방향을
 다 재야 「내 것만 되돌렸다」가 선다. ③-t 는 그 둘을 트리 해시 하나로 함께 잰다.
