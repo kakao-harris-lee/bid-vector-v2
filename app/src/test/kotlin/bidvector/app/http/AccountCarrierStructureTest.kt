@@ -185,7 +185,13 @@ private fun constructorsTaking(
         .filter { (key, text) ->
             val fqn = Regex.escape("bidvector.app." + key.replace('/', '.'))
             val declaration = Regex("""^\s*(?:public |protected |private )?(?:synthetic )?$fqn\(([^)]*)\);\s*$""")
-            text.lineSequence().any { line -> declaration.find(line)?.groupValues?.get(1)?.contains(type) == true }
+            text.lineSequence().any { line ->
+                declaration
+                    .find(line)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.contains(type) == true
+            }
         }.keys
 
 private fun appClassOutputs(): Map<String, String> {

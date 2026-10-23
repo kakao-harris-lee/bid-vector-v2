@@ -3,6 +3,7 @@ package bidvector.adapters.bidding
 import bidvector.bidding.BidCommand
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
+import bidvector.bidding.tag
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCommandResult
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -51,7 +52,10 @@ class BidCaseColumnPrivilegeTest : BidCaseDbFixture() {
         seedNotice(key, now.plusSeconds(DEADLINE_AHEAD_SECONDS))
         val workflow = workflow(appRoleDataSource())
 
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         workflow.open(mine, key, BidKind.REAL).created shouldBe false
         workflow
             .draft(mine, caseId, amount(1_000_000L), now, BidActor.User(mine))
@@ -66,7 +70,9 @@ class BidCaseColumnPrivilegeTest : BidCaseDbFixture() {
             .command(mine, caseId, BidCommand.AwaitOpening(openingAt), BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.AWAITING_OPENING
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.AWAITING_OPENING
         count("bid_case", caseId.value) shouldBe 1
         count("bid_draft", caseId.value) shouldBe 1
         // 「같은 공고에 기록이 여러 번 갱신돼도 건은 하나다」(§6.1) — 기록은 쌓이고 건은 하나다.

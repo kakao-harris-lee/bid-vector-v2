@@ -5,6 +5,7 @@ import bidvector.bidding.BidCommand
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.TransitionOutcome
+import bidvector.bidding.tag
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCommandResult
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -30,7 +31,10 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-a")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         workflow.draft(mine, caseId, amount(1_000_000L), now, BidActor.User(mine))
 
         now = now.plusSeconds(2 * HOUR)
@@ -56,14 +60,19 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val deadline = now.plusSeconds(HOUR)
         seedNotice(key, deadline)
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         deadlineCopy(caseId.value) shouldBe deadline
         purgeNotice(key)
 
         now = now.plusSeconds(2 * HOUR)
         workflow.command(mine, caseId, BidCommand.RecordBid(submission(), null), BidActor.User(mine))
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.BID_RECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.BID_RECORDED
         recordRetroactive(caseId.value) shouldBe true
     }
 
@@ -73,14 +82,19 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-c")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         workflow.read(mine, caseId)
         workflow.list(mine, BidKind.REAL, null)
         workflow.command(mine, caseId, BidCommand.Defer(now.plusSeconds(HOUR / 2)), BidActor.User(mine))
 
         workflow.timeline(mine, caseId)!!.filter { it.actorKind == ActorKind.SYSTEM }.shouldBeEmpty()
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.DEFERRED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.DEFERRED
     }
 
     /** 읽기만으로도 판정된다 — 목록의 상태 탭은 **판정 뒤에** 거른다(관심 탭에 마감 지난 건이 남지 않는다). */
@@ -90,7 +104,10 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-d")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         now = now.plusSeconds(2 * HOUR)
 
@@ -106,7 +123,10 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-e")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         val expected = Instant.parse("2026-11-02T01:00:00Z")
         // 쓰는 경로가 아직 없으므로(OPEN-7B-NOTICE-EXPECTED-WRITER) 소유자 연결로 심는다.
         adminExecute("UPDATE bid_case SET outcome_notice_expected_at = '$expected' WHERE id = ${caseId.value}")

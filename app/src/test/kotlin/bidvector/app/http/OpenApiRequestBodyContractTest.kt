@@ -47,12 +47,15 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         withBodyInMapping shouldBe withBodyInDocument
     }
 
-    /** 양성 대조 — 문서의 모든 operation 이 매핑에 있다(키 모양이 어긋나 등식이 빈 집합끼리 맞는 일이 없게). */
+    /**
+     * 양성 대조 — 문서의 operation 이 매핑에 있다(키 모양이 어긋나 등식이 빈 집합끼리 맞는 일이 없게).
+     * 예외는 미매핑 경로 템플릿 하나다 — 404 응답 모양을 문서화하려는 자리이고 매핑이 아니다(D-6A1-21).
+     */
     @Test
-    fun `문서의 operation 은 전부 매핑에 있다 — 키 모양 양성 대조`() {
+    fun `문서의 operation 은 미매핑 템플릿 하나를 빼고 전부 매핑에 있다 — 키 모양 양성 대조`() {
         val mapped = mappedOperations().keys
 
-        documentedOperations().keys.filterNot { it in mapped } shouldBe emptyList()
+        documentedOperations().keys.filterNot { it in mapped }.toSet() shouldBe setOf("GET /{unmatched}")
     }
 
     /** 문서 쪽 — `METHOD /path` → `requestBody` 가 있는가. */
@@ -75,7 +78,11 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         handlerMapping.handlerMethods.entries
             .flatMap { (info, handler) ->
                 val readsBody = handler.methodParameters.any { it.hasParameterAnnotation(RequestBody::class.java) }
-                val patterns = info.pathPatternsCondition?.patterns.orEmpty().map { it.patternString }
+                val patterns =
+                    info.pathPatternsCondition
+                        ?.patterns
+                        .orEmpty()
+                        .map { it.patternString }
                 info.methodsCondition.methods.flatMap { method ->
                     patterns.map { pattern -> "${method.name} $pattern" to readsBody }
                 }
