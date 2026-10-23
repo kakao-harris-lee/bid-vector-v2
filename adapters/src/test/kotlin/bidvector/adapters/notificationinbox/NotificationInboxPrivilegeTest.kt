@@ -103,7 +103,7 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
                 " detail_code, occurred_at, updated_at) " +
                 "VALUES ($accountId, 'NOTICE_REVISED', 'N-PRIV', '000', NULL, now(), now()) " +
                 "ON CONFLICT (account_id, kind, notice_number, notice_round) DO UPDATE SET " +
-                " occurred_at = EXCLUDED.occurred_at, updated_at = EXCLUDED.updated_at, " +
+                " occurred_at = EXCLUDED.occurred_at, updated_at = now(), " +
                 " detail_code = EXCLUDED.detail_code, " +
                 " read_at = CASE WHEN notification_inbox.detail_code IS DISTINCT FROM " +
                 "  EXCLUDED.detail_code THEN NULL ELSE notification_inbox.read_at END",

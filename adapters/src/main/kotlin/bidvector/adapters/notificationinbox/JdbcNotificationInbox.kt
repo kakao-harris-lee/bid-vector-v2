@@ -130,9 +130,7 @@ class JdbcNotificationInbox(
             statement.setString(4, record.notice.round.value)
             statement.setString(5, record.fact.detail?.name)
             statement.setTimestamp(6, occurredAt)
-            // `updated_at` 은 사실의 시각과 같은 값을 싣는다 — 이 표에 「행을 만진 서버 시각」의
-            // 독립 축을 두지 않는다(DB 시계와 애플리케이션 시계가 갈리면 두 축이 서로를 반박한다).
-            statement.setTimestamp(7, occurredAt)
+            // `updated_at` 은 바인딩하지 않는다 — 문장이 `now()` 로 찍는다(SQL 주석의 사유).
             statement.executeQuery().use { rows ->
                 rows.next()
                 if (rows.getBoolean("inserted")) {

@@ -214,7 +214,9 @@ private fun NotificationDetail?.asFlag(
  * 존재하지 않는다(7B 가 세운 「주체 없이 부르는 포트 0」 규율).
  *
  * [occurredAt] 은 **사실의 시각**이고 호출자의 시계가 정한다. 저장 층의 `created_at`(최초
- * 적재, 보존 cutoff 축)과 `updated_at`(재기록 증거)은 이 값과 다른 축이다.
+ * 적재, 보존 cutoff 축)과 `updated_at`(재기록 증거)은 이 값과 다른 축이고 **둘 다 DB 시계가
+ * 찍는다** — 저장 층이 자기 시계로 「언제 이 행을 만졌나」를 남기고, 호출자의 시계는 「사실이
+ * 언제 일어났나」만 말한다.
  */
 data class NotificationInboxRecord(
     val account: AccountId,

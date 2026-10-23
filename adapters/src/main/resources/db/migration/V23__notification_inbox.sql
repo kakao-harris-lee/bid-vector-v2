@@ -76,8 +76,10 @@ CREATE TABLE notification_inbox (
     --  · created_at  — 최초 적재. **DB 가 찍고**(A-2 의 적재 시각 축) 보존 cutoff 가 읽는다.
     --                  앱 역할은 이 열을 UPDATE 할 수 없다(아래 GRANT) — 적재 시각을 밀어 파기를
     --                  피하는 길을 권한 층에서 막는다.
-    --  · updated_at  — 재기록 증거. 같은 사실이 다시 와도 이 값은 움직인다(중복 억제가 작동한
-    --                  자리를 관측할 수 있게).
+    --  · updated_at  — 재기록 증거. **DB 가 찍는다**(upsert 문장의 `now()`). 호출자 시계를
+    --                  싣지 않는 이유: 같은 사실을 같은 `occurred_at` 으로 다시 기록하면 그 값이
+    --                  움직이지 않아 이 열의 일이 성립하지 않는다. `created_at` 과 같은 축이라
+    --                  둘이 서로를 반박하지도 않는다. 보존 cutoff 는 이 열을 읽지 않는다.
     occurred_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL,

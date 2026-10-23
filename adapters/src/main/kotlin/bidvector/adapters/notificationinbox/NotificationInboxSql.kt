@@ -13,6 +13,10 @@ internal object NotificationInboxSql {
      *
      * · `created_at` 은 INSERT 때 DB 가 찍고(DEFAULT) **충돌 경로에서 건드리지 않는다** —
      *   보존 cutoff 의 기준이 재기록으로 밀리지 않는다.
+     * · `updated_at` 은 **DB 시계가** 찍는다(`now()`). 호출자의 시계를 싣지 않는 이유: 같은
+     *   사실을 같은 `occurredAt` 으로 다시 기록하면 그 값이 움직이지 않아 「재기록 증거」라는
+     *   이 열의 일이 성립하지 않는다. `created_at` 과 같은 축(DB 가 찍는 시각)이라 둘이 서로를
+     *   반박하지도 않는다.
      * · `read_at` 은 **detail 이 바뀔 때만** 비운다(D-7C3-1 ④). 같은 사실의 재기록이 읽은
      *   항목을 안읽음으로 되돌리면 운영자가 같은 것을 반복해 읽는다. `IS DISTINCT FROM` 이라
      *   NULL ↔ 값 전이도 「바뀐 것」으로 센다(`<>` 는 NULL 이 끼면 NULL 이 되어 ELSE 로 샌다).
@@ -21,10 +25,10 @@ internal object NotificationInboxSql {
     const val UPSERT_ITEM = """
         INSERT INTO notification_inbox
             (account_id, kind, notice_number, notice_round, detail_code, occurred_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, now())
         ON CONFLICT (account_id, kind, notice_number, notice_round) DO UPDATE SET
             occurred_at = EXCLUDED.occurred_at,
-            updated_at = EXCLUDED.updated_at,
+            updated_at = now(),
             detail_code = EXCLUDED.detail_code,
             read_at = CASE
                 WHEN notification_inbox.detail_code IS DISTINCT FROM EXCLUDED.detail_code THEN NULL

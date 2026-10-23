@@ -48,10 +48,50 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER))
         val second = rawRow(account, "NOTICE_REVISED", "N-1")
 
+        // 사실의 시각은 **호출자의 시계**가 정한다.
         second.occurredAt shouldBe LATER
-        second.updatedAt shouldBe LATER
         // **적재 시각은 보존 cutoff 의 기준**이다 — 재기록으로 밀리면 90일 약속이 거짓이 된다.
         second.createdAt shouldBe first.createdAt
+    }
+
+    /**
+     * **두 시계가 갈라져 있다** — `occurred_at` 은 호출자가, `updated_at`·`created_at` 은 DB 가
+     * 찍는다. 갱신 시각이 호출자의 값을 싣게 되면 아래 test(같은 시각 재기록)가 아무것도
+     * 재지 못한다.
+     */
+    @Test
+    fun `갱신 시각은 호출자의 시계가 아니라 DB 시계다`() {
+        val account = insertAccount("clocks")
+        val notice = unknownNotice("N-1")
+
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
+
+        val row = rawRow(account, "NOTICE_REVISED", "N-1")
+        row.occurredAt shouldBe OBSERVED_AT
+        (row.updatedAt != OBSERVED_AT) shouldBe true
+        (row.updatedAt >= row.createdAt) shouldBe true
+    }
+
+    /**
+     * **같은 시각으로 다시 기록해도 갱신 시각은 움직인다** — 그것이 「재기록 증거」라는 이 열의
+     * 일이다. 호출자 시계를 실었던 앞 판에서는 이 경우 아무 열도 움직이지 않아 그 주장이
+     * 거짓이었다(이 test 가 그 회귀를 막는다).
+     */
+    @Test
+    fun `같은 사실을 같은 시각으로 재기록해도 갱신 시각은 움직인다`() {
+        val account = insertAccount("same-instant")
+        val notice = unknownNotice("N-1")
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
+        val first = rawRow(account, "NOTICE_REVISED", "N-1")
+
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT)) shouldBe
+            NotificationInboxOutcome.Updated
+        val second = rawRow(account, "NOTICE_REVISED", "N-1")
+
+        second.occurredAt shouldBe first.occurredAt
+        (second.updatedAt >= first.updatedAt) shouldBe true
+        second.createdAt shouldBe first.createdAt
+        rowCount() shouldBe 1L
     }
 
     /**
