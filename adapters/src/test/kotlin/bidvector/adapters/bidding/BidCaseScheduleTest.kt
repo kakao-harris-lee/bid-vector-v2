@@ -142,6 +142,42 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         workflow.timeline(mine, caseId)!!.count { it.actorKind == ActorKind.SYSTEM } shouldBe 1
     }
 
+    /**
+     * **정정 공고가 마감을 앞당겨 이미 지났으면** — 담을 때 적은 사본(더 늦은 마감)이 아니라 공고의 지금 값으로
+     * 판정한다(팀장 확인 2026-10-24). 사본만 보면 이 건은 아직 마감 전으로 남는다.
+     */
+    @Test
+    fun `정정 공고가 마감을 앞당겨 이미 지났으면 사본이 아니라 지금 값으로 마감 지남이 된다`() {
+        val mine = account("sched-g")
+        val key = notice("sched-g")
+        val copied = now.plusSeconds(3 * HOUR)
+        seedNotice(key, copied)
+        val workflow = workflow()
+        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        correctNoticeDeadline(key, now.plusSeconds(HOUR / 2))
+
+        now = now.plusSeconds(HOUR)
+
+        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
+        // 사본은 담을 때의 값 그대로다 — 판정이 사본을 보지 않았다는 뜻이다(사본은 아직 2시간 남았다).
+        deadlineCopy(caseId.value) shouldBe copied
+    }
+
+    /** 반대 방향 — 정정이 마감을 미루면 사본(이미 지난 마감)이 아니라 지금 값을 따라 아직 마감 전이다. */
+    @Test
+    fun `정정 공고가 마감을 미루면 사본이 지났어도 아직 마감 전이다`() {
+        val mine = account("sched-h")
+        val key = notice("sched-h")
+        seedNotice(key, now.plusSeconds(HOUR))
+        val workflow = workflow()
+        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        correctNoticeDeadline(key, now.plusSeconds(3 * HOUR))
+
+        now = now.plusSeconds(2 * HOUR)
+
+        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.WATCHING
+    }
+
     @Test
     fun `통보 예정일 값은 전이가 지우지 않는다`() {
         val mine = account("sched-e")
@@ -159,6 +195,14 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         workflow.command(mine, caseId, BidCommand.Defer(now.plusSeconds(HOUR / 2)), BidActor.User(mine))
 
         workflow.read(mine, caseId)!!.case.outcomeNoticeExpectedAt shouldBe expected
+    }
+
+    /** 정정 공고 — 공고의 마감만 바꾼다(판 번호는 V2 트리거가 올린다). */
+    private fun correctNoticeDeadline(
+        key: bidvector.bidding.NoticeKey,
+        deadline: Instant,
+    ) {
+        adminExecute("UPDATE notice SET deadline_at = '$deadline' WHERE notice_number = '${key.noticeNumber}'")
     }
 
     private fun recordRetroactive(caseId: Long): Boolean =
