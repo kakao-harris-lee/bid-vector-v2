@@ -10,7 +10,7 @@
   - verifier(opus) · code-reviewer(sonnet) 병렬.
   - verifier 표적에 **migration-reviewer 관점**과 **privacy-gate 관점**을 넣는다(이 장비에 두 에이전트 정의가 없다).
   - Codex 심판은 운영자가 범위·비용을 승인하지 않았으므로 타지 않는다.
-- **base**: main `bee7c36f` · worktree `bid-vector-v2-m7-7b` · 브랜치 `m7-7b/2026-10-21`. 병렬 레인 중 **마이그레이션을 만드는 것은 이 slice
+- **base**: main `bee7c36f`(2026-10-23 `a61ddff1` 위로 rebase — 그 사이 main 변경은 `config/quality/vuln-allowlist.properties` 한 파일, 겹침 0) · worktree `bid-vector-v2-m7-7b` · 브랜치 `m7-7b/2026-10-21`. 병렬 레인 중 **마이그레이션을 만드는 것은 이 slice
   뿐**이다(다음 번호 V21 — PR 시점 main 최대보다 크게, D-6A1-12).
 - **입력 정본**:
   - `docs/discovery/ux-journey-research.md` §6.1(상태 기계 · BID-01 초안 acceptance)
@@ -158,10 +158,10 @@
 ## rollback
 
 마이그레이션은 되돌리기 어려운 경로다 — **forward-fix 가 정본**(6B-2 runbook 관례). `rollback.md` 에 두 경우를 따로 적는다.
-- 머지 전: in_scope 경로 한정 복원 `git restore --source=bee7c36f …`, 새 파일 삭제.
+- 머지 전: in_scope 경로 한정 복원 `git restore --source=a61ddff1 …`, 새 파일 삭제.
 - 머지 뒤: PR revert + 개발 DB 재생성.
 
-머지 전 경우의 ①~⑥ 을 마지막 산출물 커밋에서 실측한다. 목록은 `git diff --name-status bee7c36f..HEAD` 기계 산출이다.
+머지 전 경우의 ①~⑥ 을 마지막 산출물 커밋에서 실측한다. 목록은 `git diff --name-status a61ddff1..HEAD` 기계 산출이다.
 
 ## 검토 레인
 
@@ -181,7 +181,7 @@ run-state · collection worktree 무접촉. `bidvector/app:local` 태그는 레�
 
 ## 계약 갱신 이력
 
-**D-7B-1 (2026-10-21, 팀장 — Phase 1 설계 수령 · 운영자 결정).** 설계는 evidence `8a27db79` 다.
+**D-7B-1 (2026-10-21, 팀장 — Phase 1 설계 수령 · 운영자 결정).** 설계는 evidence `2f3600bf` 다(rebase 전 `8a27db79`).
 - **운영자 결정 — R-2 남은 절반은 별 slice 로 미룬다.** 7B 는 새 표에만 `account_id` 를 둔다. `operator_profile` · `operator_strategy` 의
   `CHECK (id = 1)` 이전은 식별자 모델을 먼저 정해야 한다(`edit_session.operator_id` TEXT 와 `account.id` BIGINT 가 같은가, audit 주체 어휘 ·
   자격 헤더 인증기와의 관계). 그 결정과 `operator_strategy_revision` 키 변경은 별 slice 가 맡는다. 이 PR 이 `milestone-7.md` R-2 판단 문단의

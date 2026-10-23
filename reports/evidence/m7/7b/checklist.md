@@ -1,6 +1,6 @@
 # M7/7B — 입찰 건 모듈(`bidding`) · BID-01 등재 · V21 — evidence
 
-계약: `reports/evidence/m7/7b/scope.md`(커밋 `faaaa105`). base `bee7c36f`.
+계약: `reports/evidence/m7/7b/scope.md`(착수 커밋 `0c4480b1` · 계약 r2 `ebb1bd58`). base `bee7c36f` → 2026-10-23 rebase `a61ddff1`.
 
 ---
 
@@ -489,11 +489,15 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 
 | 커밋 | 내용 |
 |---|---|
-| `f62f104c` | 산출물 1 — 도메인 · workflow · V21 · 영속 |
-| `c81ee05b` | 산출물 2 — HTTP 경계 · 조립 · 서버 스냅샷(변이 실측 뒤 보강) |
-| (이 커밋) | 문서 · evidence |
+| `99493ac8` | 산출물 1 — 도메인 · workflow · V21 · 영속 |
+| `4c64987f` | 산출물 2 — HTTP 경계 · 조립 · 서버 스냅샷(변이 실측 뒤 보강) |
+| `046fa168` | 기계 전수 게이트 대응 — 반사 제거 · 주입 등재 · 본문 모양 일치 |
+| `c73aa58f` · `3af0c174` · `c58c16d2` · `9b7499e1` · `db418a0b` | 수정 라운드 — 어휘 이름 · 계정 전용 경로와 공유 test 모집단 · 맨 위 배열 응답 · 게이트 등재 · test double |
+| (evidence 커밋) | 문서 · evidence |
 
-base `bee7c36f`. 변경 목록은 `git diff --name-status bee7c36f..HEAD` 기계 산출이다.
+SHA 는 2026-10-23 rebase(`a61ddff1` 위) 뒤의 것이다 — 앞 판의 SHA 는 그 rebase 로 이력에서 사라졌다.
+
+base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계 산출이다.
 
 ### 2. 변이 표 — 9/9 적발
 
