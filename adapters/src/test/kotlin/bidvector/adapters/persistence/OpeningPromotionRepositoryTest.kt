@@ -48,6 +48,10 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
 
     private fun id(number: String) = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
+    /** 표지 상호를 실은 개찰완료 투찰 행 하나 — 마스킹 축 test 둘이 공유한다. */
+    private fun rankOneFields(): Map<String, String> =
+        mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1")
+
     private fun seed(
         id: NoticeId,
         endpoint: SourceEndpoint,
@@ -201,7 +205,7 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
     @Test
     fun `마스킹된 원문은 승격 대상에서 빠지고 수가 공시된다`() {
         val notice = id("PROMO-DB-004")
-        val key = seed(notice, SourceEndpoint.OPENING_COMPLETE, mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1"))
+        val key = seed(notice, SourceEndpoint.OPENING_COMPLETE, rankOneFields())
         markMasked(key)
 
         val read = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(Instant.EPOCH)
@@ -215,7 +219,7 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
         // **알려진 제한을 고정한다**(D-7C5P-3): canonical 사본은 그 행의 적재 시각 기준 파기에
         // 걸리고, 원문 마스킹이 소급해 지우지 않는다. 재승격도 지우지 않는다(부재는 덮지 않는다).
         val notice = id("PROMO-DB-005")
-        val key = seed(notice, SourceEndpoint.OPENING_COMPLETE, mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1"))
+        val key = seed(notice, SourceEndpoint.OPENING_COMPLETE, rankOneFields())
         val outcome = readAndPromote(notice).shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
         persist(outcome)
         find(notice)

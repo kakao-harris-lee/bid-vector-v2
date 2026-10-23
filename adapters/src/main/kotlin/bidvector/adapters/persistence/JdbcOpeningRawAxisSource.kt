@@ -63,7 +63,11 @@ class JdbcOpeningRawAxisSource(
             statement.setTimestamp(1, Timestamp.from(collectedSince))
             statement.setArray(2, openingAxisArray())
             statement.executeQuery().use { rows ->
-                if (!rows.next()) ExcludedCounts(0, 0) else ExcludedCounts(rows.getInt("masked"), rows.getInt("expired"))
+                if (!rows.next()) {
+                    ExcludedCounts(masked = 0, expired = 0)
+                } else {
+                    ExcludedCounts(masked = rows.getInt("masked"), expired = rows.getInt("expired"))
+                }
             }
         }
 
@@ -150,7 +154,7 @@ private const val OBSERVATION_FETCH_SIZE = 500
  * 제외한 행의 계수 — **원문을 가져오지 않는다**(집계뿐이다). 마스킹 표지가 있는 행과, 표지는 없으나
  * 보존 창보다 오래된 행을 따로 센다: 처방이 다르다(앞은 영구 제외, 뒤는 창을 지난 적재다).
  */
-private val COUNT_EXCLUDED_SQL =
+private const val COUNT_EXCLUDED_SQL =
     """
     SELECT count(*) FILTER (WHERE pii_masked_at IS NOT NULL) AS masked,
            count(*) FILTER (WHERE pii_masked_at IS NULL AND inserted_at < ?) AS expired
