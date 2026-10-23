@@ -1,0 +1,87 @@
+# M7/7C③ — 알림함 새 표 · NOTI-10 중복 억제 · 읽음/안읽음 · 건별 묶음 (착수 계약, 2026-10-23, 팀장)
+
+- **근거**: `milestone-7.md` 7C ③(「알림함 새 표(NOTI-10 중복 억제 키·읽음/안읽음·건별 묶음 — 기존 `inbox` 표는 이벤트 소비 멱등
+  표(ADR 0005 D-3)라 재사용하지 않는다)」) · R-4(외부 effect 는 알림함 기록까지, 채널 발송 없음) · R-2(사용자 소유 표에 `account_id`).
+  운영자 지시 2026-10-23 「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건(M6 완료 조건 성립)의 **운영자 예외**
+  (7C①·7C④ 와 같은 종류).
+- **base**: main `a61ddff1` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
+- **병렬 레인**(전부 push 0): 7B(V21, `AccountScopedRoutes`) · 7C④(V22) · 7C② · 7C⑤ · 7C①b · g1c03 · g1set01 · g1dec05.
+  무거운 빌드는 `flock ~/.local/bid-vector-build.lock` 직렬.
+- **입력 정본**: `docs/discovery/m7-screen-data-requirements.md` 「알림함」 절(항목 목록·읽음·묶음·중복 억제 키·트리거 여섯·클릭 → 워크시트) ·
+  capability map / 추적표(`reports/evidence/m6/6e1/acceptance-trace.md`)의 NOTI-10 · NOTI-04 · STR-08 행 · ADR 0005 D-3(기존 `inbox`
+  의 뜻) · `bidvector.workflow.evaluation.OutboxNotificationRequestPortTest`(멱등 키가 `noticeId` 로 고정되는 기존 측정) · 7D 의 세션 주체
+  (main) · 7B 의 계정 범위 경로 결정(`bid-vector-v2-m7-7b/reports/evidence/m7/7b/checklist.md`, 읽기 전용 참고).
+
+## 이 slice 가 닫는 절반과 남기는 절반
+
+트리거 여섯 중 대부분의 **원천**(STR-08 감시 이력 · BID-01 입찰 건 · SET-01/02 대사)은 아직 main 에 없다. 그래서 이 slice 는
+**알림함 자체**(표 · 쓰기 포트 · 중복 억제 · 읽기 API)를 세우고, 트리거는 **main 에 원천이 있는 것만** 배선한다.
+
+- **닫는다**: 알림함 표(V23 — 번호는 머지 순서에 따라 재조정) · 쓰기 포트 `NotificationInboxPort`(이름은 레인이 정함, 다른 slice 가 이것만
+  부른다) · NOTI-10 중복 억제 키(같은 건·같은 종류는 **한 항목 갱신**, 제목 문구가 바뀌어도 흔들리지 않음) · 읽음/안읽음 전이 · 건별 묶음 ·
+  목록/읽음 처리 endpoint · 항목이 공고 ID 를 실어 클릭 → 워크시트가 클라이언트에서 닫힘(ⓐ).
+- **배선하는 트리거**: main 에 원천이 있는 것 — 공고 변경(정정공고, COL-01: 공고 버전은 있으나 변경 알림 경로가 없다)을 Phase 1 에서
+  확인하고, 원천이 있으면 배선한다. 나머지 다섯(새 후보 · 마감 D-1/D-0 · 개찰 완료 · 서류 기한 D-2 · 낙찰/패찰 확정)은 **원천 slice 가
+  이 포트를 부르는 것으로 닫는다** — 이 slice 는 트리거 종류 어휘(enum)와 각 종류의 중복 억제 키 규칙을 선언만 하고, 그 원천의 판정은
+  흉내 내지 않는다(가짜 원천 금지).
+- **R-4 경계**: 알림함 기록이 끝이다. outbox → relay → 채널 경로에 새 일을 싣지 않는다(채널은 `OPEN-STR-12` 뒤).
+
+## 산출물
+
+1. **V23 마이그레이션**: 알림함 표. `account_id`(R-2) · 중복 억제 키(유일 제약 — 계정 범위 안에서) · 종류 · 공고 참조 · 읽음 시각(null =
+   안읽음) · 생성/갱신 시각 · 표시용 본문은 **PII 없는 구조 필드**(사업자번호·담당자 이름·연락처 0). 보존·파기 정책이 필요한지 Phase 1 에서
+   6B-3(보존 90일 파기)과 대조해 판정한다.
+2. **Kotlin**: 쓰기 포트 + 읽기 포트 + persistence 어댑터 + controller. 중복 억제는 DB 유일 제약 + upsert 한 문장으로(경합에서 두 항목이
+   생기지 않음을 실 DB 동시성 test 로).
+3. **OpenAPI**: 목록(안읽음 수 · 건별 묶음 · 페이지 상한 선언) · 읽음 처리(단건 · 묶음 전체). 생성 타입 재생성(W-5).
+4. **test**: 중복 억제(같은 키 두 번 → 항목 1, 갱신 시각만 이동) · 제목 문구 변경에도 1 · 읽음 전이 · 다른 계정 항목 접근 0(인가를 구조로) ·
+   인증 없음 401 · CSRF 없는 쓰기 거부 · 응답 스키마에 PII 필드 0.
+5. **추적표·capability map**: NOTI-10 행에 근거(알림함 절반 성립 — 트리거 배선은 원천 slice 몫으로 홀더). 판정 문자는 측정이 서는 만큼만 올린다.
+
+## 설계 검토 (Phase 2.5 — 레인이 Phase 1 설계 문서 §0 에서 채우고 팀장이 수령)
+
+- **(0) 위협 모델**: 방어 — 다른 계정 항목 읽기·읽음 처리(IDOR) · 중복 억제 키 경합으로 항목 증식 · 쓰기 포트를 HTTP 로 노출(알림 위조) ·
+  알림 본문으로 PII 누출 · CSRF. 방어하지 않음 — 단일 운영자가 자기 알림을 많이 읽는 것.
+- **(1) 구성**: 쓰기 포트는 HTTP 표면에 없다(아키텍처 게이트로 — 포트 호출 쌍 · denied-types). 계정 범위는 포트 시그니처가 주체를 받는 구조로.
+- **(2) 우회 ≥5** · **(2b) 값 획득 축**(새 public 표면 전수) · **(3) 과잉·미달** — 레인이 채운다.
+
+## in_scope / out_scope
+
+- in: V23 마이그레이션 · 알림함 포트·어댑터·controller 와 test · `openapi/bidvector-operator-api.yaml` · `web/src/api/generated/operator-api.ts` ·
+  게이트 설정(`config/quality/**`)의 필요한 줄(넓힌 줄마다 근거) · 추적표·capability map 의 NOTI-10 행 · `reports/evidence/m7/7c3/**`.
+- out: 채널 발송 · 원천 판정(STR-08·BID-01·SET) · 기존 `inbox` 표 · `web/src/**` 의 생성물 외 · `.github/**`.
+
+## acceptance
+
+`ci.yml` 의 `check` job 과 `web` job 명령 그대로. 마이그레이션이 있으므로 `container` job 입력이 바뀌는지 path-limited diff 로 보이고,
+바뀌면 그 job 도 잰다.
+
+## rollback
+
+`git restore --source=a61ddff1 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 마이그레이션은 **배포 전**
+되돌림만 이 방식이다 — 배포 뒤 되돌림(V23 표 drop 순방향 마이그레이션) 경로를 rollback.md 에 따로 적는다. 목록 기계 산출, 마지막 산출물
+커밋에서 ①~⑥ 실측.
+
+## 검토 레인
+
+되돌리기 어려운 경로(마이그레이션 + 사용자 소유 표). verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **migration-reviewer 관점**과
+**privacy-gate 관점**을 넣는다(이 장비에 두 에이전트 정의가 없다). Codex 는 운영자가 범위·비용을 승인하지 않았으므로 타지 않는다.
+
+## 레인 사이 계약
+
+- 7C②(투찰가 요청 결과 기록) · 7C⑤(낙찰/패찰 확정) · 7B(마감·서류 기한) 가 이 쓰기 포트를 부른다. **포트 시그니처와 종류 어휘를 Phase 1
+  에서 먼저 확정해 팀장에게 보고**한다 — 팀장이 다른 레인에 전달한다. 확정 뒤 바꾸려면 팀장 경유.
+- 7B·7C④ 와 마이그레이션 번호가 겹친다. 뒤에 머지되는 쪽이 번호를 다시 매긴다.
+
+## 호스트 빌드
+
+모든 Gradle·Testcontainers·npm 명령은 `flock ~/.local/bid-vector-build.lock <명령>`. 점검 셋(pgrep·free·ps)은 별도 호출로 먼저.
+00:30~03:00 KST 무거운 빌드 금지.
+
+## 계약 갱신 이력
+
+(없음)
+
+## 하네스 레인 변경 (상시)
+
+- 없음.
