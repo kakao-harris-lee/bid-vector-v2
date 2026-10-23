@@ -62,3 +62,21 @@ checklist.md §0 에 쓰고 팀장에게 보고한 뒤 답을 기다린다. 판�
   available < 6GB 또는 swap free < 2GB 면 시작하지 않는다. 00:30~03:00 KST 금지.
 - 완료: `check` exit 0 · 변이 표 · rollback.md(명령으로 목록 도출) · `leakPatternGate` executed 확인 → 판정 SHA 보고 후 동결. push 0.
 - 검토: verifier(opus) · code-reviewer(sonnet) 병렬. 마이그레이션이 있으면 migration-reviewer 관점 포함.
+
+## 계약 갱신 이력
+
+D-7C1B-1 ~ D-7C1B-3 의 결정 문면은 `checklist.md` §1 · §10 에 반영돼 있다(앞 팀장 세션).
+
+**D-7C1B-4 (2026-10-24, 팀장 — 검토 r2 수령 · 승인 전 일괄).** verifier r2 ready-for-review(blocker 0 · high 0 · medium 1 · low 4),
+code-reviewer r2 approve(blocker 0 · high 0 · medium 1 비차단 · low 8). r1 지적 아홉은 둘 다 「닫힘」으로 판정했다. 승인 전 일괄로 다음을 한다.
+- **verifier F-1(medium, test 공백) — 고친다.** 미결 사유 라벨 ↔ 사유의 대응을 사유별 쌍으로 단언한다. 사유 목록은 `sealedSubclasses` 에서 도출한다
+  (손 목록 금지). 두 라벨을 맞바꾸는 변이가 RED 인지 실측해 변이 표에 더한다. 위협 모델 「사유 지어내기」 자리다 — 표적 재검증 대상이다.
+- **문면 정정(verifier L-1 · CR §6-14)**: `ListSuggestionsUseCase` · `ComputationInputs` KDoc 의 「프로필을 한 번 읽어 고정」을 §1 P4 정정과 맞춘다(주석만).
+  §6-14 「대가가 재계산 1회뿐」 → 「재계산 1회이고 연속되면 409」.
+- **트리거 명시(verifier L-3)**: §6-4 에 「7C④ 병합이 프로필 쓰기 경로를 열면 프로필 고정 래퍼를 다시 판단한다」를 적는다.
+- **test 하네스(CR low)**: probe 무장/해제를 `try/finally` 로 · STR-06 use case test 의 `calledFor` 에 기대 id 목록 한 줄. 나머지 CR low
+  (문장 기록 프록시 상주 · 비지 않은 프로필의 실 JDBC 값 등식(verifier L-2와 같음) · fixture SQL 보간 · 네 번째 키 목록 사본 · 동명)는 §6 에 후속 후보로 한 줄씩 적는다.
+- **후속 slice 후보(CR medium)**: 프로필 1회 고정 래퍼(식 `5+n+h`, §6-4 A-B-A 동시 해소) + 운영 cap 급 1회 실측. 이 slice 에서 고치지 않는다.
+- **rebase**: `998b59dd` 위로. 충돌은 합집합으로 풀고 면제 수·추적표 집계를 재계수한다. 그 뒤 찬 `check`(`--rerun` 또는 `--no-build-cache`) · web job · 변이 표(F-1 포함)
+  · rollback ①~⑦ 을 새 base 에서 다시 잰다(앞 실측은 base 가 바뀌어 무효). 판정 SHA 를 다시 고정해 보고한다.
+- 새 파일이 생기면 in_scope 와 대조해 보고한다. production 코드 변경은 KDoc 두 자리뿐이어야 한다.
