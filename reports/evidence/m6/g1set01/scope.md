@@ -135,6 +135,14 @@ Codex 없음.
 - main 이 움직이지 않았으면 rebase 없이 마지막 산출물 커밋에서 check · 변이(통제군 `--rerun`) · rollback ①~⑥(base `54e2c5e2`) 재측정 → 동결.
   container 는 app 입력(settlement)이 바뀌므로 재생기로 다시 잰다.
 
+**D-G1SET01-3 (2026-10-23, 팀장 — 검토 r3 수령: verifier ready-for-review · CR APPROVE(LOW 2), 승인 전 일괄).** 판정 대상 산출물 `dee96d41`.
+- CR P-1: 제한 §3-13 정정 — Java 소스는 `sourceLanguageGate` 와 `java.setSrcDirs(emptyList())` 가 이미 막는다. 남는 것은 저장소 밖 JVM 소비자뿐.
+- CR P-2: `OperatorTradeName` KDoc 의 「새지 않는다」를 실제 거동(U+0085 만으로 된 상호는 `isNotBlank` 를 지나 `NormalizesToEmpty` 로 간다 — 안전,
+  legacy 일치, test 가 단언)에 맞춘다. 주석·KDoc 만, 거동 0.
+- **rebase**: main `56bb7474`(#84 7C⑤-0 머지) 위로. 설정 파일 겹침은 합집합, 의존 게이트 면제 수 재계산. base 는 `56bb7474` 로 재고정.
+- 재측정: 마지막 산출물 커밋에서 check(찬 clone) · rollback ①~⑥(base `56bb7474`) · 유효성 술어 · container 재생(rebase 로 app 입력이 바뀜).
+  변이는 거동 0 이고 settlement 입력이 rebase 로 바뀌지 않으면 재실행하지 않는다(그 사실을 `git diff` 로 보인다).
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
