@@ -172,8 +172,10 @@ private const val ASCII_CASE_OFFSET = 32
  * 그래서 오늘 production 이 만들 수 있는 값은 [NotDeclared] 뿐이고, 그 사실이 추적표
  * SET-01 행의 빈 자리 하나다.
  *
- * 「상호 없음」을 나타내는 길은 [NotDeclared] 하나다 — 빈·공백만 문자열로는 [Declared] 를
- * 만들 수 없다(그 입력이 「설정은 됐으나 정규화 뒤 빈」 사유로 새지 않는다).
+ * 「상호 없음」을 나타내는 길은 [NotDeclared] 하나다 — 빈 문자열과 `Char.isWhitespace()` 공백만으로 된
+ * 문자열로는 [Declared] 를 만들 수 없다. 예외는 U+0085 만으로 된 상호다: 그 글자는 생성 가드(`isNotBlank`)를
+ * 지나고 정규화(①)에서 지워져 「설정은 됐으나 정규화 뒤 빈」(`NormalizesToEmpty`) 으로 간다 — 판정은 하지 않으므로
+ * 안전하고 legacy 와 같은 결말이다(`CompanyNameNormalizationTest` 가 단언한다).
  */
 sealed interface OperatorTradeName {
     data class Declared(
@@ -191,8 +193,9 @@ sealed interface OperatorTradeName {
 
 /**
  * 결과 쪽(낙찰자) 상호의 **상태**. [NotPublished] 는 「낙찰자가 아니다」가 아니라 「낙찰자
- * 상호가 공개되지 않았다」다 — 이 구별이 접히면 미기록이 패찰이 된다. 빈·공백만 문자열로는
- * [Published] 를 만들 수 없다(「공개 안 됨」의 길은 [NotPublished] 하나다).
+ * 상호가 공개되지 않았다」다 — 이 구별이 접히면 미기록이 패찰이 된다. 빈 문자열과
+ * `Char.isWhitespace()` 공백만으로 된 문자열로는 [Published] 를 만들 수 없다(「공개 안 됨」의 길은
+ * [NotPublished] 하나다 — U+0085 만으로 된 상호는 정규화 뒤 비어 미기록(`NormalizesToEmpty`)으로 간다).
  *
  * [Published] 의 필드는 상호 하나뿐이다 — 금액·수치 필드가 더해지면 판정이 그것을 읽을 길이
  * 생기므로, 필드 집합을 test(`AwardMatchingKernelTest`)가 등식으로 고정한다.
