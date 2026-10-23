@@ -4,6 +4,17 @@ import bidvector.workflow.access.AccountId
 import jakarta.servlet.http.HttpServletRequest
 
 /**
+ * **임시 — 7B(D-7B-2) 머지 뒤 rebase 에서 이 파일과 그 test 를 삭제하고 7B 의 접근자로
+ * 교체한다**(운영자 결정 D-7C3-2 ⓐ·ⓑ). 7B 가 세션 인증이 요청 속성에 심은 **typed**
+ * `AccountId` 를 접근자 하나로 읽게 만들므로, audit 주체 **문자열을 파싱하는** 이 방식은 그
+ * 판과 정면으로 어긋난다. 동결 SHA 에 이 파일이 남아 있으면 `not-ready` 다.
+ *
+ * 지금 두는 이유는 하나뿐이다: 7B 가 아직 머지되지 않아 그 접근자가 main 에 없고, 알림함
+ * controller 가 계정 주체 없이는 컴파일되지 않는다. 그래서 **파싱을 이 한 자리에 모아** 두어
+ * 교체가 파일 삭제 하나로 끝나게 한다(controller 는 `SessionAccount.of(request)` 한 줄만
+ * 부른다 — 그 줄을 7B 접근자 호출로 바꾸는 것이 교체의 전부다).
+ *
+ * ---
  * 인증을 지난 요청에서 **계정 주체**를 꺼낸다(M7/7C③).
  *
  * 7D 의 기본 거부 필터는 「인증됐는가」까지만 보고 **어떤 주체인가**는 판정에 쓰지 않는다 —

@@ -6,6 +6,12 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
+ * **임시 — 7B(D-7B-2) 머지 뒤 rebase 에서 `SessionAccount.kt` 와 함께 삭제한다**(운영자 결정
+ * D-7C3-2 ⓑ). 7B 의 typed `AccountId` 요청 속성 + 접근자가 오면 문자열 파싱 자체가 사라지므로
+ * 이 class 가 재는 성질(라벨 왕복 · 형태 거부)도 함께 없어진다 — 그 자리는 7B 접근자의 test 가
+ * 진다. 동결 SHA 에 이 파일이 남아 있으면 `not-ready` 다.
+ *
+ * ---
  * M7/7C③ — 인증 판정의 산출물에서 **계정 주체**를 꺼내는 자리. 값만 쓰는 순수 test 다.
  *
  * 가장 중요한 단언은 **왕복**이다: 라벨을 짓는 자리(세션 인증기)와 읽는 자리([SessionAccount])

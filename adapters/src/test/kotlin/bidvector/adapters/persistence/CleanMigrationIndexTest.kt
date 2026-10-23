@@ -57,6 +57,12 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("account", "account_pkey", "USING btree (id)"),
             IndexSpec("account", "account_login_name_key", "USING btree (login_name)"),
             IndexSpec("browser_session", "browser_session_pkey", "USING btree (session_digest)"),
+            // M7/7C③ — **중복 억제 키가 PK 자체**다(파생 열·별도 UNIQUE 를 두지 않는다).
+            IndexSpec(
+                "notification_inbox",
+                "notification_inbox_pkey",
+                "USING btree (account_id, kind, notice_number, notice_round)",
+            ),
             IndexSpec("notice_requirement", "notice_requirement_pkey", "USING btree (notice_number, notice_round)"),
             IndexSpec(
                 "notice_requirement_row",
@@ -105,6 +111,18 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("outbox", "outbox_retention_cutoff_idx", "USING btree (state, inserted_at)"),
             // M7/7D — 세션도 파기 대상이다(보존 분류 PURGE) — 그 cutoff 질의를 받는다.
             IndexSpec("browser_session", "browser_session_retention_cutoff_idx", "USING btree (created_at)"),
+            // M7/7C③ — 알림함도 파기 대상이라 cutoff 질의를 받고, 목록은 계정 안에서 최신 순이다
+            // (선행 열이 `account_id` 라 계정 경계가 인덱스 층에서도 첫 축이다).
+            IndexSpec(
+                "notification_inbox",
+                "notification_inbox_account_recent_idx",
+                "USING btree (account_id, occurred_at DESC)",
+            ),
+            IndexSpec(
+                "notification_inbox",
+                "notification_inbox_retention_cutoff_idx",
+                "USING btree (created_at)",
+            ),
         )
 
     @Test

@@ -92,9 +92,24 @@ CREATE TABLE notification_inbox (
     -- 종류 ↔ detail 짝(심층 방어). Kotlin 쪽은 `NotificationFact` 의 sealed 구성이라 불법 쌍이
     -- **표현되지 않지만**, 어댑터의 codec 이 어긋나게 쓰면 그것을 잡는 것은 이 CHECK 다.
     -- 세 갈래가 종류 전수를 **덮는다**: detail 을 갖는 둘, 그리고 나머지 전부는 NULL 이어야 한다.
+    --
+    -- **각 갈래에 `IS NOT NULL` 이 있어야 한다** — 없으면 세 값 논리가 이 제약을 열어 준다
+    -- (앞 판에서 실측으로 잡힌 결함): `kind = 'OPENING_COMPLETED'` 인데 `detail_code` 가 NULL 이면
+    -- `detail_code IN (…)` 이 **NULL** 이 되어 첫 갈래가 `TRUE AND NULL` = NULL 이고 나머지 둘은
+    -- FALSE 이므로 전체가 `NULL OR FALSE OR FALSE` = **NULL** 이다. PostgreSQL 은 NULL 인 CHECK 를
+    -- **만족으로 보므로**, 「detail 을 싣는 종류인데 detail 이 없는」 행이 조용히 들어갔다.
+    -- `detail_code IS NOT NULL` 을 더하면 그 갈래가 `TRUE AND FALSE` 로 떨어져 닫힌다.
     CHECK (
-        (kind = 'OPENING_COMPLETED' AND detail_code IN ('PROVISIONAL_FIRST', 'NOT_PROVISIONAL_FIRST'))
-        OR (kind = 'AWARD_DECIDED' AND detail_code IN ('AWARDED', 'NOT_AWARDED'))
+        (
+            kind = 'OPENING_COMPLETED'
+            AND detail_code IS NOT NULL
+            AND detail_code IN ('PROVISIONAL_FIRST', 'NOT_PROVISIONAL_FIRST')
+        )
+        OR (
+            kind = 'AWARD_DECIDED'
+            AND detail_code IS NOT NULL
+            AND detail_code IN ('AWARDED', 'NOT_AWARDED')
+        )
         OR (kind NOT IN ('OPENING_COMPLETED', 'AWARD_DECIDED') AND detail_code IS NULL)
     ),
 

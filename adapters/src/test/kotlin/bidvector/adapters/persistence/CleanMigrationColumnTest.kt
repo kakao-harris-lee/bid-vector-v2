@@ -329,6 +329,18 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("browser_session", "idle_expires_at", "timestamp with time zone", false),
             ColumnSpec("browser_session", "absolute_expires_at", "timestamp with time zone", false),
             ColumnSpec("browser_session", "revoked_at", "timestamp with time zone", true),
+            // M7/7C③ 알림함(추가만). 중복 억제 키 넷은 전부 NOT NULL(PK), `detail_code` 는
+            // nullable(detail 을 싣지 않는 종류가 여섯), `created_at` 만 DEFAULT 를 갖는다
+            // (보존 cutoff 축 — DB 가 찍는다). `read_at` 이 nullable 인 것이 「안읽음」이다.
+            ColumnSpec("notification_inbox", "account_id", "bigint", false),
+            ColumnSpec("notification_inbox", "kind", "text", false),
+            ColumnSpec("notification_inbox", "notice_number", "text", false),
+            ColumnSpec("notification_inbox", "notice_round", "text", false),
+            ColumnSpec("notification_inbox", "detail_code", "text", true),
+            ColumnSpec("notification_inbox", "occurred_at", "timestamp with time zone", false),
+            ColumnSpec("notification_inbox", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notification_inbox", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("notification_inbox", "read_at", "timestamp with time zone", true),
             ColumnSpec("operator_profile", "id", "smallint", false),
             ColumnSpec("operator_profile", "business_types", "ARRAY", false),
             ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
