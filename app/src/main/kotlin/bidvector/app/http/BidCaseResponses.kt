@@ -59,12 +59,6 @@ data class BidCaseResponse(
     }
 }
 
-/** 내 입찰함 목록 — `kind` 가 요청의 필수 질의 인자라 응답에 두 종류가 섞일 수 없다. */
-data class BidCaseListResponse(
-    val bidKind: String,
-    val cases: List<BidCaseResponse>,
-)
-
 /**
  * 타임라인 한 줄 — **본문이 없다.** 메모 · 증빙 참조는 이 응답에 자리가 없다(계약 산출물 8:
  * audit 는 본문을 남기지 않는다). [reason] 은 건너뜀 · 정정의 사유다.
@@ -95,8 +89,3 @@ data class BidTimelineEntryResponse(
             )
     }
 }
-
-data class BidTimelineResponse(
-    val caseId: Long,
-    val entries: List<BidTimelineEntryResponse>,
-)

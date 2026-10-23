@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
  * 입찰함은 계정 경로 전용이라 계정 없는 인증은 401 이다(사유는 나누지 않는다, D-6A1-6).
  */
 @RestController
-@RequestMapping("/api/bid-cases")
+@RequestMapping(AccountScopedRoutes.BID_CASES)
 class BidCaseQueryController(
     private val workflow: BidCaseWorkflow,
 ) {
@@ -35,7 +35,9 @@ class BidCaseQueryController(
         val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
         val bidKind = BidCaseRouting.bidKind(kind)
         val cases = workflow.list(account, bidKind, BidCaseRouting.stateTag(state))
-        return ResponseEntity.ok(BidCaseListResponse(bidKind.name, cases.map(BidCaseResponse::from)))
+        // **맨 위가 배열**이다 — 배열을 감싼 object 는 평탄 규칙(D-6A1-20 ⓑ)에 걸린다.
+        // 요청이 `kind` 를 지정했으므로 응답이 그것을 되풀이하지 않는다.
+        return ResponseEntity.ok(cases.map(BidCaseResponse::from))
     }
 
     @GetMapping("/{caseId}")
@@ -60,7 +62,7 @@ class BidCaseQueryController(
         val id = BidCaseRouting.caseId(caseId)
         val entries = workflow.timeline(account, id)
         return entries
-            ?.let { ResponseEntity.ok<Any>(BidTimelineResponse(id.value, it.map(BidTimelineEntryResponse::from))) }
+            ?.let { ResponseEntity.ok<Any>(it.map(BidTimelineEntryResponse::from)) }
             ?: BidCaseHttp.caseNotFound(request)
     }
 }
