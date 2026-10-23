@@ -10,7 +10,7 @@
   - verifier(opus) · code-reviewer(sonnet) 병렬.
   - verifier 표적에 **migration-reviewer 관점**과 **privacy-gate 관점**을 넣는다(이 장비에 두 에이전트 정의가 없다).
   - Codex 심판은 운영자가 범위·비용을 승인하지 않았으므로 타지 않는다.
-- **base**: main `bee7c36f`(2026-10-23 `a61ddff1` → 같은 날 `56bb7474` 위로 rebase — 겹친 자리는 `EXPECTED_EXEMPT_COUNT` 하나, 합집합 66) · worktree `bid-vector-v2-m7-7b` · 브랜치 `m7-7b/2026-10-21`. 병렬 레인 중 **마이그레이션을 만드는 것은 이 slice
+- **base**: main `bee7c36f`(2026-10-23 `a61ddff1` → `56bb7474` → 2026-10-24 `998b59dd` 위로 rebase — 겹친 자리는 `EXPECTED_EXEMPT_COUNT`(합집합 66) · `capability-map.md` 활성 OPEN 수(합집합 45)) · worktree `bid-vector-v2-m7-7b` · 브랜치 `m7-7b/2026-10-21`. 병렬 레인 중 **마이그레이션을 만드는 것은 이 slice
   뿐**이다(다음 번호 V21 — PR 시점 main 최대보다 크게, D-6A1-12).
 - **입력 정본**:
   - `docs/discovery/ux-journey-research.md` §6.1(상태 기계 · BID-01 초안 acceptance)
@@ -158,10 +158,10 @@
 ## rollback
 
 마이그레이션은 되돌리기 어려운 경로다 — **forward-fix 가 정본**(6B-2 runbook 관례). `rollback.md` 에 두 경우를 따로 적는다.
-- 머지 전: in_scope 경로 한정 복원 `git restore --source=56bb7474 …`, 새 파일 삭제.
+- 머지 전: in_scope 경로 한정 복원 `git restore --source=998b59dd …`, 새 파일 삭제.
 - 머지 뒤: PR revert + 개발 DB 재생성.
 
-머지 전 경우의 ①~⑥ 을 마지막 산출물 커밋에서 실측한다. 목록은 `git diff --name-status 56bb7474..HEAD` 기계 산출이다.
+머지 전 경우의 ①~⑥ 을 마지막 산출물 커밋에서 실측한다. 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
 
 ## 검토 레인
 

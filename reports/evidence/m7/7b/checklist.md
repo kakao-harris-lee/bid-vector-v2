@@ -1,6 +1,6 @@
 # M7/7B — 입찰 건 모듈(`bidding`) · BID-01 등재 · V21 — evidence
 
-계약: `reports/evidence/m7/7b/scope.md`(착수 계약 · 계약 r2(D-7B-1) · 계약 D-7B-2 — 커밋은 제목으로 가리킨다). base `bee7c36f` → 2026-10-23 rebase `a61ddff1` → `56bb7474`.
+계약: `reports/evidence/m7/7b/scope.md`(착수 계약 · 계약 r2(D-7B-1) · 계약 D-7B-2 — 커밋은 제목으로 가리킨다). base `bee7c36f` → rebase `a61ddff1` → `56bb7474` → `998b59dd`.
 
 ---
 
@@ -518,7 +518,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 
 ### 1. 판정 대상 커밋
 
-커밋은 **제목으로** 가리킨다 — 이 slice 는 두 번 rebase 됐고(`a61ddff1` · `56bb7474`) 그때마다 SHA 가 바뀌었다. 판정 SHA 는 동결
+커밋은 **제목으로** 가리킨다 — 이 slice 는 세 번 rebase 됐고(`a61ddff1` · `56bb7474` · `998b59dd`) 그때마다 SHA 가 바뀌었다. 판정 SHA 는 동결
 보고와 PR 조치 코멘트가 정본이다.
 
 | 커밋(제목) | 내용 |
@@ -530,7 +530,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | feat 「계약 D-7B-2 — typed AccountId 를 요청 속성으로 운반 …」 · test 「입찰 건 이중체의 계정 비교를 값으로」 · test 「요청 값 test …」 · test 「append-only test 가 초안·기록 행을 심는다」 | 계약 D-7B-2 와 그 라운드의 발견 셋(§3.4) |
 | docs 커밋들 | 계약 · 설계 · evidence |
 
-base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계 산출이다.
+base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
 
 ### 2. 변이 표 — ①~⑨ 9/9 적발 · ⑩~⑭ 아래와 §3.2 · §3.4
 
@@ -703,8 +703,9 @@ base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계
   `56bb7474` 위 rebase 에서 이미 한 번 충돌했다: main 이 7C⑤-0 으로 62 → 65 였고, **합집합 66** 으로
   풀었다(근거 문단 둘 다 유지 · `check` 초록). **7C①b 레인(+2)이 뒤에 머지되면 그 레인이 다시
   합집합으로 센다**(팀장 지시 2026-10-22) — 수만 다시 세고 **사유를 지우지 않는다**.
-- **`capability-map.md` §10 집계**(95 → 96 · `V2 필수` 61 → 62)와 **활성 OPEN 수**(45 → 44) —
-  §10 블록에 「머지 직전 재계산」 표시를 문면에 넣어 두었다. g1dec05 · g1set01 이 같은 파일의
+- **`capability-map.md` §10 집계**(95 → 96 · `V2 필수` 61 → 62)와 **활성 OPEN 수** — `998b59dd` 위 rebase 에서
+  g1set01(+1, 45 → 46)과 충돌했고 **합집합 45**(7B −1)로 풀었다(두 레인의 주석 줄 유지). §10
+  블록에도 「머지 직전 재계산」 표시를 문면에 넣어 두었다. g1dec05 · g1set01 이 같은 파일의
   다른 행을 고친다.
 - **`config/quality` 의 등재 키들** — 7B 는 **자기 항목만** 더했다(`layer.domain` ·
   `app.injection.*` · `app.http.*` · `gate.tests.*` · `app.surface.api.handlers` ·
@@ -817,6 +818,9 @@ base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계
 ### 7. acceptance 실측
 
 `ci.yml` 의 job 명령 그대로다. 로그는 레인 scratchpad 에 있고 여기에는 결과 한 줄씩만 적는다.
+
+**아래 표는 `56bb7474` 위 트리의 실측이다.** 동결 직전 main 이 `998b59dd`(#85 g1set01 — settlement 코드 포함)로 움직여 다시
+rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.1 이다.
 
 | 항목 | 명령 | 자리 | 결과 |
 |---|---|---|---|
