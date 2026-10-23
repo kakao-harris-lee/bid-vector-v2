@@ -76,6 +76,8 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
   대사 배치)가 맡고, 그 자리는 OPEN 으로 등재한다. 판정 불가(순위 부재·중복·상호 미설정·유찰)는 `false` 로 접지 않고 기록하지 않는다.
 - **D-7C5-8** 7C① 질의 읽기 규율(읽는 자리 하나 · 반복 400 · 인코딩 오류 400)을 공용 internal 헬퍼로 올리고 `NoticeSearchController` 의
   private 사본을 그 호출로 바꾼다 — **in_scope 에 `NoticeSearchController.kt` 추가**. 7C① 의 기존 test·E2E 무편집 초록으로 거동 불변을 증명한다.
+- **D-7C5-9** 구현 중 설계 이탈 둘 수령: 공고 부재는 404 가 아니라 상태 `NOTICE_ABSENT`(「모른다」 갈래를 한 축에) · 진행구분 축 다섯 값
+  (`PROGRESS_ABSENT` — 개찰완료 축만 승격된 행을 「결과 없음」과 구별). 산출물 1 의 「404」 문면은 이 결정으로 대체된다.
 
 
 ## 하네스 레인 변경 (상시)
