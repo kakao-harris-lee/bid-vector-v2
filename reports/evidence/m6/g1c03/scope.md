@@ -139,6 +139,17 @@ ready-for-review(blocker·high 0, medium 3 · low 5) · code-reviewer r1 APPROVE
 test(L-1·L-2·F-4·F-5) · 정리(L-4·L-5·L-6·L-7·F-6). 장부: rollback 의 `git rm`(F-3) · M-1~M-3 · L-3 · L-8·F-7 · evidence 크기(F-8). 배치 뒤
 새 마지막 산출물 커밋에서 check·변이·rollback 재실측, F-1·F-2·F-3 은 verifier 표적 재검증.
 
+**D-G1C03-4 (2026-10-23, 팀장).** 배치가 app jar 를 바꾸므로 `container` job 을 CI 명령 그대로 다시 잰다(앞 재생 갈음 불가 — 트리 동일성).
+13:47 KST d653e8bf(산출물 트리 = 2c3d0e10) 실측 success · 태그 넷 복원. `commands.md` 의 앞 재생 「run 24」는 run 23 + uses 4 의 오기.
+
+**D-G1C03-5 (2026-10-23, 팀장 — r1 표적 재검증 · CR r2 수령, 승인 전 일괄 배치 r2).** verifier ready(F-2·F-3 닫힘, F-1 부분) · CR APPROVE(M4·M5).
+- **F-1 잔여(verifier V1·V2 = CR M4)를 구조로 닫는다**: V1 = use case 가 `decideDetailFetch(…, openingObservedAt = null, …)` 직접 호출,
+  V2 = `Candidate(…, NotCarriedByFrame)` 재구성. 두 우회가 컴파일 단계나 아키텍처 게이트에서 실패하게 한다. 수단은 레인이 고른다(서명 타입화 ·
+  참조 쌍을 앵커 파일로 좁힘 · 생성 자리를 표본틀로 좁힘). 문면을 「하나로 줄였다」로 내리는 대안은 기각. 게이트 술어 변경이 끼면 표적 재검증.
+- **M5**: 거부 → 등재(§5 기존 부채 한 줄 — 이 slice 의 +12 줄이 capability-map 역참조 약 19곳을 밀었다, M0 정정은 범위 밖).
+- **L9**: F-2 회귀 test 의 구판 RED 를 표적 실행 하나로 측정. **low**: `TruncationCause` 코드와 `INTERRUPTED_ROUND` 의 비충돌을 test 로.
+- `commands.md` 「run 24」 정정. 그 뒤 마지막 산출물 커밋에서 check · 변이(V1·V2 포함) · rollback ①~⑥ · container job 재실측 → 동결.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
