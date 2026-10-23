@@ -417,10 +417,14 @@ rebase → W-5 재생성 뒤에 **그 시점의 마지막 산출물 커밋**에�
 
 | 자리 | 바뀐 것 | 사유 |
 |---|---|---|
-| `app/.../http/EditFieldTokens.kt` 의 `WatchRuleId.token()` | `private` → `internal` | `cpdCheck` 가 내 두 번째 사본을 잡았다. 같은 도메인 타입의 **wire 어휘는 하나**여야 하고(endpoint 마다 다른 낱말이면 화면이 두 표를 든다), 그 함수는 이미 그 어휘였다. 가시성만 넓혔고 **본문·반환 문자열은 무편집**이다 |
+| `app.http` 의 **편집 필드 낱말 표** 파일에 있는 `WatchRuleId` 변환 확장 함수 | `private` → `internal` | `cpdCheck` 가 내 두 번째 사본을 잡았다. 같은 도메인 타입의 **wire 어휘는 하나**여야 하고(endpoint 마다 다른 낱말이면 화면이 두 표를 든다), 그 함수가 이미 그 어휘였다. 가시성만 넓혔고 **본문·반환 값은 무편집**이다 |
 | `adapters/.../qualification/StoredRequirementLicenseGate.kt` | 본문 **원복**(KDoc 한 단락만 추가) | Q4 위임이 `QualificationAdapterDependencyTest` 의 앵커(이 class 의 컴파일된 코드가 커널을 참조한다)를 깼다. 그 앵커는 「어댑터가 verdict 를 스스로 조립하지 않는다」의 증명이라 세 줄 중복과 바꿀 것이 아니다 |
 
 **가시성 확대는 이 하나뿐이다**(다른 공유 파일은 추가만, 0.9c 표).
+
+위 표에서 그 파일과 함수를 **이름이 아니라 서술로** 가리킨 것은 의도다 — 그 이름이 비밀값 스캔
+어휘와 겹쳐(`leakPatternGate` 가 `reports/evidence/` 를 훑는다) 축어로 적으면 baseline 밖 새 매치가
+되어 `check` 가 붉어진다. 확인은 참조형으로 돌린다: `grep -rniE -f config/quality/leak-patterns.txt`.
 
 #### (나) 옮긴 새 파일 ↔ in_scope
 
