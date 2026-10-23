@@ -13,46 +13,27 @@ git diff --name-status bee7c36f..HEAD
 
 ## 경우 ① — 머지 전 (이 브랜치에서 되돌린다)
 
-in_scope 경로 **한정** 복원이다. 다른 레인의 파일을 건드리지 않는다.
+**목록을 손으로 적지 않는다.** 앞 판은 파일 이름을 나열했고 그 목록은 **곧 드리프트했다**
+(`HttpTestSupport.kt` 가 빠져 있었다 — 실측). 되돌림 대상은 그때그때 **기계로 뽑는다**:
 
 ```bash
+cd /home/deploy/project/bid-vector-v2-m7-7b
+
 # ⓐ 수정된 기존 파일 — base 의 내용으로 되돌린다
-git restore --source=bee7c36f -- \
-  settings.gradle.kts \
-  workflow/build.gradle.kts adapters/build.gradle.kts app/build.gradle.kts \
-  config/quality/architecture-policy.properties \
-  config/quality/gate-tests.properties \
-  adapters/src/main/kotlin/bidvector/adapters/persistence/ConnectionSource.kt \
-  adapters/src/main/kotlin/bidvector/adapters/retention/RetentionTableRegistry.kt \
-  adapters/src/test/kotlin/bidvector/adapters/retention/RetentionFixture.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationIndexTest.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt \
-  app/src/main/kotlin/bidvector/app/http/ErrorBody.kt \
-  app/src/main/kotlin/bidvector/app/http/JsonValueReaders.kt \
-  openapi/bidvector-operator-api.yaml \
-  web/src/api/generated/operator-api.ts \
-  docs/discovery/capability-map.md \
-  docs/adr/0006-gradle-modules.md \
-  milestone-6.md milestone-7.md \
-  reports/evidence/m6/6e1/acceptance-trace.md
+git diff --name-status bee7c36f..HEAD | awk '$1=="M"{print $2}' \
+  | xargs -r git restore --source=bee7c36f --
 
 # ⓑ 새로 만든 것 — 지운다
-rm -rf bidding \
-  workflow/src/main/kotlin/bidvector/workflow/bidding \
-  workflow/src/test/kotlin/bidvector/workflow/bidding \
-  adapters/src/main/kotlin/bidvector/adapters/bidding \
-  adapters/src/test/kotlin/bidvector/adapters/bidding \
-  adapters/src/main/resources/db/migration/V21__bid_case.sql \
-  adapters/src/test/kotlin/bidvector/adapters/persistence/BidCaseColumnSpecs.kt \
-  app/src/main/kotlin/bidvector/app/http/BidCaseController.kt \
-  app/src/main/kotlin/bidvector/app/http/BidCaseRequests.kt \
-  app/src/main/kotlin/bidvector/app/http/BidCaseResponses.kt \
-  app/src/main/kotlin/bidvector/app/wiring/BidCaseWiring.kt
+git diff --name-status bee7c36f..HEAD | awk '$1=="A"{print $2}' | xargs -r rm -f
+
+# ⓒ 빈 디렉터리 정리(새 모듈·패키지 뿌리)
+find bidding workflow/src/*/kotlin/bidvector/workflow/bidding \
+     adapters/src/*/kotlin/bidvector/adapters/bidding -type d -empty -delete 2>/dev/null
 ```
+
+`A`·`M` 밖의 상태(`R` 이름 변경 등)는 이 slice 에 없다 — 있으면 위 두 줄이 **그것을 조용히
+빼므로**, 되돌리기 전에 `git diff --name-status bee7c36f..HEAD | cut -f1 | sort -u` 가
+`A`·`M` 둘뿐인지 먼저 본다.
 
 **개발 DB 는 파일 삭제로 돌아오지 않는다.** V21 을 이미 적용한 DB 가 있으면 재생성한다
 (`tools/db-rehearsal.sh` 가 쓰는 것과 같은 경로) — Flyway `validate()` 가 「적용된 적 있는데

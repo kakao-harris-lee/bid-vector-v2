@@ -524,6 +524,24 @@ base `bee7c36f`. 변경 목록은 `git diff --name-status bee7c36f..HEAD` 기계
   코드에 실제로 들어 있는지는 그 상수를 직접 읽는 자리가 있어야 잡힌다 —
   `EvidenceRetentionPolicyTest` 신설. 재측정 RED.
 
+**도메인 성질의 행동 변이와 래칫 변이는 다른 것을 증명한다.** 위 ⑦⑧⑨ 는 **래칫이 문다**는
+증거이고(등재와 스키마가 어긋나면 붉다), 도메인 성질이 **행동으로** 덮이는지는 따로 재야
+한다(팀장 지적 2026-10-22). 지금 행동으로 덮인 것은 소유 경계 ① · 소급 ② · 다음 확인 시점 ④ ·
+페이퍼/실 ⑤ 다. **append-only 와 스냅샷 불변**의 행동 변이 둘은 아래에 더한다.
+
+| # | 변이 | 표적 | 결과 |
+|---|---|---|---|
+| ⑩ | 초안 쓰기를 `INSERT` 대신 **같은 행 `UPDATE`** 로 | `BidCaseOwnershipTest`「초안 수정은 새 행을 쌓고」 | (기록) |
+| ⑪ | append-only 트리거 **와** GRANT 를 **함께** 연다 | `BidCaseOwnershipTest`「앱 역할은 … 고치거나 지울 수 없다」 | (기록) |
+| ⑫ | 어느 인증 축에도 안 닿는 새 POST 매핑 | `ProductionHttpSurfaceTest` `unreachable == ∅` | (기록) |
+
+**⑪ 가 「함께」인 이유 — 심층 방어는 한 겹씩은 안 잡힌다.** 트리거만 지우면 그 test 는
+**초록으로 남는다**: 앱 역할에 UPDATE·DELETE 권한이 **애초에 없어서** 권한 층이 여전히 막기
+때문이다. 그것은 test 가 약한 것이 아니라 **두 겹이 각각 충분하다**는 뜻이다. 한 겹만 여는
+변이를 RED 로 만들려면 방어를 한 겹으로 줄여야 하는데 그것은 설계 후퇴다. 그래서 ⑪ 은 두
+겹을 함께 열고, **한 겹씩 여는 변이가 초록이라는 사실 자체**를 여기 적는다(⑦ 이 트리거 한
+겹을 래칫으로 따로 잡는다).
+
 **래칫이 등재 없이는 초록이 되지 않는다는 것도 실측했다**: V21 을 넣고 등재 전에 돌린 첫
 실행에서 스키마 래칫 여섯 파일의 **12 test 가 전부 붉었다**(표 목록 · 컬럼 · 인덱스 · CHECK ·
 트리거 · 권한 행렬 · FK · UNIQUE · 보존 집합 등식). 등재는 그 붉은 것을 하나씩 끈 것이다.
@@ -539,9 +557,112 @@ base `bee7c36f`. 변경 목록은 `git diff --name-status bee7c36f..HEAD` 기계
 | 〃 | `gate.tests.workflow` | +2 | `BidCaseWorkflowTest` · `EvidenceRetentionPolicyTest`(⑵ 의 산물) |
 | 〃 | `gate.tests.adapters` | +1 | `BidCaseOwnershipTest` — 실 DB 소유 경계 |
 | `settings.gradle.kts` | `include(...)` | `+bidding` | ADR 0006 D-2 되살림 |
+| `app/src/test/.../ProductionHttpSurfaceTest.kt` | 본문 거부 전수 test | **모집단을 판정으로 가름** | 아래 §3.1 |
+| `config/quality/architecture-policy.properties` | `app.http.allowed-packages` | `+bidvector.bidding` · `+bidvector.workflow.bidding` | controller 가 요청을 command 로 옮기려면 그 어휘를 이름 불러야 한다 |
+| 〃 | `app.http.denied-types` | `+` 저장·조회 포트 셋 | 패키지를 열었으므로 **포트만 다시 닫는다** — controller 가 받는 것은 use case 하나다(D-6A2b-8) |
+| 〃 | `app.injection.allowed-types` | `+4` | `BidCaseWorkflow`(두 controller 의 단 하나의 협력자) + 응답·요청 **값 타입** 셋(이 게이트는 data class 생성자 인자도 주입으로 센다) |
+
+### 3.1 공유 게이트 test 변경 — `ProductionHttpSurfaceTest` (계약 r2 D-7B-2)
+
+**무엇이 충돌했나.** 그 test 는 `X-Operator-Credential` 하나로 **등록된 POST 매핑 전수**가
+같은 모양(415/400/400)으로 본문을 거부하는지 잰다. 그런데 입찰함은 **계정 전용**이다 —
+인증 경로 둘 중 계정을 내는 것은 세션뿐이고(자격 헤더의 주체는 `operator`, 계정 행이 없다),
+소유 경계(R-2)를 세우려면 `account.id` 가 있어야 한다. 그래서 자격 헤더로는 401 이고,
+전수 집합에 `(401, UNAUTHENTICATED)` 가 섞여 test 가 붉었다.
+
+**고른 길과 근거.** 자격 헤더를 어떤 계정에 묶는 것(선택지 a)은 **R-2 남은 절반의 식별자
+모델 결정**이라 이 slice 에서 할 수 없다. 소유 경계를 포기하는 것(c)은 논외다. 그래서 (b) —
+**모집단을 「그 자격으로 실제로 닿는 매핑」으로 가른다.** 그 test 가 재는 성질은 「본문 거부의
+모양이 매핑마다 갈리지 않는다」이고, **인증 단계에서 갈리는 것은 그 축이 아니다.**
+
+**어떻게 갈랐나(조건 1 — 기계로).** 경로 문자열을 test 에 적지 않는다. 매핑마다 **두 축으로
+한 번씩 두드려 401 인지 본다** — 401 이 아니면 그 축이 닿은 것이다. 즉 기준이 선언이 아니라
+**필터·인증기의 실제 판정**이다. 선언(`AccountScopedRoutes`)은 그 판정과 **맞대는 쪽**으로만
+쓴다(아래 셋째 단언).
+
+**단언 셋(조건 2 — 합집합·교집합).**
+1. `unreachable == ∅` — 어느 축으로도 안 닿는 매핑이 0. 이것이 커버리지가 줄지 않는다는
+   보증이고, 조건 3 변이의 앵커다.
+2. `credentialAxis ∪ sessionAxis == POST 매핑 전수`.
+3. `credentialAxis` 에 계정 전용 경로가 **없고**, 계정 전용 경로 집합 == `sessionAxis −
+   credentialAxis`. 선언과 판정이 어긋나면(예: 입찰함 매핑이 자격 헤더로 닿게 되면) 붉다.
+
+본문 거부 모양은 **닿는 축의 자격으로** 매핑마다 잰다 — 축이 달라도 성질은 같아야 한다.
+
+**조건 3 변이**: 어느 모집단에도 들지 않는 새 POST 매핑을 심으면 ①이 RED 여야 한다. (기록)
 
 **넓히지 않은 것**: `collection.external.allowed-packages.*` 는 application·adapters·app 층
 키라 domain 모듈 신설과 무관하다. `module.expected-source-sets` 도 그대로다(`main,test`).
+
+### 3.2 7B 가 바꾼 공유 게이트 test (팀장 조건 2026-10-22)
+
+**둘이다.** 둘 다 **같은 설계 사실** 때문에 바뀌었다 — 입찰함은 계정 전용이고, 기존 두 test 는
+「모든 매핑/operation 이 자격 헤더로 닿는다」를 전제하고 있었다. 전제가 깨진 것이지 성질이
+약해진 것이 아니다. 아래에 전/후 단언과 **약화가 아닌 이유**, 그리고 **여전히 문다는 변이**를
+적는다.
+
+---
+
+#### ① `ProductionHttpSurfaceTest` — 본문 거부 전수
+
+| | 단언 |
+|---|---|
+| **전** | 자격 헤더 하나로 **모든 POST 매핑**을 두드려 `(415/400/400)` 집합이 하나인지 |
+| **후** | 매핑마다 **두 축으로 두드려 닿는 축을 판정**하고 ⓐ `unreachable == ∅` ⓑ `credentialAxis ∪ sessionAxis == POST 전수` ⓒ 계정 전용 == `sessionAxis − credentialAxis` ⓓ **닿는 축의 자격으로** 같은 `(415/400/400)` 집합 |
+
+**약화가 아닌 이유.** 재던 성질(본문 거부의 모양이 매핑마다 갈리지 않는다)은 **그대로 전수**
+로 남는다 — 모집단이 준 것이 아니라 **각 매핑을 실제로 닿는 자격으로 재게** 됐다. 전 판은
+계정 전용 매핑에 대해 그 성질을 **아예 재지 못했다**(401 에서 멈추니 본문 처리에 닿지 못한다).
+그리고 단언 ⓐ 가 **새로 생겼다**: 어떤 자격으로도 닿지 않는 매핑이 0 이라는 보증은 전 판에
+없던 것이다.
+
+#### ② `OpenApiContractTest` — 자격 헤더 대안
+
+| | 단언 |
+|---|---|
+| **전** | 인증을 요구하는 **모든** operation 이 `operatorCredential` 대안을 적는다 |
+| **후** | **비계정** operation 은 그대로(변경 없음) + **계정 전용** operation 은 `browserSession`(상태 변경이면 `+operatorCsrf`)**만** 적는다 — 집합 **정확 일치** |
+
+**약화가 아닌 이유.** 전 판이 막던 것은 「문서가 구현보다 **좁아짐**」이다(필터는 자격 헤더를
+받는데 문서가 안 적으면 호출자가 막힌 줄 안다). 계정 전용 operation 은 전제가 **반대**다 —
+구현이 실제로 401 이므로 `operatorCredential` 을 적으면 문서가 구현보다 **넓어지고** 호출자가
+되는 줄 알고 401 을 받는다. 같은 결함의 반대쪽이다. 그래서 그쪽은 **양방향 정확 일치**로
+재는데, 이것은 전 판의 「포함」보다 **더 조인 단언**이다(대안을 더해도 빼도 붉다).
+
+---
+
+**파일 분할(2026-10-22)**: 축을 더하자 `OpenApiContractTest` 가 500줄을 넘었다. **한도를 올리지
+않고** 책임으로 갈랐다 — 보안 선언 축(무인증 집합 · CSRF 묶임 · 자격 헤더 대안 · 계정 전용 ·
+읽기 쿠키 대안)이 `OpenApiSecurityContractTest` 로 나갔고, 남은 쪽은 응답의 **모양**(평탄 ·
+키 집합 · ErrorBody)을 잰다. 두 축이 한 파일에 있으면 「인증 선언이 바뀌었다」와 「응답 모양이
+바뀌었다」가 같은 실패로 보인다. 새 class 는 `gate.tests.app` 에 등재했고(그 키는 app test
+**전수** 등식이다), **변이 ⑬ 의 표적도 함께 옮겼다**.
+
+#### 변이 ⑬ — 두 test 가 여전히 문다
+
+| # | 변이 | 표적 | 기대 | 결과 |
+|---|---|---|---|---|
+| ⑬a | 계정 전용 op 에 `operatorCredential` 대안을 **더한다**(문서가 넓어짐) | `OpenApiSecurityContractTest` | RED | (기록) |
+| ⑬b | 비계정 op 에서 `operatorCredential` 대안을 **뺀다**(문서가 좁아짐 — 전 판이 막던 바로 그것) | `OpenApiSecurityContractTest` | RED | (기록) |
+| ⑬c | `AccountScopedRoutes.ROOTS` 를 비운다(선언↔판정 대조 파괴) | `ProductionHttpSurfaceTest` · `OpenApiSecurityContractTest` | RED | (기록) |
+| ⑫ | 어느 축에도 안 닿는 새 POST 매핑 | `ProductionHttpSurfaceTest` ⓐ | RED | (기록) |
+
+⑬b 가 **전 판이 지키던 성질이 그대로 살아 있다**는 증거이고, ⑬a 는 **새로 조인 쪽**이 실제로
+무는다는 증거다. ⑬c 는 선언을 지우면 두 test 가 **함께** 붉어진다는 것 — 선언 한 자리를
+고쳐 둘 다 조용히 통과시키는 길이 없다.
+
+### 3.3 머지 때 충돌할 자리 (후행 레인이 재계산)
+
+- **`EXPECTED_EXEMPT_COUNT`**(`AppHttpDependencyGateTest`) — 7B 가 `BidCaseWiring` 하나를 더해
+  **62 → 63** 으로 올렸다. 같은 M7 라운드의 **7C①b 레인이 62 → 64** 로 올린다. 둘은 같은 줄을
+  고치므로 머지에서 충돌하고, **후행 rebase 레인이 합집합으로 재계산**한다(팀장 지시
+  2026-10-22). 근거 문단은 양쪽 다 남긴다 — 수만 다시 세고 **사유를 지우지 않는다**.
+- **`capability-map.md` §10 집계**(95 → 96 · `V2 필수` 61 → 62)와 **활성 OPEN 수**(45 → 44) —
+  §10 블록에 「머지 직전 재계산」 표시를 문면에 넣어 두었다. g1dec05 · g1set01 이 같은 파일의
+  다른 행을 고친다.
+- **`config/quality` 의 등재 키들** — 7B 는 **자기 항목만** 더했다(`layer.domain` ·
+  `app.injection.*` · `app.http.*` · `gate.tests.*` · `app.surface.api.handlers` ·
+  `app.assembly.tier1-*`). 같은 키를 다른 레인이 함께 늘리면 줄 충돌이지 의미 충돌이 아니다.
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
@@ -584,6 +705,12 @@ base `bee7c36f`. 변경 목록은 `git diff --name-status bee7c36f..HEAD` 기계
 4. **다수 사업자 격리 · 가입 · `operator_profile`/`operator_strategy` 계정 단위 전환**은 범위
    밖이다(운영자 결정 2026-10-21 — 별 slice).
 5. **화면 없음** — 7E 소관. 이 slice 의 응답 형태는 `BidCaseResponse` 가 고정한다.
+6. **자격 헤더 경로는 입찰함에 닿지 못한다.** 운영자 자격 헤더(`X-Operator-Credential`)로만
+   인증하는 소비자(운영 스크립트 등)는 `/api/bid-cases` 전부에서 401 을 받는다 — 그 경로의
+   주체 `operator` 에는 계정 행이 없어 소유 경계를 세울 수 없기 때문이다. 그 헤더를 계정에
+   묶는 일은 **R-2 남은 절반**(식별자 모델)이 풀 때까지 열리지 않는다(운영자 결정
+   2026-10-21 · 계약 r2 D-7B-1). 선언은 `AccountScopedRoutes`, 그 사실을 재는 자리는
+   `ProductionHttpSurfaceTest` 의 셋째 단언이다.
 
 ### 7. acceptance 실측
 
