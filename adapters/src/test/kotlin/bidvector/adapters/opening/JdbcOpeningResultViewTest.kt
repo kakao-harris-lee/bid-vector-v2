@@ -4,8 +4,12 @@ import bidvector.adapters.notice.ReadOnlyWitness
 import bidvector.adapters.notice.beginReadOnlySearchTransaction
 import bidvector.adapters.notice.witnessedDataSource
 import bidvector.adapters.persistence.JdbcNoticeRepository
+import bidvector.adapters.persistence.JdbcOpeningRawAxisSource
 import bidvector.adapters.persistence.JdbcOpeningResultRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.procurement.AttemptOutcome
+import bidvector.procurement.AxisConclusion
+import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
 import bidvector.procurement.NOTICE_ROUND_RAW_KEY
 import bidvector.procurement.NoticeCollected
@@ -15,15 +19,19 @@ import bidvector.procurement.ObservationKey
 import bidvector.procurement.ObservedBidAmount
 import bidvector.procurement.OpeningRankOneBid
 import bidvector.procurement.OpeningRankOneOutcome
+import bidvector.procurement.OpeningPromotionOutcome
 import bidvector.procurement.OpeningResult
 import bidvector.procurement.PersistOutcome
+import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
+import bidvector.procurement.promoteOpeningResult
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.export
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.ProvisionalRankOne
@@ -37,6 +45,7 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.sql.SQLException
 import java.time.Instant
+import java.time.LocalDate
 
 private val T1: Instant = Instant.parse("2026-10-22T00:00:00Z")
 private val T2: Instant = Instant.parse("2026-10-22T03:00:00Z")
@@ -364,6 +373,72 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
         read shouldContainExactly OpeningResultViewSql.RESULT_COLUMNS
         withClue("상호 두 열은 읽는 자리에서 먼저 막힌다") {
             read.none { it.contains("company_name") || it.contains("bidder_name") } shouldBe true
+        }
+    }
+
+    /**
+     * **두 slice 를 잇는 자리**(7C⑤-0 승격 → 7C⑤-a 조회). canonical 행을 test 가 직접 심지 않고
+     * **승격 경로가 쓴다** — 그래서 ⓐ 승격이 저장하는 진행구분 라벨과 이 조회의 정책 열거가 같은
+     * 어휘인지 ⓑ 승격이 저장한 투찰자 상호가 이 조회를 지나지 못하는지가 함께 측정된다.
+     *
+     * 라벨을 **앞뒤 공백과 함께** 심는다: 승격이 trim 해서 저장하고(그쪽 계약) 이 조회는 리터럴로
+     * 비교한다(이쪽 계약) — 둘 중 한쪽이 바뀌면 이 test 가 먼저 붉어진다.
+     */
+    @Test
+    fun `승격 경로가 쓴 행을 이 조회가 개찰완료로 읽고 상호는 지나지 못한다`() {
+        seedNotice()
+        val walk = T1
+        appendRawObservation(
+            RawNoticeObservation.of(
+                fields =
+                    mapOf(
+                        RawKey("progrsDivCdNm") to "  개찰완료  ",
+                        RawKey("prtcptCnum") to "7",
+                        NOTICE_NUMBER_RAW_KEY to id.number.value,
+                        NOTICE_ROUND_RAW_KEY to id.round.value,
+                    ),
+                sourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
+                observedAt = walk,
+                sourceDivision = null,
+            ),
+        )
+        appendRawObservation(
+            RawNoticeObservation.of(
+                fields =
+                    mapOf(
+                        RawKey("prcbdrNm") to SENTINEL_COMPANY,
+                        RawKey("opengRank") to "1",
+                        NOTICE_NUMBER_RAW_KEY to id.number.value,
+                        NOTICE_ROUND_RAW_KEY to id.round.value,
+                    ),
+                sourceEndpoint = SourceEndpoint.OPENING_COMPLETE,
+                observedAt = walk,
+                sourceDivision = null,
+            ),
+        )
+        val policy =
+            (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 23)) as Resolution.Resolved).value
+        val group = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(Instant.EPOCH).groups.single()
+        val conclusions =
+            listOf(SourceEndpoint.OPENING_RESULT_LIST, SourceEndpoint.OPENING_COMPLETE)
+                .associateWith { AxisConclusion(AttemptOutcome.Succeeded, walk) }
+        val promoted =
+            promoteOpeningResult(group, conclusions, policy)
+                .shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
+        JdbcOpeningResultRepository(dataSource()).persist(promoted.result, promoted.observationKey)
+
+        val facts = present(view().lookup(id))
+        val canonical = requireNotNull(facts.canonical)
+        withClue("승격이 라벨을 trim 해서 저장하고 이 조회는 리터럴로 비교한다") {
+            canonical.progressLabel shouldBe "개찰완료"
+        }
+        canonical.figures.participantCount shouldBe 7
+        canonical.figures.provisionalRankOne.shouldBeInstanceOf<ProvisionalRankOne.Determined>()
+        withClue("승격이 저장한 상호가 이 조회의 사실에 없다") {
+            facts.toString() shouldNotContain SENTINEL_COMPANY
+        }
+        withClue("확정 낙찰 칸은 비어 있다 — 낙찰 목록 적재는 다른 slice 몫이다") {
+            canonical.figures.confirmedAward shouldBe null
         }
     }
 
