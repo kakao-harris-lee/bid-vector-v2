@@ -507,11 +507,6 @@ export interface components {
             /** @description 개찰 대사(SET-02)의 후보인가 — 「투찰 기록됨」 **실투찰** 건만 참이다. 페이퍼 건은 항상 거짓이다(타입이 막는다). */
             reconciliationCandidate: boolean;
         };
-        BidCaseList: {
-            /** @enum {string} */
-            bidKind: "REAL" | "PAPER";
-            cases: components["schemas"]["BidCase"][];
-        };
         BidTimelineEntry: {
             caseVersion: number;
             /** @description 생성 전이만 null 이다(출발 상태가 없다). */
@@ -527,11 +522,6 @@ export interface components {
             retroactive: boolean;
             /** Format: date-time */
             occurredAt: string;
-        };
-        BidTimeline: {
-            /** Format: int64 */
-            caseId: number;
-            entries: components["schemas"]["BidTimelineEntry"][];
         };
         AddBidCaseRequest: {
             noticeNumber: string;
@@ -709,7 +699,7 @@ export interface components {
         };
         ErrorBody: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE";
             message: string;
             correlationId: string;
         };
@@ -1502,13 +1492,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 그 종류의 내 건 목록 */
+            /** @description 그 종류의 내 건 목록. **맨 위가 배열**이다 — 배열을 감싼 object 는 평탄 규칙 (D-6A1-20 ⓑ)에 걸리고, `searchNotices` 도 같은 모양으로 배열을 바로 낸다. 요청이 `kind` 를 지정했으므로 응답이 그것을 되풀이하지 않는다. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BidCaseList"];
+                    "application/json": components["schemas"]["BidCase"][];
                 };
             };
             /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
@@ -1669,13 +1659,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 전이 이력(오래된 순) */
+            /** @description 전이 이력(오래된 순). **맨 위가 배열**이다(위와 같은 이유). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BidTimeline"];
+                    "application/json": components["schemas"]["BidTimelineEntry"][];
                 };
             };
             /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
