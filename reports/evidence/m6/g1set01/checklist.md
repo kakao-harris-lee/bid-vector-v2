@@ -217,6 +217,13 @@ acceptance 네 줄과 재는 자리:
 **열 전부를 재측정**했고 RED 수는 열 자리 모두 첫 측정과 같았다(구현이 바뀌어도 각 단계가 무엇을 재는지는
 같다는 뜻이고, 그 일치를 근거로 쓰지 않고 **재측정 값**을 싣는다).
 
+**rebase 뒤(2026-10-23) 이 표를 다시 재지 않은 근거**: 표는 `4a52c2fd`(rebase 뒤 `5fb6a61e`) 트리에서 쟀다.
+그 뒤 판정 트리까지 `settlement/src/main` 의 변경은 **KDoc 한 줄**(`fb6c5872`, §5 P-16)뿐이고, rebase 가
+가져온 main 쪽 변경은 `config/quality/vuln-allowlist.properties` 하나다. 바이트코드가 같다는 것은 추측이 아니라
+실측이다 — 판정 회차 `check` 에서 `:settlement:compileKotlin` 은 실행됐는데 `:settlement:jar` 가
+**UP-TO-DATE**(출력이 앞 실행과 같다)였고 그래서 `:settlement:test` 도 UP-TO-DATE 였다(commands.md §4 회차 3).
+변이가 바꿔치우는 줄은 하나도 움직이지 않았다.
+
 | ID | 무엇을 **바꿔치웠나** | numstat | 그 변이에서 RED(34 중) |
 |---|---|---|---|
 | M-1 | 정규화의 **공백 제거** 단계를 「원문 그대로」로 | `1 1` | **6** — 공백 낀 표기 흡수 · 전각 공백/NBSP · 대소문자(공백 포함 사례) · 정규화 결과 빈 문자열 · 법인 표기 흡수 낙찰 · 조회 관문의 정규화 값 |
@@ -312,3 +319,38 @@ gets  java.util.Locale.ROOT               ← text.lowercase()
 **교훈(레인에 남길 것)**: domain 모듈에 **문자열을 조립하는 코드**를 새로 쓰면 `:settlement:` 류 모듈
 게이트로는 모자라고 `:app:test` 의 ArchUnit 축까지 돌려야 한다. 비용이 싼 표적은
 `./gradlew :app:test --tests '*ArchitectureGateTest*'` 다(이 호스트 실측 42초, 커밋 전에 돌릴 만하다).
+
+## 5. 약속 ↔ 출하 대조 — §0 설계 메모(Phase 1)와 계약 `scope.md` 를 출하 코드에 대고
+
+판정 칸 넷: **약속대로** · **선언된 이탈**(evidence 가 이미 이유와 함께 적었다) · **무선언 이탈**(이
+대조에서 처음 드러났다) · **약속 자체가 틀림**(약속을 그대로 지키면 다른 규칙을 어긴다). 대조는
+출하 소스를 직접 읽어 했다(2026-10-23, 재기동 뒤 레인 — 앞 세션의 기억이 아니라 파일에서).
+
+| # | 약속(출처) | 출하 | 판정 |
+|---|---|---|---|
+| P-1 | 결과 sealed 4-state, 확정은 타입 `SettledAwardOutcome`(§0.2) | `AwardOutcome.kt` 그대로 — `Won`·`Lost` 가 `SettledAwardOutcome`, `NotRecorded(reason)`·`NotJudged(reason)` | 약속대로 |
+| P-2 | 사유도 sealed, 결과 쪽 `NotPublished`·`NormalizesToEmpty` / 운영자 쪽 `NotDeclared`·`NormalizesToEmpty`(§0.2) | 같은 넷 | 약속대로 |
+| P-3 | 접는 API 없음 — `isWon(): Boolean`·`orElse` 류 0(§0.2) | `settlement/src/main` 에 `Boolean` 반환 공개 함수·`orElse` 0(grep 빈 출력) | 약속대로 |
+| P-4 | 조회 술어를 `Boolean` 이 아니라 티켓 타입으로, 판정 함수의 첫 인자가 그 산출(§0.3) | `decideAwardLookup(operator, policy): AwardLookupDecision` · `judgeAwardOutcome(lookup, winner, policy)` — 시그니처 설계 그대로, `Skip` 이면 결과 쪽을 보기 전에 `NotJudged` | 약속대로 |
+| P-5 | 판정 시그니처에 금액 없음, 컴파일 실패 하네스로 강제(계약 산출물 1·3) | 세 함수 어디에도 금액 인자 없음 · `CompileFailureHarnessTest` fixture 1 | 약속대로 |
+| P-6 | 기록 불변 — `existing` 이 확정이면 기존 값을 돌려준다, 승격 경로가 타입으로 없다, 시각 축 없음(§0.4) | `recordAwardOutcome` 그대로 · `Recorded` 가 `SettledAwardOutcome` 만 받는다 · `Instant` 참조 0 | 약속대로 |
+| P-7 | 정규화 순서는 legacy ① 공백 → ② 토큰 → ③ casefold, 공백 집합은 `Char.isWhitespace()`(§0.1) | 순서·공백 집합 그대로 | 약속대로 |
+| P-8 | ③ 을 `lowercase()` 로, `ß` 류만 알려진 제한(§0.1) | **ASCII `A`~`Z` 만** 접는 `lowercaseAscii` | **선언된 이탈** — `lowercase()` 가 바이트코드에서 `Locale.ROOT` 를 읽어 `ArchitectureGateTest` 가 붉었다(§4). 제한의 범위가 `ß` 에서 비-ASCII 라틴 전체로 넓어졌고 §3-1 이 그것을 적는다 |
+| P-9 | 계약 산출물 1 「casefold」 | 위 P-8 | **약속 자체가 틀림(부분)** — domain 모듈에서 casefold 를 그대로 지킬 길이 없다(Kotlin 대응 없음 + 대체 stdlib 경로가 허용 목록 밖). 계약 문면을 고치지 않고 이 행과 §3-1 로 남긴다 |
+| P-10 | 토큰 목록은 versioned 정책 데이터, legacy 값·순서 그대로, 출처를 `source` 에(계약 산출물 1, §0.1) | `AwardMatchingPolicyData` + `AWARD_MATCHING_POLICY`(`EffectiveDatedPolicy`, 초기 version 하나) · 열하나 값·순서 legacy 와 같음 · 출처 상수가 `source` | 약속대로 |
+| P-11 | 정책 불변식(설계 메모에 없음) | 비어 있음·공백 토큰·중복 금지를 구성 시점에 `require` | 약속대로(더한 것) — KDoc 이 이유를 적고 `AwardMatchingPolicyDataTest` 가 잰다 |
+| P-12 | `CompanyName.kt` 의 공개 표면 = `NormalizedCompanyName` · `normalizeCompanyName` · 입력 상태 둘(§0.6) | 그 넷 **+ 공개 sealed `CompanyNameNormalization`(`Normalized`·`Empty`)** | **무선언 이탈(더한 것, 무해)** — 정규화의 「빈 결과」를 `null` 대신 결말로 나르는 반환 타입이다. §0.2 의 `NormalizesToEmpty` 사유가 그 결말에서 나오므로 설계 의도와 어긋나지 않지만 §0.6·§1 의 파일 표에 없었다. 이 행으로 선언한다 |
+| P-13 | 원문 상호 운반 타입 셋의 `toString()` 가림, `equals` 유지(§0.5) | `OperatorTradeName.Declared` · `AwardWinnerTradeName.Published` · `NormalizedCompanyName` 셋 다 `REDACTED_TRADE_NAME` | 약속대로 |
+| P-14 | `NormalizedCompanyName` private 생성자 + `@ConsistentCopyVisibility` + 모듈 내 factory(§0.5) | 그대로(`internal companion object.of`) · fixture 2·3 | 약속대로 |
+| P-15 | 사업자등록번호·대표자명 슬롯 0(§0.5, P-10 (a)) | 0 | 약속대로 |
+| P-16 | 상호는 전부 가상, 실 상호 0(§0.5 — 문면은 「test·evidence」, 위협 모델은 「로그·evidence 에 실값」) | test·fixture·evidence 는 가상만. **main KDoc 한 줄**이 legacy 주석의 예시 상호를 그대로 옮겨 **실투찰에 등장한 실 상호 하나**를 담고 있었다 | **무선언 이탈 → 고침** — `fb6c5872` 가 그 줄을 가상 상호로 바꿨다(주석만, 바이트코드 무변). 실명은 이 evidence 에도 적지 않는다. 교훈: legacy 에서 **주석까지** 옮길 때 예시 값이 실데이터인지 본다 |
+| P-17 | 변이 M-1~M-9(§0.7) | M-1~M-9 + **M-7b**(가드 통째 제거) | 선언된 이탈(더한 것) — §2 가 M-7 의 좁음과 함께 적는다 |
+| P-18 | 계약 산출물 3 의 변이 「3-state 를 boolean 으로」 | M-4(미기록 → 패찰) · M-5(판정 안 함 → 패찰)로 잰다 | 선언된 이탈(해석) — §0.7 이 그 대응을 적었다. 타입이 sealed 라 문자 그대로의 `Boolean` 치환은 컴파일되지 않고, 「boolean 으로 접힘」의 실제 거동은 비확정 상태가 `Lost` 가 되는 것이다 |
+| P-19 | 컴파일 실패 하네스는 fixture 마다 양성 쌍둥이(§2-1) | 양성 파일 **둘** — fixture 3(`copy()` 우회)은 fixture 2 의 양성을 공유한다 | 선언된 이탈 — §2-1 표가 「같은 양성」으로 적는다 |
+| P-20 | 마이그레이션·영속화·endpoint·운영자 상호 입력·낙찰 목록 수집 0(계약 (3)) | `a61ddff1..HEAD` 의 파일 목록이 `settlement/**` · 등재 장부 · capability map · 추적표 · 이 evidence 뿐 | 약속대로 |
+| P-21 | 판정 ⓒ, 집계 증감 0(§0.8, 계약 산출물 4) | 추적표 SET-01 행 ⓒ · 증감 0 | 약속대로 |
+| P-22 | rollback ①~⑥ 은 **마지막 산출물 커밋**에서 실측(계약 rollback) | 앞 세션의 `rollback.md` 는 `8fc84e46` 에서 쟀는데 그 뒤 `70926fcb`(현 `2c16603d`)가 `CompanyName.kt` 를 바꿔 **그 문서가 스스로 건 대조 술어(복원 경로 diff 빈 출력)가 거짓**이었다 | **무선언 이탈 → 다시 잼** — rebase 뒤 마지막 산출물 커밋에서 다시 쟀다(`rollback.md` 가 새 실측으로 바뀌었다) |
+| P-23 | 새 OPEN 이 필요하면 레인 제안(계약 산출물 4) | `OPEN-SET01-AWARD-NAME-INGEST` 신설(팀장 지시). **운영자 결정 2026-10-22: (a) 승인, 착수는 6G 라이브 수집 종료(~10-29) 뒤** — `fb05a786` 가 capability map 의 두 행에 인용했다. 이 slice 는 착수하지 않는다 | 약속대로 — 적재가 출하되기 전까지 SET-01 행의 빈 자리는 그대로라 행 판정 ⓒ·OPEN 행 존치·집계 증감 0 은 바뀌지 않는다 |
+
+**집계**: 약속대로 15 · 선언된 이탈 4(P-8·P-17·P-18·P-19) · 무선언 이탈 3(P-12 선언으로 닫음 ·
+P-16 고침 · P-22 다시 잼) · 약속 자체가 틀림 1(P-9).

@@ -1,8 +1,15 @@
 # M6/G1-SET01 commands — 돌린 것과 그 결과
 
-판정 대상 SHA: **`4a52c2fd`**(마지막 산출물 커밋 — OPEN 신설). 산출물 커밋은 넷이다 —
-`d7ebdceb`(커널·test·등재) · `8fc84e46`(추적표·capability map) · `70926fcb`(아키텍처 게이트 수정) ·
-`4a52c2fd`(`OPEN-SET01-AWARD-NAME-INGEST` 신설, 팀장 지시).
+**2026-10-23 rebase**: 재기동(2026-10-22 23:20 KST 경) 뒤 `origin/main` `a61ddff1`(PR #81, caddy CVE 면제 —
+`config/quality/vuln-allowlist.properties` 한 파일) 위로 옮겼다. 충돌 0. 이 문서 아래쪽의 옛 SHA 는 rebase 전
+이름이고 대응은 다음과 같다 — `d7ebdceb`→`45fedb17` · `8fc84e46`→`2575071d` · `70926fcb`→`2c16603d` ·
+`4a52c2fd`→`5fb6a61e`. base 는 `bee7c36f`→`a61ddff1`.
+
+마지막 산출물 커밋: **`fb05a786`**. 산출물 커밋은 여섯이다 —
+`45fedb17`(커널·test·등재) · `2575071d`(추적표·capability map) · `2c16603d`(아키텍처 게이트 수정) ·
+`5fb6a61e`(`OPEN-SET01-AWARD-NAME-INGEST` 신설, 팀장 지시) · `fb6c5872`(KDoc 예시 상호를 가상으로 — 주석만,
+checklist §5 P-16) · `fb05a786`(그 OPEN 에 운영자 결정 2026-10-22 인용, §5 P-23). 판정 SHA 는 그 뒤 evidence
+커밋이며 팀장 보고에 적는다.
 
 호스트 규율: 무거운 명령은 전부 `flock ~/.local/bid-vector-build.lock` 으로 감쌌다. 점검 셋
 (`pgrep` Gradle · `free -m` · `ps` 상위)은 빌드 명령과 **별도 호출로 먼저** 봤다. 00:30~03:00 KST 에는
@@ -125,10 +132,26 @@ HEAD 를 양 끝에서 찍어 같음을 확인했다 — `4a52c2fd686e2811da5b7b
 **그 PID 만** 멈춘다. `./gradlew --stop` 은 같은 버전의 daemon 을 전부 멈춰 다른 레인의 빌드를
 죽이므로 쓰지 않는다.
 
+### 회차 3 — rebase 뒤 `fb05a786`, 판정 회차 (2026-10-23)
+
+점검 셋(07:57, 별도 호출): Gradle 프로세스는 다른 레인의 daemon 하나(내 것 아님) · available **16,303MB** ·
+swap free **8,190MB**.
+
+**exit 0 · BUILD SUCCESSFUL 24초 · 356 actionable task**(47 실행 · 309 up-to-date). 07:57:47~07:58:11.
+HEAD 양 끝 `fb05a7866bdaf5fe6f3925c7a27db2774485c8e3` 동일. 로그는 레인 접두 이름(`set01-check-0757.log`)이고
+첫 줄이 HEAD·`pwd`(이 worktree)다.
+
+**24초인 이유를 숨기지 않는다** — 대부분이 up-to-date 다. `:settlement:compileKotlin` 은 KDoc 변경으로
+**실행됐고** `:settlement:jar` 는 **UP-TO-DATE**(바이트코드가 앞 실행과 같다)여서 `:settlement:test` 와 그
+하류가 up-to-date 였다. 즉 이 회차가 새로 증명하는 것은 「rebase·주석 변경 뒤에도 같은 입력의 같은 결과」이고,
+`:settlement:test` 의 34 test·실패 0 은 그 up-to-date 출력(JUnit XML 다섯: 5·10·5·8·6)에서 읽었다. 같은 커밋의
+**캐시 없는 전건 실행**은 아래 rollback ④⑤⑥ 의 복원 트리가 아니라 이 트리에 대해서는 돌리지 않았다 — CI 가
+그 자리다.
+
 ### `web` · `ml-engine` · `container` 를 생략한 근거 (path-limited diff)
 
 ```sh
-git diff --name-only bee7c36f..4a52c2fd -- web ml-engine docker .github contracts openapi
+git diff --name-only a61ddff1..fb05a786 -- web ml-engine docker .github contracts openapi   # rebase 뒤 재확인
 ```
 
 → **빈 출력**. 이 slice 의 diff 는 `settlement/**` · `config/quality/gate-tests.properties` ·

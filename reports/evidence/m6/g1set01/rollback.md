@@ -1,13 +1,17 @@
 # M6/G1-SET01 rollback — in_scope 경로 한정 복원
 
-**실측 HEAD: `8fc84e46`**(이 slice 의 **마지막 산출물 커밋** — 추적표·capability map 갱신). 아래
-①~⑥ 은 그 커밋을 체크아웃한 **임시 clone** 에서 실제로 돌린 결과다. 뒤따르는 evidence 커밋은
-되돌림 대상이 아니다 — verifier 의 대조 술어는 「실측 HEAD == 판정 SHA」가 아니라
-`git diff --name-only 8fc84e46..<판정 SHA> -- <아래 복원 경로들>` 이 **빈 출력**인가다.
+**실측 HEAD: `fb05a786`**(이 slice 의 **마지막 산출물 커밋**, 2026-10-23 rebase 뒤). base 는 rebase 뒤
+`a61ddff1`. 아래 ①~⑥ 은 그 커밋을 체크아웃한 **임시 clone** 에서 실제로 돌린 결과다. 뒤따르는 evidence
+커밋은 되돌림 대상이 아니다 — verifier 의 대조 술어는 `git diff --name-only fb05a786..<판정 SHA> -- <아래
+복원 경로들>` 이 **빈 출력**인가다.
+
+> **다시 잰 이유**(checklist §5 P-22): 앞 세션의 이 문서는 `8fc84e46` 에서 쟀는데 그 뒤 `70926fcb`
+> (현 `2c16603d`)가 `CompanyName.kt` 를 바꿔, 문서가 스스로 건 위 대조 술어가 **거짓**이었다. rebase 로
+> base 도 바뀌었으므로 마지막 산출물 커밋·새 base 로 전부 다시 쟀다. 옛 수치는 옮기지 않았다.
 
 ## 되돌리는 것 — 기계 산출 목록
 
-목록은 손으로 쓰지 않는다. `git diff --name-status bee7c36f..HEAD` 에서 내고 **라운드마다
+목록은 손으로 쓰지 않는다. `git diff --name-status a61ddff1..HEAD` 에서 내고 **라운드마다
 재산출**한다.
 
 | 상태 | 경로 | 처분 |
@@ -27,7 +31,7 @@ pathspec 은 그 구멍을 닫는다.
 - `reports/evidence/m6/g1set01/**` — 이 slice 의 evidence 와 **팀장이 쓴 계약**(`scope.md`).
   관례대로 남긴다. 그 결과 복원한 트리에는 base 에 없는 문서가 남고, 그것이 ⑥-b 의 전제다.
 - 하네스 경로(`CLAUDE.md`·`.claude/**`) — 이 range 에 변경 **없음**(`git diff --name-only
-  bee7c36f..8fc84e46 -- CLAUDE.md .claude` 빈 출력).
+  a61ddff1..fb05a786 -- CLAUDE.md .claude` 빈 출력).
 
 ## 명령 — 머지 전 전제
 
@@ -36,7 +40,7 @@ pathspec 은 그 구멍을 닫는다.
 머지 커밋 revert 다.
 
 ```sh
-git restore --source=bee7c36f --staged --worktree -- \
+git restore --source=a61ddff1 --staged --worktree -- \
   settlement \
   config/quality/gate-tests.properties \
   docs/discovery/capability-map.md \
@@ -48,11 +52,11 @@ git restore --source=bee7c36f --staged --worktree -- \
 ③-b 가 잰다). **신규 파일에 별도 `git rm` 이 필요 없다** — `--source` 에 없는 경로는 이 명령이
 지운다(실측 ②).
 
-## 실측 — 임시 clone(`8fc84e46`)에서 ①~⑥
+## 실측 — 임시 clone(`fb05a786`)에서 ①~⑥ (2026-10-23)
 
 | # | 무엇 | 결과 |
 |---|---|---|
-| 전제 | base 가 HEAD 의 조상 · base 에 이 slice 의 첫 산출물 커밋(`d7ebdceb`) 없음 | 둘 다 실행 전에 단언 — **OK** |
+| 전제 | base `a61ddff1` 가 HEAD 의 조상 · base 에 이 slice 의 첫 산출물 커밋(`45fedb17`) 없음 | 둘 다 실행 전에 단언 — **OK** |
 | ① | 복원 명령 종료 코드 | **0** |
 | ② | 그 명령이 낸 변경 수 | **A 1 · D 18 · M 4** — `ModuleBoundaryAnchor.kt` 되살림 · 신규 18 삭제 · 공유 파일 셋 + `settlement/build.gradle.kts` 복원 |
 | ③ | base 대비 복원 경로 diff | **0 줄**(빈 출력) |
@@ -64,8 +68,8 @@ git restore --source=bee7c36f --staged --worktree -- \
 | ③-b | **남의 표지 보존** — 등재 장부 줄 수 | **903** == base **903** |
 | ③-b | `capability-map.md` 줄 수 | **3573** == base **3573** |
 | ③-b | `acceptance-trace.md` 줄 수 | **175** == base **175** |
-| ③-c | 되돌리지 않는 것이 base 와 **다른 채로 남는가** | `reports/evidence/m6/g1set01/scope.md` — 남는다(clone 은 커밋된 것만 가져오므로 이 트리에는 그 하나다) |
-| ④⑤⑥ | 복원한 트리에서 **전건 `check`**(컴파일 · test · 게이트) | **exit 0** · BUILD SUCCESSFUL **10분 27초** · 359 task(224 실행 · 135 캐시) |
+| ③-c | 되돌리지 않는 것이 base 와 **다른 채로 남는가** | `reports/evidence/m6/g1set01/` 의 넷(`scope.md`·`checklist.md`·`commands.md`·`rollback.md`, 커밋된 판) — 남는다 |
+| ④⑤⑥ | 복원한 트리에서 **전건 `check`**(컴파일 · test · 게이트) | **exit 0** · BUILD SUCCESSFUL **10분 3초** · 359 actionable task(224 실행 · 135 캐시) · 잠금 대기 포함 벽시계 07:59:32~08:20:18 · HEAD 끝 `fb05a786` |
 | ⑥-b | 그 트리에 이 slice 의 evidence 를 얹고 `leakPatternGate` 만 다시 | PLACEHOLDER_6B |
 
 **③-b 가 왜 줄 수인가**: 공유 파일 셋은 다른 slice 의 줄을 담고 있다. 「내 줄이 사라졌다」(③-a)만
