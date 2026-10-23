@@ -220,8 +220,31 @@ class SuggestionProductionE2ETest {
     /** 무장한 GET 한 번의 읽기 문장을 표별로 센다. */
     private fun selectCountsOfOneGet(): Pair<ResponseEntity<List<Map<String, Any?>>>, Map<String, Int>> {
         probes.statements.arm()
-        val response = suggestions()
-        return response to probes.statements.disarm().selectCountsByTable()
+        var recorded: List<String> = emptyList()
+        // 단언이 깨지거나 요청이 던져도 기록기를 해제한다 — 묵은 기록이 다음 test 로 번지지 않게(cr r2 low).
+        val response =
+            try {
+                suggestions()
+            } finally {
+                recorded = probes.statements.disarm()
+            }
+        return response to recorded.selectCountsByTable()
+    }
+
+    /** [plan] 을 무장한 채 [call] 을 한 번 돌리고 무장 구간의 `load()` 횟수를 함께 낸다 — 해제는 `finally`(cr r2 low). */
+    private fun <T> withStrategyChanges(
+        plan: Map<Int, () -> Unit>,
+        call: () -> T,
+    ): Pair<T, Int> {
+        probes.strategy.arm(plan)
+        var loads = 0
+        val result =
+            try {
+                call()
+            } finally {
+                loads = probes.strategy.disarm()
+            }
+        return result to loads
     }
 
     /**
@@ -281,9 +304,7 @@ class SuggestionProductionE2ETest {
         insertNotice("SEWER-1", "하수관로 정비")
         confirmRequiredKeyword("포장", seenRevision = 0)
 
-        probes.strategy.arm(mapOf(1 to { setRequiredKeywordBySql("하수") }))
-        val response = suggestions()
-        val loads = probes.strategy.disarm()
+        val (response, loads) = withStrategyChanges(mapOf(1 to { setRequiredKeywordBySql("하수") })) { suggestions() }
 
         response.statusCode.value() shouldBe 200
         response.numbers() shouldBe listOf("SEWER-1")
@@ -297,9 +318,10 @@ class SuggestionProductionE2ETest {
         insertNotice("SEWER-1", "하수관로 정비")
         confirmRequiredKeyword("포장", seenRevision = 0)
 
-        probes.strategy.arm(mapOf(1 to { setRequiredKeywordBySql("하수") }, 3 to { setRequiredKeywordBySql("정비") }))
-        val response = errorOfSuggestions()
-        val loads = probes.strategy.disarm()
+        val (response, loads) =
+            withStrategyChanges(mapOf(1 to { setRequiredKeywordBySql("하수") }, 3 to { setRequiredKeywordBySql("정비") })) {
+                errorOfSuggestions()
+            }
 
         response.statusCode.value() shouldBe 409
         response.body?.get("code") shouldBe ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION

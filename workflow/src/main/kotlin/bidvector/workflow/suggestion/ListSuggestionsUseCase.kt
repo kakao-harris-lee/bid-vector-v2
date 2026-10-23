@@ -69,8 +69,10 @@ class StrategyChangedDuringComputationException : RuntimeException("계산하는
 /**
  * 제안 목록 use case(M7/7C①b — STR-06·STR-07). **조회가 곧 계산이다** — 영속 스냅샷이 없다.
  *
- * **STR-07 은 소비자 쪽 값 비교로 닫는다.** 한 번의 시도는 전략·프로필을 한 번 읽어 고정하고
- * (`inputs`), 게이트를 다 돈 **뒤** 둘을 다시 읽어 값 등식으로 비교한다. 다르면 그 결과를 버린다.
+ * **STR-07 은 소비자 쪽 값 비교로 닫는다.** 한 번의 시도는 첫머리에 전략·프로필을 읽어(`inputs`)
+ * **전략만** 게이트에 고정해 넘긴다 — 프로필은 고정되지 않는다(면허 게이트가 후보마다 직접 읽는다).
+ * 첫머리의 프로필은 비교의 기준값이다. 게이트를 다 돈 **뒤** 둘을 다시 읽어 값 등식으로 비교하고,
+ * 다르면 그 결과를 버린다(A → B → A 처럼 돌아온 변경은 보지 못한다).
  * 판정이 쓰기 쪽이 무엇을 했는가(무효화 호출·이벤트·개정 +1)를 보지 않으므로, 편집 세션이든
  * 앞으로 생길 다른 경로든 수동 SQL 이든 **읽힌 값이 바뀌면** 같은 비교에 걸린다. 버린 뒤 한 번만
  * 다시 계산하고, 그것도 바뀌면 [StrategyChangedDuringComputationException](409)이다.
@@ -120,7 +122,7 @@ class ListSuggestionsUseCase(
         }
 }
 
-/** 계산의 입력 — 비교의 단위다. 프로필은 면허 게이트가 읽으므로 전략과 함께 고정·비교한다. */
+/** 계산의 입력 — 비교의 단위다. 프로필은 면허 게이트가 읽으므로 전략과 함께 비교한다(고정은 전략만). */
 private data class ComputationInputs(
     val strategy: OperatorStrategy,
     val profile: ProfileFacts?,

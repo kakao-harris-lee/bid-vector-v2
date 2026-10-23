@@ -161,30 +161,32 @@ class OpenApiSuggestionContractTest : HttpIntegrationTestBase() {
     @Test
     fun `면허 축 어휘가 구현이 실제로 내는 값의 전수와 같다`() {
         val properties = spec.schema("SuggestedNotice")["properties"] as Map<String, Any?>
+        // 사유 목록은 sealed 계층에서 도출한다 — 여섯째 사유가 생기면 이 test 가 따라온다(손 목록 금지, D-7C1B-4).
         val reasons =
-            listOf(
-                UncertainReason.RequirementDataAbsent,
-                UncertainReason.RequirementUnparsable,
-                UncertainReason.OperatorLicensesNotDeclared,
-                UncertainReason.CollectionFailed,
-                UncertainReason.PermittedIndustryCombinationRuleUndecided,
-            )
-        val emittedReasons =
-            reasons.map { reason ->
+            UncertainReason::class.sealedSubclasses.map { it.objectInstance ?: error("사유는 data object 다: $it") }
+        val emittedByReason =
+            reasons.associateWith { reason ->
                 licenseGate.verdictFor = { LicenseVerdict.Uncertain(reason) }
                 get().body?.single()?.get("licenseUncertainReason")
             }
         licenseGate.verdictFor = { LicenseVerdict.Eligible(emptySet()) }
         val eligible = get().body?.single() ?: error("본문이 비었다")
 
+        // 사유별 **쌍** 등식 — 집합 등식은 라벨 둘을 맞바꿔도 초록이다(verifier r2 F-1). 기대 라벨은 컨트롤러의
+        // `when` 이 아니라 사유 이름에서 따로 만든다(SCREAMING_SNAKE).
+        emittedByReason shouldBe reasons.associateWith { it::class.simpleName.orEmpty().screamingSnake() }
         // `null` 은 `ELIGIBLE` 카드가 실제로 내는 값이다 — 어휘 등식은 그것까지 포함해 잰다(cr L-2).
         eligible["licenseUncertainReason"] shouldBe null
-        properties.enumOf("licenseUncertainReason") shouldBe emittedReasons.toSet() + eligible["licenseUncertainReason"]
+        properties.enumOf("licenseUncertainReason") shouldBe
+            emittedByReason.values.toSet() + eligible["licenseUncertainReason"]
         properties.enumOf("licenseVerdict") shouldBe setOf("UNCERTAIN", eligible["licenseVerdict"])
         (properties["unjudgedAxes"] as Map<String, Any?>).let { (it["items"] as Map<String, Any?>)["enum"] } shouldBe
             SUGGESTION_UNJUDGED_AXES.map { it.name }
     }
 }
+
+/** `RequirementDataAbsent` → `REQUIREMENT_DATA_ABSENT`. */
+private fun String.screamingSnake(): String = replace(Regex("(?<=[a-z0-9])(?=[A-Z])"), "_").uppercase()
 
 @Suppress("UNCHECKED_CAST")
 private fun Map<String, Any?>.enumOf(property: String): Set<Any?> =

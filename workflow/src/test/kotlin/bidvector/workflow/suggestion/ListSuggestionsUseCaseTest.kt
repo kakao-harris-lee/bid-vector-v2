@@ -156,6 +156,8 @@ class ListSuggestionsUseCaseTest {
         narrow.calledFor shouldBe wide.calledFor
         narrowLicense.calledFor shouldBe wideLicense.calledFor
         narrow.calledFor shouldBe notices.map { it.id }
+        // 면허 쪽도 값으로 고정한다 — 두 쪽이 함께 0 건이 되는 변이를 등식만으로는 못 잡는다(cr r2 low).
+        narrowLicense.calledFor shouldBe listOf(second.id, third.id, fourth.id)
     }
 
     @Test
