@@ -117,6 +117,14 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
 - **rebase 는 이 배치 커밋 뒤, 동결 전에 한다**: main `54e2c5e2`(g1c03 머지) 위로. 설정 파일 겹침은 합집합, 의존 게이트 면제 수 재계산,
   g1c03 `INTERRUPTED_ROUND` 와 닫힌 라운드 사례 하나 추가. 그 HEAD 에서 check · 변이(신규 포함) · rollback ①~⑥(base 재고정) · container 재생 → 동결.
 
+**D-7C5P-12 (2026-10-23, 팀장 — r2 배치 동결 보고 수령, 판정 산출물 `a2d4724b`).** 레인 요청 넷을 수용한다.
+1. **in_scope 추가 한 줄**: `workflow/.../collection/CollectOpeningResultsUseCase.kt` 의 `DetailAxis` 가시성 `private → internal`(값·순서·사용처
+   불변, 거동 변화 0). 위 out 「수집 use case」 는 이 한 줄을 뺀 나머지로 읽는다. rollback 목록에 포함.
+2. **구판 RED 자리 대체**: `73f31710` 은 g1c03 머지 전이라 새 test 가 컴파일되지 않는다 — 같은 트리의 rebase 등가 `7c2167c7` 에서 잰 것을 수용.
+3. **계약 밖 추가 둘 수용**: 추출 축 등식 test(`OpeningPromotionAxisParityTest`) · `OPENING_PER_NOTICE_AXES` public(test 전용 창구를 두지 않기 위함).
+   (2b) 값 획득 축 등재로 족하다.
+4. **제한 20(공고 단위 축 집합 사본 네 벌)**: 등식 test 둘로 갈림을 막는 지금 모양을 수용하고, domain 으로 합치기는 별 slice(후속 등재).
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
