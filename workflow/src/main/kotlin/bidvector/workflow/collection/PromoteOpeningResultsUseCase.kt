@@ -3,7 +3,6 @@ package bidvector.workflow.collection
 import bidvector.procurement.AttemptLedger
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KonepsCollectionPolicyData
-import bidvector.procurement.NoticeAxisLedger
 import bidvector.procurement.OpeningPromotionOutcome
 import bidvector.procurement.OpeningRawAxisRead
 import bidvector.procurement.OpeningRawAxisSource
@@ -79,12 +78,10 @@ class PromoteOpeningResultsUseCase(
     fun promote(): OpeningPromotionRun {
         val sample = sampleList.confirmed() ?: return OpeningPromotionRun.SampleNotConfirmed
         val read = rawAxes.readOpeningAxes(retention.cutoffFrom(clock.now()).instant)
-        // 걷기 권위는 원장이다(D-6G-68) — raw 행의 존재도, 그 행의 시각도 아니다. 결말과 **열린
-        // 라운드**를 함께 읽는다: 결말의 부재가 「원장 이전 원문」과 「적재와 결말 사이에서 죽은
-        // 끊긴 걷기」 둘을 뜻하고, 접으면 반쪽 원문이 canonical 로 굳는다(verifier r1 F1).
-        val history = attempts.read()
-        val conclusions = history.axisConclusions()
-        val interrupted = history.interruptedRounds()
+        // 걷기 권위는 원장이다(D-6G-68) — raw 행의 존재도, 그 행의 시각도 아니다. 결말이 없는 축은
+        // 상세 축이면 쓰지 않는다: 결말의 부재는 「원장 이전 원문」·「다른 실행 상태 디렉터리의 원문」·
+        // 「적재와 결말 사이에서 죽은 걷기」를 가리지 못하고, 셋 다 반쪽 원문일 수 있다(D-7C5P-11).
+        val conclusions = attempts.read().axisConclusions()
         val policy = policyFor(referenceDate)
         val tally = PromotionTally()
         for (group in read.groups) {
@@ -93,12 +90,7 @@ class PromoteOpeningResultsUseCase(
                 tally.outsideSample++
                 continue
             }
-            val ledger =
-                NoticeAxisLedger(
-                    conclusions = conclusions[hash.value].orEmpty(),
-                    interruptedAxes = interrupted[hash.value].orEmpty().keys,
-                )
-            when (val outcome = promoteOpeningResult(group, ledger, policy)) {
+            when (val outcome = promoteOpeningResult(group, conclusions[hash.value].orEmpty(), policy)) {
                 OpeningPromotionOutcome.NoUsableAxis -> tally.noUsableAxis++
                 is OpeningPromotionOutcome.Promotable -> store(outcome, tally)
             }

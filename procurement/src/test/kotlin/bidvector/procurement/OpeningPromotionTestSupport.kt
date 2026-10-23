@@ -58,18 +58,27 @@ internal fun groupOf(vararg rows: OpeningAxisObservation): OpeningAxisGroup =
 
 internal fun succeededAt(walk: Instant): AxisConclusion = AxisConclusion(AttemptOutcome.Succeeded, walk)
 
+/**
+ * 원장이 **각 축을 그 축의 가장 늦은 걷기에서 성공으로 닫았다**고 본 결말 — 사상표 test 의 기본
+ * 전제다. 그 test 들이 재는 것은 키 → 슬롯 사상이고, 상세 축은 결말이 있어야 쓰이므로(D-7C5P-11)
+ * 원장을 세우지 않으면 사상표가 아니라 걷기 선택을 재게 된다.
+ *
+ * **결말이 없는 경우**는 `conclusions = emptyMap()` 을 명시해서 잰다 — 기본값으로 숨지 않는다.
+ */
+internal fun concludedFromRows(group: OpeningAxisGroup): Map<SourceEndpoint, AxisConclusion> =
+    group.rows
+        .groupBy { it.observation.sourceEndpoint }
+        .mapValues { (_, rows) -> succeededAt(rows.maxOf { it.observation.observedAt }) }
+
 internal fun promote(
     group: OpeningAxisGroup,
-    conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
-    interruptedAxes: Set<SourceEndpoint> = emptySet(),
-): OpeningPromotionOutcome =
-    promoteOpeningResult(group, NoticeAxisLedger(conclusions, interruptedAxes), PROMOTION_POLICY)
+    conclusions: Map<SourceEndpoint, AxisConclusion> = concludedFromRows(group),
+): OpeningPromotionOutcome = promoteOpeningResult(group, conclusions, PROMOTION_POLICY)
 
 internal fun promotedResult(
     group: OpeningAxisGroup,
-    conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
-    interruptedAxes: Set<SourceEndpoint> = emptySet(),
+    conclusions: Map<SourceEndpoint, AxisConclusion> = concludedFromRows(group),
 ): OpeningResult =
-    promote(group, conclusions, interruptedAxes)
+    promote(group, conclusions)
         .shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
         .result

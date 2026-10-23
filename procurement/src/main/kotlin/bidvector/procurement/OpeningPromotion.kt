@@ -72,37 +72,29 @@ internal sealed interface AxisWalk {
 }
 
 /**
- * 한 공고의 원장 상태 — 축별 **결말**과 **결말 없이 끝난 라운드가 있는 축**이다. 둘을 함께 받는
- * 이유: 결말의 부재가 서로 **다른 두 사실**을 뜻하고(원장 이전 원문 ↔ 적재와 결말 사이에서 죽은
- * 끊긴 걷기), 그 둘을 한 값으로 접으면 반쪽 원문이 canonical 로 굳는다(verifier r1 F1).
- */
-class NoticeAxisLedger(
-    val conclusions: Map<SourceEndpoint, AxisConclusion>,
-    /** 마지막 결말 뒤에 의도·호출 줄만 남은 축 — 그 라운드는 결말을 적지 못했다(D-6G2d-42). */
-    val interruptedAxes: Set<SourceEndpoint>,
-)
-
-/**
  * 걷기 선택의 **유일한 자리**. 원장 줄이 있으면 그 줄이 가리킨 걷기다. 행 존재로도, 적재 순서로도
  * 고르지 않는다 — 전자는 잘린 걷기를 완료로 읽고, 후자는 backfill 이 뒤집는다.
  *
- * **결말이 없을 때가 둘로 갈린다**(verifier r1 F1 — 앞 판은 하나로 접어 끊긴 걷기를 승격했다).
- * - 그 축에 **열린 라운드가 있다**(의도·호출 줄은 있는데 AXIS 결말이 없다): 적재와 결말 사이에서
- *   죽은 **끊긴 걷기**다. 그 행으로 canonical 을 쓰지 않는다 — 추출이 같은 원문을 `incomplete_axis`
- *   로 빼는 것과 **같은 판정**이다(승격이 추출보다 느슨할 이유가 없다).
- * - 줄이 **하나도 없다**: 원장 이전 원문이고(D-6G-58), 목록 축도 여기 떨어진다(목록 걷기의 줄은
- *   공고 키를 달지 않아 공고 단위로는 줄이 없다). **그때만** 가장 늦은 관측 시각으로 물러선다.
+ * **결말이 없으면 목록 축만 물러선다**(D-7C5P-11, verifier r2 R2-1). 상세 축은 열린 라운드가 있든
+ * 없든 `Unusable` 이다 — 추출의 완료 판정이 **기대 축마다** 쓸 수 있는 결말을 요구해 같은 원문을
+ * `incomplete_axis` 로 빼고, 그 기대 축 집합이 바로 이 상세 축들이다(목록 축은 추출의 기대 축이
+ * 아니다). 승격이 추출보다 느슨할 이유가 없고, 두 집합의 등식은 산문이 아니라 test 가 잰다
+ * (`OpeningPromotionAxisParityTest`).
  *
- * 그래서 승격이 **목록 축 집합을 따로 들고 있지 않다** — 구별은 원장 자신의 어휘에서 나온다.
- * 그 물러섬은 `OPEN-6G-LIST-AXIS-WALK-SELECTION` 을 **상속한다**(이 slice 가 닫지 않는다).
+ * 앞 판은 「열린 라운드가 있는 축만」 `Unusable` 로 두어, **줄이 하나도 없는 상세 축**(원장 이전
+ * 원문 · 다른 실행 상태 디렉터리가 적재한 원문)이 행 시각으로 물러서서 승격됐다. 그 갈래에서
+ * 「추출과 같은 판정」은 거짓이었다. 지금은 축으로 가르므로 열린 라운드 판독이 필요하지 않다 —
+ * 상세 축의 결말 부재는 **두 경우 모두** 쓰지 않기 때문이다(그 기제를 지웠다).
+ *
+ * 목록 축의 물러섬은 `OPEN-6G-LIST-AXIS-WALK-SELECTION` 을 **상속한다**(이 slice 가 닫지 않는다).
  */
 internal fun axisWalkOf(
+    endpoint: SourceEndpoint,
     conclusion: AxisConclusion?,
-    axisInterrupted: Boolean,
     observedAtValues: List<Instant>,
 ): AxisWalk =
     when {
-        conclusion == null && axisInterrupted -> AxisWalk.Unusable
+        conclusion == null && endpoint in OPENING_PER_NOTICE_AXES -> AxisWalk.Unusable
         conclusion == null -> observedAtValues.maxOrNull()?.let(AxisWalk::Use) ?: AxisWalk.NoRows
         conclusion.outcome == AttemptOutcome.Empty -> AxisWalk.NoRows
         !conclusion.usesRows -> AxisWalk.Unusable
@@ -139,10 +131,10 @@ sealed interface OpeningPromotionOutcome {
  */
 fun promoteOpeningResult(
     group: OpeningAxisGroup,
-    ledger: NoticeAxisLedger,
+    conclusions: Map<SourceEndpoint, AxisConclusion>,
     policy: KonepsCollectionPolicyData,
 ): OpeningPromotionOutcome {
-    val selected = selectedRowsOf(group, ledger)
+    val selected = selectedRowsOf(group, conclusions)
     if (selected.isEmpty()) return OpeningPromotionOutcome.NoUsableAxis
     val reader = FieldReader(selected, policy, group.noticeId.round)
     val contributing = selected.values.flatten()
@@ -221,17 +213,12 @@ fun promotionIsNew(
  */
 private fun selectedRowsOf(
     group: OpeningAxisGroup,
-    ledger: NoticeAxisLedger,
+    conclusions: Map<SourceEndpoint, AxisConclusion>,
 ): Map<SourceEndpoint, List<OpeningAxisObservation>> =
     group.rows
         .groupBy { it.observation.sourceEndpoint }
         .mapNotNull { (endpoint, rows) ->
-            val walk =
-                axisWalkOf(
-                    ledger.conclusions[endpoint],
-                    endpoint in ledger.interruptedAxes,
-                    rows.map { it.observation.observedAt },
-                )
+            val walk = axisWalkOf(endpoint, conclusions[endpoint], rows.map { it.observation.observedAt })
             when (walk) {
                 is AxisWalk.Use -> rows.filter { it.observation.observedAt == walk.walk }
                 AxisWalk.NoRows, AxisWalk.Unusable -> emptyList()

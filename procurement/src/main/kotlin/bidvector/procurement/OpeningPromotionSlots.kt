@@ -48,6 +48,24 @@ internal val OPENING_PROMOTION_SLOT_AXES: Map<FieldConcept, Set<SourceEndpoint>>
     )
 
 /**
+ * **공고 단위로 걷는 축**(= 상세 축, D-7C5P-11). 이 축들만 공고 키를 단 AXIS 결말 줄을 원장에 남기고,
+ * 목록 축의 줄은 공고 키가 없어(`CollectionAttempt.noticeKey` KDoc 「목록 축은 `null`」) 공고 단위로는
+ * 줄이 아예 없다. 그래서 결말이 없을 때 **목록 축만** 행 시각으로 물러설 수 있다.
+ *
+ * **정본은 수집 팬아웃의 `DetailAxis`** 다 — 이 집합은 그 열거의 거울이고, 둘이 같은지는 등식 test 가
+ * 잰다(`PromoteOpeningAxisClassTest`). 거울을 두는 이유는 층이다: 그 열거는 application 층(workflow)에
+ * 있고 사상은 그 아래 domain 층이라 직접 볼 수 없다. 등식이 깨지면 승격이 상세 축을 목록 축으로
+ * 오인해 결말 없는 원문을 올리므로, 그 test 가 이 거울의 유일한 존재 근거다.
+ */
+val OPENING_PER_NOTICE_AXES: Set<SourceEndpoint> =
+    setOf(
+        SourceEndpoint.RESERVE_PRICE_DETAIL,
+        SourceEndpoint.OPENING_COMPLETE,
+        SourceEndpoint.BASE_AMOUNT_DETAIL,
+        SourceEndpoint.BID_PRICE_FORMULA_A,
+    )
+
+/**
  * 승격이 읽는 축 전수 — 위 슬롯 선언의 **합집합**이다. 읽기 어댑터가 질의 조건으로 쓴다: 축 목록을
  * 두 자리에 적으면 한쪽만 늘어나 조용히 읽히지 않는 축이 생긴다.
  */

@@ -381,8 +381,30 @@ class PromoteOpeningResultsUseCaseTest {
     }
 
     @Test
+    fun `원장 줄이 하나도 없는 상세 축의 행은 승격하지 않는다`() {
+        // verifier r2 R2-1 회귀(VP3 모양). 원장에 이 공고의 줄이 **하나도** 없다 — 원장 이전에 적재된
+        // 원문이거나 다른 실행 상태 디렉터리의 걷기다. 앞 판은 「열린 라운드가 있는 축만」 비웠으므로
+        // 이 갈래가 행 시각으로 물러서서 승격됐다. 상세 축은 결말이 없으면 쓰지 않는다.
+        val id = noticeId("PROMOTE-018")
+        val repository = RecordingResultRepository()
+        val source =
+            ScriptedRawAxisSource(
+                OpeningRawAxisRead(
+                    listOf(groupOf(id, RowSpec(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, mapOf("plnprc" to "100")))),
+                ),
+            )
+
+        val report = reportOf(useCaseOf(source, sampleListOf(id), repository, FakeAttemptLedger()).promote())
+
+        report.promoted shouldBe 0
+        report.noUsableAxis shouldBe 1
+        repository.persistCalls.size shouldBe 0
+    }
+
+    @Test
     fun `결말 없이 끊긴 상세 축의 행은 승격하지 않는다`() {
-        // verifier r1 F1 회귀. 원장에 의도·호출 줄만 있고 AXIS 결말이 없다 — 반쪽 원문이다.
+        // verifier r1 F1 회귀. 원장에 의도·호출 줄만 있고 AXIS 결말이 없다 — 반쪽 원문이다. 지금은
+        // 축 기준 규칙(D-7C5P-11)이 같은 판정을 내므로 열린 라운드 유무는 결과를 바꾸지 않는다.
         val id = noticeId("PROMOTE-016")
         val repository = RecordingResultRepository()
         val truncated =

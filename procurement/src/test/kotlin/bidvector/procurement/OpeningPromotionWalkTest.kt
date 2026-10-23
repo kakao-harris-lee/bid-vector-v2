@@ -44,13 +44,14 @@ class OpeningPromotionWalkTest {
     }
 
     @Test
-    fun `원장 줄이 없는 축은 가장 늦은 관측으로 물러선다`() {
+    fun `원장 줄이 없는 목록 축은 가장 늦은 관측으로 물러선다`() {
         val result =
             promotedResult(
                 groupOf(
                     axisRow(SourceEndpoint.OPENING_RESULT_LIST, WALK_A, mapOf("prtcptCnum" to "3")),
                     axisRow(SourceEndpoint.OPENING_RESULT_LIST, WALK_B, mapOf("prtcptCnum" to "9")),
                 ),
+                conclusions = emptyMap(),
             )
 
         result.participantCount shouldBe 9
@@ -104,24 +105,24 @@ class OpeningPromotionWalkTest {
     }
 
     @Test
-    fun `결말 없이 끊긴 축의 행은 승격하지 않는다`() {
-        // verifier r1 F1 — 적재와 결말 사이에서 죽은 걷기다. 추출이 같은 원문을 incomplete_axis 로
-        // 빼는 것과 같은 판정이고, 승격이 그보다 느슨할 이유가 없다.
+    fun `결말 없는 상세 축의 행은 승격하지 않는다 — 원장 줄이 없어도 마찬가지다`() {
+        // verifier r2 R2-1(VP3 모양). 앞 판은 「열린 라운드가 있는 축만」 비웠고, 줄이 **하나도 없는**
+        // 상세 축은 행 시각으로 물러서서 승격했다 — 원장 이전 원문·다른 실행 상태 디렉터리의 원문이
+        // 그 갈래다. 지금은 축으로 가르므로 결말이 없으면 상세 축은 둘 다 쓰지 않는다.
         val group = groupOf(axisRow(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, mapOf("plnprc" to "100")))
 
-        promote(group, interruptedAxes = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL)) shouldBe
-            OpeningPromotionOutcome.NoUsableAxis
+        promote(group, conclusions = emptyMap()) shouldBe OpeningPromotionOutcome.NoUsableAxis
     }
 
     @Test
-    fun `끊긴 축이 있어도 온전한 다른 축은 승격된다`() {
+    fun `결말 없는 상세 축이 있어도 목록 축은 물러서서 승격된다`() {
         val result =
             promotedResult(
                 groupOf(
                     axisRow(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, mapOf("plnprc" to "100")),
                     axisRow(SourceEndpoint.OPENING_RESULT_LIST, WALK_A, mapOf("prtcptCnum" to "4")),
                 ),
-                interruptedAxes = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
+                conclusions = emptyMap(),
             )
 
         result.plannedPrice.shouldBeNull()
@@ -139,19 +140,23 @@ class OpeningPromotionWalkTest {
     }
 
     @Test
-    fun `걷기 선택은 네 갈래다`() {
-        axisWalkOf(null, axisInterrupted = false, listOf(WALK_A, WALK_B)) shouldBe AxisWalk.Use(WALK_B)
-        axisWalkOf(null, axisInterrupted = false, emptyList()) shouldBe AxisWalk.NoRows
-        // 결말이 없는데 **열린 라운드가 있다** — 끊긴 걷기다(verifier r1 F1). 물러서지 않는다.
-        axisWalkOf(null, axisInterrupted = true, listOf(WALK_A, WALK_B)) shouldBe AxisWalk.Unusable
+    fun `걷기 선택은 축과 결말로 갈린다`() {
+        val listAxis = SourceEndpoint.OPENING_RESULT_LIST
+        val detailAxis = SourceEndpoint.RESERVE_PRICE_DETAIL
+
+        // 결말이 없다 — **목록 축만** 물러선다(D-7C5P-11).
+        axisWalkOf(listAxis, null, listOf(WALK_A, WALK_B)) shouldBe AxisWalk.Use(WALK_B)
+        axisWalkOf(listAxis, null, emptyList()) shouldBe AxisWalk.NoRows
+        axisWalkOf(detailAxis, null, listOf(WALK_A, WALK_B)) shouldBe AxisWalk.Unusable
+        axisWalkOf(detailAxis, null, emptyList()) shouldBe AxisWalk.Unusable
         val bothWalks = listOf(WALK_A, WALK_B)
         val emptyConclusion = AxisConclusion(AttemptOutcome.Empty, WALK_B)
         val failedConclusion = AxisConclusion(AttemptOutcome.Failed("X"), WALK_B)
 
-        axisWalkOf(emptyConclusion, axisInterrupted = false, listOf(WALK_A)) shouldBe AxisWalk.NoRows
-        axisWalkOf(failedConclusion, axisInterrupted = false, listOf(WALK_B)) shouldBe AxisWalk.Unusable
-        axisWalkOf(succeededAt(WALK_A), axisInterrupted = false, bothWalks) shouldBe AxisWalk.Use(WALK_A)
-        // 결말이 **있으면** 열린 라운드(재걷기 진행)는 판정을 바꾸지 않는다 — 그 결말의 행은 온전하다.
-        axisWalkOf(succeededAt(WALK_A), axisInterrupted = true, bothWalks) shouldBe AxisWalk.Use(WALK_A)
+        axisWalkOf(detailAxis, emptyConclusion, listOf(WALK_A)) shouldBe AxisWalk.NoRows
+        axisWalkOf(detailAxis, failedConclusion, listOf(WALK_B)) shouldBe AxisWalk.Unusable
+        axisWalkOf(detailAxis, succeededAt(WALK_A), bothWalks) shouldBe AxisWalk.Use(WALK_A)
+        // 결말이 **있으면** 축이 무엇이든 그 결말이 이긴다.
+        axisWalkOf(listAxis, succeededAt(WALK_A), bothWalks) shouldBe AxisWalk.Use(WALK_A)
     }
 }

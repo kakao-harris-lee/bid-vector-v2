@@ -6,7 +6,6 @@ import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
 import bidvector.procurement.NOTICE_ROUND_RAW_KEY
-import bidvector.procurement.NoticeAxisLedger
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservationKey
@@ -52,13 +51,25 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
     /** 표지 상호를 실은 개찰완료 투찰 행 하나 — 마스킹 축 test 둘이 공유한다. */
     private fun rankOneFields(): Map<String, String> = mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1")
 
+    /** 이 test 가 심은 축과 그 걷기 — 기본 결말의 출처다(심지 않은 축의 결말은 짓지 않는다). */
+    private val seeded = mutableMapOf<NoticeId, MutableMap<SourceEndpoint, Instant>>()
+
+    /**
+     * 원장이 **심은 축을 그 걷기에서 성공으로 닫았다**고 본 결말. 상세 축은 결말이 있어야 쓰이므로
+     * (D-7C5P-11) 이 전제가 없으면 왕복 test 가 사상·저장이 아니라 걷기 선택을 재게 된다. 걷기 선택을
+     * 재는 test 는 `conclusions` 를 직접 준다.
+     */
+    private fun concludedFromSeeds(target: NoticeId): Map<SourceEndpoint, AxisConclusion> =
+        seeded[target].orEmpty().mapValues { (_, walk) -> AxisConclusion(AttemptOutcome.Succeeded, walk) }
+
     private fun seed(
         id: NoticeId,
         endpoint: SourceEndpoint,
         fields: Map<String, String>,
         observedAt: Instant = WALK,
-    ): ObservationKey =
-        appendRawObservation(
+    ): ObservationKey {
+        seeded.getOrPut(id) { mutableMapOf() }.merge(endpoint, observedAt) { a, b -> maxOf(a, b) }
+        return appendRawObservation(
             RawNoticeObservation.of(
                 fields =
                     fields.mapKeys { (name, _) -> RawKey(name) } +
@@ -68,16 +79,16 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
                 sourceDivision = null,
             ),
         )
+    }
 
     private fun readAndPromote(
         target: NoticeId,
         collectedSince: Instant = Instant.EPOCH,
-        conclusions: Map<SourceEndpoint, AxisConclusion> = emptyMap(),
-        interruptedAxes: Set<SourceEndpoint> = emptySet(),
+        conclusions: Map<SourceEndpoint, AxisConclusion> = concludedFromSeeds(target),
     ): OpeningPromotionOutcome {
         val read = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(collectedSince)
         val group = read.groups.single { it.noticeId == target }
-        return promoteOpeningResult(group, NoticeAxisLedger(conclusions, interruptedAxes), policy)
+        return promoteOpeningResult(group, conclusions, policy)
     }
 
     private fun persist(outcome: OpeningPromotionOutcome.Promotable) =
