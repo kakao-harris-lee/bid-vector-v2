@@ -19,11 +19,13 @@ D-G1C03-2(창 0)로 갔다.
 |---|---|---|---|
 | `./gradlew --no-daemon check --rerun-tasks` | `26beba76` | **0** | 350 task 전부 실행 · 11분 46초(`qualityBaseline` 은 이 그래프 안) |
 | `container` job 재생 — `ci.yml` step 을 순서대로, `if:` 를 앞 결과로 평가 | `fd60ce1b`(산출물 = `26beba76`) | **0** | 27 step: run 24 success · runner 전용 `uses` 4(`if:` 만 평가) · skipped 0 |
-| 표적 test + ktlint(`CollectionAttemptLedgerTest` · `bidvector.workflow.collection.*` · `OpeningCollectionE2ETest`) | `a7c5da86` 과 같은 트리(커밋 전) | **0** | 신설 test 전부 실행(게이트 test 10 · 원장 26 · E2E 5) |
-| 변이 13 + 통제군 | `a7c5da86` | **0**(스크립트) | 전부 RED · 통제군 784 중 실패 0 |
+| `./gradlew --no-daemon check` | `102d1a5f` | **1** | `:procurement:sizeGate` — 원장 test 파일 535 줄(한도 500). 관측 시각 test 넷을 새 클래스로 떼어 `2c3d0e10` |
+| `./gradlew --no-daemon check --continue` | `2c3d0e10` | **0** | 350 task · `sizeGate` · 등재·실행 게이트 · `leakPatternGate` 실행, 새 클래스 4 test 실행 |
+| 변이 13 | `2c3d0e10` | **0**(스크립트) | 전부 RED(checklist §4-1) |
+| 통제군 `… :workflow:test --rerun :procurement:test --rerun :adapters:test --rerun … :app:test --rerun …` | `2c3d0e10` | **0** | 784 실행 · 실패 0 |
 
 container 재생 뒤 공유 태그 넷은 재생 전 id 다(app `94382c1026cf` · web `855171383f43` · proxy `d93e25e04ec8` ·
-ml-serving `326e9da38043`). 검토 r1 배치(`a7c5da86`)는 Kotlin 소스만 바꿨고 이미지 빌드 입력의 형태(Dockerfile ·
+ml-serving `326e9da38043`). 검토 r1 배치(`a7c5da86` · `2c3d0e10`)는 Kotlin 소스만 바꿨고 이미지 빌드 입력의 형태(Dockerfile ·
 스크립트 · 의존)는 그대로라 container 재생은 다시 돌리지 않았다.
 
 rollback 실측은 `rollback.md` §4.

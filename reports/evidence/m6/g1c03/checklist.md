@@ -153,16 +153,17 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 복사가 아니고 기대값은 스윕 시각과 창의 대소 관계에만 의존한다. age 쌍의 use case 층 test 는 이 slice 에 없다 —
 입력 자체가 없으므로 경계 함수 층에서 잰다(§5).
 
-새 test 는 기존 등재 클래스 안에 있다 — `bidvector.workflow.collection.OpeningDetailFetchGateTest`(10) ·
-`bidvector.procurement.CollectionAttemptLedgerTest` · `bidvector.adapters.snapshot.FileAttemptLedgerTest` ·
-`bidvector.app.collection.OpeningCollectionE2ETest`. 새 클래스가 없으므로 게이트 등재 장부는 바뀌지 않는다.
+새 test 의 자리 — `bidvector.workflow.collection.OpeningDetailFetchGateTest`(10) · `bidvector.adapters.snapshot.FileAttemptLedgerTest` ·
+`bidvector.app.collection.OpeningCollectionE2ETest` · 그리고 **새 클래스** `bidvector.procurement.AxisLastObservedAtTest`(관측 시각 넷 —
+원장 test 파일이 500 줄 한도에 닿아 이 물음만 뗐다, 게이트 등재 장부에 올렸다). 원장 test 파일은 그 결과 base 와 같다.
 
 ### 4-1. 변이 실측
 
-마지막 산출물 커밋 `a7c5da86` 에서 2026-10-23 12:15~12:30 KST, 잠금 아래 한 번에 쟀다. 전부 **바꿔치기**이고 바뀐
+마지막 산출물 커밋 `2c3d0e10` 에서 2026-10-23 13:03~13:10 KST, 잠금 아래 한 번에 쟀다. 전부 **바꿔치기**이고 바뀐
 줄은 변이 직전 사본과의 `diff`(① 2줄, 나머지 1줄), 복원은 `cmp` 바이트 동일(`git checkout --` 쓰지 않음).
 복원 뒤 통제군(`:workflow:test` · `:procurement:test` · `FileAttemptLedgerTest` · `OpeningBudgetE2ETest` ·
-`OpeningCollectionE2ETest`) **exit 0 · 784 중 실패 0**.
+`OpeningCollectionE2ETest`) **exit 0 · 784 중 실패 0** — 스크립트 안의 통제군은 build cache 적중이라 `--rerun` 으로
+따로 실행했다(13:31~13:36).
 
 | ID | 바꿔치기 | RED / 표적 |
 |---|---|---|
@@ -175,9 +176,9 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | ⑤a | age 계수 가지를 무효로(L-2) | 1 / 10 — 「사유마다 따로 센다」 |
 | ⑤b | 재조회 계수 가지를 무효로 | 3 / 10 |
 | ⑥ | 원장 판독 어휘 `SUCCEEDED`→`SUCCESS` | 2 / 9 |
-| MB | 관측 시각 질의에서 닫는 줄 제외를 지움(F-2) | 3 / 109 — use case 둘(이번 실행 · 앞 실행) + 원장 질의 하나 |
-| ML1 | 관측 시각 질의에서 결말 줄 한정을 지움(L-1) | 1 / 26 |
-| MF | 마침 줄 두 칸의 값을 맞바꿈(F-4) | 1 / 5 |
+| MB | 관측 시각 질의에서 닫는 줄 제외를 지움(F-2) | 3 / 87 — use case 둘(이번 실행 · 앞 실행) + 원장 질의 하나 |
+| ML1 | 관측 시각 질의에서 결말 줄 한정을 지움(L-1) | 1 / 4 |
+| MF | 마침 줄 두 칸의 값을 맞바꿈(F-4) | 1 / 5 — 계수 스크립트는 2 / 9 를 냈다: 직전 ML1 의 결과 파일이 같은 초에 쓰여 섞였다. MF 의 Gradle 은 `:app:test` 하나만 돌았다(5 중 1) |
 | ME | 건너뜀 회계를 멈추지 않은 실행에만(F-5) | 1 / 10 |
 
 ## 5. 알려진 제한
@@ -253,6 +254,7 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | D-G1C03-2 「정책 version 관례가 있으면 따른다」 | 관례는 `EffectiveDatedPolicy` 의 효력 시작 항목인데, 항목은 **수집 창의 끝 공고일**로 고른다(조립이 `range.to` 로 푼다). 날짜 항목을 더하면 6G 백필(과거 공고일)이 옛 48 을 받으므로 `Initial` 항목의 값을 바꾸고 출처를 `source` 칸·주석에 적었다 | 선언 안 한 이탈(r1 F-7 이 잡음) → 이 행이 선언 |
 | in_scope 목록 밖 `docs/runbook/**` | 창 0 의 거동 변경과 선행 조건 · 마침 줄 두 칸 | 선언한 이탈(D-G1C03-1 이 연 범위) |
 | `CollectionAttemptLedger.kt` — 「술어 주변」이 아닌 원장 도메인 | 관측 시각 질의 `axisLastObservedAt` · 닫는 줄 값 `INTERRUPTED_ROUND` | 약속대로(D-G1C03-1 「원장 판독에 질의 하나」 · D-G1C03-3 F-2) |
+| 새 test 클래스 `AxisLastObservedAtTest` · `gate-tests.properties` 한 줄 | 관측 시각 test 넷(원장 test 파일 500 줄 한도) | 약속대로(in_scope 「해당 test」 · 「`config/quality` 새 test 등재」) |
 | in_scope 목록 밖 `CanonicalizeTest.kt` | 합성값 주석 한 줄 | 선언한 이탈(D-G1C03-3 L-6) |
 | base `bee7c36f` | 2026-10-23 main `a61ddff1` 위로 rebase(차이는 이 slice 밖 한 파일) — rollback.md 머리 | 선언한 이탈(rollback.md) |
 

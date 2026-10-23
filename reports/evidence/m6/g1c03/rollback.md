@@ -17,7 +17,6 @@ git restore --source=a61ddff1 --staged --worktree -- \
   procurement/src/main/kotlin/bidvector/procurement/CollectionAttemptLedger.kt \
   procurement/src/main/kotlin/bidvector/procurement/CollectionPolicy.kt \
   procurement/src/test/kotlin/bidvector/procurement/CanonicalizeTest.kt \
-  procurement/src/test/kotlin/bidvector/procurement/CollectionAttemptLedgerTest.kt \
   procurement/src/test/kotlin/bidvector/procurement/CollectionPolicyTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt \
   workflow/src/main/kotlin/bidvector/workflow/collection/OpeningSampleFramer.kt \
@@ -28,7 +27,8 @@ git restore --source=a61ddff1 --staged --worktree -- \
   docs/discovery/capability-map.md \
   docs/runbook/m6-6g-real-collection.md \
   reports/evidence/m6/6e1/acceptance-trace.md
-git rm -q workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
+git rm -q procurement/src/test/kotlin/bidvector/procurement/AxisLastObservedAtTest.kt \
+   workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/DetailSkipTally.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/InterruptedRoundCloser.kt \
    workflow/src/test/kotlin/bidvector/workflow/collection/OpeningDetailFetchGateTest.kt
@@ -48,11 +48,11 @@ git rm -q workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.k
 
 ## 4. 실측 (2026-10-23)
 
-실측 HEAD: `a7c5da86`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
+실측 HEAD: `2c3d0e10`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
 
 | # | 확인 | 결과 |
 |---|---|---|
 | ① | 명령 exit | **0** |
-| ② | 바뀐 경로 수 | M 16 · D 4 — §1 목록과 `git diff --name-status a61ddff1..a7c5da86`(evidence 제외)가 같다 |
+| ② | 바뀐 경로 수 | M 15 · D 5 — §1 목록과 `git diff --name-status a61ddff1..2c3d0e10`(evidence 제외)가 같다 |
 | ③ | 되돌린 트리 ↔ base | 작업 트리 ↔ 인덱스 차이 0 · 추적 안 된 파일 0 · `git diff --cached --name-status a61ddff1` 은 이 slice 의 evidence 넷(A)뿐 |
-| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(12:30~12:40, 359 task). evidence 넷이 텍스트 게이트 입력이라 트리 동일성으로 갈음하지 않았다 |
+| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(13:10~13:20, 359 task — `adapters`·`app` test 실행, 나머지 모듈 test 는 같은 입력의 build cache 적중). evidence 넷이 텍스트 게이트 입력이라 트리 동일성으로 갈음하지 않았다 |
