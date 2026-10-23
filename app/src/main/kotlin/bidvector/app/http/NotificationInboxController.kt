@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
 
 /**
  * 계약이 든 질의 매개변수 이름 — 반복 거부의 판정 대상이다. 문서와의 등식은 계약 test 가 잰다.
@@ -52,20 +53,25 @@ class NotificationInboxController(
         }
     }
 
-    /** 읽음 처리(단건). 상태를 바꾸므로 세션 경로에서 CSRF 가 함께 요구된다. */
+    /**
+     * 읽음 처리(단건). 상태를 바꾸므로 세션 경로에서 CSRF 가 함께 요구된다.
+     *
+     * 본문을 **원시 트리로 받는다** — data class 로 받으면 알려진 키 밖을 조용히 무시하고
+     * 강제 변환을 한다(사유는 `NotificationInboxRequests.kt`). 비JSON·빈 본문은 이 핸들러에
+     * 닿기 전에 Jackson 이 던지고 매핑표가 400 으로 받는다(D-6A3-19).
+     */
     @PostMapping("/read")
     fun markRead(
-        @RequestBody body: MarkNotificationReadRequest,
+        @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val account = SessionAccount.of(request) ?: return unauthenticated(request)
-        return when (val target = body.parse()) {
-            is NotificationTargetResult.Rejected ->
-                throw InvalidNotificationRequestException("읽음 처리 대상이 유효하지 않다")
-
+        val target = body.parseNotificationReadTarget()
+        return when (target) {
             is NotificationTargetResult.Item -> respond(notifications.markRead(account, target.key))
 
-            // 단건 경로의 파싱은 묶음을 내지 않는다 — 소진 `when` 을 열거로 닫기 위한 갈래다.
+            // 이 파싱은 묶음을 내지 않는다 — 소진 `when` 을 닫기 위한 갈래이고, 파싱이 갈래를
+            // 늘리면 컴파일이 이 자리를 막는다(조용히 무시되지 않는다).
             is NotificationTargetResult.Notice ->
                 throw InvalidNotificationRequestException("단건 경로가 공고 묶음을 받았다")
         }
@@ -74,14 +80,12 @@ class NotificationInboxController(
     /** 읽음 처리(한 공고의 묶음 전체). 안읽음 항목만 바뀐다. */
     @PostMapping("/read-notice")
     fun markNoticeRead(
-        @RequestBody body: MarkNoticeNotificationsReadRequest,
+        @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val account = SessionAccount.of(request) ?: return unauthenticated(request)
-        return when (val target = body.parse()) {
-            is NotificationTargetResult.Rejected ->
-                throw InvalidNotificationRequestException("읽음 처리 대상이 유효하지 않다")
-
+        val target = body.parseNoticeReadTarget()
+        return when (target) {
             is NotificationTargetResult.Notice ->
                 respond(notifications.markNoticeRead(account, target.notice))
 

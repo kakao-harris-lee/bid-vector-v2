@@ -6,6 +6,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
+import tools.jackson.databind.JsonNode
 
 /** 전체 건수 — 페이지 길이와 다른 값이다(7C① 이 채택한 계약 형태를 잇는다). */
 const val NOTIFICATION_TOTAL_COUNT_HEADER = "X-Total-Count"
@@ -14,23 +15,39 @@ const val NOTIFICATION_TOTAL_COUNT_HEADER = "X-Total-Count"
 const val NOTIFICATION_UNREAD_COUNT_HEADER = "X-Unread-Count"
 
 /**
- * 읽음 처리(단건) 요청. **합성 id 가 없다** — 항목의 신원이 「종류 + 공고 쌍」이고 그 셋은
- * 호출자가 자기 계정의 목록에서 이미 본 값이다. 계정은 **본문에서 오지 않는다**(세션이 낸다).
+ * 읽음 처리 요청의 **명시** 형식 검증 — 본문을 원시 트리로 받아 여기서 판정한다
+ * (`StrategyEditRequests.kt` 와 같은 규율 · 같은 사유).
  *
- * 알려진 키 셋 밖은 400 이다(D-6A2b-25 관례). 전부 `String?` 으로 받아 형식 오류가 프레임워크의
- * 타입 변환 실패(500 경로)로 새지 않게 한다 — 7C① 과 같은 규율.
+ * **왜 data class 로 받지 않는가**: Jackson 에 data class 를 주면 ⓐ 알려진 키 밖을 **조용히
+ * 무시**하고 ⓑ `3` → `"3"` 같은 강제 변환을 한다. ⓐ 는 계약 문서가 선언한 400 을 거짓으로
+ * 만들고(오탈자 `noticeRund` 가 성공으로 보인다), ⓑ 는 「보낸 것과 처리된 것이 다르다」다.
+ * 이 체계가 이미 그 자리를 원시 트리로 닫아 두었으므로 같은 길을 따른다.
+ *
+ * **helper 를 공유하지 않고 같은 모양으로 둔다**: 기존 helper 들은
+ * [InvalidEditRequestException] 을 던진다 — 그 예외 타입이 **어느 표면이 거부했는가**를 나르는
+ * 진단이라(응답은 구별하지 않는다) 알림함 거부가 편집 어휘로 나가면 그 진단이 거짓이 된다.
+ * 규칙은 같고 어휘만 다르다.
  */
-data class MarkNotificationReadRequest(
-    val kind: String? = null,
-    val noticeNumber: String? = null,
-    val noticeRound: String? = null,
-)
+private fun JsonNode.requireObjectBody(): JsonNode {
+    if (!isObject) throw InvalidNotificationRequestException("요청 본문이 JSON object 가 아니다")
+    return this
+}
 
-/** 읽음 처리(공고 묶음 전체) 요청 — 종류 축만 없는 같은 모양이다. */
-data class MarkNoticeNotificationsReadRequest(
-    val noticeNumber: String? = null,
-    val noticeRound: String? = null,
-)
+/** 알려진 키 밖은 거부한다 — 조용히 무시하면 오탈자가 성공으로 보인다(D-6A2b-25 관례). */
+private fun JsonNode.requireKnownKeys(allowed: Set<String>): JsonNode {
+    val unknown = propertyNames().filterNot { it in allowed }.sorted()
+    if (unknown.isNotEmpty()) throw InvalidNotificationRequestException("알 수 없는 본문 키: $unknown")
+    return this
+}
+
+/** 문자열 칸 하나 — 없음·비문자열·공백을 각각 거부한다(강제 변환 0). */
+private fun JsonNode.requiredText(key: String): String {
+    val node = get(key) ?: throw InvalidNotificationRequestException("$key 가 없다")
+    if (!node.isString) throw InvalidNotificationRequestException("$key 는 문자열이어야 한다")
+    val value = node.stringValue()
+    if (value.isBlank()) throw InvalidNotificationRequestException("$key 는 빈 문자열일 수 없다")
+    return value
+}
 
 /** 파싱 결과 — 거부를 삼키지 않도록 소진 `when` 으로 소비한다. */
 sealed interface NotificationTargetResult {
@@ -41,37 +58,47 @@ sealed interface NotificationTargetResult {
     data class Notice(
         val notice: NoticeId,
     ) : NotificationTargetResult
-
-    data object Rejected : NotificationTargetResult
 }
 
 /**
  * 공고 쌍을 값으로 읽는다. 형식을 어긴 입력은 **도메인 타입의 생성자가 던지므로** 그것을
- * `null` 로 접어 거부로 옮긴다 — 도메인 규칙(차수는 제로패딩 세 자리 · 번호는 비어 있지 않음)을
+ * 이 표면의 거부로 옮긴다 — 도메인 규칙(차수는 제로패딩 세 자리 · 번호는 비어 있지 않음)을
  * 이 층에서 다시 적지 않는다(두 벌이 되면 갈린다).
  */
-private fun noticeIdOrNull(
-    number: String?,
-    round: String?,
-): NoticeId? {
-    if (number.isNullOrBlank() || round.isNullOrBlank()) return null
-    return runCatching { NoticeId(NoticeNumber.of(number), NoticeRound.of(round)) }.getOrNull()
+private fun JsonNode.noticeId(): NoticeId {
+    val number = requiredText("noticeNumber")
+    val round = requiredText("noticeRound")
+    return runCatching { NoticeId(NoticeNumber.of(number), NoticeRound.of(round)) }
+        .getOrElse { failure ->
+            throw InvalidNotificationRequestException("공고 키 형식이 아니다").apply { initCause(failure) }
+        }
 }
 
-/** 종류 어휘 밖의 문자열은 거부다 — `valueOf` 의 예외를 값으로 접는다. */
-private fun kindOrNull(raw: String?): NotificationKind? =
-    raw?.let { name -> NotificationKind.entries.firstOrNull { it.name == name } }
-
-fun MarkNotificationReadRequest.parse(): NotificationTargetResult {
-    val kind = kindOrNull(kind) ?: return NotificationTargetResult.Rejected
-    val notice = noticeIdOrNull(noticeNumber, noticeRound) ?: return NotificationTargetResult.Rejected
-    return NotificationTargetResult.Item(NotificationItemKey(kind, notice))
+/** 종류 어휘 밖의 문자열은 거부다 — `valueOf` 의 예외를 쓰지 않고 어휘 전수에서 찾는다. */
+private fun JsonNode.notificationKind(): NotificationKind {
+    val token = requiredText("kind")
+    return NotificationKind.entries.firstOrNull { it.name == token }
+        ?: throw InvalidNotificationRequestException("알 수 없는 kind 토큰: $token")
 }
 
-fun MarkNoticeNotificationsReadRequest.parse(): NotificationTargetResult {
-    val notice = noticeIdOrNull(noticeNumber, noticeRound) ?: return NotificationTargetResult.Rejected
-    return NotificationTargetResult.Notice(notice)
+/** 읽음 처리(단건) — 신원은 「종류 + 공고 쌍」이다. 계정·시각 칸은 **허용 키에 없다**. */
+fun JsonNode.parseNotificationReadTarget(): NotificationTargetResult {
+    val body = requireObjectBody().requireKnownKeys(ITEM_TARGET_KEYS)
+    return NotificationTargetResult.Item(NotificationItemKey(body.notificationKind(), body.noticeId()))
 }
+
+/** 읽음 처리(공고 묶음 전체) — 종류 축만 없는 같은 모양이다. */
+fun JsonNode.parseNoticeReadTarget(): NotificationTargetResult {
+    val body = requireObjectBody().requireKnownKeys(NOTICE_TARGET_KEYS)
+    return NotificationTargetResult.Notice(body.noticeId())
+}
+
+/**
+ * 허용 키 — **계정 칸도 시각 칸도 없다**. 소유 경계는 세션이 정하고 읽은 시각은 서버가
+ * 정한다. 그 부재를 계약 test 가 어휘로도 잠근다.
+ */
+private val ITEM_TARGET_KEYS = setOf("kind", "noticeNumber", "noticeRound")
+private val NOTICE_TARGET_KEYS = setOf("noticeNumber", "noticeRound")
 
 /**
  * 항목 하나의 응답 — **평탄하다**(D-6A1-20 ⓑ: 속성은 스칼라이거나 스칼라 배열). 그래서 「건별
