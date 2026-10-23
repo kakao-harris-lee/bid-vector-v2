@@ -32,6 +32,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
 import java.nio.file.Files
@@ -47,13 +48,20 @@ private val POLICY: KonepsCollectionPolicyData =
 private val RETENTION: RetentionPolicyData =
     (RETENTION_POLICY.resolve(REFERENCE_DATE.date) as Resolution.Resolved).value
 
-/** 읽기 포트 대역 — **불렸는지**가 이 test 의 증거다(잠금을 못 잡으면 0 이어야 한다). */
-private class CountingRawAxisSource : OpeningRawAxisSource {
+/**
+ * 읽기 포트 대역 — **불렸는지**가 이 test 의 증거다(잠금을 못 잡으면 0 이어야 한다).
+ *
+ * [failWith] 를 주면 **불린 뒤** 던진다 — 러너의 실패 경로를 재는 자리다(CR r2 LOW-2).
+ */
+private class CountingRawAxisSource(
+    private val failWith: Exception? = null,
+) : OpeningRawAxisSource {
     var reads: Int = 0
         private set
 
     override fun readOpeningAxes(collectedSince: Instant): OpeningRawAxisRead {
         reads++
+        failWith?.let { throw it }
         return OpeningRawAxisRead(emptyList())
     }
 }
@@ -126,8 +134,8 @@ class OpeningPromotionRunnerLockTest {
     private fun harness(
         directory: Path,
         sample: SampleList?,
+        source: CountingRawAxisSource = CountingRawAxisSource(),
     ): Harness {
-        val source = CountingRawAxisSource()
         val repository = CountingResultRepository()
         val exitCodes = RecordedExitCodes()
         val lines = mutableListOf<String>()
@@ -189,6 +197,25 @@ class OpeningPromotionRunnerLockTest {
         harness.exitCodes.recorded() shouldContainExactly listOf(CollectionExitCode.COMPLETE.value)
         harness.lines.single() shouldContain "opening-promote finished groupsRead=0 promoted=0"
         harness.source.reads shouldBe 1
+    }
+
+    @Test
+    fun `읽기가 던지면 사유 코드만 로그에 남고 원 메시지는 새지 않는다`() {
+        // CR r2 LOW-2 — `promoteOrFail` 의 catch. 저장소·드라이버 예외 메시지에는 행 값이 실릴 수
+        // 있어 원 예외를 잇지 않는다(D-6F8-4). 그래서 재는 것 둘: 사유 **코드**가 나오는가,
+        // 원 메시지가 **어디에도** 없는가(로그 줄 · 던진 예외 메시지).
+        val rowValue = "주식회사-가나다-99999999"
+        val source = CountingRawAxisSource(IllegalStateException("payload=$rowValue"))
+        val harness = harness(Files.createTempDirectory("7c5p-promote-throws"), confirmedSample(), source)
+
+        val thrown = runCatching { run(harness) }.exceptionOrNull()
+
+        val failure = thrown.shouldBeInstanceOf<CollectionRunFailedException>()
+        failure.causeCode shouldBe "java.lang.IllegalStateException"
+        harness.lines shouldContainExactly listOf("collection failed cause=java.lang.IllegalStateException")
+        harness.lines.none { it.contains(rowValue) } shouldBe true
+        failure.message.orEmpty().contains(rowValue) shouldBe false
+        harness.repository.persists shouldBe 0
     }
 
     @Test
