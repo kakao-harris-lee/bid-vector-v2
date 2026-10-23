@@ -133,7 +133,7 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
         "BidTimelineEntryResponse" to
             "타임라인 줄 응답 값 객체(data class) 자동 생성 equals — 상태·명령·주체 종류·시각뿐, 본문도 자격증명도 없음",
         "BidCaseRequestsKt" to
-            "요청 읽기의 enum 어휘 조회(`values.firstOrNull { it.name == raw }`)와 provenance 짝 판정 — 공개 어휘 비교이고 자격증명 값 없음",
+            "요청 읽기의 enum 어휘 조회(`values.firstOrNull { it.name == raw }`) — 공개 어휘 비교이고 자격증명 값 없음",
         "BidCaseRouting" to
             "경로·질의 읽기의 어휘 비교(bidKind·state) — 공개 enum 이름 비교이고 자격증명 값 없음 " +
             "(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",

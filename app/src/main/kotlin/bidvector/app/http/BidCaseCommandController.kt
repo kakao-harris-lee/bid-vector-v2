@@ -38,8 +38,10 @@ class BidCaseCommandController(
     ): ResponseEntity<Any> {
         val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         val (notice, kind) = BidCaseRequests.openCase(body)
-        val view = workflow.open(account, notice, kind)
-        return ResponseEntity.status(HttpStatus.CREATED).body(BidCaseResponse.from(view))
+        val opened = workflow.open(account, notice, kind)
+        // 새로 담았으면 201, 이미 담긴 건이면 200 — 화면이 둘을 가른다(계약 D-7B-3).
+        val status = if (opened.created) HttpStatus.CREATED else HttpStatus.OK
+        return ResponseEntity.status(status).body(BidCaseResponse.from(opened.view))
     }
 
     @PostMapping("/{caseId}/defer")
@@ -51,22 +53,17 @@ class BidCaseCommandController(
         BidCaseHttp.dispatch(workflow, caseId, request) { BidCommand.Defer(BidCaseRequests.remindAt(body)) }
 
     /**
-     * 나중에 해제 — 인자가 없지만 **본문을 받는다**(빈 객체 `{}`).
+     * 나중에 해제 — 인자가 없고 **본문을 받지 않는다**(계약 D-7B-3 결정 ④ — 문서가 정본이다).
      *
-     * 인자가 없다고 `@RequestBody` 를 빼면 그 매핑만 미지원 미디어 타입·깨진 JSON 에서 다른
-     * 답을 낸다(Spring 이 본문을 보지 않으므로 415·400 이 나지 않는다). 출하 표면 전수 test 가
-     * 「본문을 받는 POST 매핑은 전부 같은 모양으로 거부한다」를 재므로, 모양을 맞춘다.
+     * 앞 판은 표면 전수 test 의 모양을 맞추려고 `{}` 를 요구했고, 문서대로 본문 없이 부르면 400 이었다.
+     * 이제 문서의 `requestBody` 유무와 매핑의 `@RequestBody` 유무를 같은 집합으로 재고
+     * (`OpenApiRequestBodyContractTest`), 본문 거부 전수는 본문을 받는 매핑만 모집단으로 삼는다.
      */
     @PostMapping("/{caseId}/resume")
     fun resume(
         @PathVariable caseId: String,
-        @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> =
-        BidCaseHttp.dispatch(workflow, caseId, request) {
-            body.requireObject().requireKnownKeys(emptySet())
-            BidCommand.Resume
-        }
+    ): ResponseEntity<Any> = BidCaseHttp.dispatch(workflow, caseId, request) { BidCommand.Resume }
 
     @PostMapping("/{caseId}/skip")
     fun skip(

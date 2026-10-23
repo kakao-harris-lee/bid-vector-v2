@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.bidding.ActorKind
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
@@ -7,6 +8,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.NoticeSnapshot
+import bidvector.bidding.OPEN_CASE_COMMAND
 import bidvector.bidding.tag
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
@@ -37,6 +39,7 @@ class InMemoryBidCaseStore : BidCaseStorePort {
         notice: NoticeKey,
         kind: BidKind,
         at: Instant,
+        deadlineAt: Instant?,
     ): OpenCaseResult {
         val existing =
             rows.values.firstOrNull {
@@ -44,10 +47,34 @@ class InMemoryBidCaseStore : BidCaseStorePort {
             }
         if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
         val id = BidCaseId(nextId++)
-        val case = BidCase(id, notice, kind, BidState.Watching, caseVersion = 0, outcomeNoticeExpectedAt = null)
-        rows[id.value] = Row(account, case)
+        val case =
+            BidCase(
+                id,
+                notice,
+                kind,
+                BidState.Watching,
+                caseVersion = 0,
+                outcomeNoticeExpectedAt = null,
+                deadlineAt = deadlineAt,
+            )
+        // 실 어댑터(`JdbcBidCaseStore.open`)처럼 **생성 전이 한 줄**을 남긴다(검토 C-M7) — 빠지면 이
+        // 이중체 위의 「담은 직후 타임라인」이 실 DB 와 갈린다.
+        rows[id.value] = Row(account, case, mutableListOf(creationEntry(at)))
         return OpenCaseResult.Opened(case)
     }
+
+    private fun creationEntry(at: Instant): TimelineEntry =
+        TimelineEntry(
+            caseVersion = 0,
+            fromState = null,
+            toState = BidStateTag.WATCHING,
+            command = OPEN_CASE_COMMAND,
+            actorKind = ActorKind.USER,
+            actorDetail = null,
+            reason = null,
+            retroactive = false,
+            occurredAt = at,
+        )
 
     override fun load(
         account: AccountId,

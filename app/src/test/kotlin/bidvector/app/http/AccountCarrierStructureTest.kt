@@ -19,7 +19,18 @@ import java.io.File
  * 3. 주체 속성 키 문자열을 가진 class — 그 속성을 **적거나 감사에 옮기는** 자리뿐이다. 접근자를
  *    우회해 `getAttribute` 로 라벨을 직접 읽는 변형은 여기서 붉다.
  *
- * 등식의 오른쪽은 **관측값**이다(2026-10-23 javap 실측). 정당한 새 자리가 생기면 이 집합을
+ * **계약 D-7B-3 이 더한 셋**(verifier r1 M-1 · 팀장 표적) — 위 문자열 상수 술어는 키를 실행 시에
+ * 조립하면(`listOf(…).joinToString(".")`) 피해 갈 수 있었다(verifier 변이 M2 초록). 그래서 문자열이 아니라
+ * **호출 지점과 서명**으로 닫는다:
+ *
+ * 4. 요청 속성을 읽는(`getAttribute`) class — 속성을 적고 읽는 정해진 넷뿐이다. 계정 범위 핸들러가 속성을
+ *    직접 읽어 라벨을 파싱하는 변형은 키를 어떻게 만들든 여기서 붉다.
+ * 5. app main 에서 `AccountId` 를 **만드는** 자리 — 0 이다. 계정은 세션 인증이 낸 값이 운반될 뿐이다.
+ * 6. `AccountId` 를 생성자 인자로 받는 class — 운반 자리(`AuthenticationResult.Authenticated`) 하나다.
+ *    `app.injection.allowed-types` 의 `AccountId` 한 줄은 타입 단위라 어느 class 에나 주입 길을 연다
+ *    (verifier 변이 M4 초록) — 이 등식이 그 줄을 한 자리로 좁힌다.
+ *
+ * 등식의 오른쪽은 **관측값**이다(javap 실측). 정당한 새 자리가 생기면 이 집합을
  * 고치는 커밋이 그 자리를 이름으로 드러낸다 — 그것이 이 test 의 목적이다.
  */
 class AccountCarrierStructureTest {
@@ -47,6 +58,38 @@ class AccountCarrierStructureTest {
         callersOf(ACCOUNT_ACCESSOR) shouldBe ACCOUNT_READERS
     }
 
+    @Test
+    fun `요청 속성을 읽는 자리는 정해진 넷뿐이다 — 키를 어떻게 만들든`() {
+        (callersOf(GET_ATTRIBUTE_HTTP) + callersOf(GET_ATTRIBUTE_SERVLET)) shouldBe ATTRIBUTE_READERS
+    }
+
+    @Test
+    fun `app main 의 어디도 AccountId 를 만들지 않는다`() {
+        callersOf(ACCOUNT_ID_INIT) shouldBe emptySet()
+    }
+
+    @Test
+    fun `AccountId 를 생성자로 받는 class 는 운반 자리 하나다`() {
+        constructorsTaking(outputs, ACCOUNT_ID_TYPE) shouldBe setOf("http/AuthenticationResult\$Authenticated")
+    }
+
+    /** 양성 대조 — 새 셋 술어가 javap 문면에서 실제로 잡는지(verifier 변이 M2 · M4 모양). */
+    @Test
+    fun `속성을 직접 읽거나 AccountId 를 만들거나 주입받는 class 는 새 술어에 걸린다 — 양성 대조`() {
+        val handler =
+            listOf(
+                "  public bidvector.app.http.NewHandler(bidvector.workflow.access.AccountId);",
+                "4: invokeinterface #9 // InterfaceMethod " +
+                    "jakarta/servlet/http/HttpServletRequest.getAttribute:(L…;)L…;",
+                "9: invokespecial #12  // Method bidvector/workflow/access/AccountId.\"<init>\":(J)V",
+            ).joinToString("\n")
+        val simulated = mapOf("http/NewHandler" to handler)
+
+        callers(simulated, GET_ATTRIBUTE_HTTP) shouldBe setOf("http/NewHandler")
+        callers(simulated, ACCOUNT_ID_INIT) shouldBe setOf("http/NewHandler")
+        constructorsTaking(simulated, ACCOUNT_ID_TYPE) shouldBe setOf("http/NewHandler")
+    }
+
     /** 양성 대조 — 술어가 javap 문면에서 실제로 잡는지, 바이트코드 없이 고정한다. */
     @Test
     fun `라벨을 파싱하는 새 class 는 세 술어에 걸린다 — 양성 대조`() {
@@ -71,6 +114,19 @@ class AccountCarrierStructureTest {
         const val ACCOUNT_LABEL_PREFIX = "account:"
         const val SUBJECT_ACCESSOR = "bidvector/app/http/ErrorBodyKt.authenticatedSubject:"
         const val ACCOUNT_ACCESSOR = "bidvector/app/http/AuthenticatedAccountKt.authenticatedAccount:"
+        const val GET_ATTRIBUTE_HTTP = "jakarta/servlet/http/HttpServletRequest.getAttribute:"
+        const val GET_ATTRIBUTE_SERVLET = "jakarta/servlet/ServletRequest.getAttribute:"
+        const val ACCOUNT_ID_INIT = "bidvector/workflow/access/AccountId.\"<init>\":"
+        const val ACCOUNT_ID_TYPE = "bidvector.workflow.access.AccountId"
+
+        /** 속성을 읽는 자리 — 계정 접근자 · 주체·correlation 접근자 · 감사 필터 · 인증 필터. */
+        val ATTRIBUTE_READERS =
+            setOf(
+                "http/AuthenticatedAccountKt",
+                "http/ErrorBodyKt",
+                "http/RequestAuditFilter",
+                "http/RequestAuthenticationFilter",
+            )
 
         /** 라벨을 만드는 자리 — `BrowserSessionAuthenticator.subjectOf`. */
         val LABEL_WRITERS = setOf("http/BrowserSessionAuthenticator\$Companion")
@@ -116,6 +172,21 @@ private fun callers(
         .filterValues { text -> text.lineSequence().any { it.contains("Method $method") } }
         .keys
 }
+
+/**
+ * 생성자 매개변수에 [type] 이 있는 class — javap `-p` 의 생성자 선언 줄(`<FQN>(…);`)을 읽는다. 키는
+ * `bidvector/app/` 아래 상대 경로이고 FQN 은 그 경로에서 만든다.
+ */
+private fun constructorsTaking(
+    outputs: Map<String, String>,
+    type: String,
+): Set<String> =
+    outputs
+        .filter { (key, text) ->
+            val fqn = Regex.escape("bidvector.app." + key.replace('/', '.'))
+            val declaration = Regex("""^\s*(?:public |protected |private )?(?:synthetic )?$fqn\(([^)]*)\);\s*$""")
+            text.lineSequence().any { line -> declaration.find(line)?.groupValues?.get(1)?.contains(type) == true }
+        }.keys
 
 private fun appClassOutputs(): Map<String, String> {
     val root = File("build/classes/kotlin/main/bidvector/app")

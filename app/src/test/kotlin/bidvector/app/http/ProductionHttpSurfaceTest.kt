@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMethod
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -115,6 +116,19 @@ class ProductionHttpSurfaceTest {
             }
         }
         return collected
+    }
+
+    /** `@RequestBody` 매개변수를 가진 POST 매핑 — 판정은 핸들러 메서드의 서명이다(경로 목록을 적지 않는다). */
+    private fun bodyReadingPostPaths(): Set<String> {
+        val handlerMapping = context.getBean(RequestMappingHandlerMapping::class.java)
+        return handlerMapping.handlerMethods
+            .filter { (info, handler) ->
+                RequestMethod.POST in info.methodsCondition.methods &&
+                    handler.methodParameters.any { it.hasParameterAnnotation(RequestBody::class.java) }
+            }.keys
+            .flatMap { info -> info.pathPatternsCondition?.patterns.orEmpty() }
+            .map { it.patternString.replace(PATH_VARIABLE_PATTERN, PATH_VARIABLE_PROBE) }
+            .toSet()
     }
 
     private fun headers(
@@ -288,8 +302,14 @@ class ProductionHttpSurfaceTest {
         credentialAxis.none(AccountScopedRoutes::covers) shouldBe true
         postPaths.filter(AccountScopedRoutes::covers).toSet() shouldBe (sessionAxis - credentialAxis)
 
-        // 본문 거부의 **모양**은 두 축에서 같아야 한다 — 닿는 축의 자격으로 잰다.
-        assertBodyRejectionShape(postPaths) { path ->
+        // 본문 거부의 **모양**은 두 축에서 같아야 한다 — 닿는 축의 자격으로 잰다. 모집단은 **본문을 받는**
+        // POST 매핑이다(계약 D-7B-3 결정 ④): 본문 없는 operation(`resumeBidCase`)은 본문을 보지 않으므로
+        // 415·400 을 낼 이유가 없다. 문서의 `requestBody` 유무와 매핑의 `@RequestBody` 유무가 같은
+        // 집합이라는 것은 `OpenApiRequestBodyContractTest` 가 따로 잰다.
+        val bodyPaths = bodyReadingPostPaths()
+        bodyPaths.shouldNotBeEmpty()
+        postPaths.shouldContainAll(bodyPaths)
+        assertBodyRejectionShape(bodyPaths) { path ->
             if (reach.getValue(path).byCredential) headers(null) else sessionHeaders(session)
         }
     }

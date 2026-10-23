@@ -212,7 +212,7 @@ export interface paths {
         put?: never;
         /**
          * 관심 담기 — 입찰함에 건을 연다(M7/7B)
-         * @description pull 모델(§0.7)에서 **사용자가 담은 것만** 입찰함에 들어온다. 같은 (공고, 종류)에 건은 하나이므로 이미 있으면 그 건을 그대로 돌려준다.
+         * @description pull 모델(§0.7)에서 **사용자가 담은 것만** 입찰함에 들어온다. 같은 (공고, 종류)에 건은 하나이므로 이미 있으면 그 건을 그대로 돌려준다 — 새로 담았으면 201, 이미 담긴 건이면 200 이다(화면이 「담겼습니다」와 「이미 담긴 건입니다」를 가른다).
          */
         post: operations["addBidCase"];
         delete?: never;
@@ -534,6 +534,7 @@ export interface components {
             remindAt: string;
         };
         SkipRequest: {
+            /** @description 건너뜀 사유 — 지울 수 없는 타임라인에 남는다(500자 상한). */
             reason: string;
         };
         DraftBidRequest: {
@@ -546,14 +547,9 @@ export interface components {
             vatTreatment: "INCLUSIVE" | "EXCLUSIVE" | "UNKNOWN";
             /**
              * Format: date-time
-             * @description 제시 시각 — 기록의 확인 시각과 다른 축이다.
+             * @description 제시 시각 — 기록의 확인 시각과 다른 축이다. 공고 스냅샷은 요청에 자리가 없다 — 서버가 초안을 만드는 순간의 공고에서 뜬다.
              */
             presentedAt: string;
-            /**
-             * Format: date-time
-             * @description 화면이 공고를 본 시각. **스냅샷 값 자체는 받지 않는다** — 서버가 공고에서 뜬다.
-             */
-            snapshotTakenAt: string;
         };
         RecordBidRequest: {
             /** Format: int64 */
@@ -590,7 +586,7 @@ export interface components {
         CorrectOutcomeRequest: {
             /** @enum {string} */
             outcome: "WON" | "LOST" | "FAILED_OR_REBID";
-            /** @description 정정은 **사유가 필수**다 — 원본은 타임라인에 남는다. */
+            /** @description 정정은 **사유가 필수**다 — 원본은 타임라인에 남는다(500자 상한). */
             reason: string;
         };
         SignInRequest: {
@@ -1543,7 +1539,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 건이 열렸다(이미 있었으면 그 건) */
+            /** @description 이미 담긴 건 — 그 건을 그대로 돌려준다 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 건이 새로 열렸다 */
             201: {
                 headers: {
                     [name: string]: unknown;
