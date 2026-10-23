@@ -88,6 +88,16 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
 변이·rollback 과 같은 락 큐 직렬. RED 별 라운드 미관측은 사실로 선언하고 test 강도는 변이(바꿔치우기 13 + 음성 대조 1)로 세운다 — 게이트의 자연
 발생 RED 는 test RED 로 세지 않는다(verifier 표적).
 
+**D-7C5P-10 (2026-10-23, 팀장 — 검토 r1 수령: verifier not-ready(재작업 1/5) · CR REQUEST_CHANGES, 일괄 배치).**
+- **F1(high) = CR M「목록 축만 물러선다」 거짓**: `conclusion == null` 물러섬을 목록 축으로만 한정. 결말 없는 상세 축의 끊긴 걷기는 승격하지 않는다
+  (추출 쪽 `incomplete_axis` 와 같은 판정). verifier VPROBE1 을 회귀 test 로.
+- **F2(medium)**: 빈 선택 축에서 `maxOf` 예외 → 실행 전체 정지. 빈 축은 맵에서 뺀다, VPROBE2 회귀 test.
+- **F3 = CR HIGH**: `OpeningPromotionRunner` 를 짓는 test — 잠금 중 기동 거부 · 종료 코드 셋 · 잠금 래퍼 제거 변이 RED(형제 러너 test 형태).
+- **CR**: 실 DB E2E 를 출하 조립(배선 → use case → 저장소)으로 · 개찰완료 행 묶음에서 확정 세 칸 부재 단언 · `finalAwardCompanyName`·
+  `progressDivision` trim 대칭(production 수정, test 동반) · 자식 행 `revision` 흔들림과 창 안 전 행 메모리 적재는 제한 등재(상한 수치 선언).
+- 장부층: container 절 매달린 자리 → verifier 재생 결과 · 변이 패치·필터 명령 기록 · 예비가격 자식 행 잔존 · 180일 상한에 파기 주기·
+  `reference-date` 가산 · 커밋 메시지 test 수 정정은 evidence 에 사실로.
+- 그 뒤 마지막 산출물 커밋에서 check · 변이(신규 포함) · rollback ①~⑥ · container 재생 → 동결.
 
 ## 하네스 레인 변경 (상시)
 
