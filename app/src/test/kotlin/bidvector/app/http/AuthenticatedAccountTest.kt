@@ -11,8 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -95,18 +93,16 @@ class AuthenticatedAccountTest : HttpIntegrationTestBase() {
 
     @Test
     fun `세션으로 닿으면 입찰함이 그 세션의 계정으로 열린다`() {
-        val session = signInSession()
+        val session = SessionTestClient(restTemplate, ::url).signIn()
 
         val opened =
-            exchange(
+            session.post(
                 AccountScopedRoutes.BID_CASES,
-                HttpMethod.POST,
-                jsonWith(cookieAndStamp(session)),
                 """{"noticeNumber":"R7B-ACCOUNT-CARRIER","noticeRound":"000","bidKind":"REAL"}""",
             )
         opened.statusCode.value() shouldBe CREATED
 
-        val listed = exchange("${AccountScopedRoutes.BID_CASES}?kind=REAL", HttpMethod.GET, cookieOnly(session))
+        val listed = session.get("${AccountScopedRoutes.BID_CASES}?kind=REAL")
         listed.statusCode.value() shouldBe OK
         listed.body.orEmpty() shouldContain "R7B-ACCOUNT-CARRIER"
     }
@@ -115,8 +111,14 @@ class AuthenticatedAccountTest : HttpIntegrationTestBase() {
     fun `자격 헤더로는 입찰함이 401 이다 — 그 경로는 계정을 심지 않는다`() {
         val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
-        exchange("${AccountScopedRoutes.BID_CASES}?kind=REAL", HttpMethod.GET, headers).statusCode.value() shouldBe
-            UNAUTHORIZED
+        val response =
+            restTemplate.exchange(
+                url("${AccountScopedRoutes.BID_CASES}?kind=REAL"),
+                HttpMethod.GET,
+                HttpEntity<String>(null, headers),
+                String::class.java,
+            )
+        response.statusCode.value() shouldBe UNAUTHORIZED
     }
 
     private fun granting(account: AccountId): RequestAuthenticationFilter =
@@ -131,52 +133,11 @@ class AuthenticatedAccountTest : HttpIntegrationTestBase() {
         return request
     }
 
-    private fun signInSession(): ProbeSession {
-        val response =
-            exchange(
-                "/api/session",
-                HttpMethod.POST,
-                jsonWith(HttpHeaders()),
-                """{"loginName":"$TEST_LOGIN","passphrase":"$TEST_PASSPHRASE"}""",
-            )
-        response.statusCode.value() shouldBe CREATED
-        val setCookie = requireNotNull(response.headers.getFirst(HttpHeaders.SET_COOKIE)) { "Set-Cookie 가 없다" }
-        val stamp = Regex("\"csrf\"\\s*:\\s*\"([^\"]+)\"").find(response.body.orEmpty())?.groupValues?.get(1)
-        return ProbeSession(
-            cookie = setCookie.substringAfter("${SessionCookieWriter.HOST_PREFIXED_NAME}=").substringBefore(";"),
-            stamp = requireNotNull(stamp) { "로그인 응답에 csrf 가 없다" },
-        )
-    }
-
-    private fun cookieOnly(session: ProbeSession): HttpHeaders =
-        HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=${session.cookie}") }
-
-    private fun cookieAndStamp(session: ProbeSession): HttpHeaders =
-        cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }
-
-    private fun jsonWith(headers: HttpHeaders): HttpHeaders =
-        HttpHeaders().apply {
-            putAll(headers)
-            contentType = MediaType.APPLICATION_JSON
-        }
-
-    private fun exchange(
-        path: String,
-        method: HttpMethod,
-        headers: HttpHeaders,
-        body: String? = null,
-    ): ResponseEntity<String> = restTemplate.exchange(url(path), method, HttpEntity(body, headers), String::class.java)
-
     private class StubAuthenticator(
         private val result: AuthenticationResult,
     ) : RequestAuthenticator {
         override fun authenticate(request: jakarta.servlet.http.HttpServletRequest): AuthenticationResult = result
     }
-
-    private class ProbeSession(
-        val cookie: String,
-        val stamp: String,
-    )
 
     private companion object {
         const val FORGED_ACCOUNT_ID = 999L
