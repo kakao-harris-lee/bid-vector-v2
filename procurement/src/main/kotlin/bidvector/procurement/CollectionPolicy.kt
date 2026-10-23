@@ -309,8 +309,8 @@ private val KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES: List<ResultCodeCategoryEn
 
 /**
  * 운영 정책 인스턴스 — 운영자 승인(`policy-values.md` §6, P-1~P-6 전부)을 옮긴다.
- * age/recheck-gate 24h/48h는 **「측정 전 잠정」**(P-5)이고, 필드 계약 열은 「미확정」 칸을
- * 뺀 채택분만 담는다(P-1). 추정가격 해석 순서에 기초금액 키가 없다는 불변식은 `init`이
+ * age-gate 24h 는 **「측정 전 잠정」**(P-5)이고 재조회 창은 **0**(운영자 결정 2026-10-22, D-G1C03-2 —
+ * P-5 의 48h 를 대체한다), 필드 계약 열은 「미확정」 칸을 뺀 채택분만 담는다(P-1). 추정가격 해석 순서에 기초금액 키가 없다는 불변식은 `init`이
  * 실값으로도 검사한다.
  */
 val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =

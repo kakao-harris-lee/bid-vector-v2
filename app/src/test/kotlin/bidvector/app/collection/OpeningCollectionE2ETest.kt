@@ -4,6 +4,9 @@ import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.adapters.snapshot.RunStateLock
 import bidvector.procurement.CollectedAxisStore
+import bidvector.workflow.collection.DetailSkipCounts
+import bidvector.workflow.collection.OpeningCollectionReport
+import bidvector.workflow.collection.SampleOutcome
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
@@ -112,5 +115,24 @@ class OpeningCollectionE2ETest {
             // 잠금도 출하 조립에서 실제로 잡힌다 — 대역이 서면 동시 실행 차단이 사라진다.
             context.getBean(RunStateDirectory::class.java).lock.shouldBeInstanceOf<RunStateLock.Held>()
         }
+    }
+
+    /**
+     * 마침 줄의 두 건너뜀 칸이 **제 사유의 수**를 싣는다(M6/G1-C03) — 값이 서로 다른 보고로 재야 두 칸을
+     * 맞바꾼 것이 드러난다(출하 경로의 실행은 둘 다 0 이라 위 E2E 로는 가려지지 않는다).
+     */
+    @Test
+    fun `마침 줄은 두 건너뜀을 제 사유의 칸에 싣는다`() {
+        val report =
+            OpeningCollectionReport(
+                frameSize = 0,
+                sample = SampleOutcome(emptyList(), emptyMap()),
+                detailCalls = 0,
+                sampleUnseen = 0,
+                halted = null,
+                skipped = DetailSkipCounts(ageGate = 1, recheckGate = 2),
+            )
+
+        openingFinishLine(report, openingExitCodeOf(report)) shouldContain "skippedAgeGate=1 skippedRecheckGate=2"
     }
 }

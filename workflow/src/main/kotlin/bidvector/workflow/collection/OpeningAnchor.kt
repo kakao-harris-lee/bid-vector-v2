@@ -1,5 +1,8 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.DetailFetchDecision
+import bidvector.procurement.DetailFetchGates
+import bidvector.procurement.decideDetailFetch
 import java.time.Instant
 
 /**
@@ -24,11 +27,30 @@ internal sealed interface OpeningAnchor {
 }
 
 /**
- * 술어에 넘길 값 — 싣지 않는 경로는 **age 판정을 하지 않는다**(건너뛰는 것은 판정이지 호출이 아니다).
- * 소진 `when` 이라 갈래가 하나 늘면 컴파일이 이 자리를 가리킨다.
+ * **조회 가치 술어로 가는 유일한 길**(M6/G1-C03) — 기준 시각을 nullable 시각이 아니라 후보가 나르는
+ * **선언째** 받는다. 수집 use case 는 후보를 넘길 뿐 기준 시각을 넘기는 인자가 없으므로, 「호출부가
+ * 상수를 넘긴다」(G1-T 가 거짓으로 판정한 자리)를 짓는 자리가 이 함수 안 하나뿐이고 거기를 test 가
+ * [OpeningAnchor.Observed] 로 잰다(출하 표본틀은 그것을 싣지 않아 use case 층에서는 잴 수 없다).
+ *
+ * 싣지 않는 경로는 **age 판정을 하지 않는다**(건너뛰는 것은 판정이지 호출이 아니다). 소진 `when` 이라
+ * 갈래가 하나 늘면 컴파일이 이 자리를 가리킨다.
  */
-internal fun OpeningAnchor.observedAt(): Instant? =
-    when (this) {
-        is OpeningAnchor.Observed -> at
-        OpeningAnchor.NotCarriedByFrame -> null
-    }
+internal fun Candidate.detailFetchDecision(
+    alreadyHeld: Boolean,
+    lastCheckedAt: Instant?,
+    now: Instant,
+    gates: DetailFetchGates,
+): DetailFetchDecision =
+    decideDetailFetch(
+        noticeId = id,
+        noticeKeyHash = keyOf(id).value,
+        alreadyHeld = alreadyHeld,
+        openingObservedAt =
+            when (val anchor = openingAnchor) {
+                is OpeningAnchor.Observed -> anchor.at
+                OpeningAnchor.NotCarriedByFrame -> null
+            },
+        lastCheckedAt = lastCheckedAt,
+        now = now,
+        gates = gates,
+    )

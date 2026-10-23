@@ -23,7 +23,6 @@ import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.attemptOutcomeOf
-import bidvector.procurement.decideDetailFetch
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
@@ -182,7 +181,14 @@ class CollectOpeningResultsUseCase(
         val startedAt = clock.now()
         val framing = framer.frame(range, sources)
         if (framing.halt != null) {
-            return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt, NO_SKIPS)
+            return OpeningCollectionReport(
+                framing.candidates.size,
+                EMPTY_SAMPLE,
+                detailCalls = 0,
+                sampleUnseen = 0,
+                halted = framing.halt,
+                skipped = NO_SKIPS,
+            )
         }
         val framed = samples.resolve(framing, scopeOf(range, sources))
         val skips = DetailSkipTally()
@@ -328,9 +334,9 @@ class CollectOpeningResultsUseCase(
         }
         // **앞 라운드를 먼저 닫는다**(D-6G2d-42) — 그 뒤에 이어 돌기를 물어야 상한이 크래시 라운드를
         // 센다. 순서가 뒤집히면 이번 실행이 그 축을 다시 부르고 상한은 여전히 0 이다.
-        val closedNow = interruptedRounds.close()
-        // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다. 두 물음
-        // (끝났는가 · 마지막으로 건드린 때)이 **같은 판독**을 쓴다(원장은 파일이고 두 번 읽지 않는다).
+        interruptedRounds.close()
+        // 실행마다 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다. 두 물음
+        // (끝났는가 · 마지막으로 건드린 때)이 **같은 판독**을 쓴다.
         val history = attempts.read()
         val resumptions = history.axisResumptions(axisRetryLimit())
         ids.forEach { id ->
@@ -347,23 +353,21 @@ class CollectOpeningResultsUseCase(
                 }
             }
         }
-        return Resumption(out, lastCheckedOf(ids, history.axisLastObservedAt(), closedNow))
+        return Resumption(out, lastCheckedOf(ids, history.axisLastObservedAt()))
     }
 
     /**
      * 조회 가치 술어를 거친 결정(M6/G1-C03) — **관측값을 넘긴다.** 앞 판은 세 인자를 상수로 넘기고
-     * 결과를 강제 캐스트해, 술어는 옳은데 출하 경로에서 게이트가 발화하지 않았다.
+     * 결과를 강제 캐스트해, 술어는 옳은데 출하 경로에서 게이트가 발화하지 않았다. 기준 시각은 후보가
+     * **선언째** 나른다([detailFetchDecision]) — 여기에는 그것을 바꿔 넣을 인자가 없다.
      */
     private fun decideFetch(
         picked: Candidate,
         axis: DetailAxis,
         resumption: Resumption,
     ): DetailFetchDecision =
-        decideDetailFetch(
-            noticeId = picked.id,
-            noticeKeyHash = keyOf(picked.id).value,
+        picked.detailFetchDecision(
             alreadyHeld = axis in resumption.done[picked.id].orEmpty(),
-            openingObservedAt = picked.openingAnchor.observedAt(),
             lastCheckedAt = resumption.lastChecked[picked.id]?.get(axis),
             now = clock.now(),
             gates = gates,
@@ -391,17 +395,15 @@ private class Resumption(
 
 /**
  * 원장의 (공고 키, 끝점) 표를 이번 표본의 (공고, 축) 표로 옮긴다 — 키를 짓는 자리는 그대로 하나다.
- * **이번 실행이 닫은 라운드는 뺀다**(`closedNow`) — 그 줄의 시각은 「닫은 때」라 관측이 아니다.
+ * 끊긴 라운드를 닫는 줄은 원장 판독이 이미 뺐다(`INTERRUPTED_ROUND`) — 그 줄의 시각은 관측이 아니다.
  */
 private fun lastCheckedOf(
     ids: List<NoticeId>,
     byKeyAndEndpoint: Map<String, Map<SourceEndpoint, Instant>>,
-    closedNow: Map<String, Set<SourceEndpoint>>,
 ): Map<NoticeId, Map<DetailAxis, Instant>> =
     ids
         .associateWith { id ->
-            val key = keyOf(id).value
-            val byEndpoint = byKeyAndEndpoint[key].orEmpty() - closedNow[key].orEmpty()
+            val byEndpoint = byKeyAndEndpoint[keyOf(id).value].orEmpty()
             DetailAxis.entries
                 .mapNotNull { axis -> byEndpoint[axis.endpoint]?.let { axis to it } }
                 .toMap()

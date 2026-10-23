@@ -1,13 +1,27 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CollectionAttempt
+import bidvector.procurement.DetailFetchDecision
 import bidvector.procurement.DetailFetchGates
+import bidvector.procurement.DetailFetchSkipReason
+import bidvector.procurement.NoticeId
+import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.sharedkernel.NoticeRound
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
 
 /**
  * **조회 가치 술어가 출하 경로에서 발화하는가**(COL-03 둘째 bullet, M6/G1-C03) — 술어 자신의 단위
@@ -129,6 +143,131 @@ class OpeningDetailFetchGateTest {
         report.skipped.recheckGate shouldBe 0
         fixture.backoffSkipped() shouldBe 0
     }
+
+    /**
+     * **이번 실행이 닫은 끊긴 라운드는 창을 열지 않는다** — 닫는 줄의 시각은 「닫은 때」라 관측이 아니다.
+     * 그 줄을 관측으로 읽으면 닫자마자 창 안이 되어 끊긴 축이 재개되지 않는다.
+     */
+    @Test
+    fun `이번 실행이 닫은 끊긴 라운드는 창을 열지 않는다`() {
+        val fixture = fixture(SYNTHETIC_RECHECK_GATES)
+        crashOnIntent(fixture)
+        val afterCrash = fixture.service.reservePriceCalls.size
+
+        fixture.now = COLLECTION_NOW.plus(Duration.ofHours(1))
+        val report = fixture.run()
+
+        fixture.service.reservePriceCalls shouldHaveSize afterCrash + 1
+        report.skipped.recheckGate shouldBe 0
+    }
+
+    /**
+     * **앞 실행이 닫고 그 축을 관측하지 못한 채 멈춰도** 다음 실행은 그 닫는 줄로 창을 열지 않는다.
+     * 둘째 기동은 라운드를 닫은 뒤 그 축의 관문에서 거부되어 멈춘다(거부는 관측이 아니다) — 셋째 기동이
+     * 그 축을 바로 다시 부른다.
+     */
+    @Test
+    fun `앞 실행이 닫고 그 축을 관측하지 못한 채 멈춰도 창을 열지 않는다`() {
+        val fixture = fixture(SYNTHETIC_RECHECK_GATES)
+        crashOnIntent(fixture)
+        fixture.now = COLLECTION_NOW.plus(Duration.ofHours(1))
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.DAILY)
+        fixture.run().halted.shouldNotBeNull()
+        fixture.service.detailTruncation = null
+        val beforeThird = fixture.service.reservePriceCalls.size
+
+        fixture.now = COLLECTION_NOW.plus(Duration.ofHours(2))
+        val report = fixture.run()
+
+        fixture.service.reservePriceCalls shouldHaveSize beforeThird + 1
+        report.skipped.recheckGate shouldBe 0
+    }
+
+    /**
+     * **멈춘 실행도 그때까지의 건너뜀을 회계에 싣는다** — 멈춘 실행에서 건너뜀이 사라지면 그날의
+     * `backoff_skipped` 가 실제보다 작다. 예비가격 축만 한 시간 전에 관측돼 이번 스윕은 창 안이고, 다음
+     * 축이 승인 상한에서 멈춘다.
+     */
+    @Test
+    fun `멈춘 실행도 그때까지의 건너뜀을 회계에 싣는다`() {
+        val fixture = fixture(SYNTHETIC_RECHECK_GATES)
+        val sample = fixture.plan().selected
+        val key = sample.single().value
+        val at = COLLECTION_NOW
+        val timedOut = CollectionAttempt(key, axis, AttemptOutcome.Failed("TIMEOUT"), at, AttemptKind.AXIS, walk = at)
+        fixture.attempts.append(timedOut)
+        fixture.now = COLLECTION_NOW.plus(Duration.ofHours(1))
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.DAILY)
+
+        val report = fixture.run()
+
+        report.halted.shouldNotBeNull()
+        report.skipped.recheckGate shouldBe 1
+        fixture.backoffSkipped() shouldBe 1
+    }
+
+    /**
+     * **기준 시각은 후보가 선언째 술어에 나른다**(D-G1C03-1) — 출하 표본틀은 [OpeningAnchor.Observed] 를
+     * 싣지 않으므로 use case 층에서는 이 배선을 잴 수 없다. 그래서 그 배선이 사는 유일한 자리
+     * ([detailFetchDecision])를 관측값을 실은 후보로 잰다: age 창 밑이면 age 로 건너뛰고, 넘기면 부른다.
+     */
+    @Test
+    fun `관측한 개찰 일시는 age 창 밑에서 건너뛰고 넘긴 뒤 부른다`() {
+        val gates = COLLECTION_POLICY.detailFetchGates
+        val openedAt = COLLECTION_NOW
+        val observed = candidate(OpeningAnchor.Observed(openedAt))
+
+        val inside = observed.decideAt(openedAt.plus(Duration.ofHours(gates.ageGateHours - 1)), gates)
+        val outside = observed.decideAt(openedAt.plus(Duration.ofHours(gates.ageGateHours + 1)), gates)
+
+        inside
+            .shouldBeInstanceOf<DetailFetchDecision.Skip>()
+            .reason
+            .shouldBeInstanceOf<DetailFetchSkipReason.AgeGateNotPassed>()
+        outside.shouldBeInstanceOf<DetailFetchDecision.Fetch>()
+        candidate(OpeningAnchor.NotCarriedByFrame)
+            .decideAt(openedAt.plus(Duration.ofHours(1)), gates)
+            .shouldBeInstanceOf<DetailFetchDecision.Fetch>()
+    }
+
+    /**
+     * 사유별 수는 **사유마다 따로** 세고 보유는 세지 않는다 — age 건너뜀은 출하 경로에서 아직 생기지 않으므로
+     * (기준 시각을 싣지 않는다) 이 자리에서 잰다. 별 slice 가 기준 시각을 실을 때 age 건너뜀이 조용히
+     * 안 세어지는 일을 막는다.
+     */
+    @Test
+    fun `건너뜀은 사유마다 따로 세고 보유는 세지 않는다`() {
+        val tally = DetailSkipTally()
+        tally.record(axis, DetailFetchSkipReason.AgeGateNotPassed(COLLECTION_NOW))
+        repeat(2) { tally.record(axis, DetailFetchSkipReason.RecheckGateNotPassed(COLLECTION_NOW)) }
+        tally.record(axis, DetailFetchSkipReason.AlreadyHeld)
+
+        tally.counts() shouldBe DetailSkipCounts(ageGate = 1, recheckGate = 2)
+    }
+
+    /** 의도 줄만 남기고 죽는 기동 하나 — 예비가격 축에 끊긴 라운드가 남는다. */
+    private fun crashOnIntent(fixture: OpeningFixture) {
+        fixture.service.crashAfterIntentOn = axis
+        shouldThrow<IllegalStateException> { fixture.run() }
+        fixture.service.crashAfterIntentOn = null
+    }
+
+    private fun candidate(anchor: OpeningAnchor): Candidate {
+        val id = NoticeId(NoticeNumber.of("SYN-ANCHOR-0001"), NoticeRound.of("000"))
+        val source =
+            OpeningCollectionSource(
+                sourceName("service"),
+                BusinessDivision.SERVICE,
+                ScriptedOpeningPort(BusinessDivision.SERVICE),
+            )
+        val sampled = SampleCandidate(keyOf(id), BusinessDivision.SERVICE, LocalDate.parse("2026-06-03"))
+        return Candidate(id, sampled, source, anchor)
+    }
+
+    private fun Candidate.decideAt(
+        now: Instant,
+        gates: DetailFetchGates,
+    ): DetailFetchDecision = detailFetchDecision(alreadyHeld = false, lastCheckedAt = null, now = now, gates = gates)
 }
 
 /** 용역 공고 하나가 가진 상세 축 수(예비가격·개찰완료·기초금액) — 공사만 A값이 하나 더 붙는다. */

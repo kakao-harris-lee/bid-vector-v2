@@ -19,9 +19,7 @@ import java.time.Instant
 data class DetailSkipCounts(
     val ageGate: Int,
     val recheckGate: Int,
-) {
-    val total: Int get() = ageGate + recheckGate
-}
+)
 
 /**
  * 한 실행이 건너뛴 축의 누적 — 사유별 합(보고)과 **축별 합**(회계 줄)을 함께 센다.

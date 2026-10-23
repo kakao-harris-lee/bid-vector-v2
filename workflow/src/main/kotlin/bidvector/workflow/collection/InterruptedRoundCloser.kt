@@ -2,9 +2,8 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
-import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.CollectionAttempt
-import bidvector.procurement.SourceEndpoint
+import bidvector.procurement.INTERRUPTED_ROUND
 import java.time.Instant
 
 /**
@@ -22,23 +21,22 @@ import java.time.Instant
  * 닫는 것은 **재개하는 쪽의 일**이다: 죽은 실행은 아무것도 적지 못하고, 다음 실행만이 「앞 라운드가
  * 끝나지 않았다」를 안다.
  *
- * **닫은 목록을 낸다**(M6/G1-C03) — 이 줄들은 **우리가 적은 장부이지 그 축의 관측이 아니다.** 시각이
- * 「닫은 때」(지금)라 재조회 게이트가 그대로 읽으면 **닫는 행위 자체가 48 시간 창을 열어** 그 축이 영영
- * 다시 불리지 않는다(매 실행이 닫고, 닫자마자 막힌다).
+ * 이 줄들은 **우리가 적은 장부이지 그 축의 관측이 아니다**(M6/G1-C03) — 결말 값을 도메인의
+ * [INTERRUPTED_ROUND] 하나로 적고, 재조회 게이트가 읽는 관측 시각은 그 값을 뺀다. 그래야 닫는 행위가
+ * 창을 열지 않는다 — 이번 실행이 닫은 줄이든, 앞 실행이 닫고 그 축에 닿기 전에 멈춘 줄이든.
  */
 internal class InterruptedRoundCloser(
     private val attempts: AttemptLedger,
     private val now: () -> Instant,
 ) {
-    fun close(): Map<String, Set<SourceEndpoint>> {
-        val closed = attempts.read().interruptedRounds()
-        closed.forEach { (noticeKey, byAxis) ->
+    fun close() {
+        attempts.read().interruptedRounds().forEach { (noticeKey, byAxis) ->
             byAxis.forEach { (axis, lastCall) ->
                 attempts.append(
                     CollectionAttempt(
                         noticeKey = noticeKey,
                         axis = axis,
-                        outcome = AttemptOutcome.Failed(INTERRUPTED_ROUND),
+                        outcome = INTERRUPTED_ROUND,
                         at = now(),
                         kind = AttemptKind.AXIS,
                         walk = lastCall,
@@ -46,12 +44,5 @@ internal class InterruptedRoundCloser(
                 )
             }
         }
-        return closed.mapValues { (_, byAxis) -> byAxis.keys }
     }
 }
-
-/**
- * 중단된 라운드의 결말 코드(D-6G2d-42) — 「이 라운드는 결말을 적지 못했다」이고, 절단 사유가 아니다
- * (그 사유들은 `failureOf` 가 분류한다). 일시 실패이므로 상한이 세고 그 축은 상한 미만에서 다시 불린다.
- */
-private const val INTERRUPTED_ROUND = "INTERRUPTED"
