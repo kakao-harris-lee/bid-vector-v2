@@ -6,10 +6,10 @@
 
 ## Phase 1 — 설계 (코드·마이그레이션 쓰기 전, 팀장 답 대기)
 
-읽은 정본: `ux-journey-research.md` §6.1(:183-228) · `adr/0006-gradle-modules.md` D-2·D-2.1(:60,71-94) ·
-`decisions-2026-09-07.md` Q-7·Q-11·Q-12(:20-25,32) · `m7-screen-data-requirements.md` 7B 행(:51-109,149) ·
-`capability-map.md` OPEN-ADR-14(:3102)·§0.6(:120-131)·§10(:2831-2856)·STR-16 블록(:715-760)·활성 집계(:2962) ·
-`milestone-7.md` R-2·R-5(:88-108). 선례: V20 · V9 · V12 · V3 · V16 · `RetentionTableRegistry` ·
+읽은 정본: `ux-journey-research.md` §6.1 · `adr/0006-gradle-modules.md` D-2·D-2.1 ·
+`decisions-2026-09-07.md` Q-7·Q-11·Q-12 · `m7-screen-data-requirements.md` 7B 행 ·
+`capability-map.md` OPEN-ADR-14·§0.6·§10·STR-16 블록·활성 집계 ·
+`milestone-7.md` R-2·R-5. 선례: V20 · V9 · V12 · V3 · V16 · `RetentionTableRegistry` ·
 `CleanMigration*Test` · `workflow/strategy`(Transition·TransitionOutcome·Actor) · `BrowserAccessPolicyData` ·
 `RequestAuthenticationFilter` · `architecture-policy.properties` · `gate-tests.properties`.
 
