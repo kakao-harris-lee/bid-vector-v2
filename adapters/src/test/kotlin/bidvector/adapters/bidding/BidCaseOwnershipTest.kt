@@ -23,6 +23,7 @@ import bidvector.workflow.bidding.BidCaseWorkflow
 import bidvector.workflow.bidding.BidCommandResult
 import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -297,10 +298,30 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
 
     // --- 권한·트리거(append-only) ----------------------------------------------
 
+    /**
+     * 세 표에 **행이 있어야** 트리거 층이 잰다 — `FOR EACH ROW` 트리거는 0 행 UPDATE·DELETE 에서
+     * 불리지 않는다. 앞 판은 건만 열고 초안·기록을 심지 않아, 그 두 표에서는 권한 층만 재고 있었다
+     * (변이 ⑪g 실측: GRANT 만 열면 0 행 UPDATE 가 「성공」해 붉었다). 이제 행을 심고 그 수를 먼저
+     * 단언한다 — 표가 비면 이 test 가 재는 것이 바뀌므로 그 사실이 먼저 붉다.
+     */
     @Test
     fun `앱 역할은 타임라인 초안 기록을 고치거나 지울 수 없다`() {
         val mine = account("own-j")
-        val opened = workflow.open(mine, notice("own-8"), BidKind.REAL)
+        val key = notice("own-8")
+        seedNotice(key)
+        val opened = workflow.open(mine, key, BidKind.REAL)
+        workflow
+            .draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
+            .shouldBeInstanceOf<BidCommandResult.Processed>()
+        workflow.command(
+            mine,
+            opened.case.id,
+            BidCommand.RecordBid(submission(EvidenceRef("doc-j")), evidenceRetainUntil = null),
+            BidActor.User(mine),
+        )
+        listOf("bid_case_transition", "bid_draft", "bid_record").forEach { table ->
+            withClue(table) { rowCount(table, opened.case.id.value) shouldBeGreaterThan 0 }
+        }
 
         val statements =
             listOf(
@@ -348,6 +369,20 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
             }
         }
     }
+
+    private fun rowCount(
+        table: String,
+        caseId: Long,
+    ): Int =
+        dataSource().connection.use { connection ->
+            connection.prepareStatement("SELECT count(*) FROM $table WHERE case_id = ?").use { statement ->
+                statement.setLong(1, caseId)
+                statement.executeQuery().use { rs ->
+                    rs.next()
+                    rs.getInt(1)
+                }
+            }
+        }
 
     private inline fun withClue(
         clue: String,
