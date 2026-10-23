@@ -385,6 +385,29 @@ test 가 담당하고, 같은 사실을 재는 test 를 하나 더 두면 둘이
 2. 추적표·capability map 의 QUAL-02 · DEC-03 · DEC-04 · STR-16 행 근거(산출물 4). 판정 문자는 측정이 서는
    만큼만 — 가격 세 축이 상태·사유로만 서므로 DEC-04 는 ⓒ 를 유지하고 「표면은 섰다, 값 없음」만 적는다.
 
+### 0.9d 7B 선행과 rebase 순서 (팀장 조정)
+
+**rebase 대상은 7B 머지 뒤의 main 이다.** 7B 가 `D-7B-2` 의 계정 접근자를 들여오고 같은 공유 파일 둘을
+만지므로, 그 전에 rebase 하면 두 번 하게 된다.
+
+**바꿀 자리 표시 — 이 slice 에는 없다(실측).** 산출물 여덟 파일에 `AccountId`·`AuthenticatedAccount`·
+`account` 참조가 **0 건**이다(기계 확인). 계정 범위 경로를 직접 만들지 않았기 때문이다 — `D-7C2-1` Q6
+대로 알림함 기록을 배선하지 않고 `NOT_RECORDED_YET` 상태에서 멈췄고, 그 상태는 계정을 요구하지 않는다.
+**그래서 7B 의 접근자로 갈아탈 자리가 없다.** 접근자가 필요해지는 자리는 알림함 기록을 배선하는 후속
+slice 이고 그 자리는 0.7(a)가 이미 적었다(그때 이 operation 이 계정 범위·세션 전용이 되며 OpenAPI 의
+`security` 선언과 「자격 헤더 대안 전수」 계약 test 를 함께 고쳐야 한다).
+
+**예상 충돌 표면 둘**(7B 가 먼저 머지된다 — 뒤에 오는 이 slice 가 합집합을 맞춘다):
+
+| 파일 | 충돌 모양 | 맞추는 방법 |
+|---|---|---|
+| `app/.../http/ErrorBody.kt` | 두 slice 가 각자 `ErrorCode` 상수를 더한다(이쪽 `NOTICE_NOT_FOUND`, 7B `NOTICE_SNAPSHOT_UNAVAILABLE`) | **합집합**이다. 둘 다 남긴다 — 「`ErrorCode` 상수 집합 ↔ 문서 enum 양방향 등식」 test 가 한쪽을 빠뜨리면 붉어지므로 그 test 가 맞췄는지 확인해 준다 |
+| `web/src/api/generated/operator-api.ts` | `ErrorBody.code` 합집합 줄이 양쪽에서 바뀐다 | **손으로 고치지 않는다.** rebase 뒤 `npm run api:types` 를 다시 돌려 생성기가 합집합을 내게 한다(수작성 단일 출처 규율 — 생성물을 손으로 편집하면 W-5 바이트 등식이 다음 생성에서 깨진다) |
+
+**그래서 rollback 실측과 동결을 뒤로 미룬다** — rollback 은 base 대비 복원이고 base 가 바뀌면 앞 실측이
+무효다. 지금 라운드에서는 `check`·`web`·S-20·변이까지만 하고, rollback ①~⑥ 과 동결 보고는 7B 머지 →
+rebase → W-5 재생성 뒤에 **그 시점의 마지막 산출물 커밋**에서 한 번 잰다.
+
 ### 0.10 모듈 배치 (Phase 2 예고)
 
 - `workflow/.../evaluation/`: `NoticeByIdPort` · `LicenseJudgementPort`(읽기 하나씩). 기존 use case·커널 무편집.
