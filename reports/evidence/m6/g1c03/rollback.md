@@ -16,6 +16,7 @@ git restore --source=a61ddff1 --staged --worktree -- \
   config/quality/gate-tests.properties \
   procurement/src/main/kotlin/bidvector/procurement/CollectionAttemptLedger.kt \
   procurement/src/main/kotlin/bidvector/procurement/CollectionPolicy.kt \
+  procurement/src/test/kotlin/bidvector/procurement/CanonicalizeTest.kt \
   procurement/src/test/kotlin/bidvector/procurement/CollectionAttemptLedgerTest.kt \
   procurement/src/test/kotlin/bidvector/procurement/CollectionPolicyTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt \
@@ -27,50 +28,31 @@ git restore --source=a61ddff1 --staged --worktree -- \
   docs/discovery/capability-map.md \
   docs/runbook/m6-6g-real-collection.md \
   reports/evidence/m6/6e1/acceptance-trace.md
-rm workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
+git rm -q workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/DetailSkipTally.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/InterruptedRoundCloser.kt \
    workflow/src/test/kotlin/bidvector/workflow/collection/OpeningDetailFetchGateTest.kt
 ```
 
-`InterruptedRoundCloser.kt` 는 **옮긴 파일**이다 — 되돌리면 그 내용이 수집 use case 파일 안으로 함께 돌아온다
-(그 파일을 `a61ddff1` 로 되돌리는 위 줄이 그것을 한다). 새 파일로 남겨 두면 같은 타입이 두 벌이 된다.
+`InterruptedRoundCloser.kt` 는 **옮긴 파일**이다 — 되돌리면 그 내용이 수집 use case 파일 안으로 함께 돌아온다.
+새 파일은 `git rm` 으로 지운다 — 작업 트리에서만 지우면 인덱스에 남아 그 트리가 컴파일되지 않는다(r1 F-3).
 
 ## 2. 되돌림 뒤 상태
 
-- **마이그레이션 0** — 되돌릴 스키마가 없다.
-- **원장 형식 불변** — 이 slice 가 쓴 줄과 앞 코드가 쓴 줄이 같은 형태다. 그래서 「새 코드가 쓴 원장을 옛
-  코드가 읽는가」는 **물을 필요가 없는 물음**이고(형식이 하나다), 이어 돌기는 되돌림 뒤에도 같은 답을 낸다.
-  그 사실 자체를 `FileAttemptLedgerTest` 의 「밖에서 쓰인 지금 형식의 원장을 그대로 읽는다」가 잠근다.
-- **데이터 되돌림 없음** — 건너뜀이 더해지는 `collection_run.backoff_skipped` 는 기존 열이고, 되돌리면 그
-  열에 게이트 건너뜀이 더 이상 실리지 않을 뿐 과거 행은 그대로 뜻을 지닌다.
-- **정책 값도 함께 되돌아간다** — 재조회 창이 0 에서 48h 로 돌아간다. 그런데 되돌린 트리에는 이 창을 **읽는
-  배선이 없으므로**(술어가 상수를 받던 판) 그 값은 아무 거동도 내지 않는다. 즉 되돌림은 48h 의 해악
-  (§3-2)을 되살리지 않는다 — 값과 배선이 함께 돌아가기 때문이다.
+- **마이그레이션 0** · **데이터 되돌림 없음**(`collection_run.backoff_skipped` 는 기존 열이고 과거 행은 뜻을 지닌다).
+- **원장 형식 불변** — 이 slice 가 쓴 줄과 앞 코드가 쓴 줄이 같은 형태라 「새 코드가 쓴 원장을 옛 코드가 읽는가」는
+  형식 하나의 물음이다(`FileAttemptLedgerTest` 「밖에서 쓰인 지금 형식의 원장을 그대로 읽는다」가 잠근다).
+- **정책 값도 함께 돌아간다**(창 0 → 48) — 되돌린 트리에는 그 값을 읽는 배선이 없어 거동이 없다.
 
-## 3. 우회 ①~⑥ 실측
-
-판정 표는 `checklist.md` §4-1 에 둔다 — 같은 사실을 두 자리에 적지 않는다. 여기서는 **무엇을 우회라고
-불렀는지**만 남긴다(계약 설계 검토 (2)).
-
-| ID | 우회 |
-|---|---|
-| ① | 호출부가 술어에 상수를 넘긴다(앞 판으로 복귀) |
-| ② | 게이트 값을 무력화한다(창을 10만 시간으로) |
-| ③ | 술어의 건너뜀 가지를 호출로 바꾼다 |
-| ④ | 기준 시각 선언을 관측값으로 바꾼다(결측이 조용히 호출로 가는 길의 거울상) |
-| ⑤ | 건너뜀을 세지 않는다 |
-| ⑥ | 옛 원장을 읽지 못하게 한다 |
+우회 ①~⑥ 과 r1 변이의 판정은 `checklist.md` §4-1 에만 둔다.
 
 ## 4. 실측 (2026-10-23)
 
-실측 HEAD: `26beba76`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
+실측 HEAD: `a7c5da86`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
 
 | # | 확인 | 결과 |
 |---|---|---|
 | ① | 명령 exit | **0** |
-| ② | 바뀐 경로 수 | M 15 · D 4 — §1 목록과 같다 |
-| ③ | 되돌린 트리 ↔ base `a61ddff1` | `git diff --cached --name-status a61ddff1` 가 이 slice 의 evidence 넷(A)만 낸다 — 산출물 경로 차이 **0**, main 쪽 변경(`vuln-allowlist.properties`)은 그대로 남는다 |
-| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(10:48~10:58, 359 task). 트리 동일성으로 갈음하지 않고 직접 돌렸다 — 남는 evidence 넷이 텍스트 게이트의 입력이라 base 트리와 같지 않기 때문이다 |
-
-원장 형식이 바뀌지 않았으므로 「새 코드가 쓴 원장을 옛 코드가 읽는가」는 §2 대로 형식 하나의 물음이다.
+| ② | 바뀐 경로 수 | M 16 · D 4 — §1 목록과 `git diff --name-status a61ddff1..a7c5da86`(evidence 제외)가 같다 |
+| ③ | 되돌린 트리 ↔ base | 작업 트리 ↔ 인덱스 차이 0 · 추적 안 된 파일 0 · `git diff --cached --name-status a61ddff1` 은 이 slice 의 evidence 넷(A)뿐 |
+| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(12:30~12:40, 359 task). evidence 넷이 텍스트 게이트 입력이라 트리 동일성으로 갈음하지 않았다 |
