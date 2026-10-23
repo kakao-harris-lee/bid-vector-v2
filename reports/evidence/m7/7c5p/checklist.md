@@ -397,6 +397,12 @@ r1 이 둘(러너 잠금 · 출하 조립), r2 가 둘(축 등식 둘)을 더해
 커밋 SHA 를 쓰지 않는 이유: 이 브랜치는 main `54e2c5e2` 위로 **rebase** 되어 r1 라운드의 SHA 가 모두
 바뀌었다(그 이력은 로컬 브랜치 `m7-7c5p/pre-rebase-2026-10-23` 에 있다).
 
+g1c03 합성 사례를 들인 커밋 메시지는 그 기제를 **틀리게** 적었다 — 「`isSettled=false` 라 원장 판독이
+결말을 내지 않는다」가 아니다. `axisConclusions` 는 갈래(`AXIS`)만 보고 어휘를 거르지 않으므로 닫는
+줄은 결말을 **내고**, 그 결말이 `Failed` 라 **실패 결말 갈래**가 그 행을 버린다(CR r3 MEDIUM).
+이력을 되쓰지 않고 사실을 여기 적는다. test 주석은 이 기제로 고쳤고, 새 규칙(축 분기)의 회귀는
+`PROMOTE-016` 이 진다는 사실도 변이 절에 적었다.
+
 ## 3. 검토 r2 처분 (D-7C5P-11 · 재작업 2/5)
 
 verifier **not-ready**(R2-1 high 하나)와 code-review **APPROVE**(MEDIUM 2 · LOW 2)를 일괄로 받았다.
@@ -445,6 +451,29 @@ verifier **not-ready**(R2-1 high 하나)와 code-review **APPROVE**(MEDIUM 2 · 
     모드 게이트와 구성 자리만 따로 잰다.
 20. **공고 단위 축 집합의 사본이 네 벌이다** — 수집의 `DetailAxis`(workflow, 정본) · 추출의
     `expectedAxesFor` 와 `DETAIL_ENDPOINTS`(adapters) · 승격의 `OPENING_PER_NOTICE_AXES`
-    (procurement). 하나로 합치는 자리는 domain 이지만 그 변경이 수집·추출 production 을 건드려
-    이 slice 의 범위 밖이다(D-7C5P-7 · 수집 경로 무편집). 지금은 **등식 test 둘**이 갈림을 기계로
-    막는다(승격↔수집 · 승격↔추출). 합치기는 별 slice 의 일이다.
+    (procurement). 하나로 합치는 길은 **있다**(예: `SourceEndpoint` 쪽 속성 — `SourceEndpoint` 가
+    procurement 에 있어 세 레인이 모두 그 하나를 부를 수 있다). 다만 그 변경이 수집·추출 production 을
+    건드려 **이 slice 의 범위 밖**이다(D-7C5P-7 · 수집 경로 무편집).
+    등식 test 둘이 묶는 것은 **셋**이다(승격 ↔ 수집 `DetailAxis` · 승격 ↔ 추출 `expectedAxesFor`).
+    **넷째 `DETAIL_ENDPOINTS` 는 어느 등식에도 들지 않는다**(verifier L-r3-1) — 추출 내부에서
+    「상세가 하나라도 있는 표본인가」를 묻는 사본이고 승격의 판정 입력이 아니어서 승격 정확성에
+    닿지 않는다. 합치는 후속 slice 의 범위에 **이름으로** 넣는다: `DetailAxis` ·
+    `expectedAxesFor` · `DETAIL_ENDPOINTS` · `OPENING_PER_NOTICE_AXES` 넷.
+
+## 4. 검토 r3 처분 (D-7C5P-13 · 승인 전 장부 일괄)
+
+verifier **ready-for-review** · code-review **APPROVE**. 산출물 blocker/high **0** — 남은 넷은 전부
+**문면**이고, 바뀐 줄은 주석·KDoc 뿐이다. 그것을 `git diff -U0 <산출물 커밋>^..<산출물 커밋>` 으로
+기계 확인했다: Kotlin 파일 다섯 · 변경 줄 **40**(`+28 / -12`) · 그중 **주석·KDoc 밖 줄 0**. 그래서
+거동 변경이 0 이고, 변이·container 를 다시 돌리지 않는다.
+
+| 지적 | 처분 | 무엇을 바꿨나 |
+|---|---|---|
+| **CR MEDIUM** g1c03 합성 test 의 기제 설명이 틀렸다 | **수정**(주석 + 장부) | 원장 판독은 갈래(`AXIS`)만 보고 어휘를 거르지 않으므로 닫는 줄은 결말을 **낸다**. `Failed` 라 `usesRows=false` 이고 **실패 결말 갈래**가 행을 버린다(r1 부터 있던 분기). 그래서 이 사례는 축 분기의 회귀가 아니고, 그 분기의 회귀는 결말이 **없는** 두 사례(`PROMOTE-016`·`PROMOTE-018`)가 진다 — 주석·변이 절·§2.4 에 적었다 |
+| **CR LOW-1** KDoc 둘의 「합칠 수 없다」 | **수정**(KDoc) | 제한 20 과 같은 문장으로 맞췄다 — 합치는 길은 **있고**(`SourceEndpoint` 쪽 속성) 이 slice 의 **범위 밖**이라 합치지 않았다 |
+| **CR LOW-2** 사상표 기본 결말이 행 시각 유래임이 안 보인다 | **수정**(KDoc 둘) | 「보증이 아니라 **가정**(원장이 그렇게 닫혔다)」을 적고, 걷기 선택을 재는 test 가 어디인지 가리켰다 |
+| **verifier L-r3-1** 제한 20 의 「등식 둘이 넷을 막는다」 | **수정**(문면) | 등식이 묶는 것은 **셋**이고 `DETAIL_ENDPOINTS` 는 추출 내부 사본으로 남는다(승격 판정 입력 아님). 후속 slice 범위에 넷을 **이름으로** 적었다 |
+
+재측정은 계약대로 **셋만** 했다(변이·container 재실행 없음 — 거동 변경 0 이므로): 찬 clone 에서
+`check` · rollback ①~⑥ · 유효성 술어.
+

@@ -1,12 +1,13 @@
 # M7/7C⑤-0 — rollback
 
-base **`54e2c5e2`**(main — g1c03 머지 커밋, 고정 SHA) · **실측 HEAD `a2d4724b`**(마지막 산출물 커밋).
-목록은 라운드마다 **기계 산출**이고, 이 라운드는 rebase 로 base 가 옮겨가 전부 다시 뽑았다 —
-복원 **5 경로** · 삭제 **20 경로**(총 25).
+base **`54e2c5e2`**(main — g1c03 머지 커밋, 고정 SHA) · **실측 HEAD `bf0e0f6c`**(마지막 산출물 커밋).
+목록은 라운드마다 **기계 산출**이고, rebase 라운드에서 base 가 옮겨가 전부 다시 뽑았다 —
+복원 **5 경로** · 삭제 **20 경로**(총 25). 마지막 라운드는 주석만 고쳐 목록이 그대로이고, 실측은
+그 커밋에서 다시 돌렸다.
 
 ## 되돌리는 법
 
-in_scope 경로 한정이고 range revert 가 아니다. 목록은 `git diff --name-status 54e2c5e2..a2d4724b` 에서
+in_scope 경로 한정이고 range revert 가 아니다. 목록은 `git diff --name-status 54e2c5e2..bf0e0f6c` 에서
 `reports/evidence/` 를 뺀 것이다.
 
 ```
@@ -57,7 +58,7 @@ canonical 저장소도 서지 않는다. **코드를 되돌리지 않고 끄는 
 | ② | 되돌림 뒤 D/M 계수 | **20 D + 5 M = 25 줄** — 기계 산출 목록과 수가 같다 |
 | ③ | **트리 동일성** — `git diff 54e2c5e2 -- <25 경로>` | **EMPTY**. 완료 판정은 종료 코드가 아니라 이것이다 |
 | ③b | 남의 표지 보존 — 되돌림 밖 경로 | **EMPTY** — 되돌림이 목록 밖을 건드리지 않았다 |
-| ④⑤⑥ | 되돌린 트리에서 compile · test · **게이트 전부**(`./gradlew --no-daemon check`) | exit **0** · `BUILD SUCCESSFUL in 9m 46s` · 359 task 중 **224 실행** · 135 캐시 |
+| ④⑤⑥ | 되돌린 트리에서 compile · test · **게이트 전부**(`./gradlew --no-daemon check`) | exit **0** · `BUILD SUCCESSFUL in 9m 56s` · 359 task 중 **224 실행** · 135 캐시 |
 
 ④⑤⑥ 을 한 명령으로 재는 이유: 부분 게이트는 안 돌린 것과 같다. 되돌린 트리에서 `check` 가 초록인
 것은 **게이트 등재까지 함께 되돌아갔다**는 뜻이다 — 복원한 다섯 파일이 base 로 돌아갔는데 test 등재와
@@ -69,7 +70,7 @@ evidence 커밋은 언제나 산출물 뒤에 오므로 두 SHA 는 영원히 �
 되돌림 대상이 움직였는가**다.
 
 ```
-git diff --name-only a2d4724b..<evidence 판정 SHA> -- <위 25 경로>
+git diff --name-only bf0e0f6c..<evidence 판정 SHA> -- <위 25 경로>
 ```
 
 이 출력이 비면 유효하고, 한 줄이라도 나오면 미검증이다. 이 slice 가 실측 뒤에 올리는 커밋은
