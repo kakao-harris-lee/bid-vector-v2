@@ -17,7 +17,10 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
     fun `자식 행의 계정은 부모 건의 소유자와 같아야 한다 — 복합 FK`() {
         val mine = account("integ-a")
         val other = account("integ-b")
-        val caseId = workflow().open(mine, notice("integ-a"), BidKind.REAL).view.case.id.value
+        val caseId =
+            workflow()
+                .open(mine, notice("integ-a"), BidKind.REAL)
+                .view.case.id.value
 
         insertsTransition(caseId, mine.value, "WATCHING", "DEFER") shouldBe true
         insertsTransition(caseId, other.value, "WATCHING", "DEFER") shouldBe false
@@ -26,7 +29,10 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
     @Test
     fun `타임라인의 상태 어휘는 건과 같은 열거다 — 보류는 들어오지 않는다`() {
         val mine = account("integ-c")
-        val caseId = workflow().open(mine, notice("integ-c"), BidKind.REAL).view.case.id.value
+        val caseId =
+            workflow()
+                .open(mine, notice("integ-c"), BidKind.REAL)
+                .view.case.id.value
 
         insertsTransition(caseId, mine.value, "DEFERRED", "DEFER") shouldBe true
         insertsTransition(caseId, mine.value, "ON_HOLD", "DEFER") shouldBe false
@@ -36,7 +42,10 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
     @Test
     fun `사유는 상한을 넘을 수 없다 — 지울 수 없는 표에 남는 자유 텍스트`() {
         val mine = account("integ-d")
-        val caseId = workflow().open(mine, notice("integ-d"), BidKind.REAL).view.case.id.value
+        val caseId =
+            workflow()
+                .open(mine, notice("integ-d"), BidKind.REAL)
+                .view.case.id.value
 
         insertsTransition(caseId, mine.value, "SKIPPED", "SKIP", "r".repeat(SkipReason.MAX_LENGTH)) shouldBe true
         insertsTransition(caseId, mine.value, "SKIPPED", "SKIP", "r".repeat(SkipReason.MAX_LENGTH + 1)) shouldBe false
@@ -45,7 +54,10 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
     @Test
     fun `추첨번호는 양수뿐이다`() {
         val mine = account("integ-e")
-        val caseId = workflow().open(mine, notice("integ-e"), BidKind.REAL).view.case.id.value
+        val caseId =
+            workflow()
+                .open(mine, notice("integ-e"), BidKind.REAL)
+                .view.case.id.value
 
         insertsRecord(caseId, mine.value, "{3,11}") shouldBe true
         insertsRecord(caseId, mine.value, "{0,11}") shouldBe false
