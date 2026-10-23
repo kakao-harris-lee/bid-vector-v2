@@ -31,9 +31,14 @@ class StoredRequirementLicenseGate(
     private val operatorProfilePort: OperatorProfilePort,
     private val policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ) : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict {
-        val collection = store.find(notice.id)
-        val operatorLicenses = operatorProfilePort.current()?.licenses ?: OperatorLicenses.NotDeclared
-        return LicenseEligibility.judge(collection, operatorLicenses, policy).verdict
-    }
+    /**
+     * **M7/7C ② — 판정 호출을 [StoredRequirementLicenseJudgement] 하나로 모았다(거동 불변).**
+     * 앞 판은 같은 세 입력으로 `judge(...)` 를 직접 불러 `.verdict` 를 꺼냈다. 7C ② 가 봉투
+     * (동반 산출)를 쓰는 포트를 더하면서 **같은 판정이 두 자리에서 조립되는** 상태가 되므로,
+     * 호출을 한 자리로 모으고 이 게이트는 그 결과를 좁혀 낸다. `verdictFor` 가 내는 값은
+     * 바뀌지 않는다 — `StoredRequirementLicenseGateDelegationTest` 가 그 등식을 잰다.
+     */
+    private val judgements = StoredRequirementLicenseJudgement(store, operatorProfilePort, policy)
+
+    override fun verdictFor(notice: Notice): LicenseVerdict = judgements.judgementFor(notice).verdict
 }

@@ -88,6 +88,36 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
 
     private fun findNotice(id: NoticeId) = JdbcNoticeRepository(dataSource()).find(id)!!
 
+    /**
+     * **M7/7C ② 위임의 거동 불변**(`D-7C2-1` Q4) — 이 게이트는 이제 판정을 직접 조립하지 않고
+     * [StoredRequirementLicenseJudgement] 의 봉투에서 `verdict` 를 꺼낸다. 두 자리가 같은 판정을
+     * 내는지를 **같은 저장 상태**에서 잰다 — 갈리면 7C ② 응답의 근거와 커널이 쓴 판정이
+     * 어긋난다는 뜻이다. 봉투가 함께 나르는 동반 산출(요건 면허명·출처 필드)이 같은 판정에서
+     * 나온 값인지도 확인한다 — 자격 카드가 그것을 근거로 싣는다.
+     */
+    @Test
+    fun `게이트의 verdict 는 판정 봉투의 verdict 와 같다 — 위임이 거동을 바꾸지 않는다`() {
+        val id = insertNotice("GATE-DELEGATION")
+        val row =
+            RequirementRow.Parsed(
+                groupNo = LmtGrpNo("1"),
+                serialNo = LmtSno("01"),
+                sourceField = RequirementSourceField.LcnsLmtNm,
+                licenseNames = listOf(LicenseName("전기공사업")),
+            )
+        JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(listOf(row)))
+        val profile = declaredLicenses("전기공사업")
+        val notice = findNotice(id)
+        val judgements = StoredRequirementLicenseJudgement(JdbcRequirementStore(dataSource()), profile, emptyPolicy)
+
+        val envelope = judgements.judgementFor(notice)
+
+        gate(profile).verdictFor(notice) shouldBe envelope.verdict
+        envelope.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+        envelope.requiredLicenses shouldBe listOf(LicenseName("전기공사업"))
+        envelope.requirementSourceFields shouldBe setOf(RequirementSourceField.LcnsLmtNm)
+    }
+
     @Test
     fun `저장된 요건이 없으면 Uncertain RequirementDataAbsent 다`() {
         val id = insertNotice("GATE-ABSENT")
