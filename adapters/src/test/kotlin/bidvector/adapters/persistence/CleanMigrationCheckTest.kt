@@ -80,6 +80,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // browser_session 은 session_digest<>''·csrf_digest<>''·유휴<=절대 셋이다.
             "account" to 3,
             "browser_session" to 3,
+            // M7/7C③(추가만). V23: kind 어휘 1 + notice_number<>'' 1 + notice_round 형식 1 +
+            // detail_code 어휘 1 + 종류↔detail 짝 1 + read_at>=created_at 1 = 6.
+            "notification_inbox" to 6,
         )
 
     @Test

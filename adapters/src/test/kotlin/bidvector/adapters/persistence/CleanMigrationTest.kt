@@ -56,6 +56,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 스키마 스냅샷 래칫 예외(M7/7D, 추가만). V20__account_browser_session.sql.
             "account",
             "browser_session",
+            // 스키마 스냅샷 래칫 예외(M7/7C③, 추가만). V23__notification_inbox.sql.
+            // `inbox`(V6)와 **다른 표**다 — 이름이 닮았을 뿐 키·계정 축·보존 분류가 다르다.
+            "notification_inbox",
         )
 
     @Test
@@ -122,6 +125,10 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 계정은 IDENTITY, 세션은 **쿠키 값의 해시**가 키다(평문을 담는 열이 없다).
             "account" to setOf("id"),
             "browser_session" to setOf("session_digest"),
+            // M7/7C③ — **중복 억제 키가 PK 자체**다(파생 문자열 열을 두지 않는다, V23 주석 ①).
+            // 네 열 복합이라 「한 계정 · 한 공고 · 한 종류에 한 항목」이 표 층의 성질이고,
+            // 그래서 축5(PK 밖 UNIQUE)는 이 표 때문에 늘지 않는다. 시퀀스도 만들지 않는다.
+            "notification_inbox" to setOf("account_id", "kind", "notice_number", "notice_round"),
         )
 
     @Test
@@ -179,6 +186,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M7/7D — 세션은 계정을 참조한다(단일 컬럼 FK, CASCADE 없음: 계정을 지우는 경로가
             // 아직 없고, 생기면 세션 폐기가 그 경로의 일이다).
             FkSpec("browser_session", "account_id", "account", "id"),
+            // M7/7C③ — 알림함도 계정만 참조한다(CASCADE 없음, 같은 사유).
+            //
+            // **공고로 가는 FK 가 이 목록에 없는 것은 의도다**(V23 주석 ③): `notice` 는 90일
+            // 파기 대상이라 CASCADE 없는 FK 는 파기를 **멈추고** CASCADE 인 FK 는 알림함을 90일째에
+            // 비운다. 알림함은 공고 행보다 오래 살아야 하므로 공고 키 두 열은 주제 참조로만 둔다.
+            // 그 부재가 이 등식에 적혀 있으므로 「빠뜨린 FK」가 아니고, 누가 FK 를 더하면 붉다.
+            FkSpec("notification_inbox", "account_id", "account", "id"),
         )
 
     @Test

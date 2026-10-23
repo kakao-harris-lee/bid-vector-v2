@@ -182,6 +182,16 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         //     잃는 것은 「그 세션이 있었다」는 사실뿐이고 요청 이력은 `api_request_audit` 가 든다.
         //     기준 시각은 DB 가 적재 때 찍는 `created_at` 이다(A-2 의 적재 시각 축).
         RetentionRule.Purge("browser_session", "created_at", PurgeCondition.TimeOnly),
+        // --- 파기(M7/7C③ 알림함) — [ExemptReason] 여덟 사유 어느 것도 맞지 않는다: 싱글턴
+        //     설정도, 멱등 원장도(그쪽은 `inbox` 다 — 이름이 닮았을 뿐 다른 표다), 개정 이력도,
+        //     수집 회계도, 참조 데이터도, 계정 신원도 아니다. 90일 지난 알림을 지워 잃는 것은
+        //     「그 알림이 있었다」뿐이고, 그 사실의 원천(공고·개찰·입찰 건)은 각자의 표가 든다.
+        //
+        //     **읽음/안읽음은 파기 조건이 아니다**(운영자 결정 D-7C3-1 ⑥). 안읽음 항목을 영구
+        //     보존하면 「90일이 지나면 사라진다」가 이 표에서 거짓이 되고, 그 예외를 두면
+        //     `TerminalStates` 같은 상태 축이 하나 더 생긴다 — 안읽음이 쌓이는 문제는 보존
+        //     분류가 아니라 화면이 푼다(알려진 제한에 등재).
+        RetentionRule.Purge("notification_inbox", "created_at", PurgeCondition.TimeOnly),
         // --- 부모와 함께 사라진다(FK ON DELETE CASCADE) — 단 기한 안쪽 행은 부모를 남긴다 ---
         RetentionRule.CascadeWithParent(
             table = "notice_requirement_row",

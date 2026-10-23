@@ -289,6 +289,24 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                     references = false,
                     trigger = false,
                 ),
+            // M7/7C③ 알림함 — `update = false` 는 **권한이 없다는 뜻이 아니다**: V23 은 네 열에
+            // **열 단위** UPDATE 를 주고 `has_table_privilege(…, 'UPDATE')` 는 표 단위 부여만
+            // 본다(`account`·`browser_session` 과 같은 자리·같은 이유). 그래서 이 행렬은 「어느
+            // 열을 갱신할 수 있는가」를 재지 못한다 — 그 축은 `NotificationInboxPrivilegeTest` 가
+            // 앱 역할로 직접 쏘아 잰다(7D 의 `AccessPrivilegeTest` 와 같은 분담).
+            //
+            // 이 행에서 읽히는 핵심은 **DELETE·TRUNCATE 가 false** 라는 것이다: 앱 프로세스가
+            // 장악돼도 알림을 지울 수 없다(파기는 소유자 연결의 일이다).
+            "notification_inbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
         )
 
     @Test
