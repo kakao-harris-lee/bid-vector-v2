@@ -1,6 +1,8 @@
 # M7/7C⑤-0 — rollback
 
-base `a61ddff1` · **실측 HEAD `662129a0`**(이 slice 의 마지막 산출물 커밋).
+base `a61ddff1` · **실측 HEAD `73f31710`**(검토 r1 수정 뒤의 마지막 산출물 커밋). 앞 라운드의 실측
+(`662129a0`, 19 경로)은 그 SHA 의 것이고, 이 라운드가 산출물을 더해 목록이 **21 경로**로 늘었다 —
+라운드마다 재산출한다.
 
 ## 되돌리는 법
 
@@ -12,7 +14,7 @@ git restore --source=a61ddff1 --staged --worktree -- <복원 목록 M 4건>
 rm -f <삭제 목록 A 15건>
 ```
 
-### 복원(M 4건) — 공유 파일
+### 복원(M 4건) — 공유 파일(라운드 간 불변)
 
 | 경로 | 이 slice 가 더한 것 |
 |---|---|
@@ -26,11 +28,12 @@ rm -f <삭제 목록 A 15건>
 그때는 다른 레인(7B·7C①b·7C③·g1c03)이 같은 키를 올려 두었을 수 있고, base 복원이 그들의 줄을
 함께 지운다. 면제 수는 뒤에 rebase 하는 쪽이 합집합으로 다시 계산한다(팀장 D-7C5P-9).
 
-### 삭제(A 15건) — 이 slice 가 만든 파일
+### 삭제(A 17건) — 이 slice 가 만든 파일
 
 procurement 셋(`OpeningPromotion.kt`·`OpeningPromotionSlots.kt`·`OpeningPromotionFieldReader.kt`)과
-그 test 넷 · workflow use case 와 그 test · adapters 읽기 어댑터와 그 실 DB test · app 러너·배선과
-그 test 둘. (evidence 는 삭제 목록에 **없다** — 되돌림 대상이 아니다.)
+그 test 넷 · workflow use case 와 그 test · adapters 읽기 어댑터와 그 실 DB test **둘**(저장소 왕복 ·
+출하 조립) · app 러너·배선과 그 test **셋**(줄 · 잠금 · 배선). 검토 r1 이 둘을 더해 17 이다.
+(evidence 는 삭제 목록에 **없다** — 되돌림 대상이 아니다.)
 
 ## 배포 뒤 비활성화 — 한 줄
 
@@ -49,10 +52,10 @@ canonical 저장소도 서지 않는다. **코드를 되돌리지 않고 끄는 
 | 단계 | 재는 것 | 결과 |
 |---|---|---|
 | ① | 되돌림 명령의 종료 코드 | `restore` exit **0** · `rm` exit **0** |
-| ② | 되돌림 뒤 D/M 계수 | **15 D + 4 M = 19 줄** — 기계 산출 목록과 수가 같다 |
-| ③ | **트리 동일성** — `git diff a61ddff1 -- <19 경로>` | **EMPTY**. 완료 판정은 종료 코드가 아니라 이것이다 |
+| ② | 되돌림 뒤 D/M 계수 | **17 D + 4 M = 21 줄** — 기계 산출 목록과 수가 같다 |
+| ③ | **트리 동일성** — `git diff a61ddff1 -- <21 경로>` | **EMPTY**. 완료 판정은 종료 코드가 아니라 이것이다 |
 | ③b | 남의 표지 보존 — 되돌림 밖 경로 | **EMPTY** — 되돌림이 목록 밖을 건드리지 않았다 |
-| ④⑤⑥ | 되돌린 트리에서 compile · test · **게이트 전부**(`./gradlew --no-daemon check`) | exit **0** · `BUILD SUCCESSFUL in 10m 9s` |
+| ④⑤⑥ | 되돌린 트리에서 compile · test · **게이트 전부**(`./gradlew --no-daemon check`) | exit **0** · `BUILD SUCCESSFUL in 9m 56s` |
 
 ④⑤⑥ 을 한 명령으로 재는 이유: 부분 게이트는 안 돌린 것과 같다. 되돌린 트리에서 `check` 가 초록인
 것은 **게이트 등재까지 함께 되돌아갔다**는 뜻이다 — 복원한 네 파일이 base 로 돌아갔는데 test 등재와
@@ -64,11 +67,11 @@ evidence 커밋은 언제나 산출물 뒤에 오므로 두 SHA 는 영원히 �
 되돌림 대상이 움직였는가**다.
 
 ```
-git diff --name-only 662129a0..<판정 SHA> -- <위 19 경로>
+git diff --name-only 73f31710..<판정 SHA> -- <위 21 경로>
 ```
 
 이 출력이 비면 유효하고, 한 줄이라도 나오면 미검증이다. 이 slice 가 실측 뒤에 올리는 커밋은
-`reports/evidence/m7/7c5p/**` 뿐이고 그 경로는 19 목록에 없다 — 그래서 비어야 한다.
+`reports/evidence/m7/7c5p/**` 뿐이고 그 경로는 21 목록에 없다 — 그래서 비어야 한다.
 
 **이 등식은 두 SHA 가 다를 때만 뜻이 있다.** 같은 SHA 를 양쪽에 넣으면 무엇이든 비어 나오고, 그
 빈 출력은 건전성의 증거가 아니다(실측 중 한 번 그렇게 재고 폐기했다 — 그때 HEAD 가 아직 실측
