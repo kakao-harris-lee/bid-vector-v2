@@ -329,7 +329,7 @@ private class FakeBidCaseStore : BidCaseStorePort {
     /** 읽기와 저장 사이에 다른 쓰기가 끼어든 상황을 만든다. */
     var interleaveBeforeApply: Boolean = false
 
-    fun countOf(account: AccountId): Int = rows.values.count { it.account == account }
+    fun countOf(account: AccountId): Int = rows.values.count { it.account.value == account.value }
 
     override fun open(
         account: AccountId,
@@ -339,7 +339,7 @@ private class FakeBidCaseStore : BidCaseStorePort {
     ): OpenCaseResult {
         val existing =
             rows.values.firstOrNull {
-                it.account == account && it.case.notice == notice && it.case.kind == kind
+                it.account.value == account.value && it.case.notice == notice && it.case.kind == kind
             }
         if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
         return OpenCaseResult.Opened(seed(account, notice, kind, BidState.Watching))
@@ -348,7 +348,7 @@ private class FakeBidCaseStore : BidCaseStorePort {
     override fun load(
         account: AccountId,
         caseId: BidCaseId,
-    ): BidCase? = rows[caseId.value]?.takeIf { it.account == account }?.case
+    ): BidCase? = rows[caseId.value]?.takeIf { it.account.value == account.value }?.case
 
     override fun list(
         account: AccountId,
@@ -356,20 +356,20 @@ private class FakeBidCaseStore : BidCaseStorePort {
         state: BidStateTag?,
     ): List<BidCase> =
         rows.values
-            .filter { it.account == account && it.case.kind == kind }
+            .filter { it.account.value == account.value && it.case.kind == kind }
             .filter { state == null || it.case.state.tag == state }
             .map { it.case }
 
     override fun timeline(
         account: AccountId,
         caseId: BidCaseId,
-    ): List<TimelineEntry> = rows[caseId.value]?.takeIf { it.account == account }?.timeline.orEmpty()
+    ): List<TimelineEntry> = rows[caseId.value]?.takeIf { it.account.value == account.value }?.timeline.orEmpty()
 
     override fun applyTransition(
         account: AccountId,
         applied: AppliedTransition,
     ): TransitionWrite {
-        val row = rows[applied.caseId.value]?.takeIf { it.account == account }
+        val row = rows[applied.caseId.value]?.takeIf { it.account.value == account.value }
         if (row != null && interleaveBeforeApply) {
             row.case = row.case.copy(caseVersion = row.case.caseVersion + 1)
             interleaveBeforeApply = false

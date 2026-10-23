@@ -40,7 +40,7 @@ class InMemoryBidCaseStore : BidCaseStorePort {
     ): OpenCaseResult {
         val existing =
             rows.values.firstOrNull {
-                it.account == account && it.case.notice == notice && it.case.kind == kind
+                it.account.value == account.value && it.case.notice == notice && it.case.kind == kind
             }
         if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
         val id = BidCaseId(nextId++)
@@ -52,7 +52,7 @@ class InMemoryBidCaseStore : BidCaseStorePort {
     override fun load(
         account: AccountId,
         caseId: BidCaseId,
-    ): BidCase? = rows[caseId.value]?.takeIf { it.account == account }?.case
+    ): BidCase? = rows[caseId.value]?.takeIf { it.account.value == account.value }?.case
 
     override fun list(
         account: AccountId,
@@ -60,20 +60,20 @@ class InMemoryBidCaseStore : BidCaseStorePort {
         state: BidStateTag?,
     ): List<BidCase> =
         rows.values
-            .filter { it.account == account && it.case.kind == kind }
+            .filter { it.account.value == account.value && it.case.kind == kind }
             .filter { state == null || it.case.state.tag == state }
             .map { it.case }
 
     override fun timeline(
         account: AccountId,
         caseId: BidCaseId,
-    ): List<TimelineEntry> = rows[caseId.value]?.takeIf { it.account == account }?.timeline.orEmpty()
+    ): List<TimelineEntry> = rows[caseId.value]?.takeIf { it.account.value == account.value }?.timeline.orEmpty()
 
     override fun applyTransition(
         account: AccountId,
         applied: AppliedTransition,
     ): TransitionWrite {
-        val row = rows[applied.caseId.value]?.takeIf { it.account == account }
+        val row = rows[applied.caseId.value]?.takeIf { it.account.value == account.value }
         return if (row == null) {
             TransitionWrite.CaseNotFound
         } else if (row.case.caseVersion != applied.expectedVersion) {
