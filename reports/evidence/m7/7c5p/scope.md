@@ -83,6 +83,11 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
 상한은 「최초 적재 + 보존 창 + 승격 지연」 ≤ **보존 창의 두 배**(운영자 보고 대상) ② 참가업체수는 목록 축 둘에서만 ③ 저장 키는 가장 늦은 걷기의
 최소 관측 키 ④ 멱등은 관측 시각 비교(upsert 조건과 같은 축). 최종낙찰일자는 canonical 슬롯이 없어 낙찰 목록 축이 들어와도 셋만 채워진다(제한).
 
+**D-7C5P-9 (2026-10-23, 팀장 — acceptance 판정 질의 수령).** `container` 는 job 전체를 CI 명령 그대로 잰다(app 갈래만 재는 안 기각 —
+줄일 수 있는 단위는 job 뿐). 「ml-serving·web·proxy 입력 변경 0」 path-limited diff 는 보조 근거로만 남긴다. 실행 전후 네 태그 이미지 ID 기록·복원,
+변이·rollback 과 같은 락 큐 직렬. RED 별 라운드 미관측은 사실로 선언하고 test 강도는 변이(바꿔치우기 13 + 음성 대조 1)로 세운다 — 게이트의 자연
+발생 RED 는 test RED 로 세지 않는다(verifier 표적).
+
 
 ## 하네스 레인 변경 (상시)
 
