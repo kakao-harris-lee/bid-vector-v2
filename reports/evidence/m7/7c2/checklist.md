@@ -371,6 +371,15 @@ conformance 실행기와 kernel test 뿐) 표본 공급 port 도 평가 경로�
 셋 다 7C① 이 같은 자리에서 받은 확장과 같은 종류다(그 slice 의 계약 갱신 이력이 `architecture-policy`·
 `gate-tests` 확장을 수용한 선례). **기존 operation·기존 갈래의 문면은 바꾸지 않았다.**
 
+**수용된 셋의 「기존 문면 불변」 증명**(`D-7C2-4`) — **새 test 를 만들지 않는다.** 이 축은 이미 있는
+test 가 담당하고, 같은 사실을 재는 test 를 하나 더 두면 둘이 갈릴 자리가 생긴다. 대응은 이렇다:
+
+| 공유 파일 | 바꾼 것 | 불변을 재는 기존 test |
+|---|---|---|
+| `ErrorBody.kt` | `ErrorCode` 에 code 하나 추가 · 매핑표에 갈래 하나 추가 · 404 핸들러가 예외 **둘**을 받게 | 「`ErrorCode` 상수 집합과 문서 enum 이 양방향으로 같다」가 추가를 양쪽에서 강제한다. 「미매핑 경로의 404 응답도 `ErrorBody` 계약과 일치한다」가 **경로 부재 쪽 거동이 그대로임**을 잰다(핸들러 서명이 넓어졌어도 그 갈래의 코드·문구가 바뀌면 붉어진다). 다른 상태 코드 갈래는 dry-run·편집·검색의 기존 계약 test 가 각자 잰다 |
+| `EvaluationWiring.kt` | 빈 둘 추가 · 자격 정책 해소를 private 함수로 묶음 | 자격 게이트 빈의 거동은 `StoredRequirementLicenseGateTest`(실 DB)가 잰다 — 그 안에 이 slice 가 더한 「게이트의 verdict == 판정 봉투의 verdict」가 있고, 해소를 묶은 것이 판정을 바꾸지 않음을 그 등식이 받친다. 출하 조립이 뜨는지는 production 조립 E2E 계열이 잰다 |
+| `HttpTestSupport.kt` | 빈 셋 추가(이중체 둘 + 팩토리) | **이 파일을 쓰는 Spring 기반 test 전건**이 그 증명이다 — 기존 빈을 건드렸으면 그 test 들이 뜨지 못한다(추가만이라 기존 배선은 그대로) |
+
 **아직 하지 않은 계약 산출물 둘**(종결 전 반드시 선다):
 1. `web/src/api/generated/operator-api.ts` 재생성(W-5 바이트 등식) — `npm ci` 가 필요하고 같은 빌드 락을 쓴다.
 2. 추적표·capability map 의 QUAL-02 · DEC-03 · DEC-04 · STR-16 행 근거(산출물 4). 판정 문자는 측정이 서는
