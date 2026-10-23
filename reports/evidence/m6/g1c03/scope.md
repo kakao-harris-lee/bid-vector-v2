@@ -150,6 +150,12 @@ test(L-1·L-2·F-4·F-5) · 정리(L-4·L-5·L-6·L-7·F-6). 장부: rollback �
 - **L9**: F-2 회귀 test 의 구판 RED 를 표적 실행 하나로 측정. **low**: `TruncationCause` 코드와 `INTERRUPTED_ROUND` 의 비충돌을 test 로.
 - `commands.md` 「run 24」 정정. 그 뒤 마지막 산출물 커밋에서 check · 변이(V1·V2 포함) · rollback ①~⑥ · container job 재실측 → 동결.
 
+**D-G1C03-6 (2026-10-23, 팀장 — r2 표적 재검증 ready · CR r3 APPROVE 수령, 마지막 일괄 배치 r3).** verifier R2-1 = CR M6: 생성 축 규칙의
+자기 면제(`outermostClassName() == type`)로 data class `copy` · 멤버 팩토리 · companion 팩토리가 양쪽에서 안 보인다 — **닫는다**(면제를 좁히고
+Candidate 를 돌려주는 Candidate 멤버·copy·companion 팩토리를 규칙으로 막거나 같은 효과의 구조, 레인 선택). 세 우회 표본 RED 를 게이트 test 로.
+CR L13(비충돌 목록 크기 단언) 수정 · CR M5 정정 문면(「19 는 부분집합」) · CR L12 와 verifier R2-2(파일 클래스 단위 허용 — 경계 파일에 함수를
+더하면 열림)는 §5 등재. 게이트 술어 변경이므로 R2-1 만 표적 재검증.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
