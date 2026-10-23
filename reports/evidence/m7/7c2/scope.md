@@ -85,6 +85,12 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 - **Q5** 미판정 축 ID 는 7C④ 와 바이트 동일(`QUAL_08_REGION`·`QUAL_11_CONSTRUCTION_CAPACITY`) + `QUAL_10_PERFORMANCE`. 뒤에 머지되는 쪽이
   어휘 등식을 맞춘다. **Q6** 7C③ 머지 전 `inboxRecordState: NOT_RECORDED_YET` 선언(가짜 포트 없음).
 
+**D-7C2-3 (2026-10-23, 팀장 — 구현 중 막힘 수령).** 「응답 평탄 유지」와 `limit.type.members=30`(ADR 0007)이 함께 서지 않는다(평탄 응답 49+ 필드).
+**R7**: Kotlin 응답 타입은 축별로 쪼개고 JSON·OpenAPI 스키마는 평탄 유지(직렬화 펴기). 키 집합 등식 test 를 출하 직렬화로 재고, 키 충돌 0 을
+단언한다. `app.http.allowed-packages` 에 Jackson 애너테이션 패키지 한 줄 추가(근거 evidence). **사전 승인된 대체 R4**: 펴기가 실측으로 안 되면
+평탄 술어를 「깊이 정확히 1, `$ref` 대상 속성이 전부 스칼라일 때만」의 허용 목록으로 넓힌다 — 게이트 술어 변경이므로 표적 재검증 대상이고
+in_scope 에 해당 contract test 를 더한다. operation 분할(R6)은 하지 않는다.
+
 
 ## 하네스 레인 변경 (상시)
 
