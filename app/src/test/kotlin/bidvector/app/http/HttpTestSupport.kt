@@ -1,7 +1,9 @@
 package bidvector.app.http
 
+import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.app.wiring.BidPriceRequestFactory
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
@@ -397,6 +399,36 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /** 7C ② — 단건 평가의 이중체 둘. 기본값이 「공고 없음」이라 설정하지 않은 test 에서는 404 다. */
+    @Bean
+    open fun mutableNoticeByIdPort(): MutableNoticeByIdPort = MutableNoticeByIdPort()
+
+    @Bean
+    open fun mutableLicenseJudgementPort(): MutableLicenseJudgementPort = MutableLicenseJudgementPort()
+
+    /**
+     * 7C ② — `BidPriceRequestController`(같은 패키지 main)가 요구하는 조립. 출하 조립과 **같은
+     * 형태**다(ML 은 항상-미가용 구현, 감시 입력은 실 production 매퍼) — 바뀌는 것은 공고·자격의
+     * 공급원뿐이라, 이 위에서 재는 것은 「HTTP 층이 결과를 어떤 응답으로 옮기는가」다.
+     */
+    @Bean
+    open fun bidPriceRequestFactory(
+        strategyRepository: TestStrategyRepository,
+        noticeByIdPort: MutableNoticeByIdPort,
+        licenseJudgementPort: MutableLicenseJudgementPort,
+        clock: Clock,
+        correlationIdFactory: CorrelationIdFactory,
+    ): BidPriceRequestFactory =
+        BidPriceRequestFactory(
+            notices = noticeByIdPort,
+            strategyRepository = strategyRepository,
+            licenseJudgements = licenseJudgementPort,
+            watchSubjects = NoticeWatchSubjectPort(),
+            mlAnalysis = UnavailableMlAnalysis(),
+            correlationIds = correlationIdFactory,
+            clock = clock,
+        )
 
     /**
      * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.
