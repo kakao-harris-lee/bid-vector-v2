@@ -6,8 +6,8 @@ import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
 import bidvector.procurement.NOTICE_ROUND_RAW_KEY
-import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeAxisLedger
+import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservationKey
 import bidvector.procurement.OpeningPromotionOutcome
