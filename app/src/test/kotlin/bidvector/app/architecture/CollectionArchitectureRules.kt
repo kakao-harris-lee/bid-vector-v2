@@ -3,6 +3,7 @@ package bidvector.app.architecture
 import com.tngtech.archunit.core.domain.JavaAccess
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
+import com.tngtech.archunit.core.domain.JavaConstructor
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.ConditionEvents
@@ -296,7 +297,7 @@ class CollectionArchitectureRules(
     /**
      * M6/G1-C03 (D-G1C03-5) — [type] 의 생성자를 부르거나 생성자 참조(`::T`)를 짓는 [root] 안의 클래스 집합은
      * [allowedCallers] 의 부분집합이다. 타입 참조로는 못 가른다 — 그 타입은 여러 자리가 **나르지만** 짓는 자리는
-     * 하나여야 하는 경우에 쓴다(타입 자신은 제외).
+     * 하나여야 하는 경우에 쓴다(타입 자신의 생성자 위임만 제외 — 아래 `constructionsOf`).
      */
     fun constructorMustBeCalledOnlyBy(
         root: String,
@@ -335,13 +336,15 @@ class CollectionArchitectureRules(
             }
         }
 
+    /**
+     * 면제는 **그 타입 자신의 생성자 → 생성자 위임**(기본 인자 합성 생성자 · 보조 생성자)뿐이다(M6/G1-C03 r3, CR M6 ·
+     * verifier R2-1). 타입 자신을 통째로 면제하면 data class `copy` · 멤버 팩토리 · 동반 객체 팩토리가 생성자를 대신 불러
+     * 「짓는 자리」가 게이트 밖으로 나간다 — 그 셋은 생성자가 아닌 코드에서 `<init>` 을 부르므로 여기서 잡힌다.
+     */
     private fun JavaClass.constructionsOf(type: String): List<JavaAccess<*>> =
-        if (outermostClassName() == type) {
-            emptyList()
-        } else {
-            (constructorCallsFromSelf.toList() + constructorReferencesFromSelf.toList())
-                .filter { it.targetOwner.name == type }
-        }
+        (constructorCallsFromSelf.toList() + constructorReferencesFromSelf.toList())
+            .filter { it.targetOwner.name == type }
+            .filterNot { it.origin is JavaConstructor && it.origin.owner.name == type }
 
     private fun isOutside(allowed: Set<String>) =
         object : com.tngtech.archunit.base.DescribedPredicate<JavaClass>("허용 집합 밖 클래스 (${allowed.size}종)") {

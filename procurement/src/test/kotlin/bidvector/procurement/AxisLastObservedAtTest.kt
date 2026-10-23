@@ -1,5 +1,6 @@
 package bidvector.procurement
 
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -90,11 +91,14 @@ class AxisLastObservedAtTest {
     /**
      * **절단 사유가 닫는 줄의 값을 내지 않는다**(M6/G1-C03 r2) — 관측 질의는 [INTERRUPTED_ROUND] 와 같은 결말을 뺀다.
      * 절단 코드가 그 값과 겹치면 **진짜 관측**(일시 실패로 끝난 걷기)이 조용히 관측에서 빠진다. 절단 사유 전수를
-     * 결말로 옮겨 그 값이 나오지 않음을 잰다 — 목록은 아래 소진 `when` 과 함께 둬서 사유가 늘면 컴파일이 여기를 가리킨다.
+     * 결말로 옮겨 그 값이 나오지 않음을 잰다. 「전수」는 손 목록이 아니라 **컴파일러가 적은 sealed 하위 타입**
+     * (`PermittedSubclasses`)과 대조한다 — 사유를 더하고 목록에 안 더하면 이 test 가 붉어진다(CR r3 L13).
      */
     @Test
     fun `절단 사유의 결말은 끊긴 라운드를 닫는 값과 겹치지 않는다`() {
-        ALL_TRUNCATION_CAUSES.forEach(::listed)
+        val permitted = TruncationCause::class.java.permittedSubclasses.toSet()
+        ALL_TRUNCATION_CAUSES shouldHaveSize permitted.size - 1 + BudgetLimit.entries.size
+        ALL_TRUNCATION_CAUSES.map { it.javaClass }.toSet() shouldBe permitted
         val outcomes = ALL_TRUNCATION_CAUSES.map { attemptOutcomeOf(truncatedBy(it)) }
 
         ALL_TRUNCATION_CAUSES.map(::truncationCodeOf) shouldNotContain INTERRUPTED_ROUND.code
@@ -102,7 +106,7 @@ class AxisLastObservedAtTest {
     }
 }
 
-/** 절단 사유 전수 — [listed] 의 소진 `when` 이 새 사유를 이 목록으로 끌어온다. */
+/** 절단 사유 전수 — sealed 하위 타입과의 등식을 위 test 가 잰다(매개변수 변종은 `BudgetLimit` 마다 하나). */
 private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
     listOf(
         TruncationCause.MaxPages,
@@ -117,24 +121,6 @@ private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
         TruncationCause.StructureFailure,
         TruncationCause.SelfThrottled,
     ) + BudgetLimit.entries.map(TruncationCause::BudgetExhausted)
-
-/** 사유가 하나 늘면 이 `when` 이 컴파일되지 않는다 — 그때 위 목록에 더한다. */
-private fun listed(cause: TruncationCause): Unit =
-    when (cause) {
-        TruncationCause.MaxPages,
-        TruncationCause.RepeatedPage,
-        TruncationCause.QuotaExhausted,
-        TruncationCause.Timeout,
-        TruncationCause.TransportFailure,
-        TruncationCause.ServerError,
-        TruncationCause.NotRetryable,
-        TruncationCause.InputError,
-        TruncationCause.Unclassified,
-        TruncationCause.StructureFailure,
-        TruncationCause.SelfThrottled,
-        is TruncationCause.BudgetExhausted,
-        -> Unit
-    }
 
 private fun truncatedBy(cause: TruncationCause) =
     CollectionAccounting(
