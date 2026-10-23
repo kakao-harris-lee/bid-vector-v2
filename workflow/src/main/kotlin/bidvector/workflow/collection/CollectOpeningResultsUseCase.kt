@@ -104,7 +104,12 @@ private fun detailAxesFor(division: BusinessDivision): List<DetailAxis> =
         }
     }
 
-private enum class DetailAxis(
+/**
+ * **승격의 목록/상세 판정이 이 열거와 등식이어야 한다**(D-7C5P-11) — `internal` 로 넓힌 것은 그
+ * 등식을 test 가 읽기 위해서다(거동 변경 0). 둘이 갈리면 승격이 상세 축을 목록 축으로 오인해
+ * 결말 없는 원문을 물러서서 올린다.
+ */
+internal enum class DetailAxis(
     val endpoint: SourceEndpoint,
 ) {
     RESERVE_PRICE(SourceEndpoint.RESERVE_PRICE_DETAIL),
