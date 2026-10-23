@@ -151,6 +151,7 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | 조회 가치 술어를 참조하는 production 클래스는 기준 시각 경계 하나다 | — | F-1 잔여 V1(아키텍처 게이트) | V1 |
 | 개찰 표본 후보를 짓는 production 클래스는 표본틀 하나다 | — | F-1 잔여 V2(아키텍처 게이트) | V2 |
 | 위반 표본 둘(술어 직접 호출 · 후보 재생성 — 생성자 호출·참조, 허용 자리 비과잉) | — | 두 규칙의 음성 대조 | — |
+| 위반 표본 셋(타입 자신이 짓는 길 — data class `copy` · 멤버 팩토리 · 동반 객체 팩토리) + 생성자 위임만 있는 타입은 짓는 자리 0 | — | 생성 축 자기 면제 사각(CR M6 · vr R2-1) | — |
 | 절단 사유의 결말은 끊긴 라운드를 닫는 값과 겹치지 않는다 | — | 절단 코드 ↔ `INTERRUPTED_ROUND` 비충돌 | MT |
 
 「창이 서면」 쪽은 **합성 정책**으로 잰다 — 출하 값이 0 이라 그 거동은 출하 값으로 잴 수 없다. 합성값은 출하 값의
@@ -196,6 +197,18 @@ r2(D-G1C03-5)는 마지막 산출물 커밋 `d1f87bf8` 에서 새 변이 셋을 
 | V2 | use case 가 `Candidate(…, OpeningAnchor.NotCarriedByFrame)` 로 후보를 다시 지음 | 1 / 109 — 「개찰 표본 후보를 짓는 … 표본틀 하나다」 |
 | MT | 절단 코드 하나(`UNCLASSIFIED`)를 `INTERRUPTED` 로 | 1 / 5 |
 
+r3(D-G1C03-6)는 마지막 산출물 커밋 `788af8ca` 에서 쟀다(16:06~16:13). 생성 축 규칙의 면제를 **타입 자신의 생성자 → 생성자 위임**
+으로 좁힌 뒤, 그 사각 셋을 production 후보에 직접 지어 넣었다(후보 파일 + use case 두 파일 바꿔치기). 다섯 모두 **Gradle exit 1** 이고
+붉은 것은 게이트 test 하나씩, 같은 실행의 `bidvector.workflow.collection.*` 83 은 초록이다. 신고된 접근은 각각 `Candidate.copy` ·
+`Candidate.withAnchor` · `Candidate$Companion.of` → `Candidate.<init>` 이다. 통제군(`--rerun`) **exit 0 · 838 중 실패 0**.
+
+| ID | 바꿔치기 | RED / 표적 |
+|---|---|---|
+| Q1 | `Candidate` 를 `data class` 로 + use case 가 `picked.copy(openingAnchor = NotCarriedByFrame)` | 1 / 109 — 후보 생성 규칙 |
+| Q2 | `Candidate` 에 멤버 팩토리 `withAnchor` + use case 가 그것을 부름 | 1 / 109 — 후보 생성 규칙 |
+| Q3 | `Candidate` 에 동반 객체 팩토리 `of` + use case 가 그것을 부름 | 1 / 109 — 후보 생성 규칙 |
+| V1 · V2 재확인 | r2 와 같은 바꿔치기 | 각 1 / 109 — 술어 경계 규칙 · 후보 생성 규칙 |
+
 **L9 — F-2 회귀 test 의 구판 RED**(버릴 clone `bdcd1459` = r1 배치 전 코드, `closedNow` 판): 그 판의 게이트 test 파일에
 F-2 use case test 둘만 옮겨 `:workflow:test --tests '…OpeningDetailFetchGateTest'` → **exit 1 · 7 중 1 실패** — 「앞 실행이 닫고 그
 축을 관측하지 못한 채 멈춰도 창을 열지 않는다」. 「이번 실행이 닫은 …」 은 구판에서도 초록이다(구판의 `closedNow` 가 그 경우를 덮었다).
@@ -218,11 +231,15 @@ F-2 use case test 둘만 옮겨 `:workflow:test --tests '…OpeningDetailFetchGa
   원천 결과코드 분류표가 아니다. 「쪽 중간 전송 실패」를 가르는 일(§6-2)은 여전히 쓰기 시점 어휘가 필요하다.
 - 원장 파일은 실행마다 **두 번** 읽힌다(닫기 · 이어 돌기, 앞 판과 같다). 관측 시각 질의로 전수 패스가 하나 늘었다(L-7).
 - 술어 참조 규칙은 술어 **파일 클래스** 단위라 `decideQualificationFetch` 도 같은 경계에 묶인다(오늘 production 호출자 0). 그 술어를
-  쓰는 slice 는 참조자를 등재해야 한다 — 게이트가 그 자리를 가리킨다.
+  쓰는 slice 는 참조자를 등재해야 한다 — 게이트가 그 자리를 가리킨다. **부작용**(CR r3 L12): COL-04 배선 slice 가 자기 use case 를
+  참조자로 더하면 그 클래스는 `decideDetailFetch` 도 자유롭게 부를 수 있다(게이트가 두 술어를 가르지 못한다). 그 slice 는
+  `DetailFetch.kt` 를 술어마다 파일로 나눠 facade 를 따로 등재해야 COL-03 의 경계가 열리지 않는다.
+- 허용 단위가 **파일 클래스**(`OpeningAnchorKt`)다(verifier R2-2) — 경계 파일에 함수를 하나 더 두면 그 함수가 술어에 상수를 넘길
+  수 있다. 그 파일 자체를 편집해야 하고 리뷰가 보는 자리라 low 이고, 메서드 단위(`detailFetchDecision` 만)로 좁히는 것은 후속이다.
 - **기존 부채(M5)** — 이 slice 는 `capability-map.md` 를 +12 / −0 으로 바꿨다(`git diff -U0` 첫 hunk `@@ -276,0 +277,12 @@`).
   그 파일을 줄 번호로 가리키는 역참조가 evidence 에 38 건 있고 그중 277 줄 아래를 가리키는 **34 건(서로 다른 줄 22)**이 12 줄
   밀린다(M0 `0a`·`0a2`·`0a3`·`0c` 28 · M1 1 · M4 4 · harness 1). 닫힌 이력이라 고치지 않고 사실만 적는다(전례
-  `reports/evidence/harness/test-discovery-guard` 의 줄 수 불변 확인). CR r2 의 「약 19」와 다른 것은 세는 단위 차이다.
+  `reports/evidence/harness/test-discovery-guard` 의 줄 수 불변 확인). CR r2 의 「약 19」는 다른 단위가 아니라 그 22 의 **부분집합**이었다(CR r3 L14 — 34 / 22 가 직접 센 값).
 - 수집 use case 파일이 크기 한도에 가깝다 — 끊긴 라운드를 닫는 자리를 형제 파일로 옮겨 여유를 냈다
   (관심사가 새로 생긴 것이 아니라 이미 한 축을 이루던 것을 옮겼다, 형제 파일들과 같은 전례).
 
@@ -327,3 +344,16 @@ verifier v-c03 ready(F-2·F-3 닫힘, F-1 부분) · code-reviewer cr-c03 APPROV
 | CR L10 — F-4 test 가 E2E 클래스에 산다 | 등재 | 다음 slice 에 묶어도 무해(CR 권고). 옮기면 등재 장부 한 줄이 늘 뿐 판정은 같다 |
 | CR L11 — 계수 스크립트의 같은 초 섞임 | 등재 | 이 라운드는 변이마다 Gradle 로그로 실제 돈 task 를 대조했다(§4-1 MF) |
 | `commands.md` 「run 24」 | 수정 | run 23 + uses 4 |
+
+## 10. 검토 r3 처분 (D-G1C03-6)
+
+verifier r2 ready · code-reviewer r3 APPROVE.
+
+| 지적 | 처분 | 근거 |
+|---|---|---|
+| CR M6 · verifier R2-1 — 생성 축의 자기 면제 사각(`copy` · 멤버 · 동반 팩토리) | 수정(구조) | 면제를 그 타입 **생성자에서 나간** 생성자 호출(위임)로 좁혔다. 타입·동반 객체의 **메서드**가 `<init>` 을 부르면 신고된다. 위반 표본 셋 + 위임만 있는 타입의 비과잉, production 변이 Q1~Q3 RED(§4-1). CR 의 `copy` 호출 축 추가는 필요 없다 — `copy` 자신이 타입의 메서드라 같은 규칙에 걸린다 |
+| CR L13 — 목록 크기 | 수정 | 손 숫자 대신 **컴파일러가 적은 sealed 하위 타입**(`permittedSubclasses`)과 크기·클래스 집합 등식. 손 숫자로는 `when` 만 고친 변경을 못 잡는다(목록 크기가 그대로다). 두 벌 열거였던 소진 `when` 은 지웠다 |
+| CR L14 — M5 「단위 차이」 | 수정 | 「부분집합」으로(§5) |
+| CR L12 — `DetailFetchKt` facade 공유 | 등재 | §5 — COL-04 배선 slice 는 술어별 파일 분리가 먼저 |
+| verifier R2-2 — 허용 단위가 파일 클래스 | 등재 | §5 — 메서드 단위는 후속 |
+

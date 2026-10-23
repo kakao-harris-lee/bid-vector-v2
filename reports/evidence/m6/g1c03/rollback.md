@@ -34,6 +34,7 @@ git restore --source=a61ddff1 --staged --worktree -- \
 git rm -q procurement/src/test/kotlin/bidvector/procurement/AxisLastObservedAtTest.kt \
    app/src/test/kotlin/bidvector/archfixture/violating/app/RogueCandidateBuilder.kt \
    app/src/test/kotlin/bidvector/archfixture/violating/app/RogueDetailFetchCaller.kt \
+   app/src/test/kotlin/bidvector/archfixture/violating/app/RogueSelfFactories.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/OpeningAnchor.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/DetailSkipTally.kt \
    workflow/src/main/kotlin/bidvector/workflow/collection/InterruptedRoundCloser.kt \
@@ -54,11 +55,11 @@ git rm -q procurement/src/test/kotlin/bidvector/procurement/AxisLastObservedAtTe
 
 ## 4. 실측 (2026-10-23)
 
-실측 HEAD: `d1f87bf8`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
+실측 HEAD: `788af8ca`(마지막 산출물 커밋). 버릴 clone 에서 §1 의 명령을 문서 그대로 돌렸다.
 
 | # | 확인 | 결과 |
 |---|---|---|
 | ① | 명령 exit | **0** |
-| ② | 바뀐 경로 수 | M 19 · D 7 — §1 목록과 `git diff --name-status a61ddff1..d1f87bf8`(evidence 제외)가 같다 |
+| ② | 바뀐 경로 수 | M 19 · D 8 — §1 목록과 `git diff --name-status a61ddff1..788af8ca`(evidence 제외)가 같다 |
 | ③ | 되돌린 트리 ↔ base | 작업 트리 ↔ 인덱스 차이 0 · 추적 안 된 파일 0 · `git diff --cached --name-status a61ddff1` 은 이 slice 의 evidence 넷(A)뿐 |
-| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(14:51~15:01, 359 task — `adapters`·`app` test 실행, 나머지 모듈 test 는 같은 입력의 build cache 적중). evidence 넷이 텍스트 게이트 입력이라 트리 동일성으로 갈음하지 않았다 |
+| ④⑤⑥ | compile · test · 게이트 | 되돌린 clone 에서 `./gradlew --no-daemon check` **exit 0**(16:14~16:24, 359 task — `adapters`·`app` test 실행, 나머지 모듈 test 는 같은 입력의 build cache 적중). evidence 넷이 텍스트 게이트 입력이라 트리 동일성으로 갈음하지 않았다 |

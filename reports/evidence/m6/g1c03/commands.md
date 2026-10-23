@@ -29,6 +29,10 @@ D-G1C03-2(창 0)로 갔다.
 | 통제군 `--rerun`(위 다섯 + 아키텍처 test 둘) | `d1f87bf8` | **0** | 837 실행 · 실패 0 |
 | L9 구판 표적 `:workflow:test --tests '…OpeningDetailFetchGateTest'` | `bdcd1459` + F-2 test 둘 | **1** | 7 중 1 실패(checklist §4-1) |
 | `container` job 재생 | `d1f87bf8` | **0** | 27 step: run 23 success · uses 4 · skipped 0. app 이미지가 새로 구워졌다(jar 변경) |
+| 변이 Q1 · Q2 · Q3 · V1 · V2 | `788af8ca` | 다섯 모두 **1** | 각각 아키텍처 게이트 test 1 · `bidvector.workflow.collection.*` 83 초록(checklist §4-1) |
+| 통제군 `--rerun`(위 다섯 + 아키텍처 test 둘) | `788af8ca` | **0** | 838 실행 · 실패 0 |
+| `./gradlew --no-daemon check --continue` | `788af8ca`(+ 미커밋 evidence md) | **0** | 350 task |
+| `container` job 재생 | `788af8ca` | 생략 | `git diff --name-only d1f87bf8 788af8ca -- '*/src/main/*'` 가 **빈 출력** — r3 은 test 소스·위반 표본만 바꿔 app jar 입력이 `d1f87bf8` 재생과 같다 |
 
 재생마다 공유 태그 넷을 재생 전 id 로 되돌렸다(app `94382c1026cf` · web `855171383f43` · proxy `d93e25e04ec8` ·
 ml-serving `326e9da38043`). compose 잔여 0 · 6G 개발 DB 손대지 않음.
