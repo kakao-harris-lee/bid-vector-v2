@@ -70,11 +70,12 @@ sealed interface CompanyNameNormalization {
  * 남는 쪽의 오차는 거짓 「패찰」이고, 그 방향이 이 커널이 고르는 안전한 쪽이다.
  *
  * **① 의 공백 집합**: legacy 는 `re.sub(r"\s+", "", …)` 다. Kotlin `Char.isWhitespace()` 는 그
- * Python `\s` 에서 **U+0085(NEL) 하나를 뺀 부분집합**이다(BMP 전수 대조 29 대 28, Kotlin 에만
- * 있는 글자 0) — 전각 공백 `U+3000`·NBSP `U+00A0` 은 양쪽 다 든다. 차이는 그 글자가 남아
- * 거짓 「패찰」 쪽으로만 난다. 공백 넷 리터럴로 옮기면 전각 공백이 낀 표기를 놓쳐 같은 방향의
- * 오차가 훨씬 커진다. zero-width 글자(U+200B 등)·전각 라틴·NFD 한글·괄호 혼용 표기(`(주）`)도
- * 정규화하지 않는다 — 모두 거짓 「패찰」 쪽이고 실수집 상호 확인(`OPEN-SET-03`)과 같은 축이다.
+ * Python `\s` 에서 **U+0085(NEL) 하나를 뺀 부분집합**이라(BMP 전수 대조 29 대 28, Kotlin 에만 있는
+ * 글자 0) 그 글자를 따로 더한다 — 그래서 이 단계의 공백 집합은 legacy 와 **같다**(전각 공백 `U+3000`·
+ * NBSP `U+00A0` 포함). 그 글자를 빼면 `U+0085` 만인 상호가 양쪽에서 비지 않아 legacy 의 「미기록」이
+ * 확정 「낙찰」로 바뀐다(r2 반례). 공백 넷 리터럴로 옮기면 전각 공백이 낀 표기를 놓친다.
+ * zero-width 글자(U+200B 등)·전각 라틴·NFD 한글·괄호 혼용 표기(`(주）`)는 정규화하지 않는다 —
+ * 실상호 쌍에서는 거짓 「패찰」 쪽이고 실수집 상호 확인(`OPEN-SET-03`)과 같은 축이다.
  *
  * **③ 의 알려진 제한**: legacy 는 `casefold()` 이고 Kotlin 에는 대응이 없다. 여기서는
  * **ASCII `A`~`Z` 만** 접는다 — 상호는 한글(대소문자 없음)과 라틴 코드가 섞이는 축이고,
@@ -134,13 +135,13 @@ private fun stripEdgeTokens(
     return text
 }
 
-/** 공백 제거(①) — `Char.isWhitespace()`, legacy `\s` 에서 U+0085 하나를 뺀 부분집합(위 KDoc). */
+/** 공백 제거(①) — `Char.isWhitespace()` + U+0085, 곧 legacy `\s` 와 같은 집합(위 KDoc). */
 private fun stripWhitespace(value: String): String {
     val chars = CharArray(value.length)
     var count = 0
     for (index in value.indices) {
         val char = value[index]
-        if (!char.isWhitespace()) {
+        if (!char.isWhitespace() && char != NEXT_LINE) {
             chars[count] = char
             count++
         }
@@ -157,6 +158,9 @@ private fun lowercaseAscii(value: String): String {
     }
     return String(chars, 0, value.length)
 }
+
+/** U+0085 NEL — Python `\s` 에는 들고 `Char.isWhitespace()` 에는 없는 유일한 글자. */
+private const val NEXT_LINE = '\u0085'
 
 /** `'A'`(65) → `'a'`(97). `qualification` 의 같은 상수와 값이 같지만 모듈 경계를 넘지 않는다. */
 private const val ASCII_CASE_OFFSET = 32

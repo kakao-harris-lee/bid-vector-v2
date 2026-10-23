@@ -31,6 +31,8 @@ import java.nio.file.Files
  * fixture 5 — `Lookup.copy()` 로 운영자 상호를 바꿔치우는 길도 같은 가시성으로 닫힌다.
  * fixture 6 — 확정 판정 `SettledAwardOutcome.Won` 을 모듈 밖에서 만들어(금액 비교 따위로)
  * 기록에 넣는 길이 닫힌다. 양성 쌍둥이는 판정 함수를 거친 기록이다.
+ * fixture 7 — `SettledAwardOutcome.Lost` 도 같다. 모듈 밖에서 만든 패찰이 먼저 기록되면 기록 불변
+ * 규율 때문에 뒤의 참 낙찰이 영구히 막힌다.
  *
  * fixture 의 상호는 전부 가상이고 **ASCII 로만** 적는다(컴파일러 소스 인코딩에 기대지 않는다).
  */
@@ -99,6 +101,17 @@ class CompileFailureHarnessTest {
     @Test
     fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment("6-won-direct-construction-typo", INTERNAL_IN)
+    }
+
+    @Test
+    fun `7 확정 판정 Lost 는 모듈 밖에서 만들어지지 않고 판정 경유 기록은 컴파일된다`() {
+        assertNegativeFails("7-lost-direct-construction", INTERNAL_IN)
+        assertPositiveCompiles("6-won-via-judge")
+    }
+
+    @Test
+    fun `7-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment("7-lost-direct-construction-typo", INTERNAL_IN)
     }
 }
 

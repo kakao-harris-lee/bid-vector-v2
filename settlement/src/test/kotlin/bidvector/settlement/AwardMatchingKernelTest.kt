@@ -1,6 +1,7 @@
 package bidvector.settlement
 
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -145,6 +146,37 @@ class AwardMatchingKernelTest {
         cooperativeLookup.shouldBeInstanceOf<AwardLookupDecision.Lookup>()
         cooperativeLookup.policy shouldBe cooperative
         judgeAwardOutcome(cooperativeLookup, winner) shouldBe SettledAwardOutcome.Won()
+    }
+
+    /**
+     * 결과 쪽 정책을 따로 잰다 — 토큰이 **낙찰자 상호에만** 있는 사례. 결과 쪽을 관문의 정책이 아닌
+     * 다른 정책(예: 출하 정책)으로 접으면 「협동조합가상해양」이 남아 패찰이 된다.
+     */
+    @Test
+    fun `낙찰자 상호도 관문을 만든 정책으로 정규화된다`() {
+        val cooperative = AwardMatchingPolicyData(legalEntityTokens = listOf("협동조합"))
+        val lookup = decideAwardLookup(OperatorTradeName.Declared("가상해양"), cooperative)
+        judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("협동조합 가상해양")) shouldBe
+            SettledAwardOutcome.Won()
+    }
+
+    /**
+     * 낙찰과 패찰은 **서로 다른 값**이다 — 두 값의 동등성은 손으로 쓴 멤버라 그 구별을 따로 잠근다.
+     * 다른 모든 단언(정확매치·정책 동반)이 이 구별 위에 선다: 두 값이 같아지면 그 단언들이 비교
+     * 방향과 무관하게 초록이 된다.
+     */
+    @Test
+    fun `낙찰과 패찰은 동등성 해시 문자열 모두 구별된다`() {
+        val won = SettledAwardOutcome.Won()
+        val lost = SettledAwardOutcome.Lost()
+        won shouldNotBe lost
+        lost shouldNotBe won
+        won.hashCode() shouldNotBe lost.hashCode()
+        won.toString() shouldNotBe lost.toString()
+        AwardOutcomeRecording.AlreadySettled(won) shouldNotBe AwardOutcomeRecording.AlreadySettled(lost)
+        AwardOutcomeRecording.Recorded(lost) shouldNotBe AwardOutcomeRecording.Recorded(won)
+        won shouldBe SettledAwardOutcome.Won()
+        lost shouldBe SettledAwardOutcome.Lost()
     }
 
     /** 「상호 없음」의 길은 `NotDeclared`·`NotPublished` 하나씩이다 — 빈·공백만 상호는 만들어지지 않는다. */

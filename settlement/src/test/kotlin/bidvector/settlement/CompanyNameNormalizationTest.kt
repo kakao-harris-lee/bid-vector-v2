@@ -63,6 +63,21 @@ class CompanyNameNormalizationTest {
         normalizedValueOf("가상해양기술\t\n") shouldBe "가상해양기술"
     }
 
+    /**
+     * U+0085(NEL) 은 legacy `\s` 에 들고 `Char.isWhitespace()` 에는 없다 — 따로 더했다. 그 글자만인
+     * 상호는 legacy 처럼 비어 결말이 「판정 안 함」이고 확정 판정이 되지 않는다.
+     */
+    @Test
+    fun `U+0085 도 공백으로 제거된다`() {
+        normalizedValueOf("가상해양기술\u0085") shouldBe "가상해양기술"
+        normalizedValueOf("주식회사\u0085가상해양기술") shouldBe "가상해양기술"
+        normalizeCompanyName("\u0085", policy) shouldBe CompanyNameNormalization.Empty
+        judgeAwardOutcome(
+            decideAwardLookup(OperatorTradeName.Declared("\u0085"), policy),
+            AwardWinnerTradeName.Published("\u0085"),
+        ) shouldBe AwardOutcome.NotJudged(OperatorNameAbsentReason.NormalizesToEmpty)
+    }
+
     @Test
     fun `소문자화가 대소문자 차이를 흡수한다`() {
         normalizedValueOf("(주)Garang Marine") shouldBe "garangmarine"

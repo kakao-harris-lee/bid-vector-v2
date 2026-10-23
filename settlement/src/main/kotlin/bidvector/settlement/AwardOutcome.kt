@@ -48,7 +48,8 @@ sealed interface AwardOutcome {
  *
  * **두 값의 생성자는 `internal` 이다** — 확정 판정을 만드는 길은 [judgeAwardOutcome] 하나다.
  * 모듈 밖에서 금액 비교 따위로 [Won] 을 직접 만들어 [recordAwardOutcome] 에 넣는 길이
- * 컴파일되지 않는다(`CompileFailureHarnessTest` fixture 6). 값은 상태가 없어 같은 종류끼리
+ * 컴파일되지 않는다(`CompileFailureHarnessTest` fixture 6 · `Lost` 는 fixture 7 — 모듈 밖에서 만든 패찰이 먼저
+ * 기록되면 뒤의 참 낙찰이 막힌다). 값은 상태가 없어 같은 종류끼리
  * 같다 — 동등성은 종류로만 선다.
  */
 sealed interface SettledAwardOutcome : AwardOutcome {
