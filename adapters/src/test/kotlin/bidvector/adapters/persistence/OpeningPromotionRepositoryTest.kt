@@ -56,8 +56,11 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
 
     /**
      * 원장이 **심은 축을 그 걷기에서 성공으로 닫았다**고 본 결말. 상세 축은 결말이 있어야 쓰이므로
-     * (D-7C5P-11) 이 전제가 없으면 왕복 test 가 사상·저장이 아니라 걷기 선택을 재게 된다. 걷기 선택을
-     * 재는 test 는 `conclusions` 를 직접 준다.
+     * (D-7C5P-11) 이 전제가 없으면 왕복 test 가 사상·저장이 아니라 걷기 선택을 재게 된다.
+     *
+     * 결말을 **심은 행의 시각에서 유도**하므로 보증이 아니라 **가정**이다(「원장이 그렇게 닫혔다」).
+     * 걷기 선택을 재는 test 는 `conclusions` 를 직접 준다 — 이 파일에서는 `원장이 가리킨 걷기의
+     * 행만 canonical 이 된다` 가 그것이고, 순수 층은 `OpeningPromotionWalkTest` 가 잰다.
      */
     private fun concludedFromSeeds(target: NoticeId): Map<SourceEndpoint, AxisConclusion> =
         seeded[target].orEmpty().mapValues { (_, walk) -> AxisConclusion(AttemptOutcome.Succeeded, walk) }

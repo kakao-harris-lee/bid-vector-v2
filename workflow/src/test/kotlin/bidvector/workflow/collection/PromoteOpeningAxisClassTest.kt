@@ -12,8 +12,9 @@ import org.junit.jupiter.api.Test
  * 승격은 「결말이 없으면 **목록 축만** 행 시각으로 물러선다」로 걷기를 고른다. 그 판정의 입력이
  * 상세 축 집합이고, 정본은 수집이 공고마다 부르는 축의 열거다. 둘이 갈리면 승격이 상세 축을 목록
  * 축으로 오인해 **결말 없는 원문을 올린다**(verifier r2 R2-1 이 잡은 결함류) — 그래서 이 등식이
- * 거울의 유일한 존재 근거다. 층이 달라(사상은 domain, 열거는 application) 한 선언으로 합칠 수 없고,
- * 이 test 가 그 틈을 기계로 닫는다.
+ * 거울의 유일한 존재 근거다. 한 선언으로 합치는 길은 **있지만**(`SourceEndpoint` 쪽 속성) 수집·추출
+ * production 을 건드려 이 slice 의 범위 밖이라 합치지 않았다(제한 20, 후속 slice) — 그 사이의 틈을
+ * 이 test 가 기계로 닫는다.
  */
 class PromoteOpeningAxisClassTest {
     @Test

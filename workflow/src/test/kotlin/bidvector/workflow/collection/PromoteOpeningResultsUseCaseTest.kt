@@ -261,10 +261,16 @@ class PromoteOpeningResultsUseCaseTest {
 
     @Test
     fun `g1c03 이 끊긴 라운드를 닫아도 그 상세 축은 승격되지 않는다`() {
-        // 닫는 줄은 `INTERRUPTED_ROUND`(= `Failed("INTERRUPTED")`)이고 `isSettled` 가 false 다 —
-        // 그래서 원장 판독은 그 축의 **결말을 내지 않는다**. 승격은 줄의 어휘를 따로 읽지 않고
-        // 「상세 축 + 결말 없음 → 쓰지 않는다」 하나로 같은 답에 닿는다(D-7C5P-11). 두 레인이
-        // 겹치지 않고 **합성**된다는 것이 이 사례의 내용이다.
+        // 닫는 줄은 AXIS 줄이라 원장 판독이 그 축의 **결말을 낸다**(`axisConclusions` 는 갈래만 보고
+        // 어휘를 거르지 않는다). 그 결말이 `Failed("INTERRUPTED")` 라 `usesRows` 가 false 이고,
+        // 승격은 **실패 결말 갈래**로 그 행을 쓰지 않는다 — r1 부터 있던 분기다.
+        //
+        // 그래서 이 사례는 축 분기(D-7C5P-11)의 회귀가 **아니다** — 축 분기를 지워도 이 결말은 그대로
+        // 실패 갈래에 걸린다. 그 분기의 회귀는 결말이 **없는** 두 사례(`PROMOTE-016` 열린 라운드 줄만 ·
+        // `PROMOTE-018` 원장 줄 0)가 진다.
+        //
+        // 이 사례가 재는 것은 **합성**이다 — 닫히기 **전**(AXIS 줄 없음)은 축 갈래가, 닫힌 **뒤**는
+        // 실패 갈래가 받아, 승격이 g1c03 의 어휘를 따로 읽지 않아도 두 레인이 겹치지 않는다.
         val id = noticeId("PROMOTE-019")
         val repository = RecordingResultRepository()
         val source =

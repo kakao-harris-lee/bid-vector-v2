@@ -53,9 +53,11 @@ internal val OPENING_PROMOTION_SLOT_AXES: Map<FieldConcept, Set<SourceEndpoint>>
  * 줄이 아예 없다. 그래서 결말이 없을 때 **목록 축만** 행 시각으로 물러설 수 있다.
  *
  * **정본은 수집 팬아웃의 `DetailAxis`** 다 — 이 집합은 그 열거의 거울이고, 둘이 같은지는 등식 test 가
- * 잰다(`PromoteOpeningAxisClassTest`). 거울을 두는 이유는 층이다: 그 열거는 application 층(workflow)에
- * 있고 사상은 그 아래 domain 층이라 직접 볼 수 없다. 등식이 깨지면 승격이 상세 축을 목록 축으로
- * 오인해 결말 없는 원문을 올리므로, 그 test 가 이 거울의 유일한 존재 근거다.
+ * 잰다(`PromoteOpeningAxisClassTest`). 거울을 둔 이유: 그 열거는 application 층(workflow)에 있고 사상은
+ * 그 아래 domain 층이라 직접 볼 수 없다. 하나로 합치는 길(예: `SourceEndpoint` 쪽 속성)은 **있지만**
+ * 수집·추출 production 을 건드려 **이 slice 의 범위 밖**이라 합치지 않았다(알려진 제한 20, 후속 slice).
+ * 등식이 깨지면 승격이 상세 축을 목록 축으로 오인해 결말 없는 원문을 올리므로, 그 test 가 이 거울의
+ * 유일한 존재 근거다.
  */
 val OPENING_PER_NOTICE_AXES: Set<SourceEndpoint> =
     setOf(

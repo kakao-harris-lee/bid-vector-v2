@@ -63,7 +63,11 @@ internal fun succeededAt(walk: Instant): AxisConclusion = AxisConclusion(Attempt
  * 전제다. 그 test 들이 재는 것은 키 → 슬롯 사상이고, 상세 축은 결말이 있어야 쓰이므로(D-7C5P-11)
  * 원장을 세우지 않으면 사상표가 아니라 걷기 선택을 재게 된다.
  *
- * **결말이 없는 경우**는 `conclusions = emptyMap()` 을 명시해서 잰다 — 기본값으로 숨지 않는다.
+ * **이 값은 결말을 행 시각에서 유도한다** — production 이 금지하는 모양(행 시각으로 걷기를 짐작)과
+ * 같다. 그래서 이것은 보증이 아니라 **가정**이다: 「원장이 그 걷기에서 그렇게 닫혔다」를 전제로
+ * 두고 사상만 본다. **걷기 선택을 재는 test 는 `conclusions` 를 직접 준다** —
+ * [OpeningPromotionWalkTest] 가 결말을 세우거나 `emptyMap()` 을 명시하는 쪽이고, 결말이 없는 경우도
+ * 거기서 잰다. 기본값으로 숨지 않는다.
  */
 internal fun concludedFromRows(group: OpeningAxisGroup): Map<SourceEndpoint, AxisConclusion> =
     group.rows
