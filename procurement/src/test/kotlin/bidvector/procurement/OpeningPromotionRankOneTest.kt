@@ -294,9 +294,11 @@ class OpeningPromotionRankOneTest {
     @Test
     fun `같은 시각이면 축 열거 순서가 앞선 축이 이긴다`() {
         // code-review r1 low 4 — 비교자의 2차 키. 참가업체수는 목록 축 **둘**에서 오므로 실제로
-        // 갈리는 조합이다. 앞선 축은 **낙찰 목록**이다(`SourceEndpoint` 열거가 그 순서다) — 이 test 를
-        // 쓸 때 반대로 적었고 실측이 바로잡았다. 그래서 기대값을 열거에서 **읽어** 둔다: 순서가
-        // 바뀌는 날 이 단언이 코드와 함께 움직이지 않고 먼저 붉어진다.
+        // 갈리는 조합이다. 이 단언이 잠그는 것은 **방향**이다: 시각이 같으면 열거가 앞선 축이 이긴다.
+        // 기대값을 열거에서 읽으므로 열거 순서가 뒤집히면 이 단언은 코드와 함께 움직인다 — 그래서
+        // 지금의 순서 자체를 아래 한 줄로 따로 못박는다(CR r2 MEDIUM-2: 앞 판 주석은 이 test 가
+        // 순서 변경에 붉어진다고 거꾸로 적었다). 두 단언이 함께 있어야 방향과 현재 순서가 다 잠긴다.
+        (SourceEndpoint.OPENING_AWARD_LIST.ordinal < SourceEndpoint.OPENING_RESULT_LIST.ordinal) shouldBe true
         val earlier =
             listOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.OPENING_RESULT_LIST).minBy { it.ordinal }
         val counts = mapOf(SourceEndpoint.OPENING_AWARD_LIST to "9", SourceEndpoint.OPENING_RESULT_LIST to "3")
