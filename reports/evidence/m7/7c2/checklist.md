@@ -408,6 +408,44 @@ slice 이고 그 자리는 0.7(a)가 이미 적었다(그때 이 operation 이 �
 무효다. 지금 라운드에서는 `check`·`web`·S-20·변이까지만 하고, rollback ①~⑥ 과 동결 보고는 7B 머지 →
 rebase → W-5 재생성 뒤에 **그 시점의 마지막 산출물 커밋**에서 한 번 잰다.
 
+### 0.9e check 라운드가 바꾼 것 — 동결 보고용 목록 둘과 변이 하나 (팀장 요청)
+
+`check` 1회차가 게이트 넷으로 설계 결함 넷을 잡았고(상세는 그 수정 커밋 메시지), `D-7C2` 의 Q4
+「위임 한 줄」은 **철회**됐다. 그 결과 동결 보고에 적을 것이 둘 늘었다.
+
+#### (가) 공유 파일의 가시성·위치가 바뀐 자리
+
+| 자리 | 바뀐 것 | 사유 |
+|---|---|---|
+| `app/.../http/EditFieldTokens.kt` 의 `WatchRuleId.token()` | `private` → `internal` | `cpdCheck` 가 내 두 번째 사본을 잡았다. 같은 도메인 타입의 **wire 어휘는 하나**여야 하고(endpoint 마다 다른 낱말이면 화면이 두 표를 든다), 그 함수는 이미 그 어휘였다. 가시성만 넓혔고 **본문·반환 문자열은 무편집**이다 |
+| `adapters/.../qualification/StoredRequirementLicenseGate.kt` | 본문 **원복**(KDoc 한 단락만 추가) | Q4 위임이 `QualificationAdapterDependencyTest` 의 앵커(이 class 의 컴파일된 코드가 커널을 참조한다)를 깼다. 그 앵커는 「어댑터가 verdict 를 스스로 조립하지 않는다」의 증명이라 세 줄 중복과 바꿀 것이 아니다 |
+
+**가시성 확대는 이 하나뿐이다**(다른 공유 파일은 추가만, 0.9c 표).
+
+#### (나) 옮긴 새 파일 ↔ in_scope
+
+| 파일 | 처음 자리 | 지금 자리 | 왜 옮겼나 |
+|---|---|---|---|
+| `PinnedLicenseGate` | `adapters.evaluation`(다른 파일 안) | `adapters.qualification`(자기 파일) | `adapters.evaluation` 은 `bidvector.qualification` 좌표를 참조할 수 없다(의존 게이트 실측) |
+| `JdbcNoticeById` | `adapters.persistence` | `adapters.evaluation` | `adapters.persistence` 는 `procurement`·shared-kernel 밖 domain 패키지를 참조할 수 없다(의존 게이트 실측). `JdbcCandidateSource` 가 같은 자리에 같은 사유로 있고, 질의·복원의 `internal` 헬퍼는 **모듈** 범위라 패키지를 옮겨도 그대로 쓴다 |
+
+둘 다 **in_scope 안이다** — 계약의 「단건 평가 workflow·controller 와 test」가 경로를 레인이 정하게
+두었고(7C① 과 같은 문면), 옮긴 뒤에도 같은 모듈·같은 slice 의 새 파일이다. 패키지가 바뀌었을 뿐
+`adapters/**` 밖으로 나간 파일은 없다.
+
+#### (다) 더할 변이 하나 — 중복의 감시자가 실제로 감시하는가
+
+위임을 되돌렸으므로 **두 어댑터가 같은 세 입력으로 커널을 각자 부른다** — 갈릴 수 있는 상태가
+실재한다. 그 갈림을 막는 것은 실 DB verdict 등식 test 하나뿐이므로, 그 test 가 실제로 감시자인지를
+변이로 잰다.
+
+- **변이**: 한쪽 어댑터(`StoredRequirementLicenseJudgement`)의 프로필 읽기를 **바꿔치운다** —
+  `operatorProfilePort.current()?.licenses ?: NotDeclared` 를 `NotDeclared` 고정으로. 더하지 않고
+  **대체**한다(더하기만 한 변이는 초록이다).
+- **기대**: 그 어댑터는 `Uncertain(OperatorLicensesNotDeclared)` 를, 게이트는 `Eligible` 을 내므로
+  등식 test 가 **RED**. 통제군으로 변이 없는 같은 명령이 초록임을 같이 적는다(cache 적중이 아니라
+  실제 실행이었는지 확인한다).
+
 ### 0.10 모듈 배치 (Phase 2 예고)
 
 - `workflow/.../evaluation/`: `NoticeByIdPort` · `LicenseJudgementPort`(읽기 하나씩). 기존 use case·커널 무편집.
