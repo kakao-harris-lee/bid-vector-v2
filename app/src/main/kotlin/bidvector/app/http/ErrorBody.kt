@@ -40,6 +40,23 @@ class InvalidNoticeSearchException(
 ) : RuntimeException(message)
 
 /**
+ * 알림함 요청의 형식·범위 오류(M7/7C③) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
+ * (`NotificationPageRejection`, 또는 읽음 처리 대상의 거부)를 진단용으로 나르고 **응답에는
+ * 실리지 않는다**(아래 [ErrorMapping] 이 고정 문구로만 옮긴다).
+ *
+ * **왜 기존 예외를 쓰지 않는가**: [InvalidNoticeSearchException] 은 공고 검색 질의의 어휘이고
+ * [InvalidEditRequestException] 은 전략 편집의 어휘다. 셋은 같은 코드·같은 고정 문구로 끝나지만
+ * **어느 표면이 거부했는가**가 예외 타입에 남아야 진단이 성립한다(응답은 어느 쪽이든 구별하지
+ * 않는다 — 어느 입력이 틀렸는지 싣지 않는 것이 이 체계의 관례다).
+ *
+ * 생성자는 문구 하나만 받는다([InvalidNoticeSearchException] 과 같은 사유 — `Throwable` 을
+ * 생성자로 받으면 주입 표면 게이트가 이 class 를 주입 대상으로 읽는다. 원인은 `initCause` 로 단다).
+ */
+class InvalidNotificationRequestException(
+    message: String,
+) : RuntimeException(message)
+
+/**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
  * [RequestAuthenticationFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
@@ -158,6 +175,11 @@ object ErrorMapping {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
+            // M7/7C③ — 알림함 질의·읽음 처리 대상의 형식 오류. 같은 코드·같은 고정 문구다.
+            is InvalidNotificationRequestException -> {
+                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            }
+
             // D-6A3-19 — 비JSON·빈 본문은 컨트롤러의 명시 검증에 닿기 전에 Jackson 이 던진다.
             is HttpMessageNotReadableException -> {
                 ErrorCode.INVALID_REQUEST to "요청 본문을 읽을 수 없다"
@@ -242,6 +264,7 @@ class GlobalErrorHandler {
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
         InvalidNoticeSearchException::class,
+        InvalidNotificationRequestException::class,
     )
     fun badRequest(
         exception: Throwable,
