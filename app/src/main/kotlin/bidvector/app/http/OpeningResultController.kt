@@ -36,23 +36,32 @@ class OpeningResultController(
             try {
                 request.readDeclaredValues(DECLARED_PARAMETERS)
             } catch (failure: IllegalStateException) {
-                throw InvalidOpeningResultQueryException("질의를 해석할 수 없다").apply { initCause(failure) }
+                unreadableQuery(failure)
             }
         val repeated = values.repeatedNames()
-        if (repeated.isNotEmpty()) {
-            throw InvalidOpeningResultQueryException("같은 매개변수가 반복됐다: $repeated")
-        }
+        if (repeated.isNotEmpty()) rejectQuery("같은 매개변수가 반복됐다: $repeated")
         val parsed =
             parseOpeningResultQuery(
                 noticeNumber = values.firstValue("noticeNumber"),
                 noticeRound = values.firstValue("noticeRound"),
             )
         return when (parsed) {
-            is OpeningResultQueryRequest.Rejected -> throw InvalidOpeningResultQueryException(parsed.reason.name)
+            is OpeningResultQueryRequest.Rejected -> rejectQuery(parsed.reason.name)
             is OpeningResultQueryRequest.Accepted ->
                 OpeningResultResponse.of(parsed.id, openingResults.read(parsed.id))
         }
     }
+
+    /**
+     * 거부 하나를 만드는 **유일한 자리** — 400 `INVALID_REQUEST` 다. 핸들러가 `throw` 를 직접 쓰지
+     * 않는 이유는 거부 갈래가 셋이기 때문이고(해석 실패 · 반복 · 파싱 거부), 그 셋이 같은 예외·같은
+     * 고정 문구로 가야 한다는 사실을 자리 하나가 진술한다.
+     */
+    private fun rejectQuery(reason: String): Nothing = throw InvalidOpeningResultQueryException(reason)
+
+    /** 질의 해석 자체가 깨진 경우 — 원래 실패를 `initCause` 로 달아 둔다(응답에는 닿지 않는다). */
+    private fun unreadableQuery(failure: Throwable): Nothing =
+        throw InvalidOpeningResultQueryException("질의를 해석할 수 없다").apply { initCause(failure) }
 }
 
 /**

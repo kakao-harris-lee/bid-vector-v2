@@ -36,7 +36,7 @@ private val DECLARED_PARAMETERS =
  * 만드는 자리는 `ErrorBody.kt` 하나다 — 이 컨트롤러는 `ErrorBody` 를 짓지 않는다).
  *
  * **질의를 읽는 자리는 [readDeclaredValues] 하나다**(verifier r3 R3-M-1 — M7/7C⑤ D-7C5-8 로 그
- * 자리가 이 컨트롤러의 private 사본에서 `DeclaredQueryParameters.kt` 의 **공용 자리**로 옮겨졌다:
+ * 자리가 이 컨트롤러의 private 사본에서 `DeclaredValue.kt` 의 **공용 자리**로 옮겨졌다:
  * 같은 규율을 쓰는 endpoint 가 둘이 되었고, 술어가 한 자리여야 변이도 한 자리에서 잡힌다).
  * `@RequestParam`
  * 으로 받으면 그 읽기가 **핸들러 바깥**(프레임워크의 인자 해석)에서 일어나, 잘못된 퍼센트
@@ -53,12 +53,10 @@ class NoticeSearchController(
             try {
                 request.readDeclaredValues(DECLARED_PARAMETERS)
             } catch (failure: IllegalStateException) {
-                throw InvalidNoticeSearchException("질의를 해석할 수 없다").apply { initCause(failure) }
+                unreadableQuery(failure)
             }
         val repeated = values.repeatedNames()
-        if (repeated.isNotEmpty()) {
-            throw InvalidNoticeSearchException("같은 매개변수가 반복됐다: $repeated")
-        }
+        if (repeated.isNotEmpty()) rejectQuery("같은 매개변수가 반복됐다: $repeated")
         val parameters =
             NoticeSearchParameters(
                 text = values.firstValue("q"),
@@ -71,10 +69,17 @@ class NoticeSearchController(
                 size = values.firstValue("size"),
             )
         return when (val parsed = parseNoticeSearchParameters(parameters)) {
-            is NoticeSearchRequest.Rejected -> throw InvalidNoticeSearchException(parsed.reason.name)
+            is NoticeSearchRequest.Rejected -> rejectQuery(parsed.reason.name)
             is NoticeSearchRequest.Accepted -> respond(notices.search(parsed.criteria))
         }
     }
+
+    /** 거부 하나를 만드는 **유일한 자리** — 400 `INVALID_REQUEST`(거부 갈래 셋이 같은 예외로 간다). */
+    private fun rejectQuery(reason: String): Nothing = throw InvalidNoticeSearchException(reason)
+
+    /** 질의 해석 자체가 깨진 경우 — 원래 실패를 `initCause` 로 단다(응답에는 닿지 않는다). */
+    private fun unreadableQuery(failure: Throwable): Nothing =
+        throw InvalidNoticeSearchException("질의를 해석할 수 없다").apply { initCause(failure) }
 
     private fun respond(page: NoticeSearchPage): ResponseEntity<List<NoticeSummaryResponse>> =
         ResponseEntity
