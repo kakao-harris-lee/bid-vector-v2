@@ -52,6 +52,26 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         recordRetroactive(caseId.value) shouldBe true
     }
 
+    /**
+     * 같은 판정이 **출하 앱 역할**(`bidvector_app`) 연결에서도 선다 — 시스템 전이를 쓰는 길이 전이 GRANT 안에
+     * 있다는 것까지 잰다(출하 조립 `BidCaseWiring` 은 이 셋 — JDBC 저장소 · 마감 질의 · 스냅샷 질의 — 과 같은
+     * use case 를 앱 역할 풀 위에 세운다).
+     */
+    @Test
+    fun `마감 판정은 출하 앱 역할 연결에서도 소급 기록까지 선다`() {
+        val mine = account("sched-f")
+        val key = notice("sched-f")
+        seedNotice(key, now.plusSeconds(HOUR))
+        val workflow = workflow(appRoleDataSource())
+        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+
+        now = now.plusSeconds(2 * HOUR)
+        workflow.command(mine, caseId, BidCommand.RecordBid(submission(), null), BidActor.User(mine))
+
+        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.BID_RECORDED
+        recordRetroactive(caseId.value) shouldBe true
+    }
+
     /** 공고가 6B-3 으로 파기돼도 담을 때 적은 사본으로 판정된다 — 초안 없이(관심 상태에서) 소급 기록이 된다. */
     @Test
     fun `공고가 파기된 관심 건도 마감 사본으로 판정되어 소급 기록이 된다`() {
