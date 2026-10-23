@@ -191,6 +191,18 @@ D-7C3-1 ① 로 **7B → 7C③ 머지 순서**가 정해졌다. 그래서 이 sl
 — controller 는 `SessionAccount.of(request)` 한 줄만 부른다. 주체 문자열을 파싱하는 코드가
 **그 한 자리 밖에 없다**는 것을 rebase 전에 `grep` 으로 재확인한다.
 
+**7B 의 구조 게이트가 `getAttribute` 호출자 집합 등식으로 강화된다**(팀장 2026-10-24) —
+접근자를 거치지 않고 요청 속성을 직접 읽는 자리를 만들면 그 등식이 붉다. 읽기 전용 실측:
+
+| 질문 | 답 |
+|---|---|
+| 이 slice 가 더한 직접 `getAttribute` 호출 | **하나** — `SessionAccount.kt` 뿐이고 그 파일이 rebase 에서 **삭제**된다 |
+| 삭제 뒤 이 slice 가 더하는 호출자 | **0** — 등식의 모수를 늘리지 않는다(구성상 준수) |
+| controller 가 요청 속성을 읽는 방법 | 직접 부르지 않는다 — 계정은 `SessionAccount.of`(→ 7B 접근자로 교체), correlation id 는 기존 공유 helper |
+
+그래서 rebase 의 확인 항목이 **둘**이다: 주체 문자열 파싱 0 · 직접 `getAttribute` 호출 0.
+둘 다 `SessionAccount.kt` 삭제로 **동시에** 성립하므로 새로 고칠 코드는 없다.
+
 ## (기록) — rollback ①~⑥ (임시 clone, 되돌린 트리)
 
 `rollback.md` 가 목록과 실측 HEAD 를 든다.
