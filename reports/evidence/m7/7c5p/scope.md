@@ -125,6 +125,13 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
    (2b) 값 획득 축 등재로 족하다.
 4. **제한 20(공고 단위 축 집합 사본 네 벌)**: 등식 test 둘로 갈림을 막는 지금 모양을 수용하고, domain 으로 합치기는 별 slice(후속 등재).
 
+**D-7C5P-13 (2026-10-23, 팀장 — 검토 r3 수령: verifier ready-for-review · CR APPROVE, 승인 전 장부 일괄).** 산출물 blocker/high 0.
+- CR r3 MEDIUM: g1c03 합성 test 주석을 기제대로(닫히기 전 = 축 갈래, 닫힌 뒤 = `INTERRUPTED_ROUND` 실패 결말 갈래). 새 규칙 회귀는 `PROMOTE-016` 이
+  진다는 사실을 변이표에. CR r3 LOW 둘: KDoc 「합칠 수 없다」 → 「이 slice 범위 밖」(제한 20), 사상표 test 기본 결말이 행 시각 유래임을 명시.
+- verifier L-r3-1: 제한 20 문면 정정 — 넷째 사본 `DETAIL_ENDPOINTS` 는 어느 등식에도 없음을 적고 후속 slice 범위에 이름으로 넣는다.
+- 주석·KDoc 만 바뀌므로 표적 재검증은 없다. 다만 되돌림 경로가 움직이므로 마지막 산출물 커밋에서 check(찬 clone) · rollback ①~⑥ 을 다시 재고
+  유효성 술어를 적는다. 변이·container 는 거동 0 이라 재실행하지 않는다(근거: 바뀐 줄이 주석·KDoc 뿐임을 `git diff -U0` 로 보인다).
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
