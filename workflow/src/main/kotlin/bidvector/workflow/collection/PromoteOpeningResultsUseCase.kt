@@ -106,8 +106,10 @@ class PromoteOpeningResultsUseCase(
         }
         when (results.persist(outcome.result, outcome.observationKey)) {
             PersistOutcome.Inserted, is PersistOutcome.Updated -> tally.promoted++
+
             // 저장이 더 늦은 관측을 이미 들고 있었다 — 읽기와 쓰기 사이에 다른 실행이 지났다.
             PersistOutcome.Unchanged -> tally.skippedUnchanged++
+
             is PersistOutcome.Rejected -> tally.rejected++
         }
     }
