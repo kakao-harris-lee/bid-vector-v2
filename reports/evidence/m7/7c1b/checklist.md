@@ -221,6 +221,22 @@ numstat 의 삭제 줄이 1 이상이어야 바꿔치우기다. M5·M8 은 줄�
 | M8 | 계약의 `SuggestedNotice.deadlineAt` 에서 `format` 삭제 | 같은 카드 형태 | 계약 「같은 정의」 등식 |
 | M9 | use case 가 첫 읽은 입력을 캐시(`by lazy`) | 저장 뒤 옛 결과가 안 보임 · 모든 편집 경로 | `SuggestionProductionE2ETest` STR-07 ① · ② (출하 조립 + 실 DB) |
 
+**수정 라운드 1 변이 일곱 + 통제군**(rebase 뒤 HEAD `1e46c616` — 코드 트리는 마지막 산출물 커밋 `19b34b6c` 와 같다). 필터는
+제안 test 네 클래스 전수(`ListSuggestionsUseCaseTest` · `SuggestionProductionE2ETest` · `SuggestionEndpointTest` ·
+`OpenApiSuggestionContractTest`)로 모든 변이에 같고, test task 마다 `--rerun` 이다. 통제군(변이 없음)은 31 건 실행 · exit 0 ·
+실패 0 이다. 일곱 모두 numstat `1 1`(바꿔치우기) · exit 1 · 컴파일 오류 0 · 복원 뒤 `git status` 빈 출력이다. 같은 일곱을
+rebase 전(base `a61ddff1`)에도 돌렸고 RED 집합이 같았다.
+
+| # | 변이 | 막는 것 | RED 로 잰 test(실패 수) |
+|---|---|---|---|
+| M2′ | 계산 뒤 비교를 항진식으로(`false &&`) | 계산 중 변경 불채택(출하 조립 포함) | use case STR-07 넷 · E2E ③ 둘 · 문장 수 · 마감 순서(8) |
+| M3′ | 비교를 전략 개정 번호만으로 | 개정을 올리지 않는 계산 중 변경 · 프로필 비교 | use case 「개정이 같아도」·「프로필이 바뀌면」 · **E2E ③ 둘**(4) — §9 의 14 행이 말한 「출하 조립에서도 잰다」의 실측 |
+| M10 | use case 가 후보마다 프로필을 한 번 더 읽음 | 질의 예산 `5 + 2n + h` | E2E 문장 수(1) |
+| M11 | 요건 행 질의를 헤더 유무와 무관하게 실행 | 질의 예산의 `h` 항 | E2E 문장 수(1) |
+| M12 | 후보 질의 `ORDER BY deadline_at DESC` | 마감 임박 순(원천) | E2E 마감 순서(1) |
+| M13 | use case 가 통과 목록을 뒤집음 | 마감 임박 순(use case) · 상한이 임박 쪽을 남김 | use case 셋 · endpoint 표시 상한 · E2E 마감 순서(5) |
+| M14 | 비교는 하되 버리지 않음(`return null` → `Unit`) | cr M-4 「비교만 하고 채택」 | use case STR-07 넷(프로필 결과 오라클 포함) · E2E ③ 둘(6) |
+
 ## 3. (2b) 값 획득 축 — 새 public 표면 전수
 
 | 새 표면 | 밖에 허락하는 것 | 허락하지 않는 것(구조) |
@@ -243,7 +259,7 @@ numstat 의 삭제 줄이 1 이상이어야 바꿔치우기다. M5·M8 은 줄�
 |---|---|---|
 | `config/quality/architecture-policy.properties` | HTTP 허용 패키지(`workflow.suggestion`) · HTTP 허용 클래스·② 층(`SuggestionQuery`) · ① 층(`SuggestionWiring`) · ② 층 workflow 타입(use case·결과) · 주입 표면(`SuggestionQuery`·use case·`NoticeSummaryResponse`) · HTTP 거부 타입(use case) · API 표면 handler(`SuggestionController`) | 전부 집합 **등식**이라 새 타입이 목록에 없으면 RED. 거부 타입은 넓힌 것을 다시 판다 |
 | `config/quality/gate-tests.properties` | test 다섯 등재(workflow 2 · app 3) | 등재 게이트가 「모집단 ∖ 제외 == 등재」 |
-| app 의 의존 게이트 test | 면제 수 62 → 64(근거 문단 동반) | ① 층 하나 + ② 층 하나 |
+| app 의 의존 게이트 test | 면제 수 62 → 64(근거 문단 동반). **rebase 뒤 65 → 67** — main 의 7C⑤-0(#84)이 62 → 65 로 셋을 먼저 넣어 그 위에 둘을 얹었다(충돌 해소, 두 레인 문단 모두 보존) | ① 층 하나 + ② 층 하나 |
 | `config/quality/architecture-policy.properties` `app.injection.allowed-types` += `NoticeSummaryResponse` | **오분류로 넓혔다(수정 라운드 1, cr L-1 — 앞 판은 위 첫 행 괄호 안에 묶어 「데이터만 움직였다」로 적었다).** `SuggestedNoticeResponse` 의 `private constructor(summary: NoticeSummaryResponse, …)` 매개변수를 INJECTION_SURFACE 규칙(`AppHttpDependencyRules.kt` 의 생성자 매개변수 타입 = 주입점)이 주입으로 셌다. 실제로는 **응답 DTO 합성**이고 빈 주입이 아니다 | 넓힌 것은 능력 포트가 아니라 응답 DTO 다 — 게이트의 목적(컨트롤러·② 층이 포트를 직접 쥐지 않는다)은 그대로다. 대가: 앞으로 그 층의 아무 클래스가 생성자로 `NoticeSummaryResponse` 를 받아도 게이트가 말하지 않는다. 코드로 피하려면 `Notice` 를 받게 바꿔야 하는데, 그러면 `Notice` 를 같은 목록에 넣어야 해서 이득이 없다 |
 
 첫 전건 `check` 가 잡은 것 넷은 이렇게 고쳤다.
@@ -322,6 +338,11 @@ Phase 2 동결(`38af04b7`) 때 미선언이던 것은 그 사실을 남기고, �
 ## 10. 수정 라운드 1 (D-7C1B-2 · D-7C1B-3) — 발견별 처분
 
 검토: code-reviewer `cr-7c1b` REQUEST_CHANGES(코드 차단급 0). verifier `v-7c1b` 는 빌드 락 대기 중 보고 없이 끝났다 — 팀장 결정으로 기다리지 않고 이 라운드를 돌렸다. 이 라운드 앞에 `origin/main` `a61ddff1`(PR #81, 컨테이너 스캔 면제 2줄) 위로 rebase 했다(충돌 0).
+**둘째 rebase**(2026-10-23 22:41 KST, 팀장 지시): `origin/main` `56bb7474`(#82 · #83 · #84) 위로. 충돌 둘을 합집합으로 풀었다 —
+(a) app 의존 게이트 test 의 면제 수: main 65 + 이 slice 2 = **67**, 근거 문단 둘 다 보존. (b) 추적표 집계 문단: main 의 G1-C03
+문단을 보존하고 ⓒ 수는 이 slice 의 42 를 쓰되, 그 문단이 인용한 16 · 43 이 「그 라운드 시점 값」임을 한 줄 덧붙였다. 설정 둘
+(`architecture-policy.properties` · `gate-tests.properties`)은 자동 병합이고 main 대비 더하기만이다(지운 줄은 목록 끝 쉼표 이음뿐).
+rebase 전 SHA ↔ 뒤 SHA 는 `commands.md` 의 대응표에 있다. **main 은 그 뒤 다시 움직였다** — PR 직전 rebase 는 검토 뒤(팀장 지시).
 
 | 발견 | 처분 |
 |---|---|

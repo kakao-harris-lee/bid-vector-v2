@@ -51,3 +51,29 @@ exit 0, BUILD SUCCESSFUL.
 ## rollback ①~⑥ · 마지막 HEAD 의 게이트 결과
 
 `rollback.md` 가 적는다.
+
+## 수정 라운드 1 (2026-10-23 ~ 24 KST)
+
+날짜가 Phase 2 와 다르다. 확인 셋은 실행마다 따로 먼저 봤다.
+
+- **표적**(커밋 전 트리, 08:00): `:workflow:test --tests 'bidvector.workflow.suggestion.*' :app:test --tests 'bidvector.app.http.Suggestion*' --tests '…OpenApiSuggestionContractTest'` + 두 모듈 ktlint test·detekt → exit 1. detekt 둘(`SuggestionE2EProbes` 미사용 매개변수 · E2E 줄 길이)이었고 test 는 use case 10 · endpoint 7 · E2E 8 실패 0. 둘을 고친 뒤 test 커밋.
+- **W-5**(`web/`): `npm run api:types:check` → 「바이트까지 같다(50843 bytes)」 exit 0 · `typecheck` · `lint` · `gate:src-tree` exit 0.
+- **전건 `check --continue`** — rebase 전 `a6ef9cf2`(base `a61ddff1`) exit 0 · **rebase 뒤 `1e46c616`**(base `56bb7474`) exit 0, `leakPatternGate` 실행.
+- **변이**: 통제군 + 일곱, `checklist.md` 2 절. rebase 전·뒤 두 번 돌렸고 RED 집합이 같다.
+- **rollback ①~⑥**: `rollback.md`. rebase 전(실측 HEAD `4d605859`, base `a61ddff1`)에도 exit 0 이었고, 정본은 rebase 뒤 실측이다.
+
+### rebase 전 ↔ 뒤 SHA (둘째 rebase, 커밋 제목으로 대응)
+
+Phase 2 문면의 SHA(`9ccf656f` · `8cb354e2` · `f255f749` · `38af04b7` 등)는 **첫 rebase 전** 값이고, 같은 제목의 커밋이 아래 「뒤」 열이다.
+
+| 전 | 뒤 | 커밋 |
+|---|---|---|
+| `344c5aeb` | `8b115f38` | 착수 계약 + Phase 1 |
+| `f1132055` | `c095aa59` | 특성화 test |
+| `ec06f519` | `8b5180ae` | 게이트 셋 추출 refactor |
+| `b48ae507` | `8e71e4a7` | 제안 목록 구현 |
+| `599006a3` | `1380882b` | 추적표 |
+| `45fd8fe0` | `3504148b` | Phase 2 evidence |
+| `6664c772` | `ddf1f065` | 수정 라운드 1 test |
+| `4d605859` | `19b34b6c` | 추적표 STR-07(**마지막 산출물 커밋**) |
+| `a6ef9cf2` | `1e46c616` | 수정 라운드 1 evidence 초안 |
