@@ -18,14 +18,19 @@ D-G1C03-2(창 0)로 갔다.
 | cmd | HEAD | exit | 핵심 결과 |
 |---|---|---|---|
 | `./gradlew --no-daemon check --rerun-tasks` | `26beba76` | **0** | 350 task 전부 실행 · 11분 46초(`qualityBaseline` 은 이 그래프 안) |
-| `container` job 재생 — `ci.yml` step 을 순서대로, `if:` 를 앞 결과로 평가 | `fd60ce1b`(산출물 = `26beba76`) | **0** | 27 step: run 24 success · runner 전용 `uses` 4(`if:` 만 평가) · skipped 0 |
+| `container` job 재생 — `ci.yml` step 을 순서대로, `if:` 를 앞 결과로 평가 | `fd60ce1b`(산출물 = `26beba76`) | **0** | 27 step: run 23 success · runner 전용 `uses` 4(`if:` 만 평가) · skipped 0 |
 | `./gradlew --no-daemon check` | `102d1a5f` | **1** | `:procurement:sizeGate` — 원장 test 파일 535 줄(한도 500). 관측 시각 test 넷을 새 클래스로 떼어 `2c3d0e10` |
 | `./gradlew --no-daemon check --continue` | `2c3d0e10` | **0** | 350 task · `sizeGate` · 등재·실행 게이트 · `leakPatternGate` 실행, 새 클래스 4 test 실행 |
 | 변이 13 | `2c3d0e10` | **0**(스크립트) | 전부 RED(checklist §4-1) |
 | 통제군 `… :workflow:test --rerun :procurement:test --rerun :adapters:test --rerun … :app:test --rerun …` | `2c3d0e10` | **0** | 784 실행 · 실패 0 |
+| `container` job 재생(D-G1C03-4) | `d653e8bf`(산출물 = `2c3d0e10`) | **0** | run 23 success · uses 4 · skipped 0 — 판정 SHA 를 움직이지 않으려고 커밋하지 않았던 측정 |
+| `./gradlew --no-daemon check --continue` | `d1f87bf8` | **0** | 359 task · 아키텍처 게이트 새 규칙 둘 포함 |
+| 변이 V1 · V2 · MT | `d1f87bf8` | V1 **1** · V2 **1** · MT **1** | 각각 아키텍처 게이트 1 · 게이트 1 · 비충돌 test 1(checklist §4-1) |
+| 통제군 `--rerun`(위 다섯 + 아키텍처 test 둘) | `d1f87bf8` | **0** | 837 실행 · 실패 0 |
+| L9 구판 표적 `:workflow:test --tests '…OpeningDetailFetchGateTest'` | `bdcd1459` + F-2 test 둘 | **1** | 7 중 1 실패(checklist §4-1) |
+| `container` job 재생 | `d1f87bf8` | **0** | 27 step: run 23 success · uses 4 · skipped 0. app 이미지가 새로 구워졌다(jar 변경) |
 
-container 재생 뒤 공유 태그 넷은 재생 전 id 다(app `94382c1026cf` · web `855171383f43` · proxy `d93e25e04ec8` ·
-ml-serving `326e9da38043`). 검토 r1 배치(`a7c5da86` · `2c3d0e10`)는 Kotlin 소스만 바꿨고 이미지 빌드 입력의 형태(Dockerfile ·
-스크립트 · 의존)는 그대로라 container 재생은 다시 돌리지 않았다.
+재생마다 공유 태그 넷을 재생 전 id 로 되돌렸다(app `94382c1026cf` · web `855171383f43` · proxy `d93e25e04ec8` ·
+ml-serving `326e9da38043`). compose 잔여 0 · 6G 개발 DB 손대지 않음.
 
 rollback 실측은 `rollback.md` §4.

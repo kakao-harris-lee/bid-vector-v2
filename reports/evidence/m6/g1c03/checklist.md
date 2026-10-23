@@ -148,6 +148,10 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | 끊긴 라운드를 닫는 줄 / 다음 라운드의 의도·호출 줄은 관측 시각을 옮기지 않는다 | — | 원장 질의(F-2 · L-1) | MB · ML1 |
 | 마침 줄은 두 건너뜀을 제 사유의 칸에 싣는다 | — | F-4 | MF |
 | 밖에서 쓰인 지금 형식의 원장을 그대로 읽는다 | — | 산출물 3(형식 불변) | ⑥ |
+| 조회 가치 술어를 참조하는 production 클래스는 기준 시각 경계 하나다 | — | F-1 잔여 V1(아키텍처 게이트) | V1 |
+| 개찰 표본 후보를 짓는 production 클래스는 표본틀 하나다 | — | F-1 잔여 V2(아키텍처 게이트) | V2 |
+| 위반 표본 둘(술어 직접 호출 · 후보 재생성 — 생성자 호출·참조, 허용 자리 비과잉) | — | 두 규칙의 음성 대조 | — |
+| 절단 사유의 결말은 끊긴 라운드를 닫는 값과 겹치지 않는다 | — | 절단 코드 ↔ `INTERRUPTED_ROUND` 비충돌 | MT |
 
 「창이 서면」 쪽은 **합성 정책**으로 잰다 — 출하 값이 0 이라 그 거동은 출하 값으로 잴 수 없다. 합성값은 출하 값의
 복사가 아니고 기대값은 스윕 시각과 창의 대소 관계에만 의존한다. age 쌍의 use case 층 test 는 이 slice 에 없다 —
@@ -181,6 +185,21 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | MF | 마침 줄 두 칸의 값을 맞바꿈(F-4) | 1 / 5 — 계수 스크립트는 2 / 9 를 냈다: 직전 ML1 의 결과 파일이 같은 초에 쓰여 섞였다. MF 의 Gradle 은 `:app:test` 하나만 돌았다(5 중 1) |
 | ME | 건너뜀 회계를 멈추지 않은 실행에만(F-5) | 1 / 10 |
 
+r2(D-G1C03-5)는 마지막 산출물 커밋 `d1f87bf8` 에서 새 변이 셋을 쟀다(14:24~14:31, 같은 방식). V1·V2 는 **Gradle exit 1** 이고
+붉은 것은 아키텍처 게이트 하나씩뿐이다 — 같은 실행에서 `bidvector.workflow.collection.*` 83 은 전부 초록(그래서 게이트가
+없으면 아무것도 막지 못한다). 복원 뒤 통제군(`--rerun`, 위 다섯 + 아키텍처 test 둘) **exit 0 · 837 중 실패 0**.
+위 13 은 `2c3d0e10` 의 측정이다 — `2c3d0e10..d1f87bf8` 의 main 코드 차이는 `OpeningAnchor.kt` 의 KDoc 줄뿐이라 변이 대상 줄이 그대로다.
+
+| ID | 바꿔치기 | RED / 표적 |
+|---|---|---|
+| V1 | use case 가 `bidvector.procurement.decideDetailFetch(…, openingObservedAt = null, …)` 를 직접 부름 | 1 / 109 — 「조회 가치 술어를 참조하는 … 경계 하나다」 |
+| V2 | use case 가 `Candidate(…, OpeningAnchor.NotCarriedByFrame)` 로 후보를 다시 지음 | 1 / 109 — 「개찰 표본 후보를 짓는 … 표본틀 하나다」 |
+| MT | 절단 코드 하나(`UNCLASSIFIED`)를 `INTERRUPTED` 로 | 1 / 5 |
+
+**L9 — F-2 회귀 test 의 구판 RED**(버릴 clone `bdcd1459` = r1 배치 전 코드, `closedNow` 판): 그 판의 게이트 test 파일에
+F-2 use case test 둘만 옮겨 `:workflow:test --tests '…OpeningDetailFetchGateTest'` → **exit 1 · 7 중 1 실패** — 「앞 실행이 닫고 그
+축을 관측하지 못한 채 멈춰도 창을 열지 않는다」. 「이번 실행이 닫은 …」 은 구판에서도 초록이다(구판의 `closedNow` 가 그 경우를 덮었다).
+
 ## 5. 알려진 제한
 
 - **COL-03 둘째 bullet 의 age 절반은 이 slice 로 성립하지 않는다**(운영자 결정 (나)). 추적표 행과 capability
@@ -198,6 +217,12 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 - 끊긴 라운드를 닫는 줄을 관측에서 빼는 판별은 **우리가 쓰는 값 하나**(`INTERRUPTED_ROUND`)와의 동일성이다 —
   원천 결과코드 분류표가 아니다. 「쪽 중간 전송 실패」를 가르는 일(§6-2)은 여전히 쓰기 시점 어휘가 필요하다.
 - 원장 파일은 실행마다 **두 번** 읽힌다(닫기 · 이어 돌기, 앞 판과 같다). 관측 시각 질의로 전수 패스가 하나 늘었다(L-7).
+- 술어 참조 규칙은 술어 **파일 클래스** 단위라 `decideQualificationFetch` 도 같은 경계에 묶인다(오늘 production 호출자 0). 그 술어를
+  쓰는 slice 는 참조자를 등재해야 한다 — 게이트가 그 자리를 가리킨다.
+- **기존 부채(M5)** — 이 slice 는 `capability-map.md` 를 +12 / −0 으로 바꿨다(`git diff -U0` 첫 hunk `@@ -276,0 +277,12 @@`).
+  그 파일을 줄 번호로 가리키는 역참조가 evidence 에 38 건 있고 그중 277 줄 아래를 가리키는 **34 건(서로 다른 줄 22)**이 12 줄
+  밀린다(M0 `0a`·`0a2`·`0a3`·`0c` 28 · M1 1 · M4 4 · harness 1). 닫힌 이력이라 고치지 않고 사실만 적는다(전례
+  `reports/evidence/harness/test-discovery-guard` 의 줄 수 불변 확인). CR r2 의 「약 19」와 다른 것은 세는 단위 차이다.
 - 수집 use case 파일이 크기 한도에 가깝다 — 끊긴 라운드를 닫는 자리를 형제 파일로 옮겨 여유를 냈다
   (관심사가 새로 생긴 것이 아니라 이미 한 축을 이루던 것을 옮겼다, 형제 파일들과 같은 전례).
 
@@ -256,6 +281,7 @@ age 24h 와 축 재호출 상한 3 은 그대로다.
 | `CollectionAttemptLedger.kt` — 「술어 주변」이 아닌 원장 도메인 | 관측 시각 질의 `axisLastObservedAt` · 닫는 줄 값 `INTERRUPTED_ROUND` | 약속대로(D-G1C03-1 「원장 판독에 질의 하나」 · D-G1C03-3 F-2) |
 | 새 test 클래스 `AxisLastObservedAtTest` · `gate-tests.properties` 한 줄 | 관측 시각 test 넷(원장 test 파일 500 줄 한도) | 약속대로(in_scope 「해당 test」 · 「`config/quality` 새 test 등재」) |
 | in_scope 목록 밖 `CanonicalizeTest.kt` | 합성값 주석 한 줄 | 선언한 이탈(D-G1C03-3 L-6) |
+| 아키텍처 게이트 — `architecture-policy.properties` 두 키 · app 아키텍처 test 넷 · 위반 표본 파일 둘 | 술어 참조자 · 후보 생성자 집합 | 선언한 이탈(D-G1C03-5 — 레인이 수단을 고른다) |
 | base `bee7c36f` | 2026-10-23 main `a61ddff1` 위로 rebase(차이는 이 slice 밖 한 파일) — rollback.md 머리 | 선언한 이탈(rollback.md) |
 
 선언 안 한 이탈: **없음**(위 대조 기준).
@@ -285,4 +311,19 @@ verifier v-c03 ready-for-review · code-reviewer cr-c03 APPROVE. 처분: **수�
 | L-6 test 의 `48` | 수정 | `CanonicalizeTest` 합성값 주석. 술어·어댑터 test 넷은 값이 의미 없거나 비-0 이 필요해 그대로 |
 | L-7 「두 번 읽지 않는다」 | 수정 · 등재 | 괄호 삭제, 전수 패스 증가는 §5 |
 | L-8 §7 에 빠진 경로 둘 | 수정 | §7 행 추가 |
-| 참고 — M0 evidence 의 capability-map 좌표 | 거부 | 범위 밖 기존 부채(이 slice 가 만든 좌표가 아니다) |
+| 참고 — M0 evidence 의 capability-map 좌표 | 등재(r2 M5 로 거부에서 바꿈) | §5 기존 부채 |
+
+## 9. 검토 r2 처분 (D-G1C03-5)
+
+verifier v-c03 ready(F-2·F-3 닫힘, F-1 부분) · code-reviewer cr-c03 APPROVE.
+
+| 지적 | 처분 | 근거 |
+|---|---|---|
+| verifier R-1 · CR M4 — F-1 잔여 V1·V2 | 수정(구조) | 아키텍처 게이트 두 규칙: 술어 파일 클래스(`DetailFetchKt`) 참조자 = `OpeningAnchorKt` · `Candidate` 생성자(호출·참조) = `OpeningSampleFramer`, 관측과 양방향 등식. 위반 표본으로 음성 대조. V1·V2 exit 1(§4-1) |
+| — 고르지 않은 수단 | 기각 | **서명 타입화**: 기준 시각을 도메인 sealed 타입으로 바꿔도 V1 이 「싣지 않음」을 이름으로 넘기면 컴파일된다 — 상수가 `null` 에서 이름으로 바뀔 뿐이다. **생성자 가시성**: Kotlin 에 파일 단위 friend 가 없어 표본틀만 짓게 할 수 없고, F-1 test 가 관측값 후보를 지을 길도 함께 막힌다. 게이트는 「누가 부르나·누가 짓나」를 직접 잰다 |
+| CR M5 | 수정(등재) | §5 기존 부채 한 줄(직접 센 수) |
+| CR L9 | 수정(측정) | 구판 RED — §4-1 |
+| verifier low · TruncationCause 비충돌 | 수정 | `AxisLastObservedAtTest` 한 건 + 소진 `when`, MT RED |
+| CR L10 — F-4 test 가 E2E 클래스에 산다 | 등재 | 다음 slice 에 묶어도 무해(CR 권고). 옮기면 등재 장부 한 줄이 늘 뿐 판정은 같다 |
+| CR L11 — 계수 스크립트의 같은 초 섞임 | 등재 | 이 라운드는 변이마다 Gradle 로그로 실제 돈 task 를 대조했다(§4-1 MF) |
+| `commands.md` 「run 24」 | 수정 | run 23 + uses 4 |
