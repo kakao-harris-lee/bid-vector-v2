@@ -66,7 +66,8 @@ class OpeningPromotionWiringTest {
 
         context.use {
             it.getBeansOfType(ApplicationRunner::class.java).keys.shouldBeEmpty()
-            it.getBeanNamesForType(Any::class.java)
+            it
+                .getBeanNamesForType(Any::class.java)
                 .filter { name -> name.startsWith("openingPromotion") || name.startsWith("promoteOpening") }
                 .shouldBeEmpty()
         }

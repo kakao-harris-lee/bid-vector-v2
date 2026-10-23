@@ -97,6 +97,8 @@ internal fun axisWalkOf(
 sealed interface OpeningPromotionOutcome {
     /** canonical 로 쓸 수 있다 — 저장 키는 기여한 걷기들의 관측 키에서 결정적으로 고른다. */
     data class Promotable(
+        /** 저장 왕복 전에 저장소를 물을 때 쓴다 — use case 가 canonical fact 를 열지 않아도 된다. */
+        val noticeId: NoticeId,
         val result: OpeningResult,
         val observationKey: ObservationKey,
     ) : OpeningPromotionOutcome
@@ -125,6 +127,7 @@ fun promoteOpeningResult(
     val reader = FieldReader(selected, policy, group.noticeId.round)
     val contributing = selected.values.flatten()
     return OpeningPromotionOutcome.Promotable(
+        noticeId = group.noticeId,
         result =
             OpeningResult(
                 noticeId = group.noticeId,
@@ -383,11 +386,16 @@ private class FieldReader(
         return null
     }
 
-    /** `Y`/`N` 만 참·거짓이다 — 그 밖의 값과 부재는 판정 불가(`null`)다. 지어내지 않는다. */
+    /**
+     * `Y`/`N` 만 참·거짓이다 — 그 밖의 값과 부재는 판정 불가(`null`)다. 지어내지 않는다.
+     *
+     * 대소문자를 **열거로** 받는다 — `uppercase()` 는 로케일을 끌어오고(domain 허용 목록 밖),
+     * 프로토콜 플래그 두 글자에 로케일 의존 대소문자 접기를 쓸 이유도 없다.
+     */
     fun predicateOf(concept: FieldConcept): Boolean? =
-        when (textOf(concept)?.trim()?.uppercase()) {
-            "Y" -> true
-            "N" -> false
+        when (textOf(concept)?.trim()) {
+            "Y", "y" -> true
+            "N", "n" -> false
             else -> null
         }
 

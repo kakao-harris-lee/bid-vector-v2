@@ -100,7 +100,7 @@ class PromoteOpeningResultsUseCase(
         outcome: OpeningPromotionOutcome.Promotable,
         tally: PromotionTally,
     ) {
-        if (!promotionIsNew(results.find(outcome.result.noticeId), outcome.result)) {
+        if (!promotionIsNew(results.find(outcome.noticeId), outcome.result)) {
             tally.skippedUnchanged++
             return
         }
