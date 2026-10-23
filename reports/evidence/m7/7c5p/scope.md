@@ -1,0 +1,75 @@
+# M7/7C⑤-0 — 개찰 결과 canonical 승격: 수집된 원문 → `opening_result` (착수 계약, 2026-10-23, 팀장)
+
+- **근거**: 7C⑤ Phase 1 실측(`bid-vector-v2-m7-7c5` 설계 커밋 `31b60c8e`, checklist §0.1) — V4·V5 의 canonical 개찰 슬롯은 있으나
+  **production 쓰기 경로가 없다**(`JdbcOpeningResultRepository` 를 생성하는 자리가 `app/src/main` 에 0). 6G 개찰 수집은 원문만 적재하고
+  (`reports/evidence/m6/6g/scope.md` D-6G-1 · `JdbcSnapshotSource` KDoc 「이 갈래는 canonical 승격을 하지 않는다」), 원문 → 도메인 사상
+  함수는 어디에도 없다. 화면 E · 7C⑤-a 의 데이터 · 7C③ 개찰 트리거 · 7C⑤-b 대사가 모두 이 승격을 선행으로 공유한다. 팀장 결정 D-7C5-2
+  (2026-10-23)로 별 slice 로 연다 — 운영자 지시 2026-10-23 R-8(7C 병렬 착수)의 범위 안이다.
+- **base**: main `a61ddff1` · worktree `bid-vector-v2-m7-7c5p` · 브랜치 `m7-7c5p/2026-10-23`.
+- **`OPEN-SET01-AWARD-NAME-INGEST` 와 다른 일이다**: 그것은 낙찰 목록 끝점을 새로 걷는 **외부 호출**이고(운영자 결정 2026-10-22: 6G 종료 뒤
+  착수) 이 slice 는 **이미 적재된 원문**을 옮기는 내부 변환이다. 새 외부 호출 · 새 끝점 · 쿼터 소비 0. 6G 가 걷지 않는 키(`bidwinnrNm` 등)는
+  이 slice 가 만들어 내지 않는다.
+- **6G 실수집과의 경계**: 6G cron 은 옛 jar 로 돈다(~2026-10-29 종료 예정). 이 slice 는 그 jar 를 다시 빌드·배포하지 않고, 실 DB 에 쓰지
+  않는다(실 DB 승격 실행은 별도 승인). 수집 경로의 거동(원문 적재 · 원장 · 회계)을 바꾸지 않는다.
+
+## 산출물
+
+1. **사상(순수)**: 원문 투영(`raw_observation.payload_fields`, 계약 등재 키) → `OpeningResult` canonical. 필드 계약(키·크기)과 provenance
+   짝을 따른다. 값이 없거나 해석할 수 없는 칸은 **부재**로 두고 0·빈 문자열로 적재하지 않는다(`OPEN-ML-04` 의 「미정산을 0 으로 적재하지
+   않는다」와 같은 원칙). 개찰 1위(잠정)는 확정 칸을 바꾸지 않는다(기존 측정 유지).
+2. **걷기 선택**: 같은 공고에 원문 관측이 여럿일 때 어느 관측을 canonical 로 삼는지 **규칙을 선언**하고 test 로 잠근다. 행 존재·행 시각으로
+   걷기를 짐작하지 않는다(6G 에서 다섯 라운드를 쓴 결함류 — 레인은 6G evidence 의 해당 결정을 Phase 1 에서 인용한다).
+3. **승격 실행 자리**: 수집 run 끝의 후처리인지 별 job 인지 Phase 1 에서 판정(기본 입장: 수집 경로를 건드리지 않는 별 use case + 출하 조립
+   배선, 멱등 — 같은 입력 두 번 → 행 불변). 출하 조립에 `JdbcOpeningResultRepository` 를 처음으로 꽂는다.
+4. **보존·개인정보**: `opening_result` 는 시각 축 파기 대상, `raw_observation` 은 업체 식별 개념 마스킹(운영자 결정 2026-10-14). canonical 에
+   옮기는 업체 식별 칸(낙찰업체명·1위 투찰업체명 등)이 그 결정과 **같은 보존 축**을 갖는지 판정하고, 마스킹된 원문을 승격하면 무엇이 되는지
+   test 로. 사업자번호·대표자명은 계약 미등재라 원문에도 없다 — 그 부재를 단언한다.
+5. **test**: 사상 property/표 test(키별 · 부재 · 해석 불가) · 걷기 선택 · 멱등 · 잠정/확정 분리 · 마스킹된 원문 · 출하 조립 + 실 DB E2E
+   (Testcontainers, 원문 심기 → 승격 → canonical 읽기) · 수집 경로 거동 불변(기존 수집 test 무편집 초록).
+6. **추적표·capability map**: COL-02 · SET-02 행에 근거, 승격 부재를 적은 자리(6G scope D-6G-1 인용처)에 「M7/7C⑤-0 이 닫음」.
+
+## 설계 검토 (Phase 2.5 — 레인이 Phase 1 설계 문서 §0 에서 채우고 팀장이 수령)
+
+- **(0) 위협 모델**: 방어 — 잘못된 관측 선택으로 틀린 낙찰가 확정 · 잠정 값이 확정 칸 오염 · 재실행으로 행 중복·흔들림 · 마스킹 우회(마스킹 전
+  사본이 canonical 에 90일 넘어 남음) · 부재를 0 으로 적재. 방어하지 않음 — 상류 원문 자체의 오류(관측 그대로 옮긴다, provenance 로 표시).
+- **(1)·(2) 우회 ≥5 · (2b) 값 획득 축 · (3) 과잉·미달** — 레인이 채운다. 과잉 금지: 새 끝점 · 새 표/마이그레이션 · 조회 API(7C⑤-a 몫) ·
+  수집 경로 변경. 마이그레이션이 필요해지면 **멈추고 보고**(계약 갱신 + 되돌리기 어려운 경로 검토로 등급이 바뀐다).
+
+## in_scope / out_scope
+
+- in: 사상·승격 use case·출하 조립 배선과 그 test · 게이트 설정(`config/quality/**`)의 필요한 줄 · 추적표·capability map 의 위 행 ·
+  `reports/evidence/m7/7c5p/**`.
+- out: 수집 use case·원장·클라이언트 · 마이그레이션 · OpenAPI · 실 DB 실행 · 6G jar 재배포 · 낙찰 목록 끝점.
+
+## acceptance
+
+`ci.yml` 의 `check` job 명령 그대로. `web` 은 입력 변경 0 이면 생략, `container` 는 app 배포물이 바뀌므로 path-limited diff 로 판정해
+바뀌면 잰다.
+
+## rollback
+
+`git restore --source=a61ddff1 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 배포 뒤라면 승격 배선 끄기(조립
+한 줄)로 비활성화 가능해야 한다 — 그 경로를 rollback.md 에 적는다. 이미 쓴 canonical 행은 원문에서 다시 만들 수 있는 파생 데이터임을 근거와
+함께 적는다. 목록 기계 산출, 마지막 산출물 커밋에서 ①~⑥ 실측.
+
+## 검토 레인
+
+verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gate 관점**(업체 식별 칸의 보존 축). Codex 없음(마이그레이션·인증·
+파기 경로 아님 — 그렇게 되면 멈추고 보고).
+
+## 레인 사이
+
+7C⑤(-a 는 canonical 읽기로 이 slice 와 독립 진행) · 7C③(개찰 완료 트리거는 이 승격이 원천) · g1c03(수집 age 게이트 — 수집 경로를 만지는
+레인, 겹치는 파일은 Phase 1 에서 목록으로).
+
+## 호스트 빌드
+
+모든 Gradle·Testcontainers 명령은 `flock ~/.local/bid-vector-build.lock <명령>`. 점검 셋은 별도 호출로 먼저. 00:30~03:00 KST 무거운 빌드 금지.
+
+## 계약 갱신 이력
+
+(없음)
+
+## 하네스 레인 변경 (상시)
+
+- 없음.
