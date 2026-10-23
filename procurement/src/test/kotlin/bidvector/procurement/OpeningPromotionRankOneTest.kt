@@ -266,6 +266,52 @@ class OpeningPromotionRankOneTest {
     }
 
     @Test
+    fun `일시 축의 DATETIME 계약은 하나다`() {
+        // code-review r1 low 2 — 일시 해석만 `presentIn` 으로 거르지 않고 첫 계약을 집는다(기존
+        // 진입점의 규칙). 그 개념의 DATETIME 계약이 둘이 되는 날 이 단언이 먼저 붉어진다.
+        val dateTimeContracts =
+            PROMOTION_POLICY.fieldContracts
+                .contractsFor(FieldConcept.ACTUAL_OPENING_AT)
+                .filter { it.scale == FieldScale.DATETIME_NO_ZONE }
+
+        dateTimeContracts.size shouldBe 1
+    }
+
+    @Test
+    fun `과세를 버리는 두 금액 축의 계약은 UNKNOWN 이다`() {
+        // code-review r1 low 3 — 낙찰금액·예정가격 값 객체는 과세를 UNKNOWN 으로 고정하므로
+        // 사상이 읽은 계약 값이 버려진다. 오늘은 둘 다 UNKNOWN 이라 무손실이고, 그 등식을 잰다.
+        fun vatOf(concept: FieldConcept) =
+            PROMOTION_POLICY.fieldContracts
+                .contractsFor(concept)
+                .single { it.scale == FieldScale.WON_INTEGER }
+                .vatTreatment
+
+        vatOf(FieldConcept.AWARD_AMOUNT) shouldBe VatTreatment.UNKNOWN
+        vatOf(FieldConcept.RESERVE_PRICE) shouldBe VatTreatment.UNKNOWN
+    }
+
+    @Test
+    fun `같은 시각이면 축 열거 순서가 앞선 축이 이긴다`() {
+        // code-review r1 low 4 — 비교자의 2차 키. 참가업체수는 목록 축 **둘**에서 오므로 실제로
+        // 갈리는 조합이다. 앞선 축은 **낙찰 목록**이다(`SourceEndpoint` 열거가 그 순서다) — 이 test 를
+        // 쓸 때 반대로 적었고 실측이 바로잡았다. 그래서 기대값을 열거에서 **읽어** 둔다: 순서가
+        // 바뀌는 날 이 단언이 코드와 함께 움직이지 않고 먼저 붉어진다.
+        val earlier =
+            listOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.OPENING_RESULT_LIST).minBy { it.ordinal }
+        val counts = mapOf(SourceEndpoint.OPENING_AWARD_LIST to "9", SourceEndpoint.OPENING_RESULT_LIST to "3")
+        val result =
+            promotedResult(
+                groupOf(
+                    axisRow(SourceEndpoint.OPENING_AWARD_LIST, WALK_A, mapOf("prtcptCnum" to "9")),
+                    axisRow(SourceEndpoint.OPENING_RESULT_LIST, WALK_A, mapOf("prtcptCnum" to "3")),
+                ),
+            )
+
+        result.participantCount shouldBe counts.getValue(earlier).toInt()
+    }
+
+    @Test
     fun `원문 값이 무엇이든 던지지 않는다`() {
         val garbage =
             listOf("", " ", "-", "+", "NaN", "1e999999", "99999999999999999999999999", "0x10", "1,,2", "\u0000")
