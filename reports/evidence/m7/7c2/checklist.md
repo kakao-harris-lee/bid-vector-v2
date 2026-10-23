@@ -350,6 +350,32 @@ conformance 실행기와 kernel test 뿐) 표본 공급 port 도 평가 경로�
 의 해소 경로로 권고해 둔 방식, 게이트 술어 변경 → 표적 재검증)과 operation 둘로 쪼개는 것(권하지 않는다 —
 한 동작이 두 왕복이 되고 자격을 따로 읽으면 판정이 두 번 일어나 pin 이 닫은 성질이 다시 열린다).
 
+### 0.9c in_scope ↔ 실제 변경 경로 대조 (기계 산출, 보고 항목)
+
+목록은 `git diff --name-status <base> -- .` + `git ls-files --others --exclude-standard` 로 산출했다
+(라운드마다 재산출한다 — 수정 라운드가 만드는 새 파일이 계약 밖에 서는 것이 반복 사각이다).
+
+**계약·`D-7C2-1` Q4 안에 있는 것**: `openapi/**` · `reports/evidence/m7/7c2/**` ·
+`config/quality/architecture-policy.properties` · `config/quality/gate-tests.properties` ·
+기존 자격 어댑터의 위임 한 줄과 그 거동 불변 test · 단건 평가의 새 workflow 포트·어댑터·요청 스코프
+팩토리·controller·응답 타입과 그 test 일곱.
+
+**계약 문면에 축어로 없는 것 셋(보고 — 팀장 수용 요청)**:
+
+| 경로 | 왜 필요했나 | 성격 |
+|---|---|---|
+| `app/.../http/ErrorBody.kt` | 「없는 공고 404」가 계약 산출물이고, **오류 형태를 만드는 자리는 이 파일 하나**라는 규율 때문에 새 code 와 404 핸들러를 여기 더해야 했다. 다른 자리에서 `ErrorBody` 를 지으면 그 규율이 깨진다 | 공유 파일, **추가만**(기존 갈래 무편집) |
+| `app/.../wiring/EvaluationWiring.kt` | 새 읽기 포트 둘과 요청 스코프 팩토리의 출하 배선 자리. 「단건 평가 controller」가 서려면 조립이 있어야 한다 | 공유 파일, 추가 + 자격 정책 해소를 두 빈이 공유하도록 private 함수로 **중복 제거** |
+| `app/src/test/.../HttpTestSupport.kt` | 새 controller 가 요구하는 빈을 `HttpTestApplication` 이 내야 Spring 기반 test 전체가 뜬다(이중체 둘 + 팩토리 빈) | 공유 test 하네스, 추가만 |
+
+셋 다 7C① 이 같은 자리에서 받은 확장과 같은 종류다(그 slice 의 계약 갱신 이력이 `architecture-policy`·
+`gate-tests` 확장을 수용한 선례). **기존 operation·기존 갈래의 문면은 바꾸지 않았다.**
+
+**아직 하지 않은 계약 산출물 둘**(종결 전 반드시 선다):
+1. `web/src/api/generated/operator-api.ts` 재생성(W-5 바이트 등식) — `npm ci` 가 필요하고 같은 빌드 락을 쓴다.
+2. 추적표·capability map 의 QUAL-02 · DEC-03 · DEC-04 · STR-16 행 근거(산출물 4). 판정 문자는 측정이 서는
+   만큼만 — 가격 세 축이 상태·사유로만 서므로 DEC-04 는 ⓒ 를 유지하고 「표면은 섰다, 값 없음」만 적는다.
+
 ### 0.10 모듈 배치 (Phase 2 예고)
 
 - `workflow/.../evaluation/`: `NoticeByIdPort` · `LicenseJudgementPort`(읽기 하나씩). 기존 use case·커널 무편집.
