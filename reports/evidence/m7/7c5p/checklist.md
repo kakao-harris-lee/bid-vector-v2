@@ -1,0 +1,273 @@
+# M7/7C⑤-0 — 점검표
+
+## 0. Phase 1 설계 (code 0 — 팀장 수령 · 결정 ID `D-7C5P-n` 대기)
+
+### 0.1 승격 가능 범위의 코드 실측 — 슬롯은 다 있고 **원천이 반쪽**이다
+
+| 사실 | 근거(코드·승인 문서) |
+|---|---|
+| canonical 쓰기 경로가 없다는 7C⑤ 실측이 이 base 에서도 참이다 — `JdbcOpeningResultRepository` 를 생성하는 자리가 `app/src/main` 에 0 | 7C⑤ checklist §0.1 · `app/src/main` 전수 grep |
+| 6G 가 **거는** 축은 다섯이다 — 개찰결과 목록(표본틀) · 예비가격 상세 · 개찰완료 · 기초금액 조회 · 입찰가격산식 A | `CollectOpeningResultsUseCase` 의 `detailAxesFor` · `OpeningSampleFramer` |
+| 6G 가 **걷지 않는** 축이 하나 있다 — **낙찰 목록**(`OPENING_AWARD_LIST`). 그래서 최종낙찰금액·최종낙찰업체명·최종낙찰률·최종낙찰일자는 `raw_observation` 에 **행 자체가 없다** | 어댑터 클래스는 낙찰 목록 인스턴스로 **세울 수 있으나**(KDoc 「둘은 대안이 아니라 다른 fact 다」) 출하 배선이 부르는 생성 함수는 **개찰결과 목록 인스턴스 하나**다(`konepsOpeningResultSourceByNoticeDate` → `listSourceEndpoint = OPENING_RESULT_LIST`) · `detailAxesFor` 의 네 축에도 없다 |
+| 총예가건수(`totRsrvtnPrceNum`)와 추첨횟수(`drwtNum`)는 **계약에 등재되지 않았다** — `FieldConcept` 65 값에 그 개념이 없다. 등재 없는 키는 allow-list 반전이 적재 단계에서 떨어뜨리므로 `payload_fields` 에도 없다 | `FieldConcept.kt` 전수 · `KonepsOpeningAxisFieldContracts` · `NoticeFacts` 의 두 슬롯 KDoc |
+| 걷기 권위는 **시도 원장**이다 — 행 존재도, 행 시각도 아니다 | D-6G-58 · D-6G-68 · D-6G-80 · `JdbcSnapshotSource.collectWalkRow` KDoc |
+| 그 원장은 **DB 가 아니라 실행 상태 디렉터리의 파일**이고 잠금 아래 있다 | `RunStateDirectory`(`attempts.jsonl` · 「여는 자리가 곧 잠금 자리」) |
+| 목록 축 둘에는 AXIS 결말 줄이 없다 — 걷기 선택이 「가장 늦은 `observed_at`」 로 물러선다(미해소 OPEN) | D-6G-78 의 `OPEN-6G-LIST-AXIS-WALK-SELECTION` · `fromLedgeredWalk` |
+| 표 권한은 이미 있다 — `opening_result`·`opening_reserve_price` 에 SELECT·INSERT·UPDATE 가 앱 역할에 부여돼 있다(DELETE 없음, 파기는 다른 역할) | `V2__provenance_guard.sql` · `V4__opening_result_rows.sql` 의 GRANT 문 |
+| canonical 행은 raw 를 **참조**한다 — `observation_key` 가 `raw_observation` 으로 가는 NOT NULL 외래키다 | `V1__schema.sql` 의 `opening_result` 정의 |
+| 보존 축이 **다르다** — `opening_result` 는 시각 파기(`created_at` 기준), `raw_observation` 은 파기하지 않고 업체 식별 개념만 마스킹(`inserted_at` 기준) | `RETENTION_TABLE_RULES` · `COMPANY_IDENTITY_CONCEPTS` · 운영자 결정 2026-10-14 |
+
+**귀결 하나**: 이 slice 가 세우는 것은 「개찰 관측의 canonical 화」이고 **「낙찰 확정의 canonical 화」가 아니다.**
+확정 축 네 칸은 코드가 아니라 **원천 부재** 때문에 비어 있고, 이 slice 는 그 부재를 메우지 않는다(새 외부 호출 0).
+화면 E·7C⑤-a 의 `confirmedAward…` 칸과 7C⑤-b 의 낙찰/패찰 확정 판정은 **이 slice 뒤에도 데이터가 0** 이다 —
+그것을 닫는 것은 `OPEN-SET01-AWARD-NAME-INGEST`(낙찰 목록 걷기)다. §0.15 `D-7C5P-1`.
+
+### 0.2 원문 → canonical 사상표 — 키별 · 부재 · 해석 불가 · provenance
+
+값 취득은 **개념 경유**다(raw 키 리터럴을 이 slice 의 코드에 쓰지 않는다 — 키를 아는 것은 계약이다).
+`presentIn` 이 아니라 **그 관측이 실제로 온 엔드포인트**로 축을 고른다.
+
+| canonical 슬롯 | 개념 | 읽는 축 | 사상 | 부재·해석 불가 |
+|---|---|---|---|---|
+| `noticeId` | NOTICE_NUMBER · NOTICE_ROUND | 모든 축 | 기존 `resolvedNoticeId` 재사용 | 어느 쪽이든 부재·형식 위반이면 **그 행은 키를 갖지 못한다**(승격 대상 밖, 계수) |
+| `observedAt`(부모) | — | — | 기여한 축들의 선택된 걷기 중 **가장 늦은 시각** | 기여 축이 0 이면 행을 만들지 않는다 |
+| `participantCount` | PARTICIPANT_COUNT | 개찰결과 목록 → 없으면 예비가격 상세 | 정수 파싱 | 음수·비수치·공백 → **부재**(0 으로 적재하지 않는다) |
+| `progressDivision` | PROGRESS_DIVISION | 개찰결과 목록 → 없으면 개찰완료 | 원문 라벨 그대로 | 공백 → 부재. 라벨 **해석은 하지 않는다**(상태 사상은 -a 몫) |
+| `plannedPrice` | RESERVE_PRICE | 예비가격 상세 | `YegaAmount(won, KRW, provenance)` | 비수치·소수부 → 부재(계수) |
+| `baseAmount` | BASE_AMOUNT | **예비가격 상세만** | `BaseAmount(won, KRW, UNKNOWN, provenance)` | 같음. 공고 목록·기초금액 조회의 같은 개념은 **쓰지 않는다** — 이 슬롯은 「예비가격 상세 오퍼레이션 자신의 관측」이다(슬롯 KDoc) |
+| `actualOpeningAt` | ACTUAL_OPENING_AT | 예비가격 상세 | 기존 `instantFrom`(계약의 `ASSUME_KST`) | 빈 문자열 → 부재, 해석 실패 → 부재 + 계수(항목을 버리지 않는다) |
+| `reservePrices[]` | RESERVE_PRICE_SEQUENCE · RESERVE_PRICE_PRELIMINARY · DRAW_FLAG | 예비가격 상세 | 행마다 `OpeningReservePriceRow`, `observedAt` = 그 걷기 | **순번 공백 행은 승격하지 않는다**(D-3E-1b (a)) · `drawCount` 는 계약 미등재라 **항상 부재** |
+| `openingRankOne` | OPENING_RANK · BID_COMPANY_NAME · BID_AMOUNT · BID_RATE | 개찰완료 | 투찰 행들을 `(순위, OpeningRankOneBid)` 짝으로 모아 기존 순수 커널 `OpeningRankOneOutcome.resolve` 에 넘긴다 | 행 0 → `NotObserved` · 1위 없음 → `RankMissing` · 1위 둘 이상 → `RankDuplicated(n)`. **투찰금액으로 순위를 재계산하지 않는다** |
+| `drawNumbers` | DRAW_NUMBER | — | **승격하지 않는다**(`NotObserved` 유지) | §0.15 `D-7C5P-2` — 승인 결정 둘이 어긋난다 |
+| `totalReservePriceCandidateCount` | (개념 없음) | — | 승격 불가 | 계약 미등재 → 구조적 부재. 그래서 추첨번호 축의 범위 검사도 영원히 `RangeCheckUnavailable` 이다 |
+| `winningRate` · `finalAwardAmount` · `finalAwardCompanyName` | WINNING_RATE · AWARD_AMOUNT · AWARD_COMPANY_NAME | 낙찰 목록 | **승격 불가** — 그 축을 걷지 않았다(§0.1) | 원문 행 자체가 없다. 이 slice 가 만들어 내지 않는다 |
+| `derivedBaseAmount` | — | — | 승격하지 않는다 | 역산 파생은 3D 소유다(「만들지 않는 것」) |
+
+**provenance 는 필드마다 짓지 않는다** — 계약의 `provenanceTemplate` 을 소진 `when` 으로 한 번 사상한다:
+`PUBLISHED → Published(차수)` · `FILLED_FROM_BUDGET_KEY → FilledFromBudgetKey(키)` · `NOT_APPLICABLE → Undeclared`.
+그래서 예정가격은 `Undeclared`(계약이 출처를 선언하지 않은 값 — 「모름을 지어내지 않는다」 자리이고 왕복이
+`ProvenanceCodec` 에 이미 있다), 개찰 기초금액은 `Published(차수)` 다. 템플릿이 하나 늘면 컴파일이 이 자리를 가리킨다.
+
+**금액은 원 단위 정수만 받는다.** 소수부가 섞인 값은 `Long` 으로 깎지 않고 **부재 + 계수**다(6G 의
+`fractionalAmounts` 와 같은 판정축 — 깎으면 원이 조용히 사라진다).
+
+### 0.3 걷기 선택 — 규칙을 선언하고 test 로 잠근다
+
+> (공고, 축)마다 **한 걷기의 행만** 쓴다. 어느 걷기인가는 **시도 원장의 마지막 AXIS 결말 줄**이 가리킨다
+> (D-6G-68 · D-6G-80, 걷기 식별자 = 마이크로초 절삭된 관측 시각). 결말이 **빈 응답**이면 그 축은 **0 행**이고
+> (앞선 잘린 걷기의 행을 쓰지 않는다), 결말이 **실패·미완**이면 그 축을 승격하지 않는다. AXIS 줄이 **하나도
+> 없는** 축(목록 축)만 「가장 늦은 `observed_at`」 로 물러선다.
+
+- **행 존재로 짐작하지 않는다**: 쪽 중간에 끊긴 걷기도 행을 남긴다 — 존재로 읽으면 반쪽 원문으로 canonical 을
+  쓰고, 그 오류는 어디서도 붉어지지 않는다(6G 가 다섯 라운드를 쓴 결함류).
+- **행 시각으로 짐작하지 않는다**: 빈 응답 재걷기 · 창 밖 재걷기 · 시계 역행 셋에서 앞의 잘린 걷기가 마지막으로
+  보인다(verifier probe W1·W2·W5).
+- **gate 단위는 축이다**(공고 전체가 아니다). 추출(`JdbcSnapshotSource`)은 「기대 축 전부 완료」가 아니면 행을
+  통째로 버리는데, canonical 슬롯은 **축별**이고 upsert 가 부분 관측을 정상으로 다룬다(V4 의 COALESCE 설계
+  문면 「부분 관측이 정상인데도」) — 그래서 여기서는 **완료된 축만 승격**하고 미완 축은 비운 채 계수한다.
+  부작용으로 업무 대분류를 몰라도 된다(개찰 축 관측은 `sourceDivision` 이 `null` 이다) — 공고 표를 읽지 않는다.
+- **범위는 확정 표본이 정한다**(D-6G-39) — `sample-list.tsv`. 「DB 의 개찰 원문 전부」를 승격하지 않는다:
+  그러면 표본 밖 공고가 canonical 에 들어오고, 그 집합은 아무 문서도 말하지 않는다.
+- 승격은 **원장을 쓰지 않는다**(AXIS 줄을 추가하지 않는다). 읽기만 한다 — 수집 거동 불변의 일부다.
+
+### 0.4 승격 실행 자리 — 별 use case + 별 러너, 수집 경로 무편집
+
+```
+procurement (domain, 순수)   OpeningPromotion.kt   : 사상 함수 + 걷기 선택 + 결과 타입
+                             OpeningRawAxisSource  : 읽기 포트(개찰 축 원문)
+workflow    (application)     PromoteOpeningResultsUseCase : 표본 순회 → 사상 → 저장, 계수 보고
+adapters                      JdbcOpeningRawAxisSource : SELECT 1 (raw_observation) + 계약 경유 판독
+app                           OpeningPromotionRunner / OpeningPromotionWiring : mode 게이트 + 잠금 + 조립
+```
+
+- **사상은 domain 에 산다.** `workflow.collection` 은 원문 타입을 **통과 전용**으로만 다룰 수 있고(이름은 붙여도
+  멤버는 못 만진다, `workflow.collection.pass-through-types`) 그 금지는 옳다 — 키를 고르는 일은 계약을 소유한
+  procurement 의 몫이다. 그래서 `valueOf`·`observedAt` 을 만지는 코드는 전부 procurement 안이다.
+- **러너는 형제 패턴 그대로다** — `bidvector.opening-promote.mode=once` 일 때만 배선 전체가 올라오고,
+  실행 상태 디렉터리 **잠금 안에서만** 돈다(`SnapshotExtractionRunner` 의 「잠그지 않으면 표본·원장이 검증되지
+  않은 채로 오고, 그 순간의 원장은 절반만 쓰인 걷기를 가리킬 수 있다」와 같은 이유). 잠금을 못 잡으면 **거부**다.
+- **수집 경로는 한 줄도 바뀌지 않는다** — `CollectOpeningResultsUseCase`·`OpeningCollectionWiring`·원장·회계 무편집.
+  기존 수집 test 가 **무편집으로 초록**인 것이 그 단언이다.
+- **끄는 법이 한 줄**이다: 설정 속성을 떼면 러너도 저장소 생성도 일어나지 않는다. rollback.md 가 그 경로를 적는다.
+
+### 0.5 멱등 — 「같은 입력 두 번 → 행 불변」을 무엇이 지는가
+
+upsert 는 `revision = revision + 1`·`observed_at = EXCLUDED.observed_at` 을 **조건 없이** 쓰고 `WHERE` 가
+`EXCLUDED.observed_at >= …` 라, 같은 관측을 다시 넣으면 **행이 바뀐다**(revision·updated_at). 그래서 멱등은
+SQL 이 아니라 **use case 가 진다**:
+
+> 승격 전에 canonical 을 읽는다(`find`). 사상 결과가 저장된 값과 **같으면 쓰지 않는다**(`Skipped`, 계수).
+
+- 이 술어가 성립하는 근거: 오늘 `opening_result` 의 **쓰기 경로가 이 승격 하나**다(§0.1) — 저장된 값은 곧 앞
+  승격이 쓴 값이다. 둘째 쓰기 경로가 생기면 그 경로가 더한 값 때문에 비교가 매 실행 어긋나 **revision 이
+  흔들린다**(데이터 손실은 없다 — COALESCE 가 남의 값을 보존한다). **알려진 제한으로 등재**하고, 그때 할 일은
+  병합 술어를 domain 에 세우고 실 DB 등식으로 재는 것이다.
+- `Sql.kt` 의 `>=` 를 `>` 로 바꾸면 공짜로 멱등이 되지만 그 문은 `qualification_text` 와 **공유 관례**이고 기존
+  3E·3F test 의 기대를 바꾼다 — 이 slice 의 범위가 아니다(건드리지 않는다).
+- `observation_key`(감사 축·신선도 표지)는 **기여한 걷기들의 관측 키 가운데 최소값**으로 정한다 — 결정적이고,
+  걷기가 바뀌면 키 전체가 새로 생기므로(키는 내용+축+시각 지문) 값과 함께 움직인다. 선택 규칙을 test 로 잠근다.
+
+### 0.6 보존·개인정보 축 — 업체 식별 칸이 canonical 로 옮겨 갈 때
+
+| 값 | raw 에서 | canonical 에서 | 판정 |
+|---|---|---|---|
+| 사업자등록번호 · 대표자명 | **없다**(계약 미등재 → allow-list 반전이 적재 전에 버린다) | 읽을 열이 없다 | 구조적 부재. **이 slice 가 그 부재를 단언한다** |
+| 개찰결과 목록의 합성 업체 문자열(OPENING_COMPANY_INFO) | 있다(마스킹 대상) | **canonical 슬롯이 없다** | 승격하지 않는다 — 응답 전문 단언이 아니라 **열이 없다**가 방어다 |
+| 투찰업체 상호(BID_COMPANY_NAME) | 있다(마스킹 대상) | 개찰 1위 축의 상호 열 | **승격한다** — 타입이 요구한다(`OpeningRankOneBid.bidderName` 은 공백 불가라, 이름 없이 `Determined` 를 표현할 수 없다) |
+| 최종낙찰업체명(AWARD_COMPANY_NAME) | **행이 없다**(낙찰 목록 미걷기) | 열은 있고 값은 없다 | 승격 불가(§0.1) |
+
+- 두 표의 처분이 **다른 방향**이다: canonical 은 90일에 **행 통째 파기**, raw 는 파기하지 않고 **그 개념만 마스킹**.
+  그래서 승격은 raw 의 지움 결정 **밖에 사본을 만들지 않는다** — canonical 사본은 더 세게 사라진다.
+- **다만 시계가 다시 시작한다.** canonical 파기 기준은 그 행의 `created_at` 이고 마스킹 기준은 raw 의
+  `inserted_at` 이다. 수집 N일 뒤에 승격하면 그 상호는 최초 수집으로부터 **90 + N일**까지 남는다. 운영자 결정
+  2026-10-14 의 지평을 **넘는다** — 코드로 메울 수 없는 자리다(기준 열을 바꾸면 마이그레이션). §0.15 `D-7C5P-3`.
+- **이미 마스킹된 원문은 승격하지 않는다** — 표지가 찍힌 행(`pii_masked_at`)은 질의가 제외하고 계수한다. 그
+  행을 승격하면 상호 칸만 빈 반쪽 canonical 이 생기고, 마스킹 전에 승격된 행과 구별되지 않는다.
+- **마스킹은 canonical 을 되돌리지 못한다**(측정할 사실): 마스킹 뒤 재승격은 그 칸을 부재로 내고, upsert 의
+  COALESCE 와 존재 가드가 **기존 값을 지우지 않는다**. 「마스킹하면 canonical 에서도 사라진다」는 거짓이다 —
+  test 로 고정하고 제한으로 등재한다.
+
+### 0.7 마이그레이션 판정 — **필요 없다**(멈추지 않는다)
+
+| 필요할 수 있던 것 | 왜 필요 없는가 |
+|---|---|
+| 새 열·새 표 | 승격하는 슬롯 전부가 V4·V5 에 이미 있다 |
+| 권한 | `opening_result`·`opening_reserve_price` 에 SELECT·INSERT·UPDATE 가 이미 있다 |
+| 외래키 전제 | `observation_key` 는 승격의 **원천 행**의 키라 참조가 언제나 성립한다 |
+| 공고 표 선행 | `opening_result` 에 `notice` 로 가는 외래키가 없다 — 공고 목록 갈래를 기다리지 않는다 |
+| 원문 읽기 인덱스 | 추출이 이미 같은 전수 질의를 돈다(배치 1회) — **미달로 선언**하고 인덱스를 만들지 않는다 |
+| 승격 이력 표 | 멱등을 읽기-대조로 이룬다(§0.5) — 표를 만들지 않는다 |
+
+### 0.8 (0) 위협 모델 경계
+
+**방어한다**: 잘못된 걷기 선택으로 틀린 값을 확정 · 잠정(개찰 1위) 값이 확정(최종낙찰) 칸을 오염 · 재실행으로
+행 중복·흔들림 · 부재를 0·빈 문자열로 적재 · 소수부 금액을 깎아 적재 · 마스킹된 원문의 승격 · 계약 없는 raw 키의
+도메인 유입 · 승격이 수집 경로의 거동(원문 적재·원장·회계)을 바꾸는 것 · 승격 경로가 DB 쓰기를 넓히는 것.
+
+**방어하지 않는다**: 상류 원문 자체의 오류(관측 그대로 옮기고 provenance 로 표시한다) · 낙찰 확정 축의 부재
+(원천이 없다 — 새 호출은 범위 밖) · 추첨번호 축의 의미(§0.15 `D-7C5P-2`) · canonical 파기 시계의 재시작
+(§0.6, 운영자 결정 대상) · 동시에 도는 둘째 승격 프로세스(실행 상태 잠금이 막되, 그 잠금은 수집·추출과 **공유**라
+승격 중에는 수집이 못 돈다 — 의도된 직렬화).
+
+### 0.9 (1) 열거인가 구성인가
+
+- **무엇을 승격하는가는 구성**이다 — 사상은 `FieldConcept` 경유이고, 개념이 나르는 raw 키가 늘면 계약만 바뀐다.
+  「승격할 키 목록」을 코드에 두지 않는다(열거는 새 운반자를 조용히 놓친다 — `FieldConceptPiiAxis` 가 그 대가를
+  이미 치렀다).
+- **어느 축에서 읽는가는 열거**다 — `SourceEndpoint` 소진 `when`. 축이 하나 늘면 컴파일이 사상 자리를 가리킨다.
+- **걷기 선택 결과는 열거**다 — sealed(원장이 가리킨 걷기 / 빈 응답 0행 / 미완 / 원장 이전). 「선택 못 했다」가
+  조용한 통과가 아니라 값이다.
+- **승격 결과는 열거**다 — sealed(승격됨 / 변화 없음 / 축 미완 / 키 없음 / 마스킹됨). 계수가 사유별로 선다.
+- **금지 목록을 쓰지 않는다** — 업체 식별 칸의 방어는 「그 열이 없다」(합성 문자열)와 「타입이 요구한다」(1위 상호)
+  이고, 지울 필드 목록을 두는 쪽이 아니다.
+
+### 0.10 (2) 우회 ↔ 막는 것 ↔ test ↔ 변이
+
+| 우회 | 막는 것 | RED 로 잴 test | 변이(무엇을 무엇으로) |
+|---|---|---|---|
+| ① 걷기를 행 시각으로 고른다 | 원장의 AXIS 결말 줄이 걷기를 가리킨다 | 빈 응답 재걷기 · 창 밖 재걷기 · 시계 역행 셋에서 **승격된 투찰 행 수 == 그 걷기의 전 참가자 또는 0** | 선택을 「가장 늦은 `observed_at`」 으로 되돌린다 |
+| ② 잘린 걷기의 반쪽 원문을 승격 | 축 결말이 성공·빈 응답일 때만 승격 | 미완 축(실패·절단) → 그 축 슬롯 전부 부재 + `incompleteAxis` 계수 | 완료 판정을 「행이 있다」로 |
+| ③ 두 걷기의 행이 합쳐진다 | (공고, 축)마다 **한 걷기**, 더 늦은 걷기가 오면 앞 걷기 행을 **버린다** | 두 걷기(3행 + 5행)를 심고 승격 → 1위 결정이 늦은 걷기의 것, 참가자 수가 합이 아니다 | 걷기 교체를 누적으로(`clear()` 제거) |
+| ④ 잠정 1위가 확정 칸으로 | 두 축이 **다른 열**이고 사상이 **다른 개념**에서 온다 | 1위만 있는 원문 → 확정 네 칸 전부 부재 · 1위를 더해도 확정 칸 불변(저장소 왕복 뒤 두 번 읽기) | 확정 금액을 1위 투찰금액에서 읽는다 |
+| ⑤ 부재를 0·빈 문자열로 | 슬롯이 nullable 이고 사상이 부재를 그대로 나른다 | 키 전수 표 test — 키마다 「없음」·「공백」·「해석 불가」 세 사례에서 **슬롯 부재** | 참가업체수 부재를 `0`, 라벨 부재를 `""` 로 |
+| ⑥ 소수부 금액을 깎아 적재 | 원 단위 정수만 받는다 | `1234.5` → 슬롯 부재 + 계수 | `toLong()` 로 절삭 |
+| ⑦ 재실행이 행을 흔든다 | 승격 전 대조 후 **쓰지 않는다** | 같은 입력 두 번 → 둘째가 `Skipped`, **`revision`·`updated_at` 불변**(원시 SQL 로 읽어 비교) | 대조를 제거하고 항상 persist |
+| ⑧ 계약 없는 raw 키가 들어온다 | 값 취득이 `valueOf(contract)` 하나뿐이고 원문 맵이 비공개다 | 미등재 키를 담은 원문 → 어느 슬롯에도 안 들어감 · 키 리터럴 게이트 | 사상에 raw 키 문자열을 직접 쓴다 |
+| ⑨ 마스킹된 원문을 승격 | 질의가 표지 있는 행을 제외 | 표지 찍힌 행만 있는 공고 → `MaskedSource` 계수, 쓰기 0 | 질의의 표지 조건 제거 |
+| ⑩ 마스킹이 canonical 을 지운 척 | **지우지 못한다는 사실을 test 가 고정** | 승격 → 마스킹 → 재승격 → 상호 칸 **그대로**(제한 등재) | — (음성 대조: 「마스킹이 canonical 도 지운다」를 단언하는 test 를 쓰면 RED) |
+| ⑪ 승격이 수집 거동을 바꾼다 | 수집 use case·원장·회계 무편집 | 기존 수집 test **무편집 초록** + `git diff --name-only` 에 수집 경로 0 | 수집 use case 에 승격 호출을 꽂는다 |
+| ⑫ 승격이 표본 밖 공고를 적재 | 범위는 확정 표본 파일 | 표본 밖 공고의 원문을 심어도 canonical 행 0 + `outsideSample` 계수 | 표본 필터 제거 |
+| ⑬ 잠금 없이 원장을 읽는다 | 잠금 자리가 곧 원장을 얻는 자리 | 잠금 보유 중 둘째 기동 → **거부**(쓰기 0) | 잠금 획득을 읽기 뒤로 |
+| ⑭ 승격이 쓰기 표면을 넓힌다 | 어댑터는 읽기 SELECT 1 · 쓰기는 기존 저장소 하나 | 읽은 열 집합 등식(`ResultSetMetaData`) · 승격 경로가 만지는 표 집합 == {raw(읽기), opening_result, opening_reserve_price} | 읽기 질의에 join 추가 · 어댑터에 DML 추가 |
+| ⑮ 추첨번호를 투찰자 선택으로 채운다 | 그 축을 **승격하지 않는다** | 개찰완료 원문에 선택 번호가 있어도 추첨번호 축 `NotObserved` | 그 축을 DRAW_NUMBER 개념에서 채운다 |
+| ⑯ 게이트를 피해 패키지를 옮긴다 | 사상이 procurement 안이라 피할 게이트가 없다 — 통과 전용 금지가 **원문 멤버 접근**을 막고, 사상은 애초에 그 금지의 대상 밖 패키지에 있다 | `workflow.collection` 허용 타입 집합 등식 + 통과 전용 규칙 | 사상을 workflow 로 옮긴다 → 멤버 접근 위반 RED |
+
+### 0.11 (2b) 값 획득 축 — 새 public 표면 전수
+
+| 새 표면 | 밖에 허락하는 것 | 허락하지 않는 것(구조) |
+|---|---|---|
+| 사상 함수(procurement) | 선택된 걷기의 원문 → canonical fact 또는 사유 | 계약 없는 키를 못 읽는다(인자가 계약을 요구한다) · **쓰기 없음**(순수) · 예외 없음(값 유래 실패는 결과다) |
+| 걷기 선택 함수(procurement) | 원장 결말 + 관측 목록 → 쓸 걷기 | 결말 없는 축의 물러섬이 **명시 변종**이다 — 조용한 기본값이 없다 |
+| 승격 결과 타입(sealed) | 사유별 계수 | 사유 밖 조합을 만들 수 없다 |
+| 읽기 포트(procurement) | 표본 공고들의 개찰 축 원문 읽기 | 읽기 메서드 **하나뿐** · 쓰기 통로 없음 |
+| 읽기 어댑터(adapters) | `raw_observation` SELECT 1 | DML 0 · join 0 · 표지 찍힌 행 제외 · 읽은 열 집합 등식 |
+| 승격 use case(workflow) | 표본 순회 + 저장 + 계수 보고 | 원문 타입 **멤버 접근 0**(통과 전용) · 외부 호출 0 · 원장 쓰기 0 |
+| 러너(app) | mode 속성이 있을 때만 서는 배치 1회 | HTTP 표면 0(새 endpoint 없다) · 잠금 밖 실행 0 · 로그에 공고 식별자·상호 0(계수와 경로만) |
+| 배선(app) | `JdbcOpeningResultRepository` 의 **첫** 생성 자리 | 다른 배선이 그것을 만들지 않는다(생성 자리 집합 등식) |
+| **「경계로 처리」 행도 실측한다** | — | ⓐ 최종낙찰 네 칸: 「원천이 없다」를 **계약의 `presentIn` ↔ 걷는 축 차집합 등식**으로 잰다(문장이 아니라 계수) ⓑ 사업자번호·대표자명: 어느 `rawName` 에도 없음을 단언(기존 계약 test 재사용 — 새 표면이 아니라 **참조**) ⓒ 추첨번호·총예가건수: 개념 부재를 단언 ⓓ 기존 순수 커널(`OpeningRankOneOutcome.resolve`·`instantFrom`·`resolvedNoticeId`)은 **재사용**이라 새 표면이 아니다 — 상수 풀 참조 단언으로 「두 번째 사본이 없다」를 잰다 |
+
+### 0.12 (3) 과잉·미달
+
+**과잉으로 하지 않는 것**: 새 끝점·새 외부 호출 · 새 표·마이그레이션·인덱스 · 조회 API(7C⑤-a 몫) · 수집 경로 변경
+· 투찰자별 canonical 표(`OPEN-6G-BIDDER-ROW-STORAGE`) · 진행구분 라벨의 **상태 해석**(-a 몫) · 역산 파생(3D 몫)
+· 승격 이력 표 · 실 DB 실행(승인 대상).
+
+**미달 — 선언하고 남긴다**:
+1. **낙찰 확정 축 네 칸은 여전히 0** — 원천 미걷기(§0.1). 화면 E·-b 의 확정 판정은 이 slice 로 닫히지 않는다.
+2. **canonical 파기 시계가 승격 시점에 다시 시작한다** — 업체 상호가 최초 수집 기준 90일을 넘길 수 있다(§0.6).
+3. **마스킹이 canonical 을 되돌리지 못한다** — 재승격으로도 상호가 지워지지 않는다(§0.6).
+4. **목록 축의 걷기 선택이 약하다** — AXIS 줄이 없어 「가장 늦은 `observed_at`」 로 물러선다. 참가업체수·진행구분이
+   그 축에서 온다 — `OPEN-6G-LIST-AXIS-WALK-SELECTION` 을 **상속**한다.
+5. **총예가건수·추첨횟수는 영원히 부재** — 계약 미등재. 추첨번호 범위 검사도 그래서 성립하지 않는다.
+6. **원문 읽기에 인덱스가 없다** — 배치 1회의 전수 스캔(추출과 같다).
+7. **둘째 쓰기 경로가 생기면 멱등이 약해진다** — revision 흔들림(값 손실은 없다, §0.5).
+8. **승격은 수집·추출과 잠금을 공유한다** — 승격 중 수집이 못 돈다(의도된 직렬화이되 운영 제약이다).
+
+### 0.13 게이트 계약 갱신 예상 · 레인 겹침
+
+**게이트**(in_scope 안 — `config/quality/**`): 필요 여부는 **게이트 실행으로 실측해 결정**한다(미리 열지 않는다).
+예상되는 자리: 러너 참조자 집합 · 워크플로 use case 생성 쌍 · `workflow.collection` 허용 procurement 타입 집합
+(승격 use case 를 그 패키지에 두면) · 포트 호출 쌍 · 주입 표면 · 크기 한도 · 게이트 test 등재 · 중복 정책.
+**이 셋은 집합 등식**이라 새 표면이 목록에 없으면 RED 가 먼저 뜬다 — 그 RED 가 등재를 강제하는 것이 설계다.
+
+**g1c03 와 겹치는 파일**(그 레인이 수집 경로를 만지는 중 — `a61ddff1..HEAD` 실측):
+
+| 파일 | g1c03 | 이 slice |
+|---|---|---|
+| `config/quality/architecture-policy.properties` | 수정 | 수정 예상 — **같은 파일 동시 편집** |
+| `config/quality/gate-tests.properties` | 수정 | 수정 예상 — 같음 |
+| `docs/discovery/capability-map.md` | 수정 | 수정(COL-02·SET-02 행) — 같음 |
+| `workflow/.../CollectOpeningResultsUseCase.kt` | 수정 | **무편집**(읽기만) |
+| `procurement/.../CollectionAttemptLedger.kt` | 수정 | **무편집**(원장 판독 재사용) |
+| `procurement/.../CollectionPolicy.kt` | 수정 | **무편집** |
+
+→ 셋이 겹친다. 둘 다 머지 전이므로 **머지 순서에 따라 충돌**한다. 승격 쪽은 **줄을 더하기만** 하고 기존 줄을
+고치지 않는다(충돌 해소가 기계적이게). g1c03 이 먼저 머지되면 rebase 뒤 게이트를 **다시 실측**한다.
+`CollectionAttemptLedger` 는 그 레인이 손대는 파일이라, 원장 판독 API 가 바뀌면 이 slice 의 러너가 따라간다.
+
+### 0.14 test 계획
+
+**순수(procurement, mock 없음)**
+- 사상 표 test — 키별 × {값 있음 · 키 없음 · 공백 · 명시 null · 해석 불가} 전수. `participantCount` 음수, 금액
+  소수부, 일시 해석 실패, 순번 공백 행.
+- provenance 템플릿 사상 소진 test(세 템플릿 → 세 provenance).
+- 개찰 1위 결정 — 0행 · 1위 없음 · 1위 하나 · 1위 둘(동값을 깨지 않는다).
+- 추첨번호 축 **부재 단언**(개찰완료 원문에 선택 번호가 있어도 `NotObserved`).
+- 확정 축 **부재 단언** + `presentIn` ↔ 걷는 축 **차집합 등식**(「원천이 없다」를 계수로).
+- 걷기 선택 — 원장 결말 있음/빈 응답/실패/없음 네 갈래 + 두 걷기 교체(합쳐지지 않는다).
+- 사업자번호·대표자명·총예가건수·추첨횟수의 **개념·키 부재** 단언.
+
+**use case(workflow, fake port)** — 멱등(둘째 실행 `Skipped`) · 표본 밖 제외 계수 · 축 미완 계수 · 마스킹 계수 ·
+사유별 계수 합이 표본 크기와 닫히는 항등식.
+
+**어댑터(실 DB, Testcontainers)** — 원문 심기 → 승격 → canonical 읽기 왕복 · 부분 관측 두 번(COALESCE 보존) ·
+`revision`·`updated_at` 불변(원시 SQL) · 마스킹 뒤 재승격이 상호를 지우지 않음 · 읽은 열 집합 등식 ·
+승격 경로가 만지는 표 집합 등식 · 존재 가드·짝 CHECK 위반 0.
+
+**출하 조립(app)** — mode 속성 없으면 러너·저장소 생성 0 · 있으면 `JdbcOpeningResultRepository` 가 **실제로**
+서는 것을 빈 타입으로 실측 · 잠금 못 잡으면 거부(쓰기 0) · 로그 줄에 공고 식별자·상호 0.
+
+**회귀 불변** — 기존 수집·추출 test 전부 **무편집 초월**(한 줄도 고치지 않는다). 고쳐야 한다면 그것은 수집 거동이
+바뀌었다는 뜻이고, 그때 멈추고 보고한다.
+
+### 0.15 OPEN — 팀장 결정 요청 (각 항에 레인 추천)
+
+| ID | 물음 | 레인 추천 |
+|---|---|---|
+| `D-7C5P-1` | 최종낙찰 네 칸(금액·업체명·낙찰률·낙찰일자)의 원천이 없다 — 이 slice 를 **개찰 관측 승격**으로 좁혀 닫고 확정 축은 `OPEN-SET01-AWARD-NAME-INGEST` 에 넘기는가 | **좁혀 닫는다.** 낙찰 목록 걷기는 새 외부 호출이라 이 계약의 out_scope 이고 운영자 결정(2026-10-22, 6G 종료 뒤 착수)이 따로 있다. 승격 기계는 그 축이 들어오면 **계약 행만 보고 따라온다**(개념 경유라 코드 변경 0) — 그것이 이 설계의 값이다 |
+| `D-7C5P-2` | 추첨번호 축을 승격하는가 — 승인 결정 **둘이 어긋난다**: D-3F-4 (a)는 그 슬롯을 개찰완료의 추첨번호 키로 정의했고, D-6G-38 은 그 키가 **투찰자가 고른 번호**이지 추첨된 번호가 아니며 쓰면 사정률이 통째로 틀린다고 실측했다(예비가격 상세의 추첨 표시 행 순번이 진짜 추첨번호다) | **승격하지 않는다**(`NotObserved` 유지 + 부재 test). 둘 중 하나를 코드가 고르면 승인 명세를 조용히 재정의하는 것이다. 슬롯을 D-6G-38 쪽으로 다시 가리키는 것은 **명세 변경**이라 별 OPEN 으로 올린다 — 이 slice 는 틀린 값을 적지 않는 쪽만 한다 |
+| `D-7C5P-3` | 업체 상호의 canonical 파기 시계가 **승격 시점에 다시 시작**한다(최초 수집 기준 90 + N일). 운영자 결정 2026-10-14 의 지평을 넘는다 | **제한으로 등재하고 운영자에게 올린다.** 코드로 메우려면 파기 기준 열을 raw 적재 시각으로 바꿔야 하고 그것은 마이그레이션 + 되돌리기 어려운 경로 검토다(계약상 「멈추고 보고」). 완화 둘은 이 slice 가 한다: 마스킹된 원문 **불승격** · 승격을 수집 직후에 돌리는 운영 순서를 runbook 에 적기 |
+| `D-7C5P-4` | 멱등을 **읽기-대조**로 이루는가, `Sql.kt` 의 `>=` 를 `>` 로 바꾸는가 | **읽기-대조.** `>` 는 `qualification_text` 와 공유하는 관례를 바꾸고 기존 3E·3F test 의 기대를 건드린다 — 범위 밖이다. 읽기-대조의 제한(둘째 쓰기 경로가 생기면 revision 흔들림)은 등재한다 |
+| `D-7C5P-5` | 승격이 **실행 상태 잠금**을 공유한다 — 승격 중에는 수집·추출이 못 돈다 | **공유한다.** 걷기 권위가 그 디렉터리의 원장이고, 잠금 밖에서 읽으면 「절반만 쓰인 걷기」를 가리킬 수 있다(추출이 같은 이유로 잠근다). 잠금 없는 승격을 열면 이 slice 가 막으려는 바로 그 결함류가 돌아온다 |
+| `D-7C5P-6` | 승격 범위를 **확정 표본**으로 좁히는가, DB 의 개찰 원문 전부로 하는가 | **확정 표본.** 전부로 하면 표본 밖 공고가 canonical 에 들어오고 그 집합을 말하는 문서가 없다. 전부 승격이 필요해지는 날은 표본 개념이 끝나는 날(실운영 수집)이고, 그때 이 러너의 범위 인자만 바뀐다 |
+| `D-7C5P-7` | 승격 use case 를 `workflow.collection` 에 두는가, 새 패키지에 두는가 | **`workflow.collection`.** 새 패키지는 그 패키지의 원문 접근 금지(통과 전용)를 **피해** 가는 모양이 된다 — 피할 이유가 없다(사상이 procurement 에 있어 멤버 접근이 0 이다). 허용 타입 집합 등식에 줄을 더하는 쪽이 정직하고, 그 RED 가 새 표면을 사람이 보게 만든다 |
