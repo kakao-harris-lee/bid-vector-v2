@@ -5,9 +5,11 @@ import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
+import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
+import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
@@ -29,6 +31,10 @@ import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
+import bidvector.workflow.opening.NoticeOpeningFacts
+import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
+import bidvector.workflow.opening.OpeningResultFactsPort
+import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -221,6 +227,22 @@ private class UnreachableLicenseGatePort : LicenseGatePort {
  * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
  * 여기서 재는 것은 **HTTP 층이 조건을 어떻게 만들고 결과를 어떤 응답으로 옮기는가**다.
  */
+/**
+ * 7C⑤-a — 개찰 결과 조회 포트의 이중체. HTTP 층이 **사실을 어떤 응답으로 옮기는가**만 재고,
+ * 실 질의 거동(열 집합·읽기 전용·원문 존재)은 `bidvector.adapters.opening
+ * .JdbcOpeningResultViewTest`(실 PostgreSQL)가 잰다.
+ */
+class FakeOpeningResultFactsPort : OpeningResultFactsPort {
+    @Volatile var facts: NoticeOpeningFacts = NoticeOpeningFacts.NoticeAbsent
+
+    @Volatile var lastLookup: NoticeId? = null
+
+    override fun lookup(id: NoticeId): NoticeOpeningFacts {
+        lastLookup = id
+        return facts
+    }
+}
+
 class FakeNoticeSearchPort : NoticeSearchPort {
     @Volatile var page: NoticeSearchPage = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NOTHING_COLLECTED)
 
@@ -397,6 +419,21 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /** 7C⑤-a — 개찰 결과 조회의 이중체(실 질의 거동은 `JdbcOpeningResultViewTest` 가 잰다). */
+    @Bean
+    open fun fakeOpeningResultFactsPort(): FakeOpeningResultFactsPort = FakeOpeningResultFactsPort()
+
+    /**
+     * 출하 조립과 **같은 형태**로 꽂는다 — 조회기가 포트·시계·정책을 받은 판정 하나를 위임한다.
+     * 정책은 운영 값 그대로다(test 전용 라벨 집합을 쓰면 문서 ↔ 구현 등식이 가짜가 된다).
+     */
+    @Bean
+    open fun openingResultQuery(
+        fakeOpeningResultFactsPort: FakeOpeningResultFactsPort,
+        clock: FixedClock,
+    ): OpeningResultQuery =
+        OpeningResultQuery(ReadOpeningResult(fakeOpeningResultFactsPort, clock, OPENING_PROGRESS_POLICY))
 
     /**
      * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.

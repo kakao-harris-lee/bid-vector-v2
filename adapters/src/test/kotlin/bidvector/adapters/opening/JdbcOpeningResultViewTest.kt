@@ -103,7 +103,8 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
         result: OpeningResult,
         observedAt: Instant = T1,
     ) {
-        JdbcOpeningResultRepository(dataSource()).persist(result, rawKey(SourceEndpoint.OPENING_RESULT_LIST, observedAt))
+        JdbcOpeningResultRepository(dataSource())
+            .persist(result, rawKey(SourceEndpoint.OPENING_RESULT_LIST, observedAt))
     }
 
     private fun canonicalOf(

@@ -79,9 +79,10 @@ class JdbcOpeningResultView(
     private fun Connection.openingAxisObserved(id: NoticeId): Boolean =
         prepareStatement(OpeningResultViewSql.SELECT_OPENING_AXIS_EXISTS).use { statement ->
             val endpoints = OpeningResultViewSql.OPENING_RESULT_ENDPOINTS.map { it.name }.toTypedArray()
-            statement.setArray(1, createArrayOf("text", endpoints))
-            statement.setString(2, id.number.value)
-            statement.setString(3, id.round.value)
+            var index = 1
+            statement.setArray(index++, createArrayOf("text", endpoints))
+            statement.setString(index++, id.number.value)
+            statement.setString(index, id.round.value)
             statement.executeQuery().use { rows -> rows.next() && rows.getBoolean("observed") }
         }
 }
@@ -131,22 +132,32 @@ private fun ResultSet.toConfirmedAward(): AwardAmount? {
  */
 private fun ResultSet.toProvisionalRankOne(): ProvisionalRankOne =
     when (val kind = getString("opening_rank_one_kind")) {
-        null -> ProvisionalRankOne.NotObserved
-        OpeningRankOneKind.RANK_MISSING -> ProvisionalRankOne.RankMissing(rankOneObservedAt())
-        OpeningRankOneKind.RANK_DUPLICATED ->
+        null -> {
+            ProvisionalRankOne.NotObserved
+        }
+
+        OpeningRankOneKind.RANK_MISSING -> {
+            ProvisionalRankOne.RankMissing(rankOneObservedAt())
+        }
+
+        OpeningRankOneKind.RANK_DUPLICATED -> {
             ProvisionalRankOne.RankDuplicated(
                 count = getInt("opening_rank_one_duplicate_count"),
                 observedAt = rankOneObservedAt(),
             )
+        }
 
-        OpeningRankOneKind.DETERMINED ->
+        OpeningRankOneKind.DETERMINED -> {
             ProvisionalRankOne.Determined(
                 bidAmount = toProvisionalBidAmount(),
                 bidRate = getBigDecimal("opening_rank_one_bid_rate_fraction")?.let(Rate::ofFraction),
                 observedAt = rankOneObservedAt(),
             )
+        }
 
-        else -> error("알 수 없는 opening_rank_one_kind: $kind")
+        else -> {
+            error("알 수 없는 opening_rank_one_kind: $kind")
+        }
     }
 
 private fun ResultSet.rankOneObservedAt(): Instant =
