@@ -87,6 +87,7 @@ internal fun case(
     state = state,
     caseVersion = 0,
     outcomeNoticeExpectedAt = null,
+    deadlineAt = null,
 )
 
 internal val RETAIN_UNTIL: LocalDate = LocalDate.of(2029, 10, 21)

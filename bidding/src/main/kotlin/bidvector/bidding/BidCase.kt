@@ -11,6 +11,9 @@ import java.time.Instant
  *
  * [outcomeNoticeExpectedAt] 만 건이 들고 [nextCheckpoint] 에 넘긴다 — 나머지 일정 축(리마인드 ·
  * 개찰일시 · 서류 기한)은 **그 상태가 싣는다**(그래야 「없을 수 없는 값」이 없을 수 없다).
+ *
+ * [deadlineAt] 은 건을 담을 때 적은 **공고 마감의 사본**이다(계약 D-7B-3 결정 ①) — 공고가 파기된
+ * 뒤에도 「마감이 지났는가」를 판정하는 근거다. 담을 때 공고가 없었으면 `null` 이다.
  */
 data class BidCase(
     val id: BidCaseId,
@@ -19,6 +22,7 @@ data class BidCase(
     val state: BidState,
     val caseVersion: Int,
     val outcomeNoticeExpectedAt: Instant?,
+    val deadlineAt: Instant?,
 ) {
     init {
         require(caseVersion >= 0) { "caseVersion 은 음수일 수 없다: $caseVersion" }

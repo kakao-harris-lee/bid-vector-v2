@@ -53,21 +53,36 @@ enum class ActorKind {
     SYSTEM,
 }
 
-/** 건너뜀의 사유 — 빈 값이 아니다. 상태가 값을 **싣고** 있어 「사유 없는 건너뜀」이 표현되지 않는다. */
+/**
+ * 건너뜀의 사유 — 빈 값이 아니다. 상태가 값을 **싣고** 있어 「사유 없는 건너뜀」이 표현되지 않는다.
+ *
+ * **길이 상한이 있다**(계약 D-7B-3) — 자유 텍스트이고 지울 수 없는 타임라인에 남으며 타임라인 응답에
+ * 실린다. 상한은 V21 의 `char_length` CHECK 와 같은 값이다.
+ */
 data class SkipReason(
     val value: String,
 ) {
     init {
         require(value.isNotBlank()) { "건너뜀은 사유를 가져야 한다" }
+        require(value.length <= MAX_LENGTH) { "건너뜀 사유는 $MAX_LENGTH 자를 넘을 수 없다: ${value.length}" }
+    }
+
+    companion object {
+        const val MAX_LENGTH: Int = 500
     }
 }
 
-/** 전이 사유(정정 등) — 타임라인에 남는다. 메모 본문을 싣는 자리가 아니다. */
+/** 전이 사유(정정 등) — 타임라인에 남는다. 메모 본문을 싣는 자리가 아니다. 상한은 [SkipReason] 과 같다. */
 data class TransitionReason(
     val value: String,
 ) {
     init {
         require(value.isNotBlank()) { "전이 사유는 빈 값일 수 없다" }
+        require(value.length <= MAX_LENGTH) { "전이 사유는 $MAX_LENGTH 자를 넘을 수 없다: ${value.length}" }
+    }
+
+    companion object {
+        const val MAX_LENGTH: Int = SkipReason.MAX_LENGTH
     }
 }
 

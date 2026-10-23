@@ -9,7 +9,8 @@ plugins {
 //
 // kotest-property 의 checkAll 은 suspend 함수이고 kotest-property-jvm 은 coroutines-core 를
 // runtime scope 로만 선언해 컴파일 classpath 에 전이되지 않으므로 이 모듈이 직접 건다
-// (qualification·strategy 와 같은 이유). 전이표 전수 test 가 196 쌍을 property 로 돈다.
+// (qualification·strategy 와 같은 이유). 전이표의 **모양**은 전수 열거 test 가 182 쌍(14 × 13)으로
+// 골든과 맞대고, 판정 함수의 **불변식**은 `BidTransitionPropertyTest` 가 property 로 잰다.
 dependencies {
     implementation(project(":shared-kernel"))
     testImplementation(libs.kotlinx.coroutines.core)
