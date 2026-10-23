@@ -30,7 +30,7 @@ legacy 순서를 구현하고, 그 사실을 test 사례로 고정한다(공백�
 - **`\s` 를 공백 넷 리터럴로 옮기지 않는다.** Python `str` 정규식의 `\s` 는 유니코드 공백
   전체(전각 공백·NBSP 등)를 덮는다. Kotlin `Char.isWhitespace()` 를 쓴다 — 그것은 `\s` 에서
   **U+0085 하나를 뺀 부분집합**이다(r1 실측 29 대 28, 착수 때 「정확히 그 집합」으로 적은 것은
-  틀렸다 — §6 R-9). `java.util.Locale` 은 domain 의 금지 표면
+  틀렸다 — §6 R-9; r2 에서 그 글자를 더해 legacy 와 같은 집합이 됐다 — §7 S-4). `java.util.Locale` 은 domain 의 금지 표면
   (`architecture-policy.properties` `effect.surface.classes`)이라 참조하지 않는다.
 - **`casefold()` 와 `lowercase()` 는 같지 않다**(`ß` → `ss` vs `ß`). 한글·ASCII 상호에서는
   일치하고 Kotlin 에 casefold 대응이 없다 — **알려진 제한**으로 적고 `OPEN-SET-03` 옆에 둔다.
@@ -186,9 +186,9 @@ acceptance 네 줄과 재는 자리:
 | acceptance bullet | 재는 자리 |
 |---|---|
 | 법인 표기 차이를 흡수해 같은 회사로 판정한다 | `CompanyNameNormalizationTest`(목록의 열하나 **각각** + 공백이 낀 표기 + 전각 공백·NBSP + 대소문자 + 양 끝 겹친 토큰 · **중간 토큰은 남는다**) · `AwardMatchingKernelTest`(접두·접미·부분 문자열 쌍 넷 양방향 = 패찰) |
-| 동일 금액·다른 상호는 패찰이다(금액은 판정에 쓰지 않는다) | `AwardMatchingKernelTest`(상호 불일치 = 패찰 · 판정에 닿는 입력 타입 여섯의 **필드 집합 등식**) + `CompileFailureHarnessTest` fixture 1(금액 인자) · fixture 6(모듈 밖 `Won` 생성) — 둘 다 **컴파일되지 않는다** |
+| 동일 금액·다른 상호는 패찰이다(금액은 판정에 쓰지 않는다) | `AwardMatchingKernelTest`(상호 불일치 = 패찰 · 판정에 닿는 입력 타입 여섯의 **필드 집합 등식**) + `CompileFailureHarnessTest` fixture 1(금액 인자) · fixture 6·7(모듈 밖 `Won`·`Lost` 생성) — 전부 **컴파일되지 않는다** · 낙찰/패찰 구별 test |
 | 낙찰가만 있고 낙찰자 상호가 없으면 `false` 가 아니라 미기록 | `AwardMatchingKernelTest`(`NotRecorded` 둘 — 미공개 · 정규화 결과 빈 문자열) |
-| 운영자 상호가 미설정이면 판정하지 않고 외부 조회도 하지 않는다 | `AwardMatchingKernelTest`(조회 술어 `Skip` 둘 + 판정 `NotJudged` 둘, 운영자 축이 결과 축보다 먼저 · 관문을 만든 정책 하나로 양쪽 정규화) + `CompileFailureHarnessTest` fixture 4·5(모듈 밖 `Lookup` 직접 생성·`copy` 가 **컴파일되지 않는다**) |
+| 운영자 상호가 미설정이면 판정하지 않고 외부 조회도 하지 않는다 | `AwardMatchingKernelTest`(조회 술어 `Skip` 둘 + 판정 `NotJudged` 둘, 운영자 축이 결과 축보다 먼저 · 관문을 만든 정책 하나로 양쪽 정규화 — 토큰이 운영자 쪽에만·낙찰자 쪽에만 있는 두 사례) + `CompileFailureHarnessTest` fixture 4·5(모듈 밖 `Lookup` 직접 생성·`copy` 가 **컴파일되지 않는다**) |
 | (분류 근거) 판정은 한 번만 기록되고 덮이지 않는다 | `AwardOutcomeRecordingTest`(반대 판정 · 같은 판정 · 확정 뒤 미기록 관측 셋 다 기존 값 유지) |
 | (계약) 목록은 코드 상수가 아니라 versioned 정책 데이터 | `AwardMatchingPolicyDataTest` + `CompanyNameNormalizationTest` 의 주입 정책 사례 |
 
@@ -201,7 +201,7 @@ acceptance 네 줄과 재는 자리:
 표기 제거에 닿는다). 그래서 문면이 아니라 legacy 순서를 구현하고 그 자체를 test 로 고정했다(M-1 이 그
 줄만으로 붉다).
 
-## 2. 변이 실측 — 바꿔치기 · `numstat` · 통제군 (r1, 마지막 산출물 커밋 `61c156c3`)
+## 2. 변이 실측 — 바꿔치기 · `numstat` · 통제군 (r2, 마지막 산출물 커밋 `dee96d41`)
 
 버릴 clone 에서 쟀다(공유 worktree 무접촉). 회차마다: 치환(대상 문자열이 정확히 한 번 나오는지 단언) →
 `git diff --numstat` → `:settlement:test --rerun`(캐시·up-to-date 없이 **실행**) → JUnit XML 에서 실패 수집 →
@@ -209,19 +209,19 @@ acceptance 네 줄과 재는 자리:
 재현의 정본은 아래 「무엇을 바꿔치웠나」 칸이다(스크립트는 레인 scratchpad 에 있고 저장소에 두지 않는다).
 
 **소비자 집합**은 `:settlement:test` 가 전부다 — `settlement` 밖 main 소스의 `bidvector.settlement` 참조 0.
-**통제군**: 변이 없는 트리 `--rerun` **46 test · 실패 0** — 측정 열의 **처음과 끝** 두 번.
+**통제군**: 변이 없는 트리 `--rerun` **51 test · 실패 0** — 측정 열의 **처음과 끝** 두 번.
 
-| ID | 무엇을 **바꿔치웠나** | numstat | RED(46 중) |
+| ID | 무엇을 **바꿔치웠나** | numstat | RED(51 중) |
 |---|---|---|---|
-| M-1 | 공백 제거 단계를 「원문 그대로」로 | `1 1` | **7** |
-| M-2 | 토큰 제거 단계를 「입력 그대로」로(단계 무력화) | `1 1` | **13** |
+| M-1 | 공백 제거 단계를 「원문 그대로」로 | `1 1` | **9** |
+| M-2 | 토큰 제거 단계를 「입력 그대로」로(단계 무력화) | `1 1` | **15** |
 | M-3 | 소문자화 단계를 「원문 그대로」로 | `1 1` | **1** — 대소문자 흡수만(한글 사례는 무관 — 그 좁음이 정확하다) |
 | M-4 | 결과 쪽 미공개(미기록) → 패찰 | `1 1` | **1** |
-| M-5 | 운영자 미설정(판정 안 함) → 패찰 | `1 1` | **2** |
+| M-5 | 운영자 미설정(판정 안 함) → 패찰 | `1 1` | **3** |
 | M-6 | 조회 술어가 미설정에도 `Lookup` | `1 1` | **3** |
 | M-7 | 기록 시 기존 확정 대신 새 판정 값 | `1 1` | **1** — 반대 판정만(값이 같은 두 test 는 초록 — 그래서 M-7b) |
 | M-7b | 불변 가드를 통째로(확정이 있어도 없는 것처럼 기록) | `1 1` | **3** — 기록 불변 test 전건 |
-| M-8 | 토큰 목록을 주입 정책 대신 코드 상수로 | `1 1` | **2** — 주입 정책 사례 · 관문 정책 동반 test |
+| M-8 | 토큰 목록을 주입 정책 대신 코드 상수로 | `1 1` | **3** — 주입 정책 사례 · 관문 정책 동반 test 둘 |
 | M-9 | 판정 시그니처에 기본값 있는 금액 인자를 **더한다** | `1 0` | **1** — fixture 1(음성이 컴파일돼 버린다) |
 | X1 | 정확매치 `==` → 양방향 접두 포함 | `1 1` | **1** — 접두·접미·부분 쌍 test(r1 전에는 **생존**) |
 | X2 | 정확매치 `==` → 양방향 부분 포함 | `1 1` | **2** — 같은 test + 관문 정책 test(r1 전에는 **생존**) |
@@ -233,14 +233,22 @@ acceptance 네 줄과 재는 자리:
 | N5 | 판정이 `lookup.policy` 대신 다른 고정 정책으로 결과 쪽을 접는다 | `1 1` | **2** — 법인 표기 흡수 · 표기뿐 미기록(관문 정책 test 자체는 그 고정 정책에서 우연히 초록 — 잠금은 이 둘이 진다) |
 | N6b | `Lookup` 을 public 으로(`internal` 과 `@ConsistentCopyVisibility` 둘 다 제거) | `1 2` | **2** — fixture 4·5 |
 | N7 | `Won` 생성자를 public 으로 | `1 1` | **1** — fixture 6 |
+| N7b | `Lost` 생성자를 public 으로(r2) | `1 1` | **1** — fixture 7(r1 에서는 **생존**, 검증자 Y7) |
+| N9 | 판정이 결과 쪽을 `lookup.policy` 대신 **출하 정책 해석값**으로 접는다(r2) | `1 1` | **1** — 낙찰자 쪽 토큰 사례(r1 에서는 **생존**, 검증자 Y8) |
+| N10 | 공백 제거에서 U+0085 절을 뺀다(r2) | `1 1` | **1** — U+0085 test |
+| E1 | `Won`·`Lost` 의 `equals` 본문을 둘 다 `other is SettledAwardOutcome` 으로(r2) | `2 2` | **1** — 낙찰/패찰 구별 test **하나뿐** |
 | N6 · N8 | `internal` 만 제거 / 주석만 제거 | `1 1` · `0 1` | **main 컴파일 실패** — `allWarningsAsErrors` 가 「주석이 중복」·「non-public 생성자가 `copy()` 로 노출」 경고를 오류로 올린다. 컴파일러가 지는 잠금이고 test 를 재지 않으므로 N6b 를 따로 쟀다 |
+
+**E1 이 하나만 붉는 것이 요점이다**(CR N-1): 오늘 코드에서 X1·X2·N5 가 붉는 것은 「실제 `Won` ≠ 기대 `Lost`」
+이기 때문이다 — 그 셋의 잠금은 이 등식 위에 서고, E1 아래에서는 모든 단언이 같은 종류끼리 비교돼 비교 방향과
+무관하게 초록이 된다. 그래서 등식 자체를 재는 test 가 그 셋의 탐지기를 지킨다.
 
 **M-9 만 「더하기」인 이유**: 인자의 **부재**는 바꿔치울 대상이 없다 — 위반은 더하기로만 표현된다. X12 도
 같은 사유다(필드의 부재).
 
 ### 2-1. 컴파일 실패 하네스의 음성 대조
 
-여섯 fixture 각각에 **양성 쌍둥이**와 **오타 변이**를 두었다. `internal` 조각(`it is internal in`)은 r1 첫 실행에서 실측됐다. 오타 변이는 컴파일에 실패하되 **기대
+일곱 fixture 각각에 **양성 쌍둥이**와 **오타 변이**를 두었다. `internal` 조각(`it is internal in`)은 r1 첫 실행에서 실측됐다. 오타 변이는 컴파일에 실패하되 **기대
 진단 조각을 담지 않아야** 한다 — 「컴파일 안 됨」만 보면 어떤 오타든 단언을 만족시키기 때문이다.
 
 | fixture | 음성(기대 진단) | 양성 | 오타 변이 |
@@ -251,6 +259,7 @@ acceptance 네 줄과 재는 자리:
 | 4 관문 `Lookup` 직접 생성(r1) | `it is internal in` — `normalizeCompanyName` 으로 얻은 값으로 `Lookup(…)` 을 만들어 판정 | fixture 1 의 양성(관문 경유 판정) | 없는 이름 생성 |
 | 5 관문 `Lookup.copy()`(r1) | `it is internal in` — 관문을 지난 값의 운영자 상호를 바꿔치움 | 같은 양성 | 없는 멤버 호출 |
 | 6 `Won` 직접 생성 → 기록(r1) | `it is internal in` | 판정 경유 기록(`positive-6`) | 없는 이름 생성 |
+| 7 `Lost` 직접 생성 → 기록(r2) | `it is internal in` | 같은 양성 | 없는 이름 생성 |
 
 fixture 의 상호는 전부 가상이고 **ASCII 로만** 적었다 — 컴파일러 소스 인코딩 가정을 두지 않는다.
 
@@ -272,9 +281,10 @@ fixture 의 상호는 전부 가상이고 **ASCII 로만** 적었다 — 컴파�
 5. **PII 가림의 대가**: 상호 운반 타입의 `toString()` 이 가려져 있어 단언 실패 메시지에 값이 보이지
    않는다. test 는 가상 상호만 쓰므로 받아들인 trade-off 이고, 값 비교가 필요한 자리는 `.value` 로
    읽는다.
-6. **공백 집합과 미달 매치** — `Char.isWhitespace()` 는 legacy `\s` 에서 U+0085(NEL) 하나를 뺀
-   부분집합이다. 그 글자, zero-width 글자(U+200B·U+FEFF 등), 전각 라틴, NFD 한글, 괄호 혼용(`(주）`)은
-   정규화하지 않는다. 전부 거짓 「패찰」 쪽(거짓 낙찰 0)이고 `OPEN-SET-03`(실수집 상호 확인) 옆의 축이다.
+6. **미달 매치** — 공백 집합은 r2 에서 legacy `\s` 와 같아졌다(`Char.isWhitespace()` + U+0085). 남는 것:
+   zero-width 글자(U+200B·U+FEFF 등), 전각 라틴, NFD 한글, 괄호 혼용(`(주）`)은 정규화하지 않는다. **실상호
+   쌍에서는** 거짓 「패찰」 쪽이고 `OPEN-SET-03`(실수집 상호 확인) 옆의 축이다. (그 글자만으로 된 퇴화 상호가
+   양쪽에 같이 오면 같은 값이라 낙찰이 된다 — legacy 도 그 글자를 지우지 않으므로 같은 거동이다.)
 7. **관문이 닫는 범위** — `Lookup` 의 유일한 생성 경로는 `decideAwardLookup` 이다(생성자·`copy`
    `internal`, fixture 4·5). 남는 여지는 하나다: **설정은 됐으나 정규화 결과가 빈 문자열**인 경우
    호출부가 관문을 무시하고 `Declared.rawName` 을 직접 들고 외부 조회를 할 수 있다. 판정에는 닿지
@@ -282,7 +292,8 @@ fixture 의 상호는 전부 가상이고 **ASCII 로만** 적었다 — 컴파�
 8. **토큰 제거는 접두·접미만 — legacy 와 의도된 어긋남.** legacy `str.replace` 는 상호 중간의 토큰도
    지워 「가상주식회사건설」 = 「가상건설」(거짓 낙찰 방향)이다. 이 커널은 계약 문면대로 양 끝에서만
    (겹치면 남김없이) 지운다. 그 결과 중간에 법인 표기가 박힌 실제 같은 회사 표기는 거짓 「패찰」이 된다.
-   differential 분류는 **intentional**(오차 방향을 안전 쪽으로 옮김)이다.
+   differential 분류는 **intentional** — 근거는 계약 결정 **D-G1SET01-1 ②**(「계약 문면대로 접두·접미만 제거한다 ·
+   legacy 와의 차이는 의도된 어긋남으로 적는다」)다. 오차 방향을 거짓 낙찰에서 거짓 패찰로 옮긴다.
 9. **저장된 확정 판정의 복원 경로가 없다** — `Won`·`Lost` 생성자가 `internal` 이라 모듈 밖에서
    `RecordedAwardOutcome.Settled(…)` 를 만들 길이 없다. 영속화 소비 slice 가 저장값에서 기록을
    되살리려면 **출처를 가진 복원 함수**를 이 모듈에 더해야 한다(그 함수가 모듈 밖 `Won` 생성 경로를 다시
@@ -296,7 +307,14 @@ fixture 의 상호는 전부 가상이고 **ASCII 로만** 적었다 — 컴파�
     `build-logic/**` 은 이 slice 의 in_scope 밖이라 고치지 않고 후속으로 넘긴다. 교훈: 타입을 지울 때
     `grep -rn '<지운 심볼>'` 로 **심볼 이름의** 역방향 파급을 본다(좌표 규율은 심볼 이름을 잡지 못한다).
 12. **모듈 밖 오버로드**(verifier V92) — 모듈 밖에서 금액을 넷째 인자로 받는 같은 이름 함수를 선언하는
-    것은 언어가 막지 않는다. 그 함수는 커널을 거치지 않으므로 확정 판정을 만들 수 없다(fixture 6).
+    것은 언어가 막지 않는다. 그 함수는 커널을 거치지 않으므로 확정 판정을 만들 수 없다(fixture 6·7).
+13. **`internal` 은 Kotlin 의 경계다**(verifier L-1r2) — 바이트코드에서는 public 이라 모듈 밖 **Java** 소스는
+    `new SettledAwardOutcome.Won()`·`new AwardLookupDecision.Lookup(…)` 를 컴파일·실행할 수 있다(검증자 실측). 저장소
+    main 의 `.java` 는 0 이고 그것을 막는 게이트는 없다 — Java 소스가 생기면 이 잠금을 다시 본다. (Kotlin 의
+    `@Suppress("INVISIBLE_*")` 우회는 `allWarningsAsErrors` 가 막는다.)
+14. **정책의 출처는 열려 있다**(CR Q-1r2) — 커널은 넘어온 정책을 양쪽에 같게 쓸 뿐, 그것이 출하
+    `AWARD_MATCHING_POLICY` 의 해석값인지는 묻지 않는다(`*PolicyData` 의 public 생성자는 저장소 관례). 호출부
+    test 의 몫이고 `OPEN-SET-03` 과 같은 축이다 — capability map SET-01 절이 같은 문장을 갖는다.
 
 ## 4. 전건 `check` 가 잡은 것 — 모듈 게이트 전건이 초록인데 붉었다
 
@@ -389,3 +407,16 @@ gets  java.util.Locale.ROOT               ← text.lowercase()
 | R-13 | verifier L-3 — evidence 크기 경계 | **ledger** — 수치는 commands §5 | — |
 | R-14 | verifier L-4 — 미달 매치 제한 누락 | **등재**(§3-6) | — |
 | R-15 | CR Q-2 — 판정 SHA 의 `check` 가 대부분 up-to-date | **실측** — `:settlement:test` 실행분은 변이 통제군 `--rerun`(commands §3) | — |
+
+## 7. 검토 r2 처분표 (D-G1SET01-2 — verifier not-ready H-1r2 · CR REQUEST_CHANGES N-1, 재작업 2/5)
+
+| S | 지적 | 처분 | 잠그는 것 |
+|---|---|---|---|
+| S-1 | CR N-1 — 낙찰/패찰 구별(손으로 쓴 `equals`·`hashCode`·`toString`)을 재는 test 가 없다 | **고침** — 양방향 `shouldNotBe` · 해시·문자열 구별 · 결말 래퍼(`AlreadySettled`·`Recorded`) 구별 | 변이 E1 |
+| S-2 | verifier H-1r2 — 「정책 동반」 test 가 결과 쪽을 잠그지 않음(Y8 생존) | **고침** — 토큰이 **낙찰자 상호에만** 있는 사례 → `Won` | 변이 N9(검증자 Y8 과 같은 모양) |
+| S-3 | verifier M-1r2 · CR N-3 — `Lost` 생성자 `internal` 미잠금(Y7 생존) | **고침** — fixture 7(음성 · 오타 변이, 양성은 fixture 6 공유) | 변이 N7b |
+| S-4 | CR N-2 — U+0085 퇴화 상호가 미기록 대신 낙찰 | **고침** — `stripWhitespace` 에 U+0085, 공백 집합이 legacy 와 같아짐 · §3-6 문면 정정 | test · 변이 N10 |
+| S-5 | verifier L-1r2 — Java 호출자는 `internal` 을 우회 | **등재**(§3-13) | — |
+| S-6 | verifier L-2r2 — container 문장 둘(run 수 · 새 이미지 ID) | **ledger** — r2 재생의 실측으로 다시 적었다(commands §4) | 재생 결과 |
+| S-7 | verifier L-3r2 — `intentional` 분류의 근거 | **ledger** — D-G1SET01-1 ② 인용(§3-8) | — |
+| S-8 | CR Q-1r2 — 정책의 출처는 열려 있다 | **등재**(§3-14 + capability map SET-01 절) | — |
