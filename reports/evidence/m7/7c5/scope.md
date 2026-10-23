@@ -74,6 +74,8 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
 - **D-7C5-6** -a 단독 PR 여부는 -a 동결 시점에 판단한다. 레인은 -a 를 종결 가능한 단위로 닫는다.
 - **D-7C5-7** -b 는 쓰기 진입점을 새로 만들지 않는다(조회는 읽기 전용 유지). 낙찰/패찰·개찰 완료 알림 기록은 대사 판정을 영속하는 경로(승격 뒤
   대사 배치)가 맡고, 그 자리는 OPEN 으로 등재한다. 판정 불가(순위 부재·중복·상호 미설정·유찰)는 `false` 로 접지 않고 기록하지 않는다.
+- **D-7C5-8** 7C① 질의 읽기 규율(읽는 자리 하나 · 반복 400 · 인코딩 오류 400)을 공용 internal 헬퍼로 올리고 `NoticeSearchController` 의
+  private 사본을 그 호출로 바꾼다 — **in_scope 에 `NoticeSearchController.kt` 추가**. 7C① 의 기존 test·E2E 무편집 초록으로 거동 불변을 증명한다.
 
 
 ## 하네스 레인 변경 (상시)
