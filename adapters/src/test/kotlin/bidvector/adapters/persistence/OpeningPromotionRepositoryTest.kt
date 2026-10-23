@@ -49,8 +49,7 @@ class OpeningPromotionRepositoryTest : PersistenceTestSupport() {
     private fun id(number: String) = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
     /** 표지 상호를 실은 개찰완료 투찰 행 하나 — 마스킹 축 test 둘이 공유한다. */
-    private fun rankOneFields(): Map<String, String> =
-        mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1")
+    private fun rankOneFields(): Map<String, String> = mapOf("prcbdrNm" to SENTINEL_BIDDER, "opengRank" to "1")
 
     private fun seed(
         id: NoticeId,
