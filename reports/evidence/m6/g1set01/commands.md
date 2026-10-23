@@ -163,7 +163,9 @@ git diff --name-only a61ddff1..fb05a786 -- web ml-engine docker .github contract
 flock ~/.local/bid-vector-build.lock ./gradlew --no-daemon leakPatternGate
 ```
 
-PLACEHOLDER_LEAK_RESULT
+→ evidence 커밋 `1934061d` 에서 **exit 0** · BUILD SUCCESSFUL 7초 · 1 actionable task(1 실행) · 2026-10-23 10:20 KST. HEAD 양 끝 `1934061d` 동일, 로그(`set01-leak-1020.log`) 첫 줄이 HEAD·`pwd`(이 worktree)다.
+이 결과를 적는 커밋 자체의 재확인은 evidence 에 다시 넣지 않는다 — 마지막 HEAD 의 결과 정본은 verifier 와
+PR 조치 코멘트다(넣으려는 시도가 커밋을 또 낳는다).
 
 이 게이트는 `reports/evidence/` 만 훑고 `scope.md` 는 제외한다. 이 slice 의 evidence 는 비밀값 스캔
 어휘를 축어로 담지 않는다 — legacy 상수와 V2 정책 필드의 이름에 그 어휘와 겹치는 조각이 있어

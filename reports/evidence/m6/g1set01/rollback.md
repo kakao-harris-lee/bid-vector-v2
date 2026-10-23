@@ -70,7 +70,7 @@ git restore --source=a61ddff1 --staged --worktree -- \
 | ③-b | `acceptance-trace.md` 줄 수 | **175** == base **175** |
 | ③-c | 되돌리지 않는 것이 base 와 **다른 채로 남는가** | `reports/evidence/m6/g1set01/` 의 넷(`scope.md`·`checklist.md`·`commands.md`·`rollback.md`, 커밋된 판) — 남는다 |
 | ④⑤⑥ | 복원한 트리에서 **전건 `check`**(컴파일 · test · 게이트) | **exit 0** · BUILD SUCCESSFUL **10분 3초** · 359 actionable task(224 실행 · 135 캐시) · 잠금 대기 포함 벽시계 07:59:32~08:20:18 · HEAD 끝 `fb05a786` |
-| ⑥-b | 그 트리에 이 slice 의 evidence 를 얹고 `leakPatternGate` 만 다시 | PLACEHOLDER_6B |
+| ⑥-b | 그 트리에 이 slice 의 evidence 를 얹고 `leakPatternGate` 만 다시 | **exit 0** · BUILD SUCCESSFUL 14초 · 2026-10-23 10:20 KST — 복원 트리(`settlement` main `.kt` 1)에 `1934061d` 의 evidence 넷을 얹었다(`cmp` 로 넷 다 동일 확인) |
 
 **③-b 가 왜 줄 수인가**: 공유 파일 셋은 다른 slice 의 줄을 담고 있다. 「내 줄이 사라졌다」(③-a)만
 재면 남의 줄까지 함께 떨어뜨린 복원도 통과한다 — 두 방향을 모두 재야 복원이 **내 것만** 되돌렸다는
