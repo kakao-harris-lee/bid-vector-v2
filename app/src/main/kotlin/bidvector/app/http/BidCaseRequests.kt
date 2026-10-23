@@ -15,8 +15,6 @@ import bidvector.bidding.TransitionReason
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
-import jakarta.servlet.http.HttpServletRequest
 import tools.jackson.databind.JsonNode
 import java.time.Instant
 
@@ -38,11 +36,14 @@ internal object BidCaseRequests {
 
     fun openCase(body: JsonNode): Pair<NoticeKey, BidKind> {
         val payload = body.requireObject().requireKnownKeys(setOf("noticeNumber", "noticeRound", "bidKind"))
-        return NoticeKey(
-            payload.requiredNonBlankText("noticeNumber"),
-            NoticeRound.of(payload.requiredNonBlankText("noticeRound")),
-        ) to
-            payload.enumOf("bidKind", BidKind.entries)
+        val notice =
+            requestValue("noticeRound") {
+                NoticeKey(
+                    payload.requiredNonBlankText("noticeNumber"),
+                    NoticeRound.of(payload.requiredNonBlankText("noticeRound")),
+                )
+            }
+        return notice to payload.enumOf("bidKind", BidKind.entries)
     }
 
     fun remindAt(body: JsonNode): Instant =
@@ -99,28 +100,31 @@ internal object BidCaseRequests {
     /** 「제출함」 — retroactive · evidenceRetainUntil 자리가 **없다**(위 KDoc). */
     fun submission(body: JsonNode): BidSubmission {
         val payload = body.requireObject().requireKnownKeys(RECORD_KEYS)
-        return BidSubmission(
-            amount =
-                SubmittedBidAmount(
-                    won = payload.requiredLong("amountWon", minimum = 0L),
-                    currency = Currency.KRW,
-                    vatTreatment = payload.enumOf("vatTreatment", VatTreatment.entries),
-                    origin = BidAmountOrigin.OperatorEntered,
-                ),
-            submittedAt = payload.requiredInstant("submittedAt"),
-            drawNumbers = payload.optionalIntArray("drawNumbers"),
-            evidence = payload.optionalNonBlankText("evidenceRef")?.let(::EvidenceRef),
-            memo = payload.optionalNonBlankText("memo")?.let(::BidMemo),
-        )
+        return requestValue("record") {
+            BidSubmission(
+                amount =
+                    SubmittedBidAmount(
+                        won = payload.requiredLong("amountWon", minimum = 0L),
+                        currency = Currency.KRW,
+                        vatTreatment = payload.enumOf("vatTreatment", VatTreatment.entries),
+                        origin = BidAmountOrigin.OperatorEntered,
+                    ),
+                submittedAt = payload.requiredInstant("submittedAt"),
+                drawNumbers = payload.optionalIntArray("drawNumbers"),
+                evidence = payload.optionalNonBlankText("evidenceRef")?.let(::EvidenceRef),
+                memo = payload.optionalNonBlankText("memo")?.let(::BidMemo),
+            )
+        }
     }
 }
 
 /**
- * 경로 · 질의 · **주체** 읽기 — 본문 읽기(`BidCaseRequests`)와 가른다.
+ * 경로 · 질의 읽기 — 본문 읽기(`BidCaseRequests`)와 가른다.
  *
  * 가른 이유는 detekt 의 object 함수 상한(11)이지만, 경계 자체는 의미가 있다: 이쪽은
- * **요청 봉투**(path · query · 인증 필터가 적은 속성)를 읽고 저쪽은 **본문**을 읽는다.
- * 주체가 본문 읽기와 같은 자리에 있으면 「본문에서 주체를 받는」 변경이 눈에 덜 띈다.
+ * **요청 봉투**(path · query)를 읽고 저쪽은 **본문**을 읽는다. **주체는 둘 다 읽지 않는다** —
+ * 계정은 인증 필터가 심은 typed 속성 하나(`request.authenticatedAccount()`, 계약 D-7B-2)에서만
+ * 오고, audit 주체 라벨을 파싱해 얻지 않는다.
  */
 internal object BidCaseRouting {
     fun bidKind(raw: String?): BidKind =
@@ -138,23 +142,22 @@ internal object BidCaseRouting {
         if (value <= 0L) throw InvalidEditRequestException("caseId 는 양수여야 한다")
         return BidCaseId(value)
     }
-
-    /**
-     * 요청의 주체 — **필터가 적은 값**에서만 온다(요청 본문·헤더에서 받지 않는다).
-     *
-     * 입찰함은 **계정 경로 전용**이다: 기존 운영자 자격 헤더(`operator`)에는 계정이 없어
-     * 소유 경계를 세울 수 없다. 그 요청은 거부하고 **사유를 나누지 않는다**(D-6A1-6) —
-     * 「인증은 됐는데 계정이 아니다」를 따로 말하면 그 자체가 신호가 된다.
-     */
-    fun accountOf(request: HttpServletRequest): AccountId? {
-        val subject = request.authenticatedSubject()
-        val raw = subject.removePrefix(ACCOUNT_SUBJECT_PREFIX)
-        if (raw == subject) return null
-        return raw.toLongOrNull()?.takeIf { it > 0L }?.let(::AccountId)
-    }
-
-    private const val ACCOUNT_SUBJECT_PREFIX = "account:"
 }
+
+/**
+ * 도메인 값 객체의 생성 규칙(`require`)을 **400 으로** 옮긴다. 형식이 틀린 요청 값(차수 형식 ·
+ * 증빙 참조·메모 길이 상한 · 추첨번호 부호)이 `IllegalArgumentException` 으로 새면 기본 처리기가
+ * **500** 을 낸다 — 요청 탓을 서버 탓으로 말하는 것이다. 그 예외 **하나만** 옮기고 나머지는 그대로
+ * 던진다(`JsonValueReaders` 의 시각 판독과 같은 관례). 메시지는 응답에 실리지 않는다.
+ */
+private fun <T> requestValue(
+    key: String,
+    build: () -> T,
+): T =
+    runCatching(build).getOrElse { failure ->
+        if (failure is IllegalArgumentException) throw InvalidEditRequestException("$key 가 값 규칙을 어긴다")
+        throw failure
+    }
 
 /** 초안 요청이 실어 오는 것 — 공고 스냅샷은 **서버가 뜨므로** 여기 없다(위협 ③). */
 internal data class DraftInput(

@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.workflow.access.AccountId
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
@@ -10,10 +11,14 @@ import jakarta.servlet.http.HttpServletResponse
 /**
  * 인증 경로 하나의 판정 — 통과면 audit 주체 라벨을 함께 낸다. 거부의 **사유를 나누지
  * 않는다**(D-6A1-6): 자격이 없는 것과 틀린 것이 같은 값이다.
+ *
+ * [Authenticated.account] 는 **계정을 내는 경로만** 채운다(세션 — M7/7B 계약 D-7B-2). 라벨
+ * [Authenticated.subject] 는 감사용 문자열이고, 계정은 그것을 파싱해 얻지 않는다.
  */
 sealed interface AuthenticationResult {
     class Authenticated(
         val subject: String,
+        val account: AccountId? = null,
     ) : AuthenticationResult
 
     data object Denied : AuthenticationResult
@@ -62,6 +67,8 @@ class RequestAuthenticationFilter(
     ) {
         val httpRequest = request as HttpServletRequest
         val httpResponse = response as HttpServletResponse
+        // 계정 속성은 **이 판정만** 적는다 — 앞서 놓인 값이 있으면 판정 전에 지운다(fail-closed).
+        httpRequest.removeAttribute(AUTHENTICATED_ACCOUNT_ATTRIBUTE)
 
         if (OPEN_ROUTES.contains(routeOf(httpRequest))) {
             // 로그인 자체는 아직 주체가 없다 — audit 행은 남고 라벨은 실패와 같은 값이다
@@ -88,6 +95,7 @@ class RequestAuthenticationFilter(
         }
 
         httpRequest.setAttribute(AUDIT_SUBJECT_ATTRIBUTE, granted.subject)
+        granted.account?.let { httpRequest.setAttribute(AUTHENTICATED_ACCOUNT_ATTRIBUTE, it) }
         chain.doFilter(request, response)
     }
 

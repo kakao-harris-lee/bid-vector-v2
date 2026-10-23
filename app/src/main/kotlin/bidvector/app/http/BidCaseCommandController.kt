@@ -36,7 +36,7 @@ class BidCaseCommandController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         val (notice, kind) = BidCaseRequests.openCase(body)
         val view = workflow.open(account, notice, kind)
         return ResponseEntity.status(HttpStatus.CREATED).body(BidCaseResponse.from(view))
@@ -86,7 +86,7 @@ class BidCaseCommandController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         val id = BidCaseRouting.caseId(caseId)
         val input = BidCaseRequests.draft(body)
         val result = workflow.draft(account, id, input.amount, input.presentedAt, BidActor.User(account))

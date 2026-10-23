@@ -135,8 +135,8 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
         "BidCaseRequestsKt" to
             "요청 읽기의 enum 어휘 조회(`values.firstOrNull { it.name == raw }`)와 provenance 짝 판정 — 공개 어휘 비교이고 자격증명 값 없음",
         "BidCaseRouting" to
-            "경로·질의·주체 읽기의 어휘 비교(bidKind·state·account 접두) — 주체 접두 " +
-            "`account:` 비교는 비밀이 아니다(계정 식별자는 추측해도 권한이 없다, V20 주석과 같은 근거)",
+            "경로·질의 읽기의 어휘 비교(bidKind·state) — 공개 enum 이름 비교이고 자격증명 값 없음 " +
+            "(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
         "DraftInput" to
             "초안 요청 값 객체(data class) 자동 생성 equals — 금액·시각뿐, 자격증명 값 없음",
         "AccountScopedRoutes" to

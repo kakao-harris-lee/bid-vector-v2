@@ -32,7 +32,7 @@ class BidCaseQueryController(
         @RequestParam(name = "state", required = false) state: String?,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         val bidKind = BidCaseRouting.bidKind(kind)
         val cases = workflow.list(account, bidKind, BidCaseRouting.stateTag(state))
         // **맨 위가 배열**이다 — 배열을 감싼 object 는 평탄 규칙(D-6A1-20 ⓑ)에 걸린다.
@@ -45,7 +45,7 @@ class BidCaseQueryController(
         @PathVariable caseId: String,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         return BidCaseHttp.view(workflow, account, BidCaseRouting.caseId(caseId), request)
     }
 
@@ -58,7 +58,7 @@ class BidCaseQueryController(
         @PathVariable caseId: String,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
         val id = BidCaseRouting.caseId(caseId)
         val entries = workflow.timeline(account, id)
         return entries

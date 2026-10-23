@@ -106,7 +106,7 @@ internal object BidCaseHttp {
         request: HttpServletRequest,
         command: () -> BidCommand,
     ): ResponseEntity<Any> {
-        val account = BidCaseRouting.accountOf(request) ?: return unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val id = BidCaseRouting.caseId(caseId)
         val result = workflow.command(account, id, command(), BidActor.User(account))
         return toResponse(result, workflow, account, id, request)
