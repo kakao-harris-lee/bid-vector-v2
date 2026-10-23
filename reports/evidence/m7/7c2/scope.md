@@ -91,6 +91,10 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 평탄 술어를 「깊이 정확히 1, `$ref` 대상 속성이 전부 스칼라일 때만」의 허용 목록으로 넓힌다 — 게이트 술어 변경이므로 표적 재검증 대상이고
 in_scope 에 해당 contract test 를 더한다. operation 분할(R6)은 하지 않는다.
 
+**D-7C2-4 (2026-10-23, 팀장 — in_scope 대조 수령).** 추가 수용: `app/.../http/ErrorBody.kt`(새 code `NOTICE_NOT_FOUND` + 404 — 오류 형태의 단일
+자리) · `app/.../wiring/EvaluationWiring.kt`(출하 배선, 자격 정책 해소 공유) · `app/src/test/.../HttpTestSupport.kt`(test 앱 빈). 전부 추가만, 기존 문면
+불변. 추적표: DEC-04 ⓒ 유지(표면만) · DEC-03 「법정 하한율 미해석」 표시 test 잠금 · QUAL-02·STR-16 은 선 절반만 적는다.
+
 
 ## 하네스 레인 변경 (상시)
 
