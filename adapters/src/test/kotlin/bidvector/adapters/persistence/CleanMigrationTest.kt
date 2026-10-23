@@ -87,6 +87,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // append-only 표의 순번 유일성이고, 전이 쪽은 **낙관적 잠금의 둘째 겹**이다
             // (같은 판에 두 전이가 들어오면 여기서 걸린다).
             "bid_case_account_id_notice_number_notice_round_bid_kind_key",
+            // 자식 셋의 복합 FK 대상(계약 D-7B-3).
+            "bid_case_id_account_key",
             "bid_case_transition_case_id_case_version_key",
             "bid_draft_case_id_draft_seq_key",
             "bid_record_case_id_record_seq_key",
@@ -177,6 +179,16 @@ class CleanMigrationTest : PersistenceTestSupport() {
         val foreignColumn: String,
     )
 
+    /** 자식 표 하나의 FK 다섯 — 계정 단일 FK + (건, 계정) 복합 FK 의 cross product 넷. */
+    private fun childOwnerForeignKeys(table: String): Array<FkSpec> =
+        arrayOf(
+            FkSpec(table, "account_id", "account", "id"),
+            FkSpec(table, "case_id", "bid_case", "id"),
+            FkSpec(table, "case_id", "bid_case", "account_id"),
+            FkSpec(table, "account_id", "bid_case", "id"),
+            FkSpec(table, "account_id", "bid_case", "account_id"),
+        )
+
     private val expectedForeignKeys =
         setOf(
             FkSpec("notice", "observation_key", "raw_observation", "observation_key"),
@@ -206,12 +218,11 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // Purge(TimeOnly) 로 두므로 FK 를 걸면 파기 sweep 이 실패하거나(RESTRICT) 운영자의
             // 투찰 기록이 공고와 함께 사라진다(CASCADE). 공고 키와 스냅샷은 사본이다(V21 머리말).
             FkSpec("bid_case", "account_id", "account", "id"),
-            FkSpec("bid_case_transition", "case_id", "bid_case", "id"),
-            FkSpec("bid_case_transition", "account_id", "account", "id"),
-            FkSpec("bid_draft", "case_id", "bid_case", "id"),
-            FkSpec("bid_draft", "account_id", "account", "id"),
-            FkSpec("bid_record", "case_id", "bid_case", "id"),
-            FkSpec("bid_record", "account_id", "account", "id"),
+            // 자식 셋은 건을 **(건, 계정) 복합 FK** 로 참조한다(계약 D-7B-3) — 자식 행의 계정이 부모 건의
+            // 소유자와 같다는 것을 구조가 진다. 복합 FK 라 위와 같은 cross product 넷이 나온다.
+            *childOwnerForeignKeys("bid_case_transition"),
+            *childOwnerForeignKeys("bid_draft"),
+            *childOwnerForeignKeys("bid_record"),
             FkSpec("bid_record", "draft_id", "bid_draft", "id"),
         )
 

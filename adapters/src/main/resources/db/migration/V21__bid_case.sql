@@ -63,17 +63,27 @@ CREATE TABLE bid_case (
     -- 낙관적 잠금 축. 타임라인의 UNIQUE (case_id, case_version) 가 같은 불변식의 둘째 겹이다.
     case_version INT NOT NULL CHECK (case_version >= 0),
 
+    -- **공고 마감의 사본**(계약 D-7B-3 결정 ①). 건을 담을 때 공고의 마감을 적어 둔다 — 공고가
+    -- 6B-3 으로 파기된 뒤에도 서버가 「마감이 지났는가」를 판정할 수 있어야 소급 확인(Q-11)이
+    -- 닿는다. 담을 때 공고가 없으면 NULL 이다(지어내지 않는다). 전이가 고치지 않는다(열 GRANT 밖).
+    deadline_at TIMESTAMPTZ,
+
     remind_at TIMESTAMPTZ,
     opening_at TIMESTAMPTZ,
     document_due_at TIMESTAMPTZ,
     outcome_notice_expected_at TIMESTAMPTZ,
 
-    skip_reason TEXT CHECK (skip_reason <> ''),
+    -- 자유 텍스트이고 지울 수 없는 타임라인에도 남는다 — 상한을 도메인(`SkipReason.MAX_LENGTH`)과
+    -- 같은 값으로 표가 한 번 더 진다(계약 D-7B-3, 개인정보 축).
+    skip_reason TEXT CHECK (skip_reason <> '' AND char_length(skip_reason) <= 500),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL,
 
     UNIQUE (account_id, notice_number, notice_round, bid_kind),
+    -- 자식 표 셋의 복합 FK 대상 — 자식 행의 `account_id` 가 **부모 건의 소유자와 같다**는 것을
+    -- 구조로 진다(계약 D-7B-3). 단일 열 FK 둘(건 · 계정)로는 둘의 일치가 강제되지 않는다.
+    CONSTRAINT bid_case_id_account_key UNIQUE (id, account_id),
 
     -- 「나중에 ⇒ 리마인드 NOT NULL」·「건너뜀 ⇒ 사유 NOT NULL」(계약 산출물 5)
     CONSTRAINT bid_case_deferred_requires_remind
@@ -106,16 +116,67 @@ CREATE INDEX bid_case_owner_idx ON bid_case (account_id, bid_kind, state);
 -- =============================================================================
 CREATE TABLE bid_case_transition (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    case_id BIGINT NOT NULL REFERENCES bid_case (id),
+    case_id BIGINT NOT NULL,
     -- 비정규화가 아니라 **소유 필터의 자리**다 — 타임라인 질의가 부모를 조인하지 않고도
-    -- 계정으로 좁혀진다(조인을 빠뜨린 질의가 남의 줄을 보는 길을 없앤다).
+    -- 계정으로 좁혀진다(조인을 빠뜨린 질의가 남의 줄을 보는 길을 없앤다). 그 값이 부모의
+    -- 소유자와 같다는 것은 아래 복합 FK 가 진다.
     account_id BIGINT NOT NULL REFERENCES account (id),
+    CONSTRAINT bid_case_transition_case_owner_fk
+        FOREIGN KEY (case_id, account_id) REFERENCES bid_case (id, account_id),
 
     case_version INT NOT NULL CHECK (case_version >= 0),
-    -- 생성 전이만 NULL — 출발 상태가 없다.
-    from_state TEXT CHECK (from_state <> ''),
-    to_state TEXT NOT NULL CHECK (to_state <> ''),
-    command TEXT NOT NULL CHECK (command <> ''),
+    -- 생성 전이만 NULL — 출발 상태가 없다. 상태 · 명령 어휘는 **건 표와 같은 열거**다(계약
+    -- D-7B-3) — 타임라인에만 다른 어휘(예: 'ON_HOLD')가 들어오면 그 건의 타임라인 조회 전체가
+    -- 깨지고, append-only 라 그 행을 지울 수도 없다.
+    from_state TEXT CHECK (from_state IN (
+        'WATCHING',
+        'DEFERRED',
+        'PRICE_RECEIVED',
+        'BID_PLANNED',
+        'BID_RECORDED',
+        'AWAITING_OPENING',
+        'OPENED_PROVISIONAL_FIRST',
+        'OPENED_OUT_OF_RANK',
+        'UNDER_QUALIFICATION_REVIEW',
+        'WON',
+        'LOST',
+        'FAILED_OR_REBID',
+        'SKIPPED',
+        'DEADLINE_PASSED_UNRECORDED'
+    )),
+    to_state TEXT NOT NULL CHECK (to_state IN (
+        'WATCHING',
+        'DEFERRED',
+        'PRICE_RECEIVED',
+        'BID_PLANNED',
+        'BID_RECORDED',
+        'AWAITING_OPENING',
+        'OPENED_PROVISIONAL_FIRST',
+        'OPENED_OUT_OF_RANK',
+        'UNDER_QUALIFICATION_REVIEW',
+        'WON',
+        'LOST',
+        'FAILED_OR_REBID',
+        'SKIPPED',
+        'DEADLINE_PASSED_UNRECORDED'
+    )),
+    -- 명령 열셋(`BidCommandTag`) + 생성 명령(`OPEN_CASE_COMMAND`).
+    command TEXT NOT NULL CHECK (command IN (
+        'ADD_TO_BID_BOX',
+        'DEFER',
+        'RESUME',
+        'RECEIVE_PRICE_MENU',
+        'DRAFT_BID',
+        'RECORD_BID',
+        'AWAIT_OPENING',
+        'RECORD_OPENING_FIRST',
+        'RECORD_OPENING_OUT_OF_RANK',
+        'ENTER_QUALIFICATION_REVIEW',
+        'RECORD_OUTCOME',
+        'CORRECT_OUTCOME',
+        'SKIP',
+        'MARK_DEADLINE_PASSED'
+    )),
 
     actor_kind TEXT NOT NULL CHECK (actor_kind IN ('USER', 'SYSTEM')),
     -- USER 의 주체는 `account_id` 다 — 사람의 이름을 적는 자리가 아니다. SYSTEM 만 경로
@@ -124,7 +185,8 @@ CREATE TABLE bid_case_transition (
     CONSTRAINT bid_case_transition_actor_pair
         CHECK ((actor_kind = 'SYSTEM') = (actor_detail IS NOT NULL)),
 
-    reason TEXT CHECK (reason <> ''),
+    -- 건너뜀 · 정정의 사유 — 상한은 도메인(`SkipReason` · `TransitionReason` 의 `MAX_LENGTH`)과 같다.
+    reason TEXT CHECK (reason <> '' AND char_length(reason) <= 500),
     retroactive BOOLEAN NOT NULL,
 
     occurred_at TIMESTAMPTZ NOT NULL,
@@ -144,7 +206,8 @@ CREATE TABLE bid_case_transition (
         )
 );
 
-CREATE INDEX bid_case_transition_case_idx ON bid_case_transition (case_id, case_version);
+-- 따로 `CREATE INDEX` 를 두지 않는다 — `UNIQUE (case_id, case_version)` 의 색인이 같은 열을 같은
+-- 순서로 덮는다(중복 색인은 쓰기 증폭뿐이다, 계약 D-7B-3). 초안 · 기록 표도 같다.
 
 CREATE TRIGGER bid_case_transition_append_only
     BEFORE UPDATE OR DELETE ON bid_case_transition
@@ -163,8 +226,10 @@ CREATE TRIGGER bid_case_transition_append_only
 -- =============================================================================
 CREATE TABLE bid_draft (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    case_id BIGINT NOT NULL REFERENCES bid_case (id),
+    case_id BIGINT NOT NULL,
     account_id BIGINT NOT NULL REFERENCES account (id),
+    CONSTRAINT bid_draft_case_owner_fk
+        FOREIGN KEY (case_id, account_id) REFERENCES bid_case (id, account_id),
     draft_seq INT NOT NULL CHECK (draft_seq >= 0),
     UNIQUE (case_id, draft_seq),
 
@@ -188,28 +253,51 @@ CREATE TABLE bid_draft (
     snapshot_taken_at TIMESTAMPTZ NOT NULL,
     snapshot_deadline_at TIMESTAMPTZ,
     snapshot_floor_rate_fraction NUMERIC,
-    snapshot_floor_rate_origin_kind TEXT,
-    snapshot_floor_rate_origin_detail TEXT,
+    -- 출처 어휘는 `notice` 와 **같은 코덱**(`FloorRateOriginCodec` · `ProvenanceCodec`)이 쓴다 — 저장소에
+    -- 셋째 어휘가 생기지 않게 열거로 닫는다(계약 D-7B-3, 검토 B-1).
+    snapshot_floor_rate_origin_kind TEXT
+        CHECK (snapshot_floor_rate_origin_kind IN ('NOTICE_VALUE', 'STATUTORY_TABLE')),
+    snapshot_floor_rate_origin_detail TEXT CHECK (snapshot_floor_rate_origin_detail <> ''),
     snapshot_base_amount_won NUMERIC(20, 0)
         CHECK (snapshot_base_amount_won IS NULL
                OR snapshot_base_amount_won BETWEEN 0 AND 9223372036854775807),
     snapshot_base_amount_currency TEXT,
     snapshot_base_amount_vat TEXT,
-    snapshot_base_amount_provenance TEXT,
+    snapshot_base_amount_provenance TEXT CHECK (snapshot_base_amount_provenance IN (
+        'PUBLISHED',
+        'DERIVED_FROM_OPENING',
+        'FILLED_FROM_BUDGET_KEY',
+        'COPIED_FROM_BASE_AMOUNT',
+        'OPERATOR_DECLARED',
+        'UNDECLARED'
+    )),
+    -- `PUBLISHED` 는 공고 판, `FILLED_FROM_BUDGET_KEY` 는 예산 키를 싣는다(`ProvenanceCodec.detailOf`).
+    snapshot_base_amount_provenance_detail TEXT CHECK (snapshot_base_amount_provenance_detail <> ''),
     -- V1 notice 와 같은 짝 CHECK — basis 없는 금액, 출처 없는 율을 두지 않는다.
     CONSTRAINT bid_draft_snapshot_floor_pair
         CHECK ((snapshot_floor_rate_fraction IS NULL) = (snapshot_floor_rate_origin_kind IS NULL)),
+    CONSTRAINT bid_draft_snapshot_floor_detail_pair
+        CHECK ((snapshot_floor_rate_origin_kind IS NULL) = (snapshot_floor_rate_origin_detail IS NULL)),
     CONSTRAINT bid_draft_snapshot_base_currency_pair
         CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_currency IS NULL)),
     CONSTRAINT bid_draft_snapshot_base_vat_pair
         CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_vat IS NULL)),
     CONSTRAINT bid_draft_snapshot_base_provenance_pair
         CHECK ((snapshot_base_amount_won IS NULL) = (snapshot_base_amount_provenance IS NULL)),
+    CONSTRAINT bid_draft_snapshot_base_provenance_detail_pair
+        -- CASE 로 적는다 — `IN` 이 NULL 을 내면 CHECK 는 통과로 읽으므로, 출처가 없을 때를 따로 가른다.
+        CHECK (
+            CASE
+                WHEN snapshot_base_amount_provenance IS NULL
+                    THEN snapshot_base_amount_provenance_detail IS NULL
+                WHEN snapshot_base_amount_provenance IN ('PUBLISHED', 'FILLED_FROM_BUDGET_KEY')
+                    THEN snapshot_base_amount_provenance_detail IS NOT NULL
+                ELSE snapshot_base_amount_provenance_detail IS NULL
+            END
+        ),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE INDEX bid_draft_case_idx ON bid_draft (case_id, draft_seq);
 
 CREATE TRIGGER bid_draft_append_only
     BEFORE UPDATE OR DELETE ON bid_draft
@@ -227,8 +315,10 @@ CREATE TRIGGER bid_draft_append_only
 -- =============================================================================
 CREATE TABLE bid_record (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    case_id BIGINT NOT NULL REFERENCES bid_case (id),
+    case_id BIGINT NOT NULL,
     account_id BIGINT NOT NULL REFERENCES account (id),
+    CONSTRAINT bid_record_case_owner_fk
+        FOREIGN KEY (case_id, account_id) REFERENCES bid_case (id, account_id),
     record_seq INT NOT NULL CHECK (record_seq >= 0),
     UNIQUE (case_id, record_seq),
 
@@ -244,12 +334,15 @@ CREATE TABLE bid_record (
 
     submitted_at TIMESTAMPTZ NOT NULL,
     confirmed_at TIMESTAMPTZ NOT NULL,
-    -- 기본값이 된 초안. 소급 확인은 초안 없이도 성립하므로 nullable 이다.
+    -- 확인 화면이 **기본값으로 채운 초안** — 기록 시점의 최신 초안이다(§6.1 「초안 금액을 기본값으로
+    -- 하되 다르게 냈으면 수정」). 「이 초안대로 냈다」가 아니다: 금액이 다를 수 있고, 같은지는 두
+    -- 금액을 비교해 본다. 소급 확인은 초안 없이도 성립하므로 nullable 이다.
     draft_id BIGINT REFERENCES bid_draft (id),
     retroactive BOOLEAN NOT NULL,
 
-    -- 추첨번호(V5 opening_result.draw_numbers 와 같은 형태).
-    draw_numbers INT[],
+    -- 추첨번호(V5 opening_result.draw_numbers 와 같은 형태). 원소 부호는 도메인(`BidSubmission`)과
+    -- 같은 규칙을 표가 한 번 더 진다.
+    draw_numbers INT[] CHECK (draw_numbers IS NULL OR 0 < ALL (draw_numbers)),
 
     evidence_ref TEXT CHECK (evidence_ref <> ''),
     -- R-5 3년. **「이 참조를 언제까지 보관하는가」이지 파일 파기 기한이 아니다** — PDF
@@ -263,8 +356,6 @@ CREATE TABLE bid_record (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX bid_record_case_idx ON bid_record (case_id, record_seq);
-
 CREATE TRIGGER bid_record_append_only
     BEFORE UPDATE OR DELETE ON bid_record
     FOR EACH ROW EXECUTE FUNCTION reject_mutation();
@@ -273,7 +364,9 @@ CREATE TRIGGER bid_record_append_only
 -- GRANT — **열 단위**다(V20 관례). 요청 경로(앱 역할)가 할 수 있는 일을 최소로 줄인다.
 --
 --  · `bid_case` 의 UPDATE 는 **전이가 실제로 바꾸는 열에만** 있다 — 앱 역할은 `account_id` ·
---    `notice_number` · `notice_round` · `bid_kind` · `created_at` 을 **바꿀 수 없다**.
+--    `notice_number` · `notice_round` · `bid_kind` · `deadline_at` · `created_at` 을 **바꿀 수 없다**.
+--    `outcome_notice_expected_at` 도 뺐다 — 오늘 그 열을 쓰는 경로가 없고(알려진 제한,
+--    `OPEN-7B-NOTICE-EXPECTED-WRITER`), 쓰지 않는 열에 권한을 열어 두지 않는다(계약 D-7B-3 결정 ②).
 --    건의 소유자를 갈아끼우거나 다른 공고의 건으로 둔갑시키는 길이 권한 층에서 없다.
 --  · 타임라인 · 초안 · 기록 셋은 INSERT · SELECT 뿐이다(append-only).
 --  · DELETE · TRUNCATE 는 **어느 표에도** 없다. 보존 · 파기는 6B-3 의 소유자 연결이 지고,
@@ -286,7 +379,6 @@ GRANT UPDATE (
     remind_at,
     opening_at,
     document_due_at,
-    outcome_notice_expected_at,
     skip_reason,
     updated_at
 ) ON bid_case TO bidvector_app;

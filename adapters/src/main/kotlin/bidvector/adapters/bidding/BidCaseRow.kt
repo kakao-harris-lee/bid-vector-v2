@@ -98,6 +98,7 @@ internal object BidCaseRow {
                     skipReason = rs.getString("skip_reason"),
                 ),
             caseVersion = rs.getInt("case_version"),
+            deadlineAt = rs.instantOrNull("deadline_at"),
             outcomeNoticeExpectedAt = rs.instantOrNull("outcome_notice_expected_at"),
         )
     }

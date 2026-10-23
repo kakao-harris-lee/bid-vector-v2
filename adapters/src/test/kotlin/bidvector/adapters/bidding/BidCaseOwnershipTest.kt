@@ -108,11 +108,11 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val other = account("own-b")
         val opened = workflow.open(other, notice("own-1"), BidKind.REAL)
 
-        workflow.read(mine, opened.case.id).shouldBeNull()
+        workflow.read(mine, opened.view.case.id).shouldBeNull()
         workflow.list(mine, BidKind.REAL, null).shouldBeEmpty()
-        workflow.timeline(mine, opened.case.id).shouldBeNull()
-        store.load(mine, opened.case.id).shouldBeNull()
-        store.timeline(mine, opened.case.id).shouldBeEmpty()
+        workflow.timeline(mine, opened.view.case.id).shouldBeNull()
+        store.load(mine, opened.view.case.id).shouldBeNull()
+        store.timeline(mine, opened.view.case.id).shouldBeEmpty()
     }
 
     @Test
@@ -123,14 +123,14 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
 
         workflow.command(
             mine,
-            opened.case.id,
+            opened.view.case.id,
             BidCommand.Skip(SkipReason("남의 건")),
             BidActor.User(mine),
         ) shouldBe BidCommandResult.CaseNotFound
 
         // 주인이 보기엔 아무 일도 없었다 — 생성 전이 하나뿐이다.
-        store.load(other, opened.case.id)!!.state shouldBe BidState.Watching
-        store.timeline(other, opened.case.id).size shouldBe 1
+        store.load(other, opened.view.case.id)!!.state shouldBe BidState.Watching
+        store.timeline(other, opened.view.case.id).size shouldBe 1
     }
 
     @Test
@@ -148,7 +148,10 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val mine = account("own-f")
         val first = workflow.open(mine, notice("own-4"), BidKind.REAL)
         val second = workflow.open(mine, notice("own-4"), BidKind.REAL)
-        second.case.id shouldBe first.case.id
+        second.view.case.id shouldBe first.view.case.id
+        // 갈래를 버리지 않는다 — 처음은 새로 담았고 둘째는 이미 있던 건이다(계약 D-7B-3).
+        first.created shouldBe true
+        second.created shouldBe false
         workflow.list(mine, BidKind.REAL, null).size shouldBe 1
     }
 
@@ -160,14 +163,14 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val opened = workflow.open(mine, notice("own-5"), BidKind.REAL)
 
         workflow
-            .command(mine, opened.case.id, BidCommand.Skip(SkipReason("면허 불일치")), BidActor.User(mine))
+            .command(mine, opened.view.case.id, BidCommand.Skip(SkipReason("면허 불일치")), BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
 
-        val reloaded = store.load(mine, opened.case.id)!!
+        val reloaded = store.load(mine, opened.view.case.id)!!
         reloaded.state shouldBe BidState.Skipped(SkipReason("면허 불일치"))
         reloaded.caseVersion shouldBe 1
 
-        val timeline = store.timeline(mine, opened.case.id)
+        val timeline = store.timeline(mine, opened.view.case.id)
         timeline.size shouldBe 2
         timeline.first().fromState.shouldBeNull()
         timeline.last().fromState shouldBe BidStateTag.WATCHING
@@ -182,16 +185,16 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val mine = account("own-h")
         val opened = workflow.open(mine, notice("own-6"), BidKind.REAL)
 
-        workflow.command(mine, opened.case.id, BidCommand.MarkDeadlinePassed, BidActor.User(mine))
+        workflow.command(mine, opened.view.case.id, BidCommand.MarkDeadlinePassed, BidActor.User(mine))
         workflow.command(
             mine,
-            opened.case.id,
+            opened.view.case.id,
             BidCommand.RecordBid(submission(EvidenceRef("doc-1")), evidenceRetainUntil = null),
             BidActor.User(mine),
         )
 
-        store.load(mine, opened.case.id)!!.state shouldBe BidState.BidRecorded
-        store.timeline(mine, opened.case.id).last().retroactive shouldBe true
+        store.load(mine, opened.view.case.id)!!.state shouldBe BidState.BidRecorded
+        store.timeline(mine, opened.view.case.id).last().retroactive shouldBe true
 
         dataSource().connection.use { connection ->
             connection
@@ -199,7 +202,7 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
                     "SELECT retroactive, amount_provenance, chosen_option_ref, draw_numbers, " +
                         "evidence_retain_until FROM bid_record WHERE case_id = ?",
                 ).use { statement ->
-                    statement.setLong(1, opened.case.id.value)
+                    statement.setLong(1, opened.view.case.id.value)
                     statement.executeQuery().use { rs ->
                         rs.next()
                         rs.getBoolean("retroactive") shouldBe true
@@ -222,10 +225,10 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val opened = workflow.open(mine, key, BidKind.REAL)
 
         workflow
-            .draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
+            .draft(mine, opened.view.case.id, amount(1_000_000L), now, BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
         workflow
-            .draft(mine, opened.case.id, amount(2_000_000L), now, BidActor.User(mine))
+            .draft(mine, opened.view.case.id, amount(2_000_000L), now, BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
 
         dataSource().connection.use { connection ->
@@ -234,7 +237,7 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
                     "SELECT draft_seq, amount_won, snapshot_notice_revision, amount_provenance " +
                         "FROM bid_draft WHERE case_id = ? ORDER BY draft_seq",
                 ).use { statement ->
-                    statement.setLong(1, opened.case.id.value)
+                    statement.setLong(1, opened.view.case.id.value)
                     statement.executeQuery().use { rs ->
                         rs.next()
                         rs.getInt("draft_seq") shouldBe 0
@@ -257,9 +260,9 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         // 공고를 심지 않는다(6B-3 파기 뒤와 같은 상태).
         val opened = workflow.open(mine, notice("own-11"), BidKind.REAL)
 
-        workflow.draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine)) shouldBe
+        workflow.draft(mine, opened.view.case.id, amount(1_000_000L), now, BidActor.User(mine)) shouldBe
             BidCommandResult.NoticeSnapshotUnavailable
-        store.load(mine, opened.case.id)!!.state shouldBe BidState.Watching
+        store.load(mine, opened.view.case.id)!!.state shouldBe BidState.Watching
     }
 
     private fun amount(won: Long) =
@@ -311,16 +314,16 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         seedNotice(key)
         val opened = workflow.open(mine, key, BidKind.REAL)
         workflow
-            .draft(mine, opened.case.id, amount(1_000_000L), now, BidActor.User(mine))
+            .draft(mine, opened.view.case.id, amount(1_000_000L), now, BidActor.User(mine))
             .shouldBeInstanceOf<BidCommandResult.Processed>()
         workflow.command(
             mine,
-            opened.case.id,
+            opened.view.case.id,
             BidCommand.RecordBid(submission(EvidenceRef("doc-j")), evidenceRetainUntil = null),
             BidActor.User(mine),
         )
         listOf("bid_case_transition", "bid_draft", "bid_record").forEach { table ->
-            withClue(table) { rowCount(table, opened.case.id.value) shouldBeGreaterThan 0 }
+            withClue(table) { rowCount(table, opened.view.case.id.value) shouldBeGreaterThan 0 }
         }
 
         val statements =
@@ -332,7 +335,7 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
                 "UPDATE bid_record SET amount_won = 1 WHERE case_id = ?",
                 "DELETE FROM bid_record WHERE case_id = ?",
             )
-        assertAllRejectedAsApp(statements, opened.case.id.value)
+        assertAllRejectedAsApp(statements, opened.view.case.id.value)
     }
 
     @Test
@@ -348,13 +351,35 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
                 "UPDATE bid_case SET bid_kind = 'PAPER' WHERE id = ?",
                 "DELETE FROM bid_case WHERE id = ?",
             )
-        assertAllRejectedAsApp(statements, opened.case.id.value)
+        assertAllRejectedAsApp(statements, opened.view.case.id.value)
+    }
+
+    /**
+     * 거부 단언의 **양성 대조**(계약 D-7B-3 · 검토 M-9) — 같은 연결 방식으로 허락돼야 하는 문장이 실제로
+     * 성공한다. 이것이 없으면 「연결이 아무 권한도 없다」(역할 설정 오류)와 「GRANT 가 좁다」가 같은 초록이다.
+     */
+    private fun assertAllowedAsApp(caseId: Long) {
+        appConnection().use { connection ->
+            connection.prepareStatement("UPDATE bid_case SET updated_at = updated_at WHERE id = ?").use { statement ->
+                statement.setLong(1, caseId)
+                statement.executeUpdate() shouldBe 1
+            }
+            connection.prepareStatement("SELECT count(*) FROM bid_case_transition WHERE case_id = ?").use { statement ->
+                statement.setLong(1, caseId)
+                statement.executeQuery().use { rs ->
+                    rs.next()
+                    rs.getInt(1) shouldBeGreaterThan 0
+                }
+            }
+            connection.rollback()
+        }
     }
 
     private fun assertAllRejectedAsApp(
         statements: List<String>,
         caseId: Long,
     ) {
+        assertAllowedAsApp(caseId)
         for (sql in statements) {
             appConnection().use { connection ->
                 val attempt =

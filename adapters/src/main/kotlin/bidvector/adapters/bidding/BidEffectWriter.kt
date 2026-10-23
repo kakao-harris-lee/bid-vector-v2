@@ -1,5 +1,7 @@
 package bidvector.adapters.bidding
 
+import bidvector.adapters.persistence.FloorRateOriginCodec
+import bidvector.adapters.persistence.ProvenanceCodec
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidDraft
 import bidvector.bidding.BidRecordEntry
@@ -14,6 +16,9 @@ import java.sql.Timestamp
  *
  * **UPDATE · DELETE 문장이 없다.** 초안 수정과 기록 갱신은 `*_seq + 1` 의 새 행이고, 그것이
  * 「스냅샷 불변」의 본체다 — 같은 행을 고치는 경로가 코드에도 권한에도 트리거에도 없다.
+ *
+ * 스냅샷의 출처 어휘는 `notice` 를 쓰는 **같은 코덱**([ProvenanceCodec] · [FloorRateOriginCodec])이
+ * 적는다(계약 D-7B-3, 검토 B-1). 손으로 쓴 셋째 어휘가 기초금액을 production 에서 늘 비게 만들었다.
  */
 internal object BidEffectWriter {
     fun insertDraft(
@@ -41,12 +46,13 @@ internal object BidEffectWriter {
             statement.setTimestamp(index++, Timestamp.from(snapshot.takenAt))
             statement.setTimestamp(index++, snapshot.deadlineAt?.let(Timestamp::from))
             statement.setBigDecimal(index++, snapshot.floorRate?.rate?.fraction)
-            statement.setString(index++, snapshot.floorRate?.origin?.let(::floorOriginKind))
-            statement.setString(index++, snapshot.floorRate?.origin?.let(::floorOriginDetail))
+            statement.setString(index++, snapshot.floorRate?.origin?.let(FloorRateOriginCodec::kindOf))
+            statement.setString(index++, snapshot.floorRate?.origin?.let(FloorRateOriginCodec::detailOf))
             statement.setObject(index++, base?.won)
             statement.setString(index++, base?.currency?.name)
             statement.setString(index++, base?.vatTreatment?.name)
-            statement.setString(index, base?.provenance?.let(::provenanceCode))
+            statement.setString(index++, base?.provenance?.let(ProvenanceCodec::kindNameOf))
+            statement.setString(index, base?.provenance?.let(ProvenanceCodec::detailOf))
             statement.executeUpdate()
         }
     }
@@ -100,7 +106,10 @@ internal object BidEffectWriter {
             }
         }
 
-    /** 기록이 기본값으로 삼은 초안 — 소급 확인이면 초안이 없을 수 있다(그러면 `null`). */
+    /**
+     * 확인 화면이 기본값으로 채운 초안 = 기록 시점의 **최신 초안**(§6.1, `BiddingSql.LATEST_DRAFT_ID`).
+     * 소급 확인이면 초안이 없을 수 있다(그러면 `null`).
+     */
     private fun latestDraftId(
         connection: Connection,
         account: AccountId,
@@ -110,32 +119,5 @@ internal object BidEffectWriter {
             statement.setLong(1, account.value)
             statement.setLong(2, caseId.value)
             statement.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else null }
-        }
-
-    /**
-     * provenance → 저장 어휘. **반사(`it::class.simpleName`)를 쓰지 않는다** — 타입 이름을
-     * 값으로 꺼내면 클래스 이름을 바꾸는 순간 저장된 값의 뜻이 조용히 달라지고, 그 경로는
-     * 수집 아키텍처 게이트가 막는 자리이기도 하다(`collection.reflection.*`).
-     */
-    private fun provenanceCode(provenance: bidvector.sharedkernel.Provenance): String =
-        when (provenance) {
-            is bidvector.sharedkernel.Provenance.Published -> "Published"
-            bidvector.sharedkernel.Provenance.DerivedFromOpening -> "DerivedFromOpening"
-            is bidvector.sharedkernel.Provenance.FilledFromBudgetKey -> "FilledFromBudgetKey"
-            bidvector.sharedkernel.Provenance.CopiedFromBaseAmount -> "CopiedFromBaseAmount"
-            bidvector.sharedkernel.Provenance.OperatorDeclared -> "OperatorDeclared"
-            bidvector.sharedkernel.Provenance.Undeclared -> "Undeclared"
-        }
-
-    private fun floorOriginKind(origin: bidvector.sharedkernel.FloorRateOrigin): String =
-        when (origin) {
-            is bidvector.sharedkernel.FloorRateOrigin.NoticeValue -> "NOTICE_VALUE"
-            is bidvector.sharedkernel.FloorRateOrigin.StatutoryTable -> "STATUTORY_TABLE"
-        }
-
-    private fun floorOriginDetail(origin: bidvector.sharedkernel.FloorRateOrigin): String? =
-        when (origin) {
-            is bidvector.sharedkernel.FloorRateOrigin.NoticeValue -> origin.noticeRevision.value
-            is bidvector.sharedkernel.FloorRateOrigin.StatutoryTable -> origin.effectiveFrom.toString()
         }
 }

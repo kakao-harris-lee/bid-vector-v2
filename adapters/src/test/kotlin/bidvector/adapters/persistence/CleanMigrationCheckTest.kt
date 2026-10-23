@@ -85,17 +85,19 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             //    bid_kind enum + state enum(열넷) + case_version>=0 + 상태별 필수 다섯
             //    (나중에⇒리마인드 · 건너뜀⇒사유 · 사유는 건너뜀에만 · 개찰 대기⇒개찰일시 ·
             //    심사 중⇒서류 기한).
-            //  · bid_case_transition 10 = 존재 가드 넷(from_state·to_state·command·actor_detail)
-            //    + reason 공백 + case_version>=0 + actor_kind enum + actor 짝 + 사유 필수(둘)
-            //    + 소급 출처 제한.
-            //  · bid_draft 13 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
-            //    + draft_seq>=0 + 스냅샷 판 번호 하한 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3).
-            //  · bid_record 10 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
-            //    + record_seq>=0 + evidence_ref 공백 + 증빙 짝 + memo 공백.
+            //  · bid_case_transition 10 = 어휘 enum 셋(from_state·to_state·command — 계약 D-7B-3 에서
+            //    공백 가드가 열거로 바뀌었다, 수는 같다) + actor_detail 공백 + reason 공백·상한
+            //    + case_version>=0 + actor_kind enum + actor 짝 + 사유 필수 + 소급 출처 제한.
+            //  · bid_draft 19 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + draft_seq>=0 + 스냅샷 판 번호 하한 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3)
+            //    + 계약 D-7B-3 의 여섯(하한율 출처 enum · detail 공백 · detail 짝 · 기초금액 출처 enum
+            //    · detail 공백 · detail 짝).
+            //  · bid_record 11 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + record_seq>=0 + evidence_ref 공백 + 증빙 짝 + memo 공백 + 추첨번호 부호(D-7B-3).
             "bid_case" to 11,
             "bid_case_transition" to 10,
-            "bid_draft" to 13,
-            "bid_record" to 10,
+            "bid_draft" to 19,
+            "bid_record" to 11,
         )
 
     @Test

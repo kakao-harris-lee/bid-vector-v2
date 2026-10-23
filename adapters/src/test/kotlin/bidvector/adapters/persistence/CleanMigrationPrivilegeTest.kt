@@ -292,7 +292,7 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
             // M7/7B 입찰 건 넷 — SELECT · INSERT 뿐이다. **DELETE · TRUNCATE 가 없다.**
             //
             // `bid_case` 의 `update` 가 `false` 인 것은 권한이 없다는 뜻이 아니라 **열 단위**라는
-            // 뜻이다(`browser_session` 과 같은 자리): V21 은 전이가 바꾸는 여덟 열에만 UPDATE 를
+            // 뜻이다(`browser_session` 과 같은 자리): V21 은 전이가 바꾸는 일곱 열에만 UPDATE 를
             // 주고, `has_table_privilege(..., 'UPDATE')` 는 열 단위 부여를 표 단위 권한으로
             // 세지 않는다. 열 집합 자체는 `BidCaseColumnPrivilegeTest` 가 따로 잰다 —
             // 이 행렬만으로는 「어느 열인가」가 비어 있다.

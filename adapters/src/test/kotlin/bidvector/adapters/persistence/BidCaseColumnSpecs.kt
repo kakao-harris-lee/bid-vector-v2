@@ -22,6 +22,7 @@ internal val bidCaseColumns =
         ColumnSpec("bid_case", "bid_kind", "text", false),
         ColumnSpec("bid_case", "state", "text", false),
         ColumnSpec("bid_case", "case_version", "integer", false),
+        ColumnSpec("bid_case", "deadline_at", "timestamp with time zone", true),
         ColumnSpec("bid_case", "remind_at", "timestamp with time zone", true),
         ColumnSpec("bid_case", "opening_at", "timestamp with time zone", true),
         ColumnSpec("bid_case", "document_due_at", "timestamp with time zone", true),
@@ -64,6 +65,7 @@ internal val bidCaseColumns =
         ColumnSpec("bid_draft", "snapshot_base_amount_currency", "text", true),
         ColumnSpec("bid_draft", "snapshot_base_amount_vat", "text", true),
         ColumnSpec("bid_draft", "snapshot_base_amount_provenance", "text", true),
+        ColumnSpec("bid_draft", "snapshot_base_amount_provenance_detail", "text", true),
         ColumnSpec("bid_draft", "created_at", "timestamp with time zone", false, true),
         // --- bid_record
         ColumnSpec("bid_record", "id", "bigint", false),

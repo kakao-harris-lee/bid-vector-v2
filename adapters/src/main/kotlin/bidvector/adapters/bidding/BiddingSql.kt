@@ -7,14 +7,14 @@ package bidvector.adapters.bidding
  * 부를 수 없다」까지이고, **그 계정이 실제로 질의를 좁히는가**는 이 파일이 진다. 둘 다 없으면
  * 조용히 열린다 — `BidCaseOwnershipTest` 가 실 DB 위에서 그 등식을 잰다.
  *
- * 쓰는 열은 V21 의 열 단위 GRANT 와 **짝**이다: `bid_case` 의 UPDATE 는 전이가 바꾸는 여덟
+ * 쓰는 열은 V21 의 열 단위 GRANT 와 **짝**이다: `bid_case` 의 UPDATE 는 전이가 바꾸는 일곱
  * 열뿐이고, `account_id` · 공고 키 · `bid_kind` 를 적는 UPDATE 문장이 여기 **없다**.
  * 나머지 세 표에는 UPDATE · DELETE 문장이 아예 없다(append-only).
  */
 internal object BiddingSql {
     private const val CASE_COLUMNS =
         "id, notice_number, notice_round, bid_kind, state, case_version, " +
-            "remind_at, opening_at, document_due_at, outcome_notice_expected_at, skip_reason"
+            "deadline_at, remind_at, opening_at, document_due_at, outcome_notice_expected_at, skip_reason"
 
     const val SELECT_CASE_BY_ID =
         "SELECT $CASE_COLUMNS FROM bid_case WHERE account_id = ? AND id = ?"
@@ -34,8 +34,8 @@ internal object BiddingSql {
 
     const val INSERT_CASE =
         "INSERT INTO bid_case (" +
-            "account_id, notice_number, notice_round, bid_kind, state, case_version, updated_at" +
-            ") VALUES (?, ?, ?, ?, 'WATCHING', 0, ?) " +
+            "account_id, notice_number, notice_round, bid_kind, state, case_version, deadline_at, updated_at" +
+            ") VALUES (?, ?, ?, ?, 'WATCHING', 0, ?, ?) " +
             "ON CONFLICT (account_id, notice_number, notice_round, bid_kind) DO NOTHING " +
             "RETURNING $CASE_COLUMNS"
 
@@ -43,13 +43,17 @@ internal object BiddingSql {
      * 전이의 **조건부 갱신** — `case_version = ?` 가 낙관적 잠금이다. 0 행이면 경합이고,
      * 그때 아무것도 쓰이지 않는다(타임라인 INSERT 는 같은 트랜잭션 뒤에 온다).
      *
-     * 일정 축 넷과 사유는 **전이가 정한 값으로 통째 덮는다** — 「이전 상태의 잔재가 남는」
+     * 일정 축 셋과 사유는 **전이가 정한 값으로 통째 덮는다** — 「이전 상태의 잔재가 남는」
      * 경우를 없앤다(건너뜀이 아닌 상태에 사유가 남으면 CHECK 가 거부한다).
+     *
+     * `outcome_notice_expected_at` 은 **이 문장에 없다**(계약 D-7B-3 결정 ②) — 전이가 그 축을 정하지
+     * 않으므로 덮으면 지운다. 쓰는 경로는 아직 없다(`OPEN-7B-NOTICE-EXPECTED-WRITER`). `deadline_at`
+     * 사본도 전이가 고치지 않는다 — 둘 다 V21 의 열 GRANT 밖이다.
      */
     const val UPDATE_CASE_STATE =
         "UPDATE bid_case SET " +
             "state = ?, case_version = ?, remind_at = ?, opening_at = ?, document_due_at = ?, " +
-            "outcome_notice_expected_at = ?, skip_reason = ?, updated_at = ? " +
+            "skip_reason = ?, updated_at = ? " +
             "WHERE account_id = ? AND id = ? AND case_version = ?"
 
     const val INSERT_TRANSITION =
@@ -73,12 +77,16 @@ internal object BiddingSql {
             "snapshot_taken_at, snapshot_deadline_at, snapshot_floor_rate_fraction, " +
             "snapshot_floor_rate_origin_kind, snapshot_floor_rate_origin_detail, " +
             "snapshot_base_amount_won, snapshot_base_amount_currency, snapshot_base_amount_vat, " +
-            "snapshot_base_amount_provenance" +
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "snapshot_base_amount_provenance, snapshot_base_amount_provenance_detail" +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
     const val NEXT_RECORD_SEQ =
         "SELECT COALESCE(MAX(record_seq) + 1, 0) FROM bid_record WHERE account_id = ? AND case_id = ?"
 
+    /**
+     * 확인 화면이 **기본값으로 채운 초안** = 기록 시점의 최신 초안(§6.1 「초안 금액을 기본값으로 하되
+     * 다르게 냈으면 수정」). 「이 초안대로 냈다」는 뜻이 아니다 — 금액은 기록이 따로 싣는다.
+     */
     const val LATEST_DRAFT_ID =
         "SELECT id FROM bid_draft WHERE account_id = ? AND case_id = ? ORDER BY draft_seq DESC LIMIT 1"
 

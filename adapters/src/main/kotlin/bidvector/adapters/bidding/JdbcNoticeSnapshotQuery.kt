@@ -1,15 +1,14 @@
 package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
-import bidvector.adapters.persistence.connectionSourceOf
+import bidvector.adapters.persistence.DataSourceConnectionSource
+import bidvector.adapters.persistence.FloorRateOriginCodec
+import bidvector.adapters.persistence.ProvenanceCodec
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.NoticeSnapshot
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.FloorRate
-import bidvector.sharedkernel.FloorRateOrigin
-import bidvector.sharedkernel.NoticeRound
-import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.VatTreatment
 import bidvector.workflow.bidding.NoticeSnapshotQueryPort
@@ -30,7 +29,7 @@ class JdbcNoticeSnapshotQuery(
     private val connections: ConnectionSource,
 ) : NoticeSnapshotQueryPort {
     /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
-    constructor(dataSource: DataSource) : this(connectionSourceOf(dataSource))
+    constructor(dataSource: DataSource) : this(DataSourceConnectionSource(dataSource))
 
     override fun snapshot(
         notice: NoticeKey,
@@ -41,75 +40,58 @@ class JdbcNoticeSnapshotQuery(
                 statement.setString(1, notice.noticeNumber)
                 statement.setString(2, notice.noticeRound.value)
                 statement.executeQuery().use { rs ->
-                    if (rs.next()) rs.toSnapshot(notice.noticeRound, takenAt) else null
+                    if (rs.next()) rs.toSnapshot(takenAt) else null
                 }
             }
         }
 
-    private fun ResultSet.toSnapshot(
-        round: NoticeRound,
-        takenAt: Instant,
-    ): NoticeSnapshot =
+    private fun ResultSet.toSnapshot(takenAt: Instant): NoticeSnapshot =
         NoticeSnapshot(
             noticeRevisionNumber = getLong("revision"),
             takenAt = takenAt,
             deadlineAt = instantOrNull("deadline_at"),
-            floorRate = floorRate(round),
-            baseAmount = baseAmount(round),
+            floorRate = floorRate(),
+            baseAmount = baseAmount(),
         )
 
     /**
-     * 하한율은 값과 출처가 **짝**이다(V1 의 CHECK 와 같은 축) — 한쪽만 있으면 `null` 이다.
-     * 출처 어휘는 좁게 받는다(모르는 어휘는 `null`).
+     * 하한율은 값과 출처가 **짝**이다(V1 의 CHECK 와 같은 축). 출처는 `notice` 를 쓴 코덱
+     * ([FloorRateOriginCodec])이 그대로 푼다 — 공고 판(`NoticeValue`)과 법정표(`StatutoryTable`) 둘 다다.
      */
-    private fun ResultSet.floorRate(round: NoticeRound): FloorRate? {
+    private fun ResultSet.floorRate(): FloorRate? {
         val fraction = getBigDecimal("floor_rate_fraction")
-        val origin =
-            when (getString("floor_rate_origin_kind")) {
-                "NOTICE_VALUE" -> FloorRateOrigin.NoticeValue(round)
-                else -> null
-            }
-        return if (fraction == null || origin == null) null else FloorRate(Rate.ofFraction(fraction), origin)
+        val kind = getString("floor_rate_origin_kind")
+        val detail = getString("floor_rate_origin_detail")
+        return if (fraction == null || kind == null || detail == null) {
+            null
+        } else {
+            FloorRate(Rate.ofFraction(fraction), FloorRateOriginCodec.decode(kind, detail))
+        }
     }
 
     /**
-     * 기초금액 — 네 성분이 **모두** 있을 때만 값을 낸다. provenance 어휘도 좁게 복원하고,
-     * 모르는 어휘면 금액 자체를 비운다 — basis · 출처 없는 금액을 스냅샷에 싣느니 「없음」이 낫다.
+     * 기초금액 — 네 성분이 **모두** 있을 때만 값을 낸다(V1 의 짝 CHECK 가 그것을 보장한다). 출처는
+     * `notice` 를 쓴 코덱([ProvenanceCodec])이 detail 과 함께 푼다(계약 D-7B-3, 검토 B-1).
      */
-    private fun ResultSet.baseAmount(round: NoticeRound): BaseAmount? {
+    private fun ResultSet.baseAmount(): BaseAmount? {
         val won = getBigDecimal("base_amount_won")
         val currencyName = getString("base_amount_currency")
         val vatName = getString("base_amount_vat")
-        val provenance = provenanceOf(getString("base_amount_provenance"), round)
+        val provenance = getString("base_amount_provenance")
         // 네 성분 중 하나라도 비면 금액을 내지 않는다 — 「전부 있는가」를 한 자리에서 센다.
-        val parts = listOf(won, currencyName, vatName, provenance)
-        if (parts.any { it == null }) return null
+        if (listOf(won, currencyName, vatName, provenance).any { it == null }) return null
         return BaseAmount(
             won = requireNotNull(won).longValueExact(),
             currency = Currency.valueOf(requireNotNull(currencyName)),
             vatTreatment = VatTreatment.valueOf(requireNotNull(vatName)),
-            provenance = requireNotNull(provenance),
+            provenance = ProvenanceCodec.decode(requireNotNull(provenance), getString("base_amount_provenance_detail")),
         )
     }
 
-    /** 저장 어휘 → provenance 룩업. 모르는 값은 `null` 이다(지어내지 않는다). */
-    private fun provenanceOf(
-        code: String?,
-        round: NoticeRound,
-    ): Provenance? =
-        when (code) {
-            "Published" -> Provenance.Published(round)
-            "DerivedFromOpening" -> Provenance.DerivedFromOpening
-            "CopiedFromBaseAmount" -> Provenance.CopiedFromBaseAmount
-            "OperatorDeclared" -> Provenance.OperatorDeclared
-            "Undeclared" -> Provenance.Undeclared
-            else -> null
-        }
-
     private companion object {
         const val SELECT_SNAPSHOT =
-            "SELECT revision, deadline_at, floor_rate_fraction, floor_rate_origin_kind, " +
-                "base_amount_won, base_amount_currency, base_amount_vat, base_amount_provenance " +
-                "FROM notice WHERE notice_number = ? AND notice_round = ?"
+            "SELECT revision, deadline_at, floor_rate_fraction, floor_rate_origin_kind, floor_rate_origin_detail, " +
+                "base_amount_won, base_amount_currency, base_amount_vat, base_amount_provenance, " +
+                "base_amount_provenance_detail FROM notice WHERE notice_number = ? AND notice_round = ?"
     }
 }

@@ -1,7 +1,7 @@
 package bidvector.adapters.bidding
 
 import bidvector.adapters.persistence.ConnectionSource
-import bidvector.adapters.persistence.connectionSourceOf
+import bidvector.adapters.persistence.DataSourceConnectionSource
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
@@ -36,17 +36,18 @@ class JdbcBidCaseStore(
     private val connections: ConnectionSource,
 ) : BidCaseStorePort {
     /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
-    constructor(dataSource: DataSource) : this(connectionSourceOf(dataSource))
+    constructor(dataSource: DataSource) : this(DataSourceConnectionSource(dataSource))
 
     override fun open(
         account: AccountId,
         notice: NoticeKey,
         kind: BidKind,
         at: Instant,
+        deadlineAt: Instant?,
     ): OpenCaseResult =
         connections.withConnection { connection ->
             connection.inTransaction {
-                val inserted = insertCase(connection, account, notice, kind, at)
+                val inserted = insertCase(connection, account, notice, kind, at, deadlineAt)
                 if (inserted != null) {
                     insertTransition(
                         connection = connection,
@@ -181,16 +182,19 @@ class JdbcBidCaseStore(
         }
     }
 
+    @Suppress("LongParameterList")
     private fun insertCase(
         connection: Connection,
         account: AccountId,
         notice: NoticeKey,
         kind: BidKind,
         at: Instant,
+        deadlineAt: Instant?,
     ): BidCase? =
         connection.prepareStatement(BiddingSql.INSERT_CASE).use { statement ->
-            val next = statement.bindCaseKey(account, notice, kind)
-            statement.setTimestamp(next, Timestamp.from(at))
+            var index = statement.bindCaseKey(account, notice, kind)
+            statement.setTimestamp(index++, deadlineAt.toTimestampOrNull())
+            statement.setTimestamp(index, Timestamp.from(at))
             statement.executeQuery().use { rs -> if (rs.next()) BidCaseRow.toCase(rs) else null }
         }
 
@@ -231,8 +235,6 @@ class JdbcBidCaseStore(
             statement.setTimestamp(index++, BidCaseRow.remindAtOf(next).toTimestampOrNull())
             statement.setTimestamp(index++, BidCaseRow.openingAtOf(next).toTimestampOrNull())
             statement.setTimestamp(index++, BidCaseRow.documentDueAtOf(next).toTimestampOrNull())
-            // 통보 예정일 축은 이 slice 의 전이가 쓰지 않는다 — 값을 지어내지 않고 그대로 둔다.
-            statement.setTimestamp(index++, null)
             statement.setString(index++, BidCaseRow.skipReasonOf(next))
             statement.setTimestamp(index++, Timestamp.from(applied.occurredAt))
             statement.setLong(index++, account.value)
