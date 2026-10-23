@@ -5,6 +5,7 @@ import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.procurement.INTERRUPTED_ROUND
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
@@ -395,6 +396,33 @@ class PromoteOpeningResultsUseCaseTest {
             )
 
         val report = reportOf(useCaseOf(source, sampleListOf(id), repository, FakeAttemptLedger()).promote())
+
+        report.promoted shouldBe 0
+        report.noUsableAxis shouldBe 1
+        repository.persistCalls.size shouldBe 0
+    }
+
+    @Test
+    fun `g1c03 이 끊긴 라운드를 닫아도 그 상세 축은 승격되지 않는다`() {
+        // 닫는 줄은 `INTERRUPTED_ROUND`(= `Failed("INTERRUPTED")`)이고 `isSettled` 가 false 다 —
+        // 그래서 원장 판독은 그 축의 **결말을 내지 않는다**. 승격은 줄의 어휘를 따로 읽지 않고
+        // 「상세 축 + 결말 없음 → 쓰지 않는다」 하나로 같은 답에 닿는다(D-7C5P-11). 두 레인이
+        // 겹치지 않고 **합성**된다는 것이 이 사례의 내용이다.
+        val id = noticeId("PROMOTE-019")
+        val repository = RecordingResultRepository()
+        val source =
+            ScriptedRawAxisSource(
+                OpeningRawAxisRead(
+                    listOf(groupOf(id, RowSpec(SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, mapOf("plnprc" to "100")))),
+                ),
+            )
+        val attempts =
+            FakeAttemptLedger(
+                openRoundLines(id, SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A) +
+                    axisLine(id, SourceEndpoint.RESERVE_PRICE_DETAIL, WALK_A, INTERRUPTED_ROUND),
+            )
+
+        val report = reportOf(useCaseOf(source, sampleListOf(id), repository, attempts).promote())
 
         report.promoted shouldBe 0
         report.noUsableAxis shouldBe 1
