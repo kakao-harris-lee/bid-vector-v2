@@ -828,7 +828,8 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 | V-M7 | V21 열 GRANT `updated_at` → `created_at`(verifier 변이 그대로) | `BidCaseColumnPrivilegeTest` | **RED** 2 — 열 집합 등식 · 앱 역할 끝까지 경로(`permission denied`) |
 | V-M3 | 조건부 UPDATE 의 `account_id = ?` → `?::bigint IS NOT NULL`(verifier 변이 그대로) | `BiddingSqlOwnershipTest` | **RED** 1 |
 | D1-lazy2 | 마감 판정 조건을 늘 거짓으로(결정 ① 의 지연 판정을 끈다) | `BidCaseScheduleTest` | **RED** 4 — 남은 둘은 「마감 전 무전이」·「통보 예정일」(판정과 무관한 축, 기대대로 초록) |
-| D1-control | 통제군 — 변이 없음 | `BidCaseScheduleTest` | 초록 6 / 6 |
+| D1-control | 통제군 — 변이 없음 | `BidCaseScheduleTest` | 초록 6 / 6(정정 공고 test 둘을 더한 뒤 다시 재서 8 / 8) |
+| COPY-first | 마감을 **사본 우선**으로(정정 공고의 지금 값을 무시) | `BidCaseScheduleTest` | **RED** 2 — 정정이 마감을 앞당긴 건 · 미룬 건(팀장 확인 2026-10-24 로 더한 test 둘) |
 | B1-read | 구판 거동 — 읽기가 출처를 클래스 이름 표기로 맞댄다 | `BidCaseSnapshotTest` | **RED** 2(기초금액 단언 둘) |
 | B1-write | 구판 거동 — 쓰기가 출처를 클래스 이름 표기로 쓴다 | `BidCaseSnapshotTest` | **RED** 2(새 어휘 CHECK 가 쓰기를 거부) |
 | D2-old | 구판 거동 — 전이가 통보 예정일을 NULL 로 덮는다 | `BidCaseScheduleTest` | **RED** 1 |
@@ -931,7 +932,12 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 | 백업·복원 리허설(S-23c) | 같은 자리 | **통과** — Flyway top 21 · 복원본 `validate` · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복 |
 | `check` job — S-20 `one-command-check.sh` | 같은 자리 | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 바이트 등식(99658 bytes) · Playwright 2 passed |
 
-### 7.2 수정 라운드 1 재실측 (판정 판 — 마지막 산출물 커밋 「style … 앱 역할 마감 test」, base `998b59dd`)
+### 7.2 수정 라운드 1 재실측 (base `998b59dd`)
+
+아래 표는 산출물 커밋 「style … 앱 역할 마감 test」에서 쟀다. 그 뒤 팀장 확인(정정 공고가 마감을 앞당긴 경우)으로 **test 파일 하나**
+(`BidCaseScheduleTest`, test 둘 추가)만 바뀐 산출물 커밋이 더 생겼고(마지막 산출물 커밋 「style … 정정 공고 test」), 그 커밋에서
+Kotlin `check` 를 다시 잰다(결과는 동결 보고 · PR 조치 코멘트가 정본). S-20 의 Python · web 절과 container 재생의 입력에는 그 파일이
+없다 — `git diff --name-only` 로 두 커밋 사이는 그 test 파일과 evidence 뿐이다.
 
 | 항목 | 결과 |
 |---|---|
@@ -972,7 +978,10 @@ rebase 했으므로, 같은 명령을 새 트리에서 다시 잰 결과는 §7.
 `998b59dd` 트리 · ④⑤⑥ `check` **exit 0**(9m42s). (측정 스크립트의 「전」 줄과 ③ 이 옛 base 를 보고 있어 그 두 줄만 `998b59dd` 기준으로
 다시 냈다 — 되돌린 트리 자체는 스크립트와 무관하게 `rollback.md` 의 HEAD 판 명령이 만든 것이다.)
 
-**수정 라운드 1 재실측(판정 판)** — clone 을 마지막 산출물 커밋(「style … 앱 역할 마감 test」)에 세웠다: 변경 A 59 · M 31 →
+**마지막 산출물 커밋(「style … 정정 공고 test」)** — ①~③ 을 같은 절차로 다시 쟀다: A 59 · M 31 → ① exit 0 · ② D 59 · M 31 · ③ diff 0 ·
+untracked 0 · 표지 737 → 0 · 되돌린 트리 객체 = `998b59dd` 트리. 더해진 test 파일은 `A` 라 ⓑ 가 통째로 지운다.
+
+**수정 라운드 1 재실측** — clone 을 산출물 커밋 「style … 앱 역할 마감 test」에 세웠다: 변경 A 59 · M 31 →
 ① exit 0 · ② D 59 · M 31 · 그 밖 0 · ③ base(`998b59dd`)와 diff 0 줄 · untracked 0 · 내 표지 737 → **0** · main 표지 3 보존 · 되돌린 트리 객체
 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 의 clone `check` 는 exit 0 이었지만 **162 task 전부 build cache 적중**이라 실행이 아니다 — 그래서
 결과로 세지 않고 **트리 동일성으로 갈음**한다: 같은 트리 객체에서 04:08 의 clone `check` 가 **실제로 실행해** exit 0(9m42s)이었다.
