@@ -24,6 +24,12 @@ internal fun openingHaltLine(halt: OpeningCollectionHalt): String =
         "truncation=${halt.truncationCause ?: "none"} notAttempted=${halt.notAttempted} " +
         "partialNotice=${halt.partialNotice}"
 
+/**
+ * **건너뜀 둘은 줄 끝에 선다**(M6/G1-C03, D-G1C03-1). 회계 열은 하나(`backoff_skipped`)라 거기서는
+ * 사유가 섞이는데, 운영자가 「수집이 줄었다」를 사유와 함께 보는 자리가 이 줄이다. 끝에 더하는 이유는
+ * 이 줄을 읽는 쪽이 `frame=` **이후를 통째로** 잘라 요약에 붙이기 때문이다(레인 확인) — 가운데에
+ * 끼우면 그 요약의 기존 토큰 자리가 밀린다.
+ */
 internal fun openingFinishLine(
     report: OpeningCollectionReport,
     exitCode: CollectionExitCode,
@@ -31,7 +37,8 @@ internal fun openingFinishLine(
     "opening-collection finished frame=${report.frameSize} sampled=${report.sample.selected.size} " +
         "requested=${report.sample.requested} short=${report.sample.short} " +
         "strata=${report.sample.strata.size} sampleUnseen=${report.sampleUnseen} " +
-        "detailCalls=${report.detailCalls} halted=${report.halted != null} exit=${exitCode.value}"
+        "detailCalls=${report.detailCalls} halted=${report.halted != null} exit=${exitCode.value} " +
+        "skippedAgeGate=${report.skipped.ageGate} skippedRecheckGate=${report.skipped.recheckGate}"
 
 /** 멈춤은 미완이다 — 예산이든 쿼터든 표본 전체를 받지 못했다. */
 internal fun openingExitCodeOf(report: OpeningCollectionReport): CollectionExitCode =

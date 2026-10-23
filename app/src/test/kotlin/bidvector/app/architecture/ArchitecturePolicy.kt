@@ -302,6 +302,17 @@ class ArchitecturePolicy private constructor(
     val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")
 
     /**
+     * M6/G1-C03 (D-G1C03-5) — 조회 가치 술어 파일 클래스와 그것을 참조해도 되는 production 클래스(기준 시각 경계 하나),
+     * 개찰 표본 후보 타입과 그것을 지어도 되는 클래스(표본틀 하나).
+     */
+    val detailFetchPredicateType: String get() = value("collection.detail-fetch-predicate.type")
+    val detailFetchPredicateReferencers: List<String>
+        get() = list("collection.detail-fetch-predicate.allowed-referencers")
+    val openingCandidateType: String get() = value("collection.opening-candidate.type")
+    val openingCandidateConstructors: List<String>
+        get() = list("collection.opening-candidate.allowed-constructors")
+
+    /**
      * T-D. **손 열거가 아니라 도출된 후보의 분류**다 — `memberEffectGate` 가 허용 클래스에서
      * 효과 표면에 닿는 멤버를 내고, `member-effects.properties` 가 그 후보를 하나씩
      * `forbidden`/`reviewed` 로 가른다. 여기서는 `forbidden` 만 읽는다.
