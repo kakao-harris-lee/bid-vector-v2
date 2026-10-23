@@ -99,6 +99,24 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
   `reference-date` 가산 · 커밋 메시지 test 수 정정은 evidence 에 사실로.
 - 그 뒤 마지막 산출물 커밋에서 check · 변이(신규 포함) · rollback ①~⑥ · container 재생 → 동결.
 
+**D-7C5P-11 (2026-10-23, 팀장 — 검토 r2 수령: verifier not-ready R2-1 high(재작업 2/5) · CR APPROVE(MEDIUM 2 · LOW 2), 일괄 배치).**
+- **R2-1 = CR MEDIUM-1 — 검증자 처방을 택한다.** 결말(`AXIS` 줄)이 없는 축은 **목록 축만** 행 시각으로 물러서고, 상세 축은 열린 라운드 유무와
+  무관하게 `Unusable` 이다. 근거: 잘린 상세 걷기가 승격되면 1위·자식 행이 굳고 자식 행은 지워지지 않는다(D-3E-3 (a)) — 되돌리기 어려운 쪽을
+  막는다. CR 의 「구현 유지 + 등재」안은 기각한다. 비용(원장 이전·다른 실행 상태 디렉터리의 상세 축 원문은 승격되지 않음 — 다음 수집이
+  원장 줄과 함께 다시 적재하면 승격된다)은 제한으로 등재한다.
+  - 목록/상세 판정은 **둘째 목록을 만들지 않고** 기존 선언 하나에서 유도한다(`SourceEndpoint` 쪽 속성, 또는 원장의 「목록 축 줄은 공고 키가 없다」
+    규칙의 정본 — 어느 쪽이든 정본 하나, 다른 자리는 그것을 부른다). 수집 쪽 `DetailAxis` 와 등식 test 하나.
+  - 열린 라운드 판독은 남긴다(무해). 회귀 test 는 VP3 모양(원장 줄 0 + 상세 축 원문 → 승격 0) 순수 층·use case 층 각 하나, 구판 `73f31710` 에서 RED 실측.
+  - 점검표 §2.1 의 「추출 `incomplete_axis` 와 같은 판정」 문장을 실측과 맞춘다.
+- **CR MEDIUM-2**: 비교자 2차 키 test 의 주석·처분표를 「2차 키 **방향**을 잠근다」로 고치고, 같은 test 에 열거 순서 단언
+  (`OPENING_AWARD_LIST.ordinal < OPENING_RESULT_LIST.ordinal`)을 더한다.
+- **CR LOW-1**: `commands.md` §3 변이표에 새 넷(+R2-1 몫)을 행으로 더하고(패치 한 줄 · 붉어진 test 이름) 제목 수를 §3b 와 맞춘다.
+- **CR LOW-2**: 러너 실패 경로(`promoteOrFail` catch) 한 사례를 대역으로 잰다. `Unlockable` 은 형제도 재지 않으므로 제한 한 줄로 둔다.
+- **verifier L-r2-1**: rollback.md 「되돌리는 법」 코드 블록의 낡은 수(A 15건)를 재산출 값으로. **L-r2-2**: 출하 조립 실 DB test 가 배선 클래스
+  `OpeningPromotionWiring` 을 거치게 하거나, 거치지 못하는 이유를 제한으로 등재(레인 판단, 처분표에 적는다).
+- **rebase 는 이 배치 커밋 뒤, 동결 전에 한다**: main `54e2c5e2`(g1c03 머지) 위로. 설정 파일 겹침은 합집합, 의존 게이트 면제 수 재계산,
+  g1c03 `INTERRUPTED_ROUND` 와 닫힌 라운드 사례 하나 추가. 그 HEAD 에서 check · 변이(신규 포함) · rollback ①~⑥(base 재고정) · container 재생 → 동결.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
