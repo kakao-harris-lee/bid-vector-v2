@@ -80,7 +80,19 @@
 
 ## 계약 갱신 이력
 
-(없음)
+**D-7C3-1 (2026-10-23, 팀장 — Phase 1 설계 `f50498e9` 수령).**
+- **머지 순서 7B → 7C③.** 계정 전용 경로(`AccountScopedRoutes`)와 그에 맞춘 공유 test 둘(본문 거부 전수 · 「인증 operation 은 자격 헤더 대안을
+  남긴다」 문서 test)의 고침은 7B 가 한 번 한다. 이 slice 는 중복 구현하지 않고, 7B 머지 뒤 rebase 해 뿌리 하나를 더한다. 동결·전체
+  acceptance·변이·rollback 은 rebase 뒤.
+- 포트 `NotificationInboxPort.record(NotificationInboxRecord) → Created|Updated|Failed`, 종류 어휘 여덟, 중복 억제 키
+  `(account_id, kind, notice_number, notice_round)` = 기본키 — 수령. 7C②·7C⑤ 에 전달함.
+- **트리거 배선 0** — COL-01 은 변경 감지는 있으나 관련성(감시 이력·입찰 건) 원천이 main 에 없어 배선하지 않는다(전수 공고가 알림함을
+  덮는다). 알려진 제한 첫 줄. 완화: 출하 조립 어댑터·실 DB 로 쓰기 포트를 두드리는 test.
+- **산출물 4 문면 정정**: 같은 키 재기록은 `occurred_at`·`updated_at` 이 이동하고 `created_at` 불변, `read_at` 은 detail 이 같으면 유지·
+  다르면 해제(「갱신 시각만 이동」을 이렇게 읽는다).
+- 읽음 처리 두 operation(단건 · 공고 묶음) · 보존 90일 안읽음 예외 없음 · 표시 문구 비저장(읽을 때 `notice` 합침, 파기된 공고는 표시 칸
+  부재 — 「파기됨」 상태를 null 과 구별할지 레인이 판정) · `notice` FK 미설정(DDL 주석에 사유) — 수령.
+
 
 ## 하네스 레인 변경 (상시)
 
