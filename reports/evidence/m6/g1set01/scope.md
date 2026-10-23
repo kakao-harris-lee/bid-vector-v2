@@ -95,7 +95,32 @@ Codex 없음.
 
 ## 계약 갱신 이력
 
-(없음)
+**D-G1SET01-1 (2026-10-23, 팀장 — 검토 r1 수령: verifier not-ready(H 2 · M 3, 재작업 1/5) · CR REQUEST_CHANGES(H 2 · M 2 · L 3 · Q 2), 일괄 배치).**
+순서: ① 이력 재작성 → ② 산출물 배치 → ③ main `54e2c5e2` 위로 rebase(base 재고정 — 위 「base」 줄은 이 결정으로 `54e2c5e2` 로 읽는다)
+→ ④ 마지막 산출물 커밋에서 전체 재측정 → 동결.
+- **① CR H-2 — 이력 재작성(운영자 보고 끝, 브랜치 push 0 이므로 외부 흔적 없음).** 실 상호가 든 커밋을 포함해 `bee7c36f..HEAD` 전 범위를
+  비파괴 재작성으로 고친다(원 HEAD 는 레인 백업 ref 로 남기고 push 하지 않는다). 술어: 상호 목록 파일을 **저장소 밖**(레인 scratchpad)에 두고
+  `git log -p <base>..HEAD` 에 그 목록 적중 0, 목록 자체는 어느 커밋·evidence 에도 적지 않는다. squash 는 쓰지 않는다(PR 브랜치로 원 커밋이 올라간다).
+  재작성 뒤 모든 SHA 가 바뀌므로 evidence 의 SHA 는 ④ 에서 한 번에 다시 적는다.
+- **② 산출물**
+  - **CR H-1 + verifier H-2 — 관문을 타입으로 닫는다.** `Lookup` 이 자기를 만든 정책을 나르고 `judgeAwardOutcome(lookup, winner)` 로 정책 인자를
+    지운다. `Lookup` 생성자는 `internal` + `@ConsistentCopyVisibility`. 컴파일 fixture: 모듈 밖 `Lookup(...)` 직접 생성 음성 · `copy` 음성 ·
+    정상 경로 양성 · 철자 변형 음성(넷). 회귀 test: 「협동조합 가상해양」 축(정책이 다른 두 정규화가 같은 판정에 들어올 길이 없음).
+  - **verifier H-1 — 정확매치를 test 로 잠근다.** 한쪽이 다른 쪽의 접두·접미·부분 문자열인 쌍 셋 이상이 `Lost`. 변이 `==`→접두/포함 RED 실측.
+  - **verifier M-2 = CR(전역 부분 문자열 토큰 제거) — 계약 문면대로 접두·접미만 제거한다.** 상호 중간의 토큰은 남긴다(거짓 `Won` 쪽을 줄이는
+    방향, legacy 와의 차이는 evidence 에 의도된 어긋남으로 적는다). 「가상주식회사건설 ≠ 가상건설」 test.
+  - **verifier M-1 — 금액이 판정에 들어올 길을 구조로 닫는다.** `Published`·`Lookup` 필드 집합 등식 test(금액·수치 필드 0) · `SettledAwardOutcome.Won`
+    생성은 판정 함수만(`internal` 생성자 + 컴파일 fixture 음성 하나).
+  - **CR L-2**: 빈·공백만 상호는 `Declared`·`Published` 로 만들어지지 않는다(생성 거부 또는 `NotDeclared` 로 접기 — 레인 판단, test 동반).
+  - **CR Q-1**(`AlreadySettled` 가 어긋난 재판정을 조용히 버림): 거동은 유지하고 어긋남을 사유로 돌려주는 test 또는 제한 등재 — 레인 판단, 처분표에.
+- **장부층**
+  - CR M-2: `DomainApiTypeFixtureTest` KDoc 이 거짓이 된 사실을 제한으로 선언(build-logic 은 in_scope 밖, 후속).
+  - CR L-1 = verifier low: 「`isWhitespace()` = Python `\s`」 → 「U+0085 하나를 뺀 부분집합(안전 방향)」. zero-width 글자·전각 라틴·괄호 혼용·NFD 미달
+    매치는 제한으로(`OPEN-SET-03` 옆).
+  - CR L-3: 이 slice 가 편집하는 파일의 좌표를 인용·절 제목으로.
+  - **verifier M-3 — container 생략 근거 기각**: app.jar 가 settlement.jar 를 싣는다. ④ 에서 container job 을 재생기로 전부 잰다(네 태그 이미지 ID 기록·복원).
+  - evidence 크기 게이트 초과 해소(산출물 이하로).
+- **④ 재측정**: check · 변이(신규 포함, 통제군 `--rerun`) · rollback ①~⑥(base `54e2c5e2`) · container 재생 → 동결, 판정 SHA(산출물·evidence) 보고.
 
 ## 하네스 레인 변경 (상시)
 
