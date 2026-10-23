@@ -1,12 +1,12 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
-import bidvector.adapters.evaluation.PinnedLicenseGate
 import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RecordingMlAnalysis
 import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.adapters.evaluation.SingleNoticeCandidateSource
+import bidvector.adapters.qualification.PinnedLicenseGate
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement

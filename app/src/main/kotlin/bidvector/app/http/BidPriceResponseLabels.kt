@@ -15,7 +15,6 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.PolicyVersion
-import bidvector.strategy.WatchRuleId
 import bidvector.strategy.WatchUndeterminableReason
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.EvaluationDropReason
@@ -350,7 +349,7 @@ private fun dropFieldsOfReason(notReached: CandidateEvaluation.NotReached): Drop
             (reason as? EvaluationDropReason.WatchGateRejected)
                 ?.rejected
                 ?.failed
-                ?.map(::watchRuleCode)
+                ?.map { it.token() }
                 ?.sorted()
                 .orEmpty(),
         watchUndeterminableReason =
@@ -402,21 +401,6 @@ private fun stageCode(stage: EvaluationStage): String =
         EvaluationStage.AnalysisBudget -> "ANALYSIS_BUDGET"
         EvaluationStage.MlAvailability -> "ML_AVAILABILITY"
         EvaluationStage.ScoreThreshold -> "SCORE_THRESHOLD"
-    }
-
-/**
- * 감시 규칙 ID — **sealed 이고 enum 이 아니다**(`WatchRuleId`). `.name` 이 없으므로 소진 `when` 으로
- * 코드를 낸다 — 1E 가 감시 축을 늘리면 이 자리가 컴파일로 드러난다.
- */
-private fun watchRuleCode(rule: WatchRuleId): String =
-    when (rule) {
-        WatchRuleId.FocusCategory -> "FOCUS_CATEGORY"
-        WatchRuleId.FocusRegion -> "FOCUS_REGION"
-        WatchRuleId.ExcludeRegion -> "EXCLUDE_REGION"
-        WatchRuleId.RequiredKeyword -> "REQUIRED_KEYWORD"
-        WatchRuleId.ExcludeKeyword -> "EXCLUDE_KEYWORD"
-        WatchRuleId.MinBudget -> "MIN_BUDGET"
-        WatchRuleId.MaxBudget -> "MAX_BUDGET"
     }
 
 /**

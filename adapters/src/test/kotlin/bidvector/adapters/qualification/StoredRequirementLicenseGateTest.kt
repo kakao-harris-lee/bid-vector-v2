@@ -89,15 +89,18 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
     private fun findNotice(id: NoticeId) = JdbcNoticeRepository(dataSource()).find(id)!!
 
     /**
-     * **M7/7C ② 위임의 거동 불변**(`D-7C2-1` Q4) — 이 게이트는 이제 판정을 직접 조립하지 않고
-     * [StoredRequirementLicenseJudgement] 의 봉투에서 `verdict` 를 꺼낸다. 두 자리가 같은 판정을
-     * 내는지를 **같은 저장 상태**에서 잰다 — 갈리면 7C ② 응답의 근거와 커널이 쓴 판정이
-     * 어긋난다는 뜻이다. 봉투가 함께 나르는 동반 산출(요건 면허명·출처 필드)이 같은 판정에서
-     * 나온 값인지도 확인한다 — 자격 카드가 그것을 근거로 싣는다.
+     * **두 어댑터가 같은 판정을 낸다**(M7/7C ②) — 이 게이트와 [StoredRequirementLicenseJudgement]
+     * 는 같은 세 입력으로 `LicenseEligibility.judge` 를 **각자** 부른다. 한때 위임으로 묶었다가
+     * `QualificationAdapterDependencyTest` 의 앵커(「이 게이트의 컴파일된 코드가 커널을 참조한다」)
+     * 때문에 되돌렸고(사유는 게이트 쪽 KDoc), 그래서 **둘이 갈릴 수 있는 상태가 실재한다** —
+     * 이 test 가 그 중복의 감시자다. 갈리면 7C ② 응답의 근거와 커널이 쓴 판정이 어긋난다.
+     *
+     * 봉투가 함께 나르는 동반 산출(요건 면허명·출처 필드)도 같은 판정에서 나온 값인지 확인한다 —
+     * 자격 카드가 그것을 근거로 싣는다.
      */
     @Test
-    fun `게이트의 verdict 는 판정 봉투의 verdict 와 같다 — 위임이 거동을 바꾸지 않는다`() {
-        val id = insertNotice("GATE-DELEGATION")
+    fun `게이트와 판정 봉투가 같은 저장 상태에서 같은 verdict 를 낸다`() {
+        val id = insertNotice("GATE-TWO-CALLERS")
         val row =
             RequirementRow.Parsed(
                 groupNo = LmtGrpNo("1"),

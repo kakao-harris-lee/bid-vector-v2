@@ -1,9 +1,9 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.evaluation.JdbcCandidateSource
+import bidvector.adapters.evaluation.JdbcNoticeById
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
-import bidvector.adapters.persistence.JdbcNoticeById
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
 import bidvector.adapters.qualification.JdbcRequirementStore
 import bidvector.adapters.qualification.StoredRequirementLicenseGate

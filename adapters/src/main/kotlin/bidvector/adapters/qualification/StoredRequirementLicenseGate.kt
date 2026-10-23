@@ -32,13 +32,16 @@ class StoredRequirementLicenseGate(
     private val policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ) : LicenseGatePort {
     /**
-     * **M7/7C ② — 판정 호출을 [StoredRequirementLicenseJudgement] 하나로 모았다(거동 불변).**
-     * 앞 판은 같은 세 입력으로 `judge(...)` 를 직접 불러 `.verdict` 를 꺼냈다. 7C ② 가 봉투
-     * (동반 산출)를 쓰는 포트를 더하면서 **같은 판정이 두 자리에서 조립되는** 상태가 되므로,
-     * 호출을 한 자리로 모으고 이 게이트는 그 결과를 좁혀 낸다. `verdictFor` 가 내는 값은
-     * 바뀌지 않는다 — `StoredRequirementLicenseGateDelegationTest` 가 그 등식을 잰다.
+     * **M7/7C ② — 위임을 되돌렸다(무편집 복원).** 7C ② 가 봉투를 내는 포트를 더하면서 한때 이
+     * 게이트가 그 어댑터에 위임하게 바꿨는데, `QualificationAdapterDependencyTest` 가
+     * **이 클래스의 컴파일된 코드가 `LicenseEligibility` 를 참조한다**는 사실을 아키텍처 게이트로
+     * 들고 있었다(실측으로 걸렸다). 그 앵커는 「어댑터가 verdict 를 스스로 조립하지 않는다」를
+     * 증명하는 자리라 내 중복 제거를 위해 바꿀 것이 아니다 — 세 줄을 두 어댑터가 각자 들고,
+     * 둘이 같은 판정을 내는지는 실 DB test 의 verdict 등식이 잰다(그 test 가 중복의 감시자다).
      */
-    private val judgements = StoredRequirementLicenseJudgement(store, operatorProfilePort, policy)
-
-    override fun verdictFor(notice: Notice): LicenseVerdict = judgements.judgementFor(notice).verdict
+    override fun verdictFor(notice: Notice): LicenseVerdict {
+        val collection = store.find(notice.id)
+        val operatorLicenses = operatorProfilePort.current()?.licenses ?: OperatorLicenses.NotDeclared
+        return LicenseEligibility.judge(collection, operatorLicenses, policy).verdict
+    }
 }
