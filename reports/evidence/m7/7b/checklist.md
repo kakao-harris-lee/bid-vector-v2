@@ -1,6 +1,6 @@
 # M7/7B — 입찰 건 모듈(`bidding`) · BID-01 등재 · V21 — evidence
 
-계약: `reports/evidence/m7/7b/scope.md`(착수 커밋 `0c4480b1` · 계약 r2 `ebb1bd58`). base `bee7c36f` → 2026-10-23 rebase `a61ddff1`.
+계약: `reports/evidence/m7/7b/scope.md`(착수 계약 · 계약 r2(D-7B-1) · 계약 D-7B-2 — 커밋은 제목으로 가리킨다). base `bee7c36f` → 2026-10-23 rebase `a61ddff1` → `56bb7474`.
 
 ---
 
@@ -485,21 +485,53 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 
 ## Phase 2 — 구현 (팀장 승인 뒤, 계약 r2 D-7B-1)
 
-### 1. 판정 대상 SHA
+### 0. 약속 ↔ 출하
 
-| 커밋 | 내용 |
+계약(`scope.md` 산출물 1~9 · D-7B-1 · D-7B-2)의 약속 하나마다 **출하한 자리**와 **그것을 재는 자리**를 적는다. 결과는 §7(acceptance) ·
+§2(변이)의 실측이고, 이 표는 그 실측이 무엇을 덮는지의 색인이다. 「부분」·「미출하」는 사유와 함께 적는다.
+
+| 약속 | 출하 | 재는 자리 | 상태 |
+|---|---|---|---|
+| 1 BID-01 정식 등재 · 축 `BID` · §10 집계 95 → 96 · `OPEN-ADR-14` 닫음 | `docs/discovery/capability-map.md` · `docs/adr/0006-gradle-modules.md`(D-2 되살림) · `settings.gradle.kts` | 문서 — 집계 줄은 「머지 직전 재계산」 표시(§3.3) | 출하 |
+| 1 추적표 행 | `acceptance-trace.md` 집계는 그대로, 교차 참조 한 줄 · 행은 §5 | §5 | 출하(D-7B-1 결정대로) |
+| 2 상태 14 · 선언적 전이표 · 「보류」 없음 | `bidding/…/BidState.kt` · `BidTransitions.kt` | `BidTransitionTableTest`(손으로 옮긴 골든 30 행과 집합 등식) · 변이 ③ | 출하 |
+| 2 초안 스냅샷 불변(서버가 뜸) | `BidDraft.kt` · `JdbcNoticeSnapshotQuery` · V21 `bid_draft` append-only | `BidCaseOwnershipTest`「초안 수정은 새 행을 쌓고」 · 변이 ⑩ | 출하 |
+| 2 기록 갱신해도 건은 하나 | `BidRecord.kt` · V21 `bid_record`(`record_seq + 1` 새 행) · 담기는 (공고, 종류)당 건 하나 | 전이표 골든의 `BID_RECORDED --RECORD_BID--> BID_RECORDED` 자기 간선 · `BidCaseOwnershipTest`「같은 공고 같은 종류를 두 번 담아도 건은 하나다」 | 출하 — **한 건에 기록 두 번을 실 DB 로 쌓는 행동 test 는 없다**(알려진 공백, §6) |
+| 2 소급 확인 무기한 + 표시 | `BidCaseWorkflow` | `BidInvariantsTest` · `BidCaseOwnershipTest`「소급 확인이」 · 변이 ② | 출하 |
+| 2 타임라인 append-only | V21 트리거 셋 + GRANT | `BidCaseOwnershipTest`「앱 역할은 … 고치거나 지울 수 없다」 · 변이 ⑦ ⑪ | 출하 |
+| 2 다음 확인 시점 비지 않음(sealed) | `NextCheckpoint.kt` | `NextCheckpointTest`(전 상태) · 변이 ④ | 출하 |
+| 2 페이퍼/실 분리(구조) | `BidCase.kt` 의 좁힘 · 목록 `kind` 필수 | `BidInvariantsTest` · `BidCaseOwnershipTest`「목록은 종류로 갈린다」 · 변이 ⑤ | 출하 |
+| 2 SET-02 후보 술어 | `ReconciliationCandidate.kt` | `BidInvariantsTest` | 출하(대사 자체는 SET 소유) |
+| 3 보관 정책 3년(versioned) | `EvidenceRetentionPolicyData.kt` · `RetentionTableRegistry` 등재 | `EvidenceRetentionPolicyTest` · 변이 ⑥ | 출하 — PDF 저장소·파기 실행은 범위 밖(§6) |
+| 4 포트가 주체를 받는다 · 남의 건 거부 | `BiddingPorts.kt` · `JdbcBidCaseStore`(모든 SQL `account_id = ?`) | `BidCaseOwnershipTest`(실 DB) · 변이 ① | 출하 |
+| 5 V21 표 넷 · `account_id` FK · 열 단위 GRANT · CHECK | `V21__bid_case.sql` | `CleanMigration*Test` 여섯 · 변이 ⑧ ⑨ | 출하 — `notice` FK 없음(D-7B-1) |
+| 5 R-2 남은 절반 | — | — | 별 slice(D-7B-1 운영자 결정) |
+| 6 operation 열넷 · 새 무인증 0 · 상태 변경 CSRF | `BidCaseCommandController` · `BidCaseQueryController` · `openapi/…yaml` · 생성 타입 | `ProductionHttpSurfaceTest` · `OpenApiSecurityContractTest` · `BrowserSessionAuthenticationTest` · 변이 ⑫ ⑬ | 출하 |
+| 6 초안 금액 provenance(메뉴 위장 금지) | 요청 DTO 에 자리 없음 · 서버가 `OPERATOR_ENTERED` | V21 CHECK · `BidCaseRequests` | 출하 — `PRICE_MENU` 도달 불가(§6) |
+| 7 각 핵심 성질이 변이에서 RED | §2 표 | §2 | 실측 |
+| 8 개인정보 — 사업자번호·대표자명 슬롯 0 · 메모 로그/audit 노출 0 | V21 · 응답에 본문 자리 없음 | `BidTimelineEntryResponse`(본문 없음) · `leakPatternGate` | 출하 |
+| 9 문서 — milestone-7 R-5 닫음 · milestone-6 예외 줄 · runbook · 리허설 | `milestone-7.md` · `milestone-6.md` · `docs/runbook/m6-6b3-retention.md` | §7 `db-rehearsal.sh` | 출하 |
+| **D-7B-2 (계약 갱신으로 추가)** typed `AccountId` 운반 · 라벨 파싱 0 | `AuthenticatedAccount.kt`(속성 키 · 접근자) · `AuthenticationResult.Authenticated.account` · 필터가 판정 전에 지우고 다시 적음 · `BidCaseRouting.accountOf` 삭제 | `AuthenticatedAccountTest`(라벨 위조 불변 · 속성 부재 null · 미리 놓인 속성 소거 · 세션 E2E · 자격 헤더 401) · `AccountCarrierStructureTest`(javap 집합 등식 셋 + 양성 대조) · 변이 ⑭ | 출하 |
+| (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
+| (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
+
+### 1. 판정 대상 커밋
+
+커밋은 **제목으로** 가리킨다 — 이 slice 는 두 번 rebase 됐고(`a61ddff1` · `56bb7474`) 그때마다 SHA 가 바뀌었다. 판정 SHA 는 동결
+보고와 PR 조치 코멘트가 정본이다.
+
+| 커밋(제목) | 내용 |
 |---|---|
-| `99493ac8` | 산출물 1 — 도메인 · workflow · V21 · 영속 |
-| `4c64987f` | 산출물 2 — HTTP 경계 · 조립 · 서버 스냅샷(변이 실측 뒤 보강) |
-| `046fa168` | 기계 전수 게이트 대응 — 반사 제거 · 주입 등재 · 본문 모양 일치 |
-| `c73aa58f` · `3af0c174` · `c58c16d2` · `9b7499e1` · `db418a0b` | 수정 라운드 — 어휘 이름 · 계정 전용 경로와 공유 test 모집단 · 맨 위 배열 응답 · 게이트 등재 · test double |
-| (evidence 커밋) | 문서 · evidence |
+| feat 「입찰 건 도메인·workflow·V21·영속」 | 산출물 1 — 도메인 · workflow · V21 · 영속 |
+| feat 「HTTP 경계·조립·서버 스냅샷」 | 산출물 2 — HTTP 경계 · 조립 · 서버 스냅샷(변이 실측 뒤 보강) |
+| fix 「기계 전수 게이트 대응」 | 반사 제거 · 주입 등재 · 본문 모양 일치 |
+| refactor 「저장 어휘 함수·인자 이름 …」 · feat 「계정 전용 경로 선언 …」 · fix 「목록·타임라인 응답을 맨 위 배열로」 · fix 「게이트 등재 …」 · test 「입찰 건 test double …」 | 수정 라운드 — 어휘 이름 · 계정 전용 경로와 공유 test 모집단 · 맨 위 배열 응답 · 게이트 등재 · test double. 「계정 전용 경로 선언」 커밋 제목의 「(D-7B-2)」는 **옛 표기**다(아래 §3.1 — 새 D-7B-2 와 다른 것, 이력은 되쓰지 않는다) |
+| feat 「계약 D-7B-2 — typed AccountId 를 요청 속성으로 운반 …」 · test 「입찰 건 이중체의 계정 비교를 값으로」 · test 「요청 값 test …」 · test 「append-only test 가 초안·기록 행을 심는다」 | 계약 D-7B-2 와 그 라운드의 발견 셋(§3.4) |
+| docs 커밋들 | 계약 · 설계 · evidence |
 
-SHA 는 2026-10-23 rebase(`a61ddff1` 위) 뒤의 것이다 — 앞 판의 SHA 는 그 rebase 로 이력에서 사라졌다.
+base `56bb7474`. 변경 목록은 `git diff --name-status 56bb7474..HEAD` 기계 산출이다.
 
-base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계 산출이다.
-
-### 2. 변이 표 — 9/9 적발
+### 2. 변이 표 — ①~⑨ 9/9 적발 · ⑩~⑭ 아래와 §3.2 · §3.4
 
 각 변이를 적용 → 표적 test 실행 → **되돌린다**(스크립트가 `.bak` 로 복원하고, 복원 뒤
 `git status` 로 잔여 0 을 확인했다). 기대는 전부 RED 다.
@@ -535,16 +567,21 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 
 | # | 변이 | 표적 | 결과 |
 |---|---|---|---|
-| ⑩ | 초안 쓰기를 `INSERT` 대신 **같은 행 `UPDATE`** 로 | `BidCaseOwnershipTest`「초안 수정은 새 행을 쌓고」 | (기록) |
-| ⑪ | append-only 트리거 **와** GRANT 를 **함께** 연다 | `BidCaseOwnershipTest`「앱 역할은 … 고치거나 지울 수 없다」 | (기록) |
-| ⑫ | 어느 인증 축에도 안 닿는 새 POST 매핑 | `ProductionHttpSurfaceTest` `unreachable == ∅` | (기록) |
+| ⑩a | 초안 둘째부터 `INSERT` 대신 **같은 행 `UPDATE`**(방어 두 겹 유지) | `BidCaseOwnershipTest`「초안 수정은 새 행을 쌓고」 | **RED** — DB 가 거부(`bid_draft` append-only 트리거의 예외). test 단언이 아니라 **방어가** 막은 것 |
+| ⑩b | ⑩a + `bid_draft` 트리거 제거(UPDATE 가 실제로 성공하게) | 같은 test | **RED** — **단언이** 잡는다: 첫 초안 금액이 둘째 금액으로 덮였다 |
+| ⑪ | 세 표 트리거 **와** 앱 역할 UPDATE·DELETE GRANT 를 **함께** 연다 | `BidCaseOwnershipTest`「앱 역할은 … 고치거나 지울 수 없다」 | **RED** — 첫 문장(`UPDATE bid_case_transition …`)부터 통과 |
+| ⑪t | 대조: 트리거만 제거(GRANT 유지) | 같은 test | **GREEN** — 권한 층 혼자 막는다 |
+| ⑪g | 대조: GRANT 만 연다(트리거 유지) | 같은 test | **GREEN**(test 보강 뒤) — 트리거 층 혼자 막는다. **보강 전에는 RED 였다**(아래) |
+| ⑫ | 어느 인증 축에도 안 닿는 새 POST 매핑(항상 401) | `ProductionHttpSurfaceTest` 본문 거부 전수 | **RED** — `unreachable == ∅` 단언이 그 경로를 내놓았다 |
 
-**⑪ 가 「함께」인 이유 — 심층 방어는 한 겹씩은 안 잡힌다.** 트리거만 지우면 그 test 는
-**초록으로 남는다**: 앱 역할에 UPDATE·DELETE 권한이 **애초에 없어서** 권한 층이 여전히 막기
-때문이다. 그것은 test 가 약한 것이 아니라 **두 겹이 각각 충분하다**는 뜻이다. 한 겹만 여는
-변이를 RED 로 만들려면 방어를 한 겹으로 줄여야 하는데 그것은 설계 후퇴다. 그래서 ⑪ 은 두
-겹을 함께 열고, **한 겹씩 여는 변이가 초록이라는 사실 자체**를 여기 적는다(⑦ 이 트리거 한
-겹을 래칫으로 따로 잡는다).
+측정 자리: ⑩a · ⑩b · ⑫ 는 「요청 값 test …」 커밋, ⑪ · ⑪t · ⑪g 는 「append-only test 가 초안·기록 행을 심는다」 커밋. 변이마다
+표적 test 만 돌리고 `git restore` 로 되돌린 뒤 작업 트리가 깨끗한지 확인했다(전부 깨끗).
+
+**⑪g 가 test 의 공백을 잡았다 — 앞 판의 「두 겹이 각각 충분하다」는 반만 재고 있었다.** 앞 판 test 는 건만 열고 초안 · 기록을
+심지 않았다. `FOR EACH ROW` 트리거는 **0 행 UPDATE · DELETE 에서 불리지 않으므로**, GRANT 만 열자 `UPDATE bid_draft …` 가 0 행으로
+「성공」해 붉었다 — 트리거 층이 그 두 표에서 **행동으로는 한 번도 재지지 않았다**(래칫 ⑦ 만 있었다). test 가 초안 · 기록 행을 심고
+그 수를 먼저 단언하게 고쳤고, 재측정에서 ⑪t · ⑪g 둘 다 초록, ⑪ 만 RED 다. 이제 「한 겹씩 열면 초록, 두 겹을 함께 열면 RED」가
+세 표 모두에서 **실측**이다.
 
 **래칫이 등재 없이는 초록이 되지 않는다는 것도 실측했다**: V21 을 넣고 등재 전에 돌린 첫
 실행에서 스키마 래칫 여섯 파일의 **12 test 가 전부 붉었다**(표 목록 · 컬럼 · 인덱스 · CHECK ·
@@ -564,9 +601,13 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 | `app/src/test/.../ProductionHttpSurfaceTest.kt` | 본문 거부 전수 test | **모집단을 판정으로 가름** | 아래 §3.1 |
 | `config/quality/architecture-policy.properties` | `app.http.allowed-packages` | `+bidvector.bidding` · `+bidvector.workflow.bidding` | controller 가 요청을 command 로 옮기려면 그 어휘를 이름 불러야 한다 |
 | 〃 | `app.http.denied-types` | `+` 저장·조회 포트 셋 | 패키지를 열었으므로 **포트만 다시 닫는다** — controller 가 받는 것은 use case 하나다(D-6A2b-8) |
-| 〃 | `app.injection.allowed-types` | `+4` | `BidCaseWorkflow`(두 controller 의 단 하나의 협력자) + 응답·요청 **값 타입** 셋(이 게이트는 data class 생성자 인자도 주입으로 센다) |
+| 〃 | `app.injection.allowed-types` | `+3` | `BidCaseWorkflow`(두 controller 의 단 하나의 협력자) · `SubmittedBidAmount`(요청 값 타입) — 응답 원소 타입 둘은 목록을 맨 위 배열로 바꾸며 표면에서 빠져 등재도 뺐다 — 그리고 **D-7B-2 의 `AccountId`**(`AuthenticationResult.Authenticated` 생성자 인자 — 이 게이트는 data class 생성자 인자도 주입으로 센다) |
+| 〃 | `app.surface.api.handlers` · `app.assembly.tier1-bootstrap-classes` | `+2` · `+1` | 두 controller · `BidCaseWiring` |
+| `config/quality/gate-tests.properties` | `gate.tests.app` | `+4` | `OpenApiSecurityContractTest`(분할) · D-7B-2 의 `AuthenticatedAccountTest` · `AccountCarrierStructureTest` · 발견 결함의 `BidCaseRequestsTest` |
+| `app/src/test/.../AppHttpDependencyGateTest.kt` | `EXPECTED_EXEMPT_COUNT` | 65 → **66** | `BidCaseWiring`(§3.3) |
+| `app/src/test/.../ConstantTimeComparisonStructureTest.kt` | 허용 목록 | `+8` | 입찰 건 HTTP 층의 data class 자동 equals · sealed when 소진 · 공개 어휘 비교 — 각 항목 근거 문장 |
 
-### 3.1 공유 게이트 test 변경 — `ProductionHttpSurfaceTest` (팀장 결정 2026-10-22 (b) — 계약 r2 의 D-7B-2 와 다른 것)
+### 3.1 공유 게이트 test 변경 — `ProductionHttpSurfaceTest` (팀장 결정 2026-10-22 (b) — 계약 D-7B-2(2026-10-23)와 다른 것)
 
 **무엇이 충돌했나.** 그 test 는 `X-Operator-Credential` 하나로 **등록된 POST 매핑 전수**가
 같은 모양(415/400/400)으로 본문을 거부하는지 잰다. 그런데 입찰함은 **계정 전용**이다 —
@@ -593,7 +634,7 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 
 본문 거부 모양은 **닿는 축의 자격으로** 매핑마다 잰다 — 축이 달라도 성질은 같아야 한다.
 
-**조건 3 변이**: 어느 모집단에도 들지 않는 새 POST 매핑을 심으면 ①이 RED 여야 한다. (기록)
+**조건 3 변이**: 어느 모집단에도 들지 않는 새 POST 매핑을 심으면 ①이 RED 여야 한다. **실측 RED**(변이 ⑫, §2).
 
 **넓히지 않은 것**: `collection.external.allowed-packages.*` 는 application·adapters·app 층
 키라 domain 모듈 신설과 무관하다. `module.expected-source-sets` 도 그대로다(`main,test`).
@@ -646,10 +687,10 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 
 | # | 변이 | 표적 | 기대 | 결과 |
 |---|---|---|---|---|
-| ⑬a | 계정 전용 op 에 `operatorCredential` 대안을 **더한다**(문서가 넓어짐) | `OpenApiSecurityContractTest` | RED | (기록) |
-| ⑬b | 비계정 op 에서 `operatorCredential` 대안을 **뺀다**(문서가 좁아짐 — 전 판이 막던 바로 그것) | `OpenApiSecurityContractTest` | RED | (기록) |
-| ⑬c | `AccountScopedRoutes.ROOTS` 를 비운다(선언↔판정 대조 파괴) | `ProductionHttpSurfaceTest` · `OpenApiSecurityContractTest` | RED | (기록) |
-| ⑫ | 어느 축에도 안 닿는 새 POST 매핑 | `ProductionHttpSurfaceTest` ⓐ | RED | (기록) |
+| ⑬a | 계정 전용 op(`listBidCases`)에 `operatorCredential` 대안을 **더한다**(문서가 넓어짐) | `OpenApiSecurityContractTest` | RED | **RED** — 「계정 전용 operation 은 세션만 적는다」 1 test(어긋난 op `GET /api/bid-cases`) |
+| ⑬b | 문서 기본 `security` 에서 `operatorCredential` 을 **뺀다**(비계정 op 가 상속 — 전 판이 막던 바로 그것) | `OpenApiSecurityContractTest` | RED | **RED** — 「인증을 요구하는 operation 은 전부 자격 헤더 대안을 남긴다」 1 test(어긋난 op `GET /api/strategy` 외 여럿) |
+| ⑬c | `AccountScopedRoutes.ROOTS` 를 비운다(선언↔판정 대조 파괴) | `ProductionHttpSurfaceTest` · `OpenApiSecurityContractTest` | RED | **RED 둘 다** — 표면: 선언↔판정 등식 · 문서: 「세션만 적는다」(비어 있음) + 「자격 헤더 대안」(입찰함 op 가 비계정으로 넘어감) — 2 test |
+| ⑫ | 어느 축에도 안 닿는 새 POST 매핑 | `ProductionHttpSurfaceTest` ⓐ | RED | **RED** — §2 표 |
 
 ⑬b 가 **전 판이 지키던 성질이 그대로 살아 있다**는 증거이고, ⑬a 는 **새로 조인 쪽**이 실제로
 무는다는 증거다. ⑬c 는 선언을 지우면 두 test 가 **함께** 붉어진다는 것 — 선언 한 자리를
@@ -657,16 +698,66 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 
 ### 3.3 머지 때 충돌할 자리 (후행 레인이 재계산)
 
-- **`EXPECTED_EXEMPT_COUNT`**(`AppHttpDependencyGateTest`) — 7B 가 `BidCaseWiring` 하나를 더해
-  **62 → 63** 으로 올렸다. 같은 M7 라운드의 **7C①b 레인이 62 → 64** 로 올린다. 둘은 같은 줄을
-  고치므로 머지에서 충돌하고, **후행 rebase 레인이 합집합으로 재계산**한다(팀장 지시
-  2026-10-22). 근거 문단은 양쪽 다 남긴다 — 수만 다시 세고 **사유를 지우지 않는다**.
+- **`EXPECTED_EXEMPT_COUNT`**(`AppHttpDependencyGateTest`) — 7B 는 `BidCaseWiring` 하나를 더한다.
+  `56bb7474` 위 rebase 에서 이미 한 번 충돌했다: main 이 7C⑤-0 으로 62 → 65 였고, **합집합 66** 으로
+  풀었다(근거 문단 둘 다 유지 · `check` 초록). **7C①b 레인(+2)이 뒤에 머지되면 그 레인이 다시
+  합집합으로 센다**(팀장 지시 2026-10-22) — 수만 다시 세고 **사유를 지우지 않는다**.
 - **`capability-map.md` §10 집계**(95 → 96 · `V2 필수` 61 → 62)와 **활성 OPEN 수**(45 → 44) —
   §10 블록에 「머지 직전 재계산」 표시를 문면에 넣어 두었다. g1dec05 · g1set01 이 같은 파일의
   다른 행을 고친다.
 - **`config/quality` 의 등재 키들** — 7B 는 **자기 항목만** 더했다(`layer.domain` ·
   `app.injection.*` · `app.http.*` · `gate.tests.*` · `app.surface.api.handlers` ·
   `app.assembly.tier1-*`). 같은 키를 다른 레인이 함께 늘리면 줄 충돌이지 의미 충돌이 아니다.
+
+### 3.4 계약 D-7B-2 — typed 계정 운반 (계약 갱신으로 추가, 2026-10-23)
+
+**무엇을 바꿨나.** 앞 판은 계정 범위 핸들러가 audit 주체 라벨(`account:<값>`)을 `removePrefix` + `toLongOrNull` 로
+되읽어 `AccountId` 를 얻었다. 소유 경계(R-2)가 문자열 왕복 위에 서 있었다 — 라벨 규약(접두 · 구분자 · 숫자 표기)이 바뀌면
+조용히 다른 계정이나 `null` 이 나온다.
+
+- `AuthenticationResult.Authenticated` 가 `account: AccountId?` 를 나른다. **세션 경로만** 채운다(자격 헤더 경로의 주체
+  `operator` 에는 계정이 없다).
+- `RequestAuthenticationFilter` 가 **판정 전에** 계정 속성을 지우고(fail-closed), 통과한 경로가 계정을 냈을 때만 다시 적는다.
+  속성을 적는 자리는 이 필터 하나다.
+- 계정 범위 핸들러(두 controller · `BidCaseHttp`)는 `request.authenticatedAccount()` 하나로 읽는다(`AuthenticatedAccount.kt`).
+  `BidCaseRouting.accountOf` 와 접두 상수는 지웠다. audit 라벨은 그대로다(감사 행이 쓰는 값).
+- 7C② · 7C③ · 7C④ 가 이 접근자를 공유한다(7B 선행 머지).
+
+**재는 자리.**
+
+| 계약 문면 | test | 결과 |
+|---|---|---|
+| 라벨을 위조 · 변경해도 계정이 바뀌지 않는다 | `AuthenticatedAccountTest`「주체 라벨을 바꿔도 계정은 바뀌지 않는다」 | 초록 |
+| 속성 부재 → 401 | 같은 class「주체 라벨만 있고 계정 속성이 없으면 계정은 없다」 · 「자격 헤더로는 입찰함이 401 이다」(실 HTTP) · 「판정 전에 놓인 계정 속성은 지워진다 — 통과해도 거부돼도」 | 초록 |
+| 실제 인증 경로가 계정을 심는다 | 「세션으로 닿으면 입찰함이 그 세션의 계정으로 열린다」(실 로그인 → 담기 201 → 목록 200) | 초록 |
+| production 의 문자열 파싱 경로 0(구조) | `AccountCarrierStructureTest` — `bidvector.app` 컴파일 class 전수를 javap 로 읽어 **집합 등식** 셋: `account:` 로 시작하는 상수를 가진 class = 라벨을 만드는 `BrowserSessionAuthenticator$Companion` 하나 · `authenticatedSubject()` 호출자 = 전략 편집의 운영자 주체 하나 · 주체 속성 키 보유 = 정의 · 필터 둘. 그리고 typed 접근자 호출자 = 계정 범위 진입점 셋. 술어 자체의 양성 대조 1 | 초록 |
+
+**변이 ⑭ — 접근자가 라벨로 되돌아가면 붉다.**
+
+| # | 변이 | 표적 | 결과 |
+|---|---|---|---|
+| ⑭ | 접근자를 `authenticatedSubject().removePrefix("account:").toLongOrNull()` 로 | `AuthenticatedAccountTest` | **RED** 2 — 위조 라벨(999)이 계정이 됐다 · 라벨만 있는데 계정이 나왔다 |
+| ⑭ | 같은 변이 | `AccountCarrierStructureTest` | **RED** 2 — `account:` 상수 보유 class 가 늘었다 · 주체 접근자 호출자가 늘었다 |
+| ⑭b | 접두 리터럴 없이 `substringAfter(':')` 로 | `AccountCarrierStructureTest` | **RED** 1 — 주체 접근자 호출자 등식 |
+
+⑭b 가 구조 test 의 둘째 등식이 왜 필요한지 보인다 — 접두 문자열 술어(첫째)만 있으면 리터럴을 피한 파싱은 초록이다.
+구조 술어는 문자열 grep 이 아니라 **컴파일된 상수 풀과 호출 지점**에 건다(게이트 술어는 구조로 닫는다).
+
+**이 라운드에서 찾은 것 둘(D-7B-2 test 를 쓰다가).**
+
+1. **요청 값의 도메인 규칙 위반이 500 이었다.** `NoticeRound` 형식("00") · 증빙 참조 128자 · 메모 2000자 상한 · 추첨번호 부호를
+   어긴 요청이 값 객체의 `require` 에서 `IllegalArgumentException` 으로 새어 기본 처리기가 500 을 냈다 — 요청 탓을 서버 탓으로
+   말한 것이다. 요청 판독(`BidCaseRequests`)이 **그 예외 하나만** 400(`INVALID_REQUEST`)으로 옮긴다(`JsonValueReaders` 의 시각
+   판독과 같은 관례). `BidCaseRequestsTest` 가 네 자리와 양성 대조 둘을 잰다.
+2. **test 이중체가 `AccountId` 를 참조 동일성으로 비교했다.** `AccountId` 는 `equals` 를 재정의하지 않으므로, 요청마다 새
+   인스턴스가 오는 HTTP 경로에서는 자기 건이 남의 것으로 보였다(세션 E2E 가 처음 그 경로를 지나며 드러났다). app 의
+   `InMemoryBidCaseStore` 와 workflow test 의 Fake 를 **값** 비교로 고쳤다. production(`JdbcBidCaseStore`)은 SQL 의
+   `account_id = ?` 라 무관하다.
+3. (§2) append-only test 가 초안 · 기록 행을 심지 않아 트리거 층을 재지 못했다 — 변이 ⑪g.
+
+**옛 「D-7B-2」 표기.** 공유 test 모집단 분리(2026-10-22 팀장 결정 (b))를 test 주석 · evidence 에서 「계약 r2 D-7B-2」로
+불렀는데, 그 이름은 `scope.md` 에 없었고 이번 계약 D-7B-2 와 겹쳤다. 주석 · evidence 를 「팀장 결정 2026-10-22 (b)」로 고쳤다.
+그 라운드의 커밋 제목 하나에는 옛 표기가 남아 있다(이력은 되쓰지 않는다).
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
@@ -714,7 +805,9 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
    주체 `operator` 에는 계정 행이 없어 소유 경계를 세울 수 없기 때문이다. 그 헤더를 계정에
    묶는 일은 **R-2 남은 절반**(식별자 모델)이 풀 때까지 열리지 않는다(운영자 결정
    2026-10-21 · 계약 r2 D-7B-1). 선언은 `AccountScopedRoutes`, 그 사실을 재는 자리는
-   `ProductionHttpSurfaceTest` 의 셋째 단언이다.
+   `ProductionHttpSurfaceTest` 의 셋째 단언이다. 계정은 세션 인증이 심은 typed 속성으로만 온다(계약 D-7B-2, §3.4).
+7. **한 건에 기록을 두 번 쌓는 실 DB 행동 test 가 없다.** 전이표 골든의 `BID_RECORDED --RECORD_BID--> BID_RECORDED`
+   자기 간선과 `record_seq + 1` 쓰기는 있지만, 두 번째 기록이 새 행이고 건이 하나로 남는 것을 실 DB 로 재는 test 는 없다.
 
 ### 7. acceptance 실측
 
@@ -729,10 +822,9 @@ base `a61ddff1`. 변경 목록은 `git diff --name-status a61ddff1..HEAD` 기계
 | `ml-engine` job | 입력 변경 0 → **생략** | 해당 없음 |
 | 백업·복원 리허설 | `tools/db-rehearsal.sh`(역할·권한 행렬 포함) | (기록) |
 
-**호스트 규율**: 모든 무거운 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고,
-점검 셋(pgrep · `free -m` · `ps`)을 **별도 호출로 먼저** 봤다(available 15.3GB · swap free
-7.0GB · 다른 레인의 유휴 daemon 1 — 그 PID 는 건드리지 않았다). **00:30~03:00(6G 수집 창)에는
-무거운 작업을 시작하지 않았다.**
+**호스트 규율**: 모든 무거운 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고, 점검 셋(pgrep · `free -m` · `ps`)을
+**별도 호출로 먼저** 봤다. 락을 얻은 순간 available ≥ 6GB · swap free ≥ 2GB 를 다시 재고 그 값을 로그 첫 줄에 남겼으며(미달이면
+시작하지 않는다), **00:30~03:00 에는 시작하지 않았다**(변이 스크립트는 변이마다 그 창을 확인한다).
 
 ### 8. rollback 실측
 
