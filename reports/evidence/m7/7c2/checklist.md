@@ -87,7 +87,7 @@
 | `confidenceNotAvailableReason` | enum | `ML_SCORE_NOT_PROVIDED`·`ML_UNAVAILABLE`·`SIMILARITY_PROJECTION_NOT_READY`·`EVALUATION_NOT_REACHED_ML_STAGE` |
 | **3안 (DEC-05 · ML-01)** | | |
 | `bidPriceMenuState` | enum `NOT_COMPUTED` | **빈 배열이 아니라 이유 있는 상태**(계약 문면) |
-| `bidPriceMenuNotComputedReason` | enum `MENU_KERNEL_NOT_WIRED` | -a. -b 가 `CANDIDATE_RATE_SOURCE_UNAVAILABLE` 로 **바꾼다** — 그래서 -b 의 효과가 응답에서 측정된다 |
+| `bidPriceMenuNotComputedReason` | enum `MENU_PATH_NOT_WIRED` | **이 배선에 산출 경로가 없다**는 사실 하나만 말한다. 「커널을 불렀더니 출처가 없었다」(`SOURCE_ABSENT`)로 적지 않는다 — 부르지 않았다. 상류 사실 둘(DEC-05 커널 미머지 · 후보 비율 출처가 미가용 ML)은 스키마 description 과 0.8 에 적고, 후속 slice 가 이 사유를 **커널 자신의 결과**로 바꾼다 |
 | **고지** | | |
 | `disclosures` | [string] | 전수 넷 — `YEGA_DRAWN_PRIVATELY` · `NOT_AUTO_SUBMITTED` · `STATUTORY_FLOOR_RATE_NOT_INTERPRETED` · `PRICE_FITNESS_IS_NOT_PROBABILITY` |
 
@@ -228,25 +228,60 @@ DEC-04 표본 공급 port 와 하한 미달 정책 표(값 결정이 운영자 �
 드롭 단계·사유 전수 · 미판정 축 · 세 「아직 산출 안 함」 상태와 사유 · 차분 test · 401/CSRF/405/404/400 ·
 PII·raw 0 · 실 DB E2E 하나.
 
-### 0.7 -b 가 더하는 것 (g1dec05 머지 뒤) — 가산성
+### 0.7 후속 slice 가 더하는 것 — 가산성 (이 slice 는 **-a 로 종결**, `D-7C2-1` Q1)
+
+`D-7C2-1` 로 **-b 를 열지 않는다.** 3안은 ML-01 뒤 별 slice 다. 이 절은 그 slice 들이 **-a 필드의 뜻을
+바꾸지 않고** 얹을 수 있음을 확인하는 자리이고, 이 slice 는 아래 어느 것도 구현하지 않는다.
+
+#### (a) 알림함 기록 — 7C③ 머지 뒤 (붙일 자리만)
+
+7C③ Phase 1(`D-7C3-1`, 미머지)이 확정한 시그니처:
+
+| 축 | 값 |
+|---|---|
+| 패키지 | `bidvector.workflow.notification` |
+| 포트 | `fun interface NotificationInboxPort { fun record(record: NotificationInboxRecord): NotificationInboxOutcome }` |
+| record | `(account: AccountId, notice: NoticeId, fact: NotificationFact, occurredAt: Instant)` |
+| 이 경로의 fact | `BidPriceRequestRecorded`(종류 `BID_PRICE_REQUEST_RECORDED`) |
+| 중복 억제 키 | `(account_id, kind, notice_number, notice_round)` — 같은 공고 재요청은 **항목 하나를 갱신** |
+| 결과 | `Created`·`Updated`·`Failed`(예외가 아니라 결과 갈래) |
+
+**붙일 자리**: 단건 factory 가 이 포트를 생성자로 받고, **factory 가 낸 run 객체**가 평가 뒤 `record(...)` 를
+한 번 부른다 — 컨트롤러는 포트를 직접 쥐지 않는다(기존 `app.http` 의존 게이트 규율, `EvaluationDryRunRun` 이
+어댑터가 아니라 값을 내는 것과 같은 이유). `occurredAt` 은 이미 주입된 시계, `notice` 는 이 요청이 평가한
+`NoticeId` 그대로다.
+
+**-a 필드의 가산 경로**: `inboxRecordState` 가 `NOT_RECORDED_YET` → `CREATED`·`UPDATED`·`FAILED` 로 넓어지고
+(enum 확장), `inboxRecordNotRecordedReason` 이 `FAILED` 의 사유 칸으로 이어진다. 중복 억제가 「갱신」이므로
+`CREATED` 와 `UPDATED` 를 **접지 않는다** — 운영자에게 「새 항목」과 「같은 항목 갱신」은 다른 사실이다.
+
+**실측한 공백(그 slice 가 먼저 풀어야 한다)**: 지금 **typed `AccountId` 가 핸들러까지 오지 않는다.** 세션
+인증 경로는 계정을 알지만 그 값을 audit 주체 **문자열**(`account:<값>` 규약)로만 바꿔 심고, 자격증명 인증
+경로는 **계정 개념이 아예 없다**(단일 운영자 자격 비교 하나). 그래서 `record` 의 첫 인자를 채우려면 ① 요청
+속성에 typed 계정을 심는 운반 장치와 ② 자격증명 경로의 처분(그 경로에서 기록을 금지할지, 기본 계정에 묶을지)
+이 정해져야 한다. **audit 주체 문자열을 다시 파싱해 `AccountId` 를 복원하는 것은 하지 않는다** — R-2 소유
+경계를 문자열 왕복으로 세우는 형태다. 7B·7C④ 도 같은 자리에서 만난다 → 보고 B1.
+
+#### (b) 3안 — ML-01 뒤 별 slice
 
 g1dec05 의 `BidMenuInput` 은 다섯을 요구한다: `base`(선다) · `publishedFloorRate`(선다) ·
 `shortfallPolicy`(**출하 정본 표 없음**) · `assessmentSamples`(**공급 port 없음**) ·
 `rates: StanceRates`(**유일 출처가 ML 응답**).
 
--b 가 더하는 것(전부 **가산**, -a 필드는 뜻이 바뀌지 않는다):
+그 slice 가 더하는 것(전부 **가산**, -a 필드는 뜻이 바뀌지 않는다):
 
 | 더하는 것 | 모양 |
 |---|---|
 | `bidPriceMenuState` 값 | `OFFERED`·`PARTIALLY_OFFERED`·`BAND_COLLAPSED`·`UNMEASURABLE`·`SOURCE_ABSENT` 추가(enum 확장) |
-| `bidPriceMenuNotComputedReason` | `MENU_KERNEL_NOT_WIRED` → `CANDIDATE_RATE_SOURCE_UNAVAILABLE` 로 **옮겨간다**(-b 의 효과가 응답에서 측정된다) |
+| `bidPriceMenuNotComputedReason` | `MENU_PATH_NOT_WIRED` 를 **커널 자신의 결과**로 바꾼다(`SOURCE_ABSENT`·`UNMEASURABLE` 등) — 그 전환이 그 slice 의 효과를 응답에서 측정하게 한다 |
 | 태도별 옵션 | **접두사 평탄화 3 × n** — `safe…`·`recommended…`·`aggressive…` 각각 `AmountWon`·`BidRateFraction`·`BindingConstraint`·`GroundsPolicyVersion`·`WithheldReason`. 태도는 고정 3 enum 이라 평탄 게이트가 그대로 닫혀 있다 |
 | 고지 | -a 의 네 코드 중 둘을 `BidMenuDisclosure.entries` **매핑으로 바꾸고 집합 등식 test** 를 더한다(어휘 이중화를 닫는다) |
 | DEC-04 | `floorShortfallState` 에 `MEASURED`·`UNMEASURABLE` 추가 + **태도별** 빈도·임계 사정률·편향 방향(`BidMenuOption.risk` 의 모양 그대로). -a 의 상태는 「이 공고에서 DEC-04 를 **잴 수 있는가**」라 그대로 유효하다 |
 
-**-a 가 -b 를 위해 미리 하는 일**: ① 3안·DEC-04·신뢰도를 **상태 + 사유**로 선언해 값 필드를 나중에 더하는
-자리를 만든다 ② 고지 코드 이름을 `BidMenuDisclosure` variant 와 맞춘다 ③ 태도 접두사 어휘(`safe`/
-`recommended`/`aggressive`)를 `BidStance` 와 같은 이름으로 예약한다(계약 문면에 적는다).
+**-a 가 후속을 위해 미리 하는 일**: ① 3안·DEC-04·신뢰도를 **상태 + 사유**로 선언해 값 필드를 나중에
+더하는 자리를 만든다 ② 고지 코드 이름을 `BidMenuDisclosure` variant 와 맞춘다 ③ 태도 접두사 어휘
+(`safe`/`recommended`/`aggressive`)를 `BidStance` 와 같은 이름으로 예약한다(계약 문면에 적는다).
+세 가지 다 **-a 가 쓰는 비용은 0**이다 — 필드를 미리 만드는 것이 아니라 **이름과 상태 축을 고르는 것**뿐이다.
 
 ### 0.8 조사로 드러난 사실 — **가격 절반은 production 에서 서지 않는다**
 
@@ -271,9 +306,14 @@ conformance 실행기와 kernel test 뿐) 표본 공급 port 도 평가 경로�
 **그래서 -a 의 정직한 산출물은 「자격·금액·하한율 근거 + 평가 상세」이고, 가격 세 축(3안·신뢰도·하한 미달
 빈도)은 상태와 사유로만 선다.** 이것은 계약의 「근거 절반」 문면과 일치한다. 어긋나는 것은 **-b 의 약속**뿐이다.
 
-### 0.9 팀장 결정 요청 (`D-7C2-n`) — 권고안 포함
+### 0.9 팀장 결정 — **전부 수령**(`D-7C2-1`, 2026-10-23)
 
-| # | 질문 | 권고 |
+여섯 다 `scope.md` 「계약 갱신 이력」의 `D-7C2-1` 로 답이 왔다. 아래 표는 **질문과 그때의 권고**이고,
+확정된 답은 그 결정 블록이 정본이다. 권고와 결정이 갈린 자리는 **Q1 하나**다 — 권고는 「둘 중 하나를
+팀장이 고른다」였고 결정은 **ⓑ(-b 를 열지 않고 -a 단독 종결)** 다. 그에 따라 0.7 을 고쳐 적었고,
+`bidPriceMenuNotComputedReason` 은 전환 쌍이 아니라 **값 하나**(`MENU_PATH_NOT_WIRED`)가 됐다.
+
+| # | 질문 | 그때의 권고 |
 |---|---|---|
 | **Q1** | -b 를 「3안을 채운다」에서 **「메뉴 커널 호출 자리를 배선하고 그 커널이 내는 사유 있는 부재를 응답에 옮긴다」**로 바꿀 것인가? | **바꾼다.** 0.8 의 셋이 그렇지 않으면 -b 가 약속을 못 지킨다. 가치는 남는다 — 커널이 배선되면 ML-01 이 닫히는 날 **표면 변경 없이** 3안이 흐른다. 대안으로 **-b 를 열지 않고 ML-01 뒤로 미루는 것**도 정직하다(g1dec05 권고에 더 가깝다). 그 경우 이 slice 는 -a 단독 PR 이 된다. 둘 중 하나를 팀장이 고른다 |
 | **Q2** | 단건 경로에 분석 예산(`candidateLimit`)을 적용하는가? | **적용하지 않는다**(`analysisBudget = null`). 예산은 스캔 비용 통제이고 운영자가 지목한 단건 요청의 허가 조건이 아니다. 차이는 test + 계약 문면 + 알려진 제한에 명시 |
