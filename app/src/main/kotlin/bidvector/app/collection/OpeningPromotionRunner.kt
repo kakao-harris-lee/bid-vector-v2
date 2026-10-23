@@ -59,7 +59,7 @@ class OpeningPromotionRunner(
         when (val run = useCase.promote()) {
             OpeningPromotionRun.SampleNotConfirmed -> {
                 // 표본이 없는 것은 오류가 아니라 **순서**다 — 수집이 먼저다. 아무것도 쓰지 않았다.
-                log.write(promotionSkippedLine())
+                log.write(PROMOTION_SKIPPED_LINE)
                 termination.terminate(CollectionExitCode.INCOMPLETE.value)
             }
 
@@ -88,4 +88,4 @@ internal fun promotionFinishedLine(report: OpeningPromotionReport): String =
         "expiredRows=${report.expiredRows}"
 
 /** 확정 표본이 없어 아무것도 쓰지 않았다 — 실패와 구별되는 한 줄이다(처방이 「수집을 먼저 돌려라」다). */
-internal fun promotionSkippedLine(): String = "opening-promote skipped reason=SAMPLE_NOT_CONFIRMED promoted=0"
+internal const val PROMOTION_SKIPPED_LINE = "opening-promote skipped reason=SAMPLE_NOT_CONFIRMED promoted=0"

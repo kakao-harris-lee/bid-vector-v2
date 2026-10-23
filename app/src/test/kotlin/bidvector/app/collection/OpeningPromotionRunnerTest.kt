@@ -54,6 +54,6 @@ class OpeningPromotionRunnerTest {
 
     @Test
     fun `표본이 없어 건너뛴 줄은 승격 0 을 명시한다`() {
-        promotionSkippedLine() shouldBe "opening-promote skipped reason=SAMPLE_NOT_CONFIRMED promoted=0"
+        PROMOTION_SKIPPED_LINE shouldBe "opening-promote skipped reason=SAMPLE_NOT_CONFIRMED promoted=0"
     }
 }
