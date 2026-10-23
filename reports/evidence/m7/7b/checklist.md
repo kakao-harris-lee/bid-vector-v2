@@ -512,7 +512,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | 8 개인정보 — 사업자번호·대표자명 슬롯 0 · 메모 로그/audit 노출 0 | V21 · 응답에 본문 자리 없음 | `BidTimelineEntryResponse`(본문 없음) · `leakPatternGate` | 출하 |
 | 9 문서 — milestone-7 R-5 닫음 · milestone-6 예외 줄 · runbook · 리허설 | `milestone-7.md` · `milestone-6.md` · `docs/runbook/m6-6b3-retention.md` | §7 `db-rehearsal.sh` | 출하 |
 | **D-7B-2 (계약 갱신으로 추가)** typed `AccountId` 운반 · 라벨 파싱 0 | `AuthenticatedAccount.kt`(속성 키 · 접근자) · `AuthenticationResult.Authenticated.account` · 필터가 판정 전에 지우고 다시 적음 · `BidCaseRouting.accountOf` 삭제 | `AuthenticatedAccountTest`(라벨 위조 불변 · 속성 부재 null · 미리 놓인 속성 소거 · 세션 E2E · 자격 헤더 401) · `AccountCarrierStructureTest`(javap 집합 등식 셋 + 양성 대조) · 변이 ⑭ | 출하 |
-| **D-7B-3 (계약 갱신으로 추가)** 검토 r1 처분 — 결정 ① ~ ④ + 고칠 목록 | §3.5 처분표의 「출하」 칸 | §3.5 처분표 · 변이 표(r1) | 출하 — 문면 인용 하나(C-M6) · 등재 셋(C-L5 · C-L6 · C-L7) |
+| **D-7B-3 (계약 갱신으로 추가)** 검토 r1 처분 — 결정 ① ~ ④ + 고칠 목록 | §3.5 처분표의 「출하」 칸 | §3.5 처분표 · 변이 표(r1) | 출하 — 근거 있는 거부 하나(C-M6) · 등재 셋(C-L5 · C-L6 · C-L7) |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
 | (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
@@ -769,7 +769,7 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 ### 3.5 수정 라운드 1 — 계약 D-7B-3 (검토 r1 처분, 2026-10-24)
 
 판정 SHA `1d90c834` 에 대한 verifier r1 **not-ready** 와 code-reviewer r1 **request_changes** 를 받은 라운드다(재작업 1/5).
-지적 ID 는 `V-`(verifier) · `C-`(code-reviewer) 접두다. **처분**은 고침 · 등재(근거) · 문면 인용 셋 중 하나다.
+지적 ID 는 `V-`(verifier) · `C-`(code-reviewer) 접두다. **처분**은 고침 · 등재(근거) · 근거 있는 거부 셋 중 하나다.
 **구판 RED** 칸은 그 지적의 회귀 test 가 **고치기 전 거동**에서 붉은지다 — `1d90c834` 와 이번 판은 API(`OpenedCase` ·
 `BidCase.deadlineAt` · 포트 서명)가 달라 새 test 를 구판 트리에 그대로 얹을 수 없으므로, **지금 트리에서 그 거동만 구판으로
 되돌리는 변이**로 쟀다(변이 이름이 `-old` 로 끝난다, 결과는 아래 변이 표).
@@ -791,7 +791,7 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 | C-M3 | 스냅샷 출처 열 셋에 어휘 · 짝 CHECK 없음 | 고침(B-1 과 같은 커밋) | 위 C-B1 | `BidCaseSnapshotTest` 어휘 등식 둘 |
 | C-M5 | 건너뜀 · 정정 사유에 길이 상한 없음(지울 수 없는 표 · 개인정보) | 고침 | 도메인 `MAX_LENGTH` 500 · 요청 판독 400 · OpenAPI `maxLength` · DB `char_length` CHECK | `BidCaseEndpointTest`「사유 상한 400」 · `BidCaseIntegrityTest`「사유 상한」 · **M5-old RED**(도메인 상한이 없으면 DB CHECK 가 500 을 낸다) |
 | C-L4 | `draw_numbers` 원소 부호를 DB 가 보지 않음 | 고침 | `CHECK (0 < ALL (draw_numbers))` | `BidCaseIntegrityTest`「추첨번호는 양수뿐」 |
-| C-M6 · V-L3(뒤 절반) | `draft_id` 가 「기본값 초안」이 아니라 「최신 초안」 | **문면 인용 — 코드 무변경, 주석 정정** | 계약 문면(ux §6.1 ⑤): 확인 화면은 「**초안이 채워진 상태**: 금액(**기본 = 고른 안, 다르게 냈으면 수정**)」이고 acceptance 는 「『제출함』 확인은 **초안 금액을 기본값으로** 하되 다르게 냈으면 수정할 수 있고」다. 확인 화면이 기본값으로 채우는 초안이 **그 시점의 최신 초안**이므로 둘은 같은 것이다. 거짓은 코드가 아니라 주석의 「이 초안대로 냈다」로 읽히는 문면이었다 — V21 · `BiddingSql` · `BidEffectWriter` 주석을 「기본값으로 채운 초안 = 최신 초안, 금액은 기록이 따로 싣는다」로 고쳤다 | — |
+| C-M6 · V-L3(뒤 절반) | `draft_id` 가 「기본값 초안」이 아니라 「최신 초안」 | **근거 있는 거부**(팀장 수용 2026-10-24) — 코드 무변경, 주석 정정 | 계약 문면(ux §6.1 ⑤): 확인 화면은 「**초안이 채워진 상태**: 금액(**기본 = 고른 안, 다르게 냈으면 수정**)」이고 acceptance 는 「『제출함』 확인은 **초안 금액을 기본값으로** 하되 다르게 냈으면 수정할 수 있고」다. 확인 화면이 기본값으로 채우는 초안이 **그 시점의 최신 초안**이므로 둘은 같은 것이다. 거짓은 코드가 아니라 주석의 「이 초안대로 냈다」로 읽히는 문면이었다 — V21 · `BiddingSql` · `BidEffectWriter` 주석을 「기본값으로 채운 초안 = 최신 초안, 금액은 기록이 따로 싣는다」로 고쳤다 | — |
 | C-M7 | HTTP 이중체가 생성 전이를 남기지 않음 | 고침 | 이중체가 생성 전이 한 줄을 남긴다 | `BidCaseEndpointTest`「담은 직후 타임라인」 · **M7d-old RED** |
 | C-M10 · V-L8 | 「속성 test 포함」 미이행 · 196 쌍 | 고침 | `BidTransitionPropertyTest`(`checkAll` — 받아들임 ⊆ 표의 행 · 주체 · 도착, 소급 ⇔ 마감 지남의 기록, 건너뜀에서 전부 거부, 결정성) · 주석 182 | **PROP RED** |
 | C-M11 | 이미 담긴 건도 201 | 고침 | `OpenedCase(view, created)` · 새로 담으면 201, 이미 있으면 200 · OpenAPI 200 추가 · 생성 타입 재생성 | `BidCaseEndpointTest`「201 · 200 같은 건」 · **M11-old RED** |
@@ -883,7 +883,8 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
    호출자가 없다. 사용자 입력 경로는 열려 있다(§6.1 「사용자가 나라장터에서 보고 오거나 입력한다」). 마감 판정
    (결정 ①)은 **읽거나 명령할 때 지연 판정**이다 — 아무도 읽지 않는 건은 저장소에서 마감 전 상태로 남아 있다가
    다음 읽기에 넘어간다. 저장된 상태만 보는 소비자(예: 알림 7C③)는 이 판정을 지나지 않으면 마감 전으로 읽는다.
-   그리고 마감은 공고의 지금 값을 쓰고, 담을 때 적은 사본은 **공고가 없을 때만** 쓴다(정정된 마감이 사본보다 우선).
+   그리고 마감은 공고의 지금 값을 쓰고, 담을 때 적은 사본은 **공고가 없을 때만** 쓴다(정정된 마감이 사본보다 우선 — 팀장 수용
+   2026-10-24). 정정이 마감을 앞당겨 이미 지난 경우와 미룬 경우를 `BidCaseScheduleTest` 둘이 잰다.
 3. **PDF 저장소 없음** — `evidence_ref` 가 가리킬 실체가 저장소 안에 없다. 완화 둘:
    형태 제한(공백 불가 · 128자 상한 · `toString()` 가림)과 문면 고정(「이 **참조**를 언제까지
    보관하는가」). 보관 기한 **집행**은 저장소 slice 가 연다.
@@ -899,7 +900,8 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 7. **통보 예정일을 쓰는 경로가 없다**(계약 D-7B-3 결정 ②) — 그래서 다음 확인 시점의 `NOTICE_EXPECTED` 후보는 오늘
    도달 불가이고, 「개찰됨」 두 상태의 다음 확인 시점은 출하 경로에서 늘 「없음」이다. 전이는 그 값을 지우지 않는다(앞 판은
    지웠다). **OPEN 후보 `OPEN-7B-NOTICE-EXPECTED-WRITER`** — 그 값을 누가(사용자 입력 · SET-02 개찰 결과 · 공고 문면)
-   어느 명령으로 쓰는가. capability map 활성 OPEN 등재 여부는 팀장 결정이다(이 evidence 에는 후보로만 적는다).
+   어느 명령으로 쓰는가. **이 PR 에서는 후보로만 둔다**(팀장 결정 2026-10-24 — capability map 활성 등재는 다음 M7 문서 PR 에서
+   `OPEN-7C5P-*` 넷과 함께 한 번에 한다. 활성 수 충돌을 피한다).
 8. **사유 자유 텍스트는 지울 수 없는 표에 남는다** — 건너뜀 · 정정 사유는 타임라인(append-only)에 남고 타임라인 응답에
    실린다. 상한(500자)을 도메인 · 요청 · 문서 · DB 네 겹에 두었지만 **내용**(사람 이름 · 연락처가 들어올 가능성)은 막지
    않는다. 메모 · 증빙과 달리 가리지 않는 것은 타임라인이 그 사유를 보여 주는 것이 계약이기 때문이다(§6.1).
