@@ -70,7 +70,21 @@ verifier(opus) · code-reviewer(sonnet) 병렬. Codex 없음(되돌리기 어려
 
 ## 계약 갱신 이력
 
-(없음)
+**D-7C2-1 (2026-10-23, 팀장 — Phase 1 설계 `f5310421` 수령).**
+- **전제 정정**: 출하 조립의 ML 분석 포트는 항상-미가용 고정이고(`OPEN-ML-ANALYSIS-WIRING` 은 운영자 결정 ④ 개정 2026-09-27 로 보류, 선행은
+  6G 백테스트), g1dec05 가 「ML-01 이 닫히기 전에는 메뉴가 production 에서 `SourceAbsent` 외 값을 낼 수 없다」고 측정했다. 따라서 「-b =
+  g1dec05 머지 뒤 3안을 채운다」는 성립하지 않는다.
+- **Q1 → -b 를 열지 않는다. 이 slice 는 -a 단독으로 종결·PR 한다.** 3안은 ML-01 뒤 별 slice. 응답은 3안·신뢰도·하한 미달 빈도를 **상태 enum +
+  사유**로만 내고 값 필드는 선언하지 않는다. 위 「-a 와 -b 를 한 PR 로」 문면은 이 결정으로 대체된다.
+- operation `POST /api/bid-price-requests`(공고 식별자는 본문, CSRF 는 구성으로) · 응답 평탄 유지(그룹 둘 이상 미보유는
+  `MULTIPLE_GROUPS_NOT_FLATTENED`) · 「확률 아님」은 고지 코드 + 필드 이름 집합 test · 커널 무편집 조립(단건 후보 소스 · 자격 판정 pin ·
+  ML 결과 record).
+- **Q2** 단건 경로에 분석 예산 미적용(의도된 어긋남, test 로 고정). **Q3** DEC-04 는 재지 않고 상태 + OPEN(정책 수치는 운영자 결정 대상).
+- **Q4 in_scope 추가**: 게이트 등재 셋(`architecture-policy.properties`·`gate-tests.properties`·`api-type-policy`)과 기존 자격 어댑터의 1줄 위임
+  (거동 불변 test 동반).
+- **Q5** 미판정 축 ID 는 7C④ 와 바이트 동일(`QUAL_08_REGION`·`QUAL_11_CONSTRUCTION_CAPACITY`) + `QUAL_10_PERFORMANCE`. 뒤에 머지되는 쪽이
+  어휘 등식을 맞춘다. **Q6** 7C③ 머지 전 `inboxRecordState: NOT_RECORDED_YET` 선언(가짜 포트 없음).
+
 
 ## 하네스 레인 변경 (상시)
 
