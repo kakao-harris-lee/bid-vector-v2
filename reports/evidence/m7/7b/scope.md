@@ -211,6 +211,50 @@ run-state · collection worktree 무접촉. `bidvector/app:local` 태그는 레�
 자격증명 경로는 계정을 심지 않는다(계정 범위 경로는 세션 전용 401 유지). 7C②·7C③·7C④ 가 이 접근자를 공유한다(7B 선행 머지 — D-7C3-1).
 test: 주체 문자열 위조/변경이 계정을 바꾸지 않음 · 속성 부재 401 · production 의 문자열 파싱 경로 0 · 접근자가 문자열로 되돌아가는 변이 RED.
 
+**D-7B-3 (2026-10-24, 팀장 — 검토 r1 수령 · 수정 라운드 1).** 판정 SHA `1d90c834` 에 대해 verifier r1 **not-ready**(high 3 · medium 2 · 장부층 8),
+code-reviewer r1 **request_changes**(blocker 1 · high 3 · medium 11 · low 7). 재작업 1/5. 두 보고를 합친 처분이다(전문: `_workspace/m7-7b/01_verifier_report.md` ·
+리뷰 파일 `cr-7b-r1.md`, 팀장이 경로를 넘긴다). 지적 ID 는 `V-`(verifier) · `C-`(code-reviewer) 접두로 evidence 처분표에 적는다.
+
+- **결정 ① — Q-11 소급 확인(V-H1): 서버가 마감을 판정한다(사용자 op 를 새로 열지 않는다).** 마감 전 상태의 건에 명령이 오거나 건을 읽을 때, 그 건의
+  마감 사본이 지났으면 use case 가 시스템 주체로 `MARK_DEADLINE_PASSED` 를 먼저 적용하고(타임라인에 시스템 주체로 남는다) 요청 명령을 이어서 판정한다.
+  마감 사본은 `bid_case` 에 둔다 — 없으면 V21 에 열을 더한다(V21 은 아직 main 에 없으므로 새 번호가 아니라 V21 수정이다). 공고가 파기된 WATCHING 건도
+  사본으로 판정되어 소급 기록이 가능해야 한다. test: 마감 뒤 기록 → `retroactive=true` + 타임라인 순서(시스템 전이 → 기록) · 파기된 공고 건 기록 · 마감 전 무전이 ·
+  지연 판정을 끄는 변이 RED. BID-01 ⓐ 는 이 test 가 출하 조립에서 초록일 때만 유지한다.
+- **결정 ② — 통보 예정일(C-H1 · V 장부층): 덮어쓰기를 멈추고, 쓰기 경로 부재는 알려진 제한으로 선언한다.** `UPDATE_CASE_STATE` 에서 그 열을 빼거나
+  기존 값을 보존한다(주석과 코드를 맞춘다). 쓰는 경로는 이 slice 에서 만들지 않는다 — `NOTICE_EXPECTED` 도달 불가를 evidence 알려진 제한에 적고
+  OPEN 후보 `OPEN-7B-NOTICE-EXPECTED-WRITER` 로 등재한다. 이중체가 그 열을 보존해 결함을 가린 갈림(C-M)도 함께 고친다. 회귀 test: 값이 있는 건을
+  전이시켜도 값이 남는다(실 DB).
+- **결정 ③ — `snapshotTakenAt`(V-M2 · C-M): 요청에서 뺀다.** 스냅샷은 서버가 뜬다(D-7B-1 위협 ③). OpenAPI · 요청 판독 · `DraftInput` · 생성 타입에서
+  제거하고, 「신선도 검사」 문면을 지운다. 미래에 화면 신선도가 필요하면 별 slice 다.
+- **결정 ④ — `resumeBidCase`(V-H3 · C-H2): 본문 없는 operation 으로 맞춘다.** 구현이 본문을 요구하지 않게 고친다(문서가 정본). 아울러 **문서
+  `requestBody` 유무 ↔ 매핑 `@RequestBody` 유무 집합 등식** 계약 test 를 전 operation 에 건다 — 새 게이트이므로 표적 재검증 대상이다.
+
+고친다(산출물):
+- **C-B1 기초금액 스냅샷 어휘**: `JdbcNoticeSnapshotQuery` · `BidEffectWriter` 가 같은 모듈의 정본 `ProvenanceCodec` · `FloorRateOriginCodec` 을 재사용한다
+  (손 어휘 금지, `FILLED_FROM_BUDGET_KEY` 포함). `bid_draft` provenance 열에 어휘 CHECK · 짝 CHECK. test: **기초금액이 있는 공고**로 초안을 만들어 스냅샷
+  네 열을 실 DB 에서 단언 + 어휘 등식(ProvenanceKind.entries ↔ CHECK 목록).
+- **V-H2 · C-H3 없는 test 둘**: `BidCaseColumnPrivilegeTest`(열 단위 UPDATE 집합 등식 + **출하 앱 역할 양성 대조**) · `BidCaseRowTest`(꼬리표 전수) 를 실제로
+  만든다. verifier 변이 M7(`updated_at`→`created_at`)이 RED 여야 한다. `assertAllRejectedAsApp` 에 앱 역할 양성 대조(C-M).
+- **AccountId 주입(팀장 표적)**: javap 등식 두 개 — app main 의 `AccountId.<init>` 호출자 = 인증 경로의 정해진 집합, 생성자 인자로 `AccountId` 를 받는
+  app class = {`Authenticated`}. verifier 변이 M4 가 RED 여야 한다. 게이트 술어 변경이므로 표적 재검증.
+- **V-M1 D-7B-2 구조 게이트**: 문자열 상수 술어 대신 `getAttribute`(계정 속성) 호출자 집합 등식으로 닫는다. verifier 변이 M2 가 RED 여야 한다.
+- **V21 구조(C-M)**: 자식 표 셋의 `account_id` 를 부모와 묶는 복합 FK · 타임라인 상태·명령 어휘 CHECK · `SkipReason` · `TransitionReason` 길이 상한(도메인 +
+  CHECK, 개인정보 축) · UNIQUE 와 중복인 `CREATE INDEX` 셋 제거(V 장부층).
+- **도메인·응답(C-M)**: `bid_record.draft_id` 가 계약이 말하는 초안(기본값이 된 초안)을 가리키게 한다 — 계약 문면이 「최신 초안」이면 문면을 인용해 보고하고
+  고치지 않는다. 이미 담긴 건 재요청은 201 이 아니라 기존 건 응답(200)으로 `OpenCaseResult` 두 갈래를 쓴다(OpenAPI 함께). 이중체가 생성 전이를 남기게 한다.
+- **속성 test(C-M)**: 계약 산출물 7 「속성 test 포함」을 이행한다 — 전이표 불변식 하나 이상을 `checkAll` 로. 「196 쌍」 문면은 182 로.
+- **장부층·low**: `connectionSourceOf` 를 `internal` 로(되돌릴 수 있으면 `ConnectionSource.kt` 를 무변경으로) · 조건부 UPDATE 계정 필터 변이 측정(V M3) ·
+  evidence §3 의 낡는 좌표 제거 · ConstantTime 허용 목록의 `BidCaseRequestsKt` 근거 문장 정정 · CR low 일곱은 고치거나 근거를 들어 등재.
+
+in_scope 명시(이 결정으로 계약에 더한다): `app/src/main/.../http/` 의 `AuthenticatedAccount.kt` · `AccountScopedRoutes.kt` · `RequestAuthentication.kt` ·
+`BrowserSessionAuthenticator.kt`(D-7B-2) · `ErrorBody.kt`(상수) · `JsonValueReaders.kt`(판독 함수) · app http test 의 공유 파일(D-7B-2 · 계약 test 분할) ·
+각 모듈 `build.gradle.kts`(새 모듈 의존) · adapters `CleanMigration*Test` 관례 등재 · `reports/evidence/m6/6e1/acceptance-trace.md` 교차 참조 한 줄(D-7B-1).
+`ConnectionSource.kt` 는 위 처분대로 무변경이 목표다 — 남기면 근거를 evidence 넓힘 표에 적는다.
+
+절차: 지적별 처분표(고침 · 등재 · 근거 있는 거부) → 구판 RED 확인(회귀 test 는 `1d90c834` 에서 RED 인지) → 찬 `check` · S-20 · container 재생(V21 변경)
+· db-rehearsal · 변이 표(verifier M2 · M4 · M7 · 결정 ① 의 지연 판정 변이 포함) · rollback ①~⑥ 재실측 → 판정 SHA 고정 보고. 수정 라운드가 만든 새 파일은
+in_scope 와 대조해 보고한다. main 이 움직이면 그 시점 main 으로 rebase 한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
