@@ -26,7 +26,7 @@ import tools.jackson.databind.JsonNode
  * 결과 → 상태 코드 변환은 이 클래스에 없다. `BidCaseHttp` 한 자리다(조회 controller 와 공유).
  */
 @RestController
-@RequestMapping("/api/bid-cases")
+@RequestMapping(AccountScopedRoutes.BID_CASES)
 class BidCaseCommandController(
     private val workflow: BidCaseWorkflow,
 ) {
