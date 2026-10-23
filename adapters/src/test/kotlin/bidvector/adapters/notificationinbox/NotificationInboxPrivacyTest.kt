@@ -207,12 +207,8 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     private fun columnsWithVocabularyCheck(table: String): Set<String> {
         val definitions = checkDefinitionsOf(table)
         return textColumnsOf(table)
-            .filter { column ->
-                definitions.any { definition ->
-                    definition.contains("= ANY") &&
-                        (definition.contains("($column)::text") || definition.contains("\"$column\""))
-                }
-            }.toSet()
+            .filter { column -> definitions.any { it.mentionsVocabularyOf(column) } }
+            .toSet()
     }
 
     private fun checkDefinitionsOf(table: String): List<String> =
@@ -238,13 +234,24 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     ): List<String> {
         val vocabulary =
             checkDefinitionsOf(table).single { definition ->
-                definition.contains("= ANY") &&
-                    definition.contains("($column)::text") &&
-                    // 짝 CHECK 도 이 열을 언급하므로 **단일 열 어휘 제약만** 고른다.
-                    !definition.contains(" OR ")
+                // 짝 CHECK 도 이 열을 언급하므로 **단일 열 어휘 제약만** 고른다(짝 쪽에는 ` OR ` 가 있다).
+                definition.mentionsVocabularyOf(column) && !definition.contains(" OR ")
             }
         return VOCABULARY_LITERAL.findAll(vocabulary).map { it.groupValues[1] }.toList()
     }
+
+    /**
+     * 이 제약 정의가 [column] 의 **어휘를 닫는가**. PostgreSQL 은 `IN (…)` 을 `= ANY (ARRAY[…])`
+     * 로 되돌려 주고, **열의 자료형에 따라 좌변 표기가 갈린다** — 이미 `text` 인 열은 `kind = ANY`
+     * 로, 캐스트가 필요한 열은 `(kind)::text = ANY` 로 나온다. 한 쪽만 보면 제약이 있는데도
+     * 「어휘가 닫히지 않았다」로 읽혀 이 class 의 등식이 **거짓으로 통과**한다(기존 스키마 래칫
+     * 의 같은 술어가 두 형태를 함께 보는 이유다 — 그 선례를 그대로 쓴다).
+     *
+     * `<> ''` 처럼 비어 있지 않음만 요구하는 CHECK 는 어휘를 닫지 않으므로 여기 들지 않는다 —
+     * 그것이 이 술어의 요점이다.
+     */
+    private fun String.mentionsVocabularyOf(column: String): Boolean =
+        contains("$column = ANY") || contains("($column)::text = ANY")
 
     private companion object {
         const val TABLE = "notification_inbox"
