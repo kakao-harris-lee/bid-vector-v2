@@ -63,12 +63,17 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         val key = notice("sched-f")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow(appRoleDataSource())
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         now = now.plusSeconds(2 * HOUR)
         workflow.command(mine, caseId, BidCommand.RecordBid(submission(), null), BidActor.User(mine))
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.BID_RECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.BID_RECORDED
         recordRetroactive(caseId.value) shouldBe true
     }
 
