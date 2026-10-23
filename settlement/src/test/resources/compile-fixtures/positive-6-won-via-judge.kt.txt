@@ -1,0 +1,13 @@
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.OperatorTradeName
+import bidvector.settlement.RecordedAwardOutcome
+import bidvector.settlement.decideAwardLookup
+import bidvector.settlement.judgeAwardOutcome
+import bidvector.settlement.recordAwardOutcome
+
+fun positiveWonViaJudge() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val lookup = decideAwardLookup(OperatorTradeName.Declared("GasangMarine"), policy)
+    recordAwardOutcome(RecordedAwardOutcome.Absent, judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("GasangMarine")))
+}

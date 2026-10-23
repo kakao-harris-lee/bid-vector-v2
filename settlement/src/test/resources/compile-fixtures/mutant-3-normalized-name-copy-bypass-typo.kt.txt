@@ -1,0 +1,10 @@
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.CompanyNameNormalization
+import bidvector.settlement.normalizeCompanyName
+
+fun mutantCopyBypassTypo() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val normalization = normalizeCompanyName("Co GasangMarine", policy)
+    check(normalization is CompanyNameNormalization.Normalized)
+    normalization.name.copyTypo(value = "gasangcivil")
+}

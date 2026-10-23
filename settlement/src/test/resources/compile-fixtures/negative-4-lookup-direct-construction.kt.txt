@@ -1,0 +1,14 @@
+import bidvector.settlement.AwardLookupDecision
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.CompanyNameNormalization
+import bidvector.settlement.judgeAwardOutcome
+import bidvector.settlement.normalizeCompanyName
+
+fun negativeLookupDirectConstruction() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val normalization = normalizeCompanyName("GasangMarine", policy)
+    check(normalization is CompanyNameNormalization.Normalized)
+    val lookup = AwardLookupDecision.Lookup(normalization.name, policy)
+    judgeAwardOutcome(lookup, AwardWinnerTradeName.Published("GasangMarine"))
+}
