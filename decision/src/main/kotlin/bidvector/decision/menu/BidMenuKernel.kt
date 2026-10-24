@@ -123,15 +123,22 @@ private fun outcomeOf(
     version: PolicyVersion,
 ): BidMenuOutcome =
     when {
-        offered.isEmpty() -> BidMenuOutcome.Unmeasurable(withheld)
-        withheld.isEmpty() -> fullMenu(offered, version)
-        else ->
+        offered.isEmpty() -> {
+            BidMenuOutcome.Unmeasurable(withheld)
+        }
+
+        withheld.isEmpty() -> {
+            fullMenu(offered, version)
+        }
+
+        else -> {
             BidMenuOutcome.PartiallyOffered(
                 offered = offered,
                 withheld = withheld,
                 disclosures = BidMenuDisclosure.entries.toSet(),
                 policyVersion = version,
             )
+        }
     }
 
 /** 셋 전부가 섰을 때만 지어진다 — 「정상 3안」의 이름이 그 사실을 말한다. */
