@@ -13,7 +13,7 @@ private val workflowClasses = File("build/classes/kotlin/main/bidvector/workflow
 /**
  * **「아직 판정하지 않음」 표시 잠금**(M7 완료 조건 G2 — QUAL-08 · QUAL-11, scope 산출물 4).
  *
- * 두 겹이다. (1) 판정 대기 표에 두 축이 있다. (2) `workflow` 의 **이 패키지 밖** 어느 컴파일된
+ * 두 겹이다. (1) 판정 대기 표에 축 셋이 있다. (2) `workflow` 의 **이 패키지 밖** 어느 컴파일된
  * 클래스도 이 패키지를 참조하지 않는다 — 판정 경로(`workflow.evaluation` 등)가 소재지나 시평액을
  * 읽기 시작하면 (2) 가 붉어지고, 그 slice 는 (1) 의 표에서 그 축을 빼야 한다. domain 모듈
  * (`qualification` 등)은 층 게이트가 이미 `workflow` 참조를 막으므로 여기서 다시 재지 않는다.
@@ -23,9 +23,16 @@ private val workflowClasses = File("build/classes/kotlin/main/bidvector/workflow
  * UTF-8 항목에 내부 이름이 그대로 실리므로 바이트 검색으로 충분하다(ASCII 이름).
  */
 class ProfileJudgementIsolationTest {
+    /**
+     * 축 ID 는 **wire 값**이다(프로필 조회 응답이 이 이름을 그대로 싣는다, 2b). 그래서 이름을 직접
+     * 잠근다 — 7C ② 의 자격 카드가 같은 세 문자열을 쓰기로 했고(`D-7C2-1` Q5), 한쪽에서 상수 이름을
+     * 바꾸면 두 표면의 어휘가 조용히 갈린다.
+     */
     @Test
-    fun `판정 대기 축은 QUAL-08 과 QUAL-11 둘이다`() {
-        UnjudgedQualificationAxis.entries.map { it.capability } shouldBe listOf("QUAL-08", "QUAL-11")
+    fun `판정 대기 축은 QUAL-08 · QUAL-10 · QUAL-11 셋이고 ID 는 7C② 어휘와 같다`() {
+        UnjudgedQualificationAxis.entries.map { it.name } shouldBe
+            listOf("QUAL_08_REGION", "QUAL_10_PERFORMANCE", "QUAL_11_CONSTRUCTION_CAPACITY")
+        UnjudgedQualificationAxis.entries.map { it.capability } shouldBe listOf("QUAL-08", "QUAL-10", "QUAL-11")
     }
 
     @Test
