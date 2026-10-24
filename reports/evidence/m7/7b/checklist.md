@@ -1135,6 +1135,18 @@ Kotlin `check` 를 다시 잰다(결과는 동결 보고 · PR 조치 코멘트�
 | S-23 · S-23b · S-24 · S-26 | 같은 자리 | 전부 성공 · 이미지 태그 넷은 재생 전 ID 로 복원(전후 등식 확인) |
 | 변이 표(r2) | §3.6 | 변이 28 · 통제군 1 — **RED 27** · 등가 변이 초록 1(OR-TRUE, 근거는 C2-N17 행) · 첫 측정에서 사각이던 D5-actor 는 test 를 더해 RED |
 
+### 7.4 승인 전 일괄 재실측 (base `998b59dd`)
+
+V21 · OpenAPI · 생성 타입은 이 일괄에서 바뀌지 않았다(`git diff --name-only 1b33c925..HEAD` 에 없다) — 그래서 container 재생과 db-rehearsal 은
+다시 돌리지 않았다(D-7B-5 「V21 을 바꾸면」 조건 밖). 아래 둘은 evidence 커밋 「승인 전 일괄(D-7B-5) 처분표 …」에서 돌렸고, 그 커밋과 마지막
+산출물 커밋 사이는 이 파일뿐이다.
+
+| 항목 | 결과 |
+|---|---|
+| `check` job — Kotlin `./gradlew --no-daemon check --continue` | **exit 0** · 18m20s(12:45–13:04) · `workflow` 529 · `adapters` 1144 · `app` 715 실행 · 실패 0(XML 확인). `bidding` 30 은 FROM-CACHE — 같은 입력으로 12:18 의 반복 측정이 실행해 초록이었다 |
+| `check` job — S-20 `one-command-check.sh` | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed(그 안의 Kotlin `check` 는 바로 앞 줄이 실행한 입력 그대로라 UP-TO-DATE) |
+| 변이 표(승인 전 일괄) | §3.7 — 변이 12 · 통제군 1 · 앞 판정 SHA 의 clone 측정 1: **RED 12**(clone 측정 포함) · 등가 변이 초록 1(D5-actor) · 통제군 초록 |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -1173,3 +1185,8 @@ base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛
 777 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 **트리 동일성으로 갈음**한다 — 같은 트리 객체에서
 04:08 의 clone `check` 가 실제로 실행해 exit 0(9m42s)이었다. 첫 시도는 측정 스크립트의 실행 권한이 없어 아무것도 돌지 않았다(하네스 문제,
 산출물 무관) — `bash` 로 불러 다시 잰 것이 위 결과다.
+
+**승인 전 일괄 재실측** — clone 을 마지막 산출물 커밋(「fix … 승인 전 일괄 HTTP …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
+읽었다: 변경 A 62 · M 31(종류는 `A` · `M` 뿐 — 새 파일 `BidTimelineRows.kt` 하나가 늘었다) → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 diff
+0 줄 · untracked 0 · 내 표지 829 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행
+실측(04:08, exit 0)으로 갈음한다(트리 동일성).
