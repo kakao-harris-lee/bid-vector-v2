@@ -4,7 +4,10 @@
   (`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`) G1 표: DEC-05 「메뉴 타입 + 커널(7C ② 가 그 위에 표면을 얹는다)」 ·
   DEC-02 「DEC-05 와 한 slice」(선언 예외 ② — 메뉴의 근거 칸이 곧 DEC-02 의 빈 자리). 홀더: 새 M6 slice 「투찰가 메뉴」.
   운영자 지시 2026-10-21 「G1 먼저」로 COL-03 레인과 병렬로 연다.
-- **base**: main `bee7c36f` · worktree `bid-vector-v2-m6-g1dec05` · 브랜치 `m6-g1dec05/2026-10-21`.
+- **base**: 착수 `bee7c36f` → **현행 `fc15975c`**(병합된 main, 머지 커밋 `851ee375`, D-G1DEC05-6) ·
+  worktree `bid-vector-v2-m6-g1dec05` · 브랜치 `m6-g1dec05/2026-10-21`.
+  **rollback 복원 기준도 `fc15975c`** 다 — 착수 base 로 복원하면 머지로 들어온 남의 변경까지 지운다.
+  전제(그 SHA 에 이 slice 가 없다)는 착수 커밋 `e88c069b` 미포함으로 확인했다.
 - **입력 정본**: `docs/discovery/capability-map.md` DEC-05 · DEC-02 절(acceptance bullet 이 정본), 제약하는 DEC-01 · DEC-04 · DEC-10 bullet ·
   `reports/evidence/m6/6e1/acceptance-trace.md` DEC-05 · DEC-02 행(「무엇이 비었는가」) · 추적표 머리의 ⓐ 술어 ②(production 배선과 출하 정책
   값에서 성립).
@@ -100,9 +103,57 @@ Codex 없음(되돌리기 어려운 경로 아님).
 (pgrep·free·ps)은 별도 호출로 먼저 본다. **00:30~03:00(6G 수집 창)에는 무거운 작업을 시작하지 않는다.** 6G DB(55432)·run-state·collection
 worktree 무접촉.
 
+## 결정 (팀장·운영자 승인분 등재)
+
+착수 계약 작성 뒤 **팀장 메시지로만 승인됐던 결정**을 계약에 올린다 — 메시지에만 있는 승인은
+남에게는 없는 승인이다. D-G1DEC05-1·2 의 내용은 `checklist.md` 의 같은 ID 절이 정본이다.
+
+- **D-G1DEC05-3**(2026-10-22, 수정 라운드 2 지시) — code-reviewer `REQUEST_CHANGES`. 고칠 것:
+  HIGH-1 태도 라벨 **뒤집는다**(안전 = 가장 높은 투찰율. 근거 셋 — legacy `app/ai/bid_target.py`
+  docstring · `app/ai/price_prediction/guardrails_apply.py` 의 후보→stance 브리지 표 ·
+  `contracts/proto/bidvector/ml/v1/prediction.proto`(운영자 메뉴는 `CandidateLabel` 축이 아니다)) ·
+  HIGH-2 후보 밴드 자신의 붕괴를 `FloorRateReading` 과 무관하게 판정 · HIGH-3 clamp 옵션의
+  반올림과 「한 옵션 실패가 메뉴 전체를 죽이지 않게」 · MEDIUM-4 항상 통과하는 test 둘 ·
+  MEDIUM-5 `AppliedFloor` KDoc 을 축 한정으로 · MEDIUM-6 `BidRateOrigin` 은 **바꾸지 않고**
+  KDoc + 알려진 제한 · LOW-8 「`Offered` ≠ 제약 검토 완료」를 알려진 제한과 7C ② 계약 조건으로.
+  verifier 추가분 — M-1(「fail-closed」 과장 → 표식형으로 문면만 낮추고 **거동 불변**) ·
+  L-3(추적표 집계 숫자 · checklist 판정 SHA 줄).
+- **D-G1DEC05-4**(2026-10-22, 라운드 2 계획 승인) — 붕괴 술어의 꼭대기 파급(`rates.safe`) ·
+  HIGH-3 의 `ceil(하한 bound × 기초금액)` 근거(**제약을 만족하는 최소 정수**) · 부분 보류를
+  별도 결과 타입으로 · `Offered` = 셋 전부 제시.
+- **D-G1DEC05-5**(2026-10-22) — 「Phase 1 약속 ↔ 출하 실물 대조표」를 **전수로** 넣는다. 무선언
+  이탈은 사유와 함께 올리고, `ArithmeticTest` KDoc 의 사후 정당화 문장은 **삭제**한다. 재리뷰
+  표적에 「checklist Phase 1 서술 ↔ 출하 코드」를 넣는다. 같은 날 승인: 대조표의 **넷째 범주
+  「약속 자체가 틀림」** 과 **파일 축 제외**(배치는 설계 판단이 아니다) — 이 넷째 범주는 앞으로
+  **모든 레인 대조표의 표준**이다.
+- **D-G1DEC05-6**(2026-10-24, 레인 재개 뒤) —
+  - `DEC-05` 의 「부분 측정(강함)」 표식은 **유지**한다. D-G1DEC05-4 의 제거 승인은 bullet ② 가
+    비어 있던 라운드 1 전제에서 나왔고 라운드 2 가 그 전제를 바꿨다. `E-24` 는 양쪽 **22** 고정.
+  - 팀장 지시 「KDoc 라운드 서사 정리」를 **철회** — 저장소 관례 확인(레인 보고: in_scope 밖
+    파일 20여 개가 같은 꼴로 쓰고 finding ID 인용도 관례다). `ArithmeticTest` 삭제는 유지.
+  - `FLOOR_PROMOTION_ROUNDING`(대조표 P-20)을 **재리뷰 표적**에 올린다 — 「(e) 신설 수치 0 과의
+    관계」.
+  - base 를 병합된 main `fc15975c` 로 올린다(위 **base** 줄).
+- **운영자 결정 2026-10-22 — `OPEN-DEC05-FLOOR-RATE-READING`** = `AsBidRateLowerBound(AtOrAbove)`.
+  **이 slice 에 적용하지 않는다** — 출하 정본은 `Undecided` 그대로이고 적용은 7C ② 에서
+  `BID_MENU_POLICY` 갱신으로 들어간다. 결정은 났고 **적용이 남은** 항목이라 활성 OPEN 에 둔다.
+- **운영자 결정 2026-10-24 — `ML-01` 이 G1 에서 빠졌다**(docs PR #88). 그 결정 블록이
+  `DEC-05`·`DEC-02` 를 **ⓐ 술어 ② 의 선언 예외**로 둔다 — 판정 근거는 「커널·구조 성립 +
+  7C ② 화면의 『아직 산출 안 함』 상태 표시가 test 로 잠김」이고, 값 출처 축과 그 값에서만
+  생기는 축은 `ML-01` 과 함께 **6G 백테스트 판정 뒤**다. 이 slice 는 두 행을 **「ⓒ + 선언 예외
+  등재」**로 적고 **ⓐ 전환은 7C ② 장부 커밋이 한다**. 수치(ⓐ/ⓑ/ⓒ)는 PR #88 이 바꾸지 않는다.
+
 ## 계약 갱신 이력
 
-(없음)
+- **2026-10-24 ①** — base 와 rollback 복원 기준을 `bee7c36f` → `fc15975c` 로 올렸다(D-G1DEC05-6).
+  사유: 착수 뒤 같은 G1 의 COL-03(#83) · SET-01(#85) 과 M7/7C①b(#87) 가 머지돼 **공유 장부의
+  집계가 움직였고**, 그 위에서 재산출하지 않으면 이 slice 가 적는 수가 머지 순간 틀린다.
+- **2026-10-24 ②** — in_scope 재대조 결과 **범위 밖 0**. `fc15975c`..판정 SHA 의 경로는 A 26 · M 7
+  이고 전부 in_scope 다. 라운드 2 가 만든 새 파일은 compile fixture 둘
+  (`decision/src/test/resources/compile-fixtures/negative-3-…` · `mutant-3-…`)이라 in_scope 안이다.
+- **2026-10-24 ③** — `OPEN-DEC02-SCORE-AXIS-FLOOR` 를 신설해 장부에 등재했다(라운드 2 실측의
+  부산물 — DEC-02 의 빈자리로 지목됐던 호출부가 하한이 적용될 자리가 아니었고, 그 자리의 진짜
+  물음이 이것이다). 판정은 **DEC-10 착수 계약**에서 함께 한다.
 
 ## 하네스 레인 변경 (상시)
 
