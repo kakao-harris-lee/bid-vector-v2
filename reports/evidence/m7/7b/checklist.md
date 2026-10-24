@@ -1027,6 +1027,39 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 | N3C | 존재 확인 뒤 본문 요구(400) | 같음 | RED 1 | **RED** 1 |
 | CTRL | 통제군 — 변이 없음 | 두 test | — | 초록 20 / 20 |
 
+### 3.9 승인 전 일괄 3 — 계약 D-7B-7 (표적 재검증 r5 처분, 2026-10-24)
+
+판정 SHA `774c46da` 에 대한 verifier r5 **ready-for-review**(차단 0 · 게이트 medium 1 · low 3)와 code-reviewer r5 **approve**(medium 2 · low 6)의 처분이다
+(재작업 2/5 유지). ID 접두는 `V5-` · `R5-`. 첫 커밋으로 scope.md 에 D-7B-7 절을 팀장 메시지 요지대로 등재했다. **이번에는 정적 규칙의 깊이를 더 쫓지 않고
+바인딩 층에서 실패로 닫았다**(V5-N1 의 처방). 게이트 술어가 바뀌므로 표적 재검증 대상이다.
+
+| 지적 | 내용(한 줄) | 처분 | 출하 | 재는 자리 · 변이 |
+|---|---|---|---|---|
+| V5-N1 · R5-1 (게이트) | 한 겹 · `@RequestMapping` 만 보는 매개변수 규칙을 두 겹 중첩(H1) · setter 운반(H2) · `@ModelAttribute` 메서드(H5)가 지나가고, Spring · Jackson 이 `AccountId(9)` 를 짓는다 | 고침(구조 — fail-closed) | 새 `AccountBindingGuard`(app.http, `@RestControllerAdvice` 이면서 Jackson `SimpleModule`, 한 빈). ① 본문: `AccountId` 역직렬화기를 늘 거부(Boot 가 컨텍스트의 `JacksonModule` 빈을 출하 매퍼에 등록한다). ② 데이터 바인딩: 전역 `@InitBinder` 가 **`JsonNode` 가 아닌 대상을 가진 바인더**를 거부(400) — 오늘 app 의 핸들러는 객체 바인딩을 한 곳도 쓰지 않는다(본문은 전부 `@RequestBody JsonNode`, 그 바인더의 대상이 `JsonNode`다). 반사 금지(`collection.reflection`) 때문에 대상 타입이 `AccountId` 에 닿는지 런타임에 걷지 않고 객체 바인딩 자체를 닫는다. ③ 단순 변환: 같은 바인더에 `AccountId` 거부 formatter(editor 는 변환 서비스보다 먼저 묻힌다). 기존 한 겹 규칙은 남기고 KDoc 과 §6 「`AccountId` 를 짓는 길 자체는 열려 있다」의 범위를 실제(한 겹 · 요청 매핑 메서드)로 고쳤다 | `AccountBindingGuardTest`(실제 MVC · Jackson 자동 구성, H1~H5 · G11 · HE(바인더를 만들지 않는 `HttpEntity` 본문 — Jackson 층만) → 전부 4xx · 핸들러 도달 0, 양성 대조 본문 `JsonNode` 200 · 도달 1, 위협을 흉내 낸 `String → AccountId` 변환기가 있어도 `@RequestParam` 미도달) · `AccountBindingGuardScanTest`(스캔으로 들어온 가드가 HTTP 조립의 매퍼에서 `AccountId` 를 거부) · 가드 경로 변이 MJ · MB · MF |
+| 조건 (c) · R5-6 | 핸들러 모집단이 비지 않음뿐 · `appClasses()` 가드 없음 | 고침 | 요청 매핑 메서드를 선언한 app class 집합 == `app.surface.api.handlers` 의 `bidvector.app` 핸들러(`HttpSurfaceCensusTest` 가 실 조립에서 잰다). `appClasses()` 에 `check(root.isDirectory)` | `AccountCarrierStructureTest`「요청 매핑 메서드를 선언한 app class 는 HTTP 표면 계약의 핸들러와 같다」 — 그래서 H1 · H2 · H5 모양의 매핑 class 를 app main 에 두면 이 등식이 먼저 붉다(아래 표) |
+| 조건 (a) · V5-L1 · R5-2 (게이트) | Jackson 등식이 소유자만 — `JsonNode` 자신의 멤버(`traverse`)가 열린 문 | 고침 | **(소유자, 멤버 서명) 쌍 전수 == 오늘 관측**(`JsonNode` 접근자 19 · 가드의 셋 = 22). 관측 집합의 `JsonNode` 멤버가 대상 타입 · 읽기 문맥을 받지 않고 `JsonParser` 를 돌려주지 않음을 함께 단언. 비지 않음(`JsonNode` 쌍 ≥ 1). **발견 하나를 함께 닫았다**: Kotlin 은 상속한 멤버를 자기 class 를 소유자로 부른다(가드의 `addDeserializer` 소유자는 `AccountBindingGuard`) — Jackson 타입을 상속한 app class 집합 == {가드, 그 역직렬화기} 등식을 더했다 | `AccountCarrierStructureTest` 셋 + 대조(F1 · G3 · `readValueAs` · jackson2 · 메서드 핸들 · `traverse` 가 쌍 밖, `JsonNode.get` 은 안 · `ObjectMapper` 하위 class 선언이 상속 술어에 걸림) · TRAV 전 초록 → 후 RED |
+| V5-L2 (게이트 표본) | 본문 없는 op 행동 등식이 `Origin` 의존 본문 요구(N2k)를 못 본다 | 고침 | 표본 둘: test 클라이언트 그대로 · 브라우저처럼 `Origin` 을 실은 요청(`SessionTestClient.send` 의 `extra`). 둘 다 문서의 2xx 와 정확히 같아야 한다 | N2k 전 초록 → 후 RED(헤더가 실제로 서버에 닿는다는 증거이기도 하다 — `HttpURLConnection` 은 `Origin` 을 조용히 버린다) |
+| R5-3 · V5-L3 | `BidActor.System` KDoc 「호출자 없음」 낡음 | 고침(문면) | 「오늘 이 값을 만드는 자리는 마감 판정 하나다(`DEADLINE_ACTOR`)」 | — |
+| R5-4 | 「호출자 둘」 ↔ 「하나뿐」 수 불일치 | 고침(문면) | 「호출자는 `DeadlineSettlement` 하나이고 그 자리가 쓰는 행은 둘」 | — |
+| R5-5 | `@InitBinder` · `@ExceptionHandler` · `@ModelAttribute` 메서드가 모집단 밖 | 분석 기록 + ① 이 닫음 | `@InitBinder` 메서드는 바인더만 받고 `@ExceptionHandler` 는 예외 · 요청 · 응답 류 해석기만 받는다 — 데이터 바인딩이 없다(test KDoc). `@ModelAttribute` 메서드의 바인딩은 가드의 `@InitBinder` 가 거부한다(H5 RED) | — |
+| R5-7 | R4-3 등식에 in-file 양성 대조 없음 | 고침 | `BidActor$System.<init>` 를 부르는 모의 줄이 술어에 걸린다 | — |
+| R5-8 | `deferredCaseId` 가 멱등이 아님 | 고침 | 부를 때마다 새 공고 번호 | — |
+
+**정책 파일 편집(게이트 허용 목록 — 공유 파일)**: `collection.external.allowed-packages.app`(정확 일치 등식)에 다섯 — `org.springframework.core`(`ResolvableType`) ·
+`org.springframework.format`(거부 formatter) · `org.springframework.web.bind`(`WebDataBinder`) · `tools.jackson.core`(역직렬화기 서명의 `JsonParser`) ·
+`tools.jackson.databind.module`(`SimpleModule`). `app.http.allowed-packages`(접두)에 둘 — `org.springframework.core` · `org.springframework.format`. 키 옆에 근거
+주석을 달았다. **대가 하나**: `tools.jackson.core` 가 app 모듈 허용이 되어, 앞 판에서 `TransportSurfaceGateTest` 의 바깥 패키지 등식이 막던 `JsonParser` 참조를
+이제 그 게이트가 막지 않는다 — 그 축은 위 Jackson (소유자, 멤버) 쌍 등식이 진다(호출이 하나라도 생기면 붉다). 처음 시도한 `java.beans` editor 는 그 패키지가
+전송 표면 뿌리(반사 호출)라 `TransportSurfaceGateTest` 가 막았다 — formatter 로 바꿨다(측정으로 확인).
+
+**새 파일 ↔ in_scope**:
+
+| 새 파일 | in_scope 근거 |
+|---|---|
+| `app/src/main/.../http/AccountBindingGuard.kt` | 「`app/**` 의 bidding controller」 — 계정 범위 경로(입찰함)의 운반 경계를 지키는 HTTP 층 가드(D-7B-7 ① 이 정한 자리) |
+| `app/src/test/.../http/AccountBindingGuardScanTest.kt` | 같은 근거(app http test) |
+| `app/src/test/kotlin/bidvector/guardprobe/AccountBindingGuardTest.kt` | 같은 근거 — 패키지를 `bidvector.app` 밖에 둔 까닭은 그 probe controller 들이 출하 · HTTP test 조립의 컴포넌트 스캔에 실리지 않게 하려는 것이다(r5 R1 의 센서스 오염). 두 test 는 `gate-tests.properties` 에 등재 |
+
 ### 4. 설계 검토 (2b) — 값 획득 축
 
 새 public 표면이 밖에 허락하는 것:
@@ -1112,7 +1145,8 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
     BMP 밖 문자는 도메인에서 둘로 세어지므로 도메인이 **더 엄격**하다(fail-closed — 도메인을 지난 값은 CHECK 도 지난다).
     「도메인 상한 = CHECK 값」 경계 test 는 ASCII 로만 잰다.
 12. **`AccountId` 를 짓는 길 자체는 열려 있다**(V3-N1) — 공개 생성자이고 7D 파일이다. app main 에서 짓는 길(생성자 호출 · Class
-    상수 · Jackson 멤버 — 소유자 {`JsonNode`} 등식 · Spring 핸들러 매개변수)은 구조 규칙이 잠그지만, 생성 경로 봉쇄는 **OPEN 후보
+    상수 · Jackson (소유자, 멤버) 쌍 · Jackson 상속)은 구조 등식이 잠그고, **요청 바인딩이 짓는 길은 `AccountBindingGuard` 가 짓는
+    층에서 거부한다**(D-7B-7 ① — 핸들러 매개변수의 정적 규칙은 **한 겹 · 요청 매핑 메서드만** 본다). 그래도 생성 경로 봉쇄는 **OPEN 후보
     `OPEN-7D-ACCOUNTID-CONSTRUCTION`** 으로 둔다(이 PR 에서는 후보로만). 그 OPEN 의 **사례**(검토 r4): G3 `readerForListOf(seed.javaClass)` ·
     G11 Spring 핸들러 매개변수 `account: AccountId` + `?value=9` 로 `AccountId(9)`(둘 다 이제 구조 등식이 붉다 — §3.8) · G1 `updateValue` ·
     G2 `readerForUpdating`(오늘은 `AccountId` 의 final 필드를 못 바꿔 무해 — 가변이 되거나 Jackson 설정이 바뀌면 열린다, 소유자 등식은 이 둘도 붉다).
@@ -1123,6 +1157,15 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 15. **`amountWon` 라벨은 금액 생성자 전체를 덮는다**(R4-9) — 통화 · 과세 값 규칙 위반도 그 라벨로 진단된다(상태 코드 400 은 같다, 응답에 메시지가 없다).
 16. **사용자 MARK 금지는 앱 층 불변식이다**(V4-L2) — 전이표가 막고 출하 코드에 사용자 MARK 행을 쓰는 길이 없지만, V21 에
     `command` ↔ `actor_kind` CHECK 는 두지 않았다(마이그레이션 재측정 비용 — 이 slice 에서 하지 않는다). 직접 쓴 행은 되돌림의 시스템 주체 조건만 막는다.
+17. **객체 바인딩은 통째로 닫혀 있다**(D-7B-7 ①) — 가드의 `@InitBinder` 는 대상이 `JsonNode` 가 아닌 바인더를 전부 400 으로 거부한다.
+    오늘 app 의 핸들러는 객체 바인딩을 쓰지 않으므로 거동 변화는 0 이지만, 뒤의 slice 가 `@ModelAttribute` · 폼 DTO 를 쓰려면 이 가드의
+    허용 규칙을 함께 고쳐야 한다(반사 금지라 「`AccountId` 에 닿는 대상만」을 런타임에 가를 수 없다).
+18. **`String → AccountId` 단순 변환의 거부는 500 으로 나타난다**(D-7B-7 ①) — 가드의 formatter 가 변환을 막지만 Spring 이 그 예외를
+    형 불일치로 감싸고 공유 오류표가 그것을 500 으로 낸다. 핸들러에는 닿지 않는다(위협을 흉내 낸 변환기가 등록돼 있어도 —
+    `AccountBindingGuardTest`). 오류표는 이 slice 가 바꾸지 않는다.
+19. **`tools.jackson.core` 가 app 모듈 허용 패키지가 되었다**(D-7B-7 ① 의 대가) — 가드의 역직렬화기 서명이 `JsonParser` 를 요구한다.
+    그래서 `TransportSurfaceGateTest` 의 바깥 패키지 등식은 더는 app 의 `JsonParser` 참조를 막지 않는다. 그 축은 Jackson (소유자, 멤버) 쌍
+    등식이 진다 — app main 이 Jackson 멤버를 하나라도 새로 가리키면 붉다.
 
 ### 7. acceptance 실측
 
