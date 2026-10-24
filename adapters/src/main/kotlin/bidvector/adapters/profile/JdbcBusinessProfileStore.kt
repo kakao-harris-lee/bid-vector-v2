@@ -21,8 +21,15 @@ import javax.sql.DataSource
 /**
  * V22 표 둘의 JDBC 어댑터(M7/7C④) — [BusinessProfileStorePort] 의 production 구현.
  *
- * **소유 경계는 SQL 이 진다**: 모든 문장의 첫 조건이 `account_id = ?` 이고([BusinessProfileSql]),
- * 그 값은 늘 port 의 첫 인자다. 「질의가 실제로 계정으로 좁혀지는가」는 fake 로 증명되지 않으므로
+ * **소유 경계는 읽기 · 삭제에서 SQL 이 지고, 쓰기에서는 호출자가 진다**(r1 CR M-1). `SELECT` 둘과
+ * `DELETE` 는 첫 조건이 `account_id = ?` 로 행을 좁히고([BusinessProfileSql]) 그 값은 늘 port 의 첫
+ * 인자다. 그러나 upsert 둘에서 `account_id` 는 **필터가 아니라 실리는 값이자 `ON CONFLICT` 대상**
+ * 이다 — 틀린 [AccountId] 를 넘기면 그 계정의 행을 덮어쓰고, 열 단위 GRANT 는 그것을 막지 않는다
+ * (권한 층이 막는 것은 **있는 행을 다른 계정으로 옮기는 일** = `account_id` 의 UPDATE 이고,
+ * `BusinessProfileSchemaGuardTest` 가 재는 것도 정확히 그것이다). 그래서 쓰기의 소유 경계는
+ * 「호출자가 세션 계정을 넘긴다」는 **전제**이고, 그 전제는 2b 의 controller 가 자기 test 로 진다
+ * (scope 알려진 제한 1 — 구조로 닫으려면 RLS 나 세션 범위 역할이고 그것은 별 판단이다).
+ * 「읽기 질의가 실제로 계정으로 좁혀지는가」는 fake 로 증명되지 않으므로
  * `JdbcBusinessProfileStoreTest` 가 실 DB 위에서 두 계정으로 잰다.
  *
  * 도메인 값을 지어내지 않는다 — 열 값을 그대로 옮기고, 어휘 밖 값이 저장돼 있으면(CHECK 가 막지만
@@ -61,8 +68,8 @@ class JdbcBusinessProfileStore(
         dataSource.connection.use { connection ->
             connection.prepareStatement(BusinessProfileSql.UPSERT_DETAILS).use { statement ->
                 statement.setLong(1, account.value)
-                statement.bindDetails(2, details)
-                statement.setTimestamp(DETAILS_UPDATED_AT_INDEX, Timestamp.from(at))
+                val updatedAtIndex = statement.bindDetails(2, details)
+                statement.setTimestamp(updatedAtIndex, Timestamp.from(at))
                 statement.executeUpdate()
             }
         }
@@ -97,11 +104,6 @@ class JdbcBusinessProfileStore(
                 statement.executeUpdate() > 0
             }
         }
-
-    private companion object {
-        /** `UPSERT_DETAILS` 의 마지막 자리 — 계정 1 + 사업 정보 다섯 뒤. */
-        const val DETAILS_UPDATED_AT_INDEX = 7
-    }
 }
 
 /** 나라장터 준비의 저장 어휘 — V22 `nara_registration` CHECK 와 같은 셋. */
@@ -109,11 +111,14 @@ private const val UNANSWERED = "UNANSWERED"
 private const val REGISTERED = "REGISTERED"
 private const val NOT_REGISTERED = "NOT_REGISTERED"
 
-/** 사업 정보 다섯 열을 `UPSERT_DETAILS` 순서대로 싣는다. */
+/**
+ * 사업 정보 다섯 열을 `UPSERT_DETAILS` 순서대로 싣고 **다음 자리를 낸다** — 자리 수를 상수로 손으로
+ * 적지 않는다(r1 CR M-2: 열을 하나 더하면 그 상수가 조용히 어긋나 다른 열 위에 덮어쓴다).
+ */
 private fun PreparedStatement.bindDetails(
     startIndex: Int,
     details: BusinessDetails,
-) {
+): Int {
     val readiness = details.naraReadiness
     val registered = readiness as? NaraReadiness.Registered
     var index = startIndex
@@ -122,7 +127,8 @@ private fun PreparedStatement.bindDetails(
     setString(index++, readiness.storedName())
     val fields = registered?.fields ?: emptySet()
     setTextArray(index++, fields.map(NaraRegistrationField::name).sorted())
-    setDate(index, registered?.businessCertificateExpiresOn?.let(Date::valueOf))
+    setDate(index++, registered?.businessCertificateExpiresOn?.let(Date::valueOf))
+    return index
 }
 
 private fun NaraReadiness.storedName(): String =
