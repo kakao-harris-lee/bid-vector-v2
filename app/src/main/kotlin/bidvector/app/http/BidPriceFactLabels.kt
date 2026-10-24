@@ -18,13 +18,11 @@ internal fun baseAmountResolutionLabel(resolved: ResolvedBaseAmount): String =
         is ResolvedBaseAmount.DerivedFromOpeningAmount -> "DERIVED_FROM_OPENING"
     }
 
-
 internal fun floorRateOriginLabel(floor: FloorRate): String =
     when (floor.origin) {
         is FloorRateOrigin.NoticeValue -> "NOTICE_VALUE"
         is FloorRateOrigin.StatutoryTable -> "STATUTORY_TABLE"
     }
-
 
 /**
  * **게시값만 근거다**(운영자 결정 2026-10-15) — 법정 하한율 표에서 온 값은 근거 칸에 싣지
@@ -34,7 +32,6 @@ internal fun floorRateOriginLabel(floor: FloorRate): String =
 internal fun usableFloorRateOf(floor: FloorRate?): FloorRate? =
     floor?.takeIf { it.origin is FloorRateOrigin.NoticeValue }
 
-
 /** 게시값 출처가 나르는 공고 차수 — 법정 표 출처에는 그 값이 없다(소진 `when`). */
 internal fun publishedOriginRoundOf(floor: FloorRate?): String? =
     when (val origin = floor?.origin) {
@@ -43,7 +40,6 @@ internal fun publishedOriginRoundOf(floor: FloorRate?): String? =
         is FloorRateOrigin.StatutoryTable -> null
     }
 
-
 internal fun floorRateGroundsStateOf(floor: FloorRate?): FloorRateGroundsState =
     when {
         floor == null -> FloorRateGroundsState.ABSENT
@@ -51,21 +47,28 @@ internal fun floorRateGroundsStateOf(floor: FloorRate?): FloorRateGroundsState =
         else -> FloorRateGroundsState.ORIGIN_NOT_PUBLISHED
     }
 
-
 internal fun mlAnalysisStateOf(outcome: MlAnalysisOutcome?): MlAnalysisStateLabel =
     when (outcome) {
-        null -> MlAnalysisStateLabel.NOT_REACHED
-        is MlAnalysisOutcome.Analyzed -> MlAnalysisStateLabel.ANALYZED
-        is MlAnalysisOutcome.Unavailable -> MlAnalysisStateLabel.UNAVAILABLE
-        is MlAnalysisOutcome.SimilarityProjectionNotReady ->
-            MlAnalysisStateLabel.SIMILARITY_PROJECTION_NOT_READY
-    }
+        null -> {
+            MlAnalysisStateLabel.NOT_REACHED
+        }
 
+        is MlAnalysisOutcome.Analyzed -> {
+            MlAnalysisStateLabel.ANALYZED
+        }
+
+        is MlAnalysisOutcome.Unavailable -> {
+            MlAnalysisStateLabel.UNAVAILABLE
+        }
+
+        is MlAnalysisOutcome.SimilarityProjectionNotReady -> {
+            MlAnalysisStateLabel.SIMILARITY_PROJECTION_NOT_READY
+        }
+    }
 
 internal fun mlUnavailableReasonLabelOf(outcome: MlAnalysisOutcome?): String? =
     (outcome as? MlAnalysisOutcome.Unavailable)
         ?.let { mlUnavailableReasonCode(it.reason) }
-
 
 private fun mlUnavailableReasonCode(reason: MlUnavailableReason): String =
     when (reason) {
@@ -82,13 +85,22 @@ private fun mlUnavailableReasonCode(reason: MlUnavailableReason): String =
         MlUnavailableReason.InvalidRequest -> "INVALID_REQUEST"
     }
 
-
 internal fun confidenceNotAvailableReasonOf(state: MlAnalysisStateLabel): ConfidenceNotAvailableReason =
     when (state) {
-        MlAnalysisStateLabel.NOT_REACHED -> ConfidenceNotAvailableReason.EVALUATION_NOT_REACHED_ML_STAGE
-        MlAnalysisStateLabel.UNAVAILABLE -> ConfidenceNotAvailableReason.ML_UNAVAILABLE
-        MlAnalysisStateLabel.SIMILARITY_PROJECTION_NOT_READY ->
+        MlAnalysisStateLabel.NOT_REACHED -> {
+            ConfidenceNotAvailableReason.EVALUATION_NOT_REACHED_ML_STAGE
+        }
+
+        MlAnalysisStateLabel.UNAVAILABLE -> {
+            ConfidenceNotAvailableReason.ML_UNAVAILABLE
+        }
+
+        MlAnalysisStateLabel.SIMILARITY_PROJECTION_NOT_READY -> {
             ConfidenceNotAvailableReason.SIMILARITY_PROJECTION_NOT_READY
+        }
+
         // 분석됐어도 이 slice 는 가격 적합도를 싣지 않는다 — 점수 자리를 만들지 않았다.
-        MlAnalysisStateLabel.ANALYZED -> ConfidenceNotAvailableReason.ML_SCORE_NOT_PROVIDED
+        MlAnalysisStateLabel.ANALYZED -> {
+            ConfidenceNotAvailableReason.ML_SCORE_NOT_PROVIDED
+        }
     }

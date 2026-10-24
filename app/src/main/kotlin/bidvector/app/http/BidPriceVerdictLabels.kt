@@ -17,30 +17,35 @@ internal fun outcomeLabelOf(evaluation: CandidateEvaluation): EvaluationOutcomeL
         is CandidateEvaluation.NotReached -> EvaluationOutcomeLabel.NOT_REACHED
     }
 
-
 internal fun verdictLabelOf(evaluation: CandidateEvaluation): String? =
     when (evaluation) {
-        is CandidateEvaluation.NotReached -> null
-        is CandidateEvaluation.Reached ->
+        is CandidateEvaluation.NotReached -> {
+            null
+        }
+
+        is CandidateEvaluation.Reached -> {
             when (evaluation.verdict) {
                 is Verdict.BidNow -> "BID_NOW"
                 is Verdict.Review -> "REVIEW"
                 is Verdict.Skip -> "SKIP"
             }
+        }
     }
-
 
 internal fun verdictReasonCodesOf(evaluation: CandidateEvaluation): List<String> =
     when (evaluation) {
-        is CandidateEvaluation.NotReached -> emptyList()
-        is CandidateEvaluation.Reached ->
+        is CandidateEvaluation.NotReached -> {
+            emptyList()
+        }
+
+        is CandidateEvaluation.Reached -> {
             when (val verdict = evaluation.verdict) {
                 is Verdict.BidNow -> verdict.reasons.map(::bidNowReasonCode)
                 is Verdict.Review -> verdict.reasons.map(::reviewReasonCode)
                 is Verdict.Skip -> listOf(skipReasonCode(verdict.reason))
             }
+        }
     }
-
 
 private fun bidNowReasonCode(reason: BidNowReason): String =
     when (reason) {
@@ -48,13 +53,11 @@ private fun bidNowReasonCode(reason: BidNowReason): String =
         is BidNowReason.ForceBidOverride -> "FORCE_BID_OVERRIDE"
     }
 
-
 private fun reviewReasonCode(reason: ReviewReason): String =
     when (reason) {
         is ReviewReason.PriorityInReviewBand -> "PRIORITY_IN_REVIEW_BAND"
         is ReviewReason.MlUnavailable -> "ML_UNAVAILABLE"
     }
-
 
 private fun skipReasonCode(reason: SkipReason): String =
     when (reason) {

@@ -28,7 +28,12 @@ class BidPriceResponseShapeTest {
     fun `펴지는 묶음들 사이에 같은 키가 없다`() {
         val names = bidPriceResponseFieldNames()
 
-        val duplicated = names.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        val duplicated =
+            names
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
 
         duplicated shouldBe emptySet()
     }

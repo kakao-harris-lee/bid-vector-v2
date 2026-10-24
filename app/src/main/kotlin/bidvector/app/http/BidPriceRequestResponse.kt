@@ -184,4 +184,3 @@ private fun floorRateFieldsOf(notice: Notice): FloorRateFields {
         floorRateGroundsState = floorRateGroundsStateOf(floor).name,
     )
 }
-

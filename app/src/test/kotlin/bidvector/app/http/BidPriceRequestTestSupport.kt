@@ -254,4 +254,3 @@ fun bidPriceResponseFieldNames(): List<String> {
 /** 펴지는 묶음 프로퍼티의 이름 — 이 이름들은 **wire 에 나타나지 않는다**(펴진다). */
 val BID_PRICE_GROUP_PROPERTY_NAMES: Set<String> =
     setOf("evaluation", "notification", "qualification", "baseAmount", "floorRate", "priceAxes")
-

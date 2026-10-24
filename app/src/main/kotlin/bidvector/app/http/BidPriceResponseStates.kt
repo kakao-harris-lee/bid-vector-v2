@@ -23,14 +23,12 @@ enum class BidPriceDisclosure {
     PRICE_FITNESS_IS_NOT_PROBABILITY,
 }
 
-
 /** 게시 하한율이 근거로 설 수 있는가 — 「없다」와 「게시값이 아니다」를 가른다(DEC-03). */
 enum class FloorRateGroundsState {
     USABLE,
     ABSENT,
     ORIGIN_NOT_PUBLISHED,
 }
-
 
 /**
  * 미보유 면허를 평탄하게 낼 수 있는가(QUAL-03 그룹 간 OR) — **합집합으로 접지 않는다.**
@@ -42,18 +40,15 @@ enum class LicenseMissingDetailState {
     MULTIPLE_GROUPS_NOT_FLATTENED,
 }
 
-
 /** 이 slice 가 산출하지 않는 축의 상태 — 값 하나다. 값이 서는 slice 가 갈래를 더한다. */
 enum class NotComputedState {
     NOT_COMPUTED,
 }
 
-
 /** 신뢰도 상태 — 값 하나다. 값이 서면 그것은 가격 적합도이고 확률이 아니다(ML-03). */
 enum class ConfidenceState {
     NOT_AVAILABLE,
 }
-
 
 /**
  * 하한 미달 빈도를 재지 못한 사유 — **`FloorUnmeasurableReason` 을 쓰지 않는다.** 그 어휘는
@@ -64,7 +59,6 @@ enum class FloorShortfallNotComputedReason {
     SHORTFALL_POLICY_NOT_PUBLISHED,
 }
 
-
 /**
  * 3안을 산출하지 않은 사유 — **이 배선에 산출 경로가 없다**는 사실 하나만 말한다. 커널을 불러
  * 「출처가 없었다」를 받은 것이 아니다(부르지 않았다). 상류 사실 둘(DEC-05 커널 미머지 · 후보
@@ -74,24 +68,20 @@ enum class BidPriceMenuNotComputedReason {
     MENU_PATH_NOT_WIRED,
 }
 
-
 /** 알림함 기록 상태 — 쓰기 포트가 머지되기 전의 사실이다(R-4 공백을 계약 문면으로 둔다). */
 enum class InboxRecordState {
     NOT_RECORDED_YET,
 }
 
-
 enum class InboxRecordNotRecordedReason {
     INBOX_WRITE_PORT_NOT_MERGED,
 }
-
 
 /** 평가가 판정에 이르렀는가 — `CandidateEvaluation` 두 갈래. */
 enum class EvaluationOutcomeLabel {
     REACHED,
     NOT_REACHED,
 }
-
 
 /** ML 단계에서 무엇이 일어났는가 — 「이르지 못했다」와 「미가용」은 다른 사실이다. */
 enum class MlAnalysisStateLabel {
@@ -100,7 +90,6 @@ enum class MlAnalysisStateLabel {
     SIMILARITY_PROJECTION_NOT_READY,
     NOT_REACHED,
 }
-
 
 /** 신뢰도가 없는 사유 — ML 상태에서 기계적으로 따라온다(두 자리에 다른 값을 두지 않는다). */
 enum class ConfidenceNotAvailableReason {

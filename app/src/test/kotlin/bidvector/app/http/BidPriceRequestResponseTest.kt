@@ -279,5 +279,4 @@ class BidPriceRequestResponseTest {
         response.notification.inboxRecordState shouldBe "NOT_RECORDED_YET"
         response.notification.inboxRecordNotRecordedReason shouldBe "INBOX_WRITE_PORT_NOT_MERGED"
     }
-
 }

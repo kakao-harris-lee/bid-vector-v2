@@ -43,7 +43,10 @@ class BidPriceRequestController(
         val currentActiveBids = parseCurrentActiveBids(body)
         return when (val outcome = factory.forRequest(noticeId, currentActiveBids)) {
             // 표면이 404 로 옮긴다 — 오류 **형태**를 만드는 자리는 `ErrorBody.kt` 하나다.
-            BidPriceRequestOutcome.NoticeNotFound -> throw NoticeNotFoundException()
+            BidPriceRequestOutcome.NoticeNotFound -> {
+                throw NoticeNotFoundException()
+            }
+
             is BidPriceRequestOutcome.Prepared -> {
                 val evaluation = runBlocking { outcome.run.evaluate() }
                 bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids)
@@ -51,6 +54,7 @@ class BidPriceRequestController(
         }
     }
 }
+
 /**
  * 요청 본문의 **명시** 형식 검증. 어긋나면 전부 [InvalidEvaluationRequestException](400
  * `INVALID_REQUEST`, 예외 메시지는 응답에 실리지 않는다 — `ErrorMapping` 이 고정 문구로만
@@ -94,8 +98,7 @@ private fun JsonNode.bidPriceText(key: String): String {
  * 메시지는 진단용이고 **응답에 실리지 않는다**(`ErrorMapping` 이 고정 문구로만 옮긴다) — 지연 평가로
  * 받아 통과하는 경로에서 문자열을 만들지도 않는다.
  */
-private fun rejectBidPriceRequest(message: () -> String): Nothing =
-    throw InvalidEvaluationRequestException(message())
+private fun rejectBidPriceRequest(message: () -> String): Nothing = throw InvalidEvaluationRequestException(message())
 
 private fun rejectBidPriceRequestIf(
     rejected: Boolean,

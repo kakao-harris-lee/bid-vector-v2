@@ -27,7 +27,12 @@ internal fun qualificationFieldsOf(judgement: LicenseJudgement): QualificationFi
         licenseGroupsSatisfied = satisfiedGroupLabelsOf(verdict),
         licenseGroupsMissing = missingByGroup.keys.map(::requirementGroupLabel).sorted(),
         // 그룹이 둘 이상이면 **비운다** — 합집합은 그룹 간 OR 을 AND 로 오독시킨다.
-        licenseMissingLicenses = singleGroup?.value?.map { it.value }?.sorted().orEmpty(),
+        licenseMissingLicenses =
+            singleGroup
+                ?.value
+                ?.map { it.value }
+                ?.sorted()
+                .orEmpty(),
         licenseMissingDetailState = missingDetailStateOf(missingByGroup.size).name,
         licenseUnparsableRowCount = judgement.unparsableRowCount,
         licenseValidity = licenseValidityLabelOf(judgement),
@@ -60,12 +65,25 @@ private fun licenseVerdictLabel(verdict: LicenseVerdict): String =
 
 private fun uncertainReasonCode(reason: UncertainReason): String =
     when (reason) {
-        UncertainReason.RequirementDataAbsent -> "REQUIREMENT_DATA_ABSENT"
-        UncertainReason.RequirementUnparsable -> "REQUIREMENT_UNPARSABLE"
-        UncertainReason.OperatorLicensesNotDeclared -> "OPERATOR_LICENSES_NOT_DECLARED"
-        UncertainReason.CollectionFailed -> "COLLECTION_FAILED"
-        UncertainReason.PermittedIndustryCombinationRuleUndecided ->
+        UncertainReason.RequirementDataAbsent -> {
+            "REQUIREMENT_DATA_ABSENT"
+        }
+
+        UncertainReason.RequirementUnparsable -> {
+            "REQUIREMENT_UNPARSABLE"
+        }
+
+        UncertainReason.OperatorLicensesNotDeclared -> {
+            "OPERATOR_LICENSES_NOT_DECLARED"
+        }
+
+        UncertainReason.CollectionFailed -> {
+            "COLLECTION_FAILED"
+        }
+
+        UncertainReason.PermittedIndustryCombinationRuleUndecided -> {
             "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED"
+        }
     }
 
 /** 그룹 라벨 — 번호 있는 그룹과 번호 없는 묶음을 구분한다(U-8). */

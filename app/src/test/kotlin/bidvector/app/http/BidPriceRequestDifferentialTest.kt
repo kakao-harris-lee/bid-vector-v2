@@ -75,8 +75,7 @@ class BidPriceRequestDifferentialTest {
             clock = clock,
         ).forRequest(id, currentActiveBids)
 
-    private fun unavailable(): MlAnalysisOutcome =
-        MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided)
+    private fun unavailable(): MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided)
 
     @Test
     fun `공고별로 전건 dry-run 과 같은 결과를 낸다 — 판정 경로를 복제하지 않았다`() {
@@ -226,10 +225,12 @@ class BidPriceRequestDifferentialTest {
      */
     private fun comparable(evaluation: CandidateEvaluation): List<Any?> =
         when (evaluation) {
-            is CandidateEvaluation.Reached ->
+            is CandidateEvaluation.Reached -> {
                 listOf("REACHED", evaluation.noticeId, evaluation.verdict, evaluation.disposition)
+            }
 
-            is CandidateEvaluation.NotReached ->
+            is CandidateEvaluation.NotReached -> {
                 listOf("NOT_REACHED", evaluation.noticeId, evaluation.stage, evaluation.reason)
+            }
         }
 }

@@ -23,7 +23,7 @@ internal fun evaluationDetailFieldsOf(
     notice: Notice,
 ): EvaluationDetailFields =
     when (evaluation) {
-        is CandidateEvaluation.Reached ->
+        is CandidateEvaluation.Reached -> {
             EvaluationDetailFields(
                 outcome = outcomeLabelOf(evaluation).name,
                 verdict = verdictLabelOf(evaluation),
@@ -36,8 +36,11 @@ internal fun evaluationDetailFieldsOf(
                 scoreThreshold = null,
                 scoreActual = null,
             )
+        }
 
-        is CandidateEvaluation.NotReached -> notReachedFieldsOf(evaluation, notice)
+        is CandidateEvaluation.NotReached -> {
+            notReachedFieldsOf(evaluation, notice)
+        }
     }
 
 private fun notReachedFieldsOf(
@@ -89,13 +92,17 @@ private fun watchUndeterminableCodeOf(reason: EvaluationDropReason): String? {
  */
 private fun scorePairOf(reason: EvaluationDropReason): Pair<String, String>? =
     when (reason) {
-        is EvaluationDropReason.BelowMinimumMatchScore ->
+        is EvaluationDropReason.BelowMinimumMatchScore -> {
             reason.threshold.toPlainString() to reason.actual.toPlainString()
+        }
 
-        is EvaluationDropReason.BelowMinimumProbabilityScore ->
+        is EvaluationDropReason.BelowMinimumProbabilityScore -> {
             reason.threshold.toPlainString() to reason.actual.toPlainString()
+        }
 
-        else -> null
+        else -> {
+            null
+        }
     }
 
 private fun EvaluationDropReason.reasonCode(): String =
