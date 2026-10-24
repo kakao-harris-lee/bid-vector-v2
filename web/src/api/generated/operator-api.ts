@@ -564,7 +564,7 @@ export interface components {
             drawNumbers?: number[];
             /** @description 제출확인서 등 증빙의 **참조(식별자)** 다 — 파일도 경로도 본문도 아니다. PDF 저장소는 이 slice 밖이다. */
             evidenceRef?: string | null;
-            /** @description 자유 텍스트. 로그·audit 어디에도 실리지 않는다. */
+            /** @description 자유 텍스트(2000자 상한). 로그·audit 어디에도 실리지 않는다. */
             memo?: string | null;
         };
         AwaitOpeningRequest: {
@@ -1809,6 +1809,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 경로의 건 식별자 형식 오류(숫자가 아니거나 양수가 아님). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */

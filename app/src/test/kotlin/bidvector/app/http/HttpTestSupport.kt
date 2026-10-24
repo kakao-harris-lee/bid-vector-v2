@@ -405,6 +405,10 @@ open class HttpTestApplication {
     @Bean
     open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
 
+    /** 7B — test 가 옮기는 공고 마감(검토 r2 C2-N6). 기본은 「지금 + 30분」이라 판정이 서지 않는다. */
+    @Bean
+    open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
+
     /**
      * controller 가 받는 **단 하나의 협력자** — 출하 조립(`BidCaseWiring`)과 같은 형태다.
      * 저장소를 controller 에 직접 주지 않는다.
@@ -412,11 +416,12 @@ open class HttpTestApplication {
     @Bean
     open fun bidCaseWorkflow(
         inMemoryBidCaseStore: InMemoryBidCaseStore,
+        movableNoticeDeadlines: MovableNoticeDeadlines,
         clock: FixedClock,
     ): BidCaseWorkflow =
         BidCaseWorkflow(
             cases = inMemoryBidCaseStore,
-            deadlines = { keys -> keys.associateWith { clock.now().plusSeconds(1800) } },
+            deadlines = movableNoticeDeadlines,
             snapshots = { _, takenAt -> fixedNoticeSnapshot(takenAt) },
             clock = clock,
             retentionPolicy =

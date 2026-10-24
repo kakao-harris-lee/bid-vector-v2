@@ -60,7 +60,7 @@ internal object BidCaseRequests {
 
     /**
      * 개찰 결과 — 1위인가 아닌가. **순위 숫자를 받지 않는다**: 운영자 요구가 「몇 위보다 낙찰
-     * 여부」이고(§6.1 :175-176), 순위를 받으면 쓰지도 않는 값을 보관하게 된다.
+     * 여부」이고(§6.1 「몇 위였나」 문장), 순위를 받으면 쓰지도 않는 값을 보관하게 된다.
      */
     fun openingFirst(body: JsonNode): Boolean {
         val payload = body.requireObject().requireKnownKeys(setOf("provisionalFirst"))
@@ -99,21 +99,20 @@ internal object BidCaseRequests {
     /** 「제출함」 — retroactive · evidenceRetainUntil 자리가 **없다**(위 KDoc). */
     fun submission(body: JsonNode): BidSubmission {
         val payload = body.requireObject().requireKnownKeys(RECORD_KEYS)
-        return requestValue("record") {
-            BidSubmission(
-                amount =
-                    SubmittedBidAmount(
-                        won = payload.requiredLong("amountWon", minimum = 0L),
-                        currency = Currency.KRW,
-                        vatTreatment = payload.enumOf("vatTreatment", VatTreatment.entries),
-                        origin = BidAmountOrigin.OperatorEntered,
-                    ),
-                submittedAt = payload.requiredInstant("submittedAt"),
-                drawNumbers = payload.optionalIntArray("drawNumbers"),
-                evidence = payload.optionalNonBlankText("evidenceRef")?.let(::EvidenceRef),
-                memo = payload.optionalNonBlankText("memo")?.let(::BidMemo),
+        val amount =
+            SubmittedBidAmount(
+                won = payload.requiredLong("amountWon", minimum = 0L),
+                currency = Currency.KRW,
+                vatTreatment = payload.enumOf("vatTreatment", VatTreatment.entries),
+                origin = BidAmountOrigin.OperatorEntered,
             )
-        }
+        val submittedAt = payload.requiredInstant("submittedAt")
+        val drawNumbers = payload.optionalIntArray("drawNumbers")
+        // 값 규칙(길이 상한 · 부호)을 가진 생성자만 그 키의 라벨로 감싼다(검토 r2 C2-N11 — 진단이 엉뚱한 키를 가리키지 않게).
+        val evidence =
+            payload.optionalNonBlankText("evidenceRef")?.let { requestValue("evidenceRef") { EvidenceRef(it) } }
+        val memo = payload.optionalNonBlankText("memo")?.let { requestValue("memo") { BidMemo(it) } }
+        return requestValue("drawNumbers") { BidSubmission(amount, submittedAt, drawNumbers, evidence, memo) }
     }
 }
 

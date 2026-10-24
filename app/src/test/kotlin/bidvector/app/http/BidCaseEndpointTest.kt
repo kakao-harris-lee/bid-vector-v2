@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.bidding.SkipReason
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -30,11 +31,24 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
     @Autowired
     private lateinit var access: InMemoryBrowserAccessTransaction
 
+    @Autowired
+    private lateinit var deadlines: MovableNoticeDeadlines
+
+    @Autowired
+    private lateinit var clock: FixedClock
+
     private lateinit var session: SessionTestClient
+
+    /** 마감 이중체는 같은 Spring 문맥을 쓰는 다른 test class 와 공유된다 — 바꾼 값을 남기지 않는다. */
+    @AfterEach
+    fun restoreDeadlines() {
+        deadlines.reset()
+    }
 
     @BeforeEach
     fun signIn() {
         access.reset()
+        deadlines.reset()
         session = SessionTestClient(restTemplate, ::url).signIn()
     }
 
@@ -93,6 +107,51 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
         skipped.statusCode.value() shouldBe BAD_REQUEST
     }
 
+    // --- 마감 판정의 운반 층(검토 r2 C2-N6) — 이중체의 마감을 test 가 옮긴다 ---------------------------------
+
+    @Test
+    fun `마감이 지난 건에는 건너뜀 · 초안이 409 이다`() {
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R7B-ENDPOINT-6")).body.orEmpty())
+        deadlines.set(clock.now().minusSeconds(1))
+
+        val skipped = session.post("${AccountScopedRoutes.BID_CASES}/$id/skip", """{"reason":"늦었다"}""")
+        skipped.statusCode.value() shouldBe CONFLICT
+        session
+            .post(
+                "${AccountScopedRoutes.BID_CASES}/$id/draft",
+                """{"amountWon":1000000,"vatTreatment":"INCLUSIVE","presentedAt":"2026-10-21T04:00:00Z"}""",
+            ).statusCode
+            .value() shouldBe CONFLICT
+    }
+
+    /** 결정 ⑦ — GET 이 시스템 판정을 쓴다(사실 선언). 타임라인에 시스템 주체 한 줄이 남는다. */
+    @Test
+    fun `마감이 지난 건을 GET 으로 읽으면 시스템 판정이 타임라인에 남는다`() {
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R7B-ENDPOINT-7")).body.orEmpty())
+        deadlines.set(clock.now().minusSeconds(1))
+
+        val read = session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty()
+        read shouldContain "\"state\":\"DEADLINE_PASSED_UNRECORDED\""
+
+        commandsOf(session.get("${AccountScopedRoutes.BID_CASES}/$id/timeline").body.orEmpty()) shouldBe
+            listOf("ADD_TO_BID_BOX", "MARK_DEADLINE_PASSED")
+    }
+
+    /** 결정 ⑤ — 마감이 다시 미래가 되면 다음 GET 이 판정을 거두고 원래 상태로 돌린다. */
+    @Test
+    fun `마감이 다시 미래가 되면 GET 이 판정을 거둔다`() {
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R7B-ENDPOINT-8")).body.orEmpty())
+        deadlines.set(clock.now().minusSeconds(1))
+        session.get("${AccountScopedRoutes.BID_CASES}/$id")
+        deadlines.set(clock.now().plusSeconds(HOUR))
+
+        session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty() shouldContain "\"state\":\"WATCHING\""
+        commandsOf(session.get("${AccountScopedRoutes.BID_CASES}/$id/timeline").body.orEmpty()) shouldBe
+            listOf("ADD_TO_BID_BOX", "MARK_DEADLINE_PASSED", "REVOKE_DEADLINE_PASSED")
+    }
+
+    private fun commandsOf(body: String): List<String> = COMMAND.findAll(body).map { it.groupValues[1] }.toList()
+
     private fun openBody(noticeNumber: String): String =
         """{"noticeNumber":"$noticeNumber","noticeRound":"000","bidKind":"REAL"}"""
 
@@ -103,6 +162,8 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
         const val OK = 200
         const val CREATED = 201
         const val BAD_REQUEST = 400
+        const val CONFLICT = 409
+        const val HOUR = 3_600L
         val ID = Regex("\"caseId\"\\s*:\\s*(\\d+)")
         val COMMAND = Regex("\"command\"\\s*:\\s*\"([A-Z_]+)\"")
     }

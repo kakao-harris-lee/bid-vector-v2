@@ -13,6 +13,8 @@ import bidvector.bidding.tag
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
 import bidvector.workflow.bidding.BidCaseStorePort
+import bidvector.workflow.bidding.NoticeDeadline
+import bidvector.workflow.bidding.NoticeDeadlineQueryPort
 import bidvector.workflow.bidding.OpenCaseResult
 import bidvector.workflow.bidding.TimelineEntry
 import bidvector.workflow.bidding.TransitionWrite
@@ -75,6 +77,18 @@ class InMemoryBidCaseStore : BidCaseStorePort {
             retroactive = false,
             occurredAt = at,
         )
+
+    /** 상위집합 — 마감을 모르므로 상태로만 좁힌다(판정은 use case 가 다시 한다, 포트 KDoc). */
+    override fun settleCandidates(
+        account: AccountId,
+        kind: BidKind,
+        judgedStates: Set<BidStateTag>,
+        now: Instant,
+    ): List<BidCase> =
+        rows.values
+            .filter { it.account.value == account.value && it.case.kind == kind }
+            .filter { it.case.state.tag in judgedStates || it.case.state.tag == BidStateTag.DEADLINE_PASSED_UNRECORDED }
+            .map { it.case }
 
     override fun load(
         account: AccountId,
@@ -141,3 +155,45 @@ fun fixedNoticeSnapshot(takenAt: Instant): NoticeSnapshot =
         floorRate = null,
         baseAmount = null,
     )
+
+/**
+ * test 가 옮기는 공고 마감(검토 r2 C2-N6) — 앞 판의 이중체는 마감이 늘 「지금 + 30분」이라 운반 층에서 마감 판정의
+ * 어느 축도 잴 수 없었다. [at] 을 정하면 모든 공고의 마감이 그 값이고, [rowPresent] 를 끄면 공고 행이 없는 것(파기)과
+ * 같다. [reset] 이 기본값으로 돌린다.
+ */
+class MovableNoticeDeadlines(
+    private val clock: FixedClock,
+) : NoticeDeadlineQueryPort {
+    @Volatile
+    var at: Instant? = null
+
+    @Volatile
+    var rowPresent: Boolean = true
+
+    @Volatile
+    private var explicit: Boolean = false
+
+    /** 마감을 정한다 — `null` 이면 공고 행은 있고 마감이 미정이다. */
+    fun set(deadline: Instant?) {
+        at = deadline
+        explicit = true
+    }
+
+    fun reset() {
+        at = null
+        explicit = false
+        rowPresent = true
+    }
+
+    override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, NoticeDeadline> =
+        if (!rowPresent) {
+            emptyMap()
+        } else {
+            val deadline = if (explicit) at else clock.now().plusSeconds(DEFAULT_AHEAD_SECONDS)
+            notices.associateWith { NoticeDeadline(deadline) }
+        }
+
+    private companion object {
+        const val DEFAULT_AHEAD_SECONDS = 1800L
+    }
+}

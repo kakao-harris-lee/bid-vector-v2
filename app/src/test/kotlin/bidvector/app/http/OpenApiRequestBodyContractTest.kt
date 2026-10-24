@@ -5,6 +5,8 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.http.HttpMethod
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 
@@ -34,6 +36,9 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
     @Autowired
     private lateinit var handlerMapping: RequestMappingHandlerMapping
 
+    @Autowired
+    private lateinit var access: InMemoryBrowserAccessTransaction
+
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
     @Test
@@ -56,6 +61,70 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         val mapped = mappedOperations().keys
 
         documentedOperations().keys.filterNot { it in mapped }.toSet() shouldBe setOf("GET /{unmatched}")
+    }
+
+    /**
+     * 검토 r2 V2-N2 — **주석이 아니라 행동으로**: 문서가 본문을 적지 않은 상태 변경 operation 전부를 **본문 없이** 불러
+     * 400 · 415 가 나지 않는지 본다. 위 등식은 `@RequestBody` 주석에 걸려 있어, 주석 없이 본문을 요구하는 핸들러(r1 H3 의
+     * 결함 모양)는 등식을 지나간다 — 이 test 는 문서에서 모집단을 **도출**하고 실제로 부른다.
+     */
+    @Test
+    fun `문서가 본문을 적지 않은 operation 은 본문 없이 불러도 400 · 415 가 아니다`() {
+        val bodyless =
+            documentedOperations()
+                .filterValues { !it }
+                .keys
+                .filterNot { it.substringBefore(' ') in READ_METHODS }
+        bodyless.toSet() shouldBe setOf("DELETE /api/session", "POST /api/bid-cases/{caseId}/resume")
+
+        val rejected =
+            bodyless
+                .associateWith { operation ->
+                    val (method, path) = operation.split(' ', limit = 2)
+                    access.reset()
+                    SessionTestClient(restTemplate, ::url)
+                        .signIn()
+                        .send(HttpMethod.valueOf(method), path.replace(PATH_VARIABLE, "1"), null)
+                        .statusCode
+                        .value()
+                }.filterValues { it == BAD_REQUEST || it == UNSUPPORTED_MEDIA_TYPE }
+
+        rejected shouldBe emptyMap()
+    }
+
+    /**
+     * 검토 r2 C2-N4 — **경로 변수를 읽는 매핑은 전부 문서에 400 을 적는다**(형식이 틀린 식별자는 400 이다). `resumeBidCase`
+     * 가 그 400 을 빠뜨렸다. 문서 쪽에서 400 을 적은 operation 은 본문 형식 오류 때문에도 400 을 적으므로 두 집합은 같지
+     * 않다 — 그래서 「경로 변수 매핑 중 400 을 적지 않은 것」의 집합이 **비어 있음**을 등식으로 본다.
+     */
+    @Test
+    fun `경로 변수를 읽는 매핑은 전부 문서에 400 을 적는다`() {
+        val pathVariableMappings =
+            handlerMapping.handlerMethods.entries
+                .filter { (_, handler) ->
+                    handler.methodParameters.any { it.hasParameterAnnotation(PathVariable::class.java) }
+                }
+                .flatMap { (info, _) ->
+                    val patterns = info.pathPatternsCondition?.patterns.orEmpty().map { it.patternString }
+                    info.methodsCondition.methods.flatMap { method -> patterns.map { "${method.name} $it" } }
+                }.toSet()
+        pathVariableMappings.shouldNotBeEmpty()
+
+        pathVariableMappings.filterNot { it in operationsDeclaring400() }.toSet() shouldBe emptySet()
+    }
+
+    private fun operationsDeclaring400(): Set<String> {
+        val paths = spec["paths"] as Map<String, Any?>
+        return paths.entries
+            .flatMap { (path, item) ->
+                val pathItem = item as Map<String, Any?>
+                pathItem.keys
+                    .filter { it in OPENAPI_METHODS }
+                    .filter { method ->
+                        val responses = (pathItem[method] as Map<String, Any?>)["responses"] as Map<String, Any?>
+                        responses.containsKey("400")
+                    }.map { "${it.uppercase()} $path" }
+            }.toSet()
     }
 
     /** 문서 쪽 — `METHOD /path` → `requestBody` 가 있는가. */
@@ -92,5 +161,11 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         /** OpenAPI 3 path item 의 메서드 고정 필드 — `parameters`·`summary` 같은 형제와 가른다. */
         val OPENAPI_METHODS =
             setOf("get", "put", "post", "delete", "options", "head", "patch", "trace")
+
+        /** 본문을 싣지 않는 것이 정상인 읽기 메서드 — 행동 등식의 모집단에서 뺀다. */
+        val READ_METHODS = setOf("GET", "HEAD", "OPTIONS")
+        val PATH_VARIABLE = Regex("""\{[^}]+}""")
+        const val BAD_REQUEST = 400
+        const val UNSUPPORTED_MEDIA_TYPE = 415
     }
 }

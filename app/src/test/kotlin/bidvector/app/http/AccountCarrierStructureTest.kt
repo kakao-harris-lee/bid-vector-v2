@@ -59,8 +59,18 @@ class AccountCarrierStructureTest {
     }
 
     @Test
-    fun `요청 속성을 읽는 자리는 정해진 넷뿐이다 — 키를 어떻게 만들든`() {
-        (callersOf(GET_ATTRIBUTE_HTTP) + callersOf(GET_ATTRIBUTE_SERVLET)) shouldBe ATTRIBUTE_READERS
+    fun `요청 속성을 읽는 자리는 정해진 넷뿐이다 — 키를 어떻게 만들든 · 어느 타입으로 부르든`() {
+        signatureCallers(outputs, GET_ATTRIBUTE_SIGNATURE) shouldBe ATTRIBUTE_READERS
+    }
+
+    /**
+     * 검토 r2 V2-N1 — `AccountId` 를 **만드는 다른 길**(Jackson `convertValue(n, AccountId::class.java)` · 반사 등)은 모두
+     * 그 타입의 Class 상수(`ldc … // class AccountId`)를 요구한다. app main 에 그 상수를 가진 class 가 없어야 한다 —
+     * `<init>` 호출자 등식은 생성자를 **직접** 부르는 길만 닫는다.
+     */
+    @Test
+    fun `app main 의 어디도 AccountId 의 Class 상수를 들지 않는다`() {
+        classConstantHolders(outputs, ACCOUNT_ID_INTERNAL) shouldBe emptySet()
     }
 
     @Test
@@ -73,6 +83,21 @@ class AccountCarrierStructureTest {
         constructorsTaking(outputs, ACCOUNT_ID_TYPE) shouldBe setOf("http/AuthenticationResult\$Authenticated")
     }
 
+    /** 양성 대조 — 래퍼 타입으로 부르는 `getAttribute` 와 Class 상수도 술어에 걸린다(verifier r2 우회 E 의 모양). */
+    @Test
+    fun `래퍼로 속성을 읽고 Jackson 으로 AccountId 를 만드는 class 는 술어에 걸린다 — 양성 대조`() {
+        val bypass =
+            listOf(
+                "4: invokevirtual #9 // Method jakarta/servlet/ServletRequestWrapper.getAttribute:" +
+                    "(Ljava/lang/String;)Ljava/lang/Object;",
+                "12: ldc #15 // class bidvector/workflow/access/AccountId",
+            ).joinToString("\n")
+        val simulated = mapOf("http/Bypass" to bypass)
+
+        signatureCallers(simulated, GET_ATTRIBUTE_SIGNATURE) shouldBe setOf("http/Bypass")
+        classConstantHolders(simulated, ACCOUNT_ID_INTERNAL) shouldBe setOf("http/Bypass")
+    }
+
     /** 양성 대조 — 새 셋 술어가 javap 문면에서 실제로 잡는지(verifier 변이 M2 · M4 모양). */
     @Test
     fun `속성을 직접 읽거나 AccountId 를 만들거나 주입받는 class 는 새 술어에 걸린다 — 양성 대조`() {
@@ -80,12 +105,12 @@ class AccountCarrierStructureTest {
             listOf(
                 "  public bidvector.app.http.NewHandler(bidvector.workflow.access.AccountId);",
                 "4: invokeinterface #9 // InterfaceMethod " +
-                    "jakarta/servlet/http/HttpServletRequest.getAttribute:(L…;)L…;",
+                    "jakarta/servlet/http/HttpServletRequest.getAttribute:(Ljava/lang/String;)Ljava/lang/Object;",
                 "9: invokespecial #12  // Method bidvector/workflow/access/AccountId.\"<init>\":(J)V",
             ).joinToString("\n")
         val simulated = mapOf("http/NewHandler" to handler)
 
-        callers(simulated, GET_ATTRIBUTE_HTTP) shouldBe setOf("http/NewHandler")
+        signatureCallers(simulated, GET_ATTRIBUTE_SIGNATURE) shouldBe setOf("http/NewHandler")
         callers(simulated, ACCOUNT_ID_INIT) shouldBe setOf("http/NewHandler")
         constructorsTaking(simulated, ACCOUNT_ID_TYPE) shouldBe setOf("http/NewHandler")
     }
@@ -114,8 +139,9 @@ class AccountCarrierStructureTest {
         const val ACCOUNT_LABEL_PREFIX = "account:"
         const val SUBJECT_ACCESSOR = "bidvector/app/http/ErrorBodyKt.authenticatedSubject:"
         const val ACCOUNT_ACCESSOR = "bidvector/app/http/AuthenticatedAccountKt.authenticatedAccount:"
-        const val GET_ATTRIBUTE_HTTP = "jakarta/servlet/http/HttpServletRequest.getAttribute:"
-        const val GET_ATTRIBUTE_SERVLET = "jakarta/servlet/ServletRequest.getAttribute:"
+        /** 소유자(타입)와 무관한 **메서드 서명** — 요청 · 래퍼 · 하위 타입 어느 것으로 불러도 같은 서명이다(V2-N1). */
+        const val GET_ATTRIBUTE_SIGNATURE = ".getAttribute:(Ljava/lang/String;)Ljava/lang/Object;"
+        const val ACCOUNT_ID_INTERNAL = "bidvector/workflow/access/AccountId"
         const val ACCOUNT_ID_INIT = "bidvector/workflow/access/AccountId.\"<init>\":"
         const val ACCOUNT_ID_TYPE = "bidvector.workflow.access.AccountId"
 
@@ -159,6 +185,24 @@ private fun utf8Value(line: String): String? =
         .find(line)
         ?.groupValues
         ?.get(1)
+
+/** 그 **서명**의 메서드를 부르는 class — 소유자 타입을 보지 않는다(`// Method` · `// InterfaceMethod` 줄). */
+private fun signatureCallers(
+    outputs: Map<String, String>,
+    signature: String,
+): Set<String> =
+    outputs
+        .filterValues { text -> text.lineSequence().any { "Method " in it && it.endsWith(signature) } }
+        .keys
+
+/** 그 타입의 **Class 상수**(`ldc` · `ldc_w`)를 드는 class — 반사 · 데이터 바인딩으로 그 타입을 만드는 길의 표지다. */
+private fun classConstantHolders(
+    outputs: Map<String, String>,
+    internalName: String,
+): Set<String> {
+    val ldc = Regex("""\bldc(_w)?\s+#\d+\s+// class ${Regex.escape(internalName)}$""")
+    return outputs.filterValues { text -> text.lineSequence().any { ldc.containsMatchIn(it.trim()) } }.keys
+}
 
 /** 그 메서드를 **부르는** class — 정의한 class 자신은 빼고 센다(정의는 호출이 아니다). */
 private fun callers(
