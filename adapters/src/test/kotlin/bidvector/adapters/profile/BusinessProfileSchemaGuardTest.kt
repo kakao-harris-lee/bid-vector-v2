@@ -187,15 +187,21 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
      * **중복 원소도 표가 거부한다**(r1 CR L-8 · F4). 앱은 늘 정렬된 distinct 집합을 쓰고 읽기에서
      * `toSet()` 이 접으므로 중복은 **조용한 정규화**였다 — 직접 SQL 로만 생기는 틈이지만, 「표 층이
      * 같은 불변식을 한 겹 더 깐다」는 주장은 그 틈이 있으면 참이 아니다.
+     *
+     * **어휘 전수를 돈다**(D-7C4-3 팀장 요청). V22 의 그 CHECK 는 어휘를 두 자리에 든다 —
+     * 「어휘 안인가」(부분집합)와 「값마다 한 번뿐인가」(값별 절). 한 값을 **한쪽에서만** 지우는 변이를
+     * 잡으려면 중복 거부를 값마다 재야 한다: 값별 절이 하나 빠지면 그 값의 중복이 통과한다.
      */
     @Test
-    fun `CHECK — 등록분야 배열은 중복 원소를 거부한다`() {
+    fun `CHECK — 등록분야 배열은 어휘 전수에서 중복 원소를 거부한다`() {
         val insert =
             "INSERT INTO account_business_profile (account_id, nara_registration, " +
                 "nara_registered_fields, updated_at) VALUES (?, 'REGISTERED', ?::text[], now())"
 
         asApp(insert, account().value, "{GOODS,SERVICE}")
-        shouldThrow<SQLException> { asApp(insert, account().value, "{GOODS,GOODS}") }
+        NaraRegistrationField.entries.forEach { field ->
+            shouldThrow<SQLException> { asApp(insert, account().value, "{${field.name},${field.name}}") }
+        }
         shouldThrow<SQLException> { asApp(insert, account().value, "{SERVICE,CONSTRUCTION,SERVICE}") }
     }
 

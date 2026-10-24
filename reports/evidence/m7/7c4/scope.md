@@ -124,6 +124,9 @@ production Flyway 는 기본값이다(`outOfOrder` 미설정 = false, `validateO
    리터럴을 지우고 상대를 참조한다. 방향은 `profile` → `evaluation` 뿐이다(반대는 격리 단언이 붉다).
 3. **`ProfileInputPolicy.CAPACITY_ROWS_MAX` 는 아직 집행되지 않는다**(CR L-1). 2a 에 use case 가 없고 표에 행 수 CHECK 도
    없다. 2b 가 집행을 세우고, 검사-후-삽입이 경합하는 것도 그때 판단한다.
+4. **상호의 빈 값 술어는 DB 가 앱보다 넓다**(유니코드 공백 변두리) — **그 차이는 앱 경로로 닿지 않는다**(팀장 수용
+   2026-10-24). 쓰기는 앱 경로로만 들어오고 앱이 `isNotBlank` 로 더 좁게 거른다. 직접 SQL 로만 생기는 틈이며, 그렇게 저장된
+   값은 읽기에서 크게 실패한다(조용히 접히지 않는다).
 
 ### low 처분 (고치지 않는 것과 사유)
 
