@@ -1,6 +1,7 @@
 # M7/7C④ — 설정 API 체크리스트
 
-계약: `reports/evidence/m7/7c4/scope.md`. base main `bee7c36f`, 브랜치 `m7-7c4/2026-10-22`.
+계약: `reports/evidence/m7/7c4/scope.md`. base main **`fc15975c`**(2026-10-24 재고정 — 착수 base 는 `bee7c36f` 였다, §3.3),
+브랜치 `m7-7c4/2026-10-22`.
 
 ## §0 Phase 1 — 설계 (코드·마이그레이션 0, 팀장 답 대기)
 
@@ -205,7 +206,8 @@ CSRF 는 구조적으로 덮인다(POST 는 면제 집합 밖, F7). 다만 **전
   `candidateLimit`·`maxActiveBids` 가 조회 응답과 편집 필드 어휘에 있다(`openapi/bidvector-operator-api.yaml:874-878`,
   `:947-960`). 세션 경로로도 이미 통한다(`BrowserSessionAuthenticationTest.kt:278`). **이 slice 는 전략 쪽에 아무것도 더하지 않는다.**
 - **STR-06 은 이 slice 범위 밖으로 둔다.** 「신설 필요」의 내용은 편집이 아니라 **후보 표시 표면**과 「표시 건수 ↔ 분석
-  예산 독립」 측정이다(`capability-map.md:528-538`, `reports/evidence/m6/6e1/acceptance-trace.md:115`). 7A 조정안은 그것을
+  예산 독립」 측정이다(capability map 의 STR-06 절 · M6 추적표의 STR-06 행 — **좌표 제거 2026-10-24**, r1 F3 · CR L-5:
+  이 slice 가 그 두 파일을 편집하므로 `파일:줄` 이 낡는다). 7A 조정안은 그것을
   **7C①** 에 배정했다(`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md:57`, `:112`). 그런데 7C① evidence 에
   STR-06 언급이 없다(`grep -rn STR-06 reports/evidence/m7/7c1` 0건) → **G2 의 STR-06 이 홀더 없이 떠 있을 수 있다. 팀장
   확인 필요(보고 B1).**
@@ -328,8 +330,10 @@ V12 업종(`business_types`)은 자유 텍스트 `CategoryCode` 라 「공사인
 
 ### 3.2 미판정 축 어휘에 `QUAL_10_PERFORMANCE` (팀장 전달, D-7C2-1 Q5)
 
-7C ② 가 같은 이름의 열거를 `workflow.evaluation` 에 두고 **두 표면의 단일 출처**로 삼기로 했다. 이 레인은 ID 셋을 바이트 동일로
-맞춘다(`QUAL_08_REGION` · `QUAL_10_PERFORMANCE` · `QUAL_11_CONSTRUCTION_CAPACITY`, 이 순서 — 7C ② worktree 의 정의와 대조).
+7C ② 가 같은 이름의 열거를 `workflow.evaluation` 에 두고 **두 표면의 단일 출처**로 삼기로 했다. 이 레인은 **ID 셋의 이름과
+순서**를 그 정의와 같게 맞춘다(`QUAL_08_REGION` · `QUAL_10_PERFORMANCE` · `QUAL_11_CONSTRUCTION_CAPACITY`, 이 순서 —
+7C ② worktree 의 정의와 대조). **「바이트 동일」은 정정한다**(r1 CR M-5): 두 열거는 패키지도 모양도 다르다(이쪽만
+`capability` 속성을 든다). 같은 것은 **항목 이름과 순서**이고, 그 등식을 잠그는 게이트는 없다 — 수동이다(scope 알려진 제한 2).
 QUAL-10(수행실적)은 이 slice 가 **입력을 받지 않는다**(D-7C4-1 Q2). 그래도 드는 이유는 이 표가 「입력이 선 축」이 아니라
 **「판정이 없는 축」**이기 때문이다 — 입력도 판정도 없는 축을 빼면 운영자에게 「면허만 보면 끝」으로 읽힌다. 축 ID 는 wire 값
 이므로 이름을 직접 잠갔다(2b 의 응답 계약 test 가 서기 전까지 이것이 유일한 잠금이다).
