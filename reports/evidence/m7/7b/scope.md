@@ -255,6 +255,61 @@ in_scope 명시(이 결정으로 계약에 더한다): `app/src/main/.../http/` 
 · db-rehearsal · 변이 표(verifier M2 · M4 · M7 · 결정 ① 의 지연 판정 변이 포함) · rollback ①~⑥ 재실측 → 판정 SHA 고정 보고. 수정 라운드가 만든 새 파일은
 in_scope 와 대조해 보고한다. main 이 움직이면 그 시점 main 으로 rebase 한다.
 
+**D-7B-4 (2026-10-24, 팀장 — 검토 r2 수령 · 수정 라운드 2).** 판정 SHA `10cf5d02`(마지막 산출물 커밋 `4409825f`)에 대해 verifier r2 **ready-for-review**(차단 0 ·
+게이트 medium 2 · 장부층 6), code-reviewer r2 **request_changes**(high 1 · medium 6 · low 14). 재작업 2/5. 두 보고를 합친 처분이다(전문: `_workspace/m7-7b/02_verifier_r2.md` ·
+리뷰 파일 `cr-7b-r2.md`, 팀장이 경로를 넘긴다). 지적 ID 는 이번 라운드도 `V-`·`C-` 접두를 쓰고, r2 의 새 번호는 `V2-N1` · `C2-N1` 처럼 라운드를 붙여 r1 과 가른다.
+main 의 #86(`b8a45da3`, vuln allowlist 만)은 이 slice 의 되돌림 경로와 겹치지 않으므로 **rebase 하지 않는다** — PR 시점 update-branch 로 받는다.
+
+- **결정 ⑤ — 마감 판정은 되돌릴 수 있다(C2-N1 high · V2-W2): 시스템 반대 간선을 둔다.** `DEADLINE_PASSED_UNRECORDED` 에서 시스템 주체만 쓰는 명령 하나를
+  전이표에 더한다(이름은 레인이 정한다, 예: `REVOKE_DEADLINE_PASSED`). 조건: 판정 시점의 유효 마감이 **미래**이고, 그 건이 그 상태에 **시스템 판정으로**
+  들어왔다. 도착 상태는 마지막 시스템 `MARK_DEADLINE_PASSED` 행의 `from_state` 이고 마감 전 넷 중 하나여야 한다(전이표가 도착 집합을 정하고, 값은 use case 가
+  타임라인에서 읽어 인자로 싣는다 — 표의 꼴을 깨지 않는다). 타임라인에는 시스템 주체 · `deadline-check` 로 남는다. 기록(`RECORD_BID`)으로 이미 그 상태를 떠난 건은
+  대상이 아니다. 판정 함수(`settle`)가 두 방향을 같이 본다. V21 명령 CHECK 에 새 명령을 넣는다(V21 수정). test: CR 이 적은 재현 그대로 — 담기 → 읽기(판정 섬) →
+  마감 연장 정정 → 읽기 → 원래 상태 + 타임라인 순서(시스템 판정 → 시스템 되돌림) · 그 뒤 `SKIP`/`DRAFT_BID` 가 받아들여짐 · 반대 간선을 끄는 변이 RED.
+- **결정 ⑥ — 「값 없음」과 「행 없음」을 가른다(C2-N7).** 마감 포트가 공고 행의 존재와 마감 값을 따로 돌려준다. 유효 마감은 **행이 있으면 그 값**(NULL 이면
+  미정 → 판정하지 않는다, 이미 판정된 건이면 결정 ⑤ 로 되돌린다)이고, **행이 없을 때만**(6B-3 파기) 사본을 쓴다. 파기된 공고는 다시 정정되지 않으므로 사본 판정은
+  되돌릴 일이 없다. KDoc 과 §6-2 를 이 문면으로 고친다. test: `deadline_at = NULL` 정정 한 줄 — 판정하지 않음 · 판정 뒤 NULL 정정이면 되돌림.
+- **결정 ⑦ — 읽기가 일으키는 쓰기는 유지하고 사실로 선언한다(C2-N2).** GET 셋이 시스템 판정을 쓸 수 있다. 값을 요청자가 고르지 못하고 결정 ⑤ 로 비가역성이
+  사라지므로 교차 출처 GET 의 실해는 「판정 시각을 앞당김」뿐이다. `BidCaseQueryController` KDoc 을 사실로 고치고, §6 에 「읽기가 시스템 전이를 쓴다 · CSRF 면제
+  메서드다」와 위협 모델 경계 문장을 적는다. 읽기 전용 응답 + enqueue 분리는 이 slice 가 하지 않는다.
+- **결정 ⑧ — 목록은 판정 대상을 SQL 로 좁히고 상태 탭을 DB 로 돌린다(C2-N3).** 판정 후보(마감 전 넷 중 유효 마감이 지난 건 + 결정 ⑤ 의 되돌림 후보)를
+  질의 하나로 먼저 고르고 그것만 판정한 뒤, 목록은 `state` 필터를 SQL 에서 적용한다(지금 무시되는 포트 인자가 다시 쓰인다). 상한·커서는 OpenAPI·web 을 바꾸므로
+  이 slice 에서 하지 않고 §6 알려진 제한 + OPEN 후보 `OPEN-7B-BIDBOX-PAGING` 으로 적는다(1 운영자 입찰함 규모 근거와 함께).
+
+고친다(산출물):
+- **게이트 우회 둘(V2-N1 · V2-N2) — 게이트 술어 변경이므로 표적 재검증 대상이다.**
+  - V2-N1 계정 운반: `getAttribute` 술어를 **소유자 클래스와 무관한 메서드 서명**(`getAttribute(Ljava/lang/String;)`)의 호출자 집합 등식으로 바꾸고, app main 에서
+    `AccountId` Class 상수(ldc)를 가진 class 집합 = 정해진 운반 자리(∅ 또는 명시 집합) 등식을 더한다. verifier 의 우회(래퍼 `getAttribute` + `convertValue`)를 변이로
+    재현해 RED 를 잰다.
+  - V2-N2 본문 없는 operation: 문서에서 `requestBody` 가 없는 operation 집합을 도출하고, 그 전부를 **본문 없이** 불렀을 때 400·415 가 아님을 집합으로 잰다
+    (`@RequestBody` 주석 유무에 걸지 않는다). 주석 없이 본문을 요구하는 핸들러 변이 RED.
+- **C2-N4**: `resumeBidCase` 에 400 선언. 「경로 변수를 읽는 매핑 ↔ 문서 400 선언」 집합 등식을 `OpenApiRequestBodyContractTest`(또는 이웃 test)에 더한다. 생성 타입
+  재생성 · W-5 바이트 등식.
+- **C2-N5**: `checkVocabulary` 재사용으로 상태 셋 · 명령 하나의 CHECK 를 `BidStateTag.entries` · `BidCommandTag.entries` 와 등식으로 잠근다(결정 ⑤ 의 새 명령 포함).
+- **C2-N6**: HTTP 이중체의 마감 포트를 test 가 옮기는 값으로 바꾸고, 운반 층에서 ① 마감 뒤 `skip`/`draft` 409 ② GET 이 일으키는 판정 전이 ③ 결정 ⑤ 의 되돌림을
+  한 번씩 잰다.
+- **C2-M1 잔여 · V2-W4 `draft_id` 묶음**: `bid_draft` 에 `UNIQUE (id, case_id, account_id)` 를 두고 `bid_record (draft_id, case_id, account_id)` 복합 FK 로
+  바꾼다(NULL `draft_id` 는 MATCH SIMPLE 로 통과). 남의 건·남의 계정 초안 거부를 행동으로 잰다(C2-N18 의 자식 둘 복합 FK 행동 측정도 여기서 닫는다).
+- **C-M6 문면(TOCTOU)**: 등식 절을 지우고 「기록 시점의 최신 초안이다 — 화면의 기본값과 같다는 보장은 없다」로 세 자리(`LATEST_DRAFT_ID` · `latestDraftId` ·
+  V21 주석)를 고친다. 요청에 초안 id 를 싣는 안은 채택하지 않는다.
+- **V2-W1 · C2-N9**: `open` 의 `Opened` 갈래도 판정을 지난다(같은 요청 쌍이 두 답을 주지 않는다).
+- **V2-W3**: 동시성 회귀 test 를 커밋한다(버전 조건을 빼는 변이 RED — 500 이 아니라 `VersionConflict`).
+- **V2-W5**: 스냅샷 test 의 공고 provenance 는 정본 코덱으로 심는다(손 리터럴 금지).
+- **C2-N8**: `settle` 이 `VersionConflict` 를 받으면 재적재 후 판정을 한 번 다시 시도하거나, 그 결과를 KDoc·§6 에 사실로 적는다(레인 선택, 처분표에 근거).
+- **C2-N13 · C2-N14**: `memo`(2000) · `evidence_ref`(128) 에 `char_length` CHECK + OpenAPI `maxLength`, 스냅샷 통화·과세 열에 `<> ''` CHECK. 경계 test.
+- **low 나머지**: C2-N10 은 evidence 에 「전이 하나가 한 트랜잭션, 요청은 둘~넷이고 판정은 요청 실패와 무관한 사실」 한 줄 · C2-N11 `submission` 판독 좁히기 ·
+  C2-N12 단위 차이를 문면에 적거나 BMP 밖 문자 경계 test · C2-N15 소스의 줄 번호 좌표를 절 제목으로 · C2-N16 `Accepted` 발생 수 단언 · C2-N17 문자열 술어는 행동
+  축이 정본임을 test KDoc 에 적고 `OR TRUE` 변이를 표에 더한다 · C2-N18 `attempt` 주석 정정 · C2-N19 NULL 사본은 §6 에 등재 · C2-N20 C-L5 근거 문장 정정 ·
+  C2-N21 `D1-lazy2` 를 현재 트리에서 다시 잰다.
+- **V2-W6**(동결 위반): 원인은 팀장 지시 순서다 — 처분표에 사실로 적고 레인 조치는 없다.
+
+등재(이 PR 에서 활성 등재하지 않고 evidence 후보로 둔다 — 팀장이 다음 M7 문서 PR 에서 등록): `OPEN-7B-NOTICE-EXPECTED-WRITER`(유지) · `OPEN-7B-BIDBOX-PAGING`(새).
+
+절차: 지적별 처분표 → 구판 RED 확인(회귀 test 는 `10cf5d02` 에서 RED 인지) → 찬 `check --continue` · S-20 · container 재생(V21 변경, 이미지 넷 태그 ID 기록·복원 —
+scan 둘은 main 의 #86 allowlist 가 없는 트리라 외부 CVE 로 남을 수 있다, 원인과 함께 적는다) · db-rehearsal · 변이 표(결정 ⑤ 반대 간선 · 결정 ⑥ NULL · V2-N1 우회 ·
+V2-N2 우회 · C2-N5 등식 · `draft_id` FK · 동시성) · rollback ①~⑥ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. **판정 SHA 보고 뒤에는 커밋하지 않는다**
+— 팀장 요청이 와도 「그 SHA 로 검증이 도는가」 먼저 묻는다. 새 파일은 in_scope 와 대조해 보고한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
