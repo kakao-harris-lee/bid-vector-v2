@@ -6,7 +6,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 
 /**
- * 전이표 **전수** — 14 상태 × 13 명령 = 182 쌍 전부를 돌려 「표에 있는 것만 허용되고 나머지는
+ * 전이표 **전수** — 14 상태 × 14 명령 = 196 쌍 전부를 돌려 「표에 있는 것만 허용되고 나머지는
  * 전부 거부」를 잰다. 금지 목록을 따로 들지 않는 설계(`BID_TRANSITIONS` KDoc)는 이 전수가
  * 없으면 주장일 뿐이다.
  *
@@ -90,6 +90,17 @@ class BidTransitionTableTest {
                 BidCommandTag.MARK_DEADLINE_PASSED,
                 setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
             ),
+            // 계약 D-7B-4 결정 ⑤ — 시스템 판정의 되돌림. 도착은 마감 전 넷이다.
+            Triple(
+                BidStateTag.DEADLINE_PASSED_UNRECORDED,
+                BidCommandTag.REVOKE_DEADLINE_PASSED,
+                setOf(
+                    BidStateTag.WATCHING,
+                    BidStateTag.DEFERRED,
+                    BidStateTag.PRICE_RECEIVED,
+                    BidStateTag.BID_PLANNED,
+                ),
+            ),
         )
 
     @Test
@@ -102,13 +113,14 @@ class BidTransitionTableTest {
     }
 
     @Test
-    fun `표 밖 주체 조합도 골든과 같다 — 시스템 전용 하나와 사용자 전용 집합`() {
+    fun `표 밖 주체 조합도 골든과 같다 — 시스템 전용 둘과 사용자 전용 집합`() {
         val systemOnly =
             BID_TRANSITIONS.entries
                 .filter { it.value.actors == setOf(ActorKind.SYSTEM) }
                 .map { it.key.command }
                 .toSet()
-        systemOnly shouldContainExactlyInAnyOrder listOf(BidCommandTag.RECEIVE_PRICE_MENU)
+        systemOnly shouldContainExactlyInAnyOrder
+            listOf(BidCommandTag.RECEIVE_PRICE_MENU, BidCommandTag.REVOKE_DEADLINE_PASSED)
 
         val userAndSystem =
             BID_TRANSITIONS.entries
@@ -145,7 +157,7 @@ class BidTransitionTableTest {
                 rejected += key
             }
         }
-        // 182 쌍 중 표가 든 것을 뺀 나머지가 전부 거부로 관측됐는지 — 수를 못 박아 둔다.
+        // 196 쌍 중 표가 든 것을 뺀 나머지가 전부 거부로 관측됐는지 — 수를 못 박아 둔다.
         rejected.size shouldBe (BidStateTag.entries.size * BidCommandTag.entries.size) - BID_TRANSITIONS.size
     }
 
@@ -203,10 +215,29 @@ class BidTransitionTableTest {
     }
 
     @Test
-    fun `마감 지남에서 나가는 간선은 소급 기록 하나뿐이다`() {
+    fun `마감 지남에서 나가는 간선은 소급 기록과 시스템 되돌림 둘뿐이다`() {
         BID_TRANSITIONS.keys
             .filter { it.from == BidStateTag.DEADLINE_PASSED_UNRECORDED }
-            .map { it.command } shouldContainExactlyInAnyOrder listOf(BidCommandTag.RECORD_BID)
+            .map { it.command } shouldContainExactlyInAnyOrder
+            listOf(BidCommandTag.RECORD_BID, BidCommandTag.REVOKE_DEADLINE_PASSED)
+    }
+
+    /** 되돌림은 시스템만 쓰고, 도착은 use case 가 실은 값이되 마감 전 넷 밖이면 전이표가 거부한다. */
+    @Test
+    fun `마감 판정 되돌림 — 사용자는 못 쓰고 마감 전 넷 밖으로는 못 간다`() {
+        val revoke = BidCommand.RevokeDeadlinePassed(BidState.BidPlanned)
+        applyCommand(BidState.DeadlinePassedUnrecorded, revoke, ActorKind.USER, T0)
+            .shouldBeInstanceOf<TransitionOutcome.Rejected>()
+            .reason shouldBe RejectionReason.ActorNotPermitted
+        applyCommand(BidState.DeadlinePassedUnrecorded, revoke, ActorKind.SYSTEM, T0)
+            .shouldBeInstanceOf<TransitionOutcome.Accepted>()
+            .next shouldBe BidState.BidPlanned
+        applyCommand(
+            BidState.DeadlinePassedUnrecorded,
+            BidCommand.RevokeDeadlinePassed(BidState.Won),
+            ActorKind.SYSTEM,
+            T0,
+        ).shouldBeInstanceOf<TransitionOutcome.Rejected>().reason shouldBe RejectionReason.TargetNotAllowed
     }
 
     @Test

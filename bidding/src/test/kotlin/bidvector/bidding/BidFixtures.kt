@@ -75,6 +75,7 @@ internal val ALL_COMMANDS: List<BidCommand> =
         BidCommand.CorrectOutcome(BidOutcome.LOST, TransitionReason("개찰 공고 정정")),
         BidCommand.Skip(SkipReason("면허 불일치")),
         BidCommand.MarkDeadlinePassed,
+        BidCommand.RevokeDeadlinePassed(BidState.Watching),
     )
 
 internal fun case(

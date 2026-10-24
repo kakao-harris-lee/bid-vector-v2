@@ -172,7 +172,10 @@ private val OUTCOME_ROWS =
             USER_ONLY,
         )
 
-/** 종료 가지 둘 — 건너뜀(종단)과 마감 지남(소급 입구 하나가 남는다). */
+/**
+ * 종료 가지 둘 — 건너뜀(종단)과 마감 지남(소급 입구 하나가 남는다). 마감 지남에는 **시스템 되돌림** 한 간선이 더
+ * 있다(계약 D-7B-4 결정 ⑤): 마감을 미룬 정정 공고 뒤에 시스템 판정을 거두는 길이고, 도착은 마감 전 넷이다.
+ */
 private val EXIT_ROWS =
     rows(PRE_SUBMISSION, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED), USER_ONLY) +
         rows(
@@ -180,6 +183,12 @@ private val EXIT_ROWS =
             BidCommandTag.MARK_DEADLINE_PASSED,
             setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
             USER_OR_SYSTEM,
+        ) +
+        rows(
+            listOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
+            BidCommandTag.REVOKE_DEADLINE_PASSED,
+            PRE_SUBMISSION.toSet(),
+            SYSTEM_ONLY,
         )
 
 /**
@@ -190,7 +199,8 @@ private val EXIT_ROWS =
  * (`CleanMigrationColumnTest` 가 같은 이유로 테이블별 리스트를 `+` 로 잇는다).
  *
  * **종단은 [BidStateTag.SKIPPED] 하나뿐이다.** `DEADLINE_PASSED_UNRECORDED` 는 여정의 종료
- * 가지이지만 Q-11(소급 무기한)이 `RECORD_BID` 한 간선을 남긴다. 낙찰·패찰·유찰 셋은
+ * 가지이지만 Q-11(소급 무기한)이 `RECORD_BID` 한 간선을 남기고, 시스템 되돌림(`REVOKE_DEADLINE_PASSED`)이
+ * 마감 전 넷으로 돌아가는 간선을 하나 더 둔다. 낙찰·패찰·유찰 셋은
  * `CORRECT_OUTCOME` 으로 서로 오간다.
  *
  * **`SYSTEM` 행에 오늘 호출자가 없다**(SET-01·SET-02·DEC 메뉴는 범위 밖, 알려진 제한 ②).
@@ -226,6 +236,7 @@ private fun targetOf(
         is BidCommand.CorrectOutcome -> command.outcome.toState().alone()
         is BidCommand.Skip -> BidState.Skipped(command.reason).alone()
         BidCommand.MarkDeadlinePassed -> BidState.DeadlinePassedUnrecorded.alone()
+        is BidCommand.RevokeDeadlinePassed -> command.restore.alone()
     }
 
 /** 기록 전이의 도착과 산출 — 서버가 정하는 둘(확인 시각 · 소급)을 여기서 싣는다. */

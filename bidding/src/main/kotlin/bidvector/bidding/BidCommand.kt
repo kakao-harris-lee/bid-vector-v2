@@ -108,6 +108,17 @@ sealed interface BidCommand {
     data object MarkDeadlinePassed : BidCommand {
         override val tag: BidCommandTag get() = BidCommandTag.MARK_DEADLINE_PASSED
     }
+
+    /**
+     * 마감 판정 되돌림(계약 D-7B-4 결정 ⑤) — 시스템이 세운 「마감 지남」을 유효 마감이 다시 미래(또는 미정)가 됐을 때
+     * 거둔다. 도착([restore])은 **use case 가 타임라인에서 읽어 싣고**, 전이표가 그 값이 마감 전 넷 중 하나인지
+     * 판정한다(표의 꼴 — 도착 집합 — 을 깨지 않는다). 시스템 주체만 쓴다.
+     */
+    data class RevokeDeadlinePassed(
+        val restore: BidState,
+    ) : BidCommand {
+        override val tag: BidCommandTag get() = BidCommandTag.REVOKE_DEADLINE_PASSED
+    }
 }
 
 /** 전이표의 열 키. 어휘는 `V21` 의 `bid_case_transition.command` CHECK 와 같다. */
@@ -125,6 +136,7 @@ enum class BidCommandTag {
     CORRECT_OUTCOME,
     SKIP,
     MARK_DEADLINE_PASSED,
+    REVOKE_DEADLINE_PASSED,
 }
 
 /**
