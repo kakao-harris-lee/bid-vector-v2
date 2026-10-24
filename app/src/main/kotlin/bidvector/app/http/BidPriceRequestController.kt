@@ -64,19 +64,14 @@ class BidPriceRequestController(
  * 주입 허용 목록을 넓히라고 요구한다(실측으로 걸렸다). 호출부가 값 둘을 그대로 들고 간다.
  */
 internal fun parseBidPriceNoticeId(body: JsonNode): NoticeId {
-    if (!body.isObject) {
-        throw InvalidEvaluationRequestException("요청 본문이 JSON object 가 아니다")
-    }
+    rejectBidPriceRequestIf(!body.isObject) { "요청 본문이 JSON object 가 아니다" }
     val number = body.bidPriceText("noticeNumber")
     val round = body.bidPriceText("noticeRound")
-    if (!NOTICE_ROUND_FORMAT.matches(round)) {
-        throw InvalidEvaluationRequestException("noticeRound 는 제로패딩 3자리 숫자여야 한다")
-    }
+    rejectBidPriceRequestIf(!NOTICE_ROUND_FORMAT.matches(round)) { "noticeRound 는 제로패딩 3자리 숫자여야 한다" }
     val normalizedNumber =
         NoticeNumber.ofOrNull(number)
-            ?: throw InvalidEvaluationRequestException("noticeNumber 가 공고번호로 서지 않는다")
+            ?: rejectBidPriceRequest { "noticeNumber 가 공고번호로 서지 않는다" }
     return NoticeId(normalizedNumber, NoticeRound.of(round))
-}
 }
 
 /**
@@ -85,20 +80,28 @@ internal fun parseBidPriceNoticeId(body: JsonNode): NoticeId {
  */
 private fun JsonNode.bidPriceText(key: String): String {
     val node = get(key)
-    if (node == null || node.isNull || !node.isString) {
-        throw InvalidEvaluationRequestException("$key 는 문자열이어야 한다")
-    }
-    val value = node.stringValue()
-    if (value.isBlank()) {
-        throw InvalidEvaluationRequestException("$key 는 빈 문자열일 수 없다")
-    }
-    if (value.length > MAX_IDENTIFIER_LENGTH) {
-        throw InvalidEvaluationRequestException("$key 가 길이 상한을 넘었다")
-    }
-    if (value.any { it.isISOControl() }) {
-        throw InvalidEvaluationRequestException("$key 에 제어 문자가 있다")
-    }
+    rejectBidPriceRequestIf(node == null || node.isNull || !node.isString) { "$key 는 문자열이어야 한다" }
+    val value = checkNotNull(node).stringValue()
+    rejectBidPriceRequestIf(value.isBlank()) { "$key 는 빈 문자열일 수 없다" }
+    rejectBidPriceRequestIf(value.length > MAX_IDENTIFIER_LENGTH) { "$key 가 길이 상한을 넘었다" }
+    rejectBidPriceRequestIf(value.any { it.isISOControl() }) { "$key 에 제어 문자가 있다" }
     return value
+}
+
+/**
+ * 거부의 **유일한 자리**. 검증마다 `throw` 를 쓰면 함수 하나가 throw 넷을 들고(detekt `ThrowsCount`),
+ * 더 중요하게는 거부가 여러 자리로 흩어져 「어떤 입력이 어떤 코드로 거부되는가」가 한눈에 안 보인다.
+ * 메시지는 진단용이고 **응답에 실리지 않는다**(`ErrorMapping` 이 고정 문구로만 옮긴다) — 지연 평가로
+ * 받아 통과하는 경로에서 문자열을 만들지도 않는다.
+ */
+private fun rejectBidPriceRequest(message: () -> String): Nothing =
+    throw InvalidEvaluationRequestException(message())
+
+private fun rejectBidPriceRequestIf(
+    rejected: Boolean,
+    message: () -> String,
+) {
+    if (rejected) rejectBidPriceRequest(message)
 }
 
 /**
