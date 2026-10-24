@@ -182,6 +182,30 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         workflow.list(mine, BidKind.REAL, BidStateTag.DEADLINE_PASSED_UNRECORDED).shouldBeEmpty()
     }
 
+    /**
+     * 결정 ⑤ 의 조건 「그 상태에 **시스템 판정으로** 들어왔다」 — 사용자가 직접 적은 「마감 지남」은 마감이 미래여도 거두지
+     * 않는다(되돌림은 서버가 세운 판정만 거둔다). 읽기 · 목록(판정 후보 질의가 이 건을 후보로 고르는 경로) 둘 다 본다.
+     */
+    @Test
+    fun `사용자가 적은 마감 지남은 마감이 미래여도 되돌리지 않는다`() {
+        val mine = account("revoke-h")
+        val key = notice("revoke-h")
+        seedNotice(key, now.plusSeconds(HOUR))
+        val workflow = workflow()
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
+        accepted(workflow.command(mine, caseId, BidCommand.MarkDeadlinePassed, BidActor.User(mine)))
+
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
+        val listed = workflow.list(mine, BidKind.REAL, BidStateTag.DEADLINE_PASSED_UNRECORDED)
+        listed.map { it.case.id } shouldBe listOf(caseId)
+        workflow.timeline(mine, caseId)!!.count { it.command == "REVOKE_DEADLINE_PASSED" } shouldBe 0
+    }
+
     private fun accepted(result: BidCommandResult) {
         result
             .shouldBeInstanceOf<BidCommandResult.Processed>()
