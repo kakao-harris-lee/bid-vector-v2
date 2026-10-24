@@ -237,6 +237,20 @@ rebase 전(base `a61ddff1`)에도 돌렸고 RED 집합이 같았다.
 | M13 | use case 가 통과 목록을 뒤집음 | 마감 임박 순(use case) · 상한이 임박 쪽을 남김 | use case 셋 · endpoint 표시 상한 · E2E 마감 순서(5) |
 | M14 | 비교는 하되 버리지 않음(`return null` → `Unit`) | cr M-4 「비교만 하고 채택」 | use case STR-07 넷(프로필 결과 오라클 포함) · E2E ③ 둘(6) |
 
+**승인 전 일괄(D-7C1B-4) — 새 base `998b59dd` 에서 다시 쟀다**(HEAD `c5a35921` = 마지막 산출물 커밋). 통제군 + 위 일곱 + **M15**,
+필터·`--rerun` 은 위와 같다. 통제군 31 건 exit 0 · 실패 0. 여덟 모두 exit 1 · 컴파일 오류 0 · 복원 뒤 빈 `git status`.
+위 표와 달라진 실패 수: **M2′ 8 → 7**(E2E 마감 순서가 빠졌다 — 앞 판은 E2E ③ 이 단언에서 깨진 뒤 관측 장치가 무장된 채 남아 다음
+test 로 번진 것이었다. 무장/해제를 `finally` 로 바꾼 뒤 그 번짐이 사라졌다). 나머지 여섯은 같다.
+
+| # | 변이 | 막는 것 | RED 로 잰 test(실패 수) |
+|---|---|---|---|
+| M15 | 미결 사유 라벨 둘을 맞바꿈(`REQUIREMENT_DATA_ABSENT` ↔ `REQUIREMENT_UNPARSABLE`, 컨트롤러 `label()`) | 사유 지어내기(위협 모델) · 면허 축 실제 값만(QUAL-02) | 계약 「면허 축 어휘가 구현이 실제로 내는 값의 전수와 같다」(1) — 사유별 쌍 등식. 앞 판(집합 등식)에서는 같은 변이가 31/31 초록이었다(verifier r2 F-1 재현) |
+
+**허위 RED 하나를 걷어냈다.** 첫 실행에서 M15 바로 뒤의 M14 가 계약 test 를 하나 더 붉혔다. 소스는 원본인데 실행된 컨트롤러
+클래스가 M15 판이었다 — M15 는 **길이가 같은** 바꿔치우기라, 같은 초 안의 복원을 빌드가 바뀌지 않은 파일로 보고 재컴파일을
+건너뛰었다. 러너가 복원 뒤 1 초를 넘겨 mtime 을 갱신하게 고치고 통제군 → M15 → M14 를 다시 돌렸다 — 통제군 초록, M15 는 계약
+test 하나, M14 는 위 표의 여섯이다. 표의 M14 는 그 재실행 값이다. 수정 라운드 1 의 일곱은 모두 파일 길이를 바꾸는 변이다(이 함정 밖). Phase 2 의 M1~M9 는 이 기준으로 다시 보지 않았다.
+
 ## 3. (2b) 값 획득 축 — 새 public 표면 전수
 
 | 새 표면 | 밖에 허락하는 것 | 허락하지 않는 것(구조) |
@@ -259,7 +273,7 @@ rebase 전(base `a61ddff1`)에도 돌렸고 RED 집합이 같았다.
 |---|---|---|
 | `config/quality/architecture-policy.properties` | HTTP 허용 패키지(`workflow.suggestion`) · HTTP 허용 클래스·② 층(`SuggestionQuery`) · ① 층(`SuggestionWiring`) · ② 층 workflow 타입(use case·결과) · 주입 표면(`SuggestionQuery`·use case·`NoticeSummaryResponse`) · HTTP 거부 타입(use case) · API 표면 handler(`SuggestionController`) | 전부 집합 **등식**이라 새 타입이 목록에 없으면 RED. 거부 타입은 넓힌 것을 다시 판다 |
 | `config/quality/gate-tests.properties` | test 다섯 등재(workflow 2 · app 3) | 등재 게이트가 「모집단 ∖ 제외 == 등재」 |
-| app 의 의존 게이트 test | 면제 수 62 → 64(근거 문단 동반). **rebase 뒤 65 → 67** — main 의 7C⑤-0(#84)이 62 → 65 로 셋을 먼저 넣어 그 위에 둘을 얹었다(충돌 해소, 두 레인 문단 모두 보존) | ① 층 하나 + ② 층 하나 |
+| app 의 의존 게이트 test | 면제 수 62 → 64(근거 문단 동반). **rebase 뒤 65 → 67**(셋째 rebase `998b59dd` 에서도 67 — main 이 그 test 를 건드리지 않았다) — main 의 7C⑤-0(#84)이 62 → 65 로 셋을 먼저 넣어 그 위에 둘을 얹었다(충돌 해소, 두 레인 문단 모두 보존) | ① 층 하나 + ② 층 하나 |
 | `config/quality/architecture-policy.properties` `app.injection.allowed-types` += `NoticeSummaryResponse` | **오분류로 넓혔다(수정 라운드 1, cr L-1 — 앞 판은 위 첫 행 괄호 안에 묶어 「데이터만 움직였다」로 적었다).** `SuggestedNoticeResponse` 의 `private constructor(summary: NoticeSummaryResponse, …)` 매개변수를 INJECTION_SURFACE 규칙(`AppHttpDependencyRules.kt` 의 생성자 매개변수 타입 = 주입점)이 주입으로 셌다. 실제로는 **응답 DTO 합성**이고 빈 주입이 아니다 | 넓힌 것은 능력 포트가 아니라 응답 DTO 다 — 게이트의 목적(컨트롤러·② 층이 포트를 직접 쥐지 않는다)은 그대로다. 대가: 앞으로 그 층의 아무 클래스가 생성자로 `NoticeSummaryResponse` 를 받아도 게이트가 말하지 않는다. 코드로 피하려면 `Notice` 를 받게 바꿔야 하는데, 그러면 `Notice` 를 같은 목록에 넣어야 해서 이득이 없다 |
 
 첫 전건 `check` 가 잡은 것 넷은 이렇게 고쳤다.
@@ -278,7 +292,7 @@ rebase 전(base `a61ddff1`)에도 돌렸고 RED 집합이 같았다.
 1. **F-1 이 남아 있다** — dry-run·커밋의 `analysisBudget = candidateLimit` 결합과 「값싼 필터 앞 절단」. 별 slice 다. STR-06 은 ⓒ 이다.
 2. **비교와 응답 전송 사이에 커밋된 저장**은 그 응답에 반영되지 않는다. `X-Strategy-Revision` 이 그것을 드러내고, 화면은 저장 뒤 다시 조회한다.
 3. **계산 중 변경은 전략 쪽만 출하 조립 + 실 DB 에서 잰다(수정 라운드 1 로 바뀜).** 앞 판은 「실 DB 재현 없음」이었다. 지금은 `SuggestionE2EProbes` 가 출하 조립의 `strategyRepository` 빈을 감싸 그 GET 의 N 번째 `load()` 직후 실 SQL 로 전략을 바꾸고, 결과가 둘째 시도의 값인지 · 연속이면 409 인지를 잰다(§10). 남는 것: (a) **프로필**의 계산 중 변경은 여전히 use case test 의 가짜 포트만 잰다. (b) 끼어드는 자리는 `load()` 반환 직후로 결정적으로 고정했다 — 다른 스레드의 커밋이 임의 시점에 끼는 경쟁 자체를 재현한 것은 아니다.
-4. **A-B-A 변경은 보지 못한다** — 계산 중에 바뀌었다가 같은 값으로 돌아오면 비교가 같다고 본다. 그 사이 면허 게이트가 중간 값을 읽었을 수 있다. 특히 **프로필은 게이트에 고정되지 않으므로**(§1 P4) 프로필이 A → B → A 로 움직이면 **한 목록 안에 프로필 A 로 판정된 카드와 B 로 판정된 카드가 섞일 수 있고**, 끝의 비교는 A == A 라 그 목록을 채택한다(cr M-1).
+4. **A-B-A 변경은 보지 못한다** — 계산 중에 바뀌었다가 같은 값으로 돌아오면 비교가 같다고 본다. 그 사이 면허 게이트가 중간 값을 읽었을 수 있다. 특히 **프로필은 게이트에 고정되지 않으므로**(§1 P4) 프로필이 A → B → A 로 움직이면 **한 목록 안에 프로필 A 로 판정된 카드와 B 로 판정된 카드가 섞일 수 있고**, 끝의 비교는 A == A 라 그 목록을 채택한다(cr M-1). 오늘 main 코드에는 프로필 **쓰기 호출자가 없다**(verifier r2). **재판단 트리거: 7C④ 병합이 프로필 쓰기 경로를 열면 프로필 고정 래퍼(5)를 다시 판단한다**(verifier r2 L-3).
 5. **면허 게이트는 후보마다 2 질의**(요건 헤더·프로필, 헤더가 있으면 +1)다. 프로필 고정 래퍼로 줄이는 제안(§0.3)은 하지 않았다 — 어댑터·wiring 하나가 늘고(「adapters 새 파일 0」 약속), 4 의 A-B-A 를 프로필 쪽에서 닫는 것도 그 래퍼 몫이다. **질의 예산은 이제 단언한다**: GET 한 번의 읽기 문장 수 `5 + 2n + h` 를 표별로 등식 단언한다(§0.3 정정 · §2 M10 · M11). 소요 시간은 여전히 관측값이다: 출하 조립 + 실 PostgreSQL 에서 통과 후보 200 건 조회 한 번이 184 ms(Phase 2 관측 한 번, 단언 아님).
 6. **스캔 상한 초과는 목록 전체를 409 로 막는다** — 조용히 자르지 않는 대가다. 운영 값 `BIDVECTOR_APP_CANDIDATE_CAP` 는 **저장소에 기본값이 없다**: `docker/compose.yaml:91` 이 `${BIDVECTOR_APP_CANDIDATE_CAP:?…}` 라 미설정이면 기동을 거부한다. 저장소에 있는 값은 CI 의 1000(`.github/workflows/ci.yml:356`)과 runbook 예시 10(`docs/runbook/m6-6g-real-collection.md:38`)뿐이다. `.env` 는 읽지 않았다. cap 1000 이면 최악 GET 한 번이 `5 + 2·1000 + h` 문장(재계산 시 두 배)이고 그 소요는 재지 않았다.
 7. **`unjudgedAxes` 선언 표가 7C④ 병합 뒤 둘이 된다** — 이름만 맞췄다. 병합 시 하나로 합친다.
@@ -288,8 +302,16 @@ rebase 전(base `a61ddff1`)에도 돌렸고 RED 집합이 같았다.
 11. **컨테이너 스모크가 `/api/suggestions` 를 부르지 않는다** — 7C① 제한 11 과 같다.
 12. **`X-Result-State` 의 `NO_MATCH` 는 빈 이유가 자격 때문인지 조건 때문인지 가르지 않는다**(cr L-3) — 열린 공고가 전부 면허 미달(`Ineligible`)로 떨어져도 감시 탈락과 같은 `NO_MATCH` 다. 어휘 넷은 승인된 설계(§0.9)라 이 slice 에서 바꾸지 않는다. **7E 와 함께 다룰 후속 후보**다.
 13. **`X-Strategy-Revision` 비교는 개정을 올리는 쓰기 경로에만 유효하다**(cr L-5) — 서버 계산은 값 비교라 개정을 올리지 않는 경로(마이그레이션 DDL · 리허설 도구 · 수동 SQL, §0.6 「코드 밖」 행)도 덮지만, 계약이 화면에 권하는 「저장 뒤 `readStrategy` 개정과 비교」는 그 경로를 덮지 못한다. 클라이언트 캐시 무효화는 7E 소관이다.
-14. **비교 범위는 이 operation 이 읽지 않는 필드까지 넓다(의도된 보수)** — 값 등식이 `OperatorStrategy` 전체(임계치·`maxActiveBids` 등)와 프로필 전체를 본다. 그 필드만 바뀐 편집이 계산 중에 끼면 결과가 같아도 버리고 1회 재계산한다(연속이면 409). 근거: 「무엇을 읽었는가」를 추적해 범위를 좁히면 게이트가 새 필드를 읽기 시작할 때 비교가 따라오지 않는 구멍이 생긴다. 넓게 비교하면 대가가 재계산 1회뿐이다. 프로필까지 비교하는 것은 면허 게이트가 프로필을 읽기 때문이다 — 전략만 비교하면 계산 중 프로필이 바뀐 결과를 채택한다.
+14. **비교 범위는 이 operation 이 읽지 않는 필드까지 넓다(의도된 보수)** — 값 등식이 `OperatorStrategy` 전체(임계치·`maxActiveBids` 등)와 프로필 전체를 본다. 그 필드만 바뀐 편집이 계산 중에 끼면 결과가 같아도 버리고 1회 재계산한다(연속이면 409). 근거: 「무엇을 읽었는가」를 추적해 범위를 좁히면 게이트가 새 필드를 읽기 시작할 때 비교가 따라오지 않는 구멍이 생긴다. 넓게 비교하면 대가는 재계산 1회이고, 연속되면 그 조회가 409 다(cr r2). 프로필까지 비교하는 것은 면허 게이트가 프로필을 읽기 때문이다 — 전략만 비교하면 계산 중 프로필이 바뀐 결과를 채택한다.
 15. **「감시 미설정」 술어가 두 자리다**(cr L-4) — 드롭 쪽 `WatchVerdict.NoGate`(`CandidateScreening`)와 상태 쪽 `watchRules.isEmpty()`(`ListSuggestionsUseCase.stateOf`). 오늘은 `WatchRules.evaluate` 첫 줄이 같은 조건이라 같다. 후속 후보: 상태를 드롭 사유 목록에서 도출해 술어를 하나로 둔다.
+16. **후속 slice 후보(cr r2 medium)** — 요청 스코프 프로필 1회 고정 래퍼(식 `5 + n + h`, 4 의 A-B-A 를 프로필 쪽에서 함께 닫는다) + 운영 cap 급(예: 1000) 조회 1회 실측. 이 slice 에서는 고치지 않는다.
+17. **문장 기록 프록시가 무장 구간 밖에서도 `DataSource` 경로에 남는다**(cr r2 low) — E2E 클래스의 모든 test 가 프록시 `Connection` 위에서 돈다. 어댑터가 연결을 구체 타입으로 캐스트하기 시작하면 이 조립이 출하와 갈린다. 후속 후보: 기록기를 문장 수 test 하나의 컨텍스트로 좁힌다.
+18. **선언된 프로필의 실 JDBC 값 등식은 재지 않는다**(verifier r2 L-2 · cr r2 low) — E2E 는 프로필 표가 빈 채로만 돈다(`null == null`). 오늘 프로필 타입은 전부 값 비교라 결함은 없다. 후속 후보: 7C④ 병합 때 「프로필이 선언된 상태에서 200 이고 `load` 2 회」 E2E 한 줄.
+19. **test fixture 가 SQL 을 문자열 보간으로 만든다**(cr r2 low) — test 소유자 연결이라 보안 문제는 아니고 따옴표가 든 값에서 원인이 가려진다. 후속 후보: 바인딩 매개변수로.
+20. **카드 키 목록의 넷째 사본**(cr r2 low) — `SuggestionEndpointTest` 의 키 집합 상수가 계약에 묶이지 않는다. 후속 후보: 계약의 `SuggestedNotice` 속성 키에서 읽는다.
+21. **같은 이름의 속성과 함수**(cr r2 low) — `HttpTestSupport` 의 가짜 면허 게이트 `verdictFor`. 기존 `FakeLicenseGatePort` 와 대칭이라 그대로 둔다. 후속 후보: 이름 정리.
+22. **최상위 JSON 배열 + 쿠키 축**(cr r2 low, 기록만) — 7C① 과 같은 선례이고 현대 브라우저에서 방어가 필요 없다. 봉투 응답은 평탄 게이트(D-6A1-38)가 막는다.
+23. **HTTP 허용 패키지가 패키지 단위로 넓어졌다**(verifier r2 L-4, 기록만) — `bidvector.workflow.suggestion` 에 들어오는 타입은 HTTP 층이 이름 붙일 수 있다. use case 는 거부 타입 목록이 다시 판다. `workflow.notice` 선례와 같다.
 
 ## 7. 추적표
 
@@ -358,6 +380,25 @@ rebase 전 SHA ↔ 뒤 SHA 는 `commands.md` 의 대응표에 있다. **main 은
 | L-5 클라이언트 개정 비교 | §6-13 |
 | 열린 질문: 운영 cap | §6-6(저장소 값만, `.env` 미열람) |
 | 열린 질문: 비교 과잉 범위 | §6-14 |
+
+**승인 전 일괄(D-7C1B-4)** — verifier r2 ready-for-review · code-reviewer r2 approve(둘 다 blocker·high 0, r1 아홉 「닫힘」).
+
+| 발견 | 처분 |
+|---|---|
+| verifier F-1(medium) 미결 사유 라벨 대응이 test 로 잠기지 않음 | 계약 test 를 사유별 **쌍** 등식으로. 사유 목록은 `UncertainReason::class.sealedSubclasses` 에서 도출하고 기대 라벨은 사유 이름(SCREAMING_SNAKE)에서 따로 만든다. 라벨 맞바꿈 변이 M15 RED(§2) |
+| verifier L-1 · cr §6-14 문면 | `ListSuggestionsUseCase` 클래스 KDoc · `ComputationInputs` KDoc 을 「고정은 전략만, 프로필은 비교 기준값」으로(주석만 — production 의 주석 밖 줄 변경 0). §6-14 정정 |
+| verifier L-3 트리거 | §6-4 |
+| verifier L-2 · cr low(프로필 실 JDBC 등식) | §6-18 |
+| verifier L-4 | §6-23(기록만) |
+| cr low: probe 무장/해제 | `try/finally`(E2E 의 문장 수 기록기 · 계산 중 변경 장치 둘 다). 효과는 §2 의 M2′ 8 → 7 |
+| cr low: STR-06 면허 호출 값 고정 | `narrowLicense.calledFor shouldBe listOf(second, third, fourth)` |
+| cr low 나머지 다섯 | §6-17 · 19 · 20 · 21 · 22 |
+| cr medium(프로필 고정 래퍼 + 운영 cap 실측) | §6-16 후속 slice 후보 |
+
+**셋째 rebase**: `998b59dd`(#85 까지) 위로. 충돌은 추적표 집계 문단 하나 — main 의 G1-SET01 문단을 보존하고, 그 문단이 인용한
+ⓐ 16 · ⓒ 43 이 그 라운드 시점 값임을 한 줄 덧붙였다(G1-C03 문단과 같은 처리). 표의 수는 ⓐ 17 · ⓑ 2 · ⓒ 42 · 성립 범위 19/61
+그대로다. `gate-tests.properties` 는 자동 병합이고 더하기만이다. 면제 수 67 은 그대로다. 이 라운드의 새 파일은 0 이다(추가 경로
+11 은 앞 라운드와 같다).
 
 **관측 장치**(`app/src/test/kotlin/bidvector/app/http/SuggestionE2EProbes.kt`, test 소스 전용). `productionApplication()` 에 초기화자 하나를 덧붙여 `BeanPostProcessor` 를 등록한다. 조립 함수·배선 클래스는 그대로다.
 

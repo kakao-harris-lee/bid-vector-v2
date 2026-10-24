@@ -77,3 +77,28 @@ Phase 2 문면의 SHA(`9ccf656f` · `8cb354e2` · `f255f749` · `38af04b7` 등)�
 | `6664c772` | `ddf1f065` | 수정 라운드 1 test |
 | `4d605859` | `19b34b6c` | 추적표 STR-07(**마지막 산출물 커밋**) |
 | `a6ef9cf2` | `1e46c616` | 수정 라운드 1 evidence 초안 |
+
+## 승인 전 일괄 (D-7C1B-4, 2026-10-24 KST, base `998b59dd`)
+
+- **셋째 rebase** → 충돌 하나(추적표 집계 문단, `checklist.md` §10). 이 라운드의 산출물 커밋 `c5a35921`(마지막 산출물 커밋).
+- **찬 `check`** `./gradlew --no-daemon check --continue --rerun-tasks --no-build-cache`(HEAD `c5a35921`, 05:20~05:32) → exit 0, `leakPatternGate` 실행.
+- **web job**(`web/`, CI 의 step 순서 그대로): `npm ci` · `lint` · `typecheck` · `gate:src-tree` · `api:types:check` · `test`(28) · `gate:tests` · `build` · `gate:boundary-canary` · `test:e2e`(Playwright 2) → 열 step 모두 exit 0.
+- **변이**: 통제군 + 여덟(`checklist.md` 2 절). 첫 실행의 M14 허위 RED 와 재실행은 그 절에 적었다.
+- **rollback ①~⑦**: `rollback.md`(실측 HEAD `c5a35921`).
+
+### 셋째 rebase 전 ↔ 뒤 SHA
+
+| 전 | 뒤 | 커밋 |
+|---|---|---|
+| `8b115f38` | `a3af4095` | 착수 계약 + Phase 1 |
+| `c095aa59` | `480ee80b` | 특성화 test |
+| `8b5180ae` | `59ea4342` | 게이트 셋 추출 refactor |
+| `8e71e4a7` | `fcb0876d` | 제안 목록 구현 |
+| `1380882b` | `9b3a980b` | 추적표 |
+| `3504148b` | `c31d1067` | Phase 2 evidence |
+| `ddf1f065` | `b79292be` | 수정 라운드 1 test |
+| `19b34b6c` | `d56222db` | 추적표 STR-07 |
+| `1e46c616` | `2d003299` | 수정 라운드 1 evidence 초안 |
+| `dbd94907` | `8d9554d4` | 수정 라운드 1 evidence(앞 판정 SHA) |
+| `4ccb3b73` | `81609dc9` | 계약 D-7C1B-4 |
+| `a6a5a693` | `c5a35921` | 승인 전 일괄 test·KDoc(**마지막 산출물 커밋**) |
