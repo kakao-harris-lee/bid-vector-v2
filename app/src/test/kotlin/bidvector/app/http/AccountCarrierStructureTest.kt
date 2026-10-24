@@ -30,8 +30,9 @@ import java.io.File
  *    `app.injection.allowed-types` 의 `AccountId` 한 줄은 타입 단위라 어느 class 에나 주입 길을 연다
  *    (verifier 변이 M4 초록) — 이 등식이 그 줄을 한 자리로 좁힌다.
  *
- * **검토 r2 · r3 이 더한 셋**: `getAttribute` 를 소유자 무관 서명으로(4 를 그렇게 바꿨다), `AccountId` Class 상수 보유 = ∅,
- * 대상 타입을 받는 데이터 바인딩 진입점 호출자 = ∅(손에 든 값의 `getClass()` 로 짓는 길, V3-N1).
+ * **검토 r2 · r3 · r4 가 더한 넷**: `getAttribute` 를 소유자 무관 서명으로(4 를 그렇게 바꿨다), `AccountId` Class 상수 보유 = ∅,
+ * app main 의 Jackson 멤버 소유자 전수 = {`JsonNode`}(손에 든 값으로 짓는 바인딩 전부 — V3-N1 · V4-N1), 요청 매핑 메서드의
+ * 매개변수에 `AccountId` 를 싣는 타입 0(Spring 이 대신 짓는 길 — V4-N1 ②). 시스템 주체(`BidActor.System`)를 짓는 자리 0(R4-3).
  *
  * 등식의 오른쪽은 **관측값**이다(javap 실측). 정당한 새 자리가 생기면 이 집합을
  * 고치는 커밋이 그 자리를 이름으로 드러낸다 — 그것이 이 test 의 목적이다.
@@ -78,36 +79,84 @@ class AccountCarrierStructureTest {
     }
 
     /**
-     * 검토 r3 V3-N1 — 손에 든 `AccountId` 로 **다른 id 를 짓는** 길(`convertValue(n, seed.javaClass)`)은 Class 상수도 `<init>`
-     * 호출도 반사도 없다. 그래서 대상 타입을 인자로 받는 **데이터 바인딩 진입점**(`convertValue` · `readValue` · `treeToValue` ·
-     * `readerFor` 등 — 타입 인자가 `Class` · `JavaType` · `TypeReference`)을 부르는 class 를 **서명으로** 센다(소유자 무관 —
-     * `ObjectMapper` · `JsonMapper` · `ObjectReader` 어느 것으로 불러도 같다). 오늘 app main 은 요청 본문을 `JsonNode` 접근자로만
-     * 읽으므로 그 집합은 ∅ 이다(javap 실측). 정당한 바인딩 자리가 생기면 이 집합을 고치는 커밋이 그 자리를 이름으로 드러낸다.
+     * 검토 r3 V3-N1 · r4 V4-N1 — 손에 든 `AccountId` 로 **다른 id 를 짓는** 길(`convertValue(n, seed.javaClass)` ·
+     * `readerForListOf(seed.javaClass)` · `readValueAs` · jackson2 `TypeReference` …)은 Class 상수도 `<init>` 호출도 반사도 없다.
+     * r3 판은 그 길을 **이름 · 서술자 열거**로 걸어 형제가 지나갔다(G3). 그래서 열거를 버리고 **소유자 쪽 허용 목록**으로 건다:
+     * app main 이 부르는 Jackson 멤버(jackson3 `tools/jackson` · jackson2 `com/fasterxml/jackson`, 메서드 참조 · 메서드 핸들 포함)의
+     * **소유자 전수 == {`JsonNode`}**. 오늘 app main 은 요청 본문을 `JsonNode` 접근자로만 읽는다(javap 실측) — 매퍼 · 판독기 ·
+     * 작성기 · 파서 · 타입 팩토리 어느 멤버를 불러도 붉다. 정당한 자리가 생기면 이 집합을 고치는 커밋이 그 소유자를 이름으로 드러낸다.
      * 근본(`AccountId` 생성 경로 봉쇄)은 7D 파일이라 이 slice 가 하지 않는다 — OPEN 후보 `OPEN-7D-ACCOUNTID-CONSTRUCTION`.
      */
     @Test
-    fun `app main 의 어디도 타입을 받는 데이터 바인딩 진입점을 부르지 않는다`() {
-        bindingEntryCallers(outputs) shouldBe emptySet()
+    fun `app main 이 부르는 Jackson 멤버의 소유자는 JsonNode 하나뿐이다`() {
+        jacksonOwners(outputs) shouldBe setOf(JSON_NODE)
     }
 
-    /** 양성 · 음성 대조 — 바인딩 술어가 우회 F1 의 모양과 타입 참조 판독기를 잡고, `JsonNode` 접근자는 잡지 않는다. */
+    /** 양성 · 음성 대조 — 우회 F1 · G3 · `readValueAs` · jackson2 `TypeReference` · 메서드 핸들이 걸리고, `JsonNode` 접근자는 허용 안이다. */
     @Test
-    fun `손에 든 값의 getClass 로 바인딩하는 class 는 술어에 걸리고 JsonNode 접근자는 걸리지 않는다 — 대조`() {
-        val forged =
-            listOf(
-                "9: invokevirtual #14 // Method java/lang/Object.getClass:()Ljava/lang/Class;",
-                "12: invokevirtual #20 // Method tools/jackson/databind/ObjectMapper.convertValue:" +
+    fun `매퍼 판독기 파서 jackson2 메서드 핸들의 멤버는 소유자 술어에 걸린다 — 대조`() {
+        val lines =
+            mapOf(
+                "F1" to "12: invokevirtual #20 // Method tools/jackson/databind/ObjectMapper.convertValue:" +
                     "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;",
-            ).joinToString("\n")
-        val reader =
-            "3: invokevirtual #8 // Method tools/jackson/databind/json/JsonMapper.readerFor:" +
-                "(Ltools/jackson/core/type/TypeReference;)Ltools/jackson/databind/ObjectReader;"
-        val accessor =
-            "5: invokevirtual #11 // Method tools/jackson/databind/JsonNode.get:" +
-                "(Ljava/lang/String;)Ltools/jackson/databind/JsonNode;"
-        val simulated = mapOf("http/Forge" to forged, "http/Reader" to reader, "http/Accessor" to accessor)
+                "G3" to "7: invokevirtual #9 // Method tools/jackson/databind/ObjectMapper.readerForListOf:" +
+                    "(Ljava/lang/Class;)Ltools/jackson/databind/ObjectReader;",
+                "AS" to "4: invokevirtual #5 // Method tools/jackson/core/JsonParser.readValueAs:" +
+                    "(Ljava/lang/Class;)Ljava/lang/Object;",
+                "J2" to "#30 = Methodref #31.#32 // com/fasterxml/jackson/databind/ObjectMapper.readValue:" +
+                    "(Ljava/lang/String;Lcom/fasterxml/jackson/core/type/TypeReference;)Ljava/lang/Object;",
+                "MH" to
+                    "#41 = MethodHandle 5:#40 // REF_invokeVirtual tools/jackson/databind/ObjectMapper.convertValue:" +
+                    "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;",
+                "NODE" to "5: invokevirtual #11 // Method tools/jackson/databind/JsonNode.get:" +
+                    "(Ljava/lang/String;)Ltools/jackson/databind/JsonNode;",
+            )
 
-        bindingEntryCallers(simulated) shouldBe setOf("http/Forge", "http/Reader")
+        lines.mapValues { (_, line) -> jacksonOwners(mapOf("x" to line)) } shouldBe
+            mapOf(
+                "F1" to setOf("tools/jackson/databind/ObjectMapper"),
+                "G3" to setOf("tools/jackson/databind/ObjectMapper"),
+                "AS" to setOf("tools/jackson/core/JsonParser"),
+                "J2" to setOf("com/fasterxml/jackson/databind/ObjectMapper"),
+                "MH" to setOf("tools/jackson/databind/ObjectMapper"),
+                "NODE" to setOf(JSON_NODE),
+            )
+    }
+
+    /**
+     * 검토 r4 V4-N1 ② — **Spring 이 대신 짓는 길**(G11): 핸들러 매개변수 `account: AccountId`(애너테이션 없음 = `@ModelAttribute`)는
+     * `?value=9` 로 `AccountId(9)` 를 짓는다. app 바이트코드에 생성 · 바인딩 호출이 없어 위 술어로는 원리상 못 본다. 그래서
+     * app main class 전수에서 **요청 매핑 메서드**(`@RequestMapping` 과 그 합성 애너테이션)의 매개변수 타입(제네릭 인자 포함)이
+     * `AccountId` 이거나 `AccountId` 를 필드 · 생성자 매개변수로 가진 타입이면 붉다 — 계정은 typed 접근자로만 꺼낸다.
+     */
+    @Test
+    fun `요청 매핑 메서드의 매개변수는 AccountId 를 싣지 않는다`() {
+        val handlers = requestMappingMethods(appClasses())
+        handlers.shouldNotBeEmpty()
+
+        handlers
+            .filter { method ->
+                method.genericParameterTypes.any(
+                    ::carriesAccountId,
+                )
+            }.map { it.toString() } shouldBe
+            emptyList()
+    }
+
+    /** 양성 대조 — G11 의 모양(매개변수 `AccountId`)과 그것을 실은 묶음 타입이 규칙에 걸리고, 평범한 매개변수는 걸리지 않는다. */
+    @Test
+    fun `AccountId 를 싣는 핸들러 매개변수는 규칙에 걸린다 — 양성 대조`() {
+        val probe =
+            requestMappingMethods(listOf(G11Probe::class.java))
+                .associate { it.name to it.genericParameterTypes.any(::carriesAccountId) }
+
+        probe shouldBe mapOf("direct" to true, "wrapped" to true, "listed" to true, "plain" to false)
+    }
+
+    /** 검토 r4 R4-3 — 「마감 지남」 진입이 시스템 전용이 된 뒤(C3-L6) app main 이 시스템 주체를 지을 길도 0 이다. */
+    @Test
+    fun `app main 의 어디도 시스템 주체를 짓지 않는다`() {
+        callersOf(BID_ACTOR_SYSTEM_INIT) shouldBe emptySet()
     }
 
     @Test
@@ -182,6 +231,8 @@ class AccountCarrierStructureTest {
         const val ACCOUNT_ID_INTERNAL = "bidvector/workflow/access/AccountId"
         const val ACCOUNT_ID_INIT = "bidvector/workflow/access/AccountId.\"<init>\":"
         const val ACCOUNT_ID_TYPE = "bidvector.workflow.access.AccountId"
+        const val JSON_NODE = "tools/jackson/databind/JsonNode"
+        const val BID_ACTOR_SYSTEM_INIT = "bidvector/workflow/bidding/BidActor\$System.\"<init>\":"
 
         /** 속성을 읽는 자리 — 계정 접근자 · 주체·correlation 접근자 · 감사 필터 · 인증 필터. */
         val ATTRIBUTE_READERS =
@@ -234,23 +285,96 @@ private fun signatureCallers(
         .keys
 
 /**
- * 대상 타입을 인자로 받는 데이터 바인딩 진입점 — 메서드 **이름과 매개변수 서술자**로 고른다(소유자를 보지 않는다). 타입을
- * 받지 않는 멤버(`JsonNode.get` · `valueToTree` 등)는 값을 지을 대상이 없어 고르지 않는다.
+ * Jackson 멤버를 가리키는 줄의 **소유자** — 호출(`Method` · `InterfaceMethod`)과 상수 풀(`Methodref` ·
+ * `InterfaceMethodref` · `MethodHandle`).
+ * jackson3(`tools/jackson`) · jackson2(`com/fasterxml/jackson`) 둘 다 본다. 이름 · 서술자를 보지 않는다(V4-N1).
  */
-private val BINDING_ENTRY =
-    Regex("""Method \S+\.(convertValue|readValue|readValues|treeToValue|updateValue|readerFor|forType):\(([^)]*)\)""")
+private val JACKSON_MEMBER = Regex("""((?:tools/jackson|com/fasterxml/jackson)/[\w/$]+)\.[\w<>"$]+:""")
 
-private val BINDING_TYPE_ARGUMENTS =
-    listOf("Ljava/lang/Class;", "Ltools/jackson/databind/JavaType;", "Ltools/jackson/core/type/TypeReference;")
+private fun jacksonOwners(outputs: Map<String, String>): Set<String> =
+    outputs.values
+        .flatMap { text ->
+            text
+                .lineSequence()
+                .filter { "Method" in it }
+                .flatMap { line -> JACKSON_MEMBER.findAll(line).map { it.groupValues[1] } }
+                .toList()
+        }.toSet()
 
-private fun bindingEntryCallers(outputs: Map<String, String>): Set<String> =
-    outputs
-        .filterValues { text ->
-            text.lineSequence().any { line ->
-                val parameters = BINDING_ENTRY.find(line)?.groupValues?.get(2)
-                parameters != null && BINDING_TYPE_ARGUMENTS.any { it in parameters }
-            }
-        }.keys
+private val ACCOUNT_ID_CLASS: Class<*> = bidvector.workflow.access.AccountId::class.java
+
+/** 요청 매핑 메서드 — `@RequestMapping` 과 그 합성(`@GetMapping` 등)을 Spring 의 메타 애너테이션 판정으로 고른다. */
+private fun requestMappingMethods(classes: List<Class<*>>): List<java.lang.reflect.Method> =
+    classes.flatMap { type ->
+        type.declaredMethods.filter {
+            org.springframework.core.annotation.AnnotatedElementUtils
+                .hasAnnotation(it, org.springframework.web.bind.annotation.RequestMapping::class.java)
+        }
+    }
+
+/** 그 타입(제네릭 인자 · 배열 원소 포함)이 `AccountId` 이거나, `AccountId` 를 필드 · 생성자 매개변수로 가진다. */
+private fun carriesAccountId(type: java.lang.reflect.Type): Boolean =
+    when (type) {
+        is Class<*> -> {
+            type == ACCOUNT_ID_CLASS ||
+                (type.isArray && carriesAccountId(type.componentType)) ||
+                type.declaredFields.any { it.type == ACCOUNT_ID_CLASS } ||
+                type.declaredConstructors.any { ACCOUNT_ID_CLASS in it.parameterTypes }
+        }
+
+        is java.lang.reflect.ParameterizedType -> {
+            carriesAccountId(type.rawType) || type.actualTypeArguments.any(::carriesAccountId)
+        }
+
+        is java.lang.reflect.WildcardType -> {
+            type.upperBounds.any(::carriesAccountId)
+        }
+
+        is java.lang.reflect.GenericArrayType -> {
+            carriesAccountId(type.genericComponentType)
+        }
+
+        else -> {
+            false
+        }
+    }
+
+/** app main class 전수 — javap 틀과 같은 파일 목록을 이름으로 적재한다(초기화하지 않는다). */
+private fun appClasses(): List<Class<*>> {
+    val root = File("build/classes/kotlin/main/bidvector/app")
+    val loader = AccountCarrierStructureTest::class.java.classLoader
+    return root
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "class" }
+        .map {
+            "bidvector.app." +
+                it
+                    .relativeTo(root)
+                    .path
+                    .removeSuffix(".class")
+                    .replace(File.separatorChar, '.')
+        }.map { Class.forName(it, false, loader) }
+        .toList()
+}
+
+/** G11 양성 대조용 — 매핑 애너테이션을 가진 메서드 넷(직접 · 묶음 · 목록 · 평범). */
+private class G11Probe {
+    class Wrapped(
+        val account: bidvector.workflow.access.AccountId,
+    )
+
+    @org.springframework.web.bind.annotation.GetMapping("/direct")
+    fun direct(account: bidvector.workflow.access.AccountId): String = account.toString()
+
+    @org.springframework.web.bind.annotation.GetMapping("/wrapped")
+    fun wrapped(form: Wrapped): String = form.account.toString()
+
+    @org.springframework.web.bind.annotation.PostMapping("/listed")
+    fun listed(accounts: List<bidvector.workflow.access.AccountId>): String = accounts.toString()
+
+    @org.springframework.web.bind.annotation.GetMapping("/plain")
+    fun plain(caseId: String): String = caseId
+}
 
 /** 그 타입의 **Class 상수**(`ldc` · `ldc_w`)를 드는 class — 반사 · 데이터 바인딩으로 그 타입을 만드는 길의 표지다. */
 private fun classConstantHolders(

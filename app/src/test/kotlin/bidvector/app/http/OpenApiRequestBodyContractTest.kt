@@ -64,12 +64,14 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * 검토 r2 V2-N2 — **주석이 아니라 행동으로**: 문서가 본문을 적지 않은 상태 변경 operation 전부를 **본문 없이** 불러
-     * 400 · 415 가 나지 않는지 본다. 위 등식은 `@RequestBody` 주석에 걸려 있어, 주석 없이 본문을 요구하는 핸들러(r1 H3 의
-     * 결함 모양)는 등식을 지나간다 — 이 test 는 문서에서 모집단을 **도출**하고 실제로 부른다.
+     * 검토 r2 V2-N2 · r4 V4-N2 — **주석이 아니라 행동으로**: 문서가 본문을 적지 않은 상태 변경 operation 전부를 **본문 없이**,
+     * 그리고 **그 operation 이 받아들여지는 상태에서** 불러, 응답 상태가 **문서의 2xx 와 정확히 같다**고 본다. 위 등식은
+     * `@RequestBody` 주석에 걸려 있어 주석 없이 본문을 요구하는 핸들러(r1 H3 의 결함 모양)가 지나간다 — 이 test 는 모집단을
+     * 문서에서 **도출**하고 실제로 부른다. r3 판은 「401 · 404 아님 + 400 · 415 아님」을 열거해, 전이 거부(409)에서 멈춘 응답을
+     * 본체 도달로 셌고(N2a — 받아들여질 때만 본문을 요구) 403 · 422 · 5xx 가 지나갔다. 성공 응답과의 등식은 그 열거를 없앤다.
      */
     @Test
-    fun `문서가 본문을 적지 않은 operation 은 본문 없이 불러도 400 · 415 가 아니다`() {
+    fun `문서가 본문을 적지 않은 operation 은 받아들여지는 상태에서 본문 없이 불러 문서의 2xx 를 낸다`() {
         val bodyless =
             documentedOperations()
                 .filterValues { !it }
@@ -82,24 +84,37 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
                 val (method, path) = operation.split(' ', limit = 2)
                 access.reset()
                 val session = SessionTestClient(restTemplate, ::url).signIn()
-                // 검토 r3 V3-N2 — 경로 변수는 **이 세션이 담은 건**의 id 로 채운다. 없는 건이면 404 에서 멈춰, 존재 확인 뒤에
-                // 본문을 요구하는 핸들러가 이 등식을 지나간다.
-                val target = if (PATH_VARIABLE in path) path.replace(PATH_VARIABLE, openedCaseId(session)) else path
+                // 경로 변수는 **이 세션이 담고 그 operation 이 받아들여지는 상태로 옮긴 건**의 id 로 채운다(지금 경로 변수를 가진
+                // 본문 없는 op 는 resume 하나이고, 그 출발 상태는 「나중에」다 — 전이표). 모집단이 바뀌면 위 등식이 먼저 붉다.
+                val target = if (PATH_VARIABLE in path) path.replace(PATH_VARIABLE, deferredCaseId(session)) else path
                 session
                     .send(HttpMethod.valueOf(method), target, null)
                     .statusCode
                     .value()
             }
 
-        // 양성 대조 — 인증 · 존재 확인에서 멈추지 않고 핸들러 본체에 닿았다.
-        statuses.filterValues { it == UNAUTHORIZED || it == NOT_FOUND } shouldBe emptyMap()
-        statuses.filterValues { it == BAD_REQUEST || it == UNSUPPORTED_MEDIA_TYPE } shouldBe emptyMap()
+        statuses shouldBe bodyless.associateWith(::documentedSuccess)
     }
 
-    private fun openedCaseId(session: SessionTestClient): String {
+    /** 담고 「나중에」로 옮긴 건 — `resume` 이 받아들여지는 상태다. */
+    private fun deferredCaseId(session: SessionTestClient): String {
         val opened = session.post(AccountScopedRoutes.BID_CASES, OPEN_BODY)
         check(opened.statusCode.is2xxSuccessful) { "담기가 실패했다: ${opened.statusCode}" }
-        return requireNotNull(CASE_ID.find(opened.body.orEmpty())) { "응답에 caseId 가 없다" }.groupValues[1]
+        val id = requireNotNull(CASE_ID.find(opened.body.orEmpty())) { "응답에 caseId 가 없다" }.groupValues[1]
+        val deferred = session.post("${AccountScopedRoutes.BID_CASES}/$id/defer", DEFER_BODY)
+        check(deferred.statusCode.is2xxSuccessful) { "나중에가 실패했다: ${deferred.statusCode}" }
+        return id
+    }
+
+    /** 문서가 그 operation 에 적은 성공 응답 — 2xx 가 정확히 하나여야 한다(둘이면 어느 쪽을 기대할지 문서가 정하지 않았다). */
+    private fun documentedSuccess(operation: String): Int {
+        val (method, path) = operation.split(' ', limit = 2)
+        val pathItem = (spec["paths"] as Map<String, Any?>)[path] as Map<String, Any?>
+        val responses = (pathItem[method.lowercase()] as Map<String, Any?>)["responses"] as Map<String, Any?>
+        return responses.keys
+            .filter { it.startsWith("2") }
+            .single()
+            .toInt()
     }
 
     /**
@@ -180,9 +195,6 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         val PATH_VARIABLE = Regex("""\{[^}]+}""")
         val CASE_ID = Regex(""""caseId":(\d+)""")
         const val OPEN_BODY = """{"noticeNumber":"R7B-BODYLESS","noticeRound":"000","bidKind":"REAL"}"""
-        const val BAD_REQUEST = 400
-        const val UNAUTHORIZED = 401
-        const val NOT_FOUND = 404
-        const val UNSUPPORTED_MEDIA_TYPE = 415
+        const val DEFER_BODY = """{"remindAt":"2099-01-01T00:00:00Z"}"""
     }
 }
