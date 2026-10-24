@@ -146,3 +146,55 @@ production Flyway 는 기본값이다(`outOfOrder` 미설정 = false, `validateO
 2. controller 가 세션 계정만 넘기는 것(위 제한 1) · `CAPACITY_ROWS_MAX` 집행(제한 3) · `updated_at` 전제조건(L-9).
 3. 격리 술어의 모집단 변화 — 2b 는 `app` 에서 `workflow.profile` 을 정당하게 참조한다. 그때 ① 의 술어가 무엇을 재는지
    다시 적는다.
+
+## D-7C4-4 (2026-10-25, 팀장) — 2a 검토 r2 처분 (승인 전 일괄 2)
+
+verifier r2 `ready-for-review`(@`efc856e5` · medium 1 · low 3) · code-review r2 `approve`(medium 4 · low 7).
+출발점은 `d55624ef`(4bd7cd59 의 어휘 전수 test 포함). 재작업 0/5 유지. 무거운 작업은 03:00 이후.
+
+| 지적 | 처분 |
+|---|---|
+| F5 · CR R2-3 (격리 규칙) | **축을 바꾼다** — 우회마다 술어를 더하는 방식을 멈추고 `adapters` **모듈 전체**에 규칙 둘(표 이름 · 값 타입 좌표, 허용은 `SourceFile` 속성), 그리고 **람다(indy) 축**을 더한다. N1 · N4 · N5 는 닫지 않고 제한·2b 표적으로 적는다 |
+| CR R2-1 · F6 (`license_name`) | 상호와 같은 POSIX 술어로 좁히고 공백 경계 test 를 더한다(RED 먼저). PK 일부라 목록 전체가 막힌다는 사실을 test KDoc 에 적는다 |
+| F7 · N8 (어휘 전수) | `4bd7cd59` 의 전수 test 가 `array_positions` 오타 · 삭제 변이를 잡는지 실측하고 전·후 표에 적는다 |
+| CR R2-2 (KDoc) | 「바이트 동일」 → 「이름 · 순서 동일」, 매달린 「위 (2)」 → 단언 이름 |
+| CR R2-4 (역방향 파급) | **1:1 줄 치환으로 고친다**(형제 장부 전례) — 줄을 더하지 않으므로 다른 slice 의 좌표가 밀지 않는다. 다른 slice 의 evidence 는 만지지 않는다 |
+| CR R2-L5 (task 산수) | 두 목록을 다시 `comm` 하고 수를 분해해 적는다 |
+| F8 · 나머지 CR low | 장부 일괄. 고치지 않는 것은 아래에 처분을 적는다 |
+
+### in_scope 추가 (D-7C4-4)
+
+- `adapters/src/test/kotlin/bidvector/adapters/profile/BusinessProfileIsolationGateTest.kt` — 신설(모듈 전체 규칙).
+  `config/quality/gate-tests.properties` 에 등재한다.
+- **요구표**(`docs/discovery/m7-screen-data-requirements.md`)는 **변경 0** 이다(CR R2-L7) — 담당 칸이 이미 `7C ④` 라
+  고칠 것이 없다. 산출물 6 의 세 장부 중 둘(추적표 · capability map)만 이 slice 가 편집한다.
+
+### 알려진 제한 추가 (D-7C4-4)
+
+5. **격리 게이트가 재는 것은 「직접 참조 · 직접 구현 · 람다 구현」뿐이다**(r2 F5 · CR R2-3). 닫지 않은 세 길:
+   **이행 값 흐름**(허용 파일의 `String` 반환 helper 를 거친다 — N1) · **제3 패키지에 선언된 인터페이스**(선언 자리를
+   한 칸 옮긴다 — N4) · **실행 시 조립한 이름**(상수 풀에 없다 — N5). 2a 에는 production 배선이 0 이고, **진짜 방어는
+   2b 배선의 포트 경계**다. 우회마다 술어를 더하는 일은 r2 에서 멈췄다.
+6. **빈 값 CHECK 의 `[:space:]` 멤버십은 DB locale(`lc_ctype`)에 달려 있다**(CR R2-L3). `C` locale 상주 DB 에서는
+   ASCII 공백만 공백이라 전각 공백(U+3000) 같은 값이 통과한다. test 는 컨테이너 기본 locale 하나를 잰다 — 「두 집합의
+   차이는 유니코드 공백의 변두리」에 **locale 차이도 든다**. 쓰기가 앱 경로로만 들어오므로 그 차이는 앱 경로에 닿지 않는다.
+
+### low 처분 (D-7C4-4)
+
+- **R2-L1 · R2-L2 는 닫힌다** — 파일 단위 이름 허용을 **지웠다**. 모듈 전체 규칙이 `SourceFile` 속성으로 자리를 정하므로
+  `BusinessProfileSql` 의 값 타입 허용(필요 없던 넓힘)도, 허용 이름을 흉내낸 class(`…Kt` 이름)도 성립하지 않는다.
+- **R2-L4 는 사유만 적는다** — 중복 CHECK 가 다차원 배열(`{{GOODS}}`)을 거부하는 것은 CHECK 위반이 아니라
+  `array_positions` 가 1차원만 받기 때문이다. 결과는 맞고 **부수 이득**이다(앞 판은 `<@` 가 통과시켜 읽기에서
+  `ClassCastException` 이 됐다). 탐침으로 사유를 실측해 evidence 에 적는다.
+- **R2-L6 — r1 L-2 처분 등재**: `UnjudgedQualificationAxis.capability` 는 production 소비자가 0 이고 **test 전용 필드**다.
+  지우지 않는다 — capability map 행 ID 와의 대응을 그 자리에 적어 두는 값이다. **머지 해소가 7C ② 열거(속성 없음)를
+  단일 출처로 삼으면 이 필드는 사라진다** — 그때 지운다(알려진 제한 2 와 같은 자리).
+- **R2-L7** 은 위 in_scope 한 줄로 닫는다.
+- **OQ-R2-1**(indy 가 class 파일을 정말 안 내는가)은 이번 변이로 실측한다. **OQ-R2-2**(`array_positions` volatility)는
+  이미 닫혀 있다 — 그 CHECK 가 PG 16.4 에서 CREATE TABLE 로 섰고 전용 RED→GREEN 짝이 있다.
+
+### 2b 표적 추가 (D-7C4-4)
+
+4. **포트 경계가 진짜 방어다** — 2b 가 배선을 세울 때 「자격 판정 use case 는 V22 port 를 받지 않는다」를 **조립 자리**
+   (wiring)에서 잠근다. 위 제한 5 의 세 길(N1 · N4 · N5)은 그 경계가 닫는다. 격리 게이트의 모집단도 그때 다시 적는다
+   (`app` 이 이 패키지를 정당하게 참조하기 시작한다).
