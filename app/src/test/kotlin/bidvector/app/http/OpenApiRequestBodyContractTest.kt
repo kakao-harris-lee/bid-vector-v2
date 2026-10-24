@@ -5,6 +5,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
@@ -79,26 +80,41 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
                 .filterNot { it.substringBefore(' ') in READ_METHODS }
         bodyless.toSet() shouldBe setOf("DELETE /api/session", "POST /api/bid-cases/{caseId}/resume")
 
+        // 검토 r5 V5-L2 — 표본은 둘이다: test 클라이언트 그대로와, 브라우저처럼 `Origin` 을 실은 요청. 헤더에 따라 본문을 요구하는
+        // 핸들러(N2k)는 앞의 것만으로는 초록이다.
+        val origin = url("/").removeSuffix("/")
+        val variants = mapOf("plain" to emptyMap(), "browser" to mapOf(HttpHeaders.ORIGIN to origin))
         val statuses =
-            bodyless.associateWith { operation ->
-                val (method, path) = operation.split(' ', limit = 2)
-                access.reset()
-                val session = SessionTestClient(restTemplate, ::url).signIn()
-                // 경로 변수는 **이 세션이 담고 그 operation 이 받아들여지는 상태로 옮긴 건**의 id 로 채운다(지금 경로 변수를 가진
-                // 본문 없는 op 는 resume 하나이고, 그 출발 상태는 「나중에」다 — 전이표). 모집단이 바뀌면 위 등식이 먼저 붉다.
-                val target = if (PATH_VARIABLE in path) path.replace(PATH_VARIABLE, deferredCaseId(session)) else path
-                session
-                    .send(HttpMethod.valueOf(method), target, null)
-                    .statusCode
-                    .value()
-            }
+            bodyless
+                .flatMap { operation -> variants.map { (variant, extra) -> operation to (variant to extra) } }
+                .associate { (operation, variant) ->
+                    val (method, path) = operation.split(' ', limit = 2)
+                    access.reset()
+                    val session = SessionTestClient(restTemplate, ::url).signIn()
+                    // 경로 변수는 **이 세션이 담고 그 operation 이 받아들여지는 상태로 옮긴 건**의 id 로 채운다(지금 경로 변수를 가진
+                    // 본문 없는 op 는 resume 하나이고, 그 출발 상태는 「나중에」다 — 전이표). 모집단이 바뀌면 위 등식이 먼저 붉다.
+                    val target =
+                        if (PATH_VARIABLE in path) path.replace(PATH_VARIABLE, deferredCaseId(session)) else path
+                    val status =
+                        session
+                            .send(HttpMethod.valueOf(method), target, null, variant.second)
+                            .statusCode
+                            .value()
+                    "$operation [${variant.first}]" to status
+                }
 
-        statuses shouldBe bodyless.associateWith(::documentedSuccess)
+        statuses shouldBe
+            bodyless
+                .flatMap { operation -> variants.keys.map { "$operation [$it]" to documentedSuccess(operation) } }
+                .toMap()
     }
 
-    /** 담고 「나중에」로 옮긴 건 — `resume` 이 받아들여지는 상태다. */
+    private var nextNotice = 0
+
+    /** 담고 「나중에」로 옮긴 건 — `resume` 이 받아들여지는 상태다. 부를 때마다 새 공고라 멱등이다(R5-8). */
     private fun deferredCaseId(session: SessionTestClient): String {
-        val opened = session.post(AccountScopedRoutes.BID_CASES, OPEN_BODY)
+        val body = """{"noticeNumber":"R7B-BODYLESS-${nextNotice++}","noticeRound":"000","bidKind":"REAL"}"""
+        val opened = session.post(AccountScopedRoutes.BID_CASES, body)
         check(opened.statusCode.is2xxSuccessful) { "담기가 실패했다: ${opened.statusCode}" }
         val id = requireNotNull(CASE_ID.find(opened.body.orEmpty())) { "응답에 caseId 가 없다" }.groupValues[1]
         val deferred = session.post("${AccountScopedRoutes.BID_CASES}/$id/defer", DEFER_BODY)
@@ -194,7 +210,6 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         val READ_METHODS = setOf("GET", "HEAD", "OPTIONS")
         val PATH_VARIABLE = Regex("""\{[^}]+}""")
         val CASE_ID = Regex(""""caseId":(\d+)""")
-        const val OPEN_BODY = """{"noticeNumber":"R7B-BODYLESS","noticeRound":"000","bidKind":"REAL"}"""
         const val DEFER_BODY = """{"remindAt":"2099-01-01T00:00:00Z"}"""
     }
 }

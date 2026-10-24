@@ -42,17 +42,22 @@ internal class SessionTestClient(
         body: String?,
     ): ResponseEntity<String> = send(HttpMethod.POST, path, body)
 
-    /** 아무 메서드 — 상태를 바꾸는 메서드면 CSRF 를 싣는다. [body] 가 `null` 이면 본문도 Content-Type 도 없다. */
+    /**
+     * 아무 메서드 — 상태를 바꾸는 메서드면 CSRF 를 싣는다. [body] 가 `null` 이면 본문도 Content-Type 도 없다.
+     * [extra] 는 브라우저가 싣는 헤더(예: `Origin`)를 흉내 내는 자리다(검토 r5 V5-L2).
+     */
     fun send(
         method: HttpMethod,
         path: String,
         body: String?,
+        extra: Map<String, String> = emptyMap(),
     ): ResponseEntity<String> {
         val headers =
             cookieOnly().apply {
                 if (method.name() !in BrowserSessionAuthenticator.CSRF_EXEMPT_METHODS) {
                     set(BrowserSessionAuthenticator.CSRF_HEADER, stamp)
                 }
+                extra.forEach { (name, value) -> set(name, value) }
             }
         return exchange(path, method, if (body == null) headers else json(headers), body)
     }
