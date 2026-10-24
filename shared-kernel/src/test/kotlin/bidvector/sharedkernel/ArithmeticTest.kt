@@ -341,8 +341,13 @@ class ArithmeticTest {
     /**
      * D-G1DEC05-2 — `appliedFloorFrom` 은 [times] 와 **같은 곱**이라 하한과 피교차값이 같은
      * 기초금액 축 위에 있다. 투찰율을 하한 그대로 쓰는 것이 가장 빡빡한 경계이므로, 그
-     * 경계에서 `DOWN` 이 하한을 밑돌면 **조용히 성공하지 않고** `ROUNDED_BELOW_FLOOR` 가
-     * 나와야 한다(`capability-map.md` DEC-02 무조건 acceptance 둘째).
+     * 경계에서 `DOWN` 이 하한을 밑돌면 **조용히 성공하지 않고** `ROUNDED_BELOW_FLOOR` 를 낸다.
+     *
+     * **이것은 이 원시 함수의 계약일 뿐 DEC-02 무조건 acceptance 둘째의 답이 아니다**(라운드 2).
+     * 앞 판은 이 자리에 「…(DEC-02 무조건 acceptance 둘째)」라고 적어, **Phase 1 설계(하한으로
+     * 올린다)를 선언 없이 버린 구현**을 acceptance 의 정답처럼 사후 정당화했다. 그 bullet 을
+     * 실제로 만족시키는 것은 메뉴 층이고, 거기서는 밑도는 값을 **보류하지 않고 제약을 만족하는
+     * 최소 정수로 올린다**(`bidvector.decision.menu.BidMenuKernelTest` 의 반올림 test 셋).
      *
      * 이 test 가 잠그는 것은 P-2b 와 다르다 — P-2b 는 임의 `BigDecimal` 하한에서 보증을
      * 재고, 여기서는 **하한이 어디서 왔는가**(같은 base·같은 rate)를 잰다. 곱의 피연산자를

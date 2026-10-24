@@ -3,23 +3,35 @@ package bidvector.workflow.prediction
 import bidvector.decision.menu.StanceRates
 
 /**
- * ML 후보 셋 → 메뉴 태도 셋의 **유일한 대응 선언**(M6/G1-DEC05 산출물 1 — 「라벨이 다르다,
- * 매핑을 한 자리에 선언」).
+ * ML 후보 셋 → 메뉴 태도 셋의 **유일한 대응 선언**(M6/G1-DEC05 산출물 1).
  *
- * 두 체계의 이름이 다르다 — 계약은 `conservative`·`base`·`aggressive`(2B ③ 라벨 고정,
- * legacy 「기준 후보는 항상 가운데」)이고 메뉴는 `safe`·`recommended`·`aggressive`
- * (`capability-map.md` DEC-05 의 운영자 어휘)다. 같은 순서 축의 다른 라벨이므로 대응은
- * 자명하지만, **자명한 대응을 두 자리에 적으면 갈린다** — 그래서 이 함수 하나만 둔다.
+ * **두 축은 뒤집혀 있다 — 이름이 비슷하다고 같은 자리가 아니다.** 계약의
+ * `conservative`·`base`·`aggressive` 는 **통계 spread**(값 오름차순, 2B ③ 라벨 고정)이고,
+ * 메뉴의 `safe`·`recommended`·`aggressive` 는 **투찰 전략 태도**다. 1차 출처 셋이 그 뒤집힘을
+ * 말한다:
+ * - `app/ai/bid_target.py` docstring — *「aggressive (band floor — most competitive, 낙하 위험),
+ *   safe (band ceiling — safe from 낙하, less competitive)」*
+ * - `app/ai/price_prediction/guardrails_apply.py:191-199` 브리지 — *「후보 conservative=최저
+ *   추정가(낮은 율)=최경쟁=공격 stance … aggressive=최고 추정가(높은 율)=낙하 안전=안전 stance」*
+ * - `contracts/proto/bidvector/ml/v1/prediction.proto:18-21` — 운영자 메뉴는 `CandidateLabel`
+ *   축이 **아니다**
+ *
+ * 그래서 **`conservative` → [StanceRates.aggressive]**, **`aggressive` → [StanceRates.safe]** 다.
+ *
+ * **라운드 1 의 결함(HIGH-1)이 바로 이 자리였다.** 앞 판은 이 대응을 「같은 순서 축의 다른
+ * 라벨이라 **자명하다**」고 적고 이름 그대로 이었다 — `conservative`→`safe`. 그 결과 운영자가
+ * 보는 「안전」이 셋 중 **낙하 위험이 가장 큰** 후보가 됐다. 자명해 보이는 대응일수록 1차
+ * 출처로 정당화한다.
  *
  * 여기 있는 이유: `decision` 은 `shared-kernel` 하나에만 의존하므로(ADR 0006 D-4)
- * [BidRateCandidates] 를 볼 수 없다. 반대 방향(`workflow` → `decision`)은 이미 열려 있다.
+ * [BidRateCandidates] 를 볼 수 없다.
  *
- * 순서 불변식은 양쪽이 각자 건다 — [BidRateCandidates] 와 [StanceRates] 의 `init` 이 같은
- * 부등식을 독립으로 재므로, 이 변환이 순서를 뒤집으면 생성 시점에 깨진다.
+ * 순서 불변식은 양쪽이 각자 건다 — 계약은 `conservative <= base <= aggressive`, 메뉴는
+ * `aggressive <= recommended <= safe` 로 **방향이 반대**이고, 이 변환이 그 뒤집음을 수행한다.
  */
 fun BidRateCandidates.toStanceRates(): StanceRates =
     StanceRates(
-        safe = conservative,
+        safe = aggressive,
         recommended = base,
-        aggressive = aggressive,
+        aggressive = conservative,
     )

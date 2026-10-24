@@ -30,14 +30,23 @@ internal fun fraction(value: String): Rate = Rate.ofFraction(BigDecimal(value))
 internal fun testBase(won: Long = 1_000_000L): BaseAmount =
     BaseAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.Published(NoticeRound.of("000")))
 
+/** 출처 미선언 기초금액 — 산술이 `UNDECLARED_PROVENANCE` 로 막히는 경로를 연다(올림 대상이 아니다). */
+internal fun undeclaredBase(won: Long = 1_000_000L): BaseAmount =
+    BaseAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.Undeclared)
+
 internal fun testFloorRate(value: String): FloorRate =
     FloorRate(fraction(value), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
+/**
+ * 인자 순서가 **값 오름차순**이다 — 공격이 가장 낮고 안전이 가장 높다(라운드 2 HIGH-1).
+ * 읽는 순서와 값의 순서를 맞춰 호출부에서 축을 헷갈릴 자리를 없앤다.
+ */
 internal fun testRates(
-    safe: String,
-    recommended: String,
     aggressive: String,
-): StanceRates = StanceRates(fraction(safe), fraction(recommended), fraction(aggressive))
+    recommended: String,
+    safe: String,
+): StanceRates =
+    StanceRates(safe = fraction(safe), recommended = fraction(recommended), aggressive = fraction(aggressive))
 
 internal fun testSamples(vararg values: String): List<AssessmentRate> =
     values.map { AssessmentRate.observed(fraction(it)) }

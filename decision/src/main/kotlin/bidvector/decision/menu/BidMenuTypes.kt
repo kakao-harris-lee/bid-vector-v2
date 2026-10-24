@@ -57,6 +57,13 @@ enum class BidMenuDisclosure {
  * 경로는 출처를 이름에 담은 factory 뿐이다. 임계 사정률을 여기 두지 않는다 — 그 값은
  * [BidMenuOption.risk] 의 `FloorShortfallJudgement.critical` 이 이미 `Derived` 로 나른다
  * (같은 사실을 두 자리에 두지 않는다).
+ *
+ * **[bidRate] 의 `origin` 은 읽지 말 것**(라운드 2 MEDIUM-6). 메뉴는 `BidRate.recommended(…)`
+ * 로 값을 만드는데, 그 `BidRateOrigin.Recommended` 는 **산술 진입에 필요한 자리채움**이지 이
+ * 값의 실제 출처가 아니다 — 하한에 걸려 올라간 값도, 읽기 미정이라 제약 없이 지나온 값도 같은
+ * `origin` 을 단다. **이 옵션의 값이 무엇 때문에 그 값인지는 [BidMenuOption.binding] 이
+ * 유일한 출처다.** `shared-kernel` 의 `BidRateOrigin` 에 variant 를 더하지 않는다(그 타입은
+ * 관측값/추천값을 가르는 다른 축이고, 이 slice 가 그 어휘를 넓힐 근거가 없다) — 알려진 제한.
  */
 data class BidMenuGrounds(
     val bidRate: BidRate,
@@ -113,8 +120,32 @@ sealed interface MenuSourceAbsence {
 }
 
 /**
- * 투찰가 메뉴의 결과(DEC-05) — **네 갈래 sealed 이고 `when` 이 전수다**(`else` 금지).
- * 밴드 붕괴가 「정상 3안」으로 위장될 수 없는 것은 그것이 **다른 타입**이기 때문이다.
+ * 밴드가 무너진 이유(DEC-05 무조건 acceptance 둘째) — **두 출처를 가른다.**
+ *
+ * 라운드 1 은 [FloorAboveBand] 하나만 쟀고, 그래서 **후보 밴드 자신이 무너진 경우**(ML 이
+ * 같은 값을 둘 이상 냈거나 clamp 가 둘 이상을 하한으로 모은 경우)가 「정상 3안」으로 나갈 수
+ * 있었다(라운드 2 HIGH-2). 값이 같은 두 옵션은 **선택지가 아니다.**
+ */
+sealed interface CollapseCause {
+    /** 후보 셋의 꼭대기([StanceRates.safe])조차 하한 bound 를 만족하지 못한다. */
+    data class FloorAboveBand(
+        val lowerBound: Rate,
+        val upperBound: Rate,
+    ) : CollapseCause
+
+    /**
+     * 효력 투찰율이 겹친다 — 입력 후보가 이미 같았거나(`StanceRates` 는 등호를 허용한다)
+     * 하한 clamp 가 둘 이상을 같은 값으로 모았다. 어느 쪽이든 운영자에게는 같은 값 둘이다.
+     */
+    data class DuplicateEffectiveRates(
+        val rate: Rate,
+    ) : CollapseCause
+}
+
+/**
+ * 투찰가 메뉴의 결과(DEC-05) — **다섯 갈래 sealed 이고 `when` 이 전수다**(`else` 금지).
+ * 밴드 붕괴도, 일부만 제시한 메뉴도 「정상 3안」으로 위장될 수 없는 것은 그것들이 각각
+ * **다른 타입**이기 때문이다 — [Offered] 는 셋 전부가 선 경우에만 지어진다.
  */
 sealed interface BidMenuOutcome {
     /**
@@ -143,18 +174,53 @@ sealed interface BidMenuOutcome {
     }
 
     /**
-     * 밴드 붕괴 — 허용 상한이 하한 이하다(DEC-05 무조건 acceptance 둘째). 후보 셋의 꼭대기
-     * ([upperBound])조차 하한 bound 를 만족하지 못하는 상태라, 셋을 내면 전부 같은 한 점으로
-     * 접혀 「선택지」가 아니게 된다.
+     * 태도 **일부만** 제시한다(라운드 2 HIGH-3) — 한 태도를 낼 수 없다고 메뉴 전체를 죽이지
+     * 않는다. 어느 태도가 **왜** 빠졌는지가 [withheld] 에 실린다.
+     *
+     * [Offered] 와 **다른 타입**인 것이 요점이다 — 「정상 3안」은 셋 전부일 때만이고, 둘짜리
+     * 메뉴가 그 이름으로 나가지 않는다(DEC-05 무조건 acceptance 둘째의 정신).
+     */
+    @ConsistentCopyVisibility
+    data class PartiallyOffered internal constructor(
+        val offered: Map<BidStance, BidMenuOption>,
+        val withheld: Map<BidStance, MenuUnmeasurableReason>,
+        val disclosures: Set<BidMenuDisclosure>,
+        val policyVersion: PolicyVersion,
+    ) : BidMenuOutcome {
+        init {
+            require(offered.isNotEmpty()) { "PartiallyOffered 는 제시 옵션이 하나 이상이어야 한다(0 이면 Unmeasurable)" }
+            require(withheld.isNotEmpty()) { "PartiallyOffered 는 보류가 하나 이상이어야 한다(0 이면 Offered)" }
+            require(offered.keys.intersect(withheld.keys).isEmpty()) { "한 태도가 제시·보류 양쪽에 있을 수 없다" }
+            require(offered.keys + withheld.keys == BidStance.entries.toSet()) { "태도 전수를 덮어야 한다" }
+            require(offered.all { (stance, option) -> option.stance == stance }) { "제시 옵션의 태도가 키와 어긋났다" }
+            require(disclosures == BidMenuDisclosure.entries.toSet()) { "공통 고지는 전수여야 한다: $disclosures" }
+        }
+    }
+
+    /**
+     * 밴드 붕괴 — 선택지가 서지 않는다(DEC-05 무조건 acceptance 둘째). [cause] 가 출처를
+     * 가르고, [collapsedStances] 는 같은 값으로 접힌 태도들이다(하한 유래면 전수).
      */
     data class BandCollapsed(
-        val lowerBound: Rate,
-        val upperBound: Rate,
-    ) : BidMenuOutcome
+        val cause: CollapseCause,
+        val collapsedStances: Set<BidStance>,
+    ) : BidMenuOutcome {
+        init {
+            require(collapsedStances.isNotEmpty()) { "붕괴한 태도 집합이 비어 있을 수 없다" }
+        }
+    }
 
+    /**
+     * 태도 **전부**를 낼 수 없다 — 사유를 태도별로 싣는다(라운드 2 HIGH-3). 하나로 뭉치면
+     * 「어느 태도가 왜」가 사라진다.
+     */
     data class Unmeasurable(
-        val reason: MenuUnmeasurableReason,
-    ) : BidMenuOutcome
+        val withheld: Map<BidStance, MenuUnmeasurableReason>,
+    ) : BidMenuOutcome {
+        init {
+            require(withheld.keys == BidStance.entries.toSet()) { "전부 보류일 때만 Unmeasurable 이다: ${withheld.keys}" }
+        }
+    }
 
     data class SourceAbsent(
         val reason: MenuSourceAbsence,

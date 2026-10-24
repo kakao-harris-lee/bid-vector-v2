@@ -10,17 +10,31 @@ import java.math.BigDecimal
 private fun fraction(value: String): Rate = Rate.ofFraction(BigDecimal(value))
 
 /**
- * ML 후보 셋 ↔ 메뉴 태도 셋의 **라벨 대응**(M6/G1-DEC05 산출물 1).
+ * **legacy 브리지 표를 선언 데이터로 둔다**(`app/ai/price_prediction/guardrails_apply.py:191-199`
+ * 의 `_CANDIDATE_LABEL_TO_SCENARIO_STANCE`). 구현에서 베낀 기대값이 아니라 **1차 출처**다.
+ */
+private val LEGACY_BRIDGE: Map<String, BidStance> =
+    mapOf(
+        "conservative" to BidStance.Aggressive,
+        "base" to BidStance.Recommended,
+        "aggressive" to BidStance.Safe,
+    )
+
+/**
+ * ML 후보 셋 ↔ 메뉴 태도 셋의 **라벨 대응**(M6/G1-DEC05).
  *
- * 왜 test 가 필요한가: 두 체계가 같은 순서 축에 다른 이름을 쓰므로(`conservative` ↔ `safe`,
- * `base` ↔ `recommended`) 대응을 뒤집어도 **타입이 같아 컴파일이 통과한다**. 순서 불변식도
- * 뒤집힌 대응을 못 잡는다 — 뒤집어도 여전히 오름차순일 수 있기 때문이 아니라, `safe` 와
- * `aggressive` 를 맞바꾸면 `init` 이 던지지만 `base` ↔ `conservative` 를 맞바꾸는 변이는
- * 값에 따라 조용히 통과하기 때문이다. 그래서 세 자리를 값으로 못박는다.
+ * **라운드 1 의 이 test 가 결함을 고정했다.** 앞 판은 oracle 을 **제 구현에서 끌어와**
+ * (`conservative → safe`) 그대로 단언했고, 그래서 반전을 잡는 대신 **반전을 잠갔다**.
+ * 구현에서 끌어온 oracle 은 구현을 확인할 뿐 검증하지 못한다. 그래서 지금 oracle 은 둘 다
+ * 구현 독립이다:
+ * - **도메인 성질** — 투찰율이 높을수록 낙하에 안전하므로 `safe` 의 율이 가장 크고
+ *   `aggressive` 의 율이 가장 작다(legacy `app/ai/bid_target.py` docstring: *aggressive =
+ *   band floor, most competitive, 낙하 위험 · safe = band ceiling, safe from 낙하*).
+ * - **1차 출처 표** — [LEGACY_BRIDGE].
  */
 class StanceRateMappingTest {
     @Test
-    fun `후보 셋의 세 라벨이 태도 셋의 세 자리에 하나씩 대응한다`() {
+    fun `도메인 성질 — 안전이 가장 높고 공격이 가장 낮다`() {
         val candidates =
             BidRateCandidates(
                 conservative = fraction("0.90"),
@@ -30,12 +44,33 @@ class StanceRateMappingTest {
 
         val stances = candidates.toStanceRates()
 
-        stances.rateOf(BidStance.Safe) shouldBe fraction("0.90")
-        stances.rateOf(BidStance.Recommended) shouldBe fraction("0.93")
-        stances.rateOf(BidStance.Aggressive) shouldBe fraction("0.96")
+        (stances.rateOf(BidStance.Safe) > stances.rateOf(BidStance.Recommended)) shouldBe true
+        (stances.rateOf(BidStance.Recommended) > stances.rateOf(BidStance.Aggressive)) shouldBe true
     }
 
-    /** 양쪽이 같은 부등식을 독립으로 재므로, 대응이 순서를 깨뜨리면 생성 시점에 드러난다. */
+    @Test
+    fun `1차 출처 표 — 계약 라벨이 legacy 브리지가 적은 태도로 간다`() {
+        val byLabel =
+            mapOf(
+                "conservative" to fraction("0.90"),
+                "base" to fraction("0.93"),
+                "aggressive" to fraction("0.96"),
+            )
+        val candidates =
+            BidRateCandidates(
+                conservative = byLabel.getValue("conservative"),
+                base = byLabel.getValue("base"),
+                aggressive = byLabel.getValue("aggressive"),
+            )
+
+        val stances = candidates.toStanceRates()
+
+        LEGACY_BRIDGE.forEach { (label, stance) ->
+            stances.rateOf(stance) shouldBe byLabel.getValue(label)
+        }
+    }
+
+    /** 두 축의 순서 불변식은 **방향이 반대**다 — 변환이 그 뒤집음을 수행한다. */
     @Test
     fun `역순 후보 셋은 애초에 만들어지지 않는다`() {
         shouldThrow<IllegalArgumentException> {

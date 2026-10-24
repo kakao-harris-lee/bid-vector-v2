@@ -13,19 +13,24 @@ import org.junit.jupiter.api.Test
  * 불변식이 실제로 던지는지를 잰다.
  */
 class BidMenuTypesTest {
+    /** 방향은 **공격이 가장 낮고 안전이 가장 높다**(라운드 2 HIGH-1) — 거꾸로는 만들어지지 않는다. */
     @Test
-    fun `StanceRates 는 역순을 받지 않는다`() {
-        shouldThrow<IllegalArgumentException> { testRates("0.95", "0.90", "0.96") }
-        shouldThrow<IllegalArgumentException> { testRates("0.90", "0.97", "0.96") }
+    fun `StanceRates 는 안전이 공격보다 낮은 조합을 받지 않는다`() {
+        shouldThrow<IllegalArgumentException> {
+            StanceRates(safe = fraction("0.90"), recommended = fraction("0.93"), aggressive = fraction("0.96"))
+        }
+        shouldThrow<IllegalArgumentException> {
+            StanceRates(safe = fraction("0.96"), recommended = fraction("0.97"), aggressive = fraction("0.90"))
+        }
     }
 
     @Test
     fun `StanceRates 는 태도 전수를 대응시킨다`() {
-        val rates = testRates("0.90", "0.93", "0.96")
+        val rates = testRates(aggressive = "0.90", recommended = "0.93", safe = "0.96")
 
-        rates.rateOf(BidStance.Safe) shouldBe fraction("0.90")
+        rates.rateOf(BidStance.Aggressive) shouldBe fraction("0.90")
         rates.rateOf(BidStance.Recommended) shouldBe fraction("0.93")
-        rates.rateOf(BidStance.Aggressive) shouldBe fraction("0.96")
+        rates.rateOf(BidStance.Safe) shouldBe fraction("0.96")
     }
 
     /** 자리와 태도가 어긋난 메뉴는 「정상 3안」으로 나갈 수 없다 — 뒤섞인 메뉴의 위조를 막는다. */

@@ -11,11 +11,16 @@ import bidvector.sharedkernel.BidAmount
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Derived
 import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.MONEY_AXIS_SCALE_DIGITS
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.Resolution
+import bidvector.sharedkernel.RoundingPolicy
+import bidvector.sharedkernel.UnroundedBidAmount
 import bidvector.sharedkernel.appliedFloorFrom
 import bidvector.sharedkernel.times
+import java.math.RoundingMode
 
 /** 세 단계 함수가 공유하는 문맥 — 기계적 묶음이 아니라 **같은 호출의 입력 전부**다. */
 internal data class OptionContext(
@@ -30,14 +35,23 @@ internal data class EffectiveRate(
     val binding: BindingConstraint,
 )
 
-/** [composeBidMenu] 의 단계 체인 — 실패를 값으로 옮긴다(`OpportunityAnalysis.Step` 관례). */
+/** 금액과 **그 금액을 정한 제약** — 하한으로 올라가면 binding 이 하한으로 바뀐다. */
+internal data class AmountDecision(
+    val amount: Derived<BidAmount>,
+    val binding: BindingConstraint,
+)
+
+/**
+ * 한 태도의 단계 체인 — 실패를 값으로 옮긴다. [Step.Halt] 가 **메뉴 전체가 아니라 그 태도
+ * 하나**를 보류시킨다(라운드 2 HIGH-3) — 한 태도를 못 낸다고 나머지 둘을 버리지 않는다.
+ */
 internal sealed interface Step<out T> {
     data class Ok<T>(
         val value: T,
     ) : Step<T>
 
     data class Halt(
-        val outcome: BidMenuOutcome,
+        val reason: MenuUnmeasurableReason,
     ) : Step<Nothing>
 }
 
@@ -47,21 +61,17 @@ internal fun <T, R> Step<T>.andThen(next: (T) -> Step<R>): Step<R> =
         is Step.Halt -> this
     }
 
-private fun halt(reason: MenuUnmeasurableReason): Step<Nothing> = Step.Halt(BidMenuOutcome.Unmeasurable(reason))
+/**
+ * 하한을 만족시키는 **최소 정수**로 올릴 때 쓰는 자리수·모드.
+ *
+ * **정책값이 아니다.** 제출 금액은 원 단위 정수이고 제약은 「하한 **이상**」이므로, 그 제약을
+ * 만족하는 값 가운데 가장 작은 것이 곧 올림이다 — 정수 도메인에서의 **제약의 정의**이지
+ * 운영자가 고를 수 있는 튜닝이 아니다. 그래서 [BidMenuPolicyData] 에 슬롯을 두지 않는다
+ * (`OPEN-DIC-10` 은 **자연 반올림**의 모드를 소유하고 이 자리와 다른 축이다).
+ */
+private val FLOOR_PROMOTION_ROUNDING = RoundingPolicy(MONEY_AXIS_SCALE_DIGITS, RoundingMode.CEILING)
 
-internal fun optionFor(
-    stance: BidStance,
-    ctx: OptionContext,
-): Step<BidMenuOption> =
-    effectiveStep(stance, ctx).andThen { effective ->
-        amountStep(stance, ctx, effective).andThen { amount ->
-            riskStep(stance, ctx, effective).andThen { risk ->
-                Step.Ok(optionOf(stance, ctx, effective, amount, risk))
-            }
-        }
-    }
-
-private fun effectiveStep(
+internal fun effectiveRateOf(
     stance: BidStance,
     ctx: OptionContext,
 ): Step<EffectiveRate> {
@@ -76,7 +86,7 @@ private fun effectiveStep(
                 boundedRate(candidate, ctx.floorRate.rate, reading.comparison)
             }
         }
-    return effective?.let { Step.Ok(it) } ?: halt(MenuUnmeasurableReason.FloorBoundNotRepresentable(stance))
+    return effective?.let { Step.Ok(it) } ?: Step.Halt(MenuUnmeasurableReason.FloorBoundNotRepresentable(stance))
 }
 
 /**
@@ -112,17 +122,55 @@ private fun appliedFloorOf(
         is FloorRateReading.AsBidRateLowerBound -> base.appliedFloorFrom(BidRate.recommended(bound))
     }
 
-private fun amountStep(
+/**
+ * 금액 파생 — 자연 반올림이 적용 하한을 밑돌면 **보류하지 않고 올린다**(라운드 2 HIGH-3).
+ *
+ * 라운드 1 은 이 자리에서 `ROUNDED_BELOW_FLOOR` 를 그대로 보류로 흘려 **하한에 걸린 옵션이 늘
+ * 사라지는** 결함이 있었다(`DOWN`·`HALF_*` 가 경계에서 1원 아래로 떨어진다). 그것은 Phase 1
+ * 설계(「하한 bound 자체를 채택한 값으로 올라간다」)를 **선언 없이 뒤집은 것**이기도 하다.
+ *
+ * 올림의 대상은 **그 옵션 자신의 반올림 전 값**이다. clamp 된 옵션은 그 값이 곧
+ * `bound × 기초금액` 이라 결과가 `ceil(bound × 기초금액)` 과 같고, clamp 되지 않은 옵션은 자기
+ * 값에서 올라가 후보 비율에 더 가깝게 남는다 — 둘 다 「제약을 만족하는 최소 정수」다.
+ */
+internal fun amountStep(
     stance: BidStance,
     ctx: OptionContext,
     effective: EffectiveRate,
-): Step<Derived<BidAmount>> {
+): Step<AmountDecision> {
     val rounding = Resolution.Resolved(ctx.policy.value.amountRounding, ctx.policy.version)
     val floor = appliedFloorOf(ctx.input.base, ctx.floorRate.rate, ctx.policy.value.floorRateReading)
-    val rounded = (ctx.input.base * BidRate.recommended(effective.rate)).roundedWith(rounding, floor)
-    return when (rounded) {
-        is Measurement.Measured -> Step.Ok(rounded.value)
-        is Measurement.Unmeasurable -> halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, rounded.reason))
+    val unrounded = ctx.input.base * BidRate.recommended(effective.rate)
+    return when (val natural = unrounded.roundedWith(rounding, floor)) {
+        is Measurement.Measured -> Step.Ok(AmountDecision(natural.value, effective.binding))
+        is Measurement.Unmeasurable -> promoteOrHalt(stance, ctx, unrounded, floor, natural.reason)
+    }
+}
+
+/** 하한 미달만 올림 대상이다 — overflow·출처 미선언 등 다른 사유는 올려도 해결되지 않는다. */
+private fun promoteOrHalt(
+    stance: BidStance,
+    ctx: OptionContext,
+    unrounded: UnroundedBidAmount,
+    floor: AppliedFloor?,
+    reason: ReasonCode,
+): Step<AmountDecision> =
+    if (reason != ReasonCode.ROUNDED_BELOW_FLOOR) {
+        Step.Halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, reason))
+    } else {
+        promoteToFloor(stance, ctx, unrounded, floor)
+    }
+
+private fun promoteToFloor(
+    stance: BidStance,
+    ctx: OptionContext,
+    unrounded: UnroundedBidAmount,
+    floor: AppliedFloor?,
+): Step<AmountDecision> {
+    val promotion = Resolution.Resolved(FLOOR_PROMOTION_ROUNDING, ctx.policy.version)
+    return when (val promoted = unrounded.roundedWith(promotion, floor)) {
+        is Measurement.Measured -> Step.Ok(AmountDecision(promoted.value, BindingConstraint.PublishedFloorBound))
+        is Measurement.Unmeasurable -> Step.Halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, promoted.reason))
     }
 }
 
@@ -131,15 +179,20 @@ private fun amountStep(
  * 지어내지 않고 사유 있는 실패를 낸다(정직 명세 2 — 「표본 부족은 0 이 아니라 부재다」와
  * 같은 규율).
  */
-private fun riskStep(
+internal fun riskStep(
     stance: BidStance,
     ctx: OptionContext,
     effective: EffectiveRate,
 ): Step<FloorShortfallJudgement> {
     val bidRate = BidRate.recommended(effective.rate)
     return when (val critical = criticalAssessmentRateFor(bidRate, ctx.floorRate, ctx.input.shortfallPolicy)) {
-        is Measurement.Unmeasurable -> halt(MenuUnmeasurableReason.CriticalRateUnmeasurable(stance, critical.reason))
-        is Measurement.Measured -> Step.Ok(judgementOf(ctx, critical.value))
+        is Measurement.Unmeasurable -> {
+            Step.Halt(MenuUnmeasurableReason.CriticalRateUnmeasurable(stance, critical.reason))
+        }
+
+        is Measurement.Measured -> {
+            Step.Ok(judgementOf(ctx, critical.value))
+        }
     }
 }
 
@@ -158,17 +211,17 @@ private fun judgementOf(
     return measureFloorShortfall(tally, critical, ctx.input.shortfallPolicy)
 }
 
-private fun optionOf(
+internal fun optionOf(
     stance: BidStance,
     ctx: OptionContext,
     effective: EffectiveRate,
-    amount: Derived<BidAmount>,
+    decision: AmountDecision,
     risk: FloorShortfallJudgement,
 ): BidMenuOption =
     BidMenuOption(
         stance = stance,
-        amount = amount,
-        binding = effective.binding,
+        amount = decision.amount,
+        binding = decision.binding,
         risk = risk,
         grounds =
             BidMenuGrounds(

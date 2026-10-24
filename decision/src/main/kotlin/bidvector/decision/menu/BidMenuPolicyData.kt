@@ -28,8 +28,11 @@ enum class FloorBoundComparison {
  * 사실을 하드 제약으로 승격하는 해석이며, 승격 여부와 경계 등가의 처분은 **값이 아니라
  * 도메인 판단**이라 이 타입이 정하지 않는다.
  *
- * [Undecided] 에서 커널은 **fail-closed** 다 — 하한 제약을 적용한 「척」하지 않고
- * [BindingConstraint.FloorRateReadingUndecided] 로 그 사실을 결과에 싣는다.
+ * [Undecided] 에서 커널은 **표식형**이다 — 하한 제약을 적용한 「척」하지 않고
+ * [BindingConstraint.FloorRateReadingUndecided] 로 미결을 결과에 **싣지만, 결과를 막지는
+ * 않는다.** 「fail-closed」라고 부르지 않는다(라운드 2 M-1) — 제약 없이 계산된 메뉴가 그대로
+ * 나가므로 닫히는 것은 **주장**이지 **출력**이 아니다. 그 표식을 읽고 처분하는 것은 표면의
+ * 의무이고, 7C② 계약 조건으로 넘긴다: 「이 binding 이 붙은 옵션을 추천으로 띄우지 않는다」.
  */
 sealed interface FloorRateReading {
     data object Undecided : FloorRateReading
