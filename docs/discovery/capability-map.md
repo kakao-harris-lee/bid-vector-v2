@@ -1471,8 +1471,18 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
   「제약 없음」으로 위장되므로 접지 않는다. 하한 자리의 basis 교차는 `shared-kernel` 의
   `AppliedFloor`(생성 경로는 `BaseAmount.appliedFloorFrom(BidRate)` 하나)가 타입으로 막는다 —
   앞 판의 `roundedWith(floor: BigDecimal?)` 은 예정가격 기준 값도 그 자리에 받았다.
+  그 보장의 **범위는 basis 축 하나다**(라운드 2, cr MEDIUM-5) — 「하한이 어떤 기초금액과
+  투찰율의 곱에서 나왔다」는 축은 타입이 지지만 「**비교 대상과 같은 공고의** 기초금액」은
+  지지 않는다. 같은 공고라는 전건은 호출부가 지고, 메뉴 경로에서는 커널이 한
+  `BidMenuInput.base` 만 쓰는 것으로 성립한다.
   **하한 제약은 율 축에서만 건다** — 게시 하한율은 예정가격 기준이고 추천 투찰율은 기초금액
   기준이라 「하한율 × 기초금액」은 §DEC-12 A5 가 폐기한 basis 혼합이다.
+  둘째 bullet(반올림이 하한 미만을 조용히 내지 않는다)의 메뉴 층 답은 **보류가 아니라
+  올림**이다(라운드 2, cr HIGH-3) — 자연 반올림이 적용 하한을 밑돌면 제약을 만족하는 최소
+  정수로 올리고 binding 을 하한으로 적는다. 올림 대상은 `ROUNDED_BELOW_FLOOR` 뿐이고
+  overflow·출처 미선언 등은 올려도 해결되지 않아 그 태도만 보류된다. `shared-kernel` 의
+  `roundedWith` 가 내는 `ROUNDED_BELOW_FLOOR` 는 **그 원시 함수의 계약**이지 이 bullet 의
+  답이 아니다.
 
 ### DEC-03 · 법정 낙찰하한율 해석 (우선순위 + 적용 범위)
 
@@ -1569,13 +1579,29 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
   - 밴드가 붕괴한 경우(상한 ≤ 하한)가 상태로 명시되며 "정상 3안"으로 위장되지 않는다.
 - **V2 구현 자리 (M6/G1-DEC05)**: `decision` 모듈 `bidvector.decision.menu` — `BidMenuOption`
   (다섯 인자 필수 + `internal` 생성자, 모듈 밖 생성 경로 0) · `BidMenuOutcome`(정상 3안 ·
-  밴드 붕괴 · 판정 불가 · 값 출처 부재의 sealed 넷) · `composeBidMenu` 순수 커널 ·
-  `BID_MENU_POLICY` 출하 정본. legacy 매직 셋에 대응하는 **스프레드 슬롯을 두지 않았다** —
-  메뉴는 받은 후보 셋을 태도에 대응시킬 뿐이라 그 수치가 필요 없다(폐기 지시의 집행이자
-  신설 정책 수치 0). 라벨 대응(`conservative`↔`safe`, `base`↔`recommended`)은 `workflow` 의
-  `BidRateCandidates.toStanceRates()` 한 자리에 선언한다. **배선·표면은 아직 없다** —
-  소비자는 M7 7C ②, 후보 비율의 출하 출처는 `OPEN-ML-ANALYSIS-WIRING` 종속이다
-  (`reports/evidence/m6/6e1/acceptance-trace.md` DEC-05 행).
+  **부분 제시** · 밴드 붕괴 · 판정 불가 · 값 출처 부재의 sealed 다섯) · `composeBidMenu`
+  순수 커널 · `BID_MENU_POLICY` 출하 정본. legacy 매직 셋에 대응하는 **스프레드 슬롯을 두지
+  않았다** — 메뉴는 받은 후보 셋을 태도에 대응시킬 뿐이라 그 수치가 필요 없다(폐기 지시의
+  집행이자 신설 정책 수치 0).
+  - **라벨 축은 뒤집혀 있다**(라운드 2 에 정정, cr HIGH-1): 투찰율이 **낮을수록 공격**이고
+    **높을수록 안전**이다 — 낮은 율은 가격 경쟁력을 얻는 대신 낙찰하한 미달(낙하) 위험을
+    진다(`bid_target.py` docstring · `guardrails_apply.py` 의 후보→stance 브리지 표).
+    그래서 대응은 `conservative`↔**`aggressive`** · `base`↔`recommended` ·
+    `aggressive`↔**`safe`** 이고, 선언 자리는 `workflow` 의
+    `BidRateCandidates.toStanceRates()` **한 곳**이다. 앞 판은 이름이 비슷해 **자명하다고
+    적고 그대로 이어** 운영자가 보는 「안전」을 셋 중 낙하 위험이 가장 큰 후보로 만들었다.
+  - **밴드 붕괴의 출처가 둘이다**(라운드 2, cr HIGH-2): 하한이 후보 밴드 위인 경우와
+    **효력 투찰율이 겹치는 경우**(ML 이 같은 값을 둘 이상 냄 · clamp 가 둘 이상을 하한으로
+    모음). 뒤쪽은 하한과 무관한 축이라 하한율 읽기가 미정이어도 판정한다.
+  - **한 태도를 못 내는 것이 메뉴 전체를 죽이지 않는다**(라운드 2, cr HIGH-3): 보류 사유를
+    태도별로 싣는 `PartiallyOffered` 가 `Offered` 와 **다른 타입**이고, `Offered` 는 셋
+    전부가 섰을 때만 지어진다. 하한 미달은 보류가 아니라 **제약을 만족하는 최소 정수로
+    올린다**(binding 이 하한을 가리킨다).
+  - **배선·표면은 아직 없다** — 소비자는 M7 7C ②, 후보 비율의 출하 출처는
+    `OPEN-ML-ANALYSIS-WIRING` 종속이다(`reports/evidence/m6/6e1/acceptance-trace.md`
+    DEC-05 행). `FloorRateReadingUndecided` binding 이 붙은 옵션을 추천으로 띄우지 않는 것은
+    **표면의 의무**이고 7C ② 계약 조건으로 넘긴다 — 커널은 미결을 표식으로 싣지만 출력을
+    막지는 않는다.
 - **동반 OPEN**: 게시 하한율을 투찰율 하한으로 읽을 것인가(`OPEN-DEC05-FLOOR-RATE-READING`, 신설).
 
 ### DEC-06 · bid_now / review / skip 액션 결정과 근거 (reason code)
