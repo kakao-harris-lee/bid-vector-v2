@@ -99,13 +99,18 @@ internal object BidCaseRequests {
     /** 「제출함」 — retroactive · evidenceRetainUntil 자리가 **없다**(위 KDoc). */
     fun submission(body: JsonNode): BidSubmission {
         val payload = body.requireObject().requireKnownKeys(RECORD_KEYS)
+        val won = payload.requiredLong("amountWon", minimum = 0L)
+        val vat = payload.enumOf("vatTreatment", VatTreatment.entries)
+        // 금액 값 규칙은 생성자가 진다 — 판독기의 minimum 이 오늘 먼저 막지만, 규칙이 갈라지면 500 이 아니라 400 이다(C3-L7).
         val amount =
-            SubmittedBidAmount(
-                won = payload.requiredLong("amountWon", minimum = 0L),
-                currency = Currency.KRW,
-                vatTreatment = payload.enumOf("vatTreatment", VatTreatment.entries),
-                origin = BidAmountOrigin.OperatorEntered,
-            )
+            requestValue("amountWon") {
+                SubmittedBidAmount(
+                    won = won,
+                    currency = Currency.KRW,
+                    vatTreatment = vat,
+                    origin = BidAmountOrigin.OperatorEntered,
+                )
+            }
         val submittedAt = payload.requiredInstant("submittedAt")
         val drawNumbers = payload.optionalIntArray("drawNumbers")
         // 값 규칙(길이 상한 · 부호)을 가진 생성자만 그 키의 라벨로 감싼다(검토 r2 C2-N11 — 진단이 엉뚱한 키를 가리키지 않게).

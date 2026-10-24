@@ -77,19 +77,29 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
                 .filterNot { it.substringBefore(' ') in READ_METHODS }
         bodyless.toSet() shouldBe setOf("DELETE /api/session", "POST /api/bid-cases/{caseId}/resume")
 
-        val rejected =
-            bodyless
-                .associateWith { operation ->
-                    val (method, path) = operation.split(' ', limit = 2)
-                    access.reset()
-                    SessionTestClient(restTemplate, ::url)
-                        .signIn()
-                        .send(HttpMethod.valueOf(method), path.replace(PATH_VARIABLE, "1"), null)
-                        .statusCode
-                        .value()
-                }.filterValues { it == BAD_REQUEST || it == UNSUPPORTED_MEDIA_TYPE }
+        val statuses =
+            bodyless.associateWith { operation ->
+                val (method, path) = operation.split(' ', limit = 2)
+                access.reset()
+                val session = SessionTestClient(restTemplate, ::url).signIn()
+                // 검토 r3 V3-N2 — 경로 변수는 **이 세션이 담은 건**의 id 로 채운다. 없는 건이면 404 에서 멈춰, 존재 확인 뒤에
+                // 본문을 요구하는 핸들러가 이 등식을 지나간다.
+                val target = if (PATH_VARIABLE in path) path.replace(PATH_VARIABLE, openedCaseId(session)) else path
+                session
+                    .send(HttpMethod.valueOf(method), target, null)
+                    .statusCode
+                    .value()
+            }
 
-        rejected shouldBe emptyMap()
+        // 양성 대조 — 인증 · 존재 확인에서 멈추지 않고 핸들러 본체에 닿았다.
+        statuses.filterValues { it == UNAUTHORIZED || it == NOT_FOUND } shouldBe emptyMap()
+        statuses.filterValues { it == BAD_REQUEST || it == UNSUPPORTED_MEDIA_TYPE } shouldBe emptyMap()
+    }
+
+    private fun openedCaseId(session: SessionTestClient): String {
+        val opened = session.post(AccountScopedRoutes.BID_CASES, OPEN_BODY)
+        check(opened.statusCode.is2xxSuccessful) { "담기가 실패했다: ${opened.statusCode}" }
+        return requireNotNull(CASE_ID.find(opened.body.orEmpty())) { "응답에 caseId 가 없다" }.groupValues[1]
     }
 
     /**
@@ -168,7 +178,11 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
         /** 본문을 싣지 않는 것이 정상인 읽기 메서드 — 행동 등식의 모집단에서 뺀다. */
         val READ_METHODS = setOf("GET", "HEAD", "OPTIONS")
         val PATH_VARIABLE = Regex("""\{[^}]+}""")
+        val CASE_ID = Regex(""""caseId":(\d+)""")
+        const val OPEN_BODY = """{"noticeNumber":"R7B-BODYLESS","noticeRound":"000","bidKind":"REAL"}"""
         const val BAD_REQUEST = 400
+        const val UNAUTHORIZED = 401
+        const val NOT_FOUND = 404
         const val UNSUPPORTED_MEDIA_TYPE = 415
     }
 }

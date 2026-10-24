@@ -150,6 +150,25 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
             listOf("ADD_TO_BID_BOX", "MARK_DEADLINE_PASSED", "REVOKE_DEADLINE_PASSED")
     }
 
+    /**
+     * 검토 r3 C3-L4 — 공고 행이 사라지면(6B-3 파기) 담을 때 적은 **사본**으로 판정한다(결정 ⑥ 의 「행 없음」 갈래, 운반 층).
+     * 담기 → 사본(과거)으로 판정 · 행의 값이 미래로 정정 → 거둠 · 행이 사라짐 → 사본으로 다시 판정.
+     */
+    @Test
+    fun `공고 행이 사라지면 담을 때 적은 사본으로 판정한다`() {
+        deadlines.set(clock.now().minusSeconds(1))
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R7B-ENDPOINT-9")).body.orEmpty())
+        deadlines.set(clock.now().plusSeconds(HOUR))
+        session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty() shouldContain "\"state\":\"WATCHING\""
+
+        deadlines.rowPresent = false
+
+        session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty() shouldContain
+            "\"state\":\"DEADLINE_PASSED_UNRECORDED\""
+        commandsOf(session.get("${AccountScopedRoutes.BID_CASES}/$id/timeline").body.orEmpty()) shouldBe
+            listOf("ADD_TO_BID_BOX", "MARK_DEADLINE_PASSED", "REVOKE_DEADLINE_PASSED", "MARK_DEADLINE_PASSED")
+    }
+
     private fun commandsOf(body: String): List<String> = COMMAND.findAll(body).map { it.groupValues[1] }.toList()
 
     private fun openBody(noticeNumber: String): String =

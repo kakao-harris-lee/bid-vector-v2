@@ -30,6 +30,9 @@ import java.io.File
  *    `app.injection.allowed-types` 의 `AccountId` 한 줄은 타입 단위라 어느 class 에나 주입 길을 연다
  *    (verifier 변이 M4 초록) — 이 등식이 그 줄을 한 자리로 좁힌다.
  *
+ * **검토 r2 · r3 이 더한 셋**: `getAttribute` 를 소유자 무관 서명으로(4 를 그렇게 바꿨다), `AccountId` Class 상수 보유 = ∅,
+ * 대상 타입을 받는 데이터 바인딩 진입점 호출자 = ∅(손에 든 값의 `getClass()` 로 짓는 길, V3-N1).
+ *
  * 등식의 오른쪽은 **관측값**이다(javap 실측). 정당한 새 자리가 생기면 이 집합을
  * 고치는 커밋이 그 자리를 이름으로 드러낸다 — 그것이 이 test 의 목적이다.
  */
@@ -64,13 +67,47 @@ class AccountCarrierStructureTest {
     }
 
     /**
-     * 검토 r2 V2-N1 — `AccountId` 를 **만드는 다른 길**(Jackson `convertValue(n, AccountId::class.java)` · 반사 등)은 모두
+     * 검토 r2 V2-N1 — `AccountId` 를 **이름으로 가리켜** 만드는 길(Jackson `convertValue(n, AccountId::class.java)` · 반사 등)은
      * 그 타입의 Class 상수(`ldc … // class AccountId`)를 요구한다. app main 에 그 상수를 가진 class 가 없어야 한다 —
-     * `<init>` 호출자 등식은 생성자를 **직접** 부르는 길만 닫는다.
+     * `<init>` 호출자 등식은 생성자를 **직접** 부르는 길만 닫는다. 이름을 쓰지 않는 길(손에 든 값의 `getClass()`)은 이 술어
+     * 밖이고 아래 데이터 바인딩 진입점 등식이 닫는다(검토 r3 V3-N1 — 「다른 길은 모두 Class 상수를 요구한다」는 사실이 아니었다).
      */
     @Test
     fun `app main 의 어디도 AccountId 의 Class 상수를 들지 않는다`() {
         classConstantHolders(outputs, ACCOUNT_ID_INTERNAL) shouldBe emptySet()
+    }
+
+    /**
+     * 검토 r3 V3-N1 — 손에 든 `AccountId` 로 **다른 id 를 짓는** 길(`convertValue(n, seed.javaClass)`)은 Class 상수도 `<init>`
+     * 호출도 반사도 없다. 그래서 대상 타입을 인자로 받는 **데이터 바인딩 진입점**(`convertValue` · `readValue` · `treeToValue` ·
+     * `readerFor` 등 — 타입 인자가 `Class` · `JavaType` · `TypeReference`)을 부르는 class 를 **서명으로** 센다(소유자 무관 —
+     * `ObjectMapper` · `JsonMapper` · `ObjectReader` 어느 것으로 불러도 같다). 오늘 app main 은 요청 본문을 `JsonNode` 접근자로만
+     * 읽으므로 그 집합은 ∅ 이다(javap 실측). 정당한 바인딩 자리가 생기면 이 집합을 고치는 커밋이 그 자리를 이름으로 드러낸다.
+     * 근본(`AccountId` 생성 경로 봉쇄)은 7D 파일이라 이 slice 가 하지 않는다 — OPEN 후보 `OPEN-7D-ACCOUNTID-CONSTRUCTION`.
+     */
+    @Test
+    fun `app main 의 어디도 타입을 받는 데이터 바인딩 진입점을 부르지 않는다`() {
+        bindingEntryCallers(outputs) shouldBe emptySet()
+    }
+
+    /** 양성 · 음성 대조 — 바인딩 술어가 우회 F1 의 모양과 타입 참조 판독기를 잡고, `JsonNode` 접근자는 잡지 않는다. */
+    @Test
+    fun `손에 든 값의 getClass 로 바인딩하는 class 는 술어에 걸리고 JsonNode 접근자는 걸리지 않는다 — 대조`() {
+        val forged =
+            listOf(
+                "9: invokevirtual #14 // Method java/lang/Object.getClass:()Ljava/lang/Class;",
+                "12: invokevirtual #20 // Method tools/jackson/databind/ObjectMapper.convertValue:" +
+                    "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;",
+            ).joinToString("\n")
+        val reader =
+            "3: invokevirtual #8 // Method tools/jackson/databind/json/JsonMapper.readerFor:" +
+                "(Ltools/jackson/core/type/TypeReference;)Ltools/jackson/databind/ObjectReader;"
+        val accessor =
+            "5: invokevirtual #11 // Method tools/jackson/databind/JsonNode.get:" +
+                "(Ljava/lang/String;)Ltools/jackson/databind/JsonNode;"
+        val simulated = mapOf("http/Forge" to forged, "http/Reader" to reader, "http/Accessor" to accessor)
+
+        bindingEntryCallers(simulated) shouldBe setOf("http/Forge", "http/Reader")
     }
 
     @Test
@@ -195,6 +232,25 @@ private fun signatureCallers(
     outputs
         .filterValues { text -> text.lineSequence().any { "Method " in it && it.endsWith(signature) } }
         .keys
+
+/**
+ * 대상 타입을 인자로 받는 데이터 바인딩 진입점 — 메서드 **이름과 매개변수 서술자**로 고른다(소유자를 보지 않는다). 타입을
+ * 받지 않는 멤버(`JsonNode.get` · `valueToTree` 등)는 값을 지을 대상이 없어 고르지 않는다.
+ */
+private val BINDING_ENTRY =
+    Regex("""Method \S+\.(convertValue|readValue|readValues|treeToValue|updateValue|readerFor|forType):\(([^)]*)\)""")
+
+private val BINDING_TYPE_ARGUMENTS =
+    listOf("Ljava/lang/Class;", "Ltools/jackson/databind/JavaType;", "Ltools/jackson/core/type/TypeReference;")
+
+private fun bindingEntryCallers(outputs: Map<String, String>): Set<String> =
+    outputs
+        .filterValues { text ->
+            text.lineSequence().any { line ->
+                val parameters = BINDING_ENTRY.find(line)?.groupValues?.get(2)
+                parameters != null && BINDING_TYPE_ARGUMENTS.any { it in parameters }
+            }
+        }.keys
 
 /** 그 타입의 **Class 상수**(`ldc` · `ldc_w`)를 드는 class — 반사 · 데이터 바인딩으로 그 타입을 만드는 길의 표지다. */
 private fun classConstantHolders(

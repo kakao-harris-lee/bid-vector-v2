@@ -1,5 +1,9 @@
 package bidvector.app.http
 
+import bidvector.bidding.BidMemo
+import bidvector.bidding.EvidenceRef
+import bidvector.bidding.SkipReason
+import bidvector.bidding.TransitionReason
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -35,8 +39,8 @@ class BidCaseRequestsTest {
 
     @Test
     fun `증빙 참조 · 메모 길이 상한과 추첨번호 부호를 어기면 400 이다`() {
-        val tooLongRef = "r".repeat(EVIDENCE_LIMIT + 1)
-        val tooLongMemo = "m".repeat(MEMO_LIMIT + 1)
+        val tooLongRef = "r".repeat(EvidenceRef.MAX_LENGTH + 1)
+        val tooLongMemo = "m".repeat(BidMemo.MAX_LENGTH + 1)
 
         listOf(
             """"evidenceRef":"$tooLongRef"""",
@@ -49,7 +53,7 @@ class BidCaseRequestsTest {
 
     @Test
     fun `상한 안의 기록은 그대로 읽힌다 — 양성 대조`() {
-        val ok = "r".repeat(EVIDENCE_LIMIT)
+        val ok = "r".repeat(EvidenceRef.MAX_LENGTH)
 
         val read = BidCaseRequests.submission(json(record(""""evidenceRef":"$ok","drawNumbers":[3]""")))
 
@@ -59,12 +63,35 @@ class BidCaseRequestsTest {
     private fun record(extra: String): String =
         """{"amountWon":1000000,"vatTreatment":"INCLUSIVE","submittedAt":"2026-10-23T00:00:00Z",$extra}"""
 
+    /**
+     * 요청 문서의 `maxLength` ↔ 도메인 상한 상수, 등식(D-7B-5 C3-M2) — 입찰 건 요청 셋의 문자열 상한 전수를 문서에서 읽는다.
+     * 문서와 도메인 중 한쪽만 바뀌면 붉다(생성 타입은 W-5 가 문서와 바이트로 묶는다).
+     */
+    @Test
+    fun `입찰 건 요청 문서의 문자열 상한은 도메인 상한 상수와 같다`() {
+        @Suppress("UNCHECKED_CAST")
+        val schemas = (loadOpenApiSpec()["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>
+        val documented =
+            BID_CASE_REQUEST_SCHEMAS
+                .flatMap { name ->
+                    @Suppress("UNCHECKED_CAST")
+                    val properties = (schemas.getValue(name) as Map<String, Any?>)["properties"] as Map<String, Any?>
+                    properties.mapNotNull { (property, schema) ->
+                        @Suppress("UNCHECKED_CAST")
+                        ((schema as Map<String, Any?>)["maxLength"] as Int?)?.let { "$name.$property" to it }
+                    }
+                }.toMap()
+
+        documented shouldBe
+            mapOf(
+                "SkipRequest.reason" to SkipReason.MAX_LENGTH,
+                "RecordBidRequest.evidenceRef" to EvidenceRef.MAX_LENGTH,
+                "RecordBidRequest.memo" to BidMemo.MAX_LENGTH,
+                "CorrectOutcomeRequest.reason" to TransitionReason.MAX_LENGTH,
+            )
+    }
+
     private companion object {
-        /**
-         * `EvidenceRef` · `BidMemo` 의 길이 상한(도메인 companion 이 private 이라 값을 옮겨 적는다).
-         * 도메인이 상한을 올리면 「넘는 값」이 정상이 되어 위 거부 test 가 붉어진다 — 어긋남이 숨지 않는다.
-         */
-        const val EVIDENCE_LIMIT = 128
-        const val MEMO_LIMIT = 2000
+        val BID_CASE_REQUEST_SCHEMAS = listOf("SkipRequest", "RecordBidRequest", "CorrectOutcomeRequest")
     }
 }
