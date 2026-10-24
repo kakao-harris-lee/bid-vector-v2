@@ -3,6 +3,10 @@ package bidvector.adapters.bidding
 import bidvector.adapters.persistence.FloorRateOriginCodec
 import bidvector.bidding.BidKind
 import bidvector.procurement.ProvenanceKind
+import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.FloorRateOrigin
+import bidvector.sharedkernel.NoticeRound
+import bidvector.sharedkernel.Provenance
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCommandResult
 import io.kotest.matchers.shouldBe
@@ -30,11 +34,9 @@ class BidCaseSnapshotTest : BidCaseDbFixture() {
                 "snap-1",
                 NoticeMoney(
                     baseWon = 123_456_789L,
-                    baseProvenance = "PUBLISHED",
-                    baseProvenanceDetail = "000",
+                    baseProvenance = Provenance.Published(NoticeRound.of("000")),
                     floorFraction = BigDecimal("0.87745"),
-                    floorOriginKind = FloorRateOriginCodec.NOTICE_VALUE_KIND,
-                    floorOriginDetail = "000",
+                    floorOrigin = FloorRateOrigin.NoticeValue(NoticeRound.of("000")),
                 ),
             )
 
@@ -59,11 +61,9 @@ class BidCaseSnapshotTest : BidCaseDbFixture() {
                 "snap-2",
                 NoticeMoney(
                     baseWon = 50_000_000L,
-                    baseProvenance = "FILLED_FROM_BUDGET_KEY",
-                    baseProvenanceDetail = "budget-key-7",
+                    baseProvenance = Provenance.FilledFromBudgetKey("budget-key-7"),
                     floorFraction = BigDecimal("0.8"),
-                    floorOriginKind = FloorRateOriginCodec.STATUTORY_TABLE_KIND,
-                    floorOriginDetail = "INITIAL",
+                    floorOrigin = FloorRateOrigin.StatutoryTable(EffectiveFrom.Initial),
                 ),
             )
 
@@ -117,26 +117,8 @@ class BidCaseSnapshotTest : BidCaseDbFixture() {
         }
     }
 
-    /** 이름 붙은 CHECK 의 `IN (…)` 어휘 — `pg_get_constraintdef` 의 `'…'::text` 리터럴을 모은다. */
-    private fun checkVocabulary(constraintName: String): Set<String> =
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?")
-                .use { statement ->
-                    statement.setString(1, constraintName)
-                    statement.executeQuery().use { rs ->
-                        rs.next()
-                        LITERAL
-                            .findAll(rs.getString(1))
-                            .map { it.groupValues[1] }
-                            .toSet()
-                    }
-                }
-        }
-
     private companion object {
         const val DEADLINE_AHEAD_SECONDS = 3_600L
-        val LITERAL = Regex("""'([A-Z_]+)'::text""")
         val SNAPSHOT_COLUMNS =
             listOf(
                 "snapshot_base_amount_won",

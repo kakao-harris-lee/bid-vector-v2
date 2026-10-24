@@ -75,6 +75,27 @@ class JdbcBidCaseStore(
             }
         }
 
+    override fun settleCandidates(
+        account: AccountId,
+        kind: BidKind,
+        judgedStates: Set<BidStateTag>,
+        now: Instant,
+    ): List<BidCase> =
+        connections.withConnection { connection ->
+            connection.prepareStatement(BiddingSql.SELECT_SETTLE_CANDIDATES).use { statement ->
+                var index = 1
+                statement.setLong(index++, account.value)
+                statement.setString(index++, kind.name)
+                val states = judgedStates.map { it.name }.toTypedArray()
+                statement.setArray(index++, connection.createArrayOf("text", states))
+                statement.setTimestamp(index++, Timestamp.from(now))
+                statement.setTimestamp(index, Timestamp.from(now))
+                statement.executeQuery().use { rs ->
+                    buildList { while (rs.next()) add(BidCaseRow.toCase(rs)) }
+                }
+            }
+        }
+
     override fun load(
         account: AccountId,
         caseId: BidCaseId,

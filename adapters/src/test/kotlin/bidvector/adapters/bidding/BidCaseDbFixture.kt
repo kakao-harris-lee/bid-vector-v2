@@ -1,14 +1,18 @@
 package bidvector.adapters.bidding
 
+import bidvector.adapters.persistence.FloorRateOriginCodec
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.ProvenanceCodec
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidSubmission
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.workflow.access.AccountId
@@ -81,14 +85,15 @@ abstract class BidCaseDbFixture : PersistenceTestSupport() {
             memo = null,
         )
 
-    /** 공고 한 건의 금액 열 — `NoticeRow.toRow` 가 쓰는 어휘(코덱 출력) 그대로 심는다. */
+    /**
+     * 공고 한 건의 금액 — 도메인 값으로 받고 **정본 코덱으로 적는다**(검토 r2 V2-W5: 손 리터럴로 심으면 「공고를 쓰는
+     * 쪽의 어휘」가 아니라 test 가 믿는 어휘를 재게 된다). `NoticeRow.toRow` 와 같은 코덱이다.
+     */
     protected data class NoticeMoney(
         val baseWon: Long,
-        val baseProvenance: String,
-        val baseProvenanceDetail: String?,
+        val baseProvenance: Provenance,
         val floorFraction: BigDecimal,
-        val floorOriginKind: String,
-        val floorOriginDetail: String,
+        val floorOrigin: FloorRateOrigin,
     )
 
     /** 공고 한 건 — `notice` 는 `raw_observation` 을 FK 로 참조하므로 그 행이 먼저다. */
@@ -117,20 +122,46 @@ abstract class BidCaseDbFixture : PersistenceTestSupport() {
                     statement.setObject(index++, money?.baseWon?.let(BigDecimal::valueOf))
                     statement.setString(index++, money?.let { Currency.KRW.name })
                     statement.setString(index++, money?.let { VatTreatment.INCLUSIVE.name })
-                    statement.setString(index++, money?.baseProvenance)
-                    statement.setString(index++, money?.baseProvenanceDetail)
+                    statement.setString(index++, money?.baseProvenance?.let(ProvenanceCodec::kindNameOf))
+                    statement.setString(index++, money?.baseProvenance?.let(ProvenanceCodec::detailOf))
                     statement.setBigDecimal(index++, money?.floorFraction)
-                    statement.setString(index++, money?.floorOriginKind)
-                    statement.setString(index, money?.floorOriginDetail)
+                    statement.setString(index++, money?.floorOrigin?.let(FloorRateOriginCodec::kindOf))
+                    statement.setString(index, money?.floorOrigin?.let(FloorRateOriginCodec::detailOf))
                     statement.executeUpdate()
                 }
         }
+    }
+
+    /** 정정 공고 — 공고의 마감만 바꾼다(`null` 이면 마감 미정). 판 번호는 V2 트리거가 올린다. */
+    protected fun correctNoticeDeadline(
+        key: NoticeKey,
+        deadline: Instant?,
+    ) {
+        val value = deadline?.let { "'$it'" } ?: "NULL"
+        adminExecute("UPDATE notice SET deadline_at = $value WHERE notice_number = '${key.noticeNumber}'")
     }
 
     /** 공고를 지운다 — 6B-3 파기 뒤와 같은 상태(건 · 기록은 FK 가 없어 남는다). */
     protected fun purgeNotice(key: NoticeKey) {
         adminExecute("DELETE FROM notice WHERE notice_number = '${key.noticeNumber}'")
     }
+
+    /** 이름 붙은 CHECK 의 `IN (…)` 어휘 — `pg_get_constraintdef` 의 `'…'::text` 리터럴을 모은다. */
+    protected fun checkVocabulary(constraintName: String): Set<String> =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?")
+                .use { statement ->
+                    statement.setString(1, constraintName)
+                    statement.executeQuery().use { rs ->
+                        check(rs.next()) { "제약이 없다: $constraintName" }
+                        CHECK_LITERAL
+                            .findAll(rs.getString(1))
+                            .map { it.groupValues[1] }
+                            .toSet()
+                    }
+                }
+        }
 
     protected fun adminExecute(sql: String) {
         dataSource().connection.use { connection -> connection.createStatement().use { it.execute(sql) } }
@@ -153,6 +184,8 @@ abstract class BidCaseDbFixture : PersistenceTestSupport() {
             }
     }
 }
+
+private val CHECK_LITERAL = Regex("""'([A-Z_]+)'::text""")
 
 /** 커넥션을 빌려줄 때마다 역할을 바꾼다 — 비풀링이라 반납 뒤 역할이 남지 않는다. */
 private class RoleDataSource(

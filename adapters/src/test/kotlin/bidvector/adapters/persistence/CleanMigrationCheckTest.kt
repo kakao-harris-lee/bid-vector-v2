@@ -91,12 +91,13 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             //  · bid_draft 19 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
             //    + draft_seq>=0 + 스냅샷 판 번호 하한 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3)
             //    + 계약 D-7B-3 의 여섯(하한율 출처 enum · detail 공백 · detail 짝 · 기초금액 출처 enum
-            //    · detail 공백 · detail 짝).
+            //    · detail 공백 · detail 짝) + D-7B-4 의 둘(스냅샷 기초금액 통화 · 과세 공백).
             //  · bid_record 11 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
-            //    + record_seq>=0 + evidence_ref 공백 + 증빙 짝 + memo 공백 + 추첨번호 부호(D-7B-3).
+            //    + record_seq>=0 + evidence_ref 공백·상한 + 증빙 짝 + memo 공백·상한 + 추첨번호 부호(D-7B-3 · D-7B-4 —
+            //    상한은 기존 CHECK 에 붙어 수가 그대로다).
             "bid_case" to 11,
             "bid_case_transition" to 10,
-            "bid_draft" to 19,
+            "bid_draft" to 21,
             "bid_record" to 11,
         )
 

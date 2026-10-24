@@ -90,6 +90,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 자식 셋의 복합 FK 대상(계약 D-7B-3).
             "bid_case_id_account_key",
             "bid_case_transition_case_id_case_version_key",
+            // 기록의 복합 FK 대상(계약 D-7B-4).
+            "bid_draft_id_case_account_key",
             "bid_draft_case_id_draft_seq_key",
             "bid_record_case_id_record_seq_key",
         )
@@ -179,6 +181,17 @@ class CleanMigrationTest : PersistenceTestSupport() {
         val foreignColumn: String,
     )
 
+    /** 복합 FK 의 cross product — 이 질의는 열 순서를 보존하지 않아 열 수의 제곱만큼 관측된다(위 주석). */
+    private fun compositeForeignKeys(
+        table: String,
+        columns: List<String>,
+        foreignTable: String,
+        foreignColumns: List<String>,
+    ): Array<FkSpec> =
+        columns
+            .flatMap { column -> foreignColumns.map { FkSpec(table, column, foreignTable, it) } }
+            .toTypedArray()
+
     /** 자식 표 하나의 FK 다섯 — 계정 단일 FK + (건, 계정) 복합 FK 의 cross product 넷. */
     private fun childOwnerForeignKeys(table: String): Array<FkSpec> =
         arrayOf(
@@ -223,7 +236,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
             *childOwnerForeignKeys("bid_case_transition"),
             *childOwnerForeignKeys("bid_draft"),
             *childOwnerForeignKeys("bid_record"),
-            FkSpec("bid_record", "draft_id", "bid_draft", "id"),
+            // 기록 → 초안은 (초안, 건, 계정) 복합 FK 다(계약 D-7B-4) — 열 셋이라 cross product 아홉이 나온다.
+            *compositeForeignKeys(
+                "bid_record",
+                listOf("draft_id", "case_id", "account_id"),
+                "bid_draft",
+                listOf("id", "case_id", "account_id"),
+            ),
         )
 
     @Test

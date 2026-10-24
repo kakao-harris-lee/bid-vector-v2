@@ -19,6 +19,10 @@ import java.lang.reflect.Modifier
  *   `account_id = ?` 를 갖는다.
  * - 그 표에 넣는 문장은 열 목록에 `account_id` 를 갖는다(값은 포트가 받은 계정이다).
  * - 공고 조회(`notice` 만 만지는 문장)는 계정 축이 없다 — 사용자 소유 데이터가 아니다.
+ *
+ * **이 술어는 문자열이다 — 정본은 행동 축이다**(검토 r2 C2-N17). `account_id = ? OR TRUE` 처럼 필터를 무력하게 하는
+ * 변형은 이 test 를 지나간다. 소유 경계가 실제로 서는지는 실 DB 의 `BidCaseOwnershipTest`(남의 건은 읽히지도 쓰이지도
+ * 않는다)가 재고, 이 test 는 「필터를 **빠뜨린** 새 문장」을 싸게 잡는 그물이다(변이 `OR TRUE` 를 변이 표에 둔다).
  */
 class BiddingSqlOwnershipTest {
     private val statements: Map<String, String> =

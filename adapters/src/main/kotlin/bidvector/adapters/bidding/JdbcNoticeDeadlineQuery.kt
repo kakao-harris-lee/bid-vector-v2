@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.DataSourceConnectionSource
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
+import bidvector.workflow.bidding.NoticeDeadline
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
 import java.time.Instant
 import javax.sql.DataSource
@@ -16,7 +17,7 @@ import javax.sql.DataSource
  * 확인할 것인가」가 아니다.
  *
  * 건이 공고를 FK 로 참조하지 않으므로(V21 머리말 — 6B-3 파기 충돌) 파기된 공고의 키는 결과에
- * **없고**, 그러면 다음 확인 시점이 「없음」이 된다. 그것이 정직한 답이다 — 지어내지 않는다.
+ * **없다**. 행이 있는데 마감이 NULL 이면 키는 **있고** 값이 `null` 이다 — 둘을 가른다(계약 D-7B-4 결정 ⑥).
  *
  * 한 번의 질의로 묶는다(목록 화면이 건마다 한 번씩 묻지 않게). 계정 축이 없는 유일한 포트이고,
  * 그 예외의 사유는 포트 KDoc 에 적혀 있다 — 공고는 사용자 소유 데이터가 아니다.
@@ -27,7 +28,7 @@ class JdbcNoticeDeadlineQuery(
     /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
     constructor(dataSource: DataSource) : this(DataSourceConnectionSource(dataSource))
 
-    override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, Instant> {
+    override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, NoticeDeadline> {
         if (notices.isEmpty()) return emptyMap()
         val keys = notices.toList()
         return connections.withConnection { connection ->
@@ -48,7 +49,7 @@ class JdbcNoticeDeadlineQuery(
                                     rs.getString("notice_number"),
                                     NoticeRound.of(rs.getString("notice_round")),
                                 )
-                            put(key, rs.getTimestamp("deadline_at").toInstant())
+                            put(key, NoticeDeadline(rs.getTimestamp("deadline_at")?.toInstant()))
                         }
                     }
                 }

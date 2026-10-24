@@ -32,6 +32,24 @@ internal object BiddingSql {
             "WHERE account_id = ? AND bid_kind = ? AND (?::text IS NULL OR state = ?::text) " +
             "ORDER BY id"
 
+    /**
+     * 마감 판정 후보(계약 D-7B-4 결정 ⑧) — 유효 마감은 **공고 행이 있으면 그 값, 없으면 사본**이다(결정 ⑥과 같은 정의).
+     * ① 판정을 세우는 상태(전이표에서 뽑아 배열로 넘긴다) 중 유효 마감이 지난 건 ② 「마감 지남」 중 유효 마감이 미래 · 미정인
+     * 건(되돌림 후보). 상위집합이어도 된다 — 판정은 use case 가 건마다 다시 한다.
+     */
+    const val SELECT_SETTLE_CANDIDATES =
+        "SELECT c.id, c.notice_number, c.notice_round, c.bid_kind, c.state, c.case_version, c.deadline_at, " +
+            "c.remind_at, c.opening_at, c.document_due_at, c.outcome_notice_expected_at, c.skip_reason " +
+            "FROM bid_case c LEFT JOIN notice n " +
+            "ON n.notice_number = c.notice_number AND n.notice_round = c.notice_round " +
+            "WHERE c.account_id = ? AND c.bid_kind = ? AND (" +
+            "(c.state = ANY (?::text[]) AND " +
+            "(CASE WHEN n.notice_number IS NULL THEN c.deadline_at ELSE n.deadline_at END) < ?) " +
+            "OR (c.state = 'DEADLINE_PASSED_UNRECORDED' AND " +
+            "((CASE WHEN n.notice_number IS NULL THEN c.deadline_at ELSE n.deadline_at END) IS NULL " +
+            "OR (CASE WHEN n.notice_number IS NULL THEN c.deadline_at ELSE n.deadline_at END) >= ?))" +
+            ") ORDER BY c.id"
+
     const val INSERT_CASE =
         "INSERT INTO bid_case (" +
             "account_id, notice_number, notice_round, bid_kind, state, case_version, deadline_at, updated_at" +
@@ -84,8 +102,8 @@ internal object BiddingSql {
         "SELECT COALESCE(MAX(record_seq) + 1, 0) FROM bid_record WHERE account_id = ? AND case_id = ?"
 
     /**
-     * 확인 화면이 **기본값으로 채운 초안** = 기록 시점의 최신 초안(§6.1 「초안 금액을 기본값으로 하되
-     * 다르게 냈으면 수정」). 「이 초안대로 냈다」는 뜻이 아니다 — 금액은 기록이 따로 싣는다.
+     * **기록 시점의 최신 초안**이다 — 화면의 기본값과 같다는 보장은 없다(요청이 초안 식별자를 싣지 않는다). 「이 초안대로
+     * 냈다」는 뜻도 아니다 — 금액은 기록이 따로 싣는다(계약 D-7B-4, C-M6 문면).
      */
     const val LATEST_DRAFT_ID =
         "SELECT id FROM bid_draft WHERE account_id = ? AND case_id = ? ORDER BY draft_seq DESC LIMIT 1"
@@ -100,6 +118,5 @@ internal object BiddingSql {
     /** 공고 마감 — 사용자 소유 데이터가 아니라 계정 축이 없다(`NoticeDeadlineQueryPort` KDoc). */
     const val SELECT_NOTICE_DEADLINE =
         "SELECT notice_number, notice_round, deadline_at FROM notice " +
-            "WHERE (notice_number, notice_round) IN (SELECT * FROM unnest(?::text[], ?::text[])) " +
-            "AND deadline_at IS NOT NULL"
+            "WHERE (notice_number, notice_round) IN (SELECT * FROM unnest(?::text[], ?::text[]))"
 }

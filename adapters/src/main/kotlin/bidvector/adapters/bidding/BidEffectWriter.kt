@@ -107,8 +107,8 @@ internal object BidEffectWriter {
         }
 
     /**
-     * 확인 화면이 기본값으로 채운 초안 = 기록 시점의 **최신 초안**(§6.1, `BiddingSql.LATEST_DRAFT_ID`).
-     * 소급 확인이면 초안이 없을 수 있다(그러면 `null`).
+     * 기록 시점의 **최신 초안**(`BiddingSql.LATEST_DRAFT_ID`) — 화면의 기본값과 같다는 보장은 없다. 소급 확인이면 초안이
+     * 없을 수 있다(그러면 `null`).
      */
     private fun latestDraftId(
         connection: Connection,

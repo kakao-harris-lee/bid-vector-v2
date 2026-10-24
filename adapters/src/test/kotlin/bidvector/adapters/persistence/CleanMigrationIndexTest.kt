@@ -126,6 +126,7 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             ),
             IndexSpec("bid_draft", "bid_draft_pkey", "USING btree (id)"),
             IndexSpec("bid_draft", "bid_draft_case_id_draft_seq_key", "USING btree (case_id, draft_seq)"),
+            IndexSpec("bid_draft", "bid_draft_id_case_account_key", "USING btree (id, case_id, account_id)"),
             IndexSpec("bid_record", "bid_record_pkey", "USING btree (id)"),
             IndexSpec("bid_record", "bid_record_case_id_record_seq_key", "USING btree (case_id, record_seq)"),
         )

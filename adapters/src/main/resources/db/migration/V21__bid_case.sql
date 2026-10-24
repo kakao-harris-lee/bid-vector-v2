@@ -160,7 +160,7 @@ CREATE TABLE bid_case_transition (
         'SKIPPED',
         'DEADLINE_PASSED_UNRECORDED'
     )),
-    -- 명령 열셋(`BidCommandTag`) + 생성 명령(`OPEN_CASE_COMMAND`).
+    -- 명령 열넷(`BidCommandTag`) + 생성 명령(`OPEN_CASE_COMMAND`). 열넷째는 마감 판정 되돌림(D-7B-4 결정 ⑤).
     command TEXT NOT NULL CHECK (command IN (
         'ADD_TO_BID_BOX',
         'DEFER',
@@ -175,7 +175,8 @@ CREATE TABLE bid_case_transition (
         'RECORD_OUTCOME',
         'CORRECT_OUTCOME',
         'SKIP',
-        'MARK_DEADLINE_PASSED'
+        'MARK_DEADLINE_PASSED',
+        'REVOKE_DEADLINE_PASSED'
     )),
 
     actor_kind TEXT NOT NULL CHECK (actor_kind IN ('USER', 'SYSTEM')),
@@ -232,6 +233,8 @@ CREATE TABLE bid_draft (
         FOREIGN KEY (case_id, account_id) REFERENCES bid_case (id, account_id),
     draft_seq INT NOT NULL CHECK (draft_seq >= 0),
     UNIQUE (case_id, draft_seq),
+    -- 기록의 복합 FK 대상 — 기록이 가리키는 초안이 **같은 건 · 같은 계정**의 것임을 구조가 진다(계약 D-7B-4).
+    CONSTRAINT bid_draft_id_case_account_key UNIQUE (id, case_id, account_id),
 
     -- 원 단위 Long 상한을 표가 막는다(V9 의 won 범위 CHECK 와 같은 방어).
     amount_won NUMERIC(20, 0) NOT NULL
@@ -261,8 +264,8 @@ CREATE TABLE bid_draft (
     snapshot_base_amount_won NUMERIC(20, 0)
         CHECK (snapshot_base_amount_won IS NULL
                OR snapshot_base_amount_won BETWEEN 0 AND 9223372036854775807),
-    snapshot_base_amount_currency TEXT,
-    snapshot_base_amount_vat TEXT,
+    snapshot_base_amount_currency TEXT CHECK (snapshot_base_amount_currency <> ''),
+    snapshot_base_amount_vat TEXT CHECK (snapshot_base_amount_vat <> ''),
     snapshot_base_amount_provenance TEXT CHECK (snapshot_base_amount_provenance IN (
         'PUBLISHED',
         'DERIVED_FROM_OPENING',
@@ -334,24 +337,28 @@ CREATE TABLE bid_record (
 
     submitted_at TIMESTAMPTZ NOT NULL,
     confirmed_at TIMESTAMPTZ NOT NULL,
-    -- 확인 화면이 **기본값으로 채운 초안** — 기록 시점의 최신 초안이다(§6.1 「초안 금액을 기본값으로
-    -- 하되 다르게 냈으면 수정」). 「이 초안대로 냈다」가 아니다: 금액이 다를 수 있고, 같은지는 두
-    -- 금액을 비교해 본다. 소급 확인은 초안 없이도 성립하므로 nullable 이다.
-    draft_id BIGINT REFERENCES bid_draft (id),
+    -- **기록 시점의 최신 초안**이다 — 화면의 기본값과 같다는 보장은 없다(요청이 초안 식별자를 싣지 않으므로
+    -- 화면 적재와 기록 사이에 초안이 하나 더 쌓이면 둘은 다르다). 「이 초안대로 냈다」도 아니다: 금액은 기록이
+    -- 따로 싣는다. 소급 확인은 초안 없이도 성립하므로 nullable 이다(아래 복합 FK 는 NULL 이면 MATCH SIMPLE 로 통과).
+    draft_id BIGINT,
+    CONSTRAINT bid_record_draft_owner_fk
+        FOREIGN KEY (draft_id, case_id, account_id) REFERENCES bid_draft (id, case_id, account_id),
     retroactive BOOLEAN NOT NULL,
 
     -- 추첨번호(V5 opening_result.draw_numbers 와 같은 형태). 원소 부호는 도메인(`BidSubmission`)과
     -- 같은 규칙을 표가 한 번 더 진다.
     draw_numbers INT[] CHECK (draw_numbers IS NULL OR 0 < ALL (draw_numbers)),
 
-    evidence_ref TEXT CHECK (evidence_ref <> ''),
+    -- 상한은 도메인(`EvidenceRef.MAX_LENGTH`)과 같은 값 — 지울 수 없는 표다(D-7B-4).
+    evidence_ref TEXT CHECK (evidence_ref <> '' AND char_length(evidence_ref) <= 128),
     -- R-5 3년. **「이 참조를 언제까지 보관하는가」이지 파일 파기 기한이 아니다** — PDF
     -- 저장소는 이 slice 밖이고, 저장소 slice 가 열리면 같은 날짜를 승계한다.
     evidence_retain_until DATE,
     CONSTRAINT bid_record_evidence_pair
         CHECK ((evidence_ref IS NULL) = (evidence_retain_until IS NULL)),
 
-    memo TEXT CHECK (memo <> ''),
+    -- 상한은 도메인(`BidMemo.MAX_LENGTH`)과 같은 값.
+    memo TEXT CHECK (memo <> '' AND char_length(memo) <= 2000),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

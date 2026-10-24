@@ -207,14 +207,6 @@ class BidCaseScheduleTest : BidCaseDbFixture() {
         workflow.read(mine, caseId)!!.case.outcomeNoticeExpectedAt shouldBe expected
     }
 
-    /** 정정 공고 — 공고의 마감만 바꾼다(판 번호는 V2 트리거가 올린다). */
-    private fun correctNoticeDeadline(
-        key: bidvector.bidding.NoticeKey,
-        deadline: Instant,
-    ) {
-        adminExecute("UPDATE notice SET deadline_at = '$deadline' WHERE notice_number = '${key.noticeNumber}'")
-    }
-
     private fun recordRetroactive(caseId: Long): Boolean =
         dataSource().connection.use { connection ->
             connection.prepareStatement("SELECT retroactive FROM bid_record WHERE case_id = ?").use { statement ->
