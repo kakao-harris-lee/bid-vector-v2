@@ -97,16 +97,19 @@ class BidCaseWorkflow(
     ): OpenedCase {
         val now = clock.now()
         val noticeDeadline = deadlines.deadlines(setOf(notice))[notice]
-        return when (val result = cases.open(account, notice, kind, now, noticeDeadline)) {
-            is OpenCaseResult.Opened -> {
-                OpenedCase(view(result.case, effectiveDeadline(result.case, noticeDeadline), now), created = true)
+        val result = cases.open(account, notice, kind, now, noticeDeadline?.at)
+        val opened =
+            when (result) {
+                is OpenCaseResult.Opened -> result.case
+                is OpenCaseResult.AlreadyOpen -> result.case
             }
-
-            is OpenCaseResult.AlreadyOpen -> {
-                val case = settlement.settle(account, result.case, noticeDeadline, now)
-                OpenedCase(view(case, effectiveDeadline(case, noticeDeadline), now), created = false)
-            }
-        }
+        // 새로 담은 건도 판정을 지난다(검토 r2 V2-W1) — 이미 마감이 지난 공고를 담으면 응답이 곧 「마감 지남」이다.
+        // 같은 요청 쌍(담기 → 읽기)이 두 답을 주지 않는다.
+        val case = settlement.settle(account, opened, noticeDeadline, now)
+        return OpenedCase(
+            view(case, effectiveDeadline(case, noticeDeadline), now),
+            created = result is OpenCaseResult.Opened,
+        )
     }
 
     fun read(
@@ -125,14 +128,14 @@ class BidCaseWorkflow(
         state: BidStateTag?,
     ): List<BidCaseView> {
         val now = clock.now()
-        val found = cases.list(account, kind, null)
+        // ① 판정 후보만 저장소가 좁혀 판정한다(계약 D-7B-4 결정 ⑧) — 목록 전건을 건마다 판정하지 않는다.
+        val candidates = cases.settleCandidates(account, kind, DEADLINE_JUDGED_STATES, now)
+        val candidateDeadlines = deadlines.deadlines(candidates.map { it.notice }.toSet())
+        candidates.forEach { settlement.settle(account, it, candidateDeadlines[it.notice], now) }
+        // ② 판정 **뒤에** 상태 탭을 DB 가 거른다 — 판정이 상태를 바꿨으므로 그 다음에 묻는다.
+        val found = cases.list(account, kind, state)
         val byNotice = deadlines.deadlines(found.map { it.notice }.toSet())
-        // 마감 판정이 상태를 바꿀 수 있으므로 **판정 뒤에** 상태 탭으로 거른다 — 먼저 거르면 「관심」
-        // 탭에 마감이 지난 건이 남는다.
-        return found
-            .map { settlement.settle(account, it, byNotice[it.notice], now) }
-            .filter { state == null || it.state.tag == state }
-            .map { view(it, effectiveDeadline(it, byNotice[it.notice]), now) }
+        return found.map { view(it, effectiveDeadline(it, byNotice[it.notice]), now) }
     }
 
     fun timeline(

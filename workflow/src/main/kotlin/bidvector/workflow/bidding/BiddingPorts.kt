@@ -99,6 +99,19 @@ interface BidCaseStorePort {
         deadlineAt: Instant?,
     ): OpenCaseResult
 
+    /**
+     * 마감 판정 **후보**(계약 D-7B-4 결정 ⑧) — 목록 화면이 판정을 건마다 묻지 않도록 저장소가 먼저 좁힌다:
+     * [judgedStates](마감 전 넷) 중 유효 마감이 [now] 보다 지난 건과, 「마감 지남」 중 유효 마감이 미래 · 미정인 건
+     * (되돌림 후보). 유효 마감은 공고 행이 있으면 그 값, 없으면 사본이다(결정 ⑥). **상위집합을 돌려줘도 된다** —
+     * 판정은 use case 가 건마다 다시 하고, 이 질의는 판정을 생략할 건을 거르는 것이다.
+     */
+    fun settleCandidates(
+        account: AccountId,
+        kind: BidKind,
+        judgedStates: Set<BidStateTag>,
+        now: Instant,
+    ): List<BidCase>
+
     /** 남의 건이면 `null` — 존재 여부를 흘리지 않는다. */
     fun load(
         account: AccountId,
@@ -127,12 +140,19 @@ interface BidCaseStorePort {
  * 이 포트만 주체를 받지 않는다(그 예외를 여기 적어 둔다 — 적지 않으면 「빠뜨린 필터」와
  * 구별되지 않는다).
  *
- * 건이 공고를 FK 로 참조하지 않으므로(`V21` 머리말 — 6B-3 파기 충돌) 공고가 파기된 뒤에는
- * 답이 없을 수 있다. 그때는 키가 결과 map 에 **없고**, 다음 확인 시점은 「없음」이 된다.
+ * **「행 없음」과 「값 없음」을 가른다**(계약 D-7B-4 결정 ⑥). 결과 map 의 키가 **있으면 공고 행이 있다**
+ * — 그 값([NoticeDeadline.at])이 `null` 이면 공고가 마감을 정하지 않았다(미정 · 정정으로 지워짐).
+ * 키가 **없으면 공고 행이 없다**(건이 공고를 FK 로 참조하지 않으므로 6B-3 파기 뒤의 상태다). 둘을 한 값으로
+ * 접으면 「마감을 지운 정정」이 「파기」로 읽혀 담을 때의 낡은 사본이 판정을 지배한다.
  */
 fun interface NoticeDeadlineQueryPort {
-    fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, Instant>
+    fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, NoticeDeadline>
 }
+
+/** 공고 행이 있다는 사실과 그 행의 마감 — [at] 이 `null` 이면 마감 미정이다. */
+data class NoticeDeadline(
+    val at: Instant?,
+)
 
 /**
  * 초안이 얼릴 **공고 스냅샷을 서버가 뜬다** — 요청이 실어 오지 않는다.

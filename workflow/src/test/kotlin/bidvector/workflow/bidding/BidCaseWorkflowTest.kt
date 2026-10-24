@@ -55,7 +55,7 @@ class BidCaseWorkflowTest {
     private fun workflow(store: FakeBidCaseStore) =
         BidCaseWorkflow(
             cases = store,
-            deadlines = { keys -> keys.associateWith { deadline } },
+            deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
             // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
             snapshots = { _, takenAt ->
                 bidvector.bidding.NoticeSnapshot(
@@ -349,6 +349,17 @@ private class FakeBidCaseStore : BidCaseStorePort {
         if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
         return OpenCaseResult.Opened(seed(account, notice, kind, BidState.Watching, deadlineAt))
     }
+
+    override fun settleCandidates(
+        account: AccountId,
+        kind: BidKind,
+        judgedStates: Set<BidStateTag>,
+        now: Instant,
+    ): List<BidCase> =
+        rows.values
+            .filter { it.account.value == account.value && it.case.kind == kind }
+            .filter { it.case.state.tag in judgedStates || it.case.state.tag == BidStateTag.DEADLINE_PASSED_UNRECORDED }
+            .map { it.case }
 
     override fun load(
         account: AccountId,
