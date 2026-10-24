@@ -1198,6 +1198,17 @@ V21 · OpenAPI · 생성 타입은 이 일괄에서 바뀌지 않았다(`git dif
 | `check` job — S-20 `one-command-check.sh` | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed(그 안의 Kotlin `check` 는 바로 앞 줄이 실행한 입력 그대로라 UP-TO-DATE) |
 | 변이 표(승인 전 일괄) | §3.7 — 변이 12 · 통제군 1 · 앞 판정 SHA 의 clone 측정 1: **RED 12**(clone 측정 포함) · 등가 변이 초록 1(D5-actor) · 통제군 초록 |
 
+### 7.5 승인 전 일괄 2 재실측 (base `998b59dd`)
+
+이 일괄은 test 두 파일과 커널 KDoc 만 바꿨다 — V21 · OpenAPI · 생성 타입 무변경이라 container 재생 · db-rehearsal 은 돌리지 않았다. 아래 둘은 evidence 커밋
+「승인 전 일괄 2(D-7B-6) 처분표 …」에서 돌렸고, 그 커밋과 산출물 커밋 사이는 evidence 뿐이다.
+
+| 항목 | 결과 |
+|---|---|
+| `check` job — Kotlin `./gradlew --no-daemon check --continue` | **exit 0** · 19m14s(16:30–16:50) · `workflow` 529 · `adapters` 1144 · `app` 718 실행 · 실패 0(XML 확인). `bidding` 30 은 UP-TO-DATE — 같은 입력(KDoc 편집 뒤)으로 14:30 에 실행해 초록이었다 |
+| `check` job — S-20 `one-command-check.sh` | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
+| 변이 표(전 · 후) | §3.8 — 형제 우회 여덟 중 전(`927e7b70`) 초록 일곱 · RED 하나(N3C) → 후 **RED 여덟** · J2 는 양쪽 컴파일 실패(근거는 표) · 통제군 초록 |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -1241,3 +1252,7 @@ base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛
 읽었다: 변경 A 62 · M 31(종류는 `A` · `M` 뿐 — 새 파일 `BidTimelineRows.kt` 하나가 늘었다) → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 diff
 0 줄 · untracked 0 · 내 표지 829 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행
 실측(04:08, exit 0)으로 갈음한다(트리 동일성).
+
+**승인 전 일괄 2 재실측** — clone 을 산출물 커밋(「fix … 승인 전 일괄 2 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서 읽었다: 변경
+A 62 · M 31 → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 → **0** · main 표지 3 보존 · 되돌린 트리 객체 =
+`998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다(트리 동일성).
