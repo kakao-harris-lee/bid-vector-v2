@@ -350,6 +350,33 @@ V2-N2 우회 · C2-N5 등식 · `draft_id` FK · 동시성) · rollback ①~⑥ 
 C3-M3 · C3-L3 · C3-L6 을 택하면 그 변이) · rollback ①~⑥ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다(#86 은
 PR 시점 update-branch). 새 파일은 in_scope 와 대조해 보고한다.
 
+**D-7B-6 (2026-10-24, 팀장 — 표적 재검증 r4 수령 · 승인 전 일괄 2).** 판정 SHA `927e7b70`(마지막 산출물 커밋 `81129ab8`)에 대해 verifier r4 **ready-for-review**
+(차단 0 · 게이트 medium 2 · low 2), code-reviewer r4 **approve**(high 0 · medium 1 · low 10). 차단이 없으므로 재작업 횟수에 넣지 않는다(2/5 유지). ID 접두는
+`V4-` · `R4-`(리뷰 파일 `v-7b-r4.md` · `cr-7b-r4.md`). V3-N1 · V3-N2 보강은 r3 우회(F1 · N3C)를 닫았지만 둘 다 **열거**라 형제 우회가 남았다 — 이번에는 열거를
+늘리지 않고 구조로 닫는다. 게이트 술어를 바꾸므로 표적 재검증 대상이다.
+
+고친다:
+- **V4-N1 · R4-1 계정 운반 바인딩**: 이름 · 서술자 열거(`readerForListOf`/`ArrayOf`/`MapOf` · `readValueAs` · jackson2 `com/fasterxml` 서술자가 밖)를 버리고
+  **소유자 쪽 허용 목록**으로 건다 — app main 이 Jackson 매퍼 · 판독기 계열 소유자(`ObjectMapper` · `JsonMapper` · `ObjectReader` · `ObjectWriter` · `JsonParser`,
+  jackson2 · jackson3 패키지 모두)에서 부르는 멤버 전수 == 허용 집합(오늘 관측값으로), 그 밖은 붉다. 양성 대조: G3(`readerForListOf(seed.javaClass)`) ·
+  `readValueAs` · jackson2 `TypeReference` 변이 RED.
+- **V4-N1 ② 핸들러 매개변수 축(G11)**: `@RequestMapping` 계열 핸들러 메서드의 매개변수 타입에 `AccountId` 와 그것을 필드 · 생성자 매개변수로 가진 타입이 없다는
+  구조 규칙(ArchUnit 또는 기존 javap 틀). G11 변이(`account: AccountId` + `?value=9`) RED.
+- **V4-N2 · R4-6 본문 없는 op**: 각 본문 없는 op 를 **받아들여지는 상태**에서 부르고(resume 은 담기 → `DEFER` 뒤), 응답 상태가 **문서의 2xx 와 정확히 같다**고
+  단언한다(상태 코드 열거 제거). N2a(상태 의존 본문 요구) · N2e(422) · N2f(403) · N3C 변이 RED.
+- **R4-3** app main 의 `BidActor$System.<init>` 호출자 = ∅ 등식 한 줄(C3-L6 을 구조로).
+- 문면: **R4-4** scope D-7B-5 의 「`internal` 로」 → 「공개 companion 상수(모듈 경계 — `SkipReason` 과 같은 모양)」 정정 표기(D-7B-5 본문은 고치지 않고 이 절이
+  정정한다) · **R4-7** `BID_TRANSITIONS` KDoc 「SYSTEM 행 호출자 없음」 → 마감 판정 둘 · **R4-10** checklist §2 전이표 `MARK_DEADLINE_PASSED` 주체 = System ·
+  **R4-11** §6 번호 참조를 항목 제목으로 · **V4-L1** 「바인딩 진입점 전수」 문장을 새 술어의 실제 범위로.
+
+적는다(§6, 코드 무변경): **R4-2**(마감 전 상태 집합이 줄면 기존 판정 행이 읽기마다 500 — append-only 라 복구 불가) · **R4-5**(상한 등식 모집단 손 열거) ·
+**R4-8**(adapters `JUDGED` 손 열거) · **R4-9**(`amountWon` 라벨 범위) · **V4-L2**(사용자 MARK 금지는 앱 층 불변식 — V21 CHECK 는 마이그레이션 재측정 비용 때문에
+이 slice 에서 하지 않는다) · G1 · G2(`updateValue` · `readerForUpdating`, 오늘 무해) · G3 · G11 을 `OPEN-7D-ACCOUNTID-CONSTRUCTION` 사례로.
+
+절차: D-7B-5 와 같다 — 처분표 → 새 게이트 test 는 `927e7b70` 에서 형제 우회(G3 · G11 · N2a · N2e · N2f)가 초록임을 먼저 보이고 수정 뒤 RED → 찬
+`check --continue` · S-20 · 변이 표 · rollback ①~③ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다.
+새 파일은 in_scope 와 대조해 보고한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
