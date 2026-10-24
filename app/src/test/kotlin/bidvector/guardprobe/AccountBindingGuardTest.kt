@@ -77,14 +77,12 @@ class AccountBindingGuardTest {
 
     /**
      * 단순 변환(`@RequestParam` `String → AccountId`) — 이 조립은 **위협을 흉내 내** `String → AccountId` 변환기를 등록한다
-     * ([ProbeConversion]). 가드의 formatter 가 변환 서비스보다 먼저 묻혀 지어지지 않는다: 핸들러에 닿지 않고 2xx 가 아니다.
-     * 응답은 500 이다(formatter 의 예외를 Spring 이 형 불일치로 감싸고, 공유 오류표가 그것을 500 으로 낸다 — 알려진 제한).
+     * ([ProbeConversion]). 가드의 formatter 가 변환 서비스보다 먼저 묻혀 지어지지 않는다: 핸들러에 닿지 않고 400 이다(Spring 이
+     * formatter 의 거부를 형 불일치로 감싸지만 가드의 advice 가 먼저 받아 400 으로 낸다 — 공유 오류표는 그대로).
      */
     @Test
-    fun `등록된 변환기가 있어도 요청 매개변수로 AccountId 를 짓지 못한다`() {
-        val status = call(HttpMethod.GET, "/probe/rp?account=9", null)
-
-        (status in SUCCESS) shouldBe false
+    fun `등록된 변환기가 있어도 요청 매개변수로 AccountId 를 짓지 못하고 400 이다`() {
+        call(HttpMethod.GET, "/probe/rp?account=9", null) shouldBe BAD_REQUEST
         Reached.count.get() shouldBe 0
     }
 
@@ -110,7 +108,7 @@ class AccountBindingGuardTest {
     private companion object {
         const val OK = 200
         val CLIENT_ERRORS = 400..499
-        val SUCCESS = 200..299
+        const val BAD_REQUEST = 400
     }
 }
 

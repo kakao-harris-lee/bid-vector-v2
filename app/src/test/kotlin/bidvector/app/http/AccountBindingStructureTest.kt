@@ -120,6 +120,8 @@ class AccountBindingStructureTest {
     /**
      * D-7B-7 ① — 바인딩 거부 가드(`AccountBindingGuard`)는 **`@RestController` 핸들러에만** 걸린다(관리 포트의 actuator 핸들러를
      * 비켜 가려고). 그래서 요청 매핑 메서드를 가진 app class 가 전부 `@RestController` 여야 가드 밖의 핸들러가 생기지 않는다.
+     * **관리 포트 핸들러는 이 모집단에 의도적으로 들지 않는다** — app main 의 class 가 아니라 Boot 의 actuator class 이고(모집단은 app main
+     * class 파일 전수다), 가드도 그들에게 걸지 않는다(그 핸들러는 선택 본문을 `Map` 으로 바인딩한다 — 걸면 health 가 400 이 된다).
      */
     @Test
     fun `요청 매핑 메서드를 선언한 app class 는 전부 RestController 다 — 바인딩 가드의 적용 범위`() {
@@ -129,6 +131,47 @@ class AccountBindingStructureTest {
         declaring
             .filterNot { it.isAnnotationPresent(org.springframework.web.bind.annotation.RestController::class.java) }
             .map { it.name } shouldBe emptyList()
+    }
+
+    /**
+     * 팀장 조건 (a) — 가드가 연 바깥 패키지(`tools.jackson.core` · `tools.jackson.databind.module` ·
+     * `org.springframework.web.bind` · `org.springframework.core` · `org.springframework.format` ·
+     * `org.springframework.web.method.annotation`)를 **가리키는 app class 는 가드 파일의 class 들뿐이다**. 패키지 허용 등식은
+     * class 단위가 아니므로(패키지가 열리면 어느 class 든 `JsonParser` · `ResolvableType` 을 쓸 수 있다) 그 사실을 이 등식이
+     * 잠근다. 하위 패키지(`…core.annotation` 등)는 대상이 아니다 — 앞서부터 열려 있던 자리다.
+     */
+    @Test
+    fun `가드가 연 바깥 패키지를 가리키는 app class 는 가드 파일의 class 들뿐이다`() {
+        guardPackageHolders(outputs) shouldBe GUARD_FILE_CLASSES
+    }
+
+    /** 대조 — 다른 app class 가 `JsonParser` · `ResolvableType` 을 가리키면 걸리고, 하위 패키지(`core.annotation`)는 걸리지 않는다. */
+    @Test
+    fun `다른 class 가 가드의 패키지를 쓰면 술어에 걸린다 — 대조`() {
+        val simulated =
+            mapOf(
+                "http/Parser" to "#7 = Class #8 // tools/jackson/core/JsonParser",
+                "http/Resolver" to "  public org.springframework.core.ResolvableType type();",
+                "http/Ordered" to "#9 = Utf8 Lorg/springframework/core/annotation/Order;",
+            )
+
+        guardPackageHolders(simulated) shouldBe setOf("http/Parser", "http/Resolver")
+    }
+
+    /**
+     * 팀장 조건 (c) — 가드의 「대상이 있는 바인더는 전부 거부」는 **오늘 app main 의 `@ModelAttribute` 사용이 0** 이라는 관측 위에 서 있다.
+     * 그 전제를 등식으로 잠근다(메서드 · 매개변수 둘 다). 뒤의 slice 가 쓰게 되면 이 등식이 먼저 붉고, 가드의 거부를 그 대상에 맞게 풀어야
+     * 한다(가드 KDoc · `OPEN-7D-ACCOUNTID-CONSTRUCTION`).
+     */
+    @Test
+    fun `app main 의 어디도 ModelAttribute 를 쓰지 않는다 — 바인딩 거부의 전제`() {
+        modelAttributeUsers(appClasses()) shouldBe emptySet()
+    }
+
+    /** 양성 대조 — 모델 속성 메서드와 모델 속성 매개변수가 술어에 걸린다. */
+    @Test
+    fun `ModelAttribute 메서드와 매개변수는 술어에 걸린다 — 양성 대조`() {
+        modelAttributeUsers(listOf(ModelAttributeProbe::class.java)) shouldBe setOf("vrAccount", "handler")
     }
 
     /** 양성 대조 — G11 의 모양(매개변수 `AccountId`)과 그것을 실은 묶음 타입이 규칙에 걸리고, 평범한 매개변수는 걸리지 않는다. */
@@ -144,6 +187,10 @@ class AccountBindingStructureTest {
     private companion object {
         const val JSON_NODE = "tools/jackson/databind/JsonNode"
         const val GUARD = "http/AccountBindingGuard"
+
+        /** 가드 파일의 class 중 가드가 연 패키지를 가리키는 것 — 오늘 관측(javap). */
+        val GUARD_FILE_CLASSES =
+            setOf(GUARD, "http/RejectingAccountIdDeserializer", "http/RejectingAccountIdFormatter")
         const val JSON_PARSER_RETURN = ")Ltools/jackson/core/JsonParser;"
         val BINDING_CAPABLE =
             listOf("Ljava/lang/Class;", "/JavaType;", "/TypeReference;", "/ObjectReadContext;")
@@ -282,4 +329,38 @@ private class G11Probe {
 
     @org.springframework.web.bind.annotation.GetMapping("/plain")
     fun plain(caseId: String): String = caseId
+}
+
+/** 가드가 연 패키지의 **바로 아래 타입**(첫 글자가 대문자) — 하위 패키지는 고르지 않는다. 슬래시 · 점 두 표기를 다 본다. */
+private val GUARD_PACKAGE_TYPE =
+    Regex(
+        """\b(?:tools[/.]jackson[/.]core|tools[/.]jackson[/.]databind[/.]module|""" +
+            """org[/.]springframework[/.]web[/.]bind|org[/.]springframework[/.]core|""" +
+            """org[/.]springframework[/.]format|""" +
+            """org[/.]springframework[/.]web[/.]method[/.]annotation)[/.][A-Z]""",
+    )
+
+private fun guardPackageHolders(outputs: Map<String, String>): Set<String> =
+    outputs.filterValues { text -> GUARD_PACKAGE_TYPE.containsMatchIn(text) }.keys
+
+/** `@ModelAttribute` 를 단 메서드와, 매개변수에 단 메서드의 이름. */
+private fun modelAttributeUsers(classes: List<Class<*>>): Set<String> =
+    classes
+        .flatMap { it.declaredMethods.toList() }
+        .filter { method ->
+            method.isAnnotationPresent(MODEL_ATTRIBUTE) ||
+                method.parameters.any { it.isAnnotationPresent(MODEL_ATTRIBUTE) }
+        }.map { it.name }
+        .toSet()
+
+private val MODEL_ATTRIBUTE = org.springframework.web.bind.annotation.ModelAttribute::class.java
+
+/** (c) 양성 대조용 — 모델 속성 메서드 하나 · 모델 속성 매개변수를 받는 핸들러 하나. */
+private class ModelAttributeProbe {
+    @org.springframework.web.bind.annotation.ModelAttribute("vrAccount")
+    fun vrAccount(account: bidvector.workflow.access.AccountId): String = account.toString()
+
+    fun handler(
+        @org.springframework.web.bind.annotation.ModelAttribute("vrAccount") held: Any,
+    ): String = held.toString()
 }
