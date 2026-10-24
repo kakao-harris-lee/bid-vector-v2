@@ -129,6 +129,15 @@ interface BidCaseStorePort {
         caseId: BidCaseId,
     ): List<TimelineEntry>
 
+    /**
+     * 마지막 타임라인 한 줄(없으면 `null`) — 마감 판정의 되돌림 판단이 쓴다(D-7B-5 C3-L8). 기본 구현은 전 타임라인을 읽어
+     * 끝을 고르고(test 이중체용), 출하 저장소는 한 줄만 읽는 질의로 바꾼다.
+     */
+    fun lastTransition(
+        account: AccountId,
+        caseId: BidCaseId,
+    ): TimelineEntry? = timeline(account, caseId).lastOrNull()
+
     fun applyTransition(
         account: AccountId,
         applied: AppliedTransition,

@@ -4,7 +4,9 @@ import bidvector.bidding.ActorKind
 import bidvector.bidding.BidCommand
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
+import bidvector.bidding.RejectionReason
 import bidvector.bidding.SkipReason
+import bidvector.bidding.TransitionOutcome
 import bidvector.bidding.tag
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCommandResult
@@ -183,11 +185,11 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
     }
 
     /**
-     * 결정 ⑤ 의 조건 「그 상태에 **시스템 판정으로** 들어왔다」 — 사용자가 직접 적은 「마감 지남」은 마감이 미래여도 거두지
-     * 않는다(되돌림은 서버가 세운 판정만 거둔다). 읽기 · 목록(판정 후보 질의가 이 건을 후보로 고르는 경로) 둘 다 본다.
+     * 「마감 지남」에 들어가는 길은 시스템 판정뿐이다(D-7B-5 C3-L6 — §6.1 은 사용자가 그 상태를 적는 길을 요구하지 않는다).
+     * 사용자가 적을 수 있으면 그 판정은 되돌림의 근거(마지막 행이 시스템 판정)를 갖지 못해 영구히 남는다 — 그 길을 닫는다.
      */
     @Test
-    fun `사용자가 적은 마감 지남은 마감이 미래여도 되돌리지 않는다`() {
+    fun `사용자는 마감 지남을 적을 수 없다 — 들어가는 길은 시스템 판정뿐이다`() {
         val mine = account("revoke-h")
         val key = notice("revoke-h")
         seedNotice(key, now.plusSeconds(HOUR))
@@ -196,14 +198,40 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
             workflow
                 .open(mine, key, BidKind.REAL)
                 .view.case.id
-        accepted(workflow.command(mine, caseId, BidCommand.MarkDeadlinePassed, BidActor.User(mine)))
 
         workflow
+            .command(mine, caseId, BidCommand.MarkDeadlinePassed, BidActor.User(mine))
+            .shouldBeInstanceOf<BidCommandResult.Processed>()
+            .outcome shouldBe TransitionOutcome.Rejected(RejectionReason.ActorNotPermitted)
+        workflow
             .read(mine, caseId)!!
-            .case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
-        val listed = workflow.list(mine, BidKind.REAL, BidStateTag.DEADLINE_PASSED_UNRECORDED)
-        listed.map { it.case.id } shouldBe listOf(caseId)
-        workflow.timeline(mine, caseId)!!.count { it.command == "REVOKE_DEADLINE_PASSED" } shouldBe 0
+            .case.state.tag shouldBe BidStateTag.WATCHING
+        workflow.timeline(mine, caseId)!!.map { it.command } shouldBe listOf("ADD_TO_BID_BOX")
+    }
+
+    /**
+     * 검토 r3 C3-L3 — 남의 건은 **판정 후보로도** 고르지 않는다(후보 질의의 계정 조건을 행동으로 잰다). 후보로 골라지면 그다음
+     * 판정 쓰기는 소유 확인이 막지만, 후보 질의가 남의 건을 읽는 것 자체가 경계 밖이다.
+     */
+    @Test
+    fun `남의 건은 판정 후보로도 고르지 않는다`() {
+        val mine = account("revoke-i")
+        val other = account("revoke-j")
+        val key = notice("revoke-i")
+        seedNotice(key, now.plusSeconds(HOUR))
+        val caseId =
+            workflow()
+                .open(other, key, BidKind.REAL)
+                .view.case.id
+        now = now.plusSeconds(2 * HOUR)
+        val store = JdbcBidCaseStore(dataSource())
+
+        store.settleCandidates(mine, BidKind.REAL, JUDGED, now).shouldBeEmpty()
+        // 양성 대조 — 주인의 후보로는 골라진다(질의가 빈 결과를 늘 내는 것이 아니다).
+        store.settleCandidates(other, BidKind.REAL, JUDGED, now).map { it.id } shouldBe listOf(caseId)
+        workflow().list(mine, BidKind.REAL, null).shouldBeEmpty()
+        // 내 목록이 남의 건을 판정하지 않았다 — 저장소를 직접 읽는다(워크플로 읽기는 그 자체로 판정을 지난다).
+        store.timeline(other, caseId).map { it.command } shouldBe listOf("ADD_TO_BID_BOX")
     }
 
     private fun accepted(result: BidCommandResult) {
@@ -218,5 +246,9 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
 
     private companion object {
         const val HOUR = 3_600L
+
+        /** 판정을 세우는 마감 전 넷(workflow 의 `DEADLINE_JUDGED_STATES` 는 모듈 내부라 값을 적는다 — 등식은 workflow test). */
+        val JUDGED =
+            setOf(BidStateTag.WATCHING, BidStateTag.DEFERRED, BidStateTag.PRICE_RECEIVED, BidStateTag.BID_PLANNED)
     }
 }

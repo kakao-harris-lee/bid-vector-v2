@@ -120,7 +120,7 @@ internal class DeadlineSettlement(
         account: AccountId,
         case: BidCase,
     ): BidCommand? {
-        val last = cases.timeline(account, case.id).lastOrNull() ?: return null
+        val last = cases.lastTransition(account, case.id) ?: return null
         val systemMark =
             last.actorKind == ActorKind.SYSTEM && last.command == BidCommandTag.MARK_DEADLINE_PASSED.name
         val from = last.fromState
@@ -129,16 +129,21 @@ internal class DeadlineSettlement(
 }
 
 /**
- * 판정 직전 상태를 복원한다. payload 가 없는 셋은 그대로이고, **나중에(DEFERRED)** 는 리마인드 시각을 판정이 지웠으므로
- * (마감 지남은 그 값을 싣지 않는다) 관심(WATCHING)으로 돌린다 — 옛 리마인드는 마감이 연장된 뒤 대개 의미를 잃는다.
- * 그 밖의 꼬리표는 전이표가 거부한다(마감 전 넷만 도착 집합이다).
+ * 되돌림 도착표 — 판정 직전 상태(타임라인의 `from_state`) → 돌아갈 상태(D-7B-5 C3-M3). 키는 판정을 세우는 마감 전 넷이고,
+ * 키 집합 == [DEADLINE_JUDGED_STATES] 를 `BidCaseWorkflowTest` 가 등식으로 잰다(마감 전 상태가 늘면 이 표도 함께 늘어야 한다).
+ * payload 가 없는 셋은 그대로 돌아간다. **`DEFERRED → WATCHING` 은 의도한 항목이다**(D-7B-4 결정 ⑤ 보충): 판정이 리마인드 시각을
+ * 지웠고 마감 지남은 그 값을 싣지 않으므로, 돌아갈 「나중에」를 지을 값이 없다.
  */
-private fun restoreOf(from: BidStateTag): BidState =
-    when (from) {
-        BidStateTag.PRICE_RECEIVED -> BidState.PriceReceived
-        BidStateTag.BID_PLANNED -> BidState.BidPlanned
-        else -> BidState.Watching
-    }
+internal val REVOKE_TARGETS: Map<BidStateTag, BidState> =
+    mapOf(
+        BidStateTag.WATCHING to BidState.Watching,
+        BidStateTag.DEFERRED to BidState.Watching,
+        BidStateTag.PRICE_RECEIVED to BidState.PriceReceived,
+        BidStateTag.BID_PLANNED to BidState.BidPlanned,
+    )
+
+/** 표 밖의 꼬리표는 시스템 판정의 출발이 될 수 없다(전이표) — 조용히 접지 않고 실패한다. */
+private fun restoreOf(from: BidStateTag): BidState = REVOKE_TARGETS[from] ?: error("되돌릴 도착이 정의되지 않은 판정 직전 상태다: $from")
 
 /** 판정을 지난 건과 그때 읽은 공고 마감(키 부재 = 공고 행 없음). */
 internal data class SettledCase(

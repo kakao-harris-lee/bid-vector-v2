@@ -175,6 +175,10 @@ private val OUTCOME_ROWS =
 /**
  * 종료 가지 둘 — 건너뜀(종단)과 마감 지남(소급 입구 하나가 남는다). 마감 지남에는 **시스템 되돌림** 한 간선이 더
  * 있다(계약 D-7B-4 결정 ⑤): 마감을 미룬 정정 공고 뒤에 시스템 판정을 거두는 길이고, 도착은 마감 전 넷이다.
+ *
+ * 마감 지남에 **들어가는** 간선은 시스템 전용이다(D-7B-5 C3-L6): §6.1 은 「확인 없이 마감이 지나면 『마감 지남(미확인)』이
+ * 되고」라 적을 뿐 사용자가 그 상태를 적는 길을 요구하지 않는다. 사용자가 적을 수 있으면 그 판정은 되돌림의 근거(마지막 행이
+ * 시스템 판정)를 갖지 못해 영구히 남는다.
  */
 private val EXIT_ROWS =
     rows(PRE_SUBMISSION, BidCommandTag.SKIP, setOf(BidStateTag.SKIPPED), USER_ONLY) +
@@ -182,7 +186,7 @@ private val EXIT_ROWS =
             PRE_SUBMISSION,
             BidCommandTag.MARK_DEADLINE_PASSED,
             setOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
-            USER_OR_SYSTEM,
+            SYSTEM_ONLY,
         ) +
         rows(
             listOf(BidStateTag.DEADLINE_PASSED_UNRECORDED),
@@ -218,8 +222,9 @@ private fun BidState.alone(): Pair<BidState, TransitionEffect> = this to Transit
 
 /**
  * payload 가 **없는** 명령의 도착 — 룩업표다(§4.5 2: 값 기반 분기는 표로, `BidCaseRow.PAYLOAD_FREE` 와 같은 모양).
- * 아래 [targetOf] 의 `when` 이 payload 를 읽는 명령만 다루게 해 분기를 줄인다. 표와 `when` 이 함께 명령 전수를 덮는지는
- * `BidTransitionTableTest` 「표에 있는 쌍은 … 허용된다」가 명령 전수(`ALL_COMMANDS`)로 잰다.
+ * 아래 [targetOf] 의 `when` 이 payload 를 읽는 명령만 다루게 해 분기를 줄인다. 표와 `when` 이 함께 덮어야 하는 것은
+ * **전이표에 행이 있는 명령에 한해서**다 — 행이 없는 명령은 전이표가 먼저 거부해 [targetOf] 에 닿지 않는다(D-7B-5 C3-L5).
+ * 그 덮음은 `BidTransitionTableTest` 「표에 있는 쌍은 … 허용된다」가 명령 전수(`ALL_COMMANDS`)로 잰다.
  */
 private val PAYLOAD_FREE_TARGETS: Map<BidCommand, BidState> =
     mapOf(

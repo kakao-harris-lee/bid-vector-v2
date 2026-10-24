@@ -23,8 +23,9 @@ data class EvidenceRef(
     /** `toString()` 을 가린다 — 예외 문면 · 로그에 값이 실리지 않게(`ClearPassphrase` 관례). */
     override fun toString(): String = "EvidenceRef(***)"
 
-    private companion object {
-        const val MAX_LENGTH = 128
+    /** 상한 — V21 `char_length` CHECK · OpenAPI `maxLength` 와 등식으로 묶인다(D-7B-5 C3-M2). */
+    companion object {
+        const val MAX_LENGTH: Int = 128
     }
 }
 
@@ -42,8 +43,9 @@ data class BidMemo(
 
     override fun toString(): String = "BidMemo(***)"
 
-    private companion object {
-        const val MAX_LENGTH = 2000
+    /** 상한 — V21 `char_length` CHECK · OpenAPI `maxLength` 와 등식으로 묶인다(D-7B-5 C3-M2). */
+    companion object {
+        const val MAX_LENGTH: Int = 2000
     }
 }
 

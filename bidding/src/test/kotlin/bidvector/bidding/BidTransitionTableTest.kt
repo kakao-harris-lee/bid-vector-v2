@@ -113,14 +113,18 @@ class BidTransitionTableTest {
     }
 
     @Test
-    fun `표 밖 주체 조합도 골든과 같다 — 시스템 전용 둘과 사용자 전용 집합`() {
+    fun `표 밖 주체 조합도 골든과 같다 — 시스템 전용 셋과 사용자·시스템 집합`() {
         val systemOnly =
             BID_TRANSITIONS.entries
                 .filter { it.value.actors == setOf(ActorKind.SYSTEM) }
                 .map { it.key.command }
                 .toSet()
         systemOnly shouldContainExactlyInAnyOrder
-            listOf(BidCommandTag.RECEIVE_PRICE_MENU, BidCommandTag.REVOKE_DEADLINE_PASSED)
+            listOf(
+                BidCommandTag.RECEIVE_PRICE_MENU,
+                BidCommandTag.MARK_DEADLINE_PASSED,
+                BidCommandTag.REVOKE_DEADLINE_PASSED,
+            )
 
         val userAndSystem =
             BID_TRANSITIONS.entries
@@ -134,7 +138,6 @@ class BidTransitionTableTest {
                 BidCommandTag.RECORD_OPENING_FIRST,
                 BidCommandTag.RECORD_OPENING_OUT_OF_RANK,
                 BidCommandTag.RECORD_OUTCOME,
-                BidCommandTag.MARK_DEADLINE_PASSED,
             )
     }
 

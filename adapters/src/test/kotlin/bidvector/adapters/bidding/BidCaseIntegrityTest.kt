@@ -2,9 +2,12 @@ package bidvector.adapters.bidding
 
 import bidvector.bidding.BidCommandTag
 import bidvector.bidding.BidKind
+import bidvector.bidding.BidMemo
 import bidvector.bidding.BidStateTag
+import bidvector.bidding.EvidenceRef
 import bidvector.bidding.OPEN_CASE_COMMAND
 import bidvector.bidding.SkipReason
+import bidvector.bidding.TransitionReason
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -110,14 +113,25 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
 
     /** 검토 r2 C2-N13 — 메모 · 증빙 참조도 지울 수 없는 표에 남으므로 도메인 상한을 표가 한 번 더 진다. */
     @Test
+    fun `자유 텍스트 상한 CHECK 는 도메인 상한 상수와 같다`() {
+        lengthLimits() shouldBe
+            mapOf(
+                "bid_case.skip_reason" to SkipReason.MAX_LENGTH,
+                "bid_case_transition.reason" to TransitionReason.MAX_LENGTH,
+                "bid_record.evidence_ref" to EvidenceRef.MAX_LENGTH,
+                "bid_record.memo" to BidMemo.MAX_LENGTH,
+            )
+    }
+
+    @Test
     fun `메모 · 증빙 참조는 도메인 상한을 넘을 수 없다`() {
         val mine = account("integ-j")
         val caseId = openCase(mine, "integ-j")
 
-        insertsRecord(caseId, mine.value, "{3}", memo = "m".repeat(MEMO_LIMIT)) shouldBe true
-        insertsRecord(caseId, mine.value, "{3}", memo = "m".repeat(MEMO_LIMIT + 1)) shouldBe false
-        insertsRecord(caseId, mine.value, "{3}", evidence = "e".repeat(EVIDENCE_LIMIT)) shouldBe true
-        insertsRecord(caseId, mine.value, "{3}", evidence = "e".repeat(EVIDENCE_LIMIT + 1)) shouldBe false
+        insertsRecord(caseId, mine.value, "{3}", memo = "m".repeat(BidMemo.MAX_LENGTH)) shouldBe true
+        insertsRecord(caseId, mine.value, "{3}", memo = "m".repeat(BidMemo.MAX_LENGTH + 1)) shouldBe false
+        insertsRecord(caseId, mine.value, "{3}", evidence = "e".repeat(EvidenceRef.MAX_LENGTH)) shouldBe true
+        insertsRecord(caseId, mine.value, "{3}", evidence = "e".repeat(EvidenceRef.MAX_LENGTH + 1)) shouldBe false
     }
 
     /** 검토 r2 C2-N14 — 스냅샷의 기초금액 통화 · 과세가 빈 문자열이면 되읽을 때 `valueOf("")` 가 터진다. */
@@ -221,9 +235,32 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
             runCatching { connection.createStatement().use { it.executeUpdate(sql) } }.isSuccess
         }
 
+    /**
+     * 자유 텍스트 상한 — V21 `char_length` CHECK 의 수 ↔ 도메인 상한 상수, 등식(D-7B-5 C3-M2). 앞 판은 test 가 값을 옮겨 적어
+     * 「어긋나면 붉다」가 거짓이었다. 이제 DB 가 내놓는 정의(`pg_get_constraintdef`)에서 읽고 도메인 상수와 맞댄다.
+     */
+    private fun lengthLimits(): Map<String, Int> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT c.relname, pg_get_constraintdef(k.oid) FROM pg_constraint k " +
+                            "JOIN pg_class c ON c.oid = k.conrelid WHERE k.contype = 'c' " +
+                            "AND c.relname IN ('bid_case', 'bid_case_transition', 'bid_draft', 'bid_record')",
+                    ).use { rs ->
+                        buildMap {
+                            while (rs.next()) {
+                                val table = rs.getString(1)
+                                CHAR_LENGTH_LIMIT.findAll(rs.getString(2)).forEach { match ->
+                                    put("$table.${match.groupValues[1]}", match.groupValues[2].toInt())
+                                }
+                            }
+                        }
+                    }
+            }
+        }
+
     private companion object {
-        /** `BidMemo` · `EvidenceRef` 의 상한(도메인 companion 이 private 이라 값을 옮겨 적는다 — 어긋나면 위 test 가 붉다). */
-        const val MEMO_LIMIT = 2000
-        const val EVIDENCE_LIMIT = 128
+        val CHAR_LENGTH_LIMIT = Regex("""char_length\((\w+)\) <= (\d+)""")
     }
 }

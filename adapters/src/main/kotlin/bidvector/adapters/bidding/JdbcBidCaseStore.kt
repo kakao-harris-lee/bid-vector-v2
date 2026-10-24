@@ -48,7 +48,7 @@ class JdbcBidCaseStore(
             connection.inTransaction {
                 val inserted = insertCase(connection, account, notice, kind, at, deadlineAt)
                 if (inserted != null) {
-                    insertTransition(
+                    BidTimelineRows.insert(
                         connection = connection,
                         account = account,
                         caseId = inserted.id,
@@ -123,31 +123,15 @@ class JdbcBidCaseStore(
         account: AccountId,
         caseId: BidCaseId,
     ): List<TimelineEntry> =
-        connections.withConnection { connection ->
-            connection.prepareStatement(BiddingSql.SELECT_TIMELINE).use { statement ->
-                var index = 1
-                statement.setLong(index++, account.value)
-                statement.setLong(index, caseId.value)
-                statement.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(
-                                TimelineEntry(
-                                    caseVersion = rs.getInt("case_version"),
-                                    fromState = rs.getString("from_state")?.let(BidStateTag::valueOf),
-                                    toState = BidStateTag.valueOf(rs.getString("to_state")),
-                                    command = rs.getString("command"),
-                                    actorKind = BidCaseRow.actorKind(rs.getString("actor_kind")),
-                                    actorDetail = rs.getString("actor_detail"),
-                                    reason = rs.getString("reason"),
-                                    retroactive = rs.getBoolean("retroactive"),
-                                    occurredAt = rs.getTimestamp("occurred_at").toInstant(),
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
+        connections.withConnection { BidTimelineRows.read(it, BiddingSql.SELECT_TIMELINE, account, caseId) }
+
+    /** 마지막 한 줄만 읽는다(D-7B-5 C3-L8 — 되돌림 판단이 타임라인 전문을 적재하지 않게). */
+    override fun lastTransition(
+        account: AccountId,
+        caseId: BidCaseId,
+    ): TimelineEntry? =
+        connections.withConnection {
+            BidTimelineRows.read(it, BiddingSql.SELECT_LAST_TRANSITION, account, caseId).singleOrNull()
         }
 
     override fun applyTransition(
@@ -163,7 +147,7 @@ class JdbcBidCaseStore(
                 if (!updateCaseState(connection, account, applied, nextVersion)) {
                     return@inTransaction TransitionWrite.VersionConflict
                 }
-                insertTransition(
+                BidTimelineRows.insert(
                     connection = connection,
                     account = account,
                     caseId = applied.caseId,
@@ -241,38 +225,6 @@ class JdbcBidCaseStore(
             statement.setLong(index++, applied.caseId.value)
             statement.setInt(index, applied.expectedVersion)
             statement.executeUpdate() == 1
-        }
-    }
-
-    @Suppress("LongParameterList")
-    private fun insertTransition(
-        connection: Connection,
-        account: AccountId,
-        caseId: BidCaseId,
-        caseVersion: Int,
-        fromState: String?,
-        toState: String,
-        command: String,
-        actorKind: String,
-        actorDetail: String?,
-        reason: String?,
-        retroactive: Boolean,
-        occurredAt: Instant,
-    ) {
-        connection.prepareStatement(BiddingSql.INSERT_TRANSITION).use { statement ->
-            var index = 1
-            statement.setLong(index++, caseId.value)
-            statement.setLong(index++, account.value)
-            statement.setInt(index++, caseVersion)
-            statement.setString(index++, fromState)
-            statement.setString(index++, toState)
-            statement.setString(index++, command)
-            statement.setString(index++, actorKind)
-            statement.setString(index++, actorDetail)
-            statement.setString(index++, reason)
-            statement.setBoolean(index++, retroactive)
-            statement.setTimestamp(index, Timestamp.from(occurredAt))
-            statement.executeUpdate()
         }
     }
 }

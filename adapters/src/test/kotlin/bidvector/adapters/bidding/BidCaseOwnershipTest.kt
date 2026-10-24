@@ -185,7 +185,8 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         val mine = account("own-h")
         val opened = workflow.open(mine, notice("own-6"), BidKind.REAL)
 
-        workflow.command(mine, opened.view.case.id, BidCommand.MarkDeadlinePassed, BidActor.User(mine))
+        // 「마감 지남」은 시스템 판정만 세운다(D-7B-5 C3-L6) — 이 test 는 소급 기록을 보므로 판정을 직접 세운다.
+        workflow.command(mine, opened.view.case.id, BidCommand.MarkDeadlinePassed, BidActor.System("deadline-check"))
         workflow.command(
             mine,
             opened.view.case.id,

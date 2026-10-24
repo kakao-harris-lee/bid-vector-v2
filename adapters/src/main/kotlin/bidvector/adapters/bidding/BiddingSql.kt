@@ -85,6 +85,12 @@ internal object BiddingSql {
             "reason, retroactive, occurred_at FROM bid_case_transition " +
             "WHERE account_id = ? AND case_id = ? ORDER BY case_version"
 
+    /** 마지막 타임라인 한 줄 — 되돌림 판단은 이것만 본다(D-7B-5 C3-L8). 열은 [SELECT_TIMELINE] 과 같다. */
+    const val SELECT_LAST_TRANSITION =
+        "SELECT case_version, from_state, to_state, command, actor_kind, actor_detail, " +
+            "reason, retroactive, occurred_at FROM bid_case_transition " +
+            "WHERE account_id = ? AND case_id = ? ORDER BY case_version DESC LIMIT 1"
+
     const val NEXT_DRAFT_SEQ =
         "SELECT COALESCE(MAX(draft_seq) + 1, 0) FROM bid_draft WHERE account_id = ? AND case_id = ?"
 

@@ -1,10 +1,12 @@
 package bidvector.workflow.bidding
 
 import bidvector.bidding.ActorKind
+import bidvector.bidding.BID_TRANSITIONS
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
+import bidvector.bidding.BidCommandTag
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
@@ -16,6 +18,7 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.RejectionReason
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.TransitionEffect
+import bidvector.bidding.TransitionKey
 import bidvector.bidding.TransitionOutcome
 import bidvector.bidding.tag
 import bidvector.sharedkernel.Currency
@@ -84,6 +87,25 @@ class BidCaseWorkflowTest {
             evidence = evidence,
             memo = null,
         )
+
+    // --- 마감 판정 되돌림 도착표(D-7B-5 C3-M3) ----------------------------------
+
+    @Test
+    fun `되돌림 도착표의 키는 마감 판정을 세우는 상태 전수와 같고 도착은 전이표가 허락한 집합 안이다`() {
+        REVOKE_TARGETS.keys shouldBe DEADLINE_JUDGED_STATES
+        val revoke =
+            requireNotNull(
+                BID_TRANSITIONS[
+                    TransitionKey(
+                        BidStateTag.DEADLINE_PASSED_UNRECORDED,
+                        BidCommandTag.REVOKE_DEADLINE_PASSED,
+                    ),
+                ],
+            )
+        revoke.allowedTargets.containsAll(REVOKE_TARGETS.values.map { it.tag }) shouldBe true
+        // 의도한 항목 — 「나중에」는 리마인드 시각을 잃었으므로 관심으로 돌아간다(D-7B-4 결정 ⑤ 보충).
+        REVOKE_TARGETS[BidStateTag.DEFERRED] shouldBe BidState.Watching
+    }
 
     // --- 소유 경계 -------------------------------------------------------------
 
