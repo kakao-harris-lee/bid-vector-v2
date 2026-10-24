@@ -513,6 +513,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | 9 문서 — milestone-7 R-5 닫음 · milestone-6 예외 줄 · runbook · 리허설 | `milestone-7.md` · `milestone-6.md` · `docs/runbook/m6-6b3-retention.md` | §7 `db-rehearsal.sh` | 출하 |
 | **D-7B-2 (계약 갱신으로 추가)** typed `AccountId` 운반 · 라벨 파싱 0 | `AuthenticatedAccount.kt`(속성 키 · 접근자) · `AuthenticationResult.Authenticated.account` · 필터가 판정 전에 지우고 다시 적음 · `BidCaseRouting.accountOf` 삭제 | `AuthenticatedAccountTest`(라벨 위조 불변 · 속성 부재 null · 미리 놓인 속성 소거 · 세션 E2E · 자격 헤더 401) · `AccountCarrierStructureTest`(javap 집합 등식 셋 + 양성 대조) · 변이 ⑭ | 출하 |
 | **D-7B-3 (계약 갱신으로 추가)** 검토 r1 처분 — 결정 ① ~ ④ + 고칠 목록 | §3.5 처분표의 「출하」 칸 | §3.5 처분표 · 변이 표(r1) | 출하 — 근거 있는 거부 하나(C-M6) · 등재 셋(C-L5 · C-L6 · C-L7) |
+| **D-7B-4 (계약 갱신으로 추가)** 검토 r2 처분 — 결정 ⑤ ~ ⑧ · 게이트 우회 둘 · 고칠 목록 | §3.6 처분표의 「출하」 칸 | §3.6 처분표 · 변이 표(r2) | 출하 — 등재 넷(C2-N10 · C2-N12 · C2-N19 · V2-W6 사실) · OPEN 후보 둘(활성 등재는 팀장 문서 PR) |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
 | (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
@@ -529,6 +530,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | fix 「기계 전수 게이트 대응」 | 반사 제거 · 주입 등재 · 본문 모양 일치 |
 | refactor 「저장 어휘 함수·인자 이름 …」 · feat 「계정 전용 경로 선언 …」 · fix 「목록·타임라인 응답을 맨 위 배열로」 · fix 「게이트 등재 …」 · test 「입찰 건 test double …」 | 수정 라운드 — 어휘 이름 · 계정 전용 경로와 공유 test 모집단 · 맨 위 배열 응답 · 게이트 등재 · test double. 「계정 전용 경로 선언」 커밋 제목의 「(D-7B-2)」는 **옛 표기**다(아래 §3.1 — 새 D-7B-2 와 다른 것, 이력은 되쓰지 않는다) |
 | feat 「계약 D-7B-2 — typed AccountId 를 요청 속성으로 운반 …」 · test 「입찰 건 이중체의 계정 비교를 값으로」 · test 「요청 값 test …」 · test 「append-only test 가 초안·기록 행을 심는다」 | 계약 D-7B-2 와 그 라운드의 발견 셋(§3.4) |
+| feat 「전이표에 시스템 되돌림 간선 …」 · feat 「마감 판정 두 방향 …」 · fix 「V21·영속 — 되돌림 명령 어휘 …」 · fix 「HTTP — resume 400 선언 …」 · fix 「detekt(함수 수 · 복잡도) …」 · test 「사용자가 적은 마감 지남은 되돌리지 않는다 …」 | 수정 라운드 2(계약 D-7B-4, §3.6). 마지막 산출물 커밋은 맨 뒤의 test 커밋이다 |
 | docs 커밋들 | 계약 · 설계 · evidence |
 
 base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
@@ -791,7 +793,7 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 | C-M3 | 스냅샷 출처 열 셋에 어휘 · 짝 CHECK 없음 | 고침(B-1 과 같은 커밋) | 위 C-B1 | `BidCaseSnapshotTest` 어휘 등식 둘 |
 | C-M5 | 건너뜀 · 정정 사유에 길이 상한 없음(지울 수 없는 표 · 개인정보) | 고침 | 도메인 `MAX_LENGTH` 500 · 요청 판독 400 · OpenAPI `maxLength` · DB `char_length` CHECK | `BidCaseEndpointTest`「사유 상한 400」 · `BidCaseIntegrityTest`「사유 상한」 · **M5-old RED**(도메인 상한이 없으면 DB CHECK 가 500 을 낸다) |
 | C-L4 | `draw_numbers` 원소 부호를 DB 가 보지 않음 | 고침 | `CHECK (0 < ALL (draw_numbers))` | `BidCaseIntegrityTest`「추첨번호는 양수뿐」 |
-| C-M6 · V-L3(뒤 절반) | `draft_id` 가 「기본값 초안」이 아니라 「최신 초안」 | **근거 있는 거부**(팀장 수용 2026-10-24) — 코드 무변경, 주석 정정 | 계약 문면(ux §6.1 ⑤): 확인 화면은 「**초안이 채워진 상태**: 금액(**기본 = 고른 안, 다르게 냈으면 수정**)」이고 acceptance 는 「『제출함』 확인은 **초안 금액을 기본값으로** 하되 다르게 냈으면 수정할 수 있고」다. 확인 화면이 기본값으로 채우는 초안이 **그 시점의 최신 초안**이므로 둘은 같은 것이다. 거짓은 코드가 아니라 주석의 「이 초안대로 냈다」로 읽히는 문면이었다 — V21 · `BiddingSql` · `BidEffectWriter` 주석을 「기본값으로 채운 초안 = 최신 초안, 금액은 기록이 따로 싣는다」로 고쳤다 | — |
+| C-M6 · V-L3(뒤 절반) | `draft_id` 가 「기본값 초안」이 아니라 「최신 초안」 | **근거 있는 거부**(팀장 수용 2026-10-24) — 코드 무변경, 주석 정정 | 계약 문면(ux §6.1 ⑤): 확인 화면은 「**초안이 채워진 상태**: 금액(**기본 = 고른 안, 다르게 냈으면 수정**)」이고 acceptance 는 「『제출함』 확인은 **초안 금액을 기본값으로** 하되 다르게 냈으면 수정할 수 있고」다. 확인 화면이 기본값으로 채우는 초안이 **그 시점의 최신 초안**이므로 둘은 같은 것이다. 거짓은 코드가 아니라 주석의 「이 초안대로 냈다」로 읽히는 문면이었다 — V21 · `BiddingSql` · `BidEffectWriter` 주석을 「기본값으로 채운 초안 = 최신 초안, 금액은 기록이 따로 싣는다」로 고쳤다. **그 등식 문면은 r2 에서 다시 고쳤다** — 화면이 뜬 뒤 초안이 새로 쌓이면 둘이 갈린다(TOCTOU, §3.6) | — |
 | C-M7 | HTTP 이중체가 생성 전이를 남기지 않음 | 고침 | 이중체가 생성 전이 한 줄을 남긴다 | `BidCaseEndpointTest`「담은 직후 타임라인」 · **M7d-old RED** |
 | C-M10 · V-L8 | 「속성 test 포함」 미이행 · 196 쌍 | 고침 | `BidTransitionPropertyTest`(`checkAll` — 받아들임 ⊆ 표의 행 · 주체 · 도착, 소급 ⇔ 마감 지남의 기록, 건너뜀에서 전부 거부, 결정성) · 주석 182 | **PROP RED** |
 | C-M11 | 이미 담긴 건도 201 | 고침 | `OpenedCase(view, created)` · 새로 담으면 201, 이미 있으면 200 · OpenAPI 200 추가 · 생성 타입 재생성 | `BidCaseEndpointTest`「201 · 200 같은 건」 · **M11-old RED** |
@@ -800,7 +802,7 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 | V-L6 | ConstantTime 근거의 실재하지 않는 「provenance 짝 판정」 | 고침 | 근거 문장 정정 | — |
 | V-L7 | evidence §3 의 낡는 좌표 | 고침 | 정책 파일 키 옆의 줄 번호 셋을 지웠다(Phase 1 표의 같은 셋도) — 키 이름만 남긴다 | `grep -nE "\(:[0-9]+\)"` 이 이 파일에서 0 |
 | C-L1 | `requestValue("noticeRound")` 가 공고번호 판독까지 감쌈 | 고침 | 감싸는 범위를 `NoticeRound.of` 하나로 | — |
-| C-L5 | 표면 전수의 본문 probe 가 입찰 건 본문 판독에 닿지 않음(경로 판독이 먼저 400) | **등재(근거)** | 그 probe 의 경로 자리표시는 **모든 매핑이 공유**한다 — 바꾸면 다른 레인의 매핑 거동이 함께 바뀌므로 이 slice 의 처분이 아니다. 입찰 건 본문 판독은 `BidCaseRequestsTest` · `BidCaseEndpointTest` 가 직접 잰다 | — |
+| C-L5 | 표면 전수의 본문 probe 가 입찰 건 본문 판독에 닿지 않음(경로 판독이 먼저 400) | **등재(근거)** — 근거 문장은 r2 C2-N20 으로 정정 | 그 자리표시는 test 전용 상수(`ProductionHttpSurfaceTest` 의 `PATH_VARIABLE_PROBE`, 숫자가 아닌 문자열)이고 **출하 거동은 바뀌지 않는다** — 바꾸면 바뀌는 것은 그 게이트가 무엇을 재는지다. 경로 변수가 있는 입찰 건 매핑만 본문 판독 전에 400 이고, 경로 변수가 없는 `POST /api/bid-cases` 는 본문 판독까지 닿는다. 공유 게이트의 측정 범위를 바꾸는 일이라 이 slice 의 처분이 아니고, 입찰 건 본문 판독은 `BidCaseRequestsTest` · `BidCaseEndpointTest` 가 직접 잰다 | — |
 | C-L6 | `AccountId` 에 `equals` 가 없음 | **등재(근거)** | `workflow/access` 는 7D 의 파일이고 in_scope 밖이다. 이 slice 의 비교는 전부 `.value` 이고(이중체 둘을 고친 것이 그 축), 후속 slice 의 위험으로 남긴다 | — |
 | C-L7 | runbook 에 `account` 행을 더한 것은 선언된 절 밖 | **등재** | 7D 의 누락을 메운 한 줄이다(보존 분류 「제외」 표). 되돌리지 않고 여기 적는다 | — |
 
@@ -827,7 +829,7 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 | V-M4 | 조회 controller 생성자에 `AccountId` + 배선이 `AccountId(1L)` 빈(verifier 변이 그대로) | `AccountCarrierStructureTest` | **RED** 2 — 생성자 인자 등식 · `AccountId` 만드는 자리 ∅ |
 | V-M7 | V21 열 GRANT `updated_at` → `created_at`(verifier 변이 그대로) | `BidCaseColumnPrivilegeTest` | **RED** 2 — 열 집합 등식 · 앱 역할 끝까지 경로(`permission denied`) |
 | V-M3 | 조건부 UPDATE 의 `account_id = ?` → `?::bigint IS NOT NULL`(verifier 변이 그대로) | `BiddingSqlOwnershipTest` | **RED** 1 |
-| D1-lazy2 | 마감 판정 조건을 늘 거짓으로(결정 ① 의 지연 판정을 끈다) | `BidCaseScheduleTest` | **RED** 4 — 남은 둘은 「마감 전 무전이」·「통보 예정일」(판정과 무관한 축, 기대대로 초록) |
+| D1-lazy2 | 마감 판정 조건을 늘 거짓으로(결정 ① 의 지연 판정을 끈다) | `BidCaseScheduleTest` | **RED** 4 — 남은 둘은 「마감 전 무전이」·「통보 예정일」(판정과 무관한 축, 기대대로 초록). **측정 트리: 정정 공고 test 둘을 더하기 전**(r2 C2-N21) — 현행 트리 재측정은 §3.6 변이 표 |
 | D1-control | 통제군 — 변이 없음 | `BidCaseScheduleTest` | 초록 6 / 6(정정 공고 test 둘을 더한 뒤 다시 재서 8 / 8) |
 | COPY-first | 마감을 **사본 우선**으로(정정 공고의 지금 값을 무시) | `BidCaseScheduleTest` | **RED** 2 — 정정이 마감을 앞당긴 건 · 미룬 건(팀장 확인 2026-10-24 로 더한 test 둘) |
 | B1-read | 구판 거동 — 읽기가 출처를 클래스 이름 표기로 맞댄다 | `BidCaseSnapshotTest` | **RED** 2(기초금액 단언 둘) |
@@ -846,6 +848,90 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 
 첫 시도의 `D1-lazy`(판정 결과를 `Rejected` 로 바꿔치우기)는 **컴파일 실패**였다 — 타입이 좁아져 뒤의 `!is Accepted` 검사가
 성립하지 않았다. 측정이 아니므로 결과로 세지 않고, 컴파일되는 변형(`D1-lazy2`)과 통제군으로 다시 쟀다.
+
+### 3.6 수정 라운드 2 — 계약 D-7B-4 (검토 r2 처분, 2026-10-24)
+
+판정 SHA `10cf5d02` 에 대한 verifier r2 **ready-for-review**(차단 0 · 게이트 medium 2 · 장부층 6)와 code-reviewer r2 **request_changes**
+(high 1 · medium 6 · low 14)를 합친 라운드다(재작업 2/5). 지적 ID 는 `V2-`(verifier) · `C2-`(code-reviewer) 접두다. **구판 RED** 는 §3.5 와
+같은 방식이다 — `10cf5d02` 와 이번 판은 포트 서명(`NoticeDeadline` · `settleCandidates`)과 전이표(새 명령)가 달라 새 test 를 구판 트리에 그대로
+얹을 수 없으므로, **지금 트리에서 그 거동만 구판으로 되돌리는 변이**로 쟀다(이름이 `-old` 거나 「구판 거동」이라 적힌 행, 결과는 아래 변이 표).
+
+| 지적 | 내용(한 줄) | 처분 | 출하 | 재는 자리 · 구판 RED |
+|---|---|---|---|---|
+| C2-N1 · V2-W2 | 마감 판정이 비가역 — 판정 뒤 마감을 미룬 정정 공고가 건을 입찰 생애에서 영구히 뺀다 | 고침(결정 ⑤ · 보충) | 전이표에 `DEADLINE_PASSED_UNRECORDED --REVOKE_DEADLINE_PASSED(SYSTEM_ONLY)--> 마감 전 넷`. `DeadlineSettlement` 가 두 방향을 본다 — 마지막 타임라인 행이 시스템 `MARK_DEADLINE_PASSED` 이고 유효 마감이 미래이거나(행이 있는데) 미정이면 그 행의 `from_state` 로(`DEFERRED` 는 `WATCHING`). V21 명령 CHECK 에 새 명령 | `BidCaseDeadlineRevocationTest` 여덟(CR 재현 그대로 · `DEFERRED` → `WATCHING` · 소급 기록으로 떠난 건 · 사용자가 적은 판정 · 목록 경로 · NULL 셋) · `BidCaseEndpointTest`「GET 이 판정을 거둔다」 · 전이표 골든 · **D5-off RED**(구판 거동) · D5-target · D5-actor |
+| C2-N7 | 「공고 지금 값 우선, 없으면 사본」이 「행 없음」과 「값 없음」을 같은 값으로 접는다 | 고침(결정 ⑥) | 포트가 `Map<NoticeKey, NoticeDeadline>`(행 있음 = 키 있음, 값은 nullable)를 돌려준다. 유효 마감 = 행이 있으면 그 값, 행이 없을 때만 사본. 조회 SQL 의 `deadline_at IS NOT NULL` 을 걷었다 | `BidCaseDeadlineRevocationTest`「마감을 지운 정정이면 … 판정하지 않는다」·「판정 뒤 마감을 지운 정정이 오면 되돌린다」 · **D6-sql-old RED** · D6-null |
+| C2-N2 | GET 셋이 상태를 바꾸는데 KDoc 은 부정한다 | 고침(결정 ⑦ — 유지 + 사실 선언) | `BidCaseQueryController` KDoc 을 사실로(읽기가 시스템 판정을 쓸 수 있다 · 값은 요청자가 고르지 못한다 · CSRF 면제 메서드다). §6-9 에 위협 모델 경계 문장 | `BidCaseEndpointTest`「GET 으로 읽으면 시스템 판정이 타임라인에 남는다」 |
+| C2-N3 | 목록이 N 건 쓰기 + 전량 적재 · 상태 탭이 SQL 필터를 잃음 · 상한 없음 | 고침(결정 ⑧) + 등재 | 판정 후보 질의 하나(`settleCandidates` — 마감 전 넷 중 유효 마감이 지난 건 + 되돌림 후보)만 판정하고, 목록은 `state` 를 SQL 에서 거른다. 상한 · 커서는 §6-10 + `OPEN-7B-BIDBOX-PAGING` 후보 | `BidCaseDeadlineRevocationTest`「목록의 판정 후보 경로」 · `BidCaseScheduleTest`「상태 탭이 그 판정을 따른다」 · D8-cand · D8-filter |
+| C2-N4 | `resumeBidCase` 가 400 을 선언하지 않는다 | 고침 | OpenAPI 400 · 생성 타입 재생성. **새 등식**: 경로 변수를 읽는 매핑 전수 ↔ 문서 400 선언 | `OpenApiRequestBodyContractTest`「경로 변수를 읽는 매핑은 전부 문서에 400 을 적는다」 · C2N4-400 · S-20 W-5 |
+| C2-N5 | 상태 · 명령 어휘 CHECK 가 도메인 열거와 등식으로 묶여 있지 않다 | 고침 | `checkVocabulary` 로 `bid_case` 상태 · 타임라인 `from_state` · `to_state` · `command` CHECK 를 `BidStateTag.entries` · `BidCommandTag.entries` + 생성 명령과 **집합 등식** | `BidCaseIntegrityTest`「상태 · 명령 어휘 CHECK 는 도메인 열거 전수와 같다」 · C2N5-state(상위집합) · C2N5-cmd(하위집합) |
+| C2-N6 | HTTP 층의 마감 판정 coverage 0 · 이중체가 「마감 지남」을 표현 못 함 | 고침 | HTTP 이중체의 마감 포트를 test 가 옮기는 값(`MovableNoticeDeadlines`, 기존 `InMemoryBidCaseStore.kt` 안) · 조립이 그 빈을 쓴다 | `BidCaseEndpointTest` 셋(마감 뒤 `skip`/`draft` 409 · GET 판정 전이 · GET 되돌림) · CMD-nosettle · D5-off-http |
+| V2-N1 (게이트) | 계정 운반 등식이 소유자 이름 열거에 걸려 래퍼 `getAttribute` + `convertValue` 로 우회된다 | 고침(게이트 술어 변경 — 표적 재검증 대상) | `getAttribute` 술어를 **소유자 무관 서명**(`getAttribute:(Ljava/lang/String;)Ljava/lang/Object;`) 호출자 집합 등식으로. app main 의 `AccountId` **Class 상수(ldc)** 보유 class = ∅ 등식을 더했다(양성 대조 하나) | `AccountCarrierStructureTest` · V2N1-E(verifier 우회 원형) · E1(래퍼만) · E2(직렬화기만) 각각 RED |
+| V2-N2 (게이트) | 본문 등식과 좁힌 거부 모집단이 `@RequestBody` 주석에 걸려 있다 | 고침(게이트 술어 변경 — 표적 재검증 대상) | 문서에서 `requestBody` 없는 operation 을 **도출**하고(지금 `DELETE /api/session` · `POST …/resume`), 새로 로그인한 세션으로 전부 **본문 없이** 불러 400 · 415 가 아님을 집합으로 잰다(경로 변수는 `1`). 주석 유무에 걸지 않는다 | `OpenApiRequestBodyContractTest`「문서가 본문을 적지 않은 operation 은 …」 · V2N2-N3B(주석 없이 본문을 요구하는 핸들러) RED |
+| C2-M1 잔여 · V2-W4 · C2-N18(뒤 절반) | `bid_record.draft_id` 가 같은 건 · 같은 계정의 초안이라는 제약이 구조에 없다 · 자식 둘 복합 FK 가 행동으로 안 재짐 | 고침 | `bid_draft UNIQUE (id, case_id, account_id)` + `bid_record (draft_id, case_id, account_id)` 복합 FK(NULL 은 MATCH SIMPLE 로 통과) | `BidCaseIntegrityTest`「기록의 초안은 같은 건 · 같은 계정의 것 — 없으면 통과」 · 자식 둘 복합 FK 거부 · `CleanMigration*Test` ratchet · **FK-draft-old RED** |
+| C-M6(문면) | 「최신 초안 = 화면의 기본값」 등식은 TOCTOU 로 깨진다 | 고침(문면) | 세 자리(`LATEST_DRAFT_ID` · `latestDraftId` · V21 주석)를 「기록 시점의 최신 초안이다 — 화면의 기본값과 같다는 보장은 없다」로. 요청에 초안 id 를 싣는 안은 채택하지 않았다(D-7B-4) | — |
+| V2-W1 · C2-N9 | `open` 의 `Opened` 갈래가 판정을 지나지 않는다 | 고침 | 두 갈래 모두 판정을 지난다 · 담을 때 쓰는 사본도 같은 조회 결과 | `BidCaseDeadlineRevocationTest`「이미 마감이 지난 공고를 담으면 담기 응답부터 마감 지남」 · **W1-old RED** |
+| V2-W3 | 지연 판정의 동시성 test 가 커밋에 없다 | 고침 | `BidCaseConcurrencyTest`(8 스레드 × 12 판, 읽기 셋 섞음 — 시스템 판정은 건마다 한 줄 · 오류 0 · 상태 하나) | **CONC RED**(버전 조건을 빼면 타임라인 UNIQUE 위반 = 500) |
+| V2-W5 | 스냅샷 test 가 공고 provenance 를 손 리터럴로 심는다 | 고침 | `BidCaseDbFixture` 가 정본 `ProvenanceCodec` · `FloorRateOriginCodec` 으로 심는다 | `BidCaseSnapshotTest` |
+| C2-N8 | `settle` 이 쓰기 결과를 버린다 | 고침(재시도 한 번 — 레인 선택) | `VersionConflict` 면 다시 읽어 **한 번 더** 판정한다(다른 전이가 이긴 뒤의 상태로 다시 묻는다). 그 뒤에도 지면 다시 읽은 값을 쓴다 — KDoc · §6-2. 재시도를 택한 근거: 동시 읽기에서 진 쪽이 낡은 상태를 응답하지 않는다 | **N8-noretry RED**(진 쪽이 `WATCHING` 을 응답) |
+| C2-N10 | 요청 하나가 트랜잭션 둘~넷이고 원자적이지 않다 | 등재(사실) | **전이 하나가 트랜잭션 하나다. 요청 하나는 판정 전이(0~1)와 요청 전이(0~1) · 읽기로 트랜잭션 둘~넷이고, 판정 전이는 요청의 성패와 무관한 사실로 남는다** — 요청이 409 여도 그 앞의 판정은 커밋돼 있다 | `BidCaseScheduleTest`「마감 뒤의 제출함은 시스템 전이 뒤 소급 기록이 된다 — 타임라인 순서까지」(판정 행과 요청 행이 따로 남는다) |
+| C2-N11 | `submission(body)` 가 판독 전체를 `requestValue("record")` 로 감싼다 | 고침 | 생성자별로 좁혔다(`evidenceRef` · `memo` · `drawNumbers`) | 라벨은 로그 진단만 바뀐다 — 상태 코드(400)는 `BidCaseRequestsTest` 가 그대로 잰다 |
+| C2-N12 | 상한 등식의 단위가 다르다(UTF-16 코드 단위 ↔ 문자) | 등재(문면) | §6-11 에 단위 차이와 방향(도메인이 더 엄격 — fail-closed)을 적었다. BMP 밖 경계 test 는 두지 않았다 | — |
+| C2-N13 · C2-N14 | 메모(2000) · 증빙 참조(128)에 DB CHECK · OpenAPI `maxLength` 없음 · 스냅샷 통화 · 과세 `<> ''` 없음 | 고침 | `char_length` CHECK 둘 · `RecordBidRequest` `maxLength` 둘 · 스냅샷 통화 · 과세 `<> ''` | `BidCaseIntegrityTest` 경계 둘 · C2N13-memo · C2N13-evid · C2N14-cur |
+| C2-N15 | `BidCaseRequests` KDoc 에 줄 번호 좌표 | 고침 | 절 제목(「§6.1 『몇 위였나』 문장」)으로 | — |
+| C2-N16 | 속성 test 에 공허성 대조가 없다 | 고침 | 반대 방향(표의 행 · 주체가 맞으면 반드시 받아들여진다)과 `Accepted` 발생 수 > 0 | **N16-vacuous RED**(커널이 늘 거부) |
+| C2-N17 | 소유 문장 술어가 문자열이다 | 고침(KDoc) + 변이 | test KDoc 에 「이 술어는 문자열이다 — 정본은 행동 축」. 변이 둘을 표에 뒀다 — 조건부 UPDATE 의 계정 조건을 `OR TRUE` 로 열면 **초록**(같은 트랜잭션의 소유 SELECT 가 먼저 막으므로 행동이 같다 — 문자열 술어도 지나간다), 그 첫 겹(건 적재 SELECT)을 열면 행동 test 가 **RED** 이고 그때 UPDATE 의 계정 조건이 쓰기를 막는다(`CaseNotFound` 대신 `VersionConflict`) | OR-TRUE(초록 — 등가 변이) · OR-TRUE-load RED |
+| C2-N18(앞 절반) | `attempt` 주석이 「실패는 롤백한다」 | 고침 | autocommit 연결이라 실패 문장은 그냥 실패한다로 | — |
+| C2-N19 | NULL 사본은 영구히 판정되지 않는다 | 등재 | §6-2 에 적었다(담을 때 공고 행이 없었고 뒤에 파기되면 그 건은 마감 판정에 닿지 않는다) | — |
+| C2-N20 | C-L5 등재 근거가 부정확 | 고침(문면) | §3.5 C-L5 행을 사실로 고쳤다 | — |
+| C2-N21 | `D1-lazy2` 행이 test 둘을 더하기 전 트리의 수 | 고침 | 현행 트리에서 다시 쟀다(아래 변이 표) · §3.5 행에 측정 트리를 적었다 | D1-lazy2 · D1-control |
+| V2-W6(절차) | 검증 도중 레인 HEAD 가 움직였다 | 사실 기록 — 레인 조치 없음 | **원인은 팀장 지시 순서다**(검증 시작 뒤 test 추가 지시 → 커밋). 팀장 정정으로 판정 SHA 를 `10cf5d02` 로 고정했다. 이번 라운드는 판정 SHA 보고 뒤 커밋하지 않는다 | — |
+
+**OPEN 후보(이 PR 에서 활성 등재하지 않는다 — 팀장이 다음 M7 문서 PR 에서 등록)**: `OPEN-7B-NOTICE-EXPECTED-WRITER`(유지, §6-7) ·
+`OPEN-7B-BIDBOX-PAGING`(새, §6-10).
+
+**수정 라운드 2 가 만든 새 파일 ↔ in_scope**:
+
+| 새 파일 | in_scope 근거 |
+|---|---|
+| `adapters/src/test/.../bidding/BidCaseDeadlineRevocationTest.kt` · `BidCaseConcurrencyTest.kt` | 「`adapters/**` 의 bidding 영속」 |
+
+그 밖은 기존 파일의 편집이다(`MovableNoticeDeadlines` 는 기존 `InMemoryBidCaseStore.kt` 안의 class). 두 test 는 `config/quality/gate-tests.properties` 에 등재했다.
+
+#### 변이 표 — 수정 라운드 2 (현행 트리 · `--rerun` · 표적 test 만 · `git restore`/새 파일 삭제 뒤 작업 트리 깨끗 확인)
+
+측정 트리: 「fix … detekt」 커밋(D5-actor · OR-TRUE-load · W1-old · N8-noretry · N16-vacuous 는 그 뒤 「test … 사용자가 적은 마감 지남」 커밋).
+변이는 전부 **바꿔치우기**이고, 게이트 우회 셋(V2N1-*)만 우회 코드를 담은 새 파일을 더한다(우회의 정의가 「그런 파일이 생긴다」이므로).
+
+| # | 변이 | 표적 | 결과 |
+|---|---|---|---|
+| D5-off | 결정 ⑤ — 되돌림 판정을 끈다(구판 거동) | `BidCaseDeadlineRevocationTest` | **RED** 4(CR 재현 · `DEFERRED` · 지운 정정 · 목록 경로) |
+| D5-off-http | 같은 변이, 운반 층 | `BidCaseEndpointTest` | **RED** 1(GET 되돌림) |
+| D5-target | 되돌림 도착을 늘 관심으로 | `BidCaseDeadlineRevocationTest` | **RED** 1(CR 재현 — `BID_PLANNED` 기대) |
+| D5-actor | 되돌림 근거에서 시스템 주체 조건을 뺀다 | `BidCaseDeadlineRevocationTest` | 첫 측정 **초록 7/7 — 사각**. test 「사용자가 적은 마감 지남은 … 되돌리지 않는다」를 더해(커밋) 다시 재서 **RED** 1 |
+| D6-null | 결정 ⑥ — 「값 없음」을 「행 없음」처럼(NULL 이면 사본) | `BidCaseDeadlineRevocationTest` | **RED** 1 |
+| D6-sql-old | 구판 거동 — 마감 조회가 NULL 행을 거른다 | `BidCaseDeadlineRevocationTest` | **RED** 2 |
+| COPY-first | 마감은 사본 우선 | `BidCaseScheduleTest` | **RED** 2 |
+| D1-lazy2 | 결정 ① 지연 판정을 끈다 — 현행 트리 재측정(C2-N21) | `BidCaseScheduleTest` | **RED** 5 / 8 — 초록 셋은 「마감 전 무전이」·「통보 예정일」·「정정이 마감을 미루면 아직 마감 전」(판정이 서지 않아야 하는 축) |
+| D1-control | 통제군 — 변이 없음 | `BidCaseScheduleTest` | 초록 8 / 8 |
+| D8-cand | 결정 ⑧ — 판정 후보 질의가 아무것도 안 고른다 | `BidCaseDeadlineRevocationTest` · `BidCaseScheduleTest` | **RED** 2(목록 경로 둘) |
+| D8-filter | 결정 ⑧ — 상태 탭 필터를 SQL 에 넘기지 않는다 | `BidCaseScheduleTest` | **RED** 1 |
+| W1-old | 구판 거동 — 새로 담은 건은 판정을 지나지 않는다 | `BidCaseDeadlineRevocationTest` | **RED** 1 |
+| N8-noretry | 경합으로 진 판정을 다시 묻지 않는다 | `BidCaseConcurrencyTest` | **RED** 1(응답 상태에 `WATCHING` 이 섞인다) |
+| CMD-nosettle | 명령 경로가 판정을 건너뛴다 | `BidCaseEndpointTest` | **RED** 1(409 기대 · 200) |
+| V2N1-E | verifier 우회 원형(래퍼 `getAttribute` + `convertValue`) | `AccountCarrierStructureTest` | **RED** 2(서명 호출자 등식 · Class 상수 ∅) |
+| V2N1-E1 | 래퍼 `getAttribute` 만 | `AccountCarrierStructureTest` | **RED** 1(서명 호출자 등식) |
+| V2N1-E2 | 직렬화기 `AccountId` 만 | `AccountCarrierStructureTest` | **RED** 1(Class 상수 ∅) |
+| V2N2-N3B | 주석 없이 본문을 요구하는 핸들러(`resume` 이 `Content-Length` 0 이면 400) | `OpenApiRequestBodyContractTest` | **RED** 1(본문 없는 operation 행동 등식) |
+| C2N4-400 | `resume` 의 400 선언을 지운다 | `OpenApiRequestBodyContractTest` | **RED** 1 |
+| C2N5-state | 상태 CHECK 에 어휘 밖 값 하나를 더한다(상위집합) | `BidCaseIntegrityTest` | **RED** 1 |
+| C2N5-cmd | 명령 CHECK 에서 `REVOKE_DEADLINE_PASSED` 를 뺀다(하위집합) | `BidCaseIntegrityTest` | **RED** 1 |
+| FK-draft-old | 구판 구조 — 기록의 `draft_id` FK 가 단일 열 | `BidCaseIntegrityTest` | **RED** 1 |
+| CONC | 조건부 갱신의 `case_version` 조건을 뺀다 | `BidCaseConcurrencyTest` | **RED** 1(타임라인 UNIQUE 위반) |
+| OR-TRUE | 조건부 UPDATE 의 계정 조건을 `OR TRUE` 로 | `BiddingSqlOwnershipTest` · `BidCaseOwnershipTest` | 초록 12 / 12 — **등가 변이**(위 C2-N17 행) |
+| OR-TRUE-load | 건 적재 SELECT 의 계정 조건을 `OR TRUE` 로(첫 겹) | 같음 | **RED** 2(남의 건 읽힘 · 남의 건 쓰기는 UPDATE 의 계정 조건이 `VersionConflict` 로 막음) |
+| C2N13-memo · C2N13-evid | 메모 · 증빙 상한 CHECK 를 뺀다 | `BidCaseIntegrityTest` | 각각 **RED** 1 |
+| C2N14-cur | 스냅샷 통화 `<> ''` CHECK 를 뺀다 | `BidCaseIntegrityTest` | **RED** 1 |
+| N16-vacuous | 전이 커널이 늘 거부 | `BidTransitionPropertyTest` | **RED** 1 |
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
@@ -884,8 +970,14 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
    호출자가 없다. 사용자 입력 경로는 열려 있다(§6.1 「사용자가 나라장터에서 보고 오거나 입력한다」). 마감 판정
    (결정 ①)은 **읽거나 명령할 때 지연 판정**이다 — 아무도 읽지 않는 건은 저장소에서 마감 전 상태로 남아 있다가
    다음 읽기에 넘어간다. 저장된 상태만 보는 소비자(예: 알림 7C③)는 이 판정을 지나지 않으면 마감 전으로 읽는다.
-   그리고 마감은 공고의 지금 값을 쓰고, 담을 때 적은 사본은 **공고가 없을 때만** 쓴다(정정된 마감이 사본보다 우선 — 팀장 수용
-   2026-10-24). 정정이 마감을 앞당겨 이미 지난 경우와 미룬 경우를 `BidCaseScheduleTest` 둘이 잰다.
+   판정은 **두 방향**이다(결정 ⑤): 시스템이 세운 「마감 지남」은 유효 마감이 다시 미래가 되거나(공고 행이 있는데) 미정이
+   되면 다음 판정이 그 직전 상태로 거둔다. 사용자가 직접 적은 「마감 지남」과 기록으로 이미 떠난 건은 거두지 않는다.
+   **미룸에서 판정된 건은 되돌릴 때 미룸을 잃는다 — 다시 미루려면 운영자가 새 리마인드로 미룬다**(결정 ⑤ 보충, 판정이
+   리마인드 시각을 지웠다). 유효 마감은 **공고 행이 있으면 그 행의 값**(값이 없으면 미정 — 판정하지 않는다)이고, **행이
+   없을 때만**(6B-3 파기) 담을 때 적은 사본이다(결정 ⑥). **담을 때 공고 행이 없었으면 사본이 NULL 이고, 그 공고가 뒤에
+   파기되면 그 건은 마감 판정에 닿지 않는다**(C2-N19 — 사본은 담을 때 한 번 쓰고 열 GRANT 밖이다). 판정 저장이 경합으로 지면
+   다시 읽어 한 번 더 판정하고, 그 뒤에도 지면 다시 읽은 값을 응답한다(C2-N8). **전이 하나가 트랜잭션 하나이고 요청 하나는
+   트랜잭션 둘~넷이다 — 판정 전이는 요청의 성패와 무관한 사실로 남는다**(C2-N10: 요청이 409 여도 앞의 판정은 커밋돼 있다).
 3. **PDF 저장소 없음** — `evidence_ref` 가 가리킬 실체가 저장소 안에 없다. 완화 둘:
    형태 제한(공백 불가 · 128자 상한 · `toString()` 가림)과 문면 고정(「이 **참조**를 언제까지
    보관하는가」). 보관 기한 **집행**은 저장소 slice 가 연다.
@@ -906,6 +998,16 @@ base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계
 8. **사유 자유 텍스트는 지울 수 없는 표에 남는다** — 건너뜀 · 정정 사유는 타임라인(append-only)에 남고 타임라인 응답에
    실린다. 상한(500자)을 도메인 · 요청 · 문서 · DB 네 겹에 두었지만 **내용**(사람 이름 · 연락처가 들어올 가능성)은 막지
    않는다. 메모 · 증빙과 달리 가리지 않는 것은 타임라인이 그 사유를 보여 주는 것이 계약이기 때문이다(§6.1).
+9. **읽기가 시스템 전이를 쓴다**(결정 ⑦) — GET 셋(목록 · 건 하나 · 타임라인)이 마감 판정을 지나므로 판정 전이(세움 · 거둠)를
+   타임라인에 쓸 수 있고, GET 은 CSRF 면제 메서드다. **위협 모델 경계**: 판정의 값은 요청자가 고르지 못하고(서버 시계와 공고가
+   정한다) 결정 ⑤ 로 되돌릴 수 있으므로, 교차 출처가 GET 을 일으켜 얻는 것은 「다음 읽기에 어차피 설 판정을 앞당김」뿐이다.
+   읽기 전용 응답 + 판정 enqueue 분리는 이 slice 가 하지 않는다.
+10. **목록에 상한 · 커서가 없다**(결정 ⑧) — 판정은 후보 질의 하나로 좁혔고 상태 탭은 SQL 이 거르지만, 응답은 그 계정 · 종류의 건
+    전부다. 근거: 1 운영자가 손으로 담는 입찰함이라 건 수가 그 운영자가 담은 공고 수를 넘지 않고, 상한 · 커서는 OpenAPI · web 을
+    함께 바꾼다. **OPEN 후보 `OPEN-7B-BIDBOX-PAGING`** — 이 PR 에서는 후보로만 둔다(팀장이 다음 M7 문서 PR 에서 등록).
+11. **상한의 단위가 층마다 다르다**(C2-N12) — 도메인 상한은 `String.length`(UTF-16 코드 단위), DB CHECK 는 `char_length`(문자)다.
+    BMP 밖 문자는 도메인에서 둘로 세어지므로 도메인이 **더 엄격**하다(fail-closed — 도메인을 지난 값은 CHECK 도 지난다).
+    「도메인 상한 = CHECK 값」 경계 test 는 ASCII 로만 잰다.
 
 ### 7. acceptance 실측
 
@@ -958,6 +1060,17 @@ Kotlin `check` 를 다시 잰다(결과는 동결 보고 · PR 조치 코멘트�
 **별도 호출로 먼저** 봤다. 락을 얻은 순간 available ≥ 6GB · swap free ≥ 2GB 를 다시 재고 그 값을 로그 첫 줄에 남겼으며(미달이면
 시작하지 않는다), **00:30~03:00 에는 시작하지 않았다**(변이 스크립트는 변이마다 그 창을 확인한다).
 
+### 7.3 수정 라운드 2 재실측 (base `998b59dd`)
+
+| 항목 | 자리 | 결과 |
+|---|---|---|
+| `check` job — Kotlin `./gradlew --no-daemon check --continue` | 「fix … detekt」 커밋 | **exit 0** · 17m24s(09:44–10:01) · `workflow` 528 · `adapters` 1141 · `app` 711 실행 · 실패 0(XML 확인) · `bidding` 30 은 같은 입력으로 09:41 에 실행(UP-TO-DATE). 앞 시도(「fix … HTTP」 커밋)는 test 전부 초록이고 detekt(함수 수 · 복잡도) · ktlint 에서 붉었다 — 그 고침이 이 커밋이다 |
+| `check` job — S-20 `one-command-check.sh` | 마지막 산출물 커밋(「test … 사용자가 적은 마감 지남」) | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed. 그 안의 Kotlin `check` 는 `adapters:test` 실행 · `app` · `bidding` test 는 FROM-CACHE — 입력이 위 줄의 커밋과 같고(두 커밋 사이는 `adapters` test 파일 하나) 거기서 실행해 초록이었다 |
+| `container` job 재생 | 같은 자리 | **run step 23 중 21 성공 · 2 실패** — 실패 둘은 S-22e2(web) · S-22e3(proxy) 이미지 취약점 게이트이고 원인은 §7.2 와 같은 외부 `CVE-2026-111497`(brotli-libs)이다. 그 면제는 main 의 #86(allowlist 만)에 있고 이 트리는 그것을 rebase 하지 않았다(D-7B-4) — PR 시점 update-branch 로 받는다. 두 step 에만 「기록된 채로 이어 가기」를 걸었고 나머지 step 은 전부 실행됐다 |
+| 백업·복원 리허설(S-23c, 위 재생 안) | 같은 자리 | **통과** — Flyway 이력 19행 top 21 · 복원본 `validate` · 복원 등식 10가지 · forward-fix · 데이터 손실 왕복(V21 의 새 명령 · 복합 FK · CHECK 를 실은 판) |
+| S-23 · S-23b · S-24 · S-26 | 같은 자리 | 전부 성공 · 이미지 태그 넷은 재생 전 ID 로 복원(전후 등식 확인) |
+| 변이 표(r2) | §3.6 | 변이 28 · 통제군 1 — **RED 27** · 등가 변이 초록 1(OR-TRUE, 근거는 C2-N17 행) · 첫 측정에서 사각이던 D5-actor 는 test 를 더해 RED |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -990,3 +1103,9 @@ untracked 0 · 표지 737 → 0 · 되돌린 트리 객체 = `998b59dd` 트리. 
 base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛 base(`a61ddff1`)를 가리켰고, 복원이 **main 의 변경까지** 되돌렸다
 (③ diff 7277 줄). 거기서 멈추고 문면을 HEAD 판에서 읽게 고쳐 다시 쟀다. 머지 전 되돌림을 실제로 할 사람도 **HEAD 의 문면**을
 읽으므로 측정이 그쪽에 맞는 것이 맞다.
+
+**수정 라운드 2 재실측** — clone 을 마지막 산출물 커밋(「test … 사용자가 적은 마감 지남」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
+읽었다: 변경 A 61 · M 31(종류는 `A` · `M` 뿐) → ① exit 0 · ② D 61 · M 31 · 그 밖 0 · ③ base(`998b59dd`)와 diff 0 줄 · untracked 0 · 내 표지
+777 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 **트리 동일성으로 갈음**한다 — 같은 트리 객체에서
+04:08 의 clone `check` 가 실제로 실행해 exit 0(9m42s)이었다. 첫 시도는 측정 스크립트의 실행 권한이 없어 아무것도 돌지 않았다(하네스 문제,
+산출물 무관) — `bash` 로 불러 다시 잰 것이 위 결과다.
