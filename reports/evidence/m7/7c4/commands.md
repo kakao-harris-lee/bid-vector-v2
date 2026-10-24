@@ -4,7 +4,9 @@
 무거운 명령 앞마다 확인 셋(pgrep · `free -m` · RSS 상위)을 **별도 호출로 먼저** 돌렸고, 다른 레인(vr5 · 7C② · 7B)의 빌드가
 도는 동안에는 락에서 기다렸다(7B 의 full check 뒤에서 40분 넘게 선 적도 있다 — 끼어들지 않았다). 날짜는 전부 2026-10-24 KST.
 
-**판정 SHA**: r1 은 `8afb94d0`, r2(D-7C4-3 수정 라운드)는 `2258342e`, **r2 종결은 `4bd7cd59`**(팀장 수용 뒤 더한 어휘 전수 test 와 알려진 제한 한 줄). base main `fc15975c`. 아래 §r1 의 rollback 수는
+**판정 SHA**(팀장이 동결하고 검토가 판정한 SHA): r1 `8afb94d0` · **r2 `efc856e5`**. base main `fc15975c`.
+그 밖의 SHA 는 **실측 HEAD** 라고 적는다(r2 F8 — 둘을 같은 낱말로 쓰면 어느 것이 판정 대상인지 흐려진다):
+r2 의 찬 `check` 는 `2258342e`, 팀장 수용 뒤 더한 어휘 전수 test 를 포함한 재측정과 rollback 실측은 `4bd7cd59`. 아래 §r1 의 rollback 수는
 실측 HEAD `1b3ade0b` 의 것이었고 **r2 에서 전부 다시 쟀다**(`rollback.md` 가 r2 판이다).
 
 ## r1 — acceptance: `check` job (`.github/workflows/ci.yml` 의 명령 그대로)
@@ -64,9 +66,13 @@
 - **찬 `check`**: `check --continue --rerun-tasks --no-build-cache` (HEAD `2258342e`, 22:20~22:32) → **exit 0**,
   `BUILD SUCCESSFUL in 11m 13s`, **356 task 전부 실행**. 루트 게이트 둘(`leakPatternGate` · `contractGate`)이 로그에 실행으로
   남았고 `FAILED` 는 0 이다. 이 slice 의 test 전부 초록 — workflow `profile` 7 · 9 · 5, adapters `profile` 8 · 10 · 6 · 5.
-- **task 수가 r1 의 365 에서 356 으로 줄었다** — 두 로그의 task 집합을 `comm` 으로 대조했다. 차이는 `:build-logic:` 의 빌드
-  인프라 12개(컴파일 · jar · 플러그인 생성)뿐이고 **게이트 · test 는 한 건도 빠지지 않았다**(r2 에만 있는 task 0).
-  `:build-logic:test` 는 두 판 모두에 있다.
+- **task 수 365 → 356 의 분해**(r2 CR R2-L5 의 산수 지적 — 「365 − 12 = 353 ≠ 356」은 **이름 수와 actionable 수를
+  섞은 것**이다). 네 로그를 같은 방식으로 세면: 이름(`> Task :…` 고유) **443 · 431 · 431 · 443**, actionable
+  **365 · 356 · 356 · 365**(r1 찬 check · r2 찬 check · r2 종결 재측정 · 되돌린 트리). 그래서
+  **이름 차 12 = actionable 차 9 + action 없는 task 3** 이고 산수가 닫힌다(443−365 = 78 과 431−356 = 75 의 차가 그 셋이다).
+  차이는 전부 `:build-logic:` 이고 **r2 에만 있는 task 는 0** 이다 — 게이트 · test 는 한 건도 빠지지 않았다.
+  셋을 개별로 지목하지는 못한다(Gradle 이 action 유무를 로그에 적지 않는다). `:build-logic:classes` 가 그런 lifecycle
+  task 로 알려진 쪽이고, **중요한 주장은 이름 집합 대조**(r2-only 0)가 진다 — actionable 수는 그 보조다.
 - **그 앞 판은 붉었다**: 같은 명령이 `:adapters:ktlintTestSourceSetCheck FAILED`(체인 호출 줄바꿈 둘)로 떨어졌고, 그 커밋
   뒤 위 초록을 다시 쟀다. 종료 코드로 판정했다 — 로그를 눈으로 훑고 넘기지 않았다.
 - `web` job 은 r2 에서도 해당 없다(변경 경로에 `web/` · `openapi/` · 생성 타입이 없다).
