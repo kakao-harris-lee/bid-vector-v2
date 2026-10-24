@@ -95,6 +95,12 @@ in_scope 에 해당 contract test 를 더한다. operation 분할(R6)은 하지 
 자리) · `app/.../wiring/EvaluationWiring.kt`(출하 배선, 자격 정책 해소 공유) · `app/src/test/.../HttpTestSupport.kt`(test 앱 빈). 전부 추가만, 기존 문면
 불변. 추적표: DEC-04 ⓒ 유지(표면만) · DEC-03 「법정 하한율 미해석」 표시 test 잠금 · QUAL-02·STR-16 은 선 절반만 적는다.
 
+**D-7C2-5 (2026-10-24, 팀장 — 허용 목록 등재 요청 수령).** 넷 다 집합 등식 등재이고 게이트 술어는 바꾸지 않는다. ① `app.port-call.allowed-pairs`:
+단건 평가 팩토리 → 새 읽기 포트 둘의 메서드 + `StrategyReader.load`(dry-run 팩토리와 같은 관례). ② `app.injection.allowed-types`: 단건 평가
+팩토리(`app.http.allowed-classes` 등재와 짝). ③ `app` 모듈 바깥 참조 허용 집합: `com.fasterxml.jackson.annotation` — D-7C2-3 R7 이 승인한 같은
+패키지를 두 번째 허용 집합에 적는 것이며 새 능력이 아니다. 대체 R4(술어 변경)와 손 직렬화기는 택하지 않는다. ④ `ConstantTimeComparisonStructureTest`
+areEqual 허용: 새 `app.http` 클래스 — 패키지를 옮겨 게이트를 비껴가지 않는다.
+
 
 ## 하네스 레인 변경 (상시)
 

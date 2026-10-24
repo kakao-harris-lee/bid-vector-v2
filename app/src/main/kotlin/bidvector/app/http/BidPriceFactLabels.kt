@@ -6,7 +6,7 @@ import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 
-/**
+/*
  * **공고 fact 와 ML 축의 어휘**(M7/7C ②, DEC-01 · DEC-03 · ML-03) — 기초금액 해석 갈래,
  * 게시 하한율의 출처 판정, ML 단계 상태. 「게시값만 근거다」가 이 파일의 분기다.
  */

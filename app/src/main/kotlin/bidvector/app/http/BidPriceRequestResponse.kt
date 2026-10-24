@@ -2,11 +2,9 @@ package bidvector.app.http
 
 import bidvector.app.wiring.BidPriceRequestRun
 import bidvector.procurement.Notice
-import bidvector.qualification.LicenseJudgement
 import bidvector.sharedkernel.export
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.MlAnalysisOutcome
-import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 
 /**
@@ -187,40 +185,3 @@ private fun floorRateFieldsOf(notice: Notice): FloorRateFields {
     )
 }
 
-private fun evaluationDetailFieldsOf(
-    evaluation: CandidateEvaluation,
-    notice: Notice,
-): EvaluationDetailFields {
-    val drop = dropFieldsOf(evaluation)
-    return EvaluationDetailFields(
-        outcome = outcomeLabelOf(evaluation).name,
-        verdict = verdictLabelOf(evaluation),
-        verdictReasonCodes = verdictReasonCodesOf(evaluation),
-        dropStage = drop.stage,
-        dropReasonCode = drop.reasonCode,
-        noticeStatus = notice.status.name,
-        failedWatchRuleIds = drop.failedWatchRuleIds,
-        watchUndeterminableReason = drop.watchUndeterminableReason,
-        scoreThreshold = drop.scoreThreshold,
-        scoreActual = drop.scoreActual,
-    )
-}
-
-private fun qualificationFieldsOf(judgement: LicenseJudgement): QualificationFields {
-    val license = licenseFieldsOf(judgement)
-    return QualificationFields(
-        licenseVerdict = license.verdict,
-        licenseUncertainReason = license.uncertainReason,
-        licenseRequiredLicenses = license.requiredLicenses,
-        licenseRequirementSourceFields = license.sourceFields,
-        licenseGroupsSatisfied = license.groupsSatisfied,
-        licenseGroupsMissing = license.groupsMissing,
-        licenseMissingLicenses = license.missingLicenses,
-        licenseMissingDetailState = license.missingDetailState,
-        licenseUnparsableRowCount = judgement.unparsableRowCount,
-        licenseValidity = licenseValidityLabelOf(judgement),
-        licensePolicySource = judgement.policyVersion.source,
-        licensePolicyEffectiveFrom = effectiveFromLabelOf(judgement.policyVersion),
-        unjudgedAxes = UnjudgedQualificationAxis.entries.map { it.name },
-    )
-}

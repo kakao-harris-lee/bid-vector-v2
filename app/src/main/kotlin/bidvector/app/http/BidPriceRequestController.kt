@@ -29,7 +29,7 @@ import tools.jackson.databind.JsonNode
  *
  * **`@RequestBody` 가 [JsonNode] 다**(D-6A3-19) — Jackson 의 기본 강제 변환이 `123`(수)을
  * 공고번호로, `"3"`(문자열)을 여력 수로 조용히 받아들이지 못하게 원시 트리로 받아
- * [parseBidPriceRequest] 가 **명시** 검증한다.
+ * [parseBidPriceNoticeId] 와 [parseCurrentActiveBids] 가 **명시** 검증한다.
  */
 @RestController
 class BidPriceRequestController(
@@ -39,24 +39,18 @@ class BidPriceRequestController(
     fun request(
         @RequestBody body: JsonNode,
     ): BidPriceRequestResponse {
-        val request = parseBidPriceRequest(body)
-        return when (val outcome = factory.forRequest(request.noticeId, request.currentActiveBids)) {
+        val noticeId = parseBidPriceNoticeId(body)
+        val currentActiveBids = parseCurrentActiveBids(body)
+        return when (val outcome = factory.forRequest(noticeId, currentActiveBids)) {
             // 표면이 404 로 옮긴다 — 오류 **형태**를 만드는 자리는 `ErrorBody.kt` 하나다.
             BidPriceRequestOutcome.NoticeNotFound -> throw NoticeNotFoundException()
             is BidPriceRequestOutcome.Prepared -> {
                 val evaluation = runBlocking { outcome.run.evaluate() }
-                bidPriceRequestResponseOf(outcome.run, evaluation, request.currentActiveBids)
+                bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids)
             }
         }
     }
 }
-
-/** 검증을 지난 요청 — 생성 경로는 [parseBidPriceRequest] 하나다. */
-internal data class BidPriceRequest(
-    val noticeId: NoticeId,
-    val currentActiveBids: Int,
-)
-
 /**
  * 요청 본문의 **명시** 형식 검증. 어긋나면 전부 [InvalidEvaluationRequestException](400
  * `INVALID_REQUEST`, 예외 메시지는 응답에 실리지 않는다 — `ErrorMapping` 이 고정 문구로만
@@ -64,8 +58,12 @@ internal data class BidPriceRequest(
  *
  * 값 객체의 `init`(공백 금지·차수 3자리)에 검증을 맡기지 않는다 — 그러면 형식 오류가
  * `IllegalArgumentException` 으로 새어 500 경로로 간다. 여기서 먼저 판정해 400 으로 옮긴다.
+ *
+ * **검증을 지난 요청을 담는 보유 타입을 두지 않는다**(값 둘을 따로 낸다) — `app.http` 의 주입
+ * 표면 게이트는 생성자 매개변수를 「주입받는다」로 읽어서, 도메인 타입을 안은 작은 보유 class 가
+ * 주입 허용 목록을 넓히라고 요구한다(실측으로 걸렸다). 호출부가 값 둘을 그대로 들고 간다.
  */
-internal fun parseBidPriceRequest(body: JsonNode): BidPriceRequest {
+internal fun parseBidPriceNoticeId(body: JsonNode): NoticeId {
     if (!body.isObject) {
         throw InvalidEvaluationRequestException("요청 본문이 JSON object 가 아니다")
     }
@@ -77,10 +75,8 @@ internal fun parseBidPriceRequest(body: JsonNode): BidPriceRequest {
     val normalizedNumber =
         NoticeNumber.ofOrNull(number)
             ?: throw InvalidEvaluationRequestException("noticeNumber 가 공고번호로 서지 않는다")
-    return BidPriceRequest(
-        noticeId = NoticeId(normalizedNumber, NoticeRound.of(round)),
-        currentActiveBids = parseCurrentActiveBids(body),
-    )
+    return NoticeId(normalizedNumber, NoticeRound.of(round))
+}
 }
 
 /**

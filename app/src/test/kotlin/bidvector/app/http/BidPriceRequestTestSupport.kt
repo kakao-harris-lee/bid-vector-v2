@@ -136,7 +136,14 @@ fun bidPriceStrategy(
     val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
     val draft =
         StrategyDraft(
-            focusCategories = listOf("CAT-1"),
+            // 감시 규칙은 **비어 있지 않고 통과해야** 한다. `focusCategories` 를 쓰면 fixture 공고의
+            // 업무 분류가 비어 있어 거절되고(그러면 ML 단계에 영원히 닿지 않는다), 규칙을 아예 비우면
+            // `NoGate` 로 떨어진다 — 둘 다 통과가 아니다. 공고에 나타날 수 없는 제외 키워드 하나만
+            // 채우면 규칙이 서면서 그 축은 항상 통과한다(실 DB E2E 가 쓰는 것과 같은 기법).
+            excludeKeywordTerms = listOf("이-문구는-공고에-없다"),
+            // 사다리 임계가 없으면 `ThresholdConfiguration` 에서 멈춘다 — 역시 ML 에 닿지 않는다.
+            bidNowThreshold = java.math.BigDecimal("0.80"),
+            reviewThreshold = java.math.BigDecimal("0.50"),
             maxActiveBids = maxActiveBids,
             candidateLimit = candidateLimit,
         )

@@ -96,6 +96,32 @@ class BidPriceRequestDifferentialTest {
         }
     }
 
+    /**
+     * **차분이 갈래마다 실제로 닿는지 고정한다**(`D-7C2-5` (d)) — 앞 판은 fixture 전략이 관심
+     * 업종으로 감시 규칙을 세워 모든 후보가 **감시 게이트에서 거절**됐고, 그래서 차분이 덮은
+     * 것은 드롭 경로뿐이었다(그 과장을 evidence 에 정정으로 적었다). 이 test 가 없으면 같은
+     * 침묵이 다시 선다 — fixture 가 조용히 한 갈래로 쏠려도 차분 등식은 초록이다.
+     */
+    @Test
+    fun `차분 표본이 드롭·사다리 도달·ML 단계 도달 셋에 실제로 닿는다`() {
+        val strategy = strategy()
+        val results = fullRunResults(strategy, currentActiveBids = 0).associateBy { it.noticeId }
+
+        withClue("마감이 지난 공고는 드롭 갈래에 닿아야 한다") {
+            (results.getValue(expired.id) is CandidateEvaluation.NotReached) shouldBe true
+        }
+        withClue("마감 전 공고는 사다리에 닿아 판정을 받아야 한다 — 닿지 않으면 판정 축이 미측정이다") {
+            (results.getValue(biddable.id) is CandidateEvaluation.Reached) shouldBe true
+        }
+
+        val prepared = singleRun(biddable.id, strategy, currentActiveBids = 0) as BidPriceRequestOutcome.Prepared
+        runBlocking { prepared.run.evaluate() }
+
+        withClue("ML 단계까지 가야 한다 — null 이면 그 앞에서 멈췄다는 뜻이다") {
+            (prepared.run.mlOutcome() != null) shouldBe true
+        }
+    }
+
     @Test
     fun `마감이 지난 공고는 404 가 아니라 수명 단계 드롭으로 내려온다`() {
         val outcome = singleRun(expired.id, strategy(), currentActiveBids = 0)

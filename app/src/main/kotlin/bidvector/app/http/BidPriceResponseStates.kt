@@ -2,7 +2,7 @@ package bidvector.app.http
 
 import bidvector.workflow.evaluation.CandidateEvaluation
 
-/**
+/*
  * 투찰가 요청 응답의 **상태 어휘**(M7/7C ②) — 「값이 없다」를 말하는 enum 들이 한자리에 있다.
  * 값이 서는 slice 가 갈래를 더하는 자리이기도 하다.
  */

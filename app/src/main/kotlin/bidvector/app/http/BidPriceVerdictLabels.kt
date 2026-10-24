@@ -6,7 +6,7 @@ import bidvector.decision.SkipReason
 import bidvector.decision.Verdict
 import bidvector.workflow.evaluation.CandidateEvaluation
 
-/**
+/*
  * **판정 축의 어휘**(M7/7C ②) — `Verdict` 세 갈래와 그 사유 코드. 전부 소진 `when` 이라
  * 4B-1 사다리에 사유가 늘면 이 자리가 컴파일로 드러난다.
  */
