@@ -145,17 +145,24 @@ private fun profileClassFiles(): List<File> {
 
 /** 이 class 가 나온 **소스 파일** 이름 — 중첩 class 와 파일 facade 를 같은 이름으로 접는다. */
 private fun allowsBusinessProfile(classFile: File): Boolean {
-    val sourceFile = classFile.name.removeSuffix(".class").substringBefore('$').removeSuffix("Kt")
+    val sourceFile =
+        classFile.name
+            .removeSuffix(".class")
+            .substringBefore('$')
+            .removeSuffix("Kt")
     return sourceFile in BUSINESS_PROFILE_FILES
 }
 
 /** 초기화하지 않고 올린다 — 어댑터의 static 초기화를 돌리지 않는다. */
-private fun load(classFile: File): Class<*> =
-    Class.forName(
-        classFile.relativeTo(classesRoot).path.removeSuffix(".class").replace(File.separatorChar, '.'),
-        false,
-        ProfileAdapterDependencyTest::class.java.classLoader,
-    )
+private fun load(classFile: File): Class<*> {
+    val binaryName =
+        classFile
+            .relativeTo(classesRoot)
+            .path
+            .removeSuffix(".class")
+            .replace(File.separatorChar, '.')
+    return Class.forName(binaryName, false, ProfileAdapterDependencyTest::class.java.classLoader)
+}
 
 /**
  * `javap`를 OS `PATH`의 이름 조회가 아니라 **실행 중인 JVM의 `java.home`**에서 해석한다
