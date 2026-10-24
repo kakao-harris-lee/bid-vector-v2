@@ -399,6 +399,21 @@ ID 접두는 `V5-` · `R5-`. 게이트 술어가 바뀌므로 다시 표적 재�
 절차: H1 · H2 · H5 · N2k · `traverse` 를 `774c46da` clone 에서 초록, 새 HEAD 에서 RED 로 전 · 후 표(통제군 `--rerun`) → 찬 `check` · S-20 · rollback ①~③ · evidence →
 판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다.
 
+**D-7B-7 ① 수령 (2026-10-25, 팀장 — 레인의 착수 전 보고 「fail-closed 는 허용 목록 넓힘과 등식 수정이 필요」에 대한 답).** 추천안대로 진행한다. 허용 목록이
+넓어지는 만큼 조건 넷:
+- (a) 새 외부 패키지의 app main 실사용은 **가드 class 에서만** 나온다 — 패키지 등식이 class 단위가 아니므로, 그 패키지를 가리키는 app class 집합을 관측값
+  (가드 class 들)으로 고정하는 등식으로 잠근다. 대조: 다른 app class 가 `JsonParser` 를 쓰는 변이 RED.
+- (b) 등재마다 삭제 변이 하나 — 거부 deserializer 등록 · `@ControllerAdvice`/`@InitBinder` · editor(formatter) 각각을 지우면 행동 test 가 RED 이고, 그 RED 가
+  **production 조립에 가드가 실제로 들어갔는지**를 증명한다.
+- (c) 「대상이 있는 바인더 = 전부 400」의 전제(app main 의 `@ModelAttribute` 사용 = ∅)를 등식으로 잠그고, 나중에 쓰게 되면 이 거부를 풀어야 한다는 사실을
+  KDoc 과 `OPEN-7D-ACCOUNTID-CONSTRUCTION` 에 한 줄로 적는다.
+- (d) 정상 경로 회귀 대조 — `@RequestBody JsonNode` · `@PathVariable String` 핸들러 전부(라우트 센서스와 같은 모집단)가 가드 뒤에도 기존 응답 그대로인지를
+  기존 계약 test 초록으로 확인하고 표에 적는다.
+
+**팀장 추가(같은 날, 중간 보고 수령)**: `@RequestParam` `String → AccountId` 가 500 으로 나가는 것은 가드 자신의 advice 안에서(공유 오류표를 건드리지 않고)
+400 으로 바꿀 수 있으면 이번 일괄에 넣는다 — 공유 오류표를 건드려야만 가능하면 알려진 제한 + OPEN 후보. 「매핑 class 는 전부 `@RestController`」 등식의
+모집단에 관리 포트 핸들러가 들어가는지 · 의도적으로 빠지는지를 test KDoc 에 한 줄.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
