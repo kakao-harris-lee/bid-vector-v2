@@ -30,7 +30,10 @@ class BidCaseConcurrencyTest : BidCaseDbFixture() {
                 val mine = account("conc-$round")
                 val key = notice("conc-$round")
                 seedNotice(key, now.plusSeconds(HOUR))
-                val caseId = workflow().open(mine, key, BidKind.REAL).view.case.id
+                val caseId =
+                    workflow()
+                        .open(mine, key, BidKind.REAL)
+                        .view.case.id
                 now = now.plusSeconds(2 * HOUR)
                 val start = CountDownLatch(1)
                 val done = CountDownLatch(THREADS)

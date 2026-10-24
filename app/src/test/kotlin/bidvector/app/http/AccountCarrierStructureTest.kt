@@ -139,6 +139,7 @@ class AccountCarrierStructureTest {
         const val ACCOUNT_LABEL_PREFIX = "account:"
         const val SUBJECT_ACCESSOR = "bidvector/app/http/ErrorBodyKt.authenticatedSubject:"
         const val ACCOUNT_ACCESSOR = "bidvector/app/http/AuthenticatedAccountKt.authenticatedAccount:"
+
         /** 소유자(타입)와 무관한 **메서드 서명** — 요청 · 래퍼 · 하위 타입 어느 것으로 불러도 같은 서명이다(V2-N1). */
         const val GET_ATTRIBUTE_SIGNATURE = ".getAttribute:(Ljava/lang/String;)Ljava/lang/Object;"
         const val ACCOUNT_ID_INTERNAL = "bidvector/workflow/access/AccountId"

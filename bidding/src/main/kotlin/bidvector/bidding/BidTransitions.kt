@@ -216,7 +216,20 @@ val BID_TRANSITIONS: Map<TransitionKey, TransitionRule> =
 /** 부수 산출이 없는 전이 — 상태만 바뀌고 초안·기록은 쓰이지 않는다. */
 private fun BidState.alone(): Pair<BidState, TransitionEffect> = this to TransitionEffect.None
 
-/** payload 가 고르는 도착 상태 — `when` 전수라 명령을 더하면 답 없이는 컴파일되지 않는다. */
+/**
+ * payload 가 **없는** 명령의 도착 — 룩업표다(§4.5 2: 값 기반 분기는 표로, `BidCaseRow.PAYLOAD_FREE` 와 같은 모양).
+ * 아래 [targetOf] 의 `when` 이 payload 를 읽는 명령만 다루게 해 분기를 줄인다. 표와 `when` 이 함께 명령 전수를 덮는지는
+ * `BidTransitionTableTest` 「표에 있는 쌍은 … 허용된다」가 명령 전수(`ALL_COMMANDS`)로 잰다.
+ */
+private val PAYLOAD_FREE_TARGETS: Map<BidCommand, BidState> =
+    mapOf(
+        BidCommand.Resume to BidState.Watching,
+        BidCommand.RecordOpeningFirst to BidState.OpenedProvisionalFirst,
+        BidCommand.RecordOpeningOutOfRank to BidState.OpenedOutOfRank,
+        BidCommand.MarkDeadlinePassed to BidState.DeadlinePassedUnrecorded,
+    )
+
+/** payload 가 고르는 도착 상태 — payload 없는 넷은 [PAYLOAD_FREE_TARGETS] 가 든다. */
 private fun targetOf(
     command: BidCommand,
     now: Instant,
@@ -224,19 +237,16 @@ private fun targetOf(
 ): Pair<BidState, TransitionEffect> =
     when (command) {
         is BidCommand.Defer -> BidState.Deferred(command.remindAt).alone()
-        BidCommand.Resume -> BidState.Watching.alone()
         is BidCommand.ReceivePriceMenu -> BidState.PriceReceived.alone()
         is BidCommand.DraftBid -> BidState.BidPlanned to TransitionEffect.DraftWritten(command.draft)
         is BidCommand.RecordBid -> recordTarget(command, now, retroactive)
         is BidCommand.AwaitOpening -> BidState.AwaitingOpening(command.openingAt).alone()
-        BidCommand.RecordOpeningFirst -> BidState.OpenedProvisionalFirst.alone()
-        BidCommand.RecordOpeningOutOfRank -> BidState.OpenedOutOfRank.alone()
         is BidCommand.EnterQualificationReview -> BidState.UnderQualificationReview(command.documentDueAt).alone()
         is BidCommand.RecordOutcome -> command.outcome.toState().alone()
         is BidCommand.CorrectOutcome -> command.outcome.toState().alone()
         is BidCommand.Skip -> BidState.Skipped(command.reason).alone()
-        BidCommand.MarkDeadlinePassed -> BidState.DeadlinePassedUnrecorded.alone()
         is BidCommand.RevokeDeadlinePassed -> command.restore.alone()
+        else -> requireNotNull(PAYLOAD_FREE_TARGETS[command]) { "도착이 정의되지 않은 명령이다: ${command.tag}" }.alone()
     }
 
 /** 기록 전이의 도착과 산출 — 서버가 정하는 둘(확인 시각 · 소급)을 여기서 싣는다. */

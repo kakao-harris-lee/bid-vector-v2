@@ -66,7 +66,6 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
         insertsRecord(caseId, mine.value, "{0,11}") shouldBe false
     }
 
-
     // --- 계약 D-7B-4 ----------------------------------------------------------------
 
     /** 검토 r2 C2-N5 — 손으로 적은 열거가 도메인 enum 과 **등식**이다(한쪽에만 어휘가 늘면 붉다). 결정 ⑤ 의 새 명령 포함. */

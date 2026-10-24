@@ -31,14 +31,21 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-a")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         workflow.draft(mine, caseId, amount(1_000_000L), now, BidActor.User(mine))
 
         now = now.plusSeconds(2 * HOUR)
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
         correctNoticeDeadline(key, now.plusSeconds(3 * HOUR))
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.BID_PLANNED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.BID_PLANNED
         val tail = workflow.timeline(mine, caseId)!!.takeLast(2)
         tail.map { it.command } shouldBe listOf("MARK_DEADLINE_PASSED", "REVOKE_DEADLINE_PASSED")
         tail.map { it.actorKind } shouldBe listOf(ActorKind.SYSTEM, ActorKind.SYSTEM)
@@ -59,14 +66,19 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-b")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         workflow.command(mine, caseId, BidCommand.Defer(now.plusSeconds(HOUR / 2)), BidActor.User(mine))
 
         now = now.plusSeconds(2 * HOUR)
         workflow.read(mine, caseId)
         correctNoticeDeadline(key, now.plusSeconds(HOUR))
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.WATCHING
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.WATCHING
         lastSystem(workflow.timeline(mine, caseId)!!).command shouldBe "REVOKE_DEADLINE_PASSED"
     }
 
@@ -77,13 +89,18 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-c")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         now = now.plusSeconds(2 * HOUR)
         workflow.command(mine, caseId, BidCommand.RecordBid(submission(), null), BidActor.User(mine))
         correctNoticeDeadline(key, now.plusSeconds(HOUR))
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.BID_RECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.BID_RECORDED
         workflow.timeline(mine, caseId)!!.count { it.command == "REVOKE_DEADLINE_PASSED" } shouldBe 0
     }
 
@@ -94,12 +111,17 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-d")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
         correctNoticeDeadline(key, null)
 
         now = now.plusSeconds(2 * HOUR)
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.WATCHING
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.WATCHING
         workflow.timeline(mine, caseId)!!.filter { it.actorKind == ActorKind.SYSTEM }.shouldBeEmpty()
     }
 
@@ -110,13 +132,20 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-e")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         now = now.plusSeconds(2 * HOUR)
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.DEADLINE_PASSED_UNRECORDED
         correctNoticeDeadline(key, null)
 
-        workflow.read(mine, caseId)!!.case.state.tag shouldBe BidStateTag.WATCHING
+        workflow
+            .read(mine, caseId)!!
+            .case.state.tag shouldBe BidStateTag.WATCHING
     }
 
     /** 검토 r2 V2-W1 · C2-N9 — 이미 마감이 지난 공고를 담으면 응답이 곧 「마감 지남」이다(담기 → 읽기가 두 답을 주지 않는다). */
@@ -139,7 +168,10 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
         val key = notice("revoke-g")
         seedNotice(key, now.plusSeconds(HOUR))
         val workflow = workflow()
-        val caseId = workflow.open(mine, key, BidKind.REAL).view.case.id
+        val caseId =
+            workflow
+                .open(mine, key, BidKind.REAL)
+                .view.case.id
 
         now = now.plusSeconds(2 * HOUR)
         val passed = workflow.list(mine, BidKind.REAL, BidStateTag.DEADLINE_PASSED_UNRECORDED)
@@ -151,7 +183,9 @@ class BidCaseDeadlineRevocationTest : BidCaseDbFixture() {
     }
 
     private fun accepted(result: BidCommandResult) {
-        result.shouldBeInstanceOf<BidCommandResult.Processed>().outcome
+        result
+            .shouldBeInstanceOf<BidCommandResult.Processed>()
+            .outcome
             .shouldBeInstanceOf<bidvector.bidding.TransitionOutcome.Accepted>()
     }
 

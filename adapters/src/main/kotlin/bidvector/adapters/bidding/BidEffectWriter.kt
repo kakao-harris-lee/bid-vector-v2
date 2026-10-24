@@ -5,8 +5,10 @@ import bidvector.adapters.persistence.ProvenanceCodec
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidDraft
 import bidvector.bidding.BidRecordEntry
+import bidvector.bidding.TransitionEffect
 import bidvector.sharedkernel.export
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.bidding.AppliedTransition
 import java.sql.Connection
 import java.sql.Date
 import java.sql.Timestamp
@@ -21,6 +23,27 @@ import java.sql.Timestamp
  * 적는다(계약 D-7B-3, 검토 B-1). 손으로 쓴 셋째 어휘가 기초금액을 production 에서 늘 비게 만들었다.
  */
 internal object BidEffectWriter {
+    /** 전이의 부수 산출을 쓴다 — 초안 · 기록 · 없음. 같은 트랜잭션 안에서 부른다(`JdbcBidCaseStore.applyTransition`). */
+    fun write(
+        connection: Connection,
+        account: AccountId,
+        applied: AppliedTransition,
+    ) {
+        when (val effect = applied.effect) {
+            TransitionEffect.None -> {
+                // 부수 산출이 없는 전이 — 건의 상태와 타임라인 한 줄만 남는다.
+            }
+
+            is TransitionEffect.DraftWritten -> {
+                insertDraft(connection, account, applied.caseId, effect.draft)
+            }
+
+            is TransitionEffect.RecordWritten -> {
+                insertRecord(connection, account, applied.caseId, effect.record)
+            }
+        }
+    }
+
     fun insertDraft(
         connection: Connection,
         account: AccountId,

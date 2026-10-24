@@ -103,9 +103,12 @@ class OpenApiRequestBodyContractTest : HttpIntegrationTestBase() {
             handlerMapping.handlerMethods.entries
                 .filter { (_, handler) ->
                     handler.methodParameters.any { it.hasParameterAnnotation(PathVariable::class.java) }
-                }
-                .flatMap { (info, _) ->
-                    val patterns = info.pathPatternsCondition?.patterns.orEmpty().map { it.patternString }
+                }.flatMap { (info, _) ->
+                    val patterns =
+                        info.pathPatternsCondition
+                            ?.patterns
+                            .orEmpty()
+                            .map { it.patternString }
                     info.methodsCondition.methods.flatMap { method -> patterns.map { "${method.name} $it" } }
                 }.toSet()
         pathVariableMappings.shouldNotBeEmpty()

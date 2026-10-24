@@ -8,7 +8,6 @@ import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
-import bidvector.bidding.TransitionEffect
 import bidvector.bidding.tag
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
@@ -178,30 +177,10 @@ class JdbcBidCaseStore(
                     retroactive = applied.retroactive,
                     occurredAt = applied.occurredAt,
                 )
-                writeEffect(connection, account, applied)
+                BidEffectWriter.write(connection, account, applied)
                 TransitionWrite.Applied
             }
         }
-
-    private fun writeEffect(
-        connection: Connection,
-        account: AccountId,
-        applied: AppliedTransition,
-    ) {
-        when (val effect = applied.effect) {
-            TransitionEffect.None -> {
-                // 부수 산출이 없는 전이 — 건의 상태와 타임라인 한 줄만 남는다.
-            }
-
-            is TransitionEffect.DraftWritten -> {
-                BidEffectWriter.insertDraft(connection, account, applied.caseId, effect.draft)
-            }
-
-            is TransitionEffect.RecordWritten -> {
-                BidEffectWriter.insertRecord(connection, account, applied.caseId, effect.record)
-            }
-        }
-    }
 
     @Suppress("LongParameterList")
     private fun insertCase(
