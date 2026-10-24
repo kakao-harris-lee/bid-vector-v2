@@ -2,7 +2,14 @@
 
 - **근거**: `milestone-7.md` 7C ④(「설정(`operator_profile` + 전략 편집 세션 재사용)」). 운영자 지시 2026-10-22 「7C④ 도 레인 열어서
   병렬로 진행」. 7C① 과 같은 종류의 `milestone-7.md` 선행 조건(M6 완료 조건 성립) **운영자 예외**다.
-- **base**: main `bee7c36f` · worktree `bid-vector-v2-m7-7c4` · 브랜치 `m7-7c4/2026-10-22`.
+- **base**: main `fc15975c` · worktree `bid-vector-v2-m7-7c4` · 브랜치 `m7-7c4/2026-10-22`.
+  **2026-10-24 재고정(R-8)**: 착수 base 는 `bee7c36f` 였고 그 뒤 main 이 PR #81~#87 로 앞섰다. 레인 브랜치에 `fc15975c` 를 병합하고
+  (충돌 0) base 와 rollback 복원 기준을 그 SHA 로 다시 고정했다. 앞 base 의 rollback 실측은 무효다 — 새 base 에서 다시 잰다.
+  마이그레이션 번호는 **V22 유효**(병합된 main 최대 V20, 7B 가 V21 보유).
+
+## 하네스 레인 변경
+
+**없음.** 이 slice 는 `CLAUDE.md` 와 `.claude/` 에 커밋이 0 이다(`git log --oneline fc15975c..HEAD -- CLAUDE.md .claude/` 빈 출력).
 - **병렬 레인**(전부 push 0): 7B(`bid-vector-v2-m7-7b`, **V21 보유**) · g1c03 · g1dec05 · g1set01. 무거운 빌드는 기존 flock 직렬에 줄을 선다.
 - **입력 정본**:
   - `docs/discovery/m7-screen-data-requirements.md` — 화면 A(시작하기) 행 27~37, 「설정」 절(:115~), 담당 칸이 `7C ④` 인 행 전부.

@@ -132,9 +132,11 @@ D-6A1-12 정의(「PR 시점 main 최대보다 크고 선점 통보 번호를 �
   `toString()` 을 가린다.
 - **evidence**: 실값 0. test fixture 는 합성 값만 쓰고, `leakPatternGate` 실행 확인을 완료 조건에 둔다.
 - **보존 분류**: 새 표 둘 모두 `RetentionTableRegistry` 에 **등재한다**(스키마와 집합 등식 test 가 요구한다).
-  `SINGLETON_SETTING` 은 싱글턴이 아니어서 맞지 않는다(`RetentionTableRegistry.kt:12-13`). 새 사유
+  `SINGLETON_SETTING` 은 그 사유의 KDoc 문면(「싱글턴 설정 행(id=1)」)대로 싱글턴 전용이어서 맞지 않는다. 새 사유
   `ACCOUNT_SETTING`(계정의 현재 설정값 — 수명은 시간이 아니라 계정이 정하고, 파기 경로는 R-2 `후속` 의 탈퇴 파기가 연다,
-  `ACCOUNT_IDENTITY` 의 서술 `:42-47` 과 같은 축) 하나를 더한다 → **Q4**.
+  같은 레지스트리의 `ACCOUNT_IDENTITY` 서술과 같은 축) 하나를 더한다 → **Q4**.
+  (**좌표 제거 2026-10-24**: 이 두 문장은 `RetentionTableRegistry` 의 `파일:줄` 을 가리켰다. 이 slice 가 그 파일을 편집하므로
+  좌표가 낡는다 — 문면 인용으로 바꿨다.)
 - 상호는 공고 쪽에서 `COMPANY_IDENTITY_CONCEPTS`(PII 축)다(`FieldConceptPiiAxis.kt:19-27`). 운영자 자신의 상호는
   `FieldConcept` 가 아니어서 그 게이트에 들지 않는다. 그래서 위 가림·경로 규칙을 이 slice 가 직접 test 로 잠근다.
 
@@ -296,7 +298,61 @@ V12 업종(`business_types`)은 자유 텍스트 `CategoryCode` 라 「공사인
 2. **전략과 프로필의 이중 저장**(B2) — 업종(V12 `business_types` ↔ 전략 `focusCategories`) · 지역어(V12 `region_terms` ↔ 전략
    `focusRegionTerms`). UX §6.2 A 가 없애라고 한 구조이고 이 slice 는 고치지 않는다 — 후속 후보(R-2 별 slice 와 묶을 수 있다).
 3. **V12 는 아직 싱글턴이다** — 계정이 둘이 되면 업종 · 면허 · 지역어가 공유된다(V9 전략과 같은 기존 노출, R-2 남은 절반).
-4. **입력만 선 축 둘**(QUAL-08 소재지 · QUAL-11 시평액) — 판정 없음. `UnjudgedQualificationAxis` 와
-   `ProfileJudgementIsolationTest` 가 그 사실을 잠근다.
+4. **입력만 선 축 둘**(QUAL-08 소재지 · QUAL-11 시평액) — 판정 없음. 판정 대기 표에는 축이 **셋**이다: QUAL-10(수행실적)은
+   입력도 판정도 없이 들어간다(§3.2). `UnjudgedQualificationAxis` 와 `ProfileJudgementIsolationTest` 가 그 사실을 잠근다.
 5. **나라장터 자기 신고값의 진위는 확인하지 않는다**(위협 모델 「방어하지 않음」).
 6. **HTTP 표면 없음(2a)** — 2b 에서 선다. 그때까지 production 의 어느 경로도 V22 표에 쓰지 않는다.
+
+## §3 레인 재개 (2026-10-24)
+
+### 3.1 남아 있던 미커밋 변경의 판정 — D-7C4-2 구현이었고, **깨져 있었다**
+
+앞 세션이 종료되며 커밋되지 않은 변경 셋(이 파일 · `OnboardingChecklist.kt` · `OnboardingChecklistTest.kt`)이 남았다. 전문을
+계약과 대조한 결과 **D-7C4-2(시평액 항목 세 상태)의 구현**이었고 in_scope 밖 파일에 닿지 않았다 — 버리지 않고 이어받았다
+(원본은 레인 scratchpad 의 패치 파일로 백업).
+
+이어받기 전에 표적 test 를 돌린 것이 값을 했다. **`OnboardingChecklistTest` 9 중 7 이 `IllegalStateException` 으로 실패했다**
+(「선행 항목이 선언되지 않은 「아직 모름」 항목: CONSTRUCTION_CAPACITY」). 원인은 선행 표를 **최상위 `val`** 로 둔 것이다:
+
+- 그 표의 초기화가 열거 상수(`OnboardingItem.CONSTRUCTION_CAPACITY`)를 읽고,
+- 열거 항목의 초기화가 같은 파일의 최상위 값(`ALWAYS`)을 읽는다.
+
+한 스레드에서 서로의 `<clinit>` 에 재진입하므로 **먼저 시작한 쪽이 상대의 미초기화 상태를 본다** — 열거가 먼저면 표의 키가
+`null` 이 되고(실측된 쪽), 표가 먼저면 열거 항목의 적용 함수가 `null` 이 된다. 어느 쪽이든 판정 전체가 깨진다.
+
+**고친 방식**: 선행을 표에서 빼고 **적용 상태 타입이 들게** 했다(`ItemApplicability.AwaitingPrerequisite(prerequisite)`, sealed).
+선행이 상태와 한 자리에 있으므로 (1) 두 자리가 어긋나 「선행 없는 대기」가 생길 수 없고 (2) 열거 상수를 읽는 최상위 값이 없어
+순환이 사라진다. 판정 함수의 `when` 은 소진형이라 상태를 더하면 컴파일이 막는다(새 상태가 조용히 어느 목록에도 들지 않는 일이
+없다). test 는 「대기의 선행은 그 스냅샷에서 걸리는 항목이다」로 바꿨다 — 죽은 선행·순환을 재고, 대기가 한 번도 관측되지
+않으면 단언이 빈 모집단 위에 서므로 그것도 함께 잰다.
+
+### 3.2 미판정 축 어휘에 `QUAL_10_PERFORMANCE` (팀장 전달, D-7C2-1 Q5)
+
+7C ② 가 같은 이름의 열거를 `workflow.evaluation` 에 두고 **두 표면의 단일 출처**로 삼기로 했다. 이 레인은 ID 셋을 바이트 동일로
+맞춘다(`QUAL_08_REGION` · `QUAL_10_PERFORMANCE` · `QUAL_11_CONSTRUCTION_CAPACITY`, 이 순서 — 7C ② worktree 의 정의와 대조).
+QUAL-10(수행실적)은 이 slice 가 **입력을 받지 않는다**(D-7C4-1 Q2). 그래도 드는 이유는 이 표가 「입력이 선 축」이 아니라
+**「판정이 없는 축」**이기 때문이다 — 입력도 판정도 없는 축을 빼면 운영자에게 「면허만 보면 끝」으로 읽힌다. 축 ID 는 wire 값
+이므로 이름을 직접 잠갔다(2b 의 응답 계약 test 가 서기 전까지 이것이 유일한 잠금이다).
+
+**머지 방향은 한쪽뿐이다.** 뒤에 머지되는 쪽이 자기 리터럴을 지우고 상대를 참조하는데, 가능한 방향은 `profile` →
+`evaluation` 이다(그 방향은 이미 `ProfileFacts` 참조로 서 있다). 반대로 `evaluation` 이 `profile` 을 참조하면
+`ProfileJudgementIsolationTest` 의 격리 단언이 붉어진다 — 그 test 가 막는 것이 바로 판정 경로의 이 패키지 참조다.
+어휘를 capability map · 추적표에 어떻게 적을지는 단일 출처를 쥔 7C ② 소관으로 둔다.
+
+### 3.3 base 재고정과 병합으로 해소된 전제 둘
+
+main 이 `fc15975c` 까지 앞섰다(7C①b · g1set01 · g1c03 · 7C⑤p · CVE allowlist 둘). 레인 브랜치에 병합했고 **충돌 0** 이다
+(`gate-tests.properties` 와 M6 추적표는 양쪽이 고쳤지만 서로 다른 절·행이다). base 와 rollback 기준을 `fc15975c` 로 고쳤다.
+
+- **g1set01 머지로 §0.2 F10 의 「미머지」 전제가 해소됐다.** 상호 커널의 운영자 입력은 `OperatorTradeName.Declared(원문)` ·
+  `NotDeclared` 이고 정규화(공백 제거 · 법인 토큰 절삭 · ASCII 소문자화)는 **대사 시점**에 커널 안에서 돈다. 이 slice 의 저장
+  형태(원문 무편집 · `NULL` = 미신고)가 그 전제와 맞는다 — 이중 정규화가 생기는 자리가 없다. 커널 코드는 끌어오지 않았다.
+- **B1 해소**: STR-06 은 main 의 7C①b 가 제안 목록 operation 으로 홀더를 세웠다. 분류는 여전히 ⓒ 이고 남은 결합(표시 상한 ↔
+  분석 예산)은 팀장 등재 예정 별 slice 다. 이 slice 는 전략 쪽에 아무것도 더하지 않는다(§0.9 그대로).
+
+### 3.4 2b 로 넘기는 결정 — `awaiting` 의 응답 형태
+
+D-7C4-2 의 `awaiting` 은 **(항목, 선행 항목) 짝**이다. 응답 평탄 규칙은 object 배열을 허용하지 않으므로(§0.1 F5) 2b 에서 형태를
+정해야 한다. 후보 둘: (가) 스칼라 배열 둘(`awaitingItems` · 같은 순서의 `awaitingPrerequisites`) — 짝이 자리로만 묶여 약하다,
+(나) 7C ② 의 평탄 술어 확장(깊이 1 · 대상 속성 전부 스칼라)이 머지되면 그 허용 안에서 짝 배열. **지금 고르지 않는다** — 2a 는
+HTTP 표면이 없고(알려진 제한 6), 고르면 7C ② 의 게이트 술어 결정을 이 레인이 선점한다.
