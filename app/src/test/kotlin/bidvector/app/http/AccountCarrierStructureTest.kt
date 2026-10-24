@@ -182,6 +182,20 @@ class AccountCarrierStructureTest {
         declaring shouldBe census
     }
 
+    /**
+     * D-7B-7 ① — 바인딩 거부 가드(`AccountBindingGuard`)는 **`@RestController` 핸들러에만** 걸린다(관리 포트의 actuator 핸들러를
+     * 비켜 가려고). 그래서 요청 매핑 메서드를 가진 app class 가 전부 `@RestController` 여야 가드 밖의 핸들러가 생기지 않는다.
+     */
+    @Test
+    fun `요청 매핑 메서드를 선언한 app class 는 전부 RestController 다 — 바인딩 가드의 적용 범위`() {
+        val declaring = requestMappingMethods(appClasses()).map { it.declaringClass }.toSet()
+        declaring.shouldNotBeEmpty()
+
+        declaring
+            .filterNot { it.isAnnotationPresent(org.springframework.web.bind.annotation.RestController::class.java) }
+            .map { it.name } shouldBe emptyList()
+    }
+
     /** 양성 대조 — G11 의 모양(매개변수 `AccountId`)과 그것을 실은 묶음 타입이 규칙에 걸리고, 평범한 매개변수는 걸리지 않는다. */
     @Test
     fun `AccountId 를 싣는 핸들러 매개변수는 규칙에 걸린다 — 양성 대조`() {

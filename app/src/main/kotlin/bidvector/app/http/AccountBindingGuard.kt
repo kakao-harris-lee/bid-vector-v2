@@ -4,6 +4,7 @@ import bidvector.workflow.access.AccountId
 import org.springframework.format.Formatter
 import org.springframework.web.bind.WebDataBinder
 import org.springframework.web.bind.annotation.InitBinder
+import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import tools.jackson.core.JsonParser
 import tools.jackson.databind.DeserializationContext
@@ -31,11 +32,14 @@ import java.util.Locale
  *    이 길로는 지어지지 않는다. 거부는 형 변환 실패로 나타나고 응답은 공유 오류표의 500 이다(Spring 이 formatter 의 예외를
  *    형 불일치로 감싼다 — 이 slice 는 그 표를 바꾸지 않는다). `java.beans` editor 는 쓰지 않는다 — 그 패키지는 전송 표면 뿌리다.
  *
+ * 바인딩 층(2 · 3)은 **`@RestController` 핸들러에만** 건다 — 관리 포트의 actuator 핸들러는 선택 본문을 `Map` 으로 바인딩하므로,
+ * 전역으로 걸면 health 가 400 이 된다(측정: `ManagementHealthSurfaceTest`). 우리 핸들러는 전부 `@RestController` 다.
+ *
  * 두 층을 **한 빈**에 둔 까닭: 출하 조립과 HTTP test 조립이 같은 컴포넌트 스캔으로 이 빈 하나를 얻는다 — 등록이 갈라져
  * 한쪽에만 빠지는 자리가 없다. 근본(`AccountId` 생성 경로 봉쇄)은 7D 파일이라 이 slice 가 하지 않는다 —
  * OPEN 후보 `OPEN-7D-ACCOUNTID-CONSTRUCTION`.
  */
-@RestControllerAdvice
+@RestControllerAdvice(annotations = [RestController::class])
 class AccountBindingGuard : SimpleModule(MODULE_NAME) {
     init {
         addDeserializer(AccountId::class.java, RejectingAccountIdDeserializer)
