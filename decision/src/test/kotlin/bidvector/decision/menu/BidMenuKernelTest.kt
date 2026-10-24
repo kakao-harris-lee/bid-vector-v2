@@ -221,6 +221,10 @@ class BidMenuKernelTest {
      * 리뷰어 수치 예 — 기초금액 1,234,567 · 하한율 0.87995 면 하한이 소수이고 `DOWN` 이 그
      * 아래로 떨어진다. 라운드 1 은 이 옵션을 **보류**했다(하한에 걸린 옵션이 늘 사라졌다).
      * 지금은 제약을 만족하는 **최소 정수**로 올라가고 binding 이 하한을 가리킨다.
+     *
+     * 기대값은 손으로 센다 — 1,234,567 × 0.87995 = **1,086,357.23165** 이므로 `DOWN` 은
+     * 1,086,357(하한 미만)이고 하한 이상인 최소 정수는 **1,086,358** 이다. 구현에서 끌어온
+     * 수가 아니다(라운드 2 의 `StanceRateMappingTest` 교훈 — oracle 은 구현 독립이어야 한다).
      */
     @Test
     fun `반올림 — 하한 경계에서 내림이 밑돌면 보류가 아니라 올린다`() {
@@ -233,7 +237,7 @@ class BidMenuKernelTest {
         offered.aggressive.binding shouldBe BindingConstraint.PublishedFloorBound
         offered.aggressive.amount.value
             .export()
-            .won shouldBe 1_086_362L
+            .won shouldBe 1_086_358L
     }
 
     @Test

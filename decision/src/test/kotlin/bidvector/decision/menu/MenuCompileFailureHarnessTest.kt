@@ -23,9 +23,14 @@ import java.nio.file.Files
  * 양성이 되어 RED 다.
  *
  * fixture 1 — [BidMenuOption] 은 모듈 밖에서 직접 지을 수 없다(유일한 생성 경로는
- * [composeBidMenu]). fixture 2 — [BidMenuOutcome.Offered] 도 같다. 둘을 나눈 이유는 명제가
- * 다르기 때문이다: 하나는 「근거 없는 **옵션**」, 하나는 「판정을 거치지 않은 **정상 3안**」의
- * 위조다(밴드 붕괴를 정상 3안으로 바꿔치는 경로가 여기로 열린다).
+ * [composeBidMenu]). fixture 2 — [BidMenuOutcome.Offered] 도 같다. fixture 3 —
+ * [BidMenuOutcome.PartiallyOffered] 도 같다. 셋을 나눈 이유는 명제가 다르기 때문이다:
+ * 「근거 없는 **옵션**」 · 「판정을 거치지 않은 **정상 3안**」(밴드 붕괴를 정상 3안으로
+ * 바꿔치는 경로) · 「**보류 사유를 지어낸 부분 메뉴**」(라운드 2 가 낸 세 번째 조립 경로 —
+ * 어느 태도를 왜 뺐는지를 밖에서 쓸 수 있으면 보류가 위조된다)의 위조다.
+ *
+ * **셋째를 「같은 기법이니 자명하다」로 갈음하지 않는다** — 라운드 2 의 HIGH-1 이 바로
+ * 「자명해 보이는 대응」을 재지 않아 생겼다. 같은 기법이라도 새 표면은 따로 잰다.
  */
 class MenuCompileFailureHarnessTest {
     @Test
@@ -52,6 +57,20 @@ class MenuCompileFailureHarnessTest {
     fun `2-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "2-menu-offered-direct-construction-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
+
+    @Test
+    fun `3 PartiallyOffered 는 모듈 밖에서 직접 지을 수 없고 커널 경유는 컴파일된다`() {
+        assertNegativeFails("3-menu-partially-offered-direct-construction", "cannot access")
+        assertPositiveCompiles("1-menu-via-kernel")
+    }
+
+    @Test
+    fun `3-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "3-menu-partially-offered-direct-construction-typo",
             realDiagnosticFragment = "cannot access",
         )
     }
