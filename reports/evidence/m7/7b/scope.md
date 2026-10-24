@@ -314,6 +314,42 @@ scan 둘은 main 의 #86 allowlist 가 없는 트리라 외부 CVE 로 남을 �
 V2-N2 우회 · C2-N5 등식 · `draft_id` FK · 동시성) · rollback ①~⑥ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. **판정 SHA 보고 뒤에는 커밋하지 않는다**
 — 팀장 요청이 와도 「그 SHA 로 검증이 도는가」 먼저 묻는다. 새 파일은 in_scope 와 대조해 보고한다.
 
+**D-7B-5 (2026-10-24, 팀장 — 검토 r3 수령 · 승인 전 일괄).** 판정 SHA `1b33c925`(마지막 산출물 커밋 `da8e59e1`)에 대해 verifier r3 **ready-for-review**
+(차단 0 · 게이트 medium 2 · 장부층 2), code-reviewer r3 **approve**(high 0 · medium 3 · low 8 · 질문 1). 차단이 없으므로 재작업 횟수에 넣지 않는다(2/5 유지).
+남은 지적은 승인 전 일괄로 한 번에 처리한다(전문: `_workspace/m7-7b/03_verifier_r3.md` · 리뷰 파일 `cr-7b-r3.md`). ID 접두는 `V3-` · `C3-`.
+게이트 술어를 바꾸는 항목(V3-N1 · V3-N2)은 표적 재검증 대상이다 — 나머지는 PR 조치 코멘트와 head CI 로 닫는다.
+
+고친다:
+- **V3-N1 계정 운반 — 손에 든 `AccountId` 로 다른 id 를 짓는 길**(`convertValue(n, seed.javaClass)`): app main 에서 Jackson 바인딩 진입점(`convertValue` · `readValue` ·
+  `treeToValue` · `readerFor` 등 대상 타입을 받는 메서드의 **서명**)을 부르는 class 집합을 고정 집합 등식으로 잠근다(소유자 무관 서명 술어, 양성 대조 포함).
+  verifier 우회를 변이로 재현해 RED. `AccountId` 생성 경로 자체의 봉쇄는 7D 파일이라 하지 않고 OPEN 후보 `OPEN-7D-ACCOUNTID-CONSTRUCTION` 으로 적는다.
+  `AccountCarrierStructureTest` KDoc 「다른 길은 모두 Class 상수를 요구한다」를 사실로 좁힌다(V3-L2 · C3 의 V2-N1 문면 지적).
+- **V3-N2 본문 없는 op 행동 등식**: 먼저 담은 건의 id 로 부르고, 응답이 401 · 404 가 아님을 양성 대조로 단언한 뒤 400 · 415 아님을 잰다. 건 존재 확인 뒤 본문을
+  요구하는 핸들러 변이(G4-N3C) RED.
+- **C3-M2 메모 · 증빙 상한 등식**: `BidMemo` · `EvidenceRef` 상한을 `internal` 로 올리고 `pg_get_constraintdef` 의 상한 ↔ 도메인 상수, OpenAPI `maxLength` ↔ 도메인
+  상수 등식을 둔다. 「어긋나면 붉다」 주석이 사실이 되게 한다.
+- **C3-M3 `restoreOf`**: 마감 전 넷을 키로 한 룩업표(`DEFERRED → Watching` 은 결정 ⑤ 보충의 의도 항목으로 표기), 그 밖은 `error`. 「되돌림 도착 키 집합 ==
+  `DEADLINE_JUDGED_STATES`」 등식 test.
+- **C3-L6 사용자 판정**: §6.1 표(도메인 명세)가 사용자의 「마감 지남」 기록을 요구하지 않으면 `MARK_DEADLINE_PASSED` 를 `SYSTEM_ONLY` 로 좁힌다(추천 — 출하 호출자는
+  시스템뿐). 요구하면 좁히지 않고 §6-2 에 「사용자가 적은 판정은 되돌릴 수 없다 — 유일한 출구는 소급 기록」을 결과까지 적는다. 어느 쪽인지 근거 문장을 처분표에 인용.
+- **C3-L3** 「남의 건은 판정 후보로도 고르지 않는다」 행동 test + `SELECT_SETTLE_CANDIDATES` `OR TRUE` 변이 행. **C3-L4** `rowPresent` 를 끄는 운반 층 test(파기 건 사본
+  판정) 하나 — 쓰지 않을 것이면 지우고 KDoc 정정. **C3-L7** `SubmittedBidAmount(...)` 를 `requestValue("amountWon")` 로 감싼다. **C3-L8** 되돌림 판단은 마지막
+  타임라인 행만 읽는 포트로. **C3-L5** `targetOf` KDoc 을 「표에 행이 있는 명령에 한해」로.
+
+적는다(§6 · evidence, 코드 무변경):
+- **C3-M1** 판정 뒤 소급 기록된 건에 연장 정정이 오면 `retroactive=true` 가 거짓인 채 남는다 — Q-11 집계는 그만큼 과대.
+- **V3-L1** 판정 뒤 공고가 파기되면 담을 때 적은 사본이 그 판정을 뒤집거나(거둠) 이른 판정을 세운다 — 파기는 보존 기한 축이라 실해가 작다.
+- **C3-L2** 「요청 하나는 트랜잭션 둘~넷」 은 명령 · 단건 조회 경로다 — 목록은 판정 후보 수에 비례한다.
+- **C3-Q1** 마감이 now 를 가로질러 반복 정정되면 교차마다 시스템 행 둘 — §6-10 에 타임라인 축 한 줄.
+- **C3-L1** checklist §12 의 줄 번호 좌표를 절 제목 · 인용으로 고치고, 좌표 확인 술어를 `grep -rnE ':[0-9]+'`(시각 · 바이트 등 허용형 제외)로 넓혀 다시 잰다.
+- 앞 라운드 동결 뒤 측정한 「DEFERRED 로 복원」 변이 RED 1(로그 `scratchpad/7b/r2-mut-deferred-1059.log`)을 변이 표에 「판정 SHA 1b33c925 의 버릴 clone 측정」 표기로 넣는다.
+
+등재 후보(evidence 에만, 팀장이 다음 M7 문서 PR 에서 등록): `OPEN-7B-NOTICE-EXPECTED-WRITER` · `OPEN-7B-BIDBOX-PAGING` · `OPEN-7D-ACCOUNTID-CONSTRUCTION`(새).
+
+절차: 처분표 → 회귀 test 는 `1b33c925` 에서 RED 인지 → 찬 `check --continue` · S-20(V21 을 바꾸면 container 재생 · db-rehearsal 도) · 변이 표(V3-N1 · V3-N2 · C3-M2 ·
+C3-M3 · C3-L3 · C3-L6 을 택하면 그 변이) · rollback ①~⑥ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다(#86 은
+PR 시점 update-branch). 새 파일은 in_scope 와 대조해 보고한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
