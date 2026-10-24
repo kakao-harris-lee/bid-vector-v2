@@ -1045,6 +1045,11 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 | R5-7 | R4-3 등식에 in-file 양성 대조 없음 | 고침 | `BidActor$System.<init>` 를 부르는 모의 줄이 술어에 걸린다 | — |
 | R5-8 | `deferredCaseId` 가 멱등이 아님 | 고침 | 부를 때마다 새 공고 번호 | — |
 
+**측정이 드러낸 회귀 둘(고침)**: ① 찬 `check` 에서 `ManagementHealthSurfaceTest` 다섯 · `ManagementSurfaceLateSourceRefusalTest` 하나가 붉었다 — 전역
+`@InitBinder` 가 관리 포트의 actuator 핸들러(선택 본문을 `Map` 으로 바인딩)를 400 으로 거부했다. 가드를 `@RestControllerAdvice(annotations =
+[RestController::class])` 로 좁혔고, 그 범위가 우리 핸들러 전부를 덮는다는 등식(「요청 매핑 메서드를 선언한 app class 는 전부 `@RestController`」)을
+더했다. ② S-20 의 `sizeGate` 가 구조 test 파일 551 줄을 막았다 — Jackson · 핸들러 매개변수 축을 `AccountBindingStructureTest` 로 나눴다(288 · 285 줄).
+
 **정책 파일 편집(게이트 허용 목록 — 공유 파일)**: `collection.external.allowed-packages.app`(정확 일치 등식)에 다섯 — `org.springframework.core`(`ResolvableType`) ·
 `org.springframework.format`(거부 formatter) · `org.springframework.web.bind`(`WebDataBinder`) · `tools.jackson.core`(역직렬화기 서명의 `JsonParser`) ·
 `tools.jackson.databind.module`(`SimpleModule`). `app.http.allowed-packages`(접두)에 둘 — `org.springframework.core` · `org.springframework.format`. 키 옆에 근거
@@ -1057,8 +1062,30 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 | 새 파일 | in_scope 근거 |
 |---|---|
 | `app/src/main/.../http/AccountBindingGuard.kt` | 「`app/**` 의 bidding controller」 — 계정 범위 경로(입찰함)의 운반 경계를 지키는 HTTP 층 가드(D-7B-7 ① 이 정한 자리) |
-| `app/src/test/.../http/AccountBindingGuardScanTest.kt` | 같은 근거(app http test) |
+| `app/src/test/.../http/AccountBindingGuardScanTest.kt` · `AccountBindingStructureTest.kt` | 같은 근거(app http test — 뒤의 것은 `AccountCarrierStructureTest` 에서 나눈 파일) |
 | `app/src/test/kotlin/bidvector/guardprobe/AccountBindingGuardTest.kt` | 같은 근거 — 패키지를 `bidvector.app` 밖에 둔 까닭은 그 probe controller 들이 출하 · HTTP test 조립의 컴포넌트 스캔에 실리지 않게 하려는 것이다(r5 R1 의 센서스 오염). 두 test 는 `gate-tests.properties` 에 등재 |
+
+#### 변이 표 — 승인 전 일괄 3 (전 · 후, `--rerun`, 표적 test 만, 되돌림 뒤 작업 트리 깨끗 확인)
+
+「전」은 `774c46da` 의 버릴 clone, 「후」는 산출물 커밋 위다(H1 · H2 · H5 · TRAV · N2k · 통제군 둘은 「test … 가드 행동 …」 커밋, 가드 경로 변이 넷은
+가드를 `@RestController` 로 좁힌 커밋 — 같은 넷을 그 앞 「test … HttpEntity 본문 모양 …」 커밋에서도 쟀고 결과가 같다). H1 · H2 · H5 는 verifier r5 의 probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다.
+
+| # | 우회 · 변이 | 표적 | 전(`774c46da`) | 후 |
+|---|---|---|---|---|
+| H1 | 두 겹 중첩 본문 DTO 를 받는 매핑 메서드 | `AccountCarrierStructureTest` | 초록 16 / 16 | **RED** 1(라우트 센서스 등식 — 표면 계약 밖의 매핑 class) |
+| H2 | setter 로 `AccountId` 를 받는 본문 DTO | 같음 | 초록 16 / 16 | **RED** 1(같음) |
+| H5 | `@ModelAttribute` 메서드가 `AccountId` 를 받음 | 같음 | 초록 16 / 16 | **RED** 1(같음) |
+| TRAV | `JsonNode.traverse(ObjectReadContext)` 로 파서를 얻음 | 같음 | 초록 16 / 16(소유자 등식은 `JsonNode` 라 통과) | **RED** 1(쌍 등식) |
+| N2k | `Origin` 이 있을 때만 resume 이 본문 요구 | `OpenApiRequestBodyContractTest` | 초록 4 / 4 | **RED** 1(브라우저 표본) |
+| CTRL | 통제군 — 변이 없음(두 표적) | 위 둘 | 초록 16 · 4 | 초록 20 · 4 |
+| MJ | 가드 — Jackson 거부 등록을 지움 | `AccountBindingGuardTest` · `AccountBindingGuardScanTest` | — | **RED** 2(HE 가 핸들러에 닿음 · 스캔 조립의 매퍼가 `AccountId` 를 읽음) |
+| MB | 가드 — 객체 바인딩 거부를 끔 | `AccountBindingGuardTest` | — | **RED** 1(H5 · G11 이 200) |
+| MF | 가드 — `String → AccountId` 거부 formatter 를 지움 | 같음 | — | **RED** 1(흉내 낸 변환기로 `@RequestParam` 이 지어짐) |
+| CTRL-guard | 통제군 — 변이 없음 | 두 가드 test | — | 초록 4 / 4 |
+
+**두 층이 겹치는 자리 — 측정이 드러냈다**: 첫 측정에서 MJ 는 **초록**이었다. `@RequestBody` 는 역직렬화 뒤 대상이 그 DTO 인 바인더를 만들고, 가드의
+`@InitBinder` 가 그 바인더를 거부해 핸들러에 닿지 않았기 때문이다(Jackson 층이 꺼져도 바인딩 층이 막는다 — 그 사이 DTO 안에 `AccountId` 가 한 번
+지어지기는 한다). Jackson 층을 따로 재려고 바인더를 만들지 않는 `HttpEntity` 본문 모양(HE)을 더했고(커밋), 다시 잰 MJ 가 위의 RED 다.
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
