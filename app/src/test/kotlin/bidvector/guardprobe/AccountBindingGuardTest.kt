@@ -34,7 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * 검토 r5 는 두 겹 중첩 본문 DTO(H1) · setter 운반(H2) · `@ModelAttribute` 메서드(H5)에서 Spring · Jackson 이 `AccountId(9)` 를
  * 짓는 것을 실측했다(상위 클래스 필드 H3 · 제네릭 `T` H4 · 핸들러 매개변수 G11 도 같은 부류). 출하 가드
  * [AccountBindingGuard] 를 **실제 MVC · Jackson 자동 구성** 위에 올리고, 그 모양을 그대로 가진 핸들러를 실제 요청으로 부른다:
- * 전부 4xx 이고 **핸들러에 닿지 않는다**(도달 계수 0 — `AccountId` 가 지어졌다면 핸들러가 불렸다). 양성 대조: 본문
+ * 전부 4xx 이고 **핸들러에 닿지 않는다**(도달 계수 0 — `AccountId` 가 지어졌다면 핸들러가 불렸다). 본문 DTO 는 두 층이 겹친다:
+ * `@RequestBody` 는 역직렬화 뒤 대상이 DTO 인 바인더를 만들어 `@InitBinder` 층도 거부한다 — 그래서 바인더를 만들지 않는
+ * `HttpEntity` 모양(HE)을 하나 더 두어 Jackson 층만 따로 잰다. 양성 대조: 본문
  * `JsonNode` 핸들러는 그대로 닿는다(가드가 모든 요청을 막아 공허하게 초록인 것이 아니다).
  *
  * 이 조립은 **이 test 의 패키지에만** 있다(`bidvector.guardprobe` — 출하 조립 `bidvector.app` · HTTP test 조립
@@ -63,6 +65,8 @@ class AccountBindingGuardTest {
                 "H2 setter 운반" to call(HttpMethod.POST, "/probe/h2", """{"account":9}"""),
                 "H3 상위 클래스 필드" to call(HttpMethod.POST, "/probe/h3", """{"account":9}"""),
                 "H4 제네릭 T" to call(HttpMethod.POST, "/probe/h4", "9"),
+                "HE 본문 HttpEntity(바인더 없음 — Jackson 층만)" to
+                    call(HttpMethod.POST, "/probe/entity", """{"inner":{"account":9}}"""),
                 "H5 @ModelAttribute 메서드" to call(HttpMethod.GET, "/probe/h5?value=9", null),
                 "G11 핸들러 매개변수" to call(HttpMethod.GET, "/probe/g11?value=9", null),
             )
@@ -189,6 +193,10 @@ class GuardProbeController {
     fun rp(
         @RequestParam account: AccountId,
     ): String = Reached.hit(account)
+
+    /** 본문을 `HttpEntity` 로 받으면 바인더가 만들어지지 않는다 — `@InitBinder` 층을 지나지 않고 Jackson 거부만 잰다. */
+    @PostMapping("/probe/entity")
+    fun entity(body: HttpEntity<H1Outer>): String = Reached.hit(body.body?.inner?.account)
 
     @PostMapping("/probe/ok")
     fun ok(
