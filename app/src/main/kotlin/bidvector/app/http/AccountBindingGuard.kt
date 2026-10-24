@@ -38,7 +38,7 @@ import java.util.Locale
  *    거부 formatter 를 단다. 바인더의 editor 는 변환 서비스보다 먼저 묻히므로, 누가 `String → AccountId` 변환기를 등록해도
  *    이 길로는 지어지지 않는다. Spring 은 formatter 의 예외를 형 불일치로 감싸 공유 오류표의 500 으로 보낸다 — 그래서 이 advice 가
  *    **먼저**(`HIGHEST_PRECEDENCE`) 그 형 불일치를 받아, 원인이 이 가드의 거부면 400 으로 낸다. 그 밖의 형 불일치는 공유 오류표의
- *    마지막 처리기와 **같은 응답**(500 · 같은 본문)을 그대로 낸다 — 공유 오류표는 바꾸지 않는다(D-7B-7 팀장 추가). `java.beans`
+ *    마지막 처리기를 **그대로 부른다**(같은 함수 — 어긋날 수 없다) — 공유 오류표는 바꾸지 않는다(D-7B-7 팀장 추가). `java.beans`
  *    editor 는 쓰지 않는다 — 그 패키지는 전송 표면 뿌리다.
  *
  * **전제와 그 잠금**: 2 의 「대상이 있는 바인더는 전부 거부」는 오늘 app main 의 `@ModelAttribute` 사용이 0 이라는 관측 위에 서 있다
@@ -70,7 +70,8 @@ class AccountBindingGuard : SimpleModule(MODULE_NAME) {
 
     /**
      * 위 formatter 의 거부를 400 으로 낸다(형 불일치 안에 [AccountBindingRefusedException] 이 있을 때). 그 밖의 형 불일치는 공유
-     * 오류표의 마지막 처리기(`GlobalErrorHandler.fallback`)와 같은 응답을 낸다 — 이 advice 가 먼저 받는다고 다른 거동이 바뀌지 않게.
+     * 오류표의 마지막 처리기 [GlobalErrorHandler.fallback] 을 **그대로 부른다** — 응답 생성 코드를 두 벌 두지 않아, fallback 이 바뀌어도
+     * 둘이 어긋날 수 없다(D-7B-7 팀장 추가 (가)). 이 advice 가 먼저 받는다고 다른 거동이 바뀌지 않는다.
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
     fun refusedConversion(
@@ -78,9 +79,9 @@ class AccountBindingGuard : SimpleModule(MODULE_NAME) {
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> {
         val refused = generateSequence<Throwable>(exception) { it.cause }.any { it is AccountBindingRefusedException }
-        val status = if (refused) HttpStatus.BAD_REQUEST else HttpStatus.INTERNAL_SERVER_ERROR
-        val reported: Throwable = if (refused) InvalidEditRequestException(REFUSED) else exception
-        return ResponseEntity.status(status).body(ErrorMapping.forThrowable(reported, request.correlationIdOrUnknown()))
+        if (!refused) return GlobalErrorHandler().fallback(exception, request)
+        val body = ErrorMapping.forThrowable(InvalidEditRequestException(REFUSED), request.correlationIdOrUnknown())
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body)
     }
 
     private companion object {
