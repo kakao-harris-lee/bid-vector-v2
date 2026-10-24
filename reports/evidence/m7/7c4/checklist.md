@@ -15,8 +15,8 @@ Gradle·DB 실행 0 — 전부 읽기로 확인한 사실이다.
 |---|---|---|
 | F1 | V12 의 세 상태는 **행 존재 + NOT NULL 두 열의 짝**으로 표현된다. 행이 생기는 순간 `licenses_declared` 에 값이 있어야 한다 | `V12__operator_profile.sql:4-8`, `:13-15`, `:22` |
 | F2 | `ProfileFacts` 는 프로필 텍스트 합성(임베딩 입력)의 **allow-list 자체**다. 필드를 더하면 그 값이 합성 텍스트로 들어간다 | `ProfilePorts.kt:8-17`, `TextSynthesis.kt:65-95` |
-| F3 | V12 `region_terms` 의 소비자는 텍스트 합성 하나뿐이다. 자격 판정은 이 값을 읽지 않는다. QUAL-08 acceptance 는 「텍스트가 아니라 **구조화 지역제한 필드**로 판정」이다 | `TextSynthesis.kt:94`, `capability-map.md:956-975` |
-| F4 | 시공능력평가액은 **면허(업종)마다 하나**다. 공고 쪽 원천 `cnstrtnAbltyEvlAmtList` 가 제한그룹·면허별 금액이고, 운영자 쪽은 legacy 에서 연 1회 수기 입력이라 기준 연도가 정의돼 있지 않았다(`OPEN-QUAL-10`) | `capability-map.md:1013-1021` |
+| F3 | V12 `region_terms` 의 소비자는 텍스트 합성 하나뿐이다. 자격 판정은 이 값을 읽지 않는다. QUAL-08 acceptance 는 「텍스트가 아니라 **구조화 지역제한 필드**로 판정」이다 | `TextSynthesis.kt:94`, capability map 의 QUAL-08 절 |
+| F4 | 시공능력평가액은 **면허(업종)마다 하나**다. 공고 쪽 원천 `cnstrtnAbltyEvlAmtList` 가 제한그룹·면허별 금액이고, 운영자 쪽은 legacy 에서 연 1회 수기 입력이라 기준 연도가 정의돼 있지 않았다(`OPEN-QUAL-10`) | capability map 의 QUAL-11 절 |
 | F5 | OpenAPI 평탄 규칙은 **object 배열을 허용하지 않는다**(스칼라 또는 스칼라 배열만). 7B 는 응답 **최상위**를 배열로 둬서 이 규칙을 피했다 | `OpenApiContractTest.kt:473-497`, `7b:BidCaseQueryController.kt` `list` 주석 |
 | F6 | 편집 세션은 전략 전용이고 주체 열이 `operator_id TEXT` 다. 계정은 `account.id BIGINT` 다 | `V8__edit_session.sql:26-27`, `V20__account_browser_session.sql:26-27` |
 | F7 | 본문 거부 기계 전수는 **POST 매핑만** 센다. 401 전수는 모든 매핑을 센다. CSRF 는 메서드로 구조적으로 요구되지만(GET·HEAD·OPTIONS 외 전부) **전 매핑을 훑는 CSRF test 는 없다** | `ProductionHttpSurfaceTest.kt:179-187`, `BrowserSessionAuthenticationTest.kt:184-200`, `BrowserSessionAuthenticator.kt:37-52` |
