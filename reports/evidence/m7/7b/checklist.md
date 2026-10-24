@@ -515,6 +515,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | **D-7B-3 (계약 갱신으로 추가)** 검토 r1 처분 — 결정 ① ~ ④ + 고칠 목록 | §3.5 처분표의 「출하」 칸 | §3.5 처분표 · 변이 표(r1) | 출하 — 근거 있는 거부 하나(C-M6) · 등재 셋(C-L5 · C-L6 · C-L7) |
 | **D-7B-4 (계약 갱신으로 추가)** 검토 r2 처분 — 결정 ⑤ ~ ⑧ · 게이트 우회 둘 · 고칠 목록 | §3.6 처분표의 「출하」 칸 | §3.6 처분표 · 변이 표(r2) | 출하 — 등재 넷(C2-N10 · C2-N12 · C2-N19 · V2-W6 사실) · OPEN 후보 둘(활성 등재는 팀장 문서 PR) |
 | **D-7B-5 (계약 갱신으로 추가)** 검토 r3 승인 전 일괄 — 게이트 보강 둘 · 고칠 목록 · 등재 | §3.7 처분표의 「출하」 칸 | §3.7 처분표 · 변이 표(승인 전 일괄) | 출하 — 등재 넷(C3-M1 · V3-L1 · C3-L2 · C3-Q1) · OPEN 후보 셋 |
+| **D-7B-6 (계약 갱신으로 추가)** 표적 재검증 r4 승인 전 일괄 2 — 게이트 둘을 구조로 · R4-3 등식 · 문면 · 등재 | §3.8 처분표의 「출하」 칸 | §3.8 처분표 · 변이 표(전 · 후) | 출하 — 등재 다섯(R4-2 · R4-5 · R4-8 · R4-9 · V4-L2) · OPEN-7D 사례 넷 |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
 | (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
@@ -533,6 +534,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | feat 「계약 D-7B-2 — typed AccountId 를 요청 속성으로 운반 …」 · test 「입찰 건 이중체의 계정 비교를 값으로」 · test 「요청 값 test …」 · test 「append-only test 가 초안·기록 행을 심는다」 | 계약 D-7B-2 와 그 라운드의 발견 셋(§3.4) |
 | feat 「전이표에 시스템 되돌림 간선 …」 · feat 「마감 판정 두 방향 …」 · fix 「V21·영속 — 되돌림 명령 어휘 …」 · fix 「HTTP — resume 400 선언 …」 · fix 「detekt(함수 수 · 복잡도) …」 · test 「사용자가 적은 마감 지남은 되돌리지 않는다 …」 | 수정 라운드 2(계약 D-7B-4, §3.6). 마지막 산출물 커밋은 맨 뒤의 test 커밋이다 |
 | fix 「승인 전 일괄 — 마감 지남 진입은 시스템 전용 …」 · fix 「승인 전 일괄 HTTP — 데이터 바인딩 진입점 등식 …」 | 승인 전 일괄(계약 D-7B-5, §3.7). 마지막 산출물 커밋은 뒤의 HTTP 커밋이다 |
+| fix 「승인 전 일괄 2 — Jackson 소유자 등식 · 핸들러 매개변수 규칙 …」 | 승인 전 일괄 2(계약 D-7B-6, §3.8). 이 일괄의 산출물 커밋은 이것 하나다 |
 | docs 커밋들 | 계약 · 설계 · evidence |
 
 base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
@@ -984,6 +986,46 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 | C3L8-first | 마지막 행 질의가 첫 행을 고른다 | `BidCaseDeadlineRevocationTest` | **RED** 4 |
 | D5-actor | 되돌림 근거의 시스템 주체 조건을 뺀다 — C3-L6 뒤 재측정 | `BidCaseDeadlineRevocationTest` | 초록 9 / 9 — **등가 변이**: 「마감 지남」에 들어가는 길이 시스템뿐이라 사용자 MARK 행이 생기지 않는다. 조건은 심층 방어로 남긴다 |
 | REV-control | 통제군 — 변이 없음 | `BidCaseDeadlineRevocationTest` | 초록 9 / 9 |
+
+### 3.8 승인 전 일괄 2 — 계약 D-7B-6 (표적 재검증 r4 처분, 2026-10-24)
+
+판정 SHA `927e7b70` 에 대한 verifier r4 **ready-for-review**(차단 0 · 게이트 medium 2 · low 2)와 code-reviewer r4 **approve**(medium 1 · low 10)의 처분이다
+(재작업 2/5 유지). ID 접두는 `V4-` · `R4-`. r3 의 두 보강은 **열거**라 형제 우회가 남았다 — 이번에는 열거를 늘리지 않고 구조로 닫았다(게이트 술어 변경 —
+표적 재검증 대상). **전 · 후 실측**: 같은 형제 우회를 `927e7b70` 의 버릴 clone 과 지금 트리에 각각 얹어 표적 test 를 돌렸다(아래 변이 표).
+
+| 지적 | 내용(한 줄) | 처분 | 출하 | 재는 자리 · 변이 |
+|---|---|---|---|---|
+| V4-N1 ① · R4-1 | 바인딩 등식이 이름 일곱 × 서술자 셋 열거라 `readerForListOf(seed.javaClass)`(G3) · `readValueAs` · jackson2 서술자가 지나간다 | 고침(구조) | **소유자 쪽 허용 목록**: app main 이 가리키는 Jackson 멤버(jackson3 `tools/jackson` · jackson2 `com/fasterxml/jackson`, 호출 · 상수 풀 `Methodref` · `MethodHandle` 포함)의 **소유자 전수 == {`JsonNode`}**. 오늘 관측값이 그 하나다(javap — 매퍼 · 판독기 · 작성기 · 파서 멤버 0). 이름 · 서술자를 보지 않는다. r3 의 이름 · 서술자 술어는 지웠다. 대조: F1 · G3 · `readValueAs` · jackson2 `TypeReference` · 메서드 핸들이 걸리고 `JsonNode.get` 은 허용 안 | G3 · G4AS: `927e7b70` 초록 → **RED** |
+| V4-N1 ② | Spring 이 핸들러 매개변수 `account: AccountId` 를 `?value=9` 로 짓는다(G11) | 고침(구조) | app main class 전수에서 요청 매핑 메서드(`@RequestMapping` 과 합성 — Spring 메타 애너테이션 판정)의 매개변수 타입(제네릭 인자 · 배열 원소 포함)이 `AccountId` 이거나 `AccountId` 를 필드 · 생성자 매개변수로 가진 타입이면 붉다. 양성 대조: 직접 · 묶음 · 목록 셋이 걸리고 평범한 `String` 은 안 걸린다. 모집단 비지 않음 단언 | G11: `927e7b70` 초록 → **RED** |
+| V4-N2 · R4-6 | 본문 없는 op 양성 대조가 전이 거부(409)를 본체 도달로 세고, 403 · 422 · 5xx 가 열거 밖이다 | 고침(구조) | 각 본문 없는 op 를 **받아들여지는 상태**에서 부른다(resume 은 담기 → 「나중에」 뒤). 응답 상태 == **문서의 2xx**(op 마다 정확히 하나 — resume 200, 로그아웃 204). 상태 코드 열거를 지웠다 | N2a · N2e · N2f: `927e7b70` 초록 → **RED** · N3C 는 전후 RED |
+| R4-3 | app main 이 시스템 주체를 짓지 않음을 재는 test 없음 | 고침 | `BidActor$System.<init>` 호출자 = ∅ 등식 | SYS: `927e7b70` 초록(그 test 가 없었다) → **RED** |
+| R4-4 | D-7B-5 의 「`internal` 로」 ↔ 코드는 공개 companion | 문면 — D-7B-6 이 정정 | scope.md D-7B-6 절이 「공개 companion 상수(모듈 경계 — `SkipReason` 과 같은 모양)」로 정정한다(D-7B-5 본문은 고치지 않는다 — 레인은 scope.md 를 건드리지 않았다). 코드는 §3.7 C3-M2 행대로다 | — |
+| R4-7 | `BID_TRANSITIONS` KDoc 「SYSTEM 행 호출자 없음」 | 고침(문면) | 「오늘 호출자는 마감 판정 둘뿐이다」 | — |
+| R4-10 | §2 전이표의 `MARK_DEADLINE_PASSED` 주체 「User · System」 | 고침(문면) | 「System(시각 판정) — D-7B-5 C3-L6 에서 좁힘」 | — |
+| R4-11 | §6 번호 참조가 렌더링과 어긋남 | 고침(문면) | §6 항목 순서를 바로잡고(12 가 11 앞에 있었다) 이 파일의 `§6-번호` 참조를 전부 항목 제목으로 바꿨다(번호로 가리키는 참조가 이 파일에 남지 않았다) | — |
+| V4-L1 | 「대상 타입을 받는 바인딩 진입점 전수」 문장이 술어 범위를 넘게 말한다 | 고침(문면) | test KDoc 을 새 술어(소유자 전수)로 바꿨다. §3.7 V3-N1 행은 그때의 판정 기록이라 고치지 않고 여기 적는다 — **r3 술어의 실제 범위는 열거한 일곱 이름 × 세 서술자였다** | — |
+| R4-2 · R4-5 · R4-8 · R4-9 · V4-L2 | 도착표 밖 꼬리표 500 · 모집단 손 열거 · `amountWon` 라벨 범위 · 사용자 MARK 금지는 앱 층 | 등재 | §6 「마감 전 상태 집합이 줄면 …」 · 「등식의 모집단 일부는 손으로 적는다」 · 「`amountWon` 라벨은 …」 · 「사용자 MARK 금지는 앱 층 불변식이다」 | — |
+| G1 · G2 · G3 · G11 | `OPEN-7D-ACCOUNTID-CONSTRUCTION` 의 사례 | 등재 | §6 「`AccountId` 를 짓는 길 자체는 열려 있다」 — G1 · G2 는 오늘 무해(final 필드)이고 소유자 등식이 붉다 | — |
+
+**새 파일**: 없다(기존 test 두 파일과 커널 KDoc 의 편집).
+
+#### 변이 표 — 승인 전 일괄 2 (형제 우회 전 · 후, `--rerun`, 표적 test 만, 되돌림 뒤 작업 트리 깨끗 확인)
+
+「전」은 `927e7b70` 의 버릴 clone, 「후」는 산출물 커밋 「fix … 승인 전 일괄 2 …」 위다. 우회는 verifier r4 의 probe 모양 그대로(G11 은 매핑 애너테이션을
+가진 비-controller class — route 를 만들지 않아 표면 census 를 건드리지 않는 모양).
+
+| # | 우회 | 표적 | 전(`927e7b70`) | 후 |
+|---|---|---|---|---|
+| G3 | `readerForListOf(seed.javaClass)` | `AccountCarrierStructureTest` | 초록 13 / 13 | **RED** 1(소유자 등식) |
+| G4AS | `JsonParser.readValueAs(seed.javaClass)` | 같음 | 초록 13 / 13(이 test 는 놓침 — Transport 게이트만 잡았다) | **RED** 1(소유자 등식) |
+| J2 | jackson2 `TypeReference` 로 `readValue` | 같음 | 컴파일 실패 | 컴파일 실패 — jackson2 `databind` · `core` 는 app **컴파일** 경로에 없다(런타임에만 전이로 실린다, `Unresolved reference`). 그래서 오늘 app main 에 쓸 수 없고, 그 모양은 대조 test 의 jackson2 줄이 잰다 |
+| G11 | 매핑 메서드 매개변수 `account: AccountId` | 같음 | 초록 13 / 13 | **RED** 1(매개변수 규칙) |
+| SYS | app main 이 `BidActor.System("vr")` 를 짓는다 | 같음 | 초록 13 / 13 | **RED** 1(R4-3) |
+| N2a | 받아들여질 때(「나중에」)만 본문 요구 | `OpenApiRequestBodyContractTest` | 초록 4 / 4 | **RED** 1 |
+| N2e | 본문이 없으면 422 | 같음 | 초록 4 / 4 | **RED** 1 |
+| N2f | 본문이 없으면 403 | 같음 | 초록 4 / 4 | **RED** 1 |
+| N3C | 존재 확인 뒤 본문 요구(400) | 같음 | RED 1 | **RED** 1 |
+| CTRL | 통제군 — 변이 없음 | 두 test | — | 초록 20 / 20 |
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
