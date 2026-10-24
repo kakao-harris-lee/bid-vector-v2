@@ -395,5 +395,9 @@ class AppHttpDependencyGateTest {
  * 러너는 실행 상태를, 줄 함수는 use case 의 보고 타입을 참조한다). 설정 타입은 **넣지 않았다** —
  * 어댑터도 workflow 타입도 쥐지 않으므로 제한 층에 남는 쪽이 옳다. 면제를 필요 이상 넓히면 이
  * 게이트가 그만큼 약해지므로, 셋 가운데 둘은 처음에 빼 두었다가 **게이트가 가리킨 뒤** 넣었다.
+ *
+ * **M7/7C①b — 둘 더해 67**(rebase 2026-10-23, 7C⑤-0 의 65 위에 얹는다): 제안 목록이 둘을 더했다 — ① 층 하나
+ * (`SuggestionWiring`, 기존 빈을 받아 use case 를 조립한다 — 새 어댑터 0), ② 층 하나(`SuggestionQuery` — 컨트롤러가
+ * 받는 조회기이고 HTTP 층 허용 목록에도 있다). `NoticeSearchWiring`·`NoticeSearchQuery` 짝과 같은 형태다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 65
+private const val EXPECTED_EXEMPT_COUNT = 67
