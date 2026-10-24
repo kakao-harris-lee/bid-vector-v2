@@ -4,6 +4,9 @@ import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.adapters.snapshot.RunStateLock
 import bidvector.procurement.CollectedAxisStore
+import bidvector.workflow.collection.DetailSkipCounts
+import bidvector.workflow.collection.OpeningCollectionReport
+import bidvector.workflow.collection.SampleOutcome
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
@@ -64,6 +67,9 @@ class OpeningCollectionE2ETest {
         // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
         e2e.capturedEverything() shouldNotContain e2e.sentinels.second
         e2e.capturedLog() shouldContain "opening-collection finished"
+        // 건너뜀 둘은 **줄 끝**에 선다(M6/G1-C03) — 이 줄을 읽는 쪽이 `frame=` 이후를 통째로 자르므로
+        // 가운데에 끼우면 그 요약의 토큰 자리가 밀린다. 첫 실행이라 둘 다 0 이고, 그 0 도 사실이다.
+        e2e.capturedLog() shouldContain "skippedAgeGate=0 skippedRecheckGate=0"
         // 실행 상태 파일(원장·표본·장부)에도 키가 없다 — 그 디렉터리는 저장소 밖에 오래 남는다.
         assertNoServiceKey(e2e.runStateText())
     }
@@ -109,5 +115,24 @@ class OpeningCollectionE2ETest {
             // 잠금도 출하 조립에서 실제로 잡힌다 — 대역이 서면 동시 실행 차단이 사라진다.
             context.getBean(RunStateDirectory::class.java).lock.shouldBeInstanceOf<RunStateLock.Held>()
         }
+    }
+
+    /**
+     * 마침 줄의 두 건너뜀 칸이 **제 사유의 수**를 싣는다(M6/G1-C03) — 값이 서로 다른 보고로 재야 두 칸을
+     * 맞바꾼 것이 드러난다(출하 경로의 실행은 둘 다 0 이라 위 E2E 로는 가려지지 않는다).
+     */
+    @Test
+    fun `마침 줄은 두 건너뜀을 제 사유의 칸에 싣는다`() {
+        val report =
+            OpeningCollectionReport(
+                frameSize = 0,
+                sample = SampleOutcome(emptyList(), emptyMap()),
+                detailCalls = 0,
+                sampleUnseen = 0,
+                halted = null,
+                skipped = DetailSkipCounts(ageGate = 1, recheckGate = 2),
+            )
+
+        openingFinishLine(report, openingExitCodeOf(report)) shouldContain "skippedAgeGate=1 skippedRecheckGate=2"
     }
 }

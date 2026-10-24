@@ -31,6 +31,12 @@ internal class Candidate(
     val id: NoticeId,
     val candidate: SampleCandidate,
     val source: OpeningCollectionSource,
+    /**
+     * 개찰 일시의 **선언**(M6/G1-C03) — 조회 가치 술어의 age-gate 앵커다. 표본 **선택**에는 들지
+     * 않는다: 결과를 보기 전에 표본을 확정한다는 계약(우회 ⑦)은 그대로이고, 이 값은 뽑힌 뒤 「언제
+     * 부를까」에만 쓴다. 지금 이 경로가 싣지 못하는 사실은 [OpeningAnchor] 가 이름으로 나른다.
+     */
+    val openingAnchor: OpeningAnchor,
 )
 
 /** 슬롯 하나의 끝 — 멈춤 사유와 「끝까지 읽었는가」. 둘은 다른 축이다(절단은 멈춤이 아니다). */
@@ -136,6 +142,8 @@ internal class OpeningSampleFramer(
                         id,
                         SampleCandidate(keyOf(id), source.division, referenceDate.date),
                         source,
+                        // 이 한 줄이 별 slice 의 바꿀 자리다 — 지금 이 갈래는 개찰 일시를 싣지 못한다.
+                        OpeningAnchor.NotCarriedByFrame,
                     )
             }
         }

@@ -287,9 +287,9 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `조회 가치 게이트는 24h_48h 잠정값과 축 재호출 상한을 담는다 — P-5 · D-6G2d-8 ⓒ`() {
+    fun `조회 가치 게이트는 age 24h 잠정값과 재조회 창 0 과 축 재호출 상한을 담는다 — P-5 · D-6G2d-8 ⓒ · D-G1C03-2`() {
         RESOLVED_POLICY.detailFetchGates shouldBe
-            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3)
+            DetailFetchGates(ageGateHours = 24, recheckGateHours = 0, axisRetryLimit = 3)
     }
 
     @Test
