@@ -101,6 +101,12 @@ in_scope 에 해당 contract test 를 더한다. operation 분할(R6)은 하지 
 패키지를 두 번째 허용 집합에 적는 것이며 새 능력이 아니다. 대체 R4(술어 변경)와 손 직렬화기는 택하지 않는다. ④ `ConstantTimeComparisonStructureTest`
 areEqual 허용: 새 `app.http` 클래스 — 패키지를 옮겨 게이트를 비껴가지 않는다.
 
+**D-7C2-6 (2026-10-24, 팀장 — PR #88 결정에 따른 in_scope 추가).** 추적표(`reports/evidence/m6/6e1/acceptance-trace.md`)의
+**DEC-05 · DEC-02 두 행**을 이 slice 가 맡는다. 「아직 산출 안 함」 상태 test 가 서면 장부 커밋에서 두 행을 「선언 예외 → ⓐ」로 바꾼다. 판정 근거는
+「커널·구조 성립 + 화면의 『아직 산출 안 함』 상태 표시가 test 로 잠김」이고, **값 출처 축은 ML-01 과 함께 6G 백테스트 판정 뒤로 남긴다**.
+g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상태로 들어오고 이 slice 가 rebase 뒤 전환한다. **DEC-05 커널 문면은 계속 범위 밖이고
+바뀌는 것은 추적표 행뿐이다.**
+
 
 ## 하네스 레인 변경 (상시)
 
