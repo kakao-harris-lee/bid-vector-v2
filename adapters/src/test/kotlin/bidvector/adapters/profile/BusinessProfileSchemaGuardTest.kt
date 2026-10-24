@@ -31,11 +31,21 @@ import javax.sql.DataSource
 class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
     private val now = Instant.parse("2026-10-22T06:00:00Z")
 
-    /** 앱 역할로 전환한 커넥션을 내는 `DataSource` — 어댑터를 요청 경로의 권한으로 돌린다. */
+    /**
+     * 앱 역할로 전환한 커넥션을 내는 `DataSource` — 어댑터를 요청 경로의 권한으로 돌린다.
+     *
+     * 두 인자 `getConnection` 은 **던진다**(r1 CR L-12). 위임하면 `SET ROLE` 없이 관리자 DataSource 로
+     * 가서, 그 형태를 부르는 호출자가 생기는 날 **관리자 권한을 재면서 조용히 초록**이 된다.
+     */
     private val appRole: DataSource =
         object : DataSource by dataSource() {
             override fun getConnection(): Connection =
                 dataSource().connection.apply { createStatement().use { it.execute("SET ROLE bidvector_app") } }
+
+            override fun getConnection(
+                username: String?,
+                password: String?,
+            ): Connection = error("앱 역할 DataSource 는 두 인자 getConnection 을 내지 않는다(권한을 재는 자리다)")
         }
 
     private var accounts = 0
@@ -134,8 +144,13 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         shouldThrow<SQLException> { asApp("DELETE FROM account_business_profile") }
     }
 
+    /**
+     * **공백뿐인 값도 표가 거부한다**(r1 CR M-3 · F4). 앱 타입은 `isNotBlank` 로 막지만, 빈 문자열만
+     * 막는 CHECK 는 `'  '` 를 받아들였고 **그 행을 읽으면 앱이 던진다** — 앱으로 고칠 수도 없는 읽기
+     * 실패였다(앱은 공백 상호를 쓸 수도 없다). 표 층도 같은 쪽으로 좁힌다.
+     */
     @Test
-    fun `CHECK — 상호는 빈 문자열을 거부하고 상한이 정책과 같다(코드포인트)`() {
+    fun `CHECK — 상호는 빈 문자열과 공백뿐인 값을 거부하고 상한이 정책과 같다(코드포인트)`() {
         val owner = account()
         val insert =
             "INSERT INTO account_business_profile (account_id, trade_name, nara_registration, " +
@@ -144,6 +159,8 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
 
         asApp(insert, owner.value, astral.repeat(ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS))
         shouldThrow<SQLException> { asApp(insert, account().value, "") }
+        shouldThrow<SQLException> { asApp(insert, account().value, "  ") }
+        shouldThrow<SQLException> { asApp(insert, account().value, "\t\n") }
         shouldThrow<SQLException> {
             asApp(insert, account().value, "가".repeat(ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS + 1))
         }
@@ -164,6 +181,22 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         shouldThrow<SQLException> { asApp(insert, owner.value, "MARS", "UNANSWERED", "{}", null) }
         shouldThrow<SQLException> { asApp(insert, owner.value, null, "MAYBE", "{}", null) }
         shouldThrow<SQLException> { asApp(insert, owner.value, null, "REGISTERED", "{FOREIGN}", null) }
+    }
+
+    /**
+     * **중복 원소도 표가 거부한다**(r1 CR L-8 · F4). 앱은 늘 정렬된 distinct 집합을 쓰고 읽기에서
+     * `toSet()` 이 접으므로 중복은 **조용한 정규화**였다 — 직접 SQL 로만 생기는 틈이지만, 「표 층이
+     * 같은 불변식을 한 겹 더 깐다」는 주장은 그 틈이 있으면 참이 아니다.
+     */
+    @Test
+    fun `CHECK — 등록분야 배열은 중복 원소를 거부한다`() {
+        val insert =
+            "INSERT INTO account_business_profile (account_id, nara_registration, " +
+                "nara_registered_fields, updated_at) VALUES (?, 'REGISTERED', ?::text[], now())"
+
+        asApp(insert, account().value, "{GOODS,SERVICE}")
+        shouldThrow<SQLException> { asApp(insert, account().value, "{GOODS,GOODS}") }
+        shouldThrow<SQLException> { asApp(insert, account().value, "{SERVICE,CONSTRUCTION,SERVICE}") }
     }
 
     /** 어휘 둘의 전수가 표에 들어간다 — 열거와 CHECK 가 갈리면 여기서 붉다. */
@@ -193,6 +226,10 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         shouldThrow<SQLException> { asApp(insert, owner.value, "합성초과", max + 1, 2026.toShort()) }
         shouldThrow<SQLException> {
             asApp(insert, owner.value, "합성연도", 1L, (ProfileInputPolicy.ASSESSMENT_YEAR_MIN - 1).toShort())
+        }
+        // 연도 상한의 **밖**도 잰다(r1 CR L-7 — 앞 판은 `MAX` 수락만 재서 상한이 미측정이었다).
+        shouldThrow<SQLException> {
+            asApp(insert, owner.value, "합성연도상한", 1L, (ProfileInputPolicy.ASSESSMENT_YEAR_MAX + 1).toShort())
         }
         shouldThrow<SQLException> { asApp(insert, owner.value, "", 1L, 2026.toShort()) }
         shouldThrow<SQLException> {

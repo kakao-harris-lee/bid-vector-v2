@@ -81,8 +81,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "account" to 3,
             "browser_session" to 3,
             // M7/7C④(추가만). V22 — 실측값이고 내역은 다음과 같다.
-            //  · account_business_profile 5 = 상호(빈 값 · 길이) + 소재지 어휘(17) + 등록 여부 어휘(셋)
-            //    + 등록분야 어휘 부분집합 + 「등록이 아니면 분야 · 만료일 없음」 짝.
+            //  · account_business_profile 5 = 상호(공백만 아님 · 길이) + 소재지 어휘(17) + 등록 여부 어휘(셋)
+            //    + 등록분야(어휘 부분집합 · 값마다 한 번뿐) + 「등록이 아니면 분야 · 만료일 없음」 짝.
+            //    한 열의 CHECK 가 조건 여럿을 AND 로 들어도 제약은 하나다 — 이 수는 제약 수다.
             //  · account_construction_capacity 3 = 면허명(빈 값 · 길이) + 금액 범위 + 기준 연도 범위.
             "account_business_profile" to 5,
             "account_construction_capacity" to 3,

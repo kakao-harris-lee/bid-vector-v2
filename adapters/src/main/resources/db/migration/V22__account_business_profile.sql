@@ -19,20 +19,28 @@
 -- ① account_business_profile — 계정당 한 행. 상호 · 본사 소재지 · 나라장터 준비.
 --
 --    `trade_name` 은 **운영자가 입력한 원문**이다(앞뒤 공백도 자르지 않는다 — 정규화는 SET-01 대사
---    시점의 커널이 한다, 이중 정규화 금지). NULL 이 「상호 미설정」이고 빈 문자열은 값이 될 수 없다.
---    길이 상한은 `ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS` 와 같은 값이다(코드포인트 수 —
---    `char_length` 가 세는 단위와 같다).
+--    시점의 커널이 한다, 이중 정규화 금지). NULL 이 「상호 미설정」이고, **공백만으로 된 값은 값이
+--    될 수 없다**(r1 CR M-3: 빈 문자열만 막으면 `'  '` 가 저장되고 그 행은 앱이 읽을 수 없다 — 앱은
+--    공백 상호를 쓸 수도 없으므로 고칠 길 없는 읽기 실패였다). 술어는 「POSIX `[:space:]` 밖 문자가
+--    하나는 있다」이고 앱의 `isNotBlank` 와 **문자 집합이 완전히 같지는 않다** — 두 집합의 차이는
+--    유니코드 공백의 변두리이고, 그 틈으로 직접 SQL 이 넣은 값을 읽으면 앱이 크게 실패한다(조용히
+--    접지 않는다). 길이 상한은 `ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS` 와 같은 값이다
+--    (코드포인트 수 — `char_length` 가 세는 단위와 같다).
 --
 --    `headquarters_region` 은 시·도 17 의 닫힌 어휘(`HeadquartersRegion` 열거 이름)다. QUAL-08 의
 --    **입력**일 뿐이고 그 판정은 아직 없다 — V12 `region_terms`(텍스트 합성용 자유 어휘)와 다른 축이다.
 --
 --    나라장터 준비는 세 열의 짝이다: 등록 여부(미응답 · 등록 · 미등록) · 등록분야 · 사업자용 인증서
 --    만료일. 「등록」이 아닌데 분야나 만료일이 실리는 것은 모순이다 — 표 층에서도 막는다.
+--    등록분야는 **집합**이라 중복 원소도 받지 않는다(r1 CR L-8: 앱은 늘 정렬된 distinct 를 쓰고 읽기
+--    에서 `toSet()` 이 접으므로 중복은 조용한 정규화였다). 어휘 목록이 두 자리에 나오는 것은 의도다 —
+--    하나는 「어휘 안인가」, 다른 하나는 「각 값이 한 번뿐인가」이고 둘 다 같은 닫힌 어휘에서 나온다.
 -- =============================================================================
 CREATE TABLE account_business_profile (
     account_id BIGINT PRIMARY KEY REFERENCES account (id),
 
-    trade_name TEXT CHECK (trade_name IS NULL OR (trade_name <> '' AND char_length(trade_name) <= 100)),
+    trade_name TEXT CHECK (trade_name IS NULL
+        OR (trade_name ~ '[^[:space:]]' AND char_length(trade_name) <= 100)),
 
     headquarters_region TEXT CHECK (headquarters_region IS NULL OR headquarters_region IN (
         'SEOUL', 'BUSAN', 'DAEGU', 'INCHEON', 'GWANGJU', 'DAEJEON', 'ULSAN', 'SEJONG', 'GYEONGGI',
@@ -40,7 +48,10 @@ CREATE TABLE account_business_profile (
 
     nara_registration TEXT NOT NULL CHECK (nara_registration IN ('UNANSWERED', 'REGISTERED', 'NOT_REGISTERED')),
     nara_registered_fields TEXT[] NOT NULL
-        CHECK (nara_registered_fields <@ ARRAY['GOODS', 'SERVICE', 'CONSTRUCTION']::TEXT[]),
+        CHECK (nara_registered_fields <@ ARRAY['GOODS', 'SERVICE', 'CONSTRUCTION']::TEXT[]
+            AND cardinality(array_positions(nara_registered_fields, 'GOODS')) <= 1
+            AND cardinality(array_positions(nara_registered_fields, 'SERVICE')) <= 1
+            AND cardinality(array_positions(nara_registered_fields, 'CONSTRUCTION')) <= 1),
     business_certificate_expires_on DATE,
 
     updated_at TIMESTAMPTZ NOT NULL,
