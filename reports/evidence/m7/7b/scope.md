@@ -377,6 +377,28 @@ PR 시점 update-branch). 새 파일은 in_scope 와 대조해 보고한다.
 `check --continue` · S-20 · 변이 표 · rollback ①~③ 재실측(마지막 산출물 커밋에서) → 판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다.
 새 파일은 in_scope 와 대조해 보고한다.
 
+**D-7B-7 (2026-10-24, 팀장 — 표적 재검증 r5 수령 · 승인 전 일괄 3; 레인이 팀장 메시지 요지대로 등재).** 판정 SHA `774c46da` 에 대해 verifier r5
+**ready-for-review**, code-reviewer r5 **approve**. 재작업이 아니라 승인 전 일괄 3 이므로 재작업 횟수는 2/5 그대로다(원문: `v-7b-r5.md` · `cr-7b-r5.md`).
+ID 접두는 `V5-` · `R5-`. 게이트 술어가 바뀌므로 다시 표적 재검증한다.
+
+고친다:
+- **① V5-N1 · R5-1(medium, 게이트) — 결합을 fail-closed 로 닫는다.** 실측으로 H1(두 겹 중첩 DTO) · H2(setter 전용 운반) · H5(`@ModelAttribute`)에서 Spring 이
+  실제로 `AccountId(9)` 를 지었다. 깊이를 더 쫓지 않고 **바인딩 층에서 `AccountId` 생성을 거부**한다: jackson3 에 `AccountId` deserializer 를 등록해 늘 거부하고
+  (app 매퍼에 실제로 들어갔는지 확인), Spring 변환 경로(ConversionService · WebDataBinder — `@InitBinder` 전역 또는 ControllerAdvice)의 `String → AccountId` 와
+  생성자 · setter 바인딩을 거부한다. 행동 test: H1~H5 모양(중첩 2단 · setter + `Any` · 상위 클래스 필드 · 제네릭 `T` · `@ModelAttribute`)을 실제 요청으로 보내 전부
+  4xx 이고 `AccountId` 가 지어지지 않음(생성 계수 0 또는 핸들러 미도달). 변이: 거부 등록 하나를 지우면 RED(경로마다). 기존 한 겹 구조 규칙은 남기되 KDoc ·
+  checklist §6 의 범위 주장을 실제 범위(한 겹 · `@RequestMapping` 만)로 고친다. 근본은 `OPEN-7D-ACCOUNTID-CONSTRUCTION` 그대로.
+- **② 조건 (c)**: 핸들러 모집단을 라우트 센서스와 등식으로 · `appClasses()` 에 `check(root.isDirectory)` 가드(R5-6).
+- **③ 조건 (a) · V5-L1 · R5-2**: (owner, member) 쌍 등식으로 올린다(오늘 관측 `JsonNode` 접근자 19쌍). `Class` · `JavaType` · `TypeReference` · `ObjectReadContext` 를
+  받거나 `JsonParser` 를 돌려주는 멤버가 관측 집합에 없음을 함께 단언하고 `traverse` 변이 RED.
+- **④ V5-L2**: test client 에 브라우저처럼 `Origin` 헤더를 실은 경로를 하나 더한다 — N2k 전 · 후 실측.
+- **⑤ 문면**: R5-3 · V5-L3(`BidActor.System` KDoc — `DeadlineSettlement` 가 만든다) · R5-4(호출자 수 문장 불일치) · R5-5(`@InitBinder` · `@ExceptionHandler` 는 데이터
+  바인딩이 없다는 분석을 적고, `@ModelAttribute` 는 ① 이 닫는다).
+- **⑥ R5-7**: R4-3 등식(시스템 주체 생성 호출자 = ∅)에 in-file 양성 대조. **R5-8**: `deferredCaseId` 를 멱등으로.
+
+절차: H1 · H2 · H5 · N2k · `traverse` 를 `774c46da` clone 에서 초록, 새 HEAD 에서 RED 로 전 · 후 표(통제군 `--rerun`) → 찬 `check` · S-20 · rollback ①~③ · evidence →
+판정 SHA 고정 보고. 보고 뒤 커밋하지 않는다. rebase 하지 않는다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
