@@ -155,7 +155,8 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
         "BidPriceFactLabelsKt" to
             "공고 fact·ML 축 사상 함수 파일 — sealed 싱글턴(금액 해석 갈래·하한율 출처·ML 상태·미가용 사유) 참조 동일성, 자격증명 값 없음",
         "BidPriceRequestController" to
-            "단건 평가 컨트롤러 — 요청 결과 sealed 갈래(공고 없음/준비됨)를 소진 when 으로 가르는 참조 동일성. 인증은 앞단 필터가 지고 이 class 는 자격증명 타입을 받지도 참조하지도 않는다",
+            "단건 평가 컨트롤러 — 요청 결과 sealed 갈래(공고 없음/준비됨)를 소진 when 으로 가르는 참조 동일성. " +
+                "인증은 앞단 필터가 지고 이 class 는 자격증명 타입을 받지도 참조하지도 않는다",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"
