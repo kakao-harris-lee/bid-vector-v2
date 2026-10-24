@@ -227,6 +227,17 @@ private class UnreachableLicenseGatePort : LicenseGatePort {
  * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
  * 여기서 재는 것은 **HTTP 층이 조건을 어떻게 만들고 결과를 어떤 응답으로 옮기는가**다.
  */
+class FakeNoticeSearchPort : NoticeSearchPort {
+    @Volatile var page: NoticeSearchPage = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NOTHING_COLLECTED)
+
+    @Volatile var lastCriteria: NoticeSearchCriteria? = null
+
+    override fun search(criteria: NoticeSearchCriteria): NoticeSearchPage {
+        lastCriteria = criteria
+        return page
+    }
+}
+
 /**
  * 7C⑤-a — 개찰 결과 조회 포트의 이중체. HTTP 층이 **사실을 어떤 응답으로 옮기는가**만 재고,
  * 실 질의 거동(열 집합·읽기 전용·원문 존재)은 `bidvector.adapters.opening
@@ -240,17 +251,6 @@ class FakeOpeningResultFactsPort : OpeningResultFactsPort {
     override fun lookup(id: NoticeId): NoticeOpeningFacts {
         lastLookup = id
         return facts
-    }
-}
-
-class FakeNoticeSearchPort : NoticeSearchPort {
-    @Volatile var page: NoticeSearchPage = NoticeSearchPage(emptyList(), 0L, NoticeSearchState.NOTHING_COLLECTED)
-
-    @Volatile var lastCriteria: NoticeSearchCriteria? = null
-
-    override fun search(criteria: NoticeSearchCriteria): NoticeSearchPage {
-        lastCriteria = criteria
-        return page
     }
 }
 
