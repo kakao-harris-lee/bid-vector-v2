@@ -1174,7 +1174,8 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 12. **`AccountId` 를 짓는 길 자체는 열려 있다**(V3-N1) — 공개 생성자이고 7D 파일이다. app main 에서 짓는 길(생성자 호출 · Class
     상수 · Jackson (소유자, 멤버) 쌍 · Jackson 상속)은 구조 등식이 잠그고, **요청 바인딩이 짓는 길은 `AccountBindingGuard` 가 짓는
     층에서 거부한다**(D-7B-7 ① — 핸들러 매개변수의 정적 규칙은 **한 겹 · 요청 매핑 메서드만** 본다). 그래도 생성 경로 봉쇄는 **OPEN 후보
-    `OPEN-7D-ACCOUNTID-CONSTRUCTION`** 으로 둔다(이 PR 에서는 후보로만). 그 OPEN 의 **사례**(검토 r4): G3 `readerForListOf(seed.javaClass)` ·
+    `OPEN-7D-ACCOUNTID-CONSTRUCTION`** 으로 둔다(이 PR 에서는 후보로만 — 그 근본 처리가 오면 가드의 객체 바인딩 거부는 필요 없어지고,
+    그 전에 `@ModelAttribute` 를 쓰려면 그 거부를 대상에 맞게 풀어야 한다). 그 OPEN 의 **사례**(검토 r4): G3 `readerForListOf(seed.javaClass)` ·
     G11 Spring 핸들러 매개변수 `account: AccountId` + `?value=9` 로 `AccountId(9)`(둘 다 이제 구조 등식이 붉다 — §3.8) · G1 `updateValue` ·
     G2 `readerForUpdating`(오늘은 `AccountId` 의 final 필드를 못 바꿔 무해 — 가변이 되거나 Jackson 설정이 바뀌면 열린다, 소유자 등식은 이 둘도 붉다).
 13. **마감 전 상태 집합이 줄면 옛 판정 행이 읽기마다 실패한다**(R4-2) — 되돌림 도착표 밖의 `from_state` 는 `error` 다(조용히 접지 않는다).
@@ -1185,11 +1186,13 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 16. **사용자 MARK 금지는 앱 층 불변식이다**(V4-L2) — 전이표가 막고 출하 코드에 사용자 MARK 행을 쓰는 길이 없지만, V21 에
     `command` ↔ `actor_kind` CHECK 는 두지 않았다(마이그레이션 재측정 비용 — 이 slice 에서 하지 않는다). 직접 쓴 행은 되돌림의 시스템 주체 조건만 막는다.
 17. **객체 바인딩은 통째로 닫혀 있다**(D-7B-7 ①) — 가드의 `@InitBinder` 는 대상이 `JsonNode` 가 아닌 바인더를 전부 400 으로 거부한다.
+    그 전제(app main 의 `@ModelAttribute` 사용 = ∅)는 `AccountBindingStructureTest` 가 등식으로 잠근다(팀장 조건 (c)).
     오늘 app 의 핸들러는 객체 바인딩을 쓰지 않으므로 거동 변화는 0 이지만, 뒤의 slice 가 `@ModelAttribute` · 폼 DTO 를 쓰려면 이 가드의
     허용 규칙을 함께 고쳐야 한다(반사 금지라 「`AccountId` 에 닿는 대상만」을 런타임에 가를 수 없다).
-18. **`String → AccountId` 단순 변환의 거부는 500 으로 나타난다**(D-7B-7 ①) — 가드의 formatter 가 변환을 막지만 Spring 이 그 예외를
-    형 불일치로 감싸고 공유 오류표가 그것을 500 으로 낸다. 핸들러에는 닿지 않는다(위협을 흉내 낸 변환기가 등록돼 있어도 —
-    `AccountBindingGuardTest`). 오류표는 이 slice 가 바꾸지 않는다.
+18. **`String → AccountId` 단순 변환의 거부는 가드의 advice 가 400 으로 낸다**(D-7B-7 팀장 추가) — Spring 은 formatter 의 거부를 형 불일치로
+    감싸 공유 오류표의 마지막 처리기(500)로 보내는데, 가드의 advice 가 **먼저**(`HIGHEST_PRECEDENCE`) 받아 원인이 가드의 거부면 400 을
+    낸다. 그 밖의 형 불일치는 공유 오류표의 마지막 처리기와 같은 응답(500 · 같은 본문)을 그대로 낸다 — 공유 오류표는 바꾸지 않았다.
+    오늘 app 핸들러의 매개변수는 문자열 · 본문뿐이라 다른 형 불일치는 생기지 않는다.
 19. **`tools.jackson.core` 가 app 모듈 허용 패키지가 되었다**(D-7B-7 ① 의 대가) — 가드의 역직렬화기 서명이 `JsonParser` 를 요구한다.
     그래서 `TransportSurfaceGateTest` 의 바깥 패키지 등식은 더는 app 의 `JsonParser` 참조를 막지 않는다. 그 축은 Jackson (소유자, 멤버) 쌍
     등식이 진다 — app main 이 Jackson 멤버를 하나라도 새로 가리키면 붉다.
