@@ -80,3 +80,5 @@ code-reviewer r2 approve(blocker 0 · high 0 · medium 1 비차단 · low 8). r1
 - **rebase**: `998b59dd` 위로. 충돌은 합집합으로 풀고 면제 수·추적표 집계를 재계수한다. 그 뒤 찬 `check`(`--rerun` 또는 `--no-build-cache`) · web job · 변이 표(F-1 포함)
   · rollback ①~⑦ 을 새 base 에서 다시 잰다(앞 실측은 base 가 바뀌어 무효). 판정 SHA 를 다시 고정해 보고한다.
 - 새 파일이 생기면 in_scope 와 대조해 보고한다. production 코드 변경은 KDoc 두 자리뿐이어야 한다.
+
+**D-7C1B-5 (2026-10-24, 팀장 — 표적 재검증 r3 수령).** verifier r3 ready-for-review(low 1) · code-reviewer r3 approve(low 6). 산출물 무변경, evidence 만 고친다: §6-18 에 r2 지적의 빠진 절(use case test 의 FlippingProfilePort 는 같은 인스턴스를 두 번 내므로 참조 등식으로 통과 — 값 등식 축은 어디서도 재지 않는다; 값 등식 없는 ProfileFacts 멤버가 들어오면 모든 조회가 재계산→409)을 더하고, CR r3 LOW-2~6 · verifier r3 L-1 을 §6 에 한 줄씩 등재한다. D-7C1B-4 의 「low 8」은 r2 실제 low 9(+medium 1)로 정정한다(본문은 고치지 않고 이 절이 정정).
