@@ -79,3 +79,67 @@ checklist.md §0 에 쓰고 팀장에게 보고한 뒤 **답을 기다린다**. 
 - 완료: `check` exit 0 · 변이 표 · rollback.md(명령으로 목록 도출) · `leakPatternGate` executed 확인 → 판정 SHA 보고 후 동결. push 0.
 - 검토: verifier(opus) · code-reviewer(sonnet) 병렬. 마이그레이션이 있으면 verifier 표적에 migration-reviewer · privacy-gate 관점을 넣는다.
   Codex 심판은 운영자가 범위·비용을 승인하지 않았으므로 타지 않는다.
+
+## D-7C4-3 (2026-10-24, 팀장) — 2a 검토 r1 처분
+
+verifier r1 `ready-for-review`(medium 1 · low 3) · code-review r1 `approve`(medium 6 · low 14), 둘 다 판정 SHA `8afb94d0`
+기준. 동결을 풀고 **승인 전 일괄**로 처리한다(재작업 0/5 유지). finding 별 커밋이고, 게이트 술어를 바꾸는 ① 은 표적
+재검증 대상이다.
+
+| 지적 | 처분 |
+|---|---|
+| F1 · CR M-4 (medium, 게이트 술어) | **구조로 닫는다** — verifier 가 실측한 우회 셋(X1 V12 port 구현이 새 입력을 접음 · X2 의존 역전 · X3 점 표기)을 전부 RED 로. 전·후 표를 evidence 에 남긴다 |
+| CR M-1 (쓰기 소유 경계 주장) | KDoc 을 기구대로 좁히고 알려진 제한에 등재. 구조 해소(RLS · 세션 범위 역할)는 2b/별 slice |
+| CR M-2 (바인딩 인덱스 상수) | `bindDetails` 가 다음 자리를 내게 바꾼다(손으로 적은 7 제거) |
+| CR M-3 · F4 (앱/DB 경계 어긋남) | V22 CHECK 를 좁힌다(공백뿐인 상호 · 중복 등록분야) + 실 DB 경계 test. V22 는 어느 상주 DB 에도 적용 0 · 미머지라 파일을 고친다 |
+| CR M-5 (어휘 중복) | 게이트를 세우지 않는다 — 주장을 「이름 · 순서 동일」로 좁히고, **뒤에 머지되는 PR 이 같은 커밋 집합에서** 리터럴 제거 + 참조 전환(알려진 제한) |
+| CR M-6 (V20 → V22 공백) | 머지 전제를 아래에 명시 |
+| F2 · F3 · CR low 14 | 장부 일괄 커밋. 처리하지 않는 것은 아래 「low 처분」에 사유를 적는다 |
+
+### in_scope 경로 (L-6 — 기계로 대조할 수 있게)
+
+in_scope = **`rollback.md` 의 기계 산출 복원 목록** ∪ `reports/evidence/m7/7c4/`. 그 등식이 「수정 라운드가 만든 새 파일 ↔
+in_scope 대조」의 술어다(목록은 라운드마다 재산출한다). 묶음은 다섯이다.
+
+- `workflow/src/{main,test}/kotlin/bidvector/workflow/profile/**` — 값 타입 · port · 입력 정책 · 체크리스트 판정 · 판정 대기 축과 그 test.
+- `adapters/src/main/kotlin/bidvector/adapters/profile/{BusinessProfileSql,JdbcBusinessProfileStore}.kt` + `adapters/src/main/resources/db/migration/V22__*.sql` + `adapters/.../retention/RetentionTableRegistry.kt`.
+- `adapters/src/test/kotlin/bidvector/adapters/{profile,persistence,retention}/…` — 신설 test 둘 · 열 명세 둘 · `CleanMigration*` 다섯 · 어댑터 의존 게이트 test · 보존 fixture.
+- `config/quality/gate-tests.properties` — 신설 test class 등재.
+- 장부: `reports/evidence/m6/6e1/acceptance-trace.md`(QUAL-11 행) · `docs/discovery/capability-map.md`(QUAL-11 절, **D-7C4-3 에서 추가** — 산출물 6 의 「capability map 갱신」) · `reports/evidence/m7/7c4/**`.
+
+### 머지 전제 (CR M-6)
+
+production Flyway 는 기본값이다(`outOfOrder` 미설정 = false, `validateOnMigrate` true). 그래서 **7B(V21)가 이 slice(V22)보다
+먼저 머지돼야 한다** — 순서가 뒤집히면 V22 가 적용된 DB 에서 뒤에 온 V21 이 out-of-order 로 거부된다. 상주 DB 적용은 0 이고
+(`CleanMigration*Test` 는 버릴 컨테이너에만 적용) 번호는 PR 직전에 D-6A1-12 대로 팀장이 다시 잰다.
+
+### 알려진 제한 추가 (D-7C4-3)
+
+1. **쓰기의 소유 경계는 호출자 전제다**(CR M-1). 읽기 · 삭제는 `account_id = ?` 필터가 좁히지만, upsert 둘에서 `account_id`
+   는 **실리는 값 / `ON CONFLICT` 대상**이다. 틀린 `AccountId` 를 넘기면 그 계정의 행을 덮어쓰고 열 단위 GRANT 는 막지
+   못한다 — 권한 층이 막는 것은 **있는 행을 다른 계정으로 옮기는 일**(`account_id` 의 UPDATE)뿐이다. 2b 는 controller 가
+   세션 계정만 넘긴다는 것을 자기 test 로 져야 한다(구조 해소는 RLS · 세션 범위 역할 — 별 판단).
+2. **판정 대기 축 어휘가 두 레인에 중복이다**(CR M-5). 7C② 의 `workflow.evaluation` 쪽과 **이름 · 순서만** 같다(모양은
+   다르다 — 이쪽만 `capability` 속성). 등식을 잠그는 게이트가 없고 **수동**이다: 뒤에 머지되는 PR 이 같은 커밋 집합에서
+   리터럴을 지우고 상대를 참조한다. 방향은 `profile` → `evaluation` 뿐이다(반대는 격리 단언이 붉다).
+3. **`ProfileInputPolicy.CAPACITY_ROWS_MAX` 는 아직 집행되지 않는다**(CR L-1). 2a 에 use case 가 없고 표에 행 수 CHECK 도
+   없다. 2b 가 집행을 세우고, 검사-후-삽입이 경합하는 것도 그때 판단한다.
+
+### low 처분 (고치지 않는 것과 사유)
+
+- **L-8**(중복 등록분야) · **L-7**(연도 상한 DB 미측정)은 ④ 와 같은 커밋에서 **닫는다**(처분: 수용).
+- **L-11**(`PersistenceTestSupport` 의 CASCADE 주석)은 **그 파일이 in_scope 밖**이다 — 2b 가 그 파일을 만질 때 또는 별
+  slice. 신설 표 둘이 `account` CASCADE 로 비워지는 사실 자체는 맞다(verifier 확인).
+- **L-9**(`updated_at` 이 port 에 닿지 않음) · **L-10**(test 안 양성 대조가 자명) · **L-13**(탈퇴 파기가 상속할 FK 제약)은
+  **사실 등재만** 한다 — L-9 는 2b 표적, L-10 의 진짜 음성 대조는 변이 표에 있고, L-13 은 `browser_session` 전례와 같다.
+- **L-12**(앱 역할 `DataSource` 가 두 인자 `getConnection` 을 위임)는 **닫는다** — 조용히 관리자 권한을 재는 자리다.
+- **OQ-1 · OQ-2**(낡은 class 파일 · task 순서)는 실패 방향이 **거짓 빨강**이라 차단이 아니다. 찬 `check --rerun-tasks` 가
+  그 여지를 줄이는 것으로 둔다.
+
+### 2b 표적 (D-7C4-3 ⑧ 포함)
+
+1. **DB 예외 문면이 밖으로 나가는가** — pgjdbc 기본값(`logServerErrorDetail` 미설정)에서 CHECK 위반 예외에 `Failing row
+   contains (…)` 로 행 값이 실린다. 그 문면이 로그 · `ErrorBody` 로 나가지 않는지 2b 가 잰다(기존 표 전부의 공통 성질).
+2. controller 가 세션 계정만 넘기는 것(위 제한 1) · `CAPACITY_ROWS_MAX` 집행(제한 3) · `updated_at` 전제조건(L-9).
+3. 격리 술어의 모집단 변화 — 2b 는 `app` 에서 `workflow.profile` 을 정당하게 참조한다. 그때 ① 의 술어가 무엇을 재는지
+   다시 적는다.
