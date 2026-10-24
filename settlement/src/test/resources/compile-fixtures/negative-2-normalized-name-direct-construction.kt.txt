@@ -1,0 +1,5 @@
+import bidvector.settlement.NormalizedCompanyName
+
+fun negativeDirectConstruction() {
+    NormalizedCompanyName("gasangmarine")
+}

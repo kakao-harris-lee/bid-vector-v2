@@ -1,0 +1,5 @@
+import bidvector.settlement.NormalizedCompanyName
+
+fun mutantDirectConstructionTypo() {
+    NormalizedCompanyNameTypo("gasangmarine")
+}

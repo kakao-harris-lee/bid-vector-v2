@@ -389,5 +389,15 @@ class AppHttpDependencyGateTest {
  * **main 통합(7C ① + 7D)**: 두 레인이 같은 상수를 각자 51 에서 올렸다(7C ① 은 둘, 7D 는 아홉).
  * 합집합은 **62** 다 — 어느 쪽 면제도 지우지 않는다. 이 수는 관측과 등식이라, 틀리면 그 test 가
  * 먼저 붉어진다(수를 합으로 「계산」한 것이 아니라 합집합을 **선언**하고 등식이 검산한다).
+ *
+ * **M7/7C⑤-0 — 셋 더해 65.** 승격 레인에서 면제가 필요한 자리는 셋이다: 배선(① 층 — canonical
+ * 저장소·원문 읽기 어댑터·실행 상태 디렉터리를 조립한다) · 러너와 그 **줄 함수 파일**(③ 층 —
+ * 러너는 실행 상태를, 줄 함수는 use case 의 보고 타입을 참조한다). 설정 타입은 **넣지 않았다** —
+ * 어댑터도 workflow 타입도 쥐지 않으므로 제한 층에 남는 쪽이 옳다. 면제를 필요 이상 넓히면 이
+ * 게이트가 그만큼 약해지므로, 셋 가운데 둘은 처음에 빼 두었다가 **게이트가 가리킨 뒤** 넣었다.
+ *
+ * **M7/7C①b — 둘 더해 67**(rebase 2026-10-23, 7C⑤-0 의 65 위에 얹는다): 제안 목록이 둘을 더했다 — ① 층 하나
+ * (`SuggestionWiring`, 기존 빈을 받아 use case 를 조립한다 — 새 어댑터 0), ② 층 하나(`SuggestionQuery` — 컨트롤러가
+ * 받는 조회기이고 HTTP 층 허용 목록에도 있다). `NoticeSearchWiring`·`NoticeSearchQuery` 짝과 같은 형태다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 62
+private const val EXPECTED_EXEMPT_COUNT = 67

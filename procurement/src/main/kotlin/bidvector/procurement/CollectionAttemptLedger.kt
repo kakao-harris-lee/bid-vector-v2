@@ -67,6 +67,13 @@ internal val NOTICE_KEY_HEX = Regex("[0-9a-f]{64}")
 
 internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 64 자다"
 
+/**
+ * 그 줄이 **그 축의 관측**인가(M6/G1-C03) — 결말 줄만, 관문 거부([AttemptOutcome.Refused])와 끊긴 라운드를
+ * 닫는 줄([INTERRUPTED_ROUND])은 빼고. 둘 다 그 축에 대해 본 것이 없다.
+ */
+private val CollectionAttempt.observesAxis: Boolean
+    get() = kind == AttemptKind.AXIS && outcome !is AttemptOutcome.Refused && outcome != INTERRUPTED_ROUND
+
 /** 그 줄이 **축을 정착시키는 결말**인가 — 갈래와 어휘를 함께 본다(한쪽만 보면 호출 줄이 섞인다). */
 private val CollectionAttempt.settlesAxis: Boolean
     get() = kind == AttemptKind.AXIS && outcome.isSettled
@@ -161,6 +168,16 @@ sealed interface AttemptOutcome {
 }
 
 /**
+ * **끊긴 라운드를 닫는 줄의 결말**(D-6G2d-42 · 49) — 재개하는 쪽이 「앞 라운드는 결말을 적지 못했다」를
+ * 적는 값이다. 일시 실패라 재호출 상한이 세고 상한 미만에서 그 축은 다시 불린다.
+ *
+ * 이 줄은 **우리가 적은 장부이지 그 축의 관측이 아니다**(M6/G1-C03) — 시각이 「닫은 때」라
+ * [AttemptHistory.axisLastObservedAt] 이 세지 않는다. 쓰는 자리와 읽는 자리가 **이 한 값**을 함께 쓰므로
+ * 원천 결과코드를 되읽어 분류하는 표가 아니다(어휘가 늘어도 이 값은 하나다).
+ */
+val INTERRUPTED_ROUND: AttemptOutcome.Failed = AttemptOutcome.Failed("INTERRUPTED")
+
+/**
  * (공고, 축)의 **마지막 AXIS 결말**(D-6G-68) — 끝났는가와, 그 결말이 **어느 걷기의 것인가**.
  *
  * 추출이 이 둘을 함께 읽어야 짐작이 사라진다. [settled] 만 있으면 「끝났다」는 알아도 **어느 행이
@@ -231,6 +248,28 @@ class AttemptHistory(
     fun axisConclusions(): Map<String, Map<SourceEndpoint, AxisConclusion>> =
         byNoticeAndAxis { it.kind == AttemptKind.AXIS }
             .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> conclusionOf(lines.last()) } }
+
+    /**
+     * (공고, 축)마다 **그 축을 마지막으로 관측한 때**(M6/G1-C03) — 재조회 게이트가 읽는 값이다.
+     *
+     * [axisConclusions] 와 같은 줄을 보되 **다른 칸**을 읽는다. 걷기 식별자(`walk`)가 아니라 결말을 적은
+     * 시각(`at`)인 이유: 게이트가 묻는 것은 「그 응답이 가리키는 걷기가 언제였나」가 아니라 「우리가 이 축을
+     * 마지막으로 본 때가 언제인가」이고, 끊긴 라운드를 닫는 줄처럼 걷기 시각이 관측 시각이 아닌 줄도 있다.
+     *
+     * **관문 거부는 빼고 센다**(D-6G2d-16 과 같은 이유) — 우리 속도 보호·승인 상한은 호출이 나가지 않은
+     * 것이고 원천의 쿼터 거절은 계정 단위 사고다. 셋 다 **그 축에 대한 관측이 아니므로** 재조회 창을 열면
+     * 안 된다: 열면 쿼터가 풀린 다음 실행이 미완 축을 이어받지 못하고 창이 닫힐 때까지 기다린다.
+     *
+     * 결말 줄만 본다 — 의도·호출 줄까지 세면 한 걷기의 쪽 수만큼 시각이 흔들리고, 게이트의 창이 그 공고의
+     * 참가자 수에 따라 달라진다(비랜덤 결측의 같은 함정).
+     *
+     * **끊긴 라운드를 닫는 줄([INTERRUPTED_ROUND])도 빼고 센다** — 시각이 「닫은 때」라 관측이 아니다.
+     * 이번 실행이 닫았든 앞 실행이 닫고 그 축에 닿기 전에 멈췄든 같다: 그 줄을 세면 닫는 행위가 창을 열어
+     * 끊긴 축이 재개되지 않는다.
+     */
+    fun axisLastObservedAt(): Map<String, Map<SourceEndpoint, Instant>> =
+        byNoticeAndAxis { it.observesAxis }
+            .mapValues { (_, byAxis) -> byAxis.mapValues { (_, lines) -> lines.last().at } }
 
     /**
      * **이어 돌기의 답**(D-6G-58 · D-6G2d-8 ⓑⓒ) — (공고, 축)마다 `true` 면 다시 부르지 않는다.

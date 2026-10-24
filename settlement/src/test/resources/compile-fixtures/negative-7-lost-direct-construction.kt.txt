@@ -1,0 +1,7 @@
+import bidvector.settlement.RecordedAwardOutcome
+import bidvector.settlement.SettledAwardOutcome
+import bidvector.settlement.recordAwardOutcome
+
+fun negativeLostDirectConstruction() {
+    recordAwardOutcome(RecordedAwardOutcome.Absent, SettledAwardOutcome.Lost())
+}

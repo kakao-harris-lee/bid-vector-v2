@@ -158,6 +158,53 @@ class CollectionArchitectureGateCatchesViolationsTest {
     }
 
     @Test
+    fun `기준 시각 경계 밖에서 조회 가치 술어를 직접 부르면 잡는다 — 기준 시각에 상수를 넘기는 길`() {
+        typeRule(setOf(policy.detailFetchPredicateType), policy.detailFetchPredicateReferencers.toSet(), "술어")
+            .mustReport("RogueDetailFetchCaller", "DetailFetchKt")
+    }
+
+    @Test
+    fun `표본틀 밖에서 후보를 다시 지으면 잡는다 — 생성자 호출과 생성자 참조 둘 다, 허용 자리는 잡지 않는다`() {
+        val rule =
+            rules.constructorMustBeCalledOnlyBy(
+                "$fixtureRoot.app",
+                "$fixtureRoot.app.FixtureOpeningCandidate",
+                setOf("$fixtureRoot.app.FixtureCandidateFramer"),
+                "음성 대조 — 후보 생성",
+            )
+        rule.mustReport("RogueCandidateBuilder", "FixtureOpeningCandidate")
+        rule.mustReport("RogueCandidateReference", "FixtureOpeningCandidate")
+        rule.mustNotReport("FixtureCandidateFramer")
+        rules.observedConstructorCallers(
+            violating,
+            listOf("$fixtureRoot.app"),
+            "$fixtureRoot.app.FixtureOpeningCandidate",
+        ) shouldBe
+            setOf("FixtureCandidateFramer", "RogueCandidateBuilder", "RogueCandidateReference")
+                .map { "$fixtureRoot.app.$it" }
+                .toSet()
+    }
+
+    @Test
+    fun `타입 자신이 짓는 길도 잡는다 — data class copy · 멤버 팩토리 · 동반 객체 팩토리, 생성자 위임은 잡지 않는다`() {
+        fun ruleFor(type: String) =
+            rules.constructorMustBeCalledOnlyBy(
+                "$fixtureRoot.app",
+                "$fixtureRoot.app.$type",
+                setOf("$fixtureRoot.app.FixtureCandidateFramer"),
+                "음성 대조 — 타입 자신의 생성",
+            )
+        ruleFor("FixtureDataCandidate").mustReport("copy", "FixtureDataCandidate")
+        ruleFor("FixtureMemberFactoryCandidate").mustReport("withAnchor", "FixtureMemberFactoryCandidate")
+        ruleFor("FixtureCompanionCandidate").mustReport("of", "FixtureCompanionCandidate")
+        rules.observedConstructorCallers(
+            violating,
+            listOf("$fixtureRoot.app"),
+            "$fixtureRoot.app.FixtureDelegatingCandidate",
+        ) shouldBe emptySet()
+    }
+
+    @Test
     fun `공고명 원시 키를 상수 풀에 가진 허용 밖 클래스를 잡는다`() {
         rules
             .titleKeyLiteralMustStayInAllowedClasses(
