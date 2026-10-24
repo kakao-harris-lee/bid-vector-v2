@@ -51,8 +51,7 @@ class OpeningResultController(
         }
     }
 
-    private fun respond(id: NoticeId): OpeningResultResponse =
-        OpeningResultResponse.of(id, openingResults.read(id))
+    private fun respond(id: NoticeId): OpeningResultResponse = OpeningResultResponse.of(id, openingResults.read(id))
 
     /**
      * 거부 하나를 만드는 **유일한 자리** — 400 `INVALID_REQUEST` 다. 핸들러가 `throw` 를 직접 쓰지
