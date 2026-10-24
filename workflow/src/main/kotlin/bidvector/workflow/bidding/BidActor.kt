@@ -24,7 +24,8 @@ sealed interface BidActor {
 
     /**
      * 시스템 — SET-01 대사 · SET-02 개찰 · 리마인드 도달이 올 자리다.
-     * **오늘 이 값을 만드는 호출자가 없다**(알려진 제한 ②). [detail] 은 타임라인의
+     * **오늘 이 값을 만드는 자리는 마감 판정 하나다**(`DeadlineSettlement` 의 `DEADLINE_ACTOR` — R5-3). 나머지 셋은 아직 호출자가
+     * 없다(알려진 제한 「자동 전이의 시스템 호출자는 마감 판정 하나뿐이다」). [detail] 은 타임라인의
      * `actor_detail` 로 남는다(사람의 이름이 아니라 경로의 이름이다).
      */
     data class System(

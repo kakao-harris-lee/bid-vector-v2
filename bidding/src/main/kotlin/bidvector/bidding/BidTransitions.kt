@@ -207,7 +207,8 @@ private val EXIT_ROWS =
  * 마감 전 넷으로 돌아가는 간선을 하나 더 둔다. 낙찰·패찰·유찰 셋은
  * `CORRECT_OUTCOME` 으로 서로 오간다.
  *
- * **`SYSTEM` 행의 오늘 호출자는 마감 판정 둘뿐이다**(`MARK_DEADLINE_PASSED` · `REVOKE_DEADLINE_PASSED` — `DeadlineSettlement`).
+ * **`SYSTEM` 행의 오늘 호출자는 `DeadlineSettlement` 하나이고, 그 자리가 쓰는 행은 둘이다**(`MARK_DEADLINE_PASSED` ·
+ * `REVOKE_DEADLINE_PASSED` — R5-4).
  * 나머지(SET-01·SET-02·DEC 메뉴)는 범위 밖이다(알려진 제한 「자동 전이의 시스템 호출자는 마감 판정 하나뿐이다」 — R4-7).
  * 사용자 입력 경로는 열려 있다 — §6.1 이 *"「몇 위였나」는 사용자가 나라장터에서 보고 오거나
  * 입력해야 한다"* 라 적는다.
