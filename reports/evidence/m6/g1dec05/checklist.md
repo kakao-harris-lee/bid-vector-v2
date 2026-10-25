@@ -1,6 +1,20 @@
 # M6/G1-DEC05 — checklist (투찰가 메뉴 DEC-05 + binding 제약 기록 DEC-02)
 
-판정 대상 SHA: (Phase 2 에서 고정)
+**실측 기준 SHA: `fdf9a277`** — acceptance · rollback 이 이 SHA 에서 돌았다. **복원 경로**
+(코드 · test · `config/quality` · 공유 장부 `acceptance-trace.md`·`capability-map.md`)를 건드린
+**마지막** 커밋이고, 그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에
+움직이지 않는다**.
+
+**변이만 `756cf042` 에서 돌았다 — 같은 SHA 가 아니라는 사실을 적어 둔다.** 그 뒤의 유일한 복원
+경로 변경이 `E-24` 머리 열거 한 줄(`acceptance-trace.md`)이다. 기계 확인:
+`git diff --name-only 756cf042..fdf9a277` 은 경로 **둘**(`acceptance-trace.md` · `scope.md`)을
+내는데 `scope.md` 는 `reports/evidence/m6/g1dec05/**` 라 **복원 경로가 아니다**. 같은 범위에서
+`*.kt`·`*.kts`·`config/quality` 변경 경로는 **0** — Kotlin 산출물·test 가 바이트 동일이다.
+변이가 재는 것은 그 Kotlin 방어이므로 Markdown 한 줄이 결과를 바꿀 수 없다.
+
+**판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence 커밋은
+언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
+`git diff --name-only fdf9a277..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
 
 ## Phase 1 — 설계 (코드 0 · Gradle 0)
 
@@ -239,7 +253,11 @@ shared-kernel test 2 · decision test 1(하한 인자 없음)이고 `app/**` 에
 | `BidStance` · `StanceRates` | 태도 셋 구성·조회 | 순서를 깨뜨린 셋 구성(`init` 이 거부) |
 | `BidMenuGrounds` | 근거 **읽기**, 그리고 구성 | 근거를 지어 **옵션으로 승격** — 옵션 생성자가 `internal` |
 | `BidMenuOption` | 다섯 칸 읽기 | **생성·`copy`**(`internal` + `@ConsistentCopyVisibility`) |
-| `BidMenuOutcome` 네 갈래 | `when` 전수 소비, 실패 셋 구성 | `Offered` 생성·`copy` |
+| `BidMenuOutcome` **다섯** 갈래 | `when` 전수 소비, 실패 셋 구성 | `Offered`·`PartiallyOffered` 생성·`copy` |
+| `BidMenuOutcome.PartiallyOffered`(라운드 2) | `offered`·`withheld` 맵 **읽기** | **생성·`copy`**(`internal` + `@ConsistentCopyVisibility`) — fixture 3 이 모듈 밖에서 실측 |
+| `CollapseCause` 둘(라운드 2) | 붕괴 사유 구성·비교 | — (사유 값이라 공개가 맞다) |
+| `BidMenuOutcome.BandCollapsed(cause, collapsedStances)` | 구성(실패 셋) | 빈 태도 집합(`init` 거부) |
+| `BidMenuOutcome.Unmeasurable(withheld)` | 구성(실패 셋) | 태도 전수가 아닌 보류(`init` 거부 — 「일부 보류」는 `PartiallyOffered` 의 자리다) |
 | `BindingConstraint`·`BidMenuDisclosure`·`MenuUnmeasurableReason`·`MenuSourceAbsence` | 구성·비교 | — (사유·어휘 값이라 공개가 맞다) |
 | `BidMenuInput`·`BidMenuPolicyData`·`FloorRateReading`·`FloorBoundComparison` | 입력·정책 구성 | — |
 | `composeBidMenu` | 메뉴 산출 | — |
@@ -250,6 +268,82 @@ shared-kernel test 2 · decision test 1(하한 인자 없음)이고 `app/**` 에
 `Derived`·`Measurement.Measured` 의 생성자가 `shared-kernel` `internal` 이라 `decision` 조차 지어낼 수 없다.
 두 폐쇄는 `MenuCompileFailureHarnessTest` 가 **모듈 밖 컴파일 단위**에서 실측한다(같은 모듈 test 는
 `internal` 을 그냥 부를 수 있어 폐쇄를 재지 못한다).
+
+**옵션이 밖으로 나가는 경로의 전수 점검(라운드 2 기준).** `BidMenuOption` 을 싣는 결과는
+`Offered` 와 `PartiallyOffered` **둘뿐**이고 둘 다 생성자가 `internal` 이다. 옵션을 담지 않는 세
+갈래(`BandCollapsed`·`Unmeasurable`·`SourceAbsent`)는 공개 생성자지만 **옵션을 실을 칸이 없다**.
+그래서 위 폐쇄는 라운드 2 가 낸 새 조립 경로에서도 유지되고, **그 유지가 추론이 아니라 fixture
+1·2·3 의 실측**이다. `AmountDecision`·`Step`·`OptionContext`·`EffectiveRate` 는 `internal` 이라
+표면이 아니다.
+
+### 수정 라운드 2 — finding 전수 대응표
+
+리뷰 원문 둘(code-reviewer `REQUEST_CHANGES` 8건 · verifier `changes-needed`)의 **전건**이다.
+번호는 원문 번호다(cr 은 HIGH-1~3 · MEDIUM-4~6 · LOW-7~8, verifier 는 H-1 · M-1 · L-1~3).
+verifier H-1 = cr HIGH-1, L-1 = MEDIUM-5, L-2 = MEDIUM-4 로 같은 자리다.
+
+| finding | 무엇이 틀렸나 | 지금 막는 자리 |
+|---|---|---|
+| **cr HIGH-1** · v H-1 | 태도 라벨 반전 — `conservative`→`safe` 로 이어 운영자가 보는 「안전」이 셋 중 **낙하 위험이 가장 큰** 후보가 됐다 | `StanceRateMappingTest` 둘(도메인 성질 · legacy 브리지 표 — oracle 둘 다 **구현 독립**) · `BidMenuKernelTest` 「태도 축」 둘 · `StanceRates.init` 방향 반전 |
+| **cr HIGH-2** | 후보 밴드 자신의 붕괴 미측정 — 값이 같은 두 옵션이 「정상 3안」으로 나갔다 | `CollapseCause.DuplicateEffectiveRates` + `BidMenuKernelTest` 밴드 붕괴 다섯(읽기 미정 · clamp 수렴 · 전수 겹침 포함). 이 축은 하한과 무관해 **읽기 미정에서도 판정**한다 |
+| **cr HIGH-3** (ⅰ) | 한 태도의 실패가 메뉴 전체를 죽였다 | `PartiallyOffered`(타입 분리, `Offered` 는 셋 전부일 때만) + `BidMenuKernelTest` 「부분 보류」 + `MenuCompileFailureHarnessTest` fixture 3 |
+| **cr HIGH-3** (ⅱ) | 하한 미달이 보류로 흘러 **하한에 걸린 옵션이 늘 사라졌다**(`DOWN`·`HALF_*` 가 경계에서 1원 아래로) | 제약을 만족하는 **최소 정수로 올림** + binding 을 하한으로 + `BidMenuKernelTest` 반올림 셋(리뷰어 수치 예 1,234,567 × 0.87995 포함) |
+| **cr MEDIUM-4** · v L-2 | 항상 통과하는 test 둘 — 자기 비교, 그리고 상수 `setOf` 크기만 세어 **커널을 부르지 않는** test | 효력 투찰율 기대값으로 바꾸고, binding 구별은 **세 시나리오를 실제로 돌려 관측된** 값 집합으로 |
+| **cr MEDIUM-5** · v L-1 | `AppliedFloor` 가 「같은 기초금액」을 보장한다고 KDoc 이 과대 진술 | KDoc 을 **basis 축 한정**으로 낮춤 + capability-map DEC-02 절 + 알려진 제한 3 |
+| **cr MEDIUM-6** | 게시 하한 유래 값이 `BidRateOrigin.Recommended` 로 라벨된다 | `BidRateOrigin` 은 **바꾸지 않고**(지시) KDoc 에 「자리채움이고 값의 이유는 `binding` 이 유일 출처」 + 알려진 제한 4 |
+| **cr LOW-7** | `StanceRateMappingTest` 에 독립 oracle 이 없어 **반전을 초록으로 통과**시켰다 | oracle 을 도메인 성질 + 1차 출처 표 둘로 교체(위 HIGH-1 과 같은 자리) |
+| **cr LOW-8** | 출하 값에서 `Offered` 가 하한을 전혀 적용하지 않고 나간다 | 알려진 제한 2 + 7C ② 계약 조건(「`FloorRateReadingUndecided` binding 이 붙은 옵션을 추천으로 띄우지 않는다」) |
+| **v M-1** | 「fail-closed」가 과장 — 미결에서도 결과가 그대로 나간다 | 문면을 **표식형**으로 낮춤(거동 불변, 지시). `BidMenuPolicyData` KDoc + **capability-map OPEN 행**(장부에도 같은 과장이 남아 있었다) |
+| **v L-3** | 추적표 집계 숫자 · checklist 판정 SHA 줄 미기입 | 집계는 머지 재산출로 ⓐ 16 · ⓑ 2 · ⓒ 43(아래 문서 등식) · 판정 SHA 줄은 이 문서 머리 |
+
+**레인 재개가 추가로 잡은 셋**(리뷰에 없던 것 — 앞 레인이 끊긴 자리):
+1. **하한 올림 test 의 기대값이 틀렸다** — 1,086,362 로 적혀 있었고 옳은 값은 **1,086,358**
+   (1,234,567 × 0.87995 = 1,086,357.23165 → `DOWN` 1,086,357 은 하한 미만 → 하한 이상 최소 정수
+   1,086,358). 손으로 센 근거를 KDoc 에 적었다.
+2. **`PartiallyOffered` 의 생성 폐쇄가 측정되지 않았다** — `Offered` 에만 음성 fixture 가 있어
+   「같은 기법이니 닫혀 있다」는 추론만 있었다. fixture 3 + 비공허성 오타 변이를 쌍으로 넣었다.
+3. **capability-map DEC-05 절이 반전된 라벨 대응을 그대로 들고 있었다** — 다음 소비자(7C ②)가
+   그 문장을 근거로 같은 결함을 재생산할 자리였다. `ktlint` 5건도 같은 성질이다(라운드 2 가
+   lint 를 돌리지 못한 채 끊겼다).
+
+### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
+
+축은 **약속 하나**다 — 파일 축은 쓰지 않는다(파일을 합치고 나누는 것은 설계 판단이 아니라
+배치이고, 그 축으로 세면 이탈이 아닌 것이 이탈로 보인다). 범주 넷:
+**① 약속대로** · **② 선언하고 이탈** · **③ 무선언 이탈** · **④ 약속 자체가 틀림**.
+
+| # | Phase 1 약속 | 출하 실물 | 범주 | 사유 |
+|---|---|---|---|---|
+| P-1 | `BidStance{Safe,Recommended,Aggressive}` 어휘 | 같다 | ① | — |
+| P-2 | 라벨 대응 `Safe→conservative`·`Aggressive→aggressive` | `conservative→Aggressive`·`aggressive→Safe` | **④** | 약속이 축을 뒤집어 적었다. 투찰율이 낮을수록 공격이다(1차 출처 셋). 라운드 1 이 **약속을 그대로 구현해** cr HIGH-1 이 됐다 |
+| P-3 | 변환 자리 = `decision` 의 `BidStance.rateOf(candidates: BidRateCandidates)` | `workflow` 의 `BidRateCandidates.toStanceRates()` + `decision` 의 `StanceRates.rateOf(stance)` | **④** | 약속이 **같은 문서 두 단락 위의 의존 규칙과 모순**이다(`decision` 의 의존은 `shared-kernel` 하나라 `BidRateCandidates` 를 볼 수 없다). 「한 자리에 선언」 의도는 유지했다 |
+| P-4 | `BidMenuDisclosure` 두 값, `Offered` 가 전수를 싣고 `init` 이 강제 | 같다 | ① | — |
+| P-5 | `BidMenuGrounds` 5 칸(`criticalAssessmentRate` 포함) | 4 칸(그 칸 없음) | ② | 같은 사실이 `risk` 의 `FloorShortfallJudgement.critical` 에 `Derived` 로 이미 실린다. 타입 KDoc 이 선언한다 |
+| P-6 | `BidMenuRisk` sealed 둘 | **그 타입이 없다** — `risk: FloorShortfallJudgement` 직접 | **③** | 저장소 전체 참조 0. `FloorShortfallJudgement` 가 이미 측정/판정불가를 가르는 sealed 봉투라 감싸면 같은 축이 둘이 된다. 판단은 맞지만 **어디에도 적지 않았다** |
+| P-7 | `BindingConstraint` 5 변종 | 3 변종(`CandidateRate`·`PublishedFloorBound`·`FloorRateReadingUndecided`) | ② | 밴드 상·하한 두 변종은 하한을 **율 축 하나**로 쓰기로 한 뒤 쓸 자리가 없어졌고(조사 1), `Provisional` 은 Phase 1 자신이 「세지 않는다」고 적은 `OPEN-DEC-03` 몫이다. `FloorRateReadingUndecided` 는 약속에 없던 **추가**이고 사유는 (e) 가 적는다 |
+| P-8 | `BidMenuOption` 다섯 인자 필수 + `internal` 생성자 | 같다 | ① | — |
+| P-9 | `BidMenuOutcome` sealed **넷** | sealed **다섯**(`PartiallyOffered` 추가) | ② | 라운드 2 가 cr HIGH-3 으로 갈랐고 D-G1DEC05-4 가 승인했다 |
+| P-10 | `BandCollapsed(lower, upper, **cause: CollapseCause**)` | 라운드 1: `(lowerBound, upperBound)` — **`cause` 없음** / 라운드 2: `(cause, collapsedStances)` | **③** → ②(라운드 2 수리) | 약속에 있던 `cause` 를 라운드 1 이 **적지 않고 뺐다**. 그 결과 붕괴 출처가 하나로 뭉쳐 **cr HIGH-2 가 바로 그 빈 자리**다 — 약속을 지켰으면 그 finding 이 없었다 |
+| P-11 | `BidMenuPolicyData` 3 칸 | 2 칸(`floorRateReading`·`amountRounding`) | `floorComparison`→`floorRateReading` 은 ② / **`criticalRateRounding` 삭제는 ③** | 읽기 미결을 타입으로 표현한 것은 (e) 가 선언한다. `criticalRateRounding` 은 **사유 없이 사라졌다** — 메뉴가 `shortfallPolicy` 를 DEC-04 커널에 그대로 넘기고 그 정책이 이미 그 슬롯을 소유하므로 두면 같은 정책이 두 축에 생기는 것이 맞지만, 그 판단을 적지 않았다 |
+| P-12 | `composeBidMenu` 순수 함수 · port·Clock·전역 0 | 같다 | ① | — |
+| P-13 | `BidMenuInput(base, **candidates: BidRateCandidates**, …)` | `BidMenuInput(base, rates: StanceRates, …)` | **④** | P-3 과 같은 모순(의존 규칙) |
+| P-14 | 커널 순서 ①출처→②율 축→③붕괴→④금액→⑤리스크→⑥조립 | ①출처→②효력율→③붕괴 **둘**→④금액·리스크→⑤조립 **세 갈래** | ② | 라운드 2 가 늘렸다(D-G1DEC05-4 승인) |
+| P-15 | ④의 `ROUNDED_BELOW_FLOOR` 는 보류가 아니라 **하한 bound 채택 값으로 올라간다**(「그 경로가 닫힌다」) | 라운드 1: 보류(`Halt`) / 라운드 2: 최소 정수 올림 | **③** → ①(라운드 2 복귀) | 라운드 1 이 약속을 **선언 없이 뒤집었고** 그것이 cr HIGH-3 이다. 게다가 `ArithmeticTest` KDoc 이 그 뒤집힌 거동을 acceptance 의 정답처럼 **사후 정당화**했다(그 문장은 D-G1DEC05-5 로 삭제) |
+| P-16 | 안 A — `roundedWith(floor: AppliedFloor?)`, 비용은 `ArithmeticTest` + `app` conformance 갱신 | `app` 갱신 **0** | ② | 호출부 실측에서 `app/**` 의 `roundedWith` 호출이 0 이었다(D-G1DEC05-2 가 선언) |
+| P-17 | (b) 이 slice 에 production 배선·표면을 만들지 않는다 | 만들지 않았다 | ① | 소비자 0 을 추적표 행이 적는다 |
+| P-18 | (c) 값 출처 표 — 후보 비율만 서지 않는다 | 그대로 | ① | — |
+| P-19 | (d) DEC-05·DEC-02 를 ⓒ 로 둔다 | ⓒ·ⓒ + `DEC-04` 정정 | ① | 자기 slice 에 불리한 정정을 포함한다 |
+| P-20 | (e) 신설 **수치 0** | `OPEN-DEC05-FLOOR-RATE-READING` 신설 · 수치 0 — 단 라운드 2 가 `FLOOR_PROMOTION_ROUNDING`(scale 0 · `CEILING`) 추가 | ② | 올림은 **정수 도메인에서 「하한 이상」 제약의 정의**이지 운영자가 고를 튜닝이 아니라고 보고 정책 슬롯을 두지 않았다. **재리뷰 표적**(판단이 갈릴 수 있다 — 아래 표적 목록) |
+| P-21 | (f) G3 OPEN 묶음 둘 등재 + 활성 개수 줄 조정 | 등재 · 머지 시점에 **50** 으로 합산 | ① | 합산 규약은 양쪽 장부가 스스로 적어 둔 것을 따랐다 |
+
+**읽는 법 — ④ 넷 중 셋(P-2·P-3·P-13)이 뿌리 하나다.** Phase 1 이 태도 축의 방향과 모듈 경계를
+동시에 틀리게 적었고, 라운드 1 이 그 약속을 **충실히 구현해** cr HIGH-1 이 됐다. 즉 이 slice 의
+가장 큰 결함은 「약속을 어긴 것」이 아니라 **「약속을 지킨 것」**이다. 그래서 다음 slice 가 재야
+할 것은 「약속을 지켰는가」가 아니라 **「약속이 1차 출처와 맞는가」를 Phase 1 에서 한 번 더 재는
+것**이다.
+
+**③ 넷 중 둘(P-10·P-15)은 약속을 적지 않고 뺐더니 그 자리가 정확히 리뷰 finding 이 됐다** —
+약속이 맞았고 이탈이 틀렸다. 나머지 둘(P-6·P-11)은 판단이 맞지만 선언이 없었다.
 
 ### 변이 표 (전부 구현 커밋 `e88c069b` 뒤, 각 변이는 `git diff --numstat` 으로 적용 확인)
 
@@ -268,50 +362,155 @@ shared-kernel test 2 · decision test 1(하한 인자 없음)이고 `app/**` 에
 M1′·M5 를 표에 남기는 이유: 「변이가 RED 였다」와 「그 test 가 RED 를 냈다」는 다른 주장이다. 둘은
 test 가 아니라 컴파일이 잡았고, M1·M5′ 가 그 test 들의 비공허성을 따로 실측한다.
 
+**위 표는 라운드 1 실측이고, 대상 코드가 라운드 2 에 바뀐 행이 있다**(M2·M4 가 가리킨 붕괴 판정과
+반올림 경로). 그래서 라운드 2 의 방어는 아래에서 **다시 전수로** 쟀다. M1·M3·M5·M5′·M6 이 가리킨
+구조(옵션 생성자 폐쇄 · binding 구별 · 하한 타입 · 정책 데이터)는 라운드 2 에 바뀌지 않았다.
+
+### 변이 표 — 라운드 2 (clone `756cf042`, 2026-10-24 23:19~23:24)
+
+버릴 clone 에서 돌렸다. 각 변이는 **바꿔치기**이고(`numstat` 의 `+`·`-` 가 둘 다 0 이 아니다)
+`git diff --numstat` 으로 적용을 확인한 뒤에만 test 를 돌렸다. test task 마다 `--rerun` 을 붙였다 —
+UP-TO-DATE·FROM-CACHE 로 건너뛴 초록은 실행이 아니다. 필터는 모듈 셋 전체(`:decision:test`
+`:workflow:test` `:shared-kernel:test`)다 — 좁은 `--tests` 필터는 **방어 부재와 미측정을 같은
+값으로** 만든다.
+
+| # | 변이 | numstat | 결과 | 잡은 자리 |
+|---|---|---|---|---|
+| **기준선** | 변이 0 | 0/0 | **GREEN** | 변이 전 clone 이 초록임을 먼저 재지 않으면 뒤의 RED 가 변이 탓인지 알 수 없다 |
+| R2-M1 | `toStanceRates` 를 라운드 1 의 반전으로 되돌림 | 2/2 | **RED**(7) | `StanceRateMappingTest` 둘 + `BidMenuKernelTest` 태도 축 |
+| R2-M2 | `floorAboveBand` 의 꼭대기를 `safe` → `aggressive` 로 오독 | 1/1 | **RED**(17) | 밴드 붕괴 · 태도 축 · 부분 보류 |
+| R2-M3 | 효력율 중복 붕괴 판정 제거(`duplicateRates` 미호출) | 1/1 | **RED**(13) | 밴드 붕괴 셋(중복·clamp 수렴·전수 겹침) |
+| R2-M4 | 부분 제시 제거 — 보류가 있으면 메뉴 전체를 죽인다(라운드 1 거동) | 1/5 | **RED**(23) | 부분 보류 + `Unmeasurable.init` 전수 불변식 |
+| R2-M5 | 하한 올림 제거(밑돌면 보류) | 1/1 | **RED**(7) | 반올림 셋 |
+| R2-M6 | 올림 모드를 `CEILING` → `DOWN`(최소 정수가 아닌 올림) | 1/1 | **RED**(7) | 반올림 — 올린 값이 하한 미만으로 남는다 |
+| R2-M7 | `PartiallyOffered` 생성자 전면 개방 | 1/2 | **RED**(7) | `MenuCompileFailureHarnessTest` fixture 3 |
+| R2-M8 | `StanceRates` 순서 불변식 방향 반전 | 1/1 | **RED**(35) | `BidMenuTypesTest` + 두 축의 생성 지점 전부 |
+| **통제군** | 주석 한 줄(거동 0) | 1/0 | **GREEN**(0) | — |
+
+괄호 안은 로그의 실패 줄 수다. **여덟 전부 RED · 기준선과 통제군 GREEN.** 통제군이 `1/0`
+(순수 추가)인 것은 의도다 — 통제군은 거동을 바꾸지 않는 변경이 초록임을 보이는 자리이고,
+`--rerun` 이 붙어 **cache 적중이 아니라 실제 실행된** 초록이다.
+
+R2-M2 를 표에 남기는 이유: HIGH-1 의 라벨 수정은 **붕괴 술어의 꼭대기 선택까지 파급**한다
+(`rates.safe` 가 꼭대기다). 라벨만 고치고 이 자리를 두면 붕괴를 놓치거나 반대로 오탐하는데,
+그 파급이 실제로 test 로 잡히는지를 이 변이가 잰다(17줄 — 한 자리의 오독이 세 축을 동시에 깬다).
+
 ### 판정
 
 - **DEC-05 → ⓒ(부분 측정, 강함)** · **DEC-02 → ⓒ(부분 측정, 강함)** · **DEC-04 → ⓒ(부분 측정, 강함, 정정)**.
-- 집계 ⓐ **16 → 15**, 성립 범위 **18 → 17/61**. 완료 조건 3 의 결론은 바뀌지 않는다.
-- DEC-05·DEC-02 를 「홀더 없는 미구현 17」에서 뺐다(홀더를 달았다) — 남은 **15**.
+- 두 행은 **ⓐ 술어 ② 의 선언 예외**로 장부에 등재했다(운영자 결정 2026-10-24, docs PR #88) —
+  판정 근거는 「커널·구조 성립 + 7C ② 화면의 『아직 산출 안 함』 상태 표시가 test 로 잠김」이고,
+  값 출처 축과 그 값에서만 생기는 축은 `ML-01` 과 함께 **6G 백테스트 판정 뒤**다. 선언 예외는
+  ⓐ 로 세지 않으므로 **두 행은 ⓒ 로 남고 수치는 움직이지 않는다**. **ⓐ 전환은 7C ② 장부 커밋**
+  이 한다 — 이 slice 가 하지 않는다.
+- 집계는 **머지 시점에 재산출**했다: 병합된 main 이 ⓐ 17 · ⓑ 2 · ⓒ 42 였고(7C①b 의 `STR-07`
+  승격) 이 레인의 자기 증감 **−1**(`DEC-04` 한 행)을 더해 **ⓐ 16 · ⓑ 2 · ⓒ 43 · 성립 18/61**.
+  축별 표는 두 레인이 서로 다른 행(`STR`·`DEC`)을 고쳐 자동 병합됐고 **그 합이 머리 숫자와
+  같다**(기계 확인). 완료 조건 3 의 결론은 바뀌지 않는다.
+- `DEC-05`·`DEC-02` 를 「홀더 없는 미구현」에서 뺐다(홀더를 달았다).
+- **「부분 측정(강함)」 표식은 유지**다(D-G1DEC05-6). D-G1DEC05-4 는 이 표식을 **떼는** 판정을
+  승인했는데 그 승인은 **bullet ② 가 비어 있던 라운드 1 전제**에서 나왔고, 라운드 2 가 그 bullet 을
+  채워 전제가 바뀌었다. `E-24` 는 **양쪽 23** 으로 고정한다(머지 전 이 레인 22 + 병합된
+  `SET-01` 1 — 아래 「문서 등식」의 경위).
 
 ### 알려진 제한
 
-1. **메뉴는 production 에서 아직 돌지 않는다.** 소비자 0 · 후보 비율 출처 0. ⓐ 는 ML-01(ML 배선)과
-   M7 7C ②(표면)가 닫힌 뒤에 재판정할 일이다.
-2. **출하 정본이 `FloorRateReading.Undecided` 라, 오늘 production 값에서는 밴드 붕괴·하한 binding 이
-   발화하지 않는다.** 그 두 상태는 test 정책 위에서만 관측된다 — 그래서 ⓒ 다. `BidMenuPolicyDataTest`
-   가 이 사실 자체를 고정하므로, 운영자가 읽기를 정하면 그 test 가 먼저 깨져 갱신을 강제한다.
+1. **메뉴는 production 에서 아직 돌지 않는다.** 소비자 0 · 후보 비율 출처 0. **ⓐ 전환은 7C ②
+   상태 test 가 선 뒤 7C ② 장부 커밋이 하고, 값 출처 축은 6G 백테스트 판정 뒤다**(운영자 결정
+   2026-10-24, PR #88) — 이 slice 가 재판정하지 않는다.
+2. **출하 정본이 `FloorRateReading.Undecided` 라, 오늘 production 값에서는 하한 유래 밴드 붕괴와
+   하한 binding 이 발화하지 않는다.** 그 두 상태는 test 정책 위에서만 관측된다 —
+   `BidMenuPolicyDataTest` 가 이 사실 자체를 고정하므로, 운영자가 읽기를 정하면 그 test 가 먼저
+   깨져 갱신을 강제한다. **단 효력율 중복 붕괴는 읽기 미정에서도 발화한다**(라운드 2 가 넓힌
+   자리 — 그 축은 하한과 무관하다).
+   - 운영자는 **2026-10-22 에 이 읽기를 `AsBidRateLowerBound(AtOrAbove)` 로 결정했다.** 이 slice 는
+     **적용하지 않는다**(출하 정본은 `Undecided` 그대로) — 적용은 7C ② 몫이다.
+   - **미결 표식은 출력을 막지 않는다**(verifier M-1 · cr LOW-8). `FloorRateReadingUndecided`
+     binding 이 붙은 옵션도 그대로 나간다 — **「`Offered` = 제약 검토 완료」가 아니다.** 그 표식을
+     읽고 처분하는 것은 표면의 의무이고 **7C ② 계약 조건**이다: 「이 binding 이 붙은 옵션을
+     추천으로 띄우지 않는다」.
 3. `BidMenuOutcome.Offered.disclosures` 는 늘 전수라 **값으로는 정보를 나르지 않는다**. 그 자리를 둔 이유는
    고지 의무가 값과 함께 표면 경계까지 이동하게 하려는 것이고, `init` 이 부분 집합을 거부한다.
 4. DEC-04 의 빈자리(출하 정책 표)는 이 slice 가 **만들지 않았다** — 값이 운영자 승인 대상이고
    (`minAssessmentSamples` 150 의 근거 문자열 포함) 이 slice 의 산출물이 아니다.
+5. **`AppliedFloor` 는 「같은 공고」를 지지 않는다**(cr MEDIUM-5). 보장 범위는 **basis 축**이고,
+   다른 공고의 `BaseAmount` 로 만든 하한을 넘겨도 타입은 막지 못한다. 메뉴 경로에서는 커널이
+   한 `BidMenuInput.base` 만 쓰는 것으로 성립한다 — 표면 경계의 그 전건은 7C ② 계약 조건이다.
+6. **`BidMenuGrounds.bidRate.origin` 은 값의 출처가 아니다**(cr MEDIUM-6). `BidRateOrigin.Recommended`
+   는 산술 진입에 필요한 **자리채움**이고, 하한에 걸려 올라간 값도 읽기 미정으로 제약 없이 지나온
+   값도 같은 `origin` 을 단다. **값의 이유는 `binding` 이 유일한 출처다.** 지시대로 shared-kernel
+   `BidRateOrigin` 에 variant 를 더하지 않았다(그 타입은 관측값/추천값을 가르는 다른 축이다).
+7. **D-G1DEC05-1 의 이름 실재 훑기 모집단은 착수 base 의 ⓐ 16 행이다.** 머지로 들어온 7C①b 의
+   `STR-07` 은 그 시점에 ⓐ 가 아니었으므로 **이름 실재 확인을 받지 않았다** — 그 행의 인용 이름
+   확인은 이 slice 의 범위 밖이다.
+8. **`OPEN-DEC02-SCORE-AXIS-FLOOR` 는 이 slice 가 닫지 않는다.** 점수 경로의 `roundedWith` 가
+   하한 인자를 주지 않는 것은 **메뉴 부재와 무관**하다(그 경로에 `AppliedFloor` 를 만드는 자리가
+   애초에 없다 — 실측). 그리고 그 자리는 하한이 적용될 자리가 아니다: budgetCapture 는
+   `기초금액 × 비율 → 반올림 → bidRateAgainst → clamp01` 의 왕복이라 그 `BidAmount` 은 비율을
+   점수로 바꾸는 중간값이고 제출·표시·영속되지 않는다. clamp 를 넣으면 하한 미달 예측이 「하한에서
+   투찰한 것」으로 점수화돼 신호가 왜곡된다. 점수 의미를 바꾸는 도메인 결정이라 **DEC-10 착수
+   계약에서 함께 판정**한다.
 
-### 수정 라운드 1 (팀장 지시, 2026-10-21)
+### 재리뷰 표적 (레인이 스스로 올리는 것)
 
-- **STR-03 production 칸 이름 정정**(판정 불변). 실재 경로: `bidvector.decision.VerdictLadderPolicyData`
-  의 `init`(`reviewThreshold <= bidNowThreshold`) + 출하 선언 `bidvector.workflow.evaluation.
-  EVALUATION_LADDER_POLICY_SLOT`(`LadderPolicySlot`) → `EvaluateCandidatesUseCase`. 집계 머리에
-  「이름 정정, 판정 불변」을 한 줄 남겼다 — 집계는 움직이지 않는다(ⓐ 15 는 `DEC-04` 한 행의 결과).
+1. **P-20 — `FLOOR_PROMOTION_ROUNDING` 과 「(e) 신설 수치 0」의 관계**(D-G1DEC05-6). 라운드 2 가
+   `RoundingPolicy(MONEY_AXIS_SCALE_DIGITS, CEILING)` 을 추가하고 **정책 슬롯을 두지 않았다** —
+   근거는 「원 단위 정수 도메인에서 『하한 이상』 제약을 만족하는 최소 원소가 곧 올림이므로 제약의
+   정의이지 운영자가 고를 튜닝이 아니다」이고 `OPEN-DIC-10`(자연 반올림 모드)과 다른 축이라는 것이다.
+   **판단이 갈릴 수 있는 자리**이므로 표적으로 올린다.
+2. **checklist Phase 1 서술 ↔ 출하 코드**(D-G1DEC05-5) — 위 대조표 21행이 그 대조이고, 그중
+   **③ 넷 · ④ 넷**이 어긋난 자리다. 특히 ④ 셋(P-2·P-3·P-13)은 **약속 자체가 1차 출처와 달랐고
+   라운드 1 이 그 약속을 지켜 결함이 됐다**.
+3. **라운드 1 변이 표의 「대상 코드 불변」 주장** — M1·M3·M5·M5′·M6 을 라운드 2 에 다시 돌리지
+   않고 「그 구조가 바뀌지 않았다」로 갈음했다. 그 갈음이 맞는지는 코드 대조로만 확인했다.
+
+### 추적표 `STR-03` — 이름 정정(판정 불변)
+
+`STR-03` 의 production 칸이 인용한 `VERDICT_LADDER_POLICY` 는 **이름 오기**다. 실체는
+`bidvector.decision.VerdictLadderPolicyData` 의 `init`(`reviewThreshold <= bidNowThreshold` 거부)과
+출하 선언 `bidvector.workflow.evaluation.EVALUATION_LADDER_POLICY_SLOT`(`LadderPolicySlot`) →
+`EvaluateCandidatesUseCase` 다. 거동이 실재하므로 **판정은 건드리지 않고 이름만 고쳤다** — 집계는
+`DEC-04` 한 행의 결과다.
+
 - **D-G1DEC05-1 의 `app` 조항**: 쓰지 않았다(위 D-G1DEC05-2 실측). 계약 쪽 삭제는 팀장 소관.
-- DEC-05 행의 빈 자리 설명에 「출하 정본이 읽기를 미정으로 두므로 오늘 production 값에서는 밴드
-  붕괴·하한 binding 이 발화하지 않는다」가 이미 들어 있다(`BidMenuPolicyDataTest` 가 고정).
 
-### acceptance 1회차 (판정 SHA 아님)
+### acceptance — 실측 기준 SHA `756cf042`
 
-`3acc38c5` 에서 `./gradlew --no-daemon check` **exit 0**(10분 44초, 360 task). 시작·끝 HEAD 동일.
-`leakPatternGate`·`gateRegistrationGate`·`sizeGate` 전부 task 그래프에 들어가 돌았다.
-이 회차 뒤 위 수정 라운드가 들어갔으므로 **판정 SHA 는 그다음 커밋**이고 acceptance 를 재측정했다.
+`.github/workflows/ci.yml` 의 `check` job 명령 그대로. 두 단계로 돌렸다 — 먼저 `check --continue`
+로 **실패 전수**를 보고(첫 실패에서 멈추면 그 뒤 게이트는 안 돌린 것과 같다), 같은 트리에서
+**CI 명령 그대로**(`--no-daemon check`)의 종료 코드를 기록용 acceptance 로 적는다.
 
-### acceptance 2회차 — 판정 SHA `2f577304`
+| 단계 | 명령 | 결과 |
+|---|---|---|
+| 1 | compile + 손댄 세 모듈 `test` | **exit 0** (32초) |
+| 2 | `--no-daemon check --continue` | **exit 0** (10분 34초 · 357 task 중 **197 executed** · 14 from-cache · 178 up-to-date) |
+| 3 | `--no-daemon check`(기록용) | **exit 0** (13초 — 2 가 같은 트리를 다 돌려 놔 대부분 up-to-date) |
 
-`./gradlew --no-daemon check` **exit 0**(32초, 360 task 중 32 executed · 328 up-to-date). 시작·끝 HEAD 동일.
+HEAD 는 양끝 불변. **clean-tree 는 복원 경로에서만 성립한다** — 위 표의 회차를 `fdf9a277` 에서
+다시 돌렸을 때(STEP2 exit 0 · STEP3 exit 0) `git status --porcelain` 에 `checklist.md`·`scope.md`
+둘이 떠 있었다. **그 시점에 이 문서를 쓰고 있었기 때문**이고 둘 다
+`reports/evidence/m6/g1dec05/**` 라 **복원 경로 밖**이다. 복원 경로(코드·test·`config/quality`·
+공유 장부)는 양끝 빈 출력이었다. 숨기지 않고 적는다 — 「트리가 깨끗했다」고 쓰면 거짓이다.
+evidence 커밋 뒤 전 경로 clean-tree 를 다시 확인해 동결 보고에 적는다.
 
-**32초 초록을 그대로 적지 않았다.** 이 회차의 변경은 Markdown 뿐이라 test task 가 전부 up-to-date 였고,
-그것이 「문서만 바꾼 변이가 UP-TO-DATE 로 건너뛰어 초록」인지 확인했다 — `acceptance-trace.md` ·
-`capability-map.md` 를 **런타임에 읽는 test 는 0**(전부 KDoc 인용. `readText`/`getResource`/`inputs` 와 같은
-줄에 오는 일치 0)이고 어느 `.kts` 에도 입력 선언이 없다. 그래서 up-to-date 는 정직하다 —
-**그리고 같은 이유로 `check` 는 이 slice 의 문서 편집을 전혀 재지 않는다.** `:leakPatternGate` 는
-up-to-date 가 아니라 **executed** 목록에 있었고 초록이다(evidence 커밋 뒤 재실행 요건 충족).
+`fdf9a277` 회차에서 **`:leakPatternGate` 과 `:contractGate` 이 executed** 였다(UP-TO-DATE 아님) —
+Markdown 한 줄 변경이 그 게이트의 입력을 바꾸므로 **evidence·장부를 고친 HEAD 에서 실제로 다시
+돌았다**. 나머지가 up-to-date 인 것은 앞 회차가 같은 Kotlin 트리를 전부 돌려 놨기 때문이다.
+
+**게이트가 실제로 돌았다**: 2 에서 `:leakPatternGate` · `:contractGate` 가 **executed** 목록에
+있고, 모듈 10 개의 `gateRegistrationGate` · `sizeGate` 가 모두 그래프에 들어갔다. 3 에서
+`leakPatternGate` 이 UP-TO-DATE 인 것은 **같은 트리를 2 가 이미 돌렸기** 때문이고 「안 돌린
+게이트」가 아니다 — 13초 초록을 그대로 적지 않는 이유가 이것이다.
+
+**앞 라운드가 lint 를 못 돌린 채 끊겼다.** 레인 재개 시점의 첫 `check` 는
+`:decision:ktlintMainSourceSetCheck` 5건(`when-entry-bracing` 3 · `blank-line-between-when-conditions` 2)
+으로 **떨어졌다** — 라운드 2 가 `outcomeOf` 의 `when` 을 늘려 놓은 자리다. 거동 0 으로 고쳤다.
+그 회차의 배경 알림은 「exit code 0」이었는데 그것은 래퍼의 `echo` 종료 코드였고 빌드는
+`STEP2 exit=1` 이었다 — **로그 끝 줄을 직접 읽어** 잡았다.
+
+**`check` 는 이 slice 의 문서 편집을 재지 않는다**: `acceptance-trace.md` · `capability-map.md` 를
+런타임에 읽는 test 가 0 이고(전부 KDoc 인용 — `readText`/`getResource`/`inputs` 와 같은 줄에 오는
+일치 0) 어느 `.kts` 에도 입력 선언이 없다. 그래서 문서 등식은 `check` 밖에서 손으로 돌린다.
 
 ### 문서 등식 — `check` 밖이라 손으로 돌렸다
 
@@ -319,37 +518,67 @@ up-to-date 가 아니라 **executed** 목록에 있었고 초록이다(evidence 
 
 | 등식 | 결과 |
 |---|---|
-| 행 수 · 판정 분포 | **61 행 · ⓐ 15 · ⓑ 2 · ⓒ 44** — 이 문서가 고친 집계표와 일치 |
+| 행 수 · 판정 분포 | **61 행 · ⓐ 16 · ⓑ 2 · ⓒ 43** — 집계표·축별 표와 일치(축별 합을 따로 세어 대조) |
 | **E-23** ⓐ 행은 production 칸이 비지 않는다(자리채움 거부 포함) | **OK** — `DEC-04` 가 ⓐ 에서 빠져 성립한다 |
-| **E-24** 「부분 측정(강함)」 표식 집합 == 머리 열거 | **OK** — 양쪽 **22** |
+| **E-24** 「부분 측정(강함)」 표식 집합 == 머리 열거 | **OK** — 양쪽 **23** |
 
-### rollback ①~⑦ 실측 (판정 SHA `2f577304`, base `bee7c36f`)
+**`E-24` 는 머지 직후 깨진 상태로 들어왔고 이 레인이 고쳤다.** 병합된 main `fc15975c` 가
+**표식 20 · 열거 19**(`SET-01` 표식만 있고 열거에 없음)였다 — M6/G1-SET01 라운드가 행에 표식을
+달면서 머리 열거에 넣지 않았다. 구간을 좁혀 확인했다: 착수 base `bee7c36f` **19·19** 로 맞고,
+이 레인의 머지 전 상태 `67667e3d` **22·22** 로 맞고, `fc15975c` 에서 **20·19** 로 깨진다.
+그래서 깨뜨린 것은 이 머지가 아니다. **행의 표식은 그 레인의 판정이므로 건드리지 않고 열거만
+채웠다** — 반대로 고치면(표식 제거) 남의 판정을 이 레인이 뒤집는 것이 된다.
 
-6G 수집 창(00:30~03:00 KST)을 피해 **2026-10-22 05:4x KST** 에 돌렸다 — `cron-6g.log` 의
-`day21 END 01:54:48 exit=2`(쿼터 정지, day20 과 같은 모양) 확인 뒤. 전 명령 `flock` 직렬화.
+그래서 **최종 수는 23 이다.** D-G1DEC05-6 의 애초 문면은 「양쪽 22」였는데 그것은 **머지 전 이
+레인의 수**이고, 머지로 `SET-01` 이 하나 들어와 23 이 된다 — 팀장이 2026-10-25 에 23 으로
+확정했고 그 결정 문면도 고쳤다. 결정의 취지(`DEC-05` 의 표식을 **유지**해 양쪽 집합에 남긴다)는
+수와 무관하게 그대로 성립한다.
+
+### rollback ①~⑦ 실측 (실측 HEAD `fdf9a277`, 복원 기준 `fc15975c`)
+
+**버릴 clone 에서** 돌렸다(2026-10-25 09:36~09:47 KST, 전 명령 `flock` 직렬화, 야간 금지창 밖).
+복원 기준은 **병합된 main `fc15975c`(고정)** 다 — 착수 base `bee7c36f` 로 복원하면 머지로 들어온
+**남의 변경까지 지운다**. 전제(그 SHA 에 이 slice 가 없다)는 착수 커밋 `e88c069b` 미포함으로
+확인했다. 목록은 `git diff --name-status fc15975c..fdf9a277` 기계 산출이고 라운드마다 재산출한다.
 
 | 단계 | 내용 | 결과 |
 |---|---|---|
-| ① | 복원 목록 ⊇ `git diff --name-only bee7c36f..HEAD`(evidence 제외) | **OK — 누락 0** |
-| ② | `git restore --source=bee7c36f` (M 7) + 새 경로 삭제 (A 24) | 적용 |
-| ③ | 되돌린 경로의 `git diff` 가 빈 출력 | **OK** |
-| ④ | `compileKotlin compileTestKotlin` | **exit 0** (17초) |
-| ⑤ | `:decision:test :shared-kernel:test :workflow:test` | **exit 0** (13초) |
-| ⑥ | `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** (9분 17초) |
-| ⑦ | `git restore --source=HEAD -- .` 로 트리 복귀 | **OK — worktree 깨끗** |
+| ① | 복원 목록 ⊇ 변경 경로(evidence 제외) — **되돌리기 전에** 돌린다 | **OK — 누락 0** (A 24 · M 7 · 계 31) |
+| ② | `git restore --source=fc15975c` (M 7) + 새 경로 삭제 (A 24) | restore exit 0 · delete exit 0 |
+| ③ | 되돌린 경로의 `git diff` 가 빈 출력 | **OK — 0 bytes** |
+| ④ | `compileKotlin compileTestKotlin` | **exit 0** (15초) |
+| ⑤ | `:decision:test :shared-kernel:test :workflow:test` | **exit 0** (14초) |
+| ⑥ | `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** (9분 24초) |
+| ⑦ | 트리 복귀 | **OK — porcelain 빈 출력 · HEAD `fdf9a277` 불변** |
 
-HEAD 는 전 구간 `2f577304` 로 불변이다(시작·끝 둘 다 찍었다).
+**완료는 종료 코드가 아니라 「내 표지 0 · 남의 표지 보존」 계수로 센다.**
+
+| 표지 | 복원 전 | 복원 후 |
+|---|---|---|
+| 내 것 — `decision/.../menu/` 디렉터리 | 있음 | **없음** |
+| 내 것 — `shared-kernel/.../AppliedFloor.kt` | 있음 | **없음** |
+| 내 것 — 복원 경로 안의 `G1-DEC05` 문자열 | 있음 | **0 파일** |
+| 내 것 — 전 트리 `*/src/*` 의 `AppliedFloor` | 있음 | **0 파일** |
+| **남의 것** — `OPEN-SET01-AWARD-NAME-INGEST`(SET-01 레인) | 5 | **5 — 보존** |
+| **남의 것** — `workflow/.../PromoteOpeningResultsUseCase.kt`(COL-03 레인) | 있음 | **있음 — 보존** |
+
+남의 표지를 함께 센 이유: 복원 기준을 착수 base 로 잘못 잡으면 **내 것이 0 이 되는 동시에 남의
+것도 0 이 된다**. 두 축을 같이 세지 않으면 그 사고가 초록으로 보인다.
 
 **④⑤⑥ 을 생략하지 않은 이유**: ③ 은 **복원한 경로 집합만** base 와 대조하므로 목록에 빠진 파일은
 정의상 검사 밖이고 구조적으로 0 줄이 나온다 — 그 누락은 ④ 컴파일만 본다(6G-2d 두 번 실측).
 ① 의 ⊇ 등식을 **되돌리기 전에** 먼저 돌리는 것도 같은 이유다.
 
-**캐시 정직성**: ⑤ 의 세 `:test` 는 **FROM-CACHE**, `sizeGate` 일부는 UP-TO-DATE 였다. 이것은 공허한
-초록이 **아니다** — 캐시 키가 맞았다는 것은 되돌린 트리의 입력이 slice 이전 상태와 **바이트 동일**이라는
-뜻이고, rollback 이 증명하려는 것이 바로 그 동일성이다. 다만 「test 가 다시 돌았다」고는 적지 않는다.
-⑥ 에서는 **실제로 실행된** 것이 있다 — 손댄 세 모듈의 `sizeGate`, `gateRegistrationGate` **전 모듈**,
-그리고 `leakPatternGate`. 그중 `gateRegistrationGate` 의 초록이 **되돌린 `gate-tests.properties` 가
-되돌린 test 클래스 모집단과 양방향으로 맞는다**는 뜻이라, 게이트 등재의 복원 완전성을 잰다.
+**캐시 정직성**: ④⑤ 는 상당수가 FROM-CACHE·UP-TO-DATE 였다(④ 42 task 중 27 from-cache ·
+⑤ 33 중 26 up-to-date). 이것은 공허한 초록이 **아니다** — 캐시 키가 맞았다는 것은 되돌린 트리의
+입력이 slice 이전 상태와 **바이트 동일**이라는 뜻이고, rollback 이 증명하려는 것이 바로 그
+동일성이다. 다만 「test 가 다시 돌았다」고는 적지 않는다. ⑥ 에서는 **실제로 실행된** 것이 있다
+(89 task 중 35 executed, 9분 24초) — `gateRegistrationGate` 의 초록이 **되돌린
+`gate-tests.properties` 가 되돌린 test 클래스 모집단과 양방향으로 맞는다**는 뜻이라, 게이트
+등재의 복원 완전성을 잰다.
+
+**갈음은 「HEAD 초록」이 아니라 트리 동일성으로만 한다** — ③ 의 빈 출력이 그 동일성이고, ④⑤⑥ 은
+③ 이 **복원한 경로 집합만** 보기 때문에 목록에서 빠진 파일을 잡지 못하는 구멍을 메운다.
 
 **부수 관측(이 slice 소관 아님)**: `kotlin-compiler-embeddable` 이 빌드 classpath 에 있다는 KGP 경고가
 전 프로젝트에 뜬다. 이 slice 가 `decision` 에 그 의존을 더했으므로 의심받을 자리인데, **④ 는 되돌린
