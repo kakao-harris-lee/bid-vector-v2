@@ -183,8 +183,7 @@ class AccountBindingStructureTest {
                     type.declaredMethods
                         .filter { it.isAnnotationPresent(INIT_BINDER) }
                         .map { "${type.simpleName}.${it.name}" }
-                }
-                .toSet()
+                }.toSet()
         val advices =
             classes
                 .filter { AnnotatedElementUtils.hasAnnotation(it, CONTROLLER_ADVICE) }

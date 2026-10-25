@@ -81,6 +81,8 @@ class AccountBindingGuardScanTest : HttpIntegrationTestBase() {
     @Test
     fun `가드가 손으로 짓는 공유 오류 처리기는 상태 없는 무인자 class 다`() {
         GlobalErrorHandler::class.java.declaredConstructors.map { it.parameterCount } shouldBe listOf(0)
-        GlobalErrorHandler::class.java.declaredFields.filterNot { it.isSynthetic }.map { it.name } shouldBe emptyList()
+        GlobalErrorHandler::class.java.declaredFields
+            .filterNot { it.isSynthetic }
+            .map { it.name } shouldBe emptyList()
     }
 }

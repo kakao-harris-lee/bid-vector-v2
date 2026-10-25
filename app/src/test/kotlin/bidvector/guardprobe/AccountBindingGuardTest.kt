@@ -67,8 +67,7 @@ internal fun callProbe(
             shape.method,
             HttpEntity(shape.body, headers),
             String::class.java,
-        )
-        .statusCode
+        ).statusCode
         .value()
 }
 
@@ -108,8 +107,12 @@ class AccountBindingGuardTest {
     fun `AccountId 를 싣는 모양은 전부 정확히 400 이고 핸들러에 닿지 않는다`() {
         val registered =
             handlerMapping.handlerMethods.keys
-                .flatMap { info -> info.pathPatternsCondition?.patterns.orEmpty().map { it.patternString } }
-                .toSet()
+                .flatMap { info ->
+                    info.pathPatternsCondition
+                        ?.patterns
+                        .orEmpty()
+                        .map { it.patternString }
+                }.toSet()
         PROBE_SHAPES.map { it.path.substringBefore('?') }.filterNot { it in registered } shouldBe emptyList()
 
         PROBE_SHAPES.associate { it.name to callProbe(restTemplate, port, it) } shouldBe
@@ -134,7 +137,6 @@ class AccountBindingGuardTest {
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
 @Import(AccountBindingGuard::class, GlobalErrorHandler::class)
 open class GuardProbeApplication
-
 
 /** 위협 흉내 — 누군가 `String → AccountId` 변환기를 등록한 조립. 가드가 없으면 `@RequestParam` 이 이것으로 `AccountId` 를 짓는다. */
 @Configuration
