@@ -516,6 +516,8 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | **D-7B-4 (계약 갱신으로 추가)** 검토 r2 처분 — 결정 ⑤ ~ ⑧ · 게이트 우회 둘 · 고칠 목록 | §3.6 처분표의 「출하」 칸 | §3.6 처분표 · 변이 표(r2) | 출하 — 등재 넷(C2-N10 · C2-N12 · C2-N19 · V2-W6 사실) · OPEN 후보 둘(활성 등재는 팀장 문서 PR) |
 | **D-7B-5 (계약 갱신으로 추가)** 검토 r3 승인 전 일괄 — 게이트 보강 둘 · 고칠 목록 · 등재 | §3.7 처분표의 「출하」 칸 | §3.7 처분표 · 변이 표(승인 전 일괄) | 출하 — 등재 넷(C3-M1 · V3-L1 · C3-L2 · C3-Q1) · OPEN 후보 셋 |
 | **D-7B-6 (계약 갱신으로 추가)** 표적 재검증 r4 승인 전 일괄 2 — 게이트 둘을 구조로 · R4-3 등식 · 문면 · 등재 | §3.8 처분표의 「출하」 칸 | §3.8 처분표 · 변이 표(전 · 후) | 출하 — 등재 다섯(R4-2 · R4-5 · R4-8 · R4-9 · V4-L2) · OPEN-7D 사례 넷 |
+| **D-7B-7 (계약 갱신으로 추가)** 표적 재검증 r5 승인 전 일괄 3 — 바인딩 층 fail-closed 가드 · 쌍 등식 · 라우트 센서스 · Origin 표본 · ① 수령 조건 넷 · 500→400 | §3.9 처분표의 「출하」 칸 | §3.9 처분표 · 변이 표 · 정상 경로 대조 표 | 출하 — 등재 셋(§6 17~19) · 정책 편집 둘(허용 목록) |
+| **D-7B-8 (계약 갱신으로 추가)** 표적 재검증 r6 PR 전 마지막 일괄 — advice · 바인더 등식 · 본문 `JsonNode` 등식 · 정확 상태 · 단일 매개변수 문면 · 키 거부 · 상한 | §3.10 처분표의 「출하」 칸 | §3.10 처분표 · 변이 표 | 출하 — 등재 하나(§6 20 용기 모양) |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
 | (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
@@ -535,6 +537,8 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | feat 「전이표에 시스템 되돌림 간선 …」 · feat 「마감 판정 두 방향 …」 · fix 「V21·영속 — 되돌림 명령 어휘 …」 · fix 「HTTP — resume 400 선언 …」 · fix 「detekt(함수 수 · 복잡도) …」 · test 「사용자가 적은 마감 지남은 되돌리지 않는다 …」 | 수정 라운드 2(계약 D-7B-4, §3.6). 마지막 산출물 커밋은 맨 뒤의 test 커밋이다 |
 | fix 「승인 전 일괄 — 마감 지남 진입은 시스템 전용 …」 · fix 「승인 전 일괄 HTTP — 데이터 바인딩 진입점 등식 …」 | 승인 전 일괄(계약 D-7B-5, §3.7). 마지막 산출물 커밋은 뒤의 HTTP 커밋이다 |
 | fix 「승인 전 일괄 2 — Jackson 소유자 등식 · 핸들러 매개변수 규칙 …」 | 승인 전 일괄 2(계약 D-7B-6, §3.8). 이 일괄의 산출물 커밋은 이것 하나다 |
+| fix 「승인 전 일괄 3 — 요청 바인딩의 AccountId 생성 fail-closed 가드 …」 외 산출물 커밋들(가드 · test · 분할 · 범위 좁힘 · 400 · fallback 호출) | 승인 전 일괄 3(계약 D-7B-7, §3.9) |
+| fix 「가드 — Map 키 거부 역직렬화기 …」 · test 「advice·바인더 등식 …」 · style 「ktlint」 · test 「probe 의 매핑 조회는 이름으로 …」 | PR 전 마지막 일괄(계약 D-7B-8, §3.10). 마지막 산출물 커밋은 맨 뒤의 test 커밋이다 |
 | docs 커밋들 | 계약 · 설계 · evidence |
 
 base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
@@ -1050,9 +1054,9 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 [RestController::class])` 로 좁혔고, 그 범위가 우리 핸들러 전부를 덮는다는 등식(「요청 매핑 메서드를 선언한 app class 는 전부 `@RestController`」)을
 더했다. ② S-20 의 `sizeGate` 가 구조 test 파일 551 줄을 막았다 — Jackson · 핸들러 매개변수 축을 `AccountBindingStructureTest` 로 나눴다(288 · 285 줄).
 
-**정책 파일 편집(게이트 허용 목록 — 공유 파일)**: `collection.external.allowed-packages.app`(정확 일치 등식)에 다섯 — `org.springframework.core`(`ResolvableType`) ·
-`org.springframework.format`(거부 formatter) · `org.springframework.web.bind`(`WebDataBinder`) · `tools.jackson.core`(역직렬화기 서명의 `JsonParser`) ·
-`tools.jackson.databind.module`(`SimpleModule`). `app.http.allowed-packages`(접두)에 둘 — `org.springframework.core` · `org.springframework.format`. 키 옆에 근거
+**정책 파일 편집(게이트 허용 목록 — 공유 파일)**: `collection.external.allowed-packages.app`(정확 일치 등식)에 여섯 — `org.springframework.core`(`ResolvableType`) ·
+`org.springframework.format`(거부 formatter) · `org.springframework.web.bind`(`WebDataBinder`) · `org.springframework.web.method.annotation`(거부를 400 으로
+내는 `MethodArgumentTypeMismatchException`) · `tools.jackson.core`(역직렬화기 서명의 `JsonParser`) · `tools.jackson.databind.module`(`SimpleModule`)(수는 r6 R6-4 로 정정). `app.http.allowed-packages`(접두)에 둘 — `org.springframework.core` · `org.springframework.format`. 키 옆에 근거
 주석을 달았다. **대가 하나**: `tools.jackson.core` 가 app 모듈 허용이 되어, 앞 판에서 `TransportSurfaceGateTest` 의 바깥 패키지 등식이 막던 `JsonParser` 참조를
 이제 그 게이트가 막지 않는다 — 그 축은 위 Jackson (소유자, 멤버) 쌍 등식이 진다(호출이 하나라도 생기면 붉다). 처음 시도한 `java.beans` editor 는 그 패키지가
 전송 표면 뿌리(반사 호출)라 `TransportSurfaceGateTest` 가 막았다 — formatter 로 바꿨다(측정으로 확인).
@@ -1112,6 +1116,42 @@ probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다. 표
 **두 층이 겹치는 자리 — 측정이 드러냈다**: 첫 측정에서 MJ 는 **초록**이었다. `@RequestBody` 는 역직렬화 뒤 대상이 그 DTO 인 바인더를 만들고, 가드의
 `@InitBinder` 가 그 바인더를 거부해 핸들러에 닿지 않았기 때문이다(Jackson 층이 꺼져도 바인딩 층이 막는다 — 그 사이 DTO 안에 `AccountId` 가 한 번
 지어지기는 한다). Jackson 층을 따로 재려고 바인더를 만들지 않는 `HttpEntity` 본문 모양(HE)을 더했고, 다시 잰 MJ 가 위의 RED 다.
+
+### 3.10 PR 전 마지막 일괄 — 계약 D-7B-8 (표적 재검증 r6 처분, 2026-10-25)
+
+판정 SHA `cb7b2c79` 에 대한 verifier r6 **ready-for-review**(medium 1 · low 2)와 code-reviewer r6 **approve**(medium 3 · low 5)의 처분이다(재작업 2/5 유지).
+ID 접두는 `V6-` · `R6-`. **새 기구는 들이지 않았다**(팀장 지시) — 등식 둘 · 정확 상태 · 문면 · 키 거부 한 줄 · 상한 하나.
+
+| 지적 | 내용(한 줄) | 처분 | 출하 · 재는 자리 |
+|---|---|---|---|
+| R6-1 | 가드가 기대는 「다른 advice · 다른 `@InitBinder` 가 없다」가 미잠금(나중 `@InitBinder` 가 같은 타입 editor 를 덮으면 formatter 가 진다) | 고침(등식) | `AccountBindingStructureTest`「app main 의 `InitBinder` 는 가드 하나이고 controller advice 는 가드와 오류 처리기 둘이다」 · 변이 INITB RED |
+| R6-2 | 가드 전제의 다른 반쪽(「본문은 전부 `@RequestBody JsonNode`」)이 미잠금 | 고침(등식) | 「핸들러 본문 매개변수는 전부 `RequestBody JsonNode` 다」(비지 않음 포함) · 변이 BODYT RED |
+| R6-3 | 가드 행동 test 가 `400..499` 를 통과로 세 매핑 없는 경로(404)와 구별 못 함 | 고침 | 모양 표(`PROBE_SHAPES`) 아홉을 **정확히 400** 으로 단언 · 그 경로가 probe 조립의 매핑에 **실재**함을 단언 · 양성 대조 `GuardlessProbeTest`(가드 없는 조립, `@Import` 만): 모양마다 200 · 도달 1(MK 만 500 · 0 — 아래) |
+| V6-N1 · V6-L2 | 용기 모양(`List` · `Array` · `Optional` · `@RequestHeader List`)이 등록된 `String → AccountId` 변환기로 `AccountId` 를 짓는다 | **문면 좁힘 + 등재**(새 기구 없음 — 팀장 지시) | 가드 KDoc 3 과 test 이름을 「단일 `AccountId` 매개변수」로. §6 「용기 모양은 이 가드 밖이다」 — 근거: 출하에서 그 변환기를 등록할 길을 세 게이트가 막는다(변환기 패키지 미허용 · `FormatterRegistry` 가드 전용 패키지 등식 · `AccountId` 생성 호출자 ∅). `OPEN-7D-ACCOUNTID-CONSTRUCTION` 에 한 줄 |
+| V6-L1 | `Map<AccountId, …>` 본문이 키 역직렬화기 부재로 500 | 고침 | 가드 모듈에 거부 key deserializer(`RejectingAccountIdKeyDeserializer` — 값 역직렬화기와 같은 `reportInputMismatch` 쌍을 다시 써 새 Class 상수 · 새 바깥 패키지 0). 쌍 등식 +1(`KeyDeserializer.<init>`) · Jackson 상속 등식 +1. 행동 모양 MK(`HttpEntity<Map<AccountId, String>>`) 400 · 변이 MK RED(500) |
+| R6-5 | 원인 사슬 순회에 상한 없음 | 고침 | `.take(32)` |
+| R6-4 | §3.9 정책 문단의 수 「다섯」 | 고침(문면) | 「여섯」과 `org.springframework.web.method.annotation` 을 넣었다 |
+| R6-6 | 분할이 남긴 매달린 참조(「아래 Jackson 멤버 등식」) | 고침(문면) | 「`AccountBindingStructureTest` 의 Jackson 멤버 등식」 |
+| R6-7 | 「값을 지을 수 없는 멤버」 자기 검사가 `JsonNode` 접두로 좁다 | 고침 | 필터를 지우고 관측 쌍 **전체**(23)에 성질을 건다 — 오늘 초록 |
+| R6-8 | `GlobalErrorHandler()` 손 생성의 전제(무상태) 미잠금 | 고침(단언) | `AccountBindingGuardScanTest`「가드가 손으로 짓는 공유 오류 처리기는 상태 없는 무인자 class 다」 |
+
+**새 파일 ↔ in_scope**: `app/src/test/kotlin/bidvector/guardless/GuardlessProbeTest.kt` — 「`app/**` 의 bidding controller」(가드 행동 test 의 양성 대조). 패키지를
+`bidvector.guardprobe` 밖에 둔 까닭은 그 패키지의 가드 조립(`@SpringBootApplication` 스캔)이 끼어들지 않게 하려는 것이다. `gate-tests.properties` 에 등재.
+
+#### 변이 표 — PR 전 마지막 일괄 (마지막 산출물 커밋 「test … probe 의 매핑 조회는 이름으로 …」 위 · `--rerun` · 표적 test 만)
+
+전 · 후는 팀장 지시대로 둘로 합친다: ③ 의 양성 대조(가드 없는 조립 = 가드가 없을 때의 거동)와 ⑤ 의 MK(키 거부 역직렬화기를 지운 거동 = 이 일괄 전).
+
+| # | 변이 · 대조 | 표적 | 결과 |
+|---|---|---|---|
+| 양성 대조 | 가드 없는 조립에서 모양 아홉 | `GuardlessProbeTest` | 초록 — 여덟 모양 200 · 도달 1, MK 500 · 도달 0(키 역직렬화기가 없어 지어지지 않음 — 404 · 405 아님) |
+| 가드 조립 | 같은 모양 아홉 | `AccountBindingGuardTest` | 초록 — 아홉 다 **정확히 400** · 도달 0 · 경로 아홉이 매핑에 실재 |
+| MK | 키 거부 역직렬화기를 지움(⑤ 의 전) | `AccountBindingGuardTest` | **RED** 1(MK 가 400 이 아님) |
+| INITB | app main 에 다른 advice 와 `@InitBinder` | `AccountBindingStructureTest` | **RED** 2(advice · 바인더 등식 · 가드 패키지 사용 등식) |
+| BODYT | app main 에 `JsonNode` 가 아닌 `@RequestBody` 핸들러 | 같음 | **RED** 2(본문 `JsonNode` 등식 · 라우트 센서스 등식) |
+| MJ · MB · MF · MA · MI · MH | 가드 등록 삭제 여섯(앞 판과 같은 변이) | 가드 test 둘 | 각각 **RED** — 이제 모양별 정확 상태 단언에서 붉다(MJ: HE · 스캔 매퍼 · MB: H5 · G11 · MF: RP · MA: 스캔 조립 셋 + H5/G11 · MI · MH: 스캔 메서드 단언 + 모양) |
+| CTRL | 통제군 — 변이 없음 | 가드 test 둘 · 구조 test · 가드 없는 대조 | 초록 5 / 5 · 14 / 14 · 1 / 1 |
+
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
@@ -1201,7 +1241,7 @@ probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다. 표
     상수 · Jackson (소유자, 멤버) 쌍 · Jackson 상속)은 구조 등식이 잠그고, **요청 바인딩이 짓는 길은 `AccountBindingGuard` 가 짓는
     층에서 거부한다**(D-7B-7 ① — 핸들러 매개변수의 정적 규칙은 **한 겹 · 요청 매핑 메서드만** 본다). 그래도 생성 경로 봉쇄는 **OPEN 후보
     `OPEN-7D-ACCOUNTID-CONSTRUCTION`** 으로 둔다(이 PR 에서는 후보로만 — 그 근본 처리가 오면 가드의 객체 바인딩 거부는 필요 없어지고,
-    그 전에 `@ModelAttribute` 를 쓰려면 그 거부를 대상에 맞게 풀어야 한다). 그 OPEN 의 **사례**(검토 r4): G3 `readerForListOf(seed.javaClass)` ·
+    그 전에 `@ModelAttribute` 를 쓰려면 그 거부를 대상에 맞게 풀어야 한다). 용기 모양(§6 「용기 모양은 이 가드 밖이다」)도 그 OPEN 의 사례다. 그 OPEN 의 **사례**(검토 r4): G3 `readerForListOf(seed.javaClass)` ·
     G11 Spring 핸들러 매개변수 `account: AccountId` + `?value=9` 로 `AccountId(9)`(둘 다 이제 구조 등식이 붉다 — §3.8) · G1 `updateValue` ·
     G2 `readerForUpdating`(오늘은 `AccountId` 의 final 필드를 못 바꿔 무해 — 가변이 되거나 Jackson 설정이 바뀌면 열린다, 소유자 등식은 이 둘도 붉다).
 13. **마감 전 상태 집합이 줄면 옛 판정 행이 읽기마다 실패한다**(R4-2) — 되돌림 도착표 밖의 `from_state` 는 `error` 다(조용히 접지 않는다).
@@ -1222,6 +1262,12 @@ probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다. 표
 19. **`tools.jackson.core` 가 app 모듈 허용 패키지가 되었다**(D-7B-7 ① 의 대가) — 가드의 역직렬화기 서명이 `JsonParser` 를 요구한다.
     그래서 `TransportSurfaceGateTest` 의 바깥 패키지 등식은 더는 app 의 `JsonParser` 참조를 막지 않는다. 그 축은 Jackson (소유자, 멤버) 쌍
     등식이 진다 — app main 이 Jackson 멤버를 하나라도 새로 가리키면 붉다.
+20. **용기 모양은 이 가드 밖이다**(D-7B-8 ④ · 검토 r6 V6-N1) — 가드의 단순 변환 거부는 **단일 `AccountId` 매개변수**에만 걸린다. `List` ·
+    `Array` · `Optional` · `@RequestHeader List` 로 받으면 원소 변환이 변환 서비스로 가 가드의 editor 를 지나지 않으므로, 누가
+    `String → AccountId` 변환기를 등록하면 지어진다. 출하에서는 그 변환기를 등록할 길을 세 게이트가 막는다: 변환기 패키지
+    (`org.springframework.core.convert.converter`) 미허용 · `FormatterRegistry`(`org.springframework.format`)는 가드 전용 패키지 등식 ·
+    변환기 몸의 `AccountId` 생성은 생성 호출자 ∅ 등식. 근본(생성 경로 봉쇄)은 `OPEN-7D-ACCOUNTID-CONSTRUCTION` 이다(이 가드에 변환 서비스 단
+    거부를 더하지 않았다 — 팀장 지시 「새 기구를 들이지 않는다」).
 
 ### 7. acceptance 실측
 
@@ -1319,6 +1365,18 @@ V21 · OpenAPI · 생성 타입은 이 일괄에서 바뀌지 않았다 — cont
 | `check` job — S-20 `one-command-check.sh`(Kotlin `check` 포함) | **exit 0** · 21m31s · `app:test` 실행 732 · 실패 0(XML) · `bidding` · `workflow` · `adapters` test 는 UP-TO-DATE — 입력이 그 뒤 무변경이고 22:46–23:07 의 찬 `check` 에서 실행해 초록이었다 · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
 | 변이 표 | §3.9 — 변이 · 우회 열여섯 RED · 통제군 셋 초록 |
 
+### 7.7 PR 전 마지막 일괄 재실측 (base `998b59dd`)
+
+V21 · OpenAPI · 생성 타입은 무변경이라 container 재생 · db-rehearsal 은 돌리지 않았다. 마지막 산출물 커밋 「test … probe 의 매핑 조회는 이름으로 …」에서 한 번의
+락 보유로 차례로 돌렸다(11:17–12:11). 첫 시도는 probe 의 매핑 조회가 같은 타입 빈 둘(actuator 매핑)에 걸려 멈췄고, 이름으로 고르는 한 줄을 커밋한 뒤 다시 돌린
+것이 아래다. ktlint 가 그 앞에서 test 파일 셋을 고쳐 style 커밋 하나가 생겼다(그 커밋 제목의 「(D-7B-7)」은 재사용한 체인 문면의 낡은 표기다 — D-7B-8 의 것이다).
+
+| 항목 | 결과 |
+|---|---|
+| 반복 측정 — `:app` ktlint · detekt · `sizeGate` · 가드 · 가드 없는 대조 · 구조 · 관리 · 본문 계약 · 아키텍처 test | **exit 0** |
+| `check` job — S-20 `one-command-check.sh`(Kotlin `check` 포함) | **exit 0** · 21m23s · `app:test` 실행 735 · 실패 0(XML) · `bidding` · `workflow` · `adapters` 는 입력 불변 UP-TO-DATE(앞 실행에서 초록) · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
+| 변이 표 | §3.10 — RED 아홉(MK · INITB · BODYT · 가드 삭제 여섯) · 양성 대조 · 통제군 초록 |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -1370,3 +1428,7 @@ A 62 · M 31 → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 dif
 **승인 전 일괄 3 재실측** — clone 을 마지막 산출물 커밋(「fix … fallback 을 그대로 호출 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
 읽었다: 변경 A 66 · M 31(가드 · 가드 test 셋 · 분할한 구조 test 가 늘었다) → ① exit 0 · ② D 66 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 ·
 내 표지 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다.
+
+**PR 전 마지막 일괄 재실측** — clone 을 마지막 산출물 커밋(「test … probe 의 매핑 조회는 이름으로 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
+읽었다: 변경 A 67 · M 31(가드 없는 대조 test 하나가 늘었다) → ① exit 0 · ② D 67 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 → **0** · main
+표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다.
