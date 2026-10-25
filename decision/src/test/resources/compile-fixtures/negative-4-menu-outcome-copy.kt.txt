@@ -1,0 +1,18 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOutcome
+import bidvector.decision.menu.BidStance
+import bidvector.decision.menu.CollapseCause
+
+/**
+ * `copy` 로 가둔 컬렉션을 우회한다 — 생성자가 private 이고 `@ConsistentCopyVisibility` 가
+ * 붙었으면 `copy` 도 모듈 밖에서 닫혀 있어야 한다.
+ */
+fun forgedCopy(original: BidMenuOutcome.BandCollapsed): BidMenuOutcome.BandCollapsed =
+    original.copy(collapsedStances = setOf(BidStance.Safe))
+
+fun forgedUnmeasurableCopy(original: BidMenuOutcome.Unmeasurable): BidMenuOutcome.Unmeasurable =
+    original.copy(withheld = emptyMap())
+
+@Suppress("unused")
+private fun anyCause(): CollapseCause = CollapseCause.DuplicateEffectiveAmounts(1L)

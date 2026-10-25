@@ -187,20 +187,32 @@ sealed interface BidMenuOutcome {
      * 함께 이동한다」와 같은 축).
      */
     @ConsistentCopyVisibility
-    data class Offered internal constructor(
+    data class Offered private constructor(
         val safe: BidMenuOption,
         val recommended: BidMenuOption,
         val aggressive: BidMenuOption,
-        private val disclosuresSource: Set<BidMenuDisclosure>,
+        /** **이미 가둔 사본이 들어온다** — 생성 경로가 [invoke] 하나뿐이라 그것이 보장된다. */
+        val disclosures: Set<BidMenuDisclosure>,
         val policyVersion: PolicyVersion,
     ) : BidMenuOutcome {
-        /**
-         * **생성 시 복사해 가둔다**(r2 M-4). 커널의 살아 있는 컬렉션을 그대로 싣지 않는다 —
-         * 싣고 나면 `as MutableSet` 로 캐스팅해 비울 수 있고, 그러면 아래 `init` 의 「고지
-         * 전수」 불변식이 **사후에** 무너진다. 불변식을 생성 시점에만 걸고 끝내면 그 불변식은
-         * 「그 순간 참이었다」는 말일 뿐이다.
-         */
-        val disclosures: Set<BidMenuDisclosure> = Collections.unmodifiableSet(disclosuresSource.toSet())
+        internal companion object {
+            /**
+             * 유일한 생성 경로 — **primary 값 자체를 가둔 사본으로 만든다**(r2 M-4 · ③′).
+             *
+             * 가둔 뷰를 따로 파생하는 것만으로는 부족했다: data class 의 `equals`·`hashCode` ·
+             * `toString` 은 **primary 생성자의 값**을 읽으므로, 그 자리에 호출자의 원본 참조가
+             * 남아 있으면 생성 뒤 원본이 바뀔 때 공개 뷰는 그대로인데 `equals`·`hashCode` 가
+             * 따라 움직인다(해시 컬렉션이 길을 잃는다). 사본을 primary 자리에 넣어 그 표류를
+             * 없앤다. 생성자가 `private` 이라 `@ConsistentCopyVisibility` 가 `copy` 도 닫는다.
+             */
+            internal operator fun invoke(
+                safe: BidMenuOption,
+                recommended: BidMenuOption,
+                aggressive: BidMenuOption,
+                disclosures: Set<BidMenuDisclosure>,
+                policyVersion: PolicyVersion,
+            ): Offered = Offered(safe, recommended, aggressive, frozen(disclosures), policyVersion)
+        }
 
         init {
             require(safe.stance == BidStance.Safe) { "safe 자리의 태도가 어긋났다: ${safe.stance}" }
@@ -218,18 +230,22 @@ sealed interface BidMenuOutcome {
      * 메뉴가 그 이름으로 나가지 않는다(DEC-05 무조건 acceptance 둘째의 정신).
      */
     @ConsistentCopyVisibility
-    data class PartiallyOffered internal constructor(
-        private val offeredSource: Map<BidStance, BidMenuOption>,
-        private val withheldSource: Map<BidStance, MenuUnmeasurableReason>,
-        private val disclosuresSource: Set<BidMenuDisclosure>,
+    data class PartiallyOffered private constructor(
+        val offered: Map<BidStance, BidMenuOption>,
+        val withheld: Map<BidStance, MenuUnmeasurableReason>,
+        val disclosures: Set<BidMenuDisclosure>,
         val policyVersion: PolicyVersion,
     ) : BidMenuOutcome {
-        /** 생성 시 복사해 가둔다(r2 M-4) — [Offered.disclosures] 와 같은 이유다. */
-        val offered: Map<BidStance, BidMenuOption> = Collections.unmodifiableMap(offeredSource.toMap())
-
-        val withheld: Map<BidStance, MenuUnmeasurableReason> = Collections.unmodifiableMap(withheldSource.toMap())
-
-        val disclosures: Set<BidMenuDisclosure> = Collections.unmodifiableSet(disclosuresSource.toSet())
+        internal companion object {
+            /** 유일한 생성 경로 — 셋 다 가둔 사본으로 받는다([Offered.invoke] 와 같은 이유). */
+            internal operator fun invoke(
+                offered: Map<BidStance, BidMenuOption>,
+                withheld: Map<BidStance, MenuUnmeasurableReason>,
+                disclosures: Set<BidMenuDisclosure>,
+                policyVersion: PolicyVersion,
+            ): PartiallyOffered =
+                PartiallyOffered(frozen(offered), frozen(withheld), frozen(disclosures), policyVersion)
+        }
 
         init {
             require(offered.isNotEmpty()) { "PartiallyOffered 는 제시 옵션이 하나 이상이어야 한다(0 이면 Unmeasurable)" }
@@ -245,12 +261,18 @@ sealed interface BidMenuOutcome {
      * 밴드 붕괴 — 선택지가 서지 않는다(DEC-05 무조건 acceptance 둘째). [cause] 가 출처를
      * 가르고, [collapsedStances] 는 같은 값으로 접힌 태도들이다(하한 유래면 전수).
      */
-    data class BandCollapsed(
+    @ConsistentCopyVisibility
+    data class BandCollapsed private constructor(
         val cause: CollapseCause,
-        private val collapsedStancesSource: Set<BidStance>,
+        val collapsedStances: Set<BidStance>,
     ) : BidMenuOutcome {
-        /** 생성 시 복사해 가둔다(r2 M-4). */
-        val collapsedStances: Set<BidStance> = Collections.unmodifiableSet(collapsedStancesSource.toSet())
+        companion object {
+            /** 생성 표면은 **public 그대로**다(실패 셋은 어디서든 지을 수 있다) — 사본만 가둔다. */
+            operator fun invoke(
+                cause: CollapseCause,
+                collapsedStances: Set<BidStance>,
+            ): BandCollapsed = BandCollapsed(cause, frozen(collapsedStances))
+        }
 
         init {
             require(collapsedStances.isNotEmpty()) { "붕괴한 태도 집합이 비어 있을 수 없다" }
@@ -261,11 +283,15 @@ sealed interface BidMenuOutcome {
      * 태도 **전부**를 낼 수 없다 — 사유를 태도별로 싣는다(라운드 2 HIGH-3). 하나로 뭉치면
      * 「어느 태도가 왜」가 사라진다.
      */
-    data class Unmeasurable(
-        private val withheldSource: Map<BidStance, MenuUnmeasurableReason>,
+    @ConsistentCopyVisibility
+    data class Unmeasurable private constructor(
+        val withheld: Map<BidStance, MenuUnmeasurableReason>,
     ) : BidMenuOutcome {
-        /** 생성 시 복사해 가둔다(r2 M-4). */
-        val withheld: Map<BidStance, MenuUnmeasurableReason> = Collections.unmodifiableMap(withheldSource.toMap())
+        companion object {
+            /** 생성 표면은 **public 그대로**다 — 사본만 가둔다. */
+            operator fun invoke(withheld: Map<BidStance, MenuUnmeasurableReason>): Unmeasurable =
+                Unmeasurable(frozen(withheld))
+        }
 
         init {
             require(withheld.keys == BidStance.entries.toSet()) { "전부 보류일 때만 Unmeasurable 이다: ${withheld.keys}" }
@@ -276,3 +302,14 @@ sealed interface BidMenuOutcome {
         val reason: MenuSourceAbsence,
     ) : BidMenuOutcome
 }
+
+/**
+ * 결과 타입이 싣는 컬렉션을 **사본으로 바꿔 가둔다**(r2 M-4 · ③′).
+ *
+ * `toSet()`·`toMap()` 만으로는 부족하다 — 돌아오는 것이 `LinkedHashSet`/`LinkedHashMap` 이라
+ * 여전히 `as MutableSet` 로 캐스팅해 비울 수 있다. 사본을 뜨고(호출자의 원본과 끊고) 읽기
+ * 전용으로 감싸는 두 가지를 함께 해야 닫힌다.
+ */
+private fun <T> frozen(values: Set<T>): Set<T> = Collections.unmodifiableSet(values.toSet())
+
+private fun <K, V> frozen(values: Map<K, V>): Map<K, V> = Collections.unmodifiableMap(values.toMap())

@@ -43,7 +43,7 @@ class BidMenuTypesTest {
                 safe = offered.recommended,
                 recommended = offered.recommended,
                 aggressive = offered.aggressive,
-                disclosuresSource = BidMenuDisclosure.entries.toSet(),
+                disclosures = BidMenuDisclosure.entries.toSet(),
                 policyVersion = MENU_TEST_VERSION,
             )
         }
@@ -59,7 +59,7 @@ class BidMenuTypesTest {
                 safe = offered.safe,
                 recommended = offered.recommended,
                 aggressive = offered.aggressive,
-                disclosuresSource = setOf(BidMenuDisclosure.NotAutoSubmitted),
+                disclosures = setOf(BidMenuDisclosure.NotAutoSubmitted),
                 policyVersion = MENU_TEST_VERSION,
             )
         }
@@ -143,6 +143,43 @@ class BidMenuTypesTest {
                 MENU_TEST_VERSION,
             )
         }
+    }
+
+    /**
+     * (팀장 지적, M-4 보강) — **가둔 뷰만으로는 부족하다.** data class 의 `equals`·`hashCode` ·
+     * `toString` · `componentN` 은 primary 생성자의 프로퍼티를 읽는데, 그 자리에 **호출자가 넘긴
+     * 원래 가변 컬렉션 참조**가 그대로 남아 있으면 생성 뒤 원본을 바꿀 때 공개 뷰는 그대로인데
+     * `equals`·`hashCode` 가 따라 움직인다 — 해시 컬렉션에 들어간 결과가 길을 잃는 자리다.
+     */
+    @Test
+    fun `결과는 생성 뒤 원본이 바뀌어도 equals 와 hashCode 가 움직이지 않는다`() {
+        val offered = anyOfferedMenu()
+        val mutableSource = BidMenuDisclosure.entries.toMutableSet()
+        // 인자를 자리로 넘긴다 — 생성자 파라미터 이름이 바뀌어도 이 test 의 뜻은 같다.
+        val fromMutable =
+            BidMenuOutcome.Offered(
+                offered.safe,
+                offered.recommended,
+                offered.aggressive,
+                mutableSource,
+                MENU_TEST_VERSION,
+            )
+        val fromFixed =
+            BidMenuOutcome.Offered(
+                offered.safe,
+                offered.recommended,
+                offered.aggressive,
+                BidMenuDisclosure.entries.toSet(),
+                MENU_TEST_VERSION,
+            )
+        (fromMutable == fromFixed) shouldBe true
+        val hashBefore = fromMutable.hashCode()
+
+        mutableSource.clear()
+
+        fromMutable.disclosures shouldBe BidMenuDisclosure.entries.toSet()
+        fromMutable.hashCode() shouldBe hashBefore
+        (fromMutable == fromFixed) shouldBe true
     }
 
     private fun anyPartialMenu(): BidMenuOutcome.PartiallyOffered =

@@ -22,6 +22,8 @@ import java.nio.file.Files
  * 생성 경로가 닫혀 있다는 사실만이 증명이다. 생성자를 공개로 되돌리는 변이에서 fixture 1 이
  * 양성이 되어 RED 다.
  *
+ * fixture 4 — 네 결과 타입의 `copy` 가 모듈 밖에서 닫혀 있다.
+ *
  * fixture 1 — [BidMenuOption] 은 모듈 밖에서 직접 지을 수 없다(유일한 생성 경로는
  * [composeBidMenu]). fixture 2 — [BidMenuOutcome.Offered] 도 같다. fixture 3 —
  * [BidMenuOutcome.PartiallyOffered] 도 같다. 셋을 나눈 이유는 명제가 다르기 때문이다:
@@ -71,6 +73,25 @@ class MenuCompileFailureHarnessTest {
     fun `3-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "3-menu-partially-offered-direct-construction-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
+
+    /**
+     * fixture 4 — `copy` 도 모듈 밖에서 닫혀 있다(r2 M-4 · ③′). 생성 폐쇄만 재면
+     * **`copy` 로 가둔 컬렉션을 갈아끼우는 경로**가 열린 채 남는다. `BandCollapsed` ·
+     * `Unmeasurable` 은 생성 표면이 public 이라 그 구멍이 **모듈 밖**에 있었다.
+     */
+    @Test
+    fun `4 결과 타입의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4-menu-outcome-copy", "cannot access")
+        assertPositiveCompiles("1-menu-via-kernel")
+    }
+
+    @Test
+    fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "4-menu-outcome-copy-typo",
             realDiagnosticFragment = "cannot access",
         )
     }

@@ -2,6 +2,7 @@ package bidvector.decision.menu
 
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
+import bidvector.sharedkernel.export
 
 /**
  * 투찰가 메뉴 커널(DEC-05 + DEC-02) — 입력 → [BidMenuOutcome] 의 **순수 함수**다.
@@ -59,7 +60,7 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
             } else {
                 BidMenuOutcome.BandCollapsed(
                     cause = CollapseCause.FloorAboveBand(lowerBound = bound, upperBound = top),
-                    collapsedStancesSource = BidStance.entries.toSet(),
+                    collapsedStances = BidStance.entries.toSet(),
                 )
             }
         }
@@ -73,9 +74,10 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
  * 태도가 셋이므로 겹침 묶음은 **많아야 하나**다(둘이 겹치면 남은 하나는 그 둘과 다르다).
  */
 private fun collidingStances(built: Map<BidStance, BidMenuOption>): Map<BidStance, Long> {
-    val byAmount = built.entries.groupBy { it.value.amount.value.export().won }
-    val collided = byAmount.entries.firstOrNull { it.value.size > 1 } ?: return emptyMap()
-    return collided.value.associate { it.key to collided.key }
+    val stancesByAmount: Map<Long, List<BidStance>> =
+        built.entries.groupBy({ entry -> entry.value.amount.value.export().won }, { entry -> entry.key })
+    val collided = stancesByAmount.entries.firstOrNull { (_, stances) -> stances.size > 1 } ?: return emptyMap()
+    return collided.value.associateWith { collided.key }
 }
 
 /**
@@ -114,7 +116,7 @@ private fun assemble(
         collided.keys == BidStance.entries.toSet() ->
             BidMenuOutcome.BandCollapsed(
                 cause = CollapseCause.DuplicateEffectiveAmounts(collided.values.first()),
-                collapsedStancesSource = collided.keys,
+                collapsedStances = collided.keys,
             )
 
         else -> outcomeOf(offered, withheld, ctx.policy.version)
@@ -151,9 +153,9 @@ private fun outcomeOf(
 
         else -> {
             BidMenuOutcome.PartiallyOffered(
-                offeredSource = offered,
-                withheldSource = withheld,
-                disclosuresSource = BidMenuDisclosure.entries.toSet(),
+                offered = offered,
+                withheld = withheld,
+                disclosures = BidMenuDisclosure.entries.toSet(),
                 policyVersion = version,
             )
         }
@@ -168,6 +170,6 @@ private fun fullMenu(
         safe = requireNotNull(offered[BidStance.Safe]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
         recommended = requireNotNull(offered[BidStance.Recommended]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
         aggressive = requireNotNull(offered[BidStance.Aggressive]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
-        disclosuresSource = BidMenuDisclosure.entries.toSet(),
+        disclosures = BidMenuDisclosure.entries.toSet(),
         policyVersion = version,
     )
