@@ -1,6 +1,7 @@
 package bidvector.workflow.profile
 
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -57,7 +58,7 @@ class ProfileJudgementIsolationTest {
      * 바꾸면 두 표면의 어휘가 조용히 갈린다. 그 등식은 **수동**이다(scope 알려진 제한 2).
      */
     @Test
-    fun `판정 대기 축은 QUAL-08 · QUAL-10 · QUAL-11 셋이고 ID 는 7C② 어휘와 같다`() {
+    fun `판정 대기 축은 QUAL-08 · QUAL-10 · QUAL-11 셋이고 7C② 와 같은 표 하나에서 온다`() {
         UnjudgedQualificationAxis.entries.map { it.name } shouldBe
             listOf("QUAL_08_REGION", "QUAL_10_PERFORMANCE", "QUAL_11_CONSTRUCTION_CAPACITY")
         UnjudgedQualificationAxis.entries.map { it.capability } shouldBe listOf("QUAL-08", "QUAL-10", "QUAL-11")

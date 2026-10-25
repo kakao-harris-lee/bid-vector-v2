@@ -1,5 +1,6 @@
 package bidvector.workflow.profile
 
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import bidvector.qualification.LicenseName
 import java.time.LocalDate
 
