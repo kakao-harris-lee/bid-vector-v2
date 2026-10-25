@@ -111,6 +111,13 @@ g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상�
 표면**이고(응답 타입을 축별로 쪼갠 것이 R7 의 기법 자체다), 그 목록에 값 타입이 이미 올라 있는 **선례(감사 행 값 객체 · 전략 · 업무 대분류)와 같은 꼴**
 이다. 아울러 조건 (c) 변이 규칙을 「등재마다 하나」에서 **「종류마다 대표 하나」**(여섯)로 바꾼다 — 등재 항목이 열아홉으로 늘어 빌드 시간이 과하다.
 
+**D-7C2-8 (2026-10-25, 팀장 — 주입 허용 넷의 새 등재).** `D-7C2-5` ②·`D-7C2-7` 의 범위 밖 새 등재 넷이다. 넷 다 **등재 직전에 그 게이트가 이름으로
+보고한** 항목이고(모집단 안, §0.9f (e) 의 술어), 각자 그 목록의 선례와 같은 종류다.
+- `bidvector.app.wiring.BidPriceRequestRun` — **요청 스코프 run**. 선례: dry-run run 이 쥔 피주입 타입들이 이미 그 목록에 있다. 이 run 이 목록에
+  오르는 것은 요청 결과 sealed 갈래가 그것을 들기 때문이다(dry-run 은 그 래퍼가 없어 run 자신은 안 올랐다).
+- `bidvector.adapters.evaluation.RecordingMlAnalysis` — **기록 어댑터**. 선례: `RecordingNotificationRequestPort` 가 같은 꼴로 이미 있다.
+- `bidvector.procurement.Notice` · `bidvector.qualification.LicenseJudgement` — **도메인 값**. 선례: `OperatorStrategy`·`BusinessDivision` 이 같은 꼴로 이미 있다.
+
 
 ## 하네스 레인 변경 (상시)
 
