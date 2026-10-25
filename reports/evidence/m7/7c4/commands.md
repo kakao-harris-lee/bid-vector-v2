@@ -4,7 +4,7 @@
 무거운 명령 앞마다 확인 셋(pgrep · `free -m` · RSS 상위)을 **별도 호출로 먼저** 돌렸고, 다른 레인(vr5 · 7C② · 7B)의 빌드가
 도는 동안에는 락에서 기다렸다(7B 의 full check 뒤에서 40분 넘게 선 적도 있다 — 끼어들지 않았다). 날짜는 전부 2026-10-24 KST.
 
-**판정 SHA**(팀장이 동결하고 검토가 판정한 SHA): r1 `8afb94d0` · **r2 `efc856e5`**. base main `fc15975c`.
+**판정 SHA**(팀장이 동결하고 검토가 판정한 SHA): r1 `8afb94d0` · r2 `efc856e5` · **r3 는 아래 종결 SHA**. base main `fc15975c`.
 그 밖의 SHA 는 **실측 HEAD** 라고 적는다(r2 F8 — 둘을 같은 낱말로 쓰면 어느 것이 판정 대상인지 흐려진다):
 r2 의 찬 `check` 는 `2258342e`, 팀장 수용 뒤 더한 어휘 전수 test 를 포함한 재측정과 rollback 실측은 `4bd7cd59`. 아래 §r1 의 rollback 수는
 실측 HEAD `1b3ade0b` 의 것이었고 **r2 에서 전부 다시 쟀다**(`rollback.md` 가 r2 판이다).
@@ -130,3 +130,84 @@ test 로는 못 잡는다).
 
 - 찬 `check` → **exit 0**, `BUILD SUCCESSFUL in 11m 9s`, **356 task 전부 실행**, 루트 게이트 둘 실행, `FAILED` 0.
   이 slice test 전부 초록 — workflow 7 · 9 · 5, adapters 8 · 10 · 6 · 5(중복 거부가 전수로 늘었어도 class 당 수는 그대로다).
+## r3 (D-7C4-4 수정 라운드) — 명령과 결과
+
+처분 표는 `scope.md` 의 D-7C4-4 절이다.
+
+### ① 격리 규칙의 축 전환 — 전·후 표 (우회 아홉)
+
+verifier r2 가 만든 우회를 그 레인 clone 에서 **읽기만** 해서 버릴 clone 에 심고, 게이트 **구판
+`d55624ef` 와 새 판 `49e8c4cf`** 에서 같은 명령을 돌렸다(`:workflow:test --tests
+'bidvector.workflow.profile.*' :adapters:test --tests '…IsolationGateTest' --tests
+'…ProfileAdapterDependencyTest' --rerun --continue`). 두 판 모두 test task 가 **실행**됐다(FROM-CACHE
+아님 — 로그로 확인). `indy` 둘은 이 레인이 만든 변종이다.
+
+| # | 우회 | 전 `d55624ef` | 후 `49e8c4cf` |
+|---|---|---|---|
+| N1 | 허용 파일의 `String` 반환 helper 를 거친 **이행** 값 흐름 | 초록 | **초록 — 닫지 않는다**(제한 5) |
+| N2 | 판정 입력 port 구현이 **SQL 문자열**로 V22 표를 직접 읽는다 | 초록 | **붉다** — 규칙 1(표 이름) · 규칙 3(port) |
+| N3 | X1 을 **새 어댑터 패키지**로 옮긴다 | 초록 | **붉다** — 규칙 2(값 타입) · 규칙 3 |
+| N4 | 인터페이스 선언을 **제3 패키지**로 옮긴다 | 초록 | **초록 — 닫지 않는다**(제한 5) |
+| N5 | 실행 시 조립한 이름(`Class.forName(joinToString)`) | 초록 | **초록 — 닫지 않는다**(제한 5) |
+| N6 | evaluation 의 **typealias** 로 profile 타입을 감춘다 | **붉다** | **붉다** — 이름 참조(전개된 이름이 바이트코드에 남는다) |
+| N7 | **허용 파일 안 중첩 class** 가 판정 입력 port 를 구현 | **붉다** | **붉다** — 구판은 파일 이름 허용으로, 새 판은 규칙 3 으로 |
+| X1-indy | 허용 파일 안에서 `OperatorProfilePort { … }` **SAM 람다**로 V22 를 접는다 | 초록 | **붉다** — 규칙 3(적발 대상 `JdbcBusinessProfileStoreKt`) |
+| X2-indy | `workflow.profile` 안 람다가 evaluation 의 `fun interface` 를 SAM 으로 만든다 | 초록 | **붉다** — 람다 축(적발 대상 `IndyProfilePortKt`) |
+
+- **새로 닫힌 것은 넷**(N2 · N3 · X1-indy · X2-indy), **이미 닫혀 있던 것은 둘**(N6 · N7), **닫지 않는
+  것은 셋**(N1 · N4 · N5 — 제한 5 와 2b 표적 4).
+- 통제군(우회 없는 새 판): 다섯 class 전부 실패 0, 두 test task 실행.
+- 적발 대상이 class 이름까지 나온다 — 규칙 3 의 목록은 `NewPackageRegionFold` · `NestedFoldHost$Fold` ·
+  `JdbcBusinessProfileStoreKt` · `SqlRegionFold` 넷이었다.
+
+### ① 의 오탐 하나 — 깨끗한 트리에서 붉었다
+
+람다 축의 첫 판은 `BootstrapMethods` 절과 indy 자리의 **모든** `bidvector` 좌표를 셌다. 그래서 **우회 없는
+트리에서 `OnboardingSnapshot.class` 가 붉었다** — `data class` 의 `toString()` 이 문자열 접합 indy 를 쓰고
+그 자리의 **인자**에 판정 패키지 타입이 실린다(`makeConcatWithConstants:(…ProfileFacts…)Ljava/lang/String;`).
+그 패키지를 **쓰는** 것은 허용 방향이라 위반이 아니다. 술어를 **indy 반환 타입**으로 좁혀 닫았다(별 커밋).
+
+**앞 보고의 정정**: 「이 저장소 컴파일 산출물에 `LambdaMetafactory` 상수 0 건」은 **틀렸다**. `grep` 이
+NUL 을 담은 바이너리 줄을 건너뛰어서 생긴 수였고(`-a` 없이 셌다), 다시 세면 **275 개 class** 가 그 상수를
+가진다. 그래서 람다 축의 양성 대조를 합성 표본이 아니라 **실제 산출물**로 바꿨다 — 이 패키지 열거의
+Kotlin 람다가 indy 라 `kotlin/jvm/functions/Function1` 이 나온다. CR 의 OQ-R2-1(indy 가 class 파일을 내지
+않는가)은 X1-indy · X2-indy 가 **class 파일 없이도 적발됐다**는 사실로 닫힌다.
+
+### ② 면허명 CHECK — RED 먼저
+
+- RED: 경계 test 만 커밋한 뒤 `:adapters:test --tests 'bidvector.adapters.profile.*'` → `SchemaGuardTest`
+  **8 중 1 실패**(`' '` · `'  '` · `'\t\n'` 에서 「예외가 안 났다」). 같은 run 에서 신설 격리 게이트는 5/0.
+- GREEN: `license_name ~ '[^[:space:]]'` 로 좁힌 뒤 같은 명령 + `CleanMigration*` → **exit 0**,
+  `SchemaGuardTest` 8/0, `CleanMigration*` 여섯 전부 초록(CHECK 제약 수 5 · 3 그대로).
+
+### ③ N8 과 DB 변두리 탐침 (실 DB, 버릴 clone)
+
+- **N8**(`array_positions` 의 `'CONSTRUCTION'` → `'CONSTRUCTIO'` 오타): **붉다** — 「등록분야 배열은 어휘
+  전수에서 중복 원소를 거부한다」 하나가 잡는다. r2 F7 이 「`efc856e5` 에서는 잡히지 않는다」고 적은 자리를
+  `4bd7cd59` 의 전수 test 가 닫은 것이 **실측으로 확인**됐다.
+- 탐침(단언 없이 수락/거부만 출력, N8 변이를 그대로 둔 채). DB locale 은 **`en_US.utf8` / `en_US.utf8`**.
+
+| 입력 | 결과 | 앱(`isNotBlank` · 어휘)과의 관계 |
+|---|---|---|
+| 상호 U+3000 단독(전각 공백) | 거부 | 앱도 거부 — **같다** |
+| 상호 U+2003 단독(em space) | 거부 | 앱도 거부 — **같다** |
+| 상호 U+00A0 단독(NBSP) | 수락 | 앱도 수락(`Character.isWhitespace(U+00A0)` 는 거짓) — **같다** |
+| 상호 U+200B 단독(zero width) | 수락 | 앱도 수락 — **같다** |
+| 분야 `{CONSTRUCTION,CONSTRUCTION}`(N8 변이 적용) | 수락 | 변이가 그 값의 중복을 열었다는 직접 증거 |
+| 분야 `{GOODS,GOODS}` | 거부 | 값별 절이 막는다 |
+| 분야 `{NULL}` | 거부 | `<@` 가 NULL 원소에서 참이 아니다 |
+| 분야 `{{GOODS}}`(다차원) | 거부 | **사유가 CHECK 위반이 아니다** — `array_positions` 가 1차원만 받는다(CR R2-L4) |
+| 면허명 공백 둘 | 거부 | 새 술어가 막는다(②) |
+| 면허명 U+3000 | 거부 | 앱도 거부 — 같다 |
+
+**이 locale 에서는 probed 범위의 앱 ↔ DB 차이가 0 이다**. 그래서 알려진 제한의 문면을 고쳤다(scope 제한 4 ·
+6): 「DB 가 앱보다 넓다」가 아니라 **「`[:space:]` 멤버십이 locale 에 달려 있고, `C` locale DB 에서는 DB 가
+더 받아들여(예: U+3000) 앱이 거부하는 값이 저장될 수 있다」**가 실측에 맞는 주장이다.
+
+### r3 종결 acceptance (`49e8c4cf`)
+
+- 찬 `check --continue --rerun-tasks --no-build-cache` → **exit 0**, `BUILD SUCCESSFUL in 11m 11s`,
+  **356 task 전부 실행**, 이름 수 431(위 분해와 같다), 루트 게이트 둘 실행, `FAILED` 0.
+  이 slice test 전부 초록 — workflow 7 · 9 · **7**(람다 축 둘이 늘었다), adapters **5**(신설 격리 게이트) ·
+  8 · 10 · 6 · **3**(형제 test 는 V22 관심사를 넘겨 셋으로 줄었다).
+- `web` job 은 r3 에서도 해당 없다(변경 경로에 `web/` · `openapi/` · 생성 타입이 없다).
