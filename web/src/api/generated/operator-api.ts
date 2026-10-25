@@ -760,7 +760,7 @@ export interface components {
             licenseVerdict: "ELIGIBLE" | "UNCERTAIN";
             /** @enum {string|null} */
             licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
-            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_10_PERFORMANCE" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
         };
         BidPriceRequestBody: {
             /** @description 공고번호. 정규화(trim · ASCII 대문자화 · 내부 공백을 `-` 로 합침)는 서버가 한다. 공백만·제어 문자·길이 상한 초과는 400 이다. */
