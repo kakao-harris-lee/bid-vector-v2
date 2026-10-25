@@ -72,7 +72,7 @@ class AccountCarrierStructureTest {
      * 검토 r2 V2-N1 — `AccountId` 를 **이름으로 가리켜** 만드는 길(Jackson `convertValue(n, AccountId::class.java)` · 반사 등)은
      * 그 타입의 Class 상수(`ldc … // class AccountId`)를 요구한다. app main 에서 그 상수를 가진 class 는 **거부 가드 하나**다
      * (D-7B-7 ① — `AccountBindingGuard` 가 「`AccountId` 는 짓지 않는다」를 등록하려면 그 타입을 이름 불러야 한다). `<init>` 호출자
-     * 등식은 생성자를 **직접** 부르는 길만 닫는다. 이름을 쓰지 않는 길(손에 든 값의 `getClass()`)은 이 술어 밖이고 아래 Jackson
+     * 등식은 생성자를 **직접** 부르는 길만 닫는다. 이름을 쓰지 않는 길(손에 든 값의 `getClass()`)은 이 술어 밖이고 `AccountBindingStructureTest` 의 Jackson
      * 멤버 등식이 닫는다(검토 r3 V3-N1 — 「다른 길은 모두 Class 상수를 요구한다」는 사실이 아니었다).
      */
     @Test

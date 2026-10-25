@@ -72,4 +72,15 @@ class AccountBindingGuardScanTest : HttpIntegrationTestBase() {
         val exceptionHandlers = methods.filter { it.isAnnotationPresent(ExceptionHandler::class.java) }.map { it.name }
         exceptionHandlers shouldBe listOf("refusedConversion")
     }
+
+    /**
+     * 검토 r6 R6-8 — 가드는 「그 밖의 형 불일치」에 `GlobalErrorHandler().fallback` 을 **손으로 지은 인스턴스**로 부른다. 그 인스턴스가
+     * 빈과 같으려면 그 처리기가 상태 없는 무인자 class 여야 한다 — 주입 상태가 생기면(기본값 있는 매개변수면 컴파일도 된다) 이 test 가
+     * 먼저 붉고, 가드는 그 처리기를 주입받아 쓰는 쪽으로 바꿔야 한다.
+     */
+    @Test
+    fun `가드가 손으로 짓는 공유 오류 처리기는 상태 없는 무인자 class 다`() {
+        GlobalErrorHandler::class.java.declaredConstructors.map { it.parameterCount } shouldBe listOf(0)
+        GlobalErrorHandler::class.java.declaredFields.filterNot { it.isSynthetic }.map { it.name } shouldBe emptyList()
+    }
 }

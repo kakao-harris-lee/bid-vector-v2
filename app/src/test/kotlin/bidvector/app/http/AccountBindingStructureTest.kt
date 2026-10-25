@@ -4,6 +4,7 @@ import bidvector.app.architecture.ArchitecturePolicy
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import org.springframework.core.annotation.AnnotatedElementUtils
 import java.io.File
 
 /**
@@ -33,14 +34,13 @@ class AccountBindingStructureTest {
     }
 
     /**
-     * 팀장 조건 (a) — 관측 집합의 `JsonNode` 멤버는 **값을 지을 수 없는 접근자**다: 대상 타입(`Class` · `JavaType` ·
-     * `TypeReference`)이나 읽기 문맥(`ObjectReadContext`)을 받지 않고 `JsonParser` 를 돌려주지 않는다. 쌍 등식이 바뀔 때
-     * 그 바뀐 쌍이 이 성질을 깨면 여기서도 붉다(등식만 고치고 지나가지 못한다).
+     * 팀장 조건 (a) · 검토 r6 R6-7 — 관측 집합의 **모든** 쌍은 값을 지을 수 없는 멤버다: 대상 타입(`Class` · `JavaType` ·
+     * `TypeReference`)이나 읽기 문맥(`ObjectReadContext`)을 받지 않고 `JsonParser` 를 돌려주지 않는다(앞 판은 `JsonNode` 쌍만 봤다 —
+     * 다른 소유자의 쌍이 등식에 더해지면 침묵했다). 쌍 등식이 바뀔 때 그 바뀐 쌍이 이 성질을 깨면 여기서도 붉다.
      */
     @Test
-    fun `관측 집합의 JsonNode 멤버는 대상 타입 · 읽기 문맥을 받지 않고 파서를 돌려주지 않는다`() {
+    fun `관측 집합의 모든 Jackson 멤버는 대상 타입 · 읽기 문맥을 받지 않고 파서를 돌려주지 않는다`() {
         OBSERVED_JACKSON_MEMBERS
-            .filter { it.startsWith("$JSON_NODE.") }
             .filter { member -> BINDING_CAPABLE.any { it in member } || member.endsWith(JSON_PARSER_RETURN) } shouldBe
             emptyList()
     }
@@ -51,8 +51,9 @@ class AccountBindingStructureTest {
      * `convertValue`). Jackson 상위 타입을 가진 app class 를 **고정 집합 등식**으로 잠근다 — 거부 가드와 그 역직렬화기 둘.
      */
     @Test
-    fun `Jackson 타입을 상속한 app class 는 거부 가드와 그 역직렬화기 둘이다`() {
-        jacksonSubclasses(outputs) shouldBe setOf(GUARD, "http/RejectingAccountIdDeserializer")
+    fun `Jackson 타입을 상속한 app class 는 거부 가드와 그 역직렬화기 둘이다 — 값 · 키`() {
+        jacksonSubclasses(outputs) shouldBe
+            setOf(GUARD, "http/RejectingAccountIdDeserializer", "http/RejectingAccountIdKeyDeserializer")
     }
 
     /** 양성 · 음성 대조 — 우회 F1 · G3 · `readValueAs` · jackson2 `TypeReference` · 메서드 핸들 · `traverse` 가 쌍으로 잡힌다. */
@@ -168,6 +169,49 @@ class AccountBindingStructureTest {
         modelAttributeUsers(appClasses()) shouldBe emptySet()
     }
 
+    /**
+     * 검토 r6 R6-1 — 가드의 formatter 는 **나중에 도는 `@InitBinder` 가 같은 타입 editor 를 덮으면** 진다(advice 순서 → controller 지역
+     * 순). 그래서 app main 의 `@InitBinder` 는 가드의 하나이고, controller advice 는 가드와 공유 오류 처리기 둘이다 — 다른 advice · 바인더가
+     * 생기면 이 등식이 먼저 붉다.
+     */
+    @Test
+    fun `app main 의 InitBinder 는 가드 하나이고 controller advice 는 가드와 오류 처리기 둘이다`() {
+        val classes = appClasses()
+        val binders =
+            classes
+                .flatMap { type ->
+                    type.declaredMethods
+                        .filter { it.isAnnotationPresent(INIT_BINDER) }
+                        .map { "${type.simpleName}.${it.name}" }
+                }
+                .toSet()
+        val advices =
+            classes
+                .filter { AnnotatedElementUtils.hasAnnotation(it, CONTROLLER_ADVICE) }
+                .map { it.simpleName }
+                .toSet()
+
+        binders shouldBe setOf("AccountBindingGuard.refuseAccountBinding")
+        advices shouldBe setOf("AccountBindingGuard", "GlobalErrorHandler")
+    }
+
+    /**
+     * 검토 r6 R6-2 — 가드 전제의 다른 반쪽: 「대상이 있는 바인더는 전부 거부(허용은 `JsonNode`)」는 **핸들러 본문 매개변수가 전부
+     * `@RequestBody JsonNode`** 라는 관측 위에 선다. 뒤 slice 가 typed DTO 본문을 쓰면 가드가 그 핸들러를 400 으로 거부하는데, 그 사유가
+     * 런타임에서야 보이지 않게 이 등식이 먼저 붉다.
+     */
+    @Test
+    fun `핸들러 본문 매개변수는 전부 RequestBody JsonNode 다 — 바인딩 거부의 전제`() {
+        val bodies =
+            requestMappingMethods(appClasses())
+                .flatMap { method ->
+                    method.parameters.filter { it.isAnnotationPresent(REQUEST_BODY) }.map { it.type.name }
+                }
+        bodies.shouldNotBeEmpty()
+
+        bodies.toSet() shouldBe setOf("tools.jackson.databind.JsonNode")
+    }
+
     /** 양성 대조 — 모델 속성 메서드와 모델 속성 매개변수가 술어에 걸린다. */
     @Test
     fun `ModelAttribute 메서드와 매개변수는 술어에 걸린다 — 양성 대조`() {
@@ -195,7 +239,7 @@ class AccountBindingStructureTest {
         val BINDING_CAPABLE =
             listOf("Ljava/lang/Class;", "/JavaType;", "/TypeReference;", "/ObjectReadContext;")
 
-        /** 오늘 관측(javap) — `JsonNode` 접근자 19 · 거부 가드의 셋. */
+        /** 오늘 관측(javap) — `JsonNode` 접근자 19 · 거부 가드의 넷(값 · 키 역직렬화기 생성자 포함). */
         val OBSERVED_JACKSON_MEMBERS =
             setOf(
                 "tools/jackson/databind/JsonNode.asInt:()I",
@@ -221,6 +265,7 @@ class AccountBindingStructureTest {
                     "(Ltools/jackson/databind/ValueDeserializer;Ljava/lang/String;[Ljava/lang/Object;)" +
                     "Ljava/lang/Object;",
                 "tools/jackson/databind/ValueDeserializer.\"<init>\":()V",
+                "tools/jackson/databind/KeyDeserializer.\"<init>\":()V",
                 "tools/jackson/databind/module/SimpleModule.\"<init>\":(Ljava/lang/String;)V",
             )
     }
@@ -364,3 +409,7 @@ private class ModelAttributeProbe {
         @org.springframework.web.bind.annotation.ModelAttribute("vrAccount") held: Any,
     ): String = held.toString()
 }
+
+private val INIT_BINDER = org.springframework.web.bind.annotation.InitBinder::class.java
+private val CONTROLLER_ADVICE = org.springframework.web.bind.annotation.ControllerAdvice::class.java
+private val REQUEST_BODY = org.springframework.web.bind.annotation.RequestBody::class.java
