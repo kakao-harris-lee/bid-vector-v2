@@ -218,8 +218,14 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         }
     }
 
+    /**
+     * **면허명의 공백뿐인 값은 상호보다 나쁘다**(r2 CR R2-1 · F6). 면허명은 **PK 의 일부**라 `' '` 와
+     * `'  '` 가 서로 다른 행이 되고, 읽기 실패가 필드 하나가 아니라 **그 계정의 시평액 목록 전체**를
+     * 막는다 — `capacities()` 가 행을 돌다 던지면 목록이 통째로 오지 않는다. 그래서 상호와 같은
+     * 술어(`[^[:space:]]`)로 좁히고 그 경계를 여기서 잰다.
+     */
     @Test
-    fun `CHECK — 시평액 금액 · 연도 · 면허명 경계가 정책과 같다`() {
+    fun `CHECK — 시평액 금액 · 연도 · 면허명 경계가 정책과 같다(공백뿐인 면허명 포함)`() {
         val owner = account()
         val insert =
             "INSERT INTO account_construction_capacity (account_id, license_name, amount_won, assessment_year, " +
@@ -238,6 +244,9 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
             asApp(insert, owner.value, "합성연도상한", 1L, (ProfileInputPolicy.ASSESSMENT_YEAR_MAX + 1).toShort())
         }
         shouldThrow<SQLException> { asApp(insert, owner.value, "", 1L, 2026.toShort()) }
+        shouldThrow<SQLException> { asApp(insert, owner.value, " ", 1L, 2026.toShort()) }
+        shouldThrow<SQLException> { asApp(insert, owner.value, "  ", 1L, 2026.toShort()) }
+        shouldThrow<SQLException> { asApp(insert, owner.value, "\t\n", 1L, 2026.toShort()) }
         shouldThrow<SQLException> {
             val tooLong = "가".repeat(ProfileInputPolicy.LICENSE_NAME_MAX_CODE_POINTS + 1)
             asApp(insert, owner.value, tooLong, 1L, 2026.toShort())
