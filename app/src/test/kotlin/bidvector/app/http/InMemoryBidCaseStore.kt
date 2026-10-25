@@ -1,5 +1,10 @@
 package bidvector.app.http
 
+import bidvector.sharedkernel.Resolution
+import bidvector.workflow.bidding.BidCaseWorkflow
+import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
+import bidvector.workflow.bidding.EvidenceRetentionPolicyData
+import java.time.LocalDate
 import bidvector.bidding.ActorKind
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
@@ -197,3 +202,22 @@ class MovableNoticeDeadlines(
         const val DEFAULT_AHEAD_SECONDS = 1800L
     }
 }
+
+/**
+ * HTTP test 조립의 입찰 건 워크플로 — 출하 조립(`BidCaseWiring`)과 같은 형태(controller 가 받는 단 하나의 협력자, 저장소를 controller 에
+ * 직접 주지 않는다). `HttpTestSupport.kt` 의 빈이 이것을 부른다(그 파일의 크기 상한 — 두 slice 병합 뒤 500 줄을 넘었다).
+ */
+@Suppress("UNCHECKED_CAST")
+fun testBidCaseWorkflow(
+    store: InMemoryBidCaseStore,
+    deadlines: MovableNoticeDeadlines,
+    clock: FixedClock,
+): BidCaseWorkflow =
+    BidCaseWorkflow(
+        cases = store,
+        deadlines = deadlines,
+        snapshots = { _, takenAt -> fixedNoticeSnapshot(takenAt) },
+        clock = clock,
+        retentionPolicy =
+            EVIDENCE_RETENTION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EvidenceRetentionPolicyData>,
+    )

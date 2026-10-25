@@ -21,9 +21,6 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
-import bidvector.workflow.bidding.BidCaseWorkflow
-import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
-import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
@@ -426,33 +423,18 @@ open class HttpTestApplication {
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
 
-    /** 7B — 입찰 건의 이중체(실 DB 없이 운반 층 거동만 잰다). */
-    @Bean
+    @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
     open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
 
-    /** 7B — test 가 옮기는 공고 마감(검토 r2 C2-N6). 기본은 「지금 + 30분」이라 판정이 서지 않는다. */
     @Bean
     open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
 
-    /**
-     * controller 가 받는 **단 하나의 협력자** — 출하 조립(`BidCaseWiring`)과 같은 형태다.
-     * 저장소를 controller 에 직접 주지 않는다.
-     */
     @Bean
     open fun bidCaseWorkflow(
         inMemoryBidCaseStore: InMemoryBidCaseStore,
         movableNoticeDeadlines: MovableNoticeDeadlines,
         clock: FixedClock,
-    ): BidCaseWorkflow =
-        BidCaseWorkflow(
-            cases = inMemoryBidCaseStore,
-            deadlines = movableNoticeDeadlines,
-            snapshots = { _, takenAt -> fixedNoticeSnapshot(takenAt) },
-            clock = clock,
-            retentionPolicy =
-                EVIDENCE_RETENTION_POLICY.resolve(LocalDate.now())
-                    as Resolution.Resolved<EvidenceRetentionPolicyData>,
-        )
+    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock)
 
     /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
     @Bean
