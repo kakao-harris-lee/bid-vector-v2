@@ -23,20 +23,25 @@ private val PROFILE_NAME_REFERENCE = Regex("""bidvector[/.]workflow[/.]profile[/
  * **「아직 판정하지 않음」 표시의 구조 쪽 잠금**(M7 완료 조건 G2, scope 산출물 4) — 판정 경로가 이
  * 패키지의 입력을 읽기 시작하면 붉어진다.
  *
- * **이 test 가 재는 것**(r1 뒤 셋):
+ * **이 test 가 재는 것**(r2 뒤 넷):
  * 1. 판정 대기 표의 축과 그 ID — wire 값이라 이름으로 잠근다.
  * 2. `workflow` 모듈에서 이 패키지 **밖** class 가 이 패키지를 **이름으로** 참조하지 않는다 — 상수 풀
  *    바이트를 빗금 · 점 두 표기로 본다.
  * 3. 이 패키지의 class 가 [EVALUATION_PACKAGE] 의 타입을 **구현 · 상속하지 않는다** — 판정 쪽이
  *    인터페이스를 선언하고 입력 쪽이 구현하면(의존 역전) 판정 쪽 상수 풀에 이 패키지 이름이 하나도
- *    남지 않아 2 가 초록이다(X2 실측). **이름이 아니라 타입 관계**를 보므로 이름을 바꿔 피할 수 없다.
+ *    남지 않아 2 가 초록이다(X2 실측).
+ * 4. 이 패키지의 class 가 그 타입을 **람다로 만들지도 않는다** — Kotlin 2.x 의 SAM 변환은 indy 라
+ *    class 파일을 내지 않으므로(r2 CR R2-3) 3 의 모집단에 들지 않는다. 그래서 `BootstrapMethods` 절과
+ *    indy 호출 자리의 좌표를 따로 본다.
  *
- * **재지 않는 것**(그래서 여기서 주장하지 않는다): ⓐ `app` 모듈 — 2b 가 HTTP 표면을 세우면 그쪽은 이
- * 패키지를 정당하게 참조한다. ⓑ `adapters` 모듈 — V12 판정 입력 port 의 구현이 이 패키지 값을 접어
- * 넣는 경로는 `ProfileAdapterDependencyTest` 가 **class 단위**로 막는다(X1). ⓒ domain 모듈
- * (`qualification` 등) — 층 게이트가 `workflow` 참조 자체를 막으므로 여기서 다시 재지 않는다.
- * ⓓ 값이 흐르는 경로 일반 — 위 셋은 **이름 · 타입 관계**의 심층 방어이고, 판정이 그 값을 실제로
- * 쓰는지는 판정을 세우는 slice 의 test 가 진다.
+ * **재는 것은 「직접 참조 · 직접 구현 · 람다 구현」뿐이다.** 재지 않는 것(그래서 주장하지 않는다):
+ * ⓐ `app` 모듈 — 2b 가 HTTP 표면을 세우면 그쪽은 이 패키지를 정당하게 참조한다. ⓑ `adapters` 모듈 —
+ * V22 를 지닌 class 의 자리는 모듈 전체에 걸리는 `BusinessProfileIsolationGateTest` 가 `SourceFile`
+ * 속성으로 정한다. ⓒ domain 모듈(`qualification` 등) — 층 게이트가 `workflow` 참조 자체를 막는다.
+ * ⓓ **이행 값 흐름**(허용 파일의 `String` 반환 helper 를 거치는 길) · **제3 패키지에 선언된 인터페이스**
+ * (선언 자리를 한 칸 옮기면 3 · 4 의 술어 밖이다) · **실행 시 조립한 이름**(상수 풀에 없다) —
+ * verifier r2 가 N1 · N4 · N5 로 실측한 자리이고, scope 알려진 제한과 2b 표적에 있다. **진짜 방어는
+ * 2b 배선의 포트 경계**이고, 판정이 그 값을 실제로 쓰는지는 판정을 세우는 slice 의 test 가 진다.
  *
  * 소스 텍스트가 아니라 **컴파일 산출물**을 본다 — import 없이 전체 한정 이름으로 쓰는 우회를 소스
  * 정규식은 못 본다(`ProfileAdapterDependencyTest` 와 같은 근거).
@@ -70,6 +75,42 @@ class ProfileJudgementIsolationTest {
         profileClasses
             .filter { type -> supertypesOf(type).any(::declaredInEvaluation) }
             .map { it.name } shouldBe emptyList()
+    }
+
+    @Test
+    fun `profile 패키지의 클래스는 판정 패키지의 타입을 람다로 만들지도 않는다`() {
+        val profileClasses = classFiles().filter(::inProfilePackage).toList()
+        profileClasses.shouldNotBeEmpty()
+
+        profileClasses
+            .filter { file -> lambdaTargets(javap(file)).any(::isEvaluationCoordinate) }
+            .map { it.name } shouldBe emptyList()
+    }
+
+    /**
+     * 양성 대조 — 람다 대상 추출이 **`BootstrapMethods` · indy 자리의 좌표만** 집는지 표본으로 잰다.
+     * 이 저장소에는 지금 indy SAM 변환이 하나도 없어(`LambdaMetafactory` 상수 0) 산출물로는 양성을
+     * 만들 수 없다. 끝에서 끝까지의 증거는 **변이**다(evidence 의 전·후 표) — 여기서는 술어가 늘
+     * 빈 목록만 내는 회귀를 막는다.
+     */
+    @Test
+    fun `람다 대상 추출은 부트스트랩 · indy 자리의 좌표만 집는다 — 양성 대조`() {
+        val sample =
+            """
+            |  public final bidvector.workflow.evaluation.ProfileFacts facts();
+            |    descriptor: ()Lbidvector/workflow/evaluation/ProfileFacts;
+            |      12: invokedynamic #30,  0
+            |        // InvokeDynamic #0:region:()Lbidvector/workflow/evaluation/RegionInputSource;
+            |BootstrapMethods:
+            |  0: #88 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(…)Ljava/lang/invoke/CallSite;
+            |    Method arguments:
+            |      #90 (Lbidvector/workflow/profile/BusinessDetails;)Ljava/lang/String;
+            """.trimMargin()
+
+        val targets = lambdaTargets(sample)
+        targets.any { "RegionInputSource" in it } shouldBe true
+        targets.any { "ProfileFacts" in it } shouldBe false // 평범한 필드 · 반환 타입 참조는 집지 않는다.
+        lambdaTargets("") shouldBe emptyList()
     }
 
     /** 양성 대조 — 이름 술어가 두 표기에서 각각 참을 낸다(늘 거짓만 내는 회귀를 막는다). */
@@ -107,6 +148,50 @@ private fun referencesProfileByName(classFile: File): Boolean =
     PROFILE_NAME_REFERENCE.containsMatchIn(String(classFile.readBytes(), Charsets.ISO_8859_1))
 
 private fun declaredInEvaluation(type: Class<*>): Boolean = type.name.startsWith("$EVALUATION_PACKAGE.")
+
+private val BIDVECTOR_COORDINATE = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
+
+private fun isEvaluationCoordinate(name: String): Boolean =
+    Regex("""bidvector[/.]workflow[/.]evaluation[/.]""").containsMatchIn(name)
+
+/**
+ * **람다로 만든 타입의 좌표** — `BootstrapMethods` 절과 indy 호출 자리에서만 뽑는다. 평범한 필드 ·
+ * 반환 타입 참조(그 패키지를 **쓰는** 것은 허용 방향이다)를 함께 집으면 이 패키지의 정당한 참조까지
+ * 붉어지므로, 모집단을 그 두 자리로 한정한다.
+ */
+private fun lambdaTargets(javapOutput: String): List<String> {
+    val bootstrapSection = javapOutput.substringAfter("BootstrapMethods:", missingDelimiterValue = "")
+    val indyLines =
+        javapOutput
+            .lineSequence()
+            .filter { it.contains("invokedynamic") || it.contains("InvokeDynamic") }
+            .joinToString("\n")
+    return BIDVECTOR_COORDINATE
+        .findAll("$bootstrapSection\n$indyLines")
+        .map { it.value }
+        .distinct()
+        .toList()
+}
+
+private fun javap(classFile: File): String {
+    val process =
+        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+    val output = process.inputStream.bufferedReader().readText()
+    check(process.waitFor() == 0) { "javap 실행 실패: ${classFile.name}\n$output" }
+    return output
+}
+
+/**
+ * `javap` 를 OS `PATH` 가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다(형제 dependency test 들과
+ * 같은 이유 — CI 의 JDK 21 과 다른 `javap` 를 부를 여지를 없앤다).
+ */
+private val javapExecutable: String by lazy {
+    val javaHome = System.getProperty("java.home")
+    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
+}
 
 /** class 파일 경로 → 그 class. **초기화하지 않고** 올린다(static 초기화를 돌리지 않는다). */
 private fun loadClass(classFile: File): Class<*> {
