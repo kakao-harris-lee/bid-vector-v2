@@ -301,3 +301,15 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
 
 - 게이트 술어 · 모집단 · 허용 키 — 한 줄도 바꾸지 않는다(그래서 좁은 표적 재검증이 붙지 않는다).
 - `config/detekt/detekt.yml` — 이 slice 의 in_scope 가 아니다(저장소 전체 설정, 위 OPEN 으로 넘긴다).
+
+## Phase 2b 착수 계약 (2026-10-26, 팀장 지시로 갱신)
+
+- **base**: main **`46ac0949`**(2a PR #90 머지판 — V22 와 2a 커널이 들어 있다) · worktree `bid-vector-v2-m7-7c4` ·
+  브랜치 **`m7-7c4b/2026-10-26`**. 2a 브랜치(`m7-7c4/2026-10-22`)는 그대로 둔다.
+- **Phase 1 은 설계만**이다 — 코드 0 · 무거운 빌드 0(빌드 락은 7C⑤ · 7C② · 7C③ · v-dec05-r2 가 차례로 쓴다).
+- **산출물(2b)**: 2a 가 세운 값 타입 · port · 판정 위에 **HTTP 표면**을 세운다(§0.6 operation 표) + 2b 표적 넷 +
+  `unauthenticated` 공용화. OpenAPI 를 바꾸므로 **acceptance 에 `web` job 이 붙는다**(생성 타입 재생성 · 바이트 등식).
+- **지금 고르지 않는 것**: `awaiting` 응답 형태 — 7C ② 의 평탄 술어 확장이 **아직 main 에 없다**(실측: 평탄 허용 목록
+  test 가 그대로다). 설계에는 후보 둘과 영향만 적고, HTTP 의 나머지 표면을 먼저 설계한다(팀장 지시).
+- **범위 밖(2a 와 같다)**: 판정 로직(QUAL-08 · 11) · 정규화 커널 · 화면(7E) · R-2 남은 절반 · `detekt.yml` 고정
+  (`OPEN-DETEKT-DEFAULT-PIN`).
