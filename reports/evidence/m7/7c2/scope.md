@@ -3,7 +3,7 @@
 - **근거**: `milestone-7.md` 7C ②(「투찰가 요청 = 기존 `evaluation-dry-runs` 를 공고 단건·운영자 요청으로(외부 effect 는 알림함 기록까지 —
   R-4)」) · 운영자 결정 2026-10-15(게시 하한율만 근거 · 「법정 하한율 미해석」 표시 · DEC-03 은 G2, DEC-10 은 G1) · 운영자 지시
   2026-10-23 「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건의 **운영자 예외**.
-- **base**: main `a61ddff1` · worktree `bid-vector-v2-m7-7c2` · 브랜치 `m7-7c2/2026-10-23`.
+- **base**: main `46ac0949`(2026-10-26 재고정 — 7B PR #89 · 7C④-2a PR #90 을 차례로 병합했다. 최초 착수 base 는 `a61ddff1` 였고, rollback 기준도 이 새 base 다) · worktree `bid-vector-v2-m7-7c2` · 브랜치 `m7-7c2/2026-10-23`.
 - **병렬 레인**(전부 push 0): **g1dec05(DEC-05 투찰가 메뉴 커널 — 이 slice 의 선행)** · 7C③(알림함 쓰기 포트 — 이 slice 의 effect 끝) ·
   7B · 7C④ · 7C⑤ · 7C①b · g1c03 · g1set01.
 - **입력 정본**: `docs/discovery/m7-screen-data-requirements.md` 화면 C 의 자격·투찰가·근거 행(QUAL-01·03·05 · DEC-01 · DEC-03 · DEC-04 ·
@@ -56,7 +56,7 @@
 
 ## rollback
 
-`git restore --source=a61ddff1 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 목록 기계 산출, 마지막 산출물
+`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 목록 기계 산출, 마지막 산출물
 커밋에서 ①~⑥ 실측(-b rebase 뒤 다시 잰다).
 
 ## 검토 레인
