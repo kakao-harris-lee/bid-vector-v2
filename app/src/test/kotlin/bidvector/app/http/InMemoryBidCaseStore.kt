@@ -1,10 +1,5 @@
 package bidvector.app.http
 
-import bidvector.sharedkernel.Resolution
-import bidvector.workflow.bidding.BidCaseWorkflow
-import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
-import bidvector.workflow.bidding.EvidenceRetentionPolicyData
-import java.time.LocalDate
 import bidvector.bidding.ActorKind
 import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
@@ -15,15 +10,20 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.NoticeSnapshot
 import bidvector.bidding.OPEN_CASE_COMMAND
 import bidvector.bidding.tag
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
 import bidvector.workflow.bidding.BidCaseStorePort
+import bidvector.workflow.bidding.BidCaseWorkflow
+import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
+import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.workflow.bidding.NoticeDeadline
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
 import bidvector.workflow.bidding.OpenCaseResult
 import bidvector.workflow.bidding.TimelineEntry
 import bidvector.workflow.bidding.TransitionWrite
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * 입찰 건의 HTTP 층 이중체(M7/7B) — 실 DB 없이 **운반 층 거동만** 잰다.
