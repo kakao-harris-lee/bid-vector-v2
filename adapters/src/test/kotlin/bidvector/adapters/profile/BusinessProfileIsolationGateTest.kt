@@ -1,11 +1,11 @@
 package bidvector.adapters.profile
 
+import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.OperatorProfilePort
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.File
-import java.lang.reflect.Modifier
 import java.util.jar.JarFile
 
 /**
@@ -21,7 +21,13 @@ private val PROFILE_COORDINATE = Regex("""bidvector[/.]workflow[/.]profile[/.]""
 /**
  * 허용 키 — **`SourceFile` 속성 하나가 아니라 「class 가 놓인 패키지 경로 + `SourceFile`」**이다.
  * `SourceFile` 은 경로를 담지 않아서 같은 이름의 파일을 다른 패키지에 두면 허용이 따라왔다(r3 CR R3-1 ·
- * F9 B3 실측). 패키지는 산출물 **경로**에서 나오므로 이름으로 꾸밀 수 없다.
+ * F9 B3 실측).
+ *
+ * 패키지는 산출물 **경로**에서 나온다. 다만 **이 test 혼자서 위조를 막지는 못한다** — Kotlin 은 소스
+ * 디렉터리와 `package` 선언이 같기를 요구하지 않으므로, 아무 디렉터리에 `package bidvector.adapters.profile`
+ * 을 선언하면 산출물은 허용 자리에 떨어진다. 그 길을 막는 것은 **`check` 의 detekt
+ * `InvalidPackageDeclaration`** 이고(verifier r4 C6 실측: 이 test 는 초록이고 `:adapters:detekt` 가 붉었다),
+ * 이 규칙은 **그 전제 위에 선다**(scope 알려진 제한).
  */
 private val TABLE_NAME_SOURCES =
     setOf(
@@ -44,11 +50,13 @@ private val PROFILE_TYPE_SOURCES = setOf("bidvector/adapters/profile/JdbcBusines
  *   쓰는 자리에 **인라인**되므로 그 문자열이 SQL 객체 밖으로도 퍼진다 — 그 자리를 허용 키가 적는다.
  * - **규칙 2 — V22 값 타입 좌표**: [PROFILE_COORDINATE] 를 지닌 class 는 [PROFILE_TYPE_SOURCES] 에서 나온
  *   것뿐이다(X1 · N3 · B3).
- * - **규칙 3 — 판정 입력 port 를 지닌 class**: `workflow.evaluation` 의 SAM port 좌표를 지닌 class 는 V22 표
+ * - **규칙 3 — 판정 입력 port 를 지닌 class**: `workflow.evaluation` 의 port 좌표를 지닌 class 는 V22 표
  *   이름도 값 타입 좌표도 **함께 지니지 않는다**. 허용 키와 **무관하게** 적용된다 — 허용 파일 안에서
  *   `OperatorProfilePort { … }` 람다로 V22 를 접는 우회(indy 변종)와 중첩 구현(N7)이 걸린다. port 집합은
- *   이름 목록이 아니라 **그 패키지의 SAM 인터페이스 전수**를 산출물에서 뽑는다(r3 CR R3-5 — 앞 판은
- *   `OperatorProfilePort` 하나만 봤다).
+ *   이름 목록이 아니라 **그 패키지의 「봉인되지 않은 인터페이스」 전수**를 산출물에서 뽑는다 — 봉인
+ *   인터페이스는 결과 · 값 타입(`CandidateEvaluation` 류)이고 port 가 아니다. 멤버 수로 고르지 **않는다**:
+ *   추상 메서드가 둘인 port 가 생겨도 집합에 남는다(r4 F13 · CR R4-L2 — 앞 판은 SAM 만 셌다). 좌표는
+ *   **빗금 · 점 두 표기**로 담는다(r4 CR R4-L3 — 이름 기반 로드가 남기는 쪽까지).
  *
  * **재는 것은 「리터럴 표 이름(대소문자 무시) · 직접 타입 참조 · SAM 구현 · SAM 람다」뿐이다.** 재지
  * 않는 것(그래서 주장하지 않는다): **classpath 자원 파일의 SQL**(모집단이 `build/classes` 다 — B2) ·
@@ -79,7 +87,7 @@ class BusinessProfileIsolationGateTest {
 
     @Test
     fun `판정 입력 port 를 지닌 class 는 V22 표도 값 타입도 함께 지니지 않는다`() {
-        val ports = evaluationSamPorts()
+        val ports = portCoordinates()
         val portBearers = scannedClasses.filter { entry -> ports.any { it in entry.bytes } }
         portBearers.shouldNotBeEmpty() // 그 port 를 지닌 class 가 적어도 하나 있다.
 
@@ -115,13 +123,22 @@ class BusinessProfileIsolationGateTest {
         ("bidvector/adapters/regionfold2/JdbcBusinessProfileStore.kt" in PROFILE_TYPE_SOURCES) shouldBe false
     }
 
-    /** 양성 대조 — port 집합이 **전수**다(앞 판은 하나였다). 이름 목록이 아니라 산출물에서 뽑는다. */
+    /**
+     * 양성 대조 — port 집합이 **전수**이고 그것이 test 로 잠긴다(r4 CR R4-L2). 앞 판은 크기만 봐서 집합이
+     * 조용히 줄어도 초록이었다. 여기서는 **그 패키지의 `*Port` 가 하나도 빠지지 않는다**를 단언하고,
+     * 멤버가 둘인 표본도 술어가 받는지(F13), 봉인된 결과 타입은 빠지는지를 함께 잰다.
+     */
     @Test
-    fun `판정 입력 port 집합은 evaluation 의 SAM 인터페이스 전수다 — 양성 대조`() {
-        val ports = evaluationSamPorts()
-        (ports.size >= 2) shouldBe true
+    fun `판정 입력 port 집합은 evaluation 의 봉인 아닌 인터페이스 전수다 — 양성 대조`() {
+        val ports = portCoordinates()
+        val named = evaluationInterfaces().filter { it.simpleName.endsWith("Port") }
+        named.shouldNotBeEmpty()
+        named.filterNot { it.name.replace('.', '/') in ports }.map { it.simpleName } shouldBe emptyList()
+
         (OperatorProfilePort::class.java.name.replace('.', '/') in ports) shouldBe true
-        ports.none { it.endsWith("/ProfileFacts") } shouldBe true // data class 는 SAM 이 아니다.
+        (OperatorProfilePort::class.java.name in ports) shouldBe true // 점 표기도 담는다(R4-L3)
+        isPortType(TwoMemberPortSample::class.java) shouldBe true // 멤버 둘도 port 다(F13)
+        isPortType(CandidateEvaluation::class.java) shouldBe false // 봉인 결과 타입은 아니다
     }
 }
 
@@ -175,21 +192,43 @@ private fun sourceFileOf(classFile: File): String? {
     return Regex("""^SourceFile: "([^"]+)"""", RegexOption.MULTILINE).find(output)?.groupValues?.get(1)
 }
 
+/** 양성 대조용 합성 표본 — 멤버가 **둘**인 port 모양(SAM 이 아니다). */
+private interface TwoMemberPortSample {
+    fun first(): String
+
+    fun second(): String
+}
+
 /**
- * `workflow.evaluation` 의 **SAM 인터페이스 전수**를 산출물에서 뽑는다(이름 목록을 적지 않는다).
- * 닻 class 의 code source 에서 그 패키지의 class 를 열거하고 **인터페이스 + 추상 메서드 하나**만 고른다.
+ * port 술어 — **인터페이스이고 봉인되지 않았다**. 봉인 인터페이스는 결과 · 값 타입이라 port 가 아니고
+ * (Kotlin 의 `sealed interface` 는 바이트코드에 `PermittedSubclasses` 를 남긴다 — 실측), 멤버 수는 보지
+ * 않는다(추상 메서드가 둘인 port 도 port 다, r4 F13).
  */
-private fun evaluationSamPorts(): Set<String> {
+private fun isPortType(type: Class<*>): Boolean = type.isInterface && !type.isSealed
+
+/**
+ * `workflow.evaluation` 의 인터페이스 전수를 산출물에서 올린다(이름 목록을 적지 않는다). class 를 올리지
+ * 못하면 **크게 실패한다** — 조용히 빠뜨리면 그만큼 규칙 3 의 모집단이 줄고 그 사실이 보이지 않는다
+ * (r4 CR R4-L4).
+ */
+private fun evaluationInterfaces(): List<Class<*>> {
     val anchor = OperatorProfilePort::class.java
     val source = anchor.protectionDomain.codeSource?.location ?: error("code source 를 찾지 못했다")
     val binaryNames = binaryNamesUnder(File(source.toURI()), "bidvector/workflow/evaluation")
     check(binaryNames.isNotEmpty()) { "판정 패키지의 class 를 찾지 못했다: $source" }
     return binaryNames
-        .mapNotNull { runCatching { Class.forName(it, false, anchor.classLoader) }.getOrNull() }
-        .filter { type -> type.isInterface && type.methods.count { Modifier.isAbstract(it.modifiers) } == 1 }
-        .map { it.name.replace('.', '/') }
-        .toSet()
+        .map { name ->
+            runCatching { Class.forName(name, false, anchor.classLoader) }
+                .getOrElse { error("판정 패키지의 class 를 올리지 못했다: $name — $it") }
+        }.filter { it.isInterface }
 }
+
+/** 규칙 3 이 찾는 좌표 — **빗금 · 점 두 표기**(이름 기반 로드가 남기는 쪽까지, r4 CR R4-L3). */
+private fun portCoordinates(): Set<String> =
+    evaluationInterfaces()
+        .filter(::isPortType)
+        .flatMap { listOf(it.name.replace('.', '/'), it.name) }
+        .toSet()
 
 private fun binaryNamesUnder(
     codeSource: File,
