@@ -82,3 +82,32 @@ internal fun JsonNode.requiredStringArray(key: String): List<String> {
         element.stringValue()
     }
 }
+
+/**
+ * M7/7B — 시각. **ISO-8601 문자열만** 받는다(epoch 숫자를 받지 않는다): 두 표기를 함께 받으면
+ * 「초인가 밀리초인가」가 요청마다 달라지고, 그 모호함이 투찰 시각에 들어오면 복기가 깨진다.
+ */
+internal fun JsonNode.requiredInstant(key: String): java.time.Instant {
+    val raw = requiredNonBlankText(key)
+    return runCatching { java.time.Instant.parse(raw) }
+        .getOrElse { throw InvalidEditRequestException("$key 는 ISO-8601 시각이어야 한다") }
+}
+
+/** M7/7B — 없거나 빈 값이면 `null`(「없음」과 「빈 문자열」을 같은 값으로 접는다). */
+internal fun JsonNode.optionalNonBlankText(key: String): String? {
+    val node = get(key)
+    if (node == null || node.isNull) return null
+    if (!node.isString) throw InvalidEditRequestException("$key 는 문자열이어야 한다")
+    return node.stringValue().takeIf { it.isNotBlank() }
+}
+
+/** M7/7B — 추첨번호. 없으면 빈 목록이고, 원소는 **정수 표기**여야 한다(`1.0` 거부). */
+internal fun JsonNode.optionalIntArray(key: String): List<Int> {
+    val node = get(key)
+    if (node == null || node.isNull) return emptyList()
+    if (!node.isArray) throw InvalidEditRequestException("$key 는 배열이어야 한다")
+    return node.values().map { element ->
+        if (!element.isIntegralNumber) throw InvalidEditRequestException("$key 의 원소는 정수여야 한다")
+        element.asInt()
+    }
+}

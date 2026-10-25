@@ -11,48 +11,56 @@ Kotlin 출하 조립이 `MlAnalysisPort` 를 자리지킴으로 고정해 **제�
 둘째 bullet 은 「부재가 요구를 충족」형 근거임을 production 칸에 적고(RT2-M-2), `STR-03` 에 production
 HTTP 경로 식별자를 더했다(RT2-L-1).
 
-집계 이력은 ⓐ **29 → 20 → 15 → 13 → 16**, 성립 범위 **31 → 22 → 17 → 15 → 18/61** 이다(마지막 걸음은 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼 같은 술어를 다시 적용한 것이 아니다 — 그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다) — 완료 조건 3 의 결론
-(「오늘 성립하지 않는다」)은 **다섯 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
+집계 이력은 ⓐ **29 → 20 → 15 → 13 → 16 → 17**, 성립 범위 **31 → 22 → 17 → 15 → 18 → 19/61** 이다(다섯째 걸음은 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼 같은 술어를 다시 적용한 것이 아니다 — 그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다. 여섯째 걸음 +1 은 M7/7C①b 의 `STR-07` 이다 — 팀장 결정 D-7C1B-1 Q2 가 「스냅샷 없는 설계에서는 acceptance 의 의도 둘을 재는 test 로 판정한다」를 정했다) — 완료 조건 3 의 결론
+(「오늘 성립하지 않는다」)은 **여섯 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
 기준으로 적용한 것**이고, 그때마다 어느 bullet 이 비었는지를 행에 남겼다.
+
+> **2026-10-21 교차 참조(M7/7B)** — 이 표의 모수 「`V2 필수` 61 전건」은 **2026-10-07 시점의 값**이다.
+> 그 뒤 `BID-01 · 입찰 건의 상태와 전이`가 `V2 필수`로 등재되어 모수가 **62** 가 됐다
+> (운영자 결정 2026-09-07 Q-7, `capability-map.md` §8.5 · §10 의 2026-10-21 집계 변경 블록).
+> **아래 집계는 다시 세지 않는다** — 6E-1 의 판정이고 그 시점의 사실이다. BID-01 의 추적 행은
+> 같은 술어(ⓐ/ⓑ/ⓒ)로 `reports/evidence/m7/7b/checklist.md` 에 있다.
 
 ## 집계
 
 | 분류 | 건수 |
 |---|---:|
-| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **16** |
+| ⓐ acceptance 의 무조건 항목 **전부**를 등재 식별자가 잰다 | **17** |
 | ⓑ 경계로 처리 — 잴 대상이 설계로 없다 | **2** |
-| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **43** |
+| ⓒ 미구현 — 무조건 항목 하나 이상에 재는 자리가 없다 | **42** |
 | **계** | **61** |
 
 | 축 | ⓐ | ⓑ | ⓒ | 계 |
 |---|---:|---:|---:|---:|
 | COL | 4 | 1 | 3 | 8 |
-| STR | 2 | 0 | 8 | 10 |
+| STR | 3 | 0 | 7 | 10 |
 | QUAL | 3 | 0 | 4 | 7 |
 | ML | 1 | 0 | 6 | 7 |
 | DEC | 4 | 0 | 5 | 9 |
 | NOTI | 1 | 1 | 3 | 5 |
 | SET | 0 | 0 | 3 | 3 |
 | OPS | 1 | 0 | 11 | 12 |
-| **계** | **16** | **2** | **43** | **61** |
+| **계** | **17** | **2** | **42** | **61** |
 
 **M6/G1-SET01(2026-10-21) — 이 라운드의 자기 증감은 0 이다.** `settlement` 에 SET-01 판정 커널과 등재 test
 다섯이 섰지만 그 거동이 출하 배선에 닿지 않아(운영자 상호 입력 칸 없음 · 낙찰자 상호 canonical 미적재)
 `SET-01` 은 ⓒ 그대로다 — 위 표의 수치 넷(ⓐ 16 · ⓑ 2 · ⓒ 43 · SET 축 0/0/3)은 이 라운드에 **움직이지
 않는다**. 같은 라운드의 병렬 레인 `g1dec05` 가 같은 표를 고치므로 **집계 머리 숫자는 머지 직전에 재계산한다**
-(rebase 없이 머지 시 합산 — 각 레인은 자기 행과 자기 증감만 적는다).
+(rebase 없이 머지 시 합산 — 각 레인은 자기 행과 자기 증감만 적는다). (이 문단의 수는 그 라운드 시점 값이다 — 뒤의
+M7/7C①b 가 `STR-07` 을 ⓐ 로 올려 위 표는 ⓐ 17 · ⓒ 42 이다.)
 
-**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 16 건**, 잴 대상이 설계로
-없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 43 건**이다. 그래서 「M0 필수 capability E2E
-전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 16 + ⓑ 2 = 18 건이고, 그 범위를 이 표가 고정한다.
+**완료 조건 3 의 오늘 답**: `V2 필수` 61 가운데 acceptance 가 **전부 측정되는 것은 17 건**, 잴 대상이 설계로
+없는 것이 2 건, **무조건 항목 하나 이상을 잴 자리가 없는 것이 42 건**이다. 그래서 「M0 필수 capability E2E
+전체 통과」는 **오늘 성립하지 않는다.** 성립하는 범위는 ⓐ 17 + ⓑ 2 = 19 건이고, 그 범위를 이 표가 고정한다.
 
 **M6/G1-C03 라운드는 이 집계를 움직이지 않는다**(운영자 결정 (나), D-G1C03-1). `COL-03` 의 둘째 bullet 은
 재조회·보유 축에서 **출하 경로에 섰고** 그 근거 식별자를 행에 적었지만, 같은 bullet 의 age 절반은 기준
 시각이 그 경로에 닿지 않아 비어 있다 — 한 bullet 의 절반이 차는 것은 ⓐ 의 조건(「무조건 항목 **전부**」)이
 아니므로 행은 ⓒ 로 남고 ⓐ 16 · ⓑ 2 · ⓒ 43 · 성립 범위 18/61 은 **그대로**다. 숫자가 움직이지 않는
-라운드도 **어느 자리가 찼는지**는 행에 남긴다.
+라운드도 **어느 자리가 찼는지**는 행에 남긴다. (이 문단의 수는 그 라운드 시점 값이다 — 뒤의 M7/7C①b 가
+`STR-07` 을 ⓐ 로 올려 위 표는 ⓐ 17 · ⓒ 42 · 성립 범위 19/61 이다.)
 
-**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 43 건 가운데 대부분은 acceptance 의 여러 항목이 이미
+**ⓒ 가 「아무것도 안 돈다」를 뜻하지 않는다** — 42 건 가운데 대부분은 acceptance 의 여러 항목이 이미
 측정되고 있고 **한둘이 비어 있다**. 그 비어 있는 항목과 이미 측정되는 부분을 행마다 적었다. 부분 측정이
 강한 행 `COL-03` · `COL-04` · `COL-07` · `STR-02` · `QUAL-02` · `ML-01` · `ML-02` · `ML-04` · `ML-05` · `ML-07` · `DEC-08` · `SET-06` · `OPS-03` · `OPS-05` · `OPS-07` · `OPS-09` · `OPS-10` · `OPS-12` · `OPS-13` 은 「부분 측정(강함)」으로 표시했다.
 
@@ -124,14 +132,14 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **STR-02** | 키워드 매칭 대상 텍스트 범위 제어 (오탐 차단) | ⓒ | — | — | 둘째 bullet 의 뒷절(「같은 키워드가 title 또는 **requirements** 에 있으면 후보다」)에 **대응할 데이터가 V2 에 없다** — 6F-4 결정 A 가 요건 원문 축을 싣지 않기로 하고 그 축소를 OPEN 으로 등재했다. 지역 매칭 대상은 공고명 + 공종 + 기관명 두 열이다. 부분 측정(강함) — 나머지 세 bullet 은 `STR-02 1`·`3`·`4` 를 축어로 인용하는 `bidvector.strategy.WatchRulesTest` 와 대상 텍스트 조립 `bidvector.strategy.WatchTextAssemblyTest` 가 production 조립의 `bidvector.adapters.evaluation.NoticeWatchSubjectPortTest` 경로 위에서 잰다. | `OPEN-6F4-STR02-REQUIREMENTS-AXIS` |
 | **STR-03** | 액션 임계치 편집 (즉시투찰 / 검토 / 보류 분기) | ⓐ | `bidvector.strategy.StrategyValidationTest` · `bidvector.decision.VerdictLadderPolicyDataTest` · `bidvector.app.http.StrategyEditEndpointTest` | production 쓰기 경로는 **편집 세션 하나**(`EditStrategyWorkflow` → `validate()`)이고 그 커널이 부등식을 거부한다. 출하 `VERDICT_LADDER_POLICY` 도 같은 부등식을 독립으로 거부한다(두 자리). | `STR-03 1`~`3` 축어 인용 넷이 커널에서, 그리고 **production HTTP 경로에서 그 거부가 400 으로 나오는 것**을 endpoint test 가 잰다(verifier RT2-L-1 — 술어 ③ 은 그 배선에서 재기를 요구한다). 「모든 경로」는 V2 의 쓰기 경로가 편집 세션 하나뿐이라 그 둘이 전수다 — 출하 사다리 정책 데이터도 같은 부등식을 독립으로 거부한다. | — |
 | **STR-04** | 알림 범위 제어 (`notify_only_high_priority`) | ⓒ | — | — | 알림 범위를 좁히는 전략 필드가 **없다** — 편집 가능 필드 13 에 `notify_only_high_priority` 대응물이 없다. 「억제된 후보를 억제 사유와 함께 조회」할 자리도 없다. | `OPEN-6F3-BID-RECORD` |
-| **STR-06** | 추천 후보 수 상한 | ⓒ | — | — | 후보 **표시** 표면이 없다(운영자 API 에 후보·제안 목록 operation 0). `candidateLimit` 과 분석 예산(`OPPORTUNITY_POLICY` 의 embedding·prediction 예산)의 독립을 재는 자리도 없다. 부분 측정 — `bidvector.workflow.evaluation.OpportunityAnalysisTest` 가 예산의 출처가 정책 값임을 잰다. | **없음 — 신설 필요** |
-| **STR-07** | 전략을 저장하면 후보 목록이 갱신된다 | ⓒ | — | — | 후보 스냅숏과 `stale` 표시·재계산 디스패치가 **없다**. 부분 측정 — 「계산 중 저장은 채택되지 않는다」축은 `bidvector.app.wiring.StrategyEditExecutorRaceTest`(끼어든 커밋이면 값 제출 거부)와 요청당 전략 1회 읽기(`bidvector.app.wiring.EvaluationDryRunFactoryTest`)가 잰다. | **없음 — 신설 필요** |
+| **STR-06** | 추천 후보 수 상한 | ⓒ | `bidvector.workflow.suggestion.ListSuggestionsUseCaseTest` · `bidvector.app.http.SuggestionEndpointTest` | `SuggestionWiring`(출하 조립)이 후보 원천(`JdbcCandidateSource`, 스캔 상한 `bidvector.evaluation.candidate-cap`)과 값싼 게이트를 `ListSuggestionsUseCase` 에 꽂고, 전략의 `candidateLimit` 은 그 use case 가 게이트를 다 돈 **뒤** 결과를 자를 때만 읽는다. | **M7/7C①b 로 제안 목록 절반이 성립했다** — `GET /api/suggestions` 가 표시 상한을 전략 값으로 두고 계산 예산(스캔 상한·게이트 호출)과 독립으로 관측한다(표시 상한 1 과 5 에서 게이트 호출 목록이 같고 본문 길이만 다르다, 원시 순번 앞쪽의 비통과 공고가 상한을 먹지 않는다). **판정이 ⓒ 인 이유**: 평가 dry-run·커밋 조립이 `analysisBudget = candidateLimit` 으로 표시 상한을 분석 예산에 결합하고, 그 예산이 값싼 게이트 **앞**에서 원시 후보 순번으로 깎인다(F-1 — `EvaluationDryRunFactory`·`EvaluationCommitWiring` 의 조립, `EvaluateCandidatesUseCase` 의 첫 드롭 갈래; 거동은 `bidvector.workflow.evaluation.EvaluateCandidatesScreeningCharacterizationTest` 의 F-1 절이 고정한다). acceptance 의 「표시 건수를 바꿔도 분석 예산이 따라 변하지 않는다」가 그 두 경로에서는 거짓이다. | **F-1(팀장 등재 예정 별 slice)** |
+| **STR-07** | 전략을 저장하면 후보 목록이 갱신된다 | ⓐ | `bidvector.app.http.SuggestionProductionE2ETest` · `bidvector.workflow.suggestion.ListSuggestionsUseCaseTest` · `bidvector.app.http.SuggestionEndpointTest` | 출하 조립(`productionApplication()`)의 `SuggestionController` → `SuggestionQuery` → `ListSuggestionsUseCase`(`SuggestionWiring`) + 실 PostgreSQL. 전략 쓰기는 편집 세션 확정(`JdbcStrategyEditTransaction`) 하나다. | **스냅샷 없는 설계 — 조회가 곧 재계산이라 stale 을 표시할 대상이 없다**(D-7C1B-1 Q2, capability map 문면은 고치지 않았다). acceptance 의 의도 둘을 잰다: ① **저장 뒤 옛 결과가 보이지 않는다** — 편집 세션 확정 뒤 조회가 새 개정(`X-Strategy-Revision`)·새 결과다(E2E ①). ② **계산 중 저장된 결과는 채택하지 않는다** — 시도 첫머리에 읽은 전략·프로필을 계산 끝에 다시 읽어 **값 등식**으로 비교하고, 다르면 버리고 1회 재계산, 또 다르면 409 `STRATEGY_CHANGED_DURING_COMPUTATION`. **이 축도 출하 조립 + 실 PostgreSQL 에서 잰다**(E2E ③ 둘, 7C①b 수정 라운드 1 — cr H-1): test 데코레이터가 출하 조립의 `strategyRepository` 빈(`PersistenceWiring`, 제안 경로의 `StrategyReader` 가 바로 이 빈)을 감싸 그 GET 의 1 번째 `load()` 직후 실 SQL 로 필수 키워드를 바꾸면 응답이 **둘째 시도의 값**이고, 1·3 번째 직후 두 번 바꾸면 409 다(감싼 빈의 `load()` 4 회 단언). use case test 가 개정이 같고 값만 다른 경우와 프로필 변경을 더 잰다. 「모든 편집 경로」는 판정이 쓰기 쪽 규율을 보지 않는 **구조**로 덮는다 — 개정도 올리지 않는 **수동 SQL** 로 전략을 바꿔도 다음 조회가 새 값이다(E2E ②, ③ 의 SQL 도 개정을 올리지 않는다). 오늘 코드의 쓰기 경로는 편집 세션 확정 하나뿐이다(`reports/evidence/m7/7c1b/checklist.md` §0.6). **남는 한계**(같은 checklist §6): 비교와 응답 전송 사이에 커밋된 저장은 그 응답에 반영되지 않는다(헤더 개정이 드러낸다) · **A-B-A**(계산 중 바뀌었다 같은 값으로 돌아오면 채택한다 — 프로필은 게이트에 고정되지 않아 다른 프로필로 판정된 카드가 섞일 수 있다) · **프로필**의 계산 중 변경은 use case test 의 가짜 포트만 잰다 · E2E ③ 은 끼우는 시점을 `load()` 직후로 결정적으로 고정했다(임의 시점의 스레드 경쟁 재현이 아니다) · 서버 계산은 개정을 올리지 않는 경로도 덮지만 계약이 화면에 권하는 `X-Strategy-Revision` 비교는 개정을 올리는 경로만 덮는다(클라이언트 캐시는 7E 소관). | — |
 | **STR-08** | 감시 실행 이력과 신규/지속/이탈 후보 diff | ⓒ | — | — | 감시 실행 이력 표와 신규/지속/이탈 diff, 중복 억제 **판정 기록**이 없다. 부분 측정 — 배달 층 중복 제거는 `bidvector.workflow.event.InboxDedupPropertyTest`·`bidvector.adapters.e2e.PipelineRedeliveryE2ETest` 가 잰다(그러나 run 이력을 입력으로 삼는 억제가 아니다). | `OPEN-6F3-BID-RECORD` |
 | **STR-09** | 주기 자동 감시 | ⓒ | — | — | 주기 실행이 **없다** — 러너는 전부 `mode=once` 1회성이고 주기는 외부 cron 이 진다. 「수동 실행과 주기 실행이 같은 후보 집합」을 잴 두 번째 트리거가 존재하지 않는다. | `OPEN-6F10-SCHEDULER` |
 | **STR-10** | 명시적 재계산 요청과 신선도 표시 | ⓒ | — | — | 재계산 요청 표면과 진행/실패 상태, 고아 running 회수가 **없다**. 고아 회수는 outbox 층에만 있고 재계산 상태 기계가 아니다. | **없음 — 신설 필요** |
 | **STR-16** | 입찰 목록 검색과 투찰가 요청 (운영자의 주 경로) | ⓒ | `bidvector.workflow.notice.NoticeSearchParametersTest` · `bidvector.adapters.notice.NoticeSearchStatementTest` · `bidvector.adapters.notice.JdbcNoticeSearchTest` · `bidvector.adapters.notice.NoticeAdapterDependencyTest` · `bidvector.app.http.NoticeSearchEndpointTest` · `bidvector.app.http.OpenApiNoticeSearchContractTest` · `bidvector.app.http.NoticeSearchProductionE2ETest` | `NoticeSearchWiring`(출하 조립)이 `JdbcNoticeSearch` 를 읽기 전용 조회기에 꽂고 `NoticeSearchController` 는 그 조회기만 부른다. **출하 조립 + 실 PostgreSQL** 로 끝까지 도는 측정이 `NoticeSearchProductionE2ETest` 다(HTTP 층 fake 위에서는 보이지 않는 갈림 — 제어 문자·잘못된 퍼센트 인코딩이 실 DB·실 컨테이너에 닿아야 드러난다). | **M7/7C ① 로 검색 절반이 성립했다 — 앞 판의 「검색 operation 이 없다」는 더 이상 참이 아니다.** `GET /api/notices` 가 감시 조건과 무관하게 수집 공고를 조회하고, 금액 범위의 basis(기초금액 · 감시 경로의 한계값과 같은 과세·provenance 규약)가 계약 문서와 조건 타입 양쪽에 선언되며(추정가격과 비교하지 않는다), 빈 결과의 두 뜻이 응답 헤더로 갈린다. 상한 초과 `size`·역전 범위·형식 오류는 조용히 절삭·변환되지 않고 400 이다. **판정이 ⓒ 인 이유는 남은 절반**이다 — 검색 결과에서 곧바로 투찰가를 요청하는 **결합**(capability map 이 「없는 것은 이 결합」이라 적은 그 축)이 아직 없다. 부분 측정 — 「요청 시 산출」축은 `bidvector.app.http.EvaluationDryRunE2ETest`·`bidvector.app.http.EvaluationDryRunBidNowE2ETest` 가, 「같은 입력이면 같은 답」은 `bidvector.adapters.e2e.PipelineReproducibilityE2ETest` 가 잰다. | **7C ② 소관(투찰가 요청 결합)** |
 | **QUAL-01** | 이 공고에 우리가 참가할 수 있는가, 없다면 무엇이 없어서인가 | ⓐ | `bidvector.qualification.LicenseEligibilityTest` · `bidvector.qualification.LicenseEligibilityPropertyTest` · `bidvector.adapters.qualification.StoredRequirementLicenseGateTest` · `bidvector.adapters.koneps.KonepsLicenseLimitDocumentSourceTest` · `bidvector.adapters.e2e.PipelineOneLineE2ETest` | 출하 `LicenseGatePort` 는 `StoredRequirementLicenseGate` 이고 `JdbcRequirementStore` 의 저장 요건을 `LicenseEligibility` 커널에 넘긴다. 첫 bullet 뒷부분(게이트 통과)은 그 조립을 끝까지 도는 e2e 가 잰다. | `Uncertain` 네 사유, 「보유 면허는 사유에 없다」, property(사유 ⊆ 실제 미보유), 파싱 불가 행의 `rowIdentifierIndeterminate` 계수가 다 붙는다. 첫 bullet 의 뒷부분(「게이트에서 **제외되지 않는다**」)을 실제로 재는 것은 e2e 다 — 요건 행을 seed 하지 않은 공고가 `Uncertain(RequirementDataAbsent)` 로 판정되고도 outbox 까지 간다고 단언한다(verifier r1 R1-M-2). | — |
-| **QUAL-02** | 자격 없는 공고를 추천 후보에서 제외한다 (게이트) | ⓒ | — | — | 제외 **건수·사유 분포**를 run 단위로 내는 자리가 없다(dry-run 응답은 평탄하고 후보별 사유가 없다). 게이트를 정책 값으로 켜고 끄는 경로도 없다 — 기본 ON 고정이다. 부분 측정(강함) — 첫 bullet(「`Uncertain` 판정이 후보 제외로 이어지지 않는다」)은 **측정된다**: `bidvector.adapters.e2e.PipelineOneLineE2ETest` 가 요건 행 없는 공고를 `Uncertain(RequirementDataAbsent)` 로 보내고도 outbox 까지 간다고 단언하므로, production 의 `Eligible`·`Uncertain` 통과 분기를 제외로 바꾸면 그 단언이 붉어진다(앞 판의 「그 분기를 고정하는 test 가 없다」는 **거짓이었고 철회한다** — verifier r1 R1-M-2). 게이트가 Ineligible 을 떨어뜨리는 쪽은 `bidvector.workflow.evaluation.EvaluateCandidatesUseCaseTest` 가 잰다. | `OPEN-6A3-EVALUATION-DETAIL` |
+| **QUAL-02** | 자격 없는 공고를 추천 후보에서 제외한다 (게이트) | ⓒ | — | — | 제외 **건수·사유 분포**를 run 단위로 내는 자리가 없다(dry-run 응답은 평탄하고 후보별 사유가 없다). 게이트를 정책 값으로 켜고 끄는 경로도 없다 — 기본 ON 고정이다. 부분 측정(강함) — 첫 bullet(「`Uncertain` 판정이 후보 제외로 이어지지 않는다」)은 **측정된다**: `bidvector.adapters.e2e.PipelineOneLineE2ETest` 가 요건 행 없는 공고를 `Uncertain(RequirementDataAbsent)` 로 보내고도 outbox 까지 간다고 단언하므로, production 의 `Eligible`·`Uncertain` 통과 분기를 제외로 바꾸면 그 단언이 붉어진다(앞 판의 「그 분기를 고정하는 test 가 없다」는 **거짓이었고 철회한다** — verifier r1 R1-M-2). 게이트가 Ineligible 을 떨어뜨리는 쪽은 `bidvector.workflow.evaluation.EvaluateCandidatesUseCaseTest` 가 잰다. **M7/7C①b(부분)**: 제안 목록 카드가 면허 축 판정의 **실제 값**(`ELIGIBLE`·`UNCERTAIN` + 미결 사유 다섯)을 싣고 지역·실적은 `unjudgedAxes` 로 「판정 없음」을 늘 싣는다 — `bidvector.app.http.OpenApiSuggestionContractTest`·`bidvector.app.http.SuggestionEndpointTest`. 제외 건수·사유 분포는 여전히 없다. | `OPEN-6A3-EVALUATION-DETAIL` |
 | **QUAL-03** | 그룹 AND/OR 자격 경로 판정 | ⓐ | `bidvector.qualification.LicenseEligibilityTest` · `bidvector.qualification.LicenseEligibilityPropertyTest` · `bidvector.adapters.koneps.KonepsLicenseLimitDocumentSourceTest` | 같은 경로 + `KonepsLicenseLimitDocumentSource` 가 `permsnIndstrytyList` 를 **출하 필드 계약에 담아** 수집하고 `LicenseGroupFolding` 이 `RequirementSourceField.PermsnIndstrytyList` 로 접는다(그 필드만의 요건이 누락되지 않는다). | 그룹 간 OR·그룹 내 AND·`lmtGrpNo` 결측 폴딩·정책 version 봉투·`permsnIndstrytyList` 포함이 모두 붙고, **조건부(`OPEN-QUAL-11`) 임시 시나리오까지** 「허용업종만 보유하면 결합 규칙 미결로 Uncertain」으로 잰다. | — |
 | **QUAL-04** | 기술부문·협회 가입 자격 축 | ⓒ | — | — | 기술부문·협회 가입 자격 축의 matcher 어휘가 **없다**. 3분(요건 없음/미충족/검증 불가)도 property(단독 차단 금지)도 잴 대상이 없다. | `OPEN-QUAL-07` |
 | **QUAL-05** | 판정 provenance (어떤 원문 → 어떤 규칙 → 어떤 결론) | ⓐ | `bidvector.qualification.LicenseEligibilityTest` · `bidvector.sharedkernel.PolicyTest` | 같은 경로. policy version 은 `EffectiveDatedPolicy` 의 **출하 엔트리**에서 오고 그 resolve 규약(기준일 이하 최대 엔트리 · 엔트리 없으면 소급 금지)이 production 공용이다. | 사유 파생은 `missingByGroup`(실제 미보유만) + 정책 version 봉투가, 어휘 version 의 시점 적용은 `EffectiveDatedPolicy` 의 「기준일 이하 최대 엔트리」·「엔트리 없으면 소급하지 않는다」가 잰다. | — |

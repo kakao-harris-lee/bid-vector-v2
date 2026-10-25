@@ -21,10 +21,29 @@
 | **파기** | `outbox` | `inserted_at` | **`DELIVERED` 만**(발송된 행 하나 — `FAILED`·`ISOLATED` 는 미발송이라 제외) |
 | **부모와 함께** | `notice_requirement_row` | `created_at` | 헤더가 지워질 때 FK `ON DELETE CASCADE` 로. **단 기한 안쪽 행이 있으면 헤더를 남긴다** |
 | **마스킹만** | `raw_observation` | `inserted_at` | `pii_masked_at IS NULL` 인 행 |
-| **제외** | `notice_audit` · `inbox` · `collection_run` · `operator_strategy` · `operator_profile` · `operator_strategy_revision` · `provenance_authority` · `flyway_schema_history` | — | 분류 레지스트리가 사유를 함께 싣는다 |
+| **제외** | `notice_audit` · `inbox` · `collection_run` · `operator_strategy` · `operator_profile` · `operator_strategy_revision` · `provenance_authority` · `account` · `flyway_schema_history` | — | 분류 레지스트리가 사유를 함께 싣는다 |
+| **제외** | `bid_case` · `bid_case_transition` · `bid_draft` · `bid_record` | — | **운영자의 입찰 이력**(M7/7B, `OPERATOR_BID_HISTORY`). 아래 1.4 |
 
 분류는 코드 한 자리(`RETENTION_TABLE_RULES`)에 있고 **스키마의 표 집합과 등식**이다. 새 마이그레이션이
 표를 더하면 그 등식이 깨지고, 러너는 **아무것도 지우지 않고** 종료 코드 4 로 멈춘다(§3).
+
+### 1.4 입찰 건 넷은 시간으로 지우지 않는다 (M7/7B)
+
+`bid_case` · `bid_case_transition` · `bid_draft` · `bid_record` 는 **파기 대상이 아니다.**
+「90일 지난 행 삭제」가 여기 걸리면 운영자의 **정산·증빙 근거**가 사라진다 — 그 데이터의 수명은
+시간이 아니라 **R-5(제출확인서 참조 보관 3년)와 운영자의 결정**이 정하고, 그 날짜는
+`bid_record.evidence_retain_until` 이 행마다 들고 있다.
+
+**이 slice 는 그 3년을 집행하지 않는다.** PDF 저장소와 파기 실행 경로가 범위 밖이라, 오늘
+그 열은 「이 **참조**를 언제까지 보관하는가」를 적어 둘 뿐이다. 집행 경로는 저장소 slice 가
+연다 — 그때 이 분류를 `Purge` 로 바꿀지는 **그 slice 의 결정**이지 기본값이 아니다.
+
+**`bid_case` 가 `notice` 를 FK 로 참조하지 않는 것은 이 절과 직접 관련이 있다.** `notice` 는
+`파기`(시각만)인데, 건이 공고를 FK 로 가리키면 기한이 지난 공고를 지울 때 ⓐ RESTRICT 로
+**파기 run 자체가 멈추거나**(종료 코드가 나고 아무것도 안 지워진다) ⓑ CASCADE 로 **운영자의
+투찰 기록이 공고와 함께 사라진다.** 그래서 공고 키와 초안의 공고 스냅샷(마감·하한율·기초금액·
+판 번호)은 **사본**이다 — 공고가 파기된 뒤에도 건과 기록은 남고, 그때 필요한 값은 스냅샷이
+이미 들고 있다. 사유는 `V21__bid_case.sql` 머리말에도 같은 문면으로 있다.
 
 ### 1.1 「공고 90일」이 원문까지 지우지는 않는다
 

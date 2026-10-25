@@ -1,16 +1,17 @@
 package bidvector.app.http
 
+import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
-import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
+import bidvector.app.wiring.SuggestionQuery
 import bidvector.procurement.Notice
-import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
+import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
@@ -24,6 +25,7 @@ import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
@@ -31,10 +33,6 @@ import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
-import bidvector.workflow.opening.NoticeOpeningFacts
-import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
-import bidvector.workflow.opening.OpeningResultFactsPort
-import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -48,6 +46,7 @@ import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.strategy.toSnapshot
+import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
@@ -239,19 +238,23 @@ class FakeNoticeSearchPort : NoticeSearchPort {
 }
 
 /**
- * 7C⑤-a — 개찰 결과 조회 포트의 이중체. HTTP 층이 **사실을 어떤 응답으로 옮기는가**만 재고,
- * 실 질의 거동(열 집합·읽기 전용·원문 존재)은 `bidvector.adapters.opening
- * .JdbcOpeningResultViewTest`(실 PostgreSQL)가 잰다.
+ * M7/7C①b — 제안 목록의 이중체 원천·면허 게이트. `SuggestionController`(같은 패키지 main)가 조회기를
+ * 요구해 `HttpTestApplication` 기반 test 가 DB 없이 제안 경로를 돈다. 감시 게이트는 **실 구현**
+ * (`NoticeWatchSubjectPort`, 순수)이다 — 전략의 감시 조건이 실제로 거른다. 실 DB 거동은
+ * `SuggestionProductionE2ETest` 가 잰다.
  */
-class FakeOpeningResultFactsPort : OpeningResultFactsPort {
-    @Volatile var facts: NoticeOpeningFacts = NoticeOpeningFacts.NoticeAbsent
+class FakeSuggestionCandidates : CandidateSourcePort {
+    @Volatile var notices: List<Notice> = emptyList()
 
-    @Volatile var lastLookup: NoticeId? = null
+    override fun openCandidates(): List<Notice> = notices
+}
 
-    override fun lookup(id: NoticeId): NoticeOpeningFacts {
-        lastLookup = id
-        return facts
+class FakeSuggestionLicenseGate : LicenseGatePort {
+    @Volatile var verdictFor: (Notice) -> LicenseVerdict = {
+        LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
     }
+
+    override fun verdictFor(notice: Notice): LicenseVerdict = verdictFor.invoke(notice)
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
@@ -420,20 +423,43 @@ open class HttpTestApplication {
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
 
-    /** 7C⑤-a — 개찰 결과 조회의 이중체(실 질의 거동은 `JdbcOpeningResultViewTest` 가 잰다). */
-    @Bean
-    open fun fakeOpeningResultFactsPort(): FakeOpeningResultFactsPort = FakeOpeningResultFactsPort()
+    @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
+    open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
 
-    /**
-     * 출하 조립과 **같은 형태**로 꽂는다 — 조회기가 포트·시계·정책을 받은 판정 하나를 위임한다.
-     * 정책은 운영 값 그대로다(test 전용 라벨 집합을 쓰면 문서 ↔ 구현 등식이 가짜가 된다).
-     */
     @Bean
-    open fun openingResultQuery(
-        fakeOpeningResultFactsPort: FakeOpeningResultFactsPort,
+    open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
+
+    @Bean
+    open fun bidCaseWorkflow(
+        inMemoryBidCaseStore: InMemoryBidCaseStore,
+        movableNoticeDeadlines: MovableNoticeDeadlines,
         clock: FixedClock,
-    ): OpeningResultQuery =
-        OpeningResultQuery(ReadOpeningResult(fakeOpeningResultFactsPort, clock, OPENING_PROGRESS_POLICY))
+    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock)
+
+    /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
+    @Bean
+    open fun fakeSuggestionCandidates(): FakeSuggestionCandidates = FakeSuggestionCandidates()
+
+    @Bean
+    open fun fakeSuggestionLicenseGate(): FakeSuggestionLicenseGate = FakeSuggestionLicenseGate()
+
+    @Bean
+    open fun suggestionQuery(
+        strategyRepository: TestStrategyRepository,
+        fakeSuggestionCandidates: FakeSuggestionCandidates,
+        fakeSuggestionLicenseGate: FakeSuggestionLicenseGate,
+        clock: FixedClock,
+    ): SuggestionQuery =
+        SuggestionQuery(
+            ListSuggestionsUseCase(
+                strategies = strategyRepository,
+                profiles = OperatorProfilePort { null },
+                candidateSource = fakeSuggestionCandidates,
+                watchSubjects = NoticeWatchSubjectPort(),
+                licenseGate = fakeSuggestionLicenseGate,
+                clock = clock,
+            ),
+        )
 
     /**
      * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.

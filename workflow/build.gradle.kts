@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":procurement"))
     implementation(project(":qualification"))
     implementation(project(":strategy"))
+    implementation(project(":bidding"))
     implementation(project(":decision"))
     implementation(project(":settlement"))
     // kotest-property 의 checkAll 은 suspend 함수이고 kotest-property-jvm 은
