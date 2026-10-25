@@ -29,7 +29,7 @@ class BrowserSessionAuthenticator(
     override fun authenticate(request: HttpServletRequest): AuthenticationResult {
         val key = cookies.read(request) ?: return AuthenticationResult.Denied
         return when (val verdict = access.authenticate(key, demandOf(request))) {
-            is AccessVerdict.Granted -> AuthenticationResult.Authenticated(subjectOf(verdict.account))
+            is AccessVerdict.Granted -> AuthenticationResult.Authenticated(subjectOf(verdict.account), verdict.account)
             is AccessVerdict.Denied -> AuthenticationResult.Denied
         }
     }

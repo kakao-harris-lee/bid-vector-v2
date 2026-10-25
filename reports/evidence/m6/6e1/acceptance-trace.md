@@ -15,6 +15,12 @@ HTTP 경로 식별자를 더했다(RT2-L-1).
 (「오늘 성립하지 않는다」)은 **일곱 걸음 모두** 같다. 숫자가 내려온 길은 **같은 술어를 더 엄격하게 같은
 기준으로 적용한 것**이고, 그때마다 어느 bullet 이 비었는지를 행에 남겼다.
 
+> **2026-10-21 교차 참조(M7/7B)** — 이 표의 모수 「`V2 필수` 61 전건」은 **2026-10-07 시점의 값**이다.
+> 그 뒤 `BID-01 · 입찰 건의 상태와 전이`가 `V2 필수`로 등재되어 모수가 **62** 가 됐다
+> (운영자 결정 2026-09-07 Q-7, `capability-map.md` §8.5 · §10 의 2026-10-21 집계 변경 블록).
+> **아래 집계는 다시 세지 않는다** — 6E-1 의 판정이고 그 시점의 사실이다. BID-01 의 추적 행은
+> 같은 술어(ⓐ/ⓑ/ⓒ)로 `reports/evidence/m7/7b/checklist.md` 에 있다.
+
 **두 종류의 걸음을 구별한다.** 다섯째(`13 → 16`)는 M6/G1-T 가 test 를 **신설**해 올린 것이고 앞 네 걸음처럼
 같은 술어를 다시 적용한 것이 아니다(그 라운드의 검토가 `COL-03` 을 ⓒ 로 되돌려 +4 가 아니라 **+3** 이 됐다).
 **일곱째(`17 → 16`)는 다시 「같은 술어를 적용한 것」이다** — M6/G1-DEC05 가 `DEC-04` 의 ⓐ 근거를 기계로
@@ -164,7 +170,7 @@ capability-map §12/§14 에도 `milestone-6.md` OPEN 목록에도 **없다**. �
 | **QUAL-04** | 기술부문·협회 가입 자격 축 | ⓒ | — | — | 기술부문·협회 가입 자격 축의 matcher 어휘가 **없다**. 3분(요건 없음/미충족/검증 불가)도 property(단독 차단 금지)도 잴 대상이 없다. | `OPEN-QUAL-07` |
 | **QUAL-05** | 판정 provenance (어떤 원문 → 어떤 규칙 → 어떤 결론) | ⓐ | `bidvector.qualification.LicenseEligibilityTest` · `bidvector.sharedkernel.PolicyTest` | 같은 경로. policy version 은 `EffectiveDatedPolicy` 의 **출하 엔트리**에서 오고 그 resolve 규약(기준일 이하 최대 엔트리 · 엔트리 없으면 소급 금지)이 production 공용이다. | 사유 파생은 `missingByGroup`(실제 미보유만) + 정책 version 봉투가, 어휘 version 의 시점 적용은 `EffectiveDatedPolicy` 의 「기준일 이하 최대 엔트리」·「엔트리 없으면 소급하지 않는다」가 잰다. | — |
 | **QUAL-08** | 지역 자격 | ⓒ | — | — | 구조화 지역제한 **필드**로 판정하는 자격 축이 없다. 전략의 지역 어휘는 watch rule 의 텍스트 매칭이고 acceptance 가 금지한 쪽이다 — 「지역 자격 없음」과 「지역 점수 낮음」을 가르는 결과 타입도 없다. | **없음 — 신설 필요** |
-| **QUAL-11** | 금액 capacity 게이트 (도급한도 / 시공능력평가액) | ⓒ | — | — | 금액 capacity 축이 **없다** — 운영자 보유액 필드도(프로필은 업종·면허·지역 셋만), 두 금액의 basis 대조도 없다. 부분 측정 — 마지막 무조건 bullet(「값 크기로 단위를 구분하는 경로가 없다」)은 `bidvector.sharedkernel.RateTest`·`bidvector.sharedkernel.CompileFailureHarnessTest` 가 타입으로 닫는다. | `OPEN-QUAL-09` · `OPEN-QUAL-10` |
+| **QUAL-11** | 금액 capacity 게이트 (도급한도 / 시공능력평가액) | ⓒ | — | — | 금액 capacity 축이 **없다** — 운영자 보유액 필드도(프로필은 업종·면허·지역 셋만), 두 금액의 basis 대조도 없다. 부분 측정 — 마지막 무조건 bullet(「값 크기로 단위를 구분하는 경로가 없다」)은 `bidvector.sharedkernel.RateTest`·`bidvector.sharedkernel.CompileFailureHarnessTest` 가 타입으로 닫는다. **2026-10-22 M7/7C④(D-7C4-1 Q2): 입력 축 좁힘 — 수행실적 제외.** 받는 입력은 면허별 시평액 + 기준 연도뿐이고(V22 `account_construction_capacity`), 판정은 여전히 없다 — 분류 ⓒ 유지. 입력 칸의 HTTP 표면은 7C④ 2b 에서 선다. | `OPEN-QUAL-09` · `OPEN-QUAL-10` |
 | **ML-01** | 투찰율 추천 타점과 시나리오 3후보 | ⓒ | — | — | **제품 배선에서 성립하지 않는다** — Kotlin 출하 조립이 `MlAnalysisPort` 를 `UnavailableMlAnalysis` 로 **고정**하므로(운영자 결정 1, architecture gate 가 그 클래스 집합을 잠근다) 이 응답이 **오늘 제품 경로에 닿지 않는다**. 분류 규칙 ② 가 바로 이 경우를 ⓐ 근거가 아니라고 적으므로 `ML-04` 와 같은 처분이다(verifier RT2-M-1 — 앞 판은 같은 사실에 술어를 다르게 적용했다). 부분 측정(강함) — 3 후보·순서·`bid_rate ≤ 1`·origin 전수와 「후보 2개면 계약 위반」은 ml-serving **출하 이미지**의 정책 위에서 `bidvector.adapters.contract.PredictionContractTest`·`bidvector.workflow.prediction.PredictionValueTest`·`bidvector.adapters.ml.SuccessShapeFailClosedTest`·`bidvector.adapters.ml.ResponseMappingTest` 가 잰다 — **서비스 컴포넌트에서는 성립하고 제품 경로에만 미배선**이다. | `OPEN-ML-ANALYSIS-WIRING` |
 | **ML-02** | 배우지 않은 공종에 답하지 않는다 (미학습 가드) | ⓒ | — | — | **제품 배선에서 성립하지 않는다** — `ML-01`·`ML-04` 와 같은 사유(출하 조립의 `MlAnalysisPort` 고정)로 이 가드의 판정이 제품 경로에 닿지 않는다(verifier RT2-M-1). 부분 측정(강함) — 「표본 얕음」 둘(`TooFewObservations`·`TooFewRatioSamples`)의 구분, 게이트가 비율 게이트보다 먼저, 경계값 포함, **직접 호출도 게이트와 같은 판정**은 출하 `inference-v1.yaml` 위에서 `ml-engine/tests/inference/test_availability.py` 가, 「설정으로 비활성화할 수 없다」는 같은 디렉터리의 `test_policy.py` 「임계 1 미만은 거부」가 잰다(CI step 축어는 `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)`). **주의** — GBM 축의 `min_category_rows=0` 은 정책이 거부하지 않는다(그 축은 `ML-05` 몫). | `OPEN-ML-ANALYSIS-WIRING` |
 | **ML-03** | 불확실성·신뢰도 표시 | ⓐ | `pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)` · `bidvector.workflow.evaluation.EvidenceLinesTest` · `bidvector.decision.priority.PriorityCompositionTest` | **그 고정 자체가 production 배선이다** — 출하 조립의 `MlAnalysisPort` 는 `UnavailableMlAnalysis` 이고, 그 아래의 거동(사유 있는 `Review(MlUnavailable)` · 확률 축 없는 성분 다섯)을 등재 식별자가 **그 배선으로** 잰다. 두 bullet 이 요구하는 것은 「없을 때 0 이 아니라 사유」와 「확률로 표기하지 않음」이라 이 배선에서 성립한다. | 「표본 부족이 confidence 0 이 아니라 사유 있는 측정 불가」는 `Unavailable`/`Absent` 타입과 「전부 Absent 면 0 이 아니라 Unavailable」이, 「가격 적합도로 명시하고 낙찰 확률로 표기하지 않는다」는 성분 다섯에 **확률 축이 없다**(`ComponentExhaustiveTest`)가 잰다. 조건부(`OPEN-ML-03`)는 타입 분리 쪽으로 이미 닫혀 있다. | — |

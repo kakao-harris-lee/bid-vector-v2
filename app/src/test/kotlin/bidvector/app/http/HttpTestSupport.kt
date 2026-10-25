@@ -423,6 +423,19 @@ open class HttpTestApplication {
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
 
+    @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
+    open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
+
+    @Bean
+    open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
+
+    @Bean
+    open fun bidCaseWorkflow(
+        inMemoryBidCaseStore: InMemoryBidCaseStore,
+        movableNoticeDeadlines: MovableNoticeDeadlines,
+        clock: FixedClock,
+    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock)
+
     /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
     @Bean
     open fun fakeSuggestionCandidates(): FakeSuggestionCandidates = FakeSuggestionCandidates()
