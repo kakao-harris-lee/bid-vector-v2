@@ -82,7 +82,7 @@ class ColumnSpec` 을 되살리고, ⓑ 의 `BidCaseColumnSpecs.kt` 삭제는 to
 
 경우 ①의 ⓐ~ⓒ 를 버릴 clone 에서 실측했다(결과는 `checklist.md` §8).
 
-실측 HEAD: `f000bc80` — PR 전 마지막 일괄(D-7B-8)의 마지막 산출물 커밋 「test(m7-7b): probe 의 매핑 조회는 이름으로 …」(①~③ 실행, ④~⑥ 은 되돌린 트리 객체가
-`998b59dd` 트리와 같아 그 트리의 실행 실측으로 갈음 — `checklist.md` §8). 앞 판들의 실측은 같은 절에 이력으로 남는다. 판정 SHA 와의 사이에 되돌림 대상 경로가 움직였는지는 `git diff --name-only <실측 HEAD>..<판정 SHA> --`
+실측 HEAD: `e16ced28` — main 병합 뒤(D-7B-9)의 마지막 산출물 커밋 「style(m7-7b): ktlint (D-7B-9)」(①~③ 실행, ④~⑥ 은 되돌린 트리 객체가
+`fb7e9d1e` 트리와 같아 그 SHA 의 main CI success 로 갈음 — `checklist.md` §8). 앞 판들의 실측은 같은 절에 이력으로 남는다. 판정 SHA 와의 사이에 되돌림 대상 경로가 움직였는지는 `git diff --name-only <실측 HEAD>..<판정 SHA> --`
 (이 문서가 되돌리는 경로)로 본다. 실측 HEAD 뒤로 움직이는 것은 evidence 파일뿐이고, 그 파일들은 이 slice 가 **새로 만든(`A`)**
 것이라 ⓑ 가 내용과 무관하게 통째로 지운다 — 되돌린 트리는 바뀌지 않는다. `M` 경로가 그 사이에 하나라도 움직이면 다시 잰다.

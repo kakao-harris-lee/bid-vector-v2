@@ -518,6 +518,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | **D-7B-6 (계약 갱신으로 추가)** 표적 재검증 r4 승인 전 일괄 2 — 게이트 둘을 구조로 · R4-3 등식 · 문면 · 등재 | §3.8 처분표의 「출하」 칸 | §3.8 처분표 · 변이 표(전 · 후) | 출하 — 등재 다섯(R4-2 · R4-5 · R4-8 · R4-9 · V4-L2) · OPEN-7D 사례 넷 |
 | **D-7B-7 (계약 갱신으로 추가)** 표적 재검증 r5 승인 전 일괄 3 — 바인딩 층 fail-closed 가드 · 쌍 등식 · 라우트 센서스 · Origin 표본 · ① 수령 조건 넷 · 500→400 | §3.9 처분표의 「출하」 칸 | §3.9 처분표 · 변이 표 · 정상 경로 대조 표 | 출하 — 등재 셋(§6 17~19) · 정책 편집 둘(허용 목록) |
 | **D-7B-8 (계약 갱신으로 추가)** 표적 재검증 r6 PR 전 마지막 일괄 — advice · 바인더 등식 · 본문 `JsonNode` 등식 · 정확 상태 · 단일 매개변수 문면 · 키 거부 · 상한 | §3.10 처분표의 「출하」 칸 | §3.10 처분표 · 변이 표 | 출하 — 등재 하나(§6 20 용기 모양) |
+| **D-7B-9 (계약 갱신으로 추가)** main(`fb7e9d1e`) 병합 · base 재고정 · low 넷 | §3.11 | §3.11 충돌 해소 표 · 변이 표 · S-20(web 포함) | 출하 |
 | (발견) 요청 값의 도메인 `require` 실패가 500 | `BidCaseRequests.requestValue` — `IllegalArgumentException` 만 400 으로 | `BidCaseRequestsTest`(차수 형식 · 길이 상한 둘 · 추첨번호 부호 + 양성 대조 둘) | 출하 — D-7B-2 test 를 쓰다 발견 |
 | (발견) OpenAPI 생성 타입이 문서와 어긋나 있었다 | `web/src/api/generated/operator-api.ts` 재생성(「OpenAPI 생성 타입 재생성 …」 커밋) | `one-command-check.sh` W-5 바이트 등식 | 출하 — 수정 라운드의 OpenAPI 편집 뒤 재생성 누락, W-5 가 잡았다 |
 | (발견) 입찰 건 이중체가 `AccountId` 를 참조 동일성으로 비교 | `InMemoryBidCaseStore` · `BidCaseWorkflowTest` 의 Fake — 값 비교 | 세션 E2E(요청마다 새 인스턴스) | 출하 — test 이중체 결함, production(SQL 값 비교)은 무관 |
@@ -539,6 +540,7 @@ Phase 1 의 「열둘」은 그 둘을 각각 묶어 센 수다. 팀장 승인 2
 | fix 「승인 전 일괄 2 — Jackson 소유자 등식 · 핸들러 매개변수 규칙 …」 | 승인 전 일괄 2(계약 D-7B-6, §3.8). 이 일괄의 산출물 커밋은 이것 하나다 |
 | fix 「승인 전 일괄 3 — 요청 바인딩의 AccountId 생성 fail-closed 가드 …」 외 산출물 커밋들(가드 · test · 분할 · 범위 좁힘 · 400 · fallback 호출) | 승인 전 일괄 3(계약 D-7B-7, §3.9) |
 | fix 「가드 — Map 키 거부 역직렬화기 …」 · test 「advice·바인더 등식 …」 · style 「ktlint」 · test 「probe 의 매핑 조회는 이름으로 …」 | PR 전 마지막 일괄(계약 D-7B-8, §3.10). 마지막 산출물 커밋은 맨 뒤의 test 커밋이다 |
+| merge 「main(fb7e9d1e …)을 병합 — 충돌 다섯을 합집합으로 해소」 · test 「low 넷 …」 · style 둘 · test 「병합 뒤 HttpTestSupport 500 줄 상한 …」 | main 병합과 low 정리(계약 D-7B-9, §3.11). 마지막 산출물 커밋은 맨 뒤의 style 커밋이다 |
 | docs 커밋들 | 계약 · 설계 · evidence |
 
 base `998b59dd`. 변경 목록은 `git diff --name-status 998b59dd..HEAD` 기계 산출이다.
@@ -1153,6 +1155,58 @@ ID 접두는 `V6-` · `R6-`. **새 기구는 들이지 않았다**(팀장 지시
 | CTRL | 통제군 — 변이 없음 | 가드 test 둘 · 구조 test · 가드 없는 대조 | 초록 5 / 5 · 14 / 14 · 1 / 1 |
 
 
+### 3.11 main 병합과 low 정리 — 계약 D-7B-9 (표적 재검증 r7 처분, 2026-10-25)
+
+판정 SHA `8b745917` 에 대한 verifier r7 **ready-for-review**(low 1) · code-reviewer r7 **approve**(low 4). 리뷰상 PR 을 열 수 있지만 main(`fb7e9d1e` — 7C①b
+PR #87 · PR #88)과 충돌이 있어 병합했다(재작업 2/5 유지).
+
+**① main 병합** — `git merge fb7e9d1e`(고정 SHA, rebase 아님 — 판정 이력 보존). 충돌 다섯을 **양쪽 의도를 모두 살려** 풀었다(병합 커밋 메시지에 파일과 원칙):
+
+| 충돌 파일 | 해소 | 실행 확인 |
+|---|---|---|
+| `AppHttpDependencyGateTest.kt` | 면제 수 = 65 + 7B 하나(`BidCaseWiring`) + 7C①b 둘(`SuggestionWiring` · `SuggestionQuery`) = **68**, 양쪽 근거 문단 보존 | 등식 test 초록(관측 == 68) |
+| `HttpTestSupport.kt` | 7B 입찰 건 빈 셋과 7C①b 제안 목록 빈 셋을 둘 다. 병합 뒤 501 줄 → 500 줄 상한(`sizeGate`)에 걸려 7B 워크플로 조립을 이 slice 의 `InMemoryBidCaseStore.kt`(`testBidCaseWorkflow`)로 옮겼다 | `BidCaseEndpointTest` · `SuggestionEndpointTest` · `SuggestionProductionE2ETest` 초록(S-20) |
+| `architecture-policy.properties` | `app.http.allowed-packages` · `app.http.denied-types` · `app.surface.api.handlers` 합집합(양쪽 주석 보존) | 의존 · 표면 게이트 초록(`HttpSurfaceCensusTest` 는 S-20 의 찬 check) |
+| `bidvector-operator-api.yaml` | 양쪽 다 **삽입만**이라 이 브랜치 판에 main 의 삽입 셋(경로 · 스키마 · 오류 코드 하나)을 같은 문맥 자리에 넣었다 — main 대비 이 slice 의 삽입만(+1015), 이 브랜치 대비 main 의 삽입만(+158), 삭제 0 | OpenAPI 계약 test 일곱 초록(S-20 의 찬 check — `OpenApiSuggestionContractTest` 포함) |
+| `web/src/api/generated/operator-api.ts` | 병합된 OpenAPI 에서 `npm run api:types` 로 재생성 | S-20 W-5 바이트 등식 |
+
+이 slice 의 등식형 게이트가 main 의 새 코드(7C①b `SuggestionController` 등)와 맞는지도 실행으로 확인했다 — 그 코드는 Jackson · `@RequestBody` · 가드 패키지 ·
+advice · 바인더를 쓰지 않고(소스 확인), Jackson 쌍 · 가드 패키지 · advice · 본문 · 센서스 · `@RestController` 등식이 병합 트리에서 초록이다. `GlobalErrorHandler`
+는 main 이 409 하나를 더했을 뿐 여전히 상태 없는 무인자 class 다(R6-8 단언 초록).
+
+**② base 재고정** — scope 와 `rollback.md` 의 base · 복원 기준을 `fb7e9d1e` 로. 그 SHA 에 이 slice 가 없다는 단언을 복원 절차 **앞에** 두었다(첫 산출물 커밋
+`5327e912` 가 base 의 조상이 아님 · 가드 파일이 base 에 없음 — 둘 다 실측 「없음」).
+
+**③ low** (새 기구 없음):
+
+| 지적 | 처분 | 재는 자리 |
+|---|---|---|
+| V7-L1 · R7-2 | 본문 등식의 모집단에 `HttpEntity` · `RequestEntity` 본문 매개변수를 넣었다(제네릭 인자를 센다 — 넣는 쪽이 쌌다). test 이름을 「핸들러 본문 매개변수는 전부 `JsonNode` 다」로 | 변이 BODYHE(r7 에서 초록이던 모양) RED |
+| R7-1 | `@InitBinder` · `@ModelAttribute` 탐지를 Spring 과 같은 메타 애너테이션 인식(`AnnotatedElementUtils.hasAnnotation`)으로. **사실**: 오늘 Spring 의 두 애너테이션은 `@Target` 이 메서드(· 매개변수)뿐이라 합성 애너테이션으로 감쌀 수 없다 — 그래서 이 고침을 RED 로 가르는 변이는 컴파일되지 않는다(일관성 고침) | INITB · MODATTR RED(직접 애너테이션 경로) |
+| R7-3 | 가드 없는 조립의 격리를 KDoc 과 단언으로 받쳤다 — 「가드 probe 조립 · 가드 없는 조립 · probe controller 는 출하 스캔 뿌리(`BidVectorApplication` 의 패키지) 밖에 있다」 | `GuardlessProbeTest`「… 출하 스캔 뿌리 밖에 있다 — 격리」 |
+| R7-4 | advice · 바인더 등식을 FQN 으로 비교 | 같은 test(초록 · INITB RED) |
+
+**사실 기록**: 체인 스크립트의 style 커밋 문면을 고치다가 그 줄에 붙어 있던 경로 인자(`-- <경로>`)를 지운 채로 한 번 돌았다 — 그 회차의 style 커밋 `e16ced28` 은
+경로 한정 없이 `git commit` 이 되었다(색인에 그 파일 하나만 있어 결과 내용은 같다 — `git show --stat` 로 한 파일 확인). 그 앞 회차는 같은 편집의 따옴표 누락으로 문법
+오류로 멈췄고, 포매터가 고친 두 파일은 손으로 경로 한정 커밋했다(`86b3416f`).
+
+**새 파일**: 없다(이 일괄은 기존 파일 편집과 병합).
+
+**역방향 파급(발견 · 이 slice 밖)**: main 에서 온 7C①b evidence(`reports/evidence/m7/7c1b/checklist.md`)가 이 파일의 **줄 번호 좌표**(「7B 의
+`checklist.md` 의 620~630 줄」 모양)를 인용한다. 이 파일은 그 뒤 여러 번 편집돼 그 좌표가 가리키는 자리가 움직였다 — 낡는 좌표 규율의 역방향 사례다. 7C①b 의
+파일이라 이 slice 가 고치지 않고 팀장에게 보고한다(절 제목 「3.4 계약 D-7B-2」로 바꾸는 것이 맞다).
+
+#### 변이 표 — main 병합 · low 정리 (마지막 산출물 커밋 「style … ktlint (D-7B-9)」 위 · `--rerun` · `AccountBindingStructureTest`)
+
+| # | 변이 | 결과 |
+|---|---|---|
+| BODYHE | `resume` 에 애너테이션 없는 `HttpEntity<Map<String, Any>>` 본문 매개변수(r7 에서 초록이던 모양) | **RED** 1(본문 `JsonNode` 등식) |
+| INITB | app main 에 다른 advice 와 `@InitBinder` | **RED** 2(advice · 바인더 FQN 등식 · 가드 패키지 사용 등식) |
+| BODYT | app main 에 `JsonNode` 가 아닌 `@RequestBody` 핸들러 | **RED** 2(본문 등식 · 라우트 센서스 등식) |
+| MODATTR | app main 에 `@ModelAttribute` 메서드 | **RED** 1 |
+| CTRL | 통제군 — 변이 없음 | 초록 14 / 14 |
+
+
 ### 4. 설계 검토 (2b) — 값 획득 축
 
 새 public 표면이 밖에 허락하는 것:
@@ -1377,6 +1431,18 @@ V21 · OpenAPI · 생성 타입은 무변경이라 container 재생 · db-rehear
 | `check` job — S-20 `one-command-check.sh`(Kotlin `check` 포함) | **exit 0** · 21m23s · `app:test` 실행 735 · 실패 0(XML) · `bidding` · `workflow` · `adapters` 는 입력 불변 UP-TO-DATE(앞 실행에서 초록) · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
 | 변이 표 | §3.10 — RED 아홉(MK · INITB · BODYT · 가드 삭제 여섯) · 양성 대조 · 통제군 초록 |
 
+### 7.8 main 병합 뒤 재실측 (base `fb7e9d1e`)
+
+V21 은 무변경이다(main 쪽에도 마이그레이션 없음) — container 재생 · db-rehearsal 은 돌리지 않았다. OpenAPI 와 생성 타입이 바뀌었으므로 S-20 의 web 절(W-1~W-11)을
+전건 돌렸다. 마지막 산출물 커밋 「style … ktlint (D-7B-9)」에서 한 번의 락 보유로 차례로(21:52–22:53).
+
+| 항목 | 결과 |
+|---|---|
+| 반복 측정 — `:app` ktlint · detekt · `sizeGate` · 가드 · 가드 없는 대조 · 구조 · 관리 · 본문 계약 · 아키텍처 test | **exit 0** |
+| `check` job — S-20 `one-command-check.sh`(Kotlin `check` 포함) | **exit 0** · 22m56s · 실행 `app` 757 · `workflow` 543 · `adapters` 1144 · 실패 0(XML) · `bidding` 30 은 입력 불변 UP-TO-DATE · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(106249 bytes)」(병합된 OpenAPI) · Playwright 2 passed |
+| 병합된 main 쪽 test(같은 실행) | `SuggestionEndpointTest` 7 · `SuggestionProductionE2ETest` 8 · `OpenApiSuggestionContractTest` 6 · `ListSuggestionsUseCaseTest` 10 — 실패 0 |
+| 변이 표 | §3.11 — RED 넷 · 통제군 초록 |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -1432,3 +1498,9 @@ A 62 · M 31 → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 dif
 **PR 전 마지막 일괄 재실측** — clone 을 마지막 산출물 커밋(「test … probe 의 매핑 조회는 이름으로 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
 읽었다: 변경 A 67 · M 31(가드 없는 대조 test 하나가 늘었다) → ① exit 0 · ② D 67 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 → **0** · main
 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다.
+
+**main 병합 뒤 재실측(새 base `fb7e9d1e`)** — 복원 절차 앞의 단언 둘을 먼저 실행했다: 첫 산출물 커밋 `5327e912` 는 base 의 조상이 **아니고**, 가드 파일은 base 에
+**없다**. clone 을 마지막 산출물 커밋(「style … ktlint (D-7B-9)」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서 읽었다: 변경 A 67 · M 31 → ① exit 0 ·
+② D 67 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 857 → **1**(base 에도 1 — main 의 7C①b 문서가 이 slice 의 이름 하나를 언급한다, 이 slice 가 남긴
+것이 아니다) · main 표지 3 보존 · 되돌린 트리 객체 = `fb7e9d1e` 트리(`c94ac3f7…`). ④⑤⑥ 은 **트리 동일성**으로 갈음한다 — 같은 트리 객체에서 main CI(`ci`, head
+`fb7e9d1e`)가 success 였다.
