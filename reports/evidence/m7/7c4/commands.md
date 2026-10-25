@@ -330,3 +330,31 @@ KDoc 의 `/**` 뒤에서 시작**해, 합집합이 내 KDoc 본문을 여는 줄
 - ①②②′③ 은 수정 뒤 HEAD 에서 다시 쟀다(복원 exit 0 · D 15 · M 11 · `comm -3` 0 줄 · base 와 바이트 동일).
 - ⑦ 내 표지 0(`ACCOUNT_SETTING` · 표 이름 둘 · `workflow.profile` · `BusinessProfile` · `array_positions`) · 남의 표지 보존
   (`bid_case` 40 · `OPERATOR_BID_HISTORY` 7 · `G1-SET01` 9 · `OpeningPromotion` 9 · `OPEN-QUAL-10` 16).
+
+## r7 (D-7C4-7 — PR 직전 승인 전 일괄) — 명령과 결과
+
+처분 표는 `scope.md` 의 D-7C4-7 절이다. **게이트 술어는 한 줄도 바꾸지 않았다** — 바뀐 것은 계약 문면, 규칙 3 의 이름
+(test 이름 포함), 주석뿐이다. 그래서 전·후 표가 없다(바꾼 술어가 없다).
+
+### 문면을 받치는 실측
+
+- **규칙 3 의 집합**(R5-L1): `workflow.evaluation` 의 **비봉인 인터페이스 열** — `*Port` **아홉** +
+  `CorrelationIdFactory`. 소스에서 `interface` 선언과 `sealed interface` 선언의 차집합으로 셌다.
+- **F15 의 전제**: 그 패키지에 `abstract class` **0** · 하위 디렉터리 **0**(그래서 「오늘 해당 코드 0」이 참이다).
+- **R5-L2 의 사실**: `config/` 전체에 `InvalidPackageDeclaration` 문자열 **0 건**(그 활성은 `buildUponDefaultConfig` 가
+  끌어오는 detekt 기본값에서 온다). 고정은 저장소 전체 설정이라 이 slice 밖 — `OPEN-DETEKT-DEFAULT-PIN`.
+
+### acceptance (`e9a388eb`)
+
+- 찬 `check --continue --rerun-tasks --no-build-cache` → **exit 0**, `BUILD SUCCESSFUL in 23m 51s`, **391 task 전부 실행**,
+  루트 게이트 둘, `FAILED` 0.
+
+### rollback (base `1107f848`)
+
+- 목록 **26 경로** — 앞 라운드와 **같은 집합**이다(`diff` 빈 출력). 다만 그중 한 경로(격리 게이트 test)가 이 라운드에
+  움직여 유효성 술어가 비지 않으므로, **갈음하지 않고 ①~⑦ 을 이 HEAD 에서 다시 쟀다**.
+- ① 복원 exit 0 · ② D 15 · M 11 · ②′ `comm -3` 0 줄 · ③ base 와 바이트 동일(worktree) ·
+  **④⑤⑥ exit 0**(`BUILD SUCCESSFUL in 24m 26s`, 400 task 전부 실행, 루트 게이트 둘) · ⑥′ 이 slice test 결과 **0 건** ·
+  ⑦ 내 표지 0 · 남의 표지 보존(`bid_case` 40 · `OPERATOR_BID_HISTORY` 7 · `G1-SET01` 9 · `OPEN-QUAL-10` 16).
+- 참고: in_scope 밖까지 포함한 트리 동일성은 **성립하지 않는다**(이 slice 의 evidence 세 파일이 라운드마다 바뀐다).
+  그래서 트리 동일성 갈음을 쓰지 않고 직접 측정했다 — evidence 를 읽는 게이트(`leakPatternGate`)가 있기 때문이다.
