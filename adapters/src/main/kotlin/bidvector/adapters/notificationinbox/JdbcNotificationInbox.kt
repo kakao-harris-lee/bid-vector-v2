@@ -124,12 +124,13 @@ class JdbcNotificationInbox(
     private fun Connection.upsert(record: NotificationInboxRecord): NotificationInboxOutcome {
         val occurredAt = Timestamp.from(record.occurredAt)
         return prepareStatement(NotificationInboxSql.UPSERT_ITEM).use { statement ->
-            statement.setLong(1, record.account.value)
-            statement.setString(2, record.fact.kind.name)
-            statement.setString(3, record.notice.number.value)
-            statement.setString(4, record.notice.round.value)
-            statement.setString(5, record.fact.detail?.name)
-            statement.setTimestamp(6, occurredAt)
+            var index = 1
+            statement.setLong(index++, record.account.value)
+            statement.setString(index++, record.fact.kind.name)
+            statement.setString(index++, record.notice.number.value)
+            statement.setString(index++, record.notice.round.value)
+            statement.setString(index++, record.fact.detail?.name)
+            statement.setTimestamp(index, occurredAt)
             // `updated_at` 은 바인딩하지 않는다 — 문장이 `now()` 로 찍는다(SQL 주석의 사유).
             statement.executeQuery().use { rows ->
                 rows.next()
@@ -147,10 +148,11 @@ class JdbcNotificationInbox(
         request: NotificationPageRequest,
     ): List<NotificationInboxItem> =
         prepareStatement(NotificationInboxSql.SELECT_PAGE).use { statement ->
-            statement.setLong(1, account.value)
-            statement.setBoolean(2, request.unreadOnly)
-            statement.setInt(3, request.size)
-            statement.setLong(4, request.offset)
+            var index = 1
+            statement.setLong(index++, account.value)
+            statement.setBoolean(index++, request.unreadOnly)
+            statement.setInt(index++, request.size)
+            statement.setLong(index, request.offset)
             statement.executeQuery().use { rows ->
                 val items = mutableListOf<NotificationInboxItem>()
                 while (rows.next()) items += rows.toItem()
@@ -180,13 +182,17 @@ private data class InboxCounts(
  */
 private fun <T> Connection.inTransaction(block: Connection.() -> T): T {
     autoCommit = false
-    return try {
+    var committed = false
+    try {
         val result = block()
         commit()
-        result
-    } catch (failure: Throwable) {
-        rollback()
-        throw failure
+        committed = true
+        return result
+    } finally {
+        // 잡아서 **다시 던지기만** 하던 `catch` 를 없앴다 — 그러면 넓은 예외를 잡는 자리가
+        // 아예 생기지 않고, 되돌림은 「커밋하지 못한 모든 경로」에서 똑같이 돈다(예외든
+        // 이른 return 이든). 삼킬 수 있는 자리가 구조상 없다.
+        if (!committed) rollback()
     }
 }
 

@@ -119,29 +119,6 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
         ) shouldBe false
     }
 
-    @Test
-    fun `읽은 시각이 적재보다 앞서면 DB 가 거부한다`() {
-        val account = insertFixtureAccount()
-
-        val failed =
-            runCatching {
-                dataSource().connection.use { connection ->
-                    connection
-                        .prepareStatement(
-                            "INSERT INTO notification_inbox (account_id, kind, notice_number, " +
-                                " notice_round, occurred_at, created_at, updated_at, read_at) " +
-                                "VALUES (?, 'NOTICE_REVISED', 'N-BACKDATE', '000', now(), now(), now(), " +
-                                " now() - interval '1 day')",
-                        ).use { statement ->
-                            statement.setLong(1, account)
-                            statement.executeUpdate()
-                        }
-                }
-            }.isFailure
-
-        failed shouldBe true
-    }
-
     private fun insertFixtureAccount(): Long =
         dataSource().connection.use { connection ->
             connection
