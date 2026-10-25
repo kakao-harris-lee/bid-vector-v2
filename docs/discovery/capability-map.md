@@ -3111,7 +3111,7 @@ scout 노트에 있다.)
 
 ## 12. OPEN 결정 목록
 
-**활성 49건** (G1 3 / G2 **7** / G3 **15** / G4 **8** / G5 7 / G6 **5** / M6 잔여·메뉴 **4**).
+**활성 50건** (G1 3 / G2 **7** / G3 **15** / G4 **8** / G5 7 / G6 **5** / M6 잔여·메뉴 **5**).
 > **M6/G1-SET01(2026-10-21) +1** — G3 에 `OPEN-SET01-AWARD-NAME-INGEST` 를 신설했다(45 → 46).
 > **M7/7B(2026-10-21) −1** — `OPEN-ADR-14` 가 닫혀 G6 가 6 → 5 다(46 → 45, 2026-10-24 `998b59dd` 위 rebase 에서 합집합으로 셈).
 > **M6/G1-DEC05(2026-10-21 · 10-24) +4** — G3 OPEN 묶음 둘(`OPEN-M6-RESIDUAL-OPS` ·
@@ -3121,7 +3121,11 @@ scout 노트에 있다.)
 > 아니었고, 그 자리의 진짜 물음이 이것이다). 묶음 둘은 기존 G3 항목을 묶는 홀더라 G3 안에
 > 세지 않고 별 칸(`M6 잔여·메뉴`)에 둔다.
 > **합산은 이 머지에서 수행됐다**: 45(7B 의 `OPEN-ADR-14` 해소가 이미 반영된 수) + 4(DEC05)
-> = **49**. SET-01 의 +1 은 그 45 안에 이미 들어 있다 — 두 번 세지 않는다.
+> = **49**, 그리고 r2 일괄이 `OPEN-DEC05-STANCE-RATE-PROVENANCE` 를 더해 **50** 이다.
+> SET-01 의 +1 은 그 45 안에 이미 들어 있다 — 두 번 세지 않는다.
+> **규약(계속 적용)** — 병렬 레인이 같은 표를 고치므로 **이 수는 머지 직전에 재계산한다.**
+> 각 레인은 자기 증감만 적고, 머지하는 쪽이 합산하면서 **이미 반영된 증감을 두 번 세지
+> 않는지** 확인한다(이 머지에서 SET-01 의 +1 이 그 자리였다).
 각 항목은 `결정 필요 사항` /
 `선택지` / `출처`를 갖는다. 항목을 해소할 때는 결정 근거(누가, 언제, 무엇으로)를 함께
 기록하는 것을 규약으로 하며, 위반 사례가 발견되면 이 절을 갱신한다.
@@ -3155,13 +3159,17 @@ scout 노트에 있다.)
 미결을 **과소 계상**한다(`milestone-0.md` 완료 조건이 이 수를 게이트로 쓴다). 신설 사유는
 §12.1에 있다. **신설은 임의 해소의 반대 방향이며 A2 위반이 아니다.**
 
-**M6/G1-DEC05 가 3건을 신설했다**(45 → **48**, 2026-10-21) — `OPEN-M6-RESIDUAL-OPS` ·
-`OPEN-M6-RESIDUAL-ML-LIFECYCLE`(둘 다 §14.3) 은 **운영자 결정 2026-10-15 이 지시한 등재**다
-(조건 3 에서 G3 24 를 빼고 OPEN 묶음 둘로 옮긴다 — `milestone-6.md` 완료 조건 아래 결정 블록이
-등재 주체를 「G1 의 첫 M6 잔여 slice 착수 계약」으로 지목했고 이 slice 가 그 첫 slice 다).
+**M6/G1-DEC05 가 5건을 신설했다**(2026-10-21 · 10-24 · 10-26, 위 머리 산술 참조) —
+`OPEN-M6-RESIDUAL-OPS` · `OPEN-M6-RESIDUAL-ML-LIFECYCLE`(둘 다 §14.3) 은 **운영자 결정
+2026-10-15 이 지시한 등재**다 (조건 3 에서 G3 24 를 빼고 OPEN 묶음 둘로 옮긴다 —
+`milestone-6.md` 완료 조건 아래 결정 블록이 등재 주체를 「G1 의 첫 M6 잔여 slice 착수 계약」으로
+지목했고 이 slice 가 그 첫 slice 다).
 `OPEN-DEC05-FLOOR-RATE-READING` 은 **신설 미결**이다 — 투찰가 메뉴 커널이 게시 하한율을 하드
 제약으로 읽을지가 값이 아니라 도메인 판단이라, 구현이 그 자리를 임의 해석으로 메우는 대신
-활성 OPEN 으로 올리고 커널을 fail-closed 로 뒀다. **신설은 임의 해소의 반대 방향이다.**
+활성 OPEN 으로 올리고 커널은 **표식형**으로 뒀다(미결을 binding 에 싣되 결과를 막지는 않는다 —
+r2 L-4 정정. 앞 문면의 「fail-closed」는 과장이었다). 나머지 둘은 라운드 2 검토가 낸 것이다 —
+`OPEN-DEC02-SCORE-AXIS-FLOOR`(점수 축의 하한 처분) · `OPEN-DEC05-STANCE-RATE-PROVENANCE`
+(후보 율의 출처). **신설은 임의 해소의 반대 방향이다.**
 
 **M1 slice 1A 가 1건을 더 신설했다**(44 → **45**) — `OPEN-ADR-15`(G6), 이 문서가
 `milestone-1.md` 를 가리키는 좌표의 일괄 교체. 1A 의 편집이 그 파일의 줄 번호를 밀어 **이 문서의
@@ -3704,6 +3712,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-M6-RESIDUAL-OPS` (M6/G1-DEC05 신설, 2026-10-21) | **M6 잔여 — 운영·전략 축 15.** 7A 조정안(`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`) G3 표의 운영 축이고, 운영자 결정 2026-10-15(`milestone-6.md` 완료 조건 아래 결정 블록)이 **조건 3 의 판정 대상에서 빼고 OPEN 묶음으로 등재**하라고 정했다. 그 결정 블록은 등재 주체를 「G1 의 첫 M6 잔여 slice 착수 계약」으로 지목했고, 이 slice 가 그 첫 slice 다. 목록(조정안 G3 표가 정본): `STR-04` · `STR-09` · `STR-10` · `NOTI-01` · `OPS-02` · `OPS-03` · `OPS-04` · `OPS-05` · `OPS-07` · `OPS-08` · `OPS-09` · `OPS-10` · `OPS-11` · `OPS-12` · `OPS-13`. 각 행이 무엇이 비었는지는 추적표가 적는다 | **M7 7F(운영 반입) 또는 별 마일스톤** | 운영자 | **정본**(이 행) · 조정안 G3 표·`milestone-6.md` 결정 블록은 포인터 |
 | `OPEN-M6-RESIDUAL-ML-LIFECYCLE` (M6/G1-DEC05 신설, 2026-10-21) | **M6 잔여 — ML 수명주기·분류 version 5.** 위 항목과 같은 결정·같은 등재 근거다. 목록: `ML-05`(낙찰률 GBM) · `ML-07`(승격 게이트) · `ML-08`(아티팩트 무결성·서명·롤아웃) · `SET-06`(정산 성숙도 → 평가 창 embargo) · `DEC-08`(분류 정책 version 저장). **G3 24 가운데 두 묶음에 들지 않는 넷**은 따로 산다 — `ML-02`·`ML-04` 는 G1 의 ML 배선 slice 가 acceptance 에 재판정을 넣고(결정 블록 문면), `QUAL-04`·`COL-07` 은 이미 홀더가 있다(`COL-07` 은 `OPEN-DEC-10`). 15 + 5 + 4 = 24 로 조정안 G3 계와 같다 | **M7 7F(운영 반입) 또는 별 마일스톤** | 운영자 | **정본**(이 행) · 조정안 G3 표는 포인터 |
 | `OPEN-DEC05-FLOOR-RATE-READING` (M6/G1-DEC05 신설, 2026-10-21) | **게시 낙찰하한율을 투찰율의 하한으로 읽을 것인가 — 그리고 경계 등가(투찰율 == 하한율)는 허용인가.** 왜 결정이 필요한가: 게시 하한율은 **예정가격 기준** 율이고 추천 투찰율은 **기초금액 기준**이라(§1.4.2 · DEC-04 분류 근거) 두 축을 잇는 정직한 다리는 임계 사정률(`투찰율 ÷ 하한율`) 하나뿐이다. 임계가 1 미만이면 그 후보는 실현 사정률이 1 이상인 어떤 추첨에서도 하한 미달이므로 「하한율을 투찰율 하한으로 읽는다」는 **해석**이 성립할 수 있으나, 그 승격 여부는 값이 아니라 도메인 판단이다. **수치 결정이 아니다** — 선택지는 (a) 읽지 않는다(현 출하값, `FloorRateReading.Undecided`) (b) 읽되 경계 등가 허용(`AtOrAbove`) (c) 읽되 경계 등가 불허(`StrictlyAbove`). 함의: (a) 에서는 하한 binding·밴드 붕괴가 production 에서 발화하지 않는다(그 사실을 `BidMenuPolicyDataTest` 가 고정한다). (c) 는 허용 구간이 열려 있어 **최소 원소가 없으므로** 하한 아래 후보를 올릴 자리가 없고 사유 있는 실패가 된다(엡실론을 지어내지 않는다). 커널은 (a) 에서 **표식형**이다 — 제약을 적용한 「척」하지 않고 binding 을 `FloorRateReadingUndecided` 로 싣지만 **결과를 막지는 않는다**(라운드 2 에 「fail-closed」 표현을 내렸다, verifier M-1 — 제약 없이 계산된 메뉴가 그대로 나가므로 닫히는 것은 주장이지 출력이 아니다). 그 표식을 읽고 처분하는 것은 표면의 의무이고 7C ② 계약 조건이다. 반올림 모드는 이 항목이 아니라 `OPEN-DIC-10` 소유다 | **운영자 결정 2026-10-22 — (b) `AsBidRateLowerBound(AtOrAbove)`.** M6/G1-DEC05 에는 **적용하지 않는다**(출하 정본은 `Undecided` 그대로) — 적용은 7C ② 에서 `BID_MENU_POLICY` 의 `floorRateReading` 갱신으로. 결정은 났고 **적용이 남은** 항목이라 활성 목록에 둔다 | 운영자 | **정본**(이 행) · `decision/src/main/kotlin/bidvector/decision/menu/BidMenuPolicyData.kt` KDoc 은 포인터 |
+| `OPEN-DEC05-STANCE-RATE-PROVENANCE` (M6/G1-DEC05 신설, 2026-10-26) | **메뉴 옵션의 근거에 「그 투찰율이 어디서 왔는가」가 없다.** `StanceRates` 는 아무 `Rate` 나 받는 public 생성자이고 `BidMenuGrounds` 는 기초금액 출처 · 게시 하한율 · 정책 version · 효력 율만 싣는다 — 그 율이 **ML release 에서 온 것인지 손으로 넣은 상수인지**를 싣지 않는다. 그래서 `composeBidMenu(BidMenuInput(base, StanceRates(0.88, 0.90, 0.92), …))` 가 legacy 매직 스프레드 같은 상수로 **「근거를 갖춘」 완전한 `Offered`** 를 낸다(verifier r2 M-5). 착수 계약 위협 모델 (0) 첫 줄(「근거 없는 숫자가 운영자에게 추천으로 가는 것」)의 **입력 경계**다. 지금 해가 없는 이유는 소비자가 0 이고 값 출처 축이 PR #88 로 `ML-01` 뒤에 있기 때문이지, 타입이 막아서가 아니다. 선택지는 (a) `StanceRates` 에 출처 슬롯을 더해 근거에 싣는다 (b) 출처 축을 만들지 않고 **표면 계약**으로만 둔다(7C ② 가 ML release 를 함께 표시) (c) 입력 타입을 ML 응답에서만 지을 수 있게 좁힌다 | **`ML-01`(ML 배선) 때 닫는다** — 그 slice 가 율의 출처를 실제로 들고 오는 자리다. 그때까지 이 slice 는 **출처 축을 새로 만들지 않는다**(D-G1DEC05-3 단계 4). 그동안 화면 표시는 「아직 산출 안 함」 선언 예외라 운영자에게 상수 메뉴가 보이지 않는다 | 운영자 · ML-01 | **정본**(이 행) · `reports/evidence/m6/g1dec05/checklist.md` 알려진 제한은 포인터 |
 | `OPEN-DEC02-SCORE-AXIS-FLOOR` (M6/G1-DEC05 신설, 2026-10-24) | **예측 투찰율이 게시 하한율 미달일 때 budget capture 점수를 어떻게 매기는가** — (a) 예측값 그대로 점수화 (b) 하한으로 clamp 한 금액으로 점수화 (c) 점수 자체를 부재(`Absent`)로 둔다. 왜 결정이 필요한가: 점수 경로(`workflow/evaluation/PredictionFacts.kt` 의 budgetCapture)는 `기초금액 × 비율 → 원 단위 반올림 → bidRateAgainst(base) → clamp01` 의 **왕복**이고, 그 중간 `BidAmount` 은 제출·표시·영속되지 않는 점수 재료다. 그래서 DEC-02 의 하한 보장(제출 축)은 이 자리에 **적용되지 않는다** — 실측: 그 호출이 `floor` 인자를 주지 않는 것은 메뉴 부재 때문이 아니라 이 경로에 `AppliedFloor` 를 만드는 자리가 애초에 없기 때문이다(메뉴·ML 배선과 **무관**하게 성립). **반대 근거(clamp 를 넣는 것이 왜곡이다)**: hard clamp 를 넣으면 하한 미달 예측이 「하한에서 투찰한 것」으로 점수화돼 아무도 예측하지 않은 투찰을 평가하게 되고, 그 점수가 verdict 로 들어간다. 즉 (b) 는 신호를 왜곡하는 쪽이므로 기본값으로 추천하지 않는다 | **DEC-10 착수 계약에서 함께 판정** — 그 초안이 평가 margin 점수 경로(`floorHeadroomOf`)를 가격 경로로 분류해 두었고, 「점수 축에서 하한을 어떻게 다루는가」가 같은 질문이다 | 운영자 | **정본**(이 행) · `reports/evidence/m6/6e1/acceptance-trace.md` DEC-02 행은 포인터 |
 | `OPEN-4B5-COMPETITIVENESS` (M4/4B-5 신설, 2026-09-10) | **V2 는 「투찰 시장 평균」 fact 를 수집·정의한 적이 없다.** `deriveCompetitiveness`(scope.md ⑤, legacy `bid_recommendation.py:111-124` 4밴드 .95/.75/.50/.25)가 필요로 하는 `marketAverage` 값도, 그것을 표현할 shared-kernel `Basis` 축도 없다 — 실측: `Basis` enum 여섯종(BASE_AMOUNT·ESTIMATED·YEGA·BID·ALLOCATED_BUDGET·AWARD)에 시장평균 없음 · `Money` 스케일 곱 연산은 `BaseAmount.times(BidRate)` 하나뿐 · `compareKnownVat` 는 같은 타입 쌍만 비교. 4B-5 가 D-4B5-4 「없으면 멈추고 보고」로 멈췄고, 처분(계약 갱신 2026-09-10 #1)은 상수 `competitivenessNotCollected(): Absent(MarketAverageMissing)` — 4B-4 재정규화가 나머지 넷 성분으로 priority 를 세운다. `DerivationPolicyData` 에도 competitiveness 필드를 두지 않았다(소비자 없는 필드 금지) | **시장 평균 fact 의 정의·수집은 M3 후속**(개찰 결과 집계 축) · **shared-kernel `Basis` 확장 결정은 별도 slice** | 운영자 | **정본**(이 행) — `reports/evidence/m4/4b5/scope.md` 「계약 갱신 — 2026-09-10」 절·`checklist.md` 는 포인터 |
 | ~~`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`~~ (M4/4C-2 verifier r2 M-3 신설, 2026-09-10 → **M3/3G 종결, 사용자 승인 2026-09-10**) | 3D 의 권한 test 둘(`provenance_authority`·`notice_audit`)이 `information_schema.role_table_grants`(역할 **직접** 부여만)를 술어로 써서 `GRANT ... TO PUBLIC` 경유로 `bidvector_app` 이 실제로 행사할 수 있는 초과 권한을 못 본다(4C-2 verifier r2 실측, `PROBE-PUB … OK rows=1`). **닫는 방법**: M3/3G 가 4C-2 의 `has_table_privilege`(직접·PUBLIC·상속 해소) 술어를 `public` 의 **전 BASE TABLE**로 전수화한 유효 권한 행렬 test 하나로 옛 술어 둘을 대체했다 — 테이블 목록은 DB 에서 발견하고(손으로 적은 목록 순회 금지) 기대 행렬과 키 집합·값을 둘 다 일치시킨다. mutation 넷(PUBLIC 경유 초과·역할 직접 초과·부족·미선언 신규 테이블)으로 게이트가 실제로 낙제함을 실측했고, verifier r1 이 mutation 여섯(신규 테이블은 실 마이그레이션으로 재현)으로 독립 재확인해 `ready-for-review`다. **사용자 승인 2026-09-10 으로 닫혔다.** 잔여는 래칫 밖 표면(`OPEN-3G-NONTABLE-PRIVILEGE-SURFACES` — 시퀀스 셋·VIEW·구체화뷰)이며 **같은 갈래의 별도 항목**으로 산다. 정본은 `reports/evidence/m3/3g/scope.md`·`milestone-3.md` Slice 3G 절 | — | — | **정본**(이 행) · `reports/evidence/m4/4c2/checklist.md` 「인계」는 옛 포인터, `milestone-3.md` Slice 3G 절이 현재 서술 |
