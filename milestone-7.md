@@ -142,6 +142,8 @@ OpenAPI 가 고정된 뒤 착수한다(목 서버로 먼저 만들지 않는다 
   미해석」 표시가, QUAL-08 · QUAL-11 은 7C ④ 입력이 서고 「아직 판정하지 않음」 표시가 test 로 잠긴다. COL-04 는 「요건 없음 vs
   수집 실패」 구분 표시를 유지한다(이미 측정됨). STR-02 의 요건 원문 축은 6F-5-b 가 열릴 때 판정한다(홀더
   `OPEN-6F4-STR02-REQUIREMENTS-AXIS`).
+- 화면 C 의 투찰가 3안 자리가 「아직 산출 안 함」 상태로 표시되고 근거 없는 숫자를 내지 않는 것이 test 로 잠긴다 — ML-01 은 운영자 결정
+  2026-10-24 로 G1 에서 빠져 6G 종결 뒤 `OPEN-ML-ANALYSIS-WIRING` 아래에서 판정한다(`milestone-6.md` 완료 조건 아래 결정 블록).
 - verifier 최종 `ready-for-review` 와 사용자 release 승인.
 
 ## 완료 후 별도 승인 사항

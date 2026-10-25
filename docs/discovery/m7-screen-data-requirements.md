@@ -59,7 +59,7 @@
 | 머리: 공고명·기관·마감/개찰/통보 예정일·낙찰방식·복수예가 여부 | 공고 단건 | COL-01 · COL-03 · COL-08 | 없음 — 공고 단건 조회 operation 0 | ⓑ | 7C ① |
 | 카운트다운 | | (클라이언트) | 마감 원값에서 계산 | ⓐ | 7E |
 | 자격 판정: 축별 ✅/❌ + 근거 원문 | provenance | QUAL-01 · QUAL-03 · QUAL-05 | 없음 | ⓑ | 7C ② + `OPEN-6A3-EVALUATION-DETAIL` |
-| [투찰가 요청] → 3안(recommended/aggressive/safe) | 요청 시 산출 | DEC-05 · ML-01 | `evaluateDryRun` 은 전략 전체 평가이고 공고 단건 요청이 아니다 · 3안 타입 없음(추적표 DEC-05) · ML 이 출하 조립에서 자리지킴(`OPEN-ML-ANALYSIS-WIRING`) | ⓑ | 7C ② — **선행: DEC-05 메뉴 타입 · ML 배선**(조정안 참조) |
+| [투찰가 요청] → 3안(recommended/aggressive/safe) | 요청 시 산출 | DEC-05 · ML-01 | `evaluateDryRun` 은 전략 전체 평가이고 공고 단건 요청이 아니다 · 3안 타입 없음(추적표 DEC-05) · ML 이 출하 조립에서 자리지킴(`OPEN-ML-ANALYSIS-WIRING`) | ⓑ | 7C ② — 「아직 산출 안 함」 상태를 낸다. 3안 값 자체는 ML-01 뒤 별 slice(운영자 결정 2026-10-24: ML-01 은 6G 백테스트 판정 뒤 — `milestone-6.md` 완료 조건 아래 결정 블록) |
 | 근거: 기초금액 basis | | DEC-01 | 없음 | ⓑ | 7C ② |
 | 근거: 하한율·출처 | | DEC-03 · DEC-10 | 없음 — 법정 하한율 해석기 없음(추적표 DEC-03) | ⓑ | 7C ② — 선행 없음(운영자 결정 2026-10-15: 게시 하한율만 근거 · 「법정 하한율 미해석」 표시 · DEC-03 은 G2, DEC-10 은 G1) |
 | 근거: 하한 미달 빈도 · 판정 불가 사유 | 정직 명세 | DEC-04 | 없음 | ⓑ | 7C ② |

@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
@@ -7,8 +8,10 @@ import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
+import bidvector.app.wiring.SuggestionQuery
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
@@ -25,6 +28,7 @@ import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
@@ -45,6 +49,7 @@ import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.strategy.toSnapshot
+import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
@@ -233,6 +238,26 @@ class FakeNoticeSearchPort : NoticeSearchPort {
         lastCriteria = criteria
         return page
     }
+}
+
+/**
+ * M7/7C①b — 제안 목록의 이중체 원천·면허 게이트. `SuggestionController`(같은 패키지 main)가 조회기를
+ * 요구해 `HttpTestApplication` 기반 test 가 DB 없이 제안 경로를 돈다. 감시 게이트는 **실 구현**
+ * (`NoticeWatchSubjectPort`, 순수)이다 — 전략의 감시 조건이 실제로 거른다. 실 DB 거동은
+ * `SuggestionProductionE2ETest` 가 잰다.
+ */
+class FakeSuggestionCandidates : CandidateSourcePort {
+    @Volatile var notices: List<Notice> = emptyList()
+
+    override fun openCandidates(): List<Notice> = notices
+}
+
+class FakeSuggestionLicenseGate : LicenseGatePort {
+    @Volatile var verdictFor: (Notice) -> LicenseVerdict = {
+        LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
+    }
+
+    override fun verdictFor(notice: Notice): LicenseVerdict = verdictFor.invoke(notice)
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
@@ -427,6 +452,31 @@ open class HttpTestApplication {
             retentionPolicy =
                 EVIDENCE_RETENTION_POLICY.resolve(LocalDate.now())
                     as Resolution.Resolved<EvidenceRetentionPolicyData>,
+        )
+
+    /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
+    @Bean
+    open fun fakeSuggestionCandidates(): FakeSuggestionCandidates = FakeSuggestionCandidates()
+
+    @Bean
+    open fun fakeSuggestionLicenseGate(): FakeSuggestionLicenseGate = FakeSuggestionLicenseGate()
+
+    @Bean
+    open fun suggestionQuery(
+        strategyRepository: TestStrategyRepository,
+        fakeSuggestionCandidates: FakeSuggestionCandidates,
+        fakeSuggestionLicenseGate: FakeSuggestionLicenseGate,
+        clock: FixedClock,
+    ): SuggestionQuery =
+        SuggestionQuery(
+            ListSuggestionsUseCase(
+                strategies = strategyRepository,
+                profiles = OperatorProfilePort { null },
+                candidateSource = fakeSuggestionCandidates,
+                watchSubjects = NoticeWatchSubjectPort(),
+                licenseGate = fakeSuggestionLicenseGate,
+                clock = clock,
+            ),
         )
 
     /**
