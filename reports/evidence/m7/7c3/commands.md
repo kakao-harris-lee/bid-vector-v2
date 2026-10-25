@@ -1,6 +1,6 @@
 # M7/7C③ — 실행 명령과 종료 코드
 
-base `a61ddff1` · 브랜치 `m7-7c3/2026-10-23` · worktree `bid-vector-v2-m7-7c3`.
+base `1107f848` · 브랜치 `m7-7c3/2026-10-23` · worktree `bid-vector-v2-m7-7c3`.
 
 호스트 규율: 모든 Gradle·npm 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고 점검 셋
 (`pgrep`·`free -m`·`ps`)을 **별도 호출로 먼저** 봤다. 이 라운드 동안 같은 락에 **다른 레인
