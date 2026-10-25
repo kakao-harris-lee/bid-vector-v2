@@ -360,3 +360,88 @@ D-7C4-2 의 `awaiting` 은 **(항목, 선행 항목) 짝**이다. 응답 평탄 
 정해야 한다. 후보 둘: (가) 스칼라 배열 둘(`awaitingItems` · 같은 순서의 `awaitingPrerequisites`) — 짝이 자리로만 묶여 약하다,
 (나) 7C ② 의 평탄 술어 확장(깊이 1 · 대상 속성 전부 스칼라)이 머지되면 그 허용 안에서 짝 배열. **지금 고르지 않는다** — 2a 는
 HTTP 표면이 없고(알려진 제한 6), 고르면 7C ② 의 게이트 술어 결정을 이 레인이 선점한다.
+
+## §4 Phase 2b — 설계 (코드 0 · 빌드 0, 팀장 답 대기)
+
+base main `46ac0949`, 브랜치 `m7-7c4b/2026-10-26`. 아래는 전부 **main 을 읽어 확인한 사실** 위에 선다.
+
+### 4.0 2a 이후 달라진 전제 (7B 가 들여온 것)
+
+| # | 사실 | 2b 에 주는 제약 |
+|---|---|---|
+| G1 | 계정은 **세션 인증이 심은 typed 요청 속성** 하나에서만 나온다(`authenticatedAccount()`), 주체 라벨 문자열 파싱은 금지 | 내 controller 도 그 접근자만 쓴다. 본문·쿼리에서 계정을 읽는 자리를 만들지 않는다 |
+| G2 | **요청 바인딩은 `AccountId` 를 짓지 못한다**(fail-closed 가드: Jackson 거부 · 객체 바인딩 거부 · 단일 매개변수 변환 거부) | 「본문에 계정을 넣는」 우회가 **앱 전역에서 이미 닫혀 있다**. 2b 가 다시 세울 필요가 없고, 대신 그 전제를 쓰는 쪽을 test 로 적는다 |
+| G3 | 본문은 **`@RequestBody JsonNode` 만** 허용된다(객체 바인딩 자체가 거부된다) | 쓰기 네 operation 의 본문을 DTO 로 받지 않는다 — `JsonNode` 를 읽어 값 타입으로 옮긴다(7B · 전략 편집과 같은 관례) |
+| G4 | `AccountScopedRoutes` 가 **계정 전용 뿌리**를 선언하고 표면 전수 test 가 그 선언과 판정을 대조한다 | `/api/profile` · `/api/onboarding-checklist` 를 그 상수에 더한다. `@RequestMapping` 은 상수에서 경로를 받는다 |
+| G5 | `ErrorBody` 는 **code · 고정 문구 · correlationId 셋뿐**이고 예외 메시지·스택트레이스를 담지 않는다 | **2b 표적 1 의 응답 쪽은 이미 닫혀 있다**(아래 4.5) |
+| G6 | 평탄 술어는 **허용 목록**이고 7C ② 의 확장은 **main 에 없다** | `awaiting` 의 짝 배열을 지금 넣을 수 없다(4.7) |
+
+### 4.1 표면 — §0.6 표를 그대로 세운다
+
+`readProfile`(GET `/api/profile`) · `replaceQualificationFacts` · `replaceBusinessDetails` ·
+`listConstructionCapacities`(GET, 최상위 배열) · `upsertConstructionCapacity` · `removeConstructionCapacity`(POST) ·
+`readOnboardingChecklist`(GET `/api/onboarding-checklist`). 쓰기는 전부 POST — CSRF 는 메서드로 구조적으로 요구되고
+실패는 **401**(사유 미구분, D-6A1-6). controller 는 조회/쓰기로 가른다(7B 관례).
+
+### 4.2 `unauthenticated` 공용화 (D-7C4-1 R1 의 남은 한 건)
+
+`authenticatedAccount()` 는 이미 `app.http` 공용이다. 공용화가 필요한 것은 **401 응답 한 벌**
+(`BidCaseHttp.unauthenticated(request)`) — 입찰함 이름 아래 있지만 내용은 계정 경로 공통이다. **거동 무변경 refactor
+한 건**으로 공용 자리에 옮기고 7B 호출부를 그 자리로 돌린다(2b 의 별 커밋, rollback 목록에 포함).
+
+### 4.3 쓰기 소유 경계 — 2b 표적 2 (controller 가 세션 계정만 넘긴다)
+
+G2 가 「본문이 계정을 짓는 길」을 이미 닫았으므로 2b 가 더할 것은 **두 겹**이다.
+1. **구조**: use case 서명의 첫 인자가 `AccountId` 이고(2a port 관례) controller 는 `authenticatedAccount()` 의 값만
+   넘긴다. 조립(wiring)에 계정을 아는 다른 출처를 두지 않는다.
+2. **test**: 「본문에 `accountId` 를 넣어도 다른 계정의 행이 바뀌지 않는다」를 실 DB E2E 로 잰다(두 계정). 이것이
+   2a 알려진 제한 1(「쓰기의 소유 경계는 호출자 전제」)을 2b 에서 **갚는 자리**다.
+
+### 4.4 `CAPACITY_ROWS_MAX` 집행 — 2b 표적 3
+
+use case 가 upsert 전에 행 수를 센다. **검사-후-삽입은 경합한다**(두 요청이 동시에 상한 직전 수를 읽으면 둘 다 통과).
+후보 둘: **(가) 앱에서만 재고 경합을 알려진 제한으로 등재**(운영자 1인 전제 — 2a 제한 1 과 같은 축) · **(나) 표 층
+제약**(행 수는 CHECK 로 못 센다 — 트리거나 부분 유니크가 필요하고, 그것은 V23 과 트리거 관례를 끌어온다).
+**권고는 (가)** — 2a 가 「동시 편집은 마지막 쓰기 승리」를 이미 등재했고, 같은 전제 위에서 수단만 늘리는 것이 과잉이다.
+→ **확인 Q1**.
+
+### 4.5 DB 예외 문면 누출 — 2b 표적 1 (응답은 닫혔고 **로그가 남는다**)
+
+- **응답**: `ErrorBody` 가 code · 고정 문구 · correlationId 뿐이라(G5) `Failing row contains (…)` 가 본문으로 나가지
+  않는다. 2b 는 그 사실을 **test 로 고정**한다(제약 위반을 일으키는 요청의 응답 본문에 행 값이 없다).
+- **로그**: 그 문면이 스택트레이스로 로그에 남을 수 있다. 수단 둘 — **(가) 어댑터가 제약 위반을 도메인 결과로 바꾸며
+  메시지를 버린다**(내 두 표에만 듣는다) · **(나) 데이터소스에 `logServerErrorDetail=false`**(pgjdbc 연결 속성 —
+  **모든 표**에 듣지만 저장소 전역 설정이라 `detekt.yml` 과 같은 성격이다). → **확인 Q2**(권고: 2b 는 (가)로 자기 표를
+  닫고, (나)는 전역 등재로 올린다).
+
+### 4.6 격리 게이트 모집단 재서술 — 2b 표적 4
+
+2b 는 `app` 이 `workflow.profile` 을 **정당하게** 참조하기 시작한다. 그래서 (1) 격리 test 의 「재지 않는 것 ⓐ `app`」
+문면을 「2b 부터 참조한다」로 고치고, (2) **진짜 방어를 조립 자리에 세운다** — 「자격 판정 use case 의 조립이 V22 port 를
+받지 않는다」를 wiring test 로 잠근다(2a 제한 5 의 N1 · N4 · N5 · B2 · B4 가 그 경계 뒤에서 무력해진다).
+**새 게이트 술어를 또 만들지 않는다** — 2a 에서 「우회마다 술어 하나」를 멈추기로 한 결정 그대로다.
+
+### 4.7 `awaiting` 응답 형태 — 지금 고르지 않는다
+
+| 후보 | 모양 | 영향 |
+|---|---|---|
+| (가) 스칼라 배열 둘 | `awaitingItems[]` + 같은 순서의 `awaitingPrerequisites[]` | 지금 평탄 술어로 **통과한다**. 짝이 자리로만 묶여 약하고, 클라이언트가 두 배열의 순서를 믿어야 한다 |
+| (나) 짝 배열 | `awaiting: [{item, prerequisite}]` | 7C ② 의 평탄 술어 확장(깊이 1 · 속성 전부 스칼라)이 **머지된 뒤에만** 가능하다. 지금 넣으면 계약 test 가 붉다 |
+
+7C ② 머지 뒤에 정한다(팀장 지시). 그때까지 체크리스트 응답은 **완료 · 미완만** 내고 `awaiting` 을 **내지 않는다** —
+그러면 D-7C4-2 의 세 상태가 응답에서 두 상태로 접힌다. → **확인 Q3**: 7C ② 를 기다렸다가 한 번에 낼지, (가)로 먼저
+내고 7C ② 뒤에 (나)로 옮길지(그 전환은 wire 변경이다).
+
+### 4.8 in_scope 예정 · 게이트 등재 자리
+
+`app/.../http/`(controller 둘 · 요청 읽기 · 응답 · `AccountScopedRoutes` 추가) · `app/.../wiring/`(조립) ·
+`openapi/bidvector-operator-api.yaml` · `web/src/.../generated`(재생성) · `config/quality/gate-tests.properties` ·
+`architecture-policy.properties`(app.http 허용 목록 · use case 포트) · 2a 의 격리 test 둘(문면) ·
+`workflow/.../profile/`(use case 신설). **마이그레이션은 없다**(V22 그대로).
+
+### 4.9 팀장 확인
+
+- **Q1** `CAPACITY_ROWS_MAX` 집행을 앱에서만(경합은 알려진 제한) — 권고 (가).
+- **Q2** DB 예외 문면의 로그 쪽을 어댑터에서 닫고(내 표), `logServerErrorDetail` 전역화는 별 등재로 — 권고 (가).
+- **Q3** `awaiting` 을 7C ② 머지까지 **응답에서 빼둘지**, (가)로 먼저 낼지.
+- **Q4** `unauthenticated` 공용화가 7B 파일을 만진다(거동 무변경) — 2b in_scope 로 받아도 되는가.
