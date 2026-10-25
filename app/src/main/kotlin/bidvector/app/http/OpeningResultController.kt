@@ -9,6 +9,7 @@ import bidvector.workflow.opening.OpeningResultView
 import bidvector.workflow.opening.ProvisionalRankOne
 import bidvector.workflow.opening.parseOpeningResultQuery
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -30,7 +31,14 @@ private val DECLARED_PARAMETERS = listOf("noticeNumber", "noticeRound")
 class OpeningResultController(
     private val openingResults: OpeningResultQuery,
 ) {
-    @GetMapping("/api/opening-results")
+    /**
+     * **`produces` 를 선언한다**(D-6A2b-21 축) — 이 endpoint 는 **필수 질의 칸**이 있어, 칸이 없으면
+     * 핸들러가 400 거부를 먼저 던진다. 그 오류 본문(JSON)을 쓰는 단계에서 `Accept` 협상이 깨지면
+     * 그 두 번째 실패가 500 으로 나간다(실측). `produces` 는 협상을 **매핑 단계**로 당겨, 받아들일
+     * 수 없는 `Accept` 가 핸들러에 닿기 전에 406 이 되게 한다 — 「406 이고 500 이 아니다」 전수
+     * 단언이 이 선언으로 선다.
+     */
+    @GetMapping("/api/opening-results", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun read(request: HttpServletRequest): OpeningResultResponse {
         val values =
             try {
