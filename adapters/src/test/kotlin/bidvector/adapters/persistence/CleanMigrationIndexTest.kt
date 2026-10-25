@@ -135,6 +135,14 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("bid_draft", "bid_draft_id_case_account_key", "USING btree (id, case_id, account_id)"),
             IndexSpec("bid_record", "bid_record_pkey", "USING btree (id)"),
             IndexSpec("bid_record", "bid_record_case_id_record_seq_key", "USING btree (case_id, record_seq)"),
+            // M7/7C④ — V22 계정 사업 정보 둘. PK 둘뿐이고 **선두 열이 `account_id`** 다(소유 필터가
+            // 색인의 첫 축). 보존 cutoff 인덱스가 없다 — 시간 기준 파기 대상이 아니다(`ACCOUNT_SETTING`).
+            IndexSpec("account_business_profile", "account_business_profile_pkey", "USING btree (account_id)"),
+            IndexSpec(
+                "account_construction_capacity",
+                "account_construction_capacity_pkey",
+                "USING btree (account_id, license_name)",
+            ),
             // M7/7C③ — 알림함도 파기 대상이라 cutoff 질의를 받고, 목록은 계정 안에서 최신 순이다
             // (선행 열이 `account_id` 라 계정 경계가 인덱스 층에서도 첫 축이다).
             IndexSpec(

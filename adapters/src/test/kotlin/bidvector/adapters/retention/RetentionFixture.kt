@@ -375,6 +375,21 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "FROM account WHERE login_name = 'ret-$tag'",
             )
         },
+        // M7/7C④ — 계정 사업 정보 둘. 전부 제외 표(`ACCOUNT_SETTING`)이고 「행 수 불변」을 재려면
+        // 행이 있어야 한다. 계정을 FK 로 참조하므로 **계정 뒤**다. 값은 합성이다(실값 0).
+        TableSeed("account_business_profile") { tag, at ->
+            listOf(
+                "INSERT INTO account_business_profile (account_id, nara_registration, nara_registered_fields, " +
+                    "updated_at) SELECT id, 'UNANSWERED', '{}', '$at' FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
+        TableSeed("account_construction_capacity") { tag, at ->
+            listOf(
+                "INSERT INTO account_construction_capacity (account_id, license_name, amount_won, " +
+                    "assessment_year, updated_at) SELECT id, 'ret-license-$tag', 1, 2026, '$at' " +
+                    "FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
         // M7/7C③ — 알림함도 계정을 FK 로 참조하므로 `account` 뒤에 온다. 공고 키는 FK 가
         // 아니라(V23 주석 ③) 심지 않은 공고 번호를 써도 된다 — 그 **부재가 설계 사실**이므로
         // 여기서 그 성질을 함께 쓴다(공고 행 없이도 알림 행이 선다).

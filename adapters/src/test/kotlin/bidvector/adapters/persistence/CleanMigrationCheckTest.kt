@@ -99,6 +99,13 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "bid_case_transition" to 10,
             "bid_draft" to 21,
             "bid_record" to 11,
+            // M7/7C④(추가만). V22 — 실측값이고 내역은 다음과 같다.
+            //  · account_business_profile 5 = 상호(공백만 아님 · 길이) + 소재지 어휘(17) + 등록 여부 어휘(셋)
+            //    + 등록분야(어휘 부분집합 · 값마다 한 번뿐) + 「등록이 아니면 분야 · 만료일 없음」 짝.
+            //    한 열의 CHECK 가 조건 여럿을 AND 로 들어도 제약은 하나다 — 이 수는 제약 수다.
+            //  · account_construction_capacity 3 = 면허명(빈 값 · 길이) + 금액 범위 + 기준 연도 범위.
+            "account_business_profile" to 5,
+            "account_construction_capacity" to 3,
             // M7/7C③(추가만). V23: kind 어휘 1 + notice_number<>'' 1 + notice_round 형식 1 +
             // detail_code 어휘 1 + 종류↔detail 짝 1 + read_at>=created_at 1 = 6.
             "notification_inbox" to 6,
