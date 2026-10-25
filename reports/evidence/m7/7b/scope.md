@@ -414,6 +414,19 @@ ID 접두는 `V5-` · `R5-`. 게이트 술어가 바뀌므로 다시 표적 재�
 400 으로 바꿀 수 있으면 이번 일괄에 넣는다 — 공유 오류표를 건드려야만 가능하면 알려진 제한 + OPEN 후보. 「매핑 class 는 전부 `@RestController`」 등식의
 모집단에 관리 포트 핸들러가 들어가는지 · 의도적으로 빠지는지를 test KDoc 에 한 줄.
 
+**D-7B-8 (2026-10-25, 팀장 — 표적 재검증 r6 수령 · PR 전 마지막 일괄; 레인이 팀장 메시지 요지대로 등재).** 판정 SHA `cb7b2c79` 에 대해 verifier r6
+**ready-for-review**(medium 1 · low 2), code-reviewer r6 **approve**(medium 3 · low 5). 재작업 2/5 그대로. **새 기구는 들이지 않고** 아래만 한다(원문 `v-7b-r6.md` · `cr-7b-r6.md`).
+- ① R6-1: 「app main 의 `@InitBinder` 와 `@ControllerAdvice`/`@RestControllerAdvice` 는 가드 하나(advice 는 가드와 `GlobalErrorHandler`)」 등식 — 다른 advice · 바인더가 생기면 RED.
+- ② R6-2: 「핸들러 본문 매개변수는 전부 `@RequestBody JsonNode`」 등식(가드 전제의 다른 반쪽).
+- ③ R6-3: 가드 행동 test 가 모양마다 **정확한 상태(400)** 를 단언하고, H1~H4 를 포함한 모양마다 「가드를 빼면 핸들러에 닿는다(200 · 도달 1)」 양성 대조로 매핑이 실재함을 증명한다(404 를 통과로 세는 경로 0).
+- ④ V6-N1 · V6-L2: 새 기구(변환 서비스 단 거부)는 들이지 않는다. 가드 KDoc 과 test 이름을 「단일 `AccountId` 매개변수」로 좁히고, 용기 모양(`List` · `Array` · `Optional` ·
+  `@RequestHeader List`)은 §6 알려진 제한 — 근거: 출하에서 `String → AccountId` 변환기 등록은 세 게이트(변환기 패키지 미허용 · `FormatterRegistry` 가드 전용 · `AccountId` 생성
+  호출자)가 막는다. `OPEN-7D-ACCOUNTID-CONSTRUCTION` 에 한 줄 연결.
+- ⑤ V6-L1: 거부 key deserializer 를 모듈에 더해 `Map<AccountId, …>` 본문을 400 으로. 행동 test 에 한 모양.
+- ⑥ R6-5: 원인 사슬 걷기에 상한(32). R6-4 · R6-6 · R6-7 · R6-8 은 문면 또는 작은 단언(R6-7 은 필터를 빼고 관측 쌍 전체에 성질).
+측정: 바뀐 test · 게이트만 표적(통제군 `--rerun`) · 전 · 후 표는 ③ 양성 대조와 ⑤ 하나 → 찬 `check` · S-20 · rollback ①~③ · evidence → 동결 · 판정 SHA. r7 은 바뀐 술어만
+보는 좁은 표적 재검증이고, 통과하면 PR 을 연다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
