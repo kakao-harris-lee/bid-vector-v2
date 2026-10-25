@@ -3,10 +3,20 @@
 **마이그레이션이 있으므로 forward-fix 가 정본이다**(6B-2 runbook 관례). 아래는 그 전제 위의 두
 경우이고, 둘은 서로 다른 절차다 — 섞어 적으면 머지 뒤에 「파일을 지우면 된다」가 된다.
 
-base: `998b59dd`(2026-10-24 세 번째 rebase — 착수 base `bee7c36f` 이후 main 이 움직였으므로 base 를 옮기지 않으면 아래 복원이 main 의 변경까지 되돌린다. 머지 전에 main 이 또 움직이면 rebase 와 함께 이 SHA 를 고친다). 대상 목록은 손으로 적지 않고 **기계 산출**이다:
+base: `fb7e9d1e`(2026-10-25 D-7B-9 — main 을 **병합**했다, rebase 아님. 앞 base `998b59dd` 위에 7C①b PR #87 · PR #88 이 얹힌 main 고정 SHA 다. 움직이는
+`origin/main` 을 쓰지 않는다). **그 SHA 에 이 slice 가 없다**는 것을 되돌리기 전에 먼저 확인한다 — 있으면 아래 복원이 아무것도 지우지 않고 exit 0 이다(2026-10-09
+교훈):
 
 ```bash
-git diff --name-status 998b59dd..HEAD
+# 이 slice 의 첫 산출물 커밋이 base 의 조상이 아니고, 가드 파일이 base 에 없다 — 둘 다 「없음」이어야 한다
+git merge-base --is-ancestor 5327e912 fb7e9d1e && echo "중단: base 에 이 slice 가 있다" || echo "base 에 이 slice 없음"
+git cat-file -e fb7e9d1e:app/src/main/kotlin/bidvector/app/http/AccountBindingGuard.kt 2>/dev/null && echo "중단: base 에 가드가 있다" || echo "base 에 가드 없음"
+```
+
+대상 목록은 손으로 적지 않고 **기계 산출**이다:
+
+```bash
+git diff --name-status fb7e9d1e..HEAD
 ```
 
 ---
@@ -20,11 +30,11 @@ git diff --name-status 998b59dd..HEAD
 cd /home/deploy/project/bid-vector-v2-m7-7b
 
 # ⓐ 수정된 기존 파일 — base 의 내용으로 되돌린다
-git diff --name-status 998b59dd..HEAD | awk '$1=="M"{print $2}' \
-  | xargs -r git restore --source=998b59dd --
+git diff --name-status fb7e9d1e..HEAD | awk '$1=="M"{print $2}' \
+  | xargs -r git restore --source=fb7e9d1e --
 
 # ⓑ 새로 만든 것 — 지운다
-git diff --name-status 998b59dd..HEAD | awk '$1=="A"{print $2}' | xargs -r rm -f
+git diff --name-status fb7e9d1e..HEAD | awk '$1=="A"{print $2}' | xargs -r rm -f
 
 # ⓒ 빈 디렉터리 정리(새 모듈·패키지 뿌리)
 find bidding workflow/src/*/kotlin/bidvector/workflow/bidding \
@@ -32,7 +42,7 @@ find bidding workflow/src/*/kotlin/bidvector/workflow/bidding \
 ```
 
 `A`·`M` 밖의 상태(`R` 이름 변경 등)는 이 slice 에 없다 — 있으면 위 두 줄이 **그것을 조용히
-빼므로**, 되돌리기 전에 `git diff --name-status 998b59dd..HEAD | cut -f1 | sort -u` 가
+빼므로**, 되돌리기 전에 `git diff --name-status fb7e9d1e..HEAD | cut -f1 | sort -u` 가
 `A`·`M` 둘뿐인지 먼저 본다.
 
 **개발 DB 는 파일 삭제로 돌아오지 않는다.** V21 을 이미 적용한 DB 가 있으면 재생성한다
