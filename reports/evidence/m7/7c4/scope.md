@@ -313,3 +313,20 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
   test 가 그대로다). 설계에는 후보 둘과 영향만 적고, HTTP 의 나머지 표면을 먼저 설계한다(팀장 지시).
 - **범위 밖(2a 와 같다)**: 판정 로직(QUAL-08 · 11) · 정규화 커널 · 화면(7E) · R-2 남은 절반 · `detekt.yml` 고정
   (`OPEN-DETEKT-DEFAULT-PIN`).
+
+### D-7C4-8 (2026-10-26, 팀장) — 2b 설계 확인 넷
+
+- **Q1 수용**: `CAPACITY_ROWS_MAX` 는 **앱에서만** 집행한다. 검사와 삽입 사이의 경합은 **알려진 제한**으로 둔다(단일
+  운영자 전제 — 2a 제한 1 과 같은 축). **V23 · 트리거를 만들지 않는다.**
+- **Q2 수용**: DB 예외 문면의 로그 누출은 **어댑터에서 이 slice 의 두 표에 한해** 닫는다(제약 위반을 도메인 결과로 바꾸며
+  메시지를 버린다). 그 사실과 `ErrorBody` 의 세 필드를 **test 로 고정**한다. `logServerErrorDetail` 전역화는
+  **`OPEN-7C4-LOG-DETAIL-GLOBAL`** 로 등재하고 다음 M7 문서 PR 이 중앙에 올린다.
+- **Q3**: 나중에 wire 를 바꾸는 길((가) 뒤 (나))은 **택하지 않는다**. `awaiting` 을 뺀 나머지 표면을 먼저 구현하고 측정
+  준비까지 간다. `awaiting` 은 **7C ② 머지 뒤** main 을 병합하고 **(나) 짝 배열**로 넣은 다음 동결한다. 동결 직전인데도
+  7C ② 가 main 에 없으면 보고한다. **어느 경우에도 세 상태를 두 상태로 접은 응답은 내보내지 않는다** — 그래서
+  **체크리스트 operation 은 `awaiting` 과 함께** 선다(그때까지 그 endpoint 를 내지 않는다).
+- **Q4 수용**: `unauthenticated` 공용화를 **2b in_scope** 로 받는다(거동 무변경 refactor 한 건, 근거는 7B test 가 그대로
+  초록인 것). rollback 에서 그 7B 파일은 base `46ac0949` 에서 복원한다.
+
+**acceptance(2b)**: OpenAPI 를 바꾸므로 Kotlin `check` job + **`web` job** 둘이다. 빌드는 `flock` 경유이고 락은
+7C ② · 7C ③ · 7C ⑤ · DEC-05 와 공유한다.
