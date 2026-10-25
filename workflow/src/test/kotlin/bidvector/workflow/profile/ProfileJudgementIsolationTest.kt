@@ -1,6 +1,7 @@
 package bidvector.workflow.profile
 
 import bidvector.workflow.evaluation.ProfileFacts
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -31,8 +32,8 @@ private val PROFILE_NAME_REFERENCE = Regex("""bidvector[/.]workflow[/.]profile[/
  *    인터페이스를 선언하고 입력 쪽이 구현하면(의존 역전) 판정 쪽 상수 풀에 이 패키지 이름이 하나도
  *    남지 않아 2 가 초록이다(X2 실측).
  * 4. 이 패키지의 class 가 그 타입을 **람다로 만들지도 않는다** — Kotlin 2.x 의 SAM 변환은 indy 라
- *    class 파일을 내지 않으므로(r2 CR R2-3) 3 의 모집단에 들지 않는다. 그래서 `BootstrapMethods` 절과
- *    indy 호출 자리의 좌표를 따로 본다.
+ *    class 파일을 내지 않으므로(r2 CR R2-3) 3 의 모집단에 들지 않는다. 그래서 **indy 호출 자리의
+ *    반환 타입**을 따로 본다 — 인자까지 세면 `data class` 의 문자열 접합 indy 가 오탐이 된다(실측).
  *
  * **재는 것은 「직접 참조 · 직접 구현 · 람다 구현」뿐이다.** 재지 않는 것(그래서 주장하지 않는다):
  * ⓐ `app` 모듈 — 2b 가 HTTP 표면을 세우면 그쪽은 이 패키지를 정당하게 참조한다. ⓑ `adapters` 모듈 —
@@ -88,29 +89,26 @@ class ProfileJudgementIsolationTest {
     }
 
     /**
-     * 양성 대조 — 람다 대상 추출이 **`BootstrapMethods` · indy 자리의 좌표만** 집는지 표본으로 잰다.
-     * 이 저장소에는 지금 indy SAM 변환이 하나도 없어(`LambdaMetafactory` 상수 0) 산출물로는 양성을
-     * 만들 수 없다. 끝에서 끝까지의 증거는 **변이**다(evidence 의 전·후 표) — 여기서는 술어가 늘
-     * 빈 목록만 내는 회귀를 막는다.
+     * 양성 대조 둘. **(1) 추출이 실제 산출물의 indy 자리를 본다** — 이 패키지의 열거가 쓰는 Kotlin
+     * 람다가 indy 라서 `kotlin/jvm/functions/Function1` 이 나온다(이 저장소에 `LambdaMetafactory` 상수를
+     * 가진 class 는 275 개다 — 2026-10-25 실측). **(2) 문자열 접합 indy 의 인자는 집지 않는다** — 그
+     * 자리를 세면 `data class` 의 `toString()` 마다 오탐이 난다(앞 판이 실제로 `OnboardingSnapshot` 에서
+     * 붉었다). 끝에서 끝까지의 증거는 **변이**다(evidence 의 전·후 표).
      */
     @Test
-    fun `람다 대상 추출은 부트스트랩 · indy 자리의 좌표만 집는다 — 양성 대조`() {
-        val sample =
-            """
-            |  public final bidvector.workflow.evaluation.ProfileFacts facts();
-            |    descriptor: ()Lbidvector/workflow/evaluation/ProfileFacts;
-            |      12: invokedynamic #30,  0
-            |        // InvokeDynamic #0:region:()Lbidvector/workflow/evaluation/RegionInputSource;
-            |BootstrapMethods:
-            |  0: #88 REF_invokeStatic java/lang/invoke/LambdaMetafactory.metafactory:(…)Ljava/lang/invoke/CallSite;
-            |    Method arguments:
-            |      #90 (Lbidvector/workflow/profile/BusinessDetails;)Ljava/lang/String;
-            """.trimMargin()
+    fun `람다 대상 추출은 indy 반환 타입만 집는다 — 양성 대조`() {
+        val enumClass = File(workflowClasses, "profile/OnboardingItem.class")
+        lambdaTargets(javap(enumClass)) shouldContain "kotlin/jvm/functions/Function1"
 
-        val targets = lambdaTargets(sample)
-        targets.any { "RegionInputSource" in it } shouldBe true
-        targets.any { "ProfileFacts" in it } shouldBe false // 평범한 필드 · 반환 타입 참조는 집지 않는다.
-        lambdaTargets("") shouldBe emptyList()
+        val stringConcat =
+            "  12: invokedynamic #30,  0  // InvokeDynamic #0:makeConcatWithConstants:" +
+                "(Lbidvector/workflow/evaluation/ProfileFacts;)Ljava/lang/String;"
+        lambdaTargets(stringConcat).none(::isEvaluationCoordinate) shouldBe true
+
+        val samConversion =
+            "  18: invokedynamic #44,  0  // InvokeDynamic #1:current:" +
+                "()Lbidvector/workflow/evaluation/OperatorProfilePort;"
+        lambdaTargets(samConversion).any(::isEvaluationCoordinate) shouldBe true
     }
 
     /** 양성 대조 — 이름 술어가 두 표기에서 각각 참을 낸다(늘 거짓만 내는 회귀를 막는다). */
@@ -149,29 +147,23 @@ private fun referencesProfileByName(classFile: File): Boolean =
 
 private fun declaredInEvaluation(type: Class<*>): Boolean = type.name.startsWith("$EVALUATION_PACKAGE.")
 
-private val BIDVECTOR_COORDINATE = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
+private fun isEvaluationCoordinate(name: String): Boolean = name.startsWith("bidvector/workflow/evaluation/")
 
-private fun isEvaluationCoordinate(name: String): Boolean =
-    Regex("""bidvector[/.]workflow[/.]evaluation[/.]""").containsMatchIn(name)
+/** indy 호출 자리의 **반환 타입** — SAM 변환은 그 인터페이스를 돌려준다. */
+private val INDY_RETURN_TYPE = Regex("""InvokeDynamic #\d+:[^:\s]+:\([^)]*\)L([A-Za-z0-9_/$]+);""")
 
 /**
- * **람다로 만든 타입의 좌표** — `BootstrapMethods` 절과 indy 호출 자리에서만 뽑는다. 평범한 필드 ·
- * 반환 타입 참조(그 패키지를 **쓰는** 것은 허용 방향이다)를 함께 집으면 이 패키지의 정당한 참조까지
- * 붉어지므로, 모집단을 그 두 자리로 한정한다.
+ * **람다로 만든 타입의 좌표** — indy 호출 자리의 **반환 타입만** 센다. 인자까지 세면 오탐이 난다:
+ * `data class` 의 `toString()` 은 **문자열 접합 indy** 를 쓰고 그 자리의 **인자**에 판정 패키지 타입이
+ * 실린다(`OnboardingSnapshot` 실측 — `makeConcatWithConstants:(…ProfileFacts…)Ljava/lang/String;`).
+ * 그 패키지를 **쓰는** 것은 허용 방향이라 위반이 아니다.
  */
-private fun lambdaTargets(javapOutput: String): List<String> {
-    val bootstrapSection = javapOutput.substringAfter("BootstrapMethods:", missingDelimiterValue = "")
-    val indyLines =
-        javapOutput
-            .lineSequence()
-            .filter { it.contains("invokedynamic") || it.contains("InvokeDynamic") }
-            .joinToString("\n")
-    return BIDVECTOR_COORDINATE
-        .findAll("$bootstrapSection\n$indyLines")
-        .map { it.value }
+private fun lambdaTargets(javapOutput: String): List<String> =
+    INDY_RETURN_TYPE
+        .findAll(javapOutput)
+        .map { it.groupValues[1] }
         .distinct()
         .toList()
-}
 
 private fun javap(classFile: File): String {
     val process =
