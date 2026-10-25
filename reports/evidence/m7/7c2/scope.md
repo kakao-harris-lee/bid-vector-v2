@@ -118,6 +118,23 @@ g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상�
 - `bidvector.adapters.evaluation.RecordingMlAnalysis` — **기록 어댑터**. 선례: `RecordingNotificationRequestPort` 가 같은 꼴로 이미 있다.
 - `bidvector.procurement.Notice` · `bidvector.qualification.LicenseJudgement` — **도메인 값**. 선례: `OperatorStrategy`·`BusinessDivision` 이 같은 꼴로 이미 있다.
 
+**D-7C2-9 (2026-10-25, 팀장 — 조립 층(tier2) 다섯 키 등재).** 요청 스코프 팩토리·run 이 그 층에 등재되지 않아 그 층의 면제를 못 받고 어댑터 참조가
+전부 위반으로 잡혔다(선행 통제군이 15 줄로 보고). **dry-run 짝의 등재를 그대로 미러링**하며 게이트 술어는 바꾸지 않는다. 키마다 「미러링 선례 ·
+그 15 줄 중 이것을 요구한 줄」을 적는다.
+- `app.assembly.tier2-request-scoped-classes` ← 팩토리·run. 선례 `EvaluationDryRunFactory`·`EvaluationDryRunRun`. 요구한 줄: 팩토리·run 이 **주어**인 줄 전부
+  (이 둘이 그 층 구성원이 아니면 면제 자체가 적용되지 않는다).
+- `app.assembly.tier2.allowed-classes` ← `RecordingMlAnalysis`·`SingleNoticeCandidateSource`·`PinnedLicenseGate`. 선례 `PinnedStrategyRepository`·
+  `RecordingNotificationRequestPort`·`RequestCapacityPort`. 요구한 줄: `팩토리 -> 그 셋` 과 `run -> RecordingMlAnalysis`.
+- `app.assembly.tier2.allowed-workflow-types` ← 새 읽기 포트 둘. 선례 `StrategyReader`·`EvaluateCandidatesUseCase`(이미 등재). 요구한 줄:
+  `팩토리 -> NoticeByIdPort` · `팩토리 -> LicenseJudgementPort`.
+- `app.workflow.use-case-construction-pairs` ← `팩토리|EvaluateCandidatesUseCase`. 선례 `EvaluationDryRunFactory|…`. 요구한 줄: `팩토리 가 조립한다 -> EvaluateCandidatesUseCase`.
+- `app.adapter.member-call-pairs` ← `run|RecordingNotificationRequestPort|requested` · `run|RecordingMlAnalysis|recordedOutcome`. 선례
+  `EvaluationDryRunRun|RecordingNotificationRequestPort|requested`. 요구한 줄: 그 두 메서드 호출 줄. **셋째(`callCount`)는 등재하지 않고 코드에서
+  없앴다** — 유일 호출자가 test 였고 그 test 는 자기 계수 fake 로 같은 값을 이미 쟀다(넓히기 전에 없앴다).
+
+`app.assembly.tier2.allowed-app-classes` 에는 **아무것도 넣지 않았다** — 그것을 요구한 줄이 15 건에 없었다(§0.9f (e) 의 「RED 가 선행하지 않은
+등재는 의심한다」를 내 등재에도 적용했다).
+
 
 ## 하네스 레인 변경 (상시)
 
