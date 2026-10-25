@@ -191,7 +191,7 @@ Kotlin 람다가 indy 라 `kotlin/jvm/functions/Function1` 이 나온다. CR 의
 |---|---|---|
 | 상호 U+3000 단독(전각 공백) | 거부 | 앱도 거부 — **같다** |
 | 상호 U+2003 단독(em space) | 거부 | 앱도 거부 — **같다** |
-| 상호 U+00A0 단독(NBSP) | 수락 | 앱도 수락(`Character.isWhitespace(U+00A0)` 는 거짓) — **같다** |
+| 상호 U+00A0 단독(NBSP) | 수락 | **앱은 거부** — Kotlin 의 `isWhitespace` 는 `isSpaceChar` 도 보므로 **DB 가 넓다**(r3 F10 정정) |
 | 상호 U+200B 단독(zero width) | 수락 | 앱도 수락 — **같다** |
 | 분야 `{CONSTRUCTION,CONSTRUCTION}`(N8 변이 적용) | 수락 | 변이가 그 값의 중복을 열었다는 직접 증거 |
 | 분야 `{GOODS,GOODS}` | 거부 | 값별 절이 막는다 |
@@ -200,9 +200,10 @@ Kotlin 람다가 indy 라 `kotlin/jvm/functions/Function1` 이 나온다. CR 의
 | 면허명 공백 둘 | 거부 | 새 술어가 막는다(②) |
 | 면허명 U+3000 | 거부 | 앱도 거부 — 같다 |
 
-**이 locale 에서는 probed 범위의 앱 ↔ DB 차이가 0 이다**. 그래서 알려진 제한의 문면을 고쳤다(scope 제한 4 ·
-6): 「DB 가 앱보다 넓다」가 아니라 **「`[:space:]` 멤버십이 locale 에 달려 있고, `C` locale DB 에서는 DB 가
-더 받아들여(예: U+3000) 앱이 거부하는 값이 저장될 수 있다」**가 실측에 맞는 주장이다.
+**정정(r3 F10 · F12 처분)**: 이 표의 NBSP 행이 틀렸고, 뒤이어 적었던 「이 locale 에서 차이 0」도 틀렸다 —
+NBSP 단독은 **DB 수락 · 앱 거부**로 **DB 가 넓다**. 나머지 넷(U+3000 · U+2003 · 공백 둘 · U+200B)은 양쪽이
+같다. locale 의존(제한 6)과 이 NBSP 차이(제한 4)를 scope 에 실측대로 적었다. DB CHECK 는 바꾸지 않는다 —
+쓰기는 앱 경로뿐이고 앱이 더 엄격하다.
 
 ### r3 종결 acceptance (`49e8c4cf`)
 
@@ -211,3 +212,51 @@ Kotlin 람다가 indy 라 `kotlin/jvm/functions/Function1` 이 나온다. CR 의
   이 slice test 전부 초록 — workflow 7 · 9 · **7**(람다 축 둘이 늘었다), adapters **5**(신설 격리 게이트) ·
   8 · 10 · 6 · **3**(형제 test 는 V22 관심사를 넘겨 셋으로 줄었다).
 - `web` job 은 r3 에서도 해당 없다(변경 경로에 `web/` · `openapi/` · 생성 타입이 없다).
+
+## r4 (D-7C4-5 수정 라운드, PR 전 마지막) — 명령과 결과
+
+처분 표는 `scope.md` 의 D-7C4-5 절이다. 보강은 셋뿐이고 새 기구는 들이지 않았다.
+
+### 전·후 표 — B1 · B3 · B5 (버릴 clone, 구판 `3e51c600` ↔ 새 판 `59e5c240`)
+
+| # | 우회 | 전 | 후 |
+|---|---|---|---|
+| B1 | 판정 입력 port 구현이 **대문자 SQL**(`… FROM ACCOUNT_BUSINESS_PROFILE …`)로 V22 를 읽는다 | 초록 | **붉다** — 규칙 1(대소문자 무시) · 규칙 3. 적발 `UpperSqlRegionFold` · `UpperSqlRegionFoldKt` |
+| B3 | 허용 파일과 **같은 이름**(`JdbcBusinessProfileStore.kt`)을 다른 패키지에 두고 V22 값 타입 · 표 이름을 쓴다 | 초록 | **붉다** — 규칙 1 · 규칙 2. 적발 `SpoofedRegionReader` |
+| B5 | 그 위조 파일 안에서 **다른** 판정 입력 port(`CapacityPort`)를 구현하며 V22 를 읽는다 | 초록 | **붉다** — 규칙 1 · **규칙 3**(port 전수). 적발 `SpoofedCapacityFold` |
+
+- 통제군(우회 제거): 다섯 class 전부 실패 0.
+- 「전」 run 은 `:adapters:test` 가 **실행**됐고(`FROM-CACHE` 아님) exit 0 이다. 두 run 모두 `:workflow:test` 는
+  **FROM-CACHE** 였다 — 이 라운드의 우회가 전부 adapters 쪽이어서 workflow 게이트는 이 표의 근거가 아니다. 그쪽 실행은
+  같은 HEAD 의 표적 run(11:16, 7/0)과 아래 찬 check 가 진다.
+- B2(자원 파일 SQL) · B4(인자 람다)는 **닫지 않는다** — scope 제한 5 의 넷째 · 다섯째다.
+
+### ③ port 집합을 구조로 뽑는다
+
+규칙 3 의 좌표는 이름 목록이 아니라 **`workflow.evaluation` 의 SAM 인터페이스 전수**다 — 닻 class 의 code source(jar 또는
+classes 디렉터리)에서 그 패키지의 class 를 열거하고 「인터페이스 + 추상 메서드 하나」만 고른다. 양성 대조가 그 집합이
+**둘 이상**이고 `OperatorProfilePort` 를 담으며 `ProfileFacts`(data class)는 담지 않는 것을 잰다.
+
+### ⑤ NBSP — evidence 정정
+
+r3 evidence 의 탐침 표에서 「상호 U+00A0 → 앱도 수락 — 같다」와 그 아래 「이 locale 에서는 probed 범위의 앱 ↔ DB 차이가
+0」은 **틀렸다**. Kotlin JVM 의 `Char.isWhitespace()` 는 `Character.isWhitespace || Character.isSpaceChar` 이고 NBSP 는
+뒤쪽이 참이므로 **앱은 NBSP 단독을 거부**한다(DB 는 수락). 그래서 그 자리는 **DB 가 앱보다 넓다** — 정정한 문면과 처분은
+scope 알려진 제한 4 · 6 에 있다(DB CHECK 는 바꾸지 않는다: 쓰기가 앱 경로뿐이다).
+
+### ⑥ 「LambdaMetafactory 275」 정정
+
+`command grep -rlaF --include='*.class' 'java/lang/invoke/LambdaMetafactory' .` 로 다시 세면 **전체 348 · `build-logic`
+제외 286 · 그중 main 만 92** 다. 어느 모집단도 275 가 아니다 — 그 수를 source KDoc 에서 지웠다.
+**원인**: 이 셸의 `grep` 은 **함수**(ugrep 래퍼)이고 `-I`(바이너리 건너뜀)와 `--ignore-files`(gitignore 존중 → `build/`
+제외)를 붙인다. 그래서 앞 라운드의 「0 건」과 「275」가 나왔다. 「`-a` 누락」이라는 앞 설명도 **틀렸다**(GNU `grep -l` 은
+`-a` 없이도 바이너리 일치를 낸다). 바이너리 · gitignore 대상을 셀 때는 `command grep` 을 쓴다.
+결론은 그대로다 — indy 람다는 실재하고, 람다 축의 양성 대조는 **실제 산출물**(`profile/OnboardingItem.class`)을 쓴다.
+
+### r4 종결 acceptance · rollback (`59e5c240`)
+
+- 찬 `check --continue --rerun-tasks --no-build-cache` → **exit 0**, `BUILD SUCCESSFUL in 11m 15s`, **356 task 전부 실행**,
+  이름 431, 루트 게이트 둘, `FAILED` 0. 이 slice test 전부 초록 — 신설 격리 게이트 **6**(양성 대조 하나가 늘었다) ·
+  나머지 그대로.
+- rollback: 목록 **27 경로(A 16 · M 11)** — r3 와 같다(이 라운드가 새 파일을 만들지 않았다). ①~⑦ 과 ③′(되돌린 트리가 앞
+  실측 트리와 소스까지 동일) 전부 통과, ④⑤⑥ exit 0(`BUILD SUCCESSFUL in 12m 4s`, 365 task 전부 실행).
