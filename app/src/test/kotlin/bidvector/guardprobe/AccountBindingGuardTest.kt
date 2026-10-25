@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
@@ -93,7 +94,9 @@ class AccountBindingGuardTest {
     @LocalServerPort
     private var port: Int = 0
 
+    /** 우리 어노테이션 매핑 — actuator 의 `controllerEndpointHandlerMapping` 도 같은 타입이라 이름으로 고른다. */
     @Autowired
+    @Qualifier("requestMappingHandlerMapping")
     private lateinit var handlerMapping: RequestMappingHandlerMapping
 
     private val restTemplate = TestRestTemplate()
