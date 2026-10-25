@@ -406,4 +406,9 @@ class AppHttpDependencyGateTest {
  *
  * **두 slice 병합(M7/7B D-7B-9, 2026-10-25)**: 65 + 7B 하나 + 7C①b 둘 = **68**. 두 등재의 합집합이다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 68
+/**
+ * M7/7C ② — 68 → 70. 조립 층 ② 에 요청 스코프 팩토리·run 둘이 더해졌다(`D-7C2-9`, dry-run 짝의
+ * 등재를 미러링). **이 숫자를 올리는 편집 자체가 그 래칫의 목적**이다 — 면제가 눈에 띄지 않게
+ * 늘지 않도록 사람이 보는 자리에 수를 둔 것이고, 올린 사실은 동결 보고와 scope 에 적는다.
+ */
+private const val EXPECTED_EXEMPT_COUNT = 70
