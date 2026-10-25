@@ -287,3 +287,46 @@ class 가 **추상 메서드 둘**인 evaluation port(`RegionFactsSource`)를 �
   심었고(같은 class 선언 둘) 컴파일이 깨졌다. 종료 코드는 1 로 같았고 **결과 XML 시각이 「전」 run 과 같아서** 미실행이
   드러났다 — 덧붙임을 먼저 되돌리고 다시 쟀다(`RegionFactsAdapter` 출현 1 회를 확인한 뒤 실행). 같은 실패 모드를 이 slice
   에서 세 번째로 같은 방법(시각 대조)으로 잡았다.
+
+## r6 (병합 라운드 — 7B/V21 선머지 수용) — 명령과 결과
+
+`git merge origin/main`(**rebase 금지**, 팀장 지시)로 main `1107f848` 을 받았다. base 가 `fc15975c` → **`1107f848`** 로 바뀌었다.
+
+### 충돌 일곱과 해소
+
+| 자리 | 해소 |
+|---|---|
+| `RetentionTableRegistry`(열거 · 규칙 둘) · `CleanMigrationCheckTest` · `IndexTest` · `Test`(래칫 예외 · PK · FK) · `gate-tests.properties`(주석 둘) | **합집합** — main 것 먼저, 7C④ 것 뒤. 양쪽 주석 · KDoc 보존 |
+| `CleanMigrationColumnTest` | 합(`+`) **식**이라 줄만 합치면 연산자가 빠진다 — `bidCaseColumns + businessProfileColumns` 로 이었다 |
+| `CleanMigrationPrivilegeTest` | 항목 **머리만** 충돌에 들고 `TablePrivileges(…)` 본문이 공유돼, 합집합이면 내 두 표가 7B 표의 권한 본문을 쓴다. 양쪽 원본(`:2:` · `:3:`)에서 **블록째 재구성** |
+
+- **마이그레이션 번호**: 병합된 main 최대 **V21**(7B) < **V22 유지**(D-6A1-12). 기존 `.sql` 수정 0.
+- `HttpTestSupport.kt` 는 **500 줄 그대로**(이 slice 는 HTTP 무편집 — `sizeGate` 는 >500 에서 붉다).
+- **`web` job 은 해당 없다**: 병합 뒤에도 이 slice 가 바꾼 경로에 `web/` · `openapi/` 가 **0 건**이다(7B 의 그 변경은 main 쪽
+  이력이지 이 slice 의 diff 가 아니다).
+
+### 해소가 깨뜨린 자리 하나 — 찬 check 가 잡았다
+
+첫 찬 check 가 **붉었다**: `:adapters:compileKotlin FAILED`(「Expecting ';' after the last enum entry」). 원인은 **충돌 경계가
+KDoc 의 `/**` 뒤에서 시작**해, 합집합이 내 KDoc 본문을 여는 줄 없이 남긴 것이다. 여는 줄을 복구하고(별 커밋) 해소한 일곱
+파일 전수에서 같은 모양이 더 없음을 확인한 뒤 다시 쟀다. **합집합은 「줄의 합」이지 「구문의 합」이 아니다** — 같은 라운드에서
+`ColumnTest` 의 빠진 연산자와 함께 두 번 나온 실패 모드다.
+
+### acceptance (`a9f4a337`)
+
+- 찬 `check --continue --rerun-tasks --no-build-cache` → **exit 0**, `BUILD SUCCESSFUL in 23m 47s`, **391 task 전부 실행**,
+  이름 474, 루트 게이트 둘, `FAILED` 0.
+- **7B 가 연 게이트가 이 트리에서 함께 돌았다** — `app` 의 입찰 · 바인딩 · 라우트 관련 test class **89 개**가 결과를 냈고
+  그 run 에 `FAILED` 가 없다.
+- 이 slice test 전부 초록 — workflow 7 · 9 · 7, adapters 6 · 8 · 10 · 6 · 3.
+
+### rollback (새 base `1107f848`)
+
+- 목록 **26 경로(A 15 · M 11)** — 앞 라운드 27 에서 **하나 줄었다**: `adapters/.../persistence/ColumnSpec.kt` 가 7B 쪽과 같은
+  내용이라 병합 뒤 이 slice 의 diff 에서 빠졌다(착수 커밋이 「rebase 시 같은 파일로 합쳐진다」고 적어 둔 자리다).
+- ④⑤⑥ 는 `34980fb0` 의 되돌린 트리에서 돌았다 — **exit 0**, `BUILD SUCCESSFUL in 24m 42s`, 400 task 전부 실행, 루트 게이트 둘,
+  ⑥′ 이 slice test 결과 **0 건**. KDoc 수정 커밋 뒤의 되돌린 트리가 **그 트리와 파일까지 같아서**(③′ `diff -rq` 빈 출력) 그
+  초록을 그대로 쓴다 — 하네스의 「갈음은 트리 동일성으로만」 규율이다.
+- ①②②′③ 은 수정 뒤 HEAD 에서 다시 쟀다(복원 exit 0 · D 15 · M 11 · `comm -3` 0 줄 · base 와 바이트 동일).
+- ⑦ 내 표지 0(`ACCOUNT_SETTING` · 표 이름 둘 · `workflow.profile` · `BusinessProfile` · `array_positions`) · 남의 표지 보존
+  (`bid_case` 40 · `OPERATOR_BID_HISTORY` 7 · `G1-SET01` 9 · `OpeningPromotion` 9 · `OPEN-QUAL-10` 16).
