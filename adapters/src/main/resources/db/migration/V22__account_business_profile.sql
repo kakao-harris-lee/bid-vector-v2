@@ -67,14 +67,17 @@ CREATE TABLE account_business_profile (
 --    capability-map QUAL-11). 금액은 원 단위 정수이고 **0 을 받지 않는다** — 0 은 「모름」의 기본값
 --    으로 흘러들기 쉬운 값이다(.claude/rules/kotlin-service.md). 기준 연도는 필수다 — legacy 의 연 1회
 --    수기 입력은 어느 해 평가액인지를 남기지 않았다(`OPEN-QUAL-10` 의 운영자 쪽 절반).
---    상한 · 연도 범위는 `ProfileInputPolicy` 와 같은 값이다.
+--    상한 · 연도 범위는 `ProfileInputPolicy` 와 같은 값이다. 면허명도 상호와 **같은 술어**로 공백뿐인
+--    값을 거부한다(r2 CR R2-1): 면허명은 **PK 의 일부**라 `' '` 와 `'  '` 가 서로 다른 행이 되고, 그
+--    행을 읽으면 그 계정의 **시평액 목록 전체**가 던진다(목록 읽기가 행을 돌다 실패한다).
 --
 --    QUAL-11 의 **입력**일 뿐이고 판정은 아직 없다. 공고 요건과의 단위 · 과세 · 기준 시점 대조는
 --    `OPEN-QUAL-10` 의 공고 쪽 절반이 열려 있는 채다.
 -- =============================================================================
 CREATE TABLE account_construction_capacity (
     account_id BIGINT NOT NULL REFERENCES account (id),
-    license_name TEXT NOT NULL CHECK (license_name <> '' AND char_length(license_name) <= 100),
+    license_name TEXT NOT NULL
+        CHECK (license_name ~ '[^[:space:]]' AND char_length(license_name) <= 100),
     amount_won BIGINT NOT NULL CHECK (amount_won > 0 AND amount_won <= 1000000000000000),
     assessment_year SMALLINT NOT NULL CHECK (assessment_year BETWEEN 2000 AND 2100),
     updated_at TIMESTAMPTZ NOT NULL,
