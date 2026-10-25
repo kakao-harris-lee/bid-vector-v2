@@ -251,3 +251,29 @@ verifier r3 `ready-for-review`(medium 1 · low 2 · 장부 1) · code-review r3 
 - **CR R3-2 · R3-3 · F11 닫힘** — KDoc 세 자리(네 겹 · adapters 쪽 주체 · 세 test)와 수 제거.
 - **OQ-R3-1**(`INDY_RETURN_TYPE` 가 모든 indy 표기를 덮는가) · **OQ-R3-2** 는 판정을 막지 않는다 — 양성 대조가 실제
   산출물에서 추출을 끝까지 증명하고, 배열 반환 indy 는 SAM 변환의 모양이 아니다.
+
+## D-7C4-6 (2026-10-25, 팀장) — 2a 검토 r4 처분 (PR 대기 중 low 정리)
+
+verifier r4 `ready-for-review`(low 2) · code-review r4 `approve`(medium 0 · low 4), 둘 다 `79d94976` 기준. 2a 는 리뷰상 PR
+가능이고, **7B(V21) 선머지**를 기다리는 동안 low 를 정리한다. 새 기구는 들이지 않는다.
+
+| 지적 | 처분 |
+|---|---|
+| F13 · CR R4-L2 | port 집합을 「`workflow.evaluation` 의 **봉인되지 않은 인터페이스** 전수」로. 봉인 인터페이스는 결과 · 값 타입(`CandidateEvaluation` 류)이라 제외한다. 대조에 **「그 패키지의 `*Port` 는 전부 집합에 있다」**를 둬서 집합이 조용히 줄면 붉게 한다 |
+| CR R4-L4 | `Class.forName` 실패를 **삼키지 않는다** — 올리지 못하면 test 가 크게 실패한다(조용히 빠지면 모집단이 줄고 그 사실이 안 보인다) |
+| CR R4-L3 | 규칙 3 좌표를 **빗금 · 점 두 표기**로(규칙 2 · workflow 이름 술어와 같은 축) |
+| F14 · CR R4-L1 | KDoc 의 「패키지는 산출물 경로라 꾸밀 수 없다」를 **「`package` 선언과 디렉터리의 일치는 `check` 의 detekt `InvalidPackageDeclaration` 이 강제하고 이 규칙은 그 전제 위에 선다」**로. 아래 제한에 등재 |
+
+### 알려진 제한 추가 (D-7C4-6)
+
+7. **허용 키의 패키지 축은 `check` 의 detekt 에 기대어 선다**(r4 F14 · CR R4-L1). Kotlin 은 소스 디렉터리와 `package`
+   선언이 같기를 요구하지 않으므로, 아무 디렉터리에 `package bidvector.adapters.profile` 을 선언하면 산출물이 허용
+   자리에 떨어진다. **격리 test 혼자서는 그 위조를 막지 못한다** — 막는 것은 detekt `InvalidPackageDeclaration` 이고,
+   verifier 가 C6 로 실측했다(격리 test 는 **초록**이고 `:adapters:detekt` 가 **붉었다**). 그래서 이 규칙의 주장은
+   「`check` 가 통과하는 트리에서」라는 전제를 달고 읽어야 한다.
+
+### 측정 범위 (D-7C4-6)
+
+바뀐 게이트만 표적으로 돌린다. 전·후 표는 **C7**(추상 메서드 둘짜리 판정 입력 port 를 구현하며 V22 를 읽는 class) 하나다 —
+앞 판에서 초록이고 새 판에서 붉어야 한다. **찬 `check` · rollback 재실측 · evidence 종결은 다음 라운드**(7B 머지 뒤
+`git merge origin/main`, rebase 금지)에서 새 base 로 한 번에 한다 — 지금 재면 그 병합이 그 실측을 무효로 만든다.
