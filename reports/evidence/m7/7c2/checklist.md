@@ -599,7 +599,7 @@ use case 조립 쌍 · 어댑터 멤버 호출 쌍). 각 삭제는 **그 이름�
 | # | 결함 | 실행이 읽은 결과 | 잡은 게이트 |
 |---|---|---|---|
 | 1 | 같은 키를 **두 번 정의**(`app.http.allowed-packages` · `app.http.denied-types`) | **뒤 정의가 이긴다** — 앞 정의에 있던 내 항목 셋이 효력 0 | `TransportSurfaceGateTest` 중복 키 단언 |
-| 2 | 내 마지막 항목에서 **이어붙임 `\` 누락** ×2 | 뒤따르던 **main 의 항목 셋**이 값 밖으로 고아 | 같은 class 의 키 집합 등식 · `AppHttpDependencyGateTest` 집합 등식 둘 |
+| 2 | 내 마지막 항목에서 **이어붙임 `\` 누락** ×2 (`app.assembly.tier2.allowed-workflow-types` · `app.workflow.use-case-construction-pairs`) | 뒤따르던 **main 의 항목 셋**이 값 밖으로 고아 | 같은 class 의 키 집합 등식 · `AppHttpDependencyGateTest` 집합 등식 둘 |
 | 3 | test 조립이 `@Configuration` — 출하 스캔 뿌리에도 잡혀 같은 이름 빈 충돌 | **E2E 열아홉이 기동 실패** | 그 test 들 자신 |
 
 1·2 는 **텍스트로는 멀쩡해 보인다** — 항목이 눈에 보이는 자리에 그대로 적혀 있고, 사라진 것은 그 항목의
@@ -615,6 +615,9 @@ use case 조립 쌍 · 어댑터 멤버 호출 쌍). 각 삭제는 **그 이름�
 - `ErrorBody.kt`: 오류 코드 22(그 밖 상수 둘은 요청 속성 키) · 중복 0, 생성 타입의 `code` 합집합 22 와 **차집합 0**.
 - `ConstantTimeComparisonStructureTest.kt`: areEqual 허용 **키 30 == 근거 본문 30** · 중복 0.
 - OpenAPI: 중복 키 거부 로더로 0 건 · main 대비 손실 0.
+
+결함 2 를 고친 커밋의 메시지는 첫 키를 `app.injection.allowed-types` 로 잘못 적었다. 실제 키는 위 표의
+`app.assembly.tier2.allowed-workflow-types` 다 — 이력은 되쓰지 않고 여기에 정정을 남긴다.
 
 **게이트가 먼저 잡았다**는 것이 이 항목의 결론이다. 눈으로도, 내가 쓴 스크립트로도 못 잡았고 **전수
 `check` 를 돌린 것**이 셋을 드러냈다. 그래서 「합집합을 풀면 부분 게이트가 아니라 전체 `check` 를
