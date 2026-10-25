@@ -33,6 +33,12 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             TriggerSpec("notice", "notice_audit_insert_trigger"),
             TriggerSpec("raw_observation", "raw_observation_append_only"),
             TriggerSpec("notice_audit", "notice_audit_append_only"),
+            // M7/7B — append-only 셋(V21). `bid_case` 에는 트리거가 없다 —
+            // 그 표는 전이가 상태를 바꾸므로 UPDATE 가 정당하고, 대신 열 단위 GRANT 가
+            // 바꿀 수 있는 열을 여덟으로 좁힌다.
+            TriggerSpec("bid_case_transition", "bid_case_transition_append_only"),
+            TriggerSpec("bid_draft", "bid_draft_append_only"),
+            TriggerSpec("bid_record", "bid_record_append_only"),
             TriggerSpec("opening_result", "guard_opening_result_winning_rate"),
             TriggerSpec("opening_result", "guard_opening_result_derived_base_amount"),
             TriggerSpec("qualification_text", "guard_qualification_text_raw_text"),
@@ -91,6 +97,12 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
         mapOf(
             TriggerSpec("raw_observation", "raw_observation_append_only") to "reject_mutation_except_masking",
             TriggerSpec("notice_audit", "notice_audit_append_only") to "reject_mutation",
+            // M7/7B — append-only 셋(V21). `bid_case` 에는 트리거가 없다 —
+            // 그 표는 전이가 상태를 바꾸므로 UPDATE 가 정당하고, 대신 열 단위 GRANT 가
+            // 바꿀 수 있는 열을 여덟으로 좁힌다.
+            TriggerSpec("bid_case_transition", "bid_case_transition_append_only") to "reject_mutation",
+            TriggerSpec("bid_draft", "bid_draft_append_only") to "reject_mutation",
+            TriggerSpec("bid_record", "bid_record_append_only") to "reject_mutation",
         )
 
     /**
@@ -103,6 +115,12 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
         mapOf(
             TriggerSpec("raw_observation", "raw_observation_append_only") to setOf("INSERT", "UPDATE", "DELETE"),
             TriggerSpec("notice_audit", "notice_audit_append_only") to setOf("UPDATE", "DELETE"),
+            // M7/7B — append-only 셋(V21). `bid_case` 에는 트리거가 없다 —
+            // 그 표는 전이가 상태를 바꾸므로 UPDATE 가 정당하고, 대신 열 단위 GRANT 가
+            // 바꿀 수 있는 열을 여덟으로 좁힌다.
+            TriggerSpec("bid_case_transition", "bid_case_transition_append_only") to setOf("UPDATE", "DELETE"),
+            TriggerSpec("bid_draft", "bid_draft_append_only") to setOf("UPDATE", "DELETE"),
+            TriggerSpec("bid_record", "bid_record_append_only") to setOf("UPDATE", "DELETE"),
         )
 
     @Test

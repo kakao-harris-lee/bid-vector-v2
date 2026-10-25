@@ -395,6 +395,42 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         // **다른 test 로 새어 나간다**(`ProvenanceAuthoritySeedTest` 가 seed 를 열거와 대조하다가
         // 미지 provenance 로 터진다, 실측). 제외 표의 「행 수 불변」 단언은 V2 seed 행이 있어
         // 심지 않아도 공허하지 않다.
+        // M7/7B — 입찰 건 넷. 전부 제외 표(`OPERATOR_BID_HISTORY`)이고 「행 수 불변」을 재려면
+        // 행이 있어야 한다. 건이 계정을 FK 로 참조하므로 **계정 뒤**이고, 자식 셋은 건 뒤다
+        // (목록 순서가 적용 순서다). `notice` FK 가 없으므로 공고를 먼저 심을 필요가 없다.
+        TableSeed("bid_case") { tag, at ->
+            listOf(
+                "INSERT INTO bid_case (account_id, notice_number, notice_round, bid_kind, state, " +
+                    "case_version, created_at, updated_at) " +
+                    "SELECT id, 'ret-notice-$tag', '000', 'REAL', 'WATCHING', 0, '$at', '$at' " +
+                    "FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
+        TableSeed("bid_case_transition") { tag, at ->
+            listOf(
+                "INSERT INTO bid_case_transition (case_id, account_id, case_version, from_state, " +
+                    "to_state, command, actor_kind, retroactive, occurred_at, recorded_at) " +
+                    "SELECT id, account_id, 0, NULL, 'WATCHING', 'ADD_TO_BID_BOX', 'USER', false, " +
+                    "'$at', '$at' FROM bid_case WHERE notice_number = 'ret-notice-$tag'",
+            )
+        },
+        TableSeed("bid_draft") { tag, at ->
+            listOf(
+                "INSERT INTO bid_draft (case_id, account_id, draft_seq, amount_won, amount_currency, " +
+                    "amount_vat, amount_provenance, presented_at, snapshot_notice_revision, " +
+                    "snapshot_taken_at, created_at) " +
+                    "SELECT id, account_id, 0, 1000, 'KRW', 'INCLUSIVE', 'OPERATOR_ENTERED', '$at', " +
+                    "1, '$at', '$at' FROM bid_case WHERE notice_number = 'ret-notice-$tag'",
+            )
+        },
+        TableSeed("bid_record") { tag, at ->
+            listOf(
+                "INSERT INTO bid_record (case_id, account_id, record_seq, amount_won, amount_currency, " +
+                    "amount_vat, amount_provenance, submitted_at, confirmed_at, retroactive, created_at) " +
+                    "SELECT id, account_id, 0, 1000, 'KRW', 'INCLUSIVE', 'OPERATOR_ENTERED', '$at', " +
+                    "'$at', false, '$at' FROM bid_case WHERE notice_number = 'ret-notice-$tag'",
+            )
+        },
         TableSeed("provenance_authority") { _, _ -> emptyList() },
         // Flyway 이력은 migrate 가 이미 채웠다 — 심지 않고 **행 수 불변**만 잰다(건드리면
         // `validate()` 가 깨지므로 fixture 가 손대지 않는 것 자체가 그 제외의 등재다).

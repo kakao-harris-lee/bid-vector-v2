@@ -45,6 +45,15 @@ internal enum class ExemptReason {
     ACCOUNT_IDENTITY,
 
     /**
+     * 운영자의 입찰 이력(M7/7B) — 「90일 지난 행 삭제」가 **정산·증빙의 근거를 지운다.**
+     * 이 넷의 수명은 시간이 아니라 R-5(제출확인서 참조 보관 **3년**)와 운영자의 결정이
+     * 정하고, 그 날짜는 `bid_record.evidence_retain_until` 이 행마다 들고 있다.
+     *
+     * **파기 실행은 이 slice 밖이다**(계약 산출물 3 — PDF 저장소·파기 경로 제외). 그래서
+     * 지금은 EXEMPT 이고, 3년 기한을 집행하는 경로는 저장소 slice 가 연다(알려진 제한).
+     * 그때 이 분류를 `Purge` 로 바꾸는 것은 **그 slice 의 결정**이지 이 열거의 기본값이 아니다.
+     */
+    OPERATOR_BID_HISTORY,
      * 계정의 **현재 설정값**(M7/7C④ — 사업 정보 · 시평액). 「90일 지난 행 삭제」가 운영자가 신고한
      * 현재 값을 지운다 — 상호가 사라지면 SET-01 대사가 「판정 안 함」으로 떨어진다.
      *
@@ -209,6 +218,11 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         RetentionRule.Exempt("operator_strategy_revision", ExemptReason.REVISION_HISTORY),
         RetentionRule.Exempt("provenance_authority", ExemptReason.REFERENCE_DATA),
         RetentionRule.Exempt("account", ExemptReason.ACCOUNT_IDENTITY),
+        // --- M7/7B 입찰 건 넷 — 운영자의 입찰 이력이라 시간 기준 파기 대상이 아니다.
+        RetentionRule.Exempt("bid_case", ExemptReason.OPERATOR_BID_HISTORY),
+        RetentionRule.Exempt("bid_case_transition", ExemptReason.OPERATOR_BID_HISTORY),
+        RetentionRule.Exempt("bid_draft", ExemptReason.OPERATOR_BID_HISTORY),
+        RetentionRule.Exempt("bid_record", ExemptReason.OPERATOR_BID_HISTORY),
         // --- M7/7C④ 계정 사업 정보 둘 — 현재 설정값이고 수명은 계정이 정한다.
         RetentionRule.Exempt("account_business_profile", ExemptReason.ACCOUNT_SETTING),
         RetentionRule.Exempt("account_construction_capacity", ExemptReason.ACCOUNT_SETTING),

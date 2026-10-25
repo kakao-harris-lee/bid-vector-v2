@@ -364,7 +364,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
             operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
             noticeRequirementColumns + noticeRequirementRowColumns + apiRequestAuditColumns +
-            businessProfileColumns
+            bidCaseColumns + businessProfileColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

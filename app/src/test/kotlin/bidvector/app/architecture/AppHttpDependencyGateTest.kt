@@ -387,7 +387,7 @@ class AppHttpDependencyGateTest {
  * 연결로만 선다.
  *
  * **main 통합(7C ① + 7D)**: 두 레인이 같은 상수를 각자 51 에서 올렸다(7C ① 은 둘, 7D 는 아홉).
- * 합집합은 **62** 다 — 어느 쪽 면제도 지우지 않는다. 이 수는 관측과 등식이라, 틀리면 그 test 가
+ * 합집합은 **62** 였다 — 어느 쪽 면제도 지우지 않는다. 이 수는 관측과 등식이라, 틀리면 그 test 가
  * 먼저 붉어진다(수를 합으로 「계산」한 것이 아니라 합집합을 **선언**하고 등식이 검산한다).
  *
  * **M7/7C⑤-0 — 셋 더해 65.** 승격 레인에서 면제가 필요한 자리는 셋이다: 배선(① 층 — canonical
@@ -396,8 +396,14 @@ class AppHttpDependencyGateTest {
  * 어댑터도 workflow 타입도 쥐지 않으므로 제한 층에 남는 쪽이 옳다. 면제를 필요 이상 넓히면 이
  * 게이트가 그만큼 약해지므로, 셋 가운데 둘은 처음에 빼 두었다가 **게이트가 가리킨 뒤** 넣었다.
  *
- * **M7/7C①b — 둘 더해 67**(rebase 2026-10-23, 7C⑤-0 의 65 위에 얹는다): 제안 목록이 둘을 더했다 — ① 층 하나
+ * **M7/7B — 하나 더해**(입찰 건 조립 `app.wiring.BidCaseWiring`, 다른 `@Configuration` 배선과 같은 tier1 — 합집합이고 어느 쪽 근거도
+ * 지우지 않는다). 이 상수를 올리는 것이 곧 「새 면제를 눈에 띄게 한다」는 이 단언의 목적이다 — 조립이 하나 늘면 **반드시** 이 줄을
+ * 고쳐야 초록이 된다.
+ *
+ * **M7/7C①b — 둘 더해**(7C⑤-0 의 65 위에 얹는다): 제안 목록이 둘을 더했다 — ① 층 하나
  * (`SuggestionWiring`, 기존 빈을 받아 use case 를 조립한다 — 새 어댑터 0), ② 층 하나(`SuggestionQuery` — 컨트롤러가
  * 받는 조회기이고 HTTP 층 허용 목록에도 있다). `NoticeSearchWiring`·`NoticeSearchQuery` 짝과 같은 형태다.
+ *
+ * **두 slice 병합(M7/7B D-7B-9, 2026-10-25)**: 65 + 7B 하나 + 7C①b 둘 = **68**. 두 등재의 합집합이다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 67
+private const val EXPECTED_EXEMPT_COUNT = 68
