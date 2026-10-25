@@ -6,11 +6,12 @@ package bidvector.workflow.profile
  * 프로필 조회 응답이 이 표를 그대로 싣는다.
  *
  * 이 표가 지키는 것은 「입력이 생겼다고 자격 판정이 그 값을 쓰는 것처럼 보이는」 표시다.
- * `ProfileJudgementIsolationTest` 가 세 겹으로 잠근다 — 이 표의 축과 ID · 판정 쪽의 **이름 참조**
- * (빗금 · 점 두 표기) · 이 패키지가 판정 쪽 타입을 **구현 · 상속하지 않음**(의존 역전). `adapters`
- * 쪽의 같은 위협(V12 판정 입력 port 의 구현이 새 입력을 접는다)은 `ProfileAdapterDependencyTest` 가
- * class 단위로 막는다. 그 두 test 의 KDoc 이 **재는 범위와 재지 않는 범위**를 적는다. 판정을 세우는
- * slice 가 이 표에서 그 축을 빼고 그 test 들을 함께 고친다.
+ * `ProfileJudgementIsolationTest` 가 **네 겹**으로 잠근다 — 이 표의 축과 ID · 판정 쪽의 **이름 참조**
+ * (빗금 · 점 두 표기) · 이 패키지가 판정 쪽 타입을 **구현 · 상속하지 않음**(의존 역전) · 그 타입을
+ * **SAM 람다로 만들지 않음**(indy 반환 타입). `adapters` 쪽의 같은 위협(판정 입력 port 의 구현이 새
+ * 입력을 접는다)은 **`BusinessProfileIsolationGateTest` 가 모듈 전체에 규칙 셋**으로 막는다(허용은
+ * 패키지 + `SourceFile`). 그 **세** test 의 KDoc 이 **재는 범위와 재지 않는 범위**를 적는다. 판정을
+ * 세우는 slice 가 이 표에서 그 축을 빼고 그 test 들을 함께 고친다.
  *
  * **항목 이름과 순서가 7C ② 의 자격 카드와 같다**(팀장 결정 `D-7C2-1` Q5 — 두 표면이 한 어휘를 쓴다).
  * **모양은 다르다**: 7C ② 의 열거는 `workflow.evaluation` 에 있고 생성자 속성이 없다(이쪽만
