@@ -79,6 +79,21 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
 - **D-7C5-9** 구현 중 설계 이탈 둘 수령: 공고 부재는 404 가 아니라 상태 `NOTICE_ABSENT`(「모른다」 갈래를 한 축에) · 진행구분 축 다섯 값
   (`PROGRESS_ABSENT` — 개찰완료 축만 승격된 행을 「결과 없음」과 구별). 산출물 1 의 「404」 문면은 이 결정으로 대체된다.
 
+**D-7C5-10 (2026-10-26, 레인 기록 — 팀장 지시).** 게이트 등재 셋과 main 병합.
+- **상수 시간 비교 허용 목록 넷**(`OpeningResultResponse`·`DeclaredValue` = data class 자동 `equals`,
+  `OpeningResultControllerKt`·`DeclaredValueKt` = **질의 칸 이름** 비교와 sealed 싱글턴 `when` 소진). 어느 것도
+  자격증명 값을 참조하지 않는다 — 항목마다 근거 문장을 붙였다.
+- **면제 수 래칫**: main 68 + 개찰 조회 둘(배선 ① 층 · 조회기 ② 층) = **70**. 합으로 선언하고 등식이 검산한다.
+  조회는 쓰기가 없어 ③ 층(러너 레인)에는 더하지 않는다.
+- **`produces` 선언**: 필수 질의 칸이 있는 endpoint 는 칸이 없을 때 400 을 먼저 던지고 그 오류 본문을 쓰다가
+  `Accept` 협상이 깨져 500 이 나갔다(전수 단언이 잡았다) — 협상을 매핑 단계로 당겨 406 이 되게 했다.
+- **test 조립을 자기 파일로**: `HttpTestSupport.kt` 가 파일 크기 한도에 닿아 있어 레인마다 그 파일에 빈을 얹으면
+  한도가 레인 사이 경합이 된다. 개찰 조회의 이중체·조립을 `OpeningResultTestWiring.kt` 로 옮겼다.
+- **main 병합**(`1107f848`, rebase 아님): 충돌 7 파일 26 hunk 를 **합집합**으로 해소했다(래칫은 합, OpenAPI 는
+  main 전문에 내 operation·schema 를 재삽입, 생성 타입은 재생성 대상). 7B 게이트 축(라우트 센서스 ·
+  `@RestController` · 계정은 세션 접근자로만)을 핸들러에 대조해 전부 만족을 확인했다 — 내 경로는 계정 전용이
+  아니고(`AccountScopedRoutes` 밖) 핸들러는 요청 속성을 읽지 않는다.
+
 
 ## 하네스 레인 변경 (상시)
 
