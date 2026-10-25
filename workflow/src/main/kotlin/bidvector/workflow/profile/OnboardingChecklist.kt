@@ -1,8 +1,8 @@
 package bidvector.workflow.profile
 
-import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import bidvector.strategy.WatchRules
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import java.time.LocalDate
 
 /**

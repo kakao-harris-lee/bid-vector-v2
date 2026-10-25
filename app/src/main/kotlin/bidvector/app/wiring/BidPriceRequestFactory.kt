@@ -59,7 +59,6 @@ class BidPriceRequestRun(
 
     /** 커널이 받은 ML 결과. 커널이 ML 단계에 이르지 못했으면 `null`(「미가용」과 다른 사실). */
     fun mlOutcome(): MlAnalysisOutcome? = mlAnalysis.recordedOutcome()
-
 }
 
 /** 요청한 공고가 없다 — 표면이 404 로 옮긴다. 평가를 시작하지 않았다는 뜻이다. */
