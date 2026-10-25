@@ -45,19 +45,22 @@ const val MAX_NOTICE_KEY_LENGTH = 200
  * 공고번호는 수집이 저장할 때 쓰는 **같은 정규화**(`NoticeNumber.of`)를 지난다 — 조회가 다른
  * 정규화를 쓰면 저장된 키를 못 찾는다. 차수는 제로패딩 3자리만 받는다(값 객체의 형식 규칙 —
  * 조회가 관대해지지 않는다).
+ *
+ * **거부 사유는 [rejectionOf] 한 자리가 센다**(값 객체 실패 둘까지). 그래서 이 함수의 출구가
+ * 하나이고, 「거부가 없다」는 곧 두 값 객체가 섰다는 뜻이다 — [requireNotNull] 이 그 구조적
+ * 사실을 적는다(사유 열거에 `number == null`·`round == null` 이 있으므로 둘 다 null 이 아니다).
  */
 fun parseOpeningResultQuery(
     noticeNumber: String?,
     noticeRound: String?,
 ): OpeningResultQueryRequest {
-    rejectionOf(noticeNumber, noticeRound)?.let { return OpeningResultQueryRequest.Rejected(it) }
-    val number =
-        runCatching { NoticeNumber.of(requireNotNull(noticeNumber)) }.getOrNull()
-            ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_NUMBER_INVALID)
-    val round =
-        runCatching { NoticeRound.of(requireNotNull(noticeRound)) }.getOrNull()
-            ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_ROUND_INVALID)
-    return OpeningResultQueryRequest.Accepted(NoticeId(number, round))
+    val number = noticeNumber?.let { raw -> runCatching { NoticeNumber.of(raw) }.getOrNull() }
+    val round = noticeRound?.let { raw -> runCatching { NoticeRound.of(raw) }.getOrNull() }
+    val id = if (number != null && round != null) NoticeId(number, round) else null
+    return when (val rejection = rejectionOf(noticeNumber, noticeRound, number, round)) {
+        null -> OpeningResultQueryRequest.Accepted(requireNotNull(id))
+        else -> OpeningResultQueryRequest.Rejected(rejection)
+    }
 }
 
 /**
@@ -70,6 +73,8 @@ fun parseOpeningResultQuery(
 private fun rejectionOf(
     noticeNumber: String?,
     noticeRound: String?,
+    number: NoticeNumber?,
+    round: NoticeRound?,
 ): OpeningResultQueryRejection? {
     val hasControlCharacter = noticeNumber.hasControlCharacter() || noticeRound.hasControlCharacter()
     val exceedsLength =
@@ -79,6 +84,8 @@ private fun rejectionOf(
         noticeRound == null -> OpeningResultQueryRejection.NOTICE_ROUND_MISSING
         hasControlCharacter -> OpeningResultQueryRejection.TEXT_CONTROL_CHARACTER
         exceedsLength -> OpeningResultQueryRejection.TEXT_TOO_LONG
+        number == null -> OpeningResultQueryRejection.NOTICE_NUMBER_INVALID
+        round == null -> OpeningResultQueryRejection.NOTICE_ROUND_INVALID
         else -> null
     }
 }
