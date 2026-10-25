@@ -16,6 +16,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import tools.jackson.core.JsonParser
 import tools.jackson.databind.DeserializationContext
 import tools.jackson.databind.JsonNode
+import tools.jackson.databind.KeyDeserializer
 import tools.jackson.databind.ValueDeserializer
 import tools.jackson.databind.module.SimpleModule
 import java.util.Locale
@@ -29,14 +30,17 @@ import java.util.Locale
  * 정적 규칙으로 쫓는 것은 열거라 형제가 남는다. 그래서 **짓는 층에서 거부한다** — 모양과 무관하게 닫힌다:
  *
  * 1. **JSON 본문**: 이 빈은 Jackson 모듈이기도 하다. Boot 가 컨텍스트의 `JacksonModule` 빈을 출하 매퍼에 등록하므로,
- *    본문 어디에 `AccountId` 자리가 있든(중첩 · setter · 제네릭 · 상위 타입) 역직렬화가 실패한다(400).
+ *    본문 어디에 `AccountId` 자리가 있든(중첩 · setter · 제네릭 · 상위 타입 · `Map` 의 키) 역직렬화가 실패한다(400).
  * 2. **데이터 바인딩**(`@ModelAttribute` 와 주석 없는 객체 매개변수 · 쿼리 · 폼): 전역 `@InitBinder` 가 **`JsonNode` 가
  *    아닌 대상을 가진 바인더**를 거부한다(400). 오늘 app 의 핸들러는 객체 바인딩을 한 곳도 쓰지 않는다 — 본문은 전부
  *    `@RequestBody JsonNode` 이고(그 바인더의 대상은 `JsonNode` 다) 나머지는 경로 · 헤더 문자열이다. 반사 금지 때문에 대상
  *    타입이 `AccountId` 에 닿는지 걷지 않고, 객체 바인딩 자체를 닫는다(허용은 `JsonNode` 하나).
- * 3. **단순 변환**(`@RequestParam` · `@PathVariable` · `@RequestHeader` 의 `String → AccountId`): 같은 바인더에 `AccountId`
- *    거부 formatter 를 단다. 바인더의 editor 는 변환 서비스보다 먼저 묻히므로, 누가 `String → AccountId` 변환기를 등록해도
- *    이 길로는 지어지지 않는다. Spring 은 formatter 의 예외를 형 불일치로 감싸 공유 오류표의 500 으로 보낸다 — 그래서 이 advice 가
+ * 3. **단순 변환 — 단일 `AccountId` 매개변수**(`@RequestParam` · `@PathVariable` · `@RequestHeader` 의 `String → AccountId`): 같은
+ *    바인더에 `AccountId` 거부 formatter 를 단다. 바인더의 editor 는 변환 서비스보다 먼저 묻히므로, 누가 `String → AccountId` 변환기를
+ *    등록해도 **단일 매개변수**는 이 길로 지어지지 않는다. **용기 모양**(`List` · `Array` · `Optional` · `@RequestHeader List`)은 원소
+ *    변환이 변환 서비스로 가므로 이 editor 를 지나지 않는다(검토 r6 V6-N1) — 출하에서는 그 변환기를 등록할 길을 세 게이트(변환기
+ *    패키지 미허용 · `FormatterRegistry` 가드 전용 · `AccountId` 생성 호출자 ∅)가 막는다. 근본은 `OPEN-7D-ACCOUNTID-CONSTRUCTION`.
+ *    Spring 은 formatter 의 예외를 형 불일치로 감싸 공유 오류표의 500 으로 보낸다 — 그래서 이 advice 가
  *    **먼저**(`HIGHEST_PRECEDENCE`) 그 형 불일치를 받아, 원인이 이 가드의 거부면 400 으로 낸다. 그 밖의 형 불일치는 공유 오류표의
  *    마지막 처리기를 **그대로 부른다**(같은 함수 — 어긋날 수 없다) — 공유 오류표는 바꾸지 않는다(D-7B-7 팀장 추가). `java.beans`
  *    editor 는 쓰지 않는다 — 그 패키지는 전송 표면 뿌리다.
@@ -57,6 +61,7 @@ import java.util.Locale
 class AccountBindingGuard : SimpleModule(MODULE_NAME) {
     init {
         addDeserializer(AccountId::class.java, RejectingAccountIdDeserializer)
+        addKeyDeserializer(AccountId::class.java, RejectingAccountIdKeyDeserializer)
     }
 
     /** 객체 바인딩을 닫고(허용 대상은 본문 `JsonNode` 하나), 단순 변환에는 `AccountId` 거부 formatter 를 단다. */
@@ -78,7 +83,11 @@ class AccountBindingGuard : SimpleModule(MODULE_NAME) {
         exception: MethodArgumentTypeMismatchException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> {
-        val refused = generateSequence<Throwable>(exception) { it.cause }.any { it is AccountBindingRefusedException }
+        // 원인 사슬은 상한까지만 걷는다(검토 r6 R6-5 — 순환 사슬이면 요청 스레드가 멈추지 않게).
+        val refused =
+            generateSequence<Throwable>(exception) { it.cause }
+                .take(CAUSE_WALK_LIMIT)
+                .any { it is AccountBindingRefusedException }
         if (!refused) return GlobalErrorHandler().fallback(exception, request)
         val body = ErrorMapping.forThrowable(InvalidEditRequestException(REFUSED), request.correlationIdOrUnknown())
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body)
@@ -87,6 +96,7 @@ class AccountBindingGuard : SimpleModule(MODULE_NAME) {
     private companion object {
         const val MODULE_NAME = "bidvector-account-binding-guard"
         const val REFUSED = "계정 식별자는 요청 값으로 지을 수 없다"
+        const val CAUSE_WALK_LIMIT = 32
     }
 }
 
@@ -96,6 +106,14 @@ private object RejectingAccountIdDeserializer : ValueDeserializer<AccountId>() {
         p: JsonParser,
         ctxt: DeserializationContext,
     ): AccountId = ctxt.reportInputMismatch(this, "계정 식별자는 요청 본문으로 지을 수 없다")
+}
+
+/** 본문 `Map` 의 키를 `AccountId` 로 읽으려 하면 실패한다(검토 r6 V6-L1 — 키 역직렬화기가 없으면 Jackson 정의 오류로 500 이었다). */
+private object RejectingAccountIdKeyDeserializer : KeyDeserializer() {
+    override fun deserializeKey(
+        key: String?,
+        ctxt: DeserializationContext,
+    ): Any = ctxt.reportInputMismatch(RejectingAccountIdDeserializer, "계정 식별자는 요청 본문의 키로 지을 수 없다")
 }
 
 /** 요청 문자열을 `AccountId` 로 바꾸려 하면 실패한다(형 변환 실패). 찍기는 값을 싣지 않는다(계정 번호가 새지 않게). */
