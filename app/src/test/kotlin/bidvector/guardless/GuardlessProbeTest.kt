@@ -1,6 +1,8 @@
 package bidvector.guardless
 
+import bidvector.app.BidVectorApplication
 import bidvector.app.http.GlobalErrorHandler
+import bidvector.guardprobe.GuardProbeApplication
 import bidvector.guardprobe.GuardProbeController
 import bidvector.guardprobe.H4Controller
 import bidvector.guardprobe.H5Controller
@@ -26,6 +28,10 @@ import org.springframework.context.annotation.Import
  * 스캔 없이 `@Import` 만 — `bidvector.guardprobe` 의 가드 조립이 끼어들지 않는다). 모양마다 200 이고 도달이 정확히 1 이다.
  * 예외 하나: `Map` 의 키(MK)는 가드가 없으면 Jackson 이 `AccountId` 키 역직렬화기를 찾지 못해 500 이다(지어지지 않는다) — 이
  * 모양의 대조는 「404 · 405 가 아니다(매핑이 있다)」까지이고, 가드가 그것을 400 으로 맞춘다(검토 r6 V6-L1).
+ *
+ * **격리**(검토 r7 R7-3): 이 조립은 `@SpringBootConfiguration` 이라 출하 조립이 중첩 조립을 빼는 제외 필터(`@SpringBootApplication`
+ * 애너테이션)에 걸리지 않는다. 그래서 격리는 **패키지가 진다** — 이 조립과 가드 probe 조립은 출하 스캔 뿌리(`BidVectorApplication` 의
+ * 패키지, HTTP test 조립의 `bidvector.app.http` 도 그 아래)의 **밖**에 있어야 한다. 아래 test 가 그것을 단언한다(옮기면 붉다).
  */
 @SpringBootTest(
     classes = [GuardlessProbeApplication::class],
@@ -50,6 +56,18 @@ class GuardlessProbeTest {
             PROBE_SHAPES.associate { shape ->
                 shape.name to if (shape.path.startsWith(MAP_KEY_PATH)) (SERVER_ERROR to 0) else (OK to 1)
             }
+    }
+
+    @Test
+    fun `가드 probe 조립과 가드 없는 조립은 출하 스캔 뿌리 밖에 있다 — 격리`() {
+        val root = BidVectorApplication::class.java.packageName
+        listOf(
+            GuardlessProbeApplication::class.java,
+            GuardProbeApplication::class.java,
+            GuardProbeController::class.java,
+        )
+            .map { it.packageName }
+            .filter { it == root || it.startsWith("$root.") } shouldBe emptyList()
     }
 
     private companion object {

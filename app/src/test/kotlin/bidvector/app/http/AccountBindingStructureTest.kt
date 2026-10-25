@@ -172,7 +172,8 @@ class AccountBindingStructureTest {
     /**
      * 검토 r6 R6-1 — 가드의 formatter 는 **나중에 도는 `@InitBinder` 가 같은 타입 editor 를 덮으면** 진다(advice 순서 → controller 지역
      * 순). 그래서 app main 의 `@InitBinder` 는 가드의 하나이고, controller advice 는 가드와 공유 오류 처리기 둘이다 — 다른 advice · 바인더가
-     * 생기면 이 등식이 먼저 붉다.
+     * 생기면 이 등식이 먼저 붉다. 탐지는 Spring 과 같은 **메타 애너테이션 인식**이고(검토 r7 R7-1 — 합성 애너테이션으로 감싼 `@InitBinder`
+     * 도 Spring 에게는 바인더다), 비교는 **FQN** 이다(R7-4 — 단순 이름이 같은 class 둘이 집합에서 접히지 않게).
      */
     @Test
     fun `app main 의 InitBinder 는 가드 하나이고 controller advice 는 가드와 오류 처리기 둘이다`() {
@@ -181,31 +182,30 @@ class AccountBindingStructureTest {
             classes
                 .flatMap { type ->
                     type.declaredMethods
-                        .filter { it.isAnnotationPresent(INIT_BINDER) }
-                        .map { "${type.simpleName}.${it.name}" }
+                        .filter { AnnotatedElementUtils.hasAnnotation(it, INIT_BINDER) }
+                        .map { "${type.name}.${it.name}" }
                 }.toSet()
         val advices =
             classes
                 .filter { AnnotatedElementUtils.hasAnnotation(it, CONTROLLER_ADVICE) }
-                .map { it.simpleName }
+                .map { it.name }
                 .toSet()
 
-        binders shouldBe setOf("AccountBindingGuard.refuseAccountBinding")
-        advices shouldBe setOf("AccountBindingGuard", "GlobalErrorHandler")
+        binders shouldBe setOf("bidvector.app.http.AccountBindingGuard.refuseAccountBinding")
+        advices shouldBe setOf("bidvector.app.http.AccountBindingGuard", "bidvector.app.http.GlobalErrorHandler")
     }
 
     /**
      * 검토 r6 R6-2 — 가드 전제의 다른 반쪽: 「대상이 있는 바인더는 전부 거부(허용은 `JsonNode`)」는 **핸들러 본문 매개변수가 전부
      * `@RequestBody JsonNode`** 라는 관측 위에 선다. 뒤 slice 가 typed DTO 본문을 쓰면 가드가 그 핸들러를 400 으로 거부하는데, 그 사유가
-     * 런타임에서야 보이지 않게 이 등식이 먼저 붉다.
+     * 런타임에서야 보이지 않게 이 등식이 먼저 붉다. 모집단은 `@RequestBody` 매개변수 **와 `HttpEntity` 계열 본문 매개변수**(`HttpEntity` ·
+     * `RequestEntity` — 애너테이션 없이 본문을 받는다, 검토 r7 V7-L1 · R7-2)이고, 뒤의 것은 제네릭 인자(본문 타입)를 센다.
      */
     @Test
-    fun `핸들러 본문 매개변수는 전부 RequestBody JsonNode 다 — 바인딩 거부의 전제`() {
+    fun `핸들러 본문 매개변수는 전부 JsonNode 다 — 바인딩 거부의 전제`() {
         val bodies =
             requestMappingMethods(appClasses())
-                .flatMap { method ->
-                    method.parameters.filter { it.isAnnotationPresent(REQUEST_BODY) }.map { it.type.name }
-                }
+                .flatMap { method -> method.parameters.mapNotNull(::bodyTypeName) }
         bodies.shouldNotBeEmpty()
 
         bodies.toSet() shouldBe setOf("tools.jackson.databind.JsonNode")
@@ -392,8 +392,8 @@ private fun modelAttributeUsers(classes: List<Class<*>>): Set<String> =
     classes
         .flatMap { it.declaredMethods.toList() }
         .filter { method ->
-            method.isAnnotationPresent(MODEL_ATTRIBUTE) ||
-                method.parameters.any { it.isAnnotationPresent(MODEL_ATTRIBUTE) }
+            AnnotatedElementUtils.hasAnnotation(method, MODEL_ATTRIBUTE) ||
+                method.parameters.any { AnnotatedElementUtils.hasAnnotation(it, MODEL_ATTRIBUTE) }
         }.map { it.name }
         .toSet()
 
@@ -412,3 +412,21 @@ private class ModelAttributeProbe {
 private val INIT_BINDER = org.springframework.web.bind.annotation.InitBinder::class.java
 private val CONTROLLER_ADVICE = org.springframework.web.bind.annotation.ControllerAdvice::class.java
 private val REQUEST_BODY = org.springframework.web.bind.annotation.RequestBody::class.java
+
+private val HTTP_ENTITY = org.springframework.http.HttpEntity::class.java
+
+/**
+ * 본문 매개변수의 본문 타입 — `@RequestBody` 면 매개변수 타입, `HttpEntity`/`RequestEntity` 면 그 제네릭 인자(인자가 없으면 원시 이름).
+ * 본문 매개변수가 아니면 `null`.
+ */
+private fun bodyTypeName(parameter: java.lang.reflect.Parameter): String? =
+    when {
+        AnnotatedElementUtils.hasAnnotation(parameter, REQUEST_BODY) -> parameter.type.name
+        HTTP_ENTITY.isAssignableFrom(parameter.type) ->
+            (parameter.parameterizedType as? java.lang.reflect.ParameterizedType)
+                ?.actualTypeArguments
+                ?.singleOrNull()
+                ?.typeName
+                ?: parameter.type.name
+        else -> null
+    }
