@@ -51,10 +51,12 @@ fun parseOpeningResultQuery(
     noticeRound: String?,
 ): OpeningResultQueryRequest {
     rejectionOf(noticeNumber, noticeRound)?.let { return OpeningResultQueryRequest.Rejected(it) }
-    val number = runCatching { NoticeNumber.of(requireNotNull(noticeNumber)) }.getOrNull()
-        ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_NUMBER_INVALID)
-    val round = runCatching { NoticeRound.of(requireNotNull(noticeRound)) }.getOrNull()
-        ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_ROUND_INVALID)
+    val number =
+        runCatching { NoticeNumber.of(requireNotNull(noticeNumber)) }.getOrNull()
+            ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_NUMBER_INVALID)
+    val round =
+        runCatching { NoticeRound.of(requireNotNull(noticeRound)) }.getOrNull()
+            ?: return OpeningResultQueryRequest.Rejected(OpeningResultQueryRejection.NOTICE_ROUND_INVALID)
     return OpeningResultQueryRequest.Accepted(NoticeId(number, round))
 }
 

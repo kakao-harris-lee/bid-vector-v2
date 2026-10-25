@@ -264,5 +264,4 @@ class OpeningResultProductionE2ETest {
             contains("\"state\":\"$state\"") shouldBe true
         }
     }
-
 }
