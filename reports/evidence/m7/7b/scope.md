@@ -427,6 +427,18 @@ ID 접두는 `V5-` · `R5-`. 게이트 술어가 바뀌므로 다시 표적 재�
 측정: 바뀐 test · 게이트만 표적(통제군 `--rerun`) · 전 · 후 표는 ③ 양성 대조와 ⑤ 하나 → 찬 `check` · S-20 · rollback ①~③ · evidence → 동결 · 판정 SHA. r7 은 바뀐 술어만
 보는 좁은 표적 재검증이고, 통과하면 PR 을 연다.
 
+**D-7B-9 (2026-10-25, 팀장 — 표적 재검증 r7 수령 · main 병합; 레인이 팀장 메시지 요지대로 등재).** 판정 SHA `8b745917` 에 대해 verifier r7 **ready-for-review**(low 1) ·
+code-reviewer r7 **approve**(low 4). 리뷰상 PR 을 열 수 있지만 main(`fb7e9d1e`)과 충돌이 있다(7C①b PR #87 · PR #88 쪽 — `AppHttpDependencyGateTest.kt` ·
+`HttpTestSupport.kt` · `architecture-policy.properties` · `openapi/bidvector-operator-api.yaml`, 생성 타입 `web/src/api/generated/operator-api.ts` 재생성). 재작업 2/5 그대로.
+- ① **main 병합**: `git merge origin/main`(rebase 금지 — 판정 이력 보존). 충돌은 양쪽 의도를 모두 살려 푼다 — OpenAPI 는 두 slice 의 operation 을 모두 담고 생성 타입을
+  재생성(`npm run api:types`), 정책 파일 · 게이트 test 는 양쪽 등재의 합집합, 등식형 게이트(관측 == 허용)가 병합 뒤 실제 관측과 맞는지 실행으로 확인. 병합 커밋 메시지에
+  충돌 파일과 해소 원칙.
+- ② **base 재고정**: scope 의 base 와 rollback 복원 기준을 병합된 main 고정 SHA `fb7e9d1e` 로, 그 SHA 에 이 slice 가 없다는 단언과 함께.
+- ③ **low 정리**(새 기구 금지): V7-L1 · R7-2 본문 등식 모집단에 `HttpEntity`/`RequestEntity` 본문(싸면 넣고, 아니면 KDoc 을 좁힌다) · R7-1 `@InitBinder` · `@ModelAttribute`
+  탐지를 메타 애너테이션 인식으로 · R7-3 가드 없는 조립이 출하 스캔에서 빠지는 근거를 패키지 하나가 아니라 제외 필터나 단언으로 · R7-4 advice · 바인더 등식을 FQN 으로.
+- ④ 측정: 병합 뒤 찬 `check` · S-20(web 포함 — OpenAPI 와 생성 타입이 바뀌므로 `web` job 전건) · rollback ①~③(새 base) · evidence → 동결 · 판정 SHA. r8 은 병합 해소와
+  ③ 만 보는 좁은 재검증이고, 통과하면 PR 을 열고 머지한다.
+
 ## 하네스 레인 변경 (상시)
 
 - 없음.
