@@ -231,6 +231,10 @@ verifier r3 `ready-for-review`(medium 1 · low 2 · 장부 1) · code-review r3 
    verifier 가 실측했다).
 5. **함수 타입을 거쳐 판정 쪽 팩토리로 넘기는 인자 람다** — indy 반환 타입이 `kotlin/jvm/functions/…` 라 람다 축 밖이고
    구현 · 상속도 아니다(B4).
+6. **`abstract class` port 와 `workflow.evaluation` 의 하위 패키지 port 는 규칙 3 밖이다**(r5 F15). 규칙 3 의 모집단은 그
+   패키지 **바로 아래의 인터페이스**이고, 추상 class 로 선언한 port 나 하위 패키지에 둔 port 는 집합에 들지 않는다.
+   **오늘 그런 코드는 0 이다**(실측: 그 패키지에 `abstract class` 0 · 하위 디렉터리 0) — 생기는 날 이 줄이 그 자리를
+   가리킨다.
 
 **진짜 방어는 2b 배선의 포트 경계**다(2b 표적 4). 2a 에는 production 배선이 0 이므로 이 다섯은 오늘 거동 결함이 아니다.
 
@@ -269,11 +273,31 @@ verifier r4 `ready-for-review`(low 2) · code-review r4 `approve`(medium 0 · lo
 7. **허용 키의 패키지 축은 `check` 의 detekt 에 기대어 선다**(r4 F14 · CR R4-L1). Kotlin 은 소스 디렉터리와 `package`
    선언이 같기를 요구하지 않으므로, 아무 디렉터리에 `package bidvector.adapters.profile` 을 선언하면 산출물이 허용
    자리에 떨어진다. **격리 test 혼자서는 그 위조를 막지 못한다** — 막는 것은 detekt `InvalidPackageDeclaration` 이고,
-   verifier 가 C6 로 실측했다(격리 test 는 **초록**이고 `:adapters:detekt` 가 **붉었다**). 그래서 이 규칙의 주장은
-   「`check` 가 통과하는 트리에서」라는 전제를 달고 읽어야 한다.
+   verifier 가 C6 로 실측했다(격리 test 는 **초록**이고 `:adapters:detekt` 가 **붉었다**).
+   **그 활성의 출처를 정확히 적는다**(r5 CR R5-L2): 그 규칙은 `config/detekt/detekt.yml` 에 **없고**,
+   `buildUponDefaultConfig = true` 로 끌어오는 **detekt `2.0.0-alpha.6`(사전 릴리스)의 기본 설정**에서 온다. detekt 를
+   올리거나 기본값이 바뀌면 이 전제가 **조용히 사라지고 붉어지는 것이 하나도 없다**(게이트 test 는 detekt 의 상태를 보지
+   못한다). `detekt.yml` 에 그 규칙을 박는 일은 **저장소 전체 설정**이라 이 slice 에서 하지 않는다 —
+   **`OPEN-DETEKT-DEFAULT-PIN`** 으로 등재하고 다음 M7 문서 PR 이 중앙에서 고정한다(팀장 결정 D-7C4-7).
 
 ### 측정 범위 (D-7C4-6)
 
 바뀐 게이트만 표적으로 돌린다. 전·후 표는 **C7**(추상 메서드 둘짜리 판정 입력 port 를 구현하며 V22 를 읽는 class) 하나다 —
 앞 판에서 초록이고 새 판에서 붉어야 한다. **찬 `check` · rollback 재실측 · evidence 종결은 다음 라운드**(7B 머지 뒤
 `git merge origin/main`, rebase 금지)에서 새 base 로 한 번에 한다 — 지금 재면 그 병합이 그 실측을 무효로 만든다.
+
+## D-7C4-7 (2026-10-26, 팀장) — 2a 검토 r5 처분 (승인 전 일괄, PR 직전)
+
+verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 · R5-L2), 둘 다 `52835ecd` 기준.
+**게이트 술어는 바꾸지 않는다**(바꾸면 표적 재검증이 붙는다) — 문면과 등재만 고친다.
+
+| 지적 | 처분 |
+|---|---|
+| F15 | 알려진 제한에 **여섯째 길** 한 줄 — `abstract class` port · 하위 패키지 port 는 규칙 3 밖(오늘 해당 코드 **0**, 실측) |
+| CR R5-L1 | 규칙 3 의 **이름과 문면**을 술어에 맞춘다 — 「판정 입력 port」가 아니라 **「판정 패키지의 비봉인 인터페이스」**(오늘 `*Port` **아홉** + `CorrelationIdFactory` = **열**, 실측). 술어는 그대로 둔다. 모집단이 넓은 쪽이라 방향은 안전하고 오늘 거짓 양성 0 이지만, 2b 가 허용 파일에서 상관 ID 를 쓰면 **거짓 빨강**이 날 수 있다는 것도 제한에 적는다 |
+| CR R5-L2 | 제한 7 을 사실대로 — 그 detekt 규칙은 `config/detekt/detekt.yml` 에 **없고** `buildUponDefaultConfig` 가 끌어오는 **2.0.0-alpha.6 기본값**이다. **`OPEN-DETEKT-DEFAULT-PIN`** 으로 등재하고 고정은 다음 M7 문서 PR(저장소 전체 설정) |
+
+### 이 라운드가 만지지 않는 것
+
+- 게이트 술어 · 모집단 · 허용 키 — 한 줄도 바꾸지 않는다(그래서 좁은 표적 재검증이 붙지 않는다).
+- `config/detekt/detekt.yml` — 이 slice 의 in_scope 가 아니다(저장소 전체 설정, 위 OPEN 으로 넘긴다).
