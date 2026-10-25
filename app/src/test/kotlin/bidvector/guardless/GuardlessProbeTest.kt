@@ -65,8 +65,7 @@ class GuardlessProbeTest {
             GuardlessProbeApplication::class.java,
             GuardProbeApplication::class.java,
             GuardProbeController::class.java,
-        )
-            .map { it.packageName }
+        ).map { it.packageName }
             .filter { it == root || it.startsWith("$root.") } shouldBe emptyList()
     }
 

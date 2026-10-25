@@ -421,12 +421,19 @@ private val HTTP_ENTITY = org.springframework.http.HttpEntity::class.java
  */
 private fun bodyTypeName(parameter: java.lang.reflect.Parameter): String? =
     when {
-        AnnotatedElementUtils.hasAnnotation(parameter, REQUEST_BODY) -> parameter.type.name
-        HTTP_ENTITY.isAssignableFrom(parameter.type) ->
+        AnnotatedElementUtils.hasAnnotation(parameter, REQUEST_BODY) -> {
+            parameter.type.name
+        }
+
+        HTTP_ENTITY.isAssignableFrom(parameter.type) -> {
             (parameter.parameterizedType as? java.lang.reflect.ParameterizedType)
                 ?.actualTypeArguments
                 ?.singleOrNull()
                 ?.typeName
                 ?: parameter.type.name
-        else -> null
+        }
+
+        else -> {
+            null
+        }
     }
