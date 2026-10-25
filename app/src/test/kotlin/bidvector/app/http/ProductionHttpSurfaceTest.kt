@@ -1,12 +1,15 @@
 package bidvector.app.http
 
+import bidvector.adapters.access.BcryptPassphraseHasher
 import bidvector.app.productionApplication
+import bidvector.workflow.access.ClearPassphrase
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ConfigurableApplicationContext
@@ -15,6 +18,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMethod
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -50,6 +54,13 @@ class ProductionHttpSurfaceTest {
     companion object {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "surface-gate-test-fixture-credential"
+
+        /** 세션 축 probe 용 계정 — 이 test 안에서만 쓰고 매 기동에 다시 심는다. */
+        private const val PROBE_LOGIN = "surface-gate-probe-account"
+        private const val PROBE_PASSPHRASE = "surface-gate-probe-passphrase"
+
+        /** bcrypt 최소 비용 — probe 는 KDF 세기를 재지 않는다(기동 시간만 늘린다). */
+        private const val PROBE_HASH_COST = 10
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -107,6 +118,19 @@ class ProductionHttpSurfaceTest {
         return collected
     }
 
+    /** `@RequestBody` 매개변수를 가진 POST 매핑 — 판정은 핸들러 메서드의 서명이다(경로 목록을 적지 않는다). */
+    private fun bodyReadingPostPaths(): Set<String> {
+        val handlerMapping = context.getBean(RequestMappingHandlerMapping::class.java)
+        return handlerMapping.handlerMethods
+            .filter { (info, handler) ->
+                RequestMethod.POST in info.methodsCondition.methods &&
+                    handler.methodParameters.any { it.hasParameterAnnotation(RequestBody::class.java) }
+            }.keys
+            .flatMap { info -> info.pathPatternsCondition?.patterns.orEmpty() }
+            .map { it.patternString.replace(PATH_VARIABLE_PATTERN, PATH_VARIABLE_PROBE) }
+            .toSet()
+    }
+
     private fun headers(
         contentType: MediaType?,
         accept: MediaType? = null,
@@ -116,6 +140,82 @@ class ProductionHttpSurfaceTest {
             contentType?.let { this.contentType = it }
             accept?.let { this.accept = listOf(it) }
         }
+
+    /** 401 판정 — 「닿았는가」의 유일한 기준이다(그 뒤의 415·400 은 닿은 뒤의 일이다). */
+    private val unauthorizedStatus = 401
+
+    /** 세션 축의 자격 — 쿠키 + CSRF(상태를 바꾸는 메서드라 둘 다 필요하다). */
+    private fun sessionHeaders(session: ProbeSession): HttpHeaders =
+        HttpHeaders().apply {
+            set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=${session.cookie}")
+            set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp)
+        }
+
+    /**
+     * 표면 전수를 세션 축으로도 두드리기 위한 실 로그인 — 계정 한 줄을 심고 `/api/session` 을
+     * 지난다(7D 의 `ProductionBrowserAccessTest` 와 같은 경로다. 그쪽은 세션 **거동**을 잰다).
+     */
+    private fun signIn(): ProbeSession {
+        seedProbeAccount()
+        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        val response =
+            restTemplate.exchange(
+                url("/api/session"),
+                HttpMethod.POST,
+                HttpEntity("""{"loginName":"$PROBE_LOGIN","passphrase":"$PROBE_PASSPHRASE"}""", headers),
+                Map::class.java,
+            ) as ResponseEntity<Map<String, Any?>>
+        response.statusCode.value() shouldBe 201
+        val setCookie = requireNotNull(response.headers.getFirst(HttpHeaders.SET_COOKIE)) { "Set-Cookie 가 없다" }
+        return ProbeSession(
+            cookie = setCookie.substringAfter("${SessionCookieWriter.HOST_PREFIXED_NAME}=").substringBefore(";"),
+            stamp = response.body?.get("csrf") as? String ?: "",
+        )
+    }
+
+    /** 계정은 **소유자 연결**로 심는다 — 앱 역할에는 `account` INSERT 권한이 없다(V20). */
+    private fun seedProbeAccount() {
+        val hash = BcryptPassphraseHasher(PROBE_HASH_COST).hash(ClearPassphrase.wrap(PROBE_PASSPHRASE))
+        val source = PGSimpleDataSource()
+        source.setUrl(postgres.jdbcUrl)
+        source.user = postgres.username
+        source.password = postgres.password
+        source.connection.use { connection ->
+            connection.createStatement().use { it.execute("DELETE FROM browser_session") }
+            connection.createStatement().use { it.execute("DELETE FROM account") }
+            connection
+                .prepareStatement(
+                    "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
+                        "VALUES (?, ?, now(), now(), 0)",
+                ).use { statement ->
+                    statement.setString(1, PROBE_LOGIN)
+                    statement.setString(2, hash.encoded)
+                    statement.executeUpdate()
+                }
+        }
+    }
+
+    private data class ProbeSession(
+        val cookie: String,
+        val stamp: String,
+    )
+
+    /** 임의 헤더로 두드린다 — 두 인증 축을 같은 코드로 재기 위한 자리. */
+    private fun exchangeWith(
+        path: String,
+        base: HttpHeaders,
+        body: String?,
+        contentType: MediaType?,
+    ): ResponseEntity<Map<String, Any?>> {
+        val headers = HttpHeaders().apply { putAll(base) }
+        contentType?.let { headers.contentType = it }
+        return restTemplate.exchange(
+            url(path),
+            HttpMethod.POST,
+            HttpEntity(body, headers),
+            Map::class.java,
+        ) as ResponseEntity<Map<String, Any?>>
+    }
 
     private fun exchange(
         path: String,
@@ -180,11 +280,51 @@ class ProductionHttpSurfaceTest {
         val postPaths = mappings().filterValues { "POST" in it }.keys
         postPaths.shouldNotBeEmpty()
 
+        // **모집단을 판정으로 가른다**(M7/7B, 팀장 결정 2026-10-22 (b) 조건 1) — 경로 문자열을 손으로
+        // 적지 않는다. 인증 경로가 둘이고(자격 헤더 · 세션) 계정을 내는 것은 세션뿐이라,
+        // 어떤 매핑은 자격 헤더로 닿지 않는다. **어느 축이 닿는지는 실제 401 이 말해 준다.**
+        val session = signIn()
+        val reach = postPaths.associateWith { reachOf(it, session) }
+
+        // 조건 2 — 두 모집단의 **합집합이 POST 매핑 전수**다. 어느 축에도 안 걸리는 매핑이
+        // 하나라도 있으면 그것은 커버리지 구멍이고(아무 인증으로도 못 부르는 endpoint),
+        // 여기서 즉시 붉다. 이 단언이 조건 3 변이(어느 모집단에도 안 드는 새 POST)의 앵커다.
+        val unreachable = reach.filterValues { !it.byCredential && !it.bySession }.keys
+        unreachable shouldBe emptySet()
+
+        val credentialAxis = reach.filterValues { it.byCredential }.keys
+        val sessionAxis = reach.filterValues { it.bySession }.keys
+        (credentialAxis + sessionAxis) shouldBe postPaths
+
+        // 조건 2 — 교집합 규칙. 계정 전용 경로는 **세션 축에만** 있고, 나머지는 둘 다에 있다
+        // (세션 주체도 인증된 주체이므로 기존 매핑에 닿는다). 선언(`AccountScopedRoutes`)과
+        // 실제 판정이 같은지를 여기서 맞댄다 — 선언만 보면 「왜 401 인가」가 주장이 된다.
+        credentialAxis.none(AccountScopedRoutes::covers) shouldBe true
+        postPaths.filter(AccountScopedRoutes::covers).toSet() shouldBe (sessionAxis - credentialAxis)
+
+        // 본문 거부의 **모양**은 두 축에서 같아야 한다 — 닿는 축의 자격으로 잰다. 모집단은 **본문을 받는**
+        // POST 매핑이다(계약 D-7B-3 결정 ④): 본문 없는 operation(`resumeBidCase`)은 본문을 보지 않으므로
+        // 415·400 을 낼 이유가 없다. 문서의 `requestBody` 유무와 매핑의 `@RequestBody` 유무가 같은
+        // 집합이라는 것은 `OpenApiRequestBodyContractTest` 가 따로 잰다.
+        val bodyPaths = bodyReadingPostPaths()
+        bodyPaths.shouldNotBeEmpty()
+        postPaths.shouldContainAll(bodyPaths)
+        assertBodyRejectionShape(bodyPaths) { path ->
+            if (reach.getValue(path).byCredential) headers(null) else sessionHeaders(session)
+        }
+    }
+
+    /** 세 가지 잘못된 본문에 대해 (상태, code) 집합이 매핑마다 같은지 — 축과 무관한 성질이다. */
+    private fun assertBodyRejectionShape(
+        postPaths: Set<String>,
+        headersFor: (String) -> HttpHeaders,
+    ) {
         val outcomes = mutableMapOf<String, Pair<Int, Any?>>()
         postPaths.forEach { path ->
-            val plainText = exchange(path, HttpMethod.POST, "not json", MediaType.TEXT_PLAIN)
-            val brokenJson = exchange(path, HttpMethod.POST, "{", MediaType.APPLICATION_JSON)
-            val emptyObject = exchange(path, HttpMethod.POST, "{}", MediaType.APPLICATION_JSON)
+            val base = headersFor(path)
+            val plainText = exchangeWith(path, base, "not json", MediaType.TEXT_PLAIN)
+            val brokenJson = exchangeWith(path, base, "{", MediaType.APPLICATION_JSON)
+            val emptyObject = exchangeWith(path, base, "{}", MediaType.APPLICATION_JSON)
             outcomes["415 $path"] = plainText.statusCode.value() to plainText.body?.get("code")
             outcomes["400 $path"] = brokenJson.statusCode.value() to brokenJson.body?.get("code")
             outcomes["누락 $path"] = emptyObject.statusCode.value() to emptyObject.body?.get("code")
@@ -197,6 +337,27 @@ class ProductionHttpSurfaceTest {
         outcomes.filterKeys { it.startsWith("누락 ") }.values.toSet() shouldBe
             setOf(400 to ErrorCode.INVALID_REQUEST)
     }
+
+    /** 한 매핑이 어느 인증 축으로 닿는가 — **401 이 아니면 닿은 것**이다(형식 오류는 닿은 뒤의 일). */
+    private fun reachOf(
+        path: String,
+        session: ProbeSession,
+    ): AxisReach =
+        AxisReach(
+            byCredential =
+                exchangeWith(path, headers(null), "{}", MediaType.APPLICATION_JSON)
+                    .statusCode
+                    .value() != unauthorizedStatus,
+            bySession =
+                exchangeWith(path, sessionHeaders(session), "{}", MediaType.APPLICATION_JSON)
+                    .statusCode
+                    .value() != unauthorizedStatus,
+        )
+
+    private data class AxisReach(
+        val byCredential: Boolean,
+        val bySession: Boolean,
+    )
 
     /**
      * D-6A2b-21 — `Accept` 협상 실패 축. 이 앱은 JSON 하나만 낸다: 받아들일 수 없는 타입을
