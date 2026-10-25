@@ -181,39 +181,70 @@ class BidMenuKernelTest {
     }
 
     /**
-     * (라운드 2 HIGH-2) — ML 이 같은 값을 둘 이상 내면 그것만으로 선택지가 아니다.
-     * **읽기가 미정이어도** 판정한다 — 하한과 무관한 축이기 때문이다.
+     * (r2 M-1) — 겹친 태도만 접고 **멀쩡한 세 번째 옵션은 살린다.** 라운드 2 초판은 겹침을
+     * 보면 메뉴 전체를 `BandCollapsed` 로 돌려 유효한 safe 까지 버렸다.
      */
     @Test
-    fun `밴드 붕괴 — 후보가 이미 겹치면 읽기가 미정이어도 붕괴다`() {
+    fun `부분 붕괴 — 겹친 둘만 보류되고 겹치지 않은 옵션은 제시된다`() {
         val rates = testRates(aggressive = "0.93", recommended = "0.93", safe = "0.96")
 
         val outcome = composeBidMenu(testInput(rates = rates), testMenuPolicy(reading = FloorRateReading.Undecided))
 
-        val collapsed = outcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>()
-        collapsed.cause shouldBe CollapseCause.DuplicateEffectiveRates(fraction("0.93"))
-        collapsed.collapsedStances shouldBe setOf(BidStance.Aggressive, BidStance.Recommended)
+        val partial = outcome.shouldBeInstanceOf<BidMenuOutcome.PartiallyOffered>()
+        partial.offered.keys shouldBe setOf(BidStance.Safe)
+        partial.withheld[BidStance.Aggressive] shouldBe
+            MenuUnmeasurableReason.CollapsedWithOtherStances(
+                stance = BidStance.Aggressive,
+                amountWon = 930_000L,
+                otherStances = setOf(BidStance.Recommended),
+            )
+        partial.withheld[BidStance.Recommended] shouldBe
+            MenuUnmeasurableReason.CollapsedWithOtherStances(
+                stance = BidStance.Recommended,
+                amountWon = 930_000L,
+                otherStances = setOf(BidStance.Aggressive),
+            )
     }
 
-    /** clamp 가 둘을 하한으로 모아도 같은 붕괴다 — 「부분 붕괴」가 정상 3안으로 나가지 않는다. */
+    /** verifier 탐침 P5 — clamp 가 둘을 하한으로 모아도 세 번째는 살아남는다. */
     @Test
-    fun `밴드 붕괴 — clamp 가 둘을 하한으로 모으면 붕괴다`() {
+    fun `부분 붕괴 — clamp 가 둘을 모아도 꼭대기 옵션은 제시된다`() {
         val rates = testRates(aggressive = "0.80", recommended = "0.85", safe = "0.96")
 
         val outcome = composeBidMenu(testInput(rates = rates), testMenuPolicy(reading = atOrAbove()))
 
-        val collapsed = outcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>()
-        collapsed.cause shouldBe CollapseCause.DuplicateEffectiveRates(fraction("0.88"))
-        collapsed.collapsedStances shouldBe setOf(BidStance.Aggressive, BidStance.Recommended)
+        val partial = outcome.shouldBeInstanceOf<BidMenuOutcome.PartiallyOffered>()
+        partial.offered.keys shouldBe setOf(BidStance.Safe)
+        partial.withheld.keys shouldBe setOf(BidStance.Aggressive, BidStance.Recommended)
+    }
+
+    /**
+     * verifier 탐침 P1(**출하 정본** `Undecided` · `HALF_UP`) — 율이 달라도 **반올림 뒤 금액**이
+     * 같으면 선택지가 아니다. 율 축으로만 재면 이 입력이 「정상 3안」으로 나갔다(r2 M-3).
+     * 1,234,567 × 0.93 = 1,148,147.31 · × 0.9300001 = 1,148,147.4334567 — 둘 다 1,148,147 원이다.
+     */
+    @Test
+    fun `부분 붕괴 — 율이 달라도 반올림 뒤 금액이 같으면 접힌다`() {
+        val rates = testRates(aggressive = "0.93", recommended = "0.9300001", safe = "0.96")
+        val input = testInput(base = testBase(1_234_567L), rates = rates)
+
+        val outcome = composeBidMenu(input, testMenuPolicy(reading = FloorRateReading.Undecided))
+
+        val partial = outcome.shouldBeInstanceOf<BidMenuOutcome.PartiallyOffered>()
+        partial.offered.keys shouldBe setOf(BidStance.Safe)
+        partial.withheld.keys shouldBe setOf(BidStance.Aggressive, BidStance.Recommended)
+        (partial.withheld.getValue(BidStance.Aggressive) as MenuUnmeasurableReason.CollapsedWithOtherStances)
+            .amountWon shouldBe 1_148_147L
     }
 
     @Test
-    fun `밴드 붕괴 — 셋이 전부 겹치면 전수가 붕괴로 실린다`() {
+    fun `밴드 붕괴 — 셋이 전부 같은 금액이면 전수가 붕괴로 실린다`() {
         val rates = testRates(aggressive = "0.93", recommended = "0.93", safe = "0.93")
 
         val outcome = composeBidMenu(testInput(rates = rates), testMenuPolicy(reading = FloorRateReading.Undecided))
 
         val collapsed = outcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>()
+        collapsed.cause shouldBe CollapseCause.DuplicateEffectiveAmounts(930_000L)
         collapsed.collapsedStances shouldBe BidStance.entries.toSet()
     }
 
@@ -238,6 +269,30 @@ class BidMenuKernelTest {
         offered.aggressive.amount.value
             .export()
             .won shouldBe 1_086_358L
+    }
+
+    /**
+     * verifier 탐침 P2 — 하한 **위** 후보가 원 단위 올림만 타는 경로(r2 M-2). 값을 정한 것은
+     * 여전히 후보 비율이므로 binding 은 [BindingConstraint.CandidateRate] 로 남아야 한다.
+     * 앞 판은 올림 경로에서 무조건 `PublishedFloorBound` 를 달아, 「하한에 걸렸거나 정확히 그
+     * 위」라는 그 값의 뜻과 어긋나는 옵션을 만들었다. 변이 N1 이 이 test 에서만 RED 다.
+     *
+     * 1,234,567 × 0.8799501 = 1,086,357.3551067 → `HALF_UP` 1,086,357 은 적용 하한
+     * 1,086,357.23165 **미만**이라 올림이 발화하고 결과는 `ceil(하한)` = 1,086,358 이다.
+     */
+    @Test
+    fun `binding — 하한 위 후보가 올림만 타면 후보 비율이 값을 정한 것으로 남는다`() {
+        val rates = testRates(aggressive = "0.8799501", recommended = "0.93", safe = "0.96")
+        val input = testInput(base = testBase(1_234_567L), rates = rates, publishedFloorRate = testFloorRate("0.87995"))
+
+        val outcome = composeBidMenu(input, testMenuPolicy(reading = atOrAbove()))
+
+        val offered = outcome.shouldBeInstanceOf<BidMenuOutcome.Offered>()
+        offered.aggressive.binding shouldBe BindingConstraint.CandidateRate
+        offered.aggressive.amount.value
+            .export()
+            .won shouldBe 1_086_358L
+        offered.aggressive.grounds.bidRate.rate shouldBe fraction("0.8799501")
     }
 
     @Test

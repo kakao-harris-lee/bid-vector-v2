@@ -9,6 +9,7 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.ReasonCode
+import java.util.Collections
 
 /**
  * 최종 추천가를 **무엇이 정했는가**(`capability-map.md` DEC-02 무조건 acceptance 첫째 —
@@ -112,6 +113,26 @@ sealed interface MenuUnmeasurableReason {
     data class FloorBoundNotRepresentable(
         val stance: BidStance,
     ) : MenuUnmeasurableReason
+
+    /**
+     * **다른 태도와 제출 금액이 같아** 선택지가 되지 못했다(r2 M-1 · M-3).
+     *
+     * 운영자가 보는 것은 율이 아니라 **반올림 뒤 금액**이므로 같음의 판정도 금액 축이다 —
+     * 율이 1/기초금액 미만으로 다르면 두 옵션은 **같은 원화 금액**이 되고, 그것은 선택지가
+     * 아니라 같은 값 둘이다. 겹친 태도만 이 사유로 보류되고 **겹치지 않은 유효한 옵션은
+     * 그대로 제시된다**(한 태도를 못 낸다고 나머지를 버리지 않는다는 [BidMenuOutcome.PartiallyOffered]
+     * 의 원칙을 붕괴 축에도 적용한다).
+     */
+    data class CollapsedWithOtherStances(
+        val stance: BidStance,
+        val amountWon: Long,
+        val otherStances: Set<BidStance>,
+    ) : MenuUnmeasurableReason {
+        init {
+            require(otherStances.isNotEmpty()) { "겹친 상대가 없으면 붕괴가 아니다: $stance" }
+            require(stance !in otherStances) { "자기 자신과 겹칠 수 없다: $stance" }
+        }
+    }
 }
 
 /** 메뉴의 입력 자체가 없다 — 「재지 못했다」가 아니라 「잴 것이 없었다」다. */
@@ -125,6 +146,9 @@ sealed interface MenuSourceAbsence {
  * 라운드 1 은 [FloorAboveBand] 하나만 쟀고, 그래서 **후보 밴드 자신이 무너진 경우**(ML 이
  * 같은 값을 둘 이상 냈거나 clamp 가 둘 이상을 하한으로 모은 경우)가 「정상 3안」으로 나갈 수
  * 있었다(라운드 2 HIGH-2). 값이 같은 두 옵션은 **선택지가 아니다.**
+ *
+ * 이 타입은 **태도 전부가 한 금액으로 접힌 경우**만 싣는다 — 일부만 겹치면 겹친 태도가
+ * [MenuUnmeasurableReason.CollapsedWithOtherStances] 로 보류되고 나머지는 제시된다(r2 M-1).
  */
 sealed interface CollapseCause {
     /** 후보 셋의 꼭대기([StanceRates.safe])조차 하한 bound 를 만족하지 못한다. */
@@ -134,11 +158,16 @@ sealed interface CollapseCause {
     ) : CollapseCause
 
     /**
-     * 효력 투찰율이 겹친다 — 입력 후보가 이미 같았거나(`StanceRates` 는 등호를 허용한다)
-     * 하한 clamp 가 둘 이상을 같은 값으로 모았다. 어느 쪽이든 운영자에게는 같은 값 둘이다.
+     * **제출 금액이 겹친다** — 입력 후보가 이미 같았거나, 하한 clamp 가 둘 이상을 같은 값으로
+     * 모았거나, 율이 달라도 **반올림 뒤 원화가 같아진** 경우다.
+     *
+     * 판정 축이 율이 아니라 금액인 이유(r2 M-3): 운영자가 보고 제출하는 것은 금액이고, 율
+     * 차이가 1/기초금액 미만이면 두 옵션은 **같은 금액**이다. 율 축으로만 재면 그 입력이
+     * 「정상 3안」으로 나간다. 또 하한 올림이 발화하면 결과가 언제나 `ceil(적용 하한)` 이라
+     * 그 경로의 겹침은 **율 축에서는 보이지 않는다**.
      */
-    data class DuplicateEffectiveRates(
-        val rate: Rate,
+    data class DuplicateEffectiveAmounts(
+        val amountWon: Long,
     ) : CollapseCause
 }
 
@@ -162,9 +191,17 @@ sealed interface BidMenuOutcome {
         val safe: BidMenuOption,
         val recommended: BidMenuOption,
         val aggressive: BidMenuOption,
-        val disclosures: Set<BidMenuDisclosure>,
+        private val disclosuresSource: Set<BidMenuDisclosure>,
         val policyVersion: PolicyVersion,
     ) : BidMenuOutcome {
+        /**
+         * **생성 시 복사해 가둔다**(r2 M-4). 커널의 살아 있는 컬렉션을 그대로 싣지 않는다 —
+         * 싣고 나면 `as MutableSet` 로 캐스팅해 비울 수 있고, 그러면 아래 `init` 의 「고지
+         * 전수」 불변식이 **사후에** 무너진다. 불변식을 생성 시점에만 걸고 끝내면 그 불변식은
+         * 「그 순간 참이었다」는 말일 뿐이다.
+         */
+        val disclosures: Set<BidMenuDisclosure> = Collections.unmodifiableSet(disclosuresSource.toSet())
+
         init {
             require(safe.stance == BidStance.Safe) { "safe 자리의 태도가 어긋났다: ${safe.stance}" }
             require(recommended.stance == BidStance.Recommended) { "recommended 자리의 태도가 어긋났다: ${recommended.stance}" }
@@ -182,11 +219,18 @@ sealed interface BidMenuOutcome {
      */
     @ConsistentCopyVisibility
     data class PartiallyOffered internal constructor(
-        val offered: Map<BidStance, BidMenuOption>,
-        val withheld: Map<BidStance, MenuUnmeasurableReason>,
-        val disclosures: Set<BidMenuDisclosure>,
+        private val offeredSource: Map<BidStance, BidMenuOption>,
+        private val withheldSource: Map<BidStance, MenuUnmeasurableReason>,
+        private val disclosuresSource: Set<BidMenuDisclosure>,
         val policyVersion: PolicyVersion,
     ) : BidMenuOutcome {
+        /** 생성 시 복사해 가둔다(r2 M-4) — [Offered.disclosures] 와 같은 이유다. */
+        val offered: Map<BidStance, BidMenuOption> = Collections.unmodifiableMap(offeredSource.toMap())
+
+        val withheld: Map<BidStance, MenuUnmeasurableReason> = Collections.unmodifiableMap(withheldSource.toMap())
+
+        val disclosures: Set<BidMenuDisclosure> = Collections.unmodifiableSet(disclosuresSource.toSet())
+
         init {
             require(offered.isNotEmpty()) { "PartiallyOffered 는 제시 옵션이 하나 이상이어야 한다(0 이면 Unmeasurable)" }
             require(withheld.isNotEmpty()) { "PartiallyOffered 는 보류가 하나 이상이어야 한다(0 이면 Offered)" }
@@ -203,8 +247,11 @@ sealed interface BidMenuOutcome {
      */
     data class BandCollapsed(
         val cause: CollapseCause,
-        val collapsedStances: Set<BidStance>,
+        private val collapsedStancesSource: Set<BidStance>,
     ) : BidMenuOutcome {
+        /** 생성 시 복사해 가둔다(r2 M-4). */
+        val collapsedStances: Set<BidStance> = Collections.unmodifiableSet(collapsedStancesSource.toSet())
+
         init {
             require(collapsedStances.isNotEmpty()) { "붕괴한 태도 집합이 비어 있을 수 없다" }
         }
@@ -215,8 +262,11 @@ sealed interface BidMenuOutcome {
      * 「어느 태도가 왜」가 사라진다.
      */
     data class Unmeasurable(
-        val withheld: Map<BidStance, MenuUnmeasurableReason>,
+        private val withheldSource: Map<BidStance, MenuUnmeasurableReason>,
     ) : BidMenuOutcome {
+        /** 생성 시 복사해 가둔다(r2 M-4). */
+        val withheld: Map<BidStance, MenuUnmeasurableReason> = Collections.unmodifiableMap(withheldSource.toMap())
+
         init {
             require(withheld.keys == BidStance.entries.toSet()) { "전부 보류일 때만 Unmeasurable 이다: ${withheld.keys}" }
         }

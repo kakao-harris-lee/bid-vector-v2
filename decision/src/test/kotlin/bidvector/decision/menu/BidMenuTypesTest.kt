@@ -43,7 +43,7 @@ class BidMenuTypesTest {
                 safe = offered.recommended,
                 recommended = offered.recommended,
                 aggressive = offered.aggressive,
-                disclosures = BidMenuDisclosure.entries.toSet(),
+                disclosuresSource = BidMenuDisclosure.entries.toSet(),
                 policyVersion = MENU_TEST_VERSION,
             )
         }
@@ -59,11 +59,97 @@ class BidMenuTypesTest {
                 safe = offered.safe,
                 recommended = offered.recommended,
                 aggressive = offered.aggressive,
-                disclosures = setOf(BidMenuDisclosure.NotAutoSubmitted),
+                disclosuresSource = setOf(BidMenuDisclosure.NotAutoSubmitted),
                 policyVersion = MENU_TEST_VERSION,
             )
         }
     }
+
+    /**
+     * (r2 M-4) — 결과가 **커널의 살아 있는 컬렉션**을 그대로 실으면 불변식이 사후에 무너진다.
+     * 생성 시 복사해 가두므로 캐스팅해 비우려는 시도는 던진다.
+     */
+    @Test
+    fun `Offered 의 고지 집합은 사후 변조되지 않는다`() {
+        val offered = anyOfferedMenu()
+
+        shouldThrow<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (offered.disclosures as MutableSet<BidMenuDisclosure>).clear()
+        }
+        offered.disclosures shouldBe BidMenuDisclosure.entries.toSet()
+    }
+
+    @Test
+    fun `PartiallyOffered 의 제시·보류 맵은 사후 변조되지 않는다`() {
+        val partial = anyPartialMenu()
+
+        shouldThrow<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (partial.offered as MutableMap<BidStance, BidMenuOption>).clear()
+        }
+        shouldThrow<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (partial.withheld as MutableMap<BidStance, MenuUnmeasurableReason>).clear()
+        }
+        partial.offered.isNotEmpty() shouldBe true
+        partial.withheld.isNotEmpty() shouldBe true
+    }
+
+    /**
+     * (cr r2 L-3) — `PartiallyOffered` 의 `init` 불변식 여섯이 하나도 재지지 않았다. 커널이
+     * 위반을 만들 수 없더라도 생성자는 같은 모듈에 열려 있으므로 `Offered` 와 같은 방식으로 잰다.
+     */
+    @Test
+    fun `PartiallyOffered 는 여섯 불변식을 각각 거부한다`() {
+        val partial = anyPartialMenu()
+        val stance = partial.offered.keys.first()
+        val option = partial.offered.getValue(stance)
+        val reason = partial.withheld.values.first()
+        val all = BidMenuDisclosure.entries.toSet()
+
+        // ① 제시가 비면 Unmeasurable 의 자리다
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(emptyMap(), partial.withheld, all, MENU_TEST_VERSION)
+        }
+        // ② 보류가 비면 Offered 의 자리다
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(partial.offered, emptyMap(), all, MENU_TEST_VERSION)
+        }
+        // ③ 한 태도가 제시·보류 양쪽에 있을 수 없다
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(partial.offered, mapOf(stance to reason), all, MENU_TEST_VERSION)
+        }
+        // ④ 태도 전수를 덮어야 한다
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(mapOf(stance to option), emptyMap(), all, MENU_TEST_VERSION)
+        }
+        // ⑤ 제시 옵션의 태도가 키와 맞아야 한다
+        val wrongKey = BidStance.entries.first { it != stance }
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(
+                mapOf(wrongKey to option),
+                BidStance.entries.filter { it != wrongKey }.associateWith { reason },
+                all,
+                MENU_TEST_VERSION,
+            )
+        }
+        // ⑥ 공통 고지는 전수여야 한다
+        shouldThrow<IllegalArgumentException> {
+            BidMenuOutcome.PartiallyOffered(
+                partial.offered,
+                partial.withheld,
+                setOf(BidMenuDisclosure.NotAutoSubmitted),
+                MENU_TEST_VERSION,
+            )
+        }
+    }
+
+    private fun anyPartialMenu(): BidMenuOutcome.PartiallyOffered =
+        composeBidMenu(
+            testInput(rates = testRates(aggressive = "0.93", recommended = "0.93", safe = "0.96")),
+            testMenuPolicy(reading = FloorRateReading.Undecided),
+        ).shouldBeInstanceOf<BidMenuOutcome.PartiallyOffered>()
 
     private fun anyOfferedMenu(): BidMenuOutcome.Offered =
         composeBidMenu(testInput(), testMenuPolicy(reading = atOrAbove()))

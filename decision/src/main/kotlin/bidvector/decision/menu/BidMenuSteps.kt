@@ -129,9 +129,17 @@ private fun appliedFloorOf(
  * 사라지는** 결함이 있었다(`DOWN`·`HALF_*` 가 경계에서 1원 아래로 떨어진다). 그것은 Phase 1
  * 설계(「하한 bound 자체를 채택한 값으로 올라간다」)를 **선언 없이 뒤집은 것**이기도 하다.
  *
- * 올림의 대상은 **그 옵션 자신의 반올림 전 값**이다. clamp 된 옵션은 그 값이 곧
- * `bound × 기초금액` 이라 결과가 `ceil(bound × 기초금액)` 과 같고, clamp 되지 않은 옵션은 자기
- * 값에서 올라가 후보 비율에 더 가깝게 남는다 — 둘 다 「제약을 만족하는 최소 정수」다.
+ * 올림의 대상은 그 옵션 자신의 반올림 전 값이지만, **결과는 언제나 `ceil(적용 하한)` 이다**
+ * (r2 L-1 정정). 올림이 발화하는 조건이 `natural < F` 이고 자연 반올림의 성질상
+ * `F <= U < natural + 1` 이므로 `ceil(U) = ceil(F)` 다 — 앞 판 KDoc 의 「clamp 되지 않은
+ * 옵션은 후보 비율에 더 가깝게 남는다」는 **거짓**이다. 「제약을 만족하는 최소 정수」라는
+ * 성질은 둘 다 참이고, 그 값이 하나로 정해진다는 것이 요점이다.
+ *
+ * **binding 은 올림이 바꾸지 않는다**(r2 M-2). 하한 **아래** 후보가 clamp 돼 올라왔으면
+ * 이미 [BindingConstraint.PublishedFloorBound] 이고, 하한 **위** 후보가 원 단위 올림만 탔으면
+ * 값을 정한 것은 여전히 후보 비율이라 [BindingConstraint.CandidateRate] 로 남는다. 앞 판은
+ * 올림 경로에서 무조건 `PublishedFloorBound` 를 달아, 「하한에 걸렸거나 정확히 그 위」라는
+ * 그 값의 뜻과 어긋나는 옵션을 만들었다.
  */
 internal fun amountStep(
     stance: BidStance,
@@ -143,7 +151,7 @@ internal fun amountStep(
     val unrounded = ctx.input.base * BidRate.recommended(effective.rate)
     return when (val natural = unrounded.roundedWith(rounding, floor)) {
         is Measurement.Measured -> Step.Ok(AmountDecision(natural.value, effective.binding))
-        is Measurement.Unmeasurable -> promoteOrHalt(stance, ctx, unrounded, floor, natural.reason)
+        is Measurement.Unmeasurable -> promoteOrHalt(stance, ctx, unrounded, floor, natural.reason, effective)
     }
 }
 
@@ -154,11 +162,12 @@ private fun promoteOrHalt(
     unrounded: UnroundedBidAmount,
     floor: AppliedFloor?,
     reason: ReasonCode,
+    effective: EffectiveRate,
 ): Step<AmountDecision> =
     if (reason != ReasonCode.ROUNDED_BELOW_FLOOR) {
         Step.Halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, reason))
     } else {
-        promoteToFloor(stance, ctx, unrounded, floor)
+        promoteToFloor(stance, ctx, unrounded, floor, effective)
     }
 
 private fun promoteToFloor(
@@ -166,10 +175,11 @@ private fun promoteToFloor(
     ctx: OptionContext,
     unrounded: UnroundedBidAmount,
     floor: AppliedFloor?,
+    effective: EffectiveRate,
 ): Step<AmountDecision> {
     val promotion = Resolution.Resolved(FLOOR_PROMOTION_ROUNDING, ctx.policy.version)
     return when (val promoted = unrounded.roundedWith(promotion, floor)) {
-        is Measurement.Measured -> Step.Ok(AmountDecision(promoted.value, BindingConstraint.PublishedFloorBound))
+        is Measurement.Measured -> Step.Ok(AmountDecision(promoted.value, effective.binding))
         is Measurement.Unmeasurable -> Step.Halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, promoted.reason))
     }
 }

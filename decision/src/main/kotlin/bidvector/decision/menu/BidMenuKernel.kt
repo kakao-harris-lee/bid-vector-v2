@@ -30,24 +30,13 @@ fun composeBidMenu(
 
 private fun withFloorRate(ctx: OptionContext): BidMenuOutcome {
     val effective = effectiveRates(ctx)
-    return collapseOf(ctx, effective) ?: assemble(ctx, effective)
+    floorAboveBand(ctx)?.let { return it }
+    return assemble(ctx, effective)
 }
 
 /** 태도별 효력 투찰율 — 낼 수 없는 태도는 사유로 남는다(그 자체가 붕괴는 아니다). */
 private fun effectiveRates(ctx: OptionContext): Map<BidStance, Step<EffectiveRate>> =
     BidStance.entries.associateWith { stance -> effectiveRateOf(stance, ctx) }
-
-/**
- * 밴드 붕괴 판정 둘(DEC-05 무조건 acceptance 둘째).
- *
- * 하한 유래([CollapseCause.FloorAboveBand])는 bound 가 설 때만 판정할 수 있지만, **효력율
- * 중복**([CollapseCause.DuplicateEffectiveRates])은 읽기가 미정이어도 판정한다 — ML 이 같은
- * 값을 둘 이상 내면 그것만으로 선택지가 아니기 때문이다(라운드 2 HIGH-2).
- */
-private fun collapseOf(
-    ctx: OptionContext,
-    effective: Map<BidStance, Step<EffectiveRate>>,
-): BidMenuOutcome.BandCollapsed? = floorAboveBand(ctx) ?: duplicateRates(effective)
 
 /**
  * 후보 셋의 **꼭대기**가 하한 bound 를 못 넘으면 셋이 한 점으로 접힌다.
@@ -70,37 +59,66 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
             } else {
                 BidMenuOutcome.BandCollapsed(
                     cause = CollapseCause.FloorAboveBand(lowerBound = bound, upperBound = top),
-                    collapsedStances = BidStance.entries.toSet(),
+                    collapsedStancesSource = BidStance.entries.toSet(),
                 )
             }
         }
     }
 
-/** 효력 투찰율이 겹친 태도 묶음 — 부분 붕괴(둘만 겹침)도 「정상 3안」이 아니다. */
-private fun duplicateRates(effective: Map<BidStance, Step<EffectiveRate>>): BidMenuOutcome.BandCollapsed? {
-    val rates = effective.mapNotNull { (stance, step) -> (step as? Step.Ok)?.let { stance to it.value.rate } }
-    val duplicated = rates.groupBy { it.second }.entries.firstOrNull { it.value.size > 1 }
-    return duplicated?.let { (rate, pairs) ->
-        BidMenuOutcome.BandCollapsed(
-            cause = CollapseCause.DuplicateEffectiveRates(rate),
-            collapsedStances = pairs.mapTo(mutableSetOf()) { it.first },
-        )
-    }
+/**
+ * 제출 **금액**이 겹친 태도 묶음(r2 M-3) — 판정 축이 율이 아니라 금액인 이유는
+ * [CollapseCause.DuplicateEffectiveAmounts] 에 적었다. 금액은 옵션을 다 지은 **뒤에야**
+ * 알 수 있으므로 이 판정은 조립 뒤에 온다.
+ *
+ * 태도가 셋이므로 겹침 묶음은 **많아야 하나**다(둘이 겹치면 남은 하나는 그 둘과 다르다).
+ */
+private fun collidingStances(built: Map<BidStance, BidMenuOption>): Map<BidStance, Long> {
+    val byAmount = built.entries.groupBy { it.value.amount.value.export().won }
+    val collided = byAmount.entries.firstOrNull { it.value.size > 1 } ?: return emptyMap()
+    return collided.value.associate { it.key to collided.key }
 }
 
+/**
+ * 조립 — 태도별로 옵션을 짓고, **금액이 겹친 태도만** 보류로 옮긴다.
+ *
+ * 겹치지 않은 유효한 옵션은 **그대로 제시한다**(r2 M-1). 라운드 2 초판은 겹침을 발견하면
+ * 메뉴 전체를 `BandCollapsed` 로 돌려 **멀쩡한 세 번째 옵션까지 버렸는데**, 그것은
+ * [BidMenuOutcome.PartiallyOffered] 를 만든 원칙(한 태도를 못 낸다고 나머지를 버리지 않는다)과
+ * 정반대다. 전부 겹쳤을 때만 밴드 붕괴다.
+ */
 private fun assemble(
     ctx: OptionContext,
     effective: Map<BidStance, Step<EffectiveRate>>,
 ): BidMenuOutcome {
-    val offered = mutableMapOf<BidStance, BidMenuOption>()
+    val built = mutableMapOf<BidStance, BidMenuOption>()
     val withheld = mutableMapOf<BidStance, MenuUnmeasurableReason>()
     for (stance in BidStance.entries) {
         when (val step = optionFor(stance, ctx, effective.getValue(stance))) {
-            is Step.Ok -> offered[stance] = step.value
+            is Step.Ok -> built[stance] = step.value
             is Step.Halt -> withheld[stance] = step.reason
         }
     }
-    return outcomeOf(offered, withheld, ctx.policy.version)
+
+    val collided = collidingStances(built)
+    for ((stance, won) in collided) {
+        withheld[stance] =
+            MenuUnmeasurableReason.CollapsedWithOtherStances(
+                stance = stance,
+                amountWon = won,
+                otherStances = collided.keys - stance,
+            )
+    }
+    val offered = built.filterKeys { it !in collided }
+
+    return when {
+        collided.keys == BidStance.entries.toSet() ->
+            BidMenuOutcome.BandCollapsed(
+                cause = CollapseCause.DuplicateEffectiveAmounts(collided.values.first()),
+                collapsedStancesSource = collided.keys,
+            )
+
+        else -> outcomeOf(offered, withheld, ctx.policy.version)
+    }
 }
 
 private fun optionFor(
@@ -133,9 +151,9 @@ private fun outcomeOf(
 
         else -> {
             BidMenuOutcome.PartiallyOffered(
-                offered = offered,
-                withheld = withheld,
-                disclosures = BidMenuDisclosure.entries.toSet(),
+                offeredSource = offered,
+                withheldSource = withheld,
+                disclosuresSource = BidMenuDisclosure.entries.toSet(),
                 policyVersion = version,
             )
         }
@@ -150,6 +168,6 @@ private fun fullMenu(
         safe = requireNotNull(offered[BidStance.Safe]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
         recommended = requireNotNull(offered[BidStance.Recommended]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
         aggressive = requireNotNull(offered[BidStance.Aggressive]) { "withheld 가 비었으면 태도 전수가 채워져 있다" },
-        disclosures = BidMenuDisclosure.entries.toSet(),
+        disclosuresSource = BidMenuDisclosure.entries.toSet(),
         policyVersion = version,
     )
