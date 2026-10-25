@@ -1,9 +1,9 @@
 package bidvector.app.http
 
 import bidvector.procurement.Notice
+import bidvector.qualification.LicenseVerdict
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
-import bidvector.workflow.evaluation.LicenseVerdict
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 
