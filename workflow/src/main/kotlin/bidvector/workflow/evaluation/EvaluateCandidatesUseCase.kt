@@ -7,15 +7,11 @@ import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
 import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.Notice
-import bidvector.procurement.isBiddable
-import bidvector.qualification.LicenseVerdict
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.PriorityScore
 import bidvector.strategy.StrategyRevision
-import bidvector.strategy.WatchVerdict
-import bidvector.strategy.evaluate
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
@@ -128,9 +124,7 @@ class EvaluateCandidatesUseCase internal constructor(
     ): CandidateEvaluation {
         val correlationId = correlationIds.newId()
         return analysisBudgetDrop(index, notice, correlationId)
-            ?: lifecycleDrop(notice, correlationId)
-            ?: watchGateDrop(notice, strategy, correlationId)
-            ?: licenseGateDrop(notice, correlationId)
+            ?: screeningDrop(notice, strategy, correlationId)
             ?: thresholdConfigurationDrop(strategy, notice, correlationId)
             ?: analyzeAndJudge(notice, strategy, capacitySnapshot, correlationId)
     }
@@ -151,64 +145,18 @@ class EvaluateCandidatesUseCase internal constructor(
             null
         }
 
-    private fun lifecycleDrop(
-        notice: Notice,
-        correlationId: CorrelationId,
-    ): CandidateEvaluation.NotReached? {
-        val deadline = notice.deadlineAt
-        return if (deadline != null && isBiddable(notice.status, clock.now(), deadline)) {
-            null
-        } else {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.NoticeLifecycle,
-                EvaluationDropReason.NoticeNotBiddable(notice.status),
-            )
-        }
-    }
-
-    private fun watchGateDrop(
+    /**
+     * 값싼 게이트 셋(생애주기 → 감시 → 면허)은 [screenCandidate] 하나가 돈다(M7/7C①b — 제안 목록
+     * use case 와 같은 함수). 통과면 `null` 이고 면허 판정 값은 이 use case 가 쓰지 않는다.
+     */
+    private fun screeningDrop(
         notice: Notice,
         strategy: OperatorStrategy,
         correlationId: CorrelationId,
-    ): CandidateEvaluation.NotReached? {
-        val subject =
-            when (val outcome = watchSubjects.subjectFor(notice)) {
-                is WatchSubjectOutcome.Unavailable -> {
-                    return notReached(
-                        notice,
-                        correlationId,
-                        EvaluationStage.WatchGate,
-                        EvaluationDropReason.WatchSubjectUnavailable,
-                    )
-                }
-
-                is WatchSubjectOutcome.Found -> {
-                    outcome.subject
-                }
-            }
-        return watchVerdictDrop(strategy.watchRules.evaluate(subject), notice, correlationId)
-    }
-
-    private fun licenseGateDrop(
-        notice: Notice,
-        correlationId: CorrelationId,
     ): CandidateEvaluation.NotReached? =
-        when (val verdict = licenseGate.verdictFor(notice)) {
-            is LicenseVerdict.Ineligible -> {
-                notReached(
-                    notice,
-                    correlationId,
-                    EvaluationStage.LicenseGate,
-                    EvaluationDropReason.LicenseIneligible(verdict),
-                )
-            }
-
-            // Uncertain은 미보유가 아니다(1C U-5) — 사다리로 넘어간다. Eligible도 통과.
-            is LicenseVerdict.Eligible, is LicenseVerdict.Uncertain -> {
-                null
-            }
+        when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
+            is CandidateScreening.Passed -> null
+            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason)
         }
 
     private fun thresholdConfigurationDrop(
@@ -397,7 +345,8 @@ class EvaluateCandidatesUseCase internal constructor(
  * 갈릴 자리가 없다.
  *
  * top-level 로 둔 이유는 크기 회피가 아니라 상태 부재다 — 이 함수는 port 하나와 인자만
- * 쓴다(클래스당 함수 11개 한도, detekt `TooManyFunctions`; `watchVerdictDrop` 과 같은 처분).
+ * 쓴다(클래스당 함수 11개 한도, detekt `TooManyFunctions` — 값싼 게이트 셋을
+ * `CandidateScreening.kt` 로 옮긴 것과 같은 처분).
  */
 private fun NotificationRequestPort.requestFor(
     notice: Notice,
@@ -428,49 +377,3 @@ private fun notReached(
     stage: EvaluationStage,
     reason: EvaluationDropReason,
 ): CandidateEvaluation.NotReached = CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason)
-
-/**
- * [WatchVerdict]가 통과가 아닌 갈래를 [CandidateEvaluation.NotReached]로 옮긴다
- * (`EvaluateCandidatesUseCase.watchGateDrop`에서 분리 — 클래스당 함수 11개 한도,
- * v2-지침서 §5, detekt `TooManyFunctions`). 인스턴스 상태가 필요 없어 top-level로 뺐다.
- * **`NoGate`는 통과가 아니다.**
- * legacy는 이 상태에서 스캔 자체를 하지 않았다(`_has_configured_watch_rules`
- * 게이트) — 결과(후보 0)를 그대로 두고 탈락만 값으로 남긴다.
- */
-private fun watchVerdictDrop(
-    verdict: WatchVerdict,
-    notice: Notice,
-    correlationId: CorrelationId,
-): CandidateEvaluation.NotReached? =
-    when (verdict) {
-        is WatchVerdict.Rejected -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateRejected(verdict),
-            )
-        }
-
-        is WatchVerdict.Undeterminable -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateUndeterminable(verdict),
-            )
-        }
-
-        is WatchVerdict.NoGate -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateNotConfigured(verdict),
-            )
-        }
-
-        is WatchVerdict.Passed -> {
-            null
-        }
-    }

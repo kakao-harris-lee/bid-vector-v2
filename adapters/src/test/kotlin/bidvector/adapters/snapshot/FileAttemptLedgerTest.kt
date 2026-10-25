@@ -177,6 +177,33 @@ class FileAttemptLedgerTest {
         shouldThrow<RunStateFormatRefusedException> { ledger.read() }.fault shouldBe RunStateFormatFault.LEGACY_LINE
     }
 
+    /**
+     * **M6/G1-C03 — 이 slice 는 줄의 형태를 바꾸지 않는다.** 6G 실수집은 옛 jar 로 계속 돌고, 그 jar 가
+     * 쓴 원장을 새 코드가 이어받는다. 그래서 여기서 읽는 것은 `append` 가 쓴 줄이 아니라 **밖에서 쓰인
+     * 바이트**다 — 자기 출력만 되읽으면 형식이 코드와 함께 움직여도 초록이라 호환을 재지 못한다.
+     *
+     * 재조회 창이 보는 질의까지 같은 바이트에서 답이 선다: 관문 거부 줄은 창을 열지 않으므로 마지막
+     * **관측** 시각은 그 앞의 결말 줄이다(D-6G2d-16 과 같은 근거 — 그 축에 대한 관측이 아니다).
+     */
+    @Test
+    fun `밖에서 쓰인 지금 형식의 원장을 그대로 읽는다`() {
+        val ledger = ledger()
+        Files.writeString(ledgerFile(), EXISTING_FORMAT_LEDGER)
+
+        val history = ledger.read()
+
+        history.size shouldBe 4
+        // 정착하지 않았고 일시 실패가 상한 미만이라 그 축은 다시 불린다.
+        history
+            .axisResumptions(LEDGER_RETRY_LIMIT)
+            .getValue(LEDGER_KEY.value)
+            .getValue(SourceEndpoint.RESERVE_PRICE_DETAIL) shouldBe false
+        history
+            .axisLastObservedAt()
+            .getValue(LEDGER_KEY.value)
+            .getValue(SourceEndpoint.RESERVE_PRICE_DETAIL) shouldBe LEDGER_AT
+    }
+
     /** 걷기는 AXIS 줄만 갖는다 — 호출 단위 줄이 걷기를 달고 있으면 그 원장은 이 코드의 것이 아니다. */
     @Test
     fun `걷기를 실은 호출 줄도 읽지 않는다`() {
@@ -199,3 +226,25 @@ class FileAttemptLedgerTest {
             "\"notice_key_hash\":\"${LEDGER_KEY.value}\",\"outcome\":\"SUCCEEDED\"," +
             "\"kind\":\"AXIS\"${walkField?.let { ",$it" } ?: ""}}\n"
 }
+
+/** 관문 거부 줄의 시각 — 결말 줄보다 **뒤**다(그런데도 마지막 관측은 앞의 결말 줄이다). */
+private val LEDGER_REFUSED_AT: Instant = LEDGER_AT.plusSeconds(3600)
+
+/**
+ * 지금 도는 jar 가 쓰는 네 줄 — 의도·호출·축 결말·관문 거부. **리터럴로 적는다**: 이 바이트가 곧
+ * 호환의 대상이고, 코드로 지으면 형식이 코드와 함께 움직인다.
+ */
+private val EXISTING_FORMAT_LEDGER: String =
+    listOf(
+        "{\"at\":\"$LEDGER_AT\",\"axis\":\"RESERVE_PRICE_DETAIL\"," +
+            "\"notice_key_hash\":\"${LEDGER_KEY.value}\",\"outcome\":null,\"kind\":\"PENDING\",\"walk\":null}",
+        "{\"at\":\"$LEDGER_AT\",\"axis\":\"RESERVE_PRICE_DETAIL\"," +
+            "\"notice_key_hash\":\"${LEDGER_KEY.value}\",\"outcome\":\"SUCCEEDED\"," +
+            "\"kind\":\"HTTP\",\"walk\":null}",
+        "{\"at\":\"$LEDGER_AT\",\"axis\":\"RESERVE_PRICE_DETAIL\"," +
+            "\"notice_key_hash\":\"${LEDGER_KEY.value}\",\"outcome\":\"FAILED:SHORT_WALK\"," +
+            "\"kind\":\"AXIS\",\"walk\":\"$LEDGER_AT\"}",
+        "{\"at\":\"$LEDGER_REFUSED_AT\",\"axis\":\"RESERVE_PRICE_DETAIL\"," +
+            "\"notice_key_hash\":\"${LEDGER_KEY.value}\",\"outcome\":\"REFUSED:QUOTA_EXHAUSTED\"," +
+            "\"kind\":\"AXIS\",\"walk\":\"$LEDGER_REFUSED_AT\"}",
+    ).joinToString("\n", postfix = "\n")

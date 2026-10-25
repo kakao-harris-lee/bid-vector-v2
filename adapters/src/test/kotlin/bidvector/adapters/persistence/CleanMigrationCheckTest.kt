@@ -80,6 +80,25 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // browser_session 은 session_digest<>''·csrf_digest<>''·유휴<=절대 셋이다.
             "account" to 3,
             "browser_session" to 3,
+            // M7/7B 신규(추가만). V21__bid_case.sql — 실측값이고 내역은 다음과 같다.
+            //  · bid_case 11 = 존재 가드 셋(notice_number·notice_round 형식·skip_reason) +
+            //    bid_kind enum + state enum(열넷) + case_version>=0 + 상태별 필수 다섯
+            //    (나중에⇒리마인드 · 건너뜀⇒사유 · 사유는 건너뜀에만 · 개찰 대기⇒개찰일시 ·
+            //    심사 중⇒서류 기한).
+            //  · bid_case_transition 10 = 어휘 enum 셋(from_state·to_state·command — 계약 D-7B-3 에서
+            //    공백 가드가 열거로 바뀌었다, 수는 같다) + actor_detail 공백 + reason 공백·상한
+            //    + case_version>=0 + actor_kind enum + actor 짝 + 사유 필수 + 소급 출처 제한.
+            //  · bid_draft 19 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + draft_seq>=0 + 스냅샷 판 번호 하한 + 기초금액 범위 + 짝 넷(하한율 1 · 기초금액 3)
+            //    + 계약 D-7B-3 의 여섯(하한율 출처 enum · detail 공백 · detail 짝 · 기초금액 출처 enum
+            //    · detail 공백 · detail 짝) + D-7B-4 의 둘(스냅샷 기초금액 통화 · 과세 공백).
+            //  · bid_record 11 = 금액 범위·통화·과세·출처 enum + 메뉴 짝 + chosen_option_ref 공백
+            //    + record_seq>=0 + evidence_ref 공백·상한 + 증빙 짝 + memo 공백·상한 + 추첨번호 부호(D-7B-3 · D-7B-4 —
+            //    상한은 기존 CHECK 에 붙어 수가 그대로다).
+            "bid_case" to 11,
+            "bid_case_transition" to 10,
+            "bid_draft" to 21,
+            "bid_record" to 11,
             // M7/7C③(추가만). V23: kind 어휘 1 + notice_number<>'' 1 + notice_round 형식 1 +
             // detail_code 어휘 1 + 종류↔detail 짝 1 + read_at>=created_at 1 = 6.
             "notification_inbox" to 6,

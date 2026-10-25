@@ -165,6 +165,45 @@ class CollectionArchitectureGateTest {
         ) shouldBe policy.collectionUseCaseReferencers.toSet()
     }
 
+    /**
+     * M6/G1-C03 (D-G1C03-5) — 조회 가치 술어를 직접 부르는 자리가 기준 시각 경계 하나뿐이다. use case 가 술어를 다시
+     * 직접 부르면(기준 시각에 상수를 넘기는 G1-T 의 결함) 여기서 붉어진다.
+     */
+    @Test
+    fun `조회 가치 술어를 참조하는 production 클래스는 기준 시각 경계 하나다`() {
+        rules
+            .appTypesMustBeReferencedOnlyBy(
+                policy.packageRoot,
+                setOf(policy.detailFetchPredicateType),
+                policy.detailFetchPredicateReferencers.toSet(),
+                "M6/G1-C03 F-1 — 술어로 가는 길은 기준 시각을 선언째 받는 경계 하나다",
+                policy.depth(DepthAxis.USECASE),
+            ).checkAll()
+        rules.observedReferencers(
+            production,
+            listOf(policy.packageRoot),
+            setOf(policy.detailFetchPredicateType),
+            policy.depth(DepthAxis.USECASE),
+        ) shouldBe policy.detailFetchPredicateReferencers.toSet()
+    }
+
+    /** M6/G1-C03 (D-G1C03-5) — 개찰 표본 후보를 짓는 자리가 표본틀 하나뿐이다. 다른 선언으로 다시 지으면 붉어진다. */
+    @Test
+    fun `개찰 표본 후보를 짓는 production 클래스는 표본틀 하나다`() {
+        rules
+            .constructorMustBeCalledOnlyBy(
+                policy.packageRoot,
+                policy.openingCandidateType,
+                policy.openingCandidateConstructors.toSet(),
+                "M6/G1-C03 F-1 — 기준 시각 선언은 표본틀이 싣고 후보는 그것을 나르기만 한다",
+            ).checkAll()
+        rules.observedConstructorCallers(
+            production,
+            listOf(policy.packageRoot),
+            policy.openingCandidateType,
+        ) shouldBe policy.openingCandidateConstructors.toSet()
+    }
+
     @Test
     fun `공고명 원시 키 리터럴은 계약 데이터를 실은 정책 클래스 밖 production 상수 풀에 없다`() {
         rules

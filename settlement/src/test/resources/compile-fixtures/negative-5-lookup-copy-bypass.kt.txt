@@ -1,0 +1,15 @@
+import bidvector.settlement.AwardLookupDecision
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.CompanyNameNormalization
+import bidvector.settlement.OperatorTradeName
+import bidvector.settlement.decideAwardLookup
+import bidvector.settlement.normalizeCompanyName
+
+fun negativeLookupCopyBypass() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val lookup = decideAwardLookup(OperatorTradeName.Declared("GasangMarine"), policy)
+    check(lookup is AwardLookupDecision.Lookup)
+    val other = normalizeCompanyName("GasangCivil", policy)
+    check(other is CompanyNameNormalization.Normalized)
+    lookup.copy(operator = other.name)
+}

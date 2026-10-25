@@ -33,8 +33,10 @@ private val DECLARED_PARAMETERS = listOf("page", "size", "unreadOnly")
  * `app.wiring` 의 조회기 하나만 받는다. 그래서 「HTTP 로 알림을 위조한다」가 게이트를 바꾸지
  * 않고는 성립하지 않는다 — 이 문장이 규율이 아니라 조립의 성질이다.
  *
- * **계정은 본문에서 오지 않는다**([SessionAccount] 가 인증 판정의 산출물에서 읽는다). 요청이
- * 자기 계정을 말할 수 있으면 소유 경계가 요청자의 주장에 의존한다.
+ * **계정은 본문에서 오지 않는다** — 7B 의 typed 접근자([authenticatedAccount])가 세션 인증이
+ * 심은 요청 속성에서 읽는다. 요청이 자기 계정을 말할 수 있으면 소유 경계가 요청자의 주장에
+ * 의존한다. 주체 라벨 **문자열을 파싱하지 않는다** — 라벨 규약이 바뀌면 파싱이 조용히 다른
+ * 계정을 내거나 `null` 을 낸다(`AccountCarrierStructureTest` 가 그 부재를 구조로 잰다).
  */
 @RestController
 @RequestMapping(AccountScopedRoutes.NOTIFICATIONS)
@@ -43,7 +45,7 @@ class NotificationInboxController(
 ) {
     @GetMapping
     fun list(request: HttpServletRequest): ResponseEntity<Any> {
-        val account = SessionAccount.of(request) ?: return unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val parameters = readDeclaredParameters(request)
         return when (val parsed = parseNotificationPageParameters(parameters)) {
             is NotificationPageResult.Rejected ->
@@ -65,7 +67,7 @@ class NotificationInboxController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = SessionAccount.of(request) ?: return unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val target = body.parseNotificationReadTarget()
         return when (target) {
             is NotificationTargetResult.Item -> respond(notifications.markRead(account, target.key))
@@ -83,7 +85,7 @@ class NotificationInboxController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = SessionAccount.of(request) ?: return unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val target = body.parseNoticeReadTarget()
         return when (target) {
             is NotificationTargetResult.Notice ->
