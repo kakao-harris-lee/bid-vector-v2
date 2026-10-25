@@ -2409,6 +2409,7 @@ components:
             type: string
             enum:
               - QUAL_08_REGION
+              - QUAL_10_PERFORMANCE
               - QUAL_11_CONSTRUCTION_CAPACITY
     BidPriceRequestBody:
       type: object
