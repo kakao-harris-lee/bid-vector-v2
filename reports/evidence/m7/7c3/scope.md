@@ -4,8 +4,8 @@
   표(ADR 0005 D-3)라 재사용하지 않는다)」) · R-4(외부 effect 는 알림함 기록까지, 채널 발송 없음) · R-2(사용자 소유 표에 `account_id`).
   운영자 지시 2026-10-23 「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건(M6 완료 조건 성립)의 **운영자 예외**
   (7C①·7C④ 와 같은 종류).
-- **base**: main `1107f848` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
-  **착수 base 는 `a61ddff1` 이었고 7B 머지(PR #89) 뒤 `1107f848` 로 재고정했다**(팀장 2026-10-26 ·
+- **base**: main `46ac0949` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
+  **착수 base 는 `a61ddff1` 이었고 7B 머지(PR #89) 뒤 `46ac0949` 로 재고정했다**(팀장 2026-10-26 ·
   D-7C3-1 ①). 옮긴 방식은 `git merge origin/main`(rebase 가 아니다 — 17 ahead / 198 behind 라
   rebase 는 같은 충돌을 커밋마다 재생한다). 충돌 9 를 전부 합집합으로 해소했다.
 - **병렬 레인**(전부 push 0): 7B(V21, `AccountScopedRoutes`) · 7C④(V22) · 7C② · 7C⑤ · 7C①b · g1c03 · g1set01 · g1dec05.
@@ -61,7 +61,7 @@
 
 ## rollback
 
-`git restore --source=1107f848 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 마이그레이션은 **배포 전**
+`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 마이그레이션은 **배포 전**
 되돌림만 이 방식이다 — 배포 뒤 되돌림(V23 표 drop 순방향 마이그레이션) 경로를 rollback.md 에 따로 적는다. 목록 기계 산출, 마지막 산출물
 커밋에서 ①~⑥ 실측.
 

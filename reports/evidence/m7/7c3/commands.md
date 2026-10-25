@@ -1,6 +1,6 @@
 # M7/7C③ — 실행 명령과 종료 코드
 
-base `1107f848` · 브랜치 `m7-7c3/2026-10-23` · worktree `bid-vector-v2-m7-7c3`.
+base `46ac0949` · 브랜치 `m7-7c3/2026-10-23` · worktree `bid-vector-v2-m7-7c3`.
 
 호스트 규율: 모든 Gradle·npm 명령은 `flock ~/.local/bid-vector-build.lock` 아래 돌렸고 점검 셋
 (`pgrep`·`free -m`·`ps`)을 **별도 호출로 먼저** 봤다. 이 라운드 동안 같은 락에 **다른 레인
@@ -217,6 +217,14 @@ D-7C3-1 ① 로 **7B → 7C③ 머지 순서**가 정해졌다. 그래서 이 sl
 즉 경고가 지목한 함정(저장된 state 직접 읽기)은 이 slice 의 구조에 **없다**. rebase 에서는
 위 네 줄을 **다시 실측해** 그 부재가 유지되는지만 확인한다(7B 머지로 `bid_case` 가 main 에
 들어오므로, 「읽을 수 있게 됐는데도 읽지 않는다」가 그때 비로소 의미 있는 측정이 된다).
+
+## 낡은 `.class` 대조 (팀장 2026-10-26 · 7C② 실측 유래)
+
+이 slice 는 타입을 **지웠고**(`SessionAccount`·그 test) 패키지를 **옮겼다**. 증분
+`build/classes` 에 옛 정의가 남으면 로컬 실측이 **가짜 RED** 를 낸다(CI 는 새 checkout 이라
+이 일이 없다). 세 축 전부 **0** 이라 `clean` 없이 쟀다 — 아홉 모듈의
+`build/classes/kotlin/{main,test}` 에 소스에 없는 class 0 · 지운 타입의 `.class` 0 · 옛 패키지
+경로에 이 slice 의 타입 0(그 경로에 남은 것은 채널 발송 패키지의 정당한 class 다).
 
 ## (기록) — rollback ①~⑥ (임시 clone, 되돌린 트리)
 

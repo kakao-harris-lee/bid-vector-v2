@@ -1,9 +1,9 @@
 # M7/7C③ — 되돌림
 
-base `1107f848`(7B 머지 뒤 재고정 — 착수 base `a61ddff1` 이 아니다). **전제**: 그 SHA 에 이
-slice 의 산출물이 **없다**(`1107f848` 은 7B 의 머지 커밋이고 알림함은 그 뒤에 온다).
+base `46ac0949`(7B 머지 뒤 재고정 — 착수 base `a61ddff1` 이 아니다). **전제**: 그 SHA 에 이
+slice 의 산출물이 **없다**(`46ac0949` 은 7B 의 머지 커밋이고 알림함은 그 뒤에 온다).
 목록은 **기계 산출**이고 라운드마다 재산출한다
-(`git diff --name-status 1107f848..HEAD`, evidence 제외).
+(`git diff --name-status 46ac0949..HEAD`, evidence 제외).
 
 **실측 HEAD**: (기록 — 마지막 산출물 커밋에서 돌린다)
 
@@ -38,7 +38,7 @@ DROP TABLE notification_inbox;   -- 인덱스 둘이 함께 사라진다
 ## 복원 목록 — 수정된 공유 파일 열 (base 로 복원)
 
 ```
-git restore --source=1107f848 --staged --worktree -- \
+git restore --source=46ac0949 --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/retention/RetentionTableRegistry.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
@@ -52,7 +52,8 @@ git restore --source=1107f848 --staged --worktree -- \
   app/src/test/kotlin/bidvector/app/http/AccountCarrierStructureTest.kt \
   config/quality/architecture-policy.properties \
   config/quality/gate-tests.properties \
-  openapi/bidvector-operator-api.yaml
+  openapi/bidvector-operator-api.yaml \
+  web/src/api/generated/operator-api.ts
 ```
 
 **머지 뒤라면 `--source` 는 base 가 아니라 병합된 main 커밋 SHA 다**(고정된 SHA — 움직이는
@@ -83,18 +84,10 @@ git restore --source=1107f848 --staged --worktree -- \
   workflow/src/test/kotlin/bidvector/workflow/notificationinbox/NotificationPageParsingTest.kt
 ```
 
-**7B 머지로 분류가 움직인 자리 셋**(앞 라운드 대비) — 이 절이 「라운드마다 재산출한다」의 실례다:
-
-| 파일 | 앞 라운드 | 지금 | 사유 |
-|---|---|---|---|
-| `app/.../http/AccountScopedRoutes.kt` | 신규(삭제) | **수정(복원)** | 7B 가 먼저 세웠다 — 이제 그 파일에 뿌리 한 줄을 더한 것이다 |
-| `app/.../http/SessionAccount.kt` | 신규(삭제) | **목록에 없음** | 임시 산출물이었고 7B 접근자로 교체하며 지웠다(D-7C3-2 ⓑ) |
-| `app/.../http/SessionAccountTest.kt` | 신규(삭제) | **목록에 없음** | 〃 |
-
 ## 등식 확인 (목록이 손 목록이 아님)
 
 ```
-comm -23 <(git diff --name-only 1107f848..HEAD | grep -v '^reports/evidence/' | sort) \
+comm -23 <(git diff --name-only 46ac0949..HEAD | grep -v '^reports/evidence/' | sort) \
          <(이 파일이 든 경로 전수 | sort)
 ```
 
@@ -109,7 +102,7 @@ comm -23 <(git diff --name-only 1107f848..HEAD | grep -v '^reports/evidence/' | 
 |---|---|---|
 | ① | 복원·삭제 명령의 종료 코드 | (기록) |
 | ② | `git diff --name-status` 의 D/M 수가 위 목록과 같다 | (기록) |
-| ③ | 되돌린 트리의 `git diff 1107f848` 가 빈 출력 | (기록) |
+| ③ | 되돌린 트리의 `git diff 46ac0949` 가 빈 출력 | (기록) |
 | ④ | 되돌린 트리에서 컴파일 | (기록) |
 | ⑤ | 되돌린 트리에서 test | (기록) |
 | ⑥ | 되돌린 트리에서 **게이트**(초록이 아니면 보완 경로까지 실행) | (기록) |
