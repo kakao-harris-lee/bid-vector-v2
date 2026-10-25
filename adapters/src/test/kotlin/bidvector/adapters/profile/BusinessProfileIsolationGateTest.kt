@@ -50,8 +50,10 @@ private val PROFILE_TYPE_SOURCES = setOf("bidvector/adapters/profile/JdbcBusines
  *   쓰는 자리에 **인라인**되므로 그 문자열이 SQL 객체 밖으로도 퍼진다 — 그 자리를 허용 키가 적는다.
  * - **규칙 2 — V22 값 타입 좌표**: [PROFILE_COORDINATE] 를 지닌 class 는 [PROFILE_TYPE_SOURCES] 에서 나온
  *   것뿐이다(X1 · N3 · B3).
- * - **규칙 3 — 판정 입력 port 를 지닌 class**: `workflow.evaluation` 의 port 좌표를 지닌 class 는 V22 표
- *   이름도 값 타입 좌표도 **함께 지니지 않는다**. 허용 키와 **무관하게** 적용된다 — 허용 파일 안에서
+ * - **규칙 3 — 판정 패키지의 비봉인 인터페이스를 지닌 class**: `workflow.evaluation` 의 그 좌표를 지닌
+ *   class 는 V22 표 이름도 값 타입 좌표도 **함께 지니지 않는다**. 집합은 오늘 **열**이다 — `*Port` 아홉과
+ *   `CorrelationIdFactory`(식별자 팩토리라 「판정 입력」은 아니지만 **일부러 넓은 쪽**으로 둔다: 모집단이
+ *   넓으면 더 잡고, 이름 목록으로 되돌아가지 않는다. r5 CR R5-L1 — 오늘 거짓 양성 0). 허용 키와 **무관하게** 적용된다 — 허용 파일 안에서
  *   `OperatorProfilePort { … }` 람다로 V22 를 접는 우회(indy 변종)와 중첩 구현(N7)이 걸린다. port 집합은
  *   이름 목록이 아니라 **그 패키지의 「봉인되지 않은 인터페이스」 전수**를 산출물에서 뽑는다 — 봉인
  *   인터페이스는 결과 · 값 타입(`CandidateEvaluation` 류)이고 port 가 아니다. 멤버 수로 고르지 **않는다**:
@@ -86,10 +88,10 @@ class BusinessProfileIsolationGateTest {
     }
 
     @Test
-    fun `판정 입력 port 를 지닌 class 는 V22 표도 값 타입도 함께 지니지 않는다`() {
+    fun `판정 패키지의 비봉인 인터페이스를 지닌 class 는 V22 표도 값 타입도 함께 지니지 않는다`() {
         val ports = portCoordinates()
         val portBearers = scannedClasses.filter { entry -> ports.any { it in entry.bytes } }
-        portBearers.shouldNotBeEmpty() // 그 port 를 지닌 class 가 적어도 하나 있다.
+        portBearers.shouldNotBeEmpty() // 그 좌표를 지닌 class 가 적어도 하나 있다.
 
         portBearers.filter { it.bearsTableName || it.bearsProfileType }.map { it.file.name } shouldBe emptyList()
     }
@@ -200,7 +202,8 @@ private interface TwoMemberPortSample {
 }
 
 /**
- * port 술어 — **인터페이스이고 봉인되지 않았다**. 봉인 인터페이스는 결과 · 값 타입이라 port 가 아니고
+ * 규칙 3 의 타입 술어 — **인터페이스이고 봉인되지 않았다**(그래서 집합에는 port 가 아닌 비봉인 인터페이스도
+ * 든다 — 위 KDoc 참조). 봉인 인터페이스는 결과 · 값 타입이라 제외되고
  * (Kotlin 의 `sealed interface` 는 바이트코드에 `PermittedSubclasses` 를 남긴다 — 실측), 멤버 수는 보지
  * 않는다(추상 메서드가 둘인 port 도 port 다, r4 F13).
  */
