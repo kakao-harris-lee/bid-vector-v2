@@ -471,6 +471,46 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         page.unreadCount shouldBe 0L
     }
 
+    // =========================================================================
+    // 시계 비의존 (운영자 결정 D-7C3-3 ② · 회귀 방어)
+    // =========================================================================
+
+    /**
+     * **이 표의 거동은 벽시계에 기대지 않는다.** 앞 판에는 `read_at >= created_at` CHECK 가
+     * 있었고, `created_at` 은 DB 의 `now()` 인데 `read_at` 은 앱 시계가 실어서 **두 시계를
+     * 비교**했다. 그래서 고정 과거 시각을 쓰는 test 가 **쓴 날은 통과하고 사흘 뒤 붉어졌다** —
+     * 코드가 아니라 달력이 바뀌어서다.
+     *
+     * 그 제약을 걷어낸 뒤의 성질을 여기서 못박는다: 호출자가 싣는 시각이 **실행 시각보다 한참
+     * 과거든 한참 미래든** 기록과 읽음 처리가 모두 성공한다. 이 test 가 붉어지면 어딘가에서
+     * 앱 시계와 DB 시계를 다시 묶은 것이다.
+     *
+     * 변이 ⑬(걷어낸 CHECK 복원)이 이 test 를 **RED 로 만든다** — 그 짝이 없으면 이것은
+     * 「늘 통과하는 test」와 구별되지 않는다.
+     */
+    @Test
+    fun `호출자의 시각이 실행 시각보다 멀어도 기록과 읽음 처리가 성공한다 — 시계 비의존`() {
+        val account = insertAccount("clock-free")
+        val farPast = Instant.parse("2001-01-01T00:00:00Z")
+        val farFuture = Instant.parse("2099-12-31T23:59:59Z")
+
+        listOf(farPast to unknownNotice("N-PAST"), farFuture to unknownNotice("N-FUTURE"))
+            .forEach { (at, notice) ->
+                inbox().record(record(account, notice, NotificationFact.NoticeRevised, at)) shouldBe
+                    NotificationInboxOutcome.Created
+                // 읽음 시각도 같은 극단으로 — 적재 시각(DB `now()`)보다 과거·미래 둘 다 받는다.
+                inbox()
+                    .markRead(
+                        account,
+                        NotificationItemKey(NotificationKind.NOTICE_REVISED, notice),
+                        at,
+                    ).markedCount shouldBe 1
+            }
+
+        rowCount() shouldBe 2L
+        inbox().list(account, page()).unreadCount shouldBe 0L
+    }
+
     private fun page(unreadOnly: Boolean = false) =
         NotificationPageRequest(
             page = 0,
