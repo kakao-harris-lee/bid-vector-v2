@@ -6,7 +6,7 @@ range revert 가 아니라 **in_scope 경로 한정**이다. 수정된 파일은
 (base 에 없는 경로는 `git restore --source=<base>` 가 성립하지 않는다).
 
 ```
-BASE=1107f848
+BASE=46ac0949
 git restore --source=$BASE --staged --worktree -- <M 목록>
 rm -- <A 목록>
 ```
@@ -17,7 +17,7 @@ rm -- <A 목록>
 ## 2. 목록 — 기계 산출
 
 ```
-git diff --name-status 1107f848..HEAD | grep -v 'reports/evidence/'
+git diff --name-status 46ac0949..HEAD | grep -v 'reports/evidence/'
 ```
 
 - **A 15** = workflow main 넷 + workflow test 하나 + adapters main 둘 + adapters test 하나 +
@@ -33,14 +33,14 @@ git diff --name-status 1107f848..HEAD | grep -v 'reports/evidence/'
 **음성 대조(빈 등식이 건전성의 증거가 아니다)** — 「내가 커밋하지 않은 경로가 목록에 들어오는가」를 센다:
 
 ```
-git diff --name-only 1107f848..HEAD -- ml-engine/ container/ .github/   # 0
+git diff --name-only 46ac0949..HEAD -- ml-engine/ container/ .github/   # 0
 ```
 
 ## 3. 공유 파일의 사정
 
 M 여덟 가운데 **공유 파일 다섯**(`ErrorBody.kt` · `NoticeSearchController.kt` · `HttpTestSupport.kt` ·
 게이트 정책 둘)과 **문서 하나**(capability map)는 다른 레인도 만지는 자리다. 이 브랜치는 **머지 전**이므로
-복원 출처는 고정된 base SHA `1107f848` 이다(**병합** 뒤의 merge-base — rebase 가 아니라 `git merge` 이고, 움직이는 `origin/main` 을 쓰지 않는다). 머지 뒤 되돌림은
+복원 출처는 고정된 base SHA `46ac0949` 이다(**병합** 뒤의 merge-base — rebase 가 아니라 `git merge` 이고, 움직이는 `origin/main` 을 쓰지 않는다). 머지 뒤 되돌림은
 PR revert 로 한다.
 
 `NoticeSearchController.kt` 는 7C①b 레인도 만진다(응답 DTO 쪽). 이 slice 가 만진 hunk 는 질의 읽기
