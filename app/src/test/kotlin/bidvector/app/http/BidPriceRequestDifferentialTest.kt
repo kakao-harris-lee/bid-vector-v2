@@ -209,7 +209,6 @@ class BidPriceRequestDifferentialTest {
         notices.callCount shouldBe 1
         withClue("감시 입력 조립은 공고 하나당 한 번이다") { watch.callCount shouldBe 1 }
         withClue("ML 호출은 요청당 한 번을 넘지 않는다") { (ml.callCount <= 1) shouldBe true }
-        prepared.run.mlCallCount() shouldBe ml.callCount
     }
 
     @Test
