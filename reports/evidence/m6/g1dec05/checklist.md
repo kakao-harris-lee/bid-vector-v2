@@ -254,7 +254,7 @@ shared-kernel test 2 · decision test 1(하한 인자 없음)이고 `app/**` 에
 | `BidMenuGrounds` | 근거 **읽기**, 그리고 구성 | 근거를 지어 **옵션으로 승격** — 옵션 생성자가 `internal` |
 | `BidMenuOption` | 다섯 칸 읽기 | **생성·`copy`**(`internal` + `@ConsistentCopyVisibility`) |
 | `BidMenuOutcome` **다섯** 갈래 | `when` 전수 소비, 실패 셋 구성 | `Offered`·`PartiallyOffered` 생성·`copy` |
-| `BidMenuOutcome.PartiallyOffered`(라운드 2) | `offered`·`withheld` 맵 **읽기** | **생성·`copy`**(`internal` + `@ConsistentCopyVisibility`) — fixture 3 이 모듈 밖에서 실측 |
+| `BidMenuOutcome.PartiallyOffered`(라운드 2) | `offered`·`withheld` 맵 **읽기만** — 반환된 맵은 가둔 사본이라 캐스팅해 바꾸면 던진다(r2 M-4) | **생성·`copy`**(생성자 비공개 + `@ConsistentCopyVisibility`) — fixture 3 이 모듈 밖에서 실측 · **사후 변조**는 `BidMenuTypesTest` 가 실측 |
 | `CollapseCause` 둘(라운드 2) | 붕괴 사유 구성·비교 | — (사유 값이라 공개가 맞다) |
 | `BidMenuOutcome.BandCollapsed(cause, collapsedStances)` | 구성(실패 셋) | 빈 태도 집합(`init` 거부) |
 | `BidMenuOutcome.Unmeasurable(withheld)` | 구성(실패 셋) | 태도 전수가 아닌 보류(`init` 거부 — 「일부 보류」는 `PartiallyOffered` 의 자리다) |
@@ -262,12 +262,14 @@ shared-kernel test 2 · decision test 1(하한 인자 없음)이고 `app/**` 에
 | `BidMenuInput`·`BidMenuPolicyData`·`FloorRateReading`·`FloorBoundComparison` | 입력·정책 구성 | — |
 | `composeBidMenu` | 메뉴 산출 | — |
 | `AppliedFloor` | 하한 값 전달 | **생성**(`internal`) — `appliedFloorFrom` 만이 경로 |
-| `BaseAmount.appliedFloorFrom` | 같은 basis 하한 산출 | 다른 basis 입력(서명이 `BidRate` 만 받는다) |
+| `BaseAmount.appliedFloorFrom` | 같은 basis 하한 산출 | **날 `BigDecimal` 을 하한 자리에 넣는 것**(r2 L-1 정정 — 막는 것은 **타입**이지 basis 가 아니다. `BidRate.recommended(floorRate.rate)` 한 줄이면 예정가 basis 율도 들어가고, 커널 자신이 `appliedFloorOf` 에서 그렇게 한다 — 결정된 읽기라 정당하다) |
 
 **근거 없이 옵션을 만들 수 있는 public 경로 = 0.** 금액을 산술 없이 실을 경로도 0이다 —
 `Derived`·`Measurement.Measured` 의 생성자가 `shared-kernel` `internal` 이라 `decision` 조차 지어낼 수 없다.
 두 폐쇄는 `MenuCompileFailureHarnessTest` 가 **모듈 밖 컴파일 단위**에서 실측한다(같은 모듈 test 는
 `internal` 을 그냥 부를 수 있어 폐쇄를 재지 못한다).
+
+**결과 타입의 컬렉션은 전부 읽기 전용이다(r2 M-4).** `Offered.disclosures` · `PartiallyOffered.offered`·`withheld` · `BandCollapsed.collapsedStances` · `Unmeasurable.withheld` 넷 다 생성 시 복사해 가둔다 — 「생성자가 닫혀 있다」와 「나온 값을 바꿀 수 없다」는 **다른 주장**이고, 앞 판은 앞쪽만 재고 있었다. 가둔 뷰만으로는 부족한 자리(원본 참조가 `equals`·`hashCode` 에 남는 표류)도 함께 닫았다.
 
 **옵션이 밖으로 나가는 경로의 전수 점검(라운드 2 기준).** `BidMenuOption` 을 싣는 결과는
 `Offered` 와 `PartiallyOffered` **둘뿐**이고 둘 다 생성자가 `internal` 이다. 옵션을 담지 않는 세
@@ -306,6 +308,36 @@ verifier H-1 = cr HIGH-1, L-1 = MEDIUM-5, L-2 = MEDIUM-4 로 같은 자리다.
    그 문장을 근거로 같은 결함을 재생산할 자리였다. `ktlint` 5건도 같은 성질이다(라운드 2 가
    lint 를 돌리지 못한 채 끊겼다).
 
+### 승인 전 일괄(D-G1DEC05-3) — r2 finding 대응표
+
+r2 는 **verifier ready-for-review · code-reviewer approve**(blocker·high 0)였고, 아래는 차단이
+아닌 등재 항목의 처분이다. 번호는 verifier 원문(M-1~M-5 · L-1~L-5)이고 cr 쪽 같은 자리를 함께 적는다.
+
+| finding | 무엇이 문제였나 | 처분 |
+|---|---|---|
+| **M-1**(cr M-1) | 부분 붕괴가 **겹치지 않은 세 번째 옵션까지** 버린다(탐침 P5) | 겹친 태도만 `CollapsedWithOtherStances` 로 보류, 나머지는 제시. 전부 겹쳤을 때만 `BandCollapsed`. 대조표 **P-22** 에 등재 |
+| **M-2**(cr M-2) | 하한 **위** 후보가 올림을 타면 binding 이 `PublishedFloorBound` 로 바뀌고 **그 경로에 test 가 없다**(변이 N1 이 GREEN) | 올림이 binding 을 덮지 않는다(`effective.binding` 전달). P2 모양 회귀 test 추가 — N1 이 이 test 에서 RED |
+| **M-3** | 중복 판정이 **율 축**에만 있어 금액이 같은 두 옵션이 「정상 3안」으로 나간다(탐침 P1) | 판정 축을 **반올림 뒤 금액**으로. `DuplicateEffectiveRates` → `DuplicateEffectiveAmounts`. 대조표 **P-23** 에 등재 |
+| **M-4**(cr M-3) | 결과 타입의 컬렉션이 **사후 변조**된다 — 「고지 전수」 불변식 포함(탐침 P3·P4) | 네 결과 타입이 **생성자를 `private` 으로 내리고 companion `invoke` 가 가둔 사본을 primary 자리에** 넣는다(③′). (2b) 표의 「맵 읽기만」도 고쳤다 |
+| **M-4 보강**(팀장 지적, ③′) | 가둔 뷰만 파생하면 **반만 닫힌다** — data class 의 `equals`·`hashCode` 가 primary 의 **원본 참조**를 읽어, 생성 뒤 원본이 바뀌면 공개 뷰는 그대로인데 해시가 움직인다. 게다가 `BandCollapsed`·`Unmeasurable` 은 public 생성자에 애너테이션이 없어 **`copy` 가 모듈 밖에 열려 있었다** | 사본을 primary 자리에 넣어 표류를 없애고, `@ConsistentCopyVisibility` 를 네 타입 전부에 달아 `copy` 를 닫았다. **RED 를 먼저 봤다** — clean 빌드에서 225 중 1 실패(그 drift test), 해시가 `-1858671038` → `-1003534475` 로 움직였다. 봉쇄는 **fixture 4**(음성 + 오타 변이)가 모듈 밖 컴파일 단위에서 잰다 |
+| **M-5** | 후보 율의 **출처가 근거에 없다** — 상수 율로 「근거를 갖춘」 메뉴를 만들 수 있다 | 출처 축을 만들지 않는다. 알려진 제한 9 + `OPEN-DEC05-STANCE-RATE-PROVENANCE` 등재(`ML-01` 때 닫는다) |
+| **L-1** | (2b) 표 `appliedFloorFrom` 행의 「다른 basis 입력 불가」가 과장 | 타입이 닫는 것은 **날 `BigDecimal`** 이지 basis 가 아니라고 고쳤다 |
+| **L-2** | 변이 표 R2-M1 의 「잡은 자리」가 실측과 다르다 | `StanceRateMappingTest` **둘뿐**으로 고쳤다(커널 test 는 `toStanceRates` 를 거치지 않는다) |
+| **L-3** | 추적표 DEC-05 행에 「`E-24` 양쪽 22」가 남았다 | **23** 으로 고쳤다 |
+| **L-4**(cr L-2) | `capability-map.md` §12 신설 사유 단락이 낡았다(「fail-closed」 · 「3건 · 45→48」) | **표식형**으로 고치고 신설 건수를 현재(5건)로 맞췄다 |
+| **L-5**(cr L-1) | `amountStep` KDoc 의 「후보 비율에 더 가깝게 남는다」가 거짓 · DEC-02 행이 점수 축 OPEN 의 ⓐ 전환 영향을 적지 않았다 | KDoc 을 `ceil(U) = ceil(F)` 증명으로 고쳤다 · DEC-02 행에 **「막지 않는다」와 그 이유**를 적었다 |
+| **cr L-3** | `PartiallyOffered` 의 `init` 불변식 **여섯이 하나도 재지지 않는다** | 여섯을 각각 `shouldThrow` 로 재는 test 추가(팀장 목록 밖 항목 — M-4 와 합쳐 닫았다) |
+
+**이 일괄이 커널 거동을 바꾼다**(M-1 · M-2 · M-3) — 그래서 표적 재검증(r3)이 붙는다.
+
+**측정 전 낡은 `.class` 대조를 절차로 넣었다.** 증분 빌드의 `build/classes` 에 **소스에서 지운 타입의
+`.class` 가 남아** test 가 옛 정의를 보고 가짜 RED 를 내는 일이 다른 레인에서 나왔다(CI 는 새 checkout 이라
+없다). 이 라운드가 `CollapseCause.DuplicateEffectiveRates` 를 `…Amounts` 로 **이름을 바꿨으므로** 그 자리다 —
+실제로 `CollapseCause$DuplicateEffectiveRates.class`(10-22 자)가 남아 있었다. **첫 대조는 그것을 놓쳤다**:
+중첩 class 는 `Outer$Inner.class` 인데 `$` 앞 마디(`CollapseCause`)만 소스와 대조했고 그 이름은 지금도
+선언돼 있어 통과로 나왔다. **마디를 전부 보도록** 고쳐야 걸린다. 지금은 단계 6 이 `clean` 뒤에 이 대조를
+돌리고 **「소스에 없는 class 0」을 본 뒤에야** 측정을 믿는다.
+
 ### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
 
 축은 **약속 하나**다 — 파일 축은 쓰지 않는다(파일을 합치고 나누는 것은 설계 판단이 아니라
@@ -334,6 +366,8 @@ verifier H-1 = cr HIGH-1, L-1 = MEDIUM-5, L-2 = MEDIUM-4 로 같은 자리다.
 | P-18 | (c) 값 출처 표 — 후보 비율만 서지 않는다 | 그대로 | ① | — |
 | P-19 | (d) DEC-05·DEC-02 를 ⓒ 로 둔다 | ⓒ·ⓒ + `DEC-04` 정정 | ① | 자기 slice 에 불리한 정정을 포함한다 |
 | P-20 | (e) 신설 **수치 0** | `OPEN-DEC05-FLOOR-RATE-READING` 신설 · 수치 0 — 단 라운드 2 가 `FLOOR_PROMOTION_ROUNDING`(scale 0 · `CEILING`) 추가 | ② | 올림은 **정수 도메인에서 「하한 이상」 제약의 정의**이지 운영자가 고를 튜닝이 아니라고 보고 정책 슬롯을 두지 않았다. **재리뷰 표적**(판단이 갈릴 수 있다 — 아래 표적 목록) |
+| P-22 | (설계 검토 (1)) 「밴드 붕괴는 선택지가 서지 않는 상태」 — 붕괴는 **메뉴가 서지 않는 경우**의 이름이다 | 라운드 2: 둘만 겹쳐도 메뉴 전체를 `BandCollapsed` 로 돌려 **멀쩡한 세 번째 옵션까지 버렸다** / r2 일괄: 겹친 태도만 보류하고 나머지는 제시 | **③** → ①(r2 수리) | 「한 태도를 못 낸다고 나머지를 버리지 않는다」는 `PartiallyOffered` 의 원칙을 붕괴 축에만 적용하지 않은 것이고, **선언이 없었다**(verifier·cr 공통 M-1). 지금은 전부 겹쳤을 때만 붕괴다 |
+| P-23 | (설계 검토 (0)) 「값이 같은 두 옵션은 선택지가 아니다」 | 라운드 2: **율 축**으로만 판정 / r2 일괄: **반올림 뒤 금액** 축으로 판정 | ② | 운영자가 보고 제출하는 것은 금액이다. 율 차이가 1/기초금액 미만이면 두 옵션은 같은 원화가 되고, 하한 올림 경로는 결과가 언제나 `ceil(적용 하한)` 이라 **율 축에서는 겹침이 보이지 않는다**(r2 M-3) |
 | P-21 | (f) G3 OPEN 묶음 둘 등재 + 활성 개수 줄 조정 | 등재 · 머지 시점에 **50** 으로 합산 | ① | 합산 규약은 양쪽 장부가 스스로 적어 둔 것을 따랐다 |
 
 **읽는 법 — ④ 넷 중 셋(P-2·P-3·P-13)이 뿌리 하나다.** Phase 1 이 태도 축의 방향과 모듈 경계를
@@ -377,7 +411,7 @@ UP-TO-DATE·FROM-CACHE 로 건너뛴 초록은 실행이 아니다. 필터는 �
 | # | 변이 | numstat | 결과 | 잡은 자리 |
 |---|---|---|---|---|
 | **기준선** | 변이 0 | 0/0 | **GREEN** | 변이 전 clone 이 초록임을 먼저 재지 않으면 뒤의 RED 가 변이 탓인지 알 수 없다 |
-| R2-M1 | `toStanceRates` 를 라운드 1 의 반전으로 되돌림 | 2/2 | **RED**(7) | `StanceRateMappingTest` 둘 + `BidMenuKernelTest` 태도 축 |
+| R2-M1 | `toStanceRates` 를 라운드 1 의 반전으로 되돌림 | 2/2 | **RED**(7) | `StanceRateMappingTest` **둘뿐**(r2 L-2 정정 — 커널 test 는 `toStanceRates` 를 거치지 않아 이 변이에 반응하지 않는다. verifier 재실측에서 실패 2) |
 | R2-M2 | `floorAboveBand` 의 꼭대기를 `safe` → `aggressive` 로 오독 | 1/1 | **RED**(17) | 밴드 붕괴 · 태도 축 · 부분 보류 |
 | R2-M3 | 효력율 중복 붕괴 판정 제거(`duplicateRates` 미호출) | 1/1 | **RED**(13) | 밴드 붕괴 셋(중복·clamp 수렴·전수 겹침) |
 | R2-M4 | 부분 제시 제거 — 보류가 있으면 메뉴 전체를 죽인다(라운드 1 거동) | 1/5 | **RED**(23) | 부분 보류 + `Unmeasurable.init` 전수 불변식 |
@@ -450,6 +484,17 @@ R2-M2 를 표에 남기는 이유: HIGH-1 의 라벨 수정은 **붕괴 술어�
    점수로 바꾸는 중간값이고 제출·표시·영속되지 않는다. clamp 를 넣으면 하한 미달 예측이 「하한에서
    투찰한 것」으로 점수화돼 신호가 왜곡된다. 점수 의미를 바꾸는 도메인 결정이라 **DEC-10 착수
    계약에서 함께 판정**한다.
+
+9. **후보 율의 출처가 근거에 없다**(r2 M-5 · `OPEN-DEC05-STANCE-RATE-PROVENANCE`).
+   `StanceRates` 는 아무 `Rate` 나 받는 public 생성자이고 `BidMenuGrounds` 는 그 율이 **ML
+   release 에서 왔는지 손으로 넣은 상수인지**를 싣지 않는다. 그래서 legacy 매직 스프레드 같은
+   상수로도 **「근거를 갖춘」 완전한 `Offered`** 가 나온다 — 착수 계약 위협 모델 (0) 첫 줄
+   (「근거 없는 숫자가 운영자에게 추천으로 가는 것」)의 **입력 경계**다.
+   - **이 slice 는 출처 축을 새로 만들지 않는다**(D-G1DEC05-3 단계 4). 닫는 자리는 `ML-01`
+     (ML 배선)이고, 그 slice 가 율의 출처를 실제로 들고 오는 자리다.
+   - 지금 해가 없는 이유는 **소비자가 0 이고 화면 표시가 「아직 산출 안 함」 선언 예외**이기
+     때문이지 타입이 막아서가 아니다 — 그 구분을 적어 둔다.
+   - 7C ② 계약 조건: 율의 ML release 출처를 근거와 함께 표시한다.
 
 ### 재리뷰 표적 (레인이 스스로 올리는 것)
 
