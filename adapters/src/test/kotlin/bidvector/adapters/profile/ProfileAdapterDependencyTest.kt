@@ -16,10 +16,17 @@ import java.io.File
  * 넓히지 않는다 — 이 test는 그것들과 별개다). `bidvector.adapters.profile` 자신은 이
  * 패키지의 클래스끼리(`JdbcOperatorProfileRepository` → `OperatorProfileRow`) 서로
  * 참조할 수 있어야 하므로 포함한다.
+ *
+ * M7/7C④ — V22 어댑터가 사업 정보 값 타입([bidvector.workflow.profile])과 주체 식별자
+ * (`bidvector.workflow.access.AccountId`)를 본다. 이 test 의 단위는 **패키지**라 루트로 적는다.
+ * **어느 class 가 그 좌표를 지녀도 되는지는 이 test 가 정하지 않는다** — `adapters` 모듈 전체에
+ * 걸리는 `BusinessProfileIsolationGateTest` 가 `SourceFile` 속성으로 그 자리를 정한다(r2 F5 처분).
  */
 private val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
+        "bidvector.workflow.profile",
+        "bidvector.workflow.access",
         "bidvector.qualification",
         "bidvector.strategy",
         "bidvector.adapters.persistence",
@@ -42,6 +49,10 @@ private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
  * import 문 없이 전체 한정 좌표로 직접 참조하는 우회(scope.md 우회 5)를 소스 텍스트 정규식
  * 형태는 못 본다(6F-1 verifier MUT-E3 실측) — 신설 게이트는 구조로 닫는 쪽만 쓴다(CLAUDE.md
  * 「게이트 술어는 문자열이 아니라 구조로」).
+ *
+ * **이 test 가 재는 것**: 이 패키지의 class 가 허용 루트 **밖**의 `bidvector` 좌표를 참조하지 않는다.
+ * 재지 않는 것: 다른 패키지 · 모듈(이 test 의 모집단이 아니다 — V22 관심사는 모듈 전체에 걸리는
+ * `BusinessProfileIsolationGateTest` 가 본다) · 값이 흐르는 경로 일반.
  */
 class ProfileAdapterDependencyTest {
     @Test
@@ -70,6 +81,7 @@ class ProfileAdapterDependencyTest {
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
         isDisallowed("bidvector.workflow.evaluation") shouldBe false
+        isDisallowed("bidvector.workflow.profile") shouldBe false
         isDisallowed("bidvector.qualification") shouldBe false
         isDisallowed("bidvector.strategy") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false

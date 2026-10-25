@@ -61,6 +61,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "bid_case_transition",
             "bid_draft",
             "bid_record",
+            // 스키마 스냅샷 래칫 예외(M7/7C④, 추가만). V22__account_business_profile.sql — 계정 사업 정보 둘.
+            "account_business_profile",
+            "account_construction_capacity",
         )
 
     @Test
@@ -146,6 +149,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "bid_case_transition" to setOf("id"),
             "bid_draft" to setOf("id"),
             "bid_record" to setOf("id"),
+            // M7/7C④ — 키의 **선두가 소유 계정**이다. 사업 정보는 계정당 한 행, 시평액은 계정 × 면허명.
+            "account_business_profile" to setOf("account_id"),
+            "account_construction_capacity" to setOf("account_id", "license_name"),
         )
 
     @Test
@@ -243,6 +249,10 @@ class CleanMigrationTest : PersistenceTestSupport() {
                 "bid_draft",
                 listOf("id", "case_id", "account_id"),
             ),
+            // M7/7C④ — 사용자 소유 표 둘이 계정을 참조한다(R-2). CASCADE 없음(계정을 지우는 경로가
+            // 아직 없다 — 생기면 이 행들의 파기가 그 경로의 일이다, `ACCOUNT_SETTING`).
+            FkSpec("account_business_profile", "account_id", "account", "id"),
+            FkSpec("account_construction_capacity", "account_id", "account", "id"),
         )
 
     @Test
