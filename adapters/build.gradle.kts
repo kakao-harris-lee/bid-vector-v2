@@ -16,6 +16,7 @@ dependencies {
     // adapters 는 domain 층이 아니라 이 둘을 함께 참조할 수 있다(ModuleDependencyGate S-5).
     implementation(project(":qualification"))
     implementation(project(":strategy"))
+    implementation(project(":bidding"))
     // `GrpcBidPredictionGateway`가 `BidPredictionOutcome.Unavailable`을 짓는 데
     // `bidvector.decision.MlUnavailableReason`을 직접 참조한다(D-4D-6). `workflow`는 이 좌표를
     // `implementation`으로만 선언해 하위 소비자(이 모듈)의 컴파일 classpath 에 전이되지

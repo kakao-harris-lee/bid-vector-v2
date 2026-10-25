@@ -25,13 +25,16 @@ dependencyResolutionManagement {
 
 rootProject.name = "bid-vector"
 
-// v2-지침서.md §3.1 · ADR 0006 D-2 의 모듈 목록 중 아홉.
-// `bidding` 은 소유 capability 가 서지 않아 보류한다 — scope.md D-2 와 capability-map.md §12.
+// v2-지침서.md §3.1 · ADR 0006 D-2 의 모듈 목록 **열 전부**.
+// `bidding` 은 M7/7B 가 되살렸다 — D-2.1 의 되살리는 조건(`OPEN-ADR-14` (c) 가 답이 되어 소유
+// capability 가 등재되고 그 분류를 받는 것)이 `BID-01 · 입찰 건의 상태와 전이`(`V2 필수`)로
+// 충족됐다(운영자 결정 2026-09-07 Q-7 — capability-map.md §0.6·§10).
 include(
     "shared-kernel",
     "procurement",
     "qualification",
     "strategy",
+    "bidding",
     "decision",
     "settlement",
     "workflow",

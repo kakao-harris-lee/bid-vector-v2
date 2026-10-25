@@ -69,7 +69,7 @@ class ConstantTimeComparisonStructureTest {
 
     /** 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다. */
     @Test
-    fun `허용 목록은 정해진 아홉뿐이고 각각 근거 문장을 갖는다`() {
+    fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
         ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
             setOf(
                 "ApiAuditRecord",
@@ -95,6 +95,14 @@ class ConstantTimeComparisonStructureTest {
                 "BidPriceQualificationLabelsKt",
                 "BidPriceFactLabelsKt",
                 "BidPriceRequestController",
+                "BidCaseResponse",
+                "BidCaseResponse\$Companion",
+                "BidTimelineEntryResponse",
+                "BidCaseRequestsKt",
+                "BidCaseRouting",
+                "DraftInput",
+                "AccountScopedRoutes",
+                "BidCaseHttp",
             )
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
@@ -157,6 +165,25 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
         "BidPriceRequestController" to
             "단건 평가 컨트롤러 — 요청 결과 sealed 갈래(공고 없음/준비됨)를 소진 when 으로 가르는 참조 동일성. " +
             "인증은 앞단 필터가 지고 이 class 는 자격증명 타입을 받지도 참조하지도 않는다",
+        // M7/7B — 입찰 건의 HTTP 층. 전부 data class 자동 equals 이거나 sealed 싱글턴
+        // when 소진이고, `OperatorCredentialAuthenticator` 의 자격증명 좌표를 참조하지 않는다.
+        "BidCaseResponse" to
+            "입찰 건 응답 값 객체(data class) 자동 생성 equals — 건 id·공고 키·상태·다음 확인 시점뿐, 자격증명 값 없음",
+        "BidCaseResponse\$Companion" to
+            "응답 변환 companion 의 NextCheckpoint sealed 싱글턴 when 소진 — 값 비교가 아니라 객체 동일성, 자격증명 좌표 0",
+        "BidTimelineEntryResponse" to
+            "타임라인 줄 응답 값 객체(data class) 자동 생성 equals — 상태·명령·주체 종류·시각뿐, 본문도 자격증명도 없음",
+        "BidCaseRequestsKt" to
+            "요청 읽기의 enum 어휘 조회(`values.firstOrNull { it.name == raw }`) — 공개 어휘 비교이고 자격증명 값 없음",
+        "BidCaseRouting" to
+            "경로·질의 읽기의 어휘 비교(bidKind·state) — 공개 enum 이름 비교이고 자격증명 값 없음 " +
+            "(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
+        "DraftInput" to
+            "초안 요청 값 객체(data class) 자동 생성 equals — 금액·시각뿐, 자격증명 값 없음",
+        "AccountScopedRoutes" to
+            "계정 전용 뿌리 선언의 경로 문자열 비교 — 공개 URL 경로이고 비밀이 아니다",
+        "BidCaseHttp" to
+            "결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(BidCommandResult·TransitionOutcome·RejectionReason) — 객체 동일성, 자격증명 좌표 0",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"

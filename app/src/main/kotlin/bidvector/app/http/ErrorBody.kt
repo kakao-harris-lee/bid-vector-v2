@@ -6,6 +6,7 @@ import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
 import bidvector.app.wiring.NoticeNotFoundException
 import bidvector.workflow.strategy.EditSessionConflictException
+import bidvector.workflow.suggestion.StrategyChangedDuringComputationException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -92,6 +93,10 @@ object ErrorCode {
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
     const val INVALID_REQUEST = "INVALID_REQUEST"
 
+    // M7/7C①b — 제안 목록 계산 중 전략(또는 프로필)이 두 번 연속 바뀌었다(409). 낡은 결과도
+    // 지어낸 결과도 내지 않는다.
+    const val STRATEGY_CHANGED_DURING_COMPUTATION = "STRATEGY_CHANGED_DURING_COMPUTATION"
+
     // D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
     // 사유를 가른다(상태 코드가 아니라 본문이 구분한다). 나머지 넷은 세션 부재(404)·
     // 낙관적 동시성 충돌(409)·값 불변식 위반(400)·메서드/미디어 타입 불일치(405/415)다.
@@ -107,6 +112,11 @@ object ErrorCode {
     const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
     const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+
+    // M7/7B — 입찰 건. 전이 거부는 409 이고 코드가 사유를 가른다(상태 코드가 아니라 본문).
+    // `NOTICE_SNAPSHOT_UNAVAILABLE` 은 초안을 만들려는데 공고를 뜰 수 없는 경우다 —
+    // 스냅샷 없는 초안을 만들지 않는다(§6.1 acceptance).
+    const val NOTICE_SNAPSHOT_UNAVAILABLE = "NOTICE_SNAPSHOT_UNAVAILABLE"
 }
 
 /**
@@ -155,6 +165,10 @@ object ErrorMapping {
 
             is CandidateCapExceededException -> {
                 ErrorCode.CANDIDATE_CAP_EXCEEDED to "후보 스캔이 상한을 초과했다"
+            }
+
+            is StrategyChangedDuringComputationException -> {
+                ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION to "계산하는 동안 전략이 바뀌었다 — 다시 조회하라"
             }
 
             is InvalidEvaluationRequestException -> {
@@ -240,13 +254,14 @@ class GlobalErrorHandler {
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
 
     /**
-     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 셋 다 같은 표([ErrorMapping])를 지나
+     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 넷 다 같은 표([ErrorMapping])를 지나
      * 서로 다른 코드를 낸다(상태 코드가 아니라 본문의 코드가 사유를 가른다, D-6A2b-6).
      */
     @ExceptionHandler(
         MaxActiveBidsNotConfiguredException::class,
         CandidateCapExceededException::class,
         EditSessionConflictException::class,
+        StrategyChangedDuringComputationException::class,
     )
     fun conflict(
         exception: Throwable,

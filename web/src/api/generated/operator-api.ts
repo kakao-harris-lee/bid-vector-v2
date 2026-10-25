@@ -38,31 +38,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/bid-price-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 투찰가 요청 — 공고 단건·운영자 요청 평가(M7/7C ②)
-         * @description 운영자가 지목한 **공고 하나**를 평가하고 그 근거를 낸다. `evaluateDryRun`(전략 전체 평가)과 **같은 판정 커널**을 돌아 같은 입력에서 같은 결과를 낸다 — 다른 점은 후보가 지목된 하나라는 것뿐이다.
-         *     **POST 인 이유**: 이 요청의 종착점이 알림함 한 항목 기록(R-4)이고, 읽기로 출하한 뒤 쓰기로 바꾸면 이미 출하된 계약을 깨야 한다. CSRF 요구도 메서드 집합으로 성립한다. 공고 식별자는 **본문**이다(경로가 아니다).
-         *     **분석 예산을 적용하지 않는다.** 전략의 후보 상한은 전건 스캔의 비용 통제이고 운영자가 지목한 공고 하나의 허가 조건이 아니다 — 상한이 1 인 전략에서도 요청한 공고는 평가된다. 이것이 `evaluateDryRun` 과 **의도적으로 어긋나는 유일한 축**이다.
-         *     **가격 세 축은 아직 값이 서지 않는다.** 3안(`bidPriceMenuState`)·신뢰도 (`confidenceState`)·하한 미달 빈도(`floorShortfallState`)는 **상태와 사유**만 낸다 — 출하 조립의 ML 분석 포트가 항상-미가용 고정이고(`OPEN-ML-ANALYSIS-WIRING` 보류) 하한 미달 정책의 출하 정본 표가 없다. 값 칸을 미리 두지 않는 이유는 「없음」이 「0」으로 읽히지 않게 하는 것이다 — 값이 서는 slice 가 칸을 더한다.
-         *     **하한율은 게시값만 근거다**(운영자 결정 2026-10-15). 법정 하한율을 해석하지 않으며 그 사실을 `disclosures` 가 `STATUTORY_FLOOR_RATE_NOT_INTERPRETED` 로 고지한다. 게시 하한율이 아닌 출처의 값은 근거 칸에 싣지 않고 `floorRateGroundsState` 가 말한다.
-         *     **「근거 원문」은 (출처 필드 + 요건 면허명 + 정책 version)이다** — 원시 관측 blob· 공고명·기관명·사업자번호는 이 응답에 자리가 없다.
-         */
-        post: operations["requestBidPrice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/strategy/edit-sessions": {
         parameters: {
             query?: never;
@@ -222,6 +197,290 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bid-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 입찰함 — 상태 탭별 목록(M7/7B)
+         * @description `kind` 가 **필수**다. 페이퍼(가상) 투찰과 실투찰을 한 응답에 함께 내는 길이 없다 (§6.1 「같은 목록에 섞이지 않는다」) — 그 분리는 질의 인자의 선택이 아니라 **계약의 모양**이다. 다음 확인 시점과 지난 일정 경고는 **서버가 한 시각 기준으로 판정해** 싣는다.
+         */
+        get: operations["listBidCases"];
+        put?: never;
+        /**
+         * 관심 담기 — 입찰함에 건을 연다(M7/7B)
+         * @description pull 모델(§0.7)에서 **사용자가 담은 것만** 입찰함에 들어온다. 같은 (공고, 종류)에 건은 하나이므로 이미 있으면 그 건을 그대로 돌려준다 — 새로 담았으면 201, 이미 담긴 건이면 200 이다(화면이 「담겼습니다」와 「이미 담긴 건입니다」를 가른다).
+         */
+        post: operations["addBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 건 하나(M7/7B) */
+        get: operations["readBidCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 건의 타임라인 — 전이·시각·주체·사유(M7/7B)
+         * @description 모든 전이가 시각과 주체와 함께 남는다(append-only). **본문은 싣지 않는다** — 메모와 증빙 참조는 이 응답에 자리가 없다(audit 는 본문을 남기지 않는다).
+         */
+        get: operations["readBidCaseTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/defer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 나중에 — 리마인드 시각 필수(M7/7B)
+         * @description 「보류」라는 상태는 없다. 리마인드 시각이 **반드시** 있어야 한다(§6.1).
+         */
+        post: operations["deferBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 나중에 해제 — 관심으로 되돌린다(M7/7B)
+         * @description 리마인드 시각을 지우고 관심 상태로 돌아간다.
+         */
+        post: operations["resumeBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 건너뜀 — 사유 필수(M7/7B)
+         * @description 유일한 종단 상태다(나가는 전이가 없다). 사유가 **반드시** 있어야 한다(§6.1).
+         */
+        post: operations["skipBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 투찰 예정 초안 만들기·수정(M7/7B)
+         * @description **공고 스냅샷을 요청이 싣지 않는다** — 서버가 공고에서 떠서 얼린다(마감·하한율·기초금액·판 번호). 그래야 나중에 「그때 이랬다」를 지어낼 수 없다. 금액 출처도 요청에 자리가 없고 `OPERATOR_ENTERED` 가 실린다 — 투찰가 메뉴(DEC-05)는 아직 출하 경로에 없고, 운영자 입력을 메뉴 값처럼 보이게 하는 요청은 **표현할 수 없다**. 수정은 같은 초안을 고치는 것이 아니라 새 초안을 쌓는 것이다. 공고를 뜰 수 없으면 409(NOTICE_SNAPSHOT_UNAVAILABLE)이고 초안을 만들지 않는다.
+         */
+        post: operations["draftBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 「제출함」 기록·갱신·소급 확인(M7/7B)
+         * @description 셋이 한 operation 이고 **출발 상태가 가른다**. 마감 지남(미확인)에서 온 기록은 「소급」으로 표시되며 그 판정은 **서버가 한다** — 요청에 그 자리가 없다(Q-11 「무기한, 소급 표시만」). 증빙 참조가 있으면 보관 기한이 정책(R-5 3년)으로 계산돼 함께 저장된다. 확인 시각은 서버의 시계이고 제출 시각과 따로 남는다.
+         */
+        post: operations["recordBidCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/await-opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 개찰 대기 — 개찰일시 필수(M7/7B)
+         * @description 개찰일시가 **반드시** 있어야 한다. 그 시각이 다음 확인 시점이 된다.
+         */
+        post: operations["awaitBidCaseOpening"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 개찰 결과 — 잠정 1위인가(M7/7B)
+         * @description **순위 숫자를 받지 않는다** — 운영자 요구가 「몇 위보다 낙찰 여부」다(§6.1). 오늘은 운영자가 나라장터에서 보고 입력한다(SET-02 자동 경로는 이 slice 밖이다).
+         */
+        post: operations["recordBidCaseOpening"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/qualification-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 적격심사 중 — 서류 기한 필수(M7/7B)
+         * @description 잠정 1위에서만 들어간다. 서류 기한이 **반드시** 있어야 하고 그것이 다음 확인 시점이 된다.
+         */
+        post: operations["enterBidCaseQualificationReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 낙찰·패찰·유찰 기록(M7/7B)
+         * @description 셋 중 하나를 고른다. 자동 대사(SET-01)는 이 slice 밖이라 오늘은 운영자가 적는다.
+         */
+        post: operations["recordBidCaseOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bid-cases/{caseId}/outcome-correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 결과 정정 — 사유 필수(M7/7B)
+         * @description §6.1 의 「사용자 정정」이다. **원본을 덮어쓰지 않는다** — 이전 결과는 타임라인의 출발 상태로 남고 사유가 함께 적힌다.
+         */
+        post: operations["correctBidCaseOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 제안 목록(STR-06·STR-07) — 현재 전략의 감시를 통과한 후보, 읽기 전용, 마감 임박 순
+         * @description 열린 공고 가운데 **현재 전략의 감시 조건을 통과하고 면허 자격이 미달이 아닌** 공고를 낸다 (M7/7C①b). 쓰기 경로가 없고 전략을 바꾸지 않는다. 질의 매개변수가 없다.
+         *     **조회가 곧 계산이다** — 영속 스냅샷이 없으므로 낡을 대상이 없다. 계산에 쓴 전략과 프로필을 계산이 끝난 뒤 현재 값과 비교해 다르면 그 결과를 버리고 한 번 다시 계산한다. 또 다르면 409 (`STRATEGY_CHANGED_DURING_COMPUTATION`)다 — 계산 중에 바뀐 전략의 결과를 채택하지 않는다. `X-Strategy-Revision` 은 이 결과를 계산한 전략 개정이다.
+         *     **표시 상한은 전략의 `candidateLimit` 이고 계산 예산과 독립이다**(STR-06). 계산은 열린 후보 전부 (운영 설정의 스캔 상한 이내 — 넘으면 409 `CANDIDATE_CAP_EXCEEDED`, 조용히 자르지 않는다)에 게이트를 돌린 **뒤** 마감 임박 순으로 앞에서부터 상한만큼 낸다. 상한이 미설정이면 자르지 않는다. `X-Total-Count` 는 자르기 전 통과 건수다.
+         *     **자격은 면허 축만 판정한다.** `licenseVerdict` 는 `ELIGIBLE`·`UNCERTAIN`(미결 — 미보유가 아니다) 둘이고, 지역·실적 자격은 판정하지 않는다 — `unjudgedAxes` 가 그 축을 늘 싣는다.
+         */
+        get: operations["listSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -243,6 +502,116 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BidCase: {
+            /** Format: int64 */
+            caseId: number;
+            noticeNumber: string;
+            noticeRound: string;
+            /** @enum {string} */
+            bidKind: "REAL" | "PAPER";
+            /**
+             * @description 「보류」는 **어휘에 없다** — 「나중에(DEFERRED)」와 「건너뜀(SKIPPED)」으로 갈렸다.
+             * @enum {string}
+             */
+            state: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
+            caseVersion: number;
+            /**
+             * @description **항상 값이 있다.** 「없음」은 빈 값이 아니라 `NONE` 이라는 **답**이다(§6.1 「없으면 「없음」이 명시된다 — 빈 값 금지」). 시각 하나로 접으면 화면이 「아직 안 정했다」와 「없는 것이 맞다」를 구별할 수 없다.
+             * @enum {string}
+             */
+            nextCheckpointKind: "DEADLINE" | "OPENING" | "DOCUMENT_DUE" | "NOTICE_EXPECTED" | "REMINDER" | "NONE";
+            /**
+             * Format: date-time
+             * @description `nextCheckpointKind` 가 `NONE` 이면 null 이다.
+             */
+            nextCheckpointAt?: string | null;
+            /** @description 지난 일정 경고 — **서버가 한 시각 기준으로** 판정한다. */
+            overdue: boolean;
+            /** @description 개찰 대사(SET-02)의 후보인가 — 「투찰 기록됨」 **실투찰** 건만 참이다. 페이퍼 건은 항상 거짓이다(타입이 막는다). */
+            reconciliationCandidate: boolean;
+        };
+        BidTimelineEntry: {
+            caseVersion: number;
+            /** @description 생성 전이만 null 이다(출발 상태가 없다). */
+            fromState?: string | null;
+            toState: string;
+            command: string;
+            /** @enum {string} */
+            actorKind: "USER" | "SYSTEM";
+            /** @description SYSTEM 일 때만 값이 있고 **경로의 이름**이다(사람의 이름이 아니다). USER 의 주체는 건의 소유 계정이다. */
+            actorDetail?: string | null;
+            /** @description 건너뜀·정정만 값을 갖는다. **메모 본문이 들어오는 자리가 아니다.** */
+            reason?: string | null;
+            retroactive: boolean;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        AddBidCaseRequest: {
+            noticeNumber: string;
+            noticeRound: string;
+            /** @enum {string} */
+            bidKind: "REAL" | "PAPER";
+        };
+        DeferRequest: {
+            /** Format: date-time */
+            remindAt: string;
+        };
+        SkipRequest: {
+            /** @description 건너뜀 사유 — 지울 수 없는 타임라인에 남는다(500자 상한). */
+            reason: string;
+        };
+        DraftBidRequest: {
+            /**
+             * Format: int64
+             * @description 원 단위 정수.
+             */
+            amountWon: number;
+            /** @enum {string} */
+            vatTreatment: "INCLUSIVE" | "EXCLUSIVE" | "UNKNOWN";
+            /**
+             * Format: date-time
+             * @description 제시 시각 — 기록의 확인 시각과 다른 축이다. 공고 스냅샷은 요청에 자리가 없다 — 서버가 초안을 만드는 순간의 공고에서 뜬다.
+             */
+            presentedAt: string;
+        };
+        RecordBidRequest: {
+            /** Format: int64 */
+            amountWon: number;
+            /** @enum {string} */
+            vatTreatment: "INCLUSIVE" | "EXCLUSIVE" | "UNKNOWN";
+            /**
+             * Format: date-time
+             * @description 운영자가 나라장터에 낸 시각(진술). 확인 시각은 서버가 찍는다.
+             */
+            submittedAt: string;
+            drawNumbers?: number[];
+            /** @description 제출확인서 등 증빙의 **참조(식별자)** 다 — 파일도 경로도 본문도 아니다. PDF 저장소는 이 slice 밖이다. */
+            evidenceRef?: string | null;
+            /** @description 자유 텍스트(2000자 상한). 로그·audit 어디에도 실리지 않는다. */
+            memo?: string | null;
+        };
+        AwaitOpeningRequest: {
+            /** Format: date-time */
+            openingAt: string;
+        };
+        RecordOpeningRequest: {
+            /** @description 순위 숫자를 받지 않는다 — 「몇 위보다 낙찰 여부」(§6.1). */
+            provisionalFirst: boolean;
+        };
+        QualificationReviewRequest: {
+            /** Format: date-time */
+            documentDueAt: string;
+        };
+        RecordOutcomeRequest: {
+            /** @enum {string} */
+            outcome: "WON" | "LOST" | "FAILED_OR_REBID";
+        };
+        CorrectOutcomeRequest: {
+            /** @enum {string} */
+            outcome: "WON" | "LOST" | "FAILED_OR_REBID";
+            /** @description 정정은 **사유가 필수**다 — 원본은 타임라인에 남는다(500자 상한). */
+            reason: string;
+        };
         SignInRequest: {
             loginName: string;
             passphrase: string;
@@ -347,164 +716,38 @@ export interface components {
             /** Format: date-time */
             deadlineAt?: string | null;
         };
-        BidPriceRequestBody: {
-            /** @description 공고번호. 정규화(trim · ASCII 대문자화 · 내부 공백을 `-` 로 합침)는 서버가 한다. 공백만·제어 문자·길이 상한 초과는 400 이다. */
-            noticeNumber: string;
-            /** @description 차수 — 제로패딩 3자리 숫자(KONEPS `bidNtceOrd`). 그 밖은 400 이다. */
-            noticeRound: string;
-            /**
-             * Format: int32
-             * @description 진행 중 투찰 건수. **호출자가 선언한다**(`evaluateDryRun` 과 같은 규약, D-6A3-3) — 서버가 0 으로 지어내지 않는다. 사다리의 여력 축이 이 값을 쓴다.
-             */
-            currentActiveBids: number;
-        };
-        BidPriceRequestResponse: {
+        SuggestedNotice: {
             noticeNumber: string;
             noticeRound: string;
-            /** @description 이 평가의 상관 ID — audit 행·오류 본문과 같은 어휘다. */
-            correlationId: string;
-            /** Format: int32 */
-            strategyRevision: number;
-            /** Format: int32 */
-            currentActiveBids: number;
-            /** Format: int32 */
-            maxActiveBids: number;
-            /**
-             * @description 판정 사다리에 이르렀는가. 이르지 못하면 `dropStage`·`dropReasonCode` 가 어디서 왜 멈췄는지 말한다.
-             * @enum {string}
-             */
-            outcome: "REACHED" | "NOT_REACHED";
-            /**
-             * @description 판정. `outcome` 이 `NOT_REACHED` 면 없다.
-             * @enum {string|null}
-             */
-            verdict?: "BID_NOW" | "REVIEW" | "SKIP" | null;
-            /** @description 판정 사유 코드. 출하 조립에서는 ML 이 항상 미가용이라 사다리에 이른 공고가 `REVIEW` · `ML_UNAVAILABLE` 로 내려온다 — 「낮은 추천」이 아니라 「추천 없음」이다. */
-            verdictReasonCodes: string[];
-            /** @description 멈춘 단계(수명·감시·자격·임계 미설정·분석 예산·ML 가용성·점수 임계). */
-            dropStage?: string | null;
-            /** @description 멈춘 사유. 단계와 사유는 한 쌍이다(사유 하나는 늘 정확히 한 단계에 속한다). */
-            dropReasonCode?: string | null;
-            noticeStatus: string;
-            /** @description 감시 거절에서 걸린 규칙 ID. 그 밖의 경우 빈 배열이다. */
-            failedWatchRuleIds: string[];
-            watchUndeterminableReason?: string | null;
-            /** @description 점수 미달 사유의 임계값 — 10진 문자열이다(부동소수로 내지 않는다). */
-            scoreThreshold?: string | null;
-            /** @description 같은 사유의 실제값 — 10진 문자열. */
-            scoreActual?: string | null;
-            /** @description 이 판정이 알림 요청을 낳았는가. **요청까지**이고 배달·기록은 하지 않는다 (`evaluateDryRun` 과 같은 경계). */
-            wouldNotify: boolean;
-            /**
-             * @description 알림함 기록 상태(R-4). 쓰기 포트가 아직 머지되지 않아 **기록하지 않는다** — 가짜 포트·임시 표를 두지 않고 그 사실을 계약에 드러낸다. 포트가 서면 값이 늘어난다.
-             * @enum {string}
-             */
-            inboxRecordState: "NOT_RECORDED_YET";
-            /** @enum {string|null} */
-            inboxRecordNotRecordedReason?: "INBOX_WRITE_PORT_NOT_MERGED" | null;
-            /**
-             * @description 면허 자격 판정(QUAL-01 · 03). **`UNCERTAIN` 은 `INELIGIBLE` 이 아니다**(U-5) — 판정 불가와 미달을 한 값으로 접지 않는다.
-             * @enum {string}
-             */
-            licenseVerdict: "ELIGIBLE" | "INELIGIBLE" | "UNCERTAIN";
-            /** @description 판정 불가 사유(요건 데이터 부재·파싱 불가·프로필 미선언·수집 실패·허용업종 결합 규칙 미결). */
-            licenseUncertainReason?: string | null;
-            /** @description 공고가 요구한 면허명 — **근거 원문의 「무엇을 요구했나」**(QUAL-05). */
-            licenseRequiredLicenses?: string[] | null;
-            /** @description 요건이 온 공고 필드 — **근거 원문의 「어느 필드에서」**(QUAL-05). */
-            licenseRequirementSourceFields: string[];
-            /** @description 충족한 제한그룹 라벨. 그룹 간 OR · 그룹 내 AND 다(QUAL-03). */
-            licenseGroupsSatisfied: string[];
-            /** @description 충족하지 못한 제한그룹 라벨. */
-            licenseGroupsMissing: string[];
-            /** @description 미보유 면허명. **미충족 그룹이 둘 이상이면 비운다** — 그룹 간 OR 을 합집합으로 접으면 「이 면허들이 다 필요하다」로 읽힌다. 그 경우는 `licenseMissingDetailState` 가 말한다. */
-            licenseMissingLicenses: string[];
-            /** @enum {string} */
-            licenseMissingDetailState: "NOT_APPLICABLE" | "SINGLE_GROUP" | "MULTIPLE_GROUPS_NOT_FLATTENED";
-            /**
-             * Format: int32
-             * @description 파싱하지 못한 요건 행 수 — 0 이 아니면 판정이 일부 요건을 보지 못했다는 뜻이다.
-             */
-            licenseUnparsableRowCount: number;
-            /**
-             * @description 면허 **유효기간 미검증**(U-7) — V2 는 유효기간을 보지 않는다. 그 사실이 판정 결과에 드러나야 한다는 요구를 이 칸이 집행한다.
-             * @enum {string}
-             */
-            licenseValidity: "NOT_VERIFIED";
-            /** @description 판정에 쓴 어휘 테이블 version 의 출처(QUAL-05 — 규칙이 바뀌면 과거 판정이 어느 version 에서 나왔는지 재현된다). */
-            licensePolicySource: string;
-            /** @description 그 version 의 시행일. 정책의 **최초 판**이면 시행일이라는 값 자체가 없어 `null` 이다 — 출처와 시행일을 한 문자열로 합치지 않는다(구분자를 지어내지 않는다). */
-            licensePolicyEffectiveFrom?: string | null;
-            /** @description **아직 판정하지 않는 자격 축**(QUAL-08 지역 · QUAL-10 수행실적 · QUAL-11 시공능력평가금액). 「판정했고 통과」와 「판정하지 않음」을 구분하게 한다 — 자격 카드가 「면허만 보면 끝」으로 읽히지 않게 한다. 판정이 생기는 slice 가 그 값을 뺀다. */
-            unjudgedAxes: string[];
+            status: string;
+            title?: string | null;
+            demandAgencyName?: string | null;
+            noticeAgencyName?: string | null;
             /** Format: int64 */
             baseAmountWon?: number | null;
             baseAmountCurrency?: string | null;
             baseAmountBasis?: string | null;
             baseAmountVatTreatment?: string | null;
             baseAmountProvenance?: string | null;
-            /**
-             * @description 기초금액이 **어떻게 정해졌나**(DEC-01) — 게시값 그대로인지, 예산 키 폴백인지, 개찰 역산인지. 파생이 원본을 덮지 않는다는 사실이 이 칸으로 보인다.
-             * @enum {string|null}
-             */
-            baseAmountResolution?: "DIRECT" | "FALLBACK_FROM_BUDGET" | "DERIVED_FROM_OPENING" | null;
-            /** @description 게시 낙찰하한율 — fraction 의 10진 문자열이다(percent 가 아니고 부동소수가 아니다). 출처가 게시값이 아니면 **싣지 않는다**. */
-            publishedFloorRateFraction?: string | null;
-            /** @enum {string|null} */
-            publishedFloorRateOrigin?: "NOTICE_VALUE" | "STATUTORY_TABLE" | null;
-            /** @description 게시값 출처의 공고 차수. */
-            publishedFloorRateNoticeRound?: string | null;
-            /**
-             * @description 게시 하한율이 근거로 설 수 있는가 — 「없다」와 「게시값이 아니다」를 가른다 (운영자 결정 2026-10-15: 게시값만 근거).
-             * @enum {string}
-             */
-            floorRateGroundsState: "USABLE" | "ABSENT" | "ORIGIN_NOT_PUBLISHED";
-            /**
-             * @description 하한 미달 빈도(DEC-04)를 **이 공고에서 잴 수 있는가**. 지금은 재지 못한다 — 커널은 있으나 출하 정본 정책 표와 표본 공급 경로가 없다. 값이 서는 slice 가 빈도 칸과 상태 값을 더한다.
-             * @enum {string}
-             */
-            floorShortfallState: "NOT_COMPUTED";
-            /**
-             * @description 재지 못한 사유. 「재려 했으나 재지 못했다」(표본 부족 등)와 **다른 어휘**다 — 표본을 보지 않았으므로 표본 수를 적지 않는다.
-             * @enum {string}
-             */
-            floorShortfallNotComputedReason: "SHORTFALL_POLICY_NOT_PUBLISHED";
-            /**
-             * @description 커널이 ML 단계에서 받은 것. `NOT_REACHED` 는 **거기까지 가지 않았다**는 뜻이고 `UNAVAILABLE`(갔으나 미가용)과 다른 사실이다.
-             * @enum {string}
-             */
-            mlAnalysisState: "ANALYZED" | "UNAVAILABLE" | "SIMILARITY_PROJECTION_NOT_READY" | "NOT_REACHED";
-            /** @description 미가용 사유. 출하 조립에서는 점수 provider 가 없어 `SCORE_NOT_PROVIDED` 다. */
-            mlUnavailableReason?: string | null;
-            /**
-             * @description 신뢰도(ML-03). 값이 서는 날 그것은 **가격 적합도이고 확률이 아니다** — 그 고지가 `disclosures` 의 `PRICE_FITNESS_IS_NOT_PROBABILITY` 다. 이 응답에 확률 칸은 없다.
-             * @enum {string}
-             */
-            confidenceState: "NOT_AVAILABLE";
+            /** Format: date-time */
+            deadlineAt?: string | null;
             /** @enum {string} */
-            confidenceNotAvailableReason: "ML_SCORE_NOT_PROVIDED" | "ML_UNAVAILABLE" | "SIMILARITY_PROJECTION_NOT_READY" | "EVALUATION_NOT_REACHED_ML_STAGE";
-            /**
-             * @description 3안(안전·추천·공격) 상태(DEC-05 · ML-01). **빈 배열이 아니라 이유 있는 상태**다 — 화면이 가짜 숫자를 그리지 않게 한다. 값이 서는 slice 가 태도별 칸과 상태 값을 더한다.
-             * @enum {string}
-             */
-            bidPriceMenuState: "NOT_COMPUTED";
-            /**
-             * @description 산출하지 않은 사유 — **이 배선에 산출 경로가 없다**는 사실 하나만 말한다. 커널을 불러 「출처가 없었다」를 받은 것이 아니다(부르지 않았다).
-             * @enum {string}
-             */
-            bidPriceMenuNotComputedReason: "MENU_PATH_NOT_WIRED";
-            /** @description **전수를 늘 싣는다** — 예정가격은 개찰 전 비공개 추첨으로 결정되어 정확한 낙찰하한을 보장할 수 없음 · 자동 제출·확정 낙찰이 아님 · 법정 하한율 미해석 · 가격 적합도는 확률이 아님. 코드만 나르고 **문장은 표면이 짓는다**(계산이 바뀐 뒤에도 옛 문구가 남는 것을 막는다). */
-            disclosures: string[];
+            licenseVerdict: "ELIGIBLE" | "UNCERTAIN";
+            /** @enum {string|null} */
+            licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
         };
         ErrorBody: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "NOTICE_NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE";
             message: string;
             correlationId: string;
         };
     };
     responses: never;
-    parameters: never;
+    parameters: {
+        BidCaseId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -599,84 +842,6 @@ export interface operations {
                 };
             };
             /** @description 요청 본문이 application/json 이 아니다(M6/6A-2b D-6A2b-7). code: UNSUPPORTED_MEDIA_TYPE */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    requestBidPrice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BidPriceRequestBody"];
-            };
-        };
-        responses: {
-            /** @description 공고 하나의 판정과 근거(축별 자격·금액 basis·게시 하한율·고지) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BidPriceRequestResponse"];
-                };
-            };
-            /** @description 요청 본문이 유효하지 않다 — 본문이 JSON object 가 아님, `noticeNumber`· `noticeRound` 의 누락·null·비문자열·공백·제어 문자·길이 상한 초과, `noticeRound` 가 제로패딩 3자리 숫자가 아님, `currentActiveBids` 가 0 이상의 JSON 정수(Int 범위)가 아님(문자열·소수의 조용한 강제 변환 없음). 어느 입력이 틀렸는지는 싣지 않는다. code: INVALID_REQUEST */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description 자격증명·세션·CSRF 가 없거나 틀림(D-6A1-6). code: UNAUTHENTICATED */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description 요청한 공고가 없다(평가를 시작하지 않았다). 경로가 없는 경우(`NOT_FOUND`)와 다른 코드다. code: NOTICE_NOT_FOUND */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description 전략에 여력 상한 미설정(D-6A3-4 와 같은 fail-closed — 여력 상한 없이 사다리를 돌리지 않는다). code: MAX_ACTIVE_BIDS_NOT_CONFIGURED */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
             415: {
                 headers: {
                     [name: string]: unknown;
@@ -1344,6 +1509,1084 @@ export interface operations {
                 };
             };
             /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listBidCases: {
+        parameters: {
+            query: {
+                kind: "REAL" | "PAPER";
+                /** @description 상태 탭. 생략하면 전부. */
+                state?: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 그 종류의 내 건 목록. **맨 위가 배열**이다 — 배열을 감싼 object 는 평탄 규칙 (D-6A1-20 ⓑ)에 걸리고, `searchNotices` 도 같은 모양으로 배열을 바로 낸다. 요청이 `kind` 를 지정했으므로 응답이 그것을 되풀이하지 않는다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"][];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    addBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddBidCaseRequest"];
+            };
+        };
+        responses: {
+            /** @description 이미 담긴 건 — 그 건을 그대로 돌려준다 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 건이 새로 열렸다 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readBidCaseTimeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 전이 이력(오래된 순). **맨 위가 배열**이다(위와 같은 이유). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidTimelineEntry"][];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    deferBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeferRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    resumeBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 경로의 건 식별자 형식 오류(숫자가 아니거나 양수가 아님). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    skipBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkipRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    draftBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftBidRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recordBidCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordBidRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    awaitBidCaseOpening: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AwaitOpeningRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recordBidCaseOpening: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordOpeningRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    enterBidCaseQualificationReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QualificationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    recordBidCaseOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    correctBidCaseOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: components["parameters"]["BidCaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description 건 하나의 지금 상태 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidCase"];
+                };
+            };
+            /** @description 요청 본문·질의 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(입찰함은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 건이 없거나 **내 건이 아니다** — 둘을 구분하지 않는다(존재 여부를 흘리지 않는다). code: NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 전이를 지금 상태가 받지 않거나(INVALID_TRANSITION) 시스템 전용 명령이거나(SYSTEM_ACTOR_NOT_PERMITTED) 경합(EDIT_SESSION_CONFLICT) 또는 공고를 뜰 수 없다(NOTICE_SNAPSHOT_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listSuggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 제안 배열(마감 임박 순). 신선도는 `X-Strategy-Revision`·`X-Computed-At`, 총수는 `X-Total-Count`, 빈 결과의 뜻은 `X-Result-State` 가 나른다. */
+            200: {
+                headers: {
+                    /** @description 이 결과를 계산한 전략 개정 번호. */
+                    "X-Strategy-Revision": number;
+                    /** @description 계산 시각(ISO-8601 instant, 원값). */
+                    "X-Computed-At": string;
+                    /** @description 게이트를 통과한 **전체** 건수(표시 상한을 적용하기 전). */
+                    "X-Total-Count": number;
+                    /** @description MATCHED(통과가 1 건 이상) | NO_OPEN_NOTICES(입찰 가능한 열린 공고가 없다) | WATCH_NOT_CONFIGURED(감시 조건이 설정되지 않아 어떤 공고도 통과하지 않는다) | NO_MATCH(열린 공고는 있으나 통과가 없다) */
+                    "X-Result-State": "MATCHED" | "NO_OPEN_NOTICES" | "WATCH_NOT_CONFIGURED" | "NO_MATCH";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedNotice"][];
+                };
+            };
+            /** @description 자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 계산하는 동안 전략 또는 프로필이 두 번 연속 바뀌었다(code: STRATEGY_CHANGED_DURING_COMPUTATION) 또는 후보 스캔이 상한 초과(code: CANDIDATE_CAP_EXCEEDED) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;

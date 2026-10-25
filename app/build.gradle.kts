@@ -28,6 +28,7 @@ dependencies {
     // 다만 이번은 main — 이 slice가 처음으로 controller/조립에서 도메인 타입을 직접
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
+    implementation(project(":bidding"))
     implementation(project(":shared-kernel"))
     // D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
     // PersistenceWiring의 전략 정책 해소와 같은 형태로 직접 참조 — 위 :strategy와 같은 이유.
