@@ -1065,27 +1065,53 @@ low 8 · 질문 1)의 남은 지적을 한 번에 처리했다(재작업 횟수 
 | `app/src/test/.../http/AccountBindingGuardScanTest.kt` · `AccountBindingStructureTest.kt` | 같은 근거(app http test — 뒤의 것은 `AccountCarrierStructureTest` 에서 나눈 파일) |
 | `app/src/test/kotlin/bidvector/guardprobe/AccountBindingGuardTest.kt` | 같은 근거 — 패키지를 `bidvector.app` 밖에 둔 까닭은 그 probe controller 들이 출하 · HTTP test 조립의 컴포넌트 스캔에 실리지 않게 하려는 것이다(r5 R1 의 센서스 오염). 두 test 는 `gate-tests.properties` 에 등재 |
 
+**D-7B-7 ① 수령 — 조건 넷과 팀장 추가(같은 날)의 처분**:
+
+| 조건 | 처분 | 출하 · 재는 자리 |
+|---|---|---|
+| (a) 새 바깥 패키지의 실사용은 가드 class 에서만 | 고침(등식) | `AccountBindingStructureTest`「가드가 연 바깥 패키지를 가리키는 app class 는 가드 파일의 class 들뿐이다」 — 가드가 연 여섯 패키지의 **바로 아래 타입**을 가리키는 app class == {`AccountBindingGuard` · `RejectingAccountIdDeserializer` · `RejectingAccountIdFormatter`}(javap 관측과 일치 — 통제군 초록). 대조: 모의 줄(`JsonParser` · `ResolvableType` 은 걸리고 `core.annotation` 은 안 걸림) · 변이 PARSER(다른 class 가 `JsonParser` 를 매개변수로 받음) RED. `java.beans` 는 쓰지 않는다(전송 표면 뿌리 — formatter 로 바꿨다) |
+| (b) 등재마다 삭제 변이 · 그 RED 가 출하 조립 진입을 증명 | 고침 | 삭제 변이 다섯: MJ(역직렬화기 등록) · MA(`@RestControllerAdvice`) · MI(`@InitBinder`) · MF(formatter) · MH(400 처리기) — 전부 RED. 출하 조립 증명은 `AccountBindingGuardScanTest` 가 진다: 그 조립(`HttpTestApplication`)은 출하처럼 **스캔으로** 가드를 얻고, 매퍼의 `AccountId` 거부 · advice 가 표면 계약 핸들러 전부에 적용 · 순서 `HIGHEST_PRECEDENCE` · `@InitBinder` · `@ExceptionHandler` 메서드의 존재를 단언한다 — MJ · MA · MI · MH 가 이 스캔 test 에서 붉다 |
+| (c) 「대상이 있는 바인더 = 전부 400」의 전제 | 고침(등식 + 문면) | 「app main 의 어디도 `@ModelAttribute` 를 쓰지 않는다」(메서드 · 매개변수) + 양성 대조 · 변이 MODATTR RED. 가드 KDoc 과 §6 「`AccountId` 를 짓는 길 자체는 열려 있다」(OPEN-7D 줄)에 「쓰게 되면 이 거부를 풀어야 한다」 |
+| (d) 정상 경로 회귀 대조 | 확인(기존 계약 test) | 아래 표 — S-20 안의 찬 `check` 에서 HTTP 계약 · 끝점 · E2E · 표면 test 33 class · 269 test 실패 0 |
+| 팀장 추가 1 — `String → AccountId` 500 → 400 | 고침 | 가드 advice 를 `@Order(HIGHEST_PRECEDENCE)` 로 두고 `MethodArgumentTypeMismatchException` 을 받는다 — 원인 사슬에 가드의 `AccountBindingRefusedException` 이 있으면 400(`INVALID_REQUEST`). 공유 오류표 무변경. `AccountBindingGuardTest`「… 짓지 못하고 400 이다」 · 변이 MH RED(500) |
+| 팀장 추가 1′ — 「그 밖의 형 불일치」의 응답 동등성 | **(가) 채택 — 같은 함수 호출** | 가드는 원인이 가드의 거부가 아닌 형 불일치에 `GlobalErrorHandler().fallback(exception, request)` 를 그대로 부른다 — 응답 생성 코드가 한 벌이라 fallback 이 바뀌어도 어긋날 수 없다 |
+| 팀장 추가 2 — 「매핑 class 는 전부 `@RestController`」 모집단과 관리 포트 | 문면 | test KDoc: 모집단은 app main class 파일 전수라 Boot 의 actuator 핸들러는 **의도적으로 빠진다** · 가드도 그들에게 걸지 않는다 |
+
+**정상 경로 회귀 대조 (조건 (d))** — S-20 안의 찬 `check`(`app:test` 실행 732 · 실패 0)에서 가드 뒤의 기존 HTTP 계약 test:
+
+| 묶음 | class(test 수) | 결과 |
+|---|---|---|
+| 입찰함 · 전략 · 검색 · 평가 끝점 | `BidCaseEndpointTest`(9) · `StrategyEditEndpointTest`(19) · `NoticeSearchEndpointTest`(15) · `EvaluationDryRunControllerTest`(12) | 실패 0 |
+| OpenAPI 계약 | `OpenApiContractTest`(11) · `OpenApiSecurityContractTest`(5) · `OpenApiRequestBodyContractTest`(4) · `OpenApiDryRunContractTest`(9) · `OpenApiEditSessionContractTest`(4) · `OpenApiNoticeSearchContractTest`(6) | 실패 0 |
+| 출하 조립 E2E · 표면 | `ProductionHttpSurfaceTest`(7) · `HttpSurfaceCensusTest`(9) · `StrategyEditProductionE2ETest`(6) · `NoticeSearchProductionE2ETest`(6) · `EvaluationDryRunE2ETest`(6) · `EvaluationDryRunBidNowE2ETest`(1) | 실패 0 |
+| 관리 포트 | `ManagementHealthSurfaceTest`(8) · `ManagementSurfaceBootRefusalTest`(7) · `ManagementSurfaceLateSourceRefusalTest`(2) · `ManagementSurfaceLockTest`(18) | 실패 0 — 가드를 좁히기 전에는 앞 둘에서 여섯이 붉었다(위 「회귀 둘」) |
+
 #### 변이 표 — 승인 전 일괄 3 (전 · 후, `--rerun`, 표적 test 만, 되돌림 뒤 작업 트리 깨끗 확인)
 
-「전」은 `774c46da` 의 버릴 clone, 「후」는 산출물 커밋 위다(H1 · H2 · H5 · TRAV · N2k · 통제군 둘은 「test … 가드 행동 …」 커밋, 가드 경로 변이 넷은
-가드를 `@RestController` 로 좁힌 커밋 — 같은 넷을 그 앞 「test … HttpEntity 본문 모양 …」 커밋에서도 쟀고 결과가 같다). H1 · H2 · H5 는 verifier r5 의 probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다.
+「전」은 `774c46da` 의 버릴 clone, 「후」는 마지막 산출물 커밋 「fix … fallback 을 그대로 호출 …」 위다(03:02–04:28 실측). H1 · H2 · H5 는 verifier r5 의
+probe 모양(스테레오타입 없는 매핑 class 를 app main 에)이다. 표적 「구조 test」는 `AccountCarrierStructureTest` · `AccountBindingStructureTest` 둘.
 
 | # | 우회 · 변이 | 표적 | 전(`774c46da`) | 후 |
 |---|---|---|---|---|
-| H1 | 두 겹 중첩 본문 DTO 를 받는 매핑 메서드 | `AccountCarrierStructureTest` | 초록 16 / 16 | **RED** 1(라우트 센서스 등식 — 표면 계약 밖의 매핑 class) |
-| H2 | setter 로 `AccountId` 를 받는 본문 DTO | 같음 | 초록 16 / 16 | **RED** 1(같음) |
-| H5 | `@ModelAttribute` 메서드가 `AccountId` 를 받음 | 같음 | 초록 16 / 16 | **RED** 1(같음) |
-| TRAV | `JsonNode.traverse(ObjectReadContext)` 로 파서를 얻음 | 같음 | 초록 16 / 16(소유자 등식은 `JsonNode` 라 통과) | **RED** 1(쌍 등식) |
-| N2k | `Origin` 이 있을 때만 resume 이 본문 요구 | `OpenApiRequestBodyContractTest` | 초록 4 / 4 | **RED** 1(브라우저 표본) |
-| CTRL | 통제군 — 변이 없음(두 표적) | 위 둘 | 초록 16 · 4 | 초록 20 · 4 |
-| MJ | 가드 — Jackson 거부 등록을 지움 | `AccountBindingGuardTest` · `AccountBindingGuardScanTest` | — | **RED** 2(HE 가 핸들러에 닿음 · 스캔 조립의 매퍼가 `AccountId` 를 읽음) |
-| MB | 가드 — 객체 바인딩 거부를 끔 | `AccountBindingGuardTest` | — | **RED** 1(H5 · G11 이 200) |
-| MF | 가드 — `String → AccountId` 거부 formatter 를 지움 | 같음 | — | **RED** 1(흉내 낸 변환기로 `@RequestParam` 이 지어짐) |
-| CTRL-guard | 통제군 — 변이 없음 | 두 가드 test | — | 초록 4 / 4 |
+| H1 | 두 겹 중첩 본문 DTO 를 받는 매핑 메서드 | 구조 test | 초록 16 / 16 | **RED** 2(라우트 센서스 등식 · `@RestController` 등식) |
+| H2 | setter 로 `AccountId` 를 받는 본문 DTO | 같음 | 초록 16 / 16 | **RED** 2(같음) |
+| H5 | `@ModelAttribute` 메서드가 `AccountId` 를 받음 | 같음 | 초록 16 / 16 | **RED** 3(같음 + `@ModelAttribute` ∅) |
+| TRAV | `JsonNode.traverse(ObjectReadContext)` 로 파서를 얻음 | 같음 | 초록 16 / 16(소유자 등식은 `JsonNode` 라 통과) | **RED** 2(쌍 등식 · 가드 패키지 사용 등식) |
+| N2k | `Origin` 이 있을 때만 resume 이 본문을 요구 | `OpenApiRequestBodyContractTest` | 초록 4 / 4 | **RED** 1(브라우저 표본 — 「test … 가드 행동 …」 커밋에서 측정. 그 뒤 마지막 산출물 커밋까지 그 test · `SessionTestClient` · resume 핸들러 무변경 — `git log` 빈 출력) |
+| CTRL-carrier | 통제군 — 변이 없음 | 구조 test | 초록 16 | 초록 25 / 25 |
+| MJ | 가드 — 역직렬화기 등록을 지움 | 가드 test 둘 | — | **RED** 2(HE 가 핸들러에 닿음 · 스캔 조립의 매퍼가 `AccountId` 를 읽음) |
+| MA | 가드 — `@RestControllerAdvice` 를 지움 | 같음 | — | **RED** 4(스캔 조립이 가드 빈을 얻지 못함 둘 · H5/G11 · RP) |
+| MI | 가드 — `@InitBinder` 를 지움 | 같음 | — | **RED** 3(스캔 test 의 메서드 단언 · H5/G11 · RP) |
+| MB | 가드 — 객체 바인딩 거부를 끔 | 같음 | — | **RED** 1(H5 · G11 200) |
+| MF | 가드 — formatter 를 지움 | 같음 | — | **RED** 1(흉내 낸 변환기로 RP 200) |
+| MH | 가드 — 400 처리기(`@ExceptionHandler`)를 지움 | 같음 | — | **RED** 2(스캔 test 의 메서드 단언 · RP 500) |
+| PARSER | 다른 app class 가 `JsonParser` 를 받음 | `AccountBindingStructureTest` | — | **RED** 1(가드 패키지 사용 등식) |
+| MODATTR | app main 에 `@ModelAttribute` 메서드 | 같음 | — | **RED** 1(`@ModelAttribute` ∅) |
+| CTRL-guard · CTRL-struct | 통제군 — 변이 없음 | 가드 test 둘 · `AccountBindingStructureTest` | — | 초록 5 / 5 · 12 / 12 |
 
 **두 층이 겹치는 자리 — 측정이 드러냈다**: 첫 측정에서 MJ 는 **초록**이었다. `@RequestBody` 는 역직렬화 뒤 대상이 그 DTO 인 바인더를 만들고, 가드의
 `@InitBinder` 가 그 바인더를 거부해 핸들러에 닿지 않았기 때문이다(Jackson 층이 꺼져도 바인딩 층이 막는다 — 그 사이 DTO 안에 `AccountId` 가 한 번
-지어지기는 한다). Jackson 층을 따로 재려고 바인더를 만들지 않는 `HttpEntity` 본문 모양(HE)을 더했고(커밋), 다시 잰 MJ 가 위의 RED 다.
+지어지기는 한다). Jackson 층을 따로 재려고 바인더를 만들지 않는 `HttpEntity` 본문 모양(HE)을 더했고, 다시 잰 MJ 가 위의 RED 다.
 
 ### 4. 설계 검토 (2b) — 값 획득 축
 
@@ -1282,6 +1308,17 @@ V21 · OpenAPI · 생성 타입은 이 일괄에서 바뀌지 않았다(`git dif
 | `check` job — S-20 `one-command-check.sh` | **exit 0** · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
 | 변이 표(전 · 후) | §3.8 — 형제 우회 여덟 중 전(`927e7b70`) 초록 일곱 · RED 하나(N3C) → 후 **RED 여덟** · J2 는 양쪽 컴파일 실패(근거는 표) · 통제군 초록 |
 
+### 7.6 승인 전 일괄 3 재실측 (base `998b59dd`)
+
+V21 · OpenAPI · 생성 타입은 이 일괄에서 바뀌지 않았다 — container 재생 · db-rehearsal 은 돌리지 않았다. 아래는 마지막 산출물 커밋 「fix … fallback 을 그대로
+호출 …」에서 한 번의 락 보유로 차례로 돌렸다(03:02–04:57, 단계마다 야간 창 재확인). 그 뒤의 커밋은 evidence 뿐이다.
+
+| 항목 | 결과 |
+|---|---|
+| 반복 측정 — `:app` ktlint · detekt · `sizeGate` · 가드 · 구조 · 관리 · 본문 계약 · 아키텍처 test | **exit 0** · 12m57s |
+| `check` job — S-20 `one-command-check.sh`(Kotlin `check` 포함) | **exit 0** · 21m31s · `app:test` 실행 732 · 실패 0(XML) · `bidding` · `workflow` · `adapters` test 는 UP-TO-DATE — 입력이 그 뒤 무변경이고 22:46–23:07 의 찬 `check` 에서 실행해 초록이었다 · pytest 1605 passed · vitest 28 passed · W-5 「바이트까지 같다(100510 bytes)」 · Playwright 2 passed |
+| 변이 표 | §3.9 — 변이 · 우회 열여섯 RED · 통제군 셋 초록 |
+
 ### 8. rollback 실측
 
 `rollback.md` 경우 ①(머지 전)을 **버릴 clone** 에서 실행했다. 절차 문면은 **지금의 정본**(worktree HEAD 의 `rollback.md`)에서 읽고
@@ -1329,3 +1366,7 @@ base 를 `56bb7474` 로 옮긴 것이 뒤의 evidence 커밋이라 문면이 옛
 **승인 전 일괄 2 재실측** — clone 을 산출물 커밋(「fix … 승인 전 일괄 2 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서 읽었다: 변경
 A 62 · M 31 → ① exit 0 · ② D 62 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 · 내 표지 → **0** · main 표지 3 보존 · 되돌린 트리 객체 =
 `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다(트리 동일성).
+
+**승인 전 일괄 3 재실측** — clone 을 마지막 산출물 커밋(「fix … fallback 을 그대로 호출 …」)에 세우고 절차 문면은 worktree HEAD 의 `rollback.md` 에서
+읽었다: 변경 A 66 · M 31(가드 · 가드 test 셋 · 분할한 구조 test 가 늘었다) → ① exit 0 · ② D 66 · M 31 · 그 밖 0 · ③ base 와 diff 0 줄 · untracked 0 ·
+내 표지 → **0** · main 표지 3 보존 · 되돌린 트리 객체 = `998b59dd` 트리(`83461186…`). ④⑤⑥ 은 같은 트리 객체의 실행 실측(04:08, exit 0)으로 갈음한다.
