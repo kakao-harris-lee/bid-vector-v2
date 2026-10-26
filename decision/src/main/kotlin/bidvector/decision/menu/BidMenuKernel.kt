@@ -66,6 +66,12 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
         }
     }
 
+/** 제출 금액(원 단위) — 겹침 판정의 축이다. */
+private fun wonOf(option: BidMenuOption): Long =
+    option.amount.value
+        .export()
+        .won
+
 /**
  * 제출 **금액**이 겹친 태도 묶음(r2 M-3) — 판정 축이 율이 아니라 금액인 이유는
  * [CollapseCause.DuplicateEffectiveAmounts] 에 적었다. 금액은 옵션을 다 지은 **뒤에야**
@@ -73,12 +79,6 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
  *
  * 태도가 셋이므로 겹침 묶음은 **많아야 하나**다(둘이 겹치면 남은 하나는 그 둘과 다르다).
  */
-/** 제출 금액(원 단위) — 겹침 판정의 축이다. */
-private fun wonOf(option: BidMenuOption): Long =
-    option.amount.value
-        .export()
-        .won
-
 private fun collidingStances(built: Map<BidStance, BidMenuOption>): Map<BidStance, Long> {
     val stancesByAmount: Map<Long, List<BidStance>> =
         built.entries.groupBy({ entry -> wonOf(entry.value) }, { entry -> entry.key })
