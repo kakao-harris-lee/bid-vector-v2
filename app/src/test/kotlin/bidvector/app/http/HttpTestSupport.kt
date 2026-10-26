@@ -2,7 +2,6 @@ package bidvector.app.http
 
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
-import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
@@ -16,7 +15,6 @@ import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
-import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
@@ -33,32 +31,23 @@ import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
-import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.EDIT_SESSION_POLICY
-import bidvector.workflow.strategy.EditSession
-import bidvector.workflow.strategy.EditSessionId
-import bidvector.workflow.strategy.EditSessionPolicyData
-import bidvector.workflow.strategy.EditSessionRepository
-import bidvector.workflow.strategy.EditSessionSnapshot
-import bidvector.workflow.strategy.EditStrategyWorkflow
-import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
-import bidvector.workflow.strategy.toSnapshot
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
+import java.net.Socket
+import java.time.Instant
+import java.time.LocalDate
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.core.Ordered
-import java.net.Socket
-import java.time.Instant
-import java.time.LocalDate
-import java.util.Collections
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
@@ -273,61 +262,6 @@ class RecordingAuditSink {
 }
 
 /**
- * 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
- * 이다(상태 기계·멱등·만료 판정을 test 사본으로 다시 짓지 않는다) — 바뀌는 것은 커넥션
- * 경계뿐이라, 이 이중체 위에서 재는 것은 「HTTP 층이 결과를 어떤 상태 코드로 옮기는가」다.
- * 원자성 자체(전략+outbox+세션 한 커밋)는 이 자리가 아니라 실 DB test 가 잰다.
- */
-class InMemoryStrategyEditTransaction(
-    private val strategies: StrategyRepository,
-    private val clock: Clock,
-) : StrategyEditTransaction {
-    val sessions: InMemoryEditSessionRepository = InMemoryEditSessionRepository()
-    val events: RecordingStrategyEventSink = RecordingStrategyEventSink()
-
-    /** Spring 컨텍스트가 test 사이에 재사용되므로 세션·발행 이력을 매 test 전에 비운다. */
-    fun reset() {
-        sessions.clear()
-        events.published.clear()
-        events.actors.clear()
-    }
-
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
-        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
-        val sessionPolicy =
-            (EDIT_SESSION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EditSessionPolicyData>).value
-        return action(EditStrategyWorkflow(sessions, strategies, clock, events, policy, sessionPolicy))
-    }
-}
-
-/** `EditSession` 은 `internal constructor` 라 저장은 값 그대로, 반환은 원시 스냅숏으로 한다(D-6B1-7). */
-class InMemoryEditSessionRepository : EditSessionRepository {
-    private val stored = mutableMapOf<EditSessionId, EditSession>()
-
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]?.toSnapshot()
-
-    override fun save(session: EditSession) {
-        stored[session.id] = session
-    }
-
-    fun clear() = stored.clear()
-}
-
-class RecordingStrategyEventSink : EventSink {
-    val published: MutableList<StrategyEvent> = Collections.synchronizedList(mutableListOf())
-
-    override fun publish(
-        event: StrategyEvent,
-        actor: Actor,
-    ) {
-        published += event
-        actors += actor
-    }
-
-    val actors: MutableList<Actor> = Collections.synchronizedList(mutableListOf())
-}
-
-/**
  * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지
  * `bidvector.app.wiring`)을 스캔 범위 밖에 둔다(`@SpringBootApplication`의 기본 컴포넌트
  * 스캔이 이 클래스의 패키지 `bidvector.app.http`와 그 하위만 본다). `StrategyReadController`·
@@ -342,6 +276,7 @@ class RecordingStrategyEventSink : EventSink {
  * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
+@Import(BidPriceTestWiring::class)
 open class HttpTestApplication {
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()

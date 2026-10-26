@@ -23,7 +23,7 @@ import org.springframework.http.ResponseEntity
  */
 @Suppress("UNCHECKED_CAST")
 @SpringBootTest(
-    classes = [HttpTestApplication::class, BidPriceTestWiring::class],
+    classes = [HttpTestApplication::class],
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = [
         PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND,
