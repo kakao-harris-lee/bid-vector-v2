@@ -405,5 +405,9 @@ class AppHttpDependencyGateTest {
  * 받는 조회기이고 HTTP 층 허용 목록에도 있다). `NoticeSearchWiring`·`NoticeSearchQuery` 짝과 같은 형태다.
  *
  * **두 slice 병합(M7/7B D-7B-9, 2026-10-25)**: 65 + 7B 하나 + 7C①b 둘 = **68**. 두 등재의 합집합이다.
+ *
+ * **M7/7C④ 2b — 하나 더해**(프로필 조립 `app.wiring.ProfileWiring`): V22 저장소와 V12 저장 어댑터를
+ * 세우는 `@Configuration` 이라 `BidCaseWiring` 과 같은 tier1 이다. 68 + 1 = **69**. 이 줄을 고치는
+ * 커밋이 그 면제를 이름으로 드러낸다 — 그것이 이 단언의 목적이다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 68
+private const val EXPECTED_EXEMPT_COUNT = 69

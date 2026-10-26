@@ -192,7 +192,15 @@ class AccountCarrierStructureTest {
 
         /** 계정 범위 경로의 주체 진입점 셋. */
         val ACCOUNT_READERS =
-            setOf("http/BidCaseCommandController", "http/BidCaseQueryController", "http/BidCaseHttp")
+            setOf(
+                "http/BidCaseCommandController",
+                "http/BidCaseQueryController",
+                "http/BidCaseHttp",
+                // M7/7C④ 2b — 프로필도 계정 전용 경로다. 두 controller 가 주체를 얻는 길은 이 접근자
+                // 하나이고, 주체 라벨(`account:`)을 읽는 자리는 늘지 않았다(위 등식이 그대로 초록).
+                "http/ProfileCommandController",
+                "http/ProfileQueryController",
+            )
     }
 }
 
