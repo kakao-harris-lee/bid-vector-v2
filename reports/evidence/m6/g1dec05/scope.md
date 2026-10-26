@@ -4,9 +4,12 @@
   (`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`) G1 표: DEC-05 「메뉴 타입 + 커널(7C ② 가 그 위에 표면을 얹는다)」 ·
   DEC-02 「DEC-05 와 한 slice」(선언 예외 ② — 메뉴의 근거 칸이 곧 DEC-02 의 빈 자리). 홀더: 새 M6 slice 「투찰가 메뉴」.
   운영자 지시 2026-10-21 「G1 먼저」로 COL-03 레인과 병렬로 연다.
-- **base**: 착수 `bee7c36f` → **현행 `fc15975c`**(병합된 main, 머지 커밋 `851ee375`, D-G1DEC05-6) ·
-  worktree `bid-vector-v2-m6-g1dec05` · 브랜치 `m6-g1dec05/2026-10-21`.
-  **rollback 복원 기준도 `fc15975c`** 다 — 착수 base 로 복원하면 머지로 들어온 남의 변경까지 지운다.
+- **base**: 착수 `bee7c36f` → `fc15975c`(머지 `851ee375`) → **현행 `46ac0949`**(병합된 main,
+  머지 커밋 `20b7129a`, D-G1DEC05-3 단계 0) · worktree `bid-vector-v2-m6-g1dec05` ·
+  브랜치 `m6-g1dec05/2026-10-21`.
+  **rollback 복원 기준도 `46ac0949`** 다 — 착수 base 로 복원하면 머지로 들어온 남의 변경까지
+  지운다(실제로 `gate-tests.properties`·`capability-map.md`·`acceptance-trace.md` 가 SET-01 ·
+  COL-03 · 7B · 7C①b · 7C④ 머지분을 잃는다).
   전제(그 SHA 에 이 slice 가 없다)는 착수 커밋 `e88c069b` 미포함으로 확인했다.
 - **입력 정본**: `docs/discovery/capability-map.md` DEC-05 · DEC-02 절(acceptance bullet 이 정본), 제약하는 DEC-01 · DEC-04 · DEC-10 bullet ·
   `reports/evidence/m6/6e1/acceptance-trace.md` DEC-05 · DEC-02 행(「무엇이 비었는가」) · 추적표 머리의 ⓐ 술어 ②(production 배선과 출하 정책
@@ -82,8 +85,13 @@
 
 ## rollback
 
-`git restore --source=bee7c36f --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일은 삭제. 목록은
-`git diff --name-status bee7c36f..HEAD` 기계 산출. 마지막 산출물 커밋에서 ①~⑥ 실측.
+`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일은 삭제. 목록은
+`git diff --name-status 46ac0949..HEAD` 기계 산출. 마지막 산출물 커밋에서 ①~⑦ 실측.
+
+**복원 기준은 「병합된 main 커밋」이지 착수 base 가 아니다**(r3 N-4 · cr M3). 이 절이 두 세대
+낡아 `bee7c36f` 를 가리키고 있었다 — 적힌 대로 실행하면 공유 장부가 착수 시점으로 돌아가 남의
+머지분이 사라진다. 실측(checklist)은 `46ac0949` 로 옳았고 이 문면만 틀렸다. **머지할 때마다 이
+줄과 머리 base 줄을 함께 올린다.**
 
 ## 검토 레인
 
@@ -160,6 +168,28 @@ worktree 무접촉.
 - **2026-10-24 ③** — `OPEN-DEC02-SCORE-AXIS-FLOOR` 를 신설해 장부에 등재했다(라운드 2 실측의
   부산물 — DEC-02 의 빈자리로 지목됐던 호출부가 하한이 적용될 자리가 아니었고, 그 자리의 진짜
   물음이 이것이다). 판정은 **DEC-10 착수 계약**에서 함께 한다.
+
+- **2026-10-26 ①** — base 와 rollback 복원 기준을 `fc15975c` → **`46ac0949`**(머지
+  `20b7129a`)로 재고정했다(D-G1DEC05-3 단계 0). 전제(**그 SHA 에 이 slice 가 없다**)는 착수
+  커밋 `e88c069b` 가 `46ac0949` 의 조상이 아님으로 재확인했다.
+- **D-G1DEC05-7**(2026-10-26, 팀장 수령) — **두 축이 함께 걸리면 율 축이 이긴다.**
+  하한 **아래** 후보가 clamp 돼 올라온 뒤 금액 올림까지 타면 `BindingConstraint.PublishedFloorBound`
+  (율 축)를 **유지**하고, 하한 **위** 후보가 원 단위 올림만 탄 경우에만
+  `BindingConstraint.PublishedFloorRounding`(금액 축, r3 N-1 신설)이다.
+  - 근거: 둘을 한 값으로 접으면 「율이 하한 미만이었다」와 「율은 여유가 있었다」가 구별되지
+    않는다. 두 사실은 운영자에게 다른 것을 말한다.
+  - 집행: `promotedBinding(effective)` 의 `when` 이 **소진**이라 binding 어휘가 늘면 그 자리가
+    컴파일로 드러난다. 변이 **A1**(새 variant 를 `CandidateRate` 로 되돌림)이 RED 로 잠근다.
+  - 배경: r1 은 올림 경로에 무조건 `PublishedFloorBound` 를 달아 율 축의 뜻을 넘겼고(r2 M-2),
+    r2 는 그것을 `CandidateRate`(「걸린 제약이 없다」)로 되돌려 **하한이 금액을 정한 사실을
+    지웠다**(r3 N-1). 셋 중 고르는 문제가 아니라 **값이 하나 더 필요했던** 자리다.
+
+- **2026-10-26 ②** — r3·r4 가 만든 새 파일을 in_scope 와 대조했다(cr r3 L-4). r3: compile
+  fixture 둘(`negative-4-…`·`mutant-4-…`). r4: compile fixture 다섯(`negative-4a`~`4e`,
+  r3 의 `negative-4-…` 하나를 타입별로 가름). 전부 `decision/src/test/resources/**` 라
+  **in_scope 안이고 범위 밖 0** 이다.
+- **2026-10-26 ③** — `OPEN-DEC05-STANCE-RATE-PROVENANCE` 의 역방향 포인터를 `ML-01` 쪽에
+  달았다(r3 L-N2) — 닫는 자리에서 그 OPEN 이 보이지 않으면 유예가 유실된다.
 
 ## 하네스 레인 변경 (상시)
 
