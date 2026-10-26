@@ -132,11 +132,34 @@ g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상�
   `EvaluationDryRunRun|RecordingNotificationRequestPort|requested`. 요구한 줄: 그 두 메서드 호출 줄. **셋째(`callCount`)는 등재하지 않고 코드에서
   없앴다** — 유일 호출자가 test 였고 그 test 는 자기 계수 fake 로 같은 값을 이미 쟀다(넓히기 전에 없앴다).
 
-`app.assembly.tier2.allowed-app-classes` 에는 **아무것도 넣지 않았다** — 그것을 요구한 줄이 15 건에 없었다(§0.9f (e) 의 「RED 가 선행하지 않은
-등재는 의심한다」를 내 등재에도 적용했다).
+**정정(verifier r1 M-4, 2026-10-26).** 위 문단은 `D-7C2-9` 수령 시점의 상태이고 **지금 HEAD 와 다르다.** 앞서 이 자리에
+「`app.assembly.tier2.allowed-app-classes` 에는 아무것도 넣지 않았다」고 적었는데, main 병합 뒤 커밋 하나가 **넷을 더했다**:
+
+- `app.assembly.tier2.allowed-app-classes` ← `BidPriceRequestRun` · `BidPriceRequestOutcome`
+- `app.assembly.tier2.allowed-workflow-types` ← `CandidateEvaluation` · `MlAnalysisOutcome`(위 「새 읽기 포트 둘」에 더해)
+
+병합이 조립 층 게이트의 관측 집합을 넓혀 **그 넷이 없으면 집합 등식이 붉었다**(RED 가 등재에 앞섰다 — §0.9f (e) 의 술어를 지켰다).
+근거가 커밋 메시지에만 있고 이 문서에 없던 것이 결함이었고, **하중은 verifier 가 독립 변이로 다시 쟀다**(둘을 각각 지우면 RED).
 
 
-**수정 라운드가 만든 새 파일 — in_scope 대조(2026-10-26).** 라운드가 끝날 때마다 새 파일을 계약과 맞춰 본다.
+**D-7C2-10 · D-7C2-11 (팀장 수령, 2026-10-24~25 — `verifier r1 M-3` · `cr r1 LOW-3` 로 여기 등재).** 앞서 이 둘은 checklist
+§0.9g·§0.9h 에 레인이 스스로 적은 선언으로만 있었다. 수령 기록이 계약 문서에 없으면 **남의 표면을 바꾼 근거가 레인의 말뿐**이 된다.
+
+- **D-7C2-10 — 병합을 먼저 한다.** 변이·web·S-20 을 먼저 재면 병합이 공유 하네스·계약·정책·등식형 게이트를 바꾸므로 그 측정이 전부
+  버려진다. 그래서 순서를 바꿔 main 을 먼저 받았다.
+- **D-7C2-11 — 미판정 축 어휘의 세 번째 사본도 합친다(남의 slice 표면을 바꾼다).** 7C①b 가 머지한 `workflow.suggestion` 쪽 사본은
+  항목이 **둘**이라 QUAL-10 이 빠져 있었다(의도가 아니라 시점 차이 — 그 축은 그 slice 머지 **뒤** `D-7C2-1` Q5 로 들어왔다). 빠진 채로
+  두면 면허 판정만 있는 제안 카드가 **수행실적까지 판정된 것처럼** 읽힌다. **wire 에 enum 값 하나가 더해지므로** `web` job 이 acceptance 에
+  들어온다.
+
+**in_scope 추가(D-7C2-11 의 귀결).** 아래 경로가 in_scope 로 들어온다 — 전부 기존 파일 수정이다.
+`workflow/.../profile/{BusinessProfileValues,OnboardingChecklist}.kt` · `workflow/.../profile/UnjudgedQualificationAxis.kt`(삭제) ·
+`workflow/.../suggestion/ListSuggestionsUseCase.kt` · `workflow/.../profile/ProfileJudgementIsolationTest.kt` ·
+`app/.../http/SuggestionEndpointTest.kt` · **편집 필드 어휘 파일**(`app/.../http/`, 아래 자국 2 가 가리키는 그 파일 —
+그 파일 이름을 축어로 적으면 누출 스캔 어휘에 걸린다. 오탐이지만 게이트는 참·거짓을 가리지 않는다).
+
+**수정 라운드가 만든 파일 — in_scope 대조(2026-10-26).** 라운드가 끝날 때마다 계약과 맞춰 본다. **대조 축은 「새 파일」과
+「수정 파일」 둘이다** — 앞 판은 새 파일만 보아, 위 일곱(전부 기존 파일 수정)이 그 대조에서 빠졌다(`verifier r1 M-3`).
 
 - `app/src/test/.../StrategyEditTestDoubles.kt` — **in_scope 안**이다(`D-7C2-4` 가 `HttpTestSupport.kt` 를 수용했고,
   이 파일은 그 파일을 가른 조각이다). 가른 이유는 그 공유 파일이 **정확히 500줄**(파일 한도)이라 test 앱에 `@Import`
@@ -146,7 +169,17 @@ g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상�
   `HttpTestSupport.kt` 는 500 → 435 줄. 같은 패키지라 쓰는 자리의 import 는 하나도 바뀌지 않는다.
 - `reports/evidence/m7/7c2/{commands,rollback}.md` — evidence 디렉터리, in_scope 안.
 
-**공유 파일에 남긴 자국 셋(동결 보고 항목).** 되돌리기는 base 복원으로 닫히지만, 머지되면 남의 레인이 보는 것들이다.
+**공유 파일에 남긴 자국 넷(동결 보고 항목).** 되돌리기는 base 복원으로 닫히지만, 머지되면 남의 레인이 보는 것들이다.
+
+0. **`HttpTestApplication` 의 `@Import` 자리**(`cr r1 HIGH`). 이 slice 는 `@Import(BidPriceTestWiring::class)` 를, 7C④-2b 는 **같은 자리**에
+   `@Import(ProfileTestWiring::class)` 를 두고 있다(그 worktree 에서 실측). `@Import` 는 `@Repeatable` 이 아니라 **둘 다 남기면
+   `Duplicate annotation` 으로 HTTP test 가 통째로 컴파일 실패**한다. git 이 충돌로 세워 주지 않을 수도 있다(한쪽이 먼저 머지되면 뒤 쪽은
+   자기 줄만 더하는 모양이 된다).
+   **병합 규칙**: 뒤에 머지되는 쪽이 **한 줄로 접는다** — `@Import(BidPriceTestWiring::class, ProfileTestWiring::class)`. 접고 나면
+   HTTP test 가 서는지가 곧 검산이다(둘 중 하나를 빠뜨리면 그 빈을 받는 컨트롤러가 기동하지 못한다).
+   같은 파일의 **이중체 분할**도 같은 자리다: 세 형제 브랜치(7C③·7C④-2b·7C⑤)의 `HttpTestSupport.kt` 에는 이 slice 가 옮겨 간 세 클래스가
+   **아직 있다**(실측). 병합 해소에서 둘 다 남기면 중복 선언으로 컴파일이 깨진다 — 뒤 쪽이 자기 파일에서 그 셋을 지운다. 크게 실패하므로
+   조용한 사고는 아니다.
 
 1. **면제 크기 래칫 68 → 70**(`AppHttpDependencyGateTest`). 조립 층 ② 에 요청 스코프 팩토리·run 둘이 더해진 기계적
    귀결이다. 그 래칫의 목적이 「면제가 눈에 띄지 않게 느는 것을 막는다」이므로 **올린 사실 자체가 보고 항목**이다.

@@ -189,7 +189,7 @@ ML 이 배선되는 날 요청당 deadline 이 필요해진다 → 알려진 제
 | # | 우회 | 무엇이 막는가 |
 |---|---|---|
 | 1 | 자격 헤더·세션 없이 호출 | 필터 기본 거부 → 401. 새 경로가 허용 목록에 없음을 **집합 등식**으로 잰다 |
-| 2 | 세션은 있고 CSRF 헤더 없이 POST | 면제 집합 밖 → 401. 표적 test |
+| 2 | 세션은 있고 CSRF 헤더 없이 POST | 면제 집합 밖 → 401. **구성으로 선다 — 이 slice 의 표적 test 는 없다**(`verifier r1 L-3` 정정). 면제는 `GET`·`HEAD`·`OPTIONS` 셋이고 그 집합을 `BrowserSessionAuthenticationTest` 가 메서드 전수로 잠근다. 새 POST 가 그 집합 밖이라는 것이 곧 방어이므로 endpoint 마다 같은 test 를 복제하지 않는다 |
 | 3 | 메서드 변형(`GET`·`PUT`·`HEAD`)으로 같은 경로 | 매핑이 POST 하나 → 405 `METHOD_NOT_ALLOWED`, 기존 전수 test 가 센다 |
 | 4 | 경로 변형(`/api/bid-price-requests/`·대소문자·`;a=b`·`/api/./…`) | 허용 목록 정확 일치 → 거부 쪽으로 떨어진다(fail-closed) |
 | 5 | 공고번호에 제어문자·초장문·수 타입 | 원시 트리 명시 검증 → 400, 어느 입력인지 싣지 않는다 |
