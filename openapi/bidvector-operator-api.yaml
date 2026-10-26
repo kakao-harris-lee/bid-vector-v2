@@ -1607,6 +1607,282 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/profile:
+    get:
+      operationId: readProfile
+      summary: 운영자 프로필 한 벌 — 자격 사실 · 사업 정보 · 판정 대기 축(M7/7C④)
+      description: >-
+        **평탄하다**(D-6A1-20 ⓑ) — 시평액 목록은 이 응답에 없고
+        `/api/profile/construction-capacities` 의 최상위 배열로 나간다.
+
+
+        면허의 **세 상태**가 응답에서 구별된다: `qualificationDeclared=false` 가 「미설정」(V12 행
+        없음), `true`+`licensesDeclared=false` 가 「미신고」, 둘 다 `true` 가 「신고」다(빈 목록도 답이다).
+        세 상태를 두 상태로 접지 않는다.
+      security:
+        - browserSession: []
+      responses:
+        "200":
+          description: 프로필 한 벌(미설정 필드는 null · 지어낸 기본값 없음)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          description: "인증 실패 또는 **계정 주체가 아닌 인증**(프로필은 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/profile/qualification-facts:
+    post:
+      operationId: replaceQualificationFacts
+      summary: 자격 사실(업종 · 면허 · 지역어) 절 교체(M7/7C④)
+      description: >-
+        V12 는 아직 **싱글턴**이다(계정 단위 전환은 R-2 남은 절반). 그래도 경로는 계정 범위라 세션
+        주체가 없으면 401 이다. 요청에 `accountId` 자리는 없다.
+      security:
+        - browserSession: []
+          operatorCsrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QualificationFactsRequest"
+      responses:
+        "200":
+          description: 교체 뒤 다시 읽은 프로필
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: "요청 본문 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "인증 실패 또는 계정 주체가 아닌 인증. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/profile/business-details:
+    post:
+      operationId: replaceBusinessDetails
+      summary: 사업 정보(상호 · 본사 소재지 · 나라장터 준비) 절 교체(M7/7C④)
+      description: >-
+        절을 **통째로** 교체한다 — 부분 갱신이 다른 필드를 지우는 모양을 계약에서 없앤다.
+        상호는 **입력 원문 그대로** 저장된다(앞뒤 공백도 자르지 않는다 — 정규화는 대사 시점의 커널이
+        한 번만 한다).
+
+
+        `naraRegistration` 이 `REGISTERED` 가 아니면 `naraRegisteredFields` ·
+        `businessCertificateExpiresOn` 을 실을 수 없다(400) — 받아 두고 버리지 않는다.
+
+
+        사업자번호 · 대표자명 · 인증서 원문은 **자리가 없다**(표에 열이 없다).
+      security:
+        - browserSession: []
+          operatorCsrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessDetailsRequest"
+      responses:
+        "200":
+          description: 교체 뒤 다시 읽은 프로필
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: "요청 본문 형식 오류(알 수 없는 키 · 어휘 밖 값 · 상태와 모순되는 필드) 또는 저장 층의 제약 거부. 어느 값이 틀렸는지는 싣지 않는다. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "인증 실패 또는 계정 주체가 아닌 인증. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/profile/construction-capacities:
+    get:
+      operationId: listConstructionCapacities
+      summary: 면허별 시공능력평가액 목록(M7/7C④)
+      description: >-
+        **맨 위가 배열**이다 — 배열을 감싼 object 는 평탄 규칙(D-6A1-20 ⓑ)에 걸린다. 면허명 순이다.
+      security:
+        - browserSession: []
+      responses:
+        "200":
+          description: 그 계정의 시평액 행 전부(없으면 빈 배열)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConstructionCapacity"
+        "401":
+          description: "인증 실패 또는 계정 주체가 아닌 인증. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      operationId: upsertConstructionCapacity
+      summary: 시평액 한 행 추가 · 갱신(M7/7C④)
+      description: >-
+        면허명이 같은 행이 있으면 금액 · 기준 연도를 바꾸고, 없으면 더한다. 응답은 **다시 읽은 목록**이다.
+
+
+        한 계정의 행 수에는 상한이 있다 — 넘기면 409 다(상한은 앱이 집행한다. 검사와 삽입 사이의
+        경합은 단일 운영자 전제 위에서 받아들인 알려진 제한이다).
+      security:
+        - browserSession: []
+          operatorCsrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConstructionCapacityRequest"
+      responses:
+        "200":
+          description: 쓴 뒤 다시 읽은 시평액 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConstructionCapacity"
+        "400":
+          description: "요청 본문 형식 오류(알 수 없는 키 · 값 규칙 위반) 또는 저장 층의 제약 거부. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "인증 실패 또는 계정 주체가 아닌 인증. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: "그 계정의 시평액 행 수가 상한에 닿았다. code: CAPACITY_ROWS_EXCEEDED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/profile/construction-capacities/remove:
+    post:
+      operationId: removeConstructionCapacity
+      summary: 시평액 한 행 삭제(M7/7C④)
+      description: >-
+        **POST 다**(DELETE 가 아니다) — 쓰기 메서드를 하나로 모아 CSRF 요구를 메서드로 받는다.
+        지울 행이 없으면 404 이고, 다른 계정의 같은 면허명은 **없는 것과 같다**(존재 여부를 흘리지 않는다).
+      security:
+        - browserSession: []
+          operatorCsrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveConstructionCapacityRequest"
+      responses:
+        "200":
+          description: 지운 뒤 다시 읽은 시평액 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConstructionCapacity"
+        "400":
+          description: "요청 본문 형식 오류(알 수 없는 키 포함). code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "인증 실패 또는 계정 주체가 아닌 인증. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 면허명의 행이 없다. code: NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /{unmatched}:
     get:
       operationId: unmatchedPath
@@ -2317,6 +2593,167 @@ components:
             enum:
               - QUAL_08_REGION
               - QUAL_11_CONSTRUCTION_CAPACITY
+    # =========================================================================
+    # M7/7C④ — 운영자 프로필. 전부 **평탄하다**(중첩 object 속성 없음, D-6A1-20 ⓑ).
+    #
+    # 요청 · 응답 어디에도 **없는** 것이 이 계약의 절반이다:
+    #  · accountId — 주체는 인증 필터가 적은 값에서만 온다(요청 바인딩은 AccountId 를 짓지 못한다)
+    #  · updatedAt — 시각은 서버 시계가 싣는다
+    #  · 사업자번호 · 대표자명 · 인증서 원문 — 표에 열이 없다
+    #  · 체크리스트 진행 상태 — 저장하지 않는다(서버가 매번 판정한다. 그 operation 은 7C② 뒤에 선다)
+    # =========================================================================
+    Profile:
+      type: object
+      required:
+        - qualificationDeclared
+        - businessTypes
+        - licensesDeclared
+        - licenseNames
+        - regionTerms
+        - naraRegistration
+        - naraRegisteredFields
+        - unjudgedAxes
+      properties:
+        qualificationDeclared:
+          type: boolean
+          description: >-
+            V12 자격 사실 행이 있는가. `false` 면 「프로필 미설정」이고, 그때의 빈 목록은
+            **신고된 빈 값이 아니다**.
+        businessTypes:
+          type: array
+          items:
+            type: string
+        licensesDeclared:
+          type: boolean
+          description: >-
+            면허를 **신고했는가**. `qualificationDeclared` 와 짝으로 세 상태를 가른다
+            (미설정 · 미신고 · 신고). 신고했고 면허가 없으면 `true` + 빈 `licenseNames` 다.
+        licenseNames:
+          type: array
+          items:
+            type: string
+        regionTerms:
+          type: array
+          items:
+            type: string
+          description: V12 의 자유 어휘(텍스트 합성용). `headquartersRegion`(구조화 입력)과 다른 축이다.
+        tradeName:
+          type: string
+          nullable: true
+          description: 입력 원문 그대로(앞뒤 공백 포함). null 은 「미설정」이다.
+        headquartersRegion:
+          type: string
+          nullable: true
+          enum: [SEOUL, BUSAN, DAEGU, INCHEON, GWANGJU, DAEJEON, ULSAN, SEJONG, GYEONGGI, GANGWON, CHUNGBUK, CHUNGNAM, JEONBUK, JEONNAM, GYEONGBUK, GYEONGNAM, JEJU]
+        naraRegistration:
+          type: string
+          enum: [UNANSWERED, REGISTERED, NOT_REGISTERED]
+          description: >-
+            **「미응답」이 값이다** — null 이나 「미등록」으로 접지 않는다(화면의 경고가 다르다).
+        naraRegisteredFields:
+          type: array
+          items:
+            type: string
+            enum: [GOODS, SERVICE, CONSTRUCTION]
+        businessCertificateExpiresOn:
+          type: string
+          format: date
+          nullable: true
+          description: 사업자용(전자서명) 인증서 만료일. 등록 상태에서만 값이 있을 수 있다.
+        unjudgedAxes:
+          type: array
+          items:
+            type: string
+            enum: [QUAL_08_REGION, QUAL_10_PERFORMANCE, QUAL_11_CONSTRUCTION_CAPACITY]
+          description: >-
+            **아직 판정하지 않는 자격 축**(M7 완료 조건 G2). 입력이 있든 없든 V2 에 판정이 없는 축이고,
+            화면은 이 목록에서 「아직 판정하지 않음」을 그린다(클라이언트가 추론하지 않는다).
+    ConstructionCapacity:
+      type: object
+      required:
+        - licenseName
+        - amountWon
+        - assessmentYear
+      properties:
+        licenseName:
+          type: string
+        amountWon:
+          type: integer
+          format: int64
+          description: 원 단위 정수. 0 을 받지 않는다(「모름」의 기본값으로 흘러들기 쉬운 값이다).
+        assessmentYear:
+          type: integer
+          description: 어느 해 평가액인지는 **필수**다(연 1회 갱신되는 값이라 기준 해가 없으면 해석이 갈린다).
+    QualificationFactsRequest:
+      type: object
+      required:
+        - businessTypes
+        - licensesDeclared
+        - licenseNames
+        - regionTerms
+      properties:
+        businessTypes:
+          type: array
+          items:
+            type: string
+        licensesDeclared:
+          type: boolean
+        licenseNames:
+          type: array
+          items:
+            type: string
+          description: "`licensesDeclared` 가 거짓이면 비어 있어야 한다(아니면 400)."
+        regionTerms:
+          type: array
+          items:
+            type: string
+    BusinessDetailsRequest:
+      type: object
+      required:
+        - naraRegistration
+      properties:
+        tradeName:
+          type: string
+          nullable: true
+        headquartersRegion:
+          type: string
+          nullable: true
+          enum: [SEOUL, BUSAN, DAEGU, INCHEON, GWANGJU, DAEJEON, ULSAN, SEJONG, GYEONGGI, GANGWON, CHUNGBUK, CHUNGNAM, JEONBUK, JEONNAM, GYEONGBUK, GYEONGNAM, JEJU]
+        naraRegistration:
+          type: string
+          enum: [UNANSWERED, REGISTERED, NOT_REGISTERED]
+        naraRegisteredFields:
+          type: array
+          items:
+            type: string
+            enum: [GOODS, SERVICE, CONSTRUCTION]
+          description: "`naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있고, 그때는 **필수**다(빈 배열 가능)."
+        businessCertificateExpiresOn:
+          type: string
+          format: date
+          nullable: true
+          description: "`naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있다."
+    ConstructionCapacityRequest:
+      type: object
+      required:
+        - licenseName
+        - amountWon
+        - assessmentYear
+      properties:
+        licenseName:
+          type: string
+        amountWon:
+          type: integer
+          format: int64
+        assessmentYear:
+          type: integer
+    RemoveConstructionCapacityRequest:
+      type: object
+      required:
+        - licenseName
+      properties:
+        licenseName:
+          type: string
     ErrorBody:
       type: object
       required:
@@ -2348,6 +2785,7 @@ components:
             - METHOD_NOT_ALLOWED
             - UNSUPPORTED_MEDIA_TYPE
             - NOTICE_SNAPSHOT_UNAVAILABLE
+            - CAPACITY_ROWS_EXCEEDED
         message:
           type: string
         correlationId:
