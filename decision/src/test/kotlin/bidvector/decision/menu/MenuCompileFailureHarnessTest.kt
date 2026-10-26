@@ -22,7 +22,8 @@ import java.nio.file.Files
  * 생성 경로가 닫혀 있다는 사실만이 증명이다. 생성자를 공개로 되돌리는 변이에서 fixture 1 이
  * 양성이 되어 RED 다.
  *
- * fixture 4a~4e — 결과 그래프 **다섯 타입**의 `copy` 가 각각 모듈 밖에서 닫혀 있다.
+ * fixture 1b·4a~4e — 결과 그래프 **여섯 타입**의 `copy` 가 각각 모듈 밖에서 닫혀 있다
+ * (`BidMenuOption` 포함 — r4 V4-M1 이 그 하나가 빠진 것을 찾았다).
  *
  * fixture 1 — [BidMenuOption] 은 모듈 밖에서 직접 지을 수 없다(유일한 생성 경로는
  * [composeBidMenu]). fixture 2 — [BidMenuOutcome.Offered] 도 같다. fixture 3 —
@@ -39,6 +40,17 @@ class MenuCompileFailureHarnessTest {
     fun `1 BidMenuOption 은 모듈 밖에서 직접 지을 수 없고 커널 경유는 컴파일된다`() {
         assertNegativeFails("1-menu-option-direct-construction", "cannot access")
         assertPositiveCompiles("1-menu-via-kernel")
+    }
+
+    /**
+     * fixture 1b — 생성 폐쇄와 **`copy` 폐쇄는 다른 명제**다(r4 V4-M1). `BidMenuOption` 은
+     * `@ConsistentCopyVisibility` 를 달고도 그 `copy` 를 재는 fixture 가 없어서,
+     * `@ExposedCopyVisibility` 로 바꾸는 변이(XOPT)가 **GREEN** 이었다 — 모듈 밖에서
+     * `copy(binding = …)` 로 근거는 그대로 둔 채 binding 만 갈아끼울 수 있었다.
+     */
+    @Test
+    fun `1b BidMenuOption 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("1b-menu-option-copy", "cannot access", "copy")
     }
 
     @Test
@@ -88,32 +100,38 @@ class MenuCompileFailureHarnessTest {
      */
     @Test
     fun `4a Offered 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4a-menu-offered-copy", "cannot access")
+        assertNegativeFails("4a-menu-offered-copy", "cannot access", "copy")
         assertPositiveCompiles("1-menu-via-kernel")
     }
 
     @Test
     fun `4b PartiallyOffered 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4b-menu-partially-offered-copy", "cannot access")
+        assertNegativeFails("4b-menu-partially-offered-copy", "cannot access", "copy")
     }
 
     @Test
     fun `4c BandCollapsed 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4c-menu-band-collapsed-copy", "cannot access")
+        assertNegativeFails("4c-menu-band-collapsed-copy", "cannot access", "copy")
     }
 
     @Test
     fun `4d Unmeasurable 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4d-menu-unmeasurable-copy", "cannot access")
+        assertNegativeFails("4d-menu-unmeasurable-copy", "cannot access", "copy")
     }
 
     @Test
     fun `4e CollapsedWithOtherStances 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4e-menu-collapsed-reason-copy", "cannot access")
+        assertNegativeFails("4e-menu-collapsed-reason-copy", "cannot access", "copy")
     }
 
+    /**
+     * 비공허성 통제군 — **`BandCollapsed` 꼴 하나만 실측한다**(cr r4 L-3). 나머지 다섯
+     * fixture 의 비공허성은 **같은 모양이라는 유추**이지 측정이 아니다. 유추로 메운 자리를
+     * 「공유 통제군」이라고 적어 측정처럼 보이게 하지 않는다 — 넓히려면 타입마다 오타 변이를
+     * 둬야 하고, 그 비용 대비 가치는 재리뷰 판단에 맡긴다.
+     */
     @Test
-    fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+    fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다(BandCollapsed 꼴)`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "4-menu-outcome-copy-typo",
             realDiagnosticFragment = "cannot access",
@@ -121,13 +139,22 @@ class MenuCompileFailureHarnessTest {
     }
 }
 
+/**
+ * 음성 fixture 는 **컴파일에 실패해야 하고, 그 실패가 우리가 노린 이유여야 한다.**
+ *
+ * 조각을 여럿 받는 이유(cr r4 L-2): 「cannot access」만 보면 **타입 자체가 `internal` 이 되는
+ * 변이**에서도 초록이다 — 그 경우도 접근 불가지만 우리가 재려는 명제(`copy` 가 닫혔다)와 다른
+ * 이유다. `copy` 처럼 **심볼을 지목하는 조각**을 함께 요구해 그 둘을 가른다.
+ */
 private fun assertNegativeFails(
     fixtureName: String,
-    expectedDiagnosticFragment: String,
+    vararg expectedDiagnosticFragments: String,
 ) {
     val result = compileFixture("negative-$fixtureName")
-    result.exitCode shouldBe ExitCode.COMPILATION_ERROR
-    result.output shouldContain expectedDiagnosticFragment
+    io.kotest.assertions.withClue(result.output) {
+        result.exitCode shouldBe ExitCode.COMPILATION_ERROR
+        expectedDiagnosticFragments.forEach { fragment -> result.output shouldContain fragment }
+    }
 }
 
 private fun assertPositiveCompiles(fixtureName: String) {

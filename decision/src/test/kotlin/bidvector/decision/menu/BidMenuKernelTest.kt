@@ -275,13 +275,15 @@ class BidMenuKernelTest {
     }
 
     /**
-     * verifier 탐침 P2 — 하한 **위** 후보가 원 단위 올림만 타는 경로(r2 M-2). 값을 정한 것은
-     * 여전히 후보 비율이므로 binding 은 [BindingConstraint.CandidateRate] 로 남아야 한다.
-     * 앞 판은 올림 경로에서 무조건 `PublishedFloorBound` 를 달아, 「하한에 걸렸거나 정확히 그
-     * 위」라는 그 값의 뜻과 어긋나는 옵션을 만들었다. 변이 N1 이 이 test 에서만 RED 다.
+     * 하한 **위** 후보가 원 단위 올림만 타는 경로 — **금액 축에서 하한이 값을 정했다**
+     * ([BindingConstraint.PublishedFloorRounding], D-G1DEC05-7). 율은 후보가 정했지만 올림이
+     * 발화하면 결과가 언제나 `ceil(적용 하한)` 이라 **금액**은 하한의 것이다.
      *
      * 1,234,567 × 0.8799501 = 1,086,357.3551067 → `HALF_UP` 1,086,357 은 적용 하한
      * 1,086,357.23165 **미만**이라 올림이 발화하고 결과는 `ceil(하한)` = 1,086,358 이다.
+     *
+     * 변이 **A1**(이 값을 `CandidateRate` 로 되돌림)이 여기서 RED 다. r2 는 이 자리를
+     * `CandidateRate` 로 적었는데 그것은 「걸린 제약이 없다」는 뜻이라 거짓이었다(r3 N-1).
      */
     @Test
     fun `binding — 하한 위 후보가 올림만 타면 금액 축에서 하한이 값을 정한 것이다`() {

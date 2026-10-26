@@ -124,11 +124,9 @@ private fun assemble(
     val offered = built.filterKeys { it !in collided }
 
     return when {
-        collided.keys == BidStance.entries.toSet() -> {
-            val amounts = collided.values.distinct()
-            require(amounts.size == 1) { "태도 전수가 접혔는데 금액이 여럿이다: $amounts" }
+        collided.keys == BidStance.entries.toSet() && collided.values.distinct().size == 1 -> {
             BidMenuOutcome.BandCollapsed(
-                cause = CollapseCause.DuplicateEffectiveAmounts(amounts.single()),
+                cause = CollapseCause.DuplicateEffectiveAmounts(collided.values.first()),
                 collapsedStances = collided.keys,
             )
         }
@@ -152,7 +150,14 @@ private fun optionFor(
         }
     }
 
-/** 셋 전부 → [BidMenuOutcome.Offered] · 일부 → `PartiallyOffered` · 전부 보류 → `Unmeasurable`. */
+/**
+ * 셋 전부 → [BidMenuOutcome.Offered] · 일부 → `PartiallyOffered` · 전부 보류 → `Unmeasurable`.
+ *
+ * **태도 전수가 한 금액으로 접혔을 때만 밴드 붕괴다**(cr r4 L-1). 태도가 넷 이상이 되어 전수가
+ * 접혔는데 금액 묶음이 둘이면 `BandCollapsed` 의 단일 `cause` 로 적을 수 없는데, 그 상태는
+ * **이미 표현 가능하다** — 전부 보류이므로 `Unmeasurable` 이 태도별 사유를 싣는다. 순수 커널이
+ * 예외를 던지는 대신 그 값으로 간다.
+ */
 private fun outcomeOf(
     offered: Map<BidStance, BidMenuOption>,
     withheld: Map<BidStance, MenuUnmeasurableReason>,
