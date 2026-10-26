@@ -4,7 +4,6 @@ import bidvector.qualification.OperatorLicenses
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.ProfileView
-import bidvector.workflow.profile.UnjudgedQualificationAxis
 
 /**
  * 프로필 조회 응답 — **평탄하다**(D-6A1-20 ⓑ): 모든 필드가 스칼라이거나 스칼라 배열이다. 그래서
@@ -60,7 +59,9 @@ data class ProfileResponse(
                         .map { it.name }
                         .sorted(),
                 businessCertificateExpiresOn = registered?.businessCertificateExpiresOn?.toString(),
-                unjudgedAxes = UnjudgedQualificationAxis.entries.map { it.name },
+                // use case 가 낸 값을 그대로 싣는다 — 선언 표를 여기서 다시 세면 그 값이 wire 에
+                // 닿지 않는다(판정이 생긴 축을 use case 가 걸러도 응답은 전부를 싣는다, v F7 · CR M-1).
+                unjudgedAxes = view.unjudgedAxes.map { it.name },
             )
         }
     }

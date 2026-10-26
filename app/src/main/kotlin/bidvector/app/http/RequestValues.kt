@@ -63,6 +63,42 @@ internal fun <T : Enum<T>> JsonNode.optionalEnum(
     return enumOf(key, values)
 }
 
+/**
+ * **제어 문자를 거부한다**(M7/7C④ 2b r2, v F5). PostgreSQL 은 NUL 을 담은 텍스트를 SQLSTATE `22021`
+ * 로 거부하고 그 예외는 어댑터의 class 23 번역 밖이라 **500** 이 된다 — 요청 값이 만든 오류를 서버
+ * 탓으로 말하는 것이다. 요청을 읽는 자리에서 400 으로 막는다(fail-closed, 저장 층에 닿기 전에).
+ *
+ * 줄바꿈 · 탭도 거부한다 — 이 표면이 받는 것은 **이름**(상호 · 면허명 · 업종 코드 · 지역어)이고,
+ * 거기에 줄바꿈이 있는 정상 입력이 없다. 넓게 거부하는 쪽이 「무엇이 통과하는가」를 세기 쉽다.
+ */
+internal fun String.rejectingControlCharacters(key: String): String {
+    if (any { it.isISOControl() }) throw InvalidEditRequestException("$key 에 제어 문자가 있다")
+    return this
+}
+
+/**
+ * 값이 **있으면** 공백뿐일 수 없다 — 없거나 `null` 만 「미설정」이다(D-7C4-1 §0.2).
+ *
+ * [optionalNonBlankText](7B)와 다른 점이 요지다: 그쪽은 공백뿐인 값을 `null` 로 접는데, **절 단위로
+ * 교체하는** 표면에서 그 접힘은 저장돼 있던 값을 지우고 200 을 낸다(공백 입력이 조용히 「지우기」가
+ * 된다, v F6 · CR M-2). 같은 파일이 「받고서 쓰지 않는 입력은 계약 거짓말」이라며 등록 전용 키를
+ * 400 으로 거부하는 규율과도 어긋난다.
+ */
+internal fun JsonNode.declaredText(
+    key: String,
+    maxCodePoints: Int,
+): String? {
+    val node = get(key)
+    if (node == null || node.isNull) return null
+    if (!node.isString) throw InvalidEditRequestException("$key 는 문자열이어야 한다")
+    val value = node.stringValue()
+    if (value.isBlank()) throw InvalidEditRequestException("$key 는 공백뿐일 수 없다 — 미설정은 null 이다")
+    if (value.codePointCount(0, value.length) > maxCodePoints) {
+        throw InvalidEditRequestException("$key 는 $maxCodePoints 자를 넘을 수 없다")
+    }
+    return value.rejectingControlCharacters(key)
+}
+
 /** 불리언 — Jackson 의 강제 변환(`"true"` · `1`)을 받지 않는다(표기 자체를 판정한다). */
 internal fun JsonNode.requiredBoolean(key: String): Boolean {
     val node = requiredNode(key)

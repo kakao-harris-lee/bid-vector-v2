@@ -10,6 +10,7 @@ import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.NaraRegistration
 import bidvector.workflow.profile.NaraRegistrationField
+import bidvector.workflow.profile.ProfileInputPolicy
 import bidvector.workflow.profile.TradeName
 import tools.jackson.databind.JsonNode
 import java.time.LocalDate
@@ -44,15 +45,15 @@ internal object ProfileRequests {
     fun qualificationFacts(body: JsonNode): ProfileFacts {
         val payload = body.requireObject().requireKnownKeys(QUALIFICATION_KEYS)
         val declared = payload.requiredBoolean("licensesDeclared")
-        val names = payload.requiredStringArray("licenseNames")
+        val names = payload.freeTerms("licenseNames")
         if (!declared && names.isNotEmpty()) {
             throw InvalidEditRequestException("licenseNames 는 licensesDeclared 가 참일 때만 실을 수 있다")
         }
         return ProfileFacts(
-            businessTypes = payload.requiredStringArray("businessTypes").map(::CategoryCode).toSet(),
+            businessTypes = payload.freeTerms("businessTypes").map(::CategoryCode).toSet(),
             licenses =
                 if (declared) OperatorLicenses.Declared(names.map(::LicenseName)) else OperatorLicenses.NotDeclared,
-            regionTerms = payload.requiredStringArray("regionTerms"),
+            regionTerms = payload.freeTerms("regionTerms"),
         )
     }
 
@@ -60,7 +61,10 @@ internal object ProfileRequests {
     fun businessDetails(body: JsonNode): BusinessDetails {
         val payload = body.requireObject().requireKnownKeys(DETAILS_KEYS)
         return BusinessDetails(
-            tradeName = payload.optionalNonBlankText("tradeName")?.let { requestValue("tradeName") { TradeName(it) } },
+            tradeName =
+                payload
+                    .declaredText("tradeName", ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS)
+                    ?.let { requestValue("tradeName") { TradeName(it) } },
             headquartersRegion = payload.optionalEnum("headquartersRegion", HeadquartersRegion.entries),
             naraReadiness = payload.naraReadiness(),
         )
@@ -68,7 +72,7 @@ internal object ProfileRequests {
 
     fun constructionCapacity(body: JsonNode): ConstructionCapacity {
         val payload = body.requireObject().requireKnownKeys(CAPACITY_KEYS)
-        val licenseName = payload.requiredNonBlankText("licenseName")
+        val licenseName = payload.requiredLicenseName()
         val amountWon = payload.requiredLong("amountWon", minimum = 1L)
         val assessmentYear = payload.requiredInt("assessmentYear", minimum = 0)
         return requestValue("constructionCapacity") {
@@ -77,7 +81,43 @@ internal object ProfileRequests {
     }
 
     fun licenseName(body: JsonNode): LicenseName =
-        LicenseName(body.requireObject().requireKnownKeys(setOf("licenseName")).requiredNonBlankText("licenseName"))
+        LicenseName(body.requireObject().requireKnownKeys(setOf("licenseName")).requiredLicenseName())
+}
+
+/**
+ * 면허명 — 공백뿐 · 길이 초과 · 제어 문자를 **요청 판독에서** 거부한다. 길이는 값 타입
+ * ([ConstructionCapacity])도 보지만, 삭제 요청에는 그 값 타입이 없어 여기 한 자리가 두 경로를 덮는다.
+ */
+private fun JsonNode.requiredLicenseName(): String =
+    declaredText("licenseName", ProfileInputPolicy.LICENSE_NAME_MAX_CODE_POINTS)
+        ?: throw InvalidEditRequestException("licenseName 이 없다")
+
+/**
+ * V12 자유 어휘 배열(업종 코드 · 면허명 · 지역어) — **원소마다** 공백 · 길이 · 제어 문자를 보고,
+ * 배열 크기와 중복도 본다(M7/7C④ 2b r2, v F4).
+ *
+ * 왜 여기인가: V12 는 이 축에 표 제약이 없고(짝 CHECK 하나뿐), 값 타입(`CategoryCode` · `LicenseName`)도
+ * 불변식을 두지 않는다. 2b 가 **처음 HTTP 로 연** 쓰기 경로라 경계가 이 자리밖에 없다. V22 쪽은 같은
+ * 성격의 규칙을 값 타입과 표 CHECK 두 겹으로 갖는다 — 그 비대칭을 좁힌다.
+ *
+ * 중복을 **거부한다**: `businessTypes` 는 도메인이 `Set` 이라 조용히 접히고(그 접힘은 운영자에게
+ * 보이지 않는다), 나머지 둘은 그대로 저장된다. 접거나 담는 대신 거부가 한 가지 답이다.
+ */
+private fun JsonNode.freeTerms(key: String): List<String> {
+    val raw = requiredStringArray(key)
+    if (raw.size > ProfileInputPolicy.QUALIFICATION_TERMS_MAX) {
+        throw InvalidEditRequestException("$key 는 ${ProfileInputPolicy.QUALIFICATION_TERMS_MAX} 개를 넘을 수 없다")
+    }
+    if (raw.size != raw.toSet().size) throw InvalidEditRequestException("$key 에 같은 값이 두 번 있다")
+    return raw.map { term ->
+        if (term.isBlank()) throw InvalidEditRequestException("$key 의 원소는 공백뿐일 수 없다")
+        if (term.codePointCount(0, term.length) > ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS) {
+            throw InvalidEditRequestException(
+                "$key 의 원소는 ${ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS} 자를 넘을 수 없다",
+            )
+        }
+        term.rejectingControlCharacters(key)
+    }
 }
 
 /** 등록 상태에서만 의미가 있는 두 키 — 다른 답의 요청에 실려 있으면 **거부한다**. */
@@ -124,9 +164,14 @@ private fun JsonNode.rejectRegisteredOnlyKeys() {
     }
 }
 
-/** ISO-8601 날짜만 받는다(시각 판독과 같은 관례 — 표기 둘을 함께 받지 않는다). */
+/**
+ * ISO-8601 날짜만 받는다(시각 판독과 같은 관례 — 표기 둘을 함께 받지 않는다). **있으면 날짜여야
+ * 한다** — 공백뿐인 값을 「미설정」으로 접지 않는다(상호와 같은 규율, v F6).
+ */
 private fun JsonNode.optionalDate(key: String): LocalDate? {
-    val raw = optionalNonBlankText(key) ?: return null
+    val node = get(key)
+    if (node == null || node.isNull) return null
+    val raw = requiredNonBlankText(key)
     return runCatching { LocalDate.parse(raw) }
         .getOrElse { throw InvalidEditRequestException("$key 는 ISO-8601 날짜여야 한다") }
 }
