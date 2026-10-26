@@ -92,15 +92,37 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
         endpoint: SourceEndpoint,
         observedAt: Instant,
         target: NoticeId = id,
+    ): RawNoticeObservation = rawObservationOf(target.number.value, target.round.value, endpoint, observedAt)
+
+    /**
+     * 원문 한 줄을 **상류가 보낸 표기 그대로** 만든다 — canonical 값을 심는 [observationOf] 와
+     * 달리 원문 ≠ canonical 사례를 만들 수 있다. 정규화는 심는 쪽이 아니라 읽는 쪽의 몫이다.
+     */
+    private fun rawObservationOf(
+        numberRaw: String,
+        roundRaw: String,
+        endpoint: SourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
+        observedAt: Instant = T1,
     ): RawNoticeObservation =
         RawNoticeObservation.of(
             mapOf(
-                NOTICE_NUMBER_RAW_KEY to target.number.value,
-                NOTICE_ROUND_RAW_KEY to target.round.value,
+                NOTICE_NUMBER_RAW_KEY to numberRaw,
+                NOTICE_ROUND_RAW_KEY to roundRaw,
             ),
             endpoint,
             observedAt,
         )
+
+    /** 보존 규율이 찍는 마스킹 표지 — 그 행은 승격 경로가 더 이상 읽지 않는다. */
+    private fun markMasked(key: ObservationKey) =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement("UPDATE raw_observation SET pii_masked_at = now() WHERE observation_key = ?")
+                .use { statement ->
+                    statement.setString(1, key.value)
+                    statement.executeUpdate() shouldBe 1
+                }
+        }
 
     private fun rawKey(
         endpoint: SourceEndpoint,
@@ -280,6 +302,40 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
         seedNotice()
         val otherRound = NoticeId(id.number, NoticeRound.of("002"))
         rawKey(SourceEndpoint.OPENING_RESULT_LIST, T1, otherRound)
+
+        present(view().lookup(id)).openingAxisObserved shouldBe false
+    }
+
+    /**
+     * 원문의 공고번호는 **상류가 보낸 그대로**이고 물어보는 쪽은 canonical 이다 — 둘을 SQL 에서
+     * 그대로 맞대면 소문자·내부 공백이 든 번호에서 조용히 빗나가 「원문도 없다」고 답한다
+     * (`JdbcCollectedAxisStore` 가 COL-05 로 세운 규율과 같은 자리).
+     */
+    @Test
+    fun `원문 번호가 소문자·공백이어도 같은 공고의 관측으로 센다`() {
+        seedNotice()
+        appendRawObservation(rawObservationOf("openview 20261022 001", id.round.value))
+
+        present(view().lookup(id)).openingAxisObserved shouldBe true
+    }
+
+    /** 접은 뒤에도 공고 축은 선다 — 표기만 다른 것과 **다른 공고**인 것을 구별한다. */
+    @Test
+    fun `원문 표기가 달라도 다른 공고의 관측은 이 공고로 세지 않는다`() {
+        seedNotice()
+        appendRawObservation(rawObservationOf("openview 20261022 999", id.round.value))
+
+        present(view().lookup(id)).openingAxisObserved shouldBe false
+    }
+
+    /**
+     * 마스킹된 원문은 **승격 대상이 아니다**(승격 쪽 `ELIGIBLE_SQL` 과 같은 조건) — 세어 주면 그
+     * 공고는 영영 「승격 전」으로 남아, 일시적이라던 상태가 영구 오답이 된다.
+     */
+    @Test
+    fun `마스킹된 원문은 관측으로 세지 않는다`() {
+        seedNotice()
+        markMasked(rawKey(SourceEndpoint.OPENING_RESULT_LIST, T1))
 
         present(view().lookup(id)).openingAxisObserved shouldBe false
     }

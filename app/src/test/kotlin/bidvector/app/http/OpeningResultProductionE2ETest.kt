@@ -51,6 +51,14 @@ private const val SENTINEL_COMPANY = "SENTINEL-WINNER-DO-NOT-EXPORT"
 private val OBSERVED_AT: Instant = Instant.parse("2026-10-22T00:00:00Z")
 
 /**
+ * 상류가 보낸 **원문 표기** — canonical 공고번호(`E2E-OPEN-1`)는 이 글자에서 파생된다
+ * (`NoticeNumber.of`: ASCII 대문자화 · 공백 → `-`). 둘이 다른 상태가 기본이어야 원문 표를
+ * 보는 질의가 정규화를 건너뛴 채 초록이 되지 않는다.
+ */
+private const val RAW_NUMBER = "e2e open 1"
+private const val RAW_ROUND = "001"
+
+/**
  * 개찰 결과 조회를 **출하 조립 + 실 PostgreSQL** 로 끝까지 돈다(`NoticeSearchProductionE2ETest`
  * 와 같은 기법) — 컨트롤러·조회기·읽기 전용 어댑터·DB 가 한 줄로 이어진 상태를 본다.
  *
@@ -100,7 +108,7 @@ class OpeningResultProductionE2ETest {
         }
     }
 
-    private val id = NoticeId(NoticeNumber.of("E2E-OPEN-1"), NoticeRound.of("001"))
+    private val id = NoticeId(NoticeNumber.of(RAW_NUMBER), NoticeRound.of(RAW_ROUND))
 
     private fun dataSource(): DataSource = context.getBean(DataSource::class.java)
 
@@ -115,14 +123,15 @@ class OpeningResultProductionE2ETest {
         }
     }
 
-    private fun rawOf(
-        endpoint: SourceEndpoint,
-        target: NoticeId = id,
-    ): RawNoticeObservation =
+    /**
+     * 원문은 **상류 표기 그대로** 심는다 — canonical 값([id])을 되심으면 「원문 = canonical」인
+     * 경우만 돌아, 정규화를 건너뛴 대조가 끝까지 초록으로 보인다(cr r1 HIGH 가 난 자리).
+     */
+    private fun rawOf(endpoint: SourceEndpoint): RawNoticeObservation =
         RawNoticeObservation.of(
             mapOf(
-                NOTICE_NUMBER_RAW_KEY to target.number.value,
-                NOTICE_ROUND_RAW_KEY to target.round.value,
+                NOTICE_NUMBER_RAW_KEY to RAW_NUMBER,
+                NOTICE_ROUND_RAW_KEY to RAW_ROUND,
             ),
             endpoint,
             OBSERVED_AT,
