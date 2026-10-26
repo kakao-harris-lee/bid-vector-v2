@@ -92,11 +92,29 @@ flock … ./gradlew --no-daemon ktlintCheck detekt                      # STYLE_
 flock … ./gradlew --no-daemon check                                   # CHECK_EXIT=0
 ```
 
-- 핵심 결과: **`check` exit 0**(BUILD SUCCESSFUL, 23m59s · task 줄 598). 이 실행이 **판정의 근거**다 —
-  앞선 실행들은 style(ktlint `when`·import·`function-signature`·KDoc 자리)과 detekt(`MatchingDeclarationName`·
-  `ReturnCount`)과 `sizeGate`(50줄)에서 끊겼고, 그 전부를 고친 뒤의 실행이다.
-- 모듈별 test 계수는 이 실행 **직후 변이 실행이 같은 자리의 XML 을 덮었다** — 그래서 이 절은 계수를 옮겨
-  적지 않는다(게이트의 판정은 종료 코드다). 계수가 필요하면 `check` 를 다시 돌려 그 자리에서 읽는다.
+- 핵심 결과(동결 판): **`check` exit 0**(BUILD SUCCESSFUL, 23m59s · task 줄 598). 앞선 실행들은 style(ktlint
+  `when`·import·`function-signature`·KDoc 자리)과 detekt(`MatchingDeclarationName`·`ReturnCount`)과
+  `sizeGate`(50줄)에서 끊겼고, 그 전부를 고친 뒤의 실행이다.
+- 모듈별 test 계수는 그 실행 **직후 변이 실행이 같은 자리의 XML 을 덮었다** — 그래서 이 절은 계수를 옮겨
+  적지 않았다(게이트의 판정은 종료 코드다). r1 재실행에서 이 slice 의 계수를 아래에 적는다.
+
+### 3b. r1 재실행 (수정 라운드 — **판정의 근거는 이쪽**이다)
+
+```
+flock … ./gradlew --no-daemon --continue ktlintCheck detekt sizeGate   # STYLE_EXIT=0
+flock … ./gradlew --no-daemon check                                    # CHECK_EXIT=0 (23m45s)
+flock … ./gradlew --no-daemon qualityBaseline                          # BASELINE_EXIT=0
+```
+
+- **한 번 끊겼다**: 회귀 test 셋이 어댑터 test 파일을 528줄로 밀어 `:adapters:sizeGate` 가 STYLE 단계에서 먼저
+  붉었다(한도 500, `STYLE_EXIT=1`). sizeGate 가 체인 앞쪽이라 **그 뒤 축은 전부 미측정**이었다 — 끊긴 체인을
+  「아직 초록이 아니다」가 아니라 「모른다」로 읽는다. 책임 둘로 가르고(원문 축 ↔ 결과 투영, 행 심기는 단언
+  없는 공용 fixture) 다시 돌렸다.
+- **정적 게이트의 초록은 컴파일을 보증하지 않는다**(31초, 전부 소스 기반) — 분할이 실제로 서는지는 `check` 가
+  본다. 그래서 게이트만 초록인 상태를 acceptance 로 세지 않았다.
+- 이 slice 의 test(r1): 순수 판정 16 · 어댑터 결과 투영 13 · 어댑터 원문 축 8 · 어댑터 의존 5 · endpoint 12 ·
+  질의 읽기 2 · 계약 7 · 출하 조립 E2E 6 — **실패 0 · 오류 0 · skip 0**.
+- 양끝 HEAD 동일(`b8ae2f01`) · 미커밋 0.
 - `web` job 명령 셋은 §5 에 따로 적는다.
 
 **`check` job 의 나머지 두 명령**(vr r1 L-5 — 앞 판은 이 절을 비워 두었다). CI 의 `check` job 은 명령이 셋이다:
