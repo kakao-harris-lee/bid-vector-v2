@@ -330,3 +330,33 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
 
 **acceptance(2b)**: OpenAPI 를 바꾸므로 Kotlin `check` job + **`web` job** 둘이다. 빌드는 `flock` 경유이고 락은
 7C ② · 7C ③ · 7C ⑤ · DEC-05 와 공유한다.
+
+### 2b in_scope (구현 라운드 r1, 2026-10-26)
+
+`git diff --name-status 46ac0949..HEAD` 로 다시 산출한다. 이 라운드가 만지는 자리는 다음과 같다.
+
+- **workflow**: `profile/BusinessProfilePorts.kt`(쓰기 결과 타입 둘) · `profile/BusinessProfileValues.kt`(나라장터 세
+  이름의 단일 선언) · `profile/ProfileUseCases.kt`(신설 — 조회 둘 · 쓰기 넷) · test 둘.
+- **adapters**: `profile/JdbcBusinessProfileStore.kt`(제약 거부를 값으로) · `profile/JdbcOperatorProfileRepository.kt`
+  (V12 저장 port 구현) · `evaluation/ProfilePorts.kt`(V12 저장 port 신설) · 실 DB test 둘 추가.
+- **app**: `http/` 의 신설 다섯(`ProfileRequests` · `ProfileResponses` · `ProfileHttp` · 조회 · 쓰기 controller) +
+  `RequestValues.kt`(아래 ②) · `AccountScopedRoutes`(프로필 뿌리) · `AuthenticatedAccount`(401 공용화) ·
+  `ErrorBody`(코드 하나) · `BidCaseHttp`·`BidCase*Controller`(호출부) · `wiring/ProfileWiring.kt`(신설) ·
+  test 넷(표면 · 조립 경계 · 이중체 조립 · 분리한 이중체 파일)과 `HttpTestSupport.kt`.
+- **계약·게이트**: `openapi/bidvector-operator-api.yaml`(operation 여섯 · 스키마 여섯 · 오류 코드 하나) ·
+  `web/src/api/generated/operator-api.ts`(재생성) · `config/quality/architecture-policy.properties`(허용 패키지 하나 ·
+  금지 타입 셋) · `config/quality/gate-tests.properties`(test 셋 등재).
+
+**승인 범위를 넘지 않지만 7B·6A 파일을 만지는 거동 무변경 refactor 가 셋**이다. D-7C4-8 Q4 가 ① 을 승인했고,
+②③ 은 같은 성격(테스트가 그대로 초록인 것이 근거)이라 **보고 항목으로 둔다**.
+
+1. **`unauthenticated` 공용화**(Q4 승인) — `BidCaseHttp` 에서 `AuthenticatedAccount.kt` 로. 입찰함 호출부 다섯이 같은
+   함수를 부른다. `OperatorSessionController` 의 private 사본은 **그대로 둔다**(7D 파일 — 후속 후보).
+2. **`requestValue` · `enumOf` 공용화** — `BidCaseRequests.kt` 의 private 둘을 `RequestValues.kt` 로 옮기고
+   `requiredBoolean` 을 더했다. 프로필 요청도 같은 두 수단이 필요했고, 복사하면 「형식 오류를 400 으로」 규율이 두
+   자리에 선다. `JsonValueReaders.kt` 가 아닌 새 파일인 이유는 그 파일이 **파일당 함수 한도(11)** 에 닿아 있어서다.
+3. **`FixedClock` · `SequentialCorrelationIdFactory` 파일 분리** — `HttpTestSupport.kt` 가 **정확히 500줄**(파일 한도)
+   이라 프로필 이중체 조립을 `@Import` 하려면 자리가 없었다. 같은 패키지로 옮겨 참조는 바뀌지 않는다.
+   **7C ⑤ 와의 겹침: 없다**(팀장 지시 2026-10-26 ②). 그쪽은 같은 한도 때문에 `EmptyCandidateSource` ·
+   `UnreachableWatchSubjectPort` · `UnreachableLicenseGatePort` 를 `EvaluationTestDoubles.kt` 로 옮긴다 — 옮기는
+   **선언 집합이 서로 소**이고 파일 이름도 다르다. 병합은 같은 파일의 **다른 hunk 삭제** 둘이 된다.
