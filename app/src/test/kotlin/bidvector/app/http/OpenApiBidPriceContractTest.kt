@@ -175,9 +175,19 @@ class OpenApiBidPriceContractTest : HttpIntegrationTestBase() {
             setOf("noticeNumber", "noticeRound", "currentActiveBids")
     }
 
-    /** 문서가 선언한 상태 코드 집합이 이 endpoint 가 실제로 내는 집합과 같다. */
+    /**
+     * **문서 집합을 못박는다 — 「구현과 같다」가 아니다**(`cr r1 M4`). 앞 이름은 등식을 주장했지만
+     * 이 단언은 문서 쪽만 읽고 손 리터럴과 비교한다. 실제로 이 endpoint 는 **405 도 낸다**(잘못된
+     * 메서드 — `BidPriceRequestEndpointTest` 가 단언한다). 405 를 문서에 적지 않는 것은 이 slice 의
+     * 선택이 아니라 **저장소 관례**다: 405 는 모든 endpoint 의 일반 거동이고 operation 29 개 가운데
+     * 그것을 선언한 것이 하나도 없다. 이 slice 만 적으면 그 관례에서 혼자 벗어난다.
+     *
+     * 그래서 이 단언이 지키는 것은 「문서가 **뜻을 가진** 상태 코드를 조용히 잃지 않는다」이고,
+     * 「문서가 구현의 전수다」가 아니다. 그 둘을 한 이름으로 부르면 다음 읽는 사람이 없는 보장을
+     * 믿는다.
+     */
     @Test
-    fun `문서가 선언한 상태 코드 집합이 구현과 같다`() {
+    fun `문서가 선언한 상태 코드 집합이 고정돼 있다`() {
         spec.responseStatusCodes("/api/bid-price-requests", "post") shouldBe
             setOf("200", "400", "401", "404", "409", "415", "500")
     }

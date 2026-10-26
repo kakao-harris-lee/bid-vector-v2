@@ -29,7 +29,9 @@ import java.time.Instant
  * 비교에서 **상관 ID 는 뺀다** — 호출마다 새로 발급되는 값이라 두 실행에서 같을 수 없고, 같다면
  * 오히려 발급이 고정됐다는 뜻이다(그 축은 이 test 의 관심이 아니다).
  *
- * 공고 셋은 **서로 다른 탈락 단계**를 덮는다. 한 단계만 재면 그 단계 밖의 차분이 측정되지 않는다.
+ * 표본 **둘**은 서로 다른 탈락 단계를 덮는다(`verifier r1 L-4` — 앞 문면의 「셋」은 틀렸다).
+ * 한 단계만 재면 그 단계 밖의 차분이 측정되지 않는다. 판정 갈래 쪽은 ML 이 늘 미가용이라
+ * `Reached` 에서 재는 갈래가 하나다 — 그 사실은 도달 단언이 따로 잰다.
  */
 class BidPriceRequestDifferentialTest {
     private val clock = FixedClock(Instant.parse("2026-10-23T00:00:00Z"))

@@ -2562,6 +2562,13 @@ components:
         licenseUncertainReason:
           type: string
           nullable: true
+          enum:
+            - null
+            - REQUIREMENT_DATA_ABSENT
+            - REQUIREMENT_UNPARSABLE
+            - OPERATOR_LICENSES_NOT_DECLARED
+            - COLLECTION_FAILED
+            - PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED
           description: 판정 불가 사유(요건 데이터 부재·파싱 불가·프로필 미선언·수집 실패·허용업종 결합 규칙 미결).
         licenseRequiredLicenses:
           type: array
@@ -2624,6 +2631,10 @@ components:
           type: array
           items:
             type: string
+            enum:
+              - QUAL_08_REGION
+              - QUAL_10_PERFORMANCE
+              - QUAL_11_CONSTRUCTION_CAPACITY
           description: >-
             **아직 판정하지 않는 자격 축**(QUAL-08 지역 · QUAL-10 수행실적 · QUAL-11
             시공능력평가금액). 「판정했고 통과」와 「판정하지 않음」을 구분하게 한다 — 자격
@@ -2740,6 +2751,11 @@ components:
           type: array
           items:
             type: string
+            enum:
+              - YEGA_DRAWN_PRIVATELY
+              - NOT_AUTO_SUBMITTED
+              - STATUTORY_FLOOR_RATE_NOT_INTERPRETED
+              - PRICE_FITNESS_IS_NOT_PROBABILITY
           description: >-
             **전수를 늘 싣는다** — 예정가격은 개찰 전 비공개 추첨으로 결정되어 정확한 낙찰하한을
             보장할 수 없음 · 자동 제출·확정 낙찰이 아님 · 법정 하한율 미해석 · 가격 적합도는

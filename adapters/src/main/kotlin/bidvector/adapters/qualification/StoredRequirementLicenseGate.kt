@@ -32,7 +32,7 @@ class StoredRequirementLicenseGate(
     private val policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ) : LicenseGatePort {
     /**
-     * **M7/7C ② — 위임을 되돌렸다(무편집 복원).** 7C ② 가 봉투를 내는 포트를 더하면서 한때 이
+     * **M7/7C ② — 위임을 되돌렸다(거동은 7C ② 앞과 같다 — 남은 diff 는 이 KDoc 뿐이다).** 7C ② 가 봉투를 내는 포트를 더하면서 한때 이
      * 게이트가 그 어댑터에 위임하게 바꿨는데, `QualificationAdapterDependencyTest` 가
      * **이 클래스의 컴파일된 코드가 `LicenseEligibility` 를 참조한다**는 사실을 아키텍처 게이트로
      * 들고 있었다(실측으로 걸렸다). 그 앵커는 「어댑터가 verdict 를 스스로 조립하지 않는다」를

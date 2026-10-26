@@ -64,7 +64,7 @@ open class EvaluationWiring {
         dataSource: DataSource,
         operatorProfilePort: OperatorProfilePort,
     ): LicenseGatePort =
-        StoredRequirementLicenseGate(JdbcRequirementStore(dataSource), operatorProfilePort, resolvedLicensePolicy())
+        StoredRequirementLicenseGate(JdbcRequirementStore(dataSource), operatorProfilePort, resolvedLicensePolicy)
 
     /**
      * M7/7C ② — 자격 판정 **봉투**를 내는 포트. [licenseGatePort] 와 같은 세 입력(요건 저장소·
@@ -80,19 +80,26 @@ open class EvaluationWiring {
         StoredRequirementLicenseJudgement(
             JdbcRequirementStore(dataSource),
             operatorProfilePort,
-            resolvedLicensePolicy(),
+            resolvedLicensePolicy,
         )
 
     /** M7/7C ② — 공고 한 행을 키로 읽는 포트(쓰기 능력이 조립 그래프에 들어오지 않는다). */
     @Bean
     open fun noticeByIdPort(dataSource: DataSource): NoticeByIdPort = JdbcNoticeById(dataSource)
 
-    /** 해소 실패는 기동 실패다 — 값을 지어내지 않는다(D-6F1-6 과 같은 규율). */
-    private fun resolvedLicensePolicy(): Resolution.Resolved<LicenseQualificationPolicyData> {
-        val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now())
-        return resolution as? Resolution.Resolved<LicenseQualificationPolicyData>
-            ?: error("면허 자격 정책이 해소되지 않았다: $resolution")
-    }
+    /**
+     * 해소 실패는 기동 실패다 — 값을 지어내지 않는다(D-6F1-6 과 같은 규율).
+     *
+     * **`fun` 이 아니라 `val` 인 것이 요점이다**(`cr r1 M2`). 함수였을 때는 두 빈이 각자 불러
+     * `LocalDate.now()` 를 **두 번** 읽었다. 자정 경계에 기동하면서 그 사이에 날이 바뀌면 게이트와
+     * 봉투가 **서로 다른 정책 version** 을 받고, 응답의 정책 출처 칸이 커널 판정과 갈린다.
+     * 조립 한 번에 해소도 한 번이다.
+     */
+    private val resolvedLicensePolicy: Resolution.Resolved<LicenseQualificationPolicyData> =
+        when (val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now())) {
+            is Resolution.Resolved -> resolution
+            else -> error("면허 자격 정책이 해소되지 않았다: $resolution")
+        }
 
     @Bean
     open fun mlAnalysisPort(): MlAnalysisPort = UnavailableMlAnalysis()

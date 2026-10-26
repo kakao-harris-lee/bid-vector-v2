@@ -55,7 +55,4 @@ class RecordingMlAnalysis(
      * 않았다」라서, 응답이 두 사실을 다른 값으로 낸다.
      */
     fun recordedOutcome(): MlAnalysisOutcome? = recorded.lastOrNull()
-
-    /** 호출 계수 — 요청당 상한(≤1)을 test 가 이 값으로 잰다. */
-    fun callCount(): Int = recorded.size
 }

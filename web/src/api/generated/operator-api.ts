@@ -822,8 +822,11 @@ export interface components {
              * @enum {string}
              */
             licenseVerdict: "ELIGIBLE" | "INELIGIBLE" | "UNCERTAIN";
-            /** @description 판정 불가 사유(요건 데이터 부재·파싱 불가·프로필 미선언·수집 실패·허용업종 결합 규칙 미결). */
-            licenseUncertainReason?: string | null;
+            /**
+             * @description 판정 불가 사유(요건 데이터 부재·파싱 불가·프로필 미선언·수집 실패·허용업종 결합 규칙 미결).
+             * @enum {string|null}
+             */
+            licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
             /** @description 공고가 요구한 면허명 — **근거 원문의 「무엇을 요구했나」**(QUAL-05). */
             licenseRequiredLicenses?: string[] | null;
             /** @description 요건이 온 공고 필드 — **근거 원문의 「어느 필드에서」**(QUAL-05). */
@@ -851,7 +854,7 @@ export interface components {
             /** @description 그 version 의 시행일. 정책의 **최초 판**이면 시행일이라는 값 자체가 없어 `null` 이다 — 출처와 시행일을 한 문자열로 합치지 않는다(구분자를 지어내지 않는다). */
             licensePolicyEffectiveFrom?: string | null;
             /** @description **아직 판정하지 않는 자격 축**(QUAL-08 지역 · QUAL-10 수행실적 · QUAL-11 시공능력평가금액). 「판정했고 통과」와 「판정하지 않음」을 구분하게 한다 — 자격 카드가 「면허만 보면 끝」으로 읽히지 않게 한다. 판정이 생기는 slice 가 그 값을 뺀다. */
-            unjudgedAxes: string[];
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_10_PERFORMANCE" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
             /** Format: int64 */
             baseAmountWon?: number | null;
             baseAmountCurrency?: string | null;
@@ -909,7 +912,7 @@ export interface components {
              */
             bidPriceMenuNotComputedReason: "MENU_PATH_NOT_WIRED";
             /** @description **전수를 늘 싣는다** — 예정가격은 개찰 전 비공개 추첨으로 결정되어 정확한 낙찰하한을 보장할 수 없음 · 자동 제출·확정 낙찰이 아님 · 법정 하한율 미해석 · 가격 적합도는 확률이 아님. 코드만 나르고 **문장은 표면이 짓는다**(계산이 바뀐 뒤에도 옛 문구가 남는 것을 막는다). */
-            disclosures: string[];
+            disclosures: ("YEGA_DRAWN_PRIVATELY" | "NOT_AUTO_SUBMITTED" | "STATUTORY_FLOOR_RATE_NOT_INTERPRETED" | "PRICE_FITNESS_IS_NOT_PROBABILITY")[];
         };
         ErrorBody: {
             /** @enum {string} */
