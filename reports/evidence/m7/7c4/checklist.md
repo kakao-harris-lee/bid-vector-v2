@@ -495,3 +495,37 @@ use case 가 upsert 전에 행 수를 센다. **검사-후-삽입은 경합한�
 4. `OperatorSessionController` 의 private 401 사본은 그대로다(7D 파일 — 공용화 후속 후보).
 5. V12 자격 사실 편집은 **계정을 받지 않는다**(싱글턴). 경로만 계정 범위다 — 두 운영자가 같은 행을 고치면 마지막
    쓰기가 이긴다(2a 제한 1 과 같은 축).
+
+### 5.6 계정 경계·비교 게이트가 요구한 것 — 코드 수정 둘과 등재 셋
+
+2b 의 새 표면이 7B·7D 가 연 게이트 넷에 걸렸다. **등재로 초록을 만들기 전에 각 게이트가 요구하는
+것을 코드가 지키는지 먼저 판정했다**(팀장 지시 2026-10-26). 결과는 코드 수정 둘, 등재 셋이다.
+
+**RED 의 출처**: acceptance A-1 (`check` job, base `46ac0949` 위 HEAD `f69d95e1`) — `:app:test` 의
+architecture test 셋과 `:app:ktlintMainSourceSetCheck`. 등재 항목은 **그 실행에서 붉은 것을 보고** 더했다.
+
+| # | 게이트 | 판정 | 무엇을 | 근거(실측) |
+|---|---|---|---|---|
+| ① | 상수 시간 비교 구조(`String.equals` 전면 금지) | **코드 결함** | 어휘를 `NaraRegistration` 열거로 세우고 각 층이 `when` 으로 소진 | 고치기 전 `ProfileRequestsKt` 가 `String.equals` **3**(문자열 `when` 이 switch 로 컴파일). 고친 뒤 app.http **전수 0** |
+| ② | ktlint | **코드 결함** | `when` 분기 중괄호 · 체인 줄바꿈 · 겹친 KDoc 둘을 자기 선언 위로 합침 | 사전 실행 P-3 의 위반 목록 |
+| ③ | `AccountCarrierStructureTest` 「계정 범위 핸들러는 typed 접근자를 쓴다」 | **등재** | 관측 집합에 controller 둘 | 그 집합은 `authenticatedAccount()` **호출자 전수**다. 같은 파일의 다른 등식(주체 라벨 접근자 호출자 · 라벨 문자열 보유 · 속성 읽기 자리 넷)은 **그대로 초록**이었다 — 내 두 controller 는 라벨을 읽지 않는다 |
+| ④ | `AppHttpDependencyGateTest` 면제 크기 | **등재** | 68 → 69 | 늘어난 하나는 `ProfileWiring` 이고 JDBC 어댑터를 조립하는 `@Configuration` 이라 `BidCaseWiring` 과 같은 tier1 이다. 같은 test 의 「면제가 실재하는 클래스만 가리킨다」와 「`app.http` 는 어느 갈래에도 없다」는 그대로 초록 |
+| ⑤ | `Intrinsics.areEqual` 허용 목록 | **등재(추가 넷) + 죽은 항목 삭제(하나)** | 아래 표 | javap 계수(사전 실행 P-2) |
+
+**⑤ 의 두 축을 따로 센다.**
+
+*추가 넷* — 전부 app.http 전수 계수에서 실제로 `areEqual` 을 가진 새 class 이고, `String.equals` 는 0 이다.
+
+| class | areEqual | 성격 |
+|---|---|---|
+| `RequestValuesKt` | 2 | 어휘 조회 둘(단일 값 · 집합) — 공개 enum 이름 비교 |
+| `ProfileResponse` | 9 | data class 자동 생성 equals |
+| `ConstructionCapacityResponse` | 1 | data class 자동 생성 equals |
+| `ProfileHttp` | 1 | sealed 싱글턴 `when` 소진(객체 동일성) |
+
+*삭제 하나* — `BidCaseRequestsKt`. 어휘 조회 둘이 `RequestValues.kt` 로 옮겨 가면서 그 파일에 최상위
+선언이 남지 않아 **facade class 자체가 사라졌다**(사전 실행 P-2: 그 이름의 class 파일 없음). 등재를
+남겨 두면 가리키는 것이 없는 항목이 된다.
+
+**자격증명 좌표 0** — 네 class 어디에도 `OperatorCredential` · 세션 토큰 · 해시 값이 없다. 비교하는 것은
+요청 본문의 공개 어휘와 응답 값 객체의 필드뿐이다.
