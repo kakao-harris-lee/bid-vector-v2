@@ -142,7 +142,12 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             NotificationInboxOutcome.Updated
 
         rowCount() shouldBe 1L
-        store().list(account, page()).items.single().display?.title shouldBe "정정된 제목"
+        store()
+            .list(account, page())
+            .items
+            .single()
+            .display
+            ?.title shouldBe "정정된 제목"
     }
 
     @Test

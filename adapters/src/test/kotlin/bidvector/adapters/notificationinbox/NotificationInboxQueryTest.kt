@@ -66,8 +66,12 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val page = store().list(account, page(unreadOnly = true))
 
         page.items.size shouldBe 1
-        page.items.single().group.itemCount shouldBe 2
-        page.items.single().group.unreadCount shouldBe 1
+        page.items
+            .single()
+            .group.itemCount shouldBe 2
+        page.items
+            .single()
+            .group.unreadCount shouldBe 1
         // 전체 건수는 **필터를 지난 집합**의 수다(페이지 계산의 분모).
         page.totalCount shouldBe 1L
         // 안읽음 계수는 필터와 무관한 계정 전수다 — 여기서는 둘이 같지만 아래 test 가 가른다.
@@ -101,7 +105,13 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = insertNotice("N-JOIN", title = "도로 포장 공사", deadline = DEADLINE)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
 
-        val display = store().list(account, page()).items.single().display.shouldNotBeNull()
+        val display =
+            store()
+                .list(account, page())
+                .items
+                .single()
+                .display
+                .shouldNotBeNull()
 
         display.title shouldBe "도로 포장 공사"
         display.status shouldBe "Open"
@@ -129,12 +139,20 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val account = insertAccount("purge")
         val notice = insertNotice("N-PURGE", title = "사라질 공고")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
-        store().list(account, page()).items.single().display.shouldNotBeNull()
+        store()
+            .list(account, page())
+            .items
+            .single()
+            .display
+            .shouldNotBeNull()
 
         deleteNotice("N-PURGE")
 
         val page = store().list(account, page())
-        page.items.single().display.shouldBeNull()
+        page.items
+            .single()
+            .display
+            .shouldBeNull()
         page.totalCount shouldBe 1L
     }
 
@@ -148,7 +166,13 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = insertNotice("N-NOTITLE", title = null)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
 
-        val display = store().list(account, page()).items.single().display.shouldNotBeNull()
+        val display =
+            store()
+                .list(account, page())
+                .items
+                .single()
+                .display
+                .shouldNotBeNull()
 
         display.title.shouldBeNull()
         display.status shouldBe "Open"

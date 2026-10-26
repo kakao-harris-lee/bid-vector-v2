@@ -67,7 +67,6 @@ class JdbcNotificationInbox(
             }
         }
     }
-
 }
 
 /**
@@ -90,4 +89,3 @@ internal fun <T> Connection.inTransaction(block: Connection.() -> T): T {
         if (!committed) rollback()
     }
 }
-

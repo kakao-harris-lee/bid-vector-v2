@@ -87,8 +87,7 @@ internal abstract class NotificationInboxTestSupport : PersistenceTestSupport() 
     }
 
     /** 알림함에 심지 **않은** 공고 키 — FK 가 없으므로 이 키로도 항목이 선다(V23 주석 ③). */
-    protected fun unknownNotice(number: String): NoticeId =
-        NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
+    protected fun unknownNotice(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
     protected fun record(
         account: AccountId,
