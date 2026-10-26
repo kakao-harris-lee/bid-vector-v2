@@ -191,7 +191,10 @@
 | 금액은 값만 싣지 않는다 | 원·통화·basis·과세·provenance 다섯 칸(R-BASIS-06) | 순수 판정 「확정 금액은 basis·통화·과세·provenance 와 함께」 + endpoint 「확정 낙찰금액은 … 와 함께 나간다」 + 계약 키 집합 등식 |
 | 인증 401 | 기본 거부 필터의 전 경로 등록(구성) | endpoint 「우회 ① …」 + 기존 기계 전수(`OperatorAuthenticationTest`) + E2E 「자격증명 없이 부르면 401」 |
 | 쓰기 0 · 마이그레이션 0 | 읽기 전용 트랜잭션(7C① 함수 재사용) · SELECT 셋 · 마이그레이션 파일 0 | 어댑터 「lookup 의 모든 문장이 읽기 전용 트랜잭션 안에서 돈다」·「세 표에 쓰기 흔적을 남기지 않는다」(+ 음성 대조) + E2E 「개찰 결과 표의 행 버전이 그대로다」 |
-| 실 DB 출하 조립 E2E | 출하 조립 + 실 PostgreSQL 로 끝까지 | `OpeningResultProductionE2ETest` 여섯 |
+| 실 DB 출하 조립 E2E | 출하 조립 + 실 PostgreSQL 로 끝까지 | `OpeningResultProductionE2ETest` 여섯(원문은 **상류 표기 그대로** 심는다 — r1) |
+| (r1) 원문 표기가 상태를 바꾸지 않는다 | 공고번호·차수를 **값 객체로 접어** 대조. 마스킹된 원문은 승격 적격 술어와 같은 조건으로 뺀다 | 어댑터 「원문 번호가 소문자·공백이어도 …」·「원문 표기가 달라도 다른 공고의 관측은 …」·「마스킹된 원문은 관측으로 세지 않는다」 + E2E 「승격 전과 수집 전이 …」 |
+| (r1) 질의 읽기 실패를 삼키지 않는다 | 공용 읽기 자리의 실패가 거부 예외의 `cause` 로 남는다(응답에는 닿지 않는다) | `OpeningResultQueryReadingTest` 둘(삼킴 변이에서 RED · 통제군 포함) |
+| (r1) 진행구분 정책 version | 출하 정책의 version 과 등재 집합이 한 단언에 묶인다 | 순수 판정 「출하 정책은 version 과 등재 집합이 함께 고정된다」 |
 
 ## 2. 우회 ↔ 막는 것 ↔ test ↔ 변이
 
@@ -225,7 +228,13 @@
 `InvalidOpeningResultQueryException`(400 거부) · `JdbcOpeningResultView`(어댑터) · `OpeningResultViewSql`(internal).
 
 **계획과 다른 하나**: `DeclaredValue`·`readDeclaredValues`·`repeatedNames`·`firstValue`(app.http internal, 파일 `DeclaredValue.kt`) — 질의 읽기 규율의 공용 자리다
-(`D-7C5-5`). 이 slice 는 **신규 파일로만** 두고 7C① 쪽 private 사본은 건드리지 않았다(§5 보고 항목).
+(`D-7C5-5`). 계획은 신규 파일만 두는 것이었으나 **`D-7C5-8` 로 7C① 의 private 사본을 이 호출로 바꿨다** —
+`NoticeSearchController` 가 in_scope 에 들어왔고 그 slice 의 test·E2E 는 무편집으로 초록이다(§5). 자리가 둘이면
+변이도 두 자리에서 재야 하고, 한 자리면 한 변이가 두 endpoint 를 함께 붉힌다(`commands.md` §4 M5).
+*(이 문단은 r1 에서 고쳤다 — 앞 판은 계획 문면을 그대로 두어 「사본을 건드리지 않았다」고 적혀 있었다.)*
+
+**r1 이 더한 표면**: 없다. 바뀐 것은 internal 객체의 질의 상수 이름(`OpeningResultViewSql` 안)과 어댑터 파일의
+private 함수 둘뿐이고, 새 test 클래스 하나(`OpeningResultQueryReadingTest`)는 게이트 등재에 함께 들어갔다.
 
 ## 4. 쓰기·마이그레이션 0 확인
 
