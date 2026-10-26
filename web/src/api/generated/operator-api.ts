@@ -514,7 +514,9 @@ export interface paths {
         put?: never;
         /**
          * 자격 사실(업종 · 면허 · 지역어) 절 교체(M7/7C④)
-         * @description V12 는 아직 **싱글턴**이다(계정 단위 전환은 R-2 남은 절반). 그래도 경로는 계정 범위라 세션 주체가 없으면 401 이다. 요청에 `accountId` 자리는 없다.
+         * @description **이 operation 은 계정 경계 밖이다** — 어느 계정의 세션이 쓰든 **모든 계정이 보는** 자격 사실을 바꾼다. V12 는 아직 싱글턴이고(계정 단위 전환은 R-2 남은 절반) 이 쓰기는 그 한 행을 덮는다. 경로는 계정 범위라 세션 주체가 없으면 401 이고, 요청에 `accountId` 자리는 없다 — 그러나 그 둘이 소유 경계를 만들지는 않는다.
+         *
+         *     다른 operation 넷(사업 정보 · 시평액)은 계정 소유다.
          */
         post: operations["replaceQualificationFacts"];
         delete?: never;
@@ -858,7 +860,7 @@ export interface components {
             licenseNames: string[];
             /** @description V12 의 자유 어휘(텍스트 합성용). `headquartersRegion`(구조화 입력)과 다른 축이다. */
             regionTerms: string[];
-            /** @description 입력 원문 그대로(앞뒤 공백 포함). null 은 「미설정」이다. */
+            /** @description 입력 원문 그대로(앞뒤 공백 포함). null 은 「미설정」이다. 길이는 **코드포인트 수**로 센다 (`maxLength` 는 그 근사다 — 서버는 코드포인트로 거부한다). */
             tradeName?: string | null;
             /** @enum {string|null} */
             headquartersRegion?: "SEOUL" | "BUSAN" | "DAEGU" | "INCHEON" | "GWANGJU" | "DAEJEON" | "ULSAN" | "SEJONG" | "GYEONGGI" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU" | null;
@@ -886,6 +888,7 @@ export interface components {
             /** @description 어느 해 평가액인지는 **필수**다(연 1회 갱신되는 값이라 기준 해가 없으면 해석이 갈린다). */
             assessmentYear: number;
         };
+        /** @description 세 배열 모두 **원소가 공백뿐일 수 없고**(400), 원소 길이 · 배열 크기에 상한이 있으며 **중복을 받지 않는다**. V12 에는 이 축의 표 제약이 없어 경계가 요청 판독에만 있다. */
         QualificationFactsRequest: {
             businessTypes: string[];
             licensesDeclared: boolean;
@@ -894,6 +897,7 @@ export interface components {
             regionTerms: string[];
         };
         BusinessDetailsRequest: {
+            /** @description **공백뿐인 값은 400 이다** — 「미설정」은 키를 빼거나 `null` 이다(절 단위 교체라 공백이 조용히 「지우기」가 되지 않게 한다). */
             tradeName?: string | null;
             /** @enum {string|null} */
             headquartersRegion?: "SEOUL" | "BUSAN" | "DAEGU" | "INCHEON" | "GWANGJU" | "DAEJEON" | "ULSAN" | "SEJONG" | "GYEONGGI" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU" | null;
