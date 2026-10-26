@@ -2,7 +2,9 @@
 
 - **근거**: `milestone-7.md` 7C ⑤(「결과(SET-01/02 대사 결과 조회)」) · 완료 조건(집계 분모 0 이면 「부재」) · 운영자 지시 2026-10-23
   「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건의 **운영자 예외**.
-- **base**: main `a61ddff1` · worktree `bid-vector-v2-m7-7c5` · 브랜치 `m7-7c5/2026-10-23`.
+- **base**: main `46ac0949`(2026-10-26 재고정) · worktree `bid-vector-v2-m7-7c5` · 브랜치 `m7-7c5/2026-10-23`.
+  착수 base 는 `a61ddff1` 이었고, 진행 중 main 을 두 번 병합했다(`2d574949` ← `1107f848` · `d373224a` ← `46ac0949`). **되돌림 기준은
+  마지막 병합의 main 커밋**이다 — 앞 SHA 로 복원하면 그 사이 main 에 들어온 7B·7C④·7C⑤-0 등재가 함께 지워진다(vr r1 M-1).
 - **병렬 레인**(전부 push 0): **g1set01(SET-01 상호 매칭 핵심 — 선행)** · **7B(BID-01 투찰 기록 — 선행)** · **7C④(상호 등 프로필 — 선행)** ·
   7C③(알림함 — 낙찰/패찰 확정 트리거의 끝) · 7C② · 7C①b · g1c03 · g1dec05.
 - **입력 정본**: `docs/discovery/m7-screen-data-requirements.md` 화면 D·E 의 SET-01 · SET-02 · COL-02 · BID-01 · DEC-05 행(건별 낙찰/패찰/유찰 ·
@@ -49,8 +51,8 @@
 
 ## rollback
 
-`git restore --source=a61ddff1 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 목록 기계 산출, 마지막 산출물
-커밋에서 ①~⑥ 실측(-b rebase 뒤 다시 잰다).
+`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 목록 기계 산출, 마지막 산출물
+커밋에서 ①~⑥ 실측(main 을 다시 병합하거나 -b 를 열면 기준 SHA 와 함께 다시 잰다).
 
 ## 검토 레인
 
@@ -78,6 +80,8 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
   private 사본을 그 호출로 바꾼다 — **in_scope 에 `NoticeSearchController.kt` 추가**. 7C① 의 기존 test·E2E 무편집 초록으로 거동 불변을 증명한다.
 - **D-7C5-9** 구현 중 설계 이탈 둘 수령: 공고 부재는 404 가 아니라 상태 `NOTICE_ABSENT`(「모른다」 갈래를 한 축에) · 진행구분 축 다섯 값
   (`PROGRESS_ABSENT` — 개찰완료 축만 승격된 행을 「결과 없음」과 구별). 산출물 1 의 「404」 문면은 이 결정으로 대체된다.
+  **수령 시점(2026-10-26)**: 팀장은 이 이탈을 **동결 보고에서 처음** 받았고 그때 수령했다(리뷰 둘이 구현·OpenAPI·생성 타입의 상태 어휘
+  일치를 확인한 뒤). 레인이 구현 **전에** 보고했어야 하는 자리다 — 앞으로 계약 이탈은 구현 전에 올린다.
 
 **D-7C5-10 (2026-10-26, 레인 기록 — 팀장 지시).** 게이트 등재 셋과 main 병합.
 - **상수 시간 비교 허용 목록 넷**(`OpeningResultResponse`·`DeclaredValue` = data class 자동 `equals`,
@@ -87,13 +91,21 @@ verifier(opus) · code-reviewer(sonnet) 병렬, verifier 표적에 **privacy-gat
   조회는 쓰기가 없어 ③ 층(러너 레인)에는 더하지 않는다.
 - **`produces` 선언**: 필수 질의 칸이 있는 endpoint 는 칸이 없을 때 400 을 먼저 던지고 그 오류 본문을 쓰다가
   `Accept` 협상이 깨져 500 이 나갔다(전수 단언이 잡았다) — 협상을 매핑 단계로 당겨 406 이 되게 했다.
-- **test 조립을 자기 파일로**: `HttpTestSupport.kt` 가 파일 크기 한도에 닿아 있어 레인마다 그 파일에 빈을 얹으면
-  한도가 레인 사이 경합이 된다. 개찰 조회의 이중체·조립을 `OpeningResultTestWiring.kt` 로 옮겼다.
+- **test 이중체를 자기 파일로**: `HttpTestSupport.kt` 가 파일 크기 한도에 닿아 있어 레인마다 그 파일에 이중체를 얹으면
+  한도가 레인 사이 경합이 된다. 개찰 조회의 이중체는 `FakeOpeningResultFactsPort.kt` 로, 기존 평가 이중체 셋은
+  `EvaluationTestDoubles.kt` 로 옮겨 자리를 냈다. **조립(`@Bean` 둘)은 `HttpTestApplication` 안에 둔다** — 중간 판의
+  별 `@Configuration` 파일은 출하 컨텍스트의 component scan 에 걸려 bean 이름 충돌을 냈고(`BidVectorApplication` 은
+  `@SpringBootApplication` 만 제외한다), 그 파일은 되돌렸다(vr r1 L-2 가 가리킨 낡은 문면).
 - **main 병합**(`1107f848`, rebase 아님): 충돌 7 파일 26 hunk 를 **합집합**으로 해소했다(래칫은 합, OpenAPI 는
   main 전문에 내 operation·schema 를 재삽입, 생성 타입은 재생성 대상). 7B 게이트 축(라우트 센서스 ·
   `@RestController` · 계정은 세션 접근자로만)을 핸들러에 대조해 전부 만족을 확인했다 — 내 경로는 계정 전용이
   아니고(`AccountScopedRoutes` 밖) 핸들러는 요청 속성을 읽지 않는다.
 
+**D-7C5-11 (2026-10-26, r1 수정 라운드 — 레인 기록).** 원문 존재 질의의 대조를 **SQL 등식에서 Kotlin 접기로** 옮겼다
+(cr r1 HIGH). `raw_observation` 의 공고번호는 상류 원문이고 묻는 쪽은 canonical 이라 SQL 등식은 소문자·내부 공백이 든
+번호에서 조용히 빗나간다 — 정규화 규칙을 SQL 에 한 벌 더 쓰지 않고(COL-05) 값 객체로 접는다. 같은 질의에
+**`pii_masked_at IS NULL`** 을 더해 승격 쪽 `ELIGIBLE_SQL` 과 술어를 맞췄다(cr r1 LOW-3) — 마스킹된 원문을 세면 그
+공고가 영영 「승격 전」으로 남는다. 대가는 **원문 축 훑기**이고 알려진 제한으로 적는다(canonical 이 없을 때만 돈다).
 
 ## 하네스 레인 변경 (상시)
 
