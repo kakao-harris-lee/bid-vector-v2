@@ -405,5 +405,22 @@ class AppHttpDependencyGateTest {
  * 받는 조회기이고 HTTP 층 허용 목록에도 있다). `NoticeSearchWiring`·`NoticeSearchQuery` 짝과 같은 형태다.
  *
  * **두 slice 병합(M7/7B D-7B-9, 2026-10-25)**: 65 + 7B 하나 + 7C①b 둘 = **68**. 두 등재의 합집합이다.
+ *
+ * **M7/7C③ — 둘 더해**: ① 층 하나(`app.wiring.NotificationInboxWiring`, 다른 `@Configuration` 배선과 같은 tier1)와
+ * ② 층 하나(`app.wiring.NotificationInboxQuery` — 컨트롤러가 받는 조회기이고 HTTP 층 허용 목록에도 있다).
+ * `NoticeSearchWiring`·`NoticeSearchQuery` 짝, 7C①b 의 `SuggestionWiring`·`SuggestionQuery` 짝과 **같은 형태**다.
+ * 68 + 7C③ 둘 = **70**.
+ *
+ * **이 수를 두 번 틀렸고 둘 다 같은 이유였다**(기록으로 남긴다): 처음엔 계수만 +1 하고 면제 **목록**에
+ * 항목을 넣지 않아 배선이 제한 층으로 판정됐고, 다음엔 조회기(② 층)를 **세지 않아** +1 로 적었다.
+ * 둘 다 「숫자를 맞추려 한」 결과다. 옳은 절차는 **base 와 목록을 diff 해 이 slice 가 더한 항목
+ * 이름을 세는 것**이고, 그 diff 가 둘(배선 · 조회기)을 그대로 보여 줬다.
+ *
+ * **병합 때는 이 숫자를 옮기지 말고 항목으로 다시 세라**(팀장 2026-10-26). 같은 라운드에서
+ * **세 레인이 이 상수를 동시에** 올린다 — 7C⑤ 둘 · 7C④-2b 하나(`ProfileWiring`) · 7C③ 하나
+ * (`NotificationInboxWiring`). 숫자만 맞추면 **나중에 머지되는 쪽이 앞 레인의 수를 덮고**, 그
+ * 덮어쓴 수가 실제 면제 집합보다 **작아도 이 단언은 초록이 아니라 붉게** 되지만, 반대로 큰 쪽으로
+ * 덮이면 새 면제가 조용히 숨는다. 그래서 병합 해소는 **항목 이름의 합집합을 세는 것**이고,
+ * 위 문단들도 어느 레인 것도 지우지 않고 **함께 남긴다**(이 KDoc 자신이 그 셈의 근거다).
  */
-private const val EXPECTED_EXEMPT_COUNT = 68
+private const val EXPECTED_EXEMPT_COUNT = 70
