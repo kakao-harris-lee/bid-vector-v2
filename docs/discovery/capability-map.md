@@ -1467,7 +1467,9 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
 - **산출 시점** (운영자 결정 2026-08-26): 추천 투찰가 산출은 **on-demand**다 — legacy의 파이프라인 배치 산출을
   채택하지 않는다(§0.7 상호작용 모델).
 - **V2 구현 자리 (M6/G1-DEC05)**: binding 기록은 `bidvector.decision.menu.BindingConstraint` 다 —
-  「후보 비율이 정했다」·「게시 하한이 정했다」·「하한율 읽기가 미정이라 재지 못했다」가 **서로
+  「후보 비율이 정했다」·「게시 하한이 **율 축**에서 정했다」·「게시 하한이 **금액 축**에서
+  정했다」(r3 N-1 신설 — 율은 하한 위였는데 원 단위 올림이 하한에 맞춰 올라간 경우)·
+  「하한율 읽기가 미정이라 재지 못했다」가 **서로
   다른 값**이고, `BidMenuOption.binding` 이 그 값을 나른다. 뒤 둘을 한 값으로 접으면 미결이
   「제약 없음」으로 위장되므로 접지 않는다. 하한 자리의 basis 교차는 `shared-kernel` 의
   `AppliedFloor`(생성 경로는 `BaseAmount.appliedFloorFrom(BidRate)` 하나)가 타입으로 막는다 —
@@ -1600,7 +1602,9 @@ ML 커널로 보므로, 성숙도 **계산**(곡선·임계 산출)은 ml-engine
     올린다**(binding 이 하한을 가리킨다).
   - **배선·표면은 아직 없다** — 소비자는 M7 7C ②, 후보 비율의 출하 출처는
     `OPEN-ML-ANALYSIS-WIRING` 종속이다(`reports/evidence/m6/6e1/acceptance-trace.md`
-    DEC-05 행). `FloorRateReadingUndecided` binding 이 붙은 옵션을 추천으로 띄우지 않는 것은
+    DEC-05 행). **`ML-01`(ML 배선)이 닫을 때 `OPEN-DEC05-STANCE-RATE-PROVENANCE` 를 함께 본다** —
+    후보 율의 출처를 근거에 싣는 자리가 거기다(r3 L-N2 역방향 포인터).
+    `FloorRateReadingUndecided` binding 이 붙은 옵션을 추천으로 띄우지 않는 것은
     **표면의 의무**이고 7C ② 계약 조건으로 넘긴다 — 커널은 미결을 표식으로 싣지만 출력을
     막지는 않는다.
 - **동반 OPEN**: 게시 하한율을 투찰율 하한으로 읽을 것인가(`OPEN-DEC05-FLOOR-RATE-READING`, 신설).
