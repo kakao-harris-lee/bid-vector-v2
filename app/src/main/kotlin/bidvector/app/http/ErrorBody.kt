@@ -109,6 +109,10 @@ object ErrorCode {
     // `NOTICE_SNAPSHOT_UNAVAILABLE` 은 초안을 만들려는데 공고를 뜰 수 없는 경우다 —
     // 스냅샷 없는 초안을 만들지 않는다(§6.1 acceptance).
     const val NOTICE_SNAPSHOT_UNAVAILABLE = "NOTICE_SNAPSHOT_UNAVAILABLE"
+
+    // M7/7C④ 2b — 한 계정의 시평액 행 수 상한(`ProfileInputPolicy.CAPACITY_ROWS_MAX`). 409 다:
+    // 요청은 올바르고 **계정의 상태가 받지 않는다**. 상한 값은 본문에 싣지 않는다(세 필드).
+    const val CAPACITY_ROWS_EXCEEDED = "CAPACITY_ROWS_EXCEEDED"
 }
 
 /**

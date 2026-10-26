@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 /**
- * **계정 주체가 있어야 닿는 경로**(M7/7B) — 입찰함이 유일하다.
+ * **계정 주체가 있어야 닿는 경로**(M7/7B · 7C④ 2b) — 입찰함과 프로필 둘이다.
  *
  * 왜 선언이 필요한가: 7D 의 기본 거부 필터는 「인증됐는가」까지만 보고 **어떤 주체인가**는
  * 보지 않는다. 인증 경로는 둘인데(운영자 자격 헤더 · 브라우저 세션) **계정을 내는 것은
@@ -20,8 +20,16 @@ object AccountScopedRoutes {
     /** 입찰함의 뿌리 — 두 controller 의 `@RequestMapping` 이 이 값을 쓴다. */
     const val BID_CASES: String = "/api/bid-cases"
 
+    /**
+     * 프로필의 뿌리(M7/7C④ 2b) — 조회 · 쓰기 두 controller 가 이 값을 쓴다.
+     *
+     * **V12 자격 사실(싱글턴)의 편집도 이 아래에 선다.** 그 표는 아직 계정 단위가 아니지만, 편집을
+     * 계정 밖 경로에 두면 「누가 고쳤는가」가 자격 헤더 주체로도 열린다 — 더 좁은 쪽을 고른다.
+     */
+    const val PROFILE: String = "/api/profile"
+
     /** 계정 전용 뿌리 전수. 늘어나면 여기만 늘린다. */
-    val ROOTS: Set<String> = setOf(BID_CASES)
+    val ROOTS: Set<String> = setOf(BID_CASES, PROFILE)
 
     /** 이 경로가 계정 주체를 요구하는가 — 표면 전수 test 가 선언↔판정 대조에 쓴다. */
     fun covers(path: String): Boolean = ROOTS.any { it == path || path.startsWith("$it/") }
