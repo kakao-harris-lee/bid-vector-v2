@@ -3,35 +3,15 @@ package bidvector.adapters.opening
 import bidvector.adapters.notice.ReadOnlyWitness
 import bidvector.adapters.notice.beginReadOnlySearchTransaction
 import bidvector.adapters.notice.witnessedDataSource
-import bidvector.adapters.persistence.JdbcNoticeRepository
-import bidvector.adapters.persistence.JdbcOpeningRawAxisSource
-import bidvector.adapters.persistence.JdbcOpeningResultRepository
-import bidvector.adapters.persistence.PersistenceTestSupport
-import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.AxisConclusion
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
-import bidvector.procurement.NOTICE_ROUND_RAW_KEY
-import bidvector.procurement.NoticeCollected
-import bidvector.procurement.NoticeId
-import bidvector.procurement.NoticeNumber
-import bidvector.procurement.ObservationKey
 import bidvector.procurement.ObservedBidAmount
-import bidvector.procurement.OpeningPromotionOutcome
 import bidvector.procurement.OpeningRankOneBid
 import bidvector.procurement.OpeningRankOneOutcome
-import bidvector.procurement.OpeningResult
-import bidvector.procurement.PersistOutcome
-import bidvector.procurement.RawKey
-import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
-import bidvector.procurement.promoteOpeningResult
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
-import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.export
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.ProvisionalRankOne
@@ -45,119 +25,19 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.sql.SQLException
 import java.time.Instant
-import java.time.LocalDate
-
-private val T1: Instant = Instant.parse("2026-10-22T00:00:00Z")
-private val T2: Instant = Instant.parse("2026-10-22T03:00:00Z")
-private val DEADLINE: Instant = Instant.parse("2026-10-21T05:00:00Z")
-
-/** 표지 상호 — 응답 어디에도 이 글자가 나오면 안 된다(D-7C5-3, 값 수준 단언). */
-private const val SENTINEL_COMPANY = "SENTINEL-BIDDER-DO-NOT-EXPORT"
 
 /**
- * [JdbcOpeningResultView] — 실제 PostgreSQL 위에서 **읽은 사실**을 잰다(상태 판정은
- * `OpeningResultViewTest` 가 DB 없이 전수로 잰다).
+ * [JdbcOpeningResultView] 가 canonical 행에서 **무엇을 읽어 내는가**와 **읽기만 하는가**(실제
+ * PostgreSQL). 상태 판정은 `OpeningResultViewTest` 가 DB 없이 전수로 잰다.
+ *
+ * 원문 존재·승격 축(「승격 전 ↔ 수집 전」)은 [JdbcOpeningAxisObservationTest] 가 잰다 — 그쪽 입력은
+ * 상류 원문 표기와 마스킹 표지이고, 이 class 의 입력은 canonical 행이다.
  *
  * 여기서 실측되는 우회: ② 상호가 응답 경로에 오르지 않는다(읽은 열 집합 + 표지 글자) ·
  * ③ 잠정 관측이 확정 칸을 바꾸지 않는다 · ⑤ 조회가 쓰기를 쥐지 않는다(읽기 전용 트랜잭션 +
- * 세 표 무쓰기 지문) · ⑩ 개찰 축 아닌 표를 끌어오지 않는다 · ⑬ 다른 공고·다른 축의 원문이
- * 이 공고의 상태를 바꾸지 않는다.
+ * 세 표 무쓰기 지문, 음성 대조 포함).
  */
-class JdbcOpeningResultViewTest : PersistenceTestSupport() {
-    private val id = NoticeId(NoticeNumber.of("OPENVIEW-20261022-001"), NoticeRound.of("001"))
-    private val other = NoticeId(NoticeNumber.of("OPENVIEW-20261022-999"), NoticeRound.of("001"))
-
-    private fun view() = JdbcOpeningResultView(dataSource())
-
-    private fun seedNotice(target: NoticeId = id) {
-        val observation = observationOf(SourceEndpoint.NOTICE_LIST, T1, target)
-        val command =
-            NoticeCollected(
-                id = target,
-                businessCategory = null,
-                baseAmount = null,
-                estimatedAmount = null,
-                allocatedBudget = null,
-                floorRate = null,
-                deadlineAt = DEADLINE,
-                openingScheduledAt = null,
-                raw = observation,
-            )
-        JdbcNoticeRepository(dataSource()).persist(command, appendRawObservation(observation)) shouldBe
-            PersistOutcome.Inserted
-    }
-
-    /** 원문 한 줄 — 공고 식별자 둘은 계약 등재 키라 투영에 실린다(`NOTICE_IDENTIFIER_PRESENT_IN`). */
-    private fun observationOf(
-        endpoint: SourceEndpoint,
-        observedAt: Instant,
-        target: NoticeId = id,
-    ): RawNoticeObservation = rawObservationOf(target.number.value, target.round.value, endpoint, observedAt)
-
-    /**
-     * 원문 한 줄을 **상류가 보낸 표기 그대로** 만든다 — canonical 값을 심는 [observationOf] 와
-     * 달리 원문 ≠ canonical 사례를 만들 수 있다. 정규화는 심는 쪽이 아니라 읽는 쪽의 몫이다.
-     */
-    private fun rawObservationOf(
-        numberRaw: String,
-        roundRaw: String,
-        endpoint: SourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
-        observedAt: Instant = T1,
-    ): RawNoticeObservation =
-        RawNoticeObservation.of(
-            mapOf(
-                NOTICE_NUMBER_RAW_KEY to numberRaw,
-                NOTICE_ROUND_RAW_KEY to roundRaw,
-            ),
-            endpoint,
-            observedAt,
-        )
-
-    /** 보존 규율이 찍는 마스킹 표지 — 그 행은 승격 경로가 더 이상 읽지 않는다. */
-    private fun markMasked(key: ObservationKey) =
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement("UPDATE raw_observation SET pii_masked_at = now() WHERE observation_key = ?")
-                .use { statement ->
-                    statement.setString(1, key.value)
-                    statement.executeUpdate() shouldBe 1
-                }
-        }
-
-    private fun rawKey(
-        endpoint: SourceEndpoint,
-        observedAt: Instant,
-        target: NoticeId = id,
-    ): ObservationKey = appendRawObservation(observationOf(endpoint, observedAt, target))
-
-    private fun seedCanonical(
-        result: OpeningResult,
-        observedAt: Instant = T1,
-    ) {
-        JdbcOpeningResultRepository(dataSource())
-            .persist(result, rawKey(SourceEndpoint.OPENING_RESULT_LIST, observedAt))
-    }
-
-    private fun canonicalOf(
-        progressDivision: String? = "개찰완료",
-        participantCount: Int? = 5,
-        finalAwardAmount: AwardAmount? = null,
-        openingRankOne: OpeningRankOneOutcome = OpeningRankOneOutcome.NotObserved,
-        observedAt: Instant = T1,
-    ) = OpeningResult(
-        noticeId = id,
-        winningRate = null,
-        derivedBaseAmount = null,
-        observedAt = observedAt,
-        finalAwardAmount = finalAwardAmount,
-        participantCount = participantCount,
-        progressDivision = progressDivision,
-        actualOpeningAt = Instant.parse("2026-10-21T06:00:00Z"),
-        openingRankOne = openingRankOne,
-    )
-
-    private fun present(facts: NoticeOpeningFacts) = facts.shouldBeInstanceOf<NoticeOpeningFacts.Present>()
-
+class JdbcOpeningResultViewTest : OpeningViewDbFixture() {
     @Test
     fun `공고 행이 없으면 공고 부재다 — 개찰 결과 질의도 돌지 않는다`() {
         view().lookup(id) shouldBe NoticeOpeningFacts.NoticeAbsent
@@ -269,89 +149,6 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
     }
 
     @Test
-    fun `canonical 이 없고 개찰 결과 축 원문이 있으면 관측됐다고 답한다`() {
-        seedNotice()
-        rawKey(SourceEndpoint.OPENING_COMPLETE, T1)
-
-        val facts = present(view().lookup(id))
-        facts.canonical shouldBe null
-        facts.openingAxisObserved shouldBe true
-    }
-
-    @Test
-    fun `우회 ⑩ — 예비가격·기초금액 축 원문만 있으면 개찰 결과 관측이 아니다`() {
-        seedNotice()
-        rawKey(SourceEndpoint.RESERVE_PRICE_DETAIL, T1)
-        rawKey(SourceEndpoint.BASE_AMOUNT_DETAIL, T2)
-
-        present(view().lookup(id)).openingAxisObserved shouldBe false
-    }
-
-    @Test
-    fun `우회 ⑬ — 다른 공고의 개찰 원문은 이 공고의 답을 바꾸지 않는다`() {
-        seedNotice()
-        seedNotice(other)
-        rawKey(SourceEndpoint.OPENING_RESULT_LIST, T1, other)
-
-        present(view().lookup(id)).openingAxisObserved shouldBe false
-        present(view().lookup(other)).openingAxisObserved shouldBe true
-    }
-
-    @Test
-    fun `차수가 다른 개찰 원문은 이 공고의 답을 바꾸지 않는다`() {
-        seedNotice()
-        val otherRound = NoticeId(id.number, NoticeRound.of("002"))
-        rawKey(SourceEndpoint.OPENING_RESULT_LIST, T1, otherRound)
-
-        present(view().lookup(id)).openingAxisObserved shouldBe false
-    }
-
-    /**
-     * 원문의 공고번호는 **상류가 보낸 그대로**이고 물어보는 쪽은 canonical 이다 — 둘을 SQL 에서
-     * 그대로 맞대면 소문자·내부 공백이 든 번호에서 조용히 빗나가 「원문도 없다」고 답한다
-     * (`JdbcCollectedAxisStore` 가 COL-05 로 세운 규율과 같은 자리).
-     */
-    @Test
-    fun `원문 번호가 소문자·공백이어도 같은 공고의 관측으로 센다`() {
-        seedNotice()
-        appendRawObservation(rawObservationOf("openview 20261022 001", id.round.value))
-
-        present(view().lookup(id)).openingAxisObserved shouldBe true
-    }
-
-    /** 접은 뒤에도 공고 축은 선다 — 표기만 다른 것과 **다른 공고**인 것을 구별한다. */
-    @Test
-    fun `원문 표기가 달라도 다른 공고의 관측은 이 공고로 세지 않는다`() {
-        seedNotice()
-        appendRawObservation(rawObservationOf("openview 20261022 999", id.round.value))
-
-        present(view().lookup(id)).openingAxisObserved shouldBe false
-    }
-
-    /**
-     * 마스킹된 원문은 **승격 대상이 아니다**(승격 쪽 `ELIGIBLE_SQL` 과 같은 조건) — 세어 주면 그
-     * 공고는 영영 「승격 전」으로 남아, 일시적이라던 상태가 영구 오답이 된다.
-     */
-    @Test
-    fun `마스킹된 원문은 관측으로 세지 않는다`() {
-        seedNotice()
-        markMasked(rawKey(SourceEndpoint.OPENING_RESULT_LIST, T1))
-
-        present(view().lookup(id)).openingAxisObserved shouldBe false
-    }
-
-    @Test
-    fun `canonical 이 있으면 원문 존재 질의는 돌지 않는다`() {
-        seedNotice()
-        seedCanonical(canonicalOf())
-
-        val witness = ReadOnlyWitness()
-        JdbcOpeningResultView(witnessedDataSource(dataSource(), witness)).lookup(id)
-
-        witness.queries().map { it.sql }.none { it.contains("raw_observation") } shouldBe true
-    }
-
-    @Test
     fun `우회 ⑤ — lookup 의 모든 문장이 읽기 전용 트랜잭션 안에서 돈다`() {
         seedNotice()
         rawKey(SourceEndpoint.OPENING_COMPLETE, T1)
@@ -433,57 +230,6 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
     }
 
     /**
-     * 원문 두 축을 심고 **승격 경로가** canonical 을 쓰게 한다 — 이 test 의 fixture 가 승격 그
-     * 자체다(손으로 짠 canonical 을 쓰면 두 slice 의 맞물림을 재지 못한다).
-     *
-     * 라벨을 **앞뒤 공백과 함께** 넘길 수 있게 열어 둔다: 승격이 trim 해서 저장하고(그쪽 계약)
-     * 이 조회는 리터럴로 비교한다(이쪽 계약) — 호출부가 그 비대칭을 입력으로 준다.
-     */
-    private fun promoteViaProductionPath(
-        progressLabel: String,
-        bidderName: String,
-        walk: Instant = T1,
-    ) {
-        appendRawObservation(
-            RawNoticeObservation.of(
-                fields =
-                    mapOf(
-                        RawKey("progrsDivCdNm") to progressLabel,
-                        RawKey("prtcptCnum") to "7",
-                        NOTICE_NUMBER_RAW_KEY to id.number.value,
-                        NOTICE_ROUND_RAW_KEY to id.round.value,
-                    ),
-                sourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
-                observedAt = walk,
-                sourceDivision = null,
-            ),
-        )
-        appendRawObservation(
-            RawNoticeObservation.of(
-                fields =
-                    mapOf(
-                        RawKey("prcbdrNm") to bidderName,
-                        RawKey("opengRank") to "1",
-                        NOTICE_NUMBER_RAW_KEY to id.number.value,
-                        NOTICE_ROUND_RAW_KEY to id.round.value,
-                    ),
-                sourceEndpoint = SourceEndpoint.OPENING_COMPLETE,
-                observedAt = walk,
-                sourceDivision = null,
-            ),
-        )
-        val policy = (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 23)) as Resolution.Resolved).value
-        val group = JdbcOpeningRawAxisSource(dataSource()).readOpeningAxes(Instant.EPOCH).groups.single()
-        val conclusions =
-            listOf(SourceEndpoint.OPENING_RESULT_LIST, SourceEndpoint.OPENING_COMPLETE)
-                .associateWith { AxisConclusion(AttemptOutcome.Succeeded, walk) }
-        val promoted =
-            promoteOpeningResult(group, conclusions, policy)
-                .shouldBeInstanceOf<OpeningPromotionOutcome.Promotable>()
-        JdbcOpeningResultRepository(dataSource()).persist(promoted.result, promoted.observationKey)
-    }
-
-    /**
      * **두 slice 를 잇는 자리**(7C⑤-0 승격 → 7C⑤-a 조회). canonical 행을 test 가 직접 심지 않고
      * 승격 경로가 쓰므로, ⓐ 승격이 저장하는 진행구분 라벨과 이 조회의 정책 열거가 같은 어휘인지
      * ⓑ 승격이 저장한 투찰자 상호가 이 조회를 지나지 못하는지가 함께 측정된다. 두 slice 중 한쪽이
@@ -508,21 +254,4 @@ class JdbcOpeningResultViewTest : PersistenceTestSupport() {
             canonical.figures.confirmedAward shouldBe null
         }
     }
-
-    /** 조회가 닿는 세 표의 쓰기 흔적 — 행 집합과 `xmin`·`ctid`(7C① R3-L-1 처방을 표 셋으로 넓혔다). */
-    private fun writeFingerprint(): List<String> =
-        listOf("notice", "opening_result", "raw_observation").flatMap { table -> fingerprintOf(table) }
-
-    private fun fingerprintOf(table: String): List<String> =
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery("SELECT xmin::text AS xmin, ctid::text AS ctid FROM $table ORDER BY ctid")
-                    .use { rows ->
-                        generateSequence {
-                            if (rows.next()) "$table@${rows.getString("xmin")}:${rows.getString("ctid")}" else null
-                        }.toList()
-                    }
-            }
-        }
 }
