@@ -1,12 +1,12 @@
 # M6/G1-DEC05 — checklist (투찰가 메뉴 DEC-05 + binding 제약 기록 DEC-02)
 
-**실측 기준 SHA: `63a207cd`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
+**실측 기준 SHA: `e28ab66f`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
 (r3 일괄). 복원 경로(코드 · test · `config/quality` · 공유 장부)를 건드린 **마지막** 커밋이고,
 그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에 움직이지 않는다**.
 
 **판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence
 커밋은 언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
-`git diff --name-only 63a207cd..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
+`git diff --name-only e28ab66f..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
 
 ## Phase 1 — 설계 (코드 0 · Gradle 0)
 
@@ -400,6 +400,25 @@ rollback 이 증명하려는 것이 그 동일성이다. 다만 「test 가 다�
 체인은 **ACC 가 붉으면 그 자리에서 멈춘다** — 붉은 기준선 위의 변이는 아무것도 재지 못하는데
 앞 회차는 그 위에서 변이 6분·rollback 25분을 돌려 **락만 잡았다**.
 
+### r4 일괄 — finding 대응표
+
+r4 는 **verifier ready-for-review · cr approve**(blocker·high 0). N-1·N-2·N-3 은 코드·test·변이로
+닫혔음을 두 검토자가 각각 실측했다(X4a~e 가 **각자 자기 fixture 만** RED · N1b·C1 재실측 일치 ·
+CI `check` 를 판정 SHA 에서 직접 exit 0).
+
+| finding | 무엇이 문제였나 | 처분 |
+|---|---|---|
+| **V4-M1** | **`BidMenuOption.copy` 를 재는 fixture 가 없다** — 그 타입만 `@ConsistentCopyVisibility` 를 달고도 모집단에서 빠져, `@ExposedCopyVisibility` 변이(**XOPT**)가 **GREEN** 이었다. 모듈 밖에서 `copy(binding = …)` 가 컴파일된다 | fixture **1b** 추가 · 하네스 KDoc 「다섯」→「여섯」. **생성 폐쇄와 `copy` 폐쇄는 다른 명제**이고, 이 경로는 **근거는 그대로 둔 채 binding 만 갈아끼운다** — 「값의 이유는 `binding` 이 유일 출처」가 그 경로로 무너진다. 변이 **XOPT** 가 RED 인지 실측 |
+| **cr M1** | `binding — 하한 위 후보가 올림만 타면 …` test 의 KDoc 이 **r2 판**(`CandidateRate` · 변이 N1)으로 남아 단언과 어긋남 | D-G1DEC05-7 문면으로 바꾸고 변이 참조를 **A1** 로 |
+| **cr M3** | `PublishedFloorBound` KDoc 이 **clamp 뒤 올림이 겹쳐 발화한 경우**를 말하지 않음 | 「이 값을 유지한다(D-G1DEC05-7)」 + 그 이유(율이 이미 걸린 옵션에 금액 축 값을 달면 「율은 여유가 있었다」로 읽혀 거짓) |
+| **cr M4** | 7C② 의 `PublishedFloorRounding` 표시 조항이 **정본 자리**(capability-map §DEC-05)에 없음 | 그 bullet 에 한 문장 추가 · checklist 는 포인터라고 명시 |
+| **V4-L1** | checklist 머리·끝의 실측 기준 SHA 가 `63a207cd` — **문서가 스스로 적은 등식으로 읽으면 14줄이라 미검증** | 세 곳을 `e28ab66f` 로. 등식이 가리키는 SHA 가 틀리면 등식 자체가 거짓말을 한다 |
+| **V4-L2** | 「제약을 지우면 결과가 바뀐다」를 **타입 성질**로 적었는데 **경계 등가**가 그 예외 | **충분조건이지 필요조건이 아니다**로 낮추고 경계 등가 예외를 `BindingConstraint` 머리와 `PublishedFloorRounding` 양쪽에. 머리의 「제약 하나를 지워도 결과가 같다가 성립할 수 없다」도 고쳤다 — 경계 등가에서 **거짓**이었다 |
+| **V4-L3**(cr L4) | 낡은 계수 둘 · OPEN 포인터 자리 부족 | trace DEC-02 「네 test」→ **일곱** · checklist P-7 「3 변종」→ **4** · `OPEN-DEC05-STANCE-RATE-PROVENANCE` 를 **capability-map `### ML-01` 절**과 **trace `ML-01` 행** 둘 다에 |
+| **cr L1** | `assemble` 의 `require(amounts.size == 1)` — 넷째 태도면 **순수 커널이 예외** | 분기 조건으로 옮겼다 — 전수가 접혔는데 금액 묶음이 둘이면 **전부 보류**이므로 `Unmeasurable` 이 태도별 사유를 싣는다. **이미 표현 가능한 값**으로 간다. 변이 **L1M** |
+| **cr L2** | 음성 단언 조각 「cannot access」가 **심볼을 지목하지 않아** 타입 자체가 `internal` 이 되는 변이에서도 초록 | 조각을 여럿 받게 하고 `copy` 를 함께 요구(여섯 fixture 전부). 변이 **L2M**(타입을 `internal` 로)이 그 구별을 실측 |
+| **cr L3** | 공유 통제군이 **`BandCollapsed` 꼴 하나만** 재는데 KDoc 은 「4a~4e 공유」 | **실측 범위를 그대로 적었다** — 나머지 다섯의 비공허성은 **유추이지 측정이 아니다**. 유추로 메운 자리를 측정처럼 보이게 하지 않는다 |
+
 ### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
 
 축은 **약속 하나**다 — 파일 축은 쓰지 않는다(파일을 합치고 나누는 것은 설계 판단이 아니라
@@ -414,7 +433,7 @@ rollback 이 증명하려는 것이 그 동일성이다. 다만 「test 가 다�
 | P-4 | `BidMenuDisclosure` 두 값, `Offered` 가 전수를 싣고 `init` 이 강제 | 같다 | ① | — |
 | P-5 | `BidMenuGrounds` 5 칸(`criticalAssessmentRate` 포함) | 4 칸(그 칸 없음) | ② | 같은 사실이 `risk` 의 `FloorShortfallJudgement.critical` 에 `Derived` 로 이미 실린다. 타입 KDoc 이 선언한다 |
 | P-6 | `BidMenuRisk` sealed 둘 | **그 타입이 없다** — `risk: FloorShortfallJudgement` 직접 | **③** | 저장소 전체 참조 0. `FloorShortfallJudgement` 가 이미 측정/판정불가를 가르는 sealed 봉투라 감싸면 같은 축이 둘이 된다. 판단은 맞지만 **어디에도 적지 않았다** |
-| P-7 | `BindingConstraint` 5 변종 | 3 변종(`CandidateRate`·`PublishedFloorBound`·`FloorRateReadingUndecided`) | ② | 밴드 상·하한 두 변종은 하한을 **율 축 하나**로 쓰기로 한 뒤 쓸 자리가 없어졌고(조사 1), `Provisional` 은 Phase 1 자신이 「세지 않는다」고 적은 `OPEN-DEC-03` 몫이다. `FloorRateReadingUndecided` 는 약속에 없던 **추가**이고 사유는 (e) 가 적는다 |
+| P-7 | `BindingConstraint` 5 변종 | **4 변종**(`CandidateRate`·`PublishedFloorBound`·**`PublishedFloorRounding`**(r3 N-1 신설, 금액 축)·`FloorRateReadingUndecided`) | ② | 밴드 상·하한 두 변종은 하한을 **율 축 하나**로 쓰기로 한 뒤 쓸 자리가 없어졌고(조사 1), `Provisional` 은 Phase 1 자신이 「세지 않는다」고 적은 `OPEN-DEC-03` 몫이다. `FloorRateReadingUndecided` 는 약속에 없던 **추가**이고 사유는 (e) 가 적는다 |
 | P-8 | `BidMenuOption` 다섯 인자 필수 + `internal` 생성자 | 같다 | ① | — |
 | P-9 | `BidMenuOutcome` sealed **넷** | sealed **다섯**(`PartiallyOffered` 추가) | ② | 라운드 2 가 cr HIGH-3 으로 갈랐고 D-G1DEC05-4 가 승인했다 |
 | P-10 | `BandCollapsed(lower, upper, **cause: CollapseCause**)` | 라운드 1: `(lowerBound, upperBound)` — **`cause` 없음** / 라운드 2: `(cause, collapsedStances)` | **③** → ②(라운드 2 수리) | 약속에 있던 `cause` 를 라운드 1 이 **적지 않고 뺐다**. 그 결과 붕괴 출처가 하나로 뭉쳐 **cr HIGH-2 가 바로 그 빈 자리**다 — 약속을 지켰으면 그 finding 이 없었다 |
@@ -605,4 +624,4 @@ r3 는 **verifier ready-for-review · cr approve**(blocker·high 0). 아래는 �
 r2 의 acceptance(`756cf042`)·문서 등식·rollback(실측 HEAD `fdf9a277` · 복원 기준 `fc15975c`)
 절은 **위 「승인 전 일괄 실측」이 대체한다**(r3 L-N3). 같은 주장을 두 기준에서 적으면 어느 쪽이
 현행인지 읽는 사람이 판단해야 하고, 라운드 이력 절은 evidence 규율이 금지한다. 현행 수치는
-전부 **실측 기준 `63a207cd` · 복원 기준 `46ac0949`** 한 벌이다.
+전부 **실측 기준 `e28ab66f` · 복원 기준 `46ac0949`** 한 벌이다.
