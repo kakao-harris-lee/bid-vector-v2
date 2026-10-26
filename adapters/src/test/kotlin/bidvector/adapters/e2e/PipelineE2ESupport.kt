@@ -14,6 +14,7 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
+import bidvector.adapters.profile.JdbcOperatorProfileWriter
 import bidvector.adapters.qualification.JdbcRequirementStore
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.NoticeId
@@ -61,6 +62,8 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
 
     protected fun profileRepository() = JdbcOperatorProfileRepository(dataSource())
 
+    private fun profileWriter() = JdbcOperatorProfileWriter(dataSource())
+
     /**
      * 공고 목록 수집 — mock 서버가 내는 합성 항목을 **production 수집 경로**(KONEPS 어댑터 →
      * [CollectNoticesUseCase] → 정규화 → `notice` 표)로 넣는다. 같은 script 를 두 번 돌리면
@@ -105,7 +108,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
 
     /** 운영자 프로필 — `OpportunityAnalysis` 가 프로필 없이는 분석을 시작하지 않는다(`findProfile`). */
     protected fun seedProfile(licenses: List<String> = listOf(E2E_LICENSE)) {
-        profileRepository().save(
+        profileWriter().save(
             ProfileFacts(
                 businessTypes = emptySet(),
                 licenses = OperatorLicenses.Declared(licenses.map(::LicenseName)),

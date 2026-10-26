@@ -1,7 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.profile.JdbcBusinessProfileStore
-import bidvector.adapters.profile.JdbcOperatorProfileRepository
+import bidvector.adapters.profile.JdbcOperatorProfileWriter
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.profile.BusinessProfileStorePort
@@ -32,10 +32,13 @@ open class ProfileWiring {
     open fun businessProfileStore(dataSource: DataSource): BusinessProfileStorePort =
         JdbcBusinessProfileStore(dataSource)
 
-    /** V12 자격 사실의 **저장** port — 조회 port 빈(`EvaluationWiring`)과 가른다. */
+    /**
+     * V12 자격 사실의 **저장** port — 조회 port 빈(`EvaluationWiring`)과 가른다. 구현도 다른
+     * 클래스다(읽기 어댑터는 쓰기 port 를 구현하지 않는다, 모양 래칫 D-3).
+     */
     @Bean
     open fun operatorProfileStore(dataSource: DataSource): OperatorProfileStorePort =
-        JdbcOperatorProfileRepository(dataSource)
+        JdbcOperatorProfileWriter(dataSource)
 
     /**
      * 조회 use case 는 **읽기 port 타입으로만** 저장소를 본다(`StrategyReader` 와 같은 규율) — 읽기 자리에

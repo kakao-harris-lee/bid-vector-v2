@@ -2,7 +2,6 @@ package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.Sql
 import bidvector.workflow.evaluation.OperatorProfilePort
-import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.evaluation.ProfileFacts
 import javax.sql.DataSource
 
@@ -11,8 +10,10 @@ import javax.sql.DataSource
  * 이 port의 실 구현이 없어 `OpportunityAnalysis`가 프로필을 요구하는 판정 축은 조립될 수
  * 없었다(port KDoc이 「실 구현은 M6」이라 적어 뒀던 공백).
  *
- * **D-6F6-1 — 이 slice 는 표 + 어댑터(읽기·저장)까지다.** 편집 HTTP endpoint 는 6A 로
- * 이관한다 — 이 클래스가 양방향(조회 [current]·저장 [save])을 내면 6A 는 HTTP 만 얹는다.
+ * **읽기 전용이다**(M7/7C④ 2b). 앞 판은 이 클래스가 조회와 저장을 함께 냈고(D-6F6-1), 2b 가
+ * 저장을 port 로 세우면서 같은 클래스가 인터페이스 둘을 구현하게 됐다 — 모양 래칫(D-3)이 그것을
+ * 막는다. 축을 가르는 쪽을 골랐다: 저장은 [JdbcOperatorProfileWriter] 이고, 읽기 자리에 쓰기
+ * 능력이 서명으로 들어오지 않는다(V22 의 reader/store 분리와 같은 규율).
  *
  * **D-6F6-2 — 도메인 타입을 직접 만들지 않는다.** [ProfileFacts]·`OperatorLicenses` 모두
  * `internal constructor`로 닫힌 유일 통로([bidvector.strategy.validate]처럼)가 없는 평범한
@@ -25,8 +26,7 @@ import javax.sql.DataSource
  */
 class JdbcOperatorProfileRepository(
     private val dataSource: DataSource,
-) : OperatorProfilePort,
-    OperatorProfileStorePort {
+) : OperatorProfilePort {
     /** 행이 없으면 「프로필 미설정」이다 — 빈 프로필을 지어내지 않는다(D-6F6-3). */
     override fun current(): ProfileFacts? =
         dataSource.connection.use { connection ->
@@ -36,21 +36,4 @@ class JdbcOperatorProfileRepository(
                 }
             }
         }
-
-    /**
-     * 저장 진입점 — [OperatorProfileStorePort] 의 구현이다(M7/7C④ 2b 가 그 port 를 세웠다. 앞 판은
-     * 어느 port 에도 속하지 않는 메서드였고 KDoc 이 「편집 HTTP 는 6A 소관」이라 적어 뒀다 — 그 자리를
-     * 2b 가 받았다). `ProfileFacts`의 필드를 그대로 행으로 옮긴다(자기 값을 지어 쓰지 않는다).
-     * **누가 이 메서드를 부르는가**의 인가는 HTTP 층이 진다 — 자격 사실은 계정 단위가 아니라 싱글턴
-     * 이므로(V12) 이 서명에 계정이 없다.
-     */
-    override fun save(facts: ProfileFacts) {
-        val row = facts.toRow()
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(Sql.UPSERT_PROFILE).use { statement ->
-                statement.bindOperatorProfileRow(1, row)
-                statement.executeUpdate()
-            }
-        }
-    }
 }
