@@ -150,7 +150,7 @@ D-6A1-12 정의(「PR 시점 main 최대보다 크고 선점 통보 번호를 �
 | `replaceBusinessDetails` | POST `/api/profile/business-details` | 상호·소재지·나라장터 준비 셋 |
 | `listConstructionCapacities` | GET `/api/profile/construction-capacities` | 최상위 배열(F5 — 7B 관례) |
 | `upsertConstructionCapacity` | POST `/api/profile/construction-capacities` | 면허명·금액·기준연도 한 행 |
-| `removeConstructionCapacity` | POST `/api/profile/construction-capacities/removal` | 면허명 한 행 삭제(값을 경로에 넣지 않기 위해 본문으로) |
+| `removeConstructionCapacity` | POST `/api/profile/construction-capacities/remove` | 면허명 한 행 삭제(값을 경로에 넣지 않기 위해 본문으로) |
 | `readOnboardingChecklist` | GET `/api/onboarding-checklist` | 0.8 |
 
 **근거**
@@ -469,9 +469,12 @@ use case 가 upsert 전에 행 수를 센다. **검사-후-삽입은 경합한�
 
 ### 5.3 나라장터 세 이름의 단일 선언
 
-같은 세 문자열이 V22 CHECK · 어댑터 · HTTP 세 곳에 복사될 참이었다. `NaraReadiness` 의 companion `const` 셋으로
-모으고 어댑터와 요청 판독이 그것을 읽는다. **`const` 인 이유**는 2a 의 초기화 순환 사고다 — 상태 object 의
-속성에서 모으면 목록 초기화가 object 초기화에 기대고 그 사슬이 순환이 된다.
+같은 세 문자열이 V22 CHECK · 어댑터 · HTTP 세 곳에 복사될 참이었다. **열거 `NaraRegistration` 하나**로 모으고
+어댑터와 요청 판독이 그것을 읽는다(r1 에서는 companion `const` 셋이었다 — r1 의 비교 게이트가 문자열 `when` 을
+막으면서 열거로 바꿨다, §5.6 ①). 열거라 각 층이 이름 비교 대신 `when` 소진으로 상태를 가른다.
+
+**선언 한 자리는 Kotlin 안에서만 참이다**(r2 CR L-5): V22 의 `nara_registration` CHECK 가 같은 세 문자열을 SQL
+문면으로 따로 적고 있고, 둘을 잇는 끈은 `JdbcBusinessProfileStoreTest` 의 왕복뿐이다 — 그 사실을 타입 KDoc 에 적었다.
 
 ### 5.4 2b 표적 넷의 수단
 
@@ -493,8 +496,12 @@ use case 가 upsert 전에 행 수를 센다. **검사-후-삽입은 경합한�
 3. **오늘 앱 경로로 닿는 제약 위반이 없다** — 값 타입이 먼저 거부하기 때문이다. 그래서 번역은 방어 겹이고, 실
    DB test 는 **없는 계정**(외래 키)으로 그 경로를 연다.
 4. `OperatorSessionController` 의 private 401 사본은 그대로다(7D 파일 — 공용화 후속 후보).
-5. V12 자격 사실 편집은 **계정을 받지 않는다**(싱글턴). 경로만 계정 범위다 — 두 운영자가 같은 행을 고치면 마지막
-   쓰기가 이긴다(2a 제한 1 과 같은 축).
+5. **V12 자격 사실 쓰기는 계정 경계 밖이다**(r2 v F3 — 앞 판은 이것을 「동시 편집」으로 줄여 적었다). 어느 계정의
+   세션이 쓰든 **모든 계정이 보는** 한 행을 덮고, 그 값은 모든 계정의 프로필 조회와 자격 판정 입력이 된다. 경로가
+   계정 범위이고 요청에 `accountId` 자리가 없다는 것이 **소유 경계를 만들지 않는다**. D-7C4-1 §0.6 이 「V12 기존
+   저장을 그대로」 승인했고 계정 단위 전환은 R-2 남은 절반이라 설계대로이지만, 문면이 동시성 문제처럼 읽히지
+   않게 적는다. OpenAPI description 과 `ProfileOwnershipE2ETest` 의 test 하나가 같은 사실을 말한다 — 그 test 가
+   붉어지면 이 제한이 사라졌다는 뜻이고, 그때 이 줄과 계약 문면을 함께 고친다.
 
 ### 5.6 계정 경계·비교 게이트가 요구한 것 — 코드 수정 둘과 등재 셋
 
@@ -511,6 +518,17 @@ architecture test 셋과 `:app:ktlintMainSourceSetCheck`. 등재 항목은 **그
 | ③ | `AccountCarrierStructureTest` 「계정 범위 핸들러는 typed 접근자를 쓴다」 | **등재** | 관측 집합에 controller 둘 | 그 집합은 `authenticatedAccount()` **호출자 전수**다. 같은 파일의 다른 등식(주체 라벨 접근자 호출자 · 라벨 문자열 보유 · 속성 읽기 자리 넷)은 **그대로 초록**이었다 — 내 두 controller 는 라벨을 읽지 않는다 |
 | ④ | `AppHttpDependencyGateTest` 면제 크기 | **등재** | 68 → 69 | 늘어난 하나는 `ProfileWiring` 이고 JDBC 어댑터를 조립하는 `@Configuration` 이라 `BidCaseWiring` 과 같은 tier1 이다. 같은 test 의 「면제가 실재하는 클래스만 가리킨다」와 「`app.http` 는 어느 갈래에도 없다」는 그대로 초록 |
 | ⑤ | `Intrinsics.areEqual` 허용 목록 | **등재(추가 넷) + 죽은 항목 삭제(하나)** | 아래 표 | javap 계수(사전 실행 P-2) |
+
+**④ 의 정책 키는 다섯이다**(r2 v F8 — 앞 표는 면제 크기 하나만 들었다). `architecture-policy.properties` 의
+2b 변경 전수와 각 근거는 다음과 같다.
+
+| 키 | 더한 것 | 근거 |
+|---|---|---|
+| `app.http.allowed-packages` | `bidvector.workflow.profile` **패키지** | controller 가 요청을 값으로 옮기고 응답을 그리려면 그 어휘를 이름 불러야 한다. 패키지를 열어도 **주입은 따로 허용 목록**이라 열림이 핸들러 주입으로 새지 않는다 |
+| `app.http.denied-types` | 저장 · 읽기 port 셋 | 위에서 연 패키지 안의 **능력 port** 를 다시 닫는다 — 핸들러가 받는 것은 use case 뿐이다 |
+| `app.injection.allowed-types` | use case 여섯 | 그 목록은 **오늘 실제 주입 타입과 등식**이다(죽은 항목 금지). 응답 값 타입의 생성자 인자는 이미 있던 스칼라·`List` 로 끝난다(중첩 응답이 없다) |
+| `app.assembly.tier1-bootstrap-classes` | `ProfileWiring` | JDBC 어댑터를 세우는 `@Configuration` — `BidCaseWiring` 과 같은 층이다. 면제 **크기** 단언(68→69)이 이 등재를 눈에 띄게 한다 |
+| `app.surface.api.handlers` | controller 둘 | 출하 조립에서 거둔 handler 집합과의 **등식**이다 — 표면이 늘면 반드시 이 줄을 고쳐야 초록이 된다 |
 
 **⑤ 의 두 축을 따로 센다.**
 
@@ -558,3 +576,52 @@ wire 를 한 번 더 바꾸게 된다. **세 상태를 두 상태로 접은 응�
 
 그래서 이 판정이 덮는 표면은 **operation 여섯**이고, 7C ② 머지 뒤 main 을 병합해 `awaiting` 을 짝 배열로
 넣은 다음 다시 동결한다. 동결 직전인데도 7C ② 가 main 에 없으면 보고한다.
+
+## §6 r2 — 승인 전 일괄 (verifier r1 ready-for-review · code-review r1 approve)
+
+차단은 0 이었고, medium 둘과 low 여덟을 한 라운드로 처리했다. 아래는 **무엇을 고쳤고 그것이 무엇을
+막는가**다.
+
+### 6.1 방어가 넓어진 둘 (medium)
+
+| # | 전 | 후 | 그 전에 무엇이 지나갔나 |
+|---|---|---|---|
+| v F1 조립 경계 | `@Bean` 서명 타입의 **이름이** `workflow.profile.` 로 시작하는가 | 타입의 **상위 타입 전이 폐포**에 그 패키지 선언이 있는가 | 판정 조립이 V22 를 **어댑터 구현 타입**(`JdbcBusinessProfileStore`)으로 받으면 지나갔다(변이 MB5 가 초록으로 살아남았다) |
+| v F2 쓰기 소유 경계 | 이중체 계정 **하나** — 「붙든 계정」과 「세션 계정」이 같은 값이라 갈라낼 수 없었다 | 출하 조립 · 실 DB · **로그인 둘**로 A 의 행이 B 에게 보이지 않음을 잰다 | controller 가 첫 세션 계정을 붙들어도 전부 초록이었다(변이 MB1) |
+
+§5.7 의 「실 DB 소유 경계는 2a 가 이미 쟀다」는 **절반만 맞았다**: 2a 가 잰 것은 SQL 의 계정 필터이고,
+「controller 가 어떤 계정을 넘기는가」는 재지 않았다. 그 자리를 `ProfileOwnershipE2ETest` 가 받는다.
+
+### 6.2 입력 경계가 좁아진 넷
+
+- **공백뿐인 상호는 400**(CR M-2 · v F6). 앞 판은 `null` 로 접어 저장된 상호를 지우고 200 을 냈다 —
+  절 단위 교체에서 공백이 조용한 「지우기」였다. 부재·`null` 만 미설정이다.
+- **제어 문자는 400**(v F5). NUL 은 PostgreSQL 이 SQLSTATE `22021` 로 거부하고 그 예외는 어댑터의
+  class 23 번역 밖이라 **500** 이 됐다 — 요청 탓을 서버 탓으로 말하는 자리였다. 저장 층에 닿기 전에 막는다.
+- **class 23 밖은 값으로 접지 않는다**를 실 DB test 로 고정(v F5 의 짝). 변이 MB4(전부 값으로 접기)가
+  초록이던 자리다.
+- **V12 자유 어휘에 값 규칙**(v F4): 원소 공백 거부 · 길이 상한 · 배열 크기 상한 · 중복 거부. V22 와
+  같은 수를 쓰고(상호·면허명 100), 새로 지은 수는 배열 크기 하나다 — `ProfileInputPolicy` 에 근거와
+  함께 선언했다. 2b 가 **처음 HTTP 로 연** 쓰기 경로라 경계가 앱에만 있다.
+
+### 6.3 값이 wire 에 닿는가 (CR M-1 · v F7)
+
+응답의 `unjudgedAxes` 가 use case 의 `ProfileView.unjudgedAxes` 를 버리고 선언 표를 다시 셌다. 지금은
+같은 값이라 거동 차이가 0 이지만, 판정이 생긴 축을 use case 가 걸러도 wire 는 전부를 실었을 것이다.
+
+### 6.4 장부·문면 (low)
+
+- 정책 등재 표를 **키 다섯 전부**로(v F8) · 제한 5 를 「계정 경계 밖」으로(v F3, test 와 OpenAPI 가 같은
+  사실을 말한다) · §5.3 의 `const` → 열거(CR L-2) · 설계 표의 `removal` → `remove`(v F10).
+- OpenAPI 에 값 범위(v F9 · CR L-4) · 어휘 배열 규칙 · V12 쓰기의 계정 경계 문면.
+- `NaraRegistration` KDoc 에 **V22 CHECK 가 같은 문자열을 따로 적고 있고 둘을 잇는 끈은 왕복 test 뿐**
+  이라고(CR L-5) · 경로 상수를 선언 한 자리로(CR L-6) · 외래 키 거부의 사유(CR L-7) · 두 이중체가
+  서로를 가리키게(CR L-8).
+- **CR L-1(두 endpoint 의 `unjudgedAxes` 어휘)은 이 라운드에서 고치지 않는다.** 7C ② 가
+  `workflow.profile.UnjudgedQualificationAxis` 를 지우고 `workflow.evaluation` 으로 옮기므로, 그 머지 뒤
+  병합에서 두 어휘가 한 선언으로 합류한다. `awaiting` 작업과 같은 자리에서 처리한다.
+
+### 6.5 새 CSRF 표적 test
+
+쓰기 넷을 **CSRF 없이** 보내면 401 임을 endpoint 에서 잰다(CR L-3). 구조적으로는 필터가 덮지만, 그 사실을
+이 표면의 test 가 말하지 않고 있었다.
