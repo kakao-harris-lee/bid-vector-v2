@@ -331,38 +331,47 @@ r2 는 **verifier ready-for-review · code-reviewer approve**(blocker·high 0)�
 선언돼 있어 통과로 나왔다. **마디를 전부 보도록** 고쳐야 걸린다. 지금은 단계 6 이 `clean` 뒤에 이 대조를
 돌리고 **「소스에 없는 class 0」을 본 뒤에야** 측정을 믿는다.
 
-### 승인 전 일괄(D-G1DEC05-3) 실측 — 실측 기준 `63a207cd`
+### 승인 전 일괄 실측 — 실측 기준 `e28ab66f`
 
 **acceptance** — `clean` 뒤 `check --continue` **exit 0** · **CI 명령 그대로 `check` exit 0**.
-HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력**. `:contractGate` executed.
+HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력** · **`:leakPatternGate`·`:contractGate`
+executed**(UP-TO-DATE 아님).
 
-**낡은 `.class` 대조 0** — `clean` 뒤 중첩 마디까지 전수로 봤다. 이 라운드가 타입 이름을
-바꿨으므로(`DuplicateEffectiveRates` → `…Amounts`) 반드시 보는 자리다.
+**낡은 `.class` 대조 0** — `clean` 뒤 중첩 마디까지 전수로. 타입 이름을 바꾼 라운드라 반드시
+보는 자리다(`DuplicateEffectiveRates` → `…Amounts`).
 
-| # | 변이 | numstat | 결과 | 실패 수 |
-|---|---|---|---|---|
-| **기준선** | 변이 0 | 0/0 | **GREEN** | 0 |
-| **N1** | 올림 경로가 binding 을 덮는다(M-2 되돌림) | 1/1 | **RED** | 1 |
-| **M3P** | 경계 등가의 binding 을 `CandidateRate` 로(갱신판 M3) | 1/1 | **RED** | 2 |
-| **C1** | 금액 겹침 판정을 못 찾게 한다(M-1·M-3 방어) | 1/1 | **RED** | 7 |
-| **F1** | `invoke` 의 복사를 뺀다(팀장 ③ · ③′ 방어) | 1/1 | **RED** | 2 |
-| **R2-M1** | `toStanceRates` 라벨 축 반전 | 2/2 | **RED** | 2 |
-| **R2-M8** | `StanceRates` 불변식 방향 반전 | 1/1 | **RED** | 28 + 2 |
-| **통제군** | 주석 한 줄(거동 0) | 1/0 | **GREEN** | 0 |
+| # | 변이 | numstat | 결과 | 실패 수 | 무엇을 잠그는가 |
+|---|---|---|---|---|---|
+| **기준선** | 변이 0 | 0/0 | **GREEN** | 0 | 변이 전 clone 이 초록 |
+| **N1** | 올림 경로가 율 축 값을 덮어쓴다(r2 M-2 재현) | 1/1 | **RED** | 2 | 두 축을 섞지 않는다 |
+| **M3P** | 경계 등가의 binding 을 `CandidateRate` 로 | 1/1 | **RED** | 2 | 율 축 제약 구별 |
+| **C1** | 금액 겹침 판정을 못 찾게 한다 | 1/1 | **RED** | 8 | M-1·M-3 방어 |
+| **F1** | `invoke` 의 복사를 뺀다 | 1/1 | **RED** | 2 | ③′ 원본 표류 |
+| **A1** | 금액 축 variant 를 `CandidateRate` 로 되돌림 | 1/1 | **RED** | 2 | **r3 N-1** 재귀속 |
+| **A2** | `otherStances` 가둠 제거 | 1/1 | **RED** | 1 | **r3 N-2** |
+| **U2** | `Unmeasurable` 의 생성자·`copy` 공개 | 1/2 | **RED** | 2 | **r3 N-3** 게이트 술어 |
+| **R2-M1** | `toStanceRates` 라벨 축 반전 | 2/2 | **RED** | 2 | 라벨 축 |
+| **R2-M8** | `StanceRates` 불변식 방향 반전 | 1/1 | **RED** | 30 + 2 | 순서 불변식 |
+| **통제군** | 주석 한 줄(거동 0) | 1/0 | **GREEN** | 0 | — |
 
-**여섯 전부 RED · 기준선과 통제군 GREEN.** 전부 바꿔치기이고(`+`·`-` 둘 다 0 이 아니다)
+**아홉 전부 적용·RED · 기준선과 통제군 GREEN · `APPLY-FAILS=0`.** 전부 바꿔치기이고
 `numstat` 으로 적용을 확인한 뒤에만 돌렸다. test task 마다 `--rerun` 이라 통제군의 초록은
 **cache 적중이 아니라 실제 실행**이다. 필터는 모듈 셋 전체다.
 
-**N1 이 1 건만 잡는 것이 요점이다** — r2 에서 이 변이는 **GREEN** 이었다(그 경로를 재는 test 가
-없었다). 지금 정확히 새 P2 회귀 test 하나가 잡는다. **F1 은 ③′ 가 없으면 못 잡는 결함**이다 —
-가둔 뷰만 파생하던 판에서는 primary 의 원본 참조가 `equals`·`hashCode` 를 끌고 다녔다.
+**「적용 실패」가 「RED」로 보이던 구멍을 닫았다.** 첫 실행에서 **N1·C1 둘이 `PATTERN 0 != 1`
+로 적용되지 않았다** — 이번 라운드가 고친 바로 그 두 줄(`promotedBinding` 도입 ·
+`firstOrNull` → `filter`)을 변이 패턴이 그대로 가리키고 있었기 때문이다. **수정 라운드가 변이
+목록을 낡게 만든다.** 게다가 `apply … && run_case …` 구조라 `apply` 가 실패하면 `run_case` 가
+호출되지 않아 그 안의 `NOT-APPLIED` 가드가 발화할 수 없었고, 스크립트 종료 코드는 마지막
+명령(통제군 GREEN)이라 **0** 이었다. 지금은 적용 실패를 세어 `APPLY-FAILS=N` 을 찍고 0 이
+아니면 **exit 2** 다. 위 표는 **패턴을 현행화해 전부 다시 돌린 한 벌**이다(일곱 + 둘로 나누어
+적지 않는다).
 
 **rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `46ac0949`**(고정), 버릴 clone.
 
 | 단계 | 결과 |
 |---|---|
-| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 26 · M 7 · 계 33) |
+| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 30 · M 7 · 계 37) |
 | ② `git restore --source=46ac0949` + 새 경로 삭제 | restore exit 0 · delete exit 0 |
 | ③ 되돌린 경로의 `git diff` | **OK — 0 bytes** |
 | ④ `compileKotlin compileTestKotlin` | **exit 0** |
@@ -376,25 +385,20 @@ HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력**. `:contract
 
 **④⑤⑥ 을 생략하지 않는 이유**: ③ 은 **복원한 경로 집합만** 기준과 대조하므로 목록에서
 빠진 파일은 정의상 검사 밖이고 구조적으로 0 줄이 나온다 — 그 누락은 ④ 컴파일만 본다.
-① 의 ⊇ 등식을 **되돌리기 전에** 먼저 돌리는 것도 같은 이유다. 그리고 **갈음은 「HEAD 초록」이
-아니라 트리 동일성으로만 한다** — ③ 의 빈 출력이 그 동일성이다.
+① 의 ⊇ 등식을 **되돌리기 전에** 먼저 돌리는 것도 같은 이유다. **갈음은 「HEAD 초록」이 아니라
+트리 동일성으로만 한다** — ③ 의 빈 출력이 그 동일성이다.
 
 **캐시 정직성**: ④⑤ 는 상당수가 FROM-CACHE·UP-TO-DATE 다. 공허한 초록이 **아니다** — 캐시
 키가 맞았다는 것은 되돌린 트리의 입력이 slice 이전 상태와 **바이트 동일**이라는 뜻이고
 rollback 이 증명하려는 것이 그 동일성이다. 다만 「test 가 다시 돌았다」고는 적지 않는다.
-⑥ 에서는 실제로 실행된 것이 있고, 그중 `gateRegistrationGate` 의 초록은 **되돌린
-`gate-tests.properties` 가 되돌린 test 클래스 모집단과 양방향으로 맞는다**는 뜻이라 게이트
-등재의 복원 완전성을 잰다.
+⑥ 의 `gateRegistrationGate` 초록은 **되돌린 `gate-tests.properties` 가 되돌린 test 클래스
+모집단과 양방향으로 맞는다**는 뜻이라 게이트 등재의 복원 완전성을 잰다.
 
-**부수 관측(이 slice 소관 아님)**: `kotlin-compiler-embeddable` 이 빌드 classpath 에 있다는 KGP
-경고가 전 프로젝트에 뜬다. 이 slice 가 `decision` 에 그 의존을 더했으므로 의심받을 자리인데,
-④ 는 **되돌린 트리**(그 의존이 없는 상태)에서 돌았고 거기서도 같은 경고가 났다 — base 거동이다.
-
-**이 라운드가 쓴 선행 패스**: 비싼 clean `check`(23분) 로 형식 오류를 발견하는 일이 두 번
-반복돼, 체인 전에 **빠른 정적 게이트**(세 모듈 × `ktlintCheck`·`detekt`·`sizeGate`·
-`typeShapeGate`·`testShapeGate`·`gateRegistrationGate`, `--continue`)를 두고 **붉은 것을 한 번에**
-보게 했다(13:41 `FASTGATE_EXIT=0`). 그리고 체인이 **ACC 가 붉으면 그 자리에서 멈추게** 고쳤다 —
-앞 회차는 붉은 기준선 위에서 변이 6분·rollback 25분을 돌려 **무효한 측정으로 락만 잡았다**.
+**이 라운드가 쓴 선행 패스**: 비싼 clean `check`(23분) 로 형식 오류를 발견하는 일이 반복돼,
+체인 전에 **빠른 정적 게이트**(세 모듈 × `ktlintCheck`·`detekt`·`sizeGate`·`typeShapeGate`·
+`testShapeGate`·`gateRegistrationGate`, `--continue`)를 두고 **붉은 것을 한 번에** 보게 했다.
+체인은 **ACC 가 붉으면 그 자리에서 멈춘다** — 붉은 기준선 위의 변이는 아무것도 재지 못하는데
+앞 회차는 그 위에서 변이 6분·rollback 25분을 돌려 **락만 잡았다**.
 
 ### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
 
