@@ -120,3 +120,24 @@ flock … ./gradlew --no-daemon check                                   # CHECK_
 초록이었다(이 라운드에 그 세 파일을 개명했다 — 좁은 필터·낡은 경로의 초록은 「방어 있음」과 구별되지 않는다).
 그 셋을 버리고 경로를 고쳐 다시 쟀고, 스크립트는 이제 **적용 실패 시 `MUTATION_NOT_APPLIED` 로 멈춘다**.
 
+## 5. `web` job — 명령 그대로, 열한 단계 전부 exit 0
+
+CI 전용 step 둘(체크아웃·툴체인 설치 · 브라우저 **시스템 패키지**(apt))만 빼고 `ci.yml` 의 `web` job 명령을
+순서까지 그대로 돌렸다(`flock` 경유, HEAD `7cc9c5b2`).
+
+| step | 명령 | exit |
+|---|---|---:|
+| — | `npm ci` | 0 |
+| W-2 | `npm run lint` | 0 |
+| W-3 | `npm run typecheck` | 0 |
+| W-4 | `npm run gate:src-tree` | 0 |
+| W-5 | `npm run api:types:check` | 0 — **생성 타입이 문서와 바이트까지 같다**(113,104 bytes) |
+| W-6 | `npm run test` | 0 — test file 5 · test 28 통과 |
+| W-7 | `npm run gate:tests` | 0 |
+| W-8 | `npm run build` | 0 |
+| W-9 | `npm run gate:boundary-canary` | 0 |
+| W-10 | `npx playwright install chromium` | 0 |
+| W-11 | `npm run test:e2e` | 0 — 스모크 2 통과 |
+
+W-5 가 이 slice 에서 특히 중요한 자리다: OpenAPI 를 병합으로 다시 세운 뒤(main 전문 + 내 operation·schema
+재삽입) 생성 타입을 재생성했고, 그 둘이 **바이트까지 같다**는 것이 문서와 구현이 갈리지 않았다는 실측이다.
