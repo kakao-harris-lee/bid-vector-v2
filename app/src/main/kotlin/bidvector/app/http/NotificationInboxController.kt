@@ -48,10 +48,13 @@ class NotificationInboxController(
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val parameters = readDeclaredParameters(request)
         return when (val parsed = parseNotificationPageParameters(parameters)) {
-            is NotificationPageResult.Rejected ->
+            is NotificationPageResult.Rejected -> {
                 throw InvalidNotificationRequestException(parsed.reason.name)
+            }
 
-            is NotificationPageResult.Accepted -> respond(notifications.list(account, parsed.request))
+            is NotificationPageResult.Accepted -> {
+                respond(notifications.list(account, parsed.request))
+            }
         }
     }
 
@@ -70,12 +73,15 @@ class NotificationInboxController(
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val target = body.parseNotificationReadTarget()
         return when (target) {
-            is NotificationTargetResult.Item -> respond(notifications.markRead(account, target.key))
+            is NotificationTargetResult.Item -> {
+                respond(notifications.markRead(account, target.key))
+            }
 
             // 이 파싱은 묶음을 내지 않는다 — 소진 `when` 을 닫기 위한 갈래이고, 파싱이 갈래를
             // 늘리면 컴파일이 이 자리를 막는다(조용히 무시되지 않는다).
-            is NotificationTargetResult.Notice ->
+            is NotificationTargetResult.Notice -> {
                 throw InvalidNotificationRequestException("단건 경로가 공고 묶음을 받았다")
+            }
         }
     }
 
@@ -88,11 +94,13 @@ class NotificationInboxController(
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val target = body.parseNoticeReadTarget()
         return when (target) {
-            is NotificationTargetResult.Notice ->
+            is NotificationTargetResult.Notice -> {
                 respond(notifications.markNoticeRead(account, target.notice))
+            }
 
-            is NotificationTargetResult.Item ->
+            is NotificationTargetResult.Item -> {
                 throw InvalidNotificationRequestException("묶음 경로가 단건을 받았다")
+            }
         }
     }
 

@@ -29,14 +29,14 @@ const val NOTIFICATION_UNREAD_COUNT_HEADER = "X-Unread-Count"
  * 규칙은 같고 어휘만 다르다.
  */
 private fun JsonNode.requireInboxObjectBody(): JsonNode {
-    if (!isObject) throw InvalidNotificationRequestException("요청 본문이 JSON object 가 아니다")
+    if (!isObject) rejectInbox("요청 본문이 JSON object 가 아니다")
     return this
 }
 
 /** 알려진 키 밖은 거부한다 — 조용히 무시하면 오탈자가 성공으로 보인다(D-6A2b-25 관례). */
 private fun JsonNode.requireKnownInboxKeys(allowed: Set<String>): JsonNode {
     val unknown = propertyNames().filterNot { it in allowed }.sorted()
-    if (unknown.isNotEmpty()) throw InvalidNotificationRequestException("알 수 없는 본문 키: $unknown")
+    if (unknown.isNotEmpty()) rejectInbox("알 수 없는 본문 키: $unknown")
     return this
 }
 
@@ -48,12 +48,21 @@ private fun JsonNode.requireKnownInboxKeys(allowed: Set<String>): JsonNode {
  */
 private fun JsonNode.requiredInboxText(key: String): String {
     val node = get(key)
-    if (node == null || node.isNull) throw InvalidNotificationRequestException("$key 가 없다")
-    if (!node.isString) throw InvalidNotificationRequestException("$key 는 문자열이어야 한다")
-    val value = node.stringValue()
-    if (value.isBlank()) throw InvalidNotificationRequestException("$key 는 빈 문자열일 수 없다")
-    return value
+    return when {
+        node == null || node.isNull -> rejectInbox("$key 가 없다")
+        !node.isString -> rejectInbox("$key 는 문자열이어야 한다")
+        node.stringValue().isBlank() -> rejectInbox("$key 는 빈 문자열일 수 없다")
+        else -> node.stringValue()
+    }
 }
+
+/**
+ * 거부를 **한 자리에서** 던진다. 판독기마다 `throw` 를 흩어 놓으면 갈래가 늘수록 그 수가
+ * 함께 늘고(detekt `ThrowsCount`), 무엇보다 「이 표면이 거부하는 방법」이 여러 자리로 흩어진다.
+ * `Nothing` 을 돌려주므로 `when` 의 각 갈래가 값 자리에 그대로 설 수 있다 — 갈래를 더해도
+ * 던지는 자리는 하나다.
+ */
+private fun rejectInbox(reason: String): Nothing = throw InvalidNotificationRequestException(reason)
 
 /** 파싱 결과 — 거부를 삼키지 않도록 소진 `when` 으로 소비한다. */
 sealed interface NotificationTargetResult {
@@ -84,7 +93,7 @@ private fun JsonNode.noticeId(): NoticeId {
 private fun JsonNode.notificationKind(): NotificationKind {
     val token = requiredInboxText("kind")
     return NotificationKind.entries.firstOrNull { it.name == token }
-        ?: throw InvalidNotificationRequestException("알 수 없는 kind 토큰: $token")
+        ?: rejectInbox("알 수 없는 kind 토큰: $token")
 }
 
 /** 읽음 처리(단건) — 신원은 「종류 + 공고 쌍」이다. 계정·시각 칸은 **허용 키에 없다**. */

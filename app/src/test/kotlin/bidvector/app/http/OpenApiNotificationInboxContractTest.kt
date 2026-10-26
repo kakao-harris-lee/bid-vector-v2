@@ -182,15 +182,13 @@ class OpenApiNotificationInboxContractTest {
     private fun queryParameters(path: String): List<Map<String, Any?>> =
         (operationOf(path, "get")["parameters"] as? List<Map<String, Any?>>).orEmpty()
 
-    private fun queryParameterNames(path: String): List<String> =
-        queryParameters(path).map { it["name"] as String }
+    private fun queryParameterNames(path: String): List<String> = queryParameters(path).map { it["name"] as String }
 
     @Suppress("UNCHECKED_CAST")
     private fun queryParameterSchema(
         path: String,
         name: String,
-    ): Map<String, Any?> =
-        queryParameters(path).single { it["name"] == name }["schema"] as Map<String, Any?>
+    ): Map<String, Any?> = queryParameters(path).single { it["name"] == name }["schema"] as Map<String, Any?>
 
     @Suppress("UNCHECKED_CAST")
     private fun responseHeaderNames(

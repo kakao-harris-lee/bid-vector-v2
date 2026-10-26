@@ -134,17 +134,21 @@ sealed interface NotificationFact {
     val detail: NotificationDetail?
         get() =
             when (this) {
-                is WithoutDetail -> null
+                is WithoutDetail -> {
+                    null
+                }
 
-                is OpeningCompleted ->
+                is OpeningCompleted -> {
                     if (provisionallyFirst) {
                         NotificationDetail.PROVISIONAL_FIRST
                     } else {
                         NotificationDetail.NOT_PROVISIONAL_FIRST
                     }
+                }
 
-                is AwardDecided ->
+                is AwardDecided -> {
                     if (awarded) NotificationDetail.AWARDED else NotificationDetail.NOT_AWARDED
+                }
             }
 }
 
@@ -164,32 +168,23 @@ fun notificationFactOf(
         NotificationKind.NEW_CANDIDATE -> NotificationFact.NewCandidate.withoutDetail(detail)
         NotificationKind.BID_DEADLINE_IMMINENT -> NotificationFact.BidDeadlineImminent.withoutDetail(detail)
         NotificationKind.BID_DEADLINE_TODAY -> NotificationFact.BidDeadlineToday.withoutDetail(detail)
-        NotificationKind.DOCUMENT_DEADLINE_IMMINENT ->
-            NotificationFact.DocumentDeadlineImminent.withoutDetail(detail)
+        NotificationKind.DOCUMENT_DEADLINE_IMMINENT -> NotificationFact.DocumentDeadlineImminent.withoutDetail(detail)
         NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised.withoutDetail(detail)
-        NotificationKind.BID_PRICE_REQUEST_RECORDED ->
-            NotificationFact.BidPriceRequestRecorded.withoutDetail(detail)
-
-        NotificationKind.OPENING_COMPLETED ->
-            NotificationFact.OpeningCompleted(
-                provisionallyFirst =
-                    detail.asFlag(
-                        kind,
-                        whenTrue = NotificationDetail.PROVISIONAL_FIRST,
-                        whenFalse = NotificationDetail.NOT_PROVISIONAL_FIRST,
-                    ),
-            )
-
-        NotificationKind.AWARD_DECIDED ->
-            NotificationFact.AwardDecided(
-                awarded =
-                    detail.asFlag(
-                        kind,
-                        whenTrue = NotificationDetail.AWARDED,
-                        whenFalse = NotificationDetail.NOT_AWARDED,
-                    ),
-            )
+        NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded.withoutDetail(detail)
+        NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(detail.isProvisionalFirst(kind))
+        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.isAwarded(kind))
     }
+
+// detail 을 싣는 종류 **각각이 자기 어휘를 읽는 함수**를 갖는다. 어휘 쌍을 호출 자리에 펴 두면
+// 갈래 하나가 여러 줄이 되고, 그러면 `when` 전체가 함수 크기 한도를 넘는다(실측). 더 중요한
+// 것은 **소진 `when` 을 지키는 것**이다 — `else` 나 표 조회로 바꾸면 종류를 더할 때 컴파일이
+// 막아 주지 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
+
+private fun NotificationDetail?.isProvisionalFirst(kind: NotificationKind): Boolean =
+    asFlag(kind, whenTrue = NotificationDetail.PROVISIONAL_FIRST, whenFalse = NotificationDetail.NOT_PROVISIONAL_FIRST)
+
+private fun NotificationDetail?.isAwarded(kind: NotificationKind): Boolean =
+    asFlag(kind, whenTrue = NotificationDetail.AWARDED, whenFalse = NotificationDetail.NOT_AWARDED)
 
 /** detail 을 갖지 않는 종류에 detail 이 실려 오면 그 짝은 복원 대상이 아니다. */
 private fun NotificationFact.WithoutDetail.withoutDetail(detail: NotificationDetail?): NotificationFact {
