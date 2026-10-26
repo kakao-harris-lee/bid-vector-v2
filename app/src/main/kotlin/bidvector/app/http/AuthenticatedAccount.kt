@@ -2,6 +2,8 @@ package bidvector.app.http
 
 import bidvector.workflow.access.AccountId
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 
 /**
  * 요청 attribute 키 — 세션 인증이 낸 **typed 계정**(M7/7B 계약 D-7B-2).
@@ -22,3 +24,16 @@ const val AUTHENTICATED_ACCOUNT_ATTRIBUTE = "bidvector.http.account"
  */
 internal fun HttpServletRequest.authenticatedAccount(): AccountId? =
     getAttribute(AUTHENTICATED_ACCOUNT_ATTRIBUTE) as? AccountId
+
+/**
+ * 계정 범위 경로의 **401 한 벌** — 계정 없는 인증(자격 헤더 경로)과 무인증을 **가르지 않는다**
+ * (D-6A1-6: 사유를 나누면 「그 계정이 있다」가 샌다).
+ *
+ * 접근자 바로 옆에 있는 이유: [authenticatedAccount] 가 `null` 일 때의 답은 하나뿐인데 그 둘이
+ * 떨어져 있으면 뒤 slice 가 각자의 401 을 짓는다. `BidCaseHttp` 에서 옮겨 왔다(M7/7C④ 2b — 거동
+ * 무변경, 입찰함 호출부가 그대로 이 함수를 부른다).
+ */
+internal fun unauthenticated(request: HttpServletRequest): ResponseEntity<Any> =
+    ResponseEntity
+        .status(HttpStatus.UNAUTHORIZED)
+        .body(ErrorMapping.unauthenticated(request.correlationIdOrUnknown()))

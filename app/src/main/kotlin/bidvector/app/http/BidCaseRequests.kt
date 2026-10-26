@@ -148,21 +148,6 @@ internal object BidCaseRouting {
 }
 
 /**
- * 도메인 값 객체의 생성 규칙(`require`)을 **400 으로** 옮긴다. 형식이 틀린 요청 값(차수 형식 ·
- * 증빙 참조·메모·사유 길이 상한 · 추첨번호 부호)이 `IllegalArgumentException` 으로 새면 기본 처리기가
- * **500** 을 낸다 — 요청 탓을 서버 탓으로 말하는 것이다. 그 예외 **하나만** 옮기고 나머지는 그대로
- * 던진다(`JsonValueReaders` 의 시각 판독과 같은 관례). 메시지는 응답에 실리지 않는다.
- */
-private fun <T> requestValue(
-    key: String,
-    build: () -> T,
-): T =
-    runCatching(build).getOrElse { failure ->
-        if (failure is IllegalArgumentException) throw InvalidEditRequestException("$key 가 값 규칙을 어긴다")
-        throw failure
-    }
-
-/**
  * 초안 요청이 실어 오는 것 — 공고 스냅샷은 **서버가 뜨므로** 여기 없다(위협 ③). 「화면이 공고를 본
  * 시각」(`snapshotTakenAt`)도 받지 않는다(계약 D-7B-3 결정 ③) — 받고서 쓰지 않는 입력은 계약 거짓말이고,
  * 화면 신선도 검사가 필요하면 별 slice 다.
@@ -172,15 +157,3 @@ internal data class DraftInput(
     val presentedAt: Instant,
 )
 
-/**
- * 알려진 어휘 하나 — 값이 enum 밖이면 400 이다. 「모르는 값을 기본값으로 접는」 경로를 두지
- * 않는다(그것이 곧 어휘를 지어내는 길이다).
- */
-private fun <T : Enum<T>> JsonNode.enumOf(
-    key: String,
-    values: List<T>,
-): T {
-    val raw = requiredNonBlankText(key)
-    return values.firstOrNull { it.name == raw }
-        ?: throw InvalidEditRequestException("$key 는 ${values.joinToString("·") { it.name }} 중 하나다")
-}
