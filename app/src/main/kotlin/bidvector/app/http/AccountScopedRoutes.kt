@@ -28,6 +28,16 @@ object AccountScopedRoutes {
      */
     const val PROFILE: String = "/api/profile"
 
+    /**
+     * 프로필의 하위 경로 — **두 controller 와 OpenAPI 가 같은 문자열**을 쓴다. 뿌리와 같은 자리에 두는
+     * 이유도 같다: 경로를 두 파일에 적으면 갈린다(r2 CR L-6 — 앞 판은 넷이 두 controller 파일에 흩어져
+     * 있었고 KDoc 은 한쪽에만 붙어 있었다).
+     */
+    const val PROFILE_QUALIFICATION_FACTS: String = "/qualification-facts"
+    const val PROFILE_BUSINESS_DETAILS: String = "/business-details"
+    const val PROFILE_CAPACITIES: String = "/construction-capacities"
+    const val PROFILE_CAPACITIES_REMOVE: String = "$PROFILE_CAPACITIES/remove"
+
     /** 계정 전용 뿌리 전수. 늘어나면 여기만 늘린다. */
     val ROOTS: Set<String> = setOf(BID_CASES, PROFILE)
 

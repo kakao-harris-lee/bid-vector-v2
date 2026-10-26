@@ -42,7 +42,7 @@ class ProfileCommandController(
      * 없다(받는 척하면 「이미 계정 단위다」라는 거짓 신호가 된다). 그래도 **경로는 계정 범위**라 세션
      * 주체가 없으면 401 이다(R-2 남은 절반이 열릴 때 이 자리가 그대로 계정을 받는다).
      */
-    @PostMapping(QUALIFICATION_FACTS_PATH)
+    @PostMapping(AccountScopedRoutes.PROFILE_QUALIFICATION_FACTS)
     fun qualificationFacts(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
@@ -52,7 +52,7 @@ class ProfileCommandController(
         return ResponseEntity.ok(ProfileResponse.from(readProfile.read(account)))
     }
 
-    @PostMapping(BUSINESS_DETAILS_PATH)
+    @PostMapping(AccountScopedRoutes.PROFILE_BUSINESS_DETAILS)
     fun businessDetails(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
@@ -65,7 +65,7 @@ class ProfileCommandController(
     }
 
     /** 면허명이 같은 행이 있으면 갱신, 없으면 추가. 응답은 **다시 읽은 목록**이다. */
-    @PostMapping(CAPACITIES_PATH)
+    @PostMapping(AccountScopedRoutes.PROFILE_CAPACITIES)
     fun upsertConstructionCapacity(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
@@ -79,7 +79,7 @@ class ProfileCommandController(
      * 시평액 한 행 삭제 — **POST 다**(DELETE 가 아니다): 쓰기 메서드를 하나로 모아 CSRF 요구를
      * 메서드로 받는다(7B 와 같은 관례). 지울 행이 없으면 404 다.
      */
-    @PostMapping(CAPACITIES_REMOVE_PATH)
+    @PostMapping(AccountScopedRoutes.PROFILE_CAPACITIES_REMOVE)
     fun removeConstructionCapacity(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
@@ -92,8 +92,3 @@ class ProfileCommandController(
     private fun capacities(account: AccountId): ResponseEntity<Any> =
         ResponseEntity.ok(listCapacities.list(account).map(ConstructionCapacityResponse::from))
 }
-
-/** 쓰기 경로 셋 — OpenAPI 문서와 같은 문자열이다. 애너테이션 인자라 전부 `const` 여야 한다. */
-internal const val QUALIFICATION_FACTS_PATH = "/qualification-facts"
-internal const val BUSINESS_DETAILS_PATH = "/business-details"
-internal const val CAPACITIES_REMOVE_PATH = "$CAPACITIES_PATH/remove"

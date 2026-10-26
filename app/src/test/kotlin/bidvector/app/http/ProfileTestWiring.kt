@@ -75,6 +75,11 @@ open class ProfileTestWiring {
  *
  * [rejection] 을 세우면 모든 쓰기가 제약 거부를 낸다 — 어댑터가 드라이버 예외를 값으로 바꾼 뒤의
  * 거동(400 · 문면 없음)을 HTTP 층에서 재는 데 쓴다.
+ *
+ * **workflow 쪽 `FakeBusinessProfileStore` 와 본문이 거의 같다**(r2 CR L-8). 합치지 않는 이유는 모듈이
+ * 다르고(이쪽은 `app` test, 저쪽은 `workflow` test) 재는 축도 다르기 때문이다 — 저쪽은 use case 에 **어떤
+ * 계정이 넘어왔는가**를 기록하고, 이쪽은 Spring 조립에 꽂혀 HTTP 거동만 받친다. 한쪽을 고칠 때 다른
+ * 쪽도 보라는 표시로 서로를 가리켜 둔다.
  */
 class InMemoryBusinessProfileStore : BusinessProfileStorePort {
     @Volatile var rejection: StorageWriteOutcome.RejectedByStorage? = null

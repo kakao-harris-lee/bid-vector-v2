@@ -142,8 +142,8 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
             .trimStart()
             .first() shouldBe '['
 
-        session.post("$CAPACITIES/remove", """{"licenseName":"없는면허"}""").statusCode.value() shouldBe NOT_FOUND
-        session.post("$CAPACITIES/remove", """{"licenseName":"합성토목"}""").statusCode.value() shouldBe OK
+        session.post(CAPACITIES_REMOVE, """{"licenseName":"없는면허"}""").statusCode.value() shouldBe NOT_FOUND
+        session.post(CAPACITIES_REMOVE, """{"licenseName":"합성토목"}""").statusCode.value() shouldBe OK
     }
 
     @Test
@@ -157,6 +157,60 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
         over.statusCode.value() shouldBe CONFLICT
         over.body.orEmpty() shouldContain "\"code\":\"${ErrorCode.CAPACITY_ROWS_EXCEEDED}\""
         keysOf(over.body.orEmpty()) shouldBe listOf("code", "message", "correlationId")
+    }
+
+    @Test
+    fun `쓰기 넷은 CSRF 없이는 401 이다 — 메서드가 요구를 만든다`() {
+        val withoutCsrf =
+            listOf(
+                QUALIFICATION_FACTS to qualificationBody(declared = false, names = emptyList()),
+                BUSINESS_DETAILS to detailsBody(),
+                CAPACITIES to capacityBody("합성면허", 1_000L),
+                CAPACITIES_REMOVE to """{"licenseName":"합성면허"}""",
+            )
+
+        withoutCsrf.forEach { (path, body) ->
+            session.postWithoutCsrf(path, body).statusCode.value() shouldBe UNAUTHORIZED
+        }
+    }
+
+    @Test
+    fun `공백뿐인 상호는 400 이다 — 조용히 미설정으로 접지 않는다`() {
+        session.post(BUSINESS_DETAILS, detailsBody(tradeName = "\"합성상호\"")).statusCode.value() shouldBe OK
+
+        val blanked = session.post(BUSINESS_DETAILS, detailsBody(tradeName = "\"   \""))
+
+        blanked.statusCode.value() shouldBe BAD_REQUEST
+        // 거부가 저장된 값을 건드리지 않았다 — 절 교체가 일어나지 않았다는 뜻이다.
+        session.get(AccountScopedRoutes.PROFILE).body.orEmpty() shouldContain "합성상호"
+    }
+
+    @Test
+    fun `제어 문자는 400 이다 — 저장 층에 닿기 전에 막는다`() {
+        // **JSON 이스케이프로** 보낸다 — 날 NUL 바이트는 Jackson 이 먼저 거부해 이 축을 가린다.
+        // 이 값이 저장 층에 닿으면 PostgreSQL 이 SQLSTATE 22021 로 거부하고, 그 예외는 어댑터의
+        // class 23 번역 밖이라 500 이 된다(요청 탓을 서버 탓으로 말하는 것이다).
+        val details =
+            """{"tradeName":"\u0000합성상호","headquartersRegion":null,"naraRegistration":"UNANSWERED"}"""
+        val capacity = """{"licenseName":"\u0000합성면허","amountWon":1000,"assessmentYear":2026}"""
+
+        session.post(BUSINESS_DETAILS, details).statusCode.value() shouldBe BAD_REQUEST
+        session.post(CAPACITIES, capacity).statusCode.value() shouldBe BAD_REQUEST
+    }
+
+    @Test
+    fun `자격 사실의 자유 어휘도 값 규칙을 받는다 — 공백 원소 · 중복 · 개수 상한`() {
+        val blankTerm = """{"businessTypes":[" "],"licensesDeclared":false,"licenseNames":[],"regionTerms":[]}"""
+        val duplicated =
+            """{"businessTypes":["CAT-1","CAT-1"],"licensesDeclared":false,"licenseNames":[],"regionTerms":[]}"""
+        val tooMany =
+            """{"businessTypes":[],"licensesDeclared":false,"licenseNames":[],"regionTerms":[""" +
+                (1..ProfileInputPolicy.QUALIFICATION_TERMS_MAX + 1).joinToString(",") { "\"지역어$it\"" } +
+                """]}"""
+
+        session.post(QUALIFICATION_FACTS, blankTerm).statusCode.value() shouldBe BAD_REQUEST
+        session.post(QUALIFICATION_FACTS, duplicated).statusCode.value() shouldBe BAD_REQUEST
+        session.post(QUALIFICATION_FACTS, tooMany).statusCode.value() shouldBe BAD_REQUEST
     }
 
     /**
@@ -180,6 +234,9 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
 
     private fun keysOf(body: String): List<String> = KEY.findAll(body).map { it.groupValues[1] }.toList()
 
+    private fun detailsBody(tradeName: String = "null"): String =
+        """{"tradeName":$tradeName,"headquartersRegion":null,"naraRegistration":"UNANSWERED"}"""
+
     private fun qualificationBody(
         declared: Boolean,
         names: List<String>,
@@ -199,9 +256,10 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
         const val NOT_FOUND = 404
         const val CONFLICT = 409
         val ROWS_MAX = ProfileInputPolicy.CAPACITY_ROWS_MAX
-        val QUALIFICATION_FACTS = AccountScopedRoutes.PROFILE + QUALIFICATION_FACTS_PATH
-        val BUSINESS_DETAILS = AccountScopedRoutes.PROFILE + BUSINESS_DETAILS_PATH
-        val CAPACITIES = AccountScopedRoutes.PROFILE + CAPACITIES_PATH
+        val QUALIFICATION_FACTS = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_QUALIFICATION_FACTS
+        val BUSINESS_DETAILS = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_BUSINESS_DETAILS
+        val CAPACITIES = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_CAPACITIES
+        val CAPACITIES_REMOVE = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_CAPACITIES_REMOVE
         val KEY = Regex("\"([A-Za-z]+)\"\\s*:")
     }
 }

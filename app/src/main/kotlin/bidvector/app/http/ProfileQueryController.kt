@@ -30,12 +30,9 @@ class ProfileQueryController(
         return ResponseEntity.ok(ProfileResponse.from(readProfile.read(account)))
     }
 
-    @GetMapping(CAPACITIES_PATH)
+    @GetMapping(AccountScopedRoutes.PROFILE_CAPACITIES)
     fun capacities(request: HttpServletRequest): ResponseEntity<Any> {
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
         return ResponseEntity.ok(listCapacities.list(account).map(ConstructionCapacityResponse::from))
     }
 }
-
-/** 시평액 경로 — 조회 · 쓰기 두 controller 가 같은 상수를 쓴다(경로를 두 곳에 적으면 갈린다). */
-internal const val CAPACITIES_PATH = "/construction-capacities"

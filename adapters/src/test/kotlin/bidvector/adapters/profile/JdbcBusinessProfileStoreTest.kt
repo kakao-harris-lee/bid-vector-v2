@@ -10,9 +10,11 @@ import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.NaraRegistrationField
 import bidvector.workflow.profile.StorageWriteOutcome
 import bidvector.workflow.profile.TradeName
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.sql.SQLException
 import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
@@ -185,6 +187,24 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
             StorageWriteOutcome.RejectedByStorage(FOREIGN_KEY_VIOLATION)
     }
 
+    /**
+     * **class 23 밖은 값으로 접지 않는다**(M7/7C④ 2b r2, v F5 의 짝). 무결성 제약 위반만 「요청이 틀렸다」
+     * 이고, 그 밖(연결 끊김 · 권한 거부 · 이 test 의 data exception)은 **장애**다 — 값으로 접으면 호출자가
+     * 「거부당했다」로 오독하고 400 을 낸다.
+     *
+     * NUL 을 담은 텍스트는 PostgreSQL 이 SQLSTATE `22021` 로 거부한다. HTTP 경로에서는 요청 판독이 제어
+     * 문자를 먼저 400 으로 막으므로(이 라운드), 이 자리는 **어댑터를 직접 부르는 길**로만 열린다.
+     */
+    @Test
+    fun `무결성 제약이 아닌 DB 오류는 그대로 던진다`() {
+        val owner = account("owner")
+        val withNul = BusinessDetails.EMPTY.copy(tradeName = TradeName("합성\u0000상호"))
+
+        val thrown = shouldThrow<SQLException> { store.replaceDetails(owner, withNul, now) }
+
+        thrown.sqlState shouldBe NUL_IN_TEXT
+    }
+
     @Test
     fun `정상 쓰기는 썼다고 낸다`() {
         val owner = account("owner")
@@ -196,3 +216,6 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
 
 /** SQL 표준 SQLSTATE — 외래 키 위반. 두 표 모두 `account (id)` 를 참조한다(V22). */
 private const val FOREIGN_KEY_VIOLATION = "23503"
+
+/** class 22(data exception) — NUL 을 담은 텍스트. **번역 대상이 아니다**(class 23 만 값으로 접는다). */
+private const val NUL_IN_TEXT = "22021"

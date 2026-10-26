@@ -112,6 +112,9 @@ class ProfileUseCasesTest {
 /**
  * 계정별 저장을 흉내 내는 fake — **port 가 받은 계정으로만** 읽고 쓴다(소유 경계를 값으로 잰다).
  *
+ * **app test 의 `InMemoryBusinessProfileStore` 와 본문이 거의 같다**(r2 CR L-8) — 재는 축이 다르다:
+ * 이쪽은 use case 에 **어떤 계정이 넘어왔는가**를 기록하고, 저쪽은 Spring 조립에 꽂혀 HTTP 거동을 받친다.
+ *
  * 키가 [AccountId] 가 아니라 그 `value` 인 것은 의도다: `AccountId` 는 `equals` 를 재정의하지 않는
  * 평범한 class 라 **동일성으로 같다**. 인스턴스를 키로 쓰면 같은 계정을 두 번 만든 호출이 조용히
  * 다른 칸을 보게 되어, fake 가 실 저장소와 다른 답을 낸다.
