@@ -40,15 +40,25 @@ data class ProfileResponse(
             val registered = readiness as? NaraReadiness.Registered
             return ProfileResponse(
                 qualificationDeclared = facts != null,
-                businessTypes = facts?.businessTypes.orEmpty().map { it.value }.sorted(),
+                businessTypes =
+                    facts
+                        ?.businessTypes
+                        .orEmpty()
+                        .map { it.value }
+                        .sorted(),
                 licensesDeclared = declaredLicenses != null,
                 licenseNames = declaredLicenses?.licenseNames.orEmpty().map { it.value },
                 regionTerms = facts?.regionTerms.orEmpty(),
                 // 상호는 **입력 원문 그대로** 나간다(앞뒤 공백도 자르지 않는다 — 이중 정규화 금지).
                 tradeName = view.details.tradeName?.raw,
                 headquartersRegion = view.details.headquartersRegion?.name,
-                naraRegistration = readiness.storedName,
-                naraRegisteredFields = registered?.fields.orEmpty().map { it.name }.sorted(),
+                naraRegistration = readiness.registration.name,
+                naraRegisteredFields =
+                    registered
+                        ?.fields
+                        .orEmpty()
+                        .map { it.name }
+                        .sorted(),
                 businessCertificateExpiresOn = registered?.businessCertificateExpiresOn?.toString(),
                 unjudgedAxes = UnjudgedQualificationAxis.entries.map { it.name },
             )

@@ -9,6 +9,7 @@ import bidvector.workflow.profile.BusinessProfileStorePort
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
+import bidvector.workflow.profile.NaraRegistration
 import bidvector.workflow.profile.NaraRegistrationField
 import bidvector.workflow.profile.StorageWriteOutcome
 import bidvector.workflow.profile.TradeName
@@ -153,7 +154,7 @@ private fun PreparedStatement.bindDetails(
     var index = startIndex
     setString(index++, details.tradeName?.raw)
     setString(index++, details.headquartersRegion?.name)
-    setString(index++, readiness.storedName)
+    setString(index++, readiness.registration.name)
     val fields = registered?.fields ?: emptySet()
     setTextArray(index++, fields.map(NaraRegistrationField::name).sorted())
     setDate(index++, registered?.businessCertificateExpiresOn?.let(Date::valueOf))
@@ -168,17 +169,18 @@ private fun ResultSet.toBusinessDetails(): BusinessDetails =
         naraReadiness = toNaraReadiness(),
     )
 
-private fun ResultSet.toNaraReadiness(): NaraReadiness =
-    when (val stored = getString("nara_registration")) {
-        NaraReadiness.UNANSWERED_NAME -> {
+private fun ResultSet.toNaraReadiness(): NaraReadiness {
+    val raw = getString("nara_registration") ?: error("nara_registration 이 NULL 이다")
+    return when (stored(raw, NaraRegistration.entries)) {
+        NaraRegistration.UNANSWERED -> {
             NaraReadiness.Unanswered
         }
 
-        NaraReadiness.NOT_REGISTERED_NAME -> {
+        NaraRegistration.NOT_REGISTERED -> {
             NaraReadiness.NotRegistered
         }
 
-        NaraReadiness.REGISTERED_NAME -> {
+        NaraRegistration.REGISTERED -> {
             NaraReadiness.Registered(
                 fields =
                     getTextList("nara_registered_fields")
@@ -187,11 +189,8 @@ private fun ResultSet.toNaraReadiness(): NaraReadiness =
                 businessCertificateExpiresOn = getDate("business_certificate_expires_on")?.toLocalDate(),
             )
         }
-
-        else -> {
-            error("nara_registration 에 어휘 밖 값이 저장돼 있다(길이 ${stored?.length})")
-        }
     }
+}
 
 private fun ResultSet.toConstructionCapacity(): ConstructionCapacity =
     ConstructionCapacity(

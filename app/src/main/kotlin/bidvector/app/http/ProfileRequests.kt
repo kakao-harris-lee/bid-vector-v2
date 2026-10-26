@@ -8,6 +8,7 @@ import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
+import bidvector.workflow.profile.NaraRegistration
 import bidvector.workflow.profile.NaraRegistrationField
 import bidvector.workflow.profile.TradeName
 import tools.jackson.databind.JsonNode
@@ -79,68 +80,48 @@ internal object ProfileRequests {
         LicenseName(body.requireObject().requireKnownKeys(setOf("licenseName")).requiredNonBlankText("licenseName"))
 }
 
-/** 등록 상태에서만 의미가 있는 두 키 — 다른 상태의 요청에 실려 있으면 **거부한다**. */
+/** 등록 상태에서만 의미가 있는 두 키 — 다른 답의 요청에 실려 있으면 **거부한다**. */
 private val REGISTERED_ONLY_KEYS = listOf("naraRegisteredFields", "businessCertificateExpiresOn")
 
 /**
- * 나라장터 준비 — 상태 이름 하나가 다른 두 필드의 **유무**를 정한다.
+ * 나라장터 준비 — 답 하나가 다른 두 필드의 **유무**를 정한다.
  *
  * 「미응답 · 미등록인데 분야 · 만료일이 실린」 요청은 받아 두고 버리지 않고 **거부한다**: 받고서 쓰지
  * 않는 입력은 계약 거짓말이고, 운영자에게는 「저장됐다」로 보인다. V22 의 짝 CHECK 가 같은 모순을
  * 표 층에서 막는다(두 겹).
+ *
+ * 답을 **열거로** 읽고 `when` 으로 소진한다 — 이름 비교는 어휘 조회 한 자리(`RequestValues.kt`)에만
+ * 있다. 그래야 이 패키지의 「빠른 문자열 비교 0」 구조 게이트가 흐려지지 않는다.
  */
-private fun JsonNode.naraReadiness(): NaraReadiness {
-    val raw = requiredNonBlankText("naraRegistration")
-    if (raw != NaraReadiness.REGISTERED_NAME) rejectRegisteredOnlyKeys()
-    return when (raw) {
-        NaraReadiness.UNANSWERED_NAME -> NaraReadiness.Unanswered
-        NaraReadiness.NOT_REGISTERED_NAME -> NaraReadiness.NotRegistered
-        NaraReadiness.REGISTERED_NAME ->
+private fun JsonNode.naraReadiness(): NaraReadiness =
+    when (enumOf("naraRegistration", NaraRegistration.entries)) {
+        NaraRegistration.UNANSWERED -> {
+            rejectRegisteredOnlyKeys()
+            NaraReadiness.Unanswered
+        }
+
+        NaraRegistration.NOT_REGISTERED -> {
+            rejectRegisteredOnlyKeys()
+            NaraReadiness.NotRegistered
+        }
+
+        NaraRegistration.REGISTERED -> {
             NaraReadiness.Registered(
                 fields = enumSet("naraRegisteredFields", NaraRegistrationField.entries),
                 businessCertificateExpiresOn = optionalDate("businessCertificateExpiresOn"),
             )
-
-        else -> throw InvalidEditRequestException(
-            "naraRegistration 은 ${NaraReadiness.NAMES.joinToString("·")} 중 하나다(길이 ${raw.length})",
-        )
+        }
     }
-}
 
 private fun JsonNode.rejectRegisteredOnlyKeys() {
     REGISTERED_ONLY_KEYS.forEach { key ->
         val node = get(key)
         if (node != null && !node.isNull) {
             throw InvalidEditRequestException(
-                "$key 는 naraRegistration 이 ${NaraReadiness.REGISTERED_NAME} 일 때만 실을 수 있다",
+                "$key 는 naraRegistration 이 ${NaraRegistration.REGISTERED} 일 때만 실을 수 있다",
             )
         }
     }
-}
-
-/** 없거나 `null` 이면 「미설정」. 값이 있으면 어휘 안이어야 한다(모르는 값을 미설정으로 접지 않는다). */
-private fun <T : Enum<T>> JsonNode.optionalEnum(
-    key: String,
-    values: List<T>,
-): T? {
-    val node = get(key)
-    if (node == null || node.isNull) return null
-    return enumOf(key, values)
-}
-
-/** 닫힌 어휘의 **집합** — 중복 원소는 거부한다(표의 cardinality CHECK 와 같은 술어). */
-private fun <T : Enum<T>> JsonNode.enumSet(
-    key: String,
-    values: List<T>,
-): Set<T> {
-    val raw = requiredStringArray(key)
-    val parsed =
-        raw.map { name ->
-            values.firstOrNull { it.name == name }
-                ?: throw InvalidEditRequestException("$key 는 ${values.joinToString("·") { it.name }} 의 부분집합이다")
-        }
-    if (parsed.size != parsed.toSet().size) throw InvalidEditRequestException("$key 에 같은 값이 두 번 있다")
-    return parsed.toSet()
 }
 
 /** ISO-8601 날짜만 받는다(시각 판독과 같은 관례 — 표기 둘을 함께 받지 않는다). */
