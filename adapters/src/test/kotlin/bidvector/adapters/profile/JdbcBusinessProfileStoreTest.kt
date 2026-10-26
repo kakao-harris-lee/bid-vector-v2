@@ -8,6 +8,7 @@ import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.NaraRegistrationField
+import bidvector.workflow.profile.StorageWriteOutcome
 import bidvector.workflow.profile.TradeName
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -165,4 +166,33 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
 
         store.details(owner) shouldBe registered
     }
+
+    /**
+     * **제약 위반은 예외가 아니라 값이다**(2b 표적 1 · D-7C4-8 Q2). 없는 계정으로 쓰면 외래 키가
+     * 거부하고 드라이버 예외의 `detail` 에는 거부된 **행의 값**이 실린다 — 그 예외가 어댑터 밖으로
+     * 나가면 그 값이 스택트레이스로 로그에 남는다. 밖으로 나오는 것은 SQLSTATE 다섯 글자뿐이다.
+     *
+     * 실 DB 가 필요한 이유: 이 번역은 **드라이버가 매기는 SQLSTATE** 위에 서 있고, fake 로는 그 값이
+     * 실제로 class 23 인지 증명되지 않는다.
+     */
+    @Test
+    fun `없는 계정으로 쓰면 제약 거부를 값으로 낸다 — 예외 문면이 밖으로 나오지 않는다`() {
+        val absent = AccountId(999_999_999L)
+
+        store.replaceDetails(absent, registered, now) shouldBe
+            StorageWriteOutcome.RejectedByStorage(FOREIGN_KEY_VIOLATION)
+        store.upsertCapacity(absent, capacity("합성토목"), now) shouldBe
+            StorageWriteOutcome.RejectedByStorage(FOREIGN_KEY_VIOLATION)
+    }
+
+    @Test
+    fun `정상 쓰기는 썼다고 낸다`() {
+        val owner = account("owner")
+
+        store.replaceDetails(owner, registered, now) shouldBe StorageWriteOutcome.Written
+        store.upsertCapacity(owner, capacity("합성토목"), now) shouldBe StorageWriteOutcome.Written
+    }
 }
+
+/** SQL 표준 SQLSTATE — 외래 키 위반. 두 표 모두 `account (id)` 를 참조한다(V22). */
+private const val FOREIGN_KEY_VIOLATION = "23503"

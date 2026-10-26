@@ -10,10 +10,12 @@ import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.NaraRegistrationField
+import bidvector.workflow.profile.StorageWriteOutcome
 import bidvector.workflow.profile.TradeName
 import java.sql.Date
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.SQLException
 import java.sql.Timestamp
 import java.time.Instant
 import javax.sql.DataSource
@@ -64,34 +66,36 @@ class JdbcBusinessProfileStore(
         account: AccountId,
         details: BusinessDetails,
         at: Instant,
-    ) {
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(BusinessProfileSql.UPSERT_DETAILS).use { statement ->
-                statement.setLong(1, account.value)
-                val updatedAtIndex = statement.bindDetails(2, details)
-                statement.setTimestamp(updatedAtIndex, Timestamp.from(at))
-                statement.executeUpdate()
+    ): StorageWriteOutcome =
+        writingRow {
+            dataSource.connection.use { connection ->
+                connection.prepareStatement(BusinessProfileSql.UPSERT_DETAILS).use { statement ->
+                    statement.setLong(1, account.value)
+                    val updatedAtIndex = statement.bindDetails(2, details)
+                    statement.setTimestamp(updatedAtIndex, Timestamp.from(at))
+                    statement.executeUpdate()
+                }
             }
         }
-    }
 
     override fun upsertCapacity(
         account: AccountId,
         capacity: ConstructionCapacity,
         at: Instant,
-    ) {
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(BusinessProfileSql.UPSERT_CAPACITY).use { statement ->
-                var index = 1
-                statement.setLong(index++, account.value)
-                statement.setString(index++, capacity.licenseName.value)
-                statement.setLong(index++, capacity.amountWon)
-                statement.setInt(index++, capacity.assessmentYear)
-                statement.setTimestamp(index, Timestamp.from(at))
-                statement.executeUpdate()
+    ): StorageWriteOutcome =
+        writingRow {
+            dataSource.connection.use { connection ->
+                connection.prepareStatement(BusinessProfileSql.UPSERT_CAPACITY).use { statement ->
+                    var index = 1
+                    statement.setLong(index++, account.value)
+                    statement.setString(index++, capacity.licenseName.value)
+                    statement.setLong(index++, capacity.amountWon)
+                    statement.setInt(index++, capacity.assessmentYear)
+                    statement.setTimestamp(index, Timestamp.from(at))
+                    statement.executeUpdate()
+                }
             }
         }
-    }
 
     override fun removeCapacity(
         account: AccountId,
@@ -106,10 +110,35 @@ class JdbcBusinessProfileStore(
         }
 }
 
-/** 나라장터 준비의 저장 어휘 — V22 `nara_registration` CHECK 와 같은 셋. */
-private const val UNANSWERED = "UNANSWERED"
-private const val REGISTERED = "REGISTERED"
-private const val NOT_REGISTERED = "NOT_REGISTERED"
+/**
+ * 무결성 제약 위반(SQL 표준 SQLSTATE class 23)을 **값으로** 옮긴다 — M7/7C④ 2b 표적 1, D-7C4-8 Q2.
+ *
+ * 왜 여기인가: 드라이버의 예외 문면은 거부된 **행의 값**을 `detail` 에 싣는다(`Failing row contains
+ * (…)`). 그 예외를 그대로 올리면 상호 · 면허명이 스택트레이스로 로그에 남는다. 이 함수 안에서 잡아
+ * [StorageWriteOutcome.RejectedByStorage] 로 바꾸면 **문면이 지날 통로 자체가 없다** — 그 타입이 지니는
+ * 것은 다섯 글자 SQLSTATE 뿐이다(운영자 입력이 아니다).
+ *
+ * class 23 **밖은 그대로 올린다**: 연결 끊김 · 권한 거부는 요청 값의 문제가 아니라 장애이고, 값으로
+ * 접으면 호출자가 「거부당했다」로 오독한다. 그 경로의 문면에는 행 값이 없다.
+ *
+ * **이 slice 의 두 표에만 듣는다** — 저장소 전역으로 닫는 길(`logServerErrorDetail`)은
+ * `OPEN-7C4-LOG-DETAIL-GLOBAL` 로 중앙에 올린다.
+ */
+private inline fun writingRow(write: () -> Unit): StorageWriteOutcome =
+    try {
+        write()
+        StorageWriteOutcome.Written
+    } catch (rejected: SQLException) {
+        val sqlState = rejected.sqlState
+        if (sqlState?.startsWith(INTEGRITY_CONSTRAINT_VIOLATION) == true) {
+            StorageWriteOutcome.RejectedByStorage(sqlState)
+        } else {
+            throw rejected
+        }
+    }
+
+/** SQLSTATE class 23 — 무결성 제약 위반(CHECK · 외래 키 · 유일성). 표준 값이라 드라이버에 묶이지 않는다. */
+private const val INTEGRITY_CONSTRAINT_VIOLATION = "23"
 
 /**
  * 사업 정보 다섯 열을 `UPSERT_DETAILS` 순서대로 싣고 **다음 자리를 낸다** — 자리 수를 상수로 손으로
@@ -124,19 +153,12 @@ private fun PreparedStatement.bindDetails(
     var index = startIndex
     setString(index++, details.tradeName?.raw)
     setString(index++, details.headquartersRegion?.name)
-    setString(index++, readiness.storedName())
+    setString(index++, readiness.storedName)
     val fields = registered?.fields ?: emptySet()
     setTextArray(index++, fields.map(NaraRegistrationField::name).sorted())
     setDate(index++, registered?.businessCertificateExpiresOn?.let(Date::valueOf))
     return index
 }
-
-private fun NaraReadiness.storedName(): String =
-    when (this) {
-        NaraReadiness.Unanswered -> UNANSWERED
-        NaraReadiness.NotRegistered -> NOT_REGISTERED
-        is NaraReadiness.Registered -> REGISTERED
-    }
 
 private fun ResultSet.toBusinessDetails(): BusinessDetails =
     BusinessDetails(
@@ -148,15 +170,15 @@ private fun ResultSet.toBusinessDetails(): BusinessDetails =
 
 private fun ResultSet.toNaraReadiness(): NaraReadiness =
     when (val stored = getString("nara_registration")) {
-        UNANSWERED -> {
+        NaraReadiness.UNANSWERED_NAME -> {
             NaraReadiness.Unanswered
         }
 
-        NOT_REGISTERED -> {
+        NaraReadiness.NOT_REGISTERED_NAME -> {
             NaraReadiness.NotRegistered
         }
 
-        REGISTERED -> {
+        NaraReadiness.REGISTERED_NAME -> {
             NaraReadiness.Registered(
                 fields =
                     getTextList("nara_registered_fields")

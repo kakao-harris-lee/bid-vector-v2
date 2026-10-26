@@ -2,6 +2,7 @@ package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.Sql
 import bidvector.workflow.evaluation.OperatorProfilePort
+import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.evaluation.ProfileFacts
 import javax.sql.DataSource
 
@@ -24,7 +25,8 @@ import javax.sql.DataSource
  */
 class JdbcOperatorProfileRepository(
     private val dataSource: DataSource,
-) : OperatorProfilePort {
+) : OperatorProfilePort,
+    OperatorProfileStorePort {
     /** 행이 없으면 「프로필 미설정」이다 — 빈 프로필을 지어내지 않는다(D-6F6-3). */
     override fun current(): ProfileFacts? =
         dataSource.connection.use { connection ->
@@ -36,12 +38,13 @@ class JdbcOperatorProfileRepository(
         }
 
     /**
-     * 저장 진입점 — [OperatorProfilePort]의 일부가 아니다(port 는 조회만 선언한다, D-6F6-1
-     * 값 획득 축 표). `ProfileFacts`의 필드를 그대로 행으로 옮긴다(자기 값을 지어 쓰지
-     * 않는다) — 「누가 이 메서드를 부르는가」의 인가는 6A 소관이다(이 클래스를 조립하는
-     * 주체는 이미 [dataSource]를 쥔 주체다).
+     * 저장 진입점 — [OperatorProfileStorePort] 의 구현이다(M7/7C④ 2b 가 그 port 를 세웠다. 앞 판은
+     * 어느 port 에도 속하지 않는 메서드였고 KDoc 이 「편집 HTTP 는 6A 소관」이라 적어 뒀다 — 그 자리를
+     * 2b 가 받았다). `ProfileFacts`의 필드를 그대로 행으로 옮긴다(자기 값을 지어 쓰지 않는다).
+     * **누가 이 메서드를 부르는가**의 인가는 HTTP 층이 진다 — 자격 사실은 계정 단위가 아니라 싱글턴
+     * 이므로(V12) 이 서명에 계정이 없다.
      */
-    fun save(facts: ProfileFacts) {
+    override fun save(facts: ProfileFacts) {
         val row = facts.toRow()
         dataSource.connection.use { connection ->
             connection.prepareStatement(Sql.UPSERT_PROFILE).use { statement ->
