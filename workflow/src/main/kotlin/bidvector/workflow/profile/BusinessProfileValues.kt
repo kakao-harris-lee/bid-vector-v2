@@ -72,9 +72,20 @@ enum class NaraRegistrationField(
  * 표현되지 않는다(V22 의 짝 CHECK 가 표 층의 둘째 겹이다).
  */
 sealed interface NaraReadiness {
-    data object Unanswered : NaraReadiness
+    /**
+     * 세 상태의 **이름** — 저장(V22 `nara_registration` CHECK)과 wire(프로필 조회·쓰기)가 같은 값을
+     * 쓰고, **선언은 이 자리 하나**다(M7/7C④ 2b). 세 문자열을 층마다 적으면 한쪽만 고쳐도 컴파일이
+     * 조용하고, 그때 어긋나는 것은 「운영자가 뭐라고 답했는가」다.
+     */
+    val storedName: String
 
-    data object NotRegistered : NaraReadiness
+    data object Unanswered : NaraReadiness {
+        override val storedName: String get() = UNANSWERED_NAME
+    }
+
+    data object NotRegistered : NaraReadiness {
+        override val storedName: String get() = NOT_REGISTERED_NAME
+    }
 
     /**
      * 등록했다고 답했다. 분야가 비었거나 만료일이 없을 수 있다 — 입력 도중의 상태이고, 체크리스트가
@@ -87,7 +98,23 @@ sealed interface NaraReadiness {
         val fields: Set<NaraRegistrationField>,
         val businessCertificateExpiresOn: LocalDate?,
     ) : NaraReadiness {
+        override val storedName: String get() = REGISTERED_NAME
+
         override fun toString(): String = "Registered(***)"
+    }
+
+    companion object {
+        /**
+         * 세 이름 — **전부 `const`** 다. 상태 object 의 속성에서 읽어 모으면 그 목록의 초기화가
+         * object 초기화에 기대고, 그 사슬은 같은 파일 안에서 조용히 순환이 된다(2a 의 체크리스트 초기화
+         * 사고와 같은 모양). `const` 는 컴파일 시점에 끼워 넣어지므로 사슬 자체가 없다.
+         */
+        const val UNANSWERED_NAME: String = "UNANSWERED"
+        const val REGISTERED_NAME: String = "REGISTERED"
+        const val NOT_REGISTERED_NAME: String = "NOT_REGISTERED"
+
+        /** 받아들이는 세 이름 — 그 밖은 어휘 밖이다(호출자가 자기 층의 거부로 옮긴다). */
+        val NAMES: List<String> = listOf(UNANSWERED_NAME, REGISTERED_NAME, NOT_REGISTERED_NAME)
     }
 }
 
