@@ -182,6 +182,52 @@ class BidMenuTypesTest {
         (fromMutable == fromFixed) shouldBe true
     }
 
+    /**
+     * (r3 N-2) — 결과 그래프의 컬렉션 **여섯 중 하나**(`CollapsedWithOtherStances.otherStances`)가
+     * 가둠 밖에 있었다. `withheld` 맵이 `unmodifiableMap` 이어도 그 **값** 안의 집합은 캐스팅
+     * 한 줄로 비울 수 있어, 그 타입의 `init` 불변식 둘이 사후에 무너졌다.
+     */
+    @Test
+    fun `보류 사유의 겹친 태도 집합은 사후 변조되지 않는다`() {
+        val partial = anyPartialMenu()
+        val reason =
+            partial.withheld.values
+                .filterIsInstance<MenuUnmeasurableReason.CollapsedWithOtherStances>()
+                .first()
+        val hashBefore = reason.hashCode()
+
+        shouldThrow<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (reason.otherStances as MutableSet<BidStance>).clear()
+        }
+        reason.otherStances.isNotEmpty() shouldBe true
+        reason.hashCode() shouldBe hashBefore
+    }
+
+    /** `BandCollapsed`·`Unmeasurable` 도 `Offered` 와 같은 꼴로 원본 표류를 막는다(r3 N-3). */
+    @Test
+    fun `실패 결과도 생성 뒤 원본이 바뀌면 흔들리지 않는다`() {
+        val mutableStances = BidStance.entries.toMutableSet()
+        val collapsed = BidMenuOutcome.BandCollapsed(CollapseCause.DuplicateEffectiveAmounts(1L), mutableStances)
+        val collapsedHash = collapsed.hashCode()
+
+        val mutableWithheld =
+            BidStance.entries
+                .associateWith<BidStance, MenuUnmeasurableReason> {
+                    MenuUnmeasurableReason.FloorBoundNotRepresentable(it)
+                }.toMutableMap()
+        val unmeasurable = BidMenuOutcome.Unmeasurable(mutableWithheld)
+        val unmeasurableHash = unmeasurable.hashCode()
+
+        mutableStances.clear()
+        mutableWithheld.clear()
+
+        collapsed.collapsedStances shouldBe BidStance.entries.toSet()
+        collapsed.hashCode() shouldBe collapsedHash
+        unmeasurable.withheld.keys shouldBe BidStance.entries.toSet()
+        unmeasurable.hashCode() shouldBe unmeasurableHash
+    }
+
     private fun anyPartialMenu(): BidMenuOutcome.PartiallyOffered =
         composeBidMenu(
             testInput(rates = testRates(aggressive = "0.93", recommended = "0.93", safe = "0.96")),

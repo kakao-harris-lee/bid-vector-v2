@@ -22,7 +22,7 @@ import java.nio.file.Files
  * 생성 경로가 닫혀 있다는 사실만이 증명이다. 생성자를 공개로 되돌리는 변이에서 fixture 1 이
  * 양성이 되어 RED 다.
  *
- * fixture 4 — 네 결과 타입의 `copy` 가 모듈 밖에서 닫혀 있다.
+ * fixture 4a~4e — 결과 그래프 **다섯 타입**의 `copy` 가 각각 모듈 밖에서 닫혀 있다.
  *
  * fixture 1 — [BidMenuOption] 은 모듈 밖에서 직접 지을 수 없다(유일한 생성 경로는
  * [composeBidMenu]). fixture 2 — [BidMenuOutcome.Offered] 도 같다. fixture 3 —
@@ -78,14 +78,38 @@ class MenuCompileFailureHarnessTest {
     }
 
     /**
-     * fixture 4 — `copy` 도 모듈 밖에서 닫혀 있다(r2 M-4 · ③′). 생성 폐쇄만 재면
-     * **`copy` 로 가둔 컬렉션을 갈아끼우는 경로**가 열린 채 남는다. `BandCollapsed` ·
-     * `Unmeasurable` 은 생성 표면이 public 이라 그 구멍이 **모듈 밖**에 있었다.
+     * fixture 4a~4e — `copy` 도 모듈 밖에서 닫혀 있다(r2 M-4 · ③′). 생성 폐쇄만 재면
+     * **`copy` 로 가둔 컬렉션을 갈아끼우는 경로**가 열린 채 남는다.
+     *
+     * **타입마다 fixture 를 따로 둔다**(r3 N-3). 앞 판은 한 파일에 copy 둘을 넣어
+     * 「**어느 하나라도** 막히면 통과」하는 술어였다 — 그러면 나머지가 열려도 초록이고,
+     * 실제로 `Offered`·`PartiallyOffered` 는 대상 밖이었다. 하나의 음성 fixture 는 하나의
+     * 명제만 재야 한다.
      */
     @Test
-    fun `4 결과 타입의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4-menu-outcome-copy", "cannot access")
+    fun `4a Offered 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4a-menu-offered-copy", "cannot access")
         assertPositiveCompiles("1-menu-via-kernel")
+    }
+
+    @Test
+    fun `4b PartiallyOffered 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4b-menu-partially-offered-copy", "cannot access")
+    }
+
+    @Test
+    fun `4c BandCollapsed 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4c-menu-band-collapsed-copy", "cannot access")
+    }
+
+    @Test
+    fun `4d Unmeasurable 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4d-menu-unmeasurable-copy", "cannot access")
+    }
+
+    @Test
+    fun `4e CollapsedWithOtherStances 의 copy 는 모듈 밖에서 닫혀 있다`() {
+        assertNegativeFails("4e-menu-collapsed-reason-copy", "cannot access")
     }
 
     @Test

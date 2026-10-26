@@ -35,7 +35,10 @@ internal data class EffectiveRate(
     val binding: BindingConstraint,
 )
 
-/** 금액과 **그 금액을 정한 제약** — 하한으로 올라가면 binding 이 하한으로 바뀐다. */
+/**
+ * 금액과 **그 금액을 정한 제약** — 올림으로 하한에 맞춰 올라가면 binding 이 금액 축 값
+ * ([BindingConstraint.PublishedFloorRounding])으로 바뀐다(율 축에서 이미 걸린 경우는 그대로).
+ */
 internal data class AmountDecision(
     val amount: Derived<BidAmount>,
     val binding: BindingConstraint,
@@ -135,11 +138,15 @@ private fun appliedFloorOf(
  * 옵션은 후보 비율에 더 가깝게 남는다」는 **거짓**이다. 「제약을 만족하는 최소 정수」라는
  * 성질은 둘 다 참이고, 그 값이 하나로 정해진다는 것이 요점이다.
  *
- * **binding 은 올림이 바꾸지 않는다**(r2 M-2). 하한 **아래** 후보가 clamp 돼 올라왔으면
- * 이미 [BindingConstraint.PublishedFloorBound] 이고, 하한 **위** 후보가 원 단위 올림만 탔으면
- * 값을 정한 것은 여전히 후보 비율이라 [BindingConstraint.CandidateRate] 로 남는다. 앞 판은
- * 올림 경로에서 무조건 `PublishedFloorBound` 를 달아, 「하한에 걸렸거나 정확히 그 위」라는
- * 그 값의 뜻과 어긋나는 옵션을 만들었다.
+ * **binding 은 어느 축에서 걸렸는지를 말한다**(r3 N-1). 올림이 발화하면 결과가 언제나
+ * `ceil(적용 하한)` 이므로 **금액을 정한 것은 하한**이다 — 하한을 빼면 값이 달라진다. 그래서
+ * 하한 **위** 후보가 원 단위 올림만 탄 경우는 [BindingConstraint.PublishedFloorRounding]
+ * (금액 축)이고, 하한 **아래** 후보가 clamp 돼 올라왔으면 율 축에서 이미 걸린 것이라
+ * [BindingConstraint.PublishedFloorBound] 를 유지한다.
+ *
+ * 앞 두 판이 양쪽으로 틀렸다 — r1 은 올림 경로에 무조건 `PublishedFloorBound` 를 달아 율 축의
+ * 뜻을 넘겼고(r2 M-2), r2 는 그것을 `CandidateRate`(「걸린 제약이 없다」)로 되돌려 **하한이
+ * 금액을 정한 사실을 지웠다**(r3 N-1). 축을 가르는 값이 하나 더 필요했던 것이다.
  */
 internal fun amountStep(
     stance: BidStance,
@@ -179,10 +186,26 @@ private fun promoteToFloor(
 ): Step<AmountDecision> {
     val promotion = Resolution.Resolved(FLOOR_PROMOTION_ROUNDING, ctx.policy.version)
     return when (val promoted = unrounded.roundedWith(promotion, floor)) {
-        is Measurement.Measured -> Step.Ok(AmountDecision(promoted.value, effective.binding))
+        is Measurement.Measured -> Step.Ok(AmountDecision(promoted.value, promotedBinding(effective)))
         is Measurement.Unmeasurable -> Step.Halt(MenuUnmeasurableReason.AmountUnmeasurable(stance, promoted.reason))
     }
 }
+
+/**
+ * 올림이 발화한 옵션의 binding — **율 축에서 이미 걸렸으면 그대로 두고**, 율은 여유가 있었는데
+ * 금액만 올라갔으면 금액 축 값으로 바꾼다(r3 N-1).
+ *
+ * `FloorRateReadingUndecided` 는 여기 닿지 않는다 — 읽기가 미정이면 적용 하한이 `null` 이라
+ * `ROUNDED_BELOW_FLOOR` 자체가 나오지 않는다. 그래도 `when` 을 소진으로 두어 태도가 아니라
+ * **binding 어휘가 늘 때** 이 자리가 컴파일로 드러나게 한다.
+ */
+private fun promotedBinding(effective: EffectiveRate): BindingConstraint =
+    when (effective.binding) {
+        BindingConstraint.CandidateRate -> BindingConstraint.PublishedFloorRounding
+        BindingConstraint.PublishedFloorBound -> BindingConstraint.PublishedFloorBound
+        BindingConstraint.PublishedFloorRounding -> BindingConstraint.PublishedFloorRounding
+        BindingConstraint.FloorRateReadingUndecided -> BindingConstraint.FloorRateReadingUndecided
+    }
 
 /**
  * 리스크 노트 — DEC-04 커널의 판정 봉투를 그대로 쓴다. 임계 사정률이 서지 않으면 빈도를

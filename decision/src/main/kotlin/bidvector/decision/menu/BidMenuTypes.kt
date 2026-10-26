@@ -26,8 +26,26 @@ sealed interface BindingConstraint {
     /** 후보 비율 자신이 값을 정했다 — 걸린 제약이 없다. */
     data object CandidateRate : BindingConstraint
 
-    /** 게시 하한율에서 읽은 투찰율 하한이 값을 정했다(후보가 그 하한에 걸렸거나 정확히 그 위다). */
+    /**
+     * 게시 하한율에서 읽은 **투찰율 하한**이 값을 정했다 — **율 축**이다(후보가 그 하한에
+     * 걸렸거나 정확히 그 위다).
+     */
     data object PublishedFloorBound : BindingConstraint
+
+    /**
+     * 게시 하한이 **금액 축**에서 값을 정했다(r3 N-1) — 후보 율은 하한 **위**였는데, 원 단위
+     * 자연 반올림이 적용 하한을 밑돌아 **제약을 만족하는 최소 정수로 올라간** 경우다.
+     *
+     * [CandidateRate] 로 적으면 거짓이다. 「걸린 제약이 없다」가 [CandidateRate] 의 뜻인데,
+     * 이 경로는 **하한을 빼면 결과가 달라진다**(실측: 기초금액 1,234,567 · 하한율 0.87995 ·
+     * 후보 0.8799501 에서 하한이 있으면 1,086,358 원, 없으면 1,086,357 원). 제약을 지웠을 때
+     * 결과가 바뀌면 그것이 binding 이고, 그 사실이 [BindingConstraint] 가 지키려는 성질이다.
+     *
+     * [PublishedFloorBound] 와 **다른 값**인 이유는 **어느 축에서 걸렸는가**가 다르기 때문이다 —
+     * 저쪽은 율이 하한에 걸렸고, 이쪽은 율은 후보가 정했는데 **금액이** 하한으로 올라갔다.
+     * 둘을 한 값으로 접으면 「율이 하한 미만이었다」와 「율은 여유가 있었다」가 구별되지 않는다.
+     */
+    data object PublishedFloorRounding : BindingConstraint
 
     /**
      * **잠정** — 하한율의 읽기가 미정이라(`OPEN-DEC05-FLOOR-RATE-READING`) 하한 제약을
@@ -123,11 +141,27 @@ sealed interface MenuUnmeasurableReason {
      * 그대로 제시된다**(한 태도를 못 낸다고 나머지를 버리지 않는다는 [BidMenuOutcome.PartiallyOffered]
      * 의 원칙을 붕괴 축에도 적용한다).
      */
-    data class CollapsedWithOtherStances(
+    @ConsistentCopyVisibility
+    data class CollapsedWithOtherStances private constructor(
         val stance: BidStance,
         val amountWon: Long,
+        /** **이미 가둔 사본이 들어온다** — 생성 경로가 [invoke] 하나뿐이라 그것이 보장된다. */
         val otherStances: Set<BidStance>,
     ) : MenuUnmeasurableReason {
+        companion object {
+            /**
+             * 유일한 생성 경로 — 결과 그래프가 싣는 컬렉션은 **전부** 가둔 사본이어야 한다
+             * (r3 N-2). 이 하나가 `frozen()` 밖에 있어서, `withheld` 맵이 `unmodifiableMap`
+             * 인데도 그 **값** 안의 집합은 캐스팅 한 줄로 비울 수 있었다 — 아래 `init` 불변식
+             * 둘이 사후에 무너지고 담은 결과의 `hashCode` 가 움직인다.
+             */
+            operator fun invoke(
+                stance: BidStance,
+                amountWon: Long,
+                otherStances: Set<BidStance>,
+            ): CollapsedWithOtherStances = CollapsedWithOtherStances(stance, amountWon, frozen(otherStances))
+        }
+
         init {
             require(otherStances.isNotEmpty()) { "겹친 상대가 없으면 붕괴가 아니다: $stance" }
             require(stance !in otherStances) { "자기 자신과 겹칠 수 없다: $stance" }

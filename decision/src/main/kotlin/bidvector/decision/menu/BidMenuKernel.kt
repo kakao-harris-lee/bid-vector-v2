@@ -15,8 +15,9 @@ import bidvector.sharedkernel.export
  * 하한 제약은 **율 축**에서만 건다. 게시 하한율은 예정가격 기준이라 기초금액에 곱하면 basis
  * 가 섞이고(DEC-12 A5), 그 해석 자체가 미결이다(`OPEN-DEC05-FLOOR-RATE-READING`).
  *
- * **순서**: ① 출처 부재 → ② 태도별 효력 투찰율 → ③ 밴드 붕괴 둘(하한이 밴드 위 · 효력율 중복)
- * → ④ 태도별 금액·리스크 → ⑤ 조립(셋 전부 / 일부 / 전부 보류).
+ * **순서**: ① 출처 부재 → ② 태도별 효력 투찰율 → ③ 하한이 밴드 위면 붕괴(율 축) →
+ * ④ 태도별 금액·리스크 → ⑤ 조립 — 여기서 **제출 금액이 겹친 태도**를 접는다(금액은 ④ 뒤에야
+ * 알 수 있어 율 축에서는 잴 수 없다, r2 M-3).
  */
 fun composeBidMenu(
     input: BidMenuInput,
@@ -73,17 +74,21 @@ private fun wonOf(option: BidMenuOption): Long =
         .won
 
 /**
- * 제출 **금액**이 겹친 태도 묶음(r2 M-3) — 판정 축이 율이 아니라 금액인 이유는
+ * 제출 **금액**이 겹친 태도 전부(r2 M-3) — 판정 축이 율이 아니라 금액인 이유는
  * [CollapseCause.DuplicateEffectiveAmounts] 에 적었다. 금액은 옵션을 다 지은 **뒤에야**
  * 알 수 있으므로 이 판정은 조립 뒤에 온다.
  *
- * 태도가 셋이므로 겹침 묶음은 **많아야 하나**다(둘이 겹치면 남은 하나는 그 둘과 다르다).
+ * **겹침 묶음을 전수로 모은다**(r3 cr L-3). 앞 판은 첫 묶음만 집고 「태도가 셋이라 묶음은
+ * 많아야 하나」라는 전제를 **주석으로만** 닫았다 — 태도가 넷이 되면 둘째 묶음이 조용히
+ * 「정상」으로 나간다. 전제를 주석에 두지 않고 모으는 방식으로 없앤다.
  */
 private fun collidingStances(built: Map<BidStance, BidMenuOption>): Map<BidStance, Long> {
     val stancesByAmount: Map<Long, List<BidStance>> =
         built.entries.groupBy({ entry -> wonOf(entry.value) }, { entry -> entry.key })
-    val collided = stancesByAmount.entries.firstOrNull { (_, stances) -> stances.size > 1 } ?: return emptyMap()
-    return collided.value.associateWith { collided.key }
+    return stancesByAmount.entries
+        .filter { (_, stances) -> stances.size > 1 }
+        .flatMap { (won, stances) -> stances.map { stance -> stance to won } }
+        .toMap()
 }
 
 /**
@@ -120,8 +125,10 @@ private fun assemble(
 
     return when {
         collided.keys == BidStance.entries.toSet() -> {
+            val amounts = collided.values.distinct()
+            require(amounts.size == 1) { "태도 전수가 접혔는데 금액이 여럿이다: $amounts" }
             BidMenuOutcome.BandCollapsed(
-                cause = CollapseCause.DuplicateEffectiveAmounts(collided.values.first()),
+                cause = CollapseCause.DuplicateEffectiveAmounts(amounts.single()),
                 collapsedStances = collided.keys,
             )
         }

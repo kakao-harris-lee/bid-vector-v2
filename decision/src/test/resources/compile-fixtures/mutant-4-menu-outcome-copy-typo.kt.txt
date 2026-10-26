@@ -4,8 +4,8 @@ import bidvector.decision.menu.BidMenuOutcome
 import bidvector.decision.menu.BidStance
 
 /**
- * 비공허성 대조 — 계약 위반이 **없는** 오타다. 이 fixture 도 컴파일에 실패하지만 진단이
- * 다르므로, 「cannot access」를 본 단언이 오타만으로 만족되지 않음을 보인다.
+ * 비공허성 대조 — 계약 위반이 **없는** 오타다. 음성 fixture 4a~4e 가 공유하는 통제군으로,
+ * 「cannot access」를 본 단언이 오타만으로 만족되지 않음을 보인다.
  */
 fun forgedCopyTypo(original: BidMenuOutcome.BandCollapsed): BidMenuOutcome.BandCollapsed =
     original.copyTypo(collapsedStances = setOf(BidStance.Safe))

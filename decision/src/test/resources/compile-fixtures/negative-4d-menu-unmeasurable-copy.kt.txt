@@ -1,0 +1,7 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOutcome
+
+/** `Unmeasurable.copy` 는 모듈 밖에서 닫혀 있다. */
+fun forgedUnmeasurableCopy(original: BidMenuOutcome.Unmeasurable): BidMenuOutcome.Unmeasurable =
+    original.copy(withheld = emptyMap())

@@ -176,8 +176,11 @@ class BidMenuKernelTest {
         val atOrAboveOutcome = composeBidMenu(testInput(rates = rates), testMenuPolicy(reading = atOrAbove()))
         val strictOutcome = composeBidMenu(testInput(rates = rates), testMenuPolicy(reading = strictlyAbove()))
 
-        atOrAboveOutcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>()
-        strictOutcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>()
+        // 같은 입력이 정책에 따라 **다른 사유**로 붕괴한다 — 사유를 단언하지 않으면 그 차이를 재지 못한다.
+        atOrAboveOutcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>().cause shouldBe
+            CollapseCause.DuplicateEffectiveAmounts(880_000L)
+        strictOutcome.shouldBeInstanceOf<BidMenuOutcome.BandCollapsed>().cause shouldBe
+            CollapseCause.FloorAboveBand(fraction("0.88"), fraction("0.88"))
     }
 
     /**
@@ -281,18 +284,58 @@ class BidMenuKernelTest {
      * 1,086,357.23165 **미만**이라 올림이 발화하고 결과는 `ceil(하한)` = 1,086,358 이다.
      */
     @Test
-    fun `binding — 하한 위 후보가 올림만 타면 후보 비율이 값을 정한 것으로 남는다`() {
+    fun `binding — 하한 위 후보가 올림만 타면 금액 축에서 하한이 값을 정한 것이다`() {
         val rates = testRates(aggressive = "0.8799501", recommended = "0.93", safe = "0.96")
         val input = testInput(base = testBase(1_234_567L), rates = rates, publishedFloorRate = testFloorRate("0.87995"))
 
         val outcome = composeBidMenu(input, testMenuPolicy(reading = atOrAbove()))
 
         val offered = outcome.shouldBeInstanceOf<BidMenuOutcome.Offered>()
-        offered.aggressive.binding shouldBe BindingConstraint.CandidateRate
+        offered.aggressive.binding shouldBe BindingConstraint.PublishedFloorRounding
         offered.aggressive.amount.value
             .export()
             .won shouldBe 1_086_358L
         offered.aggressive.grounds.bidRate.rate shouldBe fraction("0.8799501")
+    }
+
+    /**
+     * **제약을 지우면 결과가 바뀐다 — 그래서 그 제약이 binding 이다**(r3 N-1). 같은 입력에서
+     * 하한 읽기만 미정으로 바꾸면 금액이 1 원 내려간다. 이 등식이 깨지면 금액 축 binding 을
+     * `CandidateRate`(「걸린 제약이 없다」)로 적어도 들키지 않는다.
+     */
+    @Test
+    fun `binding — 금액 축 하한을 빼면 금액이 달라진다`() {
+        val rates = testRates(aggressive = "0.8799501", recommended = "0.93", safe = "0.96")
+        val input = testInput(base = testBase(1_234_567L), rates = rates, publishedFloorRate = testFloorRate("0.87995"))
+
+        val withFloor = composeBidMenu(input, testMenuPolicy(reading = atOrAbove()))
+        val withoutFloor = composeBidMenu(input, testMenuPolicy(reading = FloorRateReading.Undecided))
+
+        val raised = withFloor.shouldBeInstanceOf<BidMenuOutcome.Offered>().aggressive
+        val free = withoutFloor.shouldBeInstanceOf<BidMenuOutcome.Offered>().aggressive
+        raised.amount.value
+            .export()
+            .won shouldBe 1_086_358L
+        free.amount.value
+            .export()
+            .won shouldBe 1_086_357L
+        raised.binding shouldBe BindingConstraint.PublishedFloorRounding
+        free.binding shouldBe BindingConstraint.FloorRateReadingUndecided
+    }
+
+    /** 율 축에서 이미 걸린 옵션은 올림을 타도 **율 축 값**을 유지한다 — 두 축이 섞이지 않는다. */
+    @Test
+    fun `binding — 하한에 clamp 된 후보는 올림을 타도 율 축 값을 유지한다`() {
+        val rates = testRates(aggressive = "0.70", recommended = "0.93", safe = "0.96")
+        val input = testInput(base = testBase(1_234_567L), rates = rates, publishedFloorRate = testFloorRate("0.87995"))
+
+        val outcome = composeBidMenu(input, testMenuPolicy(reading = atOrAbove()))
+
+        val offered = outcome.shouldBeInstanceOf<BidMenuOutcome.Offered>()
+        offered.aggressive.binding shouldBe BindingConstraint.PublishedFloorBound
+        offered.aggressive.amount.value
+            .export()
+            .won shouldBe 1_086_358L
     }
 
     @Test
