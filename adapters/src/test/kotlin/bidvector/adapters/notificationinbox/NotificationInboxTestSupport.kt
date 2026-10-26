@@ -26,7 +26,11 @@ import java.time.Instant
  * production 과 같은 분담이다 — 계정 생성은 운영자 명령의 일이다.
  */
 internal abstract class NotificationInboxTestSupport : PersistenceTestSupport() {
+    /** 쓰기 포트 — `record` 만 있다(읽기 메서드를 **갖고 있지 않다**). */
     protected fun inbox(): JdbcNotificationInbox = JdbcNotificationInbox(dataSource())
+
+    /** 읽기·읽음 처리 포트 — 어댑터가 class 로도 갈려 있다(`typeShapeGate` 래칫). */
+    protected fun store(): JdbcNotificationInboxStore = JdbcNotificationInboxStore(dataSource())
 
     protected fun insertAccount(loginName: String): AccountId =
         dataSource().connection.use { connection ->

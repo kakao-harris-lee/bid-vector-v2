@@ -34,10 +34,10 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         inbox().record(record(account, grouped, NotificationFact.BidDeadlineImminent))
         inbox().record(record(account, grouped, NotificationFact.BidDeadlineToday))
         inbox().record(record(account, grouped, NotificationFact.NoticeRevised))
-        inbox().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, grouped), READ_AT)
+        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, grouped), READ_AT)
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
-        val items = inbox().list(account, page()).items
+        val items = store().list(account, page()).items
 
         items.filter { it.notice.number.value == "N-1" }.forEach { item ->
             item.group.itemCount shouldBe 3
@@ -57,13 +57,13 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.BidDeadlineImminent))
         inbox().record(record(account, notice, NotificationFact.BidDeadlineToday))
-        inbox().markRead(
+        store().markRead(
             account,
             NotificationItemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
             READ_AT,
         )
 
-        val page = inbox().list(account, page(unreadOnly = true))
+        val page = store().list(account, page(unreadOnly = true))
 
         page.items.size shouldBe 1
         page.items.single().group.itemCount shouldBe 2
@@ -80,15 +80,15 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.BidDeadlineImminent))
         inbox().record(record(account, notice, NotificationFact.BidDeadlineToday))
-        inbox().markRead(
+        store().markRead(
             account,
             NotificationItemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
             READ_AT,
         )
 
-        inbox().list(account, page()).unreadCount shouldBe 1L
-        inbox().list(account, page(unreadOnly = true)).unreadCount shouldBe 1L
-        inbox().list(account, page()).totalCount shouldBe 2L
+        store().list(account, page()).unreadCount shouldBe 1L
+        store().list(account, page(unreadOnly = true)).unreadCount shouldBe 1L
+        store().list(account, page()).totalCount shouldBe 2L
     }
 
     // =========================================================================
@@ -101,7 +101,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = insertNotice("N-JOIN", title = "도로 포장 공사", deadline = DEADLINE)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
 
-        val display = inbox().list(account, page()).items.single().display.shouldNotBeNull()
+        val display = store().list(account, page()).items.single().display.shouldNotBeNull()
 
         display.title shouldBe "도로 포장 공사"
         display.status shouldBe "Open"
@@ -117,7 +117,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val account = insertAccount("orphan")
         inbox().record(record(account, unknownNotice("N-GONE"), NotificationFact.NoticeRevised))
 
-        val item = inbox().list(account, page()).items.single()
+        val item = store().list(account, page()).items.single()
 
         item.display.shouldBeNull()
         item.notice.number.value shouldBe "N-GONE"
@@ -129,11 +129,11 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val account = insertAccount("purge")
         val notice = insertNotice("N-PURGE", title = "사라질 공고")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
-        inbox().list(account, page()).items.single().display.shouldNotBeNull()
+        store().list(account, page()).items.single().display.shouldNotBeNull()
 
         deleteNotice("N-PURGE")
 
-        val page = inbox().list(account, page())
+        val page = store().list(account, page())
         page.items.single().display.shouldBeNull()
         page.totalCount shouldBe 1L
     }
@@ -148,7 +148,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val notice = insertNotice("N-NOTITLE", title = null)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
 
-        val display = inbox().list(account, page()).items.single().display.shouldNotBeNull()
+        val display = store().list(account, page()).items.single().display.shouldNotBeNull()
 
         display.title.shouldBeNull()
         display.status shouldBe "Open"
@@ -168,7 +168,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         inbox().record(record(account, newer, NotificationFact.NoticeRevised, LATER))
 
         val keys =
-            inbox().list(account, page()).items.map { "${it.notice.number.value}/${it.fact.kind}" }
+            store().list(account, page()).items.map { "${it.notice.number.value}/${it.fact.kind}" }
 
         keys shouldContainExactly
             listOf(
@@ -192,7 +192,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
             )
         }
 
-        val second = inbox().list(account, NotificationPageRequest(page = 1, size = 2, unreadOnly = false))
+        val second = store().list(account, NotificationPageRequest(page = 1, size = 2, unreadOnly = false))
 
         second.items.size shouldBe 2
         second.totalCount shouldBe 5L
@@ -205,7 +205,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val account = insertAccount("past-end")
         inbox().record(record(account, unknownNotice("N-1"), NotificationFact.NoticeRevised))
 
-        val page = inbox().list(account, NotificationPageRequest(page = 9, size = 10, unreadOnly = false))
+        val page = store().list(account, NotificationPageRequest(page = 9, size = 10, unreadOnly = false))
 
         page.items.shouldBeEmptyList()
         page.totalCount shouldBe 1L
@@ -215,7 +215,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
     fun `항목이 없으면 빈 페이지다`() {
         val account = insertAccount("empty")
 
-        val page = inbox().list(account, page())
+        val page = store().list(account, page())
 
         page.items.shouldBeEmptyList()
         page.totalCount shouldBe 0L

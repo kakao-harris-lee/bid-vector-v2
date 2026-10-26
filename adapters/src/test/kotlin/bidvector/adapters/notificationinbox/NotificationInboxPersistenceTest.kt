@@ -102,7 +102,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val account = insertAccount("reread")
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
-        inbox().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER))
 
@@ -116,7 +116,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val notice = unknownNotice("N-1")
         val key = NotificationItemKey(NotificationKind.OPENING_COMPLETED, notice)
         inbox().record(record(account, notice, NotificationFact.OpeningCompleted(provisionallyFirst = true)))
-        inbox().markRead(account, key, READ_AT)
+        store().markRead(account, key, READ_AT)
 
         inbox().record(
             record(account, notice, NotificationFact.OpeningCompleted(provisionallyFirst = false), LATER),
@@ -142,7 +142,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             NotificationInboxOutcome.Updated
 
         rowCount() shouldBe 1L
-        inbox().list(account, page()).items.single().display?.title shouldBe "정정된 제목"
+        store().list(account, page()).items.single().display?.title shouldBe "정정된 제목"
     }
 
     @Test
@@ -169,7 +169,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(mine, unknownNotice("N-MINE"), NotificationFact.NoticeRevised))
         inbox().record(record(other, unknownNotice("N-OTHER"), NotificationFact.NoticeRevised))
 
-        val page = inbox().list(mine, page())
+        val page = store().list(mine, page())
 
         page.items.map { it.notice.number.value } shouldContainExactly listOf("N-MINE")
         page.totalCount shouldBe 1L
@@ -183,7 +183,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(other, notice, NotificationFact.NoticeRevised))
 
         val outcome =
-            inbox().markRead(mine, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+            store().markRead(mine, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
         outcome.markedCount shouldBe 0
         rawRow(other, "NOTICE_REVISED", "N-OTHER").readAt.shouldBeNull()
@@ -196,7 +196,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val notice = unknownNotice("N-OTHER")
         inbox().record(record(other, notice, NotificationFact.NoticeRevised))
 
-        inbox().markNoticeRead(mine, notice, READ_AT).markedCount shouldBe 0
+        store().markNoticeRead(mine, notice, READ_AT).markedCount shouldBe 0
         rawRow(other, "NOTICE_REVISED", "N-OTHER").readAt.shouldBeNull()
     }
 
@@ -209,7 +209,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             inbox().record(record(other, unknownNotice("N-O$index"), NotificationFact.NoticeRevised))
         }
 
-        inbox().list(mine, page()).unreadCount shouldBe 1L
+        store().list(mine, page()).unreadCount shouldBe 1L
     }
 
     // =========================================================================
@@ -224,7 +224,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
         val outcome =
-            inbox().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, first), READ_AT)
+            store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, first), READ_AT)
 
         outcome.markedCount shouldBe 1
         outcome.unreadCount shouldBe 1L
@@ -237,9 +237,9 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val notice = unknownNotice("N-1")
         val key = NotificationItemKey(NotificationKind.NOTICE_REVISED, notice)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
-        inbox().markRead(account, key, READ_AT)
+        store().markRead(account, key, READ_AT)
 
-        inbox().markRead(account, key, LATER_READ_AT).markedCount shouldBe 0
+        store().markRead(account, key, LATER_READ_AT).markedCount shouldBe 0
 
         rawRow(account, "NOTICE_REVISED", "N-1").readAt shouldBe READ_AT
     }
@@ -252,7 +252,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, target, NotificationFact.BidDeadlineToday))
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
-        val outcome = inbox().markNoticeRead(account, target, READ_AT)
+        val outcome = store().markNoticeRead(account, target, READ_AT)
 
         outcome.markedCount shouldBe 2
         outcome.unreadCount shouldBe 1L
@@ -263,7 +263,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     fun `존재하지 않는 항목의 읽음 처리는 영향 행 0 이다 — 예외가 아니다`() {
         val account = insertAccount("missing")
 
-        inbox()
+        store()
             .markRead(
                 account,
                 NotificationItemKey(NotificationKind.NOTICE_REVISED, unknownNotice("N-NONE")),
@@ -299,7 +299,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
                 inbox().record(record(account, notice, NotificationFact.NoticeRevised, at)) shouldBe
                     NotificationInboxOutcome.Created
                 // 읽음 시각도 같은 극단으로 — 적재 시각(DB `now()`)보다 과거·미래 둘 다 받는다.
-                inbox()
+                store()
                     .markRead(
                         account,
                         NotificationItemKey(NotificationKind.NOTICE_REVISED, notice),
@@ -308,7 +308,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             }
 
         rowCount() shouldBe 2L
-        inbox().list(account, page()).unreadCount shouldBe 0L
+        store().list(account, page()).unreadCount shouldBe 0L
     }
 
     private fun page(unreadOnly: Boolean = false) =

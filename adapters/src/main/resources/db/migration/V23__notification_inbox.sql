@@ -111,7 +111,7 @@ CREATE TABLE notification_inbox (
             AND detail_code IN ('AWARDED', 'NOT_AWARDED')
         )
         OR (kind NOT IN ('OPENING_COMPLETED', 'AWARD_DECIDED') AND detail_code IS NULL)
-    ),
+    )
 
     -- **`read_at >= created_at` 제약을 두지 않는다**(실측으로 걷어낸 자리).
     --
