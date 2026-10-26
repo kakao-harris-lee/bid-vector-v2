@@ -73,9 +73,15 @@ private fun floorAboveBand(ctx: OptionContext): BidMenuOutcome.BandCollapsed? =
  *
  * 태도가 셋이므로 겹침 묶음은 **많아야 하나**다(둘이 겹치면 남은 하나는 그 둘과 다르다).
  */
+/** 제출 금액(원 단위) — 겹침 판정의 축이다. */
+private fun wonOf(option: BidMenuOption): Long =
+    option.amount.value
+        .export()
+        .won
+
 private fun collidingStances(built: Map<BidStance, BidMenuOption>): Map<BidStance, Long> {
     val stancesByAmount: Map<Long, List<BidStance>> =
-        built.entries.groupBy({ entry -> entry.value.amount.value.export().won }, { entry -> entry.key })
+        built.entries.groupBy({ entry -> wonOf(entry.value) }, { entry -> entry.key })
     val collided = stancesByAmount.entries.firstOrNull { (_, stances) -> stances.size > 1 } ?: return emptyMap()
     return collided.value.associateWith { collided.key }
 }
@@ -113,13 +119,16 @@ private fun assemble(
     val offered = built.filterKeys { it !in collided }
 
     return when {
-        collided.keys == BidStance.entries.toSet() ->
+        collided.keys == BidStance.entries.toSet() -> {
             BidMenuOutcome.BandCollapsed(
                 cause = CollapseCause.DuplicateEffectiveAmounts(collided.values.first()),
                 collapsedStances = collided.keys,
             )
+        }
 
-        else -> outcomeOf(offered, withheld, ctx.policy.version)
+        else -> {
+            outcomeOf(offered, withheld, ctx.policy.version)
+        }
     }
 }
 
