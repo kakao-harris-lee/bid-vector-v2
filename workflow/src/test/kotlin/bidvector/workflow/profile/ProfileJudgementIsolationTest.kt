@@ -39,7 +39,10 @@ private val PROFILE_NAME_REFERENCE = Regex("""bidvector[/.]workflow[/.]profile[/
  *
  * **재는 것은 「직접 이름 참조 · 직접 구현 · 판정 타입을 대상으로 한 SAM 람다」뿐이다.** 재지 않는 것
  * (그래서 주장하지 않는다):
- * ⓐ `app` 모듈 — 2b 가 HTTP 표면을 세우면 그쪽은 이 패키지를 정당하게 참조한다. ⓑ `adapters` 모듈 —
+ * ⓐ `app` 모듈 — **2b 부터 정당하게 참조한다**(HTTP 표면이 요청을 이 패키지의 값으로 옮기고 응답을
+ * 그린다). 그쪽에서 막아야 하는 것은 참조가 아니라 **판정 쪽으로 건너가는 것**이고, 그 자리는 조립
+ * 하나다 — `ProfileAssemblyBoundaryTest` 가 「V22 를 받거나 내는 `@Bean` 은 프로필 조립의 것뿐」을
+ * 집합으로 잰다(2b 표적 4). ⓑ `adapters` 모듈 —
  * V22 를 지닌 class 의 자리는 모듈 전체에 걸리는 `BusinessProfileIsolationGateTest` 가 `SourceFile`
  * 속성으로 정한다. ⓒ domain 모듈(`qualification` 등) — 층 게이트가 `workflow` 참조 자체를 막는다.
  * ⓓ **이행 값 흐름**(허용 파일의 `String` 반환 helper 를 거치는 길) · **제3 패키지에 선언된 인터페이스**
