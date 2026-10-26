@@ -548,3 +548,13 @@ architecture test 셋과 `:app:ktlintMainSourceSetCheck`. 등재 항목은 **그
 9건 다시 초록. 네 번의 실행이 서로 다른 mtime 을 가져 「돌지 않고 초록」이 아니다.
 
 **이 라운드가 재지 않은 것**: 실 DB 소유 경계(2a 가 이미 쟀다)와 `awaiting`(7C ② 머지 뒤).
+
+### 5.8 이 판정에서 빠지는 것 — `awaiting` 과 체크리스트 operation
+
+D-7C4-8 Q3 대로 **`awaiting` 응답과 시작하기 체크리스트 operation 은 이 라운드에 없다**. 7C ② 의 평탄
+술어 확장이 main 에 없어서 짝 배열을 지금 넣으면 계약 test 가 붉고, 스칼라 배열 둘로 먼저 내면 나중에
+wire 를 한 번 더 바꾸게 된다. **세 상태를 두 상태로 접은 응답은 어느 경우에도 내지 않는다**는 결정에 따라
+체크리스트 endpoint 자체를 `awaiting` 과 함께 세운다.
+
+그래서 이 판정이 덮는 표면은 **operation 여섯**이고, 7C ② 머지 뒤 main 을 병합해 `awaiting` 을 짝 배열로
+넣은 다음 다시 동결한다. 동결 직전인데도 7C ② 가 main 에 없으면 보고한다.
