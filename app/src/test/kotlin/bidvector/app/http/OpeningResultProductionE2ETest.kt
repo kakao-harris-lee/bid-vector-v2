@@ -52,10 +52,13 @@ private val OBSERVED_AT: Instant = Instant.parse("2026-10-22T00:00:00Z")
 
 /**
  * 상류가 보낸 **원문 표기** — canonical 공고번호(`E2E-OPEN-1`)는 이 글자에서 파생된다
- * (`NoticeNumber.of`: ASCII 대문자화 · 공백 → `-`). 둘이 다른 상태가 기본이어야 원문 표를
- * 보는 질의가 정규화를 건너뛴 채 초록이 되지 않는다.
+ * (`NoticeNumber.of`: trim · ASCII 대문자화 · **연속** 공백류 → `-`). 둘이 다른 상태가 기본이어야
+ * 원문 표를 보는 질의가 정규화를 건너뛴 채 초록이 되지 않는다.
+ *
+ * 탭·연속 공백·앞뒤 공백을 함께 넣는다(vr r2 M-1) — 한 칸 공백만 쓰면 SQL 안의 **부분 사본**
+ * (`upper(replace(btrim(…), ' ', '-'))`)도 통과해, 그 사본을 다시 들여오는 변경이 초록으로 지나간다.
  */
-private const val RAW_NUMBER = "e2e open 1"
+private const val RAW_NUMBER = "  e2e\topen  1 "
 private const val RAW_ROUND = "001"
 
 /**

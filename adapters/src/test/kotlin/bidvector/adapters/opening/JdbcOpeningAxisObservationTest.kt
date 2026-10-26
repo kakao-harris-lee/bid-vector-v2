@@ -61,13 +61,18 @@ class JdbcOpeningAxisObservationTest : OpeningViewDbFixture() {
 
     /**
      * 원문의 공고번호는 **상류가 보낸 그대로**이고 물어보는 쪽은 canonical 이다 — 둘을 SQL 에서
-     * 그대로 맞대면 소문자·내부 공백이 든 번호에서 조용히 빗나가 「원문도 없다」고 답한다
+     * 그대로 맞대면 대소문자·공백이 든 번호에서 조용히 빗나가 「원문도 없다」고 답한다
      * (`JdbcCollectedAxisStore` 가 COL-05 로 세운 규율과 같은 자리).
+     *
+     * **표기를 이렇게 고른 이유**(vr r2 M-1): 소문자 + 한 칸 공백만 쓰면 `upper(replace(btrim(…),
+     * ' ', '-'))` 같은 **부분 사본**도 통과한다 — 그 사본을 SQL 에 다시 넣는 「최적화」가 초록으로
+     * 지나가면 탭·연속 공백·앞뒤 공백에서 결함이 되살아난다. 이 표기는 `NoticeNumber.of` 의 규칙
+     * 전부(trim · ASCII 대문자화 · **연속** 공백류 → `-`)를 만족해야만 맞는다.
      */
     @Test
-    fun `원문 번호가 소문자·공백이어도 같은 공고의 관측으로 센다`() {
+    fun `원문 번호가 대소문자·탭·연속 공백이어도 같은 공고의 관측으로 센다`() {
         seedNotice()
-        appendRawObservation(rawObservationOf("openview 20261022 001", id.round.value))
+        appendRawObservation(rawObservationOf("  openview\t20261022  001 ", id.round.value))
 
         present(view().lookup(id)).openingAxisObserved shouldBe true
     }
@@ -76,14 +81,29 @@ class JdbcOpeningAxisObservationTest : OpeningViewDbFixture() {
     @Test
     fun `원문 표기가 달라도 다른 공고의 관측은 이 공고로 세지 않는다`() {
         seedNotice()
-        appendRawObservation(rawObservationOf("openview 20261022 999", id.round.value))
+        appendRawObservation(rawObservationOf(" OpenView\t20261022  999 ", id.round.value))
 
         present(view().lookup(id)).openingAxisObserved shouldBe false
     }
 
     /**
-     * 마스킹된 원문은 **승격 대상이 아니다**(승격 쪽 `ELIGIBLE_SQL` 과 같은 조건) — 세어 주면 그
-     * 공고는 영영 「승격 전」으로 남아, 일시적이라던 상태가 영구 오답이 된다.
+     * 차수는 정규화가 아니라 **거부**다(`\d{3}`) — 형식을 어긴 원문 차수는 어느 공고의 키도 되지
+     * 못한다. 차수 등식을 SQL 에 두는 것(cr r2 M-2)과 값 객체로 접는 것이 같은 답을 낸다는 사실이
+     * 이 자리에서 선다.
+     */
+    @Test
+    fun `원문 차수가 형식을 어기면 이 공고의 관측이 아니다`() {
+        seedNotice()
+        appendRawObservation(rawObservationOf(id.number.value, "1", observedAt = T1))
+        appendRawObservation(rawObservationOf(id.number.value, " 001", observedAt = T2))
+
+        present(view().lookup(id)).openingAxisObserved shouldBe false
+    }
+
+    /**
+     * 마스킹된 원문은 **개찰 결과로 승격될 수 없다**(업체 식별 개념이 지워진 뒤다) — 세어 주면 그
+     * 공고는 영영 「승격 전」으로 남아, 일시적이라던 상태가 영구 오답이 된다. 이 조건이 승격 적격
+     * **전부**와 같다는 뜻은 아니다(cr r2 M-1 — 보존창·확정 표본은 이 조회가 볼 수 없는 축이다).
      */
     @Test
     fun `마스킹된 원문은 관측으로 세지 않는다`() {

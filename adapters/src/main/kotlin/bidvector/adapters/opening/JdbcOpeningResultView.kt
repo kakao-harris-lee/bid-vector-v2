@@ -8,7 +8,6 @@ import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservedBidAmount
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
-import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Rate
 import bidvector.workflow.opening.CanonicalOpeningFacts
 import bidvector.workflow.opening.NoticeOpeningFacts
@@ -78,33 +77,29 @@ class JdbcOpeningResultView(
         }
 
     /**
-     * 개찰 결과 축 원문이 이 공고에 있는가 — 축 둘로 거르고(`ANY`) **대조는 Kotlin 에서** 한다
-     * ([OpeningResultViewSql.SELECT_OPENING_AXIS_RAW_KEYS] KDoc, COL-05).
+     * 개찰 결과 축 원문이 이 공고에 있는가 — 축 둘(`ANY`)·차수·마스킹은 SQL 이 거르고 **공고번호의
+     * 대조만 Kotlin 에서** 한다([OpeningResultViewSql.SELECT_OPENING_AXIS_RAW_KEYS] KDoc, COL-05).
      */
     private fun Connection.openingAxisObserved(id: NoticeId): Boolean =
         prepareStatement(OpeningResultViewSql.SELECT_OPENING_AXIS_RAW_KEYS).use { statement ->
             val endpoints = OpeningResultViewSql.OPENING_RESULT_ENDPOINTS.map { it.name }.toTypedArray()
             statement.setArray(1, createArrayOf("text", endpoints))
-            statement.executeQuery().use { rows -> rows.anyKeyed(id) }
+            statement.setString(2, id.round.value)
+            statement.executeQuery().use { rows -> rows.anyNumbered(id.number) }
         }
 }
 
 /**
- * 원문 키 행을 **도메인 규칙으로 접어** 대조한다 — 규칙의 자리는 값 객체 하나뿐이다(COL-05).
- * 형태를 어긴 행은 키를 갖지 못하고 그냥 지나간다(D-6G2d-8 ⓐ): 원문은 append-only 라 지울 수
- * 없고, 무방비로 정규화하면 그런 행 하나가 조회 전체를 500 으로 만든다.
+ * 원문 공고번호를 **도메인 규칙으로 접어** 대조한다 — 규칙의 자리는 값 객체 하나뿐이다(COL-05).
+ * 번호가 서지 않는 행(빈 칸 등)은 키를 갖지 못하고 그냥 지나간다(D-6G2d-8 ⓐ): 원문은 append-only
+ * 라 지울 수 없고, 무방비로 정규화하면 그런 행 하나가 조회 전체를 500 으로 만든다.
  */
-private fun ResultSet.anyKeyed(id: NoticeId): Boolean {
+private fun ResultSet.anyNumbered(number: NoticeNumber): Boolean {
     while (next()) {
-        val number = getString("notice_number")?.let(NoticeNumber::ofOrNull)
-        val round = getString("notice_round")?.let(::roundOrNull)
-        if (number != null && round != null && NoticeId(number, round) == id) return true
+        if (getString("notice_number")?.let(NoticeNumber::ofOrNull) == number) return true
     }
     return false
 }
-
-/** 차수는 정규화가 아니라 **거부**다(제로패딩 3자리) — 형태를 어긴 원문은 키를 갖지 못한다. */
-private fun roundOrNull(raw: String): NoticeRound? = runCatching { NoticeRound.of(raw) }.getOrNull()
 
 private class NoticeRow(
     val deadlineAt: Instant?,

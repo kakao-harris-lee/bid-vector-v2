@@ -40,8 +40,10 @@ internal const val SENTINEL_COMPANY = "SENTINEL-BIDDER-DO-NOT-EXPORT"
 /**
  * 개찰 결과 조회 test 둘이 함께 쓰는 **행 심기**(`BidCaseDbFixture` 와 같은 관례).
  *
- * 단언은 하나도 두지 않는다 — 여기 있는 것은 「어떤 상태의 DB 인가」뿐이고, 「그 상태에서 조회가
- * 무엇을 답해야 하는가」는 두 test class 가 각자의 책임으로 잰다:
+ * **거동 단언은 두지 않는다 — 전제 확인만 있다**(cr r2 M-3): 심기가 실제로 됐는지 보는 넷
+ * (공고 insert · 마스킹 표지 1행 · 읽은 사실이 `Present` · 승격이 `Promotable`)은 남긴다. 전제가
+ * 조용히 어긋나면 그 뒤의 단언이 공허해지므로 **심는 자리에서 멈추는 쪽**이 낫다. 「그 상태에서
+ * 조회가 무엇을 답해야 하는가」는 두 test class 가 각자의 책임으로 잰다:
  * [JdbcOpeningResultViewTest] 는 **결과 투영과 읽기 전용**을, [JdbcOpeningAxisObservationTest] 는
  * **원문 존재와 승격 축**을 잰다. 같은 fixture 를 두 벌 두면 한쪽만 고치는 편집이 조용히 지나간다.
  */
