@@ -35,11 +35,6 @@ import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
-import java.net.Socket
-import java.time.Instant
-import java.time.LocalDate
-import java.util.Collections
-import java.util.concurrent.atomic.AtomicInteger
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
@@ -48,6 +43,11 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.core.Ordered
+import java.net.Socket
+import java.time.Instant
+import java.time.LocalDate
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
