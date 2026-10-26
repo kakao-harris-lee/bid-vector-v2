@@ -256,6 +256,12 @@ private 함수 둘뿐이고, 새 test 클래스 하나(`OpeningResultQueryReadin
 **7C①b 레인과의 겹침**: 같은 파일(`NoticeSearchController.kt`)의 **응답 DTO** 쪽을 그 레인이 바꾼다. 이 slice 가 만진 것은
 질의 읽기 private 메서드 셋(삭제)과 그 호출부뿐이라 hunk 가 겹치지 않는다 — 머지 때 뒤쪽 레인이 정리한다(팀장 지시).
 
+**in_scope 대조 — r1 이 만든 새 경로 둘**(수정 라운드가 만든 파일은 계약과 다시 맞춘다):
+`app/src/test/.../http/OpeningResultQueryReadingTest.kt`(이 endpoint 의 test — in_scope 「포트·어댑터·controller 와 test」)와
+`reports/evidence/m6/6e1/acceptance-trace.md`(in_scope 「추적표」의 그 행). **둘 다 계약 안**이고, 뒤엣것은 **다른 slice 의
+장부 파일**이라 rollback 복원 목록에도 들어간다 — 앞 판의 목록 필터가 `reports/evidence/` 를 통째로 빼고 있어 이 라운드에
+좁혔다(그렇지 않았으면 복원이 이 행을 되돌리지 않는다).
+
 **in_scope 대조(동결 보고 항목)** — 구현 중 늘어난 경로를 계약과 하나씩 맞췄다. **밖은 없다**: `DeclaredValue.kt` 는
 `D-7C5-8` 로 들어온 공용 자리의 **개명**(detekt 파일명 규칙)이고 새 경로가 아니다 · 교차 slice test 는 새 파일이 아니라
 기존 어댑터 test 안의 test 하나 · `OpeningAdapterDependencyTest.kt` 는 같은 in_scope 항목(조회 어댑터의 test) ·
