@@ -50,23 +50,31 @@ internal object OpeningResultViewSql {
      * 전」을 가르는 유일한 질의다. 승격 경로(7C⑤-0)가 서면 같은 공고의 답이 canonical 행으로
      * 바뀌므로, 그 레인이 보는 술어가 이 문장이다(evidence 에 명시).
      *
-     * 키 이름의 출처는 필드 계약이다(`JdbcCollectedAxisStore` 와 같은 자리) — 이 문장이 스스로
-     * 짓지 않는다. 차수를 등식으로 비교하므로 **형식을 어기는 원문 표기는 자동으로 빠진다**:
-     * 차수는 제로패딩 3자리이고 그 밖의 표기는 값 객체가 만들어지지 않는 「키 없는 행」이다
-     * (D-6G2d-8 ⓐ 와 같은 판정). 수집 쪽이 Kotlin 에서 정규화하는 것은 방향이 반대(원문 →
-     * 키 집합)이기 때문이고, 이쪽은 찾는 키가 이미 값 객체라 등식으로 족하다.
+     * **대조는 SQL 이 아니라 Kotlin 에서 한다**(`JdbcCollectedAxisStore` 가 COL-05 로 세운 규율과
+     * 같은 자리). `raw_observation` 의 공고번호는 온 그대로의 원문이고 물어보는 쪽은 canonical
+     * ([bidvector.procurement.NoticeNumber.of]: ASCII 대문자화 · 공백 → `-`)이다. 둘을 SQL 에서
+     * 그대로 맞대면 소문자·내부 공백이 든 번호에서 조용히 빗나가 「원문도 없다」고 답한다 —
+     * 승격을 기다리는 공고가 「수집 전」으로 보인다(실측: 어댑터·E2E 회귀 test 가 RED 였다).
+     * 정규화 규칙을 SQL 에 한 벌 더 쓰지 않는다(COL-05 「규칙은 여기 하나뿐」) — 키를 읽어 와
+     * 값 객체로 접는다. 차수도 같은 규칙으로 접는다.
      *
-     * 원문 표에 이 축의 인덱스는 없다(마이그레이션 0) — 단일 운영자 전제의 알려진 제한이다.
+     * **마스킹된 행은 세지 않는다** — 보존 규율이 표지를 찍은 원문은 승격 경로가 더 이상 읽지
+     * 않으므로(`JdbcOpeningRawAxisSource` 의 적격 질의와 같은 조건), 세어 주면 그 공고는 영영
+     * 「승격 전」으로 남아 일시적이라던 상태가 영구 오답이 된다.
+     *
+     * 키 이름의 출처는 필드 계약이다 — 이 문장이 스스로 짓지 않는다.
+     *
+     * **대가**: 이 문장은 개찰 축 원문을 훑는다(그 축의 인덱스는 없다 — 마이그레이션 0).
+     * canonical 행이 없을 때만 돌고 `DISTINCT` 가 결과를 공고 수로 묶지만, 원문이 쌓이면 비용도
+     * 는다 — 단일 운영자 전제의 알려진 제한이다.
      */
-    val SELECT_OPENING_AXIS_EXISTS =
+    val SELECT_OPENING_AXIS_RAW_KEYS =
         """
-        SELECT EXISTS (
-            SELECT 1
-            FROM raw_observation
-            WHERE source_endpoint = ANY (?)
-              AND payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' = ?
-              AND payload_fields ->> '${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}' = ?
-        ) AS observed
+        SELECT DISTINCT payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' AS notice_number,
+                        payload_fields ->> '${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}' AS notice_round
+        FROM raw_observation
+        WHERE source_endpoint = ANY (?)
+          AND pii_masked_at IS NULL
         """
 
     /**
