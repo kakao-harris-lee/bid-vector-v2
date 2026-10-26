@@ -137,7 +137,10 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
 
         val list = session.get(CAPACITIES)
         list.statusCode.value() shouldBe OK
-        list.body.orEmpty().trimStart().first() shouldBe '['
+        list.body
+            .orEmpty()
+            .trimStart()
+            .first() shouldBe '['
 
         session.post("$CAPACITIES/remove", """{"licenseName":"없는면허"}""").statusCode.value() shouldBe NOT_FOUND
         session.post("$CAPACITIES/remove", """{"licenseName":"합성토목"}""").statusCode.value() shouldBe OK

@@ -156,4 +156,3 @@ internal data class DraftInput(
     val amount: SubmittedBidAmount,
     val presentedAt: Instant,
 )
-

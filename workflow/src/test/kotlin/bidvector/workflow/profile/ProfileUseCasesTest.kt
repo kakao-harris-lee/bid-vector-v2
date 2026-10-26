@@ -128,8 +128,7 @@ private class FakeBusinessProfileStore(
     val detailWrites = mutableListOf<Triple<Long, BusinessDetails, Instant>>()
     val capacityWrites = mutableListOf<Pair<Long, ConstructionCapacity>>()
 
-    override fun details(account: AccountId): BusinessDetails =
-        detailsByAccount[account.value] ?: BusinessDetails.EMPTY
+    override fun details(account: AccountId): BusinessDetails = detailsByAccount[account.value] ?: BusinessDetails.EMPTY
 
     override fun capacities(account: AccountId): List<ConstructionCapacity> =
         capacitiesByAccount[account.value].orEmpty().sortedBy { it.licenseName.value }
