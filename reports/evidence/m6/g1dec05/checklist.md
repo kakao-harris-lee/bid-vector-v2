@@ -1,20 +1,12 @@
 # M6/G1-DEC05 — checklist (투찰가 메뉴 DEC-05 + binding 제약 기록 DEC-02)
 
-**실측 기준 SHA: `fdf9a277`** — acceptance · rollback 이 이 SHA 에서 돌았다. **복원 경로**
-(코드 · test · `config/quality` · 공유 장부 `acceptance-trace.md`·`capability-map.md`)를 건드린
-**마지막** 커밋이고, 그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에
-움직이지 않는다**.
+**실측 기준 SHA: `63a207cd`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
+(r3 일괄). 복원 경로(코드 · test · `config/quality` · 공유 장부)를 건드린 **마지막** 커밋이고,
+그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에 움직이지 않는다**.
 
-**변이만 `756cf042` 에서 돌았다 — 같은 SHA 가 아니라는 사실을 적어 둔다.** 그 뒤의 유일한 복원
-경로 변경이 `E-24` 머리 열거 한 줄(`acceptance-trace.md`)이다. 기계 확인:
-`git diff --name-only 756cf042..fdf9a277` 은 경로 **둘**(`acceptance-trace.md` · `scope.md`)을
-내는데 `scope.md` 는 `reports/evidence/m6/g1dec05/**` 라 **복원 경로가 아니다**. 같은 범위에서
-`*.kt`·`*.kts`·`config/quality` 변경 경로는 **0** — Kotlin 산출물·test 가 바이트 동일이다.
-변이가 재는 것은 그 Kotlin 방어이므로 Markdown 한 줄이 결과를 바꿀 수 없다.
-
-**판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence 커밋은
-언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
-`git diff --name-only fdf9a277..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
+**판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence
+커밋은 언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
+`git diff --name-only 63a207cd..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
 
 ## Phase 1 — 설계 (코드 0 · Gradle 0)
 
@@ -337,6 +329,55 @@ r2 는 **verifier ready-for-review · code-reviewer approve**(blocker·high 0)�
 중첩 class 는 `Outer$Inner.class` 인데 `$` 앞 마디(`CollapseCause`)만 소스와 대조했고 그 이름은 지금도
 선언돼 있어 통과로 나왔다. **마디를 전부 보도록** 고쳐야 걸린다. 지금은 단계 6 이 `clean` 뒤에 이 대조를
 돌리고 **「소스에 없는 class 0」을 본 뒤에야** 측정을 믿는다.
+
+### 승인 전 일괄(D-G1DEC05-3) 실측 — 실측 기준 `63a207cd`
+
+**acceptance** — `clean` 뒤 `check --continue` **exit 0** · **CI 명령 그대로 `check` exit 0**.
+HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력**. `:contractGate` executed.
+
+**낡은 `.class` 대조 0** — `clean` 뒤 중첩 마디까지 전수로 봤다. 이 라운드가 타입 이름을
+바꿨으므로(`DuplicateEffectiveRates` → `…Amounts`) 반드시 보는 자리다.
+
+| # | 변이 | numstat | 결과 | 실패 수 |
+|---|---|---|---|---|
+| **기준선** | 변이 0 | 0/0 | **GREEN** | 0 |
+| **N1** | 올림 경로가 binding 을 덮는다(M-2 되돌림) | 1/1 | **RED** | 1 |
+| **M3P** | 경계 등가의 binding 을 `CandidateRate` 로(갱신판 M3) | 1/1 | **RED** | 2 |
+| **C1** | 금액 겹침 판정을 못 찾게 한다(M-1·M-3 방어) | 1/1 | **RED** | 7 |
+| **F1** | `invoke` 의 복사를 뺀다(팀장 ③ · ③′ 방어) | 1/1 | **RED** | 2 |
+| **R2-M1** | `toStanceRates` 라벨 축 반전 | 2/2 | **RED** | 2 |
+| **R2-M8** | `StanceRates` 불변식 방향 반전 | 1/1 | **RED** | 28 + 2 |
+| **통제군** | 주석 한 줄(거동 0) | 1/0 | **GREEN** | 0 |
+
+**여섯 전부 RED · 기준선과 통제군 GREEN.** 전부 바꿔치기이고(`+`·`-` 둘 다 0 이 아니다)
+`numstat` 으로 적용을 확인한 뒤에만 돌렸다. test task 마다 `--rerun` 이라 통제군의 초록은
+**cache 적중이 아니라 실제 실행**이다. 필터는 모듈 셋 전체다.
+
+**N1 이 1 건만 잡는 것이 요점이다** — r2 에서 이 변이는 **GREEN** 이었다(그 경로를 재는 test 가
+없었다). 지금 정확히 새 P2 회귀 test 하나가 잡는다. **F1 은 ③′ 가 없으면 못 잡는 결함**이다 —
+가둔 뷰만 파생하던 판에서는 primary 의 원본 참조가 `equals`·`hashCode` 를 끌고 다녔다.
+
+**rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `46ac0949`**(고정), 버릴 clone.
+
+| 단계 | 결과 |
+|---|---|
+| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 26 · M 7 · 계 33) |
+| ② `git restore --source=46ac0949` + 새 경로 삭제 | restore exit 0 · delete exit 0 |
+| ③ 되돌린 경로의 `git diff` | **OK — 0 bytes** |
+| ④ `compileKotlin compileTestKotlin` | **exit 0** |
+| ⑤ `:decision:test :shared-kernel:test :workflow:test` | **exit 0** |
+| ⑥ `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** |
+| ⑦ 트리 복귀 | **OK — porcelain 빈 출력 · HEAD 불변** |
+
+**완료는 종료 코드가 아니라 계수로 센다**: 내 표지 넷(menu 디렉터리 · `AppliedFloor.kt` ·
+복원 경로 안 `G1-DEC05` · 전 트리 `AppliedFloor`) **전부 0**, 남의 표지 둘(SET-01 OPEN id
+**5 → 5** · COL-03 의 `PromoteOpeningResultsUseCase.kt` **보존**) **그대로**.
+
+**이 라운드가 쓴 선행 패스**: 비싼 clean `check`(23분) 로 형식 오류를 발견하는 일이 두 번
+반복돼, 체인 전에 **빠른 정적 게이트**(세 모듈 × `ktlintCheck`·`detekt`·`sizeGate`·
+`typeShapeGate`·`testShapeGate`·`gateRegistrationGate`, `--continue`)를 두고 **붉은 것을 한 번에**
+보게 했다(13:41 `FASTGATE_EXIT=0`). 그리고 체인이 **ACC 가 붉으면 그 자리에서 멈추게** 고쳤다 —
+앞 회차는 붉은 기준선 위에서 변이 6분·rollback 25분을 돌려 **무효한 측정으로 락만 잡았다**.
 
 ### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
 
