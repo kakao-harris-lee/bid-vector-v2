@@ -14,9 +14,45 @@ CI 는 매번 새 checkout 이라 이 차이가 없다.
 | `clean` | exit 0 |
 | `check --continue` | **exit 0** · 391 task(실행 208 · cache 156 · up-to-date 27) · FAILED **0** · 25분 9초 |
 
-`web` job · S-20 · rollback 은 §3 이후에 적는다(측정한 것만 적는다).
+## 2. acceptance — `ci.yml` `web` job
 
-## 2. 변이 — 등재 하나를 지우면 그 게이트가 붉은가
+계약상 acceptance 는 `check` job 과 `web` job 둘이다(scope.md). 아홉 단계를 워크플로 순서 그대로
+돌렸고 **전부 exit 0** 이다.
+
+| 단계 | 결과 | 단계 | 결과 |
+|---|---|---|---|
+| W-1 install | 0 | W-6 vitest | 0 · 5 파일 **28건** · skipped/todo 0 |
+| W-2 eslint | 0 | W-7 게이트 test 실행 확인 | 0 |
+| W-3 typecheck | 0 | W-8 build | 0 |
+| W-4 src 트리 경계 | 0 | W-9 번들 경계 카나리 | 0 |
+| W-5 OpenAPI 생성 타입 바이트 등식 | 0 | | |
+
+W-5 가 이 slice 의 핵심이다 — 미판정 축 어휘가 늘어 생성 타입을 다시 냈고(손으로 꿰매지 않았다),
+그 바이트 등식이 선다.
+
+## 3. S-20(one-command) 커버리지 — **돈 것만 적는다**
+
+S-20 은 acceptance 의 **상위집합**이다. 전건을 한 번 더 돌리면 한 시간 동안 락을 쥐어 네 레인을
+막으므로, **그 안에서 새로 재는 것 하나**(`qualityBaseline`)만 남기고 나머지는 이미 돌린 실행으로
+갈음했다. 아래는 단계별로 **어느 실행이 덮는가**와 그 결과다.
+
+| S-20 단계 | 덮는 실행 | 결과 |
+|---|---|---|
+| Kotlin `check` | §1 clean 전수 + S-20 안의 재실행 | exit 0 / BUILD SUCCESSFUL |
+| Kotlin `qualityBaseline` | **S-20 안에서 실측** | BUILD SUCCESSFUL |
+| Python S-1·S-1b install·extras | S-20 안에서 실측 | 통과(다음 단계로 진행) |
+| Python S-2 ruff | S-20 안에서 실측 | `All checks passed!` |
+| Python S-3 mypy --strict | S-20 안에서 실측 | `no issues found in 99 source files` |
+| Python S-4 import-linter | S-20 안에서 실측 | 통과(다음 단계로 진행) |
+| **Python S-5 pytest · S-6 설계 래칫 · S-7 재활용 출처** | **돌지 않았다** | 계약상 생략 — `ml-engine/**` 입력 변경 **0**(path-limited diff) |
+| web W-1~W-9 | §2 | 전부 exit 0 |
+| **web W-10·W-11 Playwright** | **돌지 않았다** | `web` job 에 없는 단계라 이 slice 의 계약 acceptance 밖이다 |
+
+**S-20 을 「통과」라고 적지 않는다** — Python pytest 에서 멈춰 세웠으므로 그 명령의 종료 코드는
+없다. 적는 것은 위 단계별 결과뿐이다. 중단은 락 양보를 위한 것이고, 멈출 때 내 프로세스 트리와
+`--no-daemon` 이 남긴 daemon 하나를 PID 로 확인해 정리했다(다른 레인 것은 건드리지 않았다).
+
+## 4. 변이 — 등재 하나를 지우면 그 게이트가 붉은가
 
 **바꿔치기**다(더하기가 아니다): 등재 항목 하나를 **지우고** 그 게이트 test 를 돌린다. 버릴
 clone 에서 돌려 공유 worktree 에 변이가 남을 사정거리를 0 으로 만들었고, 변이 전 작업 트리가
