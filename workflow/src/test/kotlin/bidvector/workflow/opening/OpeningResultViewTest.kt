@@ -91,6 +91,17 @@ class OpeningResultViewTest {
         progressOf("재입찰") shouldBe OpeningProgress.REBID
     }
 
+    /**
+     * 출하 정책의 **version 과 등재 집합을 한 자리에서** 잠근다(cr r1 LOW-4 — 앞 판에서 `version` 은
+     * 아무도 읽지 않는 칸이었다). 라벨을 더하거나 빼면서 version 을 그대로 두면 이 단언이 먼저
+     * 깨진다 — evidence 의 정책 값 기록과 코드가 갈리는 것을 막는 자리다.
+     */
+    @Test
+    fun `출하 정책은 version 과 등재 집합이 함께 고정된다`() {
+        OPENING_PROGRESS_POLICY.version shouldBe "opening-progress-v1"
+        OPENING_PROGRESS_POLICY.labels.keys shouldBe setOf("개찰완료", "유찰", "재입찰")
+    }
+
     @Test
     fun `우회 ⑥ — 등재 밖 라벨은 개찰완료로 접히지 않고 판정 불가다`() {
         progressOf("개찰완료 ") shouldBe OpeningProgress.UNRECOGNIZED

@@ -17,7 +17,7 @@ import java.time.Instant
  * 하나로 선다(같은 값 묶음을 네 번 복사하지 않는다).
  */
 sealed interface OpeningResultView {
-    /** 그 공고 자체가 수집되지 않았다 — HTTP 404. 개찰 결과의 부재와 다른 사실이다. */
+    /** 그 공고 자체가 수집되지 않았다 — 개찰 결과의 부재와 **다른 사실**이라 고유 상태다(`D-7C5-9`). */
     data object NoticeAbsent : OpeningResultView
 
     /**
