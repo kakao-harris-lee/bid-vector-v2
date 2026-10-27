@@ -351,7 +351,8 @@ executed**(UP-TO-DATE 아님).
 | **A2** | `otherStances` 가둠 제거 | 1/1 | **RED** | 1 | r3 N-2 |
 | **U2** | `Unmeasurable` 의 생성자·`copy` 공개 | 1/2 | **RED** | 2 | r3 N-3 게이트 술어 |
 | **XOPT** | `BidMenuOption` 을 `@ExposedCopyVisibility` 로 | 1/1 | **RED** | 1 | **r4 V4-M1** 모집단 |
-| **L2M** | 타입 자체를 `internal` 로 | 1/1 | **RED** | — | **r4 cr L-2** 단언이 심볼을 지목 |
+| ~~**L2M**~~ | 타입 자체를 `internal` 로 | 1/1 | **RED(무효)** | — | **단언 미측정** — 그 RED 는 `BidMenuOption` 을 `internal` 로 만든 **main 컴파일 실패**에서 왔고, `Unmeasurable`·`BandCollapsed` 는 interface 안이라 `internal` 자체가 문법 오류다(r5 V5-M1). 판별력을 재지 못했다 → **V5M 으로 교체** |
+| **V5M** | `copy` 봉쇄 술어를 공허한 조각(`"copy"`)으로 되돌림 | 1/1 | *(아래 실측)* | — | **r5 V5-M1** — 술어의 판별력 |
 | **L1M** | 전수 접힘 분기를 금액 묶음 수와 무관하게 | 1/1 | **GREEN** | 0 | **측정 불가 — 아래** |
 | **R2-M1** | `toStanceRates` 라벨 축 반전 | 2/2 | **RED** | 2 | 라벨 축 |
 | **R2-M8** | `StanceRates` 불변식 방향 반전 | 1/1 | **RED** | 30 + 2 | 순서 불변식 |
@@ -380,11 +381,26 @@ executed**(UP-TO-DATE 아님).
   같은 금액)을 넣어 이 분기를 **직접** 재고, L1M 을 RED 로 바꿔야 한다. 그때 이 줄이 그
   지시다.
 
+**`copy` 봉쇄 술어를 심볼에 고정했다(r5 V5-M1).** 앞 판의 `"copy"` 조각은 **아무것도 걸러내지
+못했다** — 하네스가 소스를 `compile-fixture-<baseName>/<baseName>.kt` 에 쓰고 컴파일러가 모든
+진단 줄 앞에 **그 경로**를 붙이는데, copy fixture 여섯의 `baseName` 에 전부 `copy` 가 들어 있다.
+그래서 `copy` 와 무관한 오류에서도 조각이 맞았다(verifier 탐침 실측). 지금은
+**`cannot access 'fun copy(`** — 경로에도 소스 echo 에도 나타날 수 없는 문면이다. 판별력은
+**`5-M2`** 가 잰다: **파일 이름에만** 그 낱말이 있고 **본문에는 0 회**이며 접근 불가 대상이
+`AppliedFloor` 의 `internal` 생성자인 mutant — 공허한 조각이면 경로 때문에 통과하므로 RED 다.
+
+**r4 의 L2M 을 「단언 측정」으로 적었던 것을 바로잡았다** — 그 RED 는 단언이 아니라 **main
+컴파일 실패**에서 왔다. 그 자리를 **V5M**(술어를 공허한 조각으로 되돌리는 변이)이 대신한다.
+
+**새 파일 ↔ in_scope 대조(r5 V5-L2)**: r5 가 만든 파일은 compile fixture 둘
+(`negative-1b-menu-option-copy` · `mutant-5-menu-copy-named-non-copy-access`)이고 둘 다
+`decision/src/test/resources/**` 라 **in_scope 안, 범위 밖 0** 이다.
+
 **rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `46ac0949`**(고정), 버릴 clone.
 
 | 단계 | 결과 |
 |---|---|
-| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 30 · M 7 · 계 37) |
+| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 31 · M 7 · 계 38) |
 | ② `git restore --source=46ac0949` + 새 경로 삭제 | restore exit 0 · delete exit 0 |
 | ③ 되돌린 경로의 `git diff` | **OK — 0 bytes** |
 | ④ `compileKotlin compileTestKotlin` | **exit 0** |
