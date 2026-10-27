@@ -14,9 +14,17 @@ import java.sql.Connection
  * M7/7C③ — **PII 부재를 카탈로그 성질로 잰다**(계약 (1) 「구성」 · 설계 검토 우회 ④).
  *
  * 왜 이 모양인가: 「알림 본문에 PII 를 넣지 않는다」를 문장이나 문자열 스캔으로 지키면 스타일
- * 하나로 열린다(어휘를 바꿔 적으면 지나간다). 여기서는 **표의 TEXT 열 전수**가 ⓐ 닫힌 어휘
- * CHECK 에 갇혔거나 ⓑ 공고 키 두 열이라는 **등식**을 건다 — 자유 문자열 열을 더하면 등식이
- * 깨지고, 우회하려면 이 게이트 자체를 바꿔야 한다.
+ * 하나로 열린다(어휘를 바꿔 적으면 지나간다). 여기서는 **표의 열 전수**가 ⓐ 닫힌 어휘 CHECK 에
+ * 갇혔거나 ⓑ 공고 키 두 열이거나 ⓒ 임의 문면을 담을 수 없는 자료형이라는 **등식**을 건다 —
+ * 자유 문자열 열을 더하면 등식이 깨지고, 우회하려면 이 게이트 자체를 바꿔야 한다.
+ *
+ * **r1 검토(verifier F3)가 이 술어를 두 축에서 뚫었다 — 그 둘을 구조로 닫았다.**
+ * ① 모집단이 `data_type = 'text'` 뿐이어서 `code TEXT` 는 걸렸어도 `memo VARCHAR(200)` 는
+ * 모집단에 **들지도 않았다**. 이제 모집단은 **자료형 무관 전수**이고, 통과하는 자료형을
+ * [STRUCTURAL_TYPES] 에 **열거**한다 — 새 자료형(`jsonb` 등)은 기본이 「판정 대상」이다.
+ * ② 어휘 판정이 제약 정의의 **부분 문자열**이어서 `detail_code = ANY` 가 이름이 겹치는 `code`
+ * 열을 「어휘가 닫힌 열」로 셌다(`kind = ANY` 는 `ind` 를). 이제 `pg_constraint.conkey` 로
+ * **제약이 실제로 가두는 열 번호**를 읽는다 — 이름이 겹쳐도 다른 열은 가둬지지 않는다.
  *
  * 함께 어휘 등식 둘을 잰다(우회 ⑨): Kotlin enum 과 DB CHECK 가 **같은 집합**이어야 한다.
  * 한쪽만 늘리면 저장할 수 없는 어휘나 복원할 수 없는 행이 생기고, 둘 다 조용하다.
@@ -24,27 +32,47 @@ import java.sql.Connection
 internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     /**
      * **이 표에 자유 문자열 열이 없다.** 공고 키 둘은 PII 가 아니다(공개 조달 식별자이고 형태
-     * CHECK 가 걸려 있다). 나머지 TEXT 열은 전부 `IN (…)` 어휘에 갇혀 있어 임의 문면을 담을
-     * 수 없다 — 즉 사업자번호·담당자 이름·연락처가 들어올 **칸이 없다**.
+     * CHECK 가 걸려 있다). 나머지 열은 전부 `IN (…)` 어휘에 갇혔거나 시각·정수라 임의 문면을
+     * 담을 수 없다 — 즉 사업자번호·담당자 이름·연락처가 들어올 **칸이 없다**.
      */
     @Test
-    fun `알림함의 TEXT 열은 전부 닫힌 어휘이거나 공고 키다 — 자유 문자열 열 0`() {
-        val textColumns = textColumnsOf(TABLE)
-        textColumns.shouldNotBeEmpty()
+    fun `알림함의 열 전수가 닫힌 어휘이거나 공고 키이거나 구조 자료형이다 — 자유 문자열 열 0`() {
+        val columns = columnTypesOf(TABLE)
+        columns.keys.shouldNotBeEmpty()
 
-        val constrained = columnsWithVocabularyCheck(TABLE)
-        val freeText = textColumns - constrained - NOTICE_KEY_COLUMNS
-
-        freeText.shouldBeEmpty()
+        freeFormColumns(columns, vocabularyClosedColumnsOf(TABLE)).shouldBeEmpty()
     }
 
     /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다(자유 TEXT 열이 있는 표는 걸린다). */
     @Test
     fun `자유 문자열 열을 가진 기존 표는 같은 술어에 걸린다 — 양성 대조`() {
         // `notice_audit.reason` 은 `<> ''` 뿐이라 어휘가 닫히지 않은 자유 문자열이다.
-        val freeText = textColumnsOf("notice_audit") - columnsWithVocabularyCheck("notice_audit")
+        val freeForm = freeFormColumns(columnTypesOf("notice_audit"), vocabularyClosedColumnsOf("notice_audit"))
 
-        freeText.shouldNotBeEmpty()
+        freeForm.shouldNotBeEmpty()
+    }
+
+    /**
+     * 양성 대조 — **r1 이 뚫은 두 꼴을 술어 로직만으로 고정한다**(실 DB 없이). 둘 다 앞 판
+     * 술어를 지나갔다: `code` 는 `detail_code = ANY` 의 부분 문자열에 걸려 「닫힌 열」로 셌고,
+     * `memo` 는 `varchar` 라 모집단에 들지 않았다. 지금 술어는 둘을 **자유 문면 열로** 센다.
+     */
+    @Test
+    fun `이름이 겹치는 열과 varchar 열은 술어에 걸린다 — 양성 대조`() {
+        val simulated =
+            mapOf(
+                "account_id" to "bigint",
+                "kind" to "text",
+                "detail_code" to "text",
+                "notice_number" to "text",
+                "notice_round" to "text",
+                "occurred_at" to "timestamp with time zone",
+                "code" to "text",
+                "memo" to "character varying",
+            )
+
+        freeFormColumns(simulated, vocabularyClosed = setOf("kind", "detail_code")) shouldBe
+            setOf("code", "memo")
     }
 
     @Test
@@ -160,75 +188,91 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
             }
         }.isFailure
 
-    private fun textColumnsOf(table: String): Set<String> =
+    /** 열 이름 → `information_schema` 자료형. **자료형으로 걸러내지 않는다** — 모집단은 전수다. */
+    private fun columnTypesOf(table: String): Map<String, String> =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "SELECT column_name FROM information_schema.columns " +
-                        "WHERE table_schema = 'public' AND table_name = ? AND data_type = 'text'",
+                    "SELECT column_name, data_type FROM information_schema.columns " +
+                        "WHERE table_schema = 'public' AND table_name = ?",
                 ).use { statement ->
                     statement.setString(1, table)
                     statement.executeQuery().use { rows ->
-                        val columns = mutableSetOf<String>()
-                        while (rows.next()) columns += rows.getString(1)
+                        val columns = mutableMapOf<String, String>()
+                        while (rows.next()) columns[rows.getString(1)] = rows.getString(2)
                         columns
                     }
                 }
         }
 
     /**
-     * `CHECK (… IN (…))` 로 **어휘가 닫힌** 열. PostgreSQL 은 `IN` 목록을 `= ANY (ARRAY[…])` 로
-     * 적으므로 그 형태를 찾는다. `<> ''` 처럼 비어 있지 않음만 요구하는 CHECK 는 어휘를 닫지
-     * 않으므로 여기 들지 않는다 — 그것이 이 술어의 요점이다.
+     * 임의 문면을 담을 수 있는 열 — 즉 **이 게이트가 거부해야 하는 열**. 통과 조건 셋 중
+     * 하나도 만족하지 못한 열이다: ⓐ 공고 키 ⓑ 단일 열 어휘 CHECK 에 갇힌 열 ⓒ 임의 문면을
+     * 담을 수 없는 자료형([STRUCTURAL_TYPES] 에 **열거**된 것뿐 — 모르는 자료형은 거부한다).
+     *
+     * 순수 함수다(DB 를 읽지 않는다) — 그래서 양성 대조가 실 스키마를 바꾸지 않고 술어 자체를
+     * 잴 수 있다.
      */
-    private fun columnsWithVocabularyCheck(table: String): Set<String> {
-        val definitions = checkDefinitionsOf(table)
-        return textColumnsOf(table)
-            .filter { column -> definitions.any { it.mentionsVocabularyOf(column) } }
-            .toSet()
-    }
+    private fun freeFormColumns(
+        columns: Map<String, String>,
+        vocabularyClosed: Set<String>,
+    ): Set<String> =
+        columns
+            .filterNot { (name, type) ->
+                name in NOTICE_KEY_COLUMNS || name in vocabularyClosed || type in STRUCTURAL_TYPES
+            }.keys
 
-    private fun checkDefinitionsOf(table: String): List<String> =
-        dataSource().connection.use { connection -> connection.readCheckDefinitions(table) }
+    /**
+     * **단일 열** 어휘 CHECK 가 가두는 열 — `pg_constraint.conkey` 로 제약이 실제로 가두는 열
+     * 번호를 읽어 이름으로 되돌린다(이름 부분 문자열 판정을 쓰지 않는 이유는 클래스 KDoc ②).
+     * `cardinality(conkey) = 1` 이 짝 CHECK 를 자동으로 제외한다 — 짝 CHECK 는 두 열을 든다.
+     *
+     * 어휘를 **닫는** 제약만 센다: PostgreSQL 이 `IN (…)` 을 되돌려 주는 `= ANY (ARRAY[…])`
+     * 형태여야 하고, `<> ''`·형태 정규식(`~`)처럼 집합을 열어 두는 CHECK 는 들지 않는다.
+     */
+    private fun vocabularyClosedColumnsOf(table: String): Set<String> =
+        singleColumnChecksOf(table)
+            .filterValues { definitions -> definitions.any { it.closesVocabulary() } }
+            .keys
 
-    private fun Connection.readCheckDefinitions(table: String): List<String> =
+    /** 열 이름 → 그 열 **하나만** 가두는 CHECK 정의들. */
+    private fun singleColumnChecksOf(table: String): Map<String, List<String>> =
+        dataSource().connection.use { connection -> connection.readSingleColumnChecks(table) }
+
+    private fun Connection.readSingleColumnChecks(table: String): Map<String, List<String>> =
         prepareStatement(
-            "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint " +
-                "WHERE contype = 'c' AND conrelid = ?::regclass",
+            "SELECT a.attname AS column_name, pg_get_constraintdef(c.oid) AS def " +
+                "FROM pg_constraint c " +
+                "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey) " +
+                "WHERE c.contype = 'c' AND c.conrelid = ?::regclass AND cardinality(c.conkey) = 1",
         ).use { statement ->
             statement.setString(1, table)
             statement.executeQuery().use { rows ->
-                val definitions = mutableListOf<String>()
-                while (rows.next()) definitions += rows.getString("def")
-                definitions
+                val byColumn = mutableMapOf<String, MutableList<String>>()
+                while (rows.next()) {
+                    byColumn.getOrPut(rows.getString("column_name")) { mutableListOf() } += rows.getString("def")
+                }
+                byColumn
             }
         }
 
-    /** 열 하나를 가두는 `CHECK (… IN (…))` 의 어휘 — 상수 목록을 제약 정의에서 읽는다. */
+    /** 이 제약 정의가 값 집합을 **닫는가**(`IN (…)` → `= ANY (ARRAY[…])`). */
+    private fun String.closesVocabulary(): Boolean = contains("= ANY (ARRAY[")
+
+    /**
+     * 열 하나를 가두는 `CHECK (… IN (…))` 의 어휘 — 상수 목록을 제약 정의에서 읽는다.
+     * 제약을 고르는 축은 **`conkey` 가 그 열 하나인 것**이다(이름 부분 문자열이 아니다).
+     */
     private fun checkVocabularyOf(
         table: String,
         column: String,
     ): List<String> {
         val vocabulary =
-            checkDefinitionsOf(table).single { definition ->
-                // 짝 CHECK 도 이 열을 언급하므로 **단일 열 어휘 제약만** 고른다(짝 쪽에는 ` OR ` 가 있다).
-                definition.mentionsVocabularyOf(column) && !definition.contains(" OR ")
-            }
+            singleColumnChecksOf(table)
+                .getValue(column)
+                .single { it.closesVocabulary() }
         return VOCABULARY_LITERAL.findAll(vocabulary).map { it.groupValues[1] }.toList()
     }
-
-    /**
-     * 이 제약 정의가 [column] 의 **어휘를 닫는가**. PostgreSQL 은 `IN (…)` 을 `= ANY (ARRAY[…])`
-     * 로 되돌려 주고, **열의 자료형에 따라 좌변 표기가 갈린다** — 이미 `text` 인 열은 `kind = ANY`
-     * 로, 캐스트가 필요한 열은 `(kind)::text = ANY` 로 나온다. 한 쪽만 보면 제약이 있는데도
-     * 「어휘가 닫히지 않았다」로 읽혀 이 class 의 등식이 **거짓으로 통과**한다(기존 스키마 래칫
-     * 의 같은 술어가 두 형태를 함께 보는 이유다 — 그 선례를 그대로 쓴다).
-     *
-     * `<> ''` 처럼 비어 있지 않음만 요구하는 CHECK 는 어휘를 닫지 않으므로 여기 들지 않는다 —
-     * 그것이 이 술어의 요점이다.
-     */
-    private fun String.mentionsVocabularyOf(column: String): Boolean =
-        contains("$column = ANY") || contains("($column)::text = ANY")
 
     private companion object {
         const val TABLE = "notification_inbox"
@@ -236,5 +280,22 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
         val DETAIL_BEARING_KINDS =
             setOf(NotificationKind.OPENING_COMPLETED, NotificationKind.AWARD_DECIDED)
         val VOCABULARY_LITERAL = Regex("'([^']*)'")
+
+        /**
+         * 임의 문면을 담을 수 **없는** 자료형 — 통과 축 ⓒ. **열거**이고 기본은 거부다:
+         * `character varying`·`jsonb`·`xml` 같은 것은 여기 없으므로 어휘 CHECK 없이는 걸린다.
+         */
+        val STRUCTURAL_TYPES =
+            setOf(
+                "bigint",
+                "integer",
+                "smallint",
+                "boolean",
+                "numeric",
+                "uuid",
+                "date",
+                "timestamp with time zone",
+                "timestamp without time zone",
+            )
     }
 }
