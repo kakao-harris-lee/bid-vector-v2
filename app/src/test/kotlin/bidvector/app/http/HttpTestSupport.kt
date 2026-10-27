@@ -5,6 +5,7 @@ import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
+import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
@@ -24,13 +25,14 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OperatorProfilePort
-import bidvector.workflow.evaluation.WatchSubjectOutcome
-import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
+import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
+import bidvector.workflow.opening.ReadOpeningResult
+import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
@@ -186,30 +188,6 @@ class TestStrategyRepository(
 }
 
 /**
- * `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
- * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
- * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
- * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
- *
- * **D-6A3-20 — [failure]는 `TestStrategyRepository.
- * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
- * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
- */
-class EmptyCandidateSource : CandidateSourcePort {
-    @Volatile var failure: (() -> Throwable)? = null
-
-    override fun openCandidates(): List<Notice> = failure?.let { throw it() } ?: emptyList()
-}
-
-private class UnreachableWatchSubjectPort : WatchSubjectPort {
-    override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-private class UnreachableLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-/**
  * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
  * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
  * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
@@ -357,6 +335,22 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /**
+     * 7C⑤-a — 개찰 결과 조회의 이중체와 조립. **이 class 안에 둔다**: 바깥의 `@Configuration` 은
+     * 출하 조립(`BidVectorApplication`)의 component scan 에도 걸려 같은 이름 빈이 둘이 된다(실측 —
+     * `BeanDefinitionOverrideException`). 이 class 는 `@SpringBootApplication` 어노테이션 필터가
+     * 출하 scan 에서 제외하므로, test 전용 조립의 자리는 여기다.
+     */
+    @Bean
+    open fun fakeOpeningResultFactsPort(): FakeOpeningResultFactsPort = FakeOpeningResultFactsPort()
+
+    @Bean
+    open fun openingResultQuery(
+        fakeOpeningResultFactsPort: FakeOpeningResultFactsPort,
+        clock: FixedClock,
+    ): OpeningResultQuery =
+        OpeningResultQuery(ReadOpeningResult(fakeOpeningResultFactsPort, clock, OPENING_PROGRESS_POLICY))
 
     @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
     open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()
