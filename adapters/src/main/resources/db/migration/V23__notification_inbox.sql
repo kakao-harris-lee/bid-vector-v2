@@ -144,8 +144,19 @@ CREATE INDEX notification_inbox_retention_cutoff_idx ON notification_inbox (crea
 --  · UPDATE 는 네 열에만 있다. 앱 역할은 **소유 계정 · 종류 · 공고 키 · 적재 시각을 바꿀 수
 --    없다** — 즉 남의 항목으로 옮기거나, 종류를 바꿔 중복 억제를 우회하거나, 적재 시각을 밀어
 --    파기를 피할 수 없다. upsert 의 `DO UPDATE SET` 과 읽음 처리가 필요한 열은 이 넷뿐이다.
+--  · **INSERT 도 열 단위다**(r1 검토 verifier F5). 표 단위로 주면 적재 시각을 *UPDATE* 로는
+--    못 밀어도 **INSERT 때 먼 미래로 지정**할 수 있고, 그 행은 보존 cutoff 를 영영 지나지
+--    않는다(이후 upsert 는 `created_at` 을 건드리지 않는다) — 즉 「적재 시각을 밀어 파기를
+--    피하는 길」이 UPDATE 쪽만 막혀 있었다. 여기 적은 일곱은 **어댑터의 upsert 가 실제로
+--    넣는 열 전부**이고, `created_at`(기본값 `now()`)과 `read_at`(읽음 처리의 UPDATE 로만
+--    움직인다)은 코드가 INSERT 에 쓰지 않으므로 빠진다. 열을 빼도 기본값은 서버가 넣는다.
+--    V20 `browser_session` 은 표 단위 INSERT 인데 이 표가 다르게 가는 이유는 **보존 기준 열이
+--    INSERT 로 지정 가능한가**가 여기서는 파기 회피 경로이기 때문이다(그 표의 보존 기준은
+--    세션 만료라 같은 성질이 아니다).
 --  · DELETE·TRUNCATE 는 주지 않는다 — 파기는 소유자 연결의 일이다(V8·V12·V15·V20 관례).
 --    앱 프로세스가 장악돼도 **알림을 지울 수 없다**.
 -- =============================================================================
-GRANT SELECT, INSERT ON notification_inbox TO bidvector_app;
+GRANT SELECT ON notification_inbox TO bidvector_app;
+GRANT INSERT (account_id, kind, notice_number, notice_round, detail_code, occurred_at, updated_at)
+    ON notification_inbox TO bidvector_app;
 GRANT UPDATE (detail_code, occurred_at, updated_at, read_at) ON notification_inbox TO bidvector_app;
