@@ -7,6 +7,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.lang.reflect.Modifier
 
 /**
  * M7/7C③ — 알림함 operation 셋의 **문서 자신**을 잰다(HTTP 호출 없음). 7C① 의 계약 test 와
@@ -63,9 +64,29 @@ class OpenApiNotificationInboxContractTest {
         }
     }
 
+    /**
+     * **키 집합 등식의 두 방향.** 앞 판은 제목이 「Kotlin DTO 와 일치한다」인데 **DTO 를 읽지
+     * 않았다** — 문서의 키를 이 파일의 축어 집합([ITEM_KEYS])과만 비교해서, 응답 DTO 에 칸을
+     * 더해도 아무것도 붉지 않았다(변이 ⑤ 가 GREEN — 실측으로 드러난 구멍이다). 등식을 두
+     * 방향으로 묶는다: 문서 ↔ 축어(문서가 조용히 줄어드는 쪽) · 문서 ↔ **DTO 필드 전수**
+     * (DTO 가 조용히 늘어나는 쪽, 즉 문서에 없는 칸이 wire 에 닿는 경로).
+     *
+     * `kotlin-reflect` 를 들이지 않고 순수 Java reflection 을 쓴다(app 모듈에 그 의존이
+     * 없다 — `OpenApiDryRunContractTest` 과 같은 방식). 거기와 다른 점 하나: 이 DTO 는
+     * `companion object` 를 가져 `declaredFields` 에 **정적 `Companion` 필드**가 섞인다.
+     * 그래서 synthetic 뿐 아니라 static 도 걷어낸다 — 걷지 않으면 이 test 가 「문서에
+     * `Companion` 키가 없다」는 **엉뚱한 이유로** 붉는다.
+     */
     @Test
     fun `항목 응답의 키 집합이 Kotlin DTO 와 완전히 일치한다 — 여분 필드가 생기면 깨진다`() {
+        val dtoFieldNames =
+            NotificationItemResponse::class.java.declaredFields
+                .filterNot { it.isSynthetic || Modifier.isStatic(it.modifiers) }
+                .map { it.name }
+                .toSet()
+
         spec.propertyKeys("NotificationItem") shouldBe ITEM_KEYS
+        spec.propertyKeys("NotificationItem") shouldBe dtoFieldNames
         // nullable 칸도 키 자체는 남는다(기존 관례) — 그래서 required 가 전수다.
         spec.requiredKeys("NotificationItem") shouldBe ITEM_KEYS
     }
