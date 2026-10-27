@@ -9,10 +9,24 @@
 이 slice 가 타입을 지우고 패키지를 옮기므로 증분 산출물이 남으면 **가짜 RED** 가 난다(0.9g-2).
 CI 는 매번 새 checkout 이라 이 차이가 없다.
 
-| 항목 | 값 |
-|---|---|
-| `clean` | exit 0 |
-| `check --continue` | **exit 0** · 391 task(실행 208 · cache 156 · up-to-date 27) · FAILED **0** · 25분 9초 |
+**정본은 병합 둘이 들어온 뒤의 실행이다**(`cr r3 M-2`). 앞 판의 391 task 실행은 병합 **앞** HEAD 의
+것이라, `557393af`·`f4afe17e` 가 고친 래칫 상수 · 정책 파일 · 게이트 등록부 · OpenAPI 해소를 재지
+못했다. 특히 `EXPECTED_EXEMPT_COUNT` 의 합집합 선언을 검산하는 자리는 `check` 안의 그 test 하나다.
+
+| 항목 | 값 | 어느 HEAD |
+|---|---|---|
+| `clean` | exit 0 | `f4afe17e` |
+| `check --continue` | **exit 0** · 401 task(실행 252 · cache 119 · up-to-date 30) · FAILED **0** · 28분 17초 | `f4afe17e` |
+| `qualityBaseline` | **exit 0** | `f4afe17e` |
+| CI `check` job(verifier 독립 실행) | **exit 0** · **3768 test · 실패 0** | **`c1dd8406`**(판정 SHA) |
+| (참고) 병합 앞 실행 | exit 0 · 391 task | `b28cfb2a` |
+
+판정 SHA 의 값은 verifier r3 가 독립으로 받았고, 그 트리와 내 `f4afe17e` 실행의 차이는 `rollback.md`
+하나다(코드·계약·정책 변경 0).
+
+**PR head 의 `container` job 은 붉다** — 오늘 공개된 guava CVE 로 main 도 같이 붉고 별 레인이 고친다.
+이 slice 의 변경과 무관하지만 **head green 조건에는 그대로 남는다**(머지 전에 그 레인이 먼저 들어와야
+한다). 「내 탓이 아니다」로 끝나는 사실이 아니라 순서 조건이다.
 
 ## 2. acceptance — `ci.yml` `web` job
 
@@ -108,6 +122,13 @@ cache 적중이 아니다). 변이마다 복원 뒤 clone 변경 0 · 원본 wor
 새 enum 칸을 문서에만 더하고 표를 잊는 길이 그대로 남는다. MV2 는 그 표가 실제로 문서 전수와
 묶여 있는지를 잰다.
 
+> **이 표 둘은 r1 시점의 측정이고, r2 가 그 술어 하나를 지웠다**(`cr r3 H-1` · `M-1`). r2 에서 덮개를
+> 뒤집으며 `문서 enum 칸 == 구현 표가 덮는 칸` 등식을 **옮겨 적지 않았다** — 그래서 r2~r3 사이에는
+> MV2 가 재던 방어가 없었고, 위 「묶여 있는지를 잰다」는 그 구간에 대해 **거짓**이었다. r3 일괄이 그
+> 등식을 복원하고 서로소 단언을 더했으며, 아래 r3 표가 MV2 와 MD 를 다시 RED 로 실측한 값이다.
+> **게이트 술어를 바꾼 커밋은 severity 무관 표적 재검증 대상**인데(CLAUDE.md Phase 4 예외) 내가 그
+> 규율을 r2 에서 적용하지 않았다 — 적용했다면 그 자리에서 드러났을 결함이다.
+
 ### r2 추가 — 새 등식 셋이 각자 무언가를 막는가
 
 r2 는 **사상 함수의 손 문자열**을 개명하고 초록을 받았다(문서·타입·생성 타입이 다 맞아도 응답에
@@ -132,6 +153,19 @@ r2 는 **사상 함수의 손 문자열**을 개명하고 초록을 받았다(�
 | 통제군(후행) | `> Task :app:test` | **0** | class 6 · 71 |
 
 표식 0 이 그 회차에 그 task 가 **실행됐다**는 뜻이다. 복원 뒤 clone 변경 0 · 원본 변경 0.
+
+**필터를 축어로 적는다**(`verifier r3 L-2`). 위 r2 표의 「class 6 · 71」은 아래 좁은 필터의 값이고,
+그것만으로는 재현도 대조도 되지 않았다.
+
+```
+# r2 표(좁다 — 이 slice 표면만)
+:app:test --tests 'bidvector.app.http.OpenApiBidPrice*' --tests 'bidvector.app.http.BidPriceRequest*' --rerun
+# r3 재측정(r2 폭으로 되돌렸다 — 아키텍처 게이트와 이웃 계약 test 를 함께 덮는다)
+:app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.http.OpenApi*' --tests 'bidvector.app.http.*BidPrice*' --rerun
+```
+
+**좁은 필터의 초록은 「방어 있음」이 아니라 「안 쟀음」과 구별되지 않는다** — r2 에서 그 폭이 붉혔던
+표면(사상 함수 둘)을 좁은 필터는 덮지 않는다.
 
 **셸 인용 결함 하나를 겪었고 측정에는 영향이 없었다.** 큰따옴표 안의 백틱이 명령 치환으로 읽혀
 그 자리에서 없는 명령을 실행했다. bash 는 stderr 에 한 줄을 내고 **그 자리만 빈 문자열로 치환한 뒤

@@ -673,11 +673,16 @@ OpenAPI 도 세 축인데도. 소스·OpenAPI·생성 타입 셋을 아무리 �
 |---|---|---|---|
 | 1 | `verdict` — 사상 함수의 손 문자열 | `Verdict` 하위 셋이 `internal constructor` 다. **커널만 만든다**(그 폐쇄가 설계다) — app test 가 입력을 지을 수 없다 | 하위 타입 이름 전수 등식(새 하위 타입이면 붉다). 게다가 ML 이 늘 미가용이라 production 에서 서는 갈래가 하나다 |
 | 2 | `baseAmountResolution` — 같은 종류 | provenance 별 `require` 사전 조건이 붙어 세 입력을 app test 에서 짓는 비용이 크다 | 같은 이름 전수 등식(토큰 하나만 이름과 다르고 그것은 표로 못박혀 있다) |
-| 3 | 닫힌 어휘를 `string` 으로 둔 칸 **11** | 그 어휘의 **주인이 다른 축**이다(DEC·COL·STR·QUAL·금액). 이 slice 가 올리면 남의 축 계약을 혼자 바꾸는 것이 된다 | 열린 어휘 allowlist 에 **칸마다 사유와 함께** 등재했고, 덮개 등식이 「문자열 칸 전수 == 문서 enum ∪ allowlist」를 요구한다. 그 축의 slice 가 enum 으로 올리면 이 목록에서 빠져야 하므로 **잊히지 않는다** |
+| 3 | 닫힌 어휘를 `string` 으로 둔 칸 **11** | 축이 둘로 갈린다. ⓐ `baseAmount*` 넷은 세 스키마가 공유하는 관례이고 `noticeStatus` 는 커널 enum 의 `.name` 이다 — 주인이 다른 축이라 이 slice 가 올리면 남의 계약을 혼자 바꾼다. ⓑ **`dropStage`·`dropReasonCode`·`watchUndeterminableReason` 셋은 이 slice 가 만든 파일에서 손 문자열로 찍는다**(`verifier r3 L-1` 정정 — 앞 문면은 셋까지 「다른 축 소관」이라 적었고 그것은 틀렸다). 그 셋에 구동 등식을 못 거는 이유는 값을 나르는 `CandidateEvaluation.NotReached` 가 `internal constructor` 라 app test 가 입력을 지을 수 없기 때문이고, 이는 `verdict` 와 같은 종류의 유보다 | 열린 어휘 allowlist 에 **칸마다 사유와 함께** 등재했고, 덮개 등식 **둘**이 그것을 받친다 — 「문자열 칸 전수 == 문서 enum ∪ allowlist」와 「문서 enum 칸 ∩ allowlist == ∅」. **둘째가 r2~r3 사이에는 없었다**(`cr r3 H-1`): 그 동안은 allowlist 에 있는 칸에 문서 enum 을 더해도 합집합이 변하지 않아 조용히 지났다. 지금은 그 길이 닫혔다 |
 
 **1·2 는 r2 의 `R2-M1` 이 가리킨 바로 그 종류다.** 나머지 다섯 칸(자격 판정 셋 · ML 미가용 사유 ·
 하한율 출처)은 **출하 사상 함수를 실제로 통과시켜** 닫았다. 셋을 다 닫으려면 커널 생성자 폐쇄를
 열거나 kernel 을 돌리는 fixture 를 짓는 일이 되는데, 둘 다 이 slice 의 범위 밖이다.
+
+**묶이지 않은 손 문자열 전수(`cr r3 LOW②`, 실측).** 위 유보가 남긴 리터럴은 정확히 다섯이고, app test
+에 그 문자열이 등장하지 않는다: `FALLBACK_FROM_BUDGET`(0건) · `DERIVED_FROM_OPENING`(1건이지만 다른
+문맥) · `"BID_NOW"`·`"REVIEW"`·`"SKIP"`(각 0건). 다음 slice 가 커널 생성자를 열거나 커널을 돌리는
+fixture 를 지으면 이 다섯이 먼저 묶일 자리다.
 
 **cr r1 OQ 에 대한 답(`verifier r2 R2-L3`).** 「산출하지 않는 축의 숫자 칸이 응답 타입에 없다」를
 재는 test 는 이름 접두로 거르므로 다른 이름의 숫자 칸은 지난다. **실제 방어는 그 test 가 아니라
