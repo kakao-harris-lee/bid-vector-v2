@@ -168,6 +168,10 @@ g1dec05 가 먼저 머지되면 두 행은 「ⓒ + 선언 예외 등재」 상�
   가져갔기 때문이고, **선언 교집합 0 을 기계로 확인**했다(겹치면 병합 뒤 중복 선언으로 컴파일이 깨진다).
   `HttpTestSupport.kt` 는 500 → 435 줄. 같은 패키지라 쓰는 자리의 import 는 하나도 바뀌지 않는다.
 - `reports/evidence/m7/7c2/{commands,rollback}.md` — evidence 디렉터리, in_scope 안.
+- **r1 이 만든 둘(2026-10-27)** — 둘 다 in_scope 안이다.
+  - `app/src/test/.../OpenApiBidPriceVocabularyTest.kt` — 이 slice 응답의 문서 enum ↔ 구현 어휘 등식(`verifier r1 M-1` · `cr r1 M3` 의 처방).
+  - `workflow/src/main/.../evaluation/UnjudgedQualificationAxis.kt` — 단일 출처 enum 을 `SingleNoticePorts.kt` 에서 **같은 패키지의 자기
+    파일로** 옮긴 것이다(`cr r1 LOW-2`). 패키지가 같아 쓰는 자리의 import 는 하나도 바뀌지 않는다 — 새 타입이 아니라 자리만 옮겼다.
 
 **공유 파일에 남긴 자국 넷(동결 보고 항목).** 되돌리기는 base 복원으로 닫히지만, 머지되면 남의 레인이 보는 것들이다.
 
