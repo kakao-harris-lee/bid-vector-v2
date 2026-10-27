@@ -51,7 +51,8 @@ acceptance(`./gradlew --no-daemon check`)는 Phase 4 에 돈다. 이 절은 Phas
 
 ### acceptance — `check` 전건
 
-- cmd: `./gradlew --no-daemon check` (CI `check` job 의 명령 그대로)
+- cmd: `./gradlew --no-daemon check` (CI `check` job 의 명령 그대로) @ **`78c462ef`**(r1 판정 SHA 의
+  마지막 산출물 커밋; r1 verifier 가 판정 SHA `a6a4eddc` 에서 같은 명령을 직접 재실측해 exit 0)
 - exit: 0
 - 핵심 결과: `BUILD SUCCESSFUL in 25m 13s`, 392 actionable tasks.
 - 앞선 실패 둘(둘 다 **sizeGate**, 수정 후 위 초록): `app/build.gradle.kts` 람다 56줄 ·
@@ -66,7 +67,7 @@ acceptance(`./gradlew --no-daemon check`)는 Phase 4 에 돈다. 이 절은 Phas
 
 | 변이 | 바꾼 것 | 표적 | exit |
 | --- | --- | --- | --- |
-| M1 | 게이트가 밴드를 보지 않고 전부 통과 | `PublishedFloorTrustTest` · `BidMenuFloorTrustTest` | 1 |
+| M1 | 게이트가 밴드를 보지 않고 전부 통과 | `PublishedFloorTrustTest`(12 중 5) | 1 |
 | M2 | 통과 값의 `copy` 를 모듈 밖으로 연다 | `FloorTrustCompileFailureHarnessTest` (fixture `6b`) | 1 |
 | M3 | margin 이 개연 불가·심판 아님에 **원값을 쓴다** | `PredictionFactsFloorTrustTest` (9 중 3) | 1 |
 | M4 | 집계 줄에서 사유 필드를 뺀다 | `EvaluationCommitExitCodeTest` (8 중 3) | 1 |
@@ -75,6 +76,11 @@ acceptance(`./gradlew --no-daemon check`)는 Phase 4 에 돈다. 이 절은 Phas
 
 M5·M6 이 등식의 **양방향**이다(누락 · 낡은 항목). M3 에서 `1.00000` test 가 초록으로 남는 이유는
 `checklist.md` 알려진 제한 ⑧ 이 적는다. 변이 뒤 작업 트리 잔여 0.
+
+**M1 표적 정정(r1 v M-2)** — 앞 판 표는 `BidMenuFloorTrustTest` 도 M1 의 표적으로 적었는데,
+그 test 는 실패 판정을 **직접 주입**해서 게이트 변이로는 RED 가 될 수 없다(verifier 재실행에서
+5/5 초록). r2 가 그 자리에 **종단 test 둘**(밴드 밖 원값 → 게이트 → 사유)을 더했고, 그 둘이
+변이 M1 의 표적이다.
 
 ### 비밀값 스캔
 
@@ -95,3 +101,40 @@ M5·M6 이 등식의 **양방향**이다(누락 · 낡은 항목). M3 에서 `1.
 - cmd: `git status --porcelain -- <in_scope 개별 인자>` → 미추적 evidence 한 건 외 없음
 - 양성 대조: in_scope 파일 하나에 줄을 심어 `M` 으로 **잡히는 것**을 확인하고 **비파괴 절삭**
   (`head -n <원래 줄수>`)으로 되돌렸다 — `checkout --` 는 쓰지 않는다(미커밋 편집을 함께 지운다).
+
+## 2026-10-28 — r1 수정 라운드 (r2)
+
+판정 SHA `a6a4eddc` 에 대한 verifier not-ready(high 1) · code-reviewer request_changes(high 1) 를
+한 라운드로 고쳤다. finding 별 커밋이고, 마지막 산출물 커밋은 **`bcde7d01`** 이다.
+
+### 새 게이트 축의 변이 — 전부 바꿔치우기, 표적 test `--rerun`
+
+| 변이 | 바꾼 것 | 표적 | exit |
+| --- | --- | --- | --- |
+| V1 | production `Notice` 에 **파생 접근자**(원값에서 숫자만 꺼낸다) | `FloorTrustGateTest` ⓑ′ | 1 |
+| V2 | production `workflow.evaluation` 에 **운반 클래스**(인자로 받은 원값의 멤버를 읽는다) | `FloorTrustGateTest` ⓑ′ | 1 |
+| V8 | 게이트 파일에 **둘째 생성 함수**(밴드를 보지 않는다) | `FloorTrustGateTest` ⓐ′ | 1 |
+| M7 | 계수 사슬 hop 3 을 `null` 로(`outcome.floorExclusion` → `null`) | `FloorExclusionChainTest` | 1 |
+| M8 | 최소 점수 드롭에서 계수를 다시 버린다 | `FloorExclusionChainTest` | 1 |
+| M9 | D-DEC10-12 되돌림(`>1` 전용 가지 제거) | `PredictionFactsFloorTrustTest` · `PredictionFactsTest` | 1 |
+
+여섯 전부 **의도한 test** 에서 RED 다. V1 은 **첫 적용이 구문 오류**로 떨어져(데이터 클래스
+생성자 인자 목록에 property 를 넣었다) 그 판정을 버리고 클래스 **본문**에 다시 심어 재측정했다 —
+그때 관측 집합이 `(procurement.Notice, getRate)` **하나만** 늘었다(의도한 단언). 적용 실패를
+비영 종료로 멈추는 스크립트였기에 그 오류가 RED 로 오인되지 않았다.
+
+### S-20 (`tools/one-command-check.sh`) — r1 v L-2
+
+- cmd: `./tools/one-command-check.sh` (CI `check` job 의 완료 조건 1 단계)
+- exit: **0**
+- 핵심 결과: `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과`.
+- **첫 실행은 exit 1 이었다** — `gateRegistrationGate` 가 새 test 클래스(`FloorExclusionChainTest`)의
+  **미등재**를 잡았다. 표적 test 만 돌린 라운드에서는 보이지 않는 자리다(등재하지 않으면 그 test 가
+  지워져도 `check` 가 초록이다). 등재 커밋 뒤 위 초록. 실패 이력을 남긴다 — 그 게이트가 실제로 돌았다는 증거다.
+- 이 한 명령이 `check` 전건을 품으므로 r2 의 acceptance 재실측은 이것으로 갈음한다(그 안의 첫 명령이
+  `./gradlew --no-daemon check` 다).
+
+### 비밀값 스캔 · clean-tree (r2)
+
+- `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
+- `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음(양성 대조는 r1 에서 실측)

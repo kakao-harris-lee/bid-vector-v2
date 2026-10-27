@@ -1,6 +1,10 @@
 # M6/G1-DEC10 — rollback
 
-실측 HEAD: **`78c462ef`**(이 slice 의 마지막 산출물 커밋 — 50줄 축 수정). 뒤따르는 evidence 커밋은
+실측 HEAD: **`43344b8f`**(이 slice 의 마지막 산출물 커밋 — 게이트 등재 장부 커밋).
+앞 판 실측 둘(`78c462ef`·`bcde7d01`)은 **버린다** — r2 가 파일을 더해 목록이 61 → 65 로 바뀌고, 그 뒤
+등재 커밋이 되돌림 대상 하나(`config/quality/gate-tests.properties`)를 또 바꿨다. 「라운드마다 재산출」은
+**파일이 늘 때만이 아니라 되돌림 대상의 내용이 바뀔 때도** 다시 돌려야 한다는 뜻이다(그러지 않으면
+아래 유효성 확인이 그 한 줄을 뱉어 미검증이 된다). 뒤따르는 evidence 커밋은
 되돌림 대상을 건드리지 않는다; 그 사실은 아래 「유효성 확인」 명령이 잰다.
 
 ## 복원 기준
@@ -22,7 +26,7 @@
 git diff --name-only 23837b19..<실측 HEAD> -- ':!reports/evidence/m6/g1dec10'
 ```
 
-**실측 61 경로**(`A` 21 · `M` 40). 수정 라운드가 파일을 더하면 이 절차를 다시 돌리고 `in_scope`
+**실측 65 경로**(`A` 25 · `M` 40). 수정 라운드가 파일을 더하면 이 절차를 다시 돌리고 `in_scope`
 와 대조해 계약을 갱신한다.
 
 ## 절차
@@ -32,21 +36,21 @@ git diff --name-only 23837b19..<실측 HEAD> -- ':!reports/evidence/m6/g1dec10'
    `git checkout <base> -- <경로>` 는 쓰지 않는다(base 에 없는 경로마다 pathspec 오류).
 2. **hunk 역적용은 쓰지 않는다.** 공유 파일(`capability-map.md` · `acceptance-trace.md` ·
    `milestone-6.md` · `config/quality/*` · 두 `policy-values.md` · `CollectionPolicy.kt` ·
-   `app/build.gradle.kts`)도 같은 고정 SHA 에서 복원한다 — 그 SHA 가 HEAD 의 조상이고 이 slice 를
+   `app/build.gradle.kts` · `NoticeFacts.kt` 는 **무편집**)도 같은 고정 SHA 에서 복원한다 — 그 SHA 가 HEAD 의 조상이고 이 slice 를
    담지 않으므로 **남의 줄을 떨어뜨릴 수 없다**(해시 목록이 필요 없고, 뒤에 붙는 문단도 덮는다).
 3. 이 slice 의 evidence(`reports/evidence/m6/g1dec10/`)는 되돌리지 않는다. 그로 인해 게이트가
    붉어지면 그 조건을 알려진 제한에 등재한다 — 실측에서는 붉어지지 않았다(⑥).
 4. 목록 갱신 커밋은 **evidence 경로만** 만진다(목록이 자기를 담은 커밋을 가리킬 수 없다).
 
-## 실측 (임시 clone, 실측 HEAD `78c462ef`)
+## 실측 (임시 clone, 실측 HEAD `43344b8f`)
 
 | # | 재는 것 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 exit | **0** |
-| ② | `D`/`M` 수 | **D 21 · M 40**(= 목록 61) |
+| ② | `D`/`M` 수 | **D 25 · M 40**(= 목록 65) |
 | ③ | `git diff <base> -- <목록>` | **빈 출력**(0 줄) |
 | ③′ | 「내 표지 0」 — 되돌린 트리의 production·게이트 경로에서 이 slice 의 이름 셋 | **0 건** |
-| ③″ | 「남의 줄 보존」 — 되돌리지 않기로 한 evidence 파일 수 | **4 건 그대로** |
+| ③″ | 「남의 줄 보존」 — 되돌리지 않기로 한 evidence 파일 수 | **5 건 그대로** |
 | ④ | 되돌린 트리 `compileKotlin`·`compileTestKotlin` exit | **0** |
 | ⑤⑥ | 되돌린 트리 **전건 `check`**(test + 게이트 전부) exit | **0** |
 
@@ -56,7 +60,7 @@ git diff --name-only 23837b19..<실측 HEAD> -- ':!reports/evidence/m6/g1dec10'
 ## 유효성 확인 (verifier 대조용)
 
 ```
-git diff --name-only 78c462ef..<판정 SHA> -- <위 목록의 경로들>
+git diff --name-only 43344b8f..<판정 SHA> -- <위 목록의 경로들>
 ```
 
 **빈 출력이면 이 실측이 유효하다.** 한 줄이라도 나오면 그 뒤 커밋이 되돌림 대상을 바꾼 것이므로

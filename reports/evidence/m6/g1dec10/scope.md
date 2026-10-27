@@ -89,13 +89,24 @@ verifier(opus) + code-reviewer(sonnet) 병렬. Codex 없음 — 되돌리기 어
 | ID | 결정 |
 | --- | --- |
 | **D-DEC10-8** | (OQ-1) **계수를 네 자리에 싣는다** — `PredictionComponents` → `MlAnalysisOutcome.Analyzed`(필수 인자, 기본값 없음 — 그 타입의 `evidence` 선례) → `CandidateEvaluation.Reached` → 평가 실행 집계(`EvaluationCommitTally` · finish 줄, dry-run 대칭). **OpenAPI 변경 0** — dry-run 응답은 평탄 스칼라 규칙(D-6A3-6)대로 이 필드를 읽지 않는다. 출하 배선에서 이 계수는 **구조상 항상 0**(`MlAnalysisPort` = `UnavailableMlAnalysis`, `OPEN-ML-ANALYSIS-WIRING`) — 알려진 제한으로 등재한다. |
-| **D-DEC10-9** | (OQ-2) `DerivationAbsence.FloorRateOutOfRange` 는 **개연 불가 사유가 승계**한다(항 하나 · 생산자 하나 = 게이트). `MarginInputs.init` 의 `≤ 1` 요구는 타입 최후 방어선으로 **유지**하고 「이 `init` 이 유일한 관문」이라 적는 KDoc 문면만 정정한다. `1.00000`(R-FLOOR-03 라이브 47건)이 오늘 `> 1` 필터를 통과해 **조용히** `floorHeadroom = recommended` 로 접히던 것이 **사유와 함께** 접히게 된다 — 값은 같고 계수가 생긴다(거동 회귀 0). 그 사실을 evidence 에 적는다. |
+| **D-DEC10-9** | (OQ-2) `DerivationAbsence.FloorRateOutOfRange` 는 **개연 불가 사유가 승계**한다(항 하나 · 생산자 하나 = 게이트). `MarginInputs.init` 의 `≤ 1` 요구는 타입 최후 방어선으로 **유지**하고 「이 `init` 이 유일한 관문」이라 적는 KDoc 문면만 정정한다. `1.00000`(R-FLOOR-03 라이브 47건)이 오늘 `> 1` 필터를 통과해 **조용히** `floorHeadroom = recommended` 로 접히던 것이 **사유와 함께** 접히게 된다 — 값은 같고 계수가 생긴다. **「거동 회귀 0」은 `1.00000` 에만 맞다 — `fraction > 1` 의 처분은 D-DEC10-12 가 정한다(아래).** |
 | **D-DEC10-10** | (OQ-3) **지금은 `openapi/**` · `web/**` 무편집**, 게이트만 낸다. 7C②(`m7-7c2`)는 리뷰 통과·main 재병합·최종 측정 중이라 이 slice 리뷰 요청 시점엔 main 에 있을 공산이 크다 — 그때 main 을 병합해 **그 위에서** 표시 상태를 더하고 `web` job 을 acceptance 에 붙인다. 없으면 7C② 후속으로 인계하고 계약·종결 보고에 남긴다(「양쪽 다 안 더함」 방지). |
 | **D-DEC10-11** | (OQ-4) **값 일치 test 는 `app/src/test`** + `app/build.gradle.kts` 에 ml-engine 정책 파일 경로 system property 한 줄(snakeyaml·system property 선례 넷과 같은 형태). `decision` test classpath 를 넓히지 않고 yaml 을 손으로 쪼개지 않는다. |
 
 **in_scope 추가** — `decision.menu` 의 `BidMenuGrounds.publishedFloorRate`(메뉴 결과의 근거 칸).
 착수 census 가 찾았다: 가격 경로가 만든 **출력**이 원값을 내보내므로 게이트 통과 값을 실어야
 근거가 정직하다(「이 가격이 어느 값에서 나왔는가」). 7C② 표시 상태의 입력 자리이기도 하다.
+
+## 계약 갱신 (2026-10-28 r1 판정 수령 — 팀장)
+
+verifier not-ready(high 1) · code-reviewer request_changes(high 1) 를 한 라운드로 고친다.
+
+| ID | 결정 |
+| --- | --- |
+| **D-DEC10-12** | (r1 v M-1) **`fraction > 1` 은 사용자 승인 거동 D-4B6-4 를 되돌리지 않는다** — margin 성분을 떨어뜨리고(`Absent`) **동시에 개연 불가로 계수**한다. 그러면 DEC-10 acceptance 셋째(제외는 계수된다)와 D-4B6-4 가 둘 다 선다. acceptance 첫째의 「하한 미보고와 동일하게 취급」은 `MarginInputs` 가 **입력으로 받을 수 있는 범위**(`≤ 1`)에서 성립하는 문면으로 읽는다. `1.00000` 은 접기 그대로(값 동일·계수만). **종결 보고의 운영자 확인 항목**: 「acceptance 첫째의 『접는다』를 `>1` 에서는 성분 드롭으로 읽었다」. |
+| **D-DEC10-13** | (r1 v H-1) 게이트 등식에 축 둘을 더한다 — (a) 원값 `FloorRate` 의 **멤버 접근 쌍 등식**(획득 축이 못 보는 파생 접근자·운반 클래스를 닫는다) (b) 통과 값의 **생성 계열 호출자를 코드 단위**로 센다(같은 파일의 둘째 생성 함수를 닫는다). ⓐ′ 는 정책 파일 자기 검사에서 production 관측 등식으로 바뀐다(v L-3 · CR OQ-1 해소). |
+| **D-DEC10-14** | (r1 CR M-1) 계수는 **`CandidateEvaluation` 공통 축**이다 — 최소 점수 드롭(`Analyzed` 를 받은 뒤 `NotReached`)에서도 사유가 남고 집계는 **결과 전체**에서 센다. |
+| **D-DEC10-15** | (r1 CR M-2) 계수 이름의 층 둘을 **그대로 둔다** — acceptance 의 `floor_implausible`(운영자 문서 어휘)과 로그 줄의 `floorImplausible`(줄 표기, 다른 필드와 같은 camelCase). 둘이 같은 계수임을 KDoc 과 evidence 가 적는다. 운영자 문서는 이 slice 가 고치지 않는다. |
 
 **in_scope 축소 없음** — `shared-kernel/**` 은 편집 계획 0 이다(게이트 값을 `decision` 에 두면
 `criticalAssessmentRate` 의 원값 서명을 바꿀 이유가 없다). 필요해지면 다시 갱신한다.
