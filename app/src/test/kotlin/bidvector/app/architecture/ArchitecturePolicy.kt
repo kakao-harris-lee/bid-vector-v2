@@ -204,6 +204,16 @@ class ArchitecturePolicy private constructor(
     val floorTrustRawAcquisitionPairs: List<Pair<String, String>>
         get() = pairs("floor-trust.raw-acquisition-pairs")
 
+    /**
+     * r1 v H-1 (a) — 원값의 **멤버 접근** 쌍. 획득 축(반환·필드 타입)만으로는 파생 접근자
+     * (`BigDecimal` 을 내는 getter)와 운반 클래스가 보이지 않는다.
+     */
+    val floorTrustRawTypeAccessPairs: List<Pair<String, String>>
+        get() = pairs("floor-trust.raw-type-access-pairs")
+
+    /** r1 v H-1 (b) — 통과 값의 생성 계열을 만지는 **코드 단위**(파일이 아니라 함수). */
+    val floorTrustCreationCodeUnits: List<String> get() = list("floor-trust.creation-code-units")
+
     /** D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
     val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")

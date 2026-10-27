@@ -28,6 +28,7 @@ class FloorTrustGateTest {
     private val policy = ArchitecturePolicy.load()
     private val gatedRules = DivisionValueRules(policy.floorTrustGatedType)
     private val rawRules = DivisionValueRules(policy.floorTrustRawType)
+    private val creationRules = FloorTrustRules(policy.floorTrustGatedType)
     private val production: JavaClasses =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
@@ -46,21 +47,33 @@ class FloorTrustGateTest {
     }
 
     /**
-     * 「생성 경로는 게이트 함수 하나」의 기계적 증명 — 허용 쌍 가운데 **생성 계열**(생성자·`copy`)을
-     * 만지는 호출자 집합이 정확히 한 종이어야 한다. 멤버 이름을 열거하지 않고 쌍에서 걸러내므로,
-     * 새 생성 멤버(companion factory 등)가 생기면 ⓐ 등식이 먼저 깨지고 여기서 호출자가 늘어난다.
+     * 「생성 경로는 게이트 함수 **하나**」의 기계적 증명 — **코드 단위**(함수) 입도다(r1 v H-1 (b)).
+     *
+     * 앞 판은 이 단언을 **정책 파일에서** 냈고(허용 쌍을 걸러 호출자를 셌다) 호출자가 파일
+     * 파사드였다. 그래서 ⓐ 등식과 합성해서만 의미가 있었고, 같은 파일에 밴드를 무시하는 둘째
+     * 생성 함수를 넣으면 **둘 다 초록**이었다. 지금은 production 바이트코드에서 관측한 함수 집합이
+     * 허용 집합과 **같아야** 한다 — 동어반복이 아니고, 파일 안에서 함수가 늘면 깨진다.
      */
     @Test
-    fun `ⓐ′ 생성 계열 멤버를 만지는 호출자는 한 종이다 — 게이트 함수`() {
-        val creators =
-            policy.floorTrustGatedTypeAccessPairs
-                .filter { (_, member) -> member == "<init>" || member.startsWith("copy") }
-                .map { (caller, _) -> caller }
-                .toSet()
+    fun `ⓐ′ 생성 계열을 만지는 코드 단위 집합은 허용 집합과 같다 — 파일이 아니라 함수`() {
+        creationRules.observedCreationCodeUnits(production) shouldBe policy.floorTrustCreationCodeUnits.toSet()
+    }
 
-        withClue("생성 계열 쌍: ${policy.floorTrustGatedTypeAccessPairs}") {
-            creators.size shouldBe 1
-        }
+    /** ⓐ′ 가 **무엇을** 생성 계열로 셌는지 — 빈 집합을 세고 초록인 상태를 가른다. */
+    @Test
+    fun `ⓐ″ 생성 계열로 관측된 멤버가 실제로 있다 — 축이 비어 있지 않다`() {
+        creationRules.observedMemberNames(production).shouldNotBeEmpty()
+    }
+
+    /**
+     * r1 v H-1 (a) — 원값의 **멤버 접근** 쌍 등식. 획득 축(ⓑ)은 디스크립터의 반환·필드 타입만
+     * 보므로 **파생 접근자**(원값에서 `BigDecimal` 을 꺼내 내보내는 getter)와 **운반 클래스**가
+     * 그 축 밖이었다 — 그 둘을 심어도 전건 게이트가 초록인 것이 실측됐다. 이 축은 원값 타입
+     * 자신의 멤버를 만지는 자리 전부를 세므로 그 형태가 집합을 바꾼다.
+     */
+    @Test
+    fun `ⓑ′ 원값의 멤버 접근 쌍 집합은 허용 집합과 같다`() {
+        rawRules.observedTypeAccesses(production) shouldBe policy.floorTrustRawTypeAccessPairs.toSet()
     }
 
     @Test

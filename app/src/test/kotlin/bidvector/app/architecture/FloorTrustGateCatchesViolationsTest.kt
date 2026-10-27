@@ -27,6 +27,8 @@ class FloorTrustGateCatchesViolationsTest {
 
     private val rawReader = "$fixtureRoot.RogueRawFloorRateReader"
     private val gatedReader = "$fixtureRoot.RogueGatedFloorRateReader"
+    private val fractionReader = "$fixtureRoot.RogueFloorFractionReader"
+    private val carrier = "$fixtureRoot.RogueFloorRateCarrier"
 
     @Test
     fun `심은 원값 소비자가 획득 집합에 나타난다 — 대상까지 같다`() {
@@ -46,9 +48,34 @@ class FloorTrustGateCatchesViolationsTest {
         }
     }
 
+    /**
+     * r1 v H-1 (a) — 획득 축이 **보지 못하는** 두 형태를 멤버 접근 축이 센다. 파생 접근자는
+     * 반환이 `BigDecimal` 이라, 운반 클래스는 자기 필드 읽기라 획득 축 밖이다.
+     */
     @Test
-    fun `심은 소비자 둘은 production 허용 목록 밖이다 — 양성 쪽이 음성을 허용해 초록이 된 것이 아니다`() {
+    fun `파생 접근자와 운반 클래스가 원값 멤버 접근 집합에 나타난다`() {
+        val observed = rawRules.observedTypeAccesses(violating)
+
+        withClue("관측: $observed") {
+            observed shouldContain (fractionReader to "getRate")
+            observed shouldContain (carrier to "getRate")
+        }
+    }
+
+    /** 그 둘이 **획득 축에는 없다** — 두 축이 서로 다른 것을 센다는 사실이 이 단언이다. */
+    @Test
+    fun `같은 둘은 획득 축에 나타나지 않는다 — 축을 더한 이유`() {
+        val acquisitions = rawRules.observedAcquisitions(violating).map { it.first }
+
+        acquisitions shouldNotContain fractionReader
+        acquisitions shouldNotContain carrier
+    }
+
+    @Test
+    fun `심은 소비자 넷은 production 허용 목록 밖이다 — 양성 쪽이 음성을 허용해 초록이 된 것이 아니다`() {
         policy.floorTrustRawAcquisitionPairs.map { it.first } shouldNotContain rawReader
         policy.floorTrustGatedTypeAccessPairs.map { it.first } shouldNotContain gatedReader
+        policy.floorTrustRawTypeAccessPairs.map { it.first } shouldNotContain fractionReader
+        policy.floorTrustRawTypeAccessPairs.map { it.first } shouldNotContain carrier
     }
 }
