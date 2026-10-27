@@ -2712,6 +2712,7 @@ components:
         businessTypes:
           type: array
           maxItems: 100
+          uniqueItems: true
           items:
             type: string
             minLength: 1
@@ -2721,6 +2722,7 @@ components:
         licenseNames:
           type: array
           maxItems: 100
+          uniqueItems: true
           items:
             type: string
             minLength: 1
@@ -2729,6 +2731,7 @@ components:
         regionTerms:
           type: array
           maxItems: 100
+          uniqueItems: true
           items:
             type: string
             minLength: 1
@@ -2754,10 +2757,11 @@ components:
           enum: [UNANSWERED, REGISTERED, NOT_REGISTERED]
         naraRegisteredFields:
           type: array
+          uniqueItems: true
           items:
             type: string
             enum: [GOODS, SERVICE, CONSTRUCTION]
-          description: "`naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있고, 그때는 **필수**다(빈 배열 가능)."
+          description: "`naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있고, 그때는 **필수**다(빈 배열 가능). 중복은 400 이다."
         businessCertificateExpiresOn:
           type: string
           format: date

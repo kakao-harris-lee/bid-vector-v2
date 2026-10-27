@@ -903,7 +903,7 @@ export interface components {
             headquartersRegion?: "SEOUL" | "BUSAN" | "DAEGU" | "INCHEON" | "GWANGJU" | "DAEJEON" | "ULSAN" | "SEJONG" | "GYEONGGI" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU" | null;
             /** @enum {string} */
             naraRegistration: "UNANSWERED" | "REGISTERED" | "NOT_REGISTERED";
-            /** @description `naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있고, 그때는 **필수**다(빈 배열 가능). */
+            /** @description `naraRegistration` 이 `REGISTERED` 일 때만 실을 수 있고, 그때는 **필수**다(빈 배열 가능). 중복은 400 이다. */
             naraRegisteredFields?: ("GOODS" | "SERVICE" | "CONSTRUCTION")[];
             /**
              * Format: date
