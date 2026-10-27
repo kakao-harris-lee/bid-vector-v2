@@ -199,6 +199,32 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
     }
 
     @Test
+    fun `길이 상한은 두 표면에서 선다 — 자유 어휘 원소와 삭제 요청의 면허명`() {
+        val max = ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS
+        val atLimit = "가".repeat(max)
+        val overLimit = "가".repeat(max + 1)
+
+        val accepted = session.post(QUALIFICATION_FACTS, qualificationBody(declared = true, names = listOf(atLimit)))
+        val rejected = session.post(QUALIFICATION_FACTS, qualificationBody(declared = true, names = listOf(overLimit)))
+
+        accepted.statusCode.value() shouldBe OK
+        rejected.statusCode.value() shouldBe BAD_REQUEST
+
+        // 삭제 요청에는 값 타입이 없다 — 이 규칙이 그 표면의 **유일한** 길이 상한이다.
+        session.post(CAPACITIES_REMOVE, """{"licenseName":"$atLimit"}""").statusCode.value() shouldBe NOT_FOUND
+        session.post(CAPACITIES_REMOVE, """{"licenseName":"$overLimit"}""").statusCode.value() shouldBe BAD_REQUEST
+    }
+
+    @Test
+    fun `인증서 만료일도 공백뿐이면 400 이다 — 상호와 같은 규율`() {
+        val blankDate =
+            """{"tradeName":null,"headquartersRegion":null,"naraRegistration":"REGISTERED",""" +
+                """"naraRegisteredFields":[],"businessCertificateExpiresOn":"   "}"""
+
+        session.post(BUSINESS_DETAILS, blankDate).statusCode.value() shouldBe BAD_REQUEST
+    }
+
+    @Test
     fun `자격 사실의 자유 어휘도 값 규칙을 받는다 — 공백 원소 · 중복 · 개수 상한`() {
         val blankTerm = """{"businessTypes":[" "],"licensesDeclared":false,"licenseNames":[],"regionTerms":[]}"""
         val duplicated =
