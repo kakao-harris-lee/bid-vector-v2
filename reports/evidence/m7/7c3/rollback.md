@@ -5,7 +5,7 @@ slice 의 산출물이 **없다**(`46ac0949` 은 7B 의 머지 커밋이고 알�
 목록은 **기계 산출**이고 라운드마다 재산출한다
 (`git diff --name-status 46ac0949..HEAD`, evidence 제외).
 
-**실측 HEAD**: (기록 — 마지막 산출물 커밋에서 돌린다)
+**실측 HEAD**: `2f0c29a7` (이 slice 의 **마지막 산출물 커밋** — capability map 등재. evidence 커밋은 이 뒤에 온다)
 
 ## 되돌림의 두 경로 (마이그레이션이 있어 갈린다)
 
@@ -35,7 +35,7 @@ DROP TABLE notification_inbox;   -- 인덱스 둘이 함께 사라진다
 
 머지 뒤 되돌림이면 ⓑ 를 쓰지 않고 **PR revert** 가 먼저다.
 
-## 복원 목록 — 수정된 공유 파일 열 (base 로 복원)
+## 복원 목록 — 수정된 공유 파일 **열아홉** (base 로 복원)
 
 ```
 git restore --source=46ac0949 --staged --worktree -- \
@@ -49,9 +49,13 @@ git restore --source=46ac0949 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/retention/RetentionFixture.kt \
   app/src/main/kotlin/bidvector/app/http/AccountScopedRoutes.kt \
   app/src/main/kotlin/bidvector/app/http/ErrorBody.kt \
+  app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt \
   app/src/test/kotlin/bidvector/app/http/AccountCarrierStructureTest.kt \
+  app/src/test/kotlin/bidvector/app/http/ConstantTimeComparisonStructureTest.kt \
+  app/src/test/kotlin/bidvector/app/http/HttpTestSupport.kt \
   config/quality/architecture-policy.properties \
   config/quality/gate-tests.properties \
+  docs/discovery/capability-map.md \
   openapi/bidvector-operator-api.yaml \
   web/src/api/generated/operator-api.ts
 ```
@@ -61,21 +65,26 @@ git restore --source=46ac0949 --staged --worktree -- \
 `config/quality/**` 와 `openapi/**` 의 다른 줄을 만지므로, base 복원은 **그 레인들의 줄도 함께
 지운다** — 머지 뒤에는 반드시 병합 SHA 기준이어야 한다.
 
-## 삭제 목록 — 신규 파일 18
+## 삭제 목록 — 신규 파일 **스물둘**
 
 ```
+rm -f -- \
   adapters/src/main/kotlin/bidvector/adapters/notificationinbox/JdbcNotificationInbox.kt \
+  adapters/src/main/kotlin/bidvector/adapters/notificationinbox/JdbcNotificationInboxStore.kt \
   adapters/src/main/kotlin/bidvector/adapters/notificationinbox/NotificationInboxSql.kt \
   adapters/src/main/resources/db/migration/V23__notification_inbox.sql \
   adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxConcurrencyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxPersistenceTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxPrivacyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxPrivilegeTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxQueryTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxTestSupport.kt \
   app/src/main/kotlin/bidvector/app/http/NotificationInboxController.kt \
   app/src/main/kotlin/bidvector/app/http/NotificationInboxRequests.kt \
   app/src/main/kotlin/bidvector/app/wiring/NotificationInboxQuery.kt \
   app/src/main/kotlin/bidvector/app/wiring/NotificationInboxWiring.kt \
+  app/src/test/kotlin/bidvector/app/http/FakeNotificationInboxStore.kt \
+  app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt \
   app/src/test/kotlin/bidvector/app/http/OpenApiNotificationInboxContractTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/notificationinbox/NotificationInbox.kt \
   workflow/src/main/kotlin/bidvector/workflow/notificationinbox/NotificationInboxPorts.kt \
@@ -91,21 +100,29 @@ comm -23 <(git diff --name-only 46ac0949..HEAD | grep -v '^reports/evidence/' | 
          <(이 파일이 든 경로 전수 | sort)
 ```
 
-빈 출력이어야 한다. **빈 등식이 건전성의 증거는 아니다** — 「내가 커밋하지 않아도 그 경로가
-들어오는가」를 함께 본다(위 기계 산출이 그 질문의 답이다).
+**양방향 모두 빈 출력**(실측 `2f0c29a7`): `comm -23`(기계 산출에만 있고 목록에 없는 것) 0 ·
+`comm -13`(목록에만 있고 기계 산출에 없는 것) 0. 이 파일이 드는 경로 **41** = 복원 19 + 삭제 22
+= 기계 산출(evidence 제외) 전수.
+
+**빈 등식이 건전성의 증거는 아니다** — 「내가 커밋하지 않아도 그 경로가 들어오는가」를 함께
+본다(위 기계 산출이 그 질문의 답이다). 이 라운드가 그 값을 실제로 바꿨다: 앞 판 목록은
+복원 15 · 삭제 18 이었고, 그 뒤 라운드가 만든 파일 넷(어댑터 읽기 전용 class · 읽기 투영 test ·
+test 조립 분할 둘)과 공유 파일 넷(`capability-map.md` 포함)이 **목록에 없었다**. 손으로 세지
+않고 라운드마다 재산출하는 이유가 이것이다.
 
 ## ①~⑥ 실측 (임시 clone, 되돌린 트리)
 
 버릴 clone 에서 돌린다. 갈음은 「HEAD 초록」이 아니라 **트리 동일성**으로만 한다.
 
+실측 HEAD `2f0c29a7`, clone `--no-hardlinks`(공유 저장소에 아무 작용도 남기지 않는다).
+
 | # | 확인 | 결과 |
 |---|---|---|
-| ① | 복원·삭제 명령의 종료 코드 | (기록) |
-| ② | `git diff --name-status` 의 D/M 수가 위 목록과 같다 | (기록) |
-| ③ | 되돌린 트리의 `git diff 46ac0949` 가 빈 출력 | (기록) |
-| ④ | 되돌린 트리에서 컴파일 | (기록) |
-| ⑤ | 되돌린 트리에서 test | (기록) |
-| ⑥ | 되돌린 트리에서 **게이트**(초록이 아니면 보완 경로까지 실행) | (기록) |
+| ① | 복원·삭제 명령의 종료 코드 | `RESTORE_EXIT=0` · `DELETE_EXIT=0` |
+| ② | `git diff --name-status HEAD` 의 D/M 수가 위 목록과 같다 | **M=19 · D=22**, 그 밖의 줄 0. ⚠ 첫 판은 `HEAD` 를 빼고 세어 `M=0` 이 나왔다 — `--staged --worktree` 가 **색인까지** 되돌리므로 작업트리↔색인 비교에는 복원분이 보이지 않는다. rollback 의 결함이 아니라 **계수기의 결함**이었고, 고쳐서 다시 쟀다 |
+| ③ | 되돌린 트리의 `git diff 46ac0949`(evidence 제외)가 빈 출력 | 잔차 **0 줄** |
+| ③b | **트리 동일성** — 되돌린 트리의 해시 == base 의 트리 해시 | 둘 다 `55b05134…` → `TREE_IDENTICAL=yes` |
+| ④⑤⑥ | 컴파일 · test · 게이트 | **③b 로 갈음한다.** 되돌린 트리가 base `46ac0949` 와 **바이트까지 같은 트리**이므로 그 트리에서 다시 재는 것은 base 를 재는 것과 같다. 갈음 근거는 「HEAD 초록」이 **아니라** 트리 동일성이다(base 는 머지된 main 커밋이다) |
 
 확인은 **「내 표지 0 · 남의 표지 보존」 계수**로 한다 — 내 줄이 사라졌는가와 남의 줄이 남았는가
 둘 다 본다(종료 코드만으로 완료를 주장하지 않는다).
