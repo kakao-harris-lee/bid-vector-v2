@@ -102,22 +102,30 @@ internal abstract class NotificationInboxTestSupport : PersistenceTestSupport() 
             occurredAt = occurredAt,
         )
 
-    /** 행 하나의 시각·읽음 상태를 날것으로 읽는다 — 포트가 노출하지 않는 `created_at` 을 본다. */
+    /**
+     * 행 하나의 시각·읽음 상태를 날것으로 읽는다 — 포트가 노출하지 않는 `created_at` 을 본다.
+     *
+     * **차수까지 술어에 넣는다**(r1 검토 CR LOW-6). 중복 억제 키는 네 열이고 차수는 그 하나다 —
+     * 술어에서 빠지면 같은 번호의 다른 차수 행이 생기는 순간 이 도우미가 **아무 행이나** 집어
+     * 단언이 조용히 다른 행을 재게 된다.
+     */
     protected fun rawRow(
         account: AccountId,
         kind: String,
         noticeNumber: String,
+        noticeRound: String = "000",
     ): RawInboxRow =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
                     "SELECT occurred_at, created_at, updated_at, read_at, detail_code " +
                         "FROM notification_inbox " +
-                        "WHERE account_id = ? AND kind = ? AND notice_number = ?",
+                        "WHERE account_id = ? AND kind = ? AND notice_number = ? AND notice_round = ?",
                 ).use { statement ->
                     statement.setLong(1, account.value)
                     statement.setString(2, kind)
                     statement.setString(3, noticeNumber)
+                    statement.setString(4, noticeRound)
                     statement.executeQuery().use { rows ->
                         check(rows.next()) { "행이 없다: $kind $noticeNumber" }
                         RawInboxRow(

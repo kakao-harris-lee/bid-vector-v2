@@ -1,10 +1,13 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.Timestamp
 
 /**
  * M7/7C③ — V23 의 **열 단위 GRANT** 가 실제로 무엇을 막는지 **앱 역할로 직접 쏘아** 잰다
@@ -95,23 +98,85 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
      * upsert 가 **실제로** 앱 역할로 도는지 — `ON CONFLICT DO UPDATE` 는 갱신하는 열에 대한
      * UPDATE 권한을 요구한다. 문장 단위로 재야 「네 열이면 충분하다」가 증명된다(열마다 따로
      * 재는 것으로는 그 조합이 성립하는지 알 수 없다).
+     *
+     * **출하 상수를 그대로 쏜다**(r1 검토 CR M-1 · verifier F6). 앞 판은 같은 SQL 을 손으로
+     * 베껴 두었는데, 그러면 `DO UPDATE SET` 에 GRANT 밖 열이 더해져도 **거동 test 는 admin
+     * 연결이라 초록이고 이 권한 test 는 옛 사본이라 초록**이다 — 두 자리가 같이 눈을 감는다.
      */
     @Test
-    fun `앱 역할은 upsert 문장을 그대로 돌릴 수 있다`() {
+    fun `앱 역할은 출하 upsert 상수를 그대로 돌릴 수 있다`() {
+        appPreparedFails(NotificationInboxSql.UPSERT_ITEM) { statement ->
+            statement.setLong(1, accountId)
+            statement.setString(2, NotificationKind.NOTICE_REVISED.name)
+            statement.setString(3, "N-PRIV")
+            statement.setString(4, "000")
+            statement.setString(5, null)
+            statement.setTimestamp(6, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
+        } shouldBe false
+    }
+
+    /** 읽음 처리 두 문장도 **출하 상수로** — 같은 이유(사본이 옛 모양으로 굳는다). */
+    @Test
+    fun `앱 역할은 출하 읽음 처리 상수 둘을 그대로 돌릴 수 있다`() {
+        appPreparedFails(NotificationInboxSql.MARK_ITEM_READ) { statement ->
+            statement.setTimestamp(1, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
+            statement.setLong(2, accountId)
+            statement.setString(3, NotificationKind.NOTICE_REVISED.name)
+            statement.setString(4, "N-PRIV")
+            statement.setString(5, "000")
+        } shouldBe false
+
+        appPreparedFails(NotificationInboxSql.MARK_NOTICE_READ) { statement ->
+            statement.setTimestamp(1, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
+            statement.setLong(2, accountId)
+            statement.setString(3, "N-PRIV")
+            statement.setString(4, "000")
+        } shouldBe false
+    }
+
+    /**
+     * **적재 시각을 INSERT 로 지정하는 길이 막혀 있다**(r1 검토 verifier F5). UPDATE 쪽은 열
+     * 단위 GRANT 가 이미 막았지만, 표 단위 INSERT 였을 때는 **처음 넣을 때** 먼 미래를 적어
+     * 그 행이 보존 cutoff 를 영영 지나지 않게 할 수 있었다(이후 upsert 는 `created_at` 을
+     * 건드리지 않는다). 지금은 INSERT 도 일곱 열뿐이다.
+     *
+     * 음성 대조가 바로 위 test 들이다 — 같은 역할로 **그 일곱 열만 쓰는** 출하 upsert 는 돈다.
+     * 그래서 이 실패는 「권한이 전혀 없다」가 아니라 **그 열이 범위 밖**이라는 뜻이다.
+     */
+    @Test
+    fun `앱 역할은 적재 시각을 지정해 넣을 수 없다`() {
         appStatementFails(
             "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                " detail_code, occurred_at, updated_at) " +
-                "VALUES ($accountId, 'NOTICE_REVISED', 'N-PRIV', '000', NULL, now(), now()) " +
-                "ON CONFLICT (account_id, kind, notice_number, notice_round) DO UPDATE SET " +
-                " occurred_at = EXCLUDED.occurred_at, updated_at = now(), " +
-                " detail_code = EXCLUDED.detail_code, " +
-                " read_at = CASE WHEN notification_inbox.detail_code IS DISTINCT FROM " +
-                "  EXCLUDED.detail_code THEN NULL ELSE notification_inbox.read_at END",
-        ) shouldBe false
+                " occurred_at, updated_at, created_at) " +
+                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-CREATED', '000', now(), now(), " +
+                " now() + interval '100 years')",
+        ) shouldBe true
+
+        // 읽음 시각도 같다 — 읽음은 처리 경로의 UPDATE 로만 움직인다.
+        appStatementFails(
+            "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
+                " occurred_at, updated_at, read_at) " +
+                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-READ', '000', now(), now(), now())",
+        ) shouldBe true
     }
 
     private fun appUpdateFails(assignment: String): Boolean =
         appStatementFails("UPDATE notification_inbox SET $assignment")
+
+    /** 출하 상수를 **매개변수까지 묶어** 앱 역할로 쏜다. */
+    private fun appPreparedFails(
+        sql: String,
+        bind: (PreparedStatement) -> Unit,
+    ): Boolean =
+        runCatching {
+            appConnection().use { connection ->
+                connection.prepareStatement(sql).use { statement ->
+                    bind(statement)
+                    statement.execute()
+                }
+                connection.rollback()
+            }
+        }.isFailure
 
     private fun appStatementFails(sql: String): Boolean =
         runCatching {

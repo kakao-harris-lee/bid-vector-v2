@@ -8,6 +8,7 @@ import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.date.shouldBeAfter
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -88,7 +89,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val second = rawRow(account, "NOTICE_REVISED", "N-1")
 
         second.occurredAt shouldBe first.occurredAt
-        (second.updatedAt >= first.updatedAt) shouldBe true
+        second.updatedAt shouldBeAfter first.updatedAt
         second.createdAt shouldBe first.createdAt
         rowCount() shouldBe 1L
     }
