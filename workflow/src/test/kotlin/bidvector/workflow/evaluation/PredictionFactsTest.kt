@@ -80,15 +80,14 @@ class PredictionFactsTest {
     }
 
     /**
-     * **하한율 축의 관문은 더 이상 `MarginInputs.init` 이 아니다**(DEC-10, D-DEC10-9). 앞 판은
-     * `fraction > 1` 을 `DerivationAbsence.FloorRateOutOfRange` 로 걸러 margin 성분을
-     * 떨어뜨렸고, 그 사유의 선언된 목적이 바로 이 `init` 의 `require` 를 피하는 것이었다.
-     * 지금은 신뢰 게이트가 앞에 서서 밴드 밖 값을 「하한 미보고」로 접으므로 **예외도 없고
-     * 성분 드롭도 없다**. 접힌 사실은 `floorExclusion` 으로 남고, 그 사유별 거동은
+     * **하한율 축의 관문은 더 이상 `MarginInputs.init` 이 아니다**(DEC-10) — 신뢰 게이트가 앞에
+     * 선다. 그래도 `fraction > 1` 의 **처분은 그대로**다(D-DEC10-12): margin 성분이 떨어지고
+     * (`Absent(InvalidRequest)`, 사용자 승인 거동 D-4B6-4) 예외는 없다. 바뀐 것은 그 제외가
+     * 이제 **계수된다**는 것뿐이다. 접기 가지(`1.00000` 등)의 거동은
      * `PredictionFactsFloorTrustTest` 가 잰다.
      */
     @Test
-    fun `하한율이 1 을 넘어도 예외가 없고 성분이 서며 init 의 require 에 닿지 않는다`() {
+    fun `하한율이 1 을 넘으면 예외 없이 margin 만 떨어지고 그 제외가 계수된다`() {
         val floorOverBoundary =
             FloorRate(Rate.ofFraction(BigDecimal("1.0000001")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
         val notice = testNoticeWithMoney(floorRate = floorOverBoundary)
@@ -100,7 +99,7 @@ class PredictionFactsTest {
             }
 
         facts.budgetCapture.shouldBePresent()
-        facts.expectedMargin.shouldBePresent()
+        facts.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
         facts.floorExclusion shouldBe PublishedFloorExclusion.IMPLAUSIBLE
     }
 

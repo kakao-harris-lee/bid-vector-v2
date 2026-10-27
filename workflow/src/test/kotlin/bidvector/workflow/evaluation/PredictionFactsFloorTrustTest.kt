@@ -75,17 +75,29 @@ class PredictionFactsFloorTrustTest {
     }
 
     /**
-     * D-DEC10-9 — 앞 판은 `fraction > 1` 만 `DerivationAbsence.FloorRateOutOfRange` 로 걸러
-     * **margin 성분을 떨어뜨렸다**. 그 관문의 선언된 목적은 `MarginInputs.init` 의 `require`
-     * 가 터지는 것을 막는 것이었고, 게이트가 앞에 서면서 그 사유의 생산자가 0 이 된다.
-     * 이제 `> 1` 도 개연 불가의 한 경우로 접히고 **계수된다**.
+     * **D-DEC10-12**(2026-10-28 팀장 결정, r1 v M-1) — `fraction > 1` 은 사용자 승인 거동
+     * D-4B6-4 대로 margin **성분을 떨어뜨린다**. 이 slice 는 그 거동을 되돌리지 않는다. 동시에
+     * **개연 불가로 계수**되므로 DEC-10 acceptance 셋째(제외는 계수된다)와 D-4B6-4 가 둘 다 선다.
+     *
+     * 접기(`1.00000`·`0.2999`)와 **다른** 가지라는 것이 요점이다 — 「하한 미보고와 동일하게
+     * 취급」의 문면은 `MarginInputs` 가 입력으로 받을 수 있는 범위에서만 성립한다.
      */
     @Test
-    fun `1 초과 게시값도 개연 불가 한 가지로 접힌다 — 성분 드롭이 아니다`() {
+    fun `1 초과 게시값은 성분이 떨어지고 그래도 계수된다`() {
         val facts = factsFor(noticeFloor("1.2"))
 
-        facts.expectedMargin shouldBe factsFor(null).expectedMargin
+        facts.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
         facts.floorExclusion shouldBe PublishedFloorExclusion.IMPLAUSIBLE
+    }
+
+    @Test
+    fun `1 초과는 접힌 값과 다른 처분이다 — 두 가지가 한 값으로 섞이지 않는다`() {
+        val dropped = factsFor(noticeFloor("1.2"))
+        val folded = factsFor(noticeFloor("1.00000"))
+
+        dropped.expectedMargin.shouldBeInstanceOf<ScoreFact.Absent>()
+        folded.expectedMargin.shouldBeInstanceOf<ScoreFact.Present<UnitScore>>()
+        dropped.floorExclusion shouldBe folded.floorExclusion
     }
 
     @Test
