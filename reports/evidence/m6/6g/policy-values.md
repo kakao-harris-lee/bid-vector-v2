@@ -53,7 +53,7 @@ p50=+0.0053(추천), p75=+0.0148(안전)"*, 표본은 *"clean-basis 공사 정�
 |---|---|---|
 | `institution.reserve_price_count` / `draw_count` | 15 / 4 | 복수예비가격 제도. `inference-v1.yaml` 의 `reserve.expected_price_count`·`reserve.draw_count` 와 **같은 값**이고 test 가 두 파일을 대조한다(층 계약상 한쪽이 다른 쪽을 읽을 수 없다) |
 | `floor.pure_construction_cost_ratio` | 0.98 | 순공사원가 98% 배제(국가계약법 시행령 제42조 계열, 추정가격 100억 미만 공사) |
-| `floor.rate_band_low` / `high` | 0.30 / 0.995 | 게시 하한율의 개연 밴드(legacy 게이트 승계). **밴드 확정은 `OPEN-DEC-10` 소관**이라 이 값은 「값이 있다 = 옳다」를 주장하지 않는다 — 밖의 값을 사유별로 계수할 뿐이다 |
+| `floor.rate_band_low` / `high` | 0.30 / 0.995 | 게시 하한율의 개연 밴드(legacy 게이트 승계). **확정됐다(2026-10-28, M6/G1-DEC10 D-DEC10-1)** — 같은 값이 Kotlin 출하 정책 `bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY` 에 있고 **값 일치 test** 가 두 자리를 묶는다(`OPEN-DEC-10` 은 DEC-03 표 값 쪽에만 남는다). 이 백테스트 정책은 사전 등록 실험이라 값·사유 합침을 바꾸지 않는다 |
 | `effective.construction` / `service` / `goods` | 2026-01-30 / 2026-05-26 / 2026-05-29 | 2026 낙찰하한율 개정 시행일. 적용례가 「시행일 이후 최초 **입찰공고분**」이라 개찰일이 아니라 공고일로 가른다(D-6G-14). 물품은 보도가 05-26/05-29 로 갈려 **늦은 쪽**을 쓴다 — 그 선택이 경계 구간 공고분을 통째로 뺀다 |
 | `window.days` / `embargo_days` | 7 / 7 | D-6G-5 「비중첩 주 단위 창, embargo 1주」 |
 

@@ -41,11 +41,15 @@ data class KonepsCollectionPolicyData(
     val detailFetchGates: DetailFetchGates,
     // KONEPS 실제 wire 형식(공식 문서, "YYYY-MM-DD HH:MM:SS")은 이 목록으로만 온다 — 매직 패턴 리터럴 금지.
     val dateTimePatterns: List<DateTimePatternId>,
-    // `ExpectedRangeKey.id` → `RangeBand` 단일 출처(§5.3 규율 2). 운영 정책은 아직 **빈 표**다 —
-    // `sucsfbidLwltRate`의 B6 밴드는
-    // `legacy-behavior`이고 값 확정은 활성 `OPEN-DEC-10` 소유라, 승인 전 실값을 main 에
-    // 지어내지 않는다(「미확정 칸은 인스턴스화하지 않는다」와 같은 원칙). 메커니즘은
-    // `resolveAmount`의 amount 축에 실제로 배선돼 있다(`AmountResolutionOutcome.kt`).
+    // `ExpectedRangeKey.id` → `RangeBand` 단일 출처(§5.3 규율 2). 운영 정책은 **빈 표**이고,
+    // 그 이유가 **2026-10-28 에 바뀌었다**(M6/G1-DEC10, D-DEC10-1·D-DEC10-4). 앞 판은 「값이
+    // 미확정(`OPEN-DEC-10`)이라 지어내지 않는다」였는데, `sucsfbidLwltRate` 의 B6 밴드 값은
+    // 이제 확정돼 `bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY` 가 소유한다.
+    // 그런데도 이 표가 비어 있는 것은 **결정**이다: 이 기계(`violatesExpectedRange`)는 금액 축
+    // 항목을 **drop** 하는 자리이고, 하한율 축에 걸면 **공고를 버린다**. DEC-10 은 그 반대를
+    // 요구한다 — 수집·표시는 원문을 보존하고 **가격 경로만** 게이트를 거친다(미리 접으면
+    // 개연성 위반 계수기가 조용히 0 이 되어 원문 품질을 관측할 수 없다).
+    // 메커니즘은 `resolveAmount`의 amount 축에 실제로 배선돼 있다(`AmountResolutionOutcome.kt`).
     val rangeBands: Map<String, RangeBand> = emptyMap(),
     // `bsnsDivNm`(업무구분명) 문서 열거 어휘. `policy-values.md` §1.5 표에 이미 `authoritative` 로
     // 있으나 P-1~P-6 같은 별도
