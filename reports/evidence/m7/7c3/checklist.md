@@ -291,7 +291,7 @@ POST /api/notifications/read-notice body {noticeNumber, noticeRound}         →
 |---|---|---|---|
 | ① | HTTP 에서 쓰기 포트를 불러 알림을 위조 | `app.port-call.ports` 에 두 포트 등재 + **허용 쌍 0** · `app.http.denied-types` · 주입 게이트(controller 는 `app.wiring` 의 조회기 하나만 받는다) | 허용 쌍을 하나 심으면 RED |
 | ② | 다른 계정 항목 읽기 | 두 포트 전 메서드 첫 인자 `AccountId` + SQL WHERE 에 항상 `account_id` · 주체는 **세션에서** 오고 본문에서 오지 않는다 | WHERE 에서 `account_id` 를 빼면 RED(다른 계정 항목이 보인다) |
-| ③ | 다른 계정 항목 읽음 처리 | UPDATE WHERE 에 `account_id` → 영향 행 0 → 404 | 〃 |
+| ③ | 다른 계정 항목 읽음 처리 | UPDATE WHERE 에 `account_id` → 영향 행 0 → **200 + `markedCount` 0**(r1 검토 F4 정정 — 404 가 아니다. 「없음·이미 읽음·남의 것」 셋을 구분하지 않는 것이 목적이고 문서 응답 코드에도 404 가 없다) | 〃 |
 | ④ | 항목에 PII 를 담는다 | **카탈로그 등식**: 이 표의 TEXT 열 전수가 ⓐ 닫힌 어휘 CHECK 이거나 ⓑ 공고 키 두 열. 자유 문자열 열을 더하면 등식이 깨진다 | 자유 TEXT 열을 더하면 RED |
 | ⑤ | 응답에 PII 를 담는다 | 응답 키 집합 **완전 일치** test + 평탄 술어 + 저장된 항목에 담을 PII 가 없음(④) | 키를 더하면 RED |
 | ⑥ | 중복 억제 경합으로 두 항목 | PK + 단일 문장 upsert. **실 DB 동시성 test**(두 연결 동시 기록 → 행 1) | upsert 를 select-then-insert 로 바꾸면 RED |
@@ -353,7 +353,7 @@ endpoint 는 그 전제를 깬다 — 실측:
 | 〃 — FK 목록 | `+ (notification_inbox.account_id → account.id)` | 단일 열, CASCADE 없음 |
 | 〃 — CHECK 축 test | `+` 종류·detail·짝 CHECK | 어휘 등식의 상대 |
 | 보존 분류 레지스트리 · 심기 fixture | `+Purge` 한 줄 · `+TableSeed` 한 항목 | 카탈로그 등식이 강제 |
-| `architecture-policy.properties` | `app.port-call.ports +2`(허용 쌍 **0**) · `app.http.denied-types +2` · `app.http.allowed-packages +bidvector.workflow.notification` · `app.injection.allowed-types +`(조회기·요청·응답 값 타입) · `app.surface.api.handlers +controller` · `app.assembly.tier*` 해당 줄 | 넓힌 줄마다 사유를 커밋 메시지에 남긴다 |
+| `architecture-policy.properties` | `app.port-call.ports +2`(허용 쌍 **0**) · `app.http.denied-types +2` · `app.http.allowed-packages +bidvector.workflow.notificationinbox`(문면 정정 — r1 검토 CR LOW-5. `…notification` 은 채널 발송 패키지이고 이 slice 는 그 경계를 넓히지 않는다) · `app.injection.allowed-types +`(조회기·요청·응답 값 타입) · `app.surface.api.handlers +controller` · `app.assembly.tier*` 해당 줄 | 넓힌 줄마다 사유를 커밋 메시지에 남긴다 |
 | `gate-tests.properties` | `gate.tests.app` · `gate.tests.adapters` · `gate.tests.workflow` 에 새 class 등재 | 그 키는 전수 등식 |
 | `app` 의존 게이트 면제 계수 | **62 → ?** | **충돌 예상**: 7B 가 63, 7C①b 가 64 로 올린다. 뒤에 rebase 하는 레인이 합집합으로 재계산(팀장 지시 2026-10-22) — 사유 문단은 세 레인 것을 전부 남기고 수만 다시 센다 |
 | `AccountScopedRoutes` | 뿌리 `+/api/notifications` | **충돌 예상** — 0.11 |
@@ -519,12 +519,18 @@ test(제목이 바뀐 뒤 재기록해도 항목 하나)와 ⑦(키에서 종류
 
 ## 4. acceptance 실측
 
-아래 표는 `2ad0e6b9` 실측이다 — 양 끝 `TREE=clean`, 시작·끝 HEAD 동일, **FAILED task 0.**
+r1 판정 SHA `e1ffeb3a` 에서 **acceptance-v8** 로 다시 돌렸다 — 아래 표의 15 단계 전부 0,
+**FAILED task 0**, 양 끝 `TREE=clean`, 시작·끝 HEAD 동일(2026-10-28 01:39→02:15). verifier 가
+같은 SHA 에서 세 `:test` 를 `--rerun` 으로 독립 재측정해 adapters 1213 · workflow 587 · app 771 ·
+실패 0 을 기록했다.
 
-**그 뒤 산출물 커밋 둘이 더 섰다**: `ba19fa1e`(§2 ⑤ 가 뚫은 자리를 닫는 test — app test 소스)와
-`2f0c29a7`(capability map NOTI-10 등재). 그래서 **이 표는 판정 SHA 의 실측이 아니다** — 판정
-SHA 에서의 재실측이 정본이고, 그 결과는 verifier 판정과 PR 조치 코멘트에 남는다(여기에 넣으려는
-시도가 evidence 커밋을 또 낳고, 그 커밋이 다시 판정 SHA 를 밀어낸다).
+**경과(r1 검토 CR HIGH-1 이 지적한 것)**: 앞 판 이 절은 `2ad0e6b9` 실측을 들고 있었고, 그 뒤
+산출물 커밋 둘(`ba19fa1e` test · `2f0c29a7` capability map)이 섰다. 실측은 있었고 **장부가
+낡았다** — 그 간격이 「판정 SHA 에서 측정되지 않았다」로 읽혔다. 이 절은 이제 판정 SHA 의
+실행을 든다.
+
+**r2(이 라운드)의 재실측은 병합 뒤 HEAD 에서 돈다** — main `23837b19` 병합과 차단 성격 다섯을
+담았으므로 위 숫자는 r1 의 것이고, r2 의 정본은 verifier 판정과 PR 조치 코멘트다.
 
 | job · step | 명령(ci.yml 그대로) | 결과 |
 |---|---|---|
@@ -557,6 +563,12 @@ SHA 에서의 재실측이 정본이고, 그 결과는 verifier 판정과 PR 조
 
 구현 라운드가 더한 열한째:
 
+12. **계수와 본문이 다른 snapshot 일 수 있다**(r1 검토 CR LOW-4) — 목록은 계수 질의와 본문
+    질의를 **두 문장**으로 돌고 그 둘이 READ COMMITTED 의 서로 다른 snapshot 을 볼 수 있다
+    (7C① 의 공유 읽기 전용 트랜잭션 helper 를 쓴다). 그래서 「전체 건수 7, 본문 6 줄」 같은
+    순간이 이론상 가능하다. 단일 운영자 규모에서 그 창은 사실상 닫혀 있고, 닫으려면 두 질의를
+    한 문장으로 합치거나 REPEATABLE READ 로 올려야 한다 — 둘 다 이 slice 밖의 거래다.
+
 11. **공유 test 조립의 병합 취약** — 이 slice 가 `HttpTestApplication` 을 자기 파일로 옮겼고,
     7C②·7C④-2b 는 **옛 자리**에 `@Import` 를 붙였다. §7 이 그 해소 규칙을 든다. 네 자리 중
     셋은 어긋나면 CI 가 붉고, 조용히 유실될 수 있는 것은 `@Import` 를 한 줄만 남기는 해소
@@ -581,3 +593,21 @@ SHA 에서의 재실측이 정본이고, 그 결과는 verifier 판정과 PR 조
 **알려진 제한(병합 취약).** 네 자리 중 셋은 어긋나면 CI 가 붉는다. 조용히 유실될 수 있는 것은
 **`@Import` 를 한 줄만 남기는 해소**뿐이다 — 그것은 컴파일되고, 무너지는 것은 **다른 레인의**
 test context 라 머지하는 사람이 이 행을 읽지 않으면 원인을 조립이 아니라 자기 변경에서 찾는다.
+
+## 8. r1 검토 처분 (verifier `ready-for-review` · code-review `request_changes`)
+
+| finding | 처분 | 무엇으로 닫았나 |
+|---|---|---|
+| CR HIGH-1 측정 HEAD 낡음 | **닫음** | §4 를 판정 SHA `e1ffeb3a` 의 acceptance-v8 로 갱신. 실측은 있었고 장부가 낡았다 |
+| CR HIGH-2 병합 메모가 main 의 조립 본문을 세지 않음 | **닫음** | 병합 커밋 — main 의 class 본문을 새 파일로 옮기고 `open fun` 합집합 **25** 로 계수. 메모에 없던 이중체 셋째(`EmptyCandidateSource`)도 발견해 함께 처리 |
+| v F1 · CR M-3 응답 키 등식이 wire 를 재지 않음 | **닫음** | `NotificationInboxEndpointTest` — fake 에 한 페이지를 꽂아 직렬화를 돌리고 **wire 키 집합 == 문서 키 집합**. 헤더 둘도 같은 자리에서. 반사(`declaredFields`)로는 getter 전용 속성이 보이지 않는다는 것이 F1 의 요점이다 |
+| v F2 · CR M-2 controller·판독 표면 test 0 | **닫음** | 같은 class — 미지 키 · `kind` 비문자열 · 차수 형식 위반 · 알 수 없는 토큰 · 경로 교차 · `?page=1&page=2` · 상한 초과(포트 미호출까지) 가 전부 400 |
+| v F3 카탈로그 술어가 문자열·자료형 하나에 걸림 | **닫음** | 모집단을 **자료형 무관 전수**로, 어휘 판정을 `pg_constraint.conkey` 로. 통과 자료형은 **열거**(기본 거부). 부분 문자열 술어는 파일에서 삭제. r1 이 뚫은 두 꼴(`code`·`memo`)을 순수 양성 대조로 고정 |
+| CR M-1 · v F6 권한 test 가 SQL 사본 | **닫음** | `NotificationInboxSql.UPSERT_ITEM`·`MARK_ITEM_READ`·`MARK_NOTICE_READ` 를 매개변수까지 묶어 앱 역할로 직접 쏜다 |
+| v F5 INSERT GRANT 가 표 단위 | **닫음(고치는 쪽)** | V23 이 **열 단위 INSERT** 일곱(코드가 실제로 넣는 전부). `created_at`·`read_at` 지정 INSERT 가 앱 역할로 거부되는 것을 test 가 실측. 부작용으로 `CleanMigrationPrivilegeTest` 의 `insert` 가 `false` 로(열 단위는 `has_table_privilege` 에 보이지 않는다) |
+| v F4 · CR LOW-1·5 문면 낡음 | **닫음** | §0.9 ③ 404 → 200 `markedCount 0` · §0.12 패키지 이름 · `NotificationInboxQuery` KDoc 과 OpenAPI 주석의 걷어낸 CHECK 인용 제거 |
+| CR LOW-2 `>=` 단언 | **닫음** | `shouldBeAfter` — 등호가 참이라 「움직이지 않아도」 초록이던 자리 |
+| CR LOW-3 도달하지 않는 갈래 둘 | **닫음(구조로)** | 중간 sealed 타입 `NotificationTargetResult` 를 걷고 판독기가 **정확한 타입**을 돌려준다 — 갈래가 없어서 도달 불가 갈래도 없다. 타입이 사라졌으므로 areEqual 등재 둘도 함께 걷었다(죽은 등재는 「이미 판정된 자리」로 읽힌다) |
+| CR LOW-6 `rawRow` 가 차수를 뺌 | **닫음** | 술어에 `notice_round` 추가(기본값으로 기존 호출 열하나 유지) |
+| CR LOW-4 READ COMMITTED snapshot | **등재** | §5 알려진 제한 12 |
+| v 범위 밖 참고 — port-call 게이트가 리플렉션을 못 봄 | **그대로** | 공유 게이트의 기존 성질이고 이 slice 가 만든 것이 아니다(verifier 도 finding 으로 올리지 않았다) |
