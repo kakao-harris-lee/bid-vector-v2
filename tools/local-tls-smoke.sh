@@ -117,15 +117,20 @@ trap _cleanup EXIT
 _step "빌드: web·proxy 이미지(단일 진입점 tools/local-tls-build.sh) + **게이트가 판정한 이미지와 같은가**"
 # cr M-5 — 앞선 step 들(위생·취약점 게이트)이 판정한 것은 **빌드 전에 이미 있던 태그**다.
 # 여기서 다시 빌드하므로, 재빌드가 캐시를 놓쳐 다른 바이트가 나오면 **판정한 이미지와 실행하는
-# 이미지가 다르다.** 빌드 전후의 이미지 ID 를 재어 등식을 단언한다.
+# 이미지가 다르다.** 빌드 전후의 **이미지 내용 지문**을 재어 등식을 단언한다.
+#
+# chore(2026-10-28) — 앞 판은 `docker image inspect --format '{{.Id}}'` 를 쟀다. 러너가
+# ubuntu-24.04 → 26.04 로 바뀌면서 그 값이 **provenance attestation 을 담은 index 다이제스트**가
+# 되어 같은 바이트를 다시 구워도 매번 달라졌다(run 40528127458: manifest·config 는 같고 index 만
+# 달랐다 — 사유·실측은 `bidvector_image_fingerprint` 의 주석). 약속(「게이트가 판정한 바이트 ==
+# 스모크가 실행하는 바이트」)은 그대로 두고, 그 약속을 **바이트만 담는 축**으로 옮긴다.
 pre_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do
-  # `docker image inspect --format` 는 없는 이미지에 **빈 줄을 찍고** 실패한다. 그래서
-  # `… || echo none` 은 `"\nnone"` 을 내고, `none` 을 보려던 술어가 개행 때문에 맞지 않았다
-  # (r1 이 둔 `*=none;` 가지도 같은 이유로 한 번도 타지 않았다 — 2026-10-19 실측). 값을 먼저
-  # 받아 개행을 털고, 비었으면 그때 `none` 으로 적는다.
-  img_id="$(docker image inspect "$img" --format '{{.Id}}' 2>/dev/null | tr -d '\n' || true)"
-  pre_ids="${pre_ids}${img}=${img_id:-none};"
+  # 함수는 없는 이미지에 **아무것도 찍지 않고 비-0** 이다(이 자리의 옛 함정 — `--format` 은 없는
+  # 이미지에 빈 줄을 찍고 실패해서 `… || echo none` 이 `"\nnone"` 을 냈고 `none` 술어가 개행
+  # 때문에 맞지 않았다, 2026-10-19 실측). 비었을 때만 `none` 으로 적는다.
+  img_fp="$(bidvector_image_fingerprint "$img" || true)"
+  pre_ids="${pre_ids}${img}=${img_fp:-none};"
 done
 # **앞선 빌드 step 이 남긴 기록**(cr R2-6). 있으면 「그때 만든 바이트」와 「지금 태그가 가리키는
 # 바이트」의 등식을 먼저 본다 — 그 사이에 아무도 태그를 바꾸지 않았다는 전제가 여기서 측정이
@@ -147,7 +152,7 @@ fi
 ./tools/local-tls-build.sh
 post_ids=""
 for img in bidvector/web:local bidvector/proxy:local; do
-  post_ids="${post_ids}${img}=$(docker image inspect "$img" --format '{{.Id}}' | tr -d '\n');"
+  post_ids="${post_ids}${img}=$(bidvector_image_fingerprint "$img");"
 done
 case "$pre_ids" in
   *=none\;*)
@@ -157,8 +162,8 @@ case "$pre_ids" in
     ;;
   *)
     [ "$pre_ids" = "$post_ids" ] \
-      || fail "재빌드로 이미지 ID 가 바뀌었다 — 게이트가 판정한 바이트와 스모크가 실행하는 바이트가 다르다: 전[$pre_ids] 후[$post_ids]"
-    echo "  이미지 ID 등식 성립(게이트가 판정한 것과 같은 바이트): $post_ids"
+      || fail "재빌드로 이미지 내용이 바뀌었다(layer 사슬 또는 config) — 게이트가 판정한 바이트와 스모크가 실행하는 바이트가 다르다: 전[$pre_ids] 후[$post_ids]"
+    echo "  이미지 내용 지문 등식 성립(게이트가 판정한 것과 같은 바이트): $post_ids"
     ;;
 esac
 
