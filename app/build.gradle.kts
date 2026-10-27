@@ -264,6 +264,9 @@ val compatibilitySmoke =
                 "org.apache.tomcat.embed:tomcat-embed-websocket",
                 "com.fasterxml.jackson.core:jackson-databind",
                 "tools.jackson.core:jackson-databind",
+                // chore(2026-10-28) — 같은 이유로 guava 하한도 등재한다. 이 좌표는 **선언한 자리가
+                // 없어**(grpc 전이) 등재하지 않으면 해석이 이 축에서 통째로 빠진다.
+                "com.google.guava:guava",
                 // 카탈로그가 BOM 을 이기는지 — Boot 4.1.1 BOM 은 kotlin 2.3.21 / jupiter 6.0.3 을 관리한다.
                 "org.jetbrains.kotlin:kotlin-stdlib",
                 "org.junit.jupiter:junit-jupiter",
