@@ -472,7 +472,30 @@ test 는 「늘 통과하는 test」와 구별되지 않는다.
 
 ## 4. acceptance 실측
 
-(구현 라운드에서 채운다)
+판정 대상 `2ad0e6b9`. 양 끝 `TREE=clean`, 시작·끝 HEAD 동일. **FAILED task 0.**
+
+| job · step | 명령(ci.yml 그대로) | 결과 |
+|---|---|---|
+| `check` | `./gradlew --no-daemon check` | `CHECK_EXIT=0` |
+| 〃 | `./gradlew --no-daemon qualityBaseline` | `BASELINE_EXIT=0` |
+| 〃 (S-20) | `./tools/one-command-check.sh` | `WRAPPER_EXIT=0` |
+| `web` W-1~W-9 | `npm ci` · `lint` · `typecheck` · `gate:src-tree` · `api:types:check` · `test` · `gate:tests` · `build` · `gate:boundary-canary` | 아홉 전부 0 (생성 타입은 OpenAPI 문서와 바이트까지 같다) |
+| `web` W-10·W-11 | playwright 의존·브라우저 설치 · `test:e2e` | **안 돌렸다** — apt·브라우저 CDN 이 필요한 CI 전용 step. CI 에서 |
+| `container` | job 전체 | **안 돌렸다**. **정본은 CI `container` job — PR head 커밋**(머지 조건). 부분만 돌린 것을 이 job 의 실측으로 적지 않는다(하네스: 줄일 수 있는 단위는 job) |
+| (참고 — 판정 근거 아님) | `:app:bootJar` · 앱 이미지 build · 앱 이미지 위생 게이트 | 0 · 0 · 0. V23 이 app 배포물 안으로 들어가므로 입력이 바뀌는 쪽을 미리 두드린 것이고, container job 의 갈음이 아니다 |
+
+**`check` 의 exit 0 이 「전부 실행됐다」를 뜻하지 않았다.** test 결과 XML 의 mtime 을 보니
+`:adapters:test`·`:workflow:test` 는 **2026-10-26 17:29·17:27**(HEAD `207ae4f5`) 것이고 이번
+창에서 쓰인 것은 app 쪽뿐이었다 — Gradle 이 UP-TO-DATE 로 건너뛴 것이다. Gradle 의 판단
+자체는 맞다(그 뒤 바뀐 것은 app test 소스 다섯 · `architecture-policy.properties` · evidence 뿐이고,
+그 정책 파일을 읽는 코드는 `app` 하나다). 그래도 **추론으로 갈음하지 않고** 판정 SHA 에서
+강제 실행했다:
+
+| 보강 실측 | 결과 |
+|---|---|
+| `./gradlew --no-daemon :adapters:test --rerun :workflow:test --rerun` (HEAD `2ad0e6b9`, TREE=clean) | `RERUN_EXIT=0` · adapters class 183 / test **1213** · workflow class 70 / test **587** · 실패 0 · 오류 0 |
+| 그 실행 안의 이 slice test | 어댑터 **45**(쓰기·전이 17 · 읽기 투영 11 · 카탈로그 8 · 권한 7 · 동시성 2) · 순수 커널 **21**(사실 9 · 파싱 12) · app **17**(문서 계약 14 · areEqual 구조 3) |
+| 건너뜀 4 | `RealServerIntegrationTest` — 이 slice 와 무관한 기존 건너뜀 |
 
 ## 5. 알려진 제한 (확정)
 

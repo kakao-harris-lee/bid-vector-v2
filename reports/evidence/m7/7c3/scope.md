@@ -96,6 +96,25 @@
 - 읽음 처리 두 operation(단건 · 공고 묶음) · 보존 90일 안읽음 예외 없음 · 표시 문구 비저장(읽을 때 `notice` 합침, 파기된 공고는 표시 칸
   부재 — 「파기됨」 상태를 null 과 구별할지 레인이 판정) · `notice` FK 미설정(DDL 주석에 사유) — 수령.
 
+**in_scope 확장 (2026-10-27, 팀장 수령).**
+
+- **2026-10-27 팀장 수령 — in_scope 에 15 경로 추가.** 기계 대조: `git diff --name-only 46ac0949..HEAD`
+  44 경로 ↔ 위 in_scope 문면 → 문면 밖 **15**. 이 중 **9** 는 승인된 설계 §0.12 가 이름을 든
+  공유 래칫·등록부·게이트 자리다 — `RetentionTableRegistry` · `RetentionFixture` ·
+  `CleanMigrationTest`·`CleanMigrationCheckTest`·`CleanMigrationColumnTest`·`CleanMigrationIndexTest`·
+  `CleanMigrationPrivilegeTest` · `AppHttpDependencyGateTest`(면제 계수) · `AccountScopedRoutes`.
+  나머지 **6** 은 §0.12 밖이고 **고른 것이 아니라 강제된 것**이다(각각 무엇이 강제했는가):
+
+  | 경로 | 무엇이 강제했나 |
+  |---|---|
+  | `adapters/src/test/.../persistence/PersistenceTestSupport.kt` | 비우기 목록. 새 표가 빠지면 「행 하나」·안읽음 계수·묶음 계수 대조가 **실행 순서에 의존**한다(공고 키에 FK 가 없어 `notice` 를 비워도 이 표는 비지 않는다) |
+  | `app/src/main/.../http/ErrorBody.kt` | 알림함 표면의 거부 어휘가 필요하다(추가형 — 기존 줄 변경 0). **병합 충돌 후보**: 다른 레인도 같은 파일에 거부 타입을 더한다 — 해소는 두 블록을 **다 남기는** 합집합이다 |
+  | `app/src/test/.../http/AccountCarrierStructureTest.kt` | 7B 의 `getAttribute` 호출자 집합 **등식**. 새 controller 를 등재하지 않으면 그 등식이 붉다 |
+  | `app/src/test/.../http/ConstantTimeComparisonStructureTest.kt` | `Intrinsics.areEqual` 허용 목록. 키 집합이 **두 자리**라 둘을 같이 맞춰야 한다 |
+  | `app/src/test/.../http/HttpTestSupport.kt` | 크기 상한(500 줄). 조립을 가르고, 이중체 둘은 가시성만 넓혔다 |
+  | `app/src/test/.../http/HttpTestApplication.kt` | 같은 상한이 강제한 **새 파일**(조립 ↔ 이중체·도우미로 책임 분리) |
+
+  rollback 목록은 기계 산출이라 이 15 를 이미 포함한다(`comm -23` 빈 출력으로 확인 — `rollback.md`).
 
 ## 하네스 레인 변경 (상시)
 

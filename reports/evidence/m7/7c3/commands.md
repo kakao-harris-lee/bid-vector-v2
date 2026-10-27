@@ -149,15 +149,15 @@ git status --porcelain -- <in_scope 개별 인자>
 
 ## (기록) — acceptance: `check` job · `web` job · `container` job
 
-`ci.yml` 의 job 명령 **그대로**다. 마이그레이션이 있어 app 이미지가 V23 을 싣으므로 `container`
-job 도 잰다(생략 불가 — path-limited diff 로 입력 변경을 보인다).
+`ci.yml` 의 job 명령 **그대로**다. 명령·종료 코드·실행 계수는 `checklist.md` §4 가 든다(여기서
+다시 적지 않는다). 요지: 판정 대상 `2ad0e6b9` 에서 `check`·`web`(W-1~W-9) 전부 0, FAILED task 0.
 
-| 항목 | 명령 | 결과 |
-|---|---|---|
-| `check` job | `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline` · `./tools/one-command-check.sh` | (기록) |
-| `web` job | `npm ci` · `lint` · `typecheck` · `gate:src-tree` · `api:types:check` · `test` · `gate:tests` · `build` · `gate:boundary-canary` · Playwright 스모크 | (기록) |
-| `container` job | app `bootJar` + 이미지 빌드 + 위생·취약점 게이트 | (기록) |
-| `ml-engine` job | 입력 변경 0 → **생략** | 해당 없음 |
+`container` job 은 **CI 의 PR head 커밋이 정본**이다(팀장 2026-10-27 — 부분 게이트는 안 돌린
+것과 같고 줄일 수 있는 단위는 job 이다). 로컬에서 `bootJar`·앱 이미지·위생만 돌린 것은
+**참고이고 판정 근거가 아니다.** `ml-engine` job 은 입력 변경 0 으로 해당 없음.
+
+`check` 의 exit 0 은 「전부 실행됐다」가 아니었다 — `:adapters:test`·`:workflow:test` 가
+UP-TO-DATE 로 건너뛰어, 판정 SHA 에서 `--rerun` 으로 강제 실행해 계수를 §4 에 남겼다.
 
 ### 7B 머지 전에는 공유 test 둘이 붉다 (D-7C3-1 ① 이 예상한 것 · 실측으로 확인한 원인)
 
