@@ -85,6 +85,30 @@ class OpenApiBidPriceVocabularyTest {
         }
     }
 
+    /**
+     * **문서의 enum 칸 전수가 구현 표 셋이 덮는 칸과 같다.**
+     *
+     * r1 에 있었고 **r2 에서 덮개를 뒤집으며 빠뜨린 등식**이다(`cr r3 H-1`). 아래 뒤집은 덮개와
+     * 다른 것을 잰다: 뒤집은 쪽은 「문자열 칸이 둘 중 하나로 분류됐는가」를, 이 쪽은 「문서가
+     * enum 을 선언한 칸마다 구현 어휘를 재는 표가 있는가」를 본다. 이것이 없으면 **문서에 enum
+     * 칸을 더하고 표를 잊는 길**이 열린다 — 그 칸이 allowlist 에 이미 있으면 뒤집은 합집합이
+     * 변하지 않아 조용히 지난다.
+     */
+    @Test
+    fun `문서에서 enum 을 가진 칸 전수가 구현 표 셋이 덮는 칸과 같다`() {
+        docFieldsWithEnum() shouldBe
+            (enumClassFields().keys + emittedFields().keys + nameDerivedFields().keys)
+    }
+
+    /**
+     * 열린 어휘로 둔 칸에 문서 enum 이 생기면 그 칸이 **두 분류에 동시에** 들어, 아래 뒤집은
+     * 덮개의 합집합이 변하지 않아 눈을 감는다. 서로소를 따로 단언해 그 자리를 닫는다(`cr r3 H-1`).
+     */
+    @Test
+    fun `문서 enum 칸과 열린 어휘 allowlist 는 서로소다`() {
+        (docFieldsWithEnum() intersect OPEN_VOCABULARY.keys) shouldBe emptySet()
+    }
+
     @Test
     fun `응답의 문자열 칸 전수가 문서 enum 칸과 열린 어휘 allowlist 의 합집합과 같다`() {
         stringFields() shouldBe (docFieldsWithEnum() + OPEN_VOCABULARY.keys)
@@ -210,6 +234,9 @@ class OpenApiBidPriceVocabularyTest {
             LicenseVerdict::class to licenseVerdictSamples().map { it::class }.toSet(),
             UncertainReason::class to uncertainReasons().map { it::class }.toSet(),
             MlUnavailableReason::class to mlUnavailableReasons().map { it::class }.toSet(),
+            // 유일한 손 상수다(`cr r3 LOW④`) — 다른 넷처럼 표본에서 유도하지 않는다. 이 축은
+            // 「하위 타입이 **하나**다」를 잠그는 것이 목적이고, 둘째가 생기면 그 사실이 여기서
+            // 먼저 붉어진다(유효기간 검증 variant 를 만들지 않는다는 U-7 의 구조적 표현).
             LicenseValidity::class to setOf(LicenseValidity.NotVerified::class),
             FloorRateOrigin::class to floorRateSamples().map { it.origin::class }.toSet(),
         )
@@ -275,10 +302,15 @@ class OpenApiBidPriceVocabularyTest {
                 // 닫힌 어휘이지만 **이 slice 가 소유하지 않은 축**이다(알려진 제한 R2-L2).
                 // 그 축의 slice 가 enum 으로 올릴 때 이 목록에서 빠지고, 덮개가 그것을 요구한다.
                 "verdictReasonCodes" to "판정 사유 코드 — DEC 축 소관(닫힌 어휘, 미enum)",
-                "dropStage" to "탈락 단계 — 평가 커널 소관(닫힌 어휘, 미enum)",
-                "dropReasonCode" to "탈락 사유 — 같은 축",
-                "noticeStatus" to "공고 수명 상태 — COL 축 소관",
-                "watchUndeterminableReason" to "감시 판정 불가 사유 — STR 축 소관",
+                // 아래 셋은 **이 slice 가 손 문자열로 낸다**(`verifier r3 L-1` 정정 — 앞 문면은
+                // 「다른 축 소관」이라고 적었으나 타입만 커널 소유이고 wire 리터럴은 이 slice 가
+                // 만든 파일에서 찍는다). 구동 등식을 걸지 못하는 이유는 그 값을 나르는
+                // `CandidateEvaluation.NotReached` 가 `internal constructor` 라 app test 가 입력을
+                // 지을 수 없기 때문이다 — `verdict` 와 같은 종류의 유보다.
+                "dropStage" to "탈락 단계 — 닫힌 어휘, 아직 문서 enum 에 묶이지 않았다(이 slice 가 리터럴을 찍는다)",
+                "dropReasonCode" to "탈락 사유 — 같은 종류",
+                "watchUndeterminableReason" to "감시 판정 불가 사유 — 같은 종류",
+                "noticeStatus" to "공고 수명 상태 — 커널 enum 의 `.name` 이고 이 응답만 가진 칸이다",
                 "failedWatchRuleIds" to "실패한 감시 규칙 id — STR 축 소관",
                 "licenseRequirementSourceFields" to "요건 출처 필드명 — QUAL 축 소관",
                 "baseAmountCurrency" to "통화 — shared-kernel 금액 축 소관",
