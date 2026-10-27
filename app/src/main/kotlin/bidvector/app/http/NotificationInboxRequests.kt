@@ -64,17 +64,6 @@ private fun JsonNode.requiredInboxText(key: String): String {
  */
 private fun rejectInbox(reason: String): Nothing = throw InvalidNotificationRequestException(reason)
 
-/** 파싱 결과 — 거부를 삼키지 않도록 소진 `when` 으로 소비한다. */
-sealed interface NotificationTargetResult {
-    data class Item(
-        val key: NotificationItemKey,
-    ) : NotificationTargetResult
-
-    data class Notice(
-        val notice: NoticeId,
-    ) : NotificationTargetResult
-}
-
 /**
  * 공고 쌍을 값으로 읽는다. 형식을 어긴 입력은 **도메인 타입의 생성자가 던지므로** 그것을
  * 이 표면의 거부로 옮긴다 — 도메인 규칙(차수는 제로패딩 세 자리 · 번호는 비어 있지 않음)을
@@ -97,15 +86,15 @@ private fun JsonNode.notificationKind(): NotificationKind {
 }
 
 /** 읽음 처리(단건) — 신원은 「종류 + 공고 쌍」이다. 계정·시각 칸은 **허용 키에 없다**. */
-fun JsonNode.parseNotificationReadTarget(): NotificationTargetResult {
+fun JsonNode.parseNotificationReadTarget(): NotificationItemKey {
     val body = requireInboxObjectBody().requireKnownInboxKeys(ITEM_TARGET_KEYS)
-    return NotificationTargetResult.Item(NotificationItemKey(body.notificationKind(), body.noticeId()))
+    return NotificationItemKey(body.notificationKind(), body.noticeId())
 }
 
 /** 읽음 처리(공고 묶음 전체) — 종류 축만 없는 같은 모양이다. */
-fun JsonNode.parseNoticeReadTarget(): NotificationTargetResult {
+fun JsonNode.parseNoticeReadTarget(): NoticeId {
     val body = requireInboxObjectBody().requireKnownInboxKeys(NOTICE_TARGET_KEYS)
-    return NotificationTargetResult.Notice(body.noticeId())
+    return body.noticeId()
 }
 
 /**

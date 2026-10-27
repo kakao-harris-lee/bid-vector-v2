@@ -71,18 +71,7 @@ class NotificationInboxController(
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val target = body.parseNotificationReadTarget()
-        return when (target) {
-            is NotificationTargetResult.Item -> {
-                respond(notifications.markRead(account, target.key))
-            }
-
-            // 이 파싱은 묶음을 내지 않는다 — 소진 `when` 을 닫기 위한 갈래이고, 파싱이 갈래를
-            // 늘리면 컴파일이 이 자리를 막는다(조용히 무시되지 않는다).
-            is NotificationTargetResult.Notice -> {
-                throw InvalidNotificationRequestException("단건 경로가 공고 묶음을 받았다")
-            }
-        }
+        return respond(notifications.markRead(account, body.parseNotificationReadTarget()))
     }
 
     /** 읽음 처리(한 공고의 묶음 전체). 안읽음 항목만 바뀐다. */
@@ -92,16 +81,7 @@ class NotificationInboxController(
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val target = body.parseNoticeReadTarget()
-        return when (target) {
-            is NotificationTargetResult.Notice -> {
-                respond(notifications.markNoticeRead(account, target.notice))
-            }
-
-            is NotificationTargetResult.Item -> {
-                throw InvalidNotificationRequestException("묶음 경로가 단건을 받았다")
-            }
-        }
+        return respond(notifications.markNoticeRead(account, body.parseNoticeReadTarget()))
     }
 
     /**
