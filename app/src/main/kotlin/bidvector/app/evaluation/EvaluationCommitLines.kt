@@ -53,9 +53,11 @@ internal fun tallyOf(results: List<CandidateEvaluation>): EvaluationCommitTally 
         bidNow = reached.count { it.verdict is Verdict.BidNow },
         requested = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Requested },
         requestFailed = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Failed },
+        // **결과 전체**에서 센다(r1 CR M-1) — 최소 점수 드롭은 분석을 받은 뒤 `NotReached` 로
+        // 떨어지는 자리라, `reached` 만 세면 그 가지의 제외가 줄에서 사라진다.
         floorExclusions =
             PublishedFloorExclusion.entries.associateWith { exclusion ->
-                reached.count { it.floorExclusion == exclusion }
+                results.count { it.floorExclusion == exclusion }
             },
     )
 }
@@ -86,8 +88,12 @@ internal fun evaluationCommitFinishLine(
 
 /**
  * 사유별 계수 필드 — 사유 전수를 돌아 **0 건도 적는다**. 키 이름은 소진 `when` 이 정한다
- * (Kotlin 상수 이름에서 파생시키지 않는다 — DEC-10 acceptance 셋째가 `floor_implausible` 로
- * 계수 이름을 고정하므로, 상수를 개명해도 계수 이름이 조용히 따라 바뀌면 안 된다).
+ * (Kotlin 상수 이름에서 파생시키지 않는다 — 상수를 개명해도 계수 이름이 조용히 따라 바뀌면 안 된다).
+ *
+ * **이름의 층이 둘이다**(r1 CR M-2). `capability-map.md` DEC-10 acceptance 셋째는 그 계수를
+ * `floor_implausible` 로 부르고, 그것은 운영자 승인 문서의 어휘다. 이 줄이 방출하는 키는
+ * `floorImplausible` 이다 — 같은 계수의 **이 줄 표기**이고, 줄의 다른 필드 전부가 camelCase 라
+ * 한 줄 안에서 표기가 갈리지 않게 한다. 둘의 대응은 evidence 가 한 줄로 적는다.
  */
 private fun floorExclusionFields(tally: EvaluationCommitTally): String =
     PublishedFloorExclusion.entries

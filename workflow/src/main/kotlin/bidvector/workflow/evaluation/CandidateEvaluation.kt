@@ -19,6 +19,18 @@ sealed interface CandidateEvaluation {
     val noticeId: NoticeId
     val correlationId: CorrelationId
 
+    /**
+     * DEC-10 계수(D-DEC10-5·D-DEC10-8) — 이 후보의 게시 하한율이 가격 경로에서 **제외됐다는
+     * 사실**이다. 제외가 없었으면 `null` 이다.
+     *
+     * **두 가지에 다 있다**(r1 CR M-1). 앞 판은 [Reached] 에만 두고 「판정에 이르지 못한 후보에는
+     * 이 축이 없다 — 분석을 돌지 않았다」고 적었는데, 그 문면은 거짓이었다: 최소 점수 드롭은
+     * `MlAnalysisOutcome.Analyzed` 를 **받은 뒤** [NotReached] 로 떨어지는 자리라 분석도 제외
+     * 계산도 이미 끝나 있다. 그 가지에서 계수를 버리면 「조용히 사라지는 것」을 막겠다는 이
+     * slice 의 위협 모델 첫 문장이 그 자리에서만 성립하지 않는다.
+     */
+    val floorExclusion: PublishedFloorExclusion?
+
     @ConsistentCopyVisibility
     data class Reached internal constructor(
         override val noticeId: NoticeId,
@@ -34,12 +46,7 @@ sealed interface CandidateEvaluation {
          * 규칙 그대로, `OPEN-6A3-EVALUATION-DETAIL`).
          */
         val disposition: NotificationDisposition,
-        /**
-         * DEC-10 계수(D-DEC10-8) — 이 후보의 게시 하한율이 가격 경로에서 제외됐다는 사실.
-         * 평가 실행 집계가 이 칸을 사유별로 센다. `null` 은 제외가 없었다는 뜻이고, 판정에
-         * 이르지 못한 후보([NotReached])에는 이 축이 없다(분석을 돌지 않았다).
-         */
-        val floorExclusion: PublishedFloorExclusion?,
+        override val floorExclusion: PublishedFloorExclusion?,
     ) : CandidateEvaluation
 
     @ConsistentCopyVisibility
@@ -48,5 +55,7 @@ sealed interface CandidateEvaluation {
         override val correlationId: CorrelationId,
         val stage: EvaluationStage,
         val reason: EvaluationDropReason,
+        /** 분석을 돌지 못한 가지에서는 `null` 이고, 최소 점수 드롭에서는 계산된 사유가 실린다. */
+        override val floorExclusion: PublishedFloorExclusion?,
     ) : CandidateEvaluation
 }
