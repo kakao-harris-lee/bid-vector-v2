@@ -89,7 +89,7 @@ class ArithmeticTest {
                 Provenance.OperatorDeclared,
             )
 
-        val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN), floor)
+        val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN), AppliedFloor(floor))
 
         result shouldBe Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
     }
@@ -140,7 +140,7 @@ class ArithmeticTest {
                         Provenance.OperatorDeclared,
                     )
 
-                val result = raw.roundedWith(resolvedPolicy(mode), floor)
+                val result = raw.roundedWith(resolvedPolicy(mode), AppliedFloor(floor))
 
                 val oracleScaled = floor.setScale(MONEY_AXIS_SCALE_DIGITS, mode)
                 if (oracleScaled.compareTo(floor) >= 0) {
@@ -336,6 +336,43 @@ class ArithmeticTest {
 
         result.shouldBeInstanceOf<Measurement.Measured<Derived<BidRate>>>()
         result.value.derivedFrom.policyVersion shouldBe policy.version
+    }
+
+    /**
+     * D-G1DEC05-2 — `appliedFloorFrom` 은 [times] 와 **같은 곱**이라 하한과 피교차값이 같은
+     * 기초금액 축 위에 있다. 투찰율을 하한 그대로 쓰는 것이 가장 빡빡한 경계이므로, 그
+     * 경계에서 `DOWN` 이 하한을 밑돌면 **조용히 성공하지 않고** `ROUNDED_BELOW_FLOOR` 를 낸다.
+     *
+     * **이것은 이 원시 함수의 계약이고, DEC-02 무조건 acceptance 둘째의 답은 아니다** — 그
+     * bullet 을 만족시키는 것은 메뉴 층이다. 거기서는 밑도는 값을 보류하지 않고 제약을 만족하는
+     * 최소 정수로 올린다(`bidvector.decision.menu.BidMenuKernelTest` 의 반올림 test 셋).
+     *
+     * 이 test 가 잠그는 것은 P-2b 와 다르다 — P-2b 는 임의 `BigDecimal` 하한에서 보증을
+     * 재고, 여기서는 **하한이 어디서 왔는가**(같은 base·같은 rate)를 잰다. 곱의 피연산자를
+     * 다른 것으로 바꾸는 변이가 여기서 RED 다.
+     */
+    @Test
+    fun `적용 하한은 기초금액과 투찰율 하한의 곱이고 그 경계에서 반올림이 하한을 밑돌지 않는다`() {
+        runBlocking {
+            checkAll(Arb.long(0L, 1_000_000_000L), Arb.long(1L, 999_999L)) { won, rateMicros ->
+                val theBase = base(won)
+                val rate = BidRate.recommended(Rate.ofFraction(BigDecimal(rateMicros).movePointLeft(6)))
+
+                val floor = theBase.appliedFloorFrom(rate)
+                val result = (theBase * rate).roundedWith(resolvedPolicy(RoundingMode.DOWN), floor)
+
+                val product = BigDecimal(won).multiply(rate.rate.fraction)
+                val scaled = product.setScale(MONEY_AXIS_SCALE_DIGITS, RoundingMode.DOWN)
+                if (scaled >= product) {
+                    result.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
+                    result.value.value
+                        .export()
+                        .won shouldBe scaled.longValueExact()
+                } else {
+                    result shouldBe Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
+                }
+            }
+        }
     }
 
     @Test

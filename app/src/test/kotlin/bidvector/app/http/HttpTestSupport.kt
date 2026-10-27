@@ -6,6 +6,7 @@ import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
+import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
@@ -26,13 +27,13 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OperatorProfilePort
-import bidvector.workflow.evaluation.WatchSubjectOutcome
-import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
+import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
+import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -194,30 +195,6 @@ class TestStrategyRepository(
     override fun save(applied: AppliedStrategy) {
         strategy = applied.strategy
     }
-}
-
-/**
- * `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
- * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
- * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
- * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
- *
- * **D-6A3-20 — [failure]는 `TestStrategyRepository.
- * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
- * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
- */
-class EmptyCandidateSource : CandidateSourcePort {
-    @Volatile var failure: (() -> Throwable)? = null
-
-    override fun openCandidates(): List<Notice> = failure?.let { throw it() } ?: emptyList()
-}
-
-internal class UnreachableWatchSubjectPort : WatchSubjectPort {
-    override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-internal class UnreachableLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
 }
 
 /**

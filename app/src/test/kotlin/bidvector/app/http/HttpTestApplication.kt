@@ -7,6 +7,7 @@ import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
 import bidvector.app.wiring.NotificationInboxQuery
+import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
@@ -15,6 +16,8 @@ import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.OperatorProfilePort
+import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
+import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.EditSessionRepository
 import bidvector.workflow.strategy.EditStrategyWorkflow
@@ -142,6 +145,22 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /**
+     * 7C⑤-a — 개찰 결과 조회의 이중체와 조립. **이 class 안에 둔다**: 바깥의 `@Configuration` 은
+     * 출하 조립(`BidVectorApplication`)의 component scan 에도 걸려 같은 이름 빈이 둘이 된다(실측 —
+     * `BeanDefinitionOverrideException`). 이 class 는 `@SpringBootApplication` 어노테이션 필터가
+     * 출하 scan 에서 제외하므로, test 전용 조립의 자리는 여기다.
+     */
+    @Bean
+    open fun fakeOpeningResultFactsPort(): FakeOpeningResultFactsPort = FakeOpeningResultFactsPort()
+
+    @Bean
+    open fun openingResultQuery(
+        fakeOpeningResultFactsPort: FakeOpeningResultFactsPort,
+        clock: FixedClock,
+    ): OpeningResultQuery =
+        OpeningResultQuery(ReadOpeningResult(fakeOpeningResultFactsPort, clock, OPENING_PROGRESS_POLICY))
 
     @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
     open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()

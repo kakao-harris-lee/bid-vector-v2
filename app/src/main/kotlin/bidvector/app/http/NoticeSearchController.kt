@@ -35,7 +35,10 @@ private val DECLARED_PARAMETERS =
  * 거부는 [InvalidNoticeSearchException] 하나로 400 `INVALID_REQUEST` 가 된다(오류 형태를
  * 만드는 자리는 `ErrorBody.kt` 하나다 — 이 컨트롤러는 `ErrorBody` 를 짓지 않는다).
  *
- * **질의를 읽는 자리는 [readDeclaredParameters] 하나다**(verifier r3 R3-M-1). `@RequestParam`
+ * **질의를 읽는 자리는 [readDeclaredValues] 하나다**(verifier r3 R3-M-1 — M7/7C⑤ D-7C5-8 로 그
+ * 자리가 이 컨트롤러의 private 사본에서 `DeclaredValue.kt` 의 **공용 자리**로 옮겨졌다:
+ * 같은 규율을 쓰는 endpoint 가 둘이 되었고, 술어가 한 자리여야 변이도 한 자리에서 잡힌다).
+ * `@RequestParam`
  * 으로 받으면 그 읽기가 **핸들러 바깥**(프레임워크의 인자 해석)에서 일어나, 잘못된 퍼센트
  * 인코딩처럼 **읽기 자체가 깨지는** 입력이 전역 폴백(500)으로 샜다. 읽기를 이 안으로 들이면
  * 그 실패를 같은 거부 하나로 옮길 수 있고, 다른 경로의 거동을 건드리지 않는다.
@@ -46,61 +49,37 @@ class NoticeSearchController(
 ) {
     @GetMapping("/api/notices")
     fun search(request: HttpServletRequest): ResponseEntity<List<NoticeSummaryResponse>> {
-        val values = readDeclaredParameters(request)
-        rejectRepeated(values)
+        val values =
+            try {
+                request.readDeclaredValues(DECLARED_PARAMETERS)
+            } catch (failure: IllegalStateException) {
+                unreadableQuery(failure)
+            }
+        val repeated = values.repeatedNames()
+        if (repeated.isNotEmpty()) rejectQuery("같은 매개변수가 반복됐다: $repeated")
         val parameters =
             NoticeSearchParameters(
-                text = values.first("q"),
-                agencyText = values.first("agency"),
-                amountMinWon = values.first("amountMin"),
-                amountMaxWon = values.first("amountMax"),
-                deadlineFrom = values.first("deadlineFrom"),
-                deadlineTo = values.first("deadlineTo"),
-                page = values.first("page"),
-                size = values.first("size"),
+                text = values.firstValue("q"),
+                agencyText = values.firstValue("agency"),
+                amountMinWon = values.firstValue("amountMin"),
+                amountMaxWon = values.firstValue("amountMax"),
+                deadlineFrom = values.firstValue("deadlineFrom"),
+                deadlineTo = values.firstValue("deadlineTo"),
+                page = values.firstValue("page"),
+                size = values.firstValue("size"),
             )
         return when (val parsed = parseNoticeSearchParameters(parameters)) {
-            is NoticeSearchRequest.Rejected -> throw InvalidNoticeSearchException(parsed.reason.name)
+            is NoticeSearchRequest.Rejected -> rejectQuery(parsed.reason.name)
             is NoticeSearchRequest.Accepted -> respond(notices.search(parsed.criteria))
         }
     }
 
-    /**
-     * 계약이 든 이름들의 **원문 값 목록** — 이 요청의 질의를 읽는 **유일한 자리**다.
-     *
-     * 서블릿 컨테이너는 질의 전체를 한 번에 해석한다. 그래서 `%` 뒤에 16진 두 자리가 없는 꼴이나
-     * UTF-8 로 디코딩되지 않는 바이트열이 **어느 매개변수에 있든**(계약 밖 이름이어도) 이 읽기가
-     * 깨진다. 계약은 그 입력에 400 을 선언하므로 여기서 거부로 옮긴다 — 컨테이너가 던지는 타입을
-     * 이 층이 이름으로 들지 않는다(서블릿 구현의 좌표이고, HTTP 층의 바깥 참조 허용 밖이라
-     * 전송 표면 게이트가 실측으로 막는다). **자리가 술어다**: 이 호출이 실패했다는 것이 곧 질의
-     * 해석이 실패했다는 사실이다.
-     *
-     * 잡는 타입은 실측한 가장 좁은 JDK 상위 타입이다. 컨테이너가 다른 부류를 던지게 바뀌면 출하
-     * 조립 E2E 가 그 꼴을 500 으로 잡아 붉어진다(그 회귀는 숨지 않는다).
-     */
-    private fun readDeclaredParameters(request: HttpServletRequest): Map<String, List<String>> =
-        try {
-            DECLARED_PARAMETERS.associateWith { name -> request.getParameterValues(name)?.toList().orEmpty() }
-        } catch (failure: IllegalStateException) {
-            throw InvalidNoticeSearchException("질의를 해석할 수 없다").apply { initCause(failure) }
-        }
+    /** 거부 하나를 만드는 **유일한 자리** — 400 `INVALID_REQUEST`(거부 갈래 셋이 같은 예외로 간다). */
+    private fun rejectQuery(reason: String): Nothing = throw InvalidNoticeSearchException(reason)
 
-    /**
-     * 같은 매개변수를 두 번 보내면 거부한다(verifier r1 L-3) — 값 둘을 하나로 합치면 **리터럴
-     * 검색어에 쉼표가 들어간 질의**와 구별되지 않는다. 계약에 없는 조용한 결합이라 400 으로 끊는다.
-     *
-     * 판정 대상은 **계약이 든 이름들**이다 — 알 수 없는 매개변수는 지금처럼 무시한다(그 거동은
-     * 바꾸지 않는다). 서블릿 요청의 값 목록이 합쳐지기 전의 사실을 들고 있다.
-     */
-    private fun rejectRepeated(values: Map<String, List<String>>) {
-        val repeated = values.filterValues { it.size > 1 }.keys
-        if (repeated.isNotEmpty()) {
-            throw InvalidNoticeSearchException("같은 매개변수가 반복됐다: $repeated")
-        }
-    }
-
-    /** 값이 없으면 `null` — `@RequestParam(required = false)` 이 주던 것과 같은 모양이다. */
-    private fun Map<String, List<String>>.first(name: String): String? = this[name]?.firstOrNull()
+    /** 질의 해석 자체가 깨진 경우 — 원래 실패를 `initCause` 로 단다(응답에는 닿지 않는다). */
+    private fun unreadableQuery(failure: Throwable): Nothing =
+        throw InvalidNoticeSearchException("질의를 해석할 수 없다").apply { initCause(failure) }
 
     private fun respond(page: NoticeSearchPage): ResponseEntity<List<NoticeSummaryResponse>> =
         ResponseEntity

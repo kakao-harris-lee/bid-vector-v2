@@ -102,6 +102,10 @@ class ConstantTimeComparisonStructureTest {
                 "NotificationTargetResult\$Item",
                 "NotificationTargetResult\$Notice",
                 "NotificationInboxRequestsKt",
+                "OpeningResultResponse",
+                "OpeningResultControllerKt",
+                "DeclaredValue",
+                "DeclaredValueKt",
             )
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
@@ -169,6 +173,14 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
         "NotificationInboxRequestsKt" to
             "요청 읽기의 enum 어휘 조회(`entries.firstOrNull { it.name == token }`) — 공개 어휘 비교이고 " +
             "자격증명 값 없음(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
+        "OpeningResultResponse" to
+            "개찰 결과 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태·관측값·금액 칸뿐, 자격증명 값 없음",
+        "OpeningResultControllerKt" to
+            "상태·잠정 1위 토큰의 sealed 싱글턴 when 소진과 계약 매개변수 **이름** 비교 — 비교 대상이 질의 칸 이름이지 자격증명 값이 아니다",
+        "DeclaredValue" to
+            "질의 매개변수 하나의 값 객체(data class) 자동 생성 equals — 칸 이름과 그 원문 값 목록뿐, 자격증명 값 없음",
+        "DeclaredValueKt" to
+            "계약이 든 **이름**으로 질의 값을 찾는 비교(`firstValue`) — 비교 대상이 칸 이름이지 자격증명 값이 아니다",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"
