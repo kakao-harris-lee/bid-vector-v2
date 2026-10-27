@@ -481,6 +481,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/opening-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 공고 단위 개찰 결과 조회(SET-02 표시 절반 · COL-02 표면) — 읽기 전용
+         * @description 공고 하나의 개찰 결과를 **읽기만** 한다(M7/7C⑤-a). 쓰기 경로가 없고 수집을 일으키지 않는다.
+         *     **답은 `state` 가 가르는 아홉 갈래 중 하나다** — 「데이터가 없다」·「결과가 없다」· 「아직 개찰 전이다」를 한 값으로 접지 않는다. `NOTICE_ABSENT`(그 공고 자체를 수집한 적이 없다) · `NOT_OPENED_YET`(개찰 결과가 없고 투찰 마감이 아직 지나지 않았다 — 개찰은 마감 뒤라는 도메인 사실에서만 유도한다) · `NOT_COLLECTED`(개찰 축 원문도 결과도 없다) · `OBSERVED_NOT_PROMOTED`(개찰 축 **원문은 적재됐으나** 결과로 승격되지 않았다) · `OPENED`·`FAILED_BID`(유찰)·`REBID`(재입찰) · `PROGRESS_UNRECOGNIZED`(진행구분 라벨이 등재 어휘 밖이다 — 조용히 개찰완료로 접지 않는다) · `PROGRESS_ABSENT`(결과 행은 있으나 진행구분이 없다).
+         *     **잠정과 확정은 다른 칸이다.** 확정 낙찰금액은 `confirmedAwardAmount*` 가 나르고 잠정 1위는 `provisionalRankOne*` 가 나른다 — 잠정 1위 관측이 확정 칸을 바꾸지 않는다(SET-02). 잠정 축의 상태는 `NOT_OBSERVED`(투찰 행 미관측) · `RANK_MISSING`(어느 행도 순위 1이 아니다) · `RANK_DUPLICATED`(순위 1이 둘 이상 — 동값을 임의로 깨지 않는다, 건수는 `provisionalRankOneDuplicateCount`) · `DETERMINED` 다. 순위를 투찰금액으로 재계산하지 않는다.
+         *     **다른 업체의 식별 정보를 싣지 않는다** — 사업자등록번호·대표자명은 수집 경계에서 버려져 저장 자체가 없고, 업체 **상호**는 이 응답의 어느 칸에도 없다(조회 질의가 그 열을 읽지 않는다). 낙찰/패찰 판정은 서버가 하고 그 결과만 내보낸다(후속 slice).
+         *     금액은 값만 싣지 않고 **통화·basis·과세·provenance 와 함께** 싣는다. 투찰율은 표기 그대로의 **문자열**이다(JSON 수치의 배정밀도로 소수 자리를 잃지 않는다). 시각은 모두 관측 시각이고, 잠정 축은 자기 관측 시각을 따로 나른다(소비자가 낡음을 스스로 판정한다).
+         *     `noticeNumber`·`noticeRound` 는 **둘 다 필수**다(차수를 기본값으로 접지 않는다). 차수는 제로패딩 3자리이고 그 밖의 표기·제어 문자·길이 초과·같은 매개변수의 반복·잘못된 퍼센트 인코딩은 조용히 고치지 않고 400 이다(어느 입력이 틀렸는지는 응답에 싣지 않는다).
+         */
+        get: operations["readOpeningResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -736,6 +761,35 @@ export interface components {
             /** @enum {string|null} */
             licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
             unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+        };
+        OpeningResultView: {
+            noticeNumber: string;
+            noticeRound: string;
+            /** @enum {string} */
+            state: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "OPENED" | "FAILED_BID" | "REBID" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT";
+            /** Format: int32 */
+            participantCount?: number | null;
+            /** Format: date-time */
+            actualOpeningAt?: string | null;
+            /** Format: date-time */
+            observedAt?: string | null;
+            /** Format: int64 */
+            confirmedAwardAmountWon?: number | null;
+            confirmedAwardAmountCurrency?: string | null;
+            confirmedAwardAmountBasis?: string | null;
+            confirmedAwardAmountVatTreatment?: string | null;
+            confirmedAwardAmountProvenance?: string | null;
+            /** @enum {string} */
+            provisionalRankOneState: "NOT_OBSERVED" | "RANK_MISSING" | "RANK_DUPLICATED" | "DETERMINED";
+            /** Format: int32 */
+            provisionalRankOneDuplicateCount?: number | null;
+            /** Format: int64 */
+            provisionalRankOneBidAmountWon?: number | null;
+            provisionalRankOneBidAmountCurrency?: string | null;
+            provisionalRankOneBidAmountVatTreatment?: string | null;
+            provisionalRankOneBidRateFraction?: string | null;
+            /** Format: date-time */
+            provisionalRankOneObservedAt?: string | null;
         };
         ErrorBody: {
             /** @enum {string} */
@@ -2587,6 +2641,58 @@ export interface operations {
                 };
             };
             /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readOpeningResult: {
+        parameters: {
+            query: {
+                /** @description 공고번호. 수집이 저장할 때 쓰는 같은 정규화를 지난다(대문자화·공백 합침). */
+                noticeNumber: string;
+                /** @description 차수(제로패딩 3자리). 형식을 어기면 400 이다. */
+                noticeRound: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 그 공고에 대해 아는 것 — `state` 가 아홉 갈래를 가른다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningResultView"];
+                };
+            };
+            /** @description 질의 값이 유효하지 않다 — 필수 칸 부재, 제어 문자, 길이 상한 초과, 차수 형식 위반, 같은 매개변수의 반복, 잘못된 퍼센트 인코딩(UTF-8 로 디코딩되지 않는 바이트열 포함). 어느 입력이 틀렸는지는 싣지 않는다. code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;
