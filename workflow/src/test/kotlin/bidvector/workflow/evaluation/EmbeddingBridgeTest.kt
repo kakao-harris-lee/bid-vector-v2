@@ -48,15 +48,18 @@ class EmbeddingBridgeTest {
      * `MarginInputs.init` 의 `require` 를 피하는 것이었고, 지금은 DEC-10 게이트가 가격 경로
      * 앞에서 판정하며 제외를 **계수 어휘**(`PublishedFloorExclusion`)로 낸다.
      *
-     * 리플렉션으로 하위 타입을 세지 않는다(그 API 는 이 모듈 classpath 에 없고, 세는 것은
-     * 「몇 개인가」일 뿐이다). 대신 [allDerivationAbsences] 의 **소진 `when`** 이 센다 —
-     * 항이 하나라도 생기면 그 함수가 컴파일되지 않는다.
+     * 리플렉션으로 하위 타입을 세지 않는다(그 API 는 이 모듈 classpath 에 없다). 두 축이 함께
+     * 센다 — [allDerivationAbsences] 의 **소진 `when`** 은 항이 생기면 컴파일을 멈추고, 아래
+     * **크기 단언**은 그 `when` 가지만 더하고 목록에 넣지 않는 변경을 잡는다.
      */
     @Test
     fun `DerivationAbsence 어휘 전수가 ScoreNotProvided 다 — 새 항은 컴파일을 멈춘다`() {
-        allDerivationAbsences().forEach { reason ->
-            bridgeDerivationAbsence(reason) shouldBe MlUnavailableReason.ScoreNotProvided
-        }
+        val reasons = allDerivationAbsences()
+
+        // r1 CR L-3 — `when` 가지만 더하고 목록에 안 넣는 변경을 이 수가 잡는다(앞 판 KDoc 이
+        // 「숫자를 세는 단언」을 가리켰는데 그 단언이 없었다).
+        reasons.size shouldBe 5
+        reasons.forEach { reason -> bridgeDerivationAbsence(reason) shouldBe MlUnavailableReason.ScoreNotProvided }
     }
 
     @Test

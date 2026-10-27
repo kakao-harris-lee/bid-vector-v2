@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test
 class FloorTrustCompileFailureHarnessTest {
     @Test
     fun `6 게이트 통과 값은 모듈 밖에서 직접 지을 수 없고 게이트 경유는 컴파일된다`() {
-        assertNegativeFails("6-plausible-floor-rate-direct-construction", "cannot access")
+        assertNegativeFails("6-plausible-floor-rate-direct-construction", CONSTRUCTOR_DENIED)
         assertPositiveCompiles("6-floor-trust-via-gate")
     }
 
@@ -23,7 +23,7 @@ class FloorTrustCompileFailureHarnessTest {
     fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "6-plausible-floor-rate-direct-construction-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = CONSTRUCTOR_DENIED,
         )
     }
 
@@ -38,14 +38,14 @@ class FloorTrustCompileFailureHarnessTest {
 
     @Test
     fun `7 통과 판정은 모듈 밖에서 지을 수 없다 — 통과했다는 주장의 위조`() {
-        assertNegativeFails("7-trusted-direct-construction", "cannot access")
+        assertNegativeFails("7-trusted-direct-construction", CONSTRUCTOR_DENIED)
     }
 
     @Test
     fun `7-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "7-trusted-direct-construction-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = CONSTRUCTOR_DENIED,
         )
     }
 
@@ -56,14 +56,14 @@ class FloorTrustCompileFailureHarnessTest {
      */
     @Test
     fun `8 통과 값에서 원값을 되꺼낼 수 없다`() {
-        assertNegativeFails("8-gated-value-raw-read", "cannot access")
+        assertNegativeFails("8-gated-value-raw-read", RAW_VALUE_DENIED)
     }
 
     @Test
     fun `8-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "8-gated-value-raw-read-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = RAW_VALUE_DENIED,
         )
     }
 
@@ -80,3 +80,11 @@ class FloorTrustCompileFailureHarnessTest {
         )
     }
 }
+
+/**
+ * r1 CR L-2 — 일반 단편 `"cannot access"` 는 **다른 접근 실패**에도 참이다(import 한 타입 자체가
+ * `internal` 로 바뀌는 경우 등). DEC-05 r5 가 `copy` 단편에 적용한 처방과 같게 **심볼을 지목**한다.
+ */
+private const val CONSTRUCTOR_DENIED = "cannot access 'constructor("
+
+private const val RAW_VALUE_DENIED = "cannot access 'val value:"

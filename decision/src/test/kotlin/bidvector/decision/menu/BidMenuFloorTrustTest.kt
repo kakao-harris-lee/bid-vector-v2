@@ -56,6 +56,34 @@ class BidMenuFloorTrustTest {
         outcome.reason shouldBe MenuSourceAbsence.PublishedFloorRateAbsent
     }
 
+    /**
+     * r1 v M-2 — 앞 판의 실패 가지 test 는 판정을 **직접 주입**해서 게이트 변이로는 RED 가 되지
+     * 않았다. 이 test 는 **원값에서 시작**해 게이트를 지나므로 밴드 술어가 무너지면 여기서 깨진다.
+     */
+    @Test
+    fun `밴드 밖 원값이 게이트를 지나 개연 불가 사유로 떨어진다 — 종단`() {
+        val outcome =
+            composeBidMenu(
+                testInput(publishedFloorRate = testFloorRate("1.00000")),
+                testMenuPolicy(reading = atOrAbove()),
+            )
+
+        outcome.shouldBeInstanceOf<BidMenuOutcome.SourceAbsent>()
+        outcome.reason shouldBe MenuSourceAbsence.PublishedFloorRateImplausible
+    }
+
+    @Test
+    fun `밴드 아래 원값도 종단으로 같은 사유다`() {
+        val outcome =
+            composeBidMenu(
+                testInput(publishedFloorRate = testFloorRate("0.2999")),
+                testMenuPolicy(reading = atOrAbove()),
+            )
+
+        outcome.shouldBeInstanceOf<BidMenuOutcome.SourceAbsent>()
+        outcome.reason shouldBe MenuSourceAbsence.PublishedFloorRateImplausible
+    }
+
     @Test
     fun `밴드 안 게시값은 메뉴를 낸다 — 게이트가 정상 경로를 막지 않는다`() {
         val outcome = composeBidMenu(testInput(), testMenuPolicy(reading = atOrAbove()))
