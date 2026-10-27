@@ -24,13 +24,13 @@ import java.time.Duration
  *   걸고, `bidvector.adapters.ml.ParsedSuccessFields.toRateOrNull()` 이 `> 1` 이면 `null`
  *   을 내 `BidPredictionOutcome.Unavailable(ContractViolation)` 으로 접는다(`PredictionContractTest`
  *   가 `1.0000` 통과·`1.0001` 거부를 고정).
- * - `floorRate` — **이 `init` 이 유일한 관문이다.** 상류는 4D-1 gRPC 가 아니라
- *   `Notice.floorRate`(`FloorRate`)이고, `FloorRate`(`init` 없음)·`Canonicalize.kt`
- *   (`Rate.ofPercent` 변환만, 상한 검사 없음)·`NoticeReconstruction.kt`(DB 열을
- *   `Rate.ofFraction` 으로 그대로 감쌈) 어디에도 `≤ 1` 이 없다(shared-kernel·procurement·
- *   adapters 전수 grep 0건). **4B-6 인계**(checklist 「알려진 제한」) — `MarginInputs`
- *   생성 전에 `Notice.floorRate > 1` 을 걸러 [DerivationAbsence.FloorRateOutOfRange] 로
- *   내야 한다. 이 `init` 은 그 관문이 배선되기 전까지의 마지막 방어선이다.
+ * - `floorRate` — **관문은 DEC-10 신뢰 게이트이고 이 `init` 은 최후 방어선이다**(D-DEC10-9).
+ *   원값 쪽에는 상한이 없다 — `FloorRate`(`init` 없음)·`Canonicalize.kt`(`Rate.ofPercent`
+ *   변환만)·`NoticeReconstruction.kt`(DB 열을 `Rate.ofFraction` 으로 그대로 감쌈) 어디에도
+ *   `≤ 1` 이 없고, 그것이 **의도**다(수집·영속은 공고를 버리지 않는다). 가격 경로로 들어오는
+ *   값은 `bidvector.decision.trustPublishedFloorRate` 를 거치고, 통과 값의 율은 개연 밴드
+ *   안이므로 `≤ 1` 이다 — 그래서 이 `require` 는 가격 경로에서 도달 불가다. 그래도 지운다는
+ *   것은 「호출부가 X 만 하므로 안전」을 타입에서 빼는 것이라(R-FLOOR-04 의 형태) 남겨 둔다.
  *
  * legacy 의 `max(0, min(1, ·))` 클램프는 **재현하지 않는다**(D-4B5-1 방향 — 값을 조용히
  * 자르는 대신 거부한다, `policy-values.md` §3).

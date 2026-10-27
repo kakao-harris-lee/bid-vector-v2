@@ -1,5 +1,6 @@
 package bidvector.app.evaluation
 
+import bidvector.decision.PublishedFloorExclusion
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -56,6 +57,7 @@ private fun tally(
     bidNow: Int = 0,
     requested: Int = 0,
     requestFailed: Int = 0,
+    floorExclusions: Map<PublishedFloorExclusion, Int> = emptyMap(),
 ) = EvaluationCommitTally(
     candidates = candidates,
     reached = reached,
@@ -63,4 +65,5 @@ private fun tally(
     bidNow = bidNow,
     requested = requested,
     requestFailed = requestFailed,
+    floorExclusions = floorExclusions,
 )

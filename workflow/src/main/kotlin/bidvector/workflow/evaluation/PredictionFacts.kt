@@ -1,12 +1,16 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
+import bidvector.decision.PublishedFloorTrust
 import bidvector.decision.UnitScore
+import bidvector.decision.exclusion
 import bidvector.decision.priority.ScoreFact
 import bidvector.decision.priority.derive.DerivationAbsence
 import bidvector.decision.priority.derive.MarginInputs
 import bidvector.decision.priority.derive.deriveBudgetCapture
 import bidvector.decision.priority.derive.deriveExpectedMargin
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.procurement.Notice
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.sharedkernel.BaseAmount
@@ -73,6 +77,12 @@ internal data class PredictionComponents(
     val budgetCapture: ScoreFact<UnitScore>,
     val expectedMargin: ScoreFact<UnitScore>,
     val evidence: PredictionEvidence,
+    /**
+     * DEC-10 계수(D-DEC10-5·D-DEC10-8) — 게시 하한율이 **제외됐다는 사실**이다. 점수는
+     * 「하한 미보고」와 같은 값으로 접히므로 [expectedMargin] 만 보면 제외가 보이지 않는다;
+     * 그 칸이 침묵 스킵을 막는다. 제외가 없으면 `null` 이고 부재는 제외가 아니다.
+     */
+    val floorExclusion: PublishedFloorExclusion?,
 )
 
 /**
@@ -100,10 +110,10 @@ internal fun predictedFacts(
     }
     val priceFitness = UnitScore(predicted.fitness.score)
     val budgetCapture = budgetCaptureFact(baseAmount, predicted.candidates.base, policies)
-    val expectedMargin =
+    val (expectedMargin, floorExclusion) =
         expectedMarginFact(notice, predicted.candidates.base, priceFitness, capacityScore, policies)
     val evidence = PredictionEvidence.Diagnosed(predicted.diagnostics, predicted.release, excludedSamples)
-    return PredictionComponents(budgetCapture, expectedMargin, evidence)
+    return PredictionComponents(budgetCapture, expectedMargin, evidence, floorExclusion)
 }
 
 /** fitness 범위 위반 또는 `candidates.base > 1`(`MarginInputs.init`의 두 술어) — 둘 다 같은 취급. */
@@ -134,17 +144,29 @@ private fun budgetCaptureFact(
     }
 }
 
+/**
+ * DEC-10 ③ — 게시 하한율이 **신뢰 게이트를 거쳐** 점수에 들어간다(D-DEC10-3). 통과하지 못한
+ * 값은 「하한 미보고」와 **같은 값**(`floorRate = null`)으로 접히고(DEC-10 acceptance 첫째)
+ * 제외 사유가 [PredictionComponents.floorExclusion] 으로 남는다(셋째).
+ *
+ * 값을 고쳐 접어 올리지 않는다 — 접는 것은 **쓰지 않는다**는 뜻이고, 밴드 끝으로 clamp 하면
+ * 지어낸 하한이 점수에 들어간다.
+ */
 private fun expectedMarginFact(
     notice: Notice,
     predictedRate: Rate,
     priceFitness: UnitScore,
     capacityScore: UnitScore,
     policies: ResolvedPolicies,
-): ScoreFact<UnitScore> {
-    val floorRate = notice.floorRate?.rate
-    if (floorRate != null && floorRate.fraction > BigDecimal.ONE) {
-        return ScoreFact.Absent(bridgeDerivationAbsence(DerivationAbsence.FloorRateOutOfRange))
-    }
+): Pair<ScoreFact<UnitScore>, PublishedFloorExclusion?> {
+    val trust = trustPublishedFloorRate(notice.floorRate, policies.floorTrust)
+    val floorRate =
+        when (trust) {
+            is PublishedFloorTrust.Trusted -> trust.rate.rate
+            PublishedFloorTrust.Absent -> null
+            is PublishedFloorTrust.Implausible -> null
+            is PublishedFloorTrust.OriginNotJudged -> null
+        }
     val marginInputs =
         MarginInputs(
             recommendedRate = predictedRate,
@@ -153,12 +175,17 @@ private fun expectedMarginFact(
             priceFitness = priceFitness,
             capacity = capacityScore,
         )
-    return ScoreFact.Present(deriveExpectedMargin(marginInputs, policies.derivation))
+    return ScoreFact.Present(deriveExpectedMargin(marginInputs, policies.derivation)) to trust.exclusion()
 }
 
 /** (D-4D4-1) — 예측을 시도하지 않았거나 실패로 끝난 경우는 전부 `NotPredicted`다. */
 internal fun absentPair(reason: MlUnavailableReason): PredictionComponents =
-    PredictionComponents(ScoreFact.Absent(reason), ScoreFact.Absent(reason), PredictionEvidence.NotPredicted(reason))
+    PredictionComponents(
+        ScoreFact.Absent(reason),
+        ScoreFact.Absent(reason),
+        PredictionEvidence.NotPredicted(reason),
+        floorExclusion = null,
+    )
 
 /**
  * D-4B7-9 — 표본 공급 실패(`CompetitionSampleSupply.Unavailable`) 사유를

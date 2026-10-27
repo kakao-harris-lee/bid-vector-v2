@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.Verdict
 import bidvector.procurement.NoticeId
 import bidvector.workflow.event.CorrelationId
@@ -33,6 +34,12 @@ sealed interface CandidateEvaluation {
          * 규칙 그대로, `OPEN-6A3-EVALUATION-DETAIL`).
          */
         val disposition: NotificationDisposition,
+        /**
+         * DEC-10 계수(D-DEC10-8) — 이 후보의 게시 하한율이 가격 경로에서 제외됐다는 사실.
+         * 평가 실행 집계가 이 칸을 사유별로 센다. `null` 은 제외가 없었다는 뜻이고, 판정에
+         * 이르지 못한 후보([NotReached])에는 이 축이 없다(분석을 돌지 않았다).
+         */
+        val floorExclusion: PublishedFloorExclusion?,
     ) : CandidateEvaluation
 
     @ConsistentCopyVisibility

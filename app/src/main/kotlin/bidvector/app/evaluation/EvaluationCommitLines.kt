@@ -1,5 +1,6 @@
 package bidvector.app.evaluation
 
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.Verdict
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.NotificationDisposition
@@ -34,6 +35,12 @@ internal data class EvaluationCommitTally(
     val bidNow: Int,
     val requested: Int,
     val requestFailed: Int,
+    /**
+     * DEC-10 계수(D-DEC10-5) — 게시 하한율이 가격 경로에서 제외된 건수를 **사유별로** 센다.
+     * 표는 사유 전수를 키로 갖는다(0 건도 줄에 나온다) — 「그 사유가 0 이었다」와 「그 사유를
+     * 세지 않았다」가 구별되지 않으면 계수가 없는 것과 같다.
+     */
+    val floorExclusions: Map<PublishedFloorExclusion, Int>,
 )
 
 internal fun tallyOf(results: List<CandidateEvaluation>): EvaluationCommitTally {
@@ -46,6 +53,10 @@ internal fun tallyOf(results: List<CandidateEvaluation>): EvaluationCommitTally 
         bidNow = reached.count { it.verdict is Verdict.BidNow },
         requested = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Requested },
         requestFailed = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Failed },
+        floorExclusions =
+            PublishedFloorExclusion.entries.associateWith { exclusion ->
+                reached.count { it.floorExclusion == exclusion }
+            },
     )
 }
 
@@ -71,6 +82,21 @@ internal fun evaluationCommitFinishLine(
 ): String =
     "evaluation-commit finished candidates=${tally.candidates} reached=${tally.reached} " +
         "notReached=${tally.notReached} bidNow=${tally.bidNow} requested=${tally.requested} " +
-        "requestFailed=${tally.requestFailed} exit=${exitCode.value}"
+        "requestFailed=${tally.requestFailed} ${floorExclusionFields(tally)} exit=${exitCode.value}"
+
+/**
+ * 사유별 계수 필드 — 사유 전수를 돌아 **0 건도 적는다**. 키 이름은 소진 `when` 이 정한다
+ * (Kotlin 상수 이름에서 파생시키지 않는다 — DEC-10 acceptance 셋째가 `floor_implausible` 로
+ * 계수 이름을 고정하므로, 상수를 개명해도 계수 이름이 조용히 따라 바뀌면 안 된다).
+ */
+private fun floorExclusionFields(tally: EvaluationCommitTally): String =
+    PublishedFloorExclusion.entries
+        .joinToString(" ") { exclusion -> "${logKeyOf(exclusion)}=${tally.floorExclusions[exclusion] ?: 0}" }
+
+private fun logKeyOf(exclusion: PublishedFloorExclusion): String =
+    when (exclusion) {
+        PublishedFloorExclusion.IMPLAUSIBLE -> "floorImplausible"
+        PublishedFloorExclusion.ORIGIN_NOT_JUDGED -> "floorOriginNotJudged"
+    }
 
 internal fun evaluationCommitFailureLine(causeCode: String): String = "evaluation-commit failed cause=$causeCode"

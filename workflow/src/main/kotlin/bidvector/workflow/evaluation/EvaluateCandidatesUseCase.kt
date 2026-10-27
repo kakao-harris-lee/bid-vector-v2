@@ -2,6 +2,7 @@ package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
@@ -217,6 +218,7 @@ class EvaluateCandidatesUseCase internal constructor(
                     ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
                     PredictionEvidence.NotPredicted(outcome.reason),
                     strategy.revision,
+                    floorExclusion = null,
                 )
             }
 
@@ -235,6 +237,7 @@ class EvaluateCandidatesUseCase internal constructor(
                         ),
                         outcome.evidence,
                         strategy.revision,
+                        outcome.floorExclusion,
                     )
             }
         }
@@ -313,6 +316,7 @@ class EvaluateCandidatesUseCase internal constructor(
         ladderInput: LadderInput,
         evidence: PredictionEvidence,
         strategyRevision: StrategyRevision,
+        floorExclusion: PublishedFloorExclusion?,
     ): CandidateEvaluation.Reached {
         val ladderPolicy =
             Resolution.Resolved(
@@ -331,6 +335,7 @@ class EvaluateCandidatesUseCase internal constructor(
             correlationId,
             verdict,
             notifications.requestFor(notice, correlationId, verdict, evidence, ladderPolicy.version, strategyRevision),
+            floorExclusion,
         )
     }
 }

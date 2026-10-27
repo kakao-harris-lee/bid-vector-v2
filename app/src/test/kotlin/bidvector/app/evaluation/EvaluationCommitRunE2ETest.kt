@@ -461,5 +461,6 @@ private class AlwaysBidNowMl : MlAnalysisPort {
             probabilityScore = null,
             matchedScore = null,
             evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+            floorExclusion = null,
         )
 }
