@@ -98,8 +98,10 @@ class ProfileAssemblyBoundaryTest {
     }
 
     /**
-     * 양성 대조 ② — **배열 성분**으로 감싼 의존에 같은 규칙을 돌린다. 배열 class 는 패키지가 없어
-     * 이름 비교가 지나가고, 술어가 성분 타입으로 내려가지 않으면 이 대조가 붉다(r2 CR L-2).
+     * 양성 대조 ② — **배열 성분**으로 감싼 의존에 같은 규칙을 돌린다. 배열 class 에는 패키지가 없어
+     * 이름 비교가 지나가므로, 이 길이 잡히는 근거는 **ArchUnit 이 배열 의존을 성분 타입으로도 센다**는
+     * 전제다. 이 test 가 그 전제를 잠근다 — 도구가 그렇게 세지 않게 되면 붉어진다(r2 CR L-2 의 처분:
+     * 술어에 성분 하강을 덧대는 대신 전제를 test 로 둔다).
      *
      * 배열 타입을 `importClasses` 로는 집을 수 없어서(배열에는 class 파일이 없다) 배열을 **서명에 가진**
      * fixture 를 들여온다. fixture 는 test 소스라 본 규칙의 모집단에 들지 않는다(`DoNotIncludeTests`).
@@ -150,14 +152,14 @@ private class ArrayProbeFixture {
  * 대상 타입 자신이나 그 **상위 타입**(클래스 · 인터페이스 전이)이 V22 패키지의 선언인가. 구현 타입으로
  * 감싸 넘기는 길을 같은 술어로 잡으려고 상위 타입까지 본다.
  *
- * **배열은 성분 타입으로 내려가서 본다**(r2 CR L-2) — `Array<BusinessProfileReader>` 는 Spring 이 실제로
- * 주입하는 길인데 배열 class 자체는 패키지가 없어 이름 비교가 지나간다.
+ * **배열 성분으로 내려가는 줄은 두지 않는다**(r2 CR L-2 의 처분). 한 번 넣어 본 뒤 **변이로 가렸다**:
+ * 그 줄을 지워도 배열 양성 대조가 초록이었다(MA-arr) — ArchUnit 이 배열 의존을 **배열 타입과 성분
+ * 타입 둘로** 세기 때문이다. 도구가 이미 하는 일을 덧댄 술어는 남기지 않는다. 그 전제(도구가 성분을
+ * 센다)는 위의 배열 양성 대조가 잠근다 — 전제가 깨지면 그 test 가 붉다.
  */
 private val carriesProfileType =
-    object : DescribedPredicate<JavaClass>("$PROFILE_PACKAGE 의 선언이거나 그 하위 타입(배열은 성분 타입)") {
-        override fun test(target: JavaClass): Boolean {
-            val resolved = target.baseComponentType
-            return (listOf(resolved) + resolved.allRawSuperclasses + resolved.allRawInterfaces)
+    object : DescribedPredicate<JavaClass>("$PROFILE_PACKAGE 의 선언이거나 그 하위 타입") {
+        override fun test(target: JavaClass): Boolean =
+            (listOf(target) + target.allRawSuperclasses + target.allRawInterfaces)
                 .any { it.packageName == PROFILE_PACKAGE }
-        }
     }
