@@ -481,3 +481,19 @@ test 는 「늘 통과하는 test」와 구별되지 않는다.
 ## 6. 하네스 레인 변경
 
 - 없음.
+
+## 7. 병합 메모 — 다음 머지에서 반드시 할 일 (레인 넷이 같은 네 자리를 만진다)
+
+이 slice 는 **공유 test 조립**을 건드린다. 네 자리 모두 「수를 맞추면 통과하지만 뜻이 사라지는」
+모양이라, 병합은 수가 아니라 **항목 이름의 합집합**으로 다시 센다.
+
+| 자리 | 다른 레인이 하는 것 | 이 slice 가 한 것 | 병합 규칙 |
+|---|---|---|---|
+| 조립 class `HttpTestApplication` | 7C② 가 `@Import(BidPriceTestWiring::class)`, 7C④-2b 가 `@Import(ProfileTestWiring::class)` 를 붙인다 — **둘 다 옛 자리**(`HttpTestSupport.kt` 안) | class 를 `HttpTestApplication.kt` 로 **옮겼다**(`@Import` 없음) | git 은 「옮김 + 옛 자리 편집」을 따라가지 못한다. 두 `@Import` 를 **새 파일로 옮겨 한 줄로 접는다** — `@Import(BidPriceTestWiring::class, ProfileTestWiring::class)`. `@Import` 는 `@Repeatable` 이 **아니다**(spring-context 7.0.8 의 그 annotation 을 javap 으로 확인 — `Target` 만 있고 `Repeatable` 이 없다). 그래서 위험이 갈라진다 — 두 줄로 남으면 **컴파일이 거부**되고, 충돌 해소가 **한 줄만 남기면** 다른 레인의 배선이 조용히 사라져 그 레인의 test context 가 무너진다. 접으면 둘 다 없다 |
+| 이중체 `UnreachableWatchSubjectPort` · `UnreachableLicenseGatePort` | 7C⑤ 가 같은 두 이름을 `EvaluationTestDoubles.kt` 로 `internal` 로 **옮겼다**(그 worktree 에서 실측) | **선언은 제자리에 두고 `private` → `internal` 만** 바꿨다 | 내가 선언을 옮기지 않은 이유가 이것이다 — 둘 다 옮기면 같은 패키지에 같은 이름이 두 벌이 된다. 7C⑤ 가 먼저 머지되면 `HttpTestSupport.kt` 의 **내 두 선언을 지운다**(7C⑤ 판이 이미 `internal`이라 새 파일에서 보인다) |
+| `Intrinsics.areEqual` 허용 목록 | 7C④·7C⑤ 도 늘린다 | **+4** — `NotificationItemResponse` · `NotificationTargetResult$Item` · `NotificationTargetResult$Notice` · `NotificationInboxRequestsKt` | 자리가 **둘**이다(map 의 키 · 같은 test 가 적는 축어 집합). 한 자리만 맞추면 다른 자리가 붉다(이 라운드 실측). 두 자리를 **항목 이름 합집합**으로 같이 맞춘다 |
+| `app` 의존 게이트 면제 계수 | 7C⑤ 68→70 · 7C④-2b 68→69(`ProfileWiring`) | 68 **+2** = 70 — tier1 `NotificationInboxWiring` · tier2 `NotificationInboxQuery` | 수를 맞추지 말고 목록을 base 와 diff 해 **이름**을 센다. 계수와 `tier1-bootstrap-classes` 목록은 **자리가 다르다** — 수만 올리면 계수 단언이 아니라 참조 단언이 붉는다(이 slice 에서 두 번 틀렸다) |
+
+**알려진 제한(병합 취약).** 네 자리 중 셋은 어긋나면 CI 가 붉는다. 조용히 유실될 수 있는 것은
+**`@Import` 를 한 줄만 남기는 해소**뿐이다 — 그것은 컴파일되고, 무너지는 것은 **다른 레인의**
+test context 라 머지하는 사람이 이 행을 읽지 않으면 원인을 조립이 아니라 자기 변경에서 찾는다.

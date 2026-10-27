@@ -243,3 +243,38 @@ D-7C3-1 ① 로 **7B → 7C③ 머지 순서**가 정해졌다. 그래서 이 sl
 ## (기록) — rollback ①~⑥ (임시 clone, 되돌린 트리)
 
 `rollback.md` 가 목록과 실측 HEAD 를 든다.
+
+## 조립 분할과 허용 목록 등재 (2026-10-27 — `HttpTestApplication` 를 자기 파일로)
+
+`HttpTestSupport.kt` 는 7B 머지 시점에 **정확히 500 줄**(크기 게이트 상한)이었다. 이 slice 가
+fake 조회기 bean 한 개를 더해야 해서, test 전용 조립 class 를 자기 파일로 **옮겼다** — 상한을
+올리지 않고 책임으로 갈랐다(조립 ↔ 이중체·도우미).
+
+**옮긴 것이 무엇을 잃지 않았는가(전수 대조).** 이름 추측으로 import 를 채우지 않고, 옮기기 전
+파일의 import 목록과 옮긴 본문을 기계로 대조해 **본문이 실제로 쓰는 것만** 넣었다(원본 59 중 27).
+
+| 축 | 결과 |
+|---|---|
+| 선언 이름 계수(옮기기 전 한 파일 ↔ 지금 두 파일 합) | 66 → 67 · **유실 0** · 새로 생긴 이름은 `notificationInboxQuery` 하나 |
+| `@Bean` 계수 | 22 → 23 (이 slice 가 더한 하나) |
+| 이중체 둘(`Unreachable*Port`) | **선언은 제자리** · `private` → `internal` 만 (7 번 절) |
+
+**두 게이트가 이 라운드에서 각각 다른 것을 잡았다**(둘 다 실측):
+
+| 실측 | 결과 | 무엇을 잡았나 |
+|---|---|---|
+| verify5 — `:app:test`(표적 다섯) + 정적 다섯, `--continue` | `VERIFY_EXIT=1` | `compileTestKotlin` 통과(미해결 참조 0) · `detekt`·`sizeGate`·`testShapeGate` 초록 · `ktlintTestSourceSetCheck` **FAILED**(import 순서 1건 — `java.*` 는 사전순이 아니라 **끝**) · `:app:test` 30 중 **1 실패** |
+| verify6 — 위 둘만 재측정 | `VERIFY_EXIT=0` | — |
+
+실패한 그 하나가 이 라운드의 핵심이다. `Intrinsics.areEqual` 허용 목록은 **키 집합을 두 자리**
+에 든다(map 의 키 · 같은 test 가 적는 축어 집합). 앞 라운드에서 map 에만 넷을 올렸더니 **축어
+집합 쪽이 붉었다** — 「허용 목록이 조용히 늘지 않는다」를 지키는 자리가 따로 있다. 네 항목은
+등재 전에 자리마다 판정했다(앞 절의 javap 실측 — data class 자동 `equals` 와 enum 이름 조회,
+자격증명 좌표 **0**). 등재는 그 판정 뒤의 **의도 선언**이고, 게이트를 초록으로 만들려는 수단이
+아니다.
+
+**변이 둘을 더했다(⑭·⑮ — 파일 분할을 필터가 따라가게).** 읽기 투영 test 는 분할로
+`NotificationInboxQueryTest` 로 갔는데 그 반을 재는 변이가 없었다. 변이 없는 반의 초록은
+「방어됨」과 「미측정」이 같은 값이다. 둘 다 **바꿔치우기**다 — ⑭ 묶음 전체 크기를 안읽음
+필터에 끌려가게(`count(*)` → `count(*) FILTER (WHERE read_at IS NULL)`), ⑮ 표시 칸 조인을
+`LEFT JOIN` → `JOIN`(공고가 파기된 항목이 목록에서 사라진다).
