@@ -72,9 +72,12 @@ internal fun <T : Enum<T>> JsonNode.optionalEnum(
  * - **공백뿐**: 「미설정」은 키 부재나 `null` 이다. 공백을 미설정으로 접으면 절 단위 교체에서 저장된
  *   값을 지우고 200 을 낸다(v F6 · CR M-2).
  * - **길이**: 값 타입 · 표 CHECK 와 같은 수를 쓴다(코드포인트 수).
- * - **제어 문자**: NUL 을 담은 텍스트는 PostgreSQL 이 SQLSTATE `22021` 로 거부하고 그 예외는 어댑터의
- *   class 23 번역 밖이라 **500** 이 된다 — 요청 탓을 서버 탓으로 말하는 자리다(v F5). 줄바꿈 · 탭도
- *   거부한다: 이 표면이 받는 것은 **이름**이고 거기에 줄바꿈이 있는 정상 입력이 없다.
+ * - **쓸 수 없는 문자**: 유니코드 분류로 거부한다 — 제어(Cc) · 서식(Cf) · 대리(Cs) · 사용자 영역(Co) ·
+ *   줄 구분(Zl) · 단락 구분(Zp). NUL 을 담은 텍스트는 PostgreSQL 이 SQLSTATE `22021` 로 거부하고 그
+ *   예외는 어댑터의 class 23 번역 밖이라 **500** 이 된다 — 요청 탓을 서버 탓으로 말하는 자리다(v F5).
+ *   제어만 보던 앞 판은 **보이지 않는 이름**(폭 0 문자만으로 된 상호) · `U+2028` 줄 구분 · 짝 없는
+ *   대리를 통과시켰다(r2 v L-a). 할당되지 않은 코드포인트(Cn)는 **거부하지 않는다** — 유니코드가
+ *   커지면 정상 입력을 막게 된다.
  */
 internal fun String.requiringName(
     key: String,
@@ -84,12 +87,29 @@ internal fun String.requiringName(
         when {
             isBlank() -> "$key 는 공백뿐일 수 없다 — 미설정은 null 이다"
             codePointCount(0, length) > maxCodePoints -> "$key 는 $maxCodePoints 자를 넘을 수 없다"
-            any { it.isISOControl() } -> "$key 에 제어 문자가 있다"
+            hasRejectedCharacter() -> "$key 에 쓸 수 없는 문자가 있다"
             else -> null
         }
     if (rejection != null) throw InvalidEditRequestException(rejection)
     return this
 }
+
+/**
+ * 이름에 쓸 수 없는 유니코드 분류 — 눈에 보이지 않거나 줄을 끊거나 짝이 없는 코드포인트다. 분류로
+ * 거부하므로 **문자를 열거하지 않는다**(열거에는 종점이 없다).
+ */
+private val REJECTED_CHARACTER_TYPES: Set<Int> =
+    setOf(
+        Character.CONTROL,
+        Character.FORMAT,
+        Character.SURROGATE,
+        Character.PRIVATE_USE,
+        Character.LINE_SEPARATOR,
+        Character.PARAGRAPH_SEPARATOR,
+    ).map(Byte::toInt).toSet()
+
+private fun String.hasRejectedCharacter(): Boolean =
+    codePoints().anyMatch { Character.getType(it) in REJECTED_CHARACTER_TYPES }
 
 /**
  * 값이 **있으면** 위 규칙을 지켜야 한다 — 없거나 `null` 만 「미설정」이다.

@@ -14,8 +14,9 @@ import java.time.Instant
  * 싱글턴 V12 에서 오고(계정을 받지 않는다) 나머지는 계정 소유 V22 에서 온다. 그 비대칭을 숨기지
  * 않는다 — 별 slice 가 V12 를 계정 단위로 옮기면 이 타입은 그대로 두고 port 만 바뀐다.
  *
- * [qualification] 이 `null` 이면 「프로필 미설정」이다(V12 행 없음). [unjudgedAxes] 는 선언 표를
- * 그대로 싣는다 — 입력이 있든 없든 판정이 없는 축을 응답이 말한다(M7 완료 조건 G2).
+ * [qualification] 이 `null` 이면 「프로필 미설정」이다(V12 행 없음). [unjudgedAxes] 는 **이 use case 가
+ * 정하는 목록**이고 HTTP 응답이 그것을 그대로 싣는다(순서까지) — 오늘은 선언 표 전체이고, 판정이 생긴
+ * 축을 거르는 자리가 생기면 **여기만** 고치면 wire 가 따라온다(r2 v F7).
  */
 data class ProfileView(
     val qualification: ProfileFacts?,

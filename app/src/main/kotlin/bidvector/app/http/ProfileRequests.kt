@@ -104,7 +104,12 @@ private fun JsonNode.requiredLicenseName(): String =
  * 보이지 않는다), 나머지 둘은 그대로 저장된다. 접거나 담는 대신 거부가 한 가지 답이다.
  */
 private fun JsonNode.freeTerms(key: String): List<String> {
-    val raw = requiredStringArray(key)
+    // **원소 규칙을 먼저** 본다(r2 CR L-6) — 나중에 보면 `["", ""]` 가 「공백뿐」이 아니라 「같은 값이
+    // 두 번」으로 답해, 운영자가 고칠 자리를 잘못 가리킨다.
+    val raw =
+        requiredStringArray(key).map {
+            it.requiringName(key, ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS)
+        }
     val rejection =
         when {
             raw.size > ProfileInputPolicy.QUALIFICATION_TERMS_MAX -> {
@@ -120,7 +125,7 @@ private fun JsonNode.freeTerms(key: String): List<String> {
             }
         }
     if (rejection != null) throw InvalidEditRequestException(rejection)
-    return raw.map { it.requiringName(key, ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS) }
+    return raw
 }
 
 /** 등록 상태에서만 의미가 있는 두 키 — 다른 답의 요청에 실려 있으면 **거부한다**. */

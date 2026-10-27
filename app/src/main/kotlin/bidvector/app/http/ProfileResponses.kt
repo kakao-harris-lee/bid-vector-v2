@@ -15,8 +15,10 @@ import bidvector.workflow.profile.ProfileView
  *  · `true` + [licensesDeclared] `false` → 「미신고」.
  *  · `true` + `true` → 「신고」. 그때만 [licenseNames] 가 운영자의 답이다(빈 목록도 답이다).
  *
- * [unjudgedAxes] 는 선언 표를 그대로 싣는다 — 입력이 있든 없든 **판정이 없는 축**을 응답이 말한다
- * (M7 완료 조건 G2). 화면이 이 목록에서 「아직 판정하지 않음」을 그린다(클라이언트가 추론하지 않는다).
+ * [unjudgedAxes] 는 **use case 가 낸 목록을 그대로** 싣는다 — 선언 표를 여기서 다시 세지 않는다
+ * (그러면 판정이 생긴 축을 use case 가 걸러도 응답이 전부를 싣는다, r2 v F7). 순서도 use case 의
+ * 것이다. 입력이 있든 없든 **판정이 없는 축**을 응답이 말하고(M7 완료 조건 G2), 화면은 이 목록에서
+ * 「아직 판정하지 않음」을 그린다(클라이언트가 추론하지 않는다).
  */
 data class ProfileResponse(
     val qualificationDeclared: Boolean,
