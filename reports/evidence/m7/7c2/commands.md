@@ -16,7 +16,8 @@ CI 는 매번 새 checkout 이라 이 차이가 없다.
 | 항목 | 값 | 어느 HEAD |
 |---|---|---|
 | `clean` | exit 0 | `f4afe17e` |
-| `check --continue` | **exit 0** · 401 task(실행 252 · cache 119 · up-to-date 30) · FAILED **0** · 28분 17초 | `f4afe17e` |
+| `check --continue` | **exit 0** · 392 task(실행 211 · cache 155 · up-to-date 26) · FAILED **0** · 26분 12초 | **`098399fb`**(r3 일괄 뒤) |
+| (참고) 병합 직후 실행 | exit 0 · 401 task · FAILED 0 · 28분 17초 | `f4afe17e` |
 | `qualityBaseline` | **exit 0** | `f4afe17e` |
 | CI `check` job(verifier 독립 실행) | **exit 0** · **3768 test · 실패 0** | **`c1dd8406`**(판정 SHA) |
 | (참고) 병합 앞 실행 | exit 0 · 391 task | `b28cfb2a` |
@@ -24,9 +25,13 @@ CI 는 매번 새 checkout 이라 이 차이가 없다.
 판정 SHA 의 값은 verifier r3 가 독립으로 받았고, 그 트리와 내 `f4afe17e` 실행의 차이는 `rollback.md`
 하나다(코드·계약·정책 변경 0).
 
-**PR head 의 `container` job 은 붉다** — 오늘 공개된 guava CVE 로 main 도 같이 붉고 별 레인이 고친다.
-이 slice 의 변경과 무관하지만 **head green 조건에는 그대로 남는다**(머지 전에 그 레인이 먼저 들어와야
-한다). 「내 탓이 아니다」로 끝나는 사실이 아니라 순서 조건이다.
+**PR head 의 `container` job 이 붉었던 원인은 해소됐다.** guava CVE 로 main 도 같이 붉었고, 그 chore 가
+**PR #95 로 머지됐다**(main `2c0fa487`). PR 의 CI 는 main 과의 merge ref 로 돌므로 **재실행으로 초록을
+확인한다** — 내 브랜치에 그 main 을 다시 병합하지 않는다. 경로 교집합이 **공집합**임을 실측했다
+(그 PR 은 `app/build.gradle.kts`·version catalog·그 보안 하한 test·자기 evidence 만 건드린다).
+
+이 줄을 「내 탓이 아니다」로 끝내지 않는 이유는, 그것이 **머지 순서 조건**이었기 때문이다 — 원인이
+사라진 지금도 head green 은 재실행으로 확인해야 성립한다.
 
 ## 2. acceptance — `ci.yml` `web` job
 
