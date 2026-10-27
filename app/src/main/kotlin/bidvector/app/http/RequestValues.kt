@@ -108,8 +108,23 @@ private val REJECTED_CHARACTER_TYPES: Set<Int> =
         Character.PARAGRAPH_SEPARATOR,
     ).map(Byte::toInt).toSet()
 
-private fun String.hasRejectedCharacter(): Boolean =
-    codePoints().anyMatch { Character.getType(it) in REJECTED_CHARACTER_TYPES }
+/**
+ * **코드포인트 단위로** 본다. `Char` 하나씩 보면 짝을 이룬 대리(이모지 · 희귀 한자)의 두 조각이 각각
+ * `SURROGATE` 로 읽혀 정상 입력을 거부한다 — 거부해야 하는 것은 **짝 없는** 대리다.
+ *
+ * Stream API 를 쓰지 않는다: `codePoints()` 는 `java.util.stream` · `java.util.function` 을 끌어오고,
+ * 그 둘은 `bidvector.app` 의 바깥 참조 허용 집합 밖이다(전송 표면 게이트가 실측으로 잡았다). 같은
+ * 일을 하는 표준 경로가 있으면 게이트를 넓히지 않는다.
+ */
+private fun String.hasRejectedCharacter(): Boolean {
+    var index = 0
+    while (index < length) {
+        val codePoint = codePointAt(index)
+        if (Character.getType(codePoint) in REJECTED_CHARACTER_TYPES) return true
+        index += Character.charCount(codePoint)
+    }
+    return false
+}
 
 /**
  * 값이 **있으면** 위 규칙을 지켜야 한다 — 없거나 `null` 만 「미설정」이다.
