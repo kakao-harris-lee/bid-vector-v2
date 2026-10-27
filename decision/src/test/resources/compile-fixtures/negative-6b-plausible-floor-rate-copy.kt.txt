@@ -1,0 +1,9 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.PlausibleFloorRate
+import bidvector.sharedkernel.FloorRate
+
+fun swapGatedValue(
+    gated: PlausibleFloorRate,
+    other: FloorRate,
+): PlausibleFloorRate = gated.copy(value = other)

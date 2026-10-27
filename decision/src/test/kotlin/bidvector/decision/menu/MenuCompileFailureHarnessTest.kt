@@ -1,15 +1,10 @@
 package bidvector.decision.menu
 
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
-import org.jetbrains.kotlin.cli.common.ExitCode
-import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import bidvector.decision.COPY_DENIED
+import bidvector.decision.assertMutantDoesNotMatchRealFragment
+import bidvector.decision.assertNegativeFails
+import bidvector.decision.assertPositiveCompiles
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.PrintStream
-import java.nio.file.Files
 
 /**
  * 메뉴 생성 경계의 컴파일 실패 하네스(1B·strategy `CompileFailureHarnessTest` 관례) —
@@ -153,87 +148,3 @@ class MenuCompileFailureHarnessTest {
         )
     }
 }
-
-/**
- * `copy` 봉쇄의 **진단 문면**을 지목하는 조각.
- *
- * 그냥 `"copy"` 로는 **아무것도 걸러내지 못한다**(r5 V5-M1 실측): 하네스가 소스를
- * `compile-fixture-<baseName>/<baseName>.kt` 에 쓰고 컴파일러가 모든 진단 줄 앞에 **그 경로**를
- * 붙이며 **원본 소스 줄**(`original.copy(…)`)까지 찍는데, copy fixture 여섯의 `baseName` 에는
- * 전부 `copy` 가 들어 있다. 그래서 `copy` 와 무관한 오류(`unresolved reference` 등)에서도
- * `output.contains("copy")` 가 **참**이었다 — 그 조각은 술어에 아무것도 더하지 않았다.
- *
- * `cannot access 'fun copy(` 는 경로에도 소스 echo 에도 나타날 수 없어 **심볼을 지목한다**.
- * 판별력은 `5-M2`(이름에 copy 가 들어가지만 접근 불가 대상이 copy 가 **아닌** mutant)가 잰다.
- */
-private const val COPY_DENIED = "cannot access 'fun copy("
-
-/**
- * 음성 fixture 는 **컴파일에 실패해야 하고, 그 실패가 우리가 노린 이유여야 한다.**
- */
-private fun assertNegativeFails(
-    fixtureName: String,
-    vararg expectedDiagnosticFragments: String,
-) {
-    val result = compileFixture("negative-$fixtureName")
-    io.kotest.assertions.withClue(result.output) {
-        result.exitCode shouldBe ExitCode.COMPILATION_ERROR
-        expectedDiagnosticFragments.forEach { fragment -> result.output shouldContain fragment }
-    }
-}
-
-private fun assertPositiveCompiles(fixtureName: String) {
-    val result = compileFixture("positive-$fixtureName")
-    io.kotest.assertions.withClue(result.output) {
-        result.exitCode shouldBe ExitCode.OK
-    }
-}
-
-private fun assertMutantDoesNotMatchRealFragment(
-    mutantFixtureName: String,
-    realDiagnosticFragment: String,
-) {
-    val result = compileFixture("mutant-$mutantFixtureName")
-    io.kotest.assertions.withClue(result.output) {
-        result.exitCode shouldBe ExitCode.COMPILATION_ERROR
-        result.output shouldNotContain realDiagnosticFragment
-    }
-}
-
-private data class CompileResult(
-    val exitCode: ExitCode,
-    val output: String,
-)
-
-private fun compileFixture(baseName: String): CompileResult {
-    val source = readFixtureResource(baseName)
-    val workDir = Files.createTempDirectory("compile-fixture-$baseName").toFile()
-    val sourceFile = File(workDir, "$baseName.kt").apply { writeText(source) }
-    val outputDir = File(workDir, "out").apply { mkdirs() }
-    val buffer = ByteArrayOutputStream()
-    val exitCode =
-        PrintStream(buffer).use { printStream ->
-            K2JVMCompiler().exec(
-                printStream,
-                "-cp",
-                testClasspath(),
-                "-d",
-                outputDir.absolutePath,
-                "-no-stdlib",
-                "-no-reflect",
-                sourceFile.absolutePath,
-            )
-        }
-    return CompileResult(exitCode, buffer.toString())
-}
-
-private fun readFixtureResource(baseName: String): String {
-    val resourcePath = "/compile-fixtures/$baseName.kt.txt"
-    val stream =
-        object {}.javaClass.getResourceAsStream(resourcePath)
-            ?: error("fixture resource not found: $resourcePath")
-    return stream.bufferedReader().use { it.readText() }
-}
-
-/** Gradle test worker 는 classic classpath 로 뜬다 — `java.class.path` 가 decision·shared-kernel 산출물을 담는다. */
-private fun testClasspath(): String = System.getProperty("java.class.path")

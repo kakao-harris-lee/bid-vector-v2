@@ -184,6 +184,15 @@ tasks.test {
     // T-D 의 정본은 도출된 후보의 **분류**다 — 같은 목록을 여기 두 벌로 두지 않는다.
     contractInput("memberEffects", "bidvector.member.effects", settingsFile("config/quality/member-effects.properties"))
 
+    // DEC-10(D-DEC10-11) — 개연 밴드의 **값 일치** test 가 Python 백테스트 정책 yaml 을 읽는다.
+    // Kotlin 출하 정책과 `floor.rate_band_*` 가 같아야 한다(사전 등록 실험이라 Python 쪽은 바꾸지 않는다).
+    // 경로를 test 가 추측하지 않는다 — 위 셋과 같은 주입 관례.
+    contractInput(
+        "mlBacktestPolicy",
+        "bidvector.ml.backtest-policy",
+        settingsFile("ml-engine/policy/strategy-backtest-v1.yaml"),
+    )
+
     // corpus 소비 테스트(`SharedKernelCorpusConformanceTest`)가 manifest 와
     // 그 아래 input/expected fixture 전체를 읽는다. `ArchitecturePolicy.kt` 와 같은
     // `System.getProperty` 주입 관례(조사 §6)를 그대로 쓴다.

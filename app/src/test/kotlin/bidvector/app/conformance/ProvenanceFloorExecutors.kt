@@ -5,19 +5,19 @@ import bidvector.decision.FloorShortfall
 import bidvector.decision.FloorShortfallPolicyData
 import bidvector.decision.FloorUnmeasurableReason
 import bidvector.decision.Frequency
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
+import bidvector.decision.PlausibleFloorRate
 import bidvector.decision.ProvenancePolicyData
 import bidvector.decision.ProvenanceRuleId
 import bidvector.decision.ProvenanceRules
-import bidvector.decision.ShortfallComparison
-import bidvector.decision.ShortfallTally
-import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
-import bidvector.decision.PlausibleFloorRate
 import bidvector.decision.PublishedFloorTrust
 import bidvector.decision.PublishedFloorTrustPolicyData
+import bidvector.decision.ShortfallComparison
+import bidvector.decision.ShortfallTally
 import bidvector.decision.criticalAssessmentRateFor
-import bidvector.decision.trustPublishedFloorRate
 import bidvector.decision.isShortfall
 import bidvector.decision.measureFloorShortfall
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.sharedkernel.AssessmentRate
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BaseAmountProvenance
@@ -208,11 +208,6 @@ private fun floorRateFrom(input: JsonNode): FloorRate =
     )
 
 /**
- * `floor-threshold` 축 전용 — `FloorShortfallPolicyData`가 없는 입력(ft-001·003)에서도
- * 임계을 낸다. `Derived<AssessmentRate>`를 그대로 돌려준다 — 벗겨서
- * bare rate 로 두지 않는다.
- */
-/**
  * DEC-10 — `criticalAssessmentRateFor` 는 게이트 통과 값만 받는다. corpus 의 하한율은 전부
  * 개연 밴드 안이고(실측 `0.875`), 밖의 값이 들어오면 **조용히 계산되지 않고 여기서 멈춘다**.
  */
@@ -228,6 +223,11 @@ private fun EffectiveDatedPolicy<PublishedFloorTrustPolicyData>.resolveInitial()
     Resolution.Resolved<PublishedFloorTrustPolicyData> =
     Resolution.Resolved(entries.single().second, PolicyVersion(EffectiveFrom.Initial, "conformance-floor-trust"))
 
+/**
+ * `floor-threshold` 축 전용 — `FloorShortfallPolicyData`가 없는 입력(ft-001·003)에서도
+ * 임계을 낸다. `Derived<AssessmentRate>`를 그대로 돌려준다 — 벗겨서
+ * bare rate 로 두지 않는다.
+ */
 private fun criticalAssessmentRateFrom(input: JsonNode): Derived<AssessmentRate> {
     val scalePolicy =
         Resolution.Resolved(

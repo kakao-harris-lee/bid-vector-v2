@@ -187,6 +187,23 @@ class ArchitecturePolicy private constructor(
     val divisionClassObjectReferencers: List<String>
         get() = list("collection.division-value.class-object-referencers")
 
+    /**
+     * DEC-10(D-DEC10-6) — 게시 하한율 신뢰 게이트의 두 등식. **열거가 아니라 등식**이다:
+     * 관측 집합이 허용 집합과 **같아야** 하므로 낡은 허용 항목도 실패한다.
+     * ⓐ 게이트 통과 값 타입의 **모든 멤버 접근** 쌍(생성자·`copy`·읽기 — 멤버 이름 목록이 없다).
+     * ⓑ 원값의 **획득** 쌍(`Caller->Owner#member`) — production 전 층. 쌍마다 가격/분석·표시를
+     * 정책 파일 주석이 분류한다.
+     */
+    val floorTrustGatedType: String get() = value("floor-trust.gated-type")
+
+    val floorTrustGatedTypeAccessPairs: List<Pair<String, String>>
+        get() = pairs("floor-trust.gated-type-access-pairs")
+
+    val floorTrustRawType: String get() = value("floor-trust.raw-type")
+
+    val floorTrustRawAcquisitionPairs: List<Pair<String, String>>
+        get() = pairs("floor-trust.raw-acquisition-pairs")
+
     /** D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
     val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")
