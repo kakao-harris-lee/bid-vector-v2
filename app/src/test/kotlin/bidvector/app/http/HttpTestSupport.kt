@@ -325,6 +325,8 @@ class RecordingStrategyEventSink : EventSink {
  * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
+// **병합 주의**: `@Import` 는 반복할 수 없는 애너테이션이다. 다른 레인이 자기 이중체 조립을 들이면
+// 두 줄이 아니라 `@Import(A::class, B::class)` 한 줄로 접어야 한다(합집합).
 @Import(ProfileTestWiring::class)
 open class HttpTestApplication {
     @Bean
