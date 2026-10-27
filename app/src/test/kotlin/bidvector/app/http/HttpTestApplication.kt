@@ -59,12 +59,19 @@ open class HttpTestApplication {
      * 기동 실패**한다. 빈을 **조립 자신**이 들면 출하 조립은 이 class 를 아예 모르므로 그
      * 충돌이 생길 자리가 없다.
      *
-     * fake 는 **빈 목록·0 건**만 낸다 — 목록의 모양은 어댑터의 실 DB test 가 재고, 여기서
-     * 필요한 것은 「컨트롤러가 받을 협력자가 있다」뿐이다.
+     * **fake 를 빈으로 따로 든다**(r1 검토 verifier F1 뒤). 표면 test 가 한 페이지를 꽂아
+     * 직렬화를 실제로 돌려야 「문서 ↔ wire 키 등식」을 잴 수 있고, 그러려면 test 가 그 fake 를
+     * 손에 쥐어야 한다 — main 의 `fakeOpeningResultFactsPort` · `openingResultQuery` 짝과 같은
+     * 모양이다. 기본값은 여전히 빈 목록이라 꽂지 않는 test 의 거동은 그대로다.
      */
     @Bean
-    open fun notificationInboxQuery(clock: FixedClock): NotificationInboxQuery =
-        NotificationInboxQuery(FakeNotificationInboxStore(), clock)
+    open fun fakeNotificationInboxStore(): FakeNotificationInboxStore = FakeNotificationInboxStore()
+
+    @Bean
+    open fun notificationInboxQuery(
+        fakeNotificationInboxStore: FakeNotificationInboxStore,
+        clock: FixedClock,
+    ): NotificationInboxQuery = NotificationInboxQuery(fakeNotificationInboxStore, clock)
 
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
