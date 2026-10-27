@@ -105,19 +105,22 @@ private fun JsonNode.requiredLicenseName(): String =
  */
 private fun JsonNode.freeTerms(key: String): List<String> {
     val raw = requiredStringArray(key)
-    if (raw.size > ProfileInputPolicy.QUALIFICATION_TERMS_MAX) {
-        throw InvalidEditRequestException("$key 는 ${ProfileInputPolicy.QUALIFICATION_TERMS_MAX} 개를 넘을 수 없다")
-    }
-    if (raw.size != raw.toSet().size) throw InvalidEditRequestException("$key 에 같은 값이 두 번 있다")
-    return raw.map { term ->
-        if (term.isBlank()) throw InvalidEditRequestException("$key 의 원소는 공백뿐일 수 없다")
-        if (term.codePointCount(0, term.length) > ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS) {
-            throw InvalidEditRequestException(
-                "$key 의 원소는 ${ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS} 자를 넘을 수 없다",
-            )
+    val rejection =
+        when {
+            raw.size > ProfileInputPolicy.QUALIFICATION_TERMS_MAX -> {
+                "$key 는 ${ProfileInputPolicy.QUALIFICATION_TERMS_MAX} 개를 넘을 수 없다"
+            }
+
+            raw.size != raw.toSet().size -> {
+                "$key 에 같은 값이 두 번 있다"
+            }
+
+            else -> {
+                null
+            }
         }
-        term.rejectingControlCharacters(key)
-    }
+    if (rejection != null) throw InvalidEditRequestException(rejection)
+    return raw.map { it.requiringName(key, ProfileInputPolicy.QUALIFICATION_TERM_MAX_CODE_POINTS) }
 }
 
 /** 등록 상태에서만 의미가 있는 두 키 — 다른 답의 요청에 실려 있으면 **거부한다**. */

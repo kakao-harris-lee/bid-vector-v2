@@ -64,25 +64,40 @@ internal fun <T : Enum<T>> JsonNode.optionalEnum(
 }
 
 /**
- * **제어 문자를 거부한다**(M7/7C④ 2b r2, v F5). PostgreSQL 은 NUL 을 담은 텍스트를 SQLSTATE `22021`
- * 로 거부하고 그 예외는 어댑터의 class 23 번역 밖이라 **500** 이 된다 — 요청 값이 만든 오류를 서버
- * 탓으로 말하는 것이다. 요청을 읽는 자리에서 400 으로 막는다(fail-closed, 저장 층에 닿기 전에).
+ * **이름 값 하나의 거부 규칙 표**(M7/7C④ 2b r2) — 술어가 참이면 그 문구로 400 이다. 규칙을
+ * `if … throw` 로 늘어놓지 않는 이유는 둘이다: 같은 규칙을 **두 표면**(단일 값 · 배열 원소)이
+ * 공유하고, 규칙이 늘 때 늘어나는 것이 **표의 줄**이어야 한다(함수의 throw 가 아니라).
  *
- * 줄바꿈 · 탭도 거부한다 — 이 표면이 받는 것은 **이름**(상호 · 면허명 · 업종 코드 · 지역어)이고,
- * 거기에 줄바꿈이 있는 정상 입력이 없다. 넓게 거부하는 쪽이 「무엇이 통과하는가」를 세기 쉽다.
+ * 세 규칙의 근거:
+ * - **공백뿐**: 「미설정」은 키 부재나 `null` 이다. 공백을 미설정으로 접으면 절 단위 교체에서 저장된
+ *   값을 지우고 200 을 낸다(v F6 · CR M-2).
+ * - **길이**: 값 타입 · 표 CHECK 와 같은 수를 쓴다(코드포인트 수).
+ * - **제어 문자**: NUL 을 담은 텍스트는 PostgreSQL 이 SQLSTATE `22021` 로 거부하고 그 예외는 어댑터의
+ *   class 23 번역 밖이라 **500** 이 된다 — 요청 탓을 서버 탓으로 말하는 자리다(v F5). 줄바꿈 · 탭도
+ *   거부한다: 이 표면이 받는 것은 **이름**이고 거기에 줄바꿈이 있는 정상 입력이 없다.
  */
-internal fun String.rejectingControlCharacters(key: String): String {
-    if (any { it.isISOControl() }) throw InvalidEditRequestException("$key 에 제어 문자가 있다")
+internal fun String.requiringName(
+    key: String,
+    maxCodePoints: Int,
+): String {
+    val rejection =
+        when {
+            isBlank() -> "$key 는 공백뿐일 수 없다 — 미설정은 null 이다"
+            codePointCount(0, length) > maxCodePoints -> "$key 는 $maxCodePoints 자를 넘을 수 없다"
+            any { it.isISOControl() } -> "$key 에 제어 문자가 있다"
+            else -> null
+        }
+    if (rejection != null) throw InvalidEditRequestException(rejection)
     return this
 }
 
 /**
- * 값이 **있으면** 공백뿐일 수 없다 — 없거나 `null` 만 「미설정」이다(D-7C4-1 §0.2).
+ * 값이 **있으면** 위 규칙을 지켜야 한다 — 없거나 `null` 만 「미설정」이다.
  *
  * [optionalNonBlankText](7B)와 다른 점이 요지다: 그쪽은 공백뿐인 값을 `null` 로 접는데, **절 단위로
  * 교체하는** 표면에서 그 접힘은 저장돼 있던 값을 지우고 200 을 낸다(공백 입력이 조용히 「지우기」가
- * 된다, v F6 · CR M-2). 같은 파일이 「받고서 쓰지 않는 입력은 계약 거짓말」이라며 등록 전용 키를
- * 400 으로 거부하는 규율과도 어긋난다.
+ * 된다). 같은 파일이 「받고서 쓰지 않는 입력은 계약 거짓말」이라며 등록 전용 키를 400 으로 거부하는
+ * 규율과도 어긋난다.
  */
 internal fun JsonNode.declaredText(
     key: String,
@@ -91,12 +106,7 @@ internal fun JsonNode.declaredText(
     val node = get(key)
     if (node == null || node.isNull) return null
     if (!node.isString) throw InvalidEditRequestException("$key 는 문자열이어야 한다")
-    val value = node.stringValue()
-    if (value.isBlank()) throw InvalidEditRequestException("$key 는 공백뿐일 수 없다 — 미설정은 null 이다")
-    if (value.codePointCount(0, value.length) > maxCodePoints) {
-        throw InvalidEditRequestException("$key 는 $maxCodePoints 자를 넘을 수 없다")
-    }
-    return value.rejectingControlCharacters(key)
+    return node.stringValue().requiringName(key, maxCodePoints)
 }
 
 /** 불리언 — Jackson 의 강제 변환(`"true"` · `1`)을 받지 않는다(표기 자체를 판정한다). */
