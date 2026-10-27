@@ -1,10 +1,10 @@
 package bidvector.decision.menu
 
 import bidvector.decision.FloorShortfallJudgement
+import bidvector.decision.PlausibleFloorRate
 import bidvector.sharedkernel.BidAmount
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Derived
-import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
@@ -98,7 +98,14 @@ enum class BidMenuDisclosure {
  */
 data class BidMenuGrounds(
     val bidRate: BidRate,
-    val publishedFloorRate: FloorRate,
+    /**
+     * **게이트 통과 값이다**(DEC-10, 계약 갱신 in_scope 추가) — 원값 `FloorRate` 가 아니다.
+     * 이 칸은 「이 가격이 어느 하한율에서 나왔는가」를 말하므로, 가격에 실제로 쓴 값과 **같은
+     * 타입**이어야 근거가 정직하다. 착수 census 가 이 자리를 찾았다: 가격 경로가 만든 출력이
+     * 원값을 그대로 내보내고 있었고, 그러면 소비자(표시·감사)가 게이트를 거치지 않은 값을
+     * 손에 쥘 수 있다.
+     */
+    val publishedFloorRate: PlausibleFloorRate,
     val baseProvenance: Provenance,
     val policyVersion: PolicyVersion,
 )
@@ -181,9 +188,19 @@ sealed interface MenuUnmeasurableReason {
     }
 }
 
-/** 메뉴의 입력 자체가 없다 — 「재지 못했다」가 아니라 「잴 것이 없었다」다. */
+/**
+ * 메뉴의 입력 자체가 없다 — 「재지 못했다」가 아니라 「잴 것이 없었다」다.
+ *
+ * DEC-10 이 사유 둘을 더한다(D-DEC10-3) — 개연 불가와 심판 아님은 **부재와 같은 가지로
+ * 떨어지되 같은 사유가 아니다**. 셋을 한 사유로 합치면 「원문에 하한이 없었다」와 「게이트가
+ * 걸러냈다」가 구별되지 않고, 그것이 DEC-10 acceptance 셋째가 금지하는 침묵 스킵이다.
+ */
 sealed interface MenuSourceAbsence {
     data object PublishedFloorRateAbsent : MenuSourceAbsence
+
+    data object PublishedFloorRateImplausible : MenuSourceAbsence
+
+    data object PublishedFloorRateOriginNotJudged : MenuSourceAbsence
 }
 
 /**

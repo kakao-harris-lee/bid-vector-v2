@@ -3,7 +3,6 @@ package bidvector.decision
 import bidvector.sharedkernel.AssessmentRate
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Derived
-import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.criticalAssessmentRate
@@ -84,12 +83,19 @@ fun measureFloorShortfall(
  * `FloorShortfallPolicyData.criticalRateRounding`(D-10)에서 나눗셈 정책을 만들어 임계
  * 사정률을 계산한다 — 이 함수가 그 정책 슬롯의 유일한 소비자다. 반올림 모드를 리터럴로
  * 짓지 않는다 — 자리수·모드 둘 다 정책 슬롯에서 그대로 온다. main 에 `RoundingMode` 리터럴이 없다.
+ *
+ * **하한율은 게이트 통과 값만 받는다**(DEC-10, D-DEC10-3 ②) — 임계 사정률 = 추천 투찰율 ÷
+ * 낙찰하한율이므로 개연 불가 하한율이 들어오면 임계가 조용히 다른 수가 되고, 그 임계가 하한
+ * 미달 판정의 분자를 정한다. shared-kernel 의 [bidvector.sharedkernel.criticalAssessmentRate]
+ * 는 원값 서명을 유지한다(의존 방향상 게이트 타입을 볼 수 없다) — **그 함수의 전건을 이
+ * 함수가 진다**. 이 자리가 `PlausibleFloorRate.value` 를 읽는 유일한 가격 경로이고, 그래서
+ * 허용 목록의 가격 쪽 항목도 이 쌍 하나다.
  */
 fun criticalAssessmentRateFor(
     bid: BidRate,
-    floor: FloorRate,
+    floor: PlausibleFloorRate,
     policy: Resolution.Resolved<FloorShortfallPolicyData>,
 ): Measurement<Derived<AssessmentRate>> {
     val scalePolicy = Resolution.Resolved(policy.value.criticalRateRounding, policy.version)
-    return criticalAssessmentRate(bid, floor, scalePolicy)
+    return criticalAssessmentRate(bid, floor.value, scalePolicy)
 }

@@ -2,7 +2,12 @@ package bidvector.decision.menu
 
 import bidvector.decision.AssessmentBand
 import bidvector.decision.FloorShortfallPolicyData
+import bidvector.decision.PlausibilityBand
+import bidvector.decision.PlausibleFloorRate
+import bidvector.decision.PublishedFloorTrust
+import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.decision.ShortfallComparison
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.sharedkernel.AssessmentRate
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
@@ -77,20 +82,41 @@ internal fun testMenuPolicy(
         MENU_TEST_VERSION,
     )
 
+internal val FLOOR_TRUST_TEST_VERSION = PolicyVersion(EffectiveFrom.Initial, "test-published-floor-trust-policy")
+
+/** test 밴드는 출하 값과 같다 — 경계 판정을 test 전용 값 위에서만 재지 않는다. */
+internal fun testFloorTrustPolicy(): Resolution.Resolved<PublishedFloorTrustPolicyData> =
+    Resolution.Resolved(
+        PublishedFloorTrustPolicyData(PlausibilityBand(BigDecimal("0.30"), BigDecimal("0.995"))),
+        FLOOR_TRUST_TEST_VERSION,
+    )
+
+/**
+ * `publishedFloorRate` 는 **원값**을 받아 게이트를 거친다 — 메뉴 입력 칸은 판정이므로 test 도
+ * 그 경로로만 통과 값을 얻는다. 실패 가지를 바로 주려면 [floorTrust] 를 직접 넘긴다.
+ */
 internal fun testInput(
     base: BaseAmount = testBase(),
     rates: StanceRates = testRates("0.90", "0.93", "0.96"),
     publishedFloorRate: FloorRate? = testFloorRate("0.88"),
     samples: List<AssessmentRate> = emptyList(),
     shortfallPolicy: Resolution.Resolved<FloorShortfallPolicyData> = testShortfallPolicy(),
+    floorTrust: PublishedFloorTrust = trustPublishedFloorRate(publishedFloorRate, testFloorTrustPolicy()),
 ): BidMenuInput =
     BidMenuInput(
         base = base,
         rates = rates,
-        publishedFloorRate = publishedFloorRate,
+        publishedFloorRate = floorTrust,
         assessmentSamples = samples,
         shortfallPolicy = shortfallPolicy,
     )
+
+/** 게이트 통과 값은 게이트만 만든다 — test 도 예외가 아니다(통과하지 않는 값은 여기서 터진다). */
+internal fun testPlausibleFloorRate(value: String): PlausibleFloorRate {
+    val trust = trustPublishedFloorRate(testFloorRate(value), testFloorTrustPolicy())
+    require(trust is PublishedFloorTrust.Trusted) { "밴드 안 값이어야 한다: $value" }
+    return trust.rate
+}
 
 internal fun atOrAbove(): FloorRateReading = FloorRateReading.AsBidRateLowerBound(FloorBoundComparison.AtOrAbove)
 

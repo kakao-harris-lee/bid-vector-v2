@@ -1,5 +1,6 @@
 package bidvector.decision.menu
 
+import bidvector.decision.PublishedFloorTrust
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.export
@@ -18,17 +19,24 @@ import bidvector.sharedkernel.export
  * **순서**: ① 출처 부재 → ② 태도별 효력 투찰율 → ③ 하한이 밴드 위면 붕괴(율 축) →
  * ④ 태도별 금액·리스크 → ⑤ 조립 — 여기서 **제출 금액이 겹친 태도**를 접는다(금액은 ④ 뒤에야
  * 알 수 있어 율 축에서는 잴 수 없다, r2 M-3).
+ *
+ * ① 은 **게이트 판정의 소진 `when`** 이다(DEC-10, D-DEC10-3) — 신뢰 게이트를 통과하지 못한
+ * 세 가지가 전부 출처 부재로 떨어지고 **사유가 서로 다르다**. `else` 로 뭉갤 수 없다:
+ * 통과 값([bidvector.decision.PlausibleFloorRate])은 게이트 함수만 만들므로 다른 가지에서는
+ * [OptionContext] 를 지을 재료가 아예 없다.
  */
 fun composeBidMenu(
     input: BidMenuInput,
     policy: Resolution.Resolved<BidMenuPolicyData>,
-): BidMenuOutcome {
-    val floorRate = input.publishedFloorRate
-    return when {
-        floorRate == null -> BidMenuOutcome.SourceAbsent(MenuSourceAbsence.PublishedFloorRateAbsent)
-        else -> withFloorRate(OptionContext(input, floorRate, policy))
+): BidMenuOutcome =
+    when (val trust = input.publishedFloorRate) {
+        is PublishedFloorTrust.Trusted -> withFloorRate(OptionContext(input, trust.rate, policy))
+        PublishedFloorTrust.Absent -> sourceAbsent(MenuSourceAbsence.PublishedFloorRateAbsent)
+        is PublishedFloorTrust.Implausible -> sourceAbsent(MenuSourceAbsence.PublishedFloorRateImplausible)
+        is PublishedFloorTrust.OriginNotJudged -> sourceAbsent(MenuSourceAbsence.PublishedFloorRateOriginNotJudged)
     }
-}
+
+private fun sourceAbsent(reason: MenuSourceAbsence): BidMenuOutcome = BidMenuOutcome.SourceAbsent(reason)
 
 private fun withFloorRate(ctx: OptionContext): BidMenuOutcome {
     val effective = effectiveRates(ctx)
