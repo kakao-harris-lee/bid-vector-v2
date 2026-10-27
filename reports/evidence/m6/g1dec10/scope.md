@@ -81,3 +81,21 @@ verifier(opus) + code-reviewer(sonnet) 병렬. Codex 없음 — 되돌리기 어
 ## 하네스 레인 변경 (상시)
 
 (없음 — 생기면 여기에 적는다)
+
+## 계약 갱신 (2026-10-28, Phase 1 설계 수령 — 팀장)
+
+착수 보고의 질문 넷을 **전부 추천대로** 결정했다(`design.md` §4 가 각 질문의 실측·대안을 갖는다).
+
+| ID | 결정 |
+| --- | --- |
+| **D-DEC10-8** | (OQ-1) **계수를 네 자리에 싣는다** — `PredictionComponents` → `MlAnalysisOutcome.Analyzed`(필수 인자, 기본값 없음 — 그 타입의 `evidence` 선례) → `CandidateEvaluation.Reached` → 평가 실행 집계(`EvaluationCommitTally` · finish 줄, dry-run 대칭). **OpenAPI 변경 0** — dry-run 응답은 평탄 스칼라 규칙(D-6A3-6)대로 이 필드를 읽지 않는다. 출하 배선에서 이 계수는 **구조상 항상 0**(`MlAnalysisPort` = `UnavailableMlAnalysis`, `OPEN-ML-ANALYSIS-WIRING`) — 알려진 제한으로 등재한다. |
+| **D-DEC10-9** | (OQ-2) `DerivationAbsence.FloorRateOutOfRange` 는 **개연 불가 사유가 승계**한다(항 하나 · 생산자 하나 = 게이트). `MarginInputs.init` 의 `≤ 1` 요구는 타입 최후 방어선으로 **유지**하고 「이 `init` 이 유일한 관문」이라 적는 KDoc 문면만 정정한다. `1.00000`(R-FLOOR-03 라이브 47건)이 오늘 `> 1` 필터를 통과해 **조용히** `floorHeadroom = recommended` 로 접히던 것이 **사유와 함께** 접히게 된다 — 값은 같고 계수가 생긴다(거동 회귀 0). 그 사실을 evidence 에 적는다. |
+| **D-DEC10-10** | (OQ-3) **지금은 `openapi/**` · `web/**` 무편집**, 게이트만 낸다. 7C②(`m7-7c2`)는 리뷰 통과·main 재병합·최종 측정 중이라 이 slice 리뷰 요청 시점엔 main 에 있을 공산이 크다 — 그때 main 을 병합해 **그 위에서** 표시 상태를 더하고 `web` job 을 acceptance 에 붙인다. 없으면 7C② 후속으로 인계하고 계약·종결 보고에 남긴다(「양쪽 다 안 더함」 방지). |
+| **D-DEC10-11** | (OQ-4) **값 일치 test 는 `app/src/test`** + `app/build.gradle.kts` 에 ml-engine 정책 파일 경로 system property 한 줄(snakeyaml·system property 선례 넷과 같은 형태). `decision` test classpath 를 넓히지 않고 yaml 을 손으로 쪼개지 않는다. |
+
+**in_scope 추가** — `decision.menu` 의 `BidMenuGrounds.publishedFloorRate`(메뉴 결과의 근거 칸).
+착수 census 가 찾았다: 가격 경로가 만든 **출력**이 원값을 내보내므로 게이트 통과 값을 실어야
+근거가 정직하다(「이 가격이 어느 값에서 나왔는가」). 7C② 표시 상태의 입력 자리이기도 하다.
+
+**in_scope 축소 없음** — `shared-kernel/**` 은 편집 계획 0 이다(게이트 값을 `decision` 에 두면
+`criticalAssessmentRate` 의 원값 서명을 바꿀 이유가 없다). 필요해지면 다시 갱신한다.
