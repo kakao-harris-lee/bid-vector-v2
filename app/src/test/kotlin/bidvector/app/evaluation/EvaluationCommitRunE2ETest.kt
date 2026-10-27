@@ -13,6 +13,7 @@ import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayExitCode
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.NoticeCollected
@@ -264,8 +265,12 @@ class EvaluationCommitRunE2ETest {
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
         // R-13 ⓑ — 러너의 마침 줄을 단언한다(앞 판은 로그를 모으기만 했다).
-        commitLog.single { it.startsWith("evaluation-commit finished") } shouldContain
-            "exit=${EvaluationCommitExitCode.COMPLETE.value}"
+        val finishLine = commitLog.single { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "exit=${EvaluationCommitExitCode.COMPLETE.value}"
+        // DEC-10(r1 CR H-1) — ML 분석이 실은 제외 사유가 **사슬 셋을 지나** 이 줄에 수로 나온다.
+        // `Analyzed.floorExclusion` → `Reached.floorExclusion` → `tallyOf` → 렌더링이 그 사슬이다.
+        finishLine shouldContain "floorImplausible=1"
+        finishLine shouldContain "floorOriginNotJudged=0"
         val row = notificationRows(dataSource()).single()
         row.payloadType shouldBe "NotificationRequested"
         row.payload shouldContain "20260101010"
@@ -461,6 +466,9 @@ private class AlwaysBidNowMl : MlAnalysisPort {
             probabilityScore = null,
             matchedScore = null,
             evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
-            floorExclusion = null,
+            // DEC-10(r1 CR H-1) — **non-null 로 둔다.** 이 값이 `Analyzed` → `Reached` → `tallyOf`
+            // → 마침 줄을 지나는지가 이 test 의 축 하나다. `null` 로 두면 그 세 고리가 전부
+            // 미측정이 된다(앞 판이 그랬다 — 전건 초록인데 가운데가 끊겨도 보이지 않았다).
+            floorExclusion = PublishedFloorExclusion.IMPLAUSIBLE,
         )
 }
