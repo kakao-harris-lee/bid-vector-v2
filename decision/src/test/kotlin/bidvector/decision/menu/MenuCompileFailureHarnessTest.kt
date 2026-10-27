@@ -50,7 +50,7 @@ class MenuCompileFailureHarnessTest {
      */
     @Test
     fun `1b BidMenuOption 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("1b-menu-option-copy", "cannot access", "copy")
+        assertNegativeFails("1b-menu-option-copy", COPY_DENIED)
     }
 
     @Test
@@ -100,28 +100,28 @@ class MenuCompileFailureHarnessTest {
      */
     @Test
     fun `4a Offered 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4a-menu-offered-copy", "cannot access", "copy")
+        assertNegativeFails("4a-menu-offered-copy", COPY_DENIED)
         assertPositiveCompiles("1-menu-via-kernel")
     }
 
     @Test
     fun `4b PartiallyOffered 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4b-menu-partially-offered-copy", "cannot access", "copy")
+        assertNegativeFails("4b-menu-partially-offered-copy", COPY_DENIED)
     }
 
     @Test
     fun `4c BandCollapsed 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4c-menu-band-collapsed-copy", "cannot access", "copy")
+        assertNegativeFails("4c-menu-band-collapsed-copy", COPY_DENIED)
     }
 
     @Test
     fun `4d Unmeasurable 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4d-menu-unmeasurable-copy", "cannot access", "copy")
+        assertNegativeFails("4d-menu-unmeasurable-copy", COPY_DENIED)
     }
 
     @Test
     fun `4e CollapsedWithOtherStances 의 copy 는 모듈 밖에서 닫혀 있다`() {
-        assertNegativeFails("4e-menu-collapsed-reason-copy", "cannot access", "copy")
+        assertNegativeFails("4e-menu-collapsed-reason-copy", COPY_DENIED)
     }
 
     /**
@@ -137,14 +137,39 @@ class MenuCompileFailureHarnessTest {
             realDiagnosticFragment = "cannot access",
         )
     }
+
+    /**
+     * **술어의 판별력**을 잰다(r5 V5-M1). 이 mutant 는 **이름에 `copy` 가 들어가지만**
+     * 접근 불가의 대상은 `copy` 가 **아니다**(`AppliedFloor` 의 `internal` 생성자).
+     *
+     * 앞 판의 `"copy"` 조각이라면 **경로에 들어 있는 `copy` 때문에 통과**한다 — 그래서 이
+     * test 가 그 조각에서 RED 다. 변이 `V5M` 이 그것을 실측한다.
+     */
+    @Test
+    fun `5-M2 copy 가 아닌 접근 불가는 copy 봉쇄 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "5-menu-copy-named-non-copy-access",
+            realDiagnosticFragment = COPY_DENIED,
+        )
+    }
 }
 
 /**
- * 음성 fixture 는 **컴파일에 실패해야 하고, 그 실패가 우리가 노린 이유여야 한다.**
+ * `copy` 봉쇄의 **진단 문면**을 지목하는 조각.
  *
- * 조각을 여럿 받는 이유(cr r4 L-2): 「cannot access」만 보면 **타입 자체가 `internal` 이 되는
- * 변이**에서도 초록이다 — 그 경우도 접근 불가지만 우리가 재려는 명제(`copy` 가 닫혔다)와 다른
- * 이유다. `copy` 처럼 **심볼을 지목하는 조각**을 함께 요구해 그 둘을 가른다.
+ * 그냥 `"copy"` 로는 **아무것도 걸러내지 못한다**(r5 V5-M1 실측): 하네스가 소스를
+ * `compile-fixture-<baseName>/<baseName>.kt` 에 쓰고 컴파일러가 모든 진단 줄 앞에 **그 경로**를
+ * 붙이며 **원본 소스 줄**(`original.copy(…)`)까지 찍는데, copy fixture 여섯의 `baseName` 에는
+ * 전부 `copy` 가 들어 있다. 그래서 `copy` 와 무관한 오류(`unresolved reference` 등)에서도
+ * `output.contains("copy")` 가 **참**이었다 — 그 조각은 술어에 아무것도 더하지 않았다.
+ *
+ * `cannot access 'fun copy(` 는 경로에도 소스 echo 에도 나타날 수 없어 **심볼을 지목한다**.
+ * 판별력은 `5-M2`(이름에 copy 가 들어가지만 접근 불가 대상이 copy 가 **아닌** mutant)가 잰다.
+ */
+private const val COPY_DENIED = "cannot access 'fun copy("
+
+/**
+ * 음성 fixture 는 **컴파일에 실패해야 하고, 그 실패가 우리가 노린 이유여야 한다.**
  */
 private fun assertNegativeFails(
     fixtureName: String,
