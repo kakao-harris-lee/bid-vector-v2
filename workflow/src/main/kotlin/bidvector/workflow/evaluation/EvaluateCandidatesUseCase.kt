@@ -223,25 +223,39 @@ class EvaluateCandidatesUseCase internal constructor(
             }
 
             is MlAnalysisOutcome.Analyzed -> {
-                scoreThresholdDrop(strategy, outcome, notice, correlationId)
-                    ?: reach(
-                        notice,
-                        correlationId,
-                        bidNowThreshold,
-                        reviewThreshold,
-                        ladderInputFor(
-                            capacitySnapshot,
-                            priorityScore = outcome.priorityScore,
-                            probabilityScore = outcome.probabilityScore,
-                            matchedScore = outcome.matchedScore,
-                        ),
-                        outcome.evidence,
-                        strategy.revision,
-                        outcome.floorExclusion,
-                    )
+                judgeAnalyzed(notice, strategy, capacitySnapshot, correlationId, outcome)
             }
         }
     }
+
+    /**
+     * 점수가 있는 가지 — 최소치 드롭이 먼저이고, 통과하면 사다리가 판정한다. `?:` 의 우변은
+     * 좌변이 `null` 일 때만 평가되므로 드롭될 후보에서 `LadderInput` 조립이 아예 돌지 않는다
+     * (그 시점 보존이 이 구조의 요점이다 — `CapacitySnapshot` 은 자체 불변식이 없다).
+     */
+    private fun judgeAnalyzed(
+        notice: Notice,
+        strategy: OperatorStrategy,
+        capacitySnapshot: CapacitySnapshot,
+        correlationId: CorrelationId,
+        outcome: MlAnalysisOutcome.Analyzed,
+    ): CandidateEvaluation =
+        scoreThresholdDrop(strategy, outcome, notice, correlationId)
+            ?: reach(
+                notice,
+                correlationId,
+                requireNotNull(strategy.actionThresholds.bidNowThreshold),
+                requireNotNull(strategy.actionThresholds.reviewThreshold),
+                ladderInputFor(
+                    capacitySnapshot,
+                    priorityScore = outcome.priorityScore,
+                    probabilityScore = outcome.probabilityScore,
+                    matchedScore = outcome.matchedScore,
+                ),
+                outcome.evidence,
+                strategy.revision,
+                outcome.floorExclusion,
+            )
 
     /**
      * [analyzeAndJudge]의 두 가지(`Analyzed`·`Unavailable`)가 공유하는 `LadderInput`
