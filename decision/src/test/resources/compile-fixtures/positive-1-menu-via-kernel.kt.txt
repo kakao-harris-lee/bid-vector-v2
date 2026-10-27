@@ -1,0 +1,12 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuInput
+import bidvector.decision.menu.BidMenuOutcome
+import bidvector.decision.menu.BidMenuPolicyData
+import bidvector.decision.menu.composeBidMenu
+import bidvector.sharedkernel.Resolution
+
+fun menuViaKernel(
+    input: BidMenuInput,
+    policy: Resolution.Resolved<BidMenuPolicyData>,
+): BidMenuOutcome = composeBidMenu(input, policy)
