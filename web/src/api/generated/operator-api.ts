@@ -793,7 +793,7 @@ export interface components {
              * @description 판정. `outcome` 이 `NOT_REACHED` 면 없다.
              * @enum {string|null}
              */
-            verdict?: "BID_NOW" | "REVIEW" | "SKIP" | null;
+            verdict?: null | "BID_NOW" | "REVIEW" | "SKIP";
             /** @description 판정 사유 코드. 출하 조립에서는 ML 이 항상 미가용이라 사다리에 이른 공고가 `REVIEW` · `ML_UNAVAILABLE` 로 내려온다 — 「낮은 추천」이 아니라 「추천 없음」이다. */
             verdictReasonCodes: string[];
             /** @description 멈춘 단계(수명·감시·자격·임계 미설정·분석 예산·ML 가용성·점수 임계). */
@@ -816,7 +816,7 @@ export interface components {
              */
             inboxRecordState: "NOT_RECORDED_YET";
             /** @enum {string|null} */
-            inboxRecordNotRecordedReason?: "INBOX_WRITE_PORT_NOT_MERGED" | null;
+            inboxRecordNotRecordedReason?: null | "INBOX_WRITE_PORT_NOT_MERGED";
             /**
              * @description 면허 자격 판정(QUAL-01 · 03). **`UNCERTAIN` 은 `INELIGIBLE` 이 아니다**(U-5) — 판정 불가와 미달을 한 값으로 접지 않는다.
              * @enum {string}
@@ -865,11 +865,11 @@ export interface components {
              * @description 기초금액이 **어떻게 정해졌나**(DEC-01) — 게시값 그대로인지, 예산 키 폴백인지, 개찰 역산인지. 파생이 원본을 덮지 않는다는 사실이 이 칸으로 보인다.
              * @enum {string|null}
              */
-            baseAmountResolution?: "DIRECT" | "FALLBACK_FROM_BUDGET" | "DERIVED_FROM_OPENING" | null;
+            baseAmountResolution?: null | "DIRECT" | "FALLBACK_FROM_BUDGET" | "DERIVED_FROM_OPENING";
             /** @description 게시 낙찰하한율 — fraction 의 10진 문자열이다(percent 가 아니고 부동소수가 아니다). 출처가 게시값이 아니면 **싣지 않는다**. */
             publishedFloorRateFraction?: string | null;
             /** @enum {string|null} */
-            publishedFloorRateOrigin?: "NOTICE_VALUE" | "STATUTORY_TABLE" | null;
+            publishedFloorRateOrigin?: null | "NOTICE_VALUE" | "STATUTORY_TABLE";
             /** @description 게시값 출처의 공고 차수. */
             publishedFloorRateNoticeRound?: string | null;
             /**
@@ -892,8 +892,11 @@ export interface components {
              * @enum {string}
              */
             mlAnalysisState: "ANALYZED" | "UNAVAILABLE" | "SIMILARITY_PROJECTION_NOT_READY" | "NOT_REACHED";
-            /** @description 미가용 사유. 출하 조립에서는 점수 provider 가 없어 `SCORE_NOT_PROVIDED` 다. */
-            mlUnavailableReason?: string | null;
+            /**
+             * @description 미가용 사유. 출하 조립에서는 점수 provider 가 없어 `SCORE_NOT_PROVIDED` 다.
+             * @enum {string|null}
+             */
+            mlUnavailableReason?: null | "SCORE_NOT_PROVIDED" | "DEADLINE_EXCEEDED" | "CIRCUIT_OPEN" | "RETRY_BUDGET_EXHAUSTED" | "TRANSPORT_FAILED" | "MODEL_NOT_READY" | "RELEASE_MISMATCH" | "CONTRACT_VIOLATION" | "UNSUPPORTED_SCHEMA" | "UNSUPPORTED_RELEASE" | "INVALID_REQUEST";
             /**
              * @description 신뢰도(ML-03). 값이 서는 날 그것은 **가격 적합도이고 확률이 아니다** — 그 고지가 `disclosures` 의 `PRICE_FITNESS_IS_NOT_PROBABILITY` 다. 이 응답에 확률 칸은 없다.
              * @enum {string}

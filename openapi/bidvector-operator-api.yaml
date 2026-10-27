@@ -2496,6 +2496,7 @@ components:
           type: string
           nullable: true
           enum:
+            - null
             - BID_NOW
             - REVIEW
             - SKIP
@@ -2549,6 +2550,7 @@ components:
           type: string
           nullable: true
           enum:
+            - null
             - INBOX_WRITE_PORT_NOT_MERGED
         licenseVerdict:
           type: string
@@ -2659,6 +2661,7 @@ components:
           type: string
           nullable: true
           enum:
+            - null
             - DIRECT
             - FALLBACK_FROM_BUDGET
             - DERIVED_FROM_OPENING
@@ -2675,6 +2678,7 @@ components:
           type: string
           nullable: true
           enum:
+            - null
             - NOTICE_VALUE
             - STATUTORY_TABLE
         publishedFloorRateNoticeRound:
@@ -2718,6 +2722,19 @@ components:
         mlUnavailableReason:
           type: string
           nullable: true
+          enum:
+            - null
+            - SCORE_NOT_PROVIDED
+            - DEADLINE_EXCEEDED
+            - CIRCUIT_OPEN
+            - RETRY_BUDGET_EXHAUSTED
+            - TRANSPORT_FAILED
+            - MODEL_NOT_READY
+            - RELEASE_MISMATCH
+            - CONTRACT_VIOLATION
+            - UNSUPPORTED_SCHEMA
+            - UNSUPPORTED_RELEASE
+            - INVALID_REQUEST
           description: 미가용 사유. 출하 조립에서는 점수 provider 가 없어 `SCORE_NOT_PROVIDED` 다.
         confidenceState:
           type: string
