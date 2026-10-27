@@ -1,0 +1,13 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOption
+import bidvector.decision.menu.BindingConstraint
+
+/**
+ * `BidMenuOption.copy` 도 모듈 밖에서 닫혀 있다(r4 V4-M1).
+ *
+ * 생성 폐쇄(fixture 1)만 재면 **`copy` 로 근거를 그대로 둔 채 `binding` 만 갈아끼우는 경로**가
+ * 열린 채 남는다 — 「값의 이유는 `binding` 이 유일 출처」라는 주장이 그 경로로 무너진다.
+ */
+fun forgedOptionCopy(original: BidMenuOption): BidMenuOption =
+    original.copy(binding = BindingConstraint.CandidateRate)
