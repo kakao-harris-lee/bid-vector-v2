@@ -1,12 +1,12 @@
 # M6/G1-DEC05 — checklist (투찰가 메뉴 DEC-05 + binding 제약 기록 DEC-02)
 
-**실측 기준 SHA: `e28ab66f`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
+**실측 기준 SHA: `8cf465aa`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
 (r3 일괄). 복원 경로(코드 · test · `config/quality` · 공유 장부)를 건드린 **마지막** 커밋이고,
 그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에 움직이지 않는다**.
 
 **판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence
 커밋은 언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
-`git diff --name-only e28ab66f..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
+`git diff --name-only 8cf465aa..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
 
 ## Phase 1 — 설계 (코드 0 · Gradle 0)
 
@@ -331,7 +331,7 @@ r2 는 **verifier ready-for-review · code-reviewer approve**(blocker·high 0)�
 선언돼 있어 통과로 나왔다. **마디를 전부 보도록** 고쳐야 걸린다. 지금은 단계 6 이 `clean` 뒤에 이 대조를
 돌리고 **「소스에 없는 class 0」을 본 뒤에야** 측정을 믿는다.
 
-### 승인 전 일괄 실측 — 실측 기준 `e28ab66f`
+### 승인 전 일괄 실측 — 실측 기준 `8cf465aa`
 
 **acceptance** — `clean` 뒤 `check --continue` **exit 0** · **CI 명령 그대로 `check` exit 0**.
 HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력** · **`:leakPatternGate`·`:contractGate`
@@ -343,29 +343,42 @@ executed**(UP-TO-DATE 아님).
 | # | 변이 | numstat | 결과 | 실패 수 | 무엇을 잠그는가 |
 |---|---|---|---|---|---|
 | **기준선** | 변이 0 | 0/0 | **GREEN** | 0 | 변이 전 clone 이 초록 |
-| **N1** | 올림 경로가 율 축 값을 덮어쓴다(r2 M-2 재현) | 1/1 | **RED** | 2 | 두 축을 섞지 않는다 |
-| **M3P** | 경계 등가의 binding 을 `CandidateRate` 로 | 1/1 | **RED** | 2 | 율 축 제약 구별 |
+| **N1** | 올림 경로가 율 축 값을 덮어쓴다 | 1/1 | **RED** | 2 | 두 축을 섞지 않는다 |
+| **M3P** | 경계 등가의 binding 을 `CandidateRate` 로 | 1/1 | **RED** | 2 | 경계 등가 정의 |
 | **C1** | 금액 겹침 판정을 못 찾게 한다 | 1/1 | **RED** | 8 | M-1·M-3 방어 |
 | **F1** | `invoke` 의 복사를 뺀다 | 1/1 | **RED** | 2 | ③′ 원본 표류 |
-| **A1** | 금액 축 variant 를 `CandidateRate` 로 되돌림 | 1/1 | **RED** | 2 | **r3 N-1** 재귀속 |
-| **A2** | `otherStances` 가둠 제거 | 1/1 | **RED** | 1 | **r3 N-2** |
-| **U2** | `Unmeasurable` 의 생성자·`copy` 공개 | 1/2 | **RED** | 2 | **r3 N-3** 게이트 술어 |
+| **A1** | 금액 축 variant 를 `CandidateRate` 로 되돌림 | 1/1 | **RED** | 2 | r3 N-1 재귀속 |
+| **A2** | `otherStances` 가둠 제거 | 1/1 | **RED** | 1 | r3 N-2 |
+| **U2** | `Unmeasurable` 의 생성자·`copy` 공개 | 1/2 | **RED** | 2 | r3 N-3 게이트 술어 |
+| **XOPT** | `BidMenuOption` 을 `@ExposedCopyVisibility` 로 | 1/1 | **RED** | 1 | **r4 V4-M1** 모집단 |
+| **L2M** | 타입 자체를 `internal` 로 | 1/1 | **RED** | — | **r4 cr L-2** 단언이 심볼을 지목 |
+| **L1M** | 전수 접힘 분기를 금액 묶음 수와 무관하게 | 1/1 | **GREEN** | 0 | **측정 불가 — 아래** |
 | **R2-M1** | `toStanceRates` 라벨 축 반전 | 2/2 | **RED** | 2 | 라벨 축 |
 | **R2-M8** | `StanceRates` 불변식 방향 반전 | 1/1 | **RED** | 30 + 2 | 순서 불변식 |
 | **통제군** | 주석 한 줄(거동 0) | 1/0 | **GREEN** | 0 | — |
 
-**아홉 전부 적용·RED · 기준선과 통제군 GREEN · `APPLY-FAILS=0`.** 전부 바꿔치기이고
-`numstat` 으로 적용을 확인한 뒤에만 돌렸다. test task 마다 `--rerun` 이라 통제군의 초록은
-**cache 적중이 아니라 실제 실행**이다. 필터는 모듈 셋 전체다.
+**열셋 가운데 열둘 RED · 기준선·통제군 GREEN · `APPLY-FAILS=0`.** 전부 바꿔치기이고
+`numstat` 으로 적용을 확인했다. test task 마다 `--rerun` 이라 통제군의 초록은 cache 적중이
+아니라 실제 실행이다.
 
-**「적용 실패」가 「RED」로 보이던 구멍을 닫았다.** 첫 실행에서 **N1·C1 둘이 `PATTERN 0 != 1`
-로 적용되지 않았다** — 이번 라운드가 고친 바로 그 두 줄(`promotedBinding` 도입 ·
-`firstOrNull` → `filter`)을 변이 패턴이 그대로 가리키고 있었기 때문이다. **수정 라운드가 변이
-목록을 낡게 만든다.** 게다가 `apply … && run_case …` 구조라 `apply` 가 실패하면 `run_case` 가
-호출되지 않아 그 안의 `NOT-APPLIED` 가드가 발화할 수 없었고, 스크립트 종료 코드는 마지막
-명령(통제군 GREEN)이라 **0** 이었다. 지금은 적용 실패를 세어 `APPLY-FAILS=N` 을 찍고 0 이
-아니면 **exit 2** 다. 위 표는 **패턴을 현행화해 전부 다시 돌린 한 벌**이다(일곱 + 둘로 나누어
-적지 않는다).
+**L1M — 도달 불가 분기이므로 측정 불가다**(팀장 처분 (b)). 근거를 적는다.
+- 그 조건(`collided.values.distinct().size == 1`)이 사는 분기의 좌변은 「**태도 전수**가
+  접혔다」다. 태도가 **셋**이고 `collidingStances` 는 **크기 2 이상의 금액 묶음**만 모으므로,
+  비둘기집으로 셋을 그런 묶음들로 덮는 방법은 **하나(크기 3 짜리 한 묶음)** 뿐이다 —
+  2 + 1 이면 그 1 은 접힌 것이 아니라 전수가 아니고, 1+1+1 이면 묶음이 없다.
+  따라서 **좌변이 참이면 금액 묶음은 언제나 하나**이고 그 조건은 항상 참이다. 변이로 지워도
+  **모든 도달 가능한 입력에서 거동이 같다**.
+- (a) 를 쓰지 못한 이유: 넷째 태도를 만들 공개 경로가 없다 — `BidStance` 는 멤버 셋이고
+  `StanceRates` 는 율 **셋**을 받으며, `collidingStances`·`assemble`·`outcomeOf` 는 모두
+  `private` 이라 같은 모듈 test 도 부를 수 없다. **test 편의를 위해 그 셋을 `internal` 로
+  넓히지 않았다** — (2b) 값 획득 축의 기준을 test 를 위해 완화하면 그 축이 의미를 잃는다.
+- 그래도 이 조건을 **두는** 이유: 없애면 넷째 태도가 생겼을 때 `collided.values.first()` 가
+  **임의의 한 금액**을 단일 `cause` 로 적는다(조용히 틀린다). `require` 로 두면 순수 커널이
+  예외를 던진다(cr r4 L-1 이 지적). 분기로 두면 그 입력이 **전부 보류**이므로 `Unmeasurable`
+  이 태도별 사유를 싣는다 — 세 선택 중 유일하게 거짓말하지 않는다.
+- **다음 레인이 할 일**: 태도를 넷으로 늘리는 slice 는 2+2 로 접히는 입력(예: 두 쌍이 각자
+  같은 금액)을 넣어 이 분기를 **직접** 재고, L1M 을 RED 로 바꿔야 한다. 그때 이 줄이 그
+  지시다.
 
 **rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `46ac0949`**(고정), 버릴 clone.
 
@@ -412,7 +425,7 @@ CI `check` 를 판정 SHA 에서 직접 exit 0).
 | **cr M1** | `binding — 하한 위 후보가 올림만 타면 …` test 의 KDoc 이 **r2 판**(`CandidateRate` · 변이 N1)으로 남아 단언과 어긋남 | D-G1DEC05-7 문면으로 바꾸고 변이 참조를 **A1** 로 |
 | **cr M3** | `PublishedFloorBound` KDoc 이 **clamp 뒤 올림이 겹쳐 발화한 경우**를 말하지 않음 | 「이 값을 유지한다(D-G1DEC05-7)」 + 그 이유(율이 이미 걸린 옵션에 금액 축 값을 달면 「율은 여유가 있었다」로 읽혀 거짓) |
 | **cr M4** | 7C② 의 `PublishedFloorRounding` 표시 조항이 **정본 자리**(capability-map §DEC-05)에 없음 | 그 bullet 에 한 문장 추가 · checklist 는 포인터라고 명시 |
-| **V4-L1** | checklist 머리·끝의 실측 기준 SHA 가 `63a207cd` — **문서가 스스로 적은 등식으로 읽으면 14줄이라 미검증** | 세 곳을 `e28ab66f` 로. 등식이 가리키는 SHA 가 틀리면 등식 자체가 거짓말을 한다 |
+| **V4-L1** | checklist 머리·끝의 실측 기준 SHA 가 `63a207cd` — **문서가 스스로 적은 등식으로 읽으면 14줄이라 미검증** | 세 곳을 `8cf465aa` 로. 등식이 가리키는 SHA 가 틀리면 등식 자체가 거짓말을 한다 |
 | **V4-L2** | 「제약을 지우면 결과가 바뀐다」를 **타입 성질**로 적었는데 **경계 등가**가 그 예외 | **충분조건이지 필요조건이 아니다**로 낮추고 경계 등가 예외를 `BindingConstraint` 머리와 `PublishedFloorRounding` 양쪽에. 머리의 「제약 하나를 지워도 결과가 같다가 성립할 수 없다」도 고쳤다 — 경계 등가에서 **거짓**이었다 |
 | **V4-L3**(cr L4) | 낡은 계수 둘 · OPEN 포인터 자리 부족 | trace DEC-02 「네 test」→ **일곱** · checklist P-7 「3 변종」→ **4** · `OPEN-DEC05-STANCE-RATE-PROVENANCE` 를 **capability-map `### ML-01` 절**과 **trace `ML-01` 행** 둘 다에 |
 | **cr L1** | `assemble` 의 `require(amounts.size == 1)` — 넷째 태도면 **순수 커널이 예외** | 분기 조건으로 옮겼다 — 전수가 접혔는데 금액 묶음이 둘이면 **전부 보류**이므로 `Unmeasurable` 이 태도별 사유를 싣는다. **이미 표현 가능한 값**으로 간다. 변이 **L1M** |
@@ -624,4 +637,4 @@ r3 는 **verifier ready-for-review · cr approve**(blocker·high 0). 아래는 �
 r2 의 acceptance(`756cf042`)·문서 등식·rollback(실측 HEAD `fdf9a277` · 복원 기준 `fc15975c`)
 절은 **위 「승인 전 일괄 실측」이 대체한다**(r3 L-N3). 같은 주장을 두 기준에서 적으면 어느 쪽이
 현행인지 읽는 사람이 판단해야 하고, 라운드 이력 절은 evidence 규율이 금지한다. 현행 수치는
-전부 **실측 기준 `e28ab66f` · 복원 기준 `46ac0949`** 한 벌이다.
+전부 **실측 기준 `8cf465aa` · 복원 기준 `46ac0949`** 한 벌이다.
