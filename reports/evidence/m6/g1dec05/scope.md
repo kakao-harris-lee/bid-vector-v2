@@ -4,13 +4,14 @@
   (`reports/evidence/m7/7a/m6-condition3-adjustment-proposal.md`) G1 표: DEC-05 「메뉴 타입 + 커널(7C ② 가 그 위에 표면을 얹는다)」 ·
   DEC-02 「DEC-05 와 한 slice」(선언 예외 ② — 메뉴의 근거 칸이 곧 DEC-02 의 빈 자리). 홀더: 새 M6 slice 「투찰가 메뉴」.
   운영자 지시 2026-10-21 「G1 먼저」로 COL-03 레인과 병렬로 연다.
-- **base**: 착수 `bee7c36f` → `fc15975c`(머지 `851ee375`) → **현행 `46ac0949`**(병합된 main,
-  머지 커밋 `20b7129a`, D-G1DEC05-3 단계 0) · worktree `bid-vector-v2-m6-g1dec05` ·
+- **base**: 착수 `bee7c36f` → `fc15975c` → `46ac0949` → `d406a0b7` → **현행 `7309552f`**
+  (병합된 main, 머지 커밋 `2b6a684c` — PR #91 7C⑤-a 수용) · worktree `bid-vector-v2-m6-g1dec05` ·
   브랜치 `m6-g1dec05/2026-10-21`.
-  **rollback 복원 기준도 `46ac0949`** 다 — 착수 base 로 복원하면 머지로 들어온 남의 변경까지
+  **rollback 복원 기준도 `7309552f`** 다 — 착수 base 로 복원하면 머지로 들어온 남의 변경까지
   지운다(실제로 `gate-tests.properties`·`capability-map.md`·`acceptance-trace.md` 가 SET-01 ·
-  COL-03 · 7B · 7C①b · 7C④ 머지분을 잃는다).
-  전제(그 SHA 에 이 slice 가 없다)는 착수 커밋 `e88c069b` 미포함으로 확인했다.
+  COL-03 · 7B · 7C①b · 7C④ · **7C⑤** 머지분을 잃는다).
+  전제(그 SHA 에 이 slice 가 없다)는 착수 커밋 `e88c069b` 가 `7309552f` 의 조상이 아님으로
+  확인했다(그 SHA 의 menu 경로 파일 수도 0).
 - **입력 정본**: `docs/discovery/capability-map.md` DEC-05 · DEC-02 절(acceptance bullet 이 정본), 제약하는 DEC-01 · DEC-04 · DEC-10 bullet ·
   `reports/evidence/m6/6e1/acceptance-trace.md` DEC-05 · DEC-02 행(「무엇이 비었는가」) · 추적표 머리의 ⓐ 술어 ②(production 배선과 출하 정책
   값에서 성립).
@@ -85,13 +86,17 @@
 
 ## rollback
 
-`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일은 삭제. 목록은
-`git diff --name-status 46ac0949..HEAD` 기계 산출. 마지막 산출물 커밋에서 ①~⑦ 실측.
+`git restore --source=7309552f --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일은 삭제. 목록은
+`git diff --name-status 7309552f..HEAD` 기계 산출. 마지막 산출물 커밋에서 ①~⑦ 실측.
 
 **복원 기준은 「병합된 main 커밋」이지 착수 base 가 아니다**(r3 N-4 · cr M3). 이 절이 두 세대
 낡아 `bee7c36f` 를 가리키고 있었다 — 적힌 대로 실행하면 공유 장부가 착수 시점으로 돌아가 남의
-머지분이 사라진다. 실측(checklist)은 `46ac0949` 로 옳았고 이 문면만 틀렸다. **머지할 때마다 이
-줄과 머리 base 줄을 함께 올린다.**
+머지분이 사라진다. **머지할 때마다 이 줄과 머리 base 줄을 함께 올린다.**
+
+다만 **모든 머지가 기준을 올리는 것은 아니다** — 올리는 조건은 「그 머지가 이 slice 의 복원
+경로를 건드렸는가」다. `d406a0b7`(PR #92)은 교집합 0 이라 올리지 않았고, `7309552f`(PR #91)은
+공유 장부 셋이 겹쳐 올렸다. 교집합이 없는 머지에 기준을 올리면 「올렸다」는 사실만 남고 막는
+것이 없다.
 
 ## 검토 레인
 
@@ -190,22 +195,31 @@ worktree 무접촉.
   **in_scope 안이고 범위 밖 0** 이다.
 - **2026-10-26 ③** — `OPEN-DEC05-STANCE-RATE-PROVENANCE` 의 역방향 포인터를 `ML-01` 쪽에
   달았다(r3 L-N2) — 닫는 자리에서 그 OPEN 이 보이지 않으면 유예가 유실된다.
+- **2026-10-28 ①** — base 와 rollback 복원 기준을 `46ac0949` → **`7309552f`**(머지 `2b6a684c`,
+  PR #91 7C⑤-a)로 재고정했다. 7C⑤ 가 공유 장부 **셋**(`gate-tests.properties` ·
+  `capability-map.md` · `acceptance-trace.md`)을 만졌으므로 `46ac0949` 에서 복원하면 그
+  머지분이 사라진다. 복원 목록은 재산출해도 **39 그대로**(A 32 · M 7) — 7C⑤ 변경이 base 로
+  들어가 이 slice 의 delta 만 남기 때문이다. 사이의 `d406a0b7`(PR #92)은 교집합 0 이라 기준을
+  올리지 않았다.
 
 ## 후속 — 다음 레인에게 넘기는 것
 
-- **`OPEN-DEC05-STANCE-COUNT-BRANCH`(후보, 아직 장부 미등재)** — 태도를 **넷 이상**으로 늘리는
+- **`OPEN-DEC05-STANCE-COUNT-BRANCH`(장부 등재 완료)** — 태도를 **넷 이상**으로 늘리는
   slice 는 「전수가 접혔는데 금액 묶음이 둘」인 입력(예: 2+2 로 같은 금액 쌍 둘)을 만들어
   `assemble` 의 전수 접힘 분기를 **직접 재고**, 변이 **L1M**(그 분기를 금액 묶음 수와 무관하게
   만드는 변이)을 **RED 로 바꾼다**.
   - 지금은 **도달 불가**라 측정할 수 없다(태도 셋에서는 「전수 접힘」이 곧 「금액 묶음 하나」 —
     비둘기집. 근거는 `checklist.md` 의 L1M 줄).
   - **tripwire 후보**: `BidStance.entries.size shouldBe 3` 를 두면 태도가 늘어나는 순간 그
-    test 가 먼저 깨져 이 분기의 test 를 더하라고 알린다. 이번 라운드에 넣지 않은 이유는
-    초록으로 측정된 SHA 를 코드 변경으로 다시 열어야 해서다(팀장 결정 2026-10-27).
-  - **장부 등재는 미완**이다 — `docs/discovery/capability-map.md` 는 **rollback 복원 경로**라
-    거기에 쓰면 유효성 술어(`실측 SHA..판정 SHA` 의 복원 경로 변경 0)가 깨지고 rollback·
-    acceptance 재실측이 필요하다. **PR 라운드의 main 병합 커밋에서 함께 등재한다**(그 커밋은
-    어차피 복원 경로를 움직이므로 추가 비용이 0 이다).
+    test 가 먼저 깨져 이 분기의 test 를 더하라고 알린다. 넣지 않았다(팀장 결정 2026-10-27).
+    **7C⑤ 머지로 acceptance·rollback 을 다시 쟀지만 그 사실이 이 판단을 뒤집지 않는다** — 그
+    재실측은 **남의 머지가 공유 장부를 움직여서** 필요했고 내 코드·test 는 바이트 동일이라
+    변이 앵커가 살아 있다. tripwire 는 **코드 변경**이라 변이 열셋을 전부 다시 돌려야 하고,
+    그 비용이 이 라운드의 재실측보다 크다.
+  - **장부 등재 완료** — `docs/discovery/capability-map.md` 의 OPEN 표가 **정본**이고(활성
+    **51**), 등재는 **실측 기준 SHA 보다 앞**이라 유효성 술어를 깨지 않았다. 등재를 미루려던
+    앞 계획(병합 커밋에 끼워 넣기)은 쓰지 않았다 — 공유 장부를 움직이는 커밋을 하나 더 만드는
+    것보다, 등재를 먼저 하고 그 뒤에서 실측하는 쪽이 등식을 단순하게 둔다.
 
 ## 하네스 레인 변경 (상시)
 

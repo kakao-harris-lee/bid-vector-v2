@@ -1,12 +1,18 @@
 # M6/G1-DEC05 — checklist (투찰가 메뉴 DEC-05 + binding 제약 기록 DEC-02)
 
-**실측 기준 SHA: `0befab9e`** — acceptance · 변이 · rollback 이 **모두 이 SHA** 에서 돌았다
-(r3 일괄). 복원 경로(코드 · test · `config/quality` · 공유 장부)를 건드린 **마지막** 커밋이고,
-그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에 움직이지 않는다**.
+**실측 앵커는 둘이고, 뭉치지 않는다.**
+
+- **acceptance · rollback: `2b6a684c`** — 7C⑤(PR #91) 머지 커밋. 복원 경로(코드 · test ·
+  `config/quality` · 공유 장부)를 건드린 **마지막** 커밋이 이것이다 — 공유 장부 셋이 이 병합으로
+  움직였다. 그 뒤 커밋은 `reports/evidence/m6/g1dec05/**` 뿐이라 **복원 경로가 그 사이에
+  움직이지 않는다**.
+- **변이: `0befab9e`** — 이 병합은 내 코드와 test 를 **한 줄도** 바꾸지 않으므로(교집합이 공유
+  장부 셋뿐) 변이를 다시 돌리지 않았다. 두 앵커를 한 SHA 로 적으면 **언제 무엇을 쟀는지가
+  사라진다** — 돌리지 않은 측정을 새 SHA 로 옮겨 적는 것이 그 손실의 전형이다.
 
 **판정 SHA(동결 HEAD)는 동결 보고에 적는다.** 실측 기준 SHA 와 다른 것이 정상이다(evidence
 커밋은 언제나 뒤에 온다). 검증자가 볼 등식은 「실측 HEAD == 판정 SHA」가 아니라
-`git diff --name-only 0befab9e..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
+`git diff --name-only 2b6a684c..<판정 SHA> -- <rollback 이 되돌리는 경로들>` 이 **빈 출력**인지다.
 
 ## Phase 1 — 설계 (코드 0 · Gradle 0)
 
@@ -331,11 +337,13 @@ r2 는 **verifier ready-for-review · code-reviewer approve**(blocker·high 0)�
 선언돼 있어 통과로 나왔다. **마디를 전부 보도록** 고쳐야 걸린다. 지금은 단계 6 이 `clean` 뒤에 이 대조를
 돌리고 **「소스에 없는 class 0」을 본 뒤에야** 측정을 믿는다.
 
-### 승인 전 일괄 실측 — 실측 기준 `0befab9e`
+### 승인 전 일괄 실측 — **변이** 실측 기준 `0befab9e`
 
-**acceptance** — `clean` 뒤 `check --continue` **exit 0** · **CI 명령 그대로 `check` exit 0**.
-HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력** · **`:leakPatternGate`·`:contractGate`
-executed**(UP-TO-DATE 아님).
+**acceptance(변이 기준선)** — `clean` 뒤 `check --continue` **exit 0** · **CI 명령 그대로
+`check` exit 0**. HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력** ·
+**`:leakPatternGate`·`:contractGate` executed**(UP-TO-DATE 아님). 변이가 **초록 기준선 위에서**
+돌았다는 근거다. **현행 acceptance 는 아래 「7C⑤ 머지 뒤 재실측」** 이고, 그 회차에
+`qualityBaseline` 이 더해졌다.
 
 **낡은 `.class` 대조 0** — `clean` 뒤 중첩 마디까지 전수로. 타입 이름을 바꾼 라운드라 반드시
 보는 자리다(`DuplicateEffectiveRates` → `…Amounts`).
@@ -396,55 +404,53 @@ executed**(UP-TO-DATE 아님).
 (`negative-1b-menu-option-copy` · `mutant-5-menu-copy-named-non-copy-access`)이고 둘 다
 `decision/src/test/resources/**` 라 **in_scope 안, 범위 밖 0** 이다.
 
-**rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `46ac0949`**(고정), 버릴 clone.
+**rollback ①~⑦ 전부 초록** — 복원 기준 **병합된 main `7309552f`**(고정), 버릴 clone,
+실측 기준 `2b6a684c`. ④⑤⑥ 은 전부 `--rerun-tasks` 라 **캐시가 아니라 실행**이다.
 
-| 단계 | 결과 |
-|---|---|
-| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 32 · M 7 · 계 39) |
-| ② `git restore --source=46ac0949` + 새 경로 삭제 | restore exit 0 · delete exit 0 |
-| ③ 되돌린 경로의 `git diff` | **OK — 0 bytes** |
-| ④ `compileKotlin compileTestKotlin` | **exit 0** |
-| ⑤ `:decision:test :shared-kernel:test :workflow:test` | **exit 0** |
-| ⑥ `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** |
-| ⑦ 트리 복귀 | **OK — porcelain 빈 출력 · HEAD 불변** |
+| 단계 | 결과 | 실행 |
+|---|---|---|
+| ① 복원 목록 ⊇ 변경 경로(evidence 제외) | **OK — 누락 0** (A 32 · M 7 · 계 39) | — |
+| ② `git restore --source=7309552f` + 새 경로 삭제 | restore exit 0 · delete exit 0 | — |
+| ③ 되돌린 경로의 `git diff` | **OK — 0 bytes** | — |
+| ④ `compileKotlin compileTestKotlin` | **exit 0** | **45/45 executed** · 1분 36초 |
+| ⑤ `:decision:test :shared-kernel:test :workflow:test` | **exit 0** | **35/35 executed** — 세 `:test` 에 cache 표식 **0** · 1분 36초 |
+| ⑥ `sizeGate gateRegistrationGate leakPatternGate` | **exit 0** | **96/96 executed** · 26분 28초 |
+| ⑦ 트리 복귀 | **OK — porcelain 빈 출력 · HEAD 불변** | — |
 
-**완료는 종료 코드가 아니라 계수로 센다**: 내 표지 넷(menu 디렉터리 · `AppliedFloor.kt` ·
-복원 경로 안 `G1-DEC05` · 전 트리 `AppliedFloor`) **전부 0**, 남의 표지 둘(SET-01 OPEN id
-**5 → 5** · COL-03 의 `PromoteOpeningResultsUseCase.kt` **보존**) **그대로**.
+**복원 목록은 기준을 올려도 39 그대로다**(A 32 · M 7) — 7C⑤ 변경이 새 base 로 들어가 이 slice
+의 delta 만 남기 때문이다. 목록이 그대로라는 사실이 **기준을 올린 것이 옳았다는 증거는 아니다**;
+옳음을 받치는 것은 아래 표지 계수다.
+
+**완료는 종료 코드가 아니라 계수로 센다.** 내 표지 넷(menu 디렉터리 · `AppliedFloor.kt` ·
+복원 경로 안 `G1-DEC05` · 전 트리 `AppliedFloor`) **전부 0**. 남의 표지는 이 회차에 **7C⑤ 의
+장부 셋**으로 옮겨 쟀다 — capability-map 의 7C⑤ 주석 블록 · `OpeningResultViewTest` FQN
+(acceptance-trace + gate-tests) · SET-01 OPEN id 를 한 묶음으로 세어 **복원 전후가 `1|2|6` 으로
+동일**, 그리고 COL-03 의 `PromoteOpeningResultsUseCase.kt` **보존**. 복원 기준을 올린 라운드에서
+검증의 요점은 **새 base 가 들여온 것이 복원 뒤에도 남는가**이므로 표지를 그쪽으로 옮긴다 —
+옛 base 의 표지를 계속 세면 올린 기준이 실제로 지키는 것을 재지 못한다.
 
 **④⑤⑥ 을 생략하지 않는 이유**: ③ 은 **복원한 경로 집합만** 기준과 대조하므로 목록에서
 빠진 파일은 정의상 검사 밖이고 구조적으로 0 줄이 나온다 — 그 누락은 ④ 컴파일만 본다.
 ① 의 ⊇ 등식을 **되돌리기 전에** 먼저 돌리는 것도 같은 이유다. **갈음은 「HEAD 초록」이 아니라
 트리 동일성으로만 한다** — ③ 의 빈 출력이 그 동일성이다.
 
-**캐시 적중과 실행은 다른 주장이다 — 이번에 갈라서 적는다.**
-
-첫 회차의 ④⑤⑥ 은 **55초**에 끝났고 세 `:test` 가 **전부 `FROM-CACHE`** 였다. 그때 test XML 의
-mtime 은 실행 창 안(`00:04:06`)이라 **얼핏 돈 것처럼 보였지만** 그 시각은 **캐시를 풀어 쓴
-시각**이다 — mtime 만으로는 가려지지 않는다.
+**캐시 적중과 실행은 다른 주장이다.**
 
 - **캐시 적중이 보이는 것**: 되돌린 트리의 **입력이 slice 이전 상태와 바이트 동일**이다
-  (캐시 키가 그 동일성이다). rollback 이 증명하려는 것의 **절반**이고, 이 주장은 참이다.
+  (캐시 키가 그 동일성이다). rollback 이 증명하려는 것의 **절반**이고 그 주장은 참이다.
 - **캐시 적중이 보이지 않는 것**: 「되돌린 트리에서 test 가 **지금** 통과한다」. 그것은
-  **실행 없이는 측정되지 않는다.** 앞 라운드 evidence 는 첫째 주장을 적으면서 둘째처럼 읽히게
-  뒀다 — 이번에 갈랐다(팀장 지적).
+  **실행 없이는 측정되지 않는다.**
 
-**강제 실행 재측정**(`--rerun-tasks`, 실측 기준 동일 SHA):
+**실행의 증거를 mtime 패턴으로도 남긴다**: 이 회차의 test XML mtime 은
+`02:13:37 · 02:14:19 · 02:14:48` 로 **모듈마다 벌어진다**(순차 실행). 캐시에서 풀어 쓴 회차는
+셋이 **같은 초에 몰린다** — 앞 라운드에 ④⑤⑥ 이 55초에 끝나고 세 `:test` 가 전부
+`FROM-CACHE` 였는데 mtime 이 실행 창 안에 있어 **얼핏 돈 것처럼 보였다**(그 시각은 캐시를
+풀어 쓴 시각이다). 몰린 mtime 과 벌어진 mtime 의 대비가 둘을 가르는 값싼 판별자이고, 그래서
+`rb.sh` 가 **task 실행 계수 · 세 `:test` 의 상태 · XML mtime** 을 스스로 찍는다.
 
-| 단계 | 실행 | 소요 |
-|---|---|---|
-| ④ `compileKotlin compileTestKotlin` | **45/45 executed** | 1분 32초 |
-| ⑤ `:decision:test :shared-kernel:test :workflow:test` | **35/35 executed** — 세 `:test` 에 cache 표식 **0** | 1분 51초 |
-| ⑥ `sizeGate gateRegistrationGate leakPatternGate` | **96/96 executed** | 25분 25초 |
-
-**실행의 증거를 mtime 패턴으로도 남긴다**: 강제 실행의 test XML mtime 은
-`00:15:47 · 00:16:24 · 00:16:54` 로 **모듈마다 벌어진다**(순차 실행). 캐시 회차는 셋이
-**`00:04:06` 으로 동일**했다 — 같은 초에 몰린 mtime 은 실행이 아니라 **풀어 쓴 자취**다.
-이 대비가 둘을 가르는 값싼 판별자다. 그래서 `rb.sh` 가 이제 **task 실행 계수 · 세 `:test` 의
-상태 · XML mtime** 을 스스로 찍는다.
-
-**9분 24초 → 20초 → 25분 25초의 정체**: 중간 회차가 짧았던 것은 게이트가 빨라진 것이 아니라
-**게이트 앞의 컴파일이 캐시에서 온 것**이다. 게이트 자체는 강제 실행에서 25분대다.
+**9분 24초 → 20초 → 25분대의 정체**: 중간 회차가 짧았던 것은 게이트가 빨라진 것이 아니라
+**게이트 앞의 컴파일이 캐시에서 온 것**이다. 게이트 자체는 강제 실행에서 **25~26분대**이고
+이 회차도 26분 28초였다 — 짧은 ⑥ 은 그 자체로 캐시 의심 신호다.
 
 **이 라운드가 쓴 선행 패스**: 비싼 clean `check`(23분) 로 형식 오류를 발견하는 일이 반복돼,
 체인 전에 **빠른 정적 게이트**(세 모듈 × `ktlintCheck`·`detekt`·`sizeGate`·`typeShapeGate`·
@@ -471,14 +477,70 @@ CI `check` 를 판정 SHA 에서 직접 exit 0).
 | **cr L2** | 음성 단언 조각 「cannot access」가 **심볼을 지목하지 않아** 타입 자체가 `internal` 이 되는 변이에서도 초록 | 조각을 여럿 받게 하고 `copy` 를 함께 요구(여섯 fixture 전부). 변이 **L2M**(타입을 `internal` 로)이 그 구별을 실측 |
 | **cr L3** | 공유 통제군이 **`BandCollapsed` 꼴 하나만** 재는데 KDoc 은 「4a~4e 공유」 | **실측 범위를 그대로 적었다** — 나머지 다섯의 비공허성은 **유추이지 측정이 아니다**. 유추로 메운 자리를 측정처럼 보이게 하지 않는다 |
 
-### main 이동과 교집합 (PR 직전 확인)
+### main 이동과 교집합 — 두 번
 
-main 이 `46ac0949` → **`d406a0b7`**(PR #92 — container CVE · CI 러너 지문)로 움직였다. 그
-변경 경로(`docker/` · `config/quality/{vuln-allowlist,image-hygiene-policy}` ·
-`tools/local-tls-*` · runbook · 그 evidence 셋) 와 이 slice 의 변경 경로 **41** 의 **교집합은
-0** 이다(`comm -12` 기계 확인). 그래서 **복원 기준 `46ac0949` 와 판정 근거는 그대로 간다** —
-PR 직전 병합은 복원 경로를 건드리지 않는다. `config/quality` 가 양쪽에 나오지만 **파일이
-다르다**(이 slice 는 `gate-tests.properties` 하나).
+main 이 `46ac0949` → `d406a0b7`(PR #92 — container CVE · CI 러너 지문) → **`7309552f`**
+(PR #91 — 7C⑤-a 개찰 결과 조회 표면)로 두 번 움직였고, **두 번의 처분이 다르다.**
+
+- `d406a0b7` — 이 slice 의 변경 경로와 **교집합 0**(`comm -12` 기계 확인). 복원 기준을 올리지
+  않았다. 올릴 이유가 없는 병합에 기준을 올리면 「올렸다」는 사실만 남고 막는 것이 없다.
+  `config/quality` 가 양쪽에 나오지만 **파일이 다르다**(디렉터리만 겹친다).
+- `7309552f` — **교집합 셋**: `config/quality/gate-tests.properties` ·
+  `docs/discovery/capability-map.md` · `reports/evidence/m6/6e1/acceptance-trace.md`. 셋 다
+  **공유 장부**라 `46ac0949` 에서 복원하면 7C⑤ 의 등재가 사라진다. 그래서 복원 기준을
+  `7309552f` 로 올리고 ①~⑦ 을 다시 쟀다.
+
+**병합은 `--no-ff` 머지다**(rebase 아님). 충돌 **0** 으로 붙었고, 그래서 합집합을 따로 쟀다 —
+**충돌 0 자동 병합이 같은 본문을 접거나 한쪽 항목을 조용히 버리는 것**이 이 자리의 함정이다.
+
+### 합집합 검증 — 겹친 장부 셋
+
+**축은 「양쪽의 신규가 둘 다 살아 있는가」다.** 줄 수·파일 수로는 접힘이 보이지 않는다.
+
+| 장부 | 등식 | 결과 |
+|---|---|---|
+| `gate-tests.properties` | 키·항목 쌍 집합 `after == ours ∪ theirs` | **OK** — base 455 · 내 추가 5 · 7C⑤ 추가 8 → after **468**, 초과 0 · 유실 0 |
+| 〃 | 키 중복 · 항목 중복 | 선언 키 16 = 유일 키 16 · 같은 키에 같은 FQN 두 번 **0** |
+| 〃 | 어느 쪽도 지우지 않았는가 | base ∖ ours = 0 · base ∖ theirs = **0** |
+| `capability-map.md` | 머리 활성 수 == 칸 합 | **51 == 3+7+15+8+7+5+6** |
+| 〃 | OPEN id 집합 `after == ours ∪ theirs` | **OK** — 197 / 197, 차이 0 |
+| 〃 | 7C⑤ 가 더한 블록 둘 생존 | COL-02 · SET-02 주석 블록 **각 1** |
+| `acceptance-trace.md` | 표 행 수 | **89**(base·ours·theirs 모두 89 — 7C⑤ 는 행을 더하지 않고 둘을 **제자리 수정**) |
+| 〃 | 집계 줄 == 실제 판정 letter 계수 | **ⓐ 16 · ⓑ 2 · ⓒ 43 · 계 61** 네 수 모두 일치 |
+| 〃 | 내 행 · 7C⑤ 행 동시 생존 | COL-02 · SET-02 · DEC-02 · DEC-05 네 행이 **각각 7칸**으로 분리 — 접힘 0 |
+| 〃 | 표식 집합 등식 `E-24` 양쪽 | **23 == 23**, **id 집합도 동일** — 7C⑤ 는 「부분 측정(강함)」을 더하지도 떼지도 않았다 |
+| 셋 전부 | 줄 단위 등식: 각 쪽의 신규 줄이 after 에 있는가 | capability-map 내 85 / 7C⑤ 16 · trace 내 41 / 7C⑤ 2 — **유실 0** |
+
+**활성 수가 51 로 그대로인 이유**: 7C⑤ 는 OPEN 을 **신설하지 않았다**. 추가한 두 블록은 이미
+있던 `OPEN-SET01-AWARD-NAME-INGEST` 를 가리키는 서술이고, 그래서 그 쪽 머리 수는 base 와 같은
+45 였다. 내 +6 만 더해 **51** 이 현행이고 칸 합이 그것을 받친다. **두 쪽이 같은 수를 각자
+올렸다면 자동 병합이 한쪽 값을 버렸을 자리**이므로, 수가 겹치지 않았다는 사실 자체를 적는다.
+
+**집계 줄을 행에서 되계산한 것이 이 검증의 핵심이다** — 행 하나가 접히거나 판정 letter 가
+뒤바뀌면 네 수 중 하나가 어긋난다. 줄 수나 `git diff --stat` 으로는 그것이 보이지 않는다.
+`E-24` 도 같은 이유로 **계수가 아니라 id 집합**으로 쟀다 — 양쪽이 23 으로 같아도 **들어 있는
+항목이 바뀌었으면 등식은 거짓**이고, 수만 보면 그 교환이 보이지 않는다.
+
+**게이트가 이것을 대신 잡아 주지 않는다**: `contractGate`·`gateRegistrationGate` 는 초록이었고
+그 초록은 `gate-tests.properties` 의 등식만 받친다. 추적표의 집계·표식 등식은 **기계 게이트가
+없는 장부**라 머지마다 손으로 재야 하고, 그래서 여기 적는다.
+
+### 7C⑤ 머지 뒤 재실측 — 실측 기준 `2b6a684c`
+
+**acceptance** — `clean` 뒤 **`check --continue` exit 0** · **CI 명령 그대로 `check` exit 0** ·
+**`qualityBaseline` exit 0**. HEAD 양끝 불변 · `git status --porcelain` 양끝 **빈 출력** ·
+**`:leakPatternGate`·`:contractGate` executed**(UP-TO-DATE 아님) · **낡은 `.class` 0**(중첩 마디
+전수). rollback 은 위 ①~⑦ 표가 같은 SHA 에서 받친다.
+
+**`qualityBaseline` 을 이 회차에 더했다.** CI `check` job 은 `check` 다음에 그것을 돌리는데 이
+slice 의 acceptance 스크립트가 빼고 있었다 — **부분 게이트는 안 돌린 것과 같다**는 규율대로
+job 명령에 맞췄다. 빠져 있던 동안 그 게이트는 CI 에서만 돌았고, 로컬 초록이 job 초록을
+뜻하지 않는 구간이 그만큼 있었다.
+
+**변이를 다시 돌리지 않은 근거**: 이 병합의 교집합은 **공유 장부 셋**이고 거기에는 Kotlin 이
+없다. 두 쪽이 **같은 Kotlin 파일을 만진 적이 0** 이라 KDoc·주석이 접히는 자리가 구조적으로
+생기지 않고(확인은 ④ 컴파일과 acceptance), 변이가 재는 대상(내 커널·타입·test)이 바이트
+동일이다. 바뀌지 않은 대상에 변이를 다시 돌리면 **새 SHA 에 옛 측정을 붙이는 셈**이 된다.
 
 ### Phase 1 약속 ↔ 출하 실물 대조표 (D-G1DEC05-5, 전수)
 
@@ -683,6 +745,7 @@ r3 는 **verifier ready-for-review · cr approve**(blocker·high 0). 아래는 �
 ### 앞 라운드 실측 절 — **대체됨**
 
 r2 의 acceptance(`756cf042`)·문서 등식·rollback(실측 HEAD `fdf9a277` · 복원 기준 `fc15975c`)
-절은 **위 「승인 전 일괄 실측」이 대체한다**(r3 L-N3). 같은 주장을 두 기준에서 적으면 어느 쪽이
-현행인지 읽는 사람이 판단해야 하고, 라운드 이력 절은 evidence 규율이 금지한다. 현행 수치는
-전부 **실측 기준 `0befab9e` · 복원 기준 `46ac0949`** 한 벌이다.
+절은 **위 실측 절들이 대체한다**(r3 L-N3). 같은 주장을 두 기준에서 적으면 어느 쪽이 현행인지
+읽는 사람이 판단해야 하고, 라운드 이력 절은 evidence 규율이 금지한다. 현행 수치의 앵커는
+**둘**이다 — **acceptance · rollback = 실측 기준 `2b6a684c` · 복원 기준 `7309552f`**,
+**변이 = 실측 기준 `0befab9e`**(그 뒤로 코드·test 가 바뀌지 않았다).
