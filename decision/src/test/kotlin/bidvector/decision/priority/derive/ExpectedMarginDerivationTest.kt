@@ -61,11 +61,17 @@ class ExpectedMarginDerivationTest {
      * **일반식 등식**(D-DEC10-24) — `floor = 0` 에 특례 분기가 없다. 앞 판은 그 자리에
      * `floor.signum() == 0` 분기를 두었는데 일반식이 같은 값을 낸다(`(rec − 0) ÷ (1 − 0) = rec`).
      * 분기를 지운 것이 거동을 바꾸지 않음을 **이 test 가 계속 잰다** — 옛 이름(「손계산 3 —
-     * legacy else 분기」)은 특례 분기의 거동을 주장했고, 지금 재는 것은 **분기 없이도 같은 값**
-     * 이라는 등식이다. 그래서 분모에 엡실론을 넣거나 clamp 를 바꾸는 변경이 여기서 걸린다.
+     * legacy else 분기」)은 특례 분기의 거동을 주장했고, 지금 재는 것은 `floor = 0` 에서
+     * **일반식이 `rec` 를 낸다**는 등식이다. 그래서 분모에 엡실론을 넣거나 clamp 를 바꾸는
+     * 변경이 여기서 걸린다(verifier r5 K1 실측: `floor = 0` 에 `ZERO` 특례를 심으면 RED).
+     *
+     * **이 test 는 분기의 부재를 재지 않는다**(CR r5 L-4) — 누가 `floor.signum() == 0 ->
+     * recommended` 를 **되살려도** 같은 값이라 초록이다. 이름이 「특례 분기 없이」라고 말하던
+     * 것을 그래서 좁혔다. 분기 부재 자체를 재려면 바이트코드 축으로 가야 하고 그것은 과잉이다 —
+     * 되살아난 특례는 중복일 뿐 거동을 바꾸지 않는다.
      */
     @Test
-    fun `일반식 등식 — floor 0 은 특례 분기 없이 rec 를 낸다`() {
+    fun `일반식 등식 — floor 0 은 일반식으로 rec 를 낸다`() {
         val inputs =
             MarginInputs(
                 recommendedRate = rateOf("0.70"),

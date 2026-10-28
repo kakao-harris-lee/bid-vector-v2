@@ -11,6 +11,7 @@ import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Rate
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -115,6 +116,6 @@ class FloorBoundaryAtGateTest {
 
         val trusted = factsFor(noticeFloorOf("0.88"))
         trusted.floorExclusion shouldBe null
-        (trusted.expectedMargin == factsFor(null).expectedMargin) shouldBe false
+        trusted.expectedMargin shouldNotBe factsFor(null).expectedMargin
     }
 }
