@@ -36,10 +36,10 @@ Kotlin 코드. 판정 기준 · seed · 창 · S1 · S4 정책 값은 v2 에서 
    이 값이 움직이지 않는 값 목록에 등재된 이유**이기도 하다.
 3. **실데이터 백테스트는 돌리지 않았다.** 이 slice 는 규칙과 정책까지다 — 수정된 S0 · S4 의
    우위나 운영 채택은 주장하지 않는다(검증 계획 T2 이후, 별도 승인).
-4. **낡은 docstring 을 고친 파일 둘이 경로 목록 밖에서 들어왔다.** `metrics.py`(적격 정의)는
+4. **낡은 docstring 을 고친 파일 둘이 경로 목록 밖에서 들어왔다(둘 다 해소).** `metrics.py`(적격 정의)는
    **D-6GRC-4 가 in_scope 에 넣어 해소됐다**. 같은 부류로 `reasons.py` 의
    `PURE_CONSTRUCTION_COST_ABSENT` 설명을 더했는데(그 사유의 외연이 이 slice 에서 좁아졌다)
-   그 경로는 아직 목록 밖이다 — 계약 갱신 대상이고 거동 변경은 0 이다.
+   그 경로도 **D-6GRC-5 가 in_scope 에 넣어 해소됐다** — 거동 변경은 0 이다.
 5. **`container` job 은 돌리지 않았다.** scope.md 의 acceptance 는 「ml-serving 이미지 입력이
    바뀌면 그 job 도」인데, 이미지 Dockerfile 이 `ml-engine/policy` 를 통째로 복사하므로 새 정책
    파일 하나가 이미지에 들어간다 — **입력이 바뀌었다**. 그 job 의 ml-serving 쪽 술어 넷 중

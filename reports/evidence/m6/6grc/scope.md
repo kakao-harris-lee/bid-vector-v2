@@ -30,6 +30,7 @@
 - `docs/runbook/m6-6g-real-collection.md` 의 백테스트 정책 경로 한 줄.
 - 계획이 지목한 낡은 코드 주석 · docstring.
 - `ml-engine/src/ml_engine/evaluation/backtest/metrics.py` 의 모듈 docstring(D-6GRC-4).
+- `ml-engine/src/ml_engine/evaluation/backtest/reasons.py` 의 `PURE_CONSTRUCTION_COST_ABSENT` 설명(D-6GRC-5).
 - `reports/evidence/m6/6grc/**`.
 
 ## out_scope
@@ -76,3 +77,6 @@ pytest 전체 · `tools/design_ratchet.py --check` · `tools/reuse_provenance_ch
 - 2026-10-28 **D-6GRC-4(팀장, 레인 동결 보고 수령)**: `metrics.py` 의 「적격」 정의 docstring 이 「공사는 순공사원가선까지」라
   새 적용 범위(P2)와 어긋나 레인이 고쳤다 — 「계획이 지목한 낡은 docstring」에 해당하나 경로 목록에 없었다. 그 파일(docstring 한정, 거동 변경 0)을
   in_scope 에 더한다.
+- 2026-10-28 **D-6GRC-5(팀장, r2 동결 보고 수령)**: CR r1 LOW 가 지목한 `reasons.py` 의 `PURE_CONSTRUCTION_COST_ABSENT`
+  설명(이 slice 가 그 사유의 외연을 「모든 공사」에서 「규칙이 적용되는 공사」로 좁혔다)을 레인이 더했다. D-6GRC-4 와 같은 부류 — docstring
+  한정, 거동 변경 0 — 이므로 그 파일을 in_scope 에 더한다.
