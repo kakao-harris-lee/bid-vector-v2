@@ -7,9 +7,9 @@ import bidvector.decision.UnitScore
 import bidvector.decision.exclusion
 import bidvector.decision.priority.ScoreFact
 import bidvector.decision.priority.derive.DerivationAbsence
-import bidvector.decision.priority.derive.MarginInputs
 import bidvector.decision.priority.derive.deriveBudgetCapture
 import bidvector.decision.priority.derive.deriveExpectedMargin
+import bidvector.decision.priority.derive.marginInputsFrom
 import bidvector.decision.trustPublishedFloorRate
 import bidvector.procurement.Notice
 import bidvector.procurement.ResolvedBaseAmount
@@ -191,11 +191,12 @@ private fun expectedMarginFact(
     if (excludedRate != null && exceedsMarginInputBound(excludedRate)) {
         return MarginFact(ScoreFact.Absent(MlUnavailableReason.InvalidRequest), exclusion)
     }
-    val floorRate = if (trust is PublishedFloorTrust.Trusted) trust.rate.rate else null
+    // D-DEC10-22 — 통과 값을 **그대로** 넘긴다. 이 자리에서 율을 꺼내지 않는 것이 요점이다:
+    // 꺼내면 그 숫자가 다시 날 `Rate` 가 되어 세탁 경로가 열린다.
     val marginInputs =
-        MarginInputs(
+        marginInputsFrom(
             recommendedRate = predictedRate,
-            floorRate = floorRate,
+            floorRate = (trust as? PublishedFloorTrust.Trusted)?.rate,
             predictedRate = predictedRate,
             priceFitness = priceFitness,
             capacity = capacityScore,
