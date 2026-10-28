@@ -211,8 +211,17 @@ class ArchitecturePolicy private constructor(
     val floorTrustRawTypeAccessPairs: List<Pair<String, String>>
         get() = pairs("floor-trust.raw-type-access-pairs")
 
-    /** r1 v H-1 (b) — 통과 값의 생성 계열을 만지는 **코드 단위**(파일이 아니라 함수). */
+    /** r1 v H-1 (b) — 통과 값의 생성 계열을 만지는 **코드 단위**(파일이 아니라 함수·서명). */
     val floorTrustCreationCodeUnits: List<String> get() = list("floor-trust.creation-code-units")
+
+    /**
+     * r2 CR M-1 — **밴드의 출처**. 게이트가 정책을 인자로 받으므로 위조한 정책 값을 진짜 게이트에
+     * 넘기면 다른 축이 바뀌지 않는다. 그 값을 만드는 자리를 따로 센다(production 한 자리).
+     */
+    val floorTrustPolicyValueTypes: List<String> get() = list("floor-trust.policy-value-types")
+
+    val floorTrustPolicyValueCreationCodeUnits: List<String>
+        get() = list("floor-trust.policy-value-creation-code-units")
 
     /** D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
