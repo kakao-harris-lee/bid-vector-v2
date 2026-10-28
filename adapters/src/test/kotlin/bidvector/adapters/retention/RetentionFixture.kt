@@ -390,6 +390,17 @@ internal val RETENTION_SEEDS: List<TableSeed> =
                     "FROM account WHERE login_name = 'ret-$tag'",
             )
         },
+        // M7/7C③ — 알림함도 계정을 FK 로 참조하므로 `account` 뒤에 온다. 공고 키는 FK 가
+        // 아니라(V23 주석 ③) 심지 않은 공고 번호를 써도 된다 — 그 **부재가 설계 사실**이므로
+        // 여기서 그 성질을 함께 쓴다(공고 행 없이도 알림 행이 선다).
+        TableSeed("notification_inbox") { tag, at ->
+            listOf(
+                "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
+                    " occurred_at, created_at, updated_at) " +
+                    "SELECT id, 'NOTICE_REVISED', 'RET-$tag', '001', '$at', '$at', '$at' " +
+                    "FROM account WHERE login_name = 'ret-$tag'",
+            )
+        },
         // **심지 않는다.** 이 표는 `PersistenceTestSupport` 의 test 간 TRUNCATE 목록 밖이다
         // (V2 migration 이 seed 하고 그 행이 운영 데이터다) — fixture 가 한 행을 더하면 그 행이
         // **다른 test 로 새어 나간다**(`ProvenanceAuthoritySeedTest` 가 seed 를 열거와 대조하다가

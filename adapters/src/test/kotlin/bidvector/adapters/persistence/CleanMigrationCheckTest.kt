@@ -106,6 +106,11 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             //  · account_construction_capacity 3 = 면허명(빈 값 · 길이) + 금액 범위 + 기준 연도 범위.
             "account_business_profile" to 5,
             "account_construction_capacity" to 3,
+            // M7/7C③(추가만). V23: kind 어휘 1 + notice_number<>'' 1 + notice_round 형식 1 +
+            // detail_code 어휘 1 + 종류↔detail 짝 1 = 5.
+            // **`read_at >= created_at` 은 없다** — 두 시계를 비교하는 제약이라 시계 틀어짐이 곧
+            // 쓰기 실패였다(V23 주석). 그 수를 6 에서 5 로 내린다.
+            "notification_inbox" to 5,
         )
 
     @Test
