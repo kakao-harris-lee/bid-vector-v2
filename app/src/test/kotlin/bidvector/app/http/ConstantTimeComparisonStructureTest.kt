@@ -82,6 +82,19 @@ class ConstantTimeComparisonStructureTest {
                 "EditFieldTokensKt",
                 "EditSessionResponseKt",
                 "NoticeSummaryResponse",
+                // M7/7C ② — 투찰가 요청의 응답 DTO 일곱과 사상 함수 파일 넷, 컨트롤러 하나.
+                "BidPriceRequestResponse",
+                "EvaluationDetailFields",
+                "NotificationFields",
+                "QualificationFields",
+                "BaseAmountFields",
+                "FloorRateFields",
+                "PriceAxesFields",
+                "BidPriceVerdictLabelsKt",
+                "BidPriceDropLabelsKt",
+                "BidPriceQualificationLabelsKt",
+                "BidPriceFactLabelsKt",
+                "BidPriceRequestController",
                 "BidCaseResponse",
                 "BidCaseResponse\$Companion",
                 "BidTimelineEntryResponse",
@@ -128,6 +141,34 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "상태·거부 사유 sealed 싱글턴 when 소진(javap 확인: 자격증명 좌표 0) — 값 비교가 아니라 객체 동일성",
         "NoticeSummaryResponse" to
             "공고 요약 응답 값 객체(data class) 자동 생성 equals — 공고번호·차수·상태·공고명·기관명·기초금액·마감뿐, 자격증명 값 없음",
+        // M7/7C ② (D-7C2-5 ④) — 열둘. 근거는 **클래스마다** 적는다(그 class 가 무엇을 == 로 비교하는가).
+        // 열둘 전부 javap 으로 자격증명·CSRF·서명 어휘 참조 0 을 실측했다. 패키지를 옮겨 이 게이트를
+        // 비껴가는 선택은 하지 않았다 — 위치로 보안 게이트를 피하는 형태다.
+        "BidPriceRequestResponse" to
+            "투찰가 요청 응답 값 객체(data class) 자동 생성 equals — 공고 식별자·상관 id·개정·여력 수·고지 코드와 축별 묶음 여섯, 자격증명 값 없음",
+        "EvaluationDetailFields" to
+            "평가 상세 묶음(data class) 자동 생성 equals — 판정·사유 코드·단계·공고 상태·점수 문자열뿐, 자격증명 값 없음",
+        "NotificationFields" to
+            "알림 처분 묶음(data class) 자동 생성 equals — 알림 요청 여부와 알림함 기록 상태·사유 코드뿐, 자격증명 값 없음",
+        "QualificationFields" to
+            "자격 근거 묶음(data class) 자동 생성 equals — 판정·사유 코드·면허명·그룹 라벨·출처 필드·정책 출처뿐, 자격증명 값 없음",
+        "BaseAmountFields" to
+            "기초금액 묶음(data class) 자동 생성 equals — 금액·통화·basis·과세·provenance·해석 갈래뿐, 자격증명 값 없음",
+        "FloorRateFields" to
+            "게시 하한율 묶음(data class) 자동 생성 equals — 율 문자열·출처·차수·근거 상태뿐, 자격증명 값 없음",
+        "PriceAxesFields" to
+            "가격 세 축 묶음(data class) 자동 생성 equals — 상태와 사유 코드뿐(값 칸이 없다), 자격증명 값 없음",
+        "BidPriceVerdictLabelsKt" to
+            "판정 축 사상 함수 파일 — sealed 싱글턴(Verdict·사유)을 소진 when 으로 가르는 참조 동일성, 자격증명 값 없음",
+        "BidPriceDropLabelsKt" to
+            "탈락 축 사상 함수 파일 — sealed 싱글턴(단계·드롭 사유·감시 불가 사유) 참조 동일성, 자격증명 값 없음",
+        "BidPriceQualificationLabelsKt" to
+            "자격 축 사상 함수 파일 — sealed 싱글턴(면허 판정·판정 불가 사유·그룹 id·유효기간·정책 시행일) 참조 동일성, 자격증명 값 없음",
+        "BidPriceFactLabelsKt" to
+            "공고 fact·ML 축 사상 함수 파일 — sealed 싱글턴(금액 해석 갈래·하한율 출처·ML 상태·미가용 사유) 참조 동일성, 자격증명 값 없음",
+        "BidPriceRequestController" to
+            "단건 평가 컨트롤러 — 요청 결과 sealed 갈래(공고 없음/준비됨)를 소진 when 으로 가르는 참조 동일성. " +
+            "인증은 앞단 필터가 지고 이 class 는 자격증명 타입을 받지도 참조하지도 않는다",
         // M7/7B — 입찰 건의 HTTP 층. 전부 data class 자동 equals 이거나 sealed 싱글턴
         // when 소진이고, `OperatorCredentialAuthenticator` 의 자격증명 좌표를 참조하지 않는다.
         "BidCaseResponse" to

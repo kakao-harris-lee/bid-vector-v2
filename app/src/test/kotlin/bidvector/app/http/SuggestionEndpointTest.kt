@@ -144,7 +144,12 @@ class SuggestionEndpointTest : HttpIntegrationTestBase() {
         row["deadlineAt"] shouldBe deadline.toString()
         row["licenseVerdict"] shouldBe "UNCERTAIN"
         row["licenseUncertainReason"] shouldBe "OPERATOR_LICENSES_NOT_DECLARED"
-        row["unjudgedAxes"] shouldBe listOf("QUAL_08_REGION", "QUAL_11_CONSTRUCTION_CAPACITY")
+        // M7/7C ② `D-7C2-11` — 미판정 축이 **셋**이 됐다. 같은 이름의 사본 셋을
+        // `workflow.evaluation` 단일 출처로 합치면서 `QUAL_10_PERFORMANCE` 가 들어온다. 이 카드가
+        // 그 축을 빠뜨리면 면허만 판정된 제안이 **수행실적까지 판정된 것처럼** 읽힌다. 이 줄이
+        // 고의로 손 목록인 이유는 구현과 같은 출처에서 뽑으면 어휘가 바뀌어도 늘 초록이기 때문이다.
+        row["unjudgedAxes"] shouldBe
+            listOf("QUAL_08_REGION", "QUAL_10_PERFORMANCE", "QUAL_11_CONSTRUCTION_CAPACITY")
     }
 
     @Test

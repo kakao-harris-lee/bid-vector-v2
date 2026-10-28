@@ -4,6 +4,7 @@ import bidvector.adapters.evaluation.CandidateCapExceededException
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
+import bidvector.app.wiring.NoticeNotFoundException
 import bidvector.workflow.strategy.EditSessionConflictException
 import bidvector.workflow.suggestion.StrategyChangedDuringComputationException
 import jakarta.servlet.http.HttpServletRequest
@@ -92,6 +93,13 @@ object ErrorCode {
     const val INVALID_STORED_STRATEGY = "INVALID_STORED_STRATEGY"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
 
+    /**
+     * M7/7C ② — 요청한 **공고**가 없다. [NOT_FOUND](요청한 **경로**가 없다)와 다른 코드다:
+     * 고정 문구가 하나면 「경로를 잘못 불렀다」와 「그 공고가 없다」를 호출부가 구분할 수 없다.
+     * 공고의 존재는 공개 정보라 구분이 아무것도 흘리지 않는다(인증 실패와 다른 축이다).
+     */
+    const val NOTICE_NOT_FOUND = "NOTICE_NOT_FOUND"
+
     // D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
@@ -179,6 +187,11 @@ object ErrorMapping {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
+            // M7/7C ② — 요청한 공고가 없다(평가를 시작하지 않았다).
+            is NoticeNotFoundException -> {
+                ErrorCode.NOTICE_NOT_FOUND to "요청한 공고를 찾을 수 없다"
+            }
+
             // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
             is InvalidNoticeSearchException -> {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
@@ -238,9 +251,16 @@ private fun escapeJson(value: String): String = value.replace("\\", "\\\\").repl
  */
 @RestControllerAdvice
 class GlobalErrorHandler {
-    @ExceptionHandler(NoHandlerFoundException::class)
+    /**
+     * 404 계열 — 경로가 없거나(D-6A1-21) 요청한 공고가 없다(M7/7C ②). 같은 상태 코드이고
+     * 본문의 코드가 사유를 가른다(D-6A2b-6 과 같은 규율).
+     */
+    @ExceptionHandler(
+        NoHandlerFoundException::class,
+        NoticeNotFoundException::class,
+    )
     fun notFound(
-        exception: NoHandlerFoundException,
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.NOT_FOUND, exception, request)
 
