@@ -54,6 +54,10 @@ class ExclusionReason(StrEnum):
     RESERVE_DRAW_INCOMPLETE = "RESERVE_DRAW_INCOMPLETE"
     A_VALUE_ABSENT_OR_LATE = "A_VALUE_ABSENT_OR_LATE"
     PURE_CONSTRUCTION_COST_ABSENT = "PURE_CONSTRUCTION_COST_ABSENT"
+    """순공사원가 규칙이 **적용되는** 공사(예정가격이 정책 상한 미만)의 원가 결측만.
+    미적용 공사는 그 선이 애초에 서지 않아 원가가 없어도 빠지지 않는다 — 계획
+    2026-10-28 P2 가 외연을 좁혔고, 그래서 **같은 사유 코드가 v1 판정문과 v2 판정문에서
+    다른 집합을 센다**(구분은 판정문의 정책 version·checksum 이 진다)."""
 
     BIDDER_AMOUNT_ABSENT = "BIDDER_AMOUNT_ABSENT"
     """(P-1.5) 투찰금액이 없는 행이 섞이면 「적격 투찰자 중 최저」가 최저라는 보장이
