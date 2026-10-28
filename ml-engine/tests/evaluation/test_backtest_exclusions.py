@@ -17,6 +17,7 @@ import pytest
 from _backtest_support import (
     SHIPPED_BACKTEST_POLICY_PATH,
     manifest_bytes,
+    reserve_prices,
     row_payload,
     rows_bytes,
     sample_list_bytes,
@@ -599,3 +600,146 @@ def test_admission_signature_has_no_strategy_parameter() -> None:
     """제외는 전략을 보기 전 입력 단계에서만 — 시그니처가 그것을 강제한다(우회 ④)."""
     parameters = set(inspect.signature(admit_rows).parameters)
     assert parameters == {"rows", "policy"}
+
+
+# ── 순공사원가 98% 실격선의 적용 범위 (계획 2026-10-28 P2) ───────────────────
+# 조달청 시설공사 적격심사세부기준 제5조의 적용 대상은 **예정가격 100억원 미만 공사**다.
+# 기준은 기초금액이나 낙찰방법명 문자열이 아니라 **예정가격**이고, 정확히 100억원이면
+# 미적용이다(계획 §2 P2 의 제도 근거). 기존 test 는 전부 기초금액 10억 공고라 이 경계를
+# 한 번도 지나지 않았다.
+
+_PURE_COST_RATIO_OF_CAP = 0.95
+"""순공사원가 / 예정가격 상한. 출하 배제 비율(0.98)에서 순공사원가선
+(`0.95 x 사정률 x 0.98`)이 하한가(`사정률 x 0.87745`)보다 **위**로 올라가는 값이라,
+적용 여부가 적격 판정을 실제로 가른다."""
+
+
+def _cap() -> float:
+    """예정가격 상한(배타) — **정책에서** 읽는다. test 에 적으면 정책이 바뀔 때
+    조용히 어긋난다."""
+    return _policy().floor.pure_construction_cost_max_planned_price_exclusive
+
+
+def _construction_row(
+    label: str,
+    *,
+    planned_price: float,
+    pure_cost: int | None,
+    bidder_amounts: list[float],
+) -> dict[str, Any]:
+    """예정가격 상한 주변의 공사 공고 하나. 낙찰방법명은 적격심사 표지만 달고
+    「100억 미만/이상」을 말하지 않는다 — 기준은 문자열이 아니라 예정가격이다."""
+    cap = _cap()
+    return row_payload(
+        label,
+        notice_category="CONSTRUCTION",
+        notice_bid_price_formula_a_applicable=False,
+        notice_successful_bid_method_name="적격심사제-시설공사",
+        notice_noticed_on="2026-03-01",
+        notice_base_amount=int(cap),
+        notice_pure_construction_cost=pure_cost,
+        notice_reserve_range_begin_rate=-0.02,
+        notice_reserve_range_end_rate=0.02,
+        outcome_planned_price=planned_price,
+        outcome_opening_base_amount=int(cap),
+        outcome_prices=reserve_prices(cap),
+        outcome_bidder_amounts=bidder_amounts,
+    )
+
+
+def _split_amount(planned_price: float) -> tuple[float, float, float]:
+    """(하한가, 그 둘 사이의 투찰금액, 순공사원가선) — 금액이 두 선 **사이**에
+    있어야 적용 여부가 적격 판정을 가른다."""
+    cap = _cap()
+    floor = floor_price(
+        planned_price=planned_price, floor_rate=0.87745, a_value_total=0.0
+    )
+    pure = pure_construction_floor(
+        pure_construction_cost=cap * _PURE_COST_RATIO_OF_CAP,
+        base_amount=cap,
+        planned_price=planned_price,
+        ratio=0.98,
+    )
+    return (floor, (floor + pure) / 2.0, pure)
+
+
+def test_pure_cost_rule_applies_only_below_the_planned_price_cap() -> None:
+    """계획 §3.1(exclusions) ①③④ — 예정가격 `100억 - 1원` · `100억` · `100억 + 1원`.
+
+    투찰금액을 **하한가와 순공사원가선 사이**에 두면 적용 여부가 그대로 적격 판정이
+    된다: 상한 아래에서는 적격 투찰자가 없어 제외되고, 상한과 그 위에서는 같은 금액이
+    적격이라 승인된다. 승인된 행에는 순공사원가선이 **없다**."""
+    cap = _cap()
+    cost = int(cap * _PURE_COST_RATIO_OF_CAP)
+    below = cap - 1.0
+    floor, middle, pure = _split_amount(below)
+    assert floor < middle < pure, (floor, middle, pure)
+
+    assert (
+        _reason(
+            _construction_row(
+                "cap-below",
+                planned_price=below,
+                pure_cost=cost,
+                bidder_amounts=[middle],
+            )
+        )
+        is ExclusionReason.NO_ELIGIBLE_BIDDER
+    )
+
+    for label, planned in (("cap-at", cap), ("cap-above", cap + 1.0)):
+        result = admit_rows(
+            _snapshot(
+                [
+                    _construction_row(
+                        label,
+                        planned_price=planned,
+                        pure_cost=cost,
+                        bidder_amounts=[middle],
+                    )
+                ]
+            ).rows,
+            _policy(),
+        )
+        assert result.admitted, (label, result.excluded)
+        admitted = result.admitted[0]
+        assert admitted.pure_cost_floor is None, label
+        assert admitted.eligibility_floors == (admitted.actual_floor_price,), label
+        assert admitted.lowest_eligible_amount == pytest.approx(middle), label
+
+
+def test_missing_pure_cost_excludes_only_where_the_rule_applies() -> None:
+    """계획 §3.1(exclusions) ② — 규칙이 **실제로 적용되는** 공사에서만 원가 결측을
+    제외한다. 100억원 이상 공사는 그 선이 애초에 서지 않으므로 원가가 없어도 이유 없이
+    빠지지 않는다(앞 판은 예정가격과 무관하게 제외했다)."""
+    cap = _cap()
+    amounts = [cap * 0.95, cap * 0.96]
+
+    assert (
+        _reason(
+            _construction_row(
+                "missing-below",
+                planned_price=cap - 1.0,
+                pure_cost=None,
+                bidder_amounts=amounts,
+            )
+        )
+        is ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT
+    )
+
+    for label, planned in (("missing-at", cap), ("missing-above", cap + 1.0)):
+        result = admit_rows(
+            _snapshot(
+                [
+                    _construction_row(
+                        label,
+                        planned_price=planned,
+                        pure_cost=None,
+                        bidder_amounts=amounts,
+                    )
+                ]
+            ).rows,
+            _policy(),
+        )
+        assert result.admitted, (label, result.excluded)
+        assert result.admitted[0].pure_cost_floor is None, label
