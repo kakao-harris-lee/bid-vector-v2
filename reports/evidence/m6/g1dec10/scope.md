@@ -27,7 +27,7 @@
 | **D-DEC10-4** | **분석·표시 경로는 게이트를 걸지 않는다**(legacy 의도 — 미리 접으면 계수기가 0 이 된다): 저장·재구성 · ML 스냅샷 `floor_rate` · 7B `NoticeSnapshot` · 수집 정규화(공고를 버리지 않는다 — `rangeBands`/`violatesExpectedRange` 는 금액 축 항목 drop 기계라 쓰지 않는다). |
 | **D-DEC10-5** | **계수 `floor_implausible`**: 결과 값에 사유로 싣고(침묵 스킵을 타입으로 금지) 평가 실행 집계(`EvaluationCommitTally` 꼴, dry-run 대칭)에 사유별 건수로 나온다. **영속 계수(열 추가)는 하지 않는다** — 마이그레이션은 되돌리기 어려운 경로라 이 slice 밖, 필요하면 OPEN. OpenAPI 응답 필드 추가도 이 slice 밖(아래 D-DEC10-7). |
 | **D-DEC10-6** | **「소비자가 늘면 깨진다」를 구조로**: ⓐ 게이트 값 생성자 호출자 집합 == {게이트 함수} (바이트코드 등식) ⓑ 가격 경로 패키지(`decision.menu` · DEC-04 커널 · `workflow` evaluation margin)에서 원값 `FloorRate` 를 하한율로 **읽는** 자리의 관측 집합 == 허용 집합(빈 집합 목표) — `DivisionValueRules` 의 「허용 == 관측」 틀(낡은 허용 항목도 실패) ⓒ 컴파일 실패 fixture: 밴드를 거치지 않은 값으로 게이트 값을 만들 수 없다(R-FLOOR-03 검증 방법) ⓓ 양성 대조: 관측 집합 비지 않음 · 음성 fixture 루트. 텍스트 grep 술어 금지. |
-| **D-DEC10-7** | **7C② 표시 상태**: 7C② 의 `FloorRateGroundsState` 는 밴드 밖 값을 `USABLE` 로 말한다. 두 slice 중 **나중에 머지되는 쪽**이 개연 불가 표시 상태를 더한다(OpenAPI·생성 타입 포함). **착수 시점(2026-10-28) 7C②(`m7-7c2`)는 리뷰 통과 · main 재병합 중이라 이 slice 보다 먼저 머지될 것이 확실하다 → 이 slice 가 더한다.** 7C② 머지 전에 이 slice 가 그 자리를 만질 일이 생기면 팀장에게 먼저 묻는다(7C② 머지 뒤 main 을 병합해 그 위에서 더한다). 이 slice 가 더하므로 OpenAPI 변경이 in_scope 로 들어오고 `web` job 이 acceptance 에 붙는다. |
+| **D-DEC10-7**(**D-DEC10-16 이 갈음한다** — 표시 상태는 7C② 후속으로 인계하므로 아래의 「이 slice 가 더한다 → OpenAPI in_scope · `web` job 이 acceptance 에 붙는다」는 **서지 않는다**. CR r5 L-5) | **7C② 표시 상태**: 7C② 의 `FloorRateGroundsState` 는 밴드 밖 값을 `USABLE` 로 말한다. 두 slice 중 **나중에 머지되는 쪽**이 개연 불가 표시 상태를 더한다(OpenAPI·생성 타입 포함). **착수 시점(2026-10-28) 7C②(`m7-7c2`)는 리뷰 통과 · main 재병합 중이라 이 slice 보다 먼저 머지될 것이 확실하다 → 이 slice 가 더한다.** 7C② 머지 전에 이 slice 가 그 자리를 만질 일이 생기면 팀장에게 먼저 묻는다(7C② 머지 뒤 main 을 병합해 그 위에서 더한다). 이 slice 가 더하므로 OpenAPI 변경이 in_scope 로 들어오고 `web` job 이 acceptance 에 붙는다. |
 
 ## 산출물
 
@@ -60,7 +60,8 @@
 
 ## acceptance
 
-`ci.yml` 의 `check` job 명령 그대로. OpenAPI 가 in_scope 로 들어오면 `web` job 도. `ml-engine`·`container` 는 입력 변경 0 을 path-limited diff 로 보이면 생략.
+`ci.yml` 의 `check` job 명령 그대로. OpenAPI 가 in_scope 로 들어오면 `web` job 도 — **그 조건은 서지 않았다**(D-DEC10-16 이 표시 상태를 인계했다). `ml-engine`·`container` 는 입력 변경 0 을 path-limited diff 로 보이면 생략.
+실무상 `./tools/one-command-check.sh` 가 `web` 전건까지 돌므로 S-20 실측은 그 job 도 덮는다.
 
 ## rollback
 

@@ -221,6 +221,12 @@ verifier r4 H-1(가격 경로 ③ 의 진입이 날 율이라 **표현을 바꾼
 않고** 마지막 걸음(「숫자를 ③ 의 입력으로 만든다」)을 타입으로 닫았다. `lndpos` 가 그대로 RED 인
 것이 「두 파일이 스캔 집합 안」이라는 통제군이다.
 
+**이 문면의 정정(아래 r5 승인 전 일괄)** — 「세탁 두 꼴이 **컴파일에서** 멈춘다」는 변이 `lnd`
+에 대해서는 맞지만, 그것을 **잠그는 fixture** 쪽에서는 한 꼴만 참이었다. fixture `12` 가 날
+`BigDecimal` 을 넘기는 꼴이어서 진입이 `Rate?` 였던 시절에도 컴파일되지 않았고, 그래서
+D-DEC10-22 를 가르지 못했다(verifier r5 L-1 — 되돌림 변이에서 `11` 만 RED). `12` 를 영속 행의
+`BigDecimal` 을 **율로 만들어** 넘기는 꼴로 바꿔 둘 다 그 결정을 가르게 했다.
+
 ### 측정 도구
 
 ⓐ·ⓓ 집합도 실패 로그에서 파서로 생성했다(추출기에 축 둘을 더했다). 전체 집합을 보려고
@@ -305,4 +311,48 @@ kotest 출력 한도를 **측정 동안만** 올렸고 그 편집은 커밋하�
 
 - `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
 - `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음(양성 대조는 r1 에서 실측)
+
+## 2026-10-29 — r5 승인 전 일괄 (verifier ready-for-review · CR approve 뒤)
+
+새 라운드가 아니다 — 두 리뷰가 통과한 뒤의 **장부층·LOW 일괄**이다(재작업 누계 **5/5 그대로**,
+not-ready/request_changes 계수).
+
+### 허용 목록의 키 단위 변화 (규율 ① — CR r5 M-3)
+
+| 축 | 나간 키 | 들어온 키 | 왜 |
+| --- | --- | --- | --- |
+| ⓐ | `bidvector.workflow.evaluation.PredictionFactsKt->getRate` | `bidvector.decision.priority.derive.DerivationInputsKt->getRate` | D-DEC10-22 로 **`.rate` 추출이 factory 로 옮겨갔다** — ③ 진입이 통과 값을 그대로 받으므로 호출부(`PredictionFacts`)는 더 이상 율을 꺼내지 않는다. 총수 8 그대로(순증 0) |
+
+제한 ⑫ 의 규율 ②(「추가된 키마다 자리를 적는다」)를 **이 라운드 자신의 사례**에 적용한
+자리다 — ⓓ 축의 새 키 셋은 정책 파일 주석과 `design.md`·`scope.md` 가 이미 적었고, ⓐ 의
+교체만 빠져 있었다. 집합 크기만 보면(8 → 8) 보이지 않는 변화다.
+
+### 생성기 재작성의 실측 (CR r5 M-1 · L-2 · L-6)
+
+- cmd: `python3 -I tools/floor-trust-allowlist.py <로그>` — 로그 다섯(실 clue 변이 로그 ·
+  **절단된 clue**(선언 3 · 줄 2) · **블록 넘김**(초록 축 이름이 실패 축 앞에 나온다) · 없는 파일 ·
+  전건 초록)
+- exit: **0** (실 로그 — ⓓ 의 `+`/`-` 키를 냈다) · **3**(절단 — 선언과 줄 수 불일치) ·
+  **0**(블록 넘김 — 초록 축은 「clue 없음」, 항목은 **실패 축에** 귀속) · **66**(없는 파일 —
+  traceback 아님) · **2**(전건 초록)
+- 핵심 결과: 앞 판은 kotest 의 `expected:<[…]>` 줄을 읽어 **한도 20 에서 잘린 부분집합**을
+  조용히 냈다(exit 0). 지금은 clue 의 `+`/`-` 줄을 읽고 **선언된 개수와 대조**하므로 절단이
+  비영 종료가 된다. 축 블록을 다음 축 제목까지로 잘라 귀속 오류도 닫았다.
+
+### 표적 재검증 — 게이트 술어를 바꾼 커밋 (CLAUDE.md: severity 무관)
+
+fixture 단언을 바꿨으므로 그 표적을 다시 쟀다.
+
+- cmd: `./gradlew --no-daemon :decision:gateRegistrationGate :decision:test --rerun --tests
+  '…FloorTrustCompileFailureHarnessTest' --tests '…ExpectedMarginDerivationTest'`
+- exit: **0** @ `f116dd02` — 하네스 **16 test**(12 의 음성·오타 변이 둘이 늘었다) · 커널 11 test, 0 실패.
+
+**R1 되돌림 변이(바꿔치우기) — 이 수정의 요점**
+
+- cmd: `r1-mutation.sh`(scratchpad) — ③ 진입을 다시 `Rate?` 로 바꿔치우고(적용 직전 그 경로
+  clean 단언) `:decision:test --rerun --tests '…FloorTrustCompileFailureHarnessTest'`
+- exit: **1(RED)** — 16 중 **2 실패: fixture `11` 과 `12` 둘 다**.
+- 핵심 결과: verifier r5 가 같은 변이에서 **11 만** RED 였다고 실측했고(12 는 초록 — 그 꼴이
+  진입 타입과 무관하게 컴파일 불가였다), 지금은 **둘 다** D-DEC10-22 를 가른다. 변이 뒤 그
+  경로의 작업 트리 잔여 0(evidence 편집만 남는다).
 

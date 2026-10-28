@@ -17,11 +17,11 @@
 | 5 | 개연 불가 가지를 `else` 로 통과 처리 | 결과 sealed + 가격 경로가 **통과 값만** 받는 서명 → `else` 로는 재료가 없다 | 메뉴 소진 `when` · `BidMenuFloorTrustTest` 사유 셋 · 변이 M1 RED |
 | 6 | 경계값(`0.30`·`0.995` 정확값 · `0.2999`·`0.9951` · 척도 변형) | 밴드 포함 비교가 `BigDecimal` 값 비교 | `PublishedFloorTrustTest` 경계·척도 전수 |
 | 7 | `StatutoryTable` origin 위장 | 게이트가 `NoticeValue` 에만 통과를 내준다 — 법정표는 **심판 아님** 별 가지 | `PublishedFloorTrustTest`(밴드 **안** 값도 통과가 아니다) · `BidMenuFloorTrustTest` |
-| 8 | margin 이 `rate` 를 다른 함수로 읽기 | ③ **진입 타입**이 게이트 산출물이고 그 입력 타입의 생성자·`copy` 가 `internal` 이다 — 모듈 밖에서 날 율·숫자로 입력을 지을 수 없다(D-DEC10-22) | 컴파일 fixture `10`·`10b`·`11`·`12` + 오타 변이 둘 · ⓓ 등식 |
+| 8 | margin 이 `rate` 를 다른 함수로 읽기 | ③ **진입 타입**이 게이트 산출물이고 그 입력 타입의 생성자·`copy` 가 `internal` 이다 — 모듈 밖에서 날 율·숫자로 입력을 지을 수 없다(D-DEC10-22) | 컴파일 fixture `10`·`10b`·`11`·`12` + 오타 변이 **셋**(`10`·`11`·`12`) · ⓓ 등식 |
 | 9 | 게이트를 부르고 결과를 **버리고** 원값을 쓰기 | 원값의 멤버를 만지는 **코드 단위**가 ⓑ′ 에 전부 남는다 — 같은 파일에 함수를 더해도 집합이 바뀐다. 다만 **같은 코드 단위 안에서** 버리는 것은 구조로 닫지 못한다(제한 ②) | 변이 M3 RED · N1·N2 RED |
 | 10 | 리플렉션·직렬화로 통과 값 생성 | `decision` 은 도메인 모듈이라 직렬화 표면 0(`domainDependencyGate`) · 리플렉션 뿌리 게이트가 production 전 층 | 아래 알려진 제한 ③ 이 남는 범위를 적는다 |
 | 11 | **위조한 밴드**를 진짜 게이트에 넘기기 — 타입 **밖** 조립, 같은 파일 둘째 함수, 그리고 **정책 타입 자신의 메서드**(`widened()`·`withBand()`) | ⓒ 정책 값 생성 코드 단위 등식(자기 제외 없음) — production 에서 정책 값을 만드는 자리는 출하 초기화자 하나와 컴파일러가 만든 자기 `copy` 계열뿐이다 | `FloorTrustGateTest` ⓒ·ⓒ′ · 변이 **B1**·**c1** RED |
-| 12 | 원값을 **다른 표현으로 세탁**해 가격 경로에 넣기(`toString()` 정규식 · 영속 행의 `BigDecimal` · JSON) | ⓑ·ⓑ′ census 로는 **닫히지 않는다**(타입을 따라가므로 표현이 바뀌면 안 보인다 — r4 실측). 닫는 것은 **③ 진입 타입**이다: 세탁한 숫자는 게이트 산출물이 될 수 없고, 진입이 그 타입만 받는다 | 컴파일 fixture `11`(율)·`12`(`BigDecimal`) · 변이 `lnd` 가 **컴파일 단계에서** 멈춘다 |
+| 12 | 원값을 **다른 표현으로 세탁**해 가격 경로에 넣기(`toString()` 정규식 · 영속 행의 `BigDecimal` · JSON) | ⓑ·ⓑ′ census 로는 **닫히지 않는다**(타입을 따라가므로 표현이 바뀌면 안 보인다 — r4 실측). 닫는 것은 **③ 진입 타입**이다: 세탁한 숫자는 게이트 산출물이 될 수 없고, 진입이 그 타입만 받는다 | 컴파일 fixture `11`(파싱해 지은 율)·`12`(영속 행의 `BigDecimal` 을 **율로 만들어** 넘김) · 변이 `lnd` 가 **컴파일 단계에서** 멈춘다. 두 fixture 모두 진단을 **심볼로 지목**한다(`'PlausibleFloorRate?' was expected` — CR r5 M-2) |
 
 ## 알려진 제한
 
@@ -40,7 +40,9 @@
    그 자리다).
    **손 재정의가 남는 범위**(CR r4 M-3) — 허용 키가 **서명**이므로 `toString`·`equals`·`hashCode`
    는 컴파일러가 만든 것과 **손으로 쓴 것이 같은 키**다. 그 셋이 허용에 들어 있는 자리는
-   ⓑ 획득 축 **18 키**(운반·결과 타입 여섯 × 셋) · ⓑ′ 멤버 접근 축 **12 키**(그 축에 나타난 것만)
+   ⓑ 획득 축 **18 키**(운반·결과 타입 여섯 × 셋) · ⓑ′ 멤버 접근 축 **12 키**(그 축에 나타난 것만) ·
+   **ⓐ 클래스 입도 축 3 키**(`PublishedFloorTrust`·`BidMenuGrounds`·`OptionContext` 의 `hashCode`
+   — CR r5 L-7 이 세어 준 잔여다. ⓐ 는 거친 그물이라 영향이 작지만 이 절은 「전수」로 읽힌다)
    이고, 그 자리에 원값을 문자열로 내보내는 `toString` 을 손으로 써도 **집합이 바뀌지 않는다**.
    그 꼴이 가격 경로에 닿는 것을 막는 것은 census 가 아니라 **③ 진입 타입**이다 — r4 의 `lnd`
    변이가 바로 그 형태(`toString()` 정규식 파싱)이고 r5 에서 **컴파일 단계**에서 멈춘다. 분석·표시
@@ -107,6 +109,26 @@
     그 자리를 evidence 에 한 줄로** 적는다(집합 크기 비교만으로는 「하나 늘고 하나 줄었다」가
     보이지 않는다). 도구가 그 규율을 머리글에 적고 빈 출력에 비영 종료하지만, **규율을 집행하는
     것은 사람**이다 — 그래서 이것은 게이트가 아니라 제한이다.
+    도구 자신의 실패 모드도 r5 에 하나 있었다(CR r5 M-1): 앞 판은 kotest 의 `expected:<[…]>`
+    줄을 읽어 **출력 한도 20 에서 잘린 부분집합**을 조용히 냈다(exit 0). 지금은 `shouldMatchAllowed`
+    의 clue `+`/`-` 줄을 읽고 **선언된 개수와 줄 수를 대조**해 어긋나면 비영 종료한다.
+    **저장소 루트의 `.py` 는 lint·format·type 게이트를 하나도 지나지 않는다**(CR r5 L-3) —
+    `ruff check .`·`ruff format --check`·`mypy --strict` 는 CI 에서 `ml-engine` 작업 디렉터리에서
+    돌고 `tools/` 는 그 범위 밖이다(루트 `tools/` 의 유일한 `.py`). 그래서 이 파일의 회귀는
+    **쓰는 사람이 돌려 보는 것**으로만 잡힌다 — 그 실측을 `commands.md` 가 적는다.
+
+13. **② 하류(`measureFloorShortfall`)는 게이트 타입을 받지 않는다** — verifier r5 M-1. ②의
+    진입(`criticalAssessmentRateFor`)은 `PlausibleFloorRate` 를 받지만, 그 결과를 소비하는
+    `measureFloorShortfall(critical: Derived<AssessmentRate>)` 는 **이미 계산된 임계**를 받는다 —
+    그 값은 하한율의 개연 여부를 더는 담지 않으므로 이 자리를 타입으로 닫을 수 없다. 그래서
+    ②의 폐쇄는 두 다리로 선다: (a) 원값 진입인 shared-kernel `criticalAssessmentRate` 를 쓰는
+    코드 단위가 census ⓑ·ⓑ′ 에 **전부 남는다**(verifier 가 영속 `BigDecimal` → `FloorRate` 꼴과
+    소거 컨테이너 꼴을 둘 다 심어 RED 를 실측했다) · (b) 다른 생산자
+    `YegaAmount.assessmentRateAgainst` 는 **런타임 전건을 못 만족한다**(그 타입의 VAT 가 항상
+    UNKNOWN 이라 같은-VAT 술어가 거짓 → 언제나 `Unmeasurable`). verifier 가 (b) 꼴을 심었을 때
+    **아키텍처 게이트는 전부 초록**이었고 값이 나오지 않아 작동하는 우회가 아니었다 — 그 자리가
+    **타입이 아니라 생산자 전건에 기대는 곳**이다. `assessmentRateAgainst` 가 VAT 를 알게 되는
+    날 이 제한이 깨진다; 그때 ② 하류도 게이트 타입을 받아야 한다. KDoc 이 같은 사실을 적는다.
 
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조 (r2~r5)
 
@@ -121,6 +143,7 @@
 | r4 | **없음** | 기존 파일의 술어·허용 목록만 바뀌었다 |
 | r5 | `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorBoundaryAtGateTest.kt` | 「`workflow/**/evaluation/**`」 |
 | r5 | `tools/floor-trust-allowlist.py` | **계약 갱신 D-DEC10-25** — 앞선 in_scope 열거에 `tools/` 가 없었다 |
+| r5 일괄 | `decision/src/test/resources/compile-fixtures/mutant-12-margin-entry-with-bigdecimal-typo.kt.txt` | 「`decision/src/test/resources/compile-fixtures/`」(design §3) — fixture 12 의 오타 변이 쌍둥이(CR r5 L-1) |
 
 **r5 가 계약을 갱신한다** — `tools/` 가 in_scope 에 없던 자리이고 D-DEC10-25 가 그것을 맞춘다.
 r2~r4 의 다섯은 기존 in_scope 항 안이었다. 새 정책 키 넷(`floor-trust.raw-type-access-pairs` ·
