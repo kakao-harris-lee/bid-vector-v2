@@ -28,6 +28,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.core.Ordered
 import java.time.Instant
 import java.time.LocalDate
@@ -47,6 +48,7 @@ import java.time.LocalDate
  * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
+@Import(BidPriceTestWiring::class)
 open class HttpTestApplication {
     /**
      * M7/7C③ — 알림함 컨트롤러의 협력자. 이 빈이 없으면 **컨텍스트가 기동에 실패**한다:

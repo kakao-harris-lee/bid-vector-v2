@@ -1,18 +1,22 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.evaluation.JdbcCandidateSource
+import bidvector.adapters.evaluation.JdbcNoticeById
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
 import bidvector.adapters.qualification.JdbcRequirementStore
 import bidvector.adapters.qualification.StoredRequirementLicenseGate
+import bidvector.adapters.qualification.StoredRequirementLicenseJudgement
 import bidvector.qualification.LICENSE_QUALIFICATION_POLICY
 import bidvector.qualification.LicenseQualificationPolicyData
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
+import bidvector.workflow.evaluation.LicenseJudgementPort
 import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.NoticeByIdPort
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.strategy.Clock
@@ -59,13 +63,43 @@ open class EvaluationWiring {
     open fun licenseGatePort(
         dataSource: DataSource,
         operatorProfilePort: OperatorProfilePort,
-    ): LicenseGatePort {
-        val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now())
-        val resolved =
-            resolution as? Resolution.Resolved<LicenseQualificationPolicyData>
-                ?: error("면허 자격 정책이 해소되지 않았다: $resolution")
-        return StoredRequirementLicenseGate(JdbcRequirementStore(dataSource), operatorProfilePort, resolved)
-    }
+    ): LicenseGatePort =
+        StoredRequirementLicenseGate(JdbcRequirementStore(dataSource), operatorProfilePort, resolvedLicensePolicy)
+
+    /**
+     * M7/7C ② — 자격 판정 **봉투**를 내는 포트. [licenseGatePort] 와 같은 세 입력(요건 저장소·
+     * 프로필·해소된 정책)으로 **같은 판정**을 내고, 단건 평가 조립이 그 `verdict` 를 커널에 pin
+     * 한다. 정책 해소 자리는 [resolvedLicensePolicy] 하나다 — 두 빈이 각자 `resolve` 하면 서로
+     * 다른 날짜에 해소될 수 있다.
+     */
+    @Bean
+    open fun licenseJudgementPort(
+        dataSource: DataSource,
+        operatorProfilePort: OperatorProfilePort,
+    ): LicenseJudgementPort =
+        StoredRequirementLicenseJudgement(
+            JdbcRequirementStore(dataSource),
+            operatorProfilePort,
+            resolvedLicensePolicy,
+        )
+
+    /** M7/7C ② — 공고 한 행을 키로 읽는 포트(쓰기 능력이 조립 그래프에 들어오지 않는다). */
+    @Bean
+    open fun noticeByIdPort(dataSource: DataSource): NoticeByIdPort = JdbcNoticeById(dataSource)
+
+    /**
+     * 해소 실패는 기동 실패다 — 값을 지어내지 않는다(D-6F1-6 과 같은 규율).
+     *
+     * **`fun` 이 아니라 `val` 인 것이 요점이다**(`cr r1 M2`). 함수였을 때는 두 빈이 각자 불러
+     * `LocalDate.now()` 를 **두 번** 읽었다. 자정 경계에 기동하면서 그 사이에 날이 바뀌면 게이트와
+     * 봉투가 **서로 다른 정책 version** 을 받고, 응답의 정책 출처 칸이 커널 판정과 갈린다.
+     * 조립 한 번에 해소도 한 번이다.
+     */
+    private val resolvedLicensePolicy: Resolution.Resolved<LicenseQualificationPolicyData> =
+        when (val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now())) {
+            is Resolution.Resolved -> resolution
+            else -> error("면허 자격 정책이 해소되지 않았다: $resolution")
+        }
 
     @Bean
     open fun mlAnalysisPort(): MlAnalysisPort = UnavailableMlAnalysis()
@@ -90,6 +124,31 @@ open class EvaluationWiring {
             candidateSource = candidateSourcePort,
             watchSubjects = watchSubjectPort,
             licenseGate = licenseGatePort,
+            mlAnalysis = mlAnalysisPort,
+            correlationIds = correlationIdFactory,
+            clock = clock,
+        )
+
+    /**
+     * M7/7C ② — 공고 단건·운영자 요청 평가의 요청 스코프 팩토리. 후보 스캔 포트를 **받지
+     * 않는다**(요청당 비용이 공고 수에 비례하지 않는다) — 지목된 공고 한 행을 읽어 그것만 후보로
+     * 세운다. 나머지 협력자는 dry-run 과 **같은 빈**이라 두 경로가 같은 판정 정책을 본다.
+     */
+    @Bean
+    open fun bidPriceRequestFactory(
+        noticeByIdPort: NoticeByIdPort,
+        strategyRepository: StrategyRepository,
+        licenseJudgementPort: LicenseJudgementPort,
+        watchSubjectPort: WatchSubjectPort,
+        mlAnalysisPort: MlAnalysisPort,
+        correlationIdFactory: CorrelationIdFactory,
+        clock: Clock,
+    ): BidPriceRequestFactory =
+        BidPriceRequestFactory(
+            notices = noticeByIdPort,
+            strategyRepository = strategyRepository,
+            licenseJudgements = licenseJudgementPort,
+            watchSubjects = watchSubjectPort,
             mlAnalysis = mlAnalysisPort,
             correlationIds = correlationIdFactory,
             clock = clock,
