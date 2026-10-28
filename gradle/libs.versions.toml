@@ -28,6 +28,24 @@ tomcat = "11.0.26"
 jackson2 = "2.21.7"
 jackson3 = "3.1.7"
 
+# chore(2026-10-28) — **보안 하한의 넷째 좌표**(guava). 취약점 DB 갱신(2026-10-27T19:17Z)으로
+# `CVE-2026-102554`(HIGH, 수정판 33.7.2)가 앱 이미지 bootJar 의 `guava-33.6.0-jre.jar` 에 잡혔다.
+#
+# 이 좌표는 **선언한 자리가 없다** — grpc 가 전이로 끌어온다(`io.grpc:grpc-api`·`grpc-core`·
+# `grpc-util` 의 POM 이 `33.6.0-android` 를 선언하고, Gradle 변이체 선택이 그 모듈에서 `-jre` jar 를
+# 고른다. 그래서 캐시 디렉터리 이름과 jar 이름이 다르고, 스캐너가 읽는 쪽은 jar 이름이다).
+#
+# **소유 의존을 올려도 닫히지 않는다**(2026-10-28 실측, 처방을 가른 자리): 1.84.0(현재)·1.84.3·
+# **1.85.1(최신)** 이 모두 같은 `33.6.0-android` 를 선언한다. 그래서 위 tomcat 과 **같은 형태**로
+# BOM·전이 선언 위에 하한을 얹는다 — 지렛대가 그것뿐이다.
+#
+# 접미가 `-jre` 인 이유: guava 는 판마다 `-jre`/`-android` 둘로 갈리고 우리가 출하하는 jar 는 `-jre`
+# 쪽이다. 스캐너의 수정판 표기(`33.7.2`)는 그 정규화다.
+#
+# **여기를 내리면 무엇이 붉어지는가** — 위 tomcat 블록과 같다: `BootJarSecurityFloorTest` 는 기대값이
+# 이 값이라 함께 내려가 초록이고, 붉어지는 것은 취약점 게이트다. 두 게이트가 **짝으로만** 닫힌다.
+guava = "33.7.2-jre"
+
 # ADR 0005 가 채택한 운영 라이브러리
 db-scheduler = "16.12.0"
 resilience4j = "2.4.0"
@@ -122,6 +140,9 @@ hikaricp = { module = "com.zaxxer:HikariCP" }
 # Gradle 이 제약 가운데 높은 판을 고르므로 그 밖의 좌표는 Boot 가 관리하던 그대로다.
 jackson2-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson2" }
 jackson3-bom = { module = "tools.jackson:jackson-bom", version.ref = "jackson3" }
+# chore(2026-10-28) — 선언한 자리가 없는 전이 좌표에 하한만 거는 자리(위 `guava` 블록에 사유).
+# 어느 모듈도 이것을 `implementation` 으로 끌어오지 않는다 — `app` 의 `constraints` 전용이다.
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 tomcat-embed-core = { module = "org.apache.tomcat.embed:tomcat-embed-core", version.ref = "tomcat" }
 tomcat-embed-el = { module = "org.apache.tomcat.embed:tomcat-embed-el", version.ref = "tomcat" }
 tomcat-embed-websocket = { module = "org.apache.tomcat.embed:tomcat-embed-websocket", version.ref = "tomcat" }
