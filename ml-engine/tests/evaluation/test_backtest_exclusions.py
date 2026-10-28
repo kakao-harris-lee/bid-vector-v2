@@ -609,9 +609,17 @@ def test_admission_signature_has_no_strategy_parameter() -> None:
 # 한 번도 지나지 않았다.
 
 _PURE_COST_RATIO_OF_CAP = 0.95
-"""순공사원가 / 예정가격 상한. 출하 배제 비율(0.98)에서 순공사원가선
-(`0.95 x 사정률 x 0.98`)이 하한가(`사정률 x 0.87745`)보다 **위**로 올라가는 값이라,
-적용 여부가 적격 판정을 실제로 가른다."""
+"""순공사원가 / 예정가격 상한 — **이 판의 선택**이다(출하 값이 아니다).
+
+출하 배제 비율에서 순공사원가선이 하한가보다 **위**로 올라가는 값이라 적용 여부가 적격
+판정을 실제로 가른다. 그 배치는 쓰는 자리마다 `floor < middle < pure` 로 먼저 단언한다 —
+출하 값이 움직여 배치가 깨지면 그 단언이 먼저 깨진다."""
+
+_FIXTURE_FLOOR_RATE: float = float(
+    row_payload("floor-rate-source")["notice"]["floor_rate"]
+)
+"""합성 행 조립기가 넣는 하한율 — **그 자리에서 읽는다**. test 에 적으면 조립기가 바뀔 때
+조용히 어긋난다(`_cap()` 과 같은 이유)."""
 
 
 def _cap() -> float:
@@ -620,22 +628,31 @@ def _cap() -> float:
     return _policy().floor.pure_construction_cost_max_planned_price_exclusive
 
 
-def _construction_row(
+def _cap_row(
     label: str,
     *,
     planned_price: float,
     pure_cost: int | None,
     bidder_amounts: list[float],
+    category: str = "CONSTRUCTION",
 ) -> dict[str, Any]:
-    """예정가격 상한 주변의 공사 공고 하나. 낙찰방법명은 적격심사 표지만 달고
-    「100억 미만/이상」을 말하지 않는다 — 기준은 문자열이 아니라 예정가격이다."""
+    """예정가격 상한 주변의 공고 하나. 낙찰방법명은 적격심사 표지만 달고 「100억
+    미만/이상」을 말하지 않는다 — 기준은 문자열이 아니라 예정가격이다.
+
+    `category` 로 **업무 축**을 가른다: 공사는 A 판정 칸을 채워야 하고(`None` 이면
+    제외된다) 시행일이 1 월이며, 용역은 그 칸이 `null` 이고 시행일이 5 월 하순이라
+    공고일을 그 뒤로 둔다. 원가 칸은 업무와 무관하게 채울 수 있다 — 비공사 행에 원가가
+    오지 않는다는 타입 보장이 없으므로(verifier r1 M-1) 그 판을 test 가 직접 만든다."""
     cap = _cap()
+    construction = category == "CONSTRUCTION"
     return row_payload(
         label,
-        notice_category="CONSTRUCTION",
-        notice_bid_price_formula_a_applicable=False,
-        notice_successful_bid_method_name="적격심사제-시설공사",
-        notice_noticed_on="2026-03-01",
+        notice_category=category,
+        notice_bid_price_formula_a_applicable=False if construction else None,
+        notice_successful_bid_method_name=(
+            "적격심사제-시설공사" if construction else "적격심사제-용역"
+        ),
+        notice_noticed_on="2026-03-01" if construction else "2026-06-01",
         notice_base_amount=int(cap),
         notice_pure_construction_cost=pure_cost,
         notice_reserve_range_begin_rate=-0.02,
@@ -652,13 +669,15 @@ def _split_amount(planned_price: float) -> tuple[float, float, float]:
     있어야 적용 여부가 적격 판정을 가른다."""
     cap = _cap()
     floor = floor_price(
-        planned_price=planned_price, floor_rate=0.87745, a_value_total=0.0
+        planned_price=planned_price,
+        floor_rate=_FIXTURE_FLOOR_RATE,
+        a_value_total=0.0,
     )
     pure = pure_construction_floor(
         pure_construction_cost=cap * _PURE_COST_RATIO_OF_CAP,
         base_amount=cap,
         planned_price=planned_price,
-        ratio=0.98,
+        ratio=_policy().floor.pure_construction_cost_ratio,
     )
     return (floor, (floor + pure) / 2.0, pure)
 
@@ -677,7 +696,7 @@ def test_pure_cost_rule_applies_only_below_the_planned_price_cap() -> None:
 
     assert (
         _reason(
-            _construction_row(
+            _cap_row(
                 "cap-below",
                 planned_price=below,
                 pure_cost=cost,
@@ -691,7 +710,7 @@ def test_pure_cost_rule_applies_only_below_the_planned_price_cap() -> None:
         result = admit_rows(
             _snapshot(
                 [
-                    _construction_row(
+                    _cap_row(
                         label,
                         planned_price=planned,
                         pure_cost=cost,
@@ -708,6 +727,46 @@ def test_pure_cost_rule_applies_only_below_the_planned_price_cap() -> None:
         assert admitted.lowest_eligible_amount == pytest.approx(middle), label
 
 
+def test_the_pure_cost_rule_does_not_apply_to_a_non_construction_notice() -> None:
+    """계획 P2 의 적용 조건은 **공사이고** 예정가격이 상한 아래일 때다 — 상한만 보고
+    업무 축을 보지 않으면 용역·물품에 공사 전용 실격선이 선다(verifier r1 M-1).
+
+    앞 판의 test 는 이 자리를 재지 못했다: 채점 쪽에서 업무 조건을 `True` 로 고정해도
+    전체 suite 가 초록이었다. 원가가 **있는** 용역 공고(예정가격은 상한 아래)를 넣고,
+    투찰금액을 하한가와 순공사원가선 **사이**에 둔다 — 규칙이 잘못 적용되면 적격
+    투찰자가 사라져 그 공고가 제외되므로 적격 판정이 그대로 단언이 된다."""
+    cap = _cap()
+    cost = int(cap * _PURE_COST_RATIO_OF_CAP)
+    below = cap - 1.0
+    floor, middle, pure = _split_amount(below)
+    assert floor < middle < pure, (floor, middle, pure)
+
+    result = admit_rows(
+        _snapshot(
+            [
+                _cap_row(
+                    "service-below-cap",
+                    category="SERVICE",
+                    planned_price=below,
+                    pure_cost=cost,
+                    bidder_amounts=[middle],
+                )
+            ]
+        ).rows,
+        _policy(),
+    )
+    assert result.admitted, result.excluded
+    admitted = result.admitted[0]
+    assert admitted.row.notice.pure_construction_cost == cost, (
+        "이 판은 원가가 **있는** 비공사 행이어야 한다 — 없으면 업무 축을 재지 못한다"
+    )
+    assert admitted.pure_cost_floor is None, (
+        f"비공사 공고에 순공사원가선이 섰다: {admitted.pure_cost_floor}"
+    )
+    assert admitted.eligibility_floors == (admitted.actual_floor_price,)
+    assert admitted.lowest_eligible_amount == pytest.approx(middle)
+
+
 def test_missing_pure_cost_excludes_only_where_the_rule_applies() -> None:
     """계획 §3.1(exclusions) ② — 규칙이 **실제로 적용되는** 공사에서만 원가 결측을
     제외한다. 100억원 이상 공사는 그 선이 애초에 서지 않으므로 원가가 없어도 이유 없이
@@ -717,7 +776,7 @@ def test_missing_pure_cost_excludes_only_where_the_rule_applies() -> None:
 
     assert (
         _reason(
-            _construction_row(
+            _cap_row(
                 "missing-below",
                 planned_price=cap - 1.0,
                 pure_cost=None,
@@ -731,7 +790,7 @@ def test_missing_pure_cost_excludes_only_where_the_rule_applies() -> None:
         result = admit_rows(
             _snapshot(
                 [
-                    _construction_row(
+                    _cap_row(
                         label,
                         planned_price=planned,
                         pure_cost=None,
@@ -741,5 +800,8 @@ def test_missing_pure_cost_excludes_only_where_the_rule_applies() -> None:
             ).rows,
             _policy(),
         )
+        # 여기서 더 단언하지 않는다 — 원가가 없으면 채점 쪽이 술어를 보기 **전에**
+        # `None` 을 내므로 실격선 모양은 상한을 재지 못한다(그 축은 위 test 와 아래
+        # 비공사 test 가 원가 **있는** 판으로 잰다). 이 test 의 표적은 「빠지지
+        # 않았다」 하나다.
         assert result.admitted, (label, result.excluded)
-        assert result.admitted[0].pure_cost_floor is None, label

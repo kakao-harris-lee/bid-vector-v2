@@ -29,6 +29,7 @@ from _backtest_support import (
 from ml_engine.evaluation.backtest.exclusions import AdmittedNotice, admit_rows
 from ml_engine.evaluation.backtest.floor import floor_price
 from ml_engine.evaluation.backtest.observations import (
+    BusinessCategory,
     LoadedSnapshot,
 )
 from ml_engine.evaluation.backtest.policy import (
@@ -611,3 +612,80 @@ def test_s4_pure_cost_line_follows_the_planned_price_cap() -> None:
     assert floors[0] > plain[0], "상한 아래 표본에서 순공사원가선이 서지 않았다"
     assert floors[1] == pytest.approx(plain[1]), "정확히 상한인데 규칙이 적용됐다"
     assert floors[2] == pytest.approx(plain[2]), "상한 위인데 규칙이 적용됐다"
+
+
+def _cap_scale_request(cost: float, *, category: BusinessCategory) -> StrategyInput:
+    """기초금액이 **예정가격 상한과 같은** 공고의 전략 입력 — 시뮬레이션 표본이 상한을
+    가로지르게 만드는 유일한 방법이다(출하 픽스처는 기초금액 10억이라 늘 상한 아래다).
+
+    A = 0 으로 두어 하한가가 `예정가격 x 하한율` 로 접히고, 업무와 원가만 바꾼다."""
+    policy = _policy()
+    base = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    source = build_strategy_input(_construction_admitted(), (), seed=7)
+    return replace(
+        source,
+        base_amount=base,
+        a_value_total=0.0,
+        notice=replace(source.notice, category=category, pure_construction_cost=cost),
+    )
+
+
+def _plain_floors(request: StrategyInput, ratios: np.ndarray) -> np.ndarray:
+    """순공사원가선이 **없을 때**의 실격선 — 하한가 하나뿐인 경로."""
+    return np.array(
+        [
+            floor_price(
+                planned_price=ratio * request.base_amount,
+                floor_rate=request.floor_rate,
+                a_value_total=0.0,
+            )
+            for ratio in ratios
+        ]
+    )
+
+
+def test_s4_does_not_apply_the_pure_cost_line_to_a_non_construction_notice() -> None:
+    """계획 P2 의 적용 조건은 **공사이고** 상한 아래일 때다 — S4 자리에서 업무 축이
+    고정돼도 전체 suite 가 초록이었다(verifier r1 M-1).
+
+    원가가 **있는** 용역 공고로 같은 표본을 돌린다. 업무 축을 보지 않으면 상한 아래
+    표본에 순공사원가선이 서므로 실격선이 하한가보다 커진다 — 여기서는 하한가만 남아야
+    한다. 앞 판(이 slice 전)의 `_simulated_floors` 는 **업무를 보지 않았다**는 사실까지
+    이 자리가 잠근다."""
+    policy = _policy()
+    cap = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    cost = cap * 0.95
+    request = _cap_scale_request(cost, category=BusinessCategory.SERVICE)
+    assert request.notice.pure_construction_cost == pytest.approx(cost)
+    ratios = np.array([(cap - 1.0) / cap, (cap + 1.0) / cap])
+    plain = _plain_floors(request, ratios)
+    # 선이 하한가보다 **위**인 판이라야 적용 여부가 보인다(위 공사 test 와 같은 배치).
+    assert cost * policy.floor.pure_construction_cost_ratio > plain[0]
+    floors = _simulated_floors(request, policy, ratios)
+    assert floors == pytest.approx(plain), (
+        f"비공사 공고의 S4 표본에 순공사원가선이 섰다: {floors} vs {plain}"
+    )
+
+
+def test_s4_takes_the_higher_of_the_two_floors_in_an_applied_sample() -> None:
+    """적용 표본의 실격선은 **두 선 중 높은 쪽**이다(verifier r1 L-1).
+
+    앞 판의 test 는 선이 하한가 **위**인 공고만 봤다 — 그 판에서는 `max(하한가, 선)` 을
+    `선` 으로 바꿔도 같은 수가 나온다. 선이 하한가 **아래**로 내려가는 원가를 주고,
+    규칙이 적용되는 표본에서 **하한가가 남는지** 본다."""
+    policy = _policy()
+    cap = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    cost = cap * 0.5
+    request = _cap_scale_request(cost, category=BusinessCategory.CONSTRUCTION)
+    ratios = np.array([(cap - 1.0) / cap])
+    plain = _plain_floors(request, ratios)
+    pure = cost * policy.floor.pure_construction_cost_ratio * ratios[0]
+    # 전제 둘: 규칙이 **적용되는** 표본이고(술어는 정책이 진다), 그 선이 하한가 아래다.
+    assert policy.floor.pure_cost_rule_applies(
+        is_construction=True, planned_price=float(ratios[0] * request.base_amount)
+    )
+    assert pure < plain[0], (pure, plain[0])
+    floors = _simulated_floors(request, policy, ratios)
+    assert floors[0] == pytest.approx(plain[0]), (
+        f"순공사원가선이 하한가보다 낮은데 그 선이 실격선이 됐다: {floors[0]}"
+    )
