@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.VerdictLadder
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.derive.DERIVATION_POLICY
@@ -204,13 +205,32 @@ class OpportunityAnalysisTest {
         analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)
     }
 
+    /**
+     * r2 CR H-1 ② · CR L-3 — 앞 판은 `shouldBeAnalyzed()` 만 해서 **이름의 주장을 단언하지
+     * 않았다**(접기였던 구간에서도 초록이었다). 지금은 `analyze()` 를 지나 **hop 1**
+     * (`finalOutcomeOf` 호출부가 성분의 제외 사유를 `Analyzed` 에 싣는 자리)까지 센다.
+     */
     @Test
-    fun `floorRate 1 초과면 margin 만 drop 되고 Analyzed 유지`() {
+    fun `floorRate 1 초과면 margin 만 drop 되고 Analyzed 가 그 제외를 싣는다`() {
         val floorRate =
             FloorRate(Rate.ofFraction(BigDecimal("1.2")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
         val notice = testNoticeWithMoney(floorRate = floorRate)
 
-        analyzeNotice(analysis(), notice).shouldBeAnalyzed()
+        val analyzed = analyzeNotice(analysis(), notice).shouldBeAnalyzed()
+
+        analyzed.floorExclusion shouldBe PublishedFloorExclusion.IMPLAUSIBLE
+    }
+
+    /** 밴드 안 값은 제외가 아니다 — 같은 자리에서 `null` 이 올라온다(없는 것을 지어내지 않는다). */
+    @Test
+    fun `밴드 안 floorRate 는 Analyzed 에 제외 사유를 싣지 않는다`() {
+        val floorRate =
+            FloorRate(Rate.ofFraction(BigDecimal("0.88")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+        val notice = testNoticeWithMoney(floorRate = floorRate)
+
+        val analyzed = analyzeNotice(analysis(), notice).shouldBeAnalyzed()
+
+        analyzed.floorExclusion shouldBe null
     }
 
     @Test
