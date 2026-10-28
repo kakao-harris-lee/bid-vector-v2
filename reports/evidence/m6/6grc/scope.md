@@ -29,6 +29,7 @@
 - `ml-engine/tests/evaluation/test_evaluation_no_stray_numeric_literals.py` 의 출하 임계 등재(`1e10`).
 - `docs/runbook/m6-6g-real-collection.md` 의 백테스트 정책 경로 한 줄.
 - 계획이 지목한 낡은 코드 주석 · docstring.
+- `ml-engine/src/ml_engine/evaluation/backtest/metrics.py` 의 모듈 docstring(D-6GRC-4).
 - `reports/evidence/m6/6grc/**`.
 
 ## out_scope
@@ -72,3 +73,6 @@ pytest 전체 · `tools/design_ratchet.py --check` · `tools/reuse_provenance_ch
 - 2026-10-28 **D-6GRC-3(팀장)**: M6/G1-DEC10 레인이 `app/build.gradle.kts` 의 system property 로 `ml-engine/policy/strategy-backtest-v1.yaml` 을
   가리킨다(하한율 밴드 값 일치 test). v1 이 보존되므로 그 test 는 깨지지 않지만 출하 정책은 v2 다 — **두 브랜치 중 나중에 머지되는 쪽이 그 경로를
   v2 로 옮긴다**(밴드 값은 v1 = v2 라 등식은 그대로). 이 slice 는 Kotlin 을 건드리지 않는다.
+- 2026-10-28 **D-6GRC-4(팀장, 레인 동결 보고 수령)**: `metrics.py` 의 「적격」 정의 docstring 이 「공사는 순공사원가선까지」라
+  새 적용 범위(P2)와 어긋나 레인이 고쳤다 — 「계획이 지목한 낡은 docstring」에 해당하나 경로 목록에 없었다. 그 파일(docstring 한정, 거동 변경 0)을
+  in_scope 에 더한다.
