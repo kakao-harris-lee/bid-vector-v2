@@ -223,11 +223,15 @@ tasks.test {
 // `floor.rate_band_*` 가 같아야 한다(사전 등록 실험이라 Python 쪽은 바꾸지 않는다). 경로를 test 가 추측하지
 // 않는다 — 위 `contractInput` 넷과 같은 주입 관례다. **블록을 따로 여는 것도 그 관례**다(바로 위 주석 —
 // 앞 블록의 50줄 축을 건드리지 않는다).
+//
+// **v2 를 읽는다**(D-6GRC-3 · D-DEC10-26) — 6G-rc 가 출하 백테스트 정책을 v2 로 세웠고 이 브랜치가
+// 나중 머지이므로 경로를 옮기는 쪽이 여기다. Kotlin 이 읽는 것은 `floor.rate_band_*` 둘뿐이고 v2 의
+// 두 값이 v1 과 같은 수라 등식은 그대로 선다(값 일치 test 가 그 사실을 잰다 — 추측이 아니다).
 tasks.test {
     contractInput(
         "mlBacktestPolicy",
         "bidvector.ml.backtest-policy",
-        settingsFile("ml-engine/policy/strategy-backtest-v1.yaml"),
+        settingsFile("ml-engine/policy/strategy-backtest-v2.yaml"),
     )
 }
 
