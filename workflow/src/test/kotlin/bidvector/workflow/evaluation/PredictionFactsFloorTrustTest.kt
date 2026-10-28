@@ -100,6 +100,20 @@ class PredictionFactsFloorTrustTest {
         dropped.floorExclusion shouldBe folded.floorExclusion
     }
 
+    /**
+     * r2 CR M-2 — `>1` 가드는 **사유 있는 두 실패 가지 공통**이다. base 의 필터가 origin 무관
+     * (`notice.floorRate?.rate.fraction > 1`)이었으므로 법정표 출처의 `>1` 도 같은 처분이어야
+     * 한다. 오늘 `StatutoryTable` 생성 자리가 0 이라 production 에서는 도달 불가지만, DEC-03
+     * 해석기가 생기는 날 조용히 갈리지 않도록 지금 잠근다.
+     */
+    @Test
+    fun `법정표 출처의 1 초과도 성분이 떨어지고 그 사유로 계수된다`() {
+        val facts = factsFor(statutoryFloor("1.2"))
+
+        facts.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
+        facts.floorExclusion shouldBe PublishedFloorExclusion.ORIGIN_NOT_JUDGED
+    }
+
     @Test
     fun `법정표 출처는 또 다른 사유로 접힌다 — 게이트가 심판이 아닌 값이다`() {
         val facts = factsFor(statutoryFloor("0.88"))
