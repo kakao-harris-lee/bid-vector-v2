@@ -67,7 +67,15 @@ class ConstantTimeComparisonStructureTest {
         disallowedAreEqual(simulated) shouldBe setOf("CredentialComparator")
     }
 
-    /** 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다. */
+    /**
+     * 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다.
+     *
+     * 키 집합이 **두 자리**에 있다(아래 축어 집합 · [ALLOWED_INTRINSICS_AREEQUAL] 의 키).
+     * M7 에서 레인 셋(7C③·7C④·7C⑤)이 같은 두 자리를 동시에 늘린다 — 병합은 수가 아니라
+     * **항목 이름의 합집합**으로 다시 세고 두 자리를 같이 맞춘다. 7C③ 이 더한 넷은
+     * `NotificationItemResponse` · `NotificationInboxRequestsKt` (+2 — 앞 판의 `NotificationTargetResult$Item`·
+     * `$Notice` 는 r1 검토 CR LOW-3 으로 **타입 자체가 사라져** 등재도 함께 걷었다).
+     */
     @Test
     fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
         ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
@@ -106,6 +114,8 @@ class ConstantTimeComparisonStructureTest {
                 "ConstructionCapacityResponse",
                 "ProfileHttp",
                 "BidCaseHttp",
+                "NotificationItemResponse",
+                "NotificationInboxRequestsKt",
                 "OpeningResultResponse",
                 "OpeningResultControllerKt",
                 "DeclaredValue",
@@ -189,6 +199,20 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "계정 전용 뿌리 선언의 경로 문자열 비교 — 공개 URL 경로이고 비밀이 아니다",
         "BidCaseHttp" to
             "결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(BidCommandResult·TransitionOutcome·RejectionReason) — 객체 동일성, 자격증명 좌표 0",
+        // M7/7C③ — 알림함의 HTTP 층 **둘**. **자리마다 javap 으로 확인했다**: `areEqual` 은
+        // 각각 9·1 이고 **자격증명 좌표는 둘 다 0** 이다(`credential`·`passphrase`·`csrf`·
+        // `presented` 어느 것도 참조하지 않는다). 종류는 data class 자동 equals 와 enum 어휘
+        // 조회 둘뿐이고, `BidCaseResponse`·`BidCaseRequestsKt` 와 같은 형태다.
+        //
+        // 앞 판은 넷이었다 — `NotificationTargetResult$Item`·`$Notice` 는 r1 검토(CR LOW-3)에서
+        // **중간 sealed 타입을 걷어내며 사라졌다**(판독기가 정확한 타입을 돌려준다). 타입이
+        // 없어지면 등재도 함께 걷는다 — 죽은 등재는 다음 사람에게 「이미 판정된 자리」로 읽힌다.
+        "NotificationItemResponse" to
+            "알림 항목 응답 값 객체(data class) 자동 생성 equals — 종류·detail·공고 키·시각·읽음·묶음 계수·" +
+            "합쳐 온 공고 칸뿐이고, 이 표는 자유 문자열을 저장하지 않으므로 운반할 비밀이 애초에 없다",
+        "NotificationInboxRequestsKt" to
+            "요청 읽기의 enum 어휘 조회(`entries.firstOrNull { it.name == token }`) — 공개 어휘 비교이고 " +
+            "자격증명 값 없음(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
         "OpeningResultResponse" to
             "개찰 결과 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태·관측값·금액 칸뿐, 자격증명 값 없음",
         "OpeningResultControllerKt" to

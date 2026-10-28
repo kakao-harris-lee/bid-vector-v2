@@ -531,6 +531,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 알림함 목록 — 읽음/안읽음 · 건별 묶음(M7/7C③, NOTI-10)
+         * @description 운영자의 알림함을 최신 순으로 읽는다. **계정 전용**이다 — 인증 경로 둘 중 계정을 내는 것은 브라우저 세션뿐이라(운영자 자격 헤더의 주체는 계정 행이 없다) 자격 헤더로 오면 401 이다. 읽기 메서드라 CSRF 를 요구하지 않는다.
+         *     **항목은 평탄하고 묶음은 계수로 나른다.** 같은 공고의 항목이 몇 개이고 그중 몇 개가 안읽음인지를 항목마다 `noticeItemCount`·`noticeUnreadCount` 로 싣고, 클라이언트가 공고 쌍(`noticeNumber`+`noticeRound`)으로 묶는다. 정렬이 묶음을 **연속**시키므로 클라이언트가 재정렬할 필요가 없다 — 묶음의 최신 사실 시각 역순으로 묶음이 서고 묶음 안에서도 역순이다. `noticeItemCount` 는 **페이지와 무관한 묶음 전체 크기**라 묶음이 페이지 경계에 걸쳐도 「더 있다」를 알 수 있다.
+         *     **한 공고·한 종류에 항목은 하나다**(중복 억제). 같은 사실이 다시 기록되면 그 항목이 갱신되고 행이 늘지 않는다 — 제목 문구가 바뀌어도 흔들리지 않는다(알림함은 표시 문구를 저장하지 않는다).
+         *     **공고 정보는 저장된 값이 아니라 합쳐 온 값이다.** `noticeKnown` 이 `false` 면 그 키의 공고 행이 없다는 뜻이고(보존 기한이 지나 파기됐거나 아직 수집되지 않았다 — **둘을 구분하지 않는다**) `noticeTitle`·`noticeStatus`·`noticeDeadlineAt` 가 전부 `null` 이다. 항목 자체는 남는다. `noticeKnown` 이 `true` 인데 `noticeTitle` 이 `null` 인 것은 다른 사실이다(공고 행은 있고 제목 칸이 비었다).
+         *     `X-Total-Count` 는 **필터를 지난 집합**의 건수이고 `X-Unread-Count` 는 `unreadOnly` 와 무관한 **계정의 안읽음 전수**다(화면 배지가 읽는 값이라 목록 필터에 흔들리지 않는다).
+         *     상한을 넘는 `size`·음수 `page`·형식 오류는 조용히 절삭·변환하지 않고 400 이다. `unreadOnly` 는 `true`·`false` 두 리터럴만 받는다 — 알 수 없는 값을 조용히 `false` 로 접지 않는다. **같은 매개변수를 두 번 보내면 거부한다**.
+         */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 알림 하나를 읽음으로(M7/7C③)
+         * @description 항목의 신원은 **종류와 공고 쌍**이다(합성 id 가 없다 — 호출자가 목록에서 이미 본 값이고, 열거할 불투명 id 가 없다). 계정은 **본문에서 받지 않는다**: 세션이 낸다.
+         *     **멱등이다.** 이미 읽은 항목에 다시 쏘면 `markedCount` 가 0 이고 처음 읽은 시각이 그대로 남는다. 항목이 없거나 **남의 항목**이어도 같은 0 이다 — 그 셋을 구분하지 않는다(남의 항목의 존재 여부를 알리지 않는 것이 목적이다).
+         *     읽은 시각은 **서버가 정한다**(본문에 시각 칸이 없다). 상태를 바꾸는 메서드라 세션 경로 에서 CSRF 헤더를 요구한다. 계정 전용이므로 자격 헤더로 오면 401 이다.
+         */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 한 공고의 알림 묶음 전체를 읽음으로(M7/7C③)
+         * @description 그 공고의 **안읽음 항목 전부**를 읽음으로 바꾼다. 이미 읽은 항목은 세지 않으므로 `markedCount` 가 그 묶음의 안읽음이었던 수다. 다른 공고의 항목은 바뀌지 않는다.
+         *     단건 경로와 **갈라 둔다** — 한 operation 의 선택적 `kind` 가 뜻을 바꾸는 모양(있으면 단건 · 없으면 묶음)은 조용히 잘못 맞는다. 그 밖의 규약(멱등 · 남의 것은 0 · 서버가 정하는 시각 · CSRF · 계정 전용)은 단건 경로와 같다.
+         */
+        post: operations["markNoticeNotificationsRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile": {
         parameters: {
             query?: never;
@@ -666,6 +734,74 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        NotificationItem: {
+            /**
+             * @description 알림 종류. 여덟 어휘이고 저장 층의 CHECK 와 **같은 집합**이다(한쪽만 늘면 빌드가 붉다).
+             * @enum {string}
+             */
+            kind: "NEW_CANDIDATE" | "BID_DEADLINE_IMMINENT" | "BID_DEADLINE_TODAY" | "DOCUMENT_DEADLINE_IMMINENT" | "OPENING_COMPLETED" | "AWARD_DECIDED" | "NOTICE_REVISED" | "BID_PRICE_REQUEST_RECORDED";
+            /**
+             * @description 종류가 싣는 부가 사실. **`OPENING_COMPLETED` 와 `AWARD_DECIDED` 만** 값을 갖고 나머지 여섯은 `null` 이다(짝은 저장 층의 CHECK 가 함께 진다).
+             * @enum {string|null}
+             */
+            detail: "PROVISIONAL_FIRST" | "NOT_PROVISIONAL_FIRST" | "AWARDED" | "NOT_AWARDED" | null;
+            /** @description 공고번호 — 클릭 → 워크시트의 키 절반이다. */
+            noticeNumber: string;
+            /** @description 공고 차수(제로패딩 세 자리). */
+            noticeRound: string;
+            /**
+             * Format: date-time
+             * @description **사실의 시각**이다(알림함에 적재된 시각이 아니다). 같은 사실이 다시 기록되면 최신 관측 시각으로 이동한다.
+             */
+            occurredAt: string;
+            /** @description 읽었는가 — `readAt` 이 있는지와 같은 값이다(화면이 둘을 따로 보지 않아도 되게). */
+            read: boolean;
+            /**
+             * Format: date-time
+             * @description 처음 읽은 시각. 안읽음이면 `null` 이다. 다시 읽어도 움직이지 않는다.
+             */
+            readAt: string | null;
+            /**
+             * Format: int32
+             * @description 이 공고 묶음의 **전체** 항목 수 — 페이지와 안읽음 필터에 무관하다(묶음이 페이지 경계에 걸쳐도 「더 있다」를 알 수 있다).
+             */
+            noticeItemCount: number;
+            /**
+             * Format: int32
+             * @description 이 공고 묶음의 안읽음 항목 수.
+             */
+            noticeUnreadCount: number;
+            /** @description 그 키의 공고 행이 저장소에 있는가. `false` 면 아래 세 칸이 전부 `null` 이다 — 보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고 **둘을 구분하지 않는다** (묘비를 남기지 않으므로 가를 근거가 없다). 항목 자체는 남는다. `true` 인데 `noticeTitle` 이 `null` 인 것은 **다른 사실**이다(행은 있고 제목 칸이 비었다). */
+            noticeKnown: boolean;
+            /** @description 공고명(합쳐 온 값). 공고 행이 없거나 그 칸이 비면 `null`. */
+            noticeTitle: string | null;
+            /** @description 공고 상태(합쳐 온 값). 공고 행이 없으면 `null`. */
+            noticeStatus: string | null;
+            /**
+             * Format: date-time
+             * @description 공고 마감(합쳐 온 값). 공고 행이 없거나 마감이 없으면 `null`.
+             */
+            noticeDeadlineAt: string | null;
+        };
+        MarkNotificationReadRequest: {
+            /**
+             * @description 알림 종류. 어휘 밖이면 400 이다.
+             * @enum {string}
+             */
+            kind: "NEW_CANDIDATE" | "BID_DEADLINE_IMMINENT" | "BID_DEADLINE_TODAY" | "DOCUMENT_DEADLINE_IMMINENT" | "OPENING_COMPLETED" | "AWARD_DECIDED" | "NOTICE_REVISED" | "BID_PRICE_REQUEST_RECORDED";
+            noticeNumber: string;
+            noticeRound: string;
+        };
+        MarkNoticeNotificationsReadRequest: {
+            noticeNumber: string;
+            noticeRound: string;
+        };
+        MarkNotificationReadResponse: {
+            /** Format: int32 */
+            markedCount: number;
+            /** Format: int64 */
+            unreadCount: number;
+        };
         BidCase: {
             /** Format: int64 */
             caseId: number;
@@ -3134,6 +3270,184 @@ export interface operations {
                 };
             };
             /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                /** @description 0부터 세는 페이지 번호. 음수면 400 이다. */
+                page?: number;
+                /** @description 페이지 크기(1 이상 100 이하). 범위를 벗어나면 400 이다. */
+                size?: number;
+                /** @description 안읽음만 보기. `true`·`false` 만 받는다(그 밖은 400). */
+                unreadOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 알림함 한 페이지(비었을 수 있다). 헤더 `X-Total-Count`(필터를 지난 전체 건수) · `X-Unread-Count`(계정의 안읽음 전수) */
+            200: {
+                headers: {
+                    /** @description 필터를 지난 전체 건수 — 페이지 길이와 다른 값이다. */
+                    "X-Total-Count": number;
+                    /** @description 계정의 안읽음 전수 — 목록 필터와 무관하다. */
+                    "X-Unread-Count": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationItem"][];
+                };
+            };
+            /** @description 질의 형식·범위 오류(어느 입력이 틀렸는지 싣지 않는다). code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체 없음**(자격 헤더 경로) — 구분하지 않는다. code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNotificationReadRequest"];
+            };
+        };
+        responses: {
+            /** @description 처리 결과 — 바뀐 항목 수와 처리 뒤 안읽음 전수 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkNotificationReadResponse"];
+                };
+            };
+            /** @description 본문 형식 오류 — 알려진 키 밖, 종류 어휘 밖, 공고 키 형식 위반. code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 · CSRF 불일치 · **계정 주체 없음** — 구분하지 않는다. code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 지원하지 않는 미디어 타입. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    markNoticeNotificationsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNoticeNotificationsReadRequest"];
+            };
+        };
+        responses: {
+            /** @description 처리 결과 — 바뀐 항목 수와 처리 뒤 안읽음 전수 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkNotificationReadResponse"];
+                };
+            };
+            /** @description 본문 형식 오류 — 알려진 키 밖, 공고 키 형식 위반. code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 인증 실패 · CSRF 불일치 · **계정 주체 없음** — 구분하지 않는다. code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 지원하지 않는 미디어 타입. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패. code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;

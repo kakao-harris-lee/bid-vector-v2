@@ -337,6 +337,29 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                     references = false,
                     trigger = false,
                 ),
+            // M7/7C③ 알림함 — `insert`·`update` 가 **둘 다 false 인 것은 권한이 없다는 뜻이
+            // 아니다**: V23 은 INSERT 를 일곱 열에, UPDATE 를 네 열에 **열 단위**로 주고
+            // `has_table_privilege` 는 **표 단위 부여만** 본다(`account`·`browser_session` 과 같은
+            // 자리·같은 이유). 그래서 이 행렬은 「어느 열을 넣거나 갱신할 수 있는가」를 재지
+            // 못한다 — 그 축은 `NotificationInboxPrivilegeTest` 가 앱 역할로 직접 쏘아 잰다
+            // (7D 의 `AccessPrivilegeTest` 와 같은 분담).
+            //
+            // `insert` 가 r1 검토(verifier F5)에서 `true` → `false` 로 바뀌었다: 표 단위 INSERT
+            // 는 적재 시각을 **INSERT 때 먼 미래로 지정**하는 길을 열어 두었고(그 행은 보존
+            // cutoff 를 영영 지나지 않는다), 그래서 코드가 실제로 넣는 일곱 열로 좁혔다.
+            //
+            // 이 행에서 읽히는 핵심은 **DELETE·TRUNCATE 가 false** 라는 것이다: 앱 프로세스가
+            // 장악돼도 알림을 지울 수 없다(파기는 소유자 연결의 일이다).
+            "notification_inbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
             // M7/7C④ 계정 사업 정보 둘 — `update` 가 `false` 인 것은 권한이 없다는 뜻이 아니라 **열
             // 단위**라는 뜻이다(`browser_session` 과 같은 자리). 열 집합은 `BusinessProfileSchemaGuardTest`
             // 가 `column_privileges` 로 정확히 잰다 — 소유자 열(`account_id`)이 그 집합 밖이다.

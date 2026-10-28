@@ -42,6 +42,23 @@ class InvalidNoticeSearchException(
 ) : RuntimeException(message)
 
 /**
+ * 알림함 요청의 형식·범위 오류(M7/7C③) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
+ * (`NotificationPageRejection`, 또는 읽음 처리 대상의 거부)를 진단용으로 나르고 **응답에는
+ * 실리지 않는다**(아래 [ErrorMapping] 이 고정 문구로만 옮긴다).
+ *
+ * **왜 기존 예외를 쓰지 않는가**: [InvalidNoticeSearchException] 은 공고 검색 질의의 어휘이고
+ * [InvalidEditRequestException] 은 전략 편집의 어휘다. 셋은 같은 코드·같은 고정 문구로 끝나지만
+ * **어느 표면이 거부했는가**가 예외 타입에 남아야 진단이 성립한다(응답은 어느 쪽이든 구별하지
+ * 않는다 — 어느 입력이 틀렸는지 싣지 않는 것이 이 체계의 관례다).
+ *
+ * 생성자는 문구 하나만 받는다([InvalidNoticeSearchException] 과 같은 사유 — `Throwable` 을
+ * 생성자로 받으면 주입 표면 게이트가 이 class 를 주입 대상으로 읽는다. 원인은 `initCause` 로 단다).
+ */
+class InvalidNotificationRequestException(
+    message: String,
+) : RuntimeException(message)
+
+/**
  * 개찰 결과 조회 질의의 형식 오류(M7/7C⑤-a) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
  * (`OpeningResultQueryRejection`)를 진단용으로 나르고 **응답에는 실리지 않는다**.
  *
@@ -164,7 +181,19 @@ object ErrorMapping {
         return ErrorBody(code, message, correlationId)
     }
 
-    /** 조회·dry-run 이 내는 갈래. */
+    /**
+     * 조회·dry-run 이 내는 갈래.
+     *
+     * **형식·범위 오류 넷을 한 갈래로 묶는다** — 평가 요청(D-6A3) · 공고 검색(M7/7C①) ·
+     * 알림함(M7/7C③) · 개찰 결과 조회(M7/7C⑤-a). 타입을 **따로 두는** 이유는 어느 표면이
+     * 거부했는지를 진단에 남기는 것이고(각 타입 KDoc), 응답은 넷을 구별하지 않는다 — 같은
+     * 코드·같은 고정 문구다.
+     *
+     * 갈래를 타입마다 복사하면 **레인이 하나 늘 때마다 이 함수가 세 줄씩 자란다**. 실제로
+     * 7C③ ← 7C② 병합의 합집합이 50줄 한도를 넘겼다(55줄 — r2 acceptance 의 `sizeGate` 가
+     * 잡았다). 묶는 것은 한도를 피하는 수단이 아니라 **중복을 지우는 것**이고, 다음 표면이
+     * 같은 거부를 더해도 이 함수는 한 줄만 자란다.
+     */
     private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
@@ -187,22 +216,17 @@ object ErrorMapping {
                 ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION to "계산하는 동안 전략이 바뀌었다 — 다시 조회하라"
             }
 
-            is InvalidEvaluationRequestException -> {
-                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
-            }
-
             // M7/7C ② — 요청한 공고가 없다(평가를 시작하지 않았다).
             is NoticeNotFoundException -> {
                 ErrorCode.NOTICE_NOT_FOUND to "요청한 공고를 찾을 수 없다"
             }
 
-            // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
-            is InvalidNoticeSearchException -> {
-                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
-            }
-
-            // M7/7C⑤-a — 개찰 결과 조회 질의의 형식 오류. 같은 코드·같은 고정 문구다.
-            is InvalidOpeningResultQueryException -> {
+            // 네 표면의 형식 오류가 한 갈래다(사유는 이 함수 KDoc).
+            is InvalidEvaluationRequestException,
+            is InvalidNoticeSearchException,
+            is InvalidNotificationRequestException,
+            is InvalidOpeningResultQueryException,
+            -> {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
@@ -298,6 +322,7 @@ class GlobalErrorHandler {
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
         InvalidNoticeSearchException::class,
+        InvalidNotificationRequestException::class,
         InvalidOpeningResultQueryException::class,
     )
     fun badRequest(

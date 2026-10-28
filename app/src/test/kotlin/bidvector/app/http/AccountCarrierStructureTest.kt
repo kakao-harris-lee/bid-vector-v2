@@ -190,12 +190,21 @@ class AccountCarrierStructureTest {
         val SUBJECT_KEY_HOLDERS =
             setOf("http/ErrorBodyKt", "http/RequestAuthenticationFilter", "http/RequestAuditFilter")
 
-        /** 계정 범위 경로의 주체 진입점 셋. */
+        /**
+         * 계정 범위 경로의 주체 진입점 — 입찰함 셋(M7/7B) · 알림함 하나(M7/7C③) · 프로필 둘(M7/7C④ 2b).
+         *
+         * 알림함 controller 가 여기 있다는 것이 「알림함도 typed 접근자만 쓴다」의 실측이다 —
+         * 그 slice 는 앞서 주체 **라벨 문자열을 파싱하는** 임시 자리를 들고 있었고(7B 머지 전에는
+         * 이 접근자가 main 에 없었다), 7B 가 들어오면서 그 파일을 지우고 이 자리로 옮겼다.
+         * 그래서 위 `account 접두 문자열`·`주체 라벨 접근자` 두 등식도 알림함을 모수로 포함한
+         * 채 그대로 성립한다(그쪽 집합은 늘지 않았다).
+         */
         val ACCOUNT_READERS =
             setOf(
                 "http/BidCaseCommandController",
                 "http/BidCaseQueryController",
                 "http/BidCaseHttp",
+                "http/NotificationInboxController",
                 // M7/7C④ 2b — 프로필도 계정 전용 경로다. 두 controller 가 주체를 얻는 길은 이 접근자
                 // 하나이고, 주체 라벨(`account:`)을 읽는 자리는 늘지 않았다(위 등식이 그대로 초록).
                 "http/ProfileCommandController",
