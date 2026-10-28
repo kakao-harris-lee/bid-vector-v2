@@ -349,6 +349,24 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
      * 그래서 포함이 아니라 **일치**로 본다: 좌변이 그 열(또는 그 열의 `text` 캐스트) **자체**이고,
      * 우변이 문자열 리터럴 배열이며, **그 밖의 절이 하나도 없는** 정의만 닫혔다고 센다. `OR`·
      * `NOT`·함수 감싸기·추가 술어가 섞이면 앵커가 어긋나 **기본값(열림)** 으로 떨어진다.
+     *
+     * **닫혀 있는데도 열림으로 떨어지는 꼴 셋 — 의도된 거부다**(r3 CR MEDIUM-1, PostgreSQL 16.4
+     * 에서 직접 렌더링해 확인). 앵커를 넓히지 않는 쪽을 골랐다: 넓히는 만큼 양성 대조를 같은 수로
+     * 더해야 하고, 그러지 않으면 「무엇이 열렸는지」를 다시 잃는다. 이 세 꼴로 열을 더하면 등식이
+     * 붉어지는데 그 열은 **사실 닫혀 있다** — 그때 할 일은 게이트를 넓히는 것이 아니라 그 열을
+     * 아래 ⓐ~ⓒ 중 어느 꼴로 쓸지 정하고, 넓힌다면 대조를 함께 세우는 것이다.
+     *
+     * ⓐ **길이 제한 `varchar` 의 `IN`** — `VARCHAR(20) CHECK (c IN ('a','b'))` 는
+     *   `CHECK (((c)::text = ANY ((ARRAY['a'::character varying, 'b'::character varying])::text[])))`
+     *   로 돌아온다. 배열 전체에 `::text[]` 캐스트가 붙어 리터럴 꼴이 다르다.
+     * ⓑ **nullable 어휘** — `TEXT CHECK (c IS NULL OR c IN ('a','b'))` 는
+     *   `CHECK (((c IS NULL) OR (c = ANY (ARRAY['a'::text, 'b'::text]))))` 다. **이것이 이 저장소의
+     *   지배적 관례**이고(`CleanMigrationCheckTest` 가 축어로 고정한 `business_division`·
+     *   `source_field` 가 그 꼴이다), 그래서 셋 중 다음 사람이 가장 밟기 쉬운 자리다. `NULL` 은
+     *   값이 아니므로 집합은 실제로 닫혀 있다.
+     * ⓒ **원소 하나** — `TEXT CHECK (c IN ('a'))` 는 PG 가 `CHECK ((c = 'a'::text))` 로 **접는다**.
+     *   `ANY (ARRAY[…])` 가 아예 나오지 않는다(r2 verifier X2 가 이 자리에서 「우연히 RED」를
+     *   만들었다 — 그래서 실 스키마 변이는 값을 **둘 이상**으로 둔다).
      */
     private fun String.closesVocabularyOf(column: String): Boolean {
         val col = Regex.escape(column)
