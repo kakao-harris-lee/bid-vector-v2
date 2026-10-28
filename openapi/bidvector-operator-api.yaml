@@ -3814,6 +3814,7 @@ components:
             - METHOD_NOT_ALLOWED
             - UNSUPPORTED_MEDIA_TYPE
             - NOTICE_SNAPSHOT_UNAVAILABLE
+            - CAPACITY_ROWS_EXCEEDED
         message:
           type: string
         correlationId:
