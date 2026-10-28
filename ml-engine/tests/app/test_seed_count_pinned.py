@@ -9,7 +9,7 @@
 길이는 **공용 판독기에 넣을 수 없다** — 같은 판독기가 길이 다른 목록 셋
 (`stability_seeds` 다섯 · `amount_band_edges` 넷 · `segment_axes` 둘)을 읽는다. 그래서
 **정책별 키 스키마**가 길이를 진다: `stability_seeds` 를 읽는 로더가 둘이므로 두 자리다
-(`strategy-backtest-v1.yaml` 의 판정 정책 · `evaluation-v1.yaml` 의 평가 정책 — 뒤쪽은
+(`strategy-backtest-v2.yaml` 의 판정 정책 · `evaluation-v1.yaml` 의 평가 정책 — 뒤쪽은
 M5 학습 안정성 레그가 같은 구멍을 가졌다, D-6G2e-10).
 
 여기서 재는 것은 **거동**이다(모듈의 비공개 이름을 읽지 않는다): 출하 다섯은 서고,
@@ -43,7 +43,7 @@ from ml_engine.evaluation.policy import (
 
 _SRC_ROOT = Path(evaluation_policy.__file__).resolve().parents[2]
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
-_SHIPPED_BACKTEST = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_SHIPPED_BACKTEST = _POLICY_DIR / "strategy-backtest-v2.yaml"
 _SHIPPED_EVALUATION = _POLICY_DIR / "evaluation-v1.yaml"
 _SEED_PREFIX = "stability_seeds."
 _APPROVED_SEED_COUNT = 5

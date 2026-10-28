@@ -43,7 +43,11 @@ def pure_construction_floor(
 
 
 def is_eligible(amount: float, floors: tuple[float, ...]) -> bool:
-    """실격선 전부를 넘겨야 적격이다 — 하한가 하나, 공사는 순공사원가선까지 둘."""
+    """실격선 전부를 넘겨야 적격이다 — 하한가 하나, 순공사원가 규칙이 적용되는 공사는 둘.
+
+    **몇 개인가는 여기서 정하지 않는다.** 적용 여부는 상류(`rules.pure_cost_floor` 가 부르는
+    정책 술어)가 판정하고, 이 함수는 받은 선을 전부 본다 — 적용 범위를 두 자리에서 판정하면
+    조용히 갈린다(계획 2026-10-28 P2)."""
     return all(amount >= threshold for threshold in floors)
 
 

@@ -81,7 +81,7 @@ _SCHEMA_DOCUMENT = (
     _REPO_ROOT / "reports" / "evidence" / "m6" / "6g" / "snapshot-schema.md"
 )
 _SHIPPED_BACKTEST_POLICY = (
-    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v1.yaml"
+    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v2.yaml"
 )
 
 

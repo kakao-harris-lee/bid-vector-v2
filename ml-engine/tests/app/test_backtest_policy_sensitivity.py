@@ -55,7 +55,7 @@ from ml_engine.app.backtest_job import (
     build_strategies,
     run_backtest_job,
 )
-from ml_engine.evaluation.backtest.exclusions import admit_rows
+from ml_engine.evaluation.backtest.exclusions import AdmittedNotice, admit_rows
 from ml_engine.evaluation.backtest.fit import _reference_sample, check_institutional_fit
 from ml_engine.evaluation.backtest.mcnemar import DiscordantCounts
 from ml_engine.evaluation.backtest.metrics import NoticeScore, StrategyScores
@@ -65,8 +65,10 @@ from ml_engine.evaluation.backtest.policy import (
     load_strategy_backtest_policy,
     strategy_backtest_policy_checksum,
 )
+from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.records import BacktestRequest, SampleVariant
 from ml_engine.evaluation.backtest.report import canonical_verdict_bytes
+from ml_engine.evaluation.backtest.rules import structural_reason
 from ml_engine.evaluation.backtest.run import run_strategy_backtest
 from ml_engine.evaluation.backtest.snapshot import load_snapshot
 from ml_engine.evaluation.backtest.strategies import (
@@ -104,7 +106,7 @@ from tests.evaluation._backtest_support import (
 )
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
-_SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v2.yaml"
 _SHIPPED_INFERENCE_POLICY = _POLICY_DIR / "inference-v1.yaml"
 
 # 판정이 실제로 서려면 창 규칙을 낮춰야 한다(출하 값은 창당 483행을 요구한다).
@@ -587,7 +589,7 @@ class _Probe:
 
 
 _STRONG_VALUES: Final[dict[str, tuple[str, ...]]] = {
-    "version": ("strategy-backtest-v1-perturbed",),
+    "version": ("strategy-backtest-v2-perturbed",),
     "verdict.min_relative_improvement": ("0.30", "0.15"),
     "verdict.alpha": ("0.005", "0.10"),
     "verdict.primary_hypothesis_count": ("4", "1"),
@@ -602,6 +604,10 @@ _STRONG_VALUES: Final[dict[str, tuple[str, ...]]] = {
     "floor.rate_band_low": ("0.9", "0.30"),
     "floor.rate_band_high": ("0.4975", "0.995"),
     "floor.pure_construction_cost_ratio": ("0.90",),
+    # 상한을 **모든 예정가격 아래**로 내리면 규칙이 어느 공고에도 적용되지 않는다. 반대
+    # 방향(상한을 올리는 쪽)은 판의 공고가 이미 적용 범위 안이라 거동이 0 이고, 거동 0 은
+    # 세기가 되지 못한다.
+    "floor.pure_construction_cost_max_planned_price_exclusive": ("1.0",),
     # 시행일은 YAML 이 따옴표를 쓰는 값이다 — 따옴표째 적는다(흔들기가 파일에 그대로 쓰인다).
     "effective.construction": ('"2026-07-01"', '"2026-01-30"'),
     "effective.service": ('"2026-07-01"', '"2026-05-26"'),
@@ -772,6 +778,13 @@ _OUTPUT_INPUTS: Final[dict[str, _Probe]] = {
     # 내려와 제외가 풀린다. 판은 **계획 전략** 판이다: 출하 전략 판에서는 S4 가 같은 값을
     # 따로 읽어서, 제외 단계에 상수를 박아도 S4 쪽이 움직여 초록이 된다(변이 P4 로 실측).
     "floor.pure_construction_cost_ratio": _Probe("construction-pad", "0.90"),
+    # 그 배제가 **적용되는 예정가격의 배타 상한**(v2 신규, 계획 2026-10-28 P2) — 상한을
+    # 모든 예정가격 아래로 내리면 공사의 두 번째 실격선이 서지 않아 제외가 풀린다. 판은
+    # 배제 비율과 같은 **계획 전략** 판이다(공사 공고가 채점 창 밖이라 결말은 그대로이고
+    # 제외 계수가 움직인다). 채점·S4 **두 자리**는 부류 단언이 아니라 자리별 probe 가 잰다.
+    "floor.pure_construction_cost_max_planned_price_exclusive": _Probe(
+        "construction-pad", "1.0"
+    ),
     # 판별 표본 걸러내기의 반폭 — 넓은 범위(±3%) 공고가 남거나 빠진다. 이 판의 넓은 공고는
     # 채점 창 **밖**(이력 블록)에 있어 결말에 닿지 않고, 판별 기록의 제거 수가 바뀐다.
     "sensitivity.wide_reserve_half_width": _Probe("wide-reserve", "0.035"),
@@ -804,6 +817,7 @@ _SITE_ASSERTED: Final[frozenset[str]] = frozenset(
         "institution.reserve_price_count",
         "institution.draw_count",
         "floor.pure_construction_cost_ratio",
+        "floor.pure_construction_cost_max_planned_price_exclusive",
     }
 )
 """자리마다 **따로** 단언하는 값들 — 한 자리만 상수가 되면 다른 자리가 움직여 「바뀌었다」가
@@ -1083,6 +1097,44 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "strategies._simulated_floors",
         "assign",
     ): "PROBE:s4-pure-cost",
+    # 순공사원가 규칙의 **적용 범위**(v2 신규). 비교는 정책 객체의 술어 한 곳에 있고,
+    # 그 술어를 **채점 두 자리와 S4 한 자리**가 부른다 — 자리마다 전용 probe 를 둔다
+    # (한 자리만 상수가 되면 다른 자리의 움직임이 그것을 가린다, r1 의 결함 모양).
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "policy_values.pure_cost_rule_applies",
+        "compare",
+    ): "CLASS",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "rules._is_pure_cost_absent",
+        "pure_cost_rule_applies",
+    ): "PROBE:cap-absence",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "rules._is_pure_cost_absent",
+        "return",
+    ): "PROBE:cap-absence",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "rules.pure_cost_floor",
+        "if",
+    ): "PROBE:cap-eligibility",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "rules.pure_cost_floor",
+        "pure_cost_rule_applies",
+    ): "PROBE:cap-eligibility",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "strategies._simulated_floors",
+        "listcomp",
+    ): "PROBE:cap-monte-carlo",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "strategies._simulated_floors",
+        "pure_cost_rule_applies",
+    ): "PROBE:cap-monte-carlo",
     ("floor.rate_band_high", "policy_values.contains", "compare"): "CLASS",
     (
         "floor.rate_band_high",
@@ -1369,6 +1421,11 @@ _USE_COVERAGE: Final[dict[tuple[str, str, str], str]] = {
         "floor.pure_construction_cost_ratio",
         "strategies._simulated_floors",
         "maximum",
+    ): "DERIVED",
+    (
+        "floor.pure_construction_cost_max_planned_price_exclusive",
+        "strategies._simulated_floors",
+        "where",
     ): "DERIVED",
     (
         "institution.draw_count",
@@ -1677,6 +1734,13 @@ _PROBE_TESTS: Final[dict[str, str]] = {
     "PROBE:s4-pure-cost": (
         "test_pure_construction_cost_ratio_reaches_the_monte_carlo_site"
     ),
+    "PROBE:cap-eligibility": (
+        "test_the_pure_cost_cap_reaches_the_eligibility_floor_site"
+    ),
+    "PROBE:cap-absence": (
+        "test_the_pure_cost_cap_reaches_the_missing_cost_exclusion_site"
+    ),
+    "PROBE:cap-monte-carlo": "test_the_pure_cost_cap_reaches_the_monte_carlo_site",
     "PROBE:job-direct": "test_primary_hypothesis_count_is_read_at_both_sites",
 }
 
@@ -2477,6 +2541,130 @@ def test_pure_construction_cost_ratio_reaches_the_monte_carlo_site(
     )
 
 
+# ── 순공사원가 규칙의 적용 범위 (계획 2026-10-28 P2) ─────────────────────────
+# 상한은 **자리 셋**에서 읽힌다: 제외의 원가 결측 판정 · 채점의 실격선 조립 · S4 의 표본별
+# 실격선. 자리마다 전용 probe 를 두는 이유는 배제 비율에서 이미 실증된 것이다(r1 의 변이
+# P4: 한 자리만 상수로 바꿨는데 다른 자리가 움직여 초록이었다).
+
+_PURE_COST_CAP_KEY: Final[str] = (
+    "floor.pure_construction_cost_max_planned_price_exclusive"
+)
+_CAP_OFF: Final[str] = "1.0"
+"""상한을 **모든 예정가격 아래**로 내린 값 — 규칙이 어느 공고에도 적용되지 않는다."""
+
+
+def _admitted_construction(
+    harness: _Harness, policy: StrategyBacktestPolicy
+) -> AdmittedNotice:
+    """업무 셋 판에서 **원가가 있는** 공사 공고 하나의 승인 결과. 판정 전체를 돌리지 않고
+    제외 단계만 돌리므로 S4 의 읽기가 끼어들지 않는다(자리를 가르는 자리다)."""
+    board = harness.board("mixed")
+    found = [
+        item
+        for item in admit_rows(board.snapshot.rows, policy).admitted
+        if item.row.notice.category is BusinessCategory.CONSTRUCTION
+        and item.row.notice.pure_construction_cost is not None
+    ]
+    assert found, "업무 셋 판에 승인된 공사 행이 없다"
+    return found[-1]
+
+
+def test_the_pure_cost_cap_reaches_the_eligibility_floor_site(
+    harness: _Harness,
+) -> None:
+    """자리 ① 채점의 실격선 조립 — 적용 범위 밖이면 순공사원가선이 **서지 않는다**.
+
+    같은 공고를 상한만 다른 두 정책으로 승인해 실격선 묶음을 맞댄다. 상한이 코드에 박히면
+    두 판정이 같아져 RED 다."""
+    applies = _policy_with(harness, "cap-applies")
+    disabled = _policy_with(harness, "cap-off", **{_PURE_COST_CAP_KEY: _CAP_OFF})
+    target = _admitted_construction(harness, applies)
+    board = harness.board("mixed")
+    mirror = [
+        item
+        for item in admit_rows(board.snapshot.rows, disabled).admitted
+        if item.row.notice.notice_key_hash == target.row.notice.notice_key_hash
+    ]
+    assert mirror, "상한을 내렸더니 그 공고가 승인에서 사라졌다 — 규칙을 끄는 방향이다"
+    assert target.pure_cost_floor is not None, (
+        "출하 상한에서 순공사원가선이 서지 않았다 — 이 판이 자리 ① 을 지나지 않는다"
+    )
+    assert mirror[0].pure_cost_floor is None, (
+        "자리 ① — 상한을 예정가격 아래로 내렸는데 순공사원가선이 그대로 선다"
+        f"(채점이 상한을 읽지 않는다): {mirror[0].pure_cost_floor}"
+    )
+    assert mirror[0].eligibility_floors == (mirror[0].actual_floor_price,), (
+        f"적용 범위 밖인데 실격선이 둘이다: {mirror[0].eligibility_floors}"
+    )
+
+
+def test_the_pure_cost_cap_reaches_the_missing_cost_exclusion_site(
+    harness: _Harness,
+) -> None:
+    """자리 ② 제외의 원가 결측 판정 — 규칙이 **적용되는** 공사에서만 제외 사유다.
+
+    같은 행에서 원가만 지우고 상한을 가로지르면 사유가 나타나거나 사라진다. 상한이
+    제외 쪽에 닿지 않으면 두 정책에서 같은 사유가 나와 RED 다."""
+    applies = _policy_with(harness, "cap-absence-applies")
+    disabled = _policy_with(
+        harness, "cap-absence-off", **{_PURE_COST_CAP_KEY: _CAP_OFF}
+    )
+    target = _admitted_construction(harness, applies).row
+    without_cost = dataclasses.replace(
+        target,
+        notice=dataclasses.replace(target.notice, pure_construction_cost=None),
+    )
+    assert (
+        structural_reason(without_cost, applies)
+        is ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT
+    ), "출하 상한에서 원가 결측이 제외 사유가 아니다 — 이 판이 자리 ② 를 지나지 않는다"
+    assert (
+        structural_reason(without_cost, disabled)
+        is not ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT
+    ), (
+        "자리 ② — 규칙이 적용되지 않는 공사인데 원가 결측으로 빠진다"
+        "(제외 판정이 상한을 읽지 않는다)"
+    )
+
+
+_BINDING_PURE_COST_RATIO: Final[str] = "0.9999"
+"""순공사원가선이 S4 의 후보 격자를 **실제로 묶는** 배제 비율.
+
+출하 비율(0.98)에서는 이 판의 공사 공고에서 그 선이 격자 아래에 있어, 상한을 토글해도
+투찰금액이 **같다**(실측). 그래서 자리 ③ 의 probe 는 선이 묶이는 비율을 깔고 상한만
+움직인다 — 그러지 않으면 「거동 0」을 「자리가 없다」와 구별할 수 없다. 같은 비율에서
+선이 묶인다는 것은 배제 비율 자리 ② probe 가 같은 값으로 따로 잰다."""
+
+
+def test_the_pure_cost_cap_reaches_the_monte_carlo_site(harness: _Harness) -> None:
+    """자리 ③ S4 의 표본별 실격선 — 시뮬레이션 예정가격이 적용 범위일 때만 선이 걸린다.
+
+    배제 비율은 선이 묶이는 값으로 고정하고 **상한만** 가로지른다. 상한이 S4 에 닿지
+    않으면 두 투찰금액이 같아져 RED 다(채점 쪽만 고친 변이가 그 모양이다)."""
+    request = _construction_strategy_input(harness)
+    strategy = InstitutionalMonteCarloStrategy()
+    shipped_cap = harness.values("mixed")[_PURE_COST_CAP_KEY]
+    assert shipped_cap != _CAP_OFF, shipped_cap
+    bids = {
+        value: strategy.bid(
+            request,
+            _policy_with(
+                harness,
+                f"s4-cap-{value}",
+                **{
+                    "floor.pure_construction_cost_ratio": _BINDING_PURE_COST_RATIO,
+                    _PURE_COST_CAP_KEY: value,
+                },
+            ),
+        )
+        for value in (shipped_cap, _CAP_OFF)
+    }
+    assert all(isinstance(item, BidAmount) for item in bids.values()), bids
+    assert bids[shipped_cap] != bids[_CAP_OFF], (
+        f"자리 ③ — S4 의 투찰금액이 적용 범위를 따르지 않는다: {bids}"
+    )
+
+
 _INSTITUTION_KEYS: Final[tuple[str, ...]] = (
     "institution.reserve_price_count",
     "institution.draw_count",
@@ -2665,6 +2853,9 @@ _SHIPPED_BOARD_UNMOVED: Final[frozenset[str]] = frozenset(
         "effective.construction",
         "effective.goods",
         "floor.pure_construction_cost_ratio",
+        # 같은 이유 + 작은 흔들기가 상한을 **반으로** 내려도 이 판들의 예정가격보다
+        # 여전히 위다(판 `construction-pad` 가 상한을 가로지르는 값으로 잰다).
+        "floor.pure_construction_cost_max_planned_price_exclusive",
         "sampling.calls_per_notice_construction",
         "sampling.calls_per_notice_goods",
         "strategy.s1_offset_bp",

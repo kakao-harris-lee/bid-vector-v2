@@ -24,7 +24,7 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.policy import PolicyRejected, PolicyRejectionReason
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
-_SHIPPED_PATH = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_SHIPPED_PATH = _POLICY_DIR / "strategy-backtest-v2.yaml"
 _INFERENCE_PATH = _POLICY_DIR / "inference-v1.yaml"
 _PURE_COST_CAP_KEY = "floor.pure_construction_cost_max_planned_price_exclusive"
 
