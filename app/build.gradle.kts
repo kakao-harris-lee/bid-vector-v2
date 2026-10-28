@@ -93,6 +93,9 @@ dependencies {
         implementation(libs.tomcat.embed.core)
         implementation(libs.tomcat.embed.el)
         implementation(libs.tomcat.embed.websocket)
+        // chore(2026-10-28) — guava 는 BOM 이 아니라 grpc 가 전이로 끌어온다. 최신 grpc 도 같은
+        // 판을 선언하므로 상향 지렛대가 이 하한뿐이다(카탈로그 `guava` 블록에 실측).
+        implementation(libs.guava)
     }
 }
 
@@ -213,6 +216,7 @@ tasks.test {
     systemProperty("bidvector.security.floor.tomcat", libs.versions.tomcat.get())
     systemProperty("bidvector.security.floor.jackson2", libs.versions.jackson2.get())
     systemProperty("bidvector.security.floor.jackson3", libs.versions.jackson3.get())
+    systemProperty("bidvector.security.floor.guava", libs.versions.guava.get())
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
@@ -260,6 +264,9 @@ val compatibilitySmoke =
                 "org.apache.tomcat.embed:tomcat-embed-websocket",
                 "com.fasterxml.jackson.core:jackson-databind",
                 "tools.jackson.core:jackson-databind",
+                // chore(2026-10-28) — 같은 이유로 guava 하한도 등재한다. 이 좌표는 **선언한 자리가
+                // 없어**(grpc 전이) 등재하지 않으면 해석이 이 축에서 통째로 빠진다.
+                "com.google.guava:guava",
                 // 카탈로그가 BOM 을 이기는지 — Boot 4.1.1 BOM 은 kotlin 2.3.21 / jupiter 6.0.3 을 관리한다.
                 "org.jetbrains.kotlin:kotlin-stdlib",
                 "org.junit.jupiter:junit-jupiter",

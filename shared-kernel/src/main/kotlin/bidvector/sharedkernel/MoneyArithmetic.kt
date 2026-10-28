@@ -46,16 +46,19 @@ class UnroundedBidAmount internal constructor(
      * (`v2-지침서.md` §4.1) — "출처를 모른다"는 값 오염이 계산에 들어가지
      * 않는다.
      *
-     * `floor`(적용 하한) — 준다면 반올림 결과가 그 미만일 때
-     * `ROUNDED_BELOW_FLOOR`로 막는다. 하한 자신이 소수일 수 있다(하한율×기초금액 같은
-     * 계산에서 나온다) — `1000.4`를 `scale=0`·`DOWN`으로 내리면 `1000`이고 이는 `1000.4`
+     * `floor`([AppliedFloor]) — 준다면 반올림 결과가 그 미만일 때
+     * `ROUNDED_BELOW_FLOOR`로 막는다. 하한 자신이 소수일 수 있다(기초금액×투찰율 하한에서
+     * 나온다) — `1000.4`를 `scale=0`·`DOWN`으로 내리면 `1000`이고 이는 `1000.4`
      * 미만이다(`data-dictionary.md` §1.1 정의 ②·`capability-map.md` DEC-02 무조건
      * acceptance). 기본값 `null`은 이 축을 아직 모르는 기존 호출부와 호환된다 — 하한을
      * 아는 호출부만 이 보증을 켠다.
+     *
+     * **타입이 `BigDecimal?`가 아닌 이유는 [AppliedFloor] KDoc 에 있다**(D-G1DEC05-2) —
+     * 하한은 같은 basis 의 곱에서만 와야 하고, 날 `BigDecimal`은 그 전건을 표현하지 못한다.
      */
     fun roundedWith(
         policy: Resolution.Resolved<RoundingPolicy>,
-        floor: BigDecimal? = null,
+        floor: AppliedFloor? = null,
     ): Measurement<Derived<BidAmount>> {
         val scaling = runCatching { raw.setScale(policy.value.scaleDigits, policy.value.mode) }
         return when {
@@ -74,7 +77,7 @@ class UnroundedBidAmount internal constructor(
     private fun extractWon(
         scaled: BigDecimal,
         policy: Resolution.Resolved<RoundingPolicy>,
-        floor: BigDecimal?,
+        floor: AppliedFloor?,
     ): Measurement<Derived<BidAmount>> {
         val hasFraction = scaled.signum() != 0 && scaled.stripTrailingZeros().scale() > 0
         return when {
@@ -86,7 +89,7 @@ class UnroundedBidAmount internal constructor(
     private fun extractLongValue(
         scaled: BigDecimal,
         policy: Resolution.Resolved<RoundingPolicy>,
-        floor: BigDecimal?,
+        floor: AppliedFloor?,
     ): Measurement<Derived<BidAmount>> {
         val extraction = runCatching { scaled.longValueExact() }
         return when {
@@ -98,7 +101,7 @@ class UnroundedBidAmount internal constructor(
                 Measurement.Unmeasurable(ReasonCode.NEGATIVE_AMOUNT)
             }
 
-            floor != null && BigDecimal(extraction.getOrThrow()) < floor -> {
+            floor != null && BigDecimal(extraction.getOrThrow()) < floor.raw -> {
                 Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
             }
 

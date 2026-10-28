@@ -1,8 +1,8 @@
 package bidvector.app.http
 
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.ProfileView
-import bidvector.workflow.profile.UnjudgedQualificationAxis
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 

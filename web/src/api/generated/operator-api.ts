@@ -38,6 +38,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bid-price-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 투찰가 요청 — 공고 단건·운영자 요청 평가(M7/7C ②)
+         * @description 운영자가 지목한 **공고 하나**를 평가하고 그 근거를 낸다. `evaluateDryRun`(전략 전체 평가)과 **같은 판정 커널**을 돌아 같은 입력에서 같은 결과를 낸다 — 다른 점은 후보가 지목된 하나라는 것뿐이다.
+         *     **POST 인 이유**: 이 요청의 종착점이 알림함 한 항목 기록(R-4)이고, 읽기로 출하한 뒤 쓰기로 바꾸면 이미 출하된 계약을 깨야 한다. CSRF 요구도 메서드 집합으로 성립한다. 공고 식별자는 **본문**이다(경로가 아니다).
+         *     **분석 예산을 적용하지 않는다.** 전략의 후보 상한은 전건 스캔의 비용 통제이고 운영자가 지목한 공고 하나의 허가 조건이 아니다 — 상한이 1 인 전략에서도 요청한 공고는 평가된다. 이것이 `evaluateDryRun` 과 **의도적으로 어긋나는 유일한 축**이다.
+         *     **가격 세 축은 아직 값이 서지 않는다.** 3안(`bidPriceMenuState`)·신뢰도 (`confidenceState`)·하한 미달 빈도(`floorShortfallState`)는 **상태와 사유**만 낸다 — 출하 조립의 ML 분석 포트가 항상-미가용 고정이고(`OPEN-ML-ANALYSIS-WIRING` 보류) 하한 미달 정책의 출하 정본 표가 없다. 값 칸을 미리 두지 않는 이유는 「없음」이 「0」으로 읽히지 않게 하는 것이다 — 값이 서는 slice 가 칸을 더한다.
+         *     **하한율은 게시값만 근거다**(운영자 결정 2026-10-15). 법정 하한율을 해석하지 않으며 그 사실을 `disclosures` 가 `STATUTORY_FLOOR_RATE_NOT_INTERPRETED` 로 고지한다. 게시 하한율이 아닌 출처의 값은 근거 칸에 싣지 않고 `floorRateGroundsState` 가 말한다.
+         *     **「근거 원문」은 (출처 필드 + 요건 면허명 + 정책 version)이다** — 원시 관측 blob· 공고명·기관명·사업자번호는 이 응답에 자리가 없다.
+         */
+        post: operations["requestBidPrice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategy/edit-sessions": {
         parameters: {
             query?: never;
@@ -481,6 +506,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/opening-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 공고 단위 개찰 결과 조회(SET-02 표시 절반 · COL-02 표면) — 읽기 전용
+         * @description 공고 하나의 개찰 결과를 **읽기만** 한다(M7/7C⑤-a). 쓰기 경로가 없고 수집을 일으키지 않는다.
+         *     **답은 `state` 가 가르는 아홉 갈래 중 하나다** — 「데이터가 없다」·「결과가 없다」· 「아직 개찰 전이다」를 한 값으로 접지 않는다. `NOTICE_ABSENT`(그 공고 자체를 수집한 적이 없다) · `NOT_OPENED_YET`(개찰 결과가 없고 투찰 마감이 아직 지나지 않았다 — 개찰은 마감 뒤라는 도메인 사실에서만 유도한다) · `NOT_COLLECTED`(개찰 축 원문도 결과도 없다) · `OBSERVED_NOT_PROMOTED`(개찰 축 **원문은 적재됐으나** 결과로 승격되지 않았다) · `OPENED`·`FAILED_BID`(유찰)·`REBID`(재입찰) · `PROGRESS_UNRECOGNIZED`(진행구분 라벨이 등재 어휘 밖이다 — 조용히 개찰완료로 접지 않는다) · `PROGRESS_ABSENT`(결과 행은 있으나 진행구분이 없다).
+         *     **잠정과 확정은 다른 칸이다.** 확정 낙찰금액은 `confirmedAwardAmount*` 가 나르고 잠정 1위는 `provisionalRankOne*` 가 나른다 — 잠정 1위 관측이 확정 칸을 바꾸지 않는다(SET-02). 잠정 축의 상태는 `NOT_OBSERVED`(투찰 행 미관측) · `RANK_MISSING`(어느 행도 순위 1이 아니다) · `RANK_DUPLICATED`(순위 1이 둘 이상 — 동값을 임의로 깨지 않는다, 건수는 `provisionalRankOneDuplicateCount`) · `DETERMINED` 다. 순위를 투찰금액으로 재계산하지 않는다.
+         *     **다른 업체의 식별 정보를 싣지 않는다** — 사업자등록번호·대표자명은 수집 경계에서 버려져 저장 자체가 없고, 업체 **상호**는 이 응답의 어느 칸에도 없다(조회 질의가 그 열을 읽지 않는다). 낙찰/패찰 판정은 서버가 하고 그 결과만 내보낸다(후속 slice).
+         *     금액은 값만 싣지 않고 **통화·basis·과세·provenance 와 함께** 싣는다. 투찰율은 표기 그대로의 **문자열**이다(JSON 수치의 배정밀도로 소수 자리를 잃지 않는다). 시각은 모두 관측 시각이고, 잠정 축은 자기 관측 시각을 따로 나른다(소비자가 낡음을 스스로 판정한다).
+         *     `noticeNumber`·`noticeRound` 는 **둘 다 필수**다(차수를 기본값으로 접지 않는다). 차수는 제로패딩 3자리이고 그 밖의 표기·제어 문자·길이 초과·같은 매개변수의 반복·잘못된 퍼센트 인코딩은 조용히 고치지 않고 400 이다(어느 입력이 틀렸는지는 응답에 싣지 않는다).
+         */
+        get: operations["readOpeningResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profile": {
         parameters: {
             query?: never;
@@ -849,7 +899,191 @@ export interface components {
             licenseVerdict: "ELIGIBLE" | "UNCERTAIN";
             /** @enum {string|null} */
             licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
-            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_10_PERFORMANCE" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+        };
+        BidPriceRequestBody: {
+            /** @description 공고번호. 정규화(trim · ASCII 대문자화 · 내부 공백을 `-` 로 합침)는 서버가 한다. 공백만·제어 문자·길이 상한 초과는 400 이다. */
+            noticeNumber: string;
+            /** @description 차수 — 제로패딩 3자리 숫자(KONEPS `bidNtceOrd`). 그 밖은 400 이다. */
+            noticeRound: string;
+            /**
+             * Format: int32
+             * @description 진행 중 투찰 건수. **호출자가 선언한다**(`evaluateDryRun` 과 같은 규약, D-6A3-3) — 서버가 0 으로 지어내지 않는다. 사다리의 여력 축이 이 값을 쓴다.
+             */
+            currentActiveBids: number;
+        };
+        BidPriceRequestResponse: {
+            noticeNumber: string;
+            noticeRound: string;
+            /** @description 이 평가의 상관 ID — audit 행·오류 본문과 같은 어휘다. */
+            correlationId: string;
+            /** Format: int32 */
+            strategyRevision: number;
+            /** Format: int32 */
+            currentActiveBids: number;
+            /** Format: int32 */
+            maxActiveBids: number;
+            /**
+             * @description 판정 사다리에 이르렀는가. 이르지 못하면 `dropStage`·`dropReasonCode` 가 어디서 왜 멈췄는지 말한다.
+             * @enum {string}
+             */
+            outcome: "REACHED" | "NOT_REACHED";
+            /**
+             * @description 판정. `outcome` 이 `NOT_REACHED` 면 없다.
+             * @enum {string|null}
+             */
+            verdict?: null | "BID_NOW" | "REVIEW" | "SKIP";
+            /** @description 판정 사유 코드. 출하 조립에서는 ML 이 항상 미가용이라 사다리에 이른 공고가 `REVIEW` · `ML_UNAVAILABLE` 로 내려온다 — 「낮은 추천」이 아니라 「추천 없음」이다. */
+            verdictReasonCodes: string[];
+            /** @description 멈춘 단계(수명·감시·자격·임계 미설정·분석 예산·ML 가용성·점수 임계). */
+            dropStage?: string | null;
+            /** @description 멈춘 사유. 단계와 사유는 한 쌍이다(사유 하나는 늘 정확히 한 단계에 속한다). */
+            dropReasonCode?: string | null;
+            noticeStatus: string;
+            /** @description 감시 거절에서 걸린 규칙 ID. 그 밖의 경우 빈 배열이다. */
+            failedWatchRuleIds: string[];
+            watchUndeterminableReason?: string | null;
+            /** @description 점수 미달 사유의 임계값 — 10진 문자열이다(부동소수로 내지 않는다). */
+            scoreThreshold?: string | null;
+            /** @description 같은 사유의 실제값 — 10진 문자열. */
+            scoreActual?: string | null;
+            /** @description 이 판정이 알림 요청을 낳았는가. **요청까지**이고 배달·기록은 하지 않는다 (`evaluateDryRun` 과 같은 경계). */
+            wouldNotify: boolean;
+            /**
+             * @description 알림함 기록 상태(R-4). 쓰기 포트가 아직 머지되지 않아 **기록하지 않는다** — 가짜 포트·임시 표를 두지 않고 그 사실을 계약에 드러낸다. 포트가 서면 값이 늘어난다.
+             * @enum {string}
+             */
+            inboxRecordState: "NOT_RECORDED_YET";
+            /** @enum {string|null} */
+            inboxRecordNotRecordedReason?: null | "INBOX_WRITE_PORT_NOT_MERGED";
+            /**
+             * @description 면허 자격 판정(QUAL-01 · 03). **`UNCERTAIN` 은 `INELIGIBLE` 이 아니다**(U-5) — 판정 불가와 미달을 한 값으로 접지 않는다.
+             * @enum {string}
+             */
+            licenseVerdict: "ELIGIBLE" | "INELIGIBLE" | "UNCERTAIN";
+            /**
+             * @description 판정 불가 사유(요건 데이터 부재·파싱 불가·프로필 미선언·수집 실패·허용업종 결합 규칙 미결).
+             * @enum {string|null}
+             */
+            licenseUncertainReason?: null | "REQUIREMENT_DATA_ABSENT" | "REQUIREMENT_UNPARSABLE" | "OPERATOR_LICENSES_NOT_DECLARED" | "COLLECTION_FAILED" | "PERMITTED_INDUSTRY_COMBINATION_RULE_UNDECIDED";
+            /** @description 공고가 요구한 면허명 — **근거 원문의 「무엇을 요구했나」**(QUAL-05). */
+            licenseRequiredLicenses?: string[] | null;
+            /** @description 요건이 온 공고 필드 — **근거 원문의 「어느 필드에서」**(QUAL-05). */
+            licenseRequirementSourceFields: string[];
+            /** @description 충족한 제한그룹 라벨. 그룹 간 OR · 그룹 내 AND 다(QUAL-03). */
+            licenseGroupsSatisfied: string[];
+            /** @description 충족하지 못한 제한그룹 라벨. */
+            licenseGroupsMissing: string[];
+            /** @description 미보유 면허명. **미충족 그룹이 둘 이상이면 비운다** — 그룹 간 OR 을 합집합으로 접으면 「이 면허들이 다 필요하다」로 읽힌다. 그 경우는 `licenseMissingDetailState` 가 말한다. */
+            licenseMissingLicenses: string[];
+            /** @enum {string} */
+            licenseMissingDetailState: "NOT_APPLICABLE" | "SINGLE_GROUP" | "MULTIPLE_GROUPS_NOT_FLATTENED";
+            /**
+             * Format: int32
+             * @description 파싱하지 못한 요건 행 수 — 0 이 아니면 판정이 일부 요건을 보지 못했다는 뜻이다.
+             */
+            licenseUnparsableRowCount: number;
+            /**
+             * @description 면허 **유효기간 미검증**(U-7) — V2 는 유효기간을 보지 않는다. 그 사실이 판정 결과에 드러나야 한다는 요구를 이 칸이 집행한다.
+             * @enum {string}
+             */
+            licenseValidity: "NOT_VERIFIED";
+            /** @description 판정에 쓴 어휘 테이블 version 의 출처(QUAL-05 — 규칙이 바뀌면 과거 판정이 어느 version 에서 나왔는지 재현된다). */
+            licensePolicySource: string;
+            /** @description 그 version 의 시행일. 정책의 **최초 판**이면 시행일이라는 값 자체가 없어 `null` 이다 — 출처와 시행일을 한 문자열로 합치지 않는다(구분자를 지어내지 않는다). */
+            licensePolicyEffectiveFrom?: string | null;
+            /** @description **아직 판정하지 않는 자격 축**(QUAL-08 지역 · QUAL-10 수행실적 · QUAL-11 시공능력평가금액). 「판정했고 통과」와 「판정하지 않음」을 구분하게 한다 — 자격 카드가 「면허만 보면 끝」으로 읽히지 않게 한다. 판정이 생기는 slice 가 그 값을 뺀다. */
+            unjudgedAxes: ("QUAL_08_REGION" | "QUAL_10_PERFORMANCE" | "QUAL_11_CONSTRUCTION_CAPACITY")[];
+            /** Format: int64 */
+            baseAmountWon?: number | null;
+            baseAmountCurrency?: string | null;
+            baseAmountBasis?: string | null;
+            baseAmountVatTreatment?: string | null;
+            baseAmountProvenance?: string | null;
+            /**
+             * @description 기초금액이 **어떻게 정해졌나**(DEC-01) — 게시값 그대로인지, 예산 키 폴백인지, 개찰 역산인지. 파생이 원본을 덮지 않는다는 사실이 이 칸으로 보인다.
+             * @enum {string|null}
+             */
+            baseAmountResolution?: null | "DIRECT" | "FALLBACK_FROM_BUDGET" | "DERIVED_FROM_OPENING";
+            /** @description 게시 낙찰하한율 — fraction 의 10진 문자열이다(percent 가 아니고 부동소수가 아니다). 출처가 게시값이 아니면 **싣지 않는다**. */
+            publishedFloorRateFraction?: string | null;
+            /** @enum {string|null} */
+            publishedFloorRateOrigin?: null | "NOTICE_VALUE" | "STATUTORY_TABLE";
+            /** @description 게시값 출처의 공고 차수. */
+            publishedFloorRateNoticeRound?: string | null;
+            /**
+             * @description 게시 하한율이 근거로 설 수 있는가 — 「없다」와 「게시값이 아니다」를 가른다 (운영자 결정 2026-10-15: 게시값만 근거).
+             * @enum {string}
+             */
+            floorRateGroundsState: "USABLE" | "ABSENT" | "ORIGIN_NOT_PUBLISHED";
+            /**
+             * @description 하한 미달 빈도(DEC-04)를 **이 공고에서 잴 수 있는가**. 지금은 재지 못한다 — 커널은 있으나 출하 정본 정책 표와 표본 공급 경로가 없다. 값이 서는 slice 가 빈도 칸과 상태 값을 더한다.
+             * @enum {string}
+             */
+            floorShortfallState: "NOT_COMPUTED";
+            /**
+             * @description 재지 못한 사유. 「재려 했으나 재지 못했다」(표본 부족 등)와 **다른 어휘**다 — 표본을 보지 않았으므로 표본 수를 적지 않는다.
+             * @enum {string}
+             */
+            floorShortfallNotComputedReason: "SHORTFALL_POLICY_NOT_PUBLISHED";
+            /**
+             * @description 커널이 ML 단계에서 받은 것. `NOT_REACHED` 는 **거기까지 가지 않았다**는 뜻이고 `UNAVAILABLE`(갔으나 미가용)과 다른 사실이다.
+             * @enum {string}
+             */
+            mlAnalysisState: "ANALYZED" | "UNAVAILABLE" | "SIMILARITY_PROJECTION_NOT_READY" | "NOT_REACHED";
+            /**
+             * @description 미가용 사유. 출하 조립에서는 점수 provider 가 없어 `SCORE_NOT_PROVIDED` 다.
+             * @enum {string|null}
+             */
+            mlUnavailableReason?: null | "SCORE_NOT_PROVIDED" | "DEADLINE_EXCEEDED" | "CIRCUIT_OPEN" | "RETRY_BUDGET_EXHAUSTED" | "TRANSPORT_FAILED" | "MODEL_NOT_READY" | "RELEASE_MISMATCH" | "CONTRACT_VIOLATION" | "UNSUPPORTED_SCHEMA" | "UNSUPPORTED_RELEASE" | "INVALID_REQUEST";
+            /**
+             * @description 신뢰도(ML-03). 값이 서는 날 그것은 **가격 적합도이고 확률이 아니다** — 그 고지가 `disclosures` 의 `PRICE_FITNESS_IS_NOT_PROBABILITY` 다. 이 응답에 확률 칸은 없다.
+             * @enum {string}
+             */
+            confidenceState: "NOT_AVAILABLE";
+            /** @enum {string} */
+            confidenceNotAvailableReason: "ML_SCORE_NOT_PROVIDED" | "ML_UNAVAILABLE" | "SIMILARITY_PROJECTION_NOT_READY" | "EVALUATION_NOT_REACHED_ML_STAGE";
+            /**
+             * @description 3안(안전·추천·공격) 상태(DEC-05 · ML-01). **빈 배열이 아니라 이유 있는 상태**다 — 화면이 가짜 숫자를 그리지 않게 한다. 값이 서는 slice 가 태도별 칸과 상태 값을 더한다.
+             * @enum {string}
+             */
+            bidPriceMenuState: "NOT_COMPUTED";
+            /**
+             * @description 산출하지 않은 사유 — **이 배선에 산출 경로가 없다**는 사실 하나만 말한다. 커널을 불러 「출처가 없었다」를 받은 것이 아니다(부르지 않았다).
+             * @enum {string}
+             */
+            bidPriceMenuNotComputedReason: "MENU_PATH_NOT_WIRED";
+            /** @description **전수를 늘 싣는다** — 예정가격은 개찰 전 비공개 추첨으로 결정되어 정확한 낙찰하한을 보장할 수 없음 · 자동 제출·확정 낙찰이 아님 · 법정 하한율 미해석 · 가격 적합도는 확률이 아님. 코드만 나르고 **문장은 표면이 짓는다**(계산이 바뀐 뒤에도 옛 문구가 남는 것을 막는다). */
+            disclosures: ("YEGA_DRAWN_PRIVATELY" | "NOT_AUTO_SUBMITTED" | "STATUTORY_FLOOR_RATE_NOT_INTERPRETED" | "PRICE_FITNESS_IS_NOT_PROBABILITY")[];
+        };
+        OpeningResultView: {
+            noticeNumber: string;
+            noticeRound: string;
+            /** @enum {string} */
+            state: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "OPENED" | "FAILED_BID" | "REBID" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT";
+            /** Format: int32 */
+            participantCount?: number | null;
+            /** Format: date-time */
+            actualOpeningAt?: string | null;
+            /** Format: date-time */
+            observedAt?: string | null;
+            /** Format: int64 */
+            confirmedAwardAmountWon?: number | null;
+            confirmedAwardAmountCurrency?: string | null;
+            confirmedAwardAmountBasis?: string | null;
+            confirmedAwardAmountVatTreatment?: string | null;
+            confirmedAwardAmountProvenance?: string | null;
+            /** @enum {string} */
+            provisionalRankOneState: "NOT_OBSERVED" | "RANK_MISSING" | "RANK_DUPLICATED" | "DETERMINED";
+            /** Format: int32 */
+            provisionalRankOneDuplicateCount?: number | null;
+            /** Format: int64 */
+            provisionalRankOneBidAmountWon?: number | null;
+            provisionalRankOneBidAmountCurrency?: string | null;
+            provisionalRankOneBidAmountVatTreatment?: string | null;
+            provisionalRankOneBidRateFraction?: string | null;
+            /** Format: date-time */
+            provisionalRankOneObservedAt?: string | null;
         };
         Profile: {
             /** @description V12 자격 사실 행이 있는가. `false` 면 「프로필 미설정」이고, 그때의 빈 목록은 **신고된 빈 값이 아니다**. */
@@ -922,7 +1156,7 @@ export interface components {
         };
         ErrorBody: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE" | "CAPACITY_ROWS_EXCEEDED";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "NOTICE_NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE";
             message: string;
             correlationId: string;
         };
@@ -1025,6 +1259,84 @@ export interface operations {
                 };
             };
             /** @description 요청 본문이 application/json 이 아니다(M6/6A-2b D-6A2b-7). code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requestBidPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BidPriceRequestBody"];
+            };
+        };
+        responses: {
+            /** @description 공고 하나의 판정과 근거(축별 자격·금액 basis·게시 하한율·고지) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BidPriceRequestResponse"];
+                };
+            };
+            /** @description 요청 본문이 유효하지 않다 — 본문이 JSON object 가 아님, `noticeNumber`· `noticeRound` 의 누락·null·비문자열·공백·제어 문자·길이 상한 초과, `noticeRound` 가 제로패딩 3자리 숫자가 아님, `currentActiveBids` 가 0 이상의 JSON 정수(Int 범위)가 아님(문자열·소수의 조용한 강제 변환 없음). 어느 입력이 틀렸는지는 싣지 않는다. code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 자격증명·세션·CSRF 가 없거나 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청한 공고가 없다(평가를 시작하지 않았다). 경로가 없는 경우(`NOT_FOUND`)와 다른 코드다. code: NOTICE_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 전략에 여력 상한 미설정(D-6A3-4 와 같은 fail-closed — 여력 상한 없이 사다리를 돌리지 않는다). code: MAX_ACTIVE_BIDS_NOT_CONFIGURED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
             415: {
                 headers: {
                     [name: string]: unknown;
@@ -2770,6 +3082,58 @@ export interface operations {
                 };
             };
             /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readOpeningResult: {
+        parameters: {
+            query: {
+                /** @description 공고번호. 수집이 저장할 때 쓰는 같은 정규화를 지난다(대문자화·공백 합침). */
+                noticeNumber: string;
+                /** @description 차수(제로패딩 3자리). 형식을 어기면 400 이다. */
+                noticeRound: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 그 공고에 대해 아는 것 — `state` 가 아홉 갈래를 가른다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningResultView"];
+                };
+            };
+            /** @description 질의 값이 유효하지 않다 — 필수 칸 부재, 제어 문자, 길이 상한 초과, 차수 형식 위반, 같은 매개변수의 반복, 잘못된 퍼센트 인코딩(UTF-8 로 디코딩되지 않는 바이트열 포함). 어느 입력이 틀렸는지는 싣지 않는다. code: INVALID_REQUEST */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;

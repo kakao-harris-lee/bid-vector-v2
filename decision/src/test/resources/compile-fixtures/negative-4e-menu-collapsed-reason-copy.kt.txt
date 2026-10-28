@@ -1,0 +1,9 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidStance
+import bidvector.decision.menu.MenuUnmeasurableReason
+
+/** `CollapsedWithOtherStances.copy` 도 닫혀 있다(r3 N-2 로 가둔 타입). */
+fun forgedCollapsedReasonCopy(
+    original: MenuUnmeasurableReason.CollapsedWithOtherStances,
+): MenuUnmeasurableReason.CollapsedWithOtherStances = original.copy(otherStances = setOf(BidStance.Safe))

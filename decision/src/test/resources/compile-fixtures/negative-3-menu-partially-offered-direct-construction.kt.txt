@@ -1,0 +1,20 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuDisclosure
+import bidvector.decision.menu.BidMenuOption
+import bidvector.decision.menu.BidMenuOutcome
+import bidvector.decision.menu.BidStance
+import bidvector.decision.menu.MenuUnmeasurableReason
+import bidvector.sharedkernel.PolicyVersion
+
+fun forgedPartialMenu(
+    option: BidMenuOption,
+    reason: MenuUnmeasurableReason,
+    version: PolicyVersion,
+): BidMenuOutcome.PartiallyOffered =
+    BidMenuOutcome.PartiallyOffered(
+        mapOf(BidStance.Safe to option, BidStance.Recommended to option),
+        mapOf(BidStance.Aggressive to reason),
+        BidMenuDisclosure.entries.toSet(),
+        version,
+    )

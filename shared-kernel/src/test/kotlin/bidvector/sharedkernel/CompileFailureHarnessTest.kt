@@ -234,6 +234,28 @@ class CompileFailureHarnessTest {
             realDiagnosticFragment = "no value passed for parameter",
         )
     }
+
+    /**
+     * (M6/G1-DEC05, D-G1DEC05-2) — **적용 하한 자리에 날 `BigDecimal` 을 넣을 수 없다.**
+     * 앞 판의 `floor: BigDecimal?` 은 어떤 수든 받았고, 특히 예정가격 기준 율(게시
+     * 낙찰하한율)에서 나온 값도 그 자리에 컴파일됐다 — 투찰가는 기초금액 기준이라 basis 가
+     * 섞인 비교다. `AppliedFloor` 의 유일한 생성 경로가 `BaseAmount.appliedFloorFrom(BidRate)`
+     * 이므로 **하한이 같은 basis 의 곱에서 왔다는 전건**이 서명에 실린다 —
+     * `capability-map.md` DEC-02 무조건 acceptance 셋째가 하한 자리에도 걸린다.
+     */
+    @Test
+    fun `14 적용 하한 자리에 날 BigDecimal 은 컴파일되지 않고 appliedFloorFrom 산출은 컴파일된다`() {
+        assertNegativeFails("14-raw-floor-argument", "type mismatch")
+        assertPositiveCompiles("14-applied-floor-argument")
+    }
+
+    @Test
+    fun `14-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "14-raw-floor-argument-typo",
+            realDiagnosticFragment = "type mismatch",
+        )
+    }
 }
 
 private fun assertNegativeFails(

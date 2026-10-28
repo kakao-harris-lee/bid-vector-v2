@@ -2,10 +2,10 @@ package bidvector.app.http
 
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
-import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
+import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
@@ -16,7 +16,6 @@ import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
-import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
@@ -26,26 +25,17 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OperatorProfilePort
-import bidvector.workflow.evaluation.WatchSubjectOutcome
-import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
+import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
+import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.EDIT_SESSION_POLICY
-import bidvector.workflow.strategy.EditSession
-import bidvector.workflow.strategy.EditSessionId
-import bidvector.workflow.strategy.EditSessionPolicyData
-import bidvector.workflow.strategy.EditSessionRepository
-import bidvector.workflow.strategy.EditSessionSnapshot
-import bidvector.workflow.strategy.EditStrategyWorkflow
-import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
-import bidvector.workflow.strategy.toSnapshot
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
@@ -180,30 +170,6 @@ class TestStrategyRepository(
 }
 
 /**
- * `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
- * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
- * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
- * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
- *
- * **D-6A3-20 — [failure]는 `TestStrategyRepository.
- * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
- * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
- */
-class EmptyCandidateSource : CandidateSourcePort {
-    @Volatile var failure: (() -> Throwable)? = null
-
-    override fun openCandidates(): List<Notice> = failure?.let { throw it() } ?: emptyList()
-}
-
-private class UnreachableWatchSubjectPort : WatchSubjectPort {
-    override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-private class UnreachableLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-/**
  * M7/7C ① — `NoticeSearchController`(같은 패키지 main)가 조회기를 요구해 `HttpTestApplication`
  * 기반 test 가 DB 없이 검색 경로를 돈다. 실 질의 거동(이스케이프·basis·정렬·건수)은 이 자리가
  * 아니라 `bidvector.adapters.notice.JdbcNoticeSearchTest`(실 PostgreSQL)가 잰다 —
@@ -256,61 +222,6 @@ class RecordingAuditSink {
 }
 
 /**
- * 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
- * 이다(상태 기계·멱등·만료 판정을 test 사본으로 다시 짓지 않는다) — 바뀌는 것은 커넥션
- * 경계뿐이라, 이 이중체 위에서 재는 것은 「HTTP 층이 결과를 어떤 상태 코드로 옮기는가」다.
- * 원자성 자체(전략+outbox+세션 한 커밋)는 이 자리가 아니라 실 DB test 가 잰다.
- */
-class InMemoryStrategyEditTransaction(
-    private val strategies: StrategyRepository,
-    private val clock: Clock,
-) : StrategyEditTransaction {
-    val sessions: InMemoryEditSessionRepository = InMemoryEditSessionRepository()
-    val events: RecordingStrategyEventSink = RecordingStrategyEventSink()
-
-    /** Spring 컨텍스트가 test 사이에 재사용되므로 세션·발행 이력을 매 test 전에 비운다. */
-    fun reset() {
-        sessions.clear()
-        events.published.clear()
-        events.actors.clear()
-    }
-
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
-        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
-        val sessionPolicy =
-            (EDIT_SESSION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EditSessionPolicyData>).value
-        return action(EditStrategyWorkflow(sessions, strategies, clock, events, policy, sessionPolicy))
-    }
-}
-
-/** `EditSession` 은 `internal constructor` 라 저장은 값 그대로, 반환은 원시 스냅숏으로 한다(D-6B1-7). */
-class InMemoryEditSessionRepository : EditSessionRepository {
-    private val stored = mutableMapOf<EditSessionId, EditSession>()
-
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]?.toSnapshot()
-
-    override fun save(session: EditSession) {
-        stored[session.id] = session
-    }
-
-    fun clear() = stored.clear()
-}
-
-class RecordingStrategyEventSink : EventSink {
-    val published: MutableList<StrategyEvent> = Collections.synchronizedList(mutableListOf())
-
-    override fun publish(
-        event: StrategyEvent,
-        actor: Actor,
-    ) {
-        published += event
-        actors += actor
-    }
-
-    val actors: MutableList<Actor> = Collections.synchronizedList(mutableListOf())
-}
-
-/**
  * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지
  * `bidvector.app.wiring`)을 스캔 범위 밖에 둔다(`@SpringBootApplication`의 기본 컴포넌트
  * 스캔이 이 클래스의 패키지 `bidvector.app.http`와 그 하위만 본다). `StrategyReadController`·
@@ -325,9 +236,9 @@ class RecordingStrategyEventSink : EventSink {
  * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
-// **병합 주의**: `@Import` 는 반복할 수 없는 애너테이션이다. 다른 레인이 자기 이중체 조립을 들이면
-// 두 줄이 아니라 `@Import(A::class, B::class)` 한 줄로 접어야 한다(합집합).
-@Import(ProfileTestWiring::class)
+// **병합 주의**: `@Import` 는 반복할 수 없는 애너테이션이다. 레인이 각자 자기 이중체 조립을 들이므로
+// 충돌 해소는 **두 줄이 아니라 한 줄의 합집합**이다(7C② 의 입찰가 조립과 7C④ 의 프로필 조립).
+@Import(BidPriceTestWiring::class, ProfileTestWiring::class)
 open class HttpTestApplication {
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
@@ -408,6 +319,22 @@ open class HttpTestApplication {
     @Bean
     open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
         NoticeSearchQuery(fakeNoticeSearchPort)
+
+    /**
+     * 7C⑤-a — 개찰 결과 조회의 이중체와 조립. **이 class 안에 둔다**: 바깥의 `@Configuration` 은
+     * 출하 조립(`BidVectorApplication`)의 component scan 에도 걸려 같은 이름 빈이 둘이 된다(실측 —
+     * `BeanDefinitionOverrideException`). 이 class 는 `@SpringBootApplication` 어노테이션 필터가
+     * 출하 scan 에서 제외하므로, test 전용 조립의 자리는 여기다.
+     */
+    @Bean
+    open fun fakeOpeningResultFactsPort(): FakeOpeningResultFactsPort = FakeOpeningResultFactsPort()
+
+    @Bean
+    open fun openingResultQuery(
+        fakeOpeningResultFactsPort: FakeOpeningResultFactsPort,
+        clock: FixedClock,
+    ): OpeningResultQuery =
+        OpeningResultQuery(ReadOpeningResult(fakeOpeningResultFactsPort, clock, OPENING_PROGRESS_POLICY))
 
     @Bean // 7B — 입찰 건 이중체 · 옮기는 공고 마감 · 출하 모양의 워크플로(조립은 `testBidCaseWorkflow`)
     open fun inMemoryBidCaseStore(): InMemoryBidCaseStore = InMemoryBidCaseStore()

@@ -1,6 +1,7 @@
 package bidvector.workflow.profile
 
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -57,10 +58,10 @@ class ProfileJudgementIsolationTest {
     /**
      * 축 ID 는 **wire 값**이다(프로필 조회 응답이 이 이름을 그대로 싣는다, 2b). 그래서 이름을 직접
      * 잠근다 — 7C ② 의 자격 카드가 같은 세 문자열을 쓰기로 했고(`D-7C2-1` Q5), 한쪽에서 상수 이름을
-     * 바꾸면 두 표면의 어휘가 조용히 갈린다. 그 등식은 **수동**이다(scope 알려진 제한 2).
+     * 바꾸면 두 표면의 어휘가 조용히 갈렸다. **`D-7C2-11` 로 표가 하나가 돼 그 위험이 사라졌다** — 이제 두 표면이 같은 enum 을 참조하므로 갈릴 두 표가 없다.
      */
     @Test
-    fun `판정 대기 축은 QUAL-08 · QUAL-10 · QUAL-11 셋이고 ID 는 7C② 어휘와 같다`() {
+    fun `판정 대기 축은 QUAL-08 · QUAL-10 · QUAL-11 셋이고 7C② 와 같은 표 하나에서 온다`() {
         UnjudgedQualificationAxis.entries.map { it.name } shouldBe
             listOf("QUAL_08_REGION", "QUAL_10_PERFORMANCE", "QUAL_11_CONSTRUCTION_CAPACITY")
         UnjudgedQualificationAxis.entries.map { it.capability } shouldBe listOf("QUAL-08", "QUAL-10", "QUAL-11")

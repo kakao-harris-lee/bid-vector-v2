@@ -1,0 +1,7 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOutcome
+
+/** `PartiallyOffered.copy` 는 모듈 밖에서 닫혀 있다. */
+fun forgedPartiallyOfferedCopy(original: BidMenuOutcome.PartiallyOffered): BidMenuOutcome.PartiallyOffered =
+    original.copy(disclosures = emptySet())

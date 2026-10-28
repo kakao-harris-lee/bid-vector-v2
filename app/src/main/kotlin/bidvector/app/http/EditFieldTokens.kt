@@ -22,7 +22,12 @@ internal fun EditableField.token(): String =
         EditableField.MaxActiveBids -> "MAX_ACTIVE_BIDS"
     }
 
-private fun WatchRuleId.token(): String =
+/**
+ * M7/7C ② — `private` 에서 `internal` 로 열었다. 투찰가 요청 응답의 감시 거절 사유도 **같은
+ * wire 어휘**를 써야 한다 — 같은 `WatchRuleId` 가 endpoint 마다 다른 낱말로 보이면 화면이 두 표를
+ * 들어야 한다. 중복 검사(cpdCheck)가 두 번째 사본을 실제로 잡아 이 재사용을 강제했다.
+ */
+internal fun WatchRuleId.token(): String =
     when (this) {
         WatchRuleId.FocusCategory -> "FOCUS_CATEGORY"
         WatchRuleId.FocusRegion -> "FOCUS_REGION"

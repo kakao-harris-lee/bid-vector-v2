@@ -1,0 +1,7 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOutcome
+
+/** `Offered.copy` 는 모듈 밖에서 닫혀 있다 — 타입마다 따로 잰다(r3 N-3). */
+fun forgedOfferedCopy(original: BidMenuOutcome.Offered): BidMenuOutcome.Offered =
+    original.copy(policyVersion = original.policyVersion)
