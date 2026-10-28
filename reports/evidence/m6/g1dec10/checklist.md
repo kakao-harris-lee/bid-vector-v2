@@ -38,6 +38,14 @@
    거동을 잰다) · ⓑ **`decision` 모듈 안에서** 날 율로 ③ 입력을 짓는 형태(ⓓ 등식이 production
    생성 자리를 하나로 잠그지만, 모듈 안 test 는 그 생성자를 그대로 쓴다 — 4B-5 의 경계값 test 가
    그 자리다).
+   **손 재정의가 남는 범위**(CR r4 M-3) — 허용 키가 **서명**이므로 `toString`·`equals`·`hashCode`
+   는 컴파일러가 만든 것과 **손으로 쓴 것이 같은 키**다. 그 셋이 허용에 들어 있는 자리는
+   ⓑ 획득 축 **18 키**(운반·결과 타입 여섯 × 셋) · ⓑ′ 멤버 접근 축 **12 키**(그 축에 나타난 것만)
+   이고, 그 자리에 원값을 문자열로 내보내는 `toString` 을 손으로 써도 **집합이 바뀌지 않는다**.
+   그 꼴이 가격 경로에 닿는 것을 막는 것은 census 가 아니라 **③ 진입 타입**이다 — r4 의 `lnd`
+   변이가 바로 그 형태(`toString()` 정규식 파싱)이고 r5 에서 **컴파일 단계**에서 멈춘다. 분석·표시
+   경로로 가는 노출은 애초에 이 게이트의 범위가 아니다(D-DEC10-4).
+
    입도·보장 서술은 **세 번 틀렸다가 고쳤다** — r1 「파일 입도로 닫았다」, r3 「코드 단위로 닫았다」
    (자기 제외가 남아 있었다), r4 「원값을 쥘 자리가 없다」(표현을 바꾸면 남아 있었다). 지금 문면은
    그 셋을 모두 반영한 것이고, **보장의 자리를 census 에서 타입으로 옮긴 것**이 이 라운드다.
@@ -65,10 +73,13 @@
 7. **7C② 표시 상태는 7C② 후속으로 인계한다** — **D-DEC10-16**(2026-10-28 팀장 결정, D-DEC10-10 을
    갈음). 인계 내용은 「개연 불가 · 심판 아님 사유를 하한율 근거 상태(`FloorRateGroundsState`)에
    표시」이고, 그 칸의 주인은 7C② 응답 계약이다. 이 slice 는 `openapi/**`·`web/**` 를 만지지
-   않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않는다** — 7C② 의 `floorRateGroundsStateOf` 가
-   `origin` 만 보고 **밴드를 보지 않기 때문**이다(`null` → `ABSENT`, `NoticeValue` → `USABLE`,
-   그 밖 → `ORIGIN_NOT_PUBLISHED`). 그래서 `1.00000` 같은 개연 불가 값도 `USABLE` 로 표시된다.
-   인계 범위는 그 `when` 분기 하나 + 생성 타입·OpenAPI 어휘다(병합 probe 실측). —
+   않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않을 것으로 본다** — 7C② 의 `floorRateGroundsStateOf`
+   가 `origin` 만 보고 밴드를 보지 않는다(`null` → `ABSENT`, `NoticeValue` → `USABLE`, 그 밖 →
+   `ORIGIN_NOT_PUBLISHED`). **이 문장의 근거는 머지 전 7C② 브랜치를 읽은 probe 하나이고**
+   (2026-10-28), 이 slice 는 그 코드를 돌리지도 재지도 않았다(위의 무편집·job 부재가 그 이유다).
+   그러므로 「`1.00000` 이 `USABLE` 로 표시된다」는 **단정이
+   아니라 인계 사항**이다: 7C② 가 머지된 뒤 그 분기가 그대로인지는 인계받는 쪽이 다시 확인한다.
+   인계 범위는 그 `when` 분기 하나 + 생성 타입·OpenAPI 어휘다(같은 probe). —
    게이트는 가격 경로를 닫고 계수를 값으로 남기지만, 운영자가 그 제외를 화면에서 읽는 것은
    7C② 후속이 들어온 뒤다.
 8. **변이 M3 에서 `1.00000` test 는 초록으로 남는다** — 그 값은 접어도(`null`) 안 접어도
@@ -82,21 +93,40 @@
     그 값은 개연 밴드 밖이라 통과 값이 될 수 없다. 밴드 **안** 값(`0.3`·`0.9`)으로 같은 성질
     (자리수·모드가 실제로 소비된다)을 잰다 — 명제는 그대로이고 기대값만 그 입력에 맞춰 옮겼다.
 
-## 수정 라운드가 만든 새 파일 ↔ in_scope 대조 (r2·r3·r4)
+11. **4B-5 경계 셋(`0.0`·`1.0`·`1.2`)의 처분** — D-DEC10-24(운영자 결정). 셋 다 **커널에 남고**
+    이름·문면이 「게시값의 거동 주장」에서 「모듈 안 방어층」으로 바뀌었다. 같은 세 값의 종단
+    주장(거부 · margin 드롭 · 양성 대조)은 `FloorBoundaryAtGateTest` 가 **더** 잰다 — 옮긴 것이
+    아니다. 지운 것은 `floorHeadroomOf` 의 `floor.signum() == 0` 특례 분기이고 근거는 도달
+    불가가 아니라 **일반식이 같은 값을 낸다**는 등식이다(「일반식 등식」 test 가 계속 잰다).
+    `floor = 1` 분기(분모 0 가드)와 `init` 의 `≤ 1` 술어는 **남는다** — 모듈 안에서 그 값을 지을
+    수 있다. 4B-5 의 evidence 는 무편집이다.
 
-| 새 파일 | in_scope 근거 |
-| --- | --- |
-| `app/src/test/kotlin/bidvector/app/architecture/FloorTrustRules.kt` | 「`app/**` 의 … architecture test」 |
-| `app/src/test/kotlin/bidvector/archfixture/violating/floortrust/RogueFloorFractionReader.kt` · `RogueFloorRateCarrier.kt` | 같은 항(음성 fixture 루트) |
-| `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorExclusionChainTest.kt` | 「`workflow/**/evaluation/**`」 |
+12. **허용 목록 재생성은 그 자체로 우회가 될 수 있다** — CR r4 M-1. `tools/floor-trust-allowlist.py`
+    가 관측 집합을 그대로 허용 목록 형태로 내므로, 통째로 덮으면 등식은 언제나 초록이고 새로
+    생긴 소비자가 그 덮기에 숨는다. 그래서 재생성 뒤에는 **키 단위 diff** 를 보고 **추가된 키마다
+    그 자리를 evidence 에 한 줄로** 적는다(집합 크기 비교만으로는 「하나 늘고 하나 줄었다」가
+    보이지 않는다). 도구가 그 규율을 머리글에 적고 빈 출력에 비영 종료하지만, **규율을 집행하는
+    것은 사람**이다 — 그래서 이것은 게이트가 아니라 제한이다.
 
-| `app/src/test/kotlin/bidvector/app/evaluation/FloorExclusionTallyTest.kt` (r3) | 「`app/**` 의 평가 집계 줄과 architecture test」 |
-| `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorExclusionChainTest.kt` (r2) | 「`workflow/**/evaluation/**`」 |
+## 수정 라운드가 만든 새 파일 ↔ in_scope 대조 (r2~r5)
 
-**r4 는 새 파일 0** 이다(기존 파일의 술어·허용 목록만 바뀌었다).
+표가 둘로 쪼개져 같은 파일이 두 번 적혀 있었다(CR r4 LOW) — 하나로 합치고 라운드 칸을 둔다.
 
-**계약 갱신 없음** — 여섯 다 기존 in_scope 항 안이다. 새 정책 키 둘(`floor-trust.raw-type-access-pairs` ·
-`floor-trust.creation-code-units`)도 「`config/quality/**` 의 필요한 키」 안이다.
+| 라운드 | 새 파일 | in_scope 근거 |
+| --- | --- | --- |
+| r2 | `app/src/test/kotlin/bidvector/app/architecture/FloorTrustRules.kt` | 「`app/**` 의 … architecture test」 |
+| r2 | `app/src/test/kotlin/bidvector/archfixture/violating/floortrust/RogueFloorFractionReader.kt` · `RogueFloorRateCarrier.kt` | 같은 항(음성 fixture 루트) |
+| r2 | `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorExclusionChainTest.kt` | 「`workflow/**/evaluation/**`」 |
+| r3 | `app/src/test/kotlin/bidvector/app/evaluation/FloorExclusionTallyTest.kt` | 「`app/**` 의 평가 집계 줄과 architecture test」 |
+| r4 | **없음** | 기존 파일의 술어·허용 목록만 바뀌었다 |
+| r5 | `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorBoundaryAtGateTest.kt` | 「`workflow/**/evaluation/**`」 |
+| r5 | `tools/floor-trust-allowlist.py` | **계약 갱신 D-DEC10-25** — 앞선 in_scope 열거에 `tools/` 가 없었다 |
+
+**r5 가 계약을 갱신한다** — `tools/` 가 in_scope 에 없던 자리이고 D-DEC10-25 가 그것을 맞춘다.
+r2~r4 의 다섯은 기존 in_scope 항 안이었다. 새 정책 키 넷(`floor-trust.raw-type-access-pairs` ·
+`floor-trust.creation-code-units` · `floor-trust.price-entry-types` ·
+`floor-trust.price-entry-creation-code-units`)은 「`config/quality/**` 의 필요한 키」 안이다.
+r5 가 `config/quality/gate-tests.properties` 에 새 test 클래스를 **만드는 커밋에서** 등재했다.
 
 ## 정책 version 의 근거
 
@@ -112,10 +142,10 @@
 | 항목 | 상태 |
 | --- | --- |
 | 구현 diff 커밋·clean tree | `commands.md` 의 clean-tree 판정(양성 대조 포함) |
-| acceptance 전건 exit 0 | `commands.md` — `check` 전건 |
+| acceptance 전건 exit 0 | **`5099b8bb`**(r5 의 마지막 산출물 커밋)에서 `./tools/one-command-check.sh` exit **0** — `commands.md` 의 S-20(r5 CR) 절이 마침 줄을 적는다. 앞 라운드들의 `check` 전건도 같은 절에 있다 |
 | 변경된 정책 version 근거 | 위 표 |
 | 알려진 제한·rollback | 이 문서 · `rollback.md` |
 | 비밀값 스캔 | `commands.md`(참조형) |
-| 재작업 누계 | **4/5** — **수정 라운드 수**로 센다(팀장 결정 2026-10-28, 이 프로젝트 선례). r1·r2·r3·r4 네 라운드. 상한 5 |
+| 재작업 누계 | **5/5 — 상한 도달** — **수정 라운드 수**로 센다(팀장 결정 2026-10-28 · D-DEC10-21). r1·r2·r3·r4·r5 다섯 라운드. r5 표적 재검증에서 또 HIGH 가 나오면 새 라운드를 열지 않고 D-DEC10-23 대로 **게이트 분리 종결 + OPEN 신설**로 전환한다 |
 | `differential.json` | **N/A** — Python 거동과 대조하는 case 를 이 slice 가 만들지 않는다. 밴드 값의 양쪽 일치는 값 일치 test 가 코드로 잰다(문서 판정표가 아니다) |
 | `golden-manifest.json` | **N/A** — `fixtures/` 무편집 |

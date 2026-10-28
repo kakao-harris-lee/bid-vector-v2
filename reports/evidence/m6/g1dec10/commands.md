@@ -233,3 +233,76 @@ kotest 출력 한도를 **측정 동안만** 올렸고 그 편집은 커밋하�
 - 이 줄 뒤의 evidence 커밋이 **마지막 HEAD** 다. 그 HEAD 의 게이트 결과 정본은 evidence 가 아니라
   verifier 와 PR 조치 코멘트다(`evidence-pack` 규격 — evidence 는 자기 마지막 커밋의 post-state 를
   담을 수 없다).
+
+## 2026-10-28~29 — r5 이어지는 라운드 (D-DEC10-24 + CR r4 처분)
+
+호스트가 2026-10-28 23:29(KST) 재부팅되어 **앞 레인이 죽었다**. 미커밋 편집 넷(경계 셋 처분
+진행분)을 이어받아 같은 라운드로 마쳤다 — 새 라운드가 아니다(**재작업 누계 5/5 그대로**).
+재부팅으로 **CR r4 리뷰 원문과 변이 하네스·로그가 든 scratchpad 가 사라졌다**. 처분은 팀장이
+전달한 finding 목록(H-1 · M-1 · M-2 · M-3 · LOW 여섯)에 따랐고, 하네스 두 개는 **대화 기록에서
+본문을 복원**해 새 scratchpad 에 두었다. 유실을 적는 것이 「리뷰를 축소했다」와 구별되는 자리다.
+
+### D-DEC10-24 — 경계 셋의 처분 실측
+
+- cmd: `./gradlew --no-daemon gateRegistrationGate :decision:test --rerun --tests '…ExpectedMarginDerivationTest'`
+- exit: **0** @ `825a7fd0`
+- 핵심 결과: 커널 **11 test**(0 실패) · 새 게이트 수준 **7 test**(0 실패 — 같은 실행의
+  `:workflow:test`). 등재 게이트가 새 클래스를 함께 봤다(만드는 커밋에서 등재했다).
+- 특례 분기(`floor.signum() == 0`)를 지운 근거는 도달 불가가 아니라 **등식**이다 — 같은 입력
+  (`rec 0.70 · floor 0`)에서 `0.835` 를 「일반식 등식」 test 가 **계속** 잰다. 그 test 를 지우지 않고
+  **주장을 바꿔** 남겼기 때문에 분기 제거가 일회 측정이 아니라 살아 있는 술어로 지켜진다.
+  (앞 레인은 그 test 를 지우고 일회 측정으로 갈음하려 했다 — 이어받으며 되돌렸다.)
+
+### CR r4 M-2 음성 대조 — 붉은 출력이 대칭 차집합을 이름까지 내는가
+
+- cmd: `clue-mutation.sh`(scratchpad) — 허용 목록의 관측된 키 하나를 **bogus 키로 바꿔치우고**
+  (더하기만 하는 변이가 아니다) `:app:test --rerun --tests '…FloorTrustGateTest'`. 한 변이가
+  두 방향(허용 밖 관측 · 낡은 허용)을 함께 만든다. 적용 직전 clean 단언 포함.
+- exit: **1(RED)** · 컴파일 오류 0(`^e:` 0건) · 표적은 **ⓓ 하나**
+- 핵심 결과: 실패 메시지가 `허용 밖 관측 1` + 그 키 전문, 이어 `낡은 허용 1` + bogus 키를 낸다.
+  앞 판은 같은 실패에서 집합이 **20 에서 잘려** 어느 키인지 출력에 없었다. 변이 뒤 트리 잔여 0.
+
+### CR r4 M-1 — 생성기의 양성·음성
+
+- cmd: 합성 로그(ⓑ′ 블록 하나, 항목 둘)와 **빈 로그**로 `tools/floor-trust-allowlist.py` 실행
+- exit: **0**(두 키를 정렬해 냈다) · **2**(빈 로그)
+- 핵심 결과: 「축이 초록이라 블록이 없다」와 「파서가 로그 형태를 못 읽는다」가 같은 빈 출력을
+  내지 않는다 — 도구 자신의 양성·음성이 둘 다 선다.
+
+### CR r4 H-1 — 앞 라운드 변이 표의 빠진 칸(명령·HEAD)
+
+| 라운드 | 변이 | 하네스 | HEAD |
+| --- | --- | --- | --- |
+| r4 | e1 · e1pos · c1 · c1pos | `dec10-mutations-r4.sh` | `c9e56522` |
+| r5 | lnd · lndpos · rev | `dec10-mutations-r5.sh` | `4b3c69e9` |
+
+두 하네스 모두 적용 직전 `git status --porcelain` 이 비었는지 단언하고(아니면 `exit 73` 으로 멈춘다),
+적용 실패를 비영 종료로 멈추며(`70`~`72`), 표적은 `--rerun` 으로 돈다. 표의 결과 칸은 그 라운드의
+실측이고 **이 라운드가 재실행한 것이 아니다**. HEAD 는 기록의 실행 시각과 커밋 시각을 대조해
+특정했다(복원한 스크립트 본문 · 실행 로그 판독 명령이 같은 기록에 있다).
+
+### CR r4 M-3 · LOW 여섯의 자리
+
+| finding | 자리 |
+| --- | --- |
+| M-3 `toString`·`equals`·`hashCode` 잔여 | `checklist.md` 알려진 제한 ② 의 「손 재정의가 남는 범위」 절(ⓑ 18 키 · ⓑ′ 12 키 · 진입 타입이 가격 경로를 막는다) |
+| LOW 새 파일 표 | `checklist.md` 표를 하나로 합치고 라운드 칸 · r5 둘 등재 |
+| LOW D-DEC10-20 인용 | `scope.md` 그 행의 문면 정정 + 게이트 test KDoc(ⓐ 는 자기 제외가 남는다) |
+| LOW 변이 표 명령·HEAD | 위 표 |
+| LOW `FloorRateGroundsState` 단정 | 제한 ⑦ — probe 근거를 밝히고 **단정이 아니라 인계 사항**으로 |
+| LOW 음성 대조 test 이름 | 이름이 약속한 둘째 축 단언을 그 test 몸통에 넣었다 |
+| LOW ⓐ 자기 제외 문면 | 게이트 test 클래스 KDoc(없앤 것은 `FloorTrustRules` 축들이다) |
+
+### S-20 (r5 이어지는 라운드) — 전건 재실측
+
+- cmd: `./tools/one-command-check.sh` (CI `check` job 의 완료 조건 1 단계)
+- exit: **0** @ **`5099b8bb`**(이 라운드의 **마지막 산출물 커밋**)
+- 핵심 결과: `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과`
+  (Kotlin `check` 는 `BUILD SUCCESSFUL in 26m 23s`). 이 줄 뒤의 evidence 커밋이 마지막 HEAD 이고,
+  그 HEAD 의 게이트 결과 정본은 verifier 와 PR 조치 코멘트다.
+
+### 비밀값 스캔 · clean-tree (r5 이어지는 라운드)
+
+- `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
+- `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음(양성 대조는 r1 에서 실측)
+
