@@ -70,16 +70,18 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
      * 앞 판은 면제가 자료형 집합(`bigint`·`numeric`·…)이어서, 숫자 PII 열을 더해도 위 등식이
      * 초록이었다. 지금은 쌍이므로 ⓐ 등재되지 않은 숫자 열은 걸리고, ⓑ 등재된 열은 지나가고,
      * ⓒ **등재된 열의 자료형이 바뀌면 면제가 사라진다**(이름만 맞혀서 지나가는 길도 닫는다).
+     *
+     * 어휘 인자는 `emptySet()` 이다 — 이 test 가 재는 축은 어휘가 아니라 쌍 등재이므로, 닫힌
+     * 어휘를 끼우면 어느 축이 통과시켰는지 흐려진다(앞 판은 `setOf("kind")` 를 넘겼는데 어느
+     * map 에도 `kind` 가 없어 **아무 일도 하지 않았다** — r4 CR LOW-4).
      */
     @Test
     fun `숫자 열도 등재된 쌍만 지난다 — 이름만·자료형만으로는 면제되지 않는다`() {
-        val closed = setOf("kind")
-
-        freeFormColumns(mapOf("business_registration_no" to "bigint"), closed) shouldBe
+        freeFormColumns(mapOf("business_registration_no" to "bigint"), emptySet()) shouldBe
             setOf("business_registration_no")
-        freeFormColumns(mapOf("contact_phone" to "numeric"), closed) shouldBe setOf("contact_phone")
-        freeFormColumns(mapOf("account_id" to "bigint"), closed).shouldBeEmpty()
-        freeFormColumns(mapOf("account_id" to "text"), closed) shouldBe setOf("account_id")
+        freeFormColumns(mapOf("contact_phone" to "numeric"), emptySet()) shouldBe setOf("contact_phone")
+        freeFormColumns(mapOf("account_id" to "bigint"), emptySet()).shouldBeEmpty()
+        freeFormColumns(mapOf("account_id" to "text"), emptySet()) shouldBe setOf("account_id")
     }
 
     /**
@@ -422,6 +424,12 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
          * 참이었다. 쌍으로 묶으면 그 둘이 이름으로 걸린다.
          *
          * 쌍이 드는 다섯은 **이 표가 실제로 가진 비문자열 열 전수**다: 계정 축 하나와 시각 넷.
+         *
+         * **이 쌍이 고정하지 않는 축 하나** — 열의 *제약*이다(r4 verifier 참고). `account_id` 의
+         * FK 를 떼면 그 열에 임의 정수가 들어갈 수 있는데 이 등식은 초록이고, 형제 표에 자유
+         * 문면 열을 더해도 이 test 는 표 하나만 보므로 모른다. 그 축은 같은 `check` 안의
+         * `CleanMigration*` 스냅샷 래칫(FK·열·표 목록·권한)이 맡는다 — verifier 가 두 경우를
+         * 모두 넣어 래칫이 RED 인 것을 실측했다. 여기서 그 축을 다시 재지 않는 이유다.
          */
         val STRUCTURAL_COLUMNS =
             mapOf(
