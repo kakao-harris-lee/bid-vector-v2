@@ -61,6 +61,15 @@ class FloorTrustGateTest {
         gatedRules.observedCreationMembers(production).shouldNotBeEmpty()
     }
 
+    /**
+     * **ⓑ·ⓑ′ 는 보장이 아니라 재고(inventory)다**(D-DEC10-22). census 는 **타입을 따라가므로**
+     * 값의 표현이 바뀌면(문자열·`BigDecimal`·영속 행·JSON) 그 자리가 어느 축에도 남지 않는다 —
+     * verifier r4 가 그 두 꼴을 실측했다. 그래서 「원값이 가격 경로에 닿을 수 없다」를 **이 축이
+     * 보장하지 않는다**. 보장하는 것은 **진입 타입**(ⓓ + 컴파일 실패 fixture)이고, 이 두 축이
+     * 재는 것은 **누가 원값을 만지는가가 바뀌었다**는 사실이다 — 새 소비자·새 운반 자리가
+     * 생기면 목록 한 줄을 명시적으로 더하게 되고, 그 자리가 가격 쪽인지 분석·표시 쪽인지는
+     * 사람이 분류한다.
+     */
     @Test
     fun `ⓑ 원값을 얻는 코드 단위 쌍 집합은 허용 집합과 같다 — production 전 층`() {
         rawRules.observedAcquisitionUnits(production) shouldBe policy.floorTrustRawAcquisitionPairs.toSet()
@@ -99,6 +108,29 @@ class FloorTrustGateTest {
                 .toSet()
 
         observed shouldBe policy.floorTrustPolicyValueCreationCodeUnits.toSet()
+    }
+
+    /**
+     * **가격 경로 ③ 의 입력 타입**(D-DEC10-22) — 생성자가 `internal` 이라 모듈 밖은 컴파일로
+     * 막히고(컴파일 실패 fixture), 모듈 **안**에서 날 `Rate?` 로 입력을 짓는 자리는 이 등식이
+     * 센다. production 의 생성 자리는 게이트 산출물을 받는 공개 factory 하나여야 한다.
+     */
+    @Test
+    fun `ⓓ 가격 경로 입력 타입을 만드는 코드 단위 집합은 허용 집합과 같다`() {
+        val observed =
+            policy.floorTrustPriceEntryTypes
+                .flatMap { type -> FloorTrustRules(type).observedCreationCodeUnits(production) }
+                .toSet()
+
+        observed shouldBe policy.floorTrustPriceEntryCreationCodeUnits.toSet()
+    }
+
+    @Test
+    fun `ⓓ′ 가격 경로 입력 타입이 실제로 production 에 있다 — 등식이 공허하지 않다`() {
+        policy.floorTrustPriceEntryTypes.shouldNotBeEmpty()
+        policy.floorTrustPriceEntryTypes.forEach { type ->
+            production.filter { it.fullName == type }.shouldNotBeEmpty()
+        }
     }
 
     @Test

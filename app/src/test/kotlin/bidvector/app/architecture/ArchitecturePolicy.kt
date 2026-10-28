@@ -223,6 +223,15 @@ class ArchitecturePolicy private constructor(
     val floorTrustPolicyValueCreationCodeUnits: List<String>
         get() = list("floor-trust.policy-value-creation-code-units")
 
+    /**
+     * D-DEC10-22 — 가격 경로 ③ 의 **입력 타입**을 만드는 코드 단위. 생성자가 `internal` 이라
+     * 모듈 밖은 컴파일로 막히고, 모듈 **안**의 잔여는 이 등식이 센다(production 한 자리).
+     */
+    val floorTrustPriceEntryTypes: List<String> get() = list("floor-trust.price-entry-types")
+
+    val floorTrustPriceEntryCreationCodeUnits: List<String>
+        get() = list("floor-trust.price-entry-creation-code-units")
+
     /** D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
     val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")
