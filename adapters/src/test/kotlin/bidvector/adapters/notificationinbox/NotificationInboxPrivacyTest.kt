@@ -31,9 +31,12 @@ import java.sql.Connection
  */
 internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     /**
-     * **이 표에 자유 문자열 열이 없다.** 공고 키 둘은 PII 가 아니다(공개 조달 식별자이고 형태
-     * CHECK 가 걸려 있다). 나머지 열은 전부 `IN (…)` 어휘에 갇혔거나 시각·정수라 임의 문면을
-     * 담을 수 없다 — 즉 사업자번호·담당자 이름·연락처가 들어올 **칸이 없다**.
+     * **이 표에 자유 문자열 열이 없다.** 공고 키 둘은 PII 가 아니다 — 공개 조달 식별자다.
+     * 그 둘의 제약은 **같지 않다**(r2 verifier L1 이 앞 판 문면을 바로잡았다): `notice_round` 는
+     * 세 자리 형태 정규식이고 `notice_number` 는 **비어 있지 않음뿐**이다. 그래서 이름 면제의
+     * 근거를 아래 「공고 키 두 열의 CHECK 정의가 고정돼 있다」가 따로 못박는다. 나머지 열은
+     * 전부 `IN (…)` 어휘에 갇혔거나 시각·정수라 임의 문면을 담을 수 없다 — 즉 사업자번호·
+     * 담당자 이름·연락처가 들어올 **칸이 없다**.
      */
     @Test
     fun `알림함의 열 전수가 닫힌 어휘이거나 공고 키이거나 구조 자료형이다 — 자유 문자열 열 0`() {
@@ -73,6 +76,52 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
 
         freeFormColumns(simulated, vocabularyClosed = setOf("kind", "detail_code")) shouldBe
             setOf("code", "memo")
+    }
+
+    /**
+     * 양성 대조 — **r2 가 뚫은 두 꼴을 술어 로직만으로 고정한다**(verifier M1 · CR MEDIUM-1).
+     * 아래 정의 문자열은 PostgreSQL 이 `pg_get_constraintdef` 로 되돌려 주는 형태 그대로다.
+     *
+     * 앞 판 술어는 `= ANY (ARRAY[` **포함**만 봐서 ⓐ·ⓑ 를 「닫힘」으로 셌다. 지금은 정의 전문이
+     * 한 형태와 **일치**해야 하므로 둘 다 열림으로 떨어진다. ⓒ·ⓓ 는 **음성 대조**다 — 진짜
+     * 어휘 CHECK 두 꼴(캐스트 없는 쪽·있는 쪽)이 여전히 닫힘으로 세어져야 한다. 음성 대조가
+     * 없으면 「전부 열림으로 센다」는 퇴화가 이 test 를 통과한다.
+     */
+    @Test
+    fun `OR 꼬리와 함수로 감싼 어휘 CHECK 는 닫힘으로 세지 않는다 — 양성 대조`() {
+        // ⓐ 닫힌 절 ∨ 열린 절 — 집합이 열린다.
+        """CHECK (((memo = ANY (ARRAY['x'::text, 'y'::text])) OR (memo IS NOT NULL)))"""
+            .closesVocabularyOf("memo") shouldBe false
+        // ⓑ 닫히는 것은 열이 아니라 함수값이다.
+        """CHECK ((left(note, 1) = ANY (ARRAY['a'::text, 'b'::text])))"""
+            .closesVocabularyOf("note") shouldBe false
+        // ⓒ·ⓓ 음성 대조 — 진짜 어휘 CHECK 는 닫힘이다.
+        """CHECK ((kind = ANY (ARRAY['NEW_CANDIDATE'::text, 'AWARD_DECIDED'::text])))"""
+            .closesVocabularyOf("kind") shouldBe true
+        """CHECK (((detail_code)::text = ANY (ARRAY['AWARDED'::text, 'NOT_AWARDED'::text])))"""
+            .closesVocabularyOf("detail_code") shouldBe true
+    }
+
+    /**
+     * **공고 키 두 열의 면제를 이름이 아니라 CHECK 정의로 묶는다**(r2 verifier L1).
+     *
+     * [NOTICE_KEY_COLUMNS] 는 이름만 보므로, 그 열의 제약을 풀어도 PII 등식이 초록이었다 —
+     * verifier 가 `notice_round` 의 형태 CHECK 를 `<> ''` 로 바꿔도 통과하는 것을 실측했다.
+     * 그래서 면제의 **근거**를 여기서 고정한다: 둘은 공개 조달 식별자이고 임의 문면을 담지
+     * 않는다는 주장이 제약으로 서 있어야 한다.
+     *
+     * 앞 판 KDoc 은 두 열 모두 「형태 CHECK 가 걸려 있다」고 적었는데 **사실이 아니었다** —
+     * `notice_round` 만 세 자리 정규식이고 `notice_number` 는 비어 있지 않음뿐이다. 그 차이를
+     * 숨기지 않고 각각 단언한다.
+     */
+    @Test
+    fun `공고 키 두 열의 CHECK 정의가 고정돼 있다 — 이름 면제의 근거`() {
+        val checks = singleColumnChecksOf(TABLE)
+
+        checks.getValue("notice_round").single() shouldBe
+            """CHECK ((notice_round ~ '^[0-9]{3}$'::text))"""
+        checks.getValue("notice_number").single() shouldBe
+            """CHECK ((notice_number <> ''::text))"""
     }
 
     @Test
@@ -229,11 +278,12 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
      *
      * 어휘를 **닫는** 제약만 센다: PostgreSQL 이 `IN (…)` 을 되돌려 주는 `= ANY (ARRAY[…])`
      * 형태여야 하고, `<> ''`·형태 정규식(`~`)처럼 집합을 열어 두는 CHECK 는 들지 않는다.
+     * 판정은 포함이 아니라 **정의 전문 일치**다([closesVocabularyOf]).
      */
-    private fun vocabularyClosedColumnsOf(table: String): Set<String> =
-        singleColumnChecksOf(table)
-            .filterValues { definitions -> definitions.any { it.closesVocabulary() } }
-            .keys
+    private fun vocabularyClosedColumnsOf(table: String): Set<String> {
+        val checks = singleColumnChecksOf(table)
+        return checks.filterKeys { column -> checks.getValue(column).any { it.closesVocabularyOf(column) } }.keys
+    }
 
     /** 열 이름 → 그 열 **하나만** 가두는 CHECK 정의들. */
     private fun singleColumnChecksOf(table: String): Map<String, List<String>> =
@@ -256,8 +306,27 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
             }
         }
 
-    /** 이 제약 정의가 값 집합을 **닫는가**(`IN (…)` → `= ANY (ARRAY[…])`). */
-    private fun String.closesVocabulary(): Boolean = contains("= ANY (ARRAY[")
+    /**
+     * 이 제약 정의가 [column] 의 값 집합을 **닫는가** — **정의 전문을 한 형태에 못박는다.**
+     *
+     * r2 검토(verifier M1 · CR MEDIUM-1)가 앞 판 `contains("= ANY (ARRAY[")` 를 두 꼴로 뚫었다.
+     * ⓐ `CHECK ((memo = ANY (ARRAY['x'::text, 'y'::text])) OR memo IS NOT NULL)` — 닫힌 절을
+     * **열린 절과 논리합**하면 집합이 열리는데 그 문자열은 그대로 남는다. ⓑ
+     * `CHECK ((left(note, 1) = ANY (ARRAY['a'::text, 'b'::text])))` — 닫히는 것이 **열이 아니라
+     * 함수값**이고 열 자체는 임의 문면을 담는다. 둘 다 `conkey` 가 그 열 하나라 열 귀속 축으로는
+     * 걸러지지 않는다 — 그 축은 r1 에서 닫았고 **이 축은 그때 열려 있었다.**
+     *
+     * 그래서 포함이 아니라 **일치**로 본다: 좌변이 그 열(또는 그 열의 `text` 캐스트) **자체**이고,
+     * 우변이 문자열 리터럴 배열이며, **그 밖의 절이 하나도 없는** 정의만 닫혔다고 센다. `OR`·
+     * `NOT`·함수 감싸기·추가 술어가 섞이면 앵커가 어긋나 **기본값(열림)** 으로 떨어진다.
+     */
+    private fun String.closesVocabularyOf(column: String): Boolean {
+        val col = Regex.escape(column)
+        val literal = "'[^']*'::text"
+        return Regex(
+            "^CHECK \\(\\((?:$col|\\($col\\)::text) = ANY \\(ARRAY\\[$literal(?:, $literal)*\\]\\)\\)\\)$",
+        ).matches(this)
+    }
 
     /**
      * 열 하나를 가두는 `CHECK (… IN (…))` 의 어휘 — 상수 목록을 제약 정의에서 읽는다.
@@ -270,7 +339,7 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
         val vocabulary =
             singleColumnChecksOf(table)
                 .getValue(column)
-                .single { it.closesVocabulary() }
+                .single { it.closesVocabularyOf(column) }
         return VOCABULARY_LITERAL.findAll(vocabulary).map { it.groupValues[1] }.toList()
     }
 
