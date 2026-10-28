@@ -39,8 +39,15 @@ Kotlin 코드. 판정 기준 · seed · 창 · S1 · S4 정책 값은 v2 에서 
 4. **`metrics.py` 의 docstring 한 줄이 in_scope 경로 목록 밖이다.** 계약의 「계획이 지목한 낡은
    코드 주석 · docstring」 항목으로 고쳤다(적격 정의가 「공사는 순공사원가선까지」라고 적혀 있어
    새 거동과 어긋났다). 경로 목록에 더하는 계약 갱신이 필요하다 — 팀장 판단 대상.
-5. **DEC-10 레인의 Kotlin system property 는 그대로 v1 을 가리킨다**(D-6GRC-3). 밴드 값이
+5. **`container` job 은 돌리지 않았다.** scope.md 의 acceptance 는 「ml-serving 이미지 입력이
+   바뀌면 그 job 도」인데, 이미지 Dockerfile 이 `ml-engine/policy` 를 통째로 복사하므로 새 정책
+   파일 하나가 이미지에 들어간다 — **입력이 바뀌었다**. 그 job 의 ml-serving 쪽 술어 넷 중
+   파일 목록을 보는 것은 없다(금지 import 축 · 크기 상한 · 비 root UID · serving 정책 환경변수
+   경로). 크기 여유는 상한 4억 바이트 대비 최근 실측 약 3.38억 바이트이고 이 slice 가 더하는
+   것은 몇 KB 다. 그래도 **돌린 게이트가 아니다** — CI 는 PR 의 모든 job 을 경로 필터 없이
+   돌리므로 PR 이 열리면 그 자리에서 실측된다.
+6. **DEC-10 레인의 Kotlin system property 는 그대로 v1 을 가리킨다**(D-6GRC-3). 밴드 값이
    v1 = v2 라 그 test 는 깨지지 않고, 경로를 v2 로 옮기는 것은 나중에 머지되는 쪽의 몫이다.
-6. **계약의 in_scope 중 `floor.py` 는 적용 판정을 받지 않는다.** 적용 여부는 정책 객체의 술어와
+7. **계약의 in_scope 중 `floor.py` 는 적용 판정을 받지 않는다.** 적용 여부는 정책 객체의 술어와
    `rules.pure_cost_floor` 가 지고, `floor.py` 는 받은 실격선을 전부 보는 순수 산식으로 남는다 —
    두 자리에서 판정하지 않기 위해서다(docstring 에 그 사유를 적었다).
