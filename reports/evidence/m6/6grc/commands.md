@@ -64,3 +64,24 @@ Kotlin `check` job 은 `reports/evidence` 를 읽는 게이트를 담아 **이 e
 핵심 결과: **M3 의 두 방향이 서로 다른 test 를 붉힌다** — 채점 쪽을 떼면 원가 결측 test 는
 초록으로 남고(그 자리는 안 건드렸다) 채점 자리 probe 만 붉는다. 자리별 probe 가 실제로 자리를
 가른다는 실측이다.
+
+## 2026-10-28T18:38Z — 자리별 변이 셋 (리뷰가 GREEN 으로 통과시킨 자리)
+
+표적은 `test_backtest_strategies.py` + `test_backtest_exclusions.py`(**80 passed** 통제군,
+변이 없음). 각 변이 전 그 파일의 `git status --porcelain` 이 빈 출력임을 확인했고, 적용
+스크립트는 바꿀 자리가 한 곳이 아니면 0 이 아닌 코드로 멈춘다.
+
+| 변이 | 바꿔치운 것 | 결과 |
+| --- | --- | --- |
+| V9 | S4 자리(`_simulated_floors`)의 업무 축을 `True` 로 고정 | RED 1 — 비공사 S4 test **하나만** |
+| V14 | 채점 자리(`rules.pure_cost_floor`)의 업무 축을 `True` 로 고정 | RED 1 — 비공사 채점 test **하나만** |
+| V6b | `np.maximum(floors, pure)` → `np.maximum(pure, pure)`(호출 모양 유지) | RED 1 — max 의미 test **하나만** |
+
+핵심 결과: 셋 다 **의도한 자리 하나씩만** 붉힌다(겹치지 않는다). 이 셋은 리뷰 라운드에서
+전체 1625 가 초록이던 변이들이다 — 자리별 test 가 그 구멍을 메웠다는 실측이다.
+
+## 2026-10-28T18:38Z~18:45Z — acceptance 재실행: `ci.yml` 의 `ml-engine` job
+
+- cmd: 위 acceptance 절과 같은 열두 호출
+- exit: **전부 0**
+- 핵심 결과: pytest **1628 passed**(앞 라운드 1625 + 자리별 test 셋) · import 계약 8 kept 0 broken.
