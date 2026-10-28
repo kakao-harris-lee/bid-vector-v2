@@ -136,6 +136,15 @@ verifier(opus) + code-reviewer(sonnet) 병렬. Codex 없음 — 되돌리기 어
 **in_scope 추가(D-DEC10-25)** — `tools/floor-trust-allowlist.py`(허용 목록 생성기). 앞선 in_scope 열거에
 `tools/` 가 없었다 — CR r4 M-1 이 그 자리를 지정했고 이 항이 계약을 맞춘다.
 
+## 계약 갱신 (2026-10-29 병합 라운드 — 팀장)
+
+| ID | 결정 |
+| --- | --- |
+| **D-DEC10-26** | (D-6GRC-3 이행) **값 일치 test 가 읽는 Python 백테스트 정책 경로를 v1 → v2 로 옮긴다.** 6G-rc(PR #98)가 출하 백테스트 정책을 `strategy-backtest-v2.yaml` 로 세웠고 **나중에 머지되는 쪽이 옮긴다**는 약속에 따라 이 brach 가 옮긴다. Kotlin 이 읽는 것은 `floor.rate_band_low`·`floor.rate_band_high` 둘뿐이고 v2 의 두 값이 v1 과 **같은 수**라 D-DEC10-1 의 값 일치 등식은 그대로 선다 — 그 사실은 추측이 아니라 값 일치 test 가 v2 를 읽고 잰다. 경로가 든 `app/build.gradle.kts` 는 이미 in_scope(design §3 `app` 행)이므로 in_scope 추가는 없다. |
+
+**병합 기준점 변경** — base 가 `23837b19`(PR #93) 에서 **`c4e3fd1c`**(PR #98 머지 커밋)로 옮겨간다.
+rollback 의 복원 기준·목록도 그 SHA 에서 재산출한다(`rollback.md`).
+
 **in_scope 추가** — `decision.menu` 의 `BidMenuGrounds.publishedFloorRate`(메뉴 결과의 근거 칸).
 착수 census 가 찾았다: 가격 경로가 만든 **출력**이 원값을 내보내므로 게이트 통과 값을 실어야
 근거가 정직하다(「이 가격이 어느 값에서 나왔는가」). 7C② 표시 상태의 입력 자리이기도 하다.

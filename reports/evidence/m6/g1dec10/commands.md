@@ -370,3 +370,56 @@ fixture 단언을 바꿨으므로 그 표적을 다시 쟀다.
 - `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
 - `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음
 
+## 2026-10-29 — 병합 라운드 (main `c4e3fd1c` · D-6GRC-3)
+
+### 병합 교집합과 해소 (기계 산출)
+
+- cmd: `git diff --name-only 23837b19..c4e3fd1c` ∩ 이 slice 의 복원 목록
+- 핵심 결과: main 이 들여온 **121 경로**, 교집합 **다섯** — `app/build.gradle.kts` ·
+  `config/quality/architecture-policy.properties` · `config/quality/gate-tests.properties` ·
+  `docs/discovery/capability-map.md` · `reports/evidence/m6/6e1/acceptance-trace.md`.
+- 충돌 **둘**(`gate-tests.properties` · `acceptance-trace.md`)은 **합집합**으로 해소했다.
+  목록 키 넷의 실측: adapters 185 · app **106**(양쪽 고유 4·9) · decision 31 · workflow 75.
+  `acceptance-trace.md` 는 네 행 중 셋이 `ours == base` 라 theirs 를 취하고, **DEC-03 만 양쪽이
+  같은 칸을 늘려** 두 문장을 담은 한 행으로 합쳤다.
+- **자동 해소 자리의 계수**(충돌 0 이 본문 보존을 뜻하지 않는다): `architecture-policy.properties`
+  키 139 · floor-trust 키 10 전부 생존 · 공유 15 키가 전부 양쪽 합집합과 일치 · 키 중복 정의 0 ·
+  충돌 표지 0. 다섯 파일 **줄 단위 합집합 대조**에서 양쪽이 더한 줄의 유실 0(DEC-03 한 행만
+  합친 줄로 대체).
+
+### D-6GRC-3 — 백테스트 정책 v2 전환
+
+- cmd: `app/build.gradle.kts` 의 `contractInput("mlBacktestPolicy", …)` 경로를
+  `strategy-backtest-v1.yaml` → `strategy-backtest-v2.yaml`
+- 핵심 결과: v2 의 `floor.rate_band_low`·`floor.rate_band_high` 가 **0.30 · 0.995**(v1 과 같은 수,
+  최상위 평탄 키라 같은 읽기 경로)이므로 D-DEC10-1 의 값 일치 등식이 그대로 선다. 그 사실은
+  문서 주장이 아니라 **값 일치 test 가 v2 를 읽어** 잰다.
+
+### 병합 뒤 census 가 붉어졌다 — 그 처분
+
+- cmd: `./tools/one-command-check.sh`(첫 실행) @ 병합 커밋 뒤
+- exit: **1** — `FloorTrustGateTest` 의 **ⓑ·ⓑ′ 둘만** 실패(다른 실패 0, `BUILD FAILED in 27m 14s`).
+- 핵심 결과: main 이 들여온 7C②·7C③ 의 **단건 응답 조립**이 원값 `FloorRate` 를 읽어 관측 집합이
+  커졌다 — 게이트가 설계대로 「소비자가 늘면 깨진다」를 집행한 자리다. 실패 이력을 남긴다:
+  그 등식이 실제로 돌았다는 증거다.
+- 키 단위 diff 는 **`tools/floor-trust-allowlist.py` 가 그 실패 로그의 clue 에서** 냈다(이
+  라운드에 고친 도구의 첫 실사용, exit 0): ⓑ **둘** · ⓑ′ **다섯**, 낡은 허용 0.
+- 처분: 일곱 다 **표시 경로**(D-DEC10-4)라 허용에 등재하고 **자리마다 한 줄**을 정책 파일 주석에
+  적었다(D-DEC10-25 규율 ②). 등재 뒤 ⓑ 48 → **50** · ⓑ′ 34 → **39**(정렬 유지 · 중복 0).
+  가격 세 진입은 게이트 타입이라 이 등재가 가격 폐쇄를 넓히지 않는다.
+- 그 키들이 드러낸 사실은 **알려진 제한 ⑦** 로 갔다 — 표시 상태가 밴드를 보지 않는다는 것이
+  이제 병합된 코드에서 실측된다(probe 였던 문면을 실측으로 바꿨다).
+
+### acceptance — 병합 라운드 (재실행)
+
+- cmd: `./tools/one-command-check.sh` (CI 세 job 의 명령 그대로) @ **`fd505b5d`**(병합 라운드의
+  마지막 산출물 커밋)
+- exit: **0** — `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과`
+  (Kotlin `check` 는 `BUILD SUCCESSFUL in 25m 36s`). `web` 전건이 돌았으므로 병합이 들여온
+  OpenAPI·web 산출물도 이 실행이 덮는다.
+
+### 비밀값 스캔 · clean-tree (병합 라운드)
+
+- `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
+- `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음
+

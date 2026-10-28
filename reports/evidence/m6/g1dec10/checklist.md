@@ -77,11 +77,13 @@
    표시」이고, 그 칸의 주인은 7C② 응답 계약이다. 이 slice 는 `openapi/**`·`web/**` 를 만지지
    않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않을 것으로 본다** — 7C② 의 `floorRateGroundsStateOf`
    가 `origin` 만 보고 밴드를 보지 않는다(`null` → `ABSENT`, `NoticeValue` → `USABLE`, 그 밖 →
-   `ORIGIN_NOT_PUBLISHED`). **이 문장의 근거는 머지 전 7C② 브랜치를 읽은 probe 하나이고**
-   (2026-10-28), 이 slice 는 그 코드를 돌리지도 재지도 않았다(위의 무편집·job 부재가 그 이유다).
-   그러므로 「`1.00000` 이 `USABLE` 로 표시된다」는 **단정이
-   아니라 인계 사항**이다: 7C② 가 머지된 뒤 그 분기가 그대로인지는 인계받는 쪽이 다시 확인한다.
-   인계 범위는 그 `when` 분기 하나 + 생성 타입·OpenAPI 어휘다(같은 probe). —
+   `ORIGIN_NOT_PUBLISHED`). **2026-10-29 병합으로 이 문장이 probe 에서 실측으로 바뀌었다** —
+   7C②·7C③ 가 들어온 트리에서 `floorRateGroundsStateOf` 가 `origin` 만 보고, 단건 응답이
+   `usableFloorRateOf` 로 고른 **게시 원값의 비율 문자열**을 그대로 싣는다. 그래서 개연 불가 값
+   (`1.00000`)도 `USABLE` 로 표시되고 그 숫자가 화면에 나온다. 이 사실은 이제 **게이트 census 가
+   키 일곱으로 들고 있다**(병합이 더한 ⓑ 둘 · ⓑ′ 다섯 — 정책 파일 주석이 자리를 적는다).
+   **가격은 서지 않는다**(세 진입이 게이트 타입이다) — 남는 것은 **표시**이고, 그것이 7C② 후속의
+   인계 내용이다. 인계 범위는 그 `when` 분기 하나 + 생성 타입·OpenAPI 어휘다. —
    게이트는 가격 경로를 닫고 계수를 값으로 남기지만, 운영자가 그 제외를 화면에서 읽는 것은
    7C② 후속이 들어온 뒤다.
 8. **변이 M3 에서 `1.00000` test 는 초록으로 남는다** — 그 값은 접어도(`null`) 안 접어도
@@ -144,6 +146,7 @@
 | r5 | `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorBoundaryAtGateTest.kt` | 「`workflow/**/evaluation/**`」 |
 | r5 | `tools/floor-trust-allowlist.py` | **계약 갱신 D-DEC10-25** — 앞선 in_scope 열거에 `tools/` 가 없었다 |
 | r5 일괄 | `decision/src/test/resources/compile-fixtures/mutant-12-margin-entry-with-bigdecimal-typo.kt.txt` | 「`decision/src/test/resources/compile-fixtures/`」(design §3) — fixture 12 의 오타 변이 쌍둥이(CR r5 L-1) |
+| 병합 라운드 | **없음** | main(`c4e3fd1c`)이 들여온 파일은 **base 로 들어간다** — 이 slice 의 새 파일이 아니다. 병합이 바꾼 것은 기존 in_scope 파일 둘(`app/build.gradle.kts` 의 v2 경로 · `architecture-policy.properties` 의 허용 키 일곱) |
 
 **r5 가 계약을 갱신한다** — `tools/` 가 in_scope 에 없던 자리이고 D-DEC10-25 가 그것을 맞춘다.
 r2~r4 의 다섯은 기존 in_scope 항 안이었다. 새 정책 키 넷(`floor-trust.raw-type-access-pairs` ·
