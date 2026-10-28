@@ -64,13 +64,22 @@ class FloorTrustGateCatchesViolationsTest {
         }
     }
 
-    /** 그 둘이 **획득 축에는 없다** — 두 축이 서로 다른 것을 센다는 사실이 이 단언이다. */
+    /**
+     * **파생 접근자는 획득 축에 없다** — 원값을 **인자로 받아** 숫자만 내보내므로 반환·필드
+     * 타입이 원값인 자리가 없다. 그래서 멤버 접근 축을 따로 둔 이유가 이 단언이다.
+     *
+     * 운반 클래스는 **r4 부터 두 축에 함께** 나타난다(r3 v H-1) — 자기 필드 읽기를 제외하던
+     * 규칙을 없애면서, 운반 타입이 자기 값을 내보내는 자리가 획득으로도 세어진다. 그 변화가
+     * 바로 「운반 타입의 자기 메서드가 모든 축에서 보이지 않던」 사각을 닫은 것이다.
+     */
     @Test
-    fun `같은 둘은 획득 축에 나타나지 않는다 — 축을 더한 이유`() {
+    fun `파생 접근자는 획득 축에 없고 운반 클래스는 두 축에 다 있다`() {
         val acquisitions = rawRules.observedAcquisitionUnits(violating).map { it.first.withoutSignature() }
 
-        acquisitions shouldNotContain "$fractionReader.fractionOf"
-        acquisitions shouldNotContain "$carrier.rate"
+        withClue("관측: $acquisitions") {
+            acquisitions shouldNotContain "$fractionReader.fractionOf"
+            acquisitions shouldContain "$carrier.rate"
+        }
     }
 
     @Test

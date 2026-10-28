@@ -39,17 +39,28 @@ internal class FloorTrustRules(
 
     /**
      * 그 타입 값을 **얻는** (코드 단위, `소유자#멤버`) 쌍 — 반환 타입이 그 타입인 호출과 그 타입
-     * 필드 읽기. 자기 클래스의 멤버 읽기는 획득이 아니라 제외한다(생성 인자로 받은 값을 자기
-     * 필드에서 되읽는 것은 새 소비자가 아니다 — 그 자리는 멤버 접근 축이 센다).
+     * 필드 읽기. **자기 클래스의 읽기도 센다**(r3 v H-1): 앞 판은 그것을 제외하면서 「그 자리는
+     * 멤버 접근 축이 센다」고 적었는데, **운반 타입의 자기 읽기**에는 그 말이 성립하지 않는다 —
+     * 멤버 접근 축은 원값 **자신의** 멤버만 세기 때문이다. 그래서 운반 타입이 자기 필드를
+     * 소거 타입으로 내보내는 메서드가 두 축 어디에도 없었다.
      */
     fun observedAcquisitionUnits(classes: JavaClasses): Set<Pair<String, String>> =
         classes.flatMap { candidate -> acquisitionsIn(candidate) }.toSet()
 
+    /**
+     * **자기 제외가 없다**(r3 v H-1·H-2 · CR r3 M-1). 앞 판은 `origin.owner == type` 인 접근을
+     * 걸렀고, 그래서 **그 타입 자신에 쓴 메서드**가 모든 축에서 보이지 않았다 — 운반 타입의
+     * `fun floorAny(): Any? = floorRate`(원값을 소거 타입으로 내보낸다) · 정책 타입의
+     * `fun widened() = PlausibilityBand(…)`(위조 밴드를 자기 안에서 만든다)가 전건 초록이었다.
+     * 지금은 컴파일러가 만드는 자기 멤버(getter·`componentN`·`copy`·`copy$default`·`toString`·
+     * `hashCode`·`equals`·생성자)까지 **서명 키로 허용 목록에 적는다** — 이름(`get*`·`component*`)
+     * 으로 면제하지 않는다(같은 약점의 뒤집기다). 자기 메서드가 하나 새로 생기면 N1·N2·N3 와
+     * 똑같이 **새 키**로 나타난다.
+     */
     private fun accessesTo(classes: JavaClasses): List<JavaAccess<*>> =
         classes
             .flatMap { candidate -> candidate.accessesFromSelf }
             .filter { access -> access.targetOwner.fullName == type }
-            .filter { access -> access.origin.owner.fullName != type }
 
     private fun acquisitionsIn(candidate: JavaClass): List<Pair<String, String>> {
         val accesses =
@@ -61,9 +72,7 @@ internal class FloorTrustRules(
                     },
                 )
             }
-        return accesses
-            .filter { access -> access.targetOwner.fullName != access.origin.owner.fullName }
-            .map { access -> codeUnitOf(access) to "${access.targetOwner.fullName}#${access.name}" }
+        return accesses.map { access -> codeUnitOf(access) to "${access.targetOwner.fullName}#${access.name}" }
     }
 
     private fun codeUnitOf(access: JavaAccess<*>): String {
