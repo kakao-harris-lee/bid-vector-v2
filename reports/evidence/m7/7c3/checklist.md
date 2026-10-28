@@ -90,7 +90,7 @@ detail_code IS DISTINCT FROM EXCLUDED.detail_code THEN NULL ELSE … END`, `RETU
 
 ### 0.4 포트 시그니처 (다른 레인이 부르는 것은 ① 하나다)
 
-패키지 `bidvector.workflow.notification`(새 패키지 — `workflow.access`·`procurement` 로 나가는
+패키지 `bidvector.workflow.notificationinbox`(새 패키지 — `workflow.access`·`procurement` 로 나가는
 간선만 생기고 들어오는 간선이 없어 순환이 닫히지 않는다).
 
 ```kotlin
@@ -545,6 +545,16 @@ test(제목이 바뀐 뒤 재기록해도 항목 하나)와 ⑦(키에서 종류
 
 ## 4. acceptance 실측
 
+**r2 판정 SHA `acade492` 의 job 단위 실측(정본)** — verifier r2 가 직접 돌렸다:
+`check` **exit 0**(` FAILED` 0 · `:adapters:test` 186 class/**1244** · `:app:test` 102/**884** ·
+`:workflow:test` FROM-CACHE(입력 불변) 72/606 · 실패 0 · skip 4) · `qualityBaseline` **exit 0**.
+
+**이 줄이 CR HIGH-1 을 닫는다.** 그 지적은 산출물 결함이 아니라 **머지 조건 미성립**이었다 —
+`ErrorBody` 접기가 출하 main 소스를 바꿨는데 그 뒤 job 단위 `check` 가 한 번도 초록으로 돌지
+않았고, 아래 r2 기록은 「바뀐 두 파일이 먹이는 task 만 바뀌었다」는 **논증으로 갈음**했다.
+하네스가 금지한 갈음이다(부분 게이트는 안 돌린 것과 같다 · 줄일 수 있는 단위는 job 뿐).
+논증이 결과적으로 맞았다는 것은 지금 알지만, **맞았다는 사실은 갈음을 정당화하지 않는다.**
+
 **r2 실측(병합 뒤)**: HEAD `2eed6a0c` 에서 `clean` → `check --continue` → `qualityBaseline` →
 web(W-1~W-9) → `one-command-check.sh` 를 돌렸다. **web 아홉 전부 0**, `CLEAN_EXIT=0`,
 `BASELINE_EXIT=0` 이고 Kotlin `check` 는 **붉었다**(`CHECK_EXIT=1`) — FAILED 둘:
@@ -597,18 +607,18 @@ UP-TO-DATE 아님) · BUILD SUCCESSFUL 8m 3s. 갈래 접기가 **순서를 바�
 이라 production 에서 항목이 태어나지 않는다. 완화는 출하 조립과 같은 어댑터·실 DB 로 쓰기
 포트를 두드리는 test 다.
 
-구현 라운드가 더한 열한째:
+구현 라운드가 더한 **둘**:
+
+11. **공유 test 조립의 병합 취약** — 이 slice 가 `HttpTestApplication` 을 자기 파일로 옮겼고,
+    7C②·7C④-2b 는 **옛 자리**에 `@Import` 를 붙였다. §7 이 그 해소 규칙을 든다. 네 자리 중
+    셋은 어긋나면 CI 가 붉고, 조용히 유실될 수 있는 것은 `@Import` 를 한 줄만 남기는 해소
+    하나다(무너지는 것이 **다른 레인의** test context 라 원인을 자기 변경에서 찾게 된다).
 
 12. **계수와 본문이 다른 snapshot 일 수 있다**(r1 검토 CR LOW-4) — 목록은 계수 질의와 본문
     질의를 **두 문장**으로 돌고 그 둘이 READ COMMITTED 의 서로 다른 snapshot 을 볼 수 있다
     (7C① 의 공유 읽기 전용 트랜잭션 helper 를 쓴다). 그래서 「전체 건수 7, 본문 6 줄」 같은
     순간이 이론상 가능하다. 단일 운영자 규모에서 그 창은 사실상 닫혀 있고, 닫으려면 두 질의를
     한 문장으로 합치거나 REPEATABLE READ 로 올려야 한다 — 둘 다 이 slice 밖의 거래다.
-
-11. **공유 test 조립의 병합 취약** — 이 slice 가 `HttpTestApplication` 을 자기 파일로 옮겼고,
-    7C②·7C④-2b 는 **옛 자리**에 `@Import` 를 붙였다. §7 이 그 해소 규칙을 든다. 네 자리 중
-    셋은 어긋나면 CI 가 붉고, 조용히 유실될 수 있는 것은 `@Import` 를 한 줄만 남기는 해소
-    하나다(무너지는 것이 **다른 레인의** test context 라 원인을 자기 변경에서 찾게 된다).
 
 ## 6. 하네스 레인 변경
 
@@ -686,4 +696,25 @@ operationId 33 중복 0 · 중복 키 거부 로더 적재 성공. 생성 타입
 둘을 가르는 것은 병합 뒤 acceptance 다.
 
 **V23 은 여전히 유일하다**: main 최대 V22, 열린 worktree 넷 중 V23 을 가진 곳 0.
+
+## 10. r2 검토 처분 (verifier `ready-for-review` · code-review `request_changes`)
+
+| finding | 처분 | 무엇으로 닫았나 |
+|---|---|---|
+| CR HIGH-1 접기 뒤 job 단위 `check` 미실행 | **닫음** | verifier r2 가 판정 SHA 에서 `check` exit 0 · `qualityBaseline` 0 을 직접 돌렸다(§4 머리). 지적의 성격은 산출물 결함이 아니라 **갈음 금지** 위반이었고, 그 점을 §4 에 사실로 적었다 |
+| v M1 · CR MEDIUM-1 「어휘가 닫혔다」가 아직 문자열 판정 | **닫음(구조로)** | `closesVocabularyOf(column)` 가 **정의 전문을 한 형태에 일치**시킨다 — 좌변이 그 열(또는 text 캐스트) 자체이고 우변이 리터럴 배열이며 **그 밖의 절이 없는** 정의만 닫힘이다. `OR` 꼬리와 함수 감싼 꼴을 **순수 양성 대조**로 RED 고정하고, 진짜 어휘 CHECK 두 꼴(캐스트 유/무)을 **음성 대조**로 함께 묶었다(음성 대조가 없으면 「전부 열림으로 센다」는 퇴화가 통과한다) |
+| v L1 공고 키 두 열이 이름만으로 면제 | **닫음** | 두 열의 CHECK 정의를 **각각 축어로 고정**했다 — 그 제약을 풀면 그 test 가 붉는다. 함께 KDoc 을 사실대로 고쳤다: 앞 판은 두 열 모두 「형태 CHECK」라고 적었으나 `notice_round` 만 세 자리 정규식이고 `notice_number` 는 **비어 있지 않음뿐**이다 |
+| CR MEDIUM-2 · v L2 scope.md 가 rollback.md 와 어긋남 | **닫음** | scope.md 의 base 머리말과 rollback 줄을 `734e11b9` 로, rollback.md 등식 블록의 `46ac0949..HEAD` 도 현재 base 로. 「옛 base 복원은 다른 레인 줄까지 되돌린다」를 그 자리에 적었다. 계약 갱신 이력에 **r2 절**을 세워 새 base 둘·계수 44→42·새 파일 하나의 in_scope 귀속·죽은 등재 둘의 삭제를 등재했다 |
+| v L3 §4 에 job 단위 초록 없음 | **닫음** | 위 CR HIGH-1 과 같은 자리 |
+| CR LOW-1 §0.4 패키지 이름 | **닫음** | `…notification` → `…notificationinbox`. r1 에서 §0.12 만 고쳤고 **§0.4 는 다른 레인이 포트 시그니처를 읽는 절**이라 더 중요한 자리였다 |
+| CR LOW-2 죽은 import 25 | **닫음** | 기계로 찾아 지웠다 — `HttpTestSupport.kt` 20(조립 이전·병합 해소 잔재) · `HttpTestApplication.kt` 5. ktlint `no-unused-imports` 가 이 설정에서 발화하지 않는다(레포 전체 같은 꼴 176) — **게이트가 아니라 사람이 지울 자리**라는 CR 의 판단에 동의한다 |
+| CR LOW-3 EndpointTest KDoc 이 구현과 반대 | **닫음** | 문면을 구현에 맞췄다(`findAndAddModules()` 아님). r2 에서 그 설정을 「근거가 틀린 설정」으로 걷어냈는데 **문면만 남아 있었다** |
+| CR LOW-4 읽히지 않는 fake 상태 둘 | **닫음(단언을 붙여)** | 지우는 대신 **판독한 대상이 포트에 그대로 가는지**를 재는 test 를 세웠다 — 400 들은 「거부가 된다」만 재고, 통과한 요청이 어떤 값으로 포트에 닿는지는 말하지 않는다(종류 토큰과 공고 쌍이 뒤바뀌어도 상태 코드는 같다). 공유 싱글턴이라 포착 상태 셋을 매 test 앞에서 전부 되돌린다 |
+| CR LOW-5 §5 번호·순서 | **닫음** | 「열한째」(단수) → 「둘」, 항목을 11 → 12 순서로. (고치는 중에 블록을 파일 꼬리로 밀어 §6~§9 뒤에 놓는 실수를 했고 구조 계수로 잡아 되돌렸다) |
+
+**r1·r2 를 통틀어 이 slice 의 게이트 술어는 세 번 고쳐졌다** — ⓐ 문자열 스캔(착수) → ⓑ 모집단
+전수 + `conkey` 열 귀속(r1 F3) → ⓒ 정의 전문 일치(r2 M1). 매번 「구조로 닫았다」고 적었고 두 번은
+**절반만 참이었다.** 남아 있던 축은 각각 달랐다(r1: 모집단·열 귀속 / r2: 제약의 모양). 교훈은
+「구조로 닫았다」를 적을 때 **무엇을 구조로 닫았고 무엇이 아직 텍스트인가**를 축별로 세는 것이고,
+그것을 세어 준 것은 설계 문서가 아니라 **남의 변이**였다.
 

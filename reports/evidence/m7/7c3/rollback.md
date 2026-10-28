@@ -97,7 +97,7 @@ rm -f -- \
 ## 등식 확인 (목록이 손 목록이 아님)
 
 ```
-comm -23 <(git diff --name-only 46ac0949..HEAD | grep -v '^reports/evidence/' | sort) \
+comm -23 <(git diff --name-only 734e11b9..HEAD | grep -v '^reports/evidence/' | sort) \
          <(이 파일이 든 경로 전수 | sort)
 ```
 

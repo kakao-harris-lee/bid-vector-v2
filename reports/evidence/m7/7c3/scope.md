@@ -4,7 +4,7 @@
   표(ADR 0005 D-3)라 재사용하지 않는다)」) · R-4(외부 effect 는 알림함 기록까지, 채널 발송 없음) · R-2(사용자 소유 표에 `account_id`).
   운영자 지시 2026-10-23 「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건(M6 완료 조건 성립)의 **운영자 예외**
   (7C①·7C④ 와 같은 종류).
-- **base**: main `46ac0949` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
+- **base**: main `734e11b9` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
   **착수 base 는 `a61ddff1` 이었고 7B 머지(PR #89) 뒤 `46ac0949` 로 재고정했다**(팀장 2026-10-26 ·
   D-7C3-1 ①). 옮긴 방식은 `git merge origin/main`(rebase 가 아니다 — 17 ahead / 198 behind 라
   rebase 는 같은 충돌을 커밋마다 재생한다). 충돌 9 를 전부 합집합으로 해소했다.
@@ -61,7 +61,7 @@
 
 ## rollback
 
-`git restore --source=46ac0949 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. 마이그레이션은 **배포 전**
+`git restore --source=734e11b9 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. **base 는 네 번 재고정됐다**(`a61ddff1` → `46ac0949` → `23837b19` → `1632242e` → `734e11b9`) — 정본 목록과 실측은 `rollback.md` 이고 이 줄은 그 요약이다. 옛 base 로 복원하면 **7C②·7C⑤·DEC-05·guava 의 공유 파일 줄까지 되돌아간다.** 마이그레이션은 **배포 전**
 되돌림만 이 방식이다 — 배포 뒤 되돌림(V23 표 drop 순방향 마이그레이션) 경로를 rollback.md 에 따로 적는다. 목록 기계 산출, 마지막 산출물
 커밋에서 ①~⑥ 실측.
 
@@ -115,6 +115,18 @@
   | `app/src/test/.../http/HttpTestApplication.kt` | 같은 상한이 강제한 **새 파일**(조립 ↔ 이중체·도우미로 책임 분리) |
 
   rollback 목록은 기계 산출이라 이 15 를 이미 포함한다(`comm -23` 빈 출력으로 확인 — `rollback.md`).
+
+**r2 (2026-10-28) — base 재고정 둘과 새 파일 하나.**
+- **base 를 두 번 더 받았다**: `23837b19`(7C⑤·DEC-05) → `1632242e`(7C②·guava CVE) → `734e11b9`
+  (문서 커밋). 기계 대조 계수가 **44 → 42** 로 줄었다 — 앞 base 에서 내 차이로 세어졌던 공유 파일
+  편집 일부가 그 main 에 이미 들어갔기 때문이다(목록은 `rollback.md` 가 라운드마다 재산출).
+- **새 파일 하나를 in_scope 와 대조했다**: `app/src/test/kotlin/bidvector/app/http/NotificationInboxEndpointTest.kt`
+  — r2 가 verifier F1·F2(wire 키 등식 · 표면 400)를 닫기 위해 만든 **알림함 HTTP 표면 test** 다.
+  in_scope 문면의 「알림함 포트·어댑터·controller 와 test」에 해당하고, 2026-10-27 에 승인된 확장
+  분류로는 **「게이트·상한이 강제한 여섯」이 아니라 명시 항목**이다(그 여섯은 그대로 여섯이다).
+  `gate.tests.app` 에 등재했다(그 키는 전수 등식이다).
+- r2 가 **지운** 것도 있다: 주입 허용 목록의 죽은 등재 둘(`NoticeId` · `NotificationItemKey`) —
+  중간 sealed 타입을 걷어 주입 표면이 좁아진 결과이고, 게이트의 등식이 그 삭제를 요구했다.
 
 ## 하네스 레인 변경 (상시)
 
