@@ -54,8 +54,16 @@ private fun biasDirectionOf(
  *
  * `critical`은 `Derived<AssessmentRate>`다 — 봉투가 계산 정책 version을
  * 그대로 나른다. `decision`은 `Derived`를 새로 만들 수 없으므로(shared-kernel `internal`
- * 생성자) 호출부가 [criticalAssessmentRateFor] 또는 shared-kernel의
- * [bidvector.sharedkernel.criticalAssessmentRate]로 만든 값을 그대로 넘긴다.
+ * 생성자) 호출부가 이미 만든 값을 그대로 넘긴다. **이 slice 의 가격 경로 호출부는
+ * [criticalAssessmentRateFor] 하나이고, 그 함수만 게이트 통과 값을 받는다**(D-DEC10-3 ②).
+ *
+ * **이 매개변수는 게이트 타입이 아니다**(verifier r5 M-1 — 앞 판 문면은 shared-kernel 의
+ * [bidvector.sharedkernel.criticalAssessmentRate] 로 만든 값도 넘긴다고 적어 원값 경로를
+ * 승인하는 것처럼 읽혔다). `Derived<AssessmentRate>` 는 **이미 계산된 임계**라 하한율의 개연
+ * 여부를 더는 담지 않으므로, 이 자리를 타입으로 닫을 수 없다. 그 대신 ②를 닫는 것은 둘이다 —
+ * 원값 진입(shared-kernel 함수)을 쓰는 코드 단위가 census ⓑ·ⓑ′ 에 **전부 남는 것**과,
+ * 다른 생산자(`YegaAmount.assessmentRateAgainst`)가 런타임 전건을 못 만족해 값을 내지
+ * 못하는 것이다. 자세한 범위는 evidence `checklist.md` 알려진 제한 ⑬ 에 있다.
  */
 fun measureFloorShortfall(
     tally: ShortfallTally,
