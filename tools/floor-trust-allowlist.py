@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
-"""DEC-10 게이트 등식(`FloorTrustGateTest`)의 실패 로그에서 **관측 집합**을 뽑는다.
+"""DEC-10 게이트 등식(`FloorTrustGateTest`)의 실패 로그에서 **허용 목록의 키 단위 차이**를 뽑는다.
 
-왜 도구인가 — 허용 목록의 키는 서명을 담아 길고(`패키지.클래스.메서드(인자|인자)`) 수가
-90 을 넘는다. 손으로 베끼면 한 글자 차이로 등식이 깨지고, 그 실패는 「우회가 생겼다」와
-구별되지 않는다. 그래서 **로그에서 파서로** 뽑는다.
+왜 도구인가 — 허용 목록의 키는 서명을 담아 길고(`패키지.클래스.메서드(인자|인자)`) 수가 90 을
+넘는다. 손으로 베끼면 한 글자 차이로 등식이 깨지고, 그 실패는 「우회가 생겼다」와 구별되지
+않는다. 그래서 **로그에서 파서로** 뽑는다.
+
+읽는 자리는 `shouldMatchAllowed` 가 clue 로 내는 **`+`/`-` 줄**이다(CR r5 M-1):
+
+    org.opentest4j.AssertionFailedError: 허용 밖 관측 1
+      + bidvector…marginInputsFrom(…)
+    낡은 허용 1
+      - bidvector…neverObserved(…)
+
+kotest 의 `expected:<[…]> but was:<[…]>` 줄은 **읽지 않는다**. 그 줄은 컬렉션 렌더링이라 출력
+한도(기본 20)에서 잘리고, 앞 판은 그것을 읽어 **조용히 부분집합**을 냈다(exit 0). clue 는
+문자열이라 잘리지 않으며, 선언된 개수(`허용 밖 관측 N`)와 실제 줄 수를 **대조**하므로 형태가
+바뀌면 침묵하지 않고 비영 종료한다.
 
 사용:
 
-    ./gradlew --no-daemon :app:test --tests 'bidvector.app.architecture.FloorTrustGateTest' \\
+    ./gradlew --no-daemon :app:test --rerun --tests 'bidvector.app.architecture.FloorTrustGateTest' \\
         > /tmp/gate.log 2>&1 || true
     python3 tools/floor-trust-allowlist.py /tmp/gate.log
 
-**재생성은 그 자체로 우회가 될 수 있다**(CR r4 M-1) — 관측을 그대로 허용으로 덮으면 등식은
-언제나 초록이고, 새로 생긴 소비자가 그 덮기에 숨는다. 그래서 출력을 정책 파일
-(`config/quality/architecture-policy.properties`)에 옮길 때 규율 둘을 지킨다.
+**관측 집합 전체가 필요하면** 그 축의 정책 키를 **비우고** 돌린다 — 관측 전부가 `+` 줄로 나온다.
 
-1. **키 단위 diff** — 통째로 덮지 않고 추가·삭제된 키만 본다(`comm -13`/`comm -23` 또는
-   정렬 후 `diff`). 집합 크기만 비교하면 「하나 늘고 하나 줄었다」가 보이지 않는다.
+**재생성은 그 자체로 우회가 될 수 있다**(D-DEC10-25) — 관측을 그대로 허용으로 덮으면 등식은
+언제나 초록이고, 새로 생긴 소비자가 그 덮기에 숨는다. 그래서 규율 둘을 지킨다.
+
+1. **키 단위 diff** — 이 도구의 출력이 곧 그 diff 다(`+` 는 허용 밖 관측, `-` 는 낡은 허용).
+   집합 크기만 비교하면 「하나 늘고 하나 줄었다」가 보이지 않는다.
 2. **추가된 키마다 자리를 적는다** — 그 코드 단위가 왜 원값·통과 값·정책 값·진입 타입을
    만지는지를 evidence 에 한 줄로. 설명할 수 없는 키는 허용이 아니라 **우회 후보**다.
 
-출력이 비면 **비영 종료**한다 — 「축이 초록이어서 블록이 없다」와 「파서가 로그 형태를 못
-읽는다」가 같은 값(빈 출력)을 내지 않게 한다.
+종료 코드: `0` 축 하나 이상을 읽었고 모두 일관 · `2` 축 블록을 하나도 못 읽음(전건 초록이거나
+로그 형태가 바뀜) · `3` 선언된 개수와 글머리 줄 수가 다름(절단·형태 변경) · `64` 인자 오류 ·
+`66` 로그를 읽을 수 없음.
 """
 
 from __future__ import annotations
@@ -29,8 +43,9 @@ from __future__ import annotations
 import re
 import sys
 
-# 축 ↔ 실패 블록을 찾는 test 이름 조각. `FloorTrustGateTest` 의 등식 test 이름이 바뀌면
-# 여기도 바뀐다(이름을 좌표로 쓰지 않으려면 조각이 짧아야 한다).
+# 축 ↔ 실패 블록을 찾는 test 이름 조각. `FloorTrustGateTest` 의 등식 test 이름이 바뀌면 여기도
+# 바뀐다. 블록은 **다음 축 제목까지**로 잘라서 본다 — 그러지 않으면 초록 축의 이름이 로그에
+# 나타날 때 다음 실패 축의 항목을 그 축 이름으로 낸다(CR r5 L-2 가 합성 로그로 재현했다).
 AXES = {
     "ⓐ 게이트 통과 값의 멤버 접근": "gated_class",
     "ⓐ′ 생성 계열": "creation",
@@ -40,36 +55,84 @@ AXES = {
     "ⓓ 가격 경로 입력 타입을": "price_entry",
 }
 
+EXTRA_HEADER = re.compile(r"허용 밖 관측 (\d+)")
+STALE_HEADER = re.compile(r"낡은 허용 (\d+)")
 
-def parse_items(blob: str) -> list[str]:
-    """`but was:<[...]>` 안쪽을 항목으로 쪼갠다. 쌍은 `(a, b)`, 단일은 문자열이다."""
-    blob = blob.strip()
-    if blob.startswith("("):
-        parts = re.findall(r"\(([^()]*(?:\([^()]*\)[^()]*)*)\)(?=, \(|$)", blob)
-        out = []
-        for part in parts:
-            # 마지막 쉼표가 쌍 구분자다(키 안에는 쉼표가 없다 — 인자 타입은 `|` 로 잇는다).
-            left, _, right = part.rpartition(", ")
-            out.append(f"{left}->{right}" if left else part)
-        return out
-    return [x.strip().strip('"') for x in blob.split(", ") if x.strip()]
+
+class ClueMismatch(Exception):
+    """선언된 개수와 실제 글머리 줄 수가 다르다 — 절단이거나 clue 형태가 바뀌었다."""
+
+
+def axis_blocks(text: str) -> list[tuple[str, str]]:
+    """(축 이름, 그 축의 블록) 목록. 블록은 그 제목부터 다음 제목(또는 끝)까지다."""
+    marks: list[tuple[int, str]] = []
+    for title, name in AXES.items():
+        marks.extend((match.start(), name) for match in re.finditer(re.escape(title), text))
+    marks.sort()
+    blocks = []
+    for index, (start, name) in enumerate(marks):
+        end = marks[index + 1][0] if index + 1 < len(marks) else len(text)
+        blocks.append((name, text[start:end]))
+    return blocks
+
+
+def collect(block: str, header: re.Pattern[str], bullet: str) -> list[str] | None:
+    """머리글 뒤의 글머리 줄을 모은다. 그 머리글이 블록에 없으면 `None`(그 축은 초록이다)."""
+    found = header.search(block)
+    if not found:
+        return None
+    declared = int(found.group(1))
+    keys = []
+    for line in block[found.end() :].splitlines()[1:]:
+        stripped = line.strip()
+        if stripped.startswith(f"{bullet} "):
+            keys.append(stripped[2:])
+            continue
+        if stripped:
+            break  # 다음 머리글이거나 다른 출력 — 글머리 줄은 연속이다
+    if len(keys) != declared:
+        raise ClueMismatch(f"선언 {declared} · 읽은 줄 {len(keys)}")
+    return keys
 
 
 def main(log_path: str) -> int:
-    text = open(log_path, encoding="utf-8").read()
-    found = 0
-    for title, name in AXES.items():
-        match = re.search(re.escape(title) + r".*?but was:<\[(.*?)\]>", text, re.S)
-        if not match:
-            print(f"# {name}: 실패 블록 없음(그 축이 초록이거나 출력 형태가 다르다)")
+    try:
+        with open(log_path, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError as error:
+        print(f"로그를 읽을 수 없다: {error}", file=sys.stderr)
+        return 66
+
+    # 한 축의 이름은 로그에 여러 번 나온다(실패 줄 · 스택 줄). clue 를 담은 블록만 쓰고,
+    # 어느 블록에도 없으면 그 축을 한 번만 「초록」으로 적는다.
+    parsed: dict[str, tuple[list[str], list[str]] | None] = {}
+    for name, block in axis_blocks(text):
+        try:
+            extra = collect(block, EXTRA_HEADER, "+")
+            stale = collect(block, STALE_HEADER, "-")
+        except ClueMismatch as error:
+            print(f"{name}: clue 가 일관되지 않다 — {error}", file=sys.stderr)
+            return 3
+        if extra is None and stale is None:
+            parsed.setdefault(name, None)
             continue
-        found += 1
-        items = parse_items(match.group(1))
-        print(f"### {name} — {len(items)}")
-        for item in sorted(items):
-            print(item)
+        parsed[name] = (extra or [], stale or [])
+
+    read = 0
+    for name, found in parsed.items():
+        if found is None:
+            print(f"# {name}: clue 없음(그 축이 초록이다)")
+            continue
+        extra, stale = found
+        read += 1
+        print(f"### {name} — 허용 밖 관측 {len(extra)} · 낡은 허용 {len(stale)}")
+        for key in sorted(extra):
+            print(f"+ {key}")
+        for key in sorted(stale):
+            print(f"- {key}")
         print()
-    if found == 0:
+
+    if read == 0:
         print(
             "축 블록을 하나도 못 읽었다 — 전건 초록이거나 로그 형태가 바뀌었다."
             " 빈 출력을 성공으로 읽지 않도록 비영 종료한다.",
