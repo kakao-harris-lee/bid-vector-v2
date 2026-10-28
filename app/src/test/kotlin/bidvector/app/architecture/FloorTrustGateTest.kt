@@ -3,6 +3,7 @@ package bidvector.app.architecture
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -19,8 +20,12 @@ import org.junit.jupiter.api.TestInstance
  * 자기 멤버까지 허용 목록에 서명 키로 적는다. 등식은 부분집합이
  * 아니라 **관측 == 허용**이라, 허용 밖 자리와 낡은 허용 항목을 함께 센다.
  *
- * 통과 값의 **클래스 입도** 멤버 접근 쌍(ⓐ)은 `DivisionValueRules` 를 그대로 쓴다 — 거친 그물을
- * 하나 더 두는 것이고, 그 축이 잡는 것(새 멤버의 등장)은 코드 단위와 다른 사실이다.
+ * **자기 제외가 없는 것은 `FloorTrustRules` 가 지는 축들이다** — ⓐ′·ⓑ·ⓑ′·ⓒ·ⓓ. 통과 값의
+ * **클래스 입도** 멤버 접근 쌍(ⓐ)은 `DivisionValueRules` 를 그대로 쓰므로 **자기 제외가 남아
+ * 있다**(그 술어가 `caller == type` 을 걸러낸다). 그 축은 거친 그물을 하나 더 두는 것이고 —
+ * 잡는 것은 「새 멤버의 등장」이라는 코드 단위와 다른 사실이다 — 자기 메서드의 등장을 잡는
+ * 책임은 ⓐ′ 이하가 진다. 그래서 「세 축에서 자기 제외를 없앴다」(D-DEC10-20)는 ⓐ 를 포함하지
+ * 않는다.
  *
  * 텍스트 grep 술어가 없다 — 전부 컴파일된 바이트코드의 접근 집합이다.
  */
@@ -42,9 +47,31 @@ class FloorTrustGateTest {
         production.filter { it.fullName == policy.floorTrustRawType }.shouldNotBeEmpty()
     }
 
+    /**
+     * **등식의 붉은 출력은 대칭 차집합이다**(CR r4 M-2). 허용 키가 90 을 넘어 `shouldBe` 의
+     * 집합 출력이 kotest print 한도(기본 20)에서 잘렸고, 그러면 「어느 키가 늘었는가」가
+     * 출력에 없다 — 붉어도 읽을 수 없는 게이트는 사람을 부르지 못한다. 그래서 **허용 밖
+     * 관측**과 **낡은 허용**을 세어 clue 로 먼저 적는다(한도를 올리는 전역 설정은 모든 test 의
+     * 출력을 바꾸므로 쓰지 않는다 — r4 는 측정 동안만 올렸고 커밋하지 않았다).
+     */
+    private fun <T> Set<T>.shouldMatchAllowed(allowed: Set<T>) {
+        val extra = (this - allowed).map { it.toString() }.sorted()
+        val stale = (allowed - this).map { it.toString() }.sorted()
+        val clue =
+            buildString {
+                appendLine("허용 밖 관측 ${extra.size}")
+                extra.forEach { appendLine("  + $it") }
+                appendLine("낡은 허용 ${stale.size}")
+                stale.forEach { appendLine("  - $it") }
+            }
+        withClue(clue) { this@shouldMatchAllowed shouldBe allowed }
+    }
+
     @Test
     fun `ⓐ 게이트 통과 값의 멤버 접근 쌍 집합은 허용 집합과 같다 — 클래스 입도`() {
-        gatedClassRules.observedTypeAccesses(production) shouldBe policy.floorTrustGatedTypeAccessPairs.toSet()
+        gatedClassRules
+            .observedTypeAccesses(production)
+            .shouldMatchAllowed(policy.floorTrustGatedTypeAccessPairs.toSet())
     }
 
     /**
@@ -53,7 +80,9 @@ class FloorTrustGateTest {
      */
     @Test
     fun `ⓐ′ 생성 계열을 만지는 코드 단위 집합은 허용 집합과 같다`() {
-        gatedRules.observedCreationCodeUnits(production) shouldBe policy.floorTrustCreationCodeUnits.toSet()
+        gatedRules
+            .observedCreationCodeUnits(production)
+            .shouldMatchAllowed(policy.floorTrustCreationCodeUnits.toSet())
     }
 
     @Test
@@ -72,7 +101,9 @@ class FloorTrustGateTest {
      */
     @Test
     fun `ⓑ 원값을 얻는 코드 단위 쌍 집합은 허용 집합과 같다 — production 전 층`() {
-        rawRules.observedAcquisitionUnits(production) shouldBe policy.floorTrustRawAcquisitionPairs.toSet()
+        rawRules
+            .observedAcquisitionUnits(production)
+            .shouldMatchAllowed(policy.floorTrustRawAcquisitionPairs.toSet())
     }
 
     /**
@@ -82,7 +113,9 @@ class FloorTrustGateTest {
      */
     @Test
     fun `ⓑ′ 원값의 멤버 접근 코드 단위 쌍 집합은 허용 집합과 같다`() {
-        rawRules.observedMemberAccessUnits(production) shouldBe policy.floorTrustRawTypeAccessPairs.toSet()
+        rawRules
+            .observedMemberAccessUnits(production)
+            .shouldMatchAllowed(policy.floorTrustRawTypeAccessPairs.toSet())
     }
 
     /**
@@ -107,7 +140,7 @@ class FloorTrustGateTest {
                 .flatMap { type -> FloorTrustRules(type).observedCreationCodeUnits(production) }
                 .toSet()
 
-        observed shouldBe policy.floorTrustPolicyValueCreationCodeUnits.toSet()
+        observed.shouldMatchAllowed(policy.floorTrustPolicyValueCreationCodeUnits.toSet())
     }
 
     /**
@@ -122,7 +155,7 @@ class FloorTrustGateTest {
                 .flatMap { type -> FloorTrustRules(type).observedCreationCodeUnits(production) }
                 .toSet()
 
-        observed shouldBe policy.floorTrustPriceEntryCreationCodeUnits.toSet()
+        observed.shouldMatchAllowed(policy.floorTrustPriceEntryCreationCodeUnits.toSet())
     }
 
     @Test
