@@ -75,10 +75,14 @@ class FloorTrustGateCatchesViolationsTest {
     @Test
     fun `파생 접근자는 획득 축에 없고 운반 클래스는 두 축에 다 있다`() {
         val acquisitions = rawRules.observedAcquisitionUnits(violating).map { it.first.withoutSignature() }
+        val memberAccesses = rawRules.observedMemberAccessUnits(violating).map { it.first.withoutSignature() }
 
-        withClue("관측: $acquisitions") {
+        withClue("획득: $acquisitions · 멤버 접근: $memberAccesses") {
             acquisitions shouldNotContain "$fractionReader.fractionOf"
             acquisitions shouldContain "$carrier.rate"
+            // 「두 축에 다」의 둘째 축(CR r4 LOW) — 앞 판은 이 줄이 없어 이름이 단언하지 않는
+            // 것을 약속했다. 둘째 축의 존재는 다른 test 에 있었고, 이름이 가리키는 자리에 없었다.
+            memberAccesses shouldContain "$carrier.rate"
         }
     }
 
