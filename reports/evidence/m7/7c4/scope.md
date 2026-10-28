@@ -360,3 +360,19 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
    **7C ⑤ 와의 겹침: 없다**(팀장 지시 2026-10-26 ②). 그쪽은 같은 한도 때문에 `EmptyCandidateSource` ·
    `UnreachableWatchSubjectPort` · `UnreachableLicenseGatePort` 를 `EvaluationTestDoubles.kt` 로 옮긴다 — 옮기는
    **선언 집합이 서로 소**이고 파일 이름도 다르다. 병합은 같은 파일의 **다른 hunk 삭제** 둘이 된다.
+
+### 계약 갱신 — 2026-10-28 (운영자 결정): `awaiting` 과 체크리스트 operation 을 이 slice 에서 뺀다
+
+**실측이 전제를 깼다.** D-7C4-8 Q3 은 「7C ② 의 평탄 술어 확장이 머지된 뒤 짝 배열로 넣는다」였는데,
+7C②-a 가 머지된 main(`1632242e`)에서도 그 확장이 **없다**: 계약 게이트의 평탄 술어는 속성이 **스칼라
+또는 스칼라 배열**일 때만 통과시키고(해당 test 의 diff 0 줄), 병합된 spec 전체에 깊이 1 object 속성이
+**0** 이다. 그래서 짝 배열(`awaiting: [{item, prerequisite}]`)은 지금 계약 test 에서 거부된다.
+
+**결정(2026-10-28)**: 2b 는 **operation 여섯**으로 종결하고, 체크리스트 operation 과 `awaiting` 은
+**`OPEN-7C4-AWAITING-CHECKLIST`** 로 등재해 별 slice 가 닫는다. 근거는 술어 확장이 **두 레인이 공유하는
+계약 게이트 변경**이라 별 설계 검토가 필요하고, 2b 는 측정이 끝난 상태로 종결할 수 있다는 것이다.
+스칼라 배열 둘로 먼저 내고 뒤에 짝 배열로 옮기는 길은 **택하지 않는다**(wire 를 두 번 바꾼다 — Q3 그대로).
+
+**D-7C4-8 은 그대로 남는다**: 세 상태(완료 · 미완 · 선행 대기)를 두 상태로 접은 응답은 어느 경우에도
+내보내지 않는다. 그래서 체크리스트 endpoint 는 `awaiting` 과 **함께** 선다 — 그때까지 그 endpoint 를
+내지 않는 것이 이 결정의 내용이다. 정본은 capability map 의 OPEN 행이고 이 절은 포인터다.

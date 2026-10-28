@@ -151,7 +151,7 @@ D-6A1-12 정의(「PR 시점 main 최대보다 크고 선점 통보 번호를 �
 | `listConstructionCapacities` | GET `/api/profile/construction-capacities` | 최상위 배열(F5 — 7B 관례) |
 | `upsertConstructionCapacity` | POST `/api/profile/construction-capacities` | 면허명·금액·기준연도 한 행 |
 | `removeConstructionCapacity` | POST `/api/profile/construction-capacities/remove` | 면허명 한 행 삭제(값을 경로에 넣지 않기 위해 본문으로) |
-| `readOnboardingChecklist` | GET `/api/onboarding-checklist` | 0.8 |
+| `readOnboardingChecklist` | GET `/api/onboarding-checklist` | 0.8 — **2b 가 내지 않는다**: `OPEN-7C4-AWAITING-CHECKLIST`(전제는 평탄 술어의 「깊이 1 object」 확장) |
 
 **근거**
 
@@ -496,6 +496,9 @@ use case 가 upsert 전에 행 수를 센다. **검사-후-삽입은 경합한�
 3. **오늘 앱 경로로 닿는 제약 위반이 없다** — 값 타입이 먼저 거부하기 때문이다. 그래서 번역은 방어 겹이고, 실
    DB test 는 **없는 계정**(외래 키)으로 그 경로를 연다.
 4. `OperatorSessionController` 의 private 401 사본은 그대로다(7D 파일 — 공용화 후속 후보).
+4b. **체크리스트 operation 이 없다** — 그 endpoint 와 `awaiting` 은 `OPEN-7C4-AWAITING-CHECKLIST` 가 닫는다
+   (전제: 평탄 술어의 「깊이 1 object」 확장). 2a 가 세운 판정 커널은 production 경로가 없는 채로 남고,
+   화면 A 는 그 slice 뒤에 체크리스트를 그릴 수 있다.
 5. **V12 자격 사실 쓰기는 계정 경계 밖이다**(r2 v F3 — 앞 판은 이것을 「동시 편집」으로 줄여 적었다). 어느 계정의
    세션이 쓰든 **모든 계정이 보는** 한 행을 덮고, 그 값은 모든 계정의 프로필 조회와 자격 판정 입력이 된다. 경로가
    계정 범위이고 요청에 `accountId` 자리가 없다는 것이 **소유 경계를 만들지 않는다**. D-7C4-1 §0.6 이 「V12 기존
@@ -573,13 +576,19 @@ architecture test 셋과 `:app:ktlintMainSourceSetCheck`. 등재 항목은 **그
 
 ### 5.8 이 판정에서 빠지는 것 — `awaiting` 과 체크리스트 operation
 
-D-7C4-8 Q3 대로 **`awaiting` 응답과 시작하기 체크리스트 operation 은 이 라운드에 없다**. 7C ② 의 평탄
-술어 확장이 main 에 없어서 짝 배열을 지금 넣으면 계약 test 가 붉고, 스칼라 배열 둘로 먼저 내면 나중에
-wire 를 한 번 더 바꾸게 된다. **세 상태를 두 상태로 접은 응답은 어느 경우에도 내지 않는다**는 결정에 따라
-체크리스트 endpoint 자체를 `awaiting` 과 함께 세운다.
+**`awaiting` 응답과 시작하기 체크리스트 operation 은 이 slice 에서 빠진다 — 별 slice 다**
+(`OPEN-7C4-AWAITING-CHECKLIST`, 운영자 결정 2026-10-28).
 
-그래서 이 판정이 덮는 표면은 **operation 여섯**이고, 7C ② 머지 뒤 main 을 병합해 `awaiting` 을 짝 배열로
-넣은 다음 다시 동결한다. 동결 직전인데도 7C ② 가 main 에 없으면 보고한다.
+D-7C4-8 Q3 은 「7C ② 머지 뒤 짝 배열로 넣는다」였고 그 전제는 **평탄 술어의 「깊이 1 object」 확장**
+이었다. 7C②-a 가 머지된 main 에서 그 전제를 쟀더니 **확장이 없었다**: 계약 게이트의 평탄 술어가 그대로
+(해당 test diff 0 줄)이고 병합된 spec 에 깊이 1 object 속성이 **0** 이다. 짝 배열은 지금 거부된다.
+
+술어 확장은 **두 레인이 공유하는 계약 게이트 변경**이라 별 설계 검토가 필요하고, 2b 는 측정이 끝난
+상태로 종결할 수 있다 — 그래서 이 판정이 덮는 표면은 **operation 여섯 + OPEN 하나**다. 스칼라 배열 둘로
+먼저 내고 뒤에 옮기는 길은 택하지 않는다(wire 를 두 번 바꾼다).
+
+**D-7C4-8 은 그대로 남는다**: 세 상태를 두 상태로 접은 응답은 내보내지 않으므로 체크리스트 endpoint 는
+`awaiting` 과 함께 선다. 그때까지 그 endpoint 를 내지 않는 것이 이 slice 의 상태다.
 
 ## §6 r2 — 승인 전 일괄 (verifier r1 ready-for-review · code-review r1 approve)
 

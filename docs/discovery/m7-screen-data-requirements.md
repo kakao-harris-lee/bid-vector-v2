@@ -34,7 +34,7 @@
 | 관심 업종·지역어·필수/제외 키워드 | 감시 조건 | STR-01 · STR-02 | `readStrategy` `focusCategories`·`focusRegionTerms`·`excludeRegionTerms`·`requiredKeywordTerms`·`excludeKeywordTerms` + 편집 세션 | ⓐ | — |
 | 알림 채널 선택(앱 기본 · 텔레그램 · 메일) | 채널 복제 | NOTI-03 | 없음 | ─ | R-4: 알림함 기록까지. 채널 선택 UI 는 `OPEN-STR-12` 결정 뒤 |
 | 첫 공고 미리보기 + 「어느 입력이 좁혔는가」 | 조건 확인 | STR-16 · QUAL-02 | `evaluateDryRun` 은 결과별 **공고 ID 배열**만(D-6A3-6) — 제목·기관·좁힌 사유 없음 | ⓑ | 7C ①(검색) + `OPEN-6A3-EVALUATION-DETAIL` |
-| 체크리스트 진행 상태 | 항목별 완료 | (없음) | 없음 | ⓑ | 7C ④(프로필 완료 판정은 서버가 — 클라이언트 추론 금지) |
+| 체크리스트 진행 상태 | 항목별 완료 | (없음) | 없음 | ⓑ | 7C ④ 가 판정 커널을 세웠고(서버가 판정 — 클라이언트 추론 금지) **HTTP operation 은 `OPEN-7C4-AWAITING-CHECKLIST` 로 별 slice** — 전제는 평탄 술어의 「깊이 1 object」 확장이다 |
 
 ## B. 오늘의 공고 (홈 · 검색)
 
