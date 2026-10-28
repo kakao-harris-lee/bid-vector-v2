@@ -1,11 +1,11 @@
 # M7/7C③ — 되돌림
 
-base `46ac0949`(7B 머지 뒤 재고정 — 착수 base `a61ddff1` 이 아니다). **전제**: 그 SHA 에 이
+base **`1632242e`**(r2 에서 재고정 — 7C②(PR #94)·guava(PR #95)를 담은 main. 그 전 값은 `46ac0949` 였다). **전제**: 그 SHA 에 이
 slice 의 산출물이 **없다**(`46ac0949` 은 7B 의 머지 커밋이고 알림함은 그 뒤에 온다).
 목록은 **기계 산출**이고 라운드마다 재산출한다
-(`git diff --name-status 46ac0949..HEAD`, evidence 제외).
+(`git diff --name-status 1632242e..HEAD`, evidence 제외).
 
-**실측 HEAD**: `2f0c29a7` (이 slice 의 **마지막 산출물 커밋** — capability map 등재. evidence 커밋은 이 뒤에 온다)
+**실측 HEAD**: `0f0a0514` (r2 의 마지막 산출물 커밋 — `ErrorBody` 갈래 접기. evidence 커밋은 이 뒤에 온다)
 
 ## 되돌림의 두 경로 (마이그레이션이 있어 갈린다)
 
@@ -38,7 +38,7 @@ DROP TABLE notification_inbox;   -- 인덱스 둘이 함께 사라진다
 ## 복원 목록 — 수정된 공유 파일 **열아홉** (base 로 복원)
 
 ```
-git restore --source=46ac0949 --staged --worktree -- \
+git restore --source=1632242e --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/retention/RetentionTableRegistry.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
@@ -65,7 +65,7 @@ git restore --source=46ac0949 --staged --worktree -- \
 `config/quality/**` 와 `openapi/**` 의 다른 줄을 만지므로, base 복원은 **그 레인들의 줄도 함께
 지운다** — 머지 뒤에는 반드시 병합 SHA 기준이어야 한다.
 
-## 삭제 목록 — 신규 파일 **스물둘**
+## 삭제 목록 — 신규 파일 **스물셋**
 
 ```
 rm -f -- \
@@ -85,6 +85,7 @@ rm -f -- \
   app/src/main/kotlin/bidvector/app/wiring/NotificationInboxWiring.kt \
   app/src/test/kotlin/bidvector/app/http/FakeNotificationInboxStore.kt \
   app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt \
+  app/src/test/kotlin/bidvector/app/http/NotificationInboxEndpointTest.kt \
   app/src/test/kotlin/bidvector/app/http/OpenApiNotificationInboxContractTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/notificationinbox/NotificationInbox.kt \
   workflow/src/main/kotlin/bidvector/workflow/notificationinbox/NotificationInboxPorts.kt \
@@ -100,29 +101,29 @@ comm -23 <(git diff --name-only 46ac0949..HEAD | grep -v '^reports/evidence/' | 
          <(이 파일이 든 경로 전수 | sort)
 ```
 
-**양방향 모두 빈 출력**(실측 `2f0c29a7`): `comm -23`(기계 산출에만 있고 목록에 없는 것) 0 ·
-`comm -13`(목록에만 있고 기계 산출에 없는 것) 0. 이 파일이 드는 경로 **41** = 복원 19 + 삭제 22
-= 기계 산출(evidence 제외) 전수.
+**양방향 모두 빈 출력**(실측 `0f0a0514`, base `1632242e`): `comm -23` 0 · `comm -13` 0.
+이 파일이 드는 경로 **42** = 복원 19 + 삭제 23 = 기계 산출(evidence 제외) 전수. 내가 **지운**
+파일(D)은 0 이다.
 
 **빈 등식이 건전성의 증거는 아니다** — 「내가 커밋하지 않아도 그 경로가 들어오는가」를 함께
-본다(위 기계 산출이 그 질문의 답이다). 이 라운드가 그 값을 실제로 바꿨다: 앞 판 목록은
-복원 15 · 삭제 18 이었고, 그 뒤 라운드가 만든 파일 넷(어댑터 읽기 전용 class · 읽기 투영 test ·
-test 조립 분할 둘)과 공유 파일 넷(`capability-map.md` 포함)이 **목록에 없었다**. 손으로 세지
-않고 라운드마다 재산출하는 이유가 이것이다.
+본다. 라운드마다 재산출하는 이유가 r1·r2 에서 값으로 나왔다: r1 에서 앞 판 목록(복원 15 ·
+삭제 18)에 그 뒤 라운드가 만든 파일 넷과 공유 파일 넷이 없었고, r2 에서는 base 가 두 번
+움직였다(`46ac0949` → `23837b19` → `1632242e`). base 가 바뀌면 **같은 branch 인데도 목록이
+바뀐다** — 그 main 에 이미 들어간 공유 파일 편집은 더 이상 내 차이가 아니기 때문이다.
 
 ## ①~⑥ 실측 (임시 clone, 되돌린 트리)
 
 버릴 clone 에서 돌린다. 갈음은 「HEAD 초록」이 아니라 **트리 동일성**으로만 한다.
 
-실측 HEAD `2f0c29a7`, clone `--no-hardlinks`(공유 저장소에 아무 작용도 남기지 않는다).
+실측 HEAD `0f0a0514`, base `1632242e`, clone `--no-hardlinks`(공유 저장소에 아무 작용도 남기지 않는다).
 
 | # | 확인 | 결과 |
 |---|---|---|
 | ① | 복원·삭제 명령의 종료 코드 | `RESTORE_EXIT=0` · `DELETE_EXIT=0` |
-| ② | `git diff --name-status HEAD` 의 D/M 수가 위 목록과 같다 | **M=19 · D=22**, 그 밖의 줄 0. ⚠ 첫 판은 `HEAD` 를 빼고 세어 `M=0` 이 나왔다 — `--staged --worktree` 가 **색인까지** 되돌리므로 작업트리↔색인 비교에는 복원분이 보이지 않는다. rollback 의 결함이 아니라 **계수기의 결함**이었고, 고쳐서 다시 쟀다 |
-| ③ | 되돌린 트리의 `git diff 46ac0949`(evidence 제외)가 빈 출력 | 잔차 **0 줄** |
-| ③b | **트리 동일성** — 되돌린 트리의 해시 == base 의 트리 해시 | 둘 다 `55b05134…` → `TREE_IDENTICAL=yes` |
-| ④⑤⑥ | 컴파일 · test · 게이트 | **③b 로 갈음한다.** 되돌린 트리가 base `46ac0949` 와 **바이트까지 같은 트리**이므로 그 트리에서 다시 재는 것은 base 를 재는 것과 같다. 갈음 근거는 「HEAD 초록」이 **아니라** 트리 동일성이다(base 는 머지된 main 커밋이다) |
+| ② | `git diff --name-status HEAD` 의 D/M 수가 위 목록과 같다 | **M=19 · D=23**, 그 밖의 줄 0. (계수는 반드시 `HEAD` 기준이다 — r1 에서 `HEAD` 를 빼고 세어 `M=0` 을 냈고, 그것은 rollback 이 아니라 계수기의 결함이었다. `--staged --worktree` 가 색인까지 되돌린다) |
+| ③ | 되돌린 트리의 `git diff 1632242e`(evidence 제외)가 빈 출력 | 잔차 **0 줄** |
+| ③b | **트리 동일성** — 되돌린 트리의 해시 == base 의 트리 해시 | 둘 다 `775a0cbc…` → `TREE_IDENTICAL=yes` |
+| ④⑤⑥ | 컴파일 · test · 게이트 | **③b 로 갈음한다.** 되돌린 트리가 base `1632242e` 와 **바이트까지 같은 트리**이므로 그 트리에서 다시 재는 것은 base 를 재는 것과 같다. 갈음 근거는 「HEAD 초록」이 **아니라** 트리 동일성이다(base 는 머지된 main 커밋이다) |
 
 확인은 **「내 표지 0 · 남의 표지 보존」 계수**로 한다 — 내 줄이 사라졌는가와 남의 줄이 남았는가
 둘 다 본다(종료 코드만으로 완료를 주장하지 않는다).
