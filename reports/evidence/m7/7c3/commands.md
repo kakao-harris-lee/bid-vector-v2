@@ -131,7 +131,7 @@ exit 0 · `npm ci` 265 packages · `operator-api.ts` **+314 줄 · 삭제 0**. �
 표적은 `checklist.md` §0.9 의 우회 표다. **더하기만 한 변이는 초록이므로 바꿔치운다**(음성
 대조를 함께 남긴다). 변이 **전에 커밋**한다 — 미커밋 산출물이 복원으로 함께 지워지지 않게.
 
-## (기록) — 비밀값 스캔
+## 비밀값 스캔
 
 ```
 grep -rniE -f config/quality/leak-patterns.txt <이 slice 가 더한 경로들>
@@ -139,13 +139,13 @@ grep -rniE -f config/quality/leak-patterns.txt <이 slice 가 더한 경로들>
 
 참조형으로만 돌린다(어휘를 이 파일에 축어로 적지 않는다).
 
-**실측(`b65e35d0`, 42 경로 전수)**: 적중 **21 줄**. 각 줄을 `git blame` 으로 귀속해 이 slice 가
+**실측(`db991f25`, 42 경로 전수)**: 적중 **21 줄**(r4 가 더한 적중 **0** — 라운드마다 재측정한다). 각 줄을 `git blame` 으로 귀속해 이 slice 가
 **더한 줄은 넷**이고(나머지 열일곱은 이 slice 가 만지기 전부터 있던 줄), 넷 전부 요청 판독의
 **공개 어휘 토큰**을 담는 지역 변수 이름과 그것을 인용한 허용 목록 사유 문단이다 — **값 0**.
 귀속을 같이 세는 이유: 적중 수만 적으면 남이 만든 줄과 내가 만든 줄이 한 숫자에 섞여, 다음
 라운드에 그 수가 움직여도 누구 것이 움직였는지 알 수 없다.
 
-## (기록) — clean-tree 게이트
+## clean-tree 게이트
 
 ```
 git status --porcelain -- <in_scope 개별 인자>
@@ -153,18 +153,20 @@ git status --porcelain -- <in_scope 개별 인자>
 
 빈 출력 + 양성 대조 1회(비파괴 절삭 — `checkout --` 를 쓰지 않는다).
 
-**실측(`b65e35d0`)**: 42 경로를 **개별 인자**로 넘겨 음성 쪽 `PORCELAIN_EXIT=0` · **0 줄**.
+**실측(`db991f25`)**: 42 경로를 **개별 인자**로 넘겨 음성 쪽 `PORCELAIN_EXIT=0` · **0 줄**.
 양성 대조는 V23 파일을 비파괴로 바꾼 뒤(사본을 떠 두고 주석 한 줄 덧댐 → **사본으로** 되돌림)
 같은 명령이 **그 한 파일만** 들고 오는지 보았다 — 출력 **정확히 1 줄**(` M …V23__notification_inbox.sql`),
 되돌린 뒤 다시 **0 줄** 이고 `git diff --stat` 도 0 줄이다. `checkout --` 는 쓰지 않는다 —
 미커밋 산출물을 함께 지우기 때문이다.
 
-## (기록) — acceptance: `check` job · `web` job · `container` job
+## acceptance: `check` job · `web` job · `container` job
 
 `ci.yml` 의 job 명령 **그대로**다. 명령·종료 코드·실행 계수는 `checklist.md` §4 가 든다(여기서
-다시 적지 않는다). 요지: **판정 SHA `b65e35d0`** 에서 `clean`·`check`·`qualityBaseline`·
-web(W-1~W-9)·S-20 **열셋 전부 0**, FAILED task 0. 그 창에서 test task 아홉이 **FROM-CACHE** 로
-복원됐으므로 이 slice 의 test 가 사는 세 모듈을 `--rerun` 으로 강제해 계수를 따로 쟀다(§4).
+다시 적지 않는다). 요지: **판정 SHA `db991f25`** 에서 `clean`·`check`·`qualityBaseline`·
+web(W-1~W-9)·S-20 **열셋 전부 0**, FAILED task 0. 이 창에서는 `:adapters:test`·`:app:test` 가
+**표식 없이 실행**됐고 `:workflow:test` 만 FROM-CACHE 라, 그 하나를 `--rerun` 으로 강제해 세
+모듈 전부를 실행 계수로 남겼다(§4). 라운드마다 이 구분을 다시 보는 이유는 r3 에서 같은 명령이
+test task 아홉을 **복원**으로 처리했기 때문이다 — 캐시 적중은 창마다 다르다.
 
 `container` job 은 **CI 의 PR head 커밋이 정본**이다(팀장 2026-10-27 — 부분 게이트는 안 돌린
 것과 같고 줄일 수 있는 단위는 job 이다). 로컬에서 `bootJar`·앱 이미지·위생만 돌린 것은
@@ -257,7 +259,7 @@ D-7C3-1 ① 로 **7B → 7C③ 머지 순서**가 정해졌다. 그래서 이 sl
 ## rollback ①~⑥ (임시 clone, 되돌린 트리)
 
 `rollback.md` 가 목록·실측 HEAD·①~⑥ 표를 든다(여기서 다시 적지 않는다). 요지: base
-`0768bda1` · 실측 HEAD `b65e35d0` · 복원 19 · 삭제 23 · 되돌린 트리가 base 와 **바이트까지 같은
+`0768bda1` · 실측 HEAD `db991f25` · 복원 19 · 삭제 23 · 되돌린 트리가 base 와 **바이트까지 같은
 트리**(`924ccdb8…`) · 내 표지 0 · 남의 표지 보존.
 
 ## 조립 분할과 허용 목록 등재 (2026-10-27 — `HttpTestApplication` 를 자기 파일로)
