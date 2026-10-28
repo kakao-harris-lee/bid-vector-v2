@@ -356,3 +356,17 @@ fixture 단언을 바꿨으므로 그 표적을 다시 쟀다.
   진입 타입과 무관하게 컴파일 불가였다), 지금은 **둘 다** D-DEC10-22 를 가른다. 변이 뒤 그
   경로의 작업 트리 잔여 0(evidence 편집만 남는다).
 
+### acceptance — Kotlin `check` 전건 (일괄 뒤 1회)
+
+- cmd: `./gradlew --no-daemon check` (CI `check` job 의 명령 그대로) @ `2f26825c`(장부 커밋 —
+  산출물은 `f116dd02`, 그 사이 차이는 evidence `.md` 뿐이고 Gradle task 의 입력이 아니다)
+- exit: **0** — `BUILD SUCCESSFUL in 24m 45s`, 474 actionable tasks.
+- `ml-engine`·`web`·`container` job 은 입력 변경 0 이라 생략한다. 일괄이 만진 `.py` 는 루트
+  `tools/` 라 `ml-engine` 작업 디렉터리의 ruff·mypy 범위 밖이다(제한 ⑫) — 그 사실이 생략의
+  근거이자 그 파일의 회귀가 **사람이 돌려 봐야** 잡힌다는 제한의 근거다.
+
+### 비밀값 스캔 · clean-tree (일괄)
+
+- `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
+- `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음
+

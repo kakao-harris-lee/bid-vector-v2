@@ -165,7 +165,7 @@ r5 가 `config/quality/gate-tests.properties` 에 새 test 클래스를 **만드
 | 항목 | 상태 |
 | --- | --- |
 | 구현 diff 커밋·clean tree | `commands.md` 의 clean-tree 판정(양성 대조 포함) |
-| acceptance 전건 exit 0 | **`5099b8bb`**(r5 의 마지막 산출물 커밋)에서 `./tools/one-command-check.sh` exit **0** — `commands.md` 의 S-20(r5 CR) 절이 마침 줄을 적는다. 앞 라운드들의 `check` 전건도 같은 절에 있다 |
+| acceptance 전건 exit 0 | **`5099b8bb`** 에서 `./tools/one-command-check.sh` exit **0**(Kotlin + Python + web 전건, 마침 줄 기록) · 승인 전 일괄 뒤 **`2f26825c`** 에서 Kotlin `check` 전건 exit **0**(24m 45s · 474 task). 일괄은 `ml-engine`·`web` 입력을 만지지 않았다 |
 | 변경된 정책 version 근거 | 위 표 |
 | 알려진 제한·rollback | 이 문서 · `rollback.md` |
 | 비밀값 스캔 | `commands.md`(참조형) |
