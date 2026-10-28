@@ -141,6 +141,8 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.AnalysisBudget,
                 EvaluationDropReason.AnalysisBudgetExhausted,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         } else {
             null
@@ -157,7 +159,7 @@ class EvaluateCandidatesUseCase internal constructor(
     ): CandidateEvaluation.NotReached? =
         when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
             is CandidateScreening.Passed -> null
-            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason)
+            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason, null)
         }
 
     private fun thresholdConfigurationDrop(
@@ -173,6 +175,8 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ThresholdConfiguration,
                 EvaluationDropReason.ActionThresholdsNotConfigured,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         }
 
@@ -206,6 +210,8 @@ class EvaluateCandidatesUseCase internal constructor(
                     correlationId,
                     EvaluationStage.MlAvailability,
                     EvaluationDropReason.SimilarityProjectionNotReady,
+                    // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                    null,
                 )
             }
 
@@ -405,15 +411,16 @@ private fun NotificationRequestPort.requestFor(
 }
 
 /**
- * `floorExclusion` 기본값이 `null` 인 것은 **분석 전 가지**(화면·공고 선별·ML 미가용)가 그 축을
- * 계산하지 않았기 때문이다. 최소 점수 드롭은 분석을 **받은 뒤**라 호출부가 그 값을 넘긴다
- * (r1 CR M-1).
+ * `floorExclusion` 은 **필수 인자다 — 기본값이 없다**(r2 CR M-3). D-DEC10-8 이 형제 자리
+ * (`MlAnalysisOutcome.Analyzed`)에 정한 것과 같은 규율이고, 이유도 같다: 칸을 비워 두는 길이
+ * 있으면 **분석 뒤** 드롭 가지가 하나 더 생길 때 컴파일이 아무 말 없이 계수를 버린다. 분석 전
+ * 가지(화면·공고 선별·ML 미가용)는 그 축을 계산하지 않았으므로 `null` 을 **명시**한다.
  */
 private fun notReached(
     notice: Notice,
     correlationId: CorrelationId,
     stage: EvaluationStage,
     reason: EvaluationDropReason,
-    floorExclusion: PublishedFloorExclusion? = null,
+    floorExclusion: PublishedFloorExclusion?,
 ): CandidateEvaluation.NotReached =
     CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason, floorExclusion)
