@@ -39,9 +39,14 @@ class FakeNotificationInboxStore : NotificationInboxStore {
     @Volatile
     var lastRequest: NotificationPageRequest? = null
 
+    /**
+     * 마지막 단건 읽음 처리 대상 — **판독한 종류와 공고 쌍이 그대로 포트에 닿았는지** 보는 자리다.
+     * 상태 코드로는 보이지 않는다(종류 토큰이 뒤바뀌어도 200 이다).
+     */
     @Volatile
     var lastItem: NotificationItemKey? = null
 
+    /** 마지막 묶음 읽음 처리 대상 — 같은 축이고, 이쪽은 **종류를 싣지 않는** 것까지 재는 자리다. */
     @Volatile
     var lastNotice: NoticeId? = null
 

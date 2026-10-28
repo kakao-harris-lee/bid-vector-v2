@@ -107,12 +107,12 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
 
     /**
      * 양성 대조 — **r2 가 뚫은 두 꼴을 술어 로직만으로 고정한다**(verifier M1 · CR MEDIUM-1).
-     * 아래 정의 문자열은 PostgreSQL 이 `pg_get_constraintdef` 로 되돌려 주는 형태 그대로다.
+     * 두 문자열은 PostgreSQL 16.4 가 `pg_get_constraintdef` 로 돌려준 **그대로**다(직접 렌더링해
+     * 확인). 앞 판 술어는 `= ANY (ARRAY[` **포함**만 봐서 둘을 「닫힘」으로 셌다.
      *
-     * 앞 판 술어는 `= ANY (ARRAY[` **포함**만 봐서 ⓐ·ⓑ 를 「닫힘」으로 셌다. 지금은 정의 전문이
-     * 한 형태와 **일치**해야 하므로 둘 다 열림으로 떨어진다. ⓒ·ⓓ 는 **음성 대조**다 — 진짜
-     * 어휘 CHECK 두 꼴(캐스트 없는 쪽·있는 쪽)이 여전히 닫힘으로 세어져야 한다. 음성 대조가
-     * 없으면 「전부 열림으로 센다」는 퇴화가 이 test 를 통과한다.
+     * ⓑ 의 `"left"` 가 큰따옴표인 것은 PG 의 출력이 그렇기 때문이다 — `left` 는 예약어라
+     * deparse 가 따옴표를 씌운다. 앞 판은 이 자리를 손으로 `left(note, 1)` 이라 적어, 거부
+     * 결과는 같았지만 「실제 꼴을 잰다」는 주장이 ⓑ 에서만 성립하지 않았다(r3 CR LOW-1).
      */
     @Test
     fun `OR 꼬리와 함수로 감싼 어휘 CHECK 는 닫힘으로 세지 않는다 — 양성 대조`() {
@@ -120,13 +120,25 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
         """CHECK (((memo = ANY (ARRAY['x'::text, 'y'::text])) OR (memo IS NOT NULL)))"""
             .closesVocabularyOf("memo") shouldBe false
         // ⓑ 닫히는 것은 열이 아니라 함수값이다.
-        """CHECK ((left(note, 1) = ANY (ARRAY['a'::text, 'b'::text])))"""
+        """CHECK (("left"(note, 1) = ANY (ARRAY['a'::text, 'b'::text])))"""
             .closesVocabularyOf("note") shouldBe false
-        // ⓒ·ⓓ 음성 대조 — 진짜 어휘 CHECK 는 닫힘이다.
+    }
+
+    /**
+     * 음성 대조 — **진짜 어휘 CHECK 두 꼴이 여전히 닫힘으로 세어져야 한다.** 이것이 없으면
+     * 「모든 정의를 열림으로 센다」는 퇴화가 위 양성 대조를 그대로 통과한다.
+     *
+     * 두 꼴의 출처를 가른다(둘 다 PG 16.4 실측): 캐스트 없는 쪽은 **`TEXT` 열**의 `IN` 이고
+     * 이 표의 `kind`·`detail_code` 가 그 꼴이다. 캐스트 있는 쪽은 **`varchar` 열에 `::text` 를
+     * 명시한** `IN` 이다 — 이 표에는 없고, 앞 판은 그 꼴에 `detail_code` 라는 이름을 붙여
+     * 「이 표의 detail_code 가 캐스트 꼴로 돌아온다」로 읽힐 수 있었다. 그렇지 않다.
+     */
+    @Test
+    fun `진짜 어휘 CHECK 두 꼴은 닫힘으로 센다 — 음성 대조`() {
         """CHECK ((kind = ANY (ARRAY['NEW_CANDIDATE'::text, 'AWARD_DECIDED'::text])))"""
             .closesVocabularyOf("kind") shouldBe true
-        """CHECK (((detail_code)::text = ANY (ARRAY['AWARDED'::text, 'NOT_AWARDED'::text])))"""
-            .closesVocabularyOf("detail_code") shouldBe true
+        """CHECK (((legacy_code)::text = ANY (ARRAY['AWARDED'::text, 'NOT_AWARDED'::text])))"""
+            .closesVocabularyOf("legacy_code") shouldBe true
     }
 
     /**
@@ -310,10 +322,10 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
      * 형태여야 하고, `<> ''`·형태 정규식(`~`)처럼 집합을 열어 두는 CHECK 는 들지 않는다.
      * 판정은 포함이 아니라 **정의 전문 일치**다([closesVocabularyOf]).
      */
-    private fun vocabularyClosedColumnsOf(table: String): Set<String> {
-        val checks = singleColumnChecksOf(table)
-        return checks.filterKeys { column -> checks.getValue(column).any { it.closesVocabularyOf(column) } }.keys
-    }
+    private fun vocabularyClosedColumnsOf(table: String): Set<String> =
+        singleColumnChecksOf(table)
+            .filter { (column, definitions) -> definitions.any { it.closesVocabularyOf(column) } }
+            .keys
 
     /** 열 이름 → 그 열 **하나만** 가두는 CHECK 정의들. */
     private fun singleColumnChecksOf(table: String): Map<String, List<String>> =
