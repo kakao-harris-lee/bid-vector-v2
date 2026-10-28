@@ -238,4 +238,3 @@ class RecordingAuditSink {
         records += record
     }
 }
-
