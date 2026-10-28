@@ -110,23 +110,45 @@ class FloorTrustCompileFailureHarnessTest {
     /** 세탁 꼴 ① — 파싱해 만든 **율**을 진입에 넘긴다. */
     @Test
     fun `11 ③ 의 진입은 날 율을 받지 않는다`() {
-        assertNegativeFails("11-margin-entry-with-bare-rate", "argument type mismatch")
+        assertNegativeFails("11-margin-entry-with-bare-rate", "argument type mismatch", ENTRY_TYPE_EXPECTED)
     }
 
     @Test
     fun `11-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "11-margin-entry-with-bare-rate-typo",
-            realDiagnosticFragment = "argument type mismatch",
+            realDiagnosticFragment = ENTRY_TYPE_EXPECTED,
         )
     }
 
-    /** 세탁 꼴 ② — 영속 행에서 꺼낸 **`BigDecimal`** 을 진입에 넘긴다. */
+    /**
+     * 세탁 꼴 ② — 영속 행의 `BigDecimal` 을 **율로 만들어** 진입에 넘긴다.
+     *
+     * 앞 판은 날 `BigDecimal` 을 그대로 넘겼는데 그 꼴은 진입이 `Rate?` 였던 시절에도 컴파일되지
+     * 않아 **D-DEC10-22 를 가르지 못했다**(verifier r5 L-1 — 되돌림 변이 R1 에서 11 만 RED,
+     * 12 는 초록). 지금 꼴은 되돌리면 컴파일되므로 그 변이가 둘 다 RED 로 만든다.
+     */
     @Test
-    fun `12 ③ 의 진입은 날 BigDecimal 도 받지 않는다`() {
-        assertNegativeFails("12-margin-entry-with-bigdecimal", "argument type mismatch")
+    fun `12 ③ 의 진입은 영속 행에서 지은 율도 받지 않는다`() {
+        assertNegativeFails("12-margin-entry-with-bigdecimal", "argument type mismatch", ENTRY_TYPE_EXPECTED)
+    }
+
+    @Test
+    fun `12-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "12-margin-entry-with-bigdecimal-typo",
+            realDiagnosticFragment = ENTRY_TYPE_EXPECTED,
+        )
     }
 }
+
+/**
+ * ③ 진입 폐쇄의 진단을 **심볼로 지목**하는 조각(CR r5 M-2 · verifier r5 L-1). 일반 단편
+ * `"argument type mismatch"` 는 **어느 인자가** 어긋났는지 보지 않아, `marginInputsFrom` 의
+ * 다른 인자 타입이 바뀌어도 fixture 가 초록으로 남는다. 같은 처방을 이 저장소가 두 번 세웠다 —
+ * `CONSTRUCTOR_DENIED`(r1 CR L-2) · `COPY_DENIED`(DEC-05 r5 V5-M1).
+ */
+private const val ENTRY_TYPE_EXPECTED = "'PlausibleFloorRate?' was expected"
 
 /**
  * r1 CR L-2 — 일반 단편 `"cannot access"` 는 **다른 접근 실패**에도 참이다(import 한 타입 자체가

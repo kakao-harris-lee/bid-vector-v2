@@ -6,9 +6,12 @@ import bidvector.decision.priority.derive.marginInputsFrom
 import bidvector.sharedkernel.Rate
 import java.math.BigDecimal
 
+// 영속 행에서 꺼낸 `BigDecimal` 을 **율로 만들어** 진입에 넘긴다(r4 lnd 세탁 꼴 ②).
+// 날 `BigDecimal` 을 그대로 넘기는 앞 판 꼴은 진입이 `Rate?` 였던 시절에도 컴파일되지
+// 않았으므로 D-DEC10-22 를 가르지 못했다(verifier r5 L-1 실측: 되돌림 변이에서 초록).
 fun launderedFromRow(
     rate: Rate,
     rowFraction: BigDecimal,
     fitness: UnitScore,
     capacity: UnitScore,
-): MarginInputs = marginInputsFrom(rate, rowFraction, rate, fitness, capacity)
+): MarginInputs = marginInputsFrom(rate, Rate.ofFraction(rowFraction), rate, fitness, capacity)
