@@ -4,7 +4,7 @@
   표(ADR 0005 D-3)라 재사용하지 않는다)」) · R-4(외부 effect 는 알림함 기록까지, 채널 발송 없음) · R-2(사용자 소유 표에 `account_id`).
   운영자 지시 2026-10-23 「7C②·③·⑤ 도 지금 레인 열어서 병렬로 진행」 — `milestone-7.md` 선행 조건(M6 완료 조건 성립)의 **운영자 예외**
   (7C①·7C④ 와 같은 종류).
-- **base**: main `734e11b9` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
+- **base**: main `0768bda1` · worktree `bid-vector-v2-m7-7c3` · 브랜치 `m7-7c3/2026-10-23`.
   **착수 base 는 `a61ddff1` 이었고 7B 머지(PR #89) 뒤 `46ac0949` 로 재고정했다**(팀장 2026-10-26 ·
   D-7C3-1 ①). 옮긴 방식은 `git merge origin/main`(rebase 가 아니다 — 17 ahead / 198 behind 라
   rebase 는 같은 충돌을 커밋마다 재생한다). 충돌 9 를 전부 합집합으로 해소했다.
@@ -61,7 +61,7 @@
 
 ## rollback
 
-`git restore --source=734e11b9 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. **base 는 네 번 재고정됐다**(`a61ddff1` → `46ac0949` → `23837b19` → `1632242e` → `734e11b9`) — 정본 목록과 실측은 `rollback.md` 이고 이 줄은 그 요약이다. 옛 base 로 복원하면 **7C②·7C⑤·DEC-05·guava 의 공유 파일 줄까지 되돌아간다.** 마이그레이션은 **배포 전**
+`git restore --source=0768bda1 --staged --worktree -- <in_scope 개별 경로>`(evidence 제외), 새 파일 삭제. **base 는 다섯 번 재고정됐다**(`a61ddff1` → `46ac0949` → `23837b19` → `1632242e` → `734e11b9` → `0768bda1`) — 정본 목록과 실측은 `rollback.md` 이고 이 줄은 그 요약이다. 옛 base 로 복원하면 **7C②·7C⑤·DEC-05·guava 의 공유 파일 줄까지 되돌아간다.** 마이그레이션은 **배포 전**
 되돌림만 이 방식이다 — 배포 뒤 되돌림(V23 표 drop 순방향 마이그레이션) 경로를 rollback.md 에 따로 적는다. 목록 기계 산출, 마지막 산출물
 커밋에서 ①~⑥ 실측.
 
@@ -127,6 +127,20 @@
   `gate.tests.app` 에 등재했다(그 키는 전수 등식이다).
 - r2 가 **지운** 것도 있다: 주입 허용 목록의 죽은 등재 둘(`NoticeId` · `NotificationItemKey`) —
   중간 sealed 타입을 걷어 주입 표면이 좁아진 결과이고, 게이트의 등식이 그 삭제를 요구했다.
+
+**r3 (2026-10-28) — base 다섯째 재고정, 새 파일 0.**
+
+- **base `734e11b9` → `0768bda1`.** 사유는 산출물이 아니다: 취약점 DB 갱신으로 `CVE-2026-116587`
+  (go-jose, Caddy 바이너리 내장)이 web·proxy 이미지에서 잡혀 **모든 PR 의 `container` job 이
+  막혔고**, 그 chore(PR #97)가 머지되자 받았다. 기계 대조로 **겹침 0** — chore 의 경로는
+  `config/quality/vuln-allowlist.properties` 하나와 자기 evidence 셋이고 이 slice 의 42 와
+  교집합이 없다. 계수는 **42 그대로**(복원 19 · 삭제 23).
+- **이 라운드가 만든 새 파일 0** — r3 의 산출물 커밋 둘은 기존 파일 넷을 고쳤을 뿐이라
+  「수정 라운드가 만든 새 파일 ↔ in_scope 대조」가 대조할 대상이 없다. 기계로 확인했다
+  (`--diff-filter=A` 에서 산출물 쪽 빈 출력).
+- **게이트 술어를 또 고쳤다**(F3 의 어휘 「닫힘」 판정 — 세 번째). 그래서 이 라운드의 검증은
+  severity 와 무관하게 **표적 재검증**이다(하네스 Phase 4 예외). 재검증 축은 그 술어의 네
+  축과 r3 이 세운 포착 단언 하나다 — `checklist.md` §2.
 
 ## 하네스 레인 변경 (상시)
 
