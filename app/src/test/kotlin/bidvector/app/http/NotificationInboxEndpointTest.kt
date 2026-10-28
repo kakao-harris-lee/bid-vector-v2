@@ -9,6 +9,7 @@ import bidvector.workflow.notificationinbox.NoticeGroupCounts
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationInboxPage
+import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -31,8 +32,14 @@ import java.time.Instant
  * **왜 반사 열거로는 부족했나**(F1 의 요점): 앞 판은 문서의 키를 `declaredFields` 와 맞댔는데
  * Jackson 은 **필드가 아닌 것도 내보낸다** — getter 전용 속성(`val x get() = …`)이나
  * `@get:JsonProperty` 개명은 필드 목록에 없으면서 wire 에는 실린다. 그래서 등식의 한 끝을
- * **직렬화 결과**로 옮겼다. 여기서 쓰는 mapper 는 출하 조립과 같은 모듈 설정을 집는
- * `findAndAddModules()` 다(응답이 `Instant` 를 싣는다 — 모듈이 없으면 그 칸의 모양이 달라진다).
+ * **직렬화 결과**로 옮겼다.
+ *
+ * 여기서 쓰는 mapper 는 응답을 **읽기만** 하므로 모듈 설정이 등식에 영향을 주지 않는다 —
+ * 직렬화는 출하 조립의 mapper 가 이미 했고, 이 쪽은 그 결과의 키만 센다
+ * (`JsonMapper.builder().build()`, `BidCaseRequestsTest` 와 같은 모양). 앞 판 문면은
+ * `findAndAddModules()` 라고 적었는데 구현은 그렇지 않았다 — **구현이 맞고 문면이 틀렸다**
+ * (r2 CR LOW-3). 그 설정 자체는 「근거가 틀린 설정」으로 r2 에서 이미 걷어냈고, 문면만 남아
+ * 있었다.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -45,11 +52,44 @@ internal class NotificationInboxEndpointTest : HttpIntegrationTestBase() {
 
     private lateinit var session: SessionTestClient
 
+    /**
+     * fake 는 **공유 싱글턴 빈**이라 포착 상태를 매 test 앞에서 전부 되돌린다 — 되돌리지 않으면
+     * 다음 사람이 앞 test 의 값을 읽는다(r2 CR LOW-4 가 지적한 자리. 앞 판은 `lastRequest` 만
+     * 되돌리고 나머지 둘은 **읽는 단언도 없었다**).
+     */
     @BeforeEach
     fun signIn() {
         store.page = NotificationInboxPage(items = emptyList(), totalCount = 0L, unreadCount = 0L)
         store.outcome = MarkReadOutcome(markedCount = 0, unreadCount = 0L)
+        store.lastRequest = null
+        store.lastItem = null
+        store.lastNotice = null
         session = SessionTestClient(restTemplate, ::url).signIn()
+    }
+
+    /**
+     * **판독한 대상이 포트까지 그대로 간다.** 400 들은 「거부가 된다」를 재지만, 통과한 요청이
+     * 어떤 값으로 포트에 닿는지는 그 test 들이 말하지 않는다 — 종류 토큰과 공고 쌍이 뒤바뀌어도
+     * 상태 코드는 같다. 두 경로를 각각 잰다(단건은 종류 축을 싣고, 묶음은 싣지 않는다).
+     */
+    @Test
+    fun `판독한 읽음 처리 대상이 포트에 그대로 전달된다`() {
+        session.post(AccountScopedRoutes.NOTIFICATIONS + "/read", itemBody()).statusCode.value() shouldBe 200
+        store.lastItem shouldBe
+            NotificationItemKey(
+                NotificationKind.NEW_CANDIDATE,
+                NoticeId(NoticeNumber.of("N-1"), NoticeRound.of("000")),
+            )
+        store.lastNotice shouldBe null
+
+        val grouped =
+            session.post(
+                AccountScopedRoutes.NOTIFICATIONS + "/read-notice",
+                """{"noticeNumber":"N-2","noticeRound":"007"}""",
+            )
+
+        grouped.statusCode.value() shouldBe 200
+        store.lastNotice shouldBe NoticeId(NoticeNumber.of("N-2"), NoticeRound.of("007"))
     }
 
     /**

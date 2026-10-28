@@ -2,7 +2,6 @@ package bidvector.app.http
 
 import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.ml.UnavailableMlAnalysis
-import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.app.wiring.EvaluationDryRunFactory
 import bidvector.app.wiring.NoticeSearchQuery
@@ -19,10 +18,6 @@ import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
 import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.EditSessionRepository
-import bidvector.workflow.strategy.EditStrategyWorkflow
-import bidvector.workflow.strategy.EventSink
-import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
