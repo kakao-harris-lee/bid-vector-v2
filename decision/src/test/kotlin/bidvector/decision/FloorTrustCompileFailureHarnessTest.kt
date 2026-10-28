@@ -79,6 +79,53 @@ class FloorTrustCompileFailureHarnessTest {
             realDiagnosticFragment = "argument type mismatch",
         )
     }
+
+    /**
+     * **가격 경로 ③ 의 진입**(D-DEC10-22, 운영자 결정 2026-10-28) — verifier r4 가 실측한 세탁
+     * 두 꼴(`toString()` 정규식 파싱 · 영속 행의 `BigDecimal`)이 **컴파일 단계에서** 멈춘다.
+     * 그 두 꼴의 공통 마지막 걸음이 「숫자를 ③ 의 입력으로 만든다」이므로, 그 자리를 타입으로
+     * 닫으면 세탁의 **형태를 열거하지 않고** 한 번에 닫힌다(census 는 타입을 따라가므로 표현이
+     * 바뀌면 못 본다 — 그것이 r4 의 교훈이다).
+     */
+    @Test
+    fun `10 ③ 의 입력은 모듈 밖에서 직접 지을 수 없고 게이트 산출물 경유는 컴파일된다`() {
+        assertNegativeFails("10-margin-inputs-direct-construction", CONSTRUCTOR_DENIED)
+        assertPositiveCompiles("10-margin-entry-without-floor")
+    }
+
+    @Test
+    fun `10-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "10-margin-inputs-direct-construction-typo",
+            realDiagnosticFragment = CONSTRUCTOR_DENIED,
+        )
+    }
+
+    /** 생성 폐쇄와 `copy` 폐쇄는 다른 명제다 — 기존 입력의 하한율만 갈아끼우는 길도 닫혀 있다. */
+    @Test
+    fun `10b ③ 의 입력은 copy 로 하한율을 갈아끼울 수 없다`() {
+        assertNegativeFails("10b-margin-inputs-copy", COPY_DENIED)
+    }
+
+    /** 세탁 꼴 ① — 파싱해 만든 **율**을 진입에 넘긴다. */
+    @Test
+    fun `11 ③ 의 진입은 날 율을 받지 않는다`() {
+        assertNegativeFails("11-margin-entry-with-bare-rate", "argument type mismatch")
+    }
+
+    @Test
+    fun `11-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "11-margin-entry-with-bare-rate-typo",
+            realDiagnosticFragment = "argument type mismatch",
+        )
+    }
+
+    /** 세탁 꼴 ② — 영속 행에서 꺼낸 **`BigDecimal`** 을 진입에 넘긴다. */
+    @Test
+    fun `12 ③ 의 진입은 날 BigDecimal 도 받지 않는다`() {
+        assertNegativeFails("12-margin-entry-with-bigdecimal", "argument type mismatch")
+    }
 }
 
 /**
