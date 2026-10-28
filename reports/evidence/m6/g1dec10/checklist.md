@@ -75,8 +75,9 @@
 7. **7C② 표시 상태는 7C② 후속으로 인계한다** — **D-DEC10-16**(2026-10-28 팀장 결정, D-DEC10-10 을
    갈음). 인계 내용은 「개연 불가 · 심판 아님 사유를 하한율 근거 상태(`FloorRateGroundsState`)에
    표시」이고, 그 칸의 주인은 7C② 응답 계약이다. 이 slice 는 `openapi/**`·`web/**` 를 만지지
-   않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않을 것으로 본다** — 7C② 의 `floorRateGroundsStateOf`
-   가 `origin` 만 보고 밴드를 보지 않는다(`null` → `ABSENT`, `NoticeValue` → `USABLE`, 그 밖 →
+   않으며 `web` job 도 acceptance 에 없다. **그 사유는 화면에 보이지 않는다** — 7C② 의 `floorRateGroundsStateOf`
+   가 `origin` 만 보고 밴드를 보지 않는다(앞 판 문면은 「보이지 않을 것으로 본다」였다 — probe
+   시절의 추정형이고, 아래 실측이 그것을 갈음한다)(`null` → `ABSENT`, `NoticeValue` → `USABLE`, 그 밖 →
    `ORIGIN_NOT_PUBLISHED`). **2026-10-29 병합으로 이 문장이 probe 에서 실측으로 바뀌었다** —
    7C②·7C③ 가 들어온 트리에서 `floorRateGroundsStateOf` 가 `origin` 만 보고, 단건 응답이
    `usableFloorRateOf` 로 고른 **게시 원값의 비율 문자열**을 그대로 싣는다. 그래서 개연 불가 값
@@ -123,9 +124,18 @@
     진입(`criticalAssessmentRateFor`)은 `PlausibleFloorRate` 를 받지만, 그 결과를 소비하는
     `measureFloorShortfall(critical: Derived<AssessmentRate>)` 는 **이미 계산된 임계**를 받는다 —
     그 값은 하한율의 개연 여부를 더는 담지 않으므로 이 자리를 타입으로 닫을 수 없다. 그래서
-    ②의 폐쇄는 두 다리로 선다: (a) 원값 진입인 shared-kernel `criticalAssessmentRate` 를 쓰는
-    코드 단위가 census ⓑ·ⓑ′ 에 **전부 남는다**(verifier 가 영속 `BigDecimal` → `FloorRate` 꼴과
-    소거 컨테이너 꼴을 둘 다 심어 RED 를 실측했다) · (b) 다른 생산자
+    ②의 폐쇄는 두 다리로 선다: (a) 원값 진입인 shared-kernel `criticalAssessmentRate` 를
+    **허용 목록에 없는 코드 단위**가 쓰면 그 획득이 census ⓑ·ⓑ′ 에 새 키로 남는다(verifier 가
+    영속 `BigDecimal` → `FloorRate` 꼴과 소거 컨테이너 꼴, 그리고 새 단위의 표시 읽기를 심어
+    RED 를 실측했다) — **다만 이미 허용된 단위 안에서** 그 함수를 부르는 것은 **보이지 않는다**
+    (verifier r6 M-1 실측 M4d: `floorRateFieldsOf` 안에서 불러도 새 키 0, 초록). 그 형태는 알려진
+    제한 ② 와 같은 성격이고(허용 단위 **본문 안**의 데이터 흐름), 작동하는 가격 우회도 아니다 —
+    그렇게 만든 임계는 메뉴의 DEC-04 판정에 들어가지 않고 표시 코드가 `measureFloorShortfall` 을
+    따로 부르는 **새 출력**이 있어야 한다. 그 자리를 구조로 닫는 등식(「production 에서
+    `criticalAssessmentRate` 를 부르는 코드 단위 집합 == {`criticalAssessmentRateFor`}」)은
+    **이 slice 에서 더하지 않고** `OPEN-DEC10-CRITICAL-RATE-CALLERS` 로 등재했다(팀장 결정
+    2026-10-29 — 새 census 축은 게이트 술어 변경이고 이 라운드는 머지 전 장부 일괄이다) ·
+    (b) 다른 생산자
     `YegaAmount.assessmentRateAgainst` 는 **런타임 전건을 못 만족한다**(그 타입의 VAT 가 항상
     UNKNOWN 이라 같은-VAT 술어가 거짓 → 언제나 `Unmeasurable`). verifier 가 (b) 꼴을 심었을 때
     **아키텍처 게이트는 전부 초록**이었고 값이 나오지 않아 작동하는 우회가 아니었다 — 그 자리가

@@ -140,10 +140,14 @@ verifier(opus) + code-reviewer(sonnet) 병렬. Codex 없음 — 되돌리기 어
 
 | ID | 결정 |
 | --- | --- |
-| **D-DEC10-26** | (D-6GRC-3 이행) **값 일치 test 가 읽는 Python 백테스트 정책 경로를 v1 → v2 로 옮긴다.** 6G-rc(PR #98)가 출하 백테스트 정책을 `strategy-backtest-v2.yaml` 로 세웠고 **나중에 머지되는 쪽이 옮긴다**는 약속에 따라 이 brach 가 옮긴다. Kotlin 이 읽는 것은 `floor.rate_band_low`·`floor.rate_band_high` 둘뿐이고 v2 의 두 값이 v1 과 **같은 수**라 D-DEC10-1 의 값 일치 등식은 그대로 선다 — 그 사실은 추측이 아니라 값 일치 test 가 v2 를 읽고 잰다. 경로가 든 `app/build.gradle.kts` 는 이미 in_scope(design §3 `app` 행)이므로 in_scope 추가는 없다. |
+| **D-DEC10-26** | (D-6GRC-3 이행) **값 일치 test 가 읽는 Python 백테스트 정책 경로를 v1 → v2 로 옮긴다.** 6G-rc(PR #98)가 출하 백테스트 정책을 `strategy-backtest-v2.yaml` 로 세웠고 **나중에 머지되는 쪽이 옮긴다**는 약속에 따라 이 브랜치가 옮긴다. Kotlin 이 읽는 것은 `floor.rate_band_low`·`floor.rate_band_high` 둘뿐이고 v2 의 두 값이 v1 과 **같은 수**라 D-DEC10-1 의 값 일치 등식은 그대로 선다 — 그 사실은 추측이 아니라 값 일치 test 가 v2 를 읽고 잰다. 경로가 든 `app/build.gradle.kts` 는 이미 in_scope(design §3 `app` 행)이므로 in_scope 추가는 없다. |
 
 **병합 기준점 변경** — base 가 `23837b19`(PR #93) 에서 **`c4e3fd1c`**(PR #98 머지 커밋)로 옮겨간다.
 rollback 의 복원 기준·목록도 그 SHA 에서 재산출한다(`rollback.md`).
+
+| ID | 결정 |
+| --- | --- |
+| **D-DEC10-27** | (verifier r6 M-1 · 팀장 결정 2026-10-29) **「이미 허용된 단위 안에서 원값 진입을 부르는 것」은 census 에 보이지 않는다는 사실을 문면으로 정정하고, 그것을 닫는 등식은 후속 OPEN 으로 넘긴다** — `OPEN-DEC10-CRITICAL-RATE-CALLERS`(`capability-map.md` §14.3 OPEN 표에 등재). 새 census 축을 더하는 것은 **게이트 술어 변경**이고 이 라운드는 머지 전 장부 일괄이라 범위 밖이다. 작동하는 가격 우회가 아니라는 근거(그 임계가 DEC-04 판정에 들어가지 않는다)는 제한 ⑬ 이 적는다. **in_scope 보완** — 그 등재가 `capability-map.md` 의 DEC-10 절이 아니라 **§14.3 OPEN 표**에 한 줄을 더한다(같은 파일, 다른 절). 이 slice 가 OPEN 을 신설하면 그 자리가 정본이므로 계약을 여기서 맞춘다. |
 
 **in_scope 추가** — `decision.menu` 의 `BidMenuGrounds.publishedFloorRate`(메뉴 결과의 근거 칸).
 착수 census 가 찾았다: 가격 경로가 만든 **출력**이 원값을 내보내므로 게이트 통과 값을 실어야

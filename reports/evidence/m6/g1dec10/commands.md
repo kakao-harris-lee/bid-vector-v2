@@ -423,3 +423,45 @@ fixture 단언을 바꿨으므로 그 표적을 다시 쟀다.
 - `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
 - `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음
 
+## 2026-10-29 — 머지 전 장부 일괄 (r6 리뷰 둘 통과 뒤)
+
+verifier `ready-for-review`(M 1 · L 1) · CR `approve`(L 4 · nit 1) 뒤의 **장부·도구 일괄**이다.
+**게이트 술어는 건드리지 않았다** — 새 census 축은 후속 OPEN(`OPEN-DEC10-CRITICAL-RATE-CALLERS`)
+으로 넘겼다(D-DEC10-27).
+
+### 생성기의 lint·format·type (제한 ⑫ 가 약속한 실측 — CR r6 L-1)
+
+- cmd: `ruff format --check` · `ruff check` · `mypy --strict`(`ml-engine/.venv` 의 도구, 저장소
+  루트에서 파일 경로를 주고 실행 — 빌드가 필요 없다)
+- exit: **0 · 0 · 0**
+- **첫 `ruff format --check` 는 exit 1 이었다** — `marks.extend(...)` 한 줄이 기본 폭 88 을 넘어
+  세 줄로 재포맷된다(CR r6 L-1 이 지목한 자리). 포맷 적용 뒤 위 초록. 제한 ⑫ 가 명명한
+  「쓰는 사람이 돌려 봐야 잡히는 회귀」의 **첫 사례**라 실패 이력을 남긴다.
+- `ruff check` 는 **저장소 루트에 ruff 설정이 없어 기본 규칙**으로 돈다(통과). `ml-engine` 설정
+  (더 넓은 select)으로 돌리면 `AXES` 의 프라임 문자가 `RUF001` 로 잡히는데 그 문자는 **Kotlin
+  test 이름과 글자 그대로 맞아야** 하므로 바꿀 수 없다 — `tools/` 를 그 범위에 넣는 날 필요한
+  것은 per-file ignore 다(도구 머리글과 제한 ⑫ 에 적었다). 같은 실행에서 잡힌 `N818`
+  (예외 이름)은 고쳤다(`ClueMismatch` → `ClueMismatchError`).
+
+### 생성기 — 축 순서·블록 합치기·출력 꼴 재측
+
+- cmd: 합성 로그 셋 + 앞선 다섯을 다시 — `python3 -I tools/floor-trust-allowlist.py <로그>`
+- 핵심 결과:
+  - **축 순서**(CR r6 L-2): ⓑ′ 가 먼저 실패한 로그와 ⓑ 가 먼저 실패한 로그가 **같은 출력**
+    (`cmp` 동일) — 절 순서가 `AXES` 선언 순서로 고정됐다. 앞 판은 로그 등장 순서라 같은 관측에서
+    출력 diff 가 생겼다.
+  - **같은 축 두 블록**(CR r6 L-3): 첫 블록의 `+` 키와 둘째 블록의 `-` 키가 **둘 다** 남는다
+    (`허용 밖 관측 1 · 낡은 허용 1`). 앞 판은 덮어써서 `+` 키가 조용히 사라졌다.
+  - **출력 꼴**(v r6 L-1): 키가 정책 파일 꼴 `단위->멤버` 로 나온다 — clue 의 Kotlin
+    `Pair.toString()` 을 **마지막 `, ` 에서만** 갈라 바꾼다(단위가 서명 괄호를 담는다).
+    그대로 붙여 넣을 수 있으니 「손으로 베끼는 마지막 한 걸음」이 사라졌다.
+  - 앞선 일곱 경로 **회귀 없음**: 실 로그 0 · 절단 **3** · 블록 넘김 0(귀속 정확) · 전건 초록
+    **2** · 없는 파일 **66** · 인자 없음 **64**.
+
+### 이 일괄이 Gradle 게이트를 돌리지 않는 이유
+
+`tools/**` 는 어떤 CI job 의 입력도 아니고(제한 ⑫), 나머지 변경은 evidence·`capability-map.md`
+문면이다. 산출물 코드·정책 키·test 는 한 줄도 바뀌지 않았다 — 그래서 앞 라운드의 전건
+(`fd505b5d` 의 `one-command-check` exit 0)이 그대로 유효하다. 머지 전 main 병합 라운드에서
+Kotlin `check` 1회와 rollback 유효성을 다시 잰다(팀장 지시).
+
