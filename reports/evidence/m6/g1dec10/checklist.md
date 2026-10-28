@@ -12,15 +12,15 @@
 | --- | --- | --- | --- |
 | 1 | 원값을 `copy` 로 통과 값에 실어 나르기 | `@ConsistentCopyVisibility` + `internal` 생성자 | 컴파일 fixture `6b` · 변이 M2(`@ExposedCopyVisibility`) RED |
 | 2 | 모듈 밖에서 통과 값을 직접 생성 | `internal` 생성자 | 컴파일 fixture `6` + 오타 변이 쌍둥이 |
-| 3 | 모듈 **안**에서 게이트를 거치지 않고 생성 | ⓐ 멤버 접근 쌍 등식(클래스 입도) + **ⓐ′ 코드 단위·서명 등식** | `FloorTrustGateTest` ⓐ·ⓐ′·ⓐ″ · 변이 V8(둘째 생성 함수)·**N3(같은 이름 오버로드)** RED · M5·M6 RED |
-| 4 | 가격 경로가 원값을 직접 읽기 | ⓑ 획득 + **ⓑ′ 원값 멤버 접근**, 둘 다 **코드 단위·서명** 입도 | `FloorTrustGateTest` ⓑ·ⓑ′·ⓑ″ · 음성 fixture 넷 · 변이 V1·V2 RED · **N1(허용된 파일의 확장 함수)**·**N2(같은 파일의 람다 값)** RED |
+| 3 | 모듈 **안**에서 게이트를 거치지 않고 생성 | ⓐ 멤버 접근 쌍 등식(클래스 입도) + **ⓐ′ 코드 단위·서명 등식(자기 제외 없음)** | `FloorTrustGateTest` ⓐ·ⓐ′·ⓐ″ · 변이 V8·N3 RED · M5·M6 RED |
+| 4 | 가격 경로가 원값을 직접 읽기 | ⓑ 획득 + ⓑ′ 원값 멤버 접근, 둘 다 **코드 단위·서명이고 자기 제외가 없다** — 운반 타입이 자기 값을 소거 타입으로 내보내는 메서드도 센다 | `FloorTrustGateTest` ⓑ·ⓑ′·ⓑ″ · 음성 fixture 넷 · 변이 V1·V2·N1·N2 RED · **e1(운반 타입의 `Any?` 반환 + 캐스트 소비자)** RED |
 | 5 | 개연 불가 가지를 `else` 로 통과 처리 | 결과 sealed + 가격 경로가 **통과 값만** 받는 서명 → `else` 로는 재료가 없다 | 메뉴 소진 `when` · `BidMenuFloorTrustTest` 사유 셋 · 변이 M1 RED |
 | 6 | 경계값(`0.30`·`0.995` 정확값 · `0.2999`·`0.9951` · 척도 변형) | 밴드 포함 비교가 `BigDecimal` 값 비교 | `PublishedFloorTrustTest` 경계·척도 전수 |
 | 7 | `StatutoryTable` origin 위장 | 게이트가 `NoticeValue` 에만 통과를 내준다 — 법정표는 **심판 아님** 별 가지 | `PublishedFloorTrustTest`(밴드 **안** 값도 통과가 아니다) · `BidMenuFloorTrustTest` |
 | 8 | margin 이 `rate` 를 다른 함수로 읽기 | 통과 값의 공개 표면이 율 하나 — 모듈 밖에서 원값을 쥘 자리가 없다 | 컴파일 fixture `8`(되꺼내기 불가) · `9`(DEC-04 에 원값 불가) |
 | 9 | 게이트를 부르고 결과를 **버리고** 원값을 쓰기 | 원값의 멤버를 만지는 **코드 단위**가 ⓑ′ 에 전부 남는다 — 같은 파일에 함수를 더해도 집합이 바뀐다. 다만 **같은 코드 단위 안에서** 버리는 것은 구조로 닫지 못한다(제한 ②) | 변이 M3 RED · N1·N2 RED |
-| 11 | **위조한 밴드**를 진짜 게이트에 넘기기(같은 파일 둘째 함수 또는 공개 정책 타입 조립) | ⓒ 정책 값 생성 코드 단위 등식 — production 에서 밴드·정책 값을 만드는 자리는 **출하 정책 초기화자 하나**다 | `FloorTrustGateTest` ⓒ·ⓒ′ · 변이 **B1**(위조 밴드로 감싸기) RED |
 | 10 | 리플렉션·직렬화로 통과 값 생성 | `decision` 은 도메인 모듈이라 직렬화 표면 0(`domainDependencyGate`) · 리플렉션 뿌리 게이트가 production 전 층 | 아래 알려진 제한 ③ 이 남는 범위를 적는다 |
+| 11 | **위조한 밴드**를 진짜 게이트에 넘기기 — 타입 **밖** 조립, 같은 파일 둘째 함수, 그리고 **정책 타입 자신의 메서드**(`widened()`·`withBand()`) | ⓒ 정책 값 생성 코드 단위 등식(자기 제외 없음) — production 에서 정책 값을 만드는 자리는 출하 초기화자 하나와 컴파일러가 만든 자기 `copy` 계열뿐이다 | `FloorTrustGateTest` ⓒ·ⓒ′ · 변이 **B1**·**c1** RED |
 
 ## 알려진 제한
 
@@ -30,11 +30,13 @@
    것은 커널을 직접 도는 test 다. 홀더는 `OPEN-ML-ANALYSIS-WIRING`. 게이트 자체는 배선 전에
    구조로 닫혀 있다 — 그것이 이 slice 의 범위다.
 2. **등식들은 데이터 흐름을 증명하지 않는다 — 남는 것은 「같은 코드 단위 안」이다.** 호출자를
-   **코드 단위(메서드·서명)** 로 세므로 같은 파일·같은 클래스에 함수를 더하는 형태는 전부
-   집합을 바꾼다(r2 가 실측한 확장 함수 N1 · 람다 값 N2 가 그래서 RED 다 — 람다의 합성 메서드도
-   제 코드 단위로 보인다). 남는 범위는 **이미 허용된 그 메서드 본문 안에서** 결과를 버리고 원값을
-   쓰는 형태뿐이고, 그 거동은 변이 M3 가 잰다. r1 의 「파일 입도로 닫았다」는 서술은 틀렸고
-   (verifier 가 두 꼴로 실측했다) r3 가 입도를 바꿔 닫았다.
+   **코드 단위(메서드·서명)** 로 세고 **자기 제외가 없으므로**, 같은 파일·같은 클래스·**그 타입
+   자신**에 메서드를 더하는 형태가 전부 집합을 바꾼다(확장 함수 N1 · 람다 값 N2 · 같은 이름
+   오버로드 N3 · 운반 타입의 소거 반환 e1 · 정책 타입의 자기 factory c1 이 그래서 RED 다 —
+   람다의 합성 메서드도 제 코드 단위로 보인다). 남는 범위는 **이미 허용된 그 메서드 본문 안에서**
+   결과를 버리고 원값을 쓰는 형태뿐이고, 그 거동은 변이 M3 가 잰다.
+   입도 서술은 **두 번 틀렸다가 고쳤다** — r1 은 「파일 입도로 닫았다」, r3 는 「코드 단위로 닫았다」
+   였는데 자기 제외가 남아 있었다. 지금 문면은 그 둘을 모두 반영한 것이다.
 3. **축 ②가 보지 못하는 범위** — 디스크립터의 반환·필드 **타입**만 보므로 제네릭이 소멸된 자리
    (컨테이너 원소), `Class.getEnumConstants` 류, 역직렬화 토큰은 집합에 남지 않는다.
    `OPEN-6F9-DIVISION-REFLECTION` 과 같은 형태의 범위다.
@@ -58,7 +60,10 @@
 7. **7C② 표시 상태는 7C② 후속으로 인계한다** — **D-DEC10-16**(2026-10-28 팀장 결정, D-DEC10-10 을
    갈음). 인계 내용은 「개연 불가 · 심판 아님 사유를 하한율 근거 상태(`FloorRateGroundsState`)에
    표시」이고, 그 칸의 주인은 7C② 응답 계약이다. 이 slice 는 `openapi/**`·`web/**` 를 만지지
-   않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않는다** —
+   않으며 `web` job 도 acceptance 에 없다. **그래서 오늘 그 사유는 화면에 보이지 않는다** — 7C② 의 `floorRateGroundsStateOf` 가
+   `origin` 만 보고 **밴드를 보지 않기 때문**이다(`null` → `ABSENT`, `NoticeValue` → `USABLE`,
+   그 밖 → `ORIGIN_NOT_PUBLISHED`). 그래서 `1.00000` 같은 개연 불가 값도 `USABLE` 로 표시된다.
+   인계 범위는 그 `when` 분기 하나 + 생성 타입·OpenAPI 어휘다(병합 probe 실측). —
    게이트는 가격 경로를 닫고 계수를 값으로 남기지만, 운영자가 그 제외를 화면에서 읽는 것은
    7C② 후속이 들어온 뒤다.
 8. **변이 M3 에서 `1.00000` test 는 초록으로 남는다** — 그 값은 접어도(`null`) 안 접어도
@@ -72,7 +77,7 @@
     그 값은 개연 밴드 밖이라 통과 값이 될 수 없다. 밴드 **안** 값(`0.3`·`0.9`)으로 같은 성질
     (자리수·모드가 실제로 소비된다)을 잰다 — 명제는 그대로이고 기대값만 그 입력에 맞춰 옮겼다.
 
-## 수정 라운드가 만든 새 파일 ↔ in_scope 대조 (r2)
+## 수정 라운드가 만든 새 파일 ↔ in_scope 대조 (r2·r3·r4)
 
 | 새 파일 | in_scope 근거 |
 | --- | --- |
@@ -80,7 +85,12 @@
 | `app/src/test/kotlin/bidvector/archfixture/violating/floortrust/RogueFloorFractionReader.kt` · `RogueFloorRateCarrier.kt` | 같은 항(음성 fixture 루트) |
 | `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorExclusionChainTest.kt` | 「`workflow/**/evaluation/**`」 |
 
-**계약 갱신 없음** — 넷 다 기존 in_scope 항 안이다. 새 정책 키 둘(`floor-trust.raw-type-access-pairs` ·
+| `app/src/test/kotlin/bidvector/app/evaluation/FloorExclusionTallyTest.kt` (r3) | 「`app/**` 의 평가 집계 줄과 architecture test」 |
+| `workflow/src/test/kotlin/bidvector/workflow/evaluation/FloorExclusionChainTest.kt` (r2) | 「`workflow/**/evaluation/**`」 |
+
+**r4 는 새 파일 0** 이다(기존 파일의 술어·허용 목록만 바뀌었다).
+
+**계약 갱신 없음** — 여섯 다 기존 in_scope 항 안이다. 새 정책 키 둘(`floor-trust.raw-type-access-pairs` ·
 `floor-trust.creation-code-units`)도 「`config/quality/**` 의 필요한 키」 안이다.
 
 ## 정책 version 의 근거
@@ -101,6 +111,6 @@
 | 변경된 정책 version 근거 | 위 표 |
 | 알려진 제한·rollback | 이 문서 · `rollback.md` |
 | 비밀값 스캔 | `commands.md`(참조형) |
-| 재작업 누계 | **3/5**(r1 not-ready + request_changes · r2 같은 둘 · r3 이 라운드) — 상한 5 |
+| 재작업 누계 | **4/5** — **수정 라운드 수**로 센다(팀장 결정 2026-10-28, 이 프로젝트 선례). r1·r2·r3·r4 네 라운드. 상한 5 |
 | `differential.json` | **N/A** — Python 거동과 대조하는 case 를 이 slice 가 만들지 않는다. 밴드 값의 양쪽 일치는 값 일치 test 가 코드로 잰다(문서 판정표가 아니다) |
 | `golden-manifest.json` | **N/A** — `fixtures/` 무편집 |
