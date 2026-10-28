@@ -36,6 +36,11 @@ kotest 의 `expected:<[…]> but was:<[…]>` 줄은 **읽지 않는다**. 그 �
 종료 코드: `0` 축 하나 이상을 읽었고 모두 일관 · `2` 축 블록을 하나도 못 읽음(전건 초록이거나
 로그 형태가 바뀜) · `3` 선언된 개수와 글머리 줄 수가 다름(절단·형태 변경) · `64` 인자 오류 ·
 `66` 로그를 읽을 수 없음.
+
+lint: 저장소 루트에 ruff 설정이 없어 이 파일은 **ruff 기본 규칙**으로 검사된다(통과). `ml-engine`
+설정(더 넓은 select)으로 돌리면 `AXES` 의 프라임 문자(`ⓐ′`·`ⓑ′`)가 `RUF001` 로 잡히는데, 그
+문자는 **Kotlin test 이름과 글자 그대로 맞아야** 하는 값이라 바꿀 수 없다 — `tools/` 를 그 범위에
+넣는 날 필요한 것은 문자 교체가 아니라 per-file ignore 다(evidence 알려진 제한 ⑫).
 """
 
 from __future__ import annotations
@@ -59,15 +64,30 @@ EXTRA_HEADER = re.compile(r"허용 밖 관측 (\d+)")
 STALE_HEADER = re.compile(r"낡은 허용 (\d+)")
 
 
-class ClueMismatch(Exception):
+class ClueMismatchError(Exception):
     """선언된 개수와 실제 글머리 줄 수가 다르다 — 절단이거나 clue 형태가 바뀌었다."""
+
+
+def as_policy_key(clue_key: str) -> str:
+    """clue 의 Kotlin `Pair.toString()` 꼴 `(단위, 멤버)` 를 정책 파일 꼴 `단위->멤버` 로 바꾼다.
+
+    도구가 생긴 이유가 「손으로 베끼면 한 글자 차이로 등식이 깨진다」이므로, **붙여 넣을 수 있는
+    꼴**로 내는 것이 마지막 한 걸음이다(verifier r6 L-1). 단위가 서명을 담아 괄호를 포함하므로
+    **마지막 `, ` 에서만** 가른다 — 키 안에는 쉼표가 없다(인자 타입은 `|` 로 잇는다).
+    """
+    if not (clue_key.startswith("(") and clue_key.endswith(")")):
+        return clue_key
+    unit, separator, member = clue_key[1:-1].rpartition(", ")
+    return f"{unit}->{member}" if separator else clue_key
 
 
 def axis_blocks(text: str) -> list[tuple[str, str]]:
     """(축 이름, 그 축의 블록) 목록. 블록은 그 제목부터 다음 제목(또는 끝)까지다."""
     marks: list[tuple[int, str]] = []
     for title, name in AXES.items():
-        marks.extend((match.start(), name) for match in re.finditer(re.escape(title), text))
+        marks.extend(
+            (match.start(), name) for match in re.finditer(re.escape(title), text)
+        )
     marks.sort()
     blocks = []
     for index, (start, name) in enumerate(marks):
@@ -91,7 +111,7 @@ def collect(block: str, header: re.Pattern[str], bullet: str) -> list[str] | Non
         if stripped:
             break  # 다음 머리글이거나 다른 출력 — 글머리 줄은 연속이다
     if len(keys) != declared:
-        raise ClueMismatch(f"선언 {declared} · 읽은 줄 {len(keys)}")
+        raise ClueMismatchError(f"선언 {declared} · 읽은 줄 {len(keys)}")
     return keys
 
 
@@ -110,25 +130,31 @@ def main(log_path: str) -> int:
         try:
             extra = collect(block, EXTRA_HEADER, "+")
             stale = collect(block, STALE_HEADER, "-")
-        except ClueMismatch as error:
+        except ClueMismatchError as error:
             print(f"{name}: clue 가 일관되지 않다 — {error}", file=sys.stderr)
             return 3
         if extra is None and stale is None:
             parsed.setdefault(name, None)
             continue
-        parsed[name] = (extra or [], stale or [])
+        # 같은 축의 clue 가 두 블록으로 갈리면 **덮지 않고 합친다**(CR r6 L-3) — 덮으면 먼저
+        # 읽은 블록의 키가 조용히 사라지고, 선언 개수 대조는 그 경로를 덮지 못한다.
+        previous = parsed.get(name) or ([], [])
+        parsed[name] = (previous[0] + (extra or []), previous[1] + (stale or []))
 
     read = 0
-    for name, found in parsed.items():
+    # 축 절의 순서는 **`AXES` 선언 순서**다(CR r6 L-2) — 로그 등장 순서로 내면 test 실행 순서가
+    # 바뀔 때 같은 관측에서 출력 diff 가 생겨, 라운드 간 키 단위 diff 에 잡음이 된다.
+    for name in [axis for axis in AXES.values() if axis in parsed]:
+        found = parsed[name]
         if found is None:
             print(f"# {name}: clue 없음(그 축이 초록이다)")
             continue
         extra, stale = found
         read += 1
         print(f"### {name} — 허용 밖 관측 {len(extra)} · 낡은 허용 {len(stale)}")
-        for key in sorted(extra):
+        for key in sorted(as_policy_key(k) for k in extra):
             print(f"+ {key}")
-        for key in sorted(stale):
+        for key in sorted(as_policy_key(k) for k in stale):
             print(f"- {key}")
         print()
 
