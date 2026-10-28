@@ -105,7 +105,8 @@ M5·M6 이 등식의 **양방향**이다(누락 · 낡은 항목). M3 에서 `1.
 ## 2026-10-28 — r1 수정 라운드 (r2)
 
 판정 SHA `a6a4eddc` 에 대한 verifier not-ready(high 1) · code-reviewer request_changes(high 1) 를
-한 라운드로 고쳤다. finding 별 커밋이고, 마지막 산출물 커밋은 **`bcde7d01`** 이다.
+한 라운드로 고쳤다. finding 별 커밋이다(r2 의 마지막 산출물 커밋은 등재 장부 커밋 `43344b8f` 였다 —
+`rollback.md` 가 그 SHA 로 실측했다).
 
 ### 새 게이트 축의 변이 — 전부 바꿔치우기, 표적 test `--rerun`
 
@@ -127,7 +128,8 @@ M5·M6 이 등식의 **양방향**이다(누락 · 낡은 항목). M3 에서 `1.
 
 - cmd: `./tools/one-command-check.sh` (CI `check` job 의 완료 조건 1 단계)
 - exit: **0**
-- 핵심 결과: `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과`.
+- 핵심 결과: `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과` @ **`43344b8f`**
+  (r2 의 마지막 산출물 커밋; 그 뒤 판정 SHA 까지의 diff 는 evidence 파일뿐이다).
 - **첫 실행은 exit 1 이었다** — `gateRegistrationGate` 가 새 test 클래스(`FloorExclusionChainTest`)의
   **미등재**를 잡았다. 표적 test 만 돌린 라운드에서는 보이지 않는 자리다(등재하지 않으면 그 test 가
   지워져도 `check` 가 초록이다). 등재 커밋 뒤 위 초록. 실패 이력을 남긴다 — 그 게이트가 실제로 돌았다는 증거다.
@@ -138,3 +140,24 @@ M5·M6 이 등식의 **양방향**이다(누락 · 낡은 항목). M3 에서 `1.
 
 - `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m6/g1dec10/` → exit 1(통과)
 - `git status --porcelain -- <in_scope 개별 인자>` → evidence 편집 외 없음(양성 대조는 r1 에서 실측)
+
+## 2026-10-28 — r2 수정 라운드 (r3)
+
+판정 SHA `be25c1ed` 에 대한 verifier not-ready(high 1) · code-reviewer request_changes(high 1) 를
+한 라운드로 고쳤다. **재작업 누계 3/5.**
+
+### 변이 — 전부 바꿔치우기, 적용 직전 clean 단언, 표적 test `--rerun`
+
+| 변이 | 바꾼 것 | 표적 | exit |
+| --- | --- | --- | --- |
+| N1 | 허용된 가격 경로 파일에 **확장 함수**(파생 접근자) | ⓑ·ⓑ′ | 1 |
+| N2 | 같은 파일에 **람다 값** | ⓑ·ⓑ′ | 1 |
+| N3 | **같은 이름 오버로드**가 밴드 검사 없이 통과 값 생성 | ⓐ′ | 1 |
+| B1 | 같은 파일 둘째 함수가 **위조 밴드**를 진짜 판정 함수에 넘긴다 | ⓒ | 1 |
+| T1 | 집계를 다시 `reached` 만 세게 되돌린다 | `FloorExclusionTallyTest` | 1 |
+| T2 | 사슬 hop 1 을 `null` 로 | `OpportunityAnalysisTest` | 1 |
+| T3 | `>1` 가드를 다시 `Implausible` 전용으로 | `PredictionFactsFloorTrustTest` | 1 |
+
+일곱 전부 **의도한 test** 에서 RED 이고 컴파일 오류 0 이다. **N2 가 RED 인 것이 측정 하나**다 —
+람다의 합성 메서드가 제 코드 단위로 보이므로 그 꼴을 따로 닫을 필요가 없었다(처방의 「안 잡히면
+따로 닫거나 제한으로」는 해당하지 않는다).

@@ -93,6 +93,15 @@ verifier(opus) + code-reviewer(sonnet) 병렬. Codex 없음 — 되돌리기 어
 | **D-DEC10-10** | (OQ-3) **지금은 `openapi/**` · `web/**` 무편집**, 게이트만 낸다. 7C②(`m7-7c2`)는 리뷰 통과·main 재병합·최종 측정 중이라 이 slice 리뷰 요청 시점엔 main 에 있을 공산이 크다 — 그때 main 을 병합해 **그 위에서** 표시 상태를 더하고 `web` job 을 acceptance 에 붙인다. 없으면 7C② 후속으로 인계하고 계약·종결 보고에 남긴다(「양쪽 다 안 더함」 방지). |
 | **D-DEC10-11** | (OQ-4) **값 일치 test 는 `app/src/test`** + `app/build.gradle.kts` 에 ml-engine 정책 파일 경로 system property 한 줄(snakeyaml·system property 선례 넷과 같은 형태). `decision` test classpath 를 넓히지 않고 yaml 을 손으로 쪼개지 않는다. |
 
+## 계약 갱신 (2026-10-28 r2 판정 수령 — 팀장)
+
+| ID | 결정 |
+| --- | --- |
+| **D-DEC10-16** | **표시 상태는 이 slice 에서 하지 않고 7C② 후속으로 인계한다.** 인계 내용은 「개연 불가 · 심판 아님 사유를 하한율 근거 상태(`FloorRateGroundsState`)에 표시」다. 그 칸의 주인은 7C② 응답 계약이고, 게이트 slice 에 표면 변경을 섞으면 리뷰 라운드가 하나 더 생긴다. 따라서 이 slice 는 `openapi/**`·`web/**` 를 만지지 않고 `web` job 도 acceptance 에 없다. **팀장 메시지(2026-10-28)의 『D-DEC10-13』은 이 항을 가리켰고 그 번호는 버렸다** — 그 ID 는 같은 날 게이트 축 결정(r1 v H-1)에 먼저 쓰였다. D-DEC10-10 은 이 결정이 갈음한다. |
+| **D-DEC10-17** | (r2 v H-1 · v L-1) **게이트 등식의 호출자를 전부 코드 단위(메서드·서명)로** 센다. 파일 파사드 입도는 두 번 뚫렸다 — 허용된 가격 경로 파일의 파생 접근자·람다(ⓑ·ⓑ′)와 같은 이름 오버로드(ⓐ′). 인자 타입은 `|` 로 잇는다(쉼표는 목록 구분자). |
+| **D-DEC10-18** | (r2 CR M-1) **밴드의 출처 축(ⓒ)** 을 더한다 — 정책 값 타입(`PlausibilityBand`·`PublishedFloorTrustPolicyData`)의 생성 코드 단위 집합 == 허용 집합이고, production 의 그 자리는 **출하 정책 초기화자 하나**다. 게이트가 정책을 인자로 받으므로 위조한 밴드를 진짜 게이트에 넘기면 다른 축이 바뀌지 않는다. |
+| **D-DEC10-19** | (r2 CR M-2) `>1` 가드는 **사유 있는 두 실패 가지 공통**이다(법정표 출처 포함) — base 의 필터가 origin 무관이었다. 도달 불가라도 test 로 잠근다. |
+
 **in_scope 추가** — `decision.menu` 의 `BidMenuGrounds.publishedFloorRate`(메뉴 결과의 근거 칸).
 착수 census 가 찾았다: 가격 경로가 만든 **출력**이 원값을 내보내므로 게이트 통과 값을 실어야
 근거가 정직하다(「이 가격이 어느 값에서 나왔는가」). 7C② 표시 상태의 입력 자리이기도 하다.
