@@ -99,6 +99,32 @@ class StrategyInput:
         return (self.reserve_range_end_rate - self.reserve_range_begin_rate) / _HALF
 
     @property
+    def expected_floor_rate(self) -> float:
+        """**제도상 평균 하한율** — 전략의 가격 앵커(계획 2026-10-28 P1).
+
+        하한가가 `(예정가격 - A) x r + A` 이므로, 기초금액 기준 투찰률로 옮기면
+        `r x R + (1 - r) x A / 기초금액` 이다(R = 사정률). 그 기대값이 이 값이다:
+
+            r x E[R] + (1 - r) x A / 기초금액
+
+        앞 판은 S0 와 S4 가 `r x (1 +- 반폭)` 을 썼다. 대칭 예가 + A = 0 에서는
+        E[R] = 1 이라 그 식이 이 값으로 **접히지만**, 비대칭 예가에서는 중심이 어긋나고
+        A값 공사에서는 A 보정이 빠진다(계획 §2 P1 실측: 예가 `[-2%, +4%]` · 하한율
+        0.87745 에서 앞 판 중심 0.87745, 제도 평균 0.88622450).
+
+        **S0 범위와 S4 격자 하단이 이 한 자리를 공유한다** — 두 곳에서 따로 계산하면
+        한쪽만 고쳐도 조용히 갈린다."""
+        return self.floor_rate * self.expected_assessment_ratio + (
+            1.0 - self.floor_rate
+        ) * (self.a_value_total / self.base_amount)
+
+    @property
+    def floor_rate_half_width(self) -> float:
+        """앵커의 반폭 — `하한율 x 예가 반폭`. 사정률의 반폭을 하한율 눈금으로 옮긴
+        값이고, 예가 범위의 폭은 그 공고의 필드에서 온다."""
+        return self.floor_rate * self.reserve_half_width
+
+    @property
     def expected_participant_count(self) -> int:
         """경쟁자 수 추정 — 지난 창 **공고 단위** 투찰자 수의 중앙값. 대상 공고의
         `participant_count` 는 개찰 결과라 **쓰지 않는다**(누출 금지)."""
@@ -185,9 +211,12 @@ def notice_rng(request: StrategyInput, *, stream: str) -> np.random.Generator:
 
 @dataclass(frozen=True)
 class UniformBandStrategy:
-    """**S0** — 밴드 내 균등 난수. 투찰률을 `[r(1-h), r(1+h)]` 에서 균등 추출한다
-    (h = 그 공고의 예가 범위 반폭). 이 실험의 **기준선**이고, 「분포 엔진이 난수보다
-    나은가」의 「난수」가 바로 이것이다."""
+    """**S0** — 밴드 내 균등 난수. 투찰률을 `[앵커 - 반폭, 앵커 + 반폭]` 에서 균등
+    추출한다(앵커 = `StrategyInput.expected_floor_rate`, 반폭 = `floor_rate_half_width`).
+    이 실험의 **기준선**이고, 「분포 엔진이 난수보다 나은가」의 「난수」가 바로 이것이다.
+
+    앵커를 `r x (1 +- h)` 로 되돌리면 비대칭 예가와 A값 공사에서 중심이 어긋난다
+    (계획 2026-10-28 P1) — 그래서 중심은 전략이 짓지 않고 입력 타입이 낸다."""
 
     name: str = "S0"
 
@@ -195,9 +224,9 @@ class UniformBandStrategy:
         self, request: StrategyInput, policy: StrategyBacktestPolicy
     ) -> StrategyOutcome:
         del policy
-        half_width = request.reserve_half_width
-        low = request.floor_rate * (1.0 - half_width)
-        high = request.floor_rate * (1.0 + half_width)
+        half_width = request.floor_rate_half_width
+        low = request.expected_floor_rate - half_width
+        high = request.expected_floor_rate + half_width
         return bid_from_rate(
             request,
             float(notice_rng(request, stream=S0_BAND_PURPOSE).uniform(low, high)),
@@ -231,8 +260,11 @@ def _candidate_rates(
     request: StrategyInput, policy: StrategyBacktestPolicy
 ) -> np.ndarray:
     """후보 투찰률 격자 — 밴드 하단에서 시작해 정책이 정한 폭만큼. 격자를 결과를 보고
-    고르지 않게 폭·점 수를 정책으로 고정한다."""
-    low = request.floor_rate * (1.0 - request.reserve_half_width)
+    고르지 않게 폭·점 수를 정책으로 고정한다.
+
+    하단은 S0 와 **같은 자리**에서 온다(`expected_floor_rate - floor_rate_half_width`)
+    — 두 전략의 가격 앵커가 갈리면 비교가 앵커 차이를 전략 효과로 읽는다(계획 P1)."""
+    low = request.expected_floor_rate - request.floor_rate_half_width
     span = rate_from_basis_points(policy.strategies.s4_grid_span_bp)
     return np.linspace(low, low + span, policy.strategies.s4_grid_size)
 
@@ -251,7 +283,11 @@ def _simulated_floors(
 
     입력은 전부 투찰 시점 값이라 누출이 아니다 — `pure_construction_floor` 가
     `cost * (예정가격/기초금액) * ratio` 인데 그 비율이 곧 시뮬레이션의 사정률
-    표본이다(개찰 결과를 읽지 않는다)."""
+    표본이다(개찰 결과를 읽지 않는다).
+
+    적용 여부는 **표본마다** 다르다(계획 P2): 시뮬레이션의 예정가격은
+    `기초금액 x 사정률 표본` 이므로 100억원을 가로지르는 공고에서는 표본에 따라 그 선이
+    서기도 하고 안 서기도 한다. 판정은 채점과 **같은 술어**가 진다."""
     base = request.base_amount
     floors = np.array(
         [
@@ -266,8 +302,19 @@ def _simulated_floors(
     cost = request.notice.pure_construction_cost
     if cost is None:
         return floors
+    is_construction = request.notice.category is BusinessCategory.CONSTRUCTION
+    applies = np.array(
+        [
+            policy.floor.pure_cost_rule_applies(
+                is_construction=is_construction, planned_price=ratio * base
+            )
+            for ratio in ratios
+        ]
+    )
     pure = cost * ratios * policy.floor.pure_construction_cost_ratio
-    return np.asarray(np.maximum(floors, pure), dtype=np.float64)
+    return np.asarray(
+        np.where(applies, np.maximum(floors, pure), floors), dtype=np.float64
+    )
 
 
 def _win_probabilities(
