@@ -16,6 +16,7 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
+import numpy as np
 import pytest
 from _backtest_support import (
     SHIPPED_BACKTEST_POLICY_PATH,
@@ -26,7 +27,9 @@ from _backtest_support import (
 )
 
 from ml_engine.evaluation.backtest.exclusions import AdmittedNotice, admit_rows
+from ml_engine.evaluation.backtest.floor import floor_price
 from ml_engine.evaluation.backtest.observations import (
+    BusinessCategory,
     LoadedSnapshot,
 )
 from ml_engine.evaluation.backtest.policy import (
@@ -45,6 +48,7 @@ from ml_engine.evaluation.backtest.strategies import (
     StrategyInput,
     UniformBandStrategy,
     _candidate_rates,
+    _simulated_floors,
     _win_probabilities,
     build_competitor_pool,
     build_strategy_input,
@@ -390,3 +394,298 @@ def test_strategy_input_does_not_expose_the_admitted_notice() -> None:
         isinstance(value, AdmittedNotice) for value in vars(request).values()
     )
     assert isinstance(request, StrategyInput)
+
+
+# ── 비대칭 예가 범위의 가격 앵커 (계획 2026-10-28 P1) ────────────────────────
+# 기존 test 는 **대칭 예가 + A = 0** 공고만 썼다. 그 판에서는 옛 앵커
+# `하한율 x (1 +- 반폭)` 과 제도상 평균 하한율이 **같은 수**라, 앵커가 어긋나 있어도
+# 전부 초록이었다(계획 §2 P1 실측: 예가 `[-2%, +4%]` 에서 중심이 0.87745 인데 제도
+# 평균은 0.88622450). 아래는 그 두 수가 **갈리는** 판을 짓는다.
+
+
+def _ranged_target(
+    begin_rate: float,
+    end_rate: float,
+    *,
+    a_total: int | None = None,
+) -> AdmittedNotice:
+    """예가 범위(그리고 필요하면 A)를 지정한 승인 공고 하나.
+
+    A 를 주면 공사로 짓는다 — A 는 공사 산식에만 있다(`rules.resolve_a_value`)."""
+    if a_total is None:
+        return _admitted(
+            [
+                row_payload(
+                    "range-1",
+                    notice_reserve_range_begin_rate=begin_rate,
+                    notice_reserve_range_end_rate=end_rate,
+                    outcome_bidder_amounts=_TARGET_BIDDER_AMOUNTS,
+                )
+            ]
+        )[0]
+    return _admitted(
+        [
+            row_payload(
+                "range-a-1",
+                notice_category="CONSTRUCTION",
+                notice_bid_price_formula_a_applicable=True,
+                notice_noticed_on="2026-03-01",
+                notice_successful_bid_method_name="적격심사제-시설공사",
+                notice_a_value={
+                    "total": a_total,
+                    "open_at": "2026-06-05T09:00:00+09:00",
+                    "standard_market_price_applicable": False,
+                },
+                notice_pure_construction_cost=700_000_000,
+                notice_reserve_range_begin_rate=begin_rate,
+                notice_reserve_range_end_rate=end_rate,
+                outcome_bidder_amounts=_TARGET_BIDDER_AMOUNTS,
+            )
+        ]
+    )[0]
+
+
+def _formula_anchor(request: StrategyInput) -> tuple[float, float]:
+    """계획 §2 P1 의 수정식을 **test 안에서 따로** 계산한다 — 구현의 속성을 불러
+    쓰면 식이 아니라 자기 자신을 재게 된다.
+
+    `expected_floor_rate = 하한율 x E[R] + (1 - 하한율) x A / 기초금액`,
+    반폭 `= 하한율 x 예가 반폭`."""
+    expected_ratio = (
+        1.0 + (request.reserve_range_begin_rate + request.reserve_range_end_rate) / 2.0
+    )
+    anchor = request.floor_rate * expected_ratio + (1.0 - request.floor_rate) * (
+        request.a_value_total / request.base_amount
+    )
+    half_width = (
+        request.floor_rate
+        * (request.reserve_range_end_rate - request.reserve_range_begin_rate)
+        / 2.0
+    )
+    return (anchor, half_width)
+
+
+class _EndpointRecorder:
+    """`uniform(low, high)` 의 인자를 포획하는 결정적 가짜 난수원(계획 §3.1 ③).
+
+    S0 는 밴드 안에서 **난수 하나**를 뽑으므로 금액만 보면 끝점을 되돌릴 수 없다 —
+    끝점을 직접 포획해야 「밴드가 수정식의 끝점인가」를 잴 수 있다."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[float, float]] = []
+
+    def uniform(self, low: float, high: float) -> float:
+        self.calls.append((low, high))
+        return low
+
+
+def _record_s0_band(
+    monkeypatch: pytest.MonkeyPatch, request: StrategyInput
+) -> tuple[tuple[float, float], BidAmount]:
+    recorder = _EndpointRecorder()
+    monkeypatch.setattr(
+        "ml_engine.evaluation.backtest.strategies.notice_rng",
+        lambda request, *, stream: recorder,
+    )
+    outcome = UniformBandStrategy().bid(request, _policy())
+    assert isinstance(outcome, BidAmount), outcome
+    assert len(recorder.calls) == 1, recorder.calls
+    return (recorder.calls[0], outcome)
+
+
+@pytest.mark.parametrize(
+    ("begin_rate", "end_rate", "expected_ratio"),
+    [(-0.02, 0.04, 1.01), (-0.04, 0.02, 0.99)],
+)
+def test_expected_assessment_ratio_is_the_midpoint_of_an_asymmetric_range(
+    begin_rate: float, end_rate: float, expected_ratio: float
+) -> None:
+    """계획 §3.1 ① — 비대칭 범위의 이론 평균 사정률(20만 회 직접 시뮬레이션이 `[-2%,
+    +4%]` 에서 1.01000898 을 냈다, 계획 §2 P1 실측)."""
+    request = build_strategy_input(_ranged_target(begin_rate, end_rate), (), seed=1)
+    assert request.expected_assessment_ratio == pytest.approx(expected_ratio)
+
+
+def test_expected_floor_rate_shares_one_formula_for_a_zero_and_a_positive() -> None:
+    """계획 §3.1 ② · §3.2 — 평균 하한율과 반폭은 `StrategyInput` 의 **한 자리**에서
+    나오고, A = 0 과 A > 0 이 같은 식을 쓴다(A = 0 은 그 식의 특수경우다)."""
+    plain = build_strategy_input(_ranged_target(-0.02, 0.04), (), seed=1)
+    assert plain.a_value_total == 0.0
+    anchor, half_width = _formula_anchor(plain)
+    assert plain.expected_floor_rate == pytest.approx(anchor)
+    assert plain.floor_rate_half_width == pytest.approx(half_width)
+
+    with_a = build_strategy_input(
+        _ranged_target(-0.02, 0.04, a_total=60_000_000), (), seed=1
+    )
+    assert with_a.a_value_total == 60_000_000.0
+    a_anchor, a_half_width = _formula_anchor(with_a)
+    assert with_a.expected_floor_rate == pytest.approx(a_anchor)
+    assert with_a.floor_rate_half_width == pytest.approx(a_half_width)
+    # A 보정이 실제로 **위로** 민다 — A 가 하한가의 고정분이기 때문이다.
+    assert a_anchor > anchor
+
+
+def test_s0_band_endpoints_are_the_corrected_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """계획 §3.1 ③ — S0 의 `low/high` 가 수정식의 끝점이다(A > 0 · 비대칭 범위)."""
+    request = build_strategy_input(
+        _ranged_target(-0.02, 0.04, a_total=60_000_000), (), seed=7
+    )
+    anchor, half_width = _formula_anchor(request)
+    (low, high), outcome = _record_s0_band(monkeypatch, request)
+    assert low == pytest.approx(anchor - half_width)
+    assert high == pytest.approx(anchor + half_width)
+    # 옛 앵커(`하한율 x (1 +- 반폭)`)와 **다른 수**라야 이 판이 무언가를 잰다.
+    assert low != pytest.approx(request.floor_rate * (1.0 - request.reserve_half_width))
+    assert outcome.amount == pytest.approx(math.ceil(request.base_amount * low))
+
+
+def test_symmetric_range_without_a_value_keeps_the_previous_s0_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """계획 §3.1 ⑥ — 대칭 범위 · A = 0 에서는 수정식이 **옛 기준으로 접힌다**.
+
+    E[R] = 1 이고 A = 0 이면 `하한율 x 1 + 0` 이라 중심이 하한율이고, 반폭도
+    `하한율 x 반폭` 이다 — 기존 실험의 S0 밴드와 같은 두 수다. 이 자리가 깨지면
+    수정이 대칭 공고의 거동까지 바꾼 것이다."""
+    request = build_strategy_input(_target(), (), seed=7)
+    assert request.expected_assessment_ratio == pytest.approx(1.0)
+    assert request.a_value_total == 0.0
+    (low, high), _ = _record_s0_band(monkeypatch, request)
+    assert low == pytest.approx(request.floor_rate * (1.0 - request.reserve_half_width))
+    assert high == pytest.approx(
+        request.floor_rate * (1.0 + request.reserve_half_width)
+    )
+
+
+def test_s4_grid_runs_from_the_corrected_anchor_lower_edge() -> None:
+    """계획 §3.1 ④ — S4 격자의 첫 점이 수정된 하단이고 마지막 점은 `하단 + 정책 폭`
+    이다. 격자 수·폭은 정책 그대로다(이 slice 는 그 둘을 바꾸지 않는다)."""
+    policy = _policy()
+    request = build_strategy_input(
+        _ranged_target(-0.02, 0.04, a_total=60_000_000), (), seed=7
+    )
+    anchor, half_width = _formula_anchor(request)
+    rates = _candidate_rates(request, policy)
+    span = policy.strategies.s4_grid_span_bp / 10_000.0
+    assert len(rates) == policy.strategies.s4_grid_size
+    assert rates[0] == pytest.approx(anchor - half_width)
+    assert rates[-1] == pytest.approx(anchor - half_width + span)
+
+
+# ── 순공사원가 98% 실격선의 적용 범위 (계획 2026-10-28 P2) ───────────────────
+
+
+def test_s4_pure_cost_line_follows_the_planned_price_cap() -> None:
+    """계획 §3.1 ⑤ — S4 는 **시뮬레이션 표본마다** 예정가격으로 적용을 판정한다.
+
+    100억원을 가로지르는 공고에서 표본별로 적용 여부가 갈린다: 상한 **아래** 표본은
+    순공사원가선이 서고, 상한과 그 **위** 표본은 하한가만 남는다(정확히 상한은
+    미적용 — 배타 경계)."""
+    policy = _policy()
+    cap = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    base = cap
+    cost = cap * 0.95
+    source = build_strategy_input(_construction_admitted(), (), seed=7)
+    request = replace(
+        source,
+        base_amount=base,
+        a_value_total=0.0,
+        notice=replace(source.notice, pure_construction_cost=cost),
+    )
+    ratios = np.array([(cap - 1.0) / base, cap / base, (cap + 1.0) / base])
+    floors = _simulated_floors(request, policy, ratios)
+    plain = np.array(
+        [
+            floor_price(
+                planned_price=ratio * base,
+                floor_rate=request.floor_rate,
+                a_value_total=0.0,
+            )
+            for ratio in ratios
+        ]
+    )
+    # 이 공고에서는 순공사원가선이 하한가보다 **위**다 — 아니면 적용 여부가 보이지 않는다.
+    assert cost * policy.floor.pure_construction_cost_ratio > plain[0]
+    assert floors[0] > plain[0], "상한 아래 표본에서 순공사원가선이 서지 않았다"
+    assert floors[1] == pytest.approx(plain[1]), "정확히 상한인데 규칙이 적용됐다"
+    assert floors[2] == pytest.approx(plain[2]), "상한 위인데 규칙이 적용됐다"
+
+
+def _cap_scale_request(cost: float, *, category: BusinessCategory) -> StrategyInput:
+    """기초금액이 **예정가격 상한과 같은** 공고의 전략 입력 — 시뮬레이션 표본이 상한을
+    가로지르게 만드는 유일한 방법이다(출하 픽스처는 기초금액 10억이라 늘 상한 아래다).
+
+    A = 0 으로 두어 하한가가 `예정가격 x 하한율` 로 접히고, 업무와 원가만 바꾼다."""
+    policy = _policy()
+    base = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    source = build_strategy_input(_construction_admitted(), (), seed=7)
+    return replace(
+        source,
+        base_amount=base,
+        a_value_total=0.0,
+        notice=replace(source.notice, category=category, pure_construction_cost=cost),
+    )
+
+
+def _plain_floors(request: StrategyInput, ratios: np.ndarray) -> np.ndarray:
+    """순공사원가선이 **없을 때**의 실격선 — 하한가 하나뿐인 경로."""
+    return np.array(
+        [
+            floor_price(
+                planned_price=ratio * request.base_amount,
+                floor_rate=request.floor_rate,
+                a_value_total=0.0,
+            )
+            for ratio in ratios
+        ]
+    )
+
+
+def test_s4_does_not_apply_the_pure_cost_line_to_a_non_construction_notice() -> None:
+    """계획 P2 의 적용 조건은 **공사이고** 상한 아래일 때다 — S4 자리에서 업무 축이
+    고정돼도 전체 suite 가 초록이었다(verifier r1 M-1).
+
+    원가가 **있는** 용역 공고로 같은 표본을 돌린다. 업무 축을 보지 않으면 상한 아래
+    표본에 순공사원가선이 서므로 실격선이 하한가보다 커진다 — 여기서는 하한가만 남아야
+    한다. 앞 판(이 slice 전)의 `_simulated_floors` 는 **업무를 보지 않았다**는 사실까지
+    이 자리가 잠근다."""
+    policy = _policy()
+    cap = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    cost = cap * 0.95
+    request = _cap_scale_request(cost, category=BusinessCategory.SERVICE)
+    assert request.notice.pure_construction_cost == pytest.approx(cost)
+    ratios = np.array([(cap - 1.0) / cap, (cap + 1.0) / cap])
+    plain = _plain_floors(request, ratios)
+    # 선이 하한가보다 **위**인 판이라야 적용 여부가 보인다(위 공사 test 와 같은 배치).
+    assert cost * policy.floor.pure_construction_cost_ratio > plain[0]
+    floors = _simulated_floors(request, policy, ratios)
+    assert floors == pytest.approx(plain), (
+        f"비공사 공고의 S4 표본에 순공사원가선이 섰다: {floors} vs {plain}"
+    )
+
+
+def test_s4_takes_the_higher_of_the_two_floors_in_an_applied_sample() -> None:
+    """적용 표본의 실격선은 **두 선 중 높은 쪽**이다(verifier r1 L-1).
+
+    앞 판의 test 는 선이 하한가 **위**인 공고만 봤다 — 그 판에서는 `max(하한가, 선)` 을
+    `선` 으로 바꿔도 같은 수가 나온다. 선이 하한가 **아래**로 내려가는 원가를 주고,
+    규칙이 적용되는 표본에서 **하한가가 남는지** 본다."""
+    policy = _policy()
+    cap = policy.floor.pure_construction_cost_max_planned_price_exclusive
+    cost = cap * 0.5
+    request = _cap_scale_request(cost, category=BusinessCategory.CONSTRUCTION)
+    ratios = np.array([(cap - 1.0) / cap])
+    plain = _plain_floors(request, ratios)
+    pure = cost * policy.floor.pure_construction_cost_ratio * ratios[0]
+    # 전제 둘: 규칙이 **적용되는** 표본이고(술어는 정책이 진다), 그 선이 하한가 아래다.
+    assert policy.floor.pure_cost_rule_applies(
+        is_construction=True, planned_price=float(ratios[0] * request.base_amount)
+    )
+    assert pure < plain[0], (pure, plain[0])
+    floors = _simulated_floors(request, policy, ratios)
+    assert floors[0] == pytest.approx(plain[0]), (
+        f"순공사원가선이 하한가보다 낮은데 그 선이 실격선이 됐다: {floors[0]}"
+    )

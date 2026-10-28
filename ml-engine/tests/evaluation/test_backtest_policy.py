@@ -24,8 +24,9 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.policy import PolicyRejected, PolicyRejectionReason
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
-_SHIPPED_PATH = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_SHIPPED_PATH = _POLICY_DIR / "strategy-backtest-v2.yaml"
 _INFERENCE_PATH = _POLICY_DIR / "inference-v1.yaml"
+_PURE_COST_CAP_KEY = "floor.pure_construction_cost_max_planned_price_exclusive"
 
 
 def _shipped() -> StrategyBacktestPolicy:
@@ -132,6 +133,10 @@ def test_missing_key_is_rejected(tmp_path: Path) -> None:
         ("fit.alpha", "0.0"),
         ("fit.min_sample_count", "0"),
         ("fit.max_bin_ratio_deviation", "-0.01"),
+        # 계획 2026-10-28 P3 — 예정가격 상한(배타)은 **양의 유한수**만 받는다. 0 이나
+        # 음수를 받으면 순공사원가 규칙이 어느 공사에도 적용되지 않는 정책이 조용히 선다.
+        (_PURE_COST_CAP_KEY, "0"),
+        (_PURE_COST_CAP_KEY, "-1.0"),
     ],
 )
 def test_out_of_range_values_are_rejected(tmp_path: Path, key: str, value: str) -> None:
@@ -200,3 +205,82 @@ def test_alpha_after_bonferroni_is_the_only_alpha_the_verdict_uses() -> None:
     expected = policy.verdict.alpha / policy.verdict.primary_hypothesis_count
     assert policy.verdict.primary_alpha == pytest.approx(expected)
     assert policy.verdict.primary_alpha < policy.verdict.alpha
+
+
+# ── 정책 v2 — 순공사원가 규칙의 예정가격 상한 (계획 2026-10-28 P3) ───────────
+
+_V1_PATH = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_APPROVED_PURE_COST_CAP = 10_000_000_000.0
+"""조달청 시설공사 적격심사세부기준 제5조의 적용 대상 상한 — **예정가격 100억원 미만**
+공사이고 정확히 100억원이면 미적용이다(계획 §2 P2 의 제도 근거)."""
+
+
+def test_shipped_policy_is_v2_and_carries_the_pure_cost_scope() -> None:
+    """출하 정책이 v2 이고 새 키가 승인 문면의 값 그대로다. v1 의 판정 기준·seed·창·
+    S1·S4 값은 그대로 승계한다(계획 §3.4)."""
+    policy = _shipped()
+    assert policy.version == SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION
+    assert policy.version != "strategy-backtest-v1"
+    assert policy.floor.pure_construction_cost_max_planned_price_exclusive == (
+        pytest.approx(_APPROVED_PURE_COST_CAP)
+    )
+    # 승계 확인 — 판정식 축이 v1 과 같은 값이다.
+    assert policy.verdict.min_relative_improvement == pytest.approx(0.20)
+    assert policy.verdict.min_window_rows == 483
+    assert policy.strategies.s4_grid_size == 41
+    assert policy.floor.pure_construction_cost_ratio == pytest.approx(0.98)
+
+
+def test_the_pure_cost_cap_cannot_be_dropped(tmp_path: Path) -> None:
+    """키를 지운 정책은 거부된다 — 로더가 기본값을 채우면 그 값은 더 이상 정책
+    파일이 정하는 값이 아니다(우회 ⑤)."""
+    text = "\n".join(
+        line
+        for line in _shipped_text().splitlines()
+        if not line.startswith(f"{_PURE_COST_CAP_KEY}:")
+    )
+    rejected = load_strategy_backtest_policy(_write(tmp_path, text + "\n"))
+    assert isinstance(rejected, PolicyRejected)
+    assert rejected.reason is PolicyRejectionReason.INVALID_VALUE
+
+
+def test_a_non_finite_pure_cost_cap_is_rejected(tmp_path: Path) -> None:
+    """NaN·무한은 비교 술어를 조용히 뒤집는다(`x < nan` 은 늘 거짓이라 규칙이 어느
+    공사에도 적용되지 않는다) — 값 단계에서 거부한다."""
+    for raw in (".nan", ".inf"):
+        lines = [
+            f"{_PURE_COST_CAP_KEY}: {raw}"
+            if line.startswith(f"{_PURE_COST_CAP_KEY}:")
+            else line
+            for line in _shipped_text().splitlines()
+        ]
+        rejected = load_strategy_backtest_policy(
+            _write(tmp_path, "\n".join(lines) + "\n")
+        )
+        assert isinstance(rejected, PolicyRejected), raw
+        assert rejected.reason is PolicyRejectionReason.INVALID_VALUE, raw
+
+
+def test_v1_and_v2_verdicts_are_distinguished_by_version_and_checksum(
+    tmp_path: Path,
+) -> None:
+    """계획 §2 P3 — 수정된 S0·S4 결과를 v1 실험과 섞지 않는다. 판정 JSON 의
+    `policy_version`·`policy_checksum` 이 두 판을 가른다.
+
+    v1 파일은 **보존하지만 로더가 거부한다** — 새 키가 없고 그 키에 기본값을 채우지
+    않기 때문이다(fail-closed). 그래서 v1 의 값으로 조립한 정책(v1 문면 + 새 키)을
+    지어 두 판이 갈리는지 본다."""
+    assert isinstance(load_strategy_backtest_policy(_V1_PATH), PolicyRejected)
+    v1_like = load_strategy_backtest_policy(
+        _write(
+            tmp_path,
+            _V1_PATH.read_text(encoding="utf-8")
+            + f"\n{_PURE_COST_CAP_KEY}: {_APPROVED_PURE_COST_CAP!r}\n",
+        )
+    )
+    assert isinstance(v1_like, StrategyBacktestPolicy), v1_like
+    shipped = _shipped()
+    assert v1_like.version != shipped.version
+    assert strategy_backtest_policy_checksum(v1_like) != (
+        strategy_backtest_policy_checksum(shipped)
+    )
