@@ -62,3 +62,13 @@ pytest 전체 · `tools/design_ratchet.py --check` · `tools/reuse_provenance_ch
 ## 계약 갱신 이력
 
 - 2026-10-28 착수(팀장).
+- 2026-10-28 **D-6GRC-1(팀장, 레인 1단계 보고 수령)**: 새 키를 필수(fail-closed — 기존 `test_the_loader_refuses_a_policy_with_a_key_removed`
+  가 모든 키에 요구한다)로 두면 `strategy-backtest-v1.yaml` 은 더 이상 적재되지 않는다. 그 귀결로 출하 정책을 적재하는 test 의 경로를 v2 로
+  옮기는 것을 in_scope 에 더한다: `ml-engine/tests/app/test_seed_count_pinned.py` · `ml-engine/tests/app/test_backtest_golden.py` ·
+  `ml-engine/tests/app/test_backtest_job.py`(그 안의 `policy_version == "strategy-backtest-v1"` 단언 한 줄 포함) ·
+  `ml-engine/tests/evaluation/test_backtest_sample_scope.py`. 기계적 귀결이며 새 결정이 아니다.
+- 2026-10-28 **D-6GRC-2(팀장)**: v1 파일은 **바이트 동일하게 보존하되 적재 불가**로 둔다(계획은 「보존」만 요구한다). v1·v2 구분 test 는 v1 값으로
+  조립한 정책(v1 문면 + 새 키)으로 version · checksum 차이를 잰다. 그 사실을 checklist 알려진 제한에 둔다.
+- 2026-10-28 **D-6GRC-3(팀장)**: M6/G1-DEC10 레인이 `app/build.gradle.kts` 의 system property 로 `ml-engine/policy/strategy-backtest-v1.yaml` 을
+  가리킨다(하한율 밴드 값 일치 test). v1 이 보존되므로 그 test 는 깨지지 않지만 출하 정책은 v2 다 — **두 브랜치 중 나중에 머지되는 쪽이 그 경로를
+  v2 로 옮긴다**(밴드 값은 v1 = v2 라 등식은 그대로). 이 slice 는 Kotlin 을 건드리지 않는다.
