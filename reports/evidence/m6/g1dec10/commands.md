@@ -225,3 +225,11 @@ verifier r4 H-1(가격 경로 ③ 의 진입이 날 율이라 **표현을 바꾼
 
 ⓐ·ⓓ 집합도 실패 로그에서 파서로 생성했다(추출기에 축 둘을 더했다). 전체 집합을 보려고
 kotest 출력 한도를 **측정 동안만** 올렸고 그 편집은 커밋하지 않았다(`git status` 로 확인).
+
+### S-20 (r5) — 전건 재실측
+
+- cmd: `./tools/one-command-check.sh` (CI `check` job 의 완료 조건 1 단계)
+- exit: **0** @ `2a8f1389` — `one-command-check: 완료 — Kotlin 전건 + Python 전건 + web 전건 통과`.
+- 이 줄 뒤의 evidence 커밋이 **마지막 HEAD** 다. 그 HEAD 의 게이트 결과 정본은 evidence 가 아니라
+  verifier 와 PR 조치 코멘트다(`evidence-pack` 규격 — evidence 는 자기 마지막 커밋의 post-state 를
+  담을 수 없다).
