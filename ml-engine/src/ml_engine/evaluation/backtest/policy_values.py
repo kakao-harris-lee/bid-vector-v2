@@ -121,17 +121,30 @@ class InstitutionConstants:
 
 @dataclass(frozen=True)
 class FloorRateBand:
-    """낙찰하한율 개연 밴드(D-6G-13 ②)와 공사 순공사원가 배제 비율(P-3 §4.3)."""
+    """낙찰하한율 개연 밴드(D-6G-13 ②)와 공사 순공사원가 배제 비율(P-3 §4.3), 그리고
+    그 배제가 **적용되는 예정가격 상한**(계획 2026-10-28 P2)."""
 
     rate_band_low: float
     rate_band_high: float
     pure_construction_cost_ratio: float
+    pure_construction_cost_max_planned_price_exclusive: float
+    """순공사원가 배제가 적용되는 예정가격의 **배타 상한**. 조달청 시설공사 적격심사
+    세부기준 제5조의 적용 대상이 예정가격 100억원 **미만** 공사라, 정확히 상한이면
+    미적용이다. 값이 코드가 아니라 정책에 있는 이유는 제도 수치이기 때문이다 —
+    바뀌면 새 정책 version 이고 이전 판정과 구분된다."""
 
     def __post_init__(self) -> None:
         _require_finite_unit_open(self.rate_band_low, "floor.rate_band_low")
         _require_finite_unit_open(self.rate_band_high, "floor.rate_band_high")
         _require_finite_unit_open(
             self.pure_construction_cost_ratio, "floor.pure_construction_cost_ratio"
+        )
+        # **양의 유한수만** — 0 이나 음수면 규칙이 어느 공사에도 적용되지 않는 정책이
+        # 조용히 서고, NaN 이면 `<` 비교가 늘 거짓이라 같은 결과가 된다(비교 술어를
+        # 값 단계에서 닫는다).
+        _require_finite_positive(
+            self.pure_construction_cost_max_planned_price_exclusive,
+            "floor.pure_construction_cost_max_planned_price_exclusive",
         )
         if self.rate_band_low >= self.rate_band_high:
             raise ValueError(
@@ -141,6 +154,22 @@ class FloorRateBand:
 
     def contains(self, rate: float) -> bool:
         return self.rate_band_low <= rate <= self.rate_band_high
+
+    def pure_cost_rule_applies(
+        self, *, is_construction: bool, planned_price: float
+    ) -> bool:
+        """순공사원가 98% 실격선의 **적용 범위**(계획 2026-10-28 P2).
+
+        `CONSTRUCTION && 예정가격 < 상한`. 기준은 기초금액이나 낙찰방법명 문자열이
+        아니라 **예정가격**이고, 경계는 배타(`<`)다.
+
+        **채점과 S4 가 같은 이 술어를 부른다.** 두 자리가 각자 비교를 쓰면 한쪽의
+        `<` 가 `<=` 로 바뀌어도 다른 쪽이 가려 준다 — 그러면 시뮬레이션과 채점이 다른
+        규칙으로 돌고, S4 는 채점에서 부적격이 되는 투찰률을 고른다."""
+        return (
+            is_construction
+            and planned_price < self.pure_construction_cost_max_planned_price_exclusive
+        )
 
 
 @dataclass(frozen=True)

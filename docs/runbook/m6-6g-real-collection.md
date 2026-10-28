@@ -96,12 +96,12 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
 `ml_engine.app.backtest_cli` 가 진입점이다(6G-2e D-6G2e-6 — 앞 판의 heredoc 스크립트를
 대신한다; `run_backtest_job(*, snapshot_uri, backtest_policy_path, inference_policy_path)
 -> JobCompleted | JobFailed`, 예외 없이 결과 타입). 정책 둘(판정 정책
-`strategy-backtest-v1.yaml` · 분포 엔진 정책 `inference-v1.yaml`)은 **출하 파일 그대로**이고
+`strategy-backtest-v2.yaml` · 분포 엔진 정책 `inference-v1.yaml`)은 **출하 파일 그대로**이고
 CLI 로 완화할 수 없다 — 임계를 받는 인자가 없다.
 ```
 cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
     --snapshot-uri $HOME/.local/bid-vector-snapshots/m6-6g-<YYYYMMDD> \
-    --backtest-policy policy/strategy-backtest-v1.yaml \
+    --backtest-policy policy/strategy-backtest-v2.yaml \
     --inference-policy policy/inference-v1.yaml \
     --output-dir $HOME/.local/bid-vector-verdicts/m6-6g-<YYYYMMDD>
 ```

@@ -4,6 +4,7 @@ import bidvector.adapters.evaluation.CandidateCapExceededException
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
+import bidvector.app.wiring.NoticeNotFoundException
 import bidvector.workflow.strategy.EditSessionConflictException
 import bidvector.workflow.suggestion.StrategyChangedDuringComputationException
 import jakarta.servlet.http.HttpServletRequest
@@ -37,6 +38,23 @@ class InvalidEditRequestException(
  * 어느 쪽으로 달든 응답에 닿지 않는다 — 같은 매핑표가 고정 문구만 낸다.
  */
 class InvalidNoticeSearchException(
+    message: String,
+) : RuntimeException(message)
+
+/**
+ * 알림함 요청의 형식·범위 오류(M7/7C③) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
+ * (`NotificationPageRejection`, 또는 읽음 처리 대상의 거부)를 진단용으로 나르고 **응답에는
+ * 실리지 않는다**(아래 [ErrorMapping] 이 고정 문구로만 옮긴다).
+ *
+ * **왜 기존 예외를 쓰지 않는가**: [InvalidNoticeSearchException] 은 공고 검색 질의의 어휘이고
+ * [InvalidEditRequestException] 은 전략 편집의 어휘다. 셋은 같은 코드·같은 고정 문구로 끝나지만
+ * **어느 표면이 거부했는가**가 예외 타입에 남아야 진단이 성립한다(응답은 어느 쪽이든 구별하지
+ * 않는다 — 어느 입력이 틀렸는지 싣지 않는 것이 이 체계의 관례다).
+ *
+ * 생성자는 문구 하나만 받는다([InvalidNoticeSearchException] 과 같은 사유 — `Throwable` 을
+ * 생성자로 받으면 주입 표면 게이트가 이 class 를 주입 대상으로 읽는다. 원인은 `initCause` 로 단다).
+ */
+class InvalidNotificationRequestException(
     message: String,
 ) : RuntimeException(message)
 
@@ -91,6 +109,13 @@ object ErrorCode {
     const val NOT_FOUND = "NOT_FOUND"
     const val INVALID_STORED_STRATEGY = "INVALID_STORED_STRATEGY"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
+
+    /**
+     * M7/7C ② — 요청한 **공고**가 없다. [NOT_FOUND](요청한 **경로**가 없다)와 다른 코드다:
+     * 고정 문구가 하나면 「경로를 잘못 불렀다」와 「그 공고가 없다」를 호출부가 구분할 수 없다.
+     * 공고의 존재는 공개 정보라 구분이 아무것도 흘리지 않는다(인증 실패와 다른 축이다).
+     */
+    const val NOTICE_NOT_FOUND = "NOTICE_NOT_FOUND"
 
     // D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
@@ -152,7 +177,19 @@ object ErrorMapping {
         return ErrorBody(code, message, correlationId)
     }
 
-    /** 조회·dry-run 이 내는 갈래. */
+    /**
+     * 조회·dry-run 이 내는 갈래.
+     *
+     * **형식·범위 오류 넷을 한 갈래로 묶는다** — 평가 요청(D-6A3) · 공고 검색(M7/7C①) ·
+     * 알림함(M7/7C③) · 개찰 결과 조회(M7/7C⑤-a). 타입을 **따로 두는** 이유는 어느 표면이
+     * 거부했는지를 진단에 남기는 것이고(각 타입 KDoc), 응답은 넷을 구별하지 않는다 — 같은
+     * 코드·같은 고정 문구다.
+     *
+     * 갈래를 타입마다 복사하면 **레인이 하나 늘 때마다 이 함수가 세 줄씩 자란다**. 실제로
+     * 7C③ ← 7C② 병합의 합집합이 50줄 한도를 넘겼다(55줄 — r2 acceptance 의 `sizeGate` 가
+     * 잡았다). 묶는 것은 한도를 피하는 수단이 아니라 **중복을 지우는 것**이고, 다음 표면이
+     * 같은 거부를 더해도 이 함수는 한 줄만 자란다.
+     */
     private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
@@ -175,17 +212,17 @@ object ErrorMapping {
                 ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION to "계산하는 동안 전략이 바뀌었다 — 다시 조회하라"
             }
 
-            is InvalidEvaluationRequestException -> {
-                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            // M7/7C ② — 요청한 공고가 없다(평가를 시작하지 않았다).
+            is NoticeNotFoundException -> {
+                ErrorCode.NOTICE_NOT_FOUND to "요청한 공고를 찾을 수 없다"
             }
 
-            // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
-            is InvalidNoticeSearchException -> {
-                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
-            }
-
-            // M7/7C⑤-a — 개찰 결과 조회 질의의 형식 오류. 같은 코드·같은 고정 문구다.
-            is InvalidOpeningResultQueryException -> {
+            // 네 표면의 형식 오류가 한 갈래다(사유는 이 함수 KDoc).
+            is InvalidEvaluationRequestException,
+            is InvalidNoticeSearchException,
+            is InvalidNotificationRequestException,
+            is InvalidOpeningResultQueryException,
+            -> {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
@@ -238,9 +275,16 @@ private fun escapeJson(value: String): String = value.replace("\\", "\\\\").repl
  */
 @RestControllerAdvice
 class GlobalErrorHandler {
-    @ExceptionHandler(NoHandlerFoundException::class)
+    /**
+     * 404 계열 — 경로가 없거나(D-6A1-21) 요청한 공고가 없다(M7/7C ②). 같은 상태 코드이고
+     * 본문의 코드가 사유를 가른다(D-6A2b-6 과 같은 규율).
+     */
+    @ExceptionHandler(
+        NoHandlerFoundException::class,
+        NoticeNotFoundException::class,
+    )
     fun notFound(
-        exception: NoHandlerFoundException,
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.NOT_FOUND, exception, request)
 
@@ -274,6 +318,7 @@ class GlobalErrorHandler {
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
         InvalidNoticeSearchException::class,
+        InvalidNotificationRequestException::class,
         InvalidOpeningResultQueryException::class,
     )
     fun badRequest(

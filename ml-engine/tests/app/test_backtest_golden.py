@@ -45,7 +45,7 @@ from ml_engine.evaluation.backtest.snapshot import (
 
 _TESTS_ROOT = Path(__file__).resolve().parents[1]
 _SHIPPED_BACKTEST_POLICY = (
-    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v1.yaml"
+    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v2.yaml"
 )
 
 

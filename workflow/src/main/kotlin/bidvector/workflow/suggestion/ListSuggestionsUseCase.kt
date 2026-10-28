@@ -9,6 +9,7 @@ import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.evaluation.screenCandidate
 import bidvector.workflow.strategy.Clock
@@ -40,15 +41,13 @@ enum class SuggestionState {
 }
 
 /**
- * 자격 축 가운데 **판정이 없는** 것 — 제안 카드의 면허 판정을 자격 전체로 읽지 않게 늘 싣는다. 이름은
- * 7C ④ 의 프로필 응답 `unjudgedAxes` 어휘와 같다(그 레인이 병합되면 선언 표를 하나로 합친다).
+ * 오늘 판정하지 않는 축 전수 — 제안 카드의 면허 판정을 자격 전체로 읽지 않게 늘 싣는다.
+ *
+ * **선언 표는 `workflow.evaluation` 하나다**(`D-7C2-11`). 이 자리에 있던 사본은 지웠다 — 항목이
+ * **둘**(QUAL-08 · QUAL-11)이라 **QUAL-10 이 빠져 있었고**, 그것은 의도가 아니라 시점 차이였다
+ * (QUAL-10 은 이 slice 가 머지된 **뒤** `D-7C2-1` Q5 로 들어온 축이다). 빠진 채로 두면 면허 판정만
+ * 있는 카드가 **수행실적까지 판정된 것처럼** 읽힌다.
  */
-enum class UnjudgedQualificationAxis {
-    QUAL_08_REGION,
-    QUAL_11_CONSTRUCTION_CAPACITY,
-}
-
-/** 오늘 판정하지 않는 축 전수 — 선언 표 하나. */
 val SUGGESTION_UNJUDGED_AXES: List<UnjudgedQualificationAxis> = UnjudgedQualificationAxis.entries
 
 /**

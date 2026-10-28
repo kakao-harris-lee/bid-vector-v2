@@ -333,7 +333,7 @@ _ALLOWED_ENTRIES: tuple[tuple[str, float], ...] = (
     ("evaluation/windows.py", 1),  # max_origins>0 슬라이스 경계
     # ── M6/6G `evaluation/backtest/**` ────────────────────────────────────
     # 아래 여섯은 전부 **구조적 불변식·산식 자체의 눈금**이고, 판정 임계는 하나도
-    # 없다(임계는 policy/strategy-backtest-v1.yaml 에만 있다).
+    # 없다(임계는 출하 정책 policy/strategy-backtest-v2.yaml 에만 있다).
     ("evaluation/backtest/exclusions.py", 0),  # 계수 초기값
     ("evaluation/backtest/exclusions.py", 0.0),  # 빈 표본의 채움률
     ("evaluation/backtest/exclusions.py", 1),  # 동가 1건 초과 비교
@@ -379,7 +379,7 @@ _ALLOWED_ENTRIES: tuple[tuple[str, float], ...] = (
     (
         "evaluation/backtest/strategies.py",
         1.0,
-    ),  # 비율 1 기준(밴드 상·하단, E[R] 중점)
+    ),  # 비율 1 기준(E[R] 중점 · A 보정의 (1 - 하한율) 계수)
     ("evaluation/backtest/strategies.py", 2),  # 중앙값 인덱스 나눗셈
     (
         "evaluation/backtest/strategies.py",
@@ -509,7 +509,7 @@ def test_shipped_threshold_values_never_appear_as_literals() -> None:
         5e8,
         1e9,
         5e9,
-        # M6/6G strategy-backtest-v1.yaml — A-3 승인값과 제도·밴드 상수
+        # M6/6G strategy-backtest-v2.yaml — A-3 승인값과 제도·밴드 상수
         0.20,
         0.05,
         3,
@@ -528,6 +528,9 @@ def test_shipped_threshold_values_never_appear_as_literals() -> None:
         30,
         200,
         0.02,
+        # 순공사원가 규칙의 예정가격 배타 상한(v2 신규, 계획 2026-10-28 P2). 이 수가
+        # 코드에 나타나면 적용 범위가 정책이 아니라 코드가 정하는 것이다.
+        1e10,
     }
     leaked: list[str] = []
     for path in _scanned_paths():
