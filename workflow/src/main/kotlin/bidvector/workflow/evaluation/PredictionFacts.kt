@@ -158,7 +158,10 @@ private data class MarginFact(
  * 통과하지 못한 값의 처분은 **둘로 갈린다**(D-DEC10-12, 2026-10-28 팀장 결정 — r1 v M-1):
  * - `fraction > 1` — margin **성분을 떨어뜨린다**(`Absent`). 사용자 승인 거동 D-4B6-4 이고
  *   이 slice 가 되돌리지 않는다. 그 값은 [MarginInputs] 의 불변식(`≤ 1`)으로 애초에 입력이
- *   될 수 없다 — 「접는다」가 성립하지 않는 범위다.
+ *   될 수 없다 — 「접는다」가 성립하지 않는 범위다. **사유 있는 두 실패 가지 공통**이다
+ *   (r2 CR M-2): base 의 필터가 origin 무관이었으므로 법정표 출처의 `> 1` 도 같은 처분이다.
+ *   오늘 `StatutoryTable` 생성 자리가 0 이라 도달 불가지만, DEC-03 해석기가 생기는 날 조용히
+ *   갈리지 않도록 술어를 가지 밖으로 올렸다.
  * - 그 밖의 개연 불가·심판 아님 — 「하한 미보고」와 **같은 값**(`floorRate = null`)으로 접힌다
  *   (DEC-10 acceptance 첫째). `1.00000`(R-FLOOR-03 라이브 47건)이 이 가지이고, 값·점수가
  *   앞 판과 같고 **계수만 생긴다**.
@@ -178,16 +181,17 @@ private fun expectedMarginFact(
 ): MarginFact {
     val trust = trustPublishedFloorRate(notice.floorRate, policies.floorTrust)
     val exclusion = trust.exclusion()
-    if (trust is PublishedFloorTrust.Implausible && exceedsMarginInputBound(trust.rate.rate)) {
+    val excludedRate =
+        when (trust) {
+            is PublishedFloorTrust.Trusted -> null
+            PublishedFloorTrust.Absent -> null
+            is PublishedFloorTrust.Implausible -> trust.rate.rate
+            is PublishedFloorTrust.OriginNotJudged -> trust.rate.rate
+        }
+    if (excludedRate != null && exceedsMarginInputBound(excludedRate)) {
         return MarginFact(ScoreFact.Absent(MlUnavailableReason.InvalidRequest), exclusion)
     }
-    val floorRate =
-        when (trust) {
-            is PublishedFloorTrust.Trusted -> trust.rate.rate
-            PublishedFloorTrust.Absent -> null
-            is PublishedFloorTrust.Implausible -> null
-            is PublishedFloorTrust.OriginNotJudged -> null
-        }
+    val floorRate = if (trust is PublishedFloorTrust.Trusted) trust.rate.rate else null
     val marginInputs =
         MarginInputs(
             recommendedRate = predictedRate,
