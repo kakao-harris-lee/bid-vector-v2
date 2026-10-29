@@ -457,6 +457,68 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(within(failure).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
   });
 
+  /** CR r2 M-3 — 라벨이 「다시 시도」라면 **실제로 다시 보내야** 한다(앞 판은 얼굴만 닫혔다). */
+  it('실패 뒤 「다시 시도」를 누르면 같은 기록을 다시 보낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    mocked.recordBid.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    const failure = await screen.findByTestId('write-failure');
+    expect(mocked.recordBid).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => {
+      expect(mocked.recordBid).toHaveBeenCalledTimes(2);
+    });
+    expect(mocked.recordBid.mock.calls[1]).toStrictEqual(mocked.recordBid.mock.calls[0]);
+  });
+
+  /** v r2 M-3 — 넷 가운데 하나만 「다시 읽기」가 잠겨 있었다. 초안·다시 보기도 잰다. */
+  it('초안 실패도 서버 상태를 다시 읽는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'PRICE_RECEIVED' }]);
+    mocked.draftBid.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    const before = mocked.listBidCases.mock.calls.length;
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    await screen.findByTestId('write-failure');
+    await waitFor(() => {
+      expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
+  it('다시 보기 실패도 얼굴을 내고 서버 상태를 다시 읽는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED' }]);
+    mocked.resumeCase.mockRejectedValue(new ApiError(409, 'CONFLICT'));
+    renderScreen();
+
+    const before = mocked.listBidCases.mock.calls.length;
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    expect((await screen.findByTestId('write-failure')).textContent).toContain('되돌리지 못했습니다');
+    await waitFor(() => {
+      expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
+  /** CR r2 L-5 — 투찰가 요청(POST)도 쓰기와 같은 얼굴·같은 401 갈래를 쓴다. */
+  it('투찰가 요청이 401 이면 로그인으로 가는 길을 보인다', async () => {
+    mocked.requestBidPrice.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    await askPrice();
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(within(failure).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
+  });
+
   it('타임라인은 전이·주체를 API 가 준 순서로 보인다', async () => {
     renderScreen();
 

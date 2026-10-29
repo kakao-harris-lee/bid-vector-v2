@@ -95,12 +95,37 @@ export function WorksheetScreen() {
     },
   });
 
+  /**
+   * 투찰가 요청은 **POST 인데 옛 읽기 얼굴**을 쓰고 있었다(CR r2 L-5) — 세션이 중간에 끝나면
+   * 그 자리에서 영원히 재시도한다. 쓰기 넷과 같은 얼굴·같은 401 갈래로 모은다.
+   */
+  const priceFailure = askPrice.isError
+    ? {
+        what: '투찰가를 요청하지',
+        error: askPrice.error,
+        retry: () => {
+          if (askPrice.variables !== undefined) {
+            askPrice.mutate(askPrice.variables);
+          }
+        },
+      }
+    : null;
+
   const makeDraft = useMutation({
-    mutationFn: (payload: { readonly caseId: number; readonly amountWon: number; readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN' }) =>
+    /**
+     * **시각을 payload 로 받는다**(CR r2 M-3). `mutationFn` 안에서 만들면 「다시 시도」가 같은
+     * 진술을 보내지 않는다 — 네트워크가 실패했다고 운영자가 제시한 시각이 바뀔 이유가 없다.
+     */
+    mutationFn: (payload: {
+      readonly caseId: number;
+      readonly amountWon: number;
+      readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN';
+      readonly at: string;
+    }) =>
       draftBid(payload.caseId, {
         amountWon: payload.amountWon,
         vatTreatment: payload.vat,
-        presentedAt: new Date().toISOString(),
+        presentedAt: payload.at,
       }),
     onSuccess: async () => {
       show({ text: '투찰 예정 초안을 만들었습니다.' });
@@ -120,11 +145,12 @@ export function WorksheetScreen() {
       readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN';
       readonly drawNumbers: number[];
       readonly memo: string;
+      readonly at: string;
     }) =>
       recordBid(payload.caseId, {
         amountWon: payload.amountWon,
         vatTreatment: payload.vat,
-        submittedAt: new Date().toISOString(),
+        submittedAt: payload.at,
         drawNumbers: payload.drawNumbers,
         ...(payload.memo.trim() === '' ? {} : { memo: payload.memo.trim() }),
       }),
@@ -187,7 +213,7 @@ export function WorksheetScreen() {
       return;
     }
     if (kind === 'DRAFT_BID') {
-      makeDraft.mutate({ caseId, ...amount });
+      makeDraft.mutate({ caseId, ...amount, at: new Date().toISOString() });
       return;
     }
     const drawNumbers = parseDrawNumbers(form.drawNumbers);
@@ -195,7 +221,7 @@ export function WorksheetScreen() {
       setBlocked('추첨번호는 정수로 적으십시오.');
       return;
     }
-    makeRecord.mutate({ caseId, ...amount, drawNumbers, memo: form.memo });
+    makeRecord.mutate({ caseId, ...amount, drawNumbers, memo: form.memo, at: new Date().toISOString() });
   }
 
   if (signedIn === false) {
@@ -241,11 +267,37 @@ export function WorksheetScreen() {
    * 실패했는지는 **그 전이의 이름**으로 말한다(CR H-2).
    */
   const writeFailure = makeDraft.isError
-    ? { what: '투찰 예정 초안을 만들지', error: makeDraft.error, retry: () => makeDraft.reset() }
+    ? {
+        what: '투찰 예정 초안을 만들지',
+        error: makeDraft.error,
+        // **실제로 다시 보낸다**(CR r2 M-3) — 앞 판은 `reset()` 이라 얼굴만 사라졌고, 운영자는
+        // 「다시 시도」를 누르고 메시지가 사라지는 것을 **성공으로 읽을 수 있었다**.
+        retry: () => {
+          if (makeDraft.variables !== undefined) {
+            makeDraft.mutate(makeDraft.variables);
+          }
+        },
+      }
     : makeRecord.isError
-      ? { what: '투찰 기록을 기록하지', error: makeRecord.error, retry: () => makeRecord.reset() }
+      ? {
+          what: '투찰 기록을 기록하지',
+          error: makeRecord.error,
+          retry: () => {
+            if (makeRecord.variables !== undefined) {
+              makeRecord.mutate(makeRecord.variables);
+            }
+          },
+        }
       : resume.isError
-        ? { what: '다시 보기로 되돌리지', error: resume.error, retry: () => resume.reset() }
+        ? {
+            what: '다시 보기로 되돌리지',
+            error: resume.error,
+            retry: () => {
+              if (resume.variables !== undefined) {
+                resume.mutate(resume.variables);
+              }
+            },
+          }
         : null;
 
   const amount = amountDisplayOf(notice);
@@ -321,17 +373,9 @@ export function WorksheetScreen() {
       )}
 
       {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
-      {askPrice.isError ? (
-        <ErrorFace
-          testId="price-error"
-          onRetry={() => {
-            const declared = parseCount(activeBids);
-            if (declared !== null) {
-              askPrice.mutate(declared);
-            }
-          }}
-        />
-      ) : null}
+      {priceFailure === null ? null : (
+        <WriteFailureFace what={priceFailure.what} error={priceFailure.error} onRetry={priceFailure.retry} />
+      )}
       {price === null ? null : <WorksheetGrounds price={price} />}
 
       {bidCase === undefined ? null : (
