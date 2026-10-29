@@ -462,13 +462,15 @@ test('쓰기가 401 로 거부되면 로그인으로 가는 길이 뜬다', asyn
   expect((await rejected).status()).toBe(401);
 
   /**
-   * 단언은 **결과**다 — 「로그인으로 가는 길이 뜬다」. 어느 컴포넌트가 그것을 내는지는 고정하지
-   * 않는다: 쓰기 401 뒤 `onError` 가 서버 상태를 다시 읽고 **그 읽기도 401** 이므로 화면이
-   * 로그인 얼굴로 바뀐다(CR r2 L-6 의 읽기 갈래). 두 얼굴이 같은 답을 내므로 운영자에게는 한
-   * 답이고, 그것이 옳다. `serial` 을 걷자 이 상호작용이 드러났다.
+   * 단언은 **결과**다 — 「로그인으로 가는 길이 뜬다」. 다만 **어느 얼굴이 그것을 내는지 둘 가운데
+   * 하나임을 명시한다**(CR r3 L-6): 쓰기 401 뒤 `onError` 가 서버 상태를 다시 읽고 **그 읽기도
+   * 401** 이므로 화면이 로그인 얼굴로 바뀐다(CR r2 L-6 의 읽기 갈래). 그래서 이 자리에 설 수 있는
+   * 얼굴은 쓰기 실패 얼굴과 로그아웃 얼굴 둘이다. 앞 판은 링크만 봐서 **쓰기 얼굴이 아예 사라져도**
+   * 초록이었다 — 목 없는 유일한 층의 단언이 한 단 약해진 자리였다.
    */
-  await expect(page.getByRole('link', { name: /로그인/u })).toBeVisible();
-  await expect(page.getByRole('link', { name: /로그인/u })).toHaveAttribute('href', '/login');
+  const face = page.getByTestId('write-failure').or(page.getByTestId('signed-out'));
+  await expect(face).toHaveCount(1);
+  await expect(face.getByRole('link', { name: /로그인/u })).toHaveAttribute('href', '/login');
   await expect(page.getByTestId('toast')).toHaveCount(0);
 });
 
