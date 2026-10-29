@@ -118,13 +118,13 @@ const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
 const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u];
 
 /**
- * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4). 앞 판은 확장자
- * 패턴(`/assets/*.js|css`)이었고, 그러면 번들이 **자산으로 실어 준 데이터 파일**이 같은 자리에
- * 떨어져도 초록이다(실측: `rows.css` + `new URL(…)`). 산출물 목록과 등식으로 두면 번들에
- * 들어온 것이 하나라도 늘면 이 단언이 먼저 깨진다.
+ * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4).
  *
- * 하네스가 preview 앞에서 번들을 직접 만든다(D-7E-8) — 그래서 이 디렉터리는 **이 실행의**
- * 산출물이다.
+ * **이 층이 사는 값을 정확히 적는다**(CR r4 L-5): 허용 집합은 하네스가 그 빌드에서 읽은 목록이라
+ * 자산이 늘면 양쪽이 함께 는다 — 「번들이 커지면 먼저 깨진다」는 **이 단언의 성질이 아니다**.
+ * 그 축은 하네스가 진다(산출물 모양을 {js 1 · css 1} 로 못박고, 늘면 거기서 멈춘다). 여기서
+ * 잡는 것은 **이 빌드가 내지 않은** 같은 출처 요청이다: `public/` 복사물 · 손으로 적은 경로 ·
+ * 묵은 자산. 번들 안으로 들어온 데이터는 자산 술어(`importedCss`)와 `import.meta` 금지가 막는다.
  */
 function bundleAssetPaths(): Set<string> {
   const names = journeyContext().bundleAssets;

@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import {
   apiImporterViolation,
   boundaryRoots,
+  assetOffenders,
+  importedCssOf,
   isAllowedAssetKind,
   isAllowedModuleKind,
   graphImporters,
@@ -173,15 +175,81 @@ describe('번들에 들어와도 되는 모듈 종류', () => {
  * 자리 — 의존성이 내보내는 자산이다. 그래서 술어를 단위로 잠근다.
  */
 describe('내보내도 되는 자산 종류', () => {
-  it('번들·스타일·맵은 받는다', () => {
-    for (const name of ['assets/index-abc.js', 'assets/index-abc.css', 'index.html', 'favicon.ico']) {
+  it('번들·맵·문서는 종류로 받는다', () => {
+    for (const name of ['assets/index-abc.js', 'index.html', 'favicon.ico', 'assets/index-abc.js.map']) {
       expect(isAllowedAssetKind(name), name).toBe(true);
     }
+  });
+
+  /** v r4 M-2 — `.css` 는 **종류로** 받지 않는다. 진입 chunk 가 가져온 것만 받는다. */
+  it('css 는 종류 허용 목록에 없다 — 그 축은 importedCss 가 진다', () => {
+    expect(isAllowedAssetKind('assets/index-abc.css')).toBe(false);
   });
 
   it('데이터·텍스트·확장자 없음은 받지 않는다', () => {
     for (const name of ['assets/rows-abc.txt', 'assets/data-abc.json', 'assets/x.yaml', 'assets/rows']) {
       expect(isAllowedAssetKind(name), name).toBe(false);
     }
+  });
+});
+
+/**
+ * v r4 M-2 — CSS `url('./rows.css')` 가 12KB JSON 을 `dist/assets/rows-*.css` 로 내보냈고
+ * 세 층이 모두 초록이었다(실측): W-4 는 `.css` 를 허용 종류로 보고, 자산 술어도 확장자만 봤고,
+ * 여정의 허용 집합은 **그 산출물 자체에서** 파생됐다. 이제 CSS 는 **진입 chunk 가 가져온
+ * 것**만 받는다.
+ */
+describe('CSS 자산은 진입 chunk 가 가져온 것만', () => {
+  const entryChunk = (importedCss) => ({
+    type: 'chunk',
+    fileName: 'assets/index-abc.js',
+    viteMetadata: { importedCss: new Set(importedCss) },
+  });
+
+  it('chunk 들이 가져온 CSS 를 모은다', () => {
+    const bundle = {
+      a: entryChunk(['assets/index-abc.css']),
+      b: { type: 'chunk', fileName: 'assets/lazy.js', viteMetadata: { importedCss: new Set(['assets/lazy.css']) } },
+    };
+
+    expect([...importedCssOf(bundle)].sort()).toStrictEqual(['assets/index-abc.css', 'assets/lazy.css']);
+  });
+
+  it('진입이 가져온 CSS 는 받는다', () => {
+    const bundle = {
+      a: entryChunk(['assets/index-abc.css']),
+      b: { type: 'asset', fileName: 'assets/index-abc.css' },
+      c: { type: 'asset', fileName: 'index.html' },
+    };
+
+    expect(assetOffenders(bundle)).toStrictEqual([]);
+  });
+
+  it('가져오지 않은 CSS 는 받지 않는다 — url() 이 가리킨 데이터가 이 자리에 나타난다', () => {
+    const bundle = {
+      a: entryChunk(['assets/index-abc.css']),
+      b: { type: 'asset', fileName: 'assets/index-abc.css' },
+      c: { type: 'asset', fileName: 'assets/rows-9f1.css' },
+    };
+
+    expect(assetOffenders(bundle)).toStrictEqual(['assets/rows-9f1.css']);
+  });
+
+  it('chunk 가 CSS 를 하나도 가져오지 않으면 어떤 CSS 자산도 받지 않는다', () => {
+    const bundle = {
+      a: entryChunk([]),
+      b: { type: 'asset', fileName: 'assets/index-abc.css' },
+    };
+
+    expect(assetOffenders(bundle)).toStrictEqual(['assets/index-abc.css']);
+  });
+
+  it('데이터 자산은 그대로 받지 않는다', () => {
+    const bundle = {
+      a: entryChunk(['assets/index-abc.css']),
+      b: { type: 'asset', fileName: 'assets/rows-abc.json' },
+    };
+
+    expect(assetOffenders(bundle)).toStrictEqual(['assets/rows-abc.json']);
   });
 });

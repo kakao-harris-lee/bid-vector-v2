@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 
 import {
+  acquireSingleRunLock,
   formatLockMarker,
   isOwnContainerMarker,
   lockOwnerAlive,
@@ -113,6 +118,26 @@ describe('락 소유자 생존 판정', () => {
     expect(alive).toBe(false);
   });
 
+  /**
+   * CR r4 M-2 — `kill(pid, 0)` 은 **살아 있지만 신호 권한이 없는** 프로세스에 `EPERM` 을 던진다
+   * (죽은 pid 는 `ESRCH`). 앞 판은 예외 종류를 가르지 않아 그것을 「죽었다」로 셌다 — 자기 주석이
+   * 선언한 안전 방향의 **반대**다. 이 축이 비어 있어 그 결함이 초록이었다.
+   */
+  it('EPERM 은 살아 있다로 센다 — 권한이 없을 뿐이다', () => {
+    const alive = lockOwnerAlive(MARKER, {
+      signal: () => {
+        throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+      },
+      startToken: () => undefined,
+    });
+
+    expect(alive).toBe(true);
+  });
+
+  it('실제 pid 1 도 살아 있다로 센다 — 이 호스트에서 EPERM 이 나는 자리다', () => {
+    expect(lockOwnerAlive({ ...MARKER, pid: 1, startToken: undefined })).toBe(true);
+  });
+
   it('시작 시각을 모르면 **살아 있다고 본다** — 틀려도 멈출 뿐, 남의 실행을 걷지 않는다', () => {
     expect(lockOwnerAlive({ ...MARKER, startToken: undefined }, { signal: () => undefined })).toBe(true);
     expect(lockOwnerAlive(MARKER, { signal: () => undefined, startToken: () => undefined })).toBe(true);
@@ -143,5 +168,110 @@ describe('락 표지의 꼴', () => {
     ['JSON 이 아니다', '{not json'],
   ])('%s 은 표지가 아니다 — 소유자를 알 수 없으면 멈추는 쪽이다', (_label, text) => {
     expect(parseLockMarker(text)).toBeUndefined();
+  });
+});
+
+/**
+ * CR r4 M-3 · v r4 L-1 — 획득이 **원자적 배타**인가. 앞 판은 `existsSync` 확인 → 임시 파일
+ * `wx` → `renameSync` 였고, `rename` 은 있는 락을 말없이 덮어쓰므로 동시 시작 창에서 **둘 다**
+ * 소유자가 됐다.
+ *
+ * 이 절은 **실제 파일시스템**(버릴 임시 디렉터리)에서 잰다 — 배타는 커널이 주는 성질이라
+ * 모의 fs 로는 그것을 재지 못한다. docker 는 부르지 않는다(수거를 주입으로 센다).
+ */
+describe('단일 실행 락의 원자적 배타 획득', () => {
+  const CONTAINER = 'bidvector-7e1-journey-0b2b919e';
+  let dir;
+  let lockPath;
+
+  beforeEach(() => {
+    dir = mkdtempSync(resolve(tmpdir(), 'bidvector-7e1-lock-test-'));
+    lockPath = resolve(dir, 'journey.lock');
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const acquire = (overrides = {}) =>
+    acquireSingleRunLock({
+      lockPath,
+      pid: process.pid,
+      startToken: processStartToken(process.pid),
+      container: CONTAINER,
+      ...overrides,
+    });
+
+  it('빈 자리에서는 얻고, 표지를 그 자리에 적는다', () => {
+    const reap = vi.fn(() => []);
+
+    expect(acquire({ reap }).attempt).toBe(1);
+
+    expect(parseLockMarker(readFileSync(lockPath, 'utf8'))).toStrictEqual({
+      pid: process.pid,
+      startToken: processStartToken(process.pid),
+      container: CONTAINER,
+    });
+    expect(reap, '빈 자리에서는 아무것도 걷지 않는다').not.toHaveBeenCalled();
+  });
+
+  it('**둘째 획득은 실패한다** — 소유자가 살아 있다(이 프로세스다)', () => {
+    const reap = vi.fn(() => []);
+    acquire({ reap });
+
+    expect(() => acquire({ reap })).toThrow(/앞 실행이 살아 있다/u);
+    expect(reap, '살아 있는 소유자의 컨테이너를 걷지 않는다').not.toHaveBeenCalled();
+    // 첫 소유자의 표지가 그대로다 — 덮어쓰지 않았다.
+    expect(parseLockMarker(readFileSync(lockPath, 'utf8'))?.pid).toBe(process.pid);
+  });
+
+  it('죽은 소유자의 락은 그 컨테이너를 걷고 이어받는다', () => {
+    const dead = { pid: 2_147_480_000, startToken: '1', container: 'bidvector-7e1-journey-deadbeef' };
+    writeFileSync(lockPath, formatLockMarker(dead), { mode: 0o600 });
+    const reap = vi.fn(() => ['c0ffee123456']);
+
+    expect(acquire({ reap }).attempt).toBe(2);
+
+    expect(reap).toHaveBeenCalledTimes(1);
+    expect(reap.mock.calls[0]?.[0], '걷는 대상은 **그 표지의** 컨테이너다').toBe(dead.container);
+    expect(parseLockMarker(readFileSync(lockPath, 'utf8'))?.container).toBe(CONTAINER);
+  });
+
+  it('읽을 수 없는 표지는 멈춘다 — 소유자를 모르면 넘겨받지 않는다', () => {
+    writeFileSync(lockPath, 'bidvector-7e1-journey-0b2b919e\n', { mode: 0o600 });
+    const reap = vi.fn(() => []);
+
+    expect(() => acquire({ reap })).toThrow(/락 표지를 읽을 수 없다/u);
+    expect(reap).not.toHaveBeenCalled();
+    expect(existsSync(lockPath), '그 파일을 지우지 않는다').toBe(true);
+  });
+
+  /** v r4 L-2 — 「생존 판정을 **부르는지**」를 잠근다. 앞 판은 그 블록을 지워도 초록이었다. */
+  it('획득은 생존 판정을 거친다 — 그 블록을 지우면 이 test 가 붉다', () => {
+    const dead = { pid: 2_147_480_000, startToken: '1', container: 'bidvector-7e1-journey-deadbeef' };
+    writeFileSync(lockPath, formatLockMarker(dead), { mode: 0o600 });
+    const alive = vi.fn(() => false);
+
+    acquire({ alive, reap: () => [] });
+
+    expect(alive, '표지를 읽었으면 생존을 물어야 한다').toHaveBeenCalledTimes(1);
+    expect(alive.mock.calls[0]?.[0]).toStrictEqual(dead);
+  });
+
+  it('치운 자리를 남이 또 잡으면 두 번만 시도하고 사유를 말한다', () => {
+    const dead = { pid: 2_147_480_000, startToken: '1', container: 'bidvector-7e1-journey-deadbeef' };
+    writeFileSync(lockPath, formatLockMarker(dead), { mode: 0o600 });
+    // `rmSync` 를 무력화해 「치웠는데 자리가 그대로」인 경합을 흉내 낸다.
+    const fs = {
+      openSync: () => {
+        throw Object.assign(new Error('file already exists'), { code: 'EEXIST' });
+      },
+      writeSync: () => 0,
+      closeSync: () => undefined,
+      readFileSync: () => formatLockMarker(dead),
+      rmSync: () => undefined,
+    };
+
+    expect(() => acquire({ fs, alive: () => false, reap: () => [] })).toThrow(/락을 얻지 못했다/u);
   });
 });

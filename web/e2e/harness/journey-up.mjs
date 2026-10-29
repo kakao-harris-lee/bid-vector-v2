@@ -16,8 +16,6 @@ import {
   existsSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -27,12 +25,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  acquireSingleRunLock,
   CONTAINER_PREFIX,
-  formatLockMarker,
-  lockOwnerAlive,
-  parseLockMarker,
   processStartToken,
-  reapStaleContainer,
 } from './container-marker.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -78,49 +73,25 @@ async function previewPortIsBusy() {
 /** 락을 **얻었는가** — 공유 경로를 정리할 자격이 이것 하나다(CR r2 M-5). */
 let lockOwned = false;
 
-async function acquireSingleRunLock() {
+async function acquireRunLock() {
   if (await previewPortIsBusy()) {
     throw new Error(
       `preview 포트 ${PREVIEW_PORT} 에 이미 무언가 떠 있다 — 같은 호스트의 앞 실행이 살아 있을 수 있다. ` +
         '그 실행이 끝난 뒤 다시 돌리십시오(남의 컨테이너·파일을 건드리지 않는다).',
     );
   }
-  if (existsSync(LOCK_PATH)) {
-    const existing = parseLockMarker(readFileSync(LOCK_PATH, 'utf8'));
-    if (existing === undefined) {
-      throw new Error(
-        `락 표지를 읽을 수 없다(${LOCK_PATH}) — 앞 실행이 살아 있는지 알 수 없으므로 ` +
-          '아무것도 걷지 않고 멈춘다. 그 실행이 끝난 것을 확인한 뒤 그 파일을 지우십시오.',
-      );
-    }
-    // **살아 있으면 걷지 않는다**(CR r3 M-1). preview 포트 검사는 기동 창을 못 덮는다 —
-    // 첫 실행이 Postgres 를 띄우는 동안 포트는 아직 비어 있고, 그 창에 들어온 둘째 실행이
-    // 앞 실행의 컨테이너를 걷었다. 소유자 생존을 먼저 묻는다.
-    if (lockOwnerAlive(existing)) {
-      throw new Error(
-        `앞 실행이 살아 있다(pid ${existing.pid} · 컨테이너 ${existing.container}) — ` +
-          '같은 호스트에서 둘이 돌 수 없다. 그 실행이 끝난 뒤 다시 돌리십시오.',
-      );
-    }
-    log(`묵은 락을 잇는다(죽은 소유자 pid ${existing.pid})`);
-    const reaped = reapStaleContainer(existing.container, { log });
-    log(`묵은 컨테이너 ${reaped.length}개를 걷었다`);
-  }
-  // **원자 쓰기**(CR r2 H-1 ⓐ) — 같은 파일에 바로 쓰면 「파일은 생겼고 내용은 아직 없는」 창이
-  // 생기고, 그 창에서 죽으면 다음 실행이 **빈 표지**를 읽는다. 임시 파일에 다 쓴 뒤 rename 한다.
-  //
-  // 임시 이름은 **예측 가능한 공유 경로**다 — `wx`(`O_CREAT|O_EXCL`)로 열어 남이 먼저 만들어 둔
-  // 파일·심볼릭 링크에 쓰지 않는다(CR r3 L-12). 열리면 그 이름은 이 프로세스가 만든 것이다.
-  const pending = `${LOCK_PATH}.${process.pid}.tmp`;
-  writeFileSync(
-    pending,
-    formatLockMarker({ pid: process.pid, startToken: processStartToken(process.pid), container: CONTAINER }),
-    { flag: 'wx', mode: 0o600 },
-  );
-  chmodSync(pending, 0o600);
-  renameSync(pending, LOCK_PATH);
+  // 획득 자체는 `container-marker.mjs` 가 든다 — 원자적 배타이고 주입 test 가 그 배선을
+  // 잠근다(CR r4 M-3 · v r4 L-1·L-2). 이 자리는 **포트 선검사와 소유 표시**만 한다.
+  acquireSingleRunLock({
+    lockPath: LOCK_PATH,
+    pid: process.pid,
+    startToken: processStartToken(process.pid),
+    container: CONTAINER,
+    log,
+  });
   lockOwned = true;
 }
+
 
 const secret = () => randomBytes(24).toString('base64url');
 const PG_USER = 'bidvector_admin';
@@ -215,7 +186,7 @@ async function shutdown(code) {
 }
 
 async function main() {
-  await acquireSingleRunLock();
+  await acquireRunLock();
   if (!existsSync(APP_JAR)) {
     throw new Error(`출하 jar 가 없다: ${APP_JAR} — 먼저 \`./gradlew :app:bootJar\` 를 돌리십시오`);
   }
@@ -375,13 +346,36 @@ async function main() {
     throw new Error(`번들 빌드 실패(exit=${built.status})`);
   }
 
-  // 이 빌드가 낸 자산 이름을 맥락에 적는다(v r3 M-2) — 여정은 「같은 출처의 비 API 요청」을
-  // **이 목록과 등식으로** 본다. 확장자 패턴으로 보면 번들이 자산으로 실어 준 데이터 파일이
-  // 같은 자리에 떨어져도 초록이다. 목록은 **이 실행의 산출물**이어야 하므로 여기서 읽는다.
-  const bundleAssets = readdirSync(resolve(webRoot, 'dist', 'assets')).map((one) => `/assets/${one}`);
-  if (bundleAssets.length === 0) {
-    throw new Error('번들 자산이 0 이다 — 여정의 자산 등식이 공허해진다');
+  // 이 빌드가 낸 자산을 맥락에 적는다(v r3 M-2) — 여정은 「같은 출처의 비 API 요청」을 이
+  // 목록과 등식으로 본다.
+  //
+  // **목록을 산출물에서 그냥 읽으면 방어가 아니다**(v r4 M-2 · CR r4 L-5): 자산이 늘면 허용
+  // 집합도 함께 늘어 아무것도 깨지지 않는다. 그래서 **모양을 못박는다** — 이 화면 다발은
+  // 진입 js 하나와 그것이 가져온 css 하나를 낸다. 번들에 자산이 하나라도 더 들어오면 **여기서
+  // 먼저 깨진다**(그 주장이 사실이 된다). 상한을 올릴 일이 생기면 그것은 설계 변경이고, 이
+  // 줄을 고치는 diff 로 드러나야 한다.
+  const assetDir = resolve(webRoot, 'dist', 'assets');
+  const assetEntries = existsSync(assetDir)
+    ? readdirSync(assetDir, { withFileTypes: true })
+    : (() => {
+        throw new Error(`번들 자산 디렉터리가 없다: ${assetDir} — 빌드가 무엇을 냈는지 알 수 없다`);
+      })();
+  const dirNames = assetEntries.filter((one) => !one.isFile()).map((one) => one.name);
+  if (dirNames.length > 0) {
+    throw new Error(`번들 자산 자리에 디렉터리가 있다(${dirNames.join(', ')}) — 모양 단언이 흐려진다`);
   }
+  const assetNames = assetEntries.map((one) => one.name).sort();
+  const shape = {
+    js: assetNames.filter((one) => one.endsWith('.js')).length,
+    css: assetNames.filter((one) => one.endsWith('.css')).length,
+  };
+  if (assetNames.length !== 2 || shape.js !== 1 || shape.css !== 1) {
+    throw new Error(
+      `번들 자산의 모양이 {js 1 · css 1} 이 아니다 — 받은 것: ${assetNames.join(', ')}. ` +
+        '자산이 늘었다면 그것이 무엇이고 화면이 왜 읽는지 먼저 답해야 한다(ADR 0011 D-2).',
+    );
+  }
+  const bundleAssets = assetNames.map((one) => `/assets/${one}`);
 
   log(`vite preview(127.0.0.1:${PREVIEW_PORT} → /api ⇒ 127.0.0.1:${appPort})`);
   track(

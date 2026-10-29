@@ -186,28 +186,62 @@ export function boundaryRoots(webRootReal) {
 }
 
 /**
- * 빌드가 **내보내는 자산**의 종류(v r2 M-2). 모듈 그래프 술어는 `new URL(…, import.meta.url)`
+ * 빌드가 **내보내는 자산**(v r2 M-2 · r4 M-2). 모듈 그래프 술어는 `new URL(…, import.meta.url)`
  * 로 실린 파일을 보지 못한다 — 그것은 모듈 id 가 아니라 **자산**이다(실측: `rows.txt` 가
  * `dist/assets/` 로 나갔고 다섯 층이 초록이었다). 내보내는 쪽에서 같은 술어를 한 번 더 건다.
+ *
+ * **종류 허용 목록에서 `css` 를 걷었다**(v r4 M-2): `.css` 는 허용 종류였고 데이터 판정을 하지
+ * 않았으므로, 이미 그래프에 있는 CSS 가 `url('./rows.css')` 로 12KB JSON 을 가리키면 그것이
+ * `dist/assets/rows-*.css` 로 나갔다(실측). 이제 CSS 자산은 **진입 chunk 가 가져온 것**
+ * (`viteMetadata.importedCss`)만 받는다 — 그 밖의 CSS 는 종류와 무관하게 위반이다.
  */
-const ALLOWED_ASSET_EXTENSIONS = new Set(['css', 'js', 'mjs', 'map', 'html', 'ico']);
+const ALLOWED_ASSET_EXTENSIONS = new Set(['js', 'mjs', 'map', 'html', 'ico']);
 
 export function isAllowedAssetKind(fileName) {
   const match = /\.([A-Za-z0-9]+)$/.exec(fileName);
   return match !== null && ALLOWED_ASSET_EXTENSIONS.has(match[1].toLowerCase());
 }
 
+/** chunk 들이 **가져온** CSS 전수 — Vite 가 chunk 마다 그 집합을 적는다. */
+export function importedCssOf(bundle) {
+  const names = new Set();
+  for (const one of Object.values(bundle)) {
+    if (one.type !== 'chunk') {
+      continue;
+    }
+    for (const css of one.viteMetadata?.importedCss ?? []) {
+      names.add(css);
+    }
+  }
+  return names;
+}
+
+/**
+ * 번들이 내보내는 자산 가운데 **받지 않는 것**. CSS 는 진입 chunk 가 가져온 것만,
+ * 그 밖은 종류 허용 목록으로 가린다.
+ */
+export function assetOffenders(bundle) {
+  const imported = importedCssOf(bundle);
+  return Object.values(bundle)
+    .filter((one) => one.type === 'asset')
+    .filter((one) =>
+      one.fileName.toLowerCase().endsWith('.css')
+        ? !imported.has(one.fileName)
+        : !isAllowedAssetKind(one.fileName),
+    )
+    .map((one) => one.fileName);
+}
+
 export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
   return {
     name: 'bidvector:module-graph-boundary',
     generateBundle(_options, bundle) {
-      const offenders = Object.values(bundle)
-        .filter((one) => one.type === 'asset' && !isAllowedAssetKind(one.fileName))
-        .map((one) => one.fileName);
+      const offenders = assetOffenders(bundle);
       if (offenders.length > 0) {
         this.error(
-          `번들이 **아는 종류가 아닌 자산**을 내보낸다 — 데이터 모양은 V2 계약에서만 온다 ` +
-            `(ADR 0011 D-2). new URL(…, import.meta.url) 로 실린 파일이 이 자리에 나타난다:\n` +
+          `번들이 **받지 않는 자산**을 내보낸다 — 데이터 모양은 V2 계약에서만 온다 ` +
+            `(ADR 0011 D-2). new URL(…, import.meta.url) 로 실린 파일과 CSS url() 이 가리킨 ` +
+            `데이터가 이 자리에 나타난다:\n` +
             offenders.map((line) => `  - ${line}`).join('\n'),
         );
       }

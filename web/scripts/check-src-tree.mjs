@@ -470,23 +470,58 @@ if (!apiImporters.has(API_CALL_SITE)) {
 // { apiClient };`(로컬 재수출 — 모듈 지정자가 **없다**)를 쓰면 화면은 `../api/queries` 에서
 // 그 이름을 가져오고, 그 import 는 client.ts 로 가는 간선이 아니다(실측: 다섯 층 0).
 //
-// 그래서 **그 심볼 자체**를 쫓는다: `apiClient` 라는 식별자의 심볼을 해소해(별칭이면 끝까지)
-// client.ts 의 그것과 같은지 본다. 어느 이름으로 다시 내보내도 같은 심볼이다.
+// 그래서 **그 심볼 자체**를 쫓는다: 식별자의 심볼을 해소해(별칭이면 끝까지) client.ts 의 그것과
+// 같은지 본다. 어느 이름으로 다시 내보내도 같은 심볼이다.
+//
+// **이름으로 거르지 않는다**(v r4 M-1): 앞 판은 텍스트가 `apiClient` 인 식별자만 해소했고,
+// 그래서 `import * as C from './client'` 처럼 **그 이름이 나타나지 않는** 꼴을 보지 못했다.
 const checker = program.getTypeChecker();
-const clientSymbol = (() => {
-  const clientSource = programFiles.find((one) => {
-    try {
-      return realpathSync(one.fileName) === clientModuleReal;
-    } catch {
-      return false;
-    }
-  });
-  if (clientSource === undefined) {
-    return undefined;
+
+/** 별칭을 한 단 따라간다(실패하면 그대로). */
+function aliasOrSelf(typeChecker, symbol) {
+  try {
+    return typeChecker.getAliasedSymbol(symbol);
+  } catch {
+    return symbol;
   }
-  const moduleSymbol = checker.getSymbolAtLocation(clientSource);
-  return moduleSymbol?.exports?.get(CLIENT_CAPABILITY_BINDING);
-})();
+}
+
+/** 상대 지정자를 실제 파일 경로로 — 확장자는 TS 해석 규칙대로 붙여 본다. */
+function resolveImportTarget(containingFile, specifier) {
+  const base = resolve(dirname(containingFile.fileName), specifier);
+  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, resolve(base, 'index.ts')]) {
+    try {
+      return realpathSync(candidate);
+    } catch {
+      /* 다음 후보 */
+    }
+  }
+  return undefined;
+}
+
+/** 별칭(import·재수출·네임스페이스)을 끝까지 따라간 심볼. */
+function resolveToTarget(typeChecker, node) {
+  let symbol = typeChecker.getSymbolAtLocation(node);
+  if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) {
+    try {
+      symbol = typeChecker.getAliasedSymbol(symbol);
+    } catch {
+      /* 해소 실패는 호출 자리의 비교에서 걸린다 */
+    }
+  }
+  return symbol;
+}
+
+const clientSourceFile = programFiles.find((one) => {
+  try {
+    return realpathSync(one.fileName) === clientModuleReal;
+  } catch {
+    return false;
+  }
+});
+const clientModuleSymbol =
+  clientSourceFile === undefined ? undefined : checker.getSymbolAtLocation(clientSourceFile);
+const clientSymbol = clientModuleSymbol?.exports?.get(CLIENT_CAPABILITY_BINDING);
 
 if (clientSymbol === undefined) {
   fail(`${CLIENT_MODULE} 에서 ${CLIENT_CAPABILITY_BINDING} 심볼을 찾지 못했다 — 이 층이 공허해진다`);
@@ -496,25 +531,100 @@ if (clientSymbol === undefined) {
       continue;
     }
     const visit = (node) => {
-      if (ts.isIdentifier(node) && node.text === CLIENT_CAPABILITY_BINDING) {
-        let symbol = checker.getSymbolAtLocation(node);
-        if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) {
-          try {
-            symbol = checker.getAliasedSymbol(symbol);
-          } catch {
-            /* 해소 실패는 아래 비교에서 걸린다 */
-          }
-        }
-        if (symbol === clientSymbol) {
+      if (ts.isIdentifier(node)) {
+        const resolved = resolveToTarget(checker, node);
+        if (resolved === clientSymbol || resolved === clientModuleSymbol) {
           fail(
-            `${CLIENT_CAPABILITY_BINDING} 심볼이 ${CLIENT_MODULE_CALLER} 밖에서 참조된다: ${name} ` +
-              '— 이름을 바꿔 다시 내보내도 같은 심볼이다',
+            `서버 호출 능력이 ${CLIENT_MODULE_CALLER} 밖에서 참조된다: ${name} (${node.text}) ` +
+              '— 이름을 바꾸거나 네임스페이스로 받아도 같은 심볼이다',
           );
         }
       }
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
+  }
+}
+
+// ⑤b-2b **허용 자리의 import 꼴 고정 · export 타입 전수**(v r4 M-1).
+//
+// 심볼 추적만으로는 한 꼴이 남는다: `import * as C from './client'; export const ns = C;` —
+// 그 자리는 **허용된 import** 이고, 밖으로 나가는 것은 `ns` 라는 **다른 이름의 네임스페이스**다.
+// 화면은 그것을 계산 키로 집어 미승인 쌍을 부를 수 있었다(실측: 정적 다섯 층 모두 0).
+//
+// 두 자리에서 닫는다.
+//   ⓐ 호출 자리가 client 모듈을 끌어오는 꼴은 **이름 지정 `{ apiClient }` 하나**뿐이다 —
+//      네임스페이스·default import 는 그 자체로 위반이다(그 꼴이 아니면 능력이 이름을 잃는다).
+//   ⓑ 호출 자리의 **export 전수**에서 그 능력의 타입이 나가지 않는다 — 이름을 무엇으로 바꾸든,
+//      `export default` 로 내보내든, 타입 동일성으로 걸린다.
+if (clientSymbol !== undefined && clientSourceFile !== undefined) {
+  const callerSource = inSrcFiles.find((one) => one.name === CLIENT_MODULE_CALLER)?.sourceFile;
+  if (callerSource === undefined) {
+    fail(`${CLIENT_MODULE_CALLER} 를 프로그램에서 찾지 못했다 — 아래 두 단언이 공허해진다`);
+  } else {
+    // ⓐ
+    let namedClientImports = 0;
+    for (const statement of callerSource.statements) {
+      if (
+        !ts.isImportDeclaration(statement) ||
+        !ts.isStringLiteral(statement.moduleSpecifier) ||
+        resolveImportTarget(callerSource, statement.moduleSpecifier.text) !== clientModuleReal
+      ) {
+        continue;
+      }
+      const clause = statement.importClause;
+      if (clause === undefined || clause.name !== undefined) {
+        fail(`${CLIENT_MODULE_CALLER} 가 client 모듈을 default import 로 받는다 — 이름 지정만 허용한다`);
+        continue;
+      }
+      const bindings = clause.namedBindings;
+      if (bindings === undefined || ts.isNamespaceImport(bindings)) {
+        fail(
+          `${CLIENT_MODULE_CALLER} 가 client 모듈을 **네임스페이스**로 받는다 ` +
+            '— 그러면 능력이 이름을 잃고 심볼 추적을 비켜 간다(이름 지정 { apiClient } 만 허용)',
+        );
+        continue;
+      }
+      for (const element of bindings.elements) {
+        const wanted = (element.propertyName ?? element.name).text;
+        if (wanted !== CLIENT_CAPABILITY_BINDING) {
+          fail(`${CLIENT_MODULE_CALLER} 가 client 모듈에서 ${wanted} 도 가져온다 — 허용은 ${CLIENT_CAPABILITY_BINDING} 하나다`);
+        } else {
+          namedClientImports += 1;
+        }
+      }
+    }
+    if (namedClientImports !== 1) {
+      fail(
+        `${CLIENT_MODULE_CALLER} 의 client import 가 이름 지정 ${CLIENT_CAPABILITY_BINDING} 하나가 ` +
+          `아니다(계수 ${namedClientImports})`,
+      );
+    }
+
+    // ⓑ
+    const capabilityType = checker.getTypeOfSymbolAtLocation(
+      clientSymbol,
+      clientSymbol.valueDeclaration ?? clientSourceFile,
+    );
+    const callerModuleSymbol = checker.getSymbolAtLocation(callerSource);
+    for (const exported of callerModuleSymbol === undefined ? [] : checker.getExportsOfModule(callerModuleSymbol)) {
+      const target = (exported.flags & ts.SymbolFlags.Alias) !== 0 ? aliasOrSelf(checker, exported) : exported;
+      if (target === clientSymbol || target === clientModuleSymbol) {
+        fail(`${CLIENT_MODULE_CALLER} 가 서버 호출 능력을 ${exported.name} 으로 내보낸다`);
+        continue;
+      }
+      const declaration = target.valueDeclaration ?? target.declarations?.[0];
+      if (declaration === undefined) {
+        continue;
+      }
+      const type = checker.getTypeOfSymbolAtLocation(target, declaration);
+      if (type === capabilityType || type === checker.getTypeOfSymbolAtLocation(clientModuleSymbol ?? clientSymbol, clientSourceFile)) {
+        fail(
+          `${CLIENT_MODULE_CALLER} 의 export ${exported.name} 이 서버 호출 능력 자체를 나른다 ` +
+            '— 이름을 바꾸거나 네임스페이스로 싸도 타입이 같다',
+        );
+      }
+    }
   }
 }
 
@@ -718,6 +828,7 @@ for (const { sourceFile, name } of inSrcFiles) {
 
 // ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
 const viteConfigPath = resolve(webRoot, 'vite.config.ts');
+let publicDirVerdict = '판정 없음';
 if (!existsSync(resolve(webRoot, 'scripts', 'module-graph-boundary.mjs'))) {
   fail('번들 그래프 경계 플러그인 파일이 없다: scripts/module-graph-boundary.mjs');
 }
@@ -830,28 +941,51 @@ if (!existsSync(viteConfigPath)) {
   // 붙여 돌려 등록부(`config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 · failed 0
   // 인지 본다.
 
-  // **`publicDir` 는 꺼져 있어야 한다**(CR r3 M-4) — 켜져 있으면 `web/public/` 의 아무 파일이
-  // 번들 밖 경로로 그대로 복사돼 화면이 같은 출처에서 읽어 갈 수 있고, 그 디렉터리는 위의
-  // 파일 종류 술어 **밖**이다. 오늘 `web/public/` 은 없다; 이 단언은 그것이 생기는 순간을
-  // 게이트로 만든다(생략은 꺼짐이 아니라 기본값 켜짐이다 — `resolveJsonModule` 과 같은 함정).
-  let publicDirDisabled = false;
+  // **`publicDir` 는 꺼져 있어야 한다**(CR r3 M-4 · r4 M-1) — 켜져 있으면 그 디렉터리의 아무
+  // 파일이 번들 밖 경로로 그대로 복사돼 화면이 같은 출처에서 읽어 갈 수 있고, 그 디렉터리는
+  // 위의 파일 종류 술어 **밖**이다. 생략은 꺼짐이 아니라 기본값 켜짐이다.
+  //
+  // 앞 판은 **파일 안 마지막 `publicDir` 대입**을 봤다. 그래서 최상위에 `publicDir: 'static'`
+  // 을 두고 아래 `test:` 블록에 미끼 `publicDir: false` 를 적으면 **초록인 채 입구가 열렸다**
+  // (실측). 그러므로 대입을 **모아** 「정확히 하나 · 그 값이 `false`」를 센다. 디렉터리 부재도
+  // 이름을 박지 않고 **대입된 값에서** 뽑는다.
+  const publicDirAssignments = [];
   const visitPublicDir = (node) => {
     if (
       ts.isPropertyAssignment(node) &&
       node.name !== undefined &&
-      ts.isIdentifier(node.name) &&
+      (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name)) &&
       node.name.text === 'publicDir'
     ) {
-      publicDirDisabled = node.initializer.kind === ts.SyntaxKind.FalseKeyword;
+      publicDirAssignments.push(node.initializer);
     }
     ts.forEachChild(node, visitPublicDir);
   };
   visitPublicDir(viteSource);
-  if (!publicDirDisabled) {
+
+  if (publicDirAssignments.length !== 1) {
     fail(
-      'vite.config.ts 에 publicDir: false 선언이 없다 — public/ 이 번들 경계 밖 자산 입구가 된다',
+      `vite.config.ts 의 publicDir 대입이 정확히 하나가 아니다(계수 ${publicDirAssignments.length}) ` +
+        '— 둘 이상이면 어느 것이 설정인지 게이트가 볼 수 없다(미끼 한 줄로 열리던 자리)',
     );
+  } else {
+    const [value] = publicDirAssignments;
+    if (value.kind === ts.SyntaxKind.FalseKeyword) {
+      publicDirVerdict = '꺼짐';
+    } else if (ts.isStringLiteralLike(value)) {
+      // 꺼져 있지 않다면 **그 경로의 부재**를 센다(이름을 박지 않는다).
+      publicDirVerdict = `'${value.text}'`;
+      if (existsSync(resolve(webRoot, value.text))) {
+        fail(
+          `vite.config.ts 의 publicDir 가 '${value.text}' 이고 그 디렉터리가 있다 ` +
+            '— 번들 경계 밖 자산 입구다(이 slice 는 그 입구를 쓰지 않는다)',
+        );
+      }
+    } else {
+      fail('vite.config.ts 의 publicDir 값이 false 도 문자열 리터럴도 아니다 — 게이트가 판정할 수 없다');
+    }
   }
+  // 기본값 경로도 함께 센다 — `publicDir: false` 라도 그 디렉터리가 있으면 의도가 갈린다.
   if (existsSync(resolve(webRoot, 'public'))) {
     fail('web/public/ 이 있다 — 이 slice 는 그 입구를 쓰지 않는다(publicDir 는 꺼져 있다)');
   }
@@ -875,7 +1009,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0 · 그 심볼의 재수출 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir=false 명시 · web/public/ 없음 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리의 client import 꼴 == 이름 지정 하나 · 그 자리의 export 전수에 그 능력 타입 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir 대입 하나 == ${publicDirVerdict} · 그 입구 디렉터리 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }

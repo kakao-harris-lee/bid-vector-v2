@@ -3,7 +3,7 @@
 // 왜 모듈이 따로인가: `journey-up.mjs` 는 적재되면 곧 `main()` 을 돌리므로 test 가 그 술어만
 // 집어 올 수 없다. 파괴적 경로의 가드는 **test 가 직접 부를 수 있는 자리**에 있어야 한다.
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
 
 export const CONTAINER_PREFIX = 'bidvector-7e1-journey-';
 
@@ -66,7 +66,13 @@ export function processStartToken(pid, { read = readFileSync } = {}) {
 export function lockOwnerAlive(marker, { signal = process.kill, startToken = processStartToken } = {}) {
   try {
     signal(marker.pid, 0);
-  } catch {
+  } catch (error) {
+    // **`EPERM` 은 살아 있다는 뜻이다**(CR r4 M-2) — 신호 권한이 없을 뿐이다(죽은 pid 는
+    // `ESRCH`). 앞 판은 예외 종류를 가르지 않고 「죽었다」로 세어, 자기 주석이 선언한 안전
+    // 방향의 **반대**로 기울었다: 다른 사용자의 살아 있는 실행을 묵은 것으로 읽는다.
+    if (error?.code === 'EPERM') {
+      return true;
+    }
     return false;
   }
   const current = startToken(marker.pid);
@@ -100,4 +106,70 @@ export function reapStaleContainer(marker, { dryRun = false, run = spawnSync, lo
     run('docker', ['rm', '-f', ...ids], { stdio: 'ignore' });
   }
   return ids;
+}
+
+/**
+ * 단일 실행 락의 **원자적 배타 획득**(CR r4 M-3 · v r4 L-1).
+ *
+ * 앞 판은 `existsSync` 확인 → 임시 파일 `wx` → `renameSync` 였다. `rename` 은 **있는 락을
+ * 말없이 덮어쓰므로**, 두 실행이 그 창 안에서 시작하면 둘 다 「락 없음」을 보고 둘 다 소유자가
+ * 됐다(그 뒤 맥락 파일을 서로 덮고, 먼저 끝나는 쪽이 공유 둘을 지운다).
+ *
+ * 그래서 **락 경로 자체를 `wx`(`O_CREAT|O_EXCL`)로 연다** — 커널이 하나만 열어 준다. `EEXIST`
+ * 면 표지를 읽어 ⓐ 소유자가 살아 있으면 멈추고 ⓑ 죽었으면 그 컨테이너를 걷고 락을 치운 뒤
+ * 한 번 다시 시도한다. 표지를 읽을 수 없으면(옛 꼴·깨진 값·열고 쓰기 사이의 찰나) **멈춘다** —
+ * 소유자를 알 수 없을 때 넘겨받지 않는 것이 이 모듈의 방향이다.
+ *
+ * 하네스의 배선을 test 가 부를 수 있도록 **이 모듈에 둔다**(v r4 L-2): `journey-up.mjs` 는
+ * 적재되면 곧 `main()` 을 돌려 test 가 import 할 수 없다.
+ */
+export function acquireSingleRunLock({
+  lockPath,
+  pid,
+  startToken,
+  container,
+  fs = { openSync, writeSync, closeSync, readFileSync, rmSync },
+  alive = lockOwnerAlive,
+  reap = reapStaleContainer,
+  log = () => {},
+}) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    let fd;
+    try {
+      fd = fs.openSync(lockPath, 'wx', 0o600);
+    } catch (error) {
+      if (error?.code !== 'EEXIST') {
+        throw error;
+      }
+      const existing = parseLockMarker(fs.readFileSync(lockPath, 'utf8'));
+      if (existing === undefined) {
+        throw new Error(
+          `락 표지를 읽을 수 없다(${lockPath}) — 앞 실행이 살아 있는지 알 수 없으므로 ` +
+            '아무것도 걷지 않고 멈춘다. 그 실행이 끝난 것을 확인한 뒤 그 파일을 지우십시오.',
+          { cause: error },
+        );
+      }
+      if (alive(existing)) {
+        throw new Error(
+          `앞 실행이 살아 있다(pid ${existing.pid} · 컨테이너 ${existing.container}) — ` +
+            '같은 호스트에서 둘이 돌 수 없다. 그 실행이 끝난 뒤 다시 돌리십시오.',
+          { cause: error },
+        );
+      }
+      log(`묵은 락을 잇는다(죽은 소유자 pid ${existing.pid})`);
+      const reaped = reap(existing.container, { log });
+      log(`묵은 컨테이너 ${reaped.length}개를 걷었다`);
+      fs.rmSync(lockPath, { force: true });
+      continue;
+    }
+    try {
+      fs.writeSync(fd, formatLockMarker({ pid, startToken, container }));
+    } finally {
+      fs.closeSync(fd);
+    }
+    return { attempt };
+  }
+  throw new Error(
+    `락을 얻지 못했다(${lockPath}) — 묵은 락을 치운 직후 다른 실행이 그 자리를 잡았다. 다시 돌리십시오.`,
+  );
 }
