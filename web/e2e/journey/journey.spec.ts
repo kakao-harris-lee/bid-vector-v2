@@ -105,10 +105,22 @@ const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
   QUAL_11_CONSTRUCTION_CAPACITY: '시공능력평가금액',
 };
 
-/** 화면이 **V2 API 밖**을 부르지 않는지, 그리고 **목록 안**만 부르는지 실행 중에 센다. */
-function watchRequests(page: Page): { readonly outside: string[]; readonly apiPaths: Set<string> } {
+/**
+ * 같은 출처의 **비 API 요청**도 아는 종류만 받는다(v r2 M-2). 앞 판은 `/api/` 밖 요청을 아예
+ * 기록하지 않았고, 그래서 화면이 `new URL('./rows.txt', import.meta.url)` 로 내보낸 자산을
+ * 읽어 가도 「V2 API 밖」 감시가 그것을 보지 못했다(실측).
+ */
+const ALLOWED_NON_API = [/^\/$/u, /^\/login$/u, /^\/notices\//u, /^\/assets\/[^/]+\.(?:js|css)$/u, /^\/favicon\.ico$/u];
+
+/** 화면이 **V2 API 밖**을 부르지 않는지, **목록 안**만 부르는지, 자산도 아는 종류인지 센다. */
+function watchRequests(page: Page): {
+  readonly outside: string[];
+  readonly apiPaths: Set<string>;
+  readonly unexpectedSameOrigin: string[];
+} {
   const outside: string[] = [];
   const apiPaths = new Set<string>();
+  const unexpectedSameOrigin: string[] = [];
   page.on('request', (request: Request) => {
     const url = new URL(request.url());
     if (url.origin !== sameOrigin()) {
@@ -117,9 +129,13 @@ function watchRequests(page: Page): { readonly outside: string[]; readonly apiPa
     }
     if (url.pathname.startsWith('/api/')) {
       apiPaths.add(`${request.method()} ${url.pathname}`);
+      return;
+    }
+    if (!ALLOWED_NON_API.some((allowed) => allowed.test(url.pathname))) {
+      unexpectedSameOrigin.push(url.pathname);
     }
   });
-  return { outside, apiPaths };
+  return { outside, apiPaths, unexpectedSameOrigin };
 }
 
 /**
@@ -246,6 +262,7 @@ test('여정 ② — 로그인 → 검색 → 카드 → 담기', async ({ page 
   await expect(page.getByTestId('write-failure')).toHaveCount(0);
 
   expect(watched.outside).toStrictEqual([]);
+  expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
@@ -385,6 +402,7 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   await expect(page.getByTestId('timeline')).toContainText(CASE_STATE_LABEL[last.toState] ?? last.toState);
 
   expect(watched.outside).toStrictEqual([]);
+  expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 

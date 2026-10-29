@@ -185,9 +185,33 @@ export function boundaryRoots(webRootReal) {
   return roots;
 }
 
+/**
+ * 빌드가 **내보내는 자산**의 종류(v r2 M-2). 모듈 그래프 술어는 `new URL(…, import.meta.url)`
+ * 로 실린 파일을 보지 못한다 — 그것은 모듈 id 가 아니라 **자산**이다(실측: `rows.txt` 가
+ * `dist/assets/` 로 나갔고 다섯 층이 초록이었다). 내보내는 쪽에서 같은 술어를 한 번 더 건다.
+ */
+const ALLOWED_ASSET_EXTENSIONS = new Set(['css', 'js', 'mjs', 'map', 'html', 'ico']);
+
+export function isAllowedAssetKind(fileName) {
+  const match = /\.([A-Za-z0-9]+)$/.exec(fileName);
+  return match !== null && ALLOWED_ASSET_EXTENSIONS.has(match[1].toLowerCase());
+}
+
 export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
   return {
     name: 'bidvector:module-graph-boundary',
+    generateBundle(_options, bundle) {
+      const offenders = Object.values(bundle)
+        .filter((one) => one.type === 'asset' && !isAllowedAssetKind(one.fileName))
+        .map((one) => one.fileName);
+      if (offenders.length > 0) {
+        this.error(
+          `번들이 **아는 종류가 아닌 자산**을 내보낸다 — 데이터 모양은 V2 계약에서만 온다 ` +
+            `(ADR 0011 D-2). new URL(…, import.meta.url) 로 실린 파일이 이 자리에 나타난다:\n` +
+            offenders.map((line) => `  - ${line}`).join('\n'),
+        );
+      }
+    },
     buildEnd() {
       const webRootReal = realpathSync(webRoot);
       const allowedRoots = boundaryRoots(webRootReal);
