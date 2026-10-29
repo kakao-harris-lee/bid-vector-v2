@@ -257,3 +257,57 @@ main 이 **`bb6a187e`** 가 됐다(PR #101 — caddy 직접 빌드 · app 베이
 - 핵심 결과: 복원 **20** · 삭제 **31**(r1 이 파일 다섯을 더했다) · 두 기준의 diff 모두 exit 0 ·
   **트리 동일성**(되돌린 `web` 트리 해시 == base) · 「내 표지 0 · 남의 표지 1」 · 되돌린 뒤
   typecheck·vitest(5 파일 28)·게이트 여섯·셸 스모크 전부 0
+
+## 수정 라운드 r2 (재작업 2/5) — CR `request_changes`(새 HIGH 1) · verifier M 3 · L 3
+
+- cmd: `docker ps -aq --filter name=`(읽기만, 리뷰 재현)
+- exit: 0
+- 핵심 결과: 이 호스트에서 `docker ps -aq` 와 **같은 45** — 빈 표지를 그대로 넘기면 docker 가
+  그 필터를 「전부」로 읽는다. 그것이 H-1 의 파괴 범위다
+
+- cmd: 묵은 락 수거의 양성 대조(`run` 주입, docker 미호출)
+- exit: 0
+- 핵심 결과: 빈 표지 → **호출 0 · 수거 0** · 옳은 표지 → **앵커 필터로 그 하나만** · 표지가
+  아닌 꼴 열하나 전부 거부. 여정 뒤 호스트 컨테이너 **45 그대로**
+
+- cmd: 호출 능력 우회 양성 대조 넷(재수출 · `export *` · 허용 자리 재수출 · 동적 import)
+- exit: 전부 1
+- 핵심 결과: typecheck 0 인데 **W-4 1** — 간선 종류를 적는다. 별칭 + 목록 밖 경로는
+  **typecheck 2**(타입 좁히기가 첫째 층이다)이고 operation 집합 test 도 1
+
+- cmd: operation 술어의 모르는 꼴 다섯(계산 접근·구조 분해·별칭·인자 전달·참조 내보내기)
+- exit: 1
+- 핵심 결과: 전부 `unresolved` 로 센다. 그 가운데 셋은 **술어를 고치는 과정에서 이 test 가
+  잡았다**(초기값 자리를 선언 이름으로 오인했다)
+
+- cmd: 자산 우회 양성 대조(`src/screens/rows.txt` + `new URL(…, import.meta.url)`)
+- exit: 1
+- 핵심 결과: typecheck 0 인데 **W-4 1**(「아는 종류가 아닌 파일」). 자산 층은 W-4 가 먼저 막아
+  빌드 수준 재현이 안 되므로 그 술어를 등록 test 로 잠갔다(둘째 그물)
+
+- cmd: `serial` 을 걷고 강제 실패 한 건
+- exit: 1(의도된 실패)
+- 핵심 결과: 나머지가 **그대로 보고된다**(2 failed · 2 passed) — 앞 판은 `did not run` 셋이었다.
+  걷자마자 실제 상호작용이 드러났다: 쓰기 401 뒤 재읽기도 401 이라 화면이 로그인 얼굴로 바뀐다
+
+- cmd: `--repeat-each=2 -g '여정 ②'`
+- exit: 0
+- 핵심 결과: **2 passed** — 이미 담긴 건의 모양(「담긴 건」)을 대안으로 단언한다
+
+### r2 acceptance 전건
+
+- cmd: `web` job W-1~W-13 + 여정 단독 넷
+- exit: **전부 0**
+- 핵심 결과: vitest **13 파일 174** · 여정 4건 28.4s · 단독 넷 각각 0 · 잔존 0.
+  **전건이 결함 하나를 잡았다**: 하네스 단위 test 가 Playwright 의 기본 `testMatch` 에 걸려
+  셸 스모크(W-11)가 exit 1 이었다(vitest 쪽 게이트는 초록) — 두 설정의 수집을 `*.spec.ts` 로
+  못박고 계수로 확인했다(스모크 2 · 여정 4)
+
+- cmd: `./gradlew --no-daemon check qualityBaseline` · `:app:bootJar`
+- exit: 0 · 0
+- 핵심 결과: `BUILD SUCCESSFUL in 20s` · 392 중 **357 up-to-date** · `qualityBaseline` UP-TO-DATE
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `aab938e7`)
+- exit: 0
+- 핵심 결과: 복원 **21** · 삭제 **34** · 두 기준 diff 모두 exit 0 · **트리 동일성**(되돌린 `web`
+  트리 해시 == base) · 「내 표지 0 · 남의 표지 1」 · 되돌린 뒤 게이트 여섯·셸 스모크 0

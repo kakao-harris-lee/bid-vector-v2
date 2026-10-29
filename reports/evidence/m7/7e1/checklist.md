@@ -35,14 +35,16 @@
 | # | 우회 | 막는 층 | 실측 |
 | --- | --- | --- | --- |
 | 1 | `fetch`·XHR·WebSocket 직접 호출 | eslint(보조 층) + 번들 그래프 간선 등식(구조) + 여정 e2e 의 출처·**operation 전수** 계수 | 변이 M4 → lint exit 1 |
-| 2 | 생성 타입 우회 `as any`·`as unknown as` 캐스팅 | `no-explicit-any` + 표의 `satisfies` + **호출 능력 집합 등식**(W-4)과 **operation 집합 등식**(게이트 test) — 캐스팅으로 계약 밖 경로를 불러도 그 둘이 잡는다 | 변이 M2a → typecheck exit 2 · 양성 대조 둘(아래 ⑨) |
+| 2 | 생성 타입 우회 `as any`·`as unknown as` 캐스팅 | `no-explicit-any` + 표의 `satisfies` + **클라이언트 타입을 승인 목록으로 좁힘**(어느 꼴로 들고 나가도 목록 밖 경로가 `tsc` 에서 멈춘다) + 간선·참조 전수 등식 | 변이 M2a → typecheck 2 · 양성 대조 여섯(아래 ⑨) |
 | 3 | **정적 데이터 파일 import** | `resolveJsonModule: false`(TS2732) + W-4 의 전제 단언·`src` 안 데이터 파일 0·**쿼리 접미 import 0** + 번들 그래프의 **모듈 종류 허용 목록**(모르는 종류는 기본 위반) | probe A → typecheck 2 · W-4 1 / probe B(`rows.txt?raw`) → W-4 1 · build 1 / probe C(동적 `?raw`) → W-4 1 |
 | 4 | 상태 enum 의 기본 분기 | 표 조회 자리의 폴백 0 + 표 키 집합 등식 test | 변이 M2b → vitest exit 1 |
 | 5 | e2e 가 화면 대신 API 만 검증 | 단언을 **DOM 에서 읽어 같은 실행의 API 응답과 대조**한다(기대값을 spec 에 적지 않는다) | 변이 M1(단위 fixture 와 **같은** 리터럴) → vitest 초록 · 여정 e2e exit 1 |
 | 6 | 「아직 산출 안 함」 자리에 숫자 | 값 자리의 숫자 부재 단언(단위 + e2e) | 변이 M3 → vitest exit 1 · 여정 e2e exit 1 |
 | 7 | 화면이 상태를 추론(`마감 < now ? '마감'`) | 라벨은 API `status`·`state`·`nextCheckpointKind` 에서만. 요구표가 승인한 클라이언트 계산은 **남은 날 수 하나**이고 그 경계를 test 가 고정한다 | 「마감이 지나도 날 수만 내고 「마감」이라는 말을 만들지 않는다」 test |
 | 8 | 캡처·trace 에 실데이터 | **CI 는 trace 를 남기지 않고 스크린샷만** 올린다 · 자격 값을 적은 맥락 파일은 산출물 디렉터리 **밖** · 산출물 누출 스캔(참조형) | 강제 실패(CI=1) 산출물에 `trace.zip` **0** · 스캔 일치 0 |
-| 9 | **화면이 계약 목록 밖 operation 을 부름** | W-4 의 「`apiClient` 호출 능력 import 집합 == {`queries.ts`}」(출하 소스) + 게이트 test 의 「그 파일의 호출 경로 집합 == 계약 목록」(AST) + 여정 e2e 의 런타임 경로 대조 | 양성 대조 둘: 화면이 직접 import → **W-4 exit 1** / `queries.ts` 가 목록 밖 호출 → **test exit 1** |
+| 9 | **화면이 계약 목록 밖 operation 을 부름** | ① **타입**: `createClient<Pick<paths, 승인 경로>>` — 재수출·동적 import·별칭·계산 접근 어느 꼴로 들고 나가도 목록 밖 경로가 `tsc` 에서 멈춘다 ② W-4 의 **간선 종류 셋**(import·재수출·동적) 집합 등식 ③ 게이트 test 의 **참조 전수**(모르는 꼴은 `unresolved`) ④ 여정의 런타임 경로 대조 | 양성 대조 여섯: 재수출·`export *`·허용 자리 재수출·동적 import → **W-4 1** / 별칭 + 목록 밖 → **typecheck 2** / 모르는 꼴 다섯 → **test 1** |
+| 12 | **자산 경로로 데이터 반출**(`new URL(…, import.meta.url)`) | `src` 안 **파일 종류 허용 목록**({ts,tsx,css}) + 내보낸 **자산 종류** 허용 목록 + 여정의 **비 API 같은 출처 요청** 대조 | 양성 대조: `src/screens/rows.txt` → typecheck 0 · **W-4 1** |
+| 13 | **파괴적 하네스 경로**(묵은 락 수거) | 표지 술어(접두+16진 여덟 자) + **앵커 필터** + 원자 락 쓰기 + 락 소유 뒤에만 공유 경로 정리 | 양성 대조: 빈 표지 → **docker 호출 0** · 옳은 표지 → 그 하나만. 여정 뒤 호스트 컨테이너 45 그대로 |
 | 10 | **쓰기 실패가 조용히 지나감** | 네 mutation 의 `onError` 가 성공 토스트를 걷고 서버 상태를 다시 읽은 뒤 `role="alert"` 얼굴을 낸다 · 401 은 로그인 경로 | 단위 test 다섯 · 여정 e2e 가 **실제 401**(쿠키 삭제)로 그 얼굴을 잰다 |
 | 11 | **값을 지어낸 요청 본문** | 진행 중 건수는 운영자 **선언**이고 선언 전에는 요청이 가지 않는다 · 응답의 echo 를 화면이 보인다 | 변이(리터럴 0 복원) → vitest exit 1 |
 
@@ -57,7 +59,9 @@
 | `src/api/apiError.ts` | 상태·코드만 | 서버 메시지를 담지 않는다. `queries.ts` 와 **다른 모듈**인 이유는 화면 test 가 질의 모듈을 바꿔치울 때 클래스 정체가 갈려 401 갈래가 서지 않았기 때문이다(실측) |
 | `src/components/WriteFailure` | `ApiError.status` | 401 과 일시 장애를 가른다. 서버 메시지·코드를 내보이지 않는다 |
 | `src/screens/WorksheetRecord` 의 선언 입력 | 운영자 입력 | 기본값 0 이 없다 — 계약이 「호출자가 선언한다」로 둔 칸이다 |
-| `scripts/screen-operations.mjs` | `queries.ts` 의 AST · 생성 타입의 `paths` 키 | 문자열 grep 이 아니다(주석·문서 문자열을 세지 않는 성질을 test 가 잠근다) |
+| `scripts/screen-operations.mjs` | `queries.ts` 의 AST · 생성 타입의 `paths` 키 · **승인 목록 파일** | 문자열 grep 이 아니다 · 목록을 복제하지 않고 그 파일에서 읽는다 · `apiClient` 참조 전수를 세고 모르는 꼴은 통과시키지 않는다 |
+| `src/api/approvedOperations.ts` | scope.md 의 승인 목록 | **한 자리다** — 클라이언트 타입·게이트 test·여정 감시 셋이 이것을 쓴다. 이 slice 가 쓰지 않는 operation 은 두지 않는다 |
+| `e2e/harness/container-marker.mjs` | 락 파일의 표지 문자열 | 이름 규약에 맞지 않으면 **docker 를 부르지 않는다**(파괴적 경로의 가드) |
 | `vite.config.ts` 의 e2e 입구 둘 | 환경변수(preview 포트·API 출처) | `VITE_` 접두가 아니라 **번들에 들어가지 않는다**. 값이 없으면 7A 때와 같은 preview 다 |
 | 하네스(`e2e/harness/*`) | 실행마다 난수 비밀값 · 출하 명령 인자 | production 코드에 fake·e2e 분기 0 — app 은 설정 값만 받는다 |
 
