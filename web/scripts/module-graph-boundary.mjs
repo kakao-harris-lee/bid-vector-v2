@@ -54,6 +54,22 @@ export function classifyModuleId(rawId) {
   return { kind: 'virtual', path };
 }
 
+/**
+ * **데이터 모듈** — 번들 그래프에 들어온 정적 데이터 파일(M7/7E-1).
+ *
+ * 왜 이 층에도 두는가: TS 쪽은 `resolveJsonModule` 을 꺼서 `import x from './a.json'` 이
+ * TS2732 로 막히고 W-4 가 `src` 안 데이터 파일 0 을 센다. 그러나 **Vite 전용 경로**
+ * (`import.meta.glob`·`?raw`·`?url`)는 tsc 를 거치지 않고, 그 대상이 `node_modules` 안이면
+ * 두 층 모두 통과한다 — 화면이 계약 밖에서 데이터 **모양**을 얻는 경로가 그 자리에 남는다.
+ * 그래서 그래프에서 한 번 더 센다.
+ *
+ * 패키지 자신의 `package.json`(해석기가 읽는 매니페스트)은 모듈 그래프에 **id 로 들어오지
+ * 않는다** — 들어오는 것은 누군가 import 한 데이터뿐이다.
+ */
+export function isDataModule(path) {
+  return /\.(json|json5|ya?ml|csv|xml)$/i.test(path);
+}
+
 export function isInsideRoot(candidate, root) {
   return candidate === root || candidate.startsWith(root + sep);
 }
@@ -174,6 +190,7 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
       // 식별은 디렉터리 이름이 아니라 **패키지 이름**이다(r4 M-9).
       const callSitePath = resolve(webRootReal, API_CALL_SITE);
       const apiOffenders = [];
+      const dataOffenders = [];
 
       for (const rawId of this.getModuleIds()) {
         const { kind, path } = classifyModuleId(rawId);
@@ -194,6 +211,10 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         }
         if (violatesBoundary(realPath, allowedRoots)) {
           offenders.push(`${rawId} → ${realPath}`);
+          continue;
+        }
+        if (isDataModule(realPath)) {
+          dataOffenders.push(`${rawId} → ${realPath}`);
           continue;
         }
 
@@ -227,6 +248,14 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         this.error(
           `번들 모듈 그래프가 web/src·web/node_modules·index.html 밖 파일을 담았다 (ADR 0011 D-3):\n` +
             offenders.map((line) => `  - ${line}`).join('\n'),
+        );
+      }
+
+      if (dataOffenders.length > 0) {
+        this.error(
+          `번들 모듈 그래프가 정적 데이터 파일을 담았다 — 데이터 모양은 V2 계약에서만 온다 ` +
+            `(ADR 0011 D-2):\n` +
+            dataOffenders.map((line) => `  - ${line}`).join('\n'),
         );
       }
 

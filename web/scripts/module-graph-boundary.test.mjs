@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   apiImporterViolation,
   boundaryRoots,
+  isDataModule,
   graphImporters,
   classifyModuleId,
   isInsideRoot,
@@ -123,5 +124,25 @@ describe('그래프의 importer 수집', () => {
     expect(graphImporters({ importers: ['/a.ts'] })).toEqual(['/a.ts']);
     expect(graphImporters({ dynamicImporters: ['/b.js'] })).toEqual(['/b.js']);
     expect(graphImporters(undefined)).toEqual([]);
+  });
+});
+
+/**
+ * M7/7E-1 — 정적 데이터 모듈 술어. 「계약 밖에서 데이터 모양을 얻지 않는다」의 번들 층이고,
+ * 확장자 목록이 이 술어의 전부이므로 그 목록 자체를 잠근다.
+ */
+describe('정적 데이터 모듈 술어', () => {
+  it('데이터 확장자를 잡는다 — 대소문자와 질의 접미를 넘어서', () => {
+    expect(isDataModule('/w/src/a.json')).toBe(true);
+    expect(isDataModule('/w/src/a.JSON')).toBe(true);
+    expect(isDataModule('/w/node_modules/p/data.yaml')).toBe(true);
+    expect(isDataModule('/w/src/rows.csv')).toBe(true);
+    expect(isDataModule(stripQuery('/w/src/a.json?raw'))).toBe(true);
+  });
+
+  it('코드 모듈은 잡지 않는다 — 이름에 json 이 들어 있어도', () => {
+    expect(isDataModule('/w/src/api/client.ts')).toBe(false);
+    expect(isDataModule('/w/src/jsonHelpers.ts')).toBe(false);
+    expect(isDataModule('/w/src/a.json.ts')).toBe(false);
   });
 });

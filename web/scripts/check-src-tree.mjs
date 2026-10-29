@@ -146,6 +146,23 @@ if (parsed.options.allowJs === true) {
   fail('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다');
 }
 
+// **M7/7E-1 — `resolveJsonModule` 은 파일에 `false` 로 **명시**돼 있어야 한다.**
+//
+// 켜져 있으면 `web/src` 안의 정적 JSON import 가 세 층을 모두 지난다(경계의 술어가 「src 밖
+// 금지」이고 그 파일은 안에 있다 — 7E-1 Phase 1 설계 검토 우회 ③).
+//
+// **생략은 「꺼짐」이 아니다(실측).** `moduleResolution: "bundler"` 에서는 이 값을 적지 않으면
+// JSON import 가 **그대로 컴파일된다**(probe: typecheck exit 0). `false` 를 명시하면 TS2732 로
+// 거부된다(같은 probe: exit 2). 그러므로 술어는 「true 가 아님」이 아니라 「명시된 false」다 —
+// `parsed.options` 는 암묵 기본값을 드러내지 않으므로 **파일의 선언**을 본다.
+const declaredResolveJson = config.compilerOptions?.resolveJsonModule;
+if (declaredResolveJson !== false) {
+  fail(
+    'tsconfig 의 compilerOptions.resolveJsonModule 이 false 로 명시돼 있지 않다 ' +
+      `(지금: ${JSON.stringify(declaredResolveJson)}) — 생략은 moduleResolution=bundler 에서 「켜짐」이다(실측)`,
+  );
+}
+
 if (parsed.options.paths !== undefined && Object.keys(parsed.options.paths).length > 0) {
   fail(`paths 별칭이 있다: ${Object.keys(parsed.options.paths).join(', ')}`);
 }
@@ -185,6 +202,13 @@ collectLinks(webRoot, 0);
 // 않았다(실측). 파일 종류로 그 사각을 없앤다. 번들 층은 그 파일을 보지만, 한 층이 아예 보지
 // 못하는 자리를 남기지 않는다.
 const NON_TS_SCRIPT = /\.(js|mjs|cjs|jsx)$/;
+
+/**
+ * **데이터 파일도 둔다 → 위반이다**(M7/7E-1). `resolveJsonModule` 을 꺼서 TS 쪽 입구는 닫았으나
+ * Vite 전용 경로(`import.meta.glob('./*.json')`·`?raw`)는 tsc 를 거치지 않는다 — 그 경로가
+ * 집어 갈 **대상 자체**를 `src` 에 두지 않는다. 계약 밖 데이터는 `e2e/` 의 fixture 자리로 간다.
+ */
+const DATA_FILE = /\.(json|json5|ya?ml|csv|xml)$/i;
 function collectNonTsScripts(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const full = join(directory, entry.name);
@@ -194,6 +218,9 @@ function collectNonTsScripts(directory) {
     }
     if (entry.isFile() && NON_TS_SCRIPT.test(entry.name)) {
       fail(`src 안에 TS 프로그램이 보지 못하는 스크립트가 있다: ${relative(webRoot, full)}`);
+    }
+    if (entry.isFile() && DATA_FILE.test(entry.name)) {
+      fail(`src 안에 정적 데이터 파일이 있다: ${relative(webRoot, full)} — 데이터 모양은 계약에서만 온다`);
     }
   }
 }
@@ -564,7 +591,7 @@ if (finishIfFailed()) return;
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 비 TS 스크립트 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 비 TS 스크립트 0 · src 안 정적 데이터 파일 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
