@@ -272,6 +272,43 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
     expect(failure.textContent).not.toContain('INTERNAL_ERROR');
   });
 
+  /**
+   * CR r3 L-11 — 담기도 **다시 읽는다**. 앞 판은 얼굴 문면만 재서, `onError` 를 지워도 이 test 가
+   * 초록이었다(v r2 실측). 얼굴이 「서버에 남은 상태를 다시 읽었습니다」라고 말하므로 그 말이
+   * 사실인지를 호출 계수로 센다.
+   */
+  it('담기가 실패하면 서버 상태를 다시 읽는다 — 얼굴의 말이 사실이다', async () => {
+    mocked.addBidCase.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const before = mocked.listBidCases.mock.calls.length;
+    fireEvent.click(within(card).getByRole('button', { name: /담기/u }));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('다시 읽었습니다');
+    await waitFor(() => {
+      expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
+  /**
+   * CR r3 L-5 — 이 라운드·앞 라운드의 a11y 수정에 **잠금이 없었다**. 아래층 문면이 보조기기에
+   * 닿는지(세 자리 가운데 화면 B 의 그것), 그리고 그 배선이 값 단언을 더럽히지 않는지를 센다.
+   */
+  it('기초금액의 아래층 문면이 보조기기에 닿는다 — title 하나가 아니다', async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const value = within(card).getByTestId('notice-amount');
+    const describedBy = value.closest('dd')?.getAttribute('aria-describedby');
+
+    expect(describedBy, 'aria-describedby 가 없으면 title 하나로 돌아간 것이다').not.toBeNull();
+    expect(document.getElementById(describedBy ?? '')?.textContent).toContain('추정가격과 다르다');
+    // 값 단언이 설명까지 읽지 않는다 — 그 둘이 한 요소에 있으면 금액 대조가 망가진다.
+    expect(value.textContent).not.toContain('추정가격과 다르다');
+  });
+
   /** CR M-2 — 401 은 일시 장애와 다른 답이다: 재시도로 풀리지 않으므로 로그인으로 보낸다. */
   it('담기가 401 이면 로그인으로 가는 길을 보인다', async () => {
     mocked.addBidCase.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));

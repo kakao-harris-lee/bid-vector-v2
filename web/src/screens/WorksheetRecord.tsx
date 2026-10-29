@@ -32,27 +32,34 @@ export function parseWon(raw: string): number | null {
   return Number.parseInt(digits, 10);
 }
 
+/** 계약의 정수 범위(int32) — 넘는 선언은 서버 400 이 되므로 입력에서 가른다. */
+const MAX_DECLARED_COUNT = 2_147_483_647;
+
 /**
  * 진행 중 투찰 건수의 선언 — **0 을 기본값으로 두지 않는다**(CR H-1 · v M-5). 계약이 「호출자가
  * 선언한다, 서버가 0 으로 지어내지 않는다」로 둔 칸이고, 그 수를 **서버가 세어 주는 표면이 계약에
  * 없다**(실측: `listBidCases` 에 집계도 `X-Total-Count` 도 없다). 클라이언트가 상태를 「진행 중」
  * 으로 분류해 세는 것은 계약에 없는 정의를 화면이 만드는 것이라 D-7E-4 위반이다. 그래서 운영자가
- * 적고, 적지 않으면 요청하지 않는다(빈 칸은 `null`).
+ * 적고, 적지 않으면 요청하지 않는다.
+ *
+ * **왜 `null` 하나가 아닌가**(CR r3 L-4): 「적지 않았다」와 「범위를 넘었다」는 운영자가 할 일이
+ * 다르다. 하나로 접으면 21자리를 적은 사람에게 「0 이상의 정수로 적으라」는 **틀린 말**을 한다.
  */
-const MAX_DECLARED_COUNT = 2_147_483_647;
+export type DeclaredCount =
+  | { readonly kind: 'declared'; readonly value: number }
+  | { readonly kind: 'not-declared' }
+  | { readonly kind: 'out-of-range'; readonly max: number };
 
-export function parseCount(raw: string): number | null {
+export function parseCount(raw: string): DeclaredCount {
   const digits = raw.trim();
   if (!/^\d+$/.test(digits)) {
-    return null;
+    return { kind: 'not-declared' };
   }
   const parsed = Number.parseInt(digits, 10);
-  // CR r2 L-11 — 계약의 정수 범위(int32)를 넘는 선언은 서버 400 이 되고 그 실패는 일반 얼굴로
-  // 간다. 입력에서 막아 사유를 그 자리에서 말한다.
   if (!Number.isSafeInteger(parsed) || parsed > MAX_DECLARED_COUNT) {
-    return null;
+    return { kind: 'out-of-range', max: MAX_DECLARED_COUNT };
   }
-  return parsed;
+  return { kind: 'declared', value: parsed };
 }
 
 /** 추첨번호는 정수 여럿 — 빈 칸이면 빈 배열이고 형식이 어긋나면 `null` 이다. */

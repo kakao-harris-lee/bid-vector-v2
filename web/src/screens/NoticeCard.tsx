@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
-import { StateBadge } from '../components/StateBadge';
+import { StateBadge, useHint } from '../components/StateBadge';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { UNJUDGED_AXIS_DISPLAY } from '../display/worksheetDisplay';
@@ -28,6 +28,9 @@ function DeadlineBadge({ deadlineAt, now }: { readonly deadlineAt: string | null
  * 공고 카드 한 줄(§6.2 B) — 제목 · 발주기관 · 기초금액(+provenance) · D-day · 상태 · 다음
  * 행동 하나. 모든 값은 **응답 필드 그대로**이고 카드가 계산하는 것은 남은 날뿐이다.
  */
+/** 혼동하면 투찰 금액이 틀리는 문면 — 용어와 같은 자리에 둔다. */
+const AMOUNT_HINT = '투찰 기준 금액. 추정가격과 다르다.';
+
 export function NoticeCard({
   notice,
   now,
@@ -38,6 +41,7 @@ export function NoticeCard({
   readonly action: React.ReactNode;
 }) {
   const amount = amountDisplayOf(notice);
+  const amountHint = useHint(AMOUNT_HINT);
   return (
     <li
       data-testid={`notice-card-${notice.noticeNumber}`}
@@ -59,11 +63,16 @@ export function NoticeCard({
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-xs text-ink-soft" title="투찰 기준 금액. 추정가격과 다르다.">
+          <dt className="text-xs text-ink-soft" title={AMOUNT_HINT}>
             기초금액
           </dt>
-          <dd data-testid="notice-amount" className="font-numeric text-sm">
-            {amount.amount}
+          {/* CR r3 M-5 — 같은 문면의 **세 번째 자리**였다. `title` 하나로 두면 터치·보조기기에서
+              볼 수 없다(배선은 `useHint` 한 자리). */}
+          <dd aria-describedby={amountHint.describedBy} className="font-numeric text-sm">
+            {/* 값은 **자기 요소**가 들고 아래층 문면은 그 옆에 둔다 — 값 단언이 설명까지 읽지
+                않게 하면서 `dl` 내용 모형도 지킨다(한 용어에 `<dd>` 하나). */}
+            <span data-testid="notice-amount">{amount.amount}</span>
+            {amountHint.hintNode}
           </dd>
           {/* CR L-7 — provenance 가 없으면 **빈 `<dd>` 를 내지 않는다**(빈 칸이 값처럼 읽힌다). */}
           {amount.provenance === null ? null : (

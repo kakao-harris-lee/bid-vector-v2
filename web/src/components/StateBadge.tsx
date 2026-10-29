@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 
 import { unknownStateDisplay, type DisplayTone, type StateDisplay } from '../display/stateDisplay';
 
@@ -62,6 +62,35 @@ export function StateBadge({
  * 라벨 + 값 한 줄. 값이 없으면 **빈 자리**를 그린다(§6.5 가짜 기본값 금지) — 「0」·「미정」을
  * 넣지 않는다.
  */
+/**
+ * 용어의 **아래층 문면**을 보조기기에도 닿게 묶는 한 자리(CR r2 M-4 · r3 M-5 · L-10).
+ *
+ * `title` 하나는 터치에서 볼 수 없고 `<dt>` 는 포커스를 받지 않는다. 그 문면(「투찰 기준 금액.
+ * 추정가격과 다르다」)은 혼동하면 투찰 금액이 틀리는 자리다. 배선을 여기 하나로 두는 이유는
+ * 같은 꼴이 화면마다 **복제되던 자리**이기 때문이다 — 셋째 자리에서 빠진 것이 M-5 였다.
+ *
+ * sr-only 문면은 호출자가 **값 요소 안**에 둔다. 형제 `<dd>` 로 두면 `dl` 의 내용 모형에서 한
+ * 용어에 값이 둘이 된다.
+ */
+export function useHint(hint: string | undefined): {
+  readonly describedBy: string | undefined;
+  readonly hintNode: ReactNode;
+} {
+  const generatedId = useId();
+  if (hint === undefined) {
+    return { describedBy: undefined, hintNode: null };
+  }
+  const describedBy = `field-hint-${generatedId}`;
+  return {
+    describedBy,
+    hintNode: (
+      <span id={describedBy} className="sr-only">
+        {hint}
+      </span>
+    ),
+  };
+}
+
 export function Field({
   label,
   value,
@@ -73,24 +102,18 @@ export function Field({
   readonly hint?: string;
   readonly testId?: string;
 }) {
-  // CR r2 M-4 — 아래층이 `title` 하나이면 터치에서 볼 수 없고 `<dt>` 는 포커스를 받지 않는다.
-  // `hint` 가 나르는 문면(「투찰 기준 금액. 추정가격과 다르다」)은 혼동하면 투찰 금액이 틀리는
-  // 자리다. 배지와 같은 꼴로 sr-only 문면을 묶는다.
-  const generatedId = useId();
-  const describedBy = hint === undefined ? undefined : `field-hint-${generatedId}`;
+  const { describedBy, hintNode } = useHint(hint);
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-ink-soft" title={hint}>
         {label}
       </dt>
-      <dd data-testid={testId} aria-describedby={describedBy} className="text-sm">
-        {value ?? <span className="text-absent-ink">값 없음</span>}
+      {/* sr-only 문면은 **그 `<dd>` 안**에 둔다(CR r3 L-10) — 둘째 `<dd>` 로 두면 `dl` 의 내용
+          모형에서 한 용어에 값이 둘이 되고, 보조기기가 설명을 값으로 읽는다. */}
+      <dd aria-describedby={describedBy} className="text-sm">
+        <span data-testid={testId}>{value ?? <span className="text-absent-ink">값 없음</span>}</span>
+        {hintNode}
       </dd>
-      {describedBy === undefined ? null : (
-        <dd id={describedBy} className="sr-only">
-          {hint}
-        </dd>
-      )}
     </div>
   );
 }

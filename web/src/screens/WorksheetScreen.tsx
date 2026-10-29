@@ -251,12 +251,17 @@ export function WorksheetScreen() {
       return;
     }
     const declared = parseCount(activeBids);
-    if (declared === null) {
+    // 사유를 그 자리에서 말한다(CR r3 L-4) — 「적지 않았다」와 「범위를 넘었다」는 다른 답이다.
+    if (declared.kind === 'not-declared') {
       setActiveBidsBlocked('진행 중 투찰 건수를 0 이상의 정수로 선언하십시오 — 이 수는 지어내지 않습니다.');
       return;
     }
+    if (declared.kind === 'out-of-range') {
+      setActiveBidsBlocked(`선언할 수 있는 건수는 ${declared.max.toLocaleString('ko-KR')} 까지입니다.`);
+      return;
+    }
     setActiveBidsBlocked(null);
-    askPrice.mutate({ currentActiveBids: declared, fromVersion: bidCase.caseVersion });
+    askPrice.mutate({ currentActiveBids: declared.value, fromVersion: bidCase.caseVersion });
   }
 
   function runPrimary(kind: NextActionKind, caseId: number, fromVersion: number): void {
@@ -293,7 +298,8 @@ export function WorksheetScreen() {
 
   // CR r2 L-6 — 마운트 시점의 `signedIn` 뿐 아니라 **읽기 401**(떠 있는 화면에서 세션이
   // 끝난 경우)도 같은 답이다. 그 재시도는 영원히 실패한다.
-  if (signedIn === false || isUnauthorized(notices.error ?? cases.error)) {
+  // `??` 연쇄는 **첫 오류 하나**만 봤다(CR r3 L-2). 둘 가운데 하나라도 401 이면 그 답이다.
+  if (signedIn === false || [notices.error, cases.error].some(isUnauthorized)) {
     return (
       <section data-testid="screen-worksheet" className="mx-auto max-w-3xl p-4">
         <SignedOutFace />

@@ -115,7 +115,9 @@ export function TodayNoticesScreen() {
   // 같은 얼굴을 내지 않는다.
   // CR r2 L-6 — 마운트 시점의 `signedIn` 뿐 아니라 **읽기 401**(떠 있는 화면에서 세션이
   // 끝난 경우)도 같은 답이다. 그 재시도는 영원히 실패한다.
-  if (signedIn === false || isUnauthorized(notices.error ?? suggestions.error ?? cases.error)) {
+  // `??` 연쇄는 **첫 오류 하나**만 봤다(CR r3 L-2) — 공고 읽기가 500 이고 건 목록이 401 이면
+  // 로그인 얼굴로 가지 않았다. 셋 가운데 **하나라도** 401 이면 그 답이다.
+  if (signedIn === false || [notices.error, suggestions.error, cases.error].some(isUnauthorized)) {
     return (
       <section data-testid="screen-home" className="mx-auto max-w-3xl p-4">
         <SignedOutFace />

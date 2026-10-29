@@ -597,6 +597,56 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     });
   });
 
+  /**
+   * CR r3 L-5 — 앞 라운드의 a11y 수정 둘에 **잠금이 없었다**(지우면 전 층이 초록이었다).
+   * 선언 입력의 보조 문면이 **프로그램적으로** 묶이는지와, 차단이 `aria-invalid` 로 드러나는지.
+   */
+  it('선언 입력의 안내 문면이 입력에 묶이고, 차단은 aria-invalid 로 드러난다', async () => {
+    renderScreen();
+
+    const input = await screen.findByTestId('active-bids');
+    const noteId = input.getAttribute('aria-describedby');
+    expect(noteId, 'aria-describedby 가 없으면 안내가 입력과 끊긴 것이다').not.toBeNull();
+    expect(document.getElementById(noteId ?? '')?.textContent).toContain('지어내지 않으므로');
+    expect(input.getAttribute('aria-invalid')).toBeNull();
+
+    // 선언 없이 누르면 차단이 선다 — 그때 입력 자신이 그 사실을 들고 있어야 한다.
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    expect((await screen.findByTestId('active-bids')).getAttribute('aria-invalid')).toBe('true');
+    expect(mocked.requestBidPrice).not.toHaveBeenCalled();
+  });
+
+  /** CR r3 L-4 — 범위를 넘긴 선언은 **사유가 다르다**(「0 이상의 정수로」는 그에게 틀린 말이다). */
+  it('범위를 넘긴 선언은 그 사유로 막는다', async () => {
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: '99999999999999999999' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    const blocked = await screen.findByTestId('active-bids-blocked');
+    expect(blocked.textContent).toContain('2,147,483,647');
+    expect(blocked.textContent).not.toContain('0 이상의 정수');
+    expect(mocked.requestBidPrice).not.toHaveBeenCalled();
+  });
+
+  /**
+   * CR r3 L-5 — 표 밖 코드로 목록이 그려지는지(r2 M-6 의 잠금). 직접 색인이 돌아오면 `undefined`
+   * 가 렌더되어 **빈 항목**이 서는데, 그것은 「고지가 없다」로 읽힌다.
+   */
+  it('고지 표에 없는 코드도 미지 문면으로 선다 — 빈 항목이 되지 않는다', async () => {
+    mocked.requestBidPrice.mockResolvedValue({ ...PRICE, disclosures: ['SOMETHING_NOT_IN_TABLE'] });
+    renderScreen();
+
+    await askPrice();
+
+    const list = await screen.findByTestId('disclosures');
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.textContent?.trim().length ?? 0).toBeGreaterThan(0);
+    expect(items[0]?.textContent).not.toContain('undefined');
+  });
+
   /** CR r2 L-5 — 투찰가 요청(POST)도 쓰기와 같은 얼굴·같은 401 갈래를 쓴다. */
   it('투찰가 요청이 401 이면 로그인으로 가는 길을 보인다', async () => {
     mocked.requestBidPrice.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
