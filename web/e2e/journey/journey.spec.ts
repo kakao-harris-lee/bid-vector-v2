@@ -24,6 +24,8 @@ interface JourneyContext {
   readonly previewUrl: string;
   readonly loginName: string;
   readonly passphrase: string;
+  /** 이 실행의 번들이 낸 자산 경로 전수 — 하네스가 빌드 직후 적는다(v r3 M-2). */
+  readonly bundleAssets: readonly string[];
 }
 
 const CONTEXT_PATH = resolve(tmpdir(), 'bidvector-7e1-journey-context.json');
@@ -112,7 +114,26 @@ const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
  * 기록하지 않았고, 그래서 화면이 `new URL('./rows.txt', import.meta.url)` 로 내보낸 자산을
  * 읽어 가도 「V2 API 밖」 감시가 그것을 보지 못했다(실측).
  */
-const ALLOWED_NON_API = [/^\/$/u, /^\/login$/u, /^\/notices\//u, /^\/assets\/[^/]+\.(?:js|css)$/u, /^\/favicon\.ico$/u];
+/** 라우터가 **문서**로 받는 경로 — 화면의 주소다(자산이 아니다). */
+const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u];
+
+/**
+ * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4). 앞 판은 확장자
+ * 패턴(`/assets/*.js|css`)이었고, 그러면 번들이 **자산으로 실어 준 데이터 파일**이 같은 자리에
+ * 떨어져도 초록이다(실측: `rows.css` + `new URL(…)`). 산출물 목록과 등식으로 두면 번들에
+ * 들어온 것이 하나라도 늘면 이 단언이 먼저 깨진다.
+ *
+ * 하네스가 preview 앞에서 번들을 직접 만든다(D-7E-8) — 그래서 이 디렉터리는 **이 실행의**
+ * 산출물이다.
+ */
+function bundleAssetPaths(): Set<string> {
+  const names = journeyContext().bundleAssets;
+  expect(names.length, '번들 산출물 목록이 비면 아래 단언이 공허해진다').toBeGreaterThan(0);
+  return new Set(names);
+}
+
+/** 브라우저가 스스로 거는 요청 — 화면 코드가 부르는 것이 아니다(오늘 404 다). */
+const BROWSER_INITIATED = ['/favicon.ico'];
 
 /** 화면이 **V2 API 밖**을 부르지 않는지, **목록 안**만 부르는지, 자산도 아는 종류인지 센다. */
 function watchRequests(page: Page): {
@@ -120,6 +141,7 @@ function watchRequests(page: Page): {
   readonly apiPaths: Set<string>;
   readonly unexpectedSameOrigin: string[];
 } {
+  const allowedAssets = bundleAssetPaths();
   const outside: string[] = [];
   const apiPaths = new Set<string>();
   const unexpectedSameOrigin: string[] = [];
@@ -133,7 +155,11 @@ function watchRequests(page: Page): {
       apiPaths.add(`${request.method()} ${url.pathname}`);
       return;
     }
-    if (!ALLOWED_NON_API.some((allowed) => allowed.test(url.pathname))) {
+    const known =
+      ALLOWED_ROUTES.some((allowed) => allowed.test(url.pathname)) ||
+      allowedAssets.has(url.pathname) ||
+      BROWSER_INITIATED.includes(url.pathname);
+    if (!known) {
       unexpectedSameOrigin.push(url.pathname);
     }
   });

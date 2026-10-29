@@ -682,6 +682,40 @@ if (existsSync(npmrcPath)) {
   }
 }
 
+// ⑤c **`import.meta` 멤버 허용 목록**(v r3 M-2 · CR r3 M-4) — 정적 데이터가 화면에 닿는 주소를
+// 없앤다.
+//
+// 파일 종류 허용 목록(`{ts,tsx,css}`)은 **종류**를 가리지만 그 파일을 **데이터로 읽는 주소**를
+// 가리지 못한다: `rows.css` 는 허용 종류이고 `new URL('./rows.css', import.meta.url)` 로 번들에
+// 자산으로 실려 화면이 가져다 읽는다(실측). `import.meta.glob` 은 디렉터리째 끌어온다.
+//
+// 그래서 확장자를 더 열거하는 대신 **주소 쪽을 닫는다**: `import.meta` 의 멤버는 `env` 하나만
+// 허용한다(기준 URL 을 얻는 길도, 파일을 훑는 길도 남기지 않는다). 새 멤버가 필요해지면 이
+// 게이트가 먼저 붉다.
+const ALLOWED_IMPORT_META_MEMBERS = new Set(['env']);
+for (const { sourceFile, name } of inSrcFiles) {
+  if (isTestFile(name)) {
+    continue;
+  }
+  const visitMeta = (node) => {
+    if (ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword) {
+      const access = node.parent;
+      const member =
+        access !== undefined && ts.isPropertyAccessExpression(access) && access.expression === node
+          ? access.name.text
+          : undefined;
+      if (member === undefined || !ALLOWED_IMPORT_META_MEMBERS.has(member)) {
+        fail(
+          `src 안에서 허용 밖 import.meta 멤버를 쓴다: ${name} → import.meta.${member ?? '<동적>'} ` +
+            '— 자산 주소·파일 훑기가 정적 데이터를 화면에 들인다(허용: env)',
+        );
+      }
+    }
+    ts.forEachChild(node, visitMeta);
+  };
+  visitMeta(sourceFile);
+}
+
 // ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
 const viteConfigPath = resolve(webRoot, 'vite.config.ts');
 if (!existsSync(resolve(webRoot, 'scripts', 'module-graph-boundary.mjs'))) {
@@ -796,6 +830,32 @@ if (!existsSync(viteConfigPath)) {
   // 붙여 돌려 등록부(`config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 · failed 0
   // 인지 본다.
 
+  // **`publicDir` 는 꺼져 있어야 한다**(CR r3 M-4) — 켜져 있으면 `web/public/` 의 아무 파일이
+  // 번들 밖 경로로 그대로 복사돼 화면이 같은 출처에서 읽어 갈 수 있고, 그 디렉터리는 위의
+  // 파일 종류 술어 **밖**이다. 오늘 `web/public/` 은 없다; 이 단언은 그것이 생기는 순간을
+  // 게이트로 만든다(생략은 꺼짐이 아니라 기본값 켜짐이다 — `resolveJsonModule` 과 같은 함정).
+  let publicDirDisabled = false;
+  const visitPublicDir = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      node.name !== undefined &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'publicDir'
+    ) {
+      publicDirDisabled = node.initializer.kind === ts.SyntaxKind.FalseKeyword;
+    }
+    ts.forEachChild(node, visitPublicDir);
+  };
+  visitPublicDir(viteSource);
+  if (!publicDirDisabled) {
+    fail(
+      'vite.config.ts 에 publicDir: false 선언이 없다 — public/ 이 번들 경계 밖 자산 입구가 된다',
+    );
+  }
+  if (existsSync(resolve(webRoot, 'public'))) {
+    fail('web/public/ 이 있다 — 이 slice 는 그 입구를 쓰지 않는다(publicDir 는 꺼져 있다)');
+  }
+
   if (boundaryBindings.size === 0) {
     fail(`vite.config.ts 가 ${boundaryPluginSpecifier} 를 import 하지 않는다`);
   } else {
@@ -815,7 +875,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0 · 그 심볼의 재수출 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0 · 그 심볼의 재수출 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir=false 명시 · web/public/ 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }

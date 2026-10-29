@@ -11,7 +11,16 @@
 // 비밀값은 **실행마다 난수**다 — 저장소에 자격 리터럴을 두지 않는다(D-7E-6).
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -337,6 +346,14 @@ async function main() {
     throw new Error(`번들 빌드 실패(exit=${built.status})`);
   }
 
+  // 이 빌드가 낸 자산 이름을 맥락에 적는다(v r3 M-2) — 여정은 「같은 출처의 비 API 요청」을
+  // **이 목록과 등식으로** 본다. 확장자 패턴으로 보면 번들이 자산으로 실어 준 데이터 파일이
+  // 같은 자리에 떨어져도 초록이다. 목록은 **이 실행의 산출물**이어야 하므로 여기서 읽는다.
+  const bundleAssets = readdirSync(resolve(webRoot, 'dist', 'assets')).map((one) => `/assets/${one}`);
+  if (bundleAssets.length === 0) {
+    throw new Error('번들 자산이 0 이다 — 여정의 자산 등식이 공허해진다');
+  }
+
   log(`vite preview(127.0.0.1:${PREVIEW_PORT} → /api ⇒ 127.0.0.1:${appPort})`);
   track(
     spawn(resolve(webRoot, 'node_modules', '.bin', 'vite'), ['preview'], {
@@ -362,6 +379,7 @@ async function main() {
         loginName: LOGIN_NAME,
         passphrase: PASSPHRASE,
         maxActiveBids: MAX_ACTIVE_BIDS,
+        bundleAssets,
       },
       null,
       2,

@@ -40,6 +40,9 @@ export default defineConfig({
         ? undefined
         : { '/api': { target: process.env.BIDVECTOR_E2E_API_ORIGIN, changeOrigin: false } },
   },
+  // `public/` 입구를 쓰지 않는다(CR r3 M-4) — 그 디렉터리의 파일은 번들 그래프를 거치지 않고
+  // 같은 출처로 그대로 복사된다. 켜 두면 화면이 읽는 정적 데이터가 경계 밖으로 들어온다.
+  publicDir: false,
   build: { outDir: 'dist', emptyOutDir: true },
   test: {
     // M7/7D — **test 에서만** API 기준 주소를 절대 URL 로 둔다. 브라우저는 상대 주소(`/`)를
