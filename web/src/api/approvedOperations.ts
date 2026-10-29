@@ -45,17 +45,22 @@ type ApprovedMethodsOf<P extends ApprovedOperationPath> = Lowercase<
 
 /**
  * 목록의 메서드 가운데 **그 경로의 계약에 없는 것**. 하나라도 있으면 아래 단언이 컴파일에서
- * 멈춘다 — 교집합만 쓰면 그런 메서드가 조용히 떨어져 오타가 서지 않았다.
+ * 멈춘다(CR r4 L-6).
+ *
+ * **키 존재로는 볼 수 없다**(실측): 생성기는 없는 메서드도 키로 적고 타입을 `never` 로 둔다
+ * (`/api/notices` 아래에 `put: never` 가 있다). 그래서 교집합(`& keyof paths[P]`)은 오타를
+ * 통과시켰고 `{ method: 'PUT', path: '/api/notices' }` 가 **tsc 0** 이었다. 키가 아니라 **그
+ * 자리의 타입이 `never` 인가**를 본다.
  */
+type UndeclaredMethodsFor<P extends ApprovedOperationPath> = {
+  [M in ApprovedMethodsOf<P>]: [paths[P][M]] extends [never] ? M : never;
+}[ApprovedMethodsOf<P>];
+
 type MethodsNotInContract = {
-  [P in ApprovedOperationPath]: Exclude<
-    Lowercase<Extract<ApprovedOperation, { path: P }>['method']>,
-    keyof paths[P]
-  >;
+  [P in ApprovedOperationPath]: UndeclaredMethodsFor<P>;
 }[ApprovedOperationPath];
 
-/** 그 집합이 **비어 있다**는 컴파일 단언(비어 있지 않으면 `TS2344`). */
-export type ApprovedMethodsAreInContract = MethodsNotInContract extends never ? true : MethodsNotInContract;
+/** 그 집합이 **비어 있다**는 컴파일 단언 — 비어 있지 않으면 `TS2344` 로 멈춘다. */
 type AssertEmpty<T extends never> = T;
 export type ApprovedMethodAxisCheck = AssertEmpty<MethodsNotInContract>;
 
