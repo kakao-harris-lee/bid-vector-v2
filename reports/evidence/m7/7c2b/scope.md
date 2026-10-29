@@ -58,3 +58,7 @@
 ## 계약 갱신 이력
 
 - 2026-10-29 착수(팀장).
+- 2026-10-29 **D-7C2B-6(팀장, 동결 보고 수령)**: 레인 실측 둘을 받는다. ① floor-trust 정책 표의 유일한 항목이 `EffectiveFrom.Initial` 이라
+  표시 경로에서 **정책 미해소는 구조적으로 생기지 않는다** — 다섯째 표시 상태를 만들지 않고 그 전제를 test 로 잠근다(항목이 날짜로 바뀌면 그
+  test 가 먼저 붉다). ② 정책 주입·근거 운반 타입의 기계적 귀결로 같은 in_scope 파일(`config/quality/architecture-policy.properties`)의 게이트
+  키 둘(`app.injection.allowed-types` +2 · 상수시간 비교 허용 목록 +1)을 더했다 — 새 파일 0, 계약이 지명하지 않은 키였으므로 여기에 등재한다.
