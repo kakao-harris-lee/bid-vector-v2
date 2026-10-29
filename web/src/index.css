@@ -1,4 +1,76 @@
 @import 'tailwindcss';
 
-/* Tailwind v4 CSS-first — 설정 파일(`tailwind.config.*`·`postcss.config.*`) 을 두지 않는다.
-   디자인 토큰·폰트 스택은 7E 가 화면과 함께 정한다. 7A 는 셸이 뜨는 데 필요한 것만 둔다. */
+/* M7/7E-1 — 디자인 토큰은 **이 한 자리**다(D-7E-5). Tailwind v4 CSS-first 이므로 설정
+   파일(`tailwind.config.*`·`postcss.config.*`)을 두지 않는다. 색을 컴포넌트에 리터럴로
+   적지 않는다 — 어조(tone)마다 토큰 쌍을 두고 컴포넌트는 그 이름만 쓴다. */
+@theme {
+  --color-page: #ffffff;
+  --color-card: #ffffff;
+  --color-ink: #111827;
+  --color-ink-soft: #4b5563;
+  --color-line: #e5e7eb;
+  --color-accent: #1d4ed8;
+  --color-accent-ink: #ffffff;
+
+  /* 어조 다섯 — `DisplayTone` 과 **같은 다섯**이다(`StateBadge` 가 그 등식을 든다).
+     `absent`·`unjudged` 가 `bad` 와 다른 색을 갖는 것이 요점이다: 「없음」과 「아직
+     판정하지 않음」이 「미달」로 읽히면 정직 명세가 무너진다. */
+  --color-neutral-skin: #f3f4f6;
+  --color-neutral-ink: #374151;
+  --color-absent-skin: #f3f4f6;
+  --color-absent-ink: #6b7280;
+  --color-unjudged-skin: #fef3c7;
+  --color-unjudged-ink: #92400e;
+  --color-good-skin: #dcfce7;
+  --color-good-ink: #166534;
+  --color-bad-skin: #fee2e2;
+  --color-bad-ink: #991b1b;
+
+  --font-sans:
+    Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* 금액·공고번호는 자리 수를 눈으로 세는 값이라 **고정폭**으로 둔다. */
+  --font-numeric: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+}
+
+@layer base {
+  /* 시스템 색 테마(§6.5) — 토글을 두지 않는다. 토큰 값만 갈아 끼우므로 컴포넌트는 모른다. */
+  :root {
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-page: #0b0f14;
+      --color-card: #131a22;
+      --color-ink: #e5e7eb;
+      --color-ink-soft: #9ca3af;
+      --color-line: #273341;
+      --color-accent: #60a5fa;
+      --color-accent-ink: #0b0f14;
+
+      --color-neutral-skin: #1f2937;
+      --color-neutral-ink: #d1d5db;
+      --color-absent-skin: #1f2937;
+      --color-absent-ink: #9ca3af;
+      --color-unjudged-skin: #422006;
+      --color-unjudged-ink: #fcd34d;
+      --color-good-skin: #052e16;
+      --color-good-ink: #86efac;
+      --color-bad-skin: #450a0a;
+      --color-bad-ink: #fca5a5;
+    }
+  }
+
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  /* 키보드 접근(§6.5) — 포커스 표시를 끄지 않는다. 마우스 클릭에는 테를 두지 않으려고
+     `:focus-visible` 을 쓴다(브라우저가 입력 수단을 판정한다). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

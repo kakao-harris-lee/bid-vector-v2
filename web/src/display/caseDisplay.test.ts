@@ -69,6 +69,20 @@ describe('다음 행동 하나', () => {
     expect(nextActionOf('BID_PLANNED')?.label).toBe('제출함');
   });
 
+  /**
+   * Phase 1 실측 — 투찰가 요청은 건의 상태를 바꾸지 않는다(요청 뒤에도 `WATCHING`). 그래서
+   * 「요청했는가」가 둘째 축이고, 같은 상태에서 다음 행동이 갈린다.
+   */
+  it('투찰가를 손에 쥐면 같은 상태에서 다음 행동이 초안으로 바뀐다', () => {
+    expect(nextActionOf('WATCHING', false)?.kind).toBe('REQUEST_PRICE');
+    expect(nextActionOf('WATCHING', true)?.kind).toBe('DRAFT_BID');
+  });
+
+  it('투찰가를 쥐어도 종료 상태에는 다음 행동이 생기지 않는다', () => {
+    expect(nextActionOf('WON', true)).toBeNull();
+    expect(nextActionOf('BID_RECORDED', true)).toBeNull();
+  });
+
   it('이 slice 가 전이를 만들지 않는 상태에는 다음 행동이 없다 — 버튼을 지어내지 않는다', () => {
     expect(nextActionOf('WON')).toBeNull();
     expect(nextActionOf('SKIPPED')).toBeNull();

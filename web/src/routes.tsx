@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router';
 
 import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
+import { TodayNoticesScreen } from './screens/TodayNoticesScreen';
+import { WorksheetScreen } from './screens/WorksheetScreen';
 
 /**
  * 화면 자리의 정본 표. 라우터는 이 표에서 파생한다 — 경로를 두 곳에 적지 않는다.
@@ -14,12 +16,18 @@ export interface ScreenSlot {
   readonly id: string;
   readonly path: string;
   readonly label: string;
+  /**
+   * 이 slice 가 구현한 화면의 element. **없으면 「준비 중」 빈 자리**다(D-7E-5 — 범위 밖
+   * 기능은 빈 자리뿐이고 탭·버튼을 만들지 않는다). 7E-2·3 이 자기 자리를 채운다.
+   */
+  readonly element?: React.ReactNode;
 }
 
 export const screenSlots: readonly ScreenSlot[] = [
   { id: 'onboarding', path: '/start', label: 'A 시작하기' },
-  { id: 'home', path: '/', label: 'B 오늘의 공고' },
-  { id: 'worksheet', path: '/notices/:noticeId', label: 'C 공고 워크시트' },
+  { id: 'home', path: '/', label: 'B 오늘의 공고', element: <TodayNoticesScreen /> },
+  // 공고 식별자는 **번호와 차수 두 칸**이다 — 한 문자열로 접으면 화면이 구분자를 지어내야 한다.
+  { id: 'worksheet', path: '/notices/:noticeNumber/:noticeRound', label: 'C 공고 워크시트', element: <WorksheetScreen /> },
   { id: 'bid-box', path: '/bids', label: 'D 내 입찰함' },
   { id: 'results', path: '/results', label: 'E 결과 확인' },
   { id: 'inbox', path: '/inbox', label: '알림함' },
@@ -28,7 +36,7 @@ export const screenSlots: readonly ScreenSlot[] = [
 export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({
   id: slot.id,
   path: slot.path,
-  element: <ScreenPlaceholder slot={slot} />,
+  element: slot.element ?? <ScreenPlaceholder slot={slot} />,
 }));
 
 /**
