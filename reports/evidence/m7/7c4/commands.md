@@ -458,3 +458,57 @@ slice test 결과 **0 건**/전체 477). ⑦ 의 **표지 보정 둘**은 main �
 세 경로 모두 이 slice 가 **항목 합집합**으로만 만지는 자리다(허용·면제 목록 · test 등재 · OPEN 행).
 겹침이 0 이 아니므로 최신화는 `update-branch` 가 아니라 **main 병합 라운드 한 번 더**가 필요하다 —
 판단은 팀장이 한다.
+
+## r9 (셋째 병합 라운드 — main `bb6a187e` 수용) — 명령과 결과
+
+`git merge bb6a187e`(고정 SHA. 움직이는 `origin/main` 을 쓰지 않는다). base 가 `a45105a5` →
+**`bb6a187e`** 로 바뀌었다. 들여온 것은 DEC-10 · Go stdlib CVE · Caddy 직접 빌드와 app 베이스 상향이다.
+
+### 충돌 0 을 「접히지 않았다」로 읽지 않았다
+
+교집합은 **셋**(main 130 경로 중)이고 git 은 **충돌 0** 으로 자동 병합했다. 이 저장소에는 충돌 없이
+한쪽으로 접힌 전례가 있으므로 셋 다 같은 술어로 쟀다.
+
+| 자리 | 검산 | 결과 |
+|---|---|---|
+| 아키텍처 정책 | 한쪽이라도 건드린 키 전수에 `(theirs − 내가 뺀 것) ∪ 내가 더한 것` 대조 | 키 **15** 전부 일치 · 같은 키 중복 **0** · 키 수 129 → **139**(main 이 floor-trust 열 키를 더했다) |
+| 게이트 test 등재 | 같은 술어 | 건드린 키 **셋** 일치 — app **111** · workflow **76** · decision **31** · 중복 0 |
+| capability map | 줄 단위 접힘 | 내 신규 1 · main 신규 21 · **유실 0** |
+| 교집합 셋 전수 | 줄 단위 접힘 | 내 줄 유실 **0** · main 줄 유실 **0** · 공통 줄 유실 **0** |
+| OpenAPI | 이 main 은 **무편집**(그 구간 diff 0). 그래도 중복 거부 로더 1 회 | paths 35 · schemas 39 · 오류 코드 enum **23** · 중복 **0**(앞 라운드가 고친 한 줄이 그대로다) |
+
+술어는 **앞 라운드에서 고친 판**이다. 이번에는 양쪽 모두 뺀 항목이 0 이라 두 술어의 답이 같지만,
+같은 술어를 쓴다(답이 같은 것은 입력 때문이고 술어 때문이 아니다).
+
+### acceptance (산출물 HEAD `fe26fe25`)
+
+- **찬 `check --continue --rerun-tasks --no-build-cache`** → **exit 0**, `BUILD SUCCESSFUL in 33m 2s`,
+  **401 task 전부 실행**, `FAILED` 0, `FROM-CACHE` **0**, 루트 게이트 셋(표식 없음 = 실행).
+- **`qualityBaseline --rerun-tasks`** → exit 0, **35 task 전부 실행**, `:qualityBaseline` 표식 없음.
+- **`web` job 열한 단계 전부 exit 0** — `npm ci` · eslint · typecheck · src-tree · **생성 타입 바이트
+  등식**(168795 bytes) · vitest 5 파일 **28** · 게이트 test 등록부 대조(skipped/todo 0) · build 156 모듈 ·
+  번들 경계 카나리 · Playwright 설치 · 스모크 **2**.
+- **이 slice 의 test 전부 초록**(결과 XML 시각이 이 run 이다): workflow 7 · 7, app 표면 15 · E2E 4 ·
+  요청 3 · 응답 2 · 조립 경계 4 · 면제 래칫 21 · 계약 9, 실 DB 13 · 6 — 실패·오류 **0**.
+- main 이 들여온 축도 이 트리에서 함께 돌았다(floor-trust 게이트 계열과 DEC-10 test 를 포함해
+  `FAILED` 0).
+
+### rollback (새 base `bb6a187e`)
+
+`rollback.md` 가 정본이다. 목록은 앞 라운드와 **같은 집합**(46 경로 · A 17 · M 29 · `comm -3` 빈 출력) —
+main 이 들여온 130 경로 중 내 복원 목록과 겹치는 것이 없어 목록이 움직이지 않았다.
+
+**첫 ④⑤⑥ 시도는 「전부 실행」이 아니었다**: clone 에 앞 변이 라운드의 build 산출물이 남아 있어
+`401 중 198 실행 · 203 up-to-date` 로 돌았고 **모듈 게이트 19 개가 up-to-date** 였다. 종료 코드는 0
+이었지만 「안 돌린 게이트는 아무것도 막지 못한다」가 그대로 적용되는 자리다 — build 디렉터리를 비우고
+`--rerun-tasks` 로 다시 쟀다(복원된 트리 상태는 그 사이 보존됐다: `D 17 · M 29`).
+
+| # | 확인 | 결과 |
+|---|---|---|
+| ① | 복원 명령 exit | 0 |
+| ② | `git status --short` 의 D · M 수 | **D 17 · M 29** |
+| ②′ | 목록과 실제로 바뀐 경로의 `comm -3` | **0 줄** |
+| ③ | `git diff --quiet bb6a187e -- <목록>` · 같은 명령 `--cached` | 둘 다 exit 0 |
+| ④⑤⑥ | 찬 재실행 `check --continue --rerun-tasks --no-build-cache` | **exit 0** · `BUILD SUCCESSFUL in 30m 3s` · **401 task 전부 실행** · `FAILED` 0 · `FROM-CACHE` 0 · **게이트 up-to-date 0** · 루트 게이트 셋 |
+| ⑥′ | 되돌린 트리에 이 라운드의 test 결과 | **0 건**(그 run 의 결과 XML 487 개 중) |
+| ⑦ | 표지 계수 | 내 표지 전부 0(문면 보정 둘 제외) · 남의 표지 보존 — main 이 새로 들여온 축도 보존(floor-trust 20 파일 · 메뉴 커널 5 파일) |
