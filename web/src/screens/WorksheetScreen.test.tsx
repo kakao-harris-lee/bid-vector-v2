@@ -158,6 +158,14 @@ describe('화면 C — 머리와 다음 행동 하나', () => {
  */
 /** v L-3 — 화면 C 의 세 얼굴. 분기 제거 변이가 지나갔던 자리다. */
 describe('화면 C — 빈·로딩·오류 세 얼굴', () => {
+  /** CR r2 L-6 — 떠 있는 화면에서 세션이 끝나면 읽기가 401 이다. 그 재시도는 영원히 실패한다. */
+  it('읽기가 401 이면 로그인 얼굴이 뜬다', async () => {
+    mocked.searchNotices.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    expect(await screen.findByTestId('signed-out')).not.toBeNull();
+  });
+
   /** CR M-2 — 세션이 없으면 재시도가 아니라 로그인으로 보낸다(서버의 답을 소비한다). */
   it('세션이 없으면 로그인 얼굴이 뜬다', async () => {
     mocked.readSession.mockResolvedValue(null);

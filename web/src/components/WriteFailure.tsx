@@ -77,3 +77,8 @@ export function SignedOutFace() {
     </div>
   );
 }
+
+/** 읽기 오류가 **세션 만료**인가 — 재시도로 풀리지 않는 자리를 가른다(CR r2 L-6). */
+export function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
+}

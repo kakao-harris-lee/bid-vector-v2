@@ -73,14 +73,24 @@ export function Field({
   readonly hint?: string;
   readonly testId?: string;
 }) {
+  // CR r2 M-4 — 아래층이 `title` 하나이면 터치에서 볼 수 없고 `<dt>` 는 포커스를 받지 않는다.
+  // `hint` 가 나르는 문면(「투찰 기준 금액. 추정가격과 다르다」)은 혼동하면 투찰 금액이 틀리는
+  // 자리다. 배지와 같은 꼴로 sr-only 문면을 묶는다.
+  const generatedId = useId();
+  const describedBy = hint === undefined ? undefined : `field-hint-${generatedId}`;
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-ink-soft" title={hint}>
         {label}
       </dt>
-      <dd data-testid={testId} className="text-sm">
+      <dd data-testid={testId} aria-describedby={describedBy} className="text-sm">
         {value ?? <span className="text-absent-ink">값 없음</span>}
       </dd>
+      {describedBy === undefined ? null : (
+        <dd id={describedBy} className="sr-only">
+          {hint}
+        </dd>
+      )}
     </div>
   );
 }

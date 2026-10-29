@@ -1,6 +1,6 @@
 import type { components, operations } from '../api/generated/operator-api';
 
-import type { StateDisplay } from './stateDisplay';
+import { unknownStateDisplay, type StateDisplay } from './stateDisplay';
 
 /** 화면 B(오늘의 공고)가 소비하는 축의 표시 표(D-7E-4 · D-7E-9). */
 type NoticesResultState = operations['searchNotices']['responses']['200']['headers']['X-Result-State'];
@@ -49,8 +49,12 @@ export const NOTICE_STATUS_DISPLAY: Readonly<Record<string, StateDisplay>> = {
   Cancelled: { label: '취소', tone: 'neutral' },
 };
 
+/**
+ * v r2 L-8 — 모르는 코드를 **중립 배지**로 내면 아는 라벨처럼 보인다. 미지 상태의 관례를
+ * `unknownStateDisplay` 하나로 모은다(계약이 `type: string` 인 축이라 가장 자주 밟는 자리다).
+ */
 export function noticeStatusDisplayOf(status: string): StateDisplay {
-  return NOTICE_STATUS_DISPLAY[status] ?? { label: status, tone: 'neutral' };
+  return NOTICE_STATUS_DISPLAY[status] ?? unknownStateDisplay(status);
 }
 
 /** 기초금액은 **금액과 provenance 가 한 값**이다(DEC-01) — 숫자만 떼어 보여 주지 않는다. */

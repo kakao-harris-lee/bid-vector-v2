@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 import type { components } from '../api/generated/operator-api';
 
 /** 나라장터 입찰공고 상세 — **이동만** 한다(D-UX-2: 자동 제출은 범위 밖이고 상한이 「이동 + 복사」다). */
@@ -37,12 +39,20 @@ export function parseWon(raw: string): number | null {
  * 으로 분류해 세는 것은 계약에 없는 정의를 화면이 만드는 것이라 D-7E-4 위반이다. 그래서 운영자가
  * 적고, 적지 않으면 요청하지 않는다(빈 칸은 `null`).
  */
+const MAX_DECLARED_COUNT = 2_147_483_647;
+
 export function parseCount(raw: string): number | null {
   const digits = raw.trim();
   if (!/^\d+$/.test(digits)) {
     return null;
   }
-  return Number.parseInt(digits, 10);
+  const parsed = Number.parseInt(digits, 10);
+  // CR r2 L-11 — 계약의 정수 범위(int32)를 넘는 선언은 서버 400 이 되고 그 실패는 일반 얼굴로
+  // 간다. 입력에서 막아 사유를 그 자리에서 말한다.
+  if (!Number.isSafeInteger(parsed) || parsed > MAX_DECLARED_COUNT) {
+    return null;
+  }
+  return parsed;
 }
 
 /** 추첨번호는 정수 여럿 — 빈 칸이면 빈 배열이고 형식이 어긋나면 `null` 이다. */
@@ -69,6 +79,9 @@ export function ActiveBidsDeclaration({
   readonly onChange: (next: string) => void;
   readonly blocked: string | null;
 }) {
+  // CR r2 L-7 — 안내 문면을 입력에 **프로그램적으로** 묶고, 차단 상태를 `aria-invalid` 로 드러낸다.
+  const generatedId = useId();
+  const noteId = `active-bids-note-${generatedId}`;
   return (
     <div className="mt-3 flex flex-col gap-1">
       <label className="flex flex-col gap-1">
@@ -80,11 +93,13 @@ export function ActiveBidsDeclaration({
           name="currentActiveBids"
           inputMode="numeric"
           value={value}
+          aria-describedby={noteId}
+          aria-invalid={blocked === null ? undefined : true}
           onChange={(event) => onChange(event.target.value)}
           className="w-32 rounded-md border border-line bg-card px-3 py-2 font-numeric text-sm"
         />
       </label>
-      <p className="text-xs text-ink-soft">
+      <p id={noteId} className="text-xs text-ink-soft">
         여력 축이 이 값을 씁니다. 서버도 화면도 이 수를 지어내지 않으므로 직접 적으십시오.
       </p>
       {blocked === null ? null : (

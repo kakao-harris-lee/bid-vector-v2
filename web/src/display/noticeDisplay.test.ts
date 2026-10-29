@@ -46,11 +46,15 @@ describe('공고 상태 — 계약이 enum 이 아닌 축', () => {
     expect(Object.keys(NOTICE_STATUS_DISPLAY)).toContain('Closed');
   });
 
-  it('모르는 값은 서버가 준 코드를 그대로 보이고 문면을 지어내지 않는다', () => {
+  /**
+   * v r2 L-8 — 모르는 코드를 **중립 배지**로 내면 아는 라벨처럼 보인다. 미지 상태의 관례를
+   * `unknownStateDisplay` 하나로 모았으므로 코드를 싣되 어조가 「아직 판정하지 않음」이다.
+   */
+  it('모르는 값은 서버가 준 코드를 싣고 미지 어조로 보인다', () => {
     const unknown = noticeStatusDisplayOf('SomeFutureStatus');
 
-    expect(unknown.label).toBe('SomeFutureStatus');
-    expect(unknown.tone).toBe('neutral');
+    expect(unknown.label).toContain('SomeFutureStatus');
+    expect(unknown.tone).toBe('unjudged');
   });
 });
 

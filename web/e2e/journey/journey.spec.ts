@@ -224,18 +224,22 @@ async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise
   }
 }
 
-/** 담기 — **멱등**이다(이미 담긴 건은 200). 조건 대기 뒤 버튼 유무로 가른다(v M-1 · CR M-5). */
-async function ensureInBidBox(page: Page, card: Locator): Promise<void> {
+/**
+ * 담기 — **멱등**이다(이미 담긴 건은 200). 조건 대기 뒤 버튼 유무로 가른다(v M-1 · CR M-5).
+ * 반환은 「이 실행이 실제로 담았는가」다 — 반복 실행에서 토스트 단언을 가르는 데 쓴다(CR r2 L-12).
+ */
+async function ensureInBidBox(page: Page, card: Locator): Promise<boolean> {
   await expect(card).toBeVisible();
   const addButton = card.getByRole('button', { name: /담기/u });
   if ((await addButton.count()) === 0) {
-    return;
+    return false;
   }
   const added = page.waitForResponse(
     (one) => one.url().endsWith('/api/bid-cases') && one.request().method() === 'POST',
   );
   await addButton.click();
   expect([200, 201]).toContain((await added).status());
+  return true;
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -254,11 +258,17 @@ test('여정 ② — 로그인 → 검색 → 카드 → 담기', async ({ page 
 
   const first = rows[0]!;
   const card = page.getByTestId(`notice-card-${first.noticeNumber}`);
-  await ensureInBidBox(page, card);
+  const added = await ensureInBidBox(page, card);
 
-  const toast = page.getByTestId('toast');
-  await expect(toast).toContainText('입찰함에 담았습니다');
-  await expect(toast.getByRole('button', { name: '실행 취소' })).toHaveCount(0);
+  // CR r2 L-12 — 같은 하네스에 두 번 미는 꼴(`--repeat-each`)에서는 둘째 회차에 이미 담겨 있다.
+  // 그때는 토스트가 없고 카드가 「담긴 건」을 보인다 — 두 모양을 각각 단언한다.
+  if (added) {
+    const toast = page.getByTestId('toast');
+    await expect(toast).toContainText('입찰함에 담았습니다');
+    await expect(toast.getByRole('button', { name: '실행 취소' })).toHaveCount(0);
+  } else {
+    await expect(card).toContainText('담긴 건');
+  }
   await expect(page.getByTestId('write-failure')).toHaveCount(0);
 
   expect(watched.outside).toStrictEqual([]);

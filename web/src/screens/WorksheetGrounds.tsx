@@ -155,8 +155,8 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
       {/* CR H-1 — **주장한 값을 보인다**. 응답이 되돌려 준 선언값과 여력 상한을 나란히 두어,
           운영자가 「무엇이 주장됐는지」를 화면에서 확인할 수 있게 한다. */}
       <p data-testid="capacity" className="mt-3 text-xs text-ink-soft">
-        여력: 진행 중 <span className="font-numeric">{price.currentActiveBids}</span>건으로 **선언**함 ·
-        상한 <span className="font-numeric">{price.maxActiveBids}</span>
+        여력: 진행 중 <span className="font-numeric">{price.currentActiveBids}</span>건으로{' '}
+        <strong>선언</strong>함 · 상한 <span className="font-numeric">{price.maxActiveBids}</span>
       </p>
       <p data-testid="inbox-record" className="mt-3 text-xs text-ink-soft">
         알림함: {displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, price.inboxRecordState).label}
@@ -232,8 +232,10 @@ function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
     <section className="rounded-lg border border-line bg-card p-4">
       <h3 className="text-sm font-semibold">고지</h3>
       <ul data-testid="disclosures" className="mt-2 flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
+        {/* CR r2 M-6 — 직접 색인이 남아 있었다. 표 밖 코드에 `undefined.label` 로 터지면 오류
+            경계가 **근거 패널 전체**를 먹는다 — 보이는 미지 상태가 조용한 폭발보다 낫다. */}
         {price.disclosures.map((code) => (
-          <li key={code}>{DISCLOSURE_SENTENCE[code].label}</li>
+          <li key={code}>{displayOrUnknown(DISCLOSURE_SENTENCE, code).label}</li>
         ))}
       </ul>
     </section>

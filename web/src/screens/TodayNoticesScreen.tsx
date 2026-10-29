@@ -12,7 +12,7 @@ import {
 } from '../api/queries';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
-import { SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
+import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
@@ -74,6 +74,11 @@ export function TodayNoticesScreen() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((count, page) => count + page.rows.length, 0);
+      // CR r2 L-10 — 빈 쪽을 받으면 더 받을 것이 없다. 계수와 행이 갈리는 상황에서 「더 보기」가
+      // **아무것도 더하지 않으면서** 남는 자리를 막는다.
+      if (lastPage.rows.length === 0) {
+        return undefined;
+      }
       return loaded < lastPage.total ? allPages.length : undefined;
     },
   });
@@ -108,7 +113,9 @@ export function TodayNoticesScreen() {
 
   // CR M-2 — 세션이 없다는 **서버의 답**을 소비한다. 재시도로 풀리지 않으므로 일시 장애와
   // 같은 얼굴을 내지 않는다.
-  if (signedIn === false) {
+  // CR r2 L-6 — 마운트 시점의 `signedIn` 뿐 아니라 **읽기 401**(떠 있는 화면에서 세션이
+  // 끝난 경우)도 같은 답이다. 그 재시도는 영원히 실패한다.
+  if (signedIn === false || isUnauthorized(notices.error ?? suggestions.error ?? cases.error)) {
     return (
       <section data-testid="screen-home" className="mx-auto max-w-3xl p-4">
         <SignedOutFace />

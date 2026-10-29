@@ -311,6 +311,14 @@ jobs:
         id: web-smoke
         run: npm run test:e2e
 
+      # **아래 업로드는 셸 스모크(W-11)의 산출물이다.** code-review r1 F-7 — CI reporter 는
+      # `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한 줄만 남기고 trace·스크린샷을
+      # 버렸다. 위 두 job 과 같은 major 다.
+      #
+      # **이 블록은 그 업로드 바로 위에 있어야 한다**(M7/7E-1 r2 CR L-2) — r1 에서 문면으로만
+      # 자리를 적었더니 블록이 여정 step 뒤에 남아 바로 아래가 **여정 업로드**가 됐고, 첫 줄이
+      # 틀린 말이 됐다. 설명은 설명하는 step 옆에 둔다.
+
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() && steps.web-smoke.outcome == 'failure' }}
         with:
@@ -343,22 +351,6 @@ jobs:
         id: web-journey
         run: npm run test:e2e:journey
 
-      # **아래 업로드는 셸 스모크(W-11)의 산출물이다.** code-review r1 F-7 — CI reporter 는
-      # `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한 줄만 남기고 trace·스크린샷을
-      # 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure` 가 쓰이지 않았다). 위 두
-      # job 과 같은 major 다. (M7/7E-1 v L-8 — 여정 step 이 그 뒤에 와서 이 블록이 어느 step 을
-      # 설명하는지 흐려졌다. 업로드를 스모크 바로 뒤에 둔 채 문면으로 그 자리를 못박는다.)
-      #
-      # 조건은 **스모크가 실제로 실패했을 때**로 좁힌다(PR #75 리뷰 G · in-file 선례 PR #68 M-4) —
-      # `failure()` 는 앞 어느 step 이 깨져도 참이라 trace 가 있을 수 없는 실패(예: `npm ci`)에서도
-      # 돌았다. 그리고 `if-no-files-found: error` 를 **유지한다**: 스모크가 실패했는데 산출물이
-      # 0 건이면 그 자체가 신호다 — 이번 PR 의 RED 가 그 경우였다(webServer 가 뜨지 않아 test 가
-      # 한 번도 돌지 못했고 trace 가 없었다). 그 상태를 조용히 넘기지 않고 업로드 step 의 빨강으로
-      # 표시한다.
-
-      # 여정 e2e 의 trace — 같은 관례다(**그 step 이 실제로 실패했을 때만**). 하네스가 띄우는
-      # 것이 많아 실패 사유가 로그 한 줄로는 서지 않는다. 자격 값을 적은 맥락 파일은 이
-      # 디렉터리 **밖**(OS 임시)에 있으므로 아티팩트에 실리지 않는다(D-7E-6).
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() && steps.web-journey.outcome == 'failure' }}
         with:

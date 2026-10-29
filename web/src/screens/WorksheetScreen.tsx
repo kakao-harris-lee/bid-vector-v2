@@ -16,7 +16,7 @@ import {
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
-import { SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
+import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -224,7 +224,9 @@ export function WorksheetScreen() {
     makeRecord.mutate({ caseId, ...amount, drawNumbers, memo: form.memo, at: new Date().toISOString() });
   }
 
-  if (signedIn === false) {
+  // CR r2 L-6 — 마운트 시점의 `signedIn` 뿐 아니라 **읽기 401**(떠 있는 화면에서 세션이
+  // 끝난 경우)도 같은 답이다. 그 재시도는 영원히 실패한다.
+  if (signedIn === false || isUnauthorized(notices.error ?? cases.error)) {
     return (
       <section data-testid="screen-worksheet" className="mx-auto max-w-3xl p-4">
         <SignedOutFace />
