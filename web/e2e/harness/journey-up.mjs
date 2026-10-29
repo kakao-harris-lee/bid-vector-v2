@@ -11,7 +11,7 @@
 // 비밀값은 **실행마다 난수**다 — 저장소에 자격 리터럴을 두지 않는다(D-7E-6).
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -39,18 +39,42 @@ const CONTAINER_PREFIX = 'bidvector-7e1-journey-';
 const CONTAINER = `${CONTAINER_PREFIX}${randomUUID().slice(0, 8)}`;
 
 /**
- * 앞 실행이 비정상으로 끊겼으면 같은 접두의 컨테이너가 남는다(SIGKILL 은 정리 핸들러를 건너
- * 뛴다). **시작 때 걷는다** — 누출을 한 실행으로 묶고, 다음 실행이 반드시 치운다.
+ * **한 호스트에 한 실행**(v L-6 · CR L-3). 이 레인은 호스트를 다섯 레인과 공유하고, preview
+ * 포트는 Playwright 설정이 미리 알아야 해서 고정이다. 겹치면 ① 뒤 실행이 앞 실행의 postgres 를
+ * 지우고 ② 맥락 파일을 덮어쓰고 ③ `strictPort` 로 preview 가 못 뜬다.
+ *
+ * 그래서 **접두 전체를 걷는 수거를 버리고** 포트에 매인 락 하나로 겹침을 막는다 — 앞 실행이
+ * 살아 있으면 **빠르게, 사유를 적고** 멈춘다(남의 컨테이너를 지우지 않는다). 락이 묵은
+ * 것이면(그 포트에 아무도 없다) 그 표지의 컨테이너만 걷고 잇는다.
  */
-function removeStaleContainers() {
-  const listed = spawnSync('docker', ['ps', '-aq', '--filter', `name=${CONTAINER_PREFIX}`], {
-    encoding: 'utf8',
-  });
-  const ids = (listed.stdout ?? '').split('\n').map((one) => one.trim()).filter((one) => one !== '');
-  if (ids.length > 0) {
-    log(`묵은 컨테이너 ${ids.length}개를 걷는다`);
-    spawnSync('docker', ['rm', '-f', ...ids], { stdio: 'ignore' });
+const LOCK_PATH = resolve(tmpdir(), `bidvector-7e1-journey-${PREVIEW_PORT}.lock`);
+
+async function previewPortIsBusy() {
+  try {
+    const probe = await fetch(`http://127.0.0.1:${PREVIEW_PORT}/`, { signal: AbortSignal.timeout(1500) });
+    return probe.ok || probe.status > 0;
+  } catch {
+    return false;
   }
+}
+
+async function acquireSingleRunLock() {
+  if (await previewPortIsBusy()) {
+    throw new Error(
+      `preview 포트 ${PREVIEW_PORT} 에 이미 무언가 떠 있다 — 같은 호스트의 앞 실행이 살아 있을 수 있다. ` +
+        '그 실행이 끝난 뒤 다시 돌리십시오(남의 컨테이너를 지우지 않는다).',
+    );
+  }
+  if (existsSync(LOCK_PATH)) {
+    const stale = readFileSync(LOCK_PATH, 'utf8').trim();
+    log(`묵은 락을 잇는다(앞 실행 표지 ${stale || '모름'}) — 그 표지의 컨테이너만 걷는다`);
+    const listed = spawnSync('docker', ['ps', '-aq', '--filter', `name=${stale}`], { encoding: 'utf8' });
+    const ids = (listed.stdout ?? '').split('\n').map((one) => one.trim()).filter((one) => one !== '');
+    if (ids.length > 0) {
+      spawnSync('docker', ['rm', '-f', ...ids], { stdio: 'ignore' });
+    }
+  }
+  writeFileSync(LOCK_PATH, `${CONTAINER}\n`, { mode: 0o600 });
 }
 
 const secret = () => randomBytes(24).toString('base64url');
@@ -136,11 +160,12 @@ async function shutdown(code) {
     rmSync(runStateDir, { recursive: true, force: true });
   }
   rmSync(CONTEXT_PATH, { force: true });
+  rmSync(LOCK_PATH, { force: true });
   process.exit(code);
 }
 
 async function main() {
-  removeStaleContainers();
+  await acquireSingleRunLock();
   if (!existsSync(APP_JAR)) {
     throw new Error(`출하 jar 가 없다: ${APP_JAR} — 먼저 \`./gradlew :app:bootJar\` 를 돌리십시오`);
   }
@@ -199,19 +224,36 @@ async function main() {
     30_000,
   );
 
-  const common = [
-    `--bidvector.persistence.jdbc-url=jdbc:postgresql://127.0.0.1:${pgPort}/${PG_DB}`,
-    `--bidvector.persistence.username=${PG_USER}`,
-    `--bidvector.persistence.credential=${PG_PASSWORD}`,
-    `--operator.credential.value=${OPERATOR_CREDENTIAL}`,
-    '--bidvector.evaluation.candidate-cap=1000',
+  /**
+   * CR L-4 — 비밀값을 **argv 에 싣지 않는다**. 명령줄 인자는 호스트의 아무 프로세스나 `ps` 로
+   * 읽고, app 의 stdout 은 하네스 → Playwright webServer 로그 → 실패 시 CI 로그로 흐른다.
+   * Spring 의 설정 가져오기로 넘기고 파일은 0600 · 저장소 밖 · 종료 때 지운다.
+   */
+  const COMMON_PROPERTIES = [
+    `bidvector.persistence.jdbc-url=jdbc:postgresql://127.0.0.1:${pgPort}/${PG_DB}`,
+    `bidvector.persistence.username=${PG_USER}`,
+    `bidvector.persistence.credential=${PG_PASSWORD}`,
+    `operator.credential.value=${OPERATOR_CREDENTIAL}`,
+    'bidvector.evaluation.candidate-cap=1000',
   ];
+
+  /**
+   * 호출 하나가 쓸 설정을 **파일 하나**에 담는다. `--spring.config.import` 를 두 번 실으면
+   * Spring 이 두 값을 쉼표로 이어 한 목록으로 보는 성질에 기대게 된다 — 그 성질에 기대지 않고
+   * 호출마다 하나로 둔다. 파일은 0600 · 저장소 밖(run-state) · 종료 때 디렉터리째 지워진다.
+   */
+  const writeSecrets = (name, extra) => {
+    const path = resolve(runStateDir, `${name}.properties`);
+    writeFileSync(path, `${[...COMMON_PROPERTIES, ...extra].join('\n')}\n`, { mode: 0o600 });
+    chmodSync(path, 0o600);
+    return `--spring.config.import=file:${path}`;
+  };
   const today = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
 
   // ① 수집 — 출하 일회 러너. 공고가 **이 경로로만** DB 에 들어온다.
   runJar(
     [
-      ...common,
+      writeSecrets('collect', [`bidvector.koneps.service-key=${SERVICE_KEY}`]),
       '--server.port=0',
       '--bidvector.collection.mode=once',
       `--bidvector.collection.from=${today}`,
@@ -220,7 +262,6 @@ async function main() {
       '--bidvector.collection.calls-per-day=100',
       '--bidvector.collection.calls-total=100',
       `--bidvector.collection.run-state-dir=${runStateDir}`,
-      `--bidvector.koneps.service-key=${SERVICE_KEY}`,
       `--bidvector.koneps.base-url=http://127.0.0.1:${konepsPort}`,
     ],
     '수집 러너(bidvector.collection.mode=once)',
@@ -229,11 +270,10 @@ async function main() {
   // ② 로그인 계정 — 출하 운영자 명령(가입 화면·endpoint 는 없다).
   runJar(
     [
-      ...common,
+      writeSecrets('account', [`bidvector.account.initial-value=${PASSPHRASE}`]),
       '--server.port=0',
       '--bidvector.account.mode=CREATE',
       `--bidvector.account.login=${LOGIN_NAME}`,
-      `--bidvector.account.initial-value=${PASSPHRASE}`,
     ],
     '계정 명령(bidvector.account.mode=CREATE)',
   );
@@ -245,7 +285,7 @@ async function main() {
       'java',
       [
         '-jar', APP_JAR,
-        ...common,
+        writeSecrets('server', []),
         `--server.port=${appPort}`,
         `--management.server.port=${mgmtPort}`,
         '--bidvector.access.cookie-secure=false',
@@ -299,6 +339,9 @@ async function main() {
     'vite preview',
   );
 
+  // CR L-3 — `writeFileSync` 의 `mode` 는 **이미 있는 파일의 권한을 바꾸지 않는다**(SIGKILL 로
+  // 남은 0644 파일에 새 비밀 문구가 실린다). 먼저 지우고 쓰고, 쓴 뒤 권한을 못박는다.
+  rmSync(CONTEXT_PATH, { force: true });
   writeFileSync(
     CONTEXT_PATH,
     `${JSON.stringify(
@@ -313,6 +356,7 @@ async function main() {
     )}\n`,
     { mode: 0o600 },
   );
+  chmodSync(CONTEXT_PATH, 0o600);
   log('준비 끝 — 여정 test 를 받는다');
 }
 
