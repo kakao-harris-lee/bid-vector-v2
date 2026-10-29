@@ -9,15 +9,15 @@ import {
   daysUntil,
   noticeStatusDisplayOf,
 } from './noticeDisplay';
-import { displayOf } from './stateDisplay';
+import { displayOrUnknown } from './stateDisplay';
 
 describe('화면 B 상태 표시 표 — 계약 enum 전수', () => {
   it('공고 검색의 빈 결과 두 뜻이 다른 문면이다', () => {
     expect(Object.keys(NOTICES_RESULT_STATE_DISPLAY).sort()).toStrictEqual(
       ['MATCHED', 'NOTHING_COLLECTED', 'NO_MATCH'].sort(),
     );
-    expect(displayOf(NOTICES_RESULT_STATE_DISPLAY, 'NOTHING_COLLECTED').label).not.toBe(
-      displayOf(NOTICES_RESULT_STATE_DISPLAY, 'NO_MATCH').label,
+    expect(displayOrUnknown(NOTICES_RESULT_STATE_DISPLAY, 'NOTHING_COLLECTED').label).not.toBe(
+      displayOrUnknown(NOTICES_RESULT_STATE_DISPLAY, 'NO_MATCH').label,
     );
   });
 
@@ -26,12 +26,12 @@ describe('화면 B 상태 표시 표 — 계약 enum 전수', () => {
     expect(Object.keys(SUGGESTIONS_RESULT_STATE_DISPLAY).sort()).toStrictEqual(
       ['MATCHED', 'NO_OPEN_NOTICES', 'WATCH_NOT_CONFIGURED', 'NO_MATCH'].sort(),
     );
-    expect(displayOf(SUGGESTIONS_RESULT_STATE_DISPLAY, 'WATCH_NOT_CONFIGURED').label).toContain('감시 조건');
+    expect(displayOrUnknown(SUGGESTIONS_RESULT_STATE_DISPLAY, 'WATCH_NOT_CONFIGURED').label).toContain('감시 조건');
   });
 
   it('제안 카드의 면허 판정은 두 값이고 판정 불가가 미달이 아니다', () => {
     expect(Object.keys(SUGGESTION_LICENSE_VERDICT_DISPLAY).sort()).toStrictEqual(['ELIGIBLE', 'UNCERTAIN'].sort());
-    expect(displayOf(SUGGESTION_LICENSE_VERDICT_DISPLAY, 'UNCERTAIN').tone).toBe('unjudged');
+    expect(displayOrUnknown(SUGGESTION_LICENSE_VERDICT_DISPLAY, 'UNCERTAIN').tone).toBe('unjudged');
   });
 });
 

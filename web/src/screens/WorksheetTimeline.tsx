@@ -1,7 +1,7 @@
 import type { BidTimelineEntry } from '../api/queries';
 import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, TIMELINE_ACTOR_DISPLAY, type BidCaseState } from '../display/caseDisplay';
-import { displayOf } from '../display/stateDisplay';
+import { displayOrUnknown } from '../display/stateDisplay';
 
 /**
  * 상태 문면은 상태 표에서 찾는다. **타임라인의 `toState` 는 계약이 `type: string`** 이라
@@ -26,7 +26,7 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
           <li key={entry.caseVersion} className="border-l-2 border-line pl-3">
             <p className="flex flex-wrap items-center gap-2 text-sm">
               <span>{stateLabelOf(entry.toState)}</span>
-              <StateBadge display={displayOf(TIMELINE_ACTOR_DISPLAY, entry.actorKind)} />
+              <StateBadge display={displayOrUnknown(TIMELINE_ACTOR_DISPLAY, entry.actorKind)} />
               {entry.retroactive ? <span className="text-xs text-unjudged-ink">소급</span> : null}
             </p>
             <p className="text-xs text-ink-soft">
@@ -51,5 +51,5 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
 
 /** 상태 하나의 배지 — 머리와 타임라인이 같은 표를 쓴다. */
 export function CaseStateBadge({ state, testId }: { readonly state: BidCaseState; readonly testId?: string }) {
-  return <StateBadge display={displayOf(BID_CASE_STATE_DISPLAY, state)} testId={testId} />;
+  return <StateBadge display={displayOrUnknown(BID_CASE_STATE_DISPLAY, state)} testId={testId} />;
 }

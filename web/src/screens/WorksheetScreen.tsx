@@ -19,7 +19,7 @@ import { ToastHost, useToast } from '../components/Toast';
 import { WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf } from '../display/noticeDisplay';
-import { displayOf } from '../display/stateDisplay';
+import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { WorksheetGrounds } from './WorksheetGrounds';
@@ -273,7 +273,7 @@ export function WorksheetScreen() {
             <div className="flex flex-col gap-1">
               <dt className="text-xs text-ink-soft">다음 확인 시점</dt>
               <dd data-testid="worksheet-checkpoint" className="flex flex-wrap items-center gap-2 text-sm">
-                <StateBadge display={displayOf(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
+                <StateBadge display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
                 {bidCase.nextCheckpointAt === null || bidCase.nextCheckpointAt === undefined ? null : (
                   <time dateTime={bidCase.nextCheckpointAt} className="font-numeric text-xs">
                     {bidCase.nextCheckpointAt}

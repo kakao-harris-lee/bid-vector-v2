@@ -7,7 +7,7 @@ import {
   TIMELINE_ACTOR_DISPLAY,
   nextActionOf,
 } from './caseDisplay';
-import { displayOf } from './stateDisplay';
+import { displayOrUnknown } from './stateDisplay';
 
 describe('입찰 건 상태 표시 표 — 계약 enum 전수', () => {
   it('상태 열넷이 전부 표에 있다', () => {
@@ -35,20 +35,20 @@ describe('입찰 건 상태 표시 표 — 계약 enum 전수', () => {
     const labels = Object.values(BID_CASE_STATE_DISPLAY).map((entry) => entry.label);
 
     expect(labels).not.toContain('보류');
-    expect(displayOf(BID_CASE_STATE_DISPLAY, 'DEFERRED').label).toBe('나중에');
-    expect(displayOf(BID_CASE_STATE_DISPLAY, 'SKIPPED').label).toBe('건너뜀');
+    expect(displayOrUnknown(BID_CASE_STATE_DISPLAY, 'DEFERRED').label).toBe('나중에');
+    expect(displayOrUnknown(BID_CASE_STATE_DISPLAY, 'SKIPPED').label).toBe('건너뜀');
   });
 
   it('다음 확인 시점 여섯이 전부 표에 있고 「없음」이 빈 값이 아니다', () => {
     expect(Object.keys(NEXT_CHECKPOINT_DISPLAY).sort()).toStrictEqual(
       ['DEADLINE', 'OPENING', 'DOCUMENT_DUE', 'NOTICE_EXPECTED', 'REMINDER', 'NONE'].sort(),
     );
-    expect(displayOf(NEXT_CHECKPOINT_DISPLAY, 'NONE').label).toBe('없음');
+    expect(displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, 'NONE').label).toBe('없음');
   });
 
   it('페이퍼와 실투찰이 같은 어휘를 쓰되 표시가 다르다', () => {
     expect(Object.keys(BID_KIND_DISPLAY).sort()).toStrictEqual(['REAL', 'PAPER'].sort());
-    expect(displayOf(BID_KIND_DISPLAY, 'PAPER').label).not.toBe(displayOf(BID_KIND_DISPLAY, 'REAL').label);
+    expect(displayOrUnknown(BID_KIND_DISPLAY, 'PAPER').label).not.toBe(displayOrUnknown(BID_KIND_DISPLAY, 'REAL').label);
   });
 
   it('타임라인 주체 둘이 표에 있다', () => {

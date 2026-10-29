@@ -1,6 +1,6 @@
 import type { BidPriceRequestResponse } from '../api/queries';
 import { Field, StateBadge } from '../components/StateBadge';
-import { displayOf } from '../display/stateDisplay';
+import { displayOrUnknown } from '../display/stateDisplay';
 import {
   BASE_AMOUNT_RESOLUTION_DISPLAY,
   BID_PRICE_MENU_DISPLAY,
@@ -36,13 +36,13 @@ function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
       <h3 className="text-sm font-semibold">투찰가 3안</h3>
       <div data-testid="bid-price-menu-value">
         <p className="mt-2">
-          <StateBadge display={displayOf(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState)} />
+          <StateBadge display={displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState)} />
         </p>
         <p className="mt-1 text-xs text-ink-soft">
-          {displayOf(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState).why}
+          {displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState).why}
         </p>
         <p className="mt-2 text-xs text-ink-soft">
-          {displayOf(BID_PRICE_MENU_REASON_DISPLAY, price.bidPriceMenuNotComputedReason).label}
+          {displayOrUnknown(BID_PRICE_MENU_REASON_DISPLAY, price.bidPriceMenuNotComputedReason).label}
         </p>
       </div>
     </section>
@@ -69,48 +69,48 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
             {price.baseAmountResolution === null || price.baseAmountResolution === undefined ? (
               <span className="text-sm text-absent-ink">값 없음</span>
             ) : (
-              <StateBadge display={displayOf(BASE_AMOUNT_RESOLUTION_DISPLAY, price.baseAmountResolution)} />
+              <StateBadge display={displayOrUnknown(BASE_AMOUNT_RESOLUTION_DISPLAY, price.baseAmountResolution)} />
             )}
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-ink-soft">게시 낙찰하한율</dt>
           <dd data-testid="floor-rate-grounds" className="flex flex-col gap-1">
-            <StateBadge display={displayOf(FLOOR_RATE_GROUNDS_DISPLAY, price.floorRateGroundsState)} />
+            <StateBadge display={displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, price.floorRateGroundsState)} />
             {/* 값은 **원문 10진 문자열 그대로** 보인다 — 퍼센트로 고치거나 자리를 맞추지 않는다. */}
             {price.publishedFloorRateFraction === null || price.publishedFloorRateFraction === undefined ? null : (
               <span className="font-numeric text-sm">{price.publishedFloorRateFraction}</span>
             )}
             {floorOrigin === null || floorOrigin === undefined ? null : (
-              <StateBadge display={displayOf(FLOOR_RATE_ORIGIN_DISPLAY, floorOrigin)} />
+              <StateBadge display={displayOrUnknown(FLOOR_RATE_ORIGIN_DISPLAY, floorOrigin)} />
             )}
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-ink-soft">하한 미달 빈도</dt>
           <dd data-testid="floor-shortfall" className="flex flex-col gap-1">
-            <StateBadge display={displayOf(FLOOR_SHORTFALL_STATE_DISPLAY, price.floorShortfallState)} />
+            <StateBadge display={displayOrUnknown(FLOOR_SHORTFALL_STATE_DISPLAY, price.floorShortfallState)} />
             <span className="text-xs text-ink-soft">
-              {displayOf(FLOOR_SHORTFALL_REASON_DISPLAY, price.floorShortfallNotComputedReason).label}
+              {displayOrUnknown(FLOOR_SHORTFALL_REASON_DISPLAY, price.floorShortfallNotComputedReason).label}
             </span>
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-ink-soft">신뢰도</dt>
           <dd data-testid="confidence" className="flex flex-col gap-1">
-            <StateBadge display={displayOf(CONFIDENCE_STATE_DISPLAY, price.confidenceState)} />
+            <StateBadge display={displayOrUnknown(CONFIDENCE_STATE_DISPLAY, price.confidenceState)} />
             <span className="text-xs text-ink-soft">
-              {displayOf(CONFIDENCE_REASON_DISPLAY, price.confidenceNotAvailableReason).label}
+              {displayOrUnknown(CONFIDENCE_REASON_DISPLAY, price.confidenceNotAvailableReason).label}
             </span>
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-ink-soft">분석</dt>
           <dd data-testid="ml-analysis" className="flex flex-col gap-1">
-            <StateBadge display={displayOf(ML_ANALYSIS_STATE_DISPLAY, price.mlAnalysisState)} />
+            <StateBadge display={displayOrUnknown(ML_ANALYSIS_STATE_DISPLAY, price.mlAnalysisState)} />
             {mlReason === null || mlReason === undefined ? null : (
               <span className="text-xs text-ink-soft">
-                {displayOf(ML_UNAVAILABLE_REASON_DISPLAY, mlReason).label}
+                {displayOrUnknown(ML_UNAVAILABLE_REASON_DISPLAY, mlReason).label}
               </span>
             )}
           </dd>
@@ -123,10 +123,10 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
         상한 <span className="font-numeric">{price.maxActiveBids}</span>
       </p>
       <p data-testid="inbox-record" className="mt-3 text-xs text-ink-soft">
-        알림함: {displayOf(INBOX_RECORD_STATE_DISPLAY, price.inboxRecordState).label}
+        알림함: {displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, price.inboxRecordState).label}
         {price.inboxRecordNotRecordedReason === null || price.inboxRecordNotRecordedReason === undefined
           ? ''
-          : ` — ${displayOf(INBOX_RECORD_REASON_DISPLAY, price.inboxRecordNotRecordedReason).label}`}
+          : ` — ${displayOrUnknown(INBOX_RECORD_REASON_DISPLAY, price.inboxRecordNotRecordedReason).label}`}
       </p>
     </section>
   );
@@ -139,11 +139,11 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
     <section data-testid="qualification" className="rounded-lg border border-line bg-card p-4">
       <h3 className="text-sm font-semibold">자격</h3>
       <p className="mt-2 flex flex-wrap items-center gap-2">
-        <StateBadge display={displayOf(LICENSE_VERDICT_DISPLAY, price.licenseVerdict)} testId="license-verdict" />
+        <StateBadge display={displayOrUnknown(LICENSE_VERDICT_DISPLAY, price.licenseVerdict)} testId="license-verdict" />
         {reason === null || reason === undefined ? null : (
-          <StateBadge display={displayOf(LICENSE_UNCERTAIN_REASON_DISPLAY, reason)} testId="license-reason" />
+          <StateBadge display={displayOrUnknown(LICENSE_UNCERTAIN_REASON_DISPLAY, reason)} testId="license-reason" />
         )}
-        <StateBadge display={displayOf(LICENSE_VALIDITY_DISPLAY, price.licenseValidity)} testId="license-validity" />
+        <StateBadge display={displayOrUnknown(LICENSE_VALIDITY_DISPLAY, price.licenseValidity)} testId="license-validity" />
       </p>
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
         <Field
@@ -178,12 +178,12 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
         />
       </dl>
       <p className="mt-2">
-        <StateBadge display={displayOf(LICENSE_MISSING_DETAIL_DISPLAY, price.licenseMissingDetailState)} />
+        <StateBadge display={displayOrUnknown(LICENSE_MISSING_DETAIL_DISPLAY, price.licenseMissingDetailState)} />
       </p>
       <h4 className="mt-4 text-xs font-semibold text-ink-soft">아직 판정하지 않는 축</h4>
       <p data-testid="unjudged-axes" className="mt-1 flex flex-wrap gap-1">
         {price.unjudgedAxes.map((axis) => (
-          <StateBadge key={axis} display={displayOf(UNJUDGED_AXIS_DISPLAY, axis)} />
+          <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
         ))}
       </p>
     </section>

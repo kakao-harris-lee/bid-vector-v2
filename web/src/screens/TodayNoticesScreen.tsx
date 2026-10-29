@@ -14,7 +14,7 @@ import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
-import { displayOf } from '../display/stateDisplay';
+import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { NoticeCard, SuggestionCard } from './NoticeCard';
@@ -177,7 +177,7 @@ export function TodayNoticesScreen() {
             {notices.data.rows.length === 0 ? (
               <EmptyFace
                 testId="notices-empty"
-                display={displayOf(NOTICES_RESULT_STATE_DISPLAY, notices.data.resultState)}
+                display={displayOrUnknown(NOTICES_RESULT_STATE_DISPLAY, notices.data.resultState)}
               />
             ) : (
               <ul className="flex flex-col gap-3">
@@ -217,7 +217,7 @@ export function TodayNoticesScreen() {
         {suggestions.data === undefined ? null : suggestions.data.rows.length === 0 ? (
           <EmptyFace
             testId="suggestions-empty"
-            display={displayOf(SUGGESTIONS_RESULT_STATE_DISPLAY, suggestions.data.resultState)}
+            display={displayOrUnknown(SUGGESTIONS_RESULT_STATE_DISPLAY, suggestions.data.resultState)}
           />
         ) : (
           <ul className="flex flex-col gap-3">

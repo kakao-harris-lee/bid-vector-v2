@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
 import { StateBadge } from '../components/StateBadge';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
-import { displayOf } from '../display/stateDisplay';
+import { displayOrUnknown } from '../display/stateDisplay';
 import { UNJUDGED_AXIS_DISPLAY } from '../display/worksheetDisplay';
 
 /** 워크시트 주소 — 공고번호·차수가 **경로의 두 칸**이다(식별자를 한 문자열로 접지 않는다). */
@@ -105,7 +105,7 @@ export function SuggestionCard({
           {suggestion.title ?? suggestion.noticeNumber}
         </Link>
         <StateBadge
-          display={displayOf(SUGGESTION_LICENSE_VERDICT_DISPLAY, suggestion.licenseVerdict)}
+          display={displayOrUnknown(SUGGESTION_LICENSE_VERDICT_DISPLAY, suggestion.licenseVerdict)}
           testId="suggestion-license"
         />
       </div>
@@ -116,7 +116,7 @@ export function SuggestionCard({
       </p>
       <p data-testid="suggestion-unjudged" className="mt-2 flex flex-wrap gap-1">
         {suggestion.unjudgedAxes.map((axis) => (
-          <StateBadge key={axis} display={displayOf(UNJUDGED_AXIS_DISPLAY, axis)} />
+          <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
         ))}
       </p>
       <div className="mt-3">{action}</div>
