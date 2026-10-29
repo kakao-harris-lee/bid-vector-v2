@@ -10,3 +10,9 @@
 # 형식: 한 줄에 `web/` 기준 상대 경로 하나. `#` 로 시작하는 줄과 빈 줄은 무시한다.
 # 게이트의 판정 술어를 잠그는 test 를 새로 만들면 **여기 한 줄을 더한다**.
 scripts/module-graph-boundary.test.mjs
+# M7/7E-1 — 화면 B·C 의 상태 → 표시 매핑(D-7E-4)을 잠그는 test. 계약 enum 전수와
+# 「표 밖의 값에 문면을 지어내지 않는다」가 이 slice 의 게이트 술어이므로 등록부에 든다.
+src/display/stateDisplay.test.ts
+src/display/worksheetDisplay.test.ts
+src/display/noticeDisplay.test.ts
+src/display/caseDisplay.test.ts
