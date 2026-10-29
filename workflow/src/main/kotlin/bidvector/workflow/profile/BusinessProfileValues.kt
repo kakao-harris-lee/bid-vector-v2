@@ -65,6 +65,25 @@ enum class NaraRegistrationField(
 }
 
 /**
+ * 나라장터 준비의 **답** — 저장(V22 `nara_registration` CHECK)과 wire(프로필 조회·쓰기)가 이 이름
+ * 셋을 쓰고 **선언은 이 자리 하나**다(M7/7C④ 2b). 같은 세 문자열을 층마다 적으면 한쪽만 고쳐도
+ * 컴파일이 조용하고, 그때 어긋나는 것은 「운영자가 뭐라고 답했는가」다.
+ *
+ * 열거인 이유는 어휘가 닫혀 있기 때문만이 아니다 — 각 층이 **이름 비교 대신 `when` 소진**으로 상태를
+ * 가르게 된다(새 답이 생기면 컴파일이 가를 자리를 전부 가리킨다).
+ *
+ * **「선언 한 자리」는 Kotlin 안에서만 참이다**(r2 CR L-5). V22 의 `nara_registration CHECK (… IN (…))`
+ * 은 같은 세 문자열을 **SQL 문면으로** 따로 적고 있고, 둘을 잇는 끈은 컴파일러가 아니라
+ * `JdbcBusinessProfileStoreTest` 의 왕복(세 상태를 쓰고 다시 읽는다)뿐이다. 여기에 값을 더하면서 표의
+ * CHECK 를 함께 고치지 않으면 그 test 가 붉어진다 — 그것이 유일한 경보다.
+ */
+enum class NaraRegistration {
+    UNANSWERED,
+    REGISTERED,
+    NOT_REGISTERED,
+}
+
+/**
  * 나라장터 준비 상태(UX §6.2 A — 자기 신고). **「미응답」이 값이다** — `null` 이나 「미등록」으로
  * 접지 않는다: 운영자가 아직 답하지 않은 것과 「등록하지 않았다」고 답한 것은 화면 ③ 의 경고가
  * 다르다.
@@ -73,9 +92,16 @@ enum class NaraRegistrationField(
  * 표현되지 않는다(V22 의 짝 CHECK 가 표 층의 둘째 겹이다).
  */
 sealed interface NaraReadiness {
-    data object Unanswered : NaraReadiness
+    /** 이 상태가 가리키는 [NaraRegistration] — 저장·wire 가 이 이름을 그대로 쓴다. */
+    val registration: NaraRegistration
 
-    data object NotRegistered : NaraReadiness
+    data object Unanswered : NaraReadiness {
+        override val registration: NaraRegistration get() = NaraRegistration.UNANSWERED
+    }
+
+    data object NotRegistered : NaraReadiness {
+        override val registration: NaraRegistration get() = NaraRegistration.NOT_REGISTERED
+    }
 
     /**
      * 등록했다고 답했다. 분야가 비었거나 만료일이 없을 수 있다 — 입력 도중의 상태이고, 체크리스트가
@@ -88,6 +114,8 @@ sealed interface NaraReadiness {
         val fields: Set<NaraRegistrationField>,
         val businessCertificateExpiresOn: LocalDate?,
     ) : NaraReadiness {
+        override val registration: NaraRegistration get() = NaraRegistration.REGISTERED
+
         override fun toString(): String = "Registered(***)"
     }
 }

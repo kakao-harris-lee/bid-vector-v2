@@ -111,9 +111,4 @@ internal object BidCaseHttp {
         val result = workflow.command(account, id, command(), BidActor.User(account))
         return toResponse(result, workflow, account, id, request)
     }
-
-    fun unauthenticated(request: HttpServletRequest): ResponseEntity<Any> =
-        ResponseEntity
-            .status(HttpStatus.UNAUTHORIZED)
-            .body(ErrorMapping.unauthenticated(request.correlationIdOrUnknown()))
 }

@@ -36,6 +36,18 @@ internal class SessionTestClient(
 
     fun get(path: String): ResponseEntity<String> = exchange(path, HttpMethod.GET, cookieOnly())
 
+    /**
+     * **CSRF 를 싣지 않은** 쓰기 — 쿠키만 보낸다. 기본 거부 필터가 상태 변경 메서드에서 CSRF 를
+     * 요구한다는 것을 endpoint 쪽에서 재는 자리다([post] 는 늘 실어서 그 축을 가릴 수 없다).
+     */
+    fun postWithoutCsrf(
+        path: String,
+        body: String?,
+    ): ResponseEntity<String> {
+        val headers = cookieOnly()
+        return exchange(path, HttpMethod.POST, if (body == null) headers else json(headers), body)
+    }
+
     /** 상태를 바꾸는 요청 — 쿠키 + CSRF. [body] 가 `null` 이면 본문도 Content-Type 도 싣지 않는다. */
     fun post(
         path: String,

@@ -450,5 +450,12 @@ class AppHttpDependencyGateTest {
  * — 병합 기준(`23837b19`)이 70 이고 7C② 가 둘, 7C③ 이 둘을 얹었다. 숫자를 따라가면 git 이 72 를
  * 그대로 남겨 **면제 둘이 조용히 사라진다**(앞 병합에서 70/70 → 72 로 같은 일을 겪었고, 7C②
  * 머지에서도 실제로 접혔다). 항목 이름으로 다시 세면 70 + 2 + 2 = **74**.
+ *
+ * **병합 재계산 셋째(7C④ 2b ← main `a45105a5`, 2026-10-29)**: 7C③ 머지 뒤의 main 이 **74**, 이
+ * 레인이 프로필 조립 하나(`app.wiring.ProfileWiring` — V22 저장소와 V12 저장 어댑터를 세우는
+ * `@Configuration` 이라 `BidCaseWiring` 과 같은 tier1)를 얹어 **75** 다. 수를 **숫자로 옮기지 않고**
+ * 세 tier 목록의 **항목 이름 합집합**을 기계로 세어 얻었다(병합 기준 72 · main 이 알림함 둘 ·
+ * 이 레인이 하나). 어느 레인의 면제도 지우지 않는 합집합이고, 수는 계산이 아니라 **선언**이다 —
+ * 아래 등식이 관측과 대조해 검산한다(틀리면 그 test 가 먼저 붉어진다).
  */
-private const val EXPECTED_EXEMPT_COUNT = 74
+private const val EXPECTED_EXEMPT_COUNT = 75
