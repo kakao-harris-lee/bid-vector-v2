@@ -224,6 +224,27 @@ class BidPriceRequestResponseTest {
             }
     }
 
+    /**
+     * 위 단언은 **상수만** 잰다(CR r1 LOW) — 표시 조립이 그 상수를 쓴다는 사실은 따로 잠근다.
+     * 요청 묶음에 실린 정책이 **출하 상수의 해소 결과와 값·version 까지 같다**: 표시가 다른 상수나
+     * 위조한 밴드를 쓰면 이 단언이 붉어진다.
+     *
+     * **잠기지 않는 것**: 기준일 계산이다. 표의 유일 항목이 `Initial` 인 동안은 어느 기준일로 바꿔도
+     * 같은 값이 나오므로 이 단언으로 구별되지 않는다(표가 날짜를 갖는 날 위 전제 test 가 먼저 붉다).
+     */
+    @Test
+    fun `표시 조립에 실리는 정책은 출하 상수의 해소 결과다 — 배선까지`() {
+        val run =
+            runFor(
+                bidPriceNotice(),
+                licenseJudgementFixture(),
+                MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided),
+                currentActiveBids = 0,
+            )
+
+        run.floorTrustPolicy shouldBe PUBLISHED_FLOOR_TRUST_POLICY.resolve(LocalDate.parse("2026-10-23"))
+    }
+
     @Test
     fun `기초금액은 값과 basis·과세·provenance·해석 갈래를 함께 싣는다`() {
         val response = responseFor(bidPriceNotice(baseAmountWon = 1_500L))
