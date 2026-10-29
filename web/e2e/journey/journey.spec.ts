@@ -123,7 +123,21 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   const rows = (await (await search).json()) as NoticeRow[];
   const target = rows.find((row) => row.noticeNumber === 'SYN-7E1-FLOOR-USABLE')!;
 
-  await page.getByTestId(`notice-card-${target.noticeNumber}`).getByTestId('notice-title').click();
+  // **이 여정은 앞 여정의 담기에 기대지 않는다.** 하네스 한 벌을 두 여정이 나눠 쓰므로 앞
+  // 여정이 어느 공고를 담았는지에 기대면(검색 정렬이 바뀌는 날) 사유가 흐려진 실패가 된다.
+  // 담기는 멱등이다 — 이미 담긴 건이면 계약이 200 으로 같은 건을 돌려주고, 그때는 카드에
+  // 버튼 대신 「담긴 건」이 뜨므로 누를 것이 없다.
+  const card = page.getByTestId(`notice-card-${target.noticeNumber}`);
+  const addButton = card.getByRole('button', { name: '담기' });
+  if (await addButton.isVisible()) {
+    const added = page.waitForResponse(
+      (response) => response.url().endsWith('/api/bid-cases') && response.request().method() === 'POST',
+    );
+    await addButton.click();
+    expect([200, 201]).toContain((await added).status());
+  }
+
+  await card.getByTestId('notice-title').click();
   await expect(page.getByTestId('screen-worksheet')).toBeVisible();
   await expect(page.getByTestId('worksheet-title')).toHaveText(target.title ?? target.noticeNumber);
 
