@@ -28,6 +28,7 @@
 - `app/src/main/kotlin/bidvector/app/http/BidPriceRequestResponse.kt`(`floorRateFieldsOf`) · `BidPriceFactLabels.kt`(`floorRateGroundsStateOf` · `usableFloorRateOf` 정리) · `BidPriceResponseStates.kt`(`FloorRateGroundsState.IMPLAUSIBLE`).
 - 정책 주입에 필요한 app wiring(`app/src/main/kotlin/bidvector/app/wiring/**` 중 투찰가 요청 조립 자리) — 평가 경로의 floor-trust 정책을 표시 조립에 넘기는 데 필요한 만큼.
 - `openapi/bidvector-operator-api.yaml` 의 `floorRateGroundsState` enum·설명문 · `web/src/api/generated/operator-api.ts`(재생성).
+- (D-7C2B-7 로 확장) `web/src/display/worksheetDisplay.ts`(화면 C 상태 표시 표의 하한율 상태 행) 와 그 vitest · `web/src/screens/WorksheetScreen.test.tsx` 의 화면 단언 하나 — **그 한 축에 한정**한다.
 - test: `app/src/test/kotlin/bidvector/app/http/**` 의 투찰가 요청 응답·어휘 test, DEC-10 census(`FloorTrustGateTest` 와 그 허용 목록 `config/quality/architecture-policy.properties` 의 floor-trust 키), 새 test 클래스는 `config/quality/gate-tests.properties` 등재.
 - `docs/discovery/capability-map.md` 의 DEC-10 · 7C② 관련 OPEN/인계 문면 정리(인계 종결 표시) — 한 절 안에서.
 - `reports/evidence/m7/7c2b/**`.
@@ -62,3 +63,4 @@
   표시 경로에서 **정책 미해소는 구조적으로 생기지 않는다** — 다섯째 표시 상태를 만들지 않고 그 전제를 test 로 잠근다(항목이 날짜로 바뀌면 그
   test 가 먼저 붉다). ② 정책 주입·근거 운반 타입의 기계적 귀결로 같은 in_scope 파일(`config/quality/architecture-policy.properties`)의 게이트
   키 둘(`app.injection.allowed-types` +2 · 상수시간 비교 허용 목록 +1)을 더했다 — 새 파일 0, 계약이 지명하지 않은 키였으므로 여기에 등재한다.
+- 2026-10-29 **D-7C2B-7(팀장 승인, 병합 신호)**: 7E-1·7C④-2b 가 머지된 main(`fa5ca096`)을 병합하면서 **D-7E-4 를 이행한다** — 「계약이 상태를 늘리면 나중 머지 쪽이 화면 표에 행을 더한다」이고 이 slice 가 나중 머지 쪽이다. 그래서 7E 소관인 `web/src/display/**`·`web/src/screens/**` 를 **그 한 축에 한정해** in_scope 로 넓힌다(위 in_scope 에 등재). 재생성 직후 `tsc` 가 누락을 멈춰 세운 것이 그 설계의 실측이고, 행을 지우는 변이에서 `tsc`+vitest 두 층이 함께 붉다. 문면은 숫자 없이 사유만 말한다.
