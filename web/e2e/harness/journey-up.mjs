@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { bundleAssetPaths } from './bundle-shape.mjs';
 import {
   acquireSingleRunLock,
   CONTAINER_PREFIX,
@@ -355,27 +356,10 @@ async function main() {
   // 먼저 깨진다**(그 주장이 사실이 된다). 상한을 올릴 일이 생기면 그것은 설계 변경이고, 이
   // 줄을 고치는 diff 로 드러나야 한다.
   const assetDir = resolve(webRoot, 'dist', 'assets');
-  const assetEntries = existsSync(assetDir)
-    ? readdirSync(assetDir, { withFileTypes: true })
-    : (() => {
-        throw new Error(`번들 자산 디렉터리가 없다: ${assetDir} — 빌드가 무엇을 냈는지 알 수 없다`);
-      })();
-  const dirNames = assetEntries.filter((one) => !one.isFile()).map((one) => one.name);
-  if (dirNames.length > 0) {
-    throw new Error(`번들 자산 자리에 디렉터리가 있다(${dirNames.join(', ')}) — 모양 단언이 흐려진다`);
+  if (!existsSync(assetDir)) {
+    throw new Error(`번들 자산 디렉터리가 없다: ${assetDir} — 빌드가 무엇을 냈는지 알 수 없다`);
   }
-  const assetNames = assetEntries.map((one) => one.name).sort();
-  const shape = {
-    js: assetNames.filter((one) => one.endsWith('.js')).length,
-    css: assetNames.filter((one) => one.endsWith('.css')).length,
-  };
-  if (assetNames.length !== 2 || shape.js !== 1 || shape.css !== 1) {
-    throw new Error(
-      `번들 자산의 모양이 {js 1 · css 1} 이 아니다 — 받은 것: ${assetNames.join(', ')}. ` +
-        '자산이 늘었다면 그것이 무엇이고 화면이 왜 읽는지 먼저 답해야 한다(ADR 0011 D-2).',
-    );
-  }
-  const bundleAssets = assetNames.map((one) => `/assets/${one}`);
+  const bundleAssets = bundleAssetPaths(readdirSync(assetDir, { withFileTypes: true }));
 
   log(`vite preview(127.0.0.1:${PREVIEW_PORT} → /api ⇒ 127.0.0.1:${appPort})`);
   track(

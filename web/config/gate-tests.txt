@@ -21,5 +21,10 @@ src/screens/TodayNoticesScreen.test.tsx
 src/screens/WorksheetScreen.test.tsx
 # v M-3 — 화면이 부르는 operation 집합 == 계약 목록(AST 술어).
 scripts/screen-operations.test.mjs
-# CR r2 H-1 — 하네스의 파괴적 경로 가드(묵은 락 수거의 표지 술어·앵커 필터).
+# 하네스의 파괴적·배타 경로 가드 — 묵은 락 수거의 표지 술어와 앵커 필터(CR r2 H-1), 락 소유자
+# 생존 판정(CR r3 M-1 · r4 M-2 의 EPERM 축), 그리고 락 **획득의 원자적 배타**(CR r4 M-3 ·
+# v r4 L-1·L-2 — 실제 파일시스템에서 둘째 획득이 실패하는 것을 잰다).
 e2e/harness/container-marker.test.mjs
+# v r4 M-2 · CR r4 L-5 — 여정이 받아 줄 자산의 **모양**. 허용 집합을 산출물에서 그냥 읽으면
+# 자산이 늘 때 양쪽이 함께 늘어 증가를 못 잡는다. 그 술어를 잠근다.
+e2e/harness/bundle-shape.test.mjs
