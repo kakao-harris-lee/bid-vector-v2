@@ -242,7 +242,15 @@ async function ensureInBidBox(page: Page, card: Locator): Promise<boolean> {
   return true;
 }
 
-test.describe.configure({ mode: 'serial' });
+/**
+ * **`serial` 을 두지 않는다**(v r2 참고 · r3 H-1). `serial` 에서는 앞 여정이 실패하면 뒤 셋이
+ * `did not run` 이 되어 **CI 실패 하나가 나머지 결과를 가린다**.
+ *
+ * 걷어도 순서는 그대로다 — 설정이 `workers: 1` 이라 한 하네스 위에서 차례로 돈다. 바뀌는 것은
+ * **실패 전파**뿐이고, 넷이 서로에 기대지 않는 근거는 셋이다: 각 여정이 스스로 로그인하고,
+ * 담기가 멱등이며(`ensureInBidBox`), 이미 담긴 건의 모양도 단언한다(CR r2 L-12). 단독 실행 넷이
+ * 각각 초록인 것이 같은 사실의 측정이다.
+ */
 
 test('여정 ② — 로그인 → 검색 → 카드 → 담기', async ({ page }) => {
   const watched = watchRequests(page);
