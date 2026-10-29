@@ -108,10 +108,13 @@ class ConstantTimeComparisonStructureTest {
                 "BidCaseResponse",
                 "BidCaseResponse\$Companion",
                 "BidTimelineEntryResponse",
-                "BidCaseRequestsKt",
                 "BidCaseRouting",
                 "DraftInput",
                 "AccountScopedRoutes",
+                "RequestValuesKt",
+                "ProfileResponse",
+                "ConstructionCapacityResponse",
+                "ProfileHttp",
                 "BidCaseHttp",
                 "NotificationItemResponse",
                 "NotificationInboxRequestsKt",
@@ -191,8 +194,6 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "응답 변환 companion 의 NextCheckpoint sealed 싱글턴 when 소진 — 값 비교가 아니라 객체 동일성, 자격증명 좌표 0",
         "BidTimelineEntryResponse" to
             "타임라인 줄 응답 값 객체(data class) 자동 생성 equals — 상태·명령·주체 종류·시각뿐, 본문도 자격증명도 없음",
-        "BidCaseRequestsKt" to
-            "요청 읽기의 enum 어휘 조회(`values.firstOrNull { it.name == raw }`) — 공개 어휘 비교이고 자격증명 값 없음",
         "BidCaseRouting" to
             "경로·질의 읽기의 어휘 비교(bidKind·state) — 공개 enum 이름 비교이고 자격증명 값 없음 " +
             "(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
@@ -224,6 +225,18 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "질의 매개변수 하나의 값 객체(data class) 자동 생성 equals — 칸 이름과 그 원문 값 목록뿐, 자격증명 값 없음",
         "DeclaredValueKt" to
             "계약이 든 **이름**으로 질의 값을 찾는 비교(`firstValue`) — 비교 대상이 칸 이름이지 자격증명 값이 아니다",
+        // M7/7C④ 2b — 프로필의 HTTP 층. 성격은 위 셋과 같다(어휘 조회 · data class 자동 equals ·
+        // sealed 싱글턴 when). `BidCaseRequestsKt` 는 어휘 조회 둘이 `RequestValues.kt` 로 옮겨 가며
+        // **클래스 자체가 사라져** 지웠다(javap 실측: 그 이름의 class 파일 없음).
+        "RequestValuesKt" to
+            "요청 읽기의 enum 어휘 조회 둘(`values.firstOrNull { it.name == raw }` — 단일 값·집합) — " +
+            "공개 어휘 비교이고 자격증명 값 없음(`BidCaseRequestsKt` 에서 옮겨 온 자리다)",
+        "ProfileResponse" to
+            "프로필 조회 응답 값 객체(data class) 자동 생성 equals — 업종·면허명·상호·소재지·나라장터 답·판정 대기 축뿐, 자격증명 값 없음",
+        "ConstructionCapacityResponse" to
+            "시평액 한 행 응답 값 객체(data class) 자동 생성 equals — 면허명·금액·기준 연도뿐, 자격증명 값 없음",
+        "ProfileHttp" to
+            "쓰기 결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(StorageWriteOutcome.Written) — 객체 동일성, 자격증명 좌표 0",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"

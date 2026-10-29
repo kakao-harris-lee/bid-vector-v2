@@ -1,6 +1,6 @@
 import createClient from 'openapi-fetch';
 
-import type { paths } from './generated/operator-api';
+import type { ApprovedPaths } from './approvedOperations';
 
 /**
  * 생성 타입 클라이언트를 만드는 **승인된 자리**(ADR 0011 D-2·D-3) — 게이트가 증명하는 것은
@@ -28,7 +28,17 @@ import type { paths } from './generated/operator-api';
  *    `ensureCsrf()`(없으면 조회 → 기억) 하나를 두고 `onRequest` 가 그것을 기다리면 된다.
  *    알려진 제한으로 등재돼 있다.
  */
-export const apiClient = createClient<paths>({
+/**
+ * **타입이 승인 목록으로 좁혀져 있다**(CR r2 M-1 · v r3 M-1). 전체 `paths` 를 주면 계약의 어떤
+ * operation 이든 부를 수 있어서, 이 객체를 재수출·동적 import·별칭 어느 꼴로 들고 나가도 목록
+ * 밖 호출이 컴파일된다(실측 다섯 꼴). 좁히면 **그 키가 타입에 없으므로** 어느 꼴로 들고 나가도
+ * `tsc` 가 멈춘다.
+ *
+ * 좁히는 단위는 **(메서드, 경로) 쌍**이다 — 경로만 좁히면 같은 경로의 미승인 메서드가 열린다
+ * (실측: 읽기만 쓰는 `/api/session` 에 `DELETE` 가 지나갔다). 남는 것은 `as unknown` 캐스팅뿐이고
+ * 그 자리는 여정의 런타임 대조 몫이다(알려진 제한).
+ */
+export const apiClient = createClient<ApprovedPaths>({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? '/',
   credentials: 'same-origin',
 });

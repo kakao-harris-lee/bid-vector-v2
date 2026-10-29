@@ -36,7 +36,7 @@ class BidCaseCommandController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val (notice, kind) = BidCaseRequests.openCase(body)
         val opened = workflow.open(account, notice, kind)
         // 새로 담았으면 201, 이미 담긴 건이면 200 — 화면이 둘을 가른다(계약 D-7B-3).
@@ -83,7 +83,7 @@ class BidCaseCommandController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return BidCaseHttp.unauthenticated(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val id = BidCaseRouting.caseId(caseId)
         val input = BidCaseRequests.draft(body)
         val result = workflow.draft(account, id, input.amount, input.presentedAt, BidActor.User(account))

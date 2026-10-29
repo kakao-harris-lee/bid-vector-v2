@@ -12,7 +12,8 @@
 **없음.** 이 slice 는 `CLAUDE.md` 와 `.claude/` 에 커밋이 0 이다(`git log --oneline fc15975c..HEAD -- CLAUDE.md .claude/` 빈 출력).
 - **병렬 레인**(전부 push 0): 7B(`bid-vector-v2-m7-7b`, **V21 보유**) · g1c03 · g1dec05 · g1set01. 무거운 빌드는 기존 flock 직렬에 줄을 선다.
 - **입력 정본**:
-  - `docs/discovery/m7-screen-data-requirements.md` — 화면 A(시작하기) 행 27~37, 「설정」 절(:115~), 담당 칸이 `7C ④` 인 행 전부.
+  - `docs/discovery/m7-screen-data-requirements.md` — 「## A. 시작하기 (온보딩 체크리스트)」 절과 「설정」 절에서 **담당 칸이 `7C ④` 인 행 전부**.
+    (좌표로 적지 않는다 — 이 slice 가 그 파일을 편집하므로 줄 번호가 낡는다. 2026-10-29 둘째 병합 라운드에서 고쳤다.)
   - `adapters/.../db/migration/V12__operator_profile.sql` · `adapters/.../profile/*` · `workflow/.../evaluation/ProfilePorts.kt`(싱글턴 프로필 · 면허 세 상태).
   - `openapi/bidvector-operator-api.yaml` 의 `/api/strategy` · `/api/strategy/edit-sessions*`(전략 편집 세션 — **재사용**, 새로 만들지 않는다).
   - 7B 판정 문서 `bid-vector-v2-m7-7b/reports/evidence/m7/7b/checklist.md` §9(R-2 남은 절반 = 별 slice 권고) · 7B 의 인증 축 결정
@@ -301,3 +302,125 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
 
 - 게이트 술어 · 모집단 · 허용 키 — 한 줄도 바꾸지 않는다(그래서 좁은 표적 재검증이 붙지 않는다).
 - `config/detekt/detekt.yml` — 이 slice 의 in_scope 가 아니다(저장소 전체 설정, 위 OPEN 으로 넘긴다).
+
+## Phase 2b 착수 계약 (2026-10-26, 팀장 지시로 갱신)
+
+- **base**: main **`46ac0949`**(2a PR #90 머지판 — V22 와 2a 커널이 들어 있다) · worktree `bid-vector-v2-m7-7c4` ·
+  브랜치 **`m7-7c4b/2026-10-26`**. 2a 브랜치(`m7-7c4/2026-10-22`)는 그대로 둔다.
+- **Phase 1 은 설계만**이다 — 코드 0 · 무거운 빌드 0(빌드 락은 7C⑤ · 7C② · 7C③ · v-dec05-r2 가 차례로 쓴다).
+- **산출물(2b)**: 2a 가 세운 값 타입 · port · 판정 위에 **HTTP 표면**을 세운다(§0.6 operation 표) + 2b 표적 넷 +
+  `unauthenticated` 공용화. OpenAPI 를 바꾸므로 **acceptance 에 `web` job 이 붙는다**(생성 타입 재생성 · 바이트 등식).
+- **지금 고르지 않는 것**: `awaiting` 응답 형태 — 7C ② 의 평탄 술어 확장이 **아직 main 에 없다**(실측: 평탄 허용 목록
+  test 가 그대로다). 설계에는 후보 둘과 영향만 적고, HTTP 의 나머지 표면을 먼저 설계한다(팀장 지시).
+- **범위 밖(2a 와 같다)**: 판정 로직(QUAL-08 · 11) · 정규화 커널 · 화면(7E) · R-2 남은 절반 · `detekt.yml` 고정
+  (`OPEN-DETEKT-DEFAULT-PIN`).
+
+### D-7C4-8 (2026-10-26, 팀장) — 2b 설계 확인 넷
+
+- **Q1 수용**: `CAPACITY_ROWS_MAX` 는 **앱에서만** 집행한다. 검사와 삽입 사이의 경합은 **알려진 제한**으로 둔다(단일
+  운영자 전제 — 2a 제한 1 과 같은 축). **V23 · 트리거를 만들지 않는다.**
+- **Q2 수용**: DB 예외 문면의 로그 누출은 **어댑터에서 이 slice 의 두 표에 한해** 닫는다(제약 위반을 도메인 결과로 바꾸며
+  메시지를 버린다). 그 사실과 `ErrorBody` 의 세 필드를 **test 로 고정**한다. `logServerErrorDetail` 전역화는
+  **`OPEN-7C4-LOG-DETAIL-GLOBAL`** 로 등재하고 다음 M7 문서 PR 이 중앙에 올린다.
+- **Q3**: 나중에 wire 를 바꾸는 길((가) 뒤 (나))은 **택하지 않는다**. `awaiting` 을 뺀 나머지 표면을 먼저 구현하고 측정
+  준비까지 간다. `awaiting` 은 **7C ② 머지 뒤** main 을 병합하고 **(나) 짝 배열**로 넣은 다음 동결한다. 동결 직전인데도
+  7C ② 가 main 에 없으면 보고한다. **어느 경우에도 세 상태를 두 상태로 접은 응답은 내보내지 않는다** — 그래서
+  **체크리스트 operation 은 `awaiting` 과 함께** 선다(그때까지 그 endpoint 를 내지 않는다).
+- **Q4 수용**: `unauthenticated` 공용화를 **2b in_scope** 로 받는다(거동 무변경 refactor 한 건, 근거는 7B test 가 그대로
+  초록인 것). rollback 에서 그 7B 파일은 base `46ac0949` 에서 복원한다.
+
+**acceptance(2b)**: OpenAPI 를 바꾸므로 Kotlin `check` job + **`web` job** 둘이다. 빌드는 `flock` 경유이고 락은
+7C ② · 7C ③ · 7C ⑤ · DEC-05 와 공유한다.
+
+### 2b in_scope (구현 라운드 r1, 2026-10-26)
+
+`git diff --name-status 46ac0949..HEAD` 로 다시 산출한다. 이 라운드가 만지는 자리는 다음과 같다.
+
+- **workflow**: `profile/BusinessProfilePorts.kt`(쓰기 결과 타입 둘) · `profile/BusinessProfileValues.kt`(나라장터 세
+  이름의 단일 선언) · `profile/ProfileUseCases.kt`(신설 — 조회 둘 · 쓰기 넷) · test 둘.
+- **adapters**: `profile/JdbcBusinessProfileStore.kt`(제약 거부를 값으로) · `profile/JdbcOperatorProfileRepository.kt`
+  (V12 저장 port 구현) · `evaluation/ProfilePorts.kt`(V12 저장 port 신설) · 실 DB test 둘 추가.
+- **app**: `http/` 의 신설 다섯(`ProfileRequests` · `ProfileResponses` · `ProfileHttp` · 조회 · 쓰기 controller) +
+  `RequestValues.kt`(아래 ②) · `AccountScopedRoutes`(프로필 뿌리) · `AuthenticatedAccount`(401 공용화) ·
+  `ErrorBody`(코드 하나) · `BidCaseHttp`·`BidCase*Controller`(호출부) · `wiring/ProfileWiring.kt`(신설) ·
+  test 넷(표면 · 조립 경계 · 이중체 조립 · 분리한 이중체 파일)과 `HttpTestSupport.kt`.
+- **계약·게이트**: `openapi/bidvector-operator-api.yaml`(operation 여섯 · 스키마 여섯 · 오류 코드 하나) ·
+  `web/src/api/generated/operator-api.ts`(재생성) · `config/quality/architecture-policy.properties`(허용 패키지 하나 ·
+  금지 타입 셋) · `config/quality/gate-tests.properties`(test 셋 등재).
+
+**승인 범위를 넘지 않지만 7B·6A 파일을 만지는 거동 무변경 refactor 가 셋**이다. D-7C4-8 Q4 가 ① 을 승인했고,
+②③ 은 같은 성격(테스트가 그대로 초록인 것이 근거)이라 **보고 항목으로 둔다**.
+
+1. **`unauthenticated` 공용화**(Q4 승인) — `BidCaseHttp` 에서 `AuthenticatedAccount.kt` 로. 입찰함 호출부 다섯이 같은
+   함수를 부른다. `OperatorSessionController` 의 private 사본은 **그대로 둔다**(7D 파일 — 후속 후보).
+2. **`requestValue` · `enumOf` 공용화** — `BidCaseRequests.kt` 의 private 둘을 `RequestValues.kt` 로 옮기고
+   `requiredBoolean` 을 더했다. 프로필 요청도 같은 두 수단이 필요했고, 복사하면 「형식 오류를 400 으로」 규율이 두
+   자리에 선다. `JsonValueReaders.kt` 가 아닌 새 파일인 이유는 그 파일이 **파일당 함수 한도(11)** 에 닿아 있어서다.
+3. **`FixedClock` · `SequentialCorrelationIdFactory` 파일 분리** — `HttpTestSupport.kt` 가 **정확히 500줄**(파일 한도)
+   이라 프로필 이중체 조립을 `@Import` 하려면 자리가 없었다. 같은 패키지로 옮겨 참조는 바뀌지 않는다.
+   **7C ⑤ 와의 겹침: 없다**(팀장 지시 2026-10-26 ②). 그쪽은 같은 한도 때문에 `EmptyCandidateSource` ·
+   `UnreachableWatchSubjectPort` · `UnreachableLicenseGatePort` 를 `EvaluationTestDoubles.kt` 로 옮긴다 — 옮기는
+   **선언 집합이 서로 소**이고 파일 이름도 다르다. 병합은 같은 파일의 **다른 hunk 삭제** 둘이 된다.
+
+### 계약 갱신 — 2026-10-28 (운영자 결정): `awaiting` 과 체크리스트 operation 을 이 slice 에서 뺀다
+
+**실측이 전제를 깼다.** D-7C4-8 Q3 은 「7C ② 의 평탄 술어 확장이 머지된 뒤 짝 배열로 넣는다」였는데,
+7C②-a 가 머지된 main(`1632242e`)에서도 그 확장이 **없다**: 계약 게이트의 평탄 술어는 속성이 **스칼라
+또는 스칼라 배열**일 때만 통과시키고(해당 test 의 diff 0 줄), 병합된 spec 전체에 깊이 1 object 속성이
+**0** 이다. 그래서 짝 배열(`awaiting: [{item, prerequisite}]`)은 지금 계약 test 에서 거부된다.
+
+**결정(2026-10-28)**: 2b 는 **operation 여섯**으로 종결하고, 체크리스트 operation 과 `awaiting` 은
+**`OPEN-7C4-AWAITING-CHECKLIST`** 로 등재해 별 slice 가 닫는다. 근거는 술어 확장이 **두 레인이 공유하는
+계약 게이트 변경**이라 별 설계 검토가 필요하고, 2b 는 측정이 끝난 상태로 종결할 수 있다는 것이다.
+스칼라 배열 둘로 먼저 내고 뒤에 짝 배열로 옮기는 길은 **택하지 않는다**(wire 를 두 번 바꾼다 — Q3 그대로).
+
+**D-7C4-8 은 그대로 남는다**: 세 상태(완료 · 미완 · 선행 대기)를 두 상태로 접은 응답은 어느 경우에도
+내보내지 않는다. 그래서 체크리스트 endpoint 는 `awaiting` 과 **함께** 선다 — 그때까지 그 endpoint 를
+내지 않는 것이 이 결정의 내용이다. 정본은 capability map 의 OPEN 행이고 이 절은 포인터다.
+
+## 계약 갱신 — 2026-10-29 (둘째 병합 라운드): base 재고정과 새 파일 대조
+
+**base 를 `a45105a5` 로 재고정한다** — 7C③(PR #96)이 머지된 main 이다. 앞 base(`1632242e`)의 rollback
+실측은 무효이고 새 base 에서 다시 쟀다. 마이그레이션 번호는 **V22 그대로 유효**(병합된 main 최대 V23 =
+7C③ 의 알림함 표이고, 이 slice 의 V22 는 이미 base 에 있다. 이 라운드의 마이그레이션 변경은 0 건이다).
+
+### in_scope 추가 — 수정·병합 라운드가 만든 새 경로 넷의 대조
+
+in_scope 등식(복원 목록 ∪ 이 slice 의 장부)은 그대로다. 앞 라운드 42 경로에서 **46 으로 늘었고 넷 전부
+계약에 등재한다**.
+
+- `app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt` — **main 이 그 class 를
+  `HttpTestSupport.kt` 에서 제 파일로 갈랐다**(7C③). 이 slice 의 `@Import` 한 줄과 그 병합 주의 주석이
+  그 새 파일로 따라가 **M** 이 됐다. 2b in_scope 는 `HttpTestSupport.kt` 만 적고 있었다.
+- `app/src/test/kotlin/bidvector/app/http/ProfileRequestsTest.kt` — r3 수정 라운드가 만든 신설 test
+  (전송 표면 허용 집합 축). `config/quality/gate-tests.properties` 에 **같은 커밋에서 등재**됐다.
+- `docs/discovery/capability-map.md` · `docs/discovery/m7-screen-data-requirements.md` —
+  `OPEN-7C4-AWAITING-CHECKLIST` 등재(운영자 결정 2026-10-28).
+
+### D-7C4-4 의 「요구표 변경 0」을 정정한다
+
+그 문면은 **담당 칸이 이미 `7C ④` 라 고칠 것이 없다**는 실측에 근거했고 그때는 참이었다. 운영자 결정
+2026-10-28 이 `awaiting`·체크리스트 operation 을 OPEN 으로 돌리면서 **그 행의 담당 칸 자체가 바뀌었다**
+(「7C④ 가 닫는다」 → 「판정 커널은 7C④, HTTP operation 은 별 slice」). 그래서 이 라운드의 요구표 변경은
+**한 행**이고, 산출물 6 의 세 장부 중 **셋 다** 이 slice 가 편집한다.
+
+### 2b 설계 전제의 재실측 (7C③ 머지 뒤)
+
+`OPEN-7C4-AWAITING-CHECKLIST` 의 전제(평탄 술어가 깊이 1 object 를 거부한다)를 **병합된 트리에서 다시
+쟀고 그대로 참이다**: 그 계약 test 는 main 구간에서 **무편집**(diff 0 줄)이고, 병합된 spec 전체에 깊이 1
+object 속성이 **0** 이다. 전제가 깨지지 않았으므로 그 OPEN 의 문면을 고치지 않는다.
+
+### 「`HttpTestSupport.kt` 가 정확히 500줄」 사유의 갱신
+
+2b in_scope 의 거동 무변경 refactor ③(시계 이중체 파일 분리)은 **그 파일이 파일 한도에 닿아 있다**는
+사유로 승인됐다. main 이 `HttpTestApplication` 을 갈라 그 파일은 이제 **202 줄**이라 그 사유는 더 이상
+서지 않는다 — 그러나 **분리는 유지한다**. 더 강한 사유가 main 쪽에 이미 있다: 7C② 가 가른 전략 편집
+이중체 파일의 머리 주석이 「같은 상한 때문에 다른 두 레인이 평가 축과 **시계 축**을 가져갔다 — 선언이
+겹치면 병합 뒤 중복 선언으로 컴파일이 깨진다」고 적어 두었다. 즉 이 분리는 세 레인이 합의한 축 배분의
+한 조각이고, 되돌리면 main 쪽 문면이 거짓이 된다. 병합 뒤 `FixedClock`·`SequentialCorrelationIdFactory`
+선언은 **정확히 한 자리**다.
+
+### 하네스 레인 변경
+
+**없음.** 이 라운드도 `CLAUDE.md` 와 `.claude/` 에 커밋이 0 이다
+(`git log --oneline a45105a5..HEAD -- CLAUDE.md .claude/` 빈 출력).

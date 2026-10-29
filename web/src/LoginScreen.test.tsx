@@ -15,6 +15,7 @@ import { apiClient, hasCsrf, rememberCsrf } from './api/client';
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 interface Sent {
+  readonly method: string;
   readonly url: string;
   readonly body: string;
 }
@@ -33,7 +34,7 @@ let ejectStub: (() => void) | undefined;
 function stubResponse(status: number, body: unknown): () => void {
   const middleware = {
     async onRequest({ request }: { request: Request }): Promise<Response> {
-      sent.push({ url: request.url, body: await request.clone().text() });
+      sent.push({ method: request.method, url: request.url, body: await request.clone().text() });
       return new Response(status === NO_CONTENT ? null : JSON.stringify(body), {
         status,
         headers: { 'content-type': 'application/json' },
@@ -104,15 +105,21 @@ describe('로그인 화면 (7D)', () => {
     container.remove();
   });
 
+  /**
+   * **M7/7E-1 — 「요청이 하나」가 아니라 「로그인 POST 가 하나」를 잰다.** 성공하면 `/`(화면 B)로
+   * 가고 그 화면은 자기 읽기를 건다 — 7A 때는 그 자리가 빈 자리라 요청 총수가 1 이었다. 재려는
+   * 것은 **제출이 계약의 경로·본문으로 가는가**이고 그것은 그대로다.
+   */
   it('폼이 뜨고 제출이 계약의 경로·본문으로 간다', async () => {
     ejectStub = stubResponse(201, { csrf: 'issued-stamp', expiresAt: '2026-10-16T12:00:00Z' });
     await renderLogin(container);
 
     await submit(container, 'right-passphrase-value');
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.url).toContain('/api/session');
-    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({
+    const posts = sent.filter((one) => one.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.url).toContain('/api/session');
+    expect(JSON.parse(posts[0]?.body ?? '{}')).toEqual({
       loginName: 'operator',
       passphrase: 'right-passphrase-value',
     });

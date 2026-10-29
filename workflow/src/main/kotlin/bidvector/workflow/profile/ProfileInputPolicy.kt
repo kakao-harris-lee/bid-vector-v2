@@ -31,6 +31,21 @@ object ProfileInputPolicy {
 
     /** 한 계정이 둘 수 있는 시평액 행 수 상한 — use case 가 쓰기 전에 잰다(표에는 행 수 CHECK 가 없다). */
     const val CAPACITY_ROWS_MAX: Int = 50
+
+    /**
+     * V12 자유 어휘(업종 코드 · 면허명 · 지역어) 원소의 길이 상한 — **상호 · 면허명과 같은 수**를 쓴다.
+     * 같은 성격의 짧은 이름이고, 다른 수를 지으면 두 표면이 다른 경계를 갖는다(M7/7C④ 2b r2, v F4).
+     *
+     * V12 는 이 축에 표 제약이 없다 — 2b 가 **처음 HTTP 로 연** 쓰기 경로라 경계가 앱에만 있다.
+     */
+    const val QUALIFICATION_TERM_MAX_CODE_POINTS: Int = TRADE_NAME_MAX_CODE_POINTS
+
+    /**
+     * V12 자유 어휘 배열 하나의 원소 수 상한. **도출이 아니라 선언**이다 — 업종 · 면허 · 지역어를
+     * 백 개 넘게 신고하는 정상 입력을 보지 못했고, 그 위는 붙여넣기 사고로 본다(시평액 행 상한과 같은
+     * 성격이되 수는 다르다: 그쪽은 저장 행이고 이쪽은 한 열의 배열이다).
+     */
+    const val QUALIFICATION_TERMS_MAX: Int = 100
 }
 
 /** 코드포인트 수 — 서로게이트 쌍 하나를 한 글자로 센다(DB `char_length` 와 같은 단위). */

@@ -35,18 +35,52 @@ interface BusinessProfileStorePort : BusinessProfileReader {
         account: AccountId,
         details: BusinessDetails,
         at: Instant,
-    )
+    ): StorageWriteOutcome
 
     /** 면허명이 같은 행이 있으면 금액 · 기준 연도를 바꾸고, 없으면 더한다. */
     fun upsertCapacity(
         account: AccountId,
         capacity: ConstructionCapacity,
         at: Instant,
-    )
+    ): StorageWriteOutcome
 
     /** 지운 행이 있었으면 `true`. 다른 계정의 같은 면허명 행에는 닿지 않는다. */
     fun removeCapacity(
         account: AccountId,
         licenseName: LicenseName,
     ): Boolean
+}
+
+/**
+ * 프로필 쓰기의 결과 — **business control flow 에 예외를 쓰지 않는다**(v2-지침서 §5). 거부는
+ * 오류가 아니라 값이고, 그 값에 **운영자 입력이 실릴 자리가 없다**.
+ *
+ * 갈래가 두 층인 것은 **누가 어떤 답을 낼 수 있는가**를 타입이 정하기 때문이다:
+ * 저장 port 는 [StorageWriteOutcome] 만 낼 수 있어 「행 수 상한」을 지어낼 수 없고(그 판단은 use case
+ * 의 몫이다), use case 는 셋 다 낼 수 있다. 호출자의 `when` 은 전수라 갈래가 늘면 컴파일이 잡는다.
+ */
+sealed interface ProfileWriteOutcome {
+    /**
+     * 한 계정의 시평액 행 수 상한([ProfileInputPolicy.CAPACITY_ROWS_MAX])에 걸렸다 — **use case 만**
+     * 낸다. 표에는 행 수 CHECK 가 없다(D-7C4-8 Q1).
+     */
+    data class RowLimitExceeded(
+        val limit: Int,
+    ) : ProfileWriteOutcome
+}
+
+/**
+ * 저장 층이 내는 갈래 — 썼거나, 무결성 제약이 거부했거나.
+ *
+ * **거부에 문면을 싣지 않는다**(2b 표적 1, D-7C4-8 Q2): [RejectedByStorage] 가 지니는 것은 표준
+ * 다섯 글자 SQLSTATE 뿐이고, 드라이버 예외의 메시지와 `detail`(거부된 **행의 값**을 담는다)은 이
+ * 타입에 자리가 없어 **구조적으로** 밖으로 나가지 못한다 — 어댑터가 문면을 버리는 것을 잊을 수 없다.
+ */
+sealed interface StorageWriteOutcome : ProfileWriteOutcome {
+    data object Written : StorageWriteOutcome
+
+    /** [sqlState] 는 SQL 표준 class 23(무결성 제약 위반) 코드다 — 운영자 입력이 아니다. */
+    data class RejectedByStorage(
+        val sqlState: String,
+    ) : StorageWriteOutcome
 }

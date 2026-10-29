@@ -11,9 +11,11 @@
 #
 # 베이스는 **JRE 21**(JDK 아님)이고 다이제스트로 고정한다(2026-10-09 실측 `docker buildx imagetools
 # inspect eclipse-temurin:21-jre-noble` — 멀티플랫폼 index 의 다이제스트). M6/6E-2c D-6E2C-2 —
-# **같은 태그의 새 index** 로 올렸다(ubuntu 24.04 그대로, openssl 수정판이 들어온다). `:latest`·미고정 태그는 쓰지 않는다 —
+# **같은 태그의 새 index** 로 올렸다(ubuntu 24.04 그대로, openssl 수정판이 들어온다). chore 2026-10-29 —
+# 같은 태그의 새 index 로 다시 올렸다(`libbrotli1` 1.1.0-2ubuntu0.1, CVE-2026-111497 · JDK 21.0.12.1 · 패키지 136 그대로).
+# `:latest`·미고정 태그는 쓰지 않는다 —
 # 위생 게이트가 이미지 참조의 태그와 실제 layer 체인을 둘 다 본다.
-FROM eclipse-temurin:21-jre-noble@sha256:000fd431958bc81a24abe1e8e5f0f0fd3ae365a594bd50aadb20696805f9408c AS builder
+FROM eclipse-temurin:21-jre-noble@sha256:cd35bb33859641c5374415826a5951845104093eaa401cbe9d3d9023444f1c13 AS builder
 
 WORKDIR /builder
 
@@ -31,13 +33,13 @@ RUN java -Djarmode=tools -jar application.jar extract --layers --destination ext
     }
 
 # ---- runtime ----
-FROM eclipse-temurin:21-jre-noble@sha256:000fd431958bc81a24abe1e8e5f0f0fd3ae365a594bd50aadb20696805f9408c AS runtime
+FROM eclipse-temurin:21-jre-noble@sha256:cd35bb33859641c5374415826a5951845104093eaa401cbe9d3d9023444f1c13 AS runtime
 
 # D-6C-9 와 같은 규율 — 이 라벨은 **보조 정보**다. Dockerfile 이 손으로 적는 자유 텍스트라
 # 실제 `FROM` 과 아무 것도 묶지 않는다. 구속력 있는 베이스 고정 판정은
 # `tools/image-hygiene-check.sh` 가 이 이미지의 `RootFS.Layers` 앞부분을 정책 다이제스트에서
 # 파생한 실제 layer 체인과 대조하는 것이다.
-LABEL org.bidvector.baseimage="eclipse-temurin:21-jre-noble@sha256:000fd431958bc81a24abe1e8e5f0f0fd3ae365a594bd50aadb20696805f9408c"
+LABEL org.bidvector.baseimage="eclipse-temurin:21-jre-noble@sha256:cd35bb33859641c5374415826a5951845104093eaa401cbe9d3d9023444f1c13"
 
 # non-root — 위생 게이트가 `Config.User` 와 **실 ENTRYPOINT 로 띄운 컨테이너의 모든 프로세스
 # uid** 를 정책 하한과 대조한다(ml-serving 과 같은 고정 UID/GID·시스템 계정 범위).

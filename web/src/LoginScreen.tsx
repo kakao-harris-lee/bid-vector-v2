@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 
-import { apiClient, rememberCsrf } from './api/client';
+import { rememberCsrf } from './api/client';
+import { signIn } from './api/queries';
 
 /**
  * 실패 문면은 **하나**다(M7/7D) — 계정 부재·비밀 문구 불일치·연속 실패 잠금을 화면이
@@ -32,8 +33,7 @@ export function LoginScreen() {
     // 실패의 **모양은 하나**로 둔다 — 사유를 나누지 않는 규율은 서버와 같다.
     let csrf: string | null;
     try {
-      const { data } = await apiClient.POST('/api/session', { body: { loginName, passphrase } });
-      csrf = data?.csrf ?? null;
+      csrf = (await signIn(loginName, passphrase))?.csrf ?? null;
     } catch {
       csrf = null;
     } finally {

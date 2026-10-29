@@ -29,7 +29,6 @@ import java.net.Socket
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Collections
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
@@ -132,23 +131,6 @@ fun freshStrategy(revision: Int = 1): OperatorStrategy {
         is StrategyValidation.Valid -> result.strategy
         is StrategyValidation.Invalid -> error("test fixture가 유효하지 않다: ${result.violations}")
     }
-}
-
-/** 시각을 직접 미는 fake — `Duration.between` 계산이 재현 가능해야 한다. */
-class FixedClock(
-    private var instant: Instant,
-) : Clock {
-    override fun now(): Instant = instant
-
-    fun advance(millis: Long) {
-        instant = instant.plusMillis(millis)
-    }
-}
-
-class SequentialCorrelationIdFactory : CorrelationIdFactory {
-    private val counter = AtomicInteger(0)
-
-    override fun newId(): CorrelationId = CorrelationId("test-corr-${counter.incrementAndGet()}")
 }
 
 /**

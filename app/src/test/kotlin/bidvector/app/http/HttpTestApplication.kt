@@ -43,7 +43,9 @@ import java.time.LocalDate
  * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
  */
 @SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
-@Import(BidPriceTestWiring::class)
+// **병합 주의**: `@Import` 는 반복할 수 없는 애너테이션이다. 레인이 각자 자기 이중체 조립을 들이므로
+// 충돌 해소는 **두 줄이 아니라 한 줄의 합집합**이다(7C② 의 입찰가 조립과 7C④ 의 프로필 조립).
+@Import(BidPriceTestWiring::class, ProfileTestWiring::class)
 open class HttpTestApplication {
     /**
      * M7/7C③ — 알림함 컨트롤러의 협력자. 이 빈이 없으면 **컨텍스트가 기동에 실패**한다:
