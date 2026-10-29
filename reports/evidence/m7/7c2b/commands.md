@@ -114,16 +114,24 @@ slice 의 변경과 무관하다. main `bb6a187e`(Caddy 직접 빌드 + app 베�
 ## 9. 낡는 좌표 — 역방향 파급
 
 이 slice 는 `file:line` 을 새로 적지 않는다. 편집한 파일을 가리키는 **다른 문서의 좌표**는
-`grep -rnoE '<stem>:[0-9]+'` 로 전수를 냈다(전체 파일명과 축약형 둘 다).
+`command grep -rnoE '<stem>:[0-9]+'`(전체 파일명과 축약형 둘 다) 로 전수를 내고, 그 수를 삽입
+지점과 비교해 셌다 — **삽입 지점의 줄 번호는 적지 않는다**(이 slice 가 편집하는 파일의 좌표라
+다음 편집에서 조용히 틀린다, CR r1 LOW).
 
-- `docs/discovery/capability-map.md` — 삽입 지점 1752, **순증 +3**. 그 아래를 가리키는 좌표
-  **27건**이 밀렸다(다른 slice·마일스톤의 evidence 와 codex 리뷰 JSON).
-- `openapi/bidvector-operator-api.yaml` — 첫 삽입 145, 그 아래 좌표 **1건**(다른 slice 의
-  checklist)이 밀렸다.
-- `config/quality/architecture-policy.properties`·생성 타입·Kotlin 넷 — 가리키는 좌표 **0건**.
+- `capability-map.md` — DEC-10 절의 인계 문단을 종결 문단으로 바꿨다(**순증 +3**). 그 문단보다
+  아래를 가리키는 좌표 **27건**이 밀렸다.
+- `bidvector-operator-api.yaml` — 투찰가 operation 설명문에 한 문단을 더했다(**순증 +4**). 그
+  아래 좌표 **1건**이 밀렸다.
+- 정책 파일·생성 타입·Kotlin 넷 — 가리키는 좌표 **0건**.
 
-밀린 28건은 **전부 in_scope 밖**(다른 slice·마일스톤의 evidence)이라 고치지 않고 알려진 제한으로
-둔다. 그 문서들을 이 slice 가 편집하면 그쪽 slice 의 base/head 가 흔들린다.
+밀린 28건은 **전부 in_scope 밖**(다른 slice·마일스톤의 evidence 와 리뷰 JSON)이라 고치지 않고
+알려진 제한으로 둔다. 그 문서들을 이 slice 가 편집하면 그쪽 slice 의 base/head 가 흔들린다.
+
+**크기 게이트 단위를 선언한다**(CR r1 LOW — 스킬에 단위가 명시돼 있지 않다): evidence 합계
+**줄수** 대 산출물 변경 **줄수(추가+삭제)**, 둘 다 판정 SHA 기준
+`git diff --numstat 78d97c59..HEAD`(evidence 는 `reports/evidence/m7/7c2b/`, 산출물은
+`':!reports/evidence'`)로 낸다. 추가 줄만 세면 evidence 가 산출물을 넘는다 — 삭제도 이 slice 가
+한 일(두 함수 제거·census 키 다섯 정리)이라 분모에 넣는 쪽을 택했고, 그 선택을 여기 밝힌다.
 
 ## 10. 알려진 제한
 
@@ -146,3 +154,13 @@ slice 의 변경과 무관하다. main `bb6a187e`(Caddy 직접 빌드 + app 베�
 ⑧ **게이트 등재 둘이 계약이 지명한 키 밖이다**(주입 표면 · 상수시간 비교 그물). 같은 in_scope
    파일 안이고 승인된 설계의 기계적 귀결이지만, 계약 문면에는 census 키만 적혀 있다 — 계약 갱신
    대상으로 보고한다.
+⑨ **표시와 평가가 같은 상수를 「각자」 해소한다**(CR r1 LOW) — 계약 D-7C2B-1 의 문면은 「같은
+   인스턴스」인데 구현은 두 자리가 같은 singleton 을 같은 UTC 규칙으로 **따로** 해소한다
+   (요청 조립 한 번 · 분석 한 번). 오늘은 갈라질 수 없다(표의 유일 항목이 `Initial`). 표가
+   날짜를 갖는 날 **두 `clock.now()` 사이에 UTC 자정이 끼면** 표시와 평가가 다른 밴드를 볼 수
+   있고, **두 경로의 `PolicyVersion` 동일성을 재는 test 는 없다** — census ⓒ 는 「밴드의 출처가
+   하나」만 잠근다. 표시 쪽 배선은 「출하 상수의 해소 결과와 값·version 이 같다」로 잠겨 있다
+   (이 라운드에 더한 단언). 모으는 선택(해소를 요청당 한 번으로)은 후속 slice 몫이다.
+⑩ **전제 test 가 기준일 계산을 잠그지 않는다** — 표의 유일 항목이 `Initial` 인 동안은 어느
+   기준일로 바꿔도 같은 값이 나와 단언으로 구별되지 않는다(그 사실을 그 test KDoc 에 적었다).
+   실질 방어는 거동 test 넷 · census ⓒ · 반사 위조를 잡는 구조 게이트들이다(verifier r1 R2b).
