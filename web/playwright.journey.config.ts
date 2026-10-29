@@ -14,6 +14,12 @@ const PREVIEW_URL = `http://127.0.0.1:${PREVIEW_PORT}`;
 
 export default defineConfig({
   testDir: './e2e/journey',
+  // **Playwright 가 수집하는 것은 `*.spec.ts` 뿐이다.** 기본 `testMatch` 는 `*.test.*` 도 받는데,
+  // 하네스의 단위 test(`e2e/harness/*.test.mjs`, vitest 가 돌린다)가 그 패턴에 걸려 Playwright
+  // 런너가 그것을 집어 들고 죽었다(실측: `Cannot read properties of undefined (reading 'config')`).
+  // 두 레인의 수집 경계를 **파일 이름 규약**으로 못박는다.
+  testMatch: '**/*.spec.ts',
+
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

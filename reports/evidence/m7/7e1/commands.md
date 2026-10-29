@@ -84,6 +84,10 @@ acceptance 는 `.github/workflows/ci.yml` 의 **job 명령 그대로**다(계약
 | M3 「아직 산출 안 함」 자리에 숫자 | 값 자리에 금액 한 조각 | 값 자리 숫자 부재 단언(단위 + e2e) | vitest **1** · journey **1** |
 | M4 생성 클라이언트 밖 호출 | 화면에서 직접 서버 호출 | eslint(보조 층) — typecheck·vitest 는 지나간다 | lint **1** |
 
+### r1 이 더한 변이 (같은 표 형식)
+
+| 변이 | 바꿔치운 것 | 잡은 층 | exit |
+| --- | --- | --- | --- |
 | H-1 요청 본문의 지어낸 값 | 선언값을 리터럴 `0` 으로 | 호출 인자 단언 | vitest **1** |
 | v M-2 머리의 리터럴 | 건 상태·다음 확인 시점을 **응답과 다른** 고정값으로 | 여정 ③ 의 DOM↔API 대조 | journey **1** |
 | v M-3 ⓐ 화면이 직접 호출 | 화면이 `apiClient` 를 import 해 목록 밖 `/api/strategy` | W-4 의 호출 능력 집합 등식 | typecheck 0 · lint 0 · **W-4 1** |
