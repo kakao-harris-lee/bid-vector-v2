@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 
 import { TodayNoticesScreen } from './TodayNoticesScreen';
@@ -120,7 +121,7 @@ describe('화면 B — 빈·로딩·오류 세 얼굴', () => {
   });
 
   it('오류에는 재시도가 있고 서버 메시지를 그대로 내보이지 않는다', async () => {
-    mocked.searchNotices.mockRejectedValue(new queries.ApiError(500, 'INTERNAL_ERROR'));
+    mocked.searchNotices.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();
 
     const face = await screen.findByTestId('notices-error');
@@ -186,6 +187,38 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
         bidKind: 'REAL',
       });
     });
+  });
+
+  /**
+   * CR H-2 — 쓰기 실패가 아무 얼굴도 없이 지나가면 운영자는 **다시 누른다**. 실패는 그 사실과
+   * 다시 시도를 보이고, 성공 토스트는 **뜨지 않아야** 한다.
+   */
+  it('담기가 실패하면 그 사실이 뜨고 성공 토스트는 뜨지 않는다', async () => {
+    mocked.addBidCase.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('담지 못했습니다');
+    expect(within(failure).getByRole('button', { name: '다시 시도' })).not.toBeNull();
+    expect(screen.queryByTestId('toast')).toBeNull();
+    // 서버 메시지·코드를 그대로 내보이지 않는다(D-7E-6).
+    expect(failure.textContent).not.toContain('INTERNAL_ERROR');
+  });
+
+  /** CR M-2 — 401 은 일시 장애와 다른 답이다: 재시도로 풀리지 않으므로 로그인으로 보낸다. */
+  it('담기가 401 이면 로그인으로 가는 길을 보인다', async () => {
+    mocked.addBidCase.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('로그인');
+    expect(within(failure).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
   });
 
   /**

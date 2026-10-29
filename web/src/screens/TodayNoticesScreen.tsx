@@ -12,6 +12,7 @@ import {
 } from '../api/queries';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
+import { WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
 import { displayOf } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
@@ -75,6 +76,12 @@ export function TodayNoticesScreen() {
     onSuccess: async () => {
       // 담기의 **역전이는 계약에 없다** — 그래서 토스트에 실행 취소를 두지 않는다(D-7E-5).
       show({ text: '입찰함에 담았습니다.' });
+      await queryClient.invalidateQueries({ queryKey: ['bid-cases', BID_KIND] });
+    },
+    // 실패는 **서버 상태를 다시 읽고** 얼굴을 낸다(CR H-2) — 카드가 계속 「담기」를 보이면
+    // 운영자는 다시 누르고, 그 사이 실제로 담겼는지는 아무도 모른다.
+    onError: async () => {
+      dismiss();
       await queryClient.invalidateQueries({ queryKey: ['bid-cases', BID_KIND] });
     },
   });
@@ -146,6 +153,18 @@ export function TodayNoticesScreen() {
           검색
         </button>
       </form>
+
+      {add.isError ? (
+        <WriteFailureFace
+          what="입찰함에 담지"
+          error={add.error}
+          onRetry={() => {
+            if (add.variables !== undefined) {
+              add.mutate(add.variables);
+            }
+          }}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-3">
         {notices.isPending ? <Skeleton testId="notices-loading" /> : null}

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 
 import { WorksheetScreen } from './WorksheetScreen';
@@ -340,6 +341,54 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
       expect(screen.getByTestId('record-blocked').textContent).toContain('과세 구분');
     });
     expect(mocked.recordBid).not.toHaveBeenCalled();
+  });
+
+  /**
+   * CR H-2 — 「제출함」은 이 제품의 핵심 기록이다. 실패했는데 아무 얼굴도 없으면 운영자는 투찰
+   * 기록이 남았는지 알 길이 없다. 실패는 그 사실을 보이고 **서버 상태를 다시 읽는다**.
+   */
+  it('제출함이 실패하면 그 사실이 뜨고 서버 상태를 다시 읽는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    mocked.recordBid.mockRejectedValue(new ApiError(409, 'CONFLICT'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    const callsBefore = mocked.listBidCases.mock.calls.length;
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('기록하지 못했습니다');
+    expect(screen.queryByTestId('toast')).toBeNull();
+    // 다시 읽기 — 화면이 보이는 상태가 서버의 사실이어야 한다.
+    await waitFor(() => {
+      expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+  });
+
+  it('초안 실패도 같은 얼굴을 쓴다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'PRICE_RECEIVED' }]);
+    mocked.draftBid.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    expect((await screen.findByTestId('write-failure')).textContent).toContain('만들지 못했습니다');
+  });
+
+  it('쓰기가 401 이면 로그인으로 가는 길을 보인다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    mocked.recordBid.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(within(failure).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
   });
 
   it('타임라인은 전이·주체를 API 가 준 순서로 보인다', async () => {

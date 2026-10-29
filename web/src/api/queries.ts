@@ -1,5 +1,6 @@
 import type { components, operations } from './generated/operator-api';
 
+import { ApiError } from './apiError';
 import { apiClient } from './client';
 
 /**
@@ -25,19 +26,7 @@ type NoticesResultState = operations['searchNotices']['responses']['200']['heade
 type SuggestionsResultState = operations['listSuggestions']['responses']['200']['headers']['X-Result-State'];
 export type NoticeSearchQuery = NonNullable<operations['searchNotices']['parameters']['query']>;
 
-/**
- * 서버 오류의 정제된 표현 — **서버 메시지를 담지 않는다**(D-7E-6). 코드와 상태만 나른다:
- * 메시지에는 행 값이 실릴 수 있고 그것이 콘솔·trace 로 나가는 경로를 만들지 않는다.
- */
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string | null,
-  ) {
-    super(`api status=${status} code=${code ?? 'unknown'}`);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError } from './apiError';
 
 interface ErrorLike {
   readonly code?: string;
