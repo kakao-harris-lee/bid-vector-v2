@@ -158,6 +158,15 @@ describe('화면 C — 머리와 다음 행동 하나', () => {
  */
 /** v L-3 — 화면 C 의 세 얼굴. 분기 제거 변이가 지나갔던 자리다. */
 describe('화면 C — 빈·로딩·오류 세 얼굴', () => {
+  /** CR M-2 — 세션이 없으면 재시도가 아니라 로그인으로 보낸다(서버의 답을 소비한다). */
+  it('세션이 없으면 로그인 얼굴이 뜬다', async () => {
+    mocked.readSession.mockResolvedValue(null);
+    renderScreen();
+
+    const face = await screen.findByTestId('signed-out');
+    expect(face.textContent).toContain('로그인이 필요합니다');
+  });
+
   it('로딩 중에는 스켈레톤이 뜬다', () => {
     mocked.searchNotices.mockReturnValue(new Promise(() => undefined));
     renderScreen();

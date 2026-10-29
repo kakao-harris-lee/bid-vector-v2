@@ -136,6 +136,15 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
 });
 
 describe('화면 B — 빈·로딩·오류 세 얼굴', () => {
+  /** CR M-2 — 세션이 없으면 재시도가 아니라 로그인으로 보낸다(서버의 답을 소비한다). */
+  it('세션이 없으면 로그인 얼굴이 뜬다', async () => {
+    mocked.readSession.mockResolvedValue(null);
+    renderScreen();
+
+    const face = await screen.findByTestId('signed-out');
+    expect(face.textContent).toContain('로그인이 필요합니다');
+  });
+
   it('로딩 중에는 스켈레톤이 뜬다', () => {
     mocked.searchNotices.mockReturnValue(new Promise(() => undefined));
     renderScreen();

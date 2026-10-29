@@ -16,7 +16,7 @@ import {
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
-import { WriteFailureFace } from '../components/WriteFailure';
+import { SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -50,7 +50,7 @@ export function WorksheetScreen() {
   const noticeRound = params.noticeRound ?? '';
   const queryClient = useQueryClient();
   // 쓰기를 하는 화면이다 — 새로고침 뒤에도 CSRF 값을 쥐게 한다(7A 알려진 제한 L-1).
-  useSessionCsrf();
+  const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [form, setForm] = useState<BidAmountForm>(EMPTY_BID_FORM);
   // 진행 중 투찰 건수의 **선언** — 기본값이 없다(CR H-1). 빈 칸이면 요청 경로가 막힌다.
@@ -198,6 +198,13 @@ export function WorksheetScreen() {
     makeRecord.mutate({ caseId, ...amount, drawNumbers, memo: form.memo });
   }
 
+  if (signedIn === false) {
+    return (
+      <section data-testid="screen-worksheet" className="mx-auto max-w-3xl p-4">
+        <SignedOutFace />
+      </section>
+    );
+  }
   if (notices.isPending || cases.isPending) {
     return (
       <section data-testid="screen-worksheet" className="mx-auto max-w-3xl p-4">

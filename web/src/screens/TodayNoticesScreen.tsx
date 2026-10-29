@@ -12,7 +12,7 @@ import {
 } from '../api/queries';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
-import { WriteFailureFace } from '../components/WriteFailure';
+import { SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
@@ -57,7 +57,7 @@ function queryOf(form: SearchForm, page: number): NoticeSearchQuery {
 export function TodayNoticesScreen() {
   const queryClient = useQueryClient();
   // 쓰기를 하는 화면이다 — 새로고침 뒤에도 CSRF 값을 쥐게 한다(7A 알려진 제한 L-1).
-  useSessionCsrf();
+  const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [form, setForm] = useState<SearchForm>(EMPTY_FORM);
   const [submitted, setSubmitted] = useState<SearchForm>(EMPTY_FORM);
@@ -105,6 +105,16 @@ export function TodayNoticesScreen() {
   }
 
   const inBox = new Set((cases.data ?? []).map((row) => `${row.noticeNumber}\u0000${row.noticeRound}`));
+
+  // CR M-2 — 세션이 없다는 **서버의 답**을 소비한다. 재시도로 풀리지 않으므로 일시 장애와
+  // 같은 얼굴을 내지 않는다.
+  if (signedIn === false) {
+    return (
+      <section data-testid="screen-home" className="mx-auto max-w-3xl p-4">
+        <SignedOutFace />
+      </section>
+    );
+  }
 
   return (
     <section data-testid="screen-home" className="mx-auto flex max-w-3xl flex-col gap-6 p-4">

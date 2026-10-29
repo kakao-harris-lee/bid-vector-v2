@@ -61,3 +61,19 @@ export function WriteFailureFace({
     </div>
   );
 }
+
+/**
+ * 세션이 없다는 **서버의 답**을 소비하는 얼굴(CR M-2). 읽기 401 과 「세션 자원이 없다」(404)는
+ * 재시도로 풀리지 않는다 — 앞 판은 그것을 일시 장애와 같은 얼굴로 내고 영원히 재시도하게 했다.
+ */
+export function SignedOutFace() {
+  return (
+    <div data-testid="signed-out" role="alert" className="rounded-lg border border-line p-6 text-center">
+      <p className="text-sm font-medium">로그인이 필요합니다.</p>
+      <p className="mt-1 text-xs text-ink-soft">세션이 없거나 끝났습니다.</p>
+      <Link to="/login" className="mt-3 inline-block rounded-md border border-line px-3 py-1 text-sm underline">
+        로그인 화면으로
+      </Link>
+    </div>
+  );
+}
