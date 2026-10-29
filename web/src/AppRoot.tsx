@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router';
 
 import { AppShell } from './AppShell';
@@ -33,14 +32,8 @@ export const appRoutes: RouteObject[] = [
 
 const router = createBrowserRouter(appRoutes);
 
-// 서버 상태는 TanStack Query 가 든다(ADR 0011 D-1). 7A 는 질의를 하나도 걸지 않는다 —
-// 어떤 질의를 거는지는 데이터 요구표의 ⓐ 행이 열릴 때(7B·7C 뒤) 7E 가 정한다.
-const queryClient = new QueryClient();
-
+// 서버 상태 provider 는 **셸**이 든다(M7/7E-1, `AppShell`) — 라우트 트리가 그것을 품으므로
+// 라우트를 렌더하는 test 가 provider 를 따로 세우지 않는다.
 export function AppRoot() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
+  return <RouterProvider router={router} />;
 }

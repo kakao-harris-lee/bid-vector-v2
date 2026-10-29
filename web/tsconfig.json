@@ -15,6 +15,12 @@
   // (`allowJs` 를 켠 채 rootDir 밖 `.js` 를 import 하면 TS6059 는 **난다** — U-8 실측,
   // 켜지 않는 이유는 그 입구를 아예 두지 않는 것이다).
   //
+  // **M7/7E-1 — `resolveJsonModule` 을 끈다.** 켜져 있던 동안 `web/src` **안**의 정적 JSON 은
+  // 세 층(TS 프로그램 경계 · 번들 그래프 · 네트워크 lint)을 **모두 지났다**(7E-1 Phase 1 설계
+  // 검토 우회 ③): 경계의 술어가 「`web/src` 밖 금지」이고 그 파일은 안에 있기 때문이다. 끄면
+  // `import data from './x.json'` 이 **TS2732 로 컴파일되지 않는다** — 화면이 계약 밖에서
+  // 데이터 모양을 얻는 그 입구가 구조로 닫힌다. 이 값이 다시 켜지는 것은 W-4 가 단언한다.
+  //
   // `// @ts-ignore`·`// @ts-nocheck` 는 TS6059 를 억제한다(U-4 실측) — 그 억제는 eslint
   // `@typescript-eslint/ban-ts-comment`(W-2)가 막는다.
   //
@@ -35,7 +41,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
+    "resolveJsonModule": false,
     "forceConsistentCasingInFileNames": true,
 
     "strict": true,

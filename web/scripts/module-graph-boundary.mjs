@@ -54,6 +54,29 @@ export function classifyModuleId(rawId) {
   return { kind: 'virtual', path };
 }
 
+/**
+ * 번들 그래프에 들어와도 되는 **모듈 종류**(v M-4). 앞 판은 데이터 확장자를 **열거**했고
+ * (`json|json5|ya?ml|csv|xml`), 같은 JSON 을 `rows.txt?raw` 로 들이면 그 열거를 비켜 갔다(실측).
+ * 그래서 술어를 **뒤집는다** — 아는 종류만 받고 **모르는 종류는 위반**이다.
+ *
+ * 코드와 스타일만 번들의 입력이다. 이미지·폰트 같은 자산이 필요해지면 이 목록에 한 줄을
+ * 더해야 하고, 그 변경은 diff 에 남는다(열거를 늘리는 쪽과 달리 **빠뜨림이 조용하지 않다**).
+ *
+ * 왜 이 층에도 두는가: TS 쪽은 `resolveJsonModule` 을 꺼서 `import x from './a.json'` 이
+ * TS2732 로 막히고 W-4 가 `src` 안 데이터 파일 0 과 쿼리 접미 import 0 을 센다. 그러나 그 둘은
+ * **`node_modules` 안의 데이터**를 보지 못한다 — 그 자리를 이 층이 받는다.
+ */
+const ALLOWED_MODULE_EXTENSIONS = new Set(['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs', 'css', 'html']);
+
+export function isAllowedModuleKind(path) {
+  const match = /\.([A-Za-z0-9]+)$/.exec(path);
+  if (match === null) {
+    // 확장자가 없는 파일은 종류를 알 수 없다 — 모르는 것은 통과시키지 않는다.
+    return false;
+  }
+  return ALLOWED_MODULE_EXTENSIONS.has(match[1].toLowerCase());
+}
+
 export function isInsideRoot(candidate, root) {
   return candidate === root || candidate.startsWith(root + sep);
 }
@@ -162,9 +185,71 @@ export function boundaryRoots(webRootReal) {
   return roots;
 }
 
+/**
+ * 빌드가 **내보내는 자산**(v r2 M-2 · r4 M-2). 모듈 그래프 술어는 `new URL(…, import.meta.url)`
+ * 로 실린 파일을 보지 못한다 — 그것은 모듈 id 가 아니라 **자산**이다(실측: `rows.txt` 가
+ * `dist/assets/` 로 나갔고 다섯 층이 초록이었다). 내보내는 쪽에서 같은 술어를 한 번 더 건다.
+ *
+ * **종류 허용 목록에서 `css` 를 걷었다**(v r4 M-2): `.css` 는 허용 종류였고 데이터 판정을 하지
+ * 않았으므로, 이미 그래프에 있는 CSS 가 `url('./rows.css')` 로 12KB JSON 을 가리키면 그것이
+ * `dist/assets/rows-*.css` 로 나갔다(실측). 이제 CSS 자산은 **어느 chunk든 `importedCss` 로
+ * 가져온 것**만 받는다 — 그 밖의 CSS 는 종류와 무관하게 위반이다.
+ *
+ * 문면을 구현만큼으로 적는다(CR r5 L-3 · v r5 L-2): 「진입 chunk 만」이 아니라 **chunk 전수의
+ * 합집합**이다. 지연 chunk 의 CSS 도 이 층은 받아 주고, 그 자리는 하네스의 산출물 모양
+ * 단언(`{js 1 · css 1}`)이 먼저 멈춘다 — 두 층이 겹쳐 닫는다(오늘 지연 chunk 는 0 이다).
+ */
+const ALLOWED_ASSET_EXTENSIONS = new Set(['js', 'mjs', 'map', 'html', 'ico']);
+
+export function isAllowedAssetKind(fileName) {
+  const match = /\.([A-Za-z0-9]+)$/.exec(fileName);
+  return match !== null && ALLOWED_ASSET_EXTENSIONS.has(match[1].toLowerCase());
+}
+
+/** **모든** chunk 가 가져온 CSS 의 합집합 — Vite 가 chunk 마다 그 집합을 적는다. */
+export function importedCssOf(bundle) {
+  const names = new Set();
+  for (const one of Object.values(bundle)) {
+    if (one.type !== 'chunk') {
+      continue;
+    }
+    for (const css of one.viteMetadata?.importedCss ?? []) {
+      names.add(css);
+    }
+  }
+  return names;
+}
+
+/**
+ * 번들이 내보내는 자산 가운데 **받지 않는 것**. CSS 는 어느 chunk든 가져온 것만, 그 밖은
+ * 종류 허용 목록으로 가린다.
+ */
+export function assetOffenders(bundle) {
+  const imported = importedCssOf(bundle);
+  return Object.values(bundle)
+    .filter((one) => one.type === 'asset')
+    .filter((one) =>
+      one.fileName.toLowerCase().endsWith('.css')
+        ? !imported.has(one.fileName)
+        : !isAllowedAssetKind(one.fileName),
+    )
+    .map((one) => one.fileName);
+}
+
 export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
   return {
     name: 'bidvector:module-graph-boundary',
+    generateBundle(_options, bundle) {
+      const offenders = assetOffenders(bundle);
+      if (offenders.length > 0) {
+        this.error(
+          `번들이 **받지 않는 자산**을 내보낸다 — 데이터 모양은 V2 계약에서만 온다 ` +
+            `(ADR 0011 D-2). new URL(…, import.meta.url) 로 실린 파일과 CSS url() 이 가리킨 ` +
+            `데이터가 이 자리에 나타난다:\n` +
+            offenders.map((line) => `  - ${line}`).join('\n'),
+        );
+      }
+    },
     buildEnd() {
       const webRootReal = realpathSync(webRoot);
       const allowedRoots = boundaryRoots(webRootReal);
@@ -174,6 +259,7 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
       // 식별은 디렉터리 이름이 아니라 **패키지 이름**이다(r4 M-9).
       const callSitePath = resolve(webRootReal, API_CALL_SITE);
       const apiOffenders = [];
+      const dataOffenders = [];
 
       for (const rawId of this.getModuleIds()) {
         const { kind, path } = classifyModuleId(rawId);
@@ -194,6 +280,10 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         }
         if (violatesBoundary(realPath, allowedRoots)) {
           offenders.push(`${rawId} → ${realPath}`);
+          continue;
+        }
+        if (!isAllowedModuleKind(realPath)) {
+          dataOffenders.push(`${rawId} → ${realPath}`);
           continue;
         }
 
@@ -227,6 +317,15 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
         this.error(
           `번들 모듈 그래프가 web/src·web/node_modules·index.html 밖 파일을 담았다 (ADR 0011 D-3):\n` +
             offenders.map((line) => `  - ${line}`).join('\n'),
+        );
+      }
+
+      if (dataOffenders.length > 0) {
+        this.error(
+          `번들 모듈 그래프가 **아는 종류가 아닌 모듈**을 담았다 — 코드·스타일만 번들의 입력이고 ` +
+            `데이터 모양은 V2 계약에서만 온다(ADR 0011 D-2). 경로가 node_modules 안이면 의존성 ` +
+            `올림을 먼저 보라(그 패키지가 데이터를 import 한다):\n` +
+            dataOffenders.map((line) => `  - ${line}`).join('\n'),
         );
       }
 
