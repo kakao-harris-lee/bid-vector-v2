@@ -18,11 +18,28 @@ import { expect, test, type Locator, type Page, type Request } from '@playwright
  *
  * 하네스가 적어 준 실행 맥락은 **Playwright 산출물 밖**이다(D-7E-6).
  */
-const context = JSON.parse(
-  readFileSync(resolve(tmpdir(), 'bidvector-7e1-journey-context.json'), 'utf8'),
-) as { readonly previewUrl: string; readonly loginName: string; readonly passphrase: string };
+interface JourneyContext {
+  readonly previewUrl: string;
+  readonly loginName: string;
+  readonly passphrase: string;
+}
 
-const SAME_ORIGIN = new URL(context.previewUrl).origin;
+const CONTEXT_PATH = resolve(tmpdir(), 'bidvector-7e1-journey-context.json');
+let cached: JourneyContext | undefined;
+
+/**
+ * **지연 읽기**다(OQ-2). 모듈 적재 때 읽으면 하네스가 뜨지 않은 상태에서 **수집 자체가**
+ * 실패한다 — `--list` 로 「이 설정이 무엇을 수집하는가」를 세는 길이 막히고, 수집 단계의 실패와
+ * test 의 실패가 같은 모양이 된다. 함수로 미루면 없는 파일은 **test 의 실패**다.
+ */
+function journeyContext(): JourneyContext {
+  cached ??= JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as JourneyContext;
+  return cached;
+}
+
+function sameOrigin(): string {
+  return new URL(journeyContext().previewUrl).origin;
+}
 
 /** 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. */
 const ABSENT = '값 없음';
@@ -94,7 +111,7 @@ function watchRequests(page: Page): { readonly outside: string[]; readonly apiPa
   const apiPaths = new Set<string>();
   page.on('request', (request: Request) => {
     const url = new URL(request.url());
-    if (url.origin !== SAME_ORIGIN) {
+    if (url.origin !== sameOrigin()) {
       outside.push(request.url());
       return;
     }
@@ -137,8 +154,8 @@ function assertOnlyAllowedOperations(apiPaths: Set<string>): void {
 
 async function signIn(page: Page): Promise<void> {
   await page.goto('/login');
-  await page.fill('input[name="loginName"]', context.loginName);
-  await page.fill('input[name="passphrase"]', context.passphrase);
+  await page.fill('input[name="loginName"]', journeyContext().loginName);
+  await page.fill('input[name="passphrase"]', journeyContext().passphrase);
   await Promise.all([
     page.waitForResponse(
       (response) => response.url().includes('/api/session') && response.request().method() === 'POST',
@@ -412,8 +429,8 @@ test('개인정보·비밀값이 화면과 콘솔에 나오지 않는다', async
   const body = await page.locator('body').innerText();
   // 세션 쿠키는 HttpOnly 라 스크립트가 읽지 못한다 — 그 사실을 화면 쪽에서 확인한다.
   expect(await page.evaluate(() => document.cookie)).not.toContain('bidvector_session');
-  expect(body).not.toContain(context.passphrase);
-  expect(consoleLines.join('\n')).not.toContain(context.passphrase);
+  expect(body).not.toContain(journeyContext().passphrase);
+  expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
   // 사업자등록번호 형태(3-2-5)가 화면에 없다.
   expect(body).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
 });

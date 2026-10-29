@@ -28,6 +28,9 @@ export type NoticeSearchQuery = NonNullable<operations['searchNotices']['paramet
 
 export { ApiError } from './apiError';
 
+const HTTP_NOT_FOUND = 404;
+const HTTP_UNAUTHORIZED = 401;
+
 interface ErrorLike {
   readonly code?: string;
 }
@@ -106,9 +109,6 @@ export async function readSession(): Promise<SessionResponse | null> {
   }
   return data;
 }
-
-const HTTP_NOT_FOUND = 404;
-const HTTP_UNAUTHORIZED = 401;
 
 export async function searchNotices(query: NoticeSearchQuery): Promise<Listed<NoticeSummary, NoticesResultState>> {
   const { data, error, response } = await apiClient.GET('/api/notices', { params: { query } });

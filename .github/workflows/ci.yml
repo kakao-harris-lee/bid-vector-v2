@@ -343,9 +343,11 @@ jobs:
         id: web-journey
         run: npm run test:e2e:journey
 
-      # code-review r1 F-7 — CI reporter 는 `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한
-      # 줄만 남기고 trace·스크린샷을 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure`
-      # 가 쓰이지 않았다). 위 두 job 과 같은 major 다.
+      # **아래 업로드는 셸 스모크(W-11)의 산출물이다.** code-review r1 F-7 — CI reporter 는
+      # `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한 줄만 남기고 trace·스크린샷을
+      # 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure` 가 쓰이지 않았다). 위 두
+      # job 과 같은 major 다. (M7/7E-1 v L-8 — 여정 step 이 그 뒤에 와서 이 블록이 어느 step 을
+      # 설명하는지 흐려졌다. 업로드를 스모크 바로 뒤에 둔 채 문면으로 그 자리를 못박는다.)
       #
       # 조건은 **스모크가 실제로 실패했을 때**로 좁힌다(PR #75 리뷰 G · in-file 선례 PR #68 M-4) —
       # `failure()` 는 앞 어느 step 이 깨져도 참이라 trace 가 있을 수 없는 실패(예: `npm ci`)에서도
