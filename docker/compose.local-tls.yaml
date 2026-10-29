@@ -61,8 +61,9 @@ services:
     # 서비스 이름으로 붙는다.
     healthcheck:
       # 기본 파일의 app·ml-serving 과 같은 선택 — `docker compose ps` 의 healthy 가
-      # 「요청을 받아도 되는가」를 뜻하게 한다. `curl` 은 이 베이스에 이미 있다(2026-10-16
-      # 실측) — 도구를 더 설치하지 않는다.
+      # 「요청을 받아도 되는가」를 뜻하게 한다. `curl` 은 runtime stage 가 하한과 함께 설치한다
+      # (`docker/web.Dockerfile`·`docker/proxy.Dockerfile` 의 `apk add` 줄, chore 2026-10-29 — 그 전에는 caddy
+      # 베이스에 있었다). 빠지면 위생 정책의 `required.executables` 가 붉어진다.
       test:
         - CMD
         - curl

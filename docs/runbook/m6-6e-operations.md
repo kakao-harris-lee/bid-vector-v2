@@ -753,6 +753,13 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 1. **올린다(원칙).** OS 패키지면 Dockerfile 의 베이스 다이제스트를, JVM 의존이면 버전 카탈로그·Boot
    BOM 을 올린다. 올리면 해당 finding 이 사라지고, 그 CVE 를 덮던 allowlist 등재가 **stale 로 붉어져**
    같은 PR 에서 치우게 된다. 상향과 정리는 한 번에 끝난다.
+   **셋째 갈래 — 우리가 빌드하는 바이너리**(chore 2026-10-29 부터 web·proxy 의 `usr/bin/caddy`). finding 의
+   Target 이 그 바이너리이고 패키지가 `stdlib` 이면 golang 빌더 다이제스트(두 Dockerfile 의 `caddy-build`
+   stage `FROM`, 같은 값)와 `docker/caddy/go.mod` 의 `go` 줄을, Go 모듈이면 `docker/caddy/` 에서
+   `go get <모듈>@<수정판> && go mod tidy` 로 `go.mod`·`go.sum` 을 올린다(그 빌더 이미지 안에서, `GOTOOLCHAIN=local`).
+   caddy 판 자체는 상류 릴리스를 따른다 — 상류가 고친 판을 내면 `go get github.com/caddyserver/caddy/v2@<판>`
+   과 두 Dockerfile 의 `org.bidvector.caddy` 라벨·`CADDY_VERSION` 을 함께 옮긴다. 두 이미지의 바이너리가
+   같은지는 `tools/local-tls-build.sh` 의 sha256 등식이 잡는다.
 2. **등재한다(유예).** 지금 올릴 수 없으면 사유와 만료일을 적어
    `config/quality/vuln-allowlist.properties` 에 넣는다. 등재는 **면제가 아니라 기한부 유예**다.
 
@@ -773,7 +780,8 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 상향 커밋은 그래서 늘 넷을 함께 움직인다(4 는 해당할 때):
 
 1. Dockerfile 의 `FROM`(stage 마다) — 다이제스트까지
-2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다)
+2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다).
+   web·proxy 는 라벨이 **둘**이다 — `org.bidvector.caddy` 도 caddy 판을 손으로 적는다(셋째 갈래)
 3. `config/quality/image-hygiene-policy*.properties` 의 `base.image.digest`
 4. 배포판이 바뀌었으면 `config/quality/vuln-policy.properties` 의 `scan.os.*`
 

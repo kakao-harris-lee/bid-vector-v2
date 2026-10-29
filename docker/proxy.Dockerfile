@@ -34,12 +34,14 @@ RUN go build -trimpath -ldflags='-s -w' -tags=nobadger,nomysql,nopgx -o /out/cad
 # 그 의존이 취약점 게이트의 차단 후보였다(CVE-2026-92392 · CVE-2026-111497). 패키지는 공식 이미지처럼
 # 빌드 시점의 alpine v3.23 index 에서 온다(정확 판 고정이 아니다 — 정확 고정은 alpine 이 옛 판을 index
 # 에서 빼는 날 모든 빌드를 붉힌다). 하한은 그 index 가 고친 판보다 낮은 것을 주면 빌드를 멈춘다.
+# 하한을 건 패키지는 **제약형 한 번만** 적는다 — 무제약 `curl` 을 함께 적으면 인자 순서에 따라 apk 가
+# 하한을 조용히 무시한다(검토 실측: `'curl>=99' curl` 순서면 exit 0).
 FROM alpine:3.23.7@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
 
 LABEL org.bidvector.baseimage="alpine:3.23.7@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63"
 LABEL org.bidvector.caddy="v2.11.7 self-built (docker/caddy/go.mod)"
 
-RUN apk add --no-cache ca-certificates curl libcap mailcap \
+RUN apk add --no-cache ca-certificates libcap mailcap \
         'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' 'brotli-libs>=1.2.1-r0'
 
 # 바이너리 복사와 `setcap` 을 **한 layer** 에서 한다 — `COPY` 뒤 별도 `RUN setcap` 은 xattr 하나 때문에
