@@ -396,3 +396,72 @@ main 이 **`bb6a187e`** 가 됐다(PR #101 — caddy 직접 빌드 · app 베이
 - exit: 0
 - 핵심 결과: 새 파일 **0** — 이 라운드가 고친 산출물 경로는 **열아홉**이다(`ci.yml` + `web/**`
   열여덟; evidence 셋은 따로). 변경 경로 전부 in_scope 안이라 계약 갱신이 필요하지 않다
+
+## 승인 전 마지막 일괄 (r4) — verifier `ready-for-review`(M 2 · L 3) · CR `approve`(M 3 · L 11)
+
+- cmd: v M-1 재현 — `import * as C from './client'; export const ns = C;`
+- exit: 1
+- 핵심 결과: 앞 판은 **정적 다섯 층이 모두 0** 이었다(그 꼴에는 `apiClient` 라는 이름이 나타나지
+  않고 심볼 추적이 이름으로 걸러졌다). 이제 **두 층**이 각각 적는다 — import 꼴(네임스페이스
+  금지)과 export 타입 전수
+
+- cmd: `export const cc = apiClient` · `export default apiClient`
+- exit: 1 · 1
+- 핵심 결과: 둘 다 **export 타입 전수**에서 선다(이름을 바꾸거나 default 로 내보내도 타입이 같다)
+
+- cmd: CR L-6 재현 — 계약에 없는 메서드를 목록에(`{ method: 'PUT', path: '/api/notices' }`)
+- exit: 2
+- 핵심 결과: `TS2344`(「`'put'` 이 제약 `never` 를 만족하지 않는다」). **이 단언을 두 번 틀렸다**:
+  교집합(`& keyof paths[P]`)은 생성기가 적는 없는 메서드 키를 통과시키고, 그 키는 `put?: never`
+  라 **optional** 이므로 속성 타입이 `never` 가 아니라 `undefined` 다(probe 로 확인). 세 번째
+  판에서 양성 대조가 붉어졌다 — **초록인 단언은 없는 단언과 같은 값이다**
+
+- cmd: v M-2 재현 — `src/rows.css`(13.9KB JSON) + `index.css` 의 `url('./rows.css')`
+- exit: W-4 0 · **build 1**
+- 핵심 결과: 번들이 그 데이터를 `assets/rows-*.css` 로 내보내려 할 때 **자산 술어가 그 이름을
+  적고 멈춘다**. W-4 가 0 인 것은 정상이다(파일 종류 허용 목록은 `.css` 를 받는다) — 이 축은
+  내보내는 쪽이 진다
+
+- cmd: CR M-1 재현 — 최상위 `publicDir: 'static'` + `test:` 블록의 미끼 `publicDir: false`
+- exit: 1
+- 핵심 결과: 「대입이 정확히 하나가 아니다(계수 2)」. 앞 판은 **파일 안 마지막 대입**을 봐서
+  초록인 채 입구가 열렸고 성공 문면이 그 명제를 **주장**했다
+
+- cmd: 락 주입·실 파일시스템 대조(docker 호출 0)
+- exit: 0
+- 핵심 결과: `EPERM` 축 둘이 **살아 있음**으로 선다(실제 pid 1 포함 — 앞 판은 그것을 죽음으로
+  셌다) · 버릴 임시 디렉터리에서 **둘째 획득이 실패**하고 첫 표지가 그대로다 · 죽은 소유자의
+  락은 그 컨테이너를 걷고 이어받는다 · 획득이 생존 판정을 **부르는지**도 센다(앞 판은 그 블록을
+  지워도 초록이었다)
+
+- cmd: 자산 모양 술어 잠금(새 모듈)
+- exit: 0
+- 핵심 결과: 자산이 하나 늘 때 · css 가 사라질 때 · 전수가 0 일 때 · 디렉터리가 섞일 때 각각
+  멈춘다. 여정의 허용 집합이 **산출물에서 그냥 파생**되던 자리를 이 술어가 대신 진다
+
+- cmd: 잠금 변이 넷(`Field` 배선 · 401 `.some()` 두 화면 · 되돌림 재시도)
+- exit: 1 · 1 · 1 · 1
+- 핵심 결과: 각각 그 test 만 붉다. **앞 판은 넷 다 지워도 200 초록이었다**
+
+### r4 acceptance 전건
+
+- cmd: `web` job W-1~W-13(명령 그대로) · 단독 여정 넷 · 강제 실패 한 건
+- exit: **전부 0**(강제 실패만 1 — 의도)
+- 핵심 결과: vitest **14 파일 224** · 셸 스모크 2 · 여정 **4 passed 30.5s** · 단독 넷 각각 0
+  (26.0s · 27.4s · 28.0s · 33.4s) · 강제 실패에서 **1 failed · 3 passed**(`did not run` 0)
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 38s` · 392 중 357 up-to-date (Kotlin 입력 변경 0)
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `fb9cf54a`)
+- exit: 0
+- 핵심 결과: **장부 ↔ 기계 목록 차집합 양쪽 빈 출력**(⓪ — 이 대조를 측정 안으로 넣었다) ·
+  복원 **22** · 삭제 **36** · **트리 해시 동일성** 셋 · 「내 표지 0 · 남의 표지 2」 · 되돌린 뒤
+  vitest 5 파일 28 · 게이트 여섯과 셸 스모크 0 · **내 산출물 경로 차이 0 건**
+
+- cmd: 라운드가 만든 새 파일 ↔ in_scope 대조
+- exit: 0
+- 핵심 결과: 새 파일 **둘**(`web/e2e/harness/bundle-shape.{mjs,test.mjs}`) — in_scope 의
+  `web/e2e/harness/**` 안이라 계약 갱신이 필요하지 않다. 그 test 는 만드는 커밋에서
+  `config/gate-tests.txt` 에 등재했다(W-7 로 실행 확인)
