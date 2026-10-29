@@ -1,7 +1,10 @@
 package bidvector.app.http
 
 import bidvector.app.wiring.BidPriceRequestRun
+import bidvector.decision.PublishedFloorTrustPolicyData
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.procurement.Notice
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.export
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.MlAnalysisOutcome
@@ -137,7 +140,7 @@ fun bidPriceRequestResponseOf(
         notification = notificationFieldsOf(run),
         qualification = qualificationFieldsOf(run.licenseJudgement),
         baseAmount = baseAmountFieldsOf(run.notice),
-        floorRate = floorRateFieldsOf(run.notice),
+        floorRate = floorRateFieldsOf(run.notice, run.floorTrustPolicy),
         priceAxes = priceAxesFieldsOf(run.mlOutcome()),
         disclosures = BidPriceDisclosure.entries.map { it.name },
     )
@@ -175,12 +178,24 @@ private fun baseAmountFieldsOf(notice: Notice): BaseAmountFields {
     )
 }
 
-private fun floorRateFieldsOf(notice: Notice): FloorRateFields {
+/**
+ * 근거 칸은 **DEC-10 게이트 판정 하나에서** 나온다(D-7C2B-1) — 상태와 값이 갈릴 자리가 없다.
+ * 정책은 요청 묶음이 나른다(`BidPriceRequestRun.floorTrustPolicy`) — 평가 경로와 **같은 상수**를
+ * 같은 방식으로 해소한 값이라 표시만 다른 밴드를 보는 일이 없다.
+ *
+ * 출처·차수는 **판정과 무관한 원문 사실**이라 원값에서 그대로 읽는다 — 근거가 되지 못하는 값일
+ * 때 「왜 못 되는지」를 화면이 말할 수 있어야 한다.
+ */
+private fun floorRateFieldsOf(
+    notice: Notice,
+    floorTrustPolicy: Resolution.Resolved<PublishedFloorTrustPolicyData>,
+): FloorRateFields {
     val floor = notice.floorRate
+    val grounds = floorRateGroundsOf(trustPublishedFloorRate(floor, floorTrustPolicy))
     return FloorRateFields(
-        publishedFloorRateFraction = usableFloorRateOf(floor)?.rate?.fraction?.toPlainString(),
+        publishedFloorRateFraction = grounds.fraction,
         publishedFloorRateOrigin = floor?.let(::floorRateOriginLabel),
         publishedFloorRateNoticeRound = publishedOriginRoundOf(floor),
-        floorRateGroundsState = floorRateGroundsStateOf(floor).name,
+        floorRateGroundsState = grounds.state.name,
     )
 }

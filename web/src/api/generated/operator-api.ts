@@ -54,6 +54,7 @@ export interface paths {
          *     **분석 예산을 적용하지 않는다.** 전략의 후보 상한은 전건 스캔의 비용 통제이고 운영자가 지목한 공고 하나의 허가 조건이 아니다 — 상한이 1 인 전략에서도 요청한 공고는 평가된다. 이것이 `evaluateDryRun` 과 **의도적으로 어긋나는 유일한 축**이다.
          *     **가격 세 축은 아직 값이 서지 않는다.** 3안(`bidPriceMenuState`)·신뢰도 (`confidenceState`)·하한 미달 빈도(`floorShortfallState`)는 **상태와 사유**만 낸다 — 출하 조립의 ML 분석 포트가 항상-미가용 고정이고(`OPEN-ML-ANALYSIS-WIRING` 보류) 하한 미달 정책의 출하 정본 표가 없다. 값 칸을 미리 두지 않는 이유는 「없음」이 「0」으로 읽히지 않게 하는 것이다 — 값이 서는 slice 가 칸을 더한다.
          *     **하한율은 게시값만 근거다**(운영자 결정 2026-10-15). 법정 하한율을 해석하지 않으며 그 사실을 `disclosures` 가 `STATUTORY_FLOOR_RATE_NOT_INTERPRETED` 로 고지한다. 게시 하한율이 아닌 출처의 값은 근거 칸에 싣지 않고 `floorRateGroundsState` 가 말한다.
+         *     **게시값이라도 개연 밴드 밖이면 근거가 아니다**(DEC-10 신뢰 밴드). 근거 상태는 평가 경로와 **같은 정책**으로 판정하므로 화면과 가격 판단이 다른 밴드를 보지 않는다 — 그런 값은 `IMPLAUSIBLE` 이고 근거 칸은 비어 나간다(값을 고치지 않는다).
          *     **「근거 원문」은 (출처 필드 + 요건 면허명 + 정책 version)이다** — 원시 관측 blob· 공고명·기관명·사업자번호는 이 응답에 자리가 없다.
          */
         post: operations["requestBidPrice"];
@@ -1027,17 +1028,17 @@ export interface components {
              * @enum {string|null}
              */
             baseAmountResolution?: null | "DIRECT" | "FALLBACK_FROM_BUDGET" | "DERIVED_FROM_OPENING";
-            /** @description 게시 낙찰하한율 — fraction 의 10진 문자열이다(percent 가 아니고 부동소수가 아니다). 출처가 게시값이 아니면 **싣지 않는다**. */
+            /** @description 게시 낙찰하한율 — fraction 의 10진 문자열이다(percent 가 아니고 부동소수가 아니다). **근거로 설 수 있을 때만 싣는다** — 출처가 게시값이 아니거나 개연 밴드 밖이면 비우고 `floorRateGroundsState` 가 사유를 말한다. */
             publishedFloorRateFraction?: string | null;
             /** @enum {string|null} */
             publishedFloorRateOrigin?: null | "NOTICE_VALUE" | "STATUTORY_TABLE";
             /** @description 게시값 출처의 공고 차수. */
             publishedFloorRateNoticeRound?: string | null;
             /**
-             * @description 게시 하한율이 근거로 설 수 있는가 — 「없다」와 「게시값이 아니다」를 가른다 (운영자 결정 2026-10-15: 게시값만 근거).
+             * @description 게시 하한율이 근거로 설 수 있는가 — 「없다」(ABSENT)·「게시값이 아니다」 (ORIGIN_NOT_PUBLISHED)·「게시값이지만 개연 밴드 밖이다」(IMPLAUSIBLE)를 가른다 (운영자 결정 2026-10-15 게시값만 근거 · DEC-10 신뢰 밴드). `IMPLAUSIBLE` 은 **값을 고치지 않는다** — 밴드 끝으로 접거나 클램프하지 않고 근거로 쓰지 않을 뿐이다. 그 원값은 근거 칸에 실리지 않고 이 상태가 그 사실을 말한다.
              * @enum {string}
              */
-            floorRateGroundsState: "USABLE" | "ABSENT" | "ORIGIN_NOT_PUBLISHED";
+            floorRateGroundsState: "USABLE" | "ABSENT" | "IMPLAUSIBLE" | "ORIGIN_NOT_PUBLISHED";
             /**
              * @description 하한 미달 빈도(DEC-04)를 **이 공고에서 잴 수 있는가**. 지금은 재지 못한다 — 커널은 있으나 출하 정본 정책 표와 표본 공급 경로가 없다. 값이 서는 slice 가 빈도 칸과 상태 값을 더한다.
              * @enum {string}
