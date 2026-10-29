@@ -465,3 +465,30 @@ verifier `ready-for-review`(M 1 · L 1) · CR `approve`(L 4 · nit 1) 뒤의 **�
 (`fd505b5d` 의 `one-command-check` exit 0)이 그대로 유효하다. 머지 전 main 병합 라운드에서
 Kotlin `check` 1회와 rollback 유효성을 다시 잰다(팀장 지시).
 
+## 2026-10-29 — main 병합 라운드 둘째 (`260d0c99`)
+
+### 교집합 — 0
+
+- cmd: `git diff --name-only c4e3fd1c..260d0c99` ∩ 이 slice 의 복원 목록
+- 핵심 결과: main 이 더 들여온 것은 **네 경로**(`config/quality/vuln-allowlist.properties` + 그
+  chore 의 evidence 셋)이고 이 slice 의 79 경로와 **교집합 0**. 충돌 0 · 자동 해소 자리 0.
+- **계수 검증**(충돌 0 이 본문 보존을 뜻하지 않는다): 병합 결과의 네 파일이 `260d0c99` 의 내용과
+  **바이트 동일**(`git show | cmp` 4/4) · 스테이지된 넷 ∩ 복원 목록 = **0**(병합이 내 경로를 한
+  줄도 움직이지 않았다). `vuln-allowlist.properties` 는 `allow|…` 줄 꼴이라 key=value 합집합 계수가
+  **공허하다**(양쪽 0 키) — 그래서 그 파일은 바이트 동일 대조로 센다.
+
+### acceptance — Kotlin `check` 1회
+
+- cmd: `./gradlew --no-daemon check` @ `b22efb74`
+- exit: **0**(`BUILD SUCCESSFUL in 37s`)
+- **이 초록은 「다시 돌았다」가 아니라 「입력이 안 바뀌었다」다** — 486 task 중 391 이 캐시·최신이고
+  test task 여섯이 전부 UP-TO-DATE 다. `fd505b5d`(마지막 전건 실행, Kotlin `check` 24m 45s · 전건
+  `one-command-check` exit 0) 이후 바뀐 파일은 **넷**뿐이다: `tools/floor-trust-allowlist.py`(어떤
+  CI job 의 입력도 아니다 — 제한 ⑫) · `docs/discovery/capability-map.md` · 이 slice 와 chore 의
+  evidence `.md` · `config/quality/vuln-allowlist.properties`(**`container` job 의 입력**이고 Kotlin
+  task 의 입력이 아니다). UP-TO-DATE 자체가 Gradle 의 입력 해시 동일 선언이고, 그 입력으로 실제
+  실행된 초록이 `fd505b5d` 에 있다. 캐시에 걸리지 않는 게이트 **95 task** 는 이 HEAD 에서 실행됐다.
+- `ml-engine`·`web` job 생략의 근거: 그 둘의 입력(`ml-engine/**`·`openapi/**`·`web/**`) 변경이
+  **0** 이다(위 네 파일 중 어느 것도 그 경로가 아니다). `container` 입력은 바뀌었지만 그 job 은
+  main 쪽 chore 가 고친 자리이고 이 slice 의 acceptance 에 없다 — PR CI 가 그 job 을 돌린다.
+
