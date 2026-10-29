@@ -102,6 +102,12 @@ function renderScreen() {
 
 const mocked = vi.mocked(queries);
 
+/** 투찰가 요청 경로 — 진행 중 건수를 **선언한 뒤** primary 를 누른다(CR H-1). */
+async function askPrice(declared = '2'): Promise<void> {
+  fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: declared } });
+  fireEvent.click(await screen.findByTestId('worksheet-primary'));
+}
+
 // `globals: false` 이므로 자동 cleanup 이 없다 — 남은 DOM 이 같은 testId 를 둘로 만든다.
 afterEach(() => {
   cleanup();
@@ -142,10 +148,71 @@ describe('화면 C — 머리와 다음 행동 하나', () => {
   });
 });
 
+/**
+ * CR H-1 · v M-5 — 계약은 `currentActiveBids` 를 「**호출자가 선언한다** — 서버가 0 으로 지어내지
+ * 않는다」로 둔다. 실측: 계약 전체에 그 수를 **서버가 세어 주는 표면이 없다**(`listBidCases` 에
+ * `X-Total-Count` 도 집계도 없다). 클라이언트가 상태를 「진행 중」으로 분류해 세면 그것은 계약에
+ * 없는 정의를 화면이 만드는 것이라 D-7E-4 위반이다 — 그래서 **운영자가 선언**하고 화면은 그 값을
+ * 그대로 싣고 되돌려 받은 값을 보인다.
+ */
+describe('화면 C — 진행 중 투찰 건수는 선언된 값이다(지어내지 않는다)', () => {
+  it('선언 전에는 투찰가를 요청하지 않고 무엇이 없는지 말한다', async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-bids-blocked').textContent).toContain('진행 중 투찰 건수');
+    });
+    expect(mocked.requestBidPrice).not.toHaveBeenCalled();
+  });
+
+  it('선언한 값이 그대로 요청에 실린다 — 0 을 기본값으로 두지 않는다', async () => {
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: '3' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    await waitFor(() => {
+      expect(mocked.requestBidPrice).toHaveBeenCalledWith({
+        noticeNumber: NOTICE.noticeNumber,
+        noticeRound: NOTICE.noticeRound,
+        currentActiveBids: 3,
+      });
+    });
+  });
+
+  it('0 을 선언하는 것은 가능하다 — 다만 그것은 운영자의 선언이다', async () => {
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: '0' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    await waitFor(() => {
+      expect(mocked.requestBidPrice).toHaveBeenCalledWith(
+        expect.objectContaining({ currentActiveBids: 0 }),
+      );
+    });
+  });
+
+  it('응답이 되돌려 준 선언값과 여력 상한을 근거에 보인다', async () => {
+    mocked.requestBidPrice.mockResolvedValue({ ...PRICE, currentActiveBids: 3, maxActiveBids: 5 });
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: '3' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    const capacity = await screen.findByTestId('capacity');
+    expect(capacity.textContent).toContain('3');
+    expect(capacity.textContent).toContain('5');
+    expect(capacity.textContent).toContain('선언');
+  });
+});
+
 describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
   it('3안 자리는 「아직 산출 안 함」이고 그 자리에 숫자가 없다', async () => {
     renderScreen();
-    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await askPrice();
 
     const slot = await screen.findByTestId('bid-price-menu');
     expect(slot.textContent).toContain('아직 산출 안 함');
@@ -155,7 +222,7 @@ describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
 
   it('하한 미달 빈도와 신뢰도도 상태와 사유로만 보인다', async () => {
     renderScreen();
-    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await askPrice();
 
     expect((await screen.findByTestId('floor-shortfall')).textContent).toContain('재지 못함');
     expect((await screen.findByTestId('confidence')).textContent).toContain('신뢰도 없음');
@@ -163,7 +230,7 @@ describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
 
   it('게시 하한율의 「없다」가 0% 로 보이지 않는다', async () => {
     renderScreen();
-    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await askPrice();
 
     const grounds = await screen.findByTestId('floor-rate-grounds');
     expect(grounds.textContent).toContain('게시 하한율 없음');
@@ -178,7 +245,7 @@ describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
       publishedFloorRateOrigin: 'NOTICE_VALUE',
     });
     renderScreen();
-    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await askPrice();
 
     const grounds = await screen.findByTestId('floor-rate-grounds');
     expect(grounds.textContent).toContain('0.8745');
@@ -188,7 +255,7 @@ describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
 describe('화면 C — 자격 카드(G2 13)', () => {
   beforeEach(async () => {
     renderScreen();
-    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await askPrice();
   });
 
   it('판정 불가가 미달로 읽히지 않는다', async () => {

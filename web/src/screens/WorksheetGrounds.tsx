@@ -116,6 +116,12 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
           </dd>
         </div>
       </dl>
+      {/* CR H-1 — **주장한 값을 보인다**. 응답이 되돌려 준 선언값과 여력 상한을 나란히 두어,
+          운영자가 「무엇이 주장됐는지」를 화면에서 확인할 수 있게 한다. */}
+      <p data-testid="capacity" className="mt-3 text-xs text-ink-soft">
+        여력: 진행 중 <span className="font-numeric">{price.currentActiveBids}</span>건으로 **선언**함 ·
+        상한 <span className="font-numeric">{price.maxActiveBids}</span>
+      </p>
       <p data-testid="inbox-record" className="mt-3 text-xs text-ink-soft">
         알림함: {displayOf(INBOX_RECORD_STATE_DISPLAY, price.inboxRecordState).label}
         {price.inboxRecordNotRecordedReason === null || price.inboxRecordNotRecordedReason === undefined

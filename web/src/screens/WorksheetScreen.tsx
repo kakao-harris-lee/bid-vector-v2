@@ -23,9 +23,11 @@ import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { WorksheetGrounds } from './WorksheetGrounds';
 import {
+  ActiveBidsDeclaration,
   BidAmountFields,
   EMPTY_BID_FORM,
   KonepsHandoff,
+  parseCount,
   parseDrawNumbers,
   parseWon,
   type BidAmountForm,
@@ -50,8 +52,11 @@ export function WorksheetScreen() {
   useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [form, setForm] = useState<BidAmountForm>(EMPTY_BID_FORM);
+  // 진행 중 투찰 건수의 **선언** — 기본값이 없다(CR H-1). 빈 칸이면 요청 경로가 막힌다.
+  const [activeBids, setActiveBids] = useState('');
   const [price, setPrice] = useState<BidPriceRequestResponse | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [activeBidsBlocked, setActiveBidsBlocked] = useState<string | null>(null);
   const [now] = useState(() => new Date());
 
   const notices = useQuery({
@@ -79,7 +84,9 @@ export function WorksheetScreen() {
   }
 
   const askPrice = useMutation({
-    mutationFn: () => requestBidPrice({ noticeNumber, noticeRound, currentActiveBids: 0 }),
+    // 선언된 값만 wire 에 닿는다 — 호출 자리에 리터럴이 없다(CR H-1 · v M-5).
+    mutationFn: (currentActiveBids: number) =>
+      requestBidPrice({ noticeNumber, noticeRound, currentActiveBids }),
     onSuccess: (result) => {
       setPrice(result);
     },
@@ -144,7 +151,13 @@ export function WorksheetScreen() {
 
   function runPrimary(kind: NextActionKind, caseId: number): void {
     if (kind === 'REQUEST_PRICE') {
-      askPrice.mutate();
+      const declared = parseCount(activeBids);
+      if (declared === null) {
+        setActiveBidsBlocked('진행 중 투찰 건수를 0 이상의 정수로 선언하십시오 — 이 수는 지어내지 않습니다.');
+        return;
+      }
+      setActiveBidsBlocked(null);
+      askPrice.mutate(declared);
       return;
     }
     if (kind === 'RESUME') {
@@ -248,20 +261,36 @@ export function WorksheetScreen() {
         ) : action === null ? (
           <p className="mt-3 text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
         ) : (
-          <button
-            type="button"
-            data-testid="worksheet-primary"
-            onClick={() => runPrimary(action.kind, bidCase.caseId)}
-            disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
-            className="mt-3 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink disabled:opacity-50"
-          >
-            {action.label}
-          </button>
+          <>
+            {/* 요청의 전제이므로 버튼 옆에 둔다 — 선언이 없으면 요청이 가지 않는다(CR H-1). */}
+            {action.kind === 'REQUEST_PRICE' ? (
+              <ActiveBidsDeclaration value={activeBids} onChange={setActiveBids} blocked={activeBidsBlocked} />
+            ) : null}
+            <button
+              type="button"
+              data-testid="worksheet-primary"
+              onClick={() => runPrimary(action.kind, bidCase.caseId)}
+              disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
+              className="mt-3 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink disabled:opacity-50"
+            >
+              {action.label}
+            </button>
+          </>
         )}
       </header>
 
       {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
-      {askPrice.isError ? <ErrorFace testId="price-error" onRetry={() => askPrice.mutate()} /> : null}
+      {askPrice.isError ? (
+        <ErrorFace
+          testId="price-error"
+          onRetry={() => {
+            const declared = parseCount(activeBids);
+            if (declared !== null) {
+              askPrice.mutate(declared);
+            }
+          }}
+        />
+      ) : null}
       {price === null ? null : <WorksheetGrounds price={price} />}
 
       {bidCase === undefined ? null : (

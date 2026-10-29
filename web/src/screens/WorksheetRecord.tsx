@@ -30,6 +30,21 @@ export function parseWon(raw: string): number | null {
   return Number.parseInt(digits, 10);
 }
 
+/**
+ * 진행 중 투찰 건수의 선언 — **0 을 기본값으로 두지 않는다**(CR H-1 · v M-5). 계약이 「호출자가
+ * 선언한다, 서버가 0 으로 지어내지 않는다」로 둔 칸이고, 그 수를 **서버가 세어 주는 표면이 계약에
+ * 없다**(실측: `listBidCases` 에 집계도 `X-Total-Count` 도 없다). 클라이언트가 상태를 「진행 중」
+ * 으로 분류해 세는 것은 계약에 없는 정의를 화면이 만드는 것이라 D-7E-4 위반이다. 그래서 운영자가
+ * 적고, 적지 않으면 요청하지 않는다(빈 칸은 `null`).
+ */
+export function parseCount(raw: string): number | null {
+  const digits = raw.trim();
+  if (!/^\d+$/.test(digits)) {
+    return null;
+  }
+  return Number.parseInt(digits, 10);
+}
+
 /** 추첨번호는 정수 여럿 — 빈 칸이면 빈 배열이고 형식이 어긋나면 `null` 이다. */
 export function parseDrawNumbers(raw: string): number[] | null {
   const trimmed = raw.trim();
@@ -39,6 +54,46 @@ export function parseDrawNumbers(raw: string): number[] | null {
   const parts = trimmed.split(/[\s,]+/u);
   const parsed = parts.map((part) => (/^\d+$/.test(part) ? Number.parseInt(part, 10) : Number.NaN));
   return parsed.some(Number.isNaN) ? null : parsed;
+}
+
+/**
+ * 진행 중 투찰 건수를 **선언하는 자리**. 요청의 전제이므로 투찰가 요청 버튼 옆에 둔다.
+ * 기본값이 없고, 비어 있으면 요청 경로가 막힌다.
+ */
+export function ActiveBidsDeclaration({
+  value,
+  onChange,
+  blocked,
+}: {
+  readonly value: string;
+  readonly onChange: (next: string) => void;
+  readonly blocked: string | null;
+}) {
+  return (
+    <div className="mt-3 flex flex-col gap-1">
+      <label className="flex flex-col gap-1">
+        <span className="text-xs text-ink-soft">
+          진행 중 투찰 건수(선언)
+        </span>
+        <input
+          data-testid="active-bids"
+          name="currentActiveBids"
+          inputMode="numeric"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-32 rounded-md border border-line bg-card px-3 py-2 font-numeric text-sm"
+        />
+      </label>
+      <p className="text-xs text-ink-soft">
+        여력 축이 이 값을 씁니다. 서버도 화면도 이 수를 지어내지 않으므로 직접 적으십시오.
+      </p>
+      {blocked === null ? null : (
+        <p data-testid="active-bids-blocked" role="alert" className="text-xs text-bad-ink">
+          {blocked}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
