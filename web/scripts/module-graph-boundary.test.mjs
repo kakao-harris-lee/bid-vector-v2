@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   apiImporterViolation,
   boundaryRoots,
+  isAllowedAssetKind,
   isAllowedModuleKind,
   graphImporters,
   classifyModuleId,
@@ -160,5 +161,27 @@ describe('번들에 들어와도 되는 모듈 종류', () => {
   it('이름에 데이터 확장자가 들어간 코드 모듈은 받는다', () => {
     expect(isAllowedModuleKind('/w/src/a.json.ts')).toBe(true);
     expect(isAllowedModuleKind('/w/src/jsonHelpers.ts')).toBe(true);
+  });
+});
+
+/**
+ * v r2 M-2 — 모듈 그래프는 `new URL(…, import.meta.url)` 로 실린 파일을 보지 못한다(자산은
+ * 모듈 id 가 아니다). 내보내는 쪽에서 같은 술어를 한 번 더 건다.
+ *
+ * **이 층은 둘째 그물이다**: `src` 안 파일은 W-4 의 파일 종류 허용 목록이 먼저 막으므로 그
+ * 경로로는 빌드 수준 양성 대조가 재현되지 않는다(실측). 이 층이 받는 것은 W-4 가 보지 못하는
+ * 자리 — 의존성이 내보내는 자산이다. 그래서 술어를 단위로 잠근다.
+ */
+describe('내보내도 되는 자산 종류', () => {
+  it('번들·스타일·맵은 받는다', () => {
+    for (const name of ['assets/index-abc.js', 'assets/index-abc.css', 'index.html', 'favicon.ico']) {
+      expect(isAllowedAssetKind(name), name).toBe(true);
+    }
+  });
+
+  it('데이터·텍스트·확장자 없음은 받지 않는다', () => {
+    for (const name of ['assets/rows-abc.txt', 'assets/data-abc.json', 'assets/x.yaml', 'assets/rows']) {
+      expect(isAllowedAssetKind(name), name).toBe(false);
+    }
   });
 });
