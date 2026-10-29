@@ -16,6 +16,7 @@ import {
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
+import { WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
 import { amountDisplayOf, daysUntil, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOf } from '../display/stateDisplay';
@@ -103,6 +104,11 @@ export function WorksheetScreen() {
       show({ text: '투찰 예정 초안을 만들었습니다.' });
       await refreshCase();
     },
+    // 실패는 성공 토스트를 걷고 **서버 상태를 다시 읽은 뒤** 얼굴을 낸다(CR H-2).
+    onError: async () => {
+      dismiss();
+      await refreshCase();
+    },
   });
 
   const makeRecord = useMutation({
@@ -124,12 +130,22 @@ export function WorksheetScreen() {
       show({ text: '투찰 기록을 남겼습니다.' });
       await refreshCase();
     },
+    // 실패는 성공 토스트를 걷고 **서버 상태를 다시 읽은 뒤** 얼굴을 낸다(CR H-2).
+    onError: async () => {
+      dismiss();
+      await refreshCase();
+    },
   });
 
   const resume = useMutation({
     mutationFn: (caseId: number) => resumeCase(caseId),
     onSuccess: async () => {
       show({ text: '다시 보기로 돌렸습니다.' });
+      await refreshCase();
+    },
+    // 실패는 성공 토스트를 걷고 **서버 상태를 다시 읽은 뒤** 얼굴을 낸다(CR H-2).
+    onError: async () => {
+      dismiss();
       await refreshCase();
     },
   });
@@ -211,6 +227,18 @@ export function WorksheetScreen() {
     );
   }
 
+  /**
+   * 쓰기 실패 얼굴 하나 — primary 버튼이 하나이므로 한 번에 하나의 쓰기만 돈다. 어느 전이가
+   * 실패했는지는 **그 전이의 이름**으로 말한다(CR H-2).
+   */
+  const writeFailure = makeDraft.isError
+    ? { what: '투찰 예정 초안을 만들지', error: makeDraft.error, retry: () => makeDraft.reset() }
+    : makeRecord.isError
+      ? { what: '투찰 기록을 기록하지', error: makeRecord.error, retry: () => makeRecord.reset() }
+      : resume.isError
+        ? { what: '다시 보기로 되돌리지', error: resume.error, retry: () => resume.reset() }
+        : null;
+
   const amount = amountDisplayOf(notice);
   const days = daysUntil(notice.deadlineAt, now);
   const action = bidCase === undefined ? null : nextActionOf(bidCase.state, price !== null);
@@ -278,6 +306,10 @@ export function WorksheetScreen() {
           </>
         )}
       </header>
+
+      {writeFailure === null ? null : (
+        <WriteFailureFace what={writeFailure.what} error={writeFailure.error} onRetry={writeFailure.retry} />
+      )}
 
       {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
       {askPrice.isError ? (

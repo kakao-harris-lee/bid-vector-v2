@@ -72,6 +72,23 @@ function headerState<State extends string>(response: Response, name: string): St
 }
 
 /**
+ * 로그인 — **무인증으로 열리는 유일한 operation**(계약 선언). 실패의 **모양은 하나**다(계정
+ * 부재·불일치·잠금을 가르지 않는다, 7D 규율) — 그래서 401 은 `null` 이고 호출자는 사유를
+ * 알 수 없다. 이 자리가 있는 이유는 **화면이 생성 클라이언트를 직접 쥐지 않게** 하는 것이다
+ * (v M-3 의 집합 등식).
+ */
+export async function signIn(loginName: string, passphrase: string): Promise<SessionResponse | null> {
+  const { data, error, response } = await apiClient.POST('/api/session', { body: { loginName, passphrase } });
+  if (data === undefined) {
+    if (response.status === HTTP_UNAUTHORIZED) {
+      return null;
+    }
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
  * 지금 내 세션 — **새로고침 뒤 CSRF 값을 다시 받는 자리**다(7A 가 알려진 제한으로 남긴 cr r2 L-1).
  * 값은 메모리에만 있어 새로고침하면 사라지고, 이 읽기가 쥔 쿠키에서 서버가 다시 유도해 준다.
  * 세션이 없으면 404 이고 그때는 `null` 이다 — 화면은 로그인으로 보낸다(값을 지어내지 않는다).
@@ -91,6 +108,7 @@ export async function readSession(): Promise<SessionResponse | null> {
 }
 
 const HTTP_NOT_FOUND = 404;
+const HTTP_UNAUTHORIZED = 401;
 
 export async function searchNotices(query: NoticeSearchQuery): Promise<Listed<NoticeSummary, NoticesResultState>> {
   const { data, error, response } = await apiClient.GET('/api/notices', { params: { query } });

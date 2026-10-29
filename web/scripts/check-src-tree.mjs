@@ -262,6 +262,72 @@ for (const sourceFile of programFiles) {
 // 주변 선언(`declare module '@oa'`)이 집합 등식을 통째로 지나갔다 — 문자열 `'@oa'` 는
 // `'openapi-fetch'` 와 다르고, 그 별칭을 실제로 해석하는 것은 Vite 뿐이다(그래서 같은 등식을
 // 번들 그래프 경계에서도 센다).
+/**
+ * **서버 호출 능력을 쥐는 자리도 한 곳이다**(v M-3).
+ *
+ * 앞 판은 `openapi-fetch` **패키지**의 import 집합만 셌다. 그 등식은 화면이 `../api/client` 를
+ * 직접 import 해 **계약 목록 밖 operation** 을 부르는 길을 막지 못했다(실측: lint·typecheck·W-4·
+ * 번들·vitest·journey 전부 초록). 패키지 한 겹 안쪽의 **우리 모듈**에 같은 등식을 건다.
+ *
+ * 술어는 **가져오는 이름**이다 — 서버 호출 능력을 나르는 것은 `apiClient` 바인딩(그리고 그것을
+ * 품는 namespace·default import)이고, 같은 모듈의 CSRF 상태 함수(`rememberCsrf` 등)는 호출
+ * 능력이 아니다. 이름을 보지 않고 모듈만 세면 그 함수를 쓰는 자리까지 막혀 게이트가 넓어진다.
+ *
+ * **test 파일은 대상 밖**이다: 출하되지 않고 번들 그래프에도 없으며, 클라이언트의 미들웨어를
+ * 재는 test 는 그 객체를 손에 쥐어야 한다(`client.test.ts` 가 그 자리다).
+ */
+const CLIENT_MODULE = 'src/api/client.ts';
+const CLIENT_MODULE_CALLER = 'src/api/queries.ts';
+const CLIENT_CAPABILITY_BINDING = 'apiClient';
+const isTestFile = (name) => /\.test\.tsx?$/.test(name);
+
+/** 그 import 선언이 **호출 능력**을 가져오는가 — 이름·namespace·default 를 본다. */
+const importsClientCapability = (sourceFile, moduleRealPath) => {
+  let found = false;
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+      const resolvedReal = resolveSpecifierReal(node.moduleSpecifier.text, sourceFile.fileName);
+      if (resolvedReal === moduleRealPath) {
+        const clause = node.importClause;
+        if (clause === undefined || clause.name !== undefined) {
+          found = true; // default 또는 side-effect import — 무엇이 들어오는지 좁혀지지 않는다
+        } else if (clause.namedBindings !== undefined) {
+          if (ts.isNamespaceImport(clause.namedBindings)) {
+            found = true;
+          } else {
+            for (const element of clause.namedBindings.elements) {
+              if ((element.propertyName ?? element.name).text === CLIENT_CAPABILITY_BINDING) {
+                found = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
+};
+let clientModuleReal;
+try {
+  clientModuleReal = realpathSync(resolve(webRoot, CLIENT_MODULE));
+} catch {
+  fail(`생성 타입 클라이언트 모듈이 없다: ${CLIENT_MODULE}`);
+}
+
+const resolveSpecifierReal = (specifier, containingFile) => {
+  const resolved = ts.resolveModuleName(specifier, containingFile, parsed.options, ts.sys).resolvedModule;
+  if (resolved === undefined) {
+    return undefined;
+  }
+  try {
+    return realpathSync(resolved.resolvedFileName);
+  } catch {
+    return resolved.resolvedFileName;
+  }
+};
+
 const classifyApiSpecifier = (specifier, containingFile) => {
   const resolved = ts.resolveModuleName(
     specifier,
@@ -302,6 +368,7 @@ const unresolvedIsFileInSrc = (specifier, containingFile) => {
 };
 
 const apiImporters = new Set();
+const clientModuleImporters = new Set();
 for (const { sourceFile, name } of inSrcFiles) {
   for (const imported of ts.preProcessFile(sourceFile.text, true, true).importedFiles) {
     const verdict = classifyApiSpecifier(imported.fileName, sourceFile.fileName);
@@ -315,6 +382,10 @@ for (const { sourceFile, name } of inSrcFiles) {
         `지정자를 해석할 수 없다(어느 모듈인지 게이트가 볼 수 없다): ${name} → ${imported.fileName}`,
       );
     }
+  }
+
+  if (name !== CLIENT_MODULE && !isTestFile(name) && importsClientCapability(sourceFile, clientModuleReal)) {
+    clientModuleImporters.add(name);
   }
 
   const visit = (node) => {
@@ -339,6 +410,19 @@ if (!apiImporters.has(API_CALL_SITE)) {
   fail(
     `${API_CLIENT_PACKAGE} 의 호출 자리(${API_CALL_SITE})가 그것을 import 하지 않는다 — 집합 등식이 깨졌다`,
   );
+}
+
+// ⑤b 서버 **호출 능력**의 자리 집합 등식(v M-3) — 화면은 `queries.ts` 를 지난다.
+for (const importer of clientModuleImporters) {
+  if (importer !== CLIENT_MODULE_CALLER) {
+    fail(
+      `${CLIENT_CAPABILITY_BINDING} 를 ${CLIENT_MODULE_CALLER} 밖에서 import 한다: ${importer} ` +
+        '— 화면이 계약 목록 밖 operation 을 부르는 길이 열린다',
+    );
+  }
+}
+if (!clientModuleImporters.has(CLIENT_MODULE_CALLER)) {
+  fail(`${CLIENT_MODULE_CALLER} 가 ${CLIENT_MODULE} 을 import 하지 않는다 — 집합 등식이 깨졌다`);
 }
 
 // ⑦ 허용 뿌리 `node_modules` 의 **출처**를 잠금 파일에서 본다(verifier r2 M-4).
