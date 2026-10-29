@@ -230,9 +230,12 @@ jobs:
   web:
     runs-on: ubuntu-latest
     # M7/7A(PR #75 리뷰 J) — `container` job 과 같은 사유로 상한을 둔다. 이 job 의 네트워크 의존은
-    # 셋이다(npm 레지스트리 · Playwright 브라우저 CDN · apt). 하나가 멈추면 기본 6시간까지 러너를
-    # 쥔다. 실측 소요는 분 단위라 넉넉히 잡는다.
-    timeout-minutes: 20
+    # 넷이다(npm 레지스트리 · Playwright 브라우저 CDN · apt · **postgres 이미지**). 하나가 멈추면
+    # 기본 6시간까지 러너를 쥔다. 실측 소요는 분 단위라 넉넉히 잡는다.
+    #
+    # M7/7E-1(D-7E-10) — 여정 e2e 가 들어와 `container` job 과 같은 상한(30)으로 올린다. 실측:
+    # 기존 job 42s · `:app:bootJar` 21s(main, Gradle 캐시) ~ 59s(기능 브랜치) · 하네스+여정 33s.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web
@@ -308,6 +311,38 @@ jobs:
         id: web-smoke
         run: npm run test:e2e
 
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() && steps.web-smoke.outcome == 'failure' }}
+        with:
+          name: web-playwright
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: error
+
+      # ── 여정 e2e(M7/7E-1, D-7E-1·10) ───────────────────────────────────────
+      # 여기서 **출하 jar 를 짓는다**. `needs: check` + 산출물 전달을 기각한 이유: `check` 는
+      # 실측 12m44s 이고 그것을 기다리면 web 단독 실패도 13분 뒤에 드러난다 — 지금 이 job 은
+      # 독립이고 CI 임계경로는 `check` 가 쥐고 있으므로, 같은 job 에서 짓는 쪽이 총 wall clock
+      # 을 늘리지 않는다(중복 컴파일 비용은 실측 21~59s).
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Gradle 캐시 복원 — 이것이 bootJar 를 21s 로 만든다(`container` job 실측).
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: 앱 배포물 빌드 — 여정 e2e 의 입력 (W-12)
+        working-directory: ${{ github.workspace }}
+        run: ./gradlew --no-daemon :app:bootJar
+
+      # 출하 app.jar + 버릴 Postgres(compose 와 같은 digest) + loopback fake KONEPS 위에서
+      # 여정 ②③ 을 민다. API 목이 0 이고 공고는 수집 경로로 들어온다(완료 조건 「V2 API 만」).
+      # 하네스가 컨테이너·자식 프로세스를 거둔다(`gracefulShutdown`).
+      - name: 여정 e2e — 수집 → 저장 → API → 화면 (W-13)
+        id: web-journey
+        run: npm run test:e2e:journey
+
       # code-review r1 F-7 — CI reporter 는 `list` 하나라, **CI 에서만** 깨지는 스모크는 로그 한
       # 줄만 남기고 trace·스크린샷을 버렸다(`playwright.config.ts` 의 `trace: retain-on-failure`
       # 가 쓰이지 않았다). 위 두 job 과 같은 major 다.
@@ -318,10 +353,14 @@ jobs:
       # 0 건이면 그 자체가 신호다 — 이번 PR 의 RED 가 그 경우였다(webServer 가 뜨지 않아 test 가
       # 한 번도 돌지 못했고 trace 가 없었다). 그 상태를 조용히 넘기지 않고 업로드 step 의 빨강으로
       # 표시한다.
+
+      # 여정 e2e 의 trace — 같은 관례다(**그 step 이 실제로 실패했을 때만**). 하네스가 띄우는
+      # 것이 많아 실패 사유가 로그 한 줄로는 서지 않는다. 자격 값을 적은 맥락 파일은 이
+      # 디렉터리 **밖**(OS 임시)에 있으므로 아티팩트에 실리지 않는다(D-7E-6).
       - uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() && steps.web-smoke.outcome == 'failure' }}
+        if: ${{ !cancelled() && steps.web-journey.outcome == 'failure' }}
         with:
-          name: web-playwright
+          name: web-journey-playwright
           path: web/test-results/
           retention-days: 14
           if-no-files-found: error
