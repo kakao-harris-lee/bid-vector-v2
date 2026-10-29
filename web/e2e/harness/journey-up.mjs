@@ -271,6 +271,20 @@ async function main() {
 
   // ④ 화면 — **빌드된 번들**을 preview 로 띄우고 `/api` 를 app 으로 프록시한다(같은 출처라
   //    세션 쿠키·CSRF 가 운영 형태와 같은 모양으로 돈다).
+  //
+  //    **빌드를 하네스가 돌린다.** `vite preview` 는 `dist/` 를 섬길 뿐이므로, 하네스가 짓지
+  //    않으면 **지난 번들을 재는 수가 있다** — 화면 코드를 바꿔치운 변이가 e2e 에서 초록으로
+  //    지나갔다(M1 실측). CI 는 build(W-8)가 앞에 있어 가렸지만, 그 순서에 기대는 것과
+  //    「섬기는 번들이 지금 소스에서 나온 것」을 보장하는 것은 다르다. 비용은 실측 2s 다.
+  log('번들 빌드(섬기는 것이 지금 소스에서 나오게 한다)');
+  const built = spawnSync(resolve(webRoot, 'node_modules', '.bin', 'vite'), ['build'], {
+    cwd: webRoot,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  if (built.status !== 0) {
+    throw new Error(`번들 빌드 실패(exit=${built.status})`);
+  }
+
   log(`vite preview(127.0.0.1:${PREVIEW_PORT} → /api ⇒ 127.0.0.1:${appPort})`);
   track(
     spawn(resolve(webRoot, 'node_modules', '.bin', 'vite'), ['preview'], {
