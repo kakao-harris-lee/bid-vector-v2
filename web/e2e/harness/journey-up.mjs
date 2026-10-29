@@ -26,7 +26,14 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CONTAINER_PREFIX, reapStaleContainer } from './container-marker.mjs';
+import {
+  CONTAINER_PREFIX,
+  formatLockMarker,
+  lockOwnerAlive,
+  parseLockMarker,
+  processStartToken,
+  reapStaleContainer,
+} from './container-marker.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -79,15 +86,37 @@ async function acquireSingleRunLock() {
     );
   }
   if (existsSync(LOCK_PATH)) {
-    const stale = readFileSync(LOCK_PATH, 'utf8').trim();
-    log(`묵은 락을 잇는다(앞 실행 표지 ${stale || '없음'})`);
-    const reaped = reapStaleContainer(stale, { log });
+    const existing = parseLockMarker(readFileSync(LOCK_PATH, 'utf8'));
+    if (existing === undefined) {
+      throw new Error(
+        `락 표지를 읽을 수 없다(${LOCK_PATH}) — 앞 실행이 살아 있는지 알 수 없으므로 ` +
+          '아무것도 걷지 않고 멈춘다. 그 실행이 끝난 것을 확인한 뒤 그 파일을 지우십시오.',
+      );
+    }
+    // **살아 있으면 걷지 않는다**(CR r3 M-1). preview 포트 검사는 기동 창을 못 덮는다 —
+    // 첫 실행이 Postgres 를 띄우는 동안 포트는 아직 비어 있고, 그 창에 들어온 둘째 실행이
+    // 앞 실행의 컨테이너를 걷었다. 소유자 생존을 먼저 묻는다.
+    if (lockOwnerAlive(existing)) {
+      throw new Error(
+        `앞 실행이 살아 있다(pid ${existing.pid} · 컨테이너 ${existing.container}) — ` +
+          '같은 호스트에서 둘이 돌 수 없다. 그 실행이 끝난 뒤 다시 돌리십시오.',
+      );
+    }
+    log(`묵은 락을 잇는다(죽은 소유자 pid ${existing.pid})`);
+    const reaped = reapStaleContainer(existing.container, { log });
     log(`묵은 컨테이너 ${reaped.length}개를 걷었다`);
   }
   // **원자 쓰기**(CR r2 H-1 ⓐ) — 같은 파일에 바로 쓰면 「파일은 생겼고 내용은 아직 없는」 창이
   // 생기고, 그 창에서 죽으면 다음 실행이 **빈 표지**를 읽는다. 임시 파일에 다 쓴 뒤 rename 한다.
+  //
+  // 임시 이름은 **예측 가능한 공유 경로**다 — `wx`(`O_CREAT|O_EXCL`)로 열어 남이 먼저 만들어 둔
+  // 파일·심볼릭 링크에 쓰지 않는다(CR r3 L-12). 열리면 그 이름은 이 프로세스가 만든 것이다.
   const pending = `${LOCK_PATH}.${process.pid}.tmp`;
-  writeFileSync(pending, `${CONTAINER}\n`, { mode: 0o600 });
+  writeFileSync(
+    pending,
+    formatLockMarker({ pid: process.pid, startToken: processStartToken(process.pid), container: CONTAINER }),
+    { flag: 'wx', mode: 0o600 },
+  );
   chmodSync(pending, 0o600);
   renameSync(pending, LOCK_PATH);
   lockOwned = true;

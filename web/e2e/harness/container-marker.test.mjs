@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { isOwnContainerMarker, reapStaleContainer } from './container-marker.mjs';
+import {
+  formatLockMarker,
+  isOwnContainerMarker,
+  lockOwnerAlive,
+  parseLockMarker,
+  processStartToken,
+  reapStaleContainer,
+} from './container-marker.mjs';
 
 /**
  * CR r2 H-1 — 묵은 락 수거가 **호스트의 모든 컨테이너**를 지우는 경로였다. 빈 표지를 그대로
@@ -70,5 +77,71 @@ describe('묵은 컨테이너 수거', () => {
 
     expect(reapStaleContainer('bidvector-7e1-journey-0b2b919e', { dryRun: true, run })).toStrictEqual(['abc123']);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * CR r3 M-1 — 기동 창의 상호 배제. **주입 test 뿐이다**(실 컨테이너를 지우는 대조는 하지
+ * 않는다 — 공유 호스트다). 생존 판정이 틀릴 때 어느 쪽으로 기우는지를 못박는 것이 이 절의 일.
+ */
+describe('락 소유자 생존 판정', () => {
+  const MARKER = { pid: 4321, startToken: '777', container: 'bidvector-7e1-journey-0b2b919e' };
+
+  it('신호가 닿고 시작 시각이 같으면 살아 있다 — 걷지 않고 멈추는 쪽이다', () => {
+    const alive = lockOwnerAlive(MARKER, {
+      signal: () => undefined,
+      startToken: () => '777',
+    });
+
+    expect(alive).toBe(true);
+  });
+
+  it('신호가 닿지 않으면 죽었다 — 그때만 묵은 락을 잇는다', () => {
+    const alive = lockOwnerAlive(MARKER, {
+      signal: () => {
+        throw Object.assign(new Error('no such process'), { code: 'ESRCH' });
+      },
+      startToken: () => undefined,
+    });
+
+    expect(alive).toBe(false);
+  });
+
+  it('같은 pid 가 다시 쓰인 경우는 죽은 것으로 센다 — 시작 시각이 다르다', () => {
+    const alive = lockOwnerAlive(MARKER, { signal: () => undefined, startToken: () => '999' });
+
+    expect(alive).toBe(false);
+  });
+
+  it('시작 시각을 모르면 **살아 있다고 본다** — 틀려도 멈출 뿐, 남의 실행을 걷지 않는다', () => {
+    expect(lockOwnerAlive({ ...MARKER, startToken: undefined }, { signal: () => undefined })).toBe(true);
+    expect(lockOwnerAlive(MARKER, { signal: () => undefined, startToken: () => undefined })).toBe(true);
+  });
+
+  it('자기 자신은 살아 있고, 그 시작 시각은 /proc 에서 읽힌다', () => {
+    const token = processStartToken(process.pid);
+
+    expect(token).toMatch(/^[0-9]+$/u);
+    expect(lockOwnerAlive({ pid: process.pid, startToken: token, container: MARKER.container })).toBe(true);
+  });
+});
+
+describe('락 표지의 꼴', () => {
+  it('적은 것을 그대로 돌려 읽는다', () => {
+    const marker = { pid: 7, startToken: '1', container: 'bidvector-7e1-journey-0b2b919e' };
+
+    expect(parseLockMarker(formatLockMarker(marker))).toStrictEqual(marker);
+  });
+
+  it.each([
+    ['빈 표지', ''],
+    ['공백', '   \n'],
+    ['컨테이너 이름만(옛 꼴)', 'bidvector-7e1-journey-0b2b919e'],
+    ['pid 가 없다', '{"container":"bidvector-7e1-journey-0b2b919e"}'],
+    ['pid 가 수가 아니다', '{"pid":"x","container":"bidvector-7e1-journey-0b2b919e"}'],
+    ['컨테이너가 규약 밖', '{"pid":7,"container":"other-thing"}'],
+    ['JSON 이 아니다', '{not json'],
+  ])('%s 은 표지가 아니다 — 소유자를 알 수 없으면 멈추는 쪽이다', (_label, text) => {
+    expect(parseLockMarker(text)).toBeUndefined();
   });
 });
