@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 
@@ -73,10 +73,12 @@ export function WorksheetScreen() {
     (row) => row.noticeNumber === noticeNumber && row.noticeRound === noticeRound,
   );
 
+  // CR L-5 — 가짜 id(`?? 0`)를 인코딩하지 않는다. 건이 정해진 분기에서 **그 값을 잡아** 넘기면
+  // 「0번 건을 조회하는」 자리가 아예 없다(`enabled` 를 훗날 건드려도 그렇다).
+  const caseId = bidCase?.caseId;
   const timeline = useQuery({
-    queryKey: ['timeline', bidCase?.caseId],
-    queryFn: () => readTimeline(bidCase?.caseId ?? 0),
-    enabled: bidCase !== undefined,
+    queryKey: ['timeline', caseId],
+    queryFn: caseId === undefined ? skipToken : () => readTimeline(caseId),
   });
 
   async function refreshCase(): Promise<void> {
@@ -330,9 +332,14 @@ export function WorksheetScreen() {
           <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} />
           <section className="rounded-lg border border-line bg-card p-4">
             <h3 className="text-sm font-semibold">투찰 금액과 기록</h3>
-            <p className="mt-1 text-xs text-ink-soft">
-              3안이 아직 산출되지 않아 금액은 직접 적습니다. 초안과 기록이 같은 입력을 씁니다.
-            </p>
+            {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
+                「아직 산출 안 함」을 화면이 추론해 말하는 꼴이었다(D-7E-4). */}
+            {price !== null && price.bidPriceMenuState === 'NOT_COMPUTED' ? (
+              <p data-testid="amount-self-entry-note" className="mt-1 text-xs text-ink-soft">
+                투찰가 3안이 아직 산출되지 않아 금액은 직접 적습니다(위 근거의 상태 그대로).
+              </p>
+            ) : null}
+            <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
             <div className="mt-3">
               <BidAmountFields form={form} onChange={setForm} blocked={blocked} />
             </div>

@@ -96,6 +96,43 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
 
     expect((await screen.findByTestId('notice-total')).textContent).toContain('42');
   });
+
+  /**
+   * CR M-1 — 앞 판은 전체 42건을 보이면서 카드 20장만 내고 나머지로 가는 길이 없었다.
+   * 「더 보기」가 다음 쪽을 **이어 붙인다**.
+   */
+  it('받은 수가 전체보다 적으면 「더 보기」가 있고, 누르면 다음 쪽을 이어 붙인다', async () => {
+    const second: queries.NoticeSummary = { ...NOTICE, noticeNumber: 'SYN-7E1-SECOND' };
+    mocked.searchNotices.mockResolvedValueOnce({ rows: [NOTICE], total: 2, resultState: 'MATCHED' });
+    mocked.searchNotices.mockResolvedValueOnce({ rows: [second], total: 2, resultState: 'MATCHED' });
+    renderScreen();
+
+    const more = await screen.findByTestId('notices-more');
+    fireEvent.click(more);
+
+    expect(await screen.findByTestId(`notice-card-${second.noticeNumber}`)).not.toBeNull();
+    expect(screen.getByTestId(`notice-card-${NOTICE.noticeNumber}`)).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('notices-more')).toBeNull();
+    });
+  });
+
+  it('받은 수가 전체와 같으면 「더 보기」가 없다', async () => {
+    mocked.searchNotices.mockResolvedValue({ rows: [NOTICE], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    expect(screen.queryByTestId('notices-more')).toBeNull();
+  });
+
+  /** v L-3 — 제안 목록의 오류 얼굴도 test 가 있다(분기 제거 변이가 지나갔던 자리). */
+  it('제안 목록 오류에도 재시도가 있다', async () => {
+    mocked.listSuggestions.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const face = await screen.findByTestId('suggestions-error');
+    expect(within(face).getByRole('button', { name: '다시 시도' })).not.toBeNull();
+  });
 });
 
 describe('화면 B — 빈·로딩·오류 세 얼굴', () => {
@@ -162,6 +199,16 @@ describe('화면 B — 제안 목록', () => {
 });
 
 describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
+  /** CR L-8 — 스크린리더의 버튼 목록에서 어느 공고의 담기인지 구별돼야 한다. */
+  it('담기 버튼의 접근 이름에 그 공고가 들어간다', async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const button = within(card).getByRole('button', { name: /담기/u });
+
+    expect(button.getAttribute('aria-label')).toContain(NOTICE.title as string);
+  });
+
   it('담기를 누르면 그 공고의 번호·차수로 건을 연다', async () => {
     mocked.addBidCase.mockResolvedValue({
       caseId: 7,
@@ -178,7 +225,7 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
     renderScreen();
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
-    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+    fireEvent.click(within(card).getByRole('button', { name: /담기/u }));
 
     await waitFor(() => {
       expect(mocked.addBidCase).toHaveBeenCalledWith({
@@ -198,7 +245,7 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
     renderScreen();
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
-    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+    fireEvent.click(within(card).getByRole('button', { name: /담기/u }));
 
     const failure = await screen.findByTestId('write-failure');
     expect(failure.textContent).toContain('담지 못했습니다');
@@ -214,7 +261,7 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
     renderScreen();
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
-    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+    fireEvent.click(within(card).getByRole('button', { name: /담기/u }));
 
     const failure = await screen.findByTestId('write-failure');
     expect(failure.textContent).toContain('로그인');
@@ -241,7 +288,7 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
     renderScreen();
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
-    fireEvent.click(within(card).getByRole('button', { name: '담기' }));
+    fireEvent.click(within(card).getByRole('button', { name: /담기/u }));
 
     const toast = await screen.findByTestId('toast');
     expect(toast.textContent).toContain('입찰함에 담았습니다');

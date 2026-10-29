@@ -20,6 +20,7 @@ import {
   LICENSE_VERDICT_DISPLAY,
   ML_ANALYSIS_STATE_DISPLAY,
   ML_UNAVAILABLE_REASON_DISPLAY,
+  OUTCOME_DISPLAY,
   UNJUDGED_AXIS_DISPLAY,
 } from '../display/worksheetDisplay';
 
@@ -45,6 +46,41 @@ function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
           {displayOrUnknown(BID_PRICE_MENU_REASON_DISPLAY, price.bidPriceMenuNotComputedReason).label}
         </p>
       </div>
+    </section>
+  );
+}
+
+/**
+ * 판정 — `outcome` 과 **어디서 왜 멈췄는가**(v L-4). 앞 판은 `OUTCOME_DISPLAY` 가 쓰이지 않는
+ * 표였고 그 `why`(「아래 단계·사유가 말한다」)가 가리키는 칸이 화면에 없었다. 단계·사유는
+ * 계약이 자유 문자열로 두므로 **서버가 준 코드를 그대로** 보인다(문면을 지어내지 않는다).
+ */
+function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
+  return (
+    <section data-testid="verdict" className="rounded-lg border border-line bg-card p-4">
+      <h3 className="text-sm font-semibold">판정</h3>
+      <p className="mt-2 flex flex-wrap items-center gap-2">
+        <StateBadge display={displayOrUnknown(OUTCOME_DISPLAY, price.outcome)} testId="verdict-outcome" />
+        {price.verdict === null || price.verdict === undefined ? null : (
+          <span data-testid="verdict-value" className="font-numeric text-xs">
+            {price.verdict}
+          </span>
+        )}
+      </p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="멈춘 단계" testId="drop-stage" value={price.dropStage ?? null} />
+        <Field label="멈춘 사유" testId="drop-reason" value={price.dropReasonCode ?? null} />
+        <Field
+          label="판정 사유 코드"
+          testId="verdict-reasons"
+          value={price.verdictReasonCodes.length === 0 ? null : price.verdictReasonCodes.join(', ')}
+        />
+        <Field
+          label="걸린 감시 규칙"
+          testId="failed-watch-rules"
+          value={price.failedWatchRuleIds.length === 0 ? null : price.failedWatchRuleIds.join(', ')}
+        />
+      </dl>
     </section>
   );
 }
@@ -208,6 +244,7 @@ function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
 export function WorksheetGrounds({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
     <div className="flex flex-col gap-4">
+      <Verdict price={price} />
       <BidPriceMenu price={price} />
       <Qualification price={price} />
       <Grounds price={price} />

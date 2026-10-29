@@ -156,6 +156,58 @@ describe('화면 C — 머리와 다음 행동 하나', () => {
  * 없는 정의를 화면이 만드는 것이라 D-7E-4 위반이다 — 그래서 **운영자가 선언**하고 화면은 그 값을
  * 그대로 싣고 되돌려 받은 값을 보인다.
  */
+/** v L-3 — 화면 C 의 세 얼굴. 분기 제거 변이가 지나갔던 자리다. */
+describe('화면 C — 빈·로딩·오류 세 얼굴', () => {
+  it('로딩 중에는 스켈레톤이 뜬다', () => {
+    mocked.searchNotices.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    expect(screen.getByTestId('worksheet-loading')).not.toBeNull();
+  });
+
+  it('읽기 오류에는 재시도가 있다', async () => {
+    mocked.searchNotices.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const face = await screen.findByTestId('worksheet-error');
+    expect(within(face).getByRole('button', { name: '다시 시도' })).not.toBeNull();
+  });
+
+  it('그 공고가 수집본에 없으면 이유 있는 빈 얼굴이다', async () => {
+    mocked.searchNotices.mockResolvedValue({ rows: [], total: 0, resultState: 'NO_MATCH' });
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-missing')).textContent).toContain('찾지 못했습니다');
+  });
+
+  /** v L-1 — 「3안이 아직 …」은 **API 상태에서만** 나온다(요청 전에는 그 문장이 없다). */
+  it('투찰가를 요청하기 전에는 「3안이 아직」 문장이 없다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('worksheet-primary');
+    expect(screen.queryByTestId('amount-self-entry-note')).toBeNull();
+  });
+
+  it('요청 뒤 상태가 「아직 산출 안 함」이면 그 문장이 나온다', async () => {
+    renderScreen();
+    await askPrice();
+
+    expect(await screen.findByTestId('amount-self-entry-note')).not.toBeNull();
+  });
+});
+
+/** v L-4 — 판정과 멈춘 단계·사유가 화면에 있다(`OUTCOME_DISPLAY` 가 가리키던 칸이다). */
+describe('화면 C — 판정과 멈춘 자리', () => {
+  it('판정·멈춘 단계·사유를 응답이 준 코드 그대로 보인다', async () => {
+    renderScreen();
+    await askPrice();
+
+    expect((await screen.findByTestId('verdict-outcome')).textContent).toContain('판정 전에 멈춤');
+    expect((await screen.findByTestId('drop-stage')).textContent).toBe(PRICE.dropStage as string);
+    expect((await screen.findByTestId('drop-reason')).textContent).toBe(PRICE.dropReasonCode as string);
+  });
+});
+
 describe('화면 C — 진행 중 투찰 건수는 선언된 값이다(지어내지 않는다)', () => {
   it('선언 전에는 투찰가를 요청하지 않고 무엇이 없는지 말한다', async () => {
     renderScreen();
@@ -298,9 +350,11 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(link.getAttribute('rel')).toContain('noreferrer');
   });
 
+  /** CR L-6 — 이름이 재는 것과 같아야 한다: 성공 뒤 서버가 주는 상태로 primary 가 바뀐다. */
   it('초안을 만들면 투찰 예정이 되고 primary 가 「제출함」으로 바뀐다', async () => {
     mocked.draftBid.mockResolvedValue({ ...CASE, state: 'BID_PLANNED', caseVersion: 1 });
-    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'PRICE_RECEIVED' }]);
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'PRICE_RECEIVED' }]);
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED', caseVersion: 1 }]);
     renderScreen();
 
     fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
@@ -309,6 +363,9 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
 
     await waitFor(() => {
       expect(mocked.draftBid).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('worksheet-primary').textContent).toBe('제출함');
     });
   });
 

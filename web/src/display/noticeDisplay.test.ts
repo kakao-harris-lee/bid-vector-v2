@@ -101,6 +101,12 @@ describe('마감 남은 날 — 클라이언트 계산의 경계', () => {
     expect(daysUntil('2026-10-27T00:00:00Z', now)).toBe(-2);
   });
 
+  /** CR L-2 — 지난 쪽에 내림을 쓰면 몇 시간 전 마감이 하루 과장된다. */
+  it('몇 시간 전에 마감한 공고는 하루로 세지 않는다', () => {
+    expect(daysUntil('2026-10-28T18:00:00Z', now)).toBe(0);
+    expect(daysUntil('2026-10-27T18:00:00Z', now)).toBe(-1);
+  });
+
   it('마감이 없으면 날 수가 없다 — 지어내지 않는다', () => {
     expect(daysUntil(null, now)).toBeNull();
   });

@@ -18,7 +18,9 @@
   --color-neutral-skin: #f3f4f6;
   --color-neutral-ink: #374151;
   --color-absent-skin: #f3f4f6;
-  --color-absent-ink: #6b7280;
+  /* CR L-1 — 배지는 12px(large text 아님)이라 WCAG AA 가 4.5:1 을 요구한다. `#6b7280` 은
+     4.39:1 이었고 「없음·아직」 전부가 이 어조라 가장 많이 쓰이는 배지다. 한 단 내려 넘긴다. */
+  --color-absent-ink: #5b6472;
   --color-unjudged-skin: #fef3c7;
   --color-unjudged-ink: #92400e;
   --color-good-skin: #dcfce7;

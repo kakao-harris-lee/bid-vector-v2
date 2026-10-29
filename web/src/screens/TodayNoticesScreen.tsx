@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 
 import {
@@ -19,7 +19,7 @@ import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { NoticeCard, SuggestionCard } from './NoticeCard';
 
-/** 한 페이지 크기 — 계약의 상한(100) 안이고, 「더 보기」가 다음 페이지를 잇는다. */
+/** 한 쪽 크기 — 계약의 상한(100) 안이다. 「더 보기」가 다음 쪽을 이어 붙인다(CR M-1). */
 const PAGE_SIZE = 20;
 
 /** 담기는 **실투찰 건**으로 연다 — 페이퍼는 별 화면이고 섞지 않는다(SET-03). */
@@ -63,10 +63,23 @@ export function TodayNoticesScreen() {
   const [submitted, setSubmitted] = useState<SearchForm>(EMPTY_FORM);
   const [now] = useState(() => new Date());
 
-  const notices = useQuery({
+  /**
+   * CR M-1 — 앞 판은 첫 쪽만 불러 **전체 42건**을 보이면서 카드 20장만 냈다(나머지로 가는 길이
+   * 없었다). `queryOf` 의 `page` 인자가 죽어 있던 자리이기도 하다. 「더 보기」가 다음 쪽을
+   * 이어 붙인다 — 다음 쪽의 유무는 **헤더의 전체 건수**와 지금까지 받은 수로 정한다.
+   */
+  const notices = useInfiniteQuery({
     queryKey: ['notices', submitted],
-    queryFn: () => searchNotices(queryOf(submitted, 0)),
+    queryFn: ({ pageParam }) => searchNotices(queryOf(submitted, pageParam)),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((count, page) => count + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length : undefined;
+    },
   });
+  const noticePages = notices.data?.pages;
+  const noticeRows = noticePages?.flatMap((page) => page.rows);
+  const noticeSummary = noticePages?.[0];
   const suggestions = useQuery({ queryKey: ['suggestions'], queryFn: listSuggestions });
   const cases = useQuery({ queryKey: ['bid-cases', BID_KIND], queryFn: () => listBidCases(BID_KIND) });
 
@@ -169,19 +182,19 @@ export function TodayNoticesScreen() {
       <div className="flex flex-col gap-3">
         {notices.isPending ? <Skeleton testId="notices-loading" /> : null}
         {notices.isError ? <ErrorFace testId="notices-error" onRetry={() => void notices.refetch()} /> : null}
-        {notices.data === undefined ? null : (
+        {noticeSummary === undefined || noticeRows === undefined ? null : (
           <>
             <p data-testid="notice-total" className="text-xs text-ink-soft">
-              전체 {notices.data.total}건
+              전체 {noticeSummary.total}건 · 지금 {noticeRows.length}장
             </p>
-            {notices.data.rows.length === 0 ? (
+            {noticeRows.length === 0 ? (
               <EmptyFace
                 testId="notices-empty"
-                display={displayOrUnknown(NOTICES_RESULT_STATE_DISPLAY, notices.data.resultState)}
+                display={displayOrUnknown(NOTICES_RESULT_STATE_DISPLAY, noticeSummary.resultState)}
               />
             ) : (
               <ul className="flex flex-col gap-3">
-                {notices.data.rows.map((notice) => (
+                {noticeRows.map((notice) => (
                   <NoticeCard
                     key={`${notice.noticeNumber}/${notice.noticeRound}`}
                     notice={notice}
@@ -194,6 +207,8 @@ export function TodayNoticesScreen() {
                           type="button"
                           disabled={add.isPending}
                           onClick={() => add.mutate(notice)}
+                          // CR L-8 — 스크린리더의 버튼 목록에서 어느 공고의 담기인지 구별된다.
+                          aria-label={`${notice.title ?? notice.noticeNumber} 입찰함에 담기`}
                           className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
                         >
                           담기
@@ -204,6 +219,17 @@ export function TodayNoticesScreen() {
                 ))}
               </ul>
             )}
+            {notices.hasNextPage ? (
+              <button
+                type="button"
+                data-testid="notices-more"
+                disabled={notices.isFetchingNextPage}
+                onClick={() => void notices.fetchNextPage()}
+                className="self-start rounded-md border border-line px-3 py-2 text-sm disabled:opacity-50"
+              >
+                더 보기
+              </button>
+            ) : null}
           </>
         )}
       </div>
@@ -234,6 +260,7 @@ export function TodayNoticesScreen() {
                       type="button"
                       disabled={add.isPending}
                       onClick={() => add.mutate(suggestion)}
+                      aria-label={`${suggestion.title ?? suggestion.noticeNumber} 입찰함에 담기`}
                       className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
                     >
                       담기

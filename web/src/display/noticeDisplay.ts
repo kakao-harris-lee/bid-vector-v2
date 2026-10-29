@@ -88,9 +88,13 @@ export function amountDisplayOf(fields: AmountFields): AmountDisplay {
 const MILLIS_PER_DAY = 86_400_000;
 
 /**
- * 마감까지 남은 날 — 요구표가 **클라이언트 계산으로 승인한 유일한 자리**(ⓐ 행)다. 남은
- * 시간을 날 단위로 **내림**한다. 「마감됨」 같은 **상태 라벨은 만들지 않는다** — 그것은
- * `status` 가 말한다(D-7E-4). 마감이 없으면 날 수도 없다.
+ * 마감까지 남은 날 — 요구표가 **클라이언트 계산으로 승인한 유일한 자리**(ⓐ 행)다. 「마감됨」
+ * 같은 **상태 라벨은 만들지 않는다** — 그것은 `status` 가 말한다(D-7E-4). 마감이 없으면 날 수도
+ * 없다.
+ *
+ * **남은 쪽과 지난 쪽의 어림이 다르다**(CR L-2). 남은 쪽은 **내림**이다(반 나절 남았으면
+ * `D-0` — 「아직 오늘」). 지난 쪽에 같은 내림을 쓰면 6시간 전에 마감한 공고가 `D+1` 로 **하루
+ * 과장**된다(-0.25 → -1). 그래서 지난 쪽은 0 쪽으로 자른다(`Math.ceil`).
  */
 export function daysUntil(deadlineAt: string | null | undefined, now: Date): number | null {
   if (deadlineAt === null || deadlineAt === undefined) {
@@ -100,5 +104,9 @@ export function daysUntil(deadlineAt: string | null | undefined, now: Date): num
   if (Number.isNaN(deadline)) {
     return null;
   }
-  return Math.floor((deadline - now.getTime()) / MILLIS_PER_DAY);
+  const days = (deadline - now.getTime()) / MILLIS_PER_DAY;
+  const counted = days >= 0 ? Math.floor(days) : Math.ceil(days);
+  // `Math.ceil(-0.25)` 는 **`-0`** 이다 — 그것은 `>= 0` 비교에서 참이라 「지난 날」이 「남은 날」
+  // 분기로 새고, 표시도 `D+-0` 꼴이 될 수 있다. 0 으로 모은다.
+  return counted === 0 ? 0 : counted;
 }

@@ -51,7 +51,7 @@ export function NoticeCard({
         </Link>
         <StateBadge display={noticeStatusDisplayOf(notice.status)} testId="notice-status" />
       </div>
-      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">발주기관</dt>
           <dd data-testid="notice-agency" className="text-sm break-words">
@@ -65,9 +65,12 @@ export function NoticeCard({
           <dd data-testid="notice-amount" className="font-numeric text-sm">
             {amount.amount}
           </dd>
-          <dd data-testid="notice-amount-provenance" className="text-xs text-ink-soft">
-            {amount.provenance ?? ''}
-          </dd>
+          {/* CR L-7 — provenance 가 없으면 **빈 `<dd>` 를 내지 않는다**(빈 칸이 값처럼 읽힌다). */}
+          {amount.provenance === null ? null : (
+            <dd data-testid="notice-amount-provenance" className="text-xs text-ink-soft">
+              {amount.provenance}
+            </dd>
+          )}
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">마감</dt>
@@ -75,8 +78,9 @@ export function NoticeCard({
             <DeadlineBadge deadlineAt={notice.deadlineAt} now={now} />
           </dd>
         </div>
-        <div className="flex items-end">{action}</div>
       </dl>
+      {/* CR L-7 — 버튼은 `<dl>` **밖**이다(dt/dd 가 아닌 자식은 내용 모형 위반). */}
+      <div className="mt-3 flex items-end">{action}</div>
     </li>
   );
 }
