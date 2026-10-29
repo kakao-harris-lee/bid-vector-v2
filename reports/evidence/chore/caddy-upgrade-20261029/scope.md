@@ -52,7 +52,7 @@ DB 가 `CVE-2026-56857` 를 더 보고하지 않아 그 두 줄이 stale 로 끊
   (표준 모듈만), `-trimpath -mod=readonly -ldflags='-s -w'`, CGO 끔, `-tags=nobadger,nomysql,nopgx`. xcaddy 는
   쓰지 않는다 — xcaddy 가 하는 일이 이 세 줄이고, 도구 하나를 공급망에서 뺀다. `GOTOOLCHAIN=local`.
 - **결과 동일성**: 공식 바이너리와 `go version -m` 의 dep **147 = 147**, 다른 줄은 의도한 둘(go-jose/v4 ·
-  x/net)뿐 · build 줄 동일 · `caddy list-modules` 137줄 **동일** · `caddy version` 같은 문자열 · 크기 51.6MB(공식 52.0MB).
+  x/net)뿐 · `vcs.*` 넷(`vcs`·`vcs.revision`·`vcs.time`·`vcs.modified`)을 뺀 build 줄 동일 — 공식은 git 체크아웃에서 빌드해 VCS 정보를 싣는다, 거동 차이 0 · `caddy list-modules` 137줄 **동일** · `caddy version` 같은 문자열 · 크기 51.6MB(공식 52.0MB).
 - **런타임**: `alpine:3.23.7`(공식 이미지와 같은 판)에 공식 런타임 단계를 옮김 — 패키지 넷 · `setcap
   cap_net_bind_service` · `XDG_*` · `WORKDIR` · `EXPOSE`. 그 위 UID/GID 10001 · `/data`·`/config` 소유 ·
   Caddyfile · ENTRYPOINT 는 무변경. 공식의 환영 페이지·기본 Caddyfile(어차피 덮어씀)은 싣지 않는다.

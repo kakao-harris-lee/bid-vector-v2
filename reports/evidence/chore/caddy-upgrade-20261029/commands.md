@@ -35,7 +35,7 @@ trivy 0.75.0(정책 핀 체크섬 `sha256sum -c` OK). 이미지는 다른 레인
 
 - cmd: 이미지의 `/usr/bin/caddy` 를 꺼내 `go version -m` → 공식 바이너리와 dep 목록 diff · `caddy list-modules` diff
 - exit: 0
-- 핵심 결과: go1.26.10 · dep 147 = 147, 차이 **둘**(go-jose/v4 v4.1.5→v4.1.6 · x/net v0.59.0→v0.60.0) · build 줄 동일
+- 핵심 결과: go1.26.10 · dep 147 = 147, 차이 **둘**(go-jose/v4 v4.1.5→v4.1.6 · x/net v0.59.0→v0.60.0) · `vcs.*` 넷(`vcs`·`vcs.revision`·`vcs.time`·`vcs.modified`)을 뺀 build 줄 동일 — 공식은 git 체크아웃에서 빌드해 VCS 정보를 싣는다, 거동 차이 0
   · list-modules 137줄 diff 0 · `caddy version` 공식과 같은 문자열 · `getcap` = `cap_net_bind_service=ep`
 
 ## 새 HEAD `b95fdf1e` — 빌드와 게이트
@@ -91,6 +91,8 @@ trivy 0.75.0(정책 핀 체크섬 `sha256sum -c` OK). 이미지는 다른 레인
 - cmd(M-2): `go` 하나를 심은 변이 이미지(`FROM bidvector/web:caddy-after` + golang 빌더의 `go`) · 옛 정책 / 새 정책
 - exit: **0 → 1**(「금지 실행 파일 'go'」) · 실제 web 이미지 + 새 정책 exit 0. proxy 로 같은 변이는 옛 정책에서도
   크기 상한(80MB)으로 exit 1 이라 대조에 쓰지 않았다(보상 통제가 먼저 잡는다)
+- cmd(verifier L-2 재현): `FROM <web 이미지>` + `COPY --from=<golang 빌더> /usr/local/go/bin/go /usr/local/bin/go`(81.7MB) · `7d10f600` 정책 / `f6c2b0dd` 정책
+- exit: **0 → 1**(「금지 실행 파일 'go'」)
 
 - cmd: 첫 CI 실행(PR #101, head `7d10f600`) 로그
 - 핵심 결과: caddy 컴파일 **한 번**(web 쪽 caddy-build `CACHED`) · CI 의 caddy sha256 `ddcb81ca…` = 로컬(기계 간 재현) ·
