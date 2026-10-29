@@ -358,3 +358,103 @@ KDoc 의 `/**` 뒤에서 시작**해, 합집합이 내 KDoc 본문을 여는 줄
   ⑦ 내 표지 0 · 남의 표지 보존(`bid_case` 40 · `OPERATOR_BID_HISTORY` 7 · `G1-SET01` 9 · `OPEN-QUAL-10` 16).
 - 참고: in_scope 밖까지 포함한 트리 동일성은 **성립하지 않는다**(이 slice 의 evidence 세 파일이 라운드마다 바뀐다).
   그래서 트리 동일성 갈음을 쓰지 않고 직접 측정했다 — evidence 를 읽는 게이트(`leakPatternGate`)가 있기 때문이다.
+## r8 (둘째 병합 라운드 — 7C③ 선머지 수용) — 명령과 결과
+
+`git merge origin/main`(**rebase 금지**)로 main `a45105a5` 를 받았다. base 가 `1632242e` → **`a45105a5`**
+로 바뀌었다. 병합 커밋 `a4e7cbd0`.
+
+### 해소 대상은 「충돌」이 아니라 교집합이다
+
+main 이 들여온 경로 ∩ 이 slice 의 변경 경로 = **열하나**. 그중 git 이 충돌로 세운 것은 여덟이고
+**셋은 조용히 자동 병합**됐다(`ErrorBody` · `ConstantTimeComparisonStructureTest` · capability map).
+자동 병합된 셋도 **항목 합집합인지 따로 쟀다** — 「충돌 0」은 접히지 않았다는 증거가 아니다.
+
+### 충돌 여덟과 해소
+
+| 자리 | 해소 |
+|---|---|
+| `AccountScopedRoutes` | 양쪽이 각자 「뿌리 **둘**」을 선언해 **둘 다 낡았다**. 셋으로 다시 썼다(`setOf(BID_CASES, NOTIFICATIONS, PROFILE)`) — 줄의 합집합이면 `ROOTS` 가 한쪽만 담는다 |
+| 면제 래칫(`EXPECTED_EXEMPT_COUNT`) | 숫자를 옮기지 않고 **세 tier 목록의 이름 합집합을 기계로** 셌다 — 병합 기준 72 · main 둘 · 내 하나 = **75** |
+| `architecture-policy` 셋 · `gate-tests` 하나 | main 이 목록을 **정렬판으로 바꿨다**. 조각 이어붙이기였다면 같은 키 안에 항목이 두 번 들어간다 — 실제로 그 모양이 나왔다. main 판 순서에 내 항목을 **제자리 삽입** |
+| `AccountCarrierStructureTest` | 진입점 집합 합집합 + **모수 문장**을 셋으로(main 문장은 알림함까지만 셌다) |
+| `HttpTestSupport` | main 이 `HttpTestApplication` 을 **제 파일로 갈랐다**. 내 `@Import` 한 줄과 병합 주의 주석을 그 새 파일로 옮겼다. 이 파일은 **202 줄**이 됐다 |
+| OpenAPI | 조각을 잇지 않았다 — **main 판 바탕 + 내 블록(path 5 · schema 6) 재적재** |
+
+### 합집합을 눈이 아니라 술어로 쟀다
+
+- **정책 파일 둘**: base · ours · theirs 를 파싱해 **한쪽이라도 건드린 키 전수**(13 개)에 대해
+  `(theirs − 내가 뺀 것) ∪ 내가 더한 것` 과 merged 를 대조 — **불일치 0 · 같은 키 중복 0 · 키 수 보존**.
+  `app.surface.api.handlers` 처럼 **git 이 자동 병합한 키**도 이 술어가 함께 봤다.
+- **OpenAPI**: **중복 키를 거부하는 로더**로 적재 — 중복 **0** · paths **35** · schemas **39** ·
+  추가 블록이 출처 측과 본문까지 동일 · 기존 블록 변형 **0**.
+- **생성 타입**: 병합된 spec 에서 **재생성**했고 `api:types:check` 가 바이트 등식을 확인했다.
+- **줄 단위 접힘**: 교집합 열하나 전수에 대해 「내가 더한 줄이 다 있는가」·「main 이 들여온 줄 중
+  내가 지우지 않은 것이 다 있는가」를 쟀다. 걸린 넷은 모두 **의도된 치환**이다(위 표의 낡은 2-항목
+  선언 둘 · 래칫 한 수 · 옮겨간 `@Import`).
+- **한 번 틀린 술어를 고쳤다**: 첫 판은 `theirs ∪ (ours − base)` 였고 `ConstantTimeComparisonStructureTest`
+  에서 `BidCaseRequestsKt` 누락을 올렸다. 그것은 접힘이 아니라 **이 slice 의 refactor**(어휘 조회 둘이
+  `RequestValues.kt` 로 옮겨 가 `RequestValuesKt` 가 그 자리를 받았다)다 — 내가 **뺀** 항목을 술어에서
+  빼야 한다.
+
+### 7C③ 이 바꾼 것 중 이 slice 가 기대는 것
+
+| 확인 | 결과 |
+|---|---|
+| 평탄 술어(`OPEN-7C4-AWAITING-CHECKLIST` 의 전제) | 그 test **무편집**(main 구간 diff 0 줄) · 병합된 spec 의 깊이 1 object 속성 **0** — 전제가 그대로 참이다 |
+| 공유 test 조립의 빈 이름 충돌 | 양쪽 이중체 조립 모두 `@TestConfiguration`(출하 scan 밖) — 겹치는 빈 이름 0 |
+| `ClockTestDoubles` 분리 | main 쪽 KDoc 이 **이미 전제**하고 있었다(7C② 가 「시계 축은 7C④ 가 가져갔다」고 적었다). 병합 뒤 `FixedClock`·`SequentialCorrelationIdFactory` 선언이 **정확히 한 자리** |
+| `UnjudgedQualificationAxis` | 선언 **하나**(`workflow.evaluation`) — 7C② 의 이동이 유지된다 |
+| 마이그레이션 순서 | base 최대 **V23**(7C③) > **V22**(2a, base 에 있다). 이 라운드의 마이그레이션 변경 **0 건** — out-of-order 위험 없음 |
+| 래칫 설정(`size-policy.properties`) | main 무편집 — 두 레인이 같은 게이트에 걸렸지만 **둘 다 어댑터를 갈라** 풀었고 래칫을 올리지 않았다 |
+
+### 찬 check 1 회차가 잡은 것 — 첫 병합이 접은 계약 enum
+
+첫 찬 `check`(`a4e7cbd0`)는 **붉었다**: `:app:test` 와 `:app:gateExecutionGate` 둘. 실패 test 는 **하나**로
+`OpenApiDryRunContractTest`「ErrorCode 상수 집합과 문서 enum 이 양방향으로 같다」가 Kotlin **23** · 문서
+**22** 였고, `gateExecutionGate` 가 그 실패를 다시 세웠다(「통과」가 「돌았다」를 뜻하지 않는다).
+
+**병합 산물이 아니라 선행 결함이다.** 커밋별로 Kotlin 코드 수와 문서 enum 수를 함께 세어 갈라진 자리를
+짚었다 — 이 코드를 더한 커밋에서 한 칸 벌어졌다가 계약 커밋이 22/22 로 맞췄고, 갈라진 자리는 **첫 병합**
+(`d0e78685`)이다. 거기서 Kotlin 은 줄 합집합으로 23 이 됐는데 OpenAPI 는 「main 판 바탕 + 내 블록 재적재」로
+다시 쌓여, **내 블록이 아닌 `ErrorBody.code` enum 한 줄이 main 판의 22 로 접혔다**. 그 라운드의 재검증이
+표적 열하나였고 이 계약 등식은 거기 없었다.
+
+**이 라운드의 구조적 합집합 검사도 그것을 찾지 못한다** — 그 schema 는 `ours == base` 였으므로 합집합이
+요구되지 않았다. 한쪽에 **이미 있던** 결함은 합집합 술어의 사각이고, 그래서 병합 뒤 판정은 표적이 아니라
+**전건 `check`** 가 져야 한다. 고침은 enum 한 줄과 생성 타입 재생성이고, 회귀 방어는 새 test 가 아니라
+**이미 등재된 그 계약 등식**이다(RED 가 선행했다 — 그 찬 check 가 붉었다).
+
+### acceptance (산출물 HEAD `1a89eb6d`)
+
+- **찬 `check --continue --rerun-tasks --no-build-cache`** → **exit 0**, `BUILD SUCCESSFUL in 31m 28s`,
+  **392 task 전부 실행**, `FAILED` 0, `FROM-CACHE` **0**, task 이름 474, 루트 게이트 셋(표식 없음 = 실행),
+  `:build-logic:test` 포함, 모듈 여덟 게이트가 모듈마다 1 회.
+- **1 회차와 task 수가 다른 이유를 따로 셌다**(초록을 그냥 받지 않는다): 이름 집합 차이는 **열아홉**이고
+  둘 다 설명된다 — 1 회차에만 있던 **열둘**은 included build 의 자기 컴파일(2 회차는 1 회차가 저장한
+  구성 캐시를 재사용했다), 2 회차에만 있던 **일곱**은 `:app:check` 와 그 아래 커버리지 검증(1 회차는
+  `:app:test` 실패로 거기까지 가지 못했다). 즉 2 회차가 게이트를 지는 일에서는 **상위 집합**이다.
+- **이 slice 의 test 전부 초록**(결과 XML 시각이 이 run 이다): workflow 프로필 7 · 격리 7 · app 표면 15 ·
+  두 계정 E2E 4 · 요청 변환 3 · 응답 변환 2 · 조립 경계 4 · 그 계약 test 9 — 실패·오류 **0**.
+- **`qualityBaseline`**: 단독 실행은 `35 up-to-date` 로 **실행이 아니었다**(앞 `check` 가 이미 돌렸다).
+  실행 자리는 그 `check` 안이고(표식 없음), 그와 별개로 `--rerun-tasks` 로 다시 쟀다.
+- **`web` job 열한 단계 전부 exit 0**(`npm ci` · eslint · typecheck · src-tree · **생성 타입 바이트 등식** ·
+  vitest 5 파일 28 test · 게이트 test 등록부 대조(skipped/todo 0) · build 156 모듈 · 번들 경계 카나리 ·
+  Playwright 설치 · 스모크 2). 이 라운드는 OpenAPI 와 생성 타입을 바꾸므로 이 job 이 acceptance 에 붙는다.
+
+### rollback (새 base `a45105a5`)
+
+`rollback.md` 가 정본이다. 요약: 목록 **46 경로(A 17 · M 29)** — 앞 라운드 42 에서 넷 늘었고 전부 계약에
+등재했다. ①~⑦ 전부 통과(④⑤⑥ `exit 0` · `BUILD SUCCESSFUL in 31m 5s` · 401 task 전부 실행 · ⑥′ 이
+slice test 결과 **0 건**/전체 477). ⑦ 의 **표지 보정 둘**은 main 쪽 문면이 내 산출물을 앞질러 이름으로
+가리킨 자리다(내 줄이 아니다 — base 에 있음을 확인했다).
+
+### 더 뒤의 main 과의 교집합 (팀장 요청, 기계 계수)
+
+| 구간 | main 경로 | 내 in_scope 50 과의 교집합 |
+|---|---|---|
+| `a45105a5..c4e3fd1c`(6G-rc) | 23 | **0** |
+| `a45105a5..bb6a187e`(DEC-10 · Go CVE · Caddy·베이스) | 130 | **3** — `config/quality/architecture-policy.properties` · `config/quality/gate-tests.properties` · `docs/discovery/capability-map.md` |
+
+세 경로 모두 이 slice 가 **항목 합집합**으로만 만지는 자리다(허용·면제 목록 · test 등재 · OPEN 행).
+겹침이 0 이 아니므로 최신화는 `update-branch` 가 아니라 **main 병합 라운드 한 번 더**가 필요하다 —
+판단은 팀장이 한다.

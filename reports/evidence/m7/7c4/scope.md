@@ -12,7 +12,8 @@
 **없음.** 이 slice 는 `CLAUDE.md` 와 `.claude/` 에 커밋이 0 이다(`git log --oneline fc15975c..HEAD -- CLAUDE.md .claude/` 빈 출력).
 - **병렬 레인**(전부 push 0): 7B(`bid-vector-v2-m7-7b`, **V21 보유**) · g1c03 · g1dec05 · g1set01. 무거운 빌드는 기존 flock 직렬에 줄을 선다.
 - **입력 정본**:
-  - `docs/discovery/m7-screen-data-requirements.md` — 화면 A(시작하기) 행 27~37, 「설정」 절(:115~), 담당 칸이 `7C ④` 인 행 전부.
+  - `docs/discovery/m7-screen-data-requirements.md` — 「## A. 시작하기 (온보딩 체크리스트)」 절과 「설정」 절에서 **담당 칸이 `7C ④` 인 행 전부**.
+    (좌표로 적지 않는다 — 이 slice 가 그 파일을 편집하므로 줄 번호가 낡는다. 2026-10-29 둘째 병합 라운드에서 고쳤다.)
   - `adapters/.../db/migration/V12__operator_profile.sql` · `adapters/.../profile/*` · `workflow/.../evaluation/ProfilePorts.kt`(싱글턴 프로필 · 면허 세 상태).
   - `openapi/bidvector-operator-api.yaml` 의 `/api/strategy` · `/api/strategy/edit-sessions*`(전략 편집 세션 — **재사용**, 새로 만들지 않는다).
   - 7B 판정 문서 `bid-vector-v2-m7-7b/reports/evidence/m7/7b/checklist.md` §9(R-2 남은 절반 = 별 slice 권고) · 7B 의 인증 축 결정
@@ -376,3 +377,50 @@ verifier r5 `ready-for-review`(low F15) · code-review r5 `approve`(low R5-L1 ·
 **D-7C4-8 은 그대로 남는다**: 세 상태(완료 · 미완 · 선행 대기)를 두 상태로 접은 응답은 어느 경우에도
 내보내지 않는다. 그래서 체크리스트 endpoint 는 `awaiting` 과 **함께** 선다 — 그때까지 그 endpoint 를
 내지 않는 것이 이 결정의 내용이다. 정본은 capability map 의 OPEN 행이고 이 절은 포인터다.
+
+## 계약 갱신 — 2026-10-29 (둘째 병합 라운드): base 재고정과 새 파일 대조
+
+**base 를 `a45105a5` 로 재고정한다** — 7C③(PR #96)이 머지된 main 이다. 앞 base(`1632242e`)의 rollback
+실측은 무효이고 새 base 에서 다시 쟀다. 마이그레이션 번호는 **V22 그대로 유효**(병합된 main 최대 V23 =
+7C③ 의 알림함 표이고, 이 slice 의 V22 는 이미 base 에 있다. 이 라운드의 마이그레이션 변경은 0 건이다).
+
+### in_scope 추가 — 수정·병합 라운드가 만든 새 경로 넷의 대조
+
+in_scope 등식(복원 목록 ∪ 이 slice 의 장부)은 그대로다. 앞 라운드 42 경로에서 **46 으로 늘었고 넷 전부
+계약에 등재한다**.
+
+- `app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt` — **main 이 그 class 를
+  `HttpTestSupport.kt` 에서 제 파일로 갈랐다**(7C③). 이 slice 의 `@Import` 한 줄과 그 병합 주의 주석이
+  그 새 파일로 따라가 **M** 이 됐다. 2b in_scope 는 `HttpTestSupport.kt` 만 적고 있었다.
+- `app/src/test/kotlin/bidvector/app/http/ProfileRequestsTest.kt` — r3 수정 라운드가 만든 신설 test
+  (전송 표면 허용 집합 축). `config/quality/gate-tests.properties` 에 **같은 커밋에서 등재**됐다.
+- `docs/discovery/capability-map.md` · `docs/discovery/m7-screen-data-requirements.md` —
+  `OPEN-7C4-AWAITING-CHECKLIST` 등재(운영자 결정 2026-10-28).
+
+### D-7C4-4 의 「요구표 변경 0」을 정정한다
+
+그 문면은 **담당 칸이 이미 `7C ④` 라 고칠 것이 없다**는 실측에 근거했고 그때는 참이었다. 운영자 결정
+2026-10-28 이 `awaiting`·체크리스트 operation 을 OPEN 으로 돌리면서 **그 행의 담당 칸 자체가 바뀌었다**
+(「7C④ 가 닫는다」 → 「판정 커널은 7C④, HTTP operation 은 별 slice」). 그래서 이 라운드의 요구표 변경은
+**한 행**이고, 산출물 6 의 세 장부 중 **셋 다** 이 slice 가 편집한다.
+
+### 2b 설계 전제의 재실측 (7C③ 머지 뒤)
+
+`OPEN-7C4-AWAITING-CHECKLIST` 의 전제(평탄 술어가 깊이 1 object 를 거부한다)를 **병합된 트리에서 다시
+쟀고 그대로 참이다**: 그 계약 test 는 main 구간에서 **무편집**(diff 0 줄)이고, 병합된 spec 전체에 깊이 1
+object 속성이 **0** 이다. 전제가 깨지지 않았으므로 그 OPEN 의 문면을 고치지 않는다.
+
+### 「`HttpTestSupport.kt` 가 정확히 500줄」 사유의 갱신
+
+2b in_scope 의 거동 무변경 refactor ③(시계 이중체 파일 분리)은 **그 파일이 파일 한도에 닿아 있다**는
+사유로 승인됐다. main 이 `HttpTestApplication` 을 갈라 그 파일은 이제 **202 줄**이라 그 사유는 더 이상
+서지 않는다 — 그러나 **분리는 유지한다**. 더 강한 사유가 main 쪽에 이미 있다: 7C② 가 가른 전략 편집
+이중체 파일의 머리 주석이 「같은 상한 때문에 다른 두 레인이 평가 축과 **시계 축**을 가져갔다 — 선언이
+겹치면 병합 뒤 중복 선언으로 컴파일이 깨진다」고 적어 두었다. 즉 이 분리는 세 레인이 합의한 축 배분의
+한 조각이고, 되돌리면 main 쪽 문면이 거짓이 된다. 병합 뒤 `FixedClock`·`SequentialCorrelationIdFactory`
+선언은 **정확히 한 자리**다.
+
+### 하네스 레인 변경
+
+**없음.** 이 라운드도 `CLAUDE.md` 와 `.claude/` 에 커밋이 0 이다
+(`git log --oneline a45105a5..HEAD -- CLAUDE.md .claude/` 빈 출력).
