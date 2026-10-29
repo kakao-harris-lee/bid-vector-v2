@@ -55,19 +55,26 @@ export function classifyModuleId(rawId) {
 }
 
 /**
- * **데이터 모듈** — 번들 그래프에 들어온 정적 데이터 파일(M7/7E-1).
+ * 번들 그래프에 들어와도 되는 **모듈 종류**(v M-4). 앞 판은 데이터 확장자를 **열거**했고
+ * (`json|json5|ya?ml|csv|xml`), 같은 JSON 을 `rows.txt?raw` 로 들이면 그 열거를 비켜 갔다(실측).
+ * 그래서 술어를 **뒤집는다** — 아는 종류만 받고 **모르는 종류는 위반**이다.
+ *
+ * 코드와 스타일만 번들의 입력이다. 이미지·폰트 같은 자산이 필요해지면 이 목록에 한 줄을
+ * 더해야 하고, 그 변경은 diff 에 남는다(열거를 늘리는 쪽과 달리 **빠뜨림이 조용하지 않다**).
  *
  * 왜 이 층에도 두는가: TS 쪽은 `resolveJsonModule` 을 꺼서 `import x from './a.json'` 이
- * TS2732 로 막히고 W-4 가 `src` 안 데이터 파일 0 을 센다. 그러나 **Vite 전용 경로**
- * (`import.meta.glob`·`?raw`·`?url`)는 tsc 를 거치지 않고, 그 대상이 `node_modules` 안이면
- * 두 층 모두 통과한다 — 화면이 계약 밖에서 데이터 **모양**을 얻는 경로가 그 자리에 남는다.
- * 그래서 그래프에서 한 번 더 센다.
- *
- * 패키지 자신의 `package.json`(해석기가 읽는 매니페스트)은 모듈 그래프에 **id 로 들어오지
- * 않는다** — 들어오는 것은 누군가 import 한 데이터뿐이다.
+ * TS2732 로 막히고 W-4 가 `src` 안 데이터 파일 0 과 쿼리 접미 import 0 을 센다. 그러나 그 둘은
+ * **`node_modules` 안의 데이터**를 보지 못한다 — 그 자리를 이 층이 받는다.
  */
-export function isDataModule(path) {
-  return /\.(json|json5|ya?ml|csv|xml)$/i.test(path);
+const ALLOWED_MODULE_EXTENSIONS = new Set(['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs', 'css', 'html']);
+
+export function isAllowedModuleKind(path) {
+  const match = /\.([A-Za-z0-9]+)$/.exec(path);
+  if (match === null) {
+    // 확장자가 없는 파일은 종류를 알 수 없다 — 모르는 것은 통과시키지 않는다.
+    return false;
+  }
+  return ALLOWED_MODULE_EXTENSIONS.has(match[1].toLowerCase());
 }
 
 export function isInsideRoot(candidate, root) {
@@ -213,7 +220,7 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
           offenders.push(`${rawId} → ${realPath}`);
           continue;
         }
-        if (isDataModule(realPath)) {
+        if (!isAllowedModuleKind(realPath)) {
           dataOffenders.push(`${rawId} → ${realPath}`);
           continue;
         }
@@ -253,8 +260,9 @@ export function moduleGraphBoundary({ webRoot = process.cwd() } = {}) {
 
       if (dataOffenders.length > 0) {
         this.error(
-          `번들 모듈 그래프가 정적 데이터 파일을 담았다 — 데이터 모양은 V2 계약에서만 온다 ` +
-            `(ADR 0011 D-2):\n` +
+          `번들 모듈 그래프가 **아는 종류가 아닌 모듈**을 담았다 — 코드·스타일만 번들의 입력이고 ` +
+            `데이터 모양은 V2 계약에서만 온다(ADR 0011 D-2). 경로가 node_modules 안이면 의존성 ` +
+            `올림을 먼저 보라(그 패키지가 데이터를 import 한다):\n` +
             dataOffenders.map((line) => `  - ${line}`).join('\n'),
         );
       }

@@ -350,11 +350,22 @@ const classifyApiSpecifier = (specifier, containingFile) => {
 };
 
 // 해석되지 않은 지정자 중 **허용하는 것은 하나**다: `src` 안에 그 파일이 실제로 있는 경로
-// 지정자(`./index.css` 처럼 tsc 가 타입을 모르는 것, `?raw` 같은 접미가 붙은 것). 근거는 그
-// 파일이 **번들 모듈 그래프 경계**(메인·워커)의 전수 대상이라는 것 — 같은 파일을 두 층이 본다.
-// 반대로 **bare 지정자**가 해석되지 않으면 모름이고, 모르는 것은 통과시키지 않는다.
+// 지정자(`./index.css` 처럼 tsc 가 타입을 모르는 것). 근거는 그 파일이 **번들 모듈 그래프
+// 경계**(메인·워커)의 전수 대상이라는 것 — 같은 파일을 두 층이 본다. 반대로 **bare 지정자**가
+// 해석되지 않으면 모름이고, 모르는 것은 통과시키지 않는다.
+//
+// **쿼리 접미(`?raw`·`?url`·`?inline` …)는 허용하지 않는다**(v M-4). 그 형태는 tsc 를 지나고
+// (`vite/client` 의 주변 선언이 타입을 준다) 파일 종류 열거를 비켜 간다 — 같은 JSON 을
+// `rows.txt?raw` 로 들이면 데이터 파일 술어도, 데이터 모듈 술어도 못 봤다(실측). 열거를 늘리는
+// 대신 **그 입구 자체**를 없앤다: `src` 안에서 쿼리 import 를 쓰지 않는다. 필요가 생기면 이
+// 게이트를 고쳐야 하고, 그 변경은 diff 에 남는다.
+const hasImportQuery = (specifier) => specifier.includes('?');
+
 const unresolvedIsFileInSrc = (specifier, containingFile) => {
   if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+    return false;
+  }
+  if (hasImportQuery(specifier)) {
     return false;
   }
   const withoutQuery = specifier.split('?')[0];
@@ -371,6 +382,12 @@ const apiImporters = new Set();
 const clientModuleImporters = new Set();
 for (const { sourceFile, name } of inSrcFiles) {
   for (const imported of ts.preProcessFile(sourceFile.text, true, true).importedFiles) {
+    if (hasImportQuery(imported.fileName)) {
+      fail(
+        `src 안에서 쿼리 접미 import 를 쓴다: ${name} → ${imported.fileName} ` +
+          '— tsc 를 지나고 파일 종류 술어를 비켜 가는 입구다(v M-4)',
+      );
+    }
     const verdict = classifyApiSpecifier(imported.fileName, sourceFile.fileName);
     if (verdict === 'client') {
       apiImporters.add(name);
@@ -676,7 +693,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 비 TS 스크립트 0 · src 안 정적 데이터 파일 0 · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   apiImporterViolation,
   boundaryRoots,
-  isDataModule,
+  isAllowedModuleKind,
   graphImporters,
   classifyModuleId,
   isInsideRoot,
@@ -128,21 +128,37 @@ describe('그래프의 importer 수집', () => {
 });
 
 /**
- * M7/7E-1 — 정적 데이터 모듈 술어. 「계약 밖에서 데이터 모양을 얻지 않는다」의 번들 층이고,
- * 확장자 목록이 이 술어의 전부이므로 그 목록 자체를 잠근다.
+ * v M-4 — 모듈 **종류** 술어. 앞 판은 데이터 확장자를 열거했고 `rows.txt?raw` 가 그 열거를
+ * 비켜 갔다(실측). 이제 아는 종류만 받으므로 **모르는 종류가 기본 위반**이다.
  */
-describe('정적 데이터 모듈 술어', () => {
-  it('데이터 확장자를 잡는다 — 대소문자와 질의 접미를 넘어서', () => {
-    expect(isDataModule('/w/src/a.json')).toBe(true);
-    expect(isDataModule('/w/src/a.JSON')).toBe(true);
-    expect(isDataModule('/w/node_modules/p/data.yaml')).toBe(true);
-    expect(isDataModule('/w/src/rows.csv')).toBe(true);
-    expect(isDataModule(stripQuery('/w/src/a.json?raw'))).toBe(true);
+describe('번들에 들어와도 되는 모듈 종류', () => {
+  it('코드와 스타일은 받는다', () => {
+    for (const path of ['/w/src/a.ts', '/w/src/a.tsx', '/w/src/a.css', '/w/node_modules/p/i.mjs', '/w/index.html']) {
+      expect(isAllowedModuleKind(path), path).toBe(true);
+    }
   });
 
-  it('코드 모듈은 잡지 않는다 — 이름에 json 이 들어 있어도', () => {
-    expect(isDataModule('/w/src/api/client.ts')).toBe(false);
-    expect(isDataModule('/w/src/jsonHelpers.ts')).toBe(false);
-    expect(isDataModule('/w/src/a.json.ts')).toBe(false);
+  it('데이터·텍스트·확장자 없음은 **열거하지 않아도** 위반이다', () => {
+    for (const path of [
+      '/w/src/a.json',
+      '/w/src/a.JSON',
+      '/w/node_modules/p/data.yaml',
+      '/w/src/rows.csv',
+      '/w/src/rows.txt',
+      '/w/src/notes.md',
+      '/w/src/rows',
+    ]) {
+      expect(isAllowedModuleKind(path), path).toBe(false);
+    }
+  });
+
+  it('쿼리 접미는 먼저 떼고 종류를 본다', () => {
+    expect(isAllowedModuleKind(stripQuery('/w/src/rows.txt?raw'))).toBe(false);
+    expect(isAllowedModuleKind(stripQuery('/w/src/a.ts?worker'))).toBe(true);
+  });
+
+  it('이름에 데이터 확장자가 들어간 코드 모듈은 받는다', () => {
+    expect(isAllowedModuleKind('/w/src/a.json.ts')).toBe(true);
+    expect(isAllowedModuleKind('/w/src/jsonHelpers.ts')).toBe(true);
   });
 });
