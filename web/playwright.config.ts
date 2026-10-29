@@ -7,6 +7,9 @@ import { defineConfig, devices } from '@playwright/test';
 // 띄우므로 이 스모크가 보는 것은 dev server 가 아니라 **빌드된 번들**이다.
 export default defineConfig({
   testDir: './e2e',
+  // M7/7E-1 — 여정 레인은 자기 설정 파일(`playwright.journey.config.ts`)이 돈다. 하네스를
+  // 띄우는 그 spec 들이 이 스모크에 섞이면 셸 스모크가 하네스 비용을 물게 된다.
+  testIgnore: ['journey/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

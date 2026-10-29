@@ -26,7 +26,20 @@ export default defineConfig({
   // 않으므로 해석 순서와 무관하게 같은 주소에 뜬다 — `playwright.config.ts` 의 `url`·`baseURL` 과
   // 같은 값이다.
   server: { host: '127.0.0.1', port: 5173, strictPort: true },
-  preview: { host: '127.0.0.1', port: 4173, strictPort: true },
+  // M7/7E-1 — 여정 e2e 하네스만 쓰는 두 값. **번들에 들어가지 않는다**(preview 서버 설정이고
+  // `VITE_` 접두가 아니다 — ADR 0011 D-6). 값이 없으면 7A 때와 **같은 preview** 다: 포트
+  // 4173, 프록시 없음. 그래서 production 코드에 e2e 분기가 0 이고 이 파일에만 입구가 있다.
+  preview: {
+    host: '127.0.0.1',
+    port: Number.parseInt(process.env.BIDVECTOR_E2E_PREVIEW_PORT ?? '4173', 10),
+    strictPort: true,
+    // 화면과 API 를 **같은 출처**로 둔다 — 세션 쿠키(SameSite=Strict)와 CSRF 가 운영 형태
+    // (7F 의 리버스 프록시)와 같은 모양으로 돈다. 교차 출처로 쿠키를 보내는 설정을 쓰지 않는다.
+    proxy:
+      process.env.BIDVECTOR_E2E_API_ORIGIN === undefined
+        ? undefined
+        : { '/api': { target: process.env.BIDVECTOR_E2E_API_ORIGIN, changeOrigin: false } },
+  },
   build: { outDir: 'dist', emptyOutDir: true },
   test: {
     // M7/7D — **test 에서만** API 기준 주소를 절대 URL 로 둔다. 브라우저는 상대 주소(`/`)를
