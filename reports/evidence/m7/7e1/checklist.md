@@ -34,14 +34,17 @@
 
 | # | 우회 | 막는 층 | 실측 |
 | --- | --- | --- | --- |
-| 1 | `fetch`·XHR·WebSocket 직접 호출 | eslint(보조 층) + 번들 그래프 간선 등식(구조) + 여정 e2e 의 출처 전수 계수 | 변이 M4 → lint exit 1 |
-| 2 | 생성 타입 우회 `as any` 캐스팅 | `@typescript-eslint/no-explicit-any` + 표가 `satisfies` 라 키를 지우면 컴파일 실패 | 변이 M2a → typecheck exit 2 |
-| 3 | **정적 데이터 파일 import** | `resolveJsonModule: false`(TS2732) + W-4 의 전제 단언과 `src` 안 데이터 파일 0 + 번들 그래프의 데이터 모듈 거부 | probe A → typecheck exit 2 · W-4 exit 1 / probe B(`?raw`) → build exit 1 |
+| 1 | `fetch`·XHR·WebSocket 직접 호출 | eslint(보조 층) + 번들 그래프 간선 등식(구조) + 여정 e2e 의 출처·**operation 전수** 계수 | 변이 M4 → lint exit 1 |
+| 2 | 생성 타입 우회 `as any`·`as unknown as` 캐스팅 | `no-explicit-any` + 표의 `satisfies` + **호출 능력 집합 등식**(W-4)과 **operation 집합 등식**(게이트 test) — 캐스팅으로 계약 밖 경로를 불러도 그 둘이 잡는다 | 변이 M2a → typecheck exit 2 · 양성 대조 둘(아래 ⑨) |
+| 3 | **정적 데이터 파일 import** | `resolveJsonModule: false`(TS2732) + W-4 의 전제 단언·`src` 안 데이터 파일 0·**쿼리 접미 import 0** + 번들 그래프의 **모듈 종류 허용 목록**(모르는 종류는 기본 위반) | probe A → typecheck 2 · W-4 1 / probe B(`rows.txt?raw`) → W-4 1 · build 1 / probe C(동적 `?raw`) → W-4 1 |
 | 4 | 상태 enum 의 기본 분기 | 표 조회 자리의 폴백 0 + 표 키 집합 등식 test | 변이 M2b → vitest exit 1 |
 | 5 | e2e 가 화면 대신 API 만 검증 | 단언을 **DOM 에서 읽어 같은 실행의 API 응답과 대조**한다(기대값을 spec 에 적지 않는다) | 변이 M1(단위 fixture 와 **같은** 리터럴) → vitest 초록 · 여정 e2e exit 1 |
 | 6 | 「아직 산출 안 함」 자리에 숫자 | 값 자리의 숫자 부재 단언(단위 + e2e) | 변이 M3 → vitest exit 1 · 여정 e2e exit 1 |
 | 7 | 화면이 상태를 추론(`마감 < now ? '마감'`) | 라벨은 API `status`·`state`·`nextCheckpointKind` 에서만. 요구표가 승인한 클라이언트 계산은 **남은 날 수 하나**이고 그 경계를 test 가 고정한다 | 「마감이 지나도 날 수만 내고 「마감」이라는 말을 만들지 않는다」 test |
-| 8 | 캡처·trace 에 실데이터 | trace 는 실패 시에만 · 자격 값을 적은 맥락 파일은 산출물 디렉터리 **밖** · 산출물 누출 스캔(참조형) | 성공 실행 산출물에 trace 0 · 스캔 일치 0 |
+| 8 | 캡처·trace 에 실데이터 | **CI 는 trace 를 남기지 않고 스크린샷만** 올린다 · 자격 값을 적은 맥락 파일은 산출물 디렉터리 **밖** · 산출물 누출 스캔(참조형) | 강제 실패(CI=1) 산출물에 `trace.zip` **0** · 스캔 일치 0 |
+| 9 | **화면이 계약 목록 밖 operation 을 부름** | W-4 의 「`apiClient` 호출 능력 import 집합 == {`queries.ts`}」(출하 소스) + 게이트 test 의 「그 파일의 호출 경로 집합 == 계약 목록」(AST) + 여정 e2e 의 런타임 경로 대조 | 양성 대조 둘: 화면이 직접 import → **W-4 exit 1** / `queries.ts` 가 목록 밖 호출 → **test exit 1** |
+| 10 | **쓰기 실패가 조용히 지나감** | 네 mutation 의 `onError` 가 성공 토스트를 걷고 서버 상태를 다시 읽은 뒤 `role="alert"` 얼굴을 낸다 · 401 은 로그인 경로 | 단위 test 다섯 · 여정 e2e 가 **실제 401**(쿠키 삭제)로 그 얼굴을 잰다 |
+| 11 | **값을 지어낸 요청 본문** | 진행 중 건수는 운영자 **선언**이고 선언 전에는 요청이 가지 않는다 · 응답의 echo 를 화면이 보인다 | 변이(리터럴 0 복원) → vitest exit 1 |
 
 ### 0.5 (2b) 값 획득 축 — 새 public 표면 전수
 
@@ -50,7 +53,11 @@
 | `src/display/*` 의 표와 `displayOf` | 계약 enum 타입(생성 타입)에서 키, 문면은 이 파일이 짓는다 | 값을 만들지 않는다 — 입력은 상태 하나뿐이고 폴백이 없다 |
 | `src/api/queries.ts` | `apiClient` + 생성 타입. 계약 헤더를 읽는 **유일한 자리** | 경로·요청·응답 모양을 다시 선언하지 않는다(손 미러 층 0). 목록 밖 operation 을 부르면 이 파일에 줄이 생겨 diff 에 남는다 |
 | `src/screens/*` · `src/components/*` | 위 둘에서만 | 숫자 리터럴·상태 문면 리터럴 0(변이 M1·M3 가 그 자리를 잰다) |
-| `src/session/useSessionCsrf` | `GET /api/session` | 세션이 없으면 **값을 기억하지 않는다**(fail-closed) |
+| `src/session/useSessionCsrf` | `GET /api/session` | 세션이 없으면 **값을 기억하지 않는다**(fail-closed). `signedIn` 을 화면이 **소비한다** — 재시도로 풀리지 않는 자리에 일시 장애 얼굴을 내지 않는다 |
+| `src/api/apiError.ts` | 상태·코드만 | 서버 메시지를 담지 않는다. `queries.ts` 와 **다른 모듈**인 이유는 화면 test 가 질의 모듈을 바꿔치울 때 클래스 정체가 갈려 401 갈래가 서지 않았기 때문이다(실측) |
+| `src/components/WriteFailure` | `ApiError.status` | 401 과 일시 장애를 가른다. 서버 메시지·코드를 내보이지 않는다 |
+| `src/screens/WorksheetRecord` 의 선언 입력 | 운영자 입력 | 기본값 0 이 없다 — 계약이 「호출자가 선언한다」로 둔 칸이다 |
+| `scripts/screen-operations.mjs` | `queries.ts` 의 AST · 생성 타입의 `paths` 키 | 문자열 grep 이 아니다(주석·문서 문자열을 세지 않는 성질을 test 가 잠근다) |
 | `vite.config.ts` 의 e2e 입구 둘 | 환경변수(preview 포트·API 출처) | `VITE_` 접두가 아니라 **번들에 들어가지 않는다**. 값이 없으면 7A 때와 같은 preview 다 |
 | 하네스(`e2e/harness/*`) | 실행마다 난수 비밀값 · 출하 명령 인자 | production 코드에 fake·e2e 분기 0 — app 은 설정 값만 받는다 |
 
@@ -93,6 +100,14 @@ TS 에서 `object` 커널 주입에 해당하는 자리는 **모듈 전역**이�
    검색 뒤 번호·차수 일치로 한 건을 고른다. 7C① 후속 후보로 보고한다.
 2. **`BidCase` 에 초안 금액 칸이 없다** — 그래서 「제출함」 폼이 초안 금액을 기본값으로 둘 수
    없고 운영자가 다시 적는다(가짜 기본값을 넣지 않는다). 7B 후속 후보.
+2b. **「진행 중 투찰 건수」를 서버가 세어 주는 표면이 없다** — 계약 전체에서 그 값은 **요청 칸과
+   echo** 로만 나타나고 `listBidCases` 에 집계도 `X-Total-Count` 도 없다(실측). 그래서 운영자가
+   선언하고 화면은 그 값을 그대로 싣는다. 클라이언트가 상태를 「진행 중」으로 분류해 세면 계약에
+   없는 정의를 화면이 만드는 것이라 하지 않는다. **후속 Kotlin 후보**: 진행 중 건수를 내는 표면
+   (`listBidCases` 의 총수 헤더 또는 집계 operation).
+2c. **쪽 넘김은 「더 보기」 한 방향이다** — 무한 스크롤·쪽 번호는 없다(§6.5 의 무한 스크롤은
+   7E-2·3 이 다시 본다). 받은 수와 전체 건수를 함께 보이므로 「보이는 수와 닿을 수 있는 수」가
+   어긋나지 않는다.
 3. **`NoticeSummary.status` 와 `BidTimelineEntry.toState`·`command` 는 계약이 `type: string`
    이다** — 이 축들만 `tsc` 가 전수를 보장하지 못한다. 알려진 값에는 문면을 주고 모르는 값은
    **서버가 준 코드를 그대로** 보인다(문면을 지어내지 않는다).
@@ -103,9 +118,17 @@ TS 에서 `object` 커널 주입에 해당하는 자리는 **모듈 전역**이�
    패키지를 전제한다. 전자는 이 slice 가 더한 것이고 `one-command` 도 같은 전제를 받는다.
 7. **`floorRateGroundsState` 의 `IMPLAUSIBLE`** — 진행 중인 7C②-b 가 더한다. 나중 머지 쪽이
    맞추고, 누락은 `satisfies` 가 컴파일로 잡는다(D-7E-4).
-8. 번들 그래프의 데이터 모듈 거부는 **그 모듈이 그래프에 들어왔을 때**만 센다 — 엔트리에서
+8. 번들 그래프의 모듈 종류 검사는 **그 모듈이 그래프에 들어왔을 때**만 센다 — 엔트리에서
    닿지 않는 파일은 번들에 들어오지 않으므로 그 층의 대상이 아니다(probe B 의 첫 측정이 그
    성질을 보였다: 죽은 코드는 build 초록).
+9. **「폴백 0」은 `displayOrUnknown` 안에서만 잠긴다** — 호출 자리에서 `?? TABLE.X` 를 쓰는 것은
+   어느 게이트도 보지 못한다(타입이 맞는 코드다). 그 자리는 리뷰 소관이고, 폴백을 쓸 이유가
+   없도록 미지 상태를 **보이는 값**으로 만들어 두었다.
+10. **`container` job 은 이 레인이 돌리지 않았다** — 새 devDependency 가 builder 단계의
+   `npm ci` 를 바꾸므로 이미지 위생·취약점 게이트의 판정은 **PR 체크가 든다**(OQ-1). 런타임
+   단계는 빌드 산출물만 복사한다(Dockerfile 실측).
+11. **두 job 이 Gradle 캐시를 같이 쓴다**(OQ-3) — `setup-gradle` 이 job 별 키를 쓰므로 충돌이
+   아니라 항목이 하나 느는 것이고, 캐시 용량·축출 영향은 재지 않았다.
 
 ## 3. rollback 과 재실행
 
