@@ -464,6 +464,60 @@ if (!apiImporters.has(API_CALL_SITE)) {
   );
 }
 
+// ⑤b-2 **심볼 참조 전수**(v r3 M-1) — 간선 종류 열거가 보지 못하는 꼴을 TypeChecker 로 받는다.
+//
+// 간선 술어는 「어느 파일이 그 모듈을 끌어오는가」를 센다. 그러나 허용 자리 안에서 `export
+// { apiClient };`(로컬 재수출 — 모듈 지정자가 **없다**)를 쓰면 화면은 `../api/queries` 에서
+// 그 이름을 가져오고, 그 import 는 client.ts 로 가는 간선이 아니다(실측: 다섯 층 0).
+//
+// 그래서 **그 심볼 자체**를 쫓는다: `apiClient` 라는 식별자의 심볼을 해소해(별칭이면 끝까지)
+// client.ts 의 그것과 같은지 본다. 어느 이름으로 다시 내보내도 같은 심볼이다.
+const checker = program.getTypeChecker();
+const clientSymbol = (() => {
+  const clientSource = programFiles.find((one) => {
+    try {
+      return realpathSync(one.fileName) === clientModuleReal;
+    } catch {
+      return false;
+    }
+  });
+  if (clientSource === undefined) {
+    return undefined;
+  }
+  const moduleSymbol = checker.getSymbolAtLocation(clientSource);
+  return moduleSymbol?.exports?.get(CLIENT_CAPABILITY_BINDING);
+})();
+
+if (clientSymbol === undefined) {
+  fail(`${CLIENT_MODULE} 에서 ${CLIENT_CAPABILITY_BINDING} 심볼을 찾지 못했다 — 이 층이 공허해진다`);
+} else {
+  for (const { sourceFile, name } of inSrcFiles) {
+    if (name === CLIENT_MODULE || name === CLIENT_MODULE_CALLER || isTestFile(name)) {
+      continue;
+    }
+    const visit = (node) => {
+      if (ts.isIdentifier(node) && node.text === CLIENT_CAPABILITY_BINDING) {
+        let symbol = checker.getSymbolAtLocation(node);
+        if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) {
+          try {
+            symbol = checker.getAliasedSymbol(symbol);
+          } catch {
+            /* 해소 실패는 아래 비교에서 걸린다 */
+          }
+        }
+        if (symbol === clientSymbol) {
+          fail(
+            `${CLIENT_CAPABILITY_BINDING} 심볼이 ${CLIENT_MODULE_CALLER} 밖에서 참조된다: ${name} ` +
+              '— 이름을 바꿔 다시 내보내도 같은 심볼이다',
+          );
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+}
+
 // ⑤b 서버 **호출 능력**의 자리 집합 등식(v M-3) — 화면은 `queries.ts` 를 지난다.
 for (const importer of clientModuleImporters) {
   if (importer !== CLIENT_MODULE_CALLER) {
@@ -728,7 +782,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }

@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
 
+import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
+
 /**
  * 여정 ②③ 의 e2e(D-7E-3) — **출하 app.jar · 버릴 Postgres · loopback fake KONEPS** 위에서
  * 돈다(API 목 0). 공고는 수집 경로로 들어왔고 화면은 V2 API 만 부른다.
@@ -139,25 +141,11 @@ function watchRequests(page: Page): {
 }
 
 /**
- * 계약의 「화면 B·C 가 쓰는 operation」 목록(scope.md) 그대로다 — v M-3 의 e2e 쪽 몫이다.
- * 구조 쪽 등식은 W-4(클라이언트 import 집합)와 단위 test(호출 operation 집합)가 진다.
+ * 런타임 대조 집합을 **승인 목록에서 파생**한다(v r3 M-1). 앞 판은 같은 목록을 이 파일에
+ * 복제했고, r2 에서 세 쌍을 지웠을 때 **여기만 남아** 두 자리가 갈렸다(실측: 지운 셋이 여전히
+ * 허용 목록에 있었다). 한 자리에서 파생하면 그 갈림이 생기지 않는다.
  */
-const ALLOWED_API = new Set([
-  'GET /api/session',
-  'POST /api/session',
-  'GET /api/notices',
-  'GET /api/suggestions',
-  'GET /api/bid-cases',
-  'POST /api/bid-cases',
-  'POST /api/bid-price-requests',
-  'GET /api/bid-cases/{caseId}',
-  'GET /api/bid-cases/{caseId}/timeline',
-  'POST /api/bid-cases/{caseId}/draft',
-  'POST /api/bid-cases/{caseId}/record',
-  'POST /api/bid-cases/{caseId}/skip',
-  'POST /api/bid-cases/{caseId}/defer',
-  'POST /api/bid-cases/{caseId}/resume',
-]);
+const ALLOWED_API = new Set(APPROVED_OPERATIONS.map((one) => `${one.method} ${one.path}`));
 
 function templated(methodAndPath: string): string {
   return methodAndPath.replace(/\/api\/bid-cases\/\d+/u, '/api/bid-cases/{caseId}');
