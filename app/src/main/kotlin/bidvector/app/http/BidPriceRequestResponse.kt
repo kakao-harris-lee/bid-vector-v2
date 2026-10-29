@@ -94,7 +94,10 @@ data class BaseAmountFields(
     val baseAmountResolution: String?,
 )
 
-/** 게시 하한율(DEC-03 · DEC-10 표시 축) — 게시값만 근거다. */
+/**
+ * 게시 하한율(DEC-03 · DEC-10 표시 축) — **게시값이고 DEC-10 개연 밴드를 통과한 값만 근거다.**
+ * 「게시값」은 필요조건일 뿐이다(7C②-b) — 둘 중 하나라도 어긋나면 값 칸은 비고 상태가 사유를 말한다.
+ */
 data class FloorRateFields(
     val publishedFloorRateFraction: String?,
     val publishedFloorRateOrigin: String?,
