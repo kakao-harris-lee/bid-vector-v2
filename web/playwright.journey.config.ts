@@ -24,8 +24,20 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: PREVIEW_URL,
-    // D-7E-6 — trace 는 **실패할 때만** 남긴다(성공 실행의 산출물에 응답 본문을 남기지 않는다).
-    trace: 'retain-on-failure',
+    /**
+     * D-7E-6 — **CI 에서는 trace 를 남기지 않는다**(v M-6).
+     *
+     * trace 는 네트워크 요청 본문과 쿠키를 담는다 — 강제 실패 실측에서 로그인 본문의 일회용
+     * 비밀 문구 1건과 세션 쿠키 6건이 `trace.zip` 에 있었고, CI 는 실패 시 그 디렉터리를
+     * 14일 아티팩트로 올린다. 값이 실행마다 난수이고 DB 가 버려지므로 위험은 낮지만, 계약
+     * 문면은 「e2e trace 에 세션 쿠키 평문 0」이다.
+     *
+     * Playwright 에 「본문만 빼기」 옵션이 없으므로 **아티팩트에 들어가는 종류를 바꾼다**:
+     * CI 는 **스크린샷만** 남긴다(비밀 문구는 password 입력이라 화면에 평문으로 그려지지
+     * 않는다). 로컬은 trace 를 그대로 둔다 — 그 산출물은 올라가지 않고 디버깅에 필요하다.
+     */
+    trace: process.env.CI ? 'off' : 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
