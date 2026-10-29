@@ -518,6 +518,39 @@ if (clientSymbol === undefined) {
   }
 }
 
+// ⑤b-3 **재수출 금지**(v r3 M-1 양성 대조 ①) — 위 층은 「허용 자리 밖의 참조」를 센다. 그
+// 참조를 만들 수 있게 하는 자리는 **허용 자리 안의 재수출**이다. 그것 자체를 금하면 소비자가
+// 생기기 전에 붉다 — 가능 조건을 닫는 쪽이 사용을 세는 쪽보다 앞선다. 모듈 지정자가 **있는**
+// 재수출(`export … from './client'`)은 간선 층이 이미 허용 자리에서도 거부한다; 여기서 받는
+// 것은 지정자가 **없어** 간선이 아닌 꼴(`export { apiClient };`)이다.
+if (clientSymbol !== undefined) {
+  for (const { sourceFile, name } of inSrcFiles) {
+    if (isTestFile(name)) {
+      continue;
+    }
+    const visitExports = (node) => {
+      if (ts.isExportSpecifier(node)) {
+        let symbol = checker.getExportSpecifierLocalTargetSymbol(node);
+        if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) {
+          try {
+            symbol = checker.getAliasedSymbol(symbol);
+          } catch {
+            /* 해소 실패는 아래 비교에서 걸린다 */
+          }
+        }
+        if (symbol === clientSymbol) {
+          fail(
+            `${CLIENT_CAPABILITY_BINDING} 심볼을 재수출한다: ${name} (${node.getText()}) ` +
+              '— 재수출이 있으면 허용 자리를 거쳐 어느 파일로도 능력이 건너간다',
+          );
+        }
+      }
+      ts.forEachChild(node, visitExports);
+    };
+    visitExports(sourceFile);
+  }
+}
+
 // ⑤b 서버 **호출 능력**의 자리 집합 등식(v M-3) — 화면은 `queries.ts` 를 지난다.
 for (const importer of clientModuleImporters) {
   if (importer !== CLIENT_MODULE_CALLER) {
@@ -782,7 +815,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · apiClient 심볼 참조가 그 밖에서 0 · 그 심볼의 재수출 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }
