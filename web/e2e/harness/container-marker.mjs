@@ -3,7 +3,7 @@
 // 왜 모듈이 따로인가: `journey-up.mjs` 는 적재되면 곧 `main()` 을 돌리므로 test 가 그 술어만
 // 집어 올 수 없다. 파괴적 경로의 가드는 **test 가 직접 부를 수 있는 자리**에 있어야 한다.
 import { spawnSync } from 'node:child_process';
-import { closeSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
+import { linkSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 export const CONTAINER_PREFIX = 'bidvector-7e1-journey-';
 
@@ -67,13 +67,14 @@ export function lockOwnerAlive(marker, { signal = process.kill, startToken = pro
   try {
     signal(marker.pid, 0);
   } catch (error) {
-    // **`EPERM` 은 살아 있다는 뜻이다**(CR r4 M-2) — 신호 권한이 없을 뿐이다(죽은 pid 는
-    // `ESRCH`). 앞 판은 예외 종류를 가르지 않고 「죽었다」로 세어, 자기 주석이 선언한 안전
-    // 방향의 **반대**로 기울었다: 다른 사용자의 살아 있는 실행을 묵은 것으로 읽는다.
-    if (error?.code === 'EPERM') {
-      return true;
+    // **`ESRCH` 만 죽음이다**(CR r4 M-2 · r5 L-4). 신호 권한이 없는 것(`EPERM`)은 **살아
+    // 있다는 뜻**이고, 모르는 코드도 같은 쪽으로 기운다 — 이 모듈이 선언한 방향이 「모르면
+    // 살아 있다」이기 때문이다(틀리면 멈출 뿐, 반대로 틀리면 남의 실행을 걷는다). 앞 판은
+    // `EPERM` 만 가리고 나머지를 죽음으로 세어 선언과 기본값이 어긋나 있었다.
+    if (error?.code === 'ESRCH') {
+      return false;
     }
-    return false;
+    return true;
   }
   const current = startToken(marker.pid);
   if (marker.startToken === undefined || current === undefined) {
@@ -123,51 +124,91 @@ export function reapStaleContainer(marker, { dryRun = false, run = spawnSync, lo
  * 하네스의 배선을 test 가 부를 수 있도록 **이 모듈에 둔다**(v r4 L-2): `journey-up.mjs` 는
  * 적재되면 곧 `main()` 을 돌려 test 가 import 할 수 없다.
  */
+/** 락 자리를 읽은 결과 — 「비었다」와 「못 읽겠다」는 다른 답이다. */
+function readLockSlot(fs, lockPath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    // **그 자리가 비었다**(CR r5 L-1): `EEXIST` 와 읽기 사이에 앞 실행이 정상 종료하며 락을
+    // 지울 수 있다. 그것은 재시도가 처리할 정상 경합이고 실패가 아니다.
+    if (error?.code === 'ENOENT') {
+      return { kind: 'gone' };
+    }
+    throw error;
+  }
+  const marker = parseLockMarker(raw);
+  return marker === undefined ? { kind: 'unreadable' } : { kind: 'marker', marker };
+}
+
+const sameOwner = (a, b) => a.pid === b.pid && a.startToken === b.startToken && a.container === b.container;
+
 export function acquireSingleRunLock({
   lockPath,
   pid,
   startToken,
   container,
-  fs = { openSync, writeSync, closeSync, readFileSync, rmSync },
+  fs = { writeFileSync, linkSync, readFileSync, rmSync },
   alive = lockOwnerAlive,
   reap = reapStaleContainer,
   log = () => {},
 }) {
+  const marker = formatLockMarker({ pid, startToken, container });
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    let fd;
+    // **표지를 다 쓴 뒤 `link` 로 건다**(CR r5 L-1 ⓑ) — `link` 는 대상이 있으면 `EEXIST` 이므로
+    // 배타는 그대로이고, 락 파일은 **처음부터 완전한 내용**으로 나타난다. 앞 판(`wx` 로 열고
+    // 그 fd 에 쓰기)은 열기와 쓰기 사이에 죽으면 **빈 락**을 남겨, 이후 모든 실행이 「표지를
+    // 읽을 수 없다」로 멈추는 운영 비용을 만들었다.
+    const pending = `${lockPath}.${pid}.${attempt}.tmp`;
+    fs.rmSync(pending, { force: true });
+    fs.writeFileSync(pending, marker, { flag: 'wx', mode: 0o600 });
     try {
-      fd = fs.openSync(lockPath, 'wx', 0o600);
+      fs.linkSync(pending, lockPath);
+      return { attempt };
     } catch (error) {
       if (error?.code !== 'EEXIST') {
         throw error;
       }
-      const existing = parseLockMarker(fs.readFileSync(lockPath, 'utf8'));
-      if (existing === undefined) {
+      const slot = readLockSlot(fs, lockPath);
+      if (slot.kind === 'gone') {
+        continue;
+      }
+      if (slot.kind === 'unreadable') {
         throw new Error(
           `락 표지를 읽을 수 없다(${lockPath}) — 앞 실행이 살아 있는지 알 수 없으므로 ` +
             '아무것도 걷지 않고 멈춘다. 그 실행이 끝난 것을 확인한 뒤 그 파일을 지우십시오.',
           { cause: error },
         );
       }
-      if (alive(existing)) {
+      if (alive(slot.marker)) {
         throw new Error(
-          `앞 실행이 살아 있다(pid ${existing.pid} · 컨테이너 ${existing.container}) — ` +
+          `앞 실행이 살아 있다(pid ${slot.marker.pid} · 컨테이너 ${slot.marker.container}) — ` +
             '같은 호스트에서 둘이 돌 수 없다. 그 실행이 끝난 뒤 다시 돌리십시오.',
           { cause: error },
         );
       }
-      log(`묵은 락을 잇는다(죽은 소유자 pid ${existing.pid})`);
-      const reaped = reap(existing.container, { log });
+      log(`묵은 락을 잇는다(죽은 소유자 pid ${slot.marker.pid})`);
+      const reaped = reap(slot.marker.container, { log });
       log(`묵은 컨테이너 ${reaped.length}개를 걷었다`);
+
+      // **지우기 전에 그 자리를 다시 본다**(v r5 L-1) — 수거(docker 호출)가 도는 사이에 다른
+      // 실행이 같은 묵은 락을 이어받았을 수 있다. 그때 지우면 **살아 있는 남의 락**을 지우고
+      // 둘 다 소유자가 된다(실측). 내용이 처음 읽은 표지와 같을 때만 지운다.
+      const current = readLockSlot(fs, lockPath);
+      if (current.kind === 'gone') {
+        continue;
+      }
+      if (current.kind !== 'marker' || !sameOwner(current.marker, slot.marker)) {
+        throw new Error(
+          `묵은 락이 그 사이 바뀌었다(${lockPath}) — 남의 락을 지우지 않는다. 다시 돌리십시오.`,
+          { cause: error },
+        );
+      }
       fs.rmSync(lockPath, { force: true });
       continue;
-    }
-    try {
-      fs.writeSync(fd, formatLockMarker({ pid, startToken, container }));
     } finally {
-      fs.closeSync(fd);
+      fs.rmSync(pending, { force: true });
     }
-    return { attempt };
   }
   throw new Error(
     `락을 얻지 못했다(${lockPath}) — 묵은 락을 치운 직후 다른 실행이 그 자리를 잡았다. 다시 돌리십시오.`,

@@ -134,6 +134,18 @@ describe('락 소유자 생존 판정', () => {
     expect(alive).toBe(true);
   });
 
+  /** CR r5 L-4 — 모르는 코드도 **살아 있다**로 센다(선언한 방향이 그렇다). `ESRCH` 만 죽음이다. */
+  it('모르는 오류 코드는 살아 있다로 센다 — 기본값이 선언과 같은 쪽이다', () => {
+    const alive = lockOwnerAlive(MARKER, {
+      signal: () => {
+        throw Object.assign(new Error('invalid argument'), { code: 'EINVAL' });
+      },
+      startToken: () => undefined,
+    });
+
+    expect(alive).toBe(true);
+  });
+
   it('실제 pid 1 도 살아 있다로 센다 — 이 호스트에서 EPERM 이 나는 자리다', () => {
     expect(lockOwnerAlive({ ...MARKER, pid: 1, startToken: undefined })).toBe(true);
   });
@@ -263,15 +275,114 @@ describe('단일 실행 락의 원자적 배타 획득', () => {
     writeFileSync(lockPath, formatLockMarker(dead), { mode: 0o600 });
     // `rmSync` 를 무력화해 「치웠는데 자리가 그대로」인 경합을 흉내 낸다.
     const fs = {
-      openSync: () => {
+      writeFileSync: () => undefined,
+      linkSync: () => {
         throw Object.assign(new Error('file already exists'), { code: 'EEXIST' });
       },
-      writeSync: () => 0,
-      closeSync: () => undefined,
       readFileSync: () => formatLockMarker(dead),
       rmSync: () => undefined,
     };
 
     expect(() => acquire({ fs, alive: () => false, reap: () => [] })).toThrow(/락을 얻지 못했다/u);
+  });
+});
+
+/**
+ * v r5 L-1 · CR r5 L-1 — 획득의 **남은 두 경합**. 하나는 수거가 도는 사이에 남이 같은 묵은
+ * 락을 이어받는 것이고(그때 지우면 살아 있는 남의 락을 지운다), 하나는 `EEXIST` 와 읽기 사이에
+ * 앞 실행이 정상 종료하는 것이다(정상 경합인데 `ENOENT` 로 죽었다).
+ *
+ * 주입으로만 잰다 — docker 를 부르지 않는다.
+ */
+describe('묵은 락을 잇는 길의 경합', () => {
+  const DEAD = { pid: 2_147_480_000, startToken: '1', container: 'bidvector-7e1-journey-deadbeef' };
+  const OTHER = { pid: 2_147_480_001, startToken: '2', container: 'bidvector-7e1-journey-c0ffee11' };
+  const MINE = { pid: 4321, startToken: '777', container: 'bidvector-7e1-journey-0b2b919e' };
+
+  /** 호출 순서대로 답을 돌려주는 fs — `linkSync` 는 지정한 횟수만 `EEXIST` 를 던진다. */
+  const fakeFs = ({ slots, linkFailures = 1 }) => {
+    const removed = [];
+    let reads = 0;
+    let links = 0;
+    return {
+      removed,
+      readsDone: () => reads,
+      fs: {
+        writeFileSync: () => undefined,
+        linkSync: () => {
+          links += 1;
+          if (links <= linkFailures) {
+            throw Object.assign(new Error('file already exists'), { code: 'EEXIST' });
+          }
+        },
+        readFileSync: () => {
+          const slot = slots[Math.min(reads, slots.length - 1)];
+          reads += 1;
+          if (slot === 'gone') {
+            throw Object.assign(new Error('no such file'), { code: 'ENOENT' });
+          }
+          return typeof slot === 'string' ? slot : formatLockMarker(slot);
+        },
+        rmSync: (path) => {
+          removed.push(path);
+        },
+      },
+    };
+  };
+
+  const acquire = (fs, overrides = {}) =>
+    acquireSingleRunLock({
+      lockPath: '/tmp/x.lock',
+      pid: MINE.pid,
+      startToken: MINE.startToken,
+      container: MINE.container,
+      fs,
+      alive: () => false,
+      reap: () => [],
+      ...overrides,
+    });
+
+  it('수거 사이에 남이 이어받았으면 **그 락을 지우지 않고** 멈춘다', () => {
+    const harness = fakeFs({ slots: [DEAD, OTHER], linkFailures: 2 });
+
+    expect(() => acquire(harness.fs)).toThrow(/묵은 락이 그 사이 바뀌었다/u);
+    expect(harness.removed.filter((one) => one === '/tmp/x.lock'), '남의 락을 지우지 않는다').toStrictEqual(
+      [],
+    );
+  });
+
+  it('내용이 그대로면 치우고 이어받는다', () => {
+    const harness = fakeFs({ slots: [DEAD, DEAD], linkFailures: 1 });
+    const reap = vi.fn(() => ['c0ffee123456']);
+
+    expect(acquire(harness.fs, { reap }).attempt).toBe(2);
+
+    expect(reap.mock.calls[0]?.[0]).toBe(DEAD.container);
+    expect(harness.removed).toContain('/tmp/x.lock');
+  });
+
+  it('EEXIST 와 읽기 사이에 락이 사라지면 **그대로 재시도한다** — ENOENT 로 죽지 않는다', () => {
+    const harness = fakeFs({ slots: ['gone'], linkFailures: 1 });
+    const reap = vi.fn(() => []);
+
+    expect(acquire(harness.fs, { reap }).attempt).toBe(2);
+
+    expect(reap, '비어 버린 자리에서는 아무것도 걷지 않는다').not.toHaveBeenCalled();
+  });
+
+  it('표지를 끝까지 못 읽으면 멈춘다 — 그 자리를 지우지 않는다', () => {
+    const harness = fakeFs({ slots: ['찌꺼기'], linkFailures: 1 });
+
+    expect(() => acquire(harness.fs)).toThrow(/락 표지를 읽을 수 없다/u);
+    expect(harness.removed.filter((one) => one === '/tmp/x.lock')).toStrictEqual([]);
+  });
+
+  it('살아 있는 소유자면 읽기 한 번으로 멈춘다 — 수거도 지우기도 없다', () => {
+    const harness = fakeFs({ slots: [OTHER], linkFailures: 1 });
+    const reap = vi.fn(() => []);
+
+    expect(() => acquire(harness.fs, { alive: () => true, reap })).toThrow(/앞 실행이 살아 있다/u);
+    expect(reap).not.toHaveBeenCalled();
+    expect(harness.removed.filter((one) => one === '/tmp/x.lock')).toStrictEqual([]);
   });
 });

@@ -530,10 +530,14 @@ if (clientSymbol === undefined) {
     if (name === CLIENT_MODULE || name === CLIENT_MODULE_CALLER || isTestFile(name)) {
       continue;
     }
+    // 같은 파일의 같은 이름은 **한 번만** 적는다(CR r5 L-6) — 판정은 그대로이고 실패 출력이
+    // 읽기 쉬워진다(앞 판은 `import * as C` 와 `export const ns = C` 에 같은 문장을 두 번 냈다).
+    const reported = new Set();
     const visit = (node) => {
       if (ts.isIdentifier(node)) {
         const resolved = resolveToTarget(checker, node);
-        if (resolved === clientSymbol || resolved === clientModuleSymbol) {
+        if ((resolved === clientSymbol || resolved === clientModuleSymbol) && !reported.has(node.text)) {
+          reported.add(node.text);
           fail(
             `서버 호출 능력이 ${CLIENT_MODULE_CALLER} 밖에서 참조된다: ${name} (${node.text}) ` +
               '— 이름을 바꾸거나 네임스페이스로 받아도 같은 심볼이다',
@@ -1012,7 +1016,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리의 client import 꼴 == 이름 지정 하나 · 그 자리의 export 전수에 그 능력 타입 0(TypeChecker) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir 대입 하나 == ${publicDirVerdict} · 그 입구 디렉터리 없음 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **이 게이트가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export 가운데 **타입이 그 능력과 동일한** 것 0(TypeChecker — 지정자·타입 주석으로 비켜 가는 꼴은 OPEN-7E-GATE-RESIDUAL) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir **속성 대입**(단축 속성은 세지 않는다 — OPEN) 하나 == ${publicDirVerdict} · 게이트 시점에 그 입구 디렉터리 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }

@@ -192,8 +192,12 @@ export function boundaryRoots(webRootReal) {
  *
  * **종류 허용 목록에서 `css` 를 걷었다**(v r4 M-2): `.css` 는 허용 종류였고 데이터 판정을 하지
  * 않았으므로, 이미 그래프에 있는 CSS 가 `url('./rows.css')` 로 12KB JSON 을 가리키면 그것이
- * `dist/assets/rows-*.css` 로 나갔다(실측). 이제 CSS 자산은 **진입 chunk 가 가져온 것**
- * (`viteMetadata.importedCss`)만 받는다 — 그 밖의 CSS 는 종류와 무관하게 위반이다.
+ * `dist/assets/rows-*.css` 로 나갔다(실측). 이제 CSS 자산은 **어느 chunk든 `importedCss` 로
+ * 가져온 것**만 받는다 — 그 밖의 CSS 는 종류와 무관하게 위반이다.
+ *
+ * 문면을 구현만큼으로 적는다(CR r5 L-3 · v r5 L-2): 「진입 chunk 만」이 아니라 **chunk 전수의
+ * 합집합**이다. 지연 chunk 의 CSS 도 이 층은 받아 주고, 그 자리는 하네스의 산출물 모양
+ * 단언(`{js 1 · css 1}`)이 먼저 멈춘다 — 두 층이 겹쳐 닫는다(오늘 지연 chunk 는 0 이다).
  */
 const ALLOWED_ASSET_EXTENSIONS = new Set(['js', 'mjs', 'map', 'html', 'ico']);
 
@@ -202,7 +206,7 @@ export function isAllowedAssetKind(fileName) {
   return match !== null && ALLOWED_ASSET_EXTENSIONS.has(match[1].toLowerCase());
 }
 
-/** chunk 들이 **가져온** CSS 전수 — Vite 가 chunk 마다 그 집합을 적는다. */
+/** **모든** chunk 가 가져온 CSS 의 합집합 — Vite 가 chunk 마다 그 집합을 적는다. */
 export function importedCssOf(bundle) {
   const names = new Set();
   for (const one of Object.values(bundle)) {
@@ -217,8 +221,8 @@ export function importedCssOf(bundle) {
 }
 
 /**
- * 번들이 내보내는 자산 가운데 **받지 않는 것**. CSS 는 진입 chunk 가 가져온 것만,
- * 그 밖은 종류 허용 목록으로 가린다.
+ * 번들이 내보내는 자산 가운데 **받지 않는 것**. CSS 는 어느 chunk든 가져온 것만, 그 밖은
+ * 종류 허용 목록으로 가린다.
  */
 export function assetOffenders(bundle) {
   const imported = importedCssOf(bundle);
