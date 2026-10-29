@@ -485,6 +485,87 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(mocked.recordBid.mock.calls[1]).toStrictEqual(mocked.recordBid.mock.calls[0]);
   });
 
+  /**
+   * v r3 M-3 — **재전송은 멱등이 아니다.** 하네스로 서버를 직접 쟀다: `BID_RECORDED` 인 건에
+   * 같은 본문을 다시 보내면 200 이 돌아오고 기록 행이 하나 더 생긴다(`record_seq` 0·1·2 —
+   * 금액이 달라도 받는다). 실패 뒤 다시 읽은 건의 `caseVersion` 이 앞서 있으면 그 쓰기는
+   * 닿은 것이므로 **보내지 않는다**.
+   */
+  it('실패했지만 서버에 닿은 기록은 다시 보내지 않는다 — 중복 행을 만들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'BID_PLANNED', caseVersion: 3 }]);
+    // 실패 뒤 다시 읽기(onError)가 **앞선 version** 을 돌려준다 = 그 쓰기가 닿았다는 사실.
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_RECORDED', caseVersion: 4 }]);
+    mocked.recordBid.mockRejectedValue(new ApiError(504, 'GATEWAY_TIMEOUT'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    const failure = await screen.findByTestId('write-failure');
+    expect(mocked.recordBid).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    expect((await screen.findByTestId('toast')).textContent).toContain('이미 반영');
+    expect(mocked.recordBid).toHaveBeenCalledTimes(1);
+  });
+
+  /** 뒤집은 쪽 — 건이 움직이지 않았으면 그 진술을 **그대로 다시** 보낸다(위 test 와 한 쌍이다). */
+  it('건이 움직이지 않았으면 같은 진술을 다시 보낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED', caseVersion: 3 }]);
+    mocked.recordBid.mockRejectedValue(new ApiError(504, 'GATEWAY_TIMEOUT'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
+    fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    const failure = await screen.findByTestId('write-failure');
+
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => {
+      expect(mocked.recordBid).toHaveBeenCalledTimes(2);
+    });
+    expect(mocked.recordBid.mock.calls[1]).toStrictEqual(mocked.recordBid.mock.calls[0]);
+  });
+
+  /**
+   * CR r3 M-3 — 선언은 「그때 적었던 것」이 아니라 **지금 적혀 있는 것**이다. 앞 판은 누를 때의
+   * 값을 다시 보내, 화면이 보이는 수와 wire 에 간 수가 갈릴 수 있었다.
+   */
+  it('투찰가 재시도는 지금 화면에 보이는 선언값을 보낸다', async () => {
+    mocked.requestBidPrice.mockRejectedValue(new ApiError(503, 'UNAVAILABLE'));
+    renderScreen();
+
+    fireEvent.change(await screen.findByTestId('active-bids'), { target: { value: '2' } });
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    const failure = await screen.findByTestId('write-failure');
+    expect(mocked.requestBidPrice.mock.calls[0]?.[0]).toMatchObject({ currentActiveBids: 2 });
+
+    fireEvent.change(screen.getByTestId('active-bids'), { target: { value: '4' } });
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => {
+      expect(mocked.requestBidPrice).toHaveBeenCalledTimes(2);
+    });
+    expect(mocked.requestBidPrice.mock.calls[1]?.[0]).toMatchObject({ currentActiveBids: 4 });
+  });
+
+  /** CR r3 M-2 — 얼굴이 「다시 읽었습니다」라고 말하면 그 말이 사실이어야 한다. */
+  it('투찰가 요청 실패도 서버 상태를 다시 읽는다', async () => {
+    mocked.requestBidPrice.mockRejectedValue(new ApiError(503, 'UNAVAILABLE'));
+    renderScreen();
+
+    const before = mocked.listBidCases.mock.calls.length;
+    await askPrice();
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('다시 읽었습니다');
+    await waitFor(() => {
+      expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
   /** v r2 M-3 — 넷 가운데 하나만 「다시 읽기」가 잠겨 있었다. 초안·다시 보기도 잰다. */
   it('초안 실패도 서버 상태를 다시 읽는다', async () => {
     mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'PRICE_RECEIVED' }]);

@@ -86,12 +86,53 @@ export function WorksheetScreen() {
     await queryClient.invalidateQueries({ queryKey: ['timeline'] });
   }
 
+  /**
+   * **그 명령이 이미 서버에 닿았는가** — 재시도의 공통 전제다(v r3 M-3).
+   *
+   * 하네스로 서버 거동을 직접 쟀다: `BID_RECORDED` 인 건에 같은 본문을 다시 보내면 200 이
+   * 돌아오고 **기록 행이 하나 더 생긴다**(`record_seq` 0·1·2 — 금액이 달라도 받는다). 초안도
+   * 같다(`draft_seq` 0·1·2). 되돌림만 서버가 409 로 막는다. 즉 **재전송은 멱등이 아니다.**
+   *
+   * 실패 얼굴을 내기 전에 건을 다시 읽으므로(`onError`), 그때의 `caseVersion` 이 보낼 때보다
+   * 앞서 있으면 그 쓰기는 닿은 것이다 — 다시 보내지 않는다. 다른 행위자가 건을 움직인
+   * 경우에도 막히는데, 그쪽이 안전한 방향이다(중복을 만들지 않고 운영자가 상태를 다시 본다).
+   */
+  function alreadyLanded(sentFromVersion: number | undefined): boolean {
+    return sentFromVersion !== undefined && bidCase !== undefined && bidCase.caseVersion > sentFromVersion;
+  }
+
+  /** 재시도는 **보낸 그 진술**을 다시 보낸다 — 단, 이미 닿았으면 보내지 않는다. */
+  function writeRetry<Sent extends { readonly fromVersion: number }>(mutation: {
+    readonly variables: Sent | undefined;
+    readonly mutate: (sent: Sent) => void;
+    readonly reset: () => void;
+  }): () => void {
+    return () => {
+      const sent = mutation.variables;
+      if (sent === undefined) {
+        return;
+      }
+      if (alreadyLanded(sent.fromVersion)) {
+        mutation.reset();
+        show({ text: '그 작업은 서버에 이미 반영됐습니다 — 다시 보내지 않았습니다.' });
+        return;
+      }
+      mutation.mutate(sent);
+    };
+  }
+
   const askPrice = useMutation({
     // 선언된 값만 wire 에 닿는다 — 호출 자리에 리터럴이 없다(CR H-1 · v M-5).
-    mutationFn: (currentActiveBids: number) =>
-      requestBidPrice({ noticeNumber, noticeRound, currentActiveBids }),
+    mutationFn: (payload: { readonly currentActiveBids: number; readonly fromVersion: number }) =>
+      requestBidPrice({ noticeNumber, noticeRound, currentActiveBids: payload.currentActiveBids }),
     onSuccess: (result) => {
       setPrice(result);
+    },
+    // 투찰가 요청도 **서버 상태를 움직일 수 있다**(건이 `PRICE_RECEIVED` 로 간다). 실패 얼굴이
+    // 「다시 읽었습니다」라고 말하므로 그 말이 사실이어야 한다(CR r3 M-2).
+    onError: async () => {
+      dismiss();
+      await refreshCase();
     },
   });
 
@@ -103,10 +144,18 @@ export function WorksheetScreen() {
     ? {
         what: '투찰가를 요청하지',
         error: askPrice.error,
+        /**
+         * **지금 화면에 보이는 선언값**을 보낸다(CR r3 M-3) — 누를 때의 값을 다시 보내면
+         * 운영자가 그 사이 고친 수와 보낸 수가 갈린다. 선언은 「그때 적었던 것」이 아니라
+         * 「지금 적혀 있는 것」이다.
+         */
         retry: () => {
-          if (askPrice.variables !== undefined) {
-            askPrice.mutate(askPrice.variables);
+          if (alreadyLanded(askPrice.variables?.fromVersion)) {
+            askPrice.reset();
+            show({ text: '그 요청은 서버에 이미 닿았습니다 — 다시 보내지 않았습니다.' });
+            return;
           }
+          sendPriceRequest();
         },
       }
     : null;
@@ -121,6 +170,7 @@ export function WorksheetScreen() {
       readonly amountWon: number;
       readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN';
       readonly at: string;
+      readonly fromVersion: number;
     }) =>
       draftBid(payload.caseId, {
         amountWon: payload.amountWon,
@@ -146,6 +196,7 @@ export function WorksheetScreen() {
       readonly drawNumbers: number[];
       readonly memo: string;
       readonly at: string;
+      readonly fromVersion: number;
     }) =>
       recordBid(payload.caseId, {
         amountWon: payload.amountWon,
@@ -166,7 +217,8 @@ export function WorksheetScreen() {
   });
 
   const resume = useMutation({
-    mutationFn: (caseId: number) => resumeCase(caseId),
+    mutationFn: (payload: { readonly caseId: number; readonly fromVersion: number }) =>
+      resumeCase(payload.caseId),
     onSuccess: async () => {
       show({ text: '다시 보기로 돌렸습니다.' });
       await refreshCase();
@@ -193,19 +245,27 @@ export function WorksheetScreen() {
     return { amountWon, vat: form.vat };
   }
 
-  function runPrimary(kind: NextActionKind, caseId: number): void {
+  /** 투찰가 요청 한 자리 — 첫 누름과 재시도가 **같은 길**로 간다(CR r3 M-3). */
+  function sendPriceRequest(): void {
+    if (bidCase === undefined) {
+      return;
+    }
+    const declared = parseCount(activeBids);
+    if (declared === null) {
+      setActiveBidsBlocked('진행 중 투찰 건수를 0 이상의 정수로 선언하십시오 — 이 수는 지어내지 않습니다.');
+      return;
+    }
+    setActiveBidsBlocked(null);
+    askPrice.mutate({ currentActiveBids: declared, fromVersion: bidCase.caseVersion });
+  }
+
+  function runPrimary(kind: NextActionKind, caseId: number, fromVersion: number): void {
     if (kind === 'REQUEST_PRICE') {
-      const declared = parseCount(activeBids);
-      if (declared === null) {
-        setActiveBidsBlocked('진행 중 투찰 건수를 0 이상의 정수로 선언하십시오 — 이 수는 지어내지 않습니다.');
-        return;
-      }
-      setActiveBidsBlocked(null);
-      askPrice.mutate(declared);
+      sendPriceRequest();
       return;
     }
     if (kind === 'RESUME') {
-      resume.mutate(caseId);
+      resume.mutate({ caseId, fromVersion });
       return;
     }
     const amount = amountOrBlock();
@@ -213,7 +273,7 @@ export function WorksheetScreen() {
       return;
     }
     if (kind === 'DRAFT_BID') {
-      makeDraft.mutate({ caseId, ...amount, at: new Date().toISOString() });
+      makeDraft.mutate({ caseId, ...amount, at: new Date().toISOString(), fromVersion });
       return;
     }
     const drawNumbers = parseDrawNumbers(form.drawNumbers);
@@ -221,7 +281,14 @@ export function WorksheetScreen() {
       setBlocked('추첨번호는 정수로 적으십시오.');
       return;
     }
-    makeRecord.mutate({ caseId, ...amount, drawNumbers, memo: form.memo, at: new Date().toISOString() });
+    makeRecord.mutate({
+      caseId,
+      ...amount,
+      drawNumbers,
+      memo: form.memo,
+      at: new Date().toISOString(),
+      fromVersion,
+    });
   }
 
   // CR r2 L-6 — 마운트 시점의 `signedIn` 뿐 아니라 **읽기 401**(떠 있는 화면에서 세션이
@@ -274,21 +341,13 @@ export function WorksheetScreen() {
         error: makeDraft.error,
         // **실제로 다시 보낸다**(CR r2 M-3) — 앞 판은 `reset()` 이라 얼굴만 사라졌고, 운영자는
         // 「다시 시도」를 누르고 메시지가 사라지는 것을 **성공으로 읽을 수 있었다**.
-        retry: () => {
-          if (makeDraft.variables !== undefined) {
-            makeDraft.mutate(makeDraft.variables);
-          }
-        },
+        retry: writeRetry(makeDraft),
       }
     : makeRecord.isError
       ? {
           what: '투찰 기록을 기록하지',
           error: makeRecord.error,
-          retry: () => {
-            if (makeRecord.variables !== undefined) {
-              makeRecord.mutate(makeRecord.variables);
-            }
-          },
+          retry: writeRetry(makeRecord),
         }
       : resume.isError
         ? {
@@ -360,7 +419,7 @@ export function WorksheetScreen() {
             <button
               type="button"
               data-testid="worksheet-primary"
-              onClick={() => runPrimary(action.kind, bidCase.caseId)}
+              onClick={() => runPrimary(action.kind, bidCase.caseId, bidCase.caseVersion)}
               disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
               className="mt-3 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink disabled:opacity-50"
             >
