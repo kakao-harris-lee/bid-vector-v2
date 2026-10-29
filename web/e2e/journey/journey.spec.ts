@@ -37,8 +37,39 @@ let cached: JourneyContext | undefined;
  * test 의 실패가 같은 모양이 된다. 함수로 미루면 없는 파일은 **test 의 실패**다.
  */
 function journeyContext(): JourneyContext {
-  cached ??= JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as JourneyContext;
+  cached ??= parseContext(readFileSync(CONTEXT_PATH, 'utf8'));
   return cached;
+}
+
+/**
+ * 맥락 파일의 **모양을 한 번 본다**(CR r4 L-9). 앞 판은 검증 없이 캐스팅해서, 이 라운드 전의
+ * 옛 꼴 파일이 남아 있으면 `bundleAssets` 가 `undefined` 이고 뒤에서 `TypeError` 로 터졌다 —
+ * 멈추는 방향이라 안전하지만 **사유를 말하지 못한다**. 같은 파일의 다른 입구(`parseLockMarker`)와
+ * 같은 꼴로 사유를 적는다.
+ */
+function parseContext(raw: string): JourneyContext {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error(`하네스 맥락이 객체가 아니다(${CONTEXT_PATH})`);
+  }
+  const candidate = parsed as Partial<JourneyContext>;
+  const missing = (
+    [
+      ['previewUrl', typeof candidate.previewUrl === 'string'],
+      ['loginName', typeof candidate.loginName === 'string'],
+      ['passphrase', typeof candidate.passphrase === 'string'],
+      ['bundleAssets', Array.isArray(candidate.bundleAssets)],
+    ] as const
+  )
+    .filter(([, ok]) => !ok)
+    .map(([key]) => key);
+  if (missing.length > 0) {
+    throw new Error(
+      `하네스 맥락에 ${missing.join(', ')} 이(가) 없다(${CONTEXT_PATH}) — 옛 꼴 파일이 남았거나 ` +
+        '하네스가 그 자리까지 가지 못했다. 그 파일을 지우고 다시 돌리십시오.',
+    );
+  }
+  return candidate as JourneyContext;
 }
 
 function sameOrigin(): string {

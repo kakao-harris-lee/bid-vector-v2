@@ -32,14 +32,37 @@ export type ApprovedOperation = (typeof APPROVED_OPERATIONS)[number];
 export type ApprovedOperationPath = ApprovedOperation['path'];
 
 /** 그 경로에 승인된 메서드만 — openapi-fetch 의 경로 항목은 메서드 키가 소문자다. */
+/**
+ * 그 경로에 승인된 메서드 — **계약에 있는 메서드로 제약한다**(CR r4 L-6). 앞 판은 교집합
+ * (`& keyof paths[P]`)으로 걸렀고, 그러면 계약에 없는 메서드가 **말없이 떨어져** 목록의 오타가
+ * 타입 층에서 조용했다(실측: `{ method: 'PUT', path: '/api/notices' }` → tsc 0). 경로 축은
+ * `Pick` 의 키라서 이미 컴파일로 서므로(오타는 `TS2536`), 메서드 축도 같은 자리로 돌린다.
+ */
 type ApprovedMethodsOf<P extends ApprovedOperationPath> = Lowercase<
   Extract<ApprovedOperation, { path: P }>['method']
->;
+> &
+  keyof paths[P];
+
+/**
+ * 목록의 메서드 가운데 **그 경로의 계약에 없는 것**. 하나라도 있으면 아래 단언이 컴파일에서
+ * 멈춘다 — 교집합만 쓰면 그런 메서드가 조용히 떨어져 오타가 서지 않았다.
+ */
+type MethodsNotInContract = {
+  [P in ApprovedOperationPath]: Exclude<
+    Lowercase<Extract<ApprovedOperation, { path: P }>['method']>,
+    keyof paths[P]
+  >;
+}[ApprovedOperationPath];
+
+/** 그 집합이 **비어 있다**는 컴파일 단언(비어 있지 않으면 `TS2344`). */
+export type ApprovedMethodsAreInContract = MethodsNotInContract extends never ? true : MethodsNotInContract;
+type AssertEmpty<T extends never> = T;
+export type ApprovedMethodAxisCheck = AssertEmpty<MethodsNotInContract>;
 
 /**
  * 승인된 쌍만 담은 생성 타입. 경로를 고르고(`Pick`) 그 안에서 **메서드까지** 고른다 — 미승인
  * 메서드는 타입에 **키가 없으므로** 그 호출이 컴파일되지 않는다.
  */
 export type ApprovedPaths = {
-  [P in ApprovedOperationPath]: Pick<paths[P], ApprovedMethodsOf<P> & keyof paths[P]>;
+  [P in ApprovedOperationPath]: Pick<paths[P], ApprovedMethodsOf<P>>;
 };

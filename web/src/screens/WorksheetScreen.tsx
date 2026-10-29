@@ -114,7 +114,12 @@ export function WorksheetScreen() {
       }
       if (alreadyLanded(sent.fromVersion)) {
         mutation.reset();
-        show({ text: '그 작업은 서버에 이미 반영됐습니다 — 다시 보내지 않았습니다.' });
+        // 문면은 **술어가 세운 것만** 말한다(CR r4 L-4). `alreadyLanded` 는 「건이 움직였다」를
+        // 세고, 그것이 내 쓰기였는지 다른 행위자였는지는 가리지 않는다 — 「이미 반영됐습니다」는
+        // 운영자가 「내 기록이 남았다」로 읽을 수 있고, 이 slice 의 축이 바로 투찰 기록 장부다.
+        show({
+          text: '건이 그 사이 움직였습니다 — 중복을 만들지 않으려고 보내지 않았습니다. 아래 상태를 확인하십시오.',
+        });
         return;
       }
       mutation.mutate(sent);
@@ -152,7 +157,7 @@ export function WorksheetScreen() {
         retry: () => {
           if (alreadyLanded(askPrice.variables?.fromVersion)) {
             askPrice.reset();
-            show({ text: '그 요청은 서버에 이미 닿았습니다 — 다시 보내지 않았습니다.' });
+            show({ text: '건이 그 사이 움직였습니다 — 중복 요청을 만들지 않으려고 보내지 않았습니다.' });
             return;
           }
           sendPriceRequest();
@@ -359,11 +364,7 @@ export function WorksheetScreen() {
         ? {
             what: '다시 보기로 되돌리지',
             error: resume.error,
-            retry: () => {
-              if (resume.variables !== undefined) {
-                resume.mutate(resume.variables);
-              }
-            },
+            retry: writeRetry(resume),
           }
         : null;
 

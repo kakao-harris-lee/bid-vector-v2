@@ -802,6 +802,9 @@ if (existsSync(npmrcPath)) {
 // 그래서 확장자를 더 열거하는 대신 **주소 쪽을 닫는다**: `import.meta` 의 멤버는 `env` 하나만
 // 허용한다(기준 URL 을 얻는 길도, 파일을 훑는 길도 남기지 않는다). 새 멤버가 필요해지면 이
 // 게이트가 먼저 붉다.
+// **test 파일 면제의 전제**(CR r4 L-11): 다른 층과 같은 면제다. 그 전제는 「앱 코드가 test
+// 파일을 import 하지 않는다」이고, 그것은 번들 그래프 층이 센다(진입에서 닿지 않는 파일은
+// 번들에 들어오지 않는다). 오늘 `src` 안 test 가 `import.meta.url` 로 자산을 들이는 자리는 0 이다.
 const ALLOWED_IMPORT_META_MEMBERS = new Set(['env']);
 for (const { sourceFile, name } of inSrcFiles) {
   if (isTestFile(name)) {

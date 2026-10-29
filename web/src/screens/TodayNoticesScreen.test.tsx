@@ -273,6 +273,19 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
   });
 
   /**
+   * CR r4 L-2 — 401 `.some()` 수정에 잠금이 없었다(실측: `??` 연쇄로 되돌려도 초록). 이 화면은
+   * 읽기가 셋이라 **앞의 오류가 비 401 이어도 뒤의 401** 을 봐야 한다.
+   */
+  it('앞의 오류가 비 401 이어도 뒤의 401 을 보고 로그인 얼굴을 낸다', async () => {
+    mocked.searchNotices.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    mocked.listBidCases.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    const face = await screen.findByTestId('signed-out');
+    expect(within(face).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
+  });
+
+  /**
    * CR r3 L-11 — 담기도 **다시 읽는다**. 앞 판은 얼굴 문면만 재서, `onError` 를 지워도 이 test 가
    * 초록이었다(v r2 실측). 얼굴이 「서버에 남은 상태를 다시 읽었습니다」라고 말하므로 그 말이
    * 사실인지를 호출 계수로 센다.

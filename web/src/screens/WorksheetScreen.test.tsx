@@ -506,7 +506,7 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
 
     fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
 
-    expect((await screen.findByTestId('toast')).textContent).toContain('이미 반영');
+    expect((await screen.findByTestId('toast')).textContent).toContain('움직였습니다');
     expect(mocked.recordBid).toHaveBeenCalledTimes(1);
   });
 
@@ -648,6 +648,58 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(items).toHaveLength(1);
     expect(items[0]?.textContent?.trim().length ?? 0).toBeGreaterThan(0);
     expect(items[0]?.textContent).not.toContain('undefined');
+  });
+
+  /**
+   * CR r4 L-1 — r3 L-5 의 넷 가운데 **`Field` 자리**가 아직 잠기지 않았다(실측: `aria-describedby`·
+   * `hintNode` 를 걷어도 200 전부 초록). 화면 C 의 기초금액이 화면 B 와 **같은 문면**을 같은
+   * `Field` 로 낸다 — r2 M-4 가 고친 원래 자리이고 r3 L-10 이 내용 모형을 고친 자리다.
+   */
+  it('기초금액의 아래층 문면이 보조기기에 닿는다 — Field 자리도 잠근다', async () => {
+    renderScreen();
+
+    const value = await screen.findByTestId('worksheet-amount');
+    const slot = value.closest('dd');
+    const describedBy = slot?.getAttribute('aria-describedby');
+
+    expect(describedBy, 'aria-describedby 가 없으면 title 하나로 돌아간 것이다').not.toBeNull();
+    expect(document.getElementById(describedBy ?? '')?.textContent).toContain('추정가격과 다르다');
+    // 설명은 **그 `<dd>` 안**에 있고(한 용어에 값 하나), 값 단언은 그것을 읽지 않는다.
+    expect(slot?.contains(document.getElementById(describedBy ?? ''))).toBe(true);
+    expect(value.textContent).not.toContain('추정가격과 다르다');
+  });
+
+  /**
+   * CR r4 L-2 — 401 `.some()` 수정에 잠금이 없었다(실측: `??` 연쇄로 되돌려도 200 초록).
+   * r3 L-2 가 적은 상황을 그대로 쓴다 — **공고 읽기 500 + 건 목록 401**.
+   */
+  it('앞의 오류가 비 401 이어도 뒤의 401 을 보고 로그인 얼굴을 낸다', async () => {
+    mocked.searchNotices.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    mocked.listBidCases.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    const face = await screen.findByTestId('signed-out');
+    expect(within(face).getByRole('link', { name: /로그인/u }).getAttribute('href')).toBe('/login');
+  });
+
+  /**
+   * CR r4 L-3 — 되돌림 재시도만 `writeRetry` 밖에 남아 있었다. 서버가 되돌림을 409 로 막는 것은
+   * 이 라운드가 직접 쟀으므로, 닿은 되돌림을 다시 보내면 **성공한 작업에 실패 얼굴**이 선다.
+   */
+  it('닿은 되돌림은 다시 보내지 않는다 — 네 쓰기가 같은 길로 간다', async () => {
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'DEFERRED', caseVersion: 2 }]);
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING', caseVersion: 3 }]);
+    mocked.resumeCase.mockRejectedValue(new ApiError(504, 'GATEWAY_TIMEOUT'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    const failure = await screen.findByTestId('write-failure');
+    expect(mocked.resumeCase).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    expect((await screen.findByTestId('toast')).textContent).toContain('움직였습니다');
+    expect(mocked.resumeCase).toHaveBeenCalledTimes(1);
   });
 
   /** CR r2 L-5 — 투찰가 요청(POST)도 쓰기와 같은 얼굴·같은 401 갈래를 쓴다. */
