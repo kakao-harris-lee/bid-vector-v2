@@ -88,6 +88,11 @@ CI 전용 단계(`npx playwright install-deps chromium`, apt)는 로컬에서 �
 `ml-engine`·`container` job 은 입력이 바뀌지 않았다(이 slice 의 변경 경로에 `ml-engine/**` ·
 `docker/**` 가 없다 — 복원 목록이 그 전수다). `container` 는 PR CI 가 정본이다.
 
+**다만 base `78d97c59` 에서 `container` 는 붉다**(팀장 2026-10-29) — 취약점 DB 갱신 때문이고 이
+slice 의 변경과 무관하다. main `bb6a187e`(Caddy 직접 빌드 + app 베이스 상향, PR #101)가 그것을
+고쳤으므로 **PR 전에 main 을 받아야 그 job 이 초록**이 된다. 그 병합은 D-7C2B-5 의 순서대로
+7C④-2b 머지 뒤 라운드에서 함께 한다(제한 ⑥).
+
 ## 7. 비밀값 스캔
 
 - cmd: `command grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m7/7c2b/`
@@ -134,7 +139,8 @@ CI 전용 단계(`npx playwright install-deps chromium`, apt)는 로컬에서 �
 ⑤ **좌표 28건이 밀렸다**(§9) — 전부 in_scope 밖 문서라 고치지 않았다.
 ⑥ **7C④-2b 와 OpenAPI·생성 타입이 겹친다**(D-7C2B-5). 이 브랜치는 base 이후 main 을 병합하지
    않았다 — 그 slice 가 먼저 머지되면 **재생성 + 바이트 등식**과 OpenAPI 키 계수·중복 키 0 확인이
-   필요하고, rollback 복원 기준도 그 병합된 main 커밋으로 재산출해야 한다.
+   필요하고, rollback 복원 기준도 그 병합된 main 커밋으로 재산출해야 한다. 그 병합은 **`container`
+   job 을 초록으로 만드는 전제이기도 하다**(§6 — base 의 그 job 은 이 slice 와 무관한 사유로 붉다).
 ⑦ **web 화면은 이 필드를 아직 소비하지 않는다**(7E 미착수). 어휘와 타입은 섰지만 운영자가 화면에서
    그 상태를 읽는 것은 그 slice 뒤다 — 소비 코드를 이 slice 가 만들지 않았다.
 ⑧ **게이트 등재 둘이 계약이 지명한 키 밖이다**(주입 표면 · 상수시간 비교 그물). 같은 in_scope
