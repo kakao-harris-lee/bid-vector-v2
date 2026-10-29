@@ -1,0 +1,16 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.FloorShortfallPolicyData
+import bidvector.decision.criticalAssessmentRateForTypo
+import bidvector.sharedkernel.AssessmentRate
+import bidvector.sharedkernel.BidRate
+import bidvector.sharedkernel.Derived
+import bidvector.decision.PlausibleFloorRate
+import bidvector.sharedkernel.Measurement
+import bidvector.sharedkernel.Resolution
+
+fun criticalFromRawFloor(
+    bid: BidRate,
+    gated: PlausibleFloorRate,
+    policy: Resolution.Resolved<FloorShortfallPolicyData>,
+): Measurement<Derived<AssessmentRate>> = criticalAssessmentRateForTypo(bid, gated, policy)

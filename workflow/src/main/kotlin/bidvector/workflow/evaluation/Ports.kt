@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.procurement.CategoryCode
@@ -73,6 +74,12 @@ sealed interface MlAnalysisOutcome {
         val probabilityScore: UnitScore?,
         val matchedScore: UnitScore?,
         val evidence: PredictionEvidence,
+        /**
+         * DEC-10 계수(D-DEC10-8) — `evidence` 와 **같은 처방**이다: 필수 인자, 기본값 없음.
+         * 게시 하한율 제외가 판정을 거쳐 집계까지 조용히 사라지는 것을 컴파일 거부로 막는다.
+         * 점수는 「하한 미보고」와 같은 값으로 접히므로 점수만으로는 제외가 보이지 않는다.
+         */
+        val floorExclusion: PublishedFloorExclusion?,
     ) : MlAnalysisOutcome
 
     data object SimilarityProjectionNotReady : MlAnalysisOutcome

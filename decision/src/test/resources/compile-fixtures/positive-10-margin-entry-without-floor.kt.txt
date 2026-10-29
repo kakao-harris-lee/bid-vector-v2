@@ -1,0 +1,12 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.UnitScore
+import bidvector.decision.priority.derive.MarginInputs
+import bidvector.decision.priority.derive.marginInputsFrom
+import bidvector.sharedkernel.Rate
+
+fun entryWithoutFloor(
+    rate: Rate,
+    fitness: UnitScore,
+    capacity: UnitScore,
+): MarginInputs = marginInputsFrom(rate, null, rate, fitness, capacity)

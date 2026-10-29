@@ -1,0 +1,6 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.PlausibleFloorRate
+import bidvector.sharedkernel.FloorRate
+
+fun unwrapRaw(gated: PlausibleFloorRate): FloorRate = gated.valueTypo

@@ -166,6 +166,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                             probabilityScore = UnitScore(BigDecimal("0.1")),
                             matchedScore = UnitScore(BigDecimal("0.1")),
                             evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+                            floorExclusion = null,
                         )
                     },
                 notifications = notifications,

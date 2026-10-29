@@ -1,5 +1,6 @@
 package bidvector.decision.priority.derive
 
+import bidvector.decision.PlausibleFloorRate
 import bidvector.decision.UnitScore
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Rate
@@ -24,18 +25,19 @@ import java.time.Duration
  *   걸고, `bidvector.adapters.ml.ParsedSuccessFields.toRateOrNull()` 이 `> 1` 이면 `null`
  *   을 내 `BidPredictionOutcome.Unavailable(ContractViolation)` 으로 접는다(`PredictionContractTest`
  *   가 `1.0000` 통과·`1.0001` 거부를 고정).
- * - `floorRate` — **이 `init` 이 유일한 관문이다.** 상류는 4D-1 gRPC 가 아니라
- *   `Notice.floorRate`(`FloorRate`)이고, `FloorRate`(`init` 없음)·`Canonicalize.kt`
- *   (`Rate.ofPercent` 변환만, 상한 검사 없음)·`NoticeReconstruction.kt`(DB 열을
- *   `Rate.ofFraction` 으로 그대로 감쌈) 어디에도 `≤ 1` 이 없다(shared-kernel·procurement·
- *   adapters 전수 grep 0건). **4B-6 인계**(checklist 「알려진 제한」) — `MarginInputs`
- *   생성 전에 `Notice.floorRate > 1` 을 걸러 [DerivationAbsence.FloorRateOutOfRange] 로
- *   내야 한다. 이 `init` 은 그 관문이 배선되기 전까지의 마지막 방어선이다.
+ * - `floorRate` — **관문은 DEC-10 신뢰 게이트이고 이 `init` 은 최후 방어선이다**(D-DEC10-9).
+ *   원값 쪽에는 상한이 없다 — `FloorRate`(`init` 없음)·`Canonicalize.kt`(`Rate.ofPercent`
+ *   변환만)·`NoticeReconstruction.kt`(DB 열을 `Rate.ofFraction` 으로 그대로 감쌈) 어디에도
+ *   `≤ 1` 이 없고, 그것이 **의도**다(수집·영속은 공고를 버리지 않는다). 가격 경로로 들어오는
+ *   값은 `bidvector.decision.trustPublishedFloorRate` 를 거치고, 통과 값의 율은 개연 밴드
+ *   안이므로 `≤ 1` 이다 — 그래서 이 `require` 는 가격 경로에서 도달 불가다. 그래도 지운다는
+ *   것은 「호출부가 X 만 하므로 안전」을 타입에서 빼는 것이라(R-FLOOR-04 의 형태) 남겨 둔다.
  *
  * legacy 의 `max(0, min(1, ·))` 클램프는 **재현하지 않는다**(D-4B5-1 방향 — 값을 조용히
  * 자르는 대신 거부한다, `policy-values.md` §3).
  */
-data class MarginInputs(
+@ConsistentCopyVisibility
+data class MarginInputs internal constructor(
     val recommendedRate: Rate,
     val floorRate: Rate?,
     val predictedRate: Rate,
@@ -48,6 +50,35 @@ data class MarginInputs(
         requireRateAtMostOne("predictedRate", predictedRate)
     }
 }
+
+/**
+ * **가격 경로 ③ 의 유일한 공개 진입**(운영자 결정 2026-10-28 — D-DEC10-22). 하한율 자리가
+ * [bidvector.decision.PlausibleFloorRate] 이므로 **게이트를 거친 값만** 이 경로에 들어온다.
+ *
+ * 왜 타입이어야 하는가 — 앞 판은 이 자리가 날 `Rate?` 였고, 그래서 원값을 **다른 형태로
+ * 세탁**해 넣는 길이 census 의 어느 축에도 보이지 않았다(verifier r4 실측: `toString()` 정규식
+ * 파싱 · 영속 행의 `BigDecimal`). census 는 **타입을 따라가므로** 값의 표현이 바뀌면 못 본다 —
+ * 열거를 늘리는 것은 다음 우회를 만들 뿐이고, 닫는 것은 **구성**이다.
+ *
+ * `MarginInputs` 의 생성자와 `copy` 는 `internal` 이다 — 모듈 밖에서 날 `Rate?` 로 입력을 지을
+ * 길이 없다. 같은 모듈 안에서는 4B-5 의 승인된 test 가 그 생성자로 경계값(`0.0`·`1.0`·`1.2`)을
+ * 계속 재고(그 거동을 이 slice 가 지우지 않는다), production 의 생성 자리는 이 함수 하나임을
+ * 아키텍처 등식이 잠근다.
+ */
+fun marginInputsFrom(
+    recommendedRate: Rate,
+    floorRate: PlausibleFloorRate?,
+    predictedRate: Rate,
+    priceFitness: UnitScore,
+    capacity: UnitScore,
+): MarginInputs =
+    MarginInputs(
+        recommendedRate = recommendedRate,
+        floorRate = floorRate?.rate,
+        predictedRate = predictedRate,
+        priceFitness = priceFitness,
+        capacity = capacity,
+    )
 
 private fun requireRateAtMostOne(
     label: String,

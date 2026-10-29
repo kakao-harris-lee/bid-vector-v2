@@ -1,0 +1,14 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.UnitScore
+import bidvector.decision.priority.derive.MarginInputs
+import bidvector.decision.priority.derive.marginInputsFromTypo
+import bidvector.sharedkernel.Rate
+import java.math.BigDecimal
+
+fun launderedFromRow(
+    rate: Rate,
+    rowFraction: BigDecimal,
+    fitness: UnitScore,
+    capacity: UnitScore,
+): MarginInputs = marginInputsFromTypo(rate, Rate.ofFraction(rowFraction), rate, fitness, capacity)

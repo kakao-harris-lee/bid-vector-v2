@@ -1,6 +1,7 @@
 package bidvector.decision.menu
 
 import bidvector.decision.FloorShortfallJudgement
+import bidvector.decision.PlausibleFloorRate
 import bidvector.decision.criticalAssessmentRateFor
 import bidvector.decision.measureFloorShortfall
 import bidvector.decision.tallyOf
@@ -10,7 +11,6 @@ import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BidAmount
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Derived
-import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.MONEY_AXIS_SCALE_DIGITS
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Rate
@@ -25,7 +25,8 @@ import java.math.RoundingMode
 /** 세 단계 함수가 공유하는 문맥 — 기계적 묶음이 아니라 **같은 호출의 입력 전부**다. */
 internal data class OptionContext(
     val input: BidMenuInput,
-    val floorRate: FloorRate,
+    /** **게이트 통과 값**이다 — 이 문맥을 지을 수 있다는 것이 곧 게이트를 거쳤다는 뜻이다. */
+    val floorRate: PlausibleFloorRate,
     val policy: Resolution.Resolved<BidMenuPolicyData>,
 )
 

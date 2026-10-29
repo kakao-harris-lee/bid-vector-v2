@@ -1,0 +1,12 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.UnitScore
+import bidvector.decision.priority.derive.MarginInputsTypo
+import bidvector.sharedkernel.Rate
+
+fun forgedMarginInputs(
+    rate: Rate,
+    laundered: Rate,
+    fitness: UnitScore,
+    capacity: UnitScore,
+): MarginInputsTypo = MarginInputsTypo(rate, laundered, rate, fitness, capacity)
