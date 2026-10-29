@@ -97,6 +97,8 @@ class ConstantTimeComparisonStructureTest {
                 "QualificationFields",
                 "BaseAmountFields",
                 "FloorRateFields",
+                // M7/7C②-b — 표시 근거의 운반 타입 하나가 늘었다(응답 DTO 가 아니다).
+                "FloorRateGrounds",
                 "PriceAxesFields",
                 "BidPriceVerdictLabelsKt",
                 "BidPriceDropLabelsKt",
@@ -166,6 +168,8 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "기초금액 묶음(data class) 자동 생성 equals — 금액·통화·basis·과세·provenance·해석 갈래뿐, 자격증명 값 없음",
         "FloorRateFields" to
             "게시 하한율 묶음(data class) 자동 생성 equals — 율 문자열·출처·차수·근거 상태뿐, 자격증명 값 없음",
+        "FloorRateGrounds" to
+            "근거 상태+근거 값 운반(data class, internal) 자동 생성 equals — 필드는 표시 어휘 enum 과 율 문자열 둘뿐, 자격증명 값 없음(javap: 비밀값 어휘 참조 0)",
         "PriceAxesFields" to
             "가격 세 축 묶음(data class) 자동 생성 equals — 상태와 사유 코드뿐(값 칸이 없다), 자격증명 값 없음",
         "BidPriceVerdictLabelsKt" to
