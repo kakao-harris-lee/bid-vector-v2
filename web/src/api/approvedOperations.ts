@@ -47,13 +47,16 @@ type ApprovedMethodsOf<P extends ApprovedOperationPath> = Lowercase<
  * 목록의 메서드 가운데 **그 경로의 계약에 없는 것**. 하나라도 있으면 아래 단언이 컴파일에서
  * 멈춘다(CR r4 L-6).
  *
- * **키 존재로는 볼 수 없다**(실측): 생성기는 없는 메서드도 키로 적고 타입을 `never` 로 둔다
- * (`/api/notices` 아래에 `put: never` 가 있다). 그래서 교집합(`& keyof paths[P]`)은 오타를
- * 통과시켰고 `{ method: 'PUT', path: '/api/notices' }` 가 **tsc 0** 이었다. 키가 아니라 **그
- * 자리의 타입이 `never` 인가**를 본다.
+ * **키 존재로는 볼 수 없다**(실측): 생성기는 없는 메서드도 키로 적는다. 그래서 교집합
+ * (`& keyof paths[P]`)은 오타를 통과시켰고 `{ method: 'PUT', path: '/api/notices' }` 가
+ * **tsc 0** 이었다.
+ *
+ * 그 자리를 보는 방법도 한 번 틀렸다: 생성기가 적는 것은 `put?: never` 이고 **optional** 이라
+ * 그 속성의 타입은 `never` 가 아니라 `undefined` 다(probe 로 확인). 그래서 `undefined` 를
+ * 걷어 낸 뒤 비었는지 본다 — 그것이 「계약에 그 메서드가 없다」의 모양이다.
  */
 type UndeclaredMethodsFor<P extends ApprovedOperationPath> = {
-  [M in ApprovedMethodsOf<P>]: [paths[P][M]] extends [never] ? M : never;
+  [M in ApprovedMethodsOf<P>]: [Exclude<paths[P][M], undefined>] extends [never] ? M : never;
 }[ApprovedMethodsOf<P>];
 
 type MethodsNotInContract = {
