@@ -635,7 +635,10 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
    * 가 렌더되어 **빈 항목**이 서는데, 그것은 「고지가 없다」로 읽힌다.
    */
   it('고지 표에 없는 코드도 미지 문면으로 선다 — 빈 항목이 되지 않는다', async () => {
-    mocked.requestBidPrice.mockResolvedValue({ ...PRICE, disclosures: ['SOMETHING_NOT_IN_TABLE'] });
+    // 계약 **밖** 코드를 서버가 보내는 상황이다. 타입은 그것을 막지만 wire 는 막지 못하므로
+    // (그래서 `displayOrUnknown` 이 있다) 여기서만 캐스팅으로 그 상황을 만든다.
+    const outsideContract = 'SOMETHING_NOT_IN_TABLE' as unknown as (typeof PRICE)['disclosures'][number];
+    mocked.requestBidPrice.mockResolvedValue({ ...PRICE, disclosures: [outsideContract] });
     renderScreen();
 
     await askPrice();
