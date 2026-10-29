@@ -119,6 +119,25 @@ class BidPriceRequestEndpointTest : HttpIntegrationTestBase() {
     }
 
     /**
+     * **개연 불가 게시 하한율은 wire 에 숫자로 나가지 않는다**(DEC-10 게이트 · D-7C2B-2). 순수
+     * 조립 단언(`BidPriceRequestResponseTest`)과 따로 두는 이유는 이 값이 **직렬화를 지나**
+     * 화면 근거 칸에 닿기 때문이다 — 칸은 남고(계약 키 집합) 값만 비어 나간다.
+     */
+    @Test
+    fun `개연 불가 게시 하한율은 상태만 나가고 근거 칸은 비어 나간다`() {
+        notices.notice = bidPriceNotice(floorRate = publishedFloorRate("1.00000"))
+
+        val response = post(validBody())
+
+        response.statusCode.value() shouldBe 200
+        val body = response.body ?: error("본문이 비었다")
+        body["floorRateGroundsState"] shouldBe "IMPLAUSIBLE"
+        body.containsKey("publishedFloorRateFraction") shouldBe true
+        body["publishedFloorRateFraction"] shouldBe null
+        body["publishedFloorRateOrigin"] shouldBe "NOTICE_VALUE"
+    }
+
+    /**
      * 공고번호는 **정규화해서 찾는다**(`NoticeNumber` 가 그 규칙의 단일 출처) — 소문자·여분
      * 공백 표기로 같은 공고에 닿는다. 정규화를 빼면 같은 공고가 404 가 된다.
      */
