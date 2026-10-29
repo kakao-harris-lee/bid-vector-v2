@@ -74,3 +74,14 @@
 ## 계약 갱신 이력
 
 - 2026-10-29 착수(팀장) · 운영자 승인 2026-10-29(분할 7E-1/2/3 포함).
+- 2026-10-29 **D-7E-8(팀장, Phase 1 착수 보고 수령)**: 투찰가 요청은 전략에 여력 상한(`MAX_ACTIVE_BIDS`)이 없으면 409(fail-closed, OpenAPI
+  선언)다. 그 값을 세우는 `/api/strategy/edit-sessions/*` 는 화면 B·C 의 operation 목록 밖(설정 화면 = 7E-2)이므로 **하네스가** 출하 편집 세션
+  API 로 자격 헤더를 써 심는다(begin → value → confirm). 화면은 여전히 목록 안만 부른다 — 심는 주체는 운영자 설정 행위이고 7E-2 의 설정
+  화면이 나중에 그 자리를 대신한다. 하네스의 계정 생성·수집도 출하 명령(`bidvector.account.mode=CREATE` · `bidvector.collection.mode=once`)이다.
+- 2026-10-29 **D-7E-9(팀장)**: 여정 ② 는 **검색 경로**(검색 → 카드 → 담기)로 닫는다. 제안 목록은 감시 조건이 없으면 `WATCH_NOT_CONFIGURED` 이고
+  그 빈 얼굴(API 상태 그대로)을 e2e 로 잠근다. 제안 카드가 `MATCHED` 로 뜨는 여정은 감시 조건을 세우는 설정 화면이 서는 7E-2 로 넘긴다.
+- 2026-10-29 **D-7E-10(팀장)**: CI 는 **같은 `web` job 에서 `:app:bootJar`**(setup-java + setup-gradle) 뒤 여정 e2e step 을 둔다 — `needs: check`
+  산출물 전달은 임계경로를 `check`(≈13분) 뒤로 미뤄 기각. `timeout-minutes` 30. Postgres 는 `docker/compose.yaml` 과 같은 digest 를
+  `docker run`, 실행마다 유일한 컨테이너 이름(compose 프로젝트 이름 공유 회피). `tools/one-command-check.sh` 축어 일치. 착수 보고가 찾은
+  **`web/src` 안 `.json` import 구멍**(`resolveJsonModule`)은 W-4 게이트에 「프로그램·번들 그래프의 `.json` 모듈 0」 술어로 닫는다 — 게이트
+  술어 추가이므로 양성 대조(`.json` import 하나 → RED)를 같이 잰다.
