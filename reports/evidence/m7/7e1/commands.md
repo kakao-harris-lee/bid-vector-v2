@@ -157,3 +157,32 @@ acceptance 는 `.github/workflows/ci.yml` 의 **job 명령 그대로**다(계약
 번들 자산 200·content-type · SPA fallback)이고 이 slice 는 `index.html` 과 자산 규약을 바꾸지
 않는다. 이미지에 들어가는 것은 빌드 산출물뿐이라 새 devDependency 는 런타임 단계에 없다
 (Dockerfile 의 runtime 단계가 `dist` 만 복사한다). 그 job 의 판정은 PR 체크가 든다.
+
+## 동결 전 main 병합 라운드 (팀장 지시 2026-10-29)
+
+main 이 **`bb6a187e`** 가 됐다(PR #101 — caddy 직접 빌드 · app 베이스 상향). base `78d97c59` 의
+`container` job 은 취약점 DB 갱신으로 붉으므로 그 수정을 **병합해 받는다**.
+
+- cmd: `git merge origin/main`
+- exit: 0
+- 핵심 결과: 충돌 0. **합집합 검증**(충돌 0 자동 병합이 같은 본문을 접는 함정) — 내 `web` job
+  표지 **8 그대로** · 남의 `container` job 주석 **1** · YAML 파싱 job 4 · `web` step 20 ·
+  두 job 의 timeout 30 · step 참조 검사 매달린 참조 0. 병합이 들여온 경로 20 개 중 내 in_scope
+  와의 교집합은 `ci.yml` **한 건**이고 그 hunk 는 `container` job 주석이라 겹치지 않는다
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`(병합 트리)
+- exit: 0
+- 핵심 결과: **17s · 392 actionable 중 357 up-to-date · `qualityBaseline` UP-TO-DATE** —
+  Gradle 의 up-to-date 회계가 「병합이 Kotlin 게이트 입력을 바꾸지 않았다」를 스스로 말한다
+  (경로 교집합 계수와 같은 결론: Kotlin 이 읽는 `config/quality` 열 파일 ∩ 병합이 가져온 다섯
+  파일 = **0**)
+
+- cmd: `web` job 명령 재측정(W-2~W-9 · W-11 · W-12 · W-13)
+- exit: **전부 0**
+- 핵심 결과: 축어 일치 **True**(13 명령) · 여정 3건 통과 **35.5s** · 잔존 0
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `8117a921`)
+- exit: 0
+- 핵심 결과: **복원 기준이 둘로 갈렸다** — 내 파일 18 은 base, 공유 `ci.yml` 은 병합된 main
+  고정 SHA. 두 diff 모두 exit 0 이고 「내 표지 0 · 남의 표지 1」 계수가 선다. 되돌린 뒤
+  typecheck · vitest(5 파일 28) · 게이트 여섯 · 7A 셸 스모크 전부 0
