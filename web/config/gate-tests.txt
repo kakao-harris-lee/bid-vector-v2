@@ -19,3 +19,5 @@ src/display/caseDisplay.test.ts
 # 화면 B·C 의 G2 13 행 문면과 「화면이 보이는 값 == API 가 준 값」을 잠그는 test.
 src/screens/TodayNoticesScreen.test.tsx
 src/screens/WorksheetScreen.test.tsx
+# v M-3 — 화면이 부르는 operation 집합 == 계약 목록(AST 술어).
+scripts/screen-operations.test.mjs
