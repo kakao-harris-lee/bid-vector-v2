@@ -76,7 +76,7 @@ fixture 포함) · `web/e2e/journey/journey.spec.ts` · `web/playwright.journey.
 r1 이 더한 넷: `apiError.ts`(오류 타입을 질의 모듈에서 뗀 자리) · `WriteFailure.tsx`(쓰기 실패
 얼굴) · `screen-operations.mjs`·`.test.mjs`(operation 집합 등식).
 
-## 실측 — 버릴 clone 에서 ①~⑥ (실측 HEAD `cd4a245a`)
+## 실측 — 버릴 clone 에서 ①~⑦ (실측 HEAD 는 위 머리의 값이다)
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
