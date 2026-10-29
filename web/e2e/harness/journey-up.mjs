@@ -11,11 +11,13 @@
 // 비밀값은 **실행마다 난수**다 — 저장소에 자격 리터럴을 두지 않는다(D-7E-6).
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { CONTAINER_PREFIX, reapStaleContainer } from './container-marker.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -35,7 +37,6 @@ const PREVIEW_PORT = Number.parseInt(process.env.BIDVECTOR_E2E_PREVIEW_PORT ?? '
 const CONTEXT_PATH = resolve(tmpdir(), 'bidvector-7e1-journey-context.json');
 
 /** compose 는 프로젝트 이름이 고정이라 같은 호스트의 다른 레인과 이름공간을 공유한다 — `docker run` + 유일 이름. */
-const CONTAINER_PREFIX = 'bidvector-7e1-journey-';
 const CONTAINER = `${CONTAINER_PREFIX}${randomUUID().slice(0, 8)}`;
 
 /**
@@ -58,23 +59,29 @@ async function previewPortIsBusy() {
   }
 }
 
+/** 락을 **얻었는가** — 공유 경로를 정리할 자격이 이것 하나다(CR r2 M-5). */
+let lockOwned = false;
+
 async function acquireSingleRunLock() {
   if (await previewPortIsBusy()) {
     throw new Error(
       `preview 포트 ${PREVIEW_PORT} 에 이미 무언가 떠 있다 — 같은 호스트의 앞 실행이 살아 있을 수 있다. ` +
-        '그 실행이 끝난 뒤 다시 돌리십시오(남의 컨테이너를 지우지 않는다).',
+        '그 실행이 끝난 뒤 다시 돌리십시오(남의 컨테이너·파일을 건드리지 않는다).',
     );
   }
   if (existsSync(LOCK_PATH)) {
     const stale = readFileSync(LOCK_PATH, 'utf8').trim();
-    log(`묵은 락을 잇는다(앞 실행 표지 ${stale || '모름'}) — 그 표지의 컨테이너만 걷는다`);
-    const listed = spawnSync('docker', ['ps', '-aq', '--filter', `name=${stale}`], { encoding: 'utf8' });
-    const ids = (listed.stdout ?? '').split('\n').map((one) => one.trim()).filter((one) => one !== '');
-    if (ids.length > 0) {
-      spawnSync('docker', ['rm', '-f', ...ids], { stdio: 'ignore' });
-    }
+    log(`묵은 락을 잇는다(앞 실행 표지 ${stale || '없음'})`);
+    const reaped = reapStaleContainer(stale, { log });
+    log(`묵은 컨테이너 ${reaped.length}개를 걷었다`);
   }
-  writeFileSync(LOCK_PATH, `${CONTAINER}\n`, { mode: 0o600 });
+  // **원자 쓰기**(CR r2 H-1 ⓐ) — 같은 파일에 바로 쓰면 「파일은 생겼고 내용은 아직 없는」 창이
+  // 생기고, 그 창에서 죽으면 다음 실행이 **빈 표지**를 읽는다. 임시 파일에 다 쓴 뒤 rename 한다.
+  const pending = `${LOCK_PATH}.${process.pid}.tmp`;
+  writeFileSync(pending, `${CONTAINER}\n`, { mode: 0o600 });
+  chmodSync(pending, 0o600);
+  renameSync(pending, LOCK_PATH);
+  lockOwned = true;
 }
 
 const secret = () => randomBytes(24).toString('base64url');
@@ -159,8 +166,13 @@ async function shutdown(code) {
   if (runStateDir !== null && existsSync(runStateDir)) {
     rmSync(runStateDir, { recursive: true, force: true });
   }
-  rmSync(CONTEXT_PATH, { force: true });
-  rmSync(LOCK_PATH, { force: true });
+  // CR r2 M-5 — 공유 경로는 **락을 얻은 실행만** 정리한다. 앞 판은 락을 얻지 못해 죽는
+  // 경로에서도 이 둘을 지웠고, 그러면 겹침에서 **옳게 멈추는 쪽이 앞 실행의 맥락 파일과 락을
+  // 지웠다**(앞 실행은 ENOENT 로 전건 실패하고, 그 표지가 사라져 컨테이너를 걷을 근거도 없다).
+  if (lockOwned) {
+    rmSync(CONTEXT_PATH, { force: true });
+    rmSync(LOCK_PATH, { force: true });
+  }
   process.exit(code);
 }
 

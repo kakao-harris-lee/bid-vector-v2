@@ -21,3 +21,5 @@ src/screens/TodayNoticesScreen.test.tsx
 src/screens/WorksheetScreen.test.tsx
 # v M-3 — 화면이 부르는 operation 집합 == 계약 목록(AST 술어).
 scripts/screen-operations.test.mjs
+# CR r2 H-1 — 하네스의 파괴적 경로 가드(묵은 락 수거의 표지 술어·앵커 필터).
+e2e/harness/container-marker.test.mjs

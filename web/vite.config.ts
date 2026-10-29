@@ -52,9 +52,16 @@ export default defineConfig({
     environment: 'node',
     // 게이트 스크립트의 순수 판정 함수도 여기서 잠근다(`scripts/*.test.mjs`) — 그 판정이
     // 번들 경계의 실제 술어다.
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.mjs'],
+    // 하네스의 **파괴적 경로 가드**도 단위 test 로 잠근다(CR r2 H-1) — 그 술어는 부수효과
+    // 없는 모듈(`e2e/harness/container-marker.mjs`)에 있다.
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'scripts/**/*.test.mjs',
+      'e2e/harness/**/*.test.mjs',
+    ],
     // Playwright spec 을 vitest 가 수집하면 같은 test 가 두 레인에서 서로 다른 방식으로
-    // 돌아간다.
-    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    // 돌아간다. **spec 만** 제외한다 — 하네스의 단위 test 는 위 `include` 가 받는다.
+    exclude: ['e2e/**/*.spec.ts', 'node_modules/**', 'dist/**'],
   },
 });
