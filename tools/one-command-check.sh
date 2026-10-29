@@ -130,4 +130,15 @@ npx playwright install chromium
 _step "web — Playwright 스모크 (W-11)"
 npm run test:e2e
 
+# M7/7E-1 — 여정 e2e 의 입력. ci.yml `web` job 의 W-12 와 **같은 명령**이고, 거기서 CI 전용인
+# 것은 setup-java·setup-gradle(툴체인 설치)뿐이다. 로컬에서는 위 Kotlin 절이 이미 컴파일했으므로
+# 이 명령은 보통 UP-TO-DATE 다.
+_step "web — 앱 배포물 빌드 (W-12)"
+(cd "$REPO_ROOT" && ./gradlew --no-daemon :app:bootJar)
+
+# 여정 e2e — **docker 가 필요하다**(버릴 Postgres). 브라우저 시스템 패키지와 같은 부류의
+# 장비 전제이고 evidence 의 알려진 제한에 등재한다.
+_step "web — 여정 e2e (W-13)"
+npm run test:e2e:journey
+
 _step "완료 — Kotlin 전건 + Python 전건 + web 전건 통과"

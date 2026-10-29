@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { fallbackRoute, loginRoute, screenRoutes, screenSlots } from './routes';
 
-// 7A 가 만든 것은 「화면 자리 여섯」이다. 그 여섯이 맞는지만 잠근다 — 화면 동작 test 는 7E.
+// 자리 여섯은 그대로다. M7/7E-1 은 그 가운데 **둘**(B·C)을 실화면으로 채웠고 넷은 여전히
+// 빈 자리다 — 아래 둘째 describe 가 그 경계를 잠근다(범위 밖 화면을 만들지 않는다, D-7E-5).
 const EXPECTED_PATHS = [
   '/start',
   '/',
-  '/notices/:noticeId',
+  '/notices/:noticeNumber/:noticeRound',
   '/bids',
   '/results',
   '/inbox',
@@ -33,5 +34,14 @@ describe('화면 자리 표', () => {
   it('로그인 자리는 표 밖에 있고 경로가 하나다', () => {
     expect(loginRoute.path).toBe('/login');
     expect(screenSlots.map((slot) => slot.path)).not.toContain('/login');
+  });
+});
+
+/** D-7E-5 — 범위 밖 화면은 「준비 중」 빈 자리뿐이다. 그 경계가 표의 `element` 유무다. */
+describe('이 slice 가 채운 자리', () => {
+  it('실화면은 B·C 둘이고 나머지 넷은 빈 자리다', () => {
+    const implemented = screenSlots.filter((slot) => slot.element !== undefined).map((slot) => slot.id);
+
+    expect(implemented).toEqual(['home', 'worksheet']);
   });
 });

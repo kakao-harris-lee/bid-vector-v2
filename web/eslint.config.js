@@ -136,7 +136,8 @@ export default tseslint.config(
   {
     // e2e 는 브라우저를 운전할 뿐 서버 모양을 지어내지 않는다 — 위 금지의 대상이 아니지만
     // 타입·문법 규칙은 같이 받는다.
-    files: ['e2e/**/*.ts'],
+    // 하네스(`e2e/harness/*.mjs`)도 Node 다 — 여정 e2e 가 출하 jar·컨테이너를 띄우는 자리다.
+    files: ['e2e/**/*.ts', 'e2e/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   {
