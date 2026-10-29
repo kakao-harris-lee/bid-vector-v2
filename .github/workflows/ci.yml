@@ -334,7 +334,9 @@ jobs:
     runs-on: ubuntu-latest
     # M6/6E-2b r1(code-review L-9) — 이 job 의 네트워크 의존이 셋 늘었다(릴리스 자산 · 취약점 DB ·
     # Java DB). 셋 중 하나가 멈추면 기본 6시간까지 러너를 쥔다. 실측 소요는 10분대이므로 넉넉히
-    # 둘로 잡는다. 나머지 두 job 은 이 slice 의 범위 밖이라 그대로다(알려진 제한에 등재).
+    # 둘로 잡는다. chore 2026-10-29 — 넷째 의존이 생겼다: web·proxy 빌드가 caddy 를 컴파일하며
+    # proxy.golang.org·sum.golang.org 에서 모듈을 받는다(첫 실행 실측: 그 빌드 step 약 72초, job 전체
+    # 3분 34초 — main 의 같은 날 3분 38초와 같은 대역이라 상한은 그대로다). 나머지 두 job 은 이 slice 의 범위 밖이라 그대로다(알려진 제한에 등재).
     timeout-minutes: 30
     env:
       # compose 의 postgres 서비스 전용 — 이 job 안에서만 뜨는 일회성 컨테이너의

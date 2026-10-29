@@ -58,3 +58,19 @@ for img in bidvector/web:local bidvector/proxy:local; do
   printf '%s %s (id=%s)\n' "$img" "$fp" "$(docker image inspect "$img" --format '{{.Id}}')"
   printf '%s=%s\n' "$img" "$fp" >> "$BIDVECTOR_LOCAL_TLS_ID_FILE"
 done
+
+# chore(2026-10-29) — 두 이미지의 caddy 바이너리는 **같아야 한다**. 둘 다 같은 `docker/caddy/` 입력과
+# 같은 caddy-build stage(두 Dockerfile 에 같은 글자로 있다)로 굽는다. 그 stage 의 글자가 한쪽만 바뀌면
+# 판이 갈라진다 — 글자 비교가 아니라 **산출물**의 sha256 으로 잠근다(`-trimpath`·CGO 끔이라 같은 입력은
+# 같은 바이트다).
+caddy_sums=()
+for img in bidvector/web:local bidvector/proxy:local; do
+  sum="$(docker run --rm --security-opt no-new-privileges --entrypoint sha256sum "$img" /usr/bin/caddy | awk '{print $1}')"
+  [ "${#sum}" -eq 64 ] || { echo "$img 의 /usr/bin/caddy sha256 을 읽지 못했다" >&2; exit 1; }
+  caddy_sums+=("$sum")
+done
+if [ "${caddy_sums[0]}" != "${caddy_sums[1]}" ]; then
+  echo "web·proxy 이미지의 caddy 바이너리가 다르다(web=${caddy_sums[0]} proxy=${caddy_sums[1]}) — 두 Dockerfile 의 caddy-build stage 를 맞춘다" >&2
+  exit 1
+fi
+printf 'caddy 바이너리 sha256(web=proxy) %s\n' "${caddy_sums[0]}"
