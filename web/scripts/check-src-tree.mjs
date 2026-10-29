@@ -281,33 +281,57 @@ const CLIENT_MODULE_CALLER = 'src/api/queries.ts';
 const CLIENT_CAPABILITY_BINDING = 'apiClient';
 const isTestFile = (name) => /\.test\.tsx?$/.test(name);
 
-/** 그 import 선언이 **호출 능력**을 가져오는가 — 이름·namespace·default 를 본다. */
-const importsClientCapability = (sourceFile, moduleRealPath) => {
-  let found = false;
+/**
+ * 그 파일이 **호출 능력을 나르는 간선**을 갖는가 — 셋을 본다(CR r2 M-1 · v r2 M-1).
+ *
+ * 앞 판은 `ts.isImportDeclaration` **하나만** 방문했다. 그래서 `export { apiClient } from './client'`
+ * (`ExportDeclaration`) · `export * from './client'` · 리터럴 동적 `import('./client')` 가 모두
+ * 지나갔고(실측 넷), 화면이 그 재수출을 통해 목록 밖 operation 을 부를 수 있었다.
+ *
+ * 세 간선의 성질이 다르다:
+ * - **import 선언**: `apiClient` 라는 **이름**을 가져올 때만 능력이다(같은 모듈의 CSRF 상태
+ *   함수는 능력이 아니다 — 그 이름 좁히기를 유지한다).
+ * - **재수출**: 무엇이 나가는지와 무관하게 **그 모듈을 다른 이름으로 다시 내보낸다** — 허용
+ *   자리를 포함해 **어디서도** 두지 않는다(그 한 줄이 집합 등식을 통째로 우회시킨다).
+ * - **동적 import**: 모듈 객체를 그대로 손에 쥔다 — 허용 자리 밖이면 능력이다.
+ */
+const clientCapabilityEdges = (sourceFile, moduleRealPath) => {
+  const edges = [];
+  const resolvesToClient = (specifier) =>
+    ts.isStringLiteralLike(specifier) && resolveSpecifierReal(specifier.text, sourceFile.fileName) === moduleRealPath;
+
   const visit = (node) => {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
-      const resolvedReal = resolveSpecifierReal(node.moduleSpecifier.text, sourceFile.fileName);
-      if (resolvedReal === moduleRealPath) {
-        const clause = node.importClause;
-        if (clause === undefined || clause.name !== undefined) {
-          found = true; // default 또는 side-effect import — 무엇이 들어오는지 좁혀지지 않는다
-        } else if (clause.namedBindings !== undefined) {
-          if (ts.isNamespaceImport(clause.namedBindings)) {
-            found = true;
-          } else {
-            for (const element of clause.namedBindings.elements) {
-              if ((element.propertyName ?? element.name).text === CLIENT_CAPABILITY_BINDING) {
-                found = true;
-              }
+    if (ts.isImportDeclaration(node) && resolvesToClient(node.moduleSpecifier)) {
+      const clause = node.importClause;
+      if (clause === undefined || clause.name !== undefined) {
+        edges.push('default·side-effect import');
+      } else if (clause.namedBindings !== undefined) {
+        if (ts.isNamespaceImport(clause.namedBindings)) {
+          edges.push('namespace import');
+        } else {
+          for (const element of clause.namedBindings.elements) {
+            if ((element.propertyName ?? element.name).text === CLIENT_CAPABILITY_BINDING) {
+              edges.push(`import { ${CLIENT_CAPABILITY_BINDING} }`);
             }
           }
         }
       }
     }
+    if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined && resolvesToClient(node.moduleSpecifier)) {
+      edges.push('재수출(export … from)');
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments.length > 0 &&
+      resolvesToClient(node.arguments[0])
+    ) {
+      edges.push('동적 import()');
+    }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return found;
+  return edges;
 };
 let clientModuleReal;
 try {
@@ -401,8 +425,15 @@ for (const { sourceFile, name } of inSrcFiles) {
     }
   }
 
-  if (name !== CLIENT_MODULE && !isTestFile(name) && importsClientCapability(sourceFile, clientModuleReal)) {
-    clientModuleImporters.add(name);
+  if (name !== CLIENT_MODULE && !isTestFile(name)) {
+    for (const edge of clientCapabilityEdges(sourceFile, clientModuleReal)) {
+      // **재수출은 허용 자리에서도 금지다** — 그 한 줄이 집합 등식을 통째로 우회시킨다.
+      if (edge.startsWith('재수출') || name !== CLIENT_MODULE_CALLER) {
+        clientModuleImporters.add(`${name}(${edge})`);
+      } else {
+        clientModuleImporters.add(name);
+      }
+    }
   }
 
   const visit = (node) => {
@@ -433,8 +464,8 @@ if (!apiImporters.has(API_CALL_SITE)) {
 for (const importer of clientModuleImporters) {
   if (importer !== CLIENT_MODULE_CALLER) {
     fail(
-      `${CLIENT_CAPABILITY_BINDING} 를 ${CLIENT_MODULE_CALLER} 밖에서 import 한다: ${importer} ` +
-        '— 화면이 계약 목록 밖 operation 을 부르는 길이 열린다',
+      `서버 호출 능력을 ${CLIENT_MODULE_CALLER} 밖으로 나르는 간선이 있다: ${importer} ` +
+        '— 화면이 계약 목록 밖 operation 을 부르는 길이 열린다(재수출·동적 import 포함)',
     );
   }
 }

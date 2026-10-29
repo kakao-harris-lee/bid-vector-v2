@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
-  APPROVED_PATHS,
+  collectApprovedPaths,
   collectCalledPaths,
   collectContractPaths,
   compareSets,
@@ -14,6 +14,8 @@ import {
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const queriesText = readFileSync(resolve(webRoot, 'src', 'api', 'queries.ts'), 'utf8');
 const generatedText = readFileSync(resolve(webRoot, 'src', 'api', 'generated', 'operator-api.ts'), 'utf8');
+const approvedText = readFileSync(resolve(webRoot, 'src', 'api', 'approvedOperations.ts'), 'utf8');
+const APPROVED_PATHS = collectApprovedPaths(approvedText);
 
 /**
  * v M-3 — 화면이 부를 수 있는 operation 의 **전부**가 계약 목록 안인지 잰다. W-4 가 「호출 능력을
@@ -24,6 +26,11 @@ describe('화면이 부르는 operation 집합', () => {
 
   it('비리터럴 경로가 없다 — 게이트가 못 보는 호출을 두지 않는다', () => {
     expect(collectCalledPaths(queriesText).unresolved).toStrictEqual([]);
+  });
+
+  it('승인 목록을 그 파일에서 읽는다 — 이 파일이 목록을 복제하지 않는다', () => {
+    expect(APPROVED_PATHS.length).toBeGreaterThan(5);
+    expect(APPROVED_PATHS).toContain('/api/notices');
   });
 
   it('호출 집합이 계약 목록과 같다 — 목록 밖 0 · 목록에만 있는 것 0', () => {
@@ -77,5 +84,31 @@ describe('호출 경로 수집 술어', () => {
 
     expect(paths).toStrictEqual([]);
     expect(unresolved).toHaveLength(1);
+  });
+});
+
+/**
+ * CR r2 M-2 — 앞 판은 호출 꼴을 **열거**했고 아래 셋이 `paths`·`unresolved` 어느 쪽에도 걸리지
+ * 않고 지나갔다(실측). 이제 **모르는 꼴은 `unresolved`** 다.
+ */
+describe('모르는 사용 꼴은 통과시키지 않는다', () => {
+  it.each([
+    ['계산 접근', `const a = await apiClient['GET']('/api/strategy');`],
+    ['구조 분해', `const { GET } = apiClient; const a = await GET('/api/strategy');`],
+    ['별칭', `const c = apiClient; const a = await c.GET('/api/strategy');`],
+    ['인자로 넘김', `wrap(apiClient);`],
+    ['재수출 아닌 참조', `export const x = apiClient;`],
+  ])('%s 은 모름으로 센다', (_label, code) => {
+    const { paths, unresolved } = collectCalledPaths(code);
+
+    expect(paths).toStrictEqual([]);
+    expect(unresolved.length).toBeGreaterThan(0);
+  });
+
+  it('아는 꼴은 그대로 경로를 센다', () => {
+    const { paths, unresolved } = collectCalledPaths(`const a = await apiClient.GET('/api/notices');`);
+
+    expect(paths).toStrictEqual(['/api/notices']);
+    expect(unresolved).toStrictEqual([]);
   });
 });

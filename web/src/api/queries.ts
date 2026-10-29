@@ -160,16 +160,6 @@ export async function requestBidPrice(
   return data;
 }
 
-export async function readBidCase(caseId: number): Promise<BidCase> {
-  const { data, error, response } = await apiClient.GET('/api/bid-cases/{caseId}', {
-    params: { path: { caseId: pathCaseId(caseId) } },
-  });
-  if (data === undefined) {
-    raise(response.status, error);
-  }
-  return data;
-}
-
 export async function readTimeline(caseId: number): Promise<readonly BidTimelineEntry[]> {
   const { data, error, response } = await apiClient.GET('/api/bid-cases/{caseId}/timeline', {
     params: { path: { caseId: pathCaseId(caseId) } },
@@ -208,38 +198,10 @@ export async function recordBid(
   return data;
 }
 
-export async function deferCase(
-  caseId: number,
-  body: components['schemas']['DeferRequest'],
-): Promise<BidCase> {
-  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/defer', {
-    params: { path: { caseId: pathCaseId(caseId) } },
-    body,
-  });
-  if (data === undefined) {
-    raise(response.status, error);
-  }
-  return data;
-}
-
 export async function resumeCase(caseId: number): Promise<BidCase> {
   // 되돌림 전이는 **본문이 없다**(계약에 requestBody 가 없다) — 빈 object 를 보내면 415·400 이다.
   const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/resume', {
     params: { path: { caseId: pathCaseId(caseId) } },
-  });
-  if (data === undefined) {
-    raise(response.status, error);
-  }
-  return data;
-}
-
-export async function skipCase(
-  caseId: number,
-  body: components['schemas']['SkipRequest'],
-): Promise<BidCase> {
-  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/skip', {
-    params: { path: { caseId: pathCaseId(caseId) } },
-    body,
   });
   if (data === undefined) {
     raise(response.status, error);

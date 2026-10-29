@@ -10,50 +10,96 @@
 import ts from 'typescript';
 
 /**
- * 계약이 승인한 목록 — `reports/evidence/m7/7e1/scope.md` 「화면 B·C 가 쓰는 operation」 그대로다.
- * 여정 e2e 의 런타임 대조(`ALLOWED_API`)와 **같은 집합**이고, 두 자리가 갈리면 이 술어가 아니라
- * 리뷰가 잡는다(런타임 쪽은 메서드까지 본다).
+ * 승인 목록은 **`src/api/approvedOperations.ts` 한 자리**에서 읽는다(CR r2 M-1). 앞 판은 이
+ * 파일이 같은 목록을 **복제**했고, 그러면 클라이언트 타입을 좁히는 자리와 게이트가 갈릴 수 있다.
  */
-export const APPROVED_PATHS = Object.freeze([
-  '/api/session',
-  '/api/notices',
-  '/api/suggestions',
-  '/api/bid-cases',
-  '/api/bid-cases/{caseId}',
-  '/api/bid-cases/{caseId}/timeline',
-  '/api/bid-cases/{caseId}/draft',
-  '/api/bid-cases/{caseId}/record',
-  '/api/bid-cases/{caseId}/skip',
-  '/api/bid-cases/{caseId}/defer',
-  '/api/bid-cases/{caseId}/resume',
-  '/api/bid-price-requests',
-]);
+export function collectApprovedPaths(approvedSourceText) {
+  const source = ts.createSourceFile('approvedOperations.ts', approvedSourceText, ts.ScriptTarget.ESNext, true);
+  const paths = [];
+  const visit = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'APPROVED_OPERATION_PATHS'
+    ) {
+      const initializer = ts.isAsExpression(node.initializer ?? source) ? node.initializer.expression : node.initializer;
+      if (initializer !== undefined && ts.isArrayLiteralExpression(initializer)) {
+        for (const element of initializer.elements) {
+          if (ts.isStringLiteralLike(element)) {
+            paths.push(element.text);
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return paths.sort();
+}
 
 const CLIENT_OBJECT = 'apiClient';
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE']);
 
 /**
- * `apiClient.<METHOD>('<path>', …)` 의 **경로 리터럴 전수**를 모은다. 리터럴이 아닌 첫 인자는
- * 「모름」이므로 통과시키지 않고 `unresolved` 로 센다(fail-closed).
+ * `apiClient` **참조 전수**를 보고 경로 리터럴을 모은다.
+ *
+ * **앞 판은 호출 꼴을 열거했다**(`apiClient.<METHOD>(…)` 하나). 그래서 `apiClient['GET'](…)` ·
+ * `const { GET } = apiClient` · `const c = apiClient; c.GET(…)` 가 `paths` 에도 `unresolved` 에도
+ * 걸리지 않고 **아무 흔적 없이** 지나갔다(실측 셋). 열거를 늘리는 대신 뒤집는다 — 그 식별자가
+ * 나타나는 **모든 자리**를 세고, 아는 꼴(속성 접근 + HTTP 메서드 + 경로 리터럴)이 아니면
+ * `unresolved` 로 밀어 넣는다. **모르는 것은 통과시키지 않는다.**
+ *
+ * 이 술어가 둘째 층인 이유: 첫째 층은 **타입**이다(`client.ts` 가 승인 목록으로 좁혀져 있어
+ * 목록 밖 경로는 어느 꼴로 불러도 `tsc` 가 멈춘다). 이 층은 그 전제가 조용히 넓어지는 것을
+ * 잡는다 — 목록이 늘었는데 화면이 실제로 그만큼 쓰지 않는 경우까지 등식으로 센다.
  */
 export function collectCalledPaths(sourceText, fileName = 'queries.ts') {
   const source = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.ESNext, true);
   const paths = new Set();
   const unresolved = [];
 
+  /** 이 참조가 **아는 호출 꼴**의 일부인가 — `apiClient.GET('<리터럴>')` 의 `apiClient` 자리. */
+  const knownCallShape = (reference) => {
+    const access = reference.parent;
+    if (access === undefined || !ts.isPropertyAccessExpression(access) || access.expression !== reference) {
+      return undefined;
+    }
+    if (!HTTP_METHODS.has(access.name.text)) {
+      return undefined;
+    }
+    const call = access.parent;
+    if (call === undefined || !ts.isCallExpression(call) || call.expression !== access) {
+      return undefined;
+    }
+    return call;
+  };
+
   const visit = (node) => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      ts.isIdentifier(node.expression.expression) &&
-      node.expression.expression.text === CLIENT_OBJECT &&
-      HTTP_METHODS.has(node.expression.name.text)
-    ) {
-      const first = node.arguments[0];
-      if (first !== undefined && ts.isStringLiteralLike(first)) {
-        paths.add(first.text);
-      } else {
-        unresolved.push(`${node.expression.name.text}(비리터럴 경로)`);
+    if (ts.isIdentifier(node) && node.text === CLIENT_OBJECT) {
+      // 선언·import 의 **이름 자리**만 참조가 아니다(그 자리는 W-4 의 간선 술어가 본다).
+      // 초기값 자리(`const c = apiClient`)는 **참조다** — 앞 판은 부모 종류만 보고 그것까지
+      // 제외해 별칭·구조 분해가 조용히 지나갔다(이 test 가 그 자리를 잡았다).
+      const parent = node.parent;
+      const isBindingName =
+        parent !== undefined &&
+        ((ts.isImportSpecifier(parent) && parent.name === node) ||
+          (ts.isExportSpecifier(parent) && (parent.name === node || parent.propertyName === node)) ||
+          (ts.isVariableDeclaration(parent) && parent.name === node) ||
+          (ts.isBindingElement(parent) && (parent.name === node || parent.propertyName === node)) ||
+          (ts.isPropertyAssignment(parent) && parent.name === node) ||
+          (ts.isPropertySignature(parent) && parent.name === node));
+      if (!isBindingName) {
+        const call = knownCallShape(node);
+        if (call === undefined) {
+          unresolved.push(`${CLIENT_OBJECT} 의 모르는 사용 꼴(${ts.SyntaxKind[node.parent?.kind ?? 0]})`);
+        } else {
+          const first = call.arguments[0];
+          if (first !== undefined && ts.isStringLiteralLike(first) && !ts.isTemplateExpression(first)) {
+            paths.add(first.text);
+          } else {
+            unresolved.push(`${CLIENT_OBJECT} 호출의 경로가 리터럴이 아니다`);
+          }
+        }
       }
     }
     ts.forEachChild(node, visit);
