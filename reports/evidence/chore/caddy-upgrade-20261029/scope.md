@@ -11,11 +11,14 @@ in_scope:
   - config/quality/vuln-policy.properties(scan.os.name.web·proxy)
   - config/quality/vuln-allowlist.properties(web·proxy 등재 20줄 삭제)
   - reports/evidence/chore/caddy-upgrade-20261029/
+  # r1 확장(2026-10-29, 팀장 승인 — 아래 「계약 갱신 이력」)
+  - docker/app.Dockerfile · config/quality/image-hygiene-policy-app.properties(app 베이스 다이제스트)
+  - docker/compose.local-tls.yaml · .github/workflows/ci.yml(주석만) · docs/runbook/m6-6e-operations.md(§8.3·§8.3.1)
 out_of_scope:
-  - docker/proxy.Caddyfile · docker/web.Caddyfile · compose 파일(healthcheck·ENTRYPOINT·UID 무변경)
+  - docker/proxy.Caddyfile · docker/web.Caddyfile · compose 의 거동(healthcheck·ENTRYPOINT·UID 무변경)
   - 취약점·위생 게이트 술어, 차단 문턱(block.*), 패키지 하한(scan.min-*)
-  - ml-serving·app 이미지
-acceptance_commands:  # CI `container` job 의 web·proxy step 명령 그대로
+  - ml-serving 이미지
+acceptance_commands:  # r1 부터 CI `container` job 의 run step 전부(commands.md 「r1」)
   - ./tools/local-tls-build.sh
   - ./tools/image-hygiene-check.sh bidvector/web:local config/quality/image-hygiene-policy-web.properties
   - ./tools/image-hygiene-check.sh bidvector/proxy:local config/quality/image-hygiene-policy-proxy.properties
@@ -82,6 +85,10 @@ DB 가 `CVE-2026-56857` 를 더 보고하지 않아 그 두 줄이 stale 로 끊
 3. alpine 하한은 「그 판 이상」만 보장한다. 판이 올라간 빌드는 이 evidence 의 패키지 수와 다를 수 있다.
 4. allowlist 가 네 kind 모두 0 — web·proxy 에서 stale 검사가 그물 노릇을 하던 자리는 양성 대조 둘과 OS
    매칭 술어가 진다(allowlist 머리 주석 갱신).
+5. x/net v0.59.0 → v0.60.0 은 caddy 의 HTTP/2 구현을 건드린다. 거동 축은 스모크의 https 요청(h2)과 로컬 CA
+   발급까지이고 h2c·HTTP/3 는 이름 있는 축으로 재지 않았다.
+6. `container` job 의 네트워크 의존이 넷이 됐다(proxy.golang.org·sum.golang.org). 첫 CI 실행 소요는 main 과
+   같은 대역(ci.yml 주석).
 
 ## 수용 체크리스트
 
@@ -91,7 +98,31 @@ DB 가 `CVE-2026-56857` 를 더 보고하지 않아 그 두 줄이 stale 로 끊
 - [x] 바이너리: go1.26.10 · go-jose v4.1.6 · x/net v0.60.0 · dep·모듈 목록 공식과 대조
 - [x] 로컬 TLS 스모크 통과(healthy 4 · 잔여 0)
 - [x] rollback 트리 동일성 실측(rollback.md)
+- [x] r1: app 게이트 1 → 0 · CR M-1·M-2 재실측 · CI `container` job run step 전부 로컬 실행(commands.md 「r1」)
 - [ ] Kotlin `check` — 결과 정본은 verifier 와 PR 조치 코멘트
+
+## 계약 갱신 이력
+
+- **r1(2026-10-29, 팀장 승인)** — 범위 확장: app 이미지 `CVE-2026-111497|libbrotli1`(같은 날 DB 갱신, main·모든 PR
+  공통)을 이 PR 에서 닫는다. 따로 내면 그 PR 은 main 의 web·proxy stale(56857)에, 이 PR 은 app 에 서로 막힌다.
+  같은 회차에 검토(code-reviewer, approve · M 3 · L 4) 지적을 반영 — 처리는 아래 「검토 지적 처리」.
+
+## r1 — app 베이스 상향
+
+`eclipse-temurin:21-jre-noble` 같은 태그의 새 index `cd35bb33…`(2026-10-27) — `libbrotli1` 1.1.0-2build2 →
+**1.1.0-2ubuntu0.1**(수정판), JDK 21.0.12.1 · ubuntu 24.04 · dpkg 패키지 136 **그대로**. 상향으로 닫히므로 등재하지
+않는다. 두 `FROM`·LABEL·위생 정책 `base.image.digest` 를 한 커밋에서 옮겼다(runbook §8.3.1, 배포판 문자열 무변경).
+
+## 검토 지적 처리
+
+- **M-1** 무제약 `curl` 토큰 삭제 — 하한 셋은 패키지당 제약형 한 번. 불가능한 하한은 어느 위치에서도 exit ≠ 0 재실측.
+- **M-2** web·proxy `forbidden.executables` 에 `go`·`gofmt`(golang 빌더 stage 경계) · 계수 문면 정정. 양성 대조
+  commands.md 「r1」(web 변이: 옛 정책 exit 0 → 새 정책 exit 1).
+- **M-3** runbook §8.3 셋째 갈래 · §8.3.1 의 2 에 `org.bidvector.caddy` 라벨.
+- **L-1** web ENTRYPOINT 주석(alpine `CMD` = `/bin/sh`) · **L-2** 위생 정책 크기·curl 출처 주석 · **L-3** compose
+  healthcheck 주석 · **L-4** ci.yml 네트워크 의존 넷째(Go 모듈)와 첫 CI 소요.
+- Open Question 둘 — ⓐ x/net 상향의 거동 축은 아래 알려진 제한 5. ⓑ CI 에서 caddy 컴파일은 **한 번**이다(첫 CI
+  로그: web 의 caddy-build 가 `CACHED`) — stage 공유 재설계 불필요.
 
 ## 하네스 레인 변경
 
