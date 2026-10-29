@@ -1,7 +1,9 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
 import bidvector.decision.ProvenancePolicyData
+import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.PriorityInputs
@@ -130,11 +132,21 @@ class OpportunityAnalysis internal constructor(
         val derivation = resolvedOrNull(derivationPolicyTable, referenceDate)
         val priority = resolvedOrNull(priorityPolicyTable, referenceDate)
         val provenance = resolvedOrNull(SAMPLE_PROVENANCE_POLICY, referenceDate)
+        val floorTrust = resolvedOrNull(PUBLISHED_FLOOR_TRUST_POLICY, referenceDate)
         // detekt ComplexCondition(≤3) — 네 slot 을 한 `&&` 사슬로 묶지 않고 중첩한다(스마트캐스트
         // 보존 — 중간 Boolean 변수로 쪼개면 opportunity 등이 다시 nullable 로 보인다).
         return if (opportunity != null && derivation != null && priority != null) {
-            if (provenance != null) {
-                ok(ResolvedPolicies(opportunity.value, opportunity.version, derivation, priority.value, provenance))
+            if (provenance != null && floorTrust != null) {
+                ok(
+                    ResolvedPolicies(
+                        opportunity.value,
+                        opportunity.version,
+                        derivation,
+                        priority.value,
+                        provenance,
+                        floorTrust,
+                    ),
+                )
             } else {
                 halt(MlUnavailableReason.ContractViolation)
             }
@@ -230,7 +242,14 @@ class OpportunityAnalysis internal constructor(
                 workload = workload.current().toScoreFact(),
                 complexity = ScoreFact.Present(complexityOutcome.score),
             )
-        return ok(finalOutcomeOf(composePriority(priorityInputs, policies.priority), matchScore, components.evidence))
+        return ok(
+            finalOutcomeOf(
+                composePriority(priorityInputs, policies.priority),
+                matchScore,
+                components.evidence,
+                components.floorExclusion,
+            ),
+        )
     }
 
     /** scope.md ⑥ — `notice.baseAmount`가 없으면 예측 자체를 생략한다(D-4B6B-4). */
@@ -330,6 +349,8 @@ internal data class ResolvedPolicies(
     val derivation: Resolution.Resolved<DerivationPolicyData>,
     val priority: PriorityPolicyData,
     val provenancePolicy: Resolution.Resolved<ProvenancePolicyData>,
+    /** DEC-10 — 게시 하한율 신뢰 밴드. 다른 정책 slot 과 같은 자리에서 한 번 해소한다. */
+    val floorTrust: Resolution.Resolved<PublishedFloorTrustPolicyData>,
 )
 
 private fun <T> resolvedOrNull(

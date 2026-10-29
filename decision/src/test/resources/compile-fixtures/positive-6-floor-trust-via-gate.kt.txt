@@ -1,0 +1,19 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.PublishedFloorTrust
+import bidvector.decision.PublishedFloorTrustPolicyData
+import bidvector.decision.trustPublishedFloorRate
+import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.Resolution
+
+fun gatedRate(
+    raw: FloorRate?,
+    policy: Resolution.Resolved<PublishedFloorTrustPolicyData>,
+): Rate? =
+    when (val trust = trustPublishedFloorRate(raw, policy)) {
+        is PublishedFloorTrust.Trusted -> trust.rate.rate
+        PublishedFloorTrust.Absent -> null
+        is PublishedFloorTrust.Implausible -> null
+        is PublishedFloorTrust.OriginNotJudged -> null
+    }

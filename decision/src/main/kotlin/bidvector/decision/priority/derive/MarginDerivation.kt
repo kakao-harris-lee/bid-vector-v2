@@ -49,10 +49,19 @@ fun deriveExpectedMargin(
 }
 
 /**
- * floor 가 없거나 0 이면 `recommended`(legacy `if floor_bid_rate > 0` 의 else 분기) —
- * floor = 1 이면 분모(`1 - floor`)가 0 이라 같은 값으로 되돌린다(설계 검토 우회 (6)).
- * `[MarginInputs]` 의 `init`이 `floor ≤ 1` 을 이미 보장하므로 이 분기
- * 밖(`else`)에 오는 값은 항상 `0 < floor < 1` 이다.
+ * floor 가 없으면 `recommended`(legacy `if floor_bid_rate > 0` 의 else 분기) — floor = 1 이면
+ * 분모(`1 - floor`)가 0 이라 같은 값으로 되돌린다(설계 검토 우회 (6)).
+ *
+ * **`floor = 0` 에 특례가 없는 것은 일반식이 같은 값을 내기 때문이다**(D-DEC10-24):
+ * `(rec − 0) ÷ (1 − 0) = rec`. 앞 판은 그 자리에 `floor.signum() == 0` 분기를 두었다 — 분기를
+ * 지운 것이 거동을 바꾸지 않는다는 등식은 `ExpectedMarginDerivationTest` 의 「일반식 등식」
+ * test 가 **계속** 잰다(한 번의 측정이 아니라 살아 있는 술어다). 분모에 엡실론을 넣거나
+ * clamp 를 바꾸면 그 test 가 깨진다.
+ *
+ * **`floor = 1` 분기는 남긴다 — 이 자리는 「타입으로 도달 불가」가 아니다.**
+ * `MarginInputs.init` 이 `floor ≤ 1` 까지만 좁히므로 모듈 안에서는 `floor = 1` 을 지을 수 있고,
+ * 그때 이 분기가 없으면 분모 0 으로 산술 예외가 난다(business control flow 에 예외를 쓰지
+ * 않는다는 규율을 깬다). production 경로에서는 게이트 상한 `0.995` 가 먼저 거부한다.
  *
  * **legacy 와 값이 사실상 같다는 주장은 부정확하다** — legacy 는
  * `floor = 1` 에서 분모를 `max(1e-6, 1-floor)` 로 두어 `(rec-1)/1e-6` → 큰 음수 →
@@ -67,7 +76,7 @@ private fun floorHeadroomOf(
     floor: BigDecimal?,
 ): BigDecimal =
     when {
-        floor == null || floor.signum() == 0 || floor.compareTo(BigDecimal.ONE) == 0 -> recommended
+        floor == null || floor.compareTo(BigDecimal.ONE) == 0 -> recommended
         else -> clamp01((recommended - floor).divide(BigDecimal.ONE - floor, DERIVE_DIVISION_CONTEXT))
     }
 

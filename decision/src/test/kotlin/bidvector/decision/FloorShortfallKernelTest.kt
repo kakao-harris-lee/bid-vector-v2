@@ -32,6 +32,23 @@ private val TIGHT_INDETERMINATE_BAND = AssessmentBand(BigDecimal("0.999"), BigDe
 private fun rate(value: String): AssessmentRate = AssessmentRate.observed(Rate.ofFraction(BigDecimal(value)))
 
 /**
+ * DEC-10 — `criticalAssessmentRateFor` 는 **게이트 통과 값만** 받는다. 그래서 이 test 도
+ * 게이트를 거쳐 값을 얻는다(통과하지 못하는 값은 여기서 터진다). 앞 판의 세 test 는 하한율
+ * `3`(300%)으로 비종결 몫을 만들었는데 그 값은 개연 밴드 밖이라 이제 통과 값이 될 수 없다 —
+ * 밴드 **안**의 하한율(`0.3`·`0.9`)로 같은 성질(자리수·모드가 실제로 소비된다)을 잰다.
+ */
+private fun plausibleFloor(value: String): PlausibleFloorRate {
+    val band = PlausibilityBand(BigDecimal("0.30"), BigDecimal("0.995"))
+    val trust =
+        trustPublishedFloorRate(
+            FloorRate(Rate.ofFraction(BigDecimal(value)), FloorRateOrigin.NoticeValue(NoticeRound.of("000"))),
+            Resolution.Resolved(PublishedFloorTrustPolicyData(band), TEST_VERSION),
+        )
+    check(trust is PublishedFloorTrust.Trusted) { "밴드 안 하한율이어야 한다: $value" }
+    return trust.rate
+}
+
+/**
  * `measureFloorShortfall`은 `Derived<AssessmentRate>`를 요구한다 —
  * `decision`은 `Derived`를 새로 만들 수 없으므로(shared-kernel `internal` 생성자) 실제
  * 파생 경로(`criticalAssessmentRate`)를 불러 정당한 값을 얻는다. `floor = 1`로 두면
@@ -211,7 +228,7 @@ class FloorShortfallKernelTest {
     @Test
     fun `criticalAssessmentRateFor 는 criticalRateRounding 자리수를 실제로 소비한다 — F-3`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+        val floor = plausibleFloor("0.3")
 
         val basePolicyData = policyOf(minAssessmentSamples = 150).value
         val coarsePolicy = policyOf(minAssessmentSamples = 150)
@@ -223,15 +240,15 @@ class FloorShortfallKernelTest {
         val fineMeasurement = criticalAssessmentRateFor(bid, floor, finePolicy)
         val fine = fineMeasurement as Measurement.Measured<Derived<AssessmentRate>>
 
-        // 자리수가 6(기본값)일 때와 2일 때 서로 다른 정밀도로 나온다.
-        coarse.value.value.rate.fraction shouldBe BigDecimal("0.333333")
-        fine.value.value.rate.fraction shouldBe BigDecimal("0.33")
+        // 자리수가 6(기본값)일 때와 2일 때 서로 다른 정밀도로 나온다(1÷0.3 = 3.333...).
+        coarse.value.value.rate.fraction shouldBe BigDecimal("3.333333")
+        fine.value.value.rate.fraction shouldBe BigDecimal("3.33")
     }
 
     @Test
     fun `criticalAssessmentRateFor 는 criticalRateRounding 모드를 실제로 소비한다 — N-1`() {
-        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("2")))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("0.6")))
+        val floor = plausibleFloor("0.9")
 
         val basePolicyData = policyOf(minAssessmentSamples = 150).value
         val halfUpRounding = RoundingPolicy(1, RoundingMode.HALF_UP)
@@ -241,7 +258,7 @@ class FloorShortfallKernelTest {
         val downPolicyData = basePolicyData.copy(criticalRateRounding = downRounding)
         val down = criticalAssessmentRateFor(bid, floor, Resolution.Resolved(downPolicyData, TEST_VERSION))
 
-        // 비종결 몫(2÷3=0.6666...)에서 HALF_UP 과 DOWN 이 자리수 1에서 다른 값을 낸다.
+        // 비종결 몫(0.6÷0.9=0.6666...)에서 HALF_UP 과 DOWN 이 자리수 1에서 다른 값을 낸다.
         halfUp.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
         down.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
         halfUp.value.value.rate.fraction shouldBe BigDecimal("0.7")
@@ -251,7 +268,7 @@ class FloorShortfallKernelTest {
     @Test
     fun `criticalAssessmentRateFor 가 만드는 DerivationRecord 의 policyVersion 은 policy version 과 같다 — N-3`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+        val floor = plausibleFloor("0.3")
         val policy = policyOf(minAssessmentSamples = 150)
 
         val measurement = criticalAssessmentRateFor(bid, floor, policy)

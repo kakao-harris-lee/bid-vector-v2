@@ -32,7 +32,7 @@ _BASE_AMOUNT = 1_000_000_000
 _FLOOR_RATE = 0.87745
 
 SHIPPED_BACKTEST_POLICY_PATH = (
-    Path(__file__).resolve().parents[2] / "policy" / "strategy-backtest-v1.yaml"
+    Path(__file__).resolve().parents[2] / "policy" / "strategy-backtest-v2.yaml"
 )
 
 

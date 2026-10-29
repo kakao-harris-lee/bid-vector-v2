@@ -1,6 +1,9 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
 import bidvector.decision.UnitScore
+import bidvector.decision.priority.PRIORITY_POLICY
+import bidvector.decision.priority.derive.DERIVATION_POLICY
 import bidvector.decision.priority.derive.DerivationAbsence
 import bidvector.decision.priority.derive.DerivationOutcome
 import bidvector.procurement.Agency
@@ -15,11 +18,14 @@ import bidvector.procurement.ResolvedEstimatedAmount
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.NoticeRound
+import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.CategoryCode
 import bidvector.workflow.embedding.EmbedTextPort
@@ -217,6 +223,23 @@ internal fun testProfile(
     licenses: OperatorLicenses = OperatorLicenses.NotDeclared,
     regionTerms: List<String> = listOf("서울"),
 ): ProfileFacts = ProfileFacts(businessTypes, licenses, regionTerms)
+
+/**
+ * 성분 함수를 직접 부르는 test 가 공유하는 해소된 정책 묶음 — 두 자리에 베껴 두면 새 slot 이
+ * 생길 때 한쪽만 바뀐다(DEC-10 이 `floorTrust` 를 더하면서 그 자리가 둘이 됐다).
+ */
+internal fun testResolvedPolicies(): ResolvedPolicies {
+    val version = PolicyVersion(EffectiveFrom.Initial, "test")
+    return ResolvedPolicies(
+        opportunity = OPPORTUNITY_POLICY.entries.single().second,
+        opportunityVersion = version,
+        derivation = Resolution.Resolved(DERIVATION_POLICY.entries.single().second, version),
+        priority = PRIORITY_POLICY.entries.single().second,
+        // (D-4B8-5) — 표본과 같은 SAMPLE_PROVENANCE_POLICY singleton.
+        provenancePolicy = Resolution.Resolved(SAMPLE_PROVENANCE_POLICY.entries.single().second, version),
+        floorTrust = Resolution.Resolved(PUBLISHED_FLOOR_TRUST_POLICY.entries.single().second, version),
+    )
+}
 
 /**
  * `testNotice`(4B-3)와 달리 금액·낙찰하한율을 실을 수 있는 공고 — 4B-6b가 예측·마진

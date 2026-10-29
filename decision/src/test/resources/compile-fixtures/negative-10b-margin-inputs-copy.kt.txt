@@ -1,0 +1,9 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.priority.derive.MarginInputs
+import bidvector.sharedkernel.Rate
+
+fun swapFloorRate(
+    inputs: MarginInputs,
+    laundered: Rate,
+): MarginInputs = inputs.copy(floorRate = laundered)

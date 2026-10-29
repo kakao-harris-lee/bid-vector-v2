@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.MatchOutcome
 import bidvector.decision.priority.PriorityOutcome
@@ -98,10 +99,16 @@ internal fun finalOutcomeOf(
     priorityOutcome: PriorityOutcome,
     matchScore: UnitScore,
     evidence: PredictionEvidence,
+    floorExclusion: PublishedFloorExclusion?,
 ): MlAnalysisOutcome =
     when (priorityOutcome) {
-        is PriorityOutcome.Unavailable -> MlAnalysisOutcome.Unavailable(priorityOutcome.reason)
-        is PriorityOutcome.Composed -> MlAnalysisOutcome.Analyzed(priorityOutcome.priority, null, matchScore, evidence)
+        is PriorityOutcome.Unavailable -> {
+            MlAnalysisOutcome.Unavailable(priorityOutcome.reason)
+        }
+
+        is PriorityOutcome.Composed -> {
+            MlAnalysisOutcome.Analyzed(priorityOutcome.priority, null, matchScore, evidence, floorExclusion)
+        }
     }
 
 internal fun <T> DerivationOutcome<T>.toScoreFact(): ScoreFact<T> =

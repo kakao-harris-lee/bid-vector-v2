@@ -34,14 +34,32 @@ class EmbeddingBridgeTest {
     }
 
     @Test
-    fun `DerivationAbsence 넷은 ScoreNotProvided, FloorRateOutOfRange 만 InvalidRequest`() {
+    fun `DerivationAbsence 다섯 전부 ScoreNotProvided — 하한율 사유는 DEC-10 게이트가 가져갔다`() {
         bridgeDerivationAbsence(DerivationAbsence.BaseAmountMissing) shouldBe MlUnavailableReason.ScoreNotProvided
         bridgeDerivationAbsence(DerivationAbsence.RecommendationMissing) shouldBe MlUnavailableReason.ScoreNotProvided
         bridgeDerivationAbsence(DerivationAbsence.WorkloadNotCollected) shouldBe MlUnavailableReason.ScoreNotProvided
         bridgeDerivationAbsence(DerivationAbsence.MarketAverageMissing) shouldBe MlUnavailableReason.ScoreNotProvided
         bridgeDerivationAbsence(DerivationAbsence.MoneyArithmeticUnmeasurable(ReasonCode.AMOUNT_OVERFLOW)) shouldBe
             MlUnavailableReason.ScoreNotProvided
-        bridgeDerivationAbsence(DerivationAbsence.FloorRateOutOfRange) shouldBe MlUnavailableReason.InvalidRequest
+    }
+
+    /**
+     * D-DEC10-9 — `FloorRateOutOfRange` 는 어휘에서 사라졌다. 그 사유의 선언된 목적은
+     * `MarginInputs.init` 의 `require` 를 피하는 것이었고, 지금은 DEC-10 게이트가 가격 경로
+     * 앞에서 판정하며 제외를 **계수 어휘**(`PublishedFloorExclusion`)로 낸다.
+     *
+     * 리플렉션으로 하위 타입을 세지 않는다(그 API 는 이 모듈 classpath 에 없다). 두 축이 함께
+     * 센다 — [allDerivationAbsences] 의 **소진 `when`** 은 항이 생기면 컴파일을 멈추고, 아래
+     * **크기 단언**은 그 `when` 가지만 더하고 목록에 넣지 않는 변경을 잡는다.
+     */
+    @Test
+    fun `DerivationAbsence 어휘 전수가 ScoreNotProvided 다 — 새 항은 컴파일을 멈춘다`() {
+        val reasons = allDerivationAbsences()
+
+        // r1 CR L-3 — `when` 가지만 더하고 목록에 안 넣는 변경을 이 수가 잡는다(앞 판 KDoc 이
+        // 「숫자를 세는 단언」을 가리켰는데 그 단언이 없었다).
+        reasons.size shouldBe 5
+        reasons.forEach { reason -> bridgeDerivationAbsence(reason) shouldBe MlUnavailableReason.ScoreNotProvided }
     }
 
     @Test
@@ -67,4 +85,30 @@ class EmbeddingBridgeTest {
         (abs(norm - 1.0) <= 0.0001) shouldBe true
         unitVector.values.size shouldBe 2
     }
+}
+
+/**
+ * `DerivationAbsence` 전수. `when` 이 소진이라 **항이 추가되면 이 함수가 컴파일되지 않는다** —
+ * 그것이 이 목록의 요점이고, 숫자를 세는 단언은 그 뒤의 부수적인 확인이다.
+ */
+private fun allDerivationAbsences(): List<DerivationAbsence> {
+    val reasons =
+        listOf(
+            DerivationAbsence.BaseAmountMissing,
+            DerivationAbsence.RecommendationMissing,
+            DerivationAbsence.WorkloadNotCollected,
+            DerivationAbsence.MarketAverageMissing,
+            DerivationAbsence.MoneyArithmeticUnmeasurable(ReasonCode.AMOUNT_OVERFLOW),
+        )
+    reasons.forEach { reason ->
+        when (reason) {
+            DerivationAbsence.BaseAmountMissing,
+            DerivationAbsence.RecommendationMissing,
+            DerivationAbsence.WorkloadNotCollected,
+            DerivationAbsence.MarketAverageMissing,
+            is DerivationAbsence.MoneyArithmeticUnmeasurable,
+            -> Unit
+        }
+    }
+    return reasons
 }

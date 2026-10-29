@@ -2,6 +2,7 @@ package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.ProvenanceRuleId
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.ScoreFact
@@ -42,17 +43,8 @@ import java.time.Instant
 class PredictionFactsTest {
     private val testCapacity = UnitScore(BigDecimal("0.5"))
 
-    private val testPolicies: ResolvedPolicies by lazy {
-        val version = PolicyVersion(EffectiveFrom.Initial, "test")
-        ResolvedPolicies(
-            opportunity = OPPORTUNITY_POLICY.entries.single().second,
-            opportunityVersion = version,
-            derivation = Resolution.Resolved(DERIVATION_POLICY.entries.single().second, version),
-            priority = PRIORITY_POLICY.entries.single().second,
-            // (D-4B8-5) — 표본과 같은 SAMPLE_PROVENANCE_POLICY singleton.
-            provenancePolicy = Resolution.Resolved(SAMPLE_PROVENANCE_POLICY.entries.single().second, version),
-        )
-    }
+    // 해소된 정책 묶음은 `OpportunityAnalysisFixtures` 가 소유한다(두 자리에 베껴 두지 않는다).
+    private val testPolicies: ResolvedPolicies by lazy { testResolvedPolicies() }
 
     @Test
     fun `candidates base 1 0 은 통과하고 1 0000001 은 두 성분 Absent(ContractViolation) 이며 예외가 없다`() {
@@ -87,30 +79,28 @@ class PredictionFactsTest {
         over.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ContractViolation)
     }
 
+    /**
+     * **하한율 축의 관문은 더 이상 `MarginInputs.init` 이 아니다**(DEC-10) — 신뢰 게이트가 앞에
+     * 선다. 그래도 `fraction > 1` 의 **처분은 그대로**다(D-DEC10-12): margin 성분이 떨어지고
+     * (`Absent(InvalidRequest)`, 사용자 승인 거동 D-4B6-4) 예외는 없다. 바뀐 것은 그 제외가
+     * 이제 **계수된다**는 것뿐이다. 접기 가지(`1.00000` 등)의 거동은
+     * `PredictionFactsFloorTrustTest` 가 잰다.
+     */
     @Test
-    fun `floorRate 1 0 은 margin 통과, 1 0000001 은 margin 만 Absent(InvalidRequest) — budgetCapture 는 무관`() {
-        val floorAtBoundary =
-            FloorRate(Rate.ofFraction(BigDecimal("1.0")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+    fun `하한율이 1 을 넘으면 예외 없이 margin 만 떨어지고 그 제외가 계수된다`() {
         val floorOverBoundary =
             FloorRate(Rate.ofFraction(BigDecimal("1.0000001")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
-        val noticeAtBoundary = testNoticeWithMoney(floorRate = floorAtBoundary)
-        val noticeOverBoundary = testNoticeWithMoney(floorRate = floorOverBoundary)
-        val baseAmount = requireNotNull(noticeAtBoundary.baseAmount).amount
-        val validPrediction = predicted()
+        val notice = testNoticeWithMoney(floorRate = floorOverBoundary)
+        val baseAmount = requireNotNull(notice.baseAmount).amount
 
-        val at =
+        val facts =
             shouldNotThrowAny {
-                predictedFacts(validPrediction, baseAmount, noticeAtBoundary, testPolicies, testCapacity, emptyMap())
+                predictedFacts(predicted(), baseAmount, notice, testPolicies, testCapacity, emptyMap())
             }
-        at.budgetCapture.shouldBePresent()
-        at.expectedMargin.shouldBePresent()
 
-        val over =
-            shouldNotThrowAny {
-                predictedFacts(validPrediction, baseAmount, noticeOverBoundary, testPolicies, testCapacity, emptyMap())
-            }
-        over.budgetCapture.shouldBePresent()
-        over.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
+        facts.budgetCapture.shouldBePresent()
+        facts.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
+        facts.floorExclusion shouldBe PublishedFloorExclusion.IMPLAUSIBLE
     }
 
     // ---- (scope.md D-4D3-3, 위협 모델 우회 (8)) — 진단은 사다리 점수를 바꾸지

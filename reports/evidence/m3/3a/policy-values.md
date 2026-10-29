@@ -122,7 +122,7 @@
 
 | rawName | concept | scale(원문) | canonical | expectedRange | nullability | presentIn(문서) | 층 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `sucsfbidLwltRate` | 낙찰하한율 | **percent** | fraction (제수 `100`) | §1.4.3 **B6**(게시 하한율 신뢰 밴드) 참조 — 값은 `legacy-behavior`, `OPEN-DEC-10` 소유 | nullable(옵션) | 공고목록 4종 + PPSSrch 4종 | scale `authoritative` · 밴드 `legacy-behavior` |
+| `sucsfbidLwltRate` | 낙찰하한율 | **percent** | fraction (제수 `100`) | §1.4.3 **B6**(게시 하한율 신뢰 밴드) 참조 — 값은 `legacy-behavior`. **소유 이전(2026-10-28, M6/G1-DEC10 D-DEC10-1)**: 밴드 값 `[0.30, 0.995]` 은 이제 `bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY` 가 소유하고 `OPEN-DEC-10` 은 DEC-03 법정 하한율 표 값 쪽에만 남는다. 이 행의 scale 판정은 그대로다 | nullable(옵션) | 공고목록 4종 + PPSSrch 4종 | scale `authoritative` · 밴드 `legacy-behavior` |
 | `rsrvtnPrceRngBgnRate` | 예비가격범위시작률 | **percent** | fraction (제수 `100`) | 미확정 | nullable(옵션) | 기초금액조회 3종 | scale `authoritative` |
 | `rsrvtnPrceRngEndRate` | 예비가격범위종료율 | **percent** | fraction (제수 `100`) | 미확정 | nullable(옵션) | 기초금액조회 3종 | scale `authoritative` |
 | `sucsfbidRate` | **최종낙찰률**(문서 국문 항목명) — *"최종낙찰금액/예정가격 × 100"* | **percent** | fraction (제수 `100`) | legacy 계약이 `0.5`~`1.0` 을 자체 선언 — **밴드 재선언이라 채택하지 않는다** | nullable(옵션) | 낙찰 목록 4종 + `…PPSSrch` 4종 — **§1.7.2 가 정본** | scale `authoritative`(낙찰정보서비스, 2026-09-08) · 밴드 **미확정** |

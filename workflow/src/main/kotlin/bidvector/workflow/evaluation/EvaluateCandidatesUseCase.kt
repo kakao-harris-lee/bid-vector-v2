@@ -2,6 +2,7 @@ package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
@@ -140,6 +141,8 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.AnalysisBudget,
                 EvaluationDropReason.AnalysisBudgetExhausted,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         } else {
             null
@@ -156,7 +159,7 @@ class EvaluateCandidatesUseCase internal constructor(
     ): CandidateEvaluation.NotReached? =
         when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
             is CandidateScreening.Passed -> null
-            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason)
+            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason, null)
         }
 
     private fun thresholdConfigurationDrop(
@@ -172,6 +175,8 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ThresholdConfiguration,
                 EvaluationDropReason.ActionThresholdsNotConfigured,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         }
 
@@ -205,6 +210,8 @@ class EvaluateCandidatesUseCase internal constructor(
                     correlationId,
                     EvaluationStage.MlAvailability,
                     EvaluationDropReason.SimilarityProjectionNotReady,
+                    // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                    null,
                 )
             }
 
@@ -217,28 +224,56 @@ class EvaluateCandidatesUseCase internal constructor(
                     ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
                     PredictionEvidence.NotPredicted(outcome.reason),
                     strategy.revision,
+                    floorExclusion = null,
                 )
             }
 
             is MlAnalysisOutcome.Analyzed -> {
-                scoreThresholdDrop(strategy, outcome, notice, correlationId)
-                    ?: reach(
-                        notice,
-                        correlationId,
-                        bidNowThreshold,
-                        reviewThreshold,
-                        ladderInputFor(
-                            capacitySnapshot,
-                            priorityScore = outcome.priorityScore,
-                            probabilityScore = outcome.probabilityScore,
-                            matchedScore = outcome.matchedScore,
-                        ),
-                        outcome.evidence,
-                        strategy.revision,
-                    )
+                judgeAnalyzed(
+                    notice,
+                    strategy,
+                    capacitySnapshot,
+                    correlationId,
+                    outcome,
+                    bidNowThreshold,
+                    reviewThreshold,
+                )
             }
         }
     }
+
+    /**
+     * 점수가 있는 가지 — 최소치 드롭이 먼저이고, 통과하면 사다리가 판정한다. 임계 둘은
+     * **호출부가 이미 세운 값을 받는다**(r1 CR L-1 — `requireNotNull` 을 여기서 다시 짓지
+     * 않는다; 같은 불변식의 사본을 늘리면 `analyzeAndJudge` KDoc 의 문면과 어긋난다). `?:` 의 우변은
+     * 좌변이 `null` 일 때만 평가되므로 드롭될 후보에서 `LadderInput` 조립이 아예 돌지 않는다
+     * (그 시점 보존이 이 구조의 요점이다 — `CapacitySnapshot` 은 자체 불변식이 없다).
+     */
+    private fun judgeAnalyzed(
+        notice: Notice,
+        strategy: OperatorStrategy,
+        capacitySnapshot: CapacitySnapshot,
+        correlationId: CorrelationId,
+        outcome: MlAnalysisOutcome.Analyzed,
+        bidNowThreshold: PriorityScore,
+        reviewThreshold: PriorityScore,
+    ): CandidateEvaluation =
+        scoreThresholdDrop(strategy, outcome, notice, correlationId)
+            ?: reach(
+                notice,
+                correlationId,
+                bidNowThreshold,
+                reviewThreshold,
+                ladderInputFor(
+                    capacitySnapshot,
+                    priorityScore = outcome.priorityScore,
+                    probabilityScore = outcome.probabilityScore,
+                    matchedScore = outcome.matchedScore,
+                ),
+                outcome.evidence,
+                strategy.revision,
+                outcome.floorExclusion,
+            )
 
     /**
      * [analyzeAndJudge]의 두 가지(`Analyzed`·`Unavailable`)가 공유하는 `LadderInput`
@@ -277,6 +312,7 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ScoreThreshold,
                 EvaluationDropReason.BelowMinimumMatchScore(minimumMatch, actualMatch),
+                analysis.floorExclusion,
             )
         }
         val minimumProbability =
@@ -290,6 +326,7 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ScoreThreshold,
                 EvaluationDropReason.BelowMinimumProbabilityScore(minimumProbability, actualProbability),
+                analysis.floorExclusion,
             )
         } else {
             null
@@ -313,6 +350,7 @@ class EvaluateCandidatesUseCase internal constructor(
         ladderInput: LadderInput,
         evidence: PredictionEvidence,
         strategyRevision: StrategyRevision,
+        floorExclusion: PublishedFloorExclusion?,
     ): CandidateEvaluation.Reached {
         val ladderPolicy =
             Resolution.Resolved(
@@ -331,6 +369,7 @@ class EvaluateCandidatesUseCase internal constructor(
             correlationId,
             verdict,
             notifications.requestFor(notice, correlationId, verdict, evidence, ladderPolicy.version, strategyRevision),
+            floorExclusion,
         )
     }
 }
@@ -371,9 +410,17 @@ private fun NotificationRequestPort.requestFor(
     return NotificationDisposition.Requested(requested)
 }
 
+/**
+ * `floorExclusion` 은 **필수 인자다 — 기본값이 없다**(r2 CR M-3). D-DEC10-8 이 형제 자리
+ * (`MlAnalysisOutcome.Analyzed`)에 정한 것과 같은 규율이고, 이유도 같다: 칸을 비워 두는 길이
+ * 있으면 **분석 뒤** 드롭 가지가 하나 더 생길 때 컴파일이 아무 말 없이 계수를 버린다. 분석 전
+ * 가지(화면·공고 선별·ML 미가용)는 그 축을 계산하지 않았으므로 `null` 을 **명시**한다.
+ */
 private fun notReached(
     notice: Notice,
     correlationId: CorrelationId,
     stage: EvaluationStage,
     reason: EvaluationDropReason,
-): CandidateEvaluation.NotReached = CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason)
+    floorExclusion: PublishedFloorExclusion?,
+): CandidateEvaluation.NotReached =
+    CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason, floorExclusion)

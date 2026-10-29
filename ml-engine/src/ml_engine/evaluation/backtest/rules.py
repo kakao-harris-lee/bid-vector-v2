@@ -222,10 +222,22 @@ def _is_a_value_unusable(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> b
     return resolve_a_value(row.notice) is None
 
 
-def _is_pure_cost_absent(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
-    return (
-        row.notice.category is BusinessCategory.CONSTRUCTION
-        and row.notice.pure_construction_cost is None
+def _is_pure_cost_absent(row: SnapshotRow, policy: StrategyBacktestPolicy) -> bool:
+    """원가 결측은 **그 규칙이 실제로 적용되는 공사에서만** 제외 사유다(계획 P2).
+
+    앞 판은 예정가격과 무관하게 공사의 원가 결측을 뺐다 — 100억원 이상 공사는 그 선이
+    애초에 서지 않으므로 원가가 없어도 판정에 모자란 것이 없는데 통째로 빠졌다.
+
+    예정가격은 `PLANNED_PRICE_ABSENT` 가 **먼저** 걸러서 여기서는 있는 값이다
+    (규칙 표의 순서가 그것을 보증한다) — 없는 경우에는 이 사유로 세지 않는다."""
+    planned_price = row.outcome.planned_price
+    if planned_price is None:
+        return False
+    return row.notice.pure_construction_cost is None and (
+        policy.floor.pure_cost_rule_applies(
+            is_construction=row.notice.category is BusinessCategory.CONSTRUCTION,
+            planned_price=planned_price,
+        )
     )
 
 
@@ -293,9 +305,16 @@ def pure_cost_floor(
     opening_base_amount: float,
     planned_price: float,
 ) -> float | None:
-    """환산 분모는 **개찰결과 출처** 기초금액이다 — 순공사원가가 그 축의 값이다."""
+    """환산 분모는 **개찰결과 출처** 기초금액이다 — 순공사원가가 그 축의 값이다.
+
+    적용 범위 밖(공사가 아니거나 예정가격이 상한 이상)이면 `None` 이고, 그러면 하류가
+    하한가 하나만 보는 기존 경로를 쓴다 — 적용 판정은 정책 객체의 공통 술어가 진다
+    (계획 P2). 원가 환산식과 그 근사 한계는 그대로다(바꾼 것은 적용 여부뿐이다)."""
     cost = row.notice.pure_construction_cost
-    if row.notice.category is not BusinessCategory.CONSTRUCTION or cost is None:
+    if cost is None or not policy.floor.pure_cost_rule_applies(
+        is_construction=row.notice.category is BusinessCategory.CONSTRUCTION,
+        planned_price=planned_price,
+    ):
         return None
     return pure_construction_floor(
         pure_construction_cost=cost,

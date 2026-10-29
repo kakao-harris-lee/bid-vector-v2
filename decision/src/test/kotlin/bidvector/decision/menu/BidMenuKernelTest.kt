@@ -75,7 +75,8 @@ class BidMenuKernelTest {
         val outcome = composeBidMenu(testInput(), testMenuPolicy(reading = atOrAbove()))
 
         val offered = outcome.shouldBeInstanceOf<BidMenuOutcome.Offered>()
-        offered.safe.grounds.publishedFloorRate shouldBe testFloorRate("0.88")
+        // DEC-10 — 근거 칸은 게이트 통과 값이다(원값과 다른 타입). 값 자체는 그대로다.
+        offered.safe.grounds.publishedFloorRate shouldBe testPlausibleFloorRate("0.88")
         offered.safe.grounds.baseProvenance shouldBe testBase().provenance
         offered.safe.grounds.policyVersion shouldBe MENU_TEST_VERSION
     }

@@ -1,12 +1,16 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
+import bidvector.decision.PublishedFloorTrust
 import bidvector.decision.UnitScore
+import bidvector.decision.exclusion
 import bidvector.decision.priority.ScoreFact
 import bidvector.decision.priority.derive.DerivationAbsence
-import bidvector.decision.priority.derive.MarginInputs
 import bidvector.decision.priority.derive.deriveBudgetCapture
 import bidvector.decision.priority.derive.deriveExpectedMargin
+import bidvector.decision.priority.derive.marginInputsFrom
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.procurement.Notice
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.sharedkernel.BaseAmount
@@ -73,6 +77,12 @@ internal data class PredictionComponents(
     val budgetCapture: ScoreFact<UnitScore>,
     val expectedMargin: ScoreFact<UnitScore>,
     val evidence: PredictionEvidence,
+    /**
+     * DEC-10 계수(D-DEC10-5·D-DEC10-8) — 게시 하한율이 **제외됐다는 사실**이다. 점수는
+     * 「하한 미보고」와 같은 값으로 접히므로 [expectedMargin] 만 보면 제외가 보이지 않는다;
+     * 그 칸이 침묵 스킵을 막는다. 제외가 없으면 `null` 이고 부재는 제외가 아니다.
+     */
+    val floorExclusion: PublishedFloorExclusion?,
 )
 
 /**
@@ -100,10 +110,9 @@ internal fun predictedFacts(
     }
     val priceFitness = UnitScore(predicted.fitness.score)
     val budgetCapture = budgetCaptureFact(baseAmount, predicted.candidates.base, policies)
-    val expectedMargin =
-        expectedMarginFact(notice, predicted.candidates.base, priceFitness, capacityScore, policies)
+    val margin = expectedMarginFact(notice, predicted.candidates.base, priceFitness, capacityScore, policies)
     val evidence = PredictionEvidence.Diagnosed(predicted.diagnostics, predicted.release, excludedSamples)
-    return PredictionComponents(budgetCapture, expectedMargin, evidence)
+    return PredictionComponents(budgetCapture, margin.score, evidence, margin.floorExclusion)
 }
 
 /** fitness 범위 위반 또는 `candidates.base > 1`(`MarginInputs.init`의 두 술어) — 둘 다 같은 취급. */
@@ -134,31 +143,82 @@ private fun budgetCaptureFact(
     }
 }
 
+/**
+ * 기대 마진 성분과 **그 하한율이 제외됐는가**(r1 CR L-4 — 이름 있는 결과 타입, 위치 기반 쌍이
+ * 아니다). 두 칸이 **함께** 나오는 것이 요점이다: 접힌 점수만 보면 제외가 보이지 않는다.
+ */
+private data class MarginFact(
+    val score: ScoreFact<UnitScore>,
+    val floorExclusion: PublishedFloorExclusion?,
+)
+
+/**
+ * DEC-10 ③ — 게시 하한율이 **신뢰 게이트를 거쳐** 점수에 들어간다(D-DEC10-3).
+ *
+ * 통과하지 못한 값의 처분은 **둘로 갈린다**(D-DEC10-12, 2026-10-28 팀장 결정 — r1 v M-1):
+ * - `fraction > 1` — margin **성분을 떨어뜨린다**(`Absent`). 사용자 승인 거동 D-4B6-4 이고
+ *   이 slice 가 되돌리지 않는다. 그 값은 [MarginInputs] 의 불변식(`≤ 1`)으로 애초에 입력이
+ *   될 수 없다 — 「접는다」가 성립하지 않는 범위다. **사유 있는 두 실패 가지 공통**이다
+ *   (r2 CR M-2): base 의 필터가 origin 무관이었으므로 법정표 출처의 `> 1` 도 같은 처분이다.
+ *   오늘 `StatutoryTable` 생성 자리가 0 이라 도달 불가지만, DEC-03 해석기가 생기는 날 조용히
+ *   갈리지 않도록 술어를 가지 밖으로 올렸다.
+ * - 그 밖의 개연 불가·심판 아님 — 「하한 미보고」와 **같은 값**(`floorRate = null`)으로 접힌다
+ *   (DEC-10 acceptance 첫째). `1.00000`(R-FLOOR-03 라이브 47건)이 이 가지이고, 값·점수가
+ *   앞 판과 같고 **계수만 생긴다**.
+ *
+ * **두 가지 모두 사유가 남는다**(acceptance 셋째) — 드롭이든 접기든 [MarginFact.floorExclusion]
+ * 이 실린다. 그것이 「제외는 계수된다」와 D-4B6-4 를 동시에 세우는 자리다.
+ *
+ * 값을 고쳐 접어 올리지 않는다 — 접는 것은 **쓰지 않는다**는 뜻이고, 밴드 끝으로 clamp 하면
+ * 지어낸 하한이 점수에 들어간다.
+ */
 private fun expectedMarginFact(
     notice: Notice,
     predictedRate: Rate,
     priceFitness: UnitScore,
     capacityScore: UnitScore,
     policies: ResolvedPolicies,
-): ScoreFact<UnitScore> {
-    val floorRate = notice.floorRate?.rate
-    if (floorRate != null && floorRate.fraction > BigDecimal.ONE) {
-        return ScoreFact.Absent(bridgeDerivationAbsence(DerivationAbsence.FloorRateOutOfRange))
+): MarginFact {
+    val trust = trustPublishedFloorRate(notice.floorRate, policies.floorTrust)
+    val exclusion = trust.exclusion()
+    val excludedRate =
+        when (trust) {
+            is PublishedFloorTrust.Trusted -> null
+            PublishedFloorTrust.Absent -> null
+            is PublishedFloorTrust.Implausible -> trust.rate.rate
+            is PublishedFloorTrust.OriginNotJudged -> trust.rate.rate
+        }
+    if (excludedRate != null && exceedsMarginInputBound(excludedRate)) {
+        return MarginFact(ScoreFact.Absent(MlUnavailableReason.InvalidRequest), exclusion)
     }
+    // D-DEC10-22 — 통과 값을 **그대로** 넘긴다. 이 자리에서 율을 꺼내지 않는 것이 요점이다:
+    // 꺼내면 그 숫자가 다시 날 `Rate` 가 되어 세탁 경로가 열린다.
     val marginInputs =
-        MarginInputs(
+        marginInputsFrom(
             recommendedRate = predictedRate,
-            floorRate = floorRate,
+            floorRate = (trust as? PublishedFloorTrust.Trusted)?.rate,
             predictedRate = predictedRate,
             priceFitness = priceFitness,
             capacity = capacityScore,
         )
-    return ScoreFact.Present(deriveExpectedMargin(marginInputs, policies.derivation))
+    return MarginFact(ScoreFact.Present(deriveExpectedMargin(marginInputs, policies.derivation)), exclusion)
 }
+
+/**
+ * [MarginInputs] 의 `floorRate ≤ 1` 불변식을 **그대로 되읽는** 술어다(D-DEC10-12). 정책 값이
+ * 아니라 그 타입이 든 경계라 여기서 숫자를 정하지 않는다 — 그 `init` 이 바뀌면 이 자리도 함께
+ * 틀리고, 그 사실은 `MarginInputs` KDoc 이 적는다.
+ */
+private fun exceedsMarginInputBound(rate: Rate): Boolean = rate.fraction > BigDecimal.ONE
 
 /** (D-4D4-1) — 예측을 시도하지 않았거나 실패로 끝난 경우는 전부 `NotPredicted`다. */
 internal fun absentPair(reason: MlUnavailableReason): PredictionComponents =
-    PredictionComponents(ScoreFact.Absent(reason), ScoreFact.Absent(reason), PredictionEvidence.NotPredicted(reason))
+    PredictionComponents(
+        ScoreFact.Absent(reason),
+        ScoreFact.Absent(reason),
+        PredictionEvidence.NotPredicted(reason),
+        floorExclusion = null,
+    )
 
 /**
  * D-4B7-9 — 표본 공급 실패(`CompetitionSampleSupply.Unavailable`) 사유를
