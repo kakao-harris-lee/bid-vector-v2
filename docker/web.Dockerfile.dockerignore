@@ -15,3 +15,7 @@
 !web/scripts/**
 !web/src/**
 !docker/web.Caddyfile
+# chore(2026-10-29) — caddy 바이너리를 이미지 안에서 빌드하는 입력 셋(main.go·go.mod·go.sum).
+!docker/caddy/main.go
+!docker/caddy/go.mod
+!docker/caddy/go.sum
