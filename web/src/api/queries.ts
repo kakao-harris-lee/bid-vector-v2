@@ -21,6 +21,10 @@ export type BidCase = components['schemas']['BidCase'];
 export type BidTimelineEntry = components['schemas']['BidTimelineEntry'];
 export type BidPriceRequestResponse = components['schemas']['BidPriceRequestResponse'];
 export type SessionResponse = components['schemas']['SessionResponse'];
+export type StrategyReadResponse = components['schemas']['StrategyReadResponse'];
+export type EditSessionResponse = components['schemas']['EditSessionResponse'];
+export type Profile = components['schemas']['Profile'];
+export type ConstructionCapacity = components['schemas']['ConstructionCapacity'];
 
 type NoticesResultState = operations['searchNotices']['responses']['200']['headers']['X-Result-State'];
 type SuggestionsResultState = operations['listSuggestions']['responses']['200']['headers']['X-Result-State'];
@@ -203,6 +207,222 @@ export async function resumeCase(caseId: number): Promise<BidCase> {
   const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/resume', {
     params: { path: { caseId: pathCaseId(caseId) } },
   });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/* ── 화면 D 내 입찰함의 생애주기 전이 넷(M7/7E-2) ──────────────────────────────
+   넷 다 응답이 `BidCase` 하나다 — 전이 뒤 상태를 **서버가 준 값으로** 받으므로 화면이
+   「이제 이 상태일 것이다」를 지어내지 않는다. 어느 상태에서 어느 전이가 열리는지는 계약
+   전이표의 몫이고 화면은 그 표와 같은 모양의 다음 행동 표를 든다. */
+
+export async function awaitOpening(
+  caseId: number,
+  body: components['schemas']['AwaitOpeningRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/await-opening', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function recordOpening(
+  caseId: number,
+  body: components['schemas']['RecordOpeningRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/opening', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function enterQualificationReview(
+  caseId: number,
+  body: components['schemas']['QualificationReviewRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/qualification-review', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function recordOutcome(
+  caseId: number,
+  body: components['schemas']['RecordOutcomeRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/outcome', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/* ── 설정: 전략과 편집 세션(M7/7E-2) ──────────────────────────────────────────
+   전략을 **직접 쓰는 operation 이 계약에 없다** — 모든 쓰기가 편집 세션을 지난다. 그래서
+   이 묶음은 「현재 값 읽기 하나 + 세션 여섯」이고, 확인 화면이 보이는 값은 읽기가 준 현재
+   전략과 운영자가 방금 적은 값 둘뿐이다(세션 응답에 초안 값이 없다 — 계약 주석). */
+
+export async function readStrategy(): Promise<StrategyReadResponse> {
+  const { data, error, response } = await apiClient.GET('/api/strategy');
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function beginEditSession(
+  body: components['schemas']['EditSessionBeginRequest'],
+): Promise<EditSessionResponse> {
+  // 세션 id 는 **서버가 만든다**(계약 C-3) — 화면이 id 를 고르는 자리가 없다.
+  const { data, error, response } = await apiClient.POST('/api/strategy/edit-sessions', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
+ * 세션 하나의 지금 상태 — **만료를 서버가 접는다**(계약 D-6A2b-11). 화면이 `expiresAt` 을
+ * 지금 시각과 비교해 「만료됐다」고 판정하면 그것은 상태를 클라이언트가 추론하는 것이다
+ * (D-7E-4). 그래서 확인 화면으로 돌아오는 자리가 이 읽기를 지난다.
+ */
+export async function readEditSession(sessionId: string): Promise<EditSessionResponse> {
+  const { data, error, response } = await apiClient.GET('/api/strategy/edit-sessions/{sessionId}', {
+    params: { path: { sessionId } },
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function provideEditSessionValue(
+  sessionId: string,
+  body: components['schemas']['EditSessionValueRequest'],
+): Promise<EditSessionResponse> {
+  const { data, error, response } = await apiClient.POST('/api/strategy/edit-sessions/{sessionId}/value', {
+    params: { path: { sessionId } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function confirmEditSession(
+  sessionId: string,
+  body: components['schemas']['EditSessionConfirmRequest'],
+): Promise<EditSessionResponse> {
+  const { data, error, response } = await apiClient.POST('/api/strategy/edit-sessions/{sessionId}/confirm', {
+    params: { path: { sessionId } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function requestEditSessionEdit(
+  sessionId: string,
+  body: components['schemas']['EditSessionEditRequest'],
+): Promise<EditSessionResponse> {
+  const { data, error, response } = await apiClient.POST('/api/strategy/edit-sessions/{sessionId}/edit', {
+    params: { path: { sessionId } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function cancelEditSession(
+  sessionId: string,
+  body: components['schemas']['EditSessionCancelRequest'],
+): Promise<EditSessionResponse> {
+  const { data, error, response } = await apiClient.POST('/api/strategy/edit-sessions/{sessionId}/cancel', {
+    params: { path: { sessionId } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/* ── 설정: 프로필(M7/7E-2) ────────────────────────────────────────────────────
+   자격 사실·사업 정보는 **절 단위 교체**라 응답이 프로필 한 벌이고, 시평액은 행 단위라
+   응답이 **다시 읽은 목록**이다(계약). 둘 다 서버가 준 값을 그대로 화면에 싣는다. */
+
+export async function readProfile(): Promise<Profile> {
+  const { data, error, response } = await apiClient.GET('/api/profile');
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function replaceQualificationFacts(
+  body: components['schemas']['QualificationFactsRequest'],
+): Promise<Profile> {
+  const { data, error, response } = await apiClient.POST('/api/profile/qualification-facts', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function replaceBusinessDetails(
+  body: components['schemas']['BusinessDetailsRequest'],
+): Promise<Profile> {
+  const { data, error, response } = await apiClient.POST('/api/profile/business-details', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function listConstructionCapacities(): Promise<readonly ConstructionCapacity[]> {
+  const { data, error, response } = await apiClient.GET('/api/profile/construction-capacities');
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function upsertConstructionCapacity(
+  body: components['schemas']['ConstructionCapacityRequest'],
+): Promise<readonly ConstructionCapacity[]> {
+  const { data, error, response } = await apiClient.POST('/api/profile/construction-capacities', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+export async function removeConstructionCapacity(
+  body: components['schemas']['RemoveConstructionCapacityRequest'],
+): Promise<readonly ConstructionCapacity[]> {
+  const { data, error, response } = await apiClient.POST('/api/profile/construction-capacities/remove', { body });
   if (data === undefined) {
     raise(response.status, error);
   }
