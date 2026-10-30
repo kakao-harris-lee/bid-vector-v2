@@ -148,16 +148,27 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     renderScreen();
 
     const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const button = within(row).getByRole('button', { name: /읽음/u });
     expect(within(row).getByTestId('read-state').textContent ?? '').toContain('안읽음');
 
     // 다음 읽기는 **읽음으로 바뀐 행**을 준다 — 화면은 그 재조회 결과로만 바뀐다.
     mocked.listNotifications.mockResolvedValue(
       page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
     );
-    fireEvent.click(within(row).getByRole('button', { name: /읽음/u }));
+    fireEvent.click(button);
 
-    // 아직 응답 전이다.
-    expect(within(row).getByTestId('read-state').textContent ?? '').toContain('안읽음');
+    /**
+     * **양성 표지를 먼저 기다린다**(7E-2b r1 교훈 · 변이 M5 가 가르쳐 준 자리). 누른 직후
+     * 바로 읽으면 쓰기가 아직 뜨지도 않아 「낙관 갱신을 하지 않았다」가 아니라 「아직 아무 일도
+     * 일어나지 않았다」를 재게 된다 — 앞 판은 그래서 **낙관 갱신을 넣은 변이에서도 초록**이었다.
+     * 버튼이 잠긴 것이 「요청이 떠 있다」의 관측이고, 그 동안에만 아래 음성 단언이 뜻을 가진다.
+     */
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
+    expect(
+      within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).getByTestId('read-state')
+        .textContent ?? '',
+      '응답 전에 읽음으로 바뀌었다 — 낙관 갱신이다',
+    ).toContain('안읽음');
 
     release({ markedCount: 1, unreadCount: 0 });
     await waitFor(() =>
