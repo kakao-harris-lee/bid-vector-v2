@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
-import { listBidCases, type BidCase } from '../api/queries';
-import { bidCasesQueryKey } from '../api/queryKeys';
+import { isUnauthorized as isSessionGone } from '../api/apiError';
+import { listBidCases, readOpeningResult, type BidCase } from '../api/queries';
+import { bidCasesQueryKey, openingResultQueryKey } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { RESULT_PENDING_SLOTS, isResultStage } from '../display/resultDisplay';
@@ -62,7 +63,25 @@ export function ResultsScreen() {
   const { signedIn } = useSessionCsrf();
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
 
+  const shown = (cases.data ?? []).filter((row) => isResultStage(row.state));
+
+  /**
+   * 개찰 조회를 **화면이 든다**(r3 CR L-1). 카드마다 질의를 두면 401 일 때 `SignedOutFace` 가
+   * 카드 수만큼 서고 — 같은 `role="alert"`·같은 testId 가 N 개 — 보조기술이 같은 문장을 N 번
+   * 읽고 `getByTestId('signed-out')` 가 strict 에서 모호해진다. 화면이 들면 그 얼굴이 **하나**다.
+   */
+  const openings = useQueries({
+    queries: shown.map((row) => ({
+      queryKey: openingResultQueryKey(row.noticeNumber, row.noticeRound),
+      queryFn: () => readOpeningResult(row.noticeNumber, row.noticeRound),
+    })),
+  });
+
+  /** 건별 개찰 읽기가 401 이면 **세션이 없는 것**이다 — 목록이 캐시로 살아 있어도 그렇다. */
+  const sessionGone = openings.some((one) => isSessionGone(one.error));
+
   // 세션이 없다는 **서버의 답**은 재시도로 풀리지 않는다 — 일시 장애와 같은 얼굴을 내지 않는다.
+  // **이 분기는 모든 hook 뒤에 온다** — 위의 `useQueries` 를 건너뛰면 렌더마다 hook 수가 달라진다.
   if (signedIn === false || isUnauthorized(cases.error)) {
     return (
       <section data-testid="screen-results" className="mx-auto max-w-3xl p-4">
@@ -71,7 +90,6 @@ export function ResultsScreen() {
     );
   }
 
-  const shown = (cases.data ?? []).filter((row) => isResultStage(row.state));
 
   return (
     <section data-testid="screen-results" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -85,10 +103,12 @@ export function ResultsScreen() {
         <EmptyFace display={EMPTY_DISPLAY} testId="results-empty" />
       ) : null}
 
+      {sessionGone ? <SignedOutFace /> : null}
+
       {shown.length === 0 ? null : (
         <ul className="flex flex-col gap-3">
-          {shown.map((row) => (
-            <ResultCard key={row.caseId} bidCase={row} />
+          {shown.map((row, index) => (
+            <ResultCard key={row.caseId} bidCase={row} opening={openings[index]!} />
           ))}
         </ul>
       )}

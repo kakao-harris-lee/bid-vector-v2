@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,8 +37,10 @@ function page(rows: readonly NotificationItem[], unread: number, total = rows.le
   return { rows, total, unread };
 }
 
+let client: QueryClient;
+
 function renderScreen() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
     [
       { path: '/inbox', element: <InboxScreen /> },
@@ -216,6 +218,86 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
         '쓰기 뒤 포커스가 행으로 돌아오지 않았다 — 키보드 운영자가 자리를 잃는다',
       ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')),
     );
+  });
+
+  /**
+   * **갈라진 묶음에서 둘째를 눌러도 그 묶음으로 간다**(r3 CR M-1). 앞 판은 번호·차수로 지은
+   * 문자열 id 를 `getElementById` 로 찾았고, 떨어진 같은 공고는 **두 묶음으로 남는 것이 결정**
+   * 이라 그 id 가 문서에 둘이었다 — 둘째에서 누르면 포커스가 **첫째**로 끌려갔다.
+   */
+  it('떨어진 같은 공고의 둘째 묶음에서 눌러도 그 묶음으로 간다', async () => {
+    mocked.markNoticeNotificationsRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    mocked.listNotifications.mockResolvedValue(
+      page(
+        [
+          item({ noticeNumber: 'A' }),
+          item({ noticeNumber: 'B' }),
+          item({ noticeNumber: 'A' }),
+        ],
+        3,
+      ),
+    );
+    renderScreen();
+
+    const second = await screen.findByTestId('notice-group-2-A-000');
+    fireEvent.click(within(second).getByRole('button', { name: /묶음 전체/u }));
+
+    await waitFor(() =>
+      expect(
+        document.activeElement,
+        '첫째 묶음으로 끌려갔다 — 운영자가 조작한 자리가 아니다',
+      ).toBe(screen.getByTestId('notice-group-2-A-000')),
+    );
+    expect(document.activeElement).not.toBe(screen.getByTestId('notice-group-0-A-000'));
+  });
+
+  /**
+   * **실패 경로에서도 자리를 잃지 않는다**(r3 CR M-2). 앞 판은 방아쇠가 `inbox.data` 참조라,
+   * 서버 상태가 안 바뀌는 실패에서는 structural sharing 이 **같은 참조**를 돌려줘 effect 가 서지
+   * 않았다 — 버튼은 누른 순간 잠겨 blur 됐는데 돌려놓을 자리는 없었다.
+   */
+  it('쓰기가 실패하면 포커스가 실패 얼굴로 간다', async () => {
+    mocked.markNotificationRead.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
+
+    const failure = await screen.findByTestId('write-failure');
+    await waitFor(() =>
+      expect(document.activeElement, '실패 경로에서 포커스를 잃었다').toBe(failure.parentElement),
+    );
+  });
+
+  /**
+   * **장전이 남지 않는다**(r3 CR M-2 ⓑ). 남기면 나중의 **무관한** 재조회가 포커스를 옛 행으로
+   * 끌어간다 — `BidBoxScreen` 주석이 적어 둔 바로 그 사고다.
+   */
+  it('나중의 무관한 재조회가 포커스를 끌어가지 않는다', async () => {
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId(
+      'notification-OPENING_COMPLETED-SYN-7E3-RESULT-000',
+    )));
+
+    // 운영자가 포커스를 다른 데로 옮긴 뒤, 무관한 재조회가 새 데이터를 가져온다.
+    const badge = screen.getByTestId('inbox-unread-badge');
+    badge.setAttribute('tabindex', '-1');
+    badge.focus();
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z' }), item({ kind: 'AWARD_DECIDED' })], 1),
+    );
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['notifications'] });
+    });
+
+    expect(document.activeElement, '장전이 남아 포커스가 옛 행으로 끌려갔다').toBe(badge);
   });
 
   it('묶음 전체 읽음 뒤에는 포커스가 그 묶음으로 간다', async () => {

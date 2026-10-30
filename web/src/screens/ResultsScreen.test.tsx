@@ -389,18 +389,28 @@ describe('로딩·오류 얼굴 (r1 CR M-2 · v M-2·M-3)', () => {
     expect(screen.queryByTestId('opening-state-51')).toBeNull();
   });
 
-  /** 세션이 없다는 답은 **재시도로 풀리지 않는다**(r1 CR L-5). */
-  it('개찰 조회가 401 이면 재시도 얼굴이 아니라 로그인 길이다', async () => {
+  /**
+   * 세션이 없다는 답은 **재시도로 풀리지 않는다**(r1 CR L-5)이고, 그 얼굴은 **화면에 하나**다
+   * (r3 CR L-1 — 앞 판은 카드마다 `SignedOutFace` 를 그려 같은 `role="alert"` 이 N 개 섰다).
+   */
+  it('개찰 조회가 401 이면 재시도 얼굴이 아니라 화면에 로그인 길 하나다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase(), bidCase({ caseId: 52, state: 'WON' })]);
     mocked.readOpeningResult.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
     renderScreen();
 
-    const face = await screen.findByTestId('opening-signed-out-51');
+    // 양성 표지를 먼저 — 카드 둘이 서고 각자 그 사실을 조용히 적는다.
+    expect(await screen.findByTestId('opening-signed-out-51')).toBeTruthy();
+    expect(screen.getByTestId('opening-signed-out-52')).toBeTruthy();
     expect(screen.queryByTestId('opening-error-51'), '401 에 「다시 시도」를 달았다').toBeNull();
-    // **막다른 문장이 아니라 길이어야 한다**(r2 CR L-4) — 앞 판은 맨 `<p>` 라 갈 곳이 없었다.
+
+    // **얼굴은 하나**다 — 카드 수만큼 서지 않는다.
+    const faces = screen.getAllByTestId('signed-out');
+    expect(faces, '401 얼굴이 카드 수만큼 섰다').toHaveLength(1);
     expect(
-      within(face).getByRole('link', { name: /로그인/u }).getAttribute('href'),
+      within(faces[0]!).getByRole('link', { name: /로그인/u }).getAttribute('href'),
       '401 얼굴에 로그인으로 가는 길이 없다',
     ).toBe('/login');
+    expect(screen.getAllByRole('alert'), 'alert 가 여럿이면 같은 문장을 N 번 읽는다').toHaveLength(1);
   });
 });
 

@@ -1,10 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
-import { readOpeningResult, type BidCase, type OpeningResultView } from '../api/queries';
-import { openingResultQueryKey } from '../api/queryKeys';
+import { isUnauthorized } from '../api/apiError';
+import type { BidCase, OpeningResultView } from '../api/queries';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
-import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -202,14 +201,14 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
  * **전이 버튼이 없다**(D-7E3a-8) — E 는 읽기 화면이고, 다음 행동은 그 전이를 가진 화면으로
  * 가는 링크 둘이다. 전이표의 사본을 여기 두면 D 의 표와 갈리고, 여정 ④⑤ 가 같은 건을 민다.
  */
-export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
-  const opening = useQuery({
-    queryKey: openingResultQueryKey(bidCase.noticeNumber, bidCase.noticeRound),
-    queryFn: () => readOpeningResult(bidCase.noticeNumber, bidCase.noticeRound),
-    // 401 을 다시 때리지 않는 것은 **전역 기본**이 진다(`queryClient.ts`, r2 CR L-4) — 여기에
-    // 다시 적으면 test 가 `retry: false` 로 덮는 길을 이 질의만 잃는다.
-  });
-
+export function ResultCard({
+  bidCase,
+  opening,
+}: {
+  readonly bidCase: BidCase;
+  /** 개찰 조회 결과 — **화면이 든다**(r3 CR L-1). 카드는 그린다. */
+  readonly opening: UseQueryResult<OpeningResultView>;
+}) {
   return (
     <li data-testid={`result-case-${bidCase.caseId}`} className="rounded-lg border border-line bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -245,13 +244,12 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
       {opening.isPending ? <Skeleton testId={`opening-loading-${bidCase.caseId}`} rows={2} /> : null}
       {/* **세션이 없다는 답은 재시도로 풀리지 않는다**(r1 CR L-5) — 화면의 규율이 목록 쪽에만
           걸려 있어 카드 쪽 401 이 「다시 시도」 버튼을 달았다(`retry` 까지 더해 더 때린다). */}
-      {/* **막다른 문장이 아니라 길이다**(r2 CR L-4): 앞 판은 맨 `<p>` 라 운영자가 갈 곳이
-          없었고, `refetchOnWindowFocus: false` 라 목록 쪽 재조회가 저절로 오지도 않아 그 상태가
-          오래 갔다. 저장소가 같은 뜻을 그리는 자리는 `SignedOutFace` 다. */}
+      {/* 401 의 **얼굴은 화면이 하나로** 그린다(r3 CR L-1) — 카드는 그 사실만 조용히 적는다.
+          앞 판은 카드마다 `SignedOutFace` 를 그려 같은 `role="alert"` 이 N 개 섰다. */}
       {opening.isError && isUnauthorized(opening.error) ? (
-        <div data-testid={`opening-signed-out-${bidCase.caseId}`} className="mt-3">
-          <SignedOutFace />
-        </div>
+        <p data-testid={`opening-signed-out-${bidCase.caseId}`} className="mt-3 text-xs text-absent-ink">
+          세션이 없어 개찰 결과를 읽지 못했습니다.
+        </p>
       ) : null}
       {opening.isError && !isUnauthorized(opening.error) ? (
         <ErrorFace testId={`opening-error-${bidCase.caseId}`} onRetry={() => void opening.refetch()} />

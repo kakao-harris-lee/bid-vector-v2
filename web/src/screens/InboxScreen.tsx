@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import {
@@ -29,8 +29,8 @@ const ABSENT = '값 없음';
  * 뜻을 바꾸는 모양은 조용히 잘못 맞는다) — 화면도 그 둘을 한 값으로 합치지 않는다.
  */
 type ReadRequest = {
-  /** 쓰기가 끝난 뒤 포커스를 돌려놓을 DOM id — 요청마다 다르다(행이냐 묶음이냐). */
-  readonly focusId: string;
+  /** 쓰기가 끝난 뒤 포커스를 돌려놓을 **DOM 노드**(행이냐 묶음이냐) — id 가 아니다(r3 CR M-1). */
+  readonly focus: FocusTarget;
 } & (
   | { readonly scope: 'ITEM'; readonly kind: NotificationItem['kind']; readonly noticeNumber: string; readonly noticeRound: string }
   | { readonly scope: 'NOTICE'; readonly noticeNumber: string; readonly noticeRound: string }
@@ -82,12 +82,15 @@ function itemTestId(item: NotificationItem): string {
 /**
  * 쓰기 뒤 **포커스를 돌려놓을 자리**(r2 CR M-1). 누른 버튼으로는 못 돌아간다 — 읽은 뒤 그
  * 버튼은 `disabled` 이고, 포커스된 요소가 `disabled` 가 되면 브라우저가 그것을 blur 한다
- * (HTML 의 unfocusing steps). 그래서 **행 자체**를 받을 자리로 두고 `tabIndex={-1}` 로 포커스를
- * 받을 수 있게 한다.
+ * (HTML 의 unfocusing steps). 그래서 **행·묶음 자체**를 받을 자리로 두고 `tabIndex={-1}` 로
+ * 포커스를 받을 수 있게 한다.
+ *
+ * **대상은 DOM 노드다 — 문자열 id 가 아니다**(r3 CR M-1·L-5). `groupByNotice` 는 떨어진 같은
+ * 공고를 **두 묶음으로 남기는 것이 결정**이라, 번호·차수로 지은 id 는 그때 문서에 둘이 되고
+ * `getElementById` 가 **첫째**를 돌려준다 — 둘째 묶음에서 누르면 포커스가 위로 끌려갔다.
+ * 노드를 그대로 들면 유일성에 기댈 일이 없다(r2 가 key 를 「DOM 노드의 정체」로 잰 것과 같은 축).
  */
-function itemDomId(item: NotificationItem): string {
-  return `inbox-row-${item.kind}-${item.noticeNumber}-${item.noticeRound}`;
-}
+type FocusTarget = { current: HTMLLIElement | null };
 
 function NotificationRow({
   item,
@@ -96,11 +99,13 @@ function NotificationRow({
 }: {
   readonly item: NotificationItem;
   readonly disabled: boolean;
-  readonly onRead: () => void;
+  readonly onRead: (focus: FocusTarget) => void;
 }) {
+  const focusTarget = useRef<HTMLLIElement | null>(null);
+
   return (
     <li
-      id={itemDomId(item)}
+      ref={focusTarget}
       tabIndex={-1}
       data-testid={itemTestId(item)}
       className="flex flex-wrap items-center gap-2 border-t border-line py-2 focus:outline focus:outline-2"
@@ -135,7 +140,7 @@ function NotificationRow({
       <button
         type="button"
         disabled={disabled || item.read}
-        onClick={onRead}
+        onClick={() => onRead(focusTarget)}
         className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
       >
         {item.read ? '읽음' : '읽음으로'}
@@ -161,9 +166,11 @@ function NoticeGroupBlock({
   readonly disabled: boolean;
   readonly onRead: (request: ReadRequest) => void;
 }) {
+  const focusTarget = useRef<HTMLLIElement | null>(null);
+
   return (
     <li
-      id={`inbox-group-${group.noticeNumber}-${group.noticeRound}`}
+      ref={focusTarget}
       tabIndex={-1}
       data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}`}
       className="rounded-lg border border-line bg-card p-4 focus:outline focus:outline-2"
@@ -192,7 +199,7 @@ function NoticeGroupBlock({
           onClick={() =>
             onRead({
               scope: 'NOTICE',
-              focusId: `inbox-group-${group.noticeNumber}-${group.noticeRound}`,
+              focus: focusTarget,
               noticeNumber: group.noticeNumber,
               noticeRound: group.noticeRound,
             })
@@ -209,10 +216,10 @@ function NoticeGroupBlock({
             key={itemTestId(item)}
             item={item}
             disabled={disabled}
-            onRead={() =>
+            onRead={(focus) =>
               onRead({
                 scope: 'ITEM',
-                focusId: itemDomId(item),
+                focus,
                 kind: item.kind,
                 noticeNumber: item.noticeNumber,
                 noticeRound: item.noticeRound,
@@ -250,18 +257,28 @@ export function InboxScreen() {
    * 브라우저가 그것을 blur 하고(HTML unfocusing steps) 포커스는 앞 판과 똑같이 `<body>` 로
    * 떨어진다. 더구나 `disabled` 는 **누른 순간** 서므로 쓰기가 실패하는 실행에서도 그렇다.
    *
-   * **ref 에 두고 쓰는 즉시 비운다** — 남겨 두면 뒤의 재렌더가 포커스를 다시 끌어간다.
+   * **방아쇠는 전이의 종결이다 — 데이터 참조가 아니다**(r3 CR M-2). react-query 의 structural
+   * sharing 은 깊은 값이 같으면 **이전 참조를 그대로** 돌려주므로, `[inbox.data]` 에 걸면
+   * ⓐ 쓰기 **실패** 경로(서버 상태가 안 바뀌어 재조회 결과가 같다)에서 effect 가 서지 않고
+   * ⓑ 그때 장전이 남아 **나중의 무관한 재조회**가 포커스를 옛 행으로 끌어간다. 종결마다 느는
+   * 수를 dep 으로 두면 그 둘이 함께 닫힌다.
    */
-  const pendingFocus = useRef<string | null>(null);
+  const pendingFocus = useRef<FocusTarget | null>(null);
+  const failureFocus = useRef<HTMLDivElement | null>(null);
+  const [settleCount, setSettleCount] = useState(0);
 
   useEffect(() => {
-    const target = pendingFocus.current;
-    if (target === null) {
+    if (settleCount === 0) {
       return;
     }
+    const target = pendingFocus.current;
+    // **무슨 일이 있어도 비운다** — 남기면 다음 재렌더가 그 자리로 포커스를 끌어간다.
     pendingFocus.current = null;
-    document.getElementById(target)?.focus();
-  }, [inbox.data]);
+    // 실패했으면 **실패 얼굴**로 보낸다(`role="alert"` 이라 읽히기도 한다) — 그 자리가 운영자가
+    // 다음에 할 일(다시 시도)을 들고 있다.
+    const node = failureFocus.current ?? target?.current ?? null;
+    node?.focus();
+  }, [settleCount]);
 
   const read = useMutation({
     mutationFn: sendRead,
@@ -273,6 +290,8 @@ export function InboxScreen() {
     onError: async () => {
       await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
     },
+    // **무효화를 기다린 뒤** 선다 — 그때 화면은 이미 서버의 답으로 그려져 있다.
+    onSettled: () => setSettleCount((count) => count + 1),
   });
 
   if (signedIn === false || isUnauthorized(inbox.error)) {
@@ -304,6 +323,7 @@ export function InboxScreen() {
       </div>
 
       {read.isError ? (
+        <div ref={failureFocus} tabIndex={-1} className="focus:outline focus:outline-2">
         <WriteFailureFace
           what="읽음으로 바꾸지"
           error={read.error}
@@ -313,6 +333,7 @@ export function InboxScreen() {
             }
           }}
         />
+        </div>
       ) : null}
 
       {inbox.isPending ? <Skeleton testId="inbox-loading" /> : null}
@@ -338,7 +359,7 @@ export function InboxScreen() {
               index={index}
               disabled={read.isPending}
               onRead={(request) => {
-                pendingFocus.current = request.focusId;
+                pendingFocus.current = request.focus;
                 read.mutate(request);
               }}
             />

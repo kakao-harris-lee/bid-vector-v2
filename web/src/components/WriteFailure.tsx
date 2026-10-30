@@ -78,7 +78,9 @@ export function SignedOutFace() {
   );
 }
 
-/** 읽기 오류가 **세션 만료**인가 — 재시도로 풀리지 않는 자리를 가른다(CR r2 L-6). */
-export function isUnauthorized(error: unknown): boolean {
-  return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
-}
+/**
+ * 재수출 — 판단은 `api/apiError.ts` 한 자리에 산다(M7/7E-3a r3 CR L-4). 부르는 자리를 전부
+ * 고치는 대신 여기서 잇는다: 화면들이 「얼굴을 고르는 곳」에서 이것을 쓰는 것이 자연스럽고,
+ * 네트워크 설정(`queryClient.ts`)은 순수 자리에서 직접 가져간다.
+ */
+export { isUnauthorized } from '../api/apiError';

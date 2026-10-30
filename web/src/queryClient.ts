@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 
-import { isUnauthorized } from './components/WriteFailure';
+import { isUnauthorized } from './api/apiError';
 
 /**
  * 서버 상태를 드는 클라이언트 하나(ADR 0011 D-1). **셸이 이것을 제공한다** — 라우트 트리가
