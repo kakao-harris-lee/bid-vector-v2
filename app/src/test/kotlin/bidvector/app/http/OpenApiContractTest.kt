@@ -372,6 +372,16 @@ private val NON_FLAT_KEYS = setOf("\$ref", "oneOf", "allOf", "anyOf", "additiona
 private val DEPTH_ONE_OBJECT_KEYS = setOf("type", "properties", "required", "description")
 
 /**
+ * r1 CR M-1 · v L-1 — 깊이 1 object 를 **나르는 배열 래퍼**가 가질 수 있는 키 전부(허용 목록).
+ * object 쪽만 닫으면 같은 object 를 `nullable: true` 배열로 감싸 「null 이거나 짝 배열」인 두 모양
+ * 속성이 통과한다(옛 술어는 거부했으므로 이 확장이 새로 연 자리였다).
+ *
+ * **스칼라 배열 래퍼에는 걸지 않는다** — 그 관용은 D-6A1-38 부터 있었고 계약이 스칼라 층을 범위 밖에
+ * 두었다(D-7C4C-6). 그래서 `nullable` 스칼라 배열은 통과하고 `nullable` object 배열은 거부된다.
+ */
+private val DEPTH_ONE_ARRAY_KEYS = setOf("type", "items", "description")
+
+/**
  * D-6A1-38(스칼라 축) + **D-7C4C-6(깊이 1 object 축)** — 허용 목록으로 뒤집은 평탄 속성 판정.
  *
  * 깊이 1 을 연 이유는 `awaiting` 짝(`[{item, prerequisite}]`)이다 — 스칼라 배열 둘로 내면 짝이
@@ -412,7 +422,7 @@ private fun isScalarArrayItems(items: Any?): Boolean {
 private fun isDepthOneObjectDefinition(definition: Map<String, Any?>): Boolean =
     when (definition["type"]) {
         "object" -> isDepthOneObject(definition)
-        "array" -> NON_FLAT_KEYS.none(definition::containsKey) && isDepthOneObject(definition["items"])
+        "array" -> DEPTH_ONE_ARRAY_KEYS.containsAll(definition.keys) && isDepthOneObject(definition["items"])
         else -> false
     }
 
