@@ -2,7 +2,6 @@ package bidvector.app.http
 
 import bidvector.bidding.BidAmountOrigin
 import bidvector.sharedkernel.export
-import bidvector.workflow.opening.OpeningProgress
 import bidvector.workflow.opening.OpeningResultView
 import bidvector.workflow.result.AwardGap
 import bidvector.workflow.result.AwardRateAbsence
@@ -69,7 +68,10 @@ data class MyBidCaseResponse(
 ) {
     companion object {
         fun from(result: MyBidResult): MyBidCaseResponse {
-            val award = (result.opening as? OpeningResultView.Observed)?.figures?.confirmedAward?.export()
+            val award =
+                ConfirmedAwardFields(
+                    (result.opening as? OpeningResultView.Observed)?.figures?.confirmedAward?.export(),
+                )
             val gap = result.gap as? AwardGap.Computed
             return MyBidCaseResponse(
                 caseId = result.caseId.value,
@@ -83,12 +85,12 @@ data class MyBidCaseResponse(
                 chosenOptionRef = chosenOptionRefOf(result.submitted.origin),
                 submittedAt = result.submittedAt.toString(),
                 confirmedAt = result.confirmedAt.toString(),
-                openingState = openingStateTokenOf(result.opening),
-                confirmedAwardAmountWon = award?.won,
-                confirmedAwardAmountCurrency = award?.currency?.name,
-                confirmedAwardAmountBasis = award?.basis?.name,
-                confirmedAwardAmountVatTreatment = award?.vatTreatment?.name,
-                confirmedAwardAmountProvenance = award?.provenance?.let(::provenanceLabel),
+                openingState = stateTokenOf(result.opening),
+                confirmedAwardAmountWon = award.won,
+                confirmedAwardAmountCurrency = award.currency,
+                confirmedAwardAmountBasis = award.basis,
+                confirmedAwardAmountVatTreatment = award.vatTreatment,
+                confirmedAwardAmountProvenance = award.provenance,
                 reconciledOutcome = verdictTokenOf(result.verdict),
                 reconciliationBlocker = (result.verdict as? ReconciliationVerdict.Undecidable)?.blocker?.name,
                 outcomeAgreement = result.agreement.name,
@@ -160,25 +162,6 @@ private fun verdictTokenOf(verdict: ReconciliationVerdict): String =
         ReconciliationVerdict.FailedBid -> "FAILED_BID"
         ReconciliationVerdict.Rebid -> "REBID"
         is ReconciliationVerdict.Undecidable -> "UNDECIDABLE"
-    }
-
-/** 개찰 상태 — 7C⑤-a 의 어휘를 **그대로** 쓴다(같은 사실에 두 어휘를 두지 않는다). */
-private fun openingStateTokenOf(view: OpeningResultView): String =
-    when (view) {
-        OpeningResultView.NoticeAbsent -> "NOTICE_ABSENT"
-        OpeningResultView.NotOpenedYet -> "NOT_OPENED_YET"
-        OpeningResultView.NotCollected -> "NOT_COLLECTED"
-        OpeningResultView.ObservedNotPromoted -> "OBSERVED_NOT_PROMOTED"
-        is OpeningResultView.Observed -> openingProgressTokenOf(view.progress)
-    }
-
-private fun openingProgressTokenOf(progress: OpeningProgress): String =
-    when (progress) {
-        OpeningProgress.OPENED -> "OPENED"
-        OpeningProgress.FAILED_BID -> "FAILED_BID"
-        OpeningProgress.REBID -> "REBID"
-        OpeningProgress.UNRECOGNIZED -> "PROGRESS_UNRECOGNIZED"
-        OpeningProgress.ABSENT -> "PROGRESS_ABSENT"
     }
 
 /**

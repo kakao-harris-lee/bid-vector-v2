@@ -112,7 +112,7 @@ data class OpeningResultResponse(
             view: OpeningResultView,
         ): OpeningResultResponse {
             val figures = (view as? OpeningResultView.Observed)?.figures
-            val award = figures?.confirmedAward?.export()
+            val award = ConfirmedAwardFields(figures?.confirmedAward?.export())
             val rankOne = figures?.provisionalRankOne ?: ProvisionalRankOne.NotObserved
             val determined = rankOne as? ProvisionalRankOne.Determined
             return OpeningResultResponse(
@@ -122,11 +122,11 @@ data class OpeningResultResponse(
                 participantCount = figures?.participantCount,
                 actualOpeningAt = figures?.actualOpeningAt?.toString(),
                 observedAt = figures?.observedAt?.toString(),
-                confirmedAwardAmountWon = award?.won,
-                confirmedAwardAmountCurrency = award?.currency?.name,
-                confirmedAwardAmountBasis = award?.basis?.name,
-                confirmedAwardAmountVatTreatment = award?.vatTreatment?.name,
-                confirmedAwardAmountProvenance = award?.provenance?.let(::provenanceLabel),
+                confirmedAwardAmountWon = award.won,
+                confirmedAwardAmountCurrency = award.currency,
+                confirmedAwardAmountBasis = award.basis,
+                confirmedAwardAmountVatTreatment = award.vatTreatment,
+                confirmedAwardAmountProvenance = award.provenance,
                 provisionalRankOneState = rankOneTokenOf(rankOne),
                 provisionalRankOneDuplicateCount = (rankOne as? ProvisionalRankOne.RankDuplicated)?.count,
                 provisionalRankOneBidAmountWon = determined?.bidAmount?.won,
@@ -140,12 +140,15 @@ data class OpeningResultResponse(
 }
 
 /**
- * 상태 토큰 아홉 — 소진 `when` 두 겹이라 갈래가 늘면 컴파일이 이 자리를 막는다. 공고 부재도
+ * 상태 토큰 아홉 — 소진 `when` 두 겹이라 갈래가 늘면 컴파일이 이 자리를 막는다.
+ *
+ * **M7/7C⑤-b 의 결과 조회가 같은 함수를 쓴다**(`internal` 인 이유) — 같은 사실에 어휘를 두 벌
+ * 두면 한쪽만 늘어나는 길이 생긴다. 공고 부재도
  * **상태**다(404 가 아니다): 조회의 질문은 「이 공고의 개찰에 대해 우리가 아는 것」이고 그 답이
  * 「그 공고를 모른다」인 것은 다른 「모른다」 여덟과 같은 축이다 — 7C① 이 빈 결과의 두 뜻을
  * 상태로 가른 것과 같은 판단(클라이언트의 분기 자리를 하나로 둔다).
  */
-private fun stateTokenOf(view: OpeningResultView): String =
+internal fun stateTokenOf(view: OpeningResultView): String =
     when (view) {
         OpeningResultView.NoticeAbsent -> "NOTICE_ABSENT"
         OpeningResultView.NotOpenedYet -> "NOT_OPENED_YET"
@@ -155,7 +158,7 @@ private fun stateTokenOf(view: OpeningResultView): String =
     }
 
 /** 진행구분 축의 토큰 — 갈래가 둘인 상태 축을 **축마다 한 함수**로 가른다(소진 `when` 둘). */
-private fun progressTokenOf(progress: OpeningProgress): String =
+internal fun progressTokenOf(progress: OpeningProgress): String =
     when (progress) {
         OpeningProgress.OPENED -> "OPENED"
         OpeningProgress.FAILED_BID -> "FAILED_BID"
