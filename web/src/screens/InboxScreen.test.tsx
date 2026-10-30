@@ -340,6 +340,31 @@ describe('건별 묶음', () => {
     expect(group.textContent ?? '').not.toContain('이 페이지에 다 오지 않았습니다');
   });
 
+  /**
+   * **key 가 삽입에 강하다**(r2 CR L-3). key 에 전체 차례를 쓰면 맨 앞에 묶음이 하나 끼었을 때
+   * 뒤 묶음이 **통째로 재마운트**되고, 그러면 「버튼이 DOM 에 남는다」·포커스 복귀가 그 실행에서
+   * 성립하지 않는다. DOM 노드의 **정체**로 잰다.
+   */
+  it('앞에 묶음이 끼어도 뒤 묶음의 DOM 노드가 유지된다', async () => {
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 1 });
+    mocked.listNotifications.mockResolvedValue(page([item({ noticeNumber: 'B' })], 1));
+    renderScreen();
+    const before = await screen.findByTestId('notice-group-0-B-000');
+
+    // 맨 앞에 새 공고의 묶음이 들어온다(새 알림이 그 사이에 오는 꼴) — 읽음 처리의 재조회가
+    // 그 새 목록을 받는다.
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ noticeNumber: 'A' }), item({ noticeNumber: 'B', read: true, readAt: '2026-11-02T02:00:00Z' })], 1),
+    );
+    fireEvent.click(within(before).getByRole('button', { name: /읽음으로/u }));
+
+    await waitFor(() => expect(screen.queryByTestId('notice-group-0-A-000')).not.toBeNull());
+    expect(
+      screen.getByTestId('notice-group-1-B-000'),
+      '앞에 끼어든 묶음 때문에 뒤 묶음이 재마운트됐다',
+    ).toBe(before);
+  });
+
   /** 갈라진 같은 공고의 두 묶음이 **서로 다른 testId** 를 가진다(r1 CR L-3). */
   it('떨어진 같은 공고의 두 묶음이 겹치지 않는다', async () => {
     mocked.listNotifications.mockResolvedValue(

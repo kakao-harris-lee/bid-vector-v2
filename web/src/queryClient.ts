@@ -7,6 +7,15 @@ import { isUnauthorized } from './components/WriteFailure';
  * 그 provider 를 품으므로 라우트를 렌더하는 test 가 provider 를 따로 세우지 않아도 되고,
  * 「화면이 질의를 걸 수 있는 자리」와 「셸이 뜨는 자리」가 같아진다.
  */
+/**
+ * 읽기 재시도 술어(M7/7E-3a r2 CR L-4) — **세션이 없다는 답은 다시 때리지 않는다**. 이름을
+ * 주는 이유는 그 판단을 **직접 잴 수 있게** 하기 위해서다: 설정 안에 익명 함수로 두면 그것을
+ * `retry: 1` 로 되돌리는 변이가 어느 test 에도 걸리지 않는다(실측).
+ */
+export function retryRead(failureCount: number, error: unknown): boolean {
+  return !isUnauthorized(error) && failureCount < 1;
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -21,7 +30,7 @@ export const queryClient = new QueryClient({
        * 전역 기본에 두는 이유: 같은 어긋남이 모든 읽기에 있고, 질의마다 적으면 새 질의가
        * 그것을 잊는다. test 가 `retry: false` 로 덮는 길은 그대로 남는다(기본을 덮는 쪽이다).
        */
-      retry: (failureCount, error) => !isUnauthorized(error) && failureCount < 1,
+      retry: retryRead,
     },
   },
 });

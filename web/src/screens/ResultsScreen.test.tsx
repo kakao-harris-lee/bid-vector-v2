@@ -394,8 +394,13 @@ describe('로딩·오류 얼굴 (r1 CR M-2 · v M-2·M-3)', () => {
     mocked.readOpeningResult.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
     renderScreen();
 
-    expect(await screen.findByTestId('opening-signed-out-51')).toBeTruthy();
+    const face = await screen.findByTestId('opening-signed-out-51');
     expect(screen.queryByTestId('opening-error-51'), '401 에 「다시 시도」를 달았다').toBeNull();
+    // **막다른 문장이 아니라 길이어야 한다**(r2 CR L-4) — 앞 판은 맨 `<p>` 라 갈 곳이 없었다.
+    expect(
+      within(face).getByRole('link', { name: /로그인/u }).getAttribute('href'),
+      '401 얼굴에 로그인으로 가는 길이 없다',
+    ).toBe('/login');
   });
 });
 
