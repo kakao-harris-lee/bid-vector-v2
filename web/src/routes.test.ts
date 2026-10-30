@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { fallbackRoute, loginRoute, screenRoutes, screenSlots } from './routes';
 
-// 화면 자리 여섯에 M7/7E-2 가 「설정」 하나를 더해 일곱이다. 실화면은 B·C(7E-1) · D·설정(7E-2) ·
-// A 시작하기(7E-2b) 다섯이고 둘(E 결과 확인 · 알림함)은 여전히 빈 자리다 — 아래 둘째 describe 가
-// 그 경계를 잠근다(D-7E-5).
+// 화면 자리 여섯에 M7/7E-2 가 「설정」 하나를 더해 일곱이다. M7/7E-3a 가 마지막 둘(E 결과 확인 ·
+// 알림함)을 채워 **일곱 자리가 전부 실화면**이다 — 아래 둘째 describe 가 그 경계를 잠근다(D-7E-5).
+// 빈 자리가 0 이 된 것은 이 slice 의 결과이고, 「범위 밖 화면을 만들지 않는다」는 그 표의 **길이**가
+// 그대로인 것으로 남는다(자리를 새로 늘리지 않았다).
 const EXPECTED_PATHS = [
   '/start',
   '/',
@@ -42,9 +43,18 @@ describe('화면 자리 표', () => {
 
 /** D-7E-5 — 범위 밖 화면은 「준비 중」 빈 자리뿐이다. 그 경계가 표의 `element` 유무다. */
 describe('이 slice 가 채운 자리', () => {
-  it('실화면은 A·B·C·D·설정 다섯이고 나머지 둘은 빈 자리다', () => {
+  it('일곱 자리가 전부 실화면이다 — 빈 자리 0', () => {
     const implemented = screenSlots.filter((slot) => slot.element !== undefined).map((slot) => slot.id);
 
-    expect(implemented).toEqual(['onboarding', 'home', 'worksheet', 'bid-box', 'settings']);
+    expect(implemented).toEqual([
+      'onboarding',
+      'home',
+      'worksheet',
+      'bid-box',
+      'results',
+      'inbox',
+      'settings',
+    ]);
+    expect(screenSlots.filter((slot) => slot.element === undefined)).toStrictEqual([]);
   });
 });

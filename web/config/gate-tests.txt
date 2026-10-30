@@ -63,3 +63,6 @@ src/display/resultDisplay.test.ts
 # 화면 E 가 보이는 값이 API 응답의 값이고, **잠정이 확정 자리에 서지 않으며**, E 가 결과 기록
 # 전이를 부르지 않는 것(D-7E3a-8).
 src/screens/ResultsScreen.test.tsx
+# 알림함 — 배지가 **헤더의 안읽음 전수**에서만 오고 읽음 처리가 서버 응답 뒤에만 보이는 것
+# (낙관 갱신 금지, D-7E3a-1·6). 묶음의 「공고를 모름」과 「제목만 빔」이 다른 얼굴인 것도 여기.
+src/screens/InboxScreen.test.tsx
