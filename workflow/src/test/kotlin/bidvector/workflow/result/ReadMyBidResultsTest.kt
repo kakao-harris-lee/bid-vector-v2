@@ -10,6 +10,7 @@ import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.tag
 import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.OperatorTradeName
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
@@ -22,9 +23,6 @@ import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
 import bidvector.workflow.opening.OpeningResultFigures
 import bidvector.workflow.opening.OpeningResultView
 import bidvector.workflow.opening.ProvisionalRankOne
-import bidvector.workflow.profile.BusinessDetails
-import bidvector.workflow.profile.BusinessProfileReader
-import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.TradeName
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
@@ -106,7 +104,7 @@ class ReadMyBidResultsTest {
         bids = { account -> bids[account.value].orEmpty() },
         openingFacts = { notices -> notices.mapNotNull { id -> facts[id.number.value]?.let { id to it } }.toMap() },
         winnerNames = { notices -> notices.mapNotNull { id -> winners[id.number.value]?.let { id to it } }.toMap() },
-        profiles = FakeProfiles(tradeName),
+        operatorNames = { tradeName?.let { raw -> OperatorTradeName.Declared(raw.raw) } ?: OperatorTradeName.NotDeclared },
         clock = Clock { now },
         openingPolicy = OPENING_PROGRESS_POLICY,
         matchingPolicy = matchingPolicy,
@@ -316,13 +314,4 @@ class ReadMyBidResultsTest {
         submitted.vatTreatment shouldBe VatTreatment.INCLUSIVE
         submitted.origin.shouldBeInstanceOf<BidAmountOrigin.OperatorEntered>()
     }
-}
-
-/** 상호 하나만 답하는 이중체 — 시평액 축은 이 조회가 묻지 않는다. */
-private class FakeProfiles(
-    private val tradeName: TradeName?,
-) : BusinessProfileReader {
-    override fun details(account: AccountId): BusinessDetails = BusinessDetails.EMPTY.copy(tradeName = tradeName)
-
-    override fun capacities(account: AccountId): List<ConstructionCapacity> = emptyList()
 }

@@ -124,6 +124,10 @@ class ConstantTimeComparisonStructureTest {
                 "OpeningResultControllerKt",
                 "DeclaredValue",
                 "DeclaredValueKt",
+                "MyBidResultsResponse",
+                "MyBidCaseResponse",
+                "MyBidAggregateResponse",
+                "MyBidResultResponsesKt",
             )
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
@@ -227,6 +231,16 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "질의 매개변수 하나의 값 객체(data class) 자동 생성 equals — 칸 이름과 그 원문 값 목록뿐, 자격증명 값 없음",
         "DeclaredValueKt" to
             "계약이 든 **이름**으로 질의 값을 찾는 비교(`firstValue`) — 비교 대상이 칸 이름이지 자격증명 값이 아니다",
+        // M7/7C⑤-b — 결과 조회의 HTTP 층. 성격은 위와 같다(data class 자동 equals · sealed
+        // 싱글턴 when 소진). 어느 항목도 자격증명 값을 참조하지 않는다.
+        "MyBidResultsResponse" to
+            "결과 응답 값 객체(data class) 자동 생성 equals — 건 목록과 집계뿐, 자격증명 값 없음",
+        "MyBidCaseResponse" to
+            "건 하나의 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태 토큰·금액 칸뿐, 자격증명 값 없음",
+        "MyBidAggregateResponse" to
+            "집계 응답 값 객체(data class) 자동 생성 equals — 수와 상태 토큰뿐, 자격증명 값 없음",
+        "MyBidResultResponsesKt" to
+            "대사 결말·개찰 상태·차이·비율 상태의 sealed 싱글턴 when 소진 — 비교 대상이 판정 갈래이지 자격증명 값이 아니다",
         // M7/7C④ 2b — 프로필의 HTTP 층. 성격은 위 셋과 같다(어휘 조회 · data class 자동 equals ·
         // sealed 싱글턴 when). `BidCaseRequestsKt` 는 어휘 조회 둘이 `RequestValues.kt` 로 옮겨 가며
         // **클래스 자체가 사라져** 지웠다(javap 실측: 그 이름의 class 파일 없음).

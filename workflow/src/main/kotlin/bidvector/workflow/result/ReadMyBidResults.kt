@@ -14,7 +14,6 @@ import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.OpeningProgressPolicyData
 import bidvector.workflow.opening.OpeningResultView
 import bidvector.workflow.opening.resolveOpeningResultView
-import bidvector.workflow.profile.BusinessProfileReader
 import bidvector.workflow.strategy.Clock
 import java.time.Instant
 
@@ -61,7 +60,7 @@ class ReadMyBidResults(
     private val bids: RecordedBidReadPort,
     private val openingFacts: BatchOpeningFactsPort,
     private val winnerNames: AwardWinnerNamePort,
-    private val profiles: BusinessProfileReader,
+    private val operatorNames: OperatorTradeNamePort,
     private val clock: Clock,
     private val openingPolicy: OpeningProgressPolicyData,
     private val matchingPolicy: AwardMatchingPolicyData,
@@ -71,7 +70,7 @@ class ReadMyBidResults(
         val resolvable = recorded.mapNotNull { it.notice.toNoticeId() }.toSet()
         val facts = openingFacts.lookupAll(resolvable)
         val winners = winnerNames.winnerNames(resolvable)
-        val operator = profiles.operatorTradeName(account)
+        val operator = operatorNames.tradeNameOf(account)
         val now = clock.now()
         val cases =
             recorded.map { bid ->
@@ -122,13 +121,6 @@ class ReadMyBidResults(
         )
     }
 }
-
-/**
- * 상호 원문 → 커널 입력. 「없음」의 길은 [OperatorTradeName.NotDeclared] 하나다 — 빈 문자열로
- * [OperatorTradeName.Declared] 를 만들 수 없으니 `null` 을 그쪽으로 접을 수도 없다.
- */
-private fun BusinessProfileReader.operatorTradeName(account: AccountId): OperatorTradeName =
-    details(account).tradeName?.let { OperatorTradeName.Declared(it.raw) } ?: OperatorTradeName.NotDeclared
 
 /**
  * 건의 공고 키 → 조회 키. 번호는 `String` 이라 값 객체로 접어야 [NoticeId] 가 선다.

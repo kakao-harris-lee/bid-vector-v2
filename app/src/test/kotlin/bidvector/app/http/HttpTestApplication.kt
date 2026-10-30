@@ -11,6 +11,7 @@ import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
 import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.OperatorTradeName
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
@@ -236,7 +237,10 @@ open class HttpTestApplication {
             bids = fakeRecordedBids,
             openingFacts = fakeBatchOpeningFacts,
             winnerNames = fakeAwardWinnerNames,
-            profiles = inMemoryBusinessProfileStore,
+            operatorNames = { account ->
+                inMemoryBusinessProfileStore.details(account).tradeName
+                    ?.let { OperatorTradeName.Declared(it.raw) } ?: OperatorTradeName.NotDeclared
+            },
             clock = clock,
             openingPolicy = OPENING_PROGRESS_POLICY,
             matchingPolicy = AwardMatchingPolicyData(listOf("주식회사", "(주)")),

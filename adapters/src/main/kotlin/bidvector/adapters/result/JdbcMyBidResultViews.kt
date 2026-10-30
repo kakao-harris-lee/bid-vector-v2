@@ -34,7 +34,7 @@ import javax.sql.DataSource
  * (사본을 만들지 않는다 — 술어가 한 자리여야 변이도 한 자리에서 잡힌다). 그 안에서는 어떤
  * DML 도 DB 가 거부하고, 실 DB test 가 조회 전후의 **행 수 불변**과 함께 잰다.
  */
-private inline fun <T> DataSource.readOnly(block: (Connection) -> T): T =
+internal inline fun <T> DataSource.readOnly(block: (Connection) -> T): T =
     connection.use { connection ->
         connection.beginReadOnlySearchTransaction()
         try {

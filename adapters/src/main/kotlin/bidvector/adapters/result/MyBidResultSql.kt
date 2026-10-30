@@ -137,6 +137,19 @@ internal object MyBidResultSql {
           AND pii_masked_at IS NULL
         """
 
+    /**
+     * 운영자 상호 한 열 — 프로필 절의 **다른 칸(본사 소재지 · 나라장터 준비)을 읽지 않는다**.
+     * 담을 자리가 없는 값을 읽을 이유가 없다는 규율을 입력 쪽에도 건다.
+     */
+    val OPERATOR_TRADE_NAME_COLUMNS = listOf("trade_name")
+
+    val SELECT_OPERATOR_TRADE_NAME =
+        """
+        SELECT ${OPERATOR_TRADE_NAME_COLUMNS.joinToString(", ")}
+        FROM account_business_profile
+        WHERE account_id = ?
+        """
+
     /** 개찰 **결과**를 나르는 축 둘 — 7C⑤-a 의 목록을 그대로 쓴다(사본을 만들지 않는다). */
     val OPENING_RESULT_ENDPOINTS = OpeningResultViewSql.OPENING_RESULT_ENDPOINTS
 }

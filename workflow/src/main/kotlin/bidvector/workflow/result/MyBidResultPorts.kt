@@ -7,6 +7,7 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.procurement.NoticeId
 import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.OperatorTradeName
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.opening.NoticeOpeningFacts
 import java.time.Instant
@@ -105,4 +106,20 @@ fun interface BatchOpeningFactsPort {
  */
 fun interface AwardWinnerNamePort {
     fun winnerNames(notices: Set<NoticeId>): Map<NoticeId, AwardWinnerTradeName>
+}
+
+/**
+ * 운영자 상호 읽기 — 대사의 **운영자 쪽 입력** 하나다.
+ *
+ * `BusinessProfileReader` 를 그대로 받지 않는 이유가 둘이다. ① **조립 경계**: V22 프로필 타입을
+ * 이름 부르는 조립은 `ProfileWiring` 하나라는 것이 7C④ 가 세운 규율이고(`ProfileAssemblyBoundaryTest`),
+ * 결과 조회의 조립이 그 타입을 받으면 그 경계가 무너진다. ② **읽는 양**: 이 조회에 필요한 것은
+ * 상호 하나인데 그 포트는 절 전체(본사 소재지 · 나라장터 준비)를 낸다 — 담을 자리가 없는 값을
+ * 읽을 이유가 없다는 이 slice 의 규율을 입력 쪽에도 건다.
+ *
+ * 산출이 [OperatorTradeName] 이라 「미설정」이 값이고(빈 문자열이 아니다), 정규화는 커널이 한 번만
+ * 한다 — 원문 그대로 실어 보낸다(이중 정규화 금지, `TradeName` KDoc 과 맞물린다).
+ */
+fun interface OperatorTradeNamePort {
+    fun tradeNameOf(account: AccountId): OperatorTradeName
 }
