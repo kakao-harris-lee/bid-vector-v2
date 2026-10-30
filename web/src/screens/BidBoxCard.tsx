@@ -9,6 +9,7 @@ import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
   ACTION_INPUT,
+  OUTCOME_VALUES,
   OVERDUE_DISPLAY,
   bidBoxActionOf,
   type BidBoxAction,
@@ -27,9 +28,13 @@ export type ActionPayload =
   | { readonly kind: Exclude<BidBoxActionKind, 'RECORD_OUTCOME'>; readonly value: string }
   | { readonly kind: 'RECORD_OUTCOME'; readonly value: string; readonly outcome: Outcome };
 
-/** 그 선택지 값이 결과 enum 인가 — 개찰 둘은 `'true'`·`'false'` 라 아니다. */
+/**
+ * 그 선택지 값이 결과 enum 인가 — **선택지 표에서 파생한다**(CR r2 L2R-6). 앞 판은 결과 셋을
+ * 손으로 **두 번째** 적었고, 계약이 결과를 늘리면 `Outcome` 은 넓어지는데 이 술어만 새 값을
+ * 거부했다. 표를 출처로 쓰면 그 갈림이 생기지 않는다(L-9 의 소재지 처방과 같은 꼴).
+ */
 function isOutcome(value: string): value is Outcome {
-  return value === 'WON' || value === 'LOST' || value === 'FAILED_OR_REBID';
+  return OUTCOME_VALUES.has(value);
 }
 
 /**
@@ -50,6 +55,8 @@ function ActionForm({
   const input = ACTION_INPUT[action.kind];
   const [value, setValue] = useState('');
   const [missing, setMissing] = useState(false);
+  /** 고르기는 했는데 **그 값을 보낼 수 없다** — 표와 계약이 갈린 자리다(오늘 닿을 길은 없다). */
+  const [unsendable, setUnsendable] = useState(false);
   const groupId = useId();
 
   function send(): void {
@@ -58,10 +65,13 @@ function ActionForm({
       return;
     }
     if (action.kind === 'RECORD_OUTCOME') {
+      // 표의 선택지가 결과 enum 이 아니면 **보내지 않고 그 사실을 말한다**(앞 판은 `setMissing`
+      // 만 해서 경고가 `value === ''` 조건에 걸려 **아무 말도 없이 아무 일도 일어나지 않았다**).
+
       // 결과 기록은 **계약 enum 을 그대로** 싣는다 — 고른 선택지의 값이 그 타입이다. 표의
       // 선택지가 결과 enum 이 아니면 보내지 않는다(그 꼴은 표가 바뀌어야 생긴다).
       if (!isOutcome(value)) {
-        setMissing(true);
+        setUnsendable(true);
         return;
       }
       onSend({ kind: 'RECORD_OUTCOME', value, outcome: value });
@@ -106,6 +116,11 @@ function ActionForm({
       {missing && value === '' ? (
         <p data-testid="action-missing" role="alert" className="mt-2 text-xs text-bad-ink">
           {input.label} 을(를) 먼저 고르십시오 — 고르지 않은 값을 보내지 않습니다.
+        </p>
+      ) : null}
+      {unsendable ? (
+        <p data-testid="action-unsendable" role="alert" className="mt-2 text-xs text-bad-ink">
+          고른 값을 보낼 수 없습니다 — 이 화면이 아는 결과 어휘가 아닙니다.
         </p>
       ) : null}
       <div className="mt-3 flex gap-2">

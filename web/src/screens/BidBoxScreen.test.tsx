@@ -212,6 +212,36 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
     }
   });
 
+  /**
+   * **CR r2 L2R-1 의 회귀 test.** 앞 판은 `role="tabpanel"` 을 카드 `<ul>` 자체에 붙였고, 빈 탭에서는
+   * 그 `<ul>` 이 없어 `aria-controls` 가 **없는 id** 를 가리켰다(보조기술이 그 탭이 무엇을 여는지
+   * 말할 수 없는 자리로 되돌아갔다).
+   */
+  it('빈 탭에서도 패널이 있고 aria-controls 가 실재하는 요소를 가리킨다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    renderScreen();
+
+    await screen.findByTestId('bid-case-11');
+    fireEvent.click(screen.getByRole('tab', { name: /종료/u }));
+
+    expect(await screen.findByTestId('bid-box-empty')).toBeTruthy();
+    const panel = screen.getByRole('tabpanel');
+    const selected = screen.getByRole('tab', { selected: true });
+    expect(selected.getAttribute('aria-controls')).toBe(panel.getAttribute('id'));
+    // 빈 얼굴이 **패널 안**에 있다.
+    expect(panel.contains(screen.getByTestId('bid-box-empty'))).toBe(true);
+  });
+
+  /** 카드는 `<ul>` 의 자식으로 남는다 — `tabpanel` 이 그 목록을 **감싼다**. */
+  it('카드가 목록 부모를 잃지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    expect(card.parentElement?.tagName).toBe('UL');
+    expect(screen.getByRole('tabpanel').contains(card)).toBe(true);
+  });
+
   it('좌우 화살표로 탭을 옮기고 끝에서 감싼다', async () => {
     mocked.listBidCases.mockResolvedValue([bidCase({ state: 'BID_RECORDED' })]);
     renderScreen();

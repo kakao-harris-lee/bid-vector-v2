@@ -869,7 +869,11 @@ for (const { sourceFile, name } of inSrcFiles) {
   visitMeta(sourceFile);
 }
 
-// ⑤d **CSS 를 지나는 데이터 입구**(M7/7E-2 — OPEN ④ 를 닫음).
+// ⑤d **CSS 를 지나는 데이터 입구**(M7/7E-2 — OPEN ④ 의 **재현 꼴만** 닫는다).
+//
+// 닫는 범위를 정확히 적는다(CR r2 L2R-8): 아래 읽기 술어는 **식별자 둘이 DOM lib 심볼로
+// 해소되는지**만 본다. 같은 값을 가져오는 다른 길(식별자가 아닌 계산 접근 · CSSOM ·
+// Typed OM)은 **열려 있고** `reports/evidence/m7/7e2/checklist.md` §3.1 의 ⑥·⑦ 로 등재했다.
 //
 // 재현 꼴(7E-1 checklist §4 ④): `src/index.css` 에 `:root{--rows:"[…]"}` 를 적고 화면이
 // `getComputedStyle(…).getPropertyValue('--rows')` 로 읽는다. 자산을 더 내보내지 않으므로

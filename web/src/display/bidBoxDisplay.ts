@@ -164,6 +164,9 @@ const OPENING_CHOICES = [
   { value: 'false', label: BID_CASE_STATE_DISPLAY.OPENED_OUT_OF_RANK.label },
 ] as const;
 
+/** 결과 선택지의 **값 집합** — `isOutcome` 이 이것을 쓴다(손으로 두 번 적지 않는다). */
+export const OUTCOME_VALUES: ReadonlySet<string> = new Set<Outcome>(['WON', 'LOST', 'FAILED_OR_REBID']);
+
 /** 결과 셋 — 계약 enum 전수(`RecordOutcomeRequest.outcome`)이고 문면은 상태 표에서 온다. */
 const OUTCOME_CHOICES: readonly ActionChoice[] = [
   { value: 'WON', label: BID_CASE_STATE_DISPLAY.WON.label },

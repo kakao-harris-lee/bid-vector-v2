@@ -448,8 +448,8 @@ export function ProfileSection() {
         </div>
         {capacityMissing ? (
           <p data-testid="capacity-missing" role="alert" className="mt-2 text-xs text-bad-ink">
-            면허명과 **자리 구분 없는 정수** 금액·평가 연도가 필요합니다 — 쉼표·단위가 있으면
-            보내지 않습니다(잘린 금액이 저장되지 않게).
+            면허명과 자리 구분 없는 정수 금액·평가 연도가 필요합니다 — 쉼표·단위가 있으면 보내지
+            않습니다(잘린 금액이 저장되지 않게).
           </p>
         ) : null}
         <button

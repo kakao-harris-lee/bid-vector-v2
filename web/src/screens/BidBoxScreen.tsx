@@ -200,21 +200,26 @@ export function BidBoxScreen() {
       {cases.isError && !isUnauthorized(cases.error) ? (
         <ErrorFace testId="bid-box-error" onRetry={() => void cases.refetch()} />
       ) : null}
-      {cases.isSuccess && shown.length === 0 ? (
-        <EmptyFace display={EMPTY_TAB_DISPLAY} testId="bid-box-empty" />
-      ) : null}
-
-      {shown.length === 0 ? null : (
-        <ul role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} className="flex flex-col gap-3">
-          {shown.map((row) => (
-            <BidBoxCard
-              key={row.caseId}
-              bidCase={row}
-              onSend={(caseId, payload) => transition.mutate({ caseId, payload })}
-            />
-          ))}
-        </ul>
-      )}
+      {/* 패널 래퍼를 **항상** 그린다(CR r2 L2R-1): 앞 판은 `role="tabpanel"` 을 카드 `<ul>` 자체에
+          붙였고, 빈 탭에서는 그 `<ul>` 이 아예 없어 **`aria-controls` 가 없는 id 를 가리켰다**
+          (실측: `getElementById` null · `tabpanel` 역할 수 0). 겹쳐서 `<li>` 들이 목록 부모를
+          잃었다. 이제 `<div role="tabpanel">` 가 감싸고 그 안에 빈 얼굴 또는 `<ul>` 이 온다. */}
+      <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)}>
+        {cases.isSuccess && shown.length === 0 ? (
+          <EmptyFace display={EMPTY_TAB_DISPLAY} testId="bid-box-empty" />
+        ) : null}
+        {shown.length === 0 ? null : (
+          <ul className="flex flex-col gap-3">
+            {shown.map((row) => (
+              <BidBoxCard
+                key={row.caseId}
+                bidCase={row}
+                onSend={(caseId, payload) => transition.mutate({ caseId, payload })}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
 
       <ToastHost toast={toast} onDismiss={dismiss} />
     </section>
