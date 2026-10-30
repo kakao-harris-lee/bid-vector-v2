@@ -218,6 +218,25 @@ describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
     expect((await screen.findByTestId('edit-sent-value')).textContent).toBe('9');
   });
 
+  /**
+   * 조건을 **지우려고 비워 보낸 것**과 아직 보내지 않은 것은 다른 사실이다 — 둘 다 빈 칸으로
+   * 그리면 확인 화면이 무엇을 적용하려는지 말하지 못한다(여정이 그 자리를 잡았다).
+   */
+  it('비워 보낸 값은 「비움」이라고 말한다 — 빈 칸이 아니다', async () => {
+    mocked.readStrategy.mockResolvedValue(strategy({ requiredKeywordTerms: ['합성'] }));
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'REQUIRED_KEYWORD' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    renderScreen();
+    await beginEdit('REQUIRED_KEYWORD');
+
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    const sent = await screen.findByTestId('edit-sent-value');
+    expect(sent.textContent).toContain('비움');
+    expect(sent.textContent).not.toBe('');
+    expect(sent.textContent).not.toBe('값 없음');
+  });
+
   it('적용은 운영자가 본 개정을 싣는다', async () => {
     mocked.readStrategy.mockResolvedValue(strategy({ revision: 11 }));
     mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));

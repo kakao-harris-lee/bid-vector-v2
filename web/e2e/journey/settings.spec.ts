@@ -64,7 +64,10 @@ async function setRequiredKeyword(page: Page, raw: string): Promise<{ readonly s
   await expect(panel.getByTestId('edit-session-state')).toContainText('확인을 기다린다');
 
   // 확인 화면이 보이는 것은 **보낸 값**이다(세션 응답에 초안이 없다 — 계약).
-  await expect(panel.getByTestId('edit-sent-value')).toHaveText(raw === '' ? '값 없음' : raw);
+  // 비워 보낸 것은 **「비움」이라고 말한다** — 빈 칸으로 그리면 「아직 안 보냄」과 같아 보인다.
+  await expect(panel.getByTestId('edit-sent-value')).toHaveText(
+    raw === '' ? '비움 — 이 조건을 지웁니다' : raw,
+  );
 
   const confirmed = page.waitForResponse((one) => one.url().includes('/confirm') && one.request().method() === 'POST');
   await panel.getByRole('button', { name: '적용' }).click();
@@ -120,7 +123,9 @@ test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 
   for (const row of matched.rows) {
     const card = page.getByTestId(`suggestion-card-${row.noticeNumber}`);
     await expect(card).toBeVisible();
-    await expect(card.getByTestId('notice-title')).toHaveText(row.title ?? row.noticeNumber);
+    // 제안 카드의 제목은 **워크시트로 가는 링크**다(`notice-title` 를 쓰는 검색 카드와 다른
+    // 컴포넌트다 — 첫 실행이 그 차이로 붉었다). 접근 가능한 이름을 응답의 값과 대조한다.
+    await expect(card.getByRole('link')).toHaveText(row.title ?? row.noticeNumber);
   }
 
   // ④ 조건을 **다시 비운다** — 빈 얼굴로 돌아오는 것이 이 여정의 마지막 단언이고, 그래서 이

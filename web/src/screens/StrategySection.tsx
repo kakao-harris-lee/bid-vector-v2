@@ -285,6 +285,12 @@ function EditPanel({
   const display = STRATEGY_FIELD_DISPLAY[open.field];
   const input = SLOT_INPUT[FIELD_VALUE_SLOT[open.field]];
   const currentView = STRATEGY_FIELD_VALUE[open.field](strategy);
+  /**
+   * 보낸 값의 문면. **빈 어휘를 빈 자리로 보이지 않는다**(여정이 잡은 자리): 운영자가 조건을
+   * 지우려고 비워 보낸 것과 아직 아무것도 보내지 않은 것은 다른 사실이고, 둘 다 빈 칸으로
+   * 그리면 확인 화면이 무엇을 적용하려는지 말하지 못한다. `null` 만 「값 없음」이다.
+   */
+  const sentView = open.sent === null ? null : open.sent === '' ? '비움 — 이 조건을 지웁니다' : open.sent;
 
   return (
     <div data-testid="edit-session" className="rounded-lg border border-accent/40 bg-card p-4">
@@ -340,7 +346,7 @@ function EditPanel({
           {/* 보이는 값 둘 — **지금 값**(서버)과 **보낸 값**(운영자 입력)뿐이다. */}
           <dl className="grid gap-2 sm:grid-cols-2">
             <Field label="지금 값" value={currentView.text} testId="edit-current-value" />
-            <Field label="보낸 값" value={open.sent} testId="edit-sent-value" />
+            <Field label="보낸 값" value={sentView} testId="edit-sent-value" />
           </dl>
           <div className="flex flex-wrap gap-2">
             <button
