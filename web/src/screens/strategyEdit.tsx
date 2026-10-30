@@ -91,7 +91,10 @@ export interface StrategyEditSession {
  *
  * [strategy] 를 받는 이유는 확인이 **운영자가 본 개정**을 실어야 하기 때문이다(우회 3).
  */
-export function useStrategyEditSession(strategy: StrategyReadResponse): StrategyEditSession {
+export function useStrategyEditSession(
+  strategy: StrategyReadResponse,
+  onApplied?: () => void,
+): StrategyEditSession {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<OpenSession | null>(null);
   const [raw, setRaw] = useState('');
@@ -128,6 +131,11 @@ export function useStrategyEditSession(strategy: StrategyReadResponse): Strategy
       if (session.state === 'APPLIED' || session.state === 'CANCELLED' || session.state === 'EXPIRED') {
         setOpen(null);
         setRaw('');
+        if (session.state === 'APPLIED') {
+          // **적용된 쓰기만** 알린다(마법사가 체크리스트를 다시 읽는 자리다) — 취소·만료는
+          // 아무것도 바꾸지 않았으므로 다시 읽을 것이 없다.
+          onApplied?.();
+        }
         // 적용됐으면 **지금 값을 다시 읽는다** — 화면이 바뀐 값을 짐작하지 않는다.
         await queryClient.invalidateQueries({ queryKey: STRATEGY_QUERY_KEY });
         return;

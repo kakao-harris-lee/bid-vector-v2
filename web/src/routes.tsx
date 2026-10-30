@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router';
 import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
 import { BidBoxScreen } from './screens/BidBoxScreen';
+import { OnboardingScreen } from './screens/OnboardingScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayNoticesScreen } from './screens/TodayNoticesScreen';
 import { WorksheetScreen } from './screens/WorksheetScreen';
@@ -26,7 +27,7 @@ export interface ScreenSlot {
 }
 
 export const screenSlots: readonly ScreenSlot[] = [
-  { id: 'onboarding', path: '/start', label: 'A 시작하기' },
+  { id: 'onboarding', path: '/start', label: 'A 시작하기', element: <OnboardingScreen /> },
   { id: 'home', path: '/', label: 'B 오늘의 공고', element: <TodayNoticesScreen /> },
   // 공고 식별자는 **번호와 차수 두 칸**이다 — 한 문자열로 접으면 화면이 구분자를 지어내야 한다.
   { id: 'worksheet', path: '/notices/:noticeNumber/:noticeRound', label: 'C 공고 워크시트', element: <WorksheetScreen /> },

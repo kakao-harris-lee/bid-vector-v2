@@ -1,0 +1,313 @@
+// @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ApiError } from '../api/apiError';
+import * as queries from '../api/queries';
+import { ITEM_STATE_DISPLAY, ONBOARDING_ITEM_DISPLAY, ONBOARDING_ITEM_ORDER } from '../display/onboardingDisplay';
+
+import { OnboardingScreen } from './OnboardingScreen';
+
+vi.mock('../api/queries');
+
+type Checklist = queries.OnboardingChecklist;
+type Profile = queries.Profile;
+
+function checklist(overrides: Partial<Checklist> = {}): Checklist {
+  return { completed: [], pending: [], awaiting: [], ...overrides };
+}
+
+/** **전부 채워진** 프로필 — 체크리스트와 어긋나게 투입해 「화면이 값을 보고 판정하는가」를 잰다. */
+function filledProfile(): Profile {
+  return {
+    qualificationDeclared: true,
+    businessTypes: ['토목공사업'],
+    licensesDeclared: true,
+    licenseNames: ['토목건축공사업'],
+    regionTerms: ['서울'],
+    tradeName: '여정 건설',
+    headquartersRegion: 'SEOUL',
+    naraRegistration: 'REGISTERED',
+    naraRegisteredFields: ['CONSTRUCTION'],
+    businessCertificateExpiresOn: '2099-01-01',
+    unjudgedAxes: [],
+  };
+}
+
+function emptyProfile(): Profile {
+  return {
+    qualificationDeclared: false,
+    businessTypes: [],
+    licensesDeclared: false,
+    licenseNames: [],
+    regionTerms: [],
+    naraRegistration: 'UNANSWERED',
+    naraRegisteredFields: [],
+    unjudgedAxes: [],
+  };
+}
+
+function renderScreen() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const router = createMemoryRouter(
+    [
+      { path: '/start', element: <OnboardingScreen /> },
+      { path: '/', element: <p>오늘의 공고 자리</p> },
+    ],
+    { initialEntries: ['/start'] },
+  );
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+const mocked = vi.mocked(queries);
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
+  mocked.readProfile.mockResolvedValue(emptyProfile());
+  mocked.listConstructionCapacities.mockResolvedValue([]);
+  mocked.readStrategy.mockResolvedValue({
+    revision: 7,
+    focusCategories: [],
+    focusRegionTerms: [],
+    excludeRegionTerms: [],
+    requiredKeywordTerms: [],
+    excludeKeywordTerms: [],
+  });
+  mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }));
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe('시작하기 — 항목의 상태는 서버 판정에서만 온다', () => {
+  /**
+   * **우회 1 의 자리**(D-7E2b-1): 프로필이 전부 채워져 있어도 체크리스트가 미완이라고 하면
+   * 미완이다. 화면이 프로필·전략 값을 보고 완료를 추론하면 이 단언이 깨진다.
+   */
+  it('프로필이 채워져 있어도 체크리스트가 미완이면 미완이다', async () => {
+    mocked.readProfile.mockResolvedValue(filledProfile());
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }));
+    renderScreen();
+
+    for (const item of ONBOARDING_ITEM_ORDER) {
+      expect((await screen.findByTestId(`onboarding-state-${item}`)).textContent, item).toContain(
+        ITEM_STATE_DISPLAY.PENDING.label,
+      );
+    }
+  });
+
+  /** 같은 축의 반대쪽 — 프로필이 비어 있어도 서버가 완료라고 하면 완료다. */
+  it('프로필이 비어 있어도 체크리스트가 완료라면 완료다', async () => {
+    mocked.readProfile.mockResolvedValue(emptyProfile());
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ completed: [...ONBOARDING_ITEM_ORDER] }));
+    renderScreen();
+
+    expect((await screen.findByTestId('onboarding-state-TRADE_NAME')).textContent).toContain(
+      ITEM_STATE_DISPLAY.COMPLETED.label,
+    );
+  });
+
+  it('선행 대기는 그 사실과 선행 항목의 이름을 함께 낸다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        pending: ['TRADE_NAME'],
+        awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }],
+      }),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('onboarding-state-CONSTRUCTION_CAPACITY')).textContent).toContain(
+      ITEM_STATE_DISPLAY.AWAITING.label,
+    );
+    expect((await screen.findByTestId('onboarding-prerequisite-CONSTRUCTION_CAPACITY')).textContent).toContain(
+      ONBOARDING_ITEM_DISPLAY.NARA_READINESS.label,
+    );
+  });
+
+  /** 「해당 없음」은 **세 목록의 여집합**이다 — 미완으로 접으면 끝나지 않는 항목이 생긴다. */
+  it('세 목록 어디에도 없는 항목은 해당 없음이다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: ['TRADE_NAME'] }));
+    renderScreen();
+
+    expect((await screen.findByTestId('onboarding-state-CONSTRUCTION_CAPACITY')).textContent).toContain(
+      ITEM_STATE_DISPLAY.NOT_APPLICABLE.label,
+    );
+  });
+
+  it('진행률의 분모에 선행 대기가 들지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        completed: ['TRADE_NAME'],
+        pending: ['BUSINESS_TYPES'],
+        awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }],
+      }),
+    );
+    renderScreen();
+
+    const progress = await screen.findByTestId('onboarding-progress');
+    expect(progress.textContent).toContain('1 / 2');
+    expect(progress.textContent).not.toContain('/ 3');
+  });
+});
+
+describe('시작하기 — 쓰기 뒤에는 다시 읽는다', () => {
+  /** **우회 2**(D-7E2b-1): 쓰기 200 을 낙관적 완료로 쓰지 않는다. */
+  it('쓰기가 성공해도 체크리스트가 미완이라고 하면 미완이다', async () => {
+    mocked.replaceBusinessDetails.mockResolvedValue(emptyProfile());
+    renderScreen();
+
+    await screen.findByLabelText('상호');
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+
+    await waitFor(() => expect(mocked.replaceBusinessDetails).toHaveBeenCalled());
+    await waitFor(() => expect(mocked.readOnboardingChecklist.mock.calls.length).toBeGreaterThan(1));
+    expect((await screen.findByTestId('onboarding-state-TRADE_NAME')).textContent).toContain(
+      ITEM_STATE_DISPLAY.PENDING.label,
+    );
+  });
+
+  it('다시 읽은 체크리스트가 완료라고 하면 그때 완료가 된다', async () => {
+    mocked.replaceBusinessDetails.mockResolvedValue(filledProfile());
+    mocked.readOnboardingChecklist
+      .mockResolvedValueOnce(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }))
+      .mockResolvedValue(
+        checklist({
+          completed: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION'],
+          pending: ['BUSINESS_TYPES', 'LICENSES', 'CONSTRUCTION_CAPACITY', 'BUDGET_RANGE', 'WATCH_CONDITIONS'],
+        }),
+      );
+    renderScreen();
+
+    await screen.findByLabelText('상호');
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-state-TRADE_NAME').textContent).toContain(
+        ITEM_STATE_DISPLAY.COMPLETED.label,
+      ),
+    );
+  });
+});
+
+describe('시작하기 — 단계는 쓰기 단위다', () => {
+  /** D-7E2b-7 — 같은 절을 세 번 덮어쓰지 않도록 항목 셋이 **한 폼** 뒤에 선다. */
+  it('사업 정보 단계 하나가 상호·소재지·나라장터 준비를 함께 든다', async () => {
+    renderScreen();
+
+    expect(await screen.findByLabelText('상호')).toBeTruthy();
+    expect(screen.getByLabelText('본사 소재지')).toBeTruthy();
+    expect(screen.getByLabelText('나라장터 준비')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: '사업 정보 저장' }).length).toBe(1);
+  });
+
+  it('첫 단계는 미완 항목이 있는 첫 단계다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        completed: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION', 'BUSINESS_TYPES', 'LICENSES'],
+        pending: ['BUDGET_RANGE'],
+      }),
+    );
+    renderScreen();
+
+    // 금액대 단계가 서 있다 — 전략은 **편집 세션**으로만 바뀐다(계약에 직접 쓰는 길이 없다).
+    expect(await screen.findByTestId('strategy-row-MIN_BUDGET')).toBeTruthy();
+    expect(screen.queryByLabelText('상호')).toBeNull();
+  });
+
+  it('단계를 골라 옮길 수 있고 그 단계의 폼만 선다', async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('onboarding-step-WATCH'));
+
+    expect(await screen.findByTestId('strategy-row-FOCUS_CATEGORY')).toBeTruthy();
+    expect(screen.queryByLabelText('상호')).toBeNull();
+  });
+
+  /** 설정 화면과 **같은 컴포넌트**다 — 같은 필드를 두 폼이 따로 저장하지 않는다(D-7E2b-8). */
+  it('전략 단계의 쓰기는 편집 세션을 지난다', async () => {
+    mocked.beginEditSession.mockResolvedValue({
+      sessionId: 'sess-1',
+      state: 'WAITING_FOR_VALUE',
+      sessionVersion: 1,
+      expiresAt: '2099-01-01T00:00:00Z',
+      field: 'FOCUS_CATEGORY',
+    });
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('onboarding-step-WATCH'));
+    const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+
+    await waitFor(() => expect(mocked.beginEditSession).toHaveBeenCalledWith({ field: 'FOCUS_CATEGORY' }));
+    expect(await screen.findByTestId('edit-session')).toBeTruthy();
+  });
+});
+
+describe('시작하기 — 다음 행동 하나', () => {
+  /** D-7E2b-4 — 미완 0 이면 화면 B 로 가는 행동 하나다. */
+  it('미완이 0 이면 오늘의 공고로 가는 행동 하나가 뜬다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ completed: [...ONBOARDING_ITEM_ORDER] }));
+    renderScreen();
+
+    const done = await screen.findByTestId('onboarding-complete');
+    expect(within(done).getByRole('link').getAttribute('href')).toBe('/');
+  });
+
+  it('선행 대기만 남아도 미완이 0 이면 그 행동이 뜬다 — 선행 대기는 막지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        completed: ['TRADE_NAME'],
+        awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }],
+      }),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('onboarding-complete')).toBeTruthy();
+  });
+
+  it('미완이 있으면 그 행동이 없다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('onboarding-progress');
+    expect(screen.queryByTestId('onboarding-complete')).toBeNull();
+  });
+});
+
+describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
+  /** **우회 8** — 읽기 실패를 빈 체크리스트로 접으면 「전부 완료」로 보인다. */
+  it('읽기가 실패하면 오류 얼굴이고 완료 행동이 없다', async () => {
+    mocked.readOnboardingChecklist.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    expect(await screen.findByTestId('onboarding-error')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-complete')).toBeNull();
+    expect(screen.queryByTestId('onboarding-progress')).toBeNull();
+  });
+
+  it('읽기가 401 이면 로그인 길을 낸다', async () => {
+    mocked.readOnboardingChecklist.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    expect(await screen.findByTestId('signed-out')).toBeTruthy();
+  });
+
+  /** D-7E2b-3 — 빈 자리 + 「준비 중」뿐이다. 입력칸·버튼을 만들지 않는다. */
+  it('사업자번호·알림 채널·첫 공고 미리보기는 빈 자리뿐이다', async () => {
+    renderScreen();
+
+    const notReady = await screen.findByTestId('onboarding-not-ready');
+    expect(notReady.textContent).toContain('사업자번호');
+    expect(notReady.textContent).toContain('알림 채널');
+    expect(notReady.textContent).toContain('첫 공고');
+    expect(within(notReady).queryAllByRole('textbox')).toStrictEqual([]);
+    expect(within(notReady).queryAllByRole('button')).toStrictEqual([]);
+  });
+});

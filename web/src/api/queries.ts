@@ -25,6 +25,7 @@ export type StrategyReadResponse = components['schemas']['StrategyReadResponse']
 export type EditSessionResponse = components['schemas']['EditSessionResponse'];
 export type Profile = components['schemas']['Profile'];
 export type ConstructionCapacity = components['schemas']['ConstructionCapacity'];
+export type OnboardingChecklist = components['schemas']['OnboardingChecklist'];
 
 type NoticesResultState = operations['searchNotices']['responses']['200']['headers']['X-Result-State'];
 type SuggestionsResultState = operations['listSuggestions']['responses']['200']['headers']['X-Result-State'];
@@ -421,6 +422,18 @@ export async function removeConstructionCapacity(
   body: components['schemas']['RemoveConstructionCapacityRequest'],
 ): Promise<readonly ConstructionCapacity[]> {
   const { data, error, response } = await apiClient.POST('/api/profile/construction-capacities/remove', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
+ * 시작하기 체크리스트(M7/7E-2b) — **항목별 진행 상태를 서버가 판정한다**(7C④-3). 응답은 세
+ * 목록이고 「해당 없음」은 그 여집합이다. 화면은 프로필·전략 값에서 완료를 추론하지 않는다.
+ */
+export async function readOnboardingChecklist(): Promise<OnboardingChecklist> {
+  const { data, error, response } = await apiClient.GET('/api/onboarding-checklist');
   if (data === undefined) {
     raise(response.status, error);
   }

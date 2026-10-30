@@ -19,6 +19,7 @@ import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { NoticeCard, SuggestionCard } from './NoticeCard';
+import { OnboardingBanner } from './OnboardingScreen';
 
 /** 한 쪽 크기 — 계약의 상한(100) 안이다. 「더 보기」가 다음 쪽을 이어 붙인다(CR M-1). */
 const PAGE_SIZE = 20;
@@ -129,6 +130,9 @@ export function TodayNoticesScreen() {
   return (
     <section data-testid="screen-home" className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
       <h2 className="text-lg font-semibold">오늘의 공고</h2>
+
+      {/* 시작하기로 가는 **진입 하나**(M7/7E-2b, D-7E2b-4) — 서버의 미완이 0 이면 뜨지 않는다. */}
+      <OnboardingBanner />
 
       <form onSubmit={submit} className="flex flex-col gap-2">
         <label className="flex flex-col gap-1">
