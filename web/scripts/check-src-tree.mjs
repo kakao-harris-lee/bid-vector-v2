@@ -486,19 +486,6 @@ function aliasOrSelf(typeChecker, symbol) {
   }
 }
 
-/** 상대 지정자를 실제 파일 경로로 — 확장자는 TS 해석 규칙대로 붙여 본다. */
-function resolveImportTarget(containingFile, specifier) {
-  const base = resolve(dirname(containingFile.fileName), specifier);
-  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, resolve(base, 'index.ts')]) {
-    try {
-      return realpathSync(candidate);
-    } catch {
-      /* 다음 후보 */
-    }
-  }
-  return undefined;
-}
-
 /** 별칭(import·재수출·네임스페이스)을 끝까지 따라간 심볼. */
 function resolveToTarget(typeChecker, node) {
   let symbol = typeChecker.getSymbolAtLocation(node);
@@ -550,17 +537,53 @@ if (clientSymbol === undefined) {
   }
 }
 
-// ⑤b-2b **허용 자리의 import 꼴 고정 · export 타입 전수**(v r4 M-1).
+// ⑤b-2b **허용 자리의 import 꼴 고정 · export 종류 전수**(v r4 M-1 · M7/7E-2 가 OPEN ① 을 닫음).
 //
 // 심볼 추적만으로는 한 꼴이 남는다: `import * as C from './client'; export const ns = C;` —
 // 그 자리는 **허용된 import** 이고, 밖으로 나가는 것은 `ns` 라는 **다른 이름의 네임스페이스**다.
 // 화면은 그것을 계산 키로 집어 미승인 쌍을 부를 수 있었다(실측: 정적 다섯 층 모두 0).
 //
+// **`OPEN-7E-GATE-RESIDUAL` ① 이 남긴 두 구멍을 여기서 막는다**(7E-1 checklist §4):
+//   · 앞 판은 지정자를 **손으로** 풀었다(확장자 후보를 붙여 보는 resolver). 그래서 `./client.js`
+//     로 적으면 TS 는 그것을 `client.ts` 로 해석하는데 이 게이트는 **client 로 보지 못해** import
+//     꼴 검사를 건너뛰었다. 이제 **TS 자신의 해석**을 쓴다
+//     (`checker.getSymbolAtLocation(moduleSpecifier)` 의 선언이 그 소스 파일인가).
+//   · 앞 판은 export 를 **타입 동일성**으로 비교했다. `: object` 주석 하나로 빗나갔다. 이제
+//     **선언 종류 전수**로 본다 — 값 export 는 함수 선언뿐이고 **모르는 종류는 기본 위반**이다.
+//
 // 두 자리에서 닫는다.
 //   ⓐ 호출 자리가 client 모듈을 끌어오는 꼴은 **이름 지정 `{ apiClient }` 하나**뿐이다 —
 //      네임스페이스·default import 는 그 자체로 위반이다(그 꼴이 아니면 능력이 이름을 잃는다).
-//   ⓑ 호출 자리의 **export 전수**에서 그 능력의 타입이 나가지 않는다 — 이름을 무엇으로 바꾸든,
-//      `export default` 로 내보내든, 타입 동일성으로 걸린다.
+//   ⓑ 호출 자리의 **export 선언 종류 전수**가 허용 집합 안이다 — 변수 export·클래스 export·
+//      네임스페이스 재포장은 종류로 걸리고, 타입 주석으로 비켜 갈 자리가 없다.
+
+/**
+ * **TS 가 그 지정자를 무엇으로 해석했는가** — 손 resolver 를 대신한다(OPEN ① ⓐ). 모듈 심볼의
+ * 선언은 소스 파일이므로 그 파일의 realpath 를 비교한다.
+ */
+function specifierResolvesTo(typeChecker, moduleSpecifier, targetRealPath) {
+  const symbol = typeChecker.getSymbolAtLocation(moduleSpecifier);
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+  if (declaration === undefined || !ts.isSourceFile(declaration)) {
+    return false;
+  }
+  try {
+    return realpathSync(declaration.fileName) === targetRealPath;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 호출 자리의 export 로 허용하는 **선언 종류**. 값은 함수 선언뿐이고 나머지는 타입 층이다 —
+ * 그 밖(변수·클래스·enum·네임스페이스·재수출 대상)은 **기본 위반**이다. 열거를 늘리는 것이
+ * 곧 「무엇을 내보낼 수 있는가」를 넓히는 결정이므로 그 diff 가 드러나야 한다.
+ */
+const ALLOWED_CALLER_EXPORT_KINDS = new Set([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.TypeAliasDeclaration,
+  ts.SyntaxKind.InterfaceDeclaration,
+]);
 if (clientSymbol !== undefined && clientSourceFile !== undefined) {
   const callerSource = inSrcFiles.find((one) => one.name === CLIENT_MODULE_CALLER)?.sourceFile;
   if (callerSource === undefined) {
@@ -571,8 +594,8 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
     for (const statement of callerSource.statements) {
       if (
         !ts.isImportDeclaration(statement) ||
-        !ts.isStringLiteral(statement.moduleSpecifier) ||
-        resolveImportTarget(callerSource, statement.moduleSpecifier.text) !== clientModuleReal
+        !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+        !specifierResolvesTo(checker, statement.moduleSpecifier, clientModuleReal)
       ) {
         continue;
       }
@@ -605,13 +628,13 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
       );
     }
 
-    // ⓑ
-    const capabilityType = checker.getTypeOfSymbolAtLocation(
-      clientSymbol,
-      clientSymbol.valueDeclaration ?? clientSourceFile,
-    );
+    // ⓑ — **선언 종류 전수**. 타입 비교를 쓰지 않는 이유는 위 주석의 둘째 축이다(OPEN ① ⓑ).
     const callerModuleSymbol = checker.getSymbolAtLocation(callerSource);
-    for (const exported of callerModuleSymbol === undefined ? [] : checker.getExportsOfModule(callerModuleSymbol)) {
+    const callerExports = callerModuleSymbol === undefined ? [] : checker.getExportsOfModule(callerModuleSymbol);
+    if (callerExports.length === 0) {
+      fail(`${CLIENT_MODULE_CALLER} 의 export 를 하나도 읽지 못했다 — 이 층이 공허해진다`);
+    }
+    for (const exported of callerExports) {
       const target = (exported.flags & ts.SymbolFlags.Alias) !== 0 ? aliasOrSelf(checker, exported) : exported;
       if (target === clientSymbol || target === clientModuleSymbol) {
         fail(`${CLIENT_MODULE_CALLER} 가 서버 호출 능력을 ${exported.name} 으로 내보낸다`);
@@ -619,13 +642,14 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
       }
       const declaration = target.valueDeclaration ?? target.declarations?.[0];
       if (declaration === undefined) {
+        fail(`${CLIENT_MODULE_CALLER} 의 export ${exported.name} 의 선언을 찾지 못했다 — 모르는 것은 통과시키지 않는다`);
         continue;
       }
-      const type = checker.getTypeOfSymbolAtLocation(target, declaration);
-      if (type === capabilityType || type === checker.getTypeOfSymbolAtLocation(clientModuleSymbol ?? clientSymbol, clientSourceFile)) {
+      if (!ALLOWED_CALLER_EXPORT_KINDS.has(declaration.kind)) {
         fail(
-          `${CLIENT_MODULE_CALLER} 의 export ${exported.name} 이 서버 호출 능력 자체를 나른다 ` +
-            '— 이름을 바꾸거나 네임스페이스로 싸도 타입이 같다',
+          `${CLIENT_MODULE_CALLER} 의 export ${exported.name} 이 허용 종류가 아니다 ` +
+            `(${ts.SyntaxKind[declaration.kind]}) — 값 export 는 함수 선언뿐이다(변수·클래스·네임스페이스 재포장은 ` +
+            '서버 호출 능력을 이름만 바꿔 내보내는 자리였다)',
         );
       }
     }
