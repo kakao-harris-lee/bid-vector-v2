@@ -320,6 +320,26 @@ describe('화면 C — 투찰가 요청의 세 가격 축(G2 13)', () => {
     const grounds = await screen.findByTestId('floor-rate-grounds');
     expect(grounds.textContent).toContain('0.8745');
   });
+
+  /**
+   * DEC-10(7C②-b) — 개연 범위 밖 게시값은 **사유가 보이고 숫자는 보이지 않는다**. 계약이 그
+   * 칸을 `null` 로 내므로 화면에 숫자가 설 자리가 없고, 출처는 원문 사실로 남는다.
+   */
+  it('개연 범위 밖 게시 하한율은 사유가 보이고 숫자는 보이지 않는다', async () => {
+    mocked.requestBidPrice.mockResolvedValue({
+      ...PRICE,
+      floorRateGroundsState: 'IMPLAUSIBLE',
+      publishedFloorRateFraction: null,
+      publishedFloorRateOrigin: 'NOTICE_VALUE',
+    });
+    renderScreen();
+    await askPrice();
+
+    const grounds = await screen.findByTestId('floor-rate-grounds');
+    expect(grounds.textContent).toContain('개연 범위 밖');
+    expect(grounds.textContent).toContain('공고 게시값');
+    expect(grounds.textContent).not.toMatch(/\d/);
+  });
 });
 
 describe('화면 C — 자격 카드(G2 13)', () => {
