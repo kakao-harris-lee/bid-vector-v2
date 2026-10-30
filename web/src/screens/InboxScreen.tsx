@@ -329,6 +329,9 @@ export function InboxScreen() {
           error={read.error}
           onRetry={() => {
             if (read.variables !== undefined) {
+              // **다시 장전한다**(r3 CR M-2 ③). 이 버튼은 클릭 경로를 지나지 않으므로 장전이
+              // 비어 있고, 성공하면 실패 얼굴이 사라지면서 포커스가 또 `<body>` 로 떨어진다.
+              pendingFocus.current = read.variables.focus;
               read.mutate(read.variables);
             }
           }}

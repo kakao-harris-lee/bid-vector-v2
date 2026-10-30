@@ -270,6 +270,33 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
   });
 
   /**
+   * **실패 뒤 「다시 시도」가 성공하면 그 행으로 돌아간다**(r3 CR M-2 ③). 그 버튼은 클릭 경로를
+   * 지나지 않아 장전이 비어 있고, 성공하면 실패 얼굴이 사라지면서 포커스가 또 `<body>` 로
+   * 떨어졌다.
+   */
+  it('실패 뒤 다시 시도가 성공하면 포커스가 그 행으로 돌아온다', async () => {
+    mocked.markNotificationRead.mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
+    const failure = await screen.findByTestId('write-failure');
+
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    fireEvent.click(within(failure).getByRole('button', { name: /다시 시도/u }));
+
+    await waitFor(() =>
+      expect(
+        document.activeElement,
+        '다시 시도가 성공했는데 포커스가 갈 곳을 잃었다',
+      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')),
+    );
+  });
+
+  /**
    * **장전이 남지 않는다**(r3 CR M-2 ⓑ). 남기면 나중의 **무관한** 재조회가 포커스를 옛 행으로
    * 끌어간다 — `BidBoxScreen` 주석이 적어 둔 바로 그 사고다.
    */
