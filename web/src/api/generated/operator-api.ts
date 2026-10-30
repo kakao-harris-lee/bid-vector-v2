@@ -1358,24 +1358,33 @@ export interface components {
                 noticeNumber: string;
                 /** @description 공고 차수. */
                 noticeRound: string;
-                /** @description **운영자가 적은** 건 상태. 서버 대사와 다른 칸이다. */
-                recordedState: string;
+                /**
+                 * @description **운영자가 적은** 건 상태. 서버 대사와 다른 칸이다.
+                 * @enum {string}
+                 */
+                recordedState: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
                 /** @description 내 투찰 금액(원). */
                 submittedAmountWon: number;
                 /** @description 투찰 금액의 통화. */
                 submittedAmountCurrency: string;
                 /** @description 투찰 금액의 과세 처리. */
                 submittedAmountVatTreatment: string;
-                /** @description 투찰 금액의 출처. **오늘은 언제나 OPERATOR_ENTERED 다** — 투찰가 메뉴가 출하 경로에 없어 PRICE_MENU 를 만들 길이 없다(알려진 제한). */
-                submittedAmountOrigin: string;
+                /**
+                 * @description 투찰 금액의 출처. **오늘은 언제나 OPERATOR_ENTERED 다** — 투찰가 메뉴가 출하 경로에 없어 PRICE_MENU 를 만들 길이 없다(알려진 제한).
+                 * @enum {string}
+                 */
+                submittedAmountOrigin: "OPERATOR_ENTERED" | "PRICE_MENU";
                 /** @description 메뉴에서 고른 안의 참조. 출처가 PRICE_MENU 일 때만 값이 있고, 오늘은 **언제나 null** 이다. */
                 chosenOptionRef: string | null;
                 /** @description 운영자가 나라장터에 낸 시각(진술). */
                 submittedAt: string;
                 /** @description 그 사실을 이 시스템에 확인한 시각(서버 시계). */
                 confirmedAt: string;
-                /** @description 개찰 결과 상태. 공고 단위 개찰 조회(readOpeningResult)와 **같은 어휘**다. */
-                openingState: string;
+                /**
+                 * @description 개찰 결과 상태. 공고 단위 개찰 조회(readOpeningResult)와 **같은 어휘**다.
+                 * @enum {string}
+                 */
+                openingState: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "OPENED" | "FAILED_BID" | "REBID" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT";
                 /** @description **확정** 낙찰가(원). 잠정 1위 금액이 아니다. */
                 confirmedAwardAmountWon: number | null;
                 /** @description 확정 낙찰가의 통화. */
@@ -1386,14 +1395,26 @@ export interface components {
                 confirmedAwardAmountVatTreatment: string | null;
                 /** @description 확정 낙찰가의 출처. */
                 confirmedAwardAmountProvenance: string | null;
-                /** @description **서버 대사 판정**. UNDECIDABLE 은 패찰이 아니다 — 견줄 상호나 개찰 결과가 아직 없다는 뜻이다. */
-                reconciledOutcome: string;
-                /** @description 판정이 서지 않은 사유. reconciledOutcome 이 UNDECIDABLE 일 때만 값이 있다. */
-                reconciliationBlocker: string | null;
-                /** @description 운영자 기록과 서버 대사의 관계. DISAGREE 는 **어긋났다는 사실**일 뿐 어느 쪽이 틀렸다는 판정이 아니다. */
-                outcomeAgreement: string;
-                /** @description 차이의 상태. 확정 낙찰가가 없으면 AWARD_ABSENT 이고 **잠정 금액으로 채우지 않는다**. */
-                gapState: string;
+                /**
+                 * @description **서버 대사 판정**. UNDECIDABLE 은 패찰이 아니다 — 견줄 상호나 개찰 결과가 아직 없다는 뜻이다.
+                 * @enum {string}
+                 */
+                reconciledOutcome: "WON" | "LOST" | "FAILED_BID" | "REBID" | "UNDECIDABLE";
+                /**
+                 * @description 판정이 서지 않은 사유. reconciledOutcome 이 UNDECIDABLE 일 때만 값이 있다.
+                 * @enum {string|null}
+                 */
+                reconciliationBlocker: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT" | "OPERATOR_NAME_NOT_DECLARED" | "OPERATOR_NAME_NORMALIZES_TO_EMPTY" | "WINNER_NAME_NOT_PUBLISHED" | "WINNER_NAME_NORMALIZES_TO_EMPTY" | null;
+                /**
+                 * @description 운영자 기록과 서버 대사의 관계. DISAGREE 는 **어긋났다는 사실**일 뿐 어느 쪽이 틀렸다는 판정이 아니다.
+                 * @enum {string}
+                 */
+                outcomeAgreement: "AGREE" | "DISAGREE" | "NOT_COMPARABLE";
+                /**
+                 * @description 차이의 상태. 확정 낙찰가가 없으면 AWARD_ABSENT 이고 **잠정 금액으로 채우지 않는다**.
+                 * @enum {string}
+                 */
+                gapState: "COMPUTED" | "AWARD_ABSENT";
                 /** @description 내 투찰가 − 확정 낙찰가(원). 음수는 내가 더 낮게 냈다는 뜻이다. 두 금액의 과세 축이 같다는 보장은 없다. */
                 gapWon: number | null;
                 /** @description 차이의 통화. */
@@ -1403,8 +1424,11 @@ export interface components {
             aggregate: {
                 /** @description 투찰 기록이 있는 실투찰 건의 수. 두 축이 같은 표본을 센다. */
                 sampleSize: number;
-                /** @description 운영자가 적은 결과 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**. */
-                recordedState: string;
+                /**
+                 * @description 운영자가 적은 결과 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
+                 * @enum {string}
+                 */
+                recordedRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
                 /** @description 운영자가 적은 결과 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
                 recordedAwardRate: string | null;
                 /** @description 운영자가 적은 결과 축의 낙찰 건 수(분자). */
@@ -1417,8 +1441,11 @@ export interface components {
                 recordedFailedOrRebidCount: number;
                 /** @description 운영자가 적은 결과 축의 미확정·판정 불가 건 수(분모 밖). */
                 recordedUndecidedCount: number;
-                /** @description 서버 대사 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**. */
-                reconciledState: string;
+                /**
+                 * @description 서버 대사 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
+                 * @enum {string}
+                 */
+                reconciledRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
                 /** @description 서버 대사 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
                 reconciledAwardRate: string | null;
                 /** @description 서버 대사 축의 낙찰 건 수(분자). */

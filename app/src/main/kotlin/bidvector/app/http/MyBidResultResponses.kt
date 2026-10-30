@@ -106,6 +106,10 @@ data class MyBidCaseResponse(
  * 집계 — **두 축을 병기**한다(D-7C5B-9). 축마다 분자·분모·표본·제외 둘을 함께 싣고, 분모가 0 이면
  * 비율 칸이 비고 상태가 「부재」다(**0% 가 아니다**).
  *
+ * 비율 상태 칸 이름이 `…RateState` 인 이유(r1 CR L-1): 건의 `recordedState` 는 **건 상태**
+ * 어휘이고 집계의 것은 **비율 상태** 어휘다. 한 응답에서 같은 이름이 두 어휘를 뜻하면 소비자가
+ * 같은 글자를 두 번 다르게 읽어야 한다.
+ *
  * [reconciliationBlockers] 는 표본에 나타난 판정 불가 사유 전수다 — 대사 분모가 0 일 때 그것이
  * 곧 **분모 0 의 사유**다(오늘 production 의 답은 `WINNER_NAME_NOT_PUBLISHED` 하나가 될
  * 것이다: 낙찰자 상호 적재 경로가 출하 조립에 없다, `OPEN-SET01-AWARD-NAME-INGEST`).
@@ -115,14 +119,14 @@ data class MyBidCaseResponse(
  */
 data class MyBidAggregateResponse(
     val sampleSize: Int,
-    val recordedState: String,
+    val recordedRateState: String,
     val recordedAwardRate: String?,
     val recordedWonCount: Int,
     val recordedLostCount: Int,
     val recordedDenominator: Int,
     val recordedFailedOrRebidCount: Int,
     val recordedUndecidedCount: Int,
-    val reconciledState: String,
+    val reconciledRateState: String,
     val reconciledAwardRate: String?,
     val reconciledWonCount: Int,
     val reconciledLostCount: Int,
@@ -135,14 +139,14 @@ data class MyBidAggregateResponse(
         fun from(aggregate: MyBidResultAggregate): MyBidAggregateResponse =
             MyBidAggregateResponse(
                 sampleSize = aggregate.sampleSize,
-                recordedState = rateStateTokenOf(aggregate.recorded.rate),
+                recordedRateState = rateStateTokenOf(aggregate.recorded.rate),
                 recordedAwardRate = rateValueOf(aggregate.recorded.rate),
                 recordedWonCount = aggregate.recorded.wonCount,
                 recordedLostCount = aggregate.recorded.lostCount,
                 recordedDenominator = aggregate.recorded.denominator,
                 recordedFailedOrRebidCount = aggregate.recorded.failedOrRebidCount,
                 recordedUndecidedCount = aggregate.recorded.undecidedCount,
-                reconciledState = rateStateTokenOf(aggregate.reconciled.rate),
+                reconciledRateState = rateStateTokenOf(aggregate.reconciled.rate),
                 reconciledAwardRate = rateValueOf(aggregate.reconciled.rate),
                 reconciledWonCount = aggregate.reconciled.wonCount,
                 reconciledLostCount = aggregate.reconciled.lostCount,

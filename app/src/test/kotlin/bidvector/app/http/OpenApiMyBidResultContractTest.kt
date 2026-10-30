@@ -1,11 +1,14 @@
 package bidvector.app.http
 
+import bidvector.bidding.BidStateTag
+import bidvector.workflow.result.AwardRateAbsence
+import bidvector.workflow.result.OutcomeAgreement
 import bidvector.workflow.result.ReconciliationBlocker
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
+import org.junit.jupiter.api.Test
 
 /** operation 의 좌표 — **구현 상수에서 받는다**(리터럴을 쓰면 등식을 세우지 않고 말만 한다). */
 private val BID_RESULTS_PATH = AccountScopedRoutes.BID_RESULTS
@@ -48,6 +51,19 @@ class OpenApiMyBidResultContractTest {
         (propertiesOf(resultsSchema())["cases"] as Map<String, Any?>)["items"] as Map<String, Any?>
 
     private fun aggregateSchema(): Map<String, Any?> = propertiesOf(resultsSchema())["aggregate"] as Map<String, Any?>
+
+    private fun enumOf(
+        properties: Map<String, Any?>,
+        key: String,
+    ): Set<String> {
+        val definition = requireNotNull(properties[key] as? Map<String, Any?>) { "계약에 $key 가 없다" }
+        val values = requireNotNull(definition["enum"] as? List<String>) { "$key 가 enum 이 아니다" }
+        return values.toSet()
+    }
+
+    private fun openingResultSchema(): Map<String, Any?> =
+        ((spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>)["OpeningResultView"]
+            as Map<String, Any?>
 
     @Test
     fun `최상위 키가 Kotlin DTO 와 같고 전부 required 다`() {
@@ -109,26 +125,47 @@ class OpenApiMyBidResultContractTest {
     }
 
     /**
-     * 판정 불가 사유의 **어휘가 커널과 같다** — 계약이 사유를 열거하지는 않지만(enum 을 두면 네
-     * 자리에 사본이 생긴다) 설명이 드는 토큰은 실재해야 한다. 오늘 production 의 답인
-     * `WINNER_NAME_NOT_PUBLISHED` 가 그 하나다.
+     * **토큰 칸이 계약에서 enum 이고 그 집합이 Kotlin 과 같다**(r1 CR M-1).
+     *
+     * 앞 판의 test 는 spec 을 **전혀 파싱하지 않고** `ReconciliationBlocker.entries` 를 손으로
+     * 든 집합과 맞댔다 — 이름과 KDoc 이 재는 것보다 많이 말했다. 지금은 계약을 읽어 양방향으로
+     * 맞댄다: 계약에 없는 토큰도, 커널에 없는 토큰도 붉는다.
+     *
+     * 맨 `type: string` 이면 생성 TS 가 union 이 아니라 `string` 이라 소비자가 이 값으로 분기할
+     * 때 컴파일이 돕지 않는다(화면이 `satisfies Record<…>` 로 소진할 수 없다).
      */
     @Test
-    fun `설명이 드는 판정 불가 토큰이 커널 어휘에 실재한다`() {
-        val names = ReconciliationBlocker.entries.map { it.name }.toSet()
-        names shouldBe
-            setOf(
-                "NOTICE_ABSENT",
-                "NOT_OPENED_YET",
-                "NOT_COLLECTED",
-                "OBSERVED_NOT_PROMOTED",
-                "PROGRESS_UNRECOGNIZED",
-                "PROGRESS_ABSENT",
-                "OPERATOR_NAME_NOT_DECLARED",
-                "OPERATOR_NAME_NORMALIZES_TO_EMPTY",
-                "WINNER_NAME_NOT_PUBLISHED",
-                "WINNER_NAME_NORMALIZES_TO_EMPTY",
-            )
+    fun `토큰 칸 아홉이 enum 이고 집합이 Kotlin 어휘와 양방향으로 같다`() {
+        val case = propertiesOf(caseItemSchema())
+        val aggregate = propertiesOf(aggregateSchema())
+
+        enumOf(case, "recordedState") shouldBe BidStateTag.entries.map { it.name }.toSet()
+        enumOf(case, "reconciliationBlocker") shouldBe ReconciliationBlocker.entries.map { it.name }.toSet()
+        enumOf(case, "outcomeAgreement") shouldBe OutcomeAgreement.entries.map { it.name }.toSet()
+        enumOf(case, "reconciledOutcome") shouldBe setOf("WON", "LOST", "FAILED_BID", "REBID", "UNDECIDABLE")
+        enumOf(case, "gapState") shouldBe setOf("COMPUTED", "AWARD_ABSENT")
+        enumOf(case, "submittedAmountOrigin") shouldBe setOf("OPERATOR_ENTERED", "PRICE_MENU")
+        val rateStates = AwardRateAbsence.entries.map { "ABSENT_" + it.name }.toSet() + "MEASURED"
+        enumOf(aggregate, "recordedRateState") shouldBe rateStates
+        enumOf(aggregate, "reconciledRateState") shouldBe rateStates
+    }
+
+    /**
+     * 개찰 상태는 **공고 단위 조회와 같은 어휘**다 — 설명문이 그렇게 말하므로 등식을 세운다.
+     * 두 operation 이 같은 사실에 다른 어휘를 쓰면 화면이 둘을 따로 분기해야 한다.
+     */
+    @Test
+    fun `개찰 상태 enum 이 공고 단위 조회의 것과 같다`() {
+        val mine = enumOf(propertiesOf(caseItemSchema()), "openingState")
+        val theirs = enumOf(propertiesOf(openingResultSchema()), "state")
+        mine shouldBe theirs
+    }
+
+    /** 판정 불가 사유는 **열**이다 — 커널 어휘의 수를 계약 쪽에서도 센다(D-7C5B-11). */
+    @Test
+    fun `판정 불가 사유가 열이다`() {
+        ReconciliationBlocker.entries.size shouldBe 10
+        enumOf(propertiesOf(caseItemSchema()), "reconciliationBlocker").size shouldBe 10
     }
 
     /** 읽기 전용 — 이 경로에 GET 말고 다른 메서드가 선언돼 있지 않다. */

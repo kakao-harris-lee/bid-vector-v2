@@ -243,7 +243,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         val body = body()
         body shouldContain "\"reconciledOutcome\":\"UNDECIDABLE\""
         body shouldContain "\"reconciliationBlocker\":\"WINNER_NAME_NOT_PUBLISHED\""
-        body shouldContain "\"reconciledState\":\"ABSENT_NO_DECIDED_CASES\""
+        body shouldContain "\"reconciledRateState\":\"ABSENT_NO_DECIDED_CASES\""
         body shouldContain "\"reconciledAwardRate\":null"
         body shouldContain "\"reconciliationBlockers\":[\"WINNER_NAME_NOT_PUBLISHED\"]"
     }
