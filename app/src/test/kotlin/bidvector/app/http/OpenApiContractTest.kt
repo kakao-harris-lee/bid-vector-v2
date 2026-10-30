@@ -215,17 +215,25 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
     /**
      * D-6A1-44 닫힘 판정 — `paths`의 **인라인 응답 스키마**(`components.schemas` 밖)에
-     * ① 중첩 object 속성 ② object 배열 속성 ③ `$ref` 속성을 심어도 [collectNonFlatProperties]가
-     * 셋 다 잡는지를 **합성 spec**으로 잠근다. 실 `openapi.yaml`은 오늘 위반이 없어(파일을
-     * 고쳐도 통과하므로) 위치 폐쇄 자체는 합성 spec 없이는 고정할 수 없다(verifier MUT-D6
-     * 재현).
+     * ① 깊이 2 object 속성 ② 깊이 2 object 배열 속성 ③ `$ref` 속성을 심어도
+     * [collectNonFlatProperties]가 셋 다 잡는지를 **합성 spec**으로 잠근다. 실 `openapi.yaml`은
+     * 오늘 위반이 없어(파일을 고쳐도 통과하므로) 위치 폐쇄 자체는 합성 spec 없이는 고정할 수
+     * 없다(verifier MUT-D6 재현).
+     *
+     * **D-7C4C-6 이 심는 깊이를 한 칸 내렸다.** 앞 판은 깊이 1 로 심었는데 그 모양이 이제
+     * 정당해져(`awaiting` 짝) 심은 것이 위반이 아니게 됐다 — 그러면 이 test 는 초록이지만
+     * **아무 위치도 재지 않는다**. 재는 대상은 모양이 아니라 **순회가 거기까지 가는가**이므로,
+     * 모양만 여전히 위반인 것으로 바꾼다.
      */
     @Test
     fun `paths 의 인라인 응답 스키마에 심은 위반도 순회가 잡는다`() {
         // 아래에서 위로 조립한다 — 한 표현식으로 쓰면 들여쓰기가 깊어져 줄 길이 한도를 넘는다.
         val innerScalar = mapOf("type" to "string")
-        val nestedObjectProperty = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
-        val objectItems = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
+        // **깊이 2 로 심는다**(D-7C4C-6): 깊이 1 은 이제 정당한 모양이라 그것으로는 위치 폐쇄를
+        // 잴 수 없다 — 심은 것이 위반이 아니면 이 test 는 순회가 거기까지 가는지를 묻지 못한다.
+        val depthOne = mapOf("type" to "object", "properties" to mapOf("deep" to innerScalar))
+        val nestedObjectProperty = mapOf("type" to "object", "properties" to mapOf("inner" to depthOne))
+        val objectItems = mapOf("type" to "object", "properties" to mapOf("inner" to depthOne))
         val arrayOfObjectProperty = mapOf("type" to "array", "items" to objectItems)
         val refProperty = mapOf("\$ref" to "#/components/schemas/Nested")
         val inlineResponseSchema =
