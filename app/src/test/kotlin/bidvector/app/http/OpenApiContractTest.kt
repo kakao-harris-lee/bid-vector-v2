@@ -409,11 +409,12 @@ private fun isScalarArrayItems(items: Any?): Boolean {
 }
 
 /** D-7C4C-6 — 깊이 1 object 자신이거나 그 object 를 아이템으로 갖는 배열. */
-private fun isDepthOneObjectDefinition(definition: Map<String, Any?>): Boolean {
-    if (definition["type"] == "object") return isDepthOneObject(definition)
-    if (definition["type"] != "array" || NON_FLAT_KEYS.any(definition::containsKey)) return false
-    return isDepthOneObject(definition["items"])
-}
+private fun isDepthOneObjectDefinition(definition: Map<String, Any?>): Boolean =
+    when (definition["type"]) {
+        "object" -> isDepthOneObject(definition)
+        "array" -> NON_FLAT_KEYS.none(definition::containsKey) && isDepthOneObject(definition["items"])
+        else -> false
+    }
 
 /**
  * 속성이 **전부 스칼라 또는 스칼라 배열**인 object — 키 집합도 [DEPTH_ONE_OBJECT_KEYS] 안이어야
@@ -422,8 +423,10 @@ private fun isDepthOneObjectDefinition(definition: Map<String, Any?>): Boolean {
 @Suppress("UNCHECKED_CAST")
 private fun isDepthOneObject(candidate: Any?): Boolean {
     val schema = candidate as? Map<String, Any?> ?: return false
-    if (schema["type"] != "object" || !DEPTH_ONE_OBJECT_KEYS.containsAll(schema.keys)) return false
-    val properties = schema["properties"] as? Map<String, Any?> ?: return false
-    return properties.isNotEmpty() &&
+    val properties = schema["properties"] as? Map<String, Any?>
+    return schema["type"] == "object" &&
+        DEPTH_ONE_OBJECT_KEYS.containsAll(schema.keys) &&
+        properties != null &&
+        properties.isNotEmpty() &&
         properties.values.all { it is Map<*, *> && isScalarOrScalarArray(it as Map<String, Any?>) }
 }
