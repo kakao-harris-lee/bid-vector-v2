@@ -7,6 +7,7 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.procurement.ObservedBidAmount
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
@@ -103,6 +104,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
     private fun seedOpening(
         progressLabel: String? = "개찰완료",
         award: AwardAmount? = null,
+        provisionalRankOne: ProvisionalRankOne = ProvisionalRankOne.NotObserved,
     ) {
         openingFacts.facts =
             mapOf(
@@ -117,7 +119,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
                                         participantCount = 5,
                                         actualOpeningAt = Instant.parse("2026-09-18T05:00:00Z"),
                                         confirmedAward = award,
-                                        provisionalRankOne = ProvisionalRankOne.NotObserved,
+                                        provisionalRankOne = provisionalRankOne,
                                         observedAt = Instant.parse("2026-09-18T06:00:00Z"),
                                     ),
                             ),
@@ -200,6 +202,32 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         val body = body()
         body shouldContain "\"gapState\":\"AWARD_ABSENT\""
         body shouldContain "\"gapWon\":null"
+    }
+
+    /**
+     * **잠정 1위가 wire 에서도 확정을 대신하지 않는다**(r1 v H-1).
+     *
+     * 잠정 금액이 **있는** 픽스처라야 이 방어가 측정된다 — 다른 test 는 잠정을 `NotObserved`
+     * 로 심어서 확정 대신 잠정을 쓰는 변이가 같은 답을 내고 지나갔다.
+     */
+    @Test
+    fun `잠정 1위 금액이 있어도 확정이 없으면 차이가 부재로 나간다`() {
+        seedBid(won = 1_200_000L)
+        seedOpening(
+            award = null,
+            provisionalRankOne =
+                ProvisionalRankOne.Determined(
+                    bidAmount = ObservedBidAmount(900_000L, Currency.KRW),
+                    bidRate = null,
+                    observedAt = Instant.parse("2026-09-18T06:00:00Z"),
+                ),
+        )
+        declareTradeName("주식회사 가상해양기술")
+
+        val body = body()
+        body shouldContain "\"gapState\":\"AWARD_ABSENT\""
+        body shouldContain "\"gapWon\":null"
+        body shouldNotContain "900000"
     }
 
     /**

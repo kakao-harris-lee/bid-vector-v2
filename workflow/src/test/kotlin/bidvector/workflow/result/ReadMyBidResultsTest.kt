@@ -8,6 +8,7 @@ import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.bidding.tag
+import bidvector.procurement.ObservedBidAmount
 import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.settlement.OperatorTradeName
@@ -78,6 +79,7 @@ class ReadMyBidResultsTest {
     private fun canonicalFacts(
         label: String?,
         award: AwardAmount? = null,
+        provisionalRankOne: ProvisionalRankOne = ProvisionalRankOne.NotObserved,
     ) = NoticeOpeningFacts.Present(
         deadlineAt = Instant.parse("2026-10-20T05:00:00Z"),
         canonical =
@@ -88,7 +90,7 @@ class ReadMyBidResultsTest {
                         participantCount = 5,
                         actualOpeningAt = Instant.parse("2026-10-21T05:00:00Z"),
                         confirmedAward = award,
-                        provisionalRankOne = ProvisionalRankOne.NotObserved,
+                        provisionalRankOne = provisionalRankOne,
                         observedAt = Instant.parse("2026-10-21T06:00:00Z"),
                     ),
             ),
@@ -177,6 +179,36 @@ class ReadMyBidResultsTest {
                 bids = mapOf(1L to listOf(real(10L, "20261000010"))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료")),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published("주식회사 가상해양기술")),
+            ).read(me)
+        results.cases.single().gap shouldBe AwardGap.AwardAbsent
+    }
+
+    /**
+     * **잠정 1위가 확정 낙찰가를 대신하지 않는다**(r1 v H-1).
+     *
+     * 잠정 축에 금액이 **있고** 확정 축이 비었을 때가 이 방어의 유일한 측정 자리다 — 다른
+     * 픽스처는 잠정을 `NotObserved` 로 심어서, 확정 대신 잠정을 쓰는 변이가 지나가도 답이
+     * 같아 붉지 않았다.
+     */
+    @Test
+    fun `잠정 1위 금액이 있어도 확정이 없으면 차이는 부재다`() {
+        val results =
+            readMyBidResults(
+                bids = mapOf(1L to listOf(real(10L, "20261000010", won = 1_200_000L))),
+                facts =
+                    mapOf(
+                        "20261000010" to
+                            canonicalFacts(
+                                "개찰완료",
+                                award = null,
+                                provisionalRankOne =
+                                    ProvisionalRankOne.Determined(
+                                        bidAmount = ObservedBidAmount(900_000L, Currency.KRW),
+                                        bidRate = null,
+                                        observedAt = Instant.parse("2026-10-21T06:00:00Z"),
+                                    ),
+                            ),
+                    ),
             ).read(me)
         results.cases.single().gap shouldBe AwardGap.AwardAbsent
     }
