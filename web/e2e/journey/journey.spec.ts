@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
@@ -6,9 +6,12 @@ import {
   CASE_STATE_LABEL,
   CASE_TAB_LABEL,
   CHECKPOINT_LABEL,
+  driveToRecorded,
+  ensureInBidBox,
   journeyContext,
   localDateTimeInput,
   NOTICE_STATUS_LABEL,
+  search,
   signIn,
   UNJUDGED_LABEL,
   watchRequests,
@@ -31,22 +34,6 @@ import {
  *
  * 하네스가 적어 준 실행 맥락은 **Playwright 산출물 밖**이다(D-7E-6).
  */
-
-/**
- * 검색 — 술어에 **질의까지** 넣는다(CR M-4). 경로·상태만 보면 화면 B 가 마운트 때 거는 빈 폼
- * 조회를 잡을 수 있고, 그러면 검색 경로를 **재지 않으면서 초록**이 된다.
- */
-async function search(page: Page, query: string): Promise<NoticeRow[]> {
-  const response = page.waitForResponse(
-    (one) =>
-      one.url().includes('/api/notices') &&
-      new URL(one.url()).searchParams.get('q') === query &&
-      one.status() === 200,
-  );
-  await page.fill('input[name="q"]', query);
-  await page.getByRole('button', { name: '검색' }).click();
-  return (await (await response).json()) as NoticeRow[];
-}
 
 /** 카드 **전부**를 응답 행과 대조한다(v M-2 — 한 행만 보면 모든 카드가 첫 행을 보여도 초록이다). */
 async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise<void> {
@@ -73,24 +60,6 @@ async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise
     await expect(provenance).toContainText(row.baseAmountBasis!);
     await expect(provenance).toContainText(row.baseAmountProvenance!);
   }
-}
-
-/**
- * 담기 — **멱등**이다(이미 담긴 건은 200). 조건 대기 뒤 버튼 유무로 가른다(v M-1 · CR M-5).
- * 반환은 「이 실행이 실제로 담았는가」다 — 반복 실행에서 토스트 단언을 가르는 데 쓴다(CR r2 L-12).
- */
-async function ensureInBidBox(page: Page, card: Locator): Promise<boolean> {
-  await expect(card).toBeVisible();
-  const addButton = card.getByRole('button', { name: /담기/u });
-  if ((await addButton.count()) === 0) {
-    return false;
-  }
-  const added = page.waitForResponse(
-    (one) => one.url().endsWith('/api/bid-cases') && one.request().method() === 'POST',
-  );
-  await addButton.click();
-  expect([200, 201]).toContain((await added).status());
-  return true;
 }
 
 /**
@@ -310,59 +279,6 @@ test('쓰기가 401 로 거부되면 로그인으로 가는 길이 뜬다', asyn
   await expect(face.getByRole('link', { name: /로그인/u })).toHaveAttribute('href', '/login');
   await expect(page.getByTestId('toast')).toHaveCount(0);
 });
-
-/**
- * 여정 ④ 가 쓰는 건을 **「제출함」까지** 민다 — 여정 ③ 이 그 각 단계를 자세히 재므로 여기서는
- * 같은 클릭만 하고 단언은 결과 상태 하나다. `null` 은 「이미 제출 뒤라 밀 것이 없다」다.
- *
- * 여정 ③ 과 **다른 공고**를 쓰는 이유는 fixture 의 `why_third_notice` 에 있다 — 한 하네스를
- * 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 두 여정이 서로의 전이를 본다.
- */
-async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
-  const rows = await search(page, noticeNumber);
-  // 없으면 **사유를 말하고** 멈춘다 — `!` 로 두면 `TypeError` 가 되어 「fixture 가 안 들어왔다」와
-  // 「화면이 안 그렸다」를 구별할 수 없다(CR r1 L-11).
-  expect(rows.map((row) => row.noticeNumber), `검색이 ${noticeNumber} 를 내지 않았다`).toContain(noticeNumber);
-  const target = rows.find((row) => row.noticeNumber === noticeNumber)!;
-  const card = page.getByTestId(`notice-card-${target.noticeNumber}`);
-  await ensureInBidBox(page, card);
-
-  const cases = page.waitForResponse(
-    (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
-  );
-  await card.getByTestId('notice-title').click();
-  await expect(page.getByTestId('screen-worksheet')).toBeVisible();
-  const caseRows = (await (await cases).json()) as BidCaseRow[];
-  expect(caseRows.map((row) => row.noticeNumber), `입찰함에 ${noticeNumber} 건이 없다`).toContain(noticeNumber);
-  const opened = caseRows.find((row) => row.noticeNumber === noticeNumber)!;
-
-  // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
-  // `WATCHING` 이고 아래 세 단계를 탄다.
-  if (opened.state !== 'WATCHING') {
-    return null;
-  }
-
-  await page.getByTestId('active-bids').fill('1');
-  const priced = page.waitForResponse(
-    (one) => one.url().includes('/api/bid-price-requests') && one.request().method() === 'POST',
-  );
-  await page.getByTestId('worksheet-primary').click();
-  expect((await priced).status()).toBe(200);
-
-  await page.getByTestId('record-amount').fill('1350000000');
-  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
-  const drafted = page.waitForResponse((one) => one.url().includes('/draft') && one.request().method() === 'POST');
-  await page.getByTestId('worksheet-primary').click();
-  expect((await drafted).status()).toBe(200);
-
-  await page.getByTestId('record-amount').fill('1350000000');
-  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
-  const recorded = page.waitForResponse((one) => one.url().includes('/record') && one.request().method() === 'POST');
-  await page.getByTestId('worksheet-primary').click();
-  const response = await recorded;
-  expect(response.status()).toBe(200);
-  return (await response.json()) as BidCaseRow;
-}
 
 /** 카드가 보이는 세 축이 **그 응답의 값**과 같은지 — 상태·다음 확인 시점·지난 일정. */
 async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void> {
