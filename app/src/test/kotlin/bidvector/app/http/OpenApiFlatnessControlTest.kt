@@ -56,6 +56,34 @@ class OpenApiFlatnessControlTest {
     }
 
     /**
+     * **양성 대조 — 깊이 1 object 를 나르는 `배열 래퍼`의 키도 허용 목록 안이어야 한다**(r1 CR M-1 ·
+     * v L-1). 앞 판은 object 쪽 키만 닫아서, 같은 object 를 `nullable: true` 배열로 감싸면
+     * 「null 이거나 짝 배열」인 **두 모양 속성**이 통과했다(옛 술어는 거부했다 — 이 slice 가 새로 연
+     * 자리다). 래퍼의 미지 키(`x-foo` · `prefixItems`)도 같은 구멍이었다.
+     *
+     * **스칼라 배열 래퍼는 이 축에서 건드리지 않는다** — 계약이 스칼라 층을 범위 밖에 두었고
+     * (D-7C4C-6), 그 관용은 이 slice 가 만든 것이 아니다. 그래서 `nullable` 스칼라 배열은 여전히
+     * 통과하고, 그 비대칭은 알려진 제한에 적혀 있다.
+     */
+    @Test
+    fun `깊이 1 object 를 감싼 배열 래퍼의 nullable 과 미지 키도 거부한다`() {
+        val scalar = mapOf("type" to "string")
+        val depthOne = mapOf("type" to "object", "properties" to mapOf("a" to scalar))
+
+        isFlatPropertyDefinition(arrayWithItems(depthOne) + mapOf("nullable" to true)) shouldBe false
+        isFlatPropertyDefinition(arrayWithItems(depthOne) + mapOf("x-foo" to 1)) shouldBe false
+        isFlatPropertyDefinition(
+            arrayWithItems(depthOne) + mapOf("prefixItems" to listOf(depthOne)),
+        ) shouldBe false
+        // 음성 대조 — 실 계약이 쓰는 래퍼 키 셋(`type`·`items`·`description`)은 통과한다.
+        isFlatPropertyDefinition(
+            arrayWithItems(depthOne) + mapOf("description" to "짝 배열"),
+        ) shouldBe true
+        // 스칼라 배열 래퍼의 같은 키는 **그대로 통과한다**(스칼라 층은 이 slice 의 축이 아니다).
+        isFlatPropertyDefinition(arrayWithItems(scalar) + mapOf("nullable" to true)) shouldBe true
+    }
+
+    /**
      * **음성 대조 — D-7C4C-1 이 여는 유일한 모양(`awaiting` 짝 배열)이 통과한다.**
      *
      * 이 단언이 붉은 동안은 체크리스트 operation 을 계약에 적을 수 없다(`OPEN-7C4-AWAITING-CHECKLIST`).
