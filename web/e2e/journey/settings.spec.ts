@@ -94,6 +94,57 @@ async function readSuggestions(page: Page): Promise<SuggestionsRead> {
   };
 }
 
+/**
+ * **전역 전략을 원래 자리로 돌린다 — 성공 경로가 아니라 teardown 에서**(CR r1 M-4).
+ *
+ * 왜 test 본문의 ④ 단계로는 부족한가: ② 뒤 어느 단언이 깨지면 `REQUIRED_KEYWORD` 가 서버에
+ * **남고**, `journey.spec.ts` 여정 ② 의 `WATCH_NOT_CONFIGURED` 단언이 **같은 DB 를 다시 쓰는
+ * 실행**에서 깨진다 — 그리고 그 실패가 **다른 여정에** 나타난다(진단이 가장 비싼 꼴). 계약
+ * D-7E2-9 의 「여정 순서 독립」은 성공 경로에서만 성립했다.
+ *
+ * 화면이 아니라 **출하 API 로** 되돌린다: 실패 뒤 페이지가 어디에 있는지 알 수 없고, 되돌림은
+ * 화면의 능력이 아니라 **운영자 설정 행위**다(하네스가 전략을 심는 D-7E-8 과 같은 자리). 브라우저
+ * 세션 쿠키를 그대로 쓰므로 자격 값을 spec 이 들고 있지 않아도 된다.
+ *
+ * **멱등하다**: 이미 비어 있으면 아무것도 쓰지 않는다(쓸데없는 개정 증가를 만들지 않는다).
+ * teardown 이 suite 를 깨뜨리지 않도록 실패는 삼키고 **끝 상태만** 확인한다.
+ */
+async function clearWatchCondition(page: Page): Promise<void> {
+  try {
+    const strategy = (await (await page.request.get('/api/strategy')).json()) as {
+      readonly revision: number;
+      readonly requiredKeywordTerms: readonly string[];
+    };
+    if (strategy.requiredKeywordTerms.length === 0) {
+      return;
+    }
+    const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
+    const headers = { 'X-Operator-Csrf': session.csrf };
+    const begun = (await (
+      await page.request.post('/api/strategy/edit-sessions', { headers, data: { field: KEYWORD_FIELD } })
+    ).json()) as { readonly sessionId: string };
+    await page.request.post(`/api/strategy/edit-sessions/${begun.sessionId}/value`, {
+      headers,
+      data: { commandId: `teardown-value-${Date.now()}`, field: KEYWORD_FIELD, terms: [] },
+    });
+    await page.request.post(`/api/strategy/edit-sessions/${begun.sessionId}/confirm`, {
+      headers,
+      data: { commandId: `teardown-confirm-${Date.now()}`, seenRevision: strategy.revision },
+    });
+  } catch {
+    // 되돌림이 실패하면 아래 단언이 그 사실을 말한다 — 조용히 넘기지 않는다.
+  }
+}
+
+test.afterEach(async ({ page }) => {
+  await clearWatchCondition(page);
+  const after = (await (await page.request.get('/api/strategy')).json()) as {
+    readonly requiredKeywordTerms: readonly string[];
+  };
+  // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
+  expect(after.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
+});
+
 test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 되고, 지우면 빈 얼굴로 돌아온다', async ({
   page,
 }) => {
