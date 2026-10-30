@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 
 import {
@@ -94,15 +94,24 @@ export function OnboardingScreen() {
 
 function OnboardingWizard({ checklist }: { readonly checklist: OnboardingChecklist }) {
   const queryClient = useQueryClient();
-  /** 운영자가 고른 단계. `null` 이면 **서버가 말하는 첫 미완 단계**를 따라간다(저장하면 다음으로 간다). */
+  /** 운영자가 고른 단계. `null` 이면 **서버가 말하는 첫 미완 단계**를 따라간다. */
   const [picked, setPicked] = useState<OnboardingStepId | null>(null);
+  /** 전략 단계에 **열린 편집 세션**이 있는가 — 있으면 단계를 옮기지 않는다(아래 `nav` 의 사유). */
+  const [sessionOpen, setSessionOpen] = useState(false);
   const profile = useQuery({ queryKey: PROFILE_QUERY_KEY, queryFn: readProfile });
 
   const rows = itemRowsOf(checklist);
   const progress = progressOf(checklist);
   const current = picked ?? firstStepWithPending(checklist) ?? ONBOARDING_STEPS[0].id;
-  /** 쓰기가 끝나면 **서버에 다시 묻는다** — 쓰기의 200 을 완료로 세지 않는다. */
+  /**
+   * 쓰기가 끝나면 **서버에 다시 묻는다** — 쓰기의 200 을 완료로 세지 않는다.
+   *
+   * 고른 단계를 **놓는다**(CR r1 LOW): 그래야 다음 걸음이 서버가 말하는 첫 미완으로 간다.
+   * 앞 판은 `picked` 가 한 번 세워지면 지워지지 않아, 운영자가 단계를 눌러 본 뒤로는 저장해도
+   * 그 자리에 머물렀다 — 주석만 「저장하면 다음으로 간다」고 적혀 있었다.
+   */
   const reread = () => {
+    setPicked(null);
     void queryClient.invalidateQueries({ queryKey: ONBOARDING_QUERY_KEY });
   };
 
@@ -110,7 +119,8 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
     <section data-testid="screen-onboarding" className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
       <header className="flex flex-wrap items-baseline gap-3">
         <h2 className="text-lg font-semibold">시작하기</h2>
-        <p data-testid="onboarding-progress" className="text-sm text-ink-soft">
+        {/* 저장 뒤 이 수가 바뀐다 — 보조기술이 그 변화를 읽게 한다(§6.5 · CR r1 LOW). */}
+        <p data-testid="onboarding-progress" aria-live="polite" className="text-sm text-ink-soft">
           <span className="font-numeric">
             {progress.done} / {progress.total}
           </span>{' '}
@@ -152,6 +162,12 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
         </div>
       ) : null}
 
+      {/*
+        편집 세션이 열려 있는 동안에는 단계를 옮기지 않는다(v r1 L-1). 옮기면 전략 단계가
+        언마운트되어 **보낸 값이 적용되지도 취소되지도 않은 세션**이 서버에 남는다. 설정 화면에는
+        이 길이 없었다 — 거기서는 화면을 떠나야 생기던 일이 마법사에서는 버튼 한 번으로 생긴다.
+        패널의 「그만두기」가 늘 있으므로 갇히는 자리는 없다.
+      */}
       <nav aria-label="단계" className="flex flex-wrap gap-2">
         {ONBOARDING_STEPS.map((step) => (
           <button
@@ -159,8 +175,11 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
             type="button"
             data-testid={`onboarding-step-${step.id}`}
             aria-current={step.id === current ? 'step' : undefined}
+            aria-controls="onboarding-step-body"
+            disabled={sessionOpen}
+            title={sessionOpen ? '편집을 끝내거나 그만둔 뒤에 옮길 수 있습니다' : undefined}
             onClick={() => setPicked(step.id)}
-            className={`rounded-md px-2 py-1 text-xs ${
+            className={`rounded-md px-2 py-1 text-xs disabled:opacity-50 ${
               step.id === current ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
             }`}
           >
@@ -169,12 +188,17 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
         ))}
       </nav>
 
-      <div data-testid="onboarding-step-body" className="flex flex-col gap-4">
+      <div id="onboarding-step-body" data-testid="onboarding-step-body" className="flex flex-col gap-4">
         {profile.isPending ? <Skeleton testId="onboarding-profile-loading" /> : null}
+        {/* 프로필만 401 이면 **말 없이 비지 않는다**(CR r1 LOW) — 체크리스트는 읽혔으므로
+            목록·진행률은 그대로 두고 이 자리에만 로그인 길을 낸다. */}
+        {profile.isError && isUnauthorized(profile.error) ? <SignedOutFace /> : null}
         {profile.isError && !isUnauthorized(profile.error) ? (
           <ErrorFace testId="onboarding-profile-error" onRetry={() => void profile.refetch()} />
         ) : null}
-        {profile.isSuccess ? <StepBody step={current} profile={profile.data} onSaved={reread} /> : null}
+        {profile.isSuccess ? (
+          <StepBody step={current} profile={profile.data} onSaved={reread} onSessionOpen={setSessionOpen} />
+        ) : null}
       </div>
 
       <section data-testid="onboarding-not-ready" className="flex flex-col gap-2">
@@ -200,10 +224,12 @@ function StepBody({
   step,
   profile,
   onSaved,
+  onSessionOpen,
 }: {
   readonly step: OnboardingStepId;
   readonly profile: Profile;
   readonly onSaved: () => void;
+  readonly onSessionOpen: (open: boolean) => void;
 }) {
   switch (step) {
     case 'BUSINESS_DETAILS':
@@ -214,7 +240,13 @@ function StepBody({
       return <ProfileCapacityCard onSaved={onSaved} />;
     case 'BUDGET':
     case 'WATCH':
-      return <OnboardingStrategyStep fields={STEP_STRATEGY_FIELDS[step]} onSaved={onSaved} />;
+      return (
+        <OnboardingStrategyStep
+          fields={STEP_STRATEGY_FIELDS[step]}
+          onSaved={onSaved}
+          onSessionOpen={onSessionOpen}
+        />
+      );
     default: {
       const unreachable: never = step;
       throw new Error(`모르는 단계: ${String(unreachable)}`);
@@ -226,9 +258,11 @@ function StepBody({
 function OnboardingStrategyStep({
   fields,
   onSaved,
+  onSessionOpen,
 }: {
   readonly fields: readonly StrategyField[];
   readonly onSaved: () => void;
+  readonly onSessionOpen: (open: boolean) => void;
 }) {
   const strategy = useQuery({ queryKey: STRATEGY_QUERY_KEY, queryFn: readStrategy });
 
@@ -236,24 +270,42 @@ function OnboardingStrategyStep({
     return <Skeleton testId="onboarding-strategy-loading" />;
   }
   if (strategy.isError) {
-    return isUnauthorized(strategy.error) ? null : (
+    return isUnauthorized(strategy.error) ? <SignedOutFace /> : (
       <ErrorFace testId="onboarding-strategy-error" onRetry={() => void strategy.refetch()} />
     );
   }
 
-  return <OnboardingStrategyFields strategy={strategy.data} fields={fields} onSaved={onSaved} />;
+  return (
+    <OnboardingStrategyFields
+      strategy={strategy.data}
+      fields={fields}
+      onSaved={onSaved}
+      onSessionOpen={onSessionOpen}
+    />
+  );
 }
 
 function OnboardingStrategyFields({
   strategy,
   fields,
   onSaved,
+  onSessionOpen,
 }: {
   readonly strategy: StrategyReadResponse;
   readonly fields: readonly StrategyField[];
   readonly onSaved: () => void;
+  readonly onSessionOpen: (open: boolean) => void;
 }) {
   const session = useStrategyEditSession(strategy, onSaved);
+
+  /**
+   * 열린 세션을 **위로 알린다** — 마법사가 그동안 단계 탐색을 닫는다(v r1 L-1). 언마운트에서
+   * 반드시 `false` 를 보내 「세션이 열린 채 사라진 단계」가 탐색을 영원히 막지 않게 한다.
+   */
+  useEffect(() => {
+    onSessionOpen(session.open !== null);
+    return () => onSessionOpen(false);
+  }, [session.open, onSessionOpen]);
 
   return (
     <div className="flex flex-col gap-3">

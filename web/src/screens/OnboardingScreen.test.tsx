@@ -8,7 +8,7 @@ import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { ITEM_STATE_DISPLAY, ONBOARDING_ITEM_DISPLAY, ONBOARDING_ITEM_ORDER } from '../display/onboardingDisplay';
 
-import { OnboardingScreen } from './OnboardingScreen';
+import { OnboardingBanner, OnboardingScreen } from './OnboardingScreen';
 
 vi.mock('../api/queries');
 
@@ -104,15 +104,51 @@ describe('시작하기 — 항목의 상태는 서버 판정에서만 온다', (
     }
   });
 
-  /** 같은 축의 반대쪽 — 프로필이 비어 있어도 서버가 완료라고 하면 완료다. */
-  it('프로필이 비어 있어도 체크리스트가 완료라면 완료다', async () => {
+  /**
+   * 같은 축의 반대쪽 — 프로필·전략이 **둘 다 비어** 있어도 서버가 완료라고 하면 완료다.
+   *
+   * **배지 여덟을 전부 센다**(v r1 M-1): 앞 판은 `TRADE_NAME` 하나만 단언해서, 「비어 있는 값을
+   * 보고 그 항목만 미완으로 그린다」는 변이 둘이 지나갔다 — 프로필 축(나라장터 미응답 →
+   * `NARA_READINESS` 미완)과 전략 축(관심 업종 빈 배열 → `WATCH_CONDITIONS` 미완) 각각. 어느
+   * 항목이 추론으로 넘어갈지는 미리 알 수 없으므로 전수로 센다.
+   */
+  it('프로필·전략이 비어 있어도 체크리스트가 완료라면 여덟 배지가 전부 완료다', async () => {
     mocked.readProfile.mockResolvedValue(emptyProfile());
     mocked.readOnboardingChecklist.mockResolvedValue(checklist({ completed: [...ONBOARDING_ITEM_ORDER] }));
     renderScreen();
 
-    expect((await screen.findByTestId('onboarding-state-TRADE_NAME')).textContent).toContain(
-      ITEM_STATE_DISPLAY.COMPLETED.label,
-    );
+    for (const item of ONBOARDING_ITEM_ORDER) {
+      expect((await screen.findByTestId(`onboarding-state-${item}`)).textContent, item).toContain(
+        ITEM_STATE_DISPLAY.COMPLETED.label,
+      );
+    }
+  });
+
+  /**
+   * **전략 축의 반대 방향**(v r1 M-1). 위 둘은 프로필을 어긋나게 투입했고, 전략 mock 은 늘 비어
+   * 있었다 — 그래서 「전략 값을 보고 그 항목을 완료로 그린다」는 자리가 비어 있었다. 전략을 채운
+   * 채 체크리스트가 미완이라고 하면 **미완**이다.
+   */
+  it('전략이 채워져 있어도 체크리스트가 미완이면 미완이다', async () => {
+    mocked.readStrategy.mockResolvedValue({
+      revision: 7,
+      focusCategories: ['토목'],
+      focusRegionTerms: [],
+      excludeRegionTerms: [],
+      requiredKeywordTerms: [],
+      excludeKeywordTerms: [],
+      minBudgetWon: 100_000_000,
+      maxBudgetWon: 900_000_000,
+    });
+    mocked.readProfile.mockResolvedValue(filledProfile());
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }));
+    renderScreen();
+
+    for (const item of ONBOARDING_ITEM_ORDER) {
+      expect((await screen.findByTestId(`onboarding-state-${item}`)).textContent, item).toContain(
+        ITEM_STATE_DISPLAY.PENDING.label,
+      );
+    }
   });
 
   it('선행 대기는 그 사실과 선행 항목의 이름을 함께 낸다', async () => {
@@ -218,7 +254,10 @@ describe('시작하기 — 단계는 쓰기 단위다', () => {
     renderScreen();
 
     // 금액대 단계가 서 있다 — 전략은 **편집 세션**으로만 바뀐다(계약에 직접 쓰는 길이 없다).
+    // 커널의 `BUDGET_RANGE` 는 **최소·최대 가운데 하나 이상**이라 그 단계가 **둘 다** 세워야
+    // 운영자가 어느 쪽으로든 채울 수 있다(CR r1 OQ — 앞 판은 최소만 단언했다).
     expect(await screen.findByTestId('strategy-row-MIN_BUDGET')).toBeTruthy();
+    expect(screen.getByTestId('strategy-row-MAX_BUDGET')).toBeTruthy();
     expect(screen.queryByLabelText('상호')).toBeNull();
   });
 
@@ -309,5 +348,159 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
     expect(notReady.textContent).toContain('첫 공고');
     expect(within(notReady).queryAllByRole('textbox')).toStrictEqual([]);
     expect(within(notReady).queryAllByRole('button')).toStrictEqual([]);
+  });
+
+  /**
+   * 체크리스트는 읽혔는데 **프로필만 401** 이면 앞 판은 단계 본문이 말 없이 비었다(CR r1 LOW).
+   * 화면 머리의 401 분기는 체크리스트 오류만 보기 때문이다 — 그 자리에 로그인 길을 낸다.
+   */
+  it('프로필만 401 이면 단계 본문이 말 없이 비지 않고 로그인 길을 낸다', async () => {
+    mocked.readProfile.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    await screen.findByTestId('signed-out');
+    const body = screen.getByTestId('onboarding-step-body');
+    expect(within(body).getByTestId('signed-out')).toBeTruthy();
+    // 체크리스트는 읽혔으므로 목록·진행률은 그대로 선다(전부를 로그인 얼굴로 덮지 않는다).
+    expect(screen.getByTestId('onboarding-progress')).toBeTruthy();
+  });
+});
+
+/**
+ * 홈의 진입 배너(D-7E2b-4) — **서버 `pending` 이 비어 있지 않을 때만** 뜬다.
+ *
+ * 앞 판은 이 술어의 **음성 쪽을 세는 자리가 없었다**(v r1 M-2 · CR r1 MEDIUM): 여정은 미완이
+ * 있는 상태에서만 배너를 보았고, 홈 화면 test 는 자동 mock 이 `undefined` 를 내 배너가 아예
+ * 렌더되지 않았다. 「조건을 지우고 항상 띄운다」가 전건을 초록으로 지났다.
+ */
+describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => {
+  function renderBanner() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter(
+      [
+        { path: '/', element: <OnboardingBanner /> },
+        { path: '/start', element: <p>시작하기 자리</p> },
+      ],
+      { initialEntries: ['/'] },
+    );
+    return render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('미완이 있으면 뜨고 그 수가 서버의 미완 수다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({ completed: ['TRADE_NAME'], pending: ['BUSINESS_TYPES', 'LICENSES', 'BUDGET_RANGE'] }),
+    );
+    renderBanner();
+
+    const banner = await screen.findByTestId('onboarding-banner');
+    expect(banner.textContent).toContain('3');
+    expect(within(banner).getByRole('link').getAttribute('href')).toBe('/start');
+  });
+
+  it('미완이 0 이면 뜨지 않는다 — 전부 채운 운영자에게 「0개 있습니다」가 서지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ completed: [...ONBOARDING_ITEM_ORDER] }));
+    renderBanner();
+
+    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+  });
+
+  /** 선행 대기는 **막지도 채우지도 않는다** — 미완이 아니므로 배너를 띄울 사유가 아니다. */
+  it('선행 대기만 남으면 뜨지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        completed: ['TRADE_NAME'],
+        awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }],
+      }),
+    );
+    renderBanner();
+
+    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+  });
+
+  /** 읽지 못했으면 **아무것도 그리지 않는다** — 실패를 「미완 0」으로도 「미완 있음」으로도 접지 않는다. */
+  it('읽기가 실패하면 뜨지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderBanner();
+
+    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+  });
+});
+
+describe('시작하기 — 마법사의 걸음', () => {
+  /**
+   * 주석이 적는 「저장하면 다음으로 간다」는 `picked` 가 `null` 인 동안만 참이었다(CR r1 LOW) —
+   * 운영자가 단계를 한 번 고르면 그 뒤로는 저장해도 그 자리에 머물렀다. 쓰기 성공 자리에서
+   * 고른 단계를 **놓는다**.
+   */
+  it('단계를 고른 뒤 저장하면 서버가 말하는 다음 미완 단계로 간다', async () => {
+    mocked.replaceQualificationFacts.mockResolvedValue(emptyProfile());
+    mocked.readOnboardingChecklist
+      .mockResolvedValueOnce(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }))
+      .mockResolvedValue(
+        checklist({
+          completed: ['BUSINESS_TYPES', 'LICENSES'],
+          pending: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION', 'BUDGET_RANGE', 'WATCH_CONDITIONS'],
+        }),
+      );
+    renderScreen();
+
+    // 첫 단계(사업 정보)를 두고 **자격 사실을 골라** 저장한다.
+    fireEvent.click(await screen.findByTestId('onboarding-step-QUALIFICATION_FACTS'));
+    await screen.findByLabelText('업종', { exact: true });
+    fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
+
+    // 다시 읽은 체크리스트의 첫 미완은 사업 정보다 — 그 폼으로 간다.
+    expect(await screen.findByLabelText('상호')).toBeTruthy();
+  });
+
+  /**
+   * **열린 편집 세션을 조용히 버리지 않는다**(v r1 L-1). 설정 화면에는 없던 길이다 — 거기서는
+   * 화면을 떠나야 생기던 일이 마법사에서는 버튼 한 번으로 생긴다.
+   */
+  it('편집 세션이 열려 있는 동안에는 단계를 옮길 수 없다', async () => {
+    mocked.beginEditSession.mockResolvedValue({
+      sessionId: 'sess-1',
+      state: 'WAITING_FOR_VALUE',
+      sessionVersion: 1,
+      expiresAt: '2099-01-01T00:00:00Z',
+      field: 'FOCUS_CATEGORY',
+    });
+    mocked.cancelEditSession.mockResolvedValue({
+      sessionId: 'sess-1',
+      state: 'CANCELLED',
+      sessionVersion: 2,
+      expiresAt: '2099-01-01T00:00:00Z',
+    });
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('onboarding-step-WATCH'));
+    const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+    await screen.findByTestId('edit-session');
+
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-BUSINESS_DETAILS') as HTMLButtonElement).disabled).toBe(true),
+    );
+
+    // 그만두면 다시 옮길 수 있다 — 막혀서 갇히는 자리가 없다.
+    fireEvent.click(screen.getByRole('button', { name: '그만두기' }));
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-BUSINESS_DETAILS') as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+
+  /** §6.5 — 저장 뒤 바뀌는 진행률이 보조기술에 알려진다(CR r1 LOW). */
+  it('진행률이 live region 이고 단계 버튼이 본문을 가리킨다', async () => {
+    renderScreen();
+
+    expect((await screen.findByTestId('onboarding-progress')).getAttribute('aria-live')).toBe('polite');
+    expect(screen.getByTestId('onboarding-step-WATCH').getAttribute('aria-controls')).toBe('onboarding-step-body');
   });
 });
