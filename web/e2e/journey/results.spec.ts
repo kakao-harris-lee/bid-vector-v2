@@ -130,6 +130,16 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   const rows = (await (await listed).json()) as BidCaseRow[];
   const mine = rows.find((row) => row.caseId === caseId)!;
   expect(mine.state, '화면이 읽은 목록에 내 건이 그 상태로 있다').toBe('OPENED_PROVISIONAL_FIRST');
+  /**
+   * **출처를 둘로 둔다**(r1 OQ-2). 이 목록 대기는 경로·상태만 보므로 직전 화면 D 의 무효화
+   * 재조회를 집을 수 있다(같은 query key). 술어를 「이 클릭 뒤에 뜬 요청」으로 조이면 react-query
+   * 의 중복 제거 때문에 **E 가 새 요청을 내지 않는 실행에서 영영 기다린다** — 조이는 쪽이 흔들린다.
+   * 대신 전이 응답(`opened`)과 **같은 값인지**를 함께 단언한다: 어느 응답을 집었든 그 둘이
+   * 어긋나면 붉다.
+   */
+  expect(mine.state, '목록과 전이 응답이 어긋난다').toBe(opened.state);
+  expect(mine.nextCheckpointKind).toBe(opened.nextCheckpointKind);
+  expect(mine.caseVersion).toBe(opened.caseVersion);
 
   const card = page.getByTestId(`result-case-${caseId}`);
   await expect(card).toBeVisible();
