@@ -17,6 +17,11 @@ dependencies {
     implementation(project(":qualification"))
     implementation(project(":strategy"))
     implementation(project(":bidding"))
+    // `JdbcAwardWinnerNameView` 가 읽은 낙찰자 상호를 `bidvector.settlement.AwardWinnerTradeName`
+    // 으로 낸다(M7/7C⑤-b, D-7C5B-10 ③) — 그 타입이 포트 서명이고, 상호는 그 타입 밖으로 나가지
+    // 않는다. `workflow` 는 settlement 를 `implementation` 으로만 선언해 이 모듈의 컴파일
+    // classpath 에 전이되지 않으므로 직접 선언한다 — 아래 `decision` 과 같은 자리·같은 근거다.
+    implementation(project(":settlement"))
     // `GrpcBidPredictionGateway`가 `BidPredictionOutcome.Unavailable`을 짓는 데
     // `bidvector.decision.MlUnavailableReason`을 직접 참조한다(D-4D-6). `workflow`는 이 좌표를
     // `implementation`으로만 선언해 하위 소비자(이 모듈)의 컴파일 classpath 에 전이되지

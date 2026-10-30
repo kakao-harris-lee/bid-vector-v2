@@ -131,13 +131,16 @@ private fun BusinessProfileReader.operatorTradeName(account: AccountId): Operato
     details(account).tradeName?.let { OperatorTradeName.Declared(it.raw) } ?: OperatorTradeName.NotDeclared
 
 /**
- * 건의 공고 키 → 조회 키. 건의 번호는 담을 때 적은 **사본**이고 V21 은 `<> ''` 만 걸으므로
- * 표기(대소문자·공백)가 제각각이다 — 값 객체로 접어 묻는다(COL-05: 규칙의 자리는 하나다).
+ * 건의 공고 키 → 조회 키. 번호는 `String` 이라 값 객체로 접어야 [NoticeId] 가 선다.
  *
- * `null` 갈래는 **오늘 닿지 않는다**: [NoticeKey] 가 공백뿐인 번호를 생성자에서 거부하고,
- * 정규화는 글자를 지우지 않으므로 그 뒤가 빌 수 없다. 그래도 [NoticeNumber.ofOrNull] 을 쓰는
- * 것은 그 함수의 규율(「판독은 적재 경로를 신뢰하지 않는다」)을 따르는 것이고, 전제가 바뀌면
- * 건이 **사라지는 대신** 공고 부재로 남는다.
+ * **접는 것이 값을 바꾸지는 않는다**(실측): `RECORD_BID` 는 「투찰 예정 · 투찰 기록됨 · 마감
+ * 지남」에서만 열리고 그 셋에 닿으려면 초안이나 마감 사본이 공고 행을 **정확히** 찾아야 하므로,
+ * 투찰 기록이 있는 건의 번호는 이미 canonical 표의 번호와 같다. 그래서 조회가 canonical 을
+ * 정확 일치로 묻는 것이 성립한다(`JdbcMyBidResultViewTest` 가 그 전제를 잰다).
+ *
+ * `null` 갈래도 **오늘 닿지 않는다**: [NoticeKey] 가 공백뿐인 번호를 거부하고 정규화는 글자를
+ * 지우지 않는다. 그래도 [NoticeNumber.ofOrNull] 을 쓰는 것은 그 함수의 규율(「판독은 적재 경로를
+ * 신뢰하지 않는다」)을 따르는 것이고, 전제가 바뀌면 건이 **사라지는 대신** 공고 부재로 남는다.
  */
 private fun NoticeKey.toNoticeId(): NoticeId? = NoticeNumber.ofOrNull(noticeNumber)?.let { NoticeId(it, noticeRound) }
 
