@@ -5,6 +5,7 @@ import { readOpeningResult, type BidCase, type OpeningResultView } from '../api/
 import { openingResultQueryKey } from '../api/queryKeys';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { StateBadge } from '../components/StateBadge';
+import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
   OPENING_RESULT_STATE_DISPLAY,
@@ -216,7 +217,12 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
 
       {/* 다음 행동 둘 — **전이가 아니라 이동**이다(D-7E3a-8). */}
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
-        <Link to="/bids" className="rounded-md border border-line px-3 py-1 hover:bg-neutral-skin">
+        {/* **그 건이 보이는 탭으로** 보낸다(D-7E3a-8 · r1 M-2). 맨 `/bids` 는 첫 탭(관심)을 열고
+            결과 단계 건은 거기 없다 — 운영자가 탭을 스스로 찾아야 「다음 행동」에 닿는다. */}
+        <Link
+          to={`/bids?tab=${tabOf(bidCase.state)}`}
+          className="rounded-md border border-line px-3 py-1 hover:bg-neutral-skin"
+        >
           입찰함에서 기록
         </Link>
         <Link

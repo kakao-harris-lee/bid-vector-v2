@@ -54,6 +54,15 @@ export function tabOf(state: BidCaseState): BidBoxTabId {
 }
 
 /**
+ * 바깥에서 온 문자열이 탭 id 인가(M7/7E-3a r1 M-2) — URL 질의처럼 **우리가 쓰지 않은 값**이
+ * 들어오는 자리에서 쓴다. 집합을 손으로 적지 않고 [BID_BOX_TABS] 에서 파생하므로 탭이 늘면
+ * 이 가드가 함께 넓어진다.
+ */
+export function isBidBoxTabId(value: string | null): value is BidBoxTabId {
+  return value !== null && BID_BOX_TABS.some((one) => one.id === value);
+}
+
+/**
  * D 가 낼 수 있는 행동의 종류. `OPEN_WORKSHEET` 만 **전이가 아니다** — 담기 뒤 네 상태의
  * 다음 전이는 화면 C 가 가지고 있으므로 D 는 그 화면으로 보낸다.
  */

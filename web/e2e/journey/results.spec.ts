@@ -31,9 +31,9 @@ const NOTICE = 'SYN-7E3-RESULT';
 /**
  * 결과 단계의 전이 하나 — **화면 D 에서** 보낸다(E 는 읽기 화면이라 전이를 내지 않는다).
  *
- * **탭을 먼저 고른다**: D 는 고른 탭의 건만 그리므로(그것이 탭의 뜻이다) 상태에 맞는 탭을
- * 고르지 않으면 카드가 DOM 에 아예 없다. 그 탭은 **지금 상태**에서 나오고, 화면을 떠났다
- * 돌아오면 첫 탭(관심)으로 돌아가므로 걸음마다 다시 고른다.
+ * **전역 탐색으로 들어가므로 탭을 먼저 고른다**: 그 입구는 어느 건을 보러 가는지 모르고, D 는
+ * 고른 탭의 건만 그린다(그것이 탭의 뜻이다). 화면 E 의 「다음 행동」 링크는 **그 건의 탭을
+ * 싣고**(r1 M-2) 그 착지는 위 여정이 탭을 고르지 않고 단언한다 — 둘은 다른 입구다.
  */
 async function transitionInBidBox(
   page: Page,
@@ -159,7 +159,19 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
 
   // E 는 읽기 화면이다 — 전이 버튼이 **없다**(D-7E3a-8).
   await expect(card.getByRole('button', { name: /기록|대기로|심사/u })).toHaveCount(0);
-  await expect(card.getByRole('link', { name: /입찰함/u })).toHaveAttribute('href', '/bids');
+
+  /**
+   * **「다음 행동」 링크가 그 건이 보이는 자리로 보낸다**(r1 M-2 · D-7E3a-8). 탭을 **고르지
+   * 않고** 착지해서 바로 보이는지를 잰다 — 앞 판은 맨 `/bids` 라 첫 탭(관심)이 열렸고 결과
+   * 단계 건은 DOM 에 없었다. 이 단언이 그 자리를 지킨다.
+   */
+  await card.getByRole('link', { name: /입찰함/u }).click();
+  await expect(page.getByTestId('screen-bid-box')).toBeVisible();
+  await expect(
+    page.getByTestId(`bid-case-${caseId}`),
+    'E 의 링크가 그 건이 보이지 않는 탭으로 보냈다',
+  ).toBeVisible();
+  await expect(page.getByRole('tab', { selected: true })).toContainText(CASE_TAB_LABEL[opened.state]!);
 
   // ── 심사 → 확정 ───────────────────────────────────────────────────────────
   const review = await transitionInBidBox(

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
   OPENING_RESULT_STATE_DISPLAY,
@@ -279,10 +280,33 @@ describe('E 는 읽기 화면이다 (D-7E3a-8)', () => {
     renderScreen();
     const card = within(await screen.findByTestId('result-case-51'));
 
-    expect(card.getByRole('link', { name: /입찰함/u }).getAttribute('href')).toBe('/bids');
+    // **그 건이 보이는 탭으로** 보낸다(r1 M-2) — 맨 `/bids` 는 첫 탭을 열고 결과 단계 건은
+    // 거기 없다. 탭 id 는 D 의 표에서 오고 spec 이 지어내지 않는다.
+    expect(card.getByRole('link', { name: /입찰함/u }).getAttribute('href')).toBe(
+      `/bids?tab=${tabOf('AWAITING_OPENING')}`,
+    );
     expect(card.getByRole('link', { name: /워크시트/u }).getAttribute('href')).toBe(
       '/notices/SYN-7E3-RESULT/000',
     );
+  });
+});
+
+describe('링크가 그 건의 탭을 싣는다 (r1 M-2)', () => {
+  it.each([
+    ['OPENED_PROVISIONAL_FIRST', 'under-review'],
+    ['WON', 'closed'],
+    ['AWAITING_OPENING', 'awaiting-opening'],
+  ] as const)('%s 는 %s 탭으로 보낸다', async (state, tab) => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state })]);
+    renderScreen();
+
+    const card = within(await screen.findByTestId('result-case-51'));
+    expect(card.getByRole('link', { name: /입찰함/u }).getAttribute('href')).toBe(`/bids?tab=${tab}`);
+  });
+
+  /** 세 상태가 **서로 다른 탭**으로 간다 — 한 값으로 굳어 있으면 위 표가 공허하다. */
+  it('상태가 다르면 탭도 다르다', () => {
+    expect(new Set([tabOf('AWAITING_OPENING'), tabOf('WON'), tabOf('OPENED_PROVISIONAL_FIRST')]).size).toBe(3);
   });
 });
 
