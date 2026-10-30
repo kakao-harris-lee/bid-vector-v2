@@ -200,3 +200,73 @@ verifier 의 오염 재현을 **그대로** 돌렸다: 여정 ⑤ 앞에 그 건
 늘었다 — 여정 게이트 새 파일 셋과 그 배선 둘(`package.json`·`playwright.journey.config.ts`),
 탭 deep link 가 건드린 화면 D 파일 셋이다. `comm` 양쪽 빈 출력, 버릴 clone 에서 ①~⑥ 전부 초록
 (트리·인덱스 둘 다 base 와 diff 0 · vitest **472** · 게이트 다섯 0).
+
+---
+
+# 수정 라운드 2 (r2) — verifier `ready-for-review` · code-review `approve`, 승인 전 일괄
+
+차단 0 에서 받은 일괄이다. 지적은 게이트 넷과 화면 다섯.
+
+## 지적 ↔ 커밋 대응표
+
+| 지적 | 커밋 | 고친 것 |
+| --- | --- | --- |
+| **v M-1** `test.fail()` 이 게이트를 지난다 | `32567b16` | 모든 test 의 `expectedStatus === 'passed'` 축 |
+| **CR M-2 = v L-2** spec 이 사라지는 길 | `32567b16` | 여정 spec 등록부 + 리포트 집합 등식(**양방향**) |
+| **v L-3 · CR L-5** 낡은 리포트·`interrupted` 문면 | `32567b16` | 실행 시작에 지난 리포트를 지운다 + 축 문면 |
+| **v L-1** `-- <인자>` 가 게이트로 간다 | `32567b16` | 인자 거부 + 부분 실행의 올바른 명령 안내 |
+| **CR L-1 r2** 리포트가 CI 아티팩트에 | `32567b16` | D-7E-6 문면 갱신(담기는 것과 근거) |
+| **CR M-1 r2** 읽음 뒤 포커스 | `90e6a780` | 쓰기 뒤 그 행·묶음으로 **명시적 포커스 이동** |
+| **CR L-2 r2** live region test 0 | `90e6a780` | `getByRole('status')` — 접근성 축으로 |
+| **CR L-3 r2** key 가 삽입에 약해짐 | `90e6a780`·`878a4749` | key 는 **같은 공고 안 차례**, testId 는 전체 차례 + DOM 정체 test |
+| **CR L-4 r2** 401 막다른 문장·재시도 | `90e6a780`·`878a4749` | `SignedOutFace` + **전역 기본**에서 401 재시도 금지 + 술어 test |
+| **CR OQ-1** `?tab` 한 방향 | evidence | 제한 10 + 후속 `OPEN-7E3A-TAB-URL-DIRECTION` |
+
+**게이트 넷은 한 커밋(`32567b16`)** 이다 — 게이트 술어를 바꾸는 커밋이라 표적 재검증 대상이다.
+
+## 게이트 — 양성·음성 대조 (실 Playwright, 하네스 없는 가벼운 설정)
+
+통제군(전건 통과, spec 넷): 체인 exit **0** · `통과 4 · 건너뜀 0 · spec 4/4(등록부와 같다)`.
+
+| 우회 시도 | Playwright | 체인 exit | 게이트가 말한 것 |
+| --- | --- | --- | --- |
+| **조건부 `test.fail(cond)`**(r1 skip 과 같은 구조) | `5 passed` | **1** | `통과하기로 선언되지 않은 test 1건 … (expectedStatus: failed)` |
+| **spec 하나 삭제** | `3 passed` | **1** | `등록부의 spec 이 돌지 않았다: settings.spec.ts` |
+| **`testMatch` 밖으로 개명**(`.e2e.ts`) | `3 passed` | **1** | `등록부의 spec 이 돌지 않았다: onboarding.spec.ts` |
+| **낡은 리포트**: 통과 JSON 을 두고 `--reporter=list` | exit **0** | 게이트 **1** | `여정 결과 리포트가 없다` |
+| `npm run … -- --grep zzz` | — | **1** | `이 게이트는 인자를 받지 않는다` |
+
+넷 다 **Playwright 단독으로는 통과**다 — 그것이 이 축들이 메우는 구멍이다.
+
+## 고침마다 「고치기 전 RED」 — 화면 변이 여섯
+
+| 변이 | 표적 | exit |
+| --- | --- | --- |
+| r2M1 쓰기 뒤 포커스를 옮기지 않는다 | `InboxScreen.test.tsx` | **1**(2 failed) |
+| r2M1b 행이 포커스를 받을 수 없게(`tabIndex` 제거) | `InboxScreen.test.tsx` | **1** |
+| r2L2 live region 을 지운다 | `InboxScreen.test.tsx` | **1** |
+| r2L3 key 에 전체 차례를 다시 넣는다 | `InboxScreen.test.tsx` | **1** |
+| r2L4 401 을 맨 문장으로 되돌린다 | `ResultsScreen.test.tsx` | **1** |
+| r2L4b 401 재시도 금지를 되돌린다 | `queryClient.test.ts` | **1** |
+
+**뒤 셋은 처음에 초록이었다**(고쳤는데 잠그는 단언이 없었다) — `878a4749` 가 그 셋을 잰다:
+재시도 술어를 이름 있는 export 로 올려 직접 재고, 401 얼굴에 **길이 있는지**를 보고, 묶음 key 는
+값이 아니라 **DOM 노드의 정체**로 잰다(재마운트 성질이라 값 단언으로는 안 잡힌다).
+
+## r2 acceptance
+
+`~/.local/bin/bv-build.sh ./tools/one-command-check.sh` → **exit 0**.
+
+| 구간 | 핵심 결과 |
+| --- | --- |
+| Kotlin `check` · `qualityBaseline` · `:app:bootJar` | **BUILD SUCCESSFUL** 셋 |
+| Python 전건 | 통과 |
+| web vitest(W-6) | **594 passed (30 files)** |
+| web 여정(W-13) | **11 passed** + 게이트 `통과 11 · 건너뜀 0 · spec 4/4(등록부와 같다)` |
+
+## 개인정보 — 판정 리포트가 담는 것 (r2 CR L-1)
+
+`test-results/journey-results.json` 은 실패 시 CI 아티팩트로 올라가는 디렉터리에 있다(D-7E-6 대상).
+담기는 것은 **제목·상태·오류 문면**이고 **자격 값은 0** 이다 — 근거 둘: 여정 spec 에 `console.*`
+이 0 건이라 `stdout`/`stderr` 가 비고, `watchRequests` 는 **URL·메서드만** 모은다(본문을 모으는
+자리가 없다). 설정 주석도 「스크린샷만」에서 「스크린샷과 판정 리포트」로 고쳤다.
