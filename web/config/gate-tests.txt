@@ -28,3 +28,8 @@ e2e/harness/container-marker.test.mjs
 # v r4 M-2 · CR r4 L-5 — 여정이 받아 줄 자산의 **모양**. 허용 집합을 산출물에서 그냥 읽으면
 # 자산이 늘 때 양쪽이 함께 늘어 증가를 못 잡는다. 그 술어를 잠근다.
 e2e/harness/bundle-shape.test.mjs
+# M7/7E-2 — 화면 D 의 두 표(상태 → 탭 · 상태 → 다음 행동)와 그 전수·폴백 0. 탭 분류가
+# 클라이언트 추론이 되지 않는 것이 이 slice 의 게이트 술어다(D-7E-4).
+src/display/bidBoxDisplay.test.ts
+# 화면 D 가 보이는 값이 API 응답의 값이고 「지난 일정」이 서버의 overdue 에서만 나오는 것.
+src/screens/BidBoxScreen.test.tsx
