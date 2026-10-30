@@ -57,6 +57,10 @@ export const APPROVED_OPERATIONS = [
   { method: 'GET', path: '/api/profile/construction-capacities' },
   { method: 'POST', path: '/api/profile/construction-capacities' },
   { method: 'POST', path: '/api/profile/construction-capacities/remove' },
+
+  // 화면 A 시작하기(M7/7E-2b) — **이 slice 가 목록에 더하는 것은 이것 하나뿐이다**(착수 실측).
+  // 마법사의 쓰기는 위의 설정 operation 을 그대로 쓴다(같은 컴포넌트가 저장한다).
+  { method: 'GET', path: '/api/onboarding-checklist' },
 ] as const;
 
 export type ApprovedOperation = (typeof APPROVED_OPERATIONS)[number];

@@ -167,7 +167,15 @@ export const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
  * 읽어 가도 「V2 API 밖」 감시가 그것을 보지 못했다(실측).
  */
 /** 라우터가 **문서**로 받는 경로 — 화면의 주소다(자산이 아니다). */
-export const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u, /^\/bids$/u, /^\/settings$/u];
+export const ALLOWED_ROUTES = [
+  /^\/$/u,
+  /^\/login$/u,
+  /^\/notices\//u,
+  /^\/bids$/u,
+  /^\/settings$/u,
+  /** 화면 A 시작하기(M7/7E-2b). */
+  /^\/start$/u,
+];
 
 /**
  * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4).
@@ -251,6 +259,81 @@ export async function signIn(page: Page): Promise<void> {
     page.getByRole('button', { name: '로그인' }).click(),
   ]);
   await expect(page.getByTestId('screen-home')).toBeVisible();
+}
+
+/**
+ * 전략의 어휘 칸 하나를 **비운다** — 여정이 남긴 전역 상태를 되돌리는 자리다(M7/7E-2b).
+ *
+ * 화면이 아니라 **출하 API 로** 되돌린다: 실패 뒤 페이지가 어디에 있는지 알 수 없고, 되돌림은
+ * 화면의 능력이 아니라 **운영자 설정 행위**다(하네스가 전략을 심는 D-7E-8 과 같은 자리). 브라우저
+ * 세션 쿠키를 그대로 쓰므로 자격 값을 spec 이 들고 있지 않아도 된다.
+ *
+ * **멱등하다**: 이미 비어 있으면 아무것도 쓰지 않는다. 결과는 **세 갈래**다(CR r1 LOW) —
+ * 되돌렸다 · 되돌릴 세션이 없다 · 되돌리지 못했다. 셋을 한 값으로 접으면 teardown 이
+ * **원래 실패를 자기 실패로 덮는다**: `signIn` 전에 test 가 죽으면 이 함수의 첫 읽기가 401 인데,
+ * 그것은 「되돌리지 못했다」가 아니라 「되돌릴 것이 없다」다.
+ */
+export type RevertOutcome =
+  | { readonly kind: 'reverted' }
+  /** 세션이 없다(로그인 전에 죽었다) — 전역 상태를 바꿀 기회도 없었다. */
+  | { readonly kind: 'no-session'; readonly why: string }
+  | { readonly kind: 'blocked'; readonly why: string };
+
+const HTTP_UNAUTHORIZED_STATUS = 401;
+
+export async function clearStrategyTerms(
+  page: Page,
+  field: string,
+  currentTermsOf: (strategy: Record<string, unknown>) => readonly string[],
+): Promise<RevertOutcome> {
+  const read = await page.request.get('/api/strategy');
+  if (read.status() === HTTP_UNAUTHORIZED_STATUS) {
+    return { kind: 'no-session', why: '세션이 없어 되돌릴 것도 없다(GET /api/strategy 401)' };
+  }
+  if (!read.ok()) {
+    return { kind: 'blocked', why: `전략을 읽지 못해 되돌릴 수 없었다(GET /api/strategy ${read.status()})` };
+  }
+  const strategy = (await read.json()) as Record<string, unknown> & { readonly revision: number };
+  if (currentTermsOf(strategy).length === 0) {
+    return { kind: 'reverted' };
+  }
+  const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
+  const headers = { 'X-Operator-Csrf': session.csrf };
+  const begin = await page.request.post('/api/strategy/edit-sessions', { headers, data: { field } });
+  if (!begin.ok()) {
+    return { kind: 'blocked', why: `편집 세션을 열지 못해 되돌릴 수 없었다(POST edit-sessions ${begin.status()})` };
+  }
+  const { sessionId } = (await begin.json()) as { readonly sessionId?: string };
+  if (sessionId === undefined) {
+    return { kind: 'blocked', why: '편집 세션 응답에 sessionId 가 없어 되돌릴 수 없었다' };
+  }
+  const stamp = Date.now();
+  const close = async (): Promise<void> => {
+    // 적용이 안 됐으면 **세션을 닫아** 다음 실행의 `begin` 을 막지 않는다.
+    await page.request.post(`/api/strategy/edit-sessions/${sessionId}/cancel`, {
+      headers,
+      data: { commandId: `teardown-cancel-${stamp}` },
+    });
+  };
+  // **값 단계의 응답을 본다**(CR r1 LOW): 안 보면 그 거절이 다음 단계의
+  // `INVALID_TRANSITION` 으로 나타나 「어느 단계가 막혔는가」가 한 칸 밀린다.
+  const valued = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/value`, {
+    headers,
+    data: { commandId: `teardown-value-${stamp}`, field, terms: [] },
+  });
+  if (!valued.ok()) {
+    await close();
+    return { kind: 'blocked', why: `되돌림 값이 거부됐다(value ${valued.status()})` };
+  }
+  const confirmed = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/confirm`, {
+    headers,
+    data: { commandId: `teardown-confirm-${stamp}`, seenRevision: strategy.revision },
+  });
+  if (!confirmed.ok()) {
+    await close();
+    return { kind: 'blocked', why: `되돌림 적용이 거부됐다(confirm ${confirmed.status()})` };
+  }
+  return { kind: 'reverted' };
 }
 
 /** `datetime-local` 이 받는 꼴(`YYYY-MM-DDTHH:mm`, **지역 시각**) — 시각을 조작하지 않고 지금에서 센다. */

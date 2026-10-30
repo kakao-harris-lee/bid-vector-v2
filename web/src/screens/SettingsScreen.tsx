@@ -5,7 +5,8 @@ import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { ProfileSection } from './ProfileSection';
-import { STRATEGY_QUERY_KEY, StrategySection } from './StrategySection';
+import { STRATEGY_QUERY_KEY } from './strategyEdit';
+import { StrategySection } from './StrategySection';
 
 /**
  * 범위 밖 자리 — **빈 자리 + 「준비 중」뿐이다**(D-7E2-4·7). 탭·버튼·입력칸을 만들지 않는다.
