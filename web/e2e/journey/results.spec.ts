@@ -75,8 +75,18 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   await signIn(page);
 
   const recorded = await driveToRecorded(page, NOTICE);
-  // 같은 DB 에 두 번 미는 지역 실행에서는 `null` 이다 — 그때는 이 여정이 잴 것이 없다.
-  test.skip(recorded === null, '이 건은 이미 제출 뒤다(지역 재실행) — 결과 단계를 새로 밀 수 없다');
+  /**
+   * **조건부 skip 을 두지 않는다**(v H-1 · CR H-1). `driveToRecorded` 가 `null` 을 내는 경우는
+   * 그 공고의 건이 `WATCHING` 이 아닐 때 하나뿐이고, 하네스는 **실행마다 볼륨 없는 새 Postgres**
+   * 를 띄우며(`docker run --rm`) 설정이 `reuseExistingServer: false` · `retries: 0` 이다 —
+   * 정상 실행에서 그 조건은 설 수 없다. 그래서 `null` 은 「지역 재실행」이 아니라 **회귀나 오염**
+   * 이고, skip 으로 받으면 여정 ⑤ 의 단언이 **전부 사라진 채 CI 가 초록**이다(verifier 재현:
+   * 오염 spec 을 앞에 두면 `1 skipped · 2 passed · exit 0`).
+   */
+  expect(
+    recorded,
+    '여정 ⑤ 의 건이 WATCHING 에서 출발하지 않았다 — 하네스는 실행마다 버릴 DB 이므로 회귀나 오염이다',
+  ).not.toBeNull();
   expect(recorded!.state).toBe('BID_RECORDED');
   const caseId = recorded!.caseId;
 
