@@ -45,6 +45,9 @@ BUILD SUCCESSFUL 도 그것만으로는 「그 test 가 돌았다」가 아니�
 | **상수 시간 비교 허용 목록에 넷** | `Intrinsics.areEqual` 금지 등식 | 비밀값을 **짧은 비교**로 다루는 길을 막는 게이트다. 등재한 넷은 `data class` 자동 `equals`(응답 값 객체 셋)와 sealed 싱글턴 `when` 소진(파일 하나)이고, **어느 것도 자격증명 값을 참조하지 않는다** — 항목마다 그 사유를 붙였고 그 사유가 비면 등재 자체가 거부된다 |
 | 계정 범위 핸들러 목록에 `MyBidResultController` | typed 접근자 등식 | 계정 주체를 얻는 길이 접근자 하나임을 집합으로 잠근다. 주체 **라벨**을 읽는 자리는 늘지 않았다 |
 | 상호 포트를 `ProfileWiring` 이 낸다 | 조립 경계 · V22 어댑터 격리 **둘** | 7C④ 가 「판정 쪽으로 건너가는 길」을 막으려고 세운 경계다. 소비자가 늘 때 허용 자리를 늘리는 대신 **소유자가 좁은 읽기를 publish** 한다 |
+| `app.http.allowed-packages` 에 `workflow.result` | app 층 참조 허용 목록 | 응답 조립이 판정 어휘와 수를 칸으로 옮기려면 그 어휘를 이름 불러야 한다(7C⑤-a 의 `workflow.opening`·7C④ 의 `workflow.profile` 과 같은 자리) |
+| **`app.http.denied-types` 에 읽기 포트 넷** | — (등재가 **좁히는** 쪽이다) | 패키지를 열면 포트도 함께 열린다. 핸들러가 받는 것이 use case 하나라는 사실을 여기서 다시 세운다 — 포트가 HTTP 층에 보이면 그것이 곧 지름길이다 |
+| 주입 허용 표면에 `sharedkernel.AmountRecord` | 주입 표면 집합 등식 | `ConfirmedAwardFields` 가 받는 타입이고, 금액 다섯 성분을 함께 나르는 **유일한 공개 경로**다(R-BASIS-06) |
 | `gate-tests.properties` 에 새 test class 넷 | 등재 등식(모집단 ∖ 제외 == 등재) | 등재를 잊으면 그 test 를 수집에서 빼는 것이 곧 게이트를 끄는 것이 된다 |
 
 ## 무엇이 어디서 잠기는가
