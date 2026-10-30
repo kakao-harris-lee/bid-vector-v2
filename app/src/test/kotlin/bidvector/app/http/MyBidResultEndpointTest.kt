@@ -153,6 +153,22 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         response.statusCode.value() shouldBe 401
     }
 
+    /**
+     * **wire 에서도 남의 건이 섞이지 않는다**(r1 v L-1) — 다른 계정으로 심은 건이 실재할 때만
+     * 이 단언이 무엇을 잰다. 소유 경계의 본체는 포트 서명과 실 DB test 가 지고, 이 자리는
+     * 그 경계가 **응답까지** 이어지는지를 본다.
+     */
+    @Test
+    fun `다른 계정의 건은 내 결과에 나오지 않는다`() {
+        val otherAccount = TEST_ACCOUNT_ID + 1
+        bids.put(otherAccount, listOfNotNull(fakeRecordedBid(99L, notice, amount(9_999_999L))))
+
+        val body = body()
+        body shouldContain "\"sampleSize\":0"
+        body shouldNotContain "9999999"
+        body shouldNotContain "\"caseId\":99"
+    }
+
     @Test
     fun `투찰 기록이 없으면 빈 목록과 부재 상태가 나간다`() {
         val body = body()
@@ -188,7 +204,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         body shouldContain "\"reconciledOutcome\":\"WON\""
         body shouldContain "\"gapState\":\"COMPUTED\""
         body shouldContain "\"gapWon\":200000"
-        body shouldContain "\"reconciledAwardRate\":\"1\""
+        body shouldContain "\"reconciledAwardRate\":\"1\",\"reconciledWonCount\":1"
     }
 
     /** 확정 낙찰가가 없으면 차이가 **부재**다 — 0 으로 채우지 않는다. */

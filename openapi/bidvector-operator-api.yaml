@@ -3938,6 +3938,7 @@ components:
             properties:
               caseId:
                 type: integer
+                format: int32
                 description: "입찰 건 식별자."
               noticeNumber:
                 type: string
@@ -3965,6 +3966,7 @@ components:
                   - DEADLINE_PASSED_UNRECORDED
               submittedAmountWon:
                 type: integer
+                format: int64
                 description: "내 투찰 금액(원)."
               submittedAmountCurrency:
                 type: string
@@ -3984,9 +3986,11 @@ components:
                 description: "메뉴에서 고른 안의 참조. 출처가 PRICE_MENU 일 때만 값이 있고, 오늘은 **언제나 null** 이다."
               submittedAt:
                 type: string
+                format: date-time
                 description: "운영자가 나라장터에 낸 시각(진술)."
               confirmedAt:
                 type: string
+                format: date-time
                 description: "그 사실을 이 시스템에 확인한 시각(서버 시계)."
               openingState:
                 type: string
@@ -4003,6 +4007,7 @@ components:
                   - PROGRESS_ABSENT
               confirmedAwardAmountWon:
                 type: integer
+                format: int64
                 nullable: true
                 description: "**확정** 낙찰가(원). 잠정 1위 금액이 아니다."
               confirmedAwardAmountCurrency:
@@ -4060,6 +4065,7 @@ components:
                   - AWARD_ABSENT
               gapWon:
                 type: integer
+                format: int64
                 nullable: true
                 description: "내 투찰가 − 확정 낙찰가(원). 음수는 내가 더 낮게 냈다는 뜻이다. 두 금액의 과세 축이 같다는 보장은 없다."
               gapCurrency:
@@ -4089,6 +4095,7 @@ components:
           properties:
             sampleSize:
               type: integer
+              format: int32
               description: "투찰 기록이 있는 실투찰 건의 수. 두 축이 같은 표본을 센다."
             recordedRateState:
               type: string
@@ -4103,18 +4110,23 @@ components:
               description: "운영자가 적은 결과 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다."
             recordedWonCount:
               type: integer
+              format: int32
               description: "운영자가 적은 결과 축의 낙찰 건 수(분자)."
             recordedLostCount:
               type: integer
+              format: int32
               description: "운영자가 적은 결과 축의 패찰 건 수."
             recordedDenominator:
               type: integer
+              format: int32
               description: "운영자가 적은 결과 축의 분모(낙찰 + 패찰)."
             recordedFailedOrRebidCount:
               type: integer
+              format: int32
               description: "운영자가 적은 결과 축의 유찰·재입찰 건 수(분모 밖)."
             recordedUndecidedCount:
               type: integer
+              format: int32
               description: "운영자가 적은 결과 축의 미확정·판정 불가 건 수(분모 밖)."
             reconciledRateState:
               type: string
@@ -4129,18 +4141,23 @@ components:
               description: "서버 대사 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다."
             reconciledWonCount:
               type: integer
+              format: int32
               description: "서버 대사 축의 낙찰 건 수(분자)."
             reconciledLostCount:
               type: integer
+              format: int32
               description: "서버 대사 축의 패찰 건 수."
             reconciledDenominator:
               type: integer
+              format: int32
               description: "서버 대사 축의 분모(낙찰 + 패찰)."
             reconciledFailedOrRebidCount:
               type: integer
+              format: int32
               description: "서버 대사 축의 유찰·재입찰 건 수(분모 밖)."
             reconciledUndecidedCount:
               type: integer
+              format: int32
               description: "서버 대사 축의 미확정·판정 불가 건 수(분모 밖)."
             reconciliationBlockers:
               type: array

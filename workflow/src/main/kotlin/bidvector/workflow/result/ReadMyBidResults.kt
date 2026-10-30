@@ -66,17 +66,17 @@ class ReadMyBidResults(
     private val matchingPolicy: AwardMatchingPolicyData,
 ) {
     fun read(account: AccountId): MyBidResults {
-        val recorded = bids.recordedBids(account)
-        val resolvable = recorded.mapNotNull { it.notice.toNoticeId() }.toSet()
+        val recorded = bids.recordedBids(account).map { it to it.notice.toNoticeId() }
+        val resolvable = recorded.mapNotNull { (_, id) -> id }.toSet()
         val facts = openingFacts.lookupAll(resolvable)
         val winners = winnerNames.winnerNames(resolvable)
         val operator = operatorNames.tradeNameOf(account)
         val now = clock.now()
         val cases =
-            recorded.map { bid ->
+            recorded.map { (bid, id) ->
                 bid.toResult(
-                    opening = bid.openingViewOf(facts, now),
-                    winner = bid.winnerOf(winners),
+                    opening = openingViewOf(id, facts, now),
+                    winner = id?.let(winners::get) ?: AwardWinnerTradeName.NotPublished,
                     operator = operator,
                 )
             }
@@ -84,16 +84,14 @@ class ReadMyBidResults(
     }
 
     /** 공고를 못 찾는 건도 **목록에 남는다** — 조용히 빠지면 운영자가 자기 기록을 잃는다. */
-    private fun RecordedRealBid.openingViewOf(
+    private fun openingViewOf(
+        id: NoticeId?,
         facts: Map<NoticeId, NoticeOpeningFacts>,
         now: Instant,
     ): OpeningResultView {
-        val found = notice.toNoticeId()?.let(facts::get)
+        val found = id?.let(facts::get)
         return found?.let { resolveOpeningResultView(it, now, openingPolicy) } ?: OpeningResultView.NoticeAbsent
     }
-
-    private fun RecordedRealBid.winnerOf(winners: Map<NoticeId, AwardWinnerTradeName>): AwardWinnerTradeName =
-        notice.toNoticeId()?.let(winners::get) ?: AwardWinnerTradeName.NotPublished
 
     /**
      * 건 하나의 조립 — **상호는 인자로만 지나간다.** [winner] 는 [reconcileBid] 에 넘어가고

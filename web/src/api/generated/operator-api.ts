@@ -1352,7 +1352,10 @@ export interface components {
         MyBidResults: {
             /** @description 투찰 기록이 있는 **실투찰** 건. 페이퍼(가상) 건은 들지 않는다. 순서는 확인 시각 내림차순이다. */
             cases: {
-                /** @description 입찰 건 식별자. */
+                /**
+                 * Format: int32
+                 * @description 입찰 건 식별자.
+                 */
                 caseId: number;
                 /** @description 공고번호(건이 담을 때 적은 사본). */
                 noticeNumber: string;
@@ -1363,7 +1366,10 @@ export interface components {
                  * @enum {string}
                  */
                 recordedState: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
-                /** @description 내 투찰 금액(원). */
+                /**
+                 * Format: int64
+                 * @description 내 투찰 금액(원).
+                 */
                 submittedAmountWon: number;
                 /** @description 투찰 금액의 통화. */
                 submittedAmountCurrency: string;
@@ -1376,16 +1382,25 @@ export interface components {
                 submittedAmountOrigin: "OPERATOR_ENTERED" | "PRICE_MENU";
                 /** @description 메뉴에서 고른 안의 참조. 출처가 PRICE_MENU 일 때만 값이 있고, 오늘은 **언제나 null** 이다. */
                 chosenOptionRef: string | null;
-                /** @description 운영자가 나라장터에 낸 시각(진술). */
+                /**
+                 * Format: date-time
+                 * @description 운영자가 나라장터에 낸 시각(진술).
+                 */
                 submittedAt: string;
-                /** @description 그 사실을 이 시스템에 확인한 시각(서버 시계). */
+                /**
+                 * Format: date-time
+                 * @description 그 사실을 이 시스템에 확인한 시각(서버 시계).
+                 */
                 confirmedAt: string;
                 /**
                  * @description 개찰 결과 상태. 공고 단위 개찰 조회(readOpeningResult)와 **같은 어휘**다.
                  * @enum {string}
                  */
                 openingState: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "OPENED" | "FAILED_BID" | "REBID" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT";
-                /** @description **확정** 낙찰가(원). 잠정 1위 금액이 아니다. */
+                /**
+                 * Format: int64
+                 * @description **확정** 낙찰가(원). 잠정 1위 금액이 아니다.
+                 */
                 confirmedAwardAmountWon: number | null;
                 /** @description 확정 낙찰가의 통화. */
                 confirmedAwardAmountCurrency: string | null;
@@ -1415,14 +1430,20 @@ export interface components {
                  * @enum {string}
                  */
                 gapState: "COMPUTED" | "AWARD_ABSENT";
-                /** @description 내 투찰가 − 확정 낙찰가(원). 음수는 내가 더 낮게 냈다는 뜻이다. 두 금액의 과세 축이 같다는 보장은 없다. */
+                /**
+                 * Format: int64
+                 * @description 내 투찰가 − 확정 낙찰가(원). 음수는 내가 더 낮게 냈다는 뜻이다. 두 금액의 과세 축이 같다는 보장은 없다.
+                 */
                 gapWon: number | null;
                 /** @description 차이의 통화. */
                 gapCurrency: string | null;
             }[];
             /** @description 투찰 대비 낙찰률 — **두 축을 병기**한다. 목록과 **같은 판정 패스**에서 난다. */
             aggregate: {
-                /** @description 투찰 기록이 있는 실투찰 건의 수. 두 축이 같은 표본을 센다. */
+                /**
+                 * Format: int32
+                 * @description 투찰 기록이 있는 실투찰 건의 수. 두 축이 같은 표본을 센다.
+                 */
                 sampleSize: number;
                 /**
                  * @description 운영자가 적은 결과 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
@@ -1431,15 +1452,30 @@ export interface components {
                 recordedRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
                 /** @description 운영자가 적은 결과 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
                 recordedAwardRate: string | null;
-                /** @description 운영자가 적은 결과 축의 낙찰 건 수(분자). */
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 낙찰 건 수(분자).
+                 */
                 recordedWonCount: number;
-                /** @description 운영자가 적은 결과 축의 패찰 건 수. */
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 패찰 건 수.
+                 */
                 recordedLostCount: number;
-                /** @description 운영자가 적은 결과 축의 분모(낙찰 + 패찰). */
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 분모(낙찰 + 패찰).
+                 */
                 recordedDenominator: number;
-                /** @description 운영자가 적은 결과 축의 유찰·재입찰 건 수(분모 밖). */
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 유찰·재입찰 건 수(분모 밖).
+                 */
                 recordedFailedOrRebidCount: number;
-                /** @description 운영자가 적은 결과 축의 미확정·판정 불가 건 수(분모 밖). */
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 미확정·판정 불가 건 수(분모 밖).
+                 */
                 recordedUndecidedCount: number;
                 /**
                  * @description 서버 대사 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
@@ -1448,15 +1484,30 @@ export interface components {
                 reconciledRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
                 /** @description 서버 대사 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
                 reconciledAwardRate: string | null;
-                /** @description 서버 대사 축의 낙찰 건 수(분자). */
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 낙찰 건 수(분자).
+                 */
                 reconciledWonCount: number;
-                /** @description 서버 대사 축의 패찰 건 수. */
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 패찰 건 수.
+                 */
                 reconciledLostCount: number;
-                /** @description 서버 대사 축의 분모(낙찰 + 패찰). */
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 분모(낙찰 + 패찰).
+                 */
                 reconciledDenominator: number;
-                /** @description 서버 대사 축의 유찰·재입찰 건 수(분모 밖). */
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 유찰·재입찰 건 수(분모 밖).
+                 */
                 reconciledFailedOrRebidCount: number;
-                /** @description 서버 대사 축의 미확정·판정 불가 건 수(분모 밖). */
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 미확정·판정 불가 건 수(분모 밖).
+                 */
                 reconciledUndecidedCount: number;
                 /** @description 표본에 나타난 판정 불가 사유 전수. 대사 분모가 0 이면 **이것이 그 사유다**. */
                 reconciliationBlockers: string[];
