@@ -37,6 +37,12 @@ dependencies {
     // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
     implementation(project(":decision"))
     implementation(project(":procurement"))
+    // M7/7C⑤-b — `MyBidResultWiring` 이 AWARD_MATCHING_POLICY(settlement)를 위 qualification
+    // 정책 해소와 **같은 형태로** 직접 참조한다. 정책 주입을 wiring 에 두는 것이 이 저장소의
+    // 관례이고(판정 함수가 전역에서 정책을 읽지 않아 test 가 다른 값으로 같은 판정을 잰다),
+    // 그러려면 그 타입을 이름 부를 수 있어야 한다. `workflow` 는 settlement 를
+    // `implementation` 으로만 선언해 이 모듈의 컴파일 classpath 에 전이되지 않는다.
+    implementation(project(":settlement"))
 
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
