@@ -391,6 +391,12 @@ private val DEPTH_ONE_ARRAY_KEYS = setOf("type", "items", "description")
  * ([isScalarOrScalarArray])만 부르고 자기를 다시 부르지 않아 깊이 2 는 **표현할 함수가 없다**
  * (깊이를 세는 인자였다면 1 을 2 로 고치는 한 글자로 열린다). 안쪽 object 는
  * [collectPropertyDefiningSchemas]가 스키마로 따로 수집하므로 같은 위반이 두 자리에서 잡힌다.
+ *
+ * **이 보장은 타입이 정직한 스키마에서 성립한다**(r1 v L-2 — 문장의 과대를 좁힌다). 스칼라 층은
+ * 모르는 키를 무시하므로, 깊이 1 object 의 속성이 `{type: string, properties: …}` 처럼 **스칼라라고
+ * 선언하면서 object 를 품으면** 그 안쪽은 이 술어의 판정 밖이다. 계약이 스칼라 쪽 술어를 범위 밖에
+ * 두었고(D-7C4C-6) 그 관용은 D-6A1-38 부터 있던 것이다 — 이 slice 가 연 자리가 아니며 알려진 제한에
+ * 있다. 닫으려면 스칼라 층에도 키 허용 목록을 걸어야 하고 그때 기존 계약의 서술 키들이 함께 붉는다.
  */
 internal fun isFlatPropertyDefinition(definition: Map<String, Any?>): Boolean =
     isScalarOrScalarArray(definition) || isDepthOneObjectDefinition(definition)

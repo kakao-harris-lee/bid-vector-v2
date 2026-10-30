@@ -6,8 +6,12 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
 
-/** 체크리스트 operation 의 좌표 — 문서와 구현이 같은 문자열을 쓴다. */
-private const val CHECKLIST_PATH = "/api/onboarding-checklist"
+/**
+ * 체크리스트 operation 의 좌표 — **구현 상수에서 받는다**(r1 CR LOW). 리터럴을 쓰면 이 파일이 「문서와
+ * 구현이 같은 문자열」을 말하면서 그 등식을 세우지 않는다. 경로 자체의 문서↔매핑 등식은
+ * `ProductionHttpSurfaceTest` 가 집합으로 진다.
+ */
+private val CHECKLIST_PATH = AccountScopedRoutes.ONBOARDING_CHECKLIST
 
 /**
  * 체크리스트 operation 의 **계약 대조**(M7/7C④-3) — 키 집합 · 상태 코드 · 보안 선언 · 어휘 등식.

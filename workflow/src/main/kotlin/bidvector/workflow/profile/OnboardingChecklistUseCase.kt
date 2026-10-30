@@ -13,8 +13,11 @@ import java.time.ZoneId
  * 인증서 만료 판정이 「오늘」에 달려 있고 그 오늘은 **운영자가 보는 날짜**여야 한다 — UTC 로 세면
  * KST 00~09 시에 어제 날짜를 쓰게 되고, 만료 당일 밤의 계정이 하루 먼저 「만료」로 보인다.
  * 보관 기한(`EVIDENCE_RETENTION_ZONE`)이 같은 이유로 같은 구역을 든다.
+ *
+ * **`private` 다**(r1 CR LOW): 읽는 자리가 이 파일 한 줄뿐이라 public 으로 두면 설계 검토 (2b) 의
+ * 「새 public 표면」만 하나 늘고 외부 독자는 없다. 형제 구역 상수들은 다른 패키지가 읽어서 public 이다.
  */
-val ONBOARDING_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+private val ONBOARDING_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 /**
  * 시작하기 체크리스트 조회(M7/7C④-3) — 저장된 원천 넷을 모아 [judgeOnboardingChecklist] 에 넘긴다.
