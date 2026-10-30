@@ -48,14 +48,14 @@ function screenTree(client: QueryClient) {
   );
 }
 
-function renderScreen() {
+function renderScreen(entry = '/bids') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
     [
       { path: '/bids', element: <BidBoxScreen /> },
       { path: '/notices/:noticeNumber/:noticeRound', element: <p>워크시트 자리</p> },
     ],
-    { initialEntries: ['/bids'] },
+    { initialEntries: [entry] },
   );
   return render(
     <QueryClientProvider client={client}>
@@ -445,5 +445,46 @@ describe('화면 D — 세 얼굴과 쓰기 실패', () => {
     const failure = await screen.findByTestId('write-failure');
     expect(within(failure).getByRole('link', { name: /로그인/u })).toBeTruthy();
     expect(within(failure).queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+});
+
+/**
+ * M7/7E-3a r1 M-2 — 화면 E 의 「다음 행동」이 **그 건이 보이는 탭**으로 보낸다. 받는 쪽이
+ * 여기다: 첫 탭을 URL 이 정할 수 있어야 그 링크가 뜻을 가진다.
+ */
+describe('첫 탭을 URL 이 정한다 (r1 M-2)', () => {
+  it('`?tab=` 이 가리키는 탭으로 열리고 그 묶음의 건이 보인다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 77, state: 'AWAITING_OPENING' })]);
+    renderScreen('/bids?tab=awaiting-opening');
+
+    expect(await screen.findByTestId('bid-case-77')).toBeTruthy();
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('개찰 대기');
+  });
+
+  it('칸이 없으면 지금까지의 기본(관심)이다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase()]);
+    renderScreen();
+
+    expect(await screen.findByRole('tab', { selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
+  });
+
+  /** 바깥에서 온 문자열에 탭을 **지어내지 않는다** — 모르는 값은 기본으로 떨어진다. */
+  it('아는 탭이 아니면 기본으로 떨어진다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase()]);
+    renderScreen('/bids?tab=존재하지-않는-탭');
+
+    expect(await screen.findByRole('tab', { selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
+  });
+
+  it('URL 로 연 뒤에도 운영자의 클릭이 탭을 옮긴다 — URL 이 다시 덮지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 77, state: 'AWAITING_OPENING' })]);
+    renderScreen('/bids?tab=awaiting-opening');
+    await screen.findByTestId('bid-case-77');
+
+    fireEvent.click(screen.getByRole('tab', { name: /관심/u }));
+
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
   });
 });

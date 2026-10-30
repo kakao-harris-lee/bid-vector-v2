@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { expect, type Page, type Request } from '@playwright/test';
+import { expect, type Locator, type Page, type Request } from '@playwright/test';
 
 import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
 
@@ -127,6 +127,13 @@ export const CASE_STATE_LABEL: Readonly<Record<string, string>> = {
   BID_PLANNED: '투찰 예정',
   BID_RECORDED: '투찰 기록됨',
   AWAITING_OPENING: '개찰 대기',
+  // 결과 단계 여섯(M7/7E-3a) — 여정 ⑤ 가 이 문면으로 화면 E·D 를 대조한다.
+  OPENED_PROVISIONAL_FIRST: '잠정 1위',
+  OPENED_OUT_OF_RANK: '순위 밖',
+  UNDER_QUALIFICATION_REVIEW: '적격심사 중',
+  WON: '낙찰',
+  LOST: '패찰',
+  FAILED_OR_REBID: '유찰·재공고',
 };
 
 /**
@@ -175,6 +182,9 @@ export const ALLOWED_ROUTES = [
   /^\/settings$/u,
   /** 화면 A 시작하기(M7/7E-2b). */
   /^\/start$/u,
+  /** 화면 E 결과 확인 · 알림함(M7/7E-3a). */
+  /^\/results$/u,
+  /^\/inbox$/u,
 ];
 
 /**
@@ -345,3 +355,99 @@ export function localDateTimeInput(daysFromNow: number): string {
   )}`;
 }
 
+
+/* ── 여정이 공유하는 걸음(M7/7E-3a) ─────────────────────────────────────────
+   셋을 `journey.spec.ts` 에서 이 자리로 옮겼다 — 여정 ⑤ 가 같은 걸음을 걷는데 복제하면
+   갈린다(이 파일 머리 주석의 승인 목록 선례와 같은 사유). **거동은 바뀌지 않았다**: 본문은
+   그대로이고 옮긴 것은 자리뿐이다. */
+
+/**
+ * 검색 — 술어에 **질의까지** 넣는다(CR M-4). 경로·상태만 보면 화면 B 가 마운트 때 거는 빈 폼
+ * 조회를 잡을 수 있고, 그러면 검색 경로를 **재지 않으면서 초록**이 된다.
+ */
+export async function search(page: Page, query: string): Promise<NoticeRow[]> {
+  const response = page.waitForResponse(
+    (one) =>
+      one.url().includes('/api/notices') &&
+      new URL(one.url()).searchParams.get('q') === query &&
+      one.status() === 200,
+  );
+  await page.fill('input[name="q"]', query);
+  await page.getByRole('button', { name: '검색' }).click();
+  return (await (await response).json()) as NoticeRow[];
+}
+
+/**
+ * 담기 — **멱등**이다(이미 담긴 건은 200). 조건 대기 뒤 버튼 유무로 가른다(v M-1 · CR M-5).
+ * 반환은 「이 실행이 실제로 담았는가」다 — 반복 실행에서 토스트 단언을 가르는 데 쓴다(CR r2 L-12).
+ */
+export async function ensureInBidBox(page: Page, card: Locator): Promise<boolean> {
+  await expect(card).toBeVisible();
+  const addButton = card.getByRole('button', { name: /담기/u });
+  if ((await addButton.count()) === 0) {
+    return false;
+  }
+  const added = page.waitForResponse(
+    (one) => one.url().endsWith('/api/bid-cases') && one.request().method() === 'POST',
+  );
+  await addButton.click();
+  expect([200, 201]).toContain((await added).status());
+  return true;
+}
+
+/**
+ * 건 하나를 **「제출함」까지** 민다 — 여정 ③ 이 그 각 단계를 자세히 재므로 여기서는 같은
+ * 클릭만 하고 단언은 결과 상태 하나다. **여정 ④ 와 ⑤ 가 각각 자기 공고로 부른다.**
+ *
+ * `null` 은 「그 건이 `WATCHING` 이 아니다」이고 부르는 쪽이 그것을 어떻게 받을지 정한다 —
+ * 여정 ④ 는 나머지 단언을 계속 돌리고(`if`), 여정 ⑤ 는 **붉게 멈춘다**(r1 H-1: 하네스가
+ * 실행마다 버릴 DB 라 그 조건은 회귀나 오염일 때만 선다).
+ *
+ * 여정마다 **다른 공고**를 쓰는 이유는 fixture 의 `why_third_notice`·`why_fourth_notice` 에
+ * 있다 — 한 하네스를 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 여정이 서로의 전이를 본다.
+ */
+export async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
+  const rows = await search(page, noticeNumber);
+  // 없으면 **사유를 말하고** 멈춘다 — `!` 로 두면 `TypeError` 가 되어 「fixture 가 안 들어왔다」와
+  // 「화면이 안 그렸다」를 구별할 수 없다(CR r1 L-11).
+  expect(rows.map((row) => row.noticeNumber), `검색이 ${noticeNumber} 를 내지 않았다`).toContain(noticeNumber);
+  const target = rows.find((row) => row.noticeNumber === noticeNumber)!;
+  const card = page.getByTestId(`notice-card-${target.noticeNumber}`);
+  await ensureInBidBox(page, card);
+
+  const cases = page.waitForResponse(
+    (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
+  );
+  await card.getByTestId('notice-title').click();
+  await expect(page.getByTestId('screen-worksheet')).toBeVisible();
+  const caseRows = (await (await cases).json()) as BidCaseRow[];
+  expect(caseRows.map((row) => row.noticeNumber), `입찰함에 ${noticeNumber} 건이 없다`).toContain(noticeNumber);
+  const opened = caseRows.find((row) => row.noticeNumber === noticeNumber)!;
+
+  // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
+  // `WATCHING` 이고 아래 세 단계를 탄다.
+  if (opened.state !== 'WATCHING') {
+    return null;
+  }
+
+  await page.getByTestId('active-bids').fill('1');
+  const priced = page.waitForResponse(
+    (one) => one.url().includes('/api/bid-price-requests') && one.request().method() === 'POST',
+  );
+  await page.getByTestId('worksheet-primary').click();
+  expect((await priced).status()).toBe(200);
+
+  await page.getByTestId('record-amount').fill('1350000000');
+  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
+  const drafted = page.waitForResponse((one) => one.url().includes('/draft') && one.request().method() === 'POST');
+  await page.getByTestId('worksheet-primary').click();
+  expect((await drafted).status()).toBe(200);
+
+  await page.getByTestId('record-amount').fill('1350000000');
+  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
+  const recorded = page.waitForResponse((one) => one.url().includes('/record') && one.request().method() === 'POST');
+  await page.getByTestId('worksheet-primary').click();
+  const response = await recorded;
+  expect(response.status()).toBe(200);
+  return (await response.json()) as BidCaseRow;
+}
