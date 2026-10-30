@@ -167,7 +167,15 @@ export const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
  * 읽어 가도 「V2 API 밖」 감시가 그것을 보지 못했다(실측).
  */
 /** 라우터가 **문서**로 받는 경로 — 화면의 주소다(자산이 아니다). */
-export const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u, /^\/bids$/u, /^\/settings$/u];
+export const ALLOWED_ROUTES = [
+  /^\/$/u,
+  /^\/login$/u,
+  /^\/notices\//u,
+  /^\/bids$/u,
+  /^\/settings$/u,
+  /** 화면 A 시작하기(M7/7E-2b). */
+  /^\/start$/u,
+];
 
 /**
  * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4).
@@ -251,6 +259,59 @@ export async function signIn(page: Page): Promise<void> {
     page.getByRole('button', { name: '로그인' }).click(),
   ]);
   await expect(page.getByTestId('screen-home')).toBeVisible();
+}
+
+/**
+ * 전략의 어휘 칸 하나를 **비운다** — 여정이 남긴 전역 상태를 되돌리는 자리다(M7/7E-2b).
+ *
+ * 화면이 아니라 **출하 API 로** 되돌린다: 실패 뒤 페이지가 어디에 있는지 알 수 없고, 되돌림은
+ * 화면의 능력이 아니라 **운영자 설정 행위**다(하네스가 전략을 심는 D-7E-8 과 같은 자리). 브라우저
+ * 세션 쿠키를 그대로 쓰므로 자격 값을 spec 이 들고 있지 않아도 된다.
+ *
+ * **멱등하다**: 이미 비어 있으면 아무것도 쓰지 않는다. 되돌리지 **못한** 사유는 문자열로 올린다 —
+ * 「되돌릴 수 없었다」와 「남겼다」는 다른 진단이다.
+ */
+export async function clearStrategyTerms(
+  page: Page,
+  field: string,
+  currentTermsOf: (strategy: Record<string, unknown>) => readonly string[],
+): Promise<string | null> {
+  const read = await page.request.get('/api/strategy');
+  if (!read.ok()) {
+    return `전략을 읽지 못해 되돌릴 수 없었다(GET /api/strategy ${read.status()})`;
+  }
+  const strategy = (await read.json()) as Record<string, unknown> & { readonly revision: number };
+  if (currentTermsOf(strategy).length === 0) {
+    return null;
+  }
+  const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
+  const headers = { 'X-Operator-Csrf': session.csrf };
+  const begin = await page.request.post('/api/strategy/edit-sessions', { headers, data: { field } });
+  if (!begin.ok()) {
+    return `편집 세션을 열지 못해 되돌릴 수 없었다(POST edit-sessions ${begin.status()})`;
+  }
+  const { sessionId } = (await begin.json()) as { readonly sessionId?: string };
+  if (sessionId === undefined) {
+    return '편집 세션 응답에 sessionId 가 없어 되돌릴 수 없었다';
+  }
+  const stamp = Date.now();
+  await page.request.post(`/api/strategy/edit-sessions/${sessionId}/value`, {
+    headers,
+    data: { commandId: `teardown-value-${stamp}`, field, terms: [] },
+  });
+  const confirmed = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/confirm`, {
+    headers,
+    data: { commandId: `teardown-confirm-${stamp}`, seenRevision: strategy.revision },
+  });
+  if (!confirmed.ok()) {
+    // 적용이 안 됐으면 **세션을 닫아** 다음 실행의 `begin` 을 막지 않는다.
+    await page.request.post(`/api/strategy/edit-sessions/${sessionId}/cancel`, {
+      headers,
+      data: { commandId: `teardown-cancel-${stamp}` },
+    });
+    return `되돌림 적용이 거부됐다(confirm ${confirmed.status()})`;
+  }
+  return null;
 }
 
 /** `datetime-local` 이 받는 꼴(`YYYY-MM-DDTHH:mm`, **지역 시각**) — 시각을 조작하지 않고 지금에서 센다. */
