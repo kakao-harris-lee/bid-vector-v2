@@ -110,9 +110,12 @@ state 이고 모듈 전역이 아니다. 표는 전부 `const` 라 가변 상태
    **결과**를 내는 표면이 계약에 없다(ⓑ 7C⑤). 그래서 D 는 그 축을 표시하지 않는다.
 5. **`/outcome-correction`·`/defer`·`/skip` 을 쓰지 않는다** — 요구표 D 행에 없어 목록에 두지
    않았다. 정정은 결과 확인(7E-3) 몫이고, 나중에·건너뜀은 담당 화면이 정해지면 그 slice 가 쓴다.
-6. **409 사유 표만 키가 `string` 이다** — `ErrorBody.code` 가 `type: string` 이라 `tsc` 가 전수를
-   보장할 자리가 없다(7E-1 제한 5 와 같은 꼴). 여덟 코드는 test 의 목록이 잠그고, 서버가 새
-   코드를 보내면 **그 코드를 그대로** 보인다.
+6. ~~409 사유 표만 키가 `string` 이다~~ — **정정(CR r1 M-3)**: 계약의 `ErrorBody.code` 는
+   `type: string` 이 **아니라 enum 23** 이다. 앞 판은 7E-1 의 `NOTICE_STATUS_DISPLAY` 선례(그쪽은
+   `NoticeSummary.status` 가 실제로 `type: string` 이다)를 이 축으로 잘못 끌어왔다. 이제
+   `satisfies Partial<Record<ErrorBody['code'], …>>` 가 **키 오타와 계약의 코드 개명을 컴파일에서**
+   멈춘다(음성 대조: 키 한 자를 지우면 `tsc` exit 2). 선언 타입은 `Record<string, …>` 로 남겨
+   계약이 코드를 늘렸을 때 **그 코드를 그대로 보이는** 거동을 지킨다.
 7. **`OPEN-7E-GATE-RESIDUAL` ⑤ 의 전제는 화면이 쓰는 전이에 한해서만 잠겼다** — 여정 ④ 가
    `caseVersion` 증가를 실측하지만 계약 전체의 단언은 아니다. 버전을 올리지 않는 쓰기가 계약에
    들어오고 **화면이 그것을 쓰기 시작하면** 그때 붉어진다. 서버 멱등 키(7E-1 제한 14 의 7C 후속

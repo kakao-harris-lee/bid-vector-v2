@@ -4,6 +4,8 @@ import type { StateDisplay } from './stateDisplay';
 
 type EditSessionResponse = components['schemas']['EditSessionResponse'];
 type ValueRequest = components['schemas']['EditSessionValueRequest'];
+/** 계약의 오류 코드 어휘 — **enum 이다**(23). 아래 409 사유 표의 키를 이것으로 잠근다. */
+type ErrorCode = components['schemas']['ErrorBody']['code'];
 
 /** 편집 세션이 다루는 전략 칸 — **계약 enum 전수**(`EditSessionBeginRequest.field`). */
 export type StrategyField = NonNullable<components['schemas']['EditSessionBeginRequest']['field']>;
@@ -83,10 +85,14 @@ export const EDIT_SESSION_STATE_DISPLAY = {
  * 할 일이 다르다. 모르는 코드는 `displayOrUnknown` 이 보이는 미지 상태로 낸다(이 표에 폴백을
  * 두지 않는다).
  *
- * **이 축만 키가 `string` 이다**: 계약의 `ErrorBody.code` 가 `type: string` 이라 `tsc` 가 전수를
- * 보장할 자리가 없다(7E-1 알려진 제한 5 와 같은 꼴 — `NOTICE_STATUS_DISPLAY` 가 선례다). 여덟
- * 코드를 적어 둔 것이 사실인지는 test 의 목록이 잠그고, 서버가 새 코드를 보내면 **그 코드를 그대로
- * 보인다**(문면을 지어내지 않는다). 세션 `state` 는 계약 enum 이므로 그쪽은 `satisfies` 가 든다.
+ * **키가 계약 enum 으로 잠겨 있다**(CR r1 M-3): `ErrorBody.code` 는 `type: string` 이 아니라
+ * **enum 23** 이다 — 앞 판은 7E-1 의 `NOTICE_STATUS_DISPLAY` 선례(그쪽은 `NoticeSummary.status`
+ * 가 실제로 `type: string` 이다)를 이 축으로 잘못 끌어왔다. 그래서 `satisfies Partial<Record<…>>`
+ * 로 **키 오타와 계약의 코드 개명이 컴파일에서 멈추게** 한다.
+ *
+ * 선언 타입은 `Record<string, …>` 로 남긴다 — 조회가 `displayOrUnknown` 을 지나므로 계약이 코드를
+ * **늘렸을 때** 그 값을 그대로 보일 수 있어야 한다(런타임 거동은 바뀌지 않는다). `Partial` 인
+ * 이유는 이 표가 **편집 세션의 사유만** 든다는 것이다(23 가운데 여덟).
  */
 export const EDIT_SESSION_CONFLICT_DISPLAY: Readonly<Record<string, StateDisplay>> = {
   SESSION_EXPIRED: { label: '세션이 만료됐습니다', why: '새로 시작하십시오', tone: 'absent' },
@@ -105,7 +111,7 @@ export const EDIT_SESSION_CONFLICT_DISPLAY: Readonly<Record<string, StateDisplay
   INVALID_TRANSITION: { label: '지금 단계에서 할 수 없습니다', tone: 'bad' },
   SESSION_ALREADY_ACTIVE: { label: '이미 진행 중인 세션이 있습니다', tone: 'bad' },
   EDIT_SESSION_CONFLICT: { label: '동시 편집이 부딪쳤습니다', why: '다시 시도하십시오', tone: 'bad' },
-};
+} satisfies Partial<Record<ErrorCode, StateDisplay>>;
 
 /**
  * 값 입력이 운영자에게 묻는 꼴 — 요청 칸에서 나온다(칸마다 `if` 를 두지 않는다).
