@@ -91,7 +91,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         SubmittedBidAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, BidAmountOrigin.OperatorEntered)
 
     private fun seedBid(
-        accountId: Long = 1L,
+        accountId: Long = TEST_ACCOUNT_ID,
         recordedState: BidStateTag = BidStateTag.BID_RECORDED,
         won: Long = 1_200_000L,
         kind: BidKind = BidKind.REAL,
@@ -128,7 +128,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
 
     private fun declareTradeName(raw: String) {
         profiles.replaceDetails(
-            AccountId(1L),
+            AccountId(TEST_ACCOUNT_ID),
             BusinessDetails(TradeName(raw), null, NaraReadiness.Unanswered),
             Instant.parse("2026-09-19T00:00:00Z"),
         )
