@@ -59,6 +59,16 @@ async function openOnboarding(page: Page): Promise<Checklist> {
   return (await (await read).json()) as Checklist;
 }
 
+/**
+ * 시작하기를 **다시 연다** — 이미 그 주소에 있으면 같은 링크를 눌러도 라우터가 움직이지 않아
+ * 다시 읽지 않는다(첫 실행이 그 자리에서 멈췄다). 홈을 거쳐 들어와 **서버에 다시 묻는다**.
+ */
+async function reopenOnboarding(page: Page): Promise<Checklist> {
+  await page.getByRole('link', { name: 'B 오늘의 공고' }).click();
+  await expect(page.getByTestId('screen-home')).toBeVisible();
+  return openOnboarding(page);
+}
+
 /** 쓰기 하나 — 누르고 **다시 읽은 체크리스트**를 돌려준다(쓰기 응답을 완료로 세지 않는다). */
 async function saveAndReread(page: Page, button: string): Promise<Checklist> {
   const read = checklistResponse(page);
@@ -181,10 +191,15 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await expect(page.getByTestId('edit-sent-value')).toHaveText('100,000,000원');
   await page.getByTestId('edit-session').getByRole('button', { name: '그만두기' }).click();
   await expect(page.getByTestId('edit-session')).toHaveCount(0);
-  // 적용하지 않았으므로 **지금 값이 그대로**이고 항목도 미완 그대로다.
+  // 적용하지 않았으므로 **지금 값이 그대로**이고 항목도 미완 그대로다. 화면과 **서버** 둘 다 본다
+  // — 화면만 보면 「아직 다시 읽지 않아서 그대로」와 구분되지 않는다.
   await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('값 없음');
-  const afterCancel = await openOnboarding(page);
-  expect(afterCancel.pending, '그만둔 편집은 아무것도 바꾸지 않는다').toContain('BUDGET_RANGE');
+  const strategyAfterCancel = (await (await page.request.get('/api/strategy')).json()) as {
+    readonly minBudgetWon: number | null;
+  };
+  expect(strategyAfterCancel.minBudgetWon, '그만둔 편집은 서버에 아무것도 쓰지 않는다').toBeNull();
+  const afterCancel = await reopenOnboarding(page);
+  expect(afterCancel.pending, '그래서 금액대는 미완 그대로다').toContain('BUDGET_RANGE');
 
   // ⑦ 되돌림 — **화면으로** 되돌린다(같은 폼이 그 능력을 쥔다).
   await page.getByTestId('onboarding-step-CONSTRUCTION_CAPACITY').click();
