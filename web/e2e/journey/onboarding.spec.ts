@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { assertOnlyAllowedOperations, clearStrategyTerms, signIn, watchRequests } from './shared';
+import {
+  assertOnlyAllowedOperations,
+  clearStrategyTerms,
+  journeyContext,
+  signIn,
+  watchRequests,
+} from './shared';
 
 /**
  * 여정 ①(M7/7E-2b, D-7E2b-5·9) — 빈 계정 → 시작하기 → 마법사로 항목을 채움 → 되돌림.
@@ -241,7 +247,12 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   const afterWatchCleared = (await (await watchCleared).json()) as Checklist;
   expect(afterWatchCleared.pending).toContain('WATCH_CONDITIONS');
 
-  // ⑧ 미완이 남았으므로 완료 행동은 없고, 홈의 진입은 그대로 서 있다.
+  // ⑧ D-7E-6 — **새 화면에도** 비밀 문구·사업자번호 꼴이 없다(설정 화면에만 걸려 있던 축이다).
+  const shown = await page.locator('body').innerText();
+  expect(shown).not.toContain(journeyContext().passphrase);
+  expect(shown).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
+
+  // ⑨ 미완이 남았으므로 완료 행동은 없고, 홈의 진입은 그대로 서 있다.
   await expect(page.getByTestId('onboarding-complete')).toHaveCount(0);
   await page.getByRole('link', { name: 'B 오늘의 공고' }).click();
   await expect(page.getByTestId('screen-home')).toBeVisible();
