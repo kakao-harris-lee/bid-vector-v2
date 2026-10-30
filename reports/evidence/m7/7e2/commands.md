@@ -27,8 +27,24 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 | D 화면 | `npx vitest run src/screens/BidBoxScreen.test.tsx` | **exit 1** — 모듈 부재 → 구현 뒤 20 가운데 6 이 「그 건이 다른 탭에 있다」로 붉었다(탭이 실제로 가린다는 증거) → 탭 선택 단계를 test 에 넣어 20 passed |
 
 **솔직히 적는 것**: 설정 화면(전략·프로필)의 **화면 test 는 구현 뒤에 썼다**(표 test 는 먼저
-썼다). 그 자리에 「처음부터 붉었다」는 증거가 없으므로 test 가 구현을 조이는지는 아래 변이
-여덟이 든다 — 그리고 그 변이 가운데 둘(M6·M8)은 설정 화면만 잰다.
+썼다). 그 자리에 「처음부터 붉었다」는 증거가 없으므로 test 가 구현을 조이는지는 아래 변이 열하나가
+든다 — 그리고 그 가운데 셋(M6·M8·M11)은 설정 화면·표만 잰다.
+
+**그 공백이 실제로 물렸다**: 쓰기 쪽 test 가 쉼표 없는 `'1200000'` 만 넣었고 **왕복이 단언 밖**
+이어서, 앞자리만 읽는 파서가 「읽히기는 하지만 다른 수」를 보내는 것을 아무 층도 보지 못했다
+(verifier 가 실 서버로 잡았다 — 아래 입력 모양 절). 지금은 거부 경계 **스물하나**와 왕복 넷이
+그 자리에 있다.
+
+## 입력 모양 — 거부 경계와 왕복 (v H-1 · CR H-2 · M-1 의 회귀)
+
+| 재는 것 | 명령 | 결과 |
+| --- | --- | --- |
+| 전략 값의 거부 경계 **열** | `vitest src/display/editSessionDisplay.test.ts` | 0 — 쉼표·단위·지수·꼬리 문자·금액 소수점·금액 음수·건수 소수점·건수 음수·소수 칸 쉼표·소수 칸 지수가 **각각 `null`** |
+| 받는 모양이 지나치지 않다 | 같은 파일 | 0 — `1200000000`·`0`·`-0.5`·`100` 과 앞뒤 공백 정규화는 그대로 받는다 |
+| 「보낸 값 == 본문 값」 | 같은 파일 + `SettingsScreen.test.tsx` | 0 — 본문 `1` 이면 화면도 **「1원」**이다(원문을 되풀이하지 않는다) |
+| 시평액 거부 경계 **열하나** | `vitest src/display/profileDisplay.test.ts` | 0 |
+| 화면에서 쉼표 입력 | `SettingsScreen.test.tsx`·`ProfileSection.test.tsx` | 0 — 거부 얼굴이 뜨고 **요청이 가지 않는다** |
+| 여정에서 쉼표 입력 | 설정 여정(새 test) | 0 — `value` 요청 **0 건**, 받는 입력에서 화면 문면 == `postDataJSON()` 의 값 |
 
 ## 변이 — 각각 바꿔치우고 쟀다 (전부 커밋 뒤에 돌렸다)
 
@@ -43,8 +59,15 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 | M6 | 값 칸을 둘 싣는다 | vitest **3**(표 test 둘 + 화면 test 하나) |
 | M7 | `seenRevision` 을 0 으로 고정 | vitest **1** |
 | M8 | 확인 화면의 「보낸 값」에 세션 응답의 다른 칸을 꽂음 | vitest **1** |
+| M9 | 탭 필터에 특례 하나(`BID_PLANNED → 'recorded'`) | vitest **1**(상태 14 전수 test 의 그 행) |
+| M10 | 탭 필터를 문자열 접두 추론 셋으로 | vitest **1**(`BID_PLANNED` 행) |
+| M11 | 409 사유 표의 키 한 자를 지움 | **typecheck 2**(계약 enum 으로 잠근 뒤) |
 
-**통제군**: 되돌린 뒤 `npx vitest run` **exit 0 · 305 passed**(그 시점) — 변이의 RED 가 변이에서
+**동치 변이 하나**: `startsWith('OPENED') ? 'under-review'` 만 바꾸면 **exit 0** 이다. 내 표가
+`OPENED_*` 둘을 이미 그 탭으로 보내므로 **어느 상태에서도 거동이 같다**(기계로 대조해 차집합이
+빈 것을 확인했다). 거동이 같은 변이는 어느 test 도 가를 수 없다 — test 공백이 아니다.
+
+**통제군**: 되돌린 뒤 `npx vitest run` **exit 0**(그 시점 305 · 지금 394 passed) — 변이의 RED 가 변이에서
 온 것이고 흔들림이 아니라는 계수.
 
 ## 게이트 술어 변경과 양성 대조 (`OPEN-7E-GATE-RESIDUAL`)
@@ -67,7 +90,7 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 
 | 실행 | 명령 | 결과 |
 | --- | --- | --- |
-| 전건 | `npm run test:e2e:journey` | **exit 0 · 7 passed** |
+| 전건 | `npm run test:e2e:journey` | **exit 0 · 8 passed**(34.0s) |
 | 여정 ④ 단독 | `--grep '여정 ④'` | **exit 0 · 1 passed**(26.9s) |
 | 설정 여정 단독 | `--grep '설정 여정'` | **exit 0 · 1 passed**(34.4s) |
 | 강제 실패(음성 대조) | 변이 M1 위에서 여정 ④ | **exit 1** — 여정이 화면 값을 실제로 재고 있다는 계수 |
@@ -92,17 +115,23 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 | W-3 | `npm run typecheck` | 0 |
 | W-4 | `npm run gate:src-tree` | 0 |
 | W-5 | `npm run api:types:check` | 0 — 생성 타입이 OpenAPI 와 바이트 등식(이 slice 는 OpenAPI 를 읽기만 했다) |
-| W-6 | `npm run test` | 0 — **344 passed(20 파일)** |
+| W-6 | `npm run test` | 0 — **394 passed(20 파일)** |
 | W-7 | `npm run gate:tests` | 0 — 등록부 전부 수집·통과, skipped/todo 0 |
 | W-8 | `npm run build` | 0 — 자산 `{js 1 · css 1}` · `dist` 루트 `{assets, index.html}` |
 | W-9 | `npm run gate:boundary-canary` | 0 |
 | W-10 | `npx playwright install chromium` | 0(설치본 재사용) |
 | W-11 | `npm run test:e2e` | 0 |
 | W-12 | `./gradlew --no-daemon :app:bootJar` | 0 |
-| W-13 | `npm run test:e2e:journey` | 0 — 7 passed |
-| check | `./gradlew --no-daemon check qualityBaseline` | **0** — `BUILD SUCCESSFUL in 30m 31s` · 401 task(226 실행 · **136 from cache** · 39 up-to-date) |
+| W-13 | `npm run test:e2e:journey` | 0 — **8 passed**(34.0s) |
+| check | `./gradlew --no-daemon check qualityBaseline` | **0** — evidence 최종 HEAD 에서 재실측: `BUILD SUCCESSFUL in 20s` · 392 task(35 실행 · 357 up-to-date). 첫 전건은 `BUILD SUCCESSFUL in 30m 31s`(401 task · 226 실행 · 136 from cache)였다 |
 
-**136 이 FROM-CACHE 인 것은 기대값이다** — 이 slice 는 **Kotlin 입력을 하나도 바꾸지 않았다**.
+**20s·357 up-to-date 가 「안 돌았다」가 아님을 따로 쟀다**(「초록인데 조용하다」 규율). 이 slice 가
+r1 에서 고친 것은 `web/**` 과 evidence 뿐이므로 Kotlin task 가 up-to-date 인 것은 맞지만, **입력이
+실제로 바뀐 게이트**는 `:leakPatternGate`(evidence 를 스캔한다)다. 그 task 가 이 실행의 task 목록에
+**UP-TO-DATE 표시 없이** 있고, 한 번 더 `--rerun-tasks` 로 강제해도 **exit 0** 이다. 즉 초록은
+「바뀐 것을 재고 나온 초록」이다.
+
+**첫 전건의 136 FROM-CACHE 도 기대값이다** — 이 slice 는 **Kotlin 입력을 하나도 바꾸지 않았다**.
 근거는 변경 집합 자체다: `git diff --name-only fa5ca096..HEAD` 에서 `web/` 과
 `reports/evidence/` 를 뺀 경로가 **0 건**이고, `.kt`·`.kts`·`gradle*`·`build-logic/`·
 `config/quality/` 경로 변경도 **0 건**이다. 그래서 캐시 적중은 「측정이 비었다」가 아니라 「바꾸지
