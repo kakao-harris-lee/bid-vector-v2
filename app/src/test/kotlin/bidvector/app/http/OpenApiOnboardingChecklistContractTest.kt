@@ -4,10 +4,6 @@ import bidvector.workflow.profile.OnboardingItem
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpEntity
-import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpMethod
-import org.springframework.http.ResponseEntity
 import java.lang.reflect.Modifier
 
 /** 체크리스트 operation 의 좌표 — 문서와 구현이 같은 문자열을 쓴다. */
@@ -31,9 +27,13 @@ private const val CHECKLIST_PATH = "/api/onboarding-checklist"
  * `awaiting[].prerequisite`. 네 벌이 갈리지 않는 근거는 손이 아니라 이 등식이다: 네 자리를 문서에서
  * **모아서** 세고(자리를 손으로 적으면 하나를 빠뜨린 채 초록이 된다) 각각이 Kotlin [OnboardingItem]
  * 과 **양방향** 일치해야 한다.
+ *
+ * **Spring 컨텍스트를 띄우지 않는다** — 여기서 보는 것은 문서와 타입뿐이다. 401 본문의 키 집합처럼
+ * 실제 왕복이 필요한 단언은 컨텍스트를 띄우는 `OnboardingChecklistEndpointTest` 에 둔다(앞 판은 이
+ * 파일에 두었다가 `@SpringBootTest` 없이 `url()` 이 포트 0 을 내 I/O 오류로 붉었다 — 실측).
  */
 @Suppress("UNCHECKED_CAST")
-class OpenApiOnboardingChecklistContractTest : HttpIntegrationTestBase() {
+class OpenApiOnboardingChecklistContractTest {
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
     @Test
@@ -74,20 +74,6 @@ class OpenApiOnboardingChecklistContractTest : HttpIntegrationTestBase() {
     @Test
     fun `계약이 선언한 상태 코드가 셋이다 — 200 · 401 · 500`() {
         spec.responseStatusCodes(CHECKLIST_PATH, "get") shouldBe setOf("200", "401", "500")
-    }
-
-    @Test
-    fun `401 응답의 최상위 키 집합이 ErrorBody 계약과 일치한다`() {
-        val response =
-            restTemplate.exchange(
-                url(CHECKLIST_PATH),
-                HttpMethod.GET,
-                HttpEntity<Void>(HttpHeaders()),
-                Map::class.java,
-            ) as ResponseEntity<Map<String, Any?>>
-
-        response.statusCode.value() shouldBe 401
-        (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("ErrorBody")
     }
 
     /** 문서가 **세션만** 요구한다 — 계정 전용 뿌리이므로 자격 헤더 대안을 적지 않는다(D-7C4C-7). */

@@ -72,6 +72,27 @@ class OnboardingChecklistEndpointTest : HttpIntegrationTestBase() {
     }
 
     /**
+     * 401 본문의 **키 집합**이 `ErrorBody` 계약과 같다 — 사유를 더 싣는 변경(계정이 있는지를 흘리는
+     * 길)이 여기서 붉는다. 문서 쪽 단언은 `OpenApiOnboardingChecklistContractTest` 가 지고, 이 자리는
+     * **실제 응답**이라 컨텍스트가 필요하다.
+     */
+    @Test
+    fun `401 응답의 최상위 키 집합이 ErrorBody 계약과 일치한다`() {
+        val response =
+            restTemplate.exchange(
+                url(AccountScopedRoutes.ONBOARDING_CHECKLIST),
+                HttpMethod.GET,
+                HttpEntity<Void>(HttpHeaders()),
+                Map::class.java,
+            )
+
+        response.statusCode.value() shouldBe UNAUTHORIZED
+        @Suppress("UNCHECKED_CAST")
+        val body = response.body as Map<String, Any?>?
+        (body?.keys ?: emptySet()) shouldBe loadOpenApiSpec().propertyKeys("ErrorBody")
+    }
+
+    /**
      * 아무것도 심지 않은 계정 — 미완이 여섯이고, 시평액은 **선행 대기**다(등록분야를 아직 모른다).
      * 감시 관심 업종은 test 전략 fixture 가 이미 갖고 있어 완료 쪽에 선다.
      */
