@@ -235,6 +235,10 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   // ⑦ 되돌림 — **화면으로** 되돌린다(같은 폼이 그 능력을 쥔다).
   await page.getByTestId('onboarding-step-CONSTRUCTION_CAPACITY').click();
+  // **화면이 최신 응답을 그린 뒤에** 기다림을 건다. 홈을 거쳐 들어오면 배너와 화면이 같은 질의를
+  // 각각 걸어 응답이 둘이고, 그 중 늦게 닿는 것이 다음 기다림에 잡힌다(실측: 삭제 응답 자리에
+  // 재진입 응답이 잡혀 `pending` 이 `["BUDGET_RANGE"]` 였다). 이 단언이 지나면 그 응답은 이미 닿았다.
+  await expect(page.getByTestId('onboarding-state-CONSTRUCTION_CAPACITY')).toHaveText('완료');
   const capacityGone = checklistResponse(page);
   await page.getByTestId('capacity-토목건축공사업').getByRole('button', { name: '지우기' }).click();
   expect(((await (await capacityGone).json()) as Checklist).pending).toContain('CONSTRUCTION_CAPACITY');
