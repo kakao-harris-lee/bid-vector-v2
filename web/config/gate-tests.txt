@@ -66,3 +66,7 @@ src/screens/ResultsScreen.test.tsx
 # 알림함 — 배지가 **헤더의 안읽음 전수**에서만 오고 읽음 처리가 서버 응답 뒤에만 보이는 것
 # (낙관 갱신 금지, D-7E3a-1·6). 묶음의 「공고를 모름」과 「제목만 빔」이 다른 얼굴인 것도 여기.
 src/screens/InboxScreen.test.tsx
+# M7/7E-3a r1 H-1 — 여정 레인(W-13)의 「건너뛴 test 0 · 돈 test ≥ 1」 판정. Playwright 는 건너뛴
+# test 가 있어도 exit 0 이라 vitest 쪽 「skipped 0」 등식 밖이었다. 술어를 리포터 산출물의
+# **구조**로 둔다(spec 을 grep 하는 꼴은 fixme·describe.skip·런타임 skip 으로 열린다).
+scripts/journey-results.test.mjs

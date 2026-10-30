@@ -20,7 +20,7 @@
     "test": "vitest run",
     "gate:tests": "node scripts/check-gate-tests.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:journey": "playwright test --config=playwright.journey.config.ts"
+    "test:e2e:journey": "playwright test --config=playwright.journey.config.ts && node scripts/check-journey-results.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",

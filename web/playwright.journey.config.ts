@@ -25,7 +25,16 @@ export default defineConfig({
   retries: 0,
   // 하네스가 한 벌뿐이고 여정이 같은 계정·같은 건을 쓴다 — 워커를 늘리면 서로의 전이를 본다.
   workers: 1,
-  reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
+  /**
+   * **json 리포터는 늘 켠다**(M7/7E-3a r1 H-1) — `scripts/check-journey-results.mjs` 가 그
+   * 산출물로 「건너뛴 test 0」을 판정하고, 그 파일이 없으면 그 게이트가 **통과가 아니라 실패**다.
+   * Playwright 는 건너뛴 test 가 있어도 exit 0 이라 이 자리가 없으면 여정 하나가 통째로
+   * 사라져도 CI 가 초록이다.
+   */
+  reporter: [
+    ...(process.env.CI ? [['list'] as const] : ([['list'], ['html', { open: 'never' }]] as const)),
+    ['json', { outputFile: 'test-results/journey-results.json' }] as const,
+  ],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
