@@ -71,3 +71,13 @@
 ## 계약 갱신 이력
 
 - 2026-10-30 착수(팀장) · 운영자 승인 2026-10-30.
+- 2026-10-30 **D-7E2-7(팀장, 착수 보고 수령)**: 사업자번호 — 계약(`Profile`·`BusinessDetailsRequest`)에 칸이 0 이고 `/business-details`
+  문면이 「자리가 없다」고 적는다. 입력칸을 만들면 값이 클라이언트에 머문다(API 밖 값 · 개인정보 보관) → **D-7E2-4 의 빈 자리(「준비 중」)로
+  옮긴다**. D-7E2-3 의 나머지(상호·소재지·나라장터 준비·면허·지역어·시평액)는 그대로.
+- 2026-10-30 **D-7E2-8(팀장)**: D 탭 표 — 요구표 여섯 이름 유지, `BID_PLANNED` → 「투찰가 받음」, `DEADLINE_PASSED_UNRECORDED` → 「종료」.
+  다음 행동 표는 착수 보고 §5 그대로(전이는 계약 전이표와 같은 모양, 표에서 파생한 전수 test). D 가 쓰는 operation 은 착수 보고 §2 의 +4
+  (`await-opening`·`opening`·`qualification-review`·`outcome`), 설정은 +14 — `readBidCase`·`/timeline`·`/defer`·`/skip`·`/outcome-correction` 은
+  쓰지 않아 목록에 두지 않는다.
+- 2026-10-30 **D-7E2-9(팀장)**: 범위는 계약대로 한 slice(프로필 포함), 커밋 다섯 묶음(승인 목록·queries / D + 여정 ④ / 설정 전략 + MATCHED 여정 /
+  설정 프로필 / 게이트 잔여 넷 각각 별 커밋). 설정 여정은 끝에서 감시 조건을 다시 비워 `WATCH_NOT_CONFIGURED` 로 돌아옴을 단언한다(여정 순서
+  독립 — 빈 `terms` 가 거부되면 그때 보고). `routes.tsx` 에 설정 자리 하나 추가는 in_scope.
