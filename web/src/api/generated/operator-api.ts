@@ -3859,7 +3859,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;

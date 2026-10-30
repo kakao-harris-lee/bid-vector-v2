@@ -1,5 +1,7 @@
 package bidvector.app.http
 
+import bidvector.adapters.strategy.InvalidStoredStrategyException
+import bidvector.strategy.StrategyViolation
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -45,6 +47,9 @@ class OnboardingChecklistEndpointTest : HttpIntegrationTestBase() {
     @Autowired
     private lateinit var operatorProfile: InMemoryOperatorProfile
 
+    @Autowired
+    private lateinit var strategyRepository: TestStrategyRepository
+
     private lateinit var session: SessionTestClient
 
     @BeforeEach
@@ -52,6 +57,7 @@ class OnboardingChecklistEndpointTest : HttpIntegrationTestBase() {
         access.reset()
         store.reset()
         operatorProfile.reset()
+        strategyRepository.loadFailure = null
         session = SessionTestClient(restTemplate, ::url).signIn()
     }
 
@@ -147,8 +153,30 @@ class OnboardingChecklistEndpointTest : HttpIntegrationTestBase() {
         body shouldContain "\"awaiting\":[]"
     }
 
+    /**
+     * **저장된 전략이 무효면 500 이고 그 사유 코드가 실린다**(r1 CR M-2). 이 경로는 판정 입력 둘
+     * (감시 금액대 · 관심 업종)을 전략에서 읽으므로 전략을 읽는 형제 operation 들과 같은 갈래를
+     * 지난다 — 계약 문면도 그렇게 적혀 있고, 이 test 가 그 문면과 거동을 맞댄다.
+     *
+     * **알려진 제한으로 받아들인 것**: 전략 하나가 무효이면 시작하기 화면이 통째로 500 이다(체크리스트
+     * 항목 여섯은 전략과 무관한데도). 형제 operation 들과 같은 fail-closed 이고, 부분 응답을 내는
+     * 쪽은 「어느 입력이 빠졌는가」를 응답 모양에 새로 들여야 해서 이 slice 의 축이 아니다.
+     */
+    @Test
+    fun `저장된 전략이 무효면 500 이고 사유 코드가 실린다`() {
+        strategyRepository.loadFailure = {
+            InvalidStoredStrategyException(listOf(StrategyViolation.CandidateLimitNotPositive))
+        }
+
+        val response = session.get(AccountScopedRoutes.ONBOARDING_CHECKLIST)
+
+        response.statusCode.value() shouldBe INTERNAL_SERVER_ERROR
+        response.body.orEmpty() shouldContain "\"code\":\"${ErrorCode.INVALID_STORED_STRATEGY}\""
+    }
+
     private companion object {
         const val OK = 200
         const val UNAUTHORIZED = 401
+        const val INTERNAL_SERVER_ERROR = 500
     }
 }
