@@ -3,6 +3,7 @@ package bidvector.adapters.result
 import bidvector.adapters.bidding.BidCaseDbFixture
 import bidvector.adapters.notice.ReadOnlyWitness
 import bidvector.adapters.notice.witnessedDataSource
+import bidvector.adapters.snapshot.jsonbKeyOf
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
@@ -10,6 +11,8 @@ import bidvector.bidding.BidKind
 import bidvector.bidding.BidMemo
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
+import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
+import bidvector.procurement.NOTICE_ROUND_RAW_KEY
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.settlement.AwardWinnerTradeName
@@ -22,12 +25,13 @@ import bidvector.workflow.opening.NoticeOpeningFacts
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.junit.jupiter.api.Test
 import java.sql.Timestamp
 import javax.sql.DataSource
+import org.junit.jupiter.api.Test
 
 /** 표지 상호 — 개찰 사실 경로 어디에도 이 글자가 나오면 안 된다(D-7C5B-5, 값 수준 단언). */
 private const val SENTINEL_WINNER = "SENTINEL-WINNER-DO-NOT-EXPORT"
@@ -81,6 +85,28 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
         return caseId
     }
 
+    /** 개찰 결과 축 **원문** 한 행 — 계약 등재 키로 심는다(손 리터럴이 아니다). */
+    private fun seedOpeningAxisRaw(
+        rawNumber: String,
+        rawRound: String,
+    ) {
+        val fields = """{"${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}":"$rawNumber","${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}":"$rawRound"}"""
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO raw_observation (observation_key, source_endpoint, payload, payload_fields, " +
+                        "observed_at, release_sha, inserted_at) VALUES (?, 'OPENING_RESULT_LIST', '{}', " +
+                        "?::jsonb, ?, 'test', ?)",
+                ).use { statement ->
+                    statement.setString(1, "obs-rawaxis-$rawNumber-$rawRound")
+                    statement.setString(2, fields)
+                    statement.setTimestamp(3, Timestamp.from(now))
+                    statement.setTimestamp(4, Timestamp.from(now))
+                    statement.executeUpdate()
+                }
+        }
+    }
+
     private fun seedOpeningResult(
         key: NoticeKey,
         winner: String?,
@@ -132,6 +158,23 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
             statement.setLong(1, mine.value)
             statement.setString(2, MyBidResultSql.REAL_BID_KIND)
         } shouldContainExactly MyBidResultSql.RECORDED_BID_COLUMNS
+    }
+
+    /**
+     * **나머지 세 질의도 같은 등식으로 잠근다**(r1 CR M-3) — 앞 판은 투찰 기록 하나에만 걸려
+     * 있었고, canonical 질의의 방어는 문자열 두 개의 부재 검사뿐이라 **다른 이름의** 업체 식별
+     * 열이 지역 접두로 들어오면 잡지 못했다.
+     */
+    @Test
+    fun `공고 · 상호 · canonical 질의가 읽는 열이 선언 목록과 같다`() {
+        fun numbers(statement: java.sql.PreparedStatement) =
+            statement.setArray(1, statement.connection.createArrayOf("text", arrayOf("ANY-NOTICE")))
+
+        columnsOf(MyBidResultSql.SELECT_NOTICES, ::numbers) shouldContainExactly MyBidResultSql.NOTICE_COLUMNS
+        columnsOf(MyBidResultSql.SELECT_WINNER_NAMES, ::numbers) shouldContainExactly
+            MyBidResultSql.WINNER_NAME_COLUMNS
+        columnsOf(MyBidResultSql.SELECT_CANONICAL, ::numbers) shouldContainExactly
+            MyBidResultSql.CANONICAL_COLUMNS
     }
 
     /**
@@ -237,6 +280,40 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
         recordBid(mine, key)
 
         recordedBidView().recordedBids(mine).single().recordedState shouldBe BidStateTag.BID_RECORDED
+    }
+
+    /**
+     * **원문만 있고 승격이 없으면 「승격 전」이다**(r1 CR M-2) — 이 접기에 양성 test 가 없었다.
+     * 다른 test 는 canonical 이 있거나 공고 행이 없어 그 질의가 0 행으로만 돌았다.
+     *
+     * 원문의 공고번호는 **온 그대로**라 표기가 제각각이다(소문자·공백). SQL 등식으로 맞대면
+     * 조용히 빗나가 승격을 기다리는 공고가 「수집 전」으로 나가고 화면이 **틀린 사유**를 보인다
+     * — 7C⑤-a 가 그 결함을 한 번 겪었다. 그래서 표기를 일부러 다르게 심는다.
+     */
+    @Test
+    fun `canonical 이 없고 원문만 있으면 개찰 축 관측으로 잡는다 — 표기가 달라도`() {
+        val key = notice("RAWAXIS-A")
+        seedNotice(key, now.plusSeconds(HOUR))
+        seedOpeningAxisRaw(key.noticeNumber.lowercase().replace("-", "  "), key.noticeRound.value)
+
+        val facts = openingFactsView().lookupAll(setOf(noticeId(key)))
+        val present = facts[noticeId(key)].shouldBeInstanceOf<NoticeOpeningFacts.Present>()
+        present.canonical.shouldBeNull()
+        withClue("원문이 있으면 「승격 전」이고 「수집 전」이 아니다") {
+            present.openingAxisObserved shouldBe true
+        }
+    }
+
+    /** 음성 대조 — 차수가 어긋난 원문은 같은 공고가 아니다(짝으로 맞춘다). */
+    @Test
+    fun `차수가 어긋난 원문은 개찰 축 관측으로 세지 않는다`() {
+        val key = notice("RAWAXIS-B")
+        seedNotice(key, now.plusSeconds(HOUR))
+        seedOpeningAxisRaw(key.noticeNumber, "999")
+
+        val facts = openingFactsView().lookupAll(setOf(noticeId(key)))
+        val present = facts[noticeId(key)].shouldBeInstanceOf<NoticeOpeningFacts.Present>()
+        present.openingAxisObserved shouldBe false
     }
 
     // ------------------------------------------------ 개찰 사실 · 낙찰자 상호
