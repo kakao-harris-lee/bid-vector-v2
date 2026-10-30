@@ -10,6 +10,7 @@ import {
   type NoticeSearchQuery,
   type NoticeSummary,
 } from '../api/queries';
+import { bidCasesQueryKey } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
@@ -86,7 +87,7 @@ export function TodayNoticesScreen() {
   const noticeRows = noticePages?.flatMap((page) => page.rows);
   const noticeSummary = noticePages?.[0];
   const suggestions = useQuery({ queryKey: ['suggestions'], queryFn: listSuggestions });
-  const cases = useQuery({ queryKey: ['bid-cases', BID_KIND], queryFn: () => listBidCases(BID_KIND) });
+  const cases = useQuery({ queryKey: bidCasesQueryKey(BID_KIND), queryFn: () => listBidCases(BID_KIND) });
 
   const add = useMutation({
     mutationFn: (notice: NoticeSummary) =>
@@ -94,13 +95,13 @@ export function TodayNoticesScreen() {
     onSuccess: async () => {
       // 담기의 **역전이는 계약에 없다** — 그래서 토스트에 실행 취소를 두지 않는다(D-7E-5).
       show({ text: '입찰함에 담았습니다.' });
-      await queryClient.invalidateQueries({ queryKey: ['bid-cases', BID_KIND] });
+      await queryClient.invalidateQueries({ queryKey: bidCasesQueryKey(BID_KIND) });
     },
     // 실패는 **서버 상태를 다시 읽고** 얼굴을 낸다(CR H-2) — 카드가 계속 「담기」를 보이면
     // 운영자는 다시 누르고, 그 사이 실제로 담겼는지는 아무도 모른다.
     onError: async () => {
       dismiss();
-      await queryClient.invalidateQueries({ queryKey: ['bid-cases', BID_KIND] });
+      await queryClient.invalidateQueries({ queryKey: bidCasesQueryKey(BID_KIND) });
     },
   });
 

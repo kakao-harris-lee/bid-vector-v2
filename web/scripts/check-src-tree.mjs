@@ -85,7 +85,9 @@ function finishIfFailed() {
 
 // 본문을 함수에 담아 그 `return` 으로 조기 종료한다 — 줄은 그대로 두고(들여쓰기를 바꾸면 템플릿
 // 리터럴의 내용이 바뀐다) 바깥만 감싼다.
-function run() {
+//
+// **`async` 인 이유**(M7/7E-2 — OPEN ②③): `publicDir` 판정이 Vite 의 설정 해석을 지난다.
+async function run() {
 
 // ① 기준점 — realpath 를 쓰기 **전에** 잰다.
 let srcReal;
@@ -213,6 +215,9 @@ collectLinks(webRoot, 0);
  */
 const ALLOWED_SRC_FILE = /\.(tsx?|css)$/;
 
+/** `src` 안의 스타일 파일 전수 — ⑤d 가 그 값의 모양을 본다. */
+const srcCssFiles = [];
+
 function collectSrcFileKinds(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const full = join(directory, entry.name);
@@ -220,11 +225,18 @@ function collectSrcFileKinds(directory) {
       collectSrcFileKinds(full);
       continue;
     }
-    if (entry.isFile() && !ALLOWED_SRC_FILE.test(entry.name)) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (!ALLOWED_SRC_FILE.test(entry.name)) {
       fail(
         `src 안에 아는 종류가 아닌 파일이 있다: ${relative(webRoot, full)} ` +
           '— 코드(.ts/.tsx)와 스타일(.css)만 둔다. 데이터·자산은 계약 밖 데이터 모양의 입구다',
       );
+      continue;
+    }
+    if (entry.name.endsWith('.css')) {
+      srcCssFiles.push(relative(webRoot, full));
     }
   }
 }
@@ -486,19 +498,6 @@ function aliasOrSelf(typeChecker, symbol) {
   }
 }
 
-/** 상대 지정자를 실제 파일 경로로 — 확장자는 TS 해석 규칙대로 붙여 본다. */
-function resolveImportTarget(containingFile, specifier) {
-  const base = resolve(dirname(containingFile.fileName), specifier);
-  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, resolve(base, 'index.ts')]) {
-    try {
-      return realpathSync(candidate);
-    } catch {
-      /* 다음 후보 */
-    }
-  }
-  return undefined;
-}
-
 /** 별칭(import·재수출·네임스페이스)을 끝까지 따라간 심볼. */
 function resolveToTarget(typeChecker, node) {
   let symbol = typeChecker.getSymbolAtLocation(node);
@@ -550,17 +549,53 @@ if (clientSymbol === undefined) {
   }
 }
 
-// ⑤b-2b **허용 자리의 import 꼴 고정 · export 타입 전수**(v r4 M-1).
+// ⑤b-2b **허용 자리의 import 꼴 고정 · export 종류 전수**(v r4 M-1 · M7/7E-2 가 OPEN ① 을 닫음).
 //
 // 심볼 추적만으로는 한 꼴이 남는다: `import * as C from './client'; export const ns = C;` —
 // 그 자리는 **허용된 import** 이고, 밖으로 나가는 것은 `ns` 라는 **다른 이름의 네임스페이스**다.
 // 화면은 그것을 계산 키로 집어 미승인 쌍을 부를 수 있었다(실측: 정적 다섯 층 모두 0).
 //
+// **`OPEN-7E-GATE-RESIDUAL` ① 이 남긴 두 구멍을 여기서 막는다**(7E-1 checklist §4):
+//   · 앞 판은 지정자를 **손으로** 풀었다(확장자 후보를 붙여 보는 resolver). 그래서 `./client.js`
+//     로 적으면 TS 는 그것을 `client.ts` 로 해석하는데 이 게이트는 **client 로 보지 못해** import
+//     꼴 검사를 건너뛰었다. 이제 **TS 자신의 해석**을 쓴다
+//     (`checker.getSymbolAtLocation(moduleSpecifier)` 의 선언이 그 소스 파일인가).
+//   · 앞 판은 export 를 **타입 동일성**으로 비교했다. `: object` 주석 하나로 빗나갔다. 이제
+//     **선언 종류 전수**로 본다 — 값 export 는 함수 선언뿐이고 **모르는 종류는 기본 위반**이다.
+//
 // 두 자리에서 닫는다.
 //   ⓐ 호출 자리가 client 모듈을 끌어오는 꼴은 **이름 지정 `{ apiClient }` 하나**뿐이다 —
 //      네임스페이스·default import 는 그 자체로 위반이다(그 꼴이 아니면 능력이 이름을 잃는다).
-//   ⓑ 호출 자리의 **export 전수**에서 그 능력의 타입이 나가지 않는다 — 이름을 무엇으로 바꾸든,
-//      `export default` 로 내보내든, 타입 동일성으로 걸린다.
+//   ⓑ 호출 자리의 **export 선언 종류 전수**가 허용 집합 안이다 — 변수 export·클래스 export·
+//      네임스페이스 재포장은 종류로 걸리고, 타입 주석으로 비켜 갈 자리가 없다.
+
+/**
+ * **TS 가 그 지정자를 무엇으로 해석했는가** — 손 resolver 를 대신한다(OPEN ① ⓐ). 모듈 심볼의
+ * 선언은 소스 파일이므로 그 파일의 realpath 를 비교한다.
+ */
+function specifierResolvesTo(typeChecker, moduleSpecifier, targetRealPath) {
+  const symbol = typeChecker.getSymbolAtLocation(moduleSpecifier);
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+  if (declaration === undefined || !ts.isSourceFile(declaration)) {
+    return false;
+  }
+  try {
+    return realpathSync(declaration.fileName) === targetRealPath;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 호출 자리의 export 로 허용하는 **선언 종류**. 값은 함수 선언뿐이고 나머지는 타입 층이다 —
+ * 그 밖(변수·클래스·enum·네임스페이스·재수출 대상)은 **기본 위반**이다. 열거를 늘리는 것이
+ * 곧 「무엇을 내보낼 수 있는가」를 넓히는 결정이므로 그 diff 가 드러나야 한다.
+ */
+const ALLOWED_CALLER_EXPORT_KINDS = new Set([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.TypeAliasDeclaration,
+  ts.SyntaxKind.InterfaceDeclaration,
+]);
 if (clientSymbol !== undefined && clientSourceFile !== undefined) {
   const callerSource = inSrcFiles.find((one) => one.name === CLIENT_MODULE_CALLER)?.sourceFile;
   if (callerSource === undefined) {
@@ -571,8 +606,8 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
     for (const statement of callerSource.statements) {
       if (
         !ts.isImportDeclaration(statement) ||
-        !ts.isStringLiteral(statement.moduleSpecifier) ||
-        resolveImportTarget(callerSource, statement.moduleSpecifier.text) !== clientModuleReal
+        !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+        !specifierResolvesTo(checker, statement.moduleSpecifier, clientModuleReal)
       ) {
         continue;
       }
@@ -605,13 +640,13 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
       );
     }
 
-    // ⓑ
-    const capabilityType = checker.getTypeOfSymbolAtLocation(
-      clientSymbol,
-      clientSymbol.valueDeclaration ?? clientSourceFile,
-    );
+    // ⓑ — **선언 종류 전수**. 타입 비교를 쓰지 않는 이유는 위 주석의 둘째 축이다(OPEN ① ⓑ).
     const callerModuleSymbol = checker.getSymbolAtLocation(callerSource);
-    for (const exported of callerModuleSymbol === undefined ? [] : checker.getExportsOfModule(callerModuleSymbol)) {
+    const callerExports = callerModuleSymbol === undefined ? [] : checker.getExportsOfModule(callerModuleSymbol);
+    if (callerExports.length === 0) {
+      fail(`${CLIENT_MODULE_CALLER} 의 export 를 하나도 읽지 못했다 — 이 층이 공허해진다`);
+    }
+    for (const exported of callerExports) {
       const target = (exported.flags & ts.SymbolFlags.Alias) !== 0 ? aliasOrSelf(checker, exported) : exported;
       if (target === clientSymbol || target === clientModuleSymbol) {
         fail(`${CLIENT_MODULE_CALLER} 가 서버 호출 능력을 ${exported.name} 으로 내보낸다`);
@@ -619,13 +654,14 @@ if (clientSymbol !== undefined && clientSourceFile !== undefined) {
       }
       const declaration = target.valueDeclaration ?? target.declarations?.[0];
       if (declaration === undefined) {
+        fail(`${CLIENT_MODULE_CALLER} 의 export ${exported.name} 의 선언을 찾지 못했다 — 모르는 것은 통과시키지 않는다`);
         continue;
       }
-      const type = checker.getTypeOfSymbolAtLocation(target, declaration);
-      if (type === capabilityType || type === checker.getTypeOfSymbolAtLocation(clientModuleSymbol ?? clientSymbol, clientSourceFile)) {
+      if (!ALLOWED_CALLER_EXPORT_KINDS.has(declaration.kind)) {
         fail(
-          `${CLIENT_MODULE_CALLER} 의 export ${exported.name} 이 서버 호출 능력 자체를 나른다 ` +
-            '— 이름을 바꾸거나 네임스페이스로 싸도 타입이 같다',
+          `${CLIENT_MODULE_CALLER} 의 export ${exported.name} 이 허용 종류가 아니다 ` +
+            `(${ts.SyntaxKind[declaration.kind]}) — 값 export 는 함수 선언뿐이다(변수·클래스·네임스페이스 재포장은 ` +
+            '서버 호출 능력을 이름만 바꿔 내보내는 자리였다)',
         );
       }
     }
@@ -833,6 +869,72 @@ for (const { sourceFile, name } of inSrcFiles) {
   visitMeta(sourceFile);
 }
 
+// ⑤d **CSS 를 지나는 데이터 입구**(M7/7E-2 — OPEN ④ 의 **재현 꼴만** 닫는다).
+//
+// 닫는 범위를 정확히 적는다(CR r2 L2R-8): 아래 읽기 술어는 **식별자 둘이 DOM lib 심볼로
+// 해소되는지**만 본다. 같은 값을 가져오는 다른 길(식별자가 아닌 계산 접근 · CSSOM ·
+// Typed OM)은 **열려 있고** `reports/evidence/m7/7e2/checklist.md` §3.1 의 ⑥·⑦ 로 등재했다.
+//
+// 재현 꼴(7E-1 checklist §4 ④): `src/index.css` 에 `:root{--rows:"[…]"}` 를 적고 화면이
+// `getComputedStyle(…).getPropertyValue('--rows')` 로 읽는다. 자산을 더 내보내지 않으므로
+// 모양 단언·`fetch` 계수·캐스팅 금지 어느 층도 보지 않았다.
+//
+// **읽는 쪽이 이 층의 무게를 진다**: 화면 코드에서 `getComputedStyle`·`getPropertyValue` 가
+// **DOM lib 의 그 심볼로 해소되면** 위반이다(이름이 같은 내 함수는 아니다 — TypeChecker 가
+// 가른다). 읽는 길이 없으면 CSS 에 무엇을 적어도 화면에 닿지 못한다.
+//
+// 쓰는 쪽은 **값의 모양**으로 받는다: custom property 값에 `[`·`{`·`url(`·`data:` 가 없고 길이가
+// 상한 안이다. 토큰(색·폰트 스택·수치·`var()` 참조)은 그 모양을 지키고, 데이터를 실으려면
+// 둘 중 하나를 깨야 한다. 이 축은 **보조 층**이다 — 인용 문자열 안에 쉼표로 적은 자료처럼
+// 모양을 지키는 꼴이 남고, 그것을 받는 것은 위의 읽기 금지다.
+const DOM_STYLE_READERS = new Set(['getComputedStyle', 'getPropertyValue']);
+const CSS_VALUE_MAX_LENGTH = 200;
+const CSS_FORBIDDEN_IN_VALUE = ['[', ']', '{', '}', 'url(', 'data:', '\\'];
+
+for (const { sourceFile, name } of inSrcFiles) {
+  if (isTestFile(name)) {
+    // 다른 층과 같은 면제다 — 앱 코드가 test 파일을 import 하지 않는다(번들 그래프 층이 센다).
+    continue;
+  }
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && DOM_STYLE_READERS.has(node.text)) {
+      const symbol = resolveToTarget(checker, node);
+      for (const declaration of symbol?.declarations ?? []) {
+        if (program.isSourceFileDefaultLibrary(declaration.getSourceFile())) {
+          fail(
+            `${name} 가 DOM 의 ${node.text} 을 쓴다 — CSS custom property 를 데이터 통로로 쓰는 ` +
+              '입구다(표시값은 API 응답에서만 온다). 스타일을 읽어야 하는 이유가 생기면 이 게이트를 먼저 바꾼다',
+          );
+          break;
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+if (srcCssFiles.length === 0) {
+  fail('src 안에 스타일 파일이 하나도 없다 — 아래 값 모양 단언이 공허해진다(토큰 한 자리가 전제다)');
+}
+for (const cssName of srcCssFiles) {
+  const text = readFileSync(resolve(webRoot, cssName), 'utf8');
+  for (const match of text.matchAll(/(--[A-Za-z0-9_-]+)\s*:\s*([^;}]*)/gu)) {
+    const [, property, rawValue] = match;
+    const value = rawValue.trim();
+    if (value.length > CSS_VALUE_MAX_LENGTH) {
+      fail(`${cssName} 의 ${property} 값이 ${CSS_VALUE_MAX_LENGTH}자를 넘는다(${value.length}자) — 토큰이 아닌 자료의 모양이다`);
+      continue;
+    }
+    const found = CSS_FORBIDDEN_IN_VALUE.filter((one) => value.includes(one));
+    if (found.length > 0) {
+      fail(`${cssName} 의 ${property} 값에 ${found.join(', ')} 가 있다 — 토큰 값의 모양이 아니다(데이터 통로의 입구)`);
+    }
+  }
+}
+
+if (finishIfFailed()) return;
+
 // ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
 const viteConfigPath = resolve(webRoot, 'vite.config.ts');
 let publicDirVerdict = '판정 없음';
@@ -948,50 +1050,32 @@ if (!existsSync(viteConfigPath)) {
   // 붙여 돌려 등록부(`config/gate-tests.txt`)의 파일이 passed ≥ 1 · skipped/todo 0 · failed 0
   // 인지 본다.
 
-  // **`publicDir` 는 꺼져 있어야 한다**(CR r3 M-4 · r4 M-1) — 켜져 있으면 그 디렉터리의 아무
-  // 파일이 번들 밖 경로로 그대로 복사돼 화면이 같은 출처에서 읽어 갈 수 있고, 그 디렉터리는
-  // 위의 파일 종류 술어 **밖**이다. 생략은 꺼짐이 아니라 기본값 켜짐이다.
+  // **`publicDir` 는 꺼져 있어야 한다**(CR r3 M-4 · r4 M-1 · M7/7E-2 가 OPEN ②③ 을 닫음) —
+  // 켜져 있으면 그 디렉터리의 아무 파일이 번들 밖 경로로 그대로 복사돼 화면이 같은 출처에서
+  // 읽어 갈 수 있고, 그 디렉터리는 위의 파일 종류 술어 **밖**이다.
   //
-  // 앞 판은 **파일 안 마지막 `publicDir` 대입**을 봤다. 그래서 최상위에 `publicDir: 'static'`
-  // 을 두고 아래 `test:` 블록에 미끼 `publicDir: false` 를 적으면 **초록인 채 입구가 열렸다**
-  // (실측). 그러므로 대입을 **모아** 「정확히 하나 · 그 값이 `false`」를 센다. 디렉터리 부재도
-  // 이름을 박지 않고 **대입된 값에서** 뽑는다.
-  const publicDirAssignments = [];
-  const visitPublicDir = (node) => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      node.name !== undefined &&
-      (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name)) &&
-      node.name.text === 'publicDir'
-    ) {
-      publicDirAssignments.push(node.initializer);
-    }
-    ts.forEachChild(node, visitPublicDir);
-  };
-  visitPublicDir(viteSource);
-
-  if (publicDirAssignments.length !== 1) {
+  // **AST 를 버리고 Vite 자신의 해석을 쓴다.** 앞 판은 `PropertyAssignment` 를 셌고 두 구멍이
+  // 남았다(7E-1 checklist §4 ②③): ⓐ **단축 속성**(`const publicDir = 'static'; … { publicDir }`)은
+  // 그 계수에 들지 않아 초록이었다 ⓑ 문자열 갈래는 **게이트 시점에 그 디렉터리가 없으면** 초록
+  // 이었고, 빌드 시점에 만드는 경로(prebuild·플러그인)가 남았다.
+  //
+  // `resolveConfig` 는 단축 속성·계산 키·spread·조건식·플러그인이 바꾼 값까지 **하나의 결과**로
+  // 접는다. Vite 는 `publicDir: false` 를 `''` 로 해석한다(실측). 그래서 술어가 하나다:
+  // **해석된 `publicDir` 가 빈 문자열이다.** 문자열 갈래는 이제 **값이 무엇이든 거부**한다 —
+  // 이 slice 들이 그 입구를 쓸 일이 없으므로 「없는 디렉터리라서 괜찮다」를 받지 않는다.
+  //
+  // 둘째 층은 산출물 쪽이다: 하네스가 `dist` **루트 항목**을 {index.html, assets} 로 못박는다
+  // (`e2e/harness/bundle-shape.mjs`) — 설정 경로를 어떻게 비틀어도 복사된 파일이 거기서 센다.
+  const { resolveConfig } = await import('vite');
+  const resolved = await resolveConfig({ configFile: resolve(webRoot, 'vite.config.ts') }, 'build');
+  publicDirVerdict = resolved.publicDir === '' ? '꺼짐' : `'${resolved.publicDir}'`;
+  if (resolved.publicDir !== '') {
     fail(
-      `vite.config.ts 의 publicDir 대입이 정확히 하나가 아니다(계수 ${publicDirAssignments.length}) ` +
-        '— 둘 이상이면 어느 것이 설정인지 게이트가 볼 수 없다(미끼 한 줄로 열리던 자리)',
+      `Vite 가 해석한 publicDir 가 꺼짐이 아니다(${publicDirVerdict}) — 번들 경계 밖 자산 입구다. ` +
+        '이 slice 들은 그 입구를 쓰지 않으므로 문자열 갈래는 값이 무엇이든 거부한다',
     );
-  } else {
-    const [value] = publicDirAssignments;
-    if (value.kind === ts.SyntaxKind.FalseKeyword) {
-      publicDirVerdict = '꺼짐';
-    } else if (ts.isStringLiteralLike(value)) {
-      // 꺼져 있지 않다면 **그 경로의 부재**를 센다(이름을 박지 않는다).
-      publicDirVerdict = `'${value.text}'`;
-      if (existsSync(resolve(webRoot, value.text))) {
-        fail(
-          `vite.config.ts 의 publicDir 가 '${value.text}' 이고 그 디렉터리가 있다 ` +
-            '— 번들 경계 밖 자산 입구다(이 slice 는 그 입구를 쓰지 않는다)',
-        );
-      }
-    } else {
-      fail('vite.config.ts 의 publicDir 값이 false 도 문자열 리터럴도 아니다 — 게이트가 판정할 수 없다');
-    }
   }
+
   // 기본값 경로도 함께 센다 — `publicDir: false` 라도 그 디렉터리가 있으면 의도가 갈린다.
   if (existsSync(resolve(webRoot, 'public'))) {
     fail('web/public/ 이 있다 — 이 slice 는 그 입구를 쓰지 않는다(publicDir 는 꺼져 있다)');
@@ -1016,9 +1100,13 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **이 게이트가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export 가운데 **타입이 그 능력과 동일한** 것 0(TypeChecker — 지정자·타입 주석으로 비켜 가는 꼴은 OPEN-7E-GATE-RESIDUAL) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · publicDir **속성 대입**(단축 속성은 세지 않는다 — OPEN) 하나 == ${publicDirVerdict} · 게이트 시점에 그 입구 디렉터리 없음 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **TS 가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export **선언 종류**가 전부 허용 집합 {FunctionDeclaration, TypeAlias, Interface} 안(TypeChecker — 모르는 종류는 기본 위반) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }
 
-run();
+// 해석 실패(설정 파일을 읽을 수 없음 등)도 **게이트 실패**다 — 판정하지 못한 것을 통과로 두지 않는다.
+run().catch((failure) => {
+  console.error(`컴파일 경계 전제를 재지 못했다: ${failure instanceof Error ? failure.message : String(failure)}`);
+  process.exitCode = 1;
+});

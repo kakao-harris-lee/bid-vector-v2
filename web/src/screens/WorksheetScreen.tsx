@@ -13,6 +13,7 @@ import {
   type BidCase,
   type BidPriceRequestResponse,
 } from '../api/queries';
+import { bidCasesQueryKey } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
@@ -64,7 +65,7 @@ export function WorksheetScreen() {
     queryKey: ['notice', noticeNumber, noticeRound],
     queryFn: () => searchNotices({ q: noticeNumber, size: 100 }),
   });
-  const cases = useQuery({ queryKey: ['bid-cases', BID_KIND], queryFn: () => listBidCases(BID_KIND) });
+  const cases = useQuery({ queryKey: bidCasesQueryKey(BID_KIND), queryFn: () => listBidCases(BID_KIND) });
 
   const notice = notices.data?.rows.find(
     (row) => row.noticeNumber === noticeNumber && row.noticeRound === noticeRound,
@@ -82,7 +83,7 @@ export function WorksheetScreen() {
   });
 
   async function refreshCase(): Promise<void> {
-    await queryClient.invalidateQueries({ queryKey: ['bid-cases', BID_KIND] });
+    await queryClient.invalidateQueries({ queryKey: bidCasesQueryKey(BID_KIND) });
     await queryClient.invalidateQueries({ queryKey: ['timeline'] });
   }
 

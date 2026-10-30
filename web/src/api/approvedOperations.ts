@@ -26,6 +26,37 @@ export const APPROVED_OPERATIONS = [
   { method: 'POST', path: '/api/bid-cases/{caseId}/draft' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/record' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/resume' },
+
+  // 화면 D 내 입찰함(M7/7E-2, D-7E2-8) — 「제출함」 뒤의 생애주기 넷. 계약 전이표
+  // (`BID_TRANSITIONS`)가 허락하는 쌍만이고 D 의 다음 행동 표가 그 넷을 고른다.
+  // **담기 뒤 전이(`/defer`·`/skip`)와 결과 정정(`/outcome-correction`)은 두지 않는다** —
+  // 요구표의 D 행에 없고, 쓰지 않는 능력을 목록이 품으면 「목록 == 화면의 능력」이 공허해진다.
+  { method: 'POST', path: '/api/bid-cases/{caseId}/await-opening' },
+  { method: 'POST', path: '/api/bid-cases/{caseId}/opening' },
+  { method: 'POST', path: '/api/bid-cases/{caseId}/qualification-review' },
+  { method: 'POST', path: '/api/bid-cases/{caseId}/outcome' },
+
+  // 설정 — 전략(D-7E2-2). 쓰기는 **편집 세션을 지나는 길 하나**다(계약에 전략을 직접 쓰는
+  // operation 이 없다). 세션 조회(GET)를 쓰는 이유: 만료를 `expiresAt < now` 로 화면이
+  // 판정하면 상태를 클라이언트가 추론하는 것이다 — 계약이 「접근 시점에 만료를 먼저 접는다」로
+  // 두었으므로 그 operation 이 준 `state` 를 보인다.
+  { method: 'GET', path: '/api/strategy' },
+  { method: 'POST', path: '/api/strategy/edit-sessions' },
+  { method: 'GET', path: '/api/strategy/edit-sessions/{sessionId}' },
+  { method: 'POST', path: '/api/strategy/edit-sessions/{sessionId}/value' },
+  { method: 'POST', path: '/api/strategy/edit-sessions/{sessionId}/confirm' },
+  { method: 'POST', path: '/api/strategy/edit-sessions/{sessionId}/edit' },
+  { method: 'POST', path: '/api/strategy/edit-sessions/{sessionId}/cancel' },
+
+  // 설정 — 프로필(D-7E2-3). 자격 사실·사업 정보는 **절 단위 교체**이고 시평액은 행 단위다.
+  // 사업자번호는 계약에 칸이 없어 입력칸을 만들지 않는다(D-7E2-7) — 그래서 그 축의
+  // operation 도 없다.
+  { method: 'GET', path: '/api/profile' },
+  { method: 'POST', path: '/api/profile/qualification-facts' },
+  { method: 'POST', path: '/api/profile/business-details' },
+  { method: 'GET', path: '/api/profile/construction-capacities' },
+  { method: 'POST', path: '/api/profile/construction-capacities' },
+  { method: 'POST', path: '/api/profile/construction-capacities/remove' },
 ] as const;
 
 export type ApprovedOperation = (typeof APPROVED_OPERATIONS)[number];

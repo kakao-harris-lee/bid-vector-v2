@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bundleAssetPaths, EXPECTED_ASSET_SHAPE } from './bundle-shape.mjs';
+import { assertDistRoot, bundleAssetPaths, EXPECTED_ASSET_SHAPE } from './bundle-shape.mjs';
 
 /**
  * v r4 M-2 · CR r4 L-5 — 여정의 자산 허용 집합이 **산출물에서 그냥 파생**되면 자산이 늘 때
@@ -40,5 +40,30 @@ describe('번들 자산의 모양', () => {
 
   it('기대 모양이 바뀌면 그것은 설계 변경이다 — 수를 여기서 고정한다', () => {
     expect(EXPECTED_ASSET_SHAPE).toStrictEqual({ js: 1, css: 1 });
+  });
+});
+
+/**
+ * `dist` 루트 모양(M7/7E-2, OPEN ②) — `publicDir` 복사물이 뜨는 자리를 센다. 자산 모양 단언이
+ * `dist/assets` 만 보던 사각이다.
+ */
+describe('dist 루트 모양', () => {
+  const file = (name) => ({ name, isFile: () => true });
+  const dir = (name) => ({ name, isFile: () => false });
+
+  it('진입 문서와 자산 디렉터리 둘이면 통과한다', () => {
+    expect(assertDistRoot([file('index.html'), dir('assets')])).toStrictEqual(['assets', 'index.html']);
+  });
+
+  it('복사된 파일이 하나라도 있으면 그 이름을 적어 멈춘다', () => {
+    expect(() => assertDistRoot([file('index.html'), dir('assets'), file('rows.json')])).toThrow(/rows\.json/u);
+  });
+
+  it('복사된 디렉터리도 센다', () => {
+    expect(() => assertDistRoot([file('index.html'), dir('assets'), dir('static')])).toThrow(/static/u);
+  });
+
+  it('빈 루트는 통과하지 않는다 — 빌드가 아무것도 내지 않은 것도 사실이다', () => {
+    expect(() => assertDistRoot([])).toThrow(/없음/u);
   });
 });

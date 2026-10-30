@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bundleAssetPaths } from './bundle-shape.mjs';
+import { assertDistRoot, bundleAssetPaths } from './bundle-shape.mjs';
 import {
   acquireSingleRunLock,
   CONTAINER_PREFIX,
@@ -355,10 +355,13 @@ async function main() {
   // 진입 js 하나와 그것이 가져온 css 하나를 낸다. 번들에 자산이 하나라도 더 들어오면 **여기서
   // 먼저 깨진다**(그 주장이 사실이 된다). 상한을 올릴 일이 생기면 그것은 설계 변경이고, 이
   // 줄을 고치는 diff 로 드러나야 한다.
-  const assetDir = resolve(webRoot, 'dist', 'assets');
+  const distDir = resolve(webRoot, 'dist');
+  const assetDir = resolve(distDir, 'assets');
   if (!existsSync(assetDir)) {
     throw new Error(`번들 자산 디렉터리가 없다: ${assetDir} — 빌드가 무엇을 냈는지 알 수 없다`);
   }
+  // **루트까지** 모양을 센다(OPEN ② 의 둘째 층) — `publicDir` 가 켜지면 복사물이 여기에 뜬다.
+  assertDistRoot(readdirSync(distDir, { withFileTypes: true }));
   const bundleAssets = bundleAssetPaths(readdirSync(assetDir, { withFileTypes: true }));
 
   log(`vite preview(127.0.0.1:${PREVIEW_PORT} → /api ⇒ 127.0.0.1:${appPort})`);
