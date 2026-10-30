@@ -73,7 +73,11 @@ private fun ResultSet.toRecordedRealBid(): RecordedRealBid? =
     recordedRealBidOrNull(
         kind = BidKind.valueOf(requireNotNull(getString("bid_kind"))),
         caseId = BidCaseId(getLong("case_id")),
-        notice = NoticeKey(requireNotNull(getString("notice_number")), NoticeRound(requireNotNull(getString("notice_round")))),
+        notice =
+            NoticeKey(
+                requireNotNull(getString("notice_number")),
+                NoticeRound(requireNotNull(getString("notice_round"))),
+            ),
         recordedState = BidStateTag.valueOf(requireNotNull(getString("state"))),
         amount = toSubmittedAmount(),
         submittedAt = getTimestamp("submitted_at").toInstant(),
@@ -119,28 +123,10 @@ class JdbcBatchOpeningFactsView(
 
     /** 키가 **있으면 공고 행이 있다** — 값이 `null` 인 것(마감 미정)과 다른 사실이다. */
     private fun Connection.selectNoticeDeadlines(notices: Set<NoticeId>): Map<NoticeId, Instant?> =
-        prepareStatement(MyBidResultSql.SELECT_NOTICES).use { statement ->
-            statement.bindNumbers(notices)
-            statement.executeQuery().use { rows ->
-                val wanted = notices.byCanonicalKey()
-                buildMap {
-                    while (rows.next()) {
-                        rows.canonicalId(wanted)?.let { put(it, rows.getTimestamp("deadline_at")?.toInstant()) }
-                    }
-                }
-            }
-        }
+        selectByNotices(MyBidResultSql.SELECT_NOTICES, notices) { it.getTimestamp("deadline_at")?.toInstant() }
 
     private fun Connection.selectCanonical(notices: Set<NoticeId>): Map<NoticeId, CanonicalOpeningFacts> =
-        prepareStatement(MyBidResultSql.SELECT_CANONICAL).use { statement ->
-            statement.bindNumbers(notices)
-            statement.executeQuery().use { rows ->
-                val wanted = notices.byCanonicalKey()
-                buildMap {
-                    while (rows.next()) rows.canonicalId(wanted)?.let { put(it, rows.toCanonicalFacts()) }
-                }
-            }
-        }
+        selectByNotices(MyBidResultSql.SELECT_CANONICAL, notices) { it.toCanonicalFacts() }
 
     /**
      * 개찰 축 원문이 있는 공고들 — 번호와 차수의 대조를 **Kotlin 에서** 한다(COL-05). 원문의
@@ -153,7 +139,7 @@ class JdbcBatchOpeningFactsView(
             statement.executeQuery().use { rows ->
                 val wanted = notices.byCanonicalKey()
                 buildSet {
-                    while (rows.next()) rows.foldedId(wanted)?.let(::add)
+                    while (rows.next()) rows.noticeIdOf(wanted) { NoticeNumber.ofOrNull(it)?.value }?.let(::add)
                 }
             }
         }
@@ -188,18 +174,27 @@ class JdbcAwardWinnerNameView(
         if (notices.isEmpty()) emptyMap() else dataSource.readOnly { it.selectWinnerNames(notices) }
 
     private fun Connection.selectWinnerNames(notices: Set<NoticeId>): Map<NoticeId, AwardWinnerTradeName> =
-        prepareStatement(MyBidResultSql.SELECT_WINNER_NAMES).use { statement ->
-            statement.bindNumbers(notices)
-            statement.executeQuery().use { rows ->
-                val wanted = notices.byCanonicalKey()
-                buildMap {
-                    while (rows.next()) {
-                        rows.canonicalId(wanted)?.let { put(it, rows.winnerTradeName()) }
-                    }
-                }
+        selectByNotices(MyBidResultSql.SELECT_WINNER_NAMES, notices) { it.winnerTradeName() }
+}
+
+/**
+ * 공고 번호 배열로 묻고 돌려받은 행을 **요청한 공고에 맞춰** 모은다 — 세 질의(공고 마감 ·
+ * canonical 개찰 · 낙찰자 상호)가 같은 모양이라 자리가 하나다. 값을 꺼내는 것만 호출자가 준다.
+ */
+private fun <V> Connection.selectByNotices(
+    sql: String,
+    notices: Set<NoticeId>,
+    value: (ResultSet) -> V,
+): Map<NoticeId, V> =
+    prepareStatement(sql).use { statement ->
+        statement.bindNumbers(notices)
+        statement.executeQuery().use { rows ->
+            val wanted = notices.byCanonicalKey()
+            buildMap {
+                while (rows.next()) rows.noticeIdOf(wanted) { it }?.let { put(it, value(rows)) }
             }
         }
-}
+    }
 
 private fun ResultSet.winnerTradeName(): AwardWinnerTradeName {
     val raw = getString("final_award_company_name")
@@ -211,24 +206,20 @@ private fun Set<NoticeId>.byCanonicalKey(): Map<Pair<String, String>, NoticeId> 
     associateBy { it.number.value to it.round.value }
 
 /**
- * canonical 표의 행 → 요청한 공고. 그 표들의 번호는 값 객체로 쓰여 **이미 정규형**이라 그대로
- * 맞댄다(7C⑤-a 의 `WHERE notice_number = ?` 와 같은 전제).
+ * 행 하나 → 요청한 공고. 번호를 어떻게 접을지만 호출자가 준다.
+ *
+ * canonical 표(`notice`·`opening_result`)의 번호는 값 객체로 쓰여 **이미 정규형**이라 그대로
+ * 맞댄다. **원문**(`raw_observation`)은 온 그대로라 도메인 규칙으로 접어 맞댄다(COL-05 — 규칙의
+ * 자리는 값 객체 하나다). 접기가 실패한 행은 키를 갖지 못하고 그냥 지나간다: 원문은 append-only
+ * 라 지울 수 없고, 무방비로 정규화하면 그런 행 하나가 조회 전체를 500 으로 만든다.
  */
-private fun ResultSet.canonicalId(wanted: Map<Pair<String, String>, NoticeId>): NoticeId? {
-    val number = getString("notice_number") ?: return null
-    val round = getString("notice_round") ?: return null
-    return wanted[number to round]
-}
-
-/**
- * **원문** 행 → 요청한 공고. 번호를 도메인 규칙으로 접어 맞댄다(COL-05). 번호가 서지 않는 행은
- * 키를 갖지 못하고 그냥 지나간다 — 원문은 append-only 라 지울 수 없고, 무방비로 정규화하면
- * 그런 행 하나가 조회 전체를 500 으로 만든다.
- */
-private fun ResultSet.foldedId(wanted: Map<Pair<String, String>, NoticeId>): NoticeId? {
-    val number = getString("notice_number")?.let(NoticeNumber::ofOrNull)?.value ?: return null
-    val round = getString("notice_round") ?: return null
-    return wanted[number to round]
+private fun ResultSet.noticeIdOf(
+    wanted: Map<Pair<String, String>, NoticeId>,
+    foldNumber: (String) -> String?,
+): NoticeId? {
+    val number = getString("notice_number")?.let(foldNumber)
+    val round = getString("notice_round")
+    return if (number == null || round == null) null else wanted[number to round]
 }
 
 private fun java.sql.PreparedStatement.bindNumbers(notices: Set<NoticeId>) {
