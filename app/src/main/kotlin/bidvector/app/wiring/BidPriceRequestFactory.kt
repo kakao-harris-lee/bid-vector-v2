@@ -7,9 +7,12 @@ import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.adapters.evaluation.SingleNoticeCandidateSource
 import bidvector.adapters.qualification.PinnedLicenseGate
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
+import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
+import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
@@ -21,6 +24,8 @@ import bidvector.workflow.evaluation.NoticeByIdPort
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * 공고 단건·운영자 요청 평가의 요청 스코프 묶음(M7/7C ②, `EvaluationDryRunRun` 관례) —
@@ -41,6 +46,12 @@ class BidPriceRequestRun(
     val strategy: OperatorStrategy,
     val notice: Notice,
     val licenseJudgement: LicenseJudgement,
+    /**
+     * 게시 하한율 신뢰 밴드(DEC-10) — 표시 조립이 **원값 대신 게이트 판정**을 읽는 데 쓴다
+     * (7C②-b, D-7C2B-1). 값을 묶음에 담는 이유는 응답 조립이 순수 함수라 `Clock` 도 정책 표도
+     * 읽지 않기 때문이다 — 해소는 [BidPriceRequestFactory] 한 자리에서 요청당 한 번이다.
+     */
+    val floorTrustPolicy: Resolution.Resolved<PublishedFloorTrustPolicyData>,
 ) {
     /**
      * 평가 한 번 — 커널이 후보 **하나**를 돌려주므로 결과도 하나다. 그 불변식을 여기서
@@ -135,7 +146,37 @@ class BidPriceRequestFactory(
                 analysisBudget = null,
             )
         return BidPriceRequestOutcome.Prepared(
-            BidPriceRequestRun(useCase, notifications, recordingMl, strategy, notice, judgement),
+            BidPriceRequestRun(
+                useCase,
+                notifications,
+                recordingMl,
+                strategy,
+                notice,
+                judgement,
+                resolvedFloorTrustPolicy(),
+            ),
         )
+    }
+
+    /**
+     * 표시 경로가 쓰는 DEC-10 신뢰 정책 — **평가 경로와 같은 상수**(`PUBLISHED_FLOOR_TRUST_POLICY`)
+     * 를 같은 방식(UTC 기준일)으로 해소한다. 정책 값을 이 파일에 다시 적지 않는다(D-7C2B-1).
+     *
+     * `NotApplicable` 은 **구조적으로 불가능하다** — 이 표의 유일한 항목이 `EffectiveFrom.Initial`
+     * 이고 그것은 모든 기준일에 적용된다(`Policy.resolve`). 그래서 표시 어휘에 「정책을 해소하지
+     * 못했다」는 다섯째 상태를 만들지 않았다. 항목이 날짜로 바뀌는 날 화면이 조용히 틀린 상태를
+     * 내는 대신 이 자리가 멈추고, 그 전제 자체는 `BidPriceRequestResponseTest` 가 잠근다.
+     */
+    private fun resolvedFloorTrustPolicy(): Resolution.Resolved<PublishedFloorTrustPolicyData> {
+        val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
+        return when (val resolution = PUBLISHED_FLOOR_TRUST_POLICY.resolve(referenceDate)) {
+            is Resolution.Resolved -> {
+                resolution
+            }
+
+            is Resolution.NotApplicable -> {
+                error("신뢰 정책 표는 Initial 항목을 가져 모든 기준일에 해소된다: ${resolution.reason}")
+            }
+        }
     }
 }

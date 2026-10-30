@@ -40,10 +40,21 @@ export const BID_PRICE_MENU_REASON_DISPLAY = {
   },
 } as const satisfies Record<Response['bidPriceMenuNotComputedReason'], StateDisplay>;
 
-/** DEC-10 — 「없다」와 「게시값이 아니다」를 가른다(운영자 결정: 게시값만 근거). */
+/**
+ * DEC-10 — 근거가 되지 못하는 사유를 **갈라서** 말한다: 없다 · 게시값이 아니다 · 게시값이지만
+ * 개연 범위 밖이다. 셋을 한 문구로 접으면 운영자가 원문 품질과 출처 문제를 구별할 수 없다.
+ *
+ * `IMPLAUSIBLE` 이 생긴 경위가 D-7E-4 의 설계 그대로다(7C②-b, 나중 머지 쪽이 더한다) — 계약이
+ * 상태를 늘린 순간 생성 타입이 바뀌고 `satisfies` 가 **컴파일에서** 이 파일을 멈춰 세웠다.
+ */
 export const FLOOR_RATE_GROUNDS_DISPLAY = {
   USABLE: { label: '게시 하한율', why: '공고가 게시한 값이라 근거로 쓴다', tone: 'neutral' },
   ABSENT: { label: '게시 하한율 없음', why: '공고에 그 값이 없다', tone: 'absent' },
+  IMPLAUSIBLE: {
+    label: '게시 하한율이 개연 범위 밖',
+    why: '게시값이지만 하한으로 성립하는 범위를 벗어나 근거로 쓰지 않는다 — 값을 고치지도 않는다',
+    tone: 'absent',
+  },
   ORIGIN_NOT_PUBLISHED: {
     label: '게시값이 아님',
     why: '값은 있으나 출처가 게시값이 아니라 근거로 쓰지 않는다',

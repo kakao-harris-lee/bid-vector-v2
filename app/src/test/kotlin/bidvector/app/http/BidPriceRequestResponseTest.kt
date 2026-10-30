@@ -5,6 +5,7 @@ import bidvector.app.wiring.BidPriceRequestFactory
 import bidvector.app.wiring.BidPriceRequestOutcome
 import bidvector.app.wiring.BidPriceRequestRun
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseName
 import bidvector.qualification.LicenseVerdict
@@ -13,12 +14,15 @@ import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.RequirementSourceField
 import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * 응답 조립의 순수 성질 — **값이 서지 않는 자리는 상태와 사유로만 말한다**, **게시값이 아닌
@@ -152,6 +156,93 @@ class BidPriceRequestResponseTest {
         response.floorRate.floorRateGroundsState shouldBe "ABSENT"
         response.floorRate.publishedFloorRateFraction shouldBe null
         response.floorRate.publishedFloorRateOrigin shouldBe null
+    }
+
+    /**
+     * **출처가 게시값이라는 것만으로 근거가 되지 않는다**(DEC-10 게이트, D-7C2B-1·2). 하한율
+     * `1.00000` 은 라이브에 실재하고(열린 공고 32건) 「예정가 전액 이상 투찰」이라 하한이
+     * 성립하지 않는다 — 그 값이 근거 칸에 숫자로 실리면 화면이 없는 하한을 있다고 말한다.
+     */
+    @Test
+    fun `개연 불가 게시 하한율은 IMPLAUSIBLE 이고 근거 칸을 비운다`() {
+        val response = responseFor(bidPriceNotice(floorRate = publishedFloorRate("1.00000")))
+
+        response.floorRate.floorRateGroundsState shouldBe "IMPLAUSIBLE"
+        withClue("근거로 설 수 없는 값은 근거 칸에 싣지 않고 상태가 말한다") {
+            response.floorRate.publishedFloorRateFraction shouldBe null
+        }
+        withClue("출처와 차수는 원문 사실이라 남는다 — 왜 근거가 못 되는지 보여야 한다") {
+            response.floorRate.publishedFloorRateOrigin shouldBe "NOTICE_VALUE"
+            response.floorRate.publishedFloorRateNoticeRound shouldBe "000"
+        }
+    }
+
+    /** 밴드는 **양 끝을 포함한다**(D-DEC10-1) — 경계값이 근거에서 빠지면 공고가 조용히 샌다. */
+    @Test
+    fun `개연 밴드 양 끝은 근거가 된다`() {
+        listOf("0.30" to "0.3", "0.995" to "0.995").forEach { (published, emitted) ->
+            val response = responseFor(bidPriceNotice(floorRate = publishedFloorRate(published)))
+
+            withClue(published) {
+                response.floorRate.floorRateGroundsState shouldBe "USABLE"
+                response.floorRate.publishedFloorRateFraction shouldBe emitted
+            }
+        }
+    }
+
+    /**
+     * 밴드 **바로 밖**은 근거가 아니다. 표시가 평가와 다른 밴드를 보면(리터럴을 따로 적으면)
+     * 이 두 자리가 먼저 붉어진다 — 그것이 이 경계 표본의 목적이다.
+     */
+    @Test
+    fun `개연 밴드 바로 밖은 근거가 아니다 — 표시가 평가와 같은 밴드를 본다`() {
+        listOf("0.29999", "0.99501").forEach { published ->
+            val response = responseFor(bidPriceNotice(floorRate = publishedFloorRate(published)))
+
+            withClue(published) {
+                response.floorRate.floorRateGroundsState shouldBe "IMPLAUSIBLE"
+                response.floorRate.publishedFloorRateFraction shouldBe null
+            }
+        }
+    }
+
+    /**
+     * **다섯째 상태를 만들지 않는 전제**(D-7C2B-1) — 표시 어휘는 게이트 판정 네 갈래뿐이고
+     * 「정책을 해소하지 못했다」는 자리가 없다. 그것이 성립하는 이유는 신뢰 정책 표의 유일한
+     * 항목이 `EffectiveFrom.Initial` 이라 **모든 기준일에 적용**되기 때문이다. 항목을 날짜로
+     * 바꾸는 날 이 단언이 먼저 붉어진다 — 표시가 조용히 500 을 내는 대신.
+     */
+    @Test
+    fun `표시가 쓰는 신뢰 정책은 어느 기준일에도 해소된다`() {
+        listOf(LocalDate.MIN, LocalDate.EPOCH, LocalDate.parse("2026-10-23"), LocalDate.MAX)
+            .forEach { referenceDate ->
+                withClue(referenceDate.toString()) {
+                    PUBLISHED_FLOOR_TRUST_POLICY
+                        .resolve(referenceDate)
+                        .shouldBeInstanceOf<Resolution.Resolved<*>>()
+                }
+            }
+    }
+
+    /**
+     * 위 단언은 **상수만** 잰다(CR r1 LOW) — 표시 조립이 그 상수를 쓴다는 사실은 따로 잠근다.
+     * 요청 묶음에 실린 정책이 **출하 상수의 해소 결과와 값·version 까지 같다**: 표시가 다른 상수나
+     * 위조한 밴드를 쓰면 이 단언이 붉어진다.
+     *
+     * **잠기지 않는 것**: 기준일 계산이다. 표의 유일 항목이 `Initial` 인 동안은 어느 기준일로 바꿔도
+     * 같은 값이 나오므로 이 단언으로 구별되지 않는다(표가 날짜를 갖는 날 위 전제 test 가 먼저 붉다).
+     */
+    @Test
+    fun `표시 조립에 실리는 정책은 출하 상수의 해소 결과다 — 배선까지`() {
+        val run =
+            runFor(
+                bidPriceNotice(),
+                licenseJudgementFixture(),
+                MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided),
+                currentActiveBids = 0,
+            )
+
+        run.floorTrustPolicy shouldBe PUBLISHED_FLOOR_TRUST_POLICY.resolve(LocalDate.parse("2026-10-23"))
     }
 
     @Test

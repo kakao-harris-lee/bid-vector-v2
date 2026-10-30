@@ -23,10 +23,19 @@ enum class BidPriceDisclosure {
     PRICE_FITNESS_IS_NOT_PROBABILITY,
 }
 
-/** 게시 하한율이 근거로 설 수 있는가 — 「없다」와 「게시값이 아니다」를 가른다(DEC-03). */
+/**
+ * 게시 하한율이 근거로 설 수 있는가 — 갈래가 **DEC-10 게이트 판정 넷과 하나씩 맞물린다**
+ * (D-7C2B-1, `decision.PublishedFloorTrust`). 「없다」(ABSENT)·「게시값이 아니다」
+ * (ORIGIN_NOT_PUBLISHED)·「게시값이지만 개연 밴드 밖이다」(IMPLAUSIBLE)는 서로 다른 사실이고,
+ * 셋을 한 값으로 접으면 화면이 원문 품질과 출처 문제를 가를 수 없다(DEC-03 · DEC-10).
+ *
+ * 갈래를 더하는 유일한 사유는 **게이트 판정이 늘어나는 것**이다 — 표시는 자기 판단으로 상태를
+ * 지어내지 않고, 그 사상은 `floorRateGroundsOf` 의 소진 `when` 하나다.
+ */
 enum class FloorRateGroundsState {
     USABLE,
     ABSENT,
+    IMPLAUSIBLE,
     ORIGIN_NOT_PUBLISHED,
 }
 
