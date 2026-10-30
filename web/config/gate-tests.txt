@@ -37,3 +37,7 @@ src/screens/BidBoxScreen.test.tsx
 # 세션 상태·409 사유 표, 그리고 「확인 화면이 보이는 값은 지금 값과 보낸 값 둘뿐」을 잠근다.
 src/display/editSessionDisplay.test.ts
 src/screens/SettingsScreen.test.tsx
+# M7/7E-2 — 설정의 프로필 축. 「빈 목록은 신고된 빈 값이 아니다」(세 상태) · 「미응답은 값이다」 ·
+# 등록이 아니면 두 칸을 싣지 않는다(계약) · 미판정 축은 서버가 준 목록에서 그린다(G2).
+src/display/profileDisplay.test.ts
+src/screens/ProfileSection.test.tsx

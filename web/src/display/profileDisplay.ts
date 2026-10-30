@@ -1,0 +1,120 @@
+import type { components } from '../api/generated/operator-api';
+
+import type { StateDisplay } from './stateDisplay';
+
+type Profile = components['schemas']['Profile'];
+type BusinessDetailsRequest = components['schemas']['BusinessDetailsRequest'];
+
+export type NaraRegistration = Profile['naraRegistration'];
+export type NaraField = Profile['naraRegisteredFields'][number];
+export type HeadquartersRegion = NonNullable<Profile['headquartersRegion']>;
+export type UnjudgedAxis = Profile['unjudgedAxes'][number];
+
+/**
+ * 프로필 표시의 표들(M7/7E-2, D-7E2-3).
+ *
+ * **「미응답」은 값이다**(계약) — null 이나 「미등록」으로 접지 않는다. 화면의 경고가 다르기
+ * 때문이다: 묻지 않은 것과 아니라고 답한 것은 같은 사실이 아니다.
+ */
+export const NARA_REGISTRATION_DISPLAY = {
+  UNANSWERED: { label: '미응답', why: '아직 답하지 않았다 — 「미등록」과 다른 사실이다', tone: 'absent' },
+  REGISTERED: { label: '등록', tone: 'good' },
+  NOT_REGISTERED: { label: '미등록', why: '등록하지 않았다고 답했다', tone: 'neutral' },
+} as const satisfies Record<NaraRegistration, StateDisplay>;
+
+export const NARA_FIELD_DISPLAY = {
+  GOODS: { label: '물품', tone: 'neutral' },
+  SERVICE: { label: '용역', tone: 'neutral' },
+  CONSTRUCTION: { label: '공사', tone: 'neutral' },
+} as const satisfies Record<NaraField, StateDisplay>;
+
+/** 본사 소재지 — 계약 enum 전수 열일곱. 목록을 손으로 늘리지 않는다. */
+export const REGION_DISPLAY = {
+  SEOUL: { label: '서울', tone: 'neutral' },
+  BUSAN: { label: '부산', tone: 'neutral' },
+  DAEGU: { label: '대구', tone: 'neutral' },
+  INCHEON: { label: '인천', tone: 'neutral' },
+  GWANGJU: { label: '광주', tone: 'neutral' },
+  DAEJEON: { label: '대전', tone: 'neutral' },
+  ULSAN: { label: '울산', tone: 'neutral' },
+  SEJONG: { label: '세종', tone: 'neutral' },
+  GYEONGGI: { label: '경기', tone: 'neutral' },
+  GANGWON: { label: '강원', tone: 'neutral' },
+  CHUNGBUK: { label: '충북', tone: 'neutral' },
+  CHUNGNAM: { label: '충남', tone: 'neutral' },
+  JEONBUK: { label: '전북', tone: 'neutral' },
+  JEONNAM: { label: '전남', tone: 'neutral' },
+  GYEONGBUK: { label: '경북', tone: 'neutral' },
+  GYEONGNAM: { label: '경남', tone: 'neutral' },
+  JEJU: { label: '제주', tone: 'neutral' },
+} as const satisfies Record<HeadquartersRegion, StateDisplay>;
+
+/**
+ * **아직 판정하지 않는 자격 축**(M7 완료 조건 G2) — 입력이 있든 없든 V2 에 판정이 없는 축이다.
+ * 화면은 **이 목록에서** 그 문면을 그린다(클라이언트가 어느 축이 미판정인지 추론하지 않는다).
+ */
+export const UNJUDGED_AXIS_DISPLAY = {
+  QUAL_08_REGION: { label: '지역', why: '아직 판정하지 않는다', tone: 'unjudged' },
+  QUAL_10_PERFORMANCE: { label: '수행실적', why: '아직 판정하지 않는다', tone: 'unjudged' },
+  QUAL_11_CONSTRUCTION_CAPACITY: { label: '시공능력평가금액', why: '아직 판정하지 않는다', tone: 'unjudged' },
+} as const satisfies Record<UnjudgedAxis, StateDisplay>;
+
+/**
+ * 자격 사실의 **세 상태**(계약) — `qualificationDeclared` 와 `licensesDeclared` 짝이 가른다.
+ *
+ * 왜 셋인가: `qualificationDeclared` 가 거짓이면 그때의 빈 목록은 **신고된 빈 값이 아니다**.
+ * 둘을 한 얼굴로 접으면 「면허가 없다고 신고함」과 「아직 아무것도 적지 않음」이 같아 보인다.
+ */
+export type QualificationState = 'UNSET' | 'LICENSES_NOT_DECLARED' | 'DECLARED';
+
+export const QUALIFICATION_STATE_DISPLAY = {
+  UNSET: { label: '프로필 미설정', why: '빈 목록은 신고된 빈 값이 아니다', tone: 'absent' },
+  LICENSES_NOT_DECLARED: { label: '면허 미신고', why: '업종·지역어는 신고했고 면허는 아직이다', tone: 'absent' },
+  DECLARED: { label: '신고함', tone: 'neutral' },
+} as const satisfies Record<QualificationState, StateDisplay>;
+
+/** 판정은 **서버가 준 두 boolean** 에서만 나온다 — 목록의 길이로 추론하지 않는다. */
+export function qualificationStateOf(profile: Profile): QualificationState {
+  if (!profile.qualificationDeclared) {
+    return 'UNSET';
+  }
+  return profile.licensesDeclared ? 'DECLARED' : 'LICENSES_NOT_DECLARED';
+}
+
+/** 사업 정보 폼이 쥔 값 — 전부 운영자 입력이고 기본값이 없다. */
+export interface BusinessDetailsForm {
+  readonly tradeName: string;
+  readonly headquartersRegion: string;
+  readonly naraRegistration: NaraRegistration;
+  readonly naraRegisteredFields: readonly NaraField[];
+  readonly businessCertificateExpiresOn: string;
+}
+
+/**
+ * 사업 정보 요청 본문 — **절 단위 교체**다(부분 갱신이 다른 칸을 지우는 모양이 계약에 없다).
+ *
+ * 계약의 두 제약을 **본문의 모양으로** 지킨다:
+ *  · `naraRegistration` 이 `REGISTERED` 가 **아니면** `naraRegisteredFields` ·
+ *    `businessCertificateExpiresOn` 을 **실을 수 없다**(400). 받아 두고 버리지 않는다.
+ *  · `REGISTERED` 이면 `naraRegisteredFields` 는 **필수**다(빈 배열 가능).
+ *  · 상호는 **공백뿐이면 400** 이다 — 「미설정」은 키를 빼거나 `null` 이다. 그래서 빈 입력은
+ *    `null` 로 보낸다(공백이 조용히 「지우기」가 되지 않게).
+ */
+export function businessDetailsBodyOf(form: BusinessDetailsForm): BusinessDetailsRequest {
+  const trimmed = form.tradeName.trim();
+  const base: BusinessDetailsRequest = {
+    naraRegistration: form.naraRegistration,
+    tradeName: trimmed === '' ? null : form.tradeName,
+    headquartersRegion: form.headquartersRegion === '' ? null : (form.headquartersRegion as HeadquartersRegion),
+  };
+  if (form.naraRegistration !== 'REGISTERED') {
+    return base;
+  }
+  return {
+    ...base,
+    naraRegisteredFields: [...form.naraRegisteredFields],
+    ...(form.businessCertificateExpiresOn === ''
+      ? {}
+      : { businessCertificateExpiresOn: form.businessCertificateExpiresOn }),
+  };
+}

@@ -4,6 +4,7 @@ import { readStrategy } from '../api/queries';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
+import { ProfileSection } from './ProfileSection';
 import { STRATEGY_QUERY_KEY, StrategySection } from './StrategySection';
 
 /**
@@ -41,6 +42,8 @@ export function SettingsScreen() {
       <h2 className="text-lg font-semibold">설정</h2>
 
       <StrategySection />
+
+      <ProfileSection />
 
       <section data-testid="settings-not-ready" className="flex flex-col gap-2">
         <h3 className="text-base font-semibold">준비 중</h3>

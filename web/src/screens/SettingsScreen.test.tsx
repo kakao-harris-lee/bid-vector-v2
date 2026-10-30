@@ -55,6 +55,18 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
   mocked.readStrategy.mockResolvedValue(strategy());
+  // 설정 화면은 프로필 절도 품는다 — 그 읽기의 기본값을 둔다(이 파일이 재는 것은 전략 축이다).
+  mocked.readProfile.mockResolvedValue({
+    qualificationDeclared: false,
+    businessTypes: [],
+    licensesDeclared: false,
+    licenseNames: [],
+    regionTerms: [],
+    naraRegistration: 'UNANSWERED',
+    naraRegisteredFields: [],
+    unjudgedAxes: [],
+  });
+  mocked.listConstructionCapacities.mockResolvedValue([]);
 });
 
 afterEach(() => {
