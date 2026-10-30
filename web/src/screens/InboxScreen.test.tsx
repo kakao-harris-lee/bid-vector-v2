@@ -179,6 +179,22 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     );
   });
 
+  /**
+   * **누른 버튼이 사라지지 않는다**(r1 CR L-1) — 재조회가 그 행을 읽음으로 만들 때 버튼이
+   * DOM 에서 빠지면 포커스가 `<body>` 로 떨어진다. 잠기고 문면만 바뀐다.
+   */
+  it('읽은 뒤에도 그 버튼이 남는다 — 잠기고 문면만 바뀐다', async () => {
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const button = within(row).getByRole('button', { name: /읽음/u });
+    expect(button.hasAttribute('disabled'), '읽은 행의 버튼이 열려 있다').toBe(true);
+    expect(button.textContent ?? '').toContain('읽음');
+  });
+
   it('읽음 처리는 종류와 공고 쌍으로 보낸다 — 합성 id 가 없다', async () => {
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
     renderScreen();
