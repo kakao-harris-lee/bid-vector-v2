@@ -71,6 +71,11 @@ function openSession(field: NonNullable<queries.EditSessionResponse['field']>): 
   };
 }
 
+/** 단계가 잠겼는가 — `disabled` 가 아니라 `aria-disabled` 다(포커스를 남긴다, CR r3 L-6). */
+function stepLocked(step: string): boolean {
+  return screen.getByTestId(`onboarding-step-${step}`).getAttribute('aria-disabled') === 'true';
+}
+
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -538,15 +543,14 @@ describe('시작하기 — 마법사의 걸음', () => {
     fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
     await screen.findByTestId('edit-session');
 
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-BUSINESS_DETAILS') as HTMLButtonElement).disabled).toBe(true),
-    );
+    await waitFor(() => expect(stepLocked('BUSINESS_DETAILS')).toBe(true));
+    // 잠긴 동안 **눌러도 옮겨지지 않는다** — `aria-disabled` 는 포커스만 남기고 누름은 무시한다.
+    fireEvent.click(screen.getByTestId('onboarding-step-BUSINESS_DETAILS'));
+    expect(screen.queryByLabelText('상호')).toBeNull();
 
     // 그만두면 다시 옮길 수 있다 — 막혀서 갇히는 자리가 없다.
     fireEvent.click(screen.getByRole('button', { name: '그만두기' }));
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-BUSINESS_DETAILS') as HTMLButtonElement).disabled).toBe(false),
-    );
+    await waitFor(() => expect(stepLocked('BUSINESS_DETAILS')).toBe(false));
   });
 
   /** §6.5 — 저장 뒤 바뀌는 진행률이 보조기술에 알려진다(CR r1 LOW). */
@@ -566,7 +570,8 @@ describe('시작하기 — 마법사의 걸음', () => {
     renderScreen();
 
     await screen.findByTestId('onboarding-step-WATCH');
-    expect(screen.queryByTestId('onboarding-step-lock')).toBeNull();
+    // live region 은 **비어 있는 채 먼저 서 있다** — 내용째 삽입되는 노드는 낭독이 갈린다(CR r3 L-6).
+    expect(screen.getByTestId('onboarding-step-lock').textContent).toBe('');
 
     fireEvent.click(screen.getByTestId('onboarding-step-WATCH'));
     const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
@@ -595,17 +600,13 @@ describe('시작하기 — 마법사의 걸음', () => {
     const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
     fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
     await screen.findByTestId('edit-session');
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-BUDGET') as HTMLButtonElement).disabled).toBe(true),
-    );
+    await waitFor(() => expect(stepLocked('BUDGET')).toBe(true));
 
     fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
 
     const body = await screen.findByTestId('onboarding-step-body');
     await waitFor(() => expect(within(body).queryByTestId('signed-out')).not.toBeNull());
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-BUDGET') as HTMLButtonElement).disabled).toBe(false),
-    );
+    await waitFor(() => expect(stepLocked('BUDGET')).toBe(false));
   });
 });
 
@@ -643,9 +644,7 @@ describe('시작하기 — 끝난 세션에서 빠져나갈 길', () => {
   it('409 뒤 다시 읽은 세션이 만료면 단계 잠금이 풀리고 패널에 닫기가 선다', async () => {
     await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'EXPIRED' });
 
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-WATCH') as HTMLButtonElement).disabled).toBe(false),
-    );
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(false));
     fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
     await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
   });
@@ -653,16 +652,77 @@ describe('시작하기 — 끝난 세션에서 빠져나갈 길', () => {
   it('취소된 세션도 같다', async () => {
     await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'CANCELLED' });
 
-    await waitFor(() =>
-      expect((screen.getByTestId('onboarding-step-WATCH') as HTMLButtonElement).disabled).toBe(false),
-    );
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(false));
     expect(await screen.findByTestId('edit-session-dismiss')).toBeTruthy();
   });
 
-  /** 재조회가 404 로 떨어지면 `open` 이 그대로다 — 그때는 **진행 중 state** 라 「그만두기」가 있다. */
-  it('재조회가 실패하면 진행 중 상태가 남고 그만두기로 빠져나간다', async () => {
+  /**
+   * **재조회가 실패하면 상태를 모른다** — 그때 패널을 진행 중으로 남기면 거기 있는 버튼들이 같은
+   * 실패를 반복하고 잠금도 풀리지 않는다(v·CR r3 L-1). 자리를 치우고 사유는 실패 얼굴에 남긴다.
+   */
+  it('409 재조회가 404 면 자리를 치우고 잠금을 푼다', async () => {
     await openAndExpire(new ApiError(404, 'SESSION_NOT_FOUND'));
 
-    expect(await screen.findByRole('button', { name: '그만두기' })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(false));
+    // 무슨 일이 있었는지는 남는다.
+    expect(screen.getByTestId('write-failure')).toBeTruthy();
+  });
+
+  /** 명령 자신이 404 인 길도 같다 — 그 id 의 세션이 서버에 없으면 보낼 것이 더 없다. */
+  it('그만두기가 404 면 그것으로 끝난 세션이다', async () => {
+    mocked.beginEditSession.mockResolvedValue(openSession('MIN_BUDGET'));
+    mocked.cancelEditSession.mockRejectedValue(new ApiError(404, 'SESSION_NOT_FOUND'));
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: ['BUDGET_RANGE'] }));
+    renderScreen();
+
+    const row = await screen.findByTestId('strategy-row-MIN_BUDGET');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+    await screen.findByTestId('edit-session');
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: '그만두기' }));
+
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(false));
+  });
+
+  /** 「닫기」는 **쓰기 상태도** 비운다(CR r3 L-2) — 안 그러면 「다시」가 죽은 세션으로 재전송한다. */
+  it('닫으면 실패 얼굴과 409 사유도 함께 걷힌다', async () => {
+    await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'EXPIRED' });
+
+    expect(await screen.findByTestId('write-failure')).toBeTruthy();
+    fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
+
+    await waitFor(() => expect(screen.queryByTestId('write-failure')).toBeNull());
+    expect(screen.queryByTestId('edit-conflict')).toBeNull();
+  });
+
+  /** 치운 뒤 **다시 쓸 수 있는 상태**로 남는가(CR r3 L-4) — 그것이 이 수정의 핵심이다. */
+  it('닫은 뒤 고치기를 누르면 새 세션이 선다', async () => {
+    await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'EXPIRED' });
+    fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+
+    mocked.beginEditSession.mockResolvedValue({ ...openSession('MAX_BUDGET'), sessionId: 'sess-2' });
+    const row = await screen.findByTestId('strategy-row-MAX_BUDGET');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+
+    await waitFor(() => expect(mocked.beginEditSession).toHaveBeenLastCalledWith({ field: 'MAX_BUDGET' }));
+    expect(await screen.findByTestId('edit-session')).toBeTruthy();
+    await waitFor(() => expect(stepLocked('WATCH')).toBe(true));
+  });
+
+  /**
+   * 적용은 됐는데 **성공 경로를 지나지 않은 길**(confirm 응답 유실 → 재확인 409 → 재조회 APPLIED).
+   * 닫을 때 체크리스트를 다시 읽지 않으면 목록이 낡은 채 남는다(CR r3 L-9).
+   */
+  it('APPLIED 세션을 닫으면 체크리스트를 다시 읽는다', async () => {
+    await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'APPLIED' });
+    const before = mocked.readOnboardingChecklist.mock.calls.length;
+
+    fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
+
+    await waitFor(() => expect(mocked.readOnboardingChecklist.mock.calls.length).toBeGreaterThan(before));
   });
 });

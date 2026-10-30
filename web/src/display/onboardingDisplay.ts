@@ -146,6 +146,8 @@ export function progressOf(checklist: OnboardingChecklist): { readonly done: num
  * [after] **뒤의** 첫 미완 단계 — 뒤에 없으면 앞으로 한 바퀴 돌아 찾는다. 미완이 어디에도 없으면
  * `null` 이다(선행 대기만 남은 단계는 걸을 자리가 아니다).
  *
+ * [after] 가 `null` 이면 **처음부터** 찾는다 — 마법사가 아직 아무 데도 머물지 않았을 때의 자리다.
+ *
  * 「뒤부터」인 이유(CR r2 LOW): 저장 뒤에 **늘 첫 미완**으로 가면 운영자가 일부러 뒷단계를 골라
  * 저장했을 때 앞쪽으로 끌려간다. 마법사의 걸음은 앞으로 가는 것이고, 뒤에 미완이 남지 않았을
  * 때에만 앞의 미완으로 되돌아온다.
@@ -166,9 +168,4 @@ export function nextStepWithPending(
     }
   }
   return null;
-}
-
-/** 미완 항목이 있는 **첫 단계** — 마법사가 아직 아무 데도 머물지 않았을 때의 자리다. */
-export function firstStepWithPending(checklist: OnboardingChecklist): OnboardingStepId | null {
-  return nextStepWithPending(checklist, null);
 }

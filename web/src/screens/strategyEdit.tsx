@@ -38,6 +38,7 @@ import { displayOrUnknown } from '../display/stateDisplay';
 type ValueRequest = components['schemas']['EditSessionValueRequest'];
 
 const HTTP_CONFLICT = 409;
+const HTTP_NOT_FOUND = 404;
 
 export const STRATEGY_QUERY_KEY = ['strategy'] as const;
 
@@ -65,14 +66,44 @@ export interface OpenSession {
 }
 
 /**
- * **서버에 더 보낼 것이 남은 세션인가** — 계약의 다섯 state 가운데 진행 중인 둘이다.
+ * 패널이 그릴 **단계** — 계약의 다섯 state 를 소진 `switch` 로 접는다.
+ *
+ * **진행 중 쪽을 열거하지 않는 이유**(CR r3 L-5): 「진행 중인 둘」을 열거하면 계약에 진행 중 state
+ * 가 하나 늘었을 때 그 값이 조용히 **끝난 세션**으로 떨어져 잠금이 풀리고(= 버려지는 세션이
+ * 돌아온다) 「닫기」가 선다. 소진 `switch` 는 그 순간 **이 자리에서** 컴파일을 멈춘다 — 술어를
+ * 문자열 비교가 아니라 구조로 닫는다.
+ *
+ * 단계가 셋으로 닫혀 있으므로 **패널은 늘 정확히 한 묶음을 그린다** — 「출구가 0 개인 패널」이
+ * 표현되지 않는다(CR r3 L-1 의 구조 처방).
+ */
+export type SessionPhase = 'VALUE' | 'CONFIRM' | 'ENDED';
+
+export function sessionPhase(state: EditSessionResponse['state']): SessionPhase {
+  switch (state) {
+    case 'WAITING_FOR_VALUE':
+      return 'VALUE';
+    case 'WAITING_FOR_CONFIRMATION':
+      return 'CONFIRM';
+    case 'APPLIED':
+    case 'CANCELLED':
+    case 'EXPIRED':
+      return 'ENDED';
+    default: {
+      const unreachable: never = state;
+      throw new Error(`모르는 편집 세션 상태: ${String(unreachable)}`);
+    }
+  }
+}
+
+/**
+ * **서버에 더 보낼 것이 남은 세션인가.**
  *
  * 이 구분이 필요한 이유(CR·v r2 MEDIUM): 세션이 서버에서 끝나면 그 뒤의 **모든 명령이 409** 라
  * `onSuccess` 가 영원히 오지 않고, 409 재조회는 `open` 을 살려 둔 채 state 만 종말로 바꾼다.
  * 「열린 세션」을 잠금 술어로 쓰면 그 상태가 화면을 가둔다 — 잠그는 것은 **진행 중**뿐이다.
  */
 export function isSessionInProgress(state: EditSessionResponse['state']): boolean {
-  return state === 'WAITING_FOR_VALUE' || state === 'WAITING_FOR_CONFIRMATION';
+  return sessionPhase(state) !== 'ENDED';
 }
 
 export interface StrategyEditSession {
@@ -178,12 +209,24 @@ export function useStrategyEditSession(
      * 그 상태를 추측하지 않고 세션을 다시 읽어 서버가 말하는 `state` 를 들고 온다.
      */
     onError: async (error) => {
-      if (error instanceof ApiError && error.status === HTTP_CONFLICT && open !== null) {
+      const ended = () => {
+        setOpen(null);
+        setRaw('');
+      };
+      if (error instanceof ApiError && error.status === HTTP_NOT_FOUND) {
+        // **그 id 의 세션이 서버에 없다** — 보낼 것이 더 없으므로 끝난 것으로 다룬다(CR·v r3 L-1).
+        // 앞 판은 `open` 을 진행 중 state 로 남겨 두었고, 그러면 남은 버튼이 전부 같은 404 를
+        // 내는데도 단계 잠금이 풀리지 않았다.
+        ended();
+      } else if (error instanceof ApiError && error.status === HTTP_CONFLICT && open !== null) {
         try {
           const session = await readEditSession(open.session.sessionId);
           setOpen({ ...open, session });
         } catch {
-          // 다시 읽는 것도 실패하면 **쓰기 실패 얼굴이 그대로 선다**(상태를 지어내지 않는다).
+          // **다시 읽지 못했으면 상태를 모른다** — 그때 패널을 진행 중으로 남기면 거기 있는
+          // 버튼들이 같은 실패를 반복하고 잠금도 풀리지 않는다. 자리를 치우고 **사유는 쓰기 실패
+          // 얼굴에 남긴다**(「다시」로 같은 명령을 다시 보낼 수 있다).
+          ended();
         }
       }
       await queryClient.invalidateQueries({ queryKey: STRATEGY_QUERY_KEY });
@@ -260,9 +303,18 @@ export function useStrategyEditSession(
       run.mutate({ kind: 'CANCEL', commandId: crypto.randomUUID(), sessionId: open.session.sessionId });
     },
     dismiss: () => {
+      if (open?.session.state === 'APPLIED') {
+        // **적용은 됐는데 성공 경로를 지나지 않은 길**이다(confirm 응답 유실 → 재확인 409 →
+        // 재조회가 이미 적용된 세션). `onSuccess` 가 안 지나므로 닫을 때 알린다 — 그러지 않으면
+        // 전략 값만 신선하고 **체크리스트가 낡은 채** 남는다(CR r3 L-9).
+        onApplied?.();
+      }
       setOpen(null);
       setRaw('');
       setMissing(false);
+      // 쓰기 상태도 비운다(CR r3 L-2): 안 비우면 패널이 사라진 뒤에도 실패 얼굴과 409 사유가
+      // 남고, 거기 있는 「다시」가 **이미 끝난 세션으로 같은 명령을 재전송**한다.
+      run.reset();
     },
   };
 }
@@ -345,6 +397,8 @@ export function StrategyEditPanel({
    * 값이 있으면 **본문에서 뽑은 문면**을 그대로 쓴다 — 운영자가 적은 원문이 아니다(CR H-2 ②).
    */
   const sentView = open.sent === null ? null : (open.sent.text ?? '비움 — 이 조건을 지웁니다');
+  // **정확히 한 묶음**이 그려진다 — 단계가 셋으로 닫혀 있어 「출구 0 개」가 표현되지 않는다.
+  const phase = sessionPhase(open.session.state);
 
   return (
     <div data-testid="edit-session" className="rounded-lg border border-accent/40 bg-card p-4">
@@ -356,7 +410,7 @@ export function StrategyEditPanel({
         />
       </div>
 
-      {open.session.state === 'WAITING_FOR_VALUE' ? (
+      {phase === 'VALUE' ? (
         <div className="mt-3 flex flex-col gap-2">
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">{input.hint}</span>
@@ -402,7 +456,7 @@ export function StrategyEditPanel({
         「같은 명령을 다시」뿐이면 마법사가 갇힌다. 서버에 보낼 것이 없으므로 로컬 정리로 충분하고,
         **사유는 실패 얼굴과 배지에 남는다**.
       */}
-      {isSessionInProgress(open.session.state) ? null : (
+      {phase === 'ENDED' ? (
         <div className="mt-3">
           <button
             type="button"
@@ -413,9 +467,9 @@ export function StrategyEditPanel({
             닫기
           </button>
         </div>
-      )}
+      ) : null}
 
-      {open.session.state === 'WAITING_FOR_CONFIRMATION' ? (
+      {phase === 'CONFIRM' ? (
         <div className="mt-3 flex flex-col gap-2">
           {/* 보이는 값 둘 — **지금 값**(서버)과 **보낸 값**(운영자 입력)뿐이다. */}
           <dl className="grid gap-2 sm:grid-cols-2">

@@ -189,12 +189,18 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
               data-testid={`onboarding-step-${step.id}`}
               aria-current={step.id === current ? 'step' : undefined}
               aria-controls="onboarding-step-body"
-              disabled={sessionOpen}
-              // 잠긴 사유를 **보조기술에도** 준다(CR r2 LOW): `disabled` 버튼은 탭 순서에서 빠지고
-              // `title` 은 읽히지 않아, 키보드·스크린리더 운영자에게는 탐색이 사유 없이 사라진다.
+              // **`disabled` 가 아니라 `aria-disabled`**(CR r3 L-6): `disabled` 버튼은 포커스를 받지
+              // 않아 아래 사유를 가리키는 `aria-describedby` 가 **낭독될 기회가 없다**. 포커스를
+              // 남기고 누름만 무시하면 키보드·스크린리더 운영자가 그 사유를 듣는다.
+              aria-disabled={sessionOpen || undefined}
               aria-describedby={sessionOpen ? STEP_LOCK_REASON_ID : undefined}
-              onClick={() => setPicked(step.id)}
-              className={`rounded-md px-2 py-1 text-xs disabled:opacity-50 ${
+              onClick={() => {
+                if (sessionOpen) {
+                  return;
+                }
+                setPicked(step.id);
+              }}
+              className={`rounded-md px-2 py-1 text-xs aria-disabled:opacity-50 ${
                 step.id === current
                   ? 'bg-neutral-skin font-medium text-neutral-ink'
                   : 'text-ink-soft hover:bg-neutral-skin'
@@ -204,11 +210,13 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
             </button>
           ))}
         </div>
-        {sessionOpen ? (
-          <p id={STEP_LOCK_REASON_ID} data-testid="onboarding-step-lock" role="status" className="text-xs text-ink-soft">
-            편집을 마치거나 그만두면 단계를 옮길 수 있습니다.
-          </p>
-        ) : null}
+        {/*
+          live region 은 **비어 있는 채 먼저 서 있어야** 변화가 확실히 읽힌다(CR r3 L-6) — 내용째
+          삽입되는 노드의 낭독은 스크린리더마다 갈린다. 그래서 문단은 늘 그리고 **글만 바꾼다**.
+        */}
+        <p id={STEP_LOCK_REASON_ID} data-testid="onboarding-step-lock" role="status" className="text-xs text-ink-soft">
+          {sessionOpen ? '편집을 마치거나 그만두면 단계를 옮길 수 있습니다.' : ''}
+        </p>
       </nav>
 
       <div id="onboarding-step-body" data-testid="onboarding-step-body" className="flex flex-col gap-4">

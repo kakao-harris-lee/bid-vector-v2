@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { OnboardingChecklist } from '../api/queries';
 
 import {
-  firstStepWithPending,
   itemRowsOf,
   nextStepWithPending,
   ONBOARDING_ITEM_DISPLAY,
@@ -123,18 +122,19 @@ describe('진행률 — 선행 대기도 해당 없음도 세지 않는다', () 
 
 describe('다음 단계 — 미완 항목이 있는 첫 단계', () => {
   it('단계 순서에서 앞선 미완이 이긴다', () => {
-    expect(firstStepWithPending(checklist({ pending: ['WATCH_CONDITIONS', 'TRADE_NAME'] }))).toBe(
+    expect(nextStepWithPending(checklist({ pending: ['WATCH_CONDITIONS', 'TRADE_NAME'] }), null)).toBe(
       ONBOARDING_ITEM_STEP.TRADE_NAME,
     );
   });
 
   it('미완이 없으면 다음 단계가 없다', () => {
     expect(
-      firstStepWithPending(
+      nextStepWithPending(
         checklist({
           completed: ['TRADE_NAME'],
           awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }],
         }),
+        null,
       ),
     ).toBeNull();
   });
@@ -142,7 +142,7 @@ describe('다음 단계 — 미완 항목이 있는 첫 단계', () => {
   /** 선행 대기는 **막지도 채우지도 않는다** — 그것 때문에 단계가 열리면 할 일이 없는 자리다. */
   it('선행 대기만 있는 단계는 다음 단계가 아니다', () => {
     expect(
-      firstStepWithPending(checklist({ awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }] })),
+      nextStepWithPending(checklist({ awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }] }), null),
     ).toBeNull();
   });
 });
@@ -167,9 +167,11 @@ describe('다음 걸음 — 현재 단계 뒤부터 찾는다', () => {
     ).toBe(ONBOARDING_ITEM_STEP.TRADE_NAME);
   });
 
-  it('기준이 없으면 첫 미완이다 — `firstStepWithPending` 과 같은 자리다', () => {
-    const list = checklist({ pending: ['BUDGET_RANGE', 'TRADE_NAME'] });
-    expect(nextStepWithPending(list, null)).toBe(firstStepWithPending(list));
+  it('기준이 없으면 처음부터 찾는다', () => {
+    // **단계 id 를 직접 단언한다**(CR r3 L-8): 앞 판은 같은 모듈의 다른 함수와 맞대어 항진이었다.
+    expect(nextStepWithPending(checklist({ pending: ['BUDGET_RANGE', 'TRADE_NAME'] }), null)).toBe(
+      ONBOARDING_ITEM_STEP.TRADE_NAME,
+    );
   });
 
   it('미완이 어디에도 없으면 null 이다', () => {
@@ -178,10 +180,21 @@ describe('다음 걸음 — 현재 단계 뒤부터 찾는다', () => {
     ).toBeNull();
   });
 
-  /** 자기 단계에 미완이 남아도 **뒤로** 간다 — 저장했는데 같은 자리에 머무르면 걸음이 아니다. */
-  it('기준 단계 자신은 건너뛴다', () => {
+  /** 뒤에 갈 데가 있으면 자기 자리를 지나친다 — 저장했는데 같은 자리에 머무르면 걸음이 아니다. */
+  it('뒤에 다른 미완이 있으면 자기 단계를 지나친다', () => {
     expect(
       nextStepWithPending(checklist({ pending: ['TRADE_NAME', 'BUDGET_RANGE'] }), ONBOARDING_ITEM_STEP.TRADE_NAME),
     ).toBe(ONBOARDING_ITEM_STEP.BUDGET_RANGE);
+  });
+
+  /**
+   * **갈 데가 없으면 그 자리에 남는다**(CR r3 L-7). 한 바퀴를 돌면 기준 단계가 마지막에 다시 들어
+   * 오므로 미완이 자기 단계에만 남았을 때 그 단계를 돌려준다 — 「건너뛴다」가 아니라 「뒤부터
+   * 찾는다」가 이 함수의 말이다.
+   */
+  it('미완이 자기 단계에만 남으면 그 자리에 남는다', () => {
+    expect(
+      nextStepWithPending(checklist({ pending: ['TRADE_NAME', 'NARA_READINESS'] }), ONBOARDING_ITEM_STEP.TRADE_NAME),
+    ).toBe(ONBOARDING_ITEM_STEP.TRADE_NAME);
   });
 });

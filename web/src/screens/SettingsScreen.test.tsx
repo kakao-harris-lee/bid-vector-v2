@@ -433,3 +433,66 @@ describe('설정 — 범위 밖 자리', () => {
     expect(notReady.textContent).toContain('알림 채널');
   });
 });
+
+/**
+ * 「한 번에 하나」의 술어 — **진행 중**인 세션만 다른 칸을 닫는다(M7/7E-2b r2·r3).
+ *
+ * 이 축은 마법사와 설정이 **같은 한 줄**을 쓰는데 r2 까지 세는 자리가 마법사 쪽뿐이었다
+ * (v·CR r3 L-3): 그 줄을 「열린 세션」으로 되돌리는 변이가 전건을 초록으로 지났다. 여기가 그
+ * 변이를 붉히는 자리다.
+ */
+describe('설정 — 다른 칸의 「고치기」가 닫히는 조건', () => {
+  function fixButton(field: string): HTMLButtonElement {
+    return within(screen.getByTestId(`strategy-row-${field}`)).getByRole('button', {
+      name: '고치기',
+    }) as HTMLButtonElement;
+  }
+
+  /** 값 단계까지 밀어 **확인을 기다리는** 세션 하나를 만든다. */
+  async function toConfirmation(): Promise<void> {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    await screen.findByRole('button', { name: '적용' });
+  }
+
+  it('진행 중이면 다른 칸의 고치기가 닫힌다', async () => {
+    await toConfirmation();
+
+    expect(fixButton('CANDIDATE_LIMIT').disabled).toBe(true);
+    expect(screen.queryByTestId('edit-session-dismiss')).toBeNull();
+  });
+
+  it('서버가 끝낸 세션이면 다시 열리고 패널에 닫기가 선다', async () => {
+    await toConfirmation();
+    mocked.confirmEditSession.mockRejectedValue(new ApiError(409, 'SESSION_EXPIRED'));
+    mocked.readEditSession.mockResolvedValue(session({ state: 'EXPIRED' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    await waitFor(() => expect(fixButton('CANDIDATE_LIMIT').disabled).toBe(false));
+    expect(await screen.findByTestId('edit-session-dismiss')).toBeTruthy();
+  });
+
+  /** 다시 열린 뒤 새 세션을 시작하면 **패널은 하나**이고 잠금이 다시 선다. */
+  it('끝난 세션 뒤에 새 세션을 시작하면 패널이 하나이고 다시 잠긴다', async () => {
+    await toConfirmation();
+    mocked.confirmEditSession.mockRejectedValue(new ApiError(409, 'SESSION_EXPIRED'));
+    mocked.readEditSession.mockResolvedValue(session({ state: 'EXPIRED' }));
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    await waitFor(() => expect(fixButton('CANDIDATE_LIMIT').disabled).toBe(false));
+
+    mocked.beginEditSession.mockResolvedValue(session({ sessionId: 'sess-2', field: 'CANDIDATE_LIMIT' }));
+    fireEvent.click(fixButton('CANDIDATE_LIMIT'));
+
+    await waitFor(() => expect(mocked.beginEditSession).toHaveBeenLastCalledWith({ field: 'CANDIDATE_LIMIT' }));
+    await waitFor(() => expect(screen.queryByTestId('edit-session-dismiss')).toBeNull());
+    expect(screen.getAllByTestId('edit-session')).toHaveLength(1);
+    expect(fixButton('MAX_ACTIVE_BIDS').disabled).toBe(true);
+  });
+});
