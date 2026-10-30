@@ -10,8 +10,8 @@ import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
+import bidvector.app.wiring.operatorTradeNameOf
 import bidvector.settlement.AwardMatchingPolicyData
-import bidvector.settlement.OperatorTradeName
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
@@ -22,14 +22,14 @@ import bidvector.workflow.opening.ReadOpeningResult
 import bidvector.workflow.result.ReadMyBidResults
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
+import java.time.Instant
+import java.time.LocalDate
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.core.Ordered
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지
@@ -237,12 +237,8 @@ open class HttpTestApplication {
             bids = fakeRecordedBids,
             openingFacts = fakeBatchOpeningFacts,
             winnerNames = fakeAwardWinnerNames,
-            operatorNames = { account ->
-                inMemoryBusinessProfileStore
-                    .details(account)
-                    .tradeName
-                    ?.let { OperatorTradeName.Declared(it.raw) } ?: OperatorTradeName.NotDeclared
-            },
+            // 출하 조립과 **같은 함수**다(r1 v M-1) — 사본을 두면 그 사상이 측정 밖에 남는다.
+            operatorNames = operatorTradeNameOf(inMemoryBusinessProfileStore),
             clock = clock,
             openingPolicy = OPENING_PROGRESS_POLICY,
             matchingPolicy = AwardMatchingPolicyData(listOf("주식회사", "(주)")),
