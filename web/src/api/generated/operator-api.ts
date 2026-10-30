@@ -714,6 +714,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/onboarding-checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 시작하기 체크리스트 — 항목별 진행 상태를 **서버가 판정한다**(M7/7C④-3)
+         * @description 세 목록이다(D-7C4C-8): 완료 · 미완 · **선행 대기**(`awaiting`). 클라이언트가 항목의 적용 여부나 완료 여부를 추론하지 않는다 — 요구표 A 「체크리스트 진행 상태」가 서버 판정을 요구한다.
+         *
+         *     `awaiting` 은 「이 항목이 걸리는지가 **선행 항목의 답에 달려 있다**」는 상태이고, 짝으로 그 선행 항목을 함께 싣는다. 완료로도 미완으로도 세지 않는다 — 진행률의 분자에도 분모에도 들지 않는다(막지도 채우지도 않는다, D-7C4-2).
+         *
+         *     **어느 목록에도 없는 항목은 「해당 없음」이다**(그 계정에 걸리지 않는다 — 예: 공사로 입찰하지 않는 계정의 시평액). 어휘가 닫혀 있으므로 클라이언트는 세 목록의 여집합으로 그것을 안다. 항목 순서는 체크리스트 선언 순서다(서버가 정한다).
+         *
+         *     진행 상태를 저장하지 않는다(D-7C4-1 P1) — 매 요청이 저장된 원천에서 다시 판정하므로 원천과 어긋난 둘째 사본이 없다.
+         */
+        get: operations["readOnboardingChecklist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -1290,6 +1316,19 @@ export interface components {
         };
         RemoveConstructionCapacityRequest: {
             licenseName: string;
+        };
+        OnboardingChecklist: {
+            /** @description 걸리면서 **완료된** 항목. 선언 순서를 유지한다. */
+            completed: ("TRADE_NAME" | "NARA_READINESS" | "BUSINESS_TYPES" | "LICENSES" | "HEADQUARTERS_REGION" | "CONSTRUCTION_CAPACITY" | "BUDGET_RANGE" | "WATCH_CONDITIONS")[];
+            /** @description 걸리지만 **아직 완료되지 않은** 항목. 선언 순서를 유지한다. */
+            pending: ("TRADE_NAME" | "NARA_READINESS" | "BUSINESS_TYPES" | "LICENSES" | "HEADQUARTERS_REGION" | "CONSTRUCTION_CAPACITY" | "BUDGET_RANGE" | "WATCH_CONDITIONS")[];
+            /** @description **선행 대기** — 항목이 걸리는지가 선행 항목의 답에 달려 있다. 완료·미완 어느 목록에도 들지 않고 진행률에도 들어가지 않는다. 짝을 자리로 묶지 않고 한 object 로 낸다 (스칼라 배열 둘로 내면 길이가 어긋난 응답이 표현 가능해진다, D-7C4C-1). */
+            awaiting: {
+                /** @enum {string} */
+                item: "TRADE_NAME" | "NARA_READINESS" | "BUSINESS_TYPES" | "LICENSES" | "HEADQUARTERS_REGION" | "CONSTRUCTION_CAPACITY" | "BUDGET_RANGE" | "WATCH_CONDITIONS";
+                /** @enum {string} */
+                prerequisite: "TRADE_NAME" | "NARA_READINESS" | "BUSINESS_TYPES" | "LICENSES" | "HEADQUARTERS_REGION" | "CONSTRUCTION_CAPACITY" | "BUDGET_RANGE" | "WATCH_CONDITIONS";
+            }[];
         };
         ErrorBody: {
             /** @enum {string} */
@@ -3775,6 +3814,44 @@ export interface operations {
             };
             /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readOnboardingChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 세 목록(완료 · 미완 · 선행 대기 짝) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingChecklist"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(체크리스트는 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

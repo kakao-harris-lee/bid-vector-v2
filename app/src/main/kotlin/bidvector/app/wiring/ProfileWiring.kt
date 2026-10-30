@@ -6,12 +6,14 @@ import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.profile.BusinessProfileStorePort
 import bidvector.workflow.profile.ListConstructionCapacitiesUseCase
+import bidvector.workflow.profile.ReadOnboardingChecklistUseCase
 import bidvector.workflow.profile.ReadProfileUseCase
 import bidvector.workflow.profile.RemoveConstructionCapacityUseCase
 import bidvector.workflow.profile.ReplaceBusinessDetailsUseCase
 import bidvector.workflow.profile.ReplaceQualificationFactsUseCase
 import bidvector.workflow.profile.UpsertConstructionCapacityUseCase
 import bidvector.workflow.strategy.Clock
+import bidvector.workflow.strategy.StrategyReader
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import javax.sql.DataSource
@@ -56,6 +58,30 @@ open class ProfileWiring {
     open fun listConstructionCapacitiesUseCase(
         businessProfileStore: BusinessProfileStorePort,
     ): ListConstructionCapacitiesUseCase = ListConstructionCapacitiesUseCase(businessProfileStore)
+
+    /**
+     * 체크리스트 조회(M7/7C④-3) — **이 조립에 두는 자리가 정해져 있다.**
+     * `ProfileAssemblyBoundaryTest` 가 「V22 타입에 의존하는 `app.wiring` class 는 [ProfileWiring]
+     * 하나」를 집합으로 재므로, 체크리스트 전용 조립을 새로 만들면 그 게이트가 붉다.
+     *
+     * 이 빈이 전략 읽기를 받는 것은 판정의 입력이라서다(감시 금액대 · 관심 업종) — 쓰기 port 가 아니다.
+     *
+     * **비활성화 경로**: 이 빈을 빼면 체크리스트 경로만 사라진다(컨트롤러가 use case 를 요구하므로
+     * 기동이 실패한다) — 프로필 operation 여섯은 그대로 산다.
+     */
+    @Bean
+    open fun readOnboardingChecklistUseCase(
+        operatorProfilePort: OperatorProfilePort,
+        businessProfileStore: BusinessProfileStorePort,
+        strategyReader: StrategyReader,
+        clock: Clock,
+    ): ReadOnboardingChecklistUseCase =
+        ReadOnboardingChecklistUseCase(
+            qualification = operatorProfilePort,
+            business = businessProfileStore,
+            strategies = strategyReader,
+            clock = clock,
+        )
 
     @Bean
     open fun replaceQualificationFactsUseCase(

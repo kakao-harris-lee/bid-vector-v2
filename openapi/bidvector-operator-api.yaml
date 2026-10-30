@@ -2276,6 +2276,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/onboarding-checklist:
+    get:
+      operationId: readOnboardingChecklist
+      summary: 시작하기 체크리스트 — 항목별 진행 상태를 **서버가 판정한다**(M7/7C④-3)
+      description: >-
+        세 목록이다(D-7C4C-8): 완료 · 미완 · **선행 대기**(`awaiting`). 클라이언트가 항목의 적용
+        여부나 완료 여부를 추론하지 않는다 — 요구표 A 「체크리스트 진행 상태」가 서버 판정을 요구한다.
+
+
+        `awaiting` 은 「이 항목이 걸리는지가 **선행 항목의 답에 달려 있다**」는 상태이고, 짝으로 그
+        선행 항목을 함께 싣는다. 완료로도 미완으로도 세지 않는다 — 진행률의 분자에도 분모에도 들지
+        않는다(막지도 채우지도 않는다, D-7C4-2).
+
+
+        **어느 목록에도 없는 항목은 「해당 없음」이다**(그 계정에 걸리지 않는다 — 예: 공사로 입찰하지
+        않는 계정의 시평액). 어휘가 닫혀 있으므로 클라이언트는 세 목록의 여집합으로 그것을 안다.
+        항목 순서는 체크리스트 선언 순서다(서버가 정한다).
+
+
+        진행 상태를 저장하지 않는다(D-7C4-1 P1) — 매 요청이 저장된 원천에서 다시 판정하므로 원천과
+        어긋난 둘째 사본이 없다.
+      security:
+        - browserSession: []
+      responses:
+        "200":
+          description: 세 목록(완료 · 미완 · 선행 대기 짝)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingChecklist"
+        "401":
+          description: "인증 실패 또는 **계정 주체가 아닌 인증**(체크리스트는 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /{unmatched}:
     get:
       operationId: unmatchedPath
@@ -3791,6 +3833,49 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+    # M7/7C④-3 — **이 계약의 유일한 깊이 1 object**(`awaiting` 의 아이템). 계약 게이트의 평탄
+    # 술어가 D-7C4C-6 으로 그 한 겹까지 허용한다: 그 object 의 속성은 전부 스칼라여야 하고 키는
+    # `type`·`properties`·`required`·`description` 안이어야 한다. 깊이 2 · 자유 맵 · 합성 어휘 ·
+    # `$ref` 는 여전히 거부다 — 그래서 항목 어휘를 공유 스키마로 빼지 않고 **네 자리에 인라인**
+    # 한다(`$ref` 가 깊이를 숨기는 길이라 술어가 막는다). 네 벌이 갈리지 않는 근거는 Kotlin
+    # `OnboardingItem` 과의 양방향 등식 test 다(`OpenApiOnboardingChecklistContractTest`).
+    OnboardingChecklist:
+      type: object
+      required:
+        - completed
+        - pending
+        - awaiting
+      properties:
+        completed:
+          type: array
+          description: 걸리면서 **완료된** 항목. 선언 순서를 유지한다.
+          items:
+            type: string
+            enum: [TRADE_NAME, NARA_READINESS, BUSINESS_TYPES, LICENSES, HEADQUARTERS_REGION, CONSTRUCTION_CAPACITY, BUDGET_RANGE, WATCH_CONDITIONS]
+        pending:
+          type: array
+          description: 걸리지만 **아직 완료되지 않은** 항목. 선언 순서를 유지한다.
+          items:
+            type: string
+            enum: [TRADE_NAME, NARA_READINESS, BUSINESS_TYPES, LICENSES, HEADQUARTERS_REGION, CONSTRUCTION_CAPACITY, BUDGET_RANGE, WATCH_CONDITIONS]
+        awaiting:
+          type: array
+          description: >-
+            **선행 대기** — 항목이 걸리는지가 선행 항목의 답에 달려 있다. 완료·미완 어느 목록에도
+            들지 않고 진행률에도 들어가지 않는다. 짝을 자리로 묶지 않고 한 object 로 낸다
+            (스칼라 배열 둘로 내면 길이가 어긋난 응답이 표현 가능해진다, D-7C4C-1).
+          items:
+            type: object
+            required:
+              - item
+              - prerequisite
+            properties:
+              item:
+                type: string
+                enum: [TRADE_NAME, NARA_READINESS, BUSINESS_TYPES, LICENSES, HEADQUARTERS_REGION, CONSTRUCTION_CAPACITY, BUDGET_RANGE, WATCH_CONDITIONS]
+              prerequisite:
+                type: string
+                enum: [TRADE_NAME, NARA_READINESS, BUSINESS_TYPES, LICENSES, HEADQUARTERS_REGION, CONSTRUCTION_CAPACITY, BUDGET_RANGE, WATCH_CONDITIONS]
     ErrorBody:
       type: object
       required:
