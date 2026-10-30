@@ -131,7 +131,7 @@ RTL 의 `rerender` 로 바꾼 뒤에야 변이가 붉어졌다. ⓑ 중복 접�
 | W-11 | `npm run test:e2e` | 0 |
 | W-12 | `./gradlew --no-daemon :app:bootJar` | 0 |
 | W-13 | `npm run test:e2e:journey` | 0 — **8 passed**(34.7s) |
-| check | `./gradlew --no-daemon check qualityBaseline` | **0** — evidence 최종 HEAD 에서 재실측: `BUILD SUCCESSFUL in 20s` · 392 task(35 실행 · 357 up-to-date). 첫 전건은 `BUILD SUCCESSFUL in 30m 31s`(401 task · 226 실행 · 136 from cache)였다 |
+| check | `./gradlew --no-daemon check qualityBaseline` | **0** — evidence 최종 HEAD 에서 재실측: `BUILD SUCCESSFUL in 20s` · 392 task(35 실행 · 357 up-to-date) · `:leakPatternGate` 가 그 목록에 **있다**. 첫 전건은 `BUILD SUCCESSFUL in 30m 31s`(401 task · 226 실행 · 136 from cache)였다 |
 
 **20s·357 up-to-date 가 「안 돌았다」가 아님을 따로 쟀다**(「초록인데 조용하다」 규율). 이 slice 가
 r1 에서 고친 것은 `web/**` 과 evidence 뿐이므로 Kotlin task 가 up-to-date 인 것은 맞지만, **입력이

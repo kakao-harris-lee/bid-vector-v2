@@ -13,16 +13,14 @@ base **`fa5ca096`**(착수 계약의 base 그대로 — 이 slice 의 base 는 �
 in_scope 와 겹치는 것은 **`web/src/api/generated/operator-api.ts` 하나**이고 이 slice 는 그
 파일을 **읽기만 했다**(복원·삭제 목록에 없다). 그래서 병합이 되돌림의 기준을 바꾸지 않는다.
 
-**실측 HEAD**: `ac12aebd`. 이 slice 의 **마지막 산출물 커밋은 `16c4384f`** 이고 그 뒤
-(`16c4384f..ac12aebd`)의 **산출물 경로 변경이 0 건**이라, 어느 쪽을 기준으로 봐도 되돌림 대상이
-움직이지 않았다(그 뒤는 evidence 커밋뿐이고 evidence 는 아래 목록에 들어가지 않는다).
+**실측 HEAD**: `03b25ecd` — 판정 SHA 와 같다(이 라운드의 evidence 커밋이 마지막이다).
 
-**실측을 세 번 돌렸고 앞 값을 옮기지 않았다**(`d9e19097` → `c89219a6` → `ac12aebd`). 둘째는
-등록부(`web/config/gate-tests.txt` — 복원 목록 안의 파일)에 한 줄이 더해져서, 셋째는 **r1 수정
-라운드**가 파일을 더하고 고쳐서다. 계수가 라운드마다 바뀌었다: 복원 11 → 11 → **13** · 삭제
-16 → 16 → **17**(새 파일은 `web/src/api/queryKeys.ts` 하나, 고쳐진 둘은 `TodayNoticesScreen`·
-`WorksheetScreen` — 질의 키를 한 자리로 모으며 7E-1 의 화면 둘도 그 함수를 쓰게 됐다).
-**라운드마다 재산출하는 이유가 이것이다.**
+**실측을 네 번 돌렸고 앞 값을 옮기지 않았다**(`d9e19097` → `c89219a6` → `ac12aebd` → `03b25ecd`).
+둘째는 등록부(`web/config/gate-tests.txt` — 복원 목록 안의 파일)에 한 줄이 더해져서, 셋째는 **r1
+수정 라운드**가 파일을 더하고 고쳐서, 넷째는 **승인 전 일괄**이 다시 고쳐서다. 계수가 라운드마다
+바뀌었다: 복원 11 → 11 → **13** → 13 · 삭제 16 → 16 → **17** → 17. 승인 전 일괄은 **새 파일을
+더하지 않고** 이미 목록 안의 파일만 고쳤으므로 계수가 그대로이지만, 그래도 값을 옮기지 않고 다시
+쟀다 — **라운드마다 재산출하는 이유가 이것이다**(계수가 같다는 것은 측정 뒤에 아는 사실이다).
 
 목록은 **기계 산출**이다: `git diff --name-status fa5ca096..HEAD -- web .github tools`
 (evidence 제외). 라운드마다 재산출한다.
@@ -91,7 +89,7 @@ rm -f \
 | ② | 복원·삭제 계수 | 복원 **13**(전부 `M`) · 삭제 **17**(전부 `A`) · porcelain **30**(= 13 `M` + 17 `D`) |
 | ③ | 되돌린 트리가 기준과 같은가 | **트리 해시로 본다**(종료 코드가 아니다): 삭제를 index 에 반영한 뒤 `write-tree` 의 `web` 하위 트리 == **base 의 그것**(`f37d3922…`) — 동일. **내 표지 열둘**(`BidBoxScreen`·`SettingsScreen`·`bidBoxDisplay`·`editSessionDisplay`·`profileDisplay`·`StrategySection`·`ProfileSection`·`assertDistRoot`·`specifierResolvesTo`·`SYN-7E2-BIDBOX`·`strategy-row`·`settings.spec`) **각각 0**. **남의 표지 축은 비어 있다** — 공유 파일 변경이 0 건이라 되돌릴 경로에 남의 줄이 없다 |
 | ④ | compile | `npm ci` **0** · `typecheck` **0** |
-| ⑤ | test | `vitest` **0** — 7A·7D·7E-1 의 **14 파일 230 test** 로 돌아갔다. 이 slice 가 더한 **164 test**(6 파일)가 그만큼 사라졌다(20 파일 394 → 14 파일 230) |
+| ⑤ | test | `vitest` **0** — 7A·7D·7E-1 의 **14 파일 230 test** 로 돌아갔다. 이 slice 가 더한 **174 test**(6 파일)가 그만큼 사라졌다(20 파일 404 → 14 파일 230) |
 | ⑥ | 게이트 | `lint` · `gate:src-tree` · `api:types:check` · `gate:tests` · `build` · `gate:boundary-canary` **전부 0** · 7A 의 셸 스모크 **0** |
 | ⑦ | 되돌린 뒤 base 와 남는 차이 | **in_scope 경로 0 건.** 전체로 남는 **다섯**은 전부 evidence 다 — 이 slice 의 넷(`scope.md`·`checklist.md`·`commands.md`·이 파일)과 7E-1 checklist 의 종결 표시(evidence 는 목록 밖 — 위 머리의 사유) |
 
