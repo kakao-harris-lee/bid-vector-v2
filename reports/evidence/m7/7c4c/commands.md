@@ -14,6 +14,8 @@ base `fa5ca096` · 병합된 main 고정 SHA **`ea91d753`**(PR #105 7E-2 머지)
 | A-3 | 같은 명령 (fixture 를 깊이 2 로 내린 뒤) | 0 | 13 tests, 0 failed |
 | A-4 | `./gradlew --no-daemon :app:sizeGate` | 0 | 확장 직후 `OpenApiContractTest` 가 **정확히 500/500 줄**(한도 500) — 대조를 자기 class 로 가른 사유 |
 | A-5 | `./gradlew --no-daemon :app:test --tests '…OpenApiContractTest' --tests '…OpenApiFlatnessControlTest'` | 0 | 11 + 2 = 13 — 가르기 전 수와 같다(단언 유실 0) |
+| A-6 | 같은 명령 (r2 — 배열 래퍼 대조 선행 커밋) | 1 | 3 tests, 1 failed — 래퍼의 `nullable`·미지 키가 통과하던 자리가 RED |
+| A-7 | 같은 명령 (r2 — 래퍼 키 허용 목록 단독 커밋 뒤) | 0 | 술어 대조 3 · 계약 11 · 체크리스트 계약 6, 전부 0 failed |
 
 **A-2·A-3 의 수를 정정했다**(r1 CR LOW): 앞 판은 **14** 로 적었는데 그 수의 출처가 test 실행기가 아니라
 결과 XML 의 줄 계수였다(`grep -c` 로 센 값이고 닫는 태그를 함께 셌다). 실행기 로그와 그 커밋들의 `@Test`
@@ -41,6 +43,10 @@ r2 의 배열 래퍼 허용 목록을 넣은 뒤에도 같다. 재현은 `OpenAp
 각 행은 「변이 적용 → 표적 실행 → `git checkout --` 되돌림 → 트리 깨끗」을 한 번에 돈다. 산출물이
 모두 커밋된 상태에서만 돌렸다(미커밋 작업을 되돌림이 지우지 않게).
 
+**컴파일되지 않은 변이는 세지 않는다.** r2 의 M9 첫 판은 자격 없는 이름을 써서 `Unresolved reference`
+로 떨어졌고 — 그것은 「거동 0」이 아니라 「빌드 0」이라 아무것도 재지 못한다 — 전체 한정 이름으로 고쳐
+다시 걸었다. 표의 M9 는 **컴파일된** 판의 결과다.
+
 | 변이 | 무엇을 바꿔치웠나 | 결과 | 잡은 test |
 | --- | --- | --- | --- |
 | M1 | 깊이 1 층 술어가 자기 대신 **전체 술어**를 부른다(깊이 N) | RED 1/2 | 술어 대조 — 양성 |
@@ -50,6 +56,8 @@ r2 의 배열 래퍼 허용 목록을 넣은 뒤에도 같다. 재현은 `OpenAp
 | M5 | 세 상태를 **두 상태로 접는다**(`awaiting` → `pending`) | RED 1/5 | endpoint — 「세 목록이 wire 에서 갈라진다」 |
 | M6 | `ROOTS` 에서 체크리스트 뿌리 제거(등재 망각) | RED 1/5 | 보안 계약 — 「자격 헤더 대안을 남긴다」 |
 | M7 | 미완 목록을 **정렬**(선언 순서 파괴) | RED 2/5 | endpoint — 세 목록 · 전이 둘 |
+| M8 (r2) | 배열 래퍼 검사를 **허용 목록 → 옛 차단 목록**으로 되돌린다 | RED 1/3 | 술어 대조 — 「배열 래퍼의 nullable 과 미지 키도 거부한다」 |
+| M9 (r2) | use case 가 전략 읽기 실패를 **삼키고** 빈 규칙을 쓴다 | RED 1/6 | endpoint — 「저장된 전략이 무효면 500 이고 사유 코드가 실린다」 |
 
 음성 대조(변이 없는 트리)는 B-2 가 같은 class 들에서 0 failed 다.
 
@@ -62,6 +70,9 @@ r2 의 배열 래퍼 허용 목록을 넣은 뒤에도 같다. 재현은 `OpenAp
 | D-3 | `./gradlew --no-daemon :app:ktlintTestSourceSetCheck` | 0 | 정정 확인 |
 | D-4 | `./gradlew --no-daemon check qualityBaseline` (**main `ea91d753` 병합 뒤**) | 0 | **BUILD SUCCESSFUL 27m 39s** · FAILED 0 |
 | D-5 | `./gradlew --no-daemon qualityBaseline --rerun` | 0 | D-4 에서 UP-TO-DATE 였으므로 **실제 실행**으로 다시 측정 |
+| D-6 | `./gradlew --no-daemon check qualityBaseline` (r2 1 회차) | 1 | `:workflow:ktlintMainSourceSetCheck` 하나 — **test 실패 0**. 구역 상수를 `private` 로 좁히자 파일이 class 하나만 담게 되어 filename 규칙이 걸렸다 |
+| D-7 | 같은 명령 (파일명을 class 이름으로 고친 뒤) | 0 | **BUILD SUCCESSFUL 27m 31s** · FAILED 0 |
+| D-8 | `./gradlew --no-daemon qualityBaseline leakPatternGate --rerun` | 0 | D-7 에서 UP-TO-DATE 였던 둘을 **실제 실행**으로 재측정 |
 
 **D-1·D-2 가 이 slice 의 핵심 교훈이다**: 표적 실행 7 class 가 초록인 상태에서 전건이 셋을 잡았다
 (detekt · 출하 조립 census · ktlint). 「부분 게이트는 안 돌린 것과 같다」가 두 라운드로 실증됐다.
@@ -88,6 +99,11 @@ r2 의 배열 래퍼 허용 목록을 넣은 뒤에도 같다. 재현은 `OpenAp
 
 생성 타입은 `npm run api:types` 재생성으로만 바뀌었다(손편집 0) — 병합 뒤 재생성이 **아무 바이트도
 바꾸지 않았다**(7E-2 가 계약·생성 타입을 만지지 않았다).
+
+**r2 에서 W-1~W-11 을 다시 돌렸다**(계약 문면이 바뀌어 생성 타입이 따라 바뀌었다): 전부 exit 0 ·
+단위 406 · 스모크 2 · 바이트 등식 **174196**. W-12·W-13 은 r1 에서 측정한 값이 그대로 유효하다 —
+그 뒤 바뀐 것은 계약 문면 한 줄과 test·게이트 목록이고 여정이 지나는 경로(수집 → 저장 → API → 화면)의
+코드가 아니다.
 
 ## F. 비밀값 스캔
 

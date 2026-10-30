@@ -1,7 +1,8 @@
 # M7/7C④-3 되돌리기 — 시작하기 체크리스트 operation
 
-**실측 HEAD: `96aa9f10`**(main `ea91d753` 병합 커밋). 산출물 커밋의 마지막은 `708c9f60` 이고 그 뒤는
-병합과 evidence 뿐이라, 되돌림 대상 경로는 이 HEAD 와 판정 SHA 사이에서 움직이지 않는다.
+**실측 HEAD: `d7d4cdac`**(r1 수정 라운드의 마지막 산출물 커밋 — use case 파일명 정정). 그 뒤는 evidence
+뿐이라 되돌림 대상 경로는 이 HEAD 와 판정 SHA 사이에서 움직이지 않는다(verifier 의 유효성 술어가 그것을
+빈 출력으로 확인한다). r1 의 실측(`96aa9f10`)은 **버린다** — 목록의 이름 하나가 바뀌었다.
 
 ## 복원 기준 — base 가 아니라 **병합된 main 고정 SHA**
 
@@ -29,8 +30,10 @@ revert** 다 — 머지 순간 같은 복원은 아무것도 지우지 않으면
   `m7-screen-data-requirements.md` · `bidvector-operator-api.yaml` · `operator-api.ts`
 - **A(삭제) 7** — `OnboardingChecklistController.kt` · `OnboardingChecklistResponses.kt` ·
   `OnboardingChecklistEndpointTest.kt` · `OpenApiFlatnessControlTest.kt` ·
-  `OpenApiOnboardingChecklistContractTest.kt` · `OnboardingChecklistUseCase.kt` ·
+  `OpenApiOnboardingChecklistContractTest.kt` · **`ReadOnboardingChecklistUseCase.kt`** ·
   `ReadOnboardingChecklistUseCaseTest.kt`
+  (r1 에서는 그 use case 파일이 `OnboardingChecklistUseCase.kt` 였다 — r2 가 class 이름으로 고쳤고
+  **목록은 라운드마다 재산출한다**는 규칙이 바로 이런 자리를 위한 것이다. 수는 그대로 A 7 · M 12.)
 
 **되돌리지 않는 것**: `reports/evidence/m7/7c4c/**`(이 slice 의 기록) · 하네스 경로(`CLAUDE.md` ·
 `.claude/**` — 이 range 에 변경 0).
@@ -53,8 +56,13 @@ git rm -f <A 7 경로를 개별 인자로>
 | ② 명령 | `restore` **exit 0** · `rm` **exit 0** |
 | ③ 계수 | HEAD 대비 **D 7 · M 12**(= 산출물 19). `ea91d753` 대비 in_scope **잔여 diff 0 줄** |
 | ③-b 남의 줄 보존 | 7C②-b 의 표지가 남는다 — 계약 문서의 근거 상태 어휘 **4**, 정책 목록의 운반 타입 **2** |
-| ③-c 내 표지 0 | `AwaitingItemResponse` 0 · `onboarding-checklist` 0 · `DEPTH_ONE_OBJECT_KEYS` 0 |
-| ④ compile · ⑤ test · ⑥ 게이트 | **전건 `./gradlew --no-daemon check` BUILD SUCCESSFUL 27m 11s · FAILED 0** |
+| ③-c 내 표지 0 | `AwaitingItemResponse` 0 · `onboarding-checklist` 0 · `DEPTH_ONE_OBJECT_KEYS` 0 · `DEPTH_ONE_ARRAY_KEYS` 0 · 파일 자체 없음 |
+| ④ compile · ⑤ test · ⑥ 게이트 | **전건 `./gradlew --no-daemon check --rerun-tasks` BUILD SUCCESSFUL 29m 55s · FAILED 0** |
+
+**`--rerun-tasks` 로 돌린 이유**: 캐시를 쓴 첫 실행은 31초에 끝났고 `:app:test`·`:workflow:test`·
+`:adapters:test` 가 전부 **FROM-CACHE** 였다. 입력 해시가 같다는 것은 그 자체로 뜻이 있지만, 되돌린
+트리에서 test 가 **돌았다**는 주장을 캐시 키 위에 세우지 않으려고 강제 실행으로 다시 쟀다 —
+그 실행에서 test task 셋이 모두 실제로 돌았다(`FROM-CACHE` 표기 없음).
 
 **완료 판정은 종료 코드가 아니라 계수다.** ③-b 와 ③-c 가 「내 표지 0 · 남의 표지 보존」을 둘 다 센다.
 
