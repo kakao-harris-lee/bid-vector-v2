@@ -10,15 +10,22 @@ base `fa5ca096` · 병합된 main 고정 SHA **`ea91d753`**(PR #105 7E-2 머지)
 | # | 명령 | exit | 핵심 결과 |
 | --- | --- | --- | --- |
 | A-1 | `./gradlew --no-daemon :app:test --tests '…OpenApiContractTest'` (대조 선행 커밋) | 1 | 13 tests, 1 failed — `awaiting` 짝 배열 음성 대조가 RED |
-| A-2 | 같은 명령 (술어 확장 단독 커밋 직후) | 1 | 14 tests, 1 failed — **D-6A1-44 위치 폐쇄 test** 가 RED(확장이 그 fixture 를 정당한 모양으로 만들었다) |
-| A-3 | 같은 명령 (fixture 를 깊이 2 로 내린 뒤) | 0 | 14 tests, 0 failed |
+| A-2 | 같은 명령 (술어 확장 단독 커밋 직후) | 1 | 13 tests, 1 failed — **D-6A1-44 위치 폐쇄 test** 가 RED(확장이 그 fixture 를 정당한 모양으로 만들었다) |
+| A-3 | 같은 명령 (fixture 를 깊이 2 로 내린 뒤) | 0 | 13 tests, 0 failed |
 | A-4 | `./gradlew --no-daemon :app:sizeGate` | 0 | 확장 직후 `OpenApiContractTest` 가 **정확히 500/500 줄**(한도 500) — 대조를 자기 class 로 가른 사유 |
 | A-5 | `./gradlew --no-daemon :app:test --tests '…OpenApiContractTest' --tests '…OpenApiFlatnessControlTest'` | 0 | 11 + 2 = 13 — 가르기 전 수와 같다(단언 유실 0) |
 
+**A-2·A-3 의 수를 정정했다**(r1 CR LOW): 앞 판은 **14** 로 적었는데 그 수의 출처가 test 실행기가 아니라
+결과 XML 의 줄 계수였다(`grep -c` 로 센 값이고 닫는 태그를 함께 셌다). 실행기 로그와 그 커밋들의 `@Test`
+수는 **13** 이다(`fa5ca096` 11 → 대조 둘을 더해 13 → 가르기 뒤 11+2). 커밋 `61837348` 의 메시지에도 같은
+14 가 있고 **이력은 되쓰지 않는다** — 정본은 이 줄이다. 가르기에서 단언이 유실되지 않았다는 주장은 수가
+아니라 A-5 의 등식(11+2 = 13)과 본문 이동 diff 가 진다.
+
 **확장으로 새로 통과하는 모양의 전수**(D-7C4C-2 조건): 스키마 39 · 속성 정의 241 · 옛 술어 거부 0 ·
-**새로 통과 0 · 새로 거부 0**. base `fa5ca096` 와 병합된 `87cf6a06` 두 spec 에서 같은 값이다
-(`87cf6a06` 가 더한 어휘 항목은 스칼라 분기라 object 분기와 만나지 않는다). 재현은
-`reports/evidence/m7/7c4c/` 밖 도구 없이 `OpenApiContractTest` 의 전수 단언 하나가 진다 —
+**새로 통과 0 · 새로 거부 0**. base **`fa5ca096`** 와 병합된 main **`ea91d753`** 두 spec 에서 같은
+값이고 그 사이 `87cf6a06` 도 같다(그 머지가 더한 어휘 항목은 스칼라 분기라 object 분기와 만나지 않는다).
+**head 에서는** 스키마 41 · 속성 246 · 새로 통과 **1**(이 slice 의 `awaiting` 하나) · 새로 거부 0 —
+r2 의 배열 래퍼 허용 목록을 넣은 뒤에도 같다. 재현은 `OpenApiContractTest` 의 전수 단언 하나가 진다 —
 「계약의 모든 속성 정의가 평탄한 형태만 쓴다」가 그 0 을 CI 에서 다시 센다.
 
 ## B. 산출물 표적 실행
@@ -100,11 +107,30 @@ F-2 의 셋은 게이트 대상 밖이고 D-4 의 전건이 exit 0 인 것과 �
 | G-1 | `git status --porcelain --` + in_scope 경로를 **개별 인자**로 | 0 | 빈 출력 |
 | G-2 | 양성 대조 — in_scope 파일 하나에 한 줄을 심고 G-1 재실행 | 0 | 그 파일이 `M` 으로 잡힌다. 되돌림은 **비파괴 절삭**(`head -n <원래 줄수>`)이고 `checkout --` 을 쓰지 않았다 |
 
+## I. 설계 검토 (2b) — 새 public 표면 전수 (수정 라운드마다 갱신)
+
+| 표면 | 값 획득 | 경계 |
+| --- | --- | --- |
+| `GET /api/onboarding-checklist` | 세션 계정의 체크리스트 | 계정 주체 없는 인증은 401 · 요청에 계정 인자 자리 0(질의·본문 없음) · 7B 바인딩 가드가 요청 값으로 `AccountId` 를 짓는 길을 전역 차단 |
+| `OnboardingChecklistResponse` · `AwaitingItemResponse` | 없음(커널 값에서만 채운다) | 자유 문자열 칸 0 — 닫힌 enum 이름만 싣는다 |
+| `ReadOnboardingChecklistUseCase` | `AccountId` 인자 하나 | 호출자가 세션 계정만 넘긴다(컨트롤러의 접근자 하나) |
+| `AccountScopedRoutes.ONBOARDING_CHECKLIST` | 없음(선언) | 등재를 잊으면 보안 계약 test 가 RED |
+| `ProfileWiring.readOnboardingChecklistUseCase` 빈 | 주입 넷 | 조립 경계는 `ProfileAssemblyBoundaryTest` 가 집합으로 잰다 |
+
+**r2 에서 하나 줄었다**: `ONBOARDING_CALENDAR_ZONE` 을 `private` 로 좁혔다(읽는 자리가 선언 파일 한 줄
+뿐이었다 — r1 CR LOW). 술어 함수들은 test source set 의 `private`·`internal` 이라 운영 표면이 아니다.
+
 ## H. 알려진 제한
 
-1. **`nullable` 축은 스칼라 쪽에서 그대로 열려 있다.** D-7C4C-6 의 키 허용 목록은 깊이 1 object 의
-   `nullable` 만 닫는다 — `nullable: true` 스칼라 속성은 전과 같이 통과한다(기존 계약이 그 꼴을 쓴다).
-   두 모양을 받는 속성 자체를 닫는 것은 이 slice 의 축이 아니다.
+1. **`nullable` 과 미지 키는 스칼라 층에서 그대로 열려 있다.** 키 허용 목록은 깊이 1 object 와
+   **그 object 를 나르는 배열 래퍼** 둘을 닫는다(r2 가 래퍼를 더했다 — r1 CR M-1 · v L-1). 스칼라 쪽은
+   계약이 범위 밖에 두었으므로(D-7C4C-6) `nullable: true` 스칼라 속성과 `nullable` **스칼라 배열**은
+   전과 같이 통과한다 — 의도된 비대칭이고 대조 test 가 그 두 줄을 직접 적는다. 두 자리를 함께 닫으면
+   기존 계약의 nullable 스칼라가 전부 붉어진다.
+   **같은 관용이 만드는 보장의 한계**(r1 v L-2): 깊이 1 object 의 속성이 `{type: string, properties: …}`
+   처럼 스칼라라고 선언하면서 object 를 품으면 그 안쪽은 술어의 판정 밖이다. 「깊이 2 는 표현할 함수가
+   없다」는 **타입이 정직한 스키마에서** 성립하고, 그 문면을 술어 KDoc 에서 그렇게 좁혔다. 이 관용은
+   D-6A1-38 부터 있던 것이고 이 slice 가 연 자리가 아니다.
 2. **깊이 1 object 는 속성 자리와 배열 아이템 자리에서 **같이** 열렸다**(D-7C4C-2 문면). 자리로 가르지
    않은 이유는 그것이 위치 술어이고 이 저장소가 D-6A1-44 에서 종점 없음을 세 번 겪었기 때문이다.
    오늘 계약에서 쓰는 것은 배열 아이템 한 자리뿐이다.
@@ -117,3 +143,13 @@ F-2 의 셋은 게이트 대상 밖이고 D-4 의 전건이 exit 0 인 것과 �
    가르며 확보했다 — 다음 라운드가 그 파일에 단언을 더할 여지는 그만큼이다.
 6. **「해당 없음」은 응답의 여집합으로만 안다.** 네 번째 목록을 내지 않기로 한 결과이고, 클라이언트가
    어휘 전수를 알아야 성립한다(그 어휘는 계약의 enum 네 자리가 고정한다).
+7. **전략 하나가 무효면 시작하기 화면이 통째로 500 이다**(r1 CR Open Question). 체크리스트 항목 여섯은
+   전략과 무관한데도 막힌다 — 전략을 읽는 형제 operation 들과 같은 fail-closed 이고, 부분 응답을 내는
+   쪽은 「어느 입력이 빠졌는가」를 응답 모양에 새로 들여야 해서 이 slice 의 축이 아니다. 그 사상은
+   endpoint test 가 잠근다(무효 전략 → 500 + `INVALID_STORED_STRATEGY`).
+8. **`properties` 키가 없는 스키마는 술어가 판정하지 않는다**(r1 v 참고 R-1). 루트 자유 맵·루트 배열
+   아래는 순회 표지(`properties`)가 없어 수집되지 않고, 그 아래 한 겹이 이 확장으로 더 들어갈 뿐이다
+   (맵→맵→object 는 옛 술어에서도 통과했다). D-6A1-44 가 고른 표지의 귀결이고 이 slice 의 축이 아니다.
+9. **체크리스트 endpoint 를 출하 조립으로 실제 호출하는 test 는 없다**(r1 v 참고 R-2). HTTP 거동은
+   test 조립(같은 생성자 빈)에서 재고, 출하 조립은 census 가 컨트롤러와 빈의 기동까지만 잰다 —
+   프로필 operation 들과 같은 수준이다.
