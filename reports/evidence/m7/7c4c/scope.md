@@ -62,6 +62,8 @@
 
 - **판정 대상 SHA**: `96aa9f10`(main `ea91d753` 병합 커밋). 산출물 커밋의 마지막은 `708c9f60` 이고
   그 뒤는 병합과 evidence 뿐이다 — rollback 실측 HEAD 도 `96aa9f10` 이다.
+  **r2 갱신**: 판정 대상 SHA **`a2a9a961`** · 마지막 산출물 커밋 `d7d4cdac` · rollback 실측 HEAD `d7d4cdac`
+  (위 r1 줄은 이력이다 — `rollback.md` 가 `96aa9f10` 실측을 버렸다, CR r2 LOW).
 - **하네스 레인 변경: 없음.** `git log --oneline fa5ca096..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다.
   이 range 에는 7C②-b(PR #103)·7E-2(PR #105) 머지가 들어 있으나 **in_scope 경로와 교집합이 0** 이고
   (병합 직전 실측), slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다.
@@ -71,7 +73,7 @@
   `AccountBindingStructureTest`(요청 매핑 선언 집합) **두 게이트의 단일 출처**이고, 등재를 잊으면 둘이
   함께 붉는다(전건 2 회차에서 실측됐다). ② `app.injection.allowed-types` — 짝 응답 타입과 use case
   주입점 둘. 제네릭 인자를 풀어 세는 게이트라 중첩 응답 타입이 생기면 늘어난다.
-- **새로 만든 test class 셋**(in_scope 「체크리스트 test · 계약·보안 test」):
+- **새로 만든 test class 넷**(in_scope 「체크리스트 test · 계약·보안 test」):
   `OpenApiFlatnessControlTest`(술어 대조) · `OpenApiOnboardingChecklistContractTest`(계약·어휘 등식) ·
   `OnboardingChecklistEndpointTest`(HTTP 거동) · `ReadOnboardingChecklistUseCaseTest`(원천·구역).
   넷 다 만든 커밋에서 `config/quality/gate-tests.properties` 에 등재했다.
