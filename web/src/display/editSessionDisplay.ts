@@ -147,10 +147,14 @@ export const SLOT_INPUT = {
  * (생성 타입의 그 칸이 가변 배열이다).
  */
 export function termsOf(raw: string): string[] {
-  return raw
+  const terms = raw
     .split(',')
     .map((one) => one.trim())
     .filter((one) => one !== '');
+  // **중복을 접는다**(CR r1 L-4) — 프로필 자격 사실의 세 배열은 계약이 `uniqueItems: true` 로
+  // 두어 중복이 400 이다. 전략 어휘 쪽은 그 제약이 없지만 중복을 보낼 이유도 없다(같은 조건을
+  // 두 번 세는 것은 운영자의 뜻이 아니다). 첫 등장 순서를 지킨다.
+  return [...new Set(terms)];
 }
 
 /**

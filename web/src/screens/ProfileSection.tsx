@@ -148,8 +148,33 @@ export function ProfileSection() {
   const qualification = qualificationStateOf(current);
   const factsForm = facts ?? factsFormOf(current);
   const detailsForm = details ?? detailsFormOf(current);
-  // 넷 가운데 **지금 실패한 것** 하나. `??` 연쇄는 `null` 을 건너뛰므로 실패가 없으면 `null` 이다.
-  const writeError: unknown = saveFacts.error ?? saveDetails.error ?? saveCapacity.error ?? dropCapacity.error;
+  /**
+   * **운영자가 마지막으로 누른 쓰기** 하나. 앞 판은 고정 우선순위(`saveFacts` → …)의 첫 실패를
+   * 다시 보냈고, 둘이 함께 실패해 있으면 **누르지 않은 쪽**이 갔다(CR r1 L-3). 이제 실패 얼굴과
+   * 그 재전송이 **같은 자리**에서 나온다.
+   *
+   * `submittedAt` 은 react-query 가 그 mutation 에 찍은 마지막 시각이다 — 가장 최근이 운영자가
+   * 누른 것이다.
+   */
+  const failed = [
+    { mutation: saveFacts, retry: () => saveFacts.variables !== undefined && saveFacts.mutate(saveFacts.variables) },
+    {
+      mutation: saveDetails,
+      retry: () => saveDetails.variables !== undefined && saveDetails.mutate(saveDetails.variables),
+    },
+    {
+      mutation: saveCapacity,
+      retry: () => saveCapacity.variables !== undefined && saveCapacity.mutate(saveCapacity.variables),
+    },
+    {
+      mutation: dropCapacity,
+      retry: () => dropCapacity.variables !== undefined && dropCapacity.mutate(dropCapacity.variables),
+    },
+  ]
+    .filter((one) => one.mutation.isError)
+    .sort((a, b) => b.mutation.submittedAt - a.mutation.submittedAt)[0];
+  const writeError: unknown = failed?.mutation.error ?? null;
+  const retry = failed?.retry;
 
   return (
     <section data-testid="settings-profile" className="flex flex-col gap-4">
@@ -160,16 +185,7 @@ export function ProfileSection() {
           what="프로필을 저장하지"
           error={writeError}
           onRetry={() => {
-            // 마지막으로 실패한 쓰기만 다시 보낸다 — 넷을 한꺼번에 재전송하지 않는다.
-            if (saveFacts.isError && saveFacts.variables !== undefined) {
-              saveFacts.mutate(saveFacts.variables);
-            } else if (saveDetails.isError && saveDetails.variables !== undefined) {
-              saveDetails.mutate(saveDetails.variables);
-            } else if (saveCapacity.isError && saveCapacity.variables !== undefined) {
-              saveCapacity.mutate(saveCapacity.variables);
-            } else if (dropCapacity.isError && dropCapacity.variables !== undefined) {
-              dropCapacity.mutate(dropCapacity.variables);
-            }
+            retry?.();
           }}
         />
       )}

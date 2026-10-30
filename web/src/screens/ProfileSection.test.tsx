@@ -181,6 +181,23 @@ describe('프로필 — 쓰기는 계약의 모양을 지킨다', () => {
     expect(body.naraRegisteredFields).toStrictEqual(['CONSTRUCTION']);
   });
 
+  /**
+   * **v r1 L-2 가 잡은 공백.** 폼 초기값을 `UNANSWERED → NOT_REGISTERED` 로 바꾸는 변이(지어낸
+   * 기본 답)가 76/76 으로 통과했다. 출하 코드는 서버 값을 그대로 넘기므로 지금 결함은 아니지만,
+   * 「미응답은 값이다」가 **쓰기 쪽에서도** 서야 한다.
+   */
+  it('미응답인 채 저장하면 본문이 UNANSWERED 다 — 답을 지어내지 않는다', async () => {
+    mocked.readProfile.mockResolvedValue(profile({ naraRegistration: 'UNANSWERED' }));
+    mocked.replaceBusinessDetails.mockResolvedValue(profile());
+    renderSection();
+
+    await screen.findByLabelText('상호');
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+
+    await waitFor(() => expect(mocked.replaceBusinessDetails).toHaveBeenCalled());
+    expect(mocked.replaceBusinessDetails.mock.calls[0]![0].naraRegistration).toBe('UNANSWERED');
+  });
+
   it('상호가 비면 null 로 보낸다 — 공백이 조용히 지우기가 되지 않게', async () => {
     mocked.replaceBusinessDetails.mockResolvedValue(profile());
     renderSection();

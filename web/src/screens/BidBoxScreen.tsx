@@ -13,6 +13,7 @@ import {
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
+import { bidCasesQueryKey } from '../api/queryKeys';
 import { BID_BOX_TABS, tabOf, type BidBoxTabId } from '../display/bidBoxDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
@@ -21,7 +22,7 @@ import { BidBoxCard, type ActionPayload } from './BidBoxCard';
 /** D 는 **실투찰**만 보인다 — 페이퍼(가상) 탭은 SET-03 이 `근거 부족` 이라 만들지 않는다. */
 const BID_KIND: BidCase['bidKind'] = 'REAL';
 
-const QUERY_KEY = ['bid-cases', BID_KIND] as const;
+const QUERY_KEY = bidCasesQueryKey(BID_KIND);
 
 /** 탭 ↔ 패널을 묶는 id 둘. 한 화면에 하나뿐이라 고정 문자열로 둔다. */
 const PANEL_ID = 'bid-box-panel';
@@ -57,15 +58,15 @@ function send({ caseId, payload }: Sent): Promise<BidCase> {
     case 'ENTER_QUALIFICATION_REVIEW':
       return enterQualificationReview(caseId, { documentDueAt: new Date(payload.value).toISOString() });
     case 'RECORD_OUTCOME':
-      // 선택지는 계약 enum 전수에서 왔다 — 이 자리에서 문자열을 검사하지 않는다.
-      return recordOutcome(caseId, { outcome: payload.value as 'WON' | 'LOST' | 'FAILED_OR_REBID' });
+      // 선택지의 값 타입이 **계약 enum 그대로**라 캐스팅이 없다(CR r1 L-8).
+      return recordOutcome(caseId, { outcome: payload.outcome });
     case 'OPEN_WORKSHEET':
       // 화면 이동은 서버를 부르지 않는다 — 이 자리에 닿을 길이 없다(`ActionButton` 이 링크다).
       throw new Error('전이가 아닌 행동이 전송에 닿았다: OPEN_WORKSHEET');
     default: {
       // 종류가 늘면 **이 자리가 컴파일에서 멈춘다** — 기본 분기가 값을 지어내지 않는다.
-      const unreachable: never = payload.kind;
-      throw new Error(`모르는 행동 종류: ${String(unreachable)}`);
+      const unreachable: never = payload;
+      throw new Error(`모르는 행동 종류: ${JSON.stringify(unreachable)}`);
     }
   }
 }
@@ -94,6 +95,9 @@ export function BidBoxScreen() {
       // 그것 자체가 역전이다). 「취소할 수 있다」고 보이면 거짓말이 된다(D-7E-5).
       show({ text: '보냈습니다.' });
       await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // 전이는 타임라인에도 사건을 남긴다 — C 의 쓰기와 **같은 관례**로 그 질의도 무효화한다
+      // (CR r1 L-6: 두 화면의 관례가 갈리면 C 로 돌아갔을 때 낡은 목록을 볼 수 있다).
+      await queryClient.invalidateQueries({ queryKey: ['timeline'] });
       // 상태가 바뀌었으면 그 건이 있는 탭으로 따라간다 — 보낸 뒤 빈 탭을 보지 않게 한다.
       setTab(tabOf(updated.state));
     },

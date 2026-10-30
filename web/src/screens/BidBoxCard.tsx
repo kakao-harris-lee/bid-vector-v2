@@ -1,7 +1,10 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 
+import type { components } from '../api/generated/operator-api';
 import type { BidCase } from '../api/queries';
+
+type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
 import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
@@ -13,10 +16,20 @@ import {
 } from '../display/bidBoxDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
-/** 운영자가 적은 것 — 전이 하나를 보낼 때 실리는 값이다. 빈 문자열은 「아직 고르지 않았다」다. */
-export interface ActionPayload {
-  readonly kind: BidBoxActionKind;
-  readonly value: string;
+/**
+ * 운영자가 적은 것 — 전이 하나를 보낼 때 실리는 값이다.
+ *
+ * **결과 기록만 다른 모양이다**(CR r1 L-8): `outcome` 이 **필수**이고 타입이 계약 enum 그대로다.
+ * 그래서 전송 자리에 캐스팅도 `undefined` 갈래도 없다 — 「결과 기록인데 결과가 없다」가 타입으로
+ * 표현되지 않는다.
+ */
+export type ActionPayload =
+  | { readonly kind: Exclude<BidBoxActionKind, 'RECORD_OUTCOME'>; readonly value: string }
+  | { readonly kind: 'RECORD_OUTCOME'; readonly value: string; readonly outcome: Outcome };
+
+/** 그 선택지 값이 결과 enum 인가 — 개찰 둘은 `'true'`·`'false'` 라 아니다. */
+function isOutcome(value: string): value is Outcome {
+  return value === 'WON' || value === 'LOST' || value === 'FAILED_OR_REBID';
 }
 
 /**
@@ -42,6 +55,16 @@ function ActionForm({
   function send(): void {
     if (value === '') {
       setMissing(true);
+      return;
+    }
+    if (action.kind === 'RECORD_OUTCOME') {
+      // 결과 기록은 **계약 enum 을 그대로** 싣는다 — 고른 선택지의 값이 그 타입이다. 표의
+      // 선택지가 결과 enum 이 아니면 보내지 않는다(그 꼴은 표가 바뀌어야 생긴다).
+      if (!isOutcome(value)) {
+        setMissing(true);
+        return;
+      }
+      onSend({ kind: 'RECORD_OUTCOME', value, outcome: value });
       return;
     }
     onSend({ kind: action.kind, value });
@@ -131,7 +154,15 @@ function ActionButton({
   return (
     <button
       type="button"
-      onClick={() => (shape === 'INSTANT' ? onSend({ kind: action.kind, value: 'instant' }) : onOpen(action))}
+      onClick={() => {
+        // 결과 기록은 표에서 `CHOICE` 라 이 자리에 오지 않는다. 표가 바뀌어 오더라도 **결과 없는
+        // 요청을 보내지 않고** 폼을 연다(타입이 그 요청을 만들 수 없게 돼 있다).
+        if (shape !== 'INSTANT' || action.kind === 'RECORD_OUTCOME') {
+          onOpen(action);
+          return;
+        }
+        onSend({ kind: action.kind, value: 'instant' });
+      }}
       className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink"
     >
       {action.label}

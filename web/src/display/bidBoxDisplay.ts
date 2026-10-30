@@ -143,6 +143,18 @@ export const OVERDUE_DISPLAY = {
   tone: 'bad',
 } as const;
 
+/** 행동이 받아야 하는 입력의 모양. `LINK` 만 서버를 부르지 않는다. */
+export type ActionInputShape = 'LINK' | 'INSTANT' | 'DATETIME' | 'CHOICE';
+
+export interface ActionChoice {
+  /**
+   * 선택지의 값. 결과 셋은 **계약 enum** 이므로 그 타입을 그대로 흘린다(CR r1 L-8) — 전송 자리의
+   * `as 'WON' | 'LOST' | …` 캐스팅이 사라진다. 개찰 둘은 boolean 을 문자열로 나른다.
+   */
+  readonly value: Outcome | 'true' | 'false';
+  readonly label: string;
+}
+
 /**
  * 개찰 결과의 두 선택지 — 계약은 **순위 숫자를 받지 않는다**(`provisionalFirst` boolean 하나).
  * 문면은 그 두 결과 상태의 라벨이다.
@@ -153,19 +165,11 @@ const OPENING_CHOICES = [
 ] as const;
 
 /** 결과 셋 — 계약 enum 전수(`RecordOutcomeRequest.outcome`)이고 문면은 상태 표에서 온다. */
-const OUTCOME_CHOICES: readonly { readonly value: Outcome; readonly label: string }[] = [
+const OUTCOME_CHOICES: readonly ActionChoice[] = [
   { value: 'WON', label: BID_CASE_STATE_DISPLAY.WON.label },
   { value: 'LOST', label: BID_CASE_STATE_DISPLAY.LOST.label },
   { value: 'FAILED_OR_REBID', label: BID_CASE_STATE_DISPLAY.FAILED_OR_REBID.label },
 ];
-
-/** 행동이 받아야 하는 입력의 모양. `LINK` 만 서버를 부르지 않는다. */
-export type ActionInputShape = 'LINK' | 'INSTANT' | 'DATETIME' | 'CHOICE';
-
-export interface ActionChoice {
-  readonly value: string;
-  readonly label: string;
-}
 
 export interface ActionInput {
   readonly shape: ActionInputShape;

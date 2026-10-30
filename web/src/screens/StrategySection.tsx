@@ -158,7 +158,10 @@ export function StrategySection() {
   }
 
   const current = strategy.data;
-  const conflictCode = run.error instanceof ApiError ? run.error.code : null;
+  // **409 일 때만** 사유 상자를 낸다(CR r1 L-2). 앞 판은 코드가 있으면 다 냈고, 500
+  // `INTERNAL_ERROR` · 400 `STRATEGY_VALUE_INVALID` 가 「동시 편집」 상자 안에 앉았다.
+  const conflictCode =
+    run.error instanceof ApiError && run.error.status === HTTP_CONFLICT ? run.error.code : null;
 
   return (
     <section data-testid="settings-strategy" className="flex flex-col gap-3">

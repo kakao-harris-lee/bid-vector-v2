@@ -103,12 +103,18 @@ export interface BusinessDetailsForm {
  *  · 상호는 **공백뿐이면 400** 이다 — 「미설정」은 키를 빼거나 `null` 이다. 그래서 빈 입력은
  *    `null` 로 보낸다(공백이 조용히 「지우기」가 되지 않게).
  */
+/** 그 문자열이 계약의 소재지 어휘인가 — **표의 키**로 좁힌다(CR r1 L-9, 캐스팅 없이). */
+export function isHeadquartersRegion(value: string): value is HeadquartersRegion {
+  return Object.hasOwn(REGION_DISPLAY, value);
+}
+
 export function businessDetailsBodyOf(form: BusinessDetailsForm): BusinessDetailsRequest {
   const trimmed = form.tradeName.trim();
   const base: BusinessDetailsRequest = {
     naraRegistration: form.naraRegistration,
     tradeName: trimmed === '' ? null : form.tradeName,
-    headquartersRegion: form.headquartersRegion === '' ? null : (form.headquartersRegion as HeadquartersRegion),
+    // 고르지 않았거나 표 밖의 값이면 `null` 이다 — 지어낸 소재지를 보내지 않는다.
+    headquartersRegion: isHeadquartersRegion(form.headquartersRegion) ? form.headquartersRegion : null,
   };
   if (form.naraRegistration !== 'REGISTERED') {
     return base;

@@ -320,6 +320,9 @@ test('쓰기가 401 로 거부되면 로그인으로 가는 길이 뜬다', asyn
  */
 async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
   const rows = await search(page, noticeNumber);
+  // 없으면 **사유를 말하고** 멈춘다 — `!` 로 두면 `TypeError` 가 되어 「fixture 가 안 들어왔다」와
+  // 「화면이 안 그렸다」를 구별할 수 없다(CR r1 L-11).
+  expect(rows.map((row) => row.noticeNumber), `검색이 ${noticeNumber} 를 내지 않았다`).toContain(noticeNumber);
   const target = rows.find((row) => row.noticeNumber === noticeNumber)!;
   const card = page.getByTestId(`notice-card-${target.noticeNumber}`);
   await ensureInBidBox(page, card);
@@ -330,6 +333,7 @@ async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCas
   await card.getByTestId('notice-title').click();
   await expect(page.getByTestId('screen-worksheet')).toBeVisible();
   const caseRows = (await (await cases).json()) as BidCaseRow[];
+  expect(caseRows.map((row) => row.noticeNumber), `입찰함에 ${noticeNumber} 건이 없다`).toContain(noticeNumber);
   const opened = caseRows.find((row) => row.noticeNumber === noticeNumber)!;
 
   // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
@@ -368,12 +372,13 @@ async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void>
   await expect(card.getByTestId(`checkpoint-kind-${row.caseId}`)).toHaveText(
     CHECKPOINT_LABEL[row.nextCheckpointKind] ?? row.nextCheckpointKind,
   );
-  // 「없음」은 빈 값이 아니라 답이다 — 시각이 null 이면 그 자리에 숫자가 없다.
+  // 「없음」은 빈 값이 아니라 답이다. 값이 있으면 **그 값 자체**와 대조한다(v r1 L-3: 앞 판은
+  // 「숫자가 있다」만 봐서 표시 시각을 하루 밀어도 통과했다).
   const at = card.getByTestId(`checkpoint-at-${row.caseId}`);
   if (row.nextCheckpointAt === null) {
     await expect(at).toHaveText(ABSENT);
   } else {
-    expect(await at.innerText()).toMatch(/\d/u);
+    await expect(at).toHaveText(row.nextCheckpointAt);
   }
   // 경고는 **서버의 판정 하나**를 따른다 — 있으면 1, 없으면 0 이다(화면이 시각을 비교하지 않는다).
   await expect(card.getByTestId(`overdue-${row.caseId}`)).toHaveCount(row.overdue ? 1 : 0);
@@ -392,6 +397,7 @@ test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰
   await page.getByRole('link', { name: 'D 내 입찰함' }).click();
   await expect(page.getByTestId('screen-bid-box')).toBeVisible();
   const rows = (await (await listed).json()) as BidCaseRow[];
+  expect(rows.map((row) => row.noticeNumber), '내 입찰함에 이 여정의 건이 없다').toContain('SYN-7E2-BIDBOX');
   const mine = rows.find((row) => row.noticeNumber === 'SYN-7E2-BIDBOX')!;
 
   // 질의는 **실투찰 종류**다 — 페이퍼와 한 목록에 섞이지 않는다(계약의 모양).
