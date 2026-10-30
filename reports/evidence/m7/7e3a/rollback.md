@@ -1,0 +1,101 @@
+# M7/7E-3a 되돌림
+
+**실측 HEAD: `40ce0cc0`**(이 slice 의 마지막 산출물 커밋). 이 뒤의 커밋은 evidence 뿐이고
+**복원 목록 안의 경로를 건드리지 않는다** — 유효성 확인은 아래 §4.
+
+복원 기준 **`003ec91d`**(main, PR #107 7E-2b 머지). 전제 「그 SHA 에 이 slice 없음」: 이 브랜치의
+첫 커밋이 `553715f7`(착수 계약)이고 그 부모가 `003ec91d` 다 — base 에 이 slice 의 커밋이 하나도
+없다. base 는 **머지된 main 의 고정 SHA** 이므로 공유 파일(요구표 · `gate-tests.txt` ·
+`journey.spec.ts` · `shared.ts` · `routes*` · `api/*`)도 같은 자리에서 복원한다(움직이는
+`origin/main` 을 쓰지 않는다).
+
+## 1. 복원 목록 — 기계 산출
+
+```
+git diff --name-status 003ec91d..HEAD | grep -v $'\t'reports/evidence/
+```
+
+**22 경로 = 복원(M) 10 + 삭제(A) 12.** `reports/evidence/m7/7e3a/**` 는 되돌림 대상이 아니다
+(그 안의 `scope.md` 는 팀장 파일이다).
+
+| 복원(M) 10 |
+| --- |
+| `docs/discovery/m7-screen-data-requirements.md` |
+| `web/config/gate-tests.txt` |
+| `web/e2e/harness/fixtures/notice-list.json` |
+| `web/e2e/journey/journey.spec.ts` |
+| `web/e2e/journey/shared.ts` |
+| `web/src/api/approvedOperations.ts` |
+| `web/src/api/queries.ts` |
+| `web/src/api/queryKeys.ts` |
+| `web/src/routes.test.ts` |
+| `web/src/routes.tsx` |
+
+| 삭제(A) 12 |
+| --- |
+| `web/e2e/journey/results.spec.ts` |
+| `web/src/display/notificationDisplay.ts` · `.test.ts` |
+| `web/src/display/openingResultDisplay.ts` · `.test.ts` |
+| `web/src/display/resultDisplay.ts` · `.test.ts` |
+| `web/src/screens/InboxScreen.tsx` · `.test.tsx` |
+| `web/src/screens/ResultCard.tsx` |
+| `web/src/screens/ResultsScreen.tsx` · `.test.tsx` |
+
+**목록 ↔ 기계 산출 등식**: `comm -23` · `comm -13` 둘 다 **빈 출력**(실측). 이 등식이 공허하지
+않은 근거는 목록을 손으로 적지 않고 같은 명령에서 뽑았다는 것이 아니라, **evidence 를 뺀 뒤의 두
+집합을 서로 대조**한다는 것이다 — 내가 커밋하지 않아도 경로가 들어오면 `comm -13` 이 그것을 낸다.
+
+## 2. 되돌리는 명령
+
+```bash
+BASE=003ec91d
+git diff --name-status "$BASE"..HEAD | grep -v $'\t'reports/evidence/ > /tmp/rb-all.txt
+awk -F'\t' '$1=="M"{print $2}' /tmp/rb-all.txt | sort > /tmp/rb-modified.txt
+awk -F'\t' '$1=="A"{print $2}' /tmp/rb-all.txt | sort > /tmp/rb-added.txt
+
+xargs -a /tmp/rb-modified.txt git restore --source="$BASE" --staged --worktree --
+xargs -a /tmp/rb-added.txt git rm -f --
+```
+
+새 파일은 `rm` 이 아니라 **`git rm`** 이다 — `rm` 만 하면 인덱스에 남아 트리가 base 와 같아지지
+않는다(첫 판의 오측: 작업 트리 diff 는 0 인데 `git status` 가 삭제 표지 12 를 냈다).
+
+마이그레이션 0 · 배포물 0 · 외부 호출 0 이므로 **배포 뒤 되돌림 경로가 따로 없다**. 이 slice 는
+`web/` 과 문서만 건드린다.
+
+## 3. 버릴 clone 에서의 ①~⑥ 실측
+
+`git clone --no-hardlinks` 로 뜬 트리에서 위 명령을 돌리고 **`npm ci` 로 의존을 진짜 설치**했다.
+
+| 축 | 결과 |
+| --- | --- |
+| ① 명령 exit | `git restore` **0** · `git rm` **0** |
+| ② 계수 | 복원 **10** · 삭제 **12** · `comm` 양쪽 빈 출력 |
+| ③ 트리 동일성 | 작업 트리 vs base diff **0 줄** · **인덱스** vs base diff **0 줄** |
+| ④ compile | `tsc --noEmit` exit **0** |
+| ⑤ test | `vitest run` exit **0** — **472 passed**(HEAD 의 544 에서 이 slice 의 72 가 빠진 수) |
+| ⑥ 게이트 | `gate:tests` **0** · `gate:src-tree` **0** · `api:types:check` **0** · `gate:boundary-canary` **0** · `eslint --max-warnings 0` **0** |
+
+**갈음은 「HEAD 초록」이 아니라 트리 동일성으로만** 했다 — ③ 의 두 줄이 그것이고, ④⑤⑥ 은 그
+동일한 트리가 실제로 서는지의 확인이다.
+
+### 첫 판의 오측 둘 (고쳐서 다시 쟀다)
+
+1. **`gate:src-tree` 가 붉었다** — 되돌림과 무관했다. clone 에 `node_modules` 를 **심볼릭 링크**로
+   걸었는데 그 게이트가 「`web/` 안에 심볼릭 링크가 있다」로 멈춘다(ADR 0011 D-3). 같은 clone 에서
+   **되돌리기 전에도** 같은 문면으로 실패하는 것을 통제군으로 확인하고, `npm ci` 로 바꿔 다시 쟀다.
+2. **③ 의 술어가 틀렸다** — `rm` 뒤 `git status --porcelain` 이 삭제 표지 12 를 내는 것을 「남은
+   새 파일」로 읽었다. 그것은 인덱스와 작업 트리의 차이이지 base 와의 차이가 아니다. 술어를
+   **base 대비 두 축**(작업 트리 · 인덱스)으로 바꿨다.
+
+## 4. 실측 HEAD 가 아직 유효한가
+
+evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」는 영원히 성립하지 않는다. 볼 것은
+**그 사이에 되돌림 대상이 움직였는가**다:
+
+```
+git diff --name-only 40ce0cc0..<판정 SHA> -- <위 22 경로>
+```
+
+이 출력이 비어 있으면 위 실측이 그대로 유효하다. evidence 커밋은 `reports/evidence/m7/7e3a/**`
+만 건드리므로 비어 있어야 하고, 한 줄이라도 나오면 **재측정이다**.
