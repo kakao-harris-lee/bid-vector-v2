@@ -21,11 +21,26 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
 
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
+  /**
+   * **무조건이다**(M7/7E-3a r3 v L-2). `CI` 가 없을 때 `test.only` 는 그 파일의 나머지를 조용히
+   * 버리고 게이트를 지난다(실측: 파일마다 only 하나 → `4 passed / 8`, 체인 exit 0). 여정 레인은
+   * **전건으로만** 판정하므로 로컬에서도 그 꼴을 허용하지 않는다 — 부분 실행은
+   * `npx playwright test --config=… <인자>` 로 하고, 그것은 애초에 이 게이트를 지나지 않는다.
+   */
+  forbidOnly: true,
   retries: 0,
   // 하네스가 한 벌뿐이고 여정이 같은 계정·같은 건을 쓴다 — 워커를 늘리면 서로의 전이를 본다.
   workers: 1,
-  reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
+  /**
+   * **json 리포터는 늘 켠다**(M7/7E-3a r1 H-1) — `scripts/check-journey-results.mjs` 가 그
+   * 산출물로 「건너뛴 test 0」을 판정하고, 그 파일이 없으면 그 게이트가 **통과가 아니라 실패**다.
+   * Playwright 는 건너뛴 test 가 있어도 exit 0 이라 이 자리가 없으면 여정 하나가 통째로
+   * 사라져도 CI 가 초록이다.
+   */
+  reporter: [
+    ...(process.env.CI ? [['list'] as const] : ([['list'], ['html', { open: 'never' }]] as const)),
+    ['json', { outputFile: 'test-results/journey-results.json' }] as const,
+  ],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
@@ -39,8 +54,13 @@ export default defineConfig({
      * 문면은 「e2e trace 에 세션 쿠키 평문 0」이다.
      *
      * Playwright 에 「본문만 빼기」 옵션이 없으므로 **아티팩트에 들어가는 종류를 바꾼다**:
-     * CI 는 **스크린샷만** 남긴다(비밀 문구는 password 입력이라 화면에 평문으로 그려지지
-     * 않는다). 로컬은 trace 를 그대로 둔다 — 그 산출물은 올라가지 않고 디버깅에 필요하다.
+     * CI 는 **스크린샷과 판정 리포트**를 남긴다(비밀 문구는 password 입력이라 화면에 평문으로
+     * 그려지지 않는다). 로컬은 trace 를 그대로 둔다 — 그 산출물은 올라가지 않고 디버깅에 필요하다.
+     *
+     * **판정 리포트도 이 디렉터리에 쓰인다**(M7/7E-3a r2 CR L-1): `test-results/` 는 실패 시 CI
+     * 아티팩트로 올라가므로 그 내용이 D-7E-6 의 대상이다. 담기는 것은 **제목·상태·오류 문면**
+     * 이고 자격 값은 0 이다 — 여정 spec 에 `console.*` 이 0 건이고 `watchRequests` 가 URL·메서드만
+     * 모으기 때문이다(본문을 모으는 자리가 없다). 그 근거는 evidence §개인정보에 있다.
      */
     trace: process.env.CI ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',

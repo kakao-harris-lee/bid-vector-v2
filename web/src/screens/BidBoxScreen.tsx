@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import {
   awaitOpening,
@@ -14,7 +15,7 @@ import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { bidCasesQueryKey } from '../api/queryKeys';
-import { BID_BOX_TABS, tabOf, type BidBoxTabId } from '../display/bidBoxDisplay';
+import { BID_BOX_TABS, isBidBoxTabId, tabOf, type BidBoxTabId } from '../display/bidBoxDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { BidBoxCard, type ActionPayload } from './BidBoxCard';
@@ -82,7 +83,22 @@ export function BidBoxScreen() {
   const queryClient = useQueryClient();
   const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
-  const [tab, setTab] = useState<BidBoxTabId>('watching');
+  /**
+   * 첫 탭은 **URL 이 정할 수 있다**(M7/7E-3a r1 M-2 — D-7E3a-8 의 「그 건의 D 카드(해당 상태
+   * 탭)」). 화면 E 가 `?tab=<id>` 로 보내면 그 건이 **보이는 자리**에 착지한다 — 앞 판은 맨
+   * `/bids` 라 첫 탭(관심)이 열렸고 결과 단계 건은 DOM 에 없었다.
+   *
+   * 칸이 없거나 **아는 탭이 아니면** 지금까지의 기본(`watching`)이다 — 바깥에서 온 문자열에
+   * 탭을 지어내지 않는다.
+   *
+   * 초기값으로만 읽는다(`useState` 의 첫 인자). 그 뒤의 탭은 운영자의 클릭·화살표가 정하고,
+   * URL 을 다시 읽어 덮으면 방금 고른 탭이 되돌려진다.
+   */
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<BidBoxTabId>(() => {
+    const requested = searchParams.get('tab');
+    return isBidBoxTabId(requested) ? requested : 'watching';
+  });
   /**
    * 화살표로 옮긴 뒤 **그 탭에 포커스를 한 번 둔다**(클릭은 브라우저가 이미 둔다).
    *

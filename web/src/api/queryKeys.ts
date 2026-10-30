@@ -12,3 +12,17 @@ type BidKind = components['schemas']['BidCase']['bidKind'];
 export function bidCasesQueryKey(kind: BidKind): readonly [string, BidKind] {
   return ['bid-cases', kind];
 }
+
+/**
+ * 공고 하나의 개찰 결과(M7/7E-3a). 키가 **번호와 차수 둘 다**인 이유는 공고의 신원이 그
+ * 쌍이기 때문이다 — 번호만 키로 두면 차수가 다른 공고의 답이 서로를 덮는다.
+ */
+export function openingResultQueryKey(
+  noticeNumber: string,
+  noticeRound: string,
+): readonly [string, string, string] {
+  return ['opening-result', noticeNumber, noticeRound];
+}
+
+/** 알림함 한 페이지(M7/7E-3a) — 읽음 처리가 무효화하는 자리다. */
+export const NOTIFICATIONS_QUERY_KEY: readonly [string] = ['notifications'];

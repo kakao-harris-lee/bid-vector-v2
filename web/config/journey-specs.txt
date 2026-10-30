@@ -1,0 +1,26 @@
+# 여정 spec 등록부 — **이 파일이 한 자리다**(M7/7E-3a r2 · vitest 레인의 `config/gate-tests.txt`
+# 와 같은 모양).
+#
+# `scripts/check-journey-results.mjs` 가 **리포트의 spec 파일 집합과 등식**을 건다. 「돈 test ≥ 1」
+# 축만으로는 spec 하나가 사라져도 나머지가 돌면 초록이다 — 사라지는 길은 파일 삭제만이 아니라
+# `testMatch: '**/*.spec.ts'` 밖으로 **이름을 바꾸는 것**(`.spec.tsx` · `.e2e.ts`) 하나면 된다.
+# 그때 수집은 조용히 줄고 아무 자리도 붉어지지 않았다.
+#
+# **입도는 「파일」이다**(M7/7E-3a r3 v L-1 · CR L-2). 한 spec **안에서** test 를 지우거나 수집
+# 시점 조건(`if (env) test(…)`)으로 빼는 것은 이 집합을 바꾸지 않으므로 **이 등식이 잡지 못한다**
+# (실측: 파일마다 test 하나를 빼면 8 → 4 인데 체인은 초록이었다). vitest 레인의 `gate-tests.txt`
+# 도 같은 입도이고 — 수를 박으면 등록부가 test 마다 흔들린다 — 그래서 일관된 선택으로 두고
+# **알려진 제한**에 적는다.
+#
+# 등식이라 **양쪽으로** 막는다: 여기 적힌 spec 이 안 돌아도 붉고, 등록되지 않은 spec 이 돌아도
+# 붉다(후자는 등록부를 고치라는 뜻이다 — 새 여정이 장부 없이 들어오지 않는다).
+#
+# 경로는 `playwright.journey.config.ts` 의 `testDir`(= `e2e/journey`) 기준 상대 경로다 —
+# 리포트의 `spec.file` 이 그 꼴이다. `#` 로 시작하는 줄과 빈 줄은 무시한다.
+#
+# **부분 실행은 이 등식이 막는다**: `--grep` 으로 일부만 돌리면 집합이 모자라 붉다. 여정 레인은
+# 전건으로만 판정한다.
+journey.spec.ts
+onboarding.spec.ts
+results.spec.ts
+settings.spec.ts

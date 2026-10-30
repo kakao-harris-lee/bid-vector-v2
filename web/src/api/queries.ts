@@ -26,6 +26,24 @@ export type EditSessionResponse = components['schemas']['EditSessionResponse'];
 export type Profile = components['schemas']['Profile'];
 export type ConstructionCapacity = components['schemas']['ConstructionCapacity'];
 export type OnboardingChecklist = components['schemas']['OnboardingChecklist'];
+export type OpeningResultView = components['schemas']['OpeningResultView'];
+export type NotificationItem = components['schemas']['NotificationItem'];
+export type MarkReadResult = components['schemas']['MarkNotificationReadResponse'];
+
+export type NotificationQuery = NonNullable<operations['listNotifications']['parameters']['query']>;
+
+/**
+ * 알림함 한 페이지 — 본문 행과 **두 계약 헤더**다. `Listed` 를 쓰지 않는 이유는 이 operation
+ * 에 `X-Result-State` 가 없고 대신 `X-Unread-Count` 가 있기 때문이다(모양이 다른 것을 같은
+ * 타입에 밀어 넣으면 없는 헤더를 읽는 자리가 생긴다).
+ */
+export interface NotificationPage {
+  readonly rows: readonly NotificationItem[];
+  /** 필터를 지난 전체 건수 — 페이지 길이와 다른 값이다. */
+  readonly total: number;
+  /** 계정의 안읽음 **전수** — 목록 필터와 무관하다(배지가 읽는 값). */
+  readonly unread: number;
+}
 
 type NoticesResultState = operations['searchNotices']['responses']['200']['headers']['X-Result-State'];
 type SuggestionsResultState = operations['listSuggestions']['responses']['200']['headers']['X-Result-State'];
@@ -434,6 +452,74 @@ export async function removeConstructionCapacity(
  */
 export async function readOnboardingChecklist(): Promise<OnboardingChecklist> {
   const { data, error, response } = await apiClient.GET('/api/onboarding-checklist');
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/* ── 화면 E 결과 확인 · 알림함(M7/7E-3a) ──────────────────────────────────────
+   넷 다 읽기이거나 읽음 전이다 — E 는 결과 단계 전이를 부르지 않는다(D-7E3a-8). */
+
+/**
+ * 공고 하나의 개찰 결과(SET-02 표시 절반). **답은 `state` 가 가르는 아홉 갈래 중 하나**이고
+ * 「모른다」도 200 이다 — 공고 부재가 404 가 아니라 `NOTICE_ABSENT` 상태다(계약 D-7C5-9).
+ * 그래서 이 자리에 부재 처리가 없다.
+ *
+ * 번호·차수가 **둘 다 필수**다 — 차수를 기본값으로 접지 않는다.
+ */
+export async function readOpeningResult(
+  noticeNumber: string,
+  noticeRound: string,
+): Promise<OpeningResultView> {
+  const { data, error, response } = await apiClient.GET('/api/opening-results', {
+    params: { query: { noticeNumber, noticeRound } },
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
+ * 알림함 한 페이지. **안읽음 전수는 본문이 아니라 헤더에 있다**(D-7E3a-6) — `X-Unread-Count`
+ * 는 `unreadOnly` 필터와 무관한 계정 전수라 배지가 목록 필터에 흔들리지 않는다. 본문 행을
+ * 세어 배지를 만들면 그 보증이 사라진다(한 페이지만 보고 전체를 말하게 된다).
+ *
+ * 두 헤더가 없으면 `headerNumber` 가 `CONTRACT_HEADER_MISSING` 으로 올린다 — 0 으로 지어내지
+ * 않는다(계약이 required 로 선언한 값이 없다는 것은 서버가 계약을 어겼다는 뜻이다).
+ */
+export async function listNotifications(query: NotificationQuery = {}): Promise<NotificationPage> {
+  const { data, error, response } = await apiClient.GET('/api/notifications', { params: { query } });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return {
+    rows: data,
+    total: headerNumber(response, 'X-Total-Count'),
+    unread: headerNumber(response, 'X-Unread-Count'),
+  };
+}
+
+/**
+ * 항목 하나를 읽음으로. **신원은 종류와 공고 쌍**이다 — 합성 id 가 없다(계약). 멱등이고,
+ * 이미 읽었거나 없거나 남의 것이면 `markedCount` 가 0 이다(셋을 가르지 않는다).
+ */
+export async function markNotificationRead(
+  body: components['schemas']['MarkNotificationReadRequest'],
+): Promise<MarkReadResult> {
+  const { data, error, response } = await apiClient.POST('/api/notifications/read', { body });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/** 한 공고 묶음의 **안읽음 전부**를 읽음으로. 단건 경로와 갈라 둔 것이 계약의 모양이다. */
+export async function markNoticeNotificationsRead(
+  body: components['schemas']['MarkNoticeNotificationsReadRequest'],
+): Promise<MarkReadResult> {
+  const { data, error, response } = await apiClient.POST('/api/notifications/read-notice', { body });
   if (data === undefined) {
     raise(response.status, error);
   }
