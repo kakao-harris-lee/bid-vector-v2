@@ -4,7 +4,6 @@ import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
-import bidvector.bidding.tag
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.settlement.AwardMatchingPolicyData
@@ -69,7 +68,7 @@ class ReadMyBidResults(
 ) {
     fun read(account: AccountId): MyBidResults {
         val recorded = bids.recordedBids(account)
-        val resolvable = recorded.mapNotNull { it.case.case.notice.toNoticeId() }.toSet()
+        val resolvable = recorded.mapNotNull { it.notice.toNoticeId() }.toSet()
         val facts = openingFacts.lookupAll(resolvable)
         val winners = winnerNames.winnerNames(resolvable)
         val operator = profiles.operatorTradeName(account)
@@ -90,16 +89,13 @@ class ReadMyBidResults(
         facts: Map<NoticeId, NoticeOpeningFacts>,
         now: Instant,
     ): OpeningResultView {
-        val id = case.case.notice.toNoticeId() ?: return OpeningResultView.NoticeAbsent
+        val id = notice.toNoticeId() ?: return OpeningResultView.NoticeAbsent
         val found = facts[id] ?: return OpeningResultView.NoticeAbsent
         return resolveOpeningResultView(found, now, openingPolicy)
     }
 
     private fun RecordedRealBid.winnerOf(winners: Map<NoticeId, AwardWinnerTradeName>): AwardWinnerTradeName =
-        case.case.notice
-            .toNoticeId()
-            ?.let(winners::get)
-            ?: AwardWinnerTradeName.NotPublished
+        notice.toNoticeId()?.let(winners::get) ?: AwardWinnerTradeName.NotPublished
 
     /**
      * 건 하나의 조립 — **상호는 인자로만 지나간다.** [winner] 는 [reconcileBid] 에 넘어가고
@@ -112,10 +108,9 @@ class ReadMyBidResults(
         operator: OperatorTradeName,
     ): MyBidResult {
         val verdict = reconcileBid(opening, operator, winner, matchingPolicy)
-        val recordedState = case.case.state.tag
         return MyBidResult(
-            caseId = case.case.id,
-            notice = case.case.notice,
+            caseId = caseId,
+            notice = notice,
             recordedState = recordedState,
             submitted = amount,
             submittedAt = submittedAt,

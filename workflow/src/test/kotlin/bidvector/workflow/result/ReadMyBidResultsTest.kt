@@ -1,14 +1,13 @@
 package bidvector.workflow.result
 
 import bidvector.bidding.BidAmountOrigin
-import bidvector.bidding.BidCase
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
-import bidvector.bidding.asReal
+import bidvector.bidding.tag
 import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.sharedkernel.AwardAmount
@@ -29,6 +28,7 @@ import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.TradeName
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -57,24 +57,25 @@ class ReadMyBidResultsTest {
         number: String,
         state: BidState = BidState.BidRecorded,
         won: Long = 1_200_000L,
-    ): RecordedRealBid {
-        val case =
-            BidCase(
-                id = BidCaseId(caseId),
-                notice = noticeKey(number),
-                kind = BidKind.REAL,
-                state = state,
-                caseVersion = 1,
-                outcomeNoticeExpectedAt = null,
-                deadlineAt = Instant.parse("2026-10-20T05:00:00Z"),
-            )
-        return RecordedRealBid(
-            case = requireNotNull(case.asReal()) { "REAL 건이어야 한다" },
+        kind: BidKind = BidKind.REAL,
+    ): RecordedRealBid? =
+        recordedRealBidOrNull(
+            kind = kind,
+            caseId = BidCaseId(caseId),
+            notice = noticeKey(number),
+            recordedState = state.tag,
             amount = SubmittedBidAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, BidAmountOrigin.OperatorEntered),
             submittedAt = Instant.parse("2026-10-19T05:00:00Z"),
             confirmedAt = Instant.parse("2026-10-19T06:00:00Z"),
         )
-    }
+
+    /** 실투찰 건 하나 — 페이퍼를 넘기면 값이 서지 않으므로 이 helper 는 `!!` 로 그 사실을 드러낸다. */
+    private fun real(
+        caseId: Long,
+        number: String,
+        state: BidState = BidState.BidRecorded,
+        won: Long = 1_200_000L,
+    ): RecordedRealBid = requireNotNull(recorded(caseId, number, state, won)) { "REAL 건이어야 한다" }
 
     private fun canonicalFacts(
         label: String?,
@@ -115,11 +116,21 @@ class ReadMyBidResultsTest {
     fun `내 건만 읽는다 — 다른 계정의 건이 섞이지 않는다`() {
         val read =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010")), 2L to listOf(recorded(20L, "20261000020"))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010")), 2L to listOf(real(20L, "20261000020"))),
             )
         val mineOnly = read.read(me)
         mineOnly.cases.map { it.caseId } shouldBe listOf(BidCaseId(10L))
         read.read(other).cases.map { it.caseId } shouldBe listOf(BidCaseId(20L))
+    }
+
+    /**
+     * **페이퍼 건은 값이 서지 않는다** — 질의 필터가 틀려 페이퍼 행이 흘러와도 포트의 타입을
+     * 만들 수 없다(`recordedRealBidOrNull` 이 `null` 을 준다). 문장이 아니라 구조가 막는다.
+     */
+    @Test
+    fun `페이퍼 건은 실투찰 기록 값이 되지 않는다`() {
+        recorded(10L, "20261000010", kind = BidKind.PAPER) shouldBe null
+        recorded(10L, "20261000010", kind = BidKind.REAL) shouldNotBe null
     }
 
     @Test
@@ -134,7 +145,7 @@ class ReadMyBidResultsTest {
     /** 개찰 사실을 받지 못한 공고는 **공고 부재**다 — 건이 조용히 목록에서 빠지지 않는다. */
     @Test
     fun `개찰 사실이 없는 건도 목록에 남고 공고 부재로 판정된다`() {
-        val results = readMyBidResults(bids = mapOf(1L to listOf(recorded(10L, "20261000010")))).read(me)
+        val results = readMyBidResults(bids = mapOf(1L to listOf(real(10L, "20261000010")))).read(me)
         results.cases.single().opening shouldBe OpeningResultView.NoticeAbsent
         results.cases.single().verdict shouldBe
             ReconciliationVerdict.Undecidable(ReconciliationBlocker.NOTICE_ABSENT)
@@ -145,7 +156,7 @@ class ReadMyBidResultsTest {
         val award = AwardAmount(1_000_000L, Currency.KRW, Provenance.DerivedFromOpening)
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010", won = 1_200_000L))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010", won = 1_200_000L))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료", award)),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published("주식회사 가상해양기술")),
             ).read(me)
@@ -161,7 +172,7 @@ class ReadMyBidResultsTest {
     fun `확정 낙찰가가 없으면 차이가 부재다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010"))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010"))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료")),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published("주식회사 가상해양기술")),
             ).read(me)
@@ -176,7 +187,7 @@ class ReadMyBidResultsTest {
     fun `낙찰자 상호가 산출 값에 남지 않는다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010"))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010"))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료")),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published(WINNER_SENTINEL)),
             ).read(me)
@@ -189,7 +200,7 @@ class ReadMyBidResultsTest {
     fun `상호 미설정이면 판정하지 않는다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010"))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010"))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료")),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published("(주)가상토목건설")),
                 tradeName = null,
@@ -206,7 +217,7 @@ class ReadMyBidResultsTest {
     fun `운영자 기록과 대사를 병기하고 어느 쪽도 덮지 않는다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010", state = BidState.Won))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010", state = BidState.Won))),
             ).read(me)
         val case = results.cases.single()
         case.recordedState shouldBe BidStateTag.WON
@@ -222,7 +233,7 @@ class ReadMyBidResultsTest {
     fun `운영자 기록과 대사가 어긋나면 표지가 선다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010", state = BidState.Won))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010", state = BidState.Won))),
                 facts = mapOf("20261000010" to canonicalFacts("개찰완료")),
                 winners = mapOf("20261000010" to AwardWinnerTradeName.Published("(주)가상토목건설")),
             ).read(me)
@@ -243,7 +254,7 @@ class ReadMyBidResultsTest {
             )
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "20261000010"))),
+                bids = mapOf(1L to listOf(real(10L, "20261000010"))),
                 facts = mapOf("20261000010" to facts),
             ).read(me)
         results.cases.single().verdict shouldBe
@@ -260,7 +271,7 @@ class ReadMyBidResultsTest {
     fun `공고번호 표기가 달라도 정규형으로 찾는다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(10L, "syn  ntc 2301"))),
+                bids = mapOf(1L to listOf(real(10L, "syn  ntc 2301"))),
                 facts = mapOf("SYN-NTC-2301" to canonicalFacts("유찰")),
             ).read(me)
         results.cases.single().verdict shouldBe ReconciliationVerdict.FailedBid
@@ -274,9 +285,9 @@ class ReadMyBidResultsTest {
                     mapOf(
                         1L to
                             listOf(
-                                recorded(10L, "20261000010"),
-                                recorded(11L, "20261000011", state = BidState.Lost),
-                                recorded(12L, "20261000012", state = BidState.FailedOrRebid),
+                                real(10L, "20261000010"),
+                                real(11L, "20261000011", state = BidState.Lost),
+                                real(12L, "20261000012", state = BidState.FailedOrRebid),
                             ),
                     ),
             ).read(me)
@@ -291,14 +302,14 @@ class ReadMyBidResultsTest {
     fun `포트 순서를 그대로 보존한다`() {
         val results =
             readMyBidResults(
-                bids = mapOf(1L to listOf(recorded(12L, "20261000012"), recorded(10L, "20261000010"))),
+                bids = mapOf(1L to listOf(real(12L, "20261000012"), real(10L, "20261000010"))),
             ).read(me)
         results.cases.map { it.caseId } shouldBe listOf(BidCaseId(12L), BidCaseId(10L))
     }
 
     @Test
     fun `투찰 금액은 통화와 과세와 출처를 함께 나른다`() {
-        val results = readMyBidResults(bids = mapOf(1L to listOf(recorded(10L, "20261000010")))).read(me)
+        val results = readMyBidResults(bids = mapOf(1L to listOf(real(10L, "20261000010")))).read(me)
         val submitted = results.cases.single().submitted
         submitted.won shouldBe 1_200_000L
         submitted.currency shouldBe Currency.KRW
