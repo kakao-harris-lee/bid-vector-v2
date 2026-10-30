@@ -61,6 +61,15 @@ export const APPROVED_OPERATIONS = [
   // 화면 A 시작하기(M7/7E-2b) — **이 slice 가 목록에 더하는 것은 이것 하나뿐이다**(착수 실측).
   // 마법사의 쓰기는 위의 설정 operation 을 그대로 쓴다(같은 컴포넌트가 저장한다).
   { method: 'GET', path: '/api/onboarding-checklist' },
+
+  // 화면 E 결과 확인 · 알림함(M7/7E-3a, D-7E3a-8) — **증분은 정확히 넷이다**(착수 실측).
+  // 결과 단계 전이 넷(`await-opening`·`opening`·`qualification-review`·`outcome`)은 이미 위에
+  // 있지만 **E 는 그것을 부르지 않는다**: E 는 읽기 화면이고 전이는 D 하나가 든다(전이표의
+  // 사본이 둘이 되면 갈리고, 여정 ④⑤ 가 같은 건을 밀게 된다).
+  { method: 'GET', path: '/api/opening-results' },
+  { method: 'GET', path: '/api/notifications' },
+  { method: 'POST', path: '/api/notifications/read' },
+  { method: 'POST', path: '/api/notifications/read-notice' },
 ] as const;
 
 export type ApprovedOperation = (typeof APPROVED_OPERATIONS)[number];
