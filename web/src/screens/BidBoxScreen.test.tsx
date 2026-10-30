@@ -32,6 +32,22 @@ function bidCase(overrides: Partial<BidCase> = {}): BidCase {
   };
 }
 
+/** 같은 트리를 **다시** 그릴 수 있게 뽑았다 — 포커스 test 가 실제 재렌더를 만들어야 한다. */
+function screenTree(client: QueryClient) {
+  const router = createMemoryRouter(
+    [
+      { path: '/bids', element: <BidBoxScreen /> },
+      { path: '/notices/:noticeNumber/:noticeRound', element: <p>워크시트 자리</p> },
+    ],
+    { initialEntries: ['/bids'] },
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+}
+
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -202,12 +218,43 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
 
     const first = await screen.findByRole('tab', { name: /관심/u });
     fireEvent.keyDown(first, { key: 'ArrowRight' });
-    expect(screen.getByRole('tab', { selected: true }).textContent).toContain('투찰가 받음');
+    const moved = screen.getByRole('tab', { selected: true });
+    expect(moved.textContent).toContain('투찰가 받음');
+    // 옮긴 탭에 **포커스가 간다**(그것이 roving tabindex 의 뜻이다).
+    expect(document.activeElement).toBe(moved);
 
     // 첫 탭에서 왼쪽은 **마지막 탭**으로 감싼다.
     fireEvent.keyDown(screen.getByRole('tab', { name: /투찰가 받음/u }), { key: 'ArrowLeft' });
     fireEvent.keyDown(screen.getByRole('tab', { name: /관심/u }), { key: 'ArrowLeft' });
     expect(screen.getByRole('tab', { selected: true }).textContent).toContain('종료');
+  });
+
+  /**
+   * **CR r2 M2R-1 의 회귀 test.** 앞 판은 포커스 의도를 state 에 두고 인라인 `ref` 콜백에서
+   * 적용했다 — 콜백이 렌더마다 다시 붙으면서 값이 남아 있어 `focus()` 가 **재렌더마다** 돌았고,
+   * 운영자가 포커스를 옮긴 뒤에도 부모 재렌더가 그것을 **되가져갔다**(카드 입력 중 탈취).
+   */
+  it('화살표로 옮긴 뒤 다른 곳으로 간 포커스를 재렌더가 되가져가지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, state: 'BID_RECORDED' })]);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const rendered = render(screenTree(client));
+
+    fireEvent.keyDown(await screen.findByRole('tab', { name: /관심/u }), { key: 'ArrowRight' });
+    const movedTab = screen.getByRole('tab', { selected: true });
+    expect(document.activeElement).toBe(movedTab);
+
+    // 운영자가 포커스를 **다른 곳으로** 옮긴다(실 화면에서는 카드의 입력 칸이다).
+    const elsewhere = screen.getByRole('tab', { name: /종료/u });
+    elsewhere.focus();
+    expect(document.activeElement).toBe(elsewhere);
+
+    // 부모를 **여러 번 실제로 재렌더한다** — 전이 `isPending` 전환·무효화 refetch·창 포커스
+    // 복귀가 만드는 자리와 같다. 여기서 포커스가 탭으로 끌려가면 안 된다.
+    for (let round = 0; round < 3; round += 1) {
+      rendered.rerender(screenTree(client));
+      await waitFor(() => expect(document.activeElement).toBe(elsewhere));
+    }
   });
 
   it('건이 없는 탭은 빈 얼굴을 낸다 — 가짜 행을 만들지 않는다', async () => {

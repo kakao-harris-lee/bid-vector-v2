@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   awaitOpening,
@@ -83,8 +83,26 @@ export function BidBoxScreen() {
   const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [tab, setTab] = useState<BidBoxTabId>('watching');
-  /** 화살표로 옮긴 뒤 **그 탭에 포커스를 둔다**(클릭으로 고른 경우는 브라우저가 이미 둔다). */
-  const [focusTab, setFocusTab] = useState<BidBoxTabId | null>(null);
+  /**
+   * 화살표로 옮긴 뒤 **그 탭에 포커스를 한 번 둔다**(클릭은 브라우저가 이미 둔다).
+   *
+   * **ref 에 두고 쓰는 즉시 비운다**(CR r2 M2R-1): 앞 판은 이것을 state 로 두고 인라인 `ref`
+   * 콜백에서 `focus()` 를 했다. 그 콜백은 렌더마다 정체가 바뀌어 React 가 떼고 다시 붙이고,
+   * 그때 값이 **여전히 남아 있어** `focus()` 가 다시 돌았다 — 운영자가 포커스를 옮긴 뒤에도
+   * 부모가 재렌더되는 순간(전이 `isPending` 전환 · 무효화 refetch · 창 포커스 복귀) 포커스가
+   * 탭으로 끌려갔다. 카드의 `datetime-local` 을 채우는 중 전이 응답이 오면 입력에서 빠진다.
+   */
+  const pendingFocus = useRef<BidBoxTabId | null>(null);
+
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (target === null) {
+      return;
+    }
+    // **먼저 비운다** — 이 뒤의 어떤 재렌더도 이 자리를 다시 쓰지 않는다.
+    pendingFocus.current = null;
+    document.getElementById(tabId(target))?.focus();
+  }, [tab]);
 
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
 
@@ -143,11 +161,6 @@ export function BidBoxScreen() {
               aria-selected={selected}
               aria-controls={PANEL_ID}
               tabIndex={selected ? 0 : -1}
-              ref={(node) => {
-                if (node !== null && focusTab === one.id) {
-                  node.focus();
-                }
-              }}
               onKeyDown={(event) => {
                 const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
                 if (step === 0) {
@@ -156,13 +169,10 @@ export function BidBoxScreen() {
                 event.preventDefault();
                 // 줄 끝에서 감싼다 — 그것이 그 패턴이 요구하는 이동이다.
                 const next = BID_BOX_TABS[(index + step + BID_BOX_TABS.length) % BID_BOX_TABS.length]!;
+                pendingFocus.current = next.id;
                 setTab(next.id);
-                setFocusTab(next.id);
               }}
-              onClick={() => {
-                setTab(one.id);
-                setFocusTab(null);
-              }}
+              onClick={() => setTab(one.id)}
               className={`shrink-0 rounded-md px-2 py-1 ${
                 selected ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
               }`}
