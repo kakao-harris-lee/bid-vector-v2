@@ -30,6 +30,11 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 썼다). 그 자리에 「처음부터 붉었다」는 증거가 없으므로 test 가 구현을 조이는지는 아래 변이 열하나가
 든다 — 그리고 그 가운데 셋(M6·M8·M11)은 설정 화면·표만 잰다.
 
+**test 를 변이로 재 보지 않으면 초록의 뜻을 모른다**(이 라운드의 자리 둘): ⓐ 포커스 회귀 test 를
+처음 `fireEvent.focus(window)` 로 썼더니 **재렌더가 일어나지 않아** 구판 꼴에서도 초록이었다 —
+RTL 의 `rerender` 로 바꾼 뒤에야 변이가 붉어졌다. ⓑ 중복 접기(r1 L-4)는 **어느 test 로도 잠겨
+있지 않아** 접기를 걷는 변이가 394 passed 로 통과했다(CR r2 L2R-5 가 잡았다).
+
 **그 공백이 실제로 물렸다**: 쓰기 쪽 test 가 쉼표 없는 `'1200000'` 만 넣었고 **왕복이 단언 밖**
 이어서, 앞자리만 읽는 파서가 「읽히기는 하지만 다른 수」를 보내는 것을 아무 층도 보지 못했다
 (verifier 가 실 서버로 잡았다 — 아래 입력 모양 절). 지금은 거부 경계 **스물하나**와 왕복 넷이
@@ -39,10 +44,11 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 
 | 재는 것 | 명령 | 결과 |
 | --- | --- | --- |
-| 전략 값의 거부 경계 **열** | `vitest src/display/editSessionDisplay.test.ts` | 0 — 쉼표·단위·지수·꼬리 문자·금액 소수점·금액 음수·건수 소수점·건수 음수·소수 칸 쉼표·소수 칸 지수가 **각각 `null`** |
+| 전략 값의 거부 경계 **열둘**(2^53 위 둘 포함) | `vitest src/display/editSessionDisplay.test.ts` | 0 — 쉼표·단위·지수·꼬리 문자·금액 소수점·금액 음수·건수 소수점·건수 음수·소수 칸 쉼표·소수 칸 지수가 **각각 `null`** |
 | 받는 모양이 지나치지 않다 | 같은 파일 | 0 — `1200000000`·`0`·`-0.5`·`100` 과 앞뒤 공백 정규화는 그대로 받는다 |
 | 「보낸 값 == 본문 값」 | 같은 파일 + `SettingsScreen.test.tsx` | 0 — 본문 `1` 이면 화면도 **「1원」**이다(원문을 되풀이하지 않는다) |
-| 시평액 거부 경계 **열하나** | `vitest src/display/profileDisplay.test.ts` | 0 |
+| 시평액 거부 경계 **열둘**(2^53 위 포함) | `vitest src/display/profileDisplay.test.ts` | 0 |
+| 안전 정수 **경계는 받는다** | `editSessionDisplay.test.ts` | 0 — `MAX_SAFE_INTEGER` 는 그대로 받는다(거부가 지나치지 않다) |
 | 화면에서 쉼표 입력 | `SettingsScreen.test.tsx`·`ProfileSection.test.tsx` | 0 — 거부 얼굴이 뜨고 **요청이 가지 않는다** |
 | 여정에서 쉼표 입력 | 설정 여정(새 test) | 0 — `value` 요청 **0 건**, 받는 입력에서 화면 문면 == `postDataJSON()` 의 값 |
 
@@ -62,6 +68,8 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 | M9 | 탭 필터에 특례 하나(`BID_PLANNED → 'recorded'`) | vitest **1**(상태 14 전수 test 의 그 행) |
 | M10 | 탭 필터를 문자열 접두 추론 셋으로 | vitest **1**(`BID_PLANNED` 행) |
 | M11 | 409 사유 표의 키 한 자를 지움 | **typecheck 2**(계약 enum 으로 잠근 뒤) |
+| M12 | 탭 포커스 의도를 **비우지 않고** 매 렌더 적용(승인 전 일괄이 고친 꼴) | vitest **1** — 「옮긴 뒤 다른 곳으로 간 포커스가 재렌더 뒤에도 그대로」 |
+| M13 | 어휘 중복 접기를 걷음 | vitest **1**(붉은 test 2 — 표와 프로필 쓰기 본문) |
 
 **동치 변이 하나**: `startsWith('OPENED') ? 'under-review'` 만 바꾸면 **exit 0** 이다. 내 표가
 `OPENED_*` 둘을 이미 그 탭으로 보내므로 **어느 상태에서도 거동이 같다**(기계로 대조해 차집합이
@@ -90,7 +98,7 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 
 | 실행 | 명령 | 결과 |
 | --- | --- | --- |
-| 전건 | `npm run test:e2e:journey` | **exit 0 · 8 passed**(34.0s) |
+| 전건 | `npm run test:e2e:journey` | **exit 0 · 8 passed**(34.7s) |
 | 여정 ④ 단독 | `--grep '여정 ④'` | **exit 0 · 1 passed**(26.9s) |
 | 설정 여정 단독 | `--grep '설정 여정'` | **exit 0 · 1 passed**(34.4s) |
 | 강제 실패(음성 대조) | 변이 M1 위에서 여정 ④ | **exit 1** — 여정이 화면 값을 실제로 재고 있다는 계수 |
@@ -115,14 +123,14 @@ base `fa5ca096` · 브랜치 `m7-7e2/2026-10-30`. 명령은 `web/` 에서 돌렸
 | W-3 | `npm run typecheck` | 0 |
 | W-4 | `npm run gate:src-tree` | 0 |
 | W-5 | `npm run api:types:check` | 0 — 생성 타입이 OpenAPI 와 바이트 등식(이 slice 는 OpenAPI 를 읽기만 했다) |
-| W-6 | `npm run test` | 0 — **394 passed(20 파일)** |
+| W-6 | `npm run test` | 0 — **404 passed(20 파일)** |
 | W-7 | `npm run gate:tests` | 0 — 등록부 전부 수집·통과, skipped/todo 0 |
 | W-8 | `npm run build` | 0 — 자산 `{js 1 · css 1}` · `dist` 루트 `{assets, index.html}` |
 | W-9 | `npm run gate:boundary-canary` | 0 |
 | W-10 | `npx playwright install chromium` | 0(설치본 재사용) |
 | W-11 | `npm run test:e2e` | 0 |
 | W-12 | `./gradlew --no-daemon :app:bootJar` | 0 |
-| W-13 | `npm run test:e2e:journey` | 0 — **8 passed**(34.0s) |
+| W-13 | `npm run test:e2e:journey` | 0 — **8 passed**(34.7s) |
 | check | `./gradlew --no-daemon check qualityBaseline` | **0** — evidence 최종 HEAD 에서 재실측: `BUILD SUCCESSFUL in 20s` · 392 task(35 실행 · 357 up-to-date). 첫 전건은 `BUILD SUCCESSFUL in 30m 31s`(401 task · 226 실행 · 136 from cache)였다 |
 
 **20s·357 up-to-date 가 「안 돌았다」가 아님을 따로 쟀다**(「초록인데 조용하다」 규율). 이 slice 가

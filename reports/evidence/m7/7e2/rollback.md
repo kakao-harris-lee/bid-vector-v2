@@ -37,7 +37,10 @@ in_scope 와 겹치는 것은 **`web/src/api/generated/operator-api.ts` 하나**
 설정 여정이 **전략을 바꾸지만** 그것도 되돌릴 상태가 아니다: 여정이 쓰는 DB 는 실행마다
 버려지고, 여정 자신이 끝에서 감시 조건을 비운다.
 
-## 복원 목록 — 수정된 파일 **열셋** (전부 base 기준)
+## 복원 목록 — 수정된 파일 **13** (전부 base 기준)
+
+**블록은 기계 출력을 그대로 옮긴다**(CR r2 L2R-10) — 라운드마다 다시 쓰고 끼워 넣지 않는다.
+`git diff --name-status fa5ca096..HEAD -- web .github tools` 의 `M`·`A` 를 정렬한 것이다.
 
 ```
 git restore --source=fa5ca096 --staged --worktree -- \
@@ -56,13 +59,13 @@ git restore --source=fa5ca096 --staged --worktree -- \
   web/src/screens/WorksheetScreen.tsx
 ```
 
-## 삭제 목록 — 새 파일 **열일곱**
+## 삭제 목록 — 새 파일 **17**
 
 ```
 rm -f \
   web/e2e/journey/settings.spec.ts \
-  web/src/api/queryKeys.ts \
   web/e2e/journey/shared.ts \
+  web/src/api/queryKeys.ts \
   web/src/display/bidBoxDisplay.test.ts \
   web/src/display/bidBoxDisplay.ts \
   web/src/display/editSessionDisplay.test.ts \

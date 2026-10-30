@@ -125,6 +125,9 @@ state 이고 모듈 전역이 아니다. 표는 전부 `const` 라 가변 상태
    `caseVersion` 증가를 실측하지만 계약 전체의 단언은 아니다. 버전을 올리지 않는 쓰기가 계약에
    들어오고 **화면이 그것을 쓰기 시작하면** 그때 붉어진다. 서버 멱등 키(7E-1 제한 14 의 7C 후속
    후보)가 들어오면 그쪽이 정본이 된다.
+8b. **「지남」을 막는 것은 지금 test 의 문자열 술어다**(§3.1 ⑨) — 산출물에는 브라우저 시계 판정이
+   없지만(verifier 가 확인했다), 낱말 하나만 바꾼 변이는 통과한다. 구조 처방(lint)은 **게이트
+   추가**라 이 PR 범위 밖이고 다음 구현 커밋 몫이다.
 8. **잔여 ④ 는 「그 경로만」 닫혔다** — 쓰기 축에서는 인용 문자열 안에 쉼표로 적은 자료처럼
    **토큰 모양을 지키는** 쓰기를, 읽기 축에서는 **식별자가 아닌 접근과 CSSOM** 을 보지 못한다
    (r1 검토가 둘 다 재현했다). 등재는 §3.1 의 ⑥·⑦ 이고, 처방은 열거 확장이 아니라 **호출식의
@@ -181,6 +184,8 @@ DOM lib 심볼로 해소되는지만 본다. 같은 값을 가져오는 다른 �
 | ⑥(v N6) | ④ 읽기 술어를 **계산 접근**으로 비켜 간다 | `window['getComputedStyle'](el)['getPropertyValue']('--x')` — 리터럴 원소 접근이라 **식별자가 아니고** 캐스팅도 없다(gate 0 · tsc 0 · lint 0) | 열거를 늘리지 않는다 — **호출식의 해소된 서명**으로 판정한다(`checker.getResolvedSignature(call).declaration` 이 lib.dom 선언인가). 그러면 접근 꼴과 무관해진다 | `web/scripts/check-src-tree.mjs` ⑤d |
 | ⑦(v N7) | **CSSOM 읽기**가 열려 있다 | `index.css` 의 **비-custom 속성**(`.x::after{content:"[{…}]"}`) + `document.styleSheets[0].cssRules[…].cssText` (gate 0) | 쓰기 술어를 custom property 밖으로 넓히고(선언 값 전수), 읽기 쪽에 `styleSheets`·`cssRules`·`cssText`·`computedStyleMap`·`getAttribute('style')` 를 같은 **서명 해소** 층으로 더한다 | 같은 파일 ⑤d · `web/src/index.css` |
 | ⑧(v N4) | `publicDir` 를 **환경변수로** 켠다 | `publicDir: process.env.BV_PUB ?? false` — 게이트 시점의 해석값은 `''` 라 통과(gate 0). 하네스 빌드에서 env 가 켜지면 둘째 층(`assertDistRoot`)이 잡지만 **container 빌드에는 그 층이 없다** | 설정 해석을 **여러 env 조합**으로 돌리거나, `dist` 루트 모양 단언을 container 이미지 빌드에도 둔다 | 같은 파일 ⑥ · `docker/web.Dockerfile` |
+
+| ⑨(v r2 L-2) | 「지남」 잠금이 **문면 두 낱말**에 걸려 있다 | 카드에 브라우저 시계 판정을 더하되 낱말을 바꾼다: `… < Date.now() ? ' (기한 경과)'` → **tsc 0 · vitest 전건 통과**(낱말 셋 `지남`·`남음` 을 쓰는 변이 셋은 RED). 산출물에는 시계 판정이 **없다** — 잠금이 문자열 술어라는 것이 문제다 | **낱말을 더 열거하지 않는다** — `src/screens`·`src/display` 에서 `Date.now`·`new Date` 를 lint(`no-restricted-syntax`)로 막고 승인된 `daysUntil` 자리만 예외로 둔다. **게이트 추가라 이 PR 에서 하지 않는다**(팀장 결정 — 머지를 재검증 없이 CI 로 간다) | `web/eslint.config.js` · 다음 구현 커밋 |
 
 **v N5 는 닫혔다**: `publicDir: process.argv.includes('build') ? 'static' : false` 는 게이트를
 지나지만 **실제 `vite build` 뒤 `assertDistRoot` 가 throw** 한다(verifier 실측: `assets,
