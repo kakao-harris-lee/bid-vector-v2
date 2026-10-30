@@ -75,7 +75,6 @@ export function BidBoxScreen() {
   const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [tab, setTab] = useState<BidBoxTabId>('watching');
-  const [now] = useState(() => new Date());
 
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
 
@@ -161,7 +160,6 @@ export function BidBoxScreen() {
             <BidBoxCard
               key={row.caseId}
               bidCase={row}
-              now={now}
               onSend={(caseId, payload) => transition.mutate({ caseId, payload })}
             />
           ))}

@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 
 import type { BidCase } from '../api/queries';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
   ACTION_INPUT,
@@ -11,26 +11,12 @@ import {
   type BidBoxAction,
   type BidBoxActionKind,
 } from '../display/bidBoxDisplay';
-import { daysUntil } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
 /** 운영자가 적은 것 — 전이 하나를 보낼 때 실리는 값이다. 빈 문자열은 「아직 고르지 않았다」다. */
 export interface ActionPayload {
   readonly kind: BidBoxActionKind;
   readonly value: string;
-}
-
-/**
- * 「남은 날 수」는 요구표가 클라이언트 계산으로 승인한 **유일한 자리**다(7E-1 과 같은 함수를
- * 쓴다). 지난 쪽도 날 수로만 말하고 「지났다」는 판정을 만들지 않는다 — 그 판정은 서버의
- * `overdue` 하나다.
- */
-function checkpointHint(bidCase: BidCase, now: Date): string | null {
-  const days = daysUntil(bidCase.nextCheckpointAt, now);
-  if (days === null) {
-    return null;
-  }
-  return days >= 0 ? `${days}일 남음` : `${Math.abs(days)}일 지남`;
 }
 
 /**
@@ -159,16 +145,13 @@ function ActionButton({
  */
 export function BidBoxCard({
   bidCase,
-  now,
   onSend,
 }: {
   readonly bidCase: BidCase;
-  readonly now: Date;
   readonly onSend: (caseId: number, payload: ActionPayload) => void;
 }) {
   const [open, setOpen] = useState<BidBoxAction | null>(null);
   const row = bidBoxActionOf(bidCase.state);
-  const hint = checkpointHint(bidCase, now);
 
   return (
     <li data-testid={`bid-case-${bidCase.caseId}`} className="rounded-lg border border-line bg-card p-4">
@@ -193,12 +176,24 @@ export function BidBoxCard({
             />
           </dd>
         </div>
-        <Field
-          label="시점"
-          value={bidCase.nextCheckpointAt ?? null}
-          hint={hint ?? undefined}
-          testId={`checkpoint-at-${bidCase.caseId}`}
-        />
+        {/* 시각은 **서버가 준 값 그대로**다. 「N일 남음/지남」을 여기서 내지 않는다(v r1 M-1):
+            브라우저 시계로 재면 사용자마다 답이 다르고, `overdue:false` 인 건에 「지남」이 붙어
+            서버 판정과 어긋난 말을 하게 된다. 「지남」을 말하는 것은 위의 경고 배지 하나다.
+            `<time dateTime>` 은 7E-1 의 화면 C 와 같은 꼴이다(기계 가독 의미를 D 에서만 잃지 않게). */}
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-xs text-ink-soft">시점</dt>
+          <dd className="text-sm">
+            <span data-testid={`checkpoint-at-${bidCase.caseId}`}>
+              {bidCase.nextCheckpointAt === null || bidCase.nextCheckpointAt === undefined ? (
+                <span className="text-absent-ink">값 없음</span>
+              ) : (
+                <time dateTime={bidCase.nextCheckpointAt} className="font-numeric">
+                  {bidCase.nextCheckpointAt}
+                </time>
+              )}
+            </span>
+          </dd>
+        </div>
       </dl>
 
       {row.primary === null && row.secondary === null ? null : (

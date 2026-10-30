@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
-import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
+import { BID_BOX_TABS, STATE_TAB } from '../display/bidBoxDisplay';
+import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY, type BidCaseState } from '../display/caseDisplay';
 
 import { BidBoxScreen } from './BidBoxScreen';
 
@@ -112,16 +113,31 @@ describe('화면 D — 카드가 보이는 값은 API 응답의 값이다', () =
 
   /**
    * **이 slice 의 추론 금지 단언**(D-7E-4): 다음 확인 시점이 지났는데 서버가 `overdue: false`
-   * 라면 화면은 경고를 내지 않는다. 날 수만 내고 「지났다」는 판정을 만들지 않는다.
+   * 라면 화면은 **아무 말도 만들지 않는다** — 경고도 없고 「N일 지남」도 없다.
+   *
+   * v r1 M-1 이 잡은 자리: 앞 판은 브라우저 시계로 「9799일 지남」을 냈다. 그 말은 서버 판정과
+   * 어긋나고, 사용자마다 시계가 달라 답이 갈린다.
    */
-  it('시각이 지나도 overdue 가 거짓이면 경고가 없다 — 화면이 판정하지 않는다', async () => {
+  it('시각이 지나도 overdue 가 거짓이면 경고도 「지남」 문면도 없다', async () => {
     mocked.listBidCases.mockResolvedValue([
       bidCase({ nextCheckpointAt: '2000-01-01T00:00:00Z', overdue: false }),
     ]);
     renderScreen();
 
-    await screen.findByTestId('bid-case-11');
+    const card = await screen.findByTestId('bid-case-11');
     expect(screen.queryByTestId('overdue-11')).toBeNull();
+    expect(card.textContent).not.toContain('지남');
+    expect(card.textContent).not.toContain('남음');
+  });
+
+  /** 시각은 **서버가 준 값 그대로**이고 기계 가독 `<time>` 이다(7E-1 화면 C 와 같은 꼴). */
+  it('다음 확인 시점 시각을 API 값 그대로 time 으로 낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ nextCheckpointAt: '2099-01-03T00:00:00Z' })]);
+    renderScreen();
+
+    const slot = await screen.findByTestId('checkpoint-at-11');
+    expect(slot.textContent).toBe('2099-01-03T00:00:00Z');
+    expect(slot.querySelector('time')?.getAttribute('dateTime')).toBe('2099-01-03T00:00:00Z');
   });
 });
 
@@ -140,6 +156,29 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
 
     await screen.findByTestId('bid-case-22');
     expect(screen.queryByTestId('bid-case-11')).toBeNull();
+  });
+
+  /**
+   * **v r1 M-2 가 잡은 공백.** 탭 표는 `satisfies` 로 전수이고 표 test 도 있었지만, **화면의 필터**
+   * 자리에 특례를 끼우면 살아남았다(실측: `row.state === 'BID_PLANNED' ? 'recorded' : …` 와
+   * `startsWith('OPENED'|…)` 추론이 34/34 통과). 그래서 **상태 14 각각을 렌더해** 「그 건이
+   * `STATE_TAB` 이 말하는 탭에만 있고 그 탭의 수에 들어간다」를 표에서 파생해 잰다.
+   */
+  it.each(Object.keys(STATE_TAB) as BidCaseState[])('%s 은 표가 말하는 탭에만 있다', async (state) => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state })]);
+    const expectedTab = BID_BOX_TABS.find((one) => one.id === STATE_TAB[state])!;
+    renderScreen();
+
+    // 그 탭을 고르면 카드가 있고, 탭 이름 옆의 수가 1 이다.
+    const tab = await screen.findByRole('tab', { name: new RegExp(`${expectedTab.label} 1`, 'u') });
+    fireEvent.click(tab);
+    expect(await screen.findByTestId('bid-case-11')).toBeTruthy();
+
+    // 나머지 다섯 탭에서는 **없고** 그 수가 0 이다.
+    for (const other of BID_BOX_TABS.filter((one) => one.id !== expectedTab.id)) {
+      fireEvent.click(screen.getByRole('tab', { name: new RegExp(`${other.label} 0`, 'u') }));
+      expect(screen.queryByTestId('bid-case-11'), `${state} 가 ${other.label} 탭에도 있다`).toBeNull();
+    }
   });
 
   it('건이 없는 탭은 빈 얼굴을 낸다 — 가짜 행을 만들지 않는다', async () => {
