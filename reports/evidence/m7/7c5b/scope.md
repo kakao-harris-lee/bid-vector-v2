@@ -67,3 +67,6 @@
   정직하게, 알려진 제한 등재. ② **대사 기준 분모는 오늘 구조적으로 0** — 낙찰자 상호 적재 경로(`OPENING_AWARD_LIST`)가 출하 조립에 없다
   (`OPEN-SET01-AWARD-NAME-INGEST`, 운영자 2026-10-22 (a) 승인 · 착수 전). 이 slice 는 수집을 열지 않고 그 사실을 사유로 낸다. ③ **in_scope 추가**:
   `adapters/build.gradle.kts`(settlement 의존 한 줄 — 포트 서명이 `AwardWinnerTradeName` 을 쓴다).
+- 2026-10-31 **D-7C5B-11(팀장 — D-7C5B-7 정정)**: 판정 불가 사유는 **열**이다 — 개찰 축 **여섯**(공고 부재 · 개찰 전 · 수집 전 · 승격 전 · 진행구분
+  등재 밖 `UNRECOGNIZED` · 진행구분 부재 `ABSENT`) + 커널 축 넷. D-7C5B-7 의 「여덟」·「진행구분 모름」은 착수 보고의 산술 오류(5+4)와 접기에서
+  왔다 — 7C⑤-a 가 `UNRECOGNIZED`·`ABSENT` 를 다른 사실로 가르므로(`OpeningProgress` KDoc) 대사 사유에서도 접지 않는다.
