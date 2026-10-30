@@ -127,6 +127,13 @@ export const CASE_STATE_LABEL: Readonly<Record<string, string>> = {
   BID_PLANNED: '투찰 예정',
   BID_RECORDED: '투찰 기록됨',
   AWAITING_OPENING: '개찰 대기',
+  // 결과 단계 여섯(M7/7E-3a) — 여정 ⑤ 가 이 문면으로 화면 E·D 를 대조한다.
+  OPENED_PROVISIONAL_FIRST: '잠정 1위',
+  OPENED_OUT_OF_RANK: '순위 밖',
+  UNDER_QUALIFICATION_REVIEW: '적격심사 중',
+  WON: '낙찰',
+  LOST: '패찰',
+  FAILED_OR_REBID: '유찰·재공고',
 };
 
 /**
