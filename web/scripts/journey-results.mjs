@@ -34,6 +34,8 @@ export function countOutcomes(report) {
   const titles = { skipped: [], interrupted: [] };
   /** `test.fail`·`fixme` 처럼 **통과 아닌 결말을 선언한** test 들. */
   const notExpectedToPass = [];
+  /** **재시도가 있었던** test — 설정이 `retries: 0` 이라 spec 이 덮었다는 뜻이다(r3 v M-1). */
+  const retried = [];
   const specFiles = new Set();
 
   const visitSpec = (spec, trail, fallbackFile) => {
@@ -58,6 +60,14 @@ export function countOutcomes(report) {
       if (test.expectedStatus !== EXPECTED_TO_PASS) {
         notExpectedToPass.push(`${where} (expectedStatus: ${String(test.expectedStatus)})`);
       }
+      // **재시도는 결정적 실패를 초록으로 바꾼다**(r3 v M-1). 이 레인의 설정은 `retries: 0`
+      // 이므로 시도가 둘 이상인 것은 spec 이 `test.describe.configure({ retries })` 로 덮었다는
+      // 뜻이고, 그것은 `test.fail` 과 같은 계열(실패를 초록으로 바꾸는 선언)이다. 결말이
+      // `flaky` 든 `expected` 든 **시도 수**로 본다 — 두 번 실패하고 세 번째에 통과한 회귀도 잡는다.
+      const attempts = Array.isArray(test.results) ? test.results.length : 1;
+      if (attempts > 1) {
+        retried.push(`${where} (시도 ${attempts}회)`);
+      }
     }
   };
 
@@ -75,7 +85,7 @@ export function countOutcomes(report) {
   for (const suite of report.suites ?? []) {
     visitSuite(suite, [], undefined);
   }
-  return { counts, titles, notExpectedToPass, specFiles };
+  return { counts, titles, notExpectedToPass, retried, specFiles };
 }
 
 /** 등록부 본문 → spec 경로 집합. `#` 주석과 빈 줄은 무시한다(vitest 등록부와 같은 꼴). */
@@ -94,11 +104,16 @@ export function parseSpecRegistry(text) {
  * ⓐ 건너뛴·중단된 test 0. ⓑ 모든 test 가 **통과하기로 선언**됐다(`test.fail` 차단 — r2 v M-1).
  * ⓒ **돈 test 가 하나라도 있다** — 수집이 0 이면 「전부 통과」와 「아무것도 안 돌았다」가 같은
  * exit 0 이 되고, 그러면 이 게이트가 막으려던 바로 그 꼴이 다른 문으로 들어온다. ⓓ **spec 파일
- * 집합 == 등록부**(r2 CR M-2) — ⓒ 만으로는 다섯 중 넷이 사라져도 하나만 돌면 초록이고, 사라지는
- * 길은 삭제만이 아니라 `testMatch` 밖으로의 개명 하나면 된다.
+ * 집합 == 등록부**(r2 CR M-2) — ⓒ 만으로는 spec 하나가 사라져도 나머지가 돌면 초록이고, 사라지는
+ * 길은 삭제만이 아니라 `testMatch` 밖으로의 개명 하나면 된다. ⓔ **재시도 0**(r3 v M-1) — 설정이
+ * `retries: 0` 인데 spec 이 그것을 덮으면 결정적 실패가 `flaky` 로 바뀌어 지나간다.
+ *
+ * **ⓓ 의 입도는 「파일」이다**(r3 v L-1 · CR L-2): 한 spec 안에서 test 를 지우거나 수집 시점
+ * 조건(`if (env) test(…)`)으로 빼는 것은 집합을 바꾸지 않아 이 축이 잡지 못한다. vitest 레인의
+ * 등록부도 같은 입도이고(일관된 선택), 수를 박으면 등록부가 test 마다 흔들린다 — 알려진 제한이다.
  */
 export function verdictOf(report, registry) {
-  const { counts, titles, notExpectedToPass, specFiles } = countOutcomes(report);
+  const { counts, titles, notExpectedToPass, retried, specFiles } = countOutcomes(report);
   const problems = [];
 
   for (const status of NOT_RUN_STATUSES) {
@@ -114,6 +129,13 @@ export function verdictOf(report, registry) {
       `통과하기로 선언되지 않은 test ${notExpectedToPass.length}건 — ` +
         '`test.fail`·`fixme` 는 단언을 뒤집은 채 초록으로 끝난다: ' +
         notExpectedToPass.join(' / '),
+    );
+  }
+  if (retried.length > 0 || counts.flaky > 0) {
+    problems.push(
+      `재시도가 있었던 test ${Math.max(retried.length, counts.flaky)}건 — ` +
+        '이 레인의 설정은 `retries: 0` 이다(spec 이 덮으면 결정적 실패가 flaky 로 바뀐다): ' +
+        (retried.length > 0 ? retried.join(' / ') : `flaky ${counts.flaky}`),
     );
   }
   if (counts.unknown > 0) {

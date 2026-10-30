@@ -21,7 +21,13 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
 
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
+  /**
+   * **무조건이다**(M7/7E-3a r3 v L-2). `CI` 가 없을 때 `test.only` 는 그 파일의 나머지를 조용히
+   * 버리고 게이트를 지난다(실측: 파일마다 only 하나 → `4 passed / 8`, 체인 exit 0). 여정 레인은
+   * **전건으로만** 판정하므로 로컬에서도 그 꼴을 허용하지 않는다 — 부분 실행은
+   * `npx playwright test --config=… <인자>` 로 하고, 그것은 애초에 이 게이트를 지나지 않는다.
+   */
+  forbidOnly: true,
   retries: 0,
   // 하네스가 한 벌뿐이고 여정이 같은 계정·같은 건을 쓴다 — 워커를 늘리면 서로의 전이를 본다.
   workers: 1,

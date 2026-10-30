@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import { REPORT_RELATIVE } from './journey-report-path.mjs';
 import { countOutcomes, parseSpecRegistry, verdictOf } from './journey-results.mjs';
 
 /** Playwright JSON 리포터의 모양 — 중첩 suite 안에 spec, spec 안에 test(결말). */
@@ -175,5 +180,63 @@ describe('여정 spec 등록부 등식 (r2 CR M-2)', () => {
   it('등록부를 주지 않으면 그 축은 서지 않는다 — 다른 축은 그대로다', () => {
     expect(verdictOf(report([spec('여정 ⑤', 'expected')])).ok).toBe(true);
     expect(verdictOf(report([spec('여정 ⑤', 'skipped', 'skipped')])).ok).toBe(false);
+  });
+});
+
+/**
+ * **설정과 게이트가 같은 파일을 가리켜야 한다**(r3 CR L-3). 어긋나면 fail-closed(늘 붉다)라
+ * 사고는 작지만, 그 불변을 주석만 들고 있으면 고치는 사람이 한쪽만 옮긴다. 여기서 등식을 잰다.
+ */
+describe('판정 리포트 경로의 불변', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+
+  it('설정의 outputFile 이 게이트가 읽는 경로와 같다', () => {
+    const config = readFileSync(resolve(here, '..', 'playwright.journey.config.ts'), 'utf8');
+
+    expect(
+      config,
+      'playwright.journey.config.ts 의 outputFile 과 journey-report-path.mjs 가 갈렸다',
+    ).toContain(`outputFile: '${REPORT_RELATIVE}'`);
+  });
+
+  it('시작 표지가 지우는 파일도 같은 상수에서 나온다', () => {
+    const begin = readFileSync(resolve(here, 'journey-run-begin.mjs'), 'utf8');
+
+    expect(begin, '시작 표지가 경로를 따로 적는다').toContain("from './journey-report-path.mjs'");
+  });
+});
+
+/** ⓔ 재시도 축(r3 v M-1) — 설정이 `retries: 0` 인데 spec 이 덮으면 결정적 실패가 초록이 된다. */
+describe('재시도가 있었던 test (r3 v M-1)', () => {
+  const withResults = (title, status, attempts) => ({
+    title,
+    file: 'results.spec.ts',
+    tests: [{ status, expectedStatus: 'passed', results: Array.from({ length: attempts }, () => ({})) }],
+  });
+
+  it('두 번 시도해 통과한 test 는 ok 가 아니다 — 결말이 flaky 든 expected 든', () => {
+    const verdict = verdictOf(report([withResults('여정 ⑤', 'flaky', 2)]));
+
+    expect(verdict.ok).toBe(false);
+    expect(verdict.problems.join(' ')).toContain('재시도가 있었던 test');
+    expect(verdict.problems.join(' ')).toContain('시도 2회');
+  });
+
+  it('세 번째에만 통과한 결정적 회귀도 잡는다', () => {
+    const verdict = verdictOf(report([withResults('여정 ⑤', 'expected', 3)]));
+
+    expect(verdict.ok, '시도 수를 보지 않고 결말만 보면 지나간다').toBe(false);
+  });
+
+  it('결말이 flaky 로만 오고 results 가 없어도 잡는다', () => {
+    const verdict = verdictOf({
+      suites: [{ title: 'c', file: 'results.spec.ts', specs: [{ title: 'x', file: 'results.spec.ts', tests: [{ status: 'flaky', expectedStatus: 'passed' }] }] }],
+    });
+
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('한 번에 통과한 test 는 이 축이 ok 다', () => {
+    expect(verdictOf(report([withResults('여정 ⑤', 'expected', 1)])).ok).toBe(true);
   });
 });
