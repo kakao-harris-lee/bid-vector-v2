@@ -58,6 +58,24 @@
 
 - 없음.
 
+## 구현 레인 기록 (2026-10-30)
+
+- **판정 대상 SHA**: `96aa9f10`(main `ea91d753` 병합 커밋). 산출물 커밋의 마지막은 `708c9f60` 이고
+  그 뒤는 병합과 evidence 뿐이다 — rollback 실측 HEAD 도 `96aa9f10` 이다.
+- **하네스 레인 변경: 없음.** `git log --oneline fa5ca096..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다.
+  이 range 에는 7C②-b(PR #103)·7E-2(PR #105) 머지가 들어 있으나 **in_scope 경로와 교집합이 0** 이고
+  (병합 직전 실측), slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다.
+- **in_scope 안에서 더 만진 자리 둘**(계약 문면의 「`config/quality/*` 게이트 등재·허용 목록, 기계적
+  귀결」에 드는 것으로 읽었다 — 범위 확장이 아니라 그 항목의 실제 내용이다):
+  ① `app.surface.api.handlers` — 새 컨트롤러 한 줄. 이 목록이 `HttpSurfaceCensusTest`(출하 조립 실측)와
+  `AccountBindingStructureTest`(요청 매핑 선언 집합) **두 게이트의 단일 출처**이고, 등재를 잊으면 둘이
+  함께 붉는다(전건 2 회차에서 실측됐다). ② `app.injection.allowed-types` — 짝 응답 타입과 use case
+  주입점 둘. 제네릭 인자를 풀어 세는 게이트라 중첩 응답 타입이 생기면 늘어난다.
+- **새로 만든 test class 셋**(in_scope 「체크리스트 test · 계약·보안 test」):
+  `OpenApiFlatnessControlTest`(술어 대조) · `OpenApiOnboardingChecklistContractTest`(계약·어휘 등식) ·
+  `OnboardingChecklistEndpointTest`(HTTP 거동) · `ReadOnboardingChecklistUseCaseTest`(원천·구역).
+  넷 다 만든 커밋에서 `config/quality/gate-tests.properties` 에 등재했다.
+
 ## 계약 갱신 이력
 
 - 2026-10-30 착수(팀장) · 운영자 승인 2026-10-30.
