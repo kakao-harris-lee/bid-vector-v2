@@ -9,6 +9,7 @@ import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.BusinessProfileStorePort
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.ListConstructionCapacitiesUseCase
+import bidvector.workflow.profile.ReadOnboardingChecklistUseCase
 import bidvector.workflow.profile.ReadProfileUseCase
 import bidvector.workflow.profile.RemoveConstructionCapacityUseCase
 import bidvector.workflow.profile.ReplaceBusinessDetailsUseCase
@@ -40,6 +41,24 @@ open class ProfileTestWiring {
         inMemoryOperatorProfile: InMemoryOperatorProfile,
         inMemoryBusinessProfileStore: InMemoryBusinessProfileStore,
     ): ReadProfileUseCase = ReadProfileUseCase(inMemoryOperatorProfile, inMemoryBusinessProfileStore)
+
+    /**
+     * 체크리스트 조회(M7/7C④-3) — 전략은 `HttpTestApplication` 의 `TestStrategyRepository` 빈을 그대로
+     * 받는다(둘째 전략 빈을 만들지 않는다 — 두 벌이면 test 가 고른 값과 판정이 읽는 값이 갈린다).
+     */
+    @Bean
+    open fun readOnboardingChecklistUseCase(
+        inMemoryOperatorProfile: InMemoryOperatorProfile,
+        inMemoryBusinessProfileStore: InMemoryBusinessProfileStore,
+        strategyRepository: TestStrategyRepository,
+        clock: FixedClock,
+    ): ReadOnboardingChecklistUseCase =
+        ReadOnboardingChecklistUseCase(
+            qualification = inMemoryOperatorProfile,
+            business = inMemoryBusinessProfileStore,
+            strategies = strategyRepository,
+            clock = clock,
+        )
 
     @Bean
     open fun listConstructionCapacitiesUseCase(

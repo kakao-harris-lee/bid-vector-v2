@@ -114,6 +114,8 @@ class ConstantTimeComparisonStructureTest {
                 "RequestValuesKt",
                 "ProfileResponse",
                 "ConstructionCapacityResponse",
+                "OnboardingChecklistResponse",
+                "AwaitingItemResponse",
                 "ProfileHttp",
                 "BidCaseHttp",
                 "NotificationItemResponse",
@@ -235,6 +237,12 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "프로필 조회 응답 값 객체(data class) 자동 생성 equals — 업종·면허명·상호·소재지·나라장터 답·판정 대기 축뿐, 자격증명 값 없음",
         "ConstructionCapacityResponse" to
             "시평액 한 행 응답 값 객체(data class) 자동 생성 equals — 면허명·금액·기준 연도뿐, 자격증명 값 없음",
+        // M7/7C④-3 — 체크리스트 응답 둘. 어느 칸도 운영자 입력을 나르지 않는다: 실리는 것은 **닫힌
+        // 어휘의 enum 이름**(`OnboardingItem`)뿐이고 자유 문자열 칸이 없다 — 운반할 비밀이 애초에 없다.
+        "OnboardingChecklistResponse" to
+            "체크리스트 응답 값 객체(data class) 자동 생성 equals — 항목 이름 목록 둘과 짝 목록뿐, 자격증명 값 없음",
+        "AwaitingItemResponse" to
+            "선행 대기 짝 응답 값 객체(data class) 자동 생성 equals — 항목 이름 둘(닫힌 어휘)뿐, 자격증명 값 없음",
         "ProfileHttp" to
             "쓰기 결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(StorageWriteOutcome.Written) — 객체 동일성, 자격증명 좌표 0",
     )

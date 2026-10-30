@@ -152,17 +152,25 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
     /**
      * D-6A1-44 닫힘 판정 — `paths`의 **인라인 응답 스키마**(`components.schemas` 밖)에
-     * ① 중첩 object 속성 ② object 배열 속성 ③ `$ref` 속성을 심어도 [collectNonFlatProperties]가
-     * 셋 다 잡는지를 **합성 spec**으로 잠근다. 실 `openapi.yaml`은 오늘 위반이 없어(파일을
-     * 고쳐도 통과하므로) 위치 폐쇄 자체는 합성 spec 없이는 고정할 수 없다(verifier MUT-D6
-     * 재현).
+     * ① 깊이 2 object 속성 ② 깊이 2 object 배열 속성 ③ `$ref` 속성을 심어도
+     * [collectNonFlatProperties]가 셋 다 잡는지를 **합성 spec**으로 잠근다. 실 `openapi.yaml`은
+     * 오늘 위반이 없어(파일을 고쳐도 통과하므로) 위치 폐쇄 자체는 합성 spec 없이는 고정할 수
+     * 없다(verifier MUT-D6 재현).
+     *
+     * **D-7C4C-6 이 심는 깊이를 한 칸 내렸다.** 앞 판은 깊이 1 로 심었는데 그 모양이 이제
+     * 정당해져(`awaiting` 짝) 심은 것이 위반이 아니게 됐다 — 그러면 이 test 는 초록이지만
+     * **아무 위치도 재지 않는다**. 재는 대상은 모양이 아니라 **순회가 거기까지 가는가**이므로,
+     * 모양만 여전히 위반인 것으로 바꾼다.
      */
     @Test
     fun `paths 의 인라인 응답 스키마에 심은 위반도 순회가 잡는다`() {
         // 아래에서 위로 조립한다 — 한 표현식으로 쓰면 들여쓰기가 깊어져 줄 길이 한도를 넘는다.
         val innerScalar = mapOf("type" to "string")
-        val nestedObjectProperty = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
-        val objectItems = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
+        // **깊이 2 로 심는다**(D-7C4C-6): 깊이 1 은 이제 정당한 모양이라 그것으로는 위치 폐쇄를
+        // 잴 수 없다 — 심은 것이 위반이 아니면 이 test 는 순회가 거기까지 가는지를 묻지 못한다.
+        val depthOne = mapOf("type" to "object", "properties" to mapOf("deep" to innerScalar))
+        val nestedObjectProperty = mapOf("type" to "object", "properties" to mapOf("inner" to depthOne))
+        val objectItems = mapOf("type" to "object", "properties" to mapOf("inner" to depthOne))
         val arrayOfObjectProperty = mapOf("type" to "array", "items" to objectItems)
         val refProperty = mapOf("\$ref" to "#/components/schemas/Nested")
         val inlineResponseSchema =
@@ -358,25 +366,83 @@ private val SCALAR_PROPERTY_TYPES = setOf("string", "integer", "number", "boolea
 private val NON_FLAT_KEYS = setOf("\$ref", "oneOf", "allOf", "anyOf", "additionalProperties")
 
 /**
- * D-6A1-38 — 허용 목록으로 뒤집은 평탄 속성 판정. 속성 정의가 **스칼라 타입**이거나
- * **아이템이 스칼라인 배열**일 때만 `true`다. `$ref`·`oneOf`·`allOf`·`anyOf`·
- * `additionalProperties`가 있거나 `type` 자체가 없거나 `type: object`이거나 배열의
- * 아이템이 다시 배열·object·참조이면 전부 `false` — 새로 생기는 합성 어휘를 열거할
- * 필요가 없다(차단 목록에는 종점이 없지만 허용 목록은 종점이 있다).
+ * D-7C4C-6 — **깊이 1 object 가 가질 수 있는 키 전부**(허용 목록). `nullable`(두 모양을 받는
+ * 속성)과 아직 모르는 어휘(`patternProperties` 등)는 여기 없으므로 기본 거부 쪽에 떨어진다.
  */
-private fun isFlatPropertyDefinition(definition: Map<String, Any?>): Boolean {
+private val DEPTH_ONE_OBJECT_KEYS = setOf("type", "properties", "required", "description")
+
+/**
+ * r1 CR M-1 · v L-1 — 깊이 1 object 를 **나르는 배열 래퍼**가 가질 수 있는 키 전부(허용 목록).
+ * object 쪽만 닫으면 같은 object 를 `nullable: true` 배열로 감싸 「null 이거나 짝 배열」인 두 모양
+ * 속성이 통과한다(옛 술어는 거부했으므로 이 확장이 새로 연 자리였다).
+ *
+ * **스칼라 배열 래퍼에는 걸지 않는다** — 그 관용은 D-6A1-38 부터 있었고 계약이 스칼라 층을 범위 밖에
+ * 두었다(D-7C4C-6). 그래서 `nullable` 스칼라 배열은 통과하고 `nullable` object 배열은 거부된다.
+ */
+private val DEPTH_ONE_ARRAY_KEYS = setOf("type", "items", "description")
+
+/**
+ * D-6A1-38(스칼라 축) + **D-7C4C-6(깊이 1 object 축)** — 허용 목록으로 뒤집은 평탄 속성 판정.
+ *
+ * 깊이 1 을 연 이유는 `awaiting` 짝(`[{item, prerequisite}]`)이다 — 스칼라 배열 둘로 내면 짝이
+ * **자리로만** 묶여 한쪽이 길어지는 응답이 표현 가능해진다(D-7C4C-1 이 그 선택지를 기각했다).
+ *
+ * **깊이가 열거가 아니라 호출 그래프로 닫힌다**: object 층([isDepthOneObject])이 스칼라 층
+ * ([isScalarOrScalarArray])만 부르고 자기를 다시 부르지 않아 깊이 2 는 **표현할 함수가 없다**
+ * (깊이를 세는 인자였다면 1 을 2 로 고치는 한 글자로 열린다). 안쪽 object 는
+ * [collectPropertyDefiningSchemas]가 스키마로 따로 수집하므로 같은 위반이 두 자리에서 잡힌다.
+ *
+ * **이 보장은 타입이 정직한 스키마에서 성립한다**(r1 v L-2 — 문장의 과대를 좁힌다). 스칼라 층은
+ * 모르는 키를 무시하므로, 깊이 1 object 의 속성이 `{type: string, properties: …}` 처럼 **스칼라라고
+ * 선언하면서 object 를 품으면** 그 안쪽은 이 술어의 판정 밖이다. 계약이 스칼라 쪽 술어를 범위 밖에
+ * 두었고(D-7C4C-6) 그 관용은 D-6A1-38 부터 있던 것이다 — 이 slice 가 연 자리가 아니며 알려진 제한에
+ * 있다. 닫으려면 스칼라 층에도 키 허용 목록을 걸어야 하고 그때 기존 계약의 서술 키들이 함께 붉는다.
+ */
+internal fun isFlatPropertyDefinition(definition: Map<String, Any?>): Boolean =
+    isScalarOrScalarArray(definition) || isDepthOneObjectDefinition(definition)
+
+/**
+ * D-6A1-38 — 스칼라이거나 아이템이 스칼라인 배열. `$ref`·`oneOf`·`allOf`·`anyOf`·
+ * `additionalProperties`가 있거나 `type` 자체가 없거나 `type: object`이거나 배열의 아이템이
+ * 다시 배열·object·참조이면 `false` — 새로 생기는 합성 어휘를 열거할 필요가 없다(차단 목록에는
+ * 종점이 없지만 허용 목록은 종점이 있다).
+ */
+private fun isScalarOrScalarArray(definition: Map<String, Any?>): Boolean {
     if (NON_FLAT_KEYS.any(definition::containsKey)) return false
     return when (definition["type"]) {
         in SCALAR_PROPERTY_TYPES -> true
-        "array" -> isFlatArrayItems(definition["items"])
+        "array" -> isScalarArrayItems(definition["items"])
         else -> false
     }
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun isFlatArrayItems(items: Any?): Boolean {
+private fun isScalarArrayItems(items: Any?): Boolean {
     val itemsDefinition = items as? Map<String, Any?>
     return itemsDefinition != null &&
         NON_FLAT_KEYS.none(itemsDefinition::containsKey) &&
         itemsDefinition["type"] in SCALAR_PROPERTY_TYPES
+}
+
+/** D-7C4C-6 — 깊이 1 object 자신이거나 그 object 를 아이템으로 갖는 배열. */
+private fun isDepthOneObjectDefinition(definition: Map<String, Any?>): Boolean =
+    when (definition["type"]) {
+        "object" -> isDepthOneObject(definition)
+        "array" -> DEPTH_ONE_ARRAY_KEYS.containsAll(definition.keys) && isDepthOneObject(definition["items"])
+        else -> false
+    }
+
+/**
+ * 속성이 **전부 스칼라 또는 스칼라 배열**인 object — 키 집합도 [DEPTH_ONE_OBJECT_KEYS] 안이어야
+ * 한다. 빈 `properties` 는 거부다: 키 없는 object 는 클라이언트에 아무 계약도 주지 않는다.
+ */
+@Suppress("UNCHECKED_CAST")
+private fun isDepthOneObject(candidate: Any?): Boolean {
+    val schema = candidate as? Map<String, Any?> ?: return false
+    val properties = schema["properties"] as? Map<String, Any?>
+    return schema["type"] == "object" &&
+        DEPTH_ONE_OBJECT_KEYS.containsAll(schema.keys) &&
+        properties != null &&
+        properties.isNotEmpty() &&
+        properties.values.all { it is Map<*, *> && isScalarOrScalarArray(it as Map<String, Any?>) }
 }

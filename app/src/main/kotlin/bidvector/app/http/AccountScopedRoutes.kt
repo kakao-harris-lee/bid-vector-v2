@@ -41,8 +41,17 @@ object AccountScopedRoutes {
     const val PROFILE_CAPACITIES: String = "/construction-capacities"
     const val PROFILE_CAPACITIES_REMOVE: String = "$PROFILE_CAPACITIES/remove"
 
+    /**
+     * 시작하기 체크리스트의 뿌리(M7/7C④-3, D-7C4C-7) — **프로필 아래가 아니다.**
+     *
+     * 판정의 입력 넷 가운데 둘(감시 규칙 · 시계)이 프로필 밖이라, `/api/profile/…` 아래 두면 뒤에 이
+     * 경로를 고치는 사람이 「프로필 저장만의 함수」로 읽는다 — 전략을 보지 않고 응답을 고치는 변경이
+     * 그 오독에서 나온다.
+     */
+    const val ONBOARDING_CHECKLIST: String = "/api/onboarding-checklist"
+
     /** 계정 전용 뿌리 전수. 늘어나면 여기만 늘린다. */
-    val ROOTS: Set<String> = setOf(BID_CASES, NOTIFICATIONS, PROFILE)
+    val ROOTS: Set<String> = setOf(BID_CASES, NOTIFICATIONS, PROFILE, ONBOARDING_CHECKLIST)
 
     /** 이 경로가 계정 주체를 요구하는가 — 표면 전수 test 가 선언↔판정 대조에 쓴다. */
     fun covers(path: String): Boolean = ROOTS.any { it == path || path.startsWith("$it/") }
