@@ -122,6 +122,19 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
     expect(badge.textContent ?? '').toContain('7');
   });
 
+  /**
+   * **접근성 축으로 잠근다**(r2 CR L-2). `data-testid` 로만 집으면 `role="status"` 를 지우는
+   * 변이가 초록이다 — 그 속성이 쓰기 성공의 **유일한** 신호다(알림함에는 토스트가 없다).
+   */
+  it('배지가 live region 이다 — 쓰기 성공이 조용하지 않다', async () => {
+    renderScreen();
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+
+    const live = screen.getByRole('status');
+    expect(live.getAttribute('data-testid'), 'live region 이 배지가 아니다').toBe('inbox-unread-badge');
+    expect(live.getAttribute('aria-live')).toBe('polite');
+  });
+
   it('안읽음이 0 이면 배지가 0 을 말한다 — 숨겨서 「모른다」로 만들지 않는다', async () => {
     mocked.listNotifications.mockResolvedValue(page([item({ read: true, readAt: '2026-11-02T02:00:00Z' })], 0));
     renderScreen();
@@ -180,8 +193,48 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
   });
 
   /**
-   * **누른 버튼이 사라지지 않는다**(r1 CR L-1) — 재조회가 그 행을 읽음으로 만들 때 버튼이
-   * DOM 에서 빠지면 포커스가 `<body>` 로 떨어진다. 잠기고 문면만 바뀐다.
+   * **쓰기 뒤 포커스를 돌려놓는다**(r2 CR M-1). 「버튼을 지우지 않는다」만으로는 닫히지 않는다 —
+   * 포커스된 요소가 `disabled` 가 되면 브라우저가 blur 하므로 포커스는 그대로 `<body>` 로
+   * 떨어진다. 그래서 행으로 **명시적으로** 옮긴다.
+   *
+   * jsdom 은 disable 시 blur 를 구현하지 않으므로 여기서 재는 것은 **옮기는 쪽**이다(「옮겼다」는
+   * 참, 「안 옮기면 잃는다」는 브라우저 몫 — evidence 제한에 적었다).
+   */
+  it('읽음 처리가 끝나면 포커스가 그 행으로 간다', async () => {
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    fireEvent.click(within(row).getByRole('button', { name: /읽음/u }));
+
+    await waitFor(() =>
+      expect(
+        document.activeElement,
+        '쓰기 뒤 포커스가 행으로 돌아오지 않았다 — 키보드 운영자가 자리를 잃는다',
+      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')),
+    );
+  });
+
+  it('묶음 전체 읽음 뒤에는 포커스가 그 묶음으로 간다', async () => {
+    mocked.markNoticeNotificationsRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    renderScreen();
+
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    fireEvent.click(within(group).getByRole('button', { name: /묶음 전체/u }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('notice-group-0-SYN-7E3-RESULT-000')),
+    );
+  });
+
+  /**
+   * **누른 버튼이 사라지지 않는다**(r1 CR L-1) — 포커스 복귀와 **다른 축**이다(locator 안정).
    */
   it('읽은 뒤에도 그 버튼이 남는다 — 잠기고 문면만 바뀐다', async () => {
     mocked.listNotifications.mockResolvedValue(

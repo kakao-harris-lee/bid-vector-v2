@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { readOpeningResult, type BidCase, type OpeningResultView } from '../api/queries';
 import { openingResultQueryKey } from '../api/queryKeys';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
-import { isUnauthorized } from '../components/WriteFailure';
+import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -206,6 +206,8 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
   const opening = useQuery({
     queryKey: openingResultQueryKey(bidCase.noticeNumber, bidCase.noticeRound),
     queryFn: () => readOpeningResult(bidCase.noticeNumber, bidCase.noticeRound),
+    // 401 을 다시 때리지 않는 것은 **전역 기본**이 진다(`queryClient.ts`, r2 CR L-4) — 여기에
+    // 다시 적으면 test 가 `retry: false` 로 덮는 길을 이 질의만 잃는다.
   });
 
   return (
@@ -243,10 +245,13 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
       {opening.isPending ? <Skeleton testId={`opening-loading-${bidCase.caseId}`} rows={2} /> : null}
       {/* **세션이 없다는 답은 재시도로 풀리지 않는다**(r1 CR L-5) — 화면의 규율이 목록 쪽에만
           걸려 있어 카드 쪽 401 이 「다시 시도」 버튼을 달았다(`retry` 까지 더해 더 때린다). */}
+      {/* **막다른 문장이 아니라 길이다**(r2 CR L-4): 앞 판은 맨 `<p>` 라 운영자가 갈 곳이
+          없었고, `refetchOnWindowFocus: false` 라 목록 쪽 재조회가 저절로 오지도 않아 그 상태가
+          오래 갔다. 저장소가 같은 뜻을 그리는 자리는 `SignedOutFace` 다. */}
       {opening.isError && isUnauthorized(opening.error) ? (
-        <p data-testid={`opening-signed-out-${bidCase.caseId}`} className="mt-3 text-xs text-absent-ink">
-          세션이 없어 개찰 결과를 읽지 못했습니다 — 다시 로그인해야 합니다.
-        </p>
+        <div data-testid={`opening-signed-out-${bidCase.caseId}`} className="mt-3">
+          <SignedOutFace />
+        </div>
       ) : null}
       {opening.isError && !isUnauthorized(opening.error) ? (
         <ErrorFace testId={`opening-error-${bidCase.caseId}`} onRetry={() => void opening.refetch()} />

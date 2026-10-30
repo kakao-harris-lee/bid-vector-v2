@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 
 import {
@@ -27,9 +28,13 @@ const ABSENT = '값 없음';
  * 읽음 처리 요청의 두 모양. **단건과 묶음을 갈라 둔 것이 계약의 모양**이다(선택적 `kind` 가
  * 뜻을 바꾸는 모양은 조용히 잘못 맞는다) — 화면도 그 둘을 한 값으로 합치지 않는다.
  */
-type ReadRequest =
+type ReadRequest = {
+  /** 쓰기가 끝난 뒤 포커스를 돌려놓을 DOM id — 요청마다 다르다(행이냐 묶음이냐). */
+  readonly focusId: string;
+} & (
   | { readonly scope: 'ITEM'; readonly kind: NotificationItem['kind']; readonly noticeNumber: string; readonly noticeRound: string }
-  | { readonly scope: 'NOTICE'; readonly noticeNumber: string; readonly noticeRound: string };
+  | { readonly scope: 'NOTICE'; readonly noticeNumber: string; readonly noticeRound: string }
+);
 
 function sendRead(request: ReadRequest): Promise<MarkReadResult> {
   switch (request.scope) {
@@ -57,9 +62,31 @@ const EMPTY_DISPLAY = {
   tone: 'absent',
 } as const;
 
+/** 이 묶음이 **같은 공고의 몇 번째**인가 — key 가 삽입에 흔들리지 않게 하는 자리(r2 CR L-3). */
+function sameNoticeOrdinal(groups: readonly NoticeGroup[], index: number): number {
+  let seen = 0;
+  for (let i = 0; i < index; i += 1) {
+    const one = groups[i]!;
+    if (one.noticeNumber === groups[index]!.noticeNumber && one.noticeRound === groups[index]!.noticeRound) {
+      seen += 1;
+    }
+  }
+  return seen;
+}
+
 /** 항목의 신원은 **종류와 공고 쌍**이다(합성 id 가 없다) — testId 도 그 셋으로 짓는다. */
 function itemTestId(item: NotificationItem): string {
   return `notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}`;
+}
+
+/**
+ * 쓰기 뒤 **포커스를 돌려놓을 자리**(r2 CR M-1). 누른 버튼으로는 못 돌아간다 — 읽은 뒤 그
+ * 버튼은 `disabled` 이고, 포커스된 요소가 `disabled` 가 되면 브라우저가 그것을 blur 한다
+ * (HTML 의 unfocusing steps). 그래서 **행 자체**를 받을 자리로 두고 `tabIndex={-1}` 로 포커스를
+ * 받을 수 있게 한다.
+ */
+function itemDomId(item: NotificationItem): string {
+  return `inbox-row-${item.kind}-${item.noticeNumber}-${item.noticeRound}`;
 }
 
 function NotificationRow({
@@ -72,7 +99,12 @@ function NotificationRow({
   readonly onRead: () => void;
 }) {
   return (
-    <li data-testid={itemTestId(item)} className="flex flex-wrap items-center gap-2 border-t border-line py-2">
+    <li
+      id={itemDomId(item)}
+      tabIndex={-1}
+      data-testid={itemTestId(item)}
+      className="flex flex-wrap items-center gap-2 border-t border-line py-2 focus:outline focus:outline-2"
+    >
       <StateBadge display={displayOrUnknown(NOTIFICATION_KIND_DISPLAY, item.kind)} />
       {/* 부가 사실은 **있으면 그린다** — 어느 종류가 그것을 갖는지는 서버의 규칙이고, 화면이
           그 규칙을 한 벌 더 적으면 두 규칙이 갈린다. */}
@@ -131,8 +163,10 @@ function NoticeGroupBlock({
 }) {
   return (
     <li
+      id={`inbox-group-${group.noticeNumber}-${group.noticeRound}`}
+      tabIndex={-1}
       data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}`}
-      className="rounded-lg border border-line bg-card p-4"
+      className="rounded-lg border border-line bg-card p-4 focus:outline focus:outline-2"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm font-medium">{group.noticeNumber}</span>
@@ -156,7 +190,12 @@ function NoticeGroupBlock({
           type="button"
           disabled={disabled || group.unreadCount === 0}
           onClick={() =>
-            onRead({ scope: 'NOTICE', noticeNumber: group.noticeNumber, noticeRound: group.noticeRound })
+            onRead({
+              scope: 'NOTICE',
+              focusId: `inbox-group-${group.noticeNumber}-${group.noticeRound}`,
+              noticeNumber: group.noticeNumber,
+              noticeRound: group.noticeRound,
+            })
           }
           className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
         >
@@ -173,6 +212,7 @@ function NoticeGroupBlock({
             onRead={() =>
               onRead({
                 scope: 'ITEM',
+                focusId: itemDomId(item),
                 kind: item.kind,
                 noticeNumber: item.noticeNumber,
                 noticeRound: item.noticeRound,
@@ -202,6 +242,26 @@ export function InboxScreen() {
   const { signedIn } = useSessionCsrf();
 
   const inbox = useQuery({ queryKey: NOTIFICATIONS_QUERY_KEY, queryFn: () => listNotifications() });
+
+  /**
+   * 쓰기 뒤 포커스를 **명시적으로** 돌려놓는다(r2 CR M-1 · `BidBoxScreen` 의 같은 관례).
+   *
+   * 「버튼을 지우지 않는다」만으로는 닫히지 않는 자리다: 포커스된 요소가 `disabled` 가 되면
+   * 브라우저가 그것을 blur 하고(HTML unfocusing steps) 포커스는 앞 판과 똑같이 `<body>` 로
+   * 떨어진다. 더구나 `disabled` 는 **누른 순간** 서므로 쓰기가 실패하는 실행에서도 그렇다.
+   *
+   * **ref 에 두고 쓰는 즉시 비운다** — 남겨 두면 뒤의 재렌더가 포커스를 다시 끌어간다.
+   */
+  const pendingFocus = useRef<string | null>(null);
+
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (target === null) {
+      return;
+    }
+    pendingFocus.current = null;
+    document.getElementById(target)?.focus();
+  }, [inbox.data]);
 
   const read = useMutation({
     mutationFn: sendRead,
@@ -267,11 +327,20 @@ export function InboxScreen() {
         <ul className="flex flex-col gap-3">
           {groups.map((group, index) => (
             <NoticeGroupBlock
-              key={`${index}-${group.noticeNumber}-${group.noticeRound}`}
+              /**
+               * **key 는 차례를 쓰지 않는다**(r2 CR L-3): 맨 앞에 묶음이 하나 끼면 뒤 묶음의
+               * key 가 전부 밀려 통째로 재마운트되고, 그러면 「버튼이 DOM 에 남는다」도 그
+               * 실행에서는 성립하지 않는다. 같은 공고 안에서의 차례만 붙여 갈라진 두 묶음을
+               * 가른다(testId 는 strict locator 때문에 전체 차례를 그대로 쓴다).
+               */
+              key={`${group.noticeNumber}-${group.noticeRound}-${sameNoticeOrdinal(groups, index)}`}
               group={group}
               index={index}
               disabled={read.isPending}
-              onRead={(request) => read.mutate(request)}
+              onRead={(request) => {
+                pendingFocus.current = request.focusId;
+                read.mutate(request);
+              }}
             />
           ))}
         </ul>
