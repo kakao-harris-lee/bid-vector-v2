@@ -48,8 +48,13 @@ export default defineConfig({
      * 문면은 「e2e trace 에 세션 쿠키 평문 0」이다.
      *
      * Playwright 에 「본문만 빼기」 옵션이 없으므로 **아티팩트에 들어가는 종류를 바꾼다**:
-     * CI 는 **스크린샷만** 남긴다(비밀 문구는 password 입력이라 화면에 평문으로 그려지지
-     * 않는다). 로컬은 trace 를 그대로 둔다 — 그 산출물은 올라가지 않고 디버깅에 필요하다.
+     * CI 는 **스크린샷과 판정 리포트**를 남긴다(비밀 문구는 password 입력이라 화면에 평문으로
+     * 그려지지 않는다). 로컬은 trace 를 그대로 둔다 — 그 산출물은 올라가지 않고 디버깅에 필요하다.
+     *
+     * **판정 리포트도 이 디렉터리에 쓰인다**(M7/7E-3a r2 CR L-1): `test-results/` 는 실패 시 CI
+     * 아티팩트로 올라가므로 그 내용이 D-7E-6 의 대상이다. 담기는 것은 **제목·상태·오류 문면**
+     * 이고 자격 값은 0 이다 — 여정 spec 에 `console.*` 이 0 건이고 `watchRequests` 가 URL·메서드만
+     * 모으기 때문이다(본문을 모으는 자리가 없다). 그 근거는 evidence §개인정보에 있다.
      */
     trace: process.env.CI ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
