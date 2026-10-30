@@ -32,7 +32,11 @@ describe('화면 C 상태 표시 표 — 계약 enum 전수', () => {
     ['outcome', OUTCOME_DISPLAY, ['REACHED', 'NOT_REACHED']],
     ['bidPriceMenuState', BID_PRICE_MENU_DISPLAY, ['NOT_COMPUTED']],
     ['bidPriceMenuNotComputedReason', BID_PRICE_MENU_REASON_DISPLAY, ['MENU_PATH_NOT_WIRED']],
-    ['floorRateGroundsState', FLOOR_RATE_GROUNDS_DISPLAY, ['USABLE', 'ABSENT', 'ORIGIN_NOT_PUBLISHED']],
+    [
+      'floorRateGroundsState',
+      FLOOR_RATE_GROUNDS_DISPLAY,
+      ['USABLE', 'ABSENT', 'IMPLAUSIBLE', 'ORIGIN_NOT_PUBLISHED'],
+    ],
     ['floorShortfallState', FLOOR_SHORTFALL_STATE_DISPLAY, ['NOT_COMPUTED']],
     ['floorShortfallNotComputedReason', FLOOR_SHORTFALL_REASON_DISPLAY, ['SHORTFALL_POLICY_NOT_PUBLISHED']],
     [
@@ -93,6 +97,25 @@ describe('화면 C 의 G2 13 행 문면', () => {
     expect(slot.label).toBe('아직 산출 안 함');
     expect(slot.label).not.toMatch(/\d/);
     expect(displayOrUnknown(BID_PRICE_MENU_REASON_DISPLAY, 'MENU_PATH_NOT_WIRED').label).not.toMatch(/\d/);
+  });
+
+  /**
+   * DEC-10(7C②-b) — 근거가 되지 못하는 사유 **셋이 서로 다른 문면**이다. 한 문구로 접으면
+   * 운영자가 원문 품질(개연 범위 밖)과 출처 문제(게시값 아님)와 부재를 구별할 수 없다.
+   * 개연 범위 밖 행은 **숫자를 싣지 않는다** — 계약도 그 값을 근거 칸에 싣지 않는다.
+   */
+  it('DEC-10 — 근거 불가 사유 셋이 다른 문면이고 개연 범위 밖 행에 숫자가 없다', () => {
+    const implausible = displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, 'IMPLAUSIBLE');
+
+    expect(implausible.label).toContain('개연 범위 밖');
+    expect(implausible.label).not.toMatch(/\d/);
+    expect(implausible.why).not.toMatch(/\d/);
+    expect(implausible.tone).toBe('absent');
+
+    const faces = (['ABSENT', 'IMPLAUSIBLE', 'ORIGIN_NOT_PUBLISHED'] as const).map(
+      (state) => displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, state).label,
+    );
+    expect(new Set(faces).size).toBe(faces.length);
   });
 
   it('DEC-03 — 법정 하한율 미해석 고지 문장이 있다', () => {
