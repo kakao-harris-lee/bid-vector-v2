@@ -189,7 +189,7 @@ verifier 의 오염 재현을 **그대로** 돌렸다: 여정 ⑤ 앞에 그 건
 | web vitest(W-6) | **577 passed (29 files)** — r1 이 더한 33 |
 | web `gate:tests`(W-7) | 「등록부 기준 · skipped/todo 0 · failed 0」 |
 | web 스모크(W-11) | 2 passed |
-| web 여정(W-13) | **11 passed (43.6s)** + **새 게이트**: `여정 레인: 통과 11 · flaky 0 · 건너뜀 0 · 중단 0` |
+| web 여정(W-13) | **11 passed (43.6s)** + **새 게이트**: `여정 레인: 통과 11 · flaky 0 · 건너뜀 0 · 중단 0`(r1 판의 줄 — 등록부 축은 r2 에서 붙는다) |
 
 `.github/workflows/ci.yml` · `tools/one-command-check.sh` 는 **r1 에서도 손대지 않았다** — 게이트가
 `npm run test:e2e:journey` 안에서 이어 돌기 때문이다(축어 일치 유지).
@@ -226,7 +226,7 @@ verifier 의 오염 재현을 **그대로** 돌렸다: 여정 ⑤ 앞에 그 건
 
 ## 게이트 — 양성·음성 대조 (실 Playwright, 하네스 없는 가벼운 설정)
 
-통제군(전건 통과, spec 넷): 체인 exit **0** · `통과 4 · 건너뜀 0 · spec 4/4(등록부와 같다)`.
+통제군(전건 통과, spec 넷): 체인 exit **0** · `여정 레인: 통과 4 · flaky 0 · 건너뜀 0 · 중단 0 · spec 4/4(등록부와 같다)`.
 
 | 우회 시도 | Playwright | 체인 exit | 게이트가 말한 것 |
 | --- | --- | --- | --- |
@@ -262,7 +262,7 @@ verifier 의 오염 재현을 **그대로** 돌렸다: 여정 ⑤ 앞에 그 건
 | Kotlin `check` · `qualityBaseline` · `:app:bootJar` | **BUILD SUCCESSFUL** 셋 |
 | Python 전건 | 통과 |
 | web vitest(W-6) | **594 passed (30 files)** |
-| web 여정(W-13) | **11 passed** + 게이트 `통과 11 · 건너뜀 0 · spec 4/4(등록부와 같다)` |
+| web 여정(W-13) | **11 passed** + 게이트가 낸 줄 `여정 레인: 통과 11 · flaky 0 · 건너뜀 0 · 중단 0 · spec 4/4(등록부와 같다)` |
 
 ## 개인정보 — 판정 리포트가 담는 것 (r2 CR L-1)
 
@@ -270,3 +270,110 @@ verifier 의 오염 재현을 **그대로** 돌렸다: 여정 ⑤ 앞에 그 건
 담기는 것은 **제목·상태·오류 문면**이고 **자격 값은 0** 이다 — 근거 둘: 여정 spec 에 `console.*`
 이 0 건이라 `stdout`/`stderr` 가 비고, `watchRequests` 는 **URL·메서드만** 모은다(본문을 모으는
 자리가 없다). 설정 주석도 「스크린샷만」에서 「스크린샷과 판정 리포트」로 고쳤다.
+
+---
+
+# 수정 라운드 3 (r3) — 마지막 승인 전 일괄
+
+verifier `ready-for-review` · code-review `approve`, 둘 다 차단 0 에서 받은 일괄이다. 이 뒤에는
+리뷰 라운드를 돌리지 않고 **팀장이 버릴 clone 에서 독립 재현**한다 — 그래서 아래에 **재현 명령**을
+그대로 적는다.
+
+## 지적 ↔ 커밋 대응표
+
+| 지적 | 커밋 | 고친 것 |
+| --- | --- | --- |
+| **v M-1** spec 안 `retries` 가 결정적 실패를 초록으로 | **`b300c0dd`** | 결말이 아니라 **시도 수**로 보는 축 |
+| **v L-2** `CI` 없을 때 `test.only` | **`b300c0dd`** | `forbidOnly: true` 무조건 |
+| **v L-1 · CR L-2** 등록부 입도 | **`b300c0dd`** | 문면을 「파일」로 좁히고 **제한 12** |
+| **CR L-3** 리포트 경로 불변 | **`b300c0dd`** | 설정 ↔ 상수 등식 test |
+| **CR M-1** 갈라진 묶음에서 포커스가 첫째로 | `83a8fc7e` | 문자열 id → **DOM 노드 ref** |
+| **CR M-2 ⓐⓑ** 실패 경로·장전 잔존 | `83a8fc7e` | 방아쇠를 **전이 종결**로 · 실패 얼굴로 · 늘 비운다 |
+| **CR M-2 ③** 「다시 시도」 성공 뒤 갈 곳 없음 | `43718a14` | 재시도가 **다시 장전**한다 |
+| **CR L-1** 401 얼굴이 카드마다 | `83a8fc7e` | 개찰 조회를 **화면이 들고** 얼굴은 하나 |
+| **CR L-4** `isUnauthorized` 가 UI 모듈에 | `83a8fc7e` | `api/apiError.ts` 로 |
+| **CR L-5** id 이어붙임 모호 | `83a8fc7e` | 노드 ref 로 가면서 사라졌다 |
+| **v M-2** 401 재시도가 wire 에 닿는지 | `83a8fc7e` | `queryClient.getDefaultOptions()` 단언 |
+| **CR L-6** 게이트 출력 인용 | evidence | 축어로 맞췄다(r1 판의 줄은 그때의 꼴로) |
+| **CR OQ-1 · L-2** 낭독 길이·사라지는 대상 | evidence | **제한 11** 에 묶었다 |
+
+**게이트 넷은 한 커밋(`b300c0dd`)** 이다.
+
+## 게이트 — 양성·음성 대조 (실 Playwright 1.64.1)
+
+음성: 체인 exit **0** · `여정 레인: 통과 8 · flaky 0 · 건너뜀 0 · 중단 0 · spec 4/4(등록부와 같다)`.
+
+| 우회 | Playwright | 체인 | 게이트가 말한 것 |
+| --- | --- | --- | --- |
+| **N1b** spec 안 `retries: 2` + 시도 0·1 실패, 2 에서 통과 | `7 passed` | **1** | `재시도가 있었던 test 1건 … (시도 3회)` |
+| **N2** `CI` 미설정 `test.only`(파일마다 하나) | — | **1** | Playwright 가 `forbidOnly` 로 거부 |
+
+**N1b 는 결말이 `expected`** 다 — 결말만 보면 지나간다. 시도 수로 보기 때문에 잡힌다.
+
+## 고침마다 「고치기 전 RED」 — 화면 변이 일곱
+
+통제군은 아래 acceptance(전건 초록)다. 각 변이는 **그 고침을 되돌린다**.
+
+| 변이 | 표적 | exit | 실패 수 |
+| --- | --- | --- | --- |
+| r3M1 포커스를 문자열 id 로 되돌린다 | `InboxScreen.test.tsx` | **1** | 3 |
+| r3M2 방아쇠를 `inbox.data` 참조로 | `InboxScreen.test.tsx` | **1** | 5 |
+| r3M2b 실패 경로의 되돌릴 자리를 없앤다 | `InboxScreen.test.tsx` | **1** | 1 |
+| r3M2③ 재시도의 재장전을 없앤다 | `InboxScreen.test.tsx` | **1** | 1 |
+| r3L1 401 얼굴을 카드마다 그린다 | `ResultsScreen.test.tsx` | **1** | 1 |
+| r3vM2 재시도 배선을 `retry: 1` 로 | `queryClient.test.ts` | **1** | 1 |
+| r3M2c **장전을 비우지 않는다** | `InboxScreen.test.tsx` | **0** | — |
+
+**마지막 하나는 초록이다 — 사실대로 적는다.** 방아쇠를 종결 수로 옮긴 뒤 그 줄은 **방어**가
+됐다: 장전은 클릭·재시도마다 새로 쓰이고 effect 는 종결에만 서므로, 비우지 않아도 오늘 닿는
+경로가 없다. 그 자리를 들여다보다 **진짜 구멍 하나**가 나왔다(「다시 시도」가 장전하지 않는다,
+CR M-2 ③) — 그것은 고쳤고 변이가 RED 다.
+
+## 팀장 재현 명령 (버릴 clone 에서 그대로)
+
+```bash
+# 0) 준비
+git clone --no-hardlinks <worktree> /tmp/7e3a-verify && cd /tmp/7e3a-verify/web && npm ci
+
+# 1) 전건 vitest (통제군)
+npx vitest run
+
+# 2) 게이트 술어 단위 test
+npx vitest run scripts/journey-results.test.mjs
+
+# 3) 401 재시도 배선
+npx vitest run src/queryClient.test.ts
+
+# 4) 포커스·401 얼굴 축
+npx vitest run src/screens/InboxScreen.test.tsx src/screens/ResultsScreen.test.tsx
+
+# 5) 게이트 우회 대조 — 하네스 없는 가벼운 설정
+#    playwright.journey.config.ts 에서 testDir 을 ./e2e/gateprobe 로, webServer 블록을 뺀
+#    복사본(playwright.gate.config.ts)을 만들고 등록부와 같은 이름의 spec 넷을 둔 뒤:
+node scripts/journey-run-begin.mjs \
+  && npx playwright test --config=playwright.gate.config.ts \
+  && node scripts/check-journey-results.mjs
+#    양성: 한 spec 에 `test.describe.configure({ retries: 2 })` + 시도 2 에서만 통과 → 체인 1
+#          `CI` 없이 `test.only` → Playwright 가 forbidOnly 로 거부
+#          spec 삭제 / `.e2e.ts` 로 개명 → `등록부의 spec 이 돌지 않았다`
+#          통과 JSON 을 두고 `--reporter=list` → `여정 결과 리포트가 없다`
+#          `node scripts/check-journey-results.mjs --grep zzz` → `인자를 받지 않는다`
+
+# 6) 전건 acceptance(하네스 포함)
+~/.local/bin/bv-build.sh ./tools/one-command-check.sh
+```
+
+## r3 acceptance · rollback
+
+`~/.local/bin/bv-build.sh ./tools/one-command-check.sh` → **exit 0**.
+
+| 구간 | 핵심 결과 |
+| --- | --- |
+| Kotlin `check` · `qualityBaseline` · `:app:bootJar` | **BUILD SUCCESSFUL** 셋 |
+| Python 전건 | 통과 |
+| web vitest(W-6) | **606 passed (30 files)** |
+| web 여정(W-13) | **11 passed (38.7s)** + `여정 레인: 통과 11 · flaky 0 · 건너뜀 0 · 중단 0 · spec 4/4(등록부와 같다)` |
+
+rollback 재산출: **35 → 37**(복원 18 · 삭제 19, 새 파일 0 — 늘어난 둘은 `isUnauthorized` 가 옮겨
+가며 고친 파일이다). 실측 HEAD **`43718a14`**, `comm` 양쪽 빈 출력, 버릴 clone ①~⑥ 전부 초록
+(트리·인덱스 둘 다 base 와 diff 0 · vitest **472** · 게이트 다섯 0).

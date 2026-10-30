@@ -1,6 +1,6 @@
 # M7/7E-3a 되돌림
 
-**실측 HEAD: `878a4749`**(수정 라운드 2 뒤 이 slice 의 마지막 산출물 커밋 — 라운드마다 재산출·
+**실측 HEAD: `43718a14`**(수정 라운드 3 뒤 이 slice 의 마지막 산출물 커밋 — 라운드마다 재산출·
 재실측한다). 이 뒤의 커밋은 evidence 뿐이고 **복원 목록 안의 경로를 건드리지 않는다** —
 유효성 확인은 아래 §4.
 
@@ -16,7 +16,7 @@
 git diff --name-status 003ec91d..HEAD | grep -v $'\t'reports/evidence/
 ```
 
-**35 경로 = 복원(M) 16 + 삭제(A) 19.** `reports/evidence/m7/7e3a/**` 는 되돌림 대상이 아니다
+**37 경로 = 복원(M) 18 + 삭제(A) 19.** `reports/evidence/m7/7e3a/**` 는 되돌림 대상이 아니다
 (그 안의 `scope.md` 는 팀장 파일이다).
 
 **r1 에서 여덟이 늘었다**(22 → 30). 새 파일 셋은 여정 레인 게이트(`scripts/journey-results.mjs` ·
@@ -26,7 +26,11 @@ git diff --name-status 003ec91d..HEAD | grep -v $'\t'reports/evidence/
 뒤 셋은 **화면 D 의 파일**이라 이 slice 가 처음 건드리는 공유 자리이지만, base `003ec91d` 가
 머지된 main 의 고정 SHA 이므로 복원 자리는 같다.
 
-**r2 에서 다섯이 더 늘었다**(30 → 35). 새 파일 넷은 게이트의 축 둘이 들인 것
+**r3 에서 둘이 더 늘었다**(35 → 37) — 둘 다 **고친** 파일이고 새 파일은 0 이다:
+`web/src/api/apiError.ts`(`isUnauthorized` 가 UI 모듈에서 옮겨 온 자리)와
+`web/src/components/WriteFailure.tsx`(그 재수출). 앞 라운드의 설명은 아래에 둔다.
+
+**r2 에서 다섯이 늘었다**(30 → 35). 새 파일 넷은 게이트의 축 둘이 들인 것
 (`scripts/journey-run-begin.mjs` · `journey-report-path.mjs` · `config/journey-specs.txt`)과
 재시도 술어 test(`src/queryClient.test.ts`)이고, 새로 **고친** 파일 하나는 `src/queryClient.ts`
 (401 재시도 금지를 전역 기본에 둔 자리)다 — 그것도 공유 파일이고 같은 base 에서 복원한다.
@@ -41,6 +45,8 @@ git diff --name-status 003ec91d..HEAD | grep -v $'\t'reports/evidence/
 | `web/src/api/approvedOperations.ts` · `queries.ts` · `queryKeys.ts` |
 | `web/src/display/bidBoxDisplay.ts` |
 | `web/src/queryClient.ts` |
+| `web/src/api/apiError.ts` |
+| `web/src/components/WriteFailure.tsx` |
 | `web/src/routes.test.ts` · `routes.tsx` |
 | `web/src/screens/BidBoxScreen.tsx` · `BidBoxScreen.test.tsx` |
 
@@ -80,7 +86,7 @@ xargs -a /tmp/rb-added.txt git rm -f --
 마이그레이션 0 · 배포물 0 · 외부 호출 0 이므로 **배포 뒤 되돌림 경로가 따로 없다**. 이 slice 는
 `web/` 과 문서만 건드린다.
 
-`.github/workflows/ci.yml` 과 `tools/one-command-check.sh` 는 **r1·r2 어느 라운드에서도 건드리지
+`.github/workflows/ci.yml` 과 `tools/one-command-check.sh` 는 **세 라운드 어디에서도 건드리지
 않았다** — 여정 레인 게이트는 `npm run test:e2e:journey` **안에서** 이어 돌므로(r2 에서 걸음이
 셋으로 늘었어도 그 script 이름이 같다) 두 파일의 축어 일치가 그대로다. 그래서 복원 목록에도
 들지 않는다.
@@ -92,10 +98,10 @@ xargs -a /tmp/rb-added.txt git rm -f --
 | 축 | 결과 |
 | --- | --- |
 | ① 명령 exit | `git restore` **0** · `git rm` **0** |
-| ② 계수 | 복원 **16** · 삭제 **19** · `comm` 양쪽 빈 출력 |
+| ② 계수 | 복원 **18** · 삭제 **19** · `comm` 양쪽 빈 출력 |
 | ③ 트리 동일성 | 작업 트리 vs base diff **0 줄** · **인덱스** vs base diff **0 줄** |
 | ④ compile | `tsc --noEmit` exit **0** |
-| ⑤ test | `vitest run` exit **0** — **472 passed**(HEAD 의 594 에서 이 slice 의 122 가 빠진 수) |
+| ⑤ test | `vitest run` exit **0** — **472 passed**(HEAD 의 606 에서 이 slice 의 134 가 빠진 수) |
 | ⑥ 게이트 | `gate:tests` **0** · `gate:src-tree` **0** · `api:types:check` **0** · `gate:boundary-canary` **0** · `eslint --max-warnings 0` **0** |
 
 **갈음은 「HEAD 초록」이 아니라 트리 동일성으로만** 했다 — ③ 의 두 줄이 그것이고, ④⑤⑥ 은 그
@@ -116,7 +122,7 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 **그 사이에 되돌림 대상이 움직였는가**다:
 
 ```
-git diff --name-only 878a4749..<판정 SHA> -- <위 35 경로>
+git diff --name-only 43718a14..<판정 SHA> -- <위 37 경로>
 ```
 
 이 출력이 비어 있으면 위 실측이 그대로 유효하다. evidence 커밋은 `reports/evidence/m7/7e3a/**`
