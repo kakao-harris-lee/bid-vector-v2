@@ -49,6 +49,28 @@ function emptyProfile(): Profile {
   };
 }
 
+function emptyStrategy(): queries.StrategyReadResponse {
+  return {
+    revision: 7,
+    focusCategories: [],
+    focusRegionTerms: [],
+    excludeRegionTerms: [],
+    requiredKeywordTerms: [],
+    excludeKeywordTerms: [],
+  };
+}
+
+/** 막 연 편집 세션 — 서버가 준 모양 그대로이고 state 만 바꿔 쓴다. */
+function openSession(field: NonNullable<queries.EditSessionResponse['field']>): queries.EditSessionResponse {
+  return {
+    sessionId: 'sess-1',
+    state: 'WAITING_FOR_VALUE',
+    sessionVersion: 1,
+    expiresAt: '2099-01-01T00:00:00Z',
+    field,
+  };
+}
+
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -72,14 +94,7 @@ beforeEach(() => {
   mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
   mocked.readProfile.mockResolvedValue(emptyProfile());
   mocked.listConstructionCapacities.mockResolvedValue([]);
-  mocked.readStrategy.mockResolvedValue({
-    revision: 7,
-    focusCategories: [],
-    focusRegionTerms: [],
-    excludeRegionTerms: [],
-    requiredKeywordTerms: [],
-    excludeKeywordTerms: [],
-  });
+  mocked.readStrategy.mockResolvedValue(emptyStrategy());
   mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }));
 });
 
@@ -454,28 +469,47 @@ describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => 
 
 describe('시작하기 — 마법사의 걸음', () => {
   /**
-   * 주석이 적는 「저장하면 다음으로 간다」는 `picked` 가 `null` 인 동안만 참이었다(CR r1 LOW) —
-   * 운영자가 단계를 한 번 고르면 그 뒤로는 저장해도 그 자리에 머물렀다. 쓰기 성공 자리에서
-   * 고른 단계를 **놓는다**.
+   * 저장 뒤의 걸음은 **현재 단계 뒤의 첫 미완**이다(CR r1·r2 LOW). r1 은 `picked` 를 놓지 않아
+   * 그 자리에 머물렀고, 그 다음 판은 **늘 첫 미완**으로 가서 뒷단계에서 저장하면 앞쪽으로
+   * 끌려갔다. 여기서는 **앞에도 뒤에도 미완이 있는** 입력으로 그 둘을 가른다.
    */
-  it('단계를 고른 뒤 저장하면 서버가 말하는 다음 미완 단계로 간다', async () => {
+  it('뒷단계에서 저장하면 앞으로 끌려가지 않고 그 뒤의 첫 미완으로 간다', async () => {
     mocked.replaceQualificationFacts.mockResolvedValue(emptyProfile());
     mocked.readOnboardingChecklist
       .mockResolvedValueOnce(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }))
       .mockResolvedValue(
         checklist({
           completed: ['BUSINESS_TYPES', 'LICENSES'],
-          pending: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION', 'BUDGET_RANGE', 'WATCH_CONDITIONS'],
+          // 앞(사업 정보)에도 뒤(금액대)에도 미완이 있다 — 「첫 미완」이면 앞으로 간다.
+          pending: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION', 'BUDGET_RANGE'],
         }),
       );
     renderScreen();
 
-    // 첫 단계(사업 정보)를 두고 **자격 사실을 골라** 저장한다.
     fireEvent.click(await screen.findByTestId('onboarding-step-QUALIFICATION_FACTS'));
     await screen.findByLabelText('업종', { exact: true });
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
-    // 다시 읽은 체크리스트의 첫 미완은 사업 정보다 — 그 폼으로 간다.
+    expect(await screen.findByTestId('strategy-row-MIN_BUDGET')).toBeTruthy();
+    expect(screen.queryByLabelText('상호')).toBeNull();
+  });
+
+  it('뒤에 미완이 없으면 앞의 첫 미완으로 돌아온다', async () => {
+    mocked.replaceQualificationFacts.mockResolvedValue(emptyProfile());
+    mocked.readOnboardingChecklist
+      .mockResolvedValueOnce(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }))
+      .mockResolvedValue(
+        checklist({
+          completed: ['BUSINESS_TYPES', 'LICENSES', 'CONSTRUCTION_CAPACITY', 'BUDGET_RANGE', 'WATCH_CONDITIONS'],
+          pending: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION'],
+        }),
+      );
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('onboarding-step-QUALIFICATION_FACTS'));
+    await screen.findByLabelText('업종', { exact: true });
+    fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
+
     expect(await screen.findByLabelText('상호')).toBeTruthy();
   });
 
@@ -521,5 +555,114 @@ describe('시작하기 — 마법사의 걸음', () => {
 
     expect((await screen.findByTestId('onboarding-progress')).getAttribute('aria-live')).toBe('polite');
     expect(screen.getByTestId('onboarding-step-WATCH').getAttribute('aria-controls')).toBe('onboarding-step-body');
+  });
+
+  /**
+   * 잠긴 탐색의 **사유가 보조기술에 닿는다**(CR r2 LOW): `disabled` 버튼은 탭 순서에서 빠지고
+   * `title` 은 읽히지 않는다.
+   */
+  it('단계가 잠기면 그 사유가 문단으로 서고 버튼이 그것을 가리킨다', async () => {
+    mocked.beginEditSession.mockResolvedValue(openSession('FOCUS_CATEGORY'));
+    renderScreen();
+
+    await screen.findByTestId('onboarding-step-WATCH');
+    expect(screen.queryByTestId('onboarding-step-lock')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('onboarding-step-WATCH'));
+    const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+    await screen.findByTestId('edit-session');
+
+    const reason = await screen.findByTestId('onboarding-step-lock');
+    expect(reason.textContent).toContain('편집을 마치거나 그만두면');
+    expect(screen.getByTestId('onboarding-step-BUSINESS_DETAILS').getAttribute('aria-describedby')).toBe(reason.id);
+  });
+
+  /**
+   * 단계가 **사라질 때** 잠금이 풀리는지(v r2 L-1)와 전략 401 의 로그인 길(v r2 L-2)을 한 입력에서
+   * 센다: 값 전송이 500 이면 그 실패가 전략을 다시 읽게 하고, 그 읽기가 401 이면 단계 본문이
+   * 교체되면서 전략 단계가 언마운트된다.
+   */
+  it('전략 질의가 401 이면 로그인 길을 내고 사라진 단계가 잠금을 풀어 준다', async () => {
+    mocked.beginEditSession.mockResolvedValue(openSession('FOCUS_CATEGORY'));
+    mocked.provideEditSessionValue.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    mocked.readStrategy
+      .mockResolvedValueOnce(emptyStrategy())
+      .mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('onboarding-step-WATCH'));
+    const row = await screen.findByTestId('strategy-row-FOCUS_CATEGORY');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+    await screen.findByTestId('edit-session');
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-BUDGET') as HTMLButtonElement).disabled).toBe(true),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    const body = await screen.findByTestId('onboarding-step-body');
+    await waitFor(() => expect(within(body).queryByTestId('signed-out')).not.toBeNull());
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-BUDGET') as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+});
+
+/**
+ * **서버가 끝낸 세션이 마법사를 가두지 않는다**(CR·v r2 MEDIUM — r2 의 단계 잠금이 들여온 회귀).
+ *
+ * 세션이 서버에서 끝나면 그 뒤 **모든 명령이 409** 라 `onSuccess` 가 오지 않고, 409 재조회는
+ * `open` 을 살린 채 state 만 종말로 바꾼다. 「열린 세션」으로 잠그면 패널에 버튼이 0 이고 단계
+ * 버튼도 `disabled` 라 화면 안에 나갈 길이 없다.
+ */
+describe('시작하기 — 끝난 세션에서 빠져나갈 길', () => {
+  async function openAndExpire(readBack: queries.EditSessionResponse | Error) {
+    mocked.beginEditSession.mockResolvedValue(openSession('MIN_BUDGET'));
+    mocked.confirmEditSession.mockRejectedValue(new ApiError(409, 'SESSION_EXPIRED'));
+    mocked.provideEditSessionValue.mockResolvedValue({
+      ...openSession('MIN_BUDGET'),
+      state: 'WAITING_FOR_CONFIRMATION',
+    });
+    if (readBack instanceof Error) {
+      mocked.readEditSession.mockRejectedValue(readBack);
+    } else {
+      mocked.readEditSession.mockResolvedValue(readBack);
+    }
+    mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: ['BUDGET_RANGE'] }));
+    renderScreen();
+
+    const row = await screen.findByTestId('strategy-row-MIN_BUDGET');
+    fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
+    fireEvent.change(await screen.findByLabelText('예산 하한'), { target: { value: '100000000' } });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '적용' }));
+    await waitFor(() => expect(mocked.confirmEditSession).toHaveBeenCalled());
+  }
+
+  it('409 뒤 다시 읽은 세션이 만료면 단계 잠금이 풀리고 패널에 닫기가 선다', async () => {
+    await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'EXPIRED' });
+
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-WATCH') as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+  });
+
+  it('취소된 세션도 같다', async () => {
+    await openAndExpire({ ...openSession('MIN_BUDGET'), state: 'CANCELLED' });
+
+    await waitFor(() =>
+      expect((screen.getByTestId('onboarding-step-WATCH') as HTMLButtonElement).disabled).toBe(false),
+    );
+    expect(await screen.findByTestId('edit-session-dismiss')).toBeTruthy();
+  });
+
+  /** 재조회가 404 로 떨어지면 `open` 이 그대로다 — 그때는 **진행 중 state** 라 「그만두기」가 있다. */
+  it('재조회가 실패하면 진행 중 상태가 남고 그만두기로 빠져나간다', async () => {
+    await openAndExpire(new ApiError(404, 'SESSION_NOT_FOUND'));
+
+    expect(await screen.findByRole('button', { name: '그만두기' })).toBeTruthy();
   });
 });

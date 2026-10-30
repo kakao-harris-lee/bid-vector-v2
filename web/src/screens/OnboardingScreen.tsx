@@ -15,7 +15,7 @@ import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import type { StrategyField } from '../display/editSessionDisplay';
 import {
-  firstStepWithPending,
+  nextStepWithPending,
   ITEM_STATE_DISPLAY,
   itemRowsOf,
   ONBOARDING_ITEM_DISPLAY,
@@ -38,6 +38,9 @@ import {
 } from './strategyEdit';
 
 export const ONBOARDING_QUERY_KEY = ['onboarding-checklist'] as const;
+
+/** 잠긴 단계 버튼이 가리키는 사유 문단의 id — 버튼과 문면이 같은 자리를 쓴다. */
+const STEP_LOCK_REASON_ID = 'onboarding-step-lock-reason';
 
 /**
  * 범위 밖 자리 — **빈 자리 + 「준비 중」뿐이다**(D-7E2b-3). 입력칸·버튼을 만들지 않는다.
@@ -96,21 +99,25 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
   const queryClient = useQueryClient();
   /** 운영자가 고른 단계. `null` 이면 **서버가 말하는 첫 미완 단계**를 따라간다. */
   const [picked, setPicked] = useState<OnboardingStepId | null>(null);
-  /** 전략 단계에 **열린 편집 세션**이 있는가 — 있으면 단계를 옮기지 않는다(아래 `nav` 의 사유). */
+  /** 전략 단계에 **진행 중인 편집 세션**이 있는가 — 있으면 단계를 옮기지 않는다(아래 `nav` 의 사유). */
   const [sessionOpen, setSessionOpen] = useState(false);
+  /** 마지막으로 저장한 단계 — 다음 걸음은 **그 뒤의** 첫 미완이다(CR r2 LOW). */
+  const [advanceFrom, setAdvanceFrom] = useState<OnboardingStepId | null>(null);
   const profile = useQuery({ queryKey: PROFILE_QUERY_KEY, queryFn: readProfile });
 
   const rows = itemRowsOf(checklist);
   const progress = progressOf(checklist);
-  const current = picked ?? firstStepWithPending(checklist) ?? ONBOARDING_STEPS[0].id;
+  const current = picked ?? nextStepWithPending(checklist, advanceFrom) ?? ONBOARDING_STEPS[0].id;
   /**
    * 쓰기가 끝나면 **서버에 다시 묻는다** — 쓰기의 200 을 완료로 세지 않는다.
    *
-   * 고른 단계를 **놓는다**(CR r1 LOW): 그래야 다음 걸음이 서버가 말하는 첫 미완으로 간다.
-   * 앞 판은 `picked` 가 한 번 세워지면 지워지지 않아, 운영자가 단계를 눌러 본 뒤로는 저장해도
-   * 그 자리에 머물렀다 — 주석만 「저장하면 다음으로 간다」고 적혀 있었다.
+   * 고른 단계를 **놓고**(CR r1 LOW) 그 자리를 다음 걸음의 **기준**으로 적는다(CR r2 LOW).
+   * 앞 판은 `picked` 가 한 번 세워지면 지워지지 않아 저장해도 그 자리에 머물렀고, 그 다음 판은
+   * 늘 **첫 미완**으로 가서 뒷단계에서 저장하면 앞쪽으로 끌려갔다. 지금은 **현재 단계 뒤의 첫
+   * 미완**으로 가고, 뒤에 없으면 앞의 첫 미완으로 돌아온다.
    */
   const reread = () => {
+    setAdvanceFrom(current);
     setPicked(null);
     void queryClient.invalidateQueries({ queryKey: ONBOARDING_QUERY_KEY });
   };
@@ -163,29 +170,45 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
       ) : null}
 
       {/*
-        편집 세션이 열려 있는 동안에는 단계를 옮기지 않는다(v r1 L-1). 옮기면 전략 단계가
+        편집 세션이 **진행 중인 동안**에는 단계를 옮기지 않는다(v r1 L-1). 옮기면 전략 단계가
         언마운트되어 **보낸 값이 적용되지도 취소되지도 않은 세션**이 서버에 남는다. 설정 화면에는
         이 길이 없었다 — 거기서는 화면을 떠나야 생기던 일이 마법사에서는 버튼 한 번으로 생긴다.
-        패널의 「그만두기」가 늘 있으므로 갇히는 자리는 없다.
+
+        **술어가 「열린」이 아니라 「진행 중」인 이유**(CR·v r2 MEDIUM): 첫 판은 열린 세션으로
+        잠갔고, 서버가 이미 끝낸 세션에서는 그 뒤 모든 명령이 409 라 `open` 이 비워지지 않아
+        **마법사가 갇혔다**. 그때 이 자리의 주석은 「패널의 「그만두기」가 늘 있으므로 갇히는 자리는
+        없다」였는데, 종말 state 에서는 그 버튼이 그려지지 않는다 — 거짓인 전제였다. 지금은
+        ⓐ 잠금이 진행 중에만 걸리고 ⓑ 끝난 세션의 패널에 「닫기」가 선다.
       */}
-      <nav aria-label="단계" className="flex flex-wrap gap-2">
-        {ONBOARDING_STEPS.map((step) => (
-          <button
-            key={step.id}
-            type="button"
-            data-testid={`onboarding-step-${step.id}`}
-            aria-current={step.id === current ? 'step' : undefined}
-            aria-controls="onboarding-step-body"
-            disabled={sessionOpen}
-            title={sessionOpen ? '편집을 끝내거나 그만둔 뒤에 옮길 수 있습니다' : undefined}
-            onClick={() => setPicked(step.id)}
-            className={`rounded-md px-2 py-1 text-xs disabled:opacity-50 ${
-              step.id === current ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
-            }`}
-          >
-            {step.label}
-          </button>
-        ))}
+      <nav aria-label="단계" className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
+          {ONBOARDING_STEPS.map((step) => (
+            <button
+              key={step.id}
+              type="button"
+              data-testid={`onboarding-step-${step.id}`}
+              aria-current={step.id === current ? 'step' : undefined}
+              aria-controls="onboarding-step-body"
+              disabled={sessionOpen}
+              // 잠긴 사유를 **보조기술에도** 준다(CR r2 LOW): `disabled` 버튼은 탭 순서에서 빠지고
+              // `title` 은 읽히지 않아, 키보드·스크린리더 운영자에게는 탐색이 사유 없이 사라진다.
+              aria-describedby={sessionOpen ? STEP_LOCK_REASON_ID : undefined}
+              onClick={() => setPicked(step.id)}
+              className={`rounded-md px-2 py-1 text-xs disabled:opacity-50 ${
+                step.id === current
+                  ? 'bg-neutral-skin font-medium text-neutral-ink'
+                  : 'text-ink-soft hover:bg-neutral-skin'
+              }`}
+            >
+              {step.label}
+            </button>
+          ))}
+        </div>
+        {sessionOpen ? (
+          <p id={STEP_LOCK_REASON_ID} data-testid="onboarding-step-lock" role="status" className="text-xs text-ink-soft">
+            편집을 마치거나 그만두면 단계를 옮길 수 있습니다.
+          </p>
+        ) : null}
       </nav>
 
       <div id="onboarding-step-body" data-testid="onboarding-step-body" className="flex flex-col gap-4">
@@ -302,10 +325,11 @@ function OnboardingStrategyFields({
    * 열린 세션을 **위로 알린다** — 마법사가 그동안 단계 탐색을 닫는다(v r1 L-1). 언마운트에서
    * 반드시 `false` 를 보내 「세션이 열린 채 사라진 단계」가 탐색을 영원히 막지 않게 한다.
    */
+  const { inProgress } = session;
   useEffect(() => {
-    onSessionOpen(session.open !== null);
+    onSessionOpen(inProgress);
     return () => onSessionOpen(false);
-  }, [session.open, onSessionOpen]);
+  }, [inProgress, onSessionOpen]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -317,7 +341,7 @@ function OnboardingStrategyFields({
             key={field}
             field={field}
             strategy={strategy}
-            disabled={session.open !== null}
+            disabled={session.inProgress}
             onBegin={() => session.begin(field)}
           />
         ))}

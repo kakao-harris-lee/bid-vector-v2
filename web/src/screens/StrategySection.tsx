@@ -58,8 +58,9 @@ function StrategyFields({ strategy }: { readonly strategy: StrategyReadResponse 
             key={field}
             field={field}
             strategy={strategy}
-            // 세션은 한 번에 하나다 — 열려 있으면 다른 칸의 「고치기」가 닫힌다.
-            disabled={session.open !== null}
+            // 세션은 한 번에 하나다 — **진행 중이면** 다른 칸의 「고치기」가 닫힌다.
+            // 끝난 세션(만료·취소·적용)은 막지 않는다 — 그 자리는 패널의 「닫기」로 치운다.
+            disabled={session.inProgress}
             onBegin={() => session.begin(field)}
           />
         ))}

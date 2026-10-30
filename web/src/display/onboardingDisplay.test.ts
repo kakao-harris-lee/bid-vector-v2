@@ -5,6 +5,7 @@ import type { OnboardingChecklist } from '../api/queries';
 import {
   firstStepWithPending,
   itemRowsOf,
+  nextStepWithPending,
   ONBOARDING_ITEM_DISPLAY,
   ONBOARDING_ITEM_ORDER,
   ONBOARDING_ITEM_STEP,
@@ -143,5 +144,44 @@ describe('다음 단계 — 미완 항목이 있는 첫 단계', () => {
     expect(
       firstStepWithPending(checklist({ awaiting: [{ item: 'CONSTRUCTION_CAPACITY', prerequisite: 'NARA_READINESS' }] })),
     ).toBeNull();
+  });
+});
+
+/**
+ * 저장 뒤의 걸음(CR r2 LOW) — **현재 단계 뒤**의 첫 미완이다. 늘 첫 미완으로 가면 운영자가
+ * 일부러 뒷단계를 골라 저장했을 때 앞쪽으로 끌려간다.
+ */
+describe('다음 걸음 — 현재 단계 뒤부터 찾는다', () => {
+  it('뒤에 미완이 있으면 그리로 간다 — 앞의 미완을 지나친다', () => {
+    expect(
+      nextStepWithPending(
+        checklist({ pending: ['TRADE_NAME', 'WATCH_CONDITIONS'] }),
+        ONBOARDING_ITEM_STEP.BUSINESS_TYPES,
+      ),
+    ).toBe(ONBOARDING_ITEM_STEP.WATCH_CONDITIONS);
+  });
+
+  it('뒤에 미완이 없으면 앞의 첫 미완으로 돌아온다', () => {
+    expect(
+      nextStepWithPending(checklist({ pending: ['TRADE_NAME'] }), ONBOARDING_ITEM_STEP.WATCH_CONDITIONS),
+    ).toBe(ONBOARDING_ITEM_STEP.TRADE_NAME);
+  });
+
+  it('기준이 없으면 첫 미완이다 — `firstStepWithPending` 과 같은 자리다', () => {
+    const list = checklist({ pending: ['BUDGET_RANGE', 'TRADE_NAME'] });
+    expect(nextStepWithPending(list, null)).toBe(firstStepWithPending(list));
+  });
+
+  it('미완이 어디에도 없으면 null 이다', () => {
+    expect(
+      nextStepWithPending(checklist({ completed: ['TRADE_NAME'] }), ONBOARDING_ITEM_STEP.TRADE_NAME),
+    ).toBeNull();
+  });
+
+  /** 자기 단계에 미완이 남아도 **뒤로** 간다 — 저장했는데 같은 자리에 머무르면 걸음이 아니다. */
+  it('기준 단계 자신은 건너뛴다', () => {
+    expect(
+      nextStepWithPending(checklist({ pending: ['TRADE_NAME', 'BUDGET_RANGE'] }), ONBOARDING_ITEM_STEP.TRADE_NAME),
+    ).toBe(ONBOARDING_ITEM_STEP.BUDGET_RANGE);
   });
 });

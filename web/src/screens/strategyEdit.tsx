@@ -64,8 +64,21 @@ export interface OpenSession {
   readonly sent: FieldValueView | null;
 }
 
+/**
+ * **서버에 더 보낼 것이 남은 세션인가** — 계약의 다섯 state 가운데 진행 중인 둘이다.
+ *
+ * 이 구분이 필요한 이유(CR·v r2 MEDIUM): 세션이 서버에서 끝나면 그 뒤의 **모든 명령이 409** 라
+ * `onSuccess` 가 영원히 오지 않고, 409 재조회는 `open` 을 살려 둔 채 state 만 종말로 바꾼다.
+ * 「열린 세션」을 잠금 술어로 쓰면 그 상태가 화면을 가둔다 — 잠그는 것은 **진행 중**뿐이다.
+ */
+export function isSessionInProgress(state: EditSessionResponse['state']): boolean {
+  return state === 'WAITING_FOR_VALUE' || state === 'WAITING_FOR_CONFIRMATION';
+}
+
 export interface StrategyEditSession {
   readonly open: OpenSession | null;
+  /** 열려 있고 **서버에 더 보낼 것이 남은** 상태인가 — 잠금·비활성의 술어는 이것이다. */
+  readonly inProgress: boolean;
   readonly busy: boolean;
   readonly isError: boolean;
   readonly error: unknown;
@@ -80,6 +93,8 @@ export interface StrategyEditSession {
   readonly onConfirm: () => void;
   readonly onEdit: () => void;
   readonly onCancel: () => void;
+  /** 끝난 세션의 자리를 **로컬에서** 치운다 — 서버에 보낼 것이 없으므로 그것으로 충분하다. */
+  readonly dismiss: () => void;
 }
 
 /**
@@ -177,6 +192,7 @@ export function useStrategyEditSession(
 
   return {
     open,
+    inProgress: open !== null && isSessionInProgress(open.session.state),
     busy: run.isPending,
     isError: run.isError,
     error: run.error,
@@ -242,6 +258,11 @@ export function useStrategyEditSession(
         return;
       }
       run.mutate({ kind: 'CANCEL', commandId: crypto.randomUUID(), sessionId: open.session.sessionId });
+    },
+    dismiss: () => {
+      setOpen(null);
+      setRaw('');
+      setMissing(false);
     },
   };
 }
@@ -374,6 +395,25 @@ export function StrategyEditPanel({
           </div>
         </div>
       ) : null}
+
+      {/*
+        **끝난 세션에는 닫는 길이 있어야 한다**(CR·v r2 MEDIUM). 서버가 만료·취소·적용으로 접은
+        뒤에는 아래 두 묶음이 그려지지 않아 패널에 버튼이 0 이 된다 — 그때 화면에 남는 행동이
+        「같은 명령을 다시」뿐이면 마법사가 갇힌다. 서버에 보낼 것이 없으므로 로컬 정리로 충분하고,
+        **사유는 실패 얼굴과 배지에 남는다**.
+      */}
+      {isSessionInProgress(open.session.state) ? null : (
+        <div className="mt-3">
+          <button
+            type="button"
+            data-testid="edit-session-dismiss"
+            onClick={session.dismiss}
+            className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       {open.session.state === 'WAITING_FOR_CONFIRMATION' ? (
         <div className="mt-3 flex flex-col gap-2">

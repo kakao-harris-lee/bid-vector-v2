@@ -122,6 +122,10 @@ test.afterEach(async ({ page }) => {
   if (outcome.kind === 'no-session') {
     // **원래 실패를 덮지 않는다**(CR r1 LOW): 로그인 전에 죽었으면 전역 상태를 바꿀 기회도
     // 없었으므로 되돌릴 것이 없다. 여기서 또 실패하면 진단이 teardown 으로 옮겨 간다.
+    //
+    // 다만 **포기했다는 사실은 남긴다**(CR r2 LOW): 남기지 않으면 뒤 여정이 남의 잔류로 깨졌을 때
+    // 그 원인을 여기서 찾을 수 없다. 보고서 주석이라 콘솔 단언과도 부딪히지 않는다.
+    test.info().annotations.push({ type: 'teardown 포기', description: outcome.why });
     return;
   }
   expect(outcome.kind === 'blocked' ? outcome.why : null, '여정 ① 의 전역 감시 조건을 되돌릴 수 없었다').toBeNull();
@@ -236,7 +240,8 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   expect(((await (await capacityGone).json()) as Checklist).pending).toContain('CONSTRUCTION_CAPACITY');
 
   await page.getByTestId('onboarding-step-QUALIFICATION_FACTS').click();
-  await page.getByLabel('업종').fill('');
+  // ③ 과 같은 사유로 `exact` 다(CR r1 지적이 ③ 만 닫혔던 자리 — CR r2 LOW).
+  await page.getByLabel('업종', { exact: true }).fill('');
   await page.getByLabel('지역어').fill('');
   await page.getByLabel('면허를 신고함').uncheck();
   const afterFactsCleared = await saveAndReread(page, '자격 사실 저장');
