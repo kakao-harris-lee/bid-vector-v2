@@ -5,6 +5,9 @@ import type { StateDisplay } from './stateDisplay';
 type Profile = components['schemas']['Profile'];
 type BusinessDetailsRequest = components['schemas']['BusinessDetailsRequest'];
 
+/** 받아들이는 정수의 모양 — **문자열 전체**가 자리 구분 없는 정수다(쉼표·단위·소수는 거부). */
+const INTEGER_SHAPE = /^\d+$/u;
+
 export type NaraRegistration = Profile['naraRegistration'];
 export type NaraField = Profile['naraRegisteredFields'][number];
 export type HeadquartersRegion = NonNullable<Profile['headquartersRegion']>;
@@ -117,4 +120,38 @@ export function businessDetailsBodyOf(form: BusinessDetailsForm): BusinessDetail
       ? {}
       : { businessCertificateExpiresOn: form.businessCertificateExpiresOn }),
   };
+}
+
+/** 시평액 한 행의 입력 — 셋 다 계약이 필수로 둔 칸이다. */
+export interface CapacityForm {
+  readonly licenseName: string;
+  readonly amountWon: string;
+  readonly assessmentYear: string;
+}
+
+type ConstructionCapacityRequest = components['schemas']['ConstructionCapacityRequest'];
+
+/**
+ * 시평액 요청 본문 — **문자열 전체가 정수일 때만** 받는다(CR M-1 · v H-1 과 같은 처방).
+ *
+ * 왜 엄격해야 하는가: 앞 판은 `Number.parseInt` 로 앞자리만 읽었고 `'1,500,000,000'` → **1** 이
+ * 서버로 갔다. 계약의 `minimum: 1` 이라 서버가 받고, 목록은 그 값을 `toLocaleString` 으로
+ * 보이므로 **운영자가 보이는 꼴 그대로 되타이핑하는 것이 자연스러운 입력**이었다. 전략 쪽과 달리
+ * 여기는 **확인 단계가 없어 더 조용하다**.
+ *
+ * `null` 은 「보내지 않는다」다 — 0 이나 올해를 지어내지 않는다.
+ */
+export function capacityBodyOf(form: CapacityForm): ConstructionCapacityRequest | null {
+  const licenseName = form.licenseName.trim();
+  const amount = form.amountWon.trim();
+  const year = form.assessmentYear.trim();
+  if (licenseName === '' || !INTEGER_SHAPE.test(amount) || !INTEGER_SHAPE.test(year)) {
+    return null;
+  }
+  const amountWon = Number(amount);
+  const assessmentYear = Number(year);
+  if (!Number.isFinite(amountWon) || !Number.isFinite(assessmentYear)) {
+    return null;
+  }
+  return { licenseName, amountWon, assessmentYear };
 }

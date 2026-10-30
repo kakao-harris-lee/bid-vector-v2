@@ -16,6 +16,7 @@ import { Field, StateBadge } from '../components/StateBadge';
 import { isUnauthorized, WriteFailureFace } from '../components/WriteFailure';
 import {
   businessDetailsBodyOf,
+  capacityBodyOf,
   NARA_FIELD_DISPLAY,
   NARA_REGISTRATION_DISPLAY,
   QUALIFICATION_STATE_DISPLAY,
@@ -23,6 +24,7 @@ import {
   REGION_DISPLAY,
   UNJUDGED_AXIS_DISPLAY,
   type BusinessDetailsForm,
+  type CapacityForm,
   type NaraField,
   type NaraRegistration,
 } from '../display/profileDisplay';
@@ -38,13 +40,6 @@ interface FactsForm {
   readonly licensesDeclared: boolean;
   readonly licenseNames: string;
   readonly regionTerms: string;
-}
-
-/** 시평액 한 행의 입력 — 셋 다 필수다(계약). */
-interface CapacityForm {
-  readonly licenseName: string;
-  readonly amountWon: string;
-  readonly assessmentYear: string;
 }
 
 const EMPTY_CAPACITY: CapacityForm = { licenseName: '', amountWon: '', assessmentYear: '' };
@@ -119,12 +114,8 @@ export function ProfileSection() {
   });
 
   const saveCapacity = useMutation({
-    mutationFn: (form: CapacityForm) =>
-      upsertConstructionCapacity({
-        licenseName: form.licenseName,
-        amountWon: Number.parseInt(form.amountWon, 10),
-        assessmentYear: Number.parseInt(form.assessmentYear, 10),
-      }),
+    // 본문은 **보내기 전에** 엄격 술어로 만들어졌다(아래 저장 핸들러) — 여기서 다시 읽지 않는다.
+    mutationFn: (body: NonNullable<ReturnType<typeof capacityBodyOf>>) => upsertConstructionCapacity(body),
     onSuccess: async () => {
       setCapacity(EMPTY_CAPACITY);
       await queryClient.invalidateQueries({ queryKey: CAPACITY_KEY });
@@ -441,22 +432,23 @@ export function ProfileSection() {
         </div>
         {capacityMissing ? (
           <p data-testid="capacity-missing" role="alert" className="mt-2 text-xs text-bad-ink">
-            면허명 · 금액 · 평가 연도 셋 다 필요합니다 — 빈 값을 보내지 않습니다.
+            면허명과 **자리 구분 없는 정수** 금액·평가 연도가 필요합니다 — 쉼표·단위가 있으면
+            보내지 않습니다(잘린 금액이 저장되지 않게).
           </p>
         ) : null}
         <button
           type="button"
           disabled={saveCapacity.isPending}
           onClick={() => {
-            // 셋 다 있어야 보낸다 — 0 이나 올해를 **기본값으로 지어내지 않는다**(계약이 필수로 둔 칸이다).
-            const amount = Number.parseInt(capacity.amountWon, 10);
-            const year = Number.parseInt(capacity.assessmentYear, 10);
-            if (capacity.licenseName.trim() === '' || !Number.isFinite(amount) || !Number.isFinite(year)) {
+            // 셋 다 **문자열 전체가 모양에 맞아야** 보낸다 — 0·올해를 지어내지 않고, 앞자리만
+            // 읽어 잘린 금액을 보내지도 않는다(CR M-1 — 여기는 확인 단계가 없어 더 조용하다).
+            const body = capacityBodyOf(capacity);
+            if (body === null) {
               setCapacityMissing(true);
               return;
             }
             setCapacityMissing(false);
-            saveCapacity.mutate(capacity);
+            saveCapacity.mutate(body);
           }}
           className="mt-2 rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
         >

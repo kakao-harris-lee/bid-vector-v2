@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  sentValueView,
   EDIT_SESSION_CONFLICT_DISPLAY,
   EDIT_SESSION_STATE_DISPLAY,
   FIELD_VALUE_SLOT,
@@ -178,6 +179,72 @@ describe('값 요청 본문 — field 가 이름하는 칸 하나만', () => {
     expect(valueBodyOf('MAX_ACTIVE_BIDS', 'c', '')).toBeNull();
     expect(valueBodyOf('MIN_BUDGET', 'c', '없음')).toBeNull();
     expect(valueBodyOf('REVIEW_THRESHOLD', 'c', '')).toBeNull();
+  });
+
+  /**
+   * **CR H-2 · v H-1 의 회귀 test.** 앞자리만 읽는 파서는 「읽히기는 하지만 운영자가 적은 것과
+   * 다른 수」를 통과시켰다 — `parseInt('1,200,000,000')` 은 1 이고 `Number.isFinite` 를 지난다.
+   * 실 서버 실측에서 예산 상한 `50,000,000` 이 **50** 으로 저장됐다. 그래서 **문자열 전체가
+   * 그 모양일 때만** 받는다.
+   */
+  it.each([
+    ['자리 구분 쉼표', 'MIN_BUDGET', '1,000,000'],
+    ['단위가 붙은 금액', 'MAX_BUDGET', '50,000,000원'],
+    ['지수 표기', 'MIN_BUDGET', '1e6'],
+    ['꼬리 문자', 'MIN_BUDGET', '12abc'],
+    ['금액의 소수점', 'MIN_BUDGET', '1200.5'],
+    ['금액의 음수', 'MIN_BUDGET', '-1'],
+    ['건수의 소수점', 'CANDIDATE_LIMIT', '2.9'],
+    ['건수의 음수', 'MAX_ACTIVE_BIDS', '-3'],
+    ['소수 칸의 쉼표', 'REVIEW_THRESHOLD', '0,5'],
+    ['소수 칸의 지수', 'REVIEW_THRESHOLD', '1e-3'],
+  ] as const)('%s 은 거부한다 — 잘린 수를 보내지 않는다', (_label, field, raw) => {
+    expect(valueBodyOf(field, 'c', raw)).toBeNull();
+  });
+
+  it('앞뒤 공백만 정규화한다 — 그 결과는 확인 화면이 본문 값으로 보인다', () => {
+    expect(valueBodyOf('MAX_ACTIVE_BIDS', 'c', '  5  ')).toStrictEqual({
+      commandId: 'c',
+      field: 'MAX_ACTIVE_BIDS',
+      count: 5,
+    });
+    expect(valueBodyOf('REVIEW_THRESHOLD', 'c', ' 0.42 ')?.number).toBe(0.42);
+  });
+
+  it('받는 모양은 그대로 받는다 — 거부가 지나치지 않다', () => {
+    expect(valueBodyOf('MIN_BUDGET', 'c', '1200000000')?.amountWon).toBe(1_200_000_000);
+    expect(valueBodyOf('MIN_BUDGET', 'c', '0')?.amountWon).toBe(0);
+    expect(valueBodyOf('REVIEW_THRESHOLD', 'c', '0')?.number).toBe(0);
+    expect(valueBodyOf('REVIEW_THRESHOLD', 'c', '-0.5')?.number).toBe(-0.5);
+    expect(valueBodyOf('CANDIDATE_LIMIT', 'c', '100')?.count).toBe(100);
+  });
+});
+
+/**
+ * 확인 화면이 보이는 「보낸 값」은 **본문의 값**이다(CR H-2 ②) — 원문이 아니다. 금액은 지금 값과
+ * **같은 포맷터**를 쓰므로 둘이 다르면 눈에 보인다.
+ */
+describe('보낸 값의 문면은 본문에서 나온다', () => {
+  it('금액은 지금 값과 같은 꼴로 보인다', () => {
+    const body = valueBodyOf('MIN_BUDGET', 'c', '1200000000')!;
+
+    expect(sentValueView('MIN_BUDGET', body).text).toBe('1,200,000,000원');
+  });
+
+  it('본문이 1 이면 「1원」이라고 보인다 — 원문을 되풀이하지 않는다', () => {
+    expect(sentValueView('MIN_BUDGET', { commandId: 'c', field: 'MIN_BUDGET', amountWon: 1 }).text).toBe('1원');
+  });
+
+  it('건수·소수는 본문 값 그대로', () => {
+    expect(sentValueView('MAX_ACTIVE_BIDS', valueBodyOf('MAX_ACTIVE_BIDS', 'c', '5')!).text).toBe('5');
+    expect(sentValueView('REVIEW_THRESHOLD', valueBodyOf('REVIEW_THRESHOLD', 'c', '0.42')!).text).toBe('0.42');
+  });
+
+  it('어휘는 쉼표로 이어지고 빈 어휘는 null 이다 — 「비움」 얼굴이 그 자리를 받는다', () => {
+    expect(sentValueView('REQUIRED_KEYWORD', valueBodyOf('REQUIRED_KEYWORD', 'c', '합성, 공사')!).text).toBe(
+      '합성, 공사',
+    );
+    expect(sentValueView('REQUIRED_KEYWORD', valueBodyOf('REQUIRED_KEYWORD', 'c', '')!).text).toBeNull();
   });
 
   it('빈 어휘는 빈 배열이다 — 그 조건을 지우는 길이고 공백 원소를 보내지 않는다', () => {

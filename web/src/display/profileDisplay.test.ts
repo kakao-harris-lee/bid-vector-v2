@@ -4,6 +4,7 @@ import type { components } from '../api/generated/operator-api';
 
 import {
   businessDetailsBodyOf,
+  capacityBodyOf,
   NARA_FIELD_DISPLAY,
   NARA_REGISTRATION_DISPLAY,
   QUALIFICATION_STATE_DISPLAY,
@@ -158,5 +159,49 @@ describe('사업 정보 요청 본문 — 계약의 모양을 지킨다', () => 
   it('소재지를 고르지 않으면 null 이다 — 지어낸 기본값이 없다', () => {
     expect(businessDetailsBodyOf(form({ headquartersRegion: '' })).headquartersRegion).toBeNull();
     expect(businessDetailsBodyOf(form({ headquartersRegion: 'JEJU' })).headquartersRegion).toBe('JEJU');
+  });
+});
+
+/**
+ * **CR M-1 의 회귀 test.** 앞 판은 `parseInt` 로 앞자리만 읽어 `'1,500,000,000'` → **1** 을
+ * 보냈다(계약 `minimum: 1` 이라 서버가 받는다). 목록이 그 값을 `1,500,000,000원` 으로 보이므로
+ * **보이는 꼴 그대로 되타이핑하는 것이 자연스러운 입력**이고, 전략 쪽과 달리 **확인 단계가 없다**.
+ */
+describe('시평액 요청 본문 — 문자열 전체가 정수일 때만', () => {
+  const form = (overrides: Partial<Parameters<typeof capacityBodyOf>[0]> = {}) => ({
+    licenseName: '토목공사업',
+    amountWon: '1500000000',
+    assessmentYear: '2026',
+    ...overrides,
+  });
+
+  it('모양에 맞으면 수로 바꿔 보낸다', () => {
+    expect(capacityBodyOf(form())).toStrictEqual({
+      licenseName: '토목공사업',
+      amountWon: 1_500_000_000,
+      assessmentYear: 2026,
+    });
+  });
+
+  it.each([
+    ['자리 구분 쉼표', { amountWon: '1,500,000,000' }],
+    ['단위', { amountWon: '15억' }],
+    ['소수점', { amountWon: '1500.5' }],
+    ['음수', { amountWon: '-1' }],
+    ['지수', { amountWon: '1.5e9' }],
+    ['꼬리 문자', { amountWon: '1500000000원' }],
+    ['연도의 쉼표', { assessmentYear: '2,026' }],
+    ['연도의 소수점', { assessmentYear: '2026.5' }],
+    ['빈 금액', { amountWon: '' }],
+    ['빈 연도', { assessmentYear: '' }],
+    ['공백뿐인 면허명', { licenseName: '   ' }],
+  ])('%s 은 보내지 않는다', (_label, overrides) => {
+    expect(capacityBodyOf(form(overrides))).toBeNull();
+  });
+
+  it('앞뒤 공백만 정규화한다', () => {
+    expect(capacityBodyOf(form({ licenseName: ' 토목공사업 ', amountWon: ' 10 ', assessmentYear: ' 2026 ' }))).toStrictEqual(
+      { licenseName: '토목공사업', amountWon: 10, assessmentYear: 2026 },
+    );
   });
 });

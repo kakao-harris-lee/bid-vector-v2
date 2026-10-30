@@ -181,6 +181,43 @@ describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
     expect(body.terms).toStrictEqual([]);
   });
 
+  /**
+   * **CR H-2 · v H-1 의 화면 쪽 회귀 test.** 자리 구분 쉼표를 적으면 앞 판은 `50,000,000` 을
+   * **50** 으로 보냈고 확인 화면은 원문을 보였다. 이제 보내지 않는다.
+   */
+  it('자리 구분 쉼표가 있으면 보내지 않고 받는 모양을 말한다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_BUDGET' }));
+    renderScreen();
+    await beginEdit('MAX_BUDGET');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_BUDGET.label), {
+      target: { value: '50,000,000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    expect(await screen.findByTestId('edit-value-missing')).toBeTruthy();
+    expect(mocked.provideEditSessionValue).not.toHaveBeenCalled();
+  });
+
+  /** 「보낸 값」은 **본문의 값**이다 — 원문을 되풀이하지 않는다(그것이 확인 단계의 뜻이다). */
+  it('확인 화면의 보낸 값이 본문의 값과 같은 꼴이다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_BUDGET' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    renderScreen();
+    await beginEdit('MAX_BUDGET');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_BUDGET.label), {
+      target: { value: '1200000000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    await waitFor(() => expect(mocked.provideEditSessionValue).toHaveBeenCalled());
+    const [, body] = mocked.provideEditSessionValue.mock.calls[0]!;
+    expect(body.amountWon).toBe(1_200_000_000);
+    // 본문의 값을 **지금 값과 같은 포맷터**로 보인다 — 둘이 다르면 눈에 보인다.
+    expect((await screen.findByTestId('edit-sent-value')).textContent).toBe('1,200,000,000원');
+  });
+
   /** 수로 읽히지 않으면 **보내지 않는다** — 0 으로 지어내지 않는다. */
   it('숫자 칸에 수가 아닌 값이면 보내지 않고 무엇이 빠졌는지 말한다', async () => {
     mocked.beginEditSession.mockResolvedValue(session({ field: 'CANDIDATE_LIMIT' }));

@@ -218,6 +218,19 @@ describe('프로필 — 시공능력평가액은 행 단위다', () => {
     expect(row.textContent).toContain('2026년 평가');
   });
 
+  /** **CR M-1 의 화면 쪽 회귀 test** — 목록이 보이는 꼴 그대로 되타이핑한 입력이다. */
+  it('자리 구분 쉼표가 있는 금액은 보내지 않는다 — 잘린 값이 조용히 저장되지 않게', async () => {
+    renderSection();
+
+    fireEvent.change(await screen.findByLabelText('시평액 면허명'), { target: { value: '토목공사업' } });
+    fireEvent.change(screen.getByLabelText('시평액 금액'), { target: { value: '1,500,000,000' } });
+    fireEvent.change(screen.getByLabelText('평가 연도'), { target: { value: '2026' } });
+    fireEvent.click(screen.getByRole('button', { name: '시평액 저장' }));
+
+    expect(await screen.findByTestId('capacity-missing')).toBeTruthy();
+    expect(mocked.upsertConstructionCapacity).not.toHaveBeenCalled();
+  });
+
   /** 셋 다 필수다(계약) — **0 이나 올해를 기본값으로 지어내지 않는다**. */
   it('셋 가운데 하나라도 없으면 보내지 않는다', async () => {
     renderSection();

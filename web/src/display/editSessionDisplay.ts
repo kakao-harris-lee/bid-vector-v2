@@ -107,13 +107,33 @@ export const EDIT_SESSION_CONFLICT_DISPLAY: Readonly<Record<string, StateDisplay
   EDIT_SESSION_CONFLICT: { label: '동시 편집이 부딪쳤습니다', why: '다시 시도하십시오', tone: 'bad' },
 };
 
-/** 값 입력이 운영자에게 묻는 꼴 — 요청 칸에서 나온다(칸마다 `if` 를 두지 않는다). */
+/**
+ * 값 입력이 운영자에게 묻는 꼴 — 요청 칸에서 나온다(칸마다 `if` 를 두지 않는다).
+ *
+ * `shape` 는 **받아들이는 문자열 전체의 모양**이다. 앞자리만 읽는 파서를 쓰지 않는 이유는
+ * CR H-2 · v H-1 이다: `parseInt('1,200,000,000')` 은 **1** 이고 `Number.isFinite` 를 통과하므로
+ * 「수로 읽히지 않으면 보내지 않는다」 가드를 **지나간다**. 그 결과 운영자가 적은 값과 다른 값이
+ * 저장됐다(실 서버 실측: 예산 상한 `50,000,000` 입력 → 저장 `50`).
+ *
+ * 그래서 **문자열 전체가 그 모양일 때만** 받는다. 쉼표·단위·지수·꼬리 문자는 거부이고, 앞뒤
+ * 공백만 정규화한다(그 정규화의 결과는 확인 화면이 **본문의 값**으로 보여 준다).
+ */
 export const SLOT_INPUT = {
-  terms: { kind: 'TERMS', hint: '쉼표로 나눕니다. 비우면 그 조건을 지웁니다.' },
-  amountWon: { kind: 'INTEGER', hint: '원 단위 정수' },
-  number: { kind: 'DECIMAL', hint: '0 과 1 사이의 소수' },
-  count: { kind: 'INTEGER', hint: '건수' },
-} as const satisfies Record<ValueSlot, { readonly kind: 'TERMS' | 'INTEGER' | 'DECIMAL'; readonly hint: string }>;
+  terms: { kind: 'TERMS', hint: '쉼표로 나눕니다. 비우면 그 조건을 지웁니다.', shape: null, accepts: '쉼표로 나눈 어휘' },
+  amountWon: { kind: 'INTEGER', hint: '원 단위 정수', shape: /^\d+$/u, accepts: '자리 구분 없는 원 단위 정수(예: 1200000000)' },
+  number: { kind: 'DECIMAL', hint: '0 과 1 사이의 소수', shape: /^-?\d+(\.\d+)?$/u, accepts: '소수(예: 0.42)' },
+  count: { kind: 'INTEGER', hint: '건수', shape: /^\d+$/u, accepts: '정수 건수(예: 5)' },
+} as const satisfies Record<
+  ValueSlot,
+  {
+    readonly kind: 'TERMS' | 'INTEGER' | 'DECIMAL';
+    readonly hint: string;
+    /** `null` 은 어휘 칸(모양 검사가 없다). */
+    readonly shape: RegExp | null;
+    /** 거부 얼굴이 운영자에게 말하는 「받는 모양」. */
+    readonly accepts: string;
+  }
+>;
 
 /**
  * 쉼표로 적은 어휘를 배열로 — **빈 원소를 보내지 않는다**(계약이 공백뿐인 원소를 400 으로
@@ -131,15 +151,21 @@ export function termsOf(raw: string): string[] {
  * `value` 요청 본문 — **`field` 가 이름하는 칸 하나만** 싣는다. 다른 칸이 함께 가면 400 이고,
  * 그 선택을 표가 한다.
  *
- * 숫자가 수로 읽히지 않으면 `null` 이다 — 호출자가 보내지 않고 무엇이 빠졌는지 말한다
- * (0 으로 지어내지 않는다).
+ * **모양에 맞지 않으면 `null`** 이다 — 호출자가 보내지 않고 무엇을 받는지 말한다. 앞자리만
+ * 읽어 「읽히기는 하지만 다른 수」를 보내는 일이 없다(CR H-2 · v H-1).
  */
 export function valueBodyOf(field: StrategyField, commandId: string, raw: string): ValueRequest | null {
   const slot = FIELD_VALUE_SLOT[field];
   if (slot === 'terms') {
     return { commandId, field, terms: termsOf(raw) };
   }
-  const parsed = slot === 'number' ? Number.parseFloat(raw) : Number.parseInt(raw, 10);
+  const normalized = raw.trim();
+  const { shape } = SLOT_INPUT[slot];
+  if (shape === null || !shape.test(normalized)) {
+    return null;
+  }
+  const parsed = Number(normalized);
+  // 모양을 지났어도 수가 아니거나 유한하지 않으면 보내지 않는다(아주 긴 자리 수 등).
   if (!Number.isFinite(parsed)) {
     return null;
   }
@@ -147,9 +173,31 @@ export function valueBodyOf(field: StrategyField, commandId: string, raw: string
     return { commandId, field, amountWon: parsed };
   }
   if (slot === 'count') {
+    // 건수는 정수다 — 모양이 이미 정수를 요구하므로 여기서 깎이는 값이 없다.
     return { commandId, field, count: parsed };
   }
   return { commandId, field, number: parsed };
+}
+
+/**
+ * 확인 화면의 「보낸 값」 — **본문에 실린 값**에서 그린다(원문이 아니다).
+ *
+ * 왜 본문에서 그리는가(CR H-2 ②): 원문을 보이면 운영자는 자기가 적은 것을 확인하고 「적용」을
+ * 누르는데 서버로 간 값은 다를 수 있었다. 금액은 **지금 값과 같은 포맷터**를 쓰므로 둘이 다르면
+ * `1,200,000,000원` ↔ `1원` 처럼 눈에 보인다.
+ */
+export function sentValueView(field: StrategyField, body: ValueRequest): FieldValueView {
+  const slot = FIELD_VALUE_SLOT[field];
+  if (slot === 'terms') {
+    return termsView(body.terms ?? []);
+  }
+  if (slot === 'amountWon') {
+    return { text: `${(body.amountWon ?? 0).toLocaleString('ko-KR')}원` };
+  }
+  if (slot === 'count') {
+    return numberView(body.count);
+  }
+  return numberView(body.number);
 }
 
 type Strategy = components['schemas']['StrategyReadResponse'];

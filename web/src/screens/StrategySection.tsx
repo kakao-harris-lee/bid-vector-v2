@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '../api/apiError';
+import type { components } from '../api/generated/operator-api';
 import {
   beginEditSession,
   cancelEditSession,
@@ -20,14 +21,18 @@ import {
   EDIT_SESSION_CONFLICT_DISPLAY,
   EDIT_SESSION_STATE_DISPLAY,
   FIELD_VALUE_SLOT,
+  sentValueView,
   SLOT_INPUT,
   STRATEGY_FIELD_DISPLAY,
   STRATEGY_FIELD_ORDER,
   STRATEGY_FIELD_VALUE,
   valueBodyOf,
+  type FieldValueView,
   type StrategyField,
 } from '../display/editSessionDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+
+type ValueRequest = components['schemas']['EditSessionValueRequest'];
 
 const HTTP_CONFLICT = 409;
 
@@ -36,7 +41,14 @@ export const STRATEGY_QUERY_KEY = ['strategy'] as const;
 /** 한 명령 — `commandId` 를 **여기서 한 번** 만든다. 재시도가 같은 값을 다시 쓰므로 멱등하다. */
 type EditCommand =
   | { readonly kind: 'BEGIN'; readonly commandId: string; readonly field: StrategyField }
-  | { readonly kind: 'VALUE'; readonly commandId: string; readonly sessionId: string; readonly field: StrategyField; readonly raw: string }
+  | {
+      readonly kind: 'VALUE';
+      readonly commandId: string;
+      readonly sessionId: string;
+      readonly field: StrategyField;
+      /** **보낸 본문 그대로**. 확인 화면의 「보낸 값」이 이것에서 나온다(CR H-2 ②). */
+      readonly body: ValueRequest;
+    }
   | { readonly kind: 'CONFIRM'; readonly commandId: string; readonly sessionId: string; readonly seenRevision: number }
   | { readonly kind: 'EDIT'; readonly commandId: string; readonly sessionId: string; readonly field: StrategyField }
   | { readonly kind: 'CANCEL'; readonly commandId: string; readonly sessionId: string };
@@ -45,7 +57,8 @@ type EditCommand =
 interface OpenSession {
   readonly session: EditSessionResponse;
   readonly field: StrategyField;
-  readonly sent: string | null;
+  /** `null` 은 「아직 값을 보내지 않았다」다. 값을 보냈으면 **본문에서 뽑은 문면**이 온다. */
+  readonly sent: FieldValueView | null;
 }
 
 /**
@@ -70,14 +83,9 @@ export function StrategySection() {
       switch (command.kind) {
         case 'BEGIN':
           return beginEditSession({ field: command.field });
-        case 'VALUE': {
-          const body = valueBodyOf(command.field, command.commandId, command.raw);
-          if (body === null) {
-            // 수로 읽히지 않는 값은 **보내지 않는다** — 0 으로 지어내지 않는다.
-            throw new ApiError(0, 'VALUE_NOT_READABLE');
-          }
-          return provideEditSessionValue(command.sessionId, body);
-        }
+        case 'VALUE':
+          // 본문은 **보내기 전에** 만들어졌다(아래 `onSendValue`) — 여기서 다시 만들지 않는다.
+          return provideEditSessionValue(command.sessionId, command.body);
         case 'CONFIRM':
           return confirmEditSession(command.sessionId, {
             commandId: command.commandId,
@@ -106,10 +114,18 @@ export function StrategySection() {
         return;
       }
       const field = command.kind === 'CANCEL' || command.kind === 'CONFIRM' ? open?.field : command.field;
+      if (field === undefined) {
+        // 어느 칸인지 모르면 **패널을 닫는다** — 기본값을 지어내면 그 뒤 「값 보내기」가 엉뚱한
+        // 칸으로 간다(CR L-1).
+        setOpen(null);
+        setRaw('');
+        return;
+      }
       setOpen({
         session,
-        field: field ?? STRATEGY_FIELD_ORDER[0]!,
-        sent: command.kind === 'VALUE' ? command.raw : null,
+        field,
+        // **보낸 본문의 값**에서 뽑은 문면이다 — 운영자가 적은 원문이 아니다(CR H-2 ②).
+        sent: command.kind === 'VALUE' ? sentValueView(command.field, command.body) : null,
       });
       if (command.kind === 'EDIT') {
         setRaw('');
@@ -186,17 +202,15 @@ export function StrategySection() {
             setMissing(false);
           }}
           onSendValue={() => {
-            if (valueBodyOf(open.field, 'probe', raw) === null) {
+            // 본문을 **한 번만** 만든다(앞 판은 가짜 `commandId` 로 검증용 본문을 한 번 더
+            // 만들었다 — CR L-10). 모양에 맞지 않으면 보내지 않고 받는 모양을 말한다.
+            const commandId = crypto.randomUUID();
+            const body = valueBodyOf(open.field, commandId, raw);
+            if (body === null) {
               setMissing(true);
               return;
             }
-            run.mutate({
-              kind: 'VALUE',
-              commandId: crypto.randomUUID(),
-              sessionId: open.session.sessionId,
-              field: open.field,
-              raw,
-            });
+            run.mutate({ kind: 'VALUE', commandId, sessionId: open.session.sessionId, field: open.field, body });
           }}
           onConfirm={() =>
             run.mutate({
@@ -286,11 +300,14 @@ function EditPanel({
   const input = SLOT_INPUT[FIELD_VALUE_SLOT[open.field]];
   const currentView = STRATEGY_FIELD_VALUE[open.field](strategy);
   /**
-   * 보낸 값의 문면. **빈 어휘를 빈 자리로 보이지 않는다**(여정이 잡은 자리): 운영자가 조건을
-   * 지우려고 비워 보낸 것과 아직 아무것도 보내지 않은 것은 다른 사실이고, 둘 다 빈 칸으로
-   * 그리면 확인 화면이 무엇을 적용하려는지 말하지 못한다. `null` 만 「값 없음」이다.
+   * 보낸 값의 문면. 둘을 가른다.
+   *  · `open.sent === null` — **아직 값을 보내지 않았다** → `Field` 가 「값 없음」을 낸다.
+   *  · 보냈는데 그 본문의 값이 비었다(어휘 0개) — **조건을 지우려고 비워 보낸 것**이다. 빈 칸으로
+   *    그리면 위와 같은 얼굴이 되어 무엇을 적용하려는지 말하지 못한다(여정이 잡은 자리).
+   *
+   * 값이 있으면 **본문에서 뽑은 문면**을 그대로 쓴다 — 운영자가 적은 원문이 아니다(CR H-2 ②).
    */
-  const sentView = open.sent === null ? null : open.sent === '' ? '비움 — 이 조건을 지웁니다' : open.sent;
+  const sentView = open.sent === null ? null : (open.sent.text ?? '비움 — 이 조건을 지웁니다');
 
   return (
     <div data-testid="edit-session" className="rounded-lg border border-accent/40 bg-card p-4">
@@ -317,7 +334,8 @@ function EditPanel({
           </label>
           {missing ? (
             <p data-testid="edit-value-missing" role="alert" className="text-xs text-bad-ink">
-              수로 읽을 수 있는 값을 적으십시오 — 읽을 수 없는 값을 보내지 않습니다.
+              {input.accepts} 을(를) 적으십시오 — 자리 구분 쉼표·단위·꼬리 문자가 있으면 보내지
+              않습니다(잘린 수가 저장되지 않게).
             </p>
           ) : null}
           <div className="flex gap-2">

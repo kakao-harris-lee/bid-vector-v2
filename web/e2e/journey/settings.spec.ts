@@ -148,6 +148,50 @@ test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 
 });
 
 /** D-7E2-7 — 사업자번호는 **입력칸이 없다**. 화면·콘솔에 그 꼴의 값이 0 인 것도 함께 센다. */
+/**
+ * **CR H-2 · v H-1 의 여정 쪽 단언.** 자리 구분 쉼표가 든 금액은 **보내지 않는다** — 앞 판은
+ * `50,000,000` 을 `50` 으로 보내고 확인 화면엔 원문을 보였다(실 서버 실측). 그리고 받아들인
+ * 입력에서는 **화면의 「보낸 값」이 본문의 값과 같다**.
+ */
+test('설정 — 쉼표 금액은 보내지 않고, 보낸 값은 본문의 값과 같다', async ({ page }) => {
+  const watched = watchRequests(page);
+  await signIn(page);
+  await openSettings(page);
+
+  const row = page.getByTestId('strategy-row-MAX_BUDGET');
+  await row.getByRole('button', { name: '고치기' }).click();
+  const panel = page.getByTestId('edit-session');
+  await expect(panel).toBeVisible();
+
+  // ① 쉼표 금액 — 거부 얼굴이 뜨고 value 요청이 **가지 않는다**.
+  let valueCalls = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/value') && request.method() === 'POST') {
+      valueCalls += 1;
+    }
+  });
+  await panel.getByRole('textbox').fill('50,000,000');
+  await panel.getByRole('button', { name: '값 보내기' }).click();
+  await expect(panel.getByTestId('edit-value-missing')).toBeVisible();
+  expect(valueCalls, '쉼표 금액으로 요청이 가면 안 된다').toBe(0);
+
+  // ② 받는 모양 — 본문의 값과 화면의 「보낸 값」이 같다.
+  const valued = page.waitForResponse((one) => one.url().includes('/value') && one.request().method() === 'POST');
+  await panel.getByRole('textbox').fill('50000000');
+  await panel.getByRole('button', { name: '값 보내기' }).click();
+  // 단언은 **보낸 본문**에서 읽는다 — 화면이 보이는 문면과 같은 출처를 쓰면 대조가 공허해진다.
+  const sent = (await valued).request().postDataJSON() as { readonly amountWon: number };
+  expect(sent.amountWon).toBe(50_000_000);
+  await expect(panel.getByTestId('edit-sent-value')).toHaveText(`${sent.amountWon.toLocaleString('ko-KR')}원`);
+
+  // 적용하지 않고 그만둔다 — 이 여정은 전역 전략을 바꾸지 않는다.
+  await panel.getByRole('button', { name: '그만두기' }).click();
+  await expect(page.getByTestId('edit-session')).toHaveCount(0);
+
+  expect(watched.outside).toStrictEqual([]);
+  assertOnlyAllowedOperations(watched.apiPaths);
+});
+
 test('설정에 사업자번호 입력칸이 없고 화면·콘솔에 그 꼴이 없다', async ({ page }) => {
   const consoleLines: string[] = [];
   page.on('console', (message) => consoleLines.push(message.text()));
