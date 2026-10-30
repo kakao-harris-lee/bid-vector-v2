@@ -114,20 +114,36 @@ async function editStrategyField(page: Page, field: string, raw: string): Promis
 test.afterEach(async ({ page }) => {
   // 감시 관심 업종은 **전역 전략**이고 제안 목록의 빈 얼굴을 바꾼다 — 남겨 두면 뒤 여정이
   // 남의 잔류로 깨진다(그 실패가 가장 비싼 꼴이다).
-  const blocked = await clearStrategyTerms(
+  const outcome = await clearStrategyTerms(
     page,
     'FOCUS_CATEGORY',
     (strategy) => (strategy.focusCategories as readonly string[] | undefined) ?? [],
   );
-  expect(blocked, '여정 ① 의 전역 감시 조건을 되돌릴 수 없었다').toBeNull();
+  if (outcome.kind === 'no-session') {
+    // **원래 실패를 덮지 않는다**(CR r1 LOW): 로그인 전에 죽었으면 전역 상태를 바꿀 기회도
+    // 없었으므로 되돌릴 것이 없다. 여기서 또 실패하면 진단이 teardown 으로 옮겨 간다.
+    return;
+  }
+  expect(outcome.kind === 'blocked' ? outcome.why : null, '여정 ① 의 전역 감시 조건을 되돌릴 수 없었다').toBeNull();
   const after = (await (await page.request.get('/api/strategy')).json()) as {
     readonly focusCategories: readonly string[];
   };
   expect(after.focusCategories, '여정 ① 이 전역 감시 조건을 남겼다').toStrictEqual([]);
 });
 
+/** D-7E-6 — 지금 화면에 비밀 문구도 사업자번호 꼴도 없다. 두 자리에서 부른다(채운 뒤·비운 뒤). */
+async function assertNoPrivateValues(page: Page): Promise<void> {
+  const shown = await page.locator('body').innerText();
+  expect(shown).not.toContain(journeyContext().passphrase);
+  expect(shown).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
+}
+
 test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우고 되돌린다', async ({ page }) => {
   const watched = watchRequests(page);
+  // 콘솔은 **여정 전체**에서 모은다(설정 여정과 같은 축, v r1 L-2) — 한 자리의 스냅숏이 아니라
+  // 모든 전이에서 비밀 문구가 새지 않았다는 것을 끝에서 한 번 센다.
+  const consoleLines: string[] = [];
+  page.on('console', (message) => consoleLines.push(message.text()));
   await signIn(page);
 
   // ⓪ 홈에 **A 로 가는 진입 하나**가 떠 있다(서버의 미완이 비어 있지 않을 때만, D-7E2b-4).
@@ -161,7 +177,9 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   // ③ 자격 사실 — 업종과 면허가 **같은 폼**이다.
   await page.getByTestId('onboarding-step-QUALIFICATION_FACTS').click();
-  await page.getByLabel('업종').fill('토목공사업');
+  // **`exact`** — 부분 일치면 전략 패널의 `관심 업종` 입력도 같은 패턴에 걸린다(CR r1 LOW).
+  // 오늘은 단계마다 카드 하나뿐이라 지나가지만, 화면 전체 locator 가 남의 건을 집는 자리다.
+  await page.getByLabel('업종', { exact: true }).fill('토목공사업');
   await page.getByLabel('면허를 신고함').check();
   await page.getByLabel('면허', { exact: true }).fill('토목건축공사업');
   await page.getByLabel('지역어').fill('서울');
@@ -180,6 +198,10 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   expect(afterCapacity.completed).toContain('CONSTRUCTION_CAPACITY');
   await assertRowsMatch(page, afterCapacity);
+
+  // ④-b D-7E-6 — **프로필이 채워진 상태**에서 본다(v r1 L-2). 아래 ⑨ 는 비운 뒤라, 값이 실제로
+  // 화면에 그려지는 동안 비밀 문구·사업자번호 꼴이 없는지는 이 자리에서만 잰다.
+  await assertNoPrivateValues(page);
 
   // ⑤ 감시 관심 업종 — 전략은 **편집 세션**으로만 바뀐다.
   await page.getByTestId('onboarding-step-WATCH').click();
@@ -247,10 +269,8 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   const afterWatchCleared = (await (await watchCleared).json()) as Checklist;
   expect(afterWatchCleared.pending).toContain('WATCH_CONDITIONS');
 
-  // ⑧ D-7E-6 — **새 화면에도** 비밀 문구·사업자번호 꼴이 없다(설정 화면에만 걸려 있던 축이다).
-  const shown = await page.locator('body').innerText();
-  expect(shown).not.toContain(journeyContext().passphrase);
-  expect(shown).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
+  // ⑧ D-7E-6 — 비운 뒤에도 같다. 콘솔은 이 여정 전체에서 모은 것을 ⑩ 에서 한 번 센다.
+  await assertNoPrivateValues(page);
 
   // ⑨ 미완이 남았으므로 완료 행동은 없고, 홈의 진입은 그대로 서 있다.
   await expect(page.getByTestId('onboarding-complete')).toHaveCount(0);
@@ -259,6 +279,10 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await expect(page.getByTestId('onboarding-banner')).toBeVisible();
 
   await expect(page.getByTestId('write-failure')).toHaveCount(0);
+
+  // ⑩ 콘솔에도 비밀 문구가 없다 — 여정 전체에서 모은 줄을 한 번에 센다.
+  expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
+
   expect(watched.outside).toStrictEqual([]);
   expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
   assertOnlyAllowedOperations(watched.apiPaths);
