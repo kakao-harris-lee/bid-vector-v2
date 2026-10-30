@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,7 @@ import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { ITEM_STATE_DISPLAY, ONBOARDING_ITEM_DISPLAY, ONBOARDING_ITEM_ORDER } from '../display/onboardingDisplay';
 
-import { OnboardingBanner, OnboardingScreen } from './OnboardingScreen';
+import { ONBOARDING_QUERY_KEY, OnboardingBanner, OnboardingScreen } from './OnboardingScreen';
 
 vi.mock('../api/queries');
 
@@ -374,11 +374,30 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
  * 렌더되지 않았다. 「조건을 지우고 항상 띄운다」가 전건을 초록으로 지났다.
  */
 describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => {
+  /**
+   * **질의가 끝났다는 양성 신호**. 배너의 「뜨지 않는다」는 음성 단언인데, 응답이 닿기 **전**에도
+   * 참이다 — `waitFor` 로 감싸면 첫 렌더에서 바로 통과하고 test 가 끝난다. 실제로 그 꼴이었다:
+   * 「선행 대기까지 센다」 변이(B3)가 **초록으로 지나갔다**. 같은 질의를 쓰는 이 표지를 먼저
+   * 기다린 뒤에 음성 단언을 **한 번만** 센다.
+   */
+  function BannerSettled() {
+    const checklist = useQuery({ queryKey: ONBOARDING_QUERY_KEY, queryFn: queries.readOnboardingChecklist });
+    return checklist.isPending ? null : <span data-testid="banner-settled" />;
+  }
+
   function renderBanner() {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const router = createMemoryRouter(
       [
-        { path: '/', element: <OnboardingBanner /> },
+        {
+          path: '/',
+          element: (
+            <>
+              <OnboardingBanner />
+              <BannerSettled />
+            </>
+          ),
+        },
         { path: '/start', element: <p>시작하기 자리</p> },
       ],
       { initialEntries: ['/'] },
@@ -405,8 +424,8 @@ describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => 
     mocked.readOnboardingChecklist.mockResolvedValue(checklist({ completed: [...ONBOARDING_ITEM_ORDER] }));
     renderBanner();
 
-    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+    await screen.findByTestId('banner-settled');
+    expect(screen.queryByTestId('onboarding-banner')).toBeNull();
   });
 
   /** 선행 대기는 **막지도 채우지도 않는다** — 미완이 아니므로 배너를 띄울 사유가 아니다. */
@@ -419,8 +438,8 @@ describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => 
     );
     renderBanner();
 
-    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+    await screen.findByTestId('banner-settled');
+    expect(screen.queryByTestId('onboarding-banner')).toBeNull();
   });
 
   /** 읽지 못했으면 **아무것도 그리지 않는다** — 실패를 「미완 0」으로도 「미완 있음」으로도 접지 않는다. */
@@ -428,8 +447,8 @@ describe('홈 진입 배너 — 없는 사실을 지어내지 않는다', () => 
     mocked.readOnboardingChecklist.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderBanner();
 
-    await waitFor(() => expect(mocked.readOnboardingChecklist).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTestId('onboarding-banner')).toBeNull());
+    await screen.findByTestId('banner-settled');
+    expect(screen.queryByTestId('onboarding-banner')).toBeNull();
   });
 });
 
