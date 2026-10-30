@@ -60,6 +60,32 @@ base `1e387499` · 브랜치 `m7-7e2b/2026-10-30`. 명령은 `web/` 에서 돌�
 | M6 | 프로필 값으로 완료를 추론한다(우회 1) | **화면 test 1건 실패** |
 | 통제(후) | 되돌린 clone | 23 파일 **444 passed** |
 
+### r1 — 보강한 probe 가 붉는가 (같은 방식, 승인 전 일괄)
+
+verifier·CR 이 「지금 코드에 결함은 없고 **test 가 비어 있다**」고 지목한 자리다. 그러므로 probe 는
+원문에서 **초록**이어야 하고, 그 자리를 여는 변이에서 **붉어야** 한다 — 둘 다 쟀다.
+
+| # | 변이 | 결과 |
+| --- | --- | --- |
+| 통제(전) | 없음 | 23 파일 **453 passed** |
+| S1 | 전략의 관심 업종이 비면 `WATCH_CONDITIONS` 를 미완으로 그린다 | 배지 전수 test RED |
+| S2 | 프로필이 나라장터 미응답이면 `NARA_READINESS` 를 미완으로 그린다 | 같은 test RED |
+| B1 | 읽지 못했어도 배너를 띄운다 | 배너 probe **2건** RED |
+| B2 | 미완이 0 이어도 띄운다 | 배너 probe **4건** RED |
+| B3 | 배너가 선행 대기까지 센다 | 「선행 대기만 남으면 뜨지 않는다」 RED |
+| P1 | 저장해도 고른 단계를 놓지 않는다 | 단계 전진 test RED |
+| P2 | 프로필 401 을 말 없이 비운다 | 401 test RED |
+| P3 | 편집 세션이 열려도 단계를 옮긴다 | 단계 잠금 test RED |
+| P4 | 진행률이 live region 이 아니다 | 보조기술 test RED |
+| 통제(후) | 되돌린 clone | 23 파일 **453 passed** |
+
+**첫 라운드에서 B3 가 초록으로 지나갔고, 그 사유는 거동이 아니라 단언의 시점이었다.**
+`waitFor(() => expect(queryByTestId(…)).toBeNull())` 은 응답이 닿기 **전** 첫 렌더에서 이미 참이라
+거기서 끝난다 — 세 음성 단언이 모두 그 꼴이었고, B1·B2 가 붉었던 것은 그 변이들이 **첫 렌더부터**
+배너를 세웠기 때문이다(우연이다). 같은 질의를 쓰는 **양성 표지**를 먼저 기다린 뒤 음성 단언을 한 번만
+세도록 고쳤고, 그 뒤 B1·B2 의 실패가 1006ms(타임아웃)에서 **8ms**(즉시)로 바뀌었다 — 기다림이 아니라
+판정이 되었다는 계수다.
+
 ## acceptance — `ci.yml` `web` job 의 명령 그대로 + Kotlin
 
 | step | 명령 | exit | 핵심 결과 |
@@ -68,22 +94,24 @@ base `1e387499` · 브랜치 `m7-7e2b/2026-10-30`. 명령은 `web/` 에서 돌�
 | W-3 | `npm run typecheck` | 0 | |
 | W-4 | `npm run gate:src-tree` | 0 | 컴파일 경계 전제 성립 |
 | W-5 | `npm run api:types:check` | 0 | 생성 타입이 문서와 바이트까지 같다 |
-| W-6 | `npm run test` | 0 | 23 파일 **444 passed** |
+| W-6 | `npm run test` | 0 | 23 파일 **453 passed**(r1 에서 +9) |
 | W-7 | `npm run gate:tests` | 0 | 등록부의 게이트 test 가 수집에 있고 전부 통과 |
 | W-8 | `npm run build` | 0 | 자산 둘(js·css) |
 | W-9 | `npm run gate:boundary-canary` | 0 | 메인·워커 두 그래프에서 경계가 활성 |
 | W-11 | `npm run test:e2e` | 0 | 셸 스모크 2 passed |
-| W-13 | `npm run test:e2e:journey` | 0 | **9 passed** — 여정 ① 이 들어왔고 그 **뒤에 도는 설정 여정 셋이 그대로 초록**이다(순서 독립 실측) |
+| W-13 | `npm run test:e2e:journey` | 0 | **9 passed** — 여정 ① 뒤에 도는 설정 여정 셋이 그대로 초록이다. **이 레인이 잰 것은 ① → 설정 방향뿐**이다(기본 순서에서 ② 는 ① 보다 **앞에** 돈다: `journey` < `onboarding`). 「① 다음에 ② 가 서는가」는 **r1 verifier 가 파일 이름을 바꿔 ① 을 맨 앞에 두고 재서** 9 passed 를 냈다 — 그 실측이 순서 독립의 나머지 절반이다(v r1 장부 LOW) |
 | check | `./gradlew --no-daemon check qualityBaseline` | 0 | Kotlin 전건 — `BUILD SUCCESSFUL in 28m 17s`(호스트가 여정·clone 과 겹쳐 CI 실측보다 길다) |
 
 W-1(`npm ci`)·W-10(브라우저 설치)·W-12(`:app:bootJar`)는 환경 준비 step 이고 이 레인에서 먼저
 돌려 두었다(`npm ci` 0 · `:app:bootJar` 0).
 
 **Kotlin 절이 선 자리**: 그 명령은 `39c5c01e` 의 트리 + 요구표 편집(지금의 `3354143d`)에서 돌았고,
-그 뒤 산출물 커밋(`2acd2439`)이 바꾼 것은 **e2e spec 한 파일**뿐이다 — Kotlin 소스 · OpenAPI ·
-`config/quality/**` 와 교집합이 0 이라(`git diff --name-only 39c5c01e..2acd2439`) 그 사이에 이
-job 의 입력이 움직이지 않았다. **evidence 커밋 뒤의 전건 재실측은 verifier 가 든다**(아래 비밀값
-절의 사유 — evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다).
+그 뒤 산출물 커밋(`2acd2439`)이 바꾼 것은 **e2e spec 한 파일**이다 — `git diff --name-only
+3354143d..2acd2439`. (r0 은 그 범위를 `39c5c01e..` 로 적었고 그것은 **인용 오류**였다, CR r1 LOW:
+그 범위의 실제 출력은 요구표와 spec **둘**이다. 결론은 어느 범위에서도 같다.) Kotlin 소스 ·
+OpenAPI · `config/quality/**` 와 교집합이 **0** 이라 그 사이에 이 job 의 입력이 움직이지 않았다.
+**evidence 커밋 뒤의 전건 재실측은 verifier 가 든다**(아래 비밀값 절의 사유 — evidence 는 자기
+마지막 커밋의 post-state 를 담을 수 없다).
 
 ## 새 public 표면 전수
 
