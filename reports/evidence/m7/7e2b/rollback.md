@@ -15,16 +15,17 @@ base **`1e387499`**(착수 계약의 base 그대로 — 이 slice 의 base 는 �
 base 안에** 있다. 그래서 base 복원이 남의 줄을 떨어뜨리지 않는다 — hunk 격리가 필요 없고,
 그 사실을 ③ 의 「남의 표지」 계수로 잰다.
 
-**실측 HEAD**: `1ff961f2` — 이 slice 의 **마지막 산출물 커밋**이다. 그 뒤 커밋은 evidence 뿐이고
+**실측 HEAD**: `ad2f335a` — 이 slice 의 **마지막 산출물 커밋**이다. 그 뒤 커밋은 evidence 뿐이고
 evidence 경로는 아래 목록 **밖**이다. 라운드가 더 붙어 목록 안 파일이 움직이면 이 절차를 다시
 돌린다(목록이 낡는 것이 이 결함의 실제 원인이다).
 
-**이 slice 에서 실제로 세 번 낡았다.** ① `3354143d` 에서 ⓪~⑦ 을 다 재고 나서 여정에 개인정보 단언
+**이 slice 에서 실제로 네 번 낡았다.** ① `3354143d` 에서 ⓪~⑦ 을 다 재고 나서 여정에 개인정보 단언
 한 줄을 더했고(`2acd2439`), 그 파일이 **삭제 목록 안**이라 앞 실측이 무효가 됐다. ② r1 승인 전 일괄이
 산출물을 더 고쳐(`86dfcbfd` · `fcab9df4` · `2cdcb9fa`) 또 무효가 됐다. ③ r2 가 MEDIUM 회귀를 고치며
-또 고쳤다(`1ff961f2`). 세 번 다 값을 옮기지 않고 새 HEAD 에서 전부 다시 쟀다 — 네 번 모두 계수가
-같았지만(M 11 · A 12) **같다는 것은 측정 뒤에 아는 사실이다**. r1·r2 모두 **새 파일을 더하지 않고**
-목록 안의 파일만 고쳤다(`git diff --name-status 2cdcb9fa..1ff961f2 -- web` 가 `M` 일곱).
+또 고쳤다(`1ff961f2`). ④ r3 이 설정 test 를 **처음 만지면서 목록 자체가 늘었다**(`M` 11 → 12 —
+`web/src/screens/SettingsScreen.test.tsx`). 네 번 다 값을 옮기지 않고 새 HEAD 에서 전부 다시 쟀고,
+**r3 에서 처음으로 계수가 바뀌었다** — 앞 세 번이 같았던 것은 측정 뒤에 안 사실이고, 그래서
+라운드마다 다시 재는 것이다.
 
 목록은 **기계 산출**이다: `git diff --name-status 1e387499..HEAD -- web
 docs/discovery/m7-screen-data-requirements.md .github tools`.
@@ -38,7 +39,7 @@ OpenAPI 와 Kotlin `src/main` 은 **읽기만** 했다. 여정이 띄우는 것(
 여정 ① 이 전략·프로필을 바꾸지만 되돌릴 상태가 아니다: 그 DB 는 실행마다 버려지고, 여정 자신이
 끝에서 감시 조건을 비우며 `afterEach` 가 그 되돌림을 **단언**한다.
 
-## 복원 목록 — 수정된 파일 **11** (전부 base 기준)
+## 복원 목록 — 수정된 파일 **12** (전부 base 기준)
 
 ```
 git restore --source=1e387499 --staged --worktree -- \
@@ -50,6 +51,7 @@ git restore --source=1e387499 --staged --worktree -- \
   web/src/routes.test.ts \
   web/src/routes.tsx \
   web/src/screens/ProfileSection.tsx \
+  web/src/screens/SettingsScreen.test.tsx \
   web/src/screens/SettingsScreen.tsx \
   web/src/screens/StrategySection.tsx \
   web/src/screens/TodayNoticesScreen.tsx
@@ -77,12 +79,12 @@ rm -f \
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
-| ⓪ | **장부 블록 ↔ 기계 목록** | 장부 M 11 · 기계 M 11 · 장부 A 12 · 기계 A 12. 위 두 블록은 기계 출력을 그대로 옮긴 것이고 라운드마다 다시 쓴다 |
-| ① | 복원·삭제 명령의 종료 코드 | `restore`(11개) **0** · `rm`(12개) **0** |
-| ② | 복원·삭제 계수 | porcelain **23** = 11 `M` + 12 `D` — 되돌림 **직후**의 기대값이고 「깨끗함」의 지표가 아니다 |
+| ⓪ | **장부 블록 ↔ 기계 목록** | 장부 M 12 · 기계 M 12 · 장부 A 12 · 기계 A 12. 위 두 블록은 기계 출력을 그대로 옮긴 것이고 라운드마다 다시 쓴다 |
+| ① | 복원·삭제 명령의 종료 코드 | `restore`(12개) **0** · `rm`(12개) **0** |
+| ② | 복원·삭제 계수 | porcelain **24** = 12 `M` + 12 `D` — 되돌림 **직후**의 기대값이고 「깨끗함」의 지표가 아니다 |
 | ③ | 되돌린 트리가 기준과 같은가 | **트리 해시로 본다**(종료 코드가 아니다): 되돌린 `web` 하위 트리 == base 의 그것 — **동일**. 요구표 blob 도 base 와 **동일**. **내 표지 열둘**(`OnboardingScreen`·`onboardingDisplay`·`profileWrites`·`strategyEdit`·`ProfileFactsCard`·`ProfileDetailsCard`·`ProfileCapacityCard`·`onboarding-vocabulary`·`ONBOARDING_ITEM_ORDER`·`OnboardingBanner`·`clearStrategyTerms`·slice 이름) 각각 **0**. **남의 표지는 남았다**: 7E-2 의 `bidBoxDisplay` **5 파일** · `CASE_TAB_LABEL` **2 파일** · 7C④-3 이 요구표에 쓴 operation 이름 **1 건** |
 | ④ | compile | `npm ci` **0** · `typecheck` **0** |
-| ⑤ | test | `vitest` **0** — 7A·7D·7E-1·7E-2 의 **406 test** 로 돌아갔다. 이 slice 가 더한 **58 test**(파일 셋)가 그만큼 사라졌다(464 → 406) |
+| ⑤ | test | `vitest` **0** — 7A·7D·7E-1·7E-2 의 **406 test** 로 돌아갔다. 이 slice 가 더한 **66 test** 가 그만큼 사라졌다(472 → 406). **이 줄은 실측으로 한 번 고쳤다**: 설정 test 가 복원 목록에 들어오니 403 이겠거니 적었는데 실측은 406 이었다 — 되돌린 트리는 언제나 base 이므로 라운드마다 같은 값이고, 바뀌는 것은 **이 slice 가 더한 수**뿐이다 |
 | ⑥ | 게이트 | `lint` · `gate:src-tree` · `api:types:check` · `gate:tests` · `build` · `gate:boundary-canary` **전부 0** · 7A 의 셸 스모크 **0** |
 | ⑦ | 되돌린 뒤 base 와 남는 차이 | **in_scope 경로 0 건.** 전체로 남는 것은 `reports/evidence/m7/7e2b/` 넷뿐이다(evidence 는 목록 밖 — 위 머리의 사유) |
 
