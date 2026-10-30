@@ -61,3 +61,11 @@
 ## 계약 갱신 이력
 
 - 2026-10-30 착수(팀장) · 운영자 승인 2026-10-30.
+- 2026-10-30 **D-7C4C-6(팀장, 착수 보고 수령)**: D-7C4C-2 에 넷째 조건을 더한다 — 깊이 1 object 의 키 집합이 `{type, properties, required,
+  description}` 의 부분집합일 때만 통과(허용 목록 — nullable object · `patternProperties` 등 미지 키를 닫는다). 스칼라 쪽 술어는 건드리지 않는다.
+  실측: 오늘 spec 판정 변화 0(새로 통과 0 · 새로 거부 0).
+- 2026-10-30 **D-7C4C-7(팀장)**: D-7C4C-3 의 뿌리는 **새 뿌리 `/api/onboarding-checklist`**(입력 넷 중 감시 규칙·시계가 프로필 밖이다) —
+  `AccountScopedRoutes.ROOTS` 와 `AccountCarrierStructureTest.ACCOUNT_READERS` 를 함께 늘린다(잊으면 둘 다 RED, 실측). use case 빈은
+  `ProfileAssemblyBoundaryTest` 때문에 `ProfileWiring` 에 둔다.
+- 2026-10-30 **D-7C4C-8(팀장)**: 응답은 세 목록(`completed` · `pending` · `awaiting` 짝)뿐이고 진행률 필드를 넣지 않는다(소비자 0 · D-7C4-2).
+  항목 순서는 커널 선언 순서, 「어느 목록에도 없는 항목 = 해당 없음」을 문서에 명시. enum 인라인 네 벌은 Kotlin enum 과의 양방향 등식 test 로 묶는다.
