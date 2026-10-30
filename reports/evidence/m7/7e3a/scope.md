@@ -70,3 +70,19 @@
 ## 계약 갱신 이력
 
 - 2026-10-31 착수(팀장) · 운영자 지시 2026-10-30. 7E-3 분할(3a/3b)은 팀장 결정 — 7C⑤-b 선행이 사유.
+- 2026-10-31 **D-7E3a-6(팀장, 착수 보고 수령 — D-7E3a-1·4 갱신)**: 알림 트리거 여섯은 출하 조립에서 **발화하지 않는다**(`NotificationInboxPort` 쓰기 빈
+  0 · `NotificationFact` 를 짓는 production 코드 0 — 7C③ 의 「트리거 배선 0」이 그대로). 알림함 화면은 **vitest 로** 잠그고(목록 · 묶음 · 읽음 전이 ·
+  배지), 여정 ⑤ 는 알림함을 빈 얼굴 + 배지 0 으로 지난다. 우회 fixture 로 항목을 심지 않는다. 안읽음 배지는 **`X-Unread-Count` 헤더**에서만
+  (본문을 세지 않는다, 부재는 `CONTRACT_HEADER_MISSING`). 서버가 내는 `inboxRecordState`·`inboxRecordNotRecordedReason` 을 「준비 중」의 근거로
+  그대로 쓴다. **후속 등재 `OPEN-7E3A-NOTIFICATION-TRIGGER-WIRING`** — 트리거 배선은 Kotlin `src/main` 이라 이 slice 밖.
+- 2026-10-31 **D-7E3a-7(팀장 — D-7E3a-2·4 갱신)**: 하네스는 `readOpeningResult` 아홉 갈래 중 **셋**(`NOT_OPENED_YET`·`NOTICE_ABSENT`·
+  `NOT_COLLECTED`)만 낸다. 개찰 축 수집→승격 사슬을 하네스에 태우지 않는다(fake KONEPS 두 base·operation 다섯 · 러너 둘 · fixture 다섯 — 화면
+  slice 의 몸집을 바꾼다). 아홉 갈래 · 잠정 넷 · 「잠정 ≠ 확정」은 **vitest 전수**로 잠그고, 여정 ⑤ 는 `NOT_OPENED_YET` 한 갈래를 DOM ↔ 같은 실행
+  응답으로 대조한다. **후속 등재 `OPEN-7E3A-OPENING-AXIS-HARNESS`**. 결과 단계 여섯 중 다음 확인 시점이 있는 것은 둘(`AWAITING_OPENING`=OPENING ·
+  `UNDER_QUALIFICATION_REVIEW`=DOCUMENT_DUE)이고 넷은 `NONE`+`null` — 화면은 그 「없음」을 **답으로** 그린다(빈 칸 금지).
+- 2026-10-31 **D-7E3a-8(팀장 — 화면 E 의 전이)**: 화면 E 는 **읽기 화면** — 전이를 내지 않는다. 「다음 행동 하나」는 그 건의 D 카드(해당 상태 탭)와
+  공고 워크시트로 가는 링크. 전이표의 사본은 D 하나뿐(갈림 방지 · 여정 ④⑤ 가 같은 건을 미는 것 방지). 승인 목록 증분은 **정확히 넷**
+  (`GET /api/opening-results` · `GET /api/notifications` · `POST /api/notifications/read` · `/read-notice`).
+- 2026-10-31 **D-7E3a-9(팀장 — 여정 ⑤ 격리)**: 결과 단계는 되돌릴 수 없다(`WON`→`await-opening`·`skip` 409, `outcome-correction` 은 결과 축 안에서만).
+  순서 독립은 되돌림이 아니라 **공고 격리**로 — 여정 ⑤ 전용 fixture 공고 하나(`SYN-7E3-RESULT`, 마감 미도래, 출처·SHA-256)를 더하고 그 건만
+  끝까지 민다. 이 건이 `WON`/`LOST` 로 영구히 남는 것은 알려진 제한. 기존 여정의 계수 단언이 깨지지 않음은 착수 실측대로 evidence 에.
