@@ -96,7 +96,10 @@ interface BidCaseRow {
   readonly noticeNumber: string;
   readonly noticeRound: string;
   readonly state: string;
+  readonly caseVersion: number;
   readonly nextCheckpointKind: string;
+  readonly nextCheckpointAt: string | null;
+  readonly overdue: boolean;
 }
 
 interface PriceBody {
@@ -128,6 +131,29 @@ const CASE_STATE_LABEL: Readonly<Record<string, string>> = {
   PRICE_RECEIVED: '투찰가 받음',
   BID_PLANNED: '투찰 예정',
   BID_RECORDED: '투찰 기록됨',
+  AWAITING_OPENING: '개찰 대기',
+};
+
+/**
+ * 상태 → **화면 D 의 탭 문면**(M7/7E-2). 화면의 표를 import 하지 않고 spec 이 자기 몫을
+ * 적는다 — 같은 출처에서 양쪽을 끌어오면 표가 틀려도 대조가 초록이다(`CASE_STATE_LABEL` 과
+ * 같은 이유).
+ */
+const CASE_TAB_LABEL: Readonly<Record<string, string>> = {
+  WATCHING: '관심',
+  DEFERRED: '관심',
+  PRICE_RECEIVED: '투찰가 받음',
+  BID_PLANNED: '투찰가 받음',
+  BID_RECORDED: '투찰함',
+  AWAITING_OPENING: '개찰 대기',
+  OPENED_PROVISIONAL_FIRST: '심사 중',
+  OPENED_OUT_OF_RANK: '심사 중',
+  UNDER_QUALIFICATION_REVIEW: '심사 중',
+  WON: '종료',
+  LOST: '종료',
+  FAILED_OR_REBID: '종료',
+  SKIPPED: '종료',
+  DEADLINE_PASSED_UNRECORDED: '종료',
 };
 const CHECKPOINT_LABEL: Readonly<Record<string, string>> = {
   DEADLINE: '투찰 마감',
@@ -146,7 +172,7 @@ const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
  * 읽어 가도 「V2 API 밖」 감시가 그것을 보지 못했다(실측).
  */
 /** 라우터가 **문서**로 받는 경로 — 화면의 주소다(자산이 아니다). */
-const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u];
+const ALLOWED_ROUTES = [/^\/$/u, /^\/login$/u, /^\/notices\//u, /^\/bids$/u];
 
 /**
  * 자산은 **이 빌드가 실제로 낸 파일 이름만** 받는다(v r3 M-2 · CR r3 M-4).
@@ -503,6 +529,158 @@ test('쓰기가 401 로 거부되면 로그인으로 가는 길이 뜬다', asyn
   await expect(face).toHaveCount(1);
   await expect(face.getByRole('link', { name: /로그인/u })).toHaveAttribute('href', '/login');
   await expect(page.getByTestId('toast')).toHaveCount(0);
+});
+
+/**
+ * 여정 ④ 가 쓰는 건을 **「제출함」까지** 민다 — 여정 ③ 이 그 각 단계를 자세히 재므로 여기서는
+ * 같은 클릭만 하고 단언은 결과 상태 하나다. `null` 은 「이미 제출 뒤라 밀 것이 없다」다.
+ *
+ * 여정 ③ 과 **다른 공고**를 쓰는 이유는 fixture 의 `why_third_notice` 에 있다 — 한 하네스를
+ * 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 두 여정이 서로의 전이를 본다.
+ */
+async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
+  const rows = await search(page, noticeNumber);
+  const target = rows.find((row) => row.noticeNumber === noticeNumber)!;
+  const card = page.getByTestId(`notice-card-${target.noticeNumber}`);
+  await ensureInBidBox(page, card);
+
+  const cases = page.waitForResponse(
+    (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
+  );
+  await card.getByTestId('notice-title').click();
+  await expect(page.getByTestId('screen-worksheet')).toBeVisible();
+  const caseRows = (await (await cases).json()) as BidCaseRow[];
+  const opened = caseRows.find((row) => row.noticeNumber === noticeNumber)!;
+
+  // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
+  // `WATCHING` 이고 아래 세 단계를 탄다.
+  if (opened.state !== 'WATCHING') {
+    return null;
+  }
+
+  await page.getByTestId('active-bids').fill('1');
+  const priced = page.waitForResponse(
+    (one) => one.url().includes('/api/bid-price-requests') && one.request().method() === 'POST',
+  );
+  await page.getByTestId('worksheet-primary').click();
+  expect((await priced).status()).toBe(200);
+
+  await page.getByTestId('record-amount').fill('1350000000');
+  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
+  const drafted = page.waitForResponse((one) => one.url().includes('/draft') && one.request().method() === 'POST');
+  await page.getByTestId('worksheet-primary').click();
+  expect((await drafted).status()).toBe(200);
+
+  await page.getByTestId('record-amount').fill('1350000000');
+  await page.getByTestId('record-vat').selectOption('INCLUSIVE');
+  const recorded = page.waitForResponse((one) => one.url().includes('/record') && one.request().method() === 'POST');
+  await page.getByTestId('worksheet-primary').click();
+  const response = await recorded;
+  expect(response.status()).toBe(200);
+  return (await response.json()) as BidCaseRow;
+}
+
+/** `datetime-local` 이 받는 꼴(`YYYY-MM-DDTHH:mm`, **지역 시각**) — 시각을 조작하지 않고 지금에서 센다. */
+function localDateTimeInput(daysFromNow: number): string {
+  const when = new Date(Date.now() + daysFromNow * 86_400_000);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T${pad(when.getHours())}:${pad(
+    when.getMinutes(),
+  )}`;
+}
+
+/** 카드가 보이는 세 축이 **그 응답의 값**과 같은지 — 상태·다음 확인 시점·지난 일정. */
+async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void> {
+  const card = page.getByTestId(`bid-case-${row.caseId}`);
+  await expect(card).toBeVisible();
+  await expect(card.getByTestId(`state-${row.caseId}`)).toHaveText(CASE_STATE_LABEL[row.state] ?? row.state);
+  await expect(card.getByTestId(`checkpoint-kind-${row.caseId}`)).toHaveText(
+    CHECKPOINT_LABEL[row.nextCheckpointKind] ?? row.nextCheckpointKind,
+  );
+  // 「없음」은 빈 값이 아니라 답이다 — 시각이 null 이면 그 자리에 숫자가 없다.
+  const at = card.getByTestId(`checkpoint-at-${row.caseId}`);
+  if (row.nextCheckpointAt === null) {
+    await expect(at).toHaveText(ABSENT);
+  } else {
+    expect(await at.innerText()).toMatch(/\d/u);
+  }
+  // 경고는 **서버의 판정 하나**를 따른다 — 있으면 1, 없으면 0 이다(화면이 시각을 비교하지 않는다).
+  await expect(card.getByTestId(`overdue-${row.caseId}`)).toHaveCount(row.overdue ? 1 : 0);
+}
+
+test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰 대기 전이', async ({ page }) => {
+  const watched = watchRequests(page);
+  await signIn(page);
+
+  const recorded = await driveToRecorded(page, 'SYN-7E2-BIDBOX');
+
+  // 셸의 전역 탐색으로 간다 — 주소를 손으로 적지 않는다(셸이 자리 표에서 링크를 만든다).
+  const listed = page.waitForResponse(
+    (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
+  );
+  await page.getByRole('link', { name: 'D 내 입찰함' }).click();
+  await expect(page.getByTestId('screen-bid-box')).toBeVisible();
+  const rows = (await (await listed).json()) as BidCaseRow[];
+  const mine = rows.find((row) => row.noticeNumber === 'SYN-7E2-BIDBOX')!;
+
+  // 질의는 **실투찰 종류**다 — 페이퍼와 한 목록에 섞이지 않는다(계약의 모양).
+  const listUrl = new URL((await listed).url());
+  expect(listUrl.searchParams.get('kind')).toBe('REAL');
+
+  if (recorded !== null) {
+    expect(mine.state, '제출 직후의 상태는 응답이 말한다').toBe(recorded.state);
+  }
+
+  // 그 건이 **자기 상태의 탭**에 있다 — 탭을 고르면 카드가 뜬다.
+  await page.getByRole('tab', { name: new RegExp(CASE_TAB_LABEL[mine.state]!, 'u') }).click();
+  await assertCardMatchesCase(page, mine);
+
+  // 다른 탭에서는 보이지 않는다 — 탭이 실제로 가린다(그러지 않으면 탭 표가 아무 일도 안 한다).
+  const otherTab = ['관심', '종료'].find((label) => label !== CASE_TAB_LABEL[mine.state])!;
+  await page.getByRole('tab', { name: new RegExp(otherTab, 'u') }).click();
+  await expect(page.getByTestId(`bid-case-${mine.caseId}`)).toHaveCount(0);
+  await page.getByRole('tab', { name: new RegExp(CASE_TAB_LABEL[mine.state]!, 'u') }).click();
+
+  // 개찰 대기 전이 — 개찰 일시는 **운영자 입력**이고 지금에서 센다(시각 조작 0).
+  //
+  // 단언과 클릭을 **내 카드 안으로 좁힌다**: 한 하네스를 공유하므로 여정 ③ 의 건도 같은 탭에
+  // 「투찰 기록됨」으로 앉아 있고, 화면 전체를 가리키면 locator 가 둘을 집어 **남의 건을 밀 수**
+  // 있었다(첫 실행 실측: strict mode violation — 건 1·2 가 함께 걸렸다).
+  if (mine.state === 'BID_RECORDED') {
+    const card = page.getByTestId(`bid-case-${mine.caseId}`);
+    await card.getByRole('button', { name: '개찰 대기로' }).click();
+    await card.getByLabel('개찰 일시').fill(localDateTimeInput(3));
+    const sent = page.waitForResponse(
+      (one) => one.url().includes('/await-opening') && one.request().method() === 'POST',
+    );
+    await card.getByRole('button', { name: '보내기' }).click();
+    const response = await sent;
+    expect(response.status()).toBe(200);
+    const moved = (await response.json()) as BidCaseRow;
+
+    expect(moved.state).toBe('AWAITING_OPENING');
+    expect(moved.nextCheckpointKind, '그 시각이 다음 확인 시점이 된다(계약)').toBe('OPENING');
+    /**
+     * `OPEN-7E-GATE-RESIDUAL` ⑤ — 「이미 닿았다」 가드의 전제는 **쓰기가 버전을 올린다**는 것이다.
+     * 화면이 쓰는 전이에 한해 그 전제를 **실측으로** 잠근다(계약 전체의 단언은 아니다 — 그 잔여는
+     * 알려진 제한에 남는다).
+     */
+    expect(moved.caseVersion).toBeGreaterThan(mine.caseVersion);
+
+    // 화면이 보이는 것은 **그 응답의 값**이다 — 전이 뒤 그 건의 탭으로 따라간다.
+    await assertCardMatchesCase(page, moved);
+    await expect(page.getByRole('tab', { name: new RegExp(CASE_TAB_LABEL[moved.state]!, 'u') })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByTestId('toast')).toContainText('보냈습니다');
+  }
+
+  await expect(page.getByTestId('write-failure')).toHaveCount(0);
+
+  expect(watched.outside).toStrictEqual([]);
+  expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
+  assertOnlyAllowedOperations(watched.apiPaths);
 });
 
 /** D-7E-6 — 화면·콘솔에 사업자번호·토큰·세션 쿠키 평문이 0 이다. */
