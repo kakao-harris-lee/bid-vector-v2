@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -334,5 +334,137 @@ describe('빈 자리 (D-7E3a-3)', () => {
 
     const rate = await screen.findByTestId('pending-win-rate');
     expect(rate.textContent ?? '').not.toMatch(/\d+(\.\d+)?\s*%/u);
+  });
+});
+
+/**
+ * 세 얼굴 중 **빈 얼굴만** 잠겨 있던 자리(r1 CR M-2 · v M-2·M-3). 적재 중을 빈 얼굴로 접거나
+ * 개찰 조회 실패를 「아직 개찰 전」으로 접는 변이가 모두 초록이었다.
+ */
+describe('로딩·오류 얼굴 (r1 CR M-2 · v M-2·M-3)', () => {
+  it('적재 중에는 로딩 얼굴이고 빈 얼굴이 **아니다**', async () => {
+    mocked.listBidCases.mockReturnValue(new Promise<readonly BidCase[]>(() => {}));
+    renderScreen();
+
+    // 양성 표지(로딩)를 먼저 기다린 뒤 음성 단언을 한 번 한다.
+    expect(await screen.findByTestId('results-loading')).toBeTruthy();
+    expect(screen.queryByTestId('results-empty'), '적재 중을 「건이 없다」로 접었다').toBeNull();
+  });
+
+  it('목록이 실패하면 오류 얼굴이고 「다시 시도」가 다시 읽는다', async () => {
+    mocked.listBidCases.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    expect(await screen.findByTestId('results-error')).toBeTruthy();
+    expect(screen.queryByTestId('results-empty'), '오류를 「건이 없다」로 접었다').toBeNull();
+
+    const before = mocked.listBidCases.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(mocked.listBidCases.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  /** 이 slice 고유의 모양 — **카드는 남고 개찰 절만** 오류다(건 상태는 다른 응답이 준다). */
+  it('개찰 조회만 실패하면 카드는 남고 개찰 절만 오류 얼굴이다', async () => {
+    mocked.readOpeningResult.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    expect(await screen.findByTestId('opening-error-51')).toBeTruthy();
+    expect(screen.getByTestId('result-case-51'), '카드가 통째로 사라졌다').toBeTruthy();
+    expect(screen.getByTestId('result-state-51').textContent ?? '').toContain(
+      BID_CASE_STATE_DISPLAY.AWAITING_OPENING.label,
+    );
+    // **실패를 「아직 개찰 전」으로 접지 않는다** — 아홉 갈래를 접지 않는 술어가 오류 경로에도 선다.
+    expect(screen.queryByTestId('opening-state-51'), '조회 실패에 개찰 상태를 지어냈다').toBeNull();
+    const body = document.body.textContent ?? '';
+    expect(body, '조회 실패를 「아직 개찰 전」으로 접었다').not.toContain(
+      OPENING_RESULT_STATE_DISPLAY.NOT_OPENED_YET.label,
+    );
+  });
+
+  it('개찰 조회가 적재 중이면 로딩이고 개찰 상태를 지어내지 않는다', async () => {
+    mocked.readOpeningResult.mockReturnValue(new Promise<queries.OpeningResultView>(() => {}));
+    renderScreen();
+
+    expect(await screen.findByTestId('opening-loading-51')).toBeTruthy();
+    expect(screen.queryByTestId('opening-state-51')).toBeNull();
+  });
+
+  /** 세션이 없다는 답은 **재시도로 풀리지 않는다**(r1 CR L-5). */
+  it('개찰 조회가 401 이면 재시도 얼굴이 아니라 로그인 길이다', async () => {
+    mocked.readOpeningResult.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    expect(await screen.findByTestId('opening-signed-out-51')).toBeTruthy();
+    expect(screen.queryByTestId('opening-error-51'), '401 에 「다시 시도」를 달았다').toBeNull();
+  });
+});
+
+/**
+ * **칸의 전수**(r1 CR M-3). 어휘(아홉 갈래·넷)는 전수로 잠갔는데 칸은 잠그지 않아 계약이 주는
+ * 둘(`provisionalRankOneDuplicateCount` · 결과 축 `observedAt`)을 화면이 버리고 있었다.
+ * 이 표가 그 자리를 든다 — 계약에 칸이 늘면 아래 키 집합 등식이 먼저 틀린다.
+ */
+describe('개찰 결과의 칸 전수 (r1 CR M-3)', () => {
+  /** 칸 → 그것을 싣는 testId 접두. `QUERY` 는 조회 키라 카드 머리가 이미 그린다. */
+  const FIELD_PLACEMENT = {
+    noticeNumber: 'QUERY',
+    noticeRound: 'QUERY',
+    state: 'opening-state',
+    participantCount: 'participants',
+    actualOpeningAt: 'opening-at',
+    observedAt: 'observed-at',
+    confirmedAwardAmountWon: 'confirmed-award',
+    confirmedAwardAmountCurrency: 'confirmed-award',
+    confirmedAwardAmountBasis: 'confirmed-award',
+    confirmedAwardAmountVatTreatment: 'confirmed-award',
+    confirmedAwardAmountProvenance: 'confirmed-award',
+    provisionalRankOneState: 'provisional-state',
+    provisionalRankOneDuplicateCount: 'provisional-duplicate',
+    provisionalRankOneBidAmountWon: 'provisional-award',
+    provisionalRankOneBidAmountCurrency: 'provisional-award',
+    provisionalRankOneBidAmountVatTreatment: 'provisional-award',
+    provisionalRankOneBidRateFraction: 'provisional-rate',
+    provisionalRankOneObservedAt: 'provisional-observed',
+  } as const satisfies Record<keyof OpeningResultView, string>;
+
+  it('표의 키 집합이 계약 칸 전수와 같다', () => {
+    expect(Object.keys(FIELD_PLACEMENT).sort()).toStrictEqual(Object.keys(opening()).sort());
+  });
+
+  it('QUERY 가 아닌 칸은 전부 화면에 자리가 있다', async () => {
+    renderScreen();
+    await screen.findByTestId('opening-state-51');
+
+    const places = new Set(Object.values(FIELD_PLACEMENT).filter((one) => one !== 'QUERY'));
+    for (const place of places) {
+      expect(screen.queryByTestId(`${place}-51`), `${place} 자리가 화면에 없다`).not.toBeNull();
+    }
+  });
+
+  it('순위 1이 여럿이면 **몇인지**를 보인다 — 「여럿」으로 접지 않는다', async () => {
+    mocked.readOpeningResult.mockResolvedValue(
+      opening({ state: 'OPENED', provisionalRankOneState: 'RANK_DUPLICATED', provisionalRankOneDuplicateCount: 3 }),
+    );
+    renderScreen();
+
+    const count = await screen.findByTestId('provisional-duplicate-51');
+    expect(count.textContent ?? '').toContain('3');
+  });
+
+  it('결과 축 관측 시각을 그린다 — 확정 축의 낡음을 잴 재료다', async () => {
+    mocked.readOpeningResult.mockResolvedValue(
+      opening({ state: 'OPENED', observedAt: '2026-11-02T03:04:05Z' }),
+    );
+    renderScreen();
+
+    const at = await screen.findByTestId('observed-at-51');
+    expect(at.textContent ?? '').toContain('2026-11-02T03:04:05Z');
+  });
+
+  it('두 칸이 없으면 「값 없음」이다 — 0 이나 빈 칸으로 지어내지 않는다', async () => {
+    renderScreen();
+
+    expect((await screen.findByTestId('provisional-duplicate-51')).textContent ?? '').toContain('값 없음');
+    expect(screen.getByTestId('observed-at-51').textContent ?? '').toContain('값 없음');
   });
 });

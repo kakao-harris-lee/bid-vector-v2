@@ -97,32 +97,41 @@ function NotificationRow({
         워크시트 열기
       </Link>
 
-      {item.read ? null : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onRead}
-          className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
-        >
-          읽음으로
-        </button>
-      )}
+      {/* **버튼을 지우지 않는다**(r1 CR L-1): 서버 응답 뒤 재조회가 그 행을 읽음으로 만들면
+          누른 버튼이 DOM 에서 사라져 포커스가 `<body>` 로 떨어졌다. 잠그고 문면만 바꾼다 —
+          누른 자리가 그대로 남아 키보드 운영자가 위치를 잃지 않는다. */}
+      <button
+        type="button"
+        disabled={disabled || item.read}
+        onClick={onRead}
+        className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
+      >
+        {item.read ? '읽음' : '읽음으로'}
+      </button>
     </li>
   );
 }
 
 function NoticeGroupBlock({
   group,
+  index,
   disabled,
   onRead,
 }: {
   readonly group: NoticeGroup;
+  /**
+   * 묶음의 **차례**(r1 CR L-3). `groupByNotice` 는 떨어진 같은 공고를 **두 묶음으로 남기는**
+   * 것이 결정이라, 번호·차수만으로 짓는 testId·key 는 그때 겹친다(strict locator 가 모호해지고
+   * React key 도 「한 공고·한 종류에 항목 하나」라는 **서버 계약**에 기대게 된다). 차례는
+   * 그 계약에 기대지 않는다.
+   */
+  readonly index: number;
   readonly disabled: boolean;
   readonly onRead: (request: ReadRequest) => void;
 }) {
   return (
     <li
-      data-testid={`notice-group-${group.noticeNumber}-${group.noticeRound}`}
+      data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}`}
       className="rounded-lg border border-line bg-card p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -143,18 +152,16 @@ function NoticeGroupBlock({
           {group.hasMoreThanShown ? ' · 이 페이지에 다 오지 않았습니다' : ''}
         </span>
 
-        {group.unreadCount === 0 ? null : (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() =>
-              onRead({ scope: 'NOTICE', noticeNumber: group.noticeNumber, noticeRound: group.noticeRound })
-            }
-            className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
-          >
-            묶음 전체 읽음
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={disabled || group.unreadCount === 0}
+          onClick={() =>
+            onRead({ scope: 'NOTICE', noticeNumber: group.noticeNumber, noticeRound: group.noticeRound })
+          }
+          className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
+        >
+          묶음 전체 읽음
+        </button>
       </div>
 
       <ul className="mt-2 flex flex-col">
@@ -222,8 +229,16 @@ export function InboxScreen() {
     <section data-testid="screen-inbox" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold">알림함</h2>
-        {/* 숨기지 않는다 — 0 도 **답**이다(안 보이면 「모른다」로 읽힌다). */}
-        <span data-testid="inbox-unread-badge" className="rounded-md bg-neutral-skin px-2 py-0.5 text-xs">
+        {/* 숨기지 않는다 — 0 도 **답**이다(안 보이면 「모른다」로 읽힌다).
+            **live region 이다**(r1 CR L-2 · §6.5 즉시 반응): 읽음 처리의 성공 신호가 이 숫자와
+            행 문면의 조용한 변화뿐이었다. 토스트를 새로 들이는 대신 **이미 바뀌는 값**을
+            보조기술이 읽게 한다 — 알림함에는 되돌릴 행동이 없어 「실행 취소」 토스트가 할 일이 없다. */}
+        <span
+          data-testid="inbox-unread-badge"
+          role="status"
+          aria-live="polite"
+          className="rounded-md bg-neutral-skin px-2 py-0.5 text-xs"
+        >
           안읽음 {inbox.data === undefined ? ABSENT : inbox.data.unread}
         </span>
       </div>
@@ -250,10 +265,11 @@ export function InboxScreen() {
 
       {groups.length === 0 ? null : (
         <ul className="flex flex-col gap-3">
-          {groups.map((group) => (
+          {groups.map((group, index) => (
             <NoticeGroupBlock
-              key={`${group.noticeNumber}-${group.noticeRound}-${group.items[0]?.kind ?? ''}`}
+              key={`${index}-${group.noticeNumber}-${group.noticeRound}`}
               group={group}
+              index={index}
               disabled={read.isPending}
               onRead={(request) => read.mutate(request)}
             />

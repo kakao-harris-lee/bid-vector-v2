@@ -396,11 +396,15 @@ export async function ensureInBidBox(page: Page, card: Locator): Promise<boolean
 }
 
 /**
- * 여정 ④ 가 쓰는 건을 **「제출함」까지** 민다 — 여정 ③ 이 그 각 단계를 자세히 재므로 여기서는
- * 같은 클릭만 하고 단언은 결과 상태 하나다. `null` 은 「이미 제출 뒤라 밀 것이 없다」다.
+ * 건 하나를 **「제출함」까지** 민다 — 여정 ③ 이 그 각 단계를 자세히 재므로 여기서는 같은
+ * 클릭만 하고 단언은 결과 상태 하나다. **여정 ④ 와 ⑤ 가 각각 자기 공고로 부른다.**
  *
- * 여정 ③ 과 **다른 공고**를 쓰는 이유는 fixture 의 `why_third_notice` 에 있다 — 한 하네스를
- * 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 두 여정이 서로의 전이를 본다.
+ * `null` 은 「그 건이 `WATCHING` 이 아니다」이고 부르는 쪽이 그것을 어떻게 받을지 정한다 —
+ * 여정 ④ 는 나머지 단언을 계속 돌리고(`if`), 여정 ⑤ 는 **붉게 멈춘다**(r1 H-1: 하네스가
+ * 실행마다 버릴 DB 라 그 조건은 회귀나 오염일 때만 선다).
+ *
+ * 여정마다 **다른 공고**를 쓰는 이유는 fixture 의 `why_third_notice`·`why_fourth_notice` 에
+ * 있다 — 한 하네스를 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 여정이 서로의 전이를 본다.
  */
 export async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
   const rows = await search(page, noticeNumber);

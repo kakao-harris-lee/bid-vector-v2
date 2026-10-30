@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { readOpeningResult, type BidCase, type OpeningResultView } from '../api/queries';
 import { openingResultQueryKey } from '../api/queryKeys';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
+import { isUnauthorized } from '../components/WriteFailure';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -76,7 +77,12 @@ function MoneyAxis<T extends { readonly amountWon: number }>({
   }
 }
 
-function Field({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
+/**
+ * 결과 카드의 칸 하나. **이름이 `ResultField` 인 이유**(r1 CR L-4): `components/StateBadge.tsx`
+ * 에 같은 이름의 공용 `Field` 가 있고 계약이 다르다(`value: string | null` — 배지를 담지 못해
+ * 이 지역 판이 생겼다). 이름이 겹치면 읽는 사람이 `aria-describedby` 배선까지 같다고 믿는다.
+ */
+function ResultField({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-ink-soft">{label}</dt>
@@ -89,19 +95,31 @@ function Field({ label, children }: { readonly label: string; readonly children:
 function OpeningSection({ caseId, view }: { readonly caseId: number; readonly view: OpeningResultView }) {
   return (
     <dl className="mt-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
-      <Field label="개찰 결과">
+      <ResultField label="개찰 결과">
         <StateBadge
           display={displayOrUnknown(OPENING_RESULT_STATE_DISPLAY, view.state)}
           testId={`opening-state-${caseId}`}
         />
-      </Field>
-      <Field label="잠정 1위 축">
+      </ResultField>
+      <ResultField label="잠정 1위 축">
         <StateBadge
           display={displayOrUnknown(PROVISIONAL_RANK_ONE_DISPLAY, view.provisionalRankOneState)}
           testId={`provisional-state-${caseId}`}
         />
-      </Field>
-      <Field label="참가자 수">
+      </ResultField>
+      <ResultField label="순위 1 중복 건수">
+        {/* 계약이 「동값을 임의로 깨지 않는다, **건수는 `provisionalRankOneDuplicateCount`**」라
+            적는다 — 「여럿」만 보이고 몇인지를 버리면 그 칸이 사라진다(r1 CR M-3). */}
+        <span data-testid={`provisional-duplicate-${caseId}`} className="font-numeric">
+          {view.provisionalRankOneDuplicateCount === null ||
+          view.provisionalRankOneDuplicateCount === undefined ? (
+            <AbsentText />
+          ) : (
+            view.provisionalRankOneDuplicateCount
+          )}
+        </span>
+      </ResultField>
+      <ResultField label="참가자 수">
         <span data-testid={`participants-${caseId}`} className="font-numeric">
           {view.participantCount === null || view.participantCount === undefined ? (
             <AbsentText />
@@ -109,8 +127,21 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
             view.participantCount
           )}
         </span>
-      </Field>
-      <Field label="개찰 시각">
+      </ResultField>
+      <ResultField label="결과 축 관측 시각">
+        {/* 계약: 「시각은 모두 관측 시각이고 … 소비자가 **낡음을 스스로 판정**한다」. 이 칸이
+            없으면 확정 축의 낡음을 잴 재료가 없다(r1 CR M-3). */}
+        <span data-testid={`observed-at-${caseId}`}>
+          {view.observedAt === null || view.observedAt === undefined ? (
+            <AbsentText />
+          ) : (
+            <time dateTime={view.observedAt} className="font-numeric">
+              {view.observedAt}
+            </time>
+          )}
+        </span>
+      </ResultField>
+      <ResultField label="개찰 시각">
         <span data-testid={`opening-at-${caseId}`}>
           {view.actualOpeningAt === null || view.actualOpeningAt === undefined ? (
             <AbsentText />
@@ -120,26 +151,26 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
             </time>
           )}
         </span>
-      </Field>
+      </ResultField>
 
       {/* **확정과 잠정은 다른 칸이다**(SET-02). 두 읽기가 서로의 칸을 보지 않으므로 한쪽이
           비었을 때 다른 쪽 값이 들어설 자리가 없다 — 그 보증은 아래 JSX 가 아니라
           `confirmedAwardReading`·`provisionalRankOneReading` 이 진다. */}
-      <Field label="확정 낙찰가">
+      <ResultField label="확정 낙찰가">
         <MoneyAxis
           reading={confirmedAwardReading(view)}
           testId={`confirmed-award-${caseId}`}
           parts={(value) => [value.currency, value.basis, value.vatTreatment, value.provenance]}
         />
-      </Field>
-      <Field label="잠정 1위 투찰가">
+      </ResultField>
+      <ResultField label="잠정 1위 투찰가">
         <MoneyAxis
           reading={provisionalRankOneReading(view)}
           testId={`provisional-award-${caseId}`}
           parts={(value) => [value.currency, value.vatTreatment]}
         />
-      </Field>
-      <Field label="잠정 1위 투찰율">
+      </ResultField>
+      <ResultField label="잠정 1위 투찰율">
         {/* 서버가 **문자열로** 싣는 값이다 — 숫자로 바꾸면 소수 자리를 잃는다(계약). */}
         <span data-testid={`provisional-rate-${caseId}`} className="font-numeric">
           {view.provisionalRankOneBidRateFraction === null ||
@@ -149,8 +180,8 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
             view.provisionalRankOneBidRateFraction
           )}
         </span>
-      </Field>
-      <Field label="잠정 축 관측 시각">
+      </ResultField>
+      <ResultField label="잠정 축 관측 시각">
         <span data-testid={`provisional-observed-${caseId}`}>
           {view.provisionalRankOneObservedAt === null || view.provisionalRankOneObservedAt === undefined ? (
             <AbsentText />
@@ -160,7 +191,7 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
             </time>
           )}
         </span>
-      </Field>
+      </ResultField>
     </dl>
   );
 }
@@ -189,14 +220,14 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
       </div>
 
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="다음 확인 시점">
+        <ResultField label="다음 확인 시점">
           {/* 「없음」은 빈 값이 아니라 **답**이다(D-7E3a-7 · §6.1). */}
           <StateBadge
             display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)}
             testId={`result-checkpoint-kind-${bidCase.caseId}`}
           />
-        </Field>
-        <Field label="시점">
+        </ResultField>
+        <ResultField label="시점">
           <span data-testid={`result-checkpoint-at-${bidCase.caseId}`}>
             {bidCase.nextCheckpointAt === null || bidCase.nextCheckpointAt === undefined ? (
               <AbsentText />
@@ -206,11 +237,18 @@ export function ResultCard({ bidCase }: { readonly bidCase: BidCase }) {
               </time>
             )}
           </span>
-        </Field>
+        </ResultField>
       </dl>
 
       {opening.isPending ? <Skeleton testId={`opening-loading-${bidCase.caseId}`} rows={2} /> : null}
-      {opening.isError ? (
+      {/* **세션이 없다는 답은 재시도로 풀리지 않는다**(r1 CR L-5) — 화면의 규율이 목록 쪽에만
+          걸려 있어 카드 쪽 401 이 「다시 시도」 버튼을 달았다(`retry` 까지 더해 더 때린다). */}
+      {opening.isError && isUnauthorized(opening.error) ? (
+        <p data-testid={`opening-signed-out-${bidCase.caseId}`} className="mt-3 text-xs text-absent-ink">
+          세션이 없어 개찰 결과를 읽지 못했습니다 — 다시 로그인해야 합니다.
+        </p>
+      ) : null}
+      {opening.isError && !isUnauthorized(opening.error) ? (
         <ErrorFace testId={`opening-error-${bidCase.caseId}`} onRetry={() => void opening.refetch()} />
       ) : null}
       {opening.isSuccess ? <OpeningSection caseId={bidCase.caseId} view={opening.data} /> : null}

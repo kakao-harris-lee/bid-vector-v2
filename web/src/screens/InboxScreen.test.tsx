@@ -199,7 +199,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNoticeNotificationsRead.mockResolvedValue({ markedCount: 2, unreadCount: 0 });
     renderScreen();
 
-    const group = await screen.findByTestId('notice-group-SYN-7E3-RESULT-000');
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
     fireEvent.click(within(group).getByRole('button', { name: /묶음 전체/u }));
 
     await waitFor(() =>
@@ -238,18 +238,55 @@ describe('건별 묶음', () => {
     );
     renderScreen();
 
-    const group = within(await screen.findByTestId('notice-group-SYN-7E3-RESULT-000'));
+    const group = within(await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000'));
     expect(group.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).toBeTruthy();
     expect(group.getByTestId('notification-AWARD_DECIDED-SYN-7E3-RESULT-000')).toBeTruthy();
   });
 
   /** 묶음이 페이지 경계에 걸리면 그 사실을 말한다 — 서버의 전체 크기에서만 안다. */
-  it('묶음이 페이지에 다 오지 않으면 「더 있다」를 말한다', async () => {
+  it('묶음이 페이지에 다 오지 않으면 그 문면을 말한다', async () => {
     mocked.listNotifications.mockResolvedValue(page([item({ noticeItemCount: 3, noticeUnreadCount: 3 })], 3));
     renderScreen();
 
-    const group = await screen.findByTestId('notice-group-SYN-7E3-RESULT-000');
-    expect(group.textContent ?? '').toContain('3');
+    // **문면 자체를 잰다**(r1 CR M-4): 앞 판은 `'3'` 만 봤고 묶음 머리가 이미 「항목 3」을 적어
+    // `hasMoreThanShown` 줄을 통째로 지워도 초록이었다 — 이름이 잰다고 한 것을 재지 않았다.
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    expect(group.textContent ?? '').toContain('이 페이지에 다 오지 않았습니다');
+  });
+
+  /** 음성 대조 — 다 왔으면 그 문면이 **없다**(있으면 늘 참인 단언이 된다). */
+  it('묶음이 다 왔으면 그 문면이 없다', async () => {
+    mocked.listNotifications.mockResolvedValue(
+      page(
+        [
+          item({ kind: 'OPENING_COMPLETED', noticeItemCount: 2, noticeUnreadCount: 2 }),
+          item({ kind: 'AWARD_DECIDED', noticeItemCount: 2, noticeUnreadCount: 2 }),
+        ],
+        2,
+      ),
+    );
+    renderScreen();
+
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    expect(group.textContent ?? '').not.toContain('이 페이지에 다 오지 않았습니다');
+  });
+
+  /** 갈라진 같은 공고의 두 묶음이 **서로 다른 testId** 를 가진다(r1 CR L-3). */
+  it('떨어진 같은 공고의 두 묶음이 겹치지 않는다', async () => {
+    mocked.listNotifications.mockResolvedValue(
+      page(
+        [
+          item({ noticeNumber: 'A', kind: 'OPENING_COMPLETED' }),
+          item({ noticeNumber: 'B', kind: 'OPENING_COMPLETED' }),
+          item({ noticeNumber: 'A', kind: 'OPENING_COMPLETED' }),
+        ],
+        3,
+      ),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('notice-group-0-A-000')).toBeTruthy();
+    expect(screen.getByTestId('notice-group-2-A-000')).toBeTruthy();
   });
 
   /**
@@ -261,12 +298,12 @@ describe('건별 묶음', () => {
       page([item({ noticeKnown: false, noticeTitle: null, noticeStatus: null, noticeDeadlineAt: null })], 1),
     );
     const unknown = renderScreen();
-    const unknownText = (await screen.findByTestId('notice-group-SYN-7E3-RESULT-000')).textContent ?? '';
+    const unknownText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000')).textContent ?? '';
     unknown.unmount();
 
     mocked.listNotifications.mockResolvedValue(page([item({ noticeKnown: true, noticeTitle: null })], 1));
     renderScreen();
-    const titlelessText = (await screen.findByTestId('notice-group-SYN-7E3-RESULT-000')).textContent ?? '';
+    const titlelessText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000')).textContent ?? '';
 
     expect(unknownText).not.toBe(titlelessText);
     expect(unknownText).toContain('공고를 모름');
@@ -281,5 +318,41 @@ describe('빈 자리 (R-4)', () => {
     expect(slot.textContent ?? '').toContain('준비 중');
     expect(within(slot).queryAllByRole('button')).toStrictEqual([]);
     expect(within(slot).queryAllByRole('checkbox')).toStrictEqual([]);
+  });
+});
+
+describe('로딩·오류 얼굴과 적재 중 배지 (r1 v M-1 · CR M-2)', () => {
+  it('적재 중에는 로딩 얼굴이고 빈 얼굴이 **아니다**', async () => {
+    mocked.listNotifications.mockReturnValue(new Promise<queries.NotificationPage>(() => {}));
+    renderScreen();
+
+    expect(await screen.findByTestId('inbox-loading')).toBeTruthy();
+    expect(screen.queryByTestId('inbox-empty'), '적재 중을 「알림이 없다」로 접었다').toBeNull();
+  });
+
+  /**
+   * **응답 전에 0 을 지어내지 않는다**(D-7E3a-6 · v M-1). 배지 test 둘이 모두 목록이 온 **뒤**
+   * 를 읽어서, `?? 0` 으로 바꾸는 변이가 초록이었다 — 「모른다」와 「0 이다」는 다른 답이다.
+   */
+  it('응답 전 배지는 0 이 아니라 「값 없음」이다', async () => {
+    mocked.listNotifications.mockReturnValue(new Promise<queries.NotificationPage>(() => {}));
+    renderScreen();
+
+    expect(await screen.findByTestId('inbox-loading')).toBeTruthy();
+    const badge = screen.getByTestId('inbox-unread-badge').textContent ?? '';
+    expect(badge, '응답 전에 안읽음 수를 지어냈다').toContain('값 없음');
+    expect(badge).not.toMatch(/\d/u);
+  });
+
+  it('목록이 실패하면 오류 얼굴이고 「다시 시도」가 다시 읽는다', async () => {
+    mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    expect(await screen.findByTestId('inbox-error')).toBeTruthy();
+    expect(screen.queryByTestId('inbox-empty'), '오류를 「알림이 없다」로 접었다').toBeNull();
+
+    const before = mocked.listNotifications.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(mocked.listNotifications.mock.calls.length).toBeGreaterThan(before));
   });
 });
