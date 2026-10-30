@@ -226,7 +226,7 @@ export function StrategySection() {
           const display = STRATEGY_FIELD_DISPLAY[field];
           const view = STRATEGY_FIELD_VALUE[field](current);
           return (
-            <div key={field} className="rounded-md border border-line p-3">
+            <div key={field} data-testid={`strategy-row-${field}`} className="rounded-md border border-line p-3">
               <Field
                 label={display.label}
                 value={view.text}

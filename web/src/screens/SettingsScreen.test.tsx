@@ -61,10 +61,14 @@ afterEach(() => {
   cleanup();
 });
 
-/** 「고치기」 → 값 입력 칸이 뜰 때까지. */
+/**
+ * 「고치기」 → 값 입력 칸이 뜰 때까지. **행에 자기 testId 가 있다** — DOM 조상을 더듬어 행을
+ * 찾으면(`closest`·`ancestor::div[1]`) 마크업이 한 겹 달라질 때 조용히 빗나간다(여정에서
+ * 실측으로 걸린 자리다).
+ */
 async function beginEdit(field: string): Promise<void> {
-  const row = await screen.findByTestId(`strategy-value-${field}`);
-  fireEvent.click(within(row.closest('div.rounded-md')!).getByRole('button', { name: '고치기' }));
+  const row = await screen.findByTestId(`strategy-row-${field}`);
+  fireEvent.click(within(row).getByRole('button', { name: '고치기' }));
   await screen.findByTestId('edit-session');
 }
 

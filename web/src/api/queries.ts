@@ -30,8 +30,6 @@ type NoticesResultState = operations['searchNotices']['responses']['200']['heade
 type SuggestionsResultState = operations['listSuggestions']['responses']['200']['headers']['X-Result-State'];
 export type NoticeSearchQuery = NonNullable<operations['searchNotices']['parameters']['query']>;
 
-export { ApiError } from './apiError';
-
 const HTTP_NOT_FOUND = 404;
 const HTTP_UNAUTHORIZED = 401;
 
