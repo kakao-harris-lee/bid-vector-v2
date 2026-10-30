@@ -166,8 +166,11 @@ private fun bucketOf(verdict: ReconciliationVerdict): AxisBucket =
 private fun bucketOf(state: BidStateTag): AxisBucket =
     when (state) {
         BidStateTag.WON -> AxisBucket.WON
+
         BidStateTag.LOST -> AxisBucket.LOST
+
         BidStateTag.FAILED_OR_REBID -> AxisBucket.FAILED_OR_REBID
+
         BidStateTag.WATCHING,
         BidStateTag.DEFERRED,
         BidStateTag.PRICE_RECEIVED,

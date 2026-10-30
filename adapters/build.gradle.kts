@@ -17,10 +17,7 @@ dependencies {
     implementation(project(":qualification"))
     implementation(project(":strategy"))
     implementation(project(":bidding"))
-    // `JdbcAwardWinnerNameView` 가 읽은 낙찰자 상호를 `bidvector.settlement.AwardWinnerTradeName`
-    // 으로 낸다(M7/7C⑤-b, D-7C5B-10 ③) — 그 타입이 포트 서명이고, 상호는 그 타입 밖으로 나가지
-    // 않는다. `workflow` 는 settlement 를 `implementation` 으로만 선언해 이 모듈의 컴파일
-    // classpath 에 전이되지 않으므로 직접 선언한다 — 아래 `decision` 과 같은 자리·같은 근거다.
+    // M7/7C⑤-b — `AwardWinnerNamePort` 서명의 타입(근거는 그 KDoc). 아래 `decision` 과 같은 자리.
     implementation(project(":settlement"))
     // `GrpcBidPredictionGateway`가 `BidPredictionOutcome.Unavailable`을 짓는 데
     // `bidvector.decision.MlUnavailableReason`을 직접 참조한다(D-4D-6). `workflow`는 이 좌표를
@@ -41,7 +38,6 @@ dependencies {
     implementation(libs.json.schema.validator)
     // D-3C-4 (a) — PDF 텍스트 층 추출 한 의존.
     implementation(libs.pdfbox)
-
     // D-3D-1 (a) — JDBC 직접 + Flyway(ADR 0004 D-1·D-2). `flyway-core`·`postgresql-driver`
     // 는 카탈로그에 버전이 없다 — Boot BOM 이 관리한다(app 의 관례와 같다, `app/build.gradle.kts`).
     // HikariCP 는 이 모듈의 **main** 에 넣지 않는다 — 풀은 조립(app)의 관심사이고 adapters 는
@@ -51,7 +47,6 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
-
     // `CompileFailureHarnessTest` 관례(strategy/shared-kernel
     // 이 이미 쓰는 좌표, gradle/libs.versions.toml 주석 그대로). event 패키지의 값 획득 축
     // 폐쇄(EventEnvelope 생성자·transitionOutbox·OutboxTransition.ToDelivered 생성자·

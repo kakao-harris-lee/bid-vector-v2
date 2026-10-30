@@ -51,37 +51,49 @@ class ReconcileBidTest {
      * [ReconciliationBlocker.entries] 를 도는 test 가 그 입력이 정말 그 사유를 내는지 잰다.
      * 둘이 함께라야 「더했는데 아무도 안 본다」가 막힌다.
      */
-    private fun inputFor(blocker: ReconciliationBlocker): Triple<OpeningResultView, OperatorTradeName, AwardWinnerTradeName> =
+    private fun inputFor(
+        blocker: ReconciliationBlocker,
+    ): Triple<OpeningResultView, OperatorTradeName, AwardWinnerTradeName> =
         when (blocker) {
-            ReconciliationBlocker.NOTICE_ABSENT ->
+            ReconciliationBlocker.NOTICE_ABSENT -> {
                 Triple(OpeningResultView.NoticeAbsent, mine, sameCompany)
+            }
 
-            ReconciliationBlocker.NOT_OPENED_YET ->
+            ReconciliationBlocker.NOT_OPENED_YET -> {
                 Triple(OpeningResultView.NotOpenedYet, mine, sameCompany)
+            }
 
-            ReconciliationBlocker.NOT_COLLECTED ->
+            ReconciliationBlocker.NOT_COLLECTED -> {
                 Triple(OpeningResultView.NotCollected, mine, sameCompany)
+            }
 
-            ReconciliationBlocker.OBSERVED_NOT_PROMOTED ->
+            ReconciliationBlocker.OBSERVED_NOT_PROMOTED -> {
                 Triple(OpeningResultView.ObservedNotPromoted, mine, sameCompany)
+            }
 
-            ReconciliationBlocker.PROGRESS_UNRECOGNIZED ->
+            ReconciliationBlocker.PROGRESS_UNRECOGNIZED -> {
                 Triple(observed(OpeningProgress.UNRECOGNIZED), mine, sameCompany)
+            }
 
-            ReconciliationBlocker.PROGRESS_ABSENT ->
+            ReconciliationBlocker.PROGRESS_ABSENT -> {
                 Triple(observed(OpeningProgress.ABSENT), mine, sameCompany)
+            }
 
-            ReconciliationBlocker.OPERATOR_NAME_NOT_DECLARED ->
+            ReconciliationBlocker.OPERATOR_NAME_NOT_DECLARED -> {
                 Triple(observed(OpeningProgress.OPENED), OperatorTradeName.NotDeclared, sameCompany)
+            }
 
-            ReconciliationBlocker.OPERATOR_NAME_NORMALIZES_TO_EMPTY ->
+            ReconciliationBlocker.OPERATOR_NAME_NORMALIZES_TO_EMPTY -> {
                 Triple(observed(OpeningProgress.OPENED), OperatorTradeName.Declared("(주)"), sameCompany)
+            }
 
-            ReconciliationBlocker.WINNER_NAME_NOT_PUBLISHED ->
+            ReconciliationBlocker.WINNER_NAME_NOT_PUBLISHED -> {
                 Triple(observed(OpeningProgress.OPENED), mine, AwardWinnerTradeName.NotPublished)
+            }
 
-            ReconciliationBlocker.WINNER_NAME_NORMALIZES_TO_EMPTY ->
+            ReconciliationBlocker.WINNER_NAME_NORMALIZES_TO_EMPTY -> {
                 Triple(observed(OpeningProgress.OPENED), mine, AwardWinnerTradeName.Published("(주)"))
+            }
         }
 
     @Test

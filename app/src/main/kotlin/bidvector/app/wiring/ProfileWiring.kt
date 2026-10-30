@@ -2,6 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.adapters.profile.JdbcBusinessProfileStore
 import bidvector.adapters.profile.JdbcOperatorProfileWriter
+import bidvector.settlement.OperatorTradeName
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.profile.BusinessProfileStorePort
@@ -12,6 +13,7 @@ import bidvector.workflow.profile.RemoveConstructionCapacityUseCase
 import bidvector.workflow.profile.ReplaceBusinessDetailsUseCase
 import bidvector.workflow.profile.ReplaceQualificationFactsUseCase
 import bidvector.workflow.profile.UpsertConstructionCapacityUseCase
+import bidvector.workflow.result.OperatorTradeNamePort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader
 import org.springframework.context.annotation.Bean
@@ -30,6 +32,27 @@ import javax.sql.DataSource
  */
 @Configuration
 open class ProfileWiring {
+    /**
+     * 운영자 상호 하나를 **좁은 포트로 내보낸다**(M7/7C⑤-b 가 소비한다).
+     *
+     * 소비자가 `BusinessProfileStorePort` 를 직접 받으면 두 경계가 함께 무너진다 — 「V22 타입을
+     * 조립하는 자리는 이 class 하나」(`ProfileAssemblyBoundaryTest`)와 「V22 표 이름은 허용된
+     * 어댑터 자리에서만」(`BusinessProfileIsolationGateTest`). 그래서 **V22 를 아는 쪽이
+     * 좁은 읽기를 publish** 하고 소비자는 상호 하나만 안다.
+     *
+     * 상호는 **원문 그대로** 나간다 — 정규화는 대사 시점의 커널이 한 번만 한다(이중 정규화 금지).
+     * 「미설정」은 `null` 이 아니라 값이다.
+     */
+    @Bean
+    open fun operatorTradeNamePort(businessProfileStore: BusinessProfileStorePort): OperatorTradeNamePort =
+        OperatorTradeNamePort { account ->
+            businessProfileStore
+                .details(account)
+                .tradeName
+                ?.let { OperatorTradeName.Declared(it.raw) }
+                ?: OperatorTradeName.NotDeclared
+        }
+
     @Bean
     open fun businessProfileStore(dataSource: DataSource): BusinessProfileStorePort =
         JdbcBusinessProfileStore(dataSource)

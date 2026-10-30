@@ -42,8 +42,7 @@ class OpenApiMyBidResultContractTest {
         ((spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>)["MyBidResults"]
             as Map<String, Any?>
 
-    private fun propertiesOf(schema: Map<String, Any?>): Map<String, Any?> =
-        schema["properties"] as Map<String, Any?>
+    private fun propertiesOf(schema: Map<String, Any?>): Map<String, Any?> = schema["properties"] as Map<String, Any?>
 
     private fun caseItemSchema(): Map<String, Any?> =
         (propertiesOf(resultsSchema())["cases"] as Map<String, Any?>)["items"] as Map<String, Any?>

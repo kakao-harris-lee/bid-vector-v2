@@ -104,7 +104,11 @@ class ReadMyBidResultsTest {
         bids = { account -> bids[account.value].orEmpty() },
         openingFacts = { notices -> notices.mapNotNull { id -> facts[id.number.value]?.let { id to it } }.toMap() },
         winnerNames = { notices -> notices.mapNotNull { id -> winners[id.number.value]?.let { id to it } }.toMap() },
-        operatorNames = { tradeName?.let { raw -> OperatorTradeName.Declared(raw.raw) } ?: OperatorTradeName.NotDeclared },
+        operatorNames = {
+            tradeName?.let { raw ->
+                OperatorTradeName.Declared(raw.raw)
+            } ?: OperatorTradeName.NotDeclared
+        },
         clock = Clock { now },
         openingPolicy = OPENING_PROGRESS_POLICY,
         matchingPolicy = matchingPolicy,

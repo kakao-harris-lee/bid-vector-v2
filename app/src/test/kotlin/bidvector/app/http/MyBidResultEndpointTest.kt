@@ -13,6 +13,7 @@ import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.VatTreatment
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.opening.CanonicalOpeningFacts
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.OpeningResultFigures
@@ -20,7 +21,6 @@ import bidvector.workflow.opening.ProvisionalRankOne
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.TradeName
-import bidvector.workflow.access.AccountId
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain

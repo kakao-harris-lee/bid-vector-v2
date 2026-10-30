@@ -2,7 +2,6 @@ package bidvector.app.wiring
 
 import bidvector.adapters.result.JdbcAwardWinnerNameView
 import bidvector.adapters.result.JdbcBatchOpeningFactsView
-import bidvector.adapters.result.JdbcOperatorTradeNameView
 import bidvector.adapters.result.JdbcRecordedBidView
 import bidvector.settlement.AWARD_MATCHING_POLICY
 import bidvector.settlement.AwardMatchingPolicyData
@@ -40,15 +39,6 @@ open class MyBidResultWiring {
 
     @Bean
     open fun awardWinnerNamePort(dataSource: DataSource): AwardWinnerNamePort = JdbcAwardWinnerNameView(dataSource)
-
-    /**
-     * 상호는 **좁은 포트**로 받는다 — 프로필 저장 포트를 이 조립이 이름 부르면 「V22 타입을
-     * 조립하는 자리는 `ProfileWiring` 하나」라는 7C④ 의 경계가 무너진다
-     * (`ProfileAssemblyBoundaryTest`).
-     */
-    @Bean
-    open fun operatorTradeNamePort(dataSource: DataSource): OperatorTradeNamePort =
-        JdbcOperatorTradeNameView(dataSource)
 
     /**
      * 상호 매칭 정책 — 기준일 축이 있는 정책이라 해소를 거친다(`resolvedStrategyPolicy` 관례).

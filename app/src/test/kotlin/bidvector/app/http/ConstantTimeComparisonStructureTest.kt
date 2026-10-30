@@ -78,57 +78,7 @@ class ConstantTimeComparisonStructureTest {
      */
     @Test
     fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
-        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
-            setOf(
-                "ApiAuditRecord",
-                "ErrorBody",
-                "StrategyReadResponse",
-                "StrategyReadControllerKt",
-                "EvaluationDryRunResponse",
-                "ResultBuckets",
-                "EditSessionResponse",
-                "EditFieldTokensKt",
-                "EditSessionResponseKt",
-                "NoticeSummaryResponse",
-                // M7/7C ② — 투찰가 요청의 응답 DTO 일곱과 사상 함수 파일 넷, 컨트롤러 하나.
-                "BidPriceRequestResponse",
-                "EvaluationDetailFields",
-                "NotificationFields",
-                "QualificationFields",
-                "BaseAmountFields",
-                "FloorRateFields",
-                // M7/7C②-b — 표시 근거의 운반 타입 하나가 늘었다(응답 DTO 가 아니다).
-                "FloorRateGrounds",
-                "PriceAxesFields",
-                "BidPriceVerdictLabelsKt",
-                "BidPriceDropLabelsKt",
-                "BidPriceQualificationLabelsKt",
-                "BidPriceFactLabelsKt",
-                "BidPriceRequestController",
-                "BidCaseResponse",
-                "BidCaseResponse\$Companion",
-                "BidTimelineEntryResponse",
-                "BidCaseRouting",
-                "DraftInput",
-                "AccountScopedRoutes",
-                "RequestValuesKt",
-                "ProfileResponse",
-                "ConstructionCapacityResponse",
-                "OnboardingChecklistResponse",
-                "AwaitingItemResponse",
-                "ProfileHttp",
-                "BidCaseHttp",
-                "NotificationItemResponse",
-                "NotificationInboxRequestsKt",
-                "OpeningResultResponse",
-                "OpeningResultControllerKt",
-                "DeclaredValue",
-                "DeclaredValueKt",
-                "MyBidResultsResponse",
-                "MyBidCaseResponse",
-                "MyBidAggregateResponse",
-                "MyBidResultResponsesKt",
-            )
+        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe ALLOWED_NAMES
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
 }
@@ -296,3 +246,57 @@ private fun javap(classFile: File): String {
     check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
     return output
 }
+
+/**
+ * 허용된 이름 전수 — 함수 밖 선언이다(함수 50 줄 한도). 위 사유 표와 **키가 같아야** 하고
+ * 그 등식이 이 목록의 존재 이유다: 사유 없는 등재도, 등재 없는 사유도 붉는다.
+ */
+private val ALLOWED_NAMES =
+    setOf(
+        "ApiAuditRecord",
+        "ErrorBody",
+        "StrategyReadResponse",
+        "StrategyReadControllerKt",
+        "EvaluationDryRunResponse",
+        "ResultBuckets",
+        "EditSessionResponse",
+        "EditFieldTokensKt",
+        "EditSessionResponseKt",
+        "NoticeSummaryResponse",
+        "BidPriceRequestResponse",
+        "EvaluationDetailFields",
+        "NotificationFields",
+        "QualificationFields",
+        "BaseAmountFields",
+        "FloorRateFields",
+        "FloorRateGrounds",
+        "PriceAxesFields",
+        "BidPriceVerdictLabelsKt",
+        "BidPriceDropLabelsKt",
+        "BidPriceQualificationLabelsKt",
+        "BidPriceFactLabelsKt",
+        "BidPriceRequestController",
+        "BidCaseResponse",
+        "BidCaseResponse\$Companion",
+        "BidTimelineEntryResponse",
+        "BidCaseRouting",
+        "DraftInput",
+        "AccountScopedRoutes",
+        "RequestValuesKt",
+        "ProfileResponse",
+        "ConstructionCapacityResponse",
+        "OnboardingChecklistResponse",
+        "AwaitingItemResponse",
+        "ProfileHttp",
+        "BidCaseHttp",
+        "NotificationItemResponse",
+        "NotificationInboxRequestsKt",
+        "OpeningResultResponse",
+        "OpeningResultControllerKt",
+        "DeclaredValue",
+        "DeclaredValueKt",
+        "MyBidResultsResponse",
+        "MyBidCaseResponse",
+        "MyBidAggregateResponse",
+        "MyBidResultResponsesKt",
+    )

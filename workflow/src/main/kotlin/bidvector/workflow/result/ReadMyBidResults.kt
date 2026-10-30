@@ -88,9 +88,8 @@ class ReadMyBidResults(
         facts: Map<NoticeId, NoticeOpeningFacts>,
         now: Instant,
     ): OpeningResultView {
-        val id = notice.toNoticeId() ?: return OpeningResultView.NoticeAbsent
-        val found = facts[id] ?: return OpeningResultView.NoticeAbsent
-        return resolveOpeningResultView(found, now, openingPolicy)
+        val found = notice.toNoticeId()?.let(facts::get)
+        return found?.let { resolveOpeningResultView(it, now, openingPolicy) } ?: OpeningResultView.NoticeAbsent
     }
 
     private fun RecordedRealBid.winnerOf(winners: Map<NoticeId, AwardWinnerTradeName>): AwardWinnerTradeName =
