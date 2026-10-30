@@ -36,3 +36,28 @@ export function bundleAssetPaths(entries) {
   }
   return names.map((one) => `/assets/${one}`);
 }
+
+/**
+ * `dist` **루트**가 내야 하는 항목 — 진입 문서 하나와 자산 디렉터리 하나다(M7/7E-2, OPEN ②).
+ *
+ * 왜 루트까지 세는가: `publicDir` 가 켜지면 그 디렉터리의 파일이 **번들 그래프를 거치지 않고**
+ * `dist` 루트로 그대로 복사된다. 자산 모양 단언은 `dist/assets` 만 보므로 그 복사물을 보지 못했다
+ * (7E-1 checklist §4 ②). 설정 쪽 술어(Vite 해석)와 **독립된 층**이다 — 설정을 어떻게 비틀어도
+ * 산출물에 파일이 생기면 여기서 센다.
+ */
+export const EXPECTED_DIST_ROOT = ['assets', 'index.html'];
+
+/** `readdirSync(dist, { withFileTypes: true })` 의 결과를 받아 루트 모양을 단언한다. */
+export function assertDistRoot(entries) {
+  const names = entries.map((one) => one.name).sort();
+  const expected = [...EXPECTED_DIST_ROOT].sort();
+  if (names.length !== expected.length || names.some((name, index) => name !== expected[index])) {
+    throw new Error(
+      `dist 루트 항목이 {${expected.join(', ')}} 이 아니다 — 받은 것: ${
+        names.length === 0 ? '(없음)' : names.join(', ')
+      }. 번들 그래프를 거치지 않고 복사된 파일이 있다면 그것이 무엇이고 화면이 왜 읽는지 먼저 ` +
+        '답해야 한다(ADR 0011 D-2).',
+    );
+  }
+  return names;
+}
