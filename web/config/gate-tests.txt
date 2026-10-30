@@ -41,3 +41,6 @@ src/screens/SettingsScreen.test.tsx
 # 등록이 아니면 두 칸을 싣지 않는다(계약) · 미판정 축은 서버가 준 목록에서 그린다(G2).
 src/display/profileDisplay.test.ts
 src/screens/ProfileSection.test.tsx
+# M7/7E-2 — 화면 자리 표의 경계. 「실화면은 B·C·D·설정 넷이고 나머지 셋은 빈 자리」가 D-7E-5 의
+# 「범위 밖 화면을 만들지 않는다」를 잠그는 술어다. 7A·7E-1 때는 등재되지 않았다.
+src/routes.test.ts
