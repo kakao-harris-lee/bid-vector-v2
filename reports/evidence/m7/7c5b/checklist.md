@@ -36,7 +36,7 @@
 
 | # | 우회 | 막는 것 |
 | --- | --- | --- |
-| ① | 응답 DTO 에 낙찰자 상호 칸을 더한다 | 상호를 나르는 타입이 `AwardWinnerTradeName` 하나이고 커널 산출(`ReconciliationVerdict`)에 이름 자리가 없다 — **타입 경로 부재**. 더하려면 칸을 새로 만들어야 하고 그 순간 **표지 글자 전문 단언**(엔드포인트 test)이 붉는다. 계약 test 는 칸 **이름**을 따로 잰다 |
+| ① | 응답 DTO 에 낙찰자 상호 칸을 더한다 | 상호를 나르는 타입이 `AwardWinnerTradeName` 하나이고 커널 산출(`ReconciliationVerdict`)에 이름 자리가 없다 — 그래서 **조립이 그 값을 손에 쥐지 않는다**. 다만 `Published.rawName` 이 public 이라 그 타입을 다시 읽어 아무 String 칸에 싣는 코드는 **컴파일된다**(r1 v L-2) — 실제로 막는 것은 **표지 글자 전문 단언**이고 DB 층·wire 층 둘에 있다. 계약 test 는 칸 **이름**을 따로 잰다 |
 | ② | 7C⑤-a 의 개찰 질의에 상호 열을 더해 재사용한다 | 그 질의의 열 목록(`RESULT_COLUMNS`)을 `ResultSetMetaData` 등식이 잠근다(7C⑤-a). 이 slice 는 그 목록을 **그대로 import** 하므로 더하면 양쪽이 함께 붉는다. 상호는 **별 질의**로만 읽는다 |
 | ③ | 화면이 목록을 세어 집계를 지어낸다 | 서버가 분자·분모·표본·제외 둘을 내고, 목록과 집계가 **한 operation · 한 판정 패스**에서 난다. 둘로 가르면 화면이 자기가 띄운 목록과 어긋나는 집계를 보일 수 있다 |
 | ④ | 계정 없이 부르는 조회가 생긴다 | 포트 서명의 첫 인자가 `AccountId`(7B R-2) — 「계정 없이 부르는 조회」가 **존재할 수 없다**. 실 DB 소유 경계 test + wire 401 test |
@@ -61,7 +61,7 @@
 | `recordedRealBidOrNull` | 아니다 | 페이퍼 배제의 유일 경로 |
 | `RecordedBidReadPort` | 아니다 | 첫 인자 주체 |
 | `BatchOpeningFactsPort` | **아니다** | 7C⑤-a 의 사실 타입 — 상호 자리가 없는 그 타입 |
-| `AwardWinnerNamePort` | **그렇다** | 상호를 나르는 **유일한** 표면. 산출이 `AwardWinnerTradeName` 하나이고 그 타입은 `toString()` 이 가려져 있다. 값은 `reconcileBid` 인자로만 지나가고 반환에 남지 않는다 |
+| `AwardWinnerNamePort` | **그렇다** | 상호를 나르는 **유일한** 표면. 산출이 `AwardWinnerTradeName` 하나이고 그 타입은 `toString()` 이 가려져 있다. 값은 `reconcileBid` 인자로만 지나가고 반환에 남지 않는다 — **타입이 막는 것은 거기까지**이고, 그 값을 다시 읽어 싣는 길은 표지 글자 단언이 막는다 |
 | `MyBidResult` · `MyBidResults` | 아니다 | 상호 칸 없음(전문 단언) |
 | `ReadMyBidResults` | 아니다 | 산출이 위 둘 |
 | `MyBidResultsResponse` · `MyBidCaseResponse` · `MyBidAggregateResponse` | 아니다 | 계약 키 등식 + 칸 이름 금지어 + 전문 표지 단언 |
@@ -71,8 +71,10 @@
 | `JdbcAwardWinnerNameView` | **그렇다** | 상호 열을 읽는 유일한 자리. 산출 타입이 경계 |
 | `MyBidResultWiring` 의 빈 다섯 | 아니다 | 조립만 |
 
-상호에 닿는 표면은 **둘**이고, 둘 다 산출 타입이 `AwardWinnerTradeName` 이다. 그 타입에서 응답으로
-가는 길은 커널을 지나 판정이 되는 것뿐이고 판정에는 이름 자리가 없다.
+상호에 닿는 표면은 **둘**이고, 둘 다 산출 타입이 `AwardWinnerTradeName` 이다. 조립은 그 값을 쥐지
+않는다 — 커널을 지나 판정이 되고 판정에는 이름 자리가 없다. 「닿을 **타입 경로가 없다**」는 과장이다
+(r1 v L-2): `Published.rawName` 은 public 이라 다시 읽는 코드가 컴파일된다. 그 길을 막는 것은
+**표지 글자 단언 둘**(DB 층 · wire 층)이고, 변이로 붉는 것이 확인돼 있다.
 
 ## §3 과잉·미달
 

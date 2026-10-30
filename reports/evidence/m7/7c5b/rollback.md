@@ -25,9 +25,11 @@ git rm -f --                                         <「신규」 18개>
 - `openapi/bidvector-operator-api.yaml`
 - `web/src/api/generated/operator-api.ts`
 
-**전제**: `9463f6e1` 에 이 slice 의 줄이 없다(첫 산출물 커밋이 그 뒤다 — 병합은 main 을 **받아온**
-것이지 내 것을 올린 것이 아니다). 그래서 이 복원은 머지 순간 아무것도 지우지 않으며 exit 0 이다.
-머지 뒤의 되돌림은 PR revert 가 맡는다.
+**전제**: `9463f6e1` 에 이 slice 의 줄이 없다. 근거는 **시각이 아니라 조상 관계**다(r1 CR L-2 —
+첫 산출물 커밋은 시각으로는 오히려 앞선다): `git merge-base --is-ancestor <첫 산출물 커밋>
+9463f6e1` 이 거짓이고, `9463f6e1` 은 다른 브랜치의 PR #108 병합이라 이 브랜치의 커밋을 담지
+않는다. 그래서 이 복원은 머지 순간 아무것도 지우지 않으며 exit 0 이다. 머지 뒤의 되돌림은
+PR revert 가 맡는다.
 
 ## 신규 18 — 지운다
 

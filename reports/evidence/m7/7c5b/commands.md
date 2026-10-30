@@ -48,7 +48,7 @@ BUILD SUCCESSFUL 도 그것만으로는 「그 test 가 돌았다」가 아니�
 | `app.http.allowed-packages` 에 `workflow.result` | app 층 참조 허용 목록 | 응답 조립이 판정 어휘와 수를 칸으로 옮기려면 그 어휘를 이름 불러야 한다(7C⑤-a 의 `workflow.opening`·7C④ 의 `workflow.profile` 과 같은 자리) |
 | **`app.http.denied-types` 에 읽기 포트 넷** | — (등재가 **좁히는** 쪽이다) | 패키지를 열면 포트도 함께 열린다. 핸들러가 받는 것이 use case 하나라는 사실을 여기서 다시 세운다 — 포트가 HTTP 층에 보이면 그것이 곧 지름길이다 |
 | 주입 허용 표면에 `sharedkernel.AmountRecord` | 주입 표면 집합 등식 | `ConfirmedAwardFields` 가 받는 타입이고, 금액 다섯 성분을 함께 나르는 **유일한 공개 경로**다(R-BASIS-06) |
-| `gate-tests.properties` 에 새 test class 넷 | 등재 등식(모집단 ∖ 제외 == 등재) | 등재를 잊으면 그 test 를 수집에서 빼는 것이 곧 게이트를 끄는 것이 된다 |
+| `gate-tests.properties` 에 새 test class **여섯**(workflow 3 · adapters 1 · app 2) | 등재 등식(모집단 ∖ 제외 == 등재) | 등재를 잊으면 그 test 를 수집에서 빼는 것이 곧 게이트를 끄는 것이 된다 |
 
 ## 무엇이 어디서 잠기는가
 
@@ -94,6 +94,8 @@ BUILD SUCCESSFUL 도 그것만으로는 「그 test 가 돌았다」가 아니�
 
 ## 변이(바꿔치우기) — 버릴 clone 에서
 
+표의 여덟에 §6 의 가름 둘(타입 가드만 · 둘 다)을 더해 **열**이다.
+
 **더하기가 아니라 바꿔치우기**다(각 변이는 기존 문장을 다른 것으로 바꾼다). 「붉다」는 종료 코드가
 아니라 **결과 XML 의 실패 수**로 셌다 — 종료 코드만 보면 test 가 돌지 않은 초록과 구별되지 않는다.
 
@@ -125,7 +127,15 @@ BUILD SUCCESSFUL 도 그것만으로는 「그 test 가 돌았다」가 아니�
 
 ## acceptance
 
-미실행 — `ci.yml` 의 Kotlin `check` + `qualityBaseline`, `web` job 전체.
+| 명령 | 결과 |
+| --- | --- |
+| `./gradlew --no-daemon check` | 종료 **0** · `:app:test` **976 tests · 실패 0 · 건너뜀 0** |
+| `./gradlew --no-daemon qualityBaseline` | 종료 **0** |
+| `web` job W-1~W-9 | 전부 PASS(생성 타입 바이트 등식 포함) |
+| Playwright 스모크(W-11) | 2 PASS |
+
+**미실행 하나**: 여정 e2e(W-13). bootJar + postgres 컨테이너 + 여정 하네스가 필요하고 이 slice 는
+화면 코드를 건드리지 않는다. PR CI 를 정본으로 둔다.
 
 ## 알려진 제한
 
