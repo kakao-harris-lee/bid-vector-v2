@@ -7,8 +7,8 @@ import bidvector.workflow.result.ReconciliationBlocker
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import java.lang.reflect.Modifier
 import org.junit.jupiter.api.Test
+import java.lang.reflect.Modifier
 
 /** operation 의 좌표 — **구현 상수에서 받는다**(리터럴을 쓰면 등식을 세우지 않고 말만 한다). */
 private val BID_RESULTS_PATH = AccountScopedRoutes.BID_RESULTS

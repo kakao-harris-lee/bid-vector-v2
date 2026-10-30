@@ -15,15 +15,6 @@ import bidvector.procurement.SourceEndpoint
  * 예정가격·개찰 기초금액·사정률·예비가격·추첨번호 열도 없다(§0.10 과잉 — 화면 E 가 요구하지
  * 않는다).
  */
-/**
- * 마스킹된 원문은 **세지 않는다** — 업체 식별 개념이 지워진 뒤라 개찰 결과로 승격될 수 없고,
- * 세어 주면 그 공고가 영영 「승격 전」으로 남아 일시적이라던 상태가 영구 오답이 된다.
- *
- * **자리가 하나인 이유**(M7/7C⑤-b r1 CR M-4): 이 술어는 거동을 정하므로, 사본을 두면 한쪽만
- * 고쳐질 때 두 조회가 같은 원문을 다르게 센다. 묶음 조회(`MyBidResultSql`)가 같은 상수를 쓴다.
- */
-internal const val UNMASKED_RAW_PREDICATE: String = "pii_masked_at IS NULL"
-
 internal object OpeningResultViewSql {
     /** 확정 축 네 열 + 잠정 축 다섯 열 + 공고 층 셋. 상호 열은 없다. */
     val RESULT_COLUMNS =
@@ -104,3 +95,12 @@ internal object OpeningResultViewSql {
     val OPENING_RESULT_ENDPOINTS =
         listOf(SourceEndpoint.OPENING_RESULT_LIST, SourceEndpoint.OPENING_COMPLETE)
 }
+
+/**
+ * 마스킹된 원문은 **세지 않는다** — 업체 식별 개념이 지워진 뒤라 개찰 결과로 승격될 수 없고,
+ * 세어 주면 그 공고가 영영 「승격 전」으로 남아 일시적이라던 상태가 영구 오답이 된다.
+ *
+ * **자리가 하나인 이유**(M7/7C⑤-b r1 CR M-4): 이 술어는 거동을 정하므로, 사본을 두면 한쪽만
+ * 고쳐질 때 두 조회가 같은 원문을 다르게 센다. 묶음 조회(`MyBidResultSql`)가 같은 상수를 쓴다.
+ */
+internal const val UNMASKED_RAW_PREDICATE: String = "pii_masked_at IS NULL"

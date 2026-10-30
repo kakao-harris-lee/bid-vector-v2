@@ -29,9 +29,9 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.junit.jupiter.api.Test
 import java.sql.Timestamp
 import javax.sql.DataSource
-import org.junit.jupiter.api.Test
 
 /** 표지 상호 — 개찰 사실 경로 어디에도 이 글자가 나오면 안 된다(D-7C5B-5, 값 수준 단언). */
 private const val SENTINEL_WINNER = "SENTINEL-WINNER-DO-NOT-EXPORT"
@@ -90,7 +90,9 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
         rawNumber: String,
         rawRound: String,
     ) {
-        val fields = """{"${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}":"$rawNumber","${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}":"$rawRound"}"""
+        val fields = """{"${jsonbKeyOf(
+            NOTICE_NUMBER_RAW_KEY,
+        )}":"$rawNumber","${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}":"$rawRound"}"""
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
