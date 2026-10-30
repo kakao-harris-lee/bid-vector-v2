@@ -84,5 +84,4 @@ private fun objectWithProperty(property: Map<String, Any?>): Map<String, Any?> =
     mapOf("type" to "object", "properties" to mapOf("a" to property))
 
 /** 대조용 조립 — 배열로 감싼다. */
-private fun arrayWithItems(items: Map<String, Any?>): Map<String, Any?> =
-    mapOf("type" to "array", "items" to items)
+private fun arrayWithItems(items: Map<String, Any?>): Map<String, Any?> = mapOf("type" to "array", "items" to items)
