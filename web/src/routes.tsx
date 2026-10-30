@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router';
 import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
 import { BidBoxScreen } from './screens/BidBoxScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayNoticesScreen } from './screens/TodayNoticesScreen';
 import { WorksheetScreen } from './screens/WorksheetScreen';
 
@@ -32,6 +33,9 @@ export const screenSlots: readonly ScreenSlot[] = [
   { id: 'bid-box', path: '/bids', label: 'D 내 입찰함', element: <BidBoxScreen /> },
   { id: 'results', path: '/results', label: 'E 결과 확인' },
   { id: 'inbox', path: '/inbox', label: '알림함' },
+  // 「설정」은 요구표의 화면 다섯(A~E)·알림함과 **다른 축**이지만 운영자가 늘 닿는 자리이고
+  // 전역 탐색에 있어야 한다(M7/7E-2, D-7E2-9 — 자리 하나 추가는 in_scope).
+  { id: 'settings', path: '/settings', label: '설정', element: <SettingsScreen /> },
 ];
 
 export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({

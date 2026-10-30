@@ -33,3 +33,7 @@ e2e/harness/bundle-shape.test.mjs
 src/display/bidBoxDisplay.test.ts
 # 화면 D 가 보이는 값이 API 응답의 값이고 「지난 일정」이 서버의 overdue 에서만 나오는 것.
 src/screens/BidBoxScreen.test.tsx
+# M7/7E-2 — 설정의 전략 축. 편집 세션의 칸 배정(계약이 「field 가 이름하는 칸 하나」로 둔 자리)과
+# 세션 상태·409 사유 표, 그리고 「확인 화면이 보이는 값은 지금 값과 보낸 값 둘뿐」을 잠근다.
+src/display/editSessionDisplay.test.ts
+src/screens/SettingsScreen.test.tsx

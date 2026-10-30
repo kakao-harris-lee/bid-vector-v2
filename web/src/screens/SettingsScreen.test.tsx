@@ -1,0 +1,363 @@
+// @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ApiError } from '../api/apiError';
+import * as queries from '../api/queries';
+import { EDIT_SESSION_STATE_DISPLAY, STRATEGY_FIELD_DISPLAY } from '../display/editSessionDisplay';
+
+import { SettingsScreen } from './SettingsScreen';
+
+vi.mock('../api/queries');
+
+type Strategy = queries.StrategyReadResponse;
+type Session = queries.EditSessionResponse;
+
+function strategy(overrides: Partial<Strategy> = {}): Strategy {
+  return {
+    revision: 7,
+    focusCategories: [],
+    focusRegionTerms: [],
+    excludeRegionTerms: [],
+    requiredKeywordTerms: [],
+    excludeKeywordTerms: [],
+    ...overrides,
+  };
+}
+
+function session(overrides: Partial<Session> = {}): Session {
+  return {
+    sessionId: 'sess-1',
+    state: 'WAITING_FOR_VALUE',
+    sessionVersion: 1,
+    expiresAt: '2099-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function renderScreen() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const router = createMemoryRouter([{ path: '/settings', element: <SettingsScreen /> }], {
+    initialEntries: ['/settings'],
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+const mocked = vi.mocked(queries);
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
+  mocked.readStrategy.mockResolvedValue(strategy());
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+/** 「고치기」 → 값 입력 칸이 뜰 때까지. */
+async function beginEdit(field: string): Promise<void> {
+  const row = await screen.findByTestId(`strategy-value-${field}`);
+  fireEvent.click(within(row.closest('div.rounded-md')!).getByRole('button', { name: '고치기' }));
+  await screen.findByTestId('edit-session');
+}
+
+describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
+  it('값이 없으면 빈 자리다 — 0 으로 지어내지 않는다', async () => {
+    renderScreen();
+
+    const row = await screen.findByTestId('strategy-value-MAX_ACTIVE_BIDS');
+    expect(row.textContent).toBe('값 없음');
+  });
+
+  it('어휘·금액·수를 API 가 준 그대로 보인다', async () => {
+    mocked.readStrategy.mockResolvedValue(
+      strategy({
+        requiredKeywordTerms: ['합성', '공사'],
+        minBudgetWon: 1_200_000_000,
+        minBudgetCurrency: 'KRW',
+        minBudgetVatTreatment: 'INCLUSIVE',
+        minBudgetProvenance: 'OPERATOR_DECLARED',
+        maxActiveBids: 5,
+      }),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('strategy-value-REQUIRED_KEYWORD')).textContent).toBe('합성, 공사');
+    expect((await screen.findByTestId('strategy-value-MIN_BUDGET')).textContent).toBe('1,200,000,000원');
+    expect((await screen.findByTestId('strategy-value-MAX_ACTIVE_BIDS')).textContent).toBe('5');
+  });
+
+  /** R-BASIS-06 — 금액은 **단위·과세·출처와 함께** 보인다. */
+  it('금액에 통화·과세·출처가 함께 붙는다', async () => {
+    mocked.readStrategy.mockResolvedValue(
+      strategy({
+        minBudgetWon: 500,
+        minBudgetCurrency: 'KRW',
+        minBudgetVatTreatment: 'EXCLUSIVE',
+        minBudgetProvenance: 'OPERATOR_DECLARED',
+      }),
+    );
+    renderScreen();
+
+    const qualifier = await screen.findByTestId('strategy-qualifier-MIN_BUDGET');
+    expect(qualifier.textContent).toContain('KRW');
+    expect(qualifier.textContent).toContain('EXCLUSIVE');
+  });
+
+  it('칸 열셋이 전부 뜬다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('strategy-value-FOCUS_CATEGORY');
+    for (const field of Object.keys(STRATEGY_FIELD_DISPLAY)) {
+      expect(screen.getByTestId(`strategy-value-${field}`), field).toBeTruthy();
+    }
+  });
+});
+
+describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
+  it('고치기가 세션을 시작하고 그 칸을 싣는다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    expect(mocked.beginEditSession).toHaveBeenCalledWith({ field: 'MAX_ACTIVE_BIDS' });
+  });
+
+  it('값은 그 칸이 쓰는 요청 칸 하나로만 간다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(
+      session({ state: 'WAITING_FOR_CONFIRMATION', field: 'MAX_ACTIVE_BIDS' }),
+    );
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    await waitFor(() => expect(mocked.provideEditSessionValue).toHaveBeenCalled());
+    const [sessionId, body] = mocked.provideEditSessionValue.mock.calls[0]!;
+    expect(sessionId).toBe('sess-1');
+    expect(Object.keys(body).sort()).toStrictEqual(['commandId', 'count', 'field'].sort());
+    expect(body.count).toBe(5);
+  });
+
+  it('어휘 칸은 terms 로 가고 빈 입력은 그 조건을 지운다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'REQUIRED_KEYWORD' }));
+    mocked.provideEditSessionValue.mockResolvedValue(
+      session({ state: 'WAITING_FOR_CONFIRMATION', field: 'REQUIRED_KEYWORD' }),
+    );
+    renderScreen();
+    await beginEdit('REQUIRED_KEYWORD');
+
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    await waitFor(() => expect(mocked.provideEditSessionValue).toHaveBeenCalled());
+    const [, body] = mocked.provideEditSessionValue.mock.calls[0]!;
+    expect(body.terms).toStrictEqual([]);
+  });
+
+  /** 수로 읽히지 않으면 **보내지 않는다** — 0 으로 지어내지 않는다. */
+  it('숫자 칸에 수가 아닌 값이면 보내지 않고 무엇이 빠졌는지 말한다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'CANDIDATE_LIMIT' }));
+    renderScreen();
+    await beginEdit('CANDIDATE_LIMIT');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.CANDIDATE_LIMIT.label), {
+      target: { value: '많이' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    expect(await screen.findByTestId('edit-value-missing')).toBeTruthy();
+    expect(mocked.provideEditSessionValue).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 확인 화면이 보이는 값은 **둘뿐**이다: 서버가 준 지금 값과 운영자가 방금 적은 값. 세션
+   * 응답에 초안이 없으므로(계약) 그 밖의 값을 지어낼 자리가 없다.
+   */
+  it('확인 화면은 지금 값과 보낸 값 둘만 보인다', async () => {
+    mocked.readStrategy.mockResolvedValue(strategy({ maxActiveBids: 3 }));
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(
+      session({ state: 'WAITING_FOR_CONFIRMATION', field: 'MAX_ACTIVE_BIDS' }),
+    );
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    expect((await screen.findByTestId('edit-current-value')).textContent).toBe('3');
+    expect((await screen.findByTestId('edit-sent-value')).textContent).toBe('9');
+  });
+
+  it('적용은 운영자가 본 개정을 싣는다', async () => {
+    mocked.readStrategy.mockResolvedValue(strategy({ revision: 11 }));
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    mocked.confirmEditSession.mockResolvedValue(session({ state: 'APPLIED', strategyRevision: 12 }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '적용' }));
+
+    await waitFor(() => expect(mocked.confirmEditSession).toHaveBeenCalled());
+    const [, body] = mocked.confirmEditSession.mock.calls[0]!;
+    expect(body.seenRevision).toBe(11);
+  });
+
+  it('적용되면 세션 자리가 닫히고 전략을 다시 읽는다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    mocked.confirmEditSession.mockResolvedValue(session({ state: 'APPLIED' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '적용' }));
+
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+    expect(mocked.readStrategy.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('값 고치기는 같은 세션에서 값 단계로 돌아간다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    mocked.requestEditSessionEdit.mockResolvedValue(session({ state: 'WAITING_FOR_VALUE' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '값 고치기' }));
+
+    await waitFor(() => expect(mocked.requestEditSessionEdit).toHaveBeenCalled());
+    expect(await screen.findByRole('button', { name: '값 보내기' })).toBeTruthy();
+  });
+
+  it('그만두기는 세션을 취소하고 자리를 닫는다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.cancelEditSession.mockResolvedValue(session({ state: 'CANCELLED' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.click(screen.getByRole('button', { name: '그만두기' }));
+
+    await waitFor(() => expect(mocked.cancelEditSession).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('edit-session')).toBeNull());
+  });
+});
+
+describe('설정 — 세션 상태와 충돌은 서버가 말한다', () => {
+  it('세션 상태 문면이 서버가 준 state 에서 온다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ state: 'WAITING_FOR_VALUE' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    expect((await screen.findByTestId('edit-session-state')).textContent).toContain(
+      EDIT_SESSION_STATE_DISPLAY.WAITING_FOR_VALUE.label,
+    );
+  });
+
+  /**
+   * **만료를 화면이 판정하지 않는다**(D-7E-4): `expiresAt` 이 이미 지난 세션이라도 서버가
+   * `WAITING_FOR_VALUE` 라고 하면 그 말을 보인다. 만료는 서버가 접는다.
+   */
+  it('expiresAt 이 지나도 서버가 준 state 를 보인다 — 화면이 접지 않는다', async () => {
+    mocked.beginEditSession.mockResolvedValue(
+      session({ state: 'WAITING_FOR_VALUE', expiresAt: '2000-01-01T00:00:00Z' }),
+    );
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    const badge = await screen.findByTestId('edit-session-state');
+    expect(badge.textContent).toContain(EDIT_SESSION_STATE_DISPLAY.WAITING_FOR_VALUE.label);
+    expect(badge.textContent).not.toContain(EDIT_SESSION_STATE_DISPLAY.EXPIRED.label);
+  });
+
+  /** 409 를 받으면 **세션을 다시 읽어** 서버가 말하는 상태를 보인다(추측하지 않는다). */
+  it('409 면 세션을 다시 읽고 사유와 상태를 보인다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    mocked.confirmEditSession.mockRejectedValue(new ApiError(409, 'STALE_REVISION'));
+    mocked.readEditSession.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '적용' }));
+
+    await waitFor(() => expect(mocked.readEditSession).toHaveBeenCalledWith('sess-1'));
+    expect((await screen.findByTestId('edit-conflict-reason')).textContent).toContain('그동안 전략이 바뀌었습니다');
+  });
+
+  it('쓰기 실패의 재시도는 같은 commandId 를 다시 쓴다 — 멱등 키다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
+    mocked.provideEditSessionValue.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+    await beginEdit('MAX_ACTIVE_BIDS');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_ACTIVE_BIDS.label), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    const failure = await screen.findByTestId('write-failure');
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => expect(mocked.provideEditSessionValue.mock.calls.length).toBe(2));
+    const [, first] = mocked.provideEditSessionValue.mock.calls[0]!;
+    const [, second] = mocked.provideEditSessionValue.mock.calls[1]!;
+    expect(second.commandId).toBe(first.commandId);
+  });
+
+  it('읽기가 401 이면 로그인 길을 낸다', async () => {
+    mocked.readStrategy.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    expect(await screen.findByTestId('signed-out')).toBeTruthy();
+  });
+});
+
+describe('설정 — 범위 밖 자리', () => {
+  /** D-7E2-7 — 사업자번호는 **입력칸을 만들지 않는다**(계약에 칸이 0 이다). */
+  it('사업자번호는 「준비 중」 빈 자리이고 입력칸이 없다', async () => {
+    renderScreen();
+
+    const notReady = await screen.findByTestId('settings-not-ready');
+    expect(notReady.textContent).toContain('사업자번호');
+    expect(within(notReady).queryAllByRole('textbox')).toStrictEqual([]);
+    expect(within(notReady).queryAllByRole('button')).toStrictEqual([]);
+  });
+
+  it('페이퍼 투찰과 알림 채널도 빈 자리뿐이다', async () => {
+    renderScreen();
+
+    const notReady = await screen.findByTestId('settings-not-ready');
+    expect(notReady.textContent).toContain('페이퍼');
+    expect(notReady.textContent).toContain('알림 채널');
+  });
+});
