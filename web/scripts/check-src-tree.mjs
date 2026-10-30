@@ -215,6 +215,9 @@ collectLinks(webRoot, 0);
  */
 const ALLOWED_SRC_FILE = /\.(tsx?|css)$/;
 
+/** `src` 안의 스타일 파일 전수 — ⑤d 가 그 값의 모양을 본다. */
+const srcCssFiles = [];
+
 function collectSrcFileKinds(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const full = join(directory, entry.name);
@@ -222,11 +225,18 @@ function collectSrcFileKinds(directory) {
       collectSrcFileKinds(full);
       continue;
     }
-    if (entry.isFile() && !ALLOWED_SRC_FILE.test(entry.name)) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (!ALLOWED_SRC_FILE.test(entry.name)) {
       fail(
         `src 안에 아는 종류가 아닌 파일이 있다: ${relative(webRoot, full)} ` +
           '— 코드(.ts/.tsx)와 스타일(.css)만 둔다. 데이터·자산은 계약 밖 데이터 모양의 입구다',
       );
+      continue;
+    }
+    if (entry.name.endsWith('.css')) {
+      srcCssFiles.push(relative(webRoot, full));
     }
   }
 }
@@ -859,6 +869,68 @@ for (const { sourceFile, name } of inSrcFiles) {
   visitMeta(sourceFile);
 }
 
+// ⑤d **CSS 를 지나는 데이터 입구**(M7/7E-2 — OPEN ④ 를 닫음).
+//
+// 재현 꼴(7E-1 checklist §4 ④): `src/index.css` 에 `:root{--rows:"[…]"}` 를 적고 화면이
+// `getComputedStyle(…).getPropertyValue('--rows')` 로 읽는다. 자산을 더 내보내지 않으므로
+// 모양 단언·`fetch` 계수·캐스팅 금지 어느 층도 보지 않았다.
+//
+// **읽는 쪽이 이 층의 무게를 진다**: 화면 코드에서 `getComputedStyle`·`getPropertyValue` 가
+// **DOM lib 의 그 심볼로 해소되면** 위반이다(이름이 같은 내 함수는 아니다 — TypeChecker 가
+// 가른다). 읽는 길이 없으면 CSS 에 무엇을 적어도 화면에 닿지 못한다.
+//
+// 쓰는 쪽은 **값의 모양**으로 받는다: custom property 값에 `[`·`{`·`url(`·`data:` 가 없고 길이가
+// 상한 안이다. 토큰(색·폰트 스택·수치·`var()` 참조)은 그 모양을 지키고, 데이터를 실으려면
+// 둘 중 하나를 깨야 한다. 이 축은 **보조 층**이다 — 인용 문자열 안에 쉼표로 적은 자료처럼
+// 모양을 지키는 꼴이 남고, 그것을 받는 것은 위의 읽기 금지다.
+const DOM_STYLE_READERS = new Set(['getComputedStyle', 'getPropertyValue']);
+const CSS_VALUE_MAX_LENGTH = 200;
+const CSS_FORBIDDEN_IN_VALUE = ['[', ']', '{', '}', 'url(', 'data:', '\\'];
+
+for (const { sourceFile, name } of inSrcFiles) {
+  if (isTestFile(name)) {
+    // 다른 층과 같은 면제다 — 앱 코드가 test 파일을 import 하지 않는다(번들 그래프 층이 센다).
+    continue;
+  }
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && DOM_STYLE_READERS.has(node.text)) {
+      const symbol = resolveToTarget(checker, node);
+      for (const declaration of symbol?.declarations ?? []) {
+        if (program.isSourceFileDefaultLibrary(declaration.getSourceFile())) {
+          fail(
+            `${name} 가 DOM 의 ${node.text} 을 쓴다 — CSS custom property 를 데이터 통로로 쓰는 ` +
+              '입구다(표시값은 API 응답에서만 온다). 스타일을 읽어야 하는 이유가 생기면 이 게이트를 먼저 바꾼다',
+          );
+          break;
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+if (srcCssFiles.length === 0) {
+  fail('src 안에 스타일 파일이 하나도 없다 — 아래 값 모양 단언이 공허해진다(토큰 한 자리가 전제다)');
+}
+for (const cssName of srcCssFiles) {
+  const text = readFileSync(resolve(webRoot, cssName), 'utf8');
+  for (const match of text.matchAll(/(--[A-Za-z0-9_-]+)\s*:\s*([^;}]*)/gu)) {
+    const [, property, rawValue] = match;
+    const value = rawValue.trim();
+    if (value.length > CSS_VALUE_MAX_LENGTH) {
+      fail(`${cssName} 의 ${property} 값이 ${CSS_VALUE_MAX_LENGTH}자를 넘는다(${value.length}자) — 토큰이 아닌 자료의 모양이다`);
+      continue;
+    }
+    const found = CSS_FORBIDDEN_IN_VALUE.filter((one) => value.includes(one));
+    if (found.length > 0) {
+      fail(`${cssName} 의 ${property} 값에 ${found.join(', ')} 가 있다 — 토큰 값의 모양이 아니다(데이터 통로의 입구)`);
+    }
+  }
+}
+
+if (finishIfFailed()) return;
+
 // ⑥ 번들 그래프 경계 플러그인이 `vite.config.ts` 에 등재돼 있는가 (AST).
 const viteConfigPath = resolve(webRoot, 'vite.config.ts');
 let publicDirVerdict = '판정 없음';
@@ -1024,7 +1096,7 @@ if (finishIfFailed()) return;
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
-    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **이 게이트가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export 가운데 **타입이 그 능력과 동일한** 것 0(TypeChecker — 지정자·타입 주석으로 비켜 가는 꼴은 OPEN-7E-GATE-RESIDUAL) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
+    `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **이 게이트가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export 가운데 **타입이 그 능력과 동일한** 것 0(TypeChecker — 지정자·타입 주석으로 비켜 가는 꼴은 OPEN-7E-GATE-RESIDUAL) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
 }
