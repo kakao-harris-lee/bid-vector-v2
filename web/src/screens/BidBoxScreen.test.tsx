@@ -181,6 +181,35 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
     }
   });
 
+  /** CR r1 M-5 — 탭이 **무엇을 여는지** 말해야 한다(배선이 반쪽이면 보조기술이 못 읽는다). */
+  it('탭과 패널이 aria 로 묶이고 비선택 탭은 tab 순서에서 빠진다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    renderScreen();
+
+    const panel = await screen.findByRole('tabpanel');
+    const selected = screen.getByRole('tab', { selected: true });
+    expect(selected.getAttribute('aria-controls')).toBe(panel.getAttribute('id'));
+    expect(panel.getAttribute('aria-labelledby')).toBe(selected.getAttribute('id'));
+    expect(selected.getAttribute('tabindex')).toBe('0');
+    for (const other of screen.getAllByRole('tab').filter((one) => one !== selected)) {
+      expect(other.getAttribute('tabindex')).toBe('-1');
+    }
+  });
+
+  it('좌우 화살표로 탭을 옮기고 끝에서 감싼다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'BID_RECORDED' })]);
+    renderScreen();
+
+    const first = await screen.findByRole('tab', { name: /관심/u });
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { selected: true }).textContent).toContain('투찰가 받음');
+
+    // 첫 탭에서 왼쪽은 **마지막 탭**으로 감싼다.
+    fireEvent.keyDown(screen.getByRole('tab', { name: /투찰가 받음/u }), { key: 'ArrowLeft' });
+    fireEvent.keyDown(screen.getByRole('tab', { name: /관심/u }), { key: 'ArrowLeft' });
+    expect(screen.getByRole('tab', { selected: true }).textContent).toContain('종료');
+  });
+
   it('건이 없는 탭은 빈 얼굴을 낸다 — 가짜 행을 만들지 않는다', async () => {
     mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
     renderScreen();

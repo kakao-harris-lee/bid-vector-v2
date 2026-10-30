@@ -23,6 +23,13 @@ const BID_KIND: BidCase['bidKind'] = 'REAL';
 
 const QUERY_KEY = ['bid-cases', BID_KIND] as const;
 
+/** 탭 ↔ 패널을 묶는 id 둘. 한 화면에 하나뿐이라 고정 문자열로 둔다. */
+const PANEL_ID = 'bid-box-panel';
+
+function tabId(id: BidBoxTabId): string {
+  return `bid-box-tab-${id}`;
+}
+
 /** 탭이 비었을 때의 문면 — 「이 묶음에 건이 없다」는 **사실**이고 사유를 지어내지 않는다. */
 const EMPTY_TAB_DISPLAY = {
   label: '이 묶음에 건이 없습니다.',
@@ -75,6 +82,8 @@ export function BidBoxScreen() {
   const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
   const [tab, setTab] = useState<BidBoxTabId>('watching');
+  /** 화살표로 옮긴 뒤 **그 탭에 포커스를 둔다**(클릭으로 고른 경우는 브라우저가 이미 둔다). */
+  const [focusTab, setFocusTab] = useState<BidBoxTabId | null>(null);
 
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
 
@@ -112,19 +121,46 @@ export function BidBoxScreen() {
     <section data-testid="screen-bid-box" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <h2 className="text-lg font-semibold">내 입찰함</h2>
 
-      {/* 좁은 화면에서 가로로 스크롤되는 줄 — 셸의 탐색과 같은 모양이다(§6.5 모바일 우선). */}
+      {/* 좁은 화면에서 가로로 스크롤되는 줄 — 셸의 탐색과 같은 모양이다(§6.5 모바일 우선).
+          **WAI-ARIA 탭 패턴을 끝까지 배선한다**(CR r1 M-5): 앞 판은 `tablist`·`tab`·`aria-selected`
+          까지만 두어 보조기술이 「탭 1/6, 선택됨」이라 읽고도 **그 탭이 무엇을 여는지 말할 수
+          없었다**. `aria-controls` ↔ `tabpanel` 로 묶고, 비선택 탭은 tab 순서에서 빼고
+          (roving tabindex) 좌우 화살표로 옮긴다. */}
       <div role="tablist" aria-label="상태" className="flex gap-1 overflow-x-auto text-sm">
-        {BID_BOX_TABS.map((one) => {
+        {BID_BOX_TABS.map((one, index) => {
           const count = rows.filter((row) => tabOf(row.state) === one.id).length;
+          const selected = tab === one.id;
           return (
             <button
               key={one.id}
               type="button"
               role="tab"
-              aria-selected={tab === one.id}
-              onClick={() => setTab(one.id)}
+              id={tabId(one.id)}
+              aria-selected={selected}
+              aria-controls={PANEL_ID}
+              tabIndex={selected ? 0 : -1}
+              ref={(node) => {
+                if (node !== null && focusTab === one.id) {
+                  node.focus();
+                }
+              }}
+              onKeyDown={(event) => {
+                const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+                if (step === 0) {
+                  return;
+                }
+                event.preventDefault();
+                // 줄 끝에서 감싼다 — 그것이 그 패턴이 요구하는 이동이다.
+                const next = BID_BOX_TABS[(index + step + BID_BOX_TABS.length) % BID_BOX_TABS.length]!;
+                setTab(next.id);
+                setFocusTab(next.id);
+              }}
+              onClick={() => {
+                setTab(one.id);
+                setFocusTab(null);
+              }}
               className={`shrink-0 rounded-md px-2 py-1 ${
-                tab === one.id ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
+                selected ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
               }`}
             >
               {/* 받은 행의 수다 — 계약에 총수 헤더가 없으므로 「전체 몇 건」이라 말하지 않는다. */}
@@ -155,7 +191,7 @@ export function BidBoxScreen() {
       ) : null}
 
       {shown.length === 0 ? null : (
-        <ul className="flex flex-col gap-3">
+        <ul role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} className="flex flex-col gap-3">
           {shown.map((row) => (
             <BidBoxCard
               key={row.caseId}
