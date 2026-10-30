@@ -198,8 +198,17 @@ describe('값 요청 본문 — field 가 이름하는 칸 하나만', () => {
     ['건수의 음수', 'MAX_ACTIVE_BIDS', '-3'],
     ['소수 칸의 쉼표', 'REVIEW_THRESHOLD', '0,5'],
     ['소수 칸의 지수', 'REVIEW_THRESHOLD', '1e-3'],
+    // v r2 L-1 · CR r2 L2R-3 — 모양은 지나지만 `Number` 가 접는 자리다(실 서버에서 접힌 값이 저장됐다).
+    ['2^53 을 넘는 금액', 'MIN_BUDGET', '9007199254740993'],
+    ['2^53 을 넘는 건수', 'MAX_ACTIVE_BIDS', '9007199254740993'],
   ] as const)('%s 은 거부한다 — 잘린 수를 보내지 않는다', (_label, field, raw) => {
     expect(valueBodyOf(field, 'c', raw)).toBeNull();
+  });
+
+  it('안전 정수 경계는 그대로 받는다 — 거부가 지나치지 않다', () => {
+    expect(valueBodyOf('MIN_BUDGET', 'c', String(Number.MAX_SAFE_INTEGER))?.amountWon).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
   });
 
   it('앞뒤 공백만 정규화한다 — 그 결과는 확인 화면이 본문 값으로 보인다', () => {
@@ -235,6 +244,11 @@ describe('보낸 값의 문면은 본문에서 나온다', () => {
     expect(sentValueView('MIN_BUDGET', { commandId: 'c', field: 'MIN_BUDGET', amountWon: 1 }).text).toBe('1원');
   });
 
+  /** 짝이 어긋나 칸이 비면 **「0원」을 지어내지 않는다**(CR r2 L2R-4). */
+  it('금액 칸이 비면 값이 없다고 말한다 — 0 원을 지어내지 않는다', () => {
+    expect(sentValueView('MIN_BUDGET', { commandId: 'c', field: 'MIN_BUDGET' }).text).toBeNull();
+  });
+
   it('건수·소수는 본문 값 그대로', () => {
     expect(sentValueView('MAX_ACTIVE_BIDS', valueBodyOf('MAX_ACTIVE_BIDS', 'c', '5')!).text).toBe('5');
     expect(sentValueView('REVIEW_THRESHOLD', valueBodyOf('REVIEW_THRESHOLD', 'c', '0.42')!).text).toBe('0.42');
@@ -245,6 +259,19 @@ describe('보낸 값의 문면은 본문에서 나온다', () => {
       '합성, 공사',
     );
     expect(sentValueView('REQUIRED_KEYWORD', valueBodyOf('REQUIRED_KEYWORD', 'c', '')!).text).toBeNull();
+  });
+
+  /**
+   * **중복은 접는다**(CR r1 L-4 처방 · r2 L2R-5 가 잠금 부재를 잡았다). 수는 **거부하고 받는
+   * 모양을 말하는데** 어휘 중복은 **조용히 고쳐 보내는** 차이가 있다 — 그 이유는 둘이 다른 종류의
+   * 입력이기 때문이다: `'1,000'` 은 **운영자가 뜻한 수를 알 수 없다**(1 인가 1000 인가), 반면
+   * `'건축, 건축'` 의 뜻은 하나뿐이고(업종 「건축」) 계약이 그 중복만 400 으로 거부한다. 뜻이
+   * 하나인 입력을 거부해 다시 적게 하는 것은 운영자에게 값을 주지 않는다.
+   */
+  it('중복 어휘를 접는다 — 계약이 중복을 400 으로 거부하는 자리다', () => {
+    expect(termsOf('건축, 건축')).toStrictEqual(['건축']);
+    expect(termsOf('건축, 토목, 건축')).toStrictEqual(['건축', '토목']);
+    expect(valueBodyOf('FOCUS_CATEGORY', 'c', '가, 가, 나')?.terms).toStrictEqual(['가', '나']);
   });
 
   it('빈 어휘는 빈 배열이다 — 그 조건을 지우는 길이고 공백 원소를 보내지 않는다', () => {

@@ -175,15 +175,26 @@ export function valueBodyOf(field: StrategyField, commandId: string, raw: string
     return null;
   }
   const parsed = Number(normalized);
-  // 모양을 지났어도 수가 아니거나 유한하지 않으면 보내지 않는다(아주 긴 자리 수 등).
+  /**
+   * **안전 정수 범위를 넘으면 보내지 않는다**(v r2 L-1 · CR r2 L2R-3). `^\d+$` 를 지난
+   * `'9007199254740993'` 은 `Number` 가 `…992` 로 **접고** `Number.isFinite` 는 참이다 — 실 서버
+   * 실측에서 그 접힌 값이 저장됐다(확인 화면이 접힌 값을 보이므로 사슬 자체는 성립했지만, 입력과
+   * 저장값이 다르고 거부도 없었다).
+   *
+   * 앞 판 주석은 `isFinite` 가 「아주 긴 자리 수」를 막는다고 적었는데 **틀렸다**: 그 가드가
+   * 걸리는 것은 309 자리 이상뿐이다. 소수 칸은 정수가 아니므로 유한성만 본다.
+   */
   if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  if (slot !== 'number' && !Number.isSafeInteger(parsed)) {
     return null;
   }
   if (slot === 'amountWon') {
     return { commandId, field, amountWon: parsed };
   }
   if (slot === 'count') {
-    // 건수는 정수다 — 모양이 이미 정수를 요구하므로 여기서 깎이는 값이 없다.
+    // 건수는 정수다 — 모양과 안전 정수 검사가 이미 지났으므로 여기서 깎이는 값이 없다.
     return { commandId, field, count: parsed };
   }
   return { commandId, field, number: parsed };
@@ -202,7 +213,11 @@ export function sentValueView(field: StrategyField, body: ValueRequest): FieldVa
     return termsView(body.terms ?? []);
   }
   if (slot === 'amountWon') {
-    return { text: `${(body.amountWon ?? 0).toLocaleString('ko-KR')}원` };
+    // **`0` 을 지어내지 않는다**(CR r2 L2R-4): 짝이 어긋나 그 칸이 비면 「0원」이 아니라 **값이
+    // 없다**고 말한다. 확인 화면은 이 slice 가 지어낸 값을 가장 강하게 금하는 자리다.
+    return body.amountWon === undefined
+      ? { text: null }
+      : { text: `${body.amountWon.toLocaleString('ko-KR')}원` };
   }
   if (slot === 'count') {
     return numberView(body.count);

@@ -192,6 +192,7 @@ describe('시평액 요청 본문 — 문자열 전체가 정수일 때만', () 
     ['꼬리 문자', { amountWon: '1500000000원' }],
     ['연도의 쉼표', { assessmentYear: '2,026' }],
     ['연도의 소수점', { assessmentYear: '2026.5' }],
+    ['2^53 을 넘는 금액', { amountWon: '9007199254740993' }],
     ['빈 금액', { amountWon: '' }],
     ['빈 연도', { assessmentYear: '' }],
     ['공백뿐인 면허명', { licenseName: '   ' }],

@@ -132,6 +132,18 @@ describe('프로필 — 쓰기는 계약의 모양을 지킨다', () => {
     });
   });
 
+  /** 계약의 `uniqueItems: true` — 중복이 **본문에 실리지 않는다**(CR r2 L2R-5). */
+  it('중복 업종을 적어도 본문에는 한 번만 실린다', async () => {
+    mocked.replaceQualificationFacts.mockResolvedValue(profile({ qualificationDeclared: true }));
+    renderSection();
+
+    fireEvent.change(await screen.findByLabelText('업종'), { target: { value: '건축, 건축, 토목' } });
+    fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
+
+    await waitFor(() => expect(mocked.replaceQualificationFacts).toHaveBeenCalled());
+    expect(mocked.replaceQualificationFacts.mock.calls[0]![0].businessTypes).toStrictEqual(['건축', '토목']);
+  });
+
   /** 신고하지 않으면 면허 목록은 **비어 있어야 한다**(계약 — 아니면 400). */
   it('면허 미신고면 적어 둔 면허를 보내지 않는다', async () => {
     mocked.readProfile.mockResolvedValue(

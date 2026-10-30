@@ -156,7 +156,10 @@ export function capacityBodyOf(form: CapacityForm): ConstructionCapacityRequest 
   }
   const amountWon = Number(amount);
   const assessmentYear = Number(year);
-  if (!Number.isFinite(amountWon) || !Number.isFinite(assessmentYear)) {
+  // **안전 정수 범위를 넘으면 보내지 않는다**(v r2 L-1 · CR r2 L2R-3). 계약의 `maximum` 이
+  // 1e15 라 서버도 소리를 내지만, 접힌 값을 보내고 서버가 거부하는 것과 **보내지 않는 것**은
+  // 다르다 — 거부 사유를 운영자에게 말할 수 있는 쪽이 앞이다.
+  if (!Number.isSafeInteger(amountWon) || !Number.isSafeInteger(assessmentYear)) {
     return null;
   }
   return { licenseName, amountWon, assessmentYear };
