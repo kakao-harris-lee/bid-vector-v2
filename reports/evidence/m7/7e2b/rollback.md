@@ -15,16 +15,16 @@ base **`1e387499`**(착수 계약의 base 그대로 — 이 slice 의 base 는 �
 base 안에** 있다. 그래서 base 복원이 남의 줄을 떨어뜨리지 않는다 — hunk 격리가 필요 없고,
 그 사실을 ③ 의 「남의 표지」 계수로 잰다.
 
-**실측 HEAD**: `2cdcb9fa` — 이 slice 의 **마지막 산출물 커밋**이다. 그 뒤 커밋은 evidence 뿐이고
+**실측 HEAD**: `1ff961f2` — 이 slice 의 **마지막 산출물 커밋**이다. 그 뒤 커밋은 evidence 뿐이고
 evidence 경로는 아래 목록 **밖**이다. 라운드가 더 붙어 목록 안 파일이 움직이면 이 절차를 다시
 돌린다(목록이 낡는 것이 이 결함의 실제 원인이다).
 
-**이 slice 에서 실제로 두 번 낡았다.** ① `3354143d` 에서 ⓪~⑦ 을 다 재고 나서 여정에 개인정보 단언
-한 줄을 더했고(`2acd2439`), 그 파일이 **삭제 목록 안**이라 앞 실측이 무효가 됐다. ② r1 승인 전
-일괄이 산출물을 더 고쳐(`86dfcbfd` · `fcab9df4` · `2cdcb9fa`) 또 무효가 됐다. 두 번 다 값을 옮기지
-않고 새 HEAD 에서 전부 다시 쟀다 — 세 번 모두 계수가 같았지만(M 11 · A 12) **같다는 것은 측정 뒤에
-아는 사실이다**. r1 은 **새 파일을 더하지 않고** 목록 안의 파일 넷만 고쳤다
-(`git diff --name-status 2acd2439..2cdcb9fa -- web` 가 `M` 넷).
+**이 slice 에서 실제로 세 번 낡았다.** ① `3354143d` 에서 ⓪~⑦ 을 다 재고 나서 여정에 개인정보 단언
+한 줄을 더했고(`2acd2439`), 그 파일이 **삭제 목록 안**이라 앞 실측이 무효가 됐다. ② r1 승인 전 일괄이
+산출물을 더 고쳐(`86dfcbfd` · `fcab9df4` · `2cdcb9fa`) 또 무효가 됐다. ③ r2 가 MEDIUM 회귀를 고치며
+또 고쳤다(`1ff961f2`). 세 번 다 값을 옮기지 않고 새 HEAD 에서 전부 다시 쟀다 — 네 번 모두 계수가
+같았지만(M 11 · A 12) **같다는 것은 측정 뒤에 아는 사실이다**. r1·r2 모두 **새 파일을 더하지 않고**
+목록 안의 파일만 고쳤다(`git diff --name-status 2cdcb9fa..1ff961f2 -- web` 가 `M` 일곱).
 
 목록은 **기계 산출**이다: `git diff --name-status 1e387499..HEAD -- web
 docs/discovery/m7-screen-data-requirements.md .github tools`.
@@ -82,7 +82,7 @@ rm -f \
 | ② | 복원·삭제 계수 | porcelain **23** = 11 `M` + 12 `D` — 되돌림 **직후**의 기대값이고 「깨끗함」의 지표가 아니다 |
 | ③ | 되돌린 트리가 기준과 같은가 | **트리 해시로 본다**(종료 코드가 아니다): 되돌린 `web` 하위 트리 == base 의 그것 — **동일**. 요구표 blob 도 base 와 **동일**. **내 표지 열둘**(`OnboardingScreen`·`onboardingDisplay`·`profileWrites`·`strategyEdit`·`ProfileFactsCard`·`ProfileDetailsCard`·`ProfileCapacityCard`·`onboarding-vocabulary`·`ONBOARDING_ITEM_ORDER`·`OnboardingBanner`·`clearStrategyTerms`·slice 이름) 각각 **0**. **남의 표지는 남았다**: 7E-2 의 `bidBoxDisplay` **5 파일** · `CASE_TAB_LABEL` **2 파일** · 7C④-3 이 요구표에 쓴 operation 이름 **1 건** |
 | ④ | compile | `npm ci` **0** · `typecheck` **0** |
-| ⑤ | test | `vitest` **0** — 7A·7D·7E-1·7E-2 의 **406 test** 로 돌아갔다. 이 slice 가 더한 **47 test**(파일 셋)가 그만큼 사라졌다(453 → 406) |
+| ⑤ | test | `vitest` **0** — 7A·7D·7E-1·7E-2 의 **406 test** 로 돌아갔다. 이 slice 가 더한 **58 test**(파일 셋)가 그만큼 사라졌다(464 → 406) |
 | ⑥ | 게이트 | `lint` · `gate:src-tree` · `api:types:check` · `gate:tests` · `build` · `gate:boundary-canary` **전부 0** · 7A 의 셸 스모크 **0** |
 | ⑦ | 되돌린 뒤 base 와 남는 차이 | **in_scope 경로 0 건.** 전체로 남는 것은 `reports/evidence/m7/7e2b/` 넷뿐이다(evidence 는 목록 밖 — 위 머리의 사유) |
 

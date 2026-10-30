@@ -71,7 +71,7 @@ verifier·CR 이 「지금 코드에 결함은 없고 **test 가 비어 있다**
 | S1 | 전략의 관심 업종이 비면 `WATCH_CONDITIONS` 를 미완으로 그린다 | 배지 전수 test RED |
 | S2 | 프로필이 나라장터 미응답이면 `NARA_READINESS` 를 미완으로 그린다 | 같은 test RED |
 | B1 | 읽지 못했어도 배너를 띄운다 | 배너 probe **2건** RED |
-| B2 | 미완이 0 이어도 띄운다 | 배너 probe **4건** RED |
+| B2 | 미완이 0 이어도 띄운다 | 배너 probe **4건** RED — 이 레인의 변이(`pending < 0`)는 **첫 렌더부터** 띄우므로 양성 쪽(「미완 수 표시」)까지 함께 붉는다. verifier 가 건 변이는 **데이터가 온 뒤에만** 띄워 2건이 붉었다(같은 축, 다른 변이)
 | B3 | 배너가 선행 대기까지 센다 | 「선행 대기만 남으면 뜨지 않는다」 RED |
 | P1 | 저장해도 고른 단계를 놓지 않는다 | 단계 전진 test RED |
 | P2 | 프로필 401 을 말 없이 비운다 | 401 test RED |
@@ -86,6 +86,27 @@ verifier·CR 이 「지금 코드에 결함은 없고 **test 가 비어 있다**
 세도록 고쳤고, 그 뒤 B1·B2 의 실패가 1006ms(타임아웃)에서 **8ms**(즉시)로 바뀌었다 — 기다림이 아니라
 판정이 되었다는 계수다.
 
+### r2 — 끝난 세션의 갇힘과 나머지 LOW
+
+MEDIUM 은 **r2 의 단계 잠금이 들여온 회귀**다. 그래서 회귀 test 를 **두 HEAD 에서 같은 파일로**
+돌렸다 — 고친 코드에만 있는 이름을 쓰지 않고 화면 밖에서 보이는 것만 센다.
+
+| 자리 | r2 `afec83fb` | 고친 뒤 |
+| --- | --- | --- |
+| 409 `SESSION_EXPIRED` + 재조회 `EXPIRED`·`CANCELLED` 에서 단계 탐색이 열리는가 · 패널에 빠져나갈 버튼이 있는가 | **3 failed** | **3 passed** |
+
+그 뒤 같은 방식의 변이 일곱(지금 코드에서 각각 RED · 통제군 앞뒤 **464 passed**):
+
+| # | 변이 | 결과 |
+| --- | --- | --- |
+| MR1 | 언마운트 잠금 해제를 지운다 | 전략 401 test RED |
+| MR2 | 전략 401 을 말 없이 비운다 | 같은 test RED |
+| MR3 | 잠긴 단계의 사유를 보조기술에서 뗀다 | 사유 문단 test RED |
+| MR4 | 저장 뒤 늘 첫 미완으로 간다 | 걸음 test RED |
+| MR5 | 끝난 세션의 「닫기」를 뗀다 | 회귀 test 2건 RED |
+| MR6 | 잠금 술어를 「열린 세션」으로 되돌린다 | 회귀 test 2건 RED |
+| MR7 | 다음 걸음이 선행 대기 단계도 센다 | 표 test 2건 RED |
+
 ## acceptance — `ci.yml` `web` job 의 명령 그대로 + Kotlin
 
 | step | 명령 | exit | 핵심 결과 |
@@ -94,13 +115,13 @@ verifier·CR 이 「지금 코드에 결함은 없고 **test 가 비어 있다**
 | W-3 | `npm run typecheck` | 0 | |
 | W-4 | `npm run gate:src-tree` | 0 | 컴파일 경계 전제 성립 |
 | W-5 | `npm run api:types:check` | 0 | 생성 타입이 문서와 바이트까지 같다 |
-| W-6 | `npm run test` | 0 | 23 파일 **453 passed**(r1 에서 +9) |
+| W-6 | `npm run test` | 0 | 23 파일 **464 passed**(r1 +9 · r2 +11) |
 | W-7 | `npm run gate:tests` | 0 | 등록부의 게이트 test 가 수집에 있고 전부 통과 |
 | W-8 | `npm run build` | 0 | 자산 둘(js·css) |
 | W-9 | `npm run gate:boundary-canary` | 0 | 메인·워커 두 그래프에서 경계가 활성 |
 | W-11 | `npm run test:e2e` | 0 | 셸 스모크 2 passed |
-| W-13 | `npm run test:e2e:journey` | 0 | **9 passed** — 여정 ① 뒤에 도는 설정 여정 셋이 그대로 초록이다. **이 레인이 잰 것은 ① → 설정 방향뿐**이다(기본 순서에서 ② 는 ① 보다 **앞에** 돈다: `journey` < `onboarding`). 「① 다음에 ② 가 서는가」는 **r1 verifier 가 파일 이름을 바꿔 ① 을 맨 앞에 두고 재서** 9 passed 를 냈다 — 그 실측이 순서 독립의 나머지 절반이다(v r1 장부 LOW) |
-| check | `./gradlew --no-daemon check qualityBaseline` | 0 | Kotlin 전건 — `BUILD SUCCESSFUL in 28m 17s`(호스트가 여정·clone 과 겹쳐 CI 실측보다 길다) |
+| W-13 | `npm run test:e2e:journey` | 0 | **9 passed**(이 레인, 라운드마다 마지막 산출물 커밋에서). **순서 독립은 이 레인 혼자 잴 수 없다** — 기본 순서에서 ② 가 ① 보다 앞에 돌기 때문이다(`journey` < `onboarding`). 양방향은 **verifier r2 가 정순·역순 둘 다 돌려** 각각 9 passed 를 냈다. 그리고 `e2e/**` 는 `tsconfig` 의 `include` 밖이라 **실행이 그 코드의 유일한 검증**이다 — 판정 SHA 의 정본은 그 SHA 의 **CI `web` job**(W-12·W-13 포함)이고, `afec83fb` 에서 success(3m5s)였다. 이 라운드 판정 SHA 의 CI 는 **PR 조치 코멘트가 든다**(evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다) |
+| check | `./gradlew --no-daemon check qualityBaseline` | 0 | Kotlin 전건 — `BUILD SUCCESSFUL in 28m 17s`(호스트가 여정·clone 과 겹쳐 CI 실측보다 길다). r1·r2 는 Kotlin 입력을 건드리지 않아 표적 `leakPatternGate` 로 잰다 |
 
 W-1(`npm ci`)·W-10(브라우저 설치)·W-12(`:app:bootJar`)는 환경 준비 step 이고 이 레인에서 먼저
 돌려 두었다(`npm ci` 0 · `:app:bootJar` 0).
