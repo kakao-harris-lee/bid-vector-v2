@@ -157,13 +157,21 @@ export const BASE_AMOUNT_RESOLUTION_DISPLAY = {
   DERIVED_FROM_OPENING: { label: '개찰에서 역산', tone: 'neutral' },
 } as const satisfies Record<Present<Response['baseAmountResolution']>, StateDisplay>;
 
-/** R-4 — 채널 발송은 없고 알림함 기록까지다. 그 포트가 아직 서지 않았다는 사실을 그대로 보인다. */
+/**
+ * R-4 — 채널 발송은 없고 **알림함 기록까지**다. 「처음 적혔다」와 「이미 있던 항목을 갱신했다」를
+ * 가른다: 후자는 중복 억제가 작동해 항목이 늘지 않았다는 뜻이고, 같은 공고를 다시 물은 운영자가
+ * 알림함이 쌓이지 않는 이유를 그 자리에서 본다.
+ */
 export const INBOX_RECORD_STATE_DISPLAY = {
-  NOT_RECORDED_YET: { label: '아직 기록하지 않음', tone: 'absent' },
+  RECORDED_NEW: { label: '알림함에 적음', tone: 'neutral' },
+  RECORDED_UPDATED: { label: '알림함의 기존 항목을 갱신', tone: 'neutral' },
+  NOT_RECORDED: { label: '적지 않음', tone: 'absent' },
 } as const satisfies Record<Response['inboxRecordState'], StateDisplay>;
 
+/** 적지 않은 사유 둘 — 처방이 다르다(앞은 부르는 방식, 뒤는 저장 실패다). */
 export const INBOX_RECORD_REASON_DISPLAY = {
-  INBOX_WRITE_PORT_NOT_MERGED: { label: '알림함 쓰기 경로가 아직 머지되지 않음', tone: 'absent' },
+  NO_ACCOUNT_SUBJECT: { label: '이 요청에 계정 주체가 없음(세션으로 부르면 적힙니다)', tone: 'absent' },
+  INBOX_WRITE_FAILED: { label: '알림함 저장이 실패함(평가 결과는 유효합니다)', tone: 'absent' },
 } as const satisfies Record<Present<Response['inboxRecordNotRecordedReason']>, StateDisplay>;
 
 /**

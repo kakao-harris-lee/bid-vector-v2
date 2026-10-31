@@ -14,6 +14,7 @@ import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
@@ -22,6 +23,10 @@ import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.NoticeByIdPort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
+import bidvector.workflow.notificationinbox.NotificationInboxPort
+import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader
 import java.time.LocalDate
@@ -109,6 +114,7 @@ sealed interface BidPriceRequestOutcome {
  * **`ladderPolicySlot` 을 받지 않는다** — 사다리 정책을 밖에서 바꿀 인자를 이 경로에 열지 않는다
  * (use case 기본값 그대로).
  */
+@Suppress("LongParameterList")
 class BidPriceRequestFactory(
     private val notices: NoticeByIdPort,
     private val strategyRepository: StrategyReader,
@@ -117,7 +123,27 @@ class BidPriceRequestFactory(
     private val mlAnalysis: MlAnalysisPort,
     private val correlationIds: CorrelationIdFactory,
     private val clock: Clock,
+    private val notificationInbox: NotificationInboxPort,
 ) {
+    /**
+     * 이 요청을 운영자의 알림함에 한 항목으로 적는다(M7/7C③-b · R-4 의 종착점).
+     *
+     * **주체를 인자로 받는다** — 이 클래스가 세션·요청에서 계정을 꺼낼 길이 없다. 계정이 없는
+     * 인증 경로(운영자 자격 헤더)에서는 표면이 아예 **부르지 않고**, 그래서 「계정 없이 알림을
+     * 적는다」가 호출 자리의 `if` 가 아니라 **시그니처**로 막힌다.
+     *
+     * **사실은 하나로 고정이다**(`BidPriceRequestRecorded`). 요청이 종류를 고를 자리가 없으므로
+     * 이 표면으로는 다른 종류의 알림을 위조할 수 없다 — 쓰기 포트 자체는 controller 가 받을 수
+     * 없고(`app.http.denied-types`) 이 좁은 메서드만 지난다.
+     */
+    fun recordInbox(
+        account: AccountId,
+        notice: NoticeId,
+    ): NotificationInboxOutcome =
+        notificationInbox.record(
+            NotificationInboxRecord(account, notice, NotificationFact.BidPriceRequestRecorded, clock.now()),
+        )
+
     fun forRequest(
         id: NoticeId,
         currentActiveBids: Int,

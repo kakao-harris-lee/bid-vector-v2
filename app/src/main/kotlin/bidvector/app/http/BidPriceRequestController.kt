@@ -7,6 +7,7 @@ import bidvector.app.wiring.NoticeNotFoundException
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
+import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -38,6 +39,7 @@ class BidPriceRequestController(
     @PostMapping("/api/bid-price-requests")
     fun request(
         @RequestBody body: JsonNode,
+        request: HttpServletRequest,
     ): BidPriceRequestResponse {
         val noticeId = parseBidPriceNoticeId(body)
         val currentActiveBids = parseCurrentActiveBids(body)
@@ -49,7 +51,10 @@ class BidPriceRequestController(
 
             is BidPriceRequestOutcome.Prepared -> {
                 val evaluation = runBlocking { outcome.run.evaluate() }
-                bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids)
+                // **평가가 끝난 뒤에만** 적는다 — 평가가 터진 요청은 알림함에 사실을 남기지 않는다.
+                // 계정이 없는 인증 경로에서는 `?.let` 이 호출 자체를 지운다(D-7C3B-9).
+                val inbox = request.authenticatedAccount()?.let { factory.recordInbox(it, noticeId) }
+                bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids, inbox)
             }
         }
     }

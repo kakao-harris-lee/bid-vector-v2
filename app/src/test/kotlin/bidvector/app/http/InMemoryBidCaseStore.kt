@@ -212,6 +212,7 @@ fun testBidCaseWorkflow(
     store: InMemoryBidCaseStore,
     deadlines: MovableNoticeDeadlines,
     clock: FixedClock,
+    notifications: InMemoryNotificationInbox = InMemoryNotificationInbox(),
 ): BidCaseWorkflow =
     BidCaseWorkflow(
         cases = store,
@@ -220,4 +221,5 @@ fun testBidCaseWorkflow(
         clock = clock,
         retentionPolicy =
             EVIDENCE_RETENTION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EvidenceRetentionPolicyData>,
+        notifications = notifications,
     )

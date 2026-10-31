@@ -29,6 +29,13 @@ open class BidPriceTestWiring {
     @Bean
     open fun mutableLicenseJudgementPort(): MutableLicenseJudgementPort = MutableLicenseJudgementPort()
 
+    /**
+     * 알림함 쓰기 이중체(M7/7C③-b) — **중복 억제 키를 진다**. 출하 조립은 여기서
+     * `NotificationInboxWiring` 의 빈을 받고, test 조립은 실 DB 없이 같은 자리를 메운다.
+     */
+    @Bean
+    open fun notificationInbox(): InMemoryNotificationInbox = InMemoryNotificationInbox()
+
     @Bean
     open fun bidPriceRequestFactory(
         strategyRepository: TestStrategyRepository,
@@ -36,6 +43,7 @@ open class BidPriceTestWiring {
         licenseJudgementPort: MutableLicenseJudgementPort,
         clock: Clock,
         correlationIdFactory: CorrelationIdFactory,
+        notificationInbox: InMemoryNotificationInbox,
     ): BidPriceRequestFactory =
         BidPriceRequestFactory(
             notices = noticeByIdPort,
@@ -45,5 +53,6 @@ open class BidPriceTestWiring {
             mlAnalysis = UnavailableMlAnalysis(),
             correlationIds = correlationIdFactory,
             clock = clock,
+            notificationInbox = notificationInbox,
         )
 }

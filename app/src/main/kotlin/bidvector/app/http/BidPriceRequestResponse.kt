@@ -8,6 +8,7 @@ import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.export
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.MlAnalysisOutcome
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 
 /**
@@ -128,6 +129,7 @@ fun bidPriceRequestResponseOf(
     run: BidPriceRequestRun,
     evaluation: CandidateEvaluation,
     currentActiveBids: Int,
+    inbox: NotificationInboxOutcome?,
 ): BidPriceRequestResponse =
     BidPriceRequestResponse(
         noticeNumber = run.notice.id.number.value,
@@ -140,7 +142,7 @@ fun bidPriceRequestResponseOf(
                 "factory 가 이미 상한 존재를 보장한다(MaxActiveBidsNotConfiguredException)"
             }.value,
         evaluation = evaluationDetailFieldsOf(evaluation, run.notice),
-        notification = notificationFieldsOf(run),
+        notification = notificationFieldsOf(run, inbox),
         qualification = qualificationFieldsOf(run.licenseJudgement),
         baseAmount = baseAmountFieldsOf(run.notice),
         floorRate = floorRateFieldsOf(run.notice, run.floorTrustPolicy),
@@ -148,12 +150,36 @@ fun bidPriceRequestResponseOf(
         disclosures = BidPriceDisclosure.entries.map { it.name },
     )
 
-private fun notificationFieldsOf(run: BidPriceRequestRun): NotificationFields =
+/**
+ * 알림 요청 축과 **알림함 기록 결과**. [inbox] 가 `null` 인 것은 **포트를 부르지 않았다**는
+ * 뜻이다 — 이 요청에 계정 주체가 없어서다(자격 헤더 경로). 「불렀는데 실패했다」와 구조로 갈린다:
+ * 전자는 호출 자체가 없고 후자는 포트가 낸 값이다.
+ */
+private fun notificationFieldsOf(
+    run: BidPriceRequestRun,
+    inbox: NotificationInboxOutcome?,
+): NotificationFields =
     NotificationFields(
         wouldNotify = run.wouldNotify(),
-        inboxRecordState = InboxRecordState.NOT_RECORDED_YET.name,
-        inboxRecordNotRecordedReason = InboxRecordNotRecordedReason.INBOX_WRITE_PORT_NOT_MERGED.name,
+        inboxRecordState = inboxRecordStateOf(inbox).name,
+        inboxRecordNotRecordedReason = inboxNotRecordedReasonOf(inbox)?.name,
     )
+
+/** 포트의 결과 → 표시 상태. 소진 `when` 이라 결과 갈래가 늘면 답을 주지 않고는 컴파일되지 않는다. */
+private fun inboxRecordStateOf(inbox: NotificationInboxOutcome?): InboxRecordState =
+    when (inbox) {
+        NotificationInboxOutcome.Created -> InboxRecordState.RECORDED_NEW
+        NotificationInboxOutcome.Updated -> InboxRecordState.RECORDED_UPDATED
+        NotificationInboxOutcome.Failed, null -> InboxRecordState.NOT_RECORDED
+    }
+
+/** 사유는 기록하지 않은 갈래에만 있다 — 기록된 응답에 사유 칸이 서면 화면이 둘을 함께 읽는다. */
+private fun inboxNotRecordedReasonOf(inbox: NotificationInboxOutcome?): InboxRecordNotRecordedReason? =
+    when (inbox) {
+        null -> InboxRecordNotRecordedReason.NO_ACCOUNT_SUBJECT
+        NotificationInboxOutcome.Failed -> InboxRecordNotRecordedReason.INBOX_WRITE_FAILED
+        NotificationInboxOutcome.Created, NotificationInboxOutcome.Updated -> null
+    }
 
 private fun priceAxesFieldsOf(mlOutcome: MlAnalysisOutcome?): PriceAxesFields {
     val mlState = mlAnalysisStateOf(mlOutcome)
