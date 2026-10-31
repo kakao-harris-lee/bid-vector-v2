@@ -72,7 +72,9 @@ if [ -n "$added" ]; then
 fi
 echo "  마이그레이션 차이 0 — 이미지 되돌림으로 충분하다"
 
-args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to")
+# **지금 떠 있다고 본 것을 함께 넘긴다** — 아래에서 잠금을 놓고 exec 하는 사이에 다른 반입이 끝나면
+# `to` 는 낡은 값이 된다. 반입 쪽이 잠금을 다시 쥔 자리에서 이 값을 대조해 멈춘다(v V4-6).
+args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to" --expect-running "$from")
 [ -z "$PROJECT" ] || args+=(--project "$PROJECT")
 [ "$APPLY" -eq 0 ] || args+=(--apply)
 # 잠금을 놓고 넘긴다 — 같은 잠금을 `prod-deploy.sh` 가 다시 잡는다(겹치면 자기 자신에게 막힌다).

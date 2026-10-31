@@ -41,19 +41,20 @@ WAIT_TIMEOUT_S=300
 _die() { echo "prod-deploy: $1" >&2; exit "${2:-1}"; }
 _plan() { echo "  [계획] $*"; }
 
-ENVF="" STATE="" REL="" PROJECT="" APPLY=0 ACCEPT_MISSING_DATA=0
+ENVF="" STATE="" REL="" PROJECT="" APPLY=0 ACCEPT_MISSING_DATA=0 EXPECT_RUNNING=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --env-file) ENVF="${2:-}"; shift 2 ;;
     --state-dir) STATE="${2:-}"; shift 2 ;;
     --release) REL="${2:-}"; shift 2 ;;
     --project) PROJECT="${2:-}"; shift 2 ;;
+    --expect-running) EXPECT_RUNNING="${2:-}"; shift 2 ;;
     --accept-missing-data) ACCEPT_MISSING_DATA=1; shift ;;
     --apply) APPLY=1; shift ;;
     *) _die "알 수 없는 인자: $1" 2 ;;
   esac
 done
-[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--accept-missing-data] [--apply]" 2
+[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--expect-running <태그>] [--accept-missing-data] [--apply]" 2
 for t in docker jq curl stat; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
 
 COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
@@ -145,6 +146,14 @@ pending="$(cat "$STATE/pending" 2>/dev/null || true)"
 # **지금 실제로 떠 있는 release** 는 `current` 가 아니라 `pending` 일 수 있다 — 반입이 `up`·헬스에서
 # 실패하면 컨테이너는 새 release 인데 `current` 는 마지막으로 성공한 것에 머문다(v H-2 실측).
 RUNNING_REL="${pending:-$current}"
+
+# **되돌림이 본 것과 지금이 같은가.** 되돌림은 from/to 판단을 자기 잠금 안에서 하고 **놓은 뒤** 이
+# 스크립트를 exec 한다 — 그 틈에 다른 반입이 끝나면 낡은 `to` 로 반입하게 된다(v V4-6). 잠금을 다시
+# 쥔 이 자리에서 대조한다. 되돌림만 주는 인자라 운영자가 쓸 일은 없다(주면 제약이 하나 더 걸릴 뿐,
+# 느슨해지는 길은 없다).
+if [ -n "$EXPECT_RUNNING" ] && [ "$EXPECT_RUNNING" != "${RUNNING_REL:-}" ]; then
+  _die "되돌림이 본 것(${EXPECT_RUNNING})과 지금 떠 있는 것(${RUNNING_REL:-없음})이 다르다 — 그 사이에 다른 반입이 끝났다. 되돌림을 다시 돌려 대상을 새로 정한다" 2
+fi
 
 # 컨테이너는 있는데 볼륨 조회가 비었다 — 둘 중 하나가 거짓이다. 추측하지 않고 멈춘다.
 if [ -n "$pg_cid_any" ] && [ -z "$pg_vol" ]; then
