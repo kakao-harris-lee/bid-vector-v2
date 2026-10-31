@@ -138,6 +138,14 @@
 태우지 않았으므로(fake KONEPS 두 base · operation 다섯 · 러너 둘) 나머지 여섯과 잠정 축 넷은 **vitest 로
 전수** 잠그고 여정은 `NOT_OPENED_YET` 한 갈래를 대조한다 — 후속 `OPEN-7E3A-OPENING-AXIS-HARNESS`.
 
+**화면 전반의 표시 어휘 두 축이 열려 있다**(M7/7E-3b r2 등재). **`OPEN-7E3B-TIME-DISPLAY`** —
+시각이 UTC ISO 원문이고 마이크로초까지 보인다. 저장소에 시각 서식 함수가 없고 워크시트·타임라인·
+알림함이 모두 같은 꼴이라 화면 하나만 바꾸면 새 비일관이 생긴다(KST 변환·초 절삭은 화면 전반의
+일). **`OPEN-7E3B-MONEY-TOKEN-DISPLAY`** — 금액 부속 토큰(`BASE_AMOUNT` · `PUBLISHED` · 과세)이
+화면 B 카드와 화면 C 머리에서 원문으로 선다. 7E-3b 가 과세를 **화면 E 카드와 화면 C 입력
+선택지**까지 표로 태웠고 그 밖은 남았다 — 그래서 화면 C 안에서 같은 축이 두 말로 보인다.
+둘 다 **다음 화면 정리 slice** 의 일이고, 그때 활용사례 캡처를 다시 찍는다.
+
 **대사 축의 판정 불가 사유도 하네스에서 한 갈래다**(M7/7E-3b 착수 실측): 개찰 축이 수집되지 않아 답이
 `NOT_OPENED_YET` 이고 커널 축(낙찰자 상호)에 닿지 않는다. 운영 환경의 답으로 예상되는
 `WINNER_NAME_NOT_PUBLISHED`(`OPEN-SET01-AWARD-NAME-INGEST`)는 **저장소 안에서 잴 수 없다** — 그래서
