@@ -284,7 +284,9 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
 ```
 
-직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스.
+직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스. 그때 「되돌림이 보았던
+떠 있는 release」를 `--expect-running` 으로 함께 넘기고, 반입이 잠금을 다시 쥔 자리에서 대조해 그 사이 다른
+반입이 끝났으면 멈춘다. **되돌림이 자동으로 넘긴다 — 운영자가 손으로 줄 일은 없다.**
 
 > 반입·되돌림·**주기 러너**(§9)는 **프로젝트와 상태 디렉터리에 잠금**을 건다. 그래서 반입이 도는 동안에는
 > dry-run 도 `exit 2` 로 거절된다 — 그때 「지금 무엇이 떠 있나」는 `cat /var/lib/bidvector-v2/current`(그리고
@@ -440,10 +442,11 @@ journalctl -u bidvector-notification-sweep -n 50
 ### 9.4 실패 감지
 
 종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 여기에
-`tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**가 더해진다: 반입 기록이 없거나 손상됐다 · 끝나지 않은
-반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · 반입·되돌림이 도는 중이다. **`3` 은
-앱 장애가 아니라 스택 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다. 외부 발송이 없으므로
-**journal 이 유일한 창구**다. 주기 확인:
+`tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**가 더해진다: env 파일을 읽지 못했다 · compose 판이
+하한 미만이다 · 잠금을 열지 못했거나 반입·되돌림·다른 훑기가 도는 중이다 · 반입 기록이 없거나 손상됐다 ·
+끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · app 설정 통로가 기대와
+다르다. **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
+외부 발송이 없으므로 **journal 이 유일한 창구**다. 주기 확인:
 
 ```bash
 # 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가

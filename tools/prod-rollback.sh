@@ -61,6 +61,12 @@ else
   echo "== 되돌림 ${from} → ${to}"
 fi
 
+# 상태 파일에서 읽은 값이다 — 경로·이미지 참조로 넘기기 전에 모양을 본다(CR L-1, 러너와 같은 술어).
+for _t in "$from" "$to"; do
+  _prod_valid_tag "$_t" || _die "상태 파일의 release 태그 모양이 아니다: ${_t} — ${STATE} 의 기록이 손상됐다" 2
+done
+unset _t
+
 added="$(_prod_migrations_lost "$STATE" "$from" "$to")" \
   || _die "manifest 를 읽지 못했다(떠 있는 것 ${from} · 가려는 것 ${to})" 2
 if [ -n "$added" ]; then

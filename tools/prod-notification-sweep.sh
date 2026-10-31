@@ -19,7 +19,8 @@
 # 옮겼거나 태그가 로컬에 없으면 **훑지 않는다**(v V4-2).
 #
 # 종료 코드: 러너의 것을 그대로 돌려준다(0 완료 · 1 예외 · 2 적지 못한 알림) · 3 이 스크립트의 전제
-# 실패(반입 기록 없음·손상 · 끝나지 않은 반입 · manifest 부재 · 태그 ID 불일치).
+# 실패(env 파일 · compose 판 · 잠금 · 반입 기록 없음·손상 · 끝나지 않은 반입 · manifest 부재 ·
+# 태그 ID 불일치 · app 설정 통로). runbook §9.4 가 같은 목록을 갖는다.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,6 +41,9 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$ENVF" ] && [ -n "$STATE" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> [--project <이름>]" 3
 [ -r "$ENVF" ] || _die "env 파일을 읽지 못했다: $ENVF" 3
+# 아래 `run --pull never` 가 compose 판에 기댄다 — 문턱이 반입에만 있으면 내려앉은 host 에서 「알 수
+# 없는 플래그」의 종료 코드가 러너 자신의 「1 예외」와 섞인다(CR L-7).
+_prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 3
 
 # **반입·되돌림과 같은 잠금 둘을 같은 순서로 잡는다**(`tools/prod-env.sh`). 잠금 없이 상태를 읽던
 # 앞 판은, 반입이 백업 중이라 아직 `pending` 을 쓰기 전이면 **옛 `current` 로 일회 컨테이너를 띄웠고**

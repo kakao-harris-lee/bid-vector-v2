@@ -34,7 +34,6 @@ cd "$REPO_ROOT"
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
 
-COMPOSE_MIN="2.24.0"
 DISK_MIN_MB=2048
 WAIT_TIMEOUT_S=300
 
@@ -48,13 +47,18 @@ while [ "$#" -gt 0 ]; do
     --state-dir) STATE="${2:-}"; shift 2 ;;
     --release) REL="${2:-}"; shift 2 ;;
     --project) PROJECT="${2:-}"; shift 2 ;;
+    # 되돌림이 자동으로 넘기는 인자다(runbook §7.1) — 운영자가 손으로 줄 일은 없어 사용법에서 뺐다.
     --expect-running) EXPECT_RUNNING="${2:-}"; shift 2 ;;
     --accept-missing-data) ACCEPT_MISSING_DATA=1; shift ;;
     --apply) APPLY=1; shift ;;
     *) _die "알 수 없는 인자: $1" 2 ;;
   esac
 done
-[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--expect-running <태그>] [--accept-missing-data] [--apply]" 2
+[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--accept-missing-data] [--apply]" 2
+# 이 값은 아래에서 **경로**(`<state>/releases/<태그>.manifest`)와 **이미지 참조**와 compose 보간으로
+# 간다 — 쓰기 전에 모양을 본다. 오늘은 뒤의 manifest 읽기가 fail-closed 지만, preflight 순서가 한 번
+# 바뀌면 그 보호가 사라진다(CR L-1). 되돌림이 상태 파일에서 읽어 넘기는 값도 이 자리를 지난다.
+_prod_valid_tag "$REL" || _die "release 태그 모양이 아니다: ${REL}" 2
 for t in docker jq curl stat; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
 
 COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
@@ -93,10 +97,8 @@ _prod_images_match "$MAN" "$REL" || _die "$_PROD_IMAGE_ERR" 1
 if grep -qx 'vuln=not-run' "$MAN"; then echo "  경고: 이 release 는 취약점 게이트를 돌리지 않았다(vuln=not-run)"; fi
 echo "  manifest: 이미지 ${#BIDVECTOR_PROD_SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
 
-# compose 판
-cv="$(docker compose version --short 2>/dev/null | sed 's/^v//')"
-[ -n "$cv" ] || _die "docker compose 판을 읽지 못했다" 2
-[ "$(printf '%s\n%s\n' "$COMPOSE_MIN" "$cv" | sort -V | head -n1)" = "$COMPOSE_MIN" ] || _die "compose ${cv} < ${COMPOSE_MIN} — !override 를 모른다" 1
+# compose 판 — 문턱은 `tools/prod-env.sh` 가 한 자리로 갖는다(러너도 같은 것을 본다).
+_prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 1
 
 # 해석 · 프로젝트 · 포트
 cfg="$("${COMPOSE[@]}" config --format json 2>/dev/null)" || _die "운영 compose 를 해석하지 못했다" 1
@@ -217,8 +219,11 @@ app_jdbc="$(printf '%s' "$cfg" | jq -r '.services.app.environment.BIDVECTOR_PERS
 [ -n "$app_jdbc" ] || _die "app 의 JDBC URL 을 읽지 못했다(판정 불가)" 2
 want_jdbc="jdbc:postgresql://${PG_SERVICE}:${PG_PORT}/${PG_DB}"
 if [ "$app_jdbc" != "$want_jdbc" ]; then
-  # 쿼리 매개변수에는 자격이 실릴 수 있다(`?user=…&password=…`) — 문면에 축어로 옮기지 않는다.
+  # 자격이 실릴 수 있는 두 자리를 **둘 다** 가린다 — 쿼리 매개변수와 authority(`//사용자:암호@호스트`).
+  # 앞 판은 `?` 뒤만 덮어서, `?` 가 없는 authority 꼴은 축어 그대로 stderr·journal 에 남았다(CR L-3).
+  # 이 문면은 운영자가 티켓·채팅에 그대로 복붙하는 자리다.
   shown="${app_jdbc%%\?*}"; [ "$shown" = "$app_jdbc" ] || shown="${shown}?<매개변수 생략>"
+  case "$shown" in *@*) shown="jdbc:postgresql://<자격 생략>@${shown#*@}" ;; esac
   _die "app 의 JDBC URL 이 기대 형태와 다르다(${shown} ≠ ${want_jdbc}) — 가드는 이 compose 의 ${PG_SERVICE} 를 읽는다. 호스트·포트·DB·쿼리 매개변수가 모두 같아야 둘이 같은 자리를 본다(판정 불가)" 2
 fi
 

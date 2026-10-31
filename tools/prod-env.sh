@@ -54,6 +54,27 @@ fi
 # release 가 싣는 이미지 넷 — 반입·되돌림·훑기·release 가 **같은 집합**을 본다.
 BIDVECTOR_PROD_SERVICES=(app web proxy ml-serving)
 
+# compose 의 하한 — `!override` 와 `run --pull` 을 아는 판. 문턱이 반입에만 있던 앞 판은 **러너 단독
+# 경로에 문턱이 없었고**, 내려앉은 host 에서 `--pull` 이 「알 수 없는 플래그」로 죽으면 그 종료 코드가
+# 러너 자신의 「1 예외」와 섞여 journal 에서 앱 장애로 보였다(CR L-7 — V4-4 가 닫은 것과 같은 혼동 축).
+BIDVECTOR_PROD_COMPOSE_MIN="2.24.0"
+
+# 어긋나면 1 과 `_PROD_COMPOSE_VER_ERR`.
+_prod_compose_version_ok() {
+  local cv
+  _PROD_COMPOSE_VER_ERR=""
+  cv="$(docker compose version --short 2>/dev/null | sed 's/^v//')"
+  if [ -z "$cv" ]; then
+    _PROD_COMPOSE_VER_ERR="docker compose 판을 읽지 못했다"
+    return 1
+  fi
+  if [ "$(printf '%s\n%s\n' "$BIDVECTOR_PROD_COMPOSE_MIN" "$cv" | sort -V | head -n1)" != "$BIDVECTOR_PROD_COMPOSE_MIN" ]; then
+    _PROD_COMPOSE_VER_ERR="compose ${cv} < ${BIDVECTOR_PROD_COMPOSE_MIN} — !override 와 run --pull 을 모른다"
+    return 1
+  fi
+  return 0
+}
+
 BIDVECTOR_PROD_COMPOSE=(docker compose)
 for _f in "${BIDVECTOR_PROD_COMPOSE_FILES[@]}"; do
   BIDVECTOR_PROD_COMPOSE+=(-f "$_f")
@@ -138,6 +159,9 @@ _prod_images_match() {
       return 1
     fi
   done
+  # 통과를 루프 마지막 `if` 의 암묵 반환에 맡기지 않는다 — 루프 끝에 0 이 아닐 수 있는 명령이 하나
+  # 들어오면 함수가 **조용히 1** 이 되고 `_PROD_IMAGE_ERR` 는 빈 채라, 호출자가 사유 없는 거절을 찍는다.
+  return 0
 }
 
 # **잠금의 자리는 환경에서 오지 않는다 — 고정 절대 경로다.** 앞 판은 `${TMPDIR:-/tmp}` 였고, `TMPDIR`
