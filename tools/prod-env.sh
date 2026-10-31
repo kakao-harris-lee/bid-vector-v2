@@ -51,12 +51,45 @@ if [ -z "$BIDVECTOR_PROD_PROJECT" ]; then
   return 2 2>/dev/null || exit 2
 fi
 
+# release 가 싣는 이미지 넷 — 반입·되돌림·훑기·release 가 **같은 집합**을 본다.
+BIDVECTOR_PROD_SERVICES=(app web proxy ml-serving)
+
 BIDVECTOR_PROD_COMPOSE=(docker compose)
 for _f in "${BIDVECTOR_PROD_COMPOSE_FILES[@]}"; do
   BIDVECTOR_PROD_COMPOSE+=(-f "$_f")
 done
 BIDVECTOR_PROD_COMPOSE+=(-p "$BIDVECTOR_PROD_PROJECT")
 unset _f
+
+# release 태그의 모양 — `tools/prod-release.sh` 가 만들 수 있는 집합과 같다. 상태 파일에서 읽은 값을
+# 경로·이미지 참조로 쓰기 전에 이것으로 거른다. 손상된 `current` 가 **compose 의 이미지 조회까지**
+# 흘러가 거기서 exit 1 로 끝나던 길을 앞에서 끊는다(v V4-4 — 러너 자신의 「예외(1)」와 구별되지 않았다).
+_prod_valid_tag() {
+  [[ "${1:-}" =~ ^[a-z0-9][a-z0-9._-]{0,62}$ ]] && [ "$1" != local ]
+}
+
+# <manifest 경로> <태그> → 이미지 넷의 **현재 태그 ID 가 manifest 와 같은가.** 다르면 1 과 함께
+# `_PROD_IMAGE_ERR` 에 사유를 둔다(종료 코드는 호출자마다 다르므로 끊는 것은 호출자가 한다).
+#
+# 반입 preflight 에만 있던 앞 판은 **주기 러너가 이 불변식을 거치지 않았다** — 누가 태그를 옮기면
+# 반입은 멈추는데 러너는 옮겨진 이미지를 운영 DB 자격과 함께 띄웠다(v V4-2 실측).
+_prod_images_match() {
+  local man="$1" tag="$2" svc want have
+  _PROD_IMAGE_ERR=""
+  for svc in "${BIDVECTOR_PROD_SERVICES[@]}"; do
+    # 매치 0 을 실패로 올리지 않는다 — 그러면 아래 「ID 가 없다」 문면에 닿지 못하고 조용히 죽는다.
+    want="$({ grep -E "^image\.${svc}=" "$man" || true; } | cut -d= -f2-)"
+    if [ -z "$want" ]; then
+      _PROD_IMAGE_ERR="manifest 에 ${svc} 이미지 ID 가 없다: ${man}"
+      return 1
+    fi
+    have="$(docker image inspect "bidvector/${svc}:${tag}" --format '{{.Id}}' 2>/dev/null || true)"
+    if [ "$have" != "$want" ]; then
+      _PROD_IMAGE_ERR="bidvector/${svc}:${tag} 의 ID 가 manifest 와 다르다(없거나 태그가 옮겨졌다)"
+      return 1
+    fi
+  done
+}
 
 # **잠금의 자리는 환경에서 오지 않는다 — 고정 절대 경로다.** 앞 판은 `${TMPDIR:-/tmp}` 였고, `TMPDIR`
 # 이 서로 다른 두 셸은 **다른 파일을 잠갔다** — 같은 프로젝트의 동시 반입이 환경 문자열 하나로 다시

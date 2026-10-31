@@ -34,7 +34,6 @@ cd "$REPO_ROOT"
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
 
-SERVICES=(app web proxy ml-serving)
 COMPOSE_MIN="2.24.0"
 DISK_MIN_MB=2048
 WAIT_TIMEOUT_S=300
@@ -87,14 +86,11 @@ echo "  env 파일: 저장소 밖 · 0600 · 키 집합 등식"
 # manifest 와 이미지
 MAN="$STATE/releases/${REL}.manifest"
 [ -r "$MAN" ] || _die "release manifest 가 없다: ${REL} — tools/prod-release.sh 먼저" 1
-for svc in "${SERVICES[@]}"; do
-  want="$(grep -E "^image\.${svc}=" "$MAN" | cut -d= -f2-)"
-  [ -n "$want" ] || _die "manifest 에 ${svc} 이미지 ID 가 없다" 1
-  have="$(docker image inspect "bidvector/${svc}:${REL}" --format '{{.Id}}' 2>/dev/null || true)"
-  [ "$have" = "$want" ] || _die "bidvector/${svc}:${REL} 의 ID 가 manifest 와 다르다(없거나 태그가 옮겨졌다)" 1
-done
+# 같은 술어를 주기 러너도 쓴다(`tools/prod-env.sh`) — 반입만 보던 앞 판은 러너가 옮겨진 태그를
+# 그대로 띄웠다(v V4-2).
+_prod_images_match "$MAN" "$REL" || _die "$_PROD_IMAGE_ERR" 1
 if grep -qx 'vuln=not-run' "$MAN"; then echo "  경고: 이 release 는 취약점 게이트를 돌리지 않았다(vuln=not-run)"; fi
-echo "  manifest: 이미지 ${#SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
+echo "  manifest: 이미지 ${#BIDVECTOR_PROD_SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
 
 # compose 판
 cv="$(docker compose version --short 2>/dev/null | sed 's/^v//')"
