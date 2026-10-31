@@ -15,8 +15,8 @@ main 이 더 들어오면 되돌림이 남의 것까지 지운다.
 
 기준을 **현재 main 하나**로 두면 그 갈래가 사라진다. 실측으로 안전하다:
 
-- 이 slice 가 바꾼 경로 **36** 개 가운데 main 도 바꾼 것은 **1** 개다.
-- 나머지 **35** 개는 `003ec91d` 와 `9463f6e1` 이 **바이트까지 같다**
+- 이 slice 가 바꾼 경로 **38** 개 가운데 main 도 바꾼 것은 **1** 개다.
+- 나머지 **37** 개는 `003ec91d` 와 `9463f6e1` 이 **바이트까지 같다**
   (`git diff --quiet 003ec91d 9463f6e1 -- <경로>` 가 전부 종료 0). 그래서 착수 base 에서 복원하는
   것과 결과가 같다.
 
@@ -24,17 +24,18 @@ main 이 더 들어오면 되돌림이 남의 것까지 지운다.
 
 ```
 git restore --source=9463f6e1 --staged --worktree -- <아래 「수정」 18개>
-git rm -f --                                         <아래 「신규」 18개>
+git rm -f --                                         <아래 「신규」 20개>
 ```
 
 경로는 **개별 인자**다. evidence(`reports/evidence/m7/7c5b/**`)는 목록에 **없다** — 되돌림의 기록이
 자신을 지울 수 없다.
 
-## 신규 18 — 지운다
+## 신규 20 — 지운다
 
 - `adapters/src/main/kotlin/bidvector/adapters/result/JdbcMyBidResultViews.kt`
 - `adapters/src/main/kotlin/bidvector/adapters/result/MyBidResultSql.kt`
 - `adapters/src/test/kotlin/bidvector/adapters/result/JdbcMyBidResultViewTest.kt`
+- `adapters/src/test/kotlin/bidvector/adapters/result/MyBidResultDbFixture.kt`
 - `app/src/main/kotlin/bidvector/app/http/ConfirmedAwardFields.kt`
 - `app/src/main/kotlin/bidvector/app/http/MyBidResultController.kt`
 - `app/src/main/kotlin/bidvector/app/http/MyBidResultResponses.kt`
@@ -42,6 +43,7 @@ git rm -f --                                         <아래 「신규」 18개>
 - `app/src/test/kotlin/bidvector/app/http/FakeMyBidResultPorts.kt`
 - `app/src/test/kotlin/bidvector/app/http/MyBidResultEndpointTest.kt`
 - `app/src/test/kotlin/bidvector/app/http/OpenApiMyBidResultContractTest.kt`
+- `app/src/test/kotlin/bidvector/app/wiring/ProfileWiringTradeNameTest.kt`
 - `workflow/src/main/kotlin/bidvector/workflow/result/AwardGap.kt`
 - `workflow/src/main/kotlin/bidvector/workflow/result/MyBidResultPorts.kt`
 - `workflow/src/main/kotlin/bidvector/workflow/result/MyBidResultTally.kt`
