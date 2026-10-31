@@ -70,6 +70,27 @@ verifier 가 찾아 이 레인이 **재현한 뒤**(통제군 79 passed → 변�
 더해 붉게 만들었다. R4 는 첫 시도가 없는 식별자를 써 **컴파일 실패**(45 failed)였으므로, props
 로 넘겨 **컴파일되는 꼴**로 다시 재서 1 failed 를 얻었다 — 빌드 0 은 거동 0 이 아니다.
 
+## 고침마다 RED → GREEN 과 **재현 명령** (팀장 지시 2026-10-31)
+
+명령은 전부 `web/` 에서, 변이는 **버릴 clone**(`git clone --no-hardlinks`)에서 한 번에 하나씩
+적용하고 되돌렸다. 「고치기 전 RED」는 **그 변이가 초록이었다**는 뜻이다(단언이 없던 자리).
+
+| 고침 | 고치기 전 | 고친 뒤 | 재현 |
+| --- | --- | --- | --- |
+| 못 읽음을 「없다」로 접기 | 667 passed(초록) | **exit 1 · 1 failed** | `ResultsScreen.tsx` 의 `return { kind: 'FAILED' };` → `'MISSING'` · `npx vitest run` |
+| 두 시각 칸이 서로의 값 | 79 passed(초록) | **exit 1 · 1 failed** | `ResultCard.tsx` 의 `at={result.submittedAt}` → `result.confirmedAt` · `npx vitest run` |
+| 확정 낙찰가 과세 둘 미잠금 | 667 passed(초록) | **exit 1 · 2 failed** | `ResultCard.tsx` 의 `parts` 두 자리에서 `vatTreatmentDisplayOf(value.vatTreatment).label` → `value.vatTreatment` · `npx vitest run` |
+| 「한 출처」가 값 대조뿐 | 667 passed(초록) | **exit 1 · 1 failed** | `WorksheetRecord.tsx` 의 `VAT_CHOICES` 를 **같은 문면** 손 리터럴 셋으로 · `npx vitest run` |
+| 중복 `caseId` 를 골라 그림 | — | **exit 1 · 1 failed** | `ResultsScreen.tsx` 의 `rows.length === 1 ? … : AMBIGUOUS` → `{ kind: 'FOUND', result: rows[0]! }` |
+| 내 기록 두 출처 접기 | — | **exit 1 · 1 failed** | `MyBidSection` 에 `headState` props 를 넘겨 `result.recordedState` 대신 그린다 |
+| 과세를 원문 토큰으로(투찰가) | — | **exit 1 · 1 failed** | `submitted-amount` 자리의 `vatTreatmentDisplayOf(...).label` → 응답 값 |
+| 입력 폼 라벨을 **다른** 문면으로 | — | **exit 1 · 1 failed** | `VAT_CHOICES` 의 한 라벨만 바꾼다 |
+| 양성 표지를 화면 표지로 | **exit 0**(12 장이 빈 탭으로 찍혔다) | **exit 1 · 하네스 뜨기 전 거부** | `SCREENS` 의 `d-bid-box` 를 `path:'/bids'` · `positive: () => ({ testId: 'screen-bid-box' })` 로 · `node e2e/capture/usecase-captures.mjs` |
+| 개인정보 술어가 보이는 글만 | — | **exit 1 · `a-start-desktop` 에서 멈춤** | 탐지 문자열 묶음의 **로그인 이름 칸**을 `'SEOUL'` 로(보이는 글엔 「서울」, `select` 의 value 로만 있는 값) |
+| 실패한 재실행이 산출물 삭제 | — | **13 파일 보존** | 위 대조 실행 뒤 `sha256sum -c` · `ls docs/usecase/captures | wc -l` |
+
+통제군은 각각 **79 · 91 · 148 · 667 · 673 passed**(범위가 자란 차례대로)이다.
+
 ## acceptance — `ci.yml` `web` job 명령 그대로 + Kotlin
 
 | step | 명령 | exit | 핵심 결과 |
@@ -78,7 +99,7 @@ verifier 가 찾아 이 레인이 **재현한 뒤**(통제군 79 passed → 변�
 | W-3 | `npm run typecheck` | 0 | |
 | W-4 | `npm run gate:src-tree` | 0 | 컴파일 경계 전제 성립 |
 | W-5 | `npm run api:types:check` | 0 | 생성 타입이 OpenAPI 와 바이트 동일 |
-| W-6 | `npm run test` | 0 | **33 파일 · 667 passed** |
+| W-6 | `npm run test` | 0 | **34 파일 · 673 passed** |
 | W-7 | `npm run gate:tests` | 0 | 등록부 전부 통과 · skipped/todo 0 |
 | W-8 | `npm run build` | 0 | |
 | W-9 | `npm run gate:boundary-canary` | 0 | |
@@ -101,6 +122,7 @@ Kotlin 쪽은 이 slice 가 한 줄도 바꾸지 않지만 계약이 요구하�
 | 5 | 0 | 12 장 · 합 1,027,409 — manifest 의 HEAD 가 그때 HEAD 와 일치 |
 | 6 | 0 | **최종** · 12 장 · 합 **956,016** · 최대 **140,453**. 화면 D 가 그 건의 탭, A 가 4/8 채워진 상태, B 가 검색 결과 |
 | 7 | 1 | **양성 대조** — 보이는 글에는 「서울」로 나오고 `select` 의 value 로만 있는 `SEOUL` 을 탐지 문자열로 심자 `a-start-desktop` 에서 멈췄다(앞 판 술어라면 지나갔다). 같은 실행에서 **커밋된 13 개 파일이 그대로 남은 것**도 확인 — 스테이징 교체가 선다 |
+| 8 | 0 | **최종** · 12 장 · 합 **954,109** · 최대 **140,241**. 새 표지(내용이 닿아야 서는 것)로 통과했고 manifest 의 `head` 가 현재 HEAD 와 **일치**한다(스크립트가 더러운 `web/` 을 거부한다). 크기 칸이 뷰포트와 **IHDR 실측** 으로 갈렸다 |
 
 회차 1 의 결함이 상한·개인정보 단언을 모두 지나갔다는 것이 **양성 표지**를 만든 근거인데, r1
 에서 그 표지가 **화면 하나에만** 걸려 있어 화면 D 가 빈 탭인 채 같은 길로 지나갔다. 이제
@@ -118,7 +140,7 @@ Kotlin 쪽은 이 slice 가 한 줄도 바꾸지 않지만 계약이 요구하�
 | `git status --porcelain -- <in_scope 개별 인자>` | **빈 출력** |
 | 양성 대조(비파괴 절삭 — `checkout --` 를 쓰지 않았다) | 심은 뒤 ` M` 한 줄 · 되돌린 뒤 빈 출력 |
 | 참조형 스캔(`-f config/quality/leak-patterns.txt`) · evidence 디렉터리 | exit 1 = 통과 |
-| 같은 스캔 · 산출물 경로 | **7 건** — 캡처 스크립트의 **부재 단언이 쓰는 지역 식별자와 그 전달 자리** 다섯, 과세 표시 함수의 **enum 값 인자 이름** 둘. 값 리터럴은 0 이고 일회 값은 실행 시각에 하네스 맥락에서 읽는다. 루트 게이트의 스캔 대상이 evidence 뿐인 사유(「유출 방어 코드와 도메인 어휘가 이 축과 겹친다」)에 해당하는 자리다 — 스캐너를 피하려 이름을 바꾸지 않았다(저장소가 enum 값을 그 말로 부른다) |
+| 같은 스캔 · 산출물 경로 | **7 건**(r2 뒤에도 같다) — 캡처 스크립트의 **부재 단언이 쓰는 지역 식별자와 그 전달 자리** 다섯, 과세 표시 함수의 **enum 값 인자 이름** 둘. 값 리터럴은 0 이고 일회 값은 실행 시각에 하네스 맥락에서 읽는다. 루트 게이트의 스캔 대상이 evidence 뿐인 사유(「유출 방어 코드와 도메인 어휘가 이 축과 겹친다」)에 해당하는 자리다 — 스캐너를 피하려 이름을 바꾸지 않았다(저장소가 enum 값을 그 말로 부른다) |
 | 캡처 PNG 에 하네스 로그인 이름 축어 | **0 파일** |
 | 문서·스크립트의 사업자번호 꼴 | **0 건** |
 

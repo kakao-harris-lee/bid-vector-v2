@@ -1,6 +1,6 @@
 # M7/7E-3b 되돌림
 
-**실측 HEAD: `45afd981`**(이 slice 의 마지막 산출물 커밋 — 라운드마다 재산출·재실측한다). 이
+**실측 HEAD: `a4af7fa8`**(이 slice 의 마지막 산출물 커밋 — 라운드마다 재산출·재실측한다). 이
 뒤의 커밋은 evidence 뿐이고 **복원 목록 안의 경로를 건드리지 않는다** — 유효성 확인은 §4.
 
 복원 기준 **`ac806a51`**(main, PR #109 7C⑤-b 머지). 전제 「그 SHA 에 이 slice 없음」: 이 브랜치의
@@ -20,12 +20,12 @@
 git diff --name-status ac806a51..HEAD | grep -v $'\t'reports/evidence/
 ```
 
-**35 경로 = 복원(M) 14 + 삭제(A) 21.** `reports/evidence/m7/7e3b/**` 는 되돌림 대상이 아니다
+**37 경로 = 복원(M) 15 + 삭제(A) 22.** `reports/evidence/m7/7e3b/**` 는 되돌림 대상이 아니다
 (그 안의 `scope.md` 는 팀장 파일이다).
 
-| 복원(M) 14 |
+| 복원(M) 15 |
 | --- |
-| `docs/discovery/m7-screen-data-requirements.md` |
+| `docs/discovery/m7-screen-data-requirements.md` · `.gitignore` |
 | `web/config/gate-tests.txt` · `web/package.json` |
 | `web/e2e/journey/results.spec.ts` |
 | `web/src/api/approvedOperations.ts` · `queries.ts` · `queryKeys.ts` |
@@ -33,18 +33,23 @@ git diff --name-status ac806a51..HEAD | grep -v $'\t'reports/evidence/
 | `web/src/screens/ResultCard.tsx` · `ResultsScreen.tsx` · `ResultsScreen.test.tsx` |
 | `web/src/screens/WorksheetRecord.tsx` |
 
-| 삭제(A) 21 |
+| 삭제(A) 22 |
 | --- |
 | `docs/usecase/portal-service-description.md` |
 | `docs/usecase/captures/manifest.json` + **PNG 12 장** |
 | `web/e2e/capture/usecase-captures.mjs` |
 | `web/src/display/moneyDisplay.ts` · `moneyDisplay.test.ts` |
+| `web/scripts/vat-label-source.test.mjs` |
 | `web/src/display/myBidResultDisplay.ts` · `myBidResultDisplay.test.ts` |
 | `web/src/screens/ResultsAggregate.tsx` · `ResultsAggregate.test.tsx` |
 
 `WorksheetRecord.tsx` 는 **화면 C 의 파일**이라 이 slice 가 처음 건드리는 자리다(과세 표를
 한 출처로 모으면서). base 가 머지된 main 의 고정 SHA 이므로 복원 자리는 같고, 이 range 에서
 그 파일을 만진 커밋은 이 slice 의 것 하나뿐이다.
+
+**`.gitignore` 는 계약의 in_scope 목록 밖이다**(r2 에서 새로 든 공유 파일 — 캡처 스테이징
+디렉터리 한 줄). 되돌림은 같은 `restore` 가 받고 이 range 에서 그 파일을 만진 커밋도 이 slice
+것 하나뿐이지만, **in_scope 대조 결과로 보고한다**(수정 라운드가 만든 새 자리의 반복 사각).
 
 **새 바이너리도 삭제 목록 안에 있다** — 캡처 PNG 12 장과 manifest 가 A 로 잡히므로 아래 `git rm`
 이 그것까지 지운다(별도 처리가 필요 없다).
@@ -80,10 +85,10 @@ xargs -a /tmp/rb-added.txt git rm -f --
 | 축 | 결과 |
 | --- | --- |
 | ① 명령 exit | `git restore` **0** · `git rm` **0** |
-| ② 계수 | 복원 **14** · 삭제 **21** · `comm` 양쪽 빈 출력 |
+| ② 계수 | 복원 **15** · 삭제 **22** · `comm` 양쪽 빈 출력 |
 | ③ 트리 동일성 | 작업 트리 vs base **0 줄** · **인덱스** vs base **0 줄** |
 | ④ compile | `tsc --noEmit` exit **0** |
-| ⑤ test | `vitest run` exit **0** — **606 passed**(HEAD 의 667 에서 이 slice 의 61 이 빠진 수) |
+| ⑤ test | `vitest run` exit **0** — **606 passed**(HEAD 의 673 에서 이 slice 의 67 이 빠진 수) |
 | ⑥ 게이트 | `gate:src-tree` **0** · `api:types:check` **0** · `gate:tests` **0** · `gate:boundary-canary` **0** · `eslint --max-warnings 0` **0** |
 
 **갈음은 「HEAD 초록」이 아니라 트리 동일성으로만** 했다 — ③ 의 두 줄이 그것이고, ④⑤⑥ 은 그
@@ -97,7 +102,7 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 것은 **그 사이에 되돌림 대상이 움직였는가**다:
 
 ```
-git diff --name-only 45afd981..<판정 SHA> -- <§1 의 35 경로>
+git diff --name-only a4af7fa8..<판정 SHA> -- <§1 의 37 경로>
 ```
 
 이 출력이 비어 있으면 위 실측이 그대로 유효하다. evidence 커밋은 `reports/evidence/m7/7e3b/**`
