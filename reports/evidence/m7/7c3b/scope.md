@@ -54,3 +54,19 @@
 ## 계약 갱신 이력
 
 - 2026-10-31 착수(팀장) · 운영자 지시 2026-10-31.
+- 2026-10-31 **D-7C3B-7(팀장, 착수 보고 수령 — 개찰·낙찰)**: ⒜ **① 배선 + ③ 판정 유지**. 운영자가 기록한 개찰(`RECORD_OPENING_*`)·결과 전이를
+  알림함에 기록한다 — 실제 전이 사실이라 가짜 원천이 아니고, 나중에 자동 대사가 들어오면 같은 NOTI-10 키로 갱신된다. 다만 **자동 통지가 아니므로**
+  capability map·요구표의 NOTI-04·SET-02 판정은 올리지 않는다(홀더 유지, 「운영자 기록의 되비춤」이라고 문면에 적는다).
+  ⒝ **마이그레이션 0 유지**: detail 어휘에 유찰이 없으므로 `FAILED_OR_REBID` 결과는 **알림을 기록하지 않는다**(`NOT_AWARDED` 로 접지 않는다) —
+  `OPEN-7C3B-FAILED-BID-DETAIL` 로 등재(어휘 확장은 V-마이그레이션이라 되돌리기 어려운 경로 — 별도 결정).
+- 2026-10-31 **D-7C3B-8(팀장 — 시간 기반 장치)**: 새 상주 스케줄러가 아니라 **기존 일회 러너 패턴의 여덟째**(`bidvector.notification-sweep.mode=once`,
+  `RetentionRunner` 선례)로 마감 D-1/D-0 · 서류 D-2 · 공고 개정 넷을 훑는다. 창 폭은 versioned 정책 데이터, 해소 실패는 기동 실패. **운영 host 의 cron 등록은
+  이 slice 밖**(운영 반입은 별도 승인 — 7F) — runbook 에 항목만 적는다. `DeadlineSettlement` 읽기 시 정산에 얹지 않는다(읽기가 쓰기를 낳고 순환이다).
+- 2026-10-31 **D-7C3B-9(팀장 — 원자성 · 투찰가 요청)**: 원천 커밋 뒤 best-effort, `Failed` 는 원천을 되돌리지 않고 표지·계수로(착수 보고 §3 그대로).
+  `inboxRecordState` 는 `RECORDED_NEW`·`RECORDED_UPDATED`·`NOT_RECORDED`, 사유 `NO_ACCOUNT_SUBJECT`·`INBOX_WRITE_FAILED` — `INBOX_WRITE_PORT_NOT_MERGED`
+  제거. `AccountCarrierStructureTest.ACCOUNT_READERS` 에 넷째 분류(「계정이 있으면 쓴다」)를 주석과 함께 등재.
+- 2026-10-31 **D-7C3B-10(팀장 — in_scope 추가)**: ⒞ `web/src/display/worksheetDisplay.ts` · `web/src/display/worksheetDisplay.test.ts`(생성 타입 어휘가
+  늘어 손 코드 표가 따라가야 한다). §8 **`web/e2e/journey/results.spec.ts` 의 알림함 단언 블록**(빈 얼굴 + 배지 0) — 이 slice 가 소유해 **같은 실행의
+  `GET /api/notifications` 응답과 DOM 대조**로 바꾼다(여정 ③ 의 투찰가 요청 · 여정 ⑤ 의 개찰·결과 항목이 그 응답에 서는 것을 단언, 개수는 응답에서).
+  7E-3b 는 그 블록을 만지지 않는다(나중 머지 쪽이 main 병합). 요구표 「알림함」 절의 「하나도 발화하지 않는다」 문단도 고친다.
+- 2026-10-31 **D-7C3B-11(팀장 — 리뷰 레인)**: 마이그레이션 0 이므로 `migration-reviewer`·Codex 대상 아님. `NEW_CANDIDATE` 는 OPEN 유지(STR-08 원천 없음).
