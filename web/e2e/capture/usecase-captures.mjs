@@ -13,7 +13,7 @@
 // 아니다(지우기 전에 프로세스가 죽으면 파일이 남는다).
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,57 +56,118 @@ const SECOND_NOTICE = 'SYN-7E2-BIDBOX';
  * 찍는 화면 여섯. **설정은 없다**(D-7E3b-10) — 「화면 다섯 + 알림함」 밖이고 프로필 화면은
  * 사업 정보 표면이라 캡처 대상으로 두지 않는다.
  *
- * **항목마다 `positive` 가 필수다**(r1 CR H-2). `ready` 는 「화면이 섰다」일 뿐 **빈 얼굴에도
- * 오류 얼굴에도 선다** — 실제로 화면 D 가 빈 탭인 채 상한·개인정보 술어·`ready` 를 모두 지나
- * 커밋됐다(r1 H-1). `positive` 는 **내용이 닿았을 때만** 서는 표지이고, 없으면 아래 단언이
- * 스크립트를 거부한다(다음 화면이 추가될 때 같은 빈틈이 생기지 않게).
+ * 항목마다 셋이 필수다 — `ready`(화면이 섰다) · `positive`(**내용이 닿았다**) ·
+ * `faces`(내용 없이도 서는 얼굴들). 아래 적재 시점 검사가 **`positive` 가 그 둘 중 어느 것과도
+ * 같지 않음**을 강제한다(r2 CR M-2 · v L-1).
  *
- * 알림함의 `positive` 가 **빈 얼굴**인 것이 정직한 선택이다 — 트리거가 오늘 발화하지 않으므로
- * 「항목이 있다」가 아니라 「빈 얼굴이 섰다」가 이 화면의 내용이다(서비스 설명 §5 와 같은 사실).
+ * 그 강제가 필요한 이유는 실측이다: r1 에서 `positive` 를 **필수**로 만들었는데도 고른 표지
+ * 둘이 빈 얼굴에서도 서서(`onboarding-items` 는 0/8 에서도, `worksheet-title` 은 공고만 떠도)
+ * 빈틈이 남았고, `positive` 를 `ready` 와 같은 값으로 두는 우회가 **exit 0** 이었다.
+ *
+ * 알림함만 `positive` 가 빈 얼굴이다 — 오늘 트리거가 발화하지 않으므로 「빈 얼굴이 섰다」가
+ * 이 화면의 내용이고, 그래서 `faces` 에서 그것을 뺀다(`InboxScreen.test.tsx` 가 적재 중·오류에
+ * 그 얼굴이 **서지 않음**을 단언하므로 표지로서 유효하다).
  */
 const SCREENS = [
-  { id: 'a-start', path: '/start', ready: 'screen-onboarding', positive: () => 'onboarding-items' },
-  { id: 'b-notices', path: '/', ready: 'screen-home', positive: () => `notice-card-${NOTICE}` },
+  {
+    id: 'a-start',
+    path: '/start',
+    ready: 'screen-onboarding',
+    // 씨앗이 닿아야 **완료**가 된다 — 체크리스트 `<ol>` 자체는 0/8 에서도 선다(r2 CR M-2).
+    positive: () => ({ testId: 'onboarding-state-TRADE_NAME', hasText: '완료' }),
+    faces: ['onboarding-loading', 'onboarding-error'],
+  },
+  {
+    id: 'b-notices',
+    path: '/',
+    ready: 'screen-home',
+    positive: () => ({ testId: `notice-card-${NOTICE}` }),
+    faces: ['notices-loading', 'notices-error', 'notices-empty'],
+  },
   {
     id: 'c-worksheet',
     path: `/notices/${NOTICE}/000`,
     ready: 'screen-worksheet',
-    positive: () => 'worksheet-title',
+    // **그 건이 있어야만** 서는 칸이다(`bidCase === undefined` 면 안 그린다) — 공고만 떠서는
+    // 서지 않는다. `worksheet-title` 은 공고 하나로 서므로 표지가 못 된다.
+    positive: () => ({ testId: 'worksheet-checkpoint' }),
+    faces: ['worksheet-loading', 'worksheet-error', 'worksheet-missing'],
   },
   {
     id: 'd-bid-box',
     // **그 건이 보이는 탭으로** 간다(r1 H-1 · v M-2). 맨 `/bids` 는 첫 탭(관심)을 열고 씨앗 건은
-    // 결과까지 밀려 「종료」에 있다 — 앞 판의 캡처는 「이 묶음에 건이 없습니다」였다. 화면 E 의
-    // 링크가 이미 같은 규율을 지킨다(`?tab=${tabOf(state)}`); 캡처만 그 밖에 있었다.
+    // 결과까지 밀려 「종료」에 있다 — 앞 판의 캡처는 「이 묶음에 건이 없습니다」였다.
     path: '/bids?tab=closed',
     ready: 'screen-bid-box',
-    positive: (seed) => `bid-case-${seed.wonCaseId}`,
+    positive: (seed) => ({ testId: `bid-case-${seed.wonCaseId}` }),
+    faces: ['bid-box-empty'],
   },
   {
     id: 'e-results',
     path: '/results',
     ready: 'screen-results',
-    positive: (seed) => `result-case-${seed.wonCaseId}`,
+    positive: (seed) => ({ testId: `result-case-${seed.wonCaseId}` }),
+    faces: ['results-empty'],
   },
-  { id: 'inbox', path: '/inbox', ready: 'screen-inbox', positive: () => 'inbox-empty' },
+  {
+    id: 'inbox',
+    path: '/inbox',
+    ready: 'screen-inbox',
+    positive: () => ({ testId: 'inbox-empty' }),
+    // 빈 얼굴이 **내용**이라 `faces` 가 비었다 — 위 KDoc 의 사유.
+    faces: [],
+  },
 ];
 
-const missingPositive = SCREENS.filter((one) => typeof one.positive !== 'function').map((one) => one.id);
-if (missingPositive.length > 0) {
-  throw new Error(
-    `양성 표지가 없는 화면: ${missingPositive.join(', ')} — ` +
-      '`ready` 는 빈 얼굴에도 서므로 그것만으로는 「내용이 닿았다」를 재지 못한다(r1 CR H-2).',
-  );
+/** 적재 시점 검사의 탐침 — 실제 씨앗 전에 `positive` 의 모양을 보려고 쓴다. */
+const PROBE_SEED = { wonCaseId: 0 };
+
+for (const screen of SCREENS) {
+  if (typeof screen.positive !== 'function' || !Array.isArray(screen.faces)) {
+    throw new Error(`${screen.id}: positive 함수와 faces 목록이 둘 다 필요하다(r2 CR M-2).`);
+  }
+  const marker = screen.positive(PROBE_SEED).testId;
+  if (marker === screen.ready) {
+    throw new Error(
+      `${screen.id}: 양성 표지가 화면 표지(${screen.ready})와 같다 — 그것은 빈 얼굴에도 선다(v r1 L-1).`,
+    );
+  }
+  if (screen.faces.includes(marker)) {
+    throw new Error(`${screen.id}: 양성 표지가 빈 얼굴(${marker})과 같다 — 내용을 재지 못한다.`);
+  }
+}
+
+/** PNG 의 IHDR 에서 실제 크기를 읽는다 — 폭·높이가 바이트 8~15 에 빅엔디언 32비트 둘이다. */
+function pngSize(bytes) {
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
 function log(line) {
   process.stdout.write(`capture: ${line}\n`);
 }
 
+/**
+ * 캡처가 **어느 판의 화면인가**를 한 값으로 말할 수 있을 때만 적는다(r2 v L-2).
+ *
+ * 앞 판은 `rev-parse HEAD` 만 보아, 스크립트·화면이 미커밋인 채 찍히면 manifest 의 `head` 가
+ * **그 캡처를 만든 트리를 가리키지 않았다**(r1 에서 실제로 그랬다). 화면 소스가 더러우면
+ * 거부한다 — 커밋한 뒤 다시 찍는 것이 그 자리의 답이다.
+ */
 function head() {
   const shown = spawnSync('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
   if (shown.status !== 0) {
     throw new Error('HEAD 를 읽지 못했다 — 캡처가 어느 판의 화면인지 적을 수 없다');
+  }
+  const dirty = spawnSync('git', ['-C', repoRoot, 'status', '--porcelain', '--', 'web'], {
+    encoding: 'utf8',
+  });
+  if (dirty.status !== 0) {
+    throw new Error('작업 트리 상태를 읽지 못했다');
+  }
+  if (dirty.stdout.trim() !== '') {
+    throw new Error(
+      `web/ 에 커밋되지 않은 변경이 있다 — manifest 의 head 가 이 캡처의 트리를 가리키지 못한다:\n${dirty.stdout}`,
+    );
   }
   return shown.stdout.trim();
 }
@@ -148,7 +209,9 @@ async function bringUpHarness() {
         throw new Error(`하네스가 먼저 죽었다(exit=${died})`);
       }
       // 지우지 않으므로 **묵은 파일을 이 실행의 것으로 읽을 수 있다** — 기동 뒤에 쓰인 것만 받는다.
-      return existsSync(CONTEXT_PATH) && statSync(CONTEXT_PATH).mtimeMs >= startedAt;
+      // `exists` → `stat` 두 syscall **사이**에 하네스가 묵은 파일을 지우면 `stat` 이 ENOENT 로
+      // 던진다(그 쓰기 직전 삭제가 하네스의 정상 경로다). 던지지 않는 꼴로 받는다(r2 CR L-3).
+      return (statSync(CONTEXT_PATH, { throwIfNoEntry: false })?.mtimeMs ?? 0) >= startedAt;
     },
     300_000,
   );
@@ -334,9 +397,17 @@ async function assertNoPrivateData(page, screenId, secrets) {
 }
 
 async function main() {
-  const harness = await bringUpHarness();
-  const browser = await chromium.launch();
+  /**
+   * **둘 다 `try` 안이다**(r2 CR L-3 ②). 앞 판은 `bringUpHarness()` 가 `try` **밖**이라, 맥락
+   * 대기가 던지거나 타임아웃이면 이미 뜬 하네스(Postgres 컨테이너 · app.jar · preview,
+   * **포트 락 보유**)가 안 죽었다. 이 호스트는 레인 여럿이 preview 포트를 공유하므로 고아
+   * 하나가 다음 레인의 여정 실행을 포트 선검사에서 막는다.
+   */
+  let harness = null;
+  let browser = null;
   try {
+    harness = await bringUpHarness();
+    browser = await chromium.launch();
     const run = JSON.parse(readFileSync(CONTEXT_PATH, 'utf8'));
     const secrets = { loginName: run.loginName, passphrase: run.passphrase };
 
@@ -387,11 +458,22 @@ async function main() {
         await page.waitForLoadState('networkidle');
 
         /**
-         * **양성 표지를 먼저 기다린다**(r1 CR H-2). `ready` 는 빈 얼굴에도 서므로 그것만으로는
-         * 「내용이 닿았다」를 재지 못한다 — 실제로 화면 D 가 빈 탭인 채 모든 술어를 지났다.
-         * 표지는 화면마다 다르고 `SCREENS` 가 든다.
+         * **양성 표지를 먼저 기다리고, 빈 얼굴이 없는 것도 잰다**(r1 CR H-2 · r2 CR M-2).
+         * `ready` 는 빈 얼굴에도 서므로 그것만으로는 「내용이 닿았다」를 재지 못한다 — 실제로
+         * 화면 D 가 빈 탭인 채 모든 술어를 지났다.
          */
-        await page.getByTestId(screen.positive(seed)).waitFor({ state: 'visible' });
+        const marker = screen.positive(seed);
+        const locator =
+          marker.hasText === undefined
+            ? page.getByTestId(marker.testId)
+            : page.getByTestId(marker.testId).filter({ hasText: marker.hasText });
+        await locator.first().waitFor({ state: 'visible' });
+        for (const face of screen.faces) {
+          const count = await page.getByTestId(face).count();
+          if (count > 0) {
+            throw new Error(`${screen.id}: 빈 얼굴(${face})이 서 있다 — 내용이 닿지 않았다.`);
+          }
+        }
 
         await assertNoPrivateData(page, `${screen.id}-${viewport.id}`, secrets);
 
@@ -403,12 +485,17 @@ async function main() {
           );
         }
         writeFileSync(resolve(STAGING_DIR, name), bytes);
+        const image = pngSize(bytes);
         files.push({
           path: name,
           screen: screen.id,
           viewport: viewport.id,
-          width: viewport.width,
-          height: viewport.height,
+          // **뷰포트와 이미지 크기는 다른 수다**(r2 CR L-4 · v L-3) — fullPage 캡처라 높이가
+          // 문서 길이만큼이다. 앞 판은 뷰포트 값을 `width`/`height` 로 적어 PNG 크기로 읽혔다.
+          viewportWidth: viewport.width,
+          viewportHeight: viewport.height,
+          imageWidth: image.width,
+          imageHeight: image.height,
           bytes: bytes.length,
           sha256: createHash('sha256').update(bytes).digest('hex'),
         });
@@ -439,8 +526,8 @@ async function main() {
   } finally {
     // 실패했으면 스테이징만 치운다(산출물은 건드리지 않았다).
     rmSync(STAGING_DIR, { recursive: true, force: true });
-    await browser.close();
-    harness.kill('SIGTERM');
+    await browser?.close();
+    harness?.kill('SIGTERM');
   }
 }
 
