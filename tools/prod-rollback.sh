@@ -34,6 +34,12 @@ done
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
 
+# 반입과 **같은 잠금**을 쓴다 — 되돌림이 반입과 겹치면 상태 파일이 엉킨다(v V-4). 되돌림은 결국
+# `prod-deploy.sh` 를 부르므로 그 쪽이 잡을 수 있도록 **exec 하기 전에 놓는다**(아래 `flock -u`).
+mkdir -p "$STATE"
+exec {_lockfd}>>"$STATE/.lock" || _die "상태 디렉터리 잠금 파일을 열지 못했다: $STATE/.lock" 2
+flock -n "$_lockfd" || _die "다른 반입·되돌림이 이 상태 디렉터리에서 돌고 있다($STATE) — 끝난 뒤 다시" 2
+
 current="$(cat "$STATE/current" 2>/dev/null || true)"
 previous="$(cat "$STATE/previous" 2>/dev/null || true)"
 pending="$(cat "$STATE/pending" 2>/dev/null || true)"
@@ -67,4 +73,6 @@ echo "  마이그레이션 차이 0 — 이미지 되돌림으로 충분하다"
 args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to")
 [ -z "$PROJECT" ] || args+=(--project "$PROJECT")
 [ "$APPLY" -eq 0 ] || args+=(--apply)
+# 잠금을 놓고 넘긴다 — 같은 잠금을 `prod-deploy.sh` 가 다시 잡는다(겹치면 자기 자신에게 막힌다).
+flock -u "$_lockfd"; exec {_lockfd}>&-
 exec ./tools/prod-deploy.sh "${args[@]}"
