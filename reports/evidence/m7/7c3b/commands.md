@@ -148,7 +148,44 @@ base 와 남는 차이는 팀장 계약 파일 하나(의도된 제외). 내 표
 **측정 환경의 사실 하나**: 이 레인의 clone·로그는 scratchpad **공유** 디렉터리에 두었다가 다른
 레인에 지워졌고, 레인 전용 하위 디렉터리로 옮겨 다시 쟀다. 위 수치는 전부 **옮긴 뒤**의 실측이다.
 
-## §7 동결
+## §7 r1 승인 전 일괄 — 고침별 RED → GREEN 과 재현 명령
+
+**재현의 공통 자리**: 표적 Gradle 은 `~/.local/bin/bv-build.sh ./gradlew --no-daemon -q <task> --rerun`,
+변이는 버릴 clone 에서 `python3 <레인 scratchpad>/mutate.py <clone>`.
+
+| 항목 | 고치기 전(RED 로 세운 방법) | 고친 뒤 | 재현 |
+| --- | --- | --- | --- |
+| v M-1 읽기 전수 | `list()`·`timeline()` 에 되비춤을 끼우는 변형이 **아무 test 도 지나지 않았다**(읽기 test 가 `read()` 하나) | 읽기 셋을 한 자리에서 돌며 **양성 표지**(마감 판정이 상태를 옮겼다) 뒤 음성 단언 | `:workflow:test --tests bidvector.workflow.bidding.BidCaseNotificationTest` |
+| v L-3 정책 기준일 | 기준일이 배선의 **지역 변수**라 UTC/KST 하루 어긋남을 잴 자리가 없었다(출하 표 항목이 하나라 값으로도 안 보인다) | 계산을 함수로 꺼내고 KST 경계(20:00Z)를 단언 + UTC 음성 대조 | `:app:test --tests bidvector.app.wiring.NotificationSweepWiringTest` |
+| v L-4 = CR L-2 사실의 시각 | 같은 날 두 번 돌면 `occurredAt` 이 움직여 항목이 목록 맨 위로 다시 올라왔다 | 그 KST 달력일의 **시작**을 싣는다 — 같은 날 아침·저녁이 같은 값, 다음 날은 다른 값 | `:workflow:test --tests bidvector.workflow.bidding.NotificationSweepTest` |
+| v L-1 여정 선행 | 머리글이 「순서 독립」을 말했으나 알림함 test 는 같은 파일 여정 ⑤ 에 기댄다 | 주장을 사실대로 정정(파일 안 결정적 · 다른 spec 과는 독립) | `cd web && npm run test:e2e:journey` |
+| v L-2 배지 등식 | 「전수 헤더 == 첫 페이지 안읽음」이라 항목이 한 페이지를 넘는 날 거짓으로 붉어진다 | 등식은 배지 ↔ 헤더, 본문과는 부등식 | 〃 |
+| CR L-6 행 locator | 화면 전체 locator 가 셸·다른 화면의 같은 접두를 집는다 | 알림함 화면 안으로 좁힘 | 〃 |
+| CR L-1 러너 차례 | 「아홉째」가 주장이었다 | 술어로 재실측해 KDoc 에 명령째 적음 | `command grep -rl ": ApplicationRunner" app/src/main/kotlin \| wc -l` → **9** |
+| CR M-1 · CR L-3·L-4 · CR OQ | ─ | **알려진 제한 등재**(checklist §2 10~13) — 술어 변경 없음 | ─ |
+| CR L-5 요구표 | 비고가 「cron 등록은 7F」로만 적혀 발화 여부가 안 보였다 | 「**cron 미등록이라 배포에서 아직 발화하지 않는다**」를 세 행에 | ─ |
+
+## §8 병합 라운드 둘
+
+| 병합 | main | 충돌 | 해소 |
+| --- | --- | --- | --- |
+| 첫째 | `ac806a51`(7C⑤-b) | **4** | 아래 표 |
+| 둘째 | `957587c4`(7E-3b) | **0** | `results.spec.ts` 두 test 블록 생존 확인(2) · 내 소유 둘 무변경 · 생성 TS 재생성 바이트 등식 |
+
+첫째 병합의 충돌 넷(파일별 무엇을 어떻게):
+
+| 파일 | 충돌 | 해소 |
+| --- | --- | --- |
+| `AppHttpDependencyGateTest.kt` | 양쪽이 **다른 수**(main 76 · 내 80) | 숫자를 고르지 않고 **세 tier 목록의 항목 이름 합집합을 기계로** 셌다 → **81**(중복 0). 재계산 문단을 KDoc 에 넷째로 남김 |
+| `AccountCarrierStructureTest.kt` | 양쪽이 서로 다른 controller 를 한 자리에 | **합집합** — `MyBidResultController` + `BidPriceRequestController` 둘 다 |
+| `ConstantTimeComparisonStructureTest.kt` | 양쪽이 같은 50 줄 한도에 걸려 **각자 상수를 뽑았다**(이름이 다름) | 내 중복 상수 덩어리를 KDoc 째 지우고 main 의 이름으로 통일, 내 고유 키 하나를 그 전수에 더함. main 의 +4 항목 생존을 센 뒤 키 등식 test 초록 확인 |
+| `capability-map.md` | SET-01 절을 양쪽이 다시 씀 | main 의 절을 본문으로 두고 **내 문단을 그 뒤에** — 7C⑤-b 가 세운 사실 위에서 「알림의 낙찰은 되비춤이지 대사가 아니다」를 말하도록 고쳐 씀 |
+
+**자동 병합(충돌 0)이 접지 않았는지 따로 셌다**: properties 두 파일의 **중복 키 0**(줄 이음을 펴서
+기계 산출) · OpenAPI 의 얕은 중복 키 없음 · `HttpTestApplication` 에 양쪽 빈 생존 · 생성 TS 는
+재생성해 **바이트 등식**.
+
+## §9 동결
 
 판정 대상 SHA 와 마지막 실측은 동결 보고에 적는다(evidence 편집 커밋은 언제나 그 뒤에 온다 —
 마지막 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트다).

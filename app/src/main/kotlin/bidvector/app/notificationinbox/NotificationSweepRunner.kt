@@ -9,7 +9,8 @@ import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 
 /**
- * 일회성 알림 훑기 러너(M7/7C③-b · D-7C3B-8, 아홉째 러너) —
+ * 일회성 알림 훑기 러너(M7/7C③-b · D-7C3B-8) — **아홉째**다(CR L-1 재실측:
+ * `command grep -rl ": ApplicationRunner" app/src/main/kotlin | wc -l` → 9, 이 파일 포함). —
  * `bidvector.notification-sweep.mode=once` 일 때만 빈으로 등록된다(배선이 조건을 건다).
  * 주기는 외부 cron 이 진다(`docs/runbook/m6-6e-operations.md` §1.3 관례) — 상주 루프도
  * 스케줄러도 아니다.

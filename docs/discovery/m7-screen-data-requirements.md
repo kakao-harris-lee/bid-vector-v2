@@ -158,11 +158,11 @@
 | 항목 목록 · 읽음/안읽음 · 건별 묶음 | 받은편지함 | NOTI-10 | 없음 — 알림함 표 없음(기존 `inbox` 는 이벤트 소비 멱등 표 — 재사용 금지) | ⓑ | 7C ③ |
 | 중복 억제 키(같은 건 한 항목 갱신) | | NOTI-10 | 없음 | ⓑ | 7C ③ |
 | 트리거: 새 후보(자격 통과) | | STR-08 · QUAL-02 | 없음 — 감시 실행 이력·신규/지속 diff 없음(추적표 STR-08) | ⓑ | 7C ③ — **선행: STR-08**(조정안) |
-| 트리거: 마감 D-1/D-0(투찰 미기록) | | BID-01 | `GET /api/notifications` 에 `BID_DEADLINE_IMMINENT`·`BID_DEADLINE_TODAY` | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
+| 트리거: 마감 D-1/D-0(투찰 미기록) | | BID-01 | `GET /api/notifications` 에 `BID_DEADLINE_IMMINENT`·`BID_DEADLINE_TODAY` | ⓐ | **7C③-b 가 세웠다** — 계약 표면은 닫혔고 **cron 미등록이라 배포에서 아직 발화하지 않는다**(7F) |
 | 트리거: 개찰 완료(잠정 1위 여부) | | SET-02 | 운영자가 기록한 전이의 **되비춤**만 — 수집 결과 자동 대사는 없다 | ⓑ | 7C ③ — **선행: 1위 상호**(`D-7C5-3`) |
-| 트리거: 1순위 서류 기한 D-2 | | BID-01 | `GET /api/notifications` 에 `DOCUMENT_DEADLINE_IMMINENT` | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
+| 트리거: 1순위 서류 기한 D-2 | | BID-01 | `GET /api/notifications` 에 `DOCUMENT_DEADLINE_IMMINENT` | ⓐ | **7C③-b 가 세웠다** — 계약 표면은 닫혔고 **cron 미등록이라 배포에서 아직 발화하지 않는다**(7F) |
 | 트리거: 낙찰/패찰 확정 | | SET-01 · NOTI-04 | 운영자가 기록한 전이의 **되비춤**만 — 낙찰자 상호가 없어 자동 대사가 서지 않는다 | ⓑ | 7C ③ — **선행: `OPEN-SET01-AWARD-NAME-INGEST`** |
-| 트리거: 공고 변경(정정공고) | | COL-01 | `GET /api/notifications` 에 `NOTICE_REVISED`(담은 건의 공고가 개정되면) | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
+| 트리거: 공고 변경(정정공고) | | COL-01 | `GET /api/notifications` 에 `NOTICE_REVISED`(담은 건의 공고가 개정되면) | ⓐ | **7C③-b 가 세웠다** — 계약 표면은 닫혔고 **cron 미등록이라 배포에서 아직 발화하지 않는다**(7F) |
 | 클릭 → 그 건의 워크시트 | | (클라이언트) | 항목이 공고 ID 를 실으면 닫힘 | ⓐ | 7E(7C ③ 의존) |
 | 채널 복제(텔레그램·메일) | | NOTI-01 · NOTI-03 | outbox → relay 는 있으나 채널 발송은 R-4 밖 | ─ | `OPEN-STR-12` 결정 뒤 |
 
