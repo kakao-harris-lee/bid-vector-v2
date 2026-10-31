@@ -63,6 +63,11 @@
 | V-3 | 빈 `--state-dir` 에 옛 release 의 manifest 만 두고 반입. 통제군은 같은 state-dir 에 지금 DB 와 맞는 release |
 | V-4 | 같은 상태 디렉터리로 두 deploy 를 `&` 로 동시에(마이그레이션이 같은 release 둘로 — 가드가 아니라 잠금을 재려고) |
 | N2b | 하네스가 조각만 남긴 변형을 따로 띄운다. 양성 대조는 조각 템플릿의 리다이렉트 목적지를 클라이언트 Host 로 되돌리기(사본 복원) |
+| M-1(r3) | 떠 있는 DB 에서 `alter table flyway_schema_history rename to …`(표 숨김) · 별도로 그 표의 행을 비운다 |
+| M-2(r3) | 표를 숨긴 채 `stop postgres` → 새 `--state-dir` 로 옛 release `--apply` |
+| M-3(r3) | env 파일의 `BIDVECTOR_PG_DB` 를 따옴표로 감싼다 · 음성 대조는 `BIDVECTOR_APP_JDBC_URL` 의 DB 만 다르게 |
+| V3-4 | 프로젝트 잠금 파일을 밖에서 `flock -n` 으로 쥔 채 **다른 state-dir** 로 dry-run |
+| 주기 러너 | `tools/prod-notification-sweep.sh` 를 반입 기록 없음 / `pending` 있음 / 정상 셋으로 |
 
 결과는 checklist 1.3b 의 「고치기 전 ↔ 고친 뒤」 표다.
 
