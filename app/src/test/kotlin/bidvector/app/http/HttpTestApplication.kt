@@ -10,6 +10,7 @@ import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
+import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
@@ -17,6 +18,8 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
 import bidvector.workflow.opening.ReadOpeningResult
+import bidvector.workflow.profile.operatorTradeNameOf
+import bidvector.workflow.result.ReadMyBidResults
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -209,6 +212,41 @@ open class HttpTestApplication {
                 licenseGate = fakeSuggestionLicenseGate,
                 clock = clock,
             ),
+        )
+
+    /**
+     * 7C⑤-b — 결과 조회 포트 셋의 이중체. 조립만 여기 두고 이중체 자신은 자기 파일에 있다
+     * (D-7C5-10 — 이 파일의 크기 한도가 레인 사이 경합이 되지 않게).
+     *
+     * 상호는 **프로필 이중체에서** 온다(`InMemoryBusinessProfileStore`) — 결과 조회가 상호를
+     * 따로 들고 있으면 「프로필에 넣은 값이 판정에 닿는가」를 건너뛴 채 판정만 보게 된다.
+     */
+    @Bean
+    open fun fakeRecordedBids(): FakeRecordedBids = FakeRecordedBids()
+
+    @Bean
+    open fun fakeBatchOpeningFacts(): FakeBatchOpeningFacts = FakeBatchOpeningFacts()
+
+    @Bean
+    open fun fakeAwardWinnerNames(): FakeAwardWinnerNames = FakeAwardWinnerNames()
+
+    @Bean
+    open fun readMyBidResults(
+        fakeRecordedBids: FakeRecordedBids,
+        fakeBatchOpeningFacts: FakeBatchOpeningFacts,
+        fakeAwardWinnerNames: FakeAwardWinnerNames,
+        inMemoryBusinessProfileStore: InMemoryBusinessProfileStore,
+        clock: FixedClock,
+    ): ReadMyBidResults =
+        ReadMyBidResults(
+            bids = fakeRecordedBids,
+            openingFacts = fakeBatchOpeningFacts,
+            winnerNames = fakeAwardWinnerNames,
+            // 출하 조립과 **같은 함수**다(r1 v M-1) — 사본을 두면 그 사상이 측정 밖에 남는다.
+            operatorNames = operatorTradeNameOf(inMemoryBusinessProfileStore),
+            clock = clock,
+            openingPolicy = OPENING_PROGRESS_POLICY,
+            matchingPolicy = AwardMatchingPolicyData(listOf("주식회사", "(주)")),
         )
 
     /**

@@ -1,7 +1,9 @@
 package bidvector.workflow.profile
 
 import bidvector.qualification.LicenseName
+import bidvector.settlement.OperatorTradeName
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.result.OperatorTradeNamePort
 import java.time.Instant
 
 /**
@@ -84,3 +86,28 @@ sealed interface StorageWriteOutcome : ProfileWriteOutcome {
         val sqlState: String,
     ) : StorageWriteOutcome
 }
+
+/**
+ * 프로필의 상호 절 → 대사의 운영자 쪽 입력(M7/7C⑤-b).
+ *
+ * **소유자 쪽에 두는 이유**: V22 프로필 타입을 아는 자리는 이 패키지와 `ProfileWiring` 뿐이다
+ * (`ProfileAssemblyBoundaryTest` · `BusinessProfileIsolationGateTest`). 소비자는
+ * [OperatorTradeNamePort][bidvector.workflow.result.OperatorTradeNamePort] 하나만 알고, 조립은
+ * 이 함수에 위임만 한다 — 조립에 사상을 두면 그 자리가 **app 의 새 파일 클래스**가 되어 면제
+ * 목록과 조립 경계 둘을 함께 건드린다(r1 실측).
+ *
+ * **이름 붙은 함수인 이유**: 람다로 두면 출하 경로를 지나는 test 가 없고 test 조립이 같은 사상을
+ * 사본으로 다시 적는다. 오늘 production 의 대사 사유를 정하는 줄이 이것이다 — 커널이 운영자 축을
+ * 먼저 보므로 `OPERATOR_NAME_NOT_DECLARED` 와 `WINNER_NAME_NOT_PUBLISHED` 가운데 무엇이 나갈지를
+ * 여기가 가른다.
+ *
+ * 상호는 **원문 그대로** 간다 — 정규화는 커널이 한 번만 한다(이중 정규화 금지).
+ */
+fun operatorTradeNameOf(profiles: BusinessProfileReader): OperatorTradeNamePort =
+    OperatorTradeNamePort { account ->
+        profiles
+            .details(account)
+            .tradeName
+            ?.let { OperatorTradeName.Declared(it.raw) }
+            ?: OperatorTradeName.NotDeclared
+    }

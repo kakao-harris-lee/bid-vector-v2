@@ -110,7 +110,12 @@ private fun PreparedStatement.bindNotice(id: NoticeId) {
     setString(2, id.round.value)
 }
 
-private fun ResultSet.toCanonicalFacts(): CanonicalOpeningFacts =
+/**
+ * canonical 행 → 사실. **M7/7C⑤-b 의 묶음 조회가 같은 함수를 쓴다**(`internal` 인 이유) — 사상을
+ * 복제하면 두 조회가 같은 행을 다르게 읽는 길이 생긴다. 읽는 열 목록도 한 자리
+ * ([OpeningResultViewSql.RESULT_COLUMNS])라 상호 열의 부재가 두 질의에 함께 걸린다.
+ */
+internal fun ResultSet.toCanonicalFacts(): CanonicalOpeningFacts =
     CanonicalOpeningFacts(
         progressLabel = getString("progress_division"),
         figures =

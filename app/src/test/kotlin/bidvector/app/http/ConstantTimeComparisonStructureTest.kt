@@ -78,64 +78,10 @@ class ConstantTimeComparisonStructureTest {
      */
     @Test
     fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
-        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe ALLOWED_AREEQUAL_NAMES
+        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe ALLOWED_NAMES
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
 }
-
-/**
- * 허용 목록의 **키 전수** — 아래 근거 지도와 **다른 자리**에 둔다(두 자리가 같아야 한다는 것이
- * 위 test 의 요점이다). 함수 본문에 두면 그 함수가 50 줄 한도를 넘는다(M7/7C③-b 에서 실측).
- */
-private val ALLOWED_AREEQUAL_NAMES: Set<String> =
-    setOf(
-        "ApiAuditRecord",
-        "ErrorBody",
-        "StrategyReadResponse",
-        "StrategyReadControllerKt",
-        "EvaluationDryRunResponse",
-        "ResultBuckets",
-        "EditSessionResponse",
-        "EditFieldTokensKt",
-        "EditSessionResponseKt",
-        "NoticeSummaryResponse",
-        // M7/7C ② — 투찰가 요청의 응답 DTO 일곱과 사상 함수 파일 넷, 컨트롤러 하나.
-        "BidPriceRequestResponse",
-        "EvaluationDetailFields",
-        "NotificationFields",
-        "QualificationFields",
-        "BaseAmountFields",
-        "FloorRateFields",
-        // M7/7C②-b — 표시 근거의 운반 타입 하나가 늘었다(응답 DTO 가 아니다).
-        "FloorRateGrounds",
-        "PriceAxesFields",
-        "BidPriceVerdictLabelsKt",
-        "BidPriceDropLabelsKt",
-        "BidPriceQualificationLabelsKt",
-        "BidPriceFactLabelsKt",
-        "BidPriceRequestController",
-        "BidCaseResponse",
-        "BidCaseResponse\$Companion",
-        "BidTimelineEntryResponse",
-        "BidCaseRouting",
-        "DraftInput",
-        "AccountScopedRoutes",
-        "RequestValuesKt",
-        "ProfileResponse",
-        "ConstructionCapacityResponse",
-        "OnboardingChecklistResponse",
-        "AwaitingItemResponse",
-        "ProfileHttp",
-        "BidCaseHttp",
-        "NotificationItemResponse",
-        "NotificationInboxRequestsKt",
-        "OpeningResultResponse",
-        "OpeningResultControllerKt",
-        "DeclaredValue",
-        "DeclaredValueKt",
-        // M7/7C③-b — 알림함 기록 결과 sealed 싱글턴 셋의 `when` 소진(응답 조립 파일).
-        "BidPriceRequestResponseKt",
-    )
 
 /**
  * `Intrinsics.areEqual`을 정당하게 남기는 class 파일 이름(`nameWithoutExtension`) → 근거.
@@ -237,6 +183,16 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "알림함 기록 결과(NotificationInboxOutcome) sealed 싱글턴 셋의 when 소진 — 값 비교가 아니라 객체 동일성이고 자격증명 좌표 0(javap 확인)",
         "DeclaredValueKt" to
             "계약이 든 **이름**으로 질의 값을 찾는 비교(`firstValue`) — 비교 대상이 칸 이름이지 자격증명 값이 아니다",
+        // M7/7C⑤-b — 결과 조회의 HTTP 층. 성격은 위와 같다(data class 자동 equals · sealed
+        // 싱글턴 when 소진). 어느 항목도 자격증명 값을 참조하지 않는다.
+        "MyBidResultsResponse" to
+            "결과 응답 값 객체(data class) 자동 생성 equals — 건 목록과 집계뿐, 자격증명 값 없음",
+        "MyBidCaseResponse" to
+            "건 하나의 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태 토큰·금액 칸뿐, 자격증명 값 없음",
+        "MyBidAggregateResponse" to
+            "집계 응답 값 객체(data class) 자동 생성 equals — 수와 상태 토큰뿐, 자격증명 값 없음",
+        "MyBidResultResponsesKt" to
+            "대사 결말·개찰 상태·차이·비율 상태의 sealed 싱글턴 when 소진 — 비교 대상이 판정 갈래이지 자격증명 값이 아니다",
         // M7/7C④ 2b — 프로필의 HTTP 층. 성격은 위 셋과 같다(어휘 조회 · data class 자동 equals ·
         // sealed 싱글턴 when). `BidCaseRequestsKt` 는 어휘 조회 둘이 `RequestValues.kt` 로 옮겨 가며
         // **클래스 자체가 사라져** 지웠다(javap 실측: 그 이름의 class 파일 없음).
@@ -292,3 +248,59 @@ private fun javap(classFile: File): String {
     check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
     return output
 }
+
+/**
+ * 허용된 이름 전수 — 함수 밖 선언이다(함수 50 줄 한도). 위 사유 표와 **키가 같아야** 하고
+ * 그 등식이 이 목록의 존재 이유다: 사유 없는 등재도, 등재 없는 사유도 붉는다.
+ */
+private val ALLOWED_NAMES =
+    setOf(
+        "ApiAuditRecord",
+        "ErrorBody",
+        "StrategyReadResponse",
+        "StrategyReadControllerKt",
+        "EvaluationDryRunResponse",
+        "ResultBuckets",
+        "EditSessionResponse",
+        "EditFieldTokensKt",
+        "EditSessionResponseKt",
+        "NoticeSummaryResponse",
+        "BidPriceRequestResponse",
+        "EvaluationDetailFields",
+        "NotificationFields",
+        "QualificationFields",
+        "BaseAmountFields",
+        "FloorRateFields",
+        "FloorRateGrounds",
+        "PriceAxesFields",
+        "BidPriceVerdictLabelsKt",
+        "BidPriceDropLabelsKt",
+        "BidPriceQualificationLabelsKt",
+        "BidPriceFactLabelsKt",
+        "BidPriceRequestController",
+        "BidCaseResponse",
+        "BidCaseResponse\$Companion",
+        "BidTimelineEntryResponse",
+        "BidCaseRouting",
+        "DraftInput",
+        "AccountScopedRoutes",
+        "RequestValuesKt",
+        "ProfileResponse",
+        "ConstructionCapacityResponse",
+        "OnboardingChecklistResponse",
+        "AwaitingItemResponse",
+        "ProfileHttp",
+        "BidCaseHttp",
+        "NotificationItemResponse",
+        "NotificationInboxRequestsKt",
+        "OpeningResultResponse",
+        "OpeningResultControllerKt",
+        "DeclaredValue",
+        "DeclaredValueKt",
+        "MyBidResultsResponse",
+        "MyBidCaseResponse",
+        "MyBidAggregateResponse",
+        "MyBidResultResponsesKt",
+        // M7/7C③-b — 알림함 기록 결과 sealed 싱글턴 셋의 `when` 소진(응답 조립 파일).
+        "BidPriceRequestResponseKt"
+    )

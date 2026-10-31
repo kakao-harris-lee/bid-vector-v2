@@ -741,6 +741,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bid-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 입찰 결과 — 건별 대사와 투찰 대비 낙찰률을 **서버가 판정한다**(M7/7C⑤-b)
+         * @description 투찰 기록이 있는 **실투찰** 건마다 내 투찰가 · 개찰 결과 요약 · 서버 대사 판정 · 확정 낙찰가와의 차이를 내고, 투찰 대비 낙찰률을 **두 축으로 병기**한다.
+         *
+         *     **운영자가 적은 결과(`recordedState`)와 서버 대사(`reconciledOutcome`)는 다른 칸이다.** 어느 쪽도 다른 쪽을 덮지 않고, 둘이 어긋나면 `outcomeAgreement` 가 그 사실만 나른다 — 어느 쪽이 틀렸다는 판정이 아니다.
+         *
+         *     **판정 불가는 패찰이 아니다.** 낙찰자 상호가 공개되지 않았거나 개찰 결과가 아직 승격되지 않은 건은 `UNDECIDABLE` 이고 `reconciliationBlocker` 가 사유를 든다. 그 건들은 낙찰률의 **분모에 들지 않는다**.
+         *
+         *     **분모가 0 이면 비율 칸이 비고 상태가 「부재」다**(0% 가 아니다). 「투찰 기록이 없다」와 「표본은 있으나 전부 분모 밖이다」를 다른 상태로 가른다.
+         *
+         *     **다른 업체의 상호 · 사업자등록번호 · 대표자명은 어느 칸에도 없다.** 낙찰자 상호는 서버 안에서 대사 판정에만 쓰이고 응답에 실리지 않는다. 내 메모 · 증빙 참조도 없다.
+         *
+         *     비율은 문자열이다 — JSON 수치는 클라이언트에서 배정밀도로 읽힌다. 분자와 분모를 함께 내므로 더 정밀한 값이 필요하면 그 둘로 다시 센다.
+         *
+         *     읽기 전용이다 — 대사 판정을 저장하지 않고 매 요청 원천에서 다시 판정한다.
+         */
+        get: operations["readMyBidResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{unmatched}": {
         parameters: {
             query?: never;
@@ -1320,6 +1352,170 @@ export interface components {
         };
         RemoveConstructionCapacityRequest: {
             licenseName: string;
+        };
+        MyBidResults: {
+            /** @description 투찰 기록이 있는 **실투찰** 건. 페이퍼(가상) 건은 들지 않는다. 순서는 확인 시각 내림차순이다. */
+            cases: {
+                /**
+                 * Format: int64
+                 * @description 입찰 건 식별자.
+                 */
+                caseId: number;
+                /** @description 공고번호(건이 담을 때 적은 사본). */
+                noticeNumber: string;
+                /** @description 공고 차수. */
+                noticeRound: string;
+                /**
+                 * @description **운영자가 적은** 건 상태. 서버 대사와 다른 칸이다.
+                 * @enum {string}
+                 */
+                recordedState: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
+                /**
+                 * Format: int64
+                 * @description 내 투찰 금액(원).
+                 */
+                submittedAmountWon: number;
+                /** @description 투찰 금액의 통화. */
+                submittedAmountCurrency: string;
+                /** @description 투찰 금액의 과세 처리. */
+                submittedAmountVatTreatment: string;
+                /**
+                 * @description 투찰 금액의 출처. **오늘은 언제나 OPERATOR_ENTERED 다** — 투찰가 메뉴가 출하 경로에 없어 PRICE_MENU 를 만들 길이 없다(알려진 제한).
+                 * @enum {string}
+                 */
+                submittedAmountOrigin: "OPERATOR_ENTERED" | "PRICE_MENU";
+                /** @description 메뉴에서 고른 안의 참조. 출처가 PRICE_MENU 일 때만 값이 있고, 오늘은 **언제나 null** 이다. */
+                chosenOptionRef: string | null;
+                /**
+                 * Format: date-time
+                 * @description 운영자가 나라장터에 낸 시각(진술).
+                 */
+                submittedAt: string;
+                /**
+                 * Format: date-time
+                 * @description 그 사실을 이 시스템에 확인한 시각(서버 시계).
+                 */
+                confirmedAt: string;
+                /**
+                 * @description 개찰 결과 상태. 공고 단위 개찰 조회(readOpeningResult)와 **같은 어휘**다.
+                 * @enum {string}
+                 */
+                openingState: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "OPENED" | "FAILED_BID" | "REBID" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT";
+                /**
+                 * Format: int64
+                 * @description **확정** 낙찰가(원). 잠정 1위 금액이 아니다.
+                 */
+                confirmedAwardAmountWon: number | null;
+                /** @description 확정 낙찰가의 통화. */
+                confirmedAwardAmountCurrency: string | null;
+                /** @description 확정 낙찰가의 금액 축. */
+                confirmedAwardAmountBasis: string | null;
+                /** @description 확정 낙찰가의 과세 처리. 상류가 선언하지 않아 언제나 UNKNOWN 이다. */
+                confirmedAwardAmountVatTreatment: string | null;
+                /** @description 확정 낙찰가의 출처. */
+                confirmedAwardAmountProvenance: string | null;
+                /**
+                 * @description **서버 대사 판정**. UNDECIDABLE 은 패찰이 아니다 — 견줄 상호나 개찰 결과가 아직 없다는 뜻이다.
+                 * @enum {string}
+                 */
+                reconciledOutcome: "WON" | "LOST" | "FAILED_BID" | "REBID" | "UNDECIDABLE";
+                /**
+                 * @description 판정이 서지 않은 사유. reconciledOutcome 이 UNDECIDABLE 일 때만 값이 있다.
+                 * @enum {string|null}
+                 */
+                reconciliationBlocker: "NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT" | "OPERATOR_NAME_NOT_DECLARED" | "OPERATOR_NAME_NORMALIZES_TO_EMPTY" | "WINNER_NAME_NOT_PUBLISHED" | "WINNER_NAME_NORMALIZES_TO_EMPTY" | null;
+                /**
+                 * @description 운영자 기록과 서버 대사의 관계. DISAGREE 는 **어긋났다는 사실**일 뿐 어느 쪽이 틀렸다는 판정이 아니다.
+                 * @enum {string}
+                 */
+                outcomeAgreement: "AGREE" | "DISAGREE" | "NOT_COMPARABLE";
+                /**
+                 * @description 차이의 상태. 확정 낙찰가가 없으면 AWARD_ABSENT 이고 **잠정 금액으로 채우지 않는다**.
+                 * @enum {string}
+                 */
+                gapState: "COMPUTED" | "AWARD_ABSENT";
+                /**
+                 * Format: int64
+                 * @description 내 투찰가 − 확정 낙찰가(원). 음수는 내가 더 낮게 냈다는 뜻이다. 두 금액의 과세 축이 같다는 보장은 없다.
+                 */
+                gapWon: number | null;
+                /** @description 차이의 통화. */
+                gapCurrency: string | null;
+            }[];
+            /** @description 투찰 대비 낙찰률 — **두 축을 병기**한다. 목록과 **같은 판정 패스**에서 난다. */
+            aggregate: {
+                /**
+                 * Format: int32
+                 * @description 투찰 기록이 있는 실투찰 건의 수. 두 축이 같은 표본을 센다.
+                 */
+                sampleSize: number;
+                /**
+                 * @description 운영자가 적은 결과 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
+                 * @enum {string}
+                 */
+                recordedRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
+                /** @description 운영자가 적은 결과 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
+                recordedAwardRate: string | null;
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 낙찰 건 수(분자).
+                 */
+                recordedWonCount: number;
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 패찰 건 수.
+                 */
+                recordedLostCount: number;
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 분모(낙찰 + 패찰).
+                 */
+                recordedDenominator: number;
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 유찰·재입찰 건 수(분모 밖).
+                 */
+                recordedFailedOrRebidCount: number;
+                /**
+                 * Format: int32
+                 * @description 운영자가 적은 결과 축의 미확정·판정 불가 건 수(분모 밖).
+                 */
+                recordedUndecidedCount: number;
+                /**
+                 * @description 서버 대사 축의 비율 상태. 분모가 0 이면 ABSENT_NO_RECORDED_BIDS(셀 것이 없다) 또는 ABSENT_NO_DECIDED_CASES(전부 분모 밖)이고 **0% 가 아니다**.
+                 * @enum {string}
+                 */
+                reconciledRateState: "MEASURED" | "ABSENT_NO_RECORDED_BIDS" | "ABSENT_NO_DECIDED_CASES";
+                /** @description 서버 대사 축의 낙찰률(분자/분모). 상태가 MEASURED 일 때만 값이 있다. 배정밀도를 피하려고 문자열이다. */
+                reconciledAwardRate: string | null;
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 낙찰 건 수(분자).
+                 */
+                reconciledWonCount: number;
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 패찰 건 수.
+                 */
+                reconciledLostCount: number;
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 분모(낙찰 + 패찰).
+                 */
+                reconciledDenominator: number;
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 유찰·재입찰 건 수(분모 밖).
+                 */
+                reconciledFailedOrRebidCount: number;
+                /**
+                 * Format: int32
+                 * @description 서버 대사 축의 미확정·판정 불가 건 수(분모 밖).
+                 */
+                reconciledUndecidedCount: number;
+                /** @description 표본에 나타난 판정 불가 사유 전수. 대사 분모가 0 이면 **이것이 그 사유다**. */
+                reconciliationBlockers: ("NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT" | "OPERATOR_NAME_NOT_DECLARED" | "OPERATOR_NAME_NORMALIZES_TO_EMPTY" | "WINNER_NAME_NOT_PUBLISHED" | "WINNER_NAME_NORMALIZES_TO_EMPTY")[];
+            };
         };
         OnboardingChecklist: {
             /** @description 걸리면서 **완료된** 항목. 선언 순서를 유지한다. */
@@ -3864,6 +4060,53 @@ export interface operations {
                 };
             };
             /** @description 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    readMyBidResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 건별 목록과 집계(같은 판정 패스에서 함께 난다) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyBidResults"];
+                };
+            };
+            /** @description 인증 실패 또는 **계정 주체가 아닌 인증**(결과 조회는 계정 경로 전용이다). 사유를 나누지 않는다(D-6A1-6). code: UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 받아들일 수 없는 Accept — 협상이 매핑 단계에서 끊긴다. code: NOT_ACCEPTABLE */
+            406: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
             500: {
                 headers: {
                     [name: string]: unknown;
