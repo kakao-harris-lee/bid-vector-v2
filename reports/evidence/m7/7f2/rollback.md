@@ -1,8 +1,8 @@
 # M7/7F 본편 — rollback
 
-**실측 HEAD: `57ef1f89`** — 이 slice 의 **마지막 산출물 커밋**이다(수정 라운드 2 에서 다시 냈다). 뒤따르는 evidence
+**실측 HEAD: `97a7f3da`** — 이 slice 의 **마지막 산출물 커밋**이다(수정 라운드 3 에서 다시 냈다). 뒤따르는 evidence
 커밋은 아래 복원 목록의 경로를 하나도 건드리지 않는다. 판정 SHA 와 실측 HEAD 가 다른 것은 정상이고, 확인할 것은
-**그 사이에 되돌림 대상이 움직였는가**다: `git diff --name-only 57ef1f89..<판정 SHA> -- <아래 25 경로>` 가 빈
+**그 사이에 되돌림 대상이 움직였는가**다: `git diff --name-only 97a7f3da..<판정 SHA> -- <아래 26 경로>` 가 빈
 출력이면 이 실측은 유효하다.
 
 ## 복원 기준은 병합된 main 고정 SHA `5e0617bf` 다
@@ -15,7 +15,7 @@ main 의 고정 SHA `5e0617bf`** 하나다(움직이는 `origin/main` 이 아니
 
 | 전제 | 확인 |
 |---|---|
-| `5e0617bf` 에 이 slice 가 없다 | A 19 경로 전부 그 SHA 에 **부재**(`git cat-file -e` 전수) → 복원이 그 19 개를 지우는 것이 맞다 |
+| `5e0617bf` 에 이 slice 가 없다 | A 20 경로 전부 그 SHA 에 **부재**(`git cat-file -e` 전수) → 복원이 그 20 개를 지우는 것이 맞다 |
 | 공유 파일 6 개는 그 SHA 에 **남의 내용으로** 있다 | 복원이 내 줄만 지우고 남의 줄을 보존한다 |
 | 마지막 병합 뒤의 병합은 없다 | `git log --merges 9b2162c5..HEAD` 빈 출력(`5e0617bf..HEAD` 는 **두 줄**이 나온다 — 그 SHA 자신이 main 쪽 병합 커밋이라 이 브랜치의 병합 둘이 범위에 든다) |
 
@@ -25,11 +25,12 @@ main 의 고정 SHA `5e0617bf`** 하나다(움직이는 `origin/main` 이 아니
 
 | 상태 | 경로 |
 |---|---|
-| A (19, 복원 명령이 지운다) | `deploy/nginx/test-fixture/nginx.conf` · `deploy/nginx/test-fixture/sites-enabled/default` · `deploy/nginx/test-fixture/sites-enabled/existing_site` · `deploy/nginx/zz-bidvector_kr.conf.template` · `docker/compose.prod.yaml` · `docker/prod.env.template` · `docker/proxy.prod.Caddyfile` · `docker/proxy.site.caddy` · `docs/runbook/m7-7f-production.md` · `tools/prod-cert-check.sh` · `tools/prod-deploy.sh` · `tools/prod-env-keys-check.sh` · `tools/prod-env.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` · `tools/prod-nginx-render.sh` · `tools/prod-proxy-sites-check.sh` · `tools/prod-release.sh` · `tools/prod-rollback.sh` |
+| A (20, 복원 명령이 지운다) | `deploy/nginx/test-fixture/nginx.conf` · `deploy/nginx/test-fixture/sites-enabled/default` · `deploy/nginx/test-fixture/sites-enabled/existing_site` · `deploy/nginx/zz-bidvector_kr.conf.template` · `docker/compose.prod.yaml` · `docker/prod.env.template` · `docker/proxy.prod.Caddyfile` · `docker/proxy.site.caddy` · `docs/runbook/m7-7f-production.md` · `tools/prod-cert-check.sh` · `tools/prod-deploy.sh` · `tools/prod-env-keys-check.sh` · `tools/prod-env.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` · `tools/prod-nginx-render.sh` · `tools/prod-notification-sweep.sh` · `tools/prod-proxy-sites-check.sh` · `tools/prod-release.sh` · `tools/prod-rollback.sh` |
 | M (6, `5e0617bf` 로 복원) | `.github/workflows/ci.yml` · `config/quality/image-hygiene-policy-proxy.properties` · `docker/proxy.Caddyfile` · `docker/proxy.Dockerfile` · `docker/proxy.Dockerfile.dockerignore` · `docs/runbook/m6-6e-operations.md` |
 | 되돌리지 않음 | `reports/evidence/m7/7f2/**`(계약·evidence) |
 
-경로 **스물다섯**은 위 표(A 19 + M 6)와 집합이 같다(`comm -23` 빈 출력으로 확인). 경로는 개별 인자다.
+경로 **스물여섯**은 위 표(A 20 + M 6)와 집합이 같다(`comm -23` 빈 출력으로 확인). 경로는 개별 인자다.
+수정 라운드 3 이 산출물 하나를 더했다 — `tools/prod-notification-sweep.sh`(in_scope 의 `tools/prod-*.sh` 계열).
 
 ## 명령
 
@@ -57,6 +58,7 @@ git restore --source=5e0617bf --staged --worktree -- \
   tools/prod-health.sh \
   tools/prod-nginx-check.sh \
   tools/prod-nginx-render.sh \
+  tools/prod-notification-sweep.sh \
   tools/prod-proxy-sites-check.sh \
   tools/prod-release.sh \
   tools/prod-rollback.sh
@@ -81,11 +83,11 @@ CI 축만 끄려면 `container` job 의 S-27·S-27b·S-27c 를 지운다 — 앞
 | # | 무엇 | 결과 |
 |---|---|---|
 | ① | 복원 명령 종료 코드 | **0** |
-| ② | D/M 수 | `D` **19** · `M` **6** (위 표와 같다) |
+| ② | D/M 수 | `D` **20** · `M` **6** (위 표와 같다) |
 | ③ | in_scope 의 `5e0617bf` 대비 diff | **빈 출력(0줄)**. 트리 전체로 넓혀도 남는 것은 `reports/evidence/m7/7f2/` 의 계약·evidence 넷뿐이다 |
 | ④ | compile | **N/A — 컴파일 대상 소스 변경 0**(`*.kt`·`*.kts`·`*.py`·`*.proto`·`*.ts`·`*.tsx`·`*.java` 의 base 대비 변경 0, 전수 확인). 트리 동일성으로 갈음한다 |
 | ⑤ | test | 같은 사유로 N/A |
-| ⑥ | 게이트 | (ⓐ) evidence 축 `leakPatternGate` — 되돌린 트리에서 실행 **exit 0**, 실행 뒤에도 트리가 되돌린 상태 그대로(`D` 19 · `M` 6). (ⓑ) 컨테이너 축 — 되돌린 트리의 `container` job 입력(`ci.yml`·`docker/**`·`tools/**`·`config/quality/**`·`deploy/**`)이 ③ 으로 base 와 **바이트 동일**하므로 판정이 base 와 같다(트리 동일성) |
+| ⑥ | 게이트 | (ⓐ) evidence 축 `leakPatternGate` — 되돌린 트리에서 실행 **exit 0**, 실행 뒤에도 트리가 되돌린 상태 그대로(`D` 20 · `M` 6). (ⓑ) 컨테이너 축 — 되돌린 트리의 `container` job 입력(`ci.yml`·`docker/**`·`tools/**`·`config/quality/**`·`deploy/**`)이 ③ 으로 base 와 **바이트 동일**하므로 판정이 base 와 같다(트리 동일성) |
 
 ## 리허설 잔여
 
