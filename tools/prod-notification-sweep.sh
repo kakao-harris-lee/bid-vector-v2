@@ -41,6 +41,14 @@ done
 [ -n "$ENVF" ] && [ -n "$STATE" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> [--project <이름>]" 3
 [ -r "$ENVF" ] || _die "env 파일을 읽지 못했다: $ENVF" 3
 
+# **반입·되돌림과 같은 잠금 둘을 같은 순서로 잡는다**(`tools/prod-env.sh`). 잠금 없이 상태를 읽던
+# 앞 판은, 반입이 백업 중이라 아직 `pending` 을 쓰기 전이면 **옛 `current` 로 일회 컨테이너를 띄웠고**
+# 그 뒤 새 release 가 같은 DB 를 썼다(v V4-7). 훑기는 멱등이고 주기 실행이라, 겹치면 **돌지 않고**
+# 다음 주기로 미루는 것이 맞다 — 기다리지 않는다.
+PROJ_FOR_LOCK="${PROJECT:-$BIDVECTOR_PROD_PROJECT}"
+_prod_project_lock "$PROJ_FOR_LOCK" || _die "$_PROD_LOCK_ERR" 3
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 3
+
 rel="$(cat "$STATE/current" 2>/dev/null || true)"
 [ -n "$rel" ] || _die "반입 기록이 없다($STATE/current) — 반입 전에는 훑을 스택이 없다" 3
 # 손상된 `current` 는 **여기서** 끊는다. 앞 판은 그 값을 그대로 이미지 참조로 넘겨 compose 가
@@ -71,4 +79,9 @@ echo "notification-sweep: release ${rel} · 프로젝트 $("${COMPOSE[@]}" confi
 # `--rm` — 일회 컨테이너는 남기지 않는다. 포트는 publish 하지 않아 떠 있는 app 과 다투지 않는다.
 # `--pull never` — 기본값(missing)이면 태그가 로컬에 없을 때 compose 가 **레지스트리에서 당겨와**
 #   운영 자격으로 실행하려 한다. 위 ID 등식이 먼저 막지만, 당기는 길 자체를 닫아 둔다(겹 둘).
-exec "${COMPOSE[@]}" run --rm --no-deps --pull never app --bidvector.notification-sweep.mode=once
+#
+# **exec 하지 않고 자식으로 돌린다** — 잠금을 이 셸이 쥐고 있어야 훑는 동안 반입이 끼어들지 않는다.
+# 종료 코드는 러너의 것을 그대로 돌려준다.
+rc=0
+"${COMPOSE[@]}" run --rm --no-deps --pull never app --bidvector.notification-sweep.mode=once || rc=$?
+exit "$rc"
