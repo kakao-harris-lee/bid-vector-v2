@@ -5,6 +5,7 @@ import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
 import bidvector.bidding.BidDraft
 import bidvector.bidding.BidKind
+import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NextCheckpoint
 import bidvector.bidding.NoticeKey
@@ -19,6 +20,8 @@ import bidvector.bidding.nextCheckpoint
 import bidvector.bidding.tag
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.NotificationInboxPort
+import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -79,6 +82,9 @@ sealed interface BidCommandResult {
  *
  * **마감은 서버가 판정한다**(계약 D-7B-3 결정 ①) — 건을 읽거나 명령을 걸 때 [DeadlineSettlement] 를
  * 먼저 지난다. 그래서 마감 뒤의 「제출함」은 소급 기록이 된다.
+ *
+ * **결과 전이는 알림함에 되비친다**(M7/7C③-b · D-7C3B-7) — [notifications] 가 그 자리다. 기록은
+ * 전이가 저장된 **뒤**이고 실패해도 전이를 되돌리지 않는다([reflect]).
  */
 class BidCaseWorkflow(
     private val cases: BidCaseStorePort,
@@ -86,6 +92,7 @@ class BidCaseWorkflow(
     private val snapshots: NoticeSnapshotQueryPort,
     private val clock: Clock,
     private val retentionPolicy: Resolution.Resolved<EvidenceRetentionPolicyData>,
+    private val notifications: NotificationInboxPort,
 ) {
     private val settlement = DeadlineSettlement(cases, deadlines)
 
@@ -202,10 +209,35 @@ class BidCaseWorkflow(
         now: Instant,
     ): BidCommandResult =
         when (writeTransition(cases, account, case, command, accepted, actor, now)) {
-            TransitionWrite.Applied -> BidCommandResult.Processed(accepted)
+            TransitionWrite.Applied -> {
+                reflect(account, case.notice, accepted.next, now)
+                BidCommandResult.Processed(accepted)
+            }
+
             TransitionWrite.CaseNotFound -> BidCommandResult.CaseNotFound
             TransitionWrite.VersionConflict -> BidCommandResult.VersionConflict
         }
+
+    /**
+     * 저장된 전이를 알림함에 되비춘다(D-7C3B-7) — **전이가 커밋된 뒤**이고 결과를 보지 않는다.
+     *
+     * 왜 같은 트랜잭션이 아닌가: 알림 포트는 자기 연결·자기 트랜잭션을 연다(`JdbcNotificationInbox`).
+     * 넣을 수 있더라도 그렇게 하지 않는다 — 알림 때문에 투찰 결과 기록이 실패하는 쪽이 더 나쁘고,
+     * 그 선택이 D-7C3B-9 다. 잃은 사실은 포트가 내는 `Failed` 값으로 남고 **출하 조립이 그것을
+     * 로그 표지로 적는다**(`NotificationInboxWiring`) — 이 층은 로거를 들지 않는다.
+     *
+     * **마감 판정은 이 자리를 지나지 않는다.** 시스템 판정은 [DeadlineSettlement] 가 저장 함수를
+     * 직접 부르므로, 되비추는 것은 **운영자 명령의 결과**뿐이다.
+     */
+    private fun reflect(
+        account: AccountId,
+        notice: NoticeKey,
+        next: BidState,
+        now: Instant,
+    ) {
+        val fact = reflectedNotificationFact(next) ?: return
+        notifications.record(NotificationInboxRecord(account, notice.asNotificationNoticeId(), fact, now))
+    }
 
     /**
      * 증빙이 있는 기록 명령에만 보관 기한을 싣는다 — 호출부가 넘긴 값을 쓰지 않고 **여기서
