@@ -70,3 +70,8 @@
   `GET /api/notifications` 응답과 DOM 대조**로 바꾼다(여정 ③ 의 투찰가 요청 · 여정 ⑤ 의 개찰·결과 항목이 그 응답에 서는 것을 단언, 개수는 응답에서).
   7E-3b 는 그 블록을 만지지 않는다(나중 머지 쪽이 main 병합). 요구표 「알림함」 절의 「하나도 발화하지 않는다」 문단도 고친다.
 - 2026-10-31 **D-7C3B-11(팀장 — 리뷰 레인)**: 마이그레이션 0 이므로 `migration-reviewer`·Codex 대상 아님. `NEW_CANDIDATE` 는 OPEN 유지(STR-08 원천 없음).
+- 2026-10-31 **D-7C3B-12(팀장, 중간 보고 수령)**: in_scope 에 `docs/runbook/m7-7c3b-notification-sweep.md`(D-7C3B-8 이 지시한 runbook 항목) ·
+  `web/src/screens/WorksheetScreen.test.tsx`(생성 타입 어휘 증가의 컴파일 강제 — 손 코드 fixture) 를 더한다. **페이퍼 투찰은 알림을 내지 않는다** —
+  NOTI-10 키 `(계정, 종류, 공고)` 에 투찰 종류 축이 없어 같은 공고의 페이퍼 건이 실투찰 항목을 덮어쓰기 때문(가상 연습이 실제 마감·결과를 가리지 않는다).
+  되비춤·훑기 양쪽 가드 + test. 반대 선택은 키 마이그레이션이라 하지 않는다 — `OPEN-7C3B-PAPER-BID-NOTIFICATION` 등재.
+  면제 래칫 증가(+5)는 항목별 근거를 evidence 에 두고 verifier 표적으로 넘긴다.
