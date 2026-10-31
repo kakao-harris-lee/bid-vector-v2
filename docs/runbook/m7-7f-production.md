@@ -30,7 +30,7 @@
 ## 1. 운영자 선행 작업 (한 번)
 
 1. **메모리 확인**: `free -m`(available ≥ 6GB · swap free ≥ 2GB) · `ps -eo pid,rss,args --sort=-rss | head`.
-   이 host 의 earlyoom 은 `java` 를 먼저 죽인다 — 운영 app 이 첫 희생자다(§9).
+   이 host 의 earlyoom 은 `java` 를 먼저 죽인다 — 운영 app 이 첫 희생자다(§「메모리」).
 2. **Windows 포트**: 기존 공개 site 가 이미 공개 중이므로 80·443 의 Windows → WSL 경로가 있을 가능성이 높다.
    **확인 → 없으면 설정** 순서로 한다: Windows 의 포트 포워딩(또는 WSL 네트워킹 모드) · Windows 방화벽 inbound
    80·443 · 공유기/외부 방화벽 포워딩. WSL 재시작 뒤 포워딩이 사라지지 않는지도 확인한다.
@@ -47,7 +47,7 @@
    - `BIDVECTOR_RELEASE_TAG` 는 비워 둔다(반입 스크립트가 준다).
    - `BIDVECTOR_PROXY_DOMAIN=bidvector.kr` · `BIDVECTOR_PROXY_HTTPS_PORT=28443`.
    - `BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/<BIDVECTOR_PG_DB 값>`.
-   - 메모리 키는 §9 표.
+   - 메모리 키는 §「메모리」 표.
    - 확인: `./tools/prod-env-keys-check.sh --env-file /etc/bidvector-v2/prod.env`
 4. **상태 디렉터리**(release manifest · 백업 · 이력): `sudo install -d -m 700 -o "$USER" /var/lib/bidvector-v2`
 5. **trivy 설치**(취약점 게이트 — release 가 요구한다. 없으면 release 는 판정 불가로 멈춘다).
@@ -74,9 +74,22 @@ REL="rel-$(git rev-parse --short=12 HEAD)"
 ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" --apply
 ```
 
-preflight 가 보는 것: env 파일(저장소 밖 · 0600 · 키 집합) · manifest 와 이미지 ID 등식 · compose ≥ 2.24 · 루프백
-포트 · 디스크. apply 는 **반입 직전 DB 백업**(postgres 가 돌고 있을 때) → `up -d --wait` → `tools/prod-health.sh`.
-이 단계까지는 public 노출이 없다 — 루프백뿐이다.
+preflight 가 보는 것: env 파일(저장소 밖 · 0600 · 키 집합) · manifest 와 이미지 ID 등식 · compose ≥ 2.24 ·
+**프로젝트 이름** · 루프백 포트 · 디스크 · **지금 DB 스키마와 가려는 release 의 마이그레이션 비교**. apply 는
+**반입 직전 DB 백업**(데이터 볼륨이나 postgres 컨테이너가 있으면 — 멈춰 있으면 올려서 뜬다) → `up -d --wait` →
+`tools/prod-health.sh`. 이 단계까지는 public 노출이 없다 — 루프백뿐이다.
+
+**dry-run 의 DB 줄을 읽는다.** 「데이터 볼륨이 없다(반입 기록은 …)」가 나오면 **멈추고 왜 볼륨이 없는지 먼저
+확인한다** — 첫 반입이 아닌데 볼륨이 없다는 것은 누가 `down -v` 를 돌렸거나 프로젝트 이름이 어긋났다는 뜻이고,
+그대로 진행하면 빈 DB 위에 뜬다.
+
+**반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh` 나 알림 훑기 호출이 바뀌었으면
+`/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서 감시 · §「주기 실행」). 사본은
+자동으로 따라오지 않는다.
+
+```bash
+git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh
+```
 
 ## 4. host nginx 조각 (운영 effect)
 
@@ -159,6 +172,9 @@ sudo install -m 755 -o root -g root tools/prod-cert-check.sh /usr/local/lib/bidv
 ```
 
 이 검사는 **root 가 필요 없다**(443 에 붙어 인증서를 읽을 뿐이다) — unit 도 일반 사용자로 돌린다.
+
+> `User=` 에는 **§1 에서 반입을 돌린 사용자**를 적는다. 그 절들은 `$USER` 로 쓰고 여기는 리터럴이라 — 이 host 에서는
+> 둘 다 `deploy` 다. 다르면 **두 자리를 함께** 바꾼다(아래 unit 과 §「주기 실행」의 unit).
 
 ```ini
 # /etc/systemd/system/bidvector-cert-check.service
@@ -284,7 +300,98 @@ sudo nginx -t && sudo systemctl reload nginx
   을 host 타이머로. 보관 기간·용량은 운영자 결정이다.
 - 복원 리허설은 6B-2 runbook §4 의 절차다(자기 생성 컨테이너에만 쓴다 — 운영 컨테이너를 건드리지 않는다).
 
-## 9. 메모리
+## 9. 주기 실행 — 알림 훑기 러너
+
+시간이 지나서 생기는 알림(투찰 마감 D-1·D-0, 서류 기한, 담은 공고의 정정)은 **상주 스케줄러가 아니라 일회 러너**가
+한 번 훑어 적는다. 주기는 이 host 의 타이머가 진다 — **등록하지 않으면 그 알림들은 하나도 발화하지 않는다.**
+러너 자체의 정본은 `docs/runbook/m7-7c3b-notification-sweep.md`(호출 모양 · 종료 코드 · 로그 · 끄는 법)이고,
+여기에는 **운영 반입된 스택에서 그것을 어떻게 거는가**만 적는다.
+
+**운영자 승인 항목**: 이 타이머를 켜는 것은 「시간 기반 알림을 실제로 쓰기 시작한다」는 뜻이다 — 반입 승인과 별개로
+한 번 확인한다. 외부 발송은 없다(R-4) · 결과는 알림함과 journal 에만 남는다.
+
+### 9.1 거는 법
+
+운영 app 은 컨테이너 안에 있으므로 `compose run` 으로 **일회 컨테이너**를 띄운다. 서비스 정의의 env(접속 정보)를
+그대로 물려받고, 포트는 publish 하지 않아 떠 있는 app 과 다투지 않는다.
+
+```bash
+sudo install -d -m 755 /usr/local/lib/bidvector-v2
+sudo tee /usr/local/lib/bidvector-v2/notification-sweep.sh >/dev/null <<'SH'
+#!/bin/sh
+set -eu
+cd /opt/bidvector-v2        # 반입한 compose 파일 셋이 있는 자리
+exec docker compose \
+  -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml \
+  --env-file /etc/bidvector-v2/prod.env -p bidvector-v2-prod \
+  run --rm --no-deps app --bidvector.notification-sweep.mode=once
+SH
+sudo chmod 755 /usr/local/lib/bidvector-v2/notification-sweep.sh
+```
+
+- `-p bidvector-v2-prod` 를 **반드시 적는다** — 프로젝트 이름이 다르면 다른(또는 빈) DB 를 훑는다.
+- `--no-deps` — postgres 는 이미 떠 있다. 이 러너가 스택을 건드리지 않는다.
+- `BIDVECTOR_RELEASE_TAG` 는 env 파일에 자리만 있으므로, **반입된 release 태그를 넣어 두거나** 스크립트에서
+  `BIDVECTOR_RELEASE_TAG=$(cat /var/lib/bidvector-v2/current)` 로 넘긴다(그러지 않으면 `${…:?}` 에서 멈춘다).
+
+### 9.2 주기 — 하루 두세 번
+
+마감 두 창은 각각 **그날 하루**라, 하루 한 번으로는 그날 몫을 잃을 수 있다(러너 runbook §3). 권장은 KST 이른
+아침과 낮이다. 창이 달력일 단위라 한 창에서 여러 번 돌아도 항목은 하나다.
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.service
+[Unit]
+Description=bidvector 알림 훑기 (일회 러너)
+
+[Service]
+Type=oneshot
+User=deploy
+ExecStart=/usr/local/lib/bidvector-v2/notification-sweep.sh
+```
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.timer
+[Unit]
+Description=bidvector 알림 훑기 — 하루 두 번
+
+[Timer]
+OnCalendar=*-*-* 07:30 Asia/Seoul
+OnCalendar=*-*-* 13:30 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+**실행 사용자**: `User=` 는 §1 에서 반입을 돌린 사용자와 **같아야 한다**(docker 소켓 접근). §1.3·§1.4 가 쓰는
+`$USER` 가 이 host 에서는 `deploy` 다 — 다르면 두 자리를 함께 바꾼다.
+
+### 9.3 켜고 확인
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now bidvector-notification-sweep.timer
+systemctl list-timers bidvector-notification-sweep.timer   # NEXT 가 비어 있지 않아야 한다
+sudo systemctl start bidvector-notification-sweep.service  # 한 번 즉시 돌려 결과를 본다
+journalctl -u bidvector-notification-sweep -n 50
+```
+
+### 9.4 실패 감지
+
+종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 외부 발송이 없으므로
+**journal 이 유일한 창구**다. 주기 확인:
+
+```bash
+# 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가
+journalctl -u bidvector-notification-sweep --since -2d | grep -c 'exit=COMPLETE(0)'
+# 0 이면: 타이머가 꺼졌거나(§9.3 의 list-timers) 매 run 이 실패했다(같은 로그의 cause=)
+systemctl list-timers bidvector-notification-sweep.timer
+```
+
+「안 도는 것처럼 보일 때」의 진단은 러너 runbook §6 이다.
+
+## 10. 메모리
 
 | 서비스 | `mem_limit` | 리허설 실측(2026-10-31) | 비고 |
 |---|---|---|---|
@@ -305,7 +412,7 @@ sudo nginx -t && sudo systemctl reload nginx
 권하지 않는다 ⓑ 개발 빌드의 한도(`-Xmx`·workers)를 낮추는 것이 현실적이다 ⓒ 전역 지침의 「빌드 전 확인 셋」에 운영
 app 여유를 더하는 문면.
 
-## 10. 알려진 제한
+## 11. 알려진 제한
 
 1. **응답에 `Server: nginx` 이름이 보인다** — 버전은 감추지만 이름을 지우는 모듈이 없다.
 2. **nginx → proxy 구간은 평문**이다 — host 루프백 안이고 publish 가 `127.0.0.1` 뿐이라는 전제(`tools/prod-proxy-sites-check.sh` 가 단언).
@@ -320,15 +427,18 @@ app 여유를 더하는 문면.
 5. **DB 를 넘는 되돌림은 자동화하지 않는다**(§7 「되돌림 — DB 를 넘는 경우」).
 6. **반입 묶음은 tar 가 아니라 태그 + manifest** 다 — 운영 host 가 개발 host 와 같은 기계라서다. 다른 host 로
    옮기면 `docker save`/`load` 경로를 새로 만들어야 한다. `docker image prune -a` 가 돌지 않는 이전 release 의
-   이미지를 지우면 되돌림이 manifest 대조에서 멈춘다.
+   이미지를 지우면 되돌림이 manifest 대조에서 멈춘다. **`<state>/releases/*.manifest` 도 지우지 않는다** —
+   반입과 되돌림 **양쪽**이 읽는다(마이그레이션 가드가 떠 있는 release 의 manifest 를 못 읽으면 판정 불가로 멈춘다).
 7. **TLS 와 인증서의 자동 검증은 대역까지**다 — 하네스는 자체 서명 인증서로 nginx 조각을 재고, certbot·Let's Encrypt
    발급은 운영자 수작업(§4.3)에서 처음 실측된다.
-7b. **ml-serving 은 기본 미기동인데도 release 와 반입 preflight 가 그 이미지를 요구한다.** 묶음을 네 이미지로
+8. **ml-serving 은 기본 미기동인데도 release 와 반입 preflight 가 그 이미지를 요구한다.** 묶음을 네 이미지로
    두는 선택이다 — 뒤에 `--profile ml` 로 띄울 때 그 바이트의 출처가 같은 release 이고, 네 이미지 모두 「태그가
    옮겨졌는가」를 보게 된다. 대가는 **실패 표면 하나**다: 누가 그 이미지만 지우면 서비스에 필요 없는데도 반입이
    멈춘다. 그때는 manifest 의 `image.ml-serving` ID 로 태그를 다시 달거나 같은 커밋에서 release 를 다시 만든다.
-8. **시간이 지나서 생기는 알림은 주기 실행을 등록해야 발화한다 — 이 반입 절차는 그 등록을 만들지 않는다.**
-   그런 알림은 상주 스케줄러가 아니라 **일회 러너**가 한 번 훑어 적는 구조이고 주기는 운영 host 의 cron 이 진다.
-   여기에는 그 cron 항목이 없으므로 **반입 직후 상태에서 시간 기반 알림은 하나도 발화하지 않는다**(요청으로 생기는
-   알림은 영향 없음). 그 러너를 담은 변경이 main 에 들어오면 이 runbook 의 다음 갱신에서 §4.5 와 같은 모양의
-   타이머 절을 더한다 — 러너의 호출 모양과 종료 코드는 **그 slice 의 runbook 이 정본**이라 여기서 미리 베끼지 않는다.
+9. **시간이 지나서 생기는 알림은 §「주기 실행」의 타이머를 켜야 발화한다.** 그런 알림은 상주 스케줄러가 아니라
+   일회 러너가 훑어 적는 구조라, 타이머를 켜지 않으면 **반입 직후 상태에서 하나도 발화하지 않는다**(요청으로
+   생기는 알림은 영향 없음). 켜는 것 자체가 운영자 승인 항목이다. 그 절차는 §「주기 실행」에 있고, 러너의 호출
+   모양·종료 코드·진단은 `docs/runbook/m7-7c3b-notification-sweep.md` 가 정본이다.
+10. **운영 자리의 스크립트 사본은 자동으로 갱신되지 않는다.** §「host nginx 조각」의 인증서 감시와 §「주기 실행」의
+   훑기 러너는 `/usr/local/lib/bidvector-v2/` 의 사본을 돌린다(작업 트리를 가리키지 않기 위한 선택). 그 스크립트가
+   바뀐 release 를 반입하면 **사본을 다시 깔아야** 한다 — §「반입」의 마지막 단계가 그것을 묻는다.
