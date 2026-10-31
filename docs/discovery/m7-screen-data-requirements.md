@@ -135,11 +135,11 @@ operation 이 M7/7C⑤-b 에 있고 화면은 **M7/7E-3b** 에서 붙인다. 집
 | 항목 목록 · 읽음/안읽음 · 건별 묶음 | 받은편지함 | NOTI-10 | 없음 — 알림함 표 없음(기존 `inbox` 는 이벤트 소비 멱등 표 — 재사용 금지) | ⓑ | 7C ③ |
 | 중복 억제 키(같은 건 한 항목 갱신) | | NOTI-10 | 없음 | ⓑ | 7C ③ |
 | 트리거: 새 후보(자격 통과) | | STR-08 · QUAL-02 | 없음 — 감시 실행 이력·신규/지속 diff 없음(추적표 STR-08) | ⓑ | 7C ③ — **선행: STR-08**(조정안) |
-| 트리거: 마감 D-1/D-0(투찰 미기록) | | BID-01 | 없음 | ⓑ | 7B → 7C ③ |
-| 트리거: 개찰 완료(잠정 1위 여부) | | SET-02 | 없음 | ⓑ | 7C ③ |
-| 트리거: 1순위 서류 기한 D-2 | | BID-01 | 없음 | ⓑ | 7B → 7C ③ |
-| 트리거: 낙찰/패찰 확정 | | SET-01 · NOTI-04 | 없음 | ⓑ | 7C ③ |
-| 트리거: 공고 변경(정정공고) | | COL-01 | 없음 — 공고 버전은 있으나 변경 알림 경로 없음 | ⓑ | 7C ③ |
+| 트리거: 마감 D-1/D-0(투찰 미기록) | | BID-01 | `GET /api/notifications` 에 `BID_DEADLINE_IMMINENT`·`BID_DEADLINE_TODAY` | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
+| 트리거: 개찰 완료(잠정 1위 여부) | | SET-02 | 운영자가 기록한 전이의 **되비춤**만 — 수집 결과 자동 대사는 없다 | ⓑ | 7C ③ — **선행: 1위 상호**(`D-7C5-3`) |
+| 트리거: 1순위 서류 기한 D-2 | | BID-01 | `GET /api/notifications` 에 `DOCUMENT_DEADLINE_IMMINENT` | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
+| 트리거: 낙찰/패찰 확정 | | SET-01 · NOTI-04 | 운영자가 기록한 전이의 **되비춤**만 — 낙찰자 상호가 없어 자동 대사가 서지 않는다 | ⓑ | 7C ③ — **선행: `OPEN-SET01-AWARD-NAME-INGEST`** |
+| 트리거: 공고 변경(정정공고) | | COL-01 | `GET /api/notifications` 에 `NOTICE_REVISED`(담은 건의 공고가 개정되면) | ⓐ | **7C③-b 가 세웠다**(cron 등록은 7F) |
 | 클릭 → 그 건의 워크시트 | | (클라이언트) | 항목이 공고 ID 를 실으면 닫힘 | ⓐ | 7E(7C ③ 의존) |
 | 채널 복제(텔레그램·메일) | | NOTI-01 · NOTI-03 | outbox → relay 는 있으나 채널 발송은 R-4 밖 | ─ | `OPEN-STR-12` 결정 뒤 |
 
@@ -150,15 +150,24 @@ operation 이 M7/7C⑤-b 에 있고 화면은 **M7/7E-3b** 에서 붙인다. 집
 되고 `unreadOnly` 필터에 흔들린다. 묶음의 계수도 서버 값이다(`noticeItemCount` 는 페이지와 무관한 전체
 크기라 묶음이 페이지 경계에 걸려도 「더 있다」를 안다).
 
-**트리거 여섯은 오늘 하나도 발화하지 않는다**(착수 실측 2026-10-31). 쓰기 포트 `NotificationInboxPort` 의
-빈이 출하 조립에 **존재하지 않고**(`NotificationInboxWiring` 은 읽기 쪽만 꽂는다) `NotificationFact` 를 짓는
-production 코드가 0 이다 — 7C③ 이 적은 「트리거 배선 0」이 7C②·7C⑤-a·7B 머지 뒤에도 그대로다. 하네스에서
-다섯 시점(로그인 직후 · 투찰가 요청 뒤 · 개찰 대기 뒤 · 개찰 기록 뒤 · 낙찰 확정 뒤) 전부 목록이 비고
-`X-Unread-Count` 가 0 이었다. 서버가 사유도 직접 낸다: `requestBidPrice` 응답의 `inboxRecordState:
-NOT_RECORDED_YET` · `inboxRecordNotRecordedReason: INBOX_WRITE_PORT_NOT_MERGED`(화면 C 의 근거 패널이 그것을
-그대로 보인다). 그래서 이 slice 는 **우회 fixture 로 항목을 심지 않고** 화면을 vitest 로 잠근다 — 여정은 빈
-얼굴과 배지 0 이 서버 값에서 나오는 것까지 잰다. 트리거 배선은 Kotlin `src/main` 이라 이 slice 밖이다 —
-후속 `OPEN-7E3A-NOTIFICATION-TRIGGER-WIRING`. ─ 행(채널 복제)은 빈 자리 + 「준비 중」이고 입력칸·버튼이 0 이다.
+**트리거 배선은 M7/7C③-b 가 세웠다**(2026-10-31, `OPEN-7E3A-NOTIFICATION-TRIGGER-WIRING` 종결). 쓰기 포트의
+빈이 출하 조립에 서고(`NotificationInboxWiring` 한 자리) 발화하는 경로가 **셋**이다: ① 투찰가 요청이 그 요청을
+적는다(`BID_PRICE_REQUEST_RECORDED`) ② 운영자가 기록한 개찰·결과 전이를 **되비춘다** ③ 일회 러너
+(`bidvector.notification-sweep.mode=once`, 외부 cron)가 마감 D-1/D-0 · 서류 기한 D-2 · 공고 개정을 훑는다.
+여정 ⑤ 가 그 사실을 잰다 — 앞선 여정들이 실제로 한 일이 알림함의 항목이 되고, 화면이 보이는 개수·종류가
+같은 실행의 `GET /api/notifications` 응답과 같다(우회 fixture 로 심은 항목은 0 이다).
+
+**남은 것 셋**은 그대로 ⓑ다. ⓐ **새 후보**는 감시 실행 이력(STR-08)이 없어 원천이 없다 — 지어내지 않는다.
+ⓑ **개찰 완료 · 낙찰/패찰**은 **운영자가 기록한 전이의 되비춤**이지 자동 통지가 아니다: 잠정 1위 축에는
+상호 칸이 없고(`D-7C5-3`) 낙찰자 상호가 canonical 에 적재되지 않아(`OPEN-SET01-AWARD-NAME-INGEST`) 체계가
+「1위가 나인가」를 판정할 수 없다. 그래서 NOTI-04 · SET-02 의 판정은 올리지 않는다. ⓒ **유찰**(`FAILED_OR_REBID`)은
+detail 어휘에 자리가 없어 기록하지 않는다 — 「졌다」와 「아무도 못 땄다」를 한 값으로 접지 않는다
+(`OPEN-7C3B-FAILED-BID-DETAIL`). **페이퍼 투찰도 알림을 내지 않는다**: 중복 억제 키에 투찰 종류 축이 없어
+같은 공고의 페이퍼 건이 실투찰 건의 항목을 덮는다.
+
+**운영 반입은 아직이다** — 훑기 러너는 코드로 서 있고 기본값이 꺼짐이며, 운영 host 의 cron 등록은 7F 다
+(`docs/runbook/m7-7c3b-notification-sweep.md`). 그래서 시간 기반 셋은 **하네스에서 발화하지 않는다**(러너가
+별 프로세스다) — 여정이 재는 것은 요청 경로 둘이다. ─ 행(채널 복제)은 빈 자리 + 「준비 중」이고 입력칸·버튼이 0 이다.
 
 ## 설정
 
