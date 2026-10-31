@@ -58,8 +58,11 @@ export BIDVECTOR_RELEASE_TAG="$REL"
 echo "== preflight — release ${REL}"
 # env 파일
 [ -r "$ENVF" ] || _die "env 파일을 읽지 못했다" 2
-envabs="$(cd "$(dirname "$ENVF")" && pwd)/$(basename "$ENVF")"
-case "$envabs/" in "$REPO_ROOT"/*) _die "env 파일이 저장소 안에 있다 — 저장소 밖에 둔다" 1 ;; esac
+# **심볼릭 링크까지 풀어서** 본다 — 앞 판은 dirname 의 논리 경로만 보아, 저장소 밖에 둔 링크가
+# 저장소 안 파일을 가리키면 통과했다(v L-2). 저장소 쪽도 같은 방식으로 푼다.
+envabs="$(readlink -f "$ENVF")" || _die "env 파일 경로를 해석하지 못했다: $ENVF" 2
+repo_phys="$(readlink -f "$REPO_ROOT")" || _die "저장소 경로를 해석하지 못했다" 2
+case "$envabs/" in "$repo_phys"/*) _die "env 파일이 저장소 안에 있다(링크를 풀면 ${envabs}) — 저장소 밖에 둔다" 1 ;; esac
 mode="$(stat -c '%a' "$ENVF")"
 [ "$mode" = "600" ] || _die "env 파일 권한이 0600 이 아니다: $mode" 1
 ./tools/prod-env-keys-check.sh --env-file "$ENVF" >/dev/null || _die "env 파일 키 집합이 템플릿과 다르다" 1
