@@ -302,5 +302,5 @@ private val ALLOWED_NAMES =
         "MyBidAggregateResponse",
         "MyBidResultResponsesKt",
         // M7/7C③-b — 알림함 기록 결과 sealed 싱글턴 셋의 `when` 소진(응답 조립 파일).
-        "BidPriceRequestResponseKt"
+        "BidPriceRequestResponseKt",
     )
