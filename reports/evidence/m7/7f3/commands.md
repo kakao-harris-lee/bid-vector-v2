@@ -35,11 +35,25 @@ RED 는 base `78b7f384` 의 버릴 clone 에서, GREEN 은 이 브랜치의 work
 | V4-3 회귀 통제군 | DB 이름만 다르게(앞 판도 막던 축) | exit 2 | exit 2 |
 | V4-3 통제군 | 바른 URL | exit 0 | exit 0 |
 | **V4-4** 손상된 `current` | `current` 에 `bad tag!` 를 쓰고 러너 | **exit 1**(러너 자신의 「예외」와 같은 값) · 볼륨을 만들고 죽었다 | **exit 3** — 태그 모양에서 멈춘다 |
-| **V4-5** 종료 코드 표 | runbook §9.4 의 종료 코드 문장 | `0`·`1`·`2` 만 | `3`(전제 실패)과 그 다섯 사유 |
+| **V4-5** 종료 코드 표 | runbook §9.4 의 종료 코드 문장 | `0`·`1`·`2` 만 | `3`(전제 실패)과 그 사유 여덟 |
 | **V4-6** 되돌림의 틈 | 되돌림이 `w7f3-a` 가 떠 있다고 보았는데 `current` 는 이미 `w7f3-b` — 되돌림이 exec 하는 명령 그대로 | **exit 0**(낡은 대상으로 반입) | **exit 2** — 그 사이 다른 반입이 끝났다 |
 | V4-6 통제군 | 같은 명령에 맞는 `--expect-running` | (인자 없음) | exit 0 |
 | **V4-7** 반입 중 훑기 | 프로젝트 잠금을 밖에서 쥔 채 러너 | **exit 1** · 컨테이너 **1** 개 생성 | **exit 3** · 컨테이너 **0** |
 | **V4-7** 훑는 중 반입 | 러너가 도는 동안 `prod-deploy.sh` dry-run | **exit 0**(러너가 잠금을 쥐지 않는다 — `exec` 라 놓고 떠난다) | **exit 2** · 러너가 끝난 뒤 통제군 exit 0 |
+| **V5-1** JVM 옵션 통로 | JDBC URL 은 **정상 그대로** 두고 `BIDVECTOR_APP_JAVA_TOOL_OPTIONS` 에 힙 옵션과 함께 `-Dbidvector.persistence.jdbcUrl=…` 를 실어 반입 | **exit 0** — V4-3 등식은 통과한 채다 | **exit 2** · 같은 입력으로 러너 **exit 3** |
+| V5-1 같은 축 둘 | 같은 키에 `-D…persistence.username=…` / `-XX:VMOptionsFile=…` | exit 0 · exit 0 | exit 2 · exit 2 |
+| V5-1 공백 변종 | 두 칸 공백 · 탭 · 따옴표로 감싼 두 토큰 | — | 전부 exit 2(해석값을 그대로 비교한다) |
+| V5-1 끝 공백 | `-XX:MaxRAMPercentage=70` 뒤 공백 하나 | — | **exit 0 이 맞다** — compose 가 끝 공백을 떼어 컨테이너가 받는 값이 허용 형태와 같다(해석값 실측) |
+| V5-1 통제군 | 허용 형태(`=70`) · 소수(`=66.6`) · 기본값 | exit 0 | exit 0 |
+| V5-1 표면 등식 | compose 의 app 에 새 통로 `JAVA_OPTS` 한 줄을 더한 변이(사본 복원) | (검사 없음) | **exit 2** 「더해짐[app.JAVA_OPTS]」 |
+| **V5-2** 자리 권한 | 잠금 디렉터리를 `777`·`775`·`1777` 로 | (검사 없음) | 전부 **exit 2** · `755`·`700` 통제군 exit 0 |
+| **V5-2** 자리 소유자 | 잠금 자리를 남이 소유한 디렉터리로(`/run/lock/subsys`, root 소유 — 쓰기 시도 없음) | (검사 없음) | 반입 **2** · 되돌림 **2** · 러너 **3** |
+| **V5-3** 매달린 러너 | 러너를 띄워 잠금을 쥔 채 반입 → 내 프로세스 트리를 끄고 다시 반입 | — | 쥔 동안 **exit 2** · 끈 뒤 **exit 0** · 남은 내 트리 0 (`systemctl stop` 이 기대는 성질) |
+| **V5-3** unit 상한 | §9.2 unit 블록 | `TimeoutStartSec` 0 곳 | `TimeoutStartSec=15m` · `TimeoutStopSec=1m` + §7.1 문제해결(`fuser` → `systemctl stop`) |
+| **V5-4** 종료 코드 정정 | §7.1 의 `ReadWritePaths=` 주 | 반입 값(`2`) 하나만 | 반입·되돌림 `2` · 러너 `3` 둘 다 |
+| **CR L-1** 태그 술어 | `previous` 에 `bad tag!` 를 쓰고 되돌림 · `--release 'bad tag!'` 로 반입 | (러너만 거른다) | 되돌림 **2** · 반입 **2** · 정상 통제군은 지난다 |
+| **CR L-3** authority 가림 | JDBC URL 을 `//<사용자>:<값>@호스트` 꼴로 | (축어로 남는다) | **exit 2** · 문면은 `//<자격 생략>@…` · 그 값의 계수 **0** |
+| **CR L-7** compose 문턱 | `compose version --short` 만 옛 판을 답하는 shim 을 PATH 앞에 두고 러너 | 러너에 검사 **0 곳** | 러너 **exit 3** · 반입 **exit 1** · 실제 compose 통제군은 지난다 |
 
 ## 반입·되돌림 리허설 (개발 host · 외부 effect 0)
 
@@ -47,7 +61,7 @@ RED 는 base `78b7f384` 의 버릴 clone 에서, GREEN 은 이 브랜치의 work
 |---|---|---|
 | ① 첫 반입 dry-run → `--apply` | 0 · 0 | `current=w7f3-a` · 백업 0(볼륨 없음·기록 없음 = 첫 반입) |
 | ② 헬스 | 0 | `prod-health: OK` |
-| ③ 주기 러너(뜬 스택에서 한 번) | 143 | 이미지 ID 등식·잠금·`--pull never` 를 **지나** compose 가 컨테이너를 띄웠다. 143 은 내가 멈춰 세운 값 — 아래 제한 ① |
+| ③ 주기 러너(뜬 스택에서 한 번) | 124 | compose 판·잠금·이미지 ID 등식·설정 통로를 **전부 지나** compose 가 컨테이너를 띄웠다. 124 는 내가 건 90초 상한 — 아래 제한 ① |
 | ④ 둘째 반입 `--apply` | 0 | `current=w7f3-b` · `previous=w7f3-a` · **반입 직전 백업 1** |
 | ⑤ 되돌림 dry-run → `--apply` | 0 · 0 | `--expect-running` 을 넘긴 채 `current=w7f3-a` 로 복귀 |
 | ⑥ 되돌린 뒤 헬스 | 0 | `prod-health: OK` |
@@ -72,10 +86,10 @@ RED 는 base `78b7f384` 의 버릴 clone 에서, GREEN 은 이 브랜치의 work
 | 6G 개발 DB | `bid-vector-v2-dev` 기동 유지 · 무접촉 |
 | host `/etc/nginx` | 무접촉(S-27c 는 저장소의 대역 host 설정으로 돈다) |
 | 프로브 잔여 | 컨테이너 0 · 볼륨 0 · 망 0 · 프로브 태그 0 · 잠금 파일 삭제 |
-| 고아 프로세스 | 측정마다 `tail -f /dev/null` 계수 0 을 확인(두 번 생겼고 PID 로 거뒀다) |
+| 고아 프로세스 | 측정마다 계수 0 을 확인. **끄는 대상은 내가 띄워 `$!` 로 잡은 PID 와 `pgrep -P` 로 따라간 그 자손뿐**이다 — 패턴으로 대상을 고르지 않는다 |
+| 수정 라운드 새 파일 ↔ in_scope | r1 에서 새로 만진 경로는 `docker/prod.env.template` 하나이고 계약 in_scope 안이다. **새 파일 0** — 산출물 전건 `M` |
 | evidence 비밀값 스캔 | `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7f3/` → 매치 0 |
 | clean tree | `git status --porcelain -- <in_scope 개별 인자>` 빈 출력 · 양성 대조는 아래 |
-| 수정 라운드 새 파일 ↔ in_scope | 새 파일 **0** — `git diff --name-status` 전건 `M`(evidence 제외) |
 | 낡는 좌표 | 이 slice 가 편집하는 파일에 `file:line` 0 · 역방향 `grep -rn '<stem>:[0-9]'` 0 |
 
 ## 알려진 제한
@@ -95,3 +109,10 @@ ID 등식이고 `--pull never` 는 그 뒤의 겹이다.
 
 ③ 이 slice 는 CI 워크플로를 바꾸지 않으므로 `container` job 의 나머지 step(이미지를 **굽는** 둘 포함)은
 돌리지 않았다. 입력이 바뀐 step 은 위 셋뿐이다.
+
+④ **V5-1 의 「app 이 실제로 그 값을 쓴다」는 축은 verifier r1 의 실측을 근거로 삼았다**(app 을
+`--network none` 으로 띄워 JVM 이 `-D` 의 호스트로 접속을 시도한 것). 이 레인은 그 사실 위에서 **게이트의
+RED→GREEN** 만 쟀다 — 같은 측정을 두 레인이 반복하지 않는다.
+
+⑤ 잠금 디렉터리의 **소유자 축**은 root 소유의 기존 디렉터리를 자리로 지정해 쟀다(읽기만 한다 — 그 자리에
+쓰거나 만들지 않았다). `chown` 으로 자리를 만드는 쪽은 root 권한이 없어 돌리지 않았다.
