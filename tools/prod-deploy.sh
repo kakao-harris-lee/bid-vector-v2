@@ -152,7 +152,7 @@ if [ -n "$RUNNING_REL" ] && [ "$RUNNING_REL" != "$REL" ]; then
     echo "  떠 있는 release ${RUNNING_REL} 가 ${REL} 에 없는 마이그레이션을 실었다: $(printf '%s' "$lost" | tr '\n' ' ')" >&2
     backup="$(grep -E "^${RUNNING_REL} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
     echo "  반입 직전 백업: ${backup:-기록 없음}" >&2
-    _die "멈춤 — 이미지를 되돌려도 스키마는 돌아오지 않는다(runbook §7.2)" 3
+    _die "멈춤 — 이미지를 되돌려도 스키마는 돌아오지 않는다(runbook 「되돌림 — DB 를 넘는 경우」)" 3
   fi
 fi
 

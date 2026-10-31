@@ -243,7 +243,23 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스.
 
-### 7.2 DB 를 넘는 경우 — 멈춘다
+### 7.2 반입이 실패했을 때 (가장 급한 경우)
+
+`prod-deploy.sh` 가 `up` 또는 헬스에서 실패하면 **컨테이너는 새 release 이고 마지막으로 성공한 것은 옛
+release** 다. 그 사이 상태는 `<state>/pending` 에 남는다 — 실패 문면이 그 자리와 다음 명령을 함께 보인다.
+
+```bash
+./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2           # dry-run
+./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
+```
+
+되돌림은 `pending` 을 「떠 있는 것」으로 보고 마지막으로 성공한 release 로 간다. **새 release 가
+마이그레이션을 실었으면 여기서도 exit 3 으로 멈춘다**(아래 「DB 를 넘는 경우」) — 그 검사는 `prod-deploy.sh --release <옛것>`
+으로 직접 부르는 길에도 걸려 있어, 가드를 우회하는 경로가 없다.
+
+첫 반입이 실패했다면 되돌릴 이전이 없다 — 스택을 내리고(`down`) 원인을 고친 뒤 다시 반입한다.
+
+### 7.3 DB 를 넘는 경우 — 멈춘다
 
 현재 release 가 직전에 없는 마이그레이션을 실었으면 `prod-rollback.sh` 는 **exit 3** 으로 멈추고 반입 직전 백업
 경로를 보인다. 이미지만 되돌리면 옛 app 이 새 스키마 위에서 뜬다. 선택은 둘이고 **운영자 결정**이다:
@@ -252,7 +268,7 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 - **백업 복원**: 반입 직전 백업을 6B-2 runbook §3 절차로 복원한다 — **그 사이의 쓰기를 잃는다.** 이 slice 는 이
   경로를 자동화하지 않는다.
 
-### 7.3 host nginx 조각
+### 7.4 host nginx 조각
 
 ```bash
 sudo rm /etc/nginx/sites-enabled/zz-bidvector_kr
@@ -301,7 +317,7 @@ app 여유를 더하는 문면.
    app 이 클라이언트 주소를 읽기 시작하면 Caddy 의 `trusted_proxies` 와 `X-Real-IP` 처리를 함께 정한다.
    또 그 결과 app 이 보는 `X-Forwarded-For` 는 클라이언트가 아니라 compose 망의 게이트웨이 주소다.
 4. **유량 제한은 클라이언트 주소 단위**다 — 같은 공인 IP 뒤의 여러 사용자는 한 몫을 나눠 쓴다. app 레벨 제한은 후속 후보.
-5. **DB 를 넘는 되돌림은 자동화하지 않는다**(§7.2).
+5. **DB 를 넘는 되돌림은 자동화하지 않는다**(§7 「되돌림 — DB 를 넘는 경우」).
 6. **반입 묶음은 tar 가 아니라 태그 + manifest** 다 — 운영 host 가 개발 host 와 같은 기계라서다. 다른 host 로
    옮기면 `docker save`/`load` 경로를 새로 만들어야 한다. `docker image prune -a` 가 돌지 않는 이전 release 의
    이미지를 지우면 되돌림이 manifest 대조에서 멈춘다.

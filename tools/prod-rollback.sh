@@ -44,7 +44,7 @@ pending="$(cat "$STATE/pending" 2>/dev/null || true)"
 if [ -n "$pending" ] && [ "$pending" != "$current" ]; then
   from="$pending"; to="$current"
   echo "== 되돌림 ${from} → ${to}  (끝나지 않은 반입 — 떠 있는 것은 ${from}, 마지막으로 성공한 것은 ${to})"
-  [ -n "$to" ] || _die "마지막으로 성공한 release 기록이 없다 — 첫 반입이 실패했다(runbook §7.4)" 2
+  [ -n "$to" ] || _die "마지막으로 성공한 release 기록이 없다 — 첫 반입이 실패했다(runbook 「되돌림 — 반입이 실패했을 때」)" 2
 else
   from="$current"; to="$previous"
   [ -n "$from" ] || _die "현재 release 기록이 없다 — 되돌릴 대상이 없다" 2
