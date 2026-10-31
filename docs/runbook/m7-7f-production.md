@@ -294,7 +294,18 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 > 오지 않는다. `TMPDIR` 아래였던 앞 판은 그 변수가 다른 두 셸이 서로 다른 파일을 잠가 동시 반입이
 > 열렸다. systemd unit 에 `PrivateTmp=yes` 를 붙여도 이 자리는 unit 안팎이 같은 파일을 본다 — 그 설정이
 > 가리는 것은 `/tmp` 와 `/var/tmp` 뿐이다. 반대로 `ProtectSystem=strict` 처럼 `/run` 을 읽기 전용으로
-> 만드는 설정을 더한다면 **이 디렉터리를 `ReadWritePaths=` 에 넣는다**(없으면 잠금을 열지 못해 `exit 2`).
+> 만드는 설정을 더한다면 **이 디렉터리를 `ReadWritePaths=` 에 넣는다** — 없으면 잠금을 열지 못해
+> 반입·되돌림은 `exit 2`, 주기 러너는 `exit 3` 이다.
+
+> **반입·되돌림이 `exit 2` 인데 반입·되돌림이 돌고 있지 않다면 주기 러너를 본다.** 러너도 같은 잠금을
+> 쥐고(§9.1), 매달리면 그동안 이 두 경로가 막힌다.
+> ```bash
+> fuser -v /run/lock/bidvector-v2/prod.bidvector-v2-prod.lock   # 누가 쥐고 있나
+> systemctl status bidvector-notification-sweep                  # 러너면 여기 보인다
+> sudo systemctl stop bidvector-notification-sweep               # 멈추면 fd 가 닫히고 잠금이 풀린다
+> ```
+> unit 의 `TimeoutStartSec=`(§9.2)이 상한을 지므로 이 손질이 필요한 경우는 상한 안에서 급한 때뿐이다.
+> 러너를 멈춘 뒤에는 일회 컨테이너가 남았는지 본다(`docker ps --filter name=<프로젝트>-app-run`).
 
 > **두 번째 되돌림의 대상은 「직전」이 아니라 「방금 떠난 쪽」이다.** A→B 뒤 되돌리면 B→A 가 되고
 > `previous` 는 B 가 된다 — 거기서 또 되돌리면 **B 로 간다**(마이그레이션 차이가 없으면 가드도 울지
@@ -391,6 +402,12 @@ Type=oneshot
 User=deploy
 WorkingDirectory=<저장소>
 ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+# **상한을 반드시 둔다.** 러너는 훑는 내내 프로젝트·상태 잠금을 쥔다(§7.1 의 주). `Type=oneshot` 은
+# 시작 시간 제한이 기본으로 꺼져 있으므로, 러너가 매달리면 잠금이 풀리지 않고 **반입과 되돌림이
+# `exit 2` 로 거절된다** — 사고 중에 가장 필요한 두 경로다. 상한이 지나면 systemd 가 러너를 죽이고
+# fd 가 닫히며 잠금이 풀린다.
+TimeoutStartSec=15m
+TimeoutStopSec=1m
 ```
 
 ```ini
