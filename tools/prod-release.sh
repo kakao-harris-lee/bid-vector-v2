@@ -38,7 +38,7 @@ declare -A HYGIENE_POLICY=(
   [ml-serving]=config/quality/image-hygiene-policy.properties
 )
 declare -A VULN_KIND=([app]=app [web]=web [proxy]=proxy [ml-serving]=ml-serving)
-ALLOWLIST=config/quality/vuln-allowlist.properties
+VULN_POLICY=config/quality/vuln-policy.properties
 ALLOWLIST_MIN_DAYS=14
 MIGRATION_DIR=adapters/src/main/resources/db/migration
 
@@ -76,13 +76,38 @@ dirty="$(git status --porcelain --untracked-files=no)"
 GIT_SHA="$(git rev-parse HEAD)"
 
 # allowlist 만료 근접(vr F-5).
+#
+# **정본 게이트와 같은 파일을 같은 방식으로 읽는다**(v M-2). 앞 판은 경로를 하드코딩하고 `^allow\|`
+# 정규식으로 읽었는데, `tools/vuln-scan-check.sh` 는 경로를 정책 키에서 읽고 **앞 공백·CR 을 지운 뒤**
+# 판정한다. 그래서 앞에 공백 두 칸을 둔 등재는 게이트에는 유효하고 이 검사에는 보이지 않았다
+# (2026-10-31 실측: 게이트 1 · 이 검사 0 · 만료 7일짜리가 그대로 통과).
+_policy_one() { # <키 정규식> — 정확히 한 줄이어야 한다
+  local v n
+  v="$(sed -n "s/^$1=//p" "$VULN_POLICY")"
+  n="$(printf '%s' "$v" | grep -c '' || true)"
+  [ "$n" = 1 ] || _die "취약점 정책의 $1 키가 ${n} 줄이다(판정 불가)" 2
+  printf '%s' "$v"
+}
+[ -r "$VULN_POLICY" ] || _die "취약점 정책을 읽지 못했다: ${VULN_POLICY}" 2
+ALLOWLIST="$(_policy_one 'allowlist\.file')"
+# 부재를 「등재 0」으로 읽지 않는다 — 정본 게이트와 같은 술어다(CR L-1). 이 자리는 프로세스 치환이라
+# `pipefail` 이 닿지 않아, 파일이 사라지거나 이름이 바뀌면 조용히 「등재 0」이 됐다.
+[ -r "$ALLOWLIST" ] || _die "allowlist 파일을 읽지 못했다: ${ALLOWLIST}(정책이 가리키는 파일은 실재해야 한다 — 부재를 '등재 0'으로 읽지 않는다)" 2
+
 today_epoch="$(date +%s)"
-soonest="" allow_n=0
-while IFS= read -r exp; do
+soonest="" allow_n=0 parsed_n=0
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
   allow_n=$((allow_n + 1))
-  e="$(date -d "$exp" +%s)" || _die "allowlist 만료일을 해석하지 못했다" 2
+  case "$line" in allow\|*) ;; *) _die "allowlist 행이 'allow|<kind>|<ID>|<패키지>=<만료일> <사유>' 형태가 아니다: '${line}'" 2 ;; esac
+  exp="$(printf '%s' "$line" | sed -n 's/^allow|[^=]*=\([0-9][0-9-]*\).*/\1/p')"
+  [ -n "$exp" ] || _die "allowlist 행에서 만료일을 읽지 못했다: '${line}'" 2
+  e="$(date -d "$exp" +%s)" || _die "allowlist 만료일을 해석하지 못했다: '${exp}'" 2
+  parsed_n=$((parsed_n + 1))
   if [ -z "$soonest" ] || [ "$e" -lt "$soonest" ]; then soonest="$e"; fi
-done < <(grep -oE '^allow\|[^=]+=[0-9]{4}-[0-9]{2}-[0-9]{2}' "$ALLOWLIST" | sed 's/.*=//')
+done < <(sed -e 's/\r$//' -e 's/^[[:space:]]*//' "$ALLOWLIST" | grep -v '^#' | grep -v '^$' || true)
+# 읽은 수와 판독한 수가 같아야 한다 — 한 줄이라도 새면 「가장 이른 만료」가 거짓이 된다.
+[ "$allow_n" = "$parsed_n" ] || _die "allowlist 등재 ${allow_n} 중 ${parsed_n} 만 판독했다(판정 불가)" 2
 if [ -n "$soonest" ]; then
   left=$(( (soonest - today_epoch) / 86400 ))
   [ "$left" -ge "$ALLOWLIST_MIN_DAYS" ] || _die "취약점 allowlist 의 가장 이른 만료가 ${left}일 뒤다(< ${ALLOWLIST_MIN_DAYS}) — 만료 처리 먼저(runbook §8.5)" 1
