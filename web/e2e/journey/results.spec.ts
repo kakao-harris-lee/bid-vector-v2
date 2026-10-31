@@ -21,9 +21,10 @@ import {
  * 에서 `await-opening`·`skip` 둘 다 409) 남의 여정의 건을 밀면 그 출발 단언이 영구히 깨진다.
  * 순서 독립은 되돌림이 아니라 **격리**로 선다.
  *
- * **알림함은 빈 얼굴로 지난다**(D-7E3a-6): 알림 트리거 여섯은 출하 조립에서 발화하지 않는다
- * (쓰기 포트의 빈이 없다 — 착수 실측). 우회 fixture 로 항목을 심지 않으므로 여기서 재는 것은
- * 「빈 얼굴과 배지 0 이 서버 값에서 나온다」까지다.
+ * **알림함에는 항목이 선다**(M7/7C③-b · D-7C3B-10): 트리거 배선이 들어와 투찰가 요청(여정 ③)과
+ * 결과 전이(이 여정)가 알림함에 기록된다. 우회 fixture 로 항목을 심지 않는 규율은 그대로이고,
+ * 항목은 **앞선 여정들이 실제로 한 일**에서 온다 — 그래서 여기서 재는 것은 「화면이 보이는 것이
+ * 같은 실행의 서버 응답과 같은가」다(개수도 종류도 응답에서 온다).
  */
 
 const NOTICE = 'SYN-7E3-RESULT';
@@ -235,7 +236,14 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
-test('알림함 — 트리거가 발화하지 않는 오늘의 사실을 서버 값으로 보인다', async ({ page }) => {
+type InboxItem = {
+  readonly kind: string;
+  readonly noticeNumber: string;
+  readonly noticeRound: string;
+  readonly read: boolean;
+};
+
+test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그대로 보인다', async ({ page }) => {
   const watched = watchRequests(page);
   await signIn(page);
 
@@ -248,16 +256,43 @@ test('알림함 — 트리거가 발화하지 않는 오늘의 사실을 서버 
   await expect(page.getByTestId('screen-inbox')).toBeVisible();
 
   const response = await listed;
-  const items = (await response.json()) as readonly unknown[];
+  const items = (await response.json()) as readonly InboxItem[];
   const unreadHeader = response.headers()['x-unread-count'];
 
-  // 착수 실측 그대로다 — 쓰기 포트의 빈이 출하 조립에 없어 어떤 트리거도 항목을 만들지 않는다.
-  expect(items, '알림 트리거가 발화하면 이 단언이 먼저 깨진다(그때 여정을 넓힌다)').toStrictEqual([]);
-  expect(unreadHeader, '안읽음 전수는 헤더가 나른다').toBe('0');
+  /**
+   * **트리거가 실제로 발화한다**(M7/7C③-b). 앞선 여정들이 한 일이 그대로 항목이 된다 —
+   * 투찰가 요청(여정 ③)과 개찰·결과 기록(여정 ⑤)이다. 우회 fixture 로 심은 것이 하나도 없다.
+   *
+   * **종류의 포함으로 단언한다**(전체 집합이 아니라) — 여정이 늘면 종류가 늘고, 그때 이
+   * 단언이 「여정을 더했다」는 이유로 붉어지는 것은 이 자리가 재려는 것이 아니다. 개수의
+   * 정합은 아래 DOM ↔ 응답 등식이 진다.
+   */
+  const kinds = new Set(items.map((one) => one.kind));
+  expect(items.length, '트리거가 하나도 발화하지 않았다 — 배선이 끊겼다').toBeGreaterThan(0);
+  expect(kinds, '여정 ③ 의 투찰가 요청이 알림함에 남지 않았다').toContain('BID_PRICE_REQUEST_RECORDED');
+  expect(kinds, '여정 ⑤ 의 개찰 기록이 알림함에 남지 않았다').toContain('OPENING_COMPLETED');
+  expect(kinds, '여정 ⑤ 의 결과 확정이 알림함에 남지 않았다').toContain('AWARD_DECIDED');
 
-  // **양성 표지를 먼저 기다린 뒤** 빈 얼굴을 단언한다(7E-2b r1 교훈) — 적재 중에도 항목이
-  // 없으므로, 기다리지 않으면 「아직 안 왔다」를 「비었다」로 읽는다.
-  await expect(page.getByTestId('inbox-empty')).toBeVisible();
+  // 개찰·결과 항목은 **그 건의 공고**를 싣는다 — 눌러서 워크시트로 갈 수 있는 값이다.
+  const mine = items.filter((one) => one.noticeNumber === NOTICE);
+  expect(mine.map((one) => one.kind).sort()).toStrictEqual(['AWARD_DECIDED', 'OPENING_COMPLETED']);
+
+  // **빈 얼굴이 아니다** — 양성 표지(행 하나)를 먼저 기다린 뒤 개수를 센다(7E-2b r1 교훈).
+  const rows = page.getByTestId(/^notification-/u);
+  await expect(rows.first()).toBeVisible();
+  await expect(page.getByTestId('inbox-empty')).toHaveCount(0);
+
+  // **개수는 응답에서 온다** — 화면이 센 수가 아니라 서버가 보낸 항목 수와 같아야 한다.
+  await expect(rows).toHaveCount(items.length);
+  for (const item of mine) {
+    await expect(
+      page.getByTestId(`notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}`),
+    ).toBeVisible();
+  }
+
+  // 배지는 **헤더에서만** 온다(본문 행을 세지 않는다).
+  const unread = items.filter((one) => !one.read).length;
+  expect(unreadHeader, '안읽음 전수는 헤더가 나른다').toBe(String(unread));
   await expect(page.getByTestId('inbox-unread-badge')).toHaveText(`안읽음 ${unreadHeader}`);
 
   // 채널 복제는 빈 자리다(R-4) — 입력칸·버튼을 만들지 않는다.
