@@ -71,6 +71,10 @@ for svc in "${SERVICES[@]}"; do
   fi
 done
 ./tools/prod-env-keys-check.sh --env-file "$ENVF" >/dev/null || _die "운영 env 파일 키 집합이 템플릿과 다르다" 1
+# `--untracked-files=no` — **추적되지 않는 파일은 세지 않는다.** 그래서 manifest 의 `git_sha` 는
+# 「이 커밋에서 만들었다」일 뿐 이미지 내용을 다 설명하지는 않는다: 추적되지 않는 파일도 빌드
+# 컨텍스트에 들어간다(각 이미지의 `.dockerignore` 가 좁히지만 그 자체가 설명은 아니다, CR L-10).
+# 재현 가능한 provenance 가 필요하면 깨끗한 clone 에서 release 를 만든다(runbook §2).
 dirty="$(git status --porcelain --untracked-files=no)"
 [ -z "$dirty" ] || _die "추적 파일에 커밋되지 않은 변경이 있다 — release 는 커밋 하나에서 만든다" 1
 GIT_SHA="$(git rev-parse HEAD)"
@@ -144,16 +148,35 @@ if [ "$APPLY" -eq 0 ]; then
     _plan "BIDVECTOR_RELEASE_TAG=${TAG} ${BIDVECTOR_PROD_COMPOSE[*]} --env-file <운영 env> --profile ml build ${SERVICES[*]}"
   fi
   for svc in "${SERVICES[@]}"; do _plan "위생 게이트 bidvector/${svc}:${TAG}"; done
-  [ "$VULN_RUN" -eq 1 ] && for svc in "${SERVICES[@]}"; do _plan "취약점 게이트 bidvector/${svc}:${TAG}"; done
+  # `A && for …` 가 아니라 `if`다 — 이 꼴이 블록의 마지막 명령이 되면 `set -e` 아래에서 dry-run 이
+  # 조용히 exit 1 이 된다(CR L-5).
+  if [ "$VULN_RUN" -eq 1 ]; then
+    for svc in "${SERVICES[@]}"; do _plan "취약점 게이트 bidvector/${svc}:${TAG}"; done
+  fi
   _plan "manifest → ${STATE}/releases/${TAG}.manifest"
   echo "prod-release: dry-run OK — --apply 로 실행한다"
   exit 0
 fi
 
+# 태그를 붙인 뒤 게이트가 실패하면 **태그만 남고 manifest 가 없는 막다른 상태**가 됐다. preflight 의
+# 「이미 있다」가 같은 태그의 재시도를 막는데, runbook 의 태그 규칙은 커밋당 결정적이라 같은 커밋에서
+# 원인을 고친 뒤 쓸 이름이 없었다(CR M-3). 이 실행이 붙인 태그는 이 실행이 거둔다.
+RELEASE_TAGGED=0
+_cleanup_release_tags() {
+  local rc=$?
+  [ "$RELEASE_TAGGED" -eq 1 ] || return 0
+  local svc
+  for svc in "${SERVICES[@]}"; do docker image rm "bidvector/${svc}:${TAG}" >/dev/null 2>&1 || true; done
+  echo "prod-release: 실패(exit ${rc}) — 이 실행이 붙인 release 태그 ${TAG} 를 거뒀다. 원인을 고친 뒤 **같은 태그로 다시** 돌릴 수 있다" >&2
+}
+trap _cleanup_release_tags EXIT
+
 echo "== 이미지"
 if [ -n "$SOURCE_TAG" ]; then
   for svc in "${SERVICES[@]}"; do docker tag "bidvector/${svc}:${SOURCE_TAG}" "bidvector/${svc}:${TAG}"; done
+  RELEASE_TAGGED=1
 else
+  RELEASE_TAGGED=1   # 빌드 경로도 release 태그로 굽는다 — 실패하면 같이 거둔다
   ./gradlew --no-daemon :app:bootJar
   BIDVECTOR_RELEASE_TAG="$TAG" "${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF" --profile ml build "${SERVICES[@]}"
 fi
@@ -161,7 +184,7 @@ fi
 echo "== 게이트"
 for svc in "${SERVICES[@]}"; do
   ./tools/image-hygiene-check.sh "bidvector/${svc}:${TAG}" "${HYGIENE_POLICY[$svc]}" >/dev/null \
-    || _die "위생 게이트 실패: bidvector/${svc}:${TAG} — 태그는 남지만 manifest 가 없어 반입되지 않는다" 1
+    || _die "위생 게이트 실패: bidvector/${svc}:${TAG}" 1
   echo "  위생 ${svc}: OK"
   if [ "$VULN_RUN" -eq 1 ]; then
     ./tools/vuln-scan-check.sh "bidvector/${svc}:${TAG}" "${VULN_KIND[$svc]}" config/quality/vuln-policy.properties >/dev/null \
@@ -184,4 +207,6 @@ tmp="$STATE/releases/.${TAG}.manifest.tmp"
   for m in "${MIGRATIONS[@]}"; do echo "migration=${m}"; done
 } > "$tmp"
 mv "$tmp" "$STATE/releases/${TAG}.manifest"
+# manifest 가 섰다 — 이제 태그는 반입이 쓸 것이므로 거두지 않는다.
+RELEASE_TAGGED=0
 echo "prod-release: OK — ${STATE}/releases/${TAG}.manifest"
