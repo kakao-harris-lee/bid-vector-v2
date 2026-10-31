@@ -114,4 +114,4 @@ checklist 1.5 — release·deploy·rollback 전부 0, **정지 상태 반입에�
 | 공존 서비스 식별자 | 이 slice 의 diff·커밋 이력에서 대소문자 무시 계수 **0**(D-7F2-2) |
 | evidence 비밀값 스캔 | `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7f2/` → 매치 0 |
 | clean tree | `git status --porcelain -- <in_scope 25 경로 개별 인자>` → 빈 출력. **양성 대조**(비파괴 절삭): 한 파일에 줄 하나를 더하면 ` M` 이 뜨고, `truncate` 로 되돌리면 다시 빈 출력 · `git hash-object` 전후 동일 |
-| 크기 게이트 | evidence 77,217 B ≤ 산출물 308,201 B |
+| 크기 게이트 | evidence 82,189 B ≤ 산출물 326,324 B (판정 SHA 의 정본은 PR 조치 코멘트 — 이 수는 커밋마다 움직인다) |

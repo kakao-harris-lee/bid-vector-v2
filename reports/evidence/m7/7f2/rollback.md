@@ -1,37 +1,32 @@
 # M7/7F 본편 — rollback
 
-**실측 HEAD: `8caaea45`** (수정 라운드 1 에서 다시 냈다). 마지막 **산출물** 커밋은 `77ddc45a` 이고 그 뒤는 evidence
-뿐이다 — 둘 사이에 복원 목록의 경로는 하나도 움직이지 않았다(`git diff --name-only 77ddc45a..8caaea45 -- <25 경로>`
-빈 출력). 실측을 evidence 쪽 커밋에서 낸 이유는 **⑥ⓐ 때문**이다: `77ddc45a` 의 evidence 에는 스캔 어휘가 축어로
-남아 있어 `leakPatternGate` 가 붉었고(그 자체가 이 slice 의 장부 결함이었다), 다음 커밋에서 서술로 바꿔 초록이 됐다.
-되돌림 자체(①~③·⑥ⓑ)는 두 커밋에서 같다.
+**실측 HEAD: `57ef1f89`** — 이 slice 의 **마지막 산출물 커밋**이다(수정 라운드 2 에서 다시 냈다). 뒤따르는 evidence
+커밋은 아래 복원 목록의 경로를 하나도 건드리지 않는다. 판정 SHA 와 실측 HEAD 가 다른 것은 정상이고, 확인할 것은
+**그 사이에 되돌림 대상이 움직였는가**다: `git diff --name-only 57ef1f89..<판정 SHA> -- <아래 25 경로>` 가 빈
+출력이면 이 실측은 유효하다.
 
-판정 SHA 와 실측 HEAD 가 다른 것은 정상이고, 확인할 것은 **그 사이에 되돌림 대상이 움직였는가**다:
-`git diff --name-only 8caaea45..<판정 SHA> -- <아래 25 경로>` 가 빈 출력이면 이 실측은 유효하다.
+## 복원 기준은 병합된 main 고정 SHA `5e0617bf` 다
 
-## 복원 기준은 병합된 main 고정 SHA `957587c4` 다
-
-이 브랜치는 2026-10-31 에 main 을 **병합했다**(`ceb6df59`). 그래서 앞 판의 전제(「base 이후 main 을 병합하지 않았다」)는
-더 이상 참이 아니고, 복원원도 옛 base 가 아니다 — 옛 base 로 되돌리면 공유 파일(`ci.yml` 등)에서 그 사이 들어온 **다른
-레인의 줄 860 커밋 분량**을 함께 지운다. 복원원은 **병합된 main 의 고정 SHA `957587c4`** 하나다(움직이는 `origin/main` 이
-아니다).
+이 브랜치는 main 을 **두 번 병합했다**(`ceb6df59` → `957587c4`, `9b2162c5` → `5e0617bf`). 그래서 복원원은 옛 base 가
+아니다 — 옛 base 로 되돌리면 공유 파일에서 그 사이 들어온 다른 레인의 줄을 함께 지운다. 복원원은 **마지막으로 병합한
+main 의 고정 SHA `5e0617bf`** 하나다(움직이는 `origin/main` 이 아니다).
 
 **전제 — 실측**
 
 | 전제 | 확인 |
 |---|---|
-| `957587c4` 에 이 slice 가 없다 | A 19 경로 전부 그 SHA 에 **부재**(`git cat-file -e` 전수, 하나도 안 걸림) → 복원이 그 19 개를 지우는 것이 맞다 |
+| `5e0617bf` 에 이 slice 가 없다 | A 19 경로 전부 그 SHA 에 **부재**(`git cat-file -e` 전수) → 복원이 그 19 개를 지우는 것이 맞다 |
 | 공유 파일 6 개는 그 SHA 에 **남의 내용으로** 있다 | 복원이 내 줄만 지우고 남의 줄을 보존한다 |
-| 병합은 하나뿐 | `git log --merges 957587c4..HEAD` → `ceb6df59` 한 줄 |
+| 마지막 병합 뒤의 병합은 없다 | `git log --merges 5e0617bf..HEAD` 빈 출력 |
 
 ## 목록 — 기계 산출
 
-`git diff --name-status 957587c4..HEAD` 에서 evidence(`reports/evidence/m7/7f2/**`)를 뺀 것이다. **라운드마다 다시 낸다.**
+`git diff --name-status 5e0617bf..HEAD` 에서 evidence(`reports/evidence/m7/7f2/**`)를 뺀 것이다. **라운드마다 다시 낸다.**
 
 | 상태 | 경로 |
 |---|---|
 | A (19, 복원 명령이 지운다) | `deploy/nginx/test-fixture/nginx.conf` · `deploy/nginx/test-fixture/sites-enabled/default` · `deploy/nginx/test-fixture/sites-enabled/existing_site` · `deploy/nginx/zz-bidvector_kr.conf.template` · `docker/compose.prod.yaml` · `docker/prod.env.template` · `docker/proxy.prod.Caddyfile` · `docker/proxy.site.caddy` · `docs/runbook/m7-7f-production.md` · `tools/prod-cert-check.sh` · `tools/prod-deploy.sh` · `tools/prod-env-keys-check.sh` · `tools/prod-env.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` · `tools/prod-nginx-render.sh` · `tools/prod-proxy-sites-check.sh` · `tools/prod-release.sh` · `tools/prod-rollback.sh` |
-| M (6, `957587c4` 로 복원) | `.github/workflows/ci.yml` · `config/quality/image-hygiene-policy-proxy.properties` · `docker/proxy.Caddyfile` · `docker/proxy.Dockerfile` · `docker/proxy.Dockerfile.dockerignore` · `docs/runbook/m6-6e-operations.md` |
+| M (6, `5e0617bf` 로 복원) | `.github/workflows/ci.yml` · `config/quality/image-hygiene-policy-proxy.properties` · `docker/proxy.Caddyfile` · `docker/proxy.Dockerfile` · `docker/proxy.Dockerfile.dockerignore` · `docs/runbook/m6-6e-operations.md` |
 | 되돌리지 않음 | `reports/evidence/m7/7f2/**`(계약·evidence) |
 
 경로 **스물다섯**은 위 표(A 19 + M 6)와 집합이 같다(`comm -23` 빈 출력으로 확인). 경로는 개별 인자다.
@@ -39,7 +34,7 @@
 ## 명령
 
 ```
-git restore --source=957587c4 --staged --worktree -- \
+git restore --source=5e0617bf --staged --worktree -- \
   .github/workflows/ci.yml \
   config/quality/image-hygiene-policy-proxy.properties \
   deploy/nginx/test-fixture/nginx.conf \
@@ -87,7 +82,7 @@ CI 축만 끄려면 `container` job 의 S-27·S-27b·S-27c 를 지운다 — 앞
 |---|---|---|
 | ① | 복원 명령 종료 코드 | **0** |
 | ② | D/M 수 | `D` **19** · `M` **6** (위 표와 같다) |
-| ③ | in_scope 의 `957587c4` 대비 diff | **빈 출력(0줄)**. 트리 전체로 넓혀도 남는 것은 `reports/evidence/m7/7f2/` 의 계약·evidence 넷뿐이다 |
+| ③ | in_scope 의 `5e0617bf` 대비 diff | **빈 출력(0줄)**. 트리 전체로 넓혀도 남는 것은 `reports/evidence/m7/7f2/` 의 계약·evidence 넷뿐이다 |
 | ④ | compile | **N/A — 컴파일 대상 소스 변경 0**(`*.kt`·`*.kts`·`*.py`·`*.proto`·`*.ts`·`*.tsx`·`*.java` 의 base 대비 변경 0, 전수 확인). 트리 동일성으로 갈음한다 |
 | ⑤ | test | 같은 사유로 N/A |
 | ⑥ | 게이트 | (ⓐ) evidence 축 `leakPatternGate` — 되돌린 트리에서 실행 **exit 0**, 실행 뒤에도 트리가 되돌린 상태 그대로(`D` 19 · `M` 6). (ⓑ) 컨테이너 축 — 되돌린 트리의 `container` job 입력(`ci.yml`·`docker/**`·`tools/**`·`config/quality/**`·`deploy/**`)이 ③ 으로 base 와 **바이트 동일**하므로 판정이 base 와 같다(트리 동일성) |
