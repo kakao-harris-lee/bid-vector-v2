@@ -1,9 +1,13 @@
 # M7/7F 본편 — rollback
 
-**실측 HEAD: `bd5a1114`** — 이 slice 의 **마지막 산출물 커밋**이다. 뒤따르는 evidence 커밋은 아래 복원 목록의 경로를
-하나도 건드리지 않는다(목록은 `reports/evidence/m7/7f2/**` 를 빼고 만든다). 그러므로 판정 SHA 와 실측 HEAD 가 다른 것은
-정상이고, 확인할 것은 **그 사이에 되돌림 대상이 움직였는가**다:
-`git diff --name-only bd5a1114..<판정 SHA> -- <아래 25 경로>` 가 빈 출력이면 이 실측은 유효하다.
+**실측 HEAD: `8caaea45`** (수정 라운드 1 에서 다시 냈다). 마지막 **산출물** 커밋은 `77ddc45a` 이고 그 뒤는 evidence
+뿐이다 — 둘 사이에 복원 목록의 경로는 하나도 움직이지 않았다(`git diff --name-only 77ddc45a..8caaea45 -- <25 경로>`
+빈 출력). 실측을 evidence 쪽 커밋에서 낸 이유는 **⑥ⓐ 때문**이다: `77ddc45a` 의 evidence 에는 스캔 어휘가 축어로
+남아 있어 `leakPatternGate` 가 붉었고(그 자체가 이 slice 의 장부 결함이었다), 다음 커밋에서 서술로 바꿔 초록이 됐다.
+되돌림 자체(①~③·⑥ⓑ)는 두 커밋에서 같다.
+
+판정 SHA 와 실측 HEAD 가 다른 것은 정상이고, 확인할 것은 **그 사이에 되돌림 대상이 움직였는가**다:
+`git diff --name-only 8caaea45..<판정 SHA> -- <아래 25 경로>` 가 빈 출력이면 이 실측은 유효하다.
 
 ## 복원 기준은 병합된 main 고정 SHA `957587c4` 다
 
@@ -86,7 +90,7 @@ CI 축만 끄려면 `container` job 의 S-27·S-27b·S-27c 를 지운다 — 앞
 | ③ | in_scope 의 `957587c4` 대비 diff | **빈 출력(0줄)**. 트리 전체로 넓혀도 남는 것은 `reports/evidence/m7/7f2/` 의 계약·evidence 넷뿐이다 |
 | ④ | compile | **N/A — 컴파일 대상 소스 변경 0**(`*.kt`·`*.kts`·`*.py`·`*.proto`·`*.ts`·`*.tsx`·`*.java` 의 base 대비 변경 0, 전수 확인). 트리 동일성으로 갈음한다 |
 | ⑤ | test | 같은 사유로 N/A |
-| ⑥ | 게이트 | (ⓐ) evidence 축 `leakPatternGate` — 되돌린 트리에서 실행(결과는 `commands.md`), 실행 뒤에도 트리가 되돌린 상태 그대로. (ⓑ) 컨테이너 축 — 되돌린 트리의 `container` job 입력(`ci.yml`·`docker/**`·`tools/**`·`config/quality/**`)이 ③ 으로 base 와 **바이트 동일**하므로 판정이 base 와 같다(트리 동일성) |
+| ⑥ | 게이트 | (ⓐ) evidence 축 `leakPatternGate` — 되돌린 트리에서 실행 **exit 0**, 실행 뒤에도 트리가 되돌린 상태 그대로(`D` 19 · `M` 6). (ⓑ) 컨테이너 축 — 되돌린 트리의 `container` job 입력(`ci.yml`·`docker/**`·`tools/**`·`config/quality/**`·`deploy/**`)이 ③ 으로 base 와 **바이트 동일**하므로 판정이 base 와 같다(트리 동일성) |
 
 ## 리허설 잔여
 
