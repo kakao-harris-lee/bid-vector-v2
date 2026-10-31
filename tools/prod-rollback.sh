@@ -36,24 +36,11 @@ done
 
 # 반입과 **같은 잠금 둘**을 같은 순서로 쓴다 — 되돌림이 반입과 겹치면 상태 파일이 엉킨다(v V-4).
 # 되돌림은 결국 `prod-deploy.sh` 를 부르므로 그 쪽이 잡을 수 있도록 **exec 하기 전에 전부 놓는다**.
-# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리.
-# 상태 디렉터리 하나만 잡던 앞 판은 **같은 프로젝트를 다른 state-dir 로** 동시에 반입할 수 있었다
-# (v V3-4). 순서를 고정했으므로 교착은 없다. 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
-_prod_lock() { # <잠금 파일> <무엇>
-  local f="$1" what="$2" fd
-  exec {fd}>>"$f" || _die "${what} 잠금 파일을 열지 못했다: $f" 2
-  flock -n "$fd" || _die "다른 반입·되돌림이 ${what}에서 돌고 있다($f) — 끝난 뒤 다시" 2
-  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
-}
-_prod_unlock_all() {
-  local fd
-  for fd in ${BIDVECTOR_LOCK_FDS:-}; do flock -u "$fd" 2>/dev/null || true; eval "exec ${fd}>&-" 2>/dev/null || true; done
-  BIDVECTOR_LOCK_FDS=""
-}
+# 자리와 순서의 정본은 `tools/prod-env.sh` 다 — 셋 스크립트가 같은 글자를 쓴다.
 PROJ_FOR_LOCK="${PROJECT:-$BIDVECTOR_PROD_PROJECT}"
 mkdir -p "$STATE"
-_prod_lock "${TMPDIR:-/tmp}/bidvector-v2-prod.${PROJ_FOR_LOCK}.lock" "프로젝트 ${PROJ_FOR_LOCK}"
-_prod_lock "$STATE/.lock" "이 상태 디렉터리"
+_prod_project_lock "$PROJ_FOR_LOCK" || _die "$_PROD_LOCK_ERR" 2
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 2
 
 current="$(cat "$STATE/current" 2>/dev/null || true)"
 previous="$(cat "$STATE/previous" 2>/dev/null || true)"

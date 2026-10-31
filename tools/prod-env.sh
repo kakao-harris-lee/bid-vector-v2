@@ -58,6 +58,46 @@ done
 BIDVECTOR_PROD_COMPOSE+=(-p "$BIDVECTOR_PROD_PROJECT")
 unset _f
 
+# **잠금의 자리는 환경에서 오지 않는다 — 고정 절대 경로다.** 앞 판은 `${TMPDIR:-/tmp}` 였고, `TMPDIR`
+# 이 서로 다른 두 셸은 **다른 파일을 잠갔다** — 같은 프로젝트의 동시 반입이 환경 문자열 하나로 다시
+# 열렸다(v V4-1). systemd unit 의 `PrivateTmp=yes` 도 같은 꼴이다. 그 설정이 가리는 것은 `/tmp` 와
+# `/var/tmp` 뿐이라, FHS 의 잠금 자리는 unit 안팎이 **같은 파일**을 본다. tmpfs 라 재부팅에 지워지는
+# 것도 맞다 — 잠금은 살아 있는 프로세스의 것이지 남겨 두는 기록이 아니다.
+BIDVECTOR_PROD_LOCK_DIR=/run/lock/bidvector-v2
+
+# <잠금 파일> <무엇> → `flock -n` 으로 잡는다(기다리지 않는다). 실패하면 1 과 `_PROD_LOCK_ERR` 를
+# 남긴다 — 문면의 접두는 호출자마다 다르므로 끊는 것은 호출자가 한다.
+_prod_lock() {
+  local f="$1" what="$2" fd
+  _PROD_LOCK_ERR=""
+  exec {fd}>>"$f" || { _PROD_LOCK_ERR="${what} 잠금 파일을 열지 못했다: $f"; return 1; }
+  flock -n "$fd" || {
+    _PROD_LOCK_ERR="다른 반입·되돌림·훑기가 ${what}에서 돌고 있다($f) — 끝난 뒤 다시"
+    eval "exec ${fd}>&-" 2>/dev/null || true
+    return 1
+  }
+  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
+}
+
+# <프로젝트 이름> → 그 프로젝트의 잠금. **잠금 둘의 순서는 프로젝트 먼저, 그 다음 상태 디렉터리**이고
+# 셋 스크립트가 같은 순서를 쓴다(교착이 생길 수 없다 — 셋 다 기다리지 않는다).
+_prod_project_lock() {
+  local proj="$1"
+  _PROD_LOCK_ERR=""
+  mkdir -p "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null \
+    || { _PROD_LOCK_ERR="잠금 디렉터리를 만들지 못했다: ${BIDVECTOR_PROD_LOCK_DIR}"; return 1; }
+  _prod_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${proj}.lock" "프로젝트 ${proj}"
+}
+
+_prod_unlock_all() {
+  local fd
+  for fd in ${BIDVECTOR_LOCK_FDS:-}; do
+    flock -u "$fd" 2>/dev/null || true
+    eval "exec ${fd}>&-" 2>/dev/null || true
+  done
+  BIDVECTOR_LOCK_FDS=""
+}
+
 # <상태 디렉터리> <release> → 그 release 의 마이그레이션 목록(정렬). manifest 가 없으면 1 을 돌려준다.
 _prod_migrations() {
   local man="$1/releases/$2.manifest"

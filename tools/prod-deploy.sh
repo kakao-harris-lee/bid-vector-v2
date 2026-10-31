@@ -64,23 +64,12 @@ EXPECT_PROJECT="$BIDVECTOR_PROD_PROJECT"
 if [ -n "$PROJECT" ]; then COMPOSE+=(-p "$PROJECT"); EXPECT_PROJECT="$PROJECT"; fi
 export BIDVECTOR_RELEASE_TAG="$REL"
 
-# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리.
+# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리(`tools/prod-env.sh`).
 # 상태 디렉터리 하나만 잡던 앞 판은 **같은 프로젝트를 다른 state-dir 로** 동시에 반입할 수 있었다
 # (v V3-4). 순서를 고정했으므로 교착은 없다. 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
-_prod_lock() { # <잠금 파일> <무엇>
-  local f="$1" what="$2" fd
-  exec {fd}>>"$f" || _die "${what} 잠금 파일을 열지 못했다: $f" 2
-  flock -n "$fd" || _die "다른 반입·되돌림이 ${what}에서 돌고 있다($f) — 끝난 뒤 다시" 2
-  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
-}
-_prod_unlock_all() {
-  local fd
-  for fd in ${BIDVECTOR_LOCK_FDS:-}; do flock -u "$fd" 2>/dev/null || true; eval "exec ${fd}>&-" 2>/dev/null || true; done
-  BIDVECTOR_LOCK_FDS=""
-}
 mkdir -p "$STATE"
-_prod_lock "${TMPDIR:-/tmp}/bidvector-v2-prod.${EXPECT_PROJECT}.lock" "프로젝트 ${EXPECT_PROJECT}"
-_prod_lock "$STATE/.lock" "이 상태 디렉터리"
+_prod_project_lock "$EXPECT_PROJECT" || _die "$_PROD_LOCK_ERR" 2
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 2
 
 echo "== preflight — release ${REL}"
 # env 파일
