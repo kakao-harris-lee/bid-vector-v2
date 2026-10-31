@@ -220,17 +220,18 @@ _wait_http() {
 _wait_http "http://127.0.0.1:${PPROXY}/" -H "Host: ${TEST_DOMAIN}:${PROXY_PORT}" \
   || _die "운영 site proxy 가 뜨지 않았다(판정 불가)" 2
 
-_nginx_up() {
+_nginx_up() { # [설정 디렉터리 — 기본은 $CONF]
+  local conf="${1:-$CONF}"
   docker rm -f "$C_NGINX" >/dev/null 2>&1 || true
   local test_out
   if ! test_out="$(docker run --rm --network "container:${C_PROXY}" \
-      -v "$CONF:/etc/nginx:ro" -v "$CERTS:/harness-certs:ro" \
+      -v "$conf:/etc/nginx:ro" -v "$CERTS:/harness-certs:ro" \
       -v "$ACME:/var/www/bidvector-v2-acme:ro" "$NGINX_IMAGE" nginx -t 2>&1)"; then
     echo "$test_out" | tail -n 3 >&2
     return 1
   fi
   docker run -d --name "$C_NGINX" --network "container:${C_PROXY}" \
-    -v "$CONF:/etc/nginx:ro" -v "$CERTS:/harness-certs:ro" \
+    -v "$conf:/etc/nginx:ro" -v "$CERTS:/harness-certs:ro" \
     -v "$ACME:/var/www/bidvector-v2-acme:ro" "$NGINX_IMAGE" >/dev/null
   local i
   for i in $(seq 1 40); do
@@ -358,12 +359,30 @@ body="$(curl -s --max-time 5 -H "Host: ${TEST_DOMAIN}" "http://127.0.0.1:${P80}/
 srv80="$(curl -sI --max-time 5 -H "Host: ${TEST_DOMAIN}" "http://127.0.0.1:${P80}/probe" | tr -d '\r' | sed -n 's/^[Ss]erver: //p')"
 [ -n "$srv80" ] || fail "80 응답에 Server 헤더가 없다(판정 불가)"
 [ "$srv80" = "nginx" ] || fail "80 의 Server 헤더가 이름만이 아니다(버전 노출?): '${srv80}'"
-# 리다이렉트 목적지가 **클라이언트의 Host 가 아니라 고정 도메인**이어야 한다(CR L-2).
+
+_step "(N2b) 80 리다이렉트 목적지가 **고정 도메인**이다 — 조각이 기본 대상이 되는 변형에서"
+# 평소에는 사본의 `default` site 가 80 의 기본 대상을 쥐고 있어 다른 Host 는 이 조각에 **닿지도
+# 않는다** — 그래서 목적지를 `$host` 로 되돌려도 아무 단언이 붉어지지 않았다(CR r2 M-2: 두 갈래가
+# 둘 다 통과였다). 그 전제가 바뀌는 날을 재려면 **조각이 기본 대상인 판**이 필요하다.
+# **조각만 남긴다.** `default` 만 빼면 사본의 기존 site 가 80 의 첫 server 가 되어 다른 Host 를
+# 가로챈다(첫 실측: `301 https://existing.test/probe`) — 그러면 이 단언이 또 공허해진다.
+CONF_DEFLESS="$WORK/conf-onlyfrag"
+rm -rf "$CONF_DEFLESS"; cp -a "$CONF" "$CONF_DEFLESS"
+find "$CONF_DEFLESS/sites-enabled" -mindepth 1 ! -name "$FRAGMENT_NAME" -delete
+[ -e "$CONF_DEFLESS/sites-enabled/$FRAGMENT_NAME" ] \
+  || _die "변형에 조각이 남지 않았다 — N2b 측정 불가(판정 불가)" 2
+_nginx_up "$CONF_DEFLESS" || _die "조각만 남긴 판이 뜨지 않는다 — N2b 측정 불가(판정 불가)" 2
 got_other="$(_probe_http "other.invalid")"
 case "$got_other" in
-  "301 https://${TEST_DOMAIN}/probe"|30*" https://${TEST_DOMAIN}"*) ;;
-  *) echo "  (다른 Host 는 이 조각이 받지 않는다: ${got_other})" ;;
+  30*" https://${TEST_DOMAIN}/probe")
+    echo "  다른 Host(other.invalid) → ${got_other} · 목적지가 고정 도메인이다" ;;
+  30*" https://other.invalid"*)
+    fail "리다이렉트 목적지가 클라이언트의 Host 를 되돌려준다: ${got_other}" ;;
+  *)
+    # 조각이 기본 대상이 되지 못했다 — 이 단언은 공허하다. 초록으로 넘기지 않는다.
+    _die "default site 를 뺐는데도 다른 Host 가 이 조각에 닿지 않는다(${got_other}) — N2b 측정 불가" 2 ;;
 esac
+_nginx_up || _die "원래 설정으로 되돌리지 못했다(판정 불가)" 2
 
 _https() { curl -sk --max-time 5 --resolve "${TEST_DOMAIN}:${P443}:127.0.0.1" "$@"; }
 _u() { printf 'https://%s:%s%s' "$TEST_DOMAIN" "$P443" "$1"; }
