@@ -9,6 +9,13 @@ import * as queries from '../api/queries';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
+  GAP_STATE_DISPLAY,
+  OUTCOME_AGREEMENT_DISPLAY,
+  RECONCILED_OUTCOME_DISPLAY,
+  RECONCILIATION_BLOCKER_DISPLAY,
+  SUBMITTED_AMOUNT_ORIGIN_DISPLAY,
+} from '../display/myBidResultDisplay';
+import {
   OPENING_RESULT_STATE_DISPLAY,
   PROVISIONAL_RANK_ONE_DISPLAY,
   type OpeningResultState,
@@ -21,6 +28,8 @@ vi.mock('../api/queries');
 
 type BidCase = queries.BidCase;
 type OpeningResultView = queries.OpeningResultView;
+type MyBidCase = queries.MyBidCase;
+type MyBidResults = queries.MyBidResults;
 
 function bidCase(overrides: Partial<BidCase> = {}): BidCase {
   return {
@@ -62,6 +71,64 @@ function opening(overrides: Partial<OpeningResultView> = {}): OpeningResultView 
   };
 }
 
+/** 하네스 실측값(착수 보고 ③)을 기본값으로 — 오늘의 답은 「대사 판정 불가 · 차이 부재」다. */
+function myBidCase(overrides: Partial<MyBidCase> = {}): MyBidCase {
+  return {
+    caseId: 51,
+    noticeNumber: 'SYN-7E3-RESULT',
+    noticeRound: '000',
+    recordedState: 'AWAITING_OPENING',
+    submittedAmountWon: 1_350_000_000,
+    submittedAmountCurrency: 'KRW',
+    submittedAmountVatTreatment: 'INCLUSIVE',
+    submittedAmountOrigin: 'OPERATOR_ENTERED',
+    chosenOptionRef: null,
+    submittedAt: '2026-10-31T03:20:31.073Z',
+    confirmedAt: '2026-10-31T03:20:31.082Z',
+    openingState: 'NOT_OPENED_YET',
+    confirmedAwardAmountWon: null,
+    confirmedAwardAmountCurrency: null,
+    confirmedAwardAmountBasis: null,
+    confirmedAwardAmountVatTreatment: null,
+    confirmedAwardAmountProvenance: null,
+    reconciledOutcome: 'UNDECIDABLE',
+    reconciliationBlocker: 'NOT_OPENED_YET',
+    outcomeAgreement: 'NOT_COMPARABLE',
+    gapState: 'AWARD_ABSENT',
+    gapWon: null,
+    gapCurrency: null,
+    ...overrides,
+  };
+}
+
+function myBidResults(
+  cases: readonly MyBidCase[] = [myBidCase()],
+  overrides: Partial<MyBidResults['aggregate']> = {},
+): MyBidResults {
+  return {
+    cases: [...cases],
+    aggregate: {
+      sampleSize: cases.length,
+      recordedRateState: 'ABSENT_NO_DECIDED_CASES',
+      recordedAwardRate: null,
+      recordedWonCount: 0,
+      recordedLostCount: 0,
+      recordedDenominator: 0,
+      recordedFailedOrRebidCount: 0,
+      recordedUndecidedCount: cases.length,
+      reconciledRateState: 'ABSENT_NO_DECIDED_CASES',
+      reconciledAwardRate: null,
+      reconciledWonCount: 0,
+      reconciledLostCount: 0,
+      reconciledDenominator: 0,
+      reconciledFailedOrRebidCount: 0,
+      reconciledUndecidedCount: cases.length,
+      reconciliationBlockers: ['NOT_OPENED_YET'],
+      ...overrides,
+    },
+  };
+}
+
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -86,6 +153,7 @@ beforeEach(() => {
   mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
   mocked.listBidCases.mockResolvedValue([bidCase()]);
   mocked.readOpeningResult.mockResolvedValue(opening());
+  mocked.readMyBidResults.mockResolvedValue(myBidResults());
 });
 
 afterEach(() => {
@@ -310,8 +378,8 @@ describe('링크가 그 건의 탭을 싣는다 (r1 M-2)', () => {
   });
 });
 
-describe('빈 자리 (D-7E3a-3)', () => {
-  it('일곱 자리가 전부 「준비 중」 또는 사유와 함께 뜨고 입력칸·버튼이 없다', async () => {
+describe('다루지 않는 자리 (D-7E3a-3 → M7/7E-3b)', () => {
+  it('남은 자리가 사유와 함께 뜨고 입력칸·버튼이 없다', async () => {
     renderScreen();
     const slots = within(await screen.findByTestId('results-pending'));
 
@@ -324,16 +392,222 @@ describe('빈 자리 (D-7E3a-3)', () => {
     expect(slots.queryAllByRole('textbox')).toStrictEqual([]);
   });
 
-  /** 집계는 **목록을 세어 짓지 않는다**(계약) — 분모가 서지 않으므로 숫자 자체가 없다. */
-  it('낙찰률 자리에 숫자가 없다 — 목록을 세어 집계를 지어내지 않는다', async () => {
+  /**
+   * **앞 판의 단언을 바꿔치운 자리**다. 7E-3a 는 「`pending-win-rate` 에 숫자가 없다」로 「목록을
+   * 세어 집계를 지어내지 않는다」를 잠갔다. 그 자리는 이제 집계 절이 받았으므로 단언을 지우지
+   * 않고 **같은 주장의 새 모양**으로 옮긴다: 서버가 분모 0 을 말하면 화면에도 비율 숫자가 없다.
+   */
+  it('서버가 분모 0 을 말하면 화면에 비율 숫자가 없다 — 목록을 세어 짓지 않는다', async () => {
     mocked.listBidCases.mockResolvedValue([
       bidCase({ caseId: 51, state: 'WON' }),
       bidCase({ caseId: 52, state: 'LOST' }),
     ]);
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ caseId: 51 }), myBidCase({ caseId: 52 })]),
+    );
     renderScreen();
 
-    const rate = await screen.findByTestId('pending-win-rate');
-    expect(rate.textContent ?? '').not.toMatch(/\d+(\.\d+)?\s*%/u);
+    const aggregate = await screen.findByTestId('results-aggregate');
+    expect(within(aggregate).queryByTestId('rate-value-recorded'), '분모 0 인데 비율 값을 그렸다').toBeNull();
+    expect(aggregate.textContent ?? '').not.toMatch(/\d+(\.\d+)?\s*%/u);
+  });
+
+  /** 7E-3b 가 채운 다섯은 **빈 자리 목록에서 사라졌다** — 값 옆에 「준비 중」이 함께 서지 않는다. */
+  it('7E-3b 가 채운 자리의 빈 칸이 남아 있지 않다', async () => {
+    renderScreen();
+    await screen.findByTestId('results-pending');
+
+    for (const id of ['my-bid-amount', 'award-difference', 'chosen-plan', 'reconciliation', 'win-rate']) {
+      expect(screen.queryByTestId(`pending-${id}`), `${id} 가 아직 빈 자리로 있다`).toBeNull();
+    }
+  });
+});
+
+describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b-1·7)', () => {
+  it('목록과 같은 화면에서 결과 조회를 한 번 부른다', async () => {
+    renderScreen();
+
+    await waitFor(() => expect(mocked.readMyBidResults).toHaveBeenCalledTimes(1));
+  });
+
+  /**
+   * 투찰 금액 칸은 **넷이고 전부 non-null** 이다(D-7E3b-7 ⒝ — `basis` 가 없다). 세 갈래 읽기가
+   * 적용될 자리가 아니라 숫자와 부속 칸이 함께 선다.
+   */
+  it('내 투찰가가 통화·과세와 함께 선다', async () => {
+    renderScreen();
+
+    const amount = (await screen.findByTestId('submitted-amount-51')).textContent ?? '';
+    expect(amount).toContain('1,350,000,000');
+    expect(amount).toContain('KRW');
+    expect(amount).toContain('INCLUSIVE');
+  });
+
+  /** 「고른 안」은 **빈칸이 아니라 상태**다 — 오늘의 답은 「메뉴에서 고른 것이 아님」이다. */
+  it('고른 안이 빈칸이 아니라 출처 상태로 선다', async () => {
+    renderScreen();
+
+    const chosen = (await screen.findByTestId('chosen-option-51')).textContent ?? '';
+    expect(chosen).toContain(SUBMITTED_AMOUNT_ORIGIN_DISPLAY.OPERATOR_ENTERED.label);
+    expect(chosen.trim().length).toBeGreaterThan(0);
+  });
+
+  it('차이가 서지 않으면 그 상태가 답이고 숫자가 없다', async () => {
+    renderScreen();
+
+    const gap = (await screen.findByTestId('award-gap-51')).textContent ?? '';
+    expect(gap).toContain(GAP_STATE_DISPLAY.AWARD_ABSENT.label);
+    expect(gap).not.toMatch(/\d/u);
+  });
+
+  it('차이가 서면 음수 부호까지 그대로 그린다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ gapState: 'COMPUTED', gapWon: -40_000_000, gapCurrency: 'KRW' })]),
+    );
+    renderScreen();
+
+    const gap = (await screen.findByTestId('award-gap-51')).textContent ?? '';
+    expect(gap).toContain('-40,000,000');
+    expect(gap).toContain('KRW');
+  });
+
+  /** **판정 불가는 패찰이 아니다** — 사유가 함께 서야 운영자가 기다릴지 말지를 안다. */
+  it('판정 불가가 자기 문면과 사유로 선다 — 패찰 문면이 아니다', async () => {
+    renderScreen();
+
+    const verdict = (await screen.findByTestId('reconciled-outcome-51')).textContent ?? '';
+    expect(verdict).toContain(RECONCILED_OUTCOME_DISPLAY.UNDECIDABLE.label);
+    expect(verdict).not.toContain(RECONCILED_OUTCOME_DISPLAY.LOST.label);
+    expect(screen.getByTestId('reconciliation-blocker-51').textContent ?? '').toContain(
+      RECONCILIATION_BLOCKER_DISPLAY.NOT_OPENED_YET.label,
+    );
+  });
+
+  /** 사유는 **판정 불가일 때만** 값이 있다(계약) — 결말이 선 건에 사유 자리를 만들지 않는다. */
+  it('판정이 선 건에는 사유 자리가 없다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ reconciledOutcome: 'LOST', reconciliationBlocker: null })]),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('reconciled-outcome-51')).textContent ?? '').toContain(
+      RECONCILED_OUTCOME_DISPLAY.LOST.label,
+    );
+    expect(screen.queryByTestId('reconciliation-blocker-51')).toBeNull();
+  });
+
+  it('운영자 기록과의 일치가 자기 칸으로 선다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ recordedState: 'WON', reconciledOutcome: 'LOST', outcomeAgreement: 'DISAGREE' })]),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('outcome-agreement-51')).textContent ?? '').toContain(
+      OUTCOME_AGREEMENT_DISPLAY.DISAGREE.label,
+    );
+  });
+
+  /**
+   * **두 축을 한 값으로 접지 않는다**(D-7C5B-3). 운영자 기록은 카드 머리의 상태 배지가, 서버
+   * 대사는 이 절의 판정 배지가 든다 — 어긋나도 어느 쪽도 상대를 덮지 않는다.
+   */
+  it('운영자 기록과 서버 대사가 어긋나도 둘 다 보인다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WON' })]);
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ recordedState: 'WON', reconciledOutcome: 'LOST', outcomeAgreement: 'DISAGREE' })]),
+    );
+    renderScreen();
+
+    const card = within(await screen.findByTestId('result-case-51'));
+    expect(card.getByTestId('result-state-51').textContent ?? '').toContain(BID_CASE_STATE_DISPLAY.WON.label);
+    expect(card.getByTestId('reconciled-outcome-51').textContent ?? '').toContain(
+      RECONCILED_OUTCOME_DISPLAY.LOST.label,
+    );
+  });
+
+  /**
+   * **개찰 축은 두 출처가 따로 선다**(D-7E3b-9). `readOpeningResult` 가 카드의 개찰 절을, 대사
+   * 응답의 `openingState` 가 「판정이 본 입력」을 든다 — 어긋나면 둘 다 보인다(접지 않는다).
+   */
+  it('개찰 축이 어긋나면 두 자리가 각자의 값을 보인다', async () => {
+    mocked.readOpeningResult.mockResolvedValue(opening({ state: 'OPENED' }));
+    mocked.readMyBidResults.mockResolvedValue(myBidResults([myBidCase({ openingState: 'NOT_COLLECTED' })]));
+    renderScreen();
+
+    expect((await screen.findByTestId('opening-state-51')).textContent ?? '').toContain(
+      OPENING_RESULT_STATE_DISPLAY.OPENED.label,
+    );
+    expect(screen.getByTestId('judged-opening-state-51').textContent ?? '').toContain(
+      OPENING_RESULT_STATE_DISPLAY.NOT_COLLECTED.label,
+    );
+  });
+
+  /**
+   * 카드 ⊆ `cases[]` 는 **전이표의 성질**이지 타입이 아니다(D-7E3b-7 ⒞). 짝이 없으면 칸을
+   * 비우지 않고 사유 한 줄을 적는다 — 빈 칸은 「값이 없다」로 읽혀 거짓말이 된다.
+   */
+  it('결과 조회에 그 건이 없으면 사유 한 줄이고 칸을 비우지 않는다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(myBidResults([myBidCase({ caseId: 99 })]));
+    renderScreen();
+
+    expect(await screen.findByTestId('result-missing-51')).toBeTruthy();
+    expect(screen.queryByTestId('submitted-amount-51'), '짝이 없는데 투찰가 칸을 그렸다').toBeNull();
+  });
+
+  it('결과 조회만 실패하면 카드는 남고 대사 절만 오류 얼굴이다', async () => {
+    mocked.readMyBidResults.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    expect(await screen.findByTestId('my-bid-results-error')).toBeTruthy();
+    expect(screen.getByTestId('result-case-51'), '카드가 통째로 사라졌다').toBeTruthy();
+    expect(screen.queryByTestId('reconciled-outcome-51'), '조회 실패에 판정을 지어냈다').toBeNull();
+  });
+});
+
+/**
+ * **칸의 전수**(7E-3a r1 CR M-3 의 선례). 계약이 주는 칸을 화면이 버리지 않는다 — 계약에 칸이
+ * 늘면 `satisfies` 가 컴파일에서, 키 집합 등식이 값 쪽에서 먼저 틀린다.
+ */
+describe('결과 응답의 칸 전수 (D-7E3b-3)', () => {
+  /** 칸 → 그것을 싣는 testId 접두. `QUERY` 는 대응 키·카드 머리가 이미 그리는 칸이다. */
+  const FIELD_PLACEMENT = {
+    caseId: 'QUERY',
+    noticeNumber: 'QUERY',
+    noticeRound: 'QUERY',
+    recordedState: 'QUERY',
+    submittedAmountWon: 'submitted-amount',
+    submittedAmountCurrency: 'submitted-amount',
+    submittedAmountVatTreatment: 'submitted-amount',
+    submittedAmountOrigin: 'chosen-option',
+    chosenOptionRef: 'chosen-option',
+    submittedAt: 'submitted-at',
+    confirmedAt: 'confirmed-at',
+    openingState: 'judged-opening-state',
+    confirmedAwardAmountWon: 'judged-confirmed-award',
+    confirmedAwardAmountCurrency: 'judged-confirmed-award',
+    confirmedAwardAmountBasis: 'judged-confirmed-award',
+    confirmedAwardAmountVatTreatment: 'judged-confirmed-award',
+    confirmedAwardAmountProvenance: 'judged-confirmed-award',
+    reconciledOutcome: 'reconciled-outcome',
+    reconciliationBlocker: 'reconciliation-blocker',
+    outcomeAgreement: 'outcome-agreement',
+    gapState: 'award-gap',
+    gapWon: 'award-gap',
+    gapCurrency: 'award-gap',
+  } as const satisfies Record<keyof MyBidCase, string>;
+
+  it('표의 키 집합이 계약 칸 전수와 같다', () => {
+    expect(Object.keys(FIELD_PLACEMENT).sort()).toStrictEqual(Object.keys(myBidCase()).sort());
+  });
+
+  it('QUERY 가 아닌 칸은 전부 화면에 자리가 있다', async () => {
+    renderScreen();
+    await screen.findByTestId('reconciled-outcome-51');
+
+    const places = new Set(Object.values(FIELD_PLACEMENT).filter((one) => one !== 'QUERY'));
+    for (const place of places) {
+      expect(screen.queryByTestId(`${place}-51`), `${place} 자리가 화면에 없다`).not.toBeNull();
+    }
   });
 });
 

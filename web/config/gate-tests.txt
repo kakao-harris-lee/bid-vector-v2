@@ -57,12 +57,18 @@ src/display/openingResultDisplay.test.ts
 # 알림 종류 여덟·부가 사실 넷의 전수와 **건별 묶음이 연속 접기이고 정렬이 아닌 것**(계약),
 # 묶음 계수가 이 페이지의 행 수가 아니라 서버 값인 것(D-7E3a-6).
 src/display/notificationDisplay.test.ts
-# 화면 E 가 보이는 상태의 묶음(일곱)과 빈 자리 일곱 — 「뒤에 오는 것」과 「영영 오지 않는 것」이
-# 갈려 있는 것이 D-7E3a-3 의 술어다.
+# 화면 E 가 보이는 상태의 묶음(일곱)과 다루지 않는 자리 둘 — 「뒤에 오는 것」과 「영영 오지
+# 않는 것」이 갈려 있는 것이 D-7E3a-3 의 술어이고, 7E-3b 뒤로는 「LATER 가 0 건」이 그 자리다.
 src/display/resultDisplay.test.ts
+# M7/7E-3b — 대사 어휘 여섯의 전수와 **판정 불가를 패찰로 접지 않는 것** · 분모 0 이 0% 가 아닌
+# 것 · 두 축이 자기 접두 칸만 보는 것이 이 slice 의 게이트 술어다(D-7E3b-7·8).
+src/display/myBidResultDisplay.test.ts
 # 화면 E 가 보이는 값이 API 응답의 값이고, **잠정이 확정 자리에 서지 않으며**, E 가 결과 기록
-# 전이를 부르지 않는 것(D-7E3a-8).
+# 전이를 부르지 않는 것(D-7E3a-8). M7/7E-3b 로 대사 절의 칸 전수와 「짝이 없으면 사유 한 줄」도.
 src/screens/ResultsScreen.test.tsx
+# M7/7E-3b — 집계 두 축의 **병기**와 분모 0 의 비율 값 자리 부재, 표본 정의 문면. 축 하나를
+# 지우거나 접두를 바꿔 끼우는 변이가 여기서 멈춘다(D-7E3b-2·8).
+src/screens/ResultsAggregate.test.tsx
 # 알림함 — 배지가 **헤더의 안읽음 전수**에서만 오고 읽음 처리가 서버 응답 뒤에만 보이는 것
 # (낙관 갱신 금지, D-7E3a-1·6). 묶음의 「공고를 모름」과 「제목만 빔」이 다른 얼굴인 것도 여기.
 src/screens/InboxScreen.test.tsx

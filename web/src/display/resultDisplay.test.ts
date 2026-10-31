@@ -43,42 +43,38 @@ describe('화면 E 가 보이는 상태의 묶음', () => {
   });
 });
 
-describe('E 의 빈 자리 (D-7E3a-3)', () => {
+describe('E 가 다루지 않는 자리 (D-7E3a-3 → M7/7E-3b)', () => {
   /**
-   * 빈 자리를 **표로** 두는 이유: 「준비 중」을 화면 여기저기에 글로 적으면 7E-3b 가 무엇을
-   * 채워야 하는지가 코드에서 사라진다. 표에 있으면 그 slice 가 줄을 지우는 diff 로 끝난다.
+   * 빈 자리를 **표로** 둔 덕에 7E-3b 의 일이 **줄을 지우는 diff** 로 끝났다: 「준비 중」이던
+   * 다섯(내 투찰가 · 차이 · 고른 안 · 자동 대사 · 낙찰률)은 이제 화면에 서므로 표에서 사라졌고,
+   * 남은 둘은 **영영 오지 않는** 자리다.
    */
-  it('일곱 자리이고 id 가 중복되지 않는다', () => {
+  it('둘뿐이고 id 가 중복되지 않는다', () => {
     const ids = RESULT_PENDING_SLOTS.map((one) => one.id);
 
-    expect(ids).toStrictEqual([
-      'my-bid-amount',
-      'award-difference',
-      'chosen-plan',
-      'reconciliation',
-      'win-rate',
-      'back-calculation',
-      'recommendation-error',
-    ]);
+    expect(ids).toStrictEqual(['back-calculation', 'recommendation-error']);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  /** 뒤에 오는 것과 **영영 오지 않는 것**은 다른 사실이다 — 운영자가 기다릴지 말지가 갈린다. */
-  it('7E-3b 몫 다섯과 영구 빈 자리 둘이 갈려 있다', () => {
-    const later = RESULT_PENDING_SLOTS.filter((one) => one.kind === 'LATER').map((one) => one.id);
+  /**
+   * **「준비 중」이 남아 있으면 안 된다.** 7E-3b 가 채운 자리를 표에 남겨 두면 화면이 이미 그린
+   * 값 옆에 「준비 중」이 함께 서고, 운영자는 그 칸이 아직 안 되는 것으로 읽는다.
+   */
+  it('뒤에 오는 자리(LATER)가 0 이다 — 다섯은 화면이 받았다', () => {
+    const later = RESULT_PENDING_SLOTS.filter((one) => one.kind === 'LATER');
+
+    expect(later, `아직 「준비 중」인 자리가 남았다: ${later.map((one) => one.id).join(' · ')}`).toStrictEqual(
+      [],
+    );
+  });
+
+  it('남은 둘이 영구 빈 자리다 — 근거 부족·후속', () => {
     const permanent = RESULT_PENDING_SLOTS.filter((one) => one.kind === 'PERMANENT').map((one) => one.id);
 
-    expect(later).toStrictEqual([
-      'my-bid-amount',
-      'award-difference',
-      'chosen-plan',
-      'reconciliation',
-      'win-rate',
-    ]);
     expect(permanent).toStrictEqual(['back-calculation', 'recommendation-error']);
   });
 
-  it('자리마다 사유가 있다 — 「준비 중」만 적지 않는다', () => {
+  it('자리마다 사유가 있다 — 「다루지 않음」만 적지 않는다', () => {
     for (const slot of RESULT_PENDING_SLOTS) {
       expect(slot.why.length, `${slot.id} 에 사유가 없다`).toBeGreaterThan(0);
     }
