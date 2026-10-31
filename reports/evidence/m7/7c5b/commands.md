@@ -185,3 +185,34 @@ BUILD SUCCESSFUL 도 그것만으로는 「그 test 가 돌았다」가 아니�
 | Playwright 스모크 | 2 PASS |
 
 여정 e2e(W-13)는 여전히 미실행이다(화면 무변경 · 컨테이너 필요) — PR CI 를 정본으로 둔다.
+
+## r2 수정 라운드 — 지적 ↔ 커밋 ↔ 실측 ↔ **재현 명령**
+
+이 묶음 뒤에는 리뷰 라운드가 없다. 팀장이 버릴 clone 에서 독립 재현할 수 있도록 **변이 위치와
+표적 명령**을 함께 적는다. 모든 표적 실행에 `--rerun` 을 붙인다(FROM-CACHE 통제군은 실행이 아니다).
+
+| 지적 | 커밋 | 바꿔치울 자리 | 표적 명령 | 전 | 후 |
+| --- | --- | --- | --- | --- | --- |
+| **v M-1** 토큰 넷이 손으로 쓴 집합과 맞댄다 | `efef1596` | `MyBidResultResponses.kt` 의 `ReconciliationVerdict.FailedBid -> "FAILED_BID"` → `"FAILED"`(spec 불변) | `:app:test --rerun --tests 'bidvector.app.http.*MyBidResult*'` | **0** | **1** |
+| **v L-2** 묶음 질의 마스킹 미측정 | `1331f583` | `MyBidResultSql.kt` 의 `AND ${OpeningResultViewSql.UNMASKED_RAW_PREDICATE}` → `AND TRUE` | `:adapters:test --rerun --tests '*JdbcMyBidResultViewTest'` | **0** | **1** |
+| **v L-1 · CR L-7** 출하 빈 몸통 미측정 | `1331f583` | `ProfileWiring.kt` 의 `operatorTradeNameOf(businessProfileStore)` → `OperatorTradeNamePort { OperatorTradeName.NotDeclared }` | `:app:test --rerun --tests '*ProfileWiringTradeNameTest'` | **0** | **1** |
+| **CR M-2** `caseId` 폭이 형제와 다르다 | `efef1596` | 계약의 `cases[].caseId.format` 을 `int32` 로 | `:app:test --rerun --tests '*OpenApiMyBidResultContractTest'` | — | 붉음 |
+| **CR L-1 · L-2** 사유 배열 enum · test 이름 계수 | `efef1596` | — | — | — | 아홉 계수 일치 |
+| **CR L-4 · L-5 · L-6** | `27769476` | — | — | — | 픽스처 비면 붉음 · 순서 비의존 · 소유가 이름에 |
+
+### 토큰 등식이 이제 무엇을 잡는가
+
+`reconciledOutcome` · `gapState` · `submittedAmountOrigin` · 비율 상태 둘의 계약 enum 은 이제
+**봉인 계층의 값을 전수로 만들어 토큰 함수에 통과시킨 산출**과 맞댄다. 소진 `when` 이 입력
+전수를 지키므로, 갈래가 늘면 컴파일이 먼저 막고 **글자를 바꾸면 이 등식이 깨진다**. 앞 판은
+생산자의 글자를 바꿔도 spec 도 test 도 그대로라 wire 만 달라졌다.
+
+`aggregate.reconciliationBlockers[].items` 에도 enum 을 냈다 — 생성 TS 가 `string[]` 이 아니라
+union 배열이 된다.
+
+### 요구표 집계가 넷이 아니라 **다섯** 움직인 이유 (CR L-3)
+
+이 slice 는 E 행 **넷**을 ⓑ→ⓐ 로 뒤집었는데 집계는 ⓐ(API) 3→8 · ⓑ 50→45 로 **다섯**이 움직였다.
+앞 판의 3·50 이 실제(4·49)와 하나 어긋나 있었고 — main 의 7E-3a 편집이 수를 갱신하지 않고
+남긴 것이다 — 이번 **기계 재산출**이 그것을 함께 고쳤다. 문서가 「기계로 센 값」이라 재산출이
+옳은 거동이고, 지금 수가 맞다(ⓐ 12 = API 8 + 클라이언트 4 · ⓑ 45 · 합 65 불변).
