@@ -1,18 +1,21 @@
 import { useId } from 'react';
 
-import type { components } from '../api/generated/operator-api';
+import { VAT_TREATMENT_DISPLAY, type VatTreatment } from '../display/moneyDisplay';
 
 /** 나라장터 입찰공고 상세 — **이동만** 한다(D-UX-2: 자동 제출은 범위 밖이고 상한이 「이동 + 복사」다). */
 const KONEPS_NOTICE_URL = 'https://www.g2b.go.kr/index.jsp';
 
-export type VatTreatment = components['schemas']['RecordBidRequest']['vatTreatment'];
+export type { VatTreatment };
 
-/** 과세 구분은 **운영자가 고른다** — 기본값을 지어내면 화면이 그 사실을 아는 척하게 된다. */
-export const VAT_CHOICES: readonly { readonly value: VatTreatment; readonly label: string }[] = [
-  { value: 'INCLUSIVE', label: '부가세 포함' },
-  { value: 'EXCLUSIVE', label: '부가세 별도' },
-  { value: 'UNKNOWN', label: '모름' },
-];
+/**
+ * 과세 구분은 **운영자가 고른다** — 기본값을 지어내면 화면이 그 사실을 아는 척하게 된다.
+ *
+ * 라벨을 **표에서 끌어온다**(M7/7E-3b r1 — CR M-1): 앞 판은 여기에 한글 라벨을 적고 결과 화면은
+ * 원문 토큰을 보여, 운영자가 고른 말과 돌아오는 말이 달랐다. 목록도 표의 선언 순서를 그대로 쓴다.
+ */
+export const VAT_CHOICES: readonly { readonly value: VatTreatment; readonly label: string }[] = (
+  Object.keys(VAT_TREATMENT_DISPLAY) as readonly VatTreatment[]
+).map((value) => ({ value, label: VAT_TREATMENT_DISPLAY[value].label }));
 
 export interface BidAmountForm {
   readonly amount: string;

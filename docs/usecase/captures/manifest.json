@@ -1,0 +1,139 @@
+{
+  "capturedAt": "2026-10-31T06:18:39.132Z",
+  "head": "829d302c156df2acaa5d4ac3bc86d270eaf810e9",
+  "totalBytes": 954109,
+  "files": [
+    {
+      "path": "a-start-desktop.png",
+      "screen": "a-start",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 1407,
+      "bytes": 108611,
+      "sha256": "a9e898f3e6eda1f1c60910f70f4f774d86fdb37d6f36a6882f66c0cd91196b74"
+    },
+    {
+      "path": "b-notices-desktop.png",
+      "screen": "b-notices",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 800,
+      "bytes": 55472,
+      "sha256": "dd995bd6018841babd100a2e14b6648cd4bcf9d37f52a7b315035277eb6534bd"
+    },
+    {
+      "path": "c-worksheet-desktop.png",
+      "screen": "c-worksheet",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 1454,
+      "bytes": 133295,
+      "sha256": "fa8740b02710c3d64ca8f00406f543b28c4955ec919fab087f27849263cd7968"
+    },
+    {
+      "path": "d-bid-box-desktop.png",
+      "screen": "d-bid-box",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 800,
+      "bytes": 28786,
+      "sha256": "7886660376fa38b0d0fff0f6ee6af106ca32c42ce4b36a84566813c8110994c3"
+    },
+    {
+      "path": "e-results-desktop.png",
+      "screen": "e-results",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 1359,
+      "bytes": 131869,
+      "sha256": "694bf2efaf1468d34d5786b6c29544c1684375d86d5bfe1a327665e4fe2e761c"
+    },
+    {
+      "path": "inbox-desktop.png",
+      "screen": "inbox",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 800,
+      "bytes": 33540,
+      "sha256": "4bf4dadc57dd7830977648b6daa9d868e934f6557eb848287fdb78b73ad043c3"
+    },
+    {
+      "path": "a-start-mobile.png",
+      "screen": "a-start",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 1653,
+      "bytes": 99002,
+      "sha256": "5f359a968eed185f5978d52d90c9eaef224e34337b63955cec7ba507a078bc56"
+    },
+    {
+      "path": "b-notices-mobile.png",
+      "screen": "b-notices",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 847,
+      "bytes": 49812,
+      "sha256": "1f5040951d0a55ed8145e474cf10c17087349a41cc507c30843a6d31b4468f1a"
+    },
+    {
+      "path": "c-worksheet-mobile.png",
+      "screen": "c-worksheet",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 1694,
+      "bytes": 122298,
+      "sha256": "af5244cbd038f89bc58a30ddac7168e3bf55e1d684eeb9ed5cd83ecb34fd0f0a"
+    },
+    {
+      "path": "d-bid-box-mobile.png",
+      "screen": "d-bid-box",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 844,
+      "bytes": 22711,
+      "sha256": "0011aca649764faa9c501a06214d2da41e336870cef6af8fb63031f0f3224c4f"
+    },
+    {
+      "path": "e-results-mobile.png",
+      "screen": "e-results",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 2239,
+      "bytes": 140241,
+      "sha256": "f3fe4ebdc49ca2af9b367c9470b6aace51316ba0f9adf32fa87f9195772b069d"
+    },
+    {
+      "path": "inbox-mobile.png",
+      "screen": "inbox",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 844,
+      "bytes": 28472,
+      "sha256": "5f231467a5e430cb898a7e9aa2edbb9678407f57224fcbbb4606f14e8fbbee62"
+    }
+  ]
+}

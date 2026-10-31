@@ -29,6 +29,86 @@ import {
 const NOTICE = 'SYN-7E3-RESULT';
 
 /**
+ * 결과 조회 응답에서 **이 여정이 대조하는 칸만** 적는다(M7/7E-3b). 칸 전수는 vitest 가
+ * `satisfies` 로 잠그고, 여기서 재는 것은 「DOM 이 **같은 실행의 응답**과 같은가」다.
+ */
+interface MyBidResultsBody {
+  readonly cases: readonly {
+    readonly caseId: number;
+    readonly submittedAmountWon: number;
+    readonly submittedAmountCurrency: string;
+    readonly submittedAmountVatTreatment: string;
+    readonly submittedAmountOrigin: string;
+    readonly reconciledOutcome: string;
+    readonly reconciliationBlocker: string | null;
+    readonly outcomeAgreement: string;
+    readonly gapState: string;
+  }[];
+  readonly aggregate: {
+    readonly sampleSize: number;
+    readonly recordedRateState: string;
+    readonly recordedAwardRate: string | null;
+    readonly recordedWonCount: number;
+    readonly recordedDenominator: number;
+    readonly reconciledRateState: string;
+    readonly reconciledAwardRate: string | null;
+    readonly reconciliationBlockers: readonly string[];
+  };
+}
+
+/**
+ * 계약 토큰 → 화면 문면. **화면의 표를 import 하지 않는다**(`CASE_TAB_LABEL` 과 같은 사유) —
+ * 같은 출처에서 양쪽을 끌어오면 표가 틀려도 대조가 초록이다.
+ */
+const RECONCILED_OUTCOME_LABEL: Readonly<Record<string, string>> = {
+  WON: '낙찰(대사)',
+  LOST: '패찰(대사)',
+  FAILED_BID: '유찰',
+  REBID: '재입찰',
+  UNDECIDABLE: '아직 판정 못 함',
+};
+const BLOCKER_LABEL: Readonly<Record<string, string>> = {
+  NOTICE_ABSENT: '공고를 모름',
+  NOT_OPENED_YET: '아직 개찰 전',
+  NOT_COLLECTED: '개찰 자료 없음',
+  OBSERVED_NOT_PROMOTED: '원문만 적재됨',
+  PROGRESS_UNRECOGNIZED: '진행구분 미등재',
+  PROGRESS_ABSENT: '진행구분 없음',
+  OPERATOR_NAME_NOT_DECLARED: '내 상호 미설정',
+  OPERATOR_NAME_NORMALIZES_TO_EMPTY: '내 상호가 빈 값',
+  WINNER_NAME_NOT_PUBLISHED: '낙찰자 상호 미공개',
+  WINNER_NAME_NORMALIZES_TO_EMPTY: '낙찰자 상호가 빈 값',
+};
+const AGREEMENT_LABEL: Readonly<Record<string, string>> = {
+  AGREE: '내 기록과 같음',
+  DISAGREE: '내 기록과 다름',
+  NOT_COMPARABLE: '견줄 수 없음',
+};
+const GAP_STATE_LABEL: Readonly<Record<string, string>> = {
+  COMPUTED: '차이 있음',
+  AWARD_ABSENT: '확정 낙찰가가 없어 뺄 수 없음',
+};
+const ORIGIN_LABEL: Readonly<Record<string, string>> = {
+  OPERATOR_ENTERED: '직접 입력',
+  PRICE_MENU: '추천 메뉴에서 고름',
+};
+const VAT_LABEL: Readonly<Record<string, string>> = {
+  INCLUSIVE: '부가세 포함',
+  EXCLUSIVE: '부가세 별도',
+  UNKNOWN: '과세 구분 모름',
+};
+const RATE_STATE_LABEL: Readonly<Record<string, string>> = {
+  MEASURED: '잰 값',
+  ABSENT_NO_RECORDED_BIDS: '셀 것이 없음',
+  ABSENT_NO_DECIDED_CASES: '분모에 드는 건이 없음',
+};
+
+/** 자릿점·통화를 걷고 **숫자만** 남긴다 — spec 이 화면의 서식 함수를 복제하지 않으려는 것이다. */
+function digitsOf(text: string): string {
+  return text.replace(/[^\d-]/gu, '');
+}
+
+/**
  * 결과 단계의 전이 하나 — **화면 D 에서** 보낸다(E 는 읽기 화면이라 전이를 내지 않는다).
  *
  * **전역 탐색으로 들어가므로 탭을 먼저 고른다**: 그 입구는 어느 건을 보러 가는지 모르고, D 는
@@ -209,6 +289,14 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   const relisted = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
+  /**
+   * 대사·집계의 출처(M7/7E-3b). 이 화면은 질의가 **신선도 0** 이라 들를 때마다 다시 부른다 —
+   * 이 클릭이 낳는 응답을 집는다. 앞 방문의 응답은 이미 끝났으므로 여기 걸리지 않는다.
+   */
+  const resultsRead = page.waitForResponse(
+    (one) =>
+      one.url().includes('/api/bid-results') && one.request().method() === 'GET' && one.status() === 200,
+  );
   await page.getByRole('link', { name: 'E 결과 확인' }).click();
   const finalRows = (await (await relisted).json()) as BidCaseRow[];
   const settled = finalRows.find((row) => row.caseId === caseId)!;
@@ -222,13 +310,91 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
     CHECKPOINT_LABEL.NONE!,
   );
 
-  // 빈 자리 일곱이 **입력칸·버튼 없이** 서 있다(D-7E3a-3).
+  // ── 대사 절 — DOM 이 **같은 실행의 결과 조회 응답**과 같다(D-7E3b-4) ───────
+  const results = (await (await resultsRead).json()) as MyBidResultsBody;
+  const mineResult = results.cases.find((one) => one.caseId === caseId);
+  expect(mineResult, '결과 조회에 여정 ⑤ 의 건이 없다 — 투찰 기록이 있는 건은 여기 선다').toBeDefined();
+
+  // 금액은 **숫자만** 맞대되 **정확히 같아야** 한다(v r1 L-8) — `toContain` 이면 앞뒤에 숫자가
+  // 더 붙어도 지나간다(자릿점을 걷은 뒤라 부분 일치가 쉽게 성립한다).
+  expect(digitsOf(await finalCard.getByTestId(`submitted-amount-${caseId}`).innerText())).toBe(
+    String(mineResult!.submittedAmountWon),
+  );
+  await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
+    mineResult!.submittedAmountCurrency,
+  );
+  // 과세는 **표의 문면**으로 선다(r1 CR M-1) — 원문 토큰이 아니다.
+  await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
+    VAT_LABEL[mineResult!.submittedAmountVatTreatment]!,
+  );
+
+  // 「고른 안」은 빈칸이 아니라 **출처 상태**다(오늘의 답은 「직접 입력」 — 메뉴가 출하 경로에 없다).
+  await expect(finalCard.getByTestId(`chosen-option-${caseId}`)).toContainText(
+    ORIGIN_LABEL[mineResult!.submittedAmountOrigin]!,
+  );
+  await expect(finalCard.getByTestId(`award-gap-${caseId}`)).toContainText(
+    GAP_STATE_LABEL[mineResult!.gapState]!,
+  );
+
+  /**
+   * **판정 불가는 패찰이 아니다.** 운영자는 방금 「낙찰」을 적었는데 대사 축은 아직 판정을 내지
+   * 못한다 — 하네스가 개찰 축을 수집하지 않기 때문이다(착수 실측). 두 축이 **다른 칸**으로
+   * 서 있는 것이 이 단언의 요점이다.
+   */
+  await expect(finalCard.getByTestId(`reconciled-outcome-${caseId}`)).toHaveText(
+    RECONCILED_OUTCOME_LABEL[mineResult!.reconciledOutcome]!,
+  );
+  expect(mineResult!.reconciliationBlocker, '판정 불가인데 사유가 비었다').not.toBeNull();
+  await expect(finalCard.getByTestId(`reconciliation-blocker-${caseId}`)).toHaveText(
+    BLOCKER_LABEL[mineResult!.reconciliationBlocker!]!,
+  );
+  await expect(finalCard.getByTestId(`outcome-agreement-${caseId}`)).toHaveText(
+    AGREEMENT_LABEL[mineResult!.outcomeAgreement]!,
+  );
+
+  // ── 집계 두 축 ──────────────────────────────────────────────────────────
+  //
+  // **계수를 못박지 않는다**: 집계는 계정 전역이고 여정 ③④ 도 같은 하네스에 투찰을 기록한다
+  // (실행 차례가 바뀌면 수가 달라진다). 내 것인 주장은 ⓐ DOM == 이 응답 ⓑ 분모 ≥ 1 이다.
+  const aggregate = page.getByTestId('results-aggregate');
+  await expect(aggregate).toBeVisible();
+  await expect(aggregate.getByTestId('sample-size')).toHaveText(String(results.aggregate.sampleSize));
+
+  expect(results.aggregate.recordedRateState, '낙찰을 적었으니 운영자 기록 축은 잰 값이다').toBe('MEASURED');
+  expect(results.aggregate.recordedWonCount).toBeGreaterThanOrEqual(1);
+  expect(results.aggregate.recordedDenominator).toBeGreaterThanOrEqual(1);
+  await expect(aggregate.getByTestId('rate-value-recorded')).toHaveText(results.aggregate.recordedAwardRate!);
+  await expect(aggregate.getByTestId('rate-won-recorded')).toHaveText(
+    String(results.aggregate.recordedWonCount),
+  );
+  await expect(aggregate.getByTestId('rate-denominator-recorded')).toHaveText(
+    String(results.aggregate.recordedDenominator),
+  );
+
+  /**
+   * 대사 축은 **부재 + 사유**다. 비율 자리를 「없다」로 재는 이유: 문면 대조는 `0` 을 그리는
+   * 변이를 지나보낸다(「0」도 문면이다). 사유는 서버가 준 전수를 그대로 편다 — 특정 사유를
+   * 전제하지 않는다(하네스는 `NOT_OPENED_YET`, 운영 환경은 다를 수 있다).
+   */
+  expect(results.aggregate.reconciledAwardRate, '하네스에서 대사 축이 잰 값이 됐다').toBeNull();
+  await expect(aggregate.getByTestId('rate-value-reconciled')).toHaveCount(0);
+  await expect(aggregate.getByTestId('rate-state-reconciled')).toHaveText(
+    RATE_STATE_LABEL[results.aggregate.reconciledRateState]!,
+  );
+  expect(results.aggregate.reconciliationBlockers.length, '분모 0 인데 사유가 없다').toBeGreaterThanOrEqual(1);
+  for (const blocker of results.aggregate.reconciliationBlockers) {
+    await expect(aggregate.getByTestId(`blocker-${blocker}`)).toContainText(BLOCKER_LABEL[blocker]!);
+  }
+
+  // 집계 어디에도 퍼센트가 없다 — 화면이 비율을 환산하지 않는다(D-7E3b-8).
+  await expect(aggregate).not.toContainText('%');
+
+  // 남은 빈 자리가 **입력칸·버튼 없이** 서 있다(D-7E3a-3). 「준비 중」이던 다섯은 위 절이 받았다.
   const pending = page.getByTestId('results-pending');
   await expect(pending).toBeVisible();
   await expect(pending.getByRole('button')).toHaveCount(0);
   await expect(pending.getByRole('textbox')).toHaveCount(0);
-  // 집계 자리에 숫자가 없다 — 목록을 세어 낙찰률을 짓지 않는다.
-  await expect(page.getByTestId('pending-win-rate')).not.toContainText('%');
+  await expect(page.getByTestId('pending-win-rate'), '낙찰률이 아직 빈 자리로 있다').toHaveCount(0);
 
   expect(watched.outside).toStrictEqual([]);
   expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
