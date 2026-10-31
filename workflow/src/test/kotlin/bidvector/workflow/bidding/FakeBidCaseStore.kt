@@ -40,6 +40,13 @@ internal class FakeBidCaseStore : BidCaseStorePort {
     /** 읽기와 저장 사이에 다른 쓰기가 끼어든 상황을 만든다. */
     var interleaveBeforeApply: Boolean = false
 
+    /**
+     * 읽기와 저장 사이에 **건이 사라진** 상황을 만든다 — 저장이 `CaseNotFound` 로 떨어지는
+     * 유일한 길이다(소유 확인은 읽기에서 이미 지났으므로). 그 갈래가 이중체 없이는 닿지 않아
+     * **변이가 초록이었다**(M4) — 전이가 저장되지 않았는데 알림을 적는 변형이 지나갔다.
+     */
+    var vanishBeforeApply: Boolean = false
+
     fun countOf(account: AccountId): Int = rows.values.count { it.account.value == account.value }
 
     override fun open(
@@ -92,6 +99,10 @@ internal class FakeBidCaseStore : BidCaseStorePort {
         account: AccountId,
         applied: AppliedTransition,
     ): TransitionWrite {
+        if (vanishBeforeApply) {
+            rows.remove(applied.caseId.value)
+            vanishBeforeApply = false
+        }
         val row = rows[applied.caseId.value]?.takeIf { it.account.value == account.value }
         if (row != null && interleaveBeforeApply) {
             row.case = row.case.copy(caseVersion = row.case.caseVersion + 1)

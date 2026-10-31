@@ -34,11 +34,14 @@ class JdbcNotificationSweepCandidates(
             connection.prepareStatement(NotificationSweepSql.SELECT_SWEEP_CANDIDATES).use { statement ->
                 val from = Timestamp.from(now)
                 val to = Timestamp.from(horizon)
-                statement.setTimestamp(1, from)
-                statement.setTimestamp(2, to)
-                statement.setTimestamp(3, from)
-                statement.setTimestamp(4, to)
-                statement.setTimestamp(5, from)
+                // 자리 다섯은 문장의 순서 그대로다(마감 창 · 서류 창 · 개정 축의 마감 하한) —
+                // 숫자를 손으로 적으면 문장을 고칠 때 둘이 갈린다(기존 어댑터들과 같은 관례).
+                var index = 1
+                statement.setTimestamp(index++, from)
+                statement.setTimestamp(index++, to)
+                statement.setTimestamp(index++, from)
+                statement.setTimestamp(index++, to)
+                statement.setTimestamp(index, from)
                 statement.executeQuery().use { rows ->
                     buildList {
                         while (rows.next()) {

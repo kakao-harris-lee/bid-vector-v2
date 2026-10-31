@@ -197,6 +197,24 @@ class BidCaseNotificationTest {
     }
 
     /**
+     * **저장이 건을 찾지 못한 전이도 알림을 남기지 않는다.** 읽기와 저장 사이에 건이 사라진
+     * 자리이고, 그 갈래는 이중체 없이는 닿지 않아 **변이가 한 번 초록이었다**(M4) — 그때
+     * 「전이가 저장되지 않았는데 적는다」가 아무 test 도 지나지 않고 통과했다.
+     */
+    @Test
+    fun `저장 직전에 건이 사라지면 알림을 남기지 않는다`() {
+        val store = FakeBidCaseStore()
+        val inbox = RecordingInbox()
+        val case = store.seed(mine, notice, BidKind.REAL, BidState.AwaitingOpening(now.plusSeconds(60)))
+        store.vanishBeforeApply = true
+
+        val result = workflow(store, inbox).command(mine, case.id, BidCommand.RecordOpeningFirst, BidActor.User(mine))
+
+        result shouldBe BidCommandResult.CaseNotFound
+        inbox.records.shouldBeEmpty()
+    }
+
+    /**
      * **알림 기록 실패가 원천을 되돌리지 않는다**(D-7C3B-9) — 전이는 남고 응답도 성공이다.
      * 잃은 사실은 포트의 값으로 남고 출하 조립이 그것을 로그 표지로 적는다.
      */
