@@ -5,7 +5,9 @@
 # 그 경로를 호출자가 `--env-file` 로 넘긴다. 여기서 자리값을 만들면 운영 env 파일에 없는 키가
 # 조용히 채워져 「키 집합 등식」 preflight 가 공허해진다.
 #
-# 덧쓰기 순서가 두 자리로 갈리지 않게 파일 목록만 한 자리에 둔다.
+# 덧쓰기 순서가 두 자리로 갈리지 않게 파일 목록만 한 자리에 둔다. **반입·되돌림이 함께 보는 술어**도
+# 여기 둔다(아래 `_prod_migrations`) — 두 스크립트가 같은 판단을 서로 다른 글자로 하면 한쪽만 고쳐지는
+# 날이 온다.
 
 BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml docker/compose.prod.yaml)
 BIDVECTOR_PROD_COMPOSE=(docker compose)
@@ -13,3 +15,19 @@ for _f in "${BIDVECTOR_PROD_COMPOSE_FILES[@]}"; do
   BIDVECTOR_PROD_COMPOSE+=(-f "$_f")
 done
 unset _f
+
+# <상태 디렉터리> <release> → 그 release 의 마이그레이션 목록(정렬). manifest 가 없으면 1 을 돌려준다.
+_prod_migrations() {
+  local man="$1/releases/$2.manifest"
+  [ -r "$man" ] || return 1
+  grep -E '^migration=' "$man" | cut -d= -f2- | sort
+}
+
+# <상태 디렉터리> <from release> <to release> → from 에만 있는 마이그레이션(= 되돌리면 넘어야 하는 것).
+# 둘 중 하나라도 manifest 를 못 읽으면 1 을 돌려준다(판정 불가 — 호출자가 끊는다).
+_prod_migrations_lost() {
+  local state="$1" from="$2" to="$3"
+  _prod_migrations "$state" "$from" >/dev/null || return 1
+  _prod_migrations "$state" "$to"   >/dev/null || return 1
+  comm -23 <(_prod_migrations "$state" "$from") <(_prod_migrations "$state" "$to")
+}

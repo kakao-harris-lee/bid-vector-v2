@@ -114,6 +114,11 @@ pg_vol="$(docker volume ls -q \
   --filter "label=com.docker.compose.volume=${pg_vol_key}" 2>/dev/null | head -n1 || true)"
 pg_cid="$("${COMPOSE[@]}" ps -q postgres 2>/dev/null || true)"
 current="$(cat "$STATE/current" 2>/dev/null || true)"
+pending="$(cat "$STATE/pending" 2>/dev/null || true)"
+
+# **지금 실제로 떠 있는 release** 는 `current` 가 아니라 `pending` 일 수 있다 — 반입이 `up`·헬스에서
+# 실패하면 컨테이너는 새 release 인데 `current` 는 마지막으로 성공한 것에 머문다(v H-2 실측).
+RUNNING_REL="${pending:-$current}"
 
 if [ -n "$pg_vol" ] && [ -n "$pg_cid" ]; then
   DB_STATE=running
@@ -132,7 +137,21 @@ case "$DB_STATE" in
   volume-gone) db_line="**데이터 볼륨이 없다**(반입 기록은 ${current}) — 백업할 데이터가 없다" ;;
   first)       db_line="데이터 볼륨 없음 · 반입 기록 없음 → 첫 반입" ;;
 esac
-echo "  현재 release: ${current:-없음(첫 반입)} · DB: ${db_line}"
+echo "  현재 release: ${current:-없음(첫 반입)}$([ -n "$pending" ] && echo " · **끝나지 않은 반입: ${pending}**(떠 있는 것은 이쪽)") · DB: ${db_line}"
+
+# 마이그레이션 가드 — **되돌림만이 아니라 반입 경로에도 건다.** 되돌림은 결국 이 스크립트를 부르고
+# (`prod-rollback.sh`), 운영자가 `--release <옛것>` 으로 직접 부르는 길도 있다. 그 길에 가드가 없으면
+# 옛 이미지가 새 스키마 위에서 가드 없이 뜬다(v H-2).
+if [ -n "$RUNNING_REL" ] && [ "$RUNNING_REL" != "$REL" ]; then
+  lost="$(_prod_migrations_lost "$STATE" "$RUNNING_REL" "$REL")" \
+    || _die "마이그레이션 비교에 필요한 manifest 를 읽지 못했다(떠 있는 것 ${RUNNING_REL} · 가려는 것 ${REL})" 2
+  if [ -n "$lost" ]; then
+    echo "  떠 있는 release ${RUNNING_REL} 가 ${REL} 에 없는 마이그레이션을 실었다: $(printf '%s' "$lost" | tr '\n' ' ')" >&2
+    backup="$(grep -E "^${RUNNING_REL} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
+    echo "  반입 직전 백업: ${backup:-기록 없음}" >&2
+    _die "멈춤 — 이미지를 되돌려도 스키마는 돌아오지 않는다(runbook §7.2)" 3
+  fi
+fi
 
 if [ "$APPLY" -eq 0 ]; then
   echo "== dry-run — 바꾸는 것 0"
@@ -176,13 +195,30 @@ case "$DB_STATE" in
     echo "  백업 없음 — ${db_line}"
     ;;
 esac
+# **시도 중인 release 를 먼저 적는다.** 앞 판은 `up` 앞에서 `previous ← current` 를 적고 `current` 는
+# 성공했을 때만 적었다. 그래서 반입이 실패하면 previous == current 가 되고, 떠 있는 것은 새 release 인데
+# 되돌림은 「현재와 직전이 같다」로 거부했다 — 가장 급한 순간의 막다른 문면이었다(v H-2 실측).
+# 이제 실패하면 `pending` 이 남아 「무엇이 떠 있는가」를 되돌림이 안다.
+printf '%s\n' "$REL" > "$STATE/pending"
+_deploy_failed() { # <문면>
+  echo "prod-deploy: $1" >&2
+  echo "  떠 있는 것은 ${REL} 이고 마지막으로 성공한 것은 ${current:-없음} 이다." >&2
+  if [ -n "$current" ] && [ "$current" != "$REL" ]; then
+    echo "  되돌림: ./tools/prod-rollback.sh --env-file <운영 env> --state-dir ${STATE}$([ -n "$PROJECT" ] && echo " --project ${PROJECT}") [--apply]" >&2
+  else
+    echo "  되돌릴 이전 release 가 없다(첫 반입이거나 같은 release 재시도) — runbook §7 을 본다." >&2
+  fi
+  exit 1
+}
+"${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT_S" || _deploy_failed "up 이 healthy 로 수렴하지 않았다"
+health_args=(--env-file "$ENVF")
+[ -z "$PROJECT" ] || health_args+=(--project "$PROJECT")
+./tools/prod-health.sh "${health_args[@]}" || _deploy_failed "헬스 실패"
+# 성공했을 때만 상태를 옮긴다 — previous 는 **마지막으로 성공한 직전** 이다.
 if [ -n "$current" ] && [ "$current" != "$REL" ]; then
   printf '%s\n' "$current" > "$STATE/previous"
 fi
-"${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT_S" || _die "up 이 healthy 로 수렴하지 않았다 — tools/prod-rollback.sh 를 검토한다" 1
-health_args=(--env-file "$ENVF")
-[ -z "$PROJECT" ] || health_args+=(--project "$PROJECT")
-./tools/prod-health.sh "${health_args[@]}" || _die "헬스 실패 — tools/prod-rollback.sh 를 검토한다" 1
 printf '%s\n' "$REL" > "$STATE/current"
+rm -f "$STATE/pending"
 echo "$(TZ=Asia/Seoul date '+%Y-%m-%dT%H:%M:%S%z') deploy ${REL} (previous ${current:-none})" >> "$STATE/history"
 echo "prod-deploy: OK — current=${REL}"

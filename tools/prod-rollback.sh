@@ -31,27 +31,40 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$ENVF" ] && [ -n "$STATE" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> [--project <이름>] [--apply]" 2
 
+# shellcheck source=tools/prod-env.sh
+. "$REPO_ROOT/tools/prod-env.sh"
+
 current="$(cat "$STATE/current" 2>/dev/null || true)"
 previous="$(cat "$STATE/previous" 2>/dev/null || true)"
-[ -n "$current" ] || _die "현재 release 기록이 없다 — 되돌릴 대상이 없다" 2
-[ -n "$previous" ] || _die "직전 release 기록이 없다 — 첫 반입은 되돌릴 이전이 없다" 2
-[ "$current" != "$previous" ] || _die "현재와 직전이 같다" 2
+pending="$(cat "$STATE/pending" 2>/dev/null || true)"
 
-_migrations() { grep -E '^migration=' "$STATE/releases/$1.manifest" | cut -d= -f2- | sort; }
-[ -r "$STATE/releases/${current}.manifest" ] && [ -r "$STATE/releases/${previous}.manifest" ] \
-  || _die "manifest 를 읽지 못했다(현재 ${current} · 직전 ${previous})" 2
-added="$(comm -23 <(_migrations "$current") <(_migrations "$previous"))"
-echo "== 되돌림 ${current} → ${previous}"
+# **끝나지 않은 반입이 있으면 그것이 떠 있는 것**이고, 돌아갈 자리는 마지막으로 성공한 `current` 다.
+# 그 경우가 가장 급한 경우인데 앞 판은 `current`/`previous` 만 보고 「현재와 직전이 같다」로
+# 거부했다(v H-2 실측 — 떠 있는 것은 새 release 인데 되돌림이 막혔다).
+if [ -n "$pending" ] && [ "$pending" != "$current" ]; then
+  from="$pending"; to="$current"
+  echo "== 되돌림 ${from} → ${to}  (끝나지 않은 반입 — 떠 있는 것은 ${from}, 마지막으로 성공한 것은 ${to})"
+  [ -n "$to" ] || _die "마지막으로 성공한 release 기록이 없다 — 첫 반입이 실패했다(runbook §7.4)" 2
+else
+  from="$current"; to="$previous"
+  [ -n "$from" ] || _die "현재 release 기록이 없다 — 되돌릴 대상이 없다" 2
+  [ -n "$to" ] || _die "직전 release 기록이 없다 — 첫 반입은 되돌릴 이전이 없다" 2
+  [ "$from" != "$to" ] || _die "현재와 직전이 같다" 2
+  echo "== 되돌림 ${from} → ${to}"
+fi
+
+added="$(_prod_migrations_lost "$STATE" "$from" "$to")" \
+  || _die "manifest 를 읽지 못했다(떠 있는 것 ${from} · 가려는 것 ${to})" 2
 if [ -n "$added" ]; then
-  echo "  현재 release 가 직전에 없는 마이그레이션을 실었다: $(printf '%s' "$added" | tr '\n' ' ')" >&2
-  backup="$(grep -E "^${current} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
+  echo "  떠 있는 release 가 ${to} 에 없는 마이그레이션을 실었다: $(printf '%s' "$added" | tr '\n' ' ')" >&2
+  backup="$(grep -E "^${from} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
   echo "  반입 직전 백업: ${backup:-기록 없음}" >&2
   echo "prod-rollback: 멈춤 — 이미지 되돌림만으로는 스키마가 돌아오지 않는다(runbook 「되돌림 — DB 를 넘는 경우」)" >&2
   exit 3
 fi
 echo "  마이그레이션 차이 0 — 이미지 되돌림으로 충분하다"
 
-args=(--env-file "$ENVF" --state-dir "$STATE" --release "$previous")
+args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to")
 [ -z "$PROJECT" ] || args+=(--project "$PROJECT")
 [ "$APPLY" -eq 0 ] || args+=(--apply)
 exec ./tools/prod-deploy.sh "${args[@]}"
