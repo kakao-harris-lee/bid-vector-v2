@@ -16,8 +16,10 @@
 #   · release manifest 존재 · 이미지 넷의 현재 태그 ID == manifest(누가 태그를 옮겼으면 멈춘다).
 #   · compose ≥ 2.24(`!override`) · 루프백 포트가 비었거나 이 프로젝트의 proxy 가 쥐고 있다 · 디스크 여유.
 #
-# 백업: 이 프로젝트의 postgres 가 돌고 있으면 `tools/db-backup.sh` 로 `<state>/backups/` 에 뜬다(첫 반입은
-# 대상이 없어 건너뛴다). 되돌림이 마이그레이션을 넘을 때 그 백업이 복원 재료다(`tools/prod-rollback.sh`).
+# 백업: 판정은 **데이터 볼륨의 존재**로 한다 — 실행 중 컨테이너가 아니다. 볼륨이 있으면 postgres 가
+# 멈춰 있어도 DB 만 먼저 올려 `tools/db-backup.sh` 로 뜨고, 뜨지 못하면 **반입하지 않는다.** 건너뛰는
+# 경우는 둘뿐이고 둘 다 출력에서 구별된다: 첫 반입(볼륨 없음·기록 없음)과 볼륨이 사라진 상태
+# (`down -v` 뒤 — 백업할 데이터가 없다). 되돌림이 마이그레이션을 넘을 때 그 백업이 복원 재료다.
 #
 # 종료 코드: 0 · 1 preflight·반입·헬스 실패 · 2 사용법·도구·판정 불가.
 set -euo pipefail
@@ -99,31 +101,81 @@ free_mb="$(df -Pm "$STATE" 2>/dev/null | awk 'NR==2 {print $4}')" || true
 [ -n "$free_mb" ] || { mkdir -p "$STATE" 2>/dev/null || true; free_mb="$(df -Pm "$STATE" | awk 'NR==2 {print $4}')"; }
 [ "$free_mb" -ge "$DISK_MIN_MB" ] || _die "상태 디렉터리 디스크 여유 ${free_mb}MB < ${DISK_MIN_MB}MB" 1
 
-# 백업 대상
+# 백업 대상 — 판정 술어는 **데이터 볼륨의 존재**다(실행 중 컨테이너가 아니다).
+#
+# `compose ps -q` 는 기본이 실행 중 컨테이너만이라, 스택이 `stop`·`down`(-v 없음)·crash 로 멈춰 있으면
+# 볼륨에 데이터가 그대로 있는데도 「대상 없음」이 되어 **첫 반입과 똑같은 그림**이 됐다. 그 상태로
+# 마이그레이션이 돌면 되돌릴 재료가 없다(v H-1 · CR M-1, 2026-10-31 실측).
+pg_vol_key="$(printf '%s' "$cfg" | jq -r '.services.postgres.volumes[]? | select(.type=="volume") | .source' | head -n1)"
+[ -n "$pg_vol_key" ] && [ "$pg_vol_key" != "null" ] || _die "postgres 의 데이터 볼륨을 해석하지 못했다(판정 불가)" 2
+# 이름을 짓지 않고 compose 가 붙인 라벨로 찾는다 — 프로젝트 접두 규칙을 추측하지 않는다.
+pg_vol="$(docker volume ls -q \
+  --filter "label=com.docker.compose.project=${proj}" \
+  --filter "label=com.docker.compose.volume=${pg_vol_key}" 2>/dev/null | head -n1 || true)"
 pg_cid="$("${COMPOSE[@]}" ps -q postgres 2>/dev/null || true)"
 current="$(cat "$STATE/current" 2>/dev/null || true)"
-echo "  현재 release: ${current:-없음(첫 반입)} · DB 백업 대상: $([ -n "$pg_cid" ] && echo '있음' || echo '없음')"
+
+if [ -n "$pg_vol" ] && [ -n "$pg_cid" ]; then
+  DB_STATE=running
+elif [ -n "$pg_vol" ]; then
+  DB_STATE=stopped
+elif [ -n "$current" ]; then
+  # 반입 기록은 있는데 볼륨이 없다 — 누가 `down -v` 를 돌렸다. 백업할 데이터가 없으므로 막지는
+  # 않지만, 「첫 반입」과 같은 줄로 보이면 안 된다.
+  DB_STATE=volume-gone
+else
+  DB_STATE=first
+fi
+case "$DB_STATE" in
+  running)     db_line="데이터 볼륨 있음 · postgres 실행 중 → 백업한다" ;;
+  stopped)     db_line="데이터 볼륨 있음 · **postgres 멈춰 있음** → postgres 만 올려 백업한다" ;;
+  volume-gone) db_line="**데이터 볼륨이 없다**(반입 기록은 ${current}) — 백업할 데이터가 없다" ;;
+  first)       db_line="데이터 볼륨 없음 · 반입 기록 없음 → 첫 반입" ;;
+esac
+echo "  현재 release: ${current:-없음(첫 반입)} · DB: ${db_line}"
 
 if [ "$APPLY" -eq 0 ]; then
   echo "== dry-run — 바꾸는 것 0"
-  [ -n "$pg_cid" ] && _plan "tools/db-backup.sh <postgres> ${STATE}/backups/<시각>-pre-${REL}"
-  _plan "previous ← ${current:-없음}"
+  case "$DB_STATE" in
+    stopped) _plan "${COMPOSE[*]} up -d --wait postgres   # 백업을 뜨려고 DB 만 먼저 올린다" ;;
+  esac
+  case "$DB_STATE" in
+    running|stopped) _plan "tools/db-backup.sh <postgres> ${STATE}/backups/<시각>-pre-${REL}" ;;
+    *)               _plan "백업 없음 — ${db_line}" ;;
+  esac
   _plan "${COMPOSE[*]} up -d --wait --wait-timeout ${WAIT_TIMEOUT_S}"
   _plan "tools/prod-health.sh --env-file <운영 env>$([ -n "$PROJECT" ] && echo " --project ${PROJECT}")"
-  _plan "current ← ${REL}"
+  _plan "previous ← ${current:-없음} · current ← ${REL}"
   echo "prod-deploy: dry-run OK — --apply 로 실행한다"
   exit 0
 fi
 
 echo "== 반입"
 mkdir -p "$STATE/backups"
-if [ -n "$pg_cid" ]; then
-  stamp="$(TZ=Asia/Seoul date '+%Y%m%dT%H%M%S')"
-  bdir="$STATE/backups/${stamp}-pre-${REL}"
-  ./tools/db-backup.sh "$pg_cid" "$bdir" >/dev/null || _die "반입 직전 DB 백업 실패 — 반입하지 않았다" 1
-  echo "  백업: ${bdir}"
-  echo "${REL} ${bdir}" >> "$STATE/backups/index"
-fi
+case "$DB_STATE" in
+  stopped)
+    # 볼륨에 데이터가 있는데 DB 가 멈춰 있다 — 백업을 뜨려면 올려야 한다. postgres 의 이미지는
+    # release 태그가 아니라 compose 가 고정한 다이제스트라, 여기서 올리는 것이 새 release 의
+    # 마이그레이션을 돌리지 않는다(app 을 올리지 않는다).
+    "${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT_S" postgres \
+      || _die "백업을 뜨려고 postgres 를 올리려 했으나 healthy 로 수렴하지 않았다 — 반입하지 않았다" 1
+    pg_cid="$("${COMPOSE[@]}" ps -q postgres 2>/dev/null || true)"
+    [ -n "$pg_cid" ] || _die "postgres 를 올렸으나 컨테이너를 찾지 못했다 — 반입하지 않았다" 1
+    echo "  멈춰 있던 postgres 를 올렸다(백업용)"
+    ;;
+esac
+case "$DB_STATE" in
+  running|stopped)
+    stamp="$(TZ=Asia/Seoul date '+%Y%m%dT%H%M%S')"
+    bdir="$STATE/backups/${stamp}-pre-${REL}"
+    ./tools/db-backup.sh "$pg_cid" "$bdir" >/dev/null || _die "반입 직전 DB 백업 실패 — 반입하지 않았다" 1
+    echo "  백업: ${bdir}"
+    echo "${REL} ${bdir}" >> "$STATE/backups/index"
+    ;;
+  *)
+    echo "  백업 없음 — ${db_line}"
+    ;;
+esac
 if [ -n "$current" ] && [ "$current" != "$REL" ]; then
   printf '%s\n' "$current" > "$STATE/previous"
 fi
