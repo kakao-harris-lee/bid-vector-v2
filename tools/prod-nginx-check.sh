@@ -378,6 +378,9 @@ case "$got_other" in
     echo "  다른 Host(other.invalid) → ${got_other} · 목적지가 고정 도메인이다" ;;
   30*" https://other.invalid"*)
     fail "리다이렉트 목적지가 클라이언트의 Host 를 되돌려준다: ${got_other}" ;;
+  30*" https://"*|30*" http://"*)
+    # 조각에 닿기는 했는데 목적지가 다르다 — 진단을 「닿지 않는다」로 뭉개지 않는다.
+    fail "리다이렉트 목적지가 기대와 다르다(스킴·호스트): ${got_other}" ;;
   *)
     # 조각이 기본 대상이 되지 못했다 — 이 단언은 공허하다. 초록으로 넘기지 않는다.
     _die "default site 를 뺐는데도 다른 Host 가 이 조각에 닿지 않는다(${got_other}) — N2b 측정 불가" 2 ;;

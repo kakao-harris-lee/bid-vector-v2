@@ -41,6 +41,9 @@ declare -A VULN_KIND=([app]=app [web]=web [proxy]=proxy [ml-serving]=ml-serving)
 VULN_POLICY=config/quality/vuln-policy.properties
 ALLOWLIST_MIN_DAYS=14
 MIGRATION_DIR=adapters/src/main/resources/db/migration
+# 이 스크립트는 반입·되돌림의 상태 잠금을 **잡지 않는다** — 쓰는 것이 `releases/<태그>.manifest`
+# 하나뿐이고 그 이름은 실행마다 다르며 `mv` 로 원자적으로 놓인다(같은 태그의 중복은 preflight 가
+# 막는다). 잠금을 넓히면 반입 중에 다음 release 를 만들 수 없게 되는데 그럴 이유가 없다(CR r3 L-7).
 
 _die() { echo "prod-release: $1" >&2; exit "${2:-1}"; }
 _plan() { echo "  [계획] $*"; }

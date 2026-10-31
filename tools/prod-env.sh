@@ -42,8 +42,9 @@ BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml 
 
 # 프로젝트 이름을 **고정한다.** `-p` 는 `COMPOSE_PROJECT_NAME` 보다 우선이므로(실측), 위 unset 이
 # 어떤 이유로 비껴가도 이 자리가 다시 막는다 — 겹을 둘로 둔다. 값은 짓지 않고 운영 덧쓰기의 `name:`
-# 에서 읽는다(정본은 그 파일 하나다). 호출자가 `--project` 를 주면 **뒤에 오는 `-p` 가 이긴다**.
-BIDVECTOR_PROD_PROJECT="$(sed -n 's/^name:[[:space:]]*//p' "${_prod_env_root}/${BIDVECTOR_PROD_COMPOSE_FILES[2]}" 2>/dev/null | head -n1)"
+# 에서 읽는다(정본은 그 파일 하나다 — **마지막** 덧쓰기의 `name:` 이 이기므로 배열의 마지막 원소다).
+# 호출자가 `--project` 를 주면 **뒤에 오는 `-p` 가 이긴다**.
+BIDVECTOR_PROD_PROJECT="$(sed -n 's/^name:[[:space:]]*//p' "${_prod_env_root}/${BIDVECTOR_PROD_COMPOSE_FILES[-1]}" 2>/dev/null | head -n1)"
 unset _k _prod_env_template _prod_env_root
 if [ -z "$BIDVECTOR_PROD_PROJECT" ]; then
   echo "prod-env: 운영 compose 의 name: 을 읽지 못했다 — 프로젝트 이름을 고정할 수 없다" >&2
