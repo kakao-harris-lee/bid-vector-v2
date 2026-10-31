@@ -1,5 +1,6 @@
 package bidvector.adapters.bidding
 
+import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.persistence.FloorRateOriginCodec
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.persistence.ProvenanceCodec
@@ -34,7 +35,12 @@ import javax.sql.DataSource
 abstract class BidCaseDbFixture : PersistenceTestSupport() {
     protected var now: Instant = Instant.parse("2026-10-21T04:00:00Z")
 
-    /** [source] 위의 출하 조립 — 기본은 관리자 연결이고, 권한 축은 [appRoleDataSource] 를 넘긴다. */
+    /**
+     * [source] 위의 출하 조립 — 기본은 관리자 연결이고, 권한 축은 [appRoleDataSource] 를 넘긴다.
+     *
+     * 알림 포트도 **출하 어댑터 그대로**다(M7/7C③-b) — 이중체로 바꾸면 되비춤이 실 DB 의 제약
+     * (계정 FK · 종류 CHECK · 중복 억제 PK)을 지나는지 이 자리에서 보이지 않는다.
+     */
     protected fun workflow(source: DataSource = dataSource()): BidCaseWorkflow =
         BidCaseWorkflow(
             cases = JdbcBidCaseStore(source),
@@ -46,6 +52,7 @@ abstract class BidCaseDbFixture : PersistenceTestSupport() {
                     EvidenceRetentionPolicyData(Period.ofYears(3)),
                     PolicyVersion(EffectiveFrom.Initial, "test"),
                 ),
+            notifications = JdbcNotificationInbox(source),
         )
 
     /**

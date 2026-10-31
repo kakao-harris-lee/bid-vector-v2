@@ -273,7 +273,7 @@ class NotificationSweepTest {
         report.created shouldBe 1
         report.updated shouldBe 0
         report.failed shouldBe 0
-        inbox.records.single().account shouldBe mine
+        inbox.records.single().account.value shouldBe mine.value
     }
 
     @Test

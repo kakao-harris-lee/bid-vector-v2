@@ -210,7 +210,7 @@ class BidCaseWorkflow(
     ): BidCommandResult =
         when (writeTransition(cases, account, case, command, accepted, actor, now)) {
             TransitionWrite.Applied -> {
-                reflect(account, case.notice, accepted.next, now)
+                reflect(account, case, accepted.next, now)
                 BidCommandResult.Processed(accepted)
             }
 
@@ -228,15 +228,21 @@ class BidCaseWorkflow(
      *
      * **마감 판정은 이 자리를 지나지 않는다.** 시스템 판정은 [DeadlineSettlement] 가 저장 함수를
      * 직접 부르므로, 되비추는 것은 **운영자 명령의 결과**뿐이다.
+     *
+     * **실투찰만 되비춘다**([asReal]). 알림함의 중복 억제 키에 투찰 종류 축이 없어서(7C③ 의
+     * `(계정, 종류, 공고)` PK), 같은 공고에 페이퍼와 실투찰 건이 함께 있으면 둘의 결과가 **한
+     * 항목을 덮어쓴다** — 페이퍼는 가상 연습이므로 실제 결과를 가릴 수 없게 한다. 페이퍼 건의
+     * 결과가 알림함에 서지 않는 것은 그 선택의 대가이고 알려진 제한이다.
      */
     private fun reflect(
         account: AccountId,
-        notice: NoticeKey,
+        case: BidCase,
         next: BidState,
         now: Instant,
     ) {
+        case.asReal() ?: return
         val fact = reflectedNotificationFact(next) ?: return
-        notifications.record(NotificationInboxRecord(account, notice.asNotificationNoticeId(), fact, now))
+        notifications.record(NotificationInboxRecord(account, case.notice.asNotificationNoticeId(), fact, now))
     }
 
     /**

@@ -116,7 +116,7 @@ class BidCaseNotificationTest {
 
         inbox.records.size shouldBe 1
         val record = inbox.records.single()
-        record.account shouldBe mine
+        record.account.value shouldBe mine.value
         record.notice.number shouldBe NoticeNumber.of(notice.noticeNumber)
         record.notice.round shouldBe notice.noticeRound
         record.fact shouldBe NotificationFact.OpeningCompleted(provisionallyFirst = true)
@@ -141,6 +141,23 @@ class BidCaseNotificationTest {
         record.fact shouldBe NotificationFact.AwardDecided(awarded = false)
         // 같은 항목이라는 것은 키가 말한다 — 종류와 공고가 앞 기록과 같다.
         record.fact.kind shouldBe NotificationFact.AwardDecided(awarded = true).kind
+    }
+
+    /**
+     * **페이퍼는 되비추지 않는다** — 알림 키에 투찰 종류 축이 없어서, 같은 공고의 페이퍼 건과
+     * 실투찰 건이 한 항목을 덮어쓴다. 가상 연습이 실제 결과를 가리지 않게 한다.
+     */
+    @Test
+    fun `페이퍼 건의 결과는 알림함에 서지 않는다`() {
+        val store = FakeBidCaseStore()
+        val inbox = RecordingInbox()
+        val case = store.seed(mine, notice, BidKind.PAPER, BidState.AwaitingOpening(now.plusSeconds(60)))
+
+        val result = workflow(store, inbox).command(mine, case.id, BidCommand.RecordOpeningFirst, BidActor.User(mine))
+
+        result.shouldBeProcessed()
+        store.stateOf(case.id) shouldBe BidState.OpenedProvisionalFirst
+        inbox.records.shouldBeEmpty()
     }
 
     @Test
