@@ -164,10 +164,26 @@ _prod_lock() {
 # <프로젝트 이름> → 그 프로젝트의 잠금. **잠금 둘의 순서는 프로젝트 먼저, 그 다음 상태 디렉터리**이고
 # 셋 스크립트가 같은 순서를 쓴다(교착이 생길 수 없다 — 셋 다 기다리지 않는다).
 _prod_project_lock() {
-  local proj="$1"
+  local proj="$1" owner mode
   _PROD_LOCK_ERR=""
   mkdir -p "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null \
     || { _PROD_LOCK_ERR="잠금 디렉터리를 만들지 못했다: ${BIDVECTOR_PROD_LOCK_DIR}"; return 1; }
+  # **자리의 소유자와 권한을 본다.** `/run/lock` 은 sticky·world-writable(1777)이고 tmpfs 라 재부팅마다
+  # 비므로, 그 사이 다른 계정이 이 이름을 선점할 수 있다. 남이 소유한 자리는 잠금이 서로 안 보이게
+  # 만들고, group/other 쓰기가 열린 자리는 **잠금 파일을 지워 inode 를 가르는** 우회를 누구에게나
+  # 연다(v V5-2 실측: 쥐어진 잠금의 파일을 지우면 다음 반입이 새 inode 를 잠그고 지나간다).
+  # 부팅 때 자리를 미리 만드는 법은 runbook §1.4 의 tmpfiles.d 한 줄.
+  owner="$(stat -c '%u' "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null || true)"
+  mode="$(stat -c '%a' "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null || true)"
+  if [ "$owner" != "$(id -u)" ]; then
+    _PROD_LOCK_ERR="잠금 디렉터리의 소유자가 내가 아니다(${BIDVECTOR_PROD_LOCK_DIR} uid=${owner:-?} ≠ $(id -u)) — 남이 선점한 자리에서는 잠금이 서로 보이지 않는다. runbook §1.4"
+    return 1
+  fi
+  # 마지막 세 자리가 ugo 다(앞의 setuid·setgid·sticky 자리는 쓰기 권한과 무관하다). `022` = g+o 쓰기.
+  if [ -z "$mode" ] || [ "$(( 8#${mode: -3} & 8#022 ))" -ne 0 ]; then
+    _PROD_LOCK_ERR="잠금 디렉터리의 권한을 읽지 못했거나 group/other 쓰기가 열려 있다(${BIDVECTOR_PROD_LOCK_DIR} mode=${mode:-?}) — 잠금 파일을 지워 우회할 수 있다. runbook §1.4"
+    return 1
+  fi
   _prod_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${proj}.lock" "프로젝트 ${proj}"
 }
 

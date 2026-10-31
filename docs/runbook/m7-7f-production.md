@@ -57,9 +57,20 @@
    - 메모리 키는 §「메모리」 표.
    - 확인: `./tools/prod-env-keys-check.sh --env-file /etc/bidvector-v2/prod.env`
 4. **상태 디렉터리**(release manifest · 백업 · 이력): `sudo install -d -m 700 -o "$USER" /var/lib/bidvector-v2`
-   - 잠금 자리(`/run/lock/bidvector-v2`)는 만들지 않아도 된다 — 반입·되돌림·주기 러너가 첫 실행에서 만든다.
-     tmpfs 라 재부팅에 지워지는 것이 맞다(잠금은 살아 있는 프로세스의 것이다). 자리를 환경변수에서 떼어 둔
-     이유는 §7.1 의 주를 본다.
+4c. **잠금 자리**(`/run/lock/bidvector-v2`) — 스크립트가 첫 실행에서 만들지만, **부팅마다 미리 만들어 둔다.**
+   `/run/lock` 은 tmpfs 이고 sticky·world-writable(`1777`)이라, 재부팅과 첫 반입 사이에 같은 host 의 다른
+   계정이 이 이름을 선점할 수 있다. 선점당하면 반입·되돌림은 `exit 2`, 주기 러너는 `exit 3` 으로 멈춘다
+   (fail-closed지만 그때는 고칠 때까지 반입이 안 된다).
+   ```bash
+   # /etc/tmpfiles.d/bidvector-v2.conf  — systemd-tmpfiles 가 부팅마다 자리를 먼저 만든다
+   d /run/lock/bidvector-v2 0755 deploy deploy -
+   ```
+   `sudo systemd-tmpfiles --create` 로 지금 한 번 적용한다. 소유자는 §1 에서 반입을 돌리는 사용자와 같아야
+   한다 — 스크립트가 **소유자 == 자기 uid** 와 **group/other 쓰기 없음**을 단언하고, 어긋나면 거절한다
+   (group/other 쓰기가 열린 자리는 잠금 파일을 지워 우회할 수 있다). 자리를 환경변수에서 떼어 둔 이유는
+   §7.1 의 주를 본다.
+   > 남은 자리: **그 사용자 자신**은 쥐어진 잠금 파일을 지워 우회할 수 있다(새 inode 가 잠긴다). 반입을
+   > 돌리는 사용자는 이미 docker 소켓을 가지므로 이 경로로 늘어나는 권한은 없다 — 사고 조사에서 알아 두는 사실이다.
 4b. **저장소 자리**를 한 번 정한다 — release 를 만들고(§2) 반입을 돌리고(§3) 주기 러너가 compose 파일을
    읽는(§「주기 실행」) 자리가 **모두 여기**다. 이 문서는 아래에서 `<저장소>` 로 쓴다.
    ```bash
