@@ -273,9 +273,18 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
   expect(kinds, '여정 ⑤ 의 개찰 기록이 알림함에 남지 않았다').toContain('OPENING_COMPLETED');
   expect(kinds, '여정 ⑤ 의 결과 확정이 알림함에 남지 않았다').toContain('AWARD_DECIDED');
 
-  // 개찰·결과 항목은 **그 건의 공고**를 싣는다 — 눌러서 워크시트로 갈 수 있는 값이다.
+  /**
+   * 항목은 **그 건의 공고**를 싣는다 — 눌러서 워크시트로 갈 수 있는 값이다. 이 여정의 공고
+   * 하나에 **종류 셋**이 선다: 투찰가 요청(`driveToRecorded` 가 지나는 길) · 개찰 기록 ·
+   * 결과 확정. 중복 억제 키가 **종류를 포함**하므로 셋이 한 항목으로 접히지 않고, 같은 종류를
+   * 다시 적었다면 늘지도 않는다 — 그 둘이 이 등식의 뜻이다.
+   */
   const mine = items.filter((one) => one.noticeNumber === NOTICE);
-  expect(mine.map((one) => one.kind).sort()).toStrictEqual(['AWARD_DECIDED', 'OPENING_COMPLETED']);
+  expect(mine.map((one) => one.kind).sort()).toStrictEqual([
+    'AWARD_DECIDED',
+    'BID_PRICE_REQUEST_RECORDED',
+    'OPENING_COMPLETED',
+  ]);
 
   // **빈 얼굴이 아니다** — 양성 표지(행 하나)를 먼저 기다린 뒤 개수를 센다(7E-2b r1 교훈).
   const rows = page.getByTestId(/^notification-/u);
