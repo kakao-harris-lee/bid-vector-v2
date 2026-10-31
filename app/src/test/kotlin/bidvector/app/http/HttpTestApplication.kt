@@ -177,12 +177,17 @@ open class HttpTestApplication {
     @Bean
     open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
 
+    /**
+     * 알림함 이중체는 **`BidPriceTestWiring` 의 빈 하나**를 받는다(M7/7C③-b) — 건 전이와 투찰가
+     * 요청이 같은 알림함을 보므로, 표면 test 가 두 경로의 항목을 한자리에서 센다.
+     */
     @Bean
     open fun bidCaseWorkflow(
         inMemoryBidCaseStore: InMemoryBidCaseStore,
         movableNoticeDeadlines: MovableNoticeDeadlines,
         clock: FixedClock,
-    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock)
+        notificationInbox: InMemoryNotificationInbox,
+    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock, notificationInbox)
 
     /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
     @Bean

@@ -1,5 +1,6 @@
 package bidvector.adapters.bidding
 
+import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidCommand
@@ -64,6 +65,7 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
                     EvidenceRetentionPolicyData(Period.ofYears(3)),
                     PolicyVersion(EffectiveFrom.Initial, "test"),
                 ),
+            notifications = JdbcNotificationInbox(dataSource()),
         )
 
     private fun account(login: String): AccountId =

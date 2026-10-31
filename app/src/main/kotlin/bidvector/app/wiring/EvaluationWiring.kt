@@ -19,6 +19,7 @@ import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.NoticeByIdPort
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -134,6 +135,7 @@ open class EvaluationWiring {
      * 않는다**(요청당 비용이 공고 수에 비례하지 않는다) — 지목된 공고 한 행을 읽어 그것만 후보로
      * 세운다. 나머지 협력자는 dry-run 과 **같은 빈**이라 두 경로가 같은 판정 정책을 본다.
      */
+    @Suppress("LongParameterList")
     @Bean
     open fun bidPriceRequestFactory(
         noticeByIdPort: NoticeByIdPort,
@@ -143,6 +145,7 @@ open class EvaluationWiring {
         mlAnalysisPort: MlAnalysisPort,
         correlationIdFactory: CorrelationIdFactory,
         clock: Clock,
+        notificationInboxPort: NotificationInboxPort,
     ): BidPriceRequestFactory =
         BidPriceRequestFactory(
             notices = noticeByIdPort,
@@ -152,6 +155,8 @@ open class EvaluationWiring {
             mlAnalysis = mlAnalysisPort,
             correlationIds = correlationIdFactory,
             clock = clock,
+            // 쓰기 빈은 `NotificationInboxWiring` 한 자리다(D-7C3B-2) — 이 경로가 R-4 의 종착점이다.
+            notificationInbox = notificationInboxPort,
         )
 }
 

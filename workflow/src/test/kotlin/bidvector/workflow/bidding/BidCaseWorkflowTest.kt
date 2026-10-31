@@ -28,6 +28,7 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -71,6 +72,9 @@ class BidCaseWorkflowTest {
             },
             clock = { now },
             retentionPolicy = policy(),
+            // 되비춤 자체는 `BidCaseNotificationTest` 가 잰다 — 여기서는 전이가 알림 포트에
+            // 기대지 않는다는 사실만 유지한다(무엇을 돌려주든 이 파일의 단언이 흔들리지 않는다).
+            notifications = { NotificationInboxOutcome.Created },
         )
 
     private fun submission(evidence: EvidenceRef? = null) =
@@ -322,123 +326,5 @@ class BidCaseWorkflowTest {
         entries.single().toState shouldBe BidStateTag.SKIPPED
         entries.single().actorKind shouldBe ActorKind.USER
         entries.single().reason shouldBe "면허 불일치"
-    }
-}
-
-/** 소유 필터를 **포트 안에서** 지는 fake — 실 DB 축은 `adapters` 쪽이 따로 잰다. */
-private class FakeBidCaseStore : BidCaseStorePort {
-    private data class Row(
-        val account: AccountId,
-        var case: BidCase,
-        val timeline: MutableList<TimelineEntry> = mutableListOf(),
-    )
-
-    private val rows = mutableMapOf<Long, Row>()
-    private var nextId = 1L
-
-    fun seed(
-        account: AccountId,
-        notice: NoticeKey,
-        kind: BidKind,
-        state: BidState,
-        deadlineAt: Instant? = null,
-    ): BidCase {
-        val id = BidCaseId(nextId++)
-        val case =
-            BidCase(id, notice, kind, state, caseVersion = 0, outcomeNoticeExpectedAt = null, deadlineAt = deadlineAt)
-        rows[id.value] = Row(account, case)
-        return case
-    }
-
-    fun stateOf(id: BidCaseId): BidState = rows.getValue(id.value).case.state
-
-    /** 읽기와 저장 사이에 다른 쓰기가 끼어든 상황을 만든다. */
-    var interleaveBeforeApply: Boolean = false
-
-    fun countOf(account: AccountId): Int = rows.values.count { it.account.value == account.value }
-
-    override fun open(
-        account: AccountId,
-        notice: NoticeKey,
-        kind: BidKind,
-        at: Instant,
-        deadlineAt: Instant?,
-    ): OpenCaseResult {
-        val existing =
-            rows.values.firstOrNull {
-                it.account.value == account.value && it.case.notice == notice && it.case.kind == kind
-            }
-        if (existing != null) return OpenCaseResult.AlreadyOpen(existing.case)
-        return OpenCaseResult.Opened(seed(account, notice, kind, BidState.Watching, deadlineAt))
-    }
-
-    override fun settleCandidates(
-        account: AccountId,
-        kind: BidKind,
-        judgedStates: Set<BidStateTag>,
-        now: Instant,
-    ): List<BidCase> =
-        rows.values
-            .filter { it.account.value == account.value && it.case.kind == kind }
-            .filter { it.case.state.tag in judgedStates || it.case.state.tag == BidStateTag.DEADLINE_PASSED_UNRECORDED }
-            .map { it.case }
-
-    override fun load(
-        account: AccountId,
-        caseId: BidCaseId,
-    ): BidCase? = rows[caseId.value]?.takeIf { it.account.value == account.value }?.case
-
-    override fun list(
-        account: AccountId,
-        kind: BidKind,
-        state: BidStateTag?,
-    ): List<BidCase> =
-        rows.values
-            .filter { it.account.value == account.value && it.case.kind == kind }
-            .filter { state == null || it.case.state.tag == state }
-            .map { it.case }
-
-    override fun timeline(
-        account: AccountId,
-        caseId: BidCaseId,
-    ): List<TimelineEntry> = rows[caseId.value]?.takeIf { it.account.value == account.value }?.timeline.orEmpty()
-
-    override fun applyTransition(
-        account: AccountId,
-        applied: AppliedTransition,
-    ): TransitionWrite {
-        val row = rows[applied.caseId.value]?.takeIf { it.account.value == account.value }
-        if (row != null && interleaveBeforeApply) {
-            row.case = row.case.copy(caseVersion = row.case.caseVersion + 1)
-            interleaveBeforeApply = false
-        }
-        return if (row == null) {
-            TransitionWrite.CaseNotFound
-        } else if (row.case.caseVersion != applied.expectedVersion) {
-            TransitionWrite.VersionConflict
-        } else {
-            append(row, applied)
-        }
-    }
-
-    private fun append(
-        row: Row,
-        applied: AppliedTransition,
-    ): TransitionWrite {
-        val nextVersion = row.case.caseVersion + 1
-        row.case = row.case.copy(state = applied.next, caseVersion = nextVersion)
-        row.timeline +=
-            TimelineEntry(
-                caseVersion = nextVersion,
-                fromState = applied.fromState.tag,
-                toState = applied.next.tag,
-                command = applied.command.name,
-                actorKind = applied.actorKind,
-                actorDetail = applied.actorDetail,
-                reason = applied.reason?.value,
-                retroactive = applied.retroactive,
-                occurredAt = applied.occurredAt,
-            )
-        return TransitionWrite.Applied
     }
 }

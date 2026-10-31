@@ -249,7 +249,9 @@ class BidPriceRequestE2ETest {
         // 가격 세 축은 상태와 사유만 낸다.
         body["bidPriceMenuState"] shouldBe "NOT_COMPUTED"
         body["floorShortfallState"] shouldBe "NOT_COMPUTED"
-        body["inboxRecordState"] shouldBe "NOT_RECORDED_YET"
+        // 자격 헤더 경로에는 계정 주체가 없다 — 지어내지 않고 사유를 낸다(M7/7C③-b).
+        body["inboxRecordState"] shouldBe "NOT_RECORDED"
+        body["inboxRecordNotRecordedReason"] shouldBe "NO_ACCOUNT_SUBJECT"
     }
 
     /**

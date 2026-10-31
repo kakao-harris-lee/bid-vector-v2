@@ -16,6 +16,7 @@ import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.MlAnalysisOutcome
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -39,10 +40,11 @@ class BidPriceRequestResponseTest {
         judgement: bidvector.qualification.LicenseJudgement = licenseJudgementFixture(),
         ml: MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided),
         currentActiveBids: Int = 0,
+        inbox: NotificationInboxOutcome? = NotificationInboxOutcome.Created,
     ): BidPriceRequestResponse {
         val run = runFor(notice, judgement, ml, currentActiveBids)
         val evaluation = runBlocking { run.evaluate() }
-        return bidPriceRequestResponseOf(run, evaluation, currentActiveBids)
+        return bidPriceRequestResponseOf(run, evaluation, currentActiveBids, inbox)
     }
 
     private fun runFor(
@@ -60,6 +62,7 @@ class BidPriceRequestResponseTest {
                 mlAnalysis = CountingMlAnalysisPort(ml),
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
+                notificationInbox = InMemoryNotificationInbox(),
             ).forRequest(notice.id, currentActiveBids)
         return (outcome as BidPriceRequestOutcome.Prepared).run
     }
@@ -363,11 +366,34 @@ class BidPriceRequestResponseTest {
         response.priceAxes.confidenceNotAvailableReason shouldBe "ML_UNAVAILABLE"
     }
 
+    /**
+     * 알림함 기록 결과의 **네 갈래**(M7/7C③-b · D-7C3B-9) — 포트의 결과 셋과 「부르지 않았다」다.
+     * 사유 칸은 적지 **않은** 갈래에만 선다(적힌 응답에 사유가 함께 서면 화면이 둘을 같이 읽는다).
+     */
     @Test
-    fun `알림함 기록 공백을 상태로 드러낸다 — 가짜 포트를 두지 않는다`() {
-        val response = responseFor(bidPriceNotice())
+    fun `알림함 기록 결과는 포트의 결과와 하나씩 맞물린다`() {
+        val recorded = responseFor(bidPriceNotice(), inbox = NotificationInboxOutcome.Created)
+        recorded.notification.inboxRecordState shouldBe "RECORDED_NEW"
+        recorded.notification.inboxRecordNotRecordedReason shouldBe null
 
-        response.notification.inboxRecordState shouldBe "NOT_RECORDED_YET"
-        response.notification.inboxRecordNotRecordedReason shouldBe "INBOX_WRITE_PORT_NOT_MERGED"
+        val updated = responseFor(bidPriceNotice(), inbox = NotificationInboxOutcome.Updated)
+        updated.notification.inboxRecordState shouldBe "RECORDED_UPDATED"
+        updated.notification.inboxRecordNotRecordedReason shouldBe null
+
+        val failed = responseFor(bidPriceNotice(), inbox = NotificationInboxOutcome.Failed)
+        failed.notification.inboxRecordState shouldBe "NOT_RECORDED"
+        failed.notification.inboxRecordNotRecordedReason shouldBe "INBOX_WRITE_FAILED"
+    }
+
+    /**
+     * **계정 주체가 없으면 부르지 않는다** — 「불렀는데 실패했다」와 구조로 갈린다(전자는 호출
+     * 자체가 없다). 자격 헤더 경로가 이 갈래다.
+     */
+    @Test
+    fun `계정 주체가 없으면 적지 않고 그 사실을 사유로 낸다`() {
+        val response = responseFor(bidPriceNotice(), inbox = null)
+
+        response.notification.inboxRecordState shouldBe "NOT_RECORDED"
+        response.notification.inboxRecordNotRecordedReason shouldBe "NO_ACCOUNT_SUBJECT"
     }
 }

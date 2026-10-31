@@ -115,7 +115,9 @@ class BidPriceRequestEndpointTest : HttpIntegrationTestBase() {
         body["bidPriceMenuState"] shouldBe "NOT_COMPUTED"
         body["confidenceState"] shouldBe "NOT_AVAILABLE"
         body["floorShortfallState"] shouldBe "NOT_COMPUTED"
-        body["inboxRecordState"] shouldBe "NOT_RECORDED_YET"
+        // 자격 헤더 경로에는 계정 주체가 없다 — 적지 않고 그 사실을 사유로 낸다(D-7C3B-9).
+        body["inboxRecordState"] shouldBe "NOT_RECORDED"
+        body["inboxRecordNotRecordedReason"] shouldBe "NO_ACCOUNT_SUBJECT"
     }
 
     /**
