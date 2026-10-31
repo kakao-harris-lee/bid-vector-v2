@@ -78,58 +78,64 @@ class ConstantTimeComparisonStructureTest {
      */
     @Test
     fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
-        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
-            setOf(
-                "ApiAuditRecord",
-                "ErrorBody",
-                "StrategyReadResponse",
-                "StrategyReadControllerKt",
-                "EvaluationDryRunResponse",
-                "ResultBuckets",
-                "EditSessionResponse",
-                "EditFieldTokensKt",
-                "EditSessionResponseKt",
-                "NoticeSummaryResponse",
-                // M7/7C ② — 투찰가 요청의 응답 DTO 일곱과 사상 함수 파일 넷, 컨트롤러 하나.
-                "BidPriceRequestResponse",
-                "EvaluationDetailFields",
-                "NotificationFields",
-                "QualificationFields",
-                "BaseAmountFields",
-                "FloorRateFields",
-                // M7/7C②-b — 표시 근거의 운반 타입 하나가 늘었다(응답 DTO 가 아니다).
-                "FloorRateGrounds",
-                "PriceAxesFields",
-                "BidPriceVerdictLabelsKt",
-                "BidPriceDropLabelsKt",
-                "BidPriceQualificationLabelsKt",
-                "BidPriceFactLabelsKt",
-                "BidPriceRequestController",
-                "BidCaseResponse",
-                "BidCaseResponse\$Companion",
-                "BidTimelineEntryResponse",
-                "BidCaseRouting",
-                "DraftInput",
-                "AccountScopedRoutes",
-                "RequestValuesKt",
-                "ProfileResponse",
-                "ConstructionCapacityResponse",
-                "OnboardingChecklistResponse",
-                "AwaitingItemResponse",
-                "ProfileHttp",
-                "BidCaseHttp",
-                "NotificationItemResponse",
-                "NotificationInboxRequestsKt",
-                "OpeningResultResponse",
-                "OpeningResultControllerKt",
-                "DeclaredValue",
-                "DeclaredValueKt",
-                // M7/7C③-b — 알림함 기록 결과 sealed 싱글턴 셋의 `when` 소진(응답 조립 파일).
-                "BidPriceRequestResponseKt",
-            )
+        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe ALLOWED_AREEQUAL_NAMES
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
 }
+
+/**
+ * 허용 목록의 **키 전수** — 아래 근거 지도와 **다른 자리**에 둔다(두 자리가 같아야 한다는 것이
+ * 위 test 의 요점이다). 함수 본문에 두면 그 함수가 50 줄 한도를 넘는다(M7/7C③-b 에서 실측).
+ */
+private val ALLOWED_AREEQUAL_NAMES: Set<String> =
+    setOf(
+        "ApiAuditRecord",
+        "ErrorBody",
+        "StrategyReadResponse",
+        "StrategyReadControllerKt",
+        "EvaluationDryRunResponse",
+        "ResultBuckets",
+        "EditSessionResponse",
+        "EditFieldTokensKt",
+        "EditSessionResponseKt",
+        "NoticeSummaryResponse",
+        // M7/7C ② — 투찰가 요청의 응답 DTO 일곱과 사상 함수 파일 넷, 컨트롤러 하나.
+        "BidPriceRequestResponse",
+        "EvaluationDetailFields",
+        "NotificationFields",
+        "QualificationFields",
+        "BaseAmountFields",
+        "FloorRateFields",
+        // M7/7C②-b — 표시 근거의 운반 타입 하나가 늘었다(응답 DTO 가 아니다).
+        "FloorRateGrounds",
+        "PriceAxesFields",
+        "BidPriceVerdictLabelsKt",
+        "BidPriceDropLabelsKt",
+        "BidPriceQualificationLabelsKt",
+        "BidPriceFactLabelsKt",
+        "BidPriceRequestController",
+        "BidCaseResponse",
+        "BidCaseResponse\$Companion",
+        "BidTimelineEntryResponse",
+        "BidCaseRouting",
+        "DraftInput",
+        "AccountScopedRoutes",
+        "RequestValuesKt",
+        "ProfileResponse",
+        "ConstructionCapacityResponse",
+        "OnboardingChecklistResponse",
+        "AwaitingItemResponse",
+        "ProfileHttp",
+        "BidCaseHttp",
+        "NotificationItemResponse",
+        "NotificationInboxRequestsKt",
+        "OpeningResultResponse",
+        "OpeningResultControllerKt",
+        "DeclaredValue",
+        "DeclaredValueKt",
+        // M7/7C③-b — 알림함 기록 결과 sealed 싱글턴 셋의 `when` 소진(응답 조립 파일).
+        "BidPriceRequestResponseKt",
+    )
 
 /**
  * `Intrinsics.areEqual`을 정당하게 남기는 class 파일 이름(`nameWithoutExtension`) → 근거.
