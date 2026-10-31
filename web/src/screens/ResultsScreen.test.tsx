@@ -554,6 +554,21 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
     expect(screen.queryByTestId('submitted-amount-51'), '짝이 없는데 투찰가 칸을 그렸다').toBeNull();
   });
 
+  /**
+   * **적재 중을 「없다」로 접지 않는다.** 「아직 안 왔다」와 「조회에 그 건이 없다」를 한
+   * `undefined` 로 접으면 카드가 적재 중에도 「이 건이 없습니다」를 적고, 그것은 거짓이다 —
+   * 운영자는 자기 기록이 사라진 줄 안다.
+   */
+  it('결과 조회가 적재 중이면 로딩이고 「이 건이 없다」가 아니다', async () => {
+    mocked.readMyBidResults.mockReturnValue(new Promise<MyBidResults>(() => {}));
+    renderScreen();
+
+    // 양성 표지(로딩)를 먼저 기다린 뒤 음성 단언을 한다.
+    expect(await screen.findByTestId('my-bid-loading-51')).toBeTruthy();
+    expect(screen.queryByTestId('result-missing-51'), '적재 중을 「건이 없다」로 접었다').toBeNull();
+    expect(screen.queryByTestId('reconciled-outcome-51'), '적재 중에 판정을 지어냈다').toBeNull();
+  });
+
   it('결과 조회만 실패하면 카드는 남고 대사 절만 오류 얼굴이다', async () => {
     mocked.readMyBidResults.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();
