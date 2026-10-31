@@ -19,7 +19,7 @@ import { displayOrUnknown, type StateDisplay } from './stateDisplay';
  * `UNKNOWN` 으로 그린다(`noticeDisplay.ts` 의 금액 부속 조립). 그래서 화면 C 안에서 같은 축이
  * 두 말로 보인다. 경계를 「운영자가 고르는 값이냐」로 적었던 앞 판 문장은 **틀렸다**: 개찰 절의
  * 과세도 상류 선언값인데 표를 태웠다. 실제 경계는 위 ⓐⓑ 다. 남은 축(금액 부속 토큰 전반 —
- * `BASE_AMOUNT`·`PUBLISHED` 포함)은 화면 정리 slice 의 일로 `OPEN-7E3B-MONEY-TOKEN-DISPLAY`
+ * `BASE_AMOUNT`·`PUBLISHED` 포함)은 화면 정리 slice 의 일로 `OPEN-7E3B-MONEY-WORDING`
  * 에 등재돼 있다.
  */
 export type VatTreatment = components['schemas']['RecordBidRequest']['vatTreatment'];
