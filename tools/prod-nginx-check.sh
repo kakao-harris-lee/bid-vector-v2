@@ -101,6 +101,10 @@ if [ -n "$HOST_CONFIG" ]; then
   [ -r "$HOST_CONFIG/nginx.conf" ] || _die "host 설정을 읽지 못했다: nginx.conf" 2
   # 심볼릭 링크는 그대로 둔다(sites-enabled → /etc/nginx/sites-available/… 절대 경로). 컨테이너 안에서
   # /etc/nginx 가 이 사본이므로 같은 자리를 가리킨다.
+  #
+  # **이 줄은 설정 디렉터리를 통째로** 임시 사본에 옮긴다. 아래에서 인증서 *지시어*를 하네스 것으로 바꾸므로
+  # 실제 인증서·키는 **읽히지 않지만**, 키를 `/etc/nginx/` 아래 두는 배치라면 그 파일도 사본에 들어온다.
+  # 종료 경로의 `trap` 이 사본을 지우되 `kill -9` 는 되돌리지 못한다 — **키를 설정 디렉터리 아래 두지 않는다.**
   cp -a "$HOST_CONFIG" "$CONF"
 else
   cp -a deploy/nginx/test-fixture "$CONF"
