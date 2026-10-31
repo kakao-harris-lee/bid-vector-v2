@@ -51,6 +51,7 @@ export interface paths {
          * 투찰가 요청 — 공고 단건·운영자 요청 평가(M7/7C ②)
          * @description 운영자가 지목한 **공고 하나**를 평가하고 그 근거를 낸다. `evaluateDryRun`(전략 전체 평가)과 **같은 판정 커널**을 돌아 같은 입력에서 같은 결과를 낸다 — 다른 점은 후보가 지목된 하나라는 것뿐이다.
          *     **POST 인 이유**: 이 요청의 종착점이 알림함 한 항목 기록(R-4)이고, 읽기로 출하한 뒤 쓰기로 바꾸면 이미 출하된 계약을 깨야 한다. CSRF 요구도 메서드 집합으로 성립한다. 공고 식별자는 **본문**이다(경로가 아니다).
+         *     **그 기록이 실제로 일어난다**(M7/7C③-b). 브라우저 세션으로 부르면 이 요청이 운영자의 알림함에 한 항목으로 남고(`inboxRecordState`), 같은 공고를 다시 물으면 항목이 늘지 않고 갱신된다. 운영자 자격 헤더 경로에는 계정 주체가 없어 적지 않으며 그 사실을 사유로 낸다.
          *     **분석 예산을 적용하지 않는다.** 전략의 후보 상한은 전건 스캔의 비용 통제이고 운영자가 지목한 공고 하나의 허가 조건이 아니다 — 상한이 1 인 전략에서도 요청한 공고는 평가된다. 이것이 `evaluateDryRun` 과 **의도적으로 어긋나는 유일한 축**이다.
          *     **가격 세 축은 아직 값이 서지 않는다.** 3안(`bidPriceMenuState`)·신뢰도 (`confidenceState`)·하한 미달 빈도(`floorShortfallState`)는 **상태와 사유**만 낸다 — 출하 조립의 ML 분석 포트가 항상-미가용 고정이고(`OPEN-ML-ANALYSIS-WIRING` 보류) 하한 미달 정책의 출하 정본 표가 없다. 값 칸을 미리 두지 않는 이유는 「없음」이 「0」으로 읽히지 않게 하는 것이다 — 값이 서는 slice 가 칸을 더한다.
          *     **하한율은 게시값만 근거다**(운영자 결정 2026-10-15). 법정 하한율을 해석하지 않으며 그 사실을 `disclosures` 가 `STATUTORY_FLOOR_RATE_NOT_INTERPRETED` 로 고지한다. 게시 하한율이 아닌 출처의 값은 근거 칸에 싣지 않고 `floorRateGroundsState` 가 말한다.
@@ -1113,12 +1114,15 @@ export interface components {
             /** @description 이 판정이 알림 요청을 낳았는가. **요청까지**이고 배달·기록은 하지 않는다 (`evaluateDryRun` 과 같은 경계). */
             wouldNotify: boolean;
             /**
-             * @description 알림함 기록 상태(R-4). 쓰기 포트가 아직 머지되지 않아 **기록하지 않는다** — 가짜 포트·임시 표를 두지 않고 그 사실을 계약에 드러낸다. 포트가 서면 값이 늘어난다.
+             * @description 이 요청을 **운영자의 알림함에 적은 결과**(R-4 의 종착점). `RECORDED_UPDATED` 는 같은 공고를 다시 물어 **이미 있던 항목을 갱신**했다는 뜻이다(NOTI-10 중복 억제가 작동해 항목이 늘지 않았다) — `RECORDED_NEW` 와 가른다. 채널 발송은 여전히 없다.
              * @enum {string}
              */
-            inboxRecordState: "NOT_RECORDED_YET";
-            /** @enum {string|null} */
-            inboxRecordNotRecordedReason?: null | "INBOX_WRITE_PORT_NOT_MERGED";
+            inboxRecordState: "RECORDED_NEW" | "RECORDED_UPDATED" | "NOT_RECORDED";
+            /**
+             * @description 적지 않은 사유 — 적었으면 `null` 이다. `NO_ACCOUNT_SUBJECT` 는 **이 요청에 계정 주체가 없다**는 뜻이다: 이 operation 은 운영자 자격 헤더로도 닿는데 계정 행을 갖는 것은 브라우저 세션 경로뿐이고, 알림함은 계정 소유라 주체 없이는 적을 자리가 없다 (지어내지 않는다 — 세션으로 부르면 적힌다). `INBOX_WRITE_FAILED` 는 저장이 실패한 것이고 **평가 결과는 그대로 유효하다** — 알림 기록이 평가를 되돌리지 않는다.
+             * @enum {string|null}
+             */
+            inboxRecordNotRecordedReason?: null | "NO_ACCOUNT_SUBJECT" | "INBOX_WRITE_FAILED";
             /**
              * @description 면허 자격 판정(QUAL-01 · 03). **`UNCERTAIN` 은 `INELIGIBLE` 이 아니다**(U-5) — 판정 불가와 미달을 한 값으로 접지 않는다.
              * @enum {string}

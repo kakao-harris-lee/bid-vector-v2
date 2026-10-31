@@ -75,6 +75,7 @@ class BidPriceRequestDifferentialTest {
             mlAnalysis = CountingMlAnalysisPort(unavailable()),
             correlationIds = SequentialCorrelationIdFactory(),
             clock = clock,
+            notificationInbox = InMemoryNotificationInbox(),
         ).forRequest(id, currentActiveBids)
 
     private fun unavailable(): MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided)
@@ -176,6 +177,7 @@ class BidPriceRequestDifferentialTest {
                 mlAnalysis = CountingMlAnalysisPort(unavailable()),
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
+                notificationInbox = InMemoryNotificationInbox(),
             )
 
         val prepared = factory.forRequest(biddable.id, 0) as BidPriceRequestOutcome.Prepared
@@ -203,6 +205,7 @@ class BidPriceRequestDifferentialTest {
                 mlAnalysis = ml,
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
+                notificationInbox = InMemoryNotificationInbox(),
             )
 
         val prepared = factory.forRequest(biddable.id, 0) as BidPriceRequestOutcome.Prepared

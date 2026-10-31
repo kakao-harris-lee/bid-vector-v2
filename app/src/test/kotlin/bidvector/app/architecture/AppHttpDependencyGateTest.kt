@@ -457,5 +457,10 @@ class AppHttpDependencyGateTest {
  * 세 tier 목록의 **항목 이름 합집합**을 기계로 세어 얻었다(병합 기준 72 · main 이 알림함 둘 ·
  * 이 레인이 하나). 어느 레인의 면제도 지우지 않는 합집합이고, 수는 계산이 아니라 **선언**이다 —
  * 아래 등식이 관측과 대조해 검산한다(틀리면 그 test 가 먼저 붉어진다).
+ *
+ * **M7/7C③-b 가 다섯을 더해 80 이다** — 알림 훑기의 일회 러너 갈래 넷(`app.notificationinbox` 의
+ * 러너 · 종료 코드 · 로그 줄 · 러너 파일 클래스)과 그 조립 하나(`app.wiring.NotificationSweepWiring`).
+ * 러너 갈래가 면제인 이유는 기존 여덟 러너와 같다 — **요청 경로가 아니다**(cron 이 프로세스를 띄워
+ * 한 번 돌고 끝낸다). 조립이 면제인 이유도 기존 배선들과 같다(어댑터를 쥐어 꽂는 자리다).
  */
-private const val EXPECTED_EXEMPT_COUNT = 75
+private const val EXPECTED_EXEMPT_COUNT = 80

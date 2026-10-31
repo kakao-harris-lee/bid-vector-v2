@@ -128,6 +128,10 @@ paths:
         쓰기로 바꾸면 이미 출하된 계약을 깨야 한다. CSRF 요구도 메서드 집합으로 성립한다.
         공고 식별자는 **본문**이다(경로가 아니다).
 
+        **그 기록이 실제로 일어난다**(M7/7C③-b). 브라우저 세션으로 부르면 이 요청이 운영자의
+        알림함에 한 항목으로 남고(`inboxRecordState`), 같은 공고를 다시 물으면 항목이 늘지 않고
+        갱신된다. 운영자 자격 헤더 경로에는 계정 주체가 없어 적지 않으며 그 사실을 사유로 낸다.
+
         **분석 예산을 적용하지 않는다.** 전략의 후보 상한은 전건 스캔의 비용 통제이고 운영자가
         지목한 공고 하나의 허가 조건이 아니다 — 상한이 1 인 전략에서도 요청한 공고는 평가된다.
         이것이 `evaluateDryRun` 과 **의도적으로 어긋나는 유일한 축**이다.
@@ -3312,16 +3316,26 @@ components:
         inboxRecordState:
           type: string
           enum:
-            - NOT_RECORDED_YET
+            - RECORDED_NEW
+            - RECORDED_UPDATED
+            - NOT_RECORDED
           description: >-
-            알림함 기록 상태(R-4). 쓰기 포트가 아직 머지되지 않아 **기록하지 않는다** — 가짜
-            포트·임시 표를 두지 않고 그 사실을 계약에 드러낸다. 포트가 서면 값이 늘어난다.
+            이 요청을 **운영자의 알림함에 적은 결과**(R-4 의 종착점). `RECORDED_UPDATED` 는
+            같은 공고를 다시 물어 **이미 있던 항목을 갱신**했다는 뜻이다(NOTI-10 중복 억제가
+            작동해 항목이 늘지 않았다) — `RECORDED_NEW` 와 가른다. 채널 발송은 여전히 없다.
         inboxRecordNotRecordedReason:
           type: string
           nullable: true
           enum:
             - null
-            - INBOX_WRITE_PORT_NOT_MERGED
+            - NO_ACCOUNT_SUBJECT
+            - INBOX_WRITE_FAILED
+          description: >-
+            적지 않은 사유 — 적었으면 `null` 이다. `NO_ACCOUNT_SUBJECT` 는 **이 요청에 계정
+            주체가 없다**는 뜻이다: 이 operation 은 운영자 자격 헤더로도 닿는데 계정 행을 갖는
+            것은 브라우저 세션 경로뿐이고, 알림함은 계정 소유라 주체 없이는 적을 자리가 없다
+            (지어내지 않는다 — 세션으로 부르면 적힌다). `INBOX_WRITE_FAILED` 는 저장이 실패한
+            것이고 **평가 결과는 그대로 유효하다** — 알림 기록이 평가를 되돌리지 않는다.
         licenseVerdict:
           type: string
           enum:

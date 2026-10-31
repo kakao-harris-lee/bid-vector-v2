@@ -77,13 +77,35 @@ enum class BidPriceMenuNotComputedReason {
     MENU_PATH_NOT_WIRED,
 }
 
-/** 알림함 기록 상태 — 쓰기 포트가 머지되기 전의 사실이다(R-4 공백을 계약 문면으로 둔다). */
+/**
+ * 알림함 기록 상태(M7/7C③-b · D-7C3B-9) — **이 요청이 알림함에 무엇을 했는가**다. R-4 의 끝이
+ * 알림함 한 항목이므로 이것이 그 종착점의 결과다.
+ *
+ * 「처음 생겼다」와 「이미 있던 항목을 갱신했다」를 가른다 — 후자는 **중복 억제가 작동한 자리**이고
+ * (행이 늘지 않았다) 그 둘을 한 값으로 접으면 같은 공고를 다시 물었을 때 화면이 그 사실을 말하지
+ * 못한다. 포트의 `Created`·`Updated` 와 **하나씩 맞물린다**.
+ */
 enum class InboxRecordState {
-    NOT_RECORDED_YET,
+    RECORDED_NEW,
+    RECORDED_UPDATED,
+    NOT_RECORDED,
 }
 
+/**
+ * 기록하지 않은 사유 — **둘뿐이고 서로 다른 처방이다**.
+ *
+ * [NO_ACCOUNT_SUBJECT] 는 **이 경로의 인증 둘 가운데 하나**가 계정을 내지 않는다는 사실이다:
+ * 이 operation 은 운영자 자격 헤더로도, 브라우저 세션으로도 닿는데 계정 행을 갖는 것은 세션뿐이다
+ * (`AccountScopedRoutes` KDoc). 알림함은 계정 소유라 주체 없이는 적을 자리가 없다 — 지어내지 않고
+ * 그 사실을 말한다. 고치는 법은 세션으로 부르는 것이고, 자격 헤더 경로에 계정을 묶는 일은 R-2 의
+ * 남은 절반이다(`OPEN-STR-12` 와 같은 축).
+ *
+ * [INBOX_WRITE_FAILED] 는 저장이 실패했다는 사실이다. **평가 결과는 그대로 유효하다** — 알림
+ * 기록이 평가를 되돌리지 않는 것이 D-7C3B-9 의 선택이고, 잃은 사실은 조립이 로그 표지로도 적는다.
+ */
 enum class InboxRecordNotRecordedReason {
-    INBOX_WRITE_PORT_NOT_MERGED,
+    NO_ACCOUNT_SUBJECT,
+    INBOX_WRITE_FAILED,
 }
 
 /** 평가가 판정에 이르렀는가 — `CandidateEvaluation` 두 갈래. */

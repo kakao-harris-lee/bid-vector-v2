@@ -10,6 +10,7 @@ import {
   FLOOR_RATE_GROUNDS_DISPLAY,
   FLOOR_SHORTFALL_REASON_DISPLAY,
   FLOOR_SHORTFALL_STATE_DISPLAY,
+  INBOX_RECORD_REASON_DISPLAY,
   INBOX_RECORD_STATE_DISPLAY,
   LICENSE_MISSING_DETAIL_DISPLAY,
   LICENSE_UNCERTAIN_REASON_DISPLAY,
@@ -73,7 +74,16 @@ describe('화면 C 상태 표시 표 — 계약 enum 전수', () => {
       UNJUDGED_AXIS_DISPLAY,
       ['QUAL_08_REGION', 'QUAL_10_PERFORMANCE', 'QUAL_11_CONSTRUCTION_CAPACITY'],
     ],
-    ['inboxRecordState', INBOX_RECORD_STATE_DISPLAY, ['NOT_RECORDED_YET']],
+    [
+      'inboxRecordState',
+      INBOX_RECORD_STATE_DISPLAY,
+      ['RECORDED_NEW', 'RECORDED_UPDATED', 'NOT_RECORDED'],
+    ],
+    [
+      'inboxRecordNotRecordedReason',
+      INBOX_RECORD_REASON_DISPLAY,
+      ['NO_ACCOUNT_SUBJECT', 'INBOX_WRITE_FAILED'],
+    ],
     [
       'disclosures',
       DISCLOSURE_SENTENCE,
@@ -170,7 +180,14 @@ describe('화면 C 의 G2 13 행 문면', () => {
     expect(DISCLOSURE_SENTENCE.PRICE_FITNESS_IS_NOT_PROBABILITY.label).toContain('확률');
   });
 
-  it('R-4 — 알림함은 「아직 기록하지 않음」이다', () => {
-    expect(displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, 'NOT_RECORDED_YET').label).toContain('아직');
+  it('R-4 — 적힘과 갱신을 가르고, 적지 않은 사유는 처방을 말한다', () => {
+    // 「처음 적혔다」와 「갱신했다」가 같은 문구면 중복 억제가 작동한 사실이 화면에서 사라진다.
+    expect(displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, 'RECORDED_NEW').label).not.toBe(
+      displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, 'RECORDED_UPDATED').label,
+    );
+    expect(displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, 'RECORDED_UPDATED').label).toContain('갱신');
+    // 사유 둘은 처방이 다르다 — 운영자가 무엇을 해야 하는지 문구가 말한다.
+    expect(displayOrUnknown(INBOX_RECORD_REASON_DISPLAY, 'NO_ACCOUNT_SUBJECT').label).toContain('세션');
+    expect(displayOrUnknown(INBOX_RECORD_REASON_DISPLAY, 'INBOX_WRITE_FAILED').label).toContain('평가 결과');
   });
 });
