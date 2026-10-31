@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # M7/7F 본편 — **반입**(one-command, D-7F2-2). 기본은 dry-run 이다 — `--apply` 가 없으면 컨테이너·볼륨·
-# 상태 파일 어느 것도 바꾸지 않고 preflight 와 계획만 보인다.
+# 상태 파일(`current`·`previous`·`pending`·백업) 어느 것도 바꾸지 않고 preflight 와 계획만 보인다.
+# (잠금은 preflight 앞에 있으므로 상태 디렉터리와 그 안의 `.lock` 은 dry-run 에서도 만들어진다.)
 #
 #     ./tools/prod-deploy.sh --env-file <운영 env> --state-dir <디렉터리> --release <태그>
-#                            [--project <이름>] [--apply]
+#                            [--project <이름>] [--accept-missing-data] [--apply]
+#
+# `--accept-missing-data` 는 **되돌리기 어려운 탈출구**다 — 「반입 기록은 있는데 데이터 볼륨이 없다」를
+# 넘어간다. 옛 볼륨의 데이터는 남은 채 새 쓰기가 다른 자리로 가므로, 왜 볼륨이 없는지 먼저 본다.
+# 쓰면 `<state>/history` 줄에 표지가 남는다.
 #
 # 순서: preflight → (apply) 반입 직전 DB 백업 → 직전 release 기록 → `up -d --wait` → 헬스
 #       (`tools/prod-health.sh`) → 현재 release 기록.
@@ -49,7 +54,7 @@ while [ "$#" -gt 0 ]; do
     *) _die "알 수 없는 인자: $1" 2 ;;
   esac
 done
-[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--apply]" 2
+[ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--accept-missing-data] [--apply]" 2
 for t in docker jq curl stat; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
 
 COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
@@ -59,12 +64,23 @@ EXPECT_PROJECT="$BIDVECTOR_PROD_PROJECT"
 if [ -n "$PROJECT" ]; then COMPOSE+=(-p "$PROJECT"); EXPECT_PROJECT="$PROJECT"; fi
 export BIDVECTOR_RELEASE_TAG="$REL"
 
-# **상태 디렉터리에 잠금을 건다.** 두 반입이 동시에 돌면 둘 다 preflight 를 지나고, 이긴 쪽이 진 쪽의
-# `pending` 을 지워 「떠 있는 것 ≠ current 인데 pending 도 없다」가 된다(v V-4 실측: 둘 다 반입 단계에
-# 들어가 current=pending 이 어긋난 채 남았다). 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
+# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리.
+# 상태 디렉터리 하나만 잡던 앞 판은 **같은 프로젝트를 다른 state-dir 로** 동시에 반입할 수 있었다
+# (v V3-4). 순서를 고정했으므로 교착은 없다. 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
+_prod_lock() { # <잠금 파일> <무엇>
+  local f="$1" what="$2" fd
+  exec {fd}>>"$f" || _die "${what} 잠금 파일을 열지 못했다: $f" 2
+  flock -n "$fd" || _die "다른 반입·되돌림이 ${what}에서 돌고 있다($f) — 끝난 뒤 다시" 2
+  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
+}
+_prod_unlock_all() {
+  local fd
+  for fd in ${BIDVECTOR_LOCK_FDS:-}; do flock -u "$fd" 2>/dev/null || true; eval "exec ${fd}>&-" 2>/dev/null || true; done
+  BIDVECTOR_LOCK_FDS=""
+}
 mkdir -p "$STATE"
-exec {_lockfd}>>"$STATE/.lock" || _die "상태 디렉터리 잠금 파일을 열지 못했다: $STATE/.lock" 2
-flock -n "$_lockfd" || _die "다른 반입·되돌림이 이 상태 디렉터리에서 돌고 있다($STATE) — 끝난 뒤 다시" 2
+_prod_lock "${TMPDIR:-/tmp}/bidvector-v2-prod.${EXPECT_PROJECT}.lock" "프로젝트 ${EXPECT_PROJECT}"
+_prod_lock "$STATE/.lock" "이 상태 디렉터리"
 
 echo "== preflight — release ${REL}"
 # env 파일
@@ -169,51 +185,88 @@ case "$DB_STATE" in
   first)       db_line="데이터 볼륨 ${pg_vol_name} 없음 · 반입 기록 없음 → 첫 반입" ;;
 esac
 echo "  현재 release: ${current:-없음(첫 반입)}$([ -n "$pending" ] && echo " · **끝나지 않은 반입: ${pending}**(떠 있는 것은 이쪽)") · DB: ${db_line}"
+ACCEPT_MISSING_DATA_USED=""
+if [ "$DB_STATE" = volume-gone ] && [ "$ACCEPT_MISSING_DATA" -eq 1 ]; then
+  ACCEPT_MISSING_DATA_USED=1
+  echo "  **--accept-missing-data 로 빈 DB 위에 반입한다** — 옛 볼륨의 데이터는 남고 새 쓰기는 다른 자리로 간다"
+fi
 if [ "$DB_STATE" = volume-gone ] && [ "$ACCEPT_MISSING_DATA" -eq 0 ]; then
   _die "반입 기록(${current})은 있는데 데이터 볼륨이 없다 — 빈 DB 위에 반입하지 않는다. 프로젝트 이름(${proj})이 맞는지, 누가 \`down -v\` 를 돌렸는지 먼저 본다. 정말 빈 DB 로 가려면 --accept-missing-data" 1
 fi
 
 # **지금 DB 가 어디까지 올라가 있는가** — 상태 파일이 아니라 `flyway_schema_history` 를 읽는다.
 # 상태 파일만 보던 앞 판은 새(또는 오타) `--state-dir` 로 부르면 「첫 반입」이 되어 가드가 통째로
-# 꺼졌다(v V-3 실측: DB 가 V23 인데 그보다 낮은 release 로 dry-run 이 exit 0). DB 는 어느 상태
-# 디렉터리를 쓰든 하나뿐이라, 이 술어는 상태 파일이 어긋나도 산다.
-_db_applied_versions() { # 적용된 마이그레이션 버전(정렬). 표가 없으면 빈 출력 + 0.
-  local u d
-  u="$(sed -n 's/^BIDVECTOR_PG_USER=//p' "$ENVF")"; d="$(sed -n 's/^BIDVECTOR_PG_DB=//p' "$ENVF")"
-  [ -n "$u" ] && [ -n "$d" ] || return 1
-  docker exec "$pg_cid" psql -qAt -U "$u" -d "$d" \
-    -c "select coalesce(string_agg(version, ' ' order by version), '') from flyway_schema_history where success and version is not null" 2>/dev/null \
-    | tr ' ' '\n' | grep -E '^[0-9.]+$' | sort -u
+# 꺼졌다(v V-3 실측). DB 는 어느 상태 디렉터리를 쓰든 하나뿐이라, 이 술어는 상태 파일이 어긋나도 산다.
+#
+# 자격·DB 이름은 **compose 가 해석한 값**에서 읽는다 — env 파일을 두 번째 파서로 읽던 앞 판은
+# 따옴표·CRLF 값에서 컨테이너가 쓰는 값과 갈라졌다(CR r3 M-3 실측: compose 는 `probe_db`, 이 쪽은
+# `"probe_db"`). `tools/db-backup.sh` 가 컨테이너의 `POSTGRES_USER` 를 쓰는 것과 같은 출처가 된다.
+PG_USER="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_USER // empty')"
+PG_DB="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_DB // empty')"
+[ -n "$PG_USER" ] && [ -n "$PG_DB" ] || _die "compose 가 해석한 postgres 자격·DB 이름을 읽지 못했다(판정 불가)" 2
+# **app 이 붙는 DB 와 가드가 읽는 DB 가 같아야 한다** — 둘이 갈리면 가드는 빈 DB 를 보고 통과시킨다.
+app_jdbc="$(printf '%s' "$cfg" | jq -r '.services.app.environment.BIDVECTOR_PERSISTENCE_JDBCURL // empty')"
+app_db="${app_jdbc##*/}"; app_db="${app_db%%\?*}"
+[ -n "$app_db" ] || _die "app 의 JDBC URL 에서 DB 이름을 읽지 못했다(판정 불가)" 2
+[ "$app_db" = "$PG_DB" ] \
+  || _die "app 이 붙는 DB(${app_db})와 가드가 읽는 DB(${PG_DB})가 다르다 — 가드가 다른 DB 를 본다(판정 불가)" 2
+
+# 읽기 결과를 **세 갈래**로 가른다: ok(버전 목록) · notable(이력 표 없음) · unreadable(접속·질의 실패).
+# 앞 판은 셋이 한 갈래였고, `grep` 의 「매치 0」이 `pipefail` 로 올라와 **빈 기록도 읽기 실패**가 됐다
+# — 그래서 「첫 반입이 app 에서 실패한 직후」가 자격 문제로 보고됐다(CR r3 M-1).
+DB_READ="" DB_VERSIONS=""
+_db_read_versions() {
+  DB_VERSIONS=""; DB_READ=unreadable
+  local probe out
+  probe="$(docker exec "$pg_cid" psql -qAt -U "$PG_USER" -d "$PG_DB" \
+    -c "select to_regclass('public.flyway_schema_history') is not null" 2>/dev/null)" || return 0
+  case "$probe" in
+    t) ;;
+    f) DB_READ=notable; return 0 ;;
+    *) return 0 ;;
+  esac
+  out="$(docker exec "$pg_cid" psql -qAt -U "$PG_USER" -d "$PG_DB" \
+    -c "select coalesce(string_agg(version, ' ' order by version), '') from flyway_schema_history where success and version is not null" 2>/dev/null)" || return 0
+  # `grep` 의 매치 0 을 실패로 올리지 않는다 — 빈 기록은 실패가 아니라 사실이다.
+  DB_VERSIONS="$(printf '%s' "$out" | tr ' ' '\n' | { grep -E '^[0-9.]+$' || true; } | sort -u)"
+  DB_READ=ok
 }
 _manifest_versions() { # <release> → manifest 가 적은 마이그레이션 버전(정렬)
   sed -n 's/^migration=V\([0-9][0-9.]*\)__.*/\1/p' "$STATE/releases/$1.manifest" 2>/dev/null | sort -u
 }
+# **한 함수로 둔다** — preflight 와 apply 재확인이 같은 글자를 쓴다. 앞 판은 둘이 달라서, 같은
+# 읽기 실패가 한쪽에서는 exit 2 이고 다른 쪽에서는 「모르는 마이그레이션 0」이었다(v V3-1 · CR r3 M-2).
+_db_guard() { # [실패 문면에 덧붙일 말]
+  local tail_note="${1:-}" want ahead backup
+  _db_read_versions
+  case "$DB_READ" in
+    unreadable)
+      _die "DB 스키마를 읽지 못했다(psql 접속·질의 실패 — compose 가 해석한 ${PG_USER}@${PG_DB})${tail_note} — 판정 불가" 2 ;;
+    notable)
+      DB_GUARD=notable; echo "  DB 스키마: 마이그레이션 이력 표가 아직 없다(첫 기동 전)"; return 0 ;;
+  esac
+  if [ -z "$DB_VERSIONS" ]; then
+    DB_GUARD=empty; echo "  DB 스키마: 이력 표는 있으나 적용 기록이 0 이다"; return 0
+  fi
+  want="$(_manifest_versions "$REL")"
+  [ -n "$want" ] || _die "release ${REL} 의 manifest 에서 마이그레이션 버전을 읽지 못했다(판정 불가)" 2
+  ahead="$(comm -23 <(printf '%s\n' "$DB_VERSIONS") <(printf '%s\n' "$want"))"
+  DB_GUARD=checked
+  echo "  DB 스키마: 적용 $(printf '%s\n' "$DB_VERSIONS" | wc -l)개 · 가려는 release 가 모르는 것 $(printf '%s' "$ahead" | grep -c . || true)개"
+  if [ -n "$ahead" ]; then
+    echo "  **지금 DB 가 ${REL} 에 없는 마이그레이션을 담고 있다**: $(printf '%s' "$ahead" | tr '\n' ' ')" >&2
+    backup="$(grep -E "^${RUNNING_REL:-none} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
+    echo "  반입 직전 백업: ${backup:-기록 없음}" >&2
+    _die "멈춤 — 옛 이미지는 새 스키마 위에서 뜬다(Flyway 가 모르는 상위 버전을 무시하므로 조용히 뜬다)${tail_note}" 3
+  fi
+}
 DB_GUARD=skipped
 if [ -n "$pg_cid" ]; then
-  if db_versions="$(_db_applied_versions)"; then
-    if [ -n "$db_versions" ]; then
-      want="$(_manifest_versions "$REL")"
-      [ -n "$want" ] || _die "release ${REL} 의 manifest 에서 마이그레이션 버전을 읽지 못했다(판정 불가)" 2
-      ahead="$(comm -23 <(printf '%s\n' "$db_versions") <(printf '%s\n' "$want"))"
-      DB_GUARD=checked
-      echo "  DB 스키마: 적용 $(printf '%s\n' "$db_versions" | wc -l)개 · 가려는 release 가 모르는 것 $(printf '%s' "$ahead" | grep -c . || true)개"
-      if [ -n "$ahead" ]; then
-        echo "  **지금 DB 가 ${REL} 에 없는 마이그레이션을 담고 있다**: $(printf '%s' "$ahead" | tr '\n' ' ')" >&2
-        backup="$(grep -E "^${RUNNING_REL:-none} " "$STATE/backups/index" 2>/dev/null | tail -n1 | cut -d' ' -f2- || true)"
-        echo "  반입 직전 백업: ${backup:-기록 없음}" >&2
-        _die "멈춤 — 옛 이미지는 새 스키마 위에서 뜬다(Flyway 가 모르는 상위 버전을 무시하므로 조용히 뜬다)" 3
-      fi
-    else
-      DB_GUARD=empty
-      echo "  DB 스키마: 아직 마이그레이션 기록이 없다(첫 기동 전)"
-    fi
-  else
-    _die "DB 스키마를 읽지 못했다(자격·DB 이름을 env 파일에서 읽는다) — 판정 불가" 2
-  fi
+  _db_guard
 elif [ "$DB_STATE" = stopped ]; then
   echo "  DB 스키마: postgres 가 멈춰 있어 지금은 읽지 못한다 — apply 에서 올린 뒤 다시 본다"
 else
-  echo "  DB 스키마: DB 가 없다(${db_line%% *})"
+  echo "  DB 스키마: 읽을 DB 가 없다(${DB_STATE})"
 fi
 
 # 마이그레이션 가드(상태 파일 축) — **되돌림만이 아니라 반입 경로에도 건다.** 위 DB 축이 주이고
@@ -258,16 +311,10 @@ case "$DB_STATE" in
     [ -n "$pg_cid" ] || _die "postgres 를 올렸으나 컨테이너를 찾지 못했다 — 반입하지 않았다" 1
     echo "  멈춰 있던 postgres 를 올렸다(백업용)"
     # **이제 DB 를 읽을 수 있다** — preflight 에서 건너뛴 DB 축 가드를 여기서 본다(app 은 아직
-    # 올리지 않았으므로 마이그레이션은 돌지 않았다).
+    # 올리지 않았으므로 마이그레이션은 돌지 않았다). **같은 함수**를 쓰므로 읽기 실패는 여기서도
+    # exit 2 다 — 앞 판은 이 자리만 읽기 실패를 조용히 지나 「모르는 마이그레이션 0」을 찍었다.
     if [ "$DB_GUARD" = skipped ]; then
-      if db_versions="$(_db_applied_versions)" && [ -n "$db_versions" ]; then
-        ahead="$(comm -23 <(printf '%s\n' "$db_versions") <(_manifest_versions "$REL"))"
-        if [ -n "$ahead" ]; then
-          echo "  **지금 DB 가 ${REL} 에 없는 마이그레이션을 담고 있다**: $(printf '%s' "$ahead" | tr '\n' ' ')" >&2
-          _die "멈춤 — 옛 이미지는 새 스키마 위에서 뜬다(백업용으로 올린 postgres 는 떠 있다 — 원인을 고치고 다시 반입하거나 \`compose stop postgres\`)" 3
-        fi
-      fi
-      echo "  DB 스키마: 올린 뒤 다시 보았다 — 가려는 release 가 모르는 마이그레이션 0"
+      _db_guard " (백업용으로 올린 postgres 는 떠 있다 — 원인을 고치고 다시 반입하거나 \`compose stop postgres\`)"
     fi
     ;;
 esac
@@ -313,5 +360,5 @@ if [ -n "$current" ] && [ "$current" != "$REL" ]; then
 fi
 printf '%s\n' "$REL" > "$STATE/current"
 rm -f "$STATE/pending"
-echo "$(TZ=Asia/Seoul date '+%Y-%m-%dT%H:%M:%S%z') deploy ${REL} (previous ${current:-none})" >> "$STATE/history"
+echo "$(TZ=Asia/Seoul date '+%Y-%m-%dT%H:%M:%S%z') deploy ${REL} (previous ${current:-none}${ACCEPT_MISSING_DATA_USED:+, accept-missing-data})" >> "$STATE/history"
 echo "prod-deploy: OK — current=${REL}"
