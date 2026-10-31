@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -52,6 +53,24 @@ class NotificationTriggerEndpointTest : HttpIntegrationTestBase() {
         judgements.judgement = licenseJudgementFixture()
         inbox.records.clear()
         session = SessionTestClient(restTemplate, ::url).signIn()
+    }
+
+    /**
+     * **바꾼 전역 상태를 되돌린다.** 이 조립의 이중체들은 같은 Spring 문맥을 쓰는 다른 test
+     * class 와 **공유**된다 — 전략을 투찰가용으로 바꿔 두면 그 뒤에 도는 체크리스트 test 가
+     * 감시 조건 없는 전략을 보고 다른 답을 낸다(실측으로 붉었다: 전건 실행에서만 나타나고
+     * 표적 실행에서는 보이지 않는다). 바꾼 쪽이 되돌린다(`BidCaseEndpointTest` 의 마감
+     * 이중체와 같은 규율).
+     *
+     * **건 이중체는 되돌리지 않는다** — 담은 건은 공고번호가 이 class 전용(`R7C3B-TRIGGER-*`)
+     * 이라 남의 단언이 그것을 집지 않고, 비우는 공개 자리도 없다(그 이중체는 누적이 전제다).
+     */
+    @AfterEach
+    fun restoreSharedDoubles() {
+        strategyRepository.strategy = freshStrategy()
+        judgements.judgement = licenseJudgementFixture()
+        notices.notice = null
+        inbox.records.clear()
     }
 
     private fun requestBidPrice(number: String): String {
