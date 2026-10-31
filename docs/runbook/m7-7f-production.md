@@ -196,6 +196,21 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 확인: `journalctl -u bidvector-cert-check --since -2d`.
 
+### 4.6 HSTS 값을 올릴 때
+
+지금 값은 `max-age=86400`(하루)이고 `includeSubDomains`·`preload` 는 없다 — 되돌리기 어려운 쪽을 피한
+출발값이다. **반입 뒤 2주 동안 인증서 갱신과 https 접속이 안정되면** 올리는 것을 검토한다(운영자 결정).
+
+올릴 때 **고칠 자리는 넷**이다 — 선언 하나와 그것을 단언하는 게이트 셋:
+
+| 자리 | 무엇 |
+|---|---|
+| `docker/proxy.prod.Caddyfile` | 실제로 보내는 값 |
+| `tools/prod-proxy-sites-check.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` | `EXPECT_HSTS` — 그 값을 단언한다 |
+
+한쪽만 고치면 게이트가 붉어진다(fail-closed — 틀린 채 반입되지는 않는다). 넷을 같은 커밋에서 바꾸고
+`prod-nginx-check.sh` 를 한 번 돌려 확인한다.
+
 ## 5. DNS 전환 체크리스트 (운영자)
 
 1. 전환 **하루 전**: 기존 레코드가 있으면 TTL 을 300 으로 낮춘다.

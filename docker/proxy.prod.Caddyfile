@@ -1,5 +1,6 @@
 # M7/7F 본편 — 운영 site(D-7F2-2, 설계 (A)). `docker/proxy.Dockerfile` 이 로컬 site 와 함께
-# 이미지에 굽고, `docker/compose.prod.yaml` 이 `command:` 로 이 파일을 고른다.
+# 이미지에 굽고, `docker/compose.prod.yaml` 이 **`entrypoint:`** 로 이 파일을 고른다(`command:` 는
+# 기본 ENTRYPOINT 의 인자 뒤에 덧붙을 뿐이라 로컬 site 가 뜬다).
 #
 # **TLS 는 여기서 끝나지 않는다.** 이 host 의 nginx 가 0.0.0.0:80·443 을 쥐고 있고 기존 공개
 # site 와 공존해야 하므로(D-7F2-1 Q-1), 공개 TLS·인증서(certbot)·80 리다이렉트·`/api/session`
@@ -33,6 +34,10 @@ http://{$BIDVECTOR_PROXY_DOMAIN:domain-not-set.invalid}:{$BIDVECTOR_PROXY_HTTPS_
 	# HSTS(D-7F2-1 Q-7) — `max-age=86400` 으로 시작한다. includeSubDomains·preload 는 두지
 	# 않는다(되돌리기 어려운 쪽 — 안정 뒤 값을 올리는 것은 운영자 결정). nginx 는 이 헤더를
 	# 그대로 통과시킨다. `defer` 는 공유 본문의 보안 헤더와 같은 선택이다.
+	#
+	# **값을 바꾸면 고칠 자리가 넷이다** — 이 선언과 그것을 단언하는 게이트 셋
+	# (`tools/prod-proxy-sites-check.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` 의
+	# `EXPECT_HSTS`). 한쪽만 고치면 게이트가 붉어진다(fail-closed 라 위험하진 않다). runbook §4.6 참조.
 	header {
 		defer
 		Strict-Transport-Security "max-age=86400"

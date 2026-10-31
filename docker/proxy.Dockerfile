@@ -72,8 +72,9 @@ RUN addgroup -S -g 10001 bidvector \
     && chown -R 10001:10001 /data /config
 
 # 설정 파일 셋 — 로컬 site(기본 ENTRYPOINT 가 읽는다) · 운영 site(`compose.prod.yaml` 의
-# `command:` 가 고른다) · 두 site 가 `import` 하는 공유 본문. 두 site 를 한 이미지에 구워
-# **게이트가 판정한 바이트가 두 프로필에서 같다**(운영용 이미지를 따로 만들지 않는다).
+# **`entrypoint:`** 가 고른다 — `command:` 로는 안 된다. 아래 ENTRYPOINT 가 이미 로컬 site 를 인자로
+# 들고 있어서 `command:` 는 그 뒤에 덧붙을 뿐이고 로컬 site 가 뜬다) · 두 site 가 `import` 하는 공유 본문.
+# 두 site 를 한 이미지에 구워 **게이트가 판정한 바이트가 두 프로필에서 같다**(운영용 이미지를 따로 만들지 않는다).
 COPY docker/proxy.Caddyfile /etc/caddy/Caddyfile
 COPY docker/proxy.prod.Caddyfile /etc/caddy/Caddyfile.prod
 COPY docker/proxy.site.caddy /etc/caddy/proxy.site.caddy
