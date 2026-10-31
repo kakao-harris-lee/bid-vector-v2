@@ -63,3 +63,7 @@ checklist.md §0 에 위 1~5 의 범위·순서·위험과 「운영자가 따�
 - 2026-10-31 **D-7F2-8(팀장 — 알림 러너 cron)**: **(b)** — 이번 slice 는 「`notification-sweep` cron 미등록 → 시간 기반 알림 미발화」를 runbook 제한으로만 적는다.
   단 **PR #111 이 이 slice 보다 먼저 머지되면**, 이 slice 의 다음 main 병합 라운드에서 runbook cron 절에 그 항목을 더한다(나중 머지 쪽이 맞춘다).
 - 2026-10-31 **rollback 재설계 수령**: 공유 파일 복원원은 병합된 main 고정 SHA `957587c4`, 목록은 `git diff --name-status 957587c4..HEAD` 기계 산출, 전제 문면 재작성.
+
+## 하네스 레인 변경
+
+- 없음(`git log -- CLAUDE.md .claude/` 이 이 브랜치 범위에서 0 커밋 — CR r2 L-10 의 장부 보충, 팀장).
