@@ -36,7 +36,11 @@
    80·443 · 공유기/외부 방화벽 포워딩. WSL 재시작 뒤 포워딩이 사라지지 않는지도 확인한다.
 3. **운영 env 파일**: `docker/prod.env.template` 을 저장소 **밖**으로 복사해 값을 채운다.
    ```bash
-   sudo install -d -m 700 /etc/bidvector-v2
+   # 디렉터리 소유자도 **반입을 돌릴 사용자**여야 한다 — 0700 root:root 이면 그 아래 파일이 0600 "$USER" 여도
+   # 지나갈 수 없어, 아래 확인 명령과 §3 의 deploy 가 「env 파일을 읽지 못했다」(exit 2)로 멈춘다(§1.4 와 같은 꼴).
+   sudo install -d -m 700 -o "$USER" /etc/bidvector-v2
+   # 이미 값을 채운 파일이 있으면 이 줄이 **말없이 덮는다.** 재설치·복구 때는 `-b`(사본을 남긴다)를 붙이거나
+   # 먼저 `test ! -e /etc/bidvector-v2/prod.env` 로 확인한다.
    sudo install -m 600 -o "$USER" docker/prod.env.template /etc/bidvector-v2/prod.env
    ```
    - 자격 값(PG 암호 · 운영자 자격)은 운영자가 생성한다(`openssl rand -hex 24` 등). 저장소·채팅·로그에 적지 않는다.
