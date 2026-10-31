@@ -58,6 +58,11 @@
 | L-1 | `docker/compose.prod.yaml` 의 app `environment` 에 값 없는 키 한 줄(사본 복원) |
 | L-2 | 저장소 밖 디렉터리에 저장소 안 파일을 가리키는 심볼릭 링크를 만들어 `--env-file` 로 넘긴다 |
 | L-3 | 조각 템플릿의 80 블록에서 버전 표시 끄기 지시어를 켠다(사본 복원) |
+| V-1 | 손으로 `docker volume create <프로젝트>_<볼륨 키>`(라벨 없음) → 두 번 반입(apply) → `backups/` 계수와 DB 의 적용 최대 버전 |
+| V-2 | `COMPOSE_PROJECT_NAME=<다른 이름>` 인 셸에서 `--project` 없이 dry-run(운영 스택을 내려 포트 점유 검사를 비킨다) |
+| V-3 | 빈 `--state-dir` 에 옛 release 의 manifest 만 두고 반입. 통제군은 같은 state-dir 에 지금 DB 와 맞는 release |
+| V-4 | 같은 상태 디렉터리로 두 deploy 를 `&` 로 동시에(마이그레이션이 같은 release 둘로 — 가드가 아니라 잠금을 재려고) |
+| N2b | 하네스가 조각만 남긴 변형을 따로 띄운다. 양성 대조는 조각 템플릿의 리다이렉트 목적지를 클라이언트 Host 로 되돌리기(사본 복원) |
 
 결과는 checklist 1.3b 의 「고치기 전 ↔ 고친 뒤」 표다.
 
@@ -69,6 +74,7 @@
 | M1~M6 · R1 | 전부 기대대로 붉다 — 잡은 단언까지 checklist 1.3 |
 | K1~K4 | 1 · 1 · 1 · 2 |
 | F5-A~D | 1(만료 6일) · 「등재 1 · 199일」 · 1(들여쓴 등재) · 2(파일 부재) |
+| V-1~V-4 · N2b | 전부 기대대로 — checklist 1.3b. N2b 의 첫 판은 「측정 불가(2)」로 멈췄고(다른 fixture site 가 기본 대상을 가져갔다) 조각만 남기는 판으로 고쳤다 |
 | 1.3b 의 고침별 변이 | 전부 기대대로 — 위 표의 재현으로 |
 | 복원 | 매 변이 뒤 사본 복원 + `cmp` 동일 · 저장소 `git status` 빈 출력 |
 
@@ -89,6 +95,14 @@ checklist 1.5 — release·deploy·rollback 전부 0, **정지 상태 반입에�
 | `git restore --source=957587c4 --staged --worktree -- <25 경로>` | 0 | `D` 19 · `M` 6 · in_scope 의 base 대비 diff **0줄** |
 | 되돌린 트리에서 `./gradlew --no-daemon -q leakPatternGate` (⑥ⓐ) | 0 | 실행 뒤에도 트리가 되돌린 상태 그대로(19 D · 6 M) |
 | 복원원 SHA 에 이 slice 가 없는가 | — | A 19 경로 전부 `957587c4` 에 부재 |
+
+## 병합 (두 번째 — main `5e0617bf`)
+
+| 명령 | exit | 핵심 결과 |
+|---|---|---|
+| `git merge-tree --write-tree HEAD origin/main` | 0 | **충돌 예측 0** |
+| 양쪽이 만진 파일(`comm -12`) | — | **0개** — 겹치는 자리가 없다 |
+| `git merge origin/main` | 0 | 충돌 0 · main 쪽 53 파일 수용(7C③-b 알림 트리거) |
 
 ## 경계 확인
 
