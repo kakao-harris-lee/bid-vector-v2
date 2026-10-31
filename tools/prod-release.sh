@@ -77,15 +77,21 @@ GIT_SHA="$(git rev-parse HEAD)"
 
 # allowlist 만료 근접(vr F-5).
 today_epoch="$(date +%s)"
-soonest=""
+soonest="" allow_n=0
 while IFS= read -r exp; do
+  allow_n=$((allow_n + 1))
   e="$(date -d "$exp" +%s)" || _die "allowlist 만료일을 해석하지 못했다" 2
   if [ -z "$soonest" ] || [ "$e" -lt "$soonest" ]; then soonest="$e"; fi
 done < <(grep -oE '^allow\|[^=]+=[0-9]{4}-[0-9]{2}-[0-9]{2}' "$ALLOWLIST" | sed 's/.*=//')
 if [ -n "$soonest" ]; then
   left=$(( (soonest - today_epoch) / 86400 ))
   [ "$left" -ge "$ALLOWLIST_MIN_DAYS" ] || _die "취약점 allowlist 의 가장 이른 만료가 ${left}일 뒤다(< ${ALLOWLIST_MIN_DAYS}) — 만료 처리 먼저(runbook §8.5)" 1
-  echo "  allowlist 가장 이른 만료까지 ${left}일"
+  echo "  allowlist 등재 ${allow_n} · 가장 이른 만료까지 ${left}일"
+else
+  # 등재가 0 이면 만료가 임박할 수 없다 — 그래도 **한 줄을 남긴다.** 말이 없으면 「검사가 통과했다」와
+  # 「검사가 돌 입력이 없었다」가 같은 그림이 되고, 뒤의 것은 allowlist 를 전부 치운 날 조용히 시작된다
+  # (실제로 그랬다: 등재 8 → 0 이 되며 이 자리가 말을 멈췄다).
+  echo "  allowlist 등재 0 — 만료 검사를 건너뛴다(검사할 입력이 없다)"
 fi
 
 VULN_RUN=1
