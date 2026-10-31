@@ -52,3 +52,14 @@ checklist.md §0 에 위 1~5 의 범위·순서·위험과 「운영자가 따�
 - **레인**: 구현 하나(`kotlin-implementer`). 판정 verifier(opus) + code-reviewer 병렬. **인증·비밀값 취급 경로가 있으면**(TLS 키·ACME 계정 키·env
   주입) 되돌리기 어려운 경로 — Codex 는 운영자가 범위·비용을 승인할 때만.
 - **순서**: Phase 1R(재개 보고 — 병합 계획 · 충돌 예상 · 막힌 셋 재판정 · 정합 차이) → 팀장 승인 → 병합 → 재측정 → 변이 → rollback → evidence → 동결 → PR.
+- 2026-10-31 **D-7F2-4(팀장, Phase 1R 수령 — 병합·이미지)**: 병합 승인(실충돌 1건 `proxy.Dockerfile.dockerignore` 합집합 + `proxy.Dockerfile` 머리 주석 정정).
+  **S-21c(`local-tls-build.sh`) 실행 승인** — 덮는 태그 0(`web:local`·`proxy:local` 부재 실측), S-21·S-21b 는 돌리지 않는다(`app:local`·`ml-serving:local` 보존).
+  여정 하네스는 docker 이미지를 쓰지 않으므로 다른 레인 통지는 불요. 옛 `bidvector/proxy:w7f2-dev` 는 폐기 후 재생.
+- 2026-10-31 **D-7F2-5(팀장 — trivy)**: 리허설 vuln 게이트를 건너뛰지 않는다 — CI 와 같은 절차(릴리스 바이너리 다운로드 + `vuln-policy.properties` 의 sha256 핀 대조)로
+  **레인 scratch 에만** 받아 그 호출의 PATH 에 얹는다(host 변경 0, 네트워크 다운로드 1 — 이미지 pull 과 같은 성질로 승인). host 영구 설치는 운영자 질문으로.
+- 2026-10-31 **D-7F2-6(팀장 — 리허설 범위)**: **전건 재실행**(마이그레이션 21 · D1~D3 포함) — 완료 조건 「one-command 반입과 되돌림 리허설 증거」의 정본이다.
+- 2026-10-31 **D-7F2-7(팀장 — vr F-5 공허 통과)**: 등재 0 이면 preflight 가 말 없이 건너뛴다 → ⓐ 가짜 등재 양성 대조를 변이표에 ⓑ §1.4 문면을 「등재 0 — 검사할
+  입력이 없다(검사는 살아 있다: 양성 대조)」로. 가능하면 등재 0 일 때 「건너뜀」을 한 줄 출력하게(조용한 공허 금지).
+- 2026-10-31 **D-7F2-8(팀장 — 알림 러너 cron)**: **(b)** — 이번 slice 는 「`notification-sweep` cron 미등록 → 시간 기반 알림 미발화」를 runbook 제한으로만 적는다.
+  단 **PR #111 이 이 slice 보다 먼저 머지되면**, 이 slice 의 다음 main 병합 라운드에서 runbook cron 절에 그 항목을 더한다(나중 머지 쪽이 맞춘다).
+- 2026-10-31 **rollback 재설계 수령**: 공유 파일 복원원은 병합된 main 고정 SHA `957587c4`, 목록은 `git diff --name-status 957587c4..HEAD` 기계 산출, 전제 문면 재작성.
