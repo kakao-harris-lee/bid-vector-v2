@@ -353,6 +353,17 @@ got="$(_probe_http "$TEST_DOMAIN")"
 [ "$got" = "301 https://${TEST_DOMAIN}/probe" ] || fail "80 리다이렉트가 기대와 다르다: $got"
 body="$(curl -s --max-time 5 -H "Host: ${TEST_DOMAIN}" "http://127.0.0.1:${P80}/.well-known/acme-challenge/${ACME_TOKEN}" || true)"
 [ "$body" = "$ACME_TOKEN" ] || fail "ACME webroot 경로가 토큰을 내지 않는다"
+# **80 의 Server 헤더도 잰다** — N4 는 443 만 보았고, host `nginx.conf` 에서는 `server_tokens` 줄이
+# 주석이라 조각이 켜지 않으면 301 응답에 버전이 실린다(v L-3).
+srv80="$(curl -sI --max-time 5 -H "Host: ${TEST_DOMAIN}" "http://127.0.0.1:${P80}/probe" | tr -d '\r' | sed -n 's/^[Ss]erver: //p')"
+[ -n "$srv80" ] || fail "80 응답에 Server 헤더가 없다(판정 불가)"
+[ "$srv80" = "nginx" ] || fail "80 의 Server 헤더가 이름만이 아니다(버전 노출?): '${srv80}'"
+# 리다이렉트 목적지가 **클라이언트의 Host 가 아니라 고정 도메인**이어야 한다(CR L-2).
+got_other="$(_probe_http "other.invalid")"
+case "$got_other" in
+  "301 https://${TEST_DOMAIN}/probe"|30*" https://${TEST_DOMAIN}"*) ;;
+  *) echo "  (다른 Host 는 이 조각이 받지 않는다: ${got_other})" ;;
+esac
 
 _https() { curl -sk --max-time 5 --resolve "${TEST_DOMAIN}:${P443}:127.0.0.1" "$@"; }
 _u() { printf 'https://%s:%s%s' "$TEST_DOMAIN" "$P443" "$1"; }

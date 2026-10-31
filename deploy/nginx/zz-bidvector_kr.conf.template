@@ -18,9 +18,14 @@
 limit_req_zone $binary_remote_addr zone=bidvector_v2_session:10m rate=10r/m;
 
 server {
+    # **IPv4 만 듣는다** — 443 과 같은 주소족이다(runbook §5: AAAA 를 두지 않는다). 앞 판은 여기만
+    # `[::]:80` 을 열어 두 블록의 주소족이 어긋났고, 하네스는 IPv4 만 재므로 그 비대칭이 보이지 않았다.
     listen 80;
-    listen [::]:80;
     server_name __BIDVECTOR_DOMAIN__;
+
+    # 버전만 감춘다 — host `nginx.conf` 에서는 이 줄이 주석이라, 여기서 켜지 않으면 **301 응답에
+    # 버전이 실린다**(N4 는 443 만 잰다). 443 블록과 같은 선택이다.
+    server_tokens off;
 
     # certbot webroot(HTTP-01). 발급·갱신 때만 쓰인다 — 경로는 runbook 의 certbot 명령과 같다.
     location ^~ /.well-known/acme-challenge/ {
@@ -29,8 +34,12 @@ server {
     }
 
     # 평문은 https 로 보낸다(D-7F2-1 Q-2) — 다른 응답을 두지 않는다.
+    #
+    # 목적지는 **고정 도메인**이다. `$host` 는 클라이언트가 보낸 Host 를 그대로 되돌려주므로, 이 블록이
+    # 어떤 이유로든 기본 대상이 되는 날(host 의 default site 제거·이름 변경) 임의 Host 로의 리다이렉트가
+    # 된다. 오늘은 `server_name` 이 골라야만 닿지만, 그 전제를 선언이 아니라 값으로 닫는다.
     location / {
-        return 301 https://$host$request_uri;
+        return 301 https://__BIDVECTOR_DOMAIN__$request_uri;
     }
 }
 
