@@ -50,7 +50,7 @@ private const val HOUR = 3600L
  * 실측되는 우회: ① 낙찰자 상호가 개찰 사실 경로에 오르지 않는다 · ④ 다른 계정의 건이 섞이지
  * 않는다 · ⑦ 메모·증빙·건너뜀 사유를 읽지 않는다 · ⑧ 페이퍼가 섞이지 않는다 · 쓰기 0.
  */
-class JdbcMyBidResultViewTest : BidCaseDbFixture() {
+class JdbcMyBidResultViewTest : MyBidResultDbFixture() {
     private fun recordedBidView(source: DataSource = dataSource()) = JdbcRecordedBidView(source)
 
     private fun openingFactsView(source: DataSource = dataSource()) = JdbcBatchOpeningFactsView(source)
@@ -58,100 +58,6 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
     private fun winnerNameView(source: DataSource = dataSource()) = JdbcAwardWinnerNameView(source)
 
     private fun noticeId(key: NoticeKey) = NoticeId(NoticeNumber.of(key.noticeNumber), key.noticeRound)
-
-    /** 건 하나를 열고 투찰을 기록한다 — 출하 전이 경로를 그대로 쓴다(손으로 INSERT 하지 않는다). */
-    private fun recordBid(
-        account: AccountId,
-        key: NoticeKey,
-        kind: BidKind = BidKind.REAL,
-        won: Long = 1_000_000L,
-        memo: BidMemo? = null,
-        draft: Boolean = true,
-    ): BidCaseId {
-        val workflow = workflow()
-        val caseId =
-            workflow
-                .open(account, key, kind)
-                .view.case.id
-        // 초안은 공고 스냅샷을 요구한다 — 공고 행을 못 찾는 건은 초안 없이 바로 기록한다
-        // (전이표가 「관심」에서 RECORD_BID 를 연다).
-        if (draft) workflow.draft(account, caseId, amount(won), now, BidActor.User(account))
-        workflow.command(
-            account,
-            caseId,
-            BidCommand.RecordBid(submission().copy(amount = amount(won), memo = memo), null),
-            BidActor.User(account),
-        )
-        return caseId
-    }
-
-    /** 개찰 결과 축 **원문** 한 행 — 계약 등재 키로 심는다(손 리터럴이 아니다). */
-    private fun seedOpeningAxisRaw(
-        rawNumber: String,
-        rawRound: String,
-        masked: Boolean = false,
-    ) {
-        val fields = """{"${jsonbKeyOf(
-            NOTICE_NUMBER_RAW_KEY,
-        )}":"$rawNumber","${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}":"$rawRound"}"""
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "INSERT INTO raw_observation (observation_key, source_endpoint, payload, payload_fields, " +
-                        "observed_at, release_sha, inserted_at) VALUES (?, 'OPENING_RESULT_LIST', '{}', " +
-                        "?::jsonb, ?, 'test', ?)",
-                ).use { statement ->
-                    statement.setString(1, "obs-rawaxis-$rawNumber-$rawRound")
-                    statement.setString(2, fields)
-                    statement.setTimestamp(3, Timestamp.from(now))
-                    statement.setTimestamp(4, Timestamp.from(now))
-                    statement.executeUpdate()
-                }
-            // **적재는 표지를 찍지 못한다**(DB 트리거) — 마스킹은 보존 작업의 UPDATE 로만 선다.
-            if (masked) {
-                connection
-                    .prepareStatement("UPDATE raw_observation SET pii_masked_at = now() WHERE observation_key = ?")
-                    .use { statement ->
-                        statement.setString(1, "obs-rawaxis-$rawNumber-$rawRound")
-                        statement.executeUpdate()
-                    }
-            }
-        }
-    }
-
-    private fun seedOpeningResult(
-        key: NoticeKey,
-        winner: String?,
-        progress: String = "개찰완료",
-    ) {
-        val observationKey = "obs-open-${key.noticeNumber}"
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "INSERT INTO raw_observation (observation_key, source_endpoint, payload, payload_fields, " +
-                        "observed_at, release_sha, inserted_at) VALUES (?, 'OPENING_RESULT_LIST', '{}', " +
-                        "'{}'::jsonb, ?, 'test', ?)",
-                ).use { statement ->
-                    statement.setString(1, observationKey)
-                    statement.setTimestamp(2, Timestamp.from(now))
-                    statement.setTimestamp(3, Timestamp.from(now))
-                    statement.executeUpdate()
-                }
-            connection
-                .prepareStatement(
-                    "INSERT INTO opening_result (notice_number, notice_round, observed_at, observation_key, " +
-                        "progress_division, final_award_company_name) VALUES (?, ?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    statement.setString(1, key.noticeNumber)
-                    statement.setString(2, key.noticeRound.value)
-                    statement.setTimestamp(3, Timestamp.from(now))
-                    statement.setString(4, observationKey)
-                    statement.setString(5, progress)
-                    statement.setString(6, winner)
-                    statement.executeUpdate()
-                }
-        }
-    }
 
     // ------------------------------------------------------------- 열 집합
 

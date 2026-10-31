@@ -1,7 +1,6 @@
 package bidvector.adapters.result
 
 import bidvector.adapters.opening.OpeningResultViewSql
-import bidvector.adapters.opening.UNMASKED_RAW_PREDICATE
 import bidvector.adapters.snapshot.jsonbKeyOf
 import bidvector.bidding.BidKind
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
@@ -135,7 +134,7 @@ internal object MyBidResultSql {
             payload_fields ->> '${jsonbKeyOf(NOTICE_ROUND_RAW_KEY)}' AS notice_round
         FROM raw_observation
         WHERE source_endpoint = ANY (?)
-          AND $UNMASKED_RAW_PREDICATE
+          AND ${OpeningResultViewSql.UNMASKED_RAW_PREDICATE}
         """
 
     /** 개찰 **결과**를 나르는 축 둘 — 7C⑤-a 의 목록을 그대로 쓴다(사본을 만들지 않는다). */

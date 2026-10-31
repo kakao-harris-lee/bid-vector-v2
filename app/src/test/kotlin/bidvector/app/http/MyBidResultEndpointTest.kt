@@ -22,6 +22,8 @@ import bidvector.workflow.opening.ProvisionalRankOne
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.TradeName
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -138,6 +140,19 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
 
     private fun body(): String = session.get(AccountScopedRoutes.BID_RESULTS).body.orEmpty()
 
+    /**
+     * 집계 칸 하나를 **전문에서 파싱해** 꺼낸다 — 다음 키가 무엇인지에 기대지 않는다(r2 CR L-5).
+     * 계약 키 등식은 집합 비교라 순서를 잠그지 않으므로, 칸 순서를 바꾸면 거동과 무관하게 붉는
+     * 단언이 된다.
+     */
+    private fun aggregateField(
+        body: String,
+        key: String,
+    ): String {
+        val match = Regex("\"" + key + "\":((?:\"[^\"]*\")|null|[^,}]+)").find(body)
+        return requireNotNull(match) { "응답에 $key 가 없다" }.groupValues[1]
+    }
+
     @Test
     fun `계정 없는 인증은 401 이다 — 자격 헤더만으로는 결과에 닿지 못한다`() {
         val headers = HttpHeaders().apply { set("X-Operator-Credential", TEST_CREDENTIAL) }
@@ -161,7 +176,9 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
     @Test
     fun `다른 계정의 건은 내 결과에 나오지 않는다`() {
         val otherAccount = TEST_ACCOUNT_ID + 1
-        bids.put(otherAccount, listOfNotNull(fakeRecordedBid(99L, notice, amount(9_999_999L))))
+        val theirs = listOfNotNull(fakeRecordedBid(99L, notice, amount(9_999_999L)))
+        withClue("다른 계정의 건이 실재해야 이 단언이 무엇을 잰다") { theirs.shouldNotBeEmpty() }
+        bids.put(otherAccount, theirs)
 
         val body = body()
         body shouldContain "\"sampleSize\":0"
@@ -204,7 +221,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
         body shouldContain "\"reconciledOutcome\":\"WON\""
         body shouldContain "\"gapState\":\"COMPUTED\""
         body shouldContain "\"gapWon\":200000"
-        body shouldContain "\"reconciledAwardRate\":\"1\",\"reconciledWonCount\":1"
+        aggregateField(body, "reconciledAwardRate") shouldBe "\"1\""
     }
 
     /** 확정 낙찰가가 없으면 차이가 **부재**다 — 0 으로 채우지 않는다. */
