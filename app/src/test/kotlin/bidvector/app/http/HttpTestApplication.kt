@@ -10,7 +10,6 @@ import bidvector.app.wiring.OpeningResultQuery
 import bidvector.app.wiring.StrategyEditExecutor
 import bidvector.app.wiring.StrategyQuery
 import bidvector.app.wiring.SuggestionQuery
-import bidvector.app.wiring.operatorTradeNameOf
 import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
@@ -19,17 +18,18 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.opening.OPENING_PROGRESS_POLICY
 import bidvector.workflow.opening.ReadOpeningResult
+import bidvector.workflow.profile.operatorTradeNameOf
 import bidvector.workflow.result.ReadMyBidResults
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
+import java.time.Instant
+import java.time.LocalDate
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.core.Ordered
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지

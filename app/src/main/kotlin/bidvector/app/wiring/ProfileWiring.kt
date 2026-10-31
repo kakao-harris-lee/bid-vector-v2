@@ -2,10 +2,8 @@ package bidvector.app.wiring
 
 import bidvector.adapters.profile.JdbcBusinessProfileStore
 import bidvector.adapters.profile.JdbcOperatorProfileWriter
-import bidvector.settlement.OperatorTradeName
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
-import bidvector.workflow.profile.BusinessProfileReader
 import bidvector.workflow.profile.BusinessProfileStorePort
 import bidvector.workflow.profile.ListConstructionCapacitiesUseCase
 import bidvector.workflow.profile.ReadOnboardingChecklistUseCase
@@ -14,6 +12,7 @@ import bidvector.workflow.profile.RemoveConstructionCapacityUseCase
 import bidvector.workflow.profile.ReplaceBusinessDetailsUseCase
 import bidvector.workflow.profile.ReplaceQualificationFactsUseCase
 import bidvector.workflow.profile.UpsertConstructionCapacityUseCase
+import bidvector.workflow.profile.operatorTradeNameOf
 import bidvector.workflow.result.OperatorTradeNamePort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader
@@ -123,23 +122,3 @@ open class ProfileWiring {
         businessProfileStore: BusinessProfileStorePort,
     ): RemoveConstructionCapacityUseCase = RemoveConstructionCapacityUseCase(businessProfileStore)
 }
-
-/**
- * 프로필의 상호 절 → 대사의 운영자 쪽 입력.
- *
- * **이름 붙은 함수인 이유**(r1 v M-1): 조립 람다로 두면 출하 경로를 지나는 test 가 없고, test
- * 조립이 같은 사상을 **사본으로** 다시 적게 된다. 그러면 「상호 미설정이면 어느 사유가
- * 나가는가」를 정하는 줄이 측정 밖에 남는다 — 오늘 production 의 대사 사유를 정하는 줄이 바로
- * 이것이다(커널이 운영자 축을 먼저 보므로 `OPERATOR_NAME_NOT_DECLARED` 와
- * `WINNER_NAME_NOT_PUBLISHED` 가운데 무엇이 나갈지를 여기가 가른다).
- *
- * 상호는 **원문 그대로** 간다 — 정규화는 커널이 한 번만 한다(이중 정규화 금지).
- */
-internal fun operatorTradeNameOf(profiles: BusinessProfileReader): OperatorTradeNamePort =
-    OperatorTradeNamePort { account ->
-        profiles
-            .details(account)
-            .tradeName
-            ?.let { OperatorTradeName.Declared(it.raw) }
-            ?: OperatorTradeName.NotDeclared
-    }
