@@ -1,0 +1,92 @@
+# M7/7F 본편 — 운영 프로필(D-7F2-2, 설계 (A)). 로컬 패키징 프로필 **위에** 셋째로 얹는다:
+#
+#     docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml \
+#       --env-file <host 의 운영 env 파일> ...
+#
+# 직접 부르지 않는다 — 호출의 단일 출처는 `tools/prod-env.sh` 의 `BIDVECTOR_PROD_COMPOSE` 이고,
+# 반입·되돌림·헬스 스크립트가 모두 그것을 지난다.
+#
+# 왜 셋째 덧쓰기인가: 7F-local 의 망 분리(`edge`/`default`)·내부 서비스 publish 제거·
+# `no-new-privileges`·상류 env 를 **복사하지 않고 물려받는다**. 그래서 「7F-local 과의 구성
+# 등식」이 사본 대조가 아니라 같은 정의다. 이 파일이 바꾸는 것만 아래에 있다:
+#   ① 이미지 태그 — release 태그(`:local` 을 덮지 않는다, 다른 레인의 재생 태그)
+#   ② proxy — 운영 site 선택 · 루프백 평문 publish · 그에 맞는 healthcheck · 도메인 필수
+#   ③ 메모리 상한 · 재시작 정책 · 로그 순환 · ml-serving 기본 미기동(D-7F2-1 Q-5)
+#
+# 공개 TLS·80 리다이렉트·`/api/session` 유량 제한은 host nginx 가 진다(`deploy/nginx/`).
+# 이 파일은 0.0.0.0 에 아무것도 publish 하지 않는다 — `tools/prod-proxy-sites-check.sh` 가
+# 해석된 설정에서 「publish 는 proxy 하나 · 루프백 하나」를 단언한다.
+#
+# 값은 여기 하나도 없다 — 전부 `${VAR:?}` 이고 운영 env 파일(저장소 밖)이 준다. 키 이름의 목록은
+# `docker/prod.env.template` 이고, 두 집합의 등식을 `tools/prod-env-keys-check.sh` 가 잰다.
+#
+# **프로젝트 이름을 바꾼다**(`bidvector-v2` → `bidvector-v2-prod`). 운영 host 가 개발 host 와 같은
+# 기계다(D-7F2-1 Q-1). 개발 레인과 CI 재생은 기본 파일의 `bidvector-v2` 프로젝트를 올리고
+# `down -v` 로 **볼륨까지** 지운다(7F-local 스모크·CI S-25). 운영이 같은 이름을 쓰면 그 한 줄이 운영
+# 컨테이너와 운영 DB 볼륨을 지운다. 덧쓰기의 마지막 `name:` 이 이기므로 이 파일이 이름을 정한다 —
+# 컨테이너·볼륨·네트워크 접두가 개발 스택과 갈린다. `tools/prod-proxy-sites-check.sh` 가 해석된
+# 설정의 이름을 단언한다.
+name: bidvector-v2-prod
+
+# 로그 순환 — 컨테이너 로그가 host 디스크를 채우지 않게 한다. 한 번 선언하고 서비스마다 참조한다.
+x-bidvector-logging: &bidvector-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    image: bidvector/app:${BIDVECTOR_RELEASE_TAG:?BIDVECTOR_RELEASE_TAG 환경변수가 필요합니다 — tools/prod-release.sh 가 만든 release 태그}
+    environment:
+      # 메모리 상한(아래 mem_limit)에 힙을 맞춘다. 이미지에 JVM 메모리 플래그가 없어 상한이 없으면
+      # 힙이 host RAM 의 기본 비율로 정해진다. 이미지를 바꾸지 않고 env 로 준다.
+      JAVA_TOOL_OPTIONS: ${BIDVECTOR_APP_JAVA_TOOL_OPTIONS:?BIDVECTOR_APP_JAVA_TOOL_OPTIONS 환경변수가 필요합니다}
+    mem_limit: ${BIDVECTOR_APP_MEM_LIMIT:?BIDVECTOR_APP_MEM_LIMIT 환경변수가 필요합니다}
+    restart: unless-stopped
+    logging: *bidvector-logging
+
+  postgres:
+    mem_limit: ${BIDVECTOR_PG_MEM_LIMIT:?BIDVECTOR_PG_MEM_LIMIT 환경변수가 필요합니다}
+    restart: unless-stopped
+    logging: *bidvector-logging
+
+  web:
+    image: bidvector/web:${BIDVECTOR_RELEASE_TAG:?}
+    mem_limit: ${BIDVECTOR_WEB_MEM_LIMIT:?BIDVECTOR_WEB_MEM_LIMIT 환경변수가 필요합니다}
+    restart: unless-stopped
+    logging: *bidvector-logging
+
+  ml-serving:
+    image: bidvector/ml-serving:${BIDVECTOR_RELEASE_TAG:?}
+    # app 이 부르지 않는다(D-6A2a-6). 기본으로 띄우지 않고 이미지만 release 에 싣는다(D-7F2-1 Q-5).
+    profiles: ["ml"]
+    mem_limit: ${BIDVECTOR_ML_MEM_LIMIT:?BIDVECTOR_ML_MEM_LIMIT 환경변수가 필요합니다}
+    restart: unless-stopped
+    logging: *bidvector-logging
+
+  proxy:
+    image: bidvector/proxy:${BIDVECTOR_RELEASE_TAG:?}
+    # 운영 site 를 고른다 — 같은 이미지에 두 site 가 구워져 있다(`docker/proxy.Dockerfile`).
+    entrypoint: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.prod", "--adapter", "caddyfile"]
+    environment:
+      # 운영에서는 도메인이 **필수**다(로컬 덧쓰기는 통과만 시킨다). Caddyfile 쪽 기본값도
+      # 실재할 수 없는 이름이라 두 겹으로 닫힌다.
+      - BIDVECTOR_PROXY_DOMAIN=${BIDVECTOR_PROXY_DOMAIN:?BIDVECTOR_PROXY_DOMAIN 환경변수가 필요합니다}
+    # host nginx 만 붙는 자리 — **루프백에만** 연다. 0.0.0.0 의 80·443 은 host nginx 의 것이다.
+    ports: !override
+      - "127.0.0.1:${BIDVECTOR_PROXY_HTTPS_PORT:?}:${BIDVECTOR_PROXY_HTTPS_PORT:?}"
+    healthcheck:
+      # 운영 site 는 평문이고 Host 로 site 를 가른다 — 그 이름으로 셸이 오는지를 healthy 로 둔다.
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - -o
+        - /dev/null
+        - --resolve
+        - ${BIDVECTOR_PROXY_DOMAIN:?}:${BIDVECTOR_PROXY_HTTPS_PORT:?}:127.0.0.1
+        - http://${BIDVECTOR_PROXY_DOMAIN:?}:${BIDVECTOR_PROXY_HTTPS_PORT:?}/
+    mem_limit: ${BIDVECTOR_PROXY_MEM_LIMIT:?BIDVECTOR_PROXY_MEM_LIMIT 환경변수가 필요합니다}
+    restart: unless-stopped
+    logging: *bidvector-logging

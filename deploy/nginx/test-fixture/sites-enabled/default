@@ -1,0 +1,9 @@
+# 대역 — Ubuntu 패키지 기본 site 의 모양(80 default_server, 443 없음).
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    location / {
+        return 404;
+    }
+}

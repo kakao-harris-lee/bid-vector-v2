@@ -1,0 +1,17 @@
+# 대역 — 기존 공개 site 의 모양(지어낸 이름). 80 → 301, 443 은 `default_server` 없이 듣는다.
+# 이 파일이 `zz-` 조각보다 앞에 정렬되므로 SNI 없는 443 요청은 이 site 가 받는다 — 하네스가 지키는 불변.
+server {
+    listen 80;
+    server_name existing.test;
+    return 301 https://existing.test$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name existing.test;
+    ssl_certificate     /fixture-certs/existing.crt;
+    ssl_certificate_key /fixture-certs/existing.key;
+    location / {
+        proxy_pass http://127.0.0.1:19999;
+    }
+}
