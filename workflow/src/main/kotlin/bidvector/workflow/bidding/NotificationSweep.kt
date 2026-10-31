@@ -137,11 +137,11 @@ private fun deadlineFactOf(
     now: Instant,
     policy: NotificationWindowPolicyData,
 ): NotificationFact? {
-    if (case.state !in DEADLINE_JUDGED_STATES) return null
-    val at = case.deadlineAt ?: return null
-    if (!at.isAfter(now)) return null
-    val days = daysBefore(now, at)
+    val unrecorded = case.state in DEADLINE_JUDGED_STATES
+    // 이미 지난 마감은 알리지 않는다 — 그 건은 마감 정산이 「마감 지남」으로 옮긴다.
+    val days = case.deadlineAt?.takeIf { unrecorded && it.isAfter(now) }?.let { daysBefore(now, it) }
     return when {
+        days == null -> null
         policy.bidDeadlineToday.contains(days) -> NotificationFact.BidDeadlineToday
         policy.bidDeadlineImminent.contains(days) -> NotificationFact.BidDeadlineImminent
         else -> null
@@ -157,10 +157,9 @@ private fun documentFactOf(
     now: Instant,
     policy: NotificationWindowPolicyData,
 ): NotificationFact? {
-    if (case.state != BidStateTag.UNDER_QUALIFICATION_REVIEW) return null
-    val at = case.documentDueAt ?: return null
-    if (!at.isAfter(now)) return null
-    return NotificationFact.DocumentDeadlineImminent.takeIf { policy.documentDeadline.contains(daysBefore(now, at)) }
+    val reviewing = case.state == BidStateTag.UNDER_QUALIFICATION_REVIEW
+    val days = case.documentDueAt?.takeIf { reviewing && it.isAfter(now) }?.let { daysBefore(now, it) }
+    return NotificationFact.DocumentDeadlineImminent.takeIf { days != null && policy.documentDeadline.contains(days) }
 }
 
 /**
@@ -178,12 +177,10 @@ private fun noticeRevisedAt(
     case: NotificationSweepCase,
     now: Instant,
 ): Instant? {
-    val revision = case.noticeRevision ?: return null
-    if (revision <= FIRST_NOTICE_REVISION) return null
-    val changedAt = case.noticeUpdatedAt ?: return null
-    if (!changedAt.isAfter(case.openedAt)) return null
-    val deadline = case.deadlineAt ?: return null
-    return changedAt.takeIf { deadline.isAfter(now) }
+    val everRevised = (case.noticeRevision ?: FIRST_NOTICE_REVISION) > FIRST_NOTICE_REVISION
+    val stillOpen = case.deadlineAt?.isAfter(now) == true
+    // 담기 **전**의 개정은 담을 때 이미 본 값이다 — 새 소식이 아니다.
+    return case.noticeUpdatedAt?.takeIf { everRevised && stillOpen && it.isAfter(case.openedAt) }
 }
 
 /** 며칠 **뒤**인가 — KST 달력일 차이다(0 = 오늘, 1 = 내일). */
