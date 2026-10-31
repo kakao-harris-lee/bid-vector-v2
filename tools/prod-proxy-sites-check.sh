@@ -126,6 +126,17 @@ done < docker/prod.env.template
 cfg="$("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$envf" config --format json 2>/dev/null)" || _die "운영 compose 를 해석하지 못했다" 2
 cfg_all="$("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$envf" --profile ml config --format json 2>/dev/null)" || _die "운영 compose(ml profile)를 해석하지 못했다" 2
 
+# **값 없는 통과 키가 없어야 한다.** compose 의 `environment` 에 `KEY:` 만 적으면 그 자리는 해석 결과에서
+# null 이고, 컨테이너는 **셸 env 의 같은 이름 값을 그대로 받는다** — env 파일이 아니라 호출한 셸이 app
+# 설정을 정하는 구멍이다(v L-1). 키 집합 등식(S-27)은 텍스트 술어라 이 꼴을 보지 못한다. 해석된 구조에서
+# 센다. 양성 대조: 아래 계수가 전체 environment 항목 수보다 작아야 한다(0 과 「environment 가 없다」를 가른다).
+env_items="$(printf '%s' "$cfg_all" | jq -r '[.services | to_entries[] | (.value.environment // {}) | to_entries[]] | length')"
+[ "$env_items" -gt 0 ] || fail "해석된 environment 항목이 0 개다 — 양성 대조 실패(경로가 틀렸다)"
+null_env="$(printf '%s' "$cfg_all" | jq -r '[.services | to_entries[] | . as $s | ($s.value.environment // {}) | to_entries[] | select(.value == null) | "\($s.key).\(.key)"] | join(" ")')"
+null_n=0; [ -z "$null_env" ] || null_n="$(printf '%s' "$null_env" | wc -w)"
+[ "$null_n" -eq 0 ] || fail "compose 의 environment 에 값 없는 통과 키가 있다: ${null_env} — 그 자리는 셸 env 가 그대로 실린다"
+echo "  environment 항목 ${env_items} · 값 없는 통과 키 ${null_n}"
+
 name="$(printf '%s' "$cfg" | jq -r .name)"
 [ "$name" = "$EXPECT_PROJECT" ] || fail "프로젝트 이름이 $EXPECT_PROJECT 가 아니다: $name"
 [ "$name" != "$DEV_PROJECT" ] || fail "운영 프로젝트 이름이 개발 스택과 같다 — 개발 레인의 down -v 가 운영 볼륨을 지운다"
