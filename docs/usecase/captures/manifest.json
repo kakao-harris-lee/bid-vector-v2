@@ -1,0 +1,115 @@
+{
+  "capturedAt": "2026-10-31T03:54:09.133Z",
+  "head": "bf6fd53405f93bb5efc5c20f45f4aa19478a4158",
+  "totalBytes": 1027409,
+  "files": [
+    {
+      "path": "a-start-desktop.png",
+      "screen": "a-start",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 103872,
+      "sha256": "1663f12d26ec264ae2cacbdb567d4f5e134e37a4b6913ad9fd1a9834b407dd55"
+    },
+    {
+      "path": "b-notices-desktop.png",
+      "screen": "b-notices",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 99840,
+      "sha256": "11ec69b40c04c3bd67e285d292672120b5c4f9c1649b48ed8be38867027d08ce"
+    },
+    {
+      "path": "c-worksheet-desktop.png",
+      "screen": "c-worksheet",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 134756,
+      "sha256": "f427ff58ab4874c178581cb2ef743f7e491d671a89c64e24bd7bc7a8f4c57c98"
+    },
+    {
+      "path": "d-bid-box-desktop.png",
+      "screen": "d-bid-box",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 28205,
+      "sha256": "be7d1cba4c731feb5097c499d3aa8650d69e0f825f6fcff4f9fed7c5c7fff09a"
+    },
+    {
+      "path": "e-results-desktop.png",
+      "screen": "e-results",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 129879,
+      "sha256": "86c3c9a93897955f718bec0382418648e3eea665d015d71b17e704b46f4a9193"
+    },
+    {
+      "path": "inbox-desktop.png",
+      "screen": "inbox",
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 800,
+      "bytes": 33540,
+      "sha256": "4bf4dadc57dd7830977648b6daa9d868e934f6557eb848287fdb78b73ad043c3"
+    },
+    {
+      "path": "a-start-mobile.png",
+      "screen": "a-start",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 93662,
+      "sha256": "8ede50481591002ee77c0afbc6a228312a5332b1bfcec528dfe0893f5b2f5e00"
+    },
+    {
+      "path": "b-notices-mobile.png",
+      "screen": "b-notices",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 90738,
+      "sha256": "a65896d2f1c7ac2cc85f7840456f48e96ea1ab5027235469423906596e82aa31"
+    },
+    {
+      "path": "c-worksheet-mobile.png",
+      "screen": "c-worksheet",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 123760,
+      "sha256": "3d27deb887538110720dc46e811fb6809d362500e9d178d5dd03d7946194af7d"
+    },
+    {
+      "path": "d-bid-box-mobile.png",
+      "screen": "d-bid-box",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 22103,
+      "sha256": "cc415398285f5151590603e28ac9d28bf38f3b0261da3a0d2bb23279c1905cdf"
+    },
+    {
+      "path": "e-results-mobile.png",
+      "screen": "e-results",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 138582,
+      "sha256": "400bf50e6888973848e3ea330a5c3b81c90c926d9e3c132486a788e4ea35ff4b"
+    },
+    {
+      "path": "inbox-mobile.png",
+      "screen": "inbox",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "bytes": 28472,
+      "sha256": "5f231467a5e430cb898a7e9aa2edbb9678407f57224fcbbb4606f14e8fbbee62"
+    }
+  ]
+}
