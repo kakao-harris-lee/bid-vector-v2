@@ -3938,7 +3938,7 @@ components:
             properties:
               caseId:
                 type: integer
-                format: int32
+                format: int64
                 description: "입찰 건 식별자."
               noticeNumber:
                 type: string
@@ -4164,6 +4164,17 @@ components:
               description: "표본에 나타난 판정 불가 사유 전수. 대사 분모가 0 이면 **이것이 그 사유다**."
               items:
                 type: string
+                enum:
+                  - NOTICE_ABSENT
+                  - NOT_OPENED_YET
+                  - NOT_COLLECTED
+                  - OBSERVED_NOT_PROMOTED
+                  - PROGRESS_UNRECOGNIZED
+                  - PROGRESS_ABSENT
+                  - OPERATOR_NAME_NOT_DECLARED
+                  - OPERATOR_NAME_NORMALIZES_TO_EMPTY
+                  - WINNER_NAME_NOT_PUBLISHED
+                  - WINNER_NAME_NORMALIZES_TO_EMPTY
     OnboardingChecklist:
       type: object
       required:

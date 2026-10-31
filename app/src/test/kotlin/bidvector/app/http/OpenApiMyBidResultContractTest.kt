@@ -1,14 +1,22 @@
 package bidvector.app.http
 
+import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidStateTag
+import bidvector.bidding.PriceMenuRef
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Rate
+import bidvector.workflow.result.AwardGap
 import bidvector.workflow.result.AwardRateAbsence
+import bidvector.workflow.result.AwardRateState
 import bidvector.workflow.result.OutcomeAgreement
 import bidvector.workflow.result.ReconciliationBlocker
+import bidvector.workflow.result.ReconciliationVerdict
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
+import java.math.BigDecimal
+import org.junit.jupiter.api.Test
 
 /** operation 의 좌표 — **구현 상수에서 받는다**(리터럴을 쓰면 등식을 세우지 않고 말만 한다). */
 private val BID_RESULTS_PATH = AccountScopedRoutes.BID_RESULTS
@@ -58,6 +66,17 @@ class OpenApiMyBidResultContractTest {
     ): Set<String> {
         val definition = requireNotNull(properties[key] as? Map<String, Any?>) { "계약에 $key 가 없다" }
         val values = requireNotNull(definition["enum"] as? List<String>) { "$key 가 enum 이 아니다" }
+        return values.toSet()
+    }
+
+    /** 스칼라 **배열** 칸의 어휘는 `items` 가 든다. */
+    private fun itemEnumOf(
+        properties: Map<String, Any?>,
+        key: String,
+    ): Set<String> {
+        val definition = requireNotNull(properties[key] as? Map<String, Any?>) { "계약에 $key 가 없다" }
+        val items = requireNotNull(definition["items"] as? Map<String, Any?>) { "$key 가 배열이 아니다" }
+        val values = requireNotNull(items["enum"] as? List<String>) { "$key 의 아이템이 enum 이 아니다" }
         return values.toSet()
     }
 
@@ -125,41 +144,51 @@ class OpenApiMyBidResultContractTest {
     }
 
     /**
-     * **토큰 칸이 계약에서 enum 이고 그 집합이 Kotlin 과 같다**(r1 CR M-1).
+     * **토큰 칸 아홉이 enum 이고 그 집합이 응답을 만드는 함수의 산출과 같다**(r2 v M-1 · CR L-1).
      *
-     * 앞 판의 test 는 spec 을 **전혀 파싱하지 않고** `ReconciliationBlocker.entries` 를 손으로
-     * 든 집합과 맞댔다 — 이름과 KDoc 이 재는 것보다 많이 말했다. 지금은 계약을 읽어 양방향으로
-     * 맞댄다: 계약에 없는 토큰도, 커널에 없는 토큰도 붉는다.
+     * 앞 판은 넷을 **test 안에 손으로 쓴 집합**과 맞댔다 — 생산자의 글자를 바꾸면 spec 도 test 도
+     * 그대로인 채 wire 만 달라졌다(변이 F 가 244 test 를 지나갔다). 지금은 봉인 계층의 값을
+     * **전수로 만들어** 토큰 함수에 통과시키고 그 산출을 계약과 맞댄다 — 소진 `when` 이 입력
+     * 전수를 지키고, 글자를 바꾸면 이 등식이 먼저 깨진다.
      *
-     * 맨 `type: string` 이면 생성 TS 가 union 이 아니라 `string` 이라 소비자가 이 값으로 분기할
-     * 때 컴파일이 돕지 않는다(화면이 `satisfies Record<…>` 로 소진할 수 없다).
+     * 선례: `OpenApiOpeningResultContractTest` 의 `implementationStates()`.
      */
     @Test
-    fun `토큰 칸 아홉이 enum 이고 집합이 Kotlin 어휘와 양방향으로 같다`() {
+    fun `토큰 칸 아홉이 enum 이고 집합이 응답 생산자의 산출과 같다`() {
         val case = propertiesOf(caseItemSchema())
         val aggregate = propertiesOf(aggregateSchema())
 
         enumOf(case, "recordedState") shouldBe BidStateTag.entries.map { it.name }.toSet()
         enumOf(case, "reconciliationBlocker") shouldBe ReconciliationBlocker.entries.map { it.name }.toSet()
+        itemEnumOf(aggregate, "reconciliationBlockers") shouldBe ReconciliationBlocker.entries.map { it.name }.toSet()
         enumOf(case, "outcomeAgreement") shouldBe OutcomeAgreement.entries.map { it.name }.toSet()
-        enumOf(case, "reconciledOutcome") shouldBe setOf("WON", "LOST", "FAILED_BID", "REBID", "UNDECIDABLE")
-        enumOf(case, "gapState") shouldBe setOf("COMPUTED", "AWARD_ABSENT")
-        enumOf(case, "submittedAmountOrigin") shouldBe setOf("OPERATOR_ENTERED", "PRICE_MENU")
-        val rateStates = AwardRateAbsence.entries.map { "ABSENT_" + it.name }.toSet() + "MEASURED"
+
+        enumOf(case, "reconciledOutcome") shouldBe allVerdicts().map(::verdictTokenOf).toSet()
+        enumOf(case, "gapState") shouldBe allGaps().map(::gapStateTokenOf).toSet()
+        enumOf(case, "submittedAmountOrigin") shouldBe allOrigins().map(::originTokenOf).toSet()
+        val rateStates = allRateStates().map(::rateStateTokenOf).toSet()
         enumOf(aggregate, "recordedRateState") shouldBe rateStates
         enumOf(aggregate, "reconciledRateState") shouldBe rateStates
+        enumOf(case, "openingState") shouldBe enumOf(propertiesOf(openingResultSchema()), "state")
     }
 
-    /**
-     * 개찰 상태는 **공고 단위 조회와 같은 어휘**다 — 설명문이 그렇게 말하므로 등식을 세운다.
-     * 두 operation 이 같은 사실에 다른 어휘를 쓰면 화면이 둘을 따로 분기해야 한다.
-     */
-    @Test
-    fun `개찰 상태 enum 이 공고 단위 조회의 것과 같다`() {
-        val mine = enumOf(propertiesOf(caseItemSchema()), "openingState")
-        val theirs = enumOf(propertiesOf(openingResultSchema()), "state")
-        mine shouldBe theirs
-    }
+    /** 봉인 계층의 값 **전수** — 갈래가 늘면 소진 `when` 이 먼저 컴파일을 막는다. */
+    private fun allVerdicts(): List<ReconciliationVerdict> =
+        listOf(
+            ReconciliationVerdict.Won,
+            ReconciliationVerdict.Lost,
+            ReconciliationVerdict.FailedBid,
+            ReconciliationVerdict.Rebid,
+        ) + ReconciliationBlocker.entries.map(ReconciliationVerdict::Undecidable)
+
+    private fun allGaps(): List<AwardGap> = listOf(AwardGap.AwardAbsent, AwardGap.Computed(0L, Currency.KRW))
+
+    private fun allOrigins(): List<BidAmountOrigin> =
+        listOf(BidAmountOrigin.OperatorEntered, BidAmountOrigin.PriceMenu(PriceMenuRef("menu-1")))
+
+    private fun allRateStates(): List<AwardRateState> =
+        listOf(AwardRateState.Measured(Rate.ofFraction(BigDecimal.ONE))) +
+            AwardRateAbsence.entries.map(AwardRateState::Absent)
 
     /** 판정 불가 사유는 **열**이다 — 커널 어휘의 수를 계약 쪽에서도 센다(D-7C5B-11). */
     @Test

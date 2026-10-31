@@ -1353,7 +1353,7 @@ export interface components {
             /** @description 투찰 기록이 있는 **실투찰** 건. 페이퍼(가상) 건은 들지 않는다. 순서는 확인 시각 내림차순이다. */
             cases: {
                 /**
-                 * Format: int32
+                 * Format: int64
                  * @description 입찰 건 식별자.
                  */
                 caseId: number;
@@ -1510,7 +1510,7 @@ export interface components {
                  */
                 reconciledUndecidedCount: number;
                 /** @description 표본에 나타난 판정 불가 사유 전수. 대사 분모가 0 이면 **이것이 그 사유다**. */
-                reconciliationBlockers: string[];
+                reconciliationBlockers: ("NOTICE_ABSENT" | "NOT_OPENED_YET" | "NOT_COLLECTED" | "OBSERVED_NOT_PROMOTED" | "PROGRESS_UNRECOGNIZED" | "PROGRESS_ABSENT" | "OPERATOR_NAME_NOT_DECLARED" | "OPERATOR_NAME_NORMALIZES_TO_EMPTY" | "WINNER_NAME_NOT_PUBLISHED" | "WINNER_NAME_NORMALIZES_TO_EMPTY")[];
             };
         };
         OnboardingChecklist: {

@@ -158,8 +158,14 @@ data class MyBidAggregateResponse(
     }
 }
 
-/** 소진 `when` — 대사 결말이 늘면 답을 주지 않고는 컴파일되지 않는다. */
-private fun verdictTokenOf(verdict: ReconciliationVerdict): String =
+/**
+ * 소진 `when` — 대사 결말이 늘면 답을 주지 않고는 컴파일되지 않는다.
+ *
+ * **`internal` 인 이유**(r2 v M-1): 계약 enum 과의 등식을 손으로 쓴 집합이 아니라 **이 함수의
+ * 산출 전수**와 맞댄다. 여기 글자를 바꾸면 spec 도 test 도 그대로인 채 wire 만 달라지는 빈틈이
+ * 있었다(변이 F 가 244 test 를 지나갔다).
+ */
+internal fun verdictTokenOf(verdict: ReconciliationVerdict): String =
     when (verdict) {
         ReconciliationVerdict.Won -> "WON"
         ReconciliationVerdict.Lost -> "LOST"
@@ -173,7 +179,7 @@ private fun verdictTokenOf(verdict: ReconciliationVerdict): String =
  * 메뉴가 출하 경로에 없고 HTTP 요청 DTO 에 provenance·메뉴 참조 칸이 없어 use case 가
  * `OperatorEntered` 를 상수로 싣는다. 칸은 두되 그 사실이 상태로 보이게 한다.
  */
-private fun originTokenOf(origin: BidAmountOrigin): String =
+internal fun originTokenOf(origin: BidAmountOrigin): String =
     when (origin) {
         BidAmountOrigin.OperatorEntered -> "OPERATOR_ENTERED"
         is BidAmountOrigin.PriceMenu -> "PRICE_MENU"
@@ -186,13 +192,13 @@ private fun chosenOptionRefOf(origin: BidAmountOrigin): String? =
     }
 
 /** 차이의 상태 — 「확정 낙찰가가 없다」와 「차이가 0 이다」가 다른 값이다. */
-private fun gapStateTokenOf(gap: AwardGap): String =
+internal fun gapStateTokenOf(gap: AwardGap): String =
     when (gap) {
         AwardGap.AwardAbsent -> "AWARD_ABSENT"
         is AwardGap.Computed -> "COMPUTED"
     }
 
-private fun rateStateTokenOf(state: AwardRateState): String =
+internal fun rateStateTokenOf(state: AwardRateState): String =
     when (state) {
         is AwardRateState.Measured -> "MEASURED"
         is AwardRateState.Absent -> absenceTokenOf(state.reason)
