@@ -34,3 +34,21 @@ checklist.md §0 에 위 1~5 의 범위·순서·위험과 「운영자가 따�
 - 이미지 태그 `bidvector/app:local` 등 **다른 레인이 container 재생에 쓰는 태그를 덮지 않는다**(g1c03 이 `94382c1026cf` 로 복원 중).
 - 완료: `check` · container job 재생 · 위생/취약점 게이트 · rollback.md(명령으로 도출) · `leakPatternGate` executed → 판정 SHA 보고 후 동결.
   push 0. 검토: verifier(opus) · code-reviewer(sonnet) 병렬.
+
+## 재개 (2026-10-31, 팀장)
+
+- **근거**: 운영자 지시 2026-10-31 「7E-3b 끝나면 7F 착수」 — R-9(「7F 본편은 서비스가 오픈 가능한 상태가 된 뒤」)의 승인. 7E-3b(PR #110)가 main
+  `957587c4` 로 머지되어 화면 다섯 + 알림함 · 활용사례 캡처 · 서비스 설명이 섰다. 이 브랜치는 2026-10-22 Phase 2(`1d1c2476`)에서 PR 없이 멈췄다.
+- **새 base**: main **`957587c4`** — `git merge origin/main`(rebase 아님, 이력 보존). 손 병합 금지 · 합집합 해소(OpenAPI·게이트 설정·compose·CI
+  워크플로 · runbook). **rollback 기준은 병합 뒤 `957587c4` 하나**.
+- **경계 그대로**: 외부 effect 0 — DNS 변경 · Let's Encrypt 실발급(staging 포함) · 운영 host 반입 apply · public 포트 개방을 하지 않는다. 그것은 이
+  slice 머지 뒤 **별도 승인**(운영자 입력: DNS 레코드 · 연락 이메일 · 80/443 · 반입 실행 승인)이다. D-7F2-1(host = 이 WSL, host nginx 공존)·D-7F2-2
+  ·D-7F2-3 은 유효하다 — 병합 뒤 그 전제가 바뀌었으면 보고.
+- **재판정할 막힌 것**(checklist §1.6): ① caddy Go stdlib CVE — main 의 Caddy 상향(PR #9x)·CI 이미지 교체 뒤 현재 상태를 실측해 해소/allowlist/대기
+  중 하나로 ② container job 재생이 다른 레인 태그를 덮는 문제 — 레인 전용 태그로 재생하는 방법 ③ host trivy 부재 — 리허설 vuln 게이트를 건너뛰지 않는
+  길(설치는 host 변경이라 보고).
+- **이 사이 main 에 들어온 것과의 정합**: 7D 세션·CSRF · 7C③-b(PR #111, 미머지 — 알림 일회 러너 `notification-sweep` 가 cron 항목을 하나 더한다,
+  runbook 에서 함께 다룬다) · 7E 화면 · 7F-local 이후 compose/proxy 변경. 운영 compose 가 지금 main 의 서비스 집합·환경 변수와 등식인지 재측정.
+- **레인**: 구현 하나(`kotlin-implementer`). 판정 verifier(opus) + code-reviewer 병렬. **인증·비밀값 취급 경로가 있으면**(TLS 키·ACME 계정 키·env
+  주입) 되돌리기 어려운 경로 — Codex 는 운영자가 범위·비용을 승인할 때만.
+- **순서**: Phase 1R(재개 보고 — 병합 계획 · 충돌 예상 · 막힌 셋 재판정 · 정합 차이) → 팀장 승인 → 병합 → 재측정 → 변이 → rollback → evidence → 동결 → PR.
