@@ -41,11 +41,15 @@ data class KonepsCollectionPolicyData(
     val detailFetchGates: DetailFetchGates,
     // KONEPS 실제 wire 형식(공식 문서, "YYYY-MM-DD HH:MM:SS")은 이 목록으로만 온다 — 매직 패턴 리터럴 금지.
     val dateTimePatterns: List<DateTimePatternId>,
-    // `ExpectedRangeKey.id` → `RangeBand` 단일 출처(§5.3 규율 2). 운영 정책은 아직 **빈 표**다 —
-    // `sucsfbidLwltRate`의 B6 밴드는
-    // `legacy-behavior`이고 값 확정은 활성 `OPEN-DEC-10` 소유라, 승인 전 실값을 main 에
-    // 지어내지 않는다(「미확정 칸은 인스턴스화하지 않는다」와 같은 원칙). 메커니즘은
-    // `resolveAmount`의 amount 축에 실제로 배선돼 있다(`AmountResolutionOutcome.kt`).
+    // `ExpectedRangeKey.id` → `RangeBand` 단일 출처(§5.3 규율 2). 운영 정책은 **빈 표**이고,
+    // 그 이유가 **2026-10-28 에 바뀌었다**(M6/G1-DEC10, D-DEC10-1·D-DEC10-4). 앞 판은 「값이
+    // 미확정(`OPEN-DEC-10`)이라 지어내지 않는다」였는데, `sucsfbidLwltRate` 의 B6 밴드 값은
+    // 이제 확정돼 `bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY` 가 소유한다.
+    // 그런데도 이 표가 비어 있는 것은 **결정**이다: 이 기계(`violatesExpectedRange`)는 금액 축
+    // 항목을 **drop** 하는 자리이고, 하한율 축에 걸면 **공고를 버린다**. DEC-10 은 그 반대를
+    // 요구한다 — 수집·표시는 원문을 보존하고 **가격 경로만** 게이트를 거친다(미리 접으면
+    // 개연성 위반 계수기가 조용히 0 이 되어 원문 품질을 관측할 수 없다).
+    // 메커니즘은 `resolveAmount`의 amount 축에 실제로 배선돼 있다(`AmountResolutionOutcome.kt`).
     val rangeBands: Map<String, RangeBand> = emptyMap(),
     // `bsnsDivNm`(업무구분명) 문서 열거 어휘. `policy-values.md` §1.5 표에 이미 `authoritative` 로
     // 있으나 P-1~P-6 같은 별도
@@ -309,15 +313,16 @@ private val KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES: List<ResultCodeCategoryEn
 
 /**
  * 운영 정책 인스턴스 — 운영자 승인(`policy-values.md` §6, P-1~P-6 전부)을 옮긴다.
- * age/recheck-gate 24h/48h는 **「측정 전 잠정」**(P-5)이고, 필드 계약 열은 「미확정」 칸을
- * 뺀 채택분만 담는다(P-1). 추정가격 해석 순서에 기초금액 키가 없다는 불변식은 `init`이
+ * age-gate 24h 는 **「측정 전 잠정」**(P-5)이고 재조회 창은 **0**(운영자 결정 2026-10-22, D-G1C03-2 —
+ * P-5 의 48h 를 대체한다), 필드 계약 열은 「미확정」 칸을 뺀 채택분만 담는다(P-1). 추정가격 해석 순서에 기초금액 키가 없다는 불변식은 `init`이
  * 실값으로도 검사한다.
  */
 val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
     EffectiveDatedPolicy(
         source =
             "reports/evidence/m3/3a/policy-values.md 「운영자 승인 2026-09-07」 절 — " +
-                "「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)",
+                "「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6) · " +
+                "재조회 창 0 은 「운영자 결정 2026-10-22, D-G1C03-2」",
         entries =
             listOf(
                 EffectiveFrom.Initial to
@@ -337,8 +342,21 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         // `axisRetryLimit` 은 6G-2d D-6G2d-8 ⓒ 의 **잠정값**이다 — `policy-values.md`
                         // 의 운영자 승인 표(P-1~P-6)에 이 축이 아직 없고, 계약이 든 「예: 3회」를
                         // 옮겼다. 실수집 뒤 재호출 분포를 보고 정한다(`OPEN-6G2D-AXIS-RETRY-LIMIT`).
+                        //
+                        // `recheckGateHours = 0` — **운영자 결정 2026-10-22, D-G1C03-2**(앞 값 48 은
+                        // `policy-values.md` P-5 의 legacy 이식 「측정 전 잠정」이었다). 0 은 「이 경로에
+                        // 재조회 창을 두지 않는다」는 **결정**이지 미설정이 아니다. 근거: V2 에서
+                        // legacy 창의 표적(「조회했으나 비어 있었다」)은 이미 빈 응답이 **정착**이라 다시
+                        // 부르지 않는다. 그래서 창이 실제로 무는 자리는 **미완이라 이어 걸어야 하는 축**
+                        // 하나뿐이고, 거기서 창은 이어 돌기와 싸운다 — 쪽 중간에 끊긴 축이 다음 기동에
+                        // 재개되지 않고, 끊길 확률이 쪽 수(= 참가자 수)에 비례해 **결손이 참가자 많은
+                        // 공고에 몰린다**(D-6G-58 의 보증을 재는 E2E 가 그것을 잡았다).
+                        //
+                        // 창을 되살리려면 「끊긴 걷기는 창을 열지 않는다」를 **쓰기 시점 어휘**로 가르는
+                        // 설계가 먼저다(원장 형식 변경 = 별 slice). 지금 코드로 값만 올리면 그 상관이
+                        // 되살아난다. age-gate 24h 와 축 재호출 상한 3 은 그대로다.
                         detailFetchGates =
-                            DetailFetchGates(ageGateHours = 24, recheckGateHours = 48, axisRetryLimit = 3),
+                            DetailFetchGates(ageGateHours = 24, recheckGateHours = 0, axisRetryLimit = 3),
                         // policy-values.md §1.4 authoritative — "YYYY-MM-DD HH:MM:SS"(항목크기
                         // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
                         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),

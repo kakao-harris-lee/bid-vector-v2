@@ -1,0 +1,10 @@
+import bidvector.settlement.AwardMatchingPolicyData
+import bidvector.settlement.AwardWinnerTradeName
+import bidvector.settlement.OperatorTradeName
+import bidvector.settlement.decideAwardLookup
+
+fun mutantJudgeWithAmountTypo() {
+    val policy = AwardMatchingPolicyData(listOf("Co"))
+    val lookup = decideAwardLookup(OperatorTradeName.Declared("GasangMarine"), policy)
+    judgeAwardOutcomeTypo(lookup, AwardWinnerTradeName.Published("GasangMarine"), 1000000L)
+}

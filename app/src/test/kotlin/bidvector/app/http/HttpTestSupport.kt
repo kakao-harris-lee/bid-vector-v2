@@ -1,19 +1,13 @@
 package bidvector.app.http
 
-import bidvector.adapters.ml.UnavailableMlAnalysis
-import bidvector.adapters.strategy.StrategyEditTransaction
-import bidvector.app.wiring.BrowserAccessExecutor
-import bidvector.app.wiring.EvaluationDryRunFactory
-import bidvector.app.wiring.NoticeSearchQuery
-import bidvector.app.wiring.StrategyEditExecutor
-import bidvector.app.wiring.StrategyQuery
+import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
-import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
@@ -21,39 +15,20 @@ import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
-import bidvector.workflow.evaluation.MlAnalysisPort
-import bidvector.workflow.evaluation.WatchSubjectOutcome
-import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
-import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.EDIT_SESSION_POLICY
-import bidvector.workflow.strategy.EditSession
-import bidvector.workflow.strategy.EditSessionId
-import bidvector.workflow.strategy.EditSessionPolicyData
-import bidvector.workflow.strategy.EditSessionRepository
-import bidvector.workflow.strategy.EditSessionSnapshot
-import bidvector.workflow.strategy.EditStrategyWorkflow
-import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
-import bidvector.workflow.strategy.toSnapshot
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
-import org.springframework.boot.web.servlet.FilterRegistrationBean
-import org.springframework.context.annotation.Bean
-import org.springframework.core.Ordered
 import java.net.Socket
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Collections
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
@@ -158,23 +133,6 @@ fun freshStrategy(revision: Int = 1): OperatorStrategy {
     }
 }
 
-/** 시각을 직접 미는 fake — `Duration.between` 계산이 재현 가능해야 한다. */
-class FixedClock(
-    private var instant: Instant,
-) : Clock {
-    override fun now(): Instant = instant
-
-    fun advance(millis: Long) {
-        instant = instant.plusMillis(millis)
-    }
-}
-
-class SequentialCorrelationIdFactory : CorrelationIdFactory {
-    private val counter = AtomicInteger(0)
-
-    override fun newId(): CorrelationId = CorrelationId("test-corr-${counter.incrementAndGet()}")
-}
-
 /**
  * `load()`를 제어할 수 있는 fake. **`save()`가 실제로 저장한다**: 편집 endpoint test 가 「confirm 뒤 `GET /api/strategy`
  * 가 새 값을 낸다」를 같은 저장소에서 확인한다.
@@ -189,30 +147,6 @@ class TestStrategyRepository(
     override fun save(applied: AppliedStrategy) {
         strategy = applied.strategy
     }
-}
-
-/**
- * `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
- * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
- * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
- * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
- *
- * **D-6A3-20 — [failure]는 `TestStrategyRepository.
- * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
- * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
- */
-class EmptyCandidateSource : CandidateSourcePort {
-    @Volatile var failure: (() -> Throwable)? = null
-
-    override fun openCandidates(): List<Notice> = failure?.let { throw it() } ?: emptyList()
-}
-
-private class UnreachableWatchSubjectPort : WatchSubjectPort {
-    override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("빈 후보 목록에서는 불릴 수 없다")
-}
-
-private class UnreachableLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
 }
 
 /**
@@ -232,6 +166,26 @@ class FakeNoticeSearchPort : NoticeSearchPort {
     }
 }
 
+/**
+ * M7/7C①b — 제안 목록의 이중체 원천·면허 게이트. `SuggestionController`(같은 패키지 main)가 조회기를
+ * 요구해 `HttpTestApplication` 기반 test 가 DB 없이 제안 경로를 돈다. 감시 게이트는 **실 구현**
+ * (`NoticeWatchSubjectPort`, 순수)이다 — 전략의 감시 조건이 실제로 거른다. 실 DB 거동은
+ * `SuggestionProductionE2ETest` 가 잰다.
+ */
+class FakeSuggestionCandidates : CandidateSourcePort {
+    @Volatile var notices: List<Notice> = emptyList()
+
+    override fun openCandidates(): List<Notice> = notices
+}
+
+class FakeSuggestionLicenseGate : LicenseGatePort {
+    @Volatile var verdictFor: (Notice) -> LicenseVerdict = {
+        LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
+    }
+
+    override fun verdictFor(notice: Notice): LicenseVerdict = verdictFor.invoke(notice)
+}
+
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
 class RecordingAuditSink {
     val records: MutableList<ApiAuditRecord> = Collections.synchronizedList(mutableListOf())
@@ -245,193 +199,4 @@ class RecordingAuditSink {
         }
         records += record
     }
-}
-
-/**
- * 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
- * 이다(상태 기계·멱등·만료 판정을 test 사본으로 다시 짓지 않는다) — 바뀌는 것은 커넥션
- * 경계뿐이라, 이 이중체 위에서 재는 것은 「HTTP 층이 결과를 어떤 상태 코드로 옮기는가」다.
- * 원자성 자체(전략+outbox+세션 한 커밋)는 이 자리가 아니라 실 DB test 가 잰다.
- */
-class InMemoryStrategyEditTransaction(
-    private val strategies: StrategyRepository,
-    private val clock: Clock,
-) : StrategyEditTransaction {
-    val sessions: InMemoryEditSessionRepository = InMemoryEditSessionRepository()
-    val events: RecordingStrategyEventSink = RecordingStrategyEventSink()
-
-    /** Spring 컨텍스트가 test 사이에 재사용되므로 세션·발행 이력을 매 test 전에 비운다. */
-    fun reset() {
-        sessions.clear()
-        events.published.clear()
-        events.actors.clear()
-    }
-
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
-        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
-        val sessionPolicy =
-            (EDIT_SESSION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EditSessionPolicyData>).value
-        return action(EditStrategyWorkflow(sessions, strategies, clock, events, policy, sessionPolicy))
-    }
-}
-
-/** `EditSession` 은 `internal constructor` 라 저장은 값 그대로, 반환은 원시 스냅숏으로 한다(D-6B1-7). */
-class InMemoryEditSessionRepository : EditSessionRepository {
-    private val stored = mutableMapOf<EditSessionId, EditSession>()
-
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]?.toSnapshot()
-
-    override fun save(session: EditSession) {
-        stored[session.id] = session
-    }
-
-    fun clear() = stored.clear()
-}
-
-class RecordingStrategyEventSink : EventSink {
-    val published: MutableList<StrategyEvent> = Collections.synchronizedList(mutableListOf())
-
-    override fun publish(
-        event: StrategyEvent,
-        actor: Actor,
-    ) {
-        published += event
-        actors += actor
-    }
-
-    val actors: MutableList<Actor> = Collections.synchronizedList(mutableListOf())
-}
-
-/**
- * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지
- * `bidvector.app.wiring`)을 스캔 범위 밖에 둔다(`@SpringBootApplication`의 기본 컴포넌트
- * 스캔이 이 클래스의 패키지 `bidvector.app.http`와 그 하위만 본다). `StrategyReadController`·
- * `GlobalErrorHandler`는 같은 패키지의 main 소스라 스캔으로 자동 등록된다 — 이 클래스는
- * fake 의존과 필터 등록만 배선한다.
- *
- * **M6/6E-2a — `DataSourceAutoConfiguration` 을 끈다.** 커넥션 풀 구현이 classpath 에 오면서
- * Boot 의 자동설정이 **`DataSource` 빈이 없는 조립에서** 스스로 풀을 만들려 든다(그 전에는 지원
- * 풀 구현이 없어 조용히 물러나 있었다). 이 조립은 DB 가 없는 HTTP 층 전용이라 접속 정보가 없고,
- * 자동설정은 「드라이버를 정할 수 없다」로 컨텍스트 기동을 깬다. 출하 조립은
- * `PersistenceWiring` 의 빈이 있어 같은 자동설정이 물러난다(그 사실은
- * [bidvector.app.wiring.ProductionPoolRoleTest] 의 빈 개수 단언이 잠근다).
- */
-@SpringBootApplication(exclude = [DataSourceAutoConfiguration::class])
-open class HttpTestApplication {
-    @Bean
-    open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
-
-    /** D-6A2b-8 — `StrategyReadController` 는 포트가 아니라 이 조회기를 받는다. */
-    @Bean
-    open fun strategyQuery(strategyRepository: TestStrategyRepository): StrategyQuery =
-        StrategyQuery(strategyRepository)
-
-    @Bean
-    open fun strategyEditTransaction(
-        strategyRepository: TestStrategyRepository,
-        clock: FixedClock,
-    ): InMemoryStrategyEditTransaction = InMemoryStrategyEditTransaction(strategyRepository, clock)
-
-    @Bean
-    open fun strategyEditExecutor(strategyEditTransaction: InMemoryStrategyEditTransaction): StrategyEditExecutor =
-        StrategyEditExecutor(
-            strategyEditTransaction,
-            STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>,
-        )
-
-    @Bean
-    open fun testClock(): FixedClock = FixedClock(Instant.parse("2026-09-19T00:00:00Z"))
-
-    @Bean
-    open fun correlationIdFactory(): CorrelationIdFactory = SequentialCorrelationIdFactory()
-
-    @Bean
-    open fun auditSink(): RecordingAuditSink = RecordingAuditSink()
-
-    /** D-6A3-20 — `OpenApiContractTest`가 [EmptyCandidateSource.failure]를 autowire 해 제어한다. */
-    @Bean
-    open fun emptyCandidateSource(): EmptyCandidateSource = EmptyCandidateSource()
-
-    /**
-     * `EvaluationDryRunController`(같은 패키지 main)가 요구하는 최소 배선 — 후보가
-     * 비어 있어 [watchSubjects]·[licenseGate]는 절대 안 불린다(auth·OpenAPI 계약
-     * test 는 후보 거동을 보지 않는다). 실 후보·판정 거동은 production 조립 E2E
-     * (`ProductionAssemblyAuthAuditTest` 계열)가 잰다.
-     */
-    @Bean
-    open fun evaluationDryRunFactory(
-        strategyRepository: TestStrategyRepository,
-        candidateSource: EmptyCandidateSource,
-        clock: Clock,
-        correlationIdFactory: CorrelationIdFactory,
-    ): EvaluationDryRunFactory =
-        EvaluationDryRunFactory(
-            strategyRepository = strategyRepository,
-            candidateSource = candidateSource,
-            watchSubjects = UnreachableWatchSubjectPort(),
-            licenseGate = UnreachableLicenseGatePort(),
-            mlAnalysis = UnavailableMlAnalysis(),
-            correlationIds = correlationIdFactory,
-            clock = clock,
-        )
-
-    /** 7D — 세션 경로의 이중체 조립(실 DB 없이 쿠키·CSRF 거동만 잰다). */
-    @Bean
-    open fun browserAccessTransaction(clock: FixedClock): InMemoryBrowserAccessTransaction =
-        InMemoryBrowserAccessTransaction(clock)
-
-    @Bean
-    open fun browserAccessExecutor(transaction: InMemoryBrowserAccessTransaction): BrowserAccessExecutor =
-        BrowserAccessExecutor(transaction)
-
-    /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
-    @Bean
-    open fun sessionCookieWriter(): SessionCookieWriter =
-        SessionCookieWriter(secure = true, absoluteWindow = TEST_ACCESS_POLICY.absoluteWindow)
-
-    /** 7C ① — 공고 검색의 이중체. */
-    @Bean
-    open fun fakeNoticeSearchPort(): FakeNoticeSearchPort = FakeNoticeSearchPort()
-
-    /** D-6A2b-8 — `NoticeSearchController` 는 포트가 아니라 조회기를 받는다(출하 조립과 같은 형태). */
-    @Bean
-    open fun noticeSearchQuery(fakeNoticeSearchPort: FakeNoticeSearchPort): NoticeSearchQuery =
-        NoticeSearchQuery(fakeNoticeSearchPort)
-
-    /**
-     * **기본 거부 등록 하나**(출하 조립과 같은 모양) — 인증 경로 둘을 구성으로 받는다.
-     * 순서까지 출하와 같게 둔다(자격 헤더 먼저).
-     *
-     * **main 통합**: 7C ① 쪽은 여기에 옛 `operatorCredentialFilterRegistration` 을 두고 있었는데,
-     * 7D 가 그 필터를 기본 거부 등록 하나로 **대체**했다(`OperatorCredentialFilter` →
-     * `RequestAuthenticationFilter`, 자격 헤더 경로는 인증기로 그 안에 산다). 등록은 여전히
-     * 하나이고 자격 헤더 경로도 그대로다 — 합집합에서 사라진 축이 없다.
-     */
-    @Bean
-    open fun requestAuthenticationFilterRegistration(
-        browserAccessExecutor: BrowserAccessExecutor,
-        sessionCookieWriter: SessionCookieWriter,
-    ): FilterRegistrationBean<RequestAuthenticationFilter> =
-        FilterRegistrationBean(
-            RequestAuthenticationFilter(
-                listOf(
-                    OperatorCredentialAuthenticator(OperatorCredential.of(TEST_CREDENTIAL)),
-                    BrowserSessionAuthenticator(browserAccessExecutor, sessionCookieWriter),
-                ),
-            ),
-        ).apply {
-            urlPatterns = listOf("/*")
-            order = Ordered.HIGHEST_PRECEDENCE + 1
-        }
-
-    @Bean
-    open fun requestAuditFilterRegistration(
-        clock: FixedClock,
-        correlationIdFactory: CorrelationIdFactory,
-        auditSink: RecordingAuditSink,
-    ): FilterRegistrationBean<RequestAuditFilter> =
-        FilterRegistrationBean(RequestAuditFilter(clock, correlationIdFactory, auditSink::record)).apply {
-            urlPatterns = listOf("/*")
-            order = Ordered.HIGHEST_PRECEDENCE
-        }
 }

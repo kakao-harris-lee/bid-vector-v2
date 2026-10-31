@@ -1,0 +1,8 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.decision.menu.BidMenuOutcome
+import bidvector.decision.menu.BidStance
+
+/** `BandCollapsed.copy` 는 모듈 밖에서 닫혀 있다. */
+fun forgedBandCollapsedCopy(original: BidMenuOutcome.BandCollapsed): BidMenuOutcome.BandCollapsed =
+    original.copy(collapsedStances = setOf(BidStance.Safe))

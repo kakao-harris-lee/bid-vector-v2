@@ -2,20 +2,17 @@ package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
 import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.Notice
-import bidvector.procurement.isBiddable
-import bidvector.qualification.LicenseVerdict
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.PriorityScore
 import bidvector.strategy.StrategyRevision
-import bidvector.strategy.WatchVerdict
-import bidvector.strategy.evaluate
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
@@ -128,9 +125,7 @@ class EvaluateCandidatesUseCase internal constructor(
     ): CandidateEvaluation {
         val correlationId = correlationIds.newId()
         return analysisBudgetDrop(index, notice, correlationId)
-            ?: lifecycleDrop(notice, correlationId)
-            ?: watchGateDrop(notice, strategy, correlationId)
-            ?: licenseGateDrop(notice, correlationId)
+            ?: screeningDrop(notice, strategy, correlationId)
             ?: thresholdConfigurationDrop(strategy, notice, correlationId)
             ?: analyzeAndJudge(notice, strategy, capacitySnapshot, correlationId)
     }
@@ -146,69 +141,25 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.AnalysisBudget,
                 EvaluationDropReason.AnalysisBudgetExhausted,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         } else {
             null
         }
 
-    private fun lifecycleDrop(
-        notice: Notice,
-        correlationId: CorrelationId,
-    ): CandidateEvaluation.NotReached? {
-        val deadline = notice.deadlineAt
-        return if (deadline != null && isBiddable(notice.status, clock.now(), deadline)) {
-            null
-        } else {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.NoticeLifecycle,
-                EvaluationDropReason.NoticeNotBiddable(notice.status),
-            )
-        }
-    }
-
-    private fun watchGateDrop(
+    /**
+     * 값싼 게이트 셋(생애주기 → 감시 → 면허)은 [screenCandidate] 하나가 돈다(M7/7C①b — 제안 목록
+     * use case 와 같은 함수). 통과면 `null` 이고 면허 판정 값은 이 use case 가 쓰지 않는다.
+     */
+    private fun screeningDrop(
         notice: Notice,
         strategy: OperatorStrategy,
         correlationId: CorrelationId,
-    ): CandidateEvaluation.NotReached? {
-        val subject =
-            when (val outcome = watchSubjects.subjectFor(notice)) {
-                is WatchSubjectOutcome.Unavailable -> {
-                    return notReached(
-                        notice,
-                        correlationId,
-                        EvaluationStage.WatchGate,
-                        EvaluationDropReason.WatchSubjectUnavailable,
-                    )
-                }
-
-                is WatchSubjectOutcome.Found -> {
-                    outcome.subject
-                }
-            }
-        return watchVerdictDrop(strategy.watchRules.evaluate(subject), notice, correlationId)
-    }
-
-    private fun licenseGateDrop(
-        notice: Notice,
-        correlationId: CorrelationId,
     ): CandidateEvaluation.NotReached? =
-        when (val verdict = licenseGate.verdictFor(notice)) {
-            is LicenseVerdict.Ineligible -> {
-                notReached(
-                    notice,
-                    correlationId,
-                    EvaluationStage.LicenseGate,
-                    EvaluationDropReason.LicenseIneligible(verdict),
-                )
-            }
-
-            // Uncertain은 미보유가 아니다(1C U-5) — 사다리로 넘어간다. Eligible도 통과.
-            is LicenseVerdict.Eligible, is LicenseVerdict.Uncertain -> {
-                null
-            }
+        when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
+            is CandidateScreening.Passed -> null
+            is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason, null)
         }
 
     private fun thresholdConfigurationDrop(
@@ -224,6 +175,8 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ThresholdConfiguration,
                 EvaluationDropReason.ActionThresholdsNotConfigured,
+                // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                null,
             )
         }
 
@@ -257,6 +210,8 @@ class EvaluateCandidatesUseCase internal constructor(
                     correlationId,
                     EvaluationStage.MlAvailability,
                     EvaluationDropReason.SimilarityProjectionNotReady,
+                    // 분석 전 가지 — 계수 축을 계산하지 않았다(r2 CR M-3: 기본값 대신 명시).
+                    null,
                 )
             }
 
@@ -269,28 +224,56 @@ class EvaluateCandidatesUseCase internal constructor(
                     ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
                     PredictionEvidence.NotPredicted(outcome.reason),
                     strategy.revision,
+                    floorExclusion = null,
                 )
             }
 
             is MlAnalysisOutcome.Analyzed -> {
-                scoreThresholdDrop(strategy, outcome, notice, correlationId)
-                    ?: reach(
-                        notice,
-                        correlationId,
-                        bidNowThreshold,
-                        reviewThreshold,
-                        ladderInputFor(
-                            capacitySnapshot,
-                            priorityScore = outcome.priorityScore,
-                            probabilityScore = outcome.probabilityScore,
-                            matchedScore = outcome.matchedScore,
-                        ),
-                        outcome.evidence,
-                        strategy.revision,
-                    )
+                judgeAnalyzed(
+                    notice,
+                    strategy,
+                    capacitySnapshot,
+                    correlationId,
+                    outcome,
+                    bidNowThreshold,
+                    reviewThreshold,
+                )
             }
         }
     }
+
+    /**
+     * 점수가 있는 가지 — 최소치 드롭이 먼저이고, 통과하면 사다리가 판정한다. 임계 둘은
+     * **호출부가 이미 세운 값을 받는다**(r1 CR L-1 — `requireNotNull` 을 여기서 다시 짓지
+     * 않는다; 같은 불변식의 사본을 늘리면 `analyzeAndJudge` KDoc 의 문면과 어긋난다). `?:` 의 우변은
+     * 좌변이 `null` 일 때만 평가되므로 드롭될 후보에서 `LadderInput` 조립이 아예 돌지 않는다
+     * (그 시점 보존이 이 구조의 요점이다 — `CapacitySnapshot` 은 자체 불변식이 없다).
+     */
+    private fun judgeAnalyzed(
+        notice: Notice,
+        strategy: OperatorStrategy,
+        capacitySnapshot: CapacitySnapshot,
+        correlationId: CorrelationId,
+        outcome: MlAnalysisOutcome.Analyzed,
+        bidNowThreshold: PriorityScore,
+        reviewThreshold: PriorityScore,
+    ): CandidateEvaluation =
+        scoreThresholdDrop(strategy, outcome, notice, correlationId)
+            ?: reach(
+                notice,
+                correlationId,
+                bidNowThreshold,
+                reviewThreshold,
+                ladderInputFor(
+                    capacitySnapshot,
+                    priorityScore = outcome.priorityScore,
+                    probabilityScore = outcome.probabilityScore,
+                    matchedScore = outcome.matchedScore,
+                ),
+                outcome.evidence,
+                strategy.revision,
+                outcome.floorExclusion,
+            )
 
     /**
      * [analyzeAndJudge]의 두 가지(`Analyzed`·`Unavailable`)가 공유하는 `LadderInput`
@@ -329,6 +312,7 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ScoreThreshold,
                 EvaluationDropReason.BelowMinimumMatchScore(minimumMatch, actualMatch),
+                analysis.floorExclusion,
             )
         }
         val minimumProbability =
@@ -342,6 +326,7 @@ class EvaluateCandidatesUseCase internal constructor(
                 correlationId,
                 EvaluationStage.ScoreThreshold,
                 EvaluationDropReason.BelowMinimumProbabilityScore(minimumProbability, actualProbability),
+                analysis.floorExclusion,
             )
         } else {
             null
@@ -365,6 +350,7 @@ class EvaluateCandidatesUseCase internal constructor(
         ladderInput: LadderInput,
         evidence: PredictionEvidence,
         strategyRevision: StrategyRevision,
+        floorExclusion: PublishedFloorExclusion?,
     ): CandidateEvaluation.Reached {
         val ladderPolicy =
             Resolution.Resolved(
@@ -383,6 +369,7 @@ class EvaluateCandidatesUseCase internal constructor(
             correlationId,
             verdict,
             notifications.requestFor(notice, correlationId, verdict, evidence, ladderPolicy.version, strategyRevision),
+            floorExclusion,
         )
     }
 }
@@ -397,7 +384,8 @@ class EvaluateCandidatesUseCase internal constructor(
  * 갈릴 자리가 없다.
  *
  * top-level 로 둔 이유는 크기 회피가 아니라 상태 부재다 — 이 함수는 port 하나와 인자만
- * 쓴다(클래스당 함수 11개 한도, detekt `TooManyFunctions`; `watchVerdictDrop` 과 같은 처분).
+ * 쓴다(클래스당 함수 11개 한도, detekt `TooManyFunctions` — 값싼 게이트 셋을
+ * `CandidateScreening.kt` 로 옮긴 것과 같은 처분).
  */
 private fun NotificationRequestPort.requestFor(
     notice: Notice,
@@ -422,55 +410,17 @@ private fun NotificationRequestPort.requestFor(
     return NotificationDisposition.Requested(requested)
 }
 
+/**
+ * `floorExclusion` 은 **필수 인자다 — 기본값이 없다**(r2 CR M-3). D-DEC10-8 이 형제 자리
+ * (`MlAnalysisOutcome.Analyzed`)에 정한 것과 같은 규율이고, 이유도 같다: 칸을 비워 두는 길이
+ * 있으면 **분석 뒤** 드롭 가지가 하나 더 생길 때 컴파일이 아무 말 없이 계수를 버린다. 분석 전
+ * 가지(화면·공고 선별·ML 미가용)는 그 축을 계산하지 않았으므로 `null` 을 **명시**한다.
+ */
 private fun notReached(
     notice: Notice,
     correlationId: CorrelationId,
     stage: EvaluationStage,
     reason: EvaluationDropReason,
-): CandidateEvaluation.NotReached = CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason)
-
-/**
- * [WatchVerdict]가 통과가 아닌 갈래를 [CandidateEvaluation.NotReached]로 옮긴다
- * (`EvaluateCandidatesUseCase.watchGateDrop`에서 분리 — 클래스당 함수 11개 한도,
- * v2-지침서 §5, detekt `TooManyFunctions`). 인스턴스 상태가 필요 없어 top-level로 뺐다.
- * **`NoGate`는 통과가 아니다.**
- * legacy는 이 상태에서 스캔 자체를 하지 않았다(`_has_configured_watch_rules`
- * 게이트) — 결과(후보 0)를 그대로 두고 탈락만 값으로 남긴다.
- */
-private fun watchVerdictDrop(
-    verdict: WatchVerdict,
-    notice: Notice,
-    correlationId: CorrelationId,
-): CandidateEvaluation.NotReached? =
-    when (verdict) {
-        is WatchVerdict.Rejected -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateRejected(verdict),
-            )
-        }
-
-        is WatchVerdict.Undeterminable -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateUndeterminable(verdict),
-            )
-        }
-
-        is WatchVerdict.NoGate -> {
-            notReached(
-                notice,
-                correlationId,
-                EvaluationStage.WatchGate,
-                EvaluationDropReason.WatchGateNotConfigured(verdict),
-            )
-        }
-
-        is WatchVerdict.Passed -> {
-            null
-        }
-    }
+    floorExclusion: PublishedFloorExclusion?,
+): CandidateEvaluation.NotReached =
+    CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason, floorExclusion)

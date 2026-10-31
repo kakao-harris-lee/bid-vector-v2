@@ -35,8 +35,13 @@ internal fun bridgeEmbeddingReason(reason: EmbeddingUnavailableReason): MlUnavai
 
 /**
  * [DerivationAbsence] → [MlUnavailableReason](scope.md ④) — fact 부재는 전부
- * `ScoreNotProvided`(값이 아직 없다는 사실), 단 [DerivationAbsence.FloorRateOutOfRange]만
- * `InvalidRequest`(호출부가 준 값 자체가 계약 범위 밖이라는 다른 사실).
+ * `ScoreNotProvided`(값이 아직 없다는 사실)다.
+ *
+ * **전수 사상인데도 `when` 을 유지한다**(DEC-10, D-DEC10-9) — 앞 판에는 하한율이 계약 범위
+ * 밖이라는 다른 사실을 `InvalidRequest` 로 나르는 가지가 하나 있었고, DEC-10 게이트가 그
+ * 판정을 앞에서 가져가면서 그 사유의 생산자가 0 이 됐다. 값이 하나로 모였다고 `when` 을
+ * 치우면 **새 부재 사유가 분류 없이 기본값으로 흘러든다** — 소진 `when` 이 그 자리에서
+ * 컴파일을 멈추게 한다.
  */
 internal fun bridgeDerivationAbsence(reason: DerivationAbsence): MlUnavailableReason =
     when (reason) {
@@ -46,8 +51,6 @@ internal fun bridgeDerivationAbsence(reason: DerivationAbsence): MlUnavailableRe
         DerivationAbsence.MarketAverageMissing,
         is DerivationAbsence.MoneyArithmeticUnmeasurable,
         -> MlUnavailableReason.ScoreNotProvided
-
-        DerivationAbsence.FloorRateOutOfRange -> MlUnavailableReason.InvalidRequest
     }
 
 /**

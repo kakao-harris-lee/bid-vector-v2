@@ -1,0 +1,208 @@
+# M7/7C②-b — 명령과 실측
+
+base **`fa5ca096`**(병합 라운드에서 재고정 — 착수 base 는 `78d97c59` 였다) · 브랜치
+`m7-7c2b/2026-10-29` · 마지막 산출물·계약 커밋 `703b9157`.
+출력 전문을 싣지 않는다(핵심 결과 한 줄). **마지막 HEAD 의 전건 결과 정본은 verifier 와 PR 조치
+코멘트다** — 이 표는 그 직전까지 담는다.
+
+## 1. RED 선행 (착수 커밋 기준)
+
+- cmd: `./gradlew --no-daemon :app:test --rerun --tests 'bidvector.app.http.BidPriceRequestResponseTest' --tests 'bidvector.app.http.BidPriceRequestEndpointTest'`
+- exit: **1(RED)** · 핵심 결과: 44 중 **3 실패** · 컴파일 오류 0(`^e:` 0건)
+- RED 인 셋: 개연 불가(`1.00000`) 순수 조립 · 같은 값의 **응답 JSON** · 밴드 바로 밖(`0.29999`).
+  셋 다 `expected:<IMPLAUSIBLE> but was:<USABLE>` — 표시가 `origin` 만 보던 사실의 실측이다.
+- **RED 가 아닌 둘을 함께 적는다**(초록인 것도 측정이다): 밴드 양 끝(`0.30`·`0.995`)은 앞 판에서도
+  `USABLE` 이라 경계 포함을 잠그는 **보존 단언**이고, 정책 해소 전제는 「표시 어휘에 다섯째 상태가
+  없다」의 근거(`EffectiveFrom.Initial`)를 잠그는 **전제 단언**이다. 둘은 변이 ⓒ 에서 붉어진다.
+
+## 2. 어휘 등식이 살아 있다 (구현 뒤 · OpenAPI 갱신 전)
+
+- cmd: `./gradlew --no-daemon :app:test --rerun --tests 'bidvector.app.http.BidPrice*' --tests 'bidvector.app.http.OpenApiBidPrice*'`
+- exit: **1** · 핵심 결과: 80 중 **1 실패** — `OpenApiBidPriceVocabularyTest` 의 문서↔타입 등식
+  하나(`floorRateGroundsState` 에 새 값이 타입에만 있다). 표시 test 다섯은 이 시점에 이미 초록.
+- 이 한 줄이 「어휘의 정본은 OpenAPI 이고 생성 타입이 따라간다」가 **기계로 집행된다**는 실측이다.
+
+## 3. 생성 타입 (손 편집 아님)
+
+- cmd: `npm ci` → `npm run api:types` → `npm run api:types:check` (web/)
+- exit: 0 / 0 / 0 · 핵심 결과: 바이트 등식 **147654 bytes** — 생성기 출력이 커밋본과 같다.
+
+## 4. DEC-10 census 키 단위 diff
+
+- cmd: `./gradlew --no-daemon :app:test --rerun --tests 'bidvector.app.architecture.FloorTrustGateTest'`
+  → `python3 tools/floor-trust-allowlist.py <로그>`
+- exit: 1(게이트) / **0**(도구) · 핵심 결과: ⓐ **+1** · ⓑ **+1 / −2** · ⓑ′ **−3**
+- 자리별 사유는 `config/quality/architecture-policy.properties` 의 floor-trust 머리말이 정본이다
+  (여기 옮겨 적지 않는다 — 같은 사실을 두 자리에 두지 않는다).
+
+## 5. 변이 — 각각 RED, 통제군은 `--rerun`
+
+표적은 네 묶음(`FloorTrustGate*` · 투찰가 · 어휘 · 밴드 값 일치)이고 **매 회차 `--rerun`** 이다
+(FROM-CACHE 는 실행이 아니다 — 로그의 `FROM-CACHE` 0건).
+
+| 변이 | 바꿔치운 것 | exit | 붉어진 자리 |
+| --- | --- | --- | --- |
+| 통제군 | 없음(산출물 그대로) | **0** | 100 초록 · 실패 0 · 건너뜀 0 |
+| ⓐ | 표시가 다시 `origin` 만 보고 상태·값을 짓게 | **1** | 거동 3 + **census ⓑ′**(원값 멤버 접근 둘이 되돌아온다) |
+| ⓑ | `IMPLAUSIBLE` 에서 근거 칸에 값을 싣게 | **1** | 거동 3 + **census ⓑ·ⓑ′**(제외 가지에서 원값을 꺼내는 자리가 새로 보인다) |
+| ⓒ | 표시가 평가와 다른 밴드(리터럴)를 보게 | **1** | 거동 3 + **census ⓒ**(「밴드의 출처가 하나다」) |
+
+- 컴파일 오류 0(세 회차 모두 `^e:` 0건) — 의도한 test 에서 RED 다.
+- ⓐⓑⓒ 가 **거동과 census 두 층에서** 동시에 붉은 것이 이 slice 의 핵심 측정이다: 거동 단언만
+  지우면 census 가 남고, census 를 재생성으로 덮으면 거동이 남는다.
+- 변이 적용 전 HEAD 가 매번 커밋돼 있었고 되돌림은 그 파일 하나의 `git checkout --` 이다
+  (미커밋 산출물 없음 — 회차마다 뒤에 `git status --porcelain` 빈 출력 확인).
+
+## 6. acceptance — CI job 명령 그대로
+
+Kotlin `check` job(`.github/workflows/ci.yml`) — 두 회차를 **실패 이력까지** 적는다:
+
+| 회차 | HEAD | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| 1 | `187da92f` | `./gradlew --no-daemon check` | **1** | `app:test` **3 실패** — 새 표면 둘이 게이트 미등재(주입 표면 등식 둘 · 상수시간 비교 그물 하나) |
+| 1 | `187da92f` | `./gradlew --no-daemon qualityBaseline` | 0 | 측정이라 실패시키지 않는다 |
+| 2 | `b36857be` | `./gradlew --no-daemon check` | **1** | `app:detekt` **1 실패** — 1회차 수정에서 더한 근거 문장이 줄 길이 상한 초과 |
+| 2 | `b36857be` | `./gradlew --no-daemon qualityBaseline` | 0 | — |
+| 3 | `6da69dba` | `./gradlew --no-daemon check` | **0** | 전건 초록(이 문서의 본문이 트리에 있는 상태에서 쟀다 — 누출 게이트의 scanRoot 가 이 디렉터리다) |
+| 3 | `6da69dba` | `./gradlew --no-daemon qualityBaseline` | 0 | — |
+
+**두 회차의 빨강이 이 slice 의 교훈**이다 — 표적 test 선택(투찰가·어휘·census)으로는 세 자리가
+보이지 않았고 **전건 job 이 잡았다**. 둘째 빨강은 그 수정 자체가 만든 것이고, 표적
+`:app:ktlintCheck` 가 **그 편집 전에** 돌아 가려졌다.
+
+수정 뒤 표적 재확인(각각 해당 HEAD):
+
+| cmd | exit | 핵심 결과 |
+| --- | --- | --- |
+| `./gradlew --no-daemon :app:test --rerun --tests 'bidvector.app.architecture.AppHttpDependencyGateTest' --tests 'bidvector.app.http.ConstantTimeComparisonStructureTest'` | 0 | 등재 둘이 등식을 만족 |
+| `./gradlew --no-daemon :app:detekt :app:ktlintCheck` | 0 | `^e:` 0건 |
+
+`web` job 전건(`web/`, 단계 ID `W-1`~`W-11`, HEAD `6da69dba`) — **전부 exit 0**:
+`npm ci`(W-1) · `npm run lint`(W-2) · `npm run typecheck`(W-3) · `npm run gate:src-tree`(W-4) ·
+`npm run api:types:check`(W-5) · `npm run test`(W-6) · `npm run gate:tests`(W-7) ·
+`npm run build`(W-8) · `npm run gate:boundary-canary`(W-9) ·
+`npx playwright install chromium`(W-10) · `npm run test:e2e`(W-11, 스모크 2 통과).
+
+CI 전용 단계(`npx playwright install-deps chromium`, apt)는 로컬에서 돌리지 않는다 —
+`tools/one-command-check.sh` 머리 주석이 그 제외를 이미 규정한다.
+
+`ml-engine`·`container` job 은 입력이 바뀌지 않았다(이 slice 의 변경 경로에 `ml-engine/**` ·
+`docker/**` 가 없다 — 복원 목록이 그 전수다). `container` 는 PR CI 가 정본이다.
+
+**다만 base `78d97c59` 에서 `container` 는 붉다**(팀장 2026-10-29) — 취약점 DB 갱신 때문이고 이
+slice 의 변경과 무관하다. main `bb6a187e`(Caddy 직접 빌드 + app 베이스 상향, PR #101)가 그것을
+고쳤으므로 **PR 전에 main 을 받아야 그 job 이 초록**이 된다. 그 병합은 D-7C2B-5 의 순서대로
+7C④-2b 머지 뒤 라운드에서 함께 한다(제한 ⑥).
+
+## 7. 비밀값 스캔
+
+- cmd: `command grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m7/7c2b/`
+- exit: **0 — 매치 있음**. 전부 **이 slice 가 더하지 않은 기존 줄**이다(정책 파일의 비밀값 축 키 ·
+  capability-map 의 legacy 분류 근거 · OpenAPI 의 보안 스키마 종류). 그 줄들은 `leakPatternGate`
+  의 baseline 에 이미 있어 `check` 에서 초록이다.
+- 그래서 **이 slice 가 더한 줄만** 따로 쟀다: `git diff 78d97c59..HEAD -- ':!reports/evidence'` 의
+  `+` 줄과 이 디렉터리의 문서를 모아 같은 패턴 파일로 스캔 → **exit 1(매치 없음 = 통과)**, 434줄.
+- 육안 확인: 알림 채널 식별자·사업자 정보 없음. 패턴 어휘를 이 문서에 축어로 적지 않는다.
+
+## 8. clean-tree
+
+- cmd: `git status --porcelain -- <in_scope 경로 개별 인자>`(코드·정책·문서 열하나)
+- 결과: **빈 출력** · 양성 대조 1회 — in_scope 파일 하나에 줄을 덧붙이면 ` M …` 로 잡히고,
+  **비파괴 절삭**(`head -n <원래 줄수>`)으로 복구한 뒤 다시 빈 출력(`checkout --` 을 쓰지 않는다 —
+  미커밋 편집을 함께 지운다).
+- evidence 경로는 이 문서를 커밋하기 전이라 더럽다 — 그 커밋 뒤의 빈 출력은 verifier 가 잰다.
+
+## 9. 낡는 좌표 — 역방향 파급
+
+이 slice 는 `file:line` 을 새로 적지 않는다. 편집한 파일을 가리키는 **다른 문서의 좌표**는
+`command grep -rnoE '<stem>:[0-9]+'`(전체 파일명과 축약형 둘 다) 로 전수를 내고, 그 수를 삽입
+지점과 비교해 셌다 — **삽입 지점의 줄 번호는 적지 않는다**(이 slice 가 편집하는 파일의 좌표라
+다음 편집에서 조용히 틀린다, CR r1 LOW).
+
+- `capability-map.md` — DEC-10 절의 인계 문단을 종결 문단으로 바꿨다(**순증 +3**). 그 문단보다
+  아래를 가리키는 좌표 **27건**이 밀렸다.
+- `bidvector-operator-api.yaml` — 투찰가 operation 설명문에 한 문단을 더했다(**순증 +4**). 그
+  아래 좌표 **1건**이 밀렸다.
+- 정책 파일·생성 타입·Kotlin 넷 — 가리키는 좌표 **0건**.
+
+밀린 28건은 **전부 in_scope 밖**(다른 slice·마일스톤의 evidence 와 리뷰 JSON)이라 고치지 않고
+알려진 제한으로 둔다. 그 문서들을 이 slice 가 편집하면 그쪽 slice 의 base/head 가 흔들린다.
+
+**크기 게이트 단위를 선언한다**(CR r1 LOW — 스킬에 단위가 명시돼 있지 않다): evidence 합계
+**줄수** 대 산출물 변경 **줄수(추가+삭제)**, 둘 다 판정 SHA 기준
+`git diff --numstat 78d97c59..HEAD`(evidence 는 `reports/evidence/m7/7c2b/`, 산출물은
+`':!reports/evidence'`)로 낸다. 추가 줄만 세면 evidence 가 산출물을 넘는다 — 삭제도 이 slice 가
+한 일(두 함수 제거·census 키 다섯 정리)이라 분모에 넣는 쪽을 택했고, 그 선택을 여기 밝힌다.
+
+## 10. 알려진 제한
+
+① **표시 경로가 census ⓐ 에 처음 들어왔다.** D-DEC10-4(「분석·표시는 게이트를 걸지 않는다」)가
+   **표시 축에서 바뀐 것**이고 가격 경로의 진입 타입은 불변이다. 정책 파일 머리말이 그 사실을 적는다.
+② **`OPEN-DEC10-CRITICAL-RATE-CALLERS` 는 out_scope 이고 이 slice 가 그 사각을 줄이지 않는다.**
+   이미 허용된 코드 단위 안에서 shared-kernel 원값 진입 함수를 부르는 형태는 census 가 보지 못하며,
+   이 slice 의 `floorRateFieldsOf` 도 그 허용 단위 가운데 하나다(서명이 바뀌어 키만 재적혔다).
+③ **밴드 밖 원값을 응답에 아예 내지 않는다**(D-7C2B-2 의 선택). 운영자는 「공고에 어떤 값이 적혀
+   있었나」를 이 응답으로 볼 수 없고 출처·차수만 본다. 새 칸을 만들지 않기로 한 결과다.
+④ **표시 율 문자열은 `Rate` 의 정규화 결과다** — 게시 표기 `0.30000` 은 `0.3` 으로 나간다. 이
+   slice 가 만든 거동이 아니고(DEC-03 축의 기존 정규화), 밴드 경계 test 가 그 사실을 고정한다.
+⑤ **좌표 28건이 밀렸다**(§9) — 전부 in_scope 밖 문서라 고치지 않았다.
+⑥ **해소됨(병합 라운드, §11)** — 7C④-2b·7E-1 이 머지된 main `fa5ca096` 을 병합했고, 재생성 +
+   바이트 등식 · OpenAPI 키 계수·중복 0 · rollback 기준 재산출을 모두 그 라운드에서 했다. base 의
+   붉은 `container` 도 그 병합으로 초록이 됐다(`fa5ca096` check-run 조회).
+⑦ **갱신됨 — 화면이 이 상태를 읽는다**(§11). 7E-1 이 머지돼 화면 C 가 생겼고, D-7E-4 대로 이
+   slice 가 그 표에 행 하나를 더했다(D-7C2B-7 로 scope 확장). **남는 것**: 그 행이 뜨는 모습은
+   vitest 와 화면 test 가 잠그지만 **여정 e2e 는 개연 불가 공고를 밀지 않는다** — 그 축의 공고를
+   fake 수집에 넣는 일은 이 slice 가 하지 않았다.
+⑧ **게이트 등재 둘이 계약이 지명한 키 밖이다**(주입 표면 · 상수시간 비교 그물). 같은 in_scope
+   파일 안이고 승인된 설계의 기계적 귀결이지만, 계약 문면에는 census 키만 적혀 있다 — 계약 갱신
+   대상으로 보고한다.
+⑨ **표시와 평가가 같은 상수를 「각자」 해소한다**(CR r1 LOW) — 계약 D-7C2B-1 의 문면은 「같은
+   인스턴스」인데 구현은 두 자리가 같은 singleton 을 같은 UTC 규칙으로 **따로** 해소한다
+   (요청 조립 한 번 · 분석 한 번). 오늘은 갈라질 수 없다(표의 유일 항목이 `Initial`). 표가
+   날짜를 갖는 날 **두 `clock.now()` 사이에 UTC 자정이 끼면** 표시와 평가가 다른 밴드를 볼 수
+   있고, **두 경로의 `PolicyVersion` 동일성을 재는 test 는 없다** — census ⓒ 는 「밴드의 출처가
+   하나」만 잠근다. 표시 쪽 배선은 「출하 상수의 해소 결과와 값·version 이 같다」로 잠겨 있다
+   (이 라운드에 더한 단언). 모으는 선택(해소를 요청당 한 번으로)은 후속 slice 몫이다.
+⑩ **전제 test 가 기준일 계산을 잠그지 않는다** — 표의 유일 항목이 `Initial` 인 동안은 어느
+   기준일로 바꿔도 같은 값이 나와 단언으로 구별되지 않는다(그 사실을 그 test KDoc 에 적었다).
+   실질 방어는 거동 test 넷 · census ⓒ · 반사 위조를 잡는 구조 게이트들이다(verifier r1 R2b).
+
+## 11. 병합 라운드 (main `fa5ca096`)
+
+| 확인 | 결과 |
+| --- | --- |
+| 교집합 파일 | **다섯**(정책·capability-map·OpenAPI·생성 타입·상수시간 test) |
+| 충돌 | **하나** — 정책 파일의 주입 목록 설명 문단(양쪽이 같은 자리에 더했다). 양쪽 보존으로 해소 |
+| 정책 목록 넷 | 주입 **66** · 통과 값 접근 **9** · 원값 획득 **49** · 원값 멤버 **36** — 전부 기대와 일치 |
+| OpenAPI | paths **35** · schemas **39** · operationId **39** · 응답 속성 **51** · required **31** · 중복 키 **0**(거부 로더) |
+| `floorRateGroundsState` | 네 값 유지(`IMPLAUSIBLE` 포함) · 내 설명문 셋 각 1건 보존 |
+| 상수시간 허용 목록 | **40** = 기대 · 근거 map 키 집합과 같음 |
+| capability-map | main 의 OPEN 행 1건 · 이 slice 의 DEC-10 종결 문단 — **둘 다** 보존 |
+| 생성 타입 | **재생성**(`npm run api:types`) + `api:types:check` 바이트 등식 **169601 bytes**. 자동 병합본과 재생성본의 diff **0** — 믿은 것이 아니라 재생성으로 확인했다 |
+
+**검산 술어는 합집합이 아니다**: `(main − 내가 뺀 것) ∪ 내가 더한 것`. 순수 합집합으로 재면 이
+slice 가 **의도적으로 뺀 낡은 허용 키 다섯**이 되살아나 「일치」가 거짓이 된다(처음 그 술어로
+재서 NG 둘이 나왔고, 식을 고쳐 0 이 됐다).
+
+### D-7E-4 이행 (화면 C 의 하한율 상태 표)
+
+| 단계 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| 재생성 직후 | `npm run typecheck` | **2** | `satisfies Record<…>` 와 화면 호출 자리 둘에서 「`IMPLAUSIBLE` 이 없다」 — 사람이 찾은 누락이 아니라 **컴파일이 세운** 누락이다 |
+| 행 추가 뒤 | `npm run typecheck` · `npm run test` | 0 · 0 | vitest **232 통과** |
+| 변이(행 제거) | 같은 둘 | **2 · 1** | `tsc` 오류 4줄 + vitest **3 실패**(표 키 집합 등식 · 문면 단언 · 화면 단언) |
+
+두 층이 서로의 사각을 덮는다 — `tsc` 는 누락을, test 는 문면과 화면을 본다.
+
+### acceptance 4회차 (`703b9157`, **찬 상태**)
+
+| cmd | exit | 핵심 결과 |
+| --- | --- | --- |
+| `./gradlew --no-daemon clean` | 0 | 병합 뒤 재검증이라 표적이 아니라 전건·찬 상태로 돌렸다 |
+| `./gradlew --no-daemon check` | **0** | 401 task · 230 실행 |
+| `./gradlew --no-daemon qualityBaseline` | 0 | — |
+| `web` W-1~W-11 | **전부 0** | vitest 232 · 스모크 2 |
+| `:app:bootJar`(W-12) · `npm run test:e2e:journey`(W-13) | 0 · **0** | 여정 e2e **4 통과**(수집 → 저장 → API → 화면) |
+
+`ml-engine` 입력은 이 라운드에서도 바뀌지 않았다. `container` 는 PR CI 가 정본이고, 새 base 에서
+그 job 은 초록이다(제한 ⑥).

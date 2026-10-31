@@ -1,0 +1,6 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.PlausibleFloorRate
+import bidvector.decision.PublishedFloorTrust
+
+fun forgedTrust(gated: PlausibleFloorRate): PublishedFloorTrust = PublishedFloorTrust.TrustedTypo(gated)

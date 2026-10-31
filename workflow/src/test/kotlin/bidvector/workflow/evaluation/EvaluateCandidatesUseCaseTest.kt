@@ -213,6 +213,7 @@ class EvaluateCandidatesUseCaseTest {
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
                             evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+                            floorExclusion = null,
                         )
                     },
             )
@@ -253,6 +254,7 @@ class EvaluateCandidatesUseCaseTest {
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
                             evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+                            floorExclusion = null,
                         )
                     },
                 capacity = FakeCapacityPort(CapacitySnapshot(currentActiveBids = -1, maxActiveBids = 10)),
@@ -328,6 +330,7 @@ class EvaluateCandidatesUseCaseTest {
                 probabilityScore = null,
                 matchedScore = null,
                 evidence = evidence,
+                floorExclusion = null,
             )
         val useCase =
             useCase(
@@ -367,6 +370,7 @@ class EvaluateCandidatesUseCaseTest {
                             probabilityScore = null,
                             matchedScore = null,
                             evidence = evidence,
+                            floorExclusion = null,
                         )
                     },
             )

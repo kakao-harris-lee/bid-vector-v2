@@ -1,0 +1,13 @@
+package bidvector.decision.menu.compilefixtures
+
+import bidvector.sharedkernel.AppliedFloor
+import java.math.BigDecimal
+
+/**
+ * 판별력 통제군(r5 V5-M1).
+ *
+ * **파일 이름에만** 문제의 낱말이 들어 있고 **본문에는 한 번도 나오지 않는다.** 접근 불가의
+ * 대상은 `AppliedFloor` 의 `internal` 생성자다. 그래서 진단 문면에 그 낱말이 없고, 출력
+ * 어딘가에 그것이 보인다면 출처는 **컴파일러가 붙인 경로**뿐이다 — 앞 판 술어가 공허했던 이유다.
+ */
+fun deniedElsewhere(): AppliedFloor = AppliedFloor(BigDecimal.ONE)

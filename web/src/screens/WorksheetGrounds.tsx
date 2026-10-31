@@ -1,0 +1,256 @@
+import type { BidPriceRequestResponse } from '../api/queries';
+import { Field, StateBadge } from '../components/StateBadge';
+import { displayOrUnknown } from '../display/stateDisplay';
+import {
+  BASE_AMOUNT_RESOLUTION_DISPLAY,
+  BID_PRICE_MENU_DISPLAY,
+  BID_PRICE_MENU_REASON_DISPLAY,
+  CONFIDENCE_REASON_DISPLAY,
+  CONFIDENCE_STATE_DISPLAY,
+  DISCLOSURE_SENTENCE,
+  FLOOR_RATE_GROUNDS_DISPLAY,
+  FLOOR_RATE_ORIGIN_DISPLAY,
+  FLOOR_SHORTFALL_REASON_DISPLAY,
+  FLOOR_SHORTFALL_STATE_DISPLAY,
+  INBOX_RECORD_REASON_DISPLAY,
+  INBOX_RECORD_STATE_DISPLAY,
+  LICENSE_MISSING_DETAIL_DISPLAY,
+  LICENSE_UNCERTAIN_REASON_DISPLAY,
+  LICENSE_VALIDITY_DISPLAY,
+  LICENSE_VERDICT_DISPLAY,
+  ML_ANALYSIS_STATE_DISPLAY,
+  ML_UNAVAILABLE_REASON_DISPLAY,
+  OUTCOME_DISPLAY,
+  UNJUDGED_AXIS_DISPLAY,
+} from '../display/worksheetDisplay';
+
+/**
+ * 투찰가 **3안 자리**(DEC-05 · DEC-02). 계약에 금액 칸이 없으므로 이 자리에 숫자가 들어올
+ * 경로가 없다 — 상태와 사유만 보인다. 그것이 「근거 없는 숫자를 내지 않는다」의 구조다.
+ */
+function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
+  return (
+    <section data-testid="bid-price-menu" className="rounded-lg border border-line bg-card p-4">
+      {/* 제목에는 도메인 용어의 숫자가 들어간다(「3안」) — 그래서 **값 자리**를 따로 표시해
+          두고 「이 자리에 숫자가 없다」를 그 자리에서만 잰다(test 가 제목을 함께 읽으면 그
+          단언이 용어 때문에 붉어진다, 실측). */}
+      <h3 className="text-sm font-semibold">투찰가 3안</h3>
+      <div data-testid="bid-price-menu-value">
+        <p className="mt-2">
+          <StateBadge display={displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState)} />
+        </p>
+        <p className="mt-1 text-xs text-ink-soft">
+          {displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState).why}
+        </p>
+        <p className="mt-2 text-xs text-ink-soft">
+          {displayOrUnknown(BID_PRICE_MENU_REASON_DISPLAY, price.bidPriceMenuNotComputedReason).label}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 판정 — `outcome` 과 **어디서 왜 멈췄는가**(v L-4). 앞 판은 `OUTCOME_DISPLAY` 가 쓰이지 않는
+ * 표였고 그 `why`(「아래 단계·사유가 말한다」)가 가리키는 칸이 화면에 없었다. 단계·사유는
+ * 계약이 자유 문자열로 두므로 **서버가 준 코드를 그대로** 보인다(문면을 지어내지 않는다).
+ */
+function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
+  return (
+    <section data-testid="verdict" className="rounded-lg border border-line bg-card p-4">
+      <h3 className="text-sm font-semibold">판정</h3>
+      <p className="mt-2 flex flex-wrap items-center gap-2">
+        <StateBadge display={displayOrUnknown(OUTCOME_DISPLAY, price.outcome)} testId="verdict-outcome" />
+        {price.verdict === null || price.verdict === undefined ? null : (
+          <span data-testid="verdict-value" className="font-numeric text-xs">
+            {price.verdict}
+          </span>
+        )}
+      </p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="멈춘 단계" testId="drop-stage" value={price.dropStage ?? null} />
+        <Field label="멈춘 사유" testId="drop-reason" value={price.dropReasonCode ?? null} />
+        <Field
+          label="판정 사유 코드"
+          testId="verdict-reasons"
+          value={price.verdictReasonCodes.length === 0 ? null : price.verdictReasonCodes.join(', ')}
+        />
+        <Field
+          label="걸린 감시 규칙"
+          testId="failed-watch-rules"
+          value={price.failedWatchRuleIds.length === 0 ? null : price.failedWatchRuleIds.join(', ')}
+        />
+      </dl>
+    </section>
+  );
+}
+
+/** 근거 — 기초금액 · 게시 하한율 · 하한 미달 빈도 · 신뢰도 · 분석. 전부 상태에서 나온다. */
+function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
+  const floorOrigin = price.publishedFloorRateOrigin;
+  const mlReason = price.mlUnavailableReason;
+  return (
+    <section className="rounded-lg border border-line bg-card p-4">
+      <h3 className="text-sm font-semibold">근거</h3>
+      <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+        <Field
+          label="기초금액"
+          hint="투찰 기준 금액. 추정가격과 다르다."
+          testId="base-amount"
+          value={price.baseAmountWon === null || price.baseAmountWon === undefined ? null : `${price.baseAmountWon.toLocaleString('ko-KR')}원`}
+        />
+        <div className="flex flex-col gap-1">
+          <dt className="text-xs text-ink-soft">기초금액이 정해진 방식</dt>
+          <dd data-testid="base-amount-resolution">
+            {price.baseAmountResolution === null || price.baseAmountResolution === undefined ? (
+              <span className="text-sm text-absent-ink">값 없음</span>
+            ) : (
+              <StateBadge display={displayOrUnknown(BASE_AMOUNT_RESOLUTION_DISPLAY, price.baseAmountResolution)} />
+            )}
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1">
+          <dt className="text-xs text-ink-soft">게시 낙찰하한율</dt>
+          <dd data-testid="floor-rate-grounds" className="flex flex-col gap-1">
+            <StateBadge display={displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, price.floorRateGroundsState)} />
+            {/* 값은 **원문 10진 문자열 그대로** 보인다 — 퍼센트로 고치거나 자리를 맞추지 않는다. */}
+            {price.publishedFloorRateFraction === null || price.publishedFloorRateFraction === undefined ? null : (
+              <span className="font-numeric text-sm">{price.publishedFloorRateFraction}</span>
+            )}
+            {floorOrigin === null || floorOrigin === undefined ? null : (
+              <StateBadge display={displayOrUnknown(FLOOR_RATE_ORIGIN_DISPLAY, floorOrigin)} />
+            )}
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1">
+          <dt className="text-xs text-ink-soft">하한 미달 빈도</dt>
+          <dd data-testid="floor-shortfall" className="flex flex-col gap-1">
+            <StateBadge display={displayOrUnknown(FLOOR_SHORTFALL_STATE_DISPLAY, price.floorShortfallState)} />
+            <span className="text-xs text-ink-soft">
+              {displayOrUnknown(FLOOR_SHORTFALL_REASON_DISPLAY, price.floorShortfallNotComputedReason).label}
+            </span>
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1">
+          <dt className="text-xs text-ink-soft">신뢰도</dt>
+          <dd data-testid="confidence" className="flex flex-col gap-1">
+            <StateBadge display={displayOrUnknown(CONFIDENCE_STATE_DISPLAY, price.confidenceState)} />
+            <span className="text-xs text-ink-soft">
+              {displayOrUnknown(CONFIDENCE_REASON_DISPLAY, price.confidenceNotAvailableReason).label}
+            </span>
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1">
+          <dt className="text-xs text-ink-soft">분석</dt>
+          <dd data-testid="ml-analysis" className="flex flex-col gap-1">
+            <StateBadge display={displayOrUnknown(ML_ANALYSIS_STATE_DISPLAY, price.mlAnalysisState)} />
+            {mlReason === null || mlReason === undefined ? null : (
+              <span className="text-xs text-ink-soft">
+                {displayOrUnknown(ML_UNAVAILABLE_REASON_DISPLAY, mlReason).label}
+              </span>
+            )}
+          </dd>
+        </div>
+      </dl>
+      {/* CR H-1 — **주장한 값을 보인다**. 응답이 되돌려 준 선언값과 여력 상한을 나란히 두어,
+          운영자가 「무엇이 주장됐는지」를 화면에서 확인할 수 있게 한다. */}
+      <p data-testid="capacity" className="mt-3 text-xs text-ink-soft">
+        여력: 진행 중 <span className="font-numeric">{price.currentActiveBids}</span>건으로{' '}
+        <strong>선언</strong>함 · 상한 <span className="font-numeric">{price.maxActiveBids}</span>
+      </p>
+      <p data-testid="inbox-record" className="mt-3 text-xs text-ink-soft">
+        알림함: {displayOrUnknown(INBOX_RECORD_STATE_DISPLAY, price.inboxRecordState).label}
+        {price.inboxRecordNotRecordedReason === null || price.inboxRecordNotRecordedReason === undefined
+          ? ''
+          : ` — ${displayOrUnknown(INBOX_RECORD_REASON_DISPLAY, price.inboxRecordNotRecordedReason).label}`}
+      </p>
+    </section>
+  );
+}
+
+/** 자격 — **면허 축만** 판정한다. 판정하지 않는 축을 함께 싣는 것이 이 카드의 요점이다. */
+function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
+  const reason = price.licenseUncertainReason;
+  return (
+    <section data-testid="qualification" className="rounded-lg border border-line bg-card p-4">
+      <h3 className="text-sm font-semibold">자격</h3>
+      <p className="mt-2 flex flex-wrap items-center gap-2">
+        <StateBadge display={displayOrUnknown(LICENSE_VERDICT_DISPLAY, price.licenseVerdict)} testId="license-verdict" />
+        {reason === null || reason === undefined ? null : (
+          <StateBadge display={displayOrUnknown(LICENSE_UNCERTAIN_REASON_DISPLAY, reason)} testId="license-reason" />
+        )}
+        <StateBadge display={displayOrUnknown(LICENSE_VALIDITY_DISPLAY, price.licenseValidity)} testId="license-validity" />
+      </p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field
+          label="요건이 온 필드"
+          testId="license-source-fields"
+          value={price.licenseRequirementSourceFields.length === 0 ? null : price.licenseRequirementSourceFields.join(', ')}
+        />
+        <Field
+          label="공고가 요구한 면허"
+          testId="license-required"
+          value={
+            price.licenseRequiredLicenses === null || price.licenseRequiredLicenses === undefined || price.licenseRequiredLicenses.length === 0
+              ? null
+              : price.licenseRequiredLicenses.join(', ')
+          }
+        />
+        <Field
+          label="충족한 제한그룹"
+          testId="license-groups-satisfied"
+          value={price.licenseGroupsSatisfied.length === 0 ? null : price.licenseGroupsSatisfied.join(', ')}
+        />
+        <Field
+          label="미충족 제한그룹"
+          testId="license-groups-missing"
+          value={price.licenseGroupsMissing.length === 0 ? null : price.licenseGroupsMissing.join(', ')}
+        />
+        <Field label="판정 어휘 version" testId="license-policy" value={price.licensePolicySource} />
+        <Field
+          label="읽지 못한 요건 행"
+          testId="license-unparsable"
+          value={`${price.licenseUnparsableRowCount}`}
+        />
+      </dl>
+      <p className="mt-2">
+        <StateBadge display={displayOrUnknown(LICENSE_MISSING_DETAIL_DISPLAY, price.licenseMissingDetailState)} />
+      </p>
+      <h4 className="mt-4 text-xs font-semibold text-ink-soft">아직 판정하지 않는 축</h4>
+      <p data-testid="unjudged-axes" className="mt-1 flex flex-wrap gap-1">
+        {price.unjudgedAxes.map((axis) => (
+          <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
+        ))}
+      </p>
+    </section>
+  );
+}
+
+/** 고지 — **계약이 준 코드 전수**를 문장으로 보인다(문장은 표면이 짓는다). */
+function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
+  return (
+    <section className="rounded-lg border border-line bg-card p-4">
+      <h3 className="text-sm font-semibold">고지</h3>
+      <ul data-testid="disclosures" className="mt-2 flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
+        {/* CR r2 M-6 — 직접 색인이 남아 있었다. 표 밖 코드에 `undefined.label` 로 터지면 오류
+            경계가 **근거 패널 전체**를 먹는다 — 보이는 미지 상태가 조용한 폭발보다 낫다. */}
+        {price.disclosures.map((code) => (
+          <li key={code}>{displayOrUnknown(DISCLOSURE_SENTENCE, code).label}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** 투찰가 요청의 결과 전부 — 3안 자리 · 근거 · 자격 · 고지. */
+export function WorksheetGrounds({ price }: { readonly price: BidPriceRequestResponse }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <Verdict price={price} />
+      <BidPriceMenu price={price} />
+      <Qualification price={price} />
+      <Grounds price={price} />
+      <Disclosures price={price} />
+    </div>
+  );
+}

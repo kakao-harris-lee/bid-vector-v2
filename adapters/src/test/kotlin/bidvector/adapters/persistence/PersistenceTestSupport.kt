@@ -93,12 +93,16 @@ abstract class PersistenceTestSupport {
                 // account·browser_session 도 같은 이유로 더한다(M7/7D, 추가만) — 계정·세션 행이
                 // test 간에 새어 나가면 「계정 없음」·「세션 하나」 대조가 실행 순서에 의존한다.
                 // 세션은 account 를 FK 로 참조하므로 CASCADE 가 함께 비운다(명시로도 적는다).
+                // notification_inbox 도 같은 이유로 더한다(M7/7C③, 추가만) — 알림 항목이 test
+                // 간에 새어 나가면 「행 하나」·안읽음 계수·묶음 계수 대조가 실행 순서에 의존한다.
+                // 이 표도 account 를 FK 로 참조해 CASCADE 가 함께 비우지만 **명시로도 적는다**:
+                // 공고 키에는 FK 가 없어서(V23 주석 ③) `notice` 를 비워도 이 표는 비지 않는다.
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
                         "qualification_text, collection_run, raw_observation, outbox, inbox, " +
                         "edit_session, operator_strategy, operator_strategy_revision, " +
                         "operator_profile, notice_requirement, api_request_audit, " +
-                        "browser_session, account " +
+                        "notification_inbox, browser_session, account " +
                         "RESTART IDENTITY CASCADE",
                 )
             }

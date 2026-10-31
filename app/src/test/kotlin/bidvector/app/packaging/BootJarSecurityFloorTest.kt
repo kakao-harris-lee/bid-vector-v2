@@ -93,6 +93,28 @@ class BootJarSecurityFloorTest {
     }
 
     /**
+     * **guava 는 선언한 자리가 없는 좌표다**(chore 2026-10-28, `CVE-2026-102554`).
+     *
+     * grpc 가 전이로 끌어오고(`grpc-api`·`grpc-core`·`grpc-util` 이 `33.6.0-android` 를 선언 → Gradle
+     * 변이체 선택이 그 모듈에서 `-jre` jar 를 고른다) **최신 grpc 도 같은 판을 선언**하므로 상향
+     * 지렛대가 `constraints` 하한뿐이다. 그 선언이 해석에 효과를 냈는지는 위 tomcat 과 같은 이유로
+     * 선언 자체가 말해 주지 않는다 — 배포물에서 읽는다.
+     *
+     * **기대는 집합 등식이다**(tomcat 과 같은 형태 — jackson 의 부분집합이 아니다). 좌표가 통째로
+     * 빠지면 RED 다: guava 는 grpc 가 요구하므로 사라지는 해석은 상향이 아니라 배선이 깨진 신호다.
+     * 하한보다 **높은** 판이 실리는 것도 RED 이고, 그때 할 일은 이 하한을 치우는 것이다 — 조용히
+     * 통과시키면 무력해진 선언이 남는다.
+     */
+    @Test
+    fun `배포물의 guava 가 보안 하한 판이다`() {
+        val names = bundledJarNames()
+        withClue("배포물의 BOOT-INF/lib 가 비어 있다 — 빈 목록 위의 '위반 0' 은 공허하다") {
+            names.shouldNotBeEmpty()
+        }
+        withClue("guava") { versionsOf("guava", names) shouldBe setOf(floor("guava")) }
+    }
+
+    /**
      * **jackson 은 두 축으로 잰다**(D-6E2C-8).
      *
      * ⓐ **카탈로그가 하한을 선언한 좌표**(`jackson-core`·`jackson-databind`)는 **접두와 무관하게 항상

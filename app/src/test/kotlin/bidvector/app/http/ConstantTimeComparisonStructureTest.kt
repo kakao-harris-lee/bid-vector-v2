@@ -67,22 +67,18 @@ class ConstantTimeComparisonStructureTest {
         disallowedAreEqual(simulated) shouldBe setOf("CredentialComparator")
     }
 
-    /** 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다. */
+    /**
+     * 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다.
+     *
+     * 키 집합이 **두 자리**에 있다(아래 축어 집합 · [ALLOWED_INTRINSICS_AREEQUAL] 의 키).
+     * M7 에서 레인 셋(7C③·7C④·7C⑤)이 같은 두 자리를 동시에 늘린다 — 병합은 수가 아니라
+     * **항목 이름의 합집합**으로 다시 세고 두 자리를 같이 맞춘다. 7C③ 이 더한 넷은
+     * `NotificationItemResponse` · `NotificationInboxRequestsKt` (+2 — 앞 판의 `NotificationTargetResult$Item`·
+     * `$Notice` 는 r1 검토 CR LOW-3 으로 **타입 자체가 사라져** 등재도 함께 걷었다).
+     */
     @Test
-    fun `허용 목록은 정해진 아홉뿐이고 각각 근거 문장을 갖는다`() {
-        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
-            setOf(
-                "ApiAuditRecord",
-                "ErrorBody",
-                "StrategyReadResponse",
-                "StrategyReadControllerKt",
-                "EvaluationDryRunResponse",
-                "ResultBuckets",
-                "EditSessionResponse",
-                "EditFieldTokensKt",
-                "EditSessionResponseKt",
-                "NoticeSummaryResponse",
-            )
+    fun `허용 목록은 등재된 것뿐이고 각각 근거 문장을 갖는다`() {
+        ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe ALLOWED_NAMES
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
 }
@@ -116,6 +112,103 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "상태·거부 사유 sealed 싱글턴 when 소진(javap 확인: 자격증명 좌표 0) — 값 비교가 아니라 객체 동일성",
         "NoticeSummaryResponse" to
             "공고 요약 응답 값 객체(data class) 자동 생성 equals — 공고번호·차수·상태·공고명·기관명·기초금액·마감뿐, 자격증명 값 없음",
+        // M7/7C ② (D-7C2-5 ④) — 열둘. 근거는 **클래스마다** 적는다(그 class 가 무엇을 == 로 비교하는가).
+        // 열둘 전부 javap 으로 자격증명·CSRF·서명 어휘 참조 0 을 실측했다. 패키지를 옮겨 이 게이트를
+        // 비껴가는 선택은 하지 않았다 — 위치로 보안 게이트를 피하는 형태다.
+        "BidPriceRequestResponse" to
+            "투찰가 요청 응답 값 객체(data class) 자동 생성 equals — 공고 식별자·상관 id·개정·여력 수·고지 코드와 축별 묶음 여섯, 자격증명 값 없음",
+        "EvaluationDetailFields" to
+            "평가 상세 묶음(data class) 자동 생성 equals — 판정·사유 코드·단계·공고 상태·점수 문자열뿐, 자격증명 값 없음",
+        "NotificationFields" to
+            "알림 처분 묶음(data class) 자동 생성 equals — 알림 요청 여부와 알림함 기록 상태·사유 코드뿐, 자격증명 값 없음",
+        "QualificationFields" to
+            "자격 근거 묶음(data class) 자동 생성 equals — 판정·사유 코드·면허명·그룹 라벨·출처 필드·정책 출처뿐, 자격증명 값 없음",
+        "BaseAmountFields" to
+            "기초금액 묶음(data class) 자동 생성 equals — 금액·통화·basis·과세·provenance·해석 갈래뿐, 자격증명 값 없음",
+        "FloorRateFields" to
+            "게시 하한율 묶음(data class) 자동 생성 equals — 율 문자열·출처·차수·근거 상태뿐, 자격증명 값 없음",
+        "FloorRateGrounds" to
+            "근거 상태+근거 값 운반(data class) 자동 생성 equals — 표시 어휘 enum 과 율 문자열 둘뿐, 자격증명 값 없음",
+        "PriceAxesFields" to
+            "가격 세 축 묶음(data class) 자동 생성 equals — 상태와 사유 코드뿐(값 칸이 없다), 자격증명 값 없음",
+        "BidPriceVerdictLabelsKt" to
+            "판정 축 사상 함수 파일 — sealed 싱글턴(Verdict·사유)을 소진 when 으로 가르는 참조 동일성, 자격증명 값 없음",
+        "BidPriceDropLabelsKt" to
+            "탈락 축 사상 함수 파일 — sealed 싱글턴(단계·드롭 사유·감시 불가 사유) 참조 동일성, 자격증명 값 없음",
+        "BidPriceQualificationLabelsKt" to
+            "자격 축 사상 함수 파일 — sealed 싱글턴(면허 판정·판정 불가 사유·그룹 id·유효기간·정책 시행일) 참조 동일성, 자격증명 값 없음",
+        "BidPriceFactLabelsKt" to
+            "공고 fact·ML 축 사상 함수 파일 — sealed 싱글턴(금액 해석 갈래·하한율 출처·ML 상태·미가용 사유) 참조 동일성, 자격증명 값 없음",
+        "BidPriceRequestController" to
+            "단건 평가 컨트롤러 — 요청 결과 sealed 갈래(공고 없음/준비됨)를 소진 when 으로 가르는 참조 동일성. " +
+            "인증은 앞단 필터가 지고 이 class 는 자격증명 타입을 받지도 참조하지도 않는다",
+        // M7/7B — 입찰 건의 HTTP 층. 전부 data class 자동 equals 이거나 sealed 싱글턴
+        // when 소진이고, `OperatorCredentialAuthenticator` 의 자격증명 좌표를 참조하지 않는다.
+        "BidCaseResponse" to
+            "입찰 건 응답 값 객체(data class) 자동 생성 equals — 건 id·공고 키·상태·다음 확인 시점뿐, 자격증명 값 없음",
+        "BidCaseResponse\$Companion" to
+            "응답 변환 companion 의 NextCheckpoint sealed 싱글턴 when 소진 — 값 비교가 아니라 객체 동일성, 자격증명 좌표 0",
+        "BidTimelineEntryResponse" to
+            "타임라인 줄 응답 값 객체(data class) 자동 생성 equals — 상태·명령·주체 종류·시각뿐, 본문도 자격증명도 없음",
+        "BidCaseRouting" to
+            "경로·질의 읽기의 어휘 비교(bidKind·state) — 공개 enum 이름 비교이고 자격증명 값 없음 " +
+            "(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
+        "DraftInput" to
+            "초안 요청 값 객체(data class) 자동 생성 equals — 금액·시각뿐, 자격증명 값 없음",
+        "AccountScopedRoutes" to
+            "계정 전용 뿌리 선언의 경로 문자열 비교 — 공개 URL 경로이고 비밀이 아니다",
+        "BidCaseHttp" to
+            "결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(BidCommandResult·TransitionOutcome·RejectionReason) — 객체 동일성, 자격증명 좌표 0",
+        // M7/7C③ — 알림함의 HTTP 층 **둘**. **자리마다 javap 으로 확인했다**: `areEqual` 은
+        // 각각 9·1 이고 **자격증명 좌표는 둘 다 0** 이다(`credential`·`passphrase`·`csrf`·
+        // `presented` 어느 것도 참조하지 않는다). 종류는 data class 자동 equals 와 enum 어휘
+        // 조회 둘뿐이고, `BidCaseResponse`·`BidCaseRequestsKt` 와 같은 형태다.
+        //
+        // 앞 판은 넷이었다 — `NotificationTargetResult$Item`·`$Notice` 는 r1 검토(CR LOW-3)에서
+        // **중간 sealed 타입을 걷어내며 사라졌다**(판독기가 정확한 타입을 돌려준다). 타입이
+        // 없어지면 등재도 함께 걷는다 — 죽은 등재는 다음 사람에게 「이미 판정된 자리」로 읽힌다.
+        "NotificationItemResponse" to
+            "알림 항목 응답 값 객체(data class) 자동 생성 equals — 종류·detail·공고 키·시각·읽음·묶음 계수·" +
+            "합쳐 온 공고 칸뿐이고, 이 표는 자유 문자열을 저장하지 않으므로 운반할 비밀이 애초에 없다",
+        "NotificationInboxRequestsKt" to
+            "요청 읽기의 enum 어휘 조회(`entries.firstOrNull { it.name == token }`) — 공개 어휘 비교이고 " +
+            "자격증명 값 없음(주체는 읽지 않는다 — 계정은 typed 속성, 계약 D-7B-2)",
+        "OpeningResultResponse" to
+            "개찰 결과 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태·관측값·금액 칸뿐, 자격증명 값 없음",
+        "OpeningResultControllerKt" to
+            "상태·잠정 1위 토큰의 sealed 싱글턴 when 소진과 계약 매개변수 **이름** 비교 — 비교 대상이 질의 칸 이름이지 자격증명 값이 아니다",
+        "DeclaredValue" to
+            "질의 매개변수 하나의 값 객체(data class) 자동 생성 equals — 칸 이름과 그 원문 값 목록뿐, 자격증명 값 없음",
+        "DeclaredValueKt" to
+            "계약이 든 **이름**으로 질의 값을 찾는 비교(`firstValue`) — 비교 대상이 칸 이름이지 자격증명 값이 아니다",
+        // M7/7C⑤-b — 결과 조회의 HTTP 층. 성격은 위와 같다(data class 자동 equals · sealed
+        // 싱글턴 when 소진). 어느 항목도 자격증명 값을 참조하지 않는다.
+        "MyBidResultsResponse" to
+            "결과 응답 값 객체(data class) 자동 생성 equals — 건 목록과 집계뿐, 자격증명 값 없음",
+        "MyBidCaseResponse" to
+            "건 하나의 응답 값 객체(data class) 자동 생성 equals — 공고 키·상태 토큰·금액 칸뿐, 자격증명 값 없음",
+        "MyBidAggregateResponse" to
+            "집계 응답 값 객체(data class) 자동 생성 equals — 수와 상태 토큰뿐, 자격증명 값 없음",
+        "MyBidResultResponsesKt" to
+            "대사 결말·개찰 상태·차이·비율 상태의 sealed 싱글턴 when 소진 — 비교 대상이 판정 갈래이지 자격증명 값이 아니다",
+        // M7/7C④ 2b — 프로필의 HTTP 층. 성격은 위 셋과 같다(어휘 조회 · data class 자동 equals ·
+        // sealed 싱글턴 when). `BidCaseRequestsKt` 는 어휘 조회 둘이 `RequestValues.kt` 로 옮겨 가며
+        // **클래스 자체가 사라져** 지웠다(javap 실측: 그 이름의 class 파일 없음).
+        "RequestValuesKt" to
+            "요청 읽기의 enum 어휘 조회 둘(`values.firstOrNull { it.name == raw }` — 단일 값·집합) — " +
+            "공개 어휘 비교이고 자격증명 값 없음(`BidCaseRequestsKt` 에서 옮겨 온 자리다)",
+        "ProfileResponse" to
+            "프로필 조회 응답 값 객체(data class) 자동 생성 equals — 업종·면허명·상호·소재지·나라장터 답·판정 대기 축뿐, 자격증명 값 없음",
+        "ConstructionCapacityResponse" to
+            "시평액 한 행 응답 값 객체(data class) 자동 생성 equals — 면허명·금액·기준 연도뿐, 자격증명 값 없음",
+        // M7/7C④-3 — 체크리스트 응답 둘. 어느 칸도 운영자 입력을 나르지 않는다: 실리는 것은 **닫힌
+        // 어휘의 enum 이름**(`OnboardingItem`)뿐이고 자유 문자열 칸이 없다 — 운반할 비밀이 애초에 없다.
+        "OnboardingChecklistResponse" to
+            "체크리스트 응답 값 객체(data class) 자동 생성 equals — 항목 이름 목록 둘과 짝 목록뿐, 자격증명 값 없음",
+        "AwaitingItemResponse" to
+            "선행 대기 짝 응답 값 객체(data class) 자동 생성 equals — 항목 이름 둘(닫힌 어휘)뿐, 자격증명 값 없음",
+        "ProfileHttp" to
+            "쓰기 결과 → 상태 코드 매핑의 sealed 싱글턴 when 소진(StorageWriteOutcome.Written) — 객체 동일성, 자격증명 좌표 0",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"
@@ -153,3 +246,57 @@ private fun javap(classFile: File): String {
     check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
     return output
 }
+
+/**
+ * 허용된 이름 전수 — 함수 밖 선언이다(함수 50 줄 한도). 위 사유 표와 **키가 같아야** 하고
+ * 그 등식이 이 목록의 존재 이유다: 사유 없는 등재도, 등재 없는 사유도 붉는다.
+ */
+private val ALLOWED_NAMES =
+    setOf(
+        "ApiAuditRecord",
+        "ErrorBody",
+        "StrategyReadResponse",
+        "StrategyReadControllerKt",
+        "EvaluationDryRunResponse",
+        "ResultBuckets",
+        "EditSessionResponse",
+        "EditFieldTokensKt",
+        "EditSessionResponseKt",
+        "NoticeSummaryResponse",
+        "BidPriceRequestResponse",
+        "EvaluationDetailFields",
+        "NotificationFields",
+        "QualificationFields",
+        "BaseAmountFields",
+        "FloorRateFields",
+        "FloorRateGrounds",
+        "PriceAxesFields",
+        "BidPriceVerdictLabelsKt",
+        "BidPriceDropLabelsKt",
+        "BidPriceQualificationLabelsKt",
+        "BidPriceFactLabelsKt",
+        "BidPriceRequestController",
+        "BidCaseResponse",
+        "BidCaseResponse\$Companion",
+        "BidTimelineEntryResponse",
+        "BidCaseRouting",
+        "DraftInput",
+        "AccountScopedRoutes",
+        "RequestValuesKt",
+        "ProfileResponse",
+        "ConstructionCapacityResponse",
+        "OnboardingChecklistResponse",
+        "AwaitingItemResponse",
+        "ProfileHttp",
+        "BidCaseHttp",
+        "NotificationItemResponse",
+        "NotificationInboxRequestsKt",
+        "OpeningResultResponse",
+        "OpeningResultControllerKt",
+        "DeclaredValue",
+        "DeclaredValueKt",
+        "MyBidResultsResponse",
+        "MyBidCaseResponse",
+        "MyBidAggregateResponse",
+        "MyBidResultResponsesKt",
+    )

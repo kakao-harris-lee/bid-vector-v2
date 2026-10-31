@@ -1,0 +1,6 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.PlausibleFloorRateTypo
+import bidvector.sharedkernel.FloorRate
+
+fun forgedPlausibleFloorRate(raw: FloorRate): PlausibleFloorRateTypo = PlausibleFloorRateTypo(raw)

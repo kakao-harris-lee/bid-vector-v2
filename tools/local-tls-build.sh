@@ -42,11 +42,35 @@ done
 # 다시 빌드해도 태그가 안 바뀐다」였다. 둘은 *빌드 step 과 스모크 사이에서 아무도 그 태그를
 # 바꾸지 않는다* 는 전제에서만 같고, 그 전제는 코드에 없었다. 이 기록이 그 전제를 **측정**으로
 # 바꾼다 — 스모크가 자기 재빌드 **전에** 이 파일을 읽어 현재 태그와 대조한다.
+#
+# 기록하는 값은 **이미지 내용 지문**이다(`bidvector_image_fingerprint`, chore 2026-10-28). `.Id` 는
+# 데몬의 이미지 저장소에 따라 index 다이제스트가 되고 그 안에는 빌드마다 바뀌는 provenance 가
+# 들어간다 — 사유와 실측은 `tools/local-tls-env.sh` 의 그 함수 주석에 있다. 진단에 쓸 `.Id` 는
+# 사람이 보는 줄에만 함께 찍고, 등식의 축으로는 쓰지 않는다.
 BIDVECTOR_LOCAL_TLS_ID_FILE="${REPO_ROOT}/build/local-tls/built-image-ids.txt"
 mkdir -p "$(dirname "$BIDVECTOR_LOCAL_TLS_ID_FILE")"
 : > "$BIDVECTOR_LOCAL_TLS_ID_FILE"
 for img in bidvector/web:local bidvector/proxy:local; do
-  id="$(docker image inspect "$img" --format '{{.Id}}')"
-  printf '%s %s\n' "$img" "$id"
-  printf '%s=%s\n' "$img" "$id" >> "$BIDVECTOR_LOCAL_TLS_ID_FILE"
+  fp="$(bidvector_image_fingerprint "$img")" || {
+    echo "$img 을 방금 구웠는데 조회할 수 없다 — 빌드가 태그를 남기지 않았다" >&2
+    exit 1
+  }
+  printf '%s %s (id=%s)\n' "$img" "$fp" "$(docker image inspect "$img" --format '{{.Id}}')"
+  printf '%s=%s\n' "$img" "$fp" >> "$BIDVECTOR_LOCAL_TLS_ID_FILE"
 done
+
+# chore(2026-10-29) — 두 이미지의 caddy 바이너리는 **같아야 한다**. 둘 다 같은 `docker/caddy/` 입력과
+# 같은 caddy-build stage(두 Dockerfile 에 같은 글자로 있다)로 굽는다. 그 stage 의 글자가 한쪽만 바뀌면
+# 판이 갈라진다 — 글자 비교가 아니라 **산출물**의 sha256 으로 잠근다(`-trimpath`·CGO 끔이라 같은 입력은
+# 같은 바이트다).
+caddy_sums=()
+for img in bidvector/web:local bidvector/proxy:local; do
+  sum="$(docker run --rm --security-opt no-new-privileges --entrypoint sha256sum "$img" /usr/bin/caddy | awk '{print $1}')"
+  [ "${#sum}" -eq 64 ] || { echo "$img 의 /usr/bin/caddy sha256 을 읽지 못했다" >&2; exit 1; }
+  caddy_sums+=("$sum")
+done
+if [ "${caddy_sums[0]}" != "${caddy_sums[1]}" ]; then
+  echo "web·proxy 이미지의 caddy 바이너리가 다르다(web=${caddy_sums[0]} proxy=${caddy_sums[1]}) — 두 Dockerfile 의 caddy-build stage 를 맞춘다" >&2
+  exit 1
+fi
+printf 'caddy 바이너리 sha256(web=proxy) %s\n' "${caddy_sums[0]}"

@@ -1,6 +1,11 @@
-# M7/7F-local(7F 본편 D-7F2-2 로 셋) — 이 이미지의 정본 COPY 는 설정 파일 셋이다. 전부 빼고 그것만 다시 넣는다
-# (`docker/app.Dockerfile.dockerignore` 와 같은 형태).
+# 이 이미지의 정본 COPY 는 **두 묶음**이다 — 설정 파일 셋(7F 본편 D-7F2-2)과 caddy 빌드 입력 셋
+# (chore 2026-10-29). 전부 빼고 그 둘만 다시 넣는다(`docker/app.Dockerfile.dockerignore` 와 같은 형태).
 **
+# 설정 — 로컬 site · 운영 site · 두 site 가 `import` 하는 공유 본문.
 !docker/proxy.Caddyfile
 !docker/proxy.prod.Caddyfile
 !docker/proxy.site.caddy
+# chore(2026-10-29) — caddy 바이너리를 이미지 안에서 빌드하는 입력 셋(main.go·go.mod·go.sum).
+!docker/caddy/main.go
+!docker/caddy/go.mod
+!docker/caddy/go.sum

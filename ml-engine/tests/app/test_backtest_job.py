@@ -43,7 +43,7 @@ from ml_engine.inference.policy import InferencePolicy, load_inference_policy
 from tests.evaluation._backtest_fixture import build_files, fixture_dir
 
 _POLICY_DIR = Path(__file__).resolve().parents[2] / "policy"
-_SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v1.yaml"
+_SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v2.yaml"
 _INFERENCE_POLICY = _POLICY_DIR / "inference-v1.yaml"
 
 # 출하 파일에서 낮추는 값 — 전부 **표본 크기·계산량** 축이고 판정식 축이 아니다.
@@ -316,7 +316,7 @@ def test_verdict_carries_the_policy_checksum_and_snapshot_coordinates(
     payload = _main_variant(_run(_snapshot_dir(tmp_path), policy_path).verdict_bytes)
     loaded = load_strategy_backtest_policy(policy_path)
     assert isinstance(loaded, StrategyBacktestPolicy)
-    assert payload["policy_version"] == "strategy-backtest-v1"
+    assert payload["policy_version"] == "strategy-backtest-v2"
     assert len(payload["policy_checksum"]) == 64
     assert payload["snapshot"]["snapshot_id"] == "m6-6g-synthetic-v1"
     assert len(payload["snapshot"]["rows_sha256"]) == 64

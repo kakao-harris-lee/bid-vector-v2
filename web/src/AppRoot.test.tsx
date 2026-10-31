@@ -49,11 +49,15 @@ describe('오류 경계의 자리', () => {
     expect(container.querySelector('[data-testid="route-error"]')).not.toBeNull();
   });
 
+  /**
+   * M7/7E-1 — `/`(화면 B)는 이제 질의를 거는 실화면이라 이 test 의 자리로 쓰지 않는다. 재는
+   * 것은 **셸 ↔ 화면 자리의 구조**이고 그것은 아직 빈 자리인 `/start` 에서 그대로 보인다.
+   */
   it('평소에는 셸 안에 화면 자리가 뜬다', () => {
-    const container = renderAt([...appRoutes], '/');
+    const container = renderAt([...appRoutes], '/start');
 
     expect(container.querySelector('[data-testid="app-shell"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="screen-home"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="screen-onboarding"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="route-error"]')).toBeNull();
   });
 });

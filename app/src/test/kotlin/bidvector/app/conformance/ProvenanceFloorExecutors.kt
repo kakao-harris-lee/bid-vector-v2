@@ -5,20 +5,26 @@ import bidvector.decision.FloorShortfall
 import bidvector.decision.FloorShortfallPolicyData
 import bidvector.decision.FloorUnmeasurableReason
 import bidvector.decision.Frequency
+import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
+import bidvector.decision.PlausibleFloorRate
 import bidvector.decision.ProvenancePolicyData
 import bidvector.decision.ProvenanceRuleId
 import bidvector.decision.ProvenanceRules
+import bidvector.decision.PublishedFloorTrust
+import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.decision.ShortfallComparison
 import bidvector.decision.ShortfallTally
 import bidvector.decision.criticalAssessmentRateFor
 import bidvector.decision.isShortfall
 import bidvector.decision.measureFloorShortfall
+import bidvector.decision.trustPublishedFloorRate
 import bidvector.sharedkernel.AssessmentRate
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.Derived
+import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.FloorRate
@@ -200,6 +206,22 @@ private fun floorRateFrom(input: JsonNode): FloorRate =
         rateFromFractionNode(input.atDollarPath("$.floorRate")),
         FloorRateOrigin.NoticeValue(UNASSERTED_FLOOR_RATE_NOTICE_REVISION),
     )
+
+/**
+ * DEC-10 — `criticalAssessmentRateFor` 는 게이트 통과 값만 받는다. corpus 의 하한율은 전부
+ * 개연 밴드 안이고(실측 `0.875`), 밖의 값이 들어오면 **조용히 계산되지 않고 여기서 멈춘다**.
+ */
+private fun plausibleFloorRateFrom(input: JsonNode): PlausibleFloorRate {
+    val trust = trustPublishedFloorRate(floorRateFrom(input), PUBLISHED_FLOOR_TRUST_POLICY.resolveInitial())
+    check(trust is PublishedFloorTrust.Trusted) {
+        "corpus 의 floorRate 가 DEC-10 개연 밴드 밖이다 — 게이트 판정: $trust"
+    }
+    return trust.rate
+}
+
+private fun EffectiveDatedPolicy<PublishedFloorTrustPolicyData>.resolveInitial():
+    Resolution.Resolved<PublishedFloorTrustPolicyData> =
+    Resolution.Resolved(entries.single().second, PolicyVersion(EffectiveFrom.Initial, "conformance-floor-trust"))
 
 /**
  * `floor-threshold` 축 전용 — `FloorShortfallPolicyData`가 없는 입력(ft-001·003)에서도
@@ -402,7 +424,7 @@ private fun floorShortfallResultProjection(
  */
 private fun floorShortfallExecutor(input: JsonNode): Map<String, Any?> {
     val policy = floorShortfallPolicyFrom(input)
-    val measurement = criticalAssessmentRateFor(bidRateFrom(input), floorRateFrom(input), policy)
+    val measurement = criticalAssessmentRateFor(bidRateFrom(input), plausibleFloorRateFrom(input), policy)
     check(measurement is Measurement.Measured<Derived<AssessmentRate>>) {
         "이 corpus 는 floorRate=0 을 다루지 않는다 — criticalAssessmentRate 가 Unmeasurable 을 냈다"
     }

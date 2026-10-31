@@ -28,6 +28,7 @@ dependencies {
     // 다만 이번은 main — 이 slice가 처음으로 controller/조립에서 도메인 타입을 직접
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
+    implementation(project(":bidding"))
     implementation(project(":shared-kernel"))
     // D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
     // PersistenceWiring의 전략 정책 해소와 같은 형태로 직접 참조 — 위 :strategy와 같은 이유.
@@ -36,7 +37,8 @@ dependencies {
     // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
     implementation(project(":decision"))
     implementation(project(":procurement"))
-
+    // M7/7C⑤-b — wiring 이 AWARD_MATCHING_POLICY 를 위 `qualification` 과 같은 형태로 해소한다.
+    implementation(project(":settlement"))
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
     // HTTP 골격의 유일한 신규 production 좌표(D-6A1-16, scope.md in_scope).
@@ -56,7 +58,6 @@ dependencies {
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
-
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.archunit.junit6)
@@ -92,6 +93,9 @@ dependencies {
         implementation(libs.tomcat.embed.core)
         implementation(libs.tomcat.embed.el)
         implementation(libs.tomcat.embed.websocket)
+        // chore(2026-10-28) — guava 는 BOM 이 아니라 grpc 가 전이로 끌어온다. 최신 grpc 도 같은
+        // 판을 선언하므로 상향 지렛대가 이 하한뿐이다(카탈로그 `guava` 블록에 실측).
+        implementation(libs.guava)
     }
 }
 
@@ -212,6 +216,23 @@ tasks.test {
     systemProperty("bidvector.security.floor.tomcat", libs.versions.tomcat.get())
     systemProperty("bidvector.security.floor.jackson2", libs.versions.jackson2.get())
     systemProperty("bidvector.security.floor.jackson3", libs.versions.jackson3.get())
+    systemProperty("bidvector.security.floor.guava", libs.versions.guava.get())
+}
+
+// DEC-10(D-DEC10-11) — 개연 밴드의 **값 일치** test 가 Python 백테스트 정책 yaml 을 읽는다. Kotlin 출하 정책과
+// `floor.rate_band_*` 가 같아야 한다(사전 등록 실험이라 Python 쪽은 바꾸지 않는다). 경로를 test 가 추측하지
+// 않는다 — 위 `contractInput` 넷과 같은 주입 관례다. **블록을 따로 여는 것도 그 관례**다(바로 위 주석 —
+// 앞 블록의 50줄 축을 건드리지 않는다).
+//
+// **v2 를 읽는다**(D-6GRC-3 · D-DEC10-26) — 6G-rc 가 출하 백테스트 정책을 v2 로 세웠고 이 브랜치가
+// 나중 머지이므로 경로를 옮기는 쪽이 여기다. Kotlin 이 읽는 것은 `floor.rate_band_*` 둘뿐이고 v2 의
+// 두 값이 v1 과 같은 수라 등식은 그대로 선다(값 일치 test 가 그 사실을 잰다 — 추측이 아니다).
+tasks.test {
+    contractInput(
+        "mlBacktestPolicy",
+        "bidvector.ml.backtest-policy",
+        settingsFile("ml-engine/policy/strategy-backtest-v2.yaml"),
+    )
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
@@ -259,6 +280,9 @@ val compatibilitySmoke =
                 "org.apache.tomcat.embed:tomcat-embed-websocket",
                 "com.fasterxml.jackson.core:jackson-databind",
                 "tools.jackson.core:jackson-databind",
+                // chore(2026-10-28) — 같은 이유로 guava 하한도 등재한다. 이 좌표는 **선언한 자리가
+                // 없어**(grpc 전이) 등재하지 않으면 해석이 이 축에서 통째로 빠진다.
+                "com.google.guava:guava",
                 // 카탈로그가 BOM 을 이기는지 — Boot 4.1.1 BOM 은 kotlin 2.3.21 / jupiter 6.0.3 을 관리한다.
                 "org.jetbrains.kotlin:kotlin-stdlib",
                 "org.junit.jupiter:junit-jupiter",

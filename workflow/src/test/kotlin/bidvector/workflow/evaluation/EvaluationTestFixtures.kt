@@ -87,6 +87,7 @@ internal fun skipAnalysis(): MlAnalysisOutcome =
         probabilityScore = null,
         matchedScore = null,
         evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+        floorExclusion = null,
     )
 
 internal fun testNotice(
@@ -265,6 +266,7 @@ internal fun bidNowAnalysis(): MlAnalysisOutcome =
         probabilityScore = null,
         matchedScore = null,
         evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+        floorExclusion = null,
     )
 
 /** (scope.md ①) — ML 미가용 값(기본 사유 `ScoreNotProvided`, 항상-미가용 배선 관례). */

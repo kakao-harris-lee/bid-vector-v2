@@ -64,19 +64,29 @@ describe('생성 타입 클라이언트의 인증 설정 (7D)', () => {
     expect(captured[0]?.csrf).toBeNull();
   });
 
+  /**
+   * **M7/7E-1 r3 — 상태를 바꾸는 요청을 `POST` 로 잰다.** 앞 판은 `DELETE /api/session`(로그아웃)을
+   * 썼는데, 클라이언트 타입이 **(메서드, 경로) 승인 쌍**으로 좁혀진 뒤 그 호출은 컴파일되지
+   * 않는다(이 slice 의 화면이 로그아웃을 부르지 않는다 — 7E-2·3 이 그 쌍을 더할 때 되살린다).
+   * 재는 성질은 그대로다: **면제 집합 밖 메서드에는 기억한 값이 붙는다.**
+   */
   it('상태를 바꾸는 요청에는 기억한 CSRF 값을 붙인다', async () => {
     rememberCsrf('remembered-stamp');
 
-    await apiClient.DELETE('/api/session', { fetch: stub(204, null) });
+    await apiClient.POST('/api/session', {
+      body: { loginName: 'operator', passphrase: 'x' },
+      fetch: stub(201, SESSION_BODY),
+    });
 
-    expect(captured[0]?.method).toBe('DELETE');
+    expect(captured[0]?.method).toBe('POST');
     expect(captured[0]?.csrf).toBe('remembered-stamp');
   });
 
   it('값이 없으면 지어 붙이지 않는다 — 서버가 거부한다(fail-closed)', async () => {
     expect(hasCsrf()).toBe(false);
 
-    await apiClient.DELETE('/api/session', {
+    await apiClient.POST('/api/session', {
+      body: { loginName: 'operator', passphrase: 'x' },
       fetch: stub(401, { code: 'UNAUTHENTICATED', message: '인증에 실패했다', correlationId: 'c' }),
     });
 

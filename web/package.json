@@ -19,7 +19,9 @@
     "api:types:check": "node scripts/check-api-types.mjs",
     "test": "vitest run",
     "gate:tests": "node scripts/check-gate-tests.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:journey": "node scripts/journey-run-begin.mjs && playwright test --config=playwright.journey.config.ts && node scripts/check-journey-results.mjs",
+    "capture:usecase": "node e2e/capture/usecase-captures.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",
@@ -32,6 +34,8 @@
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",

@@ -10,8 +10,10 @@ import javax.sql.DataSource
  * 이 port의 실 구현이 없어 `OpportunityAnalysis`가 프로필을 요구하는 판정 축은 조립될 수
  * 없었다(port KDoc이 「실 구현은 M6」이라 적어 뒀던 공백).
  *
- * **D-6F6-1 — 이 slice 는 표 + 어댑터(읽기·저장)까지다.** 편집 HTTP endpoint 는 6A 로
- * 이관한다 — 이 클래스가 양방향(조회 [current]·저장 [save])을 내면 6A 는 HTTP 만 얹는다.
+ * **읽기 전용이다**(M7/7C④ 2b). 앞 판은 이 클래스가 조회와 저장을 함께 냈고(D-6F6-1), 2b 가
+ * 저장을 port 로 세우면서 같은 클래스가 인터페이스 둘을 구현하게 됐다 — 모양 래칫(D-3)이 그것을
+ * 막는다. 축을 가르는 쪽을 골랐다: 저장은 [JdbcOperatorProfileWriter] 이고, 읽기 자리에 쓰기
+ * 능력이 서명으로 들어오지 않는다(V22 의 reader/store 분리와 같은 규율).
  *
  * **D-6F6-2 — 도메인 타입을 직접 만들지 않는다.** [ProfileFacts]·`OperatorLicenses` 모두
  * `internal constructor`로 닫힌 유일 통로([bidvector.strategy.validate]처럼)가 없는 평범한
@@ -34,20 +36,4 @@ class JdbcOperatorProfileRepository(
                 }
             }
         }
-
-    /**
-     * 저장 진입점 — [OperatorProfilePort]의 일부가 아니다(port 는 조회만 선언한다, D-6F6-1
-     * 값 획득 축 표). `ProfileFacts`의 필드를 그대로 행으로 옮긴다(자기 값을 지어 쓰지
-     * 않는다) — 「누가 이 메서드를 부르는가」의 인가는 6A 소관이다(이 클래스를 조립하는
-     * 주체는 이미 [dataSource]를 쥔 주체다).
-     */
-    fun save(facts: ProfileFacts) {
-        val row = facts.toRow()
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(Sql.UPSERT_PROFILE).use { statement ->
-                statement.bindOperatorProfileRow(1, row)
-                statement.executeUpdate()
-            }
-        }
-    }
 }

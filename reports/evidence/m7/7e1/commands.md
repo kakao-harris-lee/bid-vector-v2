@@ -1,0 +1,516 @@
+# M7/7E-1 실행 명령과 종료 코드
+
+acceptance 는 `.github/workflows/ci.yml` 의 **job 명령 그대로**다(계약 「acceptance」) — `web` job
+전건(여정 e2e 포함)과 Kotlin `check` · `qualityBaseline`. `ml-engine` 은 입력 변경 0 이라 돌리지
+않는다(그 job 의 입력 경로를 이 slice 가 건드리지 않는다). `container` 는 web 이미지 입력이
+바뀌면 도는데, 이 slice 는 `web/src` 와 설정만 바꾸고 `docker/web.Dockerfile` 의 입력 규약을
+바꾸지 않는다 — 다만 번들 내용이 바뀌므로 **승인 전 그 job 의 판정은 PR 체크가 든다**.
+
+호스트는 레인 다섯이 공유하므로 Gradle 명령은 `~/.local/bin/bv-build.sh <명령>`(자리 둘 + 획득
+순간 메모리 재확인)으로 감쌌다. 아래 `cmd` 는 그 래퍼 **안쪽** 명령이다.
+
+**마지막 HEAD 의 결과 정본은 이 문서가 아니라 verifier 와 PR 조치 코멘트다**(evidence 는 자기
+마지막 커밋의 post-state 를 담을 수 없다).
+
+## Phase 1 착수 실측 (구현 전 — 하네스가 설 수 있는가)
+
+- cmd: `java -jar app.jar --bidvector.collection.mode=once …`(fake KONEPS loopback)
+- exit: 0
+- 핵심 결과: 수집 **8.9s** · `/api/notices` 가 `X-Total-Count: 4` · `X-Result-State: MATCHED` 와
+  제목·기관·기초금액+provenance·마감을 낸다 — 수집 → 저장 → API 가 한 사슬이고 DB 직접 INSERT 0
+
+- cmd: `CollectionWiringTest` 의 loopback 허용 test(출하 test, 읽기만)
+- exit: —
+- 핵심 결과: `requireSafeKonepsBaseUri` 가 `http://127.0.0.1:…` 를 받는다(설정 키는
+  `bidvector.koneps.base-url`) → **출하 코드 변경 0 으로 fake 를 꽂는다**
+
+- cmd: 전략 편집 세션 begin → value → confirm(자격 헤더) 뒤 `POST /api/bid-price-requests`
+- exit: 0
+- 핵심 결과: 여력 상한이 **없으면 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED`**, 심은 뒤 **200** 이고
+  G2 13 행이 요구하는 상태·사유·고지가 전부 응답에 있다(D-7E-8 의 근거)
+
+- cmd: 로그인 → 담기 → 초안 → 제출함 → 타임라인(출하 API, 브라우저 세션)
+- exit: 0
+- 핵심 결과: `WATCHING` → `BID_PLANNED` → `BID_RECORDED` · 타임라인 3행 `actorKind: USER` ·
+  기록 뒤 `nextCheckpointKind: NONE`·`reconciliationCandidate: true`
+
+## 구현 중 표적 실측
+
+- cmd: `npm run test`(상태 표시 표 test 넷을 **구현 전에** 먼저)
+- exit: 1
+- 핵심 결과: RED 4 파일(모듈 부재) / 28 통과 — 구현 뒤 11 파일 **107** 통과
+
+- cmd: `npm run test`(화면 B·C test 를 구현 전에)
+- exit: 1
+- 핵심 결과: RED 2 파일 → 구현 뒤 전부 통과. 그 과정에서 **자기 test 가 한 번 정정을 요구**했다:
+  「3안 자리에 숫자 0」을 카드 전체에서 재면 제목의 도메인 용어(「3안」)가 붉히므로 **값 자리**에
+  표지를 따로 두고 그 자리에서만 잰다
+
+- cmd: `npm run test`(testing-library 자동 cleanup 부재 실측)
+- exit: 1
+- 핵심 결과: `globals: false` 라 자동 cleanup 이 등록되지 않아 앞 test 의 DOM 이 남고 같은 표지가
+  둘이 된다 — `afterEach(cleanup)` 을 직접 건다
+
+- cmd: `npm run typecheck`(경로 칸 타입)
+- exit: 2
+- 핵심 결과: 계약이 건 id 를 **경로에서는 문자열**로 선언한다(본문은 int64) — 공개 인자는 본문
+  쪽에 맞추고 경로에 넣는 자리에서만 문자열로 적는다. 되돌림 전이는 **본문이 없다**
+
+## 게이트 술어 추가 — 정적 데이터 입구 (양성 대조 포함)
+
+- cmd: probe A — `src/__probe-data.json` + 그 import
+- exit: typecheck **2**(TS2732) · W-4 **1**
+- 핵심 결과: 두 층이 각각 잡는다. **그 전에 술어를 한 번 고쳤다** — `resolveJsonModule` 을
+  **생략**하는 것은 「꺼짐」이 아니다(`moduleResolution: bundler` 에서 같은 probe 가 typecheck
+  exit 0). 그래서 W-4 는 「파일에 명시된 `false`」를 본다
+
+- cmd: probe B — `?raw` 로 `node_modules` 의 데이터 파일을 **엔트리에서 닿게** 함
+- exit: typecheck **0** · build **1**
+- 핵심 결과: TS 층은 `*?raw` 주변 선언 때문에 못 본다 — 번들 층이 그 자리를 받고 **그 실경로를
+  적는다**. 첫 측정에서 probe 가 엔트리에서 닿지 않아 build 가 초록이었다(죽은 코드는 번들에
+  들어오지 않는다 — 양성 대조의 전제)
+
+- cmd: 두 probe 를 걷은 뒤 게이트 여섯
+- exit: 0
+- 핵심 결과: typecheck · W-4 · build · 카나리 · vitest · lint 전부 0
+
+## 변이 (계약 §3 — 각각 RED)
+
+| 변이 | 바꿔치운 것 | 잡은 층 | exit |
+| --- | --- | --- | --- |
+| M1 화면이 값을 리터럴로 | 카드 제목을 **단위 test fixture 와 같은** 리터럴로 | 여정 e2e(DOM ↔ 같은 실행의 API 대조) — 단위는 **초록** | vitest 0 · journey **1** |
+| M2a exhaustive 표에서 행 제거 | 게시 하한율 상태 표의 한 행 | typecheck(`satisfies`) + 표 키 집합 test | typecheck **2** · vitest **1** |
+| M2b 표 조회에 기본 분기 | 조회 자리에 폴백 추가 | 「표 밖의 값에 문면을 지어내지 않는다」 test(typecheck 는 지나간다) | typecheck 0 · vitest **1** |
+| M3 「아직 산출 안 함」 자리에 숫자 | 값 자리에 금액 한 조각 | 값 자리 숫자 부재 단언(단위 + e2e) | vitest **1** · journey **1** |
+| M4 생성 클라이언트 밖 호출 | 화면에서 직접 서버 호출 | eslint(보조 층) — typecheck·vitest 는 지나간다 | lint **1** |
+
+### r1 이 더한 변이 (같은 표 형식)
+
+| 변이 | 바꿔치운 것 | 잡은 층 | exit |
+| --- | --- | --- | --- |
+| H-1 요청 본문의 지어낸 값 | 선언값을 리터럴 `0` 으로 | 호출 인자 단언 | vitest **1** |
+| v M-2 머리의 리터럴 | 건 상태·다음 확인 시점을 **응답과 다른** 고정값으로 | 여정 ③ 의 DOM↔API 대조 | journey **1** |
+| v M-3 ⓐ 화면이 직접 호출 | 화면이 `apiClient` 를 import 해 목록 밖 `/api/strategy` | W-4 의 호출 능력 집합 등식 | typecheck 0 · lint 0 · **W-4 1** |
+| v M-3 ⓑ 목록 밖 operation | `queries.ts` 에 목록 밖 호출 한 줄 | operation 집합 등식(AST) | typecheck 0 · W-4 0 · **test 1** |
+| v M-4 ⓐ 쿼리 접미 import | `src` 안 `rows.txt?raw` 정적 import | W-4 의 쿼리 접미 금지 · 번들 종류 허용 목록 | typecheck 0 · **W-4 1** · **build 1** |
+| v M-4 ⓑ 동적 쿼리 import | 리터럴 동적 `import('./rows.md?raw')` | 같은 층 | **W-4 1** |
+
+**응답과 같은 값을 쓴 리터럴은 DOM↔API 대조를 지나간다**(실측) — 화면이 옳은 값을 보이고 있으므로
+그것이 맞는 거동이다. 그 자리는 표 등식과 G2 13 문면 test 가 받는다.
+
+**M1 이 하네스의 구멍을 드러냈다**: 첫 측정에서 여정 e2e 가 **초록**이었다(journey exit 0).
+변이가 안 잡힌 것이 아니라 **재지 않은 것**이다 — `vite preview` 는 빌드 산출물을 섬길 뿐이고
+하네스가 빌드를 돌리지 않아 바꾸기 전 번들을 봤다. 하네스가 직접 짓게 하고(실측 2.23s) 같은
+변이를 다시 재니 **exit 1**. CI 는 build step 이 앞에 있어 가려져 있던 자리다.
+
+## 여정 e2e (하네스 전건)
+
+- cmd: `npm run test:e2e:journey`
+- exit: 0
+- 핵심 결과: **33.0s** — 하네스(묵은 컨테이너 수거 · 버릴 Postgres · fake KONEPS · 수집 러너
+  exit 0 · 계정 명령 exit 0 · 전략 개정 1 · 번들 빌드 · preview) + 여정 3건 통과. fake KONEPS
+  요청 **2건**(공고 목록 오퍼레이션 하나 × 쪽 하나 × 재조회 0)
+
+- cmd: 같은 명령 뒤 잔존 계수
+- exit: 0
+- 핵심 결과: 컨테이너 **0** · 하네스·fake·preview 프로세스 **0** · OS 임시의 맥락 파일 **0**.
+  첫 판은 실행마다 컨테이너가 하나씩 남았다(세 개 실측) — Playwright 가 기본으로 webServer
+  프로세스 그룹을 SIGKILL 하기 때문이고, `gracefulShutdown`(SIGTERM) + 시작 때 수거 +
+  동기 종료 핸들러로 닫았다
+
+- cmd: 산출물 누출 스캔(참조형 — `-f config/quality/leak-patterns.txt`)
+- exit: 1(일치 0건)
+- 핵심 결과: 성공 실행의 산출물은 실행 요약 하나뿐이고 trace 0(실패 시에만) · 스캔 일치 **0**
+
+- cmd: 빌드 산출물에서 e2e·하네스 어휘 계수
+- exit: 0
+- 핵심 결과: preview 입구 두 환경변수 이름 · 하네스 스크립트 이름 둘 · DB 사용자 · 전략 칸
+  이름 · 자격 헤더 이름이 **각각 0 건**, `process.env` 참조 0 건
+
+## CI 와 one-command 축어 일치
+
+- cmd: `ci.yml` `web` job 의 `run` 명령과 `one-command-check.sh` web 절을 기계 대조
+- exit: 0
+- 핵심 결과: CI 전용(브라우저 시스템 패키지 설치) 하나를 뺀 **13 명령이 순서까지 같다**
+
+- cmd: `bash tools/workflow-step-refs-check.sh .github/workflows/ci.yml`
+- exit: 0
+- 핵심 결과: job 4 · id 15 · `steps.<id>` 참조 18 · 매달린 참조 0
+
+## acceptance 전건
+
+- cmd: `web` job 명령 **W-1 ~ W-11** 순서 그대로(`npm ci` · lint · typecheck · gate:src-tree ·
+  api:types:check · test · gate:tests · build · gate:boundary-canary · 브라우저 설치 · 셸 스모크)
+- exit: **전부 0**
+- 핵심 결과: vitest **11 파일 109** · 생성 타입 바이트 등식(146,848 bytes) · 경계 전제 성립
+  (`resolveJsonModule=false 명시` · `src` 안 정적 데이터 파일 0 · 프로그램 파일 229) ·
+  게이트 test 전부 수집·통과 · 번들 경계 **활성**(메인·워커 두 그래프) · 셸 스모크 2 통과
+
+- cmd: `npm run test:e2e:journey`(W-13)
+- exit: 0
+- 핵심 결과: 여정 3건 통과 **52.6s**(같은 호스트에서 다른 레인 둘이 빌드 중 — 단독 실행 실측은
+  33.0s). 잔존 컨테이너·프로세스 0
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 29m 45s` · 401 actionable(226 실행 · 136 캐시 · 39 up-to-date) ·
+  `:check` · `:qualityBaseline` · `:contractGate` 가 모두 돌았다. 이 slice 는 Kotlin `src` 를
+  건드리지 않으므로 그 전건은 **회귀 부재의 확인**이다 — 바뀐 입력은 `ci.yml`·`one-command`
+  두 공유 파일뿐이고 그 둘을 읽는 게이트가 `check` 안에 있다(워크플로 step 참조 검사)
+
+- cmd: `./gradlew --no-daemon :app:bootJar`(W-12)
+- exit: 0
+- 핵심 결과: **17s · 39 tasks 전부 up-to-date** — Kotlin 입력이 바뀌지 않았다는 사실이 이 계수로
+  선다(이 slice 는 app.jar 의 **소비자**이고 입력이 아니다)
+
+- cmd: `npm run test:e2e:journey`(여정 독립성 수정 뒤 최종)
+- exit: 0
+- 핵심 결과: 3건 통과 **31.6s** · 잔존 컨테이너·프로세스·맥락 파일 **0**
+
+`container` job 은 돌리지 않았다 — 그 job 의 web 쪽 단언은 **서버 응답**(마운트 지점 ·
+번들 자산 200·content-type · SPA fallback)이고 이 slice 는 `index.html` 과 자산 규약을 바꾸지
+않는다. 이미지에 들어가는 것은 빌드 산출물뿐이라 새 devDependency 는 런타임 단계에 없다
+(Dockerfile 의 runtime 단계가 `dist` 만 복사한다). 그 job 의 판정은 PR 체크가 든다.
+
+## 동결 전 main 병합 라운드 (팀장 지시 2026-10-29)
+
+main 이 **`bb6a187e`** 가 됐다(PR #101 — caddy 직접 빌드 · app 베이스 상향). base `78d97c59` 의
+`container` job 은 취약점 DB 갱신으로 붉으므로 그 수정을 **병합해 받는다**.
+
+- cmd: `git merge origin/main`
+- exit: 0
+- 핵심 결과: 충돌 0. **합집합 검증**(충돌 0 자동 병합이 같은 본문을 접는 함정) — 내 `web` job
+  표지 **8 그대로** · 남의 `container` job 주석 **1** · YAML 파싱 job 4 · `web` step 20 ·
+  두 job 의 timeout 30 · step 참조 검사 매달린 참조 0. 병합이 들여온 경로 20 개 중 내 in_scope
+  와의 교집합은 `ci.yml` **한 건**이고 그 hunk 는 `container` job 주석이라 겹치지 않는다
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`(병합 트리)
+- exit: 0
+- 핵심 결과: **17s · 392 actionable 중 357 up-to-date · `qualityBaseline` UP-TO-DATE** —
+  Gradle 의 up-to-date 회계가 「병합이 Kotlin 게이트 입력을 바꾸지 않았다」를 스스로 말한다
+  (경로 교집합 계수와 같은 결론: Kotlin 이 읽는 `config/quality` 열 파일 ∩ 병합이 가져온 다섯
+  파일 = **0**)
+
+- cmd: `web` job 명령 재측정(W-2~W-9 · W-11 · W-12 · W-13)
+- exit: **전부 0**
+- 핵심 결과: 축어 일치 **True**(13 명령) · 여정 3건 통과 **35.5s** · 잔존 0
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `8117a921`)
+- exit: 0
+- 핵심 결과: **복원 기준이 둘로 갈렸다** — 내 파일 18 은 base, 공유 `ci.yml` 은 병합된 main
+  고정 SHA. 두 diff 모두 exit 0 이고 「내 표지 0 · 남의 표지 1」 계수가 선다. 되돌린 뒤
+  typecheck · vitest(5 파일 28) · 게이트 여섯 · 7A 셸 스모크 전부 0
+
+## 수정 라운드 r1 (재작업 1/5) — CR `request_changes`(HIGH 2) · verifier M 6 · L 8
+
+처분은 finding 별 커밋이고 각 커밋 메시지가 그 자리의 실측을 든다. 아래는 **측정만** 모은다.
+
+- cmd: 계약에서 「진행 중」을 세는 표면 찾기(H-1 처방 ⓐ)
+- exit: —
+- 핵심 결과: **없다** — `listBidCases` 는 `kind`(필수)·단일 `state`(선택)뿐이고 집계도
+  `X-Total-Count` 도 없다. 계약 전체에서 `currentActiveBids` 는 **요청 칸과 echo** 로만 나타난다.
+  그래서 ⓑ(운영자 선언 + 응답 echo 표시 + 알려진 제한 + 후속 Kotlin 후보)로 갔다
+
+- cmd: 여정 네 건을 **각각 단독** 실행(v M-1)
+- exit: 전부 0
+- 핵심 결과: 25.0s · 28.2s · 26.2s · 24.8s — 앞 판은 ③ 이 단독에서 2/2 재현 실패였다
+
+- cmd: `CI=1` 강제 실패 뒤 산출물 종류·누출 스캔(v M-6)
+- exit: 1(의도된 실패)
+- 핵심 결과: 산출물이 **스크린샷·error-context·실행 요약** 셋이고 `trace.zip` **0** · 참조형 스캔
+  **일치 0건** · `error-context.md` 의 20자 이상 토큰 전수가 spec 식별자(난수 값 0)
+
+- cmd: 실행 중 app 의 `/proc/<pid>/cmdline` 계수(CR L-4)
+- exit: 0
+- 핵심 결과: 비밀 어휘 **계수 0** — `--spring.config.import` 경로만 남는다(앞 판은 DB 자격·운영자
+  자격·비밀 문구·서비스 키가 argv 였다)
+
+- cmd: 두 Playwright 설정의 수집 목록(OQ-2)
+- exit: 0
+- 핵심 결과: 셸 스모크 **2 tests in 1 file** · 여정 **4 tests in 1 file** — `testIgnore` 가 실제로
+  여정을 뺀다. 그 측정이 위생 문제를 드러냈다(맥락 파일을 모듈 적재 때 읽어 수집이 실행 상태에
+  묶여 있었다 — 지연 읽기로 바꿨다). 맞지 않는 `-g` 필터도 exit 1 이라 「0 건 수집이 조용히
+  초록」인 경로는 없다
+
+- cmd: `git checkout --` 가 미커밋 편집을 지운 사실
+- exit: —
+- 핵심 결과: 변이 되돌림이 **아직 커밋되지 않은 H-2 편집**(화면 C 의 `onError` 셋·실패 얼굴)을
+  함께 지웠고 그 상태가 H-2 커밋에 담겼다. 이력을 되쓰지 않고 뒤 커밋에서 다시 올렸다 — 화면 B
+  쪽은 그 되돌림을 타지 않아 온전했다(계수로 확인)
+
+### r1 acceptance 전건
+
+- cmd: `web` job **W-1 ~ W-13** 순서 그대로
+- exit: **전부 0**
+- 핵심 결과: vitest **12 파일 143** · 게이트 test 전부 수집·통과 · 번들 경계 활성 · 셸 스모크 2 ·
+  **여정 4건 27.9s** · 여정 **단독 실행 넷도 각각 0**(24.0s · 25.5s · 25.2s · 23.7s) ·
+  잔존 컨테이너·run-state·맥락 파일 **0**
+
+- cmd: `./gradlew --no-daemon check qualityBaseline` · `:app:bootJar`
+- exit: 0 · 0
+- 핵심 결과: `BUILD SUCCESSFUL in 24s` · 392 중 **357 up-to-date** · `qualityBaseline` UP-TO-DATE —
+  r1 이 Kotlin 입력을 건드리지 않았다는 사실이 Gradle 의 회계로 선다(바뀐 것은 `web/**` 와
+  `ci.yml` 주석뿐). 호스트가 포화라 자리 대기에 약 16분이 들었다(빌드 자체는 24s)
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `ed827b22`)
+- exit: 0
+- 핵심 결과: 복원 **20** · 삭제 **31**(r1 이 파일 다섯을 더했다) · 두 기준의 diff 모두 exit 0 ·
+  **트리 동일성**(되돌린 `web` 트리 해시 == base) · 「내 표지 0 · 남의 표지 1」 · 되돌린 뒤
+  typecheck·vitest(5 파일 28)·게이트 여섯·셸 스모크 전부 0
+
+## 수정 라운드 r2 (재작업 2/5) — CR `request_changes`(새 HIGH 1) · verifier M 3 · L 3
+
+- cmd: `docker ps -aq --filter name=`(읽기만, 리뷰 재현)
+- exit: 0
+- 핵심 결과: 이 호스트에서 `docker ps -aq` 와 **같은 45** — 빈 표지를 그대로 넘기면 docker 가
+  그 필터를 「전부」로 읽는다. 그것이 H-1 의 파괴 범위다
+
+- cmd: 묵은 락 수거의 양성 대조(`run` 주입, docker 미호출)
+- exit: 0
+- 핵심 결과: 빈 표지 → **호출 0 · 수거 0** · 옳은 표지 → **앵커 필터로 그 하나만** · 표지가
+  아닌 꼴 열하나 전부 거부. 여정 뒤 호스트 컨테이너 **45 그대로**
+
+- cmd: 호출 능력 우회 양성 대조 넷(재수출 · `export *` · 허용 자리 재수출 · 동적 import)
+- exit: 전부 1
+- 핵심 결과: typecheck 0 인데 **W-4 1** — 간선 종류를 적는다. 별칭 + 목록 밖 경로는
+  **typecheck 2**(타입 좁히기가 첫째 층이다)이고 operation 집합 test 도 1
+
+- cmd: operation 술어의 모르는 꼴 다섯(계산 접근·구조 분해·별칭·인자 전달·참조 내보내기)
+- exit: 1
+- 핵심 결과: 전부 `unresolved` 로 센다. 그 가운데 셋은 **술어를 고치는 과정에서 이 test 가
+  잡았다**(초기값 자리를 선언 이름으로 오인했다)
+
+- cmd: 자산 우회 양성 대조(`src/screens/rows.txt` + `new URL(…, import.meta.url)`)
+- exit: 1
+- 핵심 결과: typecheck 0 인데 **W-4 1**(「아는 종류가 아닌 파일」). 자산 층은 W-4 가 먼저 막아
+  빌드 수준 재현이 안 되므로 그 술어를 등록 test 로 잠갔다(둘째 그물)
+
+- cmd: `serial` 을 걷고 강제 실패 한 건
+- exit: 1(의도된 실패)
+- 핵심 결과: 나머지가 **그대로 보고된다**. **이 줄의 수는 그 라운드 트리에서 재현되지 않는다** —
+  해제가 커밋에 들어가지 않았기 때문이고, 원인과 재측정(1 failed · 3 passed)은 아래 r3 절이 든다.
+  걷자마자 실제 상호작용이 드러났다: 쓰기 401 뒤 재읽기도 401 이라 화면이 로그인 얼굴로 바뀐다
+
+- cmd: `--repeat-each=2 -g '여정 ②'`
+- exit: 0
+- 핵심 결과: **2 passed** — 이미 담긴 건의 모양(「담긴 건」)을 대안으로 단언한다
+
+### r2 acceptance 전건
+
+- cmd: `web` job W-1~W-13 + 여정 단독 넷
+- exit: **전부 0**
+- 핵심 결과: vitest **13 파일 174** · 여정 4건 28.4s · 단독 넷 각각 0 · 잔존 0.
+  **전건이 결함 하나를 잡았다**: 하네스 단위 test 가 Playwright 의 기본 `testMatch` 에 걸려
+  셸 스모크(W-11)가 exit 1 이었다(vitest 쪽 게이트는 초록) — 두 설정의 수집을 `*.spec.ts` 로
+  못박고 계수로 확인했다(스모크 2 · 여정 4)
+
+- cmd: `./gradlew --no-daemon check qualityBaseline` · `:app:bootJar`
+- exit: 0 · 0
+- 핵심 결과: `BUILD SUCCESSFUL in 20s` · 392 중 **357 up-to-date** · `qualityBaseline` UP-TO-DATE
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `aab938e7`)
+- exit: 0
+- 핵심 결과: 복원 **21** · 삭제 **34** · 두 기준 diff 모두 exit 0 · **트리 동일성**(되돌린 `web`
+  트리 해시 == base) · 「내 표지 0 · 남의 표지 1」 · 되돌린 뒤 게이트 여섯·셸 스모크 0
+
+## 수정 라운드 r3 (재작업 3/5) — CR `request_changes`(HIGH 1) · verifier M 3 · L 2
+
+- cmd: r2 의 「여정 `serial` 해제」 커밋에서 `mode: 'serial'` 계수
+- exit: 0
+- 핵심 결과: **1** — 그 변경이 트리에 없었다. 원인은 **변이 측정 뒤의 `git checkout --`** 이다:
+  해제가 아직 커밋되지 않은 채로 변이를 되돌리며 그 편집까지 함께 지웠고, 그 뒤 커밋은 401
+  단언 변경만 담았다(r1 의 같은 사고와 같은 꼴). 이 라운드는 모든 변이를 **편집 → 커밋 →
+  측정** 순서로 돌렸다
+
+- cmd: `serial` 을 실제로 걷고 전건 · 강제 실패 한 건
+- exit: 0 · 1(의도된 실패)
+- 핵심 결과: 전건 **4 passed** · 강제 실패에서 **1 failed · 3 passed**(`did not run` **0**) —
+  나머지가 그대로 보고된다. 되돌림 뒤 커밋된 수정은 남아 있다(`serial` 계수 0 · 얼굴 단언 1)
+
+- cmd: v M-1 양성 대조 셋(로컬 재수출 · 승인 경로의 미승인 메서드 · 캐스팅 쓰기)
+- exit: 1 · 2 · 1
+- 핵심 결과: `DELETE /api/session` 은 **typecheck 2**(TS2345 — 그 메서드 키가 `never`) ·
+  캐스팅 쓰기는 operation 술어 **1**(`AsExpression` 을 모르는 꼴로 센다). **첫 대조가 처음엔
+  초록이었다** — 심볼 참조 층은 「허용 자리 **밖**의 참조」를 세므로 소비자가 생기기 전에는
+  붉지 않다. 그래서 **재수출 자체**를 금해 가능 조건을 닫았고, 그 뒤 **W-4 1**
+
+- cmd: 승인 목록을 쌍으로 바꾼 뒤 수집기 이름 대조
+- exit: 0
+- 핵심 결과: 옛 이름(`…_PATHS`)으로 읽던 수집기가 **빈 배열**을 내 등식이 항진명제가 될
+  자리였다 — 쌍의 꼴(`^(GET|POST|…) /api/`)을 test 가 전수 단언해 그 자리를 닫았다
+
+- cmd: v M-2 · CR M-4 양성 대조 셋 + 빌드 수준 확인
+- exit: 1 · 1 · 1 / 0
+- 핵심 결과: `rows.css` + `new URL(…, import.meta.url)` · `web/public/rows.txt` 존재 ·
+  `publicDir: false` 선언 제거 — **각각 W-4 1**. `public/` 을 둔 채 빌드하면 `dist` 에 그 파일이
+  **없다**(복사가 막힌다)
+
+- cmd: 하네스로 서버 거동 직접 측정 — 중복 기록(verifier·CR 판독이 엇갈린 자리)
+- exit: 0
+- 핵심 결과: **verifier 가 맞다.** `BID_RECORDED` 인 건에 같은 본문을 다시 보내면 **200** 이고
+  `bid_record` 가 **세 행**(`record_seq` 0·1·2) — 셋째는 **금액이 다른데도** 받았다. 타임라인은
+  `caseVersion` 2·3·4 로 `BID_RECORDED → BID_RECORDED` 전이 둘을 적는다. 초안도 같다
+  (`draft_seq` 0·1·2). **되돌림만** 409 다. upsert 수렴이 아니다 — 재전송은 멱등이 아니다
+
+- cmd: 재시도 가드 변이 셋(`caseVersion` 가드 제거 · 투찰가 재시도가 묵은 값 · 투찰가 `onError` 제거)
+- exit: 1 · 1 · 1
+- 핵심 결과: 각각 **그 자리의 test 하나만** 붉다(나머지 39 통과)
+
+- cmd: 락 소유자 생존 판정 주입 test
+- exit: 0
+- 핵심 결과: 살아 있음 · 죽음 · pid 재사용 · 시작 시각 미지 넷과 표지 꼴 일곱을 센다.
+  **docker 호출 0** — 파괴적 대조를 단위 test 로 두지 않는다(공유 호스트)
+
+- cmd: a11y·사유 분기 변이 셋(`useHint` 배선 제거 · 담기 `onError` 제거 · 범위 사유 접기)
+- exit: 1 · 1 · 1
+- 핵심 결과: 각각 그 test 하나만 붉다. **둘째 변이는 처음에 적용되지 않았고**(정규식이 실제 꼴과
+  달랐다) 그 run 의 초록은 측정이 아니었다 — 꼴을 맞춰 다시 쟀다
+
+### r3 acceptance 전건
+
+- cmd: `web` job W-1~W-13(명령 그대로) · 단독 여정 넷 · 강제 실패 한 건
+- exit: **전부 0**(강제 실패만 1 — 의도)
+- 핵심 결과: vitest **13 파일 200** · 셸 스모크 **2** · 여정 **4 passed 30.4s** · `:app:bootJar`
+  **6s** · 단독 넷 각각 0 · 강제 실패에서 **1 failed · 3 passed**. **전건이 결함 하나를 잡았다**:
+  새 test 가 계약 **밖** 고지 코드를 타입 그대로 넘겨 W-3 이 **exit 2** 였다 — W-6 은 초록이었다
+  (vitest 는 타입을 보지 않는다). 그 상황은 wire 에서만 생기므로 그 자리에서만 캐스팅으로 만든다
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 19s` · 392 중 **357 up-to-date** (Kotlin 입력 변경 0)
+
+- cmd: `web` job 명령 ↔ `tools/one-command-check.sh` 축어 대조(기계)
+- exit: 0
+- 핵심 결과: job 의 `run` **열넷** 전부 one-command 안에 있다(이 라운드의 `ci.yml` 변경은
+  주석뿐이라 명령 집합이 움직이지 않았다)
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `8eb48df8`)
+- exit: 0
+- 핵심 결과: 복원 **22** · 삭제 **34** · **트리 동일성**(되돌린 `web` 트리 해시 == base,
+  `ci.yml` blob == 병합된 main) · 「내 표지 0 · 남의 표지 2」 · 되돌린 뒤 vitest 5 파일 28 ·
+  게이트 여섯과 셸 스모크 0. **앞 라운드 장부의 흠 하나를 잡았다** — 계수는 21 인데 복원 블록은
+  스물만 열거했다(`web/src/api/client.ts` 누락). 이 라운드는 블록을 기계 목록과 대조해 차집합이
+  양쪽 다 빈 것을 확인했다
+
+- cmd: 라운드가 만든 새 파일 ↔ in_scope 대조
+- exit: 0
+- 핵심 결과: 새 파일 **0** — 이 라운드가 고친 산출물 경로는 **열아홉**이다(`ci.yml` + `web/**`
+  열여덟; evidence 셋은 따로). 변경 경로 전부 in_scope 안이라 계약 갱신이 필요하지 않다
+
+## 승인 전 마지막 일괄 (r4) — verifier `ready-for-review`(M 2 · L 3) · CR `approve`(M 3 · L 11)
+
+- cmd: v M-1 재현 — `import * as C from './client'; export const ns = C;`
+- exit: 1
+- 핵심 결과: 앞 판은 **정적 다섯 층이 모두 0** 이었다(그 꼴에는 `apiClient` 라는 이름이 나타나지
+  않고 심볼 추적이 이름으로 걸러졌다). 이제 **두 층**이 각각 적는다 — import 꼴(네임스페이스
+  금지)과 export 타입 전수
+
+- cmd: `export const cc = apiClient` · `export default apiClient`
+- exit: 1 · 1
+- 핵심 결과: 둘 다 **export 타입 전수**에서 선다(이름을 바꾸거나 default 로 내보내도 타입이 같다)
+
+- cmd: CR L-6 재현 — 계약에 없는 메서드를 목록에(`{ method: 'PUT', path: '/api/notices' }`)
+- exit: 2
+- 핵심 결과: `TS2344`(「`'put'` 이 제약 `never` 를 만족하지 않는다」). **이 단언을 두 번 틀렸다**:
+  교집합(`& keyof paths[P]`)은 생성기가 적는 없는 메서드 키를 통과시키고, 그 키는 `put?: never`
+  라 **optional** 이므로 속성 타입이 `never` 가 아니라 `undefined` 다(probe 로 확인). 세 번째
+  판에서 양성 대조가 붉어졌다 — **초록인 단언은 없는 단언과 같은 값이다**
+
+- cmd: v M-2 재현 — `src/rows.css`(13.9KB JSON) + `index.css` 의 `url('./rows.css')`
+- exit: W-4 0 · **build 1**
+- 핵심 결과: 번들이 그 데이터를 `assets/rows-*.css` 로 내보내려 할 때 **자산 술어가 그 이름을
+  적고 멈춘다**. W-4 가 0 인 것은 정상이다(파일 종류 허용 목록은 `.css` 를 받는다) — 이 축은
+  내보내는 쪽이 진다
+
+- cmd: CR M-1 재현 — 최상위 `publicDir: 'static'` + `test:` 블록의 미끼 `publicDir: false`
+- exit: 1
+- 핵심 결과: 「대입이 정확히 하나가 아니다(계수 2)」. 앞 판은 **파일 안 마지막 대입**을 봐서
+  초록인 채 입구가 열렸고 성공 문면이 그 명제를 **주장**했다
+
+- cmd: 락 주입·실 파일시스템 대조(docker 호출 0)
+- exit: 0
+- 핵심 결과: `EPERM` 축 둘이 **살아 있음**으로 선다(실제 pid 1 포함 — 앞 판은 그것을 죽음으로
+  셌다) · 버릴 임시 디렉터리에서 **둘째 획득이 실패**하고 첫 표지가 그대로다 · 죽은 소유자의
+  락은 그 컨테이너를 걷고 이어받는다 · 획득이 생존 판정을 **부르는지**도 센다(앞 판은 그 블록을
+  지워도 초록이었다)
+
+- cmd: 자산 모양 술어 잠금(새 모듈)
+- exit: 0
+- 핵심 결과: 자산이 하나 늘 때 · css 가 사라질 때 · 전수가 0 일 때 · 디렉터리가 섞일 때 각각
+  멈춘다. 여정의 허용 집합이 **산출물에서 그냥 파생**되던 자리를 이 술어가 대신 진다
+
+- cmd: 잠금 변이 넷(`Field` 배선 · 401 `.some()` 두 화면 · 되돌림 재시도)
+- exit: 1 · 1 · 1 · 1
+- 핵심 결과: 각각 그 test 만 붉다. **앞 판은 넷 다 지워도 200 초록이었다**
+
+### r4 acceptance 전건
+
+- cmd: `web` job W-1~W-13(명령 그대로) · 단독 여정 넷 · 강제 실패 한 건
+- exit: **전부 0**(강제 실패만 1 — 의도)
+- 핵심 결과: vitest **14 파일 224** · 셸 스모크 2 · 여정 **4 passed 30.5s** · 단독 넷 각각 0
+  (26.0s · 27.4s · 28.0s · 33.4s) · 강제 실패에서 **1 failed · 3 passed**(`did not run` 0)
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 38s` · 392 중 357 up-to-date (Kotlin 입력 변경 0)
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `fb9cf54a`)
+- exit: 0
+- 핵심 결과: **장부 ↔ 기계 목록 차집합 양쪽 빈 출력**(⓪ — 이 대조를 측정 안으로 넣었다) ·
+  복원 **22** · 삭제 **36** · **트리 해시 동일성** 셋 · 「내 표지 0 · 남의 표지 2」 · 되돌린 뒤
+  vitest 5 파일 28 · 게이트 여섯과 셸 스모크 0 · **내 산출물 경로 차이 0 건**
+
+- cmd: 라운드가 만든 새 파일 ↔ in_scope 대조
+- exit: 0
+- 핵심 결과: 새 파일 **둘**(`web/e2e/harness/bundle-shape.{mjs,test.mjs}`) — in_scope 의
+  `web/e2e/harness/**` 안이라 계약 갱신이 필요하지 않다. 그 test 는 만드는 커밋에서
+  `config/gate-tests.txt` 에 등재했다(W-7 로 실행 확인)
+
+## 머지 전 마지막 일괄 (r5) — verifier `ready-for-review`(제품 결함 0) · CR `approve`
+
+- cmd: verifier 의 락 경합 재현 스크립트(주입, docker 0) — 수거 사이에 남이 이어받는 꼴
+- exit: 1(의도된 거부)
+- 핵심 결과: 앞 판은 **둘 다 `{attempt:2}` 성공**이고 B 가 A 의 살아 있는 락을 지웠다. 이제 B 가
+  「묵은 락이 그 사이 바뀌었다 — 남의 락을 지우지 않는다」로 멈추고 **A 의 표지가 그대로**
+  남는다(락 내용으로 확인) · 임시 파일 잔존 0
+
+- cmd: 락 획득 경합 주입 test 다섯(사라진 자리 · 바뀐 자리 · 못 읽는 표지 · 살아 있는 소유자 ·
+  내용 그대로)
+- exit: 0
+- 핵심 결과: `EEXIST` 와 읽기 사이에 락이 사라지면 **재시도**(앞 판은 `ENOENT` 로 죽었다) ·
+  바뀐 자리는 **지우지 않고** 멈춤 · 못 읽는 표지도 그 자리를 지우지 않는다. `link` 레시피라
+  **빈 락이 원리적으로 생기지 않는다**(표지를 다 쓴 뒤 건다)
+
+- cmd: 생존 판정의 기본값(모르는 코드)
+- exit: 0
+- 핵심 결과: `ESRCH` 만 죽음이고 `EPERM`·`EINVAL`·모르는 코드는 **살아 있음**이다 — 모듈이
+  선언한 방향(「모르면 살아 있다」)과 기본값을 맞췄다
+
+- cmd: W-4 성공 문면 좁히기(판정 로직 변경 0)
+- exit: 0
+- 핵심 결과: 「client import 꼴 == 이름 지정 하나」 → 「**이 게이트가 client 로 해석한** import
+  는 이름 지정 하나」 · 「export 전수에 그 능력 타입 0」 → 「export 가운데 **타입이 동일한** 것
+  0」 · 「publicDir 대입 하나」 → 「publicDir **속성 대입**(단축 속성 제외)」. 비켜 가는 꼴은
+  `OPEN-7E-GATE-RESIDUAL` 을 가리킨다 — **술어가 세우지 못하는 명제를 출력이 주장하지 않는다**
+
+### r5 acceptance 전건
+
+- cmd: `web` job W-1~W-13 · 단독 여정 넷 · 강제 실패 한 건
+- exit: **전부 0**(강제 실패만 1 — 의도)
+- 핵심 결과: vitest **14 파일 230** · 셸 스모크 2 · 여정 **4 passed 31.4s** · 단독 넷 각각 0
+  (27.0s · 26.6s · 27.1s · 30.0s) · 강제 실패 **1 failed · 3 passed**. 락 획득을 `link` 레시피로
+  바꾼 뒤에도 하네스가 여섯 번 모두 정상 기동했다
+
+- cmd: `./gradlew --no-daemon check qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 17s` · 392 중 357 up-to-date
+
+- cmd: 되돌림 재측정(버릴 clone, 실측 HEAD `4fd61acc` — 하네스 파일이 움직였으므로 재산출)
+- exit: 0
+- 핵심 결과: **장부 ↔ 기계 차집합 양쪽 빈 출력** · 복원 22 · 삭제 36(둘 다 r4 와 같다 — 이
+  라운드가 고친 파일이 전부 이미 목록 안이었다) · **트리 해시 동일성 셋** · 「내 표지 0 · 남의
+  표지 2」 · 되돌린 뒤 vitest 5 파일 28 · 게이트 여섯과 셸 스모크 0 · 내 산출물 경로 차이 **0 건**
+
+- cmd: 라운드가 만든 새 파일 ↔ in_scope 대조
+- exit: 0
+- 핵심 결과: 새 파일 **0**(고친 산출물 경로 넷). 계약 갱신 불필요

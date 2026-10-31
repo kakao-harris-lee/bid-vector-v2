@@ -1,0 +1,13 @@
+package bidvector.decision.compilefixtures
+
+import bidvector.decision.UnitScore
+import bidvector.decision.priority.derive.MarginInputs
+import bidvector.decision.priority.derive.marginInputsFrom
+import bidvector.sharedkernel.Rate
+
+fun launderedEntry(
+    rate: Rate,
+    laundered: Rate,
+    fitness: UnitScore,
+    capacity: UnitScore,
+): MarginInputs = marginInputsFrom(rate, laundered, rate, fitness, capacity)

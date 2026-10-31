@@ -19,6 +19,9 @@ import java.sql.SQLException
 class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
     private fun repository() = JdbcOperatorProfileRepository(dataSource())
 
+    /** 저장은 **다른 클래스**가 진다(읽기 어댑터는 쓰기 port 를 구현하지 않는다, M7/7C④ 2b). */
+    private fun writer() = JdbcOperatorProfileWriter(dataSource())
+
     @Test
     fun `프로필 미설정 — 행이 없으면 current 는 null`() {
         repository().current() shouldBe null
@@ -33,7 +36,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = listOf("서울", "경기"),
             )
 
-        repository().save(facts)
+        writer().save(facts)
 
         repository().current() shouldBe facts
     }
@@ -50,10 +53,10 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val declaredEmpty =
             ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(emptyList()), emptyList())
 
-        repository().save(notDeclared)
+        writer().save(notDeclared)
         val afterNotDeclared = repository().current()
 
-        repository().save(declaredEmpty)
+        writer().save(declaredEmpty)
         val afterDeclaredEmpty = repository().current()
 
         afterNotDeclared shouldBe notDeclared
@@ -72,15 +75,15 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val second =
             ProfileFacts(setOf(CategoryCode("전기공사업")), OperatorLicenses.NotDeclared, listOf("부산", "울산"))
 
-        repository().save(first)
-        repository().save(second)
+        writer().save(first)
+        writer().save(second)
 
         repository().current() shouldBe second
     }
 
     /**
      * D-6F6-3·우회 (7) — 표 자신의 `CHECK (id = 1)`이 두 번째 행을 거부한다. 애플리케이션
-     * 경로([JdbcOperatorProfileRepository.save])는 늘 `id=1`만 쓰므로, 이 test 는 그 경로를
+     * 경로([JdbcOperatorProfileWriter.save])는 늘 `id=1`만 쓰므로, 이 test 는 그 경로를
      * 우회하는 직접 SQL로 표 제약 자체를 잰다(`bidvector_app` 역할, `appConnection()`).
      */
     @Test
@@ -123,7 +126,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = emptyList(),
             )
 
-        repository().save(facts)
+        writer().save(facts)
 
         val restoredProfile = repository().current()!!
         val restoredValues = restoredProfile.businessTypes.map(CategoryCode::value).toSet()

@@ -11,22 +11,6 @@ import org.junit.jupiter.api.Test
  * 넘었다). D-3D-6 여덟 축 중 컬럼 셋만 다룬다(다른 다섯 축은 `CleanMigrationTest`).
  */
 class CleanMigrationColumnTest : PersistenceTestSupport() {
-    /**
-     * `hasDefault` — 이름·타입·NOT NULL 삼중항만으로는
-     * `session_version INTEGER NOT NULL DEFAULT 0`(D-6B1-3 이 금지한 바로 그 것)이 초록으로
-     * 지났다. 정확한 DEFAULT 식 문자열이 아니라 **있고 없음**만 잰다 — 식 문자열은 Postgres
-     * 버전·캐스트 표기가 갈릴 수 있어 이름 재작성만으로 오탐이 날 수 있다(예: `1` vs
-     * `1::bigint`). 기존 행은 전부 `hasDefault` 를 안 적어 Kotlin 기본값 `false` 를 쓴다 —
-     * 실제로 DEFAULT 가 있는 21개 컬럼만 `true` 로 명시했다(추가만, 기존 표 기대치는 그대로).
-     */
-    private data class ColumnSpec(
-        val table: String,
-        val column: String,
-        val dataType: String,
-        val nullable: Boolean,
-        val hasDefault: Boolean = false,
-    )
-
     // sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은
     // 그 축이 아니다(size-policy.properties). buildList{} 람다 하나로 몰지 않고 테이블별
     // 평범한 리스트 초기화 + `+` 연결로 나눈 것은 그 예외를 그대로 쓴 것이다(함수 아님).
@@ -329,6 +313,18 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("browser_session", "idle_expires_at", "timestamp with time zone", false),
             ColumnSpec("browser_session", "absolute_expires_at", "timestamp with time zone", false),
             ColumnSpec("browser_session", "revoked_at", "timestamp with time zone", true),
+            // M7/7C③ 알림함(추가만). 중복 억제 키 넷은 전부 NOT NULL(PK), `detail_code` 는
+            // nullable(detail 을 싣지 않는 종류가 여섯), `created_at` 만 DEFAULT 를 갖는다
+            // (보존 cutoff 축 — DB 가 찍는다). `read_at` 이 nullable 인 것이 「안읽음」이다.
+            ColumnSpec("notification_inbox", "account_id", "bigint", false),
+            ColumnSpec("notification_inbox", "kind", "text", false),
+            ColumnSpec("notification_inbox", "notice_number", "text", false),
+            ColumnSpec("notification_inbox", "notice_round", "text", false),
+            ColumnSpec("notification_inbox", "detail_code", "text", true),
+            ColumnSpec("notification_inbox", "occurred_at", "timestamp with time zone", false),
+            ColumnSpec("notification_inbox", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notification_inbox", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("notification_inbox", "read_at", "timestamp with time zone", true),
             ColumnSpec("operator_profile", "id", "smallint", false),
             ColumnSpec("operator_profile", "business_types", "ARRAY", false),
             ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
@@ -379,7 +375,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
             operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
-            noticeRequirementColumns + noticeRequirementRowColumns + apiRequestAuditColumns
+            noticeRequirementColumns + noticeRequirementRowColumns + apiRequestAuditColumns +
+            bidCaseColumns + businessProfileColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

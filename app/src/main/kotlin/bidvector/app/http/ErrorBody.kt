@@ -4,7 +4,9 @@ import bidvector.adapters.evaluation.CandidateCapExceededException
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
+import bidvector.app.wiring.NoticeNotFoundException
 import bidvector.workflow.strategy.EditSessionConflictException
+import bidvector.workflow.suggestion.StrategyChangedDuringComputationException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -36,6 +38,35 @@ class InvalidEditRequestException(
  * 어느 쪽으로 달든 응답에 닿지 않는다 — 같은 매핑표가 고정 문구만 낸다.
  */
 class InvalidNoticeSearchException(
+    message: String,
+) : RuntimeException(message)
+
+/**
+ * 알림함 요청의 형식·범위 오류(M7/7C③) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
+ * (`NotificationPageRejection`, 또는 읽음 처리 대상의 거부)를 진단용으로 나르고 **응답에는
+ * 실리지 않는다**(아래 [ErrorMapping] 이 고정 문구로만 옮긴다).
+ *
+ * **왜 기존 예외를 쓰지 않는가**: [InvalidNoticeSearchException] 은 공고 검색 질의의 어휘이고
+ * [InvalidEditRequestException] 은 전략 편집의 어휘다. 셋은 같은 코드·같은 고정 문구로 끝나지만
+ * **어느 표면이 거부했는가**가 예외 타입에 남아야 진단이 성립한다(응답은 어느 쪽이든 구별하지
+ * 않는다 — 어느 입력이 틀렸는지 싣지 않는 것이 이 체계의 관례다).
+ *
+ * 생성자는 문구 하나만 받는다([InvalidNoticeSearchException] 과 같은 사유 — `Throwable` 을
+ * 생성자로 받으면 주입 표면 게이트가 이 class 를 주입 대상으로 읽는다. 원인은 `initCause` 로 단다).
+ */
+class InvalidNotificationRequestException(
+    message: String,
+) : RuntimeException(message)
+
+/**
+ * 개찰 결과 조회 질의의 형식 오류(M7/7C⑤-a) — 400 `INVALID_REQUEST`. 메시지는 거부 사유 어휘
+ * (`OpeningResultQueryRejection`)를 진단용으로 나르고 **응답에는 실리지 않는다**.
+ *
+ * 공고 검색의 거부와 **다른 타입**인 이유: 코드·고정 문구가 같아도 어느 표면이 거부했는지가
+ * 타입으로 남아야 매핑표를 읽는 사람이 그 표면을 찾을 수 있다. 생성자가 문구 하나만 받는 것은
+ * [InvalidNoticeSearchException] 과 같은 이유다(주입 표면 게이트).
+ */
+class InvalidOpeningResultQueryException(
     message: String,
 ) : RuntimeException(message)
 
@@ -79,10 +110,21 @@ object ErrorCode {
     const val INVALID_STORED_STRATEGY = "INVALID_STORED_STRATEGY"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
 
+    /**
+     * M7/7C ② — 요청한 **공고**가 없다. [NOT_FOUND](요청한 **경로**가 없다)와 다른 코드다:
+     * 고정 문구가 하나면 「경로를 잘못 불렀다」와 「그 공고가 없다」를 호출부가 구분할 수 없다.
+     * 공고의 존재는 공개 정보라 구분이 아무것도 흘리지 않는다(인증 실패와 다른 축이다).
+     */
+    const val NOTICE_NOT_FOUND = "NOTICE_NOT_FOUND"
+
     // D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
     const val INVALID_REQUEST = "INVALID_REQUEST"
+
+    // M7/7C①b — 제안 목록 계산 중 전략(또는 프로필)이 두 번 연속 바뀌었다(409). 낡은 결과도
+    // 지어낸 결과도 내지 않는다.
+    const val STRATEGY_CHANGED_DURING_COMPUTATION = "STRATEGY_CHANGED_DURING_COMPUTATION"
 
     // D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
     // 사유를 가른다(상태 코드가 아니라 본문이 구분한다). 나머지 넷은 세션 부재(404)·
@@ -99,6 +141,15 @@ object ErrorCode {
     const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
     const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+
+    // M7/7B — 입찰 건. 전이 거부는 409 이고 코드가 사유를 가른다(상태 코드가 아니라 본문).
+    // `NOTICE_SNAPSHOT_UNAVAILABLE` 은 초안을 만들려는데 공고를 뜰 수 없는 경우다 —
+    // 스냅샷 없는 초안을 만들지 않는다(§6.1 acceptance).
+    const val NOTICE_SNAPSHOT_UNAVAILABLE = "NOTICE_SNAPSHOT_UNAVAILABLE"
+
+    // M7/7C④ 2b — 한 계정의 시평액 행 수 상한(`ProfileInputPolicy.CAPACITY_ROWS_MAX`). 409 다:
+    // 요청은 올바르고 **계정의 상태가 받지 않는다**. 상한 값은 본문에 싣지 않는다(세 필드).
+    const val CAPACITY_ROWS_EXCEEDED = "CAPACITY_ROWS_EXCEEDED"
 }
 
 /**
@@ -130,7 +181,19 @@ object ErrorMapping {
         return ErrorBody(code, message, correlationId)
     }
 
-    /** 조회·dry-run 이 내는 갈래. */
+    /**
+     * 조회·dry-run 이 내는 갈래.
+     *
+     * **형식·범위 오류 넷을 한 갈래로 묶는다** — 평가 요청(D-6A3) · 공고 검색(M7/7C①) ·
+     * 알림함(M7/7C③) · 개찰 결과 조회(M7/7C⑤-a). 타입을 **따로 두는** 이유는 어느 표면이
+     * 거부했는지를 진단에 남기는 것이고(각 타입 KDoc), 응답은 넷을 구별하지 않는다 — 같은
+     * 코드·같은 고정 문구다.
+     *
+     * 갈래를 타입마다 복사하면 **레인이 하나 늘 때마다 이 함수가 세 줄씩 자란다**. 실제로
+     * 7C③ ← 7C② 병합의 합집합이 50줄 한도를 넘겼다(55줄 — r2 acceptance 의 `sizeGate` 가
+     * 잡았다). 묶는 것은 한도를 피하는 수단이 아니라 **중복을 지우는 것**이고, 다음 표면이
+     * 같은 거부를 더해도 이 함수는 한 줄만 자란다.
+     */
     private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
@@ -149,12 +212,21 @@ object ErrorMapping {
                 ErrorCode.CANDIDATE_CAP_EXCEEDED to "후보 스캔이 상한을 초과했다"
             }
 
-            is InvalidEvaluationRequestException -> {
-                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            is StrategyChangedDuringComputationException -> {
+                ErrorCode.STRATEGY_CHANGED_DURING_COMPUTATION to "계산하는 동안 전략이 바뀌었다 — 다시 조회하라"
             }
 
-            // M7/7C ① — 공고 검색 질의의 형식·범위 오류. 같은 코드·같은 고정 문구다.
-            is InvalidNoticeSearchException -> {
+            // M7/7C ② — 요청한 공고가 없다(평가를 시작하지 않았다).
+            is NoticeNotFoundException -> {
+                ErrorCode.NOTICE_NOT_FOUND to "요청한 공고를 찾을 수 없다"
+            }
+
+            // 네 표면의 형식 오류가 한 갈래다(사유는 이 함수 KDoc).
+            is InvalidEvaluationRequestException,
+            is InvalidNoticeSearchException,
+            is InvalidNotificationRequestException,
+            is InvalidOpeningResultQueryException,
+            -> {
                 ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
@@ -207,9 +279,16 @@ private fun escapeJson(value: String): String = value.replace("\\", "\\\\").repl
  */
 @RestControllerAdvice
 class GlobalErrorHandler {
-    @ExceptionHandler(NoHandlerFoundException::class)
+    /**
+     * 404 계열 — 경로가 없거나(D-6A1-21) 요청한 공고가 없다(M7/7C ②). 같은 상태 코드이고
+     * 본문의 코드가 사유를 가른다(D-6A2b-6 과 같은 규율).
+     */
+    @ExceptionHandler(
+        NoHandlerFoundException::class,
+        NoticeNotFoundException::class,
+    )
     fun notFound(
-        exception: NoHandlerFoundException,
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.NOT_FOUND, exception, request)
 
@@ -220,13 +299,14 @@ class GlobalErrorHandler {
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
 
     /**
-     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 셋 다 같은 표([ErrorMapping])를 지나
+     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 넷 다 같은 표([ErrorMapping])를 지나
      * 서로 다른 코드를 낸다(상태 코드가 아니라 본문의 코드가 사유를 가른다, D-6A2b-6).
      */
     @ExceptionHandler(
         MaxActiveBidsNotConfiguredException::class,
         CandidateCapExceededException::class,
         EditSessionConflictException::class,
+        StrategyChangedDuringComputationException::class,
     )
     fun conflict(
         exception: Throwable,
@@ -242,6 +322,8 @@ class GlobalErrorHandler {
         HttpMessageNotReadableException::class,
         InvalidEditRequestException::class,
         InvalidNoticeSearchException::class,
+        InvalidNotificationRequestException::class,
+        InvalidOpeningResultQueryException::class,
     )
     fun badRequest(
         exception: Throwable,

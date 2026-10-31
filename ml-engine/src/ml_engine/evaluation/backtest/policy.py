@@ -1,7 +1,11 @@
 """`ml_engine.evaluation.backtest.policy` — 6G 사전 등록 정책 로더(D-6G-6). 값은 전부
-`ml-engine/policy/strategy-backtest-v1.yaml` 에만 있고 코드 리터럴로 새지 않는다(ML-07
-acceptance ③). 로더는 `path` 하나만 받는다 — CLI·환경변수로 임계를 완화하는 통로가
-없다(같은 acceptance ④).
+출하 정책 파일(`ml-engine/policy/strategy-backtest-v2.yaml`)에만 있고 코드 리터럴로
+새지 않는다(ML-07 acceptance ③). 로더는 `path` 하나만 받는다 — CLI·환경변수로 임계를
+완화하는 통로가 없다(같은 acceptance ④).
+
+출하 version 이 v2 인 이유는 계획 2026-10-28 P3 다. v1 파일은 보존하지만 이 로더는
+거부한다 — 키 스키마가 `floor.pure_construction_cost_max_planned_price_exclusive` 를
+요구하고 빠진 키에 기본값을 채우지 않기 때문이다(fail-closed, 우회 ⑤).
 
 필드 판독기(`require_number`·`collect_indexed_list` 등)는 5C-2 `evaluation.policy` 의
 것을 그대로 쓴다(M5 가 이미 만든 평탄 인덱스 키 규약 — 5A `registry.policy.load_policy`
@@ -48,7 +52,7 @@ from ml_engine.evaluation.policy import (
 from ml_engine.registry.policy import PolicyError, PolicyScalar
 from ml_engine.registry.policy import load_policy as _load_raw_policy
 
-SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION: Final[str] = "strategy-backtest-v1"
+SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION: Final[str] = "strategy-backtest-v2"
 
 __all__ = [
     "SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION",
@@ -77,6 +81,7 @@ _NUMBER_KEYS: Final[tuple[str, ...]] = (
     "floor.rate_band_low",
     "floor.rate_band_high",
     "floor.pure_construction_cost_ratio",
+    "floor.pure_construction_cost_max_planned_price_exclusive",
     "strategy.s1_offset_bp",
     "strategy.s4_grid_span_bp",
     "fit.alpha",
@@ -208,6 +213,9 @@ def _assemble(
             rate_band_low=numbers["floor.rate_band_low"],
             rate_band_high=numbers["floor.rate_band_high"],
             pure_construction_cost_ratio=numbers["floor.pure_construction_cost_ratio"],
+            pure_construction_cost_max_planned_price_exclusive=numbers[
+                "floor.pure_construction_cost_max_planned_price_exclusive"
+            ],
         ),
         exclusion=ExclusionConstants(
             first_notice_ordinal=integers["exclusion.first_notice_ordinal"]

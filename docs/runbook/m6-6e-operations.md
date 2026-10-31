@@ -715,7 +715,9 @@ severity 낱말이 다른 칸에도 나와 술어가 스타일 하나로 열린�
 일은 **스캔이 왜 비었는지 보는 것**이다.
 
 통과·실패와 무관하게 마지막 `-- 실측 요약 --` 블록이 그 실행이 실제로 무엇을 봤는지 전부 담는다 —
-정책 파일 · kind · **이미지 ID**(태그가 아니라 바이트) · trivy 판 · **취약점 DB 판과 갱신 시각** ·
+정책 파일 · kind · **이미지 ID**(태그가 아니라 그 순간의 이미지 — containerd 이미지 저장소에서는
+attestation 을 담은 index 다이제스트라 같은 바이트를 다시 구우면 달라진다, 2026-10-28) · trivy 판 ·
+**취약점 DB 판과 갱신 시각** ·
 SBOM 구성 요소 수와 하한 · **스캔이 분석한 패키지 수와 하한** · 전체 finding 수 · 차단 후보 수 ·
 allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 
@@ -751,6 +753,13 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 1. **올린다(원칙).** OS 패키지면 Dockerfile 의 베이스 다이제스트를, JVM 의존이면 버전 카탈로그·Boot
    BOM 을 올린다. 올리면 해당 finding 이 사라지고, 그 CVE 를 덮던 allowlist 등재가 **stale 로 붉어져**
    같은 PR 에서 치우게 된다. 상향과 정리는 한 번에 끝난다.
+   **셋째 갈래 — 우리가 빌드하는 바이너리**(chore 2026-10-29 부터 web·proxy 의 `usr/bin/caddy`). finding 의
+   Target 이 그 바이너리이고 패키지가 `stdlib` 이면 golang 빌더 다이제스트(두 Dockerfile 의 `caddy-build`
+   stage `FROM`, 같은 값)와 `docker/caddy/go.mod` 의 `go` 줄을, Go 모듈이면 `docker/caddy/` 에서
+   `go get <모듈>@<수정판> && go mod tidy` 로 `go.mod`·`go.sum` 을 올린다(그 빌더 이미지 안에서, `GOTOOLCHAIN=local`).
+   caddy 판 자체는 상류 릴리스를 따른다 — 상류가 고친 판을 내면 `go get github.com/caddyserver/caddy/v2@<판>`
+   과 두 Dockerfile 의 `org.bidvector.caddy` 라벨·`CADDY_VERSION` 을 함께 옮긴다. 두 이미지의 바이너리가
+   같은지는 `tools/local-tls-build.sh` 의 sha256 등식이 잡는다.
 2. **등재한다(유예).** 지금 올릴 수 없으면 사유와 만료일을 적어
    `config/quality/vuln-allowlist.properties` 에 넣는다. 등재는 **면제가 아니라 기한부 유예**다.
 
@@ -771,7 +780,8 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 상향 커밋은 그래서 늘 넷을 함께 움직인다(4 는 해당할 때):
 
 1. Dockerfile 의 `FROM`(stage 마다) — 다이제스트까지
-2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다)
+2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다).
+   web·proxy 는 라벨이 **둘**이다 — `org.bidvector.caddy` 도 caddy 판을 손으로 적는다(셋째 갈래)
 3. `config/quality/image-hygiene-policy*.properties` 의 `base.image.digest`
 4. 배포판이 바뀌었으면 `config/quality/vuln-policy.properties` 의 `scan.os.*`
 
@@ -969,8 +979,17 @@ docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml down -v
 
 **web·proxy 의 입력(Dockerfile·Caddyfile·번들)을 고친 뒤에는 이 빌드를 먼저 돌린다.** 스모크는
 「앞선 빌드가 만든 바이트 == 지금 태그 == 재빌드 결과」를 단언하므로, 입력을 고치고 스모크만
-돌리면 그 등식에서 먼저 끊긴다(「재빌드로 이미지 ID 가 바뀌었다 …」). CI 에서는 S-21c 가 앞서
-있어 늘 성립하는 단언이고, 깨지는 것은 **로컬에서 빌드를 건너뛸 때**다(검토 r2 vr R2-L1).
+돌리면 그 등식에서 먼저 끊긴다(「재빌드로 이미지 내용이 바뀌었다(layer 사슬 또는 config) …」).
+CI 에서는 S-21c 가 앞서 있어 늘 성립하는 단언이고, 깨지는 것은 **로컬에서 빌드를 건너뛸 때**다
+(검토 r2 vr R2-L1).
+
+**그 등식이 재는 값은 `docker image inspect` 의 `.Id` 가 아니라 layer 사슬 + config 의 해시**다
+(chore 2026-10-28). `.Id` 의 뜻이 데몬의 이미지 저장소에 따라 갈리기 때문이다 — containerd 이미지
+저장소에서는 태그가 provenance attestation 을 담은 manifest list 를 가리키고 `.Id` 는 그 index
+다이제스트라 **같은 바이트를 다시 구워도 매번 달라진다**(러너 `ubuntu-latest` 가 24.04 → 26.04 로
+바뀐 날 실측: run 40528127458 에서 manifest·config 는 같고 index 만 달라 등식이 깨졌다). 지문은
+바이트만 담으므로 그 축에서 자유롭다 — 정본 주석은 `tools/local-tls-env.sh` 의
+`bidvector_image_fingerprint` 다.
 
 `up -d proxy` 하나로 의존(app → postgres, web)이 함께 뜬다. **ml-serving 은 뜨지 않는다** — 이
 프로필의 상류가 아니다(그 이미지 빌드를 로컬 패키징의 전제로 만들지 않는다).
