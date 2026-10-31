@@ -14,6 +14,7 @@ import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
@@ -21,7 +22,6 @@ import bidvector.workflow.evaluation.LicenseJudgementPort
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.NoticeByIdPort
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome

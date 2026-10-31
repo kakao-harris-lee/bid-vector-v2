@@ -214,8 +214,13 @@ class BidCaseWorkflow(
                 BidCommandResult.Processed(accepted)
             }
 
-            TransitionWrite.CaseNotFound -> BidCommandResult.CaseNotFound
-            TransitionWrite.VersionConflict -> BidCommandResult.VersionConflict
+            TransitionWrite.CaseNotFound -> {
+                BidCommandResult.CaseNotFound
+            }
+
+            TransitionWrite.VersionConflict -> {
+                BidCommandResult.VersionConflict
+            }
         }
 
     /**

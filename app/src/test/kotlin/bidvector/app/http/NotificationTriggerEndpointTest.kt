@@ -90,7 +90,10 @@ class NotificationTriggerEndpointTest : HttpIntegrationTestBase() {
     fun `적히는 주체는 모두 같은 세션 계정이다`() {
         requestBidPrice("BP-INBOX-2")
 
-        inbox.records.map { it.account.value }.toSet().size shouldBe 1
+        inbox.records
+            .map { it.account.value }
+            .toSet()
+            .size shouldBe 1
     }
 
     /**

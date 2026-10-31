@@ -6,6 +6,7 @@ import bidvector.adapters.notificationinbox.JdbcNotificationSweepCandidates
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.NOTIFICATION_WINDOW_POLICY
 import bidvector.workflow.bidding.NotificationSweepCase
@@ -14,7 +15,6 @@ import bidvector.workflow.bidding.SweepNotifications
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
-import bidvector.sharedkernel.Resolution
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -51,7 +51,9 @@ internal class NotificationSweepCandidatesTest : BidCaseDbFixture() {
         kind: BidKind = BidKind.REAL,
     ): Long {
         seedNotice(key, deadline)
-        return workflow().open(account, key, kind).view.case.id.value
+        return workflow()
+            .open(account, key, kind)
+            .view.case.id.value
     }
 
     @Test

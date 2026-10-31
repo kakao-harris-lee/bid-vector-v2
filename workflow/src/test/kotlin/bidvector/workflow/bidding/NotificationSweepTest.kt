@@ -42,7 +42,12 @@ class NotificationSweepTest {
         day: Int,
         hour: Int,
         minute: Int,
-    ): Instant = LocalDate.of(year, month, day).atTime(LocalTime.of(hour, minute)).atZone(zone).toInstant()
+    ): Instant =
+        LocalDate
+            .of(year, month, day)
+            .atTime(LocalTime.of(hour, minute))
+            .atZone(zone)
+            .toInstant()
 
     private fun case(
         state: BidStateTag = BidStateTag.WATCHING,
@@ -273,7 +278,9 @@ class NotificationSweepTest {
         report.created shouldBe 1
         report.updated shouldBe 0
         report.failed shouldBe 0
-        inbox.records.single().account.value shouldBe mine.value
+        inbox.records
+            .single()
+            .account.value shouldBe mine.value
     }
 
     @Test

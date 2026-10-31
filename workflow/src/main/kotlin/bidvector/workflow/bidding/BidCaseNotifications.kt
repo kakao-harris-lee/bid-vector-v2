@@ -31,8 +31,11 @@ import bidvector.workflow.notificationinbox.NotificationFact
 internal fun reflectedNotificationFact(state: BidState): NotificationFact? =
     when (state) {
         BidState.OpenedProvisionalFirst -> NotificationFact.OpeningCompleted(provisionallyFirst = true)
+
         BidState.OpenedOutOfRank -> NotificationFact.OpeningCompleted(provisionallyFirst = false)
+
         BidState.Won -> NotificationFact.AwardDecided(awarded = true)
+
         BidState.Lost -> NotificationFact.AwardDecided(awarded = false)
 
         // 아래는 **되비출 사실이 아니다.** 유찰만 사유가 다르다(어휘 부재, 위 KDoc) — 나머지는
