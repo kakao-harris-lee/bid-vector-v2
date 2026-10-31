@@ -304,8 +304,15 @@ describe('잠정은 확정 자리에 서지 않는다 (SET-02)', () => {
 
     const confirmed = (await screen.findByTestId('confirmed-award-51')).textContent ?? '';
     expect(confirmed).toContain('1,350,000,000');
+    expect(confirmed).toContain('KRW');
     expect(confirmed).toContain('BASE_AMOUNT');
     expect(confirmed).toContain('PUBLISHED');
+    /**
+     * **다섯 칸을 말하면 다섯을 재야 한다**(r2 CR M-1). 앞 판은 셋만 보아서, 이 자리의 과세를
+     * 원문 토큰으로 되돌리는 변이가 **667 passed** 로 지나갔다(재현함). 통화·과세가 빠져 있었다.
+     */
+    expect(confirmed).toContain(VAT_TREATMENT_DISPLAY.INCLUSIVE.label);
+    expect(confirmed, '원문 토큰이 그대로 섰다').not.toContain('INCLUSIVE');
   });
 
   /** 반쯤 온 금액은 **숫자를 그리지 않는다** — 통화·basis 없는 금액은 해석되지 않는다. */
@@ -550,6 +557,30 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
     expect(card.getByTestId('judged-recorded-state-51').textContent ?? '').toContain(
       BID_CASE_STATE_DISPLAY.UNDER_QUALIFICATION_REVIEW.label,
     );
+  });
+
+  /**
+   * 대사 절의 확정 낙찰가도 **같은 표**를 읽는다(r2 CR M-1) — 전수 표는 **자리**만 보므로 그
+   * 칸을 원문 토큰으로 되돌리는 변이가 초록이었다.
+   */
+  it('판정이 본 확정 낙찰가의 과세도 표 문면이다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([
+        myBidCase({
+          confirmedAwardAmountWon: 1_310_000_000,
+          confirmedAwardAmountCurrency: 'KRW',
+          confirmedAwardAmountBasis: 'BASE_AMOUNT',
+          confirmedAwardAmountVatTreatment: 'INCLUSIVE',
+          confirmedAwardAmountProvenance: 'PUBLISHED',
+        }),
+      ]),
+    );
+    renderScreen();
+
+    const judged = (await screen.findByTestId('judged-confirmed-award-51')).textContent ?? '';
+    expect(judged).toContain('1,310,000,000');
+    expect(judged).toContain(VAT_TREATMENT_DISPLAY.INCLUSIVE.label);
+    expect(judged, '원문 토큰이 그대로 섰다').not.toContain('INCLUSIVE');
   });
 
   /**

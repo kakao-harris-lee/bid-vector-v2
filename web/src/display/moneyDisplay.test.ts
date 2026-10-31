@@ -7,6 +7,18 @@ import { VAT_TREATMENT_DISPLAY, vatTreatmentDisplayOf, type VatTreatment } from 
 /** 계약 enum 을 **축어로** 적는다 — 표에서 키를 뽑아 자기와 대조하면 등식이 공허하다. */
 const CONTRACT_VAT: readonly VatTreatment[] = ['INCLUSIVE', 'EXCLUSIVE', 'UNKNOWN'];
 
+/**
+ * **라벨도 축어로** 적는다(r2 CR L-1). 앞 판은 표에서 뽑은 라벨을 입력 폼의 라벨과 맞댔는데,
+ * 둘 다 같은 객체에서 나오므로 **문면이 바뀌어도 등식이 그대로 참**이었다 — 「같은 출처에서
+ * 양쪽을 끌어오면 표가 틀려도 대조가 초록이다」의 실례가 이 파일 안에 있었다.
+ */
+const CONTRACT_VAT_LABEL: Readonly<Record<VatTreatment, string>> = {
+  INCLUSIVE: '부가세 포함',
+  EXCLUSIVE: '부가세 별도',
+  UNKNOWN: '과세 구분 모름',
+};
+
+
 describe('과세 구분은 한 표에서만 나온다 (r1 CR M-1 · v L-2)', () => {
   it('표의 키 집합이 계약 전수와 같다', () => {
     expect(Object.keys(VAT_TREATMENT_DISPLAY).sort()).toStrictEqual([...CONTRACT_VAT].sort());
@@ -18,17 +30,35 @@ describe('과세 구분은 한 표에서만 나온다 (r1 CR M-1 · v L-2)', () 
     expect(new Set(labels).size).toBe(labels.length);
   });
 
+  /** 표의 문면이 바뀌면 **이 목록이 먼저 틀린다** — 값 쪽의 같은 주장이다(r2 CR L-1). */
+  it('표의 라벨이 축어 목록과 같다', () => {
+    for (const value of CONTRACT_VAT) {
+      expect(VAT_TREATMENT_DISPLAY[value].label, `${value} 의 문면이 바뀌었다`).toBe(
+        CONTRACT_VAT_LABEL[value],
+      );
+    }
+  });
+
   /**
    * **이 slice 가 막는 핵심 불일치.** 운영자는 화면 C 의 고르는 자리에서 「부가세 포함」을
-   * 고르는데 결과 화면이 `INCLUSIVE` 를 돌려주고 있었다. 두 자리가 같은 표를 읽는 것이 그
-   * 불일치를 **구조로** 막는 자리다 — 한쪽에 라벨을 적는 순간 이 등식이 깨진다.
+   * 고르는데 결과 화면이 `INCLUSIVE` 를 돌려주고 있었다.
    */
-  it('입력 폼의 라벨이 표의 라벨과 같다 — 한 값에 두 말이 없다', () => {
+  it('입력 폼의 값·라벨이 표와 같다', () => {
     expect(VAT_CHOICES.map((one) => one.value)).toStrictEqual(Object.keys(VAT_TREATMENT_DISPLAY));
     for (const choice of VAT_CHOICES) {
-      expect(choice.label, `${choice.value} 의 라벨이 표와 다르다`).toBe(
-        VAT_TREATMENT_DISPLAY[choice.value].label,
-      );
+      expect(choice.label, `${choice.value} 의 라벨이 표와 다르다`).toBe(CONTRACT_VAT_LABEL[choice.value]);
+    }
+  });
+
+  /**
+   * **「한 출처」는 값 대조로 설 수 없다**(r2 CR L-1 — 실측: 같은 문면을 손으로 적는 변이가
+   * 667 passed). 같은 글자를 양쪽에 적으면 어떤 값 등식도 참이기 때문이다. 그 축은 원문을
+   * 읽어야 서므로 **`scripts/vat-label-source.test.mjs`** 가 든다(여기는 TS 프로그램 안이라
+   * node 내장 모듈을 쓸 수 없다 — ADR 0011 D-3 의 경계).
+   */
+  it('표의 라벨이 전부 비어 있지 않다', () => {
+    for (const value of CONTRACT_VAT) {
+      expect(VAT_TREATMENT_DISPLAY[value].label.length).toBeGreaterThan(0);
     }
   });
 

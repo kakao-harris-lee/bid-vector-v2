@@ -60,9 +60,12 @@ src/display/notificationDisplay.test.ts
 # 화면 E 가 보이는 상태의 묶음(일곱)과 다루지 않는 자리 둘 — 「뒤에 오는 것」과 「영영 오지
 # 않는 것」이 갈려 있는 것이 D-7E3a-3 의 술어이고, 7E-3b 뒤로는 「LATER 가 0 건」이 그 자리다.
 src/display/resultDisplay.test.ts
-# M7/7E-3b r1 — 과세 구분이 **입력 폼과 결과 표시에서 한 표**를 읽는 것(CR M-1). 한쪽에 라벨을
-# 적는 변이가 이 등식에서 멈춘다.
+# M7/7E-3b r1 — 과세 구분의 전수·문면과 표 밖 값 처리(CR M-1). 문면이 바뀌면 축어 목록이
+# 먼저 틀린다.
 src/display/moneyDisplay.test.ts
+# M7/7E-3b r2 — 「한 출처」를 **원문으로** 잠근다(CR L-1). 값 대조로는 설 수 없다: 같은 문면을
+# 손으로 적는 변이가 667 passed 였다. 라벨 문면이 표 모듈에만 있는지 본다.
+scripts/vat-label-source.test.mjs
 # M7/7E-3b — 대사 어휘 여섯의 전수와 **판정 불가를 패찰로 접지 않는 것** · 분모 0 이 0% 가 아닌
 # 것 · 두 축이 자기 접두 칸만 보는 것이 이 slice 의 게이트 술어다(D-7E3b-7·8).
 src/display/myBidResultDisplay.test.ts
