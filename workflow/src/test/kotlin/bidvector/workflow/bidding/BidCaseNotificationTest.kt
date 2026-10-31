@@ -232,34 +232,47 @@ class BidCaseNotificationTest {
     }
 
     /**
-     * **마감 판정은 되비추지 않는다** — 시스템 판정은 저장 함수를 직접 부르고 이 경로를 지나지
-     * 않는다. 「마감 지남」은 알림 종류가 아니고(마감 D-1/D-0 은 훑기의 종류다) 운영자 명령도 아니다.
+     * **읽기 경로 전수가 잠긴다**(v M-1). 앞 판은 `read()` 하나만 쟀고, 그래서 `list()` 나
+     * `timeline()` 에 되비춤을 끼워 넣는 변형이 아무 test 도 지나지 않았다. 세 읽기가 모두
+     * 마감 판정을 지나므로(그 판정이 상태를 옮긴다) 모집단은 **읽기 operation 전수**다.
      */
     @Test
-    fun `마감 판정이 상태를 옮겨도 알림은 서지 않는다`() {
-        val store = FakeBidCaseStore()
-        val inbox = RecordingInbox()
+    fun `읽기 경로 셋 가운데 어느 것도 알림을 남기지 않는다`() {
         val passed = now.minusSeconds(60)
-        val case = store.seed(mine, notice, BidKind.REAL, BidState.Watching, deadlineAt = passed)
+        listOf<(BidCaseWorkflow, FakeBidCaseStore, bidvector.bidding.BidCaseId) -> Any?>(
+            { w, _, id -> w.read(mine, id) },
+            { w, _, _ -> w.list(mine, BidKind.REAL, null) },
+            { w, _, id -> w.timeline(mine, id) },
+        ).forEach { readOperation ->
+            val store = FakeBidCaseStore()
+            val inbox = RecordingInbox()
+            val case = store.seed(mine, notice, BidKind.REAL, BidState.Watching, deadlineAt = passed)
 
-        val workflow =
-            BidCaseWorkflow(
-                cases = store,
-                deadlines = { keys -> keys.associateWith { NoticeDeadline(passed) } },
-                snapshots = { _, _ -> null },
-                clock = { now },
-                retentionPolicy =
-                    Resolution.Resolved(
-                        EvidenceRetentionPolicyData(Period.ofYears(3)),
-                        PolicyVersion(EffectiveFrom.Initial, "test"),
-                    ),
-                notifications = inbox,
-            )
-        workflow.read(mine, case.id)
+            readOperation(settlingWorkflow(store, inbox, passed), store, case.id)
 
-        store.stateOf(case.id) shouldBe BidState.DeadlinePassedUnrecorded
-        inbox.records.shouldBeEmpty()
+            // 양성 표지 — 읽기가 실제로 마감 판정을 돌려 상태를 옮겼다(아무 일도 없었던 것이 아니다).
+            store.stateOf(case.id) shouldBe BidState.DeadlinePassedUnrecorded
+            inbox.records.shouldBeEmpty()
+        }
     }
+
+    /** 마감이 지난 공고를 든 조립 — 읽기 셋이 전부 마감 판정을 지난다. */
+    private fun settlingWorkflow(
+        store: FakeBidCaseStore,
+        inbox: NotificationInboxPort,
+        deadlineAt: Instant,
+    ) = BidCaseWorkflow(
+        cases = store,
+        deadlines = { keys -> keys.associateWith { NoticeDeadline(deadlineAt) } },
+        snapshots = { _, _ -> null },
+        clock = { now },
+        retentionPolicy =
+            Resolution.Resolved(
+                EvidenceRetentionPolicyData(Period.ofYears(3)),
+                PolicyVersion(EffectiveFrom.Initial, "test"),
+            ),
+        notifications = inbox,
+    )
 
     private fun BidCommandResult.shouldBeProcessed() {
         (this is BidCommandResult.Processed) shouldBe true

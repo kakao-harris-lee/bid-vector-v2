@@ -115,7 +115,7 @@ fun sweepNotificationsFor(
         listOfNotNull(
             deadlineFactOf(case, now, policy),
             documentFactOf(case, now, policy),
-        ).map { fact -> NotificationInboxRecord(case.account, notice, fact, now) }
+        ).map { fact -> NotificationInboxRecord(case.account, notice, fact, calendarDayStart(now)) }
     val revised =
         noticeRevisedAt(case, now)?.let { changedAt ->
             // **사실의 시각은 개정 시각이다**(훑은 시각이 아니다) — 호출자의 시계가 정하는 것은
@@ -182,6 +182,19 @@ private fun noticeRevisedAt(
     // 담기 **전**의 개정은 담을 때 이미 본 값이다 — 새 소식이 아니다.
     return case.noticeUpdatedAt?.takeIf { everRevised && stillOpen && it.isAfter(case.openedAt) }
 }
+
+/**
+ * 시간 기반 사실의 시각 — **그 판정이 선 KST 달력일의 시작**이다(v L-4 · CR L-2).
+ *
+ * 훑은 시각(`now`)을 쓰지 않는 이유: 창은 달력일로 세므로 같은 날 두 번 돌아도 **같은 판정**인데,
+ * `now` 를 실으면 재기록마다 `occurred_at` 이 움직여 그 항목이 목록 맨 위로 다시 올라온다(목록은
+ * 그 열의 역순이다). 운영자에게는 「새 소식이 왔다」로 보이지만 바뀐 것이 없다.
+ *
+ * 마감 시각 자체를 쓰지 않는 이유: 그것은 **미래**라 사실의 시각이 아니고, 역순 목록에서 아직
+ * 일어나지 않은 일이 이미 일어난 일 위에 선다.
+ */
+private fun calendarDayStart(now: Instant): Instant =
+    LocalDate.ofInstant(now, NOTIFICATION_CALENDAR_ZONE).atStartOfDay(NOTIFICATION_CALENDAR_ZONE).toInstant()
 
 /** 며칠 **뒤**인가 — KST 달력일 차이다(0 = 오늘, 1 = 내일). */
 private fun daysBefore(

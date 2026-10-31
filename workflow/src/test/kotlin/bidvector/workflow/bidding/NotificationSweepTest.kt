@@ -159,6 +159,39 @@ class NotificationSweepTest {
         ).shouldBeEmpty()
     }
 
+    /**
+     * **시간 기반 사실의 시각은 「오늘(KST)의 시작」이다**(v L-4 · CR L-2) — 훑은 시각이 아니다.
+     * 같은 날 두 번 돌면 같은 값이라 **항목이 목록 맨 위로 다시 올라오지 않는다**(목록은 그 열의
+     * 역순이다). 훑은 시각을 실으면 바뀐 것이 없는데 「새 소식」으로 보인다.
+     */
+    @Test
+    fun `마감 알림의 시각은 훑은 시각이 아니라 그날의 시작이다`() {
+        val deadline = kst(2026, 11, 1, 11, 0)
+        val dayStart = kst(2026, 10, 31, 0, 0)
+
+        val morning = sweepNotificationsFor(case(deadlineAt = deadline), kst(2026, 10, 31, 7, 0), policy)
+        val evening = sweepNotificationsFor(case(deadlineAt = deadline), kst(2026, 10, 31, 22, 0), policy)
+
+        morning.single().occurredAt shouldBe dayStart
+        evening.single().occurredAt shouldBe dayStart
+        // 음성 대조 — 훑은 시각을 실었다면 둘이 달랐다.
+        (kst(2026, 10, 31, 7, 0) == kst(2026, 10, 31, 22, 0)) shouldBe false
+    }
+
+    /** 날이 바뀌면 시각도 바뀐다 — 그날의 판정이 다른 사실이기 때문이다(서류 기한 창은 폭이 있다). */
+    @Test
+    fun `다음 날 훑으면 그날의 시작이 실린다`() {
+        val due = kst(2026, 11, 2, 11, 0)
+        val review = BidStateTag.UNDER_QUALIFICATION_REVIEW
+
+        sweepNotificationsFor(case(state = review, documentDueAt = due), kst(2026, 10, 31, 9, 0), policy)
+            .single()
+            .occurredAt shouldBe kst(2026, 10, 31, 0, 0)
+        sweepNotificationsFor(case(state = review, documentDueAt = due), kst(2026, 11, 1, 9, 0), policy)
+            .single()
+            .occurredAt shouldBe kst(2026, 11, 1, 0, 0)
+    }
+
     // --- 서류 기한 축 -----------------------------------------------------------
 
     @Test

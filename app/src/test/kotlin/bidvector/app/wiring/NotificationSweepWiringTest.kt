@@ -15,6 +15,8 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.io.PrintWriter
 import java.sql.Connection
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.function.Supplier
 import java.util.logging.Logger
 import javax.sql.DataSource
@@ -112,6 +114,19 @@ class NotificationSweepWiringTest {
                 .toList()
                 .shouldBeEmpty()
         }
+    }
+
+    /**
+     * **기준일의 구역이 창을 세는 달력과 같다**(v L-3). KST 05 시(= 전날 20:00Z)는 **KST 로 오늘**
+     * 이다 — UTC 로 고르면 어제가 되고, 효력일이 바뀌는 날 정책이 하루 어긋난다.
+     */
+    @Test
+    fun `창 정책의 기준일은 KST 달력일이다`() {
+        val kstEarlyMorning = Instant.parse("2026-10-31T20:00:00Z")
+
+        notificationPolicyReferenceDate(kstEarlyMorning) shouldBe LocalDate.of(2026, 11, 1)
+        // 음성 대조 — UTC 로 골랐다면 하루 전이다.
+        LocalDate.ofInstant(kstEarlyMorning, ZoneOffset.UTC) shouldBe LocalDate.of(2026, 10, 31)
     }
 
     /** 창 정책은 **조립에서 한 번** 해소되고 러너가 그 값을 받는다 — 출하 표의 값 그대로다. */

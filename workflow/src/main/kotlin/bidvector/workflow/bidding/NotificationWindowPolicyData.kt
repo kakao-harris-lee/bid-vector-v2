@@ -63,11 +63,16 @@ data class NotificationWindowPolicyData(
 /**
  * 알림 창을 세는 달력 구역 — 날짜 경계가 운영자의 하루와 같아야 한다(KST).
  *
+ * **public 이다** — 창 **정책을 해소하는 조립**(`NotificationSweepWiring`)이 같은 구역으로 기준일을
+ * 골라야 하기 때문이다(v L-3). UTC 로 고르면 KST 00~09 시에 **어제 날짜로 정책을 해소**하고, 그러면
+ * 효력일이 바뀌는 날 판정 달력과 정책 달력이 하루 어긋난다 — 체크리스트가 같은 함정을 자기 구역
+ * 상수로 막은 것과 같은 자리다.
+ *
  * `EVIDENCE_RETENTION_ZONE` 을 재사용하지 않는다: 같은 값이지만 **다른 축**이다(보관 기한은 R-5,
  * 알림 창은 NOTI-10). 한 상수를 둘이 쓰면 한쪽 축을 옮기는 변경이 다른 축을 말없이 옮긴다 —
  * 체크리스트가 자기 구역 상수를 따로 든 것과 같은 판단이다.
  */
-internal val NOTIFICATION_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+val NOTIFICATION_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 /**
  * **정본은 코드가 아니라 문서다**(`EVIDENCE_RETENTION_POLICY` 관례) — 값을 바꾸려면 `source` 의

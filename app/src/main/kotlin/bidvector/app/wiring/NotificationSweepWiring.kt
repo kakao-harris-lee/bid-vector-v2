@@ -4,6 +4,7 @@ import bidvector.adapters.notificationinbox.JdbcNotificationSweepCandidates
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.notificationinbox.NotificationSweepRunner
+import bidvector.workflow.bidding.NOTIFICATION_CALENDAR_ZONE
 import bidvector.workflow.bidding.NOTIFICATION_WINDOW_POLICY
 import bidvector.workflow.bidding.NotificationWindowPolicyData
 import bidvector.workflow.bidding.SweepNotifications
@@ -14,8 +15,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
 import javax.sql.DataSource
 
 /**
@@ -43,7 +44,7 @@ open class NotificationSweepWiring {
     open fun resolvedNotificationWindowPolicy(clock: Clock): NotificationWindowPolicyData {
         // 정책 해소도 **주입된 시계**로 한다 — 러너가 시계를 받으면서 정책만 시스템 시계로
         // 고르면 그 둘이 갈리는 날이 장부 밖이다(보존 배선의 cr L-4 와 같은 자리).
-        val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
+        val referenceDate = notificationPolicyReferenceDate(clock.now())
         return resolvedOrFail(NOTIFICATION_WINDOW_POLICY.resolve(referenceDate), "알림 창 정책")
     }
 
@@ -70,3 +71,15 @@ open class NotificationSweepWiring {
         return NotificationSweepRunner(sweep, CollectionLog { logger.info(it) }, termination)
     }
 }
+
+/**
+ * 창 정책을 고르는 **기준일** — 구역이 창을 세는 달력과 **같다**(v L-3).
+ *
+ * UTC 로 고르면 KST 00~09 시에 **어제 날짜**로 정책을 해소하고, 그러면 효력일이 바뀌는 날 판정
+ * 달력과 정책 달력이 하루 어긋난다(체크리스트가 같은 함정을 자기 구역 상수로 막은 자리와 같다).
+ *
+ * 함수로 꺼낸 이유는 **경계를 잴 수 있게** 하기 위해서다 — 배선 안의 지역 변수로 두면 그 하루
+ * 어긋남이 어떤 test 도 지나지 않는다(출하 정책 표의 항목이 하나라 값으로는 관측되지 않는다).
+ */
+internal fun notificationPolicyReferenceDate(now: Instant): LocalDate =
+    LocalDate.ofInstant(now, NOTIFICATION_CALENDAR_ZONE)
