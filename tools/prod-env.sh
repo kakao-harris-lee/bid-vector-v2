@@ -28,13 +28,33 @@ else
   echo "prod-env: 운영 env 템플릿을 읽지 못했다: ${_prod_env_template}(키 집합을 모르면 셸 값을 비울 수 없다)" >&2
   return 2 2>/dev/null || exit 2
 fi
-unset _k _prod_env_template _prod_env_root
+# **compose 자신의 변수도 비운다 — 이름을 열거하지 않고 접두로.** 템플릿 18키만 비우던 앞 판은
+# `COMPOSE_PROJECT_NAME` 을 그대로 두었고, 그 변수는 compose 파일의 `name:` 을 이긴다. 개발 스택을
+# 만지던 셸에서 반입하면 **다른 프로젝트의 빈 볼륨 위에 운영이 떴다**(v V-2 실측: `--project` 없이
+# dry-run 이 「프로젝트 …-shadow · 데이터 볼륨이 없다」로 exit 0). 이름을 더 적는 처방은 같은 구멍을
+# 다시 여므로 `COMPOSE_` 로 시작하는 것을 전부 비운다(`COMPOSE_FILE`·`COMPOSE_PROFILES`·
+# `COMPOSE_ENV_FILES`·`COMPOSE_IGNORE_ORPHANS` …).
+while IFS='=' read -r _k _; do
+  case "$_k" in COMPOSE_*) unset "$_k" 2>/dev/null || true ;; esac
+done < <(env)
 
 BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml docker/compose.prod.yaml)
+
+# 프로젝트 이름을 **고정한다.** `-p` 는 `COMPOSE_PROJECT_NAME` 보다 우선이므로(실측), 위 unset 이
+# 어떤 이유로 비껴가도 이 자리가 다시 막는다 — 겹을 둘로 둔다. 값은 짓지 않고 운영 덧쓰기의 `name:`
+# 에서 읽는다(정본은 그 파일 하나다). 호출자가 `--project` 를 주면 **뒤에 오는 `-p` 가 이긴다**.
+BIDVECTOR_PROD_PROJECT="$(sed -n 's/^name:[[:space:]]*//p' "${_prod_env_root}/${BIDVECTOR_PROD_COMPOSE_FILES[2]}" 2>/dev/null | head -n1)"
+unset _k _prod_env_template _prod_env_root
+if [ -z "$BIDVECTOR_PROD_PROJECT" ]; then
+  echo "prod-env: 운영 compose 의 name: 을 읽지 못했다 — 프로젝트 이름을 고정할 수 없다" >&2
+  return 2 2>/dev/null || exit 2
+fi
+
 BIDVECTOR_PROD_COMPOSE=(docker compose)
 for _f in "${BIDVECTOR_PROD_COMPOSE_FILES[@]}"; do
   BIDVECTOR_PROD_COMPOSE+=(-f "$_f")
 done
+BIDVECTOR_PROD_COMPOSE+=(-p "$BIDVECTOR_PROD_PROJECT")
 unset _f
 
 # <상태 디렉터리> <release> → 그 release 의 마이그레이션 목록(정렬). manifest 가 없으면 1 을 돌려준다.
