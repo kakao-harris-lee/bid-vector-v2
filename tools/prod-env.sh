@@ -61,6 +61,55 @@ done
 BIDVECTOR_PROD_COMPOSE+=(-p "$BIDVECTOR_PROD_PROJECT")
 unset _f
 
+# **해석된 compose 가 컨테이너에 주는 env 키의 집합**(ml 프로필 없이 — 반입·훑기가 쓰는 모양).
+# 값이 아니라 **키**를 고정한다: 새 키가 compose 에 들어오면 preflight 가 멈추고, 사람이 「이것이 app
+# 설정을 바꾸는 통로인가」를 한 번 본다. v V5-1 이 바로 그 축이었다 — `JAVA_TOOL_OPTIONS` 는 템플릿
+# 키 집합 게이트를 통과하는 키인데 **내용은 아무도 보지 않았고**, 거기 넣은 `-D` 시스템 속성이 compose
+# 가 준 env 를 이겨 app 이 가드와 다른 DB 에 붙었다. 통로 이름을 열거해 거부하면 새 이름 하나로 다시
+# 열리므로 **표면 자체를 등식으로** 닫는다.
+BIDVECTOR_PROD_SERVICE_ENV_KEYS=(
+  app.BIDVECTOR_EVALUATION_CANDIDATECAP
+  app.BIDVECTOR_PERSISTENCE_CREDENTIAL
+  app.BIDVECTOR_PERSISTENCE_JDBCURL
+  app.BIDVECTOR_PERSISTENCE_USERNAME
+  app.JAVA_TOOL_OPTIONS
+  app.MANAGEMENT_SERVER_PORT
+  app.OPERATOR_CREDENTIAL_VALUE
+  app.SERVER_PORT
+  postgres.POSTGRES_DB
+  postgres.POSTGRES_PASSWORD
+  postgres.POSTGRES_USER
+  proxy.BIDVECTOR_PROXY_APP_UPSTREAM
+  proxy.BIDVECTOR_PROXY_DOMAIN
+  proxy.BIDVECTOR_PROXY_HTTPS_PORT
+  proxy.BIDVECTOR_PROXY_WEB_UPSTREAM
+  web.BIDVECTOR_WEB_PORT
+)
+
+# app 의 JVM 옵션 문자열 — **허용 형태 하나**다(거부 목록이 아니다). runbook 「메모리」 표가 쓰는
+# 그 형태이고, 그 밖의 무엇도 받지 않는다. 자유 문자열인 이 키가 운영 app 의 유일한 옵션 통로다.
+_prod_jvm_options_ok() {
+  [[ "${1:-}" =~ ^-XX:MaxRAMPercentage=([0-9]{1,2}|100)(\.[0-9]+)?$ ]]
+}
+
+# <해석된 config json> → app 설정 통로가 기대대로인가. 어긋나면 1 과 `_PROD_SURFACE_ERR`.
+# **값은 문면에 옮기지 않는다** — 이 키에 자격을 실을 수 있다.
+_prod_config_surface_ok() {
+  local cfg="$1" got want
+  _PROD_SURFACE_ERR=""
+  got="$(printf '%s' "$cfg" | jq -r '.services | to_entries[] | .key as $s | (.value.environment // {} | keys[]) | "\($s).\(.)"' | sort)"
+  want="$(printf '%s\n' "${BIDVECTOR_PROD_SERVICE_ENV_KEYS[@]}" | sort)"
+  if [ "$got" != "$want" ]; then
+    _PROD_SURFACE_ERR="해석된 compose 의 서비스 env 키 집합이 고정 목록과 다르다 — 더해짐[$(comm -23 <(printf '%s\n' "$got") <(printf '%s\n' "$want") | tr '\n' ' ')] 빠짐[$(comm -13 <(printf '%s\n' "$got") <(printf '%s\n' "$want") | tr '\n' ' ')]. 새 키가 app 설정을 바꾸는 통로인지 보고 tools/prod-env.sh 의 목록을 갱신한다"
+    return 1
+  fi
+  if ! _prod_jvm_options_ok "$(printf '%s' "$cfg" | jq -r '.services.app.environment.JAVA_TOOL_OPTIONS // empty')"; then
+    _PROD_SURFACE_ERR="app 의 JVM 옵션이 허용 형태가 아니다 — 받는 것은 '-XX:MaxRAMPercentage=<0..100>' 하나뿐이다. 이 문자열의 -D 시스템 속성은 compose 가 준 env 를 이기므로 app 이 가드와 다른 DB·자격으로 갈 수 있다"
+    return 1
+  fi
+  return 0
+}
+
 # release 태그의 모양 — `tools/prod-release.sh` 가 만들 수 있는 집합과 같다. 상태 파일에서 읽은 값을
 # 경로·이미지 참조로 쓰기 전에 이것으로 거른다. 손상된 `current` 가 **compose 의 이미지 조회까지**
 # 흘러가 거기서 exit 1 로 끝나던 길을 앞에서 끊는다(v V4-4 — 러너 자신의 「예외(1)」와 구별되지 않았다).

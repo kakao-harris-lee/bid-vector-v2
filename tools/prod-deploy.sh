@@ -116,6 +116,12 @@ fi
   || _die "해석된 프로젝트 이름이 기대와 다르다: ${proj} ≠ ${EXPECT_PROJECT} — compose 환경변수가 끼어들었다" 1
 echo "  프로젝트 ${proj} · 루프백 포트 ${port} $([ -n "$holder" ] && echo '(이 프로젝트가 사용 중)' || echo '(비어 있음)')"
 
+# **app 이 받는 설정 통로** — 아래 JDBC 등식의 전제다. JDBC URL 을 바르게 두고 `JAVA_TOOL_OPTIONS` 에
+# `-Dbidvector.persistence.jdbcUrl=…` 를 넣으면 시스템 속성이 env 를 이겨 **app 만 다른 DB 로 간다**
+# (v V5-1 실측 — 가드는 여전히 통과였다). 그래서 URL 등식만으로는 그 불변식이 서지 않는다.
+_prod_config_surface_ok "$cfg" || _die "${_PROD_SURFACE_ERR}(판정 불가)" 2
+echo "  app 설정 통로: env 키 집합 ${#BIDVECTOR_PROD_SERVICE_ENV_KEYS[@]}개 등식 · JVM 옵션 허용 형태"
+
 # 디스크
 free_mb="$(df -Pm "$STATE" 2>/dev/null | awk 'NR==2 {print $4}')" || true
 [ -n "$free_mb" ] || { mkdir -p "$STATE" 2>/dev/null || true; free_mb="$(df -Pm "$STATE" | awk 'NR==2 {print $4}')"; }

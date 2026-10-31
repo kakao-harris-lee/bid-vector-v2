@@ -74,7 +74,13 @@ COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
 [ -z "$PROJECT" ] || COMPOSE+=(-p "$PROJECT")
 export BIDVECTOR_RELEASE_TAG="$rel"
 
-echo "notification-sweep: release ${rel} · 프로젝트 $("${COMPOSE[@]}" config --format json 2>/dev/null | jq -r .name)"
+# **반입과 같은 설정 통로 술어**도 거친다. 일회 컨테이너는 운영 DB 자격을 그대로 받으므로, 반입 뒤
+# env 를 고쳐 `JAVA_TOOL_OPTIONS` 에 `-D` 를 끼우면 **반입 가드를 거치지 않은 채** 다른 DB 로 가는
+# 러너가 주기마다 뜬다(v V5-1 과 같은 축, 다른 시각). 해석은 한 번만 하고 아래 문면과 함께 쓴다.
+cfg="$("${COMPOSE[@]}" config --format json 2>/dev/null)" || _die "운영 compose 를 해석하지 못했다" 3
+_prod_config_surface_ok "$cfg" || _die "${_PROD_SURFACE_ERR} — 훑지 않는다" 3
+
+echo "notification-sweep: release ${rel} · 프로젝트 $(printf '%s' "$cfg" | jq -r .name)"
 # `--no-deps` — postgres 는 이미 떠 있다. 이 러너가 스택을 건드리지 않는다.
 # `--rm` — 일회 컨테이너는 남기지 않는다. 포트는 publish 하지 않아 떠 있는 app 과 다투지 않는다.
 # `--pull never` — 기본값(missing)이면 태그가 로컬에 없을 때 compose 가 **레지스트리에서 당겨와**

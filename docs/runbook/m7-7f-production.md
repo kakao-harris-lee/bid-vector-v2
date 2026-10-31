@@ -49,6 +49,11 @@
    - `BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/<BIDVECTOR_PG_DB 값>` — **이 형태 그대로**다.
      호스트·포트를 바꾸거나 `?currentSchema=…` 같은 매개변수를 붙이면 반입이 `exit 2` 로 멈춘다: 마이그레이션
      가드는 이 compose 의 `postgres` 를 읽으므로, app 이 다른 자리에 붙으면 **가드가 다른 DB 를 보고 통과시킨다.**
+   - `BIDVECTOR_APP_JAVA_TOOL_OPTIONS` 는 **`-XX:MaxRAMPercentage=<0..100>` 하나만** 받는다(§「메모리」 표의 그
+     형태). 다른 옵션을 더하면 반입이 `exit 2` · 주기 러너가 `exit 3` 으로 멈춘다 — 이 문자열의 `-D` 시스템
+     속성은 compose 가 준 env 를 **이기므로**, 여기에 `-Dbidvector.persistence.jdbcUrl=…` 를 넣으면 위 JDBC
+     등식을 통과한 채 app 만 다른 DB 로 간다. 힙 말고 다른 JVM 조정이 필요하면 **이 키가 아니라** compose
+     파일과 그 게이트 목록을 함께 고친다.
    - 메모리 키는 §「메모리」 표.
    - 확인: `./tools/prod-env-keys-check.sh --env-file /etc/bidvector-v2/prod.env`
 4. **상태 디렉터리**(release manifest · 백업 · 이력): `sudo install -d -m 700 -o "$USER" /var/lib/bidvector-v2`
