@@ -89,6 +89,7 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
     private fun seedOpeningAxisRaw(
         rawNumber: String,
         rawRound: String,
+        masked: Boolean = false,
     ) {
         val fields = """{"${jsonbKeyOf(
             NOTICE_NUMBER_RAW_KEY,
@@ -106,6 +107,15 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
                     statement.setTimestamp(4, Timestamp.from(now))
                     statement.executeUpdate()
                 }
+            // **적재는 표지를 찍지 못한다**(DB 트리거) — 마스킹은 보존 작업의 UPDATE 로만 선다.
+            if (masked) {
+                connection
+                    .prepareStatement("UPDATE raw_observation SET pii_masked_at = now() WHERE observation_key = ?")
+                    .use { statement ->
+                        statement.setString(1, "obs-rawaxis-$rawNumber-$rawRound")
+                        statement.executeUpdate()
+                    }
+            }
         }
     }
 
@@ -303,6 +313,25 @@ class JdbcMyBidResultViewTest : BidCaseDbFixture() {
         present.canonical.shouldBeNull()
         withClue("원문이 있으면 「승격 전」이고 「수집 전」이 아니다") {
             present.openingAxisObserved shouldBe true
+        }
+    }
+
+    /**
+     * **마스킹된 원문은 세지 않는다**(r2 v L-2) — 업체 식별 개념이 지워진 뒤라 개찰 결과로
+     * 승격될 수 없고, 세어 주면 그 공고가 영영 「승격 전」으로 남아 일시적이라던 상태가 영구
+     * 오답이 된다. 술어는 7C⑤-a 와 같은 상수이지만 **묶음 질의에서만 빼는** 변이가 여기 없으면
+     * 지나간다.
+     */
+    @Test
+    fun `마스킹된 원문은 개찰 축 관측으로 세지 않는다`() {
+        val key = notice("RAWAXIS-C")
+        seedNotice(key, now.plusSeconds(HOUR))
+        seedOpeningAxisRaw(key.noticeNumber, key.noticeRound.value, masked = true)
+
+        val facts = openingFactsView().lookupAll(setOf(noticeId(key)))
+        val present = facts[noticeId(key)].shouldBeInstanceOf<NoticeOpeningFacts.Present>()
+        withClue("마스킹된 행을 세면 그 공고가 영영 「승격 전」으로 남는다") {
+            present.openingAxisObserved shouldBe false
         }
     }
 
