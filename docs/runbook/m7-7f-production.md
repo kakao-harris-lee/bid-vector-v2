@@ -259,6 +259,11 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스.
 
+> **두 번째 되돌림의 대상은 「직전」이 아니라 「방금 떠난 쪽」이다.** A→B 뒤 되돌리면 B→A 가 되고
+> `previous` 는 B 가 된다 — 거기서 또 되돌리면 **B 로 간다**(마이그레이션 차이가 없으면 가드도 울지
+> 않는다). dry-run 이 기본이고 머리줄에 `== 되돌림 <어디서> → <어디로>` 를 찍는다 — **그 줄을 읽고**
+> apply 한다. 더 옛 release 로 가려면 `prod-deploy.sh --release <그것>` 을 쓴다.
+
 ### 7.2 반입이 실패했을 때 (가장 급한 경우)
 
 `prod-deploy.sh` 가 `up` 또는 헬스에서 실패하면 **컨테이너는 새 release 이고 마지막으로 성공한 것은 옛
