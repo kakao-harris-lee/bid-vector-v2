@@ -198,8 +198,19 @@ export function awardGapReading(one: {
  * `listBidCases` 의 차례다. 두 목록의 **길이도 다르다** — `cases[]` 는 「투찰 기록이 있는
  * 실투찰 건 전부」이고 카드는 「결과 단계 일곱」이다.
  */
-export function caseResultsById(cases: readonly MyBidCase[]): ReadonlyMap<number, MyBidCase> {
-  return new Map(cases.map((one) => [one.caseId, one]));
+export function caseResultsById(cases: readonly MyBidCase[]): ReadonlyMap<number, readonly MyBidCase[]> {
+  const grouped = new Map<number, MyBidCase[]>();
+  for (const one of cases) {
+    const rows = grouped.get(one.caseId);
+    if (rows === undefined) {
+      grouped.set(one.caseId, [one]);
+    } else {
+      // **행을 버리지 않는다**(CR r1 L-4): `new Map(...)` 이면 뒤의 것만 남아 중복이 조용히
+      // 사라진다. 세어 두면 부르는 자리가 그 사실을 답으로 낼 수 있다.
+      rows.push(one);
+    }
+  }
+  return grouped;
 }
 
 /**
@@ -215,7 +226,13 @@ export type CaseResult =
   | { readonly kind: 'FAILED' }
   | { readonly kind: 'FOUND'; readonly result: MyBidCase }
   /** 조회는 성공했는데 이 건이 없다 — 투찰 기록이 없는 건이다. */
-  | { readonly kind: 'MISSING' };
+  | { readonly kind: 'MISSING' }
+  /**
+   * 한 건에 행이 둘 이상이다 — **계약 위반**이다(건 식별자는 유일해야 한다). 하나를 골라
+   * 그리면 운영자는 **어느 쪽인지 모른 채** 값을 믿는다. 이 slice 의 다른 자리와 같은 처리다
+   * (`awardGapReading` 의 `INCOMPLETE` — 계약이 깨지면 숫자가 아니라 진단을 낸다).
+   */
+  | { readonly kind: 'AMBIGUOUS'; readonly count: number };
 
 /** 집계 한 축 — 응답의 접두사를 벗긴 꼴. */
 export interface RateAxis {

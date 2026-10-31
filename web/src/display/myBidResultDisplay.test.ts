@@ -270,8 +270,23 @@ describe('카드와 건의 대응은 caseId 로', () => {
   it('목록 순서와 무관하게 caseId 로 찾는다', () => {
     const map = caseResultsById([bidResult({ caseId: 3 }), bidResult({ caseId: 1 })]);
 
-    expect(map.get(1)?.caseId).toBe(1);
-    expect(map.get(3)?.caseId).toBe(3);
+    expect(map.get(1)?.map((one) => one.caseId)).toStrictEqual([1]);
+    expect(map.get(3)?.map((one) => one.caseId)).toStrictEqual([3]);
+  });
+
+  /**
+   * **중복을 조용히 접지 않는다**(CR r1 L-4). 앞 판은 `new Map(...)` 이라 같은 건의 행이 둘이면
+   * **뒤의 것만** 남았다 — 계약 위반인데 화면은 하나를 고른 채 멀쩡해 보인다. 행을 모아 두면
+   * 부르는 자리가 그 사실을 답으로 낼 수 있다.
+   */
+  it('같은 caseId 의 행을 버리지 않고 모은다', () => {
+    const map = caseResultsById([
+      bidResult({ caseId: 7, submittedAmountWon: 1 }),
+      bidResult({ caseId: 7, submittedAmountWon: 2 }),
+    ]);
+
+    expect(map.get(7)).toHaveLength(2);
+    expect(map.get(7)?.map((one) => one.submittedAmountWon)).toStrictEqual([1, 2]);
   });
 
   /** 카드에 짝이 없을 수 있다 — 그때 `undefined` 는 **답**이고 화면이 사유를 적는다(D-7E3b-7 ⒞). */

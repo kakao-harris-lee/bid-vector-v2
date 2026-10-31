@@ -287,6 +287,16 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
       <ResultField label="확인 시각(서버)">
         <TimeOrAbsent at={result.confirmedAt} testId={`confirmed-at-${caseId}`} />
       </ResultField>
+      {/* **운영자 기록 축도 두 출처다**(CR r1 L-1 · v r1 L-6). 카드 머리의 배지는 목록 응답의
+          상태이고 이 칸은 **결과 조회가 본** 같은 축이다 — 다른 요청의 답이라 어긋날 수 있고,
+          개찰 축과 같은 대접(접지 않고 둘 다 보인다)을 받는다. 앞 판은 「카드 머리가 이미
+          그린다」로 이 칸을 전수 표에서 빼 두 출처를 접었다. */}
+      <ResultField label="판정이 본 내 기록">
+        <StateBadge
+          display={displayOrUnknown(BID_CASE_STATE_DISPLAY, result.recordedState)}
+          testId={`judged-recorded-state-${caseId}`}
+        />
+      </ResultField>
       <ResultField label="판정이 본 개찰 축">
         <StateBadge
           display={displayOrUnknown(OPENING_RESULT_STATE_DISPLAY, result.openingState)}
@@ -305,7 +315,7 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
 }
 
 /**
- * 결과 조회의 네 답을 **소진 `switch`** 로 가른다 — 답이 늘면 여기가 컴파일에서 멈춘다.
+ * 결과 조회의 다섯 답을 **소진 `switch`** 로 가른다 — 답이 늘면 여기가 컴파일에서 멈춘다.
  *
  * `FAILED` 에서 조용한 이유: 오류 얼굴은 **화면이 하나로** 그린다(7E-3a r3 CR L-1 — 카드마다
  * 그리면 같은 `role="alert"` 이 N 개 선다).
@@ -322,6 +332,12 @@ function CaseResultSection({ caseId, result }: { readonly caseId: number; readon
       return (
         <p data-testid={`result-missing-${caseId}`} className="mt-3 text-xs text-absent-ink">
           결과 조회에 이 건이 없습니다 — 투찰 기록이 없는 건입니다.
+        </p>
+      );
+    case 'AMBIGUOUS':
+      return (
+        <p data-testid={`result-ambiguous-${caseId}`} className="mt-3 text-xs text-unjudged-ink">
+          결과 조회가 이 건에 행을 {result.count} 개 냈습니다 — 어느 것인지 고르지 않습니다.
         </p>
       );
     default: {

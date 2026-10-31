@@ -310,10 +310,11 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   const mineResult = results.cases.find((one) => one.caseId === caseId);
   expect(mineResult, '결과 조회에 여정 ⑤ 의 건이 없다 — 투찰 기록이 있는 건은 여기 선다').toBeDefined();
 
-  // 금액은 **숫자만** 맞댄다 — spec 이 화면의 자릿점 서식을 복제하지 않는다.
-  expect(
-    digitsOf(await finalCard.getByTestId(`submitted-amount-${caseId}`).innerText()),
-  ).toContain(String(mineResult!.submittedAmountWon));
+  // 금액은 **숫자만** 맞대되 **정확히 같아야** 한다(v r1 L-8) — `toContain` 이면 앞뒤에 숫자가
+  // 더 붙어도 지나간다(자릿점을 걷은 뒤라 부분 일치가 쉽게 성립한다).
+  expect(digitsOf(await finalCard.getByTestId(`submitted-amount-${caseId}`).innerText())).toBe(
+    String(mineResult!.submittedAmountWon),
+  );
   await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
     mineResult!.submittedAmountCurrency,
   );

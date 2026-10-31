@@ -88,8 +88,12 @@ export function ResultsScreen() {
     if (!results.isSuccess) {
       return { kind: 'FAILED' };
     }
-    const found = byId.get(caseId);
-    return found === undefined ? { kind: 'MISSING' } : { kind: 'FOUND', result: found };
+    const rows = byId.get(caseId);
+    if (rows === undefined) {
+      return { kind: 'MISSING' };
+    }
+    // 둘 이상이면 **고르지 않는다** — 어느 쪽인지 모른 채 믿게 하는 것보다 진단이 낫다.
+    return rows.length === 1 ? { kind: 'FOUND', result: rows[0]! } : { kind: 'AMBIGUOUS', count: rows.length };
   };
 
   /**

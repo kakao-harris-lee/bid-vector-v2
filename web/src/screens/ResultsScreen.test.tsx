@@ -526,6 +526,25 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
   });
 
   /**
+   * **운영자 기록 축도 두 출처다**(CR r1 L-1 · v r1 L-6) — 카드 머리는 목록 응답, 대사 절은
+   * 결과 조회. 개찰 축과 같은 대접을 받으므로 어긋나면 **둘 다** 보인다(한쪽이 상대를 덮지
+   * 않는다). 앞 판은 이 칸을 전수 표에서 「카드 머리가 이미 그린다」로 빼 두 출처를 접었다.
+   */
+  it('내 기록 축이 두 응답에서 어긋나면 두 자리가 각자의 값을 보인다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WON' })]);
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ recordedState: 'UNDER_QUALIFICATION_REVIEW' })]),
+    );
+    renderScreen();
+
+    const card = within(await screen.findByTestId('result-case-51'));
+    expect(card.getByTestId('result-state-51').textContent ?? '').toContain(BID_CASE_STATE_DISPLAY.WON.label);
+    expect(card.getByTestId('judged-recorded-state-51').textContent ?? '').toContain(
+      BID_CASE_STATE_DISPLAY.UNDER_QUALIFICATION_REVIEW.label,
+    );
+  });
+
+  /**
    * **개찰 축은 두 출처가 따로 선다**(D-7E3b-9). `readOpeningResult` 가 카드의 개찰 절을, 대사
    * 응답의 `openingState` 가 「판정이 본 입력」을 든다 — 어긋나면 둘 다 보인다(접지 않는다).
    */
@@ -555,6 +574,23 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
   });
 
   /**
+   * 한 건에 행이 둘이면 **고르지 않는다**(CR r1 L-4). 하나를 골라 그리면 운영자는 어느 쪽인지
+   * 모른 채 값을 믿는다 — 계약이 깨졌을 때 숫자가 아니라 진단을 내는 이 slice 의 규율이다.
+   */
+  it('결과 조회가 한 건에 행을 둘 내면 고르지 않고 사유를 적는다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([
+        myBidCase({ submittedAmountWon: 1_350_000_000 }),
+        myBidCase({ submittedAmountWon: 999 }),
+      ]),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('result-ambiguous-51')).textContent ?? '').toContain('2');
+    expect(screen.queryByTestId('submitted-amount-51'), '모호한데 한 행을 골라 그렸다').toBeNull();
+  });
+
+  /**
    * **적재 중을 「없다」로 접지 않는다.** 「아직 안 왔다」와 「조회에 그 건이 없다」를 한
    * `undefined` 로 접으면 카드가 적재 중에도 「이 건이 없습니다」를 적고, 그것은 거짓이다 —
    * 운영자는 자기 기록이 사라진 줄 안다.
@@ -576,6 +612,32 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
     expect(await screen.findByTestId('my-bid-results-error')).toBeTruthy();
     expect(screen.getByTestId('result-case-51'), '카드가 통째로 사라졌다').toBeTruthy();
     expect(screen.queryByTestId('reconciled-outcome-51'), '조회 실패에 판정을 지어냈다').toBeNull();
+    /**
+     * **못 읽은 것을 「없다」로 접지 않는다**(v r1 M-3). 이 단언이 없어 `FAILED` → `MISSING`
+     * 변이가 초록이었다(재현함) — 그러면 조회 500 에서 카드마다 「투찰 기록이 없는 건입니다」가
+     * 서고 그것은 거짓이다. 적재 중 축(변이 E)에서 막은 것과 같은 꼴이 오류 축에 남아 있었다.
+     */
+    expect(screen.queryByTestId('result-missing-51'), '못 읽은 것을 「건이 없다」로 접었다').toBeNull();
+  });
+});
+
+/**
+ * **칸의 자리만이 아니라 값을 잰다**(v r1 L-3). 칸 전수 표는 「그 자리가 화면에 있는가」까지만
+ * 보므로, 두 시각 칸이 **서로의 값**을 그리는 변이(N6)가 초록이었다 — 두 값은 다른 사실이다
+ * (운영자의 진술 vs 서버가 그 사실을 확인한 시각).
+ */
+describe('시각 두 칸이 서로의 값을 그리지 않는다 (v r1 L-3)', () => {
+  const SUBMITTED = '2026-10-31T03:20:31.073Z';
+  const CONFIRMED = '2026-10-31T03:20:31.082Z';
+
+  it('낸 시각과 확인 시각이 각자의 값이다', async () => {
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ submittedAt: SUBMITTED, confirmedAt: CONFIRMED })]),
+    );
+    renderScreen();
+
+    expect((await screen.findByTestId('submitted-at-51')).textContent ?? '').toBe(SUBMITTED);
+    expect(screen.getByTestId('confirmed-at-51').textContent ?? '').toBe(CONFIRMED);
   });
 });
 
@@ -584,12 +646,14 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
  * 늘면 `satisfies` 가 컴파일에서, 키 집합 등식이 값 쪽에서 먼저 틀린다.
  */
 describe('결과 응답의 칸 전수 (D-7E3b-3)', () => {
-  /** 칸 → 그것을 싣는 testId 접두. `QUERY` 는 대응 키·카드 머리가 이미 그리는 칸이다. */
+  /** 칸 → 그것을 싣는 testId 접두. `KEY` 는 **대응 키**(값 칸이 아니다 — CR r1 L-1). */
   const FIELD_PLACEMENT = {
-    caseId: 'QUERY',
-    noticeNumber: 'QUERY',
-    noticeRound: 'QUERY',
-    recordedState: 'QUERY',
+    caseId: 'KEY',
+    noticeNumber: 'KEY',
+    noticeRound: 'KEY',
+    // **대응 키가 아니라 값 칸이다**(CR r1 L-1) — 카드 머리의 배지는 *목록 응답*의 상태이고
+    // 이것은 결과 조회가 본 같은 축이다. 둘을 한 표지로 묶으면 두 출처가 접힌다.
+    recordedState: 'judged-recorded-state',
     submittedAmountWon: 'submitted-amount',
     submittedAmountCurrency: 'submitted-amount',
     submittedAmountVatTreatment: 'submitted-amount',
@@ -615,11 +679,11 @@ describe('결과 응답의 칸 전수 (D-7E3b-3)', () => {
     expect(Object.keys(FIELD_PLACEMENT).sort()).toStrictEqual(Object.keys(myBidCase()).sort());
   });
 
-  it('QUERY 가 아닌 칸은 전부 화면에 자리가 있다', async () => {
+  it('키가 아닌 칸은 전부 화면에 자리가 있다', async () => {
     renderScreen();
     await screen.findByTestId('reconciled-outcome-51');
 
-    const places = new Set(Object.values(FIELD_PLACEMENT).filter((one) => one !== 'QUERY'));
+    const places = new Set(Object.values(FIELD_PLACEMENT).filter((one) => one !== 'KEY'));
     for (const place of places) {
       expect(screen.queryByTestId(`${place}-51`), `${place} 자리가 화면에 없다`).not.toBeNull();
     }
