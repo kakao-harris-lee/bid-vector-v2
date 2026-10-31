@@ -50,6 +50,12 @@
    - 메모리 키는 §「메모리」 표.
    - 확인: `./tools/prod-env-keys-check.sh --env-file /etc/bidvector-v2/prod.env`
 4. **상태 디렉터리**(release manifest · 백업 · 이력): `sudo install -d -m 700 -o "$USER" /var/lib/bidvector-v2`
+4b. **저장소 자리**를 한 번 정한다 — release 를 만들고(§2) 반입을 돌리고(§3) 주기 러너가 compose 파일을
+   읽는(§「주기 실행」) 자리가 **모두 여기**다. 이 문서는 아래에서 `<저장소>` 로 쓴다.
+   ```bash
+   # 예: /srv/bidvector-v2 — 운영자가 정한다. 레인들이 브랜치를 바꾸는 작업 트리를 쓰지 않는다.
+   echo /srv/bidvector-v2
+   ```
 5. **trivy 설치**(취약점 게이트 — release 가 요구한다. 없으면 release 는 판정 불가로 멈춘다).
 6. **certbot 설치**: `sudo apt-get install certbot` — 패키지가 갱신 타이머(`certbot.timer`)를 함께 설치한다.
 
@@ -259,6 +265,10 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스.
 
+> 반입·되돌림은 **프로젝트와 상태 디렉터리에 잠금**을 건다. 그래서 반입이 도는 동안에는 dry-run 도
+> `exit 2` 로 거절된다 — 그때 「지금 무엇이 떠 있나」는 `cat /var/lib/bidvector-v2/current`(그리고
+> 끝나지 않은 반입이면 `.../pending`)로 본다.
+
 > **두 번째 되돌림의 대상은 「직전」이 아니라 「방금 떠난 쪽」이다.** A→B 뒤 되돌리면 B→A 가 되고
 > `previous` 는 B 가 된다 — 거기서 또 되돌리면 **B 로 간다**(마이그레이션 차이가 없으면 가드도 울지
 > 않는다). dry-run 이 기본이고 머리줄에 `== 되돌림 <어디서> → <어디로>` 를 찍는다 — **그 줄을 읽고**
@@ -317,27 +327,22 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### 9.1 거는 법
 
-운영 app 은 컨테이너 안에 있으므로 `compose run` 으로 **일회 컨테이너**를 띄운다. 서비스 정의의 env(접속 정보)를
-그대로 물려받고, 포트는 publish 하지 않아 떠 있는 app 과 다투지 않는다.
+호출은 **저장소의 `tools/prod-notification-sweep.sh`** 가 진다 — 반입과 같은 compose 파일 셋·같은
+프로젝트 이름·같은 env 파일을 쓰고, **release 태그를 `<state>/current` 에서 읽는다**(env 파일에 넣지
+않는다 — §1.3 이 그 키를 비워 두라고 적는다. 그래서 반입 뒤 갱신을 잊을 수 없다). 끝나지 않은 반입이
+있으면 돌리지 않고 멈춘다 — 그때 떠 있는 것은 `current` 가 아니다.
+
+**이 스크립트는 사본으로 떼어 둘 수 없다** — compose 파일 셋을 읽으므로 `<저장소>`(§1.4b) 안에서
+돈다. 인증서 감시(§「host nginx 조각」)가 단독 스크립트라 사본으로 떼어 둔 것과 다른 점이다. 그래서
+이 unit 이 실행하는 내용은 **그 저장소에 쓸 수 있는 사람**이 정한다 — 레인들이 브랜치를 바꾸는 작업
+트리를 `<저장소>` 로 쓰지 않는 이유다(§1.4b).
+
+한 번 손으로 확인:
 
 ```bash
-sudo install -d -m 755 /usr/local/lib/bidvector-v2
-sudo tee /usr/local/lib/bidvector-v2/notification-sweep.sh >/dev/null <<'SH'
-#!/bin/sh
-set -eu
-cd /opt/bidvector-v2        # 반입한 compose 파일 셋이 있는 자리
-exec docker compose \
-  -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml \
-  --env-file /etc/bidvector-v2/prod.env -p bidvector-v2-prod \
-  run --rm --no-deps app --bidvector.notification-sweep.mode=once
-SH
-sudo chmod 755 /usr/local/lib/bidvector-v2/notification-sweep.sh
+cd <저장소>
+./tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
 ```
-
-- `-p bidvector-v2-prod` 를 **반드시 적는다** — 프로젝트 이름이 다르면 다른(또는 빈) DB 를 훑는다.
-- `--no-deps` — postgres 는 이미 떠 있다. 이 러너가 스택을 건드리지 않는다.
-- `BIDVECTOR_RELEASE_TAG` 는 env 파일에 자리만 있으므로, **반입된 release 태그를 넣어 두거나** 스크립트에서
-  `BIDVECTOR_RELEASE_TAG=$(cat /var/lib/bidvector-v2/current)` 로 넘긴다(그러지 않으면 `${…:?}` 에서 멈춘다).
 
 ### 9.2 주기 — 하루 두세 번
 
@@ -352,7 +357,8 @@ Description=bidvector 알림 훑기 (일회 러너)
 [Service]
 Type=oneshot
 User=deploy
-ExecStart=/usr/local/lib/bidvector-v2/notification-sweep.sh
+WorkingDirectory=<저장소>
+ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
 ```
 
 ```ini
@@ -398,11 +404,11 @@ systemctl list-timers bidvector-notification-sweep.timer
 
 ## 10. 메모리
 
-| 서비스 | `mem_limit` | 리허설 실측(2026-10-31) | 비고 |
+| 서비스 | `mem_limit` | 리허설 실측(2026-10-31 · 정본은 evidence checklist 1.5 — 리허설을 다시 돌리면 여기도 같이 고친다) | 비고 |
 |---|---|---|---|
-| app | `1536m` | 기동 직후 292MiB · 인증 GET 300건(8 병렬) 뒤 319MiB | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` — 힙 상한 약 1.05GiB |
-| postgres | `1g` | 42 → 44MiB | **빈 DB** 의 수다 — 데이터가 쌓이면 늘어난다 |
-| proxy | `128m` | 11 → 15MiB | |
+| app | `1536m` | 기동 직후 300MiB · 인증 GET 300건(8 병렬) 뒤 323MiB | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` — 힙 상한 약 1.05GiB |
+| postgres | `1g` | 42 → 45MiB | **빈 DB** 의 수다 — 데이터가 쌓이면 늘어난다 |
+| proxy | `128m` | 11 → 16MiB | |
 | web | `64m` | 11 → 11MiB | |
 | ml-serving | `1g` | 재지 않았다(기본 미기동) | `--profile ml` 로 띄울 때 먼저 잰다 |
 
