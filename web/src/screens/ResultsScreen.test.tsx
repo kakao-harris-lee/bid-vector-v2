@@ -8,6 +8,7 @@ import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
+import { VAT_TREATMENT_DISPLAY } from '../display/moneyDisplay';
 import {
   GAP_STATE_DISPLAY,
   OUTCOME_AGREEMENT_DISPLAY,
@@ -275,7 +276,9 @@ describe('잠정은 확정 자리에 서지 않는다 (SET-02)', () => {
     const provisional = (await screen.findByTestId('provisional-award-51')).textContent ?? '';
     expect(provisional).toContain('1,310,000,000');
     expect(provisional).toContain('KRW');
-    expect(provisional).toContain('INCLUSIVE');
+    // 과세는 **표의 문면**이다(r1 CR M-1) — 운영자가 화면 C 에서 고른 말과 같은 말이어야 한다.
+    expect(provisional).toContain(VAT_TREATMENT_DISPLAY.INCLUSIVE.label);
+    expect(provisional, '원문 토큰이 그대로 섰다').not.toContain('INCLUSIVE');
   });
 
   it('투찰율은 서버 표기 그대로다', async () => {
@@ -440,7 +443,12 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
     const amount = (await screen.findByTestId('submitted-amount-51')).textContent ?? '';
     expect(amount).toContain('1,350,000,000');
     expect(amount).toContain('KRW');
-    expect(amount).toContain('INCLUSIVE');
+    /**
+     * **같은 값에 두 말을 두지 않는다**(r1 CR M-1 · v L-2). 운영자는 화면 C 에서 「부가세 포함」을
+     * 고르는데 앞 판은 여기서 `INCLUSIVE` 를 돌려줬다 — 자기가 고른 값을 못 알아본다.
+     */
+    expect(amount).toContain(VAT_TREATMENT_DISPLAY.INCLUSIVE.label);
+    expect(amount, '원문 토큰이 그대로 섰다').not.toContain('INCLUSIVE');
   });
 
   /** 「고른 안」은 **빈칸이 아니라 상태**다 — 오늘의 답은 「메뉴에서 고른 것이 아님」이다. */

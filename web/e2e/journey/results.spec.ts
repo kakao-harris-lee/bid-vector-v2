@@ -92,6 +92,11 @@ const ORIGIN_LABEL: Readonly<Record<string, string>> = {
   OPERATOR_ENTERED: '직접 입력',
   PRICE_MENU: '추천 메뉴에서 고름',
 };
+const VAT_LABEL: Readonly<Record<string, string>> = {
+  INCLUSIVE: '부가세 포함',
+  EXCLUSIVE: '부가세 별도',
+  UNKNOWN: '과세 구분 모름',
+};
 const RATE_STATE_LABEL: Readonly<Record<string, string>> = {
   MEASURED: '잰 값',
   ABSENT_NO_RECORDED_BIDS: '셀 것이 없음',
@@ -318,8 +323,9 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
     mineResult!.submittedAmountCurrency,
   );
+  // 과세는 **표의 문면**으로 선다(r1 CR M-1) — 원문 토큰이 아니다.
   await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
-    mineResult!.submittedAmountVatTreatment,
+    VAT_LABEL[mineResult!.submittedAmountVatTreatment]!,
   );
 
   // 「고른 안」은 빈칸이 아니라 **출처 상태**다(오늘의 답은 「직접 입력」 — 메뉴가 출하 경로에 없다).

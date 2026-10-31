@@ -23,6 +23,7 @@ import {
   provisionalRankOneReading,
   type MoneyReading,
 } from '../display/openingResultDisplay';
+import { vatTreatmentDisplayOf } from '../display/moneyDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
 /** 값이 없는 자리의 **한 문면** — 화면 D·C 와 같은 말이다(같은 뜻에 두 말을 두지 않는다). */
@@ -152,14 +153,14 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
         <MoneyAxis
           reading={confirmedAwardReading(view)}
           testId={`confirmed-award-${caseId}`}
-          parts={(value) => [value.currency, value.basis, value.vatTreatment, value.provenance]}
+          parts={(value) => [value.currency, value.basis, vatTreatmentDisplayOf(value.vatTreatment).label, value.provenance]}
         />
       </ResultField>
       <ResultField label="잠정 1위 투찰가">
         <MoneyAxis
           reading={provisionalRankOneReading(view)}
           testId={`provisional-award-${caseId}`}
-          parts={(value) => [value.currency, value.vatTreatment]}
+          parts={(value) => [value.currency, vatTreatmentDisplayOf(value.vatTreatment).label]}
         />
       </ResultField>
       <ResultField label="잠정 1위 투찰율">
@@ -245,7 +246,9 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
         <span data-testid={`submitted-amount-${caseId}`} className="flex flex-wrap items-baseline gap-1">
           <span className="font-numeric text-sm font-medium">{amountText(result.submittedAmountWon)}</span>
           <span className="text-xs text-ink-soft">{result.submittedAmountCurrency}</span>
-          <span className="text-xs text-ink-soft">{result.submittedAmountVatTreatment}</span>
+          <span className="text-xs text-ink-soft">
+            {vatTreatmentDisplayOf(result.submittedAmountVatTreatment).label}
+          </span>
         </span>
       </ResultField>
       <ResultField label="추천 3안 중 고른 안">
@@ -307,7 +310,7 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
         <MoneyAxis
           reading={confirmedAwardReading(result)}
           testId={`judged-confirmed-award-${caseId}`}
-          parts={(value) => [value.currency, value.basis, value.vatTreatment, value.provenance]}
+          parts={(value) => [value.currency, value.basis, vatTreatmentDisplayOf(value.vatTreatment).label, value.provenance]}
         />
       </ResultField>
     </dl>
