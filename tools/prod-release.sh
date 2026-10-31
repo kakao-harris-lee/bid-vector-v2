@@ -176,8 +176,9 @@ if [ -n "$SOURCE_TAG" ]; then
   for svc in "${SERVICES[@]}"; do docker tag "bidvector/${svc}:${SOURCE_TAG}" "bidvector/${svc}:${TAG}"; done
   RELEASE_TAGGED=1
 else
-  RELEASE_TAGGED=1   # 빌드 경로도 release 태그로 굽는다 — 실패하면 같이 거둔다
+  # 빌드가 끝나야 태그가 생긴다 — 그 전에 표시를 올리면 아무 태그도 없는데 「거뒀다」가 찍힌다(CR r2 L-6).
   ./gradlew --no-daemon :app:bootJar
+  RELEASE_TAGGED=1
   BIDVECTOR_RELEASE_TAG="$TAG" "${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF" --profile ml build "${SERVICES[@]}"
 fi
 
@@ -206,7 +207,9 @@ tmp="$STATE/releases/.${TAG}.manifest.tmp"
   done
   for m in "${MIGRATIONS[@]}"; do echo "migration=${m}"; done
 } > "$tmp"
-mv "$tmp" "$STATE/releases/${TAG}.manifest"
-# manifest 가 섰다 — 이제 태그는 반입이 쓸 것이므로 거두지 않는다.
+# **먼저 내리고 옮긴다.** 반대 순서면 `mv` 와 `RELEASE_TAGGED=0` 사이에서 죽었을 때 manifest 는
+# 있는데 태그는 trap 이 거둔 상태가 되고, 그 뒤 반입은 「ID 가 manifest 와 다르다」로, release 재시도는
+# 「manifest 가 이미 있다」로 둘 다 막힌다(CR r2 L-6).
 RELEASE_TAGGED=0
+mv "$tmp" "$STATE/releases/${TAG}.manifest"
 echo "prod-release: OK — ${STATE}/releases/${TAG}.manifest"
