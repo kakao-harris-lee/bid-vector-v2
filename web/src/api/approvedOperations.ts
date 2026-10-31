@@ -70,6 +70,11 @@ export const APPROVED_OPERATIONS = [
   { method: 'GET', path: '/api/notifications' },
   { method: 'POST', path: '/api/notifications/read' },
   { method: 'POST', path: '/api/notifications/read-notice' },
+
+  // 화면 E 의 대사·집계(M7/7E-3b, D-7E3b-1·2) — **증분은 이것 하나다**. 읽기 하나뿐인 것이
+  // 계약의 모양이고(쓰기 표면 0 — D-7C5B-1), 건별 목록과 집계가 **한 응답**이라 화면이 목록을
+  // 세어 집계를 지어낼 자리가 없다. 질의 인자도 없다 — 주체는 세션 계정이 정한다.
+  { method: 'GET', path: '/api/bid-results' },
 ] as const;
 
 export type ApprovedOperation = (typeof APPROVED_OPERATIONS)[number];

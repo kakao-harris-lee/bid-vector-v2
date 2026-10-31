@@ -40,51 +40,26 @@ export function isResultStage(state: BidCaseState): boolean {
 }
 
 /**
- * 아직 채우지 않은 자리. **뒤에 오는 것(`LATER`)과 영영 오지 않는 것(`PERMANENT`)을 가른다**
- * — 운영자가 기다릴지 말지가 그것으로 갈린다.
+ * 채우지 않은 자리. **뒤에 오는 것(`LATER`)과 영영 오지 않는 것(`PERMANENT`)을 가른다** —
+ * 운영자가 기다릴지 말지가 그것으로 갈린다.
  *
- * 표로 두는 이유: 「준비 중」을 화면 여기저기에 글로 적으면 7E-3b 가 무엇을 채워야 하는지가
- * 코드에서 사라진다. 표에 있으면 그 slice 의 일이 **줄을 지우는 diff** 로 끝난다.
+ * 표로 둔 덕에 **M7/7E-3b 의 일이 줄을 지우는 diff 로 끝났다**: 「준비 중」이던 다섯(내
+ * 투찰가 · 차이 · 고른 안 · 자동 대사 · 낙찰률)은 `readMyBidResults` 가 서면서 화면이 받았다.
+ * 그 자리를 표에 남겨 두면 이미 그린 값 옆에 「준비 중」이 함께 서고, 운영자는 그 칸이 아직
+ * 안 되는 것으로 읽는다.
+ *
+ * 남은 둘은 **영영 오지 않는** 자리다. `kind` 를 그대로 두는 이유는 그 구별이 이 표의
+ * 요점이기 때문이고, 새 `LATER` 가 생기면 그때도 같은 자리가 받는다.
  */
 export interface PendingSlot {
   readonly id: string;
   readonly label: string;
-  /** 왜 비어 있는가 — 「준비 중」만 적지 않는다. */
+  /** 왜 비어 있는가 — 「다루지 않음」만 적지 않는다. */
   readonly why: string;
   readonly kind: 'LATER' | 'PERMANENT';
 }
 
 export const RESULT_PENDING_SLOTS: readonly PendingSlot[] = [
-  {
-    id: 'my-bid-amount',
-    label: '내 투찰가',
-    why: '투찰 기록을 읽을 operation 이 아직 없다 — M7/7C⑤-b 가 세운 뒤 7E-3b 에서 붙는다',
-    kind: 'LATER',
-  },
-  {
-    id: 'award-difference',
-    label: '낙찰가와의 차이',
-    why: '내 투찰가가 서야 뺄 수 있다 — 7E-3b',
-    kind: 'LATER',
-  },
-  {
-    id: 'chosen-plan',
-    label: '추천 3안 중 고른 안',
-    why: '기록이 보존한 그 값을 읽을 자리가 아직 없다 — 7E-3b',
-    kind: 'LATER',
-  },
-  {
-    id: 'reconciliation',
-    label: '자동 대사 결과',
-    why: '상호 매칭(SET-01) 판정을 내는 operation 이 아직 없다 — 7E-3b',
-    kind: 'LATER',
-  },
-  {
-    id: 'win-rate',
-    label: '투찰 대비 낙찰률',
-    why: '집계 operation 이 아직 없다 — 목록을 세어 짓지 않는다(분모 0 이면 「부재」가 답이다)',
-    kind: 'LATER',
-  },
   {
     id: 'back-calculation',
     label: '역산(이 금액이면?)',

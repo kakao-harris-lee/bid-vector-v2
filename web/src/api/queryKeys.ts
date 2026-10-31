@@ -26,3 +26,11 @@ export function openingResultQueryKey(
 
 /** 알림함 한 페이지(M7/7E-3a) — 읽음 처리가 무효화하는 자리다. */
 export const NOTIFICATIONS_QUERY_KEY: readonly [string] = ['notifications'];
+
+/**
+ * 내 입찰 결과(M7/7E-3b) — 건별과 집계가 **한 응답**이라 키도 하나다.
+ *
+ * **인자가 없다**: 계약에 질의 인자가 없고 주체는 세션 계정이 정한다. 계정을 키에 섞으면
+ * 화면이 주체를 아는 척하게 되고, 그 값이 틀려도 캐시는 조용히 갈린다.
+ */
+export const MY_BID_RESULTS_QUERY_KEY: readonly [string] = ['my-bid-results'];
