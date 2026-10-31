@@ -122,7 +122,7 @@ git diff --name-only 9463f6e1..HEAD -- adapters/src/main/resources/db/migration 
 
 | 명령 | 결과 |
 | --- | --- |
-| Kotlin `check` + `qualityBaseline` | **BUILD SUCCESSFUL** (29m 16s) — test **3790 · 실패 0**(app 973 · adapters 1258 · workflow 682 · 나머지 877) |
+| Kotlin `check` + `qualityBaseline` | **BUILD SUCCESSFUL** (30m 01s) — test **3877 · 실패 0**(병합 둘 뒤의 마지막 실측) |
 | web job(Playwright 밖 여덟 step) | 여덟 전부 통과 — `api:types:check` 가 생성 타입과 OpenAPI 의 **바이트 등식**을 확인 |
 | 여정 e2e(W-13) | **11 통과 · flaky 0 · 건너뜀 0 · 중단 0 · spec 4/4**(등록부와 같다) |
 | `container` job 입력 | 무변경(위 path-limited diff 빈 출력) |
@@ -141,7 +141,8 @@ git diff --name-only 9463f6e1..HEAD -- adapters/src/main/resources/db/migration 
 
 ## §6 rollback
 
-`rollback.md` — 경로 한정 복원 목록(기계 산출) · 버릴 clone ①~⑦ 실측 · `실측 HEAD 6af4751d`.
+`rollback.md` — 경로 한정 복원 목록(기계 산출) · 버릴 clone ①~⑦ 실측 · 기준 **`957587c4`** ·
+`실측 HEAD 0b19cd56`.
 핵심 결과: 복원 31 · 삭제 18 · 되돌린 경로의 diff **0 줄** · 복원 트리에서 `check` **exit 0** ·
 base 와 남는 차이는 팀장 계약 파일 하나(의도된 제외). 내 표지 여덟 전부 0, 남의 표지 넷 보존.
 
