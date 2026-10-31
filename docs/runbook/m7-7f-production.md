@@ -286,12 +286,12 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 9. 메모리
 
-| 서비스 | `mem_limit` | 리허설 실측(2026-10-22) | 비고 |
+| 서비스 | `mem_limit` | 리허설 실측(2026-10-31) | 비고 |
 |---|---|---|---|
-| app | `1536m` | 기동 직후 277MiB · 인증 GET 300건(8 병렬) 뒤 265MiB | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` — 힙 상한 약 1.05GiB |
-| postgres | `1g` | 48 → 58MiB | **빈 DB** 의 수다 — 데이터가 쌓이면 늘어난다 |
-| proxy | `128m` | 11 → 16MiB | |
-| web | `64m` | 14 → 11MiB | |
+| app | `1536m` | 기동 직후 292MiB · 인증 GET 300건(8 병렬) 뒤 319MiB | `BIDVECTOR_APP_JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70` — 힙 상한 약 1.05GiB |
+| postgres | `1g` | 42 → 44MiB | **빈 DB** 의 수다 — 데이터가 쌓이면 늘어난다 |
+| proxy | `128m` | 11 → 15MiB | |
+| web | `64m` | 11 → 11MiB | |
 | ml-serving | `1g` | 재지 않았다(기본 미기동) | `--profile ml` 로 띄울 때 먼저 잰다 |
 
 실측은 빈 DB · 짧은 부하라 **상한을 낮출 근거가 아니다**. 승인된 안을 그대로 두고, 운영 중 `docker stats`
