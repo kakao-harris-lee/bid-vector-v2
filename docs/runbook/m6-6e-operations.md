@@ -904,7 +904,7 @@ trivy 는 공식 릴리스 바이너리를 직접 받는다 — 버전 · 자산
 
 이 절은 **로컬에서 재현되는 것만** 적는다. 실 도메인·공개 DNS·운영 인증서·반입 절차는 7F 본편의
 `docs/runbook/m7-7f-production.md` 에 있다. 프록시 설정은 7F 본편에서 **공유 본문**(`docker/proxy.site.caddy`)과
-site 파일 둘(로컬 `docker/proxy.Caddyfile` · 운영 `docker/proxy.Caddyfile.prod`)로 나뉘었다 — 로컬 거동은 그대로다.
+site 파일 둘(로컬 `docker/proxy.Caddyfile` · 운영 `docker/proxy.prod.Caddyfile`)로 나뉘었다 — 로컬 거동은 그대로다.
 
 ### 9.1 무엇이 어디서 도는가
 
