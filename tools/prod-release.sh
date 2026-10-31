@@ -29,7 +29,7 @@ cd "$REPO_ROOT"
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
 
-SERVICES=(app web proxy ml-serving)
+SERVICES=("${BIDVECTOR_PROD_SERVICES[@]}")
 # 서비스 → (위생 정책 · 취약점 kind). CI container job 의 S-22a~b3 · S-22d~e3 와 같은 대응이다.
 declare -A HYGIENE_POLICY=(
   [app]=config/quality/image-hygiene-policy-app.properties

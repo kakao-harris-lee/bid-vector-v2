@@ -51,12 +51,174 @@ if [ -z "$BIDVECTOR_PROD_PROJECT" ]; then
   return 2 2>/dev/null || exit 2
 fi
 
+# release 가 싣는 이미지 넷 — 반입·되돌림·훑기·release 가 **같은 집합**을 본다.
+BIDVECTOR_PROD_SERVICES=(app web proxy ml-serving)
+
+# compose 의 하한 — `!override` 와 `run --pull` 을 아는 판. 문턱이 반입에만 있던 앞 판은 **러너 단독
+# 경로에 문턱이 없었고**, 내려앉은 host 에서 `--pull` 이 「알 수 없는 플래그」로 죽으면 그 종료 코드가
+# 러너 자신의 「1 예외」와 섞여 journal 에서 앱 장애로 보였다(CR L-7 — V4-4 가 닫은 것과 같은 혼동 축).
+BIDVECTOR_PROD_COMPOSE_MIN="2.24.0"
+
+# 어긋나면 1 과 `_PROD_COMPOSE_VER_ERR`.
+_prod_compose_version_ok() {
+  local cv
+  _PROD_COMPOSE_VER_ERR=""
+  cv="$(docker compose version --short 2>/dev/null | sed 's/^v//')"
+  if [ -z "$cv" ]; then
+    _PROD_COMPOSE_VER_ERR="docker compose 판을 읽지 못했다"
+    return 1
+  fi
+  if [ "$(printf '%s\n%s\n' "$BIDVECTOR_PROD_COMPOSE_MIN" "$cv" | sort -V | head -n1)" != "$BIDVECTOR_PROD_COMPOSE_MIN" ]; then
+    _PROD_COMPOSE_VER_ERR="compose ${cv} < ${BIDVECTOR_PROD_COMPOSE_MIN} — !override 와 run --pull 을 모른다"
+    return 1
+  fi
+  return 0
+}
+
 BIDVECTOR_PROD_COMPOSE=(docker compose)
 for _f in "${BIDVECTOR_PROD_COMPOSE_FILES[@]}"; do
   BIDVECTOR_PROD_COMPOSE+=(-f "$_f")
 done
 BIDVECTOR_PROD_COMPOSE+=(-p "$BIDVECTOR_PROD_PROJECT")
 unset _f
+
+# **해석된 compose 가 컨테이너에 주는 env 키의 집합**(ml 프로필 없이 — 반입·훑기가 쓰는 모양).
+# 값이 아니라 **키**를 고정한다: 새 키가 compose 에 들어오면 preflight 가 멈추고, 사람이 「이것이 app
+# 설정을 바꾸는 통로인가」를 한 번 본다. v V5-1 이 바로 그 축이었다 — `JAVA_TOOL_OPTIONS` 는 템플릿
+# 키 집합 게이트를 통과하는 키인데 **내용은 아무도 보지 않았고**, 거기 넣은 `-D` 시스템 속성이 compose
+# 가 준 env 를 이겨 app 이 가드와 다른 DB 에 붙었다. 통로 이름을 열거해 거부하면 새 이름 하나로 다시
+# 열리므로 **표면 자체를 등식으로** 닫는다.
+BIDVECTOR_PROD_SERVICE_ENV_KEYS=(
+  app.BIDVECTOR_EVALUATION_CANDIDATECAP
+  app.BIDVECTOR_PERSISTENCE_CREDENTIAL
+  app.BIDVECTOR_PERSISTENCE_JDBCURL
+  app.BIDVECTOR_PERSISTENCE_USERNAME
+  app.JAVA_TOOL_OPTIONS
+  app.MANAGEMENT_SERVER_PORT
+  app.OPERATOR_CREDENTIAL_VALUE
+  app.SERVER_PORT
+  postgres.POSTGRES_DB
+  postgres.POSTGRES_PASSWORD
+  postgres.POSTGRES_USER
+  proxy.BIDVECTOR_PROXY_APP_UPSTREAM
+  proxy.BIDVECTOR_PROXY_DOMAIN
+  proxy.BIDVECTOR_PROXY_HTTPS_PORT
+  proxy.BIDVECTOR_PROXY_WEB_UPSTREAM
+  web.BIDVECTOR_WEB_PORT
+)
+
+# app 의 JVM 옵션 문자열 — **허용 형태 하나**다(거부 목록이 아니다). runbook 「메모리」 표가 쓰는
+# 그 형태이고, 그 밖의 무엇도 받지 않는다. 자유 문자열인 이 키가 운영 app 의 유일한 옵션 통로다.
+_prod_jvm_options_ok() {
+  [[ "${1:-}" =~ ^-XX:MaxRAMPercentage=([0-9]{1,2}|100)(\.[0-9]+)?$ ]]
+}
+
+# <해석된 config json> → app 설정 통로가 기대대로인가. 어긋나면 1 과 `_PROD_SURFACE_ERR`.
+# **값은 문면에 옮기지 않는다** — 이 키에 자격을 실을 수 있다.
+_prod_config_surface_ok() {
+  local cfg="$1" got want
+  _PROD_SURFACE_ERR=""
+  got="$(printf '%s' "$cfg" | jq -r '.services | to_entries[] | .key as $s | (.value.environment // {} | keys[]) | "\($s).\(.)"' | sort)"
+  want="$(printf '%s\n' "${BIDVECTOR_PROD_SERVICE_ENV_KEYS[@]}" | sort)"
+  if [ "$got" != "$want" ]; then
+    _PROD_SURFACE_ERR="해석된 compose 의 서비스 env 키 집합이 고정 목록과 다르다 — 더해짐[$(comm -23 <(printf '%s\n' "$got") <(printf '%s\n' "$want") | tr '\n' ' ')] 빠짐[$(comm -13 <(printf '%s\n' "$got") <(printf '%s\n' "$want") | tr '\n' ' ')]. 새 키가 app 설정을 바꾸는 통로인지 보고 tools/prod-env.sh 의 목록을 갱신한다"
+    return 1
+  fi
+  if ! _prod_jvm_options_ok "$(printf '%s' "$cfg" | jq -r '.services.app.environment.JAVA_TOOL_OPTIONS // empty')"; then
+    _PROD_SURFACE_ERR="app 의 JVM 옵션이 허용 형태가 아니다 — 받는 것은 '-XX:MaxRAMPercentage=<0..100>' 하나뿐이다. 이 문자열의 -D 시스템 속성은 compose 가 준 env 를 이기므로 app 이 가드와 다른 DB·자격으로 갈 수 있다"
+    return 1
+  fi
+  return 0
+}
+
+# release 태그의 모양 — `tools/prod-release.sh` 가 만들 수 있는 집합과 같다. 상태 파일에서 읽은 값을
+# 경로·이미지 참조로 쓰기 전에 이것으로 거른다. 손상된 `current` 가 **compose 의 이미지 조회까지**
+# 흘러가 거기서 exit 1 로 끝나던 길을 앞에서 끊는다(v V4-4 — 러너 자신의 「예외(1)」와 구별되지 않았다).
+_prod_valid_tag() {
+  [[ "${1:-}" =~ ^[a-z0-9][a-z0-9._-]{0,62}$ ]] && [ "$1" != local ]
+}
+
+# <manifest 경로> <태그> → 이미지 넷의 **현재 태그 ID 가 manifest 와 같은가.** 다르면 1 과 함께
+# `_PROD_IMAGE_ERR` 에 사유를 둔다(종료 코드는 호출자마다 다르므로 끊는 것은 호출자가 한다).
+#
+# 반입 preflight 에만 있던 앞 판은 **주기 러너가 이 불변식을 거치지 않았다** — 누가 태그를 옮기면
+# 반입은 멈추는데 러너는 옮겨진 이미지를 운영 DB 자격과 함께 띄웠다(v V4-2 실측).
+_prod_images_match() {
+  local man="$1" tag="$2" svc want have
+  _PROD_IMAGE_ERR=""
+  for svc in "${BIDVECTOR_PROD_SERVICES[@]}"; do
+    # 매치 0 을 실패로 올리지 않는다 — 그러면 아래 「ID 가 없다」 문면에 닿지 못하고 조용히 죽는다.
+    want="$({ grep -E "^image\.${svc}=" "$man" || true; } | cut -d= -f2-)"
+    if [ -z "$want" ]; then
+      _PROD_IMAGE_ERR="manifest 에 ${svc} 이미지 ID 가 없다: ${man}"
+      return 1
+    fi
+    have="$(docker image inspect "bidvector/${svc}:${tag}" --format '{{.Id}}' 2>/dev/null || true)"
+    if [ "$have" != "$want" ]; then
+      _PROD_IMAGE_ERR="bidvector/${svc}:${tag} 의 ID 가 manifest 와 다르다(없거나 태그가 옮겨졌다)"
+      return 1
+    fi
+  done
+  # 통과를 루프 마지막 `if` 의 암묵 반환에 맡기지 않는다 — 루프 끝에 0 이 아닐 수 있는 명령이 하나
+  # 들어오면 함수가 **조용히 1** 이 되고 `_PROD_IMAGE_ERR` 는 빈 채라, 호출자가 사유 없는 거절을 찍는다.
+  return 0
+}
+
+# **잠금의 자리는 환경에서 오지 않는다 — 고정 절대 경로다.** 앞 판은 `${TMPDIR:-/tmp}` 였고, `TMPDIR`
+# 이 서로 다른 두 셸은 **다른 파일을 잠갔다** — 같은 프로젝트의 동시 반입이 환경 문자열 하나로 다시
+# 열렸다(v V4-1). systemd unit 의 `PrivateTmp=yes` 도 같은 꼴이다. 그 설정이 가리는 것은 `/tmp` 와
+# `/var/tmp` 뿐이라, FHS 의 잠금 자리는 unit 안팎이 **같은 파일**을 본다. tmpfs 라 재부팅에 지워지는
+# 것도 맞다 — 잠금은 살아 있는 프로세스의 것이지 남겨 두는 기록이 아니다.
+BIDVECTOR_PROD_LOCK_DIR=/run/lock/bidvector-v2
+
+# <잠금 파일> <무엇> → `flock -n` 으로 잡는다(기다리지 않는다). 실패하면 1 과 `_PROD_LOCK_ERR` 를
+# 남긴다 — 문면의 접두는 호출자마다 다르므로 끊는 것은 호출자가 한다.
+_prod_lock() {
+  local f="$1" what="$2" fd
+  _PROD_LOCK_ERR=""
+  exec {fd}>>"$f" || { _PROD_LOCK_ERR="${what} 잠금 파일을 열지 못했다: $f"; return 1; }
+  flock -n "$fd" || {
+    _PROD_LOCK_ERR="다른 반입·되돌림·훑기가 ${what}에서 돌고 있다($f) — 끝난 뒤 다시"
+    eval "exec ${fd}>&-" 2>/dev/null || true
+    return 1
+  }
+  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
+}
+
+# <프로젝트 이름> → 그 프로젝트의 잠금. **잠금 둘의 순서는 프로젝트 먼저, 그 다음 상태 디렉터리**이고
+# 셋 스크립트가 같은 순서를 쓴다(교착이 생길 수 없다 — 셋 다 기다리지 않는다).
+_prod_project_lock() {
+  local proj="$1" owner mode
+  _PROD_LOCK_ERR=""
+  mkdir -p "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null \
+    || { _PROD_LOCK_ERR="잠금 디렉터리를 만들지 못했다: ${BIDVECTOR_PROD_LOCK_DIR}"; return 1; }
+  # **자리의 소유자와 권한을 본다.** `/run/lock` 은 sticky·world-writable(1777)이고 tmpfs 라 재부팅마다
+  # 비므로, 그 사이 다른 계정이 이 이름을 선점할 수 있다. 남이 소유한 자리는 잠금이 서로 안 보이게
+  # 만들고, group/other 쓰기가 열린 자리는 **잠금 파일을 지워 inode 를 가르는** 우회를 누구에게나
+  # 연다(v V5-2 실측: 쥐어진 잠금의 파일을 지우면 다음 반입이 새 inode 를 잠그고 지나간다).
+  # 부팅 때 자리를 미리 만드는 법은 runbook §1.4 의 tmpfiles.d 한 줄.
+  owner="$(stat -c '%u' "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null || true)"
+  mode="$(stat -c '%a' "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null || true)"
+  if [ "$owner" != "$(id -u)" ]; then
+    _PROD_LOCK_ERR="잠금 디렉터리의 소유자가 내가 아니다(${BIDVECTOR_PROD_LOCK_DIR} uid=${owner:-?} ≠ $(id -u)) — 남이 선점한 자리에서는 잠금이 서로 보이지 않는다. runbook §1.4"
+    return 1
+  fi
+  # 마지막 세 자리가 ugo 다(앞의 setuid·setgid·sticky 자리는 쓰기 권한과 무관하다). `022` = g+o 쓰기.
+  if [ -z "$mode" ] || [ "$(( 8#${mode: -3} & 8#022 ))" -ne 0 ]; then
+    _PROD_LOCK_ERR="잠금 디렉터리의 권한을 읽지 못했거나 group/other 쓰기가 열려 있다(${BIDVECTOR_PROD_LOCK_DIR} mode=${mode:-?}) — 잠금 파일을 지워 우회할 수 있다. runbook §1.4"
+    return 1
+  fi
+  _prod_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${proj}.lock" "프로젝트 ${proj}"
+}
+
+_prod_unlock_all() {
+  local fd
+  for fd in ${BIDVECTOR_LOCK_FDS:-}; do
+    flock -u "$fd" 2>/dev/null || true
+    eval "exec ${fd}>&-" 2>/dev/null || true
+  done
+  BIDVECTOR_LOCK_FDS=""
+}
 
 # <상태 디렉터리> <release> → 그 release 의 마이그레이션 목록(정렬). manifest 가 없으면 1 을 돌려준다.
 _prod_migrations() {

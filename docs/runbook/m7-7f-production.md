@@ -46,10 +46,31 @@
    - 자격 값(PG 암호 · 운영자 자격)은 운영자가 생성한다(`openssl rand -hex 24` 등). 저장소·채팅·로그에 적지 않는다.
    - `BIDVECTOR_RELEASE_TAG` 는 비워 둔다(반입 스크립트가 준다).
    - `BIDVECTOR_PROXY_DOMAIN=bidvector.kr` · `BIDVECTOR_PROXY_HTTPS_PORT=28443`.
-   - `BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/<BIDVECTOR_PG_DB 값>`.
+   - `BIDVECTOR_APP_JDBC_URL=jdbc:postgresql://postgres:5432/<BIDVECTOR_PG_DB 값>` — **이 형태 그대로**다.
+     호스트·포트를 바꾸거나 `?currentSchema=…` 같은 매개변수를 붙이면 반입이 `exit 2` 로 멈춘다: 마이그레이션
+     가드는 이 compose 의 `postgres` 를 읽으므로, app 이 다른 자리에 붙으면 **가드가 다른 DB 를 보고 통과시킨다.**
+   - `BIDVECTOR_APP_JAVA_TOOL_OPTIONS` 는 **`-XX:MaxRAMPercentage=<0..100>` 하나만** 받는다(§「메모리」 표의 그
+     형태). 다른 옵션을 더하면 반입이 `exit 2` · 주기 러너가 `exit 3` 으로 멈춘다 — 이 문자열의 `-D` 시스템
+     속성은 compose 가 준 env 를 **이기므로**, 여기에 `-Dbidvector.persistence.jdbcUrl=…` 를 넣으면 위 JDBC
+     등식을 통과한 채 app 만 다른 DB 로 간다. 힙 말고 다른 JVM 조정이 필요하면 **이 키가 아니라** compose
+     파일과 그 게이트 목록을 함께 고친다.
    - 메모리 키는 §「메모리」 표.
    - 확인: `./tools/prod-env-keys-check.sh --env-file /etc/bidvector-v2/prod.env`
 4. **상태 디렉터리**(release manifest · 백업 · 이력): `sudo install -d -m 700 -o "$USER" /var/lib/bidvector-v2`
+4c. **잠금 자리**(`/run/lock/bidvector-v2`) — 스크립트가 첫 실행에서 만들지만, **부팅마다 미리 만들어 둔다.**
+   `/run/lock` 은 tmpfs 이고 sticky·world-writable(`1777`)이라, 재부팅과 첫 반입 사이에 같은 host 의 다른
+   계정이 이 이름을 선점할 수 있다. 선점당하면 반입·되돌림은 `exit 2`, 주기 러너는 `exit 3` 으로 멈춘다
+   (fail-closed지만 그때는 고칠 때까지 반입이 안 된다).
+   ```bash
+   # /etc/tmpfiles.d/bidvector-v2.conf  — systemd-tmpfiles 가 부팅마다 자리를 먼저 만든다
+   d /run/lock/bidvector-v2 0755 deploy deploy -
+   ```
+   `sudo systemd-tmpfiles --create` 로 지금 한 번 적용한다. 소유자는 §1 에서 반입을 돌리는 사용자와 같아야
+   한다 — 스크립트가 **소유자 == 자기 uid** 와 **group/other 쓰기 없음**을 단언하고, 어긋나면 거절한다
+   (group/other 쓰기가 열린 자리는 잠금 파일을 지워 우회할 수 있다). 자리를 환경변수에서 떼어 둔 이유는
+   §7.1 의 주를 본다.
+   > 남은 자리: **그 사용자 자신**은 쥐어진 잠금 파일을 지워 우회할 수 있다(새 inode 가 잠긴다). 반입을
+   > 돌리는 사용자는 이미 docker 소켓을 가지므로 이 경로로 늘어나는 권한은 없다 — 사고 조사에서 알아 두는 사실이다.
 4b. **저장소 자리**를 한 번 정한다 — release 를 만들고(§2) 반입을 돌리고(§3) 주기 러너가 compose 파일을
    읽는(§「주기 실행」) 자리가 **모두 여기**다. 이 문서는 아래에서 `<저장소>` 로 쓴다.
    ```bash
@@ -263,11 +284,30 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
 ```
 
-직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스.
+직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스. 그때 「되돌림이 보았던
+떠 있는 release」를 `--expect-running` 으로 함께 넘기고, 반입이 잠금을 다시 쥔 자리에서 대조해 그 사이 다른
+반입이 끝났으면 멈춘다. **되돌림이 자동으로 넘긴다 — 운영자가 손으로 줄 일은 없다.**
 
-> 반입·되돌림은 **프로젝트와 상태 디렉터리에 잠금**을 건다. 그래서 반입이 도는 동안에는 dry-run 도
-> `exit 2` 로 거절된다 — 그때 「지금 무엇이 떠 있나」는 `cat /var/lib/bidvector-v2/current`(그리고
-> 끝나지 않은 반입이면 `.../pending`)로 본다.
+> 반입·되돌림·**주기 러너**(§9)는 **프로젝트와 상태 디렉터리에 잠금**을 건다. 그래서 반입이 도는 동안에는
+> dry-run 도 `exit 2` 로 거절된다 — 그때 「지금 무엇이 떠 있나」는 `cat /var/lib/bidvector-v2/current`(그리고
+> 끝나지 않은 반입이면 `.../pending`)로 본다. 셋 다 기다리지 않으므로 교착은 생기지 않는다.
+>
+> 프로젝트 잠금의 자리는 `/run/lock/bidvector-v2/prod.<프로젝트>.lock` 으로 **고정**이다 — 환경변수에서
+> 오지 않는다. `TMPDIR` 아래였던 앞 판은 그 변수가 다른 두 셸이 서로 다른 파일을 잠가 동시 반입이
+> 열렸다. systemd unit 에 `PrivateTmp=yes` 를 붙여도 이 자리는 unit 안팎이 같은 파일을 본다 — 그 설정이
+> 가리는 것은 `/tmp` 와 `/var/tmp` 뿐이다. 반대로 `ProtectSystem=strict` 처럼 `/run` 을 읽기 전용으로
+> 만드는 설정을 더한다면 **이 디렉터리를 `ReadWritePaths=` 에 넣는다** — 없으면 잠금을 열지 못해
+> 반입·되돌림은 `exit 2`, 주기 러너는 `exit 3` 이다.
+
+> **반입·되돌림이 `exit 2` 인데 반입·되돌림이 돌고 있지 않다면 주기 러너를 본다.** 러너도 같은 잠금을
+> 쥐고(§9.1), 매달리면 그동안 이 두 경로가 막힌다.
+> ```bash
+> fuser -v /run/lock/bidvector-v2/prod.bidvector-v2-prod.lock   # 누가 쥐고 있나
+> systemctl status bidvector-notification-sweep                  # 러너면 여기 보인다
+> sudo systemctl stop bidvector-notification-sweep               # 멈추면 fd 가 닫히고 잠금이 풀린다
+> ```
+> unit 의 `TimeoutStartSec=`(§9.2)이 상한을 지므로 이 손질이 필요한 경우는 상한 안에서 급한 때뿐이다.
+> 러너를 멈춘 뒤에는 일회 컨테이너가 남았는지 본다(`docker ps --filter name=<프로젝트>-app-run`).
 
 > **두 번째 되돌림의 대상은 「직전」이 아니라 「방금 떠난 쪽」이다.** A→B 뒤 되돌리면 B→A 가 되고
 > `previous` 는 B 가 된다 — 거기서 또 되돌리면 **B 로 간다**(마이그레이션 차이가 없으면 가드도 울지
@@ -332,6 +372,11 @@ sudo nginx -t && sudo systemctl reload nginx
 않는다 — §1.3 이 그 키를 비워 두라고 적는다. 그래서 반입 뒤 갱신을 잊을 수 없다). 끝나지 않은 반입이
 있으면 돌리지 않고 멈춘다 — 그때 떠 있는 것은 `current` 가 아니다.
 
+러너는 **반입과 같은 이미지 불변식**도 거친다: `<state>/releases/<current>.manifest` 의 이미지 ID 와 지금
+태그가 가리키는 ID 가 같아야 하고, 일회 컨테이너는 `--pull never` 로 뜬다. 누가 태그를 옮겼거나 태그가
+로컬에 없으면 **훑지 않고 `exit 3`** 이다(반입이 막는 것을 러너만 통과시키는 길이 없다). 잠금도 반입과
+같은 둘을 잡는다(§7.1 의 주) — 반입이 도는 중이면 훑지 않고 다음 주기로 미룬다. 훑기는 멱등이라 그래도 된다.
+
 **이 스크립트는 사본으로 떼어 둘 수 없다** — compose 파일 셋을 읽으므로 `<저장소>`(§1.4b) 안에서
 돈다. 인증서 감시(§「host nginx 조각」)가 단독 스크립트라 사본으로 떼어 둔 것과 다른 점이다. 그래서
 이 unit 이 실행하는 내용은 **그 저장소에 쓸 수 있는 사람**이 정한다 — 레인들이 브랜치를 바꾸는 작업
@@ -359,6 +404,12 @@ Type=oneshot
 User=deploy
 WorkingDirectory=<저장소>
 ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+# **상한을 반드시 둔다.** 러너는 훑는 내내 프로젝트·상태 잠금을 쥔다(§7.1 의 주). `Type=oneshot` 은
+# 시작 시간 제한이 기본으로 꺼져 있으므로, 러너가 매달리면 잠금이 풀리지 않고 **반입과 되돌림이
+# `exit 2` 로 거절된다** — 사고 중에 가장 필요한 두 경로다. 상한이 지나면 systemd 가 러너를 죽이고
+# fd 가 닫히며 잠금이 풀린다.
+TimeoutStartSec=15m
+TimeoutStopSec=1m
 ```
 
 ```ini
@@ -390,8 +441,12 @@ journalctl -u bidvector-notification-sweep -n 50
 
 ### 9.4 실패 감지
 
-종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 외부 발송이 없으므로
-**journal 이 유일한 창구**다. 주기 확인:
+종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 여기에
+`tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**가 더해진다: env 파일을 읽지 못했다 · compose 판이
+하한 미만이다 · 잠금을 열지 못했거나 반입·되돌림·다른 훑기가 도는 중이다 · 반입 기록이 없거나 손상됐다 ·
+끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · app 설정 통로가 기대와
+다르다. **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
+외부 발송이 없으므로 **journal 이 유일한 창구**다. 주기 확인:
 
 ```bash
 # 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가

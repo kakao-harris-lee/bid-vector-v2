@@ -36,24 +36,11 @@ done
 
 # 반입과 **같은 잠금 둘**을 같은 순서로 쓴다 — 되돌림이 반입과 겹치면 상태 파일이 엉킨다(v V-4).
 # 되돌림은 결국 `prod-deploy.sh` 를 부르므로 그 쪽이 잡을 수 있도록 **exec 하기 전에 전부 놓는다**.
-# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리.
-# 상태 디렉터리 하나만 잡던 앞 판은 **같은 프로젝트를 다른 state-dir 로** 동시에 반입할 수 있었다
-# (v V3-4). 순서를 고정했으므로 교착은 없다. 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
-_prod_lock() { # <잠금 파일> <무엇>
-  local f="$1" what="$2" fd
-  exec {fd}>>"$f" || _die "${what} 잠금 파일을 열지 못했다: $f" 2
-  flock -n "$fd" || _die "다른 반입·되돌림이 ${what}에서 돌고 있다($f) — 끝난 뒤 다시" 2
-  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
-}
-_prod_unlock_all() {
-  local fd
-  for fd in ${BIDVECTOR_LOCK_FDS:-}; do flock -u "$fd" 2>/dev/null || true; eval "exec ${fd}>&-" 2>/dev/null || true; done
-  BIDVECTOR_LOCK_FDS=""
-}
+# 자리와 순서의 정본은 `tools/prod-env.sh` 다 — 셋 스크립트가 같은 글자를 쓴다.
 PROJ_FOR_LOCK="${PROJECT:-$BIDVECTOR_PROD_PROJECT}"
 mkdir -p "$STATE"
-_prod_lock "${TMPDIR:-/tmp}/bidvector-v2-prod.${PROJ_FOR_LOCK}.lock" "프로젝트 ${PROJ_FOR_LOCK}"
-_prod_lock "$STATE/.lock" "이 상태 디렉터리"
+_prod_project_lock "$PROJ_FOR_LOCK" || _die "$_PROD_LOCK_ERR" 2
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 2
 
 current="$(cat "$STATE/current" 2>/dev/null || true)"
 previous="$(cat "$STATE/previous" 2>/dev/null || true)"
@@ -74,6 +61,12 @@ else
   echo "== 되돌림 ${from} → ${to}"
 fi
 
+# 상태 파일에서 읽은 값이다 — 경로·이미지 참조로 넘기기 전에 모양을 본다(CR L-1, 러너와 같은 술어).
+for _t in "$from" "$to"; do
+  _prod_valid_tag "$_t" || _die "상태 파일의 release 태그 모양이 아니다: ${_t} — ${STATE} 의 기록이 손상됐다" 2
+done
+unset _t
+
 added="$(_prod_migrations_lost "$STATE" "$from" "$to")" \
   || _die "manifest 를 읽지 못했다(떠 있는 것 ${from} · 가려는 것 ${to})" 2
 if [ -n "$added" ]; then
@@ -85,7 +78,9 @@ if [ -n "$added" ]; then
 fi
 echo "  마이그레이션 차이 0 — 이미지 되돌림으로 충분하다"
 
-args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to")
+# **지금 떠 있다고 본 것을 함께 넘긴다** — 아래에서 잠금을 놓고 exec 하는 사이에 다른 반입이 끝나면
+# `to` 는 낡은 값이 된다. 반입 쪽이 잠금을 다시 쥔 자리에서 이 값을 대조해 멈춘다(v V4-6).
+args=(--env-file "$ENVF" --state-dir "$STATE" --release "$to" --expect-running "$from")
 [ -z "$PROJECT" ] || args+=(--project "$PROJECT")
 [ "$APPLY" -eq 0 ] || args+=(--apply)
 # 잠금을 놓고 넘긴다 — 같은 잠금을 `prod-deploy.sh` 가 다시 잡는다(겹치면 자기 자신에게 막힌다).

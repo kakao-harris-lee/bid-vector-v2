@@ -34,27 +34,31 @@ cd "$REPO_ROOT"
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
 
-SERVICES=(app web proxy ml-serving)
-COMPOSE_MIN="2.24.0"
 DISK_MIN_MB=2048
 WAIT_TIMEOUT_S=300
 
 _die() { echo "prod-deploy: $1" >&2; exit "${2:-1}"; }
 _plan() { echo "  [계획] $*"; }
 
-ENVF="" STATE="" REL="" PROJECT="" APPLY=0 ACCEPT_MISSING_DATA=0
+ENVF="" STATE="" REL="" PROJECT="" APPLY=0 ACCEPT_MISSING_DATA=0 EXPECT_RUNNING=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --env-file) ENVF="${2:-}"; shift 2 ;;
     --state-dir) STATE="${2:-}"; shift 2 ;;
     --release) REL="${2:-}"; shift 2 ;;
     --project) PROJECT="${2:-}"; shift 2 ;;
+    # 되돌림이 자동으로 넘기는 인자다(runbook §7.1) — 운영자가 손으로 줄 일은 없어 사용법에서 뺐다.
+    --expect-running) EXPECT_RUNNING="${2:-}"; shift 2 ;;
     --accept-missing-data) ACCEPT_MISSING_DATA=1; shift ;;
     --apply) APPLY=1; shift ;;
     *) _die "알 수 없는 인자: $1" 2 ;;
   esac
 done
 [ -n "$ENVF" ] && [ -n "$STATE" ] && [ -n "$REL" ] || _die "사용법: $0 --env-file <운영 env> --state-dir <dir> --release <태그> [--project <이름>] [--accept-missing-data] [--apply]" 2
+# 이 값은 아래에서 **경로**(`<state>/releases/<태그>.manifest`)와 **이미지 참조**와 compose 보간으로
+# 간다 — 쓰기 전에 모양을 본다. 오늘은 뒤의 manifest 읽기가 fail-closed 지만, preflight 순서가 한 번
+# 바뀌면 그 보호가 사라진다(CR L-1). 되돌림이 상태 파일에서 읽어 넘기는 값도 이 자리를 지난다.
+_prod_valid_tag "$REL" || _die "release 태그 모양이 아니다: ${REL}" 2
 for t in docker jq curl stat; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
 
 COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
@@ -64,23 +68,12 @@ EXPECT_PROJECT="$BIDVECTOR_PROD_PROJECT"
 if [ -n "$PROJECT" ]; then COMPOSE+=(-p "$PROJECT"); EXPECT_PROJECT="$PROJECT"; fi
 export BIDVECTOR_RELEASE_TAG="$REL"
 
-# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리.
+# **잠금 둘을 정해진 순서로 잡는다** — 프로젝트 먼저, 그 다음 상태 디렉터리(`tools/prod-env.sh`).
 # 상태 디렉터리 하나만 잡던 앞 판은 **같은 프로젝트를 다른 state-dir 로** 동시에 반입할 수 있었다
 # (v V3-4). 순서를 고정했으므로 교착은 없다. 잡지 못하면 **바로 거절**한다 — 기다리지 않는다.
-_prod_lock() { # <잠금 파일> <무엇>
-  local f="$1" what="$2" fd
-  exec {fd}>>"$f" || _die "${what} 잠금 파일을 열지 못했다: $f" 2
-  flock -n "$fd" || _die "다른 반입·되돌림이 ${what}에서 돌고 있다($f) — 끝난 뒤 다시" 2
-  BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
-}
-_prod_unlock_all() {
-  local fd
-  for fd in ${BIDVECTOR_LOCK_FDS:-}; do flock -u "$fd" 2>/dev/null || true; eval "exec ${fd}>&-" 2>/dev/null || true; done
-  BIDVECTOR_LOCK_FDS=""
-}
 mkdir -p "$STATE"
-_prod_lock "${TMPDIR:-/tmp}/bidvector-v2-prod.${EXPECT_PROJECT}.lock" "프로젝트 ${EXPECT_PROJECT}"
-_prod_lock "$STATE/.lock" "이 상태 디렉터리"
+_prod_project_lock "$EXPECT_PROJECT" || _die "$_PROD_LOCK_ERR" 2
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 2
 
 echo "== preflight — release ${REL}"
 # env 파일
@@ -98,19 +91,14 @@ echo "  env 파일: 저장소 밖 · 0600 · 키 집합 등식"
 # manifest 와 이미지
 MAN="$STATE/releases/${REL}.manifest"
 [ -r "$MAN" ] || _die "release manifest 가 없다: ${REL} — tools/prod-release.sh 먼저" 1
-for svc in "${SERVICES[@]}"; do
-  want="$(grep -E "^image\.${svc}=" "$MAN" | cut -d= -f2-)"
-  [ -n "$want" ] || _die "manifest 에 ${svc} 이미지 ID 가 없다" 1
-  have="$(docker image inspect "bidvector/${svc}:${REL}" --format '{{.Id}}' 2>/dev/null || true)"
-  [ "$have" = "$want" ] || _die "bidvector/${svc}:${REL} 의 ID 가 manifest 와 다르다(없거나 태그가 옮겨졌다)" 1
-done
+# 같은 술어를 주기 러너도 쓴다(`tools/prod-env.sh`) — 반입만 보던 앞 판은 러너가 옮겨진 태그를
+# 그대로 띄웠다(v V4-2).
+_prod_images_match "$MAN" "$REL" || _die "$_PROD_IMAGE_ERR" 1
 if grep -qx 'vuln=not-run' "$MAN"; then echo "  경고: 이 release 는 취약점 게이트를 돌리지 않았다(vuln=not-run)"; fi
-echo "  manifest: 이미지 ${#SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
+echo "  manifest: 이미지 ${#BIDVECTOR_PROD_SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
 
-# compose 판
-cv="$(docker compose version --short 2>/dev/null | sed 's/^v//')"
-[ -n "$cv" ] || _die "docker compose 판을 읽지 못했다" 2
-[ "$(printf '%s\n%s\n' "$COMPOSE_MIN" "$cv" | sort -V | head -n1)" = "$COMPOSE_MIN" ] || _die "compose ${cv} < ${COMPOSE_MIN} — !override 를 모른다" 1
+# compose 판 — 문턱은 `tools/prod-env.sh` 가 한 자리로 갖는다(러너도 같은 것을 본다).
+_prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 1
 
 # 해석 · 프로젝트 · 포트
 cfg="$("${COMPOSE[@]}" config --format json 2>/dev/null)" || _die "운영 compose 를 해석하지 못했다" 1
@@ -129,6 +117,12 @@ fi
 [ "$proj" = "$EXPECT_PROJECT" ] \
   || _die "해석된 프로젝트 이름이 기대와 다르다: ${proj} ≠ ${EXPECT_PROJECT} — compose 환경변수가 끼어들었다" 1
 echo "  프로젝트 ${proj} · 루프백 포트 ${port} $([ -n "$holder" ] && echo '(이 프로젝트가 사용 중)' || echo '(비어 있음)')"
+
+# **app 이 받는 설정 통로** — 아래 JDBC 등식의 전제다. JDBC URL 을 바르게 두고 `JAVA_TOOL_OPTIONS` 에
+# `-Dbidvector.persistence.jdbcUrl=…` 를 넣으면 시스템 속성이 env 를 이겨 **app 만 다른 DB 로 간다**
+# (v V5-1 실측 — 가드는 여전히 통과였다). 그래서 URL 등식만으로는 그 불변식이 서지 않는다.
+_prod_config_surface_ok "$cfg" || _die "${_PROD_SURFACE_ERR}(판정 불가)" 2
+echo "  app 설정 통로: env 키 집합 ${#BIDVECTOR_PROD_SERVICE_ENV_KEYS[@]}개 등식 · JVM 옵션 허용 형태"
 
 # 디스크
 free_mb="$(df -Pm "$STATE" 2>/dev/null | awk 'NR==2 {print $4}')" || true
@@ -160,6 +154,14 @@ pending="$(cat "$STATE/pending" 2>/dev/null || true)"
 # **지금 실제로 떠 있는 release** 는 `current` 가 아니라 `pending` 일 수 있다 — 반입이 `up`·헬스에서
 # 실패하면 컨테이너는 새 release 인데 `current` 는 마지막으로 성공한 것에 머문다(v H-2 실측).
 RUNNING_REL="${pending:-$current}"
+
+# **되돌림이 본 것과 지금이 같은가.** 되돌림은 from/to 판단을 자기 잠금 안에서 하고 **놓은 뒤** 이
+# 스크립트를 exec 한다 — 그 틈에 다른 반입이 끝나면 낡은 `to` 로 반입하게 된다(v V4-6). 잠금을 다시
+# 쥔 이 자리에서 대조한다. 되돌림만 주는 인자라 운영자가 쓸 일은 없다(주면 제약이 하나 더 걸릴 뿐,
+# 느슨해지는 길은 없다).
+if [ -n "$EXPECT_RUNNING" ] && [ "$EXPECT_RUNNING" != "${RUNNING_REL:-}" ]; then
+  _die "되돌림이 본 것(${EXPECT_RUNNING})과 지금 떠 있는 것(${RUNNING_REL:-없음})이 다르다 — 그 사이에 다른 반입이 끝났다. 되돌림을 다시 돌려 대상을 새로 정한다" 2
+fi
 
 # 컨테이너는 있는데 볼륨 조회가 비었다 — 둘 중 하나가 거짓이다. 추측하지 않고 멈춘다.
 if [ -n "$pg_cid_any" ] && [ -z "$pg_vol" ]; then
@@ -205,11 +207,25 @@ PG_USER="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_U
 PG_DB="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_DB // empty')"
 [ -n "$PG_USER" ] && [ -n "$PG_DB" ] || _die "compose 가 해석한 postgres 자격·DB 이름을 읽지 못했다(판정 불가)" 2
 # **app 이 붙는 DB 와 가드가 읽는 DB 가 같아야 한다** — 둘이 갈리면 가드는 빈 DB 를 보고 통과시킨다.
+#
+# 술어는 URL 의 마지막 조각이 아니라 **URL 전체**다. DB 이름만 비교하던 앞 판은 두 축으로 열렸다
+# (v V4-3 실측): 호스트가 `elsewhere.example` 이어도 통과했고(가드는 compose 의 postgres 를 읽고 app 은
+# 다른 서버로 간다), `?currentSchema=shadow` 면 가드가 `public` 을 보고 「이력 표가 아직 없다」로 통과했다.
+# 기대 형태는 운영자가 고를 수 있는 것이 아니다 — 가드가 `docker exec` 로 **이 compose 의 postgres**
+# 를 읽으므로, app 도 같은 서비스·같은 DB·매개변수 없이 붙어야 둘이 같은 자리를 본다.
+PG_SERVICE=postgres   # compose 서비스 이름 = 이 망 안에서의 호스트 이름
+PG_PORT=5432          # 컨테이너 안 포트(운영 compose 는 publish 하지 않는다)
 app_jdbc="$(printf '%s' "$cfg" | jq -r '.services.app.environment.BIDVECTOR_PERSISTENCE_JDBCURL // empty')"
-app_db="${app_jdbc##*/}"; app_db="${app_db%%\?*}"
-[ -n "$app_db" ] || _die "app 의 JDBC URL 에서 DB 이름을 읽지 못했다(판정 불가)" 2
-[ "$app_db" = "$PG_DB" ] \
-  || _die "app 이 붙는 DB(${app_db})와 가드가 읽는 DB(${PG_DB})가 다르다 — 가드가 다른 DB 를 본다(판정 불가)" 2
+[ -n "$app_jdbc" ] || _die "app 의 JDBC URL 을 읽지 못했다(판정 불가)" 2
+want_jdbc="jdbc:postgresql://${PG_SERVICE}:${PG_PORT}/${PG_DB}"
+if [ "$app_jdbc" != "$want_jdbc" ]; then
+  # 자격이 실릴 수 있는 두 자리를 **둘 다** 가린다 — 쿼리 매개변수와 authority(`//사용자:암호@호스트`).
+  # 앞 판은 `?` 뒤만 덮어서, `?` 가 없는 authority 꼴은 축어 그대로 stderr·journal 에 남았다(CR L-3).
+  # 이 문면은 운영자가 티켓·채팅에 그대로 복붙하는 자리다.
+  shown="${app_jdbc%%\?*}"; [ "$shown" = "$app_jdbc" ] || shown="${shown}?<매개변수 생략>"
+  case "$shown" in *@*) shown="jdbc:postgresql://<자격 생략>@${shown#*@}" ;; esac
+  _die "app 의 JDBC URL 이 기대 형태와 다르다(${shown} ≠ ${want_jdbc}) — 가드는 이 compose 의 ${PG_SERVICE} 를 읽는다. 호스트·포트·DB·쿼리 매개변수가 모두 같아야 둘이 같은 자리를 본다(판정 불가)" 2
+fi
 
 # 읽기 결과를 **세 갈래**로 가른다: ok(버전 목록) · notable(이력 표 없음) · unreadable(접속·질의 실패).
 # 앞 판은 셋이 한 갈래였고, `grep` 의 「매치 0」이 `pipefail` 로 올라와 **빈 기록도 읽기 실패**가 됐다
