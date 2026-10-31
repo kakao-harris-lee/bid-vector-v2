@@ -60,3 +60,16 @@
   그 블록·파일을 만지지 않는다 — 같은 spec 의 화면 E 카드·집계 쪽만. 나중 머지 쪽이 main 을 병합한다(손 병합 금지, 생성 TS 는 재생성).
 - 7C⑤-b 머지(PR #109)로 생성 TS 의 결과 어휘가 union 이다 — 집계 상태 칸 이름은 `recordedRateState`·`reconciledRateState`(D-7E3b-2 의
   `recordedState`·`reconciledState` 표기를 이것으로 읽는다), 사유 배열 `reconciliationBlockers[]` 도 enum 이다.
+- 2026-10-31 **D-7E3b-7(팀장, 착수 보고 수령 — D-7E3b-1·2 정정)**: ⒜ 하네스의 대사 축 사유는 `NOT_OPENED_YET`(개찰 축 미수집)이고
+  `WINNER_NAME_NOT_PUBLISHED` 는 운영 환경 예상일 뿐이다 — 화면은 특정 사유를 전제하지 않고 `reconciliationBlockers[]` **전수**를 그리며, 여정 ⑤ 는
+  「부재 + 사유 ≥1」까지, 사유 열 전수는 vitest. ⒝ 내 투찰 금액은 **넷 칸 non-null**(basis 없음) — 세 갈래 `MoneyReading` 은 확정 낙찰가 다섯 칸에만 적용.
+  ⒞ 카드 ⊆ `cases[]` 는 전이표의 성질이라 대응은 `caseId` 로, 행을 못 찾으면 사유 한 줄(Q5). ⒟ 집계 절에 **표본 정의 문면**(「카드 수 ≠ 표본」)을 칸으로.
+- 2026-10-31 **D-7E3b-8(팀장 — 비율 표기 Q1)**: 서버 비율 문자열을 **그대로** + 분자/분모 병기(「낙찰률 0.5 — 낙찰 1 / 분모 2」), 퍼센트 환산 없음(화면 계산 0).
+- 2026-10-31 **D-7E3b-9(팀장 — 개찰 축 두 출처 Q2)**: 카드의 개찰 절(`readOpeningResult`)은 그대로, `readMyBidResults` 의 `openingState`·`confirmedAward*` 는
+  대사 절 안 「판정이 본 입력」으로 따로 그린다 — 어긋나면 둘 다 보인다(접지 않는다, 전용 경고 UI 없음).
+- 2026-10-31 **D-7E3b-10(팀장 — 캡처 Q3·Q4)**: 화면 여섯(A·B·C·D·E·알림함) × 폭 둘 = 12 PNG, **설정 화면 제외**(화면 다섯 밖 + 프로필 PII 표면).
+  스크립트 `web/e2e/capture/usecase-captures.mjs`(여정 `testDir` 밖 · `npm run capture:usecase` 수동 · CI 미연결), 캡처 **직전** DOM 단언이 하나라도 걸리면
+  파일을 쓰지 않고 멈춘다. 산출물 `docs/usecase/captures/` + `manifest.json`(파일별 SHA-256 · 캡처 시각 · HEAD), 상한 PNG 300KB · 합 2MB(스크립트가 재고 실패).
+  in_scope 에 `docs/usecase/**` 를 더한다(저장소 첫 이미지 바이너리).
+- 2026-10-31 **D-7E3b-11(팀장 — 서비스 설명)**: `docs/usecase/portal-service-description.md`, 착수 보고 §5 목차, 「하지 않는 것」 각 줄은 OPEN 홀더 id·결정 id 를
+  인용한다(홀더가 닫히면 그 slice 가 문서를 고친다). 알림 트리거 줄은 7C③-b 머지 순서에 따라 나중 머지 쪽이 맞춘다.
