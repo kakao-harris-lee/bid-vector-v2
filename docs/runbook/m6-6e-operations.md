@@ -902,8 +902,9 @@ trivy 는 공식 릴리스 바이너리를 직접 받는다 — 버전 · 자산
 
 ## 9. 로컬 패키징 — web 정적 이미지 · 리버스 프록시 · 로컬 TLS (M7/7F-local)
 
-이 절은 **로컬에서 재현되는 것만** 적는다. 실 도메인·공개 DNS·운영 인증서는 7F 본편이고, 그
-전까지 「운영에 올리는 절차」는 이 저장소에 없다(§9.5 제한 1).
+이 절은 **로컬에서 재현되는 것만** 적는다. 실 도메인·공개 DNS·운영 인증서·반입 절차는 7F 본편의
+`docs/runbook/m7-7f-production.md` 에 있다. 프록시 설정은 7F 본편에서 **공유 본문**(`docker/proxy.site.caddy`)과
+site 파일 둘(로컬 `docker/proxy.Caddyfile` · 운영 `docker/proxy.prod.Caddyfile`)로 나뉘었다 — 로컬 거동은 그대로다.
 
 ### 9.1 무엇이 어디서 도는가
 
@@ -1107,3 +1108,7 @@ docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml \
     사각). 반대 방향으로는 `run:` 본문의 셸 glob(`echo a *b c`)이 별칭으로 읽혀 **거짓 판정 불가**가
     날 수 있다(fail-closed, 오늘 `ci.yml` 에는 없다). 이름 문자를 YAML 정의대로 넓히면 앞쪽이
     닫히고 뒤쪽은 늘어난다 — 어느 쪽을 택할지는 실제 표기가 들어올 때 정한다.
+19. **제외 접두 `/etc/ssl/certs/` 아래는 형식과 상관없이 이름 축 밖이다**(7F-local 검토 r6 vr R6-L1). 내용 축은
+    PEM 만 보므로, 그 아래 놓인 비-PEM 키와 그것을 가리키는 키 이름 링크는 둘 다 지나간다. 위험 수준은 제한 13 의
+    「확장자 없는 비-PEM 키」와 같다. 고친다면 제외를 `.pem`·`.crt`·`.cer` 에만 거는 방법이 싸다.
+20. **키 이름의 매달린 링크(대상 없음)는 exit 1 이다**(7F-local 검토 r6 vr R6-L2) — fail-closed 쪽 거짓 양성이다.

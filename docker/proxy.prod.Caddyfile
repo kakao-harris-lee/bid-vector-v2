@@ -1,0 +1,45 @@
+# M7/7F 본편 — 운영 site(D-7F2-2, 설계 (A)). `docker/proxy.Dockerfile` 이 로컬 site 와 함께
+# 이미지에 굽고, `docker/compose.prod.yaml` 이 **`entrypoint:`** 로 이 파일을 고른다(`command:` 는
+# 기본 ENTRYPOINT 의 인자 뒤에 덧붙을 뿐이라 로컬 site 가 뜬다).
+#
+# **TLS 는 여기서 끝나지 않는다.** 이 host 의 nginx 가 0.0.0.0:80·443 을 쥐고 있고 기존 공개
+# site 와 공존해야 하므로(D-7F2-1 Q-1), 공개 TLS·인증서(certbot)·80 리다이렉트·`/api/session`
+# 유량 제한은 host nginx 의 `deploy/nginx/zz-bidvector_kr.conf` 가 진다. 이 프록시는 compose 가
+# **루프백에만** publish 하는 평문 리스너 하나다 — 구간이 host 루프백 안이라는 것이 이 선택의
+# 전제이고, 그 전제(publish 가 `127.0.0.1` 뿐)를 `tools/prod-proxy-sites-check.sh` 가 해석된
+# compose 설정에서 단언한다.
+#
+# 7F-local 의 방어(상류 집합 둘·관리 경로 404·경로 접두 미절삭·로그 헤더 삭제·보안 헤더)는
+# `proxy.site.caddy` 를 **공유**하므로 그대로다. 로컬과 다른 것은 셋뿐이다 — 리스너(평문) ·
+# TLS 없음 · HSTS.
+{
+	admin off
+	persist_config off
+	# TLS 를 이 프로세스가 다루지 않는다 — 인증서 발급·리다이렉트 리스너를 만들지 않는다.
+	auto_https off
+	servers {
+		# 평문 리스너에서는 h2·h3 가 성립하지 않는다(nginx 가 HTTP/1.1 로 붙는다). h3 광고는
+		# TLS 리스너에서만 나오므로 7F-local 제한 12(cr L-5)는 이 site 에서 구조로 사라진다.
+		protocols h1
+	}
+}
+
+# 도메인 기본값은 **실재할 수 없는 이름**이다 — 값이 비면 site 주소가 `http://:<포트>` 가 되어
+# **모든 Host 를 받는** 쪽으로 열리므로, 비었을 때 아무 요청도 맞지 않게 닫는다(fail-closed).
+# compose 운영 덧쓰기도 `${BIDVECTOR_PROXY_DOMAIN:?}` 로 값을 요구한다 — 두 겹이다.
+# 포트 변수 이름은 로컬 덧쓰기와 공유한다(이 프로세스의 리스너 포트 하나 — 운영에서는 평문).
+http://{$BIDVECTOR_PROXY_DOMAIN:domain-not-set.invalid}:{$BIDVECTOR_PROXY_HTTPS_PORT} {
+	import proxy.site.caddy
+
+	# HSTS(D-7F2-1 Q-7) — `max-age=86400` 으로 시작한다. includeSubDomains·preload 는 두지
+	# 않는다(되돌리기 어려운 쪽 — 안정 뒤 값을 올리는 것은 운영자 결정). nginx 는 이 헤더를
+	# 그대로 통과시킨다. `defer` 는 공유 본문의 보안 헤더와 같은 선택이다.
+	#
+	# **값을 바꾸면 고칠 자리가 넷이다** — 이 선언과 그것을 단언하는 게이트 셋
+	# (`tools/prod-proxy-sites-check.sh` · `tools/prod-health.sh` · `tools/prod-nginx-check.sh` 의
+	# `EXPECT_HSTS`). 한쪽만 고치면 게이트가 붉어진다(fail-closed 라 위험하진 않다). runbook §4.6 참조.
+	header {
+		defer
+		Strict-Transport-Security "max-age=86400"
+	}
+}
