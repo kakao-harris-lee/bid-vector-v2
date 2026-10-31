@@ -458,4 +458,4 @@ class AppHttpDependencyGateTest {
  * 이 레인이 하나). 어느 레인의 면제도 지우지 않는 합집합이고, 수는 계산이 아니라 **선언**이다 —
  * 아래 등식이 관측과 대조해 검산한다(틀리면 그 test 가 먼저 붉어진다).
  */
-private const val EXPECTED_EXEMPT_COUNT = 75
+private const val EXPECTED_EXEMPT_COUNT = 76

@@ -50,8 +50,18 @@ object AccountScopedRoutes {
      */
     const val ONBOARDING_CHECKLIST: String = "/api/onboarding-checklist"
 
+    /**
+     * 내 입찰 결과의 뿌리(M7/7C⑤-b) — **입찰함 아래가 아니다.**
+     *
+     * [BID_CASES] 아래 두면 그 뿌리의 GET 셋과 한 묶음으로 읽히는데, 그 셋은 마감 정산이
+     * 타임라인에 **쓴다**(D-7B-4 결정 ⑦). 이 조회는 쓰기가 0 이고(D-7C5B-8) 그 차이가 경로에서
+     * 보여야 한다 — 뒤에 이 자리를 고치는 사람이 「입찰함 조회니까 정산을 지나겠지」로 읽지
+     * 않게([ONBOARDING_CHECKLIST] 를 프로필 아래 두지 않은 것과 같은 판단).
+     */
+    const val BID_RESULTS: String = "/api/bid-results"
+
     /** 계정 전용 뿌리 전수. 늘어나면 여기만 늘린다. */
-    val ROOTS: Set<String> = setOf(BID_CASES, NOTIFICATIONS, PROFILE, ONBOARDING_CHECKLIST)
+    val ROOTS: Set<String> = setOf(BID_CASES, BID_RESULTS, NOTIFICATIONS, PROFILE, ONBOARDING_CHECKLIST)
 
     /** 이 경로가 계정 주체를 요구하는가 — 표면 전수 test 가 선언↔판정 대조에 쓴다. */
     fun covers(path: String): Boolean = ROOTS.any { it == path || path.startsWith("$it/") }

@@ -37,7 +37,8 @@ dependencies {
     // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
     implementation(project(":decision"))
     implementation(project(":procurement"))
-
+    // M7/7C⑤-b — wiring 이 AWARD_MATCHING_POLICY 를 위 `qualification` 과 같은 형태로 해소한다.
+    implementation(project(":settlement"))
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
     // HTTP 골격의 유일한 신규 production 좌표(D-6A1-16, scope.md in_scope).
@@ -57,7 +58,6 @@ dependencies {
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
-
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.archunit.junit6)

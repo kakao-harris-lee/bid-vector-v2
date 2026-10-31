@@ -212,6 +212,9 @@ class AccountCarrierStructureTest {
                 // M7/7C④-3 — 체크리스트도 계정 전용 뿌리다(D-7C4C-7). 주체를 얻는 길은 같은 접근자
                 // 하나이고, 라벨을 읽는 자리는 여전히 늘지 않았다.
                 "http/OnboardingChecklistController",
+                // M7/7C⑤-b — 결과 조회도 계정 전용 뿌리다. 주체를 얻는 길은 같은 접근자 하나이고,
+                // 라벨을 읽는 자리는 여전히 늘지 않았다.
+                "http/MyBidResultController",
             )
     }
 }
