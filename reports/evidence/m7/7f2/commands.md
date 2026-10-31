@@ -42,20 +42,45 @@
 | `./tools/vuln-scan-check.sh` proxy · web | 0 · 0 | **차단후보 0 · 미등재 0 · allowlist 전체 0** · 분석 패키지 181(하한 126) · OS 선언 등식 |
 | `./tools/local-tls-smoke.sh` (S-26) | 0 | 우회 ①~⑤ · 헤더 · 관리 경로 404 · 평문 거부 · 비-root · 로그에 자격 값 0. 정리 뒤 잔여 0 |
 
+## 수정 라운드의 고침 — 재현 명령
+
+프로브는 **레인 전용** 프로젝트·포트(`w7f2r2-probe` · 38443)이고 6G 개발 DB·host nginx·`:local` 태그에 닿지 않는다.
+되돌리기 어려운 경로의 고침은 **실제 실패 경로**로 쟀다(env 값만 바꾼다 — 값은 운영자 자유 영역이다).
+
+| 고침 | 재현 |
+|---|---|
+| H-1 | 프로브 프로젝트에 `up -d --wait postgres` → `stop postgres`(볼륨 남김) → `state/current` 기록 → `prod-deploy.sh … --release <다음>` dry-run·apply |
+| H-2 | 성공 반입 뒤 env 의 JVM 옵션 키를 없는 플래그로 바꾸고 apply(앱이 즉시 죽는다) → 같은 상태에서 `prod-rollback.sh` dry·apply |
+| H-2 우회 | 떠 있는 release 의 manifest 에 `migration=` 한 줄을 더하고(상태 편집) `prod-deploy.sh --release <옛것>` |
+| M-1 | `BIDVECTOR_PROXY_HTTPS_PORT=<다른 값> ./tools/prod-deploy.sh …` dry-run · `. tools/local-tls-env.sh` 한 셸에서 같은 명령 |
+| F5-C·D | 버릴 clone 에 앞 공백 두 칸짜리 등재를 **커밋**(깨끗한 트리 게이트가 앞에 있다) · allowlist 파일을 `git rm` |
+| M-3 | 버릴 clone 에서 위생 정책의 `content.min-entries` 를 99 로 커밋 → `prod-release.sh … --apply` → 같은 태그로 재시도 → 정책을 되돌리고 다시 |
+| L-1 | `docker/compose.prod.yaml` 의 app `environment` 에 값 없는 키 한 줄(사본 복원) |
+| L-2 | 저장소 밖 디렉터리에 저장소 안 파일을 가리키는 심볼릭 링크를 만들어 `--env-file` 로 넘긴다 |
+| L-3 | 조각 템플릿의 80 블록에서 버전 표시 끄기 지시어를 켠다(사본 복원) |
+
+결과는 checklist 1.3b 의 「고치기 전 ↔ 고친 뒤」 표다.
+
 ## 변이 · 양성 대조
 
 | 묶음 | 결과 |
 |---|---|
-| 통제군 | 대역 하네스 0 · 키 집합 0 · `zz-` 렌더 0 |
+| 통제군 | 대역 하네스 0 · 키 집합 0 · `zz-` 렌더 0 · S-27b 통과 키 0(항목 23) |
 | M1~M6 · R1 | 전부 기대대로 붉다 — 잡은 단언까지 checklist 1.3 |
 | K1~K4 | 1 · 1 · 1 · 2 |
-| F5-A · F5-B | release preflight 1(만료 6일) · 「등재 1 · 199일」 |
+| F5-A~D | 1(만료 6일) · 「등재 1 · 199일」 · 1(들여쓴 등재) · 2(파일 부재) |
+| 1.3b 의 고침별 변이 | 전부 기대대로 — 위 표의 재현으로 |
 | 복원 | 매 변이 뒤 사본 복원 + `cmp` 동일 · 저장소 `git status` 빈 출력 |
 
-## 반입 리허설 (개발 host, 외부 effect 0)
+## 반입 리허설 (개발 host, 외부 effect 0) — 수정 라운드에서 **전건 재실행**
 
-`--accept-no-vuln-scan` 없이 전건. 단계별 결과는 checklist 1.5 — release·deploy·rollback 전부 0, D1·D2·D3 는 1·1·3,
-인증 GET 300건 200×300, 정리 뒤 컨테이너·볼륨·망 0, `:local` 의 ID 전후 동일.
+스크립트가 바뀌었으므로 다시 돌렸다. `--accept-no-vuln-scan` 없이 release 마다 게이트 **8 건**. 단계별 결과는
+checklist 1.5 — release·deploy·rollback 전부 0, **정지 상태 반입에서 백업 생성**, **그 백업의 복원 + manifest 등식 OK**,
+**진짜 헬스 실패 뒤 되돌림 0**, D1·D2·D3·D3b 는 1·1·3·3, 인증 GET 300건 200×300, 정리 뒤 컨테이너·볼륨·망 0,
+`:local` 태그 전 4 줄 · 후 4 줄 · ID 동일(계수의 양성 대조를 먼저 통과시킨 비교다).
+
+**앞 라운드 보고의 정정**: 그때의 「`:local` ID 전후 동일」은 측정 하네스의 태그 거르기 술어가 틀려 **빈 집합 둘을
+비교한 결과**였다(공허한 초록). 이번 수치가 실제 비교다.
 
 ## rollback 실측 (버릴 clone)
 
@@ -75,4 +100,4 @@
 | 공존 서비스 식별자 | 이 slice 의 diff·커밋 이력에서 대소문자 무시 계수 **0**(D-7F2-2) |
 | evidence 비밀값 스캔 | `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m7/7f2/` → 매치 0 |
 | clean tree | `git status --porcelain -- <in_scope 25 경로 개별 인자>` → 빈 출력. **양성 대조**(비파괴 절삭): 한 파일에 줄 하나를 더하면 ` M` 이 뜨고, `truncate` 로 되돌리면 다시 빈 출력 · `git hash-object` 전후 동일 |
-| 크기 게이트 | evidence 67,924 B ≤ 산출물 285,820 B |
+| 크기 게이트 | evidence 77,217 B ≤ 산출물 308,201 B |
