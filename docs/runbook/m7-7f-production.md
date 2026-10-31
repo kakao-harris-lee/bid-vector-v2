@@ -137,26 +137,61 @@ printf '#!/bin/sh\nnginx -t && systemctl reload nginx\n' | sudo tee /etc/letsenc
 sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
 systemctl list-timers certbot.timer
 sudo certbot renew --dry-run
+# `renew --dry-run` 은 **deploy hook 을 돌리지 않는다** — 위에서 만든 reload hook 이 실제로 서는지는
+# 따로 본다(둘 중 하나).
+sudo /etc/letsencrypt/renewal-hooks/deploy/reload-nginx && echo "hook OK"
+# 또는: sudo certbot renew --dry-run --run-deploy-hooks
 ```
 
 reload 는 같은 nginx 를 쓰는 기존 site 에도 걸린다(graceful — 연결을 끊지 않는다). hook 이 `nginx -t` 를 먼저
 보므로 깨진 설정으로 reload 하지 않는다.
 
-**인증서 감시 타이머**(갱신 실패 감지): 하루 한 번 `./tools/prod-cert-check.sh bidvector.kr` 를 돌린다(남은
-21일 미만이면 exit 1). 외부 발송은 없다(R-4) — 결과는 journal 에서 본다.
+**인증서 감시 타이머**(갱신 실패 감지): 하루 한 번 `prod-cert-check.sh bidvector.kr` 를 돌린다(남은 21일
+미만이면 exit 1). 외부 발송은 없다(R-4) — 결과는 journal 에서 본다.
+
+**먼저 스크립트를 운영 자리로 복사한다.** 작업 트리(`/home/deploy/project/bid-vector-v2`)를 그대로 가리키면
+안 된다 — 그 트리는 레인들이 브랜치를 바꾸는 공유 자리이고, 거기에 쓸 수 있는 누구든 이 unit 이 실행하는
+내용을 바꿀 수 있다. 반입한 release 의 커밋에서 한 번 복사하고, 소유자는 root 로 둔다.
+
+```bash
+sudo install -d -m 755 /usr/local/lib/bidvector-v2
+sudo install -m 755 -o root -g root tools/prod-cert-check.sh /usr/local/lib/bidvector-v2/prod-cert-check.sh
+```
+
+이 검사는 **root 가 필요 없다**(443 에 붙어 인증서를 읽을 뿐이다) — unit 도 일반 사용자로 돌린다.
 
 ```ini
 # /etc/systemd/system/bidvector-cert-check.service
+[Unit]
+Description=bidvector 인증서 잔여일 검사
+
 [Service]
 Type=oneshot
-WorkingDirectory=/home/deploy/project/bid-vector-v2
-ExecStart=/home/deploy/project/bid-vector-v2/tools/prod-cert-check.sh bidvector.kr
+User=deploy
+ExecStart=/usr/local/lib/bidvector-v2/prod-cert-check.sh bidvector.kr
+```
+
+```ini
 # /etc/systemd/system/bidvector-cert-check.timer
+[Unit]
+Description=bidvector 인증서 잔여일 검사 — 매일
+
 [Timer]
 OnCalendar=*-*-* 09:00 Asia/Seoul
 Persistent=true
+
 [Install]
 WantedBy=timers.target
+```
+
+**켜는 단계**(이것이 없으면 타이머는 영영 돌지 않고 journal 도 비어 있다 — 「갱신 실패 감지」가 설치되지
+않은 채 조용한 초록이 된다):
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now bidvector-cert-check.timer
+systemctl list-timers bidvector-cert-check.timer   # NEXT 가 비어 있지 않아야 한다
+sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결과를 본다
 ```
 
 확인: `journalctl -u bidvector-cert-check --since -2d`.
