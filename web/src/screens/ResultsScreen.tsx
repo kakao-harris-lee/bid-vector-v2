@@ -1,14 +1,16 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import { isUnauthorized as isSessionGone } from '../api/apiError';
-import { listBidCases, readOpeningResult, type BidCase } from '../api/queries';
-import { bidCasesQueryKey, openingResultQueryKey } from '../api/queryKeys';
+import { listBidCases, readMyBidResults, readOpeningResult, type BidCase } from '../api/queries';
+import { bidCasesQueryKey, MY_BID_RESULTS_QUERY_KEY, openingResultQueryKey } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
+import { caseResultsById, type CaseResult } from '../display/myBidResultDisplay';
 import { RESULT_PENDING_SLOTS, isResultStage } from '../display/resultDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { ResultCard } from './ResultCard';
+import { ResultsAggregate } from './ResultsAggregate';
 
 /** E 도 **실투찰**만 보인다 — 페이퍼 탭은 SET-03 이 `근거 부족` 이라 만들지 않는다. */
 const BID_KIND: BidCase['bidKind'] = 'REAL';
@@ -26,13 +28,16 @@ const EMPTY_DISPLAY = {
 } as const;
 
 /**
- * 아직 비어 있는 자리의 목록. 자리마다 **사유**가 붙고 입력칸·버튼이 없다(D-7E3a-3 ·
- * D-7E-5 「범위 밖 기능은 빈 자리뿐」).
+ * **영영 오지 않는** 자리의 목록. 자리마다 사유가 붙고 입력칸·버튼이 없다(D-7E3a-3 · D-7E-5
+ * 「범위 밖 기능은 빈 자리뿐」).
+ *
+ * 7E-3a 가 「준비 중」으로 둔 다섯은 M7/7E-3b 에서 화면이 받아 이 목록에서 사라졌다 — 제목이
+ * 「아직 비어 있는」이면 남은 둘에 대해 틀린 말이 된다.
  */
 function PendingSlots() {
   return (
     <section data-testid="results-pending" className="rounded-lg border border-dashed border-line p-4">
-      <h3 className="text-sm font-medium">아직 비어 있는 자리</h3>
+      <h3 className="text-sm font-medium">다루지 않는 자리</h3>
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
         {RESULT_PENDING_SLOTS.map((slot) => (
           <div key={slot.id} data-testid={`pending-${slot.id}`} className="flex flex-col gap-0.5">
@@ -63,7 +68,29 @@ export function ResultsScreen() {
   const { signedIn } = useSessionCsrf();
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
 
+  /**
+   * 결과 조회는 **화면이 한 번** 부른다(M7/7E-3b) — 건별과 집계가 한 응답이라 카드마다 부를
+   * 것이 없고, 그래서 화면이 띄운 목록과 집계가 어긋날 수 없다.
+   */
+  const results = useQuery({ queryKey: MY_BID_RESULTS_QUERY_KEY, queryFn: readMyBidResults });
+
   const shown = (cases.data ?? []).filter((row) => isResultStage(row.state));
+
+  /**
+   * 카드 하나가 받는 답. **「아직 안 왔다」·「못 읽었다」·「없다」를 한 값으로 접지 않는다** —
+   * 접으면 적재 중에도 카드가 「이 건이 없습니다」를 적고, 그것은 거짓이다.
+   */
+  const byId = caseResultsById(results.data?.cases ?? []);
+  const resultOf = (caseId: number): CaseResult => {
+    if (results.isPending) {
+      return { kind: 'LOADING' };
+    }
+    if (!results.isSuccess) {
+      return { kind: 'FAILED' };
+    }
+    const found = byId.get(caseId);
+    return found === undefined ? { kind: 'MISSING' } : { kind: 'FOUND', result: found };
+  };
 
   /**
    * 개찰 조회를 **화면이 든다**(r3 CR L-1). 카드마다 질의를 두면 401 일 때 `SignedOutFace` 가
@@ -77,8 +104,8 @@ export function ResultsScreen() {
     })),
   });
 
-  /** 건별 개찰 읽기가 401 이면 **세션이 없는 것**이다 — 목록이 캐시로 살아 있어도 그렇다. */
-  const sessionGone = openings.some((one) => isSessionGone(one.error));
+  /** 건별 개찰 읽기나 결과 조회가 401 이면 **세션이 없는 것**이다 — 목록이 캐시로 살아 있어도 그렇다. */
+  const sessionGone = openings.some((one) => isSessionGone(one.error)) || isSessionGone(results.error);
 
   // 세션이 없다는 **서버의 답**은 재시도로 풀리지 않는다 — 일시 장애와 같은 얼굴을 내지 않는다.
   // **이 분기는 모든 hook 뒤에 온다** — 위의 `useQueries` 를 건너뛰면 렌더마다 hook 수가 달라진다.
@@ -108,10 +135,22 @@ export function ResultsScreen() {
       {shown.length === 0 ? null : (
         <ul className="flex flex-col gap-3">
           {shown.map((row, index) => (
-            <ResultCard key={row.caseId} bidCase={row} opening={openings[index]!} />
+            <ResultCard
+              key={row.caseId}
+              bidCase={row}
+              opening={openings[index]!}
+              result={resultOf(row.caseId)}
+            />
           ))}
         </ul>
       )}
+
+      {/* 결과 조회의 **얼굴은 화면이 하나로** 그린다 — 카드마다 그리면 같은 alert 이 N 개 선다. */}
+      {results.isError && !isSessionGone(results.error) ? (
+        <ErrorFace testId="my-bid-results-error" onRetry={() => void results.refetch()} />
+      ) : null}
+      {results.isPending ? <Skeleton testId="aggregate-loading" rows={3} /> : null}
+      {results.isSuccess ? <ResultsAggregate aggregate={results.data.aggregate} /> : null}
 
       <PendingSlots />
     </section>

@@ -29,6 +29,10 @@ export type OnboardingChecklist = components['schemas']['OnboardingChecklist'];
 export type OpeningResultView = components['schemas']['OpeningResultView'];
 export type NotificationItem = components['schemas']['NotificationItem'];
 export type MarkReadResult = components['schemas']['MarkNotificationReadResponse'];
+export type MyBidResults = components['schemas']['MyBidResults'];
+/** 건 하나와 집계 하나는 **응답에서 파생한다** — 따로 적으면 계약과 갈린다. */
+export type MyBidCase = MyBidResults['cases'][number];
+export type MyBidAggregate = MyBidResults['aggregate'];
 
 export type NotificationQuery = NonNullable<operations['listNotifications']['parameters']['query']>;
 
@@ -475,6 +479,23 @@ export async function readOpeningResult(
   const { data, error, response } = await apiClient.GET('/api/opening-results', {
     params: { query: { noticeNumber, noticeRound } },
   });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
+ * 내 입찰 결과 — 건별 대사와 투찰 대비 낙찰률을 **서버가 판정한다**(M7/7E-3b).
+ *
+ * **건별과 집계가 한 응답**이다(D-7C5B-9). 둘이 다른 요청이면 서로 다른 판정 패스에서 나와
+ * 화면이 자기가 띄운 목록과 어긋나는 집계를 보일 수 있다 — 「화면이 목록을 세어 집계를
+ * 지어내지 않는다」가 전송 층에서도 깨지지 않게 한 모양이다.
+ *
+ * **인자가 없다** — 주체는 세션 계정이고 계약에 질의 인자가 없다.
+ */
+export async function readMyBidResults(): Promise<MyBidResults> {
+  const { data, error, response } = await apiClient.GET('/api/bid-results');
   if (data === undefined) {
     raise(response.status, error);
   }

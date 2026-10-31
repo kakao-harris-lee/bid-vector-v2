@@ -128,10 +128,26 @@ function readRequired<T>(
 }
 
 /**
+ * 확정 낙찰가 다섯 칸을 가진 것 — `readOpeningResult` 와 `readMyBidResults` 가 **같은 칸
+ * 이름**으로 이 축을 낸다(M7/7E-3b). 읽기를 복제하면 한쪽만 고쳐지는 길이 생기므로 구조적
+ * 타입 하나로 받는다.
+ *
+ * **두 응답을 한 값으로 접는다는 뜻이 아니다**(D-7E3b-9): 화면은 두 출처를 따로 그리고
+ * 어긋나면 둘 다 보인다. 같아지는 것은 「다섯 칸을 어떻게 읽는가」뿐이다.
+ */
+export interface ConfirmedAwardColumns {
+  readonly confirmedAwardAmountWon?: number | null;
+  readonly confirmedAwardAmountCurrency?: string | null;
+  readonly confirmedAwardAmountBasis?: string | null;
+  readonly confirmedAwardAmountVatTreatment?: string | null;
+  readonly confirmedAwardAmountProvenance?: string | null;
+}
+
+/**
  * 확정 낙찰금액 — **`confirmedAward*` 칸만 읽는다.** 잠정 축의 칸은 이 함수의 본문에 이름조차
  * 없으므로 「확정이 비면 잠정으로 메운다」가 성립하지 않는다(SET-02).
  */
-export function confirmedAwardReading(view: OpeningResultView): MoneyReading<ConfirmedAward> {
+export function confirmedAwardReading(view: ConfirmedAwardColumns): MoneyReading<ConfirmedAward> {
   return readRequired(
     [
       ['confirmedAwardAmountWon', view.confirmedAwardAmountWon],

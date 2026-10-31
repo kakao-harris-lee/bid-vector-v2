@@ -640,6 +640,17 @@ describe('로딩·오류 얼굴 (r1 CR M-2 · v M-2·M-3)', () => {
   /** 이 slice 고유의 모양 — **카드는 남고 개찰 절만** 오류다(건 상태는 다른 응답이 준다). */
   it('개찰 조회만 실패하면 카드는 남고 개찰 절만 오류 얼굴이다', async () => {
     mocked.readOpeningResult.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    /**
+     * **대사 절도 개찰 축을 낸다**(M7/7E-3b · D-7E3b-9) — 그 값은 다른 operation 의 답이라
+     * 지어낸 것이 아니다. 아래 전문 스캔이 뜻을 가지려면 두 출처의 값이 **달라야** 하므로 이
+     * 건의 대사 축을 다른 갈래로 둔다. 같은 값으로 두면 스캔이 정당한 값에 걸려, 「실패를 아직
+     * 개찰 전으로 접었다」를 더 이상 재지 못한다.
+     */
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase({ openingState: 'NOT_COLLECTED', reconciliationBlocker: 'NOT_COLLECTED' })], {
+        reconciliationBlockers: ['NOT_COLLECTED'],
+      }),
+    );
     renderScreen();
 
     expect(await screen.findByTestId('opening-error-51')).toBeTruthy();
