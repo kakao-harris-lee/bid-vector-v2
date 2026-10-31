@@ -190,11 +190,22 @@ PG_USER="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_U
 PG_DB="$(printf '%s' "$cfg" | jq -r '.services.postgres.environment.POSTGRES_DB // empty')"
 [ -n "$PG_USER" ] && [ -n "$PG_DB" ] || _die "compose 가 해석한 postgres 자격·DB 이름을 읽지 못했다(판정 불가)" 2
 # **app 이 붙는 DB 와 가드가 읽는 DB 가 같아야 한다** — 둘이 갈리면 가드는 빈 DB 를 보고 통과시킨다.
+#
+# 술어는 URL 의 마지막 조각이 아니라 **URL 전체**다. DB 이름만 비교하던 앞 판은 두 축으로 열렸다
+# (v V4-3 실측): 호스트가 `elsewhere.example` 이어도 통과했고(가드는 compose 의 postgres 를 읽고 app 은
+# 다른 서버로 간다), `?currentSchema=shadow` 면 가드가 `public` 을 보고 「이력 표가 아직 없다」로 통과했다.
+# 기대 형태는 운영자가 고를 수 있는 것이 아니다 — 가드가 `docker exec` 로 **이 compose 의 postgres**
+# 를 읽으므로, app 도 같은 서비스·같은 DB·매개변수 없이 붙어야 둘이 같은 자리를 본다.
+PG_SERVICE=postgres   # compose 서비스 이름 = 이 망 안에서의 호스트 이름
+PG_PORT=5432          # 컨테이너 안 포트(운영 compose 는 publish 하지 않는다)
 app_jdbc="$(printf '%s' "$cfg" | jq -r '.services.app.environment.BIDVECTOR_PERSISTENCE_JDBCURL // empty')"
-app_db="${app_jdbc##*/}"; app_db="${app_db%%\?*}"
-[ -n "$app_db" ] || _die "app 의 JDBC URL 에서 DB 이름을 읽지 못했다(판정 불가)" 2
-[ "$app_db" = "$PG_DB" ] \
-  || _die "app 이 붙는 DB(${app_db})와 가드가 읽는 DB(${PG_DB})가 다르다 — 가드가 다른 DB 를 본다(판정 불가)" 2
+[ -n "$app_jdbc" ] || _die "app 의 JDBC URL 을 읽지 못했다(판정 불가)" 2
+want_jdbc="jdbc:postgresql://${PG_SERVICE}:${PG_PORT}/${PG_DB}"
+if [ "$app_jdbc" != "$want_jdbc" ]; then
+  # 쿼리 매개변수에는 자격이 실릴 수 있다(`?user=…&password=…`) — 문면에 축어로 옮기지 않는다.
+  shown="${app_jdbc%%\?*}"; [ "$shown" = "$app_jdbc" ] || shown="${shown}?<매개변수 생략>"
+  _die "app 의 JDBC URL 이 기대 형태와 다르다(${shown} ≠ ${want_jdbc}) — 가드는 이 compose 의 ${PG_SERVICE} 를 읽는다. 호스트·포트·DB·쿼리 매개변수가 모두 같아야 둘이 같은 자리를 본다(판정 불가)" 2
+fi
 
 # 읽기 결과를 **세 갈래**로 가른다: ok(버전 목록) · notable(이력 표 없음) · unreadable(접속·질의 실패).
 # 앞 판은 셋이 한 갈래였고, `grep` 의 「매치 0」이 `pipefail` 로 올라와 **빈 기록도 읽기 실패**가 됐다
