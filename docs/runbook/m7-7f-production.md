@@ -12,7 +12,7 @@
 ```
 인터넷 ─► (공유기·외부 방화벽) ─► Windows 80/443 ─► WSL host nginx (0.0.0.0:80·443, 기존 공개 site 와 공존)
                                                      │  server_name bidvector.kr  (sites-enabled/zz-bidvector_kr)
-                                                     │  · TLS(certbot) · 80→301 · /api/session limit_req · XFF 덮어쓰기
+                                                     │  · TLS(구매 인증서 §4.7 · certbot 은 §4.3) · 80→301 · /api/session limit_req · XFF 덮어쓰기
                                                      ▼
                                        127.0.0.1:<루프백 포트>  proxy(Caddy 운영 site, 평문)
                                           · 보안 헤더·HSTS · /actuator* 404 · 상류 둘
@@ -78,7 +78,7 @@
    echo /srv/bidvector-v2
    ```
 5. **trivy 설치**(취약점 게이트 — release 가 요구한다. 없으면 release 는 판정 불가로 멈춘다).
-6. **certbot 설치**: `sudo apt-get install certbot` — 패키지가 갱신 타이머(`certbot.timer`)를 함께 설치한다.
+6. **certbot 설치**: `sudo apt-get install certbot` — 패키지가 갱신 타이머(`certbot.timer`)를 함께 설치한다. 구매 인증서(§4.7)로 운영하면 쓰지 않는다.
 
 ## 2. release 만들기
 
@@ -148,6 +148,8 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### 4.3 인증서 — staging 먼저
 
+> 현행 운영은 구매 인증서다(§4.7). 이 절과 §4.5 의 certbot 경로는 Let's Encrypt 로 옮길 때 쓴다.
+
 DNS 가 이 host 를 가리킨 뒤(§5)에만 된다.
 
 ```bash
@@ -186,7 +188,7 @@ sudo /etc/letsencrypt/renewal-hooks/deploy/reload-nginx && echo "hook OK"
 reload 는 같은 nginx 를 쓰는 기존 site 에도 걸린다(graceful — 연결을 끊지 않는다). hook 이 `nginx -t` 를 먼저
 보므로 깨진 설정으로 reload 하지 않는다.
 
-**인증서 감시 타이머**(갱신 실패 감지): 하루 한 번 `prod-cert-check.sh bidvector.kr` 를 돌린다(남은 21일
+**인증서 감시 타이머**(갱신 실패 감지 — 구매 인증서면 임계를 §4.7-4 의 30일로): 하루 한 번 `prod-cert-check.sh bidvector.kr` 를 돌린다(남은 21일
 미만이면 exit 1). 외부 발송은 없다(R-4) — 결과는 journal 에서 본다.
 
 **먼저 스크립트를 운영 자리로 복사한다.** 작업 트리(`/home/deploy/project/bid-vector-v2`)를 그대로 가리키면
@@ -254,12 +256,30 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 한쪽만 고치면 게이트가 붉어진다(fail-closed — 틀린 채 반입되지는 않는다). 넷을 같은 커밋에서 바꾸고
 `prod-nginx-check.sh` 를 한 번 돌려 확인한다.
 
+### 4.7 구매 인증서 — 운영 현행 (2026-11-02 첫 반입)
+
+첫 반입은 §4.3~4.5(certbot) 대신 **운영자가 구매한 DV 인증서**(GoGetSSL, 기존 site 와 같은 방식)로 열었다.
+그래서 §4.3·§4.5 의 certbot 발급·갱신 hook 은 쓰지 않는다 — 갱신은 **만료 전 운영자 수작업**이다.
+
+1. 확인(배치 전): 키 ↔ 인증서 공개키 일치 · `openssl verify -untrusted <all.crt> <crt>` OK · SAN 에 `DNS:bidvector.kr`.
+2. 배치: `/etc/gogetssl/bidvector.kr_<주문번호>.{all.crt,crt}.pem`(0644) · `….key.pem`(**0600**). 원본 사본의 키도 0600 으로.
+3. 조각: §4.4 와 같이 렌더한 뒤 **인증서 두 줄만** 바꾼다 — `ssl_certificate` → `….all.crt.pem` ·
+   `ssl_certificate_key` → `….key.pem`. 나머지 줄(헤더·유량 제한·XFF)은 그대로다. §4.1 은 **렌더 원본**을 재고
+   손으로 바꾼 두 줄은 재지 않는다 — 그 두 줄은 배치 때 `sudo nginx -t` 와 배치 뒤 `prod-cert-check.sh` 가 거른다.
+4. 감시: §4.5 의 감시 unit `ExecStart` 끝에 **`--min-days 30`** 을 붙인다 — 구매 인증서는 자동 갱신이 없으므로 21일이 아니라
+   한 달 앞에서 붉게 한다(재발급·검증에 시간이 든다).
+5. 교체: 새 파일을 **새 이름**(주문번호가 다르다)으로 놓고 조각의 두 줄을 바꾼 뒤 `sudo nginx -t && sudo systemctl
+   reload nginx` → `./tools/prod-cert-check.sh bidvector.kr` 로 서빙 인증서의 남은 일수를 확인한다. 옛 파일은 그 뒤 지운다.
+
+나중에 certbot 으로 옮길 때는 §4.2 → §4.3(staging 먼저) → §4.4 → §4.5 순서이고, 감시 임계는 기본값(21)으로 돌린다.
+
 ## 5. DNS 전환 체크리스트 (운영자)
 
 1. 전환 **하루 전**: 기존 레코드가 있으면 TTL 을 300 으로 낮춘다.
 2. `bidvector.kr` **A** 레코드 → host 의 공인 IPv4.
 3. **AAAA 는 두지 않는다** — 조각의 443 은 IPv4 만 듣는다(IPv6 443 을 열면 그 주소족에서 기존 site 이름까지 받는다).
-4. 선택: CAA `0 issue "letsencrypt.org"`.
+4. 선택: CAA — **실제 발급 기관**을 적는다. 구매 인증서(§4.7)를 쓰는 동안 `letsencrypt.org` 만 적으면 재발급이
+   막힌다(기관의 CAA 식별자는 그 기관 안내를 따른다). 확신이 없으면 두지 않는다.
 5. 확인: `dig +short bidvector.kr A` 가 공인 IP 하나 · `curl -sI http://bidvector.kr/` 가 301.
 6. 그 뒤 §4.3 발급 → §4.4.
 
@@ -267,7 +287,8 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 | 증상 | 먼저 볼 것 | 조치 |
 |---|---|---|
-| `prod-cert-check` exit 1 「남은 일수」 | `systemctl status certbot.timer` · `journalctl -u certbot` | `sudo certbot renew --dry-run` 으로 원인 → 고친 뒤 `sudo certbot renew` |
+| exit 1 「남은 일수」 — **구매 인증서(§4.7, 현행)** | 만료일 `openssl x509 -enddate` | 재발급·구매 → §4.7-5 교체 |
+| `prod-cert-check` exit 1 「남은 일수」 — certbot | `systemctl status certbot.timer` · `journalctl -u certbot` | `sudo certbot renew --dry-run` 으로 원인 → 고친 뒤 `sudo certbot renew` |
 | exit 1 「SAN 에 … 없다」 | 다른 site 인증서가 나온다 — `ls /etc/nginx/sites-enabled/` 이름 정렬 | 조각 이름이 `zz-` 인지 · server_name |
 | 파일은 갱신됐는데 서빙 인증서가 옛것 | reload hook 실행 여부 | `sudo nginx -t && sudo systemctl reload nginx` |
 | HTTP-01 실패 | 80 이 이 host 에 오는지(Windows 포워딩·DNS) · `/.well-known/acme-challenge/` 가 301 이 아닌지 | §1.2 · §5 |
@@ -505,6 +526,61 @@ app 여유를 더하는 문면.
    일회 러너가 훑어 적는 구조라, 타이머를 켜지 않으면 **반입 직후 상태에서 하나도 발화하지 않는다**(요청으로
    생기는 알림은 영향 없음). 켜는 것 자체가 운영자 승인 항목이다. 그 절차는 §「주기 실행」에 있고, 러너의 호출
    모양·종료 코드·진단은 `docs/runbook/m7-7c3b-notification-sweep.md` 가 정본이다.
-10. **운영 자리의 스크립트 사본은 자동으로 갱신되지 않는다.** §「host nginx 조각」의 인증서 감시와 §「주기 실행」의
-   훑기 러너는 `/usr/local/lib/bidvector-v2/` 의 사본을 돌린다(작업 트리를 가리키지 않기 위한 선택). 그 스크립트가
-   바뀐 release 를 반입하면 **사본을 다시 깔아야** 한다 — §「반입」의 마지막 단계가 그것을 묻는다.
+10. **운영 자리의 스크립트 사본은 자동으로 갱신되지 않는다.** §「host nginx 조각」의 인증서 감시는
+   `/usr/local/lib/bidvector-v2/` 의 사본을 돌린다(작업 트리를 가리키지 않기 위한 선택). 그 스크립트가 바뀐 release 를
+   반입하면 **사본을 다시 깔아야** 한다 — §「반입」의 마지막 단계가 그것을 묻는다. §「주기 실행」의 훑기 러너는 사본이
+   아니라 `<저장소>` 에서 직접 돈다(compose 파일 셋을 읽으므로, §9.1).
+11. **이 host 안에서 공인 주소로는 자기 site 에 닿지 않는다**(헤어핀 NAT — 2026-11-02 실측: 기존 site 도 같은
+   시간 초과). host 의 검사 도구는 이 경로를 쓰지 않는다 — `prod-health.sh --public` 과 `prod-cert-check.sh` 는
+   `127.0.0.1:443` + SNI 로 붙어 host nginx 까지를 잰다. **공인 경로(DNS → 공유기 → Windows 포워딩 → WSL)는 그
+   도구들이 재지 못하므로** 바깥 망(휴대폰 LTE 등)의 브라우저나 `curl -sI https://bidvector.kr/` 로 확인한다.
+
+## 12. 운영 계정 — 처음 한 번 · 비밀 문구 교체
+
+가입 화면·HTTP endpoint 는 없다. 계정은 **운영자 명령**으로 만든다(M7/7D). 떠 있는 서비스를 내리지 않고 **일회
+컨테이너**를 띄운다. 이 명령은 **DB 소유자 연결**로 쓰므로, 훑기 러너(§9.1)와 **같은 가드**를 같은 함수로 먼저
+지난다 — compose 호출 단일 출처(`tools/prod-env.sh`: 템플릿 키·`COMPOSE_*` unset · 파일 셋 · 프로젝트 고정) ·
+잠금 둘 · 반입 기록 · 끝나지 않은 반입 · manifest 이미지 ID · 설정 통로. 하나라도 어긋나면 `exit 3` 으로 멈추고 아무것도
+쓰지 않는다(`exit 1` 은 앱이 낸 「계정이 이미 있다」·「계정이 없다」뿐이다). 비밀 문구는 잠금을 잡기 전에 받는다 —
+프롬프트 앞에서 자리를 비워도 반입·되돌림·훑기를 막지 않는다.
+
+블록 전체가 **서브셸**(`( … )`)이다 — 실패해도 운영자 셸이 닫히지 않고, 비밀 문구 변수는 서브셸과 함께 사라진다.
+bash 에서 붙여 넣는다.
+
+```bash
+cd <저장소>
+(
+  set -euo pipefail
+  read -rsp '비밀 문구: ' BIDVECTOR_ACCOUNT_INITIAL_VALUE; echo   # 잠금을 잡기 **전에** 받는다(입력을 기다리며 잠금을 쥐지 않게)
+  . tools/prod-env.sh
+  export BIDVECTOR_ACCOUNT_INITIAL_VALUE
+  ENVF=/etc/bidvector-v2/prod.env S=/var/lib/bidvector-v2
+  [ -r "$ENVF" ] || { echo "env 파일을 읽지 못했다: $ENVF"; exit 3; }
+  _prod_compose_version_ok || { echo "$_PROD_COMPOSE_VER_ERR"; exit 3; }
+  _prod_project_lock "$BIDVECTOR_PROD_PROJECT" || { echo "$_PROD_LOCK_ERR"; exit 3; }
+  _prod_lock "$S/.lock" "이 상태 디렉터리" || { echo "$_PROD_LOCK_ERR"; exit 3; }
+  rel="$(cat "$S/current" 2>/dev/null || true)"; [ -n "$rel" ] || { echo "반입 기록이 없다"; exit 3; }
+  _prod_valid_tag "$rel" || { echo "반입 기록이 손상됐다"; exit 3; }
+  p="$(cat "$S/pending" 2>/dev/null || true)"; [ -z "$p" ] || [ "$p" = "$rel" ] || { echo "끝나지 않은 반입: $p"; exit 3; }
+  _prod_images_match "$S/releases/$rel.manifest" "$rel" || { echo "$_PROD_IMAGE_ERR"; exit 3; }
+  export BIDVECTOR_RELEASE_TAG="$rel"
+  C=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
+  cfg="$("${C[@]}" config --format json 2>/dev/null)" || { echo "운영 compose 를 해석하지 못했다"; exit 3; }
+  _prod_config_surface_ok "$cfg" || { echo "$_PROD_SURFACE_ERR"; exit 3; }
+  "${C[@]}" run --rm --no-deps --pull never \
+    -e SPRING_MAIN_WEB_APPLICATION_TYPE=none -e BIDVECTOR_ACCOUNT_INITIAL_VALUE \
+    app --bidvector.account.mode=create --bidvector.account.login=<로그인 이름>
+)
+```
+
+- 결과 줄: `account command=create result=created login=…`. 계정이 **하나라도** 있으면(이름과 무관)
+  `result=refused cause=account-exists`(exit 1) — 둘째 계정은 이 명령으로 만들 수 없다.
+- **비밀 문구 교체**는 `mode=rotate` — 그 계정의 세션을 전부 폐기하고(같은 트랜잭션) 연속 실패 잠금도 푼다
+  (실패 횟수 0 · 잠금 시각 해제). 잠겨서 못 들어갈 때의 복구도 이것이다. 계정이 없으면 `cause=account-absent`.
+- 값은 **환경변수로만** 넘긴다 — `-e NAME` 은 이름만 싣고 값은 셸 env 에서 읽는다(argv·프로세스 표·셸 이력에 값이
+  없다). 일회 컨테이너가 떠 있는 수 초 동안은 `docker inspect` 로 그 env 가 보인다(`--rm` 으로 끝나면 지워진다) —
+  docker 소켓을 가진 사람은 이미 DB 에 닿으므로 늘어나는 권한은 없다. 채팅·저장소·로그에 적지 않는다.
+- `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 은 선택이 아니다 — 끄지 않으면 일회 컨테이너 안에 무인증 `POST /api/session`
+  을 포함한 API 표면이 수 초 뜬다(7D checklist 「운영자 명령 사용법」).
+- `--no-deps` 는 postgres 가 이미 떠 있다는 전제다(반입 뒤).
+- 로그인 실패·연속 실패 잠금은 응답에서 구분되지 않는다(401 하나).
