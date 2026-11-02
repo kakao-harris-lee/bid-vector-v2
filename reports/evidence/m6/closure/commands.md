@@ -8,7 +8,8 @@
 - cmd: 빌드 자리 래퍼(`bv-build.sh`)를 통해 `./tools/one-command-check.sh`
 - 호스트 점검(별도 호출로 먼저, 결과를 보고 시작): 다른 Gradle 빌드 0 · available 14.5GB · swap free 7.0GB ·
   RSS 상위에 다른 세션의 큰 프로세스 없음.
-- 단계: 선언된 25 단계가 전부 **순서대로 돌았다**(Kotlin 둘 · Python 아홉 · web 열넷).
+- 단계: 선언된 작업 단계 25 가 전부 **순서대로 돌았다**(Kotlin 2 · Python 10 · web 13). 스크립트의 26 번째
+  `_step` 은 작업이 아니라 **완료 표지**이고, 아래 W-13 에서 멈춰 찍히지 않았다.
 
 | 단계 | 결과 |
 | --- | --- |
@@ -16,8 +17,8 @@
 | Kotlin — `qualityBaseline` | BUILD SUCCESSFUL |
 | Kotlin test 계수(**결과 XML 집계**, 콘솔 grep 아님) | **tests 4,156 · 실패 0 · 오류 0 · 건너뜀 4** (XML 510개) |
 | 건너뜀 4 의 자리 | `bidvector.adapters.contract.RealServerIntegrationTest` 하나 — 실 서버 통합이라 태그로 기본 실행에서 분리돼 있다(6C 계약의 「경계로 처리」) |
-| Python — 아홉 단계(S-1~S-11) | 전부 통과 |
-| web — W-1~W-12 | 전부 통과(Playwright 스모크 포함) |
+| Python — 열 단계(S-1~S-11) | 전부 통과 |
+| web — W-1~W-12(열두 단계) | 전부 통과(Playwright 스모크 포함) |
 | **web — W-13 여정 e2e** | **1회차 실패 — 1 failed · 10 passed.** 전건은 이 단계에서 멈췄고(완료 표지 없음) **비-0** 으로 끝났다 |
 
 **1회차 실패의 정체 — 재실행으로 가렸다(아래 B).** production 거동이 아니라 **e2e 하네스의 응답 포착

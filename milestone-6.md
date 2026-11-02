@@ -827,7 +827,7 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 `reports/evidence/m6/closure/`(`scope.md`·`checklist.md`·`open-inventory.md`·`commands.md`). 판정 base 는
 M7 종결(PR #115) 이후의 `main` 이고 **아홉을 그 시점에 다시 재었다** — 「M6 당시 통과」를 근거로 쓰지 않았다.
 조건 1 은 운영자 결정 2026-10-15 가 확장한 `tools/one-command-check.sh` 전건을 **버릴 clone** 에서 돌렸다:
-선언된 25 단계가 전부 순서대로 돌았고 Kotlin `check` 는 **tests 4,156 · 실패 0 · 건너뜀 4**(결과 XML 집계,
+선언된 작업 단계 25 가 전부 순서대로 돌았고 Kotlin `check` 는 **tests 4,156 · 실패 0 · 건너뜀 4**(결과 XML 집계,
 건너뜀은 태그로 분리된 실 서버 통합 하나)다.
 
 충족 다섯은 ①one-command ②legacy 무의존 ④dry-run ⑦되돌림 리허설 ⑧보안·비밀값 스캔이다. 좁혀진 셋은
