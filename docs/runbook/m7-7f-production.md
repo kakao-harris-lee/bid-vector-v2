@@ -78,7 +78,7 @@
    echo /srv/bidvector-v2
    ```
 5. **trivy 설치**(취약점 게이트 — release 가 요구한다. 없으면 release 는 판정 불가로 멈춘다).
-6. **certbot 설치**: `sudo apt-get install certbot` — 패키지가 갱신 타이머(`certbot.timer`)를 함께 설치한다.
+6. **certbot 설치**: `sudo apt-get install certbot` — 패키지가 갱신 타이머(`certbot.timer`)를 함께 설치한다. 구매 인증서(§4.7)로 운영하면 쓰지 않는다.
 
 ## 2. release 만들기
 
@@ -147,6 +147,8 @@ sudo nginx -t && sudo systemctl reload nginx
 `nginx -t` 가 실패하면 reload 하지 않고 링크를 지운다. reload 뒤 **기존 site 를 먼저** 확인한다(브라우저와 `curl -sI`).
 
 ### 4.3 인증서 — staging 먼저
+
+> 현행 운영은 구매 인증서다(§4.7). 이 절과 §4.5 의 certbot 경로는 Let's Encrypt 로 옮길 때 쓴다.
 
 DNS 가 이 host 를 가리킨 뒤(§5)에만 된다.
 
@@ -538,7 +540,9 @@ app 여유를 더하는 문면.
 가입 화면·HTTP endpoint 는 없다. 계정은 **운영자 명령**으로 만든다(M7/7D). 떠 있는 서비스를 내리지 않고 **일회
 컨테이너**를 띄운다. 이 명령은 **DB 소유자 연결**로 쓰므로, 훑기 러너(§9.1)와 **같은 가드**를 같은 함수로 먼저
 지난다 — compose 호출 단일 출처(`tools/prod-env.sh`: 템플릿 키·`COMPOSE_*` unset · 파일 셋 · 프로젝트 고정) ·
-잠금 둘 · 끝나지 않은 반입 · manifest 이미지 ID · 설정 통로. 하나라도 어긋나면 `exit 3` 으로 멈추고 아무것도 쓰지 않는다.
+잠금 둘 · 반입 기록 · 끝나지 않은 반입 · manifest 이미지 ID · 설정 통로. 하나라도 어긋나면 `exit 3` 으로 멈추고 아무것도
+쓰지 않는다(`exit 1` 은 앱이 낸 「계정이 이미 있다」·「계정이 없다」뿐이다). 비밀 문구는 잠금을 잡기 전에 받는다 —
+프롬프트 앞에서 자리를 비워도 반입·되돌림·훑기를 막지 않는다.
 
 블록 전체가 **서브셸**(`( … )`)이다 — 실패해도 운영자 셸이 닫히지 않고, 비밀 문구 변수는 서브셸과 함께 사라진다.
 bash 에서 붙여 넣는다.
@@ -547,18 +551,22 @@ bash 에서 붙여 넣는다.
 cd <저장소>
 (
   set -euo pipefail
+  read -rsp '비밀 문구: ' BIDVECTOR_ACCOUNT_INITIAL_VALUE; echo   # 잠금을 잡기 **전에** 받는다(입력을 기다리며 잠금을 쥐지 않게)
   . tools/prod-env.sh
+  export BIDVECTOR_ACCOUNT_INITIAL_VALUE
   ENVF=/etc/bidvector-v2/prod.env S=/var/lib/bidvector-v2
+  [ -r "$ENVF" ] || { echo "env 파일을 읽지 못했다: $ENVF"; exit 3; }
   _prod_compose_version_ok || { echo "$_PROD_COMPOSE_VER_ERR"; exit 3; }
   _prod_project_lock "$BIDVECTOR_PROD_PROJECT" || { echo "$_PROD_LOCK_ERR"; exit 3; }
   _prod_lock "$S/.lock" "이 상태 디렉터리" || { echo "$_PROD_LOCK_ERR"; exit 3; }
-  rel="$(cat "$S/current")"; _prod_valid_tag "$rel" || { echo "반입 기록이 손상됐다"; exit 3; }
+  rel="$(cat "$S/current" 2>/dev/null || true)"; [ -n "$rel" ] || { echo "반입 기록이 없다"; exit 3; }
+  _prod_valid_tag "$rel" || { echo "반입 기록이 손상됐다"; exit 3; }
   p="$(cat "$S/pending" 2>/dev/null || true)"; [ -z "$p" ] || [ "$p" = "$rel" ] || { echo "끝나지 않은 반입: $p"; exit 3; }
   _prod_images_match "$S/releases/$rel.manifest" "$rel" || { echo "$_PROD_IMAGE_ERR"; exit 3; }
   export BIDVECTOR_RELEASE_TAG="$rel"
   C=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
-  _prod_config_surface_ok "$("${C[@]}" config --format json)" || { echo "$_PROD_SURFACE_ERR"; exit 3; }
-  read -rsp '비밀 문구: ' BIDVECTOR_ACCOUNT_INITIAL_VALUE; echo; export BIDVECTOR_ACCOUNT_INITIAL_VALUE
+  cfg="$("${C[@]}" config --format json 2>/dev/null)" || { echo "운영 compose 를 해석하지 못했다"; exit 3; }
+  _prod_config_surface_ok "$cfg" || { echo "$_PROD_SURFACE_ERR"; exit 3; }
   "${C[@]}" run --rm --no-deps --pull never \
     -e SPRING_MAIN_WEB_APPLICATION_TYPE=none -e BIDVECTOR_ACCOUNT_INITIAL_VALUE \
     app --bidvector.account.mode=create --bidvector.account.login=<로그인 이름>
