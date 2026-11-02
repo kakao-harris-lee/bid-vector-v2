@@ -1,5 +1,10 @@
 # 마일스톤 7 — 사용자 웹 화면, 도메인·운영 반입
 
+> **종결(2026-11-02)** — 완료 조건 전건 대조: `reports/evidence/m7/close/checklist.md`(PR #114, verifier r2
+> ready-for-review · code-reviewer approve). 사용자 release 승인 2026-11-02(privacy-gate 판정 부재 → 7D 의 verifier
+> 표적 대체를 포함한 승인). 운영 반입 `rel-0479e1ff2f6e` · https://bidvector.kr (구매 인증서, runbook §4.7).
+> 넘기는 OPEN 은 그 checklist 「넘기는 것」.
+
 > **지위: 초안(2026-10-03, 세션 모델 단독 저작) — 운영자 승인은 PR #55 의 머지다.** 동반 문면(README 단계 표 M7 행 ·
 > `ADR 0008` D-1·D-3·D-4 개정과 `OPEN-ADR-09` 해소 · capability map §14.3 행 · `milestone-6.md` 다음 마일스톤 절 ·
 > `decisions-2026-09-07.md` 후속 절)은 **이 PR 에 함께 실린다** — 머지 전에는 어느 것도 `main` 에 없으므로 승인 전에
