@@ -254,6 +254,22 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 한쪽만 고치면 게이트가 붉어진다(fail-closed — 틀린 채 반입되지는 않는다). 넷을 같은 커밋에서 바꾸고
 `prod-nginx-check.sh` 를 한 번 돌려 확인한다.
 
+### 4.7 구매 인증서 — 운영 현행 (2026-11-02 첫 반입)
+
+첫 반입은 §4.3~4.5(certbot) 대신 **운영자가 구매한 DV 인증서**(GoGetSSL, 기존 site 와 같은 방식)로 열었다.
+그래서 §4.3·§4.5 의 certbot 발급·갱신 hook 은 쓰지 않는다 — 갱신은 **만료 전 운영자 수작업**이다.
+
+1. 확인(배치 전): 키 ↔ 인증서 공개키 일치 · `openssl verify -untrusted <all.crt> <crt>` OK · SAN 에 `DNS:bidvector.kr`.
+2. 배치: `/etc/gogetssl/bidvector.kr_<주문번호>.{all.crt,crt}.pem`(0644) · `….key.pem`(**0600**). 원본 사본의 키도 0600 으로.
+3. 조각: §4.4 와 같이 렌더한 뒤 **인증서 두 줄만** 바꾼다 — `ssl_certificate` → `….all.crt.pem` ·
+   `ssl_certificate_key` → `….key.pem`. 나머지 줄(헤더·유량 제한·XFF)은 그대로다. 배치 전 §4.1 을 돌린다.
+4. 감시: §4.5 의 감시 타이머를 **`--min-days 30`** 으로 건다 — 구매 인증서는 자동 갱신이 없으므로 21일이 아니라
+   한 달 앞에서 붉게 한다(재발급·검증에 시간이 든다).
+5. 교체: 새 파일을 **새 이름**(주문번호가 다르다)으로 놓고 조각의 두 줄을 바꾼 뒤 `sudo nginx -t && sudo systemctl
+   reload nginx` → `./tools/prod-cert-check.sh bidvector.kr` 로 서빙 인증서의 남은 일수를 확인한다. 옛 파일은 그 뒤 지운다.
+
+나중에 certbot 으로 옮길 때는 §4.2 → §4.3(staging 먼저) → §4.4 → §4.5 순서이고, 감시 임계는 기본값(21)으로 돌린다.
+
 ## 5. DNS 전환 체크리스트 (운영자)
 
 1. 전환 **하루 전**: 기존 레코드가 있으면 TTL 을 300 으로 낮춘다.
@@ -508,3 +524,31 @@ app 여유를 더하는 문면.
 10. **운영 자리의 스크립트 사본은 자동으로 갱신되지 않는다.** §「host nginx 조각」의 인증서 감시와 §「주기 실행」의
    훑기 러너는 `/usr/local/lib/bidvector-v2/` 의 사본을 돌린다(작업 트리를 가리키지 않기 위한 선택). 그 스크립트가
    바뀐 release 를 반입하면 **사본을 다시 깔아야** 한다 — §「반입」의 마지막 단계가 그것을 묻는다.
+11. **이 host 안에서 공인 주소로는 자기 site 에 닿지 않는다**(헤어핀 NAT — 2026-11-02 실측: 기존 site 도 같은
+   시간 초과). 그래서 외부 경로 확인(`prod-health.sh --public`, 브라우저)은 **바깥 망**(휴대폰 LTE 등)에서 한다.
+   host 안의 검사는 `127.0.0.1:443` + SNI 로 붙는다(`prod-cert-check.sh` 의 기본 접속 자리).
+
+## 12. 운영 계정 — 처음 한 번 · 비밀 문구 교체
+
+가입 화면·HTTP endpoint 는 없다. 계정은 **운영자 명령**으로 만든다(M7/7D). 떠 있는 서비스를 내리지 않고, 반입과 같은
+compose 파일 셋·프로젝트·env 로 **일회 컨테이너**를 띄운다.
+
+```bash
+cd <저장소>
+for v in $(compgen -e | grep -E '^COMPOSE_' || true); do unset "$v"; done
+export BIDVECTOR_RELEASE_TAG="$(cat /var/lib/bidvector-v2/current)"
+read -rsp '비밀 문구: ' BIDVECTOR_ACCOUNT_INITIAL_VALUE; echo; export BIDVECTOR_ACCOUNT_INITIAL_VALUE
+docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml \
+  -p bidvector-v2-prod --env-file /etc/bidvector-v2/prod.env \
+  run --rm --no-deps --pull never \
+  -e SPRING_MAIN_WEB_APPLICATION_TYPE=none -e BIDVECTOR_ACCOUNT_INITIAL_VALUE \
+  app --bidvector.account.mode=create --bidvector.account.login=<로그인 이름>
+unset BIDVECTOR_ACCOUNT_INITIAL_VALUE
+```
+
+- 결과 줄: `account command=create result=created login=…`. 계정이 이미 있으면 `result=refused cause=account-exists`(exit 1).
+- **비밀 문구 교체**는 `mode=rotate` — 그 계정의 세션을 전부 폐기한다(같은 트랜잭션). 계정이 없으면 `cause=account-absent`.
+- 값은 **환경변수로만** 넘긴다(`-e NAME` 은 값 없이 이름만 — argv·프로세스 표에 값이 없다). 채팅·저장소·로그에 적지 않는다.
+- `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 은 선택이 아니다 — 끄지 않으면 일회 컨테이너 안에 무인증 `POST /api/session`
+  을 포함한 API 표면이 수 초 뜬다(7D checklist 「운영자 명령 사용법」).
+- 로그인 실패·연속 실패 잠금은 응답에서 구분되지 않는다(401 하나).
