@@ -53,6 +53,7 @@ dependency가 되어서는 안 된다.
 | M5 | 기존 ML 코드를 이식·튜닝한 독립 Python training/serving engine | DB 없는 serving |
 | M6 | persistence·API·E2E·배포 후보 완성 | 승인된 테스트 환경만 |
 | M7 | 사용자 웹 화면(화면 다섯·입찰 건 모듈)·도메인·운영 반입 — **종결 2026-11-02** | 운영 host 반입 · bidvector.kr 공개(별도 승인으로 수행) |
+| M8 | 투찰가 ML 효용 판정(6G 종결)과 그 귀결 — **초안** | 0 (이미 수집한 자료만 · 새 호출·배선은 별도 승인) |
 
 ## 절대 규칙
 
