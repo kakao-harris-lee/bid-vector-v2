@@ -40,9 +40,11 @@ cron 처분은 이미 정해졌다 — 운영자가 2026-11-02 주석 처리했�
 ## acceptance
 
 - 문서 slice: CI 4 job 초록(PR head).
-- `git diff --name-only 3706d4fe..HEAD -- reports/evidence/m8/8a reports/evidence/m6/6g/commands.md milestone-8.md`
-  가 그 네 파일뿐. **range 로 재지 않는다** — base 뒤에 머지된 main 에는 남의 산출물이 섞여 있어
-  `3706d4fe..HEAD` 전체는 in_scope 밖 파일을 낸다. slice 의 커밋 집합은 in_scope 경로의 변경이다.
+- `git log --no-merges --format= --name-only 3706d4fe..HEAD ^origin/main | sort -u` ⊆ in_scope.
+  **경로 지정 diff 로 재지 않는다** — `diff --name-only <base>..HEAD -- <in_scope>` 는 정의상 그
+  경로만 내므로 범위 밖 파일이 섞여도 붉어지지 않는 항진이다. **range 전체로도 재지 않는다** —
+  base 뒤에 머지된 main 에 남의 산출물이 섞인다. 재는 것은 **이 레인의 non-merge 커밋이 만진
+  경로**다(기록 브랜치에서 온 `commands.md` 도 그 집합에 든다).
 - `command grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m8/8a reports/evidence/m6/6g/commands.md` — 새 줄 0.
 - 판정: verifier `ready-for-review` + code-reviewer(sonnet) 병렬 → 사용자 승인.
 
