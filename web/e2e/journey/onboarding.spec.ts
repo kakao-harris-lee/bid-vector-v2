@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
+import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 
 import {
   assertOnlyAllowedOperations,
@@ -62,7 +62,12 @@ function checklistResponse(page: Page) {
 }
 
 interface ChecklistReads {
-  /** [write] 로 끝나는 POST 의 응답 **뒤에 출발한** 첫 200 체크리스트 읽기. */
+  /**
+   * [write] 로 끝나는 POST 의 응답 **뒤에 출발한** 첫 200 체크리스트 읽기.
+   *
+   * 쓰기 뒤 다시 읽기가 **없으면** 이 기다림은 닫히지 않고 타임아웃이다(낡은 값으로 초록이 되는
+   * 것보다 낫다 — CR r1 L-2). 그때 볼 자리는 쓰기의 `invalidateQueries` 다.
+   */
   readonly afterWrite: (write: string) => Promise<Checklist>;
 }
 
@@ -78,6 +83,8 @@ interface ChecklistReads {
  * 날아오는 중이 아니다」가 서지 않는다 — 그래서 **요청 출발 순서**로 거른다.
  */
 function checklistReads(page: Page): ChecklistReads {
+  // 장부는 **마지막 쓰기까지** 필요하고 그 뒤 곧 페이지가 닫힌다 — 해제 자리를 두어도 버는 것이
+  // 없고, 이 여정의 체크리스트 읽기는 십여 건이다(CR r1 L-5 가 「기록으로만」이라 적은 자리).
   const started = new Set<Request>();
   page.on('request', (one) => {
     if (isChecklistRead(one)) {
@@ -86,8 +93,10 @@ function checklistReads(page: Page): ChecklistReads {
   });
   return {
     afterWrite(write: string): Promise<Checklist> {
-      // 봉인은 **응답 핸들러 안에서** 한다 — `await` 뒤로 미루면 그 사이에 다시 읽기가 이미
-      // 출발해 낡은 것과 함께 봉인되고, 그러면 이 기다림이 닫히지 않는다.
+      // 봉인은 **응답 핸들러 안에서** 한다 — 그러면 봉인과 다시 읽기의 출발 순서가 **이벤트
+      // 디스패치로** 보장된다. `await` 뒤로 미룬 판은 지금 실측으로는 구분되지 않지만(v r1 L-1
+      // 변이 M3 GREEN — 마이크로태스크 continuation 이 다음 프로토콜 메시지보다 먼저 돈다),
+      // 그 판의 순서는 런타임의 처리 순서에 달린다. 더 안전한 쪽을 둔다.
       let stale: ReadonlySet<Request> | null = null;
       const read = page.waitForResponse(
         (one) =>
@@ -103,6 +112,9 @@ function checklistReads(page: Page): ChecklistReads {
         stale = new Set(started);
         return true;
       });
+      // 쓰기 단언이 터지면 `read` 는 관측되지 않은 채 남아 뒤늦게 reject 된다 — 이미 실패한
+      // test 에 노이즈만 붙으므로 삼킨다(CR r1 L-3).
+      void read.catch(() => {});
       return (async () => {
         expect((await written).status(), `${write} 쓰기 응답`).toBe(200);
         return (await read).json() as Promise<Checklist>;
@@ -135,6 +147,13 @@ const SAVE_WRITES = {
   '자격 사실 저장': '/api/profile/qualification-facts',
   '시평액 저장': '/api/profile/construction-capacities',
 } as const;
+
+/**
+ * 전략의 쓰기 — `/api/strategy/edit-sessions/{sessionId}/confirm` 의 접미다(세션 id 가 경로에 있어
+ * 전체 경로를 적을 수 없다). 승인 목록에 `/confirm` 으로 끝나는 POST 는 이것 하나뿐이고, 새 것이
+ * 생기면 그 목록이 먼저 걸린다(CR r1 L-1).
+ */
+const STRATEGY_CONFIRM = '/confirm';
 
 /** 쓰기 하나 — 누르고 **그 쓰기 뒤에 출발한 다시 읽기**를 돌려준다(쓰기 응답을 완료로 세지 않는다). */
 async function saveAndReread(
@@ -210,6 +229,9 @@ async function assertNoPrivateValues(page: Page): Promise<void> {
 /** 시평액 행 지우기의 쓰기 — ⑦ 의 기준점이고 경합 대조도 같은 자리를 쓴다. */
 const CAPACITY_REMOVE = '/api/profile/construction-capacities/remove';
 
+/** 경합 대조가 **자기 읽기에만** 붙이는 표지 — 역할을 순번이 아니라 이것으로 가른다. */
+const LATE_READ_HEADER = 'x-late-read';
+
 interface LateRead {
   /** 늦춘 응답이 **닿았는가** — 닿지 않았으면 경합이 없었던 것이고 대조가 빈다. */
   readonly delivered: () => boolean;
@@ -231,35 +253,58 @@ interface LateRead {
  * 자체를 끄고 **대기 중인 요청을 그대로 흘려보낸다** — 미루기가 조용히 사라지고, 뒤늦은
  * `route.continue()` 가 「Route is already handled」로 터진다(20회 중 5회). 그래서 경로를 남겨 두고
  * [LateRead.stop] 으로 걷는다.
+ *
+ * **역할은 순번이 아니라 요청 표지로 가른다**(CR r1 M-1): 가로채기를 건 뒤 하네스의 읽기보다 앞서
+ * 앱의 읽기가 하나 끼면 순번이 뒤바뀌어, 늦추는 것과 미루는 것이 서로 자리를 바꾼 채 **조용히 다른
+ * 것을 재게** 된다. 표지는 **헤더**다 — 질의 문자열을 쓰면 URL 이 달라져 [isChecklistRead] 와
+ * 구판의 포착 술어가 어긋나고(그 응답을 집지 않게 되어) 재현 자체가 무력해진다. 같은 출처라
+ * preflight 도 없다. 미루는 쪽도 **쓰기 응답을 본 뒤** 첫 읽기로 못박는다.
+ *
+ * **이 자리 전용이다**(CR r1 M-2): 쓰기 경로(`CAPACITY_REMOVE`)와 「지우기 전에는 미완이 아니다」는
+ * 항목이 둘 다 안에 박혀 있다. 다른 쓰기에 그대로 쓰면 그 자기 점검이 **공허하게 통과**해 대조가
+ * 조용히 빈다 — 범용이 필요해지면 그 항목을 인자로 받아 넓힌다.
  */
-async function raceLateChecklistRead(page: Page, write: string): Promise<LateRead> {
+async function raceLateReadOnCapacityRemove(page: Page): Promise<LateRead> {
   const before = await page.request.get('/api/onboarding-checklist');
   expect(before.status(), '늦출 응답을 읽지 못했다').toBe(200);
   const stale = (await before.json()) as Checklist;
-  expect(stale.pending, '늦출 응답은 쓰기 전 상태다').not.toContain('CONSTRUCTION_CAPACITY');
-  const written = page.waitForResponse((one) => one.request().method() === 'POST' && one.url().endsWith(write));
+  expect(stale.pending, '늦출 응답은 지우기 전 상태다').not.toContain('CONSTRUCTION_CAPACITY');
+  const written = page.waitForResponse(
+    (one) => one.request().method() === 'POST' && one.url().endsWith(CAPACITY_REMOVE),
+  );
+  let writeSeen = false;
+  void written.then(
+    () => {
+      writeSeen = true;
+    },
+    () => {},
+  );
   const pattern = '**/api/onboarding-checklist';
   let delivered = false;
-  let seen = 0;
-  await page.route(pattern, async (route) => {
-    seen += 1;
-    if (seen === 1) {
+  let delayed = false;
+  const intercept = async (route: Route) => {
+    if (route.request().headers()[LATE_READ_HEADER] === '1') {
       // 하네스가 낸 읽기 — 쓰기 응답을 본 뒤에 놓는다(쓰기 전에 출발해 쓰기 뒤에 닿는 응답).
       await written;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stale) });
       delivered = true;
       return;
     }
-    if (seen === 2) {
+    if (writeSeen && !delayed) {
       // 쓰기 뒤 다시 읽기 — 늦은 응답이 먼저 닿게 이것만 미룬다.
+      delayed = true;
       await new Promise((done) => setTimeout(done, 1_000));
     }
     await route.continue();
-  });
-  await page.evaluate(() => {
-    void fetch('/api/onboarding-checklist');
-  });
-  return { delivered: () => delivered, stop: () => page.unroute(pattern) };
+  };
+  await page.route(pattern, intercept);
+  await page.evaluate(
+    (header) => {
+      void fetch('/api/onboarding-checklist', { headers: { [header]: '1' } });
+    },
+    LATE_READ_HEADER,
+  );
+  return { delivered: () => delivered, stop: () => page.unroute(pattern, intercept) };
 }
 
 test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우고 되돌린다', async ({ page }) => {
@@ -334,7 +379,7 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await page.getByTestId('onboarding-step-WATCH').click();
   await editStrategyField(page, 'FOCUS_CATEGORY', '토목');
   // 전략의 쓰기는 편집 세션 `confirm` 이다 — 그 응답이 다시 읽기의 기준점이다.
-  const watchApplied = reads.afterWrite('/confirm');
+  const watchApplied = reads.afterWrite(STRATEGY_CONFIRM);
   await page.getByTestId('edit-session').getByRole('button', { name: '적용' }).click();
   const afterWatch = await watchApplied;
 
@@ -364,7 +409,7 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   // 아니다).
   await expect(page.getByTestId('onboarding-state-CONSTRUCTION_CAPACITY')).toHaveText('완료');
   // 늦은 응답을 **인위로 하나 띄워 둔 채** 지운다 — 포착이 출발 순서로 거르는지를 매 실행 잰다.
-  const late = await raceLateChecklistRead(page, CAPACITY_REMOVE);
+  const late = await raceLateReadOnCapacityRemove(page);
   const capacityGone = reads.afterWrite(CAPACITY_REMOVE);
   await page.getByTestId('capacity-토목건축공사업').getByRole('button', { name: '지우기' }).click();
   expect((await capacityGone).pending, '포착된 것은 지우기 뒤 다시 읽기다').toContain('CONSTRUCTION_CAPACITY');
@@ -404,7 +449,7 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await page.getByTestId('onboarding-step-WATCH').click();
   await editStrategyField(page, 'FOCUS_CATEGORY', '');
   await expect(page.getByTestId('edit-sent-value')).toHaveText('비움 — 이 조건을 지웁니다');
-  const watchCleared = reads.afterWrite('/confirm');
+  const watchCleared = reads.afterWrite(STRATEGY_CONFIRM);
   await page.getByTestId('edit-session').getByRole('button', { name: '적용' }).click();
   const afterWatchCleared = await watchCleared;
   expect(afterWatchCleared.pending).toContain('WATCH_CONDITIONS');
