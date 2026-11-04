@@ -112,6 +112,10 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
             statement.setString(4, "000")
             statement.setString(5, null)
             statement.setTimestamp(6, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
+            // 읽음 해제 정책 축(D-M9-3). **값은 어느 쪽이어도 같은 문장**이고, 이 test 가 재는
+            // 것은 그 문장이 요구하는 권한이다 — PostgreSQL 은 충돌이 없어도 `DO UPDATE SET` 의
+            // 열 권한을 본다.
+            statement.setBoolean(7, true)
         } shouldBe false
     }
 

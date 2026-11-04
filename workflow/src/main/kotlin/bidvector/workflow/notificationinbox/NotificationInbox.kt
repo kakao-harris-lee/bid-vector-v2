@@ -94,6 +94,59 @@ enum class AwardOutcome(
 }
 
 /**
+ * 같은 키의 **재기록이 읽음을 해제하는가** — 종류별 정책이다(D-M9-3).
+ *
+ * 왜 종류로 가르는가: 7C③ 은 한 규칙이었다(「detail 이 바뀔 때만 해제」). detail 을 **갖지 않는**
+ * 종류는 그 규칙 아래에서 재기록이 영영 읽음을 유지하고, `NOTICE_REVISED` 에서는 그것이 틀렸다 —
+ * 이미 본 공고가 **또** 바뀐 것은 새 소식이다(7C③-b 의 알려진 제한 13).
+ *
+ * 이 어휘는 **SQL 로 bind 하나로** 내려간다. 종류 문자열을 SQL 에 늘어놓으면 종류를 더할 때
+ * 컴파일이 막아 주지 않고, 그 부재를 `NotificationInboxSqlPolicyTest` 가 종류 전수로 잰다.
+ */
+enum class ReadResetPolicy {
+    /**
+     * detail 이 바뀔 때만 해제한다(D-7C3-1 ④) — 같은 사실의 재기록은 읽음을 유지한다. 그러지
+     * 않으면 운영자가 같은 것을 반복해 읽는다.
+     */
+    ON_DETAIL_CHANGE,
+
+    /**
+     * 사실의 시각이 **전진한** 재기록도 해제한다 — 그 종류에서는 전진이 「새 소식」과 동치다.
+     *
+     * **매 재기록이 아니다**: 같은 사실을 다시 적는 것만으로 해제하면, 그 사실을 주기로 다시
+     * 적는 원천 위에서 읽음 처리가 **영영 유지되지 않는다**(공고 개정 훑기가 그런 원천이다 —
+     * 조건이 유지되는 동안 매 run 마다 같은 개정을 다시 적는다). 전진을 보면 그 재기록은
+     * 지나가고 **새 개정만** 배지를 세운다.
+     */
+    ON_NEWER_FACT,
+}
+
+/**
+ * 종류 **전수 표**(`else` 없는 `when`) — 종류를 더하면 이 정책을 정하지 않고는 컴파일되지
+ * 않는다. 어느 종류가 어느 정책인지는 `NotificationFactTest` 가 파티션 등식으로 고정한다
+ * (그 등식이 없으면 정책을 뒤집어도 거동 test 둘이 각자 자기 파티션을 돌아 **둘 다** 초록이다).
+ *
+ * `NOTICE_REVISED` 만 [ReadResetPolicy.ON_NEWER_FACT] 인 이유: 그 종류의 사실 시각은 개정 시각
+ * (`notice.updated_at`)이고, V2 의 트리거가 `revision` 과 그 열을 **함께** 올리므로(그리고 내용이
+ * 같으면 UPDATE 자체가 돌지 않는다) 시각의 전진은 **새 개정과 동치**다. 시간 기반 종류들은
+ * 사실 시각이 달력일 시작이라 전진이 「같은 판정의 다음 날」을 뜻하고, 그것은 새 소식이 아니다.
+ */
+val NotificationKind.readResetPolicy: ReadResetPolicy
+    get() =
+        when (this) {
+            NotificationKind.NOTICE_REVISED -> ReadResetPolicy.ON_NEWER_FACT
+
+            NotificationKind.NEW_CANDIDATE,
+            NotificationKind.BID_DEADLINE_IMMINENT,
+            NotificationKind.BID_DEADLINE_TODAY,
+            NotificationKind.DOCUMENT_DEADLINE_IMMINENT,
+            NotificationKind.OPENING_COMPLETED,
+            NotificationKind.AWARD_DECIDED,
+            NotificationKind.BID_PRICE_REQUEST_RECORDED,
+            -> ReadResetPolicy.ON_DETAIL_CHANGE
+        }
+
+/**
  * 알림 하나가 나르는 **사실**. 자유 문자열 칸이 없다 — 표시 문구(공고명·기관·마감)는 저장하지
  * 않고 읽을 때 `notice` 에서 합친다(D-7C3-1 ⑦). 그래서 두 성질이 규율이 아니라 **구조**다:
  *

@@ -8,7 +8,10 @@ import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
+import bidvector.workflow.notificationinbox.ReadResetPolicy
+import bidvector.workflow.notificationinbox.readResetPolicy
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.date.shouldBeAfter
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -40,7 +43,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     }
 
     @Test
-    fun `재기록은 사실의 시각과 갱신 시각만 움직인다 — 적재 시각과 읽음은 그대로다`() {
+    fun `재기록은 사실의 시각과 갱신 시각만 움직인다 — 적재 시각은 그대로다`() {
         val account = insertAccount("timestamps")
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
@@ -97,18 +100,71 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
 
     /**
      * **같은 사실의 재기록은 읽음을 되돌리지 않는다**(D-7C3-1 ④) — 되돌리면 운영자가 같은 것을
-     * 반복해 읽는다.
+     * 반복해 읽는다. 그 규칙을 **그 정책을 가진 종류 전수**에서 잰다(D-M9-3): 모집단을 손으로
+     * 고르면 정책이 바뀐 종류가 조용히 빠진다.
+     *
+     * 사실의 시각을 **전진시켜** 재기록한다 — 그래야 「detail 이 같으면 유지」와 「시각이
+     * 전진하면 해제」가 갈리는 자리를 지난다(같은 시각으로 적으면 두 규칙이 같은 답을 낸다).
      */
     @Test
-    fun `detail 이 같은 재기록은 읽음 상태를 유지한다`() {
+    fun `detail 변화로만 해제하는 종류 전수에서 재기록은 읽음을 유지한다`() {
         val account = insertAccount("reread")
+        val kinds = NotificationKind.entries.filter { it.readResetPolicy == ReadResetPolicy.ON_DETAIL_CHANGE }
+        kinds.shouldNotBeEmpty()
+
+        kinds.forEach { kind ->
+            val notice = unknownNotice("N-${kind.name}")
+            val fact = factOf(kind)
+            inbox().record(record(account, notice, fact))
+            store().markRead(account, NotificationItemKey(kind, notice), READ_AT)
+
+            inbox().record(record(account, notice, fact, LATER)) shouldBe NotificationInboxOutcome.Updated
+
+            rawRow(account, kind.name, notice.number.value).readAt shouldBe READ_AT
+        }
+    }
+
+    /**
+     * **이미 본 공고가 또 바뀌면 배지에 선다**(D-M9-3 — 7C③-b 의 알려진 제한 13 이 닫힌 자리).
+     *
+     * `NOTICE_REVISED` 는 detail 이 없어 7C③ 의 한 규칙 아래에서는 재기록이 **영영** 읽음을
+     * 유지했다. 이제 그 종류는 사실의 시각(= 개정 시각)이 전진하면 안읽음으로 돌아온다.
+     */
+    @Test
+    fun `읽은 개정 항목은 더 늦은 개정에 안읽음으로 돌아온다`() {
+        val account = insertAccount("revision-reunread")
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
         store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
-        inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER))
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER)) shouldBe
+            NotificationInboxOutcome.Updated
+
+        rawRow(account, "NOTICE_REVISED", "N-1").readAt.shouldBeNull()
+        store().list(account, page()).unreadCount shouldBe 1L
+    }
+
+    /**
+     * **같은 개정의 재기록은 읽음을 유지한다** — 이 음성 대조가 없으면 그 종류의 규칙이 「매
+     * 재기록」으로 넓어져도 위 test 가 초록이다. 그리고 넓어지면 **배지를 끌 수 없다**: 공고
+     * 개정 훑기는 조건이 유지되는 동안 매 run 마다 같은 개정을 다시 적는다.
+     *
+     * 늦게 도착한 **옛** 사실도 해제하지 않는다(시각 축이 `IS DISTINCT FROM` 이 아니라 `>` 다).
+     */
+    @Test
+    fun `같은 개정과 옛 개정의 재기록은 읽음을 유지한다 — 훑기가 run 마다 배지를 세우지 않는다`() {
+        val account = insertAccount("same-revision")
+        val notice = unknownNotice("N-1")
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
+        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
+        rawRow(account, "NOTICE_REVISED", "N-1").readAt shouldBe READ_AT
+
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, EARLIER))
 
         rawRow(account, "NOTICE_REVISED", "N-1").readAt shouldBe READ_AT
+        store().list(account, page()).unreadCount shouldBe 0L
     }
 
     /** **사실이 바뀌면 다시 봐야 한다** — 잠정 1위였다가 아니게 된 것은 다른 사실이다. */
@@ -344,6 +400,23 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         store().list(account, page()).unreadCount shouldBe 0L
     }
 
+    /**
+     * 종류 하나의 **대표 사실** — 소진 `when` 이라 종류를 더하면 여기서 컴파일이 막힌다. 위
+     * 전수 test 의 모집단이 종류 어휘와 함께 자라는 것은 그래서다(목록을 손으로 들면 자라지
+     * 않는다).
+     */
+    private fun factOf(kind: NotificationKind): NotificationFact =
+        when (kind) {
+            NotificationKind.NEW_CANDIDATE -> NotificationFact.NewCandidate
+            NotificationKind.BID_DEADLINE_IMMINENT -> NotificationFact.BidDeadlineImminent
+            NotificationKind.BID_DEADLINE_TODAY -> NotificationFact.BidDeadlineToday
+            NotificationKind.DOCUMENT_DEADLINE_IMMINENT -> NotificationFact.DocumentDeadlineImminent
+            NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised
+            NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded
+            NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(provisionallyFirst = true)
+            NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(AwardOutcome.AWARDED)
+        }
+
     private fun page(unreadOnly: Boolean = false) =
         NotificationPageRequest(
             page = 0,
@@ -363,6 +436,8 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         }
 
     private companion object {
+        /** `OBSERVED_AT` 보다 **이른** 사실 시각 — 늦게 도착한 옛 사실의 자리다. */
+        val EARLIER: Instant = Instant.parse("2026-10-22T00:00:00Z")
         val LATER: Instant = Instant.parse("2026-10-24T00:00:00Z")
         val READ_AT: Instant = Instant.parse("2026-10-23T12:00:00Z")
         val LATER_READ_AT: Instant = Instant.parse("2026-10-25T12:00:00Z")

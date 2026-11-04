@@ -12,6 +12,11 @@ import org.junit.jupiter.api.Test
  * 이 class 가 지키는 것은 「문서가 적은 종류 ↔ detail 짝이 코드의 구성과 같다」다. 열거 +
  * nullable 필드로 두면 `NewCandidate(detail = AWARDED)` 같은 상태가 표현되고 그것을 막는 일이
  * 런타임 검증으로 내려간다 — 그 상태가 **표현되지 않는다**는 것이 여기서 재는 성질이다.
+ *
+ * **읽음 해제 정책의 파티션도 여기서 잰다**(D-M9-3). 같은 종류 전수 표가 정본이고(같은 파일의
+ * `readResetPolicy`), 그 표의 **거동**은 실 DB 쪽이 진다 — 여기서 재는 것은 「어느 종류가 어느
+ * 정책인가」뿐이다. 그 등식이 없으면 정책을 뒤집어도 거동 test 둘이 각자 자기 파티션을 돌아
+ * **둘 다** 초록이다(실측으로 세운 자리가 아니라, 분할 test 의 구조가 그렇다).
  */
 class NotificationFactTest {
     /**
@@ -122,6 +127,31 @@ class NotificationFactTest {
         shouldThrow<IllegalArgumentException> {
             notificationFactOf(NotificationKind.AWARD_DECIDED, NotificationDetail.PROVISIONAL_FIRST)
         }
+    }
+
+    // --- 읽음 해제 정책의 파티션 (D-M9-3) ---------------------------------------
+
+    /**
+     * **정책 표 자체를 고정한다.** 「개정의 둘째 소식이 배지에 선다」는 성질은 이 파티션에
+     * 의존하고, 뒤집히면 실 DB 거동 test 들이 **각자 다른 파티션으로 옮겨가** 둘 다 통과한다.
+     */
+    @Test
+    fun `사실 시각 전진으로 읽음을 해제하는 종류는 공고 변경 하나다`() {
+        val onNewerFact = NotificationKind.entries.filter { it.readResetPolicy == ReadResetPolicy.ON_NEWER_FACT }
+
+        onNewerFact shouldContainExactlyInAnyOrder listOf(NotificationKind.NOTICE_REVISED)
+    }
+
+    /**
+     * 음성 대조 — 나머지 전부가 **지금 규칙**이다. 위 등식만 있으면 「전부 `ON_NEWER_FACT`」로
+     * 가는 변이가 그 등식에서만 붉고, 어느 쪽이 기본인지는 아무 단언도 묻지 않는다.
+     */
+    @Test
+    fun `나머지 종류 전부는 detail 변화로만 읽음을 해제한다`() {
+        val byDetailChange = NotificationKind.entries.filter { it.readResetPolicy == ReadResetPolicy.ON_DETAIL_CHANGE }
+
+        byDetailChange shouldContainExactlyInAnyOrder
+            NotificationKind.entries.filterNot { it == NotificationKind.NOTICE_REVISED }
     }
 
     companion object {
