@@ -15,6 +15,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.AwardOutcome
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
@@ -91,8 +92,8 @@ class BidCaseNotificationTest {
             NotificationFact.OpeningCompleted(provisionallyFirst = true)
         reflectedNotificationFact(BidState.OpenedOutOfRank) shouldBe
             NotificationFact.OpeningCompleted(provisionallyFirst = false)
-        reflectedNotificationFact(BidState.Won) shouldBe NotificationFact.AwardDecided(awarded = true)
-        reflectedNotificationFact(BidState.Lost) shouldBe NotificationFact.AwardDecided(awarded = false)
+        reflectedNotificationFact(BidState.Won) shouldBe NotificationFact.AwardDecided(AwardOutcome.AWARDED)
+        reflectedNotificationFact(BidState.Lost) shouldBe NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED)
     }
 
     /**
@@ -138,9 +139,9 @@ class BidCaseNotificationTest {
         )
 
         val record = inbox.records.single()
-        record.fact shouldBe NotificationFact.AwardDecided(awarded = false)
+        record.fact shouldBe NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED)
         // 같은 항목이라는 것은 키가 말한다 — 종류와 공고가 앞 기록과 같다.
-        record.fact.kind shouldBe NotificationFact.AwardDecided(awarded = true).kind
+        record.fact.kind shouldBe NotificationFact.AwardDecided(AwardOutcome.AWARDED).kind
     }
 
     /**

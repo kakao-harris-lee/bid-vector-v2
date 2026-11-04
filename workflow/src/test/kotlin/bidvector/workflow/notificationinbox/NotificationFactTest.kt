@@ -50,10 +50,30 @@ class NotificationFactTest {
             NotificationDetail.NOT_PROVISIONAL_FIRST
     }
 
+    /**
+     * **결과 셋이 detail 셋으로 갈린다**(D-M9-1). 앞 판은 `Boolean` 이라 어휘가 둘뿐이었고, 그래서
+     * 유찰은 「패찰로 접기」나 「알림 없음」 중 하나여야 했다.
+     */
     @Test
-    fun `낙찰 확정의 낙찰 여부가 detail 두 값으로 갈린다`() {
-        NotificationFact.AwardDecided(awarded = true).detail shouldBe NotificationDetail.AWARDED
-        NotificationFact.AwardDecided(awarded = false).detail shouldBe NotificationDetail.NOT_AWARDED
+    fun `낙찰 확정의 결과 셋이 detail 셋으로 갈린다`() {
+        NotificationFact.AwardDecided(AwardOutcome.AWARDED).detail shouldBe NotificationDetail.AWARDED
+        NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED).detail shouldBe NotificationDetail.NOT_AWARDED
+        NotificationFact.AwardDecided(AwardOutcome.FAILED_OR_REBID).detail shouldBe
+            NotificationDetail.FAILED_OR_REBID
+    }
+
+    /**
+     * **결과 전수가 서로 다른 detail 을 가리킨다**(D-M9-1). 어휘 짝이 생성자 인자라 겹침이
+     * 표현되기는 하고(열거가 아니라 구성인 대가), 겹치면 아래 왕복 등식의 복원이 `single` 에서
+     * 어긋나 붉다 — 다만 **무엇이 접혔는지**를 말해 주는 것은 이 등식이다.
+     *
+     * 「내가 졌다」와 「아무도 못 땄다」가 한 값이 되는 접기가 7C③-b 가 거부한 바로 그것이다.
+     */
+    @Test
+    fun `결과 전수가 서로 다른 detail 을 가리킨다 — 유찰이 패찰로 접히지 않는다`() {
+        val details = AwardOutcome.entries.map { it.detail }
+
+        details.distinct() shouldContainExactlyInAnyOrder details
     }
 
     /**
@@ -121,13 +141,17 @@ class NotificationFactTest {
                 NotificationFact.NoticeRevised,
                 NotificationFact.BidPriceRequestRecorded,
                 NotificationFact.OpeningCompleted(provisionallyFirst = true),
-                NotificationFact.AwardDecided(awarded = true),
+                NotificationFact.AwardDecided(AwardOutcome.AWARDED),
             )
 
+        /**
+         * detail 을 갖는 둘의 **나머지 값 전부**. 낙찰 확정 쪽은 결과 전수에서 짓는다 — 손으로
+         * 적으면 결과를 더하고 여기 빠뜨린 변형이 아래 왕복 등식의 모집단 밖에 남는다.
+         */
         private val DETAIL_BEARING_VARIANTS: List<NotificationFact> =
-            listOf(
-                NotificationFact.OpeningCompleted(provisionallyFirst = false),
-                NotificationFact.AwardDecided(awarded = false),
-            )
+            listOf(NotificationFact.OpeningCompleted(provisionallyFirst = false)) +
+                AwardOutcome.entries
+                    .filterNot { it == AwardOutcome.AWARDED }
+                    .map { NotificationFact.AwardDecided(it) }
     }
 }

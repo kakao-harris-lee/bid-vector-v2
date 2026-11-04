@@ -50,7 +50,7 @@ enum class NotificationKind {
     /** 개찰 완료. 잠정 1위 여부를 detail 로 싣는다 — 그 값은 **갱신되어야 한다**. */
     OPENING_COMPLETED,
 
-    /** 낙찰/패찰 확정. 낙찰 여부를 detail 로 싣는다. */
+    /** 낙찰·패찰·유찰 확정. 결과 셋([AwardOutcome])을 detail 로 싣는다. */
     AWARD_DECIDED,
 
     /** 공고 변경(정정공고). 원천 판정은 관련성이 서는 slice 몫이다(D-7C3-1 ②). */
@@ -61,7 +61,7 @@ enum class NotificationKind {
 }
 
 /**
- * detail 어휘 — **닫힌 넷**이다. 자유 문자열이 아니므로 이 축으로 PII 가 들어올 수 없다.
+ * detail 어휘 — **닫힌 다섯**이다. 자유 문자열이 아니므로 이 축으로 PII 가 들어올 수 없다.
  * 어느 종류가 어느 값을 갖는지는 [NotificationFact] 의 구성이 정하고, 저장 층의 짝 CHECK 가
  * 같은 규칙을 한 겹 더 진다(심층 방어).
  */
@@ -70,6 +70,27 @@ enum class NotificationDetail {
     NOT_PROVISIONAL_FIRST,
     AWARDED,
     NOT_AWARDED,
+    FAILED_OR_REBID,
+}
+
+/**
+ * 낙찰 확정의 **결과** — 닫힌 셋이고 각자 자기 detail 을 **생성자로** 든다(D-M9-1).
+ *
+ * **`Boolean` 이 아닌 이유**: 결과는 셋이다. 유찰(아무도 못 땄다 · 재입찰)은 패찰(내가 졌다)과
+ * 다른 사실이고, 운영자의 다음 할 일도 다르다 — 유찰은 재입찰 공고를 기다리는 일이다. 앞 판은
+ * 어휘가 둘(`awarded: Boolean`)이어서 유찰이 **알림을 아예 남기지 못했다**(7C③-b 의 알려진 제한).
+ * `NOT_AWARDED` 로 접는 길은 거부됐다 — 「내가 졌다」와 「아무도 못 땄다」가 한 값이 된다.
+ *
+ * **짝이 생성자 인자인 이유**: 투영과 복원이 **한 표**를 읽는다. 양쪽에 `when` 을 두면 표가
+ * 둘이 되고 갈릴 자리가 생긴다. 겹침(두 결과가 한 detail 을 가리키는 접기)은 이 꼴에서
+ * 표현되기는 하지만 복원이 [notificationFactOf] 의 `single` 에서 어긋나 붉다.
+ */
+enum class AwardOutcome(
+    val detail: NotificationDetail,
+) {
+    AWARDED(NotificationDetail.AWARDED),
+    NOT_AWARDED(NotificationDetail.NOT_AWARDED),
+    FAILED_OR_REBID(NotificationDetail.FAILED_OR_REBID),
 }
 
 /**
@@ -120,9 +141,9 @@ sealed interface NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.OPENING_COMPLETED
     }
 
-    /** 낙찰/패찰 확정 — 낙찰 여부. */
+    /** 낙찰·패찰·유찰 확정 — 결과를 [AwardOutcome] 으로 싣는다. 바뀌면 안읽음으로 돌아간다. */
     data class AwardDecided(
-        val awarded: Boolean,
+        val outcome: AwardOutcome,
     ) : NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.AWARD_DECIDED
     }
@@ -147,7 +168,7 @@ sealed interface NotificationFact {
                 }
 
                 is AwardDecided -> {
-                    if (awarded) NotificationDetail.AWARDED else NotificationDetail.NOT_AWARDED
+                    outcome.detail
                 }
             }
 }
@@ -172,37 +193,41 @@ fun notificationFactOf(
         NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised.withoutDetail(detail)
         NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded.withoutDetail(detail)
         NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(detail.isProvisionalFirst(kind))
-        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.isAwarded(kind))
+        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.asAwardOutcome(kind))
     }
 
 // detail 을 싣는 종류 **각각이 자기 어휘를 읽는 함수**를 갖는다. 어휘 쌍을 호출 자리에 펴 두면
-// 갈래 하나가 여러 줄이 되고, 그러면 `when` 전체가 함수 크기 한도를 넘는다(실측). 더 중요한
-// 것은 **소진 `when` 을 지키는 것**이다 — `else` 나 표 조회로 바꾸면 종류를 더할 때 컴파일이
-// 막아 주지 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
+// 갈래 하나가 여러 줄이 되고, 그러면 위 `when` 이 함수 크기 한도를 넘는다(실측). 더 중요한
+// 것은 **소진 `when` 을 지키는 것**이다 — `else` 로 바꾸면 종류를 더할 때 컴파일이 막아 주지
+// 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
+//
+// 두 본문의 꼴이 **다른 이유**: 개찰 축은 `Boolean` 이라 어휘 쌍이 여기 적히고, 낙찰 축은
+// [AwardOutcome] 이 짝을 이미 들고 있어 그 표를 **되읽는다**. 그쪽에 `when` 을 또 적으면 같은
+// 짝이 두 자리에 살고 갈릴 자리가 생긴다.
 
 private fun NotificationDetail?.isProvisionalFirst(kind: NotificationKind): Boolean =
-    asFlag(kind, whenTrue = NotificationDetail.PROVISIONAL_FIRST, whenFalse = NotificationDetail.NOT_PROVISIONAL_FIRST)
+    when (this) {
+        NotificationDetail.PROVISIONAL_FIRST -> true
+        NotificationDetail.NOT_PROVISIONAL_FIRST -> false
+        else -> throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
+    }
 
-private fun NotificationDetail?.isAwarded(kind: NotificationKind): Boolean =
-    asFlag(kind, whenTrue = NotificationDetail.AWARDED, whenFalse = NotificationDetail.NOT_AWARDED)
+/**
+ * 낙찰 확정의 detail → 결과. [AwardOutcome] 의 짝을 **역으로** 읽는다.
+ *
+ * `single` 이 아니라 `singleOrNull` + 던지기인 것은 「둘이 걸렸다」와 「없다」를 **같은 거부**로
+ * 접기 위해서다. 둘이 걸리는 경우는 두 결과가 한 detail 을 가리키는 접기이고, 그 상태는 복원할
+ * 수 있는 짝이 아니다 — 하나를 골라 주면 그 접기가 조용히 작동한다.
+ */
+private fun NotificationDetail?.asAwardOutcome(kind: NotificationKind): AwardOutcome =
+    AwardOutcome.entries.singleOrNull { it.detail == this }
+        ?: throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
 
 /** detail 을 갖지 않는 종류에 detail 이 실려 오면 그 짝은 복원 대상이 아니다. */
 private fun NotificationFact.WithoutDetail.withoutDetail(detail: NotificationDetail?): NotificationFact {
     require(detail == null) { "$kind 는 detail 을 싣지 않는다: $detail" }
     return this
 }
-
-/** 두 값 중 하나여야 한다 — 앞 값이면 `true`, 뒤 값이면 `false`, 그 밖은 복원 대상이 아니다. */
-private fun NotificationDetail?.asFlag(
-    kind: NotificationKind,
-    whenTrue: NotificationDetail,
-    whenFalse: NotificationDetail,
-): Boolean =
-    when (this) {
-        whenTrue -> true
-        whenFalse -> false
-        else -> throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
-    }
 
 /**
  * 쓰기 포트가 받는 한 건. **첫 필드가 주체**다 — 주체 없이 알림을 기록하는 호출이 시그니처상

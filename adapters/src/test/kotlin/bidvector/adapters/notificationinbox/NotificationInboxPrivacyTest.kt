@@ -1,7 +1,9 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.notificationinbox.AwardOutcome
 import bidvector.workflow.notificationinbox.NotificationDetail
+import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -203,38 +205,45 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
         }
     }
 
+    /**
+     * **짝의 전수 교차**(D-M9-1 로 어휘가 넷에서 다섯이 되며 세운 자리) — detail 을 갖는 종류
+     * 둘 × detail 어휘 전수의 **모든 칸**을 재고, 들어가야 하는 칸과 막혀야 하는 칸을 같은
+     * 등식에서 가른다.
+     *
+     * 앞 판은 손으로 고른 짝 넷(개찰에 낙찰 어휘 둘 · 올바른 짝 셋)이었다. 그 꼴에서는 어휘를
+     * 하나 더할 때 **그 값이 어느 종류에 붙는지를 아무 단언도 묻지 않는다** — 유찰을 detail
+     * 어휘에만 더하고 짝 CHECK 를 안 고친 상태가 그 넷을 전부 지나갔다(실측).
+     *
+     * 기대 집합은 **사실의 구성에서 짓는다**: 개찰 축은 `Boolean` 둘, 낙찰 축은 결과 전수다.
+     * 손으로 어휘를 다시 적으면 그 목록이 둘째 정본이 되어 구성과 갈린다.
+     *
+     * 음성 대조가 이 등식 **안**에 있다 — 「막혀야 하는 칸」만 재면 전부 막는 술어도 초록이다.
+     */
     @Test
-    fun `개찰 완료에 낙찰 어휘를 실으면 DB 가 거부한다 — 어휘가 맞아도 짝이 틀리면 막힌다`() {
+    fun `종류 × detail 전수 교차에서 자기 어휘만 들어간다`() {
         val account = insertFixtureAccount()
+        val expected =
+            mapOf(
+                NotificationKind.OPENING_COMPLETED to
+                    listOf(true, false).mapNotNull { NotificationFact.OpeningCompleted(it).detail },
+                NotificationKind.AWARD_DECIDED to
+                    AwardOutcome.entries.mapNotNull { NotificationFact.AwardDecided(it).detail },
+            )
+        expected.keys shouldBe DETAIL_BEARING_KINDS
 
-        insertFails(
-            account,
-            NotificationKind.OPENING_COMPLETED.name,
-            NotificationDetail.AWARDED.name,
-        ) shouldBe true
-        insertFails(
-            account,
-            NotificationKind.AWARD_DECIDED.name,
-            NotificationDetail.PROVISIONAL_FIRST.name,
-        ) shouldBe true
+        expected.forEach { (kind, own) ->
+            NotificationDetail.entries.forEach { detail ->
+                insertFails(account, kind.name, detail.name) shouldBe (detail !in own)
+            }
+        }
     }
 
-    /** 음성 대조 — 올바른 짝은 실제로 들어간다(위 셋이 전부를 막는 술어가 아님을 보인다). */
+    /** 음성 대조 — detail 을 갖지 않는 종류에 `null` 은 실제로 들어간다. */
     @Test
-    fun `올바른 짝은 들어간다 — 음성 대조`() {
+    fun `detail 을 갖지 않는 종류에 null 은 들어간다 — 음성 대조`() {
         val account = insertFixtureAccount()
 
         insertFails(account, NotificationKind.NOTICE_REVISED.name, null) shouldBe false
-        insertFails(
-            account,
-            NotificationKind.OPENING_COMPLETED.name,
-            NotificationDetail.PROVISIONAL_FIRST.name,
-        ) shouldBe false
-        insertFails(
-            account,
-            NotificationKind.AWARD_DECIDED.name,
-            NotificationDetail.NOT_AWARDED.name,
-        ) shouldBe false
     }
 
     private fun insertFixtureAccount(): Long =
@@ -408,7 +417,7 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     private companion object {
         const val TABLE = "notification_inbox"
         val NOTICE_KEY_COLUMNS = setOf("notice_number", "notice_round")
-        val DETAIL_BEARING_KINDS =
+        val DETAIL_BEARING_KINDS: Set<NotificationKind> =
             setOf(NotificationKind.OPENING_COMPLETED, NotificationKind.AWARD_DECIDED)
         val VOCABULARY_LITERAL = Regex("'([^']*)'")
 

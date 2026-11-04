@@ -4,6 +4,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.NoticeKey
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.workflow.notificationinbox.AwardOutcome
 import bidvector.workflow.notificationinbox.NotificationFact
 
 /**
@@ -34,9 +35,9 @@ internal fun reflectedNotificationFact(state: BidState): NotificationFact? =
 
         BidState.OpenedOutOfRank -> NotificationFact.OpeningCompleted(provisionallyFirst = false)
 
-        BidState.Won -> NotificationFact.AwardDecided(awarded = true)
+        BidState.Won -> NotificationFact.AwardDecided(AwardOutcome.AWARDED)
 
-        BidState.Lost -> NotificationFact.AwardDecided(awarded = false)
+        BidState.Lost -> NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED)
 
         // 아래는 **되비출 사실이 아니다.** 유찰만 사유가 다르다(어휘 부재, 위 KDoc) — 나머지는
         // 알림함 어휘에 대응하는 종류가 없거나(초안 · 제출함 · 개찰 대기 · 적격심사) 시간 기반

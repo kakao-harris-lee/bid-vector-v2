@@ -1,5 +1,6 @@
 package bidvector.adapters.notificationinbox
 
+import bidvector.workflow.notificationinbox.AwardOutcome
 import bidvector.workflow.notificationinbox.NotificationDetail
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxLimits
@@ -126,6 +127,32 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val row = rawRow(account, "OPENING_COMPLETED", "N-1")
         row.readAt.shouldBeNull()
         row.detailCode shouldBe NotificationDetail.NOT_PROVISIONAL_FIRST.name
+    }
+
+    /**
+     * **유찰이 자기 detail 로 적힌다**(D-M9-1) — 7C③-b 는 어휘에 자리가 없어 유찰을 **기록하지
+     * 않았고**, `NOT_AWARDED` 로 접는 길은 「내가 졌다」와 「아무도 못 땄다」를 한 값으로 만들어
+     * 거부됐다. V24 가 어휘와 짝 CHECK 를 넓힌 자리를 **실 DB 에서** 잰다.
+     *
+     * 함께 재는 것 둘: 낙찰로 적힌 항목이 유찰로 **정정**되면 ⓐ 항목이 늘지 않고(같은 키)
+     * ⓑ detail 이 바뀌었으므로 안읽음으로 돌아온다.
+     */
+    @Test
+    fun `유찰 결과가 자기 detail 로 적힌다 — 항목 하나에 새 detail`() {
+        val account = insertAccount("failed-bid")
+        val notice = unknownNotice("N-1")
+        val key = NotificationItemKey(NotificationKind.AWARD_DECIDED, notice)
+        inbox().record(record(account, notice, NotificationFact.AwardDecided(AwardOutcome.AWARDED)))
+        store().markRead(account, key, READ_AT)
+
+        inbox().record(
+            record(account, notice, NotificationFact.AwardDecided(AwardOutcome.FAILED_OR_REBID), LATER),
+        ) shouldBe NotificationInboxOutcome.Updated
+
+        rowCount() shouldBe 1L
+        val row = rawRow(account, "AWARD_DECIDED", "N-1")
+        row.detailCode shouldBe NotificationDetail.FAILED_OR_REBID.name
+        row.readAt.shouldBeNull()
     }
 
     /**
