@@ -461,7 +461,14 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   expect(afterBudget.completed, '금액대를 적용하면 완료로 간다').toContain('BUDGET_RANGE');
   await assertRowsMatch(page, afterBudget);
-  // 화면과 **서버** 둘 다 본다 — 화면만 보면 「다시 읽지 않아서 그렇게 보인다」와 구분되지 않는다.
+  // **미완이 0 이 됐다** — 이 여정이 처음으로 그 얼굴에 닿는다(D-7E2b-4 의 「다음 행동 하나」는
+  // 금액대를 적용할 수 없던 동안 화면 test 로만 잠겨 있었다).
+  expect(afterBudget.pending, '여덟 항목이 전부 채워졌다').toStrictEqual([]);
+  await expect(page.getByTestId('onboarding-complete')).toBeVisible();
+  // 적용 뒤 **단계가 옮겨 간다**(쓰기 뒤 다음 미완으로 — 미완이 0 이면 첫 단계로). 그래서 값을
+  // 보려면 그 단계로 돌아온다 — 화면과 **서버** 둘 다 본다(화면만 보면 「다시 읽지 않아서 그렇게
+  // 보인다」와 구분되지 않는다).
+  await page.getByTestId('onboarding-step-BUDGET').click();
   await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('100,000,000원');
   const strategyWithBudget = (await (await page.request.get('/api/strategy')).json()) as {
     readonly minBudgetWon: number | null;
@@ -540,6 +547,8 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   const afterBudgetCleared = await budgetCleared;
 
   expect(afterBudgetCleared.pending, '비우면 금액대가 미완으로 돌아온다').toContain('BUDGET_RANGE');
+  // 적용 뒤 단계가 옮겨 가므로 다시 그 단계로 온다(위 ⑥ 과 같은 사유).
+  await page.getByTestId('onboarding-step-BUDGET').click();
   await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('값 없음');
   const strategyAfterClear = (await (await page.request.get('/api/strategy')).json()) as {
     readonly minBudgetWon: number | null;
