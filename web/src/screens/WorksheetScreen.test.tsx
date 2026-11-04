@@ -133,6 +133,24 @@ describe('화면 C — 머리와 다음 행동 하나', () => {
     expect((await screen.findByTestId('worksheet-agency')).textContent).toContain(NOTICE.demandAgencyName as string);
   });
 
+  /**
+   * M9 D-1 — 마감은 **KST 표기 + D-day** 한 칸이고, 다음 확인 시점도 같은 표기를 쓴다. 앞 판은
+   * 둘 다 응답의 ISO 원문이었다(`OPEN-7E3B-TIME-DISPLAY`).
+   */
+  it('마감과 다음 확인 시점을 KST 표기로 보인다 — ISO 원문이 아니다', async () => {
+    renderScreen();
+
+    const deadline = (await screen.findByTestId('worksheet-deadline')).textContent ?? '';
+    expect(deadline).toContain('2099-01-03 09:00');
+    expect(deadline, 'ISO 원문이 화면에 남았다').not.toContain(NOTICE.deadlineAt as string);
+    // D-day 는 그 자리에 **함께** 선다(요구표 ⓐ 행 — 클라이언트 계산으로 승인된 유일한 축).
+    expect(deadline).toMatch(/\(D[-+]\d+\)/);
+
+    const checkpoint = (await screen.findByTestId('worksheet-checkpoint')).textContent ?? '';
+    expect(checkpoint).toContain('2099-01-03 09:00');
+    expect(checkpoint, 'ISO 원문이 화면에 남았다').not.toContain(CASE.nextCheckpointAt as string);
+  });
+
   /** §6.5 — primary 버튼은 **그 상태의 다음 전이 하나**다. */
   it('담긴 건의 primary 버튼은 투찰가 요청 하나다', async () => {
     renderScreen();
