@@ -45,6 +45,9 @@ BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml 
 # 에서 읽는다(정본은 그 파일 하나다 — **마지막** 덧쓰기의 `name:` 이 이기므로 배열의 마지막 원소다).
 # 호출자가 `--project` 를 주면 **뒤에 오는 `-p` 가 이긴다**.
 BIDVECTOR_PROD_PROJECT="$(sed -n 's/^name:[[:space:]]*//p' "${_prod_env_root}/${BIDVECTOR_PROD_COMPOSE_FILES[-1]}" 2>/dev/null | head -n1)"
+# **반입 트리의 자리**. 아래 `_prod_git_sha_match` 가 보는 저장소다 — cwd 에 기대지 않는다(호출자가
+# 어디서 부르든 compose 파일을 읽는 트리는 이 조각이 있는 트리 하나다).
+BIDVECTOR_PROD_REPO_ROOT="$_prod_env_root"
 unset _k _prod_env_template _prod_env_root
 if [ -z "$BIDVECTOR_PROD_PROJECT" ]; then
   echo "prod-env: 운영 compose 의 name: 을 읽지 못했다 — 프로젝트 이름을 고정할 수 없다" >&2
@@ -161,6 +164,82 @@ _prod_images_match() {
   done
   # 통과를 루프 마지막 `if` 의 암묵 반환에 맡기지 않는다 — 루프 끝에 0 이 아닐 수 있는 명령이 하나
   # 들어오면 함수가 **조용히 1** 이 되고 `_PROD_IMAGE_ERR` 는 빈 채라, 호출자가 사유 없는 거절을 찍는다.
+  return 0
+}
+
+# <manifest 경로> → **지금 반입 트리가 그 release 를 만든 커밋인가.** 다르면 1 과 함께
+# `_PROD_GIT_SHA_ERR` 에 사유를 둔다(종료 코드는 호출자마다 다르다 — 반입 1 · 되돌림 2 · 러너 3).
+#
+# 이미지 ID 등식(`_prod_images_match`)이 묶는 것은 **이미지 바이트**뿐이다. compose 파일 셋·프로필·
+# 포트·볼륨 이름·`mem_limit`·헬스체크·그리고 이 스크립트들 자신은 **이 checkout 에서** 읽히므로,
+# 다른 커밋의 트리에서 반입하면 「release 의 이미지」가 「다른 커밋의 배선」으로 뜬다. 주기 러너는
+# 더 멀다 — 타이머가 도는 동안 누가 트리를 옮기면 그 뒤의 모든 run 이 옮겨진 배선으로 돈다
+# (러너는 사본이 아니라 저장소에서 직접 돈다, runbook §9.1).
+#
+# 더티 판정은 `tools/prod-release.sh` 와 **같은 규칙**이다(`--untracked-files=no`) — 그래서 같은 한계를
+# 물려받는다: 추적되지 않는 파일은 세지 않는다(CR L-10).
+_prod_git_sha_match() {
+  local man="$1" want have dirty
+  _PROD_GIT_SHA_ERR=""
+  # 매치 0 을 실패로 올리지 않는다 — 그러면 아래 「git_sha 가 없다」 문면에 닿지 못한다.
+  want="$({ grep -E '^git_sha=' "$man" || true; } | cut -d= -f2-)"
+  if [ -z "$want" ]; then
+    _PROD_GIT_SHA_ERR="manifest 에 git_sha 가 없다: ${man}"
+    return 1
+  fi
+  have="$(git -C "$BIDVECTOR_PROD_REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+  if [ -z "$have" ]; then
+    _PROD_GIT_SHA_ERR="반입 트리의 커밋을 읽지 못했다(${BIDVECTOR_PROD_REPO_ROOT} — git 이 없거나 저장소가 아니다)"
+    return 1
+  fi
+  if [ "$have" != "$want" ]; then
+    _PROD_GIT_SHA_ERR="반입 트리가 이 release 를 만든 커밋이 아니다(HEAD ${have:0:12} ≠ manifest ${want:0:12}) — compose 배선과 이 스크립트들은 트리에서 읽힌다. 'git -C ${BIDVECTOR_PROD_REPO_ROOT} checkout ${want}' 뒤에 다시 돌린다"
+    return 1
+  fi
+  dirty="$(git -C "$BIDVECTOR_PROD_REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" || {
+    _PROD_GIT_SHA_ERR="반입 트리의 상태를 읽지 못했다(${BIDVECTOR_PROD_REPO_ROOT})"
+    return 1
+  }
+  if [ -n "$dirty" ]; then
+    _PROD_GIT_SHA_ERR="반입 트리의 추적 파일에 커밋되지 않은 변경이 $(printf '%s\n' "$dirty" | grep -c '')개 있다 — release 를 만든 커밋 그대로여야 한다(git status --porcelain --untracked-files=no)"
+    return 1
+  fi
+  return 0
+}
+
+# <프로젝트 이름> → 그 프로젝트의 **일회(one-off) app 컨테이너 잔존이 0 인가.** 남아 있으면 1 과
+# `_PROD_ONEOFF_ERR`(이름 목록은 `_PROD_ONEOFF_NAMES`).
+#
+# 일회 컨테이너는 `compose run --rm` 이 끝날 때 지워진다. 그런데 러너가 **신호로** 끝나면
+# (systemd 의 `TimeoutStartSec` 상한 — runbook §9.2) `--rm` 이 돌지 못하고 **운영 DB 자격을 받은
+# 컨테이너가 남는다.** 다음 run 이 그것을 보지 않으면 잔존이 아무 때나 쌓이고, 남은 컨테이너가
+# 떠 있으면 그 안의 러너가 다음 run 과 같은 DB 를 동시에 쓴다.
+#
+# 판정 축은 **둘의 합집합**이다 — ⓐ compose 의 `oneoff` 라벨 ⓑ 이름 `<프로젝트>-app-run-…`.
+# 교집합으로 두면 compose 의 라벨 값 표기나 이름 규칙 한쪽이 바뀌는 날 술어가 **조용히 0** 이 된다
+# (「안 돌린 게이트」와 같은 값). 조회 자체가 실패하면 0 으로 읽지 않고 거절한다.
+_prod_oneoff_residue() {
+  local proj="$1" out name oneoff
+  _PROD_ONEOFF_ERR=""; _PROD_ONEOFF_NAMES=""
+  out="$(docker ps -a \
+      --filter "label=com.docker.compose.project=${proj}" \
+      --filter "label=com.docker.compose.service=app" \
+      --format '{{.Names}}|{{.Label "com.docker.compose.oneoff"}}' 2>/dev/null)" || {
+    _PROD_ONEOFF_ERR="프로젝트 ${proj} 의 일회 컨테이너 잔존을 세지 못했다(docker ps 실패) — 판정 불가"
+    return 1
+  }
+  while IFS='|' read -r name oneoff; do
+    [ -n "$name" ] || continue
+    case "$oneoff" in
+      [Tt]rue) ;;
+      *) case "$name" in "${proj}-app-run-"*) ;; *) continue ;; esac ;;
+    esac
+    _PROD_ONEOFF_NAMES="${_PROD_ONEOFF_NAMES}${name} "
+  done < <(printf '%s\n' "$out")
+  if [ -n "$_PROD_ONEOFF_NAMES" ]; then
+    _PROD_ONEOFF_ERR="프로젝트 ${proj} 에 지난 run 의 일회 컨테이너가 남아 있다: ${_PROD_ONEOFF_NAMES}— 신호로 끝났거나 docker 가 치우지 못했다. 'docker logs <이름>' 으로 그 run 을 보고 'docker rm -f <이름>' 으로 치운 뒤 다시 돌린다(runbook §9.4)"
+    return 1
+  fi
   return 0
 }
 
