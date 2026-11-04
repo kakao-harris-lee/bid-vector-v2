@@ -146,13 +146,17 @@ describe('화면 D — 카드가 보이는 값은 API 응답의 값이다', () =
     expect(card.textContent).not.toContain('남음');
   });
 
-  /** 시각은 **서버가 준 값 그대로**이고 기계 가독 `<time>` 이다(7E-1 화면 C 와 같은 꼴). */
-  it('다음 확인 시점 시각을 API 값 그대로 time 으로 낸다', async () => {
+  /**
+   * 보이는 글자는 **KST 표기**이고(M9 D-1 — 앞 판은 응답의 ISO 원문이었다) 기계 가독 `<time>`
+   * 은 원문을 그대로 든다. 서식은 보이는 글자의 일이고 기계 칸의 일이 아니다.
+   */
+  it('다음 확인 시점 시각을 KST 표기로 내고 기계 칸에 원문을 든다', async () => {
     mocked.listBidCases.mockResolvedValue([bidCase({ nextCheckpointAt: '2099-01-03T00:00:00Z' })]);
     renderScreen();
 
     const slot = await screen.findByTestId('checkpoint-at-11');
-    expect(slot.textContent).toBe('2099-01-03T00:00:00Z');
+    expect(slot.textContent).toBe('2099-01-03 09:00');
+    expect(slot.textContent, 'ISO 원문이 화면에 남았다').not.toContain('2099-01-03T00:00:00Z');
     expect(slot.querySelector('time')?.getAttribute('dateTime')).toBe('2099-01-03T00:00:00Z');
   });
 });

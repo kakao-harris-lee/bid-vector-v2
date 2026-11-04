@@ -325,9 +325,11 @@ describe('지금 값을 읽는 표', () => {
     });
 
     expect(view.text).toBe('1,200,000,000원');
-    expect(view.qualifier).toContain('KRW');
-    expect(view.qualifier).toContain('INCLUSIVE');
-    expect(view.qualifier).toContain('OPERATOR_DECLARED');
+    // **문면이다 — 원문 토큰이 아니다**(M9 D-3). 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
+    expect(view.qualifier).toBe('원 · 부가세 포함 · 운영자 선언값');
+    for (const token of ['KRW', 'INCLUSIVE', 'OPERATOR_DECLARED']) {
+      expect(view.qualifier, `${token} 이 화면 문면에 남았다`).not.toContain(token);
+    }
   });
 
   it('금액만 있고 단위·과세·출처가 없으면 그 사실을 적는다', () => {

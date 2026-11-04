@@ -138,11 +138,15 @@ describe('마감 남은 날 — 클라이언트 계산의 경계', () => {
  * `src/screens`·`src/display` 는 lint 가 막는다 — 그 술어는 `eslint.config.js` 가 든다.
  */
 describe('벽시계 읽기는 한 자리다', () => {
+  /**
+   * **이 파일도 시계 금지의 대상이다**(예외는 `timeDisplay.ts` 하나) — 그래서 기준을 `Date.now()`
+   * 로 잡지 않고 **고정 시점의 파싱값**으로 잡는다. 「0 이나 고정 epoch 가 아니라 지금을 읽는다」가
+   * 이 단언의 내용이다.
+   */
   it('지금을 Date 로 낸다', () => {
-    const before = Date.now();
     const read = readClock();
 
     expect(read).toBeInstanceOf(Date);
-    expect(read.getTime()).toBeGreaterThanOrEqual(before);
+    expect(read.getTime()).toBeGreaterThan(Date.parse('2026-01-01T00:00:00Z'));
   });
 });

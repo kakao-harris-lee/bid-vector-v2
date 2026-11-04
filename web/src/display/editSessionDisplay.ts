@@ -1,5 +1,6 @@
 import type { components } from '../api/generated/operator-api';
 
+import { amountQualifierTextOf } from './moneyDisplay';
 import type { StateDisplay } from './stateDisplay';
 
 type EditSessionResponse = components['schemas']['EditSessionResponse'];
@@ -251,10 +252,11 @@ function budgetView(
   if (won === null || won === undefined) {
     return { text: null };
   }
-  const parts = [currency, vat, provenance].filter((one): one is string => one !== null && one !== undefined);
+  // 부속 칸은 **표의 문면**이다(M9 D-3) — 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
+  const qualifier = amountQualifierTextOf({ currency, vatTreatment: vat, provenance });
   return {
     text: `${won.toLocaleString('ko-KR')}원`,
-    qualifier: parts.length === 0 ? '단위·과세·출처 미기재' : parts.join(' · '),
+    qualifier: qualifier ?? '단위·과세·출처 미기재',
   };
 }
 

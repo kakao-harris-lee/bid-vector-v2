@@ -16,6 +16,9 @@ import {
   type BidBoxActionKind,
 } from '../display/bidBoxDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { instantDisplayOf } from '../display/timeDisplay';
+
+import { InstantText } from './InstantText';
 
 /**
  * 운영자가 적은 것 — 전이 하나를 보낼 때 실리는 값이다.
@@ -222,21 +225,16 @@ export function BidBoxCard({
             />
           </dd>
         </div>
-        {/* 시각은 **서버가 준 값 그대로**다. 「N일 남음/지남」을 여기서 내지 않는다(v r1 M-1):
-            브라우저 시계로 재면 사용자마다 답이 다르고, `overdue:false` 인 건에 「지남」이 붙어
-            서버 판정과 어긋난 말을 하게 된다. 「지남」을 말하는 것은 위의 경고 배지 하나다.
-            `<time dateTime>` 은 7E-1 의 화면 C 와 같은 꼴이다(기계 가독 의미를 D 에서만 잃지 않게). */}
+        {/* 시각은 **KST 표기**다(M9 D-1 — 앞 판은 응답의 ISO 원문이었다). 「N일 남음/지남」을
+            여기서 내지 않는다(v r1 M-1): 브라우저 시계로 재면 사용자마다 답이 다르고,
+            `overdue:false` 인 건에 「지남」이 붙어 서버 판정과 어긋난 말을 하게 된다. 「지남」을
+            말하는 것은 위의 경고 배지 하나다. `<time dateTime>` 의 기계 가독 원문은 그대로
+            싣는다(`InstantText` — 서식은 보이는 글자의 일이고 기계 칸의 일이 아니다). */}
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">시점</dt>
           <dd className="text-sm">
             <span data-testid={`checkpoint-at-${bidCase.caseId}`}>
-              {bidCase.nextCheckpointAt === null || bidCase.nextCheckpointAt === undefined ? (
-                <span className="text-absent-ink">값 없음</span>
-              ) : (
-                <time dateTime={bidCase.nextCheckpointAt} className="font-numeric">
-                  {bidCase.nextCheckpointAt}
-                </time>
-              )}
+              <InstantText display={instantDisplayOf(bidCase.nextCheckpointAt)} />
             </span>
           </dd>
         </div>

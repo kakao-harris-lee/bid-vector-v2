@@ -22,6 +22,7 @@ import {
   type OpeningResultState,
 } from '../display/openingResultDisplay';
 import { RESULT_PENDING_SLOTS } from '../display/resultDisplay';
+import { ABSENT_INSTANT } from '../display/timeDisplay';
 
 import { ResultsScreen } from './ResultsScreen';
 
@@ -193,14 +194,16 @@ describe('화면 E — 결과 단계 건만, 서버 상태 그대로', () => {
 
     const kind = await screen.findByTestId('result-checkpoint-kind-51');
     expect(kind.textContent ?? '').toContain(NEXT_CHECKPOINT_DISPLAY.NONE.label);
-    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toContain('값 없음');
+    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toBe(ABSENT_INSTANT);
   });
 
   it('시점이 있으면 서버가 준 값 그대로 그린다 — 남은 날을 세지 않는다', async () => {
     renderScreen();
 
     const at = await screen.findByTestId('result-checkpoint-at-51');
-    expect(at.textContent ?? '').toContain('2099-01-03T00:00:00Z');
+    // M9 D-1 — 보이는 글자는 KST 표기이고, 기계 가독 칸은 원문을 그대로 든다.
+    expect(at.textContent ?? '').toBe('2099-01-03 09:00');
+    expect(at.getAttribute('dateTime')).toBe('2099-01-03T00:00:00Z');
   });
 
   it('건이 없으면 빈 얼굴이고 「결과가 없다」로 접지 않는다', async () => {
@@ -275,7 +278,9 @@ describe('잠정은 확정 자리에 서지 않는다 (SET-02)', () => {
 
     const provisional = (await screen.findByTestId('provisional-award-51')).textContent ?? '';
     expect(provisional).toContain('1,310,000,000');
-    expect(provisional).toContain('KRW');
+    // 통화도 **표의 문면**이다(M9 D-3) — 앞 판은 `KRW` 가 그대로 섰다.
+    expect(provisional).toContain('원');
+    expect(provisional, '원문 토큰이 그대로 섰다').not.toContain('KRW');
     // 과세는 **표의 문면**이다(r1 CR M-1) — 운영자가 화면 C 에서 고른 말과 같은 말이어야 한다.
     expect(provisional).toContain(VAT_TREATMENT_DISPLAY.INCLUSIVE.label);
     expect(provisional, '원문 토큰이 그대로 섰다').not.toContain('INCLUSIVE');
@@ -304,9 +309,13 @@ describe('잠정은 확정 자리에 서지 않는다 (SET-02)', () => {
 
     const confirmed = (await screen.findByTestId('confirmed-award-51')).textContent ?? '';
     expect(confirmed).toContain('1,350,000,000');
-    expect(confirmed).toContain('KRW');
-    expect(confirmed).toContain('BASE_AMOUNT');
-    expect(confirmed).toContain('PUBLISHED');
+    // 다섯 칸 전부 **표의 문면**이다(M9 D-3) — 앞 판은 통화·basis·provenance 가 원문이었다.
+    expect(confirmed).toContain('원');
+    expect(confirmed).toContain('기초금액');
+    expect(confirmed).toContain('공고 게시값');
+    for (const token of ['KRW', 'BASE_AMOUNT', 'PUBLISHED']) {
+      expect(confirmed, `${token} 이 화면에 남았다`).not.toContain(token);
+    }
     /**
      * **다섯 칸을 말하면 다섯을 재야 한다**(r2 CR M-1). 앞 판은 셋만 보아서, 이 자리의 과세를
      * 원문 토큰으로 되돌리는 변이가 **667 passed** 로 지나갔다(재현함). 통화·과세가 빠져 있었다.
@@ -675,8 +684,11 @@ describe('시각 두 칸이 서로의 값을 그리지 않는다 (v r1 L-3)', ()
     );
     renderScreen();
 
-    expect((await screen.findByTestId('submitted-at-51')).textContent ?? '').toBe(SUBMITTED);
-    expect(screen.getByTestId('confirmed-at-51').textContent ?? '').toBe(CONFIRMED);
+    // **두 칸이 각자의 값**이라는 주장은 그대로다 — 비교 대상만 KST 표기로 바뀐다(M9 D-1).
+    // 둘은 11초 차이라 분까지 자르면 같은 글자가 된다. 그래서 **기계 가독 칸**으로 가린다.
+    expect((await screen.findByTestId('submitted-at-51')).getAttribute('dateTime')).toBe(SUBMITTED);
+    expect(screen.getByTestId('confirmed-at-51').getAttribute('dateTime')).toBe(CONFIRMED);
+    expect((await screen.findByTestId('submitted-at-51')).textContent ?? '').toBe('2026-10-31 12:20');
   });
 });
 
@@ -876,13 +888,15 @@ describe('개찰 결과의 칸 전수 (r1 CR M-3)', () => {
     renderScreen();
 
     const at = await screen.findByTestId('observed-at-51');
-    expect(at.textContent ?? '').toContain('2026-11-02T03:04:05Z');
+    expect(at.textContent ?? '').toBe('2026-11-02 12:04');
+    expect(at.getAttribute('dateTime')).toBe('2026-11-02T03:04:05Z');
   });
 
   it('두 칸이 없으면 「값 없음」이다 — 0 이나 빈 칸으로 지어내지 않는다', async () => {
     renderScreen();
 
     expect((await screen.findByTestId('provisional-duplicate-51')).textContent ?? '').toContain('값 없음');
-    expect(screen.getByTestId('observed-at-51').textContent ?? '').toContain('값 없음');
+    // 시각 칸의 없음 표지는 `timeDisplay` 의 상수다(M9 D-1) — 금액·계수 칸과 글자가 다르다.
+    expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe(ABSENT_INSTANT);
   });
 });

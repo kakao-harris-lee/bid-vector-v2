@@ -1,5 +1,6 @@
 import type { components, operations } from '../api/generated/operator-api';
 
+import { amountQualifierTextOf } from './moneyDisplay';
 import { unknownStateDisplay, type StateDisplay } from './stateDisplay';
 
 /** 화면 B(오늘의 공고)가 소비하는 축의 표시 표(D-7E-4 · D-7E-9). */
@@ -74,6 +75,9 @@ const ABSENT_AMOUNT = '값 없음';
 /**
  * 값이 없으면 **빈 자리**다(§6.5 가짜 기본값 금지) — `0원`·`미정`을 지어내지 않는다. 통화가
  * 원이 아니면 숫자만 적지 않고 통화 코드를 함께 적는다(단위를 아는 척하지 않는다).
+ *
+ * 부속 세 칸은 **표의 문면**이다(M9 D-3) — 앞 판은 `BASE_AMOUNT · INCLUSIVE · PUBLISHED` 를
+ * 그대로 이어 화면 C 안에서 같은 과세 축이 두 말로 보였다(`OPEN-7E3B-MONEY-WORDING`).
  */
 export function amountDisplayOf(fields: AmountFields): AmountDisplay {
   const won = fields.baseAmountWon;
@@ -83,34 +87,14 @@ export function amountDisplayOf(fields: AmountFields): AmountDisplay {
   const currency = fields.baseAmountCurrency;
   const formatted = won.toLocaleString('ko-KR');
   const amount = currency === 'KRW' || currency === null || currency === undefined ? `${formatted}원` : `${formatted} ${currency}`;
-  const provenance = [fields.baseAmountBasis, fields.baseAmountVatTreatment, fields.baseAmountProvenance]
-    .filter((part): part is string => part !== null && part !== undefined)
-    .join(' · ');
-  return { present: true, amount, provenance: provenance === '' ? null : provenance };
+  // 통화는 **금액 글자가 이미 들었다**(위 줄) — 부속 칸에 다시 적지 않는다.
+  const provenance = amountQualifierTextOf({
+    basis: fields.baseAmountBasis,
+    vatTreatment: fields.baseAmountVatTreatment,
+    provenance: fields.baseAmountProvenance,
+  });
+  return { present: true, amount, provenance };
 }
 
-const MILLIS_PER_DAY = 86_400_000;
-
-/**
- * 마감까지 남은 날 — 요구표가 **클라이언트 계산으로 승인한 유일한 자리**(ⓐ 행)다. 「마감됨」
- * 같은 **상태 라벨은 만들지 않는다** — 그것은 `status` 가 말한다(D-7E-4). 마감이 없으면 날 수도
- * 없다.
- *
- * **남은 쪽과 지난 쪽의 어림이 다르다**(CR L-2). 남은 쪽은 **내림**이다(반 나절 남았으면
- * `D-0` — 「아직 오늘」). 지난 쪽에 같은 내림을 쓰면 6시간 전에 마감한 공고가 `D+1` 로 **하루
- * 과장**된다(-0.25 → -1). 그래서 지난 쪽은 0 쪽으로 자른다(`Math.ceil`).
- */
-export function daysUntil(deadlineAt: string | null | undefined, now: Date): number | null {
-  if (deadlineAt === null || deadlineAt === undefined) {
-    return null;
-  }
-  const deadline = Date.parse(deadlineAt);
-  if (Number.isNaN(deadline)) {
-    return null;
-  }
-  const days = (deadline - now.getTime()) / MILLIS_PER_DAY;
-  const counted = days >= 0 ? Math.floor(days) : Math.ceil(days);
-  // `Math.ceil(-0.25)` 는 **`-0`** 이다 — 그것은 `>= 0` 비교에서 참이라 「지난 날」이 「남은 날」
-  // 분기로 새고, 표시도 `D+-0` 꼴이 될 수 있다. 0 으로 모은다.
-  return counted === 0 ? 0 : counted;
-}
+// `daysUntil` 은 **`timeDisplay` 로 옮겼다**(M9 D-1·D-2) — 시각 축의 절대·상대 표기가 한
+// 모듈을 지난다. 이 파일에 남기면 서식 자리가 둘이 된다.
