@@ -1,15 +1,19 @@
 package bidvector.adapters.relay
 
 import bidvector.adapters.event.outboxStateOf
+import bidvector.adapters.notification.FakeTelegramServer
+import bidvector.adapters.notification.TelegramScript
+import bidvector.adapters.notification.channelSettings
 import bidvector.adapters.persistence.PersistenceTestSupport
-import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RuntimeEnvironment
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.time.Clock
+import java.time.ZoneOffset
 
 /**
  * 어휘 해석표(D-6F10-12)의 네 갈래와 **production 조립 자신**을 실 DB 상태로 잰다(R1-L-3·cr L-1).
@@ -100,30 +104,37 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
      * 조립을 어느 test 도 거동으로 돌리지 않았고, 그 KDoc 이 스스로 예고한 실패(경계 인스턴스
      * 분리)는 컴파일·배선 모두 통과하고 **첫 질의에서만** 터지는 종류였다.
      *
-     * 발송 축 셋이 자리지킴이라 `OPEN-STR-12` 로 던지는 것이 **정상 거동**이다. 중요한 것은
-     * 던지기 **전에** claim 이 성공했다는 사실이다 — 그러려면 경계를 세 참여자가 공유해야
-     * 하므로, 이 한 건이 경계 공유를 **전이적으로** 잠근다.
+     * **M9/STR12 로 단언이 바뀌었다.** 자리지킴 셋이 사라져 조립이 끝까지 간다 — claim → 렌더 →
+     * 가짜 Telegram 서버 → `DELIVERED` + inbox 한 줄. 앞 판은 「던지기 **전에** claim 이 커밋됐다」
+     * 로 경계 공유를 전이적으로 잠갔고, 지금은 **T1 과 T2 가 둘 다 섰다**는 사실이 같은 것을 더
+     * 세게 잠근다(경계가 갈라지면 둘 중 하나가 실행 시점에 터진다).
+     *
+     * 공고 행이 없으므로 본문은 **사실을 주장하지 않는 축약 판**이다(설계 검토 D-6 결정) — 그
+     * 갈래가 던지지도, 결과를 거부로 옮기지도 않음을 이 자리가 실 DB 위에서 함께 잰다.
      */
     @Test
-    fun `production 조립은 claim 까지 지나고 자리지킴 발송에서 던진다 — 경계 공유`() {
-        insertPendingNotificationRow(dataSource(), "assembly-1")
-        val run =
-            NotificationRelayRun(
-                dataSource = dataSource(),
-                target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
-                environment = RuntimeEnvironment.Production,
-                policy = relayNotificationPolicy(),
-            )
+    fun `production 조립이 가짜 서버로 끝까지 발송한다 — 경계 공유와 렌더 실패 처분`() {
+        insertPendingNotificationRow(dataSource(), "assembly-1", noticeId = "ASM-001")
 
-        // 행 처분 도중의 예외는 집계와 함께 올라온다(PR #63 finding 4) — 자리지킴의 사유는
-        // `cause` 에 그대로 있다(가려지지 않는다).
-        val aborted = shouldThrow<RelayAborted> { run.relay(RELAY_DB_LIMIT) }
+        FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+            val run =
+                NotificationRelayRun(
+                    dataSource = dataSource(),
+                    target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
+                    environment = RuntimeEnvironment.Production,
+                    policy = relayNotificationPolicy(),
+                    channels = channelSettings(server.baseUrl),
+                    clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
+                )
 
-        aborted.cause.message.orEmpty() shouldBe
-            "배달 경로 구현이 없다 — OPEN-STR-12. relay 는 Live 환경에서만 이 자리에 닿는다"
-        aborted.partial.claimed shouldBe 1
-        aborted.partial.delivered shouldBe 0
-        // 던지기 전에 claim 이 커밋됐다 = 경계를 세 참여자가 공유했다(T1 이 섰다).
-        outboxStateOf(dataSource(), "assembly-1") shouldBe "CLAIMED"
+            val report = run.relay(RELAY_DB_LIMIT).shouldBeInstanceOf<RelayReport.Completed>()
+
+            report.claimed shouldBe 1
+            report.delivered shouldBe 1
+            // T1 과 T2 가 둘 다 같은 경계에서 섰다.
+            outboxStateOf(dataSource(), "assembly-1") shouldBe "DELIVERED"
+            inboxKeyCount(dataSource()) shouldBe 1
+            server.received().single().form.getValue("text") shouldContain "저장된 공고 정보가 없습니다"
+        }
     }
 }
