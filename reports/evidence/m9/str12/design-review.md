@@ -23,10 +23,10 @@ Telegram 자신의 가용성·전달 보장, 메시지 내용의 업무적 옳�
 
 | 표면 | 비밀값을 낼 수 있는가 | 막는 것 |
 | --- | --- | --- |
-| `TelegramBotToken` / `TelegramChatId` 생성자 | — (값을 **넣는** 자리) | `private constructor` + `of()` 하나, 공백 거부 |
+| `TelegramBotCredential` / `TelegramChatId` 생성자 | — (값을 **넣는** 자리) | `private constructor` + `of()` 하나, 공백 거부 |
 | 위 둘의 `toString()` | **아니오** | 마스킹 문자열 고정(원문 길이도 노출하지 않는다 — `MaskedTarget` 과 달리 길이조차 싣지 않는다) |
 | 위 둘의 `equals`/`hashCode` | 아니오 | 값 비교만. 해시는 원문을 복원하지 않는다 |
-| 원문 접근자 (`TelegramBotToken.pathSegment()` · `TelegramChatId.formValue()`) | **예 — 설계된 유일한 출구** | `internal`. 호출자는 URI 조립 한 자리와 form body 조립 한 자리뿐이고, 그 두 산출물은 어느 필드에도 보관되지 않는다(지역 변수) |
+| 원문 접근자 (`TelegramBotCredential.pathSegment()` · `TelegramChatId.formValue()`) | **예 — 설계된 유일한 출구** | `internal`. 호출자는 URI 조립 한 자리와 form body 조립 한 자리뿐이고, 그 두 산출물은 어느 필드에도 보관되지 않는다(지역 변수) |
 | `TelegramSenderSettings` (data class) 의 합성 `toString`/`copy`/`componentN` | 아니오 | 필드 타입이 위 마스킹 타입이라 합성 `toString` 이 마스킹 값을 쓴다 |
 | `TelegramNotificationSender.send` 의 반환 | 아니오 | `DeliveryResult` — 자유 문자열 칸 0, target 은 `MaskedTarget` |
 | `telegramDeliveryResult(...)` (순수 분류) | 아니오 | 입력이 상태 코드·`TelegramCallOutcome` 이고 **설정을 받지 않는다** |
@@ -43,7 +43,7 @@ Telegram 자신의 가용성·전달 보장, 메시지 내용의 업무적 옳�
 
 | # | 우회 | 막는 층 |
 | --- | --- | --- |
-| 1 | 실패 갈래에서 예외를 로그·예외 메시지에 실어 토큰이 담긴 URI 를 흘린다 | `TelegramSecretLeakTest` — 아홉 갈래 각각에서 결과 `toString` · 캡처한 전 로그 · 되던진 예외 전수에 토큰·chat id **원문 부재**를 단언. JDK 가 URI 를 싣는지 여부에 의존하지 않는다(그 객체를 아예 쓰지 않음을 거동으로 잰다) |
+| 1 | 실패 갈래에서 예외를 로그·예외 메시지에 실어 토큰이 담긴 URI 를 흘린다 | `TelegramCredentialLeakTest` — 아홉 갈래 각각에서 결과 `toString` · 이 패키지의 로거 부재(바이트코드) · 되던진 예외 전수에 토큰·chat id **원문 부재**를 단언. JDK 가 URI 를 싣는지 여부에 의존하지 않는다(그 객체를 아예 쓰지 않음을 거동으로 잰다) |
 | 2 | 모호한 결과(timeout·5xx·429)를 `Rejected`·`Delivered` 로 접어 재발송·전달 표기한다 | `telegramDeliveryResult` 순수 분류 test 전수 + **변이 ①**(Unknown→Rejected 바꿔치움)이 RED |
 | 3 | 멱등 기억을 지워 같은 키가 두 번 발송된다 | 가짜 서버 **수신 계수**로 잰다(`callCount`/`effectCount` 분리, `SenderContractTest` 와 같은 골격) + **변이 ②** RED |
 | 4 | 기동 검사를 지워 토큰 없이 Live 로 뜬다 → relay 가 claim 한 뒤 발송 자리에서 터져 행을 영구히 잃는다 | `RelayBootDecisionTest`(결손 조합 전수) + `RelayWiringTest`(바이트코드로 「배선이 판정 함수를 지난다」) + **변이 ④** RED |
