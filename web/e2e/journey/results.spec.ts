@@ -2,11 +2,13 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
+  ABSENT_INSTANT,
   assertOnlyAllowedOperations,
   CASE_STATE_LABEL,
   CASE_TAB_LABEL,
   CHECKPOINT_LABEL,
   driveToRecorded,
+  expectedKstText,
   localDateTimeInput,
   signIn,
   watchRequests,
@@ -238,9 +240,12 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
     CHECKPOINT_LABEL[mine.nextCheckpointKind] ?? mine.nextCheckpointKind,
   );
   if (mine.nextCheckpointAt === null) {
-    await expect(card.getByTestId(`result-checkpoint-at-${caseId}`)).toHaveText(ABSENT);
+    await expect(card.getByTestId(`result-checkpoint-at-${caseId}`)).toHaveText(ABSENT_INSTANT);
   } else {
-    await expect(card.getByTestId(`result-checkpoint-at-${caseId}`)).toHaveText(mine.nextCheckpointAt);
+    // M9 D-1 — 같은 자리의 두 축(보이는 KST 표기 · 기계 가독 원문).
+    const at = card.getByTestId(`result-checkpoint-at-${caseId}`);
+    await expect(at).toHaveText(expectedKstText(mine.nextCheckpointAt));
+    await expect(at).toHaveAttribute('datetime', mine.nextCheckpointAt);
   }
 
   // 개찰 결과 칸 — **같은 실행의 응답과 대조**한다. 하네스가 개찰 축을 수집하지 않으므로

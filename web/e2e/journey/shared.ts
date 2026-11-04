@@ -74,6 +74,40 @@ export function sameOrigin(): string {
 /** 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. */
 export const ABSENT = '값 없음';
 
+/**
+ * **시각 칸의 없는 값 표지**(M9/screen-display D-1) — 금액·계수 칸의 `ABSENT` 와 다른 글자다.
+ * 여정은 두 자리를 가려 대조한다(한 글자로 합치면 어느 칸이 비었는지 여정이 말하지 못한다).
+ */
+export const ABSENT_INSTANT = '—';
+
+/**
+ * 화면이 보일 **KST 표기의 독립 기댓값**(M9 D-1 — `YYYY-MM-DD HH:mm`, 초 이하 절삭).
+ *
+ * **산출물의 함수를 부르지 않는다**: 양쪽을 같은 자리에서 끌어오면 그 자리가 틀려도 대조가
+ * 초록이다(저장소 선례 — 7E-3b r2 CR L-1 의 「같은 문면을 손으로 적는 변이가 667 passed」).
+ * 그래서 여기서는 **다른 기계**를 쓴다: 산출물은 고정 오프셋 산술이고 이 oracle 은 시간대
+ * 자료(`Intl`)다. 둘이 같은 글자를 내는 것은 둘 다 맞을 때뿐이다.
+ */
+export function expectedKstText(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const read = (type: Intl.DateTimeFormatPartTypes): string => {
+    const found = parts.find((one) => one.type === type);
+    if (found === undefined) {
+      throw new Error(`Intl 이 ${type} 칸을 내지 않았다 — 러너의 시간대 자료를 확인하십시오.`);
+    }
+    return found.value;
+  };
+  return `${read('year')}-${read('month')}-${read('day')} ${read('hour')}:${read('minute')}`;
+}
+
 export interface NoticeRow {
   readonly noticeNumber: string;
   readonly noticeRound: string;
@@ -161,6 +195,28 @@ export const CHECKPOINT_LABEL: Readonly<Record<string, string>> = {
   DEADLINE: '투찰 마감',
   OPENING: '개찰',
   NONE: '없음',
+};
+
+/**
+ * 금액 부속 토큰의 문면(M9/screen-display D-3) — 앞 판은 여정이 **원문 토큰**을 카드에서
+ * 찾았다(`BASE_AMOUNT`·`PUBLISHED`). 다른 라벨 표와 같은 관례로 **축어로** 적는다: 산출물의
+ * 표에서 끌어오면 그 표가 틀려도 대조가 초록이다.
+ */
+export const AMOUNT_BASIS_LABEL: Readonly<Record<string, string>> = {
+  BASE_AMOUNT: '기초금액',
+  ESTIMATED: '추정가격',
+  YEGA: '예정가격',
+  BID: '투찰금액',
+  ALLOCATED_BUDGET: '배정예산',
+  AWARD: '낙찰금액',
+};
+export const AMOUNT_PROVENANCE_LABEL: Readonly<Record<string, string>> = {
+  PUBLISHED: '공고 게시값',
+  DERIVED_FROM_OPENING: '개찰 역산값',
+  FILLED_FROM_BUDGET_KEY: '예산 항목에서 채운 값',
+  COPIED_FROM_BASE_AMOUNT: '기초금액에서 복사한 값',
+  OPERATOR_DECLARED: '운영자 선언값',
+  UNDECLARED: '출처 미선언',
 };
 export const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
   QUAL_08_REGION: '지역',
