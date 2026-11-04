@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.app.wiring.EditValue
 import bidvector.app.wiring.EditValueSlot
+import bidvector.app.wiring.acceptsClearing
 import bidvector.app.wiring.valueSlot
 import bidvector.strategy.StrategyRevision
 import bidvector.workflow.strategy.CommandId
@@ -51,6 +52,15 @@ internal fun JsonNode.editValue(field: EditableField): EditValue {
         .filter { it != slot && has(it.jsonKey) }
         .forEach { throw InvalidEditRequestException("${field.token()} 는 ${it.jsonKey} 칸을 읽지 않는다") }
     requireKnownKeys(setOf("commandId", "field", slot.jsonKey))
+    // M9 D-1 — **칸에 적힌 `null` 만** 비움이다. 칸 생략은 값을 말하지 않은 것이라 그대로 400 이고
+    // (아래 `required*` 가 낸다), 비움을 받지 않는 필드의 `null` 도 400 이다. 받는 집합은 여기서
+    // 열거하지 않는다 — 비움 패치표 하나가 그 집합을 정한다(`acceptsClearing`).
+    if (isExplicitNull(slot.jsonKey)) {
+        if (!field.acceptsClearing()) {
+            throw InvalidEditRequestException("${field.token()} 는 비울 수 없다 — ${slot.jsonKey} 에 값이 있어야 한다")
+        }
+        return EditValue.Cleared
+    }
     return when (slot) {
         EditValueSlot.TERMS -> EditValue.Terms(requiredStringArray(slot.jsonKey))
         EditValueSlot.AMOUNT_WON -> EditValue.AmountWon(requiredLong(slot.jsonKey, minimum = 0))

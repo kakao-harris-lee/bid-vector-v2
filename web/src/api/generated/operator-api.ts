@@ -1030,7 +1030,7 @@ export interface components {
             field: "FOCUS_CATEGORY" | "FOCUS_REGION" | "EXCLUDE_REGION" | "REQUIRED_KEYWORD" | "EXCLUDE_KEYWORD" | "MIN_BUDGET" | "MAX_BUDGET" | "MINIMUM_MATCH_SCORE" | "MINIMUM_PROBABILITY_SCORE" | "BID_NOW_THRESHOLD" | "REVIEW_THRESHOLD" | "CANDIDATE_LIMIT" | "MAX_ACTIVE_BIDS";
             terms?: string[];
             /** Format: int64 */
-            amountWon?: number;
+            amountWon?: number | null;
             number?: number;
             /** Format: int32 */
             count?: number;
