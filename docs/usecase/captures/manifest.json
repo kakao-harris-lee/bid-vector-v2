@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-11-05T10:09:21.692Z",
-  "head": "cb4669b9a44ebd2da3637145b3ac5478d9b040aa",
-  "totalBytes": 1010589,
+  "capturedAt": "2026-11-05T16:00:06.289Z",
+  "head": "931c933c4cf50cc0a46a4863f23526e6f93ac86f",
+  "totalBytes": 1009304,
   "files": [
     {
       "path": "a-start-desktop.png",
@@ -22,8 +22,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 55314,
-      "sha256": "d3e8a25e2b55422c688b31e265b863404792a8b2484f999ee8a5b07329745ec7"
+      "bytes": 55402,
+      "sha256": "a01dd82d39156b2a0f8341051fc0fd977b02a3946d0ca5620576ac1d4c5841ca"
     },
     {
       "path": "c-worksheet-desktop.png",
@@ -32,9 +32,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1454,
-      "bytes": 128226,
-      "sha256": "6f2b350ad07d14e0724daeee2b7cd7fe346184223ddd1128f66ccc52ae8cb011"
+      "imageHeight": 1482,
+      "bytes": 127211,
+      "sha256": "61279a8253d997c641772de43c135cd68329da4a808fb8b92f6694d243acb245"
     },
     {
       "path": "d-bid-box-desktop.png",
@@ -55,8 +55,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 1359,
-      "bytes": 130059,
-      "sha256": "0a69f5d5c31bf3ecd994d7822a1cc8bc308d0290990b819db93933485c7518fb"
+      "bytes": 130240,
+      "sha256": "ed1bf23836a5185884ce55f71a30ee63103f12a5bfc6f29c54fa3d773ea0c0c3"
     },
     {
       "path": "inbox-desktop.png",
@@ -66,8 +66,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 69766,
-      "sha256": "1fe3b4c9598849ef5f83fedeb00e34914b7e279a9dd323dc1135966e040fd984"
+      "bytes": 69951,
+      "sha256": "1aa9c2b501ca6b12b8650f2ac336a0b84241bbf74ecd24a4731935edd86e3a1d"
     },
     {
       "path": "a-start-mobile.png",
@@ -88,8 +88,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 847,
-      "bytes": 49529,
-      "sha256": "f51769954a54ce7c33ef0b41ee614450063a6dce166d99124f861de27521c10b"
+      "bytes": 49614,
+      "sha256": "72bfc49ada825068928d17792889f1f0b15ecee7a547f31e4cec60d0d3ddf2fb"
     },
     {
       "path": "c-worksheet-mobile.png",
@@ -98,9 +98,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 1678,
-      "bytes": 117180,
-      "sha256": "87499aa49e4d7b7402c44b9175061ccb9e9bcbaea4aa0b25ca756c995c023020"
+      "imageHeight": 1746,
+      "bytes": 115819,
+      "sha256": "6940bcf4297dfaa230bb36169b6200245b6d02d7b839326b80c34e1290f189d5"
     },
     {
       "path": "d-bid-box-mobile.png",
@@ -121,8 +121,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 2239,
-      "bytes": 137982,
-      "sha256": "d3d19064fa083b3b411e6e2f0f14a00396b37aa4ed00eae256c41ad16b52fcac"
+      "bytes": 138321,
+      "sha256": "a16886db7297ab160dd7a6a30519c49046cc40eb2019c870b8902f280437a7e9"
     },
     {
       "path": "inbox-mobile.png",
@@ -132,8 +132,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 844,
-      "bytes": 63423,
-      "sha256": "fd10b7800838b47f8e6a5699b0a879335dca061b344cc6e67d26bada9ae5f0d2"
+      "bytes": 63636,
+      "sha256": "e82ffb482e5fb00571d523b684b598ee165c4e2cced802352d837a295417c882"
     }
   ]
 }

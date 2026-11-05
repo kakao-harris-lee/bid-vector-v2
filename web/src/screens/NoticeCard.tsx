@@ -13,6 +13,13 @@ export function worksheetPathOf(notice: Pick<NoticeSummary, 'noticeNumber' | 'no
 }
 
 /**
+ * 숫자의 **뜻**을 말하는 유일한 산출물 문면. 셈이 KST 달력일 차로 바뀌었으므로 이 자리도 그
+ * 말을 쓴다 — 앞 판은 「남은 날(내림)」이었고 그것은 **사라진 기계**를 가리킨다. 「남은」도 덜
+ * 맞는다: 새 정의에는 거울상(`D+1` — 마감일이 어제)이 있다.
+ */
+const DEADLINE_HINT = '마감일까지의 KST 달력일 차';
+
+/**
  * 남은 날 — **숫자만** 낸다. 「마감됨」 같은 상태 말은 만들지 않는다(그것은 `status` 가 한다).
  *
  * **이미 센 날 수를 받는다**(M9 D-4): `*At` 원문이 JSX 를 지나면 게이트가 멈춘다. 세는 일과
@@ -24,7 +31,7 @@ function DeadlineBadge({ days }: { readonly days: number | null }) {
     return <span className="text-xs text-absent-ink">마감 없음</span>;
   }
   return (
-    <span className="font-numeric text-xs" title="마감까지 남은 날(내림)">
+    <span data-testid="notice-deadline" className="font-numeric text-xs" title={DEADLINE_HINT}>
       {text}
     </span>
   );

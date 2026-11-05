@@ -1,6 +1,11 @@
 import type { BidTimelineEntry } from '../api/queries';
 import { StateBadge } from '../components/StateBadge';
-import { BID_CASE_STATE_DISPLAY, TIMELINE_ACTOR_DISPLAY, type BidCaseState } from '../display/caseDisplay';
+import {
+  BID_CASE_STATE_DISPLAY,
+  TIMELINE_ACTOR_DISPLAY,
+  commandDisplayOf,
+  type BidCaseState,
+} from '../display/caseDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { instantDisplayOf } from '../display/timeDisplay';
 
@@ -32,10 +37,13 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
               <StateBadge display={displayOrUnknown(TIMELINE_ACTOR_DISPLAY, entry.actorKind)} />
               {entry.retroactive ? <span className="text-xs text-unjudged-ink">소급</span> : null}
             </p>
-            <p className="text-xs text-ink-soft">
+            <p className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
               <InstantText display={instantDisplayOf(entry.occurredAt)} />
               {' · '}
-              {entry.command}
+              {/* 명령은 **표의 문면**이다(`OPEN-M9-TIMELINE-COMMAND-WORDING`) — 앞 판은 서버가 준
+                  토큰 원문(`ADD_TO_BID_BOX` 꼴)이 이 자리에 그대로 섰다. 한 명령이 여러 동작인
+                  자리(초안 수정 · 소급 확인)는 배지의 아래층이 그 사실을 나른다. */}
+              <StateBadge display={commandDisplayOf(entry.command)} />
               {entry.fromState === null || entry.fromState === undefined
                 ? ''
                 : ` · ${stateLabelOf(entry.fromState)} → ${stateLabelOf(entry.toState)}`}
