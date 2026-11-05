@@ -15,16 +15,17 @@
 전환은 설정 값이라 **인자만으로** 옛 서비스로 돌아간다(옛 URL 이 공지일 기준 90일 — ≈2027-02-01 —
 동안 살아 있을 때만 참이다).
 
-```
---bidvector.koneps.base-url=https://apis.data.go.kr/1230000/ad/BidPublicInfoService
---bidvector.koneps.operations.construction.path=getBidPblancListInfoCnstwk
---bidvector.koneps.operations.service.path=getBidPblancListInfoServc
---bidvector.koneps.opening.operations.construction.base-amount-path=getBidPblancListInfoCnstwkBsisAmount
---bidvector.koneps.opening.operations.service.base-amount-path=getBidPblancListInfoServcBsisAmount
---bidvector.koneps.opening.bid-price-formula-a-path=getBidPblancListBidPrceCalclAInfo
-```
+**인자 목록의 정본은 `app/src/test/resources/rollback/koneps-portal-02-rollback-args.txt`** 이고
+`docs/runbook/m6-6g-real-collection.md` §8-4 와 `KonepsRollbackArgumentsTest` 가 **그 한 파일**을 읽는다.
+목록을 여기 베껴 적지 않는다 — 베끼면 한쪽만 바뀌는 날이 오고, 그 결함이 바로 아래 적는 것이다.
 
-낙찰정보서비스 인자는 **주지 않는다** — 이 slice 가 그 축을 움직이지 않았다.
+**행 전수여야 한다(cr H-1).** 앞 판의 이 절은 여섯 인자를 적었고 그 가운데 넷이
+`…operations.<업종>.<칸 하나>` 꼴이었다. `operations` 두 축은 값 객체의 Map 이고 행 타입의 칸이 전부
+필수라, 한 칸만 주면 Spring 이 그 행을 그 칸만으로 구성해 나머지가 null 이 되고 **프로세스가 뜨지
+않는다**. 실측(그 목록 그대로 기동): `parameter division` 과 `parameter openingResultListPath` 가
+null 이라는 바인딩 실패. 그래서 낙찰정보서비스 경로 둘도 **같은 값으로 다시** 적는다 — 그 축이
+바뀌는 것이 아니라 행 전체가 교체되기 때문이다. `KonepsRollbackArgumentsTest` 가 ⓐ 정본 목록으로 두
+배선이 뜨고 여섯 경로가 옛 이름인지 ⓑ 행의 한 칸만 주는 꼴이 기동 실패인지를 함께 잠근다.
 
 ## 코드 되돌림 — in_scope 경로 한정
 
@@ -61,7 +62,7 @@ git restore --source=319fe212 --staged --worktree -- \
 **그래서 확인은 두 계수다** — 「내 표지 0」 **그리고** 「남의 표지 보존」. 종료 코드만 보면 반쯤
 되돌린 트리도 exit 0 이다.
 
-## 실측 (버릴 clone, 실측 HEAD `24bd2803`)
+## 실측 (버릴 clone, 실측 HEAD `7f51bdc0`)
 
 | 단계 | 결과 |
 | --- | --- |

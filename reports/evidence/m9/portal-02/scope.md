@@ -34,7 +34,9 @@
 
 ## rollback
 
-재빌드 없이: `bidvector.koneps.base-url`·`operations.*.path` 설정으로 옛 값. 코드: in_scope 경로 한정 `git restore --source=79f3e5c4 …`; 목록 기계 산출(`rollback.md`).
+재빌드 없이: 설정 인자로 옛 값 — **목록 정본은 `app/src/test/resources/rollback/koneps-portal-02-rollback-args.txt`** 이고
+`operations` 두 축은 **행 전수**여야 한다(한 칸만 주면 기동 실패 — cr H-1, `KonepsRollbackArgumentsTest` 가 잠근다).
+코드: in_scope 경로 한정 `git restore --source=<병합한 main SHA> …`; 목록 기계 산출(`rollback.md`).
 
 ## 하네스 레인 변경
 

@@ -220,11 +220,14 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
    - 봉투: `response.header.resultCode` == `00`.
    - 필드 계약: 그 축의 `FieldContractRow` 가 선언한 raw 키가 응답 항목에 **전부 있다**. 없어진 키
      수와 새로 생긴 키 수를 **계수로** evidence 에 적는다(원문·공고 식별자 없이).
-4. 한 축이라도 봉투가 `00` 이 아니거나 읽는 키가 사라졌으면 **반영하지 않고 보고**한다. 되돌림은
-   재빌드 없이 설정이다 — `--bidvector.koneps.base-url=…/ad/BidPublicInfoService` ·
-   `--bidvector.koneps.operations.<업종>.path=…` · `--bidvector.koneps.opening.operations.<업종>.base-amount-path=…` ·
-   `--bidvector.koneps.opening.bid-price-formula-a-path=…`. 옛 URL 이 90일 안에 살아 있는 동안만 참인
-   되돌림이다.
+4. 한 축이라도 봉투가 `00` 이 아니거나 읽는 키가 사라졌으면 **반영하지 않고 보고**한다.
+
+   되돌림은 재빌드 없이 설정이고 **인자 목록의 정본은 `app/src/test/resources/rollback/koneps-portal-02-rollback-args.txt`** 이다(`#`
+   줄을 뺀 14 줄에 `--` 를 붙여 넘긴다). 그 파일을 쓰는 이유: `operations` 두 축은 값 객체의 Map 이라
+   **행 전수**를 줘야 하고(한 칸만 주면 나머지 칸이 null 이 되어 **프로세스가 뜨지 않는다**), 그래서
+   낙찰정보서비스 경로 둘도 같은 값으로 다시 적는다. 그 목록으로 두 배선이 실제로 뜨는지는
+   `KonepsRollbackArgumentsTest` 가 잰다 — **이 절과 그 test 가 한 파일을 읽으므로** 목록이 틀리면
+   CI 가 먼저 붉다. 옛 URL 이 90일(≈2027-02-01) 안에 살아 있는 동안만 참인 되돌림이다.
 5. 개편이 **별도 오퍼레이션으로 분리한 넷**(공동도급의무지역·가산지역·부대공종·첨부파일)은 이 절차가
    부르지 않는다(D-2) — 그 필드를 읽는 production 자리가 0 이다. 첨부 축이 열릴 때 쓸 자리는
    `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` 행이 가리킨다.
