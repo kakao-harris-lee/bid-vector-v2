@@ -1,6 +1,6 @@
 # M9/inbox-vocab rollback
 
-base **`79f3e5c4`**(병합된 main) · **실측 HEAD `30766939`**(이 slice 의 마지막 산출물 커밋).
+base **`79f3e5c4`**(병합된 main) · **실측 HEAD `0df93d4c`**(이 slice 의 마지막 산출물 커밋).
 evidence 커밋은 언제나 이 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
 **그 사이에 되돌림 대상이 움직였는가**이고, 그 확인 명령은 §4 다.
 
@@ -33,18 +33,29 @@ git rm -q -f -- "${ADDED[@]}"
 검증에서 **실패한다** — 처분이 선택이 아니라 순서상 필수다. 삭제는 **소유자 연결**의 일이다(앱
 역할에 `DELETE` 권한이 없다).
 
+**이 갈래는 §1 의 파일 삭제와 배타다**(v L-3 ⓐ). 적용 DB 에서 V24 파일을 지우면 Flyway 의
+`validateOnMigrate` 가 「applied migration not resolved locally」로 **기동을 막는다** — 이력에 남은
+적용 기록을 로컬에서 해소할 수 없기 때문이다. 즉 적용 뒤에는 파일을 지우는 길이 없고 새 V 뿐이다.
+
+**순서는 forward-fix V 가 앱 되돌림보다 먼저다**(v L-3 ⓑ). 옛 코드는 `FAILED_OR_REBID` 를 모르므로
+그 행을 **복원하지도 처분하지도 못한다**(`notificationFactOf` 의 복원이 그 어휘에서 던지고, 앱
+역할에는 `DELETE` 권한이 없다). 앱을 먼저 되돌리면 그 행을 읽는 목록 질의가 복원 단계에서 깨진다.
+web·openapi 쪽은 어휘가 줄어도 미지 값 표시로 떨어져 순서에 무관하지만(아래), **Kotlin 쪽은
+무관하지 않다.**
+
 `web`·openapi 쪽은 어휘가 줄어도 **거부가 아니라 미지 값 표시**로 떨어지므로(표 조회가 폴백 없이
-`unknownStateDisplay` 로 간다) 배포 순서는 DB 먼저여도 화면 먼저여도 깨지지 않는다.
+`unknownStateDisplay` 로 간다) 화면 배포 순서는 DB 먼저여도 화면 먼저여도 깨지지 않는다 — 위
+Kotlin 쪽 순서 제약과 **다른 축**이다.
 
 ## 3. 실측 (버릴 clone, `git clone --no-hardlinks`)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 복원 **14**(M) · 삭제 **2**(A) — 기계 목록과 같다 |
+| ② 계수 | 복원 **16**(M) · 삭제 **2**(A) — 기계 목록과 같다 |
 | ③ 되돌린 경로의 차이 | 작업 트리 ↔ base **0 파일** · 색인 ↔ base **0 파일** · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ base 와 남는 차이 | `reports/evidence/m9/inbox-vocab/{scope,design-review}.md` 둘뿐(의도된 제외) |
+| ⑦ base 와 남는 차이 | **실측 시점(`0df93d4c`)에** `reports/evidence/m9/inbox-vocab/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
@@ -52,9 +63,9 @@ git rm -q -f -- "${ADDED[@]}"
 main 이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시 돌리는 것은 같은
 트리를 다시 재는 일이다.
 
-**같지 않은 입력 하나를 이름 붙인다**: 위 ⑦ 의 evidence 파일 둘이다. 그 둘은 빌드 입력이
+**같지 않은 입력을 이름 붙인다**: 위 ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이
 **맞다** — `LeakPatternGateTask` 가 `reports/evidence` 를 스캔한다. 그 축은 이 slice 의 HEAD
-(두 파일을 **포함한** 상위집합)에서 `check` 가 초록이었으므로 이미 실측돼 있다.
+(그 파일들을 **포함한** 상위집합)에서 `check` 가 초록이었으므로 이미 실측돼 있다.
 
 ### 표지 계수 — 「내 줄 사라짐」과 「남의 줄 남음」 둘 다
 
@@ -62,7 +73,7 @@ main 이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에�
 
 | 내 표지(0 이어야 한다) | 복원 뒤 |
 | --- | --- |
-| `AwardResult` · `ReadResetPolicy` · `ON_NEWER_FACT` · `readResetPolicy` · `NotificationInboxSqlPolicyTest` · 화면 표의 유찰 라벨 | **전부 0** |
+| `AwardResult` · `ReadResetPolicy` · `ON_NEWER_FACT` · `readResetPolicy` · `NotificationInboxSqlPolicyTest` · 화면 표의 유찰 라벨 · `GREATEST(notification_inbox.occurred_at` | **전부 0** |
 | V24 파일 | **0** |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
@@ -99,8 +110,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 30766939..<판정 SHA> -- \
-  $(git diff --name-only 79f3e5c4..30766939 -- . ':(exclude)reports/evidence/m9/inbox-vocab')
+git diff --name-only 0df93d4c..<판정 SHA> -- \
+  $(git diff --name-only 79f3e5c4..0df93d4c -- . ':(exclude)reports/evidence/m9/inbox-vocab')
 ```
 
 빈 출력이면 이 실측이 유효하고, 한 줄이라도 나오면 **미검증**이다(그때 ①~③ 과 §4 를 다시 잰다).
