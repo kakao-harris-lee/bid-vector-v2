@@ -378,29 +378,13 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("api_request_audit", "correlation_id", "text", false),
         )
 
-    // M9/ops-migrations(DEC-08, V26) — 판정 기록. 규칙만 NULL 허용이고 그 NULL 이 「매치 없음
-    // = UNKNOWN」과 결속된다(V26 CHECK). 정책 두 축은 PK 안이라 NOT NULL 이다.
-    private val baseAmountClassificationColumns =
-        listOf(
-            ColumnSpec("base_amount_classification", "notice_number", "text", false),
-            ColumnSpec("base_amount_classification", "notice_round", "text", false),
-            ColumnSpec("base_amount_classification", "policy_source", "text", false),
-            ColumnSpec("base_amount_classification", "policy_effective_from", "text", false),
-            ColumnSpec("base_amount_classification", "classification", "text", false),
-            ColumnSpec("base_amount_classification", "first_matched_rule", "text", true),
-            ColumnSpec("base_amount_classification", "judged_amount_won", "numeric", false),
-            ColumnSpec("base_amount_classification", "judged_amount_currency", "text", false),
-            ColumnSpec("base_amount_classification", "judged_amount_vat", "text", false),
-            ColumnSpec("base_amount_classification", "recorded_at", "timestamp with time zone", false, true),
-        )
-
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
             operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
             noticeRequirementColumns + noticeRequirementRowColumns + apiRequestAuditColumns +
-            bidCaseColumns + businessProfileColumns + baseAmountClassificationColumns
+            bidCaseColumns + businessProfileColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

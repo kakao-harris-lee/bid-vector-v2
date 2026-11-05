@@ -1,7 +1,6 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.PUBLISHED_FLOOR_TRUST_POLICY
-import bidvector.decision.ProvenanceJudgement
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.derive.DERIVATION_POLICY
@@ -140,35 +139,9 @@ internal fun analysis(
     watchSubjects: FakeWatchSubjectPort = FakeWatchSubjectPort(),
     capacity: FakeCapacityPort = FakeCapacityPort(CapacitySnapshot(currentActiveBids = 2, maxActiveBids = 10)),
     samples: FakeCompetitionSamplePort = FakeCompetitionSamplePort(),
-    classificationRecords: RecordingClassificationPort = RecordingClassificationPort(),
     clock: FixedClock = FixedClock(),
 ): OpportunityAnalysis =
-    OpportunityAnalysis(
-        embed,
-        prediction,
-        profile,
-        workload,
-        watchSubjects,
-        capacity,
-        samples,
-        classificationRecords,
-        clock,
-    )
-
-/**
- * M9/DEC-08 — 판정 기록 port 의 fake. mock framework 0(v2-지침서 §5) — 호출 사실을 **값으로**
- * 기록해 test 가 「어느 정책 version 으로 어느 라벨이 났는가」를 단언한다.
- */
-internal class RecordingClassificationPort : BaseAmountClassificationRecordPort {
-    val recorded = mutableListOf<Pair<NoticeId, ProvenanceJudgement>>()
-
-    override fun record(
-        noticeId: NoticeId,
-        judgement: ProvenanceJudgement,
-    ) {
-        recorded += noticeId to judgement
-    }
-}
+    OpportunityAnalysis(embed, prediction, profile, workload, watchSubjects, capacity, samples, clock)
 
 internal fun analyzeNotice(
     instance: OpportunityAnalysis,

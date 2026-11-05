@@ -1,7 +1,6 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
-import bidvector.decision.ProvenancePolicyData
 import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.VerdictLadder
 import bidvector.decision.priority.PRIORITY_POLICY
@@ -13,22 +12,16 @@ import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Rate
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.embedding.EmbeddingOutcome
 import bidvector.workflow.embedding.EmbeddingUnavailableReason
 import bidvector.workflow.embedding.TextKind
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.UnmeasurableReason
-import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Duration
-import java.time.ZoneOffset
 
 /**
  * `OpportunityAnalysis`(scope.md ①~④) 경로 전수(⑤) — 정상, guard 체인 각 단계 실패,
@@ -42,40 +35,6 @@ class OpportunityAnalysisTest {
 
         analyzed.probabilityScore shouldBe null
         analyzed.matchedScore?.value?.compareTo(BigDecimal.ONE) shouldBe 0
-    }
-
-    /**
-     * M9/DEC-08 — **판정 근거가 port 로 나간다.** 앞 판은 라벨만 취하고 정책 version 을 버려서
-     * 「어느 정책이 이 분류를 냈는가」를 저장할 값이 없었다. 기록은 예측 요청을 조립하는 자리와
-     * **같은 판정**에서 나온다(두 번 분류하지 않는다 — 라벨과 기록된 라벨이 같다).
-     */
-    @Test
-    fun `분석은 분류 판정을 정책 version 과 함께 기록 port 로 넘긴다`() {
-        val records = RecordingClassificationPort()
-
-        val analyzed = analyzeNotice(analysis(classificationRecords = records)).shouldBeAnalyzed()
-
-        records.recorded shouldHaveSize 1
-        val (noticeId, judgement) = records.recorded.single()
-        noticeId shouldBe testNoticeWithMoney().id
-        // 기록된 version 은 **출하 정책표**가 이 run 의 기준일로 해소한 그 version 이다
-        // (상수를 베껴 적지 않는다 — 정책표가 바뀌면 이 단언이 따라 움직인다).
-        val resolved = SAMPLE_PROVENANCE_POLICY.resolve(FixedClock().now().atZone(ZoneOffset.UTC).toLocalDate())
-        val resolvedPolicy = resolved.shouldBeInstanceOf<Resolution.Resolved<ProvenancePolicyData>>()
-        judgement.evidence.policyVersion shouldBe resolvedPolicy.version
-        judgement.evidence.ruleOrder shouldBe resolvedPolicy.value.ruleOrder
-        analyzed.shouldNotBeNull()
-    }
-
-    /** 예측까지 가지 않는 run 은 **아무것도 기록하지 않는다** — 판정이 나지 않았으므로 적을 것이 없다. */
-    @Test
-    fun `subject 가 없어 분석이 멈추면 판정 기록도 0 이다`() {
-        val records = RecordingClassificationPort()
-        val watchSubjects = FakeWatchSubjectPort { WatchSubjectOutcome.Unavailable }
-
-        analyzeNotice(analysis(watchSubjects = watchSubjects, classificationRecords = records))
-
-        records.recorded.shouldBeEmpty()
     }
 
     @Test
@@ -203,7 +162,6 @@ class OpportunityAnalysisTest {
                 watchSubjects = FakeWatchSubjectPort(),
                 capacity = FakeCapacityPort(CapacitySnapshot(2, 10)),
                 samples = FakeCompetitionSamplePort(),
-                classificationRecords = RecordingClassificationPort(),
                 clock = FixedClock(),
                 opportunityPolicyTable = opportunityPolicyTable,
                 derivationPolicyTable = DERIVATION_POLICY,

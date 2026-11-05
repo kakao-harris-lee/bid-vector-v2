@@ -291,19 +291,8 @@ class PredictionFactsTest {
         val cleanResolved = requireNotNull(cleanNotice.baseAmount)
         val suspectResolved = requireNotNull(suspectNotice.baseAmount)
 
-        val cleanJudgement =
-            provenanceJudgementFor(cleanNotice, null, cleanResolved.amount, testPolicies.provenancePolicy)
-        val suspectJudgement =
-            provenanceJudgementFor(suspectNotice, null, suspectResolved.amount, testPolicies.provenancePolicy)
         val cleanRequest =
-            predictionRequestFor(
-                cleanResolved,
-                cleanNotice,
-                testPolicies,
-                CorrelationId("corr-clean"),
-                emptyList(),
-                cleanJudgement.classification,
-            )
+            predictionRequestFor(cleanResolved, cleanNotice, testPolicies, CorrelationId("corr-clean"), emptyList())
         val suspectRequest =
             predictionRequestFor(
                 suspectResolved,
@@ -311,30 +300,11 @@ class PredictionFactsTest {
                 testPolicies,
                 CorrelationId("corr-suspect"),
                 emptyList(),
-                suspectJudgement.classification,
             )
 
         cleanRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.Clean
         suspectRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.SuspectRatio
         (cleanRequest.baseAmountProvenanceLabel == BaseAmountProvenance.Unknown) shouldBe false
-    }
-
-    /**
-     * M9/DEC-08 — **근거가 봉투에 남는다.** 라벨만 내는 함수였을 때는 판정에 쓴 정책 version 이
-     * 호출부에서 사라졌고(6e1 추적), 저장할 값이 메모리에만 있었다. 라벨과 근거가 **같은 판정**
-     * 에서 온다는 것도 함께 잰다(두 번 분류하지 않는다).
-     */
-    @Test
-    fun `provenanceJudgementFor 는 라벨과 함께 판정에 쓴 정책 version 과 규칙을 낸다`() {
-        val notice = testNoticeWithMoney(number = "20260101026", won = 1_000_000_000L)
-        val resolved = requireNotNull(notice.baseAmount)
-
-        val judgement = provenanceJudgementFor(notice, null, resolved.amount, testPolicies.provenancePolicy)
-
-        judgement.classification shouldBe BaseAmountProvenance.Clean
-        judgement.evidence.firstMatchedRule shouldBe ProvenanceRuleId.CleanInteger
-        judgement.evidence.policyVersion shouldBe testPolicies.provenancePolicy.version
-        judgement.original shouldBe resolved.amount
     }
 
     // ---- (D-3H2-1, scope.md 우회 (1)(4)) — 요청 축 agencyId 조립(`predictionRequestFor`). ----
@@ -348,15 +318,7 @@ class PredictionFactsTest {
             )
         val resolved = requireNotNull(notice.baseAmount)
 
-        val request =
-            predictionRequestFor(
-                resolved,
-                notice,
-                testPolicies,
-                CorrelationId("corr-agency"),
-                emptyList(),
-                BaseAmountProvenance.Unknown,
-            )
+        val request = predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-agency"), emptyList())
 
         request.agencyId shouldBe AgencyId("1234567")
     }
@@ -371,14 +333,7 @@ class PredictionFactsTest {
         val resolved = requireNotNull(notice.baseAmount)
 
         val request =
-            predictionRequestFor(
-                resolved,
-                notice,
-                testPolicies,
-                CorrelationId("corr-no-fallback"),
-                emptyList(),
-                BaseAmountProvenance.Unknown,
-            )
+            predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-no-fallback"), emptyList())
 
         request.agencyId shouldBe null
     }
@@ -392,15 +347,7 @@ class PredictionFactsTest {
             )
         val resolved = requireNotNull(notice.baseAmount)
 
-        val request =
-            predictionRequestFor(
-                resolved,
-                notice,
-                testPolicies,
-                CorrelationId("corr-name-only"),
-                emptyList(),
-                BaseAmountProvenance.Unknown,
-            )
+        val request = predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-name-only"), emptyList())
 
         request.agencyId shouldBe null
     }

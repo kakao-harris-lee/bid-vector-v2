@@ -67,9 +67,6 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 스키마 스냅샷 래칫 예외(M7/7C③, 추가만). V23__notification_inbox.sql.
             // `inbox`(V6)와 **다른 표**다 — 이름이 닮았을 뿐 키·계정 축·보존 분류가 다르다.
             "notification_inbox",
-            // 스키마 스냅샷 래칫 예외(M9/ops-migrations, 추가만). V26__base_amount_classification.sql —
-            // DEC-08 판정 기록(사실이 아니라 **판단**이고 정책 version 마다 새 행이다).
-            "base_amount_classification",
         )
 
     @Test
@@ -162,10 +159,6 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 네 열 복합이라 「한 계정 · 한 공고 · 한 종류에 한 항목」이 표 층의 성질이고,
             // 그래서 축5(PK 밖 UNIQUE)는 이 표 때문에 늘지 않는다. 시퀀스도 만들지 않는다.
             "notification_inbox" to setOf("account_id", "kind", "notice_number", "notice_round"),
-            // M9/ops-migrations — 공고 둘 + 정책 둘. 정책 두 축이 키 안이라 version 이 바뀌면
-            // 덮지 않고 **새 행**이다(같은 version 재판정은 멱등).
-            "base_amount_classification" to
-                setOf("notice_number", "notice_round", "policy_source", "policy_effective_from"),
         )
 
     @Test

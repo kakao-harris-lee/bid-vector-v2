@@ -384,18 +384,6 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                     references = false,
                     trigger = false,
                 ),
-            // M9/ops-migrations(DEC-08, V26) — 판정 기록은 **추가 전용**(api_request_audit·outbox
-            // 와 같은 관례). UPDATE·DELETE 부재가 append-only 트리거와 두 겹이다.
-            "base_amount_classification" to
-                TablePrivileges(
-                    select = true,
-                    insert = true,
-                    update = false,
-                    delete = false,
-                    truncate = false,
-                    references = false,
-                    trigger = false,
-                ),
         )
 
     @Test

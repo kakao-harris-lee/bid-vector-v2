@@ -14,7 +14,6 @@ import bidvector.decision.trustPublishedFloorRate
 import bidvector.procurement.Notice
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.sharedkernel.BaseAmount
-import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Rate
@@ -51,9 +50,6 @@ internal fun predictionRequestFor(
     // 0건은 호출부가 명시적으로 `emptyList()`를 넘겨야만 나오는 값이지, 조용히 새는
     // 기본값이 아니다.
     competitionSamples: List<CompetitionSample>,
-    // (M9 DEC-08) — 라벨을 **값으로** 받는다. 판정은 호출부(`OpportunityAnalysis.predictionFacts`)
-    // 가 내고 그 봉투를 기록 port 로도 넘긴다 — 여기서 분류기를 부르면 근거가 다시 버려진다.
-    baseAmountProvenanceLabel: BaseAmountProvenance,
 ): BidPredictionRequest =
     BidPredictionRequest(
         baseAmount = resolvedBaseAmount,
@@ -63,7 +59,8 @@ internal fun predictionRequestFor(
         // (`Agency.kt` KDoc). 이름만 있고 코드가 없으면 `AgencyCode`가 없으므로 여기서도
         // `null`(우회 (4), 이름을 키로 싣지 않는다).
         agencyId = notice.demandAgency?.code?.let { AgencyId(it.value) },
-        baseAmountProvenanceLabel = baseAmountProvenanceLabel,
+        baseAmountProvenanceLabel =
+            provenanceLabelFor(notice, null, resolvedBaseAmount.amount, policies.provenancePolicy),
         competitionSamples = competitionSamples,
         objective = policies.opportunity.objective,
         releaseSelector = policies.opportunity.releaseSelector,
