@@ -74,7 +74,11 @@ class JdbcNotificationInboxStore(
                     prepareStatement(NotificationInboxSql.MARK_ITEM_READ).use { statement ->
                         statement.setTimestamp(1, Timestamp.from(at))
                         statement.setLong(2, account.value)
-                        statement.setString(statement.bindGroup(3, item.group), item.kind.name)
+                        // 묶음 세 열을 먼저 묶고 **그 다음 자리**를 받는다 — 부수효과가 있는
+                        // 호출을 인자 자리에 두면 `kind` 가 몇 번인지 알려면 `bindGroup` 의
+                        // 원소 수를 먼저 세야 하고, 문장을 읽는 순서가 SQL 순서와 달라진다.
+                        val kindIndex = statement.bindGroup(3, item.group)
+                        statement.setString(kindIndex, item.kind.name)
                         statement.executeUpdate()
                     }
                 MarkReadOutcome(marked, readCounts(account).unread)

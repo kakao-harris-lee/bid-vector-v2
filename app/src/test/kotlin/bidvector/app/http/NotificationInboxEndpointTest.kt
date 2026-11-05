@@ -106,25 +106,30 @@ internal class NotificationInboxEndpointTest : HttpIntegrationTestBase() {
     }
 
     /**
-     * **투찰 종류 어휘 밖은 400 이다** — 알림 종류 축과 같은 술어(`valueOf` 가 아니라 어휘 전수
-     * 조회)라는 것을 이 자리가 잰다. 축을 빠뜨린 본문도 같은 거부다(허용 키가 아니라 **필수**).
+     * **투찰 종류 어휘 밖은 400, 빠진 칸도 400 이다** — 알림 종류 축과 같은 술어(`valueOf` 가
+     * 아니라 어휘 전수 조회)이고, 축은 허용 키가 아니라 **필수**다.
+     *
+     * **두 꼴을 두 경로 **각각**에 쏜다**(cr LOW). 앞 판은 어휘 밖을 `/read` 에서만, 빠진 칸을
+     * `/read-notice` 에서만 쟀다 — 그러면 `/read` 의 축 판독을 **선택적**(기본값 `REAL`)으로
+     * 바꾸는 회귀가 이 test 를 지나고, 그 회귀는 조용하다(200 이고 계수도 그럴듯한데 서버가
+     * 실투찰 항목을 읽는다).
      */
     @Test
-    fun `읽음 처리 본문의 투찰 종류가 어휘 밖이거나 없으면 400 이다`() {
-        session
-            .post(
-                AccountScopedRoutes.NOTIFICATIONS + "/read",
-                """{"kind":"NEW_CANDIDATE","noticeNumber":"N-1","noticeRound":"000","bidKind":"REEL"}""",
-            ).statusCode
-            .value() shouldBe 400
+    fun `읽음 처리 본문의 투찰 종류가 어휘 밖이거나 없으면 400 이다 — 두 경로 각각`() {
+        val item = AccountScopedRoutes.NOTIFICATIONS + "/read"
+        val notice = AccountScopedRoutes.NOTIFICATIONS + "/read-notice"
 
-        session
-            .post(
-                AccountScopedRoutes.NOTIFICATIONS + "/read-notice",
-                """{"noticeNumber":"N-1","noticeRound":"000"}""",
-            ).statusCode
-            .value() shouldBe 400
+        rejects(item, """{"kind":"NEW_CANDIDATE","noticeNumber":"N-1","noticeRound":"000","bidKind":"REEL"}""")
+        rejects(item, """{"kind":"NEW_CANDIDATE","noticeNumber":"N-1","noticeRound":"000"}""")
+        rejects(notice, """{"noticeNumber":"N-1","noticeRound":"000","bidKind":"REEL"}""")
+        rejects(notice, """{"noticeNumber":"N-1","noticeRound":"000"}""")
     }
+
+    /** 그 본문이 **그 경로에서** 400 인가 — 네 칸을 한 줄씩 읽게 한다. */
+    private fun rejects(
+        path: String,
+        body: String,
+    ) = withClue("$path $body") { session.post(path, body).statusCode.value() shouldBe 400 }
 
     /**
      * ⓐ **wire 의 키 집합 == 문서의 키 집합.** 항목을 하나 꽂아 `NotificationItemResponse.from`
