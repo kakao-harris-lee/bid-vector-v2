@@ -47,11 +47,13 @@ data class NoticeReference(
          */
         fun parse(raw: String): NoticeReference? {
             val separator = raw.lastIndexOf('-')
-            if (separator <= 0) return null
-            val round = raw.substring(separator + 1)
-            if (!ROUND_SHAPE.matches(round)) return null
-            val number = raw.substring(0, separator)
-            return if (number.isBlank()) null else NoticeReference(number, round)
+            val number = if (separator > 0) raw.substring(0, separator) else ""
+            val round = if (separator > 0) raw.substring(separator + 1) else ""
+            return if (number.isNotBlank() && ROUND_SHAPE.matches(round)) {
+                NoticeReference(number, round)
+            } else {
+                null
+            }
         }
     }
 }

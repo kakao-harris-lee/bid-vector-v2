@@ -37,7 +37,13 @@ internal const val FAKE_SITE_BASE_URL = "https://bidvector.example"
 
 private const val MASKED_SUFFIX_LENGTH = 4
 private const val FAST_TIMEOUT_MILLIS = 300L
-private const val SLOW_SERVER_MILLIS = 4_000L
+
+/**
+ * 응답 timeout 보다 **확실히 길고** 그만큼만 길다 — 가짜 서버의 핸들러는 `HttpServer` 의 기본
+ * 실행자(디스패처 스레드)에서 돌므로, 이 시간 동안 그 스레드가 잠든다. 길게 두면 test 가 끝난 뒤에도
+ * 스레드가 남는다.
+ */
+private const val SLOW_SERVER_MILLIS = 1_500L
 
 /** 전 환경을 `Live` 로 덮는다 — 발송 축을 재려면 dispatch 가 억제하지 않아야 한다(`SenderContractTest` 관례). */
 internal val LIVE_POLICY =

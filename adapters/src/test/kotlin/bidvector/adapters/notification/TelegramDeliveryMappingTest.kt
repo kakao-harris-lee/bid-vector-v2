@@ -5,6 +5,11 @@ import bidvector.workflow.notification.MaskedTarget
 import bidvector.workflow.notification.RejectionReason
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.UnknownHostException
+import java.net.http.HttpTimeoutException
 
 /**
  * D-4 결과 어휘 대응의 **순수 판정**. 변이 ①(Unknown → Rejected 바꿔치움)이 직접 치는 자리다 —
@@ -98,6 +103,55 @@ class TelegramDeliveryMappingTest {
         telegramStatusVerdict(HTTP_OK) shouldBe TelegramStatusVerdict.Acknowledged
         telegramStatusVerdict(HTTP_LAST_SUCCESS) shouldBe TelegramStatusVerdict.Acknowledged
         telegramStatusVerdict(HTTP_MOVED) shouldBe TelegramStatusVerdict.Ambiguous
+    }
+
+    /**
+     * 전송 실패 분류 — **이름 해소 실패는 거동으로 재지 않는다.** 그러려면 해소되지 않는 이름으로
+     * 실제 질의를 내야 하고, 그 답은 이 저장소가 통제하지 않는 resolver 가 낸다(NXDOMAIN 을
+     * 가로채는 망에서는 연결이 서고 갈래가 달라진다). 타입으로 직접 친다.
+     */
+    @Test
+    fun `송신 전 실패 둘과 모호 넷의 분류`() {
+        telegramFailureOutcome(UnknownHostException("h")) shouldBe
+            TelegramCallOutcome.NotSent(TelegramNotSentCause.NameNotResolved)
+        telegramFailureOutcome(ConnectException("refused")) shouldBe
+            TelegramCallOutcome.NotSent(TelegramNotSentCause.ConnectionRefused)
+        telegramFailureOutcome(HttpTimeoutException("t")) shouldBe
+            TelegramCallOutcome.Ambiguous(TelegramAmbiguityCause.Timeout)
+        telegramFailureOutcome(InterruptedException()) shouldBe
+            TelegramCallOutcome.Ambiguous(TelegramAmbiguityCause.Interrupted)
+        telegramFailureOutcome(SocketException("reset")) shouldBe
+            TelegramCallOutcome.Ambiguous(TelegramAmbiguityCause.ConnectionBroken)
+        telegramFailureOutcome(IllegalStateException("?")) shouldBe
+            TelegramCallOutcome.Ambiguous(TelegramAmbiguityCause.TransportFailure)
+    }
+
+    /**
+     * **원인 사슬을 본다** — JDK 는 같은 사실을 일반 `IOException` 으로 감싸 올릴 수 있다. 겉
+     * 타입만 보면 「닿지 않았음이 확정」이 「모호」로 접히고, 그러면 장부가 `FAILED` 대신
+     * `ISOLATED` 를 적는다. 이 칸이 없으면 사슬 순회를 지워도 초록이다.
+     */
+    @Test
+    fun `일반 IOException 이 구체 사유를 감싸도 그 사유가 이긴다`() {
+        val wrapped = IOException("io", ConnectException("refused"))
+
+        telegramFailureOutcome(wrapped) shouldBe
+            TelegramCallOutcome.NotSent(TelegramNotSentCause.ConnectionRefused)
+    }
+
+    /**
+     * 원인 사슬이 **고리**를 이뤄도 멈춘다(JDK 는 자기 자신을 원인으로 두는 것만 막는다 — 둘이
+     * 서로를 가리키는 고리는 만들 수 있다). 순회가 무한히 돌면 발송 한 건이 run 을 멈춘다.
+     */
+    @Test
+    fun `서로를 원인으로 갖는 고리도 분류된다`() {
+        val first = IOException("first")
+        val second = IOException("second")
+        first.initCause(second)
+        second.initCause(first)
+
+        telegramFailureOutcome(first) shouldBe
+            TelegramCallOutcome.Ambiguous(TelegramAmbiguityCause.ConnectionBroken)
     }
 
     private companion object {

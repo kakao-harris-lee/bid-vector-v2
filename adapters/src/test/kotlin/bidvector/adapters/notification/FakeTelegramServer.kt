@@ -79,13 +79,33 @@ internal class FakeTelegramServer private constructor(
 
         private fun decode(raw: String): String = URLDecoder.decode(raw, StandardCharsets.UTF_8)
 
+        /**
+         * 클라이언트가 먼저 끊은 뒤의 쓰기는 `IOException` 이다(timeout 갈래에서 정상으로
+         * 일어난다) — 핸들러 밖으로 내보내면 `HttpServer` 가 그것을 로그로 토해내 test 출력이
+         * 시끄러워진다. 교환은 어느 경로에서든 닫힌다.
+         */
         private fun respond(
+            exchange: HttpExchange,
+            step: TelegramScript,
+        ) {
+            @Suppress("SwallowedException", "TooGenericExceptionCaught")
+            try {
+                write(exchange, step)
+            } catch (clientGone: java.io.IOException) {
+                // 클라이언트가 이미 떠났다 — 이 test 서버가 할 일이 없다.
+            }
+        }
+
+        private fun write(
             exchange: HttpExchange,
             step: TelegramScript,
         ) {
             exchange.use {
                 when (step) {
-                    is TelegramScript.Reply -> reply(exchange, step.status, step.body)
+                    is TelegramScript.Reply -> {
+                        reply(exchange, step.status, step.body)
+                    }
+
                     is TelegramScript.Stall -> {
                         Thread.sleep(step.millis)
                         reply(exchange, TelegramScript.OK_STATUS, """{"ok":true}""")

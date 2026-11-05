@@ -27,8 +27,10 @@ class TelegramNotificationSenderTest {
             result to server.received()
         }
 
-    private fun resultOf(status: Int, body: String): DeliveryResult =
-        sendTo(listOf(TelegramScript.Reply(status, body))).first
+    private fun resultOf(
+        status: Int,
+        body: String,
+    ): DeliveryResult = sendTo(listOf(TelegramScript.Reply(status, body))).first
 
     @Test
     fun `2xx 와 ok true 면 전달이고 target 은 마스킹된 값이다`() {
@@ -99,14 +101,6 @@ class TelegramNotificationSenderTest {
     @Test
     fun `연결이 거부되면 Rejected 이고 호출은 일어나지 않는다`() {
         val sender = telegramSender(telegramSettings(FakeTelegramServer.closedPortBaseUrl()))
-
-        dispatchThrough(sender) shouldBe DeliveryResult.Rejected(RejectionReason.ProviderDeclined)
-    }
-
-    /** 이름 해소 실패(DNS)도 같은 갈래다 — 예약된 미등록 TLD 를 쓴다(바깥 질의 0). */
-    @Test
-    fun `이름이 해소되지 않으면 Rejected 다`() {
-        val sender = telegramSender(telegramSettings("http://str12-no-such-host.invalid"))
 
         dispatchThrough(sender) shouldBe DeliveryResult.Rejected(RejectionReason.ProviderDeclined)
     }

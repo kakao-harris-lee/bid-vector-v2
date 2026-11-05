@@ -18,11 +18,13 @@ import bidvector.workflow.strategy.OperatorId
  * 「새 채널을 활성으로 둘 것인가」를 결정하게 된다(빠뜨린 채널은 「활성인데 경로가 없다」로 읽힌다).
  */
 class ConfiguredRouteDirectory(
-    private val owner: OperatorId,
+    private val configuredOwner: OperatorId,
     private val telegramRoute: RouteKey,
 ) : RouteDirectory {
+    // 매개변수 이름은 port 의 것(`owner`)을 그대로 쓴다 — 바꾸면 named argument 호출이 깨진다는
+    // 경고가 `-Werror` 에서 컴파일 실패다. 그래서 **필드** 쪽 이름을 비켰다.
     override fun routesFor(owner: OperatorId): Map<Channel, ChannelRoute> =
-        if (owner != this.owner) {
+        if (owner != configuredOwner) {
             emptyMap()
         } else {
             Channel.entries.associateWith(::routeFor)
@@ -31,6 +33,7 @@ class ConfiguredRouteDirectory(
     private fun routeFor(channel: Channel): ChannelRoute =
         when (channel) {
             Channel.Telegram -> ChannelRoute(enabled = true, key = telegramRoute)
+
             // Email 은 이 slice 밖이다(D-2) — 「활성인데 경로가 없다」가 아니라 **비활성**이다.
             Channel.Email -> ChannelRoute(enabled = false, key = null)
         }

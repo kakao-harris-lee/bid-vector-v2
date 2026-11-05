@@ -32,9 +32,11 @@ internal object TelegramResponseBody {
 
     private fun readVerdict(body: String): TelegramBodyVerdict {
         val root = mapper.readTree(body)
-        if (!root.isObject) return TelegramBodyVerdict.Unreadable
-        val ok = root.get(OK_FIELD) ?: return TelegramBodyVerdict.Unreadable
-        if (!ok.isBoolean) return TelegramBodyVerdict.Unreadable
-        return if (ok.booleanValue()) TelegramBodyVerdict.Ok else TelegramBodyVerdict.NotOk
+        val ok = if (root.isObject) root.get(OK_FIELD) else null
+        return when {
+            ok == null || !ok.isBoolean -> TelegramBodyVerdict.Unreadable
+            ok.booleanValue() -> TelegramBodyVerdict.Ok
+            else -> TelegramBodyVerdict.NotOk
+        }
     }
 }

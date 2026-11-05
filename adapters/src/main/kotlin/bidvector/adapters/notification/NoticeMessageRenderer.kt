@@ -36,8 +36,7 @@ class NoticeMessageRenderer(
 
     private fun bodyFor(raw: String): String {
         val reference = NoticeReference.parse(raw) ?: return undecodableBody(raw)
-        val known = facts.factsFor(reference) ?: return missingNoticeBody(reference)
-        return noticeBody(reference, known)
+        return facts.factsFor(reference)?.let { noticeBody(reference, it) } ?: missingNoticeBody(reference)
     }
 
     private fun noticeBody(

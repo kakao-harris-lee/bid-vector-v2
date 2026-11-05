@@ -84,7 +84,9 @@ internal fun telegramDeliveryResult(
         // 대상(chat)이 틀린 것이 아니라 provider 쪽에 닿지 못했다 — `InvalidTarget` 은 chat 축의
         // 뜻이라 쓰지 않는다. 어휘가 두 값뿐인 한계는 알려진 제한이다.
         is TelegramCallOutcome.NotSent -> DeliveryResult.Rejected(RejectionReason.ProviderDeclined)
+
         is TelegramCallOutcome.Ambiguous -> DeliveryResult.Unknown(at)
+
         is TelegramCallOutcome.Responded -> respondedResult(outcome, at, target)
     }
 
@@ -111,11 +113,18 @@ private fun acknowledgedResult(
         TelegramBodyVerdict.Unreadable -> DeliveryResult.Unknown(at)
     }
 
-/** 프로토콜 상수 — 정책 값이 아니라 HTTP·Bot API 의 사실이다(versioned policy 데이터 아님). */
+/**
+ * 프로토콜 상수 — 정책 값이 아니라 HTTP·Bot API 의 사실이다(versioned policy 데이터 아님).
+ * 범위는 **상수에서 조립한다** — 범위 리터럴을 직접 쓰면 같은 수가 두 자리에 생긴다.
+ */
 private object TelegramHttpStatus {
-    val SUCCESS_RANGE = 200..299
-    val CLIENT_ERROR_RANGE = 400..499
+    const val OK = 200
+    const val LAST_SUCCESS = 299
     const val BAD_REQUEST = 400
     const val FORBIDDEN = 403
     const val TOO_MANY_REQUESTS = 429
+    const val LAST_CLIENT_ERROR = 499
+
+    val SUCCESS_RANGE = OK..LAST_SUCCESS
+    val CLIENT_ERROR_RANGE = BAD_REQUEST..LAST_CLIENT_ERROR
 }

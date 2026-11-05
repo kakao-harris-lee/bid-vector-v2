@@ -123,9 +123,6 @@ class TelegramCredentialLeakTest {
             LeakProbe("연결 거부") {
                 dispatchThrough(telegramSender(telegramSettings(FakeTelegramServer.closedPortBaseUrl())))
             },
-            LeakProbe("이름 해소 실패") {
-                dispatchThrough(telegramSender(telegramSettings("http://str12-no-such-host.invalid")))
-            },
         )
 
     private fun serverProbe(
@@ -151,6 +148,13 @@ class TelegramCredentialLeakTest {
         const val TOO_MANY_REQUESTS = 429
         const val SERVER_ERROR = 500
         const val CHAT_ID_SUFFIX = "3210"
-        const val EXPECTED_PROBE_COUNT = 12
+
+        /**
+         * 갈래 수 — 「전수」가 조용히 줄어드는 것을 막는 하한이자 상한이다. 이름 해소 실패 갈래는
+         * **여기 없다**: 그 갈래를 거동으로 재려면 통제하지 않는 resolver 에 의존해야 하고, 그래서
+         * 분류는 [TelegramDeliveryMappingTest] 가 타입으로 직접 친다(그 경로의 결과 타입에도
+         * 자유 문자열 칸이 없으므로 누출 표면은 여기 열한 갈래와 같다).
+         */
+        const val EXPECTED_PROBE_COUNT = 11
     }
 }

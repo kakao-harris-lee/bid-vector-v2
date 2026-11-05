@@ -40,8 +40,15 @@ private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
  * 구조로 닫는 자리다(`TelegramCredentialLeakTest` KDoc): 로거가 없으면 흘릴 자리가 없고, 로거를
  * 들이는 편집이 **이 단언에서** 붉어져 그때 누출 축을 다시 보게 된다.
  */
-private val LOGGING_NAME =
-    Regex("""(org[/.]slf4j|java[/.]util[/.]logging|org[/.]apache[/.]log(ging|4j)|ch[/.]qos[/.]logback)[A-Za-z0-9_/.$]*""")
+private val LOGGING_ROOTS =
+    listOf(
+        "org[/.]slf4j",
+        "java[/.]util[/.]logging",
+        "org[/.]apache[/.]log(ging|4j)",
+        "ch[/.]qos[/.]logback",
+    )
+
+private val LOGGING_NAME = Regex("""(${LOGGING_ROOTS.joinToString("|")})[A-Za-z0-9_/.$]*""")
 
 private val CLASSES_DIR = File("build/classes/kotlin/main/bidvector/adapters/notification")
 
