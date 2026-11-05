@@ -234,8 +234,8 @@ internal class AwardCollectionE2EHarness {
         extra: Map<String, String> = emptyMap(),
         noticesPerSlot: Int = AWARD_NOTICES_PER_SLOT,
         pageSize: Int = 0,
-    ): Pair<List<Int>, MockAwardKonepsHttp> {
-        return captured {
+    ): Pair<List<Int>, MockAwardKonepsHttp> =
+        captured {
             val started = MockAwardKonepsHttp(noticesPerSlot, nonce, AWARD_WINNER_NAME, pageSize)
             try {
                 boot(awardProperties(started) + extra) to started
@@ -246,7 +246,6 @@ internal class AwardCollectionE2EHarness {
                 started.close()
             }
         }
-    }
 
     /** 기존 승격 갈래를 기동한다 — **이 slice 가 고치지 않은** 배선이다. */
     fun bootPromote(extra: Map<String, String> = emptyMap()): List<Int> = captured { boot(promoteProperties() + extra) }
