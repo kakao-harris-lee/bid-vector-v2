@@ -16,3 +16,19 @@
 `ml-engine/**`(src·tests·policy) · capability map 해당 행 · evidence
 ## acceptance
 CI `ml-engine` job 명령 그대로(로컬 pytest·mypy·import-linter OK — 가볍다) · 각 바꿔치우기 변이 RED. 6G 판정(`reports/evidence/m6/6g/verdict.md`) 결과를 바꾸지 않는다(재판정 0).
+
+## 계약 갱신 2026-11-06 (팀장) — 수정 라운드 2
+
+**사후 등재(v r2 L-2)** — `reports/evidence/m5/5c2/policy-values.md` · `reports/evidence/m5/5d/policy-values.md`
+(정책 값 승인 장부, 합 +4 −1). 이 slice 가 `evaluation-v1` 에 effective date 칸을 더하고 성숙도 키를 바꿨으므로
+그 version 의 **승인 장부가 같은 값을 적어야** 한다 — 팀장이 이 확장을 승인한다(원래 문면은 덮지 않고 덧붙이는
+형태 유지).
+
+**v r2 H-2 처방 — 구조로 닫는다(팀장 결정, 「운영자가 아무 파일이나 고를 수 있다」 경계는 채택하지 않는다).**
+version 문자열이 내용에 묶이지 않아 env 로 가리킨 편집 사본·코드가 쓴 완화 사본이 같은 `evaluation-v1` 로
+통과했다 — ML-07 수용 문면 둘(env 주입이 판정을 바꾸지 않는다 · version 변경이 전후 판정을 가른다)을 깬다.
+- 승인된 version → 정책 파일 sha256 을 **코드 상수 등록부**(`ml-engine/src/**`)로 둔다. 로더와 재검증은 등록부에
+  없는 version, 등록된 version 인데 내용 digest 가 다른 파일을 **거부**한다.
+- 등록부 ↔ 출하 `ml-engine/policy/*.yaml` digest 등식 test, 등록부의 각 version 의 값 ↔ 위 승인 장부 표 대조 test.
+- 새 version 을 승인하는 길은 「yaml + 등록부 한 줄 + 승인 장부」 세 자리를 같은 커밋에서 바꾸는 것뿐 — runbook·
+  design-review 에 적는다.
