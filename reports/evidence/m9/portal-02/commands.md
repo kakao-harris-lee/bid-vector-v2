@@ -1,0 +1,197 @@
+# M9 / portal-02 — 실행 명령과 종료 코드
+
+base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m9-portal-02`.
+실 조달청 호출 0 — 모든 KONEPS 응답은 loopback in-process mock 이다.
+
+## 2026-11-05T17:30+09:00 — RED ①(D-3 라우팅)
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon :app:test --tests 'bidvector.app.collection.MockKonepsRoutingTest'`
+- exit: 1
+- 핵심 결과: 2 tests, 1 failed — 표에 없는 오퍼레이션이 `expected:<404> but was:<200>`(접두 라우팅이 공고 목록 응답을 조용히 냈다).
+
+## 2026-11-05T17:52+09:00 — GREEN ①
+- cmd: 위 명령 + `--tests 'bidvector.app.collection.CollectionRunnerE2ETest' --tests '…OpeningCollectionE2ETest' --tests '…OpeningPageSizeE2ETest' --tests '…OpeningBudgetE2ETest'`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 정확 일치 표로 바꾼 뒤 수집 E2E 전부 초록.
+
+## 2026-11-05T18:02+09:00 — 정확 일치 표 아래 adapters 축
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon :adapters:test --tests 'bidvector.adapters.koneps.*'`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — `createContext` 접두 일치를 뿌리 + 경로 정확 비교로 바꾼 뒤 초록.
+
+## 2026-11-05T18:14+09:00 — RED ②(D-1 기본값 문면)
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon :app:test --tests 'bidvector.app.wiring.KonepsEndpointDefaultsTest'`
+- exit: 1
+- 핵심 결과: 5 tests, 4 failed — base·공고 목록 둘·A값·기초금액 둘이 `02` 없이 왔다. **낙찰정보서비스 불변 test 는 처음부터 초록**(통제군: 이 slice 가 그 축을 움직이지 않는다).
+
+## 2026-11-05T18:26+09:00 — GREEN ②
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon :app:test --tests 'bidvector.app.wiring.KonepsEndpointDefaultsTest' --tests 'bidvector.app.collection.*' --tests 'bidvector.app.wiring.CollectionWiringTest' --tests 'bidvector.app.wiring.OpeningCollectionWiringTest'`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 107 tests 초록. `OpeningPageSizeE2ETest` 의 축 분류기도 같은 표로 옮긴 뒤다(접미 술어가 `02` 에서 기초금액·산식 A 를 「그 밖」으로 떨어뜨려 두 축의 단언이 공집합에서 참이 되던 자리).
+
+## 2026-11-05T18:27+09:00 — 옛 base 리터럴 계수(acceptance)
+- cmd: `git grep -n 'BidPublicInfoService"' -- '*.kt' '*.kts' '*.yml' '*.yaml' '*.properties'`
+- exit: 1 (일치 0)
+- 핵심 결과: 옛 base 리터럴 0건. 같은 자리에서 main source 의 옛 오퍼레이션 리터럴도 0건.
+
+## 2026-11-05T20:50+09:00 — 전건 check ①(RED: 스타일·크기 게이트)
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon check`
+- exit: 1
+- 핵심 결과: `:app:detekt` 2건 — `MatchingDeclarationName`(합성 표본 파일명) · `ReturnCount`(`respond` 반환 3). test 축은 전부 초록이었다.
+
+## 2026-11-05T21:35+09:00 — 스타일·크기 표적 라운드
+- cmd: `~/.local/bin/bv-build.sh bash -c "… ./gradlew --no-daemon :app:detekt :adapters:detekt :app:sizeGate :adapters:sizeGate :app:ktlintCheck :adapters:ktlintCheck"`
+- exit: 0 (앞선 세 번은 1 — ktlint `when-entry-bracing` 9 · 함수 50줄 `itemsOf` 51 · 파일 500줄 505)
+- 핵심 결과: 네 지적을 추출·분할로 닫은 뒤 여섯 task 전부 초록.
+
+## 2026-11-05T22:30+09:00 — **전건 check ②(acceptance)**
+- cmd: `~/.local/bin/bv-build.sh ./gradlew --no-daemon check`
+- exit: **0**
+- 핵심 결과: BUILD SUCCESSFUL in 33m 30s · 392 tasks.
+
+## 2026-11-05T22:40+09:00 — 변이 ①(기본 경로 하나를 옛 이름으로)
+- cmd: `…:app:test --tests 'bidvector.app.wiring.KonepsEndpointDefaultsTest'` (`…Cnstwk02` → `…Cnstwk` 치환 뒤)
+- exit: 1
+- 핵심 결과: 5 tests, **2 failed** — 열거(공고 목록 둘)와 경계(두 서비스 집합 분리) 양쪽이 잡았다. 변이 파일만 `git restore`.
+
+## 2026-11-05T22:45+09:00 — 변이 ②(mock 을 접두 라우팅으로)
+- cmd: `…:app:test --tests 'bidvector.app.collection.MockKonepsRoutingTest' --tests 'bidvector.app.collection.OpeningCollectionE2ETest'` (정확 일치 → `startsWith(name.removeSuffix("02"))` 치환 뒤)
+- exit: 1
+- 핵심 결과: 7 tests, **2 failed** — 기초금액 요청이 공고 목록 축으로 갔고(`noticeListCalls` 에 `…CnstwkBsisAmount02` 가 섞였다) **E2E 「표본에 뽑힌 공고만 상세를 부른다」도 함께 붉다**. 변이 파일만 `git restore`.
+
+## 2026-11-05T22:50+09:00 — rollback ①②③ (버릴 clone, 실측 HEAD `24bd2803`)
+- cmd: `git restore --source=79f3e5c4 --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 5 · M 9 · in_scope 코드·문서의 `git diff 79f3e5c4` 빈 출력 · 복원 목록 등식(`comm -23`)은 evidence 한 경로만 남긴다.
+
+## 2026-11-05T23:55+09:00 — rollback ④⑤⑥ (되돌린 트리, evidence 디렉터리를 남긴 채)
+- cmd: `~/.local/bin/bv-build.sh bash -c "cd <버릴 clone> && ./gradlew --no-daemon check"`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL in 30m 37s — 되돌린 트리에서 compile·test·게이트 전부 초록(`leakPatternGate` 가 `reports/evidence` 를 입력으로 잡으므로 base 결과로 갈음하지 않고 실제로 돌렸다).
+
+## 2026-11-06T00:00+09:00 — evidence 점검
+- cmd: `wc -l reports/evidence/m9/portal-02/*.md` · `git diff --numstat 79f3e5c4..HEAD -- app adapters config docs`
+- exit: 0
+- 핵심 결과: evidence 262줄 대 산출물 785줄(크기 게이트 통과). 참조형 누출 스캔(`grep -rniE -f config/quality/leak-patterns.txt`)은 evidence·runbook 에서 0건.
+
+## 2026-11-06T00:30+09:00 — web fake KONEPS 라우팅 실측 (계약 갱신분, docker·playwright 없이)
+- cmd: `node e2e/harness/fake-koneps.mjs <port>` 뒤 출하 기본 경로와 옛 이름으로 `curl -o /dev/null -w '%{http_code}'`
+- exit: 0
+- 핵심 결과: `…Cnstwk02` → **200**(`resultCode 00` · 항목 4) · 옛 이름 → **404**. fixture 를 옛 이름으로 둔 변이에서는 **출하 기본 경로가 404** 다 — W-13 여정이 붉어지는 기구가 이 한 자리다.
+
+## 2026-11-06T00:40+09:00 — rollback ①②③ 재산출 (실측 HEAD `a49738d3`)
+- cmd: `git restore --source=79f3e5c4 --staged --worktree -- <in_scope 경로 개별 인자, web fixture 포함>`
+- exit: 0
+- 핵심 결과: D 5 · M 10 · 되돌린 트리의 `git diff 79f3e5c4 -- app adapters config docs web` 빈 출력(= base 와 바이트 동일) · 내 표지 0 · base 의 web fixture 옛 이름 4 복원.
+
+## 2026-11-05T13:05Z — PR CI 라운드 1 (run 42025625713, HEAD `bea3a225`)
+- cmd: `gh pr checks 130` · `gh api .../actions/jobs/127238986505`
+- exit: 1 (`web` fail · `container`·`ml-engine` pass · `check` 중단)
+- 핵심 결과: W-1~W-12 초록, **step 20 「여정 e2e (W-13)」 하나가 붉다** — 로그가 「fake KONEPS 를 30000ms 안에 기다리지 못했다」와 「요청 75건 받고 종료」다. 수집이 아니라 **준비 대기**가 영구 404 로 죽었다(이름 사본 셋째).
+
+## 2026-11-05T14:10+09:00 — 준비 대기 교체 실측 (node, docker·playwright 없이)
+- cmd: fake 단독 기동 뒤 `curl -D -` 로 루트·출하 기본 경로·옛 이름 / `node -e` 로 probe 식 그대로
+- exit: 0
+- 핵심 결과: 루트 `404` + 표지 `x-fake-koneps` → **준비 판정 true** · 출하 기본 경로 `200` · 옛 이름 `404`(표지 있음). **음성 대조**: 표지 없는 남의 서버 `200` → 준비 판정 **false**(포트 오점유를 가른다). `import` 안전 확인도 같은 자리.
+
+## 2026-11-05T14:25+09:00 — main 병합 — **움직이는 ref 가 물었다**
+- cmd: `git fetch origin` → `git log -1 origin/main`(= `4953d743`) → `git merge --no-edit origin/main`
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합된 둘째 부모가 **`319fe212`**(PR #124 머지)다 — fetch 와 merge 사이에 공유 ref `origin/main` 이 `4953d743` → `319fe212` 로 움직였다. 그래서 **rollback 복원 원천은 `4953d743` 이 아니라 실제로 병합한 `319fe212`** 다. 내 표지 계수·줄 수는 병합 전후 동일(probe 2 · setHeader 1 · fixture 4 · 449/91 줄).
+
+## 2026-11-05T14:40+09:00 — 겹침 계수 (합집합 함정)
+- cmd: `comm -12 <내 비-병합 커밋 경로(^319fe212)> <main 이 만진 경로>`
+- exit: 0
+- 핵심 결과: 겹치는 공유 파일 **둘** — `config/quality/gate-tests.properties` · `docs/discovery/capability-map.md`. 내 세 web 하네스 파일을 main 이 만진 커밋은 **0** 이다.
+
+## 2026-11-05T14:50+09:00 — rollback 재산출 (실측 HEAD `7f51bdc0`, 원천 `319fe212`)
+- cmd: `git restore --source=319fe212 --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 5 · M 12 · 결과 트리가 `319fe212` 와 **바이트 동일**(`git diff 319fe212 -- app adapters config docs web` 빈 출력). **내 표지 0**(기본값·라우팅 표·게이트 등재·OPEN 행·fixture·표지 전부) · **남의 표지 보존**(#124 게이트 등재 1 · #124 OPEN 행 2 · #125 `web/e2e/journey/shared.ts` 있음 · 옛 probe 이름 1 복원).
+
+## 2026-11-05T15:00+09:00 — evidence 점검 (라운드 2)
+- cmd: 참조형 누출 스캔 `grep -rniE -f config/quality/leak-patterns.txt` · 내 비-병합 커밋의 `git show --numstat`
+- exit: 0
+- 핵심 결과: evidence **0건**. 편집한 web 하네스 둘 중 `journey-up.mjs` 는 13건이지만 **병합한 main 쪽도 같은 13건**이라 내가 들인 줄이 아니다(`fake-koneps.mjs` 는 양쪽 0). 크기 게이트: evidence 409줄 대 산출물 866줄.
+
+## 2026-11-05T13:35Z — **PR CI 라운드 2 = 전건 acceptance 정본** (run 42028468446, head `be07aaa1`)
+- cmd: CI job 의 명령 그대로 — `check`: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline` · `tools/one-command-check.sh`(S-20) / `web`: `npm run test:e2e` · `npm run test:e2e:journey`(W-13)
+- exit: 0 (run conclusion **success**)
+- 핵심 결과: 네 job 전부 **pass** — `check` 47m11s(세 step 전부 success) · `web` 2m57s · `container` 7m16s · `ml-engine` 9m34s.
+
+## 2026-11-05T13:40Z — W-13 이 실제로 돌았는지 (초록인데 조용한가)
+- cmd: `gh api .../actions/jobs/127248711530` step 20 시각 · 그 job 의 로그에서 여정 줄
+- exit: 0
+- 핵심 결과: step 20 이 **43초 동안 실행**(12:38:19Z→12:39:02Z, 앞 라운드는 30초 타임아웃 뒤 실패)되고 로그가 「공고 4건 준비」 → 「수집 러너 끝(exit=0)」 → **여정 test 11 passed · flaky 0 · 건너뜀 0 · spec 4/4(등록부와 같다)**. 준비 대기가 더는 타임아웃하지 않고 수집이 실제로 공고를 넣었다.
+
+## 2026-11-05T16:10+09:00 — RED ③ (cr H-1: 문서의 되돌림 인자로 기동)
+- cmd: `…:app:test --tests 'bidvector.app.wiring.KonepsRollbackArgumentsTest'` (리소스에 **문서의 여섯 인자**를 둔 채)
+- exit: 1
+- 핵심 결과: 3 tests, **2 failed** — `Parameter specified as non-null is null: … parameter division` · `… parameter openingResultListPath`. **문서대로는 프로세스가 뜨지 않는다**(cr H-1 실증). 「행의 한 칸만 주면 기동 실패」 test 는 그때도 초록(통제군).
+
+## 2026-11-05T16:25+09:00 — GREEN ③ (행 전수 14 인자)
+- cmd: 위 + `KonepsEndpointDefaultsTest` · `MockKonepsRoutingTest` · `CollectionWiringTest` · `OpeningCollectionWiringTest`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 두 배선이 뜨고 여섯 경로가 옛 이름, 낙찰정보 경로 넷은 같은 값으로 복원된다.
+
+## 2026-11-05T16:40+09:00 — 스타일·크기 (수정 라운드)
+- cmd: `:app:detekt :adapters:detekt :app:sizeGate :adapters:sizeGate :app:ktlintCheck :adapters:ktlintCheck` + 표적 test
+- exit: 0 (앞 한 번은 1 — detekt `MaxLineLength` 121자 한 줄)
+- 핵심 결과: 여섯 게이트 초록.
+
+## 2026-11-05T16:50+09:00 — web 표지 둘 (cr M-1)
+- cmd: `node --check` 둘 · fake 단독 기동 뒤 `served` 표지 판독
+- exit: 0
+- 핵심 결과: 수집 전 `""` → 출하 기본 경로 응답 뒤 `"getBidPblancListInfoCnstwk02"` → **옛 이름 404 뒤에도 불변**(404 는 집합에 들어오지 않는다).
+
+## 2026-11-05T17:00+09:00 — 변이 ⑤⑥⑦ (수정 라운드, 전부 커밋 뒤)
+- cmd: 세 변이를 각각 적용하고 표적 test / node 실측, 변이 파일만 `git restore`
+- exit: 1 · 1 · 0(단언 조건 성립)
+- 핵심 결과: **⑤** 정본 목록에서 `division` 줄 둘을 빼면 `KonepsRollbackArgumentsTest` 2/3 RED — 목록을 줄이는 편집이 잡힌다. **⑥** 표를 `ROUTES[op] ?: ROUTES[op+"02"]` 로 느슨하게 하고 배선을 옛 이름으로 되돌리면 `MockKonepsRoutingTest` 가 **RED**(`expected:<404> but was:<200>`) — verifier 의 M3M2 가 초록이던 자리가 닫혔다. **⑦** fixture 를 옛 이름으로 두면 출하 기본 경로가 404 이고 `served` 집합이 **0** 이라 여정 단언이 멈춘다.
+
+## 2026-11-05T17:20+09:00 — rollback 재산출 (실측 HEAD `9b025e3f`, 원천 `319fe212`)
+- cmd: `git restore --source=319fe212 --staged --worktree -- <in_scope 경로 개별 인자, test 리소스 포함>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `319fe212` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#124 등재 1 · #124 OPEN 행 2 · #125 `shared.ts`). 이 라운드 중 `origin/main` 이 `31551579`(#129)로 또 움직였으나 **병합하지 않았으므로** 원천은 `319fe212` 그대로다.
+
+## 2026-11-06T02:10+09:00 — 머지 직전 main 병합 (`df4976cc`, #129·#123)
+- cmd: `git fetch origin` → `git merge --no-edit df4976cc`(**SHA 를 직접** 준다 — `origin/main` 은 쓰지 않는다)
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합 커밋 `5ffdc1cc`, 둘째 부모 **`df4976cc`** 로 확인. 앞 라운드에서 `fetch` 와 `merge` 사이에 공유 ref 가 움직여 지시받은 SHA 가 아닌 것이 병합됐으므로 이번에는 ref 를 거치지 않았다.
+
+## 2026-11-06T02:15+09:00 — 겹침 둘의 합집합 계수
+- cmd: 세 판(base·내 판·main)의 등재 항목 집합을 `comm` 으로 가르고 줄 수 등식 확인
+- exit: 0
+- 핵심 결과: **gate 등록부** — base 1064 · 내 +4 · main +2 · **공통 추가 1**(`StrategyBudgetClearEndpointTest`: 내 판도 main 도 #124 를 담는다) → 1064+4+2−1 = **1069 = 실제**. 중복 등재 0 · 이어붙임 끊김 0 · 사라진 항목 0 · 내 셋과 #123·#124 등재가 블록 안 사전순 제자리. **capability map** — 양쪽 추가 각 14 · 병합 16(공통 12) · 내 편집 행은 **내 판**, main 이 고친 보존 기한 줄은 **main 판**(서로 다른 줄이라 접힘 아님).
+  「양쪽 추가를 더하면 된다」는 기대는 **틀린다** — 두 판이 이미 같은 PR 을 담고 있으면 그 줄은 한 번만 센다.
+
+## 2026-11-06T02:20+09:00 — 병합 트리 표적 검증
+- cmd: `:app:ktlintCheck :app:detekt :app:sizeGate :adapters:ktlintCheck` · `:app:test`(koneps·wiring 다섯) · `:adapters:test --tests 'bidvector.adapters.koneps.*'`
+- exit: 0 (BUILD SUCCESSFUL 셋)
+- 핵심 결과: 스타일·크기·표적 test 전부 초록.
+
+## 2026-11-06T03:05+09:00 — 병합 트리 게이트 등록부 등식
+- cmd: `./gradlew --no-daemon :app:gateRegistrationGate :adapters:gateRegistrationGate :app:gateExecutionGate`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL in 36m 36s — 합집합된 등록부가 「모집단 ∖ 제외 == 등재」를 양방향으로 만족하고 등재 class 들이 실제로 돌았다(실패·건너뜀 0). `gateExecutionGate` 가 두 모듈 test 전수를 끌어 표적보다 무거웠다.
+
+## 2026-11-06T03:15+09:00 — rollback 재산출 (실측 HEAD `5ffdc1cc`, 원천 `df4976cc`)
+- cmd: `git restore --source=df4976cc --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `df4976cc` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#123 등재 1 · #124 등재 1 · #124 OPEN 행 2 · #129 보존 기한 문면 1 · #125 `shared.ts`). 전제 둘 실측(조상 · 내 첫 산출물 커밋 미포함).
+
+## 2026-11-06T05:30+09:00 — 마지막 main 병합 (`0db22fbb`, #131·#133)
+- cmd: `git fetch origin` → `git merge --no-edit 0db22fbb`(SHA 직접)
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합 커밋 `979658a9`, 둘째 부모 **`0db22fbb`** 확인. main 의 이 구간은 Kotlin·Gradle 소스를 만지지 않았다(CI 워크플로·docker·`config/quality` 정책 셋·문서·장부) — 그래서 표적 Kotlin 재실행 없이 겹침 계수와 rollback 으로 간다. 내 `gate-tests.properties` 는 이 구간이 만지지 않아 앞 라운드의 게이트 등록부 등식이 그대로 유효하다.
+
+## 2026-11-06T05:35+09:00 — capability map 합집합 계수
+- cmd: 세 판 줄 수 · 표지 계수 · 표 행 중복·파이프 분포 · 양쪽 대비 사라진 줄
+- exit: 0
+- 핵심 결과: 줄 수 `3858(df4976cc) + 1(내 고유) + 112(#133) = 3971` **실제 일치**. **내 표지**: OPEN 표 행 1 · 공지 등재 1 · 첨부 행 추기 1 · license-limit 절 1. **#133 표지**: §12.3 제목 1 · (a)~(e) 각 1 · §14.3 두 행 각 1. **내 쪽 대비 사라진 줄 0**, main 대비 사라진 줄 1 = 내가 고친 `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` 행(내 판이 이김 — 의도). 깨진 표 줄 0.
+  **중복 표 행 16 은 선행 사실**이다 — 세 판(내 판·main·병합) 모두 16 으로 같다(한 OPEN 이 여러 절의 표에 나오는 구조). 내 병합이 만든 중복 0.
+
+## 2026-11-06T05:50+09:00 — rollback 재산출 (실측 HEAD `979658a9`, 원천 `0db22fbb`)
+- cmd: `git restore --source=0db22fbb --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `0db22fbb` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·OPEN 표 행·license-limit 절) · **남의 표지 보존**(#133 §12.3 과 §14.3 두 행 · #131 `config/quality` 셋 · #123·#124 등재 · #125 `shared.ts`).
+  **같은 ID 다른 주인**: 되돌린 트리에 `OPEN-M9-PORTAL-02-SPLIT-OPERATIONS` 언급이 **1** 남는데 그것은 #133 이 §12.3 (b)에 쓴 **선참조**이고 내 **표 행은 0** 이다 — 복원이 같은 식별자 가운데 내 것만 걷었다.
