@@ -36,14 +36,18 @@ Telegram 자신의 가용성·전달 보장, 메시지 내용의 업무적 옳�
 | 예외 전파 | **아니오** | `send` 는 `Exception` 을 전부 삼키고 **catch 본문이 throwable 의 message 를 읽지 않는다**(타입만 본다). `HttpRequest`/`HttpResponse` 의 `toString` 은 URI(=토큰)를 싣는데, 그 두 객체는 메시지 조립에 **한 번도** 쓰이지 않는다 |
 | 로그 | 아니오 | 이 패키지는 로거를 쥐지 않는다(`object` 커널 주입 자리도 없다) — 발송 축의 관측은 `RelayReport` 계수와 러너 로그가 진다 |
 
-`object` 싱글턴 커널 주입 자리: 없다. 이 패키지의 모든 협력자는 생성자 주입이고 `object` 는 SQL 상수
-하나뿐이다(값 획득 축 아님).
+`object` 싱글턴 커널 주입 자리: 없다. 이 패키지의 모든 협력자는 생성자 주입이고 `object` 는 **둘**이다 —
+공고 질의 상수와 응답 `ok` 판독(`ObjectMapper` 를 읽기 전용으로 공유). 둘 다 설정도 비밀값도 받지
+않으므로 값 획득 축이 아니고, 주입으로 거동을 바꿀 수 있는 상태를 쥐지 않는다.
+
+`TelegramChatId` 의 셋째 `internal` 접근자(`masked(policy)`)는 원문 출구가 아니다 — 돌려주는 것이
+`MaskedTarget` 이고 그 타입에는 원문 accessor 가 없다(NOTI-03).
 
 ## (2b) 우회 경로와 막는 층
 
 | # | 우회 | 막는 층 |
 | --- | --- | --- |
-| 1 | 실패 갈래에서 예외를 로그·예외 메시지에 실어 토큰이 담긴 URI 를 흘린다 | `TelegramCredentialLeakTest` — 아홉 갈래 각각에서 결과 `toString` · 이 패키지의 로거 부재(바이트코드) · 되던진 예외 전수에 토큰·chat id **원문 부재**를 단언. JDK 가 URI 를 싣는지 여부에 의존하지 않는다(그 객체를 아예 쓰지 않음을 거동으로 잰다) |
+| 1 | 실패 갈래에서 예외를 로그·예외 메시지에 실어 토큰이 담긴 URI 를 흘린다 | `TelegramCredentialLeakTest` — **열한 갈래** 각각에서 결과 `toString` · 설정 `toString` · 되던진 예외(없어야 한다)에 자격·chat id **원문 부재**를 단언하고, 「서버가 그 둘을 실제로 받았다」를 양성 대조로 먼저 잰다. 로그 축은 문자열 검사가 아니라 **구조**로 닫는다 — 이 패키지는 로거를 쥐지 않고 `NotificationAdapterDependencyTest` 가 바이트코드로 단언한다. JDK 가 URI 를 싣는지 여부에 의존하지 않는다(그 객체를 메시지 조립에 아예 쓰지 않음을 거동으로 잰다) |
 | 2 | 모호한 결과(timeout·5xx·429)를 `Rejected`·`Delivered` 로 접어 재발송·전달 표기한다 | `telegramDeliveryResult` 순수 분류 test 전수 + **변이 ①**(Unknown→Rejected 바꿔치움)이 RED |
 | 3 | 멱등 기억을 지워 같은 키가 두 번 발송된다 | 가짜 서버 **수신 계수**로 잰다(`callCount`/`effectCount` 분리, `SenderContractTest` 와 같은 골격) + **변이 ②** RED |
 | 4 | 기동 검사를 지워 토큰 없이 Live 로 뜬다 → relay 가 claim 한 뒤 발송 자리에서 터져 행을 영구히 잃는다 | `RelayBootDecisionTest`(결손 조합 전수) + `RelayWiringTest`(바이트코드로 「배선이 판정 함수를 지난다」) + **변이 ④** RED |

@@ -28,6 +28,14 @@
 - `adapters/src/test/kotlin/bidvector/adapters/relay/**` · `adapters/src/test/kotlin/bidvector/adapters/notification/**`
 - `adapters/src/test/kotlin/bidvector/adapters/e2e/**` (실 sender 조립 E2E — 6D-2 가 「production 조립 E2E(실 sender)는 `OPEN-STR-12` 뒤」로 넘긴 것: 가짜 Telegram 서버를 상대로 평가→outbox→relay→발송→DELIVERED·inbox 한 줄)
 - `app/src/main/kotlin/bidvector/app/wiring/RelayWiring.kt` · `app/src/main/kotlin/bidvector/app/relay/**` · 그 test
+- **`app/src/test/kotlin/bidvector/app/evaluation/EvaluationCommitRunE2ETest.kt` 와 그 형제
+  `RelayFailureInjection.kt`(신설) — 계약 밖이었고 서명 변경이 강제한 편집**(in_scope 대조에서 드러난 한 자리).
+  그 test 가 `NotificationRelayRun` 을 직접 세우므로 새 매개변수 둘(`channels`·`clock`)이 컴파일을 깬다.
+  거동도 바뀐다: 그 test 는 「자리지킴 발송이 던진다」를 러너 실패 분기의 입력으로 썼는데 자리지킴이 사라져
+  그 던짐이 없어졌다 — **claim 뒤 첫 연결에서 끊기는 `DataSource` 대역**으로 바꿔 같은 단언(실패 줄 + 부분
+  집계)을 유지했다. 발송 실패는 예외가 아니라 결과이므로(D-4) 이제 production 조립이 claim 뒤에 스스로
+  던지지 않는다. 대역과 설정 헬퍼를 **형제 파일로 뽑은 이유는 크기 축**이다 — 그 test 파일이 543 줄로
+  500 한도를 넘었다(`:app:sizeGate` 실측). 새 파일에 `@Test` 가 없어 게이트 등재 대상은 아니다.
 - ~~`app/src/main/resources/application*.yml|properties`~~ — **쓰지 않았다.** 이 저장소에는 `application.yml` 이 하나도 없고 설정은 전부 env 다. 환경 기본값(base URL·timeout 둘·route 슬러그)은 **그 저장소 선례 그대로** `@ConfigurationProperties` 클래스의 기본 인자에 둔다(`OpeningCollectionProperties` 의 경로 기본값과 같은 자리) — 새 설정 파일을 하나 들여 기동 경로의 전제를 늘리지 않는다.
 - `config/quality/**` 의 게이트 등재 — 새 test 클래스 `gate-tests.properties` 등재(만드는 커밋에서 같이) **와 `architecture-policy.properties` 의 전송 표면 쌍·멤버 등재**(새 HTTP 클라이언트 보유자가 생기므로 `collection.transport.*` 등식이 그것을 요구한다)
 - `docs/runbook/m6-6e-operations.md` · `docs/runbook/m7-7f-production.md`. **`docker/prod.env.template` 은 편집하지 않았다** — 그 파일의 키 집합은 `tools/prod-env-keys-check.sh` 가 compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고 그 compose 들은 out_scope 다. relay 는 compose 서비스가 아니라 일회 러너이므로 env 키 이름은 runbook 의 systemd unit 이 든다(§9 선례와 같은 자리).
