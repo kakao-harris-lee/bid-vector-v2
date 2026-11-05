@@ -55,8 +55,44 @@ function balancedBodyAfter(source, from, what) {
 }
 
 /**
+ * 인자 목록을 **먼저 뗀다** — 균형 괄호로. 쉼표로 먼저 쪼개면 `A(FOO, BAR)` 가 두 조각이 되고,
+ * 접두사 읽기가 거기서 유령 항목 `BAR` 를 낸다(PR #132 v M-4 = cr L-2 의 실측).
+ */
+function withoutParenGroups(text, what) {
+  let out = '';
+  let depth = 0;
+  for (const ch of text) {
+    if (ch === '(') {
+      depth += 1;
+    } else if (ch === ')') {
+      depth -= 1;
+      if (depth < 0) {
+        throw new Error(`${what} 의 괄호가 맞지 않는다 — 꼴이 바뀌었다`);
+      }
+    } else if (depth === 0) {
+      out += ch;
+    }
+  }
+  if (depth !== 0) {
+    throw new Error(`${what} 의 괄호가 닫히지 않았다 — 꼴이 바뀌었다`);
+  }
+  return out;
+}
+
+/** 항목 이름의 꼴 — **전체 일치**다. 접두사로 보면 `Won` 이 `W` 로 절삭된다. */
+const ENUM_ENTRY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+
+/**
  * Kotlin `enum class <name>` 의 **열거 전수**. 한 줄 열거·뒤 쉼표·인자를 받는 엔트리·본문 멤버
- * 선언(`;` 뒤)을 모두 받되, **헤더가 하나가 아니거나 열거가 비면 던진다**.
+ * 선언(`;` 뒤)을 모두 받되, **헤더가 하나가 아니거나 열거가 비거나 조각을 읽지 못하면 던진다**.
+ *
+ * **못 읽는 조각을 버리지 않는다**(v M-4 = cr L-2). 앞 판은 패턴에 안 맞는 조각을 `filter` 로
+ * 떨어뜨렸고, 그래서 주석 달린 항목(`@Deprecated("x") NEW_CMD`)·백틱 이름·소문자 항목이 **조용히
+ * 사라졌다** — 그 상태로 등식은 초록이다. 이 게이트가 막으려는 것이 정확히 「Kotlin 이 늘었는데
+ * web 이 안 붉어진다」이므로, 읽기가 그 꼴을 만들어서는 안 된다. 읽지 못하면 RED 로 세운다.
+ *
+ * 항목 이름을 **대문자로 한정하지 않는다**: Kotlin 이 소문자 항목을 더해도 읽기는 그것을 그대로
+ * 내고 **등식**이 갈린 것을 말한다(읽기가 어휘 정책을 겸하면 그 둘이 한 자리에서 섞인다).
  */
 export function kotlinEnumEntries(source, name) {
   const stripped = withoutKotlinComments(source);
@@ -65,15 +101,22 @@ export function kotlinEnumEntries(source, name) {
   if (matches.length !== 1) {
     throw new Error(`enum class ${name} 이 ${matches.length} 번 나온다 — 정본을 가리지 못한다`);
   }
+  const what = `enum class ${name}`;
   // enum 본문은 `;` 로 열거와 멤버 선언이 갈린다 — 열거는 그 앞까지다.
-  const body = balancedBodyAfter(stripped, matches[0].index, `enum class ${name}`).split(';')[0];
-  const entries = body
-    .split(',')
-    .map((one) => /^[A-Z][A-Z0-9_]*/u.exec(one.trim()))
-    .filter((one) => one !== null)
-    .map((one) => one[0]);
+  const body = balancedBodyAfter(stripped, matches[0].index, what).split(';')[0];
+  const entries = [];
+  for (const raw of withoutParenGroups(body, what).split(',')) {
+    const piece = raw.trim();
+    if (piece === '') {
+      continue;
+    }
+    if (!ENUM_ENTRY.test(piece)) {
+      throw new Error(`${what} 의 항목을 읽지 못했다: ${piece} — 꼴이 바뀌었다`);
+    }
+    entries.push(piece);
+  }
   if (entries.length === 0) {
-    throw new Error(`enum class ${name} 의 열거가 비었다 — 꼴이 바뀌었다`);
+    throw new Error(`${what} 의 열거가 비었다 — 꼴이 바뀌었다`);
   }
   return entries;
 }
@@ -299,6 +342,43 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
 
   it('인자를 받는 엔트리는 머리만 읽는다', () => {
     expect(kotlinEnumEntries('enum class Probe { A(1), B(2) }', 'Probe')).toStrictEqual(['A', 'B']);
+  });
+
+  /**
+   * **인자 목록 안의 쉼표가 항목을 지어내지 않는다**(PR #132 v M-4 = cr L-2). 앞 판은 쉼표로
+   * 먼저 쪼갠 뒤 **접두사**로 읽어서 `A(FOO, BAR)` 에서 유령 항목 `BAR` 를 냈다. 그 집합은
+   * 시끄러운 오탐이지만, 같은 접두사 읽기가 아래의 **조용한 누락**을 만든다.
+   */
+  it('인자 목록 안의 쉼표로 유령 항목을 만들지 않는다', () => {
+    expect(kotlinEnumEntries('enum class Probe { A(FOO, BAR), B(BAZ) }', 'Probe')).toStrictEqual(['A', 'B']);
+  });
+
+  /**
+   * **소문자로 시작하는 항목을 조용히 떨어뜨리지 않는다** — 같은 축의 위험한 방향이다. 앞 판은
+   * `krw` 를 버리고 `Won` 을 `W` 로 절삭했다. Kotlin 이 그런 항목을 더하면 읽기가 조용히 줄고
+   * 등식은 초록으로 남는다 — 이 게이트가 막으려는 바로 그 꼴이 게이트 안에 있었다.
+   */
+  it('소문자로 시작하는 항목도 그대로 읽는다 — 절삭하거나 버리지 않는다', () => {
+    expect(kotlinEnumEntries('enum class Probe { krw, Won, A }', 'Probe')).toStrictEqual(['krw', 'Won', 'A']);
+  });
+
+  /**
+   * **읽지 못하는 꼴은 버리지 않고 던진다**(v M-4). 앞 판은 패턴에 안 맞는 조각을 `filter` 로
+   * 떨어뜨려서 주석 달린 항목·백틱 이름·본문을 가진 항목이 **전부 초록**이었다 — checklist 가
+   * 적은 「못 읽는 꼴은 RED」와 어긋나던 자리다.
+   */
+  it('읽지 못하는 항목 꼴은 던진다 — 조용히 버리지 않는다', () => {
+    const annotated = 'enum class Probe {\n    @Deprecated("x") NEW_CMD,\n    A,\n}\n';
+    const quoted = 'enum class Probe {\n    `NEW_CMD`,\n    A,\n}\n';
+    const entryBody = 'enum class Probe {\n    A { override fun f() = 1 },\n    B,\n}\n';
+
+    expect(() => kotlinEnumEntries(annotated, 'Probe')).toThrow(/읽지 못했다/u);
+    expect(() => kotlinEnumEntries(quoted, 'Probe')).toThrow(/읽지 못했다/u);
+    expect(() => kotlinEnumEntries(entryBody, 'Probe')).toThrow(/읽지 못했다/u);
+  });
+
+  it('인자 목록의 괄호가 맞지 않으면 던진다', () => {
+    expect(() => kotlinEnumEntries('enum class Probe { A(1 }', 'Probe')).toThrow(/괄호/u);
   });
 
   /** **음성 대조 넷** — 조용한 초록이 아니라 **예외**가 된다. */
