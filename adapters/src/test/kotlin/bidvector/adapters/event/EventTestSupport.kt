@@ -61,6 +61,18 @@ internal fun insertPendingOutboxRow(
         }
 }
 
+/** 종단 사유(M9 OPS-05) — 비종단 행과 열 추가 전에 종단한 행은 `null` 이다. */
+internal fun outboxTerminalReasonOf(
+    dataSource: DataSource,
+    entryId: String,
+): String? =
+    dataSource.connection.use { connection ->
+        connection.prepareStatement("SELECT terminal_reason FROM outbox WHERE entry_id = ?").use { statement ->
+            statement.setString(1, entryId)
+            statement.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+    }
+
 internal fun outboxStateOf(
     dataSource: DataSource,
     entryId: String,

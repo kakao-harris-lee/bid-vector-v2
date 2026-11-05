@@ -48,8 +48,8 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "raw_observation" to 5,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
-            // 신규(추가만, D-4C2-2).
-            "outbox" to 11,
+            // 신규(추가만, D-4C2-2). M9/ops-migrations(OPS-05, V27) — 사유↔상태 쌍 CHECK 하나 추가 → 12.
+            "outbox" to 12,
             "inbox" to 1,
             // 신규(추가만, D-6B1-8). V8__edit_session.sql: id<>''·operator_id<>''·
             // state enum·session_version>=0·(state=EXPIRED)=(state_payload IS NULL) 짝 — 5.

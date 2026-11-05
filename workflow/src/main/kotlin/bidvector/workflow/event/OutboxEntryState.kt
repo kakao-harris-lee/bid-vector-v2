@@ -24,15 +24,20 @@ sealed interface OutboxEntryState {
     data object Isolated : OutboxEntryState
 }
 
-/** outbox 전이를 요청하는 명령(scope.md ②) — [transitionOutbox]의 두 번째 인자. */
+/**
+ * outbox 전이를 요청하는 명령(scope.md ②) — [transitionOutbox]의 두 번째 인자.
+ *
+ * **종단 명령은 하나다(M9 OPS-05).** `Deliver`·`Fail`·`Isolate` 셋을 [Terminate] 로 모았고
+ * 목표 상태는 [OutboxTerminalReason.terminalState] 가 정한다 — 상태와 사유를 따로 받으면
+ * 어긋난 조합(`Fail` + `ORPHANED_CLAIM`)이 성립하고 그것을 막는 검사를 또 두어야 한다.
+ * **사유 없이 종단으로 가는 길은 컴파일되지 않는다.**
+ */
 sealed interface OutboxCommand {
     data object Claim : OutboxCommand
 
-    data object Deliver : OutboxCommand
-
-    data object Fail : OutboxCommand
-
-    data object Isolate : OutboxCommand
+    data class Terminate(
+        val reason: OutboxTerminalReason,
+    ) : OutboxCommand
 }
 
 /**
@@ -44,6 +49,14 @@ sealed interface OutboxCommand {
 sealed interface OutboxTransition {
     val entryId: OutboxEntryId
 
+    /**
+     * 종단으로 가는 통로 셋 — **사유를 나른다**(M9 OPS-05). 어댑터는 이 값에서 사유를 읽어
+     * 같은 UPDATE 에 싣는다(상태만 옮기고 사유를 따로 쓰는 경로가 없다).
+     */
+    sealed interface Terminal : OutboxTransition {
+        val reason: OutboxTerminalReason
+    }
+
     @ConsistentCopyVisibility
     data class ToClaimed internal constructor(
         override val entryId: OutboxEntryId,
@@ -52,17 +65,20 @@ sealed interface OutboxTransition {
     @ConsistentCopyVisibility
     data class ToDelivered internal constructor(
         override val entryId: OutboxEntryId,
-    ) : OutboxTransition
+        override val reason: OutboxTerminalReason,
+    ) : Terminal
 
     @ConsistentCopyVisibility
     data class ToFailed internal constructor(
         override val entryId: OutboxEntryId,
-    ) : OutboxTransition
+        override val reason: OutboxTerminalReason,
+    ) : Terminal
 
     @ConsistentCopyVisibility
     data class ToIsolated internal constructor(
         override val entryId: OutboxEntryId,
-    ) : OutboxTransition
+        override val reason: OutboxTerminalReason,
+    ) : Terminal
 }
 
 /** [transitionOutbox]의 결과. */
@@ -96,19 +112,34 @@ internal fun transitionOutbox(
             OutboxTransitionOutcome.Accepted(OutboxTransition.ToClaimed(entryId))
         }
 
-        current is OutboxEntryState.Claimed && command is OutboxCommand.Deliver -> {
-            OutboxTransitionOutcome.Accepted(OutboxTransition.ToDelivered(entryId))
-        }
-
-        current is OutboxEntryState.Claimed && command is OutboxCommand.Fail -> {
-            OutboxTransitionOutcome.Accepted(OutboxTransition.ToFailed(entryId))
-        }
-
-        current is OutboxEntryState.Claimed && command is OutboxCommand.Isolate -> {
-            OutboxTransitionOutcome.Accepted(OutboxTransition.ToIsolated(entryId))
+        current is OutboxEntryState.Claimed && command is OutboxCommand.Terminate -> {
+            OutboxTransitionOutcome.Accepted(terminationFor(entryId, command.reason))
         }
 
         else -> {
             OutboxTransitionOutcome.Rejected(entryId, current, command)
         }
+    }
+
+/**
+ * 사유 → 통로. 어휘 전수를 소진하는 `when` 이라 사유가 하나 늘면 **컴파일이 깨진다** —
+ * 새 사유가 어느 종단으로 가는지 고르지 않고 지나갈 자리가 없다.
+ */
+private fun terminationFor(
+    entryId: OutboxEntryId,
+    reason: OutboxTerminalReason,
+): OutboxTransition.Terminal =
+    when (reason) {
+        OutboxTerminalReason.DELIVERED,
+        OutboxTerminalReason.DUPLICATE_SKIPPED,
+        -> OutboxTransition.ToDelivered(entryId, reason)
+
+        OutboxTerminalReason.DELIVERY_REJECTED,
+        OutboxTerminalReason.DELIVERY_SUPPRESSED,
+        -> OutboxTransition.ToFailed(entryId, reason)
+
+        OutboxTerminalReason.DELIVERY_OUTCOME_UNKNOWN,
+        OutboxTerminalReason.UNKNOWN_PAYLOAD,
+        OutboxTerminalReason.ORPHANED_CLAIM,
+        -> OutboxTransition.ToIsolated(entryId, reason)
     }

@@ -215,6 +215,9 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("outbox", "payload_type", "text", false),
             ColumnSpec("outbox", "payload", "text", false),
             ColumnSpec("outbox", "state", "text", false),
+            // M9/ops-migrations(OPS-05, V27) — 종단 사유. 비종단 행과 열 추가 전에 종단한 행은
+            // NULL 이다(지어낸 사유로 과거를 채우지 않는다) — NOT NULL 로 두지 못하는 근거.
+            ColumnSpec("outbox", "terminal_reason", "text", true),
             ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false, true),
         )
 
