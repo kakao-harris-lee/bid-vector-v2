@@ -10,6 +10,7 @@ import bidvector.workflow.strategy.Clock
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -23,6 +24,10 @@ import java.util.function.Supplier
 import javax.sql.DataSource
 
 private const val OWNER_DATA_SOURCE_TYPE = "org.postgresql.ds.PGSimpleDataSource"
+private const val RETENTION_WIRING_CLASS = "bidvector.app.wiring.RetentionWiring"
+private const val RETENTION_WORKFLOW_PACKAGE = "bidvector.workflow.retention"
+private const val ZONE_ID_TYPE = "java.time.ZoneId"
+private const val SYSTEM_DEFAULT_ZONE = "systemDefault"
 private const val RETENTION_CUTOFF_TYPE = "bidvector.workflow.retention.RetentionCutoff"
 
 /**
@@ -124,7 +129,8 @@ class RetentionWiringTest {
     /** `mode=once` 로 띄운 배선이 러너에 쥐여 준 보존 기간 — 조립을 지난 **그 한 벌**의 값이다. */
     private fun retentionDaysAt(now: Instant): Int =
         withBoot("bidvector.retention.mode=once", now = now) { booted ->
-            booted.context.getBean(RetentionRunner::class.java).purge.policy.retentionDays
+            val runner = booted.context.getBean(RetentionRunner::class.java)
+            runner.purge.policy.retentionDays
         }
 
     @Test
@@ -201,6 +207,31 @@ class RetentionWiringTest {
     @Test
     fun `개정일 첫 순간(KST)부터 1년이다 — UTC 날짜로는 아직 전날이다`() {
         retentionDaysAt(FIRST_INSTANT_OF_REVISION_KST) shouldBe DAYS_FROM_REVISION
+    }
+
+    /**
+     * **v r2 L-1 — 구역 축은 거동으로 닫히지 않는다.** 해소 구역을 `ZoneId.systemDefault()` 로 바꾼
+     * 변이는 호스트가 KST 인 곳에서 `Asia/Seoul` 과 **같은 값**이라 위 경계 test 가 통과한다(CI 는 UTC 라
+     * 붉다). 그 비대칭은 test 를 더 써서 메울 수 없다 — 두 식이 그 호스트에서 **실제로 같은 함수**다.
+     * 그래서 호스트에 의존하지 않는 층, 즉 **바이트코드의 호출 부재**로 닫는다.
+     *
+     * 범위를 보존 축(파기 배선 + `workflow` 보존 패키지)으로 좁히고 **그 집합에 배선이 있다는 것까지
+     * 단언**한다 — 좁은 필터는 클래스가 옮겨지면 조용히 아무것도 재지 않게 되고, 그때의 초록은 방어
+     * 부재와 구별되지 않는다.
+     */
+    @Test
+    fun `보존 축은 시스템 기본 구역을 부르지 않는다 — 구역은 선언된 상수다`() {
+        val axis =
+            productionClasses().filter {
+                it.fullName == RETENTION_WIRING_CLASS || it.packageName == RETENTION_WORKFLOW_PACKAGE
+            }
+
+        axis.map { it.fullName } shouldContain RETENTION_WIRING_CLASS
+        axis
+            .flatMap { it.methodCallsFromSelf }
+            .filter { it.target.owner.fullName == ZONE_ID_TYPE && it.target.name == SYSTEM_DEFAULT_ZONE }
+            .map { it.originOwner.fullName }
+            .shouldBeEmpty()
     }
 
     @Test
