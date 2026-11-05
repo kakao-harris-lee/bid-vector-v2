@@ -2,6 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.koneps.KonepsCallGate
+import bidvector.adapters.koneps.KonepsCallPacer
 import bidvector.adapters.koneps.KonepsHttpPolicyData
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.snapshot.RunStateDirectory
@@ -22,6 +23,7 @@ import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.net.URI
 import java.net.http.HttpClient
+import java.time.Duration
 import java.time.LocalDate
 
 /**
@@ -108,8 +110,20 @@ internal fun konepsTransportFor(
                 budget = budget,
                 attempts = runState.attempts,
                 now = clock::now,
+                // OPS-08 — 간격도 **전송 정책**이 정한다(승인 상한처럼 설정에서 오는 값이 아니라
+                // rate limiter 값과 같은 표에서 온다: 둘은 같은 throttle 축의 두 축이다). 기다림이
+                // 주입이라 production 만 실제로 잠들고 test 는 벽시계를 태우지 않는다.
+                pacer = KonepsCallPacer(httpPolicy.minimumCallInterval, clock::now, ::sleepFor),
             ),
     )
+}
+
+/**
+ * 간격을 실제로 기다리는 자리 — 관문 경로는 `suspend` 가 아니라 전부 동기이고 수집은 직렬이라
+ * 차단 대기가 이 경로의 모양이다(Resilience4j 의 rate limiter 도 같은 경로에서 차단으로 기다린다).
+ */
+private fun sleepFor(duration: Duration) {
+    Thread.sleep(duration.toMillis())
 }
 
 /**

@@ -29,6 +29,13 @@ data class KonepsHttpPolicyData(
      * 「빈 표」로 조용히 허용하지 않으려고 이 자리를 필수로 둔다.
      */
     val statusRules: List<KonepsStatusRule>,
+    /**
+     * 연속 호출 사이에 보장되는 **최소 간격**(OPS-08 (a)) — 기본값이 없다. [rateLimiterPermits]·
+     * [rateLimiterPeriod] 와 **다른 축**이다: 계수는 창 안의 호출 수를 세므로 창 경계에서 두 호출이
+     * 붙어 나갈 수 있고, legacy 에서 429 를 부른 원인이 바로 그 동시성이었다(조사 a-4). 이 값은
+     * 그 붙음을 시간으로 막는다 — 소비자는 [KonepsCallPacer] 다.
+     */
+    val minimumCallInterval: Duration,
 ) {
     /**
      * 그 상태 코드의 처분 — 표에 없으면 봉투로 간다([KONEPS_STATUS_RULES] 의 사유).
@@ -45,6 +52,7 @@ data class KonepsHttpPolicyData(
         require(statusRules.map(KonepsStatusRule::status).toSet().size == statusRules.size) {
             "statusRules 에 같은 상태 코드가 두 번 있다 — 어느 줄이 이기는지가 목록 순서에 숨는다"
         }
+        require(!minimumCallInterval.isNegative) { "최소 호출 간격은 음수일 수 없다: $minimumCallInterval" }
         require(retryBackoff.size == maxAttempts - 1) {
             "retryBackoff 길이(${retryBackoff.size})는 maxAttempts-1(${maxAttempts - 1})과 같아야 한다 — 시도별 대기"
         }
@@ -83,6 +91,11 @@ val KONEPS_HTTP_POLICY: EffectiveDatedPolicy<KonepsHttpPolicyData> =
                         // 두면서도 실제 JVM 스택 한계(수천~수만)와는 자릿수가 다르다(M-4).
                         maxJsonDepth = 32,
                         statusRules = KONEPS_STATUS_RULES,
+                        // 계수 축이 선언한 속도(1 permit / 1초)와 **같은 속도**를 간격으로도 건다 —
+                        // 새 속도를 들여오는 것이 아니라 창 경계에서 두 호출이 붙어 나가는 자리를
+                        // 막는 것이 이 값의 일이다. 그래서 두 축이 겹쳐 대기가 두 배로 쌓이지
+                        // 않는다(계수가 이미 벌려 놓은 호출은 간격을 0 으로 지난다).
+                        minimumCallInterval = Duration.ofSeconds(1),
                     ),
             ),
     )

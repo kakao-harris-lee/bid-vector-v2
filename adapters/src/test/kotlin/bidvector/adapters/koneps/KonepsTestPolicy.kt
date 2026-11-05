@@ -19,6 +19,10 @@ internal fun testKonepsHttpPolicy(
     // 상태 처분 표는 **운영 표 그대로**다 — 좁힐 값이 없고(시간이 아니라 분류다), 시나리오
     // test 가 운영과 다른 표 위에서 돌면 재는 것이 운영 거동이 아니게 된다.
     statusRules: List<KonepsStatusRule> = KONEPS_STATUS_RULES,
+    // 간격은 **0 이 기본**이다. 시나리오 test 는 고정 시계를 쓰므로(`testCallGate`) 운영값을 그대로
+    // 두면 둘째 호출부터 간격만큼 실제로 잠든다. 간격 자체는 `KonepsCallPacerTest` 가 주입 시계로
+    // 잰다 — 전송 시나리오가 그 축까지 재는 자리가 아니다.
+    minimumCallInterval: Duration = Duration.ZERO,
 ): KonepsHttpPolicyData =
     KonepsHttpPolicyData(
         requestTimeout = requestTimeout,
@@ -30,6 +34,7 @@ internal fun testKonepsHttpPolicy(
         maxPages = maxPages,
         maxJsonDepth = maxJsonDepth,
         statusRules = statusRules,
+        minimumCallInterval = minimumCallInterval,
     )
 
 /** 3A 운영 정책을 그대로 resolve — 3B 는 필드 계약·resultCode 범주표를 재선언하지 않는다. */
