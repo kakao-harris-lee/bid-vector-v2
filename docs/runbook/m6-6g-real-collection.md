@@ -200,3 +200,31 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 3. 0 을 확인한 뒤 같은 디렉터리로 전량(`calls-per-day=20000`) 재기동한다. 페이지 크기 인자는 주지 않는다(기본 999). **`release-sha` 는 인자 무변경이 아니다**: 실행기가 `git rev-parse --short HEAD` 로 계산해 넘기므로 새 jar 와 함께 새 값이 원장에 간다(그 값이 안 바뀌면 교체가 반영되지 않은 것이다). 재실행을 거는 자리는 OS crontab 이 아니라 **세션 cron(00:41, 7일 만료)** 이므로 만료 뒤에는 손으로 다시 걸어야 한다.
 4. 첫 전량 실행 뒤 evidence 표에 셋을 적는다 — **개찰완료 HTTP 줄 수 ≈ 정착 공고 수**(「공고당 1 호출」의 실측) · **산식 A 의 HTTP 줄 수**(그 축도 업무 공통 단일 operation 이라 각각 1,000/일에 닿을 수 있다) · **표본틀 걷기 호출 수 ≈ 240**(슬롯 = 공고일 × 업무, 슬롯당 1 쪽 — §2-2).
 5. 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이). 확정된 표본은 쪽 크기와 무관하므로 이 되돌림이 `sample-list.tsv` 를 건드리지 않는다. 다만 위 문단대로 **이미 `FinalFailure` 로 정착한 축은 이 인자로 복구되지 않는다**. **그 인자를 쓴 날과 값을 evidence 에 적는다** — 원장·판정문이 쪽 크기를 싣지 않아 한 디렉터리에 두 확정 제외 문턱이 섞일 수 있다(`OPEN-6G2F-MAX-PAGES-PROVENANCE`).
+
+## 8. 입찰공고정보서비스 `02` 전환 사전 확인 (M9/portal-02 D-4 — 운영 반영 전 1회, 사용자 확인 뒤)
+
+조달청이 입찰공고정보서비스의 BASE URL 과 오퍼레이션명 뒤에 `02` 를 붙였다(data.go.kr 공지
+2026-11-03 NOTICE_0000000005128). **옛 URL 은 공지일로부터 90일**(≈2027-02-01)만 산다. 출하
+기본값은 이미 `02` 판이고(문면은 `KonepsEndpointDefaultsTest` 가 잠근다) **낙찰정보서비스
+(`as/ScsbidInfoService`)는 공지 대상이 아니라 불변**이다 — 그쪽에 `02` 를 붙이면 그 절반이 404 다.
+
+**공지가 적지 않은 것**: 응답 필드가 바뀌었는지. 그래서 아래 다섯 호출이 이 절차의 본체다 —
+`02` 가 200 을 내는지와 **우리가 읽는 키가 그대로 있는지**는 실 호출 없이는 모른다.
+
+1. 호스트 3단 점검(§1-1)을 별도 호출로, 그리고 수집 실행이 돌지 않는 창(`pgrep -af 'java -jar .*app.jar'`
+   빈 출력)을 확인한다.
+2. **오퍼레이션 다섯을 `numOfRows=1` 로 각 1회**(총 5 호출, 원장 밖 `curl`, 키는 환경에만 두고 공고
+   식별자는 적지 않는다). 다섯은 공고 목록 공사·용역 · 기초금액 공사·용역 · 입찰가격산식 A — 즉
+   출하 기본 표가 입찰공고정보서비스 축으로 선언한 경로 전부다.
+3. **판독 기준(둘 다 참이어야 go)**:
+   - 봉투: `response.header.resultCode` == `00`.
+   - 필드 계약: 그 축의 `FieldContractRow` 가 선언한 raw 키가 응답 항목에 **전부 있다**. 없어진 키
+     수와 새로 생긴 키 수를 **계수로** evidence 에 적는다(원문·공고 식별자 없이).
+4. 한 축이라도 봉투가 `00` 이 아니거나 읽는 키가 사라졌으면 **반영하지 않고 보고**한다. 되돌림은
+   재빌드 없이 설정이다 — `--bidvector.koneps.base-url=…/ad/BidPublicInfoService` ·
+   `--bidvector.koneps.operations.<업종>.path=…` · `--bidvector.koneps.opening.operations.<업종>.base-amount-path=…` ·
+   `--bidvector.koneps.opening.bid-price-formula-a-path=…`. 옛 URL 이 90일 안에 살아 있는 동안만 참인
+   되돌림이다.
+5. 개편이 **별도 오퍼레이션으로 분리한 넷**(공동도급의무지역·가산지역·부대공종·첨부파일)은 이 절차가
+   부르지 않는다(D-2) — 그 필드를 읽는 production 자리가 0 이다. 첨부 축이 열릴 때 쓸 자리는
+   `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` 행이 가리킨다.
