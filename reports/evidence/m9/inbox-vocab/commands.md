@@ -169,7 +169,31 @@ main 이 다시 움직였다 — `origin/main` **`4953d743`**(#125 화면 표시
 사실·사상 · **`:app:test *OpenApi*`**(계약 게이트 전수) + `NotificationInboxEndpointTest` ·
 세 모듈 `ktlintCheck` → **exit 0**.
 
-## §9 재활용 조사가 찾은 이름 충돌
+## §9 수정 라운드 5 — #129 재병합(**내 test 파일 둘과 겹침**)
+
+`origin/main` **`31551579`**(#129 보존 1년) → 병합 커밋 `c4354840`. 이번 겹침은 **내 in_scope
+test 파일 둘**이다 — `NotificationInboxPersistenceTest` · `NotificationInboxPrivilegeTest`.
+
+| 축 | 결과 |
+| --- | --- |
+| #129 가 그 둘에서 바꾼 것 | **주석 문면만** — 「90일 약속」→「보존 기간 약속」 · 「90일이면 사라진다」→「기한이 지나면 사라진다」(보존 기간을 1년으로 일반화하며 문면을 넓힌 것) |
+| 병합 뒤 양쪽 생존 | #129 문면 **각 1** · 내 쪽 test 표지 **3** · `setBoolean(7, true)` **1** · 낡은 「90일 약속」 **0** |
+| 겹친 둘의 변화량 | `2 files changed, 2 insertions(+), 2 deletions(-)` — 정확히 #129 의 두 줄 |
+| 내 나머지 16 경로 | 병합 전과 차이 **0 파일** |
+| main 의 32 경로 | `origin/main` 과 차이 **2** — 그 둘이 겹친 파일이고 내 변경을 담으므로 달라야 한다 |
+| `HEAD` vs `origin/main` | 차이가 내 경로뿐 |
+| 마이그레이션 번호 | #129 는 마이그레이션을 더하지 않았다 — V24 와 충돌 0 |
+| 내 산출물·evidence 의 「90일」 주장 | **0** — 보존 기간을 숫자로 적은 자리가 없어 #129 와 어긋날 문면이 없다 |
+
+**로컬 게이트**: Kotlin 표적(`*NotificationInbox*` · 사실·사상 · `:app:test *OpenApi*` ·
+`NotificationInboxEndpointTest`) + 세 모듈 `ktlintCheck` **exit 0**. web lint **0** · typecheck **0** ·
+vitest **38 파일 / 762 test** · `gate:tests` 통과 · `api:types:check` **189564 bytes**.
+
+**복원이 겹친 파일에서도 남의 줄을 지키는가** — 가장 날카로운 자리다. 복원 뒤 그 두 파일에 #129 의
+문면이 **각 1** 로 남고 내 표지는 0 이다(§3 의 ③′). 즉 「내 것만 걷어내고 남의 것은 그 파일 안에
+그대로」가 계수로 선다.
+
+## §10 재활용 조사가 찾은 이름 충돌
 
 새 enum 의 첫 이름은 `AwardOutcome` 이었고, 그 이름은 `bidvector.settlement.AwardOutcome` 이
 **다른 개념**으로 이미 쓰고 있다(개찰 대사의 4-state). `workflow` 모듈은 그 타입을 실제로 든다
@@ -180,7 +204,7 @@ main 이 다시 움직였다 — `origin/main` **`4953d743`**(#125 화면 표시
 나왔다. `AwardResult` 로 바꾸고 재활용 조사의 결론(기존 어휘 셋을 보고 쓰지 않은 근거)을
 그 타입의 KDoc 과 `checklist.md` §3 에 남겼다.
 
-## §10 되돌림 리허설
+## §11 되돌림 리허설
 
 `rollback.md` — 두 갈래(미적용 DB = 파일 삭제 / 적용 DB = 새 V 로 원복 + 유찰 행 처분)를 버릴
 clone 에서 실측했다.
