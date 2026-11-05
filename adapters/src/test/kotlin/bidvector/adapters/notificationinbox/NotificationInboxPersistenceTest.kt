@@ -437,23 +437,6 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         store().list(account, page()).unreadCount shouldBe 0L
     }
 
-    /**
-     * 종류 하나의 **대표 사실** — 소진 `when` 이라 종류를 더하면 여기서 컴파일이 막힌다. 위
-     * 전수 test 의 모집단이 종류 어휘와 함께 자라는 것은 그래서다(목록을 손으로 들면 자라지
-     * 않는다).
-     */
-    private fun factOf(kind: NotificationKind): NotificationFact =
-        when (kind) {
-            NotificationKind.NEW_CANDIDATE -> NotificationFact.NewCandidate
-            NotificationKind.BID_DEADLINE_IMMINENT -> NotificationFact.BidDeadlineImminent
-            NotificationKind.BID_DEADLINE_TODAY -> NotificationFact.BidDeadlineToday
-            NotificationKind.DOCUMENT_DEADLINE_IMMINENT -> NotificationFact.DocumentDeadlineImminent
-            NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised
-            NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded
-            NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(provisionallyFirst = true)
-            NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(AwardResult.AWARDED)
-        }
-
     private fun page(unreadOnly: Boolean = false) =
         NotificationPageRequest(
             page = 0,
@@ -475,8 +458,6 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     private companion object {
         /** `OBSERVED_AT` 보다 **이른** 사실 시각 — 늦게 도착한 옛 사실의 자리다. */
         val EARLIER: Instant = Instant.parse("2026-10-22T00:00:00Z")
-        val LATER: Instant = Instant.parse("2026-10-24T00:00:00Z")
-        val READ_AT: Instant = Instant.parse("2026-10-23T12:00:00Z")
         val LATER_READ_AT: Instant = Instant.parse("2026-10-25T12:00:00Z")
     }
 }
