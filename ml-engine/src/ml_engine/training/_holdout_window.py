@@ -217,6 +217,7 @@ def _assemble_window_result(
         training_spec_checksum=spec_checksum(spec),
         seed=spec.seed,
         code_version=code_version.value,
+        sample_scope=fit.trained_all.sample_scope,
     )
     models = [fit.model_score]
     if fit.conservative_score is not None:
