@@ -185,6 +185,68 @@ describe('마감 남은 날 — 클라이언트 계산의 경계', () => {
 });
 
 /**
+ * **KST 달력일의 차다 — 남은 시간이 아니다**(M9/web-followups, `OPEN-M9-DDAY-CALENDAR`).
+ *
+ * 앞 판은 24시간으로 나눠 내림·올림했다. 그래서 운영자가 **달력을 보고 세는 날**과 어긋났다:
+ * 23:00 에 이튿날 01:00 마감이면 달력으로 하루 뒤인데 `D-0` 이었다. 아래가 그 경계 전수다.
+ */
+describe('D-day 는 KST 달력일로 센다 (OPEN-M9-DDAY-CALENDAR)', () => {
+  /** 23:00 KST(= 14:00Z) 에 **이튿날** 01:00 KST(= 16:00Z) 마감 — OPEN 이 지목한 자리다. */
+  it('두 시간 뒤 마감이 달력으로 이튿날이면 D-1 이다', () => {
+    const now = new Date('2026-11-06T14:00:00Z');
+
+    expect(daysUntil('2026-11-06T16:00:00Z', now)).toBe(1);
+  });
+
+  /** 같은 달력일 안이면 **거의 하루**가 남아도 `D-0` 이다 — 오늘 마감이기 때문이다. */
+  it('같은 달력일 안의 마감은 23시간 58분이 남아도 D-0 이다', () => {
+    const now = new Date('2026-11-06T15:01:00Z');
+
+    expect(daysUntil('2026-11-07T14:59:00Z', now)).toBe(0);
+  });
+
+  /** 거울상 — 한 시간 전 마감이 달력으로 **어제**면 `D+1` 이다(하루 과장이 아니라 달력 사실이다). */
+  it('한 시간 전 마감이 달력으로 어제면 D+1 이다', () => {
+    const now = new Date('2026-11-06T15:01:00Z');
+
+    expect(daysUntil('2026-11-06T14:00:00Z', now)).toBe(-1);
+  });
+
+  /**
+   * **자정 양쪽의 1 분**이 날을 가른다. 두 눈금이 같은 달력일/다른 달력일로 갈리는 가장 좁은
+   * 자리라, 오프셋을 잘못 더하면 여기가 먼저 틀린다.
+   */
+  it('KST 자정 양쪽의 1 분이 날을 가른다', () => {
+    const beforeMidnight = new Date('2026-11-06T14:59:00Z');
+    const afterMidnight = new Date('2026-11-06T15:00:00Z');
+
+    expect(daysUntil('2026-11-06T15:00:00Z', beforeMidnight)).toBe(1);
+    expect(daysUntil('2026-11-06T15:00:00Z', afterMidnight)).toBe(0);
+  });
+
+  /** 여러 날은 **시각과 무관하게** 달력일 수로 센다 — 끝의 시·분이 날 수를 깎지 않는다. */
+  it('여러 날도 달력일 수로 센다 — 시·분이 날 수를 깎지 않는다', () => {
+    const now = new Date('2026-11-06T14:59:00Z');
+
+    expect(daysUntil('2026-11-09T00:01:00Z', now)).toBe(3);
+    expect(daysUntil('2026-11-03T23:59:00Z', now)).toBe(-2);
+  });
+
+  /**
+   * **`-0` 자리가 없어졌다.** 앞 판은 `Math.ceil(-0.25)` 가 `-0` 이라 「지난 날」이 「남은 날」
+   * 분기로 새고 표시가 `D+-0` 이 될 수 있었다. 달력일 차는 정수라 그 자리가 **구성상** 없다.
+   */
+  it('같은 달력일의 지난 마감도 양의 0 이다 — D+-0 꼴이 서지 않는다', () => {
+    const now = new Date('2026-11-06T06:00:00Z');
+    const days = daysUntil('2026-11-06T05:00:00Z', now);
+
+    expect(days).toBe(0);
+    expect(Object.is(days, -0), '-0 이 돌아왔다 — 표시가 D+-0 이 된다').toBe(false);
+    expect(dayCountText(days)).toBe('D-0');
+  });
+});
+
+/**
  * 벽시계를 읽는 자리가 **이 모듈 하나**다(`OPEN-7E-GATE-RESIDUAL` ⑨ 처방). 나머지
  * `src/screens`·`src/display` 는 lint 가 막는다 — 그 술어는 `eslint.config.js` 가 든다.
  */

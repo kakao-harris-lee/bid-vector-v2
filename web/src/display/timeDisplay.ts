@@ -126,13 +126,29 @@ function isRealDate(year: number, month: number, day: number): boolean {
 const MILLIS_PER_DAY = 86_400_000;
 
 /**
+ * 그 순간이 **KST 의 어느 달력일인가** — epoch 로부터의 날 번호다. 오프셋을 더한 뒤 날로
+ * 내림하므로 [kstText] 와 **같은 기계**를 쓴다(하나가 날을 넘겼는데 다른 하나가 안 넘기는 일이
+ * 없다).
+ */
+function kstDayNumber(millis: number): number {
+  return Math.floor((millis + KST_OFFSET_MILLIS) / MILLIS_PER_DAY);
+}
+
+/**
  * 마감까지 남은 날 — 요구표가 **클라이언트 계산으로 승인한 유일한 자리**(ⓐ 행)다. 「마감됨」
  * 같은 **상태 라벨은 만들지 않는다** — 그것은 `status` 가 말한다(D-7E-4). 마감이 없으면 날 수도
  * 없다.
  *
- * **남은 쪽과 지난 쪽의 어림이 다르다**(7E-1 CR L-2). 남은 쪽은 **내림**이다(반 나절 남았으면
- * `D-0` — 「아직 오늘」). 지난 쪽에 같은 내림을 쓰면 6시간 전에 마감한 공고가 `D+1` 로 **하루
- * 과장**된다(-0.25 → -1). 그래서 지난 쪽은 0 쪽으로 자른다(`Math.ceil`).
+ * **KST 달력일의 차를 센다 — 남은 시간이 아니다**(`OPEN-M9-DDAY-CALENDAR`). 앞 판은 24시간으로
+ * 나눠 남은 쪽은 내림, 지난 쪽은 올림이었다. 그래서 운영자가 **달력을 보고 세는 날**과 어긋났다:
+ * 23:00 에 이튿날 01:00 마감이면 달력으로 하루 뒤인데 `D-0` 이었다.
+ *
+ * 달력일로 세면 그 **어림의 비대칭이 필요하지 않다** — 두 날 번호의 차는 정수이고, 그래서
+ * 「반 나절은 아직 오늘」도 「몇 시간 전 마감을 하루로 세지 않는다」도 **구성상** 참이다
+ * (7E-1 CR L-2 가 내림으로 막으려던 것이 여기서는 자리 자체가 없다). `-0` 분기도 사라진다.
+ *
+ * 거울상의 귀결을 적는다: 한 시간 전 마감이 달력으로 어제면 `D+1` 이다. 그것은 하루 과장이
+ * 아니라 **마감일이 어제**라는 달력 사실이다.
  */
 export function daysUntil(deadlineAt: string | null | undefined, now: Date): number | null {
   if (deadlineAt === null || deadlineAt === undefined) {
@@ -143,11 +159,7 @@ export function daysUntil(deadlineAt: string | null | undefined, now: Date): num
   if (deadline === null) {
     return null;
   }
-  const days = (deadline - now.getTime()) / MILLIS_PER_DAY;
-  const counted = days >= 0 ? Math.floor(days) : Math.ceil(days);
-  // `Math.ceil(-0.25)` 는 **`-0`** 이다 — 그것은 `>= 0` 비교에서 참이라 「지난 날」이 「남은 날」
-  // 분기로 새고, 표시도 `D+-0` 꼴이 될 수 있다. 0 으로 모은다.
-  return counted === 0 ? 0 : counted;
+  return kstDayNumber(deadline) - kstDayNumber(now.getTime());
 }
 
 /** D-day 문면 — 날 수가 없으면 **자리도 없다**(`null`). 상태 말은 여기서도 만들지 않는다. */
