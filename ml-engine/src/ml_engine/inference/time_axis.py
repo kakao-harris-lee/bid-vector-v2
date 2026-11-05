@@ -78,6 +78,19 @@ class UnmeasurableTimeAxis:
 type TimeAxis = KnownTimeAxis | UnmeasurableTimeAxis
 
 
+class TimeAxisSubstitute(StrEnum):
+    """대체 출처 승인 상태 — **닫힌 어휘**다(v L-2).
+
+    앞 판은 정책 파일의 bool 한 칸이었다. YAML 1.1 은 `yes`·`on`·`y` 를 **참으로 읽으므로**
+    `maturity.time_axis_substitute_approved: yes` 가 승인으로 통과했다(실측) — 로더가 bool
+    타입만 보았기 때문이다(`"true"`·`1` 은 거부됐으니 「느슨한 참값을 승인으로 읽지
+    않는다」는 문면이 절반만 참이었다). 어휘를 문자열 두 값으로 닫으면 YAML 의 참값 표기가
+    **전부** 미지 값이 된다 — 승인은 그 두 단어 중 하나를 적어야만 생긴다."""
+
+    NOT_APPROVED = "NOT_APPROVED"
+    APPROVED = "APPROVED"
+
+
 @dataclass(frozen=True)
 class TimeAxisPolicy:
     """승인된 시간축 해석 한 벌. `substitute_approved` 는 versioned 정책 파일에서만 오고

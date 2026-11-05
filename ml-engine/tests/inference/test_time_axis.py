@@ -19,6 +19,9 @@ import ast
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+import yaml
+
 from ml_engine.inference.policy import (
     InferencePolicy,
     load_inference_policy,
@@ -28,6 +31,7 @@ from ml_engine.inference.time_axis import (
     KnownTimeAxis,
     TimeAxisPolicy,
     TimeAxisSource,
+    TimeAxisSubstitute,
     TimeAxisUnmeasurableReason,
     UnmeasurableTimeAxis,
     resolve_time_axis,
@@ -98,7 +102,7 @@ def test_shipped_inference_policy_does_not_approve_substitution() -> None:
     칸이 바뀐다(코드에는 승인 목록이 없다)."""
     policy = load_inference_policy(_SHIPPED_INFERENCE_POLICY)
     assert isinstance(policy, InferencePolicy), policy
-    assert policy.maturity_time_axis_substitute_approved is False
+    assert policy.maturity_time_axis_substitute is TimeAxisSubstitute.NOT_APPROVED
     axis_policy = time_axis_policy_of(policy)
     assert axis_policy.substitute_approved is False
     assert axis_policy.version == policy.version
@@ -193,3 +197,42 @@ def test_unmeasurable_axis_carries_the_policy_that_judged_it() -> None:
         assert isinstance(axis, UnmeasurableTimeAxis)
         assert axis.policy_version == _STRICT.version
         assert not hasattr(axis, "value")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "yes",  # YAML 1.1 참값 — 앞 판의 bool 칸은 이것을 **승인으로** 읽었다(v L-2)
+        "on",
+        "y",
+        "true",
+        "True",
+        "1",
+        "APPROVED_SOMEDAY",
+        "approved",
+    ],
+)
+def test_loose_truthy_spellings_never_become_an_approval(
+    tmp_path: Path, raw: str
+) -> None:
+    """승인은 닫힌 어휘 두 단어 중 하나를 적어야만 생긴다."""
+    values = dict(yaml.safe_load(_SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8")))
+    values["maturity.time_axis_substitute"] = raw
+    path = tmp_path / "inference.yaml"
+    path.write_text(yaml.safe_dump(values), encoding="utf-8")
+    assert not isinstance(load_inference_policy(path), InferencePolicy), raw
+
+
+def test_the_closed_vocabulary_actually_loads(tmp_path: Path) -> None:
+    """양성 대조 — 위 거부 test 들이 「비튼 칸과 무관한 이유로」 통과하지 않는다."""
+    values = dict(yaml.safe_load(_SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8")))
+    for member in TimeAxisSubstitute:
+        values["maturity.time_axis_substitute"] = member.value
+        path = tmp_path / f"inference-{member.value}.yaml"
+        path.write_text(yaml.safe_dump(values), encoding="utf-8")
+        loaded = load_inference_policy(path)
+        assert isinstance(loaded, InferencePolicy), (member, loaded)
+        assert loaded.maturity_time_axis_substitute is member
+        assert time_axis_policy_of(loaded).substitute_approved is (
+            member is TimeAxisSubstitute.APPROVED
+        )

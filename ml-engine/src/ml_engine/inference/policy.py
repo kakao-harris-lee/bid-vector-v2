@@ -32,7 +32,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ml_engine.inference.rounding import quantize_bid_rate
-from ml_engine.inference.time_axis import TimeAxisPolicy
+from ml_engine.inference.time_axis import TimeAxisPolicy, TimeAxisSubstitute
 from ml_engine.registry.policy import Policy, PolicyError, PolicyScalar, load_policy
 
 SHIPPED_INFERENCE_POLICY_VERSION = "inference-v1"
@@ -64,7 +64,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "bid_ratio.plausible_max",
         "gbm.min_category_rows",
         "maturity.window_days",
-        "maturity.time_axis_substitute_approved",
+        "maturity.time_axis_substitute",
     }
 )
 
@@ -117,10 +117,11 @@ class InferencePolicy:
     bid_ratio_plausible_max: Decimal
     gbm_min_category_rows: int
     maturity_window_days: int
-    maturity_time_axis_substitute_approved: bool
+    maturity_time_axis_substitute: TimeAxisSubstitute
     """`OPEN-SET-10` — 개찰 시각 결측 시 마감 시각 대체를 승인된 정책으로 채택할 것인가
-    (M9/ml-lifecycle, SET-06). 미결이므로 출하값은 `false` 이고, 승인되면 **정책 파일의
-    이 한 칸**이 바뀐다 — 코드에는 승인 목록이 없다."""
+    (M9/ml-lifecycle, SET-06). 미결이므로 출하값은 `NOT_APPROVED` 이고, 승인되면 **정책
+    파일의 이 한 칸**이 바뀐다 — 코드에는 승인 목록이 없다. 값이 bool 이 아니라 닫힌 어휘인
+    이유는 `TimeAxisSubstitute` docstring(YAML 1.1 참값 표기)."""
 
 
 def _to_decimal(value: PolicyScalar) -> Decimal:
@@ -129,12 +130,19 @@ def _to_decimal(value: PolicyScalar) -> Decimal:
     return Decimal(str(value))
 
 
-def _to_bool(value: PolicyScalar) -> bool:
-    """YAML bool 만 받는다 — `"true"`/`1` 같은 느슨한 참값을 승인으로 읽지 않는다
-    (승인은 조용히 생기지 않는다)."""
-    if not isinstance(value, bool):
-        raise TypeError(f"bool 정책 값이 아니다: {value!r}")
-    return value
+def _to_time_axis_substitute(value: PolicyScalar) -> TimeAxisSubstitute:
+    """닫힌 어휘 두 값만 받는다 — YAML 의 어떤 참값 표기(`true`·`yes`·`on`·`1`)도 승인이
+    되지 않는다(v L-2). `bool` 은 먼저 거부한다: `str(True)` 가 `"True"` 라 어휘 대조 전에
+    문자열로 접히는 길을 막는다."""
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise TypeError(f"시간축 대체 승인 값은 닫힌 어휘 문자열이어야 한다: {value!r}")
+    try:
+        return TimeAxisSubstitute(value)
+    except ValueError as exc:
+        raise TypeError(
+            f"시간축 대체 승인 값이 닫힌 어휘 밖이다: {value!r} "
+            f"(허용: {[item.value for item in TimeAxisSubstitute]})"
+        ) from exc
 
 
 def _to_int(value: PolicyScalar) -> int:
@@ -207,8 +215,8 @@ def _coerce_values(
             bid_ratio_plausible_max=_to_decimal(values["bid_ratio.plausible_max"]),
             gbm_min_category_rows=_to_int(values["gbm.min_category_rows"]),
             maturity_window_days=_to_int(values["maturity.window_days"]),
-            maturity_time_axis_substitute_approved=_to_bool(
-                values["maturity.time_axis_substitute_approved"]
+            maturity_time_axis_substitute=_to_time_axis_substitute(
+                values["maturity.time_axis_substitute"]
             ),
         )
     except (TypeError, ValueError, InvalidOperation, KeyError) as exc:
@@ -325,5 +333,7 @@ def time_axis_policy_of(policy: InferencePolicy) -> TimeAxisPolicy:
     전수를 AST 로 세어 그 하나임을 확인한다."""
     return TimeAxisPolicy(
         version=policy.version,
-        substitute_approved=policy.maturity_time_axis_substitute_approved,
+        substitute_approved=(
+            policy.maturity_time_axis_substitute is TimeAxisSubstitute.APPROVED
+        ),
     )
