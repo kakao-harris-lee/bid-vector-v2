@@ -206,7 +206,7 @@ function AwardGap({ caseId, result }: { readonly caseId: number; readonly result
       return (
         <span data-testid={`award-gap-${caseId}`} className="flex flex-wrap items-baseline gap-1">
           <span className="font-numeric text-sm font-medium">{amountText(reading.differenceWon)}</span>
-          <span className="text-xs text-ink-soft">{reading.currency}</span>
+          <span className="text-xs text-ink-soft">{currencyDisplayOf(reading.currency).label}</span>
         </span>
       );
     case 'ABSENT':
@@ -247,7 +247,7 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
       <ResultField label="내 투찰가">
         <span data-testid={`submitted-amount-${caseId}`} className="flex flex-wrap items-baseline gap-1">
           <span className="font-numeric text-sm font-medium">{amountText(result.submittedAmountWon)}</span>
-          <span className="text-xs text-ink-soft">{result.submittedAmountCurrency}</span>
+          <span className="text-xs text-ink-soft">{currencyDisplayOf(result.submittedAmountCurrency).label}</span>
           <span className="text-xs text-ink-soft">
             {vatTreatmentDisplayOf(result.submittedAmountVatTreatment).label}
           </span>

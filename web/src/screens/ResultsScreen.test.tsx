@@ -458,7 +458,9 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
 
     const amount = (await screen.findByTestId('submitted-amount-51')).textContent ?? '';
     expect(amount).toContain('1,350,000,000');
-    expect(amount).toContain('KRW');
+    // 통화도 **표의 문면**이다(D-3) — 이 칸이 r1 리뷰 H-1 의 두 자리 중 하나였다.
+    expect(amount).toContain('원');
+    expect(amount, '원문 토큰이 그대로 섰다').not.toContain('KRW');
     /**
      * **같은 값에 두 말을 두지 않는다**(r1 CR M-1 · v L-2). 운영자는 화면 C 에서 「부가세 포함」을
      * 고르는데 앞 판은 여기서 `INCLUSIVE` 를 돌려줬다 — 자기가 고른 값을 못 알아본다.
@@ -492,7 +494,9 @@ describe('대사 절 — 내 투찰가 · 고른 안 · 차이 · 판정 (D-7E3b
 
     const gap = (await screen.findByTestId('award-gap-51')).textContent ?? '';
     expect(gap).toContain('-40,000,000');
-    expect(gap).toContain('KRW');
+    // 같은 사유로 이 칸도 표의 문면이다(r1 리뷰 H-1 의 둘째 자리).
+    expect(gap).toContain('원');
+    expect(gap, '원문 토큰이 그대로 섰다').not.toContain('KRW');
   });
 
   /** **판정 불가는 패찰이 아니다** — 사유가 함께 서야 운영자가 기다릴지 말지를 안다. */
