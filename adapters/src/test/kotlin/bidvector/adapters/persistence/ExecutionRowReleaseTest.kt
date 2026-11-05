@@ -77,8 +77,8 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
 
     /**
      * 값 객체가 거부하는 것 — 공백과 과도한 길이. 「경계로 처리」로 적고 넘기지 않고 실측한다
-     * (설계 검토 (2b) 표). 저장 층 CHECK 는 공백을 또 막지만(이중 방어), 빈 값이 **쓰기 시점**
-     * 까지 가지 않는 것은 이 타입이 진다.
+     * (설계 검토 (2b) 표). **저장 층과 겹치지 않는다**: V27 CHECK 는 빈 문자열만 막고 공백
+     * 하나(`' '`)·과도한 길이는 통과하므로, 그 둘을 막는 자리는 이 타입 **하나**다.
      */
     @Test
     fun `릴리스 식별자는 공백과 과도한 길이를 거부한다`() {
@@ -97,6 +97,9 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
      */
     @Test
     fun `canonical 네 표의 릴리스는 observation_key 조인으로 도달한다 — 전제 셋`() {
+        // **증분으로 읽는다**(`CleanMigration*Test` 와 같은 관례, 레인 간 래칫이다): 기준선 넷
+        // (V1 셋 + V4 하나). `raw_observation` 에 FK 를 더하는 레인은 이 줄을 고치면서 **그 표의
+        // 릴리스 도달 경로도 함께 판단해야 한다** — 이 단언이 붉어지는 것이 그 판단을 부르는 자리다.
         val joined = listOf("notice", "opening_result", "qualification_text", "opening_reserve_price")
 
         joined.forEach { table ->

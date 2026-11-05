@@ -15,6 +15,12 @@
 -- 붙는 길을 닫는다) ② 트리거: **새로** 종단에 닿는 INSERT·UPDATE 는 사유를 요구한다
 -- (V18 의 `pii_masked_at` NULL→값 1회 트리거와 같은 형태).
 --
+-- **열 추가 전 종단 행에는 틈이 하나 있다**(의도된 대가). 둘째 검사가 「이 갱신이 종단으로
+-- 옮기는가」를 묻기 때문에, 이미 종단이고 사유가 NULL 인 legacy 행은 종단 상태 사이를 사유 없이
+-- 옮길 수 있다(`FAILED` → `DELIVERED`). 출하 경로로는 닿지 않는다 — 전이 SQL 이 모두
+-- `WHERE state = 'CLAIMED'` 다. 그 틈을 막으려면 기존 행에 지어낸 사유를 넣어야 하고, 그것이
+-- 이 마이그레이션이 피하는 바로 그 일이다(sentinel 금지).
+--
 -- 열·PK·GRANT·인덱스 변경은 **CHECK 하나와 트리거 하나 외에 0** 이다.
 ALTER TABLE outbox ADD COLUMN terminal_reason TEXT;
 

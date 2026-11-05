@@ -17,6 +17,9 @@
 ALTER TABLE collection_run ADD COLUMN release_sha TEXT;
 ALTER TABLE outbox ADD COLUMN release_sha TEXT;
 
+-- CHECK 가 막는 것은 **빈 문자열**이고 공백 하나(`' '`)는 통과한다 — 어휘가 아니라 식별자라
+-- 저장 층에서 모양을 재지 않는다. 공백·길이는 쓰기 전에 값 객체(`ReleaseIdentifier`)가 지고,
+-- 이 CHECK 는 V1 의 `raw_observation.release_sha <> ''` 와 같은 층의 최소 방어다.
 ALTER TABLE collection_run
     ADD CONSTRAINT collection_run_release_sha_check
     CHECK (release_sha IS NULL OR release_sha <> '');

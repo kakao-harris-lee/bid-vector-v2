@@ -257,6 +257,10 @@ async function main() {
     `bidvector.persistence.credential=${PG_PASSWORD}`,
     `operator.credential.value=${OPERATOR_CREDENTIAL}`,
     'bidvector.evaluation.candidate-cap=1000',
+    // M9/OPS-10 — 기본값이 **없는** 필수 키다(`ReleaseWiring` 은 조건 없는 조립이라 어느 모드로
+    // 뜨든 요구한다). 이 하네스가 출하 jar 를 세 번 띄우고 그 가운데 수집 러너가
+    // `collection_run` 행을 쓰므로(V27 트리거의 대상) 이 한 줄이 셋을 덮는다.
+    `bidvector.release.sha=${process.env.BIDVECTOR_RELEASE_SHA ?? 'journey-e2e-release'}`,
   ];
 
   /**
