@@ -1,6 +1,6 @@
 # M9 / ops-migrations rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `beeefba8`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `04e412c6`**.
 
 **원천이 착수 base 와 같다** — 이 브랜치는 main 을 합치지 않았다(`git log --merges df4976cc..HEAD`
 빈 출력). 합치는 라운드가 생기면 원천을 **그때 합친 main 의 고정 SHA** 로 다시 고정해야 한다
@@ -81,11 +81,12 @@ ALTER TABLE outbox DROP CONSTRAINT outbox_terminal_reason_state_check, DROP COLU
 전이가 `terminal_reason` 을 싣는다). 설정 쪽도 같은 축이다 — `bidvector.release.sha` 를 지우는 것은
 옛 jar 로 돌아간 **뒤**라야 한다(새 jar 는 그 값 없이 못 뜬다).
 
-## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `beeefba8`)
+## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `04e412c6`)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 목록 산출 | 내 커밋 경로 **104**(evidence 제외) = 복원 **91**(M) · 삭제 **7**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 104 로 닫힌다 |
+| ①′ **재측정한 이유** | 처음 `beeefba8` 에서 쟀고 그 뒤 **복원 목록 안의 파일**(장부 둘)을 커밋해 §4 술어가 두 줄을 냈다 — 규율대로 「등록부 한 줄도 재측정」이라 `04e412c6` 에서 ①~③ 을 다시 쟀다. 집합은 같다(장부 둘이 이미 M 안에 있었다) |
 | ② 명령 종료 코드 | `restore` **0** · `git rm` **0** — DEC-08 포함 HEAD(`50ef257a`)에서 잰 값이다. 현 HEAD 에서 그 쌍을 다시 돌리지 못한 것은 이 환경의 안전 검사가 스크립트 안의 `git rm` 을 막기 때문이고(우회하지 않았다), 끝 상태는 ③ 으로 쟀다 |
 | ③ 결과 트리 == `df4976cc` 트리 | `git read-tree -u --reset` exit **0** · `git diff --name-only df4976cc` **0 파일** · 미추적 **0** · V25+ 마이그레이션 **0** |
 | ③′ 남의 변경 보존 | 이 브랜치는 병합 0 이라 그 축이 없다 — 대신 **남의 표지**를 센다(아래) |
@@ -123,8 +124,8 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only beeefba8..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..beeefba8 \
+git diff --name-only 04e412c6..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..04e412c6 \
       -- . ':(exclude)reports/evidence/m9/ops-migrations' | sort -u)
 ```
 
