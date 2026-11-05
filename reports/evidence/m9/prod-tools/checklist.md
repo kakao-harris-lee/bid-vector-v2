@@ -21,33 +21,62 @@ L-1/L-2 는 다른 계열이고 이미 닫혔다.
 | 잔존 술어 | `_prod_oneoff_residue <프로젝트>` — `docker ps -a` 를 **프로젝트·서비스 라벨**로 좁히고, 일회 판정은 **합집합**이다: ⓐ `com.docker.compose.oneoff` 라벨 ⓑ 이름 `<프로젝트>-app-run-…`. 교집합이면 라벨 표기나 이름 규칙 한쪽이 바뀌는 날 술어가 **조용히 0** 이 된다. 조회 실패를 「잔존 0」으로 읽지 않는다. |
 | 러너 | 시작 전(해석·설정 통로 뒤, `run` 앞) 잔존 ≠ 0 → `exit 3` + 치울 이름·명령. 멈춘 컨테이너까지 센다. |
 | 자기 것만 치운다 | 일회 컨테이너 이름을 `--name <프로젝트>-app-run-sweep` 로 **고정**하고, TERM·INT trap 이 그 이름 하나를 `docker rm -f` 한다. 접두·필터로 지우지 않는다 — 그러면 운영자가 §12 로 띄운 일회 컨테이너까지 집는다. 치운 뒤 **그 신호로 죽는다**(종료 코드를 꾸미지 않는다). |
-| 겹 하나 더 | runbook §9.2 unit 에 `ExecStopPost=-/usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep`(KILL 로 trap 이 못 돈 경우). `-` 접두라 「없으면」이 실패로 세지 않는다. |
+| 겹 하나 더 | runbook §9.2 unit 의 `ExecStopPost` (KILL 로 trap 이 못 돈 경우). **조건이 붙는다** — 성공 종료와 `exit 3` 에서는 아무것도 하지 않는다(아래 v M-1). |
+| 신호 범위 | TERM·INT·**HUP**(`KillSignal=` 을 바꾼 unit · 끊긴 ssh 세션의 손 실행). 치운 뒤 그 신호로 죽는다. |
+| 전역 이름 | 컨테이너 이름 공간은 **전역**이라 `--name` 이 새 실패 축을 연다 — 같은 이름이 프로젝트 밖에 있으면 `run` 의 rc 가 러너의 「1 예외」와 섞인다(v V4-4 혼동 축). run 앞에 전역 조회 한 줄로 `exit 3` 으로 가른다. |
+| 프로젝트 이름 | 잠금은 원문, 잔존·`--name` 은 해석된 이름 — 둘의 **등식을 단언**한다(반입이 같은 자리에서 하는 것과 같은 사유, v V-2). |
+
+## 수정 라운드 (PR #122 판정 v ready-for-review · cr approve, 2026-11-05)
+
+| 지적 | 처리 | 한 줄 |
+| --- | --- | --- |
+| **v M-1** 조건 없는 `ExecStopPost` 가 남의 sweep 컨테이너를 지운다 | 수정 | 성공 종료와 `exit 3`(= 남의 실행이 있다는 뜻)에서는 돌지 않게 — 남는 것은 timeout·신호·그 밖의 실패뿐. §9.1 의 손 확인은 unit 을 깐 뒤에는 `systemctl start` 경유. 조건의 **존재**를 검사가 텍스트 술어로 잠근다(문서에는 그 층밖에 없다). |
+| **cr M-1** `GIT_*` 하나가 트리 묶기를 무력화 | 수정 | `git -C` 는 `GIT_DIR` 을 이기지 못한다 — unset 루프를 `COMPOSE_*|GIT_*` 로 넓히고 술어는 `_prod_git` 으로 접두 비움(겹 둘). 양성 대조 둘(source 시점·source 뒤). |
+| **cr M-2** 검사가 운영 잠금 자리를 만들 수 있다 | 수정 | 자리가 없으면 **만들지 않고** exit 2(판정 불가) + 고치는 명령. 소유자 바뀜으로 운영 스크립트 셋이 멈추는 길을 닫는다. |
+| **v L-1** 「멈춘 것까지 센다」 미잠금 | 수정 | 가짜 `ps` 가 `-a` 없으면 멈춘 행을 숨기고, 멈춘 잔존 단언을 더했다 — 변이 ⑤ 가 이제 RED. |
+| **v L-2** 「cwd 에 기대지 않는다」 미잠금 | 수정 | 가짜 git 이 `-C` 값을 기대 루트와 대조(없으면 exit 98) — 변이 ⑥ 이 이제 RED. |
+| **cr LOW** HUP trap · 프로젝트 이름 등식 · 전역 이름 충돌 · 검사의 그룹 kill 이 실제 pgid · CI 주석이 자리의 정본을 가리킴 · `ExecStopPost` 정상 경로 소음 | 수정(여섯) | 전부 한 줄이고 **이 라운드가 이미 만지는 줄** 안에 있다. 앞 넷은 새 단언으로 잠갔다(변이 ③⑨⑩). |
+| **cr LOW** 잔존 경계가 `service=app` 이라는 사실 | 등재 | 같은 프로젝트의 `run postgres`·`run ml-serving` 잔존은 세지 않는다 — 과검출로 주기 훑기를 멈추는 비용이 더 크다(아래 제한 5, runbook §11 제한 13). |
+| **cr LOW** 반입은 잔존을 보지 않는다 | 등재 | 계약 D-2 가 러너로 좁힌 선택이다. 비대칭을 제한 5 와 runbook §11 제한 13 에 적었다(후속에서 넓히려면 과검출 정책을 먼저 정한다). |
+| cr Open Questions 둘(compose 의 `-p` 대문자 정규화 · `docker rm -f <없는 이름>` 의 종료 코드) | 미실측 등재 | 둘 다 실제 docker 가 필요해 이 레인에서 재지 않았다. 앞의 것은 프로젝트 이름 등식 단언이 **갈리는 순간 멈추게** 만들어 영향을 0 으로 했고, 뒤의 것은 `-` 접두와 `>/dev/null 2>&1` 로 journal 문면까지 닫았다. |
 
 ## 측정 (D-4) — 가짜 docker·git
 
-`tools/prod-guards-check.sh` 39 단언, exit 0. **실제 docker·운영 host·컨테이너에 닿지 않는다** —
+`tools/prod-guards-check.sh` **57 단언**, exit 0. **실제 docker·운영 host·컨테이너에 닿지 않는다** —
 PATH 앞 shim(`mktemp -d` 아래)과 fixture 상태 디렉터리로만 돈다. 결과 한 줄은 `commands.md`.
 
-- 술어 양성: 같은 커밋·깨끗한 트리 통과 · 잔존 0 통과 · 떠 있는 서비스 컨테이너는 잔존이 아니다 ·
-  남의 프로젝트 일회 컨테이너는 세지 않는다.
+가짜 쪽이 **거꾸로 단언하는 것 셋** — 술어가 조용히 헐거워지는 축을 변이 없이도 잡는다: 가짜 git 은
+`GIT_*` 가 보이면 exit 99 · `-C` 가 없거나 기대 루트가 아니면 exit 98 · 가짜 `ps` 는 `-a` 가 없으면
+**멈춘 행을 숨긴다.** 그래서 「통과」가 곧 「술어가 그 축을 닫았다」의 실측이다.
+
+- 술어 양성: 같은 커밋·깨끗한 트리 통과 · `GIT_DIR`·`GIT_WORK_TREE`·`GIT_INDEX_FILE` 이 있어도 통과 ·
+  잔존 0 통과 · 떠 있는 서비스 컨테이너는 잔존이 아니다 · 남의 프로젝트 일회 컨테이너는 세지 않는다.
 - 술어 음성: 다른 커밋 · 더티 트리 · manifest 에 `git_sha` 없음 · HEAD 를 못 읽음 · 라벨 축 · 이름 축 ·
-  `docker ps` 실패.
-- 세 스크립트 거동: 반입이 트리 축에서 `exit 1` 하고 **compose 해석 앞에서** 끝난다 · 되돌림이 `exit 2` 로
-  필요한 커밋을 보이고 **반입 호출 앞에서** 끝난다 · 그 커밋이면 통과해 반입으로 넘어가고 반입 쪽 트리 축도
-  통과한다 · 러너가 트리·잔존 각각에서 `exit 3` 하고 **`run` 에 닿지 않는다** · 통과하면
+  **멈춘 잔존** · `docker ps` 실패.
+- 세 스크립트 거동: 반입이 트리 축에서 `exit 1` 하고 **compose 해석 앞에서** 끝난다(환경에 `GIT_*` 가
+  있어도 산다) · 되돌림이 `exit 2` 로 필요한 커밋을 보이고 **반입 호출 앞에서** 끝난다 · 그 커밋이면 통과해
+  반입으로 넘어가고 반입 쪽 트리 축도 통과한다 · 러너가 트리·**프로젝트 이름**·잔존·**전역 이름 충돌**
+  각각에서 `exit 3` 하고 **`run` 에 닿지 않는다** · 통과하면
   `--rm --pull never --name <프로젝트>-app-run-sweep` 으로 띄운다.
-- 신호 경로: `setsid` 로 프로세스 그룹을 만들어 TERM 을 그룹에 보낸다 → exit 143 · trap 의 삭제 호출이
-  **하나** 이고 대상이 자기 이름 · 남의 컨테이너 이름은 로그에 없다 · 접두·필터 형태가 아니다.
-- 변이 넷(술어 둘을 항상 참으로 · trap 삭제 · `--name` 삭제) 전부 RED — `commands.md` 에 어긋남 수.
-- 잠금만 가짜가 없다(고정 절대 경로가 설계다). 검사는 **검사 전용 프로젝트 이름**으로 잡고 끝에 지운다 —
-  운영 프로젝트의 잠금 파일은 건드리지 않는다. 자리를 쓸 수 없으면 통과가 아니라 exit 2(판정 불가)이고,
-  CI step 이 그 자리를 `install -d` 로 먼저 만든다(runbook §1.4 tmpfiles.d 와 같은 것).
+- 신호 경로: `setsid` + 그룹 kill(그룹 번호는 `$!` 가 아니라 `ps -o pgid=` 로 읽는다) → **TERM 143 ·
+  HUP 129** · trap 의 삭제 호출이 **하나** 이고 대상이 자기 이름 · 남의 컨테이너 이름은 로그에 없다 ·
+  접두·필터 형태가 아니다.
+- 검사 자신: 잠금 자리가 없으면 **만들지 않고** exit 2 로 끝낸다(그 경로를 만들지 않았음을 함께 센다).
+- runbook: `ExecStopPost` 줄이 **모두 종료 사유 조건을 갖는다**(텍스트 술어 — 문서에는 그 층밖에 없다).
+- 변이 **열 중 아홉이 RED**(술어 둘을 항상 참으로 · trap 삭제 · `--name` 삭제 · `ps -a` 제거 ·
+  `REPO_ROOT` 를 cwd 로 · `_prod_git` 제거 · 프로젝트 이름 등식 삭제 · 전역 이름 충돌 검사 삭제).
+  초록 하나는 `GIT_*` 겹 중 **앞쪽 하나만** 뺀 변이다 — 사유는 `commands.md` 의 변이표 아래에 적었다.
+- 잠금만 가짜가 없다(고정 절대 경로가 설계다). 검사는 그 **자리를 만들지 않고**, 있으면 **검사 전용
+  프로젝트 이름**의 잠금 파일만 만들고 끝에 지운다 — 운영 프로젝트의 잠금 파일·디렉터리는 건드리지 않는다.
+  자리가 없으면 통과가 아니라 exit 2(판정 불가)이고, CI step 이 그 자리를 `install -d` 로 먼저 만든다
+  (runbook §1.4 tmpfiles.d 와 같은 것 · 자리의 정본은 `tools/prod-env.sh` 의 상수다).
 
 ## in_scope 대조 (수정 라운드가 만든 새 파일 포함)
 
-`git log --no-merges --format= --name-only 79f3e5c4..HEAD | sort -u` = 여덟 경로이고 scope.md 의
-in_scope 안이다(`tools/prod-{env,deploy,rollback,notification-sweep}.sh` · 새 `tools/prod-guards-check.sh` ·
+`git log --no-merges --format= --name-only 79f3e5c4..HEAD | sort -u` 의 전체가 scope.md 의 in_scope
+안이다(`tools/prod-{env,deploy,rollback,notification-sweep}.sh` · 새 `tools/prod-guards-check.sh` ·
 `docs/runbook/m7-7f-production.md` · `.github/workflows/ci.yml` · `reports/evidence/m9/prod-tools/**`).
+**수정 라운드가 만든 새 파일은 0** 이다 — 지적 처리가 기존 다섯 파일과 evidence 안에서 끝났다.
 `ci.yml` 포함을 **선언한다** — D-4 가 「걸 가치가 있으면」으로 둔 조건을 택했다(한 번만 로컬에서 돈 검사는
 뒤따르는 편집을 막지 못한다). `tools/testdata/**` 는 쓰지 않았다 — fixture 를 런타임에 `mktemp -d` 아래
 만드므로 저장소에 고정 fixture 가 필요 없다. out_scope 는 지켰다: 운영 host 실행 0 · systemd 설치 0 ·
@@ -63,9 +92,19 @@ in_scope 안이다(`tools/prod-{env,deploy,rollback,notification-sweep}.sh` · �
    (CR L-10 의 한계를 그대로 물려받는다 — 재현 가능한 provenance 는 깨끗한 clone, runbook §2).
 4. 잔존이 남으면 **치울 때까지 주기 훑기가 멈춘다**(러너는 남의 것을 지우지 않는다). 외부 발송이 없어
    journal 이 유일한 창구다 — runbook §11 제한 13 에 등재.
-5. `oneoff` 라벨·`-app-run-` 이름 **둘 다** 아닌 일회 컨테이너(`docker run` 수동 기동)는 세지 않는다 —
-   「같은 compose 프로젝트의 일회 컨테이너」가 술어의 경계다.
+5. **잔존 술어의 경계는 「이 프로젝트의 `app` 서비스 일회 컨테이너」다**(cr LOW 등재). 세지 않는 것 셋:
+   같은 프로젝트의 `compose run postgres`·`run ml-serving` 잔존(서비스 축) · `oneoff` 라벨과 `-app-run-`
+   이름 **둘 다** 아닌 수동 `docker run` · 그리고 **반입(`prod-deploy.sh`)은 이 검사를 아예 하지 않는다**
+   (계약 D-2 가 러너로 좁혔다 — 남은 일회 컨테이너는 잠금의 대상이 아니라 반입 중에도 같은 DB 를 쓸 수
+   있다). 넓히려면 과검출로 주기 훑기를 멈추는 비용을 먼저 정한다. runbook §11 제한 13 에 같은 경계.
 6. 신호 경로의 실측은 `setsid` + 그룹 kill 로 systemd 의 cgroup kill 을 흉내낸 것이다. 그룹 kill 이 안 되는
-   환경에서는 가짜 run 이 끝난 뒤 trap 이 도는데, **무엇을 지우는가**는 같은 값으로 잰다.
+   환경에서는 가짜 run 이 끝난 뒤 trap 이 도는데, **무엇을 지우는가**는 같은 값으로 잰다. KILL·SIGSTOP
+   뒤 KILL 에는 trap 이 없다 — 그 경우가 제한 4 의 「사람이 치운다」다.
 7. 실제 docker 로 도는 acceptance 줄(S-27b·S-27c)은 이 레인에서 돌리지 않았다 — 운영 host 공유 기계의
    금지 때문이고, 이 slice 는 그 둘이 보는 파일을 편집하지 않는다(`commands.md`).
+8. **`GIT_*` 를 막는 겹 둘 중 앞쪽(source 시점 unset)은 측정되지 않는다** — 오늘 git 을 부르는 곳이 술어
+   하나여서 뒤쪽(`_prod_git`)만으로 모든 축이 닫힌다(변이 ⑧ 초록). 그래도 남긴 이유는 `commands.md` 의
+   변이표 아래에 있다.
+9. **systemd unit 문면은 실행으로 확인하지 않았다**(운영 host 금지). `ExecStopPost` 의 조건은 `$$` 로
+   `sh` 가 펼치게 적었고 `$SERVICE_RESULT`·`$EXIT_STATUS` 는 systemd 가 그 자리에 넣는 변수다 —
+   검사는 **조건의 존재**만 텍스트로 잠근다(값의 거동은 운영자가 §9.3 의 첫 `systemctl start` 에서 본다).
