@@ -1056,7 +1056,15 @@ jobs:
       # 세 축 래칫(`mutationReportGate`). 모듈 이름을 이 워크플로에 적지 않는다: 대상 집합의
       # 정본은 `config/quality/mutation-policy.properties` 이고, 그 집합과 실제 적용의 등식은
       # 위 게이트가 잰다(여기 열거하면 조용히 어긋날 자리가 하나 더 생긴다).
-      - run: ./gradlew --no-daemon mutationCheck
+      #
+      # **`--max-workers=1` 은 메모리 때문이다.** 루트 `gradle.properties` 가
+      # `org.gradle.parallel=true` 라서 이 한 명령이 일곱 모듈의 `pitest` 를 들면 **worker 수만큼
+      # PIT JVM 트리가 동시에** 뜬다. 로컬 비용 실측은 호스트 규율 때문에 **한 모듈씩**이었고
+      # (프로세스 트리 피크 RSS 가 모듈당 1.5~5.8GB), 병렬로 뜬 합은 아무도 재지 않았다 — 러너가
+      # OOM·스왑으로 **매 PR 을 비결정적으로** 붉히는 쪽이 느린 쪽보다 비싸다. 직렬이면 실측과
+      # 같은 조건이 되고 그때의 분석 시간 합이 11분 24초라 위 45분 상한에 여유가 있다. 첫 PR CI 의
+      # 시간·메모리는 `OPEN-ADR07-MUTATION-BUDGET` 이 받는다(거기서 올릴지 정한다).
+      - run: ./gradlew --no-daemon --max-workers=1 mutationCheck
 
       # 래칫이 붉을 때 사람이 볼 것은 「무엇이 살아남았는가」다 — 실패해도 올린다.
       - uses: actions/upload-artifact@v6
