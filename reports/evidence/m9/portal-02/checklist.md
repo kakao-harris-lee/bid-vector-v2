@@ -1,6 +1,6 @@
 # M9 / portal-02 — 점검표
 
-- base: main `79f3e5c4` · 브랜치 `feature/m9-portal-02` · 마지막 산출물 커밋 `24bd2803`
+- base: main `79f3e5c4` · 브랜치 `feature/m9-portal-02` · 마지막 산출물 커밋 `a49738d3`
 - 성격: **이름 전환 + mock 라우팅 구조 교체.** 실 조달청 호출 0 · DB 쓰기 0 · 운영 반영 0 · push/PR 0.
 - 계약: 같은 디렉터리의 `scope.md`(D-1~D-5).
 
@@ -8,7 +8,7 @@
 
 | 항목 | 결과 |
 | --- | --- |
-| CI Kotlin `check` job 명령 그대로 exit 0 | `commands.md` 「전건 check ②」 행 — exit 0, 33m 30s |
+| CI Kotlin `check` job 명령 그대로 exit 0 | 로컬 `commands.md` 「전건 check ②」 행 — exit 0, 33m 30s(계약 갱신 전 HEAD). **전건 정본은 PR CI 의 `check`·`web` job** — 같은 절 「PR CI」 행 |
 | 기본 base·경로 다섯이 `02`(부팅/설정 test) | `KonepsEndpointDefaultsTest` — 바인딩을 지난 값으로 열거 셋 + 두 서비스 경로 집합이 갈리는 경계 하나 |
 | ScsbidInfoService 기본값 불변 | 같은 test 의 넷째 — base·개찰완료·개찰결과 목록 둘·예비가격 상세 둘. **RED 라운드에서 처음부터 초록**(통제군) |
 | mock 이 두 축을 정확히 가르고 미등록 경로는 실패 | `MockKonepsRoutingTest` ⓐ 공고 목록 ↔ 기초금액 분리 · ⓑ 미등재 둘이 404 이고 `close` 가 실패로 올림. 두 이름은 기본 표에서 읽으므로 위 test 가 그 문면을 `…Cnstwk02`·`…BsisAmount02` 로 고정한다 |
@@ -21,12 +21,16 @@
 | --- | --- | --- |
 | ① 기본 경로 하나를 옛 이름으로(`…Cnstwk02` → `…Cnstwk`) | RED | 2/5 붉음 — 열거와 경계 양쪽이 잡았다 |
 | ② mock 을 접두 라우팅으로 되돌림(정확 일치 → 접두 일치) | RED | 2/7 붉음 — 기초금액이 공고 목록 축으로 갔고 **E2E 「표본에 뽑힌 공고만 상세를 부른다」도 함께** 붉다 |
+| ③ web fixture 하나를 옛 이름으로 | 404 | 출하 기본 경로 요청이 **404** — W-13 이 붉어지는 기구를 그 자리에서 쟀다(여정 전건은 CI W-13 이 든다, 팀장 결정) |
 
 변이 둘 다 **바꿔치우기**다 — 술어를 더한 것이 아니라 그 자리의 술어를 갈았다.
 
 ## 알려진 제한
 
-1. **web 여정 e2e 가 이 전환으로 붉어진다 — in_scope 밖이라 고치지 않았다(차단, 계약 갱신 요청).**
+1. ~~**web 여정 e2e 가 이 전환으로 붉어진다 — in_scope 밖이라 고치지 않았다(차단).**~~ **닫혔다 2026-11-05** —
+   팀장이 그 경로를 in_scope 에 더했고(`scope.md` 「계약 갱신 2026-11-05」) fixture 의 `operation` 값 넷을
+   `…02` 로 바꿨다. `fake-koneps.mjs` 는 손대지 않았다(정확 일치 유지 — 옛 이름 404 가 다음 개편에서도
+   같은 자리를 소리내어 잡는다). 아래는 그 차단의 기구 기록이다.
    `web/e2e/harness/fake-koneps.mjs` 는 요청 경로의 오퍼레이션 이름을 fixture 의 `operation` 값과
    **정확 일치**로 라우팅하고 모르는 이름에 404 를 낸다. 그 fixture
    (`web/e2e/harness/fixtures/notice-list.json`)의 `operation` 값 넷이 옛 이름이고,
@@ -35,7 +39,9 @@
    여정 단언(공고 카드)이 전부 붉다. 그 명령이 도는 자리는 둘이다 — CI `web` job 의 W-13 과
    **`check` job 의 S-20**(`tools/one-command-check.sh` 가 web 전건을 포함한다). 즉 `./gradlew --no-daemon check`
    는 초록이어도 **CI 의 `check` job 은 붉다.** 고치는 쪽은 그 fixture 의 `operation` 값 넷(또는
-   journey 가 옛 경로를 인자로 주는 것)이고 둘 다 `web/**` — 계약 in_scope 에 없다.
+   journey 가 옛 경로를 인자로 주는 것)이고 둘 다 `web/**` 였다. `_provenance.sources[].sha256` 은
+   **출처 문서**를 핀하고 이 fixture 자신을 핀하지 않으므로(재산출 스크립트도 없다) 값 치환이 그 블록을
+   무효화하지 않는다.
 2. **응답 필드가 바뀌었는지는 모른다**(D-4) — 공지가 적지 않고 이 slice 는 실 호출을 하지 않는다.
    운영 반영 전 1회 사전 확인 절차는 `docs/runbook/m6-6g-real-collection.md` §8.
 3. **분리된 네 오퍼레이션은 구현하지 않았다**(D-2) — 공동도급의무지역·가산지역·부대공종·첨부파일.
@@ -58,11 +64,24 @@
    (§0.1 의 다섯 필드가 legacy 근거를 요구한다) 외부 서비스 개편은 그 어휘에 들어가지 않는다.
    개편 사실과 미지의 자리는 capability map 의 OPEN 행이 갖는다.
 
+## PR CI (전건 acceptance 정본)
+
+| job | 명령 | 결과 |
+| --- | --- | --- |
+| `check` | `./gradlew --no-daemon check` + `tools/one-command-check.sh`(S-20) | PR 열고 기록 |
+| `web` | `npm run test:e2e` · `npm run test:e2e:journey`(W-13) | PR 열고 기록 |
+
+로컬에서 web 전건(`npm ci` → playwright → docker 여정)을 반복하지 않는다(팀장 결정 2026-11-05, 호스트
+빌드 큐 포화). 이 레인이 로컬에서 잰 것은 **fake KONEPS 라우팅 한 자리**이고(`commands.md` 「web fake
+KONEPS 라우팅 실측」) 여정 전건은 CI 가 든다. `web/` 에 `node_modules` 가 없어 eslint 는 돌리지 않았다 —
+바꾼 것이 JSON 데이터 값 넷이라 eslint 가 보는 축이 아니고, `python3 -c json.load` 로 파싱만 확인했다.
+
 ## in_scope 대조
 
 `git log --no-merges --format= --name-only 79f3e5c4..HEAD | sort -u` 의 경로가 전부 in_scope 안이다
 (기본값 둘 · `app` test 둘 디렉터리 · `adapters` koneps test · `config/quality` · runbook ·
-capability map · 이 evidence 디렉터리). in_scope 에 있으나 손대지 않은 것은 위 7항 둘.
+capability map · **web 여정 fixture**(계약 갱신분) · 이 evidence 디렉터리). in_scope 에 있으나 손대지
+않은 것은 위 7항 둘과 `web/e2e/harness/fake-koneps.mjs`(계약이 「필요하면」으로 두었고 필요하지 않았다).
 
 **이 slice 가 만든 새 파일 다섯 ↔ in_scope**: `MockKonepsRoutes.kt`·`SyntheticBidder.kt`·
 `MockKonepsEnvelope.kt`·`MockKonepsRoutingTest.kt`(`app/src/test/.../collection/`) ·

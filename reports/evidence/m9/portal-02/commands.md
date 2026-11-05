@@ -72,3 +72,13 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: `wc -l reports/evidence/m9/portal-02/*.md` · `git diff --numstat 79f3e5c4..HEAD -- app adapters config docs`
 - exit: 0
 - 핵심 결과: evidence 262줄 대 산출물 785줄(크기 게이트 통과). 참조형 누출 스캔(`grep -rniE -f config/quality/leak-patterns.txt`)은 evidence·runbook 에서 0건.
+
+## 2026-11-06T00:30+09:00 — web fake KONEPS 라우팅 실측 (계약 갱신분, docker·playwright 없이)
+- cmd: `node e2e/harness/fake-koneps.mjs <port>` 뒤 출하 기본 경로와 옛 이름으로 `curl -o /dev/null -w '%{http_code}'`
+- exit: 0
+- 핵심 결과: `…Cnstwk02` → **200**(`resultCode 00` · 항목 4) · 옛 이름 → **404**. fixture 를 옛 이름으로 둔 변이에서는 **출하 기본 경로가 404** 다 — W-13 여정이 붉어지는 기구가 이 한 자리다.
+
+## 2026-11-06T00:40+09:00 — rollback ①②③ 재산출 (실측 HEAD `a49738d3`)
+- cmd: `git restore --source=79f3e5c4 --staged --worktree -- <in_scope 경로 개별 인자, web fixture 포함>`
+- exit: 0
+- 핵심 결과: D 5 · M 10 · 되돌린 트리의 `git diff 79f3e5c4 -- app adapters config docs web` 빈 출력(= base 와 바이트 동일) · 내 표지 0 · base 의 web fixture 옛 이름 4 복원.

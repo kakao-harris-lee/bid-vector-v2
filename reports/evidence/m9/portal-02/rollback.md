@@ -1,6 +1,6 @@
 # M9 / portal-02 — 되돌림
 
-- base: main `79f3e5c4` · **실측 HEAD: `24bd2803`**(이 slice 의 마지막 산출물 커밋)
+- base: main `79f3e5c4` · **실측 HEAD: `a49738d3`**(이 slice 의 마지막 산출물 커밋 — 계약 갱신분 web fixture 포함)
 - 전제: **main 에 이 slice 가 없다.** 이 브랜치는 `79f3e5c4` 에서 갈라졌고 main 을 되병합하지 않았다 —
   그래서 복원 출처가 고정 SHA `79f3e5c4` 이고 움직이는 `origin/main` 을 쓰지 않는다. 머지된 뒤의
   되돌림은 이 절차가 아니라 **그 PR 의 revert** 다(머지 순간 같은 명령은 아무것도 지우지 않으면서 exit 0).
@@ -35,7 +35,8 @@ git restore --source=79f3e5c4 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/koneps \
   config/quality \
   docs/runbook/m6-6g-real-collection.md \
-  docs/discovery/capability-map.md
+  docs/discovery/capability-map.md \
+  web/e2e/harness/fixtures/notice-list.json
 ```
 
 `git checkout <base> --` 를 쓰지 않는다 — base 에 없는 신규 경로에서 pathspec 오류로 아무것도 적용되지 않는다.
@@ -59,10 +60,11 @@ git restore --source=79f3e5c4 --staged --worktree -- \
 | 단계 | 결과 |
 | --- | --- |
 | ① 명령 exit | 0 |
-| ② D/M 수 | D 5 · M 9 (= `git diff --name-status` 의 A 5 · M 9) |
-| ③ in_scope diff | `git diff 79f3e5c4 --name-only -- app adapters config docs` 빈 출력 |
-| 내 표지 계수 | `BidPublicInfoService02` 0건 · `MockKonepsRoutes.kt` 없음 — 이 slice 의 표지가 남지 않았다 |
-| ④ compile · ⑤ test · ⑥ 게이트 | `./gradlew --no-daemon check` 한 명령이 셋을 든다 — `commands.md` 「rollback ④⑤⑥」 행 |
+| ② D/M 수 | D 5 · M 10 (= `git diff --name-status` 의 A 5 · M 10) |
+| ③ in_scope diff | `git diff 79f3e5c4 --name-only -- app adapters config docs web` 빈 출력 |
+| 내 표지 계수 | `BidPublicInfoService02` 0건 · `MockKonepsRoutes.kt` 없음 · web fixture 의 `Cnstwk02` 0건 — 이 slice 의 표지가 남지 않았다 |
+| 남의 표지 | base 의 web fixture 옛 이름 4건 복원 — 되돌림이 그 파일을 비우지 않았다 |
+| ④ compile · ⑤ test · ⑥ 게이트 | **트리 동일성으로 갈음**(팀장 결정 2026-11-05, 빌드 큐 포화) — 위 ③ 이 빈 출력이므로 되돌린 트리의 코드·문서·web 경로가 **base 와 바이트 동일**하고, 따라서 `24bd2803` 에서 같은 복원을 돌려 `./gradlew --no-daemon check` **exit 0**(30m 37s, `commands.md` 「rollback ④⑤⑥」 행)을 실측한 트리와도 동일하다. 그 실측은 evidence 디렉터리를 남긴 채 돌렸다 — 두 트리의 유일한 차이는 그 디렉터리의 **내용**이고, 그것을 입력으로 잡는 게이트는 `leakPatternGate` 하나인데 이 slice 의 evidence 는 참조형 누출 스캔에서 0건이다(`commands.md` 「evidence 점검」 행) |
 
 복원 목록 등식: `comm -23 <전체 변경> <복원 인자가 덮는 것>` 이 `reports/evidence/m9/portal-02/scope.md`
 하나만 남긴다(= 복원 목록 밖으로 선언한 evidence). **이 등식이 비어 있다는 것만으로 목록이 건전하다고
