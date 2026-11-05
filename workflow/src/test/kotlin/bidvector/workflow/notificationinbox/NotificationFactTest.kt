@@ -61,9 +61,9 @@ class NotificationFactTest {
      */
     @Test
     fun `낙찰 확정의 결과 셋이 detail 셋으로 갈린다`() {
-        NotificationFact.AwardDecided(AwardOutcome.AWARDED).detail shouldBe NotificationDetail.AWARDED
-        NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED).detail shouldBe NotificationDetail.NOT_AWARDED
-        NotificationFact.AwardDecided(AwardOutcome.FAILED_OR_REBID).detail shouldBe
+        NotificationFact.AwardDecided(AwardResult.AWARDED).detail shouldBe NotificationDetail.AWARDED
+        NotificationFact.AwardDecided(AwardResult.NOT_AWARDED).detail shouldBe NotificationDetail.NOT_AWARDED
+        NotificationFact.AwardDecided(AwardResult.FAILED_OR_REBID).detail shouldBe
             NotificationDetail.FAILED_OR_REBID
     }
 
@@ -76,7 +76,7 @@ class NotificationFactTest {
      */
     @Test
     fun `결과 전수가 서로 다른 detail 을 가리킨다 — 유찰이 패찰로 접히지 않는다`() {
-        val details = AwardOutcome.entries.map { it.detail }
+        val details = AwardResult.entries.map { it.detail }
 
         details.distinct() shouldContainExactlyInAnyOrder details
     }
@@ -171,7 +171,7 @@ class NotificationFactTest {
                 NotificationFact.NoticeRevised,
                 NotificationFact.BidPriceRequestRecorded,
                 NotificationFact.OpeningCompleted(provisionallyFirst = true),
-                NotificationFact.AwardDecided(AwardOutcome.AWARDED),
+                NotificationFact.AwardDecided(AwardResult.AWARDED),
             )
 
         /**
@@ -180,8 +180,8 @@ class NotificationFactTest {
          */
         private val DETAIL_BEARING_VARIANTS: List<NotificationFact> =
             listOf(NotificationFact.OpeningCompleted(provisionallyFirst = false)) +
-                AwardOutcome.entries
-                    .filterNot { it == AwardOutcome.AWARDED }
+                AwardResult.entries
+                    .filterNot { it == AwardResult.AWARDED }
                     .map { NotificationFact.AwardDecided(it) }
     }
 }

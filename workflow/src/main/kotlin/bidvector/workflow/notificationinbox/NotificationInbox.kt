@@ -50,7 +50,7 @@ enum class NotificationKind {
     /** 개찰 완료. 잠정 1위 여부를 detail 로 싣는다 — 그 값은 **갱신되어야 한다**. */
     OPENING_COMPLETED,
 
-    /** 낙찰·패찰·유찰 확정. 결과 셋([AwardOutcome])을 detail 로 싣는다. */
+    /** 낙찰·패찰·유찰 확정. 결과 셋([AwardResult])을 detail 로 싣는다. */
     AWARD_DECIDED,
 
     /** 공고 변경(정정공고). 원천 판정은 관련성이 서는 slice 몫이다(D-7C3-1 ②). */
@@ -76,6 +76,20 @@ enum class NotificationDetail {
 /**
  * 낙찰 확정의 **결과** — 닫힌 셋이고 각자 자기 detail 을 **생성자로** 든다(D-M9-1).
  *
+ * **이름이 `AwardOutcome` 이 아닌 이유**: 그 이름은 `bidvector.settlement.AwardOutcome`(개찰
+ * 대사의 4-state 결말 — 미기록·판정 안 함·낙찰·패찰)이 쓰고 있고, 이 모듈은 그 타입을 실제로
+ * 들고 있다(`workflow.result.ReconciliationVerdict`). 같은 이름 둘이 한 모듈에서 import 로만
+ * 갈리면 읽는 사람이 어느 쪽인지 알 수 없다.
+ *
+ * **기존 어휘를 재활용하지 않은 이유**(조사 뒤 채택): `bidvector.bidding.BidOutcome` 이
+ * `WON`·`LOST`·`FAILED_OR_REBID` 로 **값이 같다**. 그래도 쓰지 않는다 — 알림함의 detail 어휘는
+ * 저장 층 CHECK 와 **집합 등식**을 이루는 이 패키지의 닫힌 어휘이고, 그것을 `bidding` 의 enum 에
+ * 묶으면 알림함이 입찰 모듈 없이는 서지 않는다(7C③ 이 이 패키지의 의존을 `procurement.NoticeId` ·
+ * `workflow.access.AccountId` 둘로 묶어 둔 사유와 같은 축). 그리고 둘은 앞으로 갈린다: 자동 대사가
+ * 들어오면 같은 종류의 원천이 `settlement` 쪽 4-state 가 되는데 그 집합에는 유찰이 **없다**. 즉
+ * 어느 기존 타입도 알림함의 어휘가 아니다. 두 벌이 갈리는 것은 `BidCaseNotifications` 의 상태
+ * 사상 등식이 막는다(상태 전수 ↔ 사실 전수).
+ *
  * **`Boolean` 이 아닌 이유**: 결과는 셋이다. 유찰(아무도 못 땄다 · 재입찰)은 패찰(내가 졌다)과
  * 다른 사실이고, 운영자의 다음 할 일도 다르다 — 유찰은 재입찰 공고를 기다리는 일이다. 앞 판은
  * 어휘가 둘(`awarded: Boolean`)이어서 유찰이 **알림을 아예 남기지 못했다**(7C③-b 의 알려진 제한).
@@ -85,7 +99,7 @@ enum class NotificationDetail {
  * 둘이 되고 갈릴 자리가 생긴다. 겹침(두 결과가 한 detail 을 가리키는 접기)은 이 꼴에서
  * 표현되기는 하지만 복원이 [notificationFactOf] 의 `single` 에서 어긋나 붉다.
  */
-enum class AwardOutcome(
+enum class AwardResult(
     val detail: NotificationDetail,
 ) {
     AWARDED(NotificationDetail.AWARDED),
@@ -194,9 +208,9 @@ sealed interface NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.OPENING_COMPLETED
     }
 
-    /** 낙찰·패찰·유찰 확정 — 결과를 [AwardOutcome] 으로 싣는다. 바뀌면 안읽음으로 돌아간다. */
+    /** 낙찰·패찰·유찰 확정 — 결과를 [AwardResult] 으로 싣는다. 바뀌면 안읽음으로 돌아간다. */
     data class AwardDecided(
-        val outcome: AwardOutcome,
+        val outcome: AwardResult,
     ) : NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.AWARD_DECIDED
     }
@@ -246,7 +260,7 @@ fun notificationFactOf(
         NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised.withoutDetail(detail)
         NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded.withoutDetail(detail)
         NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(detail.isProvisionalFirst(kind))
-        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.asAwardOutcome(kind))
+        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.asAwardResult(kind))
     }
 
 // detail 을 싣는 종류 **각각이 자기 어휘를 읽는 함수**를 갖는다. 어휘 쌍을 호출 자리에 펴 두면
@@ -255,7 +269,7 @@ fun notificationFactOf(
 // 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
 //
 // 두 본문의 꼴이 **다른 이유**: 개찰 축은 `Boolean` 이라 어휘 쌍이 여기 적히고, 낙찰 축은
-// [AwardOutcome] 이 짝을 이미 들고 있어 그 표를 **되읽는다**. 그쪽에 `when` 을 또 적으면 같은
+// [AwardResult] 이 짝을 이미 들고 있어 그 표를 **되읽는다**. 그쪽에 `when` 을 또 적으면 같은
 // 짝이 두 자리에 살고 갈릴 자리가 생긴다.
 
 private fun NotificationDetail?.isProvisionalFirst(kind: NotificationKind): Boolean =
@@ -266,14 +280,14 @@ private fun NotificationDetail?.isProvisionalFirst(kind: NotificationKind): Bool
     }
 
 /**
- * 낙찰 확정의 detail → 결과. [AwardOutcome] 의 짝을 **역으로** 읽는다.
+ * 낙찰 확정의 detail → 결과. [AwardResult] 의 짝을 **역으로** 읽는다.
  *
  * `single` 이 아니라 `singleOrNull` + 던지기인 것은 「둘이 걸렸다」와 「없다」를 **같은 거부**로
  * 접기 위해서다. 둘이 걸리는 경우는 두 결과가 한 detail 을 가리키는 접기이고, 그 상태는 복원할
  * 수 있는 짝이 아니다 — 하나를 골라 주면 그 접기가 조용히 작동한다.
  */
-private fun NotificationDetail?.asAwardOutcome(kind: NotificationKind): AwardOutcome =
-    AwardOutcome.entries.singleOrNull { it.detail == this }
+private fun NotificationDetail?.asAwardResult(kind: NotificationKind): AwardResult =
+    AwardResult.entries.singleOrNull { it.detail == this }
         ?: throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
 
 /** detail 을 갖지 않는 종류에 detail 이 실려 오면 그 짝은 복원 대상이 아니다. */

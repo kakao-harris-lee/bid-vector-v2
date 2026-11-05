@@ -1,7 +1,7 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.PersistenceTestSupport
-import bidvector.workflow.notificationinbox.AwardOutcome
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationDetail
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationKind
@@ -228,7 +228,7 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
                 NotificationKind.OPENING_COMPLETED to
                     listOf(true, false).mapNotNull { NotificationFact.OpeningCompleted(it).detail },
                 NotificationKind.AWARD_DECIDED to
-                    AwardOutcome.entries.mapNotNull { NotificationFact.AwardDecided(it).detail },
+                    AwardResult.entries.mapNotNull { NotificationFact.AwardDecided(it).detail },
             )
         expected.keys shouldBe DETAIL_BEARING_KINDS
 

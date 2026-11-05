@@ -1,6 +1,6 @@
 package bidvector.adapters.notificationinbox
 
-import bidvector.workflow.notificationinbox.AwardOutcome
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationDetail
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxLimits
@@ -198,11 +198,11 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val account = insertAccount("failed-bid")
         val notice = unknownNotice("N-1")
         val key = NotificationItemKey(NotificationKind.AWARD_DECIDED, notice)
-        inbox().record(record(account, notice, NotificationFact.AwardDecided(AwardOutcome.AWARDED)))
+        inbox().record(record(account, notice, NotificationFact.AwardDecided(AwardResult.AWARDED)))
         store().markRead(account, key, READ_AT)
 
         inbox().record(
-            record(account, notice, NotificationFact.AwardDecided(AwardOutcome.FAILED_OR_REBID), LATER),
+            record(account, notice, NotificationFact.AwardDecided(AwardResult.FAILED_OR_REBID), LATER),
         ) shouldBe NotificationInboxOutcome.Updated
 
         rowCount() shouldBe 1L
@@ -414,7 +414,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised
             NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded
             NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(provisionallyFirst = true)
-            NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(AwardOutcome.AWARDED)
+            NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(AwardResult.AWARDED)
         }
 
     private fun page(unreadOnly: Boolean = false) =

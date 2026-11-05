@@ -4,7 +4,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.NoticeKey
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
-import bidvector.workflow.notificationinbox.AwardOutcome
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationFact
 
 /**
@@ -35,11 +35,11 @@ internal fun reflectedNotificationFact(state: BidState): NotificationFact? =
 
         BidState.OpenedOutOfRank -> NotificationFact.OpeningCompleted(provisionallyFirst = false)
 
-        BidState.Won -> NotificationFact.AwardDecided(AwardOutcome.AWARDED)
+        BidState.Won -> NotificationFact.AwardDecided(AwardResult.AWARDED)
 
-        BidState.Lost -> NotificationFact.AwardDecided(AwardOutcome.NOT_AWARDED)
+        BidState.Lost -> NotificationFact.AwardDecided(AwardResult.NOT_AWARDED)
 
-        BidState.FailedOrRebid -> NotificationFact.AwardDecided(AwardOutcome.FAILED_OR_REBID)
+        BidState.FailedOrRebid -> NotificationFact.AwardDecided(AwardResult.FAILED_OR_REBID)
 
         // 아래는 **되비출 사실이 아니다** — 알림함 어휘에 대응하는 종류가 없거나(초안 · 제출함 ·
         // 개찰 대기 · 적격심사) 시간 기반 훑기가 자기 종류로 따로 낸다(마감 지남 계열).
