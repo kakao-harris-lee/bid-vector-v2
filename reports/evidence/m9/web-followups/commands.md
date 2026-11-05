@@ -1,6 +1,9 @@
 # M9 / web-followups — commands
 
-base `df4976cc` · 브랜치 `feature/m9-web-followups` · 판정 SHA `50bc35c0`(마지막 산출물 커밋)
+base `df4976cc` · 브랜치 `feature/m9-web-followups` · 판정 SHA `68834ea2`(마지막 산출물 커밋)
+
+앞 라운드의 판정 SHA 는 `50bc35c0` 이었고 **PR #132 수정 라운드**가 그 뒤에 온다(아래 절).
+「게이트」 표는 **지금 판정 SHA** 의 수치다.
 
 로컬에서 돌리는 것은 **web 레인 게이트와 표적 변이뿐**이다(공통 규율) — 전건 Kotlin `check` ·
 컨테이너 · S-20 · Playwright 여정은 **PR CI 가 정본**이고 같은 명령이다.
@@ -13,13 +16,13 @@ base `df4976cc` · 브랜치 `feature/m9-web-followups` · 판정 SHA `50bc35c0`
 | W-3 | `npm run typecheck` | 0 |
 | W-4 | `npm run gate:src-tree` | 0 |
 | W-5 | `npm run api:types:check` | 0 |
-| W-6 | `npm run test` | 0 — `39 files · 810 passed` |
+| W-6 | `npm run test` | 0 — `39 files · 821 passed` |
 | W-7 | `npm run gate:tests` | 0 — 등록부 기준 skipped/todo/failed 0 |
 | W-8 | `npm run build` | 0 |
 | W-9 | `npm run gate:boundary-canary` | 0 |
 
 base 의 수치는 `38 files · 756 passed` 였다(PR #125 판정). 이 slice 가 **test 파일 하나와 단언
-54 개**를 더한다.
+65 개**를 더한다(앞 라운드 54 + 수정 라운드 11).
 
 ## 항목별 RED 선행과 변이 — 전부 실측
 
@@ -96,3 +99,37 @@ daemon 이 없다. 캡처 하네스의 컨테이너도 남지 않았다(남은 `
 
 무거운 작업(jar 빌드) 전 별도 호출로 쟀다 — available 15.6GB · swap free 5.4GB · 도는 Gradle 빌드
 없음. 빌드는 `bv-build.sh` 의 자리를 지나 돌았다.
+
+## PR #132 수정 라운드 — 일곱 자리
+
+v `ready-for-review` @`50bc35c0` · cr `approve` @`7506085e`, 둘 다 blocker/high 0. 팀장 지시로
+**아래 일곱만** 고치고 나머지는 경계 문장을 사실에 맞게 좁혀 등재했다(checklist §3·§5).
+**캡처는 다시 뜨지 않았다** — 이 라운드가 바꾼 것은 `title` 속성·판정 함수·게이트 술어뿐이라
+그려지는 글자가 하나도 바뀌지 않는다.
+
+| 자리 | RED 선행 | 변이(바꿔치우기) | 결과 |
+| --- | --- | --- | --- |
+| ① 구조 분해 축 (v M-1 = cr M-1) | 대조 추가 뒤 2 failed | 그 선택자 제거 | `1 failed` |
+| ② 빈 인자 서식 호출 (v M-2 = cr M-2) | 같은 2 failed 에 포함 | `undefined`·spread 꼴 제거 | `1 failed` |
+| ③ Kotlin 읽기가 던진다 (v M-4 = cr L-2) | 대조 추가 뒤 4 failed | 못 읽는 조각을 다시 버림 | `1 failed` |
+| ④ 훑기 재귀·`.ts` (v M-3 값싼 둘) | — (범위 확장, 의무 집합 불변) | 재귀 제거 / `.ts` 제외 | 각 `1 failed` |
+| ⑤ D-day 설명 문면 (cr M-3) | 화면 test 추가 뒤 1 failed | 옛 문면으로 되돌림 | `1 failed` |
+| ⑥a 옛 test 주장 (cr L-1) | — (주장만 고친다 · 단언 불변) | — | — |
+| ⑥b `Object.hasOwn` (cr L-3) | 대조 추가 뒤 1 failed | 그 한 줄 제거 | `1 failed` |
+| ⑦ `DateTimeFormat` 단독 대조 (v L-3) | — (앞 판에서 그 이름을 빼도 31 전부 초록이던 자리) | 목록에서 `DateTimeFormat` 제거 | `1 failed` |
+
+변이는 전부 원복 뒤 `git status --porcelain` 빈 출력을 확인했다. ⑦ 은 **대조 자신이 변이로만
+의미를 얻는 꼴**이라 RED 선행이 없다 — 그 대신 변이가 그 대조 하나만 깬다는 것을 쟀다.
+
+### ② 에서 측정으로 가린 자리
+
+인자 꼴 선택자를 `[arguments.0.name='undefined']` 만으로 쓰면 **첫 인자가 식별자가 아닌 모든
+호출**에 걸린다(없는 경로를 읽은 값이 그 글자와 같다고 쳐진다). 실측 — `format(1200)` ·
+`format(o.d)` · `format(new Date(1))` · 인자 0 개가 전부 1 회. `[arguments.0.type='Identifier']`
+를 함께 두면 넷이 전부 0 이 된다. 그래서 선택자를 그 꼴로 적었다.
+
+### 등재만 한 것
+
+v L-1·L-2 · cr L-4~L-9 · cr OQ. 그 가운데 cr L-5(오탐과 탈출 경로)는 **네트워크 쪽과 같은
+자리**(선택자 ① 주석)에도 적었다 — 처방이 지목한 자리가 거기다. cr L-8 의 비용 실측은
+checklist §3 ⑪ 에 수치로 남겼다.
