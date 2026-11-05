@@ -76,6 +76,12 @@ const CLOCK_SELECTORS = [
   // ① 소유자를 지나 집어 가는 꼴 — `globalThis.Date` · `window.Date` · `Intl.DateTimeFormat` ·
   //    `globalThis.performance`. `no-restricted-globals` 는 **전역 이름 참조**만 보므로 이 꼴이
   //    그 밖에 있었다(실측). **속성 이름**을 본다(소유자를 열거하지 않는다).
+  //
+  //    그 대가는 네트워크 금지와 같은 **오탐**이다(PR #132 cr L-5): 속성 이름이 같으면 시계와
+  //    무관한 멤버도 걸린다 — `metrics.performance`(실적·성능) · `row.Date` · 인자 없는
+  //    `builder.format()`. 특히 `performance` 는 이 도메인에서 충분히 나올 이름이다. 그때는
+  //    **그 줄에 `eslint-disable-next-line` 을 달고 리뷰로 간다** — 규칙을 좁히지 않는다(좁히면
+  //    소유자 열거로 돌아가고, 그 열거가 앞 판에서 축을 통째로 열어 두었다).
   ...CLOCK_MEMBERS.map((name) => ({
     selector: `MemberExpression[property.name='${name}']`,
     message: clockMessage,
@@ -102,11 +108,38 @@ const CLOCK_SELECTORS = [
   // ⑤ **인자 없는** `new Date()` 만 막는다 — `new Date(millis)` 는 시계 읽기가 아니라 변환이고,
   //    그것까지 막으면 서식 모듈이 자기 일을 못 한다.
   { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: clockMessage },
-  // ⑥ **인자 없는 서식 호출** — `f.format()` · `f.formatToParts()` 는 지금을 쓴다. 서식기를
-  //    props 로 받아 부르면 `Intl` 이라는 이름을 지나지 않으므로 ① 이 못 본다. 인자를 받은
-  //    호출(`format(1200)` · `format(new Date(ms))`)은 **대상이 아니다**(음성 대조로 잰다).
+  // ⑥ **빈 인자로 부르는 서식 호출** — `f.format()` · `f.formatToParts()` 는 지금을 쓴다.
+  //    서식기를 props 로 받아 부르면 `Intl` 이라는 이름을 지나지 않으므로 ① 이 못 본다.
+  //
+  //    **인자 개수만 보면 모자란다**(PR #132 v M-2 = cr M-2): `format(undefined)` 은 개수가 1
+  //    인데 **지금**을 서식한다(명세의 기본값 자리다). spread 로 빈 배열을 펴는 꼴도 같다.
+  //    그래서 세 꼴을 함께 본다 — 없음 · 첫 인자가 `undefined` · 첫 인자가 spread.
+  //
+  //    값을 주는 호출(`format(1200)` · `format(new Date(ms))`)은 **대상이 아니다**(음성 대조로
+  //    잰다). `void 0` 처럼 다른 글자로 적은 빈 값은 이 층 밖이다(알려진 제한에 등재).
+  //
+  //    **인자 꼴은 `type` 과 함께 본다**(이 라운드의 실측): `[arguments.0.name='undefined']` 만
+  //    쓰면 첫 인자가 **식별자가 아닌 모든 호출**에 걸린다(리터럴 `format(1200)` · 멤버
+  //    `format(o.d)` · `format(new Date(1))` · 인자 0 개 — 전부 1 회). 없는 경로를 읽은 값이 그
+  //    글자와 같다고 쳐지기 때문이다. `type` 을 함께 보면 그 넷이 전부 0 이 된다.
+  ...[
+    'CallExpression[arguments.length=0]',
+    "CallExpression[arguments.0.type='Identifier'][arguments.0.name='undefined']",
+    "CallExpression[arguments.0.type='SpreadElement']",
+  ].map((call) => ({
+    selector: `${call} > MemberExpression[property.name=/^(format|formatToParts)$/]`,
+    message: clockMessage,
+  })),
+  // ⑦ **구조 분해** — `const { Date: D } = globalThis` · `const { DateTimeFormat: F } = Intl`
+  //    (PR #132 v M-1 = cr M-1). 네트워크 금지는 이 축을 같은 꼴로 닫아 두었는데 시계 쪽에는
+  //    짝이 없었다: 구조 분해는 `MemberExpression` 이 아니라 ①②③ 이 못 보고, 지역 이름 `D` 는
+  //    전역 참조가 아니라 `no-restricted-globals` 도 못 보며, `new D()` 는 `callee.name` 이
+  //    `Date` 가 아니라 ⑤ 도 비켜 간다(리뷰 실측: 셋 다 초록이었다).
+  //
+  //    네트워크 쪽과 같은 범위다 — **키가 식별자일 때만** 걸린다(따옴표 키·계산 키·템플릿 키는
+  //    같은 리터럴의 다른 표기이고 알려진 제한에 등재돼 있다).
   {
-    selector: "CallExpression[arguments.length=0] > MemberExpression[property.name=/^(format|formatToParts)$/]",
+    selector: `ObjectPattern > Property[key.name=/^(${CLOCK_MEMBERS.join('|')})$/]`,
     message: clockMessage,
   },
 ];

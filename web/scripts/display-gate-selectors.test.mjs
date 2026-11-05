@@ -243,6 +243,53 @@ describe('지금을 낼 수 있는 다른 표면도 막는다 (OPEN-M9-CLOCK-LIN
     expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(0);
   });
 
+  /**
+   * **구조 분해 축**(PR #132 v M-1 = cr M-1). 네트워크 금지는 이 축을 선택자 ④ 로 닫아 두었는데
+   * 시계 쪽에는 짝이 없었다 — 구조 분해는 `MemberExpression` 이 아니라 ①②③ 이 못 보고, 지역
+   * 이름은 전역 참조가 아니라 `no-restricted-globals` 도 못 보며, `new D()` 는 `callee.name` 이
+   * `Date` 가 아니라 ⑤ 도 비켜 간다(리뷰 실측: 셋 다 초록이었다).
+   */
+  it('구조 분해로 집어 가는 꼴도 RED 다', async () => {
+    const date = await lintAs(
+      'src/screens/Planted.tsx',
+      'const { Date: D } = globalThis;\nexport const n = D.now();\nexport const m = new D();\n',
+    );
+    const formatter = await lintAs(
+      'src/screens/Planted.tsx',
+      "const { DateTimeFormat: F } = Intl;\nexport const s = new F('ko').format(undefined);\n",
+    );
+
+    expect(messagesMatching(date, CLOCK_FRAGMENT).length).toBeGreaterThanOrEqual(1);
+    expect(messagesMatching(formatter, CLOCK_FRAGMENT).length).toBeGreaterThanOrEqual(1);
+  });
+
+  /**
+   * **인자가 있어도 비어 있으면 지금을 쓴다**(PR #132 v M-2 = cr M-2). `format(undefined)` 은
+   * 인자 **개수**가 1 이라 앞 판의 「인자 없는 호출」 선택자를 지나갔는데, 그 호출은 지금을
+   * 서식한다. spread 로 빈 배열을 펴는 꼴도 같다.
+   */
+  it('`format(undefined)` · `formatToParts(...xs)` 도 RED 다', async () => {
+    const explicit = await lintAs('src/screens/Planted.tsx', 'export const a = (f) => f.format(undefined);\n');
+    const spread = await lintAs('src/display/planted.ts', 'export const a = (f, xs) => f.formatToParts(...xs);\n');
+
+    expect(messagesMatching(explicit, CLOCK_FRAGMENT).length).toBe(1);
+    expect(messagesMatching(spread, CLOCK_FRAGMENT).length).toBe(1);
+  });
+
+  /**
+   * **`DateTimeFormat` 선택자를 홀로 잠근다**(PR #132 v L-3). 앞 판에서는 그 이름을 목록에서
+   * 빼도 대조 서른하나가 전부 초록이었다 — 인자 없는 서식 호출 선택자가 대신 잡았기 때문이다.
+   * 인자를 **받는** 서식 호출은 그 선택자 밖이라 이 꼴은 `DateTimeFormat` 이름으로만 걸린다.
+   */
+  it('인자를 받는 `Intl.DateTimeFormat(…).format(d)` 도 RED 다 — 이름 선택자 단독', async () => {
+    const messages = await lintAs(
+      'src/screens/Planted.tsx',
+      "export const a = (d) => new Intl.DateTimeFormat('ko').format(d);\n",
+    );
+
+    expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(1);
+  });
+
   /** test 는 여전히 대상이 아니다 — 고정 fixture 를 짓는 자리다(제외가 의도다). */
   it('test 파일은 새 축에서도 대상이 아니다', async () => {
     const messages = await lintAs(
