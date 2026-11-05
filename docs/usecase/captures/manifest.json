@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-11-05T08:29:03.036Z",
-  "head": "b6fe5e2c25e90bd6e34abf2547086ddf36728eac",
-  "totalBytes": 1010745,
+  "capturedAt": "2026-11-05T10:09:21.692Z",
+  "head": "cb4669b9a44ebd2da3637145b3ac5478d9b040aa",
+  "totalBytes": 1010589,
   "files": [
     {
       "path": "a-start-desktop.png",
@@ -33,8 +33,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 1454,
-      "bytes": 127481,
-      "sha256": "8cd99f0eb6e831344eb055c57ad7d05ef713c4c5bd9984aa3e2a34b72b8e2301"
+      "bytes": 128226,
+      "sha256": "6f2b350ad07d14e0724daeee2b7cd7fe346184223ddd1128f66ccc52ae8cb011"
     },
     {
       "path": "d-bid-box-desktop.png",
@@ -55,8 +55,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 1359,
-      "bytes": 130421,
-      "sha256": "408a1c7e675dfea8cf71d10940fcceaf08541623aeb056018997f25dd398b28c"
+      "bytes": 130059,
+      "sha256": "0a69f5d5c31bf3ecd994d7822a1cc8bc308d0290990b819db93933485c7518fb"
     },
     {
       "path": "inbox-desktop.png",
@@ -66,8 +66,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 70308,
-      "sha256": "7f4419ab711dfc95ce07ce41f5dd579617ecf834964484996d3a8bc5933616e2"
+      "bytes": 69766,
+      "sha256": "1fe3b4c9598849ef5f83fedeb00e34914b7e279a9dd323dc1135966e040fd984"
     },
     {
       "path": "a-start-mobile.png",
@@ -99,8 +99,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 1678,
-      "bytes": 116281,
-      "sha256": "2f4045c6fdeb24e870f918484db56acfb51ce935cc5e4259238dbcd40f0595a8"
+      "bytes": 117180,
+      "sha256": "87499aa49e4d7b7402c44b9175061ccb9e9bcbaea4aa0b25ca756c995c023020"
     },
     {
       "path": "d-bid-box-mobile.png",
@@ -121,8 +121,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 2239,
-      "bytes": 138338,
-      "sha256": "1daf232167903e7963d1d9433eb29b82077322dcd455ef6f0985adc68b3fdcfc"
+      "bytes": 137982,
+      "sha256": "d3d19064fa083b3b411e6e2f0f14a00396b37aa4ed00eae256c41ad16b52fcac"
     },
     {
       "path": "inbox-mobile.png",
@@ -132,8 +132,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 844,
-      "bytes": 63963,
-      "sha256": "69c08cab4e22655dbdcc7f8d049e0d2b6850dead4e2981ec680d1e4000cb2c0f"
+      "bytes": 63423,
+      "sha256": "fd10b7800838b47f8e6a5699b0a879335dca061b344cc6e67d26bada9ae5f0d2"
     }
   ]
 }
