@@ -13,7 +13,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 이 mock 이 서는 오퍼레이션 — 공고 목록 용역이다. **리터럴인 이유**: `adapters` 는 `app` 의 설정
- * 기본 표를 보지 못한다(의존 방향). 문면 자체는 `KonepsEndpointDefaultsTest` 가 잠근다.
+ * 기본 표를 보지 못한다(의존 방향).
+ *
+ * **이 이름은 production 기본값과 비교되지 않는다.** 여기서만 쓰여 `baseUri` 를 만들고 그 요청을
+ * 이 서버가 받으므로, 출하 기본값과 갈려도 어느 test 도 붉지 않고 거동도 없다 — 「어느 test 가
+ * 잠근다」가 아니라 「무관하다」가 사실이다. 비교를 세우려면 의존 방향을 거슬러야 해서 비싸다.
  */
 private const val NOTICE_LIST_OPERATION = "getBidPblancListInfoServc02"
 

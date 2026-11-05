@@ -32,8 +32,9 @@
 
 1. ~~**web 여정 e2e 가 이 전환으로 붉어진다 — in_scope 밖이라 고치지 않았다(차단).**~~ **닫혔다 2026-11-05** —
    팀장이 그 경로를 in_scope 에 더했고(`scope.md` 「계약 갱신 2026-11-05」) fixture 의 `operation` 값 넷을
-   `…02` 로 바꿨다. `fake-koneps.mjs` 는 손대지 않았다(정확 일치 유지 — 옛 이름 404 가 다음 개편에서도
-   같은 자리를 소리내어 잡는다). 아래는 그 차단의 기구 기록이다.
+   `…02` 로 바꿨다. `fake-koneps.mjs` 의 **정확 일치 라우팅은 그대로 두었다**(옛 이름 404 가 다음
+   개편에서도 같은 자리를 소리내어 잡는다) — 다만 그 파일 자체는 계약 갱신 2차에서 편집했다(준비
+   대기가 볼 표지 둘과 import 안전화). 아래는 그 차단의 기구 기록이다.
    `web/e2e/harness/fake-koneps.mjs` 는 요청 경로의 오퍼레이션 이름을 fixture 의 `operation` 값과
    **정확 일치**로 라우팅하고 모르는 이름에 404 를 낸다. 그 fixture
    (`web/e2e/harness/fixtures/notice-list.json`)의 `operation` 값 넷이 옛 이름이고,

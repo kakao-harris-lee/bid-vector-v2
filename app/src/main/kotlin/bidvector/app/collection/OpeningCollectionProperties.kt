@@ -69,7 +69,7 @@ data class KonepsOpeningOperationProperties(
 /**
  * 개찰 축 엔드포인트(D-6G-19) — **서비스가 둘이다.** 개찰결과 목록·예비가격 상세·개찰완료는
  * 낙찰정보서비스(`as/ScsbidInfoService`)이고, 입찰가격산식 A·기초금액 조회는 입찰공고정보서비스
- * (`ad/BidPublicInfoService`, [KonepsEndpointProperties.baseUrl])다. 한 base 로 접으면 절반이 404 다.
+ * (`ad/BidPublicInfoService02`, [KonepsEndpointProperties.baseUrl])다. 한 base 로 접으면 절반이 404 다.
  *
  * 개찰완료·A값은 업무 접미가 **없는 단일 오퍼레이션**이라 경로가 하나다(P-1 §1.5).
  * 기본 표는 공사·용역 둘이다 — 물품은 이 slice 가 검증하지 않아 짓지 않는다.
