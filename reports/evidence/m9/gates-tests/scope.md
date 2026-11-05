@@ -15,3 +15,9 @@
 `adapters/src/test/kotlin/**`(해당 test) · `qualification/**` · 커널 둘·testFixtures · `adapters/src/main/kotlin/bidvector/adapters/evaluation/NoticeWatchSubjectPort.kt`(+test) · `config/quality/gate-tests.properties` · 해당 OPEN 문서 행 · evidence
 ## acceptance
 각 술어 양성·음성 대조, 바꿔치우기 변이 RED. 전건 PR CI.
+
+## 계약 갱신 2026-11-06 (팀장)
+
+- **항목 3(`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`)은 이 slice 에서 뺀다(①).** 처방 「test 조립은 testFixtures factory 로」가 저장소 전역 차단과 충돌한다 — build-logic conventions 가 `java-test-fixtures` 를 전 모듈에서 거부하고 그 자리가 `OPEN-1BC-TESTFIXTURES-GATE`(「면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다」)를 가리킨다 · `module.expected-source-sets=main,test` · `sourceSetLayoutGate` 의 compile task 집합 · `TestFixturesGateTest`. 그리고 `internal` 은 testFixtures source set 에서도 보이지 않아 `associateWith` 배선이 필요하다. 생성자를 `internal` 로 내리면 모듈 밖 test 14 파일(app 10 · workflow 4)이 컴파일되지 않는다. ADR 없이 여는 것은 그 OPEN 의 우회다.
+- 받는 자리: **testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행) — ADR + build-logic + 정책 + 14 test 가 한 묶음. capability map 의 OPEN 행 갱신은 M9 장부 후속이 받는다.
+- 항목 4 의 필드 축을 `EvaluationAdapterDependencyTest` 에 둔 것은 in_scope 「(+test)」 읽기로 승인. 항목 2 의 DB 단언 첫 실측은 PR CI.
