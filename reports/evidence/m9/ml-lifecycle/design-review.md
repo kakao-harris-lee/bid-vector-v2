@@ -55,9 +55,10 @@
    생성 자리가 **하나**이고 그것이 `load_evaluation_policy` 안임을 잰다. 테스트 코드는 대상 밖
    (그 자유가 있어야 거부 test 를 쓸 수 있다) — 그래서 「src 안」으로 범위를 적는다.
 4. **승격을 창 없이 만든다** — `derive_promotion` 에 `citation` 을 안 넘기거나 `Citable` 을
-   지어낸다. `citation` 은 기본값 없는 키워드이고 `Citable` 은 `cite_promotion_window` 만
-   만든다(모듈 밖에서 그 타입을 지으려면 import 해 생성해야 하고, src 생성 자리 전수 test 가
-   그 자리를 센다).
+   지어낸다. 막는 것: `citation` 이 기본값 없는 키워드라 안 넘기면 mypy 가 거부하고, 지어낸
+   `Citable` 은 **거동 test** 가 잡는다(홀드아웃 전건에서 승격이 갈리는 등식). **정정**
+   (verifier L-1): 앞 판 문면은 「src 생성 자리 전수 test 가 그 자리를 센다」고 적었는데
+   `Citable` 을 세는 test 는 **없다** — 세는 것은 `EvaluationPolicy`·`TimeAxisPolicy` 둘이다.
 5. **측정 불가 행을 어느 주에 배정해 분모를 채운다**(legacy 의 조용한 대체) — `UnknownTimeAxis`
    에는 시각 값이 **없다**(타입에 필드가 없다). 주를 고르려면 값을 지어내야 하고, 지어내면
    항등식의 모집단 계수가 어긋난다.
@@ -90,3 +91,37 @@
   지금 경계는 「SET-06 의 리포트는 `MaturityTable` 자신」이고, 평가 report 로의 전달은 앱 배선
   축과 함께 미룬다.
 - **미달 아님(ML-08)**: 서명 키 보관·회전은 운영자 결정이라 코드로 만들 축이 없다 — 등재만.
+
+
+## 5. 수정 라운드 — v H-1 이 뒤집은 설계 (2026-11-06)
+
+위 §2 표의 `EvaluationPolicy.effective_date` 행은 값 획득 자리를 「로더가 `path` 하나만
+받는다」로만 적었고, §3 우회 3 은 그 방어를 「src 안 생성 **자리** 하나」로 적었다. **둘 다
+모자랐다** — verifier 가 세 경로로 실제 임계 완화를 전 게이트 초록으로 통과시켰다:
+
+| 경로 | 앞 판이 지나간 이유 |
+| --- | --- |
+| `dataclasses.replace(p, paired_t_threshold=…)` | 생성 **호출**이 아니라 복사라 AST 가 세지 않는다 |
+| `type(p)(**{**vars(p), …})` | 호출 이름이 `type(p)` 라 이름 대조 밖이다 |
+| `getattr(importlib.import_module(…), "Evaluation"+"Policy")(…)` | 이름이 **실행 시점**에 만들어져 어떤 AST 도 보지 못한다 |
+
+주입원도 이름 대조를 비켜 갔다 — 환경 변수 이름(`ML_ENGINE_GATE_T`)이 정책 키를 담지 않았다.
+
+**처방은 열거 확대가 아니라 형태다**(겹 둘, 둘 다 실측):
+
+1. **생성 토큰** — `EvaluationPolicy` 의 첫 매개변수가 기본값 없는 `InitVar[_ParsedPolicyFile]`
+   (모듈 private). `InitVar` 는 인스턴스에 저장되지 않아 `vars()`·`fields()`·`asdict()` 에
+   없으므로 **기존 객체에서 베껴 올 자리가 없다** — 위 세 형태가 전부 `TypeError`/`ValueError`.
+2. **출처 재검증** — 정책이 자기 파일과 그 지문을 들고, 제품 경로가 파일을 다시 읽어 값과
+   바이트를 대조한다. 이 겹은 객체가 **어떻게 만들어졌든** 무관하므로 토큰 이름을 동적으로
+   훔쳐 위조한 객체도 드러난다(AST 가 볼 수 없는 마지막 경로).
+
+**경계를 새로 적는다**: 어느 **파일**을 정책으로 쓸지는 운영자가 고른다
+(`ML_ENGINE_EVALUATION_POLICY`). 이 두 겹이 막는 것은 「코드가 값을 지어내거나 비트는 것」이고,
+완화된 임계는 **승인 근거와 version·effective date 를 가진 정책 산출물**로만 존재할 수 있다 —
+그리고 그 파일의 지문이 report 에 남는다(`policy_source_digest`). 그것이 ML-07 ③④ 가 요구한
+모양이고, 앞 판은 그 모양을 **이름으로 근사**하고 있었다.
+
+**재검증을 제품 경로에 둔 이유**(라이브러리 진입점이 아니라): `run_holdout` 은 커널 test 가
+승인 밖 조합(seed 재배열·단일 seed)으로도 불러야 하고 그런 정책은 로더가 거부한다 — 거기서
+재검증하면 그 test 들이 **재는 것을 잃는다**. 제품 경로는 하나다(`app.pipeline._run_holdout`).

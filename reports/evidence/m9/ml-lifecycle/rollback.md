@@ -10,9 +10,12 @@
 ② 이 slice 의 **첫 커밋이 그 SHA 에 없다**(`--is-ancestor` 비-0). ② 가 성립하므로 그 SHA 에서의 전체 복원이
 남의 줄을 떨어뜨릴 수 없고 커밋 해시 hunk 격리가 필요 없다.
 
-**공유 파일에 hunk 격리가 필요 없는 근거**: 다른 slice 도 만지는 파일은 `docs/discovery/capability-map.md`
-하나이고, 이 range 에서 그 파일을 만진 커밋은 **하나이며 이 slice 의 것**이다
-(`git log --oneline df4976cc..HEAD -- docs/discovery/capability-map.md` 1행).
+**공유 파일에 hunk 격리가 필요 없는 근거**: 다른 slice 도 만지는 파일은 `docs/discovery/capability-map.md` 와
+**다른 slice 의 정책 값 장부 둘**(`reports/evidence/m5/5c2/policy-values.md` ·
+`reports/evidence/m5/5d/policy-values.md` — 수정 라운드 cr M-4 로 in_scope 확장 승인)이다. 이 range 에서 그
+셋을 만진 커밋은 **각각 하나이고 전부 이 slice 의 것**이며(`git log --oneline df4976cc..HEAD -- <파일>` 각 1행),
+편집은 **덧붙이기**다(기존 행 무편집). 복원 원천 `df4976cc` 가 그 선행 내용을 모두 담으므로 전체 복원이 남의
+줄을 떨어뜨릴 수 없다.
 
 **하네스 경로**(`CLAUDE.md` · `.claude/**`)는 되돌리지 않는다 — 같은 range 의 로그가 **빈 출력**(이 slice 에
 하네스 레인 커밋 0).
@@ -35,42 +38,51 @@ git restore --source=df4976cc --staged --worktree -- \
   ml-engine/src/ml_engine/inference/__init__.py \
   ml-engine/src/ml_engine/inference/maturity.py \
   ml-engine/src/ml_engine/inference/policy.py \
+  ml-engine/src/ml_engine/registry/policy.py \
   ml-engine/src/ml_engine/training/_holdout_window.py \
   ml-engine/src/ml_engine/training/artifact_writer.py \
   ml-engine/src/ml_engine/training/holdout.py \
+  ml-engine/src/ml_engine/training/jobs/pipeline.py \
   ml-engine/src/ml_engine/training/release.py \
   ml-engine/tests/app/test_pipeline.py \
   ml-engine/tests/evaluation/test_baselines.py \
   ml-engine/tests/evaluation/test_evaluation_policy.py \
+  ml-engine/tests/evaluation/test_public_signatures.py \
   ml-engine/tests/evaluation/test_report.py \
   ml-engine/tests/evaluation/test_segments.py \
   ml-engine/tests/evaluation/test_verdict.py \
   ml-engine/tests/evaluation/test_windows.py \
+  ml-engine/tests/gates/test_policy_loader.py \
   ml-engine/tests/inference/golden/test_kernel_golden.py \
   ml-engine/tests/inference/test_maturity.py \
   ml-engine/tests/serving/test_prediction.py \
   ml-engine/tests/serving/test_runtime.py \
   ml-engine/tests/training/test_holdout.py \
   ml-engine/tests/training/test_residual_release.py \
-  ml-engine/tests/training/test_train_artifact.py
+  ml-engine/tests/training/test_train_artifact.py \
+  reports/evidence/m5/5c2/policy-values.md \
+  reports/evidence/m5/5d/policy-values.md
 ```
 
-**신규 파일은 복원이 아니라 삭제다**(`df4976cc` 에 없으므로 `restore` 가 받지 않는다) — 여섯이다.
+**신규 파일은 복원이 아니라 삭제다**(`df4976cc` 에 없으므로 `restore` 가 받지 않는다) — **9** 이다.
 
 ```bash
 git rm -f \
   ml-engine/src/ml_engine/evaluation/epoch.py \
+  ml-engine/src/ml_engine/evaluation/policy_source.py \
   ml-engine/src/ml_engine/inference/time_axis.py \
+  ml-engine/tests/ast_sites.py \
   ml-engine/tests/evaluation/test_epoch.py \
   ml-engine/tests/evaluation/test_gate_relaxation_paths.py \
   ml-engine/tests/inference/test_time_axis.py \
+  ml-engine/tests/policy_fixture.py \
   ml-engine/tests/training/test_release_identity.py
 ```
 
 evidence 디렉터리는 **목록 밖**이다(장부층 — 그래서 이 목록이 자기를 담은 커밋을 가리키지 않는다).
 함께 지우려면 `git rm -r reports/evidence/m9/ml-lifecycle`.
 
-목록은 **기계 산출**이다(`git diff --name-status df4976cc..HEAD` 에서 evidence 제외 — `M` **29** · `A` **6**).
+목록은 **기계 산출**이다(`git diff --name-status df4976cc..HEAD` 에서 evidence 제외 — `M` **35** · `A` **9**).
 라운드가 늘면 다시 산출한다.
 
 ## 되돌린 트리에서 무엇이 꺼지는가
@@ -86,22 +98,27 @@ evidence 디렉터리는 **목록 밖**이다(장부층 — 그래서 이 목록
   같은 `release_id` 를 가질 수 있는 상태로 돌아간다. **이미 쓰인 아티팩트의 식별자가 바뀐다** — 되돌림 전에
   학습한 아티팩트를 되돌린 코드로 재파생하면 다른 id 가 나온다(운영 반입이 보류 상태라 영향 범위는 저장소
   안이다).
+- **정책 출처 재검증이 사라진다**(수정 라운드): `EvaluationPolicy` 가 생성 토큰 없이 조립 가능해지고, 제품
+  경로가 정책 파일을 다시 읽지 않는다 — `dataclasses.replace` 류로 임계를 비튼 정책이 다시 게이트를 돌 수
+  있는 상태로 돌아간다. 정책 파일의 `effective_date` 칸과 `maturity.time_axis_substitute` 칸도 함께 사라져
+  되돌린 로더의 `known_keys` 전수와 다시 일치한다.
 - **운영 영향 0**: ML 앱 배선과 수집 연장이 사용자 결정으로 보류 상태이고, 이 레인은 운영 host·DB·외부 API 에
   닿지 않았다. 되돌림은 저장소 파일만 움직인다.
 
 예상 복구 시간: 명령 둘(초 단위).
 
-## 실측 (버릴 clone, **실측 HEAD `8284e602`** — 마지막 산출물 커밋)
+## 실측 (버릴 clone, **실측 HEAD `9ddfc542`** — 마지막 산출물 커밋)
 
-**앞 라운드의 실측을 옮기지 않았다.** 첫 측정은 `22394872` 에서 났는데 그 뒤 전건 acceptance 가 설계 래칫
-위반 하나를 잡아 `_holdout_window.py`(복원 목록 **안**)를 다시 커밋했다 — 되돌림 대상이 움직였으므로 그
-측정은 무효이고 이 절은 재측정 결과다(목록·트리 해시는 같다).
+**앞 라운드의 실측을 옮기지 않았다 — 이 절은 세 번째 측정이다.** ① `22394872` 측정 뒤 전건 acceptance 가
+설계 래칫 위반을 잡아 `_holdout_window.py`(복원 목록 **안**)를 다시 커밋했고 ② 그 뒤 수정 라운드가 목록을
+**29+6 → 35+9** 로 늘렸다(새 모듈 둘·공용 test 보조 둘·`registry/policy.py`·`jobs/pipeline.py`·장부 둘 등).
+되돌림 대상이 움직일 때마다 목록을 다시 산출하고 다시 쟀다. 트리 해시는 세 번 모두 같다.
 
 | # | 확인 | 결과 |
 |---|---|---|
-| — | 목록 등식 | 기계 산출 `M` **29** · `A` **6**(evidence 제외) · 문서 목록 **29 + 6** |
+| — | 목록 등식 | 기계 산출 `M` **35** · `A` **9**(evidence 제외) · 문서 목록 **35 + 9** |
 | ① | 복원 명령 둘 | `restore` exit **0** · `rm` exit **0** |
-| ② | `git status --porcelain` | **`M` 29 · `D` 8**(`D` 는 신규 여섯 + 함께 지운 evidence 둘) |
+| ② | `git status --porcelain` | **`M` 35 · `D` 14**(`D` 는 신규 9 + 함께 지운 evidence 다섯) |
 | ③ | `git diff df4976cc -- .` | **빈 출력** |
 | ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**(「HEAD 초록」이 아니다): 복원 뒤 작업 트리의 `git write-tree` 가 base 트리 해시와 **같다**(`29e4039d…` 양쪽) — 되돌린 트리는 `df4976cc` 와 **같은 트리**이고 그것은 CI 가 통과한 main 이다 |
 | ⑥ | 이 slice 가 닿는 게이트 | 아래 「⑥ 게이트」 |
@@ -123,7 +140,7 @@ evidence 디렉터리는 **목록 밖**이다(장부층 — 그래서 이 목록
 ## 유효성 확인 (감사자용)
 
 ```bash
-git diff --name-only 8284e602..<판정 SHA> -- <위 복원 목록 29 + 신규 6>
+git diff --name-only 9ddfc542..<판정 SHA> -- <위 복원 목록 35 + 신규 9>
 ```
 
 빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.

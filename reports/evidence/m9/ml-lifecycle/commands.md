@@ -41,11 +41,15 @@ wheel 재수출까지). 판정 SHA 에서의 결과:
 | S-2 | `ruff check .` · `ruff format --check .` | 0 · 0 | 236 files already formatted |
 | S-3 | `mypy --strict src/ml_engine` | 0 | 101 source files, no issues |
 | S-4 | `lint-imports` | 0 | **8 kept, 0 broken** |
-| S-5 | `pytest tests -q` | 0 | **1679 passed**(착수 1628 → +51) |
+| S-5 | `pytest tests -q` | 0 | 착수 라운드 **1679 passed** · 수정 라운드 **1700 passed**(착수 base 1628 → +72) |
 | S-6 | `python tools/design_ratchet.py --check` | 0 | allowlist 밖 위반 0 |
 | S-7 | 재활용 출처 두 자리 대조 + 양성 대조 | 0 | 어긋난 evidence 가 실제로 실패 |
 | S-9 | Python 버전 두 자리 대조 | 0 | — |
 | S-11 | wheel 빌드 + 설치본 재수출 | 0 | 1 passed |
+
+위 표는 **착수 라운드(`8284e602`)** 측정이고, 수정 라운드 HEAD(`9ddfc542`)에서 **같은 열한
+단계를 다시 돌려 전부 exit 0** 이다(S-5 1700 passed · S-3 102 files · S-4 8 kept/0 broken ·
+S-6 위반 0 · S-2b 239 files formatted).
 
 **S-6 가 한 번 붉었다.** ML-05 가 더한 `sample_scope` 한 줄이 `_assemble_window_result` 를 함수 길이 소프트
 한도 위로 밀었고, 그 라운드에서는 ML-05 뒤에 래칫을 다시 돌리지 않아 **전건 acceptance 에서 처음** 드러났다
@@ -87,6 +91,51 @@ Kotlin·web·docker 경로가 **0 건**이다(변경은 `ml-engine/**` · `docs/
 게이트를 **그 모듈 안에서 그 타입을 가리키는 이름 전수**(원래 이름 + 별칭 + 한 단계 재대입)로 보강하고 같은
 변이를 다시 돌려 RED 를 실측했다. 남은 한계(재대입 두 단계 이상)는 그 게이트 docstring 과
 `checklist.md` 제한 3 에 적었다.
+
+## §4b 수정 라운드 (v not-ready @`8284e602` · cr approve)
+
+finding 별 별도 커밋이고 각각 RED 선행이다.
+
+| finding | 처방 | RED/변이 실측 | 커밋 |
+| --- | --- | --- | --- |
+| **v H-1**(차단) 완화 불가 게이트가 이름 문자열 술어 | 겹 둘 — `InitVar` 생성 토큰 + 출처 재검증(제품 경로) | V1·V2·V3 형태가 각각 `TypeError`/`ValueError` · 위조 토큰 객체가 재검증에서 `PolicySourceMismatch` · 제품 경로에서 job 실패(통제군: 정직한 정책은 끝까지 돈다) | `8f6ae6ac` |
+| cr M-1 측정 불가 행의 정책 version | 검사를 두 갈래 공통 자리로 + `UnmeasurableTimeAxis.policy_version` | 새 test 둘이 앞 판에서 `AttributeError`·「예외 없음」 | `352e6c59` + `75d2cc96` |
+| cr M-2 표 항등식이 provenance 를 안 묶는다 | `__post_init__` 등식 둘(창별 출처 합 = 분모 · 대체 계수 = 창들의 합) | 새 test 셋이 「DID NOT RAISE」로 붉다(**3 failed** 실측) | `85a68e64` |
+| v L-2 `yes` 가 승인으로 읽힌다 | bool → 닫힌 어휘 `TimeAxisSubstitute` | 느슨한 표기 여덟 전부 거부 + 어휘 두 값 양성 대조 | `da405f6c` + `847f7784` |
+| v M-1 창 경로의 scope 축 미잠금 | `sample_scope` 만 다른 두 manifest 로 창 id 가 갈리는 test | v 변이 **R4**(그 자리 상수화) 재현 → 이 test 만 RED(27 passed) | `a0e9f1cc` |
+| cr M-6 게이트 AST 보조 복제 | `tests/ast_sites.py` 한 자리 | — (구조) | `6cc07e06` |
+| cr M-3 금지 인자 열거가 스키마를 안 따라온다 | 정책 키에서 **생성** + 비정책 이름 명시 예외 | — (모집단 등식 test) | `9b010c79` |
+| cr M-5 · cr LOW 넷 | 문면 정정 + env 축 별칭 구멍·`os` 뿌리 비교 | — (문면) · 별칭 구멍은 ④ 축의 M8b 와 같은 갈래 | `954e62c1` |
+| cr M-4 장부 미갱신 | `m5/5c2`·`m5/5d` 에 새 키 행(in_scope 확장 승인) | — (장부) | `9ddfc542` |
+| 설계 래칫 | `policy_source.py` 분리(파일 500) · `_maturities` 분리 · docstring 축약 | 라운드 중 **2건 붉음 → 0** | `8f6ae6ac` 안 |
+
+**계측을 한 번 더 틀렸다**: cr M-1 의 회귀 test 를 **붉은 채로 커밋했고**(`352e6c59`) 그 test
+자체도 축을 재지 못했다 — 두 fixture 가 승인 칸만 다르고 version 이 같아 정책 version 검사를
+트리지 않았다. 다음 커밋(`75d2cc96`)에서 다른 version 의 정책을 따로 만들고 양성 대조를 붙였다.
+같은 라운드에 `da405f6c` 는 serving 두 test 를 함께 고치지 않아 collection error 를 남겼고
+`847f7784` 가 받았다 — **표적을 좁혀 돌린 대가**이고, 그래서 라운드 끝에 전건을 다시 돌린다.
+
+### v H-1 의 세 변이 재현 — **게이트가 아니라 형태가 막는다**
+
+버릴 clone 에 verifier 의 V1 을 그대로 심었다(`server.py::_preload` 의 평가 줄을
+`_tuned(load_…)` 로 바꿔치우고 그 함수가 `os.environ["ML_ENGINE_GATE_T"]` → `replace`).
+
+| 축 | 결과 |
+| --- | --- |
+| 완화 경로 게이트 + 숫자 리터럴 게이트 | **16 passed(초록)** — 이 층은 `replace` 를 세지 않는다. 앞 판과 같다 |
+| 그 코드가 **실제로 도는가** | `ML_ENGINE_GATE_T=0.01` 로 호출 → **`ValueError: InitVar 'parsed' must be specified with replace()`**. 파일 임계 2.58 은 그대로다 |
+| V2 `type(p)(**vars(p))` · V3 `getattr(…, "Evaluation"+"Policy")(…)` | 각각 **`TypeError`**(토큰 누락) |
+| V4 토큰 절취 위조 | 객체는 만들어진다 → 출처 재검증이 `PolicySourceMismatch`, 제품 경로가 job 실패. 통제군: 정직한 정책은 끝까지 돈다 |
+
+**문면을 정확히 적는다**: V1·V2·V3 는 「게이트가 붉어져서」 막히는 것이 아니라 **그 코드가
+자기 일을 할 수 없어서** 막힌다 — 완화가 탐지되는 것이 아니라 **불가능**하다. 탐지가 필요한
+잔여(동적 절취)는 V4 축이 받고, 그쪽은 제품 경로에서 job 실패로 드러난다. 이름 대조 층
+(`src` 생성 자리 하나)은 그대로 보조로 남겨 **정적으로** 가져가는 길을 계속 센다
+(M8a·M8b RED).
+
+**거부한 지적 하나**: cr LOW `_matched_keys` 부분 일치 → **등재**(`checklist.md` 제한 3b).
+좁히면 접두·접미를 붙인 완화 이름이 조용히 통과하고, 지금 형태의 대가는 조용한 구멍이 아니라
+사람이 볼 신호다.
 
 ## §5 되돌림
 
