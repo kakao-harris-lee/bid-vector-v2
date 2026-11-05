@@ -11,6 +11,7 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -237,9 +238,18 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
      * (검증 레인 실측). 그래서 순서가 아니라 **거동**을 잠근다.
      *
      * 「다른 칸에 담긴 `null`」(`terms: null` 류)은 칸 배정 진단이 먼저 받는다 — 그 자리는 위 test 다.
+     *
+     * **먼저 금액대를 세우고 잰다**: 거절이 「아무것도 쓰지 않았다」는 **지울 것이 있을 때만** 뜻이
+     * 있다. 빈 전략에서 「지금도 비어 있다」를 단언한 앞 판은 거절이 실제로 비웠어도 통과했다
+     * (v r2 L-b — 공허한 단언).
      */
     @Test
-    fun `비움 요청에 다른 칸이나 미지 키가 함께 오면 400 이다`() {
+    fun `비움 요청에 다른 칸이나 미지 키가 함께 오면 400 이고 세운 값이 그대로다`() {
+        applyValue("MIN_BUDGET", """"amountWon":100000000""", "min-set")
+        val before = strategyRepository.strategy.watchRules.budget.min
+        val beforeRevision = strategyRepository.strategy.revision
+        before shouldNotBe null
+
         val probes =
             listOf(
                 """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"terms":["x"]}""",
@@ -253,7 +263,9 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
 
         outcomes.map { it.first } shouldBe listOf(400, 400, 400, 400, 400)
         outcomes.forEach { (_, body) -> body shouldContain ErrorCode.INVALID_REQUEST }
-        // 거절이 **아무것도 쓰지 않았다** — 거절된 비움이 조용히 적용되지 않는다.
-        strategyRepository.strategy.watchRules.budget.min shouldBe null
+        // 거절이 **아무것도 쓰지 않았다** — 세운 값·개정이 그대로이고 wire 도 그 값을 낸다.
+        strategyRepository.strategy.watchRules.budget.min shouldBe before
+        strategyRepository.strategy.revision shouldBe beforeRevision
+        strategyBody() shouldContain "\"minBudgetWon\":100000000"
     }
 }
