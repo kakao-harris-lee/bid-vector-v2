@@ -7,6 +7,7 @@ import bidvector.procurement.PageCursor
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
+import bidvector.workflow.collection.AwardListSourcePort
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.URI
@@ -58,37 +59,17 @@ class KonepsOpeningResultSource(
     override fun fetchOpeningResults(
         referenceDate: CollectionReferenceDate,
         cursor: PageCursor?,
-    ): SourceBatch<RawNoticeObservation> {
-        val policy = config.collectionPolicyProvider(referenceDate)
-        val window = openingDayWindow(referenceDate)
-        val uriBuilder =
-            KonepsPageUriBuilder { pageNo ->
-                buildKonepsOperationUri(
-                    base = listBaseUri,
-                    serviceKey = config.serviceKey,
-                    operation = listOperation,
-                    pageNo = pageNo,
-                    numOfRows = config.numOfRowsPerPage,
-                    periodWindow = window,
-                )
-            }
-        return walkKonepsNoticePages(
-            config.gate,
-            KonepsCallContext(listSourceEndpoint),
+    ): SourceBatch<RawNoticeObservation> =
+        walkKonepsOpeningList(
+            listBaseUri,
+            listOperation,
+            listSourceEndpoint,
+            config,
             retry,
             rateLimiter,
-            uriBuilder,
-            config.httpPolicy,
-            policy,
-            config.clock,
+            referenceDate,
             cursor,
-        ) { item, itemPolicy, observedAt ->
-            // 낙찰 목록·개찰결과 목록은 한 행=한 공고라 listOperation
-            // 이 선언한 rowIdentifierRawKeys 를 그대로 쓴다(AWARD_LIST·OPENING_RESULT_LIST
-            // 둘 다 emptyList()).
-            mapMaskedOpeningItem(item, itemPolicy, listSourceEndpoint, observedAt, listOperation.rowIdentifierRawKeys)
-        }
-    }
+        )
 
     /**
      * 예비가격 상세(②) — 서명이 [DetailFetchDecision.Fetch]를 요구해 3A 조회 가치 술어
@@ -198,6 +179,95 @@ class KonepsOpeningResultSource(
             )
         }
 }
+
+/**
+ * 개찰 축 **목록** 오퍼레이션 한 쪽 걷기 — 낙찰 목록과 개찰결과 목록이 이 자리 하나를 공유한다.
+ *
+ * 두 소스가 같은 걷기를 각자 조립하면(창·URI·회계·매핑 네 줄) 한쪽만 고치는 표류가 생기고, 그
+ * 표류는 조용하다(같은 모양을 두 벌 두는 것을 중복 게이트가 실제로 잡는다). 재시도·속도 한도는
+ * **인자로 받는다** — 인스턴스마다 자기 것을 쥐므로, 이 함수가 그것을 지으면 상세 축과 목록 축이
+ * 한 소스 안에서 서로 다른 한도를 갖게 된다(기존 거동이 바뀐다).
+ */
+internal fun walkKonepsOpeningList(
+    listBaseUri: URI,
+    listOperation: KonepsOperationDescriptor,
+    listSourceEndpoint: SourceEndpoint,
+    config: KonepsSourceConfig,
+    retry: Retry,
+    rateLimiter: RateLimiter,
+    referenceDate: CollectionReferenceDate,
+    cursor: PageCursor?,
+): SourceBatch<RawNoticeObservation> {
+    val policy = config.collectionPolicyProvider(referenceDate)
+    val window = openingDayWindow(referenceDate)
+    val uriBuilder =
+        KonepsPageUriBuilder { pageNo ->
+            buildKonepsOperationUri(
+                base = listBaseUri,
+                serviceKey = config.serviceKey,
+                operation = listOperation,
+                pageNo = pageNo,
+                numOfRows = config.numOfRowsPerPage,
+                periodWindow = window,
+            )
+        }
+    return walkKonepsNoticePages(
+        config.gate,
+        KonepsCallContext(listSourceEndpoint),
+        retry,
+        rateLimiter,
+        uriBuilder,
+        config.httpPolicy,
+        policy,
+        config.clock,
+        cursor,
+    ) { item, itemPolicy, observedAt ->
+        // 낙찰 목록·개찰결과 목록은 한 행=한 공고라 listOperation 이 선언한 rowIdentifierRawKeys 를
+        // 그대로 쓴다(AWARD_LIST·OPENING_RESULT_LIST 둘 다 emptyList()).
+        mapMaskedOpeningItem(item, itemPolicy, listSourceEndpoint, observedAt, listOperation.rowIdentifierRawKeys)
+    }
+}
+
+/**
+ * 낙찰 목록 소스(M9/award-ingest D-1·D-2) — **목록 걷기 하나뿐**이다.
+ *
+ * `KonepsOpeningResultSource` 를 쓰지 않는 이유는 그 타입이 상세 축 넷의 엔드포인트를 **필수로**
+ * 요구하기 때문이다: 이 갈래는 그 넷을 부르지 않으므로 넘길 참값이 없고, 아무 값이나 넣으면
+ * 「부르면 엉뚱한 곳으로 가는 포트」가 생긴다. 포트를 좁히면 그 조합 자체가 표현되지 않는다.
+ */
+internal class KonepsAwardListSource(
+    private val listBaseUri: URI,
+    private val config: KonepsSourceConfig,
+) : AwardListSourcePort {
+    private val retryName = "koneps-award-${SourceEndpoint.OPENING_AWARD_LIST.name.lowercase()}"
+    private val retry: Retry = buildKonepsRetry(retryName, config.httpPolicy)
+    private val rateLimiter: RateLimiter = buildKonepsRateLimiter(retryName, config.httpPolicy)
+
+    override fun fetchAwardList(
+        referenceDate: CollectionReferenceDate,
+        cursor: PageCursor?,
+    ): SourceBatch<RawNoticeObservation> =
+        walkKonepsOpeningList(
+            listBaseUri,
+            KonepsOperationPolicy.AWARD_LIST,
+            SourceEndpoint.OPENING_AWARD_LIST,
+            config,
+            retry,
+            rateLimiter,
+            referenceDate,
+            cursor,
+        )
+}
+
+/**
+ * 낙찰 목록 소스 한 벌(M9/award-ingest) — 호출부는 **경로만** 준다. 조회 축(`inqryDiv=3`, 개찰일시)과
+ * 적재 endpoint(`OPENING_AWARD_LIST`)는 이 모듈 안에 남는다: 배선이 그 둘을 고를 수 있으면 다른 축을
+ * 걷거나 다른 계약 슬롯으로 적재하는 조합이 설정 한 줄로 생긴다.
+ */
+fun konepsAwardListSource(
+    listBaseUri: URI,
+    config: KonepsSourceConfig,
+): AwardListSourcePort = KonepsAwardListSource(listBaseUri, config)
 
 /**
  * 6G 표본틀 소스 한 벌(M6/6G D-6G-11·19) — 호출부는 **경로만** 준다. `inqryDiv` 축과 행 식별자 같은

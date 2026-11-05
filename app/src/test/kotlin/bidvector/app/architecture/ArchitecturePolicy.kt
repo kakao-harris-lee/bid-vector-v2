@@ -342,8 +342,11 @@ class ArchitecturePolicy private constructor(
                 .map { it.removePrefix(DEPTH_PREFIX) }
                 .toSet()
 
-    /** D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
-    val collectionUseCaseType: String get() = value("collection.usecase.type")
+    /**
+     * D-6F8-6 (h) — 수집 use case 타입**들**과 그것을 참조해도 되는 production 클래스 집합. 갈래가 늘면
+     * 타입도 는다(M9 낙찰 목록) — 키를 집합으로 두지 않으면 새 use case 가 이 게이트 밖에 선다.
+     */
+    val collectionUseCaseTypes: List<String> get() = list("collection.usecase.types")
     val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")
 
     /**

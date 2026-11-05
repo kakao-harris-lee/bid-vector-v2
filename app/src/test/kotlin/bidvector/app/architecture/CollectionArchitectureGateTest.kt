@@ -152,7 +152,7 @@ class CollectionArchitectureGateTest {
         rules
             .appTypesMustBeReferencedOnlyBy(
                 policy.packageRoot,
-                setOf(policy.collectionUseCaseType),
+                policy.collectionUseCaseTypes.toSet(),
                 policy.collectionUseCaseReferencers.toSet(),
                 "D-6F8-6 우회 5 — 수집 use case 참조 집합은 러너와 배선이다",
                 policy.depth(DepthAxis.USECASE),
@@ -160,7 +160,7 @@ class CollectionArchitectureGateTest {
         rules.observedReferencers(
             production,
             listOf(policy.packageRoot),
-            setOf(policy.collectionUseCaseType),
+            policy.collectionUseCaseTypes.toSet(),
             policy.depth(DepthAxis.USECASE),
         ) shouldBe policy.collectionUseCaseReferencers.toSet()
     }
