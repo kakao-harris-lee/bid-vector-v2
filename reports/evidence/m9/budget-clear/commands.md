@@ -1,9 +1,12 @@
 # M9 / budget-clear — 실행한 명령과 핵심 결과
 
-**판정 대상 SHA `a246585e`** — 이 slice 의 마지막 산출물 커밋(라운드 3·4 의 변경은 **test·장부뿐**). 앞 head 는
-`a8120fb5`(`origin/main` = `6c38fb32` 을 이 브랜치로 병합한 커밋) · 산출물 `be1026dc` · `c36a01e1` ·
-첫 리뷰 대상 head `b988f985` 였다. base `79f3e5c4`, 병합 뒤 비교 원천은 `6c38fb32`
+**판정 대상 SHA `f5cbecba`** — `origin/main`(`4953d743`, PR #125 m9-screen-display 반영)을 이 브랜치로
+받은 **두 번째 병합 커밋**이다. 산출물 자체의 마지막은 `a246585e`(라운드 4) · 그 앞 `ae6f4044`·`be1026dc`·
+`c36a01e1` · 첫 리뷰 head `b988f985`. base `79f3e5c4`, **비교·복원 원천은 `4953d743`**
 (`rollback.md` 「원천이 바뀐 이유」).
+
+PR #125 는 이 slice 와 **같은 파일 셋**을 만졌다 — 그 병합의 합집합 보존 실측은 `rollback.md`
+「합집합 보존」 절이다(표지 계수 · 중복 정의 0 · 고아 주석 0 · 양쪽 test 둘 다 통과).
 
 **acceptance 의 정본은 PR CI 다**(팀장 공지 2026-11-05 — 호스트 빌드 큐 포화로 전건 재실측을 CI 로 옮겼다).
 로컬은 표적·변이만 돌렸다.
@@ -39,7 +42,21 @@ diff(`79f3e5c4..34ddda2b`)와 같고(`d3d2ac3c…`) 경로 수 18 도 같다. ma
 새 test 클래스 `StrategyBudgetClearEndpointTest` 는 **만드는 커밋에서** `config/quality/gate-tests.properties` 의
 `gate.tests.app` 블록에 사전순으로 등재했다 — 등재가 없으면 `gateRegistrationGate` 가 모집단 등식으로 떨어진다.
 
-## `web` job 의 step 별 로컬 실행 (앞 라운드, 참고 — 정본은 위 CI `web` pass)
+## 둘째 병합 뒤 로컬 web 게이트 (가벼운 것만 — e2e·전건은 CI)
+
+`4953d743` 을 받은 뒤 `web/` 에서 다시 돌렸다. 무거운 둘(Playwright 스모크·여정)은 팀장 공지대로 CI 가 받는다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `npm ci` | exit 0 |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run api:types:check` | exit 0 |
+| `npm run gate:src-tree` | exit 0 |
+| `npm run test` | exit 0 — **38 파일 · 761 test**(병합 전 내 쪽 34·678 → #125 의 네 파일과 단언이 더해졌다) |
+| `npm run gate:tests` | exit 0 — 등록부 기준 skipped/todo 0 · failed 0. 겹치는 test 파일 둘이 **그 등록부에 있다** |
+
+## `web` job 의 step 별 로컬 실행 (앞 라운드, 참고 — 정본은 CI `web` pass)
 
 | step | 명령 | 결과 |
 | --- | --- | --- |

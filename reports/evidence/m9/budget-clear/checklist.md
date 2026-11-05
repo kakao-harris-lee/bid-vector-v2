@@ -1,6 +1,6 @@
 # M9 / budget-clear 완료 점검
 
-정본 계약 `scope.md`(D-1~D-4 + 계약 갱신 2026-11-05 · r2). **판정 대상 SHA `a246585e`**(마지막 산출물 커밋). 앞선 head 들: `ae6f4044`(라운드 3) · `a8120fb5`(`origin/main` 병합) · `be1026dc` · `c36a01e1` · 첫 리뷰 head `b988f985`.
+정본 계약 `scope.md`(D-1~D-4 + 계약 갱신 2026-11-05 · r2). **판정 대상 SHA `f5cbecba`**(두 번째 `origin/main` 병합 = PR #125 반영). 산출물 마지막은 `a246585e` · 앞선 head 들: `ae6f4044` · `a8120fb5` · `be1026dc` · `c36a01e1` · 첫 리뷰 head `b988f985`.
 **전건 acceptance 의 정본은 PR CI 다**(팀장 공지) — `a8120fb5` 의 run `42009499386` 이 네 job 전부 pass 였고, 라운드 3 의 변경은 **test·장부뿐**이라 로컬에서 표적·변이·통제군만 돌렸다. 이 head 의 CI 는 push 뒤 돈다.
 명령·변이는 `commands.md`, 되돌림은 `rollback.md`.
 
