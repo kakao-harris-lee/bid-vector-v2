@@ -10,7 +10,7 @@
 
 | 항목 | 결과 |
 | --- | --- |
-| CI Kotlin `check` job 명령 그대로 exit 0 | 로컬 `commands.md` 「전건 check ②」 행 — exit 0, 33m 30s(계약 갱신 전 HEAD). **전건 정본은 PR CI 의 `check`·`web` job** — 같은 절 「PR CI」 행 |
+| CI Kotlin `check` job 명령 그대로 exit 0 | **PR CI run 42028468446 `check` job pass**(판정 SHA `be07aaa1`) — 로컬 전건도 계약 갱신 전 HEAD 에서 exit 0 이었다(33m 30s) |
 | 기본 base·경로 다섯이 `02`(부팅/설정 test) | `KonepsEndpointDefaultsTest` — 바인딩을 지난 값으로 열거 셋 + 두 서비스 경로 집합이 갈리는 경계 하나 |
 | ScsbidInfoService 기본값 불변 | 같은 test 의 넷째 — base·개찰완료·개찰결과 목록 둘·예비가격 상세 둘. **RED 라운드에서 처음부터 초록**(통제군) |
 | mock 이 두 축을 정확히 가르고 미등록 경로는 실패 | `MockKonepsRoutingTest` ⓐ 공고 목록 ↔ 기초금액 분리 · ⓑ 미등재 둘이 404 이고 `close` 가 실패로 올림. 두 이름은 기본 표에서 읽으므로 위 test 가 그 문면을 `…Cnstwk02`·`…BsisAmount02` 로 고정한다 |
@@ -72,7 +72,11 @@
 | 라운드 | HEAD | 결과 |
 | --- | --- | --- |
 | 1 (run 42025625713) | `bea3a225` | `container`·`ml-engine` **pass** · `web` **fail**(step 20 W-13 — 준비 대기가 영구 404 로 30초 타임아웃) · `check` 중단 |
-| 2 | `7f51bdc0` | push 뒤 기록 |
+| 2 (run 42028468446) | **`be07aaa1`**(판정 SHA) | **네 job 전부 pass** — `check` 47m11s(`check`·`qualityBaseline`·S-20 세 step 전부 success) · `web` 2m57s · `container` 7m16s · `ml-engine` 9m34s |
+
+**W-13 이 조용히 초록인 것이 아니다.** step 20 이 43초 실행되고(앞 라운드는 30초 타임아웃 뒤 실패)
+로그가 「공고 4건 준비」 → 「수집 러너 끝(exit=0)」 → **여정 11 passed · flaky 0 · 건너뜀 0 ·
+spec 4/4(등록부와 같다)** 다. 수집이 실제로 공고를 넣었고 화면 단언이 그것을 봤다.
 
 로컬에서 web 전건(`npm ci` → playwright → docker 여정)을 반복하지 않는다(팀장 결정 2026-11-05, 호스트
 빌드 큐 포화). 이 레인이 로컬에서 잰 것은 **fake KONEPS 라우팅 한 자리**이고(`commands.md` 「web fake

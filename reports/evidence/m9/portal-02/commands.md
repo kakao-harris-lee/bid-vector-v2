@@ -112,3 +112,13 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: 참조형 누출 스캔 `grep -rniE -f config/quality/leak-patterns.txt` · 내 비-병합 커밋의 `git show --numstat`
 - exit: 0
 - 핵심 결과: evidence **0건**. 편집한 web 하네스 둘 중 `journey-up.mjs` 는 13건이지만 **병합한 main 쪽도 같은 13건**이라 내가 들인 줄이 아니다(`fake-koneps.mjs` 는 양쪽 0). 크기 게이트: evidence 409줄 대 산출물 866줄.
+
+## 2026-11-05T13:35Z — **PR CI 라운드 2 = 전건 acceptance 정본** (run 42028468446, head `be07aaa1`)
+- cmd: CI job 의 명령 그대로 — `check`: `./gradlew --no-daemon check` · `./gradlew --no-daemon qualityBaseline` · `tools/one-command-check.sh`(S-20) / `web`: `npm run test:e2e` · `npm run test:e2e:journey`(W-13)
+- exit: 0 (run conclusion **success**)
+- 핵심 결과: 네 job 전부 **pass** — `check` 47m11s(세 step 전부 success) · `web` 2m57s · `container` 7m16s · `ml-engine` 9m34s.
+
+## 2026-11-05T13:40Z — W-13 이 실제로 돌았는지 (초록인데 조용한가)
+- cmd: `gh api .../actions/jobs/127248711530` step 20 시각 · 그 job 의 로그에서 여정 줄
+- exit: 0
+- 핵심 결과: step 20 이 **43초 동안 실행**(12:38:19Z→12:39:02Z, 앞 라운드는 30초 타임아웃 뒤 실패)되고 로그가 「공고 4건 준비」 → 「수집 러너 끝(exit=0)」 → **여정 test 11 passed · flaky 0 · 건너뜀 0 · spec 4/4(등록부와 같다)**. 준비 대기가 더는 타임아웃하지 않고 수집이 실제로 공고를 넣었다.
