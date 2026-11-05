@@ -15,7 +15,9 @@
 | --- | --- |
 | import 없이 전체 한정 좌표로 층 밖 domain 참조 | **막힘** — 이 slice 가 닫은 그 자리(변이 실측, commands) |
 | 허용 루트의 **이름 접두**를 공유하는 이웃 패키지 | 막힘 — 세그먼트 경계 단언 |
-| `Class.forName("bidvector.decision.X")` 류 문자열 좌표 | 막힘 — 정규식이 점 표기도 본다 |
+| `Class.forName("bidvector.decision.X")` — **리터럴** 좌표 | 막힘 — 정규식이 점 표기도 본다 |
+| 같은 reflection 인데 이름을 **짜 맞추거나** 바깥에서 받기 | **안 막힘**(v-134 L-3) — 상수 풀에는 조각(`"bidvector."`)만 남아 좌표가 성립하지 않는다. 위 행의 주장은 **리터럴 한정**이다 |
+| 허용된 형제 `adapters.snapshot` 을 **경유**해 층 밖에 닿기 | **안 막힘**(v-134 L-2, 아래 「알려진 제한」) |
 | `const val` 이 호출부로 인라인돼 참조를 남기지 않음 | **안 막힘** — 형제 여덟과 공유하는 등재된 사각(`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`) |
 | 코드를 persistence 밖 새 패키지로 옮겨 거기서 호출 | 이 test 의 모집단 밖 — 형제가 각자 자기 패키지를 보고, 새 패키지는 `packageOwnershipGate` 와 등재가 받는다 |
 | 산출물 디렉터리를 비워 「위반 없음」으로 만들기 | 막힘 — 디렉터리 존재 `check` + 비지 않음 단언 |
@@ -56,40 +58,38 @@
 
 | OPEN | 처분 |
 | --- | --- |
-| `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | **닫힘 후보** — 술어를 상수 풀 허용 목록으로 이식, 변이로 양쪽 실측 |
+| `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | **닫힘 후보** — 술어를 상수 풀 허용 목록으로 이식, 변이로 양쪽 실측. 처방이 지목한 「술어 종류」는 바뀌었다. **신설 OPEN 후보 하나를 남긴다**(v-134 L-2): 패키지 단위 허용 목록이 **허용한 형제 패키지의 도달 범위를 물려받는 것** — 형제 여덟 전부가 공유하고 이 slice 가 만든 것이 아니다(§4) |
 | `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | **닫힘 후보** — 존재 단언 셋이 사라졌고 `any { contains }` 형태가 그 파일에 0 이다. 함께 받은 0 행 자리도 명시 실패로. 실 Postgres 원판·변이 둘 다 실측됐다(§4) |
 | `OPEN-6F4W-UNAVAILABLE-PRODUCER` | **닫힘 후보 — 「불가」 처분**. 순수 전(total) 매퍼라 이 어댑터가 그 갈래를 낼 길이 없다(D-6F4W-3). 갈래 자체는 **지우지 않는다**: port 의 어휘이고 소비자 둘(후보 탈락·분석 정지)이 실제 분기를 진다. 대신 「낼 수 없다」를 산문에서 **구조**로 옮겼다 |
-| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 계약 갱신으로 이 slice 에서 분리**(팀장 결정 2026-11-06 ①). 받는 자리는 **testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행). 근거와 영향 14 파일 목록은 scope.md 계약 갱신 절 · §3 |
-| 신설 OPEN | 없음 |
+| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 계약 갱신으로 이 slice 에서 분리**(팀장 결정 2026-11-06 ①). 받는 자리는 **testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행). 근거와 영향 16 파일 목록은 scope.md 계약 갱신 절 · §3 |
+| 신설 OPEN | **후보 하나** — 위 행의 「형제 패키지 경유 간접 참조」. 식별자 발급과 등재는 M9 장부 레인이 받는다(이 slice 는 근거만 남긴다) |
 
 ## 3. 항목 3 분리 — 처방이 다른 차단과 충돌한다
 
-계약의 처방은 「`LicenseVerdict` subtype 생성자를 `internal` + `@ConsistentCopyVisibility`,
-test 조립은 **testFixtures factory** 로」다. `java-test-fixtures` 는 **전 모듈에서 차단**돼 있고
-(빌드 규약이 그 플러그인 적용 시 평가를 끊는다 · `module.expected-source-sets` 가 `main,test`
-둘 · 레이아웃 게이트의 기대 컴파일 task 둘 · 그 차단 자체의 회귀 test) 그 차단의 근거가
-**`OPEN-1BC-TESTFIXTURES-GATE` — 「면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다」**다.
-즉 ADR 선행이 그 OPEN 자신의 조건이다.
+**정본은 scope.md 의 「계약 갱신 2026-11-06」 절**이다(차단 근거 넷 · `associateWith` 필요성 ·
+영향 16 파일 목록 · 받는 자리). 같은 내용을 두 자리에 두지 않는다.
 
-실측 둘 더 — ⓐ `internal` 로 내리면 **in_scope 밖 test 14 파일**이 컴파일 실패한다(`app` 열 ·
-`workflow` 넷. 같은 모듈인 `qualification` test 둘은 보인다). ⓑ Kotlin 의 `internal` 은
-testFixtures 컴파일에서도 **안 보인다**(module = compilation) — 처방대로 가려면 그 컴파일을
-main 과 묶는 배선까지 필요하다. main 생산 지점이 커널 둘뿐이라는 D-6F5-20 실측은 **맞다**.
-
-그래서 ADR + 빌드 규약 + 정책 파일 + 14 test 가 한 묶음이고, 전부 이 slice 의 in_scope 밖이다.
-**팀장 결정(2026-11-06): ① 별도 slice 로 분리.** ADR 없이 여는 것은 `OPEN-1BC-TESTFIXTURES-GATE`
-자신의 우회라는 것이 근거다. 이 slice 는 이 항목을 **한 줄도 건드리지 않았다**(내 커밋 경로에
-`qualification/**` 가 없다 — §5).
+여기서만 적는 것 하나 — 이 slice 는 그 항목을 **한 줄도 건드리지 않았다**: 내 커밋 경로에
+`qualification/**` 도 `build-logic/**` 도 정책 파일도 없다(§5). `OPEN-VERDICT-CONSTRUCTION-
+VISIBILITY` 가 적은 D-6F5-20 실측(main 생산 지점은 커널 둘뿐)은 재확인 결과 **맞다**.
 
 ## 4. 알려진 제한
 
-- **항목 2 의 미실측은 해소됐다.** 처음에는 레인 기본이 container 금지라 기대 본문이 정적
-  유도였고 그것이 이 slice 의 가장 큰 미실측이었다(보정 대조로 가장 덜 확실한 두 꼴만 다른
-  test 의 축어로 확인한 상태). 팀장 승인으로 `CleanMigrationCheckTest` 한 클래스를 로컬에서
-  **2회**(원판·변이) 돌렸다 — 원판 `11 tests, 0 failed` 로 **유도한 기대 본문이 전부 글자까지
-  맞았고**, 변이에서 새 단언 둘만 붉어지고 **개수 축은 초록**이었다(commands).
-  **남는 한계는 「이 한 클래스만 돌았다」**는 것이다: 같은 표를 보는 다른 persistence test 와
-  전건 `check` 는 여전히 PR CI 가 처음 받는다.
+- **항목 2 의 미실측은 해소됐다**(v-134 L-4). 처음에는 레인 기본이 container 금지라 기대 본문이
+  정적 유도였고 그것이 이 slice 의 가장 큰 미실측이었다. 팀장 승인으로 `CleanMigrationCheckTest`
+  한 클래스를 로컬에서 **2회**(원판·변이) 돌렸다 — 원판 `11 tests, 0 failed` 로 **유도한 기대
+  본문이 전부 글자까지 맞았고**, 변이에서 새 단언 둘만 붉어지고 **개수 축은 초록**이었다
+  (commands). **verifier 가 저작 레인과 별개로 같은 클래스를 로컬 Testcontainers 로 돌려
+  11/11 통과를 재확인했다**(PR #134 v-134). 남는 한계는 **그 한 클래스만 돌았다**는 것뿐이고,
+  같은 표를 보는 다른 persistence test 와 전건 `check` 는 PR CI 가 받는다.
+- **허용된 형제 패키지를 경유하는 간접 참조는 이 축 밖이다**(v-134 L-2, **OPEN 후보**). 항목 1 의
+  허용 목록은 **패키지 단위**라 허용한 형제의 도달 범위를 그대로 물려받는다. 실측: 허용 루트인
+  `adapters.snapshot` 의 main 은 `bidvector.workflow.collection`·`adapters.koneps` 를 참조하고
+  **자기 의존 게이트가 없다**(그 패키지의 test 셋은 거동·계약 축이다). persistence 가 snapshot
+  헬퍼를 통해 층 밖에 닿으면 persistence 상수 풀에는 `adapters.snapshot` 만 남아 이 게이트는
+  초록이다 — `bidvector.workflow` 를 직접 참조하면 양성 대조가 잡는 그 좌표다. 형제 여덟이
+  **모두** 공유하는 구조적 한계이고 닫으려면 술어를 전이 폐쇄로 바꾸거나 형제 패키지마다
+  게이트를 세워야 한다(다른 결정 — 이 slice 가 만든 것이 아니다).
 - 내 여섯 가운데 `notification_inbox` 하나는 알림함 privacy test 가 이미 고정한다. 단위가
   달라(그쪽은 알림함 한 표의 privacy 축, 이쪽은 여섯 표가 같은 본문을 공유한다는 주장)
   지우지 않았다 — 두 자리가 어긋나면 둘 다 붉어진다.
