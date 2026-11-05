@@ -1,6 +1,10 @@
 # M9/gates-tests rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `23c2031c`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `2c6dae54`**.
+
+**재산출 1회** — 팀장의 계약 갱신 커밋과 DB 실측 반영 커밋이 뒤에 왔으므로 이 절을 그 뒤에서
+다시 쟀다. 복원 목록은 **그대로 5**다(그 두 커밋은 `reports/evidence/m9/gates-tests/**` 만
+건드려 `EXCL` 안에 든다). 앞 실측(`23c2031c`)의 값을 옮겨 적지 않고 전부 다시 돌렸다.
 
 **원천이 착수 base 와 같다** — 이 브랜치는 수정 라운드에서 `origin/main` 을 **합치지 않았고**,
 그 base 는 PR #123 의 병합 커밋(= main 의 고정 SHA)이다. 그래서 「남의 변경까지 지운다」
@@ -42,7 +46,7 @@ git restore --source=$MAIN --staged --worktree -- "${MODIFIED[@]}"
 | ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
 | ③′ 남의 변경 보존 | **해당 없음** — 이 브랜치는 main 을 합치지 않았다(위 머리말) |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | `reports/evidence/m9/gates-tests/**` **셋**뿐(의도된 제외). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | `reports/evidence/m9/gates-tests/**` **넷**뿐(의도된 제외 — 실측 시점의 수다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
@@ -80,11 +84,15 @@ test 여덟이 그 이름을 이미 들고 있어 **남의 줄까지 세게 된�
 **해당 없음** — 이 slice 는 마이그레이션을 더하지 않는다. 바뀐 것은 test 술어 넷, port
 KDoc 한 문단, 등재부 문면 하나다. DB 에 닿는 변경이 0 이라 적용 뒤 되돌림 갈래가 없다.
 
+변이 실측에서 마이그레이션 세 파일을 **일시 약화**했지만 커밋하지 않았고, 복원 뒤 변이 표지
+**0 파일** · 원판 형식 CHECK 표지 **4 파일**(V1·V4·V21·V23)로 확인했다(commands). 그 컨테이너는
+일회용이고 공유 DB 에 닿지 않는다.
+
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only 23c2031c..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..23c2031c \
+git diff --name-only 2c6dae54..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..2c6dae54 \
       -- . ':(exclude)reports/evidence/m9/gates-tests' | sort -u)
 ```
 
