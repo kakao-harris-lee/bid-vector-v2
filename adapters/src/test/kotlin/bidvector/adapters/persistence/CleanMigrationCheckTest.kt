@@ -1,5 +1,6 @@
 package bidvector.adapters.persistence
 
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -131,12 +132,69 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         actual shouldBe expectedCheckCountByTable
     }
 
+    /**
+     * `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 처방 (1/2) — COL-06 항등식과 H-3 결합식은 둘 다
+     * `collection_run` 의 CHECK 다. 앞 판은 **스키마 전체**의 본문 목록에 부분 문자열이 있는지만
+     * 봤다(`any { contains }`): 제자리에 `OR TRUE` 를 붙여 항진명제로 약화해도 부분 문자열도
+     * 개수(위 축8, 13)도 그대로라 초록이었다 — D-6F5-21·D-6A1-31 이 세 번째·네 번째로 실측한
+     * 같은 결함 클래스다. 그 둘과 같은 관례로 **표 범위 본문 집합 등식**으로 바꾼다.
+     *
+     * 집합 등식이 혼자 닫지 못하는 자리는 **같은 본문의 중복**이다(집합이 둘을 하나로 접는다) —
+     * 그 자리는 위 개수 축(`collection_run` to 13)이 진다. 둘이 함께 개수·존재·본문·소속을 닫는다.
+     */
     @Test
-    fun `축8 부가 — COL-06 항등식·H-3 결합식·notice_round 형식 CHECK 가 본문에 살아 있다`() {
-        val checkBodies = queryCheckBodies()
-        checkBodies.any { it.contains("received = ((normalized + duplicate) + dropped))") } shouldBe true
-        checkBodies.any { it.contains("truncated = (truncation_cause IS NOT NULL))") } shouldBe true
-        checkBodies.any { it.contains("notice_round ~ '^[0-9]{3}\$'") } shouldBe true
+    fun `축8 부가 — collection_run CHECK 본문 집합이 정확히 고정된다(COL-06 항등식·H-3 결합식 포함)`() {
+        val expectedCheckBodies =
+            setOf(
+                "CHECK ((source_endpoint <> ''::text))",
+                "CHECK ((received >= 0))",
+                "CHECK ((normalized >= 0))",
+                "CHECK ((duplicate >= 0))",
+                "CHECK ((dropped >= 0))",
+                "CHECK (((source_total IS NULL) OR (source_total >= 0)))",
+                "CHECK ((pages_fetched >= 0))",
+                "CHECK ((unknown_fields >= 0))",
+                "CHECK ((quota_exceeded >= 0))",
+                "CHECK ((backoff_skipped >= 0))",
+                "CHECK ((finished_at >= started_at))",
+                // COL-06 항등식.
+                "CHECK ((received = ((normalized + duplicate) + dropped)))",
+                // H-3 결합 불변식.
+                "CHECK ((truncated = (truncation_cause IS NOT NULL)))",
+            )
+        queryCheckBodiesForTable("collection_run").toSet() shouldBe expectedCheckBodies
+    }
+
+    /**
+     * `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 처방 (2/2) — `notice_round` 형식 CHECK 는 **여섯 표**에
+     * 같은 본문으로 산다(`notice`·`opening_result`·`qualification_text`·`opening_reserve_price`·
+     * `bid_case`·`notification_inbox`, 마이그레이션 전수 실측). 앞 판의 존재 단언은 스키마 전체를
+     * 한 목록으로 보고 「어딘가 하나 있으면」 초록이었다 — **여섯 중 다섯을 `TRUE` 로 약화해도
+     * 통과했고** 개수 축도 표마다 제약 수가 그대로라 함께 초록이었다. 단언의 단위를 스키마에서
+     * **표**로 내려 여섯을 각각 고정한다.
+     *
+     * 집합 등식이 아니라 이름 지정 본문 등식인 이유: 여섯 표의 CHECK 를 전부 열거하면(합계 수십)
+     * 이 축이 재는 것(`notice_round` 형식)과 무관한 본문이 단언의 대부분을 차지하고, 그 표들의
+     * 다른 축은 각자의 test 가 이미 진다. 제자리 약화는 이름 지정 등식이 그대로 잡고, 제약을
+     * **지우는** 경로는 [queryConstraintDef] 의 0 행 명시 실패가 잡는다.
+     */
+    @Test
+    fun `축8 부가 — notice_round 형식 CHECK 가 여섯 표에서 각각 본문으로 고정된다`() {
+        val expectedBody = "CHECK ((notice_round ~ '^[0-9]{3}\$'::text))"
+        val tablesWithNoticeRoundCheck =
+            listOf(
+                "notice",
+                "opening_result",
+                "qualification_text",
+                "opening_reserve_price",
+                "bid_case",
+                "notification_inbox",
+            )
+        tablesWithNoticeRoundCheck.forEach { table ->
+            withClue("notice_round 형식 CHECK: $table") {
+                queryConstraintDef("${table}_notice_round_check") shouldBe expectedBody
+            }
+        }
     }
 
     /**
@@ -170,11 +228,14 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
     }
 
     /**
-     * (`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`) — `any { contains ... }`
-     * 형태(위 COL-06/H-3 test)는 CHECK 를 제자리에서 항진명제로 약화해도 통과한다. V14 의
+     * `any { contains ... }` 형태는 CHECK 를 제자리에서 항진명제로 약화해도 통과한다. V14 의
      * 문자 클래스가 두 번 좁아졌을 때도 개수 축(축8 CHECK
      * 개수)은 계속 초록이었다 — `outbox_state_check`·`edit_session_state_check`(위 두 test)와
      * 같은 관례로 본문을 **정확히** 고정한다. 클래스가 좁아지는 순간 이 test 가 먼저 붉어진다.
+     *
+     * 이 KDoc 이 `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 를 세운 자리였다(그 OPEN 이 가리킨
+     * COL-06·H-3·`notice_round` 단언 셋). M9 에서 그 셋이 집합 등식과 표마다의 본문 등식으로
+     * 바뀌어 **이 파일에 `any { contains }` 형태는 남지 않는다**.
      */
     @Test
     fun `축8 부가 — notice_notice_title_check 본문이 V4 bracket 과 정확히 같은 문자 클래스로 고정된다(D-6F4-1)`() {
@@ -267,6 +328,17 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         queryCheckBodiesForTable("api_request_audit").toSet() shouldBe expectedCheckBodies
     }
 
+    /**
+     * `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 가 함께 받은 자리(6F-5-a r4 LOW-2) — 앞 판은
+     * `rs.next()` 의 반환값을 버렸다. 이름이 틀렸거나 제약이 **지워졌을** 때 커서가 행 앞에
+     * 머문 채로 `getString` 이 불려 JDBC 드라이버의 커서 위치 예외로 죽었고, 그 메시지는
+     * 「어느 제약이 없다」를 말하지 않는다. 같은 파일의 [convalidatedOf] 가 이미 쓰는
+     * `check(rs.next())` 관례로 맞춘다.
+     *
+     * 행이 **둘 이상**인 경우도 함께 막는다. `pg_constraint.conname` 은 표마다 유일할 뿐
+     * 스키마 안에서 유일하지 않다 — 이름이 두 표에 같이 있으면 앞 판은 **먼저 온 한 행**을
+     * 조용히 집어 「다른 표의 제약」을 단언 대상으로 삼을 수 있었다.
+     */
     private fun queryConstraintDef(constraintName: String): String =
         dataSource().connection.use { connection ->
             connection
@@ -275,27 +347,13 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                 ).use { statement ->
                     statement.setString(1, constraintName)
                     statement.executeQuery().use { rs ->
-                        rs.next()
-                        rs.getString("def")
+                        check(rs.next()) { "제약이 없다: $constraintName" }
+                        val def = rs.getString("def")
+                        check(!rs.next()) { "이름이 같은 제약이 둘 이상이다: $constraintName" }
+                        def
                     }
                 }
         }
-
-    private fun queryCheckBodies(): List<String> {
-        val bodies = mutableListOf<String>()
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint " +
-                            "WHERE contype='c' AND connamespace = 'public'::regnamespace",
-                    ).use { rs ->
-                        while (rs.next()) bodies += rs.getString("def")
-                    }
-            }
-        }
-        return bodies
-    }
 
     /**
      * **mig M-2 — `NOT VALID` 와 검증된 제약을 개수가 구별하지 못한다.** 위 축8 은 `pg_constraint` 의
@@ -323,7 +381,11 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                 }
         }
 
-    /** D-6F5-21 — [queryCheckBodies]와 같은 조회를 **표 하나로 좁힌다**(집합 등식 대상). */
+    /**
+     * D-6F5-21 — CHECK 본문 조회를 **표 하나로 좁힌다**(집합 등식 대상). 앞 판에는 스키마
+     * 전체를 한 목록으로 내는 형제 헬퍼가 있었고 존재 단언 셋이 그것을 썼다 — M9 에서 그
+     * 단언들이 사라지며 헬퍼도 함께 지웠다(소속을 잃은 본문 목록은 이 파일에 남지 않는다).
+     */
     private fun queryCheckBodiesForTable(tableName: String): List<String> {
         val bodies = mutableListOf<String>()
         dataSource().connection.use { connection ->
