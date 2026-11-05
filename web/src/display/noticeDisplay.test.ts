@@ -6,7 +6,6 @@ import {
   SUGGESTIONS_RESULT_STATE_DISPLAY,
   SUGGESTION_LICENSE_VERDICT_DISPLAY,
   amountDisplayOf,
-  daysUntil,
   noticeStatusDisplayOf,
 } from './noticeDisplay';
 import { displayOrUnknown } from './stateDisplay';
@@ -71,7 +70,11 @@ describe('기초금액 표시', () => {
 
     expect(shown.present).toBe(true);
     expect(shown.amount).toBe('1,200,000,000원');
-    expect(shown.provenance).toContain('BASE_AMOUNT');
+    // 부속 세 칸은 **표의 문면**이다(M9 D-3) — 통화는 금액 글자가 이미 들었으므로 여기 없다.
+    expect(shown.provenance).toBe('기초금액 · 과세 구분 모름 · 공고 게시값');
+    for (const token of ['BASE_AMOUNT', 'UNKNOWN', 'PUBLISHED']) {
+      expect(shown.provenance, `${token} 이 화면 문면에 남았다`).not.toContain(token);
+    }
   });
 
   it('금액이 없으면 0 이 아니라 「값 없음」이다', () => {
@@ -89,29 +92,5 @@ describe('기초금액 표시', () => {
   });
 });
 
-/**
- * D-day 는 요구표가 **클라이언트 계산으로 승인한 유일한 자리**(ⓐ 행)다 — 그래서 남은 날 수만
- * 계산하고 **상태 라벨은 계산하지 않는다**(마감 여부는 `status` 가 말한다, D-7E-4).
- */
-describe('마감 남은 날 — 클라이언트 계산의 경계', () => {
-  const now = new Date('2026-10-29T00:00:00Z');
-
-  it('마감이 있으면 남은 날을 센다', () => {
-    expect(daysUntil('2026-10-31T00:00:00Z', now)).toBe(2);
-    expect(daysUntil('2026-10-29T06:00:00Z', now)).toBe(0);
-  });
-
-  it('마감이 지났으면 음수를 내고 「마감」이라는 말을 만들지 않는다', () => {
-    expect(daysUntil('2026-10-27T00:00:00Z', now)).toBe(-2);
-  });
-
-  /** CR L-2 — 지난 쪽에 내림을 쓰면 몇 시간 전 마감이 하루 과장된다. */
-  it('몇 시간 전에 마감한 공고는 하루로 세지 않는다', () => {
-    expect(daysUntil('2026-10-28T18:00:00Z', now)).toBe(0);
-    expect(daysUntil('2026-10-27T18:00:00Z', now)).toBe(-1);
-  });
-
-  it('마감이 없으면 날 수가 없다 — 지어내지 않는다', () => {
-    expect(daysUntil(null, now)).toBeNull();
-  });
-});
+// D-day 의 test 는 **`timeDisplay.test.ts` 로 옮겼다**(M9 D-1·D-2) — 판정 함수가 그 모듈로
+// 갔으므로 단언도 함께 간다(여기 남기면 두 자리가 같은 주장을 하고 한쪽이 먼저 낡는다).

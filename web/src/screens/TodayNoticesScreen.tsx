@@ -15,6 +15,7 @@ import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
+import { readClock } from '../display/timeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
@@ -63,7 +64,9 @@ export function TodayNoticesScreen() {
   const { toast, show, dismiss } = useToast();
   const [form, setForm] = useState<SearchForm>(EMPTY_FORM);
   const [submitted, setSubmitted] = useState<SearchForm>(EMPTY_FORM);
-  const [now] = useState(() => new Date());
+  // **한 번 읽고 내린다**(M9 D-1) — 카드마다 다시 읽으면 같은 목록의 두 카드가 서로 다른
+  // 「지금」으로 남은 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
+  const [now] = useState(readClock);
 
   /**
    * CR M-1 — 앞 판은 첫 쪽만 불러 **전체 42건**을 보이면서 카드 20장만 냈다(나머지로 가는 길이

@@ -2,12 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
+  AMOUNT_BASIS_LABEL,
+  AMOUNT_PROVENANCE_LABEL,
   assertOnlyAllowedOperations,
   CASE_STATE_LABEL,
   CASE_TAB_LABEL,
   CHECKPOINT_LABEL,
   driveToRecorded,
   ensureInBidBox,
+  expectedKstText,
   journeyContext,
   localDateTimeInput,
   NOTICE_STATUS_LABEL,
@@ -56,9 +59,18 @@ async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise
     // 그 자리를 공허하게 두지 않는다(CR M-6).
     expect(row.baseAmountBasis, 'fixture 가 basis 를 싣는다').not.toBeNull();
     expect(row.baseAmountProvenance, 'fixture 가 provenance 를 싣는다').not.toBeNull();
+    // M9 D-3 — 카드는 **표의 문면**을 그린다. 어휘 밖 값이 오면 그 사실이 드러나야 하므로
+    // 라벨을 찾지 못한 경우를 통과시키지 않는다(`?? 원문` 폴백을 두면 되돌림이 초록이다).
+    const basisLabel = AMOUNT_BASIS_LABEL[row.baseAmountBasis!];
+    const provenanceLabel = AMOUNT_PROVENANCE_LABEL[row.baseAmountProvenance!];
+    expect(basisLabel, `basis ${row.baseAmountBasis} 의 문면이 라벨 표에 없다`).toBeDefined();
+    expect(provenanceLabel, `provenance ${row.baseAmountProvenance} 의 문면이 라벨 표에 없다`).toBeDefined();
     const provenance = card.getByTestId('notice-amount-provenance');
-    await expect(provenance).toContainText(row.baseAmountBasis!);
-    await expect(provenance).toContainText(row.baseAmountProvenance!);
+    await expect(provenance).toContainText(basisLabel!);
+    await expect(provenance).toContainText(provenanceLabel!);
+    // 원문 토큰이 그 자리에 **남아 있지 않은 것**까지 잰다(문면만 보면 둘이 함께 있어도 통과).
+    await expect(provenance).not.toContainText(row.baseAmountBasis!);
+    await expect(provenance).not.toContainText(row.baseAmountProvenance!);
   }
 }
 
@@ -294,7 +306,11 @@ async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void>
   if (row.nextCheckpointAt === null) {
     await expect(at).toHaveText(ABSENT);
   } else {
-    await expect(at).toHaveText(row.nextCheckpointAt);
+    // M9 D-1 — 보이는 글자는 **KST 표기**이고 기계 가독 칸이 응답 원문을 든다. 둘 다 잰다:
+    // 표기만 보면 원문이 사라진 것을 모르고, 원문만 보면 서식이 틀린 것을 모른다.
+    await expect(at).toHaveText(expectedKstText(row.nextCheckpointAt));
+    // 질의 꼴을 화면 E 와 **하나로** 맞춘다(r1 cr LOW) — testId 가 `<time>` 자신에 붙는다.
+    await expect(at).toHaveAttribute('datetime', row.nextCheckpointAt);
   }
   // 경고는 **서버의 판정 하나**를 따른다 — 있으면 1, 없으면 0 이다(화면이 시각을 비교하지 않는다).
   await expect(card.getByTestId(`overdue-${row.caseId}`)).toHaveCount(row.overdue ? 1 : 0);

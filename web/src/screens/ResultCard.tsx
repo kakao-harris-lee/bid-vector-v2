@@ -23,8 +23,16 @@ import {
   provisionalRankOneReading,
   type MoneyReading,
 } from '../display/openingResultDisplay';
-import { vatTreatmentDisplayOf } from '../display/moneyDisplay';
+import {
+  amountBasisDisplayOf,
+  amountProvenanceDisplayOf,
+  currencyDisplayOf,
+  vatTreatmentDisplayOf,
+} from '../display/moneyDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { instantDisplayOf } from '../display/timeDisplay';
+
+import { InstantText } from './InstantText';
 
 /** 값이 없는 자리의 **한 문면** — 화면 D·C 와 같은 말이다(같은 뜻에 두 말을 두지 않는다). */
 const ABSENT = '값 없음';
@@ -140,10 +148,10 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
       <ResultField label="결과 축 관측 시각">
         {/* 계약: 「시각은 모두 관측 시각이고 … 소비자가 **낡음을 스스로 판정**한다」. 이 칸이
             없으면 확정 축의 낡음을 잴 재료가 없다(r1 CR M-3). */}
-        <TimeOrAbsent at={view.observedAt} testId={`observed-at-${caseId}`} />
+        <InstantText display={instantDisplayOf(view.observedAt)} testId={`observed-at-${caseId}`} />
       </ResultField>
       <ResultField label="개찰 시각">
-        <TimeOrAbsent at={view.actualOpeningAt} testId={`opening-at-${caseId}`} />
+        <InstantText display={instantDisplayOf(view.actualOpeningAt)} testId={`opening-at-${caseId}`} />
       </ResultField>
 
       {/* **확정과 잠정은 다른 칸이다**(SET-02). 두 읽기가 서로의 칸을 보지 않으므로 한쪽이
@@ -153,14 +161,19 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
         <MoneyAxis
           reading={confirmedAwardReading(view)}
           testId={`confirmed-award-${caseId}`}
-          parts={(value) => [value.currency, value.basis, vatTreatmentDisplayOf(value.vatTreatment).label, value.provenance]}
+          parts={(value) => [
+            currencyDisplayOf(value.currency).label,
+            amountBasisDisplayOf(value.basis).label,
+            vatTreatmentDisplayOf(value.vatTreatment).label,
+            amountProvenanceDisplayOf(value.provenance).label,
+          ]}
         />
       </ResultField>
       <ResultField label="잠정 1위 투찰가">
         <MoneyAxis
           reading={provisionalRankOneReading(view)}
           testId={`provisional-award-${caseId}`}
-          parts={(value) => [value.currency, vatTreatmentDisplayOf(value.vatTreatment).label]}
+          parts={(value) => [currencyDisplayOf(value.currency).label, vatTreatmentDisplayOf(value.vatTreatment).label]}
         />
       </ResultField>
       <ResultField label="잠정 1위 투찰율">
@@ -175,26 +188,15 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
         </span>
       </ResultField>
       <ResultField label="잠정 축 관측 시각">
-        <TimeOrAbsent at={view.provisionalRankOneObservedAt} testId={`provisional-observed-${caseId}`} />
+        <InstantText display={instantDisplayOf(view.provisionalRankOneObservedAt)} testId={`provisional-observed-${caseId}`} />
       </ResultField>
     </dl>
   );
 }
 
-/** 시각 한 칸 — 「없음」을 **답으로** 그린다(§6.1). 네 자리가 같은 꼴이라 한 자리에 둔다. */
-function TimeOrAbsent({ at, testId }: { readonly at: string | null | undefined; readonly testId: string }) {
-  return (
-    <span data-testid={testId}>
-      {at === null || at === undefined ? (
-        <AbsentText />
-      ) : (
-        <time dateTime={at} className="font-numeric">
-          {at}
-        </time>
-      )}
-    </span>
-  );
-}
+// 시각 여섯 칸은 **`InstantText` 하나**로 모았다(M9 D-1·D-2) — 앞 판의 `TimeOrAbsent` 는 이
+// 파일 안의 다섯째 「없음」 분기였고 ISO 원문을 그대로 그렸다. 「없음」을 답으로 그리는 성질은
+// 그대로다(§6.1).
 
 /** 차이 한 칸 — **상태가 답일 때 숫자를 그리지 않는다**(차이 0 과 「뺄 것이 없다」는 다르다). */
 function AwardGap({ caseId, result }: { readonly caseId: number; readonly result: MyBidCase }) {
@@ -204,7 +206,7 @@ function AwardGap({ caseId, result }: { readonly caseId: number; readonly result
       return (
         <span data-testid={`award-gap-${caseId}`} className="flex flex-wrap items-baseline gap-1">
           <span className="font-numeric text-sm font-medium">{amountText(reading.differenceWon)}</span>
-          <span className="text-xs text-ink-soft">{reading.currency}</span>
+          <span className="text-xs text-ink-soft">{currencyDisplayOf(reading.currency).label}</span>
         </span>
       );
     case 'ABSENT':
@@ -245,7 +247,7 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
       <ResultField label="내 투찰가">
         <span data-testid={`submitted-amount-${caseId}`} className="flex flex-wrap items-baseline gap-1">
           <span className="font-numeric text-sm font-medium">{amountText(result.submittedAmountWon)}</span>
-          <span className="text-xs text-ink-soft">{result.submittedAmountCurrency}</span>
+          <span className="text-xs text-ink-soft">{currencyDisplayOf(result.submittedAmountCurrency).label}</span>
           <span className="text-xs text-ink-soft">
             {vatTreatmentDisplayOf(result.submittedAmountVatTreatment).label}
           </span>
@@ -285,10 +287,10 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
         />
       </ResultField>
       <ResultField label="낸 시각(내 진술)">
-        <TimeOrAbsent at={result.submittedAt} testId={`submitted-at-${caseId}`} />
+        <InstantText display={instantDisplayOf(result.submittedAt)} testId={`submitted-at-${caseId}`} />
       </ResultField>
       <ResultField label="확인 시각(서버)">
-        <TimeOrAbsent at={result.confirmedAt} testId={`confirmed-at-${caseId}`} />
+        <InstantText display={instantDisplayOf(result.confirmedAt)} testId={`confirmed-at-${caseId}`} />
       </ResultField>
       {/* **운영자 기록 축도 두 출처다**(CR r1 L-1 · v r1 L-6). 카드 머리의 배지는 목록 응답의
           상태이고 이 칸은 **결과 조회가 본** 같은 축이다 — 다른 요청의 답이라 어긋날 수 있고,
@@ -310,7 +312,12 @@ function MyBidSection({ caseId, result }: { readonly caseId: number; readonly re
         <MoneyAxis
           reading={confirmedAwardReading(result)}
           testId={`judged-confirmed-award-${caseId}`}
-          parts={(value) => [value.currency, value.basis, vatTreatmentDisplayOf(value.vatTreatment).label, value.provenance]}
+          parts={(value) => [
+            currencyDisplayOf(value.currency).label,
+            amountBasisDisplayOf(value.basis).label,
+            vatTreatmentDisplayOf(value.vatTreatment).label,
+            amountProvenanceDisplayOf(value.provenance).label,
+          ]}
         />
       </ResultField>
     </dl>
@@ -391,7 +398,7 @@ export function ResultCard({
           />
         </ResultField>
         <ResultField label="시점">
-          <TimeOrAbsent at={bidCase.nextCheckpointAt} testId={`result-checkpoint-at-${bidCase.caseId}`} />
+          <InstantText display={instantDisplayOf(bidCase.nextCheckpointAt)} testId={`result-checkpoint-at-${bidCase.caseId}`} />
         </ResultField>
       </dl>
 
