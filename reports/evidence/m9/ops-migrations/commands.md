@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-판정 SHA: **`<동결 보고가 적는다>`** · 마지막 산출물 커밋 **`41358ce1`** · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
+마지막 산출물 커밋 **`beeefba8`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -14,9 +14,8 @@
 | `:adapters:compileTestKotlin` · `:app:compileTestKotlin` | exit 0 |
 | `tools/prod-env-keys-check.sh` | exit 0 — 「키 18개(템플릿 == compose 세 파일)」, 새 키 0 |
 
-**container test 는 로컬에서 돌리지 않았다**(공통 규율 — PR CI 가 정본). 그 집합: 세 마이그레이션의
-clean-migrate·CHECK·트리거·GRANT 실측(`CleanMigration*Test` · `OutboxTransitionSqlTest` ·
-`ExecutionRowReleaseTest` · `BaseAmountClassificationStoreTest` · relay DB · e2e pipeline).
+**container test 는 라운드 1·2 에서 로컬에 돌리지 않았다**(공통 규율). 라운드 3 에서 팀장이 허용한
+자리(적용 DB 리허설)와 verifier 가 지정한 재현 표적을 돌렸다 — 아래 라운드 3 표가 그 전수다.
 
 ## RED 선행 — 축마다 하나
 
@@ -30,14 +29,16 @@ clean-migrate·CHECK·트리거·GRANT 실측(`CleanMigration*Test` · `OutboxTr
 
 둘을 한 번에 심고 **서로 다른 test** 가 붉어지는지로 귀속했다. 더하기가 아니라 **바꿔치우기·삭제**다.
 
-| 변이 | 실측 |
-| --- | --- |
-| 중복 생략의 사유를 `DUPLICATE_SKIPPED` → `DELIVERED` 로 접는다(어휘 바꿔치우기) | **RED** — relay 중복 자리 하나 |
-| 분석에서 판정 기록 호출을 **지운다** | **RED** — 분석 기록 자리 하나 |
-| 통제군(원복 뒤 `--rerun`) | **44 tests · failures 0**(XML 재작성 확인 — cache 적중이 아니다) |
+| 변이 | 축 | 실측 |
+| --- | --- | --- |
+| 중복 생략의 사유를 `DUPLICATE_SKIPPED` → `DELIVERED` 로 접는다 | OPS-05 | **RED** — relay 중복 자리 하나 |
+| `JdbcCollectionRunStore` 의 `release.value` 바인딩을 상수로 바꿔치운다 | OPS-10 | **RED** — `ExecutionRowReleaseTest` 둘(쓰기 자리 · 「지울 수 없다」 자리) |
+| `ReleaseProperties.sha` 에 기본값 `unversioned` 를 되살린다 | 설정 | **RED** — `ReleaseWiringTest` 의 「없으면 기동 실패」 하나 |
+| 통제군(원복 뒤 `--rerun`) | — | 셋 다 초록 재확인(XML 재작성 확인 — cache 적중이 아니다) |
 
-container test 안의 축(사유↔상태 CHECK · 릴리스 관문 트리거 · 라벨↔규칙 결속 · 값 객체 공백 거부)은
-로컬에서 변이를 **재지 못했다**(규율) — 그 축은 CI·verifier 몫이다.
+**축마다 하나씩 있다**(cr M-2 지적 반영) — 앞 판은 OPS-10 축에 변이가 0 이었고, 빠진 DEC-08 축의
+변이를 적고 있었다. 지금 남는 미실측 변이 축: 쌍↔상태 CHECK 본문과 관문 트리거 **자체**를 바꿔치우는
+변이(그 둘은 거부 실측·집합 등식 test 가 덮지만 변이로는 안 쳤다) — verifier 표적으로 남긴다.
 
 ## 핵심 결정과 그 근거(diff 에 안 보이는 것)
 
@@ -113,3 +114,27 @@ HEAD 트리에 마이그레이션이 넷이 됐다. 그 가운데 **버전 27 �
 | `OutboxCommand` 종단 생성자(PR #127 Telegram) | **의도된 컴파일 강제**다 — #127 의 dispatch 결과 → 종단 전이 자리가 사유 인자를 대야 한다. 어휘 일곱 가운데 `DELIVERY_REJECTED`·`DELIVERY_SUPPRESSED`·`DELIVERY_OUTCOME_UNKNOWN` 이 그 자리의 셋이고 새 사유가 필요하면 enum 과 V26 CHECK 를 **같이** 넓혀야 한다(집합 등식 test 가 한쪽만 넓히는 것을 막는다) |
 | `release-sha` 키 제거(PR #128 `AwardCollectionProperties`) | 그 클래스에 release 키·기본값이 있으면 **제거하고 `ReleaseIdentifier` 빈을 주입**받아야 한다(이 slice 의 두 수집 갈래와 같은 모양). 운영 env 키 등식은 표적 실측했다 — `tools/prod-env-keys-check.sh` exit 0, 키 18, **새 키 0**(운영 compose 는 `compose.yaml` 을 상속하므로 `compose.prod.yaml` 편집 0) |
 | `CleanMigration*Test` 래칫(paper-bid V25) | 계수를 **증분 주석**으로 적었다 — `collection_run` 13+1=14 · `outbox` 11+1+1=13. paper-bid 의 `notification_inbox` 5→7 과 다른 행이라 병합은 계수의 합이다 |
+
+## 라운드 3 — container 표적 실측(팀장 허용분 + verifier 재현)
+
+| 표적 | 결과 |
+| --- | --- |
+| `:adapters:test` — `CleanMigration*`(다섯) · `OutboxTransitionSqlTest` · `ExecutionRowReleaseTest` · `RelayVocabularyDatabaseTest` | exit 0 — **OQ-1 답**: 쌍 집합 등식 test(제약 본문에서 쌍을 뽑아 Kotlin 어휘 전수와 대조)가 **초록**이다. 래칫 세 축(CHECK 개수 증분 · 열 전수 · 트리거 목록)도 이 라운드에서 실측됐다 |
+| `:adapters:test` — `bidvector.adapters.retention.*` · `RelayDatabaseTest` · `RelayLeaseLossDatabaseTest` · `RelayVocabularyDatabaseTest`(v B-1 재현) | exit 0 · **131 tests · 0 실패**(fixture 둘 수정 뒤). 수정 전에는 verifier 가 **46 실패**를 실측했다 |
+| `:app:test` — `ReleaseWiringTest`(v M-2 신설) | exit 0 · 3 tests |
+| 적용 DB 되돌림 리허설(버릴 clone · 버릴 클러스터) | 초록 — `rollback.md` §5 가 단계별 실측을 적는다 |
+| 세 모듈 `compileTestKotlin` · `ktlint{Main,Test}SourceSetCheck` · `detekt` | exit 0 |
+| `web` npm lint·typecheck | **미실행** — 이 worktree 에 `node_modules` 가 없다(설치는 레인 밖 비용). `journey-up.mjs` 한 줄은 `node --check` 로 문법만 확인했다 · CI `web` job 이 정본 |
+
+### 전수 확인 — outbox 종단 행을 직접 쓰는 test fixture
+
+`command grep -rn "INSERT INTO outbox|UPDATE outbox" adapters/src/test app/src/test web` → **셋**이고
+전부 고쳤다: `EventTestSupport`(라운드 2 에서 릴리스) · `RetentionFixture`(상태별 유효 사유) ·
+`RelayDbSupport.forceOutboxState`(종단 강제 시 사유). 둘은 **verifier 가 먼저 찾았다** — 내 라운드 2
+표적 선택(`RelayVocabularyDatabaseTest` 만)이 그 둘을 지나갔다: **표적을 고르면 고른 만큼만 초록이다.**
+
+## 등재만 (cr L-5)
+
+`ReleaseIdentifier.MAX_LENGTH = 128` 은 **Kotlin 에만** 있다 — 열은 TEXT 이고 길이 CHECK 가 없다.
+쓰는 자리가 값 객체 경유 하나라 오늘 영향이 없고, 주석도 「설정 오타를 자르는 값」이라 적어 사실과
+일치한다. 저장 층으로 내리지 않은 이유는 그것이 어휘가 아니라 식별자이기 때문이다(L-1 과 같은 축).

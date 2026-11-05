@@ -72,7 +72,7 @@ ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 
 6. **고아 격리가 사유 없이 남는다** → `ORPHANED_CLAIM`. 「왜 ISOLATED 인가」 셋(미지 payload · 배달
    결과 불명 · 고아)이 DB 에서 갈린다.
 
-### OPS-10 (V27 · 릴리스 칸 넷 + 기본값 제거)
+### OPS-10 (V27 · 릴리스 칸 **둘** + 기본값 제거) — 아래 열 표의 「넷」은 당시 계획이다
 
 1. **기본값이 다른 이름으로 돌아온다**(`"unknown"`·`"local"`·`""`) → 설정 칸에 기본값이 없고
    공백은 값 객체(`ReleaseIdentifier`)가 거부한다. **sentinel version 금지**(data-dictionary §4.1).
@@ -121,7 +121,7 @@ ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ~~(당시 V26)~~ | ~~`base_amount_classification`(신설)~~ — **제외**, 번호는 OPS-05 가 받았다 | 공고 키 2 · 정책 2 · 라벨 · 규칙 · 원본 금액 3 · 릴리스 · 기록 시각 | TEXT·DATE·NUMERIC(20,0)·TIMESTAMPTZ | 규칙만 NULL 허용(= `UNKNOWN` 결속) | 없음(신설) | SELECT, INSERT | PK(공고 2 + 정책 2) |
 | V26 | `outbox` | `terminal_reason` | TEXT | 허용 | **NULL 로 남긴다** — 기존 종단 행의 사유는 진실한 원천이 없다(로그에만 갔다). 「사유가 있으면 종단이다」는 CHECK 로, 「**새** 종단 전이는 사유를 요구한다」는 전이 트리거로 가른다(V18 의 `pii_masked_at` NULL→값 1회 트리거와 같은 형태) — 쌍 CHECK 로 접으면 기존 행이 적용을 막는다 | 변경 0 | 변경 0 |
-| V27 | `notice`·`opening_result` | `release_sha` | TEXT | NOT NULL | `observation_key → raw_observation.release_sha` backfill(전사, FK·NOT NULL 로 결손 불가) | 변경 0(표 단위 INSERT·UPDATE 가 새 열 포함) | 없음 |
+| ~~(당시 계획)~~ | ~~`notice`·`opening_result`~~ — **철회**(아래 갱신 1): 조인으로 도달하고, backfill `UPDATE` 가 V2 의 판 번호·감사 트리거를 깨운다 | — | — | — | — | — | — |
 | V27 | `collection_run`·`outbox` | `release_sha` | TEXT | 허용 | NULL(진실한 원천 없음) + INSERT/UPDATE 거부 트리거 | 변경 0 | 없음 |
 
 **두 축이 같은 모양을 쓴다** — 「기존 행은 NULL(모름), 새 행·새 전이는 구조가 요구」. 지어낸 값으로
@@ -144,3 +144,13 @@ ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 
 
 **(당시 기록) (2b) 표에 더해졌던 DEC-08 표면 둘**: `JdbcBaseAmountClassificationStore`(adapters.ml — 의존
 게이트가 정한 자리, `JdbcCompetitionSampleSource` 와 같은 사유) · `DiscardingBaseAmountClassificationRecordPort`(부작용 없는 조립이 끼우는 구현 — 획득자가 할 수 있는 일은 **아무것도 하지 않는 것**뿐).
+
+4. **조인 한계의 정정**(verifier M-1) — 갱신 1 이 「조인으로 **이미 답해진다**」고 적었는데, 조인이
+   주는 것은 「그 **원문을 수집한** 릴리스」다. `notice` 는 수집 run 이 원문과 canonical 을 같은 run
+   에 쓰므로 그 둘이 같지만, **승격 러너**가 쓰는 `opening_result`·`opening_reserve_price` 는
+   「이 행을 **쓴** 릴리스」가 아니다. 칸 추가의 비용(판 번호·감사 트리거)은 그대로여서 이 slice 는
+   칸을 더하지 않고 `OPEN-M9-PROMOTED-ROW-RELEASE` 로 넘긴다 — 갱신 1 의 **근거 ②는 유효하고
+   근거 ①이 좁아진** 형태다.
+5. **새 필수 키의 기동점 census 는 이 slice 가 세우지 않는다**(팀장 판단) —
+   `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`. H-1(여정 하네스)이 그 부재의 첫 실현이었고, 이번
+   라운드는 기동점 셋을 손으로 고치고 음성 대조(`ReleaseWiringTest`) 하나를 남겼다.

@@ -6,11 +6,11 @@
 
 | 계약 문면 | 상태 | 어디서 |
 | --- | --- | --- |
-| 각 마이그레이션 clean-migrate | **CI 정본** — 두 V 파일이 빈 컨테이너 migrate 경로에 든다(`CleanMigration*Test`). 로컬 미실행(container 규율) | PR CI Kotlin `check` |
+| 각 마이그레이션 clean-migrate | **로컬 실측**(이 라운드) — `CleanMigration*` 다섯 + `OutboxTransitionSqlTest` + `ExecutionRowReleaseTest` + relay DB 셋 초록. 전건은 PR CI | `commands.md` 라운드 3 표 |
 | CHECK·GRANT 등식 | 래칫 갱신 완료 — CHECK 개수(`collection_run` 13+1 · `outbox` 11+1+1, **증분 주석**) · 열 셋 · 트리거 셋. **GRANT 변경 0**(두 축이 열·제약·트리거만 더한다) | `CleanMigration{Check,Column,Trigger}Test` |
-| 되돌림 리허설 두 갈래 | **미적용 갈래 실측**(파일 삭제 + 트리 동일성) · **적용 갈래는 모양만**(forward-fix V) — 실행은 container 가 필요해 못 돌렸다 | `rollback.md` §3 / §2 |
+| 되돌림 리허설 두 갈래 | **둘 다 실측** — 미적용(목록 산출 + 트리 동일성) · 적용(버릴 Postgres 에서 forward-fix 를 **Flyway 로** 적용, 장부 기입·음성 대조 포함, 팀장 허용 1회) | `rollback.md` §3 / §5 |
 | 기본값 제거로 깨지는 배선 전수 갱신 | 완료 — 배선 test 일곱 로컬 exit 0, 출하 조립 속성 전수 19 자리, compose·CI·tools·runbook 둘 | `commands.md` 「in_scope 밖」 표 |
-| 변이 RED | 둘 로컬 실측(사유 바꿔치우기 · 기록 호출 삭제) + 통제군 | `commands.md` 변이 절 |
+| 변이 RED | **셋** 로컬 실측 — 사유 바꿔치우기(OPS-05) · 릴리스 결속 상수화(OPS-10, container) · 기본값 `unversioned` 복귀(설정 축) + 통제군 셋 | `commands.md` 변이 절 |
 | 전건 PR CI | **미실행** — push 는 팀장 몫(공통 규율) | — |
 
 ## 설계 검토가 지목한 우회 ↔ 무엇이 막는가
@@ -40,8 +40,9 @@
 
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
-이 slice 가 만든 새 파일 **다섯**(V26·V27 · `ReleaseIdentifier` · `ReleaseWiring` · 사유 enum ·
-`ExecutionRowReleaseTest`) 전부 계약의 in_scope 안이다. 라운드 2 가 **되돌린** 넷(판정 표·Jdbc
+이 slice 가 만든 새 파일 **일곱**(V26·V27 · `ReleaseIdentifier` · `ReleaseWiring` · 사유 enum ·
+`ExecutionRowReleaseTest` · `ReleaseWiringTest`) 전부 계약의 in_scope 안이고, test 둘은 만드는
+커밋에서 게이트 등록부에 함께 등재했다. 라운드 2 가 **되돌린** 넷(판정 표·Jdbc
 store·기록 port·그 test)은 HEAD 에 없다 — 되돌림 목록의 `HISTORY_ONLY` 가 그 셋이고 `rollback.md`
 §1 이 그 분류를 적는다. in_scope 밖으로 나간 것은 `commands.md` 의 표 다섯
 (compose·env 템플릿·tools·CI·runbook 둘)이고 그 근거는 같은 표가 적는다.
