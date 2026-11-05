@@ -13,18 +13,18 @@ export function worksheetPathOf(notice: Pick<NoticeSummary, 'noticeNumber' | 'no
 }
 
 /**
- * 남은 날 — **숫자만** 낸다. 「마감됨」 같은 상태 말은 만들지 않는다(그것은 `status` 가 한다).
- *
- * **이미 센 날 수를 받는다**(M9 D-4): `*At` 원문이 JSX 를 지나면 게이트가 멈춘다. 세는 일과
- * 문면을 만드는 일은 둘 다 `timeDisplay` 가 한다 — 이 컴포넌트는 그릴 뿐이다.
- */
-/**
  * 숫자의 **뜻**을 말하는 유일한 산출물 문면. 셈이 KST 달력일 차로 바뀌었으므로 이 자리도 그
  * 말을 쓴다 — 앞 판은 「남은 날(내림)」이었고 그것은 **사라진 기계**를 가리킨다. 「남은」도 덜
  * 맞는다: 새 정의에는 거울상(`D+1` — 마감일이 어제)이 있다.
  */
 const DEADLINE_HINT = '마감일까지의 KST 달력일 차';
 
+/**
+ * 남은 날 — **숫자만** 낸다. 「마감됨」 같은 상태 말은 만들지 않는다(그것은 `status` 가 한다).
+ *
+ * **이미 센 날 수를 받는다**(M9 D-4): `*At` 원문이 JSX 를 지나면 게이트가 멈춘다. 세는 일과
+ * 문면을 만드는 일은 둘 다 `timeDisplay` 가 한다 — 이 컴포넌트는 그릴 뿐이다.
+ */
 function DeadlineBadge({ days }: { readonly days: number | null }) {
   const text = dayCountText(days);
   if (text === null) {
