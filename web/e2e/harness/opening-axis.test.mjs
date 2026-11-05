@@ -11,6 +11,7 @@ import {
   openingAxisDesign,
   openingAxisRouteTable,
   promotionExpectation,
+  runnerLine,
   shippedNoticeListOperations,
   shippedOpeningOperationPaths,
   shippedProgressLabels,
@@ -242,6 +243,19 @@ describe('러너 계수 등식', () => {
     expect(() => assertRunnerCounts(line, { groupsRead: 7, promoted: 6, outsideSample: 1 }, '승격')).not.toThrow();
     expect(() => assertRunnerCounts(line, { promoted: 5 }, '승격')).toThrow(/promoted/u);
     expect(() => assertRunnerCounts(line, { promoted: 5 }, '승격')).toThrow(/groupsRead=7/u);
+  });
+
+  it('출력에서 그 줄 하나를 집는다 — 좁히지 않으면 뒤 줄의 값이 계수를 덮는다', () => {
+    const output = [
+      'opening-collection finished frame=6 sampled=6 detailCalls=24 exit=0',
+      'opening-promote finished groupsRead=7 promoted=6 outsideSample=1',
+    ].join('\n');
+
+    expect(runnerLine(output, 'opening-collection finished', '수집')).toContain('frame=6');
+    expect(() =>
+      assertRunnerCounts(runnerLine(output, 'opening-collection finished', '수집'), { frame: 6 }, '수집'),
+    ).not.toThrow();
+    expect(() => runnerLine(output, 'snapshot finished', '추출')).toThrow(/그 자리까지 가지 못했다/u);
   });
 
   it('줄에 그 칸이 **없으면** 통과가 아니다', () => {

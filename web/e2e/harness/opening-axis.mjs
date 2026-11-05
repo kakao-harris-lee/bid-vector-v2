@@ -340,6 +340,18 @@ export function promotionExpectation(design) {
 }
 
 /**
+ * 러너 출력에서 그 줄 **하나**를 집는다. 출력 전체를 그냥 넘기면 `key=value` 가 여러 줄에 있어
+ * 계수가 뒤 줄의 값으로 덮인다 — 줄을 먼저 좁히지 않으면 등식이 **다른 줄을 재면서** 초록일 수 있다.
+ */
+export function runnerLine(output, marker, label) {
+  const line = output.split('\n').find((one) => one.includes(marker));
+  if (line === undefined) {
+    throw new Error(`${label} 출력에 「${marker}」 줄이 없다 — 러너가 그 자리까지 가지 못했다`);
+  }
+  return line;
+}
+
+/**
  * 러너가 남긴 줄의 계수 ↔ 기대. 어긋나면 **줄 전문**을 담아 던진다 — 앞 판의 붉음은 「30000ms
  * 안에 기다리지 못했다」였고 그것은 원인을 말하지 않아 오진 비용을 만들었다(PR #130 의 같은 교훈).
  */

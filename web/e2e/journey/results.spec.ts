@@ -9,6 +9,7 @@ import {
   CHECKPOINT_LABEL,
   driveToRecorded,
   expectedKstText,
+  journeyContext,
   localDateTimeInput,
   signIn,
   watchRequests,
@@ -111,6 +112,36 @@ const RATE_STATE_LABEL: Readonly<Record<string, string>> = {
   ABSENT_NO_RECORDED_BIDS: '셀 것이 없음',
   ABSENT_NO_DECIDED_CASES: '분모에 드는 건이 없음',
 };
+
+/**
+ * 개찰 결과 상태 아홉의 문면(M9/opening-harness). **`BLOCKER_LABEL` 과 합치지 않는다**: 그것은
+ * 대사 판정 불가 사유의 어휘(열)이고 이것은 개찰 결과 상태의 어휘(아홉)다 — 오늘 문면이 겹치는
+ * 여섯이 있을 뿐이고, 한 표로 접으면 두 계약이 갈리는 날 그 사실이 가려진다.
+ */
+const OPENING_STATE_LABEL: Readonly<Record<string, string>> = {
+  NOTICE_ABSENT: '공고를 모름',
+  NOT_OPENED_YET: '아직 개찰 전',
+  NOT_COLLECTED: '개찰 자료 없음',
+  OBSERVED_NOT_PROMOTED: '원문만 적재됨',
+  OPENED: '개찰 완료',
+  FAILED_BID: '유찰',
+  REBID: '재입찰',
+  PROGRESS_UNRECOGNIZED: '진행구분 미등재',
+  PROGRESS_ABSENT: '진행구분 없음',
+};
+const PROVISIONAL_STATE_LABEL: Readonly<Record<string, string>> = {
+  NOT_OBSERVED: '투찰 행 미관측',
+  RANK_MISSING: '순위 1 없음',
+  RANK_DUPLICATED: '순위 1이 여럿',
+  DETERMINED: '잠정 1위 확인',
+};
+
+/** 개찰 결과 조회에서 **이 여정이 대조하는 칸만** — 칸 전수는 vitest 가 `satisfies` 로 잠근다. */
+interface OpeningResultBody {
+  readonly state: string;
+  readonly provisionalRankOneState: string;
+  readonly provisionalRankOneBidAmountWon: number | null;
+}
 
 /** 자릿점·통화를 걷고 **숫자만** 남긴다 — spec 이 화면의 서식 함수를 복제하지 않으려는 것이다. */
 function digitsOf(text: string): string {
@@ -248,16 +279,39 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
     await expect(at).toHaveAttribute('datetime', mine.nextCheckpointAt);
   }
 
-  // 개찰 결과 칸 — **같은 실행의 응답과 대조**한다. 하네스가 개찰 축을 수집하지 않으므로
-  // 오늘의 답은 `NOT_OPENED_YET` 이고(D-7E3a-7) 그 사실을 응답에서 읽어 확인한다.
-  const openingBody = (await (await openingRead).json()) as { readonly state: string };
-  expect(openingBody.state, '하네스에서는 개찰 축이 수집되지 않는다(착수 실측)').toBe('NOT_OPENED_YET');
-  await expect(card.getByTestId(`opening-state-${caseId}`)).toContainText('아직 개찰 전');
+  // 개찰 결과 칸 — **같은 실행의 응답과 대조**한다. M9/opening-harness 부터 하네스가 개찰 축을
+  // 수집·승격하므로 이 건의 답은 **확정 갈래**(`OPENED`)다 — 앞 판은 그 사슬이 없어
+  // `NOT_OPENED_YET` 에서 멈췄다(D-7E3a-7 의 후속). 기대값을 여기 적지 않고 **하네스의
+  // 설계표**에서 읽는다: 적으면 설계와 기대가 사본 둘이 되고 한쪽만 고쳐진다.
+  const openingBody = (await (await openingRead).json()) as OpeningResultBody;
+  const designed = journeyContext().openingAxis.find((one) => one.noticeNumber === NOTICE);
+  expect(designed, `하네스 설계표에 ${NOTICE} 가 없다 — 여정 ⑤ 의 건이 설계 밖이다`).toBeDefined();
+  expect(openingBody.state, `설계: ${designed?.why}`).toBe(designed?.expectedOpeningState);
+  await expect(card.getByTestId(`opening-state-${caseId}`)).toContainText(
+    OPENING_STATE_LABEL[openingBody.state]!,
+  );
 
-  // 건 상태가 「잠정 1위」인데 **개찰 결과 축은 여전히 미개찰**이다 — 두 축이 다르다는 사실이
-  // 화면에서도 갈려 보여야 한다(운영자 기록 ≠ 수집된 개찰 결과).
+  // 건 상태(**운영자 기록**)와 개찰 결과 축(**수집**)은 다른 칸이다 — 개찰 축이 선 뒤에도 그 둘이
+  // 한 값으로 접히지 않는다.
+  //
+  // 확정 낙찰금액은 여전히 **부재**다: 그 축(낙찰 목록)은 출하 수집 배선에 오퍼레이션이 없어
+  // 하네스가 세울 수 없다(알려진 제한). 그 사실을 단언으로 못박는다 — 「개찰 축을 세우면 확정
+  // 낙찰가도 온다」는 오해가 여기서 멈춘다.
   await expect(card.getByTestId(`confirmed-award-${caseId}`)).toHaveText(ABSENT);
-  await expect(card.getByTestId(`provisional-award-${caseId}`)).toHaveText(ABSENT);
+
+  // 잠정 1위 축은 개찰완료 상세 축에서 오고 그 축은 **연령 게이트 뒤에만** 불린다 — 공고마다
+  // 갈리므로 두 얼굴을 **응답에서 읽어** 각각 단언한다(리터럴 기대를 적지 않는다).
+  await expect(card.getByTestId(`provisional-state-${caseId}`)).toContainText(
+    PROVISIONAL_STATE_LABEL[openingBody.provisionalRankOneState]!,
+  );
+  const provisional = card.getByTestId(`provisional-award-${caseId}`);
+  if (openingBody.provisionalRankOneBidAmountWon === null) {
+    await expect(provisional).toHaveText(ABSENT);
+  } else {
+    expect(digitsOf(await provisional.innerText())).toBe(
+      String(openingBody.provisionalRankOneBidAmountWon),
+    );
+  }
 
   // E 는 읽기 화면이다 — 전이 버튼이 **없다**(D-7E3a-8).
   await expect(card.getByRole('button', { name: /기록|대기로|심사/u })).toHaveCount(0);
@@ -504,4 +558,46 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
   expect(watched.outside).toStrictEqual([]);
   expect(watched.unexpectedSameOrigin).toStrictEqual([]);
   assertOnlyAllowedOperations(watched.apiPaths);
+});
+
+/**
+ * 개찰 결과 **아홉 갈래의 응답 집합 등식**(M9/opening-harness · `OPEN-7E3A-OPENING-AXIS-HARNESS`).
+ *
+ * 재는 것은 **화면이 아니라 하네스**다 — 화면의 아홉 갈래 표시는 vitest 가 전수로 잠그고
+ * (D-7E3a-7), 여기서는 「하네스가 그 아홉을 **실제로 낳는가**」를 본다. 앞 판의 하네스는 개찰 축을
+ * 수집하지 않아 셋만 낼 수 있었고, 그 사실이 산문으로만 적혀 있었다.
+ *
+ * **등식이 둘로 갈려 있다.** 「설계 집합 == 계약 열거」는 `e2e/harness/opening-axis.test.mjs` 가
+ * 로컬에서 잠그고, 이 자리가 「**살아 있는 응답** == 그 설계」를 잠근다. 둘이 함께 서야 「아홉을
+ * 낳았다」가 참이다 — 한쪽만으로는 설계를 거짓으로 적는 변이(로컬 초록)나 설계에서 갈래를 지우는
+ * 변이(CI 초록)가 지나간다.
+ *
+ * **화면 경로를 쓰지 않는 이유**: 설계 공고들에는 건(`bid_case`)이 없어 화면 E 에 카드가 서지
+ * 않고, 건을 만들면 그 공고들이 다른 여정의 입찰함 단언에 섞인다. 격리를 깨지 않으려고 조회만
+ * 보낸다(로그인한 같은 브라우저 맥락의 세션 쿠키를 쓴다).
+ */
+test('개찰 결과 — 하네스가 설계한 갈래 전수를 **살아 있는 응답으로** 낸다', async ({ page }) => {
+  await signIn(page);
+  const design = journeyContext().openingAxis;
+
+  const observed: string[] = [];
+  for (const one of design) {
+    // 차수는 계약이 제로패딩 3자리로 두고 fixture 가 전부 `000` 이다(형식을 어기면 400).
+    const response = await page.request.get('/api/opening-results', {
+      params: { noticeNumber: one.noticeNumber, noticeRound: '000' },
+    });
+    expect(response.status(), `${one.noticeNumber} 개찰 결과 조회`).toBe(200);
+    const body = (await response.json()) as OpeningResultBody;
+    // 공고마다 **설계가 선언한 갈래**와 같은가. 어긋나면 그 공고가 왜 그 갈래인지를 함께 낸다.
+    expect(body.state, `${one.noticeNumber} — 설계: ${one.why}`).toBe(one.expectedOpeningState);
+    observed.push(body.state);
+  }
+
+  /**
+   * **집합 등식** — 문면 표가 아는 갈래 전수가 실제로 섰다. 비교 대상을 설계표가 아니라 이 파일의
+   * 문면 표로 두는 이유: 설계표와 맞대면 **설계에서 갈래를 지우는 변이가 양쪽을 함께 줄여** 등식이
+   * 참으로 남는다. 문면 표는 손으로 적은 다른 출처이고, 계약이 열을 더하면 그 표가 먼저 늘어야
+   * 위의 문면 단언이 서므로 이 등식이 하네스에게 그 갈래를 요구한다.
+   */
+  expect(new Set(observed)).toStrictEqual(new Set(Object.keys(OPENING_STATE_LABEL)));
 });
