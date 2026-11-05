@@ -275,6 +275,56 @@ export function standaloneOccurrences(text: string, token: string): number {
   return matches === null ? 0 : matches.length;
 }
 
+/**
+ * **글자 경계만으로는 모자란다**(r2 표적 재검증 실측). 화면은 금액 부속을 **칸마다 제 요소**로
+ * 그리므로 통화 원문이 숫자에 바로 붙어 `…000KRW` 가 된다 — 숫자도 식별자 글자라 위 술어가
+ * 그것을 **세지 못했다**(고친 칸을 되돌리는 변이가 이 게이트를 지나갔다).
+ *
+ * 그래서 **잎 요소의 글자 전체**와 토큰을 맞댄다: 자식 요소가 없는 요소의 글자가 토큰과 **같으면**
+ * 그 자리는 원문을 그린 것이다. 이어붙인 글자의 경계를 추측하지 않으므로 숫자 인접에 둔감하지
+ * 않고, 명령 토큰처럼 **다른 글자와 한 요소에 섞인** 값은 잎이 아니라 그대로 지나간다.
+ */
+export function leafTokenHits(root: Element, tokens: readonly string[]): readonly string[] {
+  const wanted = new Set(tokens);
+  const hits: string[] = [];
+  for (const element of root.querySelectorAll('*')) {
+    if (element.childElementCount > 0) {
+      continue;
+    }
+    const text = (element.textContent ?? '').trim();
+    if (wanted.has(text)) {
+      hits.push(text);
+    }
+  }
+  return hits;
+}
+
+describe('잎 글자 등식 — 술어 자신의 대조', () => {
+  function leafOf(html: string): Element {
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    return host;
+  }
+
+  it('제 칸에 홀로 선 토큰을 집는다 — 숫자에 붙어 있어도', () => {
+    const root = leafOf('<span>1,350,000,000</span><span>KRW</span>');
+
+    expect(leafTokenHits(root, ['KRW'])).toStrictEqual(['KRW']);
+  });
+
+  it('다른 글자와 한 요소에 섞인 값은 집지 않는다', () => {
+    const root = leafOf('<p>관심 · ADD_TO_BID_BOX</p>');
+
+    expect(leafTokenHits(root, ['BID'])).toStrictEqual([]);
+  });
+
+  it('표의 문면은 집지 않는다', () => {
+    const root = leafOf('<span>원</span><span>기초금액</span>');
+
+    expect(leafTokenHits(root, ['KRW', 'BASE_AMOUNT'])).toStrictEqual([]);
+  });
+});
+
 describe('홀로 선 토큰만 센다 — 술어 자신의 대조', () => {
   it('홀로 선 토큰은 센다', () => {
     expect(standaloneOccurrences('기초금액 · BID · 공고 게시값', 'BID')).toBe(1);
@@ -296,6 +346,9 @@ describe('화면이 그린 글자에 금액 토큰 원문이 없다 (D-4)', () =
     for (const token of MONEY_TOKENS) {
       expect(standaloneOccurrences(text, token), `${token} 이 화면에 그대로 그려졌다`).toBe(0);
     }
+    // 칸마다 제 요소로 그려지는 자리는 **잎 글자 등식**으로 — 숫자에 붙은 토큰을 글자 경계가
+    // 세지 못한다(r2 표적 재검증 실측).
+    expect(leafTokenHits(container, MONEY_TOKENS), '원문 토큰이 제 칸에 그대로 섰다').toStrictEqual([]);
   });
 
   /**
