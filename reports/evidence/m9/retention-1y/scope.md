@@ -58,4 +58,9 @@ evidence 에 **거동 파급**으로 적고 그대로 진행한다(되돌림 항
 
 **acceptance 재실측의 자리**: 호스트 빌드 큐가 포화라(대기 12) 전건 `check`·`qualityBaseline` 은 **PR CI 가
 정본**이다(같은 명령). 이 갱신 뒤 HEAD 가 움직이므로 전건은 draft PR 의 CI 로 재실측하고, 로컬에서는
-**표적 test 와 변이만** 돌린다.
+**표적 test·변이·`leakPatternGate`** 만 돌린다.
+
+**main 병합(팀장 지시)**: `ci.yml` 은 PR #122(S-27d)가 main 에 들어간 뒤라 **먼저 `origin/main` 을 병합**했다 —
+병합 커밋 `c9a953f2`, 들인 main `6c38fb32`(PR #122 · #126). 그래서 이 slice 의 **복원 원천이 base 에서 그
+병합 main SHA 로 옮겨간다**(하네스 규율: 공유 파일은 병합한 main 커밋에서 복원). 병합이 Kotlin·정책·fixture
+입력을 **하나도 바꾸지 않았고**(실측 0 파일) 내 복원 목록과 겹치는 경로는 `ci.yml` 하나다.

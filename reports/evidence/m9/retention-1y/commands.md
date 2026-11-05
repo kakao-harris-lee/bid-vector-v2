@@ -12,11 +12,9 @@ base `79f3e5c4` · 브랜치 `feature/m9-retention-1y` · worktree `bid-vector-v
 evidence 커밋들이 입력을 바꾸는 게이트는 `leakPatternGate` 하나이고(scanRoot 가 `reports/evidence`) 그
 측정은 완료 보고가 든다.
 
-**호스트 규율**: 무거운 명령 전에 확인 셋(`pgrep -af 'GradleWrapperMain|GradleWorkerMain'` · `free -m` ·
-`ps -eo pid,rss,args --sort=-rss`)을 **별도 호출로** 먼저 돌렸다. Gradle 은 전부 빌드 자리 진입점
-(`bv-build.sh`, 획득 순간 메모리 재확인) 아래에서 `--no-daemon` 으로 돌렸다. 이 레인이 도는 동안 호스트에
-다른 레인 다섯이 같은 두 자리를 두고 줄을 섰다 — 그래서 표적을 좁혀 돌리고 전건은 마지막에 한 번 돌렸고,
-전건 `check` 의 벽시계(33m47s)는 그 경합을 포함한다.
+**호스트 규율**: 무거운 명령 전에 확인 셋(`pgrep` · `free -m` · RSS 상위)을 **별도 호출로** 먼저 돌렸고 Gradle 은
+전부 `bv-build.sh` 아래 `--no-daemon` 이다. 레인 다섯이 같은 두 자리에 줄을 서 있었다 — 전건 `check` 의
+벽시계(33m47s)는 그 경합을 포함한다.
 
 ## RED (구현 전) — 승인된 값이 wire 에 닿지 않는 상태
 
@@ -74,9 +72,7 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 
 ## 계약 갱신 2026-11-05 뒤 — 확장 범위의 재실측
 
-세 경로는 **문서와 워크플로 주석**이라 Kotlin 입력이 0 이다(그 커밋의 diff 는 두 runbook 과 `ci.yml` 주석 한
-줄). 그래서 돌린 것은 **그 파일을 읽는 술어**다. 전건 `check`·`qualityBaseline` 은 호스트 빌드 큐 포화로
-**draft PR 의 CI 가 정본**이다(계약 갱신 절 — 같은 명령).
+세 경로는 문서와 워크플로 주석이라 Kotlin 입력이 0 이다. 그래서 돌린 것은 **그 파일을 읽는 술어**다.
 
 | # | 명령 | 결과 |
 |---|---|---|
@@ -84,10 +80,25 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 | 7 | YAML 파싱(`yaml.safe_load`) | ok |
 | 8 | `git diff -- .github/workflows/ci.yml` | **그 주석 줄 하나**(−1 / +2, 전부 주석) — PR #122 가 만지는 다른 hunk 무접촉 |
 
-`ci.yml` 의 **주석은 어느 게이트의 입력도 아니다** — `ci.yml` 을 읽는 자리 전수 가운데 술어를 가진 것은
-`workflow-step-refs-check.sh` 하나이고 그 술어는 job·step id 와 참조만 센다(위 6 이 그 계수다).
+## main 병합 뒤 재실측 (병합 커밋 `c9a953f2`, 들인 main `6c38fb32`)
+
+PR #122 의 S-27d 가 들어간 뒤라 **병합을 먼저** 했다. **자동 병합이 같은 본문을 접지 않았는지를 계수와 직접
+대조로** 봤다(충돌 0 은 그 자체로 근거가 아니다). `ci.yml` 을 읽는 자리 가운데 술어를 가진 것은
+`workflow-step-refs-check.sh` 하나이고 주석은 그 입력이 아니다.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| 9 | 병합 뒤 `ci.yml` 계수 ↔ 병합 전 예측 | **일치** — 줄 1026(= main 1025 + 내 주석 순증 1) · step 56 · step id 15 · job 5 · `S-27d` **1** · 내 새 문장 **1** · 옛 문장 **0** |
+| 10 | `diff <(git show origin/main:…ci.yml) …ci.yml` | **그 주석 한 자리만**(−1 / +2) — 남의 hunk 보존, 내 줄 중복 0, 고아 주석 0 |
+| 11 | 병합이 바꾼 Kotlin·정책·fixture | **0 파일**(`git diff --name-only 79f3e5c4..origin/main -- '*.kt' '*.kts' 'config/**' 'fixtures/**'`) |
+| 12 | 내 복원 목록 ∩ main 이 바꾼 경로 | **`ci.yml` 하나**(`comm -12`) |
+| 13 | 표적 test 재실행(`--rerun`): retention 전 패키지 + `RetentionWiringTest` | **exit 0** · 클래스 20 · test **151** · fail 0 · **skip 0**(XML mtime 로 실행 확인 — 세 test task 가 실제로 돌았다) |
+| 14 | `./gradlew --no-daemon -q leakPatternGate` | **exit 0** |
+| 15 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | **exit 0** — job 4 · step id 15 · 참조 18 · 매달린 0(병합 전과 같은 계수) |
+
+전건 `check`·`qualityBaseline` 은 이 병합 뒤 HEAD 에서 **돌리지 않았다** — 팀장 지시대로 **draft PR 의 CI 가
+정본**이다(빌드 큐 포화). 위 11(컴파일 입력 0)이 그 생략의 근거이고 그 생략은 PR CI 가 메운다.
 
 ## rollback 실측
 
-`rollback.md` 가 정본이다 — 버릴 clone 에서 ①②③ 과 **트리 동일성**(복원 + evidence 제거 뒤 `git write-tree`
-가 base 트리 해시와 같다), ⑥ 은 되돌리지 않는 evidence 디렉터리를 입력으로 삼는 게이트 하나.
+`rollback.md` 가 정본이다(버릴 clone · ①②③ · 트리 동일성 · ⑥ 게이트).
