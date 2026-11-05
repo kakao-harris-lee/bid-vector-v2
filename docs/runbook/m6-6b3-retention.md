@@ -1,8 +1,14 @@
-# M6/6B-3 보존 runbook — 90일 파기 · 원문 PII 마스킹 (2026-10-14)
+# M6/6B-3 보존 runbook — 기한 파기 · 원문 PII 마스킹 (2026-10-14 · 보존 1년 개정 2026-11-05)
 
 운영자 결정 2026-09-26 ②(「보존 기간 90일 — 공고·평가 이력·audit」)와 6B-3 운영자 결정 A-1~A-4 를
 실행하는 절차다. 설정·종료 코드의 일반 관례는 `m6-6e-operations.md` §1·§3 이 정본이고, 이 문서는
 보존 축만 더한다.
+
+**보존 기간은 2026-11-05 부터 1년이다**(사용자 결정 — 90일을 대체한다). 값의 정본은 코드의
+`RETENTION_POLICY` **날짜 개정 표**이고 90일 항목은 지우지 않고 남겨 둔다 — 개정일 앞쪽 기준일로
+해소하면 그 시대의 값이 선다(소급 금지). 아래에서 숫자를 적는 자리는 **세어 보는 질의**(§2.2)뿐이고,
+정책이 다시 개정되면 그 자리도 함께 바꾼다. 기간을 늘리는 개정은 **이미 지워진 행을 되살리지
+않는다** — 그래서 §2.4 로 「이 절차가 운영에서 돈 적이 있는가」를 먼저 본다.
 
 **실행은 별도 승인이다.** 이 문서는 절차를 적을 뿐이고, 운영 DB 에 파기를 돌리는 것은
 `milestone-6.md` 「완료 후 별도 승인 사항」에 걸린다. 6B-3 은 Testcontainers 위에서만 실행했다.
@@ -30,7 +36,7 @@
 ### 1.4 입찰 건 넷은 시간으로 지우지 않는다 (M7/7B)
 
 `bid_case` · `bid_case_transition` · `bid_draft` · `bid_record` 는 **파기 대상이 아니다.**
-「90일 지난 행 삭제」가 여기 걸리면 운영자의 **정산·증빙 근거**가 사라진다 — 그 데이터의 수명은
+「기한이 지난 행 삭제」가 여기 걸리면 운영자의 **정산·증빙 근거**가 사라진다 — 그 데이터의 수명은
 시간이 아니라 **R-5(제출확인서 참조 보관 3년)와 운영자의 결정**이 정하고, 그 날짜는
 `bid_record.evidence_retain_until` 이 행마다 들고 있다.
 
@@ -45,7 +51,7 @@
 판 번호)은 **사본**이다 — 공고가 파기된 뒤에도 건과 기록은 남고, 그때 필요한 값은 스냅샷이
 이미 들고 있다. 사유는 `V21__bid_case.sql` 머리말에도 같은 문면으로 있다.
 
-### 1.1 「공고 90일」이 원문까지 지우지는 않는다
+### 1.1 공고 파기가 원문까지 지우지는 않는다
 
 `raw_observation` 은 파기 대상이 아니다(A-3) — 6G 백테스트 표본을 남기기 위해서다. 그 표에서
 사라지는 것은 **담당자 키**(`payload` 안의 이름·전화·전자우편)와 **업체 식별을 나르는 등재 개념
@@ -73,7 +79,7 @@ DB 트리거가 거부한다. 마스킹을 정하는 **세 입력 전부가 적�
 
 `notice_audit` 도 파기하지 않고 마스킹도 하지 않는다. 사유를 사실대로 적는다: 그 표의
 `previous_row` 는 `notice` 행의 **전체 스냅숏**이고 `notice` 로 가는 FK 가 없다 — 그래서 `notice` 행이
-파기돼도 그 스냅숏(금액 축·분류·마감)은 **90일 창 밖에도 남고 그 표는 무한히 자란다**(알려진 제한 8).
+파기돼도 그 스냅숏(금액 축·분류·마감)은 **보존 창 밖에도 남고 그 표는 무한히 자란다**(알려진 제한 8).
 담당자 PII 는 그 스냅숏에 없다(`notice` 에 담당자 열이 없다 — 그 사실을 「`notice` 열 집합 ↔ 보존
 분류가 아는 열 집합」 등식이 잠근다. 새 열은 분류를 거치지 않고는 빌드를 지나지 못한다). 그래서 그
 표의 append-only 트리거는 **손대지 않았다** — 구멍은 `raw_observation` 하나다.
@@ -237,24 +243,25 @@ migration `bidvector-migration` 과 가른다).
 
 §4.3 의 멈춤 조건(「파기 수가 예상과 자릿수로 다를 때」)은 **예상이 있어야** 발화한다. 러너에는 세기만
 하는 모드가 없으므로(설계대로 `mode=once` 하나다) 운영 DB 첫 실행 **전에** 소유자 연결로 같은 술어의
-`COUNT(*)` 를 돌려 수를 기록하고 그 수를 예상으로 쓴다. 보존 기간은 승인된 값(90일)이다.
+`COUNT(*)` 를 돌려 수를 기록하고 그 수를 예상으로 쓴다. 보존 기간은 승인된 값(**2026-11-05 부터 1년**,
+그 전에는 90일)이고 아래 질의의 `365 days` 가 그 값이다 — 정책이 다시 개정되면 이 숫자도 함께 바꾼다.
 
 ```sql
 -- 파기 대상(표마다 기준 시각 열이 §1 의 표와 같아야 한다)
-SELECT 'notice', count(*) FROM notice WHERE created_at < now() - interval '90 days'
-UNION ALL SELECT 'opening_result', count(*) FROM opening_result WHERE created_at < now() - interval '90 days'
+SELECT 'notice', count(*) FROM notice WHERE created_at < now() - interval '365 days'
+UNION ALL SELECT 'opening_result', count(*) FROM opening_result WHERE created_at < now() - interval '365 days'
 UNION ALL SELECT 'opening_reserve_price', count(*) FROM opening_reserve_price
-    WHERE created_at < now() - interval '90 days'
-UNION ALL SELECT 'qualification_text', count(*) FROM qualification_text WHERE created_at < now() - interval '90 days'
-UNION ALL SELECT 'notice_requirement', count(*) FROM notice_requirement WHERE created_at < now() - interval '90 days'
-UNION ALL SELECT 'rejected_write', count(*) FROM rejected_write WHERE recorded_at < now() - interval '90 days'
-UNION ALL SELECT 'api_request_audit', count(*) FROM api_request_audit WHERE occurred_at < now() - interval '90 days'
-UNION ALL SELECT 'edit_session', count(*) FROM edit_session WHERE created_at < now() - interval '90 days'
+    WHERE created_at < now() - interval '365 days'
+UNION ALL SELECT 'qualification_text', count(*) FROM qualification_text WHERE created_at < now() - interval '365 days'
+UNION ALL SELECT 'notice_requirement', count(*) FROM notice_requirement WHERE created_at < now() - interval '365 days'
+UNION ALL SELECT 'rejected_write', count(*) FROM rejected_write WHERE recorded_at < now() - interval '365 days'
+UNION ALL SELECT 'api_request_audit', count(*) FROM api_request_audit WHERE occurred_at < now() - interval '365 days'
+UNION ALL SELECT 'edit_session', count(*) FROM edit_session WHERE created_at < now() - interval '365 days'
 UNION ALL SELECT 'outbox', count(*) FROM outbox
-    WHERE inserted_at < now() - interval '90 days' AND state = 'DELIVERED'
+    WHERE inserted_at < now() - interval '365 days' AND state = 'DELIVERED'
 -- 마스킹 대상
 UNION ALL SELECT 'raw_observation(mask)', count(*) FROM raw_observation
-    WHERE inserted_at < now() - interval '90 days' AND pii_masked_at IS NULL;
+    WHERE inserted_at < now() - interval '365 days' AND pii_masked_at IS NULL;
 ```
 
 자식 가드 때문에 **실제 파기 수는 이 수보다 적을 수 있다**(기한 안쪽 자식이 있는 부모는 남는다 —
@@ -266,8 +273,30 @@ cutoff 는 run 시작에 고정되고, 러너는 표별로 일괄 상한(정책 
 백로그를 비운다**. 도중에 실패하면 앞서 커밋된 일괄은 남고 **다음 run 이 이어받는다**(이어받기에
 상태가 필요 없다 — cutoff 가 시각으로 정해진다).
 
-첫 실행은 90일 치 백로그를 한 번에 지우므로 그 트랜잭션들이 만드는 부풀음(bloat)을 뒤에 봐야
+첫 실행은 보존 기간(1년) 치 백로그를 한 번에 지우므로 그 트랜잭션들이 만드는 부풀음(bloat)을 뒤에 봐야
 한다 — `VACUUM` 운영 반입은 M7 축이다(알려진 제한).
+
+### 2.4 이 절차가 운영에서 돈 적이 있는가 — 1년 개정 뒤 첫 실행 전에 본다
+
+기간을 늘리는 개정은 **이미 사라진 행을 되살리지 않는다.** 그래서 「개정 전에 무엇이 사라졌나」를
+알아야 하고, 그 답의 출발점은 「이 러너가 운영에서 한 번이라도 돌았는가」다.
+
+구조적 사실 하나가 범위를 좁힌다: **운영 compose 는 `bidvector.retention.mode` 를 설정하지 않는다**
+(일회 러너 공통 관례 D-6A2a-5 — 그래서 기본 조립은 「보존이 꺼진 상태」다). 보존 run 이 돌 수 있는
+길은 **§2.1 의 호스트 cron 하나**이고 그 cron 은 운영자가 직접 걸어야 한다.
+
+| 확인 | 무엇을 본다 | 읽는 법 |
+|---|---|---|
+| cron 등재 | 운영자 crontab 에 보존 줄이 있는지 · §2.1 의 래퍼 스크립트가 호스트에 있는지 | 둘 다 없으면 이 절차는 **한 번도 돌지 않았다** |
+| run 로그 | §2.1 cron 줄이 가리키는 로그 파일 | 없으면 run 기록이 없다. 있으면 마침·실패 줄의 `cutoff=` 가 **어느 기간으로 돌았는지** 말한다 |
+| 마스킹 표지 | `SELECT count(*) FROM raw_observation WHERE pii_masked_at IS NOT NULL` | 0 이면 마스킹이 한 행도 처리하지 않았다 |
+| 파기 흔적 | §2.2 의 질의를 **옛 기간**(`interval '90 days'`)으로 한 번 더 | 90일을 넘긴 행이 **그대로 있으면** 90일 시대의 파기가 돌지 않았다는 뜻이다(개정 뒤 그 행들은 1년까지 남는다) |
+
+네 축이 전부 「돈 적 없음」이면 개정의 데이터 영향은 **0** 이다 — 기간을 늘리는 방향이고 아직
+아무것도 지워지지 않았다. 하나라도 「돌았다」면 그 run 의 `cutoff=` 를 읽어 **무엇이 옛 기준으로
+사라졌는지**를 먼저 적고, 그 뒤에 새 기준 첫 실행을 §2.2 로 세어 본다.
+
+이 확인은 읽기 질의와 파일 존재 확인뿐이다. **운영 DB 에서의 파기 실행은 여전히 별도 승인**이다(§4.1).
 
 ## 3. 종료 코드로 읽는다
 
@@ -364,16 +393,18 @@ SELECT count(*) FROM raw_observation WHERE pii_masked_at >= '<run 시작 시각>
    **`ON DELETE CASCADE` 자식도 같다**(운영자 결정 2026-10-14): 헤더 upsert 가 `created_at` 을
    유지하고 행은 새 `created_at` 을 받으므로 「120일 전 헤더 · 오늘 행」이 실재하고, 가드가 없으면
    cascade 가 기한 안쪽 행을 함께 지웠다. 자식이 기한을 넘을 때 둘이 함께 사라진다.
-3. **수집 시점 마스킹은 하지 않는다.** 원문은 90일 동안 담당자 PII **와 업체 식별 키**를 가진다
+3. **수집 시점 마스킹은 하지 않는다.** 원문은 보존 기간 동안(2026-11-05 부터 **1년**) 담당자 PII
+   **와 업체 식별 키**를 가진다
    (결정 문면 그대로 — §1.1 과 같은 문면이다, cr L-5).
 4. **백업 산출물 속 과거 행**은 이 절차의 밖이다(`m6-6b2-backup-restore.md` · M7).
 5. **시계는 신뢰 앵커다.** 호스트 시계가 미래로 틀어지면 cutoff 도 미래로 움직인다. 정책 값이
    0·음수를 거부하는 것까지가 이 slice 의 방어다.
-6. **6G 실수집 표본의 첫 파기 대상 시점**은 2026-12-31 이후다(적재가 2026-10-02 이후). 그 전에
-   스냅숏 추출이 끝나므로 이 slice 가 6G 를 막지 않는다.
+6. **6G 실수집 표본의 첫 파기 대상 시점**은 적재(2026-10-02 이후) + 보존 기간이다 — 1년 개정으로
+   **2027-10-02 이후**로 밀렸다(90일 시대의 값은 2026-12-31 이었다). 그 전에 스냅숏 추출이
+   끝나므로 이 slice 가 6G 를 막지 않는다.
 7. `VACUUM`/부풀음 운영 반입은 M7 축이다(§2.3).
 8. **`notice_audit` 은 파기도 마스킹도 받지 않아 무한히 자란다.** 그 표의 `previous_row` 는 파기된
-   `notice` 행의 전체 스냅숏(금액 축 셋·분류·마감)이고 `notice` 로 가는 FK 가 없으므로, 「공고 90일」
+   `notice` 행의 전체 스냅숏(금액 축 셋·분류·마감)이고 `notice` 로 가는 FK 가 없으므로, 공고 파기
    뒤에도 그 스냅숏은 남는다. 담당자 PII 는 그 스냅숏에 없다(§1.1 의 등식). 보존 자체를 바꾸는 것은
    운영자 결정 축이다(`OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION`).
 9. **소유자 마스킹 UPDATE 는 키 제거가 아닌 임의 내용 주입도 통과한다**(표지만 찍고 `payload` 를
@@ -415,7 +446,7 @@ SELECT count(*) FROM raw_observation WHERE pii_masked_at >= '<run 시작 시각>
 18. **자유텍스트 개념의 비PII 분류는 「키의 의미」 축이다 — 값의 내용은 보지 않는다**(cr L-1 ·
     privacy F-11). `NON_PII_CONCEPTS` 에는 공고명·적용기준내용·시공능력요건·업무분류라벨처럼 상류가
     쓰는 **자유 문자열**이 든다. 그 키가 담기로 한 것은 사람 이름도 상호도 아니지만, 담겨 **들어오면**
-    그 문자열은 `raw_observation` 이 파기 대상이 아니므로(A-3) 90일 뒤에도 남고 마스킹 뒤에도 남는다
+    그 문자열은 `raw_observation` 이 파기 대상이 아니므로(A-3) 보존 기간 뒤에도 남고 마스킹 뒤에도 남는다
     (표지가 찍히므로 영구). 측정이 아니라 **가정**이고, 그 가정을 운영 첫 실행 전에 실물 표본으로
     재확인한다(`OPEN-6B3-FREE-TEXT-PII-AXIS`).
 19. **마스킹은 키 이름으로 고른다 — 값에 심은 상호는 두 열 모두에 남는다**(privacy F-10 의 닫을 수
@@ -425,7 +456,7 @@ SELECT count(*) FROM raw_observation WHERE pii_masked_at >= '<run 시작 시각>
 20. **오늘 다시 저장된 헤더라도 자식이 0 이면 `created_at` 으로 파기된다**(PR #73 P8).
     `notice_requirement` 의 기준 시각은 **헤더가 처음 생긴 때**이고 upsert 는 그 값을 갱신하지 않는다.
     그래서 요건 재수집이 **행 0 으로 끝난**(상류가 `FAILED`·요건 부재) 헤더는 오늘 손댔어도 기한 안쪽
-    자식이 없어 가드를 지나고, 90일 지난 `created_at` 때문에 사라진다. 대가는 **KONEPS 재수집 한 번**
+    자식이 없어 가드를 지나고, 기한을 지난 `created_at` 때문에 사라진다. 대가는 **KONEPS 재수집 한 번**
     (그 공고를 다시 평가할 때 요건을 다시 받는다) — 데이터 손실이 아니라 호출 비용이고, 그래서
     고치지 않았다. 재수집이 비싸지면 처분은 「기준 시각을 갱신한다」가 아니라 「행 0 헤더의 분류」다.
 

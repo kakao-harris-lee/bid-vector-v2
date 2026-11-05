@@ -725,6 +725,18 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 `OPEN-…-RETENTION` 을 여기로 넘겼다) · **6B-4**(ML job 영속·큐 상한 — **큐 정책 결정**) · **6F-5-b**(요건을
 채우는 LLM 추출 — **실 LLM 호출은 운영자 승인 대상**).
 
+**정정 2026-11-05 — 위 목록의 6B-3 은 그 뒤 열려 닫혔다.** 「승인된 보존 기간이 없다」는 2026-09-23 시점의
+사실이고 오늘은 거짓이다(같은 문면이 「6A-1 의 경계」·6B 분할·6F-6 인계 문단에도 있다 — 전부 이 정정이 덮는다).
+운영자 결정 2026-09-26 ② 가 보존 90일을 주고, **6B-3 은 PR #73 으로 구현·머지됐다**(2026-10-14 — 정본
+`reports/evidence/m6/6b3/scope.md`, 절차 `docs/runbook/m6-6b3-retention.md`). 6F-6·6F-5-a·6A-1 이 넘긴 셋
+(`OPEN-6F6-PROFILE-RETENTION`·`OPEN-6F5A-RETENTION`·`OPEN-6F8-RAW-PII-RETENTION`)은 그 slice 가 닫았다.
+**사용자 결정 2026-11-05: 보존 기간을 1년으로 개정한다**(90일을 대체 — 정책 표의 **날짜 개정 항목**이고 90일
+항목은 그 시대의 값으로 남는다, 소급 없음; 정본 `reports/evidence/m9/retention-1y/scope.md`). 6B-3 이 신설한
+서브 OPEN 넷(`OPEN-6B3-OUTBOX-UNSENT-RETENTION` · `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` ·
+`OPEN-6B3-PURGE-LOCK-TIMEOUT` · `OPEN-6B3-FREE-TEXT-PII-AXIS`)은 **처분하지 않고 등재를 유지한다** — 특히
+마지막 건의 「운영 첫 실행 전 실표본 판독」 선행 조건은 그대로이고 runbook 의 알려진 제한이 그 자리를 든다.
+목록의 나머지 둘(6B-4·6F-5-b)은 이 정정의 범위가 아니다.
+
 **배선 뒤**: **6D**(E2E·장애 주입) · **6E**(제품 acceptance·운영 runbook — `OPEN-6A1-CONNECTION-POOL` 이
 여기서 닫혀야 운영 반입이 가능하다).
 
