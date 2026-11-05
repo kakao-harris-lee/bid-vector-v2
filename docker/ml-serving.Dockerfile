@@ -55,6 +55,30 @@ FROM python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3adc7812bab69eca5dbdc1a5cc69
 # (앞 판 주석은 `base.image.layers` 를 가리켰는데 그 키는 D-6C-10 에서 없어졌다.)
 LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3adc7812bab69eca5dbdc1a5cc690ad28306d234ffb4ef8ac9753"
 
+# chore(2026-11-05) — `CVE-2026-109518`(HIGH, `apt`·`libapt-pkg6.0` 2.6.1)이 이 베이스에 새로 잡혀
+# 모든 PR 의 `container` job S-22d 가 붉다. **베이스 상향으로는 닫히지 않는다**: 같은 태그의 최신
+# index `sha256:e697c818…`(2026-10-28)도 `apt` 2.6.1 이고 debian point release 도 12.15 그대로다
+# (실측). 수정판 **2.6.2** 는 `bookworm-security` 에 있으므로 런타임 stage 에서 그 둘만 올린다.
+# allowlist 에 등재하지 않는다 — 네 kind 모두 등재 0 을 유지하고 상향으로 해소하는 것이 이
+# 저장소의 관례다(`config/quality/vuln-allowlist.properties` 머리 주석 · 선례 chore 2026-10-29).
+#
+# **하한은 설치 인자가 아니라 `dpkg --compare-versions` 로 닫는다.** `apt-get install` 에는 apk 의
+# `'curl>=8.23.0-r0'` 같은 하한 문법이 없고 `pkg=<판>` 정확 고정뿐인데, 정확 고정은 security pocket
+# 이 다음 판으로 갈아치우는 날 **모든 빌드를 붉힌다**(web·proxy 가 apk 하한을 고른 것과 같은 사유).
+# 그래서 올리기는 무제약으로 하고 하한을 **별도 술어로** 단언한다 — 후보가 하한 아래면 그 자리에서
+# 빌드가 비-0 이다(음성 대조 실측: 하한 99 → exit 1). 이 형태는 apk 하한이 「무제약 토큰을 함께
+# 적으면 조용히 무시된다」던 함정(web.Dockerfile 주석)도 갖지 않는다 — 술어가 설치와 별개 줄이다.
+RUN set -eu; \
+    apt-get update -qq; \
+    apt-get install --only-upgrade -y --no-install-recommends apt libapt-pkg6.0; \
+    for floor in 'apt 2.6.2' 'libapt-pkg6.0 2.6.2'; do \
+        set -- $floor; \
+        cur="$(dpkg-query -f '${Version}' -W "$1")"; \
+        dpkg --compare-versions "$cur" ge "$2" \
+            || { echo "$1 $cur 가 하한 $2 미만이다 — CVE-2026-109518 이 닫히지 않는다" >&2; exit 1; }; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
+
 # non-root — 위생 게이트 (1)이 `docker inspect` 의 `Config.User` 와 이미지 안 `id -u` 로
 # 실측한다(고정 UID/GID, 시스템 계정 범위).
 RUN groupadd --system --gid 10001 mlserving \
