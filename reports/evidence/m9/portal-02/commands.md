@@ -178,3 +178,20 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: `git restore --source=df4976cc --staged --worktree -- <in_scope 경로 개별 인자>`
 - exit: 0
 - 핵심 결과: D 7 · M 12 · 결과 트리가 `df4976cc` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#123 등재 1 · #124 등재 1 · #124 OPEN 행 2 · #129 보존 기한 문면 1 · #125 `shared.ts`). 전제 둘 실측(조상 · 내 첫 산출물 커밋 미포함).
+
+## 2026-11-06T05:30+09:00 — 마지막 main 병합 (`0db22fbb`, #131·#133)
+- cmd: `git fetch origin` → `git merge --no-edit 0db22fbb`(SHA 직접)
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합 커밋 `979658a9`, 둘째 부모 **`0db22fbb`** 확인. main 의 이 구간은 Kotlin·Gradle 소스를 만지지 않았다(CI 워크플로·docker·`config/quality` 정책 셋·문서·장부) — 그래서 표적 Kotlin 재실행 없이 겹침 계수와 rollback 으로 간다. 내 `gate-tests.properties` 는 이 구간이 만지지 않아 앞 라운드의 게이트 등록부 등식이 그대로 유효하다.
+
+## 2026-11-06T05:35+09:00 — capability map 합집합 계수
+- cmd: 세 판 줄 수 · 표지 계수 · 표 행 중복·파이프 분포 · 양쪽 대비 사라진 줄
+- exit: 0
+- 핵심 결과: 줄 수 `3858(df4976cc) + 1(내 고유) + 112(#133) = 3971` **실제 일치**. **내 표지**: OPEN 표 행 1 · 공지 등재 1 · 첨부 행 추기 1 · license-limit 절 1. **#133 표지**: §12.3 제목 1 · (a)~(e) 각 1 · §14.3 두 행 각 1. **내 쪽 대비 사라진 줄 0**, main 대비 사라진 줄 1 = 내가 고친 `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` 행(내 판이 이김 — 의도). 깨진 표 줄 0.
+  **중복 표 행 16 은 선행 사실**이다 — 세 판(내 판·main·병합) 모두 16 으로 같다(한 OPEN 이 여러 절의 표에 나오는 구조). 내 병합이 만든 중복 0.
+
+## 2026-11-06T05:50+09:00 — rollback 재산출 (실측 HEAD `979658a9`, 원천 `0db22fbb`)
+- cmd: `git restore --source=0db22fbb --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `0db22fbb` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·OPEN 표 행·license-limit 절) · **남의 표지 보존**(#133 §12.3 과 §14.3 두 행 · #131 `config/quality` 셋 · #123·#124 등재 · #125 `shared.ts`).
+  **같은 ID 다른 주인**: 되돌린 트리에 `OPEN-M9-PORTAL-02-SPLIT-OPERATIONS` 언급이 **1** 남는데 그것은 #133 이 §12.3 (b)에 쓴 **선참조**이고 내 **표 행은 0** 이다 — 복원이 같은 식별자 가운데 내 것만 걷었다.
