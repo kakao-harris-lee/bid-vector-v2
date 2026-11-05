@@ -302,7 +302,13 @@ val jarContentGate =
         description = "배포되는 아카이브의 class 가 게이트를 통과한 산출물 그 바이트인지 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
-        archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
+        // **모듈의 Jar 타입 task 전수**다(`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`). 앞 판은 `jar`
+        // 하나를 이름으로 걸어, 배포물이 `bootJar` 인 `app` 에서 게이트가 배포되지 않는 아카이브를
+        // 재고 있었다. 타입 전수라 나중에 생기는 Jar task(`bootJar`·shadow 류)도 정의상 대상이다 —
+        // `BOOT-INF/classes/` 접두는 `jar.class-roots` 가 벗기고, 그 아카이브가 품는 다른 출처의
+        // 클래스(Boot launcher)는 `jar.external-class-roots` 가 면제한다.
+        archives.from(provider { tasks.withType(Jar::class.java).filter { it.enabled }.map { it.archiveFile } })
+        dependsOn(tasks.withType(Jar::class.java))
         verifiedSources.from(sourceSetKotlinFiles)
         // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
         // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다.

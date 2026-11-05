@@ -12,7 +12,13 @@ import kotlin.test.assertTrue
  * 소스에 한 줄로 붙어 위조되므로 앵커가 되지 못한다.
  */
 class JarContentPolicyTest {
-    private val policy = JarContentPolicy("bidvector/settlement", setOf("Anchor.kt"))
+    private val policy =
+        JarContentPolicy(
+            "bidvector/settlement",
+            setOf("Anchor.kt"),
+            classRoots = listOf("BOOT-INF/classes/"),
+            externalClassRoots = listOf("org/springframework/boot/loader/"),
+        )
     private val verified = mapOf("bidvector/settlement/Anchor.class" to "hash-a")
 
     private fun entry(
@@ -20,6 +26,11 @@ class JarContentPolicyTest {
         digest: String = "hash-a",
         sourceFile: String? = "Anchor.kt",
     ) = JarClassEntry(name, digest, sourceFile)
+
+    private fun JarContentPolicy.violations(
+        entries: List<JarClassEntry>,
+        verified: Map<String, String>,
+    ) = judge(entries, verified).violations
 
     @Test
     fun `게이트를 통과한 그 바이트면 위반이 없다`() {
@@ -57,5 +68,63 @@ class JarContentPolicyTest {
     fun `소유 밖 클래스는 그 사유로 잡는다`() {
         val violations = policy.violations(listOf(entry("evil/Sneak.class")), verified)
         assertTrue(violations.single().contains("소유 밖"), violations.single())
+    }
+
+    // ---- 배포물 축(`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`) ----
+
+    @Test
+    fun `bootJar 접두 밑의 그 바이트는 위반이 없다 — 접두를 벗기고 판정한다`() {
+        val entries = listOf(entry("BOOT-INF/classes/bidvector/settlement/Anchor.class"))
+
+        assertEquals(emptyList(), policy.violations(entries, verified))
+    }
+
+    @Test
+    fun `bootJar 접두 밑에 심은 비-검증 클래스는 잡는다 — 접두가 판정을 느슨하게 하지 않는다`() {
+        val entries = listOf(entry("BOOT-INF/classes/bidvector/settlement/Sneak.class"))
+
+        assertTrue(policy.violations(entries, verified).single().contains("게이트를 거치지 않은"))
+    }
+
+    @Test
+    fun `bootJar 접두 밑의 소유 밖 클래스도 잡는다`() {
+        val entries = listOf(entry("BOOT-INF/classes/evil/Sneak.class"))
+
+        assertTrue(policy.violations(entries, verified).single().contains("소유 밖"))
+    }
+
+    @Test
+    fun `launcher 접두는 면제하되 수를 센다 — 그 바이트는 이 저장소의 소스가 아니다`() {
+        val verdict =
+            policy.judge(
+                listOf(
+                    entry("org/springframework/boot/loader/launch/JarLauncher.class", sourceFile = null),
+                    entry("BOOT-INF/classes/bidvector/settlement/Anchor.class"),
+                ),
+                verified,
+            )
+
+        assertEquals(emptyList(), verdict.violations)
+        assertEquals(1, verdict.exempt)
+        assertEquals(1, verdict.judged, "면제는 판정 수에 들지 않는다 — 공허 판정을 공허로 세기 위해")
+    }
+
+    @Test
+    fun `면제 접두 밖의 비-소유 클래스는 면제가 있어도 그대로 위반이다`() {
+        val entries = listOf(entry("org/evil/Sneak.class"))
+
+        assertTrue(policy.violations(entries, verified).single().contains("소유 밖"))
+    }
+
+    @Test
+    fun `면제만 남은 아카이브는 판정 수가 0 이다 — 비-공허 단언의 입력`() {
+        val verdict =
+            policy.judge(
+                listOf(entry("org/springframework/boot/loader/launch/JarLauncher.class", sourceFile = null)),
+                verified,
+            )
+
+        assertEquals(0, verdict.judged)
+        assertEquals(emptyList(), verdict.violations)
     }
 }
