@@ -21,8 +21,16 @@ import java.time.LocalDate
 
 private const val EDIT_SESSIONS = "/api/strategy/edit-sessions"
 
-/** 세션 id — 응답 본문에서 한 자리로 읽는다(이 test 가 JSON 해석기를 들이지 않는다). */
+/** 세션 id·상태 — 응답 본문에서 한 자리로 읽는다(이 test 가 JSON 해석기를 들이지 않는다). */
 private val SESSION_ID = Regex("\"sessionId\"\\s*:\\s*\"([^\"]+)\"")
+private val SESSION_STATE = Regex("\"state\"\\s*:\\s*\"([^\"]+)\"")
+
+/** 값 하나를 보낸 결과 — 상태 코드 · 본문 · **그 뒤 세션의 상태**. */
+private data class ValueOutcome(
+    val status: Int,
+    val body: String,
+    val sessionState: String?,
+)
 
 /**
  * **금액대를 비우는 길**(M9 D-1·D-2) — 예산 한계 둘만 `amountWon: null` 을 「명시적 비움」으로
@@ -123,16 +131,25 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
         }
     }
 
-    /** 세션을 열어 값 하나를 보낸 **응답만** 본다 — 거절을 재는 자리다(적용까지 가지 않는다). */
+    /**
+     * 세션을 열어 값 하나를 보낸 뒤 **응답과 그 세션의 상태**를 본다 — 거절을 재는 자리다.
+     *
+     * 상태를 함께 읽는 이유: 값 단계의 거절에서 「아무것도 쓰지 않았다」를 **전략 값으로는 잴 수
+     * 없다**. 쓰기는 `confirm` 에서만 일어나고 이 함수는 확인하지 않으므로, 전략 값 단언은 비움
+     * 코드를 어떻게 망가뜨려도 통과한다. 거절이 실제로 남기는 흔적은 **세션이 전진했는가**다 —
+     * 전진하면 뒤따르는 `confirm` 하나가 운영자가 요청하지 않은 비움을 적용한다(통제군 실측:
+     * 검사 순서를 바꾸면 이 상태가 `WAITING_FOR_CONFIRMATION` 으로 간다).
+     */
     private fun valueResponse(
         field: String,
         body: String,
-    ): Pair<Int, String> {
+    ): ValueOutcome {
         val sessionId = beginFor(field)
         val response = session.post("$EDIT_SESSIONS/$sessionId/value", body)
+        val state = SESSION_STATE.find(session.get("$EDIT_SESSIONS/$sessionId").body.orEmpty())?.groupValues?.get(1)
         // 다음 `begin` 이 `SESSION_ALREADY_ACTIVE` 로 막히지 않게 세션을 닫는다.
         session.post("$EDIT_SESSIONS/$sessionId/cancel", """{"commandId":"close-$field"}""")
-        return response.statusCode.value() to response.body.orEmpty()
+        return ValueOutcome(response.statusCode.value(), response.body.orEmpty(), state)
     }
 
     private fun strategyBody(): String = session.get("/api/strategy").body.orEmpty()
@@ -196,10 +213,11 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
      */
     @Test
     fun `값 칸 생략은 여전히 400 이다 — 비움은 명시적 null 뿐이다`() {
-        val (status, body) = valueResponse("MIN_BUDGET", """{"commandId":"c1","field":"MIN_BUDGET"}""")
+        val outcome = valueResponse("MIN_BUDGET", """{"commandId":"c1","field":"MIN_BUDGET"}""")
 
-        status shouldBe 400
-        body shouldContain ErrorCode.INVALID_REQUEST
+        outcome.status shouldBe 400
+        outcome.body shouldContain ErrorCode.INVALID_REQUEST
+        outcome.sessionState shouldBe "WAITING_FOR_VALUE"
     }
 
     /**
@@ -222,7 +240,7 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
 
         val statuses =
             probes.map { (field, slot) ->
-                valueResponse(field, """{"commandId":"c1","field":"$field",$slot}""").first
+                valueResponse(field, """{"commandId":"c1","field":"$field",$slot}""").status
             }
 
         statuses shouldBe listOf(400, 400, 400, 400)
@@ -261,9 +279,12 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
 
         val outcomes = probes.map { body -> valueResponse("MIN_BUDGET", body) }
 
-        outcomes.map { it.first } shouldBe listOf(400, 400, 400, 400, 400)
-        outcomes.forEach { (_, body) -> body shouldContain ErrorCode.INVALID_REQUEST }
-        // 거절이 **아무것도 쓰지 않았다** — 세운 값·개정이 그대로이고 wire 도 그 값을 낸다.
+        outcomes.map { it.status } shouldBe listOf(400, 400, 400, 400, 400)
+        outcomes.forEach { outcome -> outcome.body shouldContain ErrorCode.INVALID_REQUEST }
+        // **거절이 세션을 전진시키지 않았다** — 이것이 falsifiable 한 자리다(위 헬퍼 KDoc).
+        // 전진했으면 뒤따르는 `confirm` 하나가 요청되지 않은 비움을 적용한다.
+        outcomes.map { it.sessionState } shouldBe List(outcomes.size) { "WAITING_FOR_VALUE" }
+        // 그래서 세운 값·개정·wire 값이 그대로다.
         strategyRepository.strategy.watchRules.budget.min shouldBe before
         strategyRepository.strategy.revision shouldBe beforeRevision
         strategyBody() shouldContain "\"minBudgetWon\":100000000"
