@@ -19,7 +19,7 @@
 // 화면 test 가 같은 주장을 든다. 그 제외는 **이름 규약 하나에 기대지 않는다** — 뺀 이름마다
 // 짝이 되는 test 파일이 실제로 있는지 함께 센다.
 import { readdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import ts from 'typescript';
 
@@ -227,14 +227,39 @@ export function missingVocabularyDeclarations(program, webRoot) {
   return missing;
 }
 
+/**
+ * 화면 디렉터리의 소스 파일 — **재귀**이고 `.ts` 도 담는다(PR #132 v M-3). 앞 판은 한 겹
+ * 평면 훑기에 `.tsx` 만이었고, 그래서 하위 디렉터리에 둔 카드와 JSX 를 쓰지 않는 `.ts` 카드가
+ * 경계 문장(`src/screens/**`)과 달리 **모집단 밖**이었다.
+ *
+ * 반환은 `dir` 기준 상대 경로다 — 하위 디렉터리의 파일도 자기 자리를 들고 다녀야 짝이 되는
+ * test 파일을 **같은 디렉터리에서** 찾을 수 있다.
+ */
+export function screenFilesIn(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      for (const nested of screenFilesIn(resolve(dir, entry.name))) {
+        found.push(join(entry.name, nested));
+      }
+      continue;
+    }
+    if (!/\.tsx?$/u.test(entry.name) || /\.test\.tsx?$/u.test(entry.name)) {
+      continue;
+    }
+    found.push(entry.name);
+  }
+  return found.sort();
+}
+
 /** 화면 디렉터리를 훑어 의무 집합과 화면 집합을 가른다. */
 export function collectScreenVocabulary(webRoot, overlay = new Map()) {
   const program = screenProgram(webRoot, overlay);
   const screensDir = resolve(webRoot, 'src', 'screens');
   const obligations = [];
   const screens = [];
-  const files = readdirSync(screensDir).filter((one) => one.endsWith('.tsx') && !one.endsWith('.test.tsx'));
-  for (const file of files.sort()) {
+  const files = screenFilesIn(screensDir);
+  for (const file of files) {
     const source = program.getSourceFile(resolve(screensDir, file));
     if (source === undefined) {
       // 프로그램이 화면 파일을 안 담으면 이 훑기는 **미측정**이다 — 빈 집합으로 초록이 되는

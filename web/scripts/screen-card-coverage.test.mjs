@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,7 @@ import {
   collectScreenVocabulary,
   missingVocabularyDeclarations,
   mountedCardsOf,
+  screenFilesIn,
   screenProgram,
   vocabularyComponentsOf,
   VOCABULARY_DECLARATIONS,
@@ -65,10 +67,50 @@ describe('어휘 게이트의 모집단 (r1 v M-1)', () => {
    * 하나에 기대지 않는다** — 뺀 이름마다 짝이 되는 test 파일이 실제로 있는지 센다.
    */
   it('의무에서 뺀 화면마다 자기 test 파일이 있다', () => {
-    for (const { name } of screens) {
-      const spec = resolve(screensDir, `${name}.test.tsx`);
-      expect(existsSync(spec), `${name} 을 의무에서 뺐는데 ${name}.test.tsx 가 없다`).toBe(true);
+    for (const { name, file } of screens) {
+      // **그 파일의 디렉터리에서** 찾는다 — 훑기가 재귀가 된 뒤로 화면이 뿌리에만 있지 않다.
+      const beside = resolve(screensDir, dirname(file));
+      const found = ['tsx', 'ts'].some((ext) => existsSync(resolve(beside, `${name}.test.${ext}`)));
+
+      expect(found, `${name} 을 의무에서 뺐는데 짝이 되는 test 파일이 없다`).toBe(true);
     }
+  });
+});
+
+/**
+ * **훑기의 범위를 실제 파일시스템으로 잰다**(PR #132 v M-3). 앞 판은 한 겹 평면에 `.tsx` 만
+ * 이어서 경계 문장(`src/screens/**`)보다 좁았다 — 하위 디렉터리의 카드와 `.ts` 카드가 모집단
+ * 밖이었다. 합성 원문이 아니라 **버릴 디렉터리**로 재는 이유는 그 술어가 파일시스템 자체이기
+ * 때문이다.
+ */
+describe('화면 파일 훑기의 범위 (v M-3)', () => {
+  it('하위 디렉터리와 `.ts` 를 담고, test 파일과 다른 확장자는 뺀다', () => {
+    const root = mkdtempSync(join(tmpdir(), 'bidvector-screen-walk-'));
+    try {
+      mkdirSync(join(root, 'nested', 'deeper'), { recursive: true });
+      writeFileSync(join(root, 'Flat.tsx'), 'export const a = 1;\n');
+      writeFileSync(join(root, 'Plain.ts'), 'export const b = 2;\n');
+      writeFileSync(join(root, 'Flat.test.tsx'), 'export const c = 3;\n');
+      writeFileSync(join(root, 'Plain.test.ts'), 'export const d = 4;\n');
+      writeFileSync(join(root, 'notes.md'), 'x\n');
+      writeFileSync(join(root, 'nested', 'Nested.tsx'), 'export const e = 5;\n');
+      writeFileSync(join(root, 'nested', 'deeper', 'Deep.ts'), 'export const f = 6;\n');
+
+      expect(screenFilesIn(root)).toStrictEqual([
+        'Flat.tsx',
+        'Plain.ts',
+        join('nested', 'Nested.tsx'),
+        join('nested', 'deeper', 'Deep.ts'),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /** 실제 화면 디렉터리에서도 비지 않는다 — 빈 훑기는 모든 등식을 공허하게 만든다. */
+  it('실제 화면 디렉터리를 담는다', () => {
+    expect(screenFilesIn(screensDir).length).toBe(files.length);
+    expect(files).toContain('WorksheetTimeline.tsx');
   });
 });
 
