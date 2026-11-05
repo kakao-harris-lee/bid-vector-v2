@@ -228,13 +228,17 @@ internal class AwardCollectionE2EHarness {
         noticesPerSlot: Int = AWARD_NOTICES_PER_SLOT,
         pageSize: Int = 0,
     ): Pair<List<Int>, MockAwardKonepsHttp> {
-        var mock: MockAwardKonepsHttp? = null
         return captured {
             val started = MockAwardKonepsHttp(noticesPerSlot, nonce, AWARD_WINNER_NAME, pageSize)
-            mock = started
-            val exits = boot(awardProperties(started) + extra)
-            exits to started
-        }.also { mock?.close() }
+            try {
+                boot(awardProperties(started) + extra) to started
+            } finally {
+                // **`finally` 다**(형제 기동기와 같은 자리) — 기동이 던지는 판(상한 구성 오류·배선 거부)이
+                // 이 E2E 의 단언 대상이고, 그때 서버를 닫지 않으면 실패한 기동마다 loopback 서버와 그
+                // 스레드 풀이 test JVM 에 남는다.
+                started.close()
+            }
+        }
     }
 
     /** 기존 승격 갈래를 기동한다 — **이 slice 가 고치지 않은** 배선이다. */
