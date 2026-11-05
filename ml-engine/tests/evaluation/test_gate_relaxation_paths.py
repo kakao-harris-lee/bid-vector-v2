@@ -77,6 +77,39 @@ def _called_name(node: ast.Call) -> str | None:
     return None
 
 
+def _bound_names(tree: ast.Module, target: str) -> set[str]:
+    """그 모듈 안에서 `target` 타입을 가리키는 이름 전수 — 원래 이름 + `as` 별칭 +
+    `_P = Target` 재대입.
+
+    **측정으로 더한 층이다**(M9/ml-lifecycle 변이 M8b): 호출 이름만 보던 앞 판은
+    `from … import EvaluationPolicy as _P` 뒤 `_P(...)` 를 지나갔다 — 별칭 하나가 문이었다.
+    **남은 한계**(문면에 둔다): 재대입은 **한 단계**만 따라간다(`_A = Target; _B = _A`
+    연쇄는 못 본다). 그 잔여 경로도 src 를 편집해야 성립하고, 새 임계 **값**은 숫자 리터럴
+    게이트가, 새 입력 **경로**는 아래 세 축이 막는다."""
+    names = {target}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == target
+            )
+        elif isinstance(node, ast.Import):
+            names.update(
+                alias.asname or alias.name.rsplit(".", 1)[-1]
+                for alias in node.names
+                if alias.name.rsplit(".", 1)[-1] == target
+            )
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in names
+        ):
+            names.update(item.id for item in node.targets if isinstance(item, ast.Name))
+    return names
+
+
 def _string_constants(node: ast.AST) -> list[str]:
     return [
         inner.value
@@ -126,8 +159,9 @@ def test_evaluation_policy_is_constructed_only_inside_the_loader() -> None:
     sites: set[tuple[str, str]] = set()
     for path, tree in _trees():
         owner = _enclosing_functions(tree)
+        watched = _bound_names(tree, "EvaluationPolicy")
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and _called_name(node) == "EvaluationPolicy":
+            if isinstance(node, ast.Call) and _called_name(node) in watched:
                 sites.add((_key(path), owner.get(id(node), "<module>")))
     assert sites == {("evaluation/policy.py", "load_evaluation_policy")}, sites
 
