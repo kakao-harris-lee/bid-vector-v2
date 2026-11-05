@@ -14,7 +14,13 @@
 `gradle/libs.versions.toml` · `build-logic/**`(새 convention) · 대상 모듈 `build.gradle.kts` · `.github/workflows/ci.yml`(새 job 만 — 기존 job 무편집) · `config/quality/**` · `docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md`(**계약 갱신 2026-11-06** — 아래) · evidence
 
 ## 계약 갱신
-- **2026-11-06 · `docs/discovery/capability-map.md` 추가(팀장 승인).** §12 OPEN 표의 `OPEN-ADR-07` **한 행만** `OPEN-ADR-08` 선례 꼴로 갱신한다(취소선 + 「닫혔다 — M9/adr07-pitest, 2026-11-06」 + 해소 전문은 ADR 0007 §5 가 갖는다는 포인터). 사유: ADR 에서 OPEN 을 닫고 registry 행을 그대로 두면 두 자리가 어긋나고, 그것이 ADR 0007 머리말이 스스로 지적하는 실패(「문면이 사실을 따라가지 않았다」)와 같은 형태다. 이 파일은 **공유 파일**이라 산출물 커밋을 따로 두고 rollback 목록 갱신 커밋과 나눈다.
+- **2026-11-06 · `docs/discovery/capability-map.md` 추가(팀장 승인).** **§14.2 「(B) M1 진행 중 필요」** 표의 `OPEN-ADR-07` **한 행만** `OPEN-ADR-08` 선례 꼴로 갱신한다(취소선 + 「닫혔다 — M9/adr07-pitest, 2026-11-06」 + 해소 전문은 ADR 0007 §5 가 갖는다는 포인터). 사유: ADR 에서 OPEN 을 닫고 registry 행을 그대로 두면 두 자리가 어긋나고, 그것이 ADR 0007 머리말이 스스로 지적하는 실패(「문면이 사실을 따라가지 않았다」)와 같은 형태다. 이 파일은 **공유 파일**이라 산출물 커밋을 따로 두고 rollback 목록 갱신 커밋과 나눈다.
+- **절 번호 정정(2026-11-06)** — 그 행이 든 절은 **§14.2** 다. 앞선 보고와 산출물 커밋
+  `41168ed9` 의 메시지는 그 자리를 **「§12」로 잘못 적었다**(§12 는 「결정 완료 항목」 계열이고 그
+  표에 이 행은 없다). **이력을 되쓰지 않고 여기에 사실로 선언한다** — 절 지목은 낡는 좌표를 피하려
+  쓰는 장치인데 잘못된 절을 가리키면 그 장치가 무력해지므로 evidence 문면을 정본으로 둔다.
+  머지된 PR #133 이 바꾼 자리는 **§12.3(신설)·§14.3** 이고 §14.2 가 아니다 — 그 추가분 전체에
+  `OPEN-ADR-07` 이 **0 건**이다(기계 계수). 세 절이 서로 다르므로 병합에서 이 행이 겹치지 않는다.
 - `reports/evidence/m6/closure/open-inventory.md` 는 **고치지 않는다** — 그 당시의 사실 기록이다(팀장 확인).
 ## acceptance
 pitest task 가 대상 모듈에서 돌아 리포트 산출 · 래칫 위반(임계 위로 올린 값) → 실패 양성 대조 · CI 새 job 이 PR 에서 돈다(PR CI 로 확인). 로컬 pitest 는 **한 모듈씩만**, 실행 전 메모리 확인.
