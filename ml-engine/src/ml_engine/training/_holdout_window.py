@@ -200,6 +200,24 @@ def _compute_diagnostics(
     )
 
 
+def _window_release_id(
+    window: WeekMaturity,
+    spec: TrainingSpec,
+    code_version: CodeVersion,
+    fit: ModelFit,
+) -> str:
+    """창별 model_version — 입력은 전부 그 창의 학습 결과에서만 읽는다(M9/ml-lifecycle 이
+    `sample_scope` 를 더해 여섯이 되며 설계 래칫의 함수 길이 한도를 넘어 분리했다)."""
+    return derive_release_id(
+        dataset_id=f"{fit.trained_all.dataset_id}#window={window.start.isoformat()}",
+        training_spec_version=spec.version,
+        training_spec_checksum=spec_checksum(spec),
+        seed=spec.seed,
+        code_version=code_version.value,
+        sample_scope=fit.trained_all.sample_scope,
+    )
+
+
 def _assemble_window_result(
     window: WeekMaturity,
     spec: TrainingSpec,
@@ -211,14 +229,7 @@ def _assemble_window_result(
     stability: StabilitySummary,
     outcome: GateOutcome,
 ) -> WindowResult:
-    release_id = derive_release_id(
-        dataset_id=f"{fit.trained_all.dataset_id}#window={window.start.isoformat()}",
-        training_spec_version=spec.version,
-        training_spec_checksum=spec_checksum(spec),
-        seed=spec.seed,
-        code_version=code_version.value,
-        sample_scope=fit.trained_all.sample_scope,
-    )
+    release_id = _window_release_id(window, spec, code_version, fit)
     models = [fit.model_score]
     if fit.conservative_score is not None:
         models.append(fit.conservative_score)
