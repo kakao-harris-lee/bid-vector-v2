@@ -15,3 +15,20 @@
 `adapters/src/main/resources/db/migration/V26__*.sql`·`V27__*.sql`·`V28__*.sql` · 관련 adapters·workflow·app 코드와 test · GRANT·privacy 등재 test · `config/quality/**` · `docs/discovery/data-dictionary.md` 해당 절 · capability map 행 · runbook(릴리스 식별자 주입 — 운영 compose 가 이미 넘기는지 확인) · evidence
 ## acceptance
 각 마이그레이션 clean-migrate · CHECK·GRANT 등식 · 되돌림 리허설 두 갈래(미적용=파일 삭제 / 적용=새 V) · 기본값 제거로 깨지는 배선(운영 compose·dev compose·test) 전수 갱신 · 변이 RED. 전건 PR CI.
+
+## 계약 갱신 2026-11-06 (팀장)
+
+- **DEC-08 을 이 slice 에서 뺀다(①).** 출하 조립의 `MlAnalysisPort` 는 `UnavailableMlAnalysis`
+  고정이고 의존 게이트가 그 집합을 잠근다 — 분류가 출하에서 **0 회** 돈다. e2e 조립만 쓰는 표를
+  마이그레이션으로 들이면 「칸만 만들고 아무도 안 쓴다」의 변형이고, 남는 것은 되돌리기 어려운
+  스키마다. ML 출하 배선은 사용자가 보류한 결정이라 이 slice 가 열 수 없다. 받는 자리는
+  `OPEN-ML-ANALYSIS-WIRING` — capability map DEC-08 행이 그 포인터를 적는다.
+- **번호를 당긴다**: OPS-05 = **V26** · OPS-10 = **V27**(V25 는 paper-bid 레인). 마이그레이션 결번
+  0 게이트(gates-build 레인)가 서는 중이라 번호 구멍을 남기지 않는다.
+- **래칫은 증분으로 적는다** — paper-bid 레인의 V25 가 같은 `CleanMigration*Test` 의 다른 행을
+  바꾼다. 기준선 대비 증분을 주석에 남겨 병합이 계수로 합쳐지게 한다.
+- **레인 간 겹침 셋**(이 slice 는 셋보다 **나중에** 머지한다 — 컴파일 강제가 남의 새 코드를 잡게):
+  ① `EvaluationCommitRun`(ops-code 레인의 알림함 생산자 포트) — 주입 자리를 분리 ② `OutboxCommand`
+  종단 생성자(PR #127 Telegram 의 relay·sender) — 그쪽 dispatch 결과 → 종단 전이 자리가 사유 인자를
+  받아야 한다 ③ `release-sha` 키 제거(PR #128 의 `AwardCollectionProperties` 에 release 키가 있는지
+  병합 때 확인) · 운영 env 키 등식(`prod-env-keys-check`)은 표적 확인.
