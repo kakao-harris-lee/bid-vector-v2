@@ -660,7 +660,8 @@ jobs:
         if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web_proxy.outcome == 'success' && steps.hygiene_proxy.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/proxy:local proxy config/quality/vuln-policy.properties
 
-      # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
+      # B-6 — CycloneDX SBOM 보관. artifact 보관 90일은 **데이터 보존 정책과 별개 축**이다
+      # (그 정책은 2026-11-05 부터 1년이고 이 값과 함께 움직이지 않는다).
       # M7/7F-local(D-7F-1) — 담는 이미지가 넷이 됐다(web·proxy 추가). 경로 glob 은 그대로이고
       # 스캔 스크립트가 kind 별 파일 이름을 쓰므로 배선 변경이 없다 — 바뀐 것은 조건의 「어느
       # 스캔이든 돌았는가」에 새 둘이 들어간 것뿐이다.
