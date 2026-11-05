@@ -27,13 +27,21 @@ class MockKonepsRoutingTest {
         KonepsOpeningEndpointProperties().operations.getValue("construction").baseAmountPath
 
     /**
-     * 표에 **없는** 두 이름. 하나는 등재하지 않은 업종(물품)의 공고 목록이고, 하나는 그 업종의 기초금액
-     * 이다 — 둘 다 접두 `getBidPblancListInfo` 를 공유하므로, 접두 라우팅이면 둘 다 공고 목록 응답을
-     * 200 으로 받는다. 기본 표가 물품을 담지 않는 한(`OPEN-6F9-GOODS-FOREIGN-COLLECTION`) 이 이름들은
-     * 어느 축도 아니다.
+     * 표에 **없는** 세 이름. 둘은 등재하지 않은 업종(물품)의 공고 목록·기초금액이고 — 접두
+     * `getBidPblancListInfo` 를 공유하므로 접두 라우팅이면 둘 다 공고 목록 응답을 200 으로 받는다 —
+     * 셋째는 **개편 전 옛 이름**이다.
+     *
+     * **옛 이름이 목록에 있어야 하는 이유**(v L-1): 물품 둘만 두면 「표가 `02` 를 떼고도 받아준다」는
+     * 느슨함이 잡히지 않는다. `mockKonepsRouteOf` 를 `ROUTES[op] ?: ROUTES[op + "02"]` 로 바꾸고
+     * 배선을 옛 이름으로 되돌리면 그 판이 **전부 초록**이 된다 — 전환이 안 됐는데 초록인 자리다.
+     * 옛 이름을 미등재로 못 박으면 그 변이가 여기서 붉다.
      */
     private val unroutedOperations =
-        listOf("getBidPblancListInfoThng", "getBidPblancListInfoThngBsisAmount02")
+        listOf(
+            "getBidPblancListInfoThng",
+            "getBidPblancListInfoThngBsisAmount02",
+            "getBidPblancListInfoCnstwk",
+        )
 
     @Test
     fun `표에 있는 이름은 자기 축으로만 간다 — 공고 목록과 기초금액이 접두를 공유해도 갈린다`() {
