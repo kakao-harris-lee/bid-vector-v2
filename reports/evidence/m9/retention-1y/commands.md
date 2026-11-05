@@ -62,8 +62,8 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 
 | 확인 | 결과 |
 |---|---|
-| in_scope 대조 | `git log --no-merges --format= --name-only 79f3e5c4..HEAD \| sort -u` → **24 경로**, 전부 계약 in_scope 안(retention 네 묶음 · 「90일 문면」 파일 · 문서 넷 · 이 evidence) |
-| 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 23 전건 `M`) |
+| in_scope 대조 | `git log --no-merges --format= --name-only 79f3e5c4..HEAD \| sort -u` → **27 경로**, 전부 계약 in_scope 안(retention 네 묶음 · 「90일 문면」 파일 · 문서 여섯 · `ci.yml` 주석 · 이 evidence). 계약 갱신 2026-11-05 이 들여온 세 경로가 그 늘어난 셋이다 |
+| 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 26 전건 `M`) — 갱신 라운드가 만든 새 파일 **0** |
 | 새 test 클래스 | **0** — 기존 네 클래스에 test 를 더했다. 그래서 `config/quality/gate-tests.properties` 편집이 **없고** 「새 클래스 미등재」 함정에 해당하지 않는다 |
 | 마이그레이션 | `git diff --name-only 79f3e5c4..HEAD -- adapters/src/main/resources/db/migration/` **0 파일**(D-4 — 적용된 `V19`·`V23` 의 주석을 고치지 않았다, checksum) |
 | 낡는 좌표 | 이 slice 가 편집하는 파일에 `file:line` **0**. 역방향(편집한 파일 stem 으로 `<stem>:[0-9]` 전수) 유효 참조 **0** — 유일한 매치는 M4 evidence 에 적힌 **grep 명령문 안의 패턴**이고 좌표 참조가 아니다 |
@@ -71,6 +71,21 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 | clean tree | `git status --porcelain -- <in_scope 개별 인자>` **빈 출력**. **양성 대조**: in_scope 문서 하나에 한 줄을 심고 같은 술어를 돌려 ` M` **1행**을 받았고, **비파괴 절삭**(`head -n <원래 줄수>` 로 덮어쓰기 — `git checkout --` 금지)으로 걷은 뒤 다시 빈 출력이었다(줄수 469 → 470 → 469). 변이 ①~③ 도 같은 술어에 잡혔다 |
 | 외부 effect | 운영·dev DB(55432) 무접촉 · 실 API·LLM·알림 호출 0 · push/PR/머지 0. DB 축은 전부 Testcontainers(이 slice 는 접속 설정을 만지지 않는다) |
 | 마이그레이션 적용 DB | 없음 — 이 slice 는 스키마를 바꾸지 않으므로 적용 창도, forward-fix 도 없다 |
+
+## 계약 갱신 2026-11-05 뒤 — 확장 범위의 재실측
+
+세 경로는 **문서와 워크플로 주석**이라 Kotlin 입력이 0 이다(그 커밋의 diff 는 두 runbook 과 `ci.yml` 주석 한
+줄). 그래서 돌린 것은 **그 파일을 읽는 술어**다. 전건 `check`·`qualityBaseline` 은 호스트 빌드 큐 포화로
+**draft PR 의 CI 가 정본**이다(계약 갱신 절 — 같은 명령).
+
+| # | 명령 | 결과 |
+|---|---|---|
+| 6 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | **exit 0** — job 4 · step id 15 · `steps.<id>` 참조 18 · 매달린 참조 0 |
+| 7 | YAML 파싱(`yaml.safe_load`) | ok |
+| 8 | `git diff -- .github/workflows/ci.yml` | **그 주석 줄 하나**(−1 / +2, 전부 주석) — PR #122 가 만지는 다른 hunk 무접촉 |
+
+`ci.yml` 의 **주석은 어느 게이트의 입력도 아니다** — `ci.yml` 을 읽는 자리 전수 가운데 술어를 가진 것은
+`workflow-step-refs-check.sh` 하나이고 그 술어는 job·step id 와 참조만 센다(위 6 이 그 계수다).
 
 ## rollback 실측
 

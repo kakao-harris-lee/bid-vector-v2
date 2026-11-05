@@ -13,28 +13,30 @@
 | **D-5** | `milestone-6.md`·`reports/evidence/m6/closure/open-inventory.md` §2 에 **날짜 붙은 정정 문단**. 원 문면은 지우지 않았다 | 두 문단이 (a) 6B-3 은 PR #73 로 닫혔다 (b) 넘긴 셋은 그 slice 가 닫았다 (c) 서브 OPEN 넷은 등재 유지 (d) 1년 개정 을 적는다. `-FREE-TEXT-PII-AXIS` 의 「운영 첫 실행 전 실표본 판독」 선행 조건은 runbook 알려진 제한에 그대로 |
 | **D-6** | runbook 머리에 개정일·정본 · 세어 보는 질의의 기간 · **§2.4** 「이 절차가 운영에서 돈 적이 있는가」 | §2.4 가 네 축을 든다(cron 등재 · run 로그 · 마스킹 표지 · **옛 기준**으로 다시 센 파기 흔적). 구조적 근거는 `docker/**` 에 `bidvector.retention.mode` 가 **없다**는 것(측정: `grep -rn retention docker/ tools/` 매치 0) — 보존 run 의 유일한 길이 호스트 cron 이다. 운영 실행은 이 slice 밖 |
 
-## 거동 파급 — 이 slice 가 바꾸는 것 둘
+## 거동 파급 — 이 slice 가 바꾸는 것 셋
 
 1. **파기·마스킹 cutoff** 가 `시계 − 365일` 이 된다(개정일 이후 기준일). 기간을 늘리는 방향이라 **이미 지워진
    행은 돌아오지 않는다**. 운영에서 sweep 이 돈 적이 없다면 데이터 영향은 0 이고, 그 확인 절차가 runbook §2.4 다.
-2. **개찰 승격의 원문 적재 시각 하한**도 함께 넓어진다 — `PromoteOpeningResultsUseCase` 가 같은 정책을 그 창의
-   정본으로 쓴다(D-7C5P-3). 승격 run 이 훑는 원문 창이 90일에서 1년이 되고, 그만큼 읽기 범위가 늘어난다.
-   값을 한 자리에 두기로 한 대가이고 D-2 가 그 선택을 다시 확인한다. 배선 주석에 사실로 적었다.
+2. **개찰 승격의 원문 적재 시각 하한도 함께 넓어진다**(90일 → 1년) — `PromoteOpeningResultsUseCase` 가
+   같은 정책을 그 창의 정본으로 쓴다(D-7C5P-3). 승격 run 이 훑는 원문 창이 그만큼 늘어난다. **팀장 판단
+   2026-11-05: 의도된 귀결이다** — 낙찰자 상호 수집에 유리하고, D-2 가 값 복제를 금한 이유가 바로 소비자를
+   해소값에 묶는 것이다(계약 갱신 절). **되돌림 항목이 아니다.** 배선 주석에도 사실로 적었다.
 3. **원문의 PII 체류가 길어진다** — 담당자 키·업체 식별 키가 `raw_observation` 에 1년 동안 남는다(수집 시점
    마스킹은 없다, A-3). privacy 축의 직접 결과이고 runbook 알려진 제한 3 이 그 문면을 든다.
 
-## 범위 밖에 남는 「90일」 — 등재
+## 확장 범위(계약 갱신 2026-11-05) — 처분 완료
 
-in_scope 밖이라 고치지 않았다. 셋 다 **현재 정책을 90일로 서술**하므로 개정 뒤 낡는다.
+| 자리 | 처분 |
+|---|---|
+| `docs/runbook/m6-6e-operations.md` 두 곳 | `DELIVERED` outbox 파기 시점을 「보존 기한(정책값 — 1년)」으로 |
+| `docs/runbook/m7-7c3b-notification-sweep.md` 두 곳 | 공고 파기·알림함 지움 경로를 같은 꼴로 |
+| `.github/workflows/ci.yml` SBOM 보관 주석 | 「운영자 보존 결정과 **같은 값**」 → 「**별개 축**」. artifact 보관 일수(90)는 **그대로**이고 diff 는 그 주석 줄뿐이다(PR #122 가 같은 파일의 다른 hunk 를 만진다) |
 
-| 자리 | 문면 | 처분 |
-|---|---|---|
-| `docs/runbook/m6-6e-operations.md` 두 곳 | `DELIVERED` outbox 행의 파기 시점을 90일로 | 후속 문서 라운드 |
-| `docs/runbook/m7-7c3b-notification-sweep.md` 두 곳 | 공고 파기·알림함 지움 경로를 90일로 | 후속 문서 라운드 |
-| `.github/workflows/ci.yml` SBOM 보관 주석 | 「보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다」 — 개정 뒤 **그 등식 문장이 거짓**이다(artifact 보관 90일 자체는 다른 축이라 값은 그대로가 맞다) | 후속. 고칠 것은 값이 아니라 그 한 문장 |
-
-`config/quality/vuln-policy.properties` 의 90(SBOM 보관·면제 만료 상한)은 **다른 축**이고 이 개정과 무관하다.
-`reports/evidence/m6/**`·`m7/**` 의 90일은 그 slice 들이 선 날의 기록이라 고치지 않는다.
+그 결과 **현재 정책을 90일로 서술하는 문면이 저장소에 0** 이다. 남은 「90일」은 세 갈래다 — ⓐ **역사 서술**
+(옛 결정 인용 · 「90일 시대」 · 정책 표의 `Initial` 항목과 그것을 재는 test) ⓑ **다른 축**(`vuln-policy.properties`
+와 `ci.yml`·`m6-6e-operations.md` 의 SBOM artifact 보관 일수 · 면제 만료 상한) ⓒ **D-4** 로 손대지 않는
+`V19`·`V23` 의 SQL 주석(적용된 마이그레이션 — checksum). `reports/evidence/m6/**`·`m7/**` 의 90일은 그
+slice 들이 선 날의 기록이라 고치지 않는다.
 
 ## 알려진 제한
 
