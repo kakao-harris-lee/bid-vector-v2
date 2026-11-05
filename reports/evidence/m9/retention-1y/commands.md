@@ -60,7 +60,7 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 
 | 확인 | 결과 |
 |---|---|
-| in_scope 대조 | `git diff --name-only 4953d743..HEAD` → **32 경로**(산출물 **28** + 이 evidence 넷), 전부 계약 in_scope 안. **열거는 `rollback.md` 의 복원 목록이 정본**이다(계약의 「… 등 — 실제로 고친 경로를 evidence 에 열거」를 그 자리가 충족한다 — v L-2). 산출물 수는 23 → 26(계약 갱신) → **28**(수정 라운드 1 의 `RetentionWiring*`) 으로 늘었다 |
+| in_scope 대조 | `git diff --name-only 319fe212..HEAD` → **32 경로**(산출물 **28** + 이 evidence 넷), 전부 계약 in_scope 안. **열거는 `rollback.md` 의 복원 목록이 정본**이다(계약의 「… 등 — 실제로 고친 경로를 evidence 에 열거」를 그 자리가 충족한다 — v L-2). 산출물 수는 23 → 26(계약 갱신) → **28**(수정 라운드 1 의 `RetentionWiring*`) 으로 늘었다 |
 | 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 28 전건 `M`). 수정 라운드 1 이 **새로 만진** 경로 둘(`RetentionWiring.kt`·`RetentionWiringTest.kt`)은 D-8 로 in_scope 에 등재했다 — 「수정 라운드가 만드는 새 파일 ↔ in_scope 대조」 |
 | 새 test 클래스 | **0** — 기존 네 클래스에 test 를 더했다. 그래서 `config/quality/gate-tests.properties` 편집이 **없고** 「새 클래스 미등재」 함정에 해당하지 않는다 |
 | 마이그레이션 | `git diff --name-only 79f3e5c4..HEAD -- adapters/src/main/resources/db/migration/` **0 파일**(D-4 — 적용된 `V19`·`V23` 의 주석을 고치지 않았다, checksum) |
@@ -132,6 +132,26 @@ PR #122 의 S-27d 가 들어간 뒤라 **병합을 먼저** 했다. **자동 병
 내 28 경로 = 빈 출력) · main 이 바꾼 Kotlin·정책·fixture **0 파일**(그래서 Kotlin 결과가 병합으로 달라질 수
 없다) · 병합이 내 28 경로를 **움직이지 않았다**(`git diff 7f44fd9f..HEAD -- <28>` 빈 출력) · main 의 `web/**`
 33 파일이 **그대로 보존**(`git diff 4953d743..HEAD -- 'web/**'` 빈 출력).
+
+## 라운드 3 — 셋째 main 병합과 **충돌 해소**(PR #124, main `319fe212`)
+
+PR #129 CI 는 `519a09bb` 에서 4/4 초록이었고, 막은 것은 main 과의 **충돌**이다. #124 도 같은 세 문서(공유
+문서)를 덧붙였다 — `milestone-6.md` 는 **내 정정 문단과 같은 구역**이어서 실제로 충돌했고, 나머지 둘은 자동
+병합됐다.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| 24 | 겹침 | main 이 바꾼 경로 ∩ 내 28 = **문서 셋**(`capability-map`·`milestone-6`·`open-inventory`). Kotlin 겹침 **0**(main 은 app 쪽 다섯을 바꿨고 내 목록과 교집합이 없다) |
+| 25 | 충돌 해소 | `milestone-6.md` 한 파일. **양쪽 문단을 모두 보존**하고 목록 순서(6B-3 → 6B-4)대로 두었다. 내 쪽 마지막 절만 「6B-4 가 받은 OPEN 둘의 상태는 아래 M9/budget-clear 정정이 적는다」로 고쳐 두 문단이 어긋나 읽히지 않게 했다 — **남의 문단은 한 줄도 고치지 않았다** |
+| 26 | 모순 검사 | 두 정정이 같은 사실(6B-4 = PR #71, 열려 머지됨)을 말하고 **서로 모순되지 않는다**. #124 의 「일곱」은 **6F-10 식별자**를 세는 것이라 내 「6B-3 서브 OPEN 여섯」과 **다른 모수**다(헷갈릴 자리를 확인했다) |
+| 27 | 양쪽 표지(커밋 수준) | 내 쪽 — `6F-5-b 에만 참` 2 · 「서브 OPEN 여섯」 1 · 1년 개정 1 · `6F-6·6F-5-a·6F-8` 1 · `D-6A1-7` 1. #124 쪽 — `## §` 제목 **7**(§1~§7, 번호 겹침 0) · 「일곱」 7 · `OPEN-6F10` **8** · milestone-6 의 budget-clear 정정 1 · `OPEN-5E-JOB-PERSISTENCE` 2 |
+| 28 | 남의 줄 보존 | `git diff --numstat 319fe212..HEAD`: `capability-map` **2/1**(내 두 줄뿐) · `milestone-6` 20/3 이고 그 **삭제 3 줄은 전부 내 pointer 줄 수정**이다(남의 줄 삭제 0) |
+| 29 | 표적 재검증 | lint·정적분석 **6 task exit 0** · `:app:test`(retention·wiring) + `:workflow:test`(retention) **exit 0** · 클래스 5 · test **48** · fail 0 · skip 0 |
+
+**측정 기준의 함정 하나를 자기 교정했다**: 충돌 해소 직후 `git diff 319fe212..HEAD` 를 재면 남의 줄이
+**13 줄 삭제**로 보였다. 원인은 병합을 아직 **커밋하지 않아** HEAD 가 병합 전 커밋이었던 것이다(작업 트리는
+이미 양쪽을 담고 있었다). 커밋 뒤 같은 명령이 위 28 의 값을 냈다 — **커밋 수준 비교는 병합을 끝낸 뒤에만
+뜻이 있다**.
 
 ## rollback 실측
 
