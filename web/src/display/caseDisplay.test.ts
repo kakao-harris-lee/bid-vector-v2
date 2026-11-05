@@ -124,6 +124,22 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
     expect(unknown.tone).toBe('unjudged');
   });
 
+  /**
+   * **`Object.prototype` 의 키도 표 밖이다**(PR #132 cr L-3). 맨 색인 읽기(`table[value]`)는
+   * `toString`·`constructor`·`__proto__` 에서 **프로토타입의 값**을 내고, 그것이 폴백을 삼켜
+   * `label`·`tone` 이 `undefined` 인 「상태」가 화면까지 간다 — 배지가 아무것도 그리지 않는
+   * **조용한 빈 자리**가 그 입력에서 되살아난다. 계약이 이 칸을 `type: string` 으로 내므로
+   * 자유 문자열이 닿는 자리이기도 하다(형제 칸 `actorKind` 에는 enum 이 있다).
+   */
+  it('프로토타입 키도 보이는 미지 상태로 낸다', () => {
+    for (const key of ['toString', 'constructor', 'valueOf', 'hasOwnProperty', '__proto__']) {
+      const unknown = commandDisplayOf(key);
+
+      expect(unknown.label, `${key} 가 프로토타입의 값을 냈다`).toContain(key);
+      expect(unknown.tone, `${key} 의 어조가 미지가 아니다`).toBe('unjudged');
+    }
+  });
+
   it('표 안 토큰은 표의 행을 낸다', () => {
     expect(commandDisplayOf('ADD_TO_BID_BOX')).toBe(BID_COMMAND_DISPLAY.ADD_TO_BID_BOX);
   });
