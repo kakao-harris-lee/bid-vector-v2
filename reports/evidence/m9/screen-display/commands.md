@@ -340,3 +340,48 @@
 - exit: 0
 - 핵심 결과: ② `D` 7 · `M` 35 · ③ 트리 동일성 `web/` 0 줄 · `docs/usecase` 0 줄 ·
   ④ 0/0 · ⑤ `674 passed` · ⑥ web 게이트 넷 0 · ⑥b evidence 자기매치 0
+
+## main 병합 뒤 (팀장 공지 2026-11-05 — 빌드 큐 포화 · 복원 원천)
+
+### 2026-11-05T13:05Z — `origin/main` 병합
+- cmd: `git merge --no-edit origin/main` (합친 고정 SHA `6c38fb32`)
+- exit: 0
+- 핵심 결과: 충돌 0. **경로 겹침이 없다** — main 15 경로는 전부 `tools/`·`docker/`·
+  `.github/`·runbook·남의 evidence 이고 내 in_scope 와 `comm -12` 가 빈 출력
+
+### 2026-11-05T13:08Z — 병합이 어느 쪽 본문도 접지 않았다
+- cmd: `git diff --stat 2d801d73 HEAD -- <내 경로들>` · `git diff --stat 6c38fb32 HEAD -- <main 경로들>`
+- exit: 0
+- 핵심 결과: **둘 다 빈 출력** — 충돌 0 자동 병합이 같은 본문을 접는 사례가 있어 양쪽을 따로 쟀다
+
+### 2026-11-05T13:10Z — acceptance 명령이 그대로인가
+- cmd: `git diff 79f3e5c4..origin/main -- .github/workflows/ci.yml`
+- exit: 0
+- 핵심 결과: `web`·`check` job 의 명령은 **무편집**이고 `container` job 에 step 하나(S-27d)가
+  늘었다 — 내 acceptance 목록은 그대로다
+
+### 2026-11-05T13:15Z — 로컬 가벼운 게이트 (팀장 지시 — 무거운 축은 PR CI 가 정본)
+- cmd: `npm run lint` / `npx tsc --noEmit` / `npx vitest run` / `npm run gate:tests` (web)
+- exit: 0 / 0 / 0 / **1 → 0**
+- 핵심 결과: vitest `756 passed (38 파일)`. `gate:tests` 가 **한 번 exit 1** 이었고 **재현되지
+  않는다**(격리 3 회 · 앞선 vitest 와 연달아 2 회 전부 exit 0). 그 실행의 출력을 남기지
+  못했다(출력을 버린 호출이었다) — **원인 미상 1 회**로 적는다. 알려진 제한에 등재
+
+### 2026-11-05T13:30Z — 변이 다섯 재확인 (병합 트리에서)
+- cmd: 각 변이 적용 뒤 `npx vitest run` (web)
+- exit: 전부 1
+- 핵심 결과: `mut-RC-green` 2 failed · `mut-RC-money-green` 1 failed · 고친 칸 되돌림 2 failed ·
+  없음 표지 되돌림 3 failed · 모집단에서 카드 뺌 1 failed. 전부 원복 확인
+
+### 2026-11-05T13:50Z — rollback 재산출·재실측 (복원 원천 = 합친 main)
+- cmd: 버릴 clone(`ac0f4484`)에서 `git restore --source=6c38fb32 … -- <내 커밋만 42 경로>` 뒤 ①~⑥
+- exit: 0
+- 핵심 결과: ② `D` 7 · `M` 35 · ③ **복원한 작업 트리가 `6c38fb32` 와 evidence 넷만 다르다** ·
+  ④ 0/0 · ⑤ `674 passed` · ⑥ web 게이트 넷 0 · ⑥b 자기매치 0 ·
+  **내 표지 여섯 0 파일 · 남의 표지 다섯 전부 보존**
+
+### 2026-11-05T13:55Z — 첫 판의 오류(③)
+- cmd: `git diff --name-only 6c38fb32 HEAD` 대 `git diff --name-only 6c38fb32`
+- exit: 0
+- 핵심 결과: 앞은 **커밋끼리** 대조라 복원 결과를 보지 못하고 `web/**` 가 그대로 나왔다.
+  트리 동일성은 **작업 트리**와 맞대야 한다

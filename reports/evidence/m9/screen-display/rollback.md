@@ -1,27 +1,36 @@
 # M9 / screen-display — rollback
 
-실측 HEAD: `ca84b58a` (이 slice 의 **마지막 산출물 커밋** — 뒤의 커밋은 evidence 뿐이다)
+실측 HEAD: `ac0f4484` (병합 커밋 — 이 트리가 판정 대상이다)\n\n복원 원천: `6c38fb32` · 복원 목록 산출: `79f3e5c4..2d801d73`(내 커밋만)
 
 ## 전제
 
-- base `79f3e5c4` 는 HEAD 의 **조상**이다(`git merge-base --is-ancestor` exit 0).
-- base 에 이 slice 의 산출물이 **없다**(`git show 79f3e5c4:web/src/display/timeDisplay.ts` exit ≠ 0).
-- 이 slice 는 **아직 main 에 없다**. 복원 출처는 base SHA 하나이고 움직이는 ref(`origin/main`)를
-  쓰지 않는다. **머지 뒤**의 되돌림은 이 절차가 아니라 그 PR 의 머지 커밋 revert 다 — 머지 순간
-  같은 복원은 아무것도 지우지 않으면서 exit 0 을 낸다(의미가 뒤집힌다).
-- **공유 파일 하나**가 목록에 있다: `web/config/gate-tests.txt` 는 slice 들이 줄을 더해 온
-  등록부다. 다만 `git log --oneline 79f3e5c4..ca84b58a -- web/config/gate-tests.txt` 의 커밋이
-  **이 slice 의 하나뿐**이라, base 복원이 지우는 것은 이 slice 가 더한 줄뿐이다(다른 slice 의
-  줄은 이 브랜치의 range 에 없다). 그래서 커밋 해시별 hunk 격리가 필요하지 않다.
+**이 브랜치는 `origin/main` 을 합쳤다**(병합 커밋 `ac0f4484`, 둘째 부모 `6c38fb32`). 그래서
+복원 원천이 base 가 아니다 — 아래 두 줄이 이 절의 핵심이다.
+
+- **복원 원천은 합친 main 의 고정 SHA `6c38fb32`** 다. base `79f3e5c4` 로 되돌리면 그 사이
+  main 에 들어온 **남의 변경**(#122 prod-tools · #126 CVE apt)까지 지운다(PR #124 verifier 실측).
+  움직이는 ref(`origin/main`)를 쓰지 않는다 — fetch 시점에 따라 지우는 범위가 달라진다.
+- **복원 목록은 내 커밋만**에서 산출한다: `git diff --name-only 79f3e5c4..2d801d73`(병합 전 내
+  head). 병합 커밋을 포함한 range 로 내면 main 이 가져온 경로가 목록에 섞인다.
+
+그 둘이 맞물려야 한다 — 원천만 바꾸고 목록을 range 로 내면, 남의 경로를 「main 으로 복원」하는
+무의미한 항목이 들어오고 목록이 자기 범위를 거짓으로 말한다.
+
+- base `79f3e5c4` 는 두 부모의 **공통 조상**이다(`git merge-base` 확인).
+- base·main 둘 다 이 slice 의 산출물을 **갖지 않는다**.
+- **main 과 내 in_scope 는 경로가 겹치지 않는다**(`comm -12` 빈 출력 — main 15 경로는 전부
+  `tools/`·`docker/`·`.github/`·runbook·남의 evidence 다). 그래서 공유 파일 hunk 격리가 필요
+  없고, 병합도 **어느 쪽 본문도 접지 않았다**(양쪽 트리 대조 둘 다 빈 출력).
+- **머지 뒤**의 되돌림은 이 절차가 아니라 그 PR 의 머지 커밋 revert 다 — 머지 순간 같은 복원은
+  아무것도 지우지 않으면서 exit 0 을 낸다(의미가 뒤집힌다).
 - 하네스 레인 변경 **없음**(`git log --oneline 79f3e5c4..HEAD -- CLAUDE.md .claude/` 빈 출력).
-  되돌리지 않는다.
 
 ## 복원 목록 — 기계 산출
 
 목록은 손으로 쓰지 않는다:
 
 ```
-git diff --name-status 79f3e5c4..ca84b58a
+git diff --name-status 79f3e5c4..2d801d73
 ```
 
 `A` 는 삭제 대상, `M` 은 base 로 복원. `--source` 에 없는 경로는 삭제되므로 신규 파일에 별도
@@ -79,19 +88,29 @@ git restore --source=79f3e5c4 --staged --worktree -- \
 
 ## 임시 clone 실측 — ①~⑥
 
-실측 HEAD `ca84b58a` 에서 만든 버릴 clone 에서 위 명령을 **실제로** 돌렸다.
+실측 HEAD `ac0f4484`(병합 커밋)에서 만든 버릴 clone 에서 위 명령을 **실제로** 돌렸다.
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
 | ① 명령 exit | 위 `git restore` | 0 |
 | ② D/M 수 | `git status --porcelain` 의 첫 칸 계수 | `D` 7 · `M` 35 (목록 42 와 같다) |
-| ③ 트리 동일성 | `git diff 79f3e5c4 -- web/` · `-- docs/usecase` | **둘 다 0 줄** — 되돌린 트리가 base 와 바이트까지 같다(갈음은 「HEAD 초록」이 아니라 트리 동일성으로만 본다) |
+| ③ 트리 동일성 | `git diff --name-only 6c38fb32`(**작업 트리** 대조) | 나온 경로가 **이 slice 의 evidence 넷뿐**이다 — 되돌린 트리가 합친 main 의 트리와 같다(되돌리지 않기로 한 자리만 남는다). 커밋끼리 대조하면 복원 결과를 보지 못한다(첫 판의 오류) |
 | ④ compile | `npx tsc --noEmit -p tsconfig.json` · `npm run build` | 0 · 0 |
 | ⑤ test | `npx vitest run` | `674 passed (674)` · 파일 34 (이 slice 가 더한 test 와 단언이 함께 걷혔다 — HEAD 는 756/38) |
 | ⑥ 게이트 | 이 slice 가 닿은 web 레인 게이트 넷 — `lint`(W-2) · `gate:src-tree`(W-4) · `gate:tests`(W-7) · `gate:boundary-canary`(W-9) | 0 · 0 · 0 · 0 |
 
 **W-7 이 되돌린 트리에서도 0 인 것이 중요하다**: 등록부와 게이트 test 파일이 **함께** 걷히므로
 「등록부에는 있는데 파일이 없다」가 생기지 않는다.
+
+### 「내 표지 0 · 남의 표지 보존」 계수
+
+종료 코드가 아니라 **계수**로 완료를 판정한다(합친 main 이 있으면 반쯤 되돌린 트리도 ①~⑥ 이
+전부 exit 0 일 수 있다).
+
+| 축 | 센 것 | 결과 |
+| --- | --- | --- |
+| 내 표지 0 | 이 slice 가 들인 이름 여섯(시각 서식 함수 · 게이트 마운트 목록 상수 · 없음 표지 상수 · 금액 부속 조립 함수 · 입력 변환 함수 · 잎 등식 함수)을 담은 `web/` 파일 수 | 여섯 전부 **0 파일** |
+| 남의 표지 보존 | `tools/prod-guards-check.sh` 존재 · `tools/prod-env.sh` 의 잠금 자리 상수 8 회 · `ci.yml` 의 S-27d 1 회 · `docker/app.Dockerfile` 이 `6c38fb32` 와 **0 줄 차이** · 남의 evidence 4 파일 | 전부 **보존** |
 
 ### ⑥b 보존한 evidence 가 게이트를 붉히는가 — 두 번 쟀다
 
@@ -111,10 +130,10 @@ verifier 가 대조하는 것은 「실측 HEAD == 판정 SHA」가 아니다(�
 커밋이 언제나 뒤에 온다). **그 사이에 되돌림 대상이 움직였는가**를 본다:
 
 ```
-git diff --name-only ca84b58a..<판정 SHA> -- <위 복원 목록 경로들>
+git diff --name-only ac0f4484..<판정 SHA> -- <위 복원 목록 경로들>
 ```
 
-`ca84b58a..<판정 SHA>` 에서 **빈 출력**이다 — 그 뒤 커밋은 evidence 뿐이고 evidence 는 복원 목록
+`ac0f4484..<판정 SHA>` 에서 **빈 출력**이다 — 그 뒤 커밋은 evidence 뿐이고 evidence 는 복원 목록
 밖이다.
 
 ## 되돌린 뒤의 상태
