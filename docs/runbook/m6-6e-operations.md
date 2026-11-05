@@ -482,7 +482,7 @@ ml-serving 을 「다시 올리는」 명령은 이 저장소에 **없다**. `to
 
 | `bidvector.relay.environment` | `DeliveryMode` | relay 가 claim 하는가 | 행의 운명 | 기동 | run 종료 코드 |
 |---|---|---|---|---|---|
-| `Production` | `Live` | — | — | **거부** (§5.2) | 러너가 뜨지 않는다 |
+| `Production` | `Live` | **예** | 발송 결과에 따라 `DELIVERED`·`FAILED`·`ISOLATED` | 설정 완비면 뜨고 **결손이면 거부** (§5.2) | `0` 또는 `2`(집었는데 전달 0) |
 | `Staging` | `DryRun` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
 | `Development` | `DryRun` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
 | `Test` | `Blocked` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
@@ -493,16 +493,26 @@ ml-serving 을 「다시 올리는」 명령은 이 저장소에 **없다**. `to
 **정책 판정과 환경 판정은 서로 다른 필드로 남는다** — 「정책상 차단」과 「환경상 불가」가 한 값으로
 합쳐지지 않는다.
 
-### 5.2 `Live` 기동 거부의 의미
+### 5.2 `Live` 기동 거부의 의미 (M9/STR12 로 좁아졌다)
 
-정책표가 그 환경에 `Live` 를 붙이면 `RelayBootDecision` 이 `RefusedLiveWithoutSender` 를 내고
-**러너가 기동하지 않는다**(`OPEN-STR-12` — 실 발송 채널이 없다). 이유:
+**앞 판**: 실 발송 채널이 없어(`OPEN-STR-12`) 정책표가 `Live` 를 붙인 환경은 **무조건** 기동 거부였다.
+자리지킴 sender 가 호출되면 던지고, 그 행은 다음 run 의 고아 격리가 태워 **매 run 이 행을 영구히
+잃었기** 때문이다.
 
-> 이대로 뜨면 relay 가 claim 한 뒤 자리지킴 sender 에서 터지고, 그 행은 다음 run 의 고아 격리가 태운다.
-> **매 run 이 행을 영구히 잃는다.**
+**지금**(M9/STR12): Telegram 발송 채널이 들어와 그 자리지킴이 사라졌다. 거부 사유가 **설정 결손**으로
+좁아졌다 — 정책표가 그 환경에 `Live` 를 붙였는데 알림 채널 설정(봇 자격 · chat id · 공고 링크 도메인)이
+하나라도 비면 `RelayBootDecision` 이 `RefusedMissingChannelConfig` 를 내고 러너가 기동하지 않는다.
+거부 메시지는 **채워야 하는 칸의 이름**을 말하고 값은 말하지 않는다.
 
-즉 기동 거부는 보수적인 과잉이 아니라 §3.6 의 손실을 막는 유일한 수단이다. **`Live` 가 뜨게 하려면
-설정이 아니라 실 sender 가 먼저 있어야 한다.** 귀결: 오늘 relay 가 실제로 claim 하는 배포는 **없다**.
+> 설정이 빈 채로 뜨면 relay 가 claim 한 뒤 보낼 곳이 없어 그 행들이 어휘 밖 종단으로 타 버린다 —
+> 종단 전이는 단방향이라 되돌릴 간선이 없다.
+
+`Live` 가 **아닌** 환경은 지금처럼 설정 없이 뜬다(claim 0, `4` `ENV_SUPPRESSED`) — 그 환경의 relay 는
+행을 하나도 만지지 않으므로 쓰지도 않을 자격을 받을 이유가 없다.
+
+**활성화 절차의 정본은 `docs/runbook/m7-7f-production.md` §13** 이다(봇 만들기 → env 두 값 → 일회 러너
+timer → 첫 발송 확인 → 끄는 법). 이 문서는 판정 구조만 적는다. **운영 활성화 자체는 별도 운영자
+확인 항목**이고 이 slice 는 실행하지 않았다.
 
 ### 5.3 평가 dry-run — `POST /api/evaluation-dry-runs`
 
@@ -595,7 +605,11 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
 7. **model rollback 의 수단이 재배포뿐이고 그 재배포 절차가 저장소에 없다**(§4.4·§4.5). 승격 상태·demote
    가 없고 비현재 `EXACT` 는 실 serving 이 거부한다 — 6D-1 의 정의는 fake 서버 위에서만 성립한다
    (`OPEN-6E1-MODEL-ROLLBACK-MECHANISM`).
-8. **실 알림 발송 채널이 없다**(`OPEN-STR-12`). `Live` 는 기동이 거부된다.
+8. **실 알림 발송 채널은 Telegram 한 방향뿐이고 운영 활성화는 아직 하지 않았다**(M9/STR12 —
+   `OPEN-STR-12` 의 발송 축을 닫았다). 코드·runbook 까지 있고 실 토큰 투입과 timer 설치는 별도 운영자
+   확인 항목이다(절차는 `m7-7f-production.md` §13). Email 채널과 채널 선택 UI 는 여전히 없고,
+   대화형 전략 편집 채택은 `OPEN-STR-12-INTERACTIVE` 로 분리됐다. 재기동을 건너는 멱등 기억이 없어
+   ADR 0005 §7.6 B-2 창(발송 뒤 종단 전이 전 크래시)은 그대로다.
 9. **주기 실행(스케줄러)이 없다**(`OPEN-6F10-SCHEDULER`). 모든 러너는 `mode=once` 1회성이고 주기는
    외부 cron 이 진다.
 10. **이미지 서명·레지스트리 push 가 없다**(`OPEN-6E2B-IMAGE-SIGNING-PUSH`). SBOM·CVE 스캔은 6E-2b 가 더했고(§8,

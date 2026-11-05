@@ -584,3 +584,122 @@ cd <저장소>
   을 포함한 API 표면이 수 초 뜬다(7D checklist 「운영자 명령 사용법」).
 - `--no-deps` 는 postgres 가 이미 떠 있다는 전제다(반입 뒤).
 - 로그인 실패·연속 실패 잠금은 응답에서 구분되지 않는다(401 하나).
+
+---
+
+## 13. 알림 실발송 (Telegram) 활성화 — 절차만, 실행은 운영자 확인 항목
+
+M9/STR12 가 발송 채널을 들였다. **이 문서를 쓴 slice 는 아래를 실행하지 않았다** — 실 토큰 투입과 timer
+설치는 「시간 기반 알림 타이머를 켠다」(§9)와 같은 등급의 운영자 확인 항목이다. 켜는 순간부터 **운영자의
+휴대폰으로 메시지가 나간다.**
+
+판정 구조(환경 → 모드 → claim → 종료 코드, 기동 거부의 뜻)의 정본은
+`docs/runbook/m6-6e-operations.md` §5 다. 여기에는 **어떻게 켜는가**만 적는다.
+
+### 13.1 봇 만들기 (Telegram 쪽, 한 번)
+
+1. Telegram 앱에서 `@BotFather` 와 대화해 봇을 만든다 — 받는 값이 **봇 자격**(BotFather 는 이것을
+   「token」이라 부른다)이다. **그 값을 채팅·저장소·로그·전달 메시지에 남기지 않는다.**
+2. 알림을 받을 대화(1:1 또는 그룹)에서 그 봇에게 아무 메시지나 한 번 보낸다 — 봇은 **먼저 말을 걸 수
+   없다**(Bot API 규칙). 이 한 번이 없으면 첫 발송이 `403` 으로 거부된다.
+3. 그 대화의 **chat id** 를 얻는다. 가장 좁은 방법은 `getUpdates` 한 번이고, 그 호출은 자격을 URL 에
+   싣는다 — 명령 문자열·history 에 남지 않는 형태로 돌린다(자격을 서브셸 변수로 읽어 그 프로세스
+   환경에만 넘긴다, §5.4 의 서비스 키 관례와 같다).
+
+### 13.2 env 두 값 + 링크 도메인
+
+세 값이 **전부 있어야** `Live` 모드 환경의 러너가 뜬다(없으면 기동 실패, 메시지가 빈 칸 이름을 말한다).
+
+```ini
+# relay 러너 unit 의 env 파일 — root 소유 0600, **저장소 밖**
+# 예: /etc/bidvector-v2/relay.env
+BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=   # §13.1 ①
+BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=          # §13.1 ③
+BIDVECTOR_NOTIFICATION_SITE_BASE_URL=             # 예: https://<운영 도메인> — 끝에 `/` 없이
+```
+
+**`docker/prod.env.template` 에는 넣지 않는다.** 그 파일의 키 집합은 `tools/prod-env-keys-check.sh` 가
+compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay 는 compose 서비스가 아니라 일회
+러너다 — 템플릿에 넣으면 compose 가 요구하지 않는 죽은 키가 되어 그 검사가 붉어진다.
+
+바꿀 수 있는 나머지 넷은 기본이 있다(건드릴 이유가 거의 없다):
+`…_TELEGRAM_BASE_URL`(기본 `https://api.telegram.org`) · `…_TELEGRAM_ROUTE_KEY`(기본
+`telegram-primary`) · `…_TELEGRAM_CONNECT_TIMEOUT`(기본 `5s`) · `…_TELEGRAM_RESPONSE_TIMEOUT`(기본 `10s`).
+
+### 13.3 일회 러너 — relay 와 평가 커밋
+
+둘 다 `mode=once` 일회 러너다(상주 스케줄러가 없다 — `OPEN-6F10-SCHEDULER`). **순서가 있다**: 평가
+커밋이 `outbox` 에 행을 남기고, relay 가 그 행을 집어 보낸다. 같은 주기에 둘을 거는 쪽이 자연스럽다.
+
+```ini
+# /etc/systemd/system/bidvector-notification-relay.service
+[Unit]
+Description=bidvector 알림 relay (일회 러너)
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=<저장소>
+EnvironmentFile=/etc/bidvector-v2/relay.env
+# 호출 모양은 반입된 스택의 일회 컨테이너다 — §9.1 의 훑기 러너와 같은 전제(같은 compose 파일 셋 ·
+# 같은 프로젝트 이름 · release 태그는 <state>/current 에서 읽는다 · `--pull never`).
+#   bidvector.relay.mode=once · bidvector.relay.environment=production
+#   bidvector.relay.owner=<운영자 id> · bidvector.relay.channel=telegram · bidvector.relay.claim-limit=50
+#   SPRING_MAIN_WEB_APPLICATION_TYPE=none
+ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+# 상한을 반드시 둔다(§9.1 과 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다.
+TimeoutStartSec=15m
+TimeoutStopSec=1m
+```
+
+```ini
+# /etc/systemd/system/bidvector-notification-relay.timer
+[Unit]
+Description=bidvector 알림 relay — 하루 두 번
+
+[Timer]
+OnCalendar=*-*-* 07:40 Asia/Seoul
+OnCalendar=*-*-* 13:40 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+**`tools/prod-notification-relay.sh` 는 아직 없다** — §9.1 의 훑기 스크립트와 같은 모양으로 만드는 것이
+활성화 slice 의 몫이다(이 slice 는 코드와 절차까지만 낸다). 그때까지 손으로 돌리려면 §9.1 의 스크립트를
+읽고 같은 전제(잠금 · manifest 대조 · `--pull never`)를 지켜야 한다 — 그 전제를 건너뛰면 반입이 막는
+것을 러너만 통과시키는 길이 생긴다.
+
+### 13.4 첫 발송 확인
+
+1. **먼저 억제 환경에서 한 번** — `bidvector.relay.environment=staging` 으로 돌린다. 정책표가 그 환경에
+   `DryRun` 을 붙이므로 claim 0 이고 종료 코드는 `4` `ENV_SUPPRESSED` 다. 여기서 확인하는 것은
+   「러너가 뜨고 DB·잠금에 닿는다」뿐이다(발송은 0).
+2. **다음에 `production` 으로 한 번** — 종료 코드 `0` 과 마침 줄의 `delivered=` 계수를 본다. 메시지가
+   실제로 도착했는지는 **Telegram 앱에서** 확인한다(장부는 발송을 선언하지만 읽음을 알지 못한다).
+3. 어긋나면 §13.6.
+
+### 13.5 끄는 법
+
+```bash
+sudo systemctl disable --now bidvector-notification-relay.timer
+systemctl list-timers bidvector-notification-relay.timer   # 비어 있어야 한다
+```
+
+타이머만 끄면 **행은 `outbox` 에 `PENDING` 으로 쌓인다**(잃지 않는다) — 다시 켜면 그때 나간다. 90일
+보존 러너가 `DELIVERED` 행만 파기하므로 미발송 행은 그 대상이 아니다. 더 센 차단이 필요하면 env 의 세
+값을 비운다 — 그러면 `production` 러너가 **기동 실패**한다(claim 0, 행 보존).
+
+### 13.6 어긋날 때
+
+| 증상 | 뜻 | 처방 |
+|---|---|---|
+| 기동 실패, 메시지가 빈 칸 이름을 말한다 | env 세 값 중 결손 | §13.2 를 채운다 |
+| 종료 코드 `4` | 그 환경이 발송 가능 모드가 아니다 | `environment=production` 인지 본다(§5 사상표) |
+| 마침 줄 `failed>0` | Telegram 이 **확정 거부**했다 — chat id 가 틀렸거나(400) 봇이 차단됐거나(403) 자격이 무효(401) | §13.1 ②③ 를 다시 본다. 그 행은 되살아나지 않는다 — 설정을 고치면 **다음** 판정이 새 행을 낳는다 |
+| 마침 줄 `isolated>0` | 받았는지 **모른다**(timeout · 5xx · 429 · 응답 해독 불가) — 재시도하지 않는다 | Telegram 앱에서 중복·누락을 눈으로 본다. 모호를 재발송하지 않는 것이 at-most-once 설계다 |
+| 메시지에 「저장된 공고 정보가 없습니다」 | 그 공고 행이 파기(90일)됐거나 아직 수집되지 않았다 | 정상 거동이다. 알림 자체를 버리지 않고 **사실을 주장하지 않는** 본문을 보낸다 |
+
+**로그에 자격·chat id 원문이 남지 않는다** — 발송 어댑터는 로거를 쥐지 않고, 결과 타입에 provider
+문자열을 담을 칸이 없다. 그래서 「무엇이 거부됐는지」는 계수와 이 표로 읽는다(원문을 되짚는 경로는 없다).
