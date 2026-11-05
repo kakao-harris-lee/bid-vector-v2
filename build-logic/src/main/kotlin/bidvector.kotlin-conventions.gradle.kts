@@ -15,6 +15,7 @@ import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
+import bidvector.buildlogic.UnusedImportGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
@@ -303,6 +304,17 @@ val sourceLanguageGate =
         report = layout.buildDirectory.file("reports/source-language-gate/offenders.txt")
     }
 
+// 쓰이지 않는 import(`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`) — ktlint 의 `no-unused-imports` 가 켜져
+// 있는데도 조용했던 축이다(실측, 운영자 등재 결정 2026-09-26). 도구가 조용한 축은 도구로 덮지 않는다.
+// `sourceLanguageGate` 와 같은 이유로 **관례 트리를 직접** 걸고 source set 에서 파생시키지 않는다.
+val unusedImportGate =
+    tasks.register<UnusedImportGateTask>("unusedImportGate") {
+        description = "import 가 들여온 이름이 그 파일 본문에서 쓰이는지 잰다 — ktlint 가 조용한 축"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        sources.from(layout.projectDirectory.dir("src"), layout.projectDirectory.file("build.gradle.kts"))
+        report = layout.buildDirectory.file("reports/unused-import/violations.txt")
+    }
+
 val jarContentGate =
     tasks.register<JarContentGateTask>("jarContentGate") {
         description = "배포되는 아카이브의 class 가 게이트를 통과한 산출물 그 바이트인지 잰다"
@@ -495,6 +507,7 @@ tasks.named("check") {
         sourceLanguageGate,
         jarContentGate,
         migrationOrderGate,
+        unusedImportGate,
         sourceSetLayoutGate,
         gateExecutionGate,
         gateRegistrationGate,
