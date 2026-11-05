@@ -21,6 +21,20 @@
   쓰는 장치인데 잘못된 절을 가리키면 그 장치가 무력해지므로 evidence 문면을 정본으로 둔다.
   머지된 PR #133 이 바꾼 자리는 **§12.3(신설)·§14.3** 이고 §14.2 가 아니다 — 그 추가분 전체에
   `OPEN-ADR-07` 이 **0 건**이다(기계 계수). 세 절이 서로 다르므로 병합에서 이 행이 겹치지 않는다.
+- **2026-11-06(수정 라운드 1) · 두 경로 추가(팀장 승인).** ① `docs/discovery/capability-map.md` 의
+  **§12 G6** — 후속 OPEN 둘을 활성 registry 에 행으로 세우고 머리말에 자기 증감 **+2** 를 적는다
+  (「각 레인은 자기 증감만, 합산은 머지하는 쪽」 규약). 앞 라운드의 「한 행만」 승인은 §14.2 의
+  해소 행이었고 이것은 그 위의 확장이다. ② `tools/workflow-step-refs-check.sh` — **주석만**
+  (실측 baseline 의 job 수가 이 slice 의 새 job 으로 낡았다). `tools/one-command-check.sh` 는
+  **건드리지 않는다**(팀장 판단 — mutation job 은 직렬 11분 대라 로컬 한 방 검사 밖이 맞고, 그
+  제외 근거는 ADR 0007 §5 가 든다).
 - `reports/evidence/m6/closure/open-inventory.md` 는 **고치지 않는다** — 그 당시의 사실 기록이다(팀장 확인).
+
+## in_scope (갱신 반영)
+`gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈 `build.gradle.kts`(도메인 일곱) ·
+`.github/workflows/ci.yml`(새 job 만) · `config/quality/**` ·
+`docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md` ·
+`tools/workflow-step-refs-check.sh`(주석만) · evidence
+
 ## acceptance
 pitest task 가 대상 모듈에서 돌아 리포트 산출 · 래칫 위반(임계 위로 올린 값) → 실패 양성 대조 · CI 새 job 이 PR 에서 돈다(PR CI 로 확인). 로컬 pitest 는 **한 모듈씩만**, 실행 전 메모리 확인.

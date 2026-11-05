@@ -1,6 +1,6 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `41168ed9`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `eab07b5b`**.
 
 **원천이 착수 base 와 같다.** 이 브랜치는 `origin/main` 을 **한 번도 합치지 않았다**
 (`git log --merges df4976cc..HEAD` 가 0 줄) — 그래서 base 에서 복원해도 남의 변경을 지우지
@@ -42,12 +42,12 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `41168ed9`
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `eab07b5b`
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 내 커밋 경로 **24**(evidence 제외) = 복원 **14**(M) · 삭제 **10**(A) — 기계 목록과 같다 |
+| ② 계수 | 내 커밋 경로 **26**(evidence 제외) = 복원 **15**(M) · 삭제 **11**(A) — 기계 목록과 같다. 수정 라운드가 둘을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh`) |
 | ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | 실측 시점에 `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
@@ -73,7 +73,8 @@ main(PR #123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그�
 
 | 내 표지(0 이어야 한다 · evidence 제외) | 복원 뒤 |
 | --- | --- |
-| `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `MutationReport` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
+| `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
+| 수정 라운드가 들여온 둘 — `MutationReportGateUpToDateTest` · `max-workers=1` | **0** |
 | capability-map 전용 — `닫혔다 — M9/adr07-pitest` | **0** |
 | 같은 행의 **반대 방향** — 취소선 없는 `OPEN-ADR-07` 행(되살아나야 한다) | **1** |
 
@@ -88,15 +89,17 @@ main(PR #123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그�
 | `cpdCheckObserved`(1C) | 6 |
 | `leakPatternGate` | 129 |
 | `OPEN-ADR-16`(같은 ADR 의 다른 절) | 15 |
+| `MIN_JOBS`(`workflow-step-refs-check.sh` — 주석만 고쳤고 하한은 남는다) | 1 |
+| `OPEN-ADR-15`(capability-map G6 의 이웃 행) | 4 |
 | `OPEN-ADR-08`(capability-map 에서 내 행이 본뜬 **선례 행**) | 11 |
 
 표지로 맨 `pitest` 를 쓸 수 없다 — base 의 카탈로그가 이미 그 좌표를 들고 있어 **남의 줄까지
 세게 된다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다. `pitest-engine` 행은 **방향이 반대인
 대조**다: 내가 지운 것이 복원으로 돌아오는지를 본다.
 
-공유 파일 쪽에서는 **줄 수**가 보존의 대조다 — 복원 뒤 `capability-map.md` 는 **3858 줄**로
-원천과 같다(§머리말의 전제 표와 같은 수). 내 변경이 1:1 행 교체였으므로 줄 수가 달라졌다면
-다른 행이 함께 움직였다는 뜻이 된다.
+공유 파일 쪽에서는 **줄 수**가 보존의 대조다 — HEAD 의 `capability-map.md` 는 원천 **3858** 줄에
+내 **+6**(G6 두 행 + 머리말 증감 네 줄)을 더한 **3864** 줄이고, 복원 뒤 다시 **3858** 이다. 내
+변경이 「1:1 행 교체 + 추가 6」이므로 복원 뒤 수가 3858 이 아니면 다른 행이 함께 움직였다는 뜻이다.
 
 ## 3. 코드를 되돌리지 않고 끄는 법
 
@@ -119,8 +122,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 41168ed9..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..41168ed9 \
+git diff --name-only eab07b5b..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..eab07b5b \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 

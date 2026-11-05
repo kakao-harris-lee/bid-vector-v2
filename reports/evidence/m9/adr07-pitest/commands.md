@@ -1,7 +1,12 @@
 # M9/adr07-pitest commands
 
-base `df4976cc` · 판정 SHA `f4a85991` · 전 실행 `~/.local/bin/bv-build.sh ./gradlew --no-daemon …`
-(호스트 빌드 자리 둘 규율). 아래 「결과」는 핵심 한 줄이고 출력 전문은 싣지 않는다.
+base `df4976cc` · **판정 SHA `eab07b5b`**(수정 라운드 1 뒤) · 전 실행
+`~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(호스트 빌드 자리 둘 규율). 아래 「결과」는
+핵심 한 줄이고 출력 전문은 싣지 않는다.
+
+**판정 SHA 문면 정정(v L-1)** — 앞 라운드에 이 머리말과 `checklist.md` 가 `f4a85991` 을 적었는데
+그 뒤로 산출물 커밋이 더 왔다(capability-map 행 하나 · 수정 라운드 다섯). §1~§7 은 **그때의**
+실측이고 **§9 가 현 판정 SHA 에서의 재실측**이다 — 어느 수가 어느 SHA 의 것인지 절로 가른다.
 
 ## 1. 도구가 이 저장소에서 서는가 — 채택의 전제
 
@@ -102,3 +107,73 @@ baseline 밖 신규 일치 없음. 패턴 어휘를 이 파일에 축어로 적�
 ## 8. 되돌림
 
 `rollback.md` 가 든다 — 실측 HEAD·복원 목록·트리 동일성·표지 계수.
+
+## 9. 수정 라운드 1 재실측 — 판정 SHA `eab07b5b`
+
+리뷰 라운드의 지적 처리는 `checklist.md` §6 의 대응표가 들고, 여기는 **수**만 적는다.
+
+### 9.1 H-1 — RED 선행과 처방 뒤
+
+| # | 명령 | 결과 |
+| --- | --- | --- |
+| R-4 | 새 회귀 test 셋, **구판**에서 | **RED** — 「리포트 악화」와 「리포트 삭제」가 `UnexpectedBuildSuccess`(게이트가 UP-TO-DATE 로 건너뛰어 초록). 음성 대조(「리포트가 그대로면 UP-TO-DATE」)만 통과 |
+| R-5 | 같은 셋, 처방 뒤 | 초록 셋. 음성 대조가 **그대로 통과**한다 — `upToDateWhen { false }` 였다면 그 단언이 깨진다 |
+| R-6 | `-p build-logic test ktlint{Main,Test}SourceSetCheck detekt` | 초록. mutation 관련 test **33** — `MutationGateChecksTest` 14 · `MutationPolicyTest` 10 · `MutationReportTest` 6 · `MutationReportGateUpToDateTest` 3, 실패·건너뜀 0(앞 라운드 26 에서 +7) |
+
+회귀 test 가 **리포트만** 바꾼다 — 정책도 class 산출물도 손대지 않는다. 그것이 앞 라운드의 양성
+대조 일곱이 지나지 않았던 경로다(그 일곱은 전부 선언된 입력을 바꿨다).
+
+**프로덕션 배선 e2e 대조**(버릴 clone, settlement — cr H-1 이 요구한 「추가할 대조」). TestKit
+fixture 는 두 property 를 자기가 묶으므로 **convention 의 배선 실수**를 잡지 못한다 — 그래서
+실제 모듈에서 한 번 더 쟀다.
+
+| 단계 | 실측 |
+| --- | --- |
+| 손대지 않은 상태 `:settlement:mutationReportGate` | exit **0** · 리포트 **61/73(84%)** |
+| test 둘 삭제(정책·main 소스 불변) 뒤 같은 명령 | exit **1** · `pitest` 가 다시 돌아 리포트 **15/73** · 게이트 **FAILED** — 「15/73(20%) 가 래칫 83% 밑이다」 |
+
+verifier 가 **구판에서** 같은 조작으로 「리포트 15/73 · UP-TO-DATE · BUILD SUCCESSFUL」을 얻었다 —
+같은 입력이 이제 RED 다. 콘솔의 21% 와 게이트의 20% 가 다른 것은 §2 의 반올림·내림 차이 그대로다.
+
+### 9.2 표적 게이트 — 표적 test 가 돌리지 않는 등식
+
+전건 `check` 는 팀장 판단으로 로컬에서 돌리지 않는다(PR CI 가 정본). 대신 `--tests` 표적 실행이
+**건너뛰는** 등재·실행 등식 게이트를 직접 돌렸다 — 새 test 클래스가 들어온 라운드라 이 축이
+바로 그 자리다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `buildLogicGateRegistrationGate` · `buildLogicGateExecutionGate` · `leakPatternGate` | **exit 0** |
+| `tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | **exit 0** — job 5 · id 15 · 참조 18 · 매달린 참조 0 |
+
+### 9.3 acceptance — CI 와 같은 직렬
+
+`./gradlew --no-daemon --max-workers=1 mutationCheck` **exit 0 · 10분 11초.** `pitest` 일곱 모듈
+전부 실제 실행(UP-TO-DATE·FROM-CACHE **0 건**을 따로 셌다), PIT 분석 블록 7, 게이트 여덟 통과.
+직렬 소요가 앞 라운드의 병렬 6분 32초 대비 10분 11초로 — 45분 상한에 여유가 있다.
+
+게이트 리포트에 `policyVersion=1` 이 적히고, 집합 세 변(`expected`·`registered`·`domain`)이 같다.
+
+**이 전건은 `8f3cb545`(판정 SHA 한 커밋 앞)에서 돌았다.** 그 뒤 커밋(`eab07b5b`)이 coverage 게이트
+술어의 **문면 구성**을 바꿨으므로 — 하네스 규율대로 severity 무관 표적 재검증 대상이다 —
+통과 경로(`mutationCoverageGate` 단독, 위반 0)와 실패 경로(C-9 재대조)를 판정 SHA 에서 각각 다시
+쟀다. 바뀐 가지는 **위반이 있을 때의 줄 구성**뿐이고 통과 시 결과는 빈 목록으로 같다.
+
+### 9.4 양성 대조 재실측 — 술어가 바뀌었으므로 전부 다시
+
+| # | 변이 | 결과 |
+| --- | --- | --- |
+| C-1 | 점수 래칫 83 → **84**(경계 한 칸) | exit 1 — 「점수 61/73(83%) 가 래칫 84% 밑이다」 |
+| C-2 | 변이 수 래칫 73 → **74** | exit 1 — 「변이 수 73 이 래칫 74 밑이다」 |
+| C-3 | 변이 클래스 래칫 8 → **9** | exit 1 — 「클래스 수 8 가 래칫 9 밑이다」 |
+| C-8 | 점수 래칫을 **0** 으로 무력화 | exit 1 — 「값이 1..100 밖이다: 0」(신설, cr L-4) |
+| C-4 | 정책에서 모듈을 뺀다 | exit 1 — 「정책 밖 모듈이 … 적용했다: [settlement]」 |
+| C-5 | 리포트를 옮기고 게이트만 | exit 1 — 「리포트가 존재하지 않는다」 |
+| C-6 | 모듈에서 convention 만 뺀다 | exit 1 — 「… 적용하지 않았다: [settlement]」 |
+| C-7 | 비도메인 모듈이 convention 을 적용 | exit 1 — **구성 단계**에서 「순수 도메인 모듈이 아니다」 |
+| C-9 | 정책이 도메인 밖 모듈을 든다 | exit 1 — 「순수 도메인 밖 모듈을 대상으로 들었다: [workflow]」 **한 줄**(신설, cr L-3) |
+
+**C-9 의 첫 실측이 보완을 하나 더 만들었다.** 처음에는 같은 오기가 **두 줄**로 났고 먼저 읽히는
+줄이 「적용하지 않았다」였다 — L-3 이 없애려던 두 걸음이 순서만 바뀌어 남아 있었다. 도메인 밖
+모듈은 convention 을 적용할 수 없으므로(C-7 이 그 증거다) 그 축에서 빼고 도메인 축을 앞에 놓았다.
+지금은 **한 줄**이고 test 가 줄 수 1 을 단언한다.
