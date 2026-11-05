@@ -232,6 +232,7 @@ val mutationCoverageGate =
         group = "verification"
         description = "mutation 대상 모듈 집합과 실제 적용 집합의 양방향 등식 — 적용의 부재는 조용하다"
         policyFile = layout.settingsDirectory.file("config/quality/mutation-policy.properties")
+        architecturePolicyFile = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
         report = layout.buildDirectory.file("reports/mutation-gate/modules.txt")
     }
 

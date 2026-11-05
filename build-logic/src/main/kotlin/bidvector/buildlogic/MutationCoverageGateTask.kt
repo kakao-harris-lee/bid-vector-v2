@@ -23,14 +23,19 @@ import org.gradle.api.tasks.TaskAction
  */
 abstract class MutationCoverageGateTask : DefaultTask() {
     /**
-     * 대상 집합의 정본. **구성 단계가 아니라 실행 시점에 읽는다** — 구성 단계의 직접 파일
-     * 읽기는 configuration cache 가 입력으로 추적하지 않아, `mutation.modules` 를 줄인 편집이
-     * 낡은 cache 와 함께 조용히 통과할 수 있다. 이 축은 「어느 모듈이 게이트를 받는가」를 정하는
-     * 자리라 그 침묵을 받을 수 없다.
+     * 대상 집합의 정본. **구성 단계가 아니라 실행 시점에 `@InputFile` 로 읽는다** — 그래야
+     * warm configuration cache 에서도 **정책만 바꾼 편집이 이 task 를 다시 돌게** 한다
+     * (`GateRegistrationGateTask` 가 자기 장부에 쓰는 것과 같은 사유). 이 축은 「어느 모듈이
+     * 게이트를 받는가」를 정하는 자리라 그 재실행이 없으면 판정이 낡는다.
      */
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val policyFile: RegularFileProperty
+
+    /** `layer.domain` 의 출처. 모듈 이름을 이 게이트 안에 열거하지 않는다. */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val architecturePolicyFile: RegularFileProperty
 
     @get:Input
     abstract val registeredModules: SetProperty<String>
@@ -40,13 +45,22 @@ abstract class MutationCoverageGateTask : DefaultTask() {
 
     @TaskAction
     fun gate() {
-        val expected = MutationPolicy.load(policyFile.get().asFile).modules.toSet()
+        val policy = MutationPolicy.load(policyFile.get().asFile)
+        val expected = policy.modules.toSet()
         val registered = registeredModules.get()
-        val violations = mutationModuleCoverageViolations(expected, registered)
+        val domainModules =
+            readPolicy(architecturePolicyFile.get().asFile).requireList("layer.domain").toSet()
+        val violations = mutationModuleCoverageViolations(expected, registered, domainModules)
 
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
-            (listOf("expected=${expected.sorted()}", "registered=${registered.sorted()}") + violations)
-                .joinToString(separator = "\n", postfix = "\n"),
+            (
+                listOf(
+                    "policyVersion=${policy.version}",
+                    "expected=${expected.sorted()}",
+                    "registered=${registered.sorted()}",
+                    "domain=${domainModules.sorted()}",
+                ) + violations
+            ).joinToString(separator = "\n", postfix = "\n"),
         )
 
         if (violations.isNotEmpty()) {

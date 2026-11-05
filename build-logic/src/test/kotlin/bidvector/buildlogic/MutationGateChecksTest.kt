@@ -166,10 +166,14 @@ class MutationGateChecksTest {
     }
 
     @Test
-    fun `정책 모듈 집합과 등록 집합이 같으면 위반이 없다`() {
+    fun `정책 모듈 집합과 등록 집합이 같고 전부 도메인이면 위반이 없다`() {
         assertEquals(
             emptyList(),
-            mutationModuleCoverageViolations(expected = setOf("qualification"), registered = setOf("qualification")),
+            mutationModuleCoverageViolations(
+                expected = setOf("qualification"),
+                registered = setOf("qualification"),
+                domainModules = DOMAIN,
+            ),
         )
     }
 
@@ -179,8 +183,9 @@ class MutationGateChecksTest {
             mutationModuleCoverageViolations(
                 expected = setOf("qualification", "settlement"),
                 registered = setOf("qualification"),
+                domainModules = DOMAIN,
             )
-        assertTrue(violations.any { it.contains("settlement") }, "$violations")
+        assertTrue(violations.any { it.contains("적용하지 않았다") && it.contains("settlement") }, "$violations")
     }
 
     @Test
@@ -189,7 +194,25 @@ class MutationGateChecksTest {
             mutationModuleCoverageViolations(
                 expected = setOf("qualification"),
                 registered = setOf("qualification", "app"),
+                domainModules = DOMAIN,
             )
-        assertTrue(violations.any { it.contains("app") }, "$violations")
+        assertTrue(violations.any { it.contains("정책 밖 모듈") && it.contains("app") }, "$violations")
+    }
+
+    @Test
+    fun `정책이 도메인 밖 모듈을 대상으로 들면 한 걸음에 그 사유로 위반이다`() {
+        // 이 축이 없으면 「convention 을 적용하지 않았다」로 붉고, 그 문면을 따라 적용하면 구성
+        // 단계에서 다른 예외가 난다 — 두 걸음이라 읽는 사람이 엉뚱한 고침을 한다.
+        val violations =
+            mutationModuleCoverageViolations(
+                expected = setOf("qualification", "workflow"),
+                registered = setOf("qualification", "workflow"),
+                domainModules = DOMAIN,
+            )
+        assertTrue(violations.any { it.contains("순수 도메인 밖") && it.contains("workflow") }, "$violations")
+    }
+
+    private companion object {
+        val DOMAIN = setOf("shared-kernel", "qualification", "settlement", "strategy")
     }
 }

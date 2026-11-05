@@ -59,18 +59,29 @@ internal fun mutationGateViolations(
 }
 
 /**
- * 「정책이 대상이라 한 모듈」과 「실제로 pitest convention 을 적용한 모듈」의 **양방향** 등식.
+ * 「정책이 대상이라 한 모듈」과 「실제로 pitest convention 을 적용한 모듈」의 **양방향** 등식,
+ * 그리고 그 집합이 **순수 도메인 안에 있는지**.
  *
- * 한 방향만 재면 모듈에서 convention 적용을 빼는 것이 조용한 면제가 된다 — task 가 사라지면
- * 실패할 것도 없기 때문이다(`conventionCoverageGate` 와 같은 사유).
+ * 양방향인 이유: 한 방향만 재면 모듈에서 convention 적용을 빼는 것이 조용한 면제가 된다 —
+ * task 가 사라지면 실패할 것도 없기 때문이다(`conventionCoverageGate` 와 같은 사유).
+ *
+ * 셋째 축(`layer.domain` 교차)은 **문면을 한 걸음으로 만든다.** 그것이 없으면 도메인 밖 모듈을
+ * 정책에 적었을 때 이 게이트가 「convention 을 적용하지 않았다」로 붉고, 그 문면을 따라 적용하면
+ * 구성 단계에서 **다른** 예외가 난다 — 두 걸음이라 읽는 사람이 엉뚱한 고침을 한다. 구성 단계
+ * 차단(convention 의 `layer.domain` 가드)이 여전히 1차이고 이 축은 정책 쪽 오기를 집는다.
  */
 internal fun mutationModuleCoverageViolations(
     expected: Set<String>,
     registered: Set<String>,
+    domainModules: Set<String>,
 ): List<String> =
     listOfNotNull(
         "정책이 대상으로 든 모듈이 pitest convention 을 적용하지 않았다: ${(expected - registered).sorted()}"
             .takeIf { (expected - registered).isNotEmpty() },
         "정책 밖 모듈이 pitest convention 을 적용했다: ${(registered - expected).sorted()}"
             .takeIf { (registered - expected).isNotEmpty() },
+        (
+            "정책이 순수 도메인 밖 모듈을 대상으로 들었다: ${(expected - domainModules).sorted()} — " +
+                "mutation 대상은 layer.domain 안에서만 고른다(ADR 0007 OPEN-ADR-07 D-1)"
+        ).takeIf { (expected - domainModules).isNotEmpty() },
     )

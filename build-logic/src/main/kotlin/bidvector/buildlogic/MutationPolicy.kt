@@ -38,6 +38,13 @@ internal class MutationPolicy(
                 require(it.isNotEmpty()) { "정책 키 'mutation.modules' 의 값이 비어 있다 — 최소 하나의 모듈이 필요하다" }
             }
 
+    /**
+     * 정책 **판**. 게이트 리포트가 이 값을 함께 적어 「어느 판이 판정했는가」가 남는다
+     * (`SizeGateTask` 관례). 읽는 쪽이 없으면 형식이 바뀌는 날 조용히 지나간다 — `requireValue`
+     * 라 키가 사라지면 그 자리에서 깨진다.
+     */
+    val version: String get() = values.requireValue("policy.version")
+
     val threads: Int get() = values.requireInt("threads")
 
     /** 판정은 `mutations.xml` 로만 선다 — XML 을 끄는 것은 게이트를 끄는 것과 같다. */
@@ -47,17 +54,30 @@ internal class MutationPolicy(
                 require(it.contains("XML")) { "정책 키 'output.formats' 에 XML 이 없다 — 래칫 판정이 설 근거가 사라진다" }
             }
 
+    /**
+     * **세 축 모두 양수를 요구한다.** 0 은 키가 **있으므로** 「래칫 키가 없다」 검사를 통과하면서
+     * 그 축을 무력화한다 — 세 축을 한꺼번에 0 으로 두면 게이트가 남는 방어는 diff 가시성 하나다.
+     * 실측에서 나온 값은 정의상 양수이므로 이 요구가 정당한 값을 막지 않는다.
+     */
     fun ratchet(module: String): MutationRatchet {
         val score = requireRatchetInt(module, "score.min-percent")
-        require(score in 0..PERCENT_DENOMINATOR) {
-            "정책 키 'ratchet.$module.score.min-percent' 의 값이 백분율 범위를 벗어난다: $score"
+        require(score in 1..PERCENT_DENOMINATOR) {
+            "정책 키 'ratchet.$module.score.min-percent' 의 값이 1..$PERCENT_DENOMINATOR 밖이다: $score"
         }
         return MutationRatchet(
             minScorePercent = score,
-            minMutations = requireRatchetInt(module, "mutations.min"),
-            minMutatedClasses = requireRatchetInt(module, "classes.min"),
+            minMutations = requirePositiveRatchetInt(module, "mutations.min"),
+            minMutatedClasses = requirePositiveRatchetInt(module, "classes.min"),
         )
     }
+
+    private fun requirePositiveRatchetInt(
+        module: String,
+        axis: String,
+    ): Int =
+        requireRatchetInt(module, axis).also {
+            require(it > 0) { "정책 키 'ratchet.$module.$axis' 가 양수가 아니다: $it — 0 은 그 축을 무력화한다" }
+        }
 
     /**
      * 래칫 키의 부재는 「임계 없음」이 아니라 조용한 면제다 — 모듈을 목록에 더하고 래칫을

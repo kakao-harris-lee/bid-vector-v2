@@ -20,9 +20,12 @@ plugins {
 val libs = versionCatalog
 val configDir = layout.settingsDirectory.dir("config")
 val mutationPolicyFile = configDir.file("quality/mutation-policy.properties")
-// 구성 단계의 직접 파일 읽기는 configuration cache 가 입력으로 추적하지 않는다 — 그래서 여기서
-// 꺼내는 것은 **판정에 쓰이지 않는 값**(실행 폭·출력 형식)뿐이다. 판정하는 두 값(모듈 집합과
-// 모듈별 래칫)은 각 게이트 task 가 `@InputFile` 로 받아 실행 시점에 읽는다.
+// 구성 단계에서 꺼내는 것은 **판정에 쓰이지 않는 값**(실행 폭·출력 형식)뿐이다. 판정하는 두 값
+// (모듈 집합과 모듈별 래칫)은 각 게이트 task 가 `@InputFile` 로 받아 실행 시점에 읽는다 —
+// 그래야 warm configuration cache 에서도 **정책만 바꾼 편집이 그 task 를 다시 돌게** 한다
+// (`GateRegistrationGateTask` 가 자기 장부에 쓰는 것과 같은 사유). Gradle 9 는 구성 단계의 파일
+// 읽기도 undeclared configuration input 으로 추적해 CC 엔트리를 무효화하지만, 그것은 **구성을**
+// 다시 돌리는 것이고 task 를 다시 돌리는 것은 선언된 입력이 한다.
 private val mutationPolicy = MutationPolicy.load(mutationPolicyFile.asFile)
 val architecturePolicy = readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
 
@@ -73,7 +76,9 @@ val mutationReportGate =
         description = "mutation 점수·변이 수·변이 클래스 수의 절대값 래칫(ADR 0007 OPEN-ADR-07)"
         moduleName = project.name
         policyFile = mutationPolicyFile
+        // 한 값에서 둘을 채운다 — 메시지용 경로와 **지문**이 같은 파일을 가리켜야 한다.
         mutationXmlReport.set(pitestXmlReport)
+        mutationXmlReportFingerprint.from(pitestXmlReport)
         classDirectories.from(provider { sourceSets["main"].output.classesDirs })
         dependsOn(tasks.named("pitest"))
         report = layout.buildDirectory.file("reports/mutation-gate/violations.txt")

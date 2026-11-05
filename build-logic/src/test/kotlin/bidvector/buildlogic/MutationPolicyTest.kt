@@ -81,4 +81,28 @@ class MutationPolicyTest {
             }
         assertTrue(error.message.orEmpty().contains("score.min-percent"), "${error.message}")
     }
+
+    @Test
+    fun `정책 판을 낸다`() {
+        // 읽는 쪽이 없으면 형식이 바뀌는 날 조용히 지나간다 — 게이트 리포트가 이 값을 함께 적는다.
+        assertEquals("1", policy().version)
+    }
+
+    @Test
+    fun `정책 판 키가 없으면 거부한다`() {
+        val error = assertFailsWith<IllegalStateException> { MutationPolicy(mapOf("threads" to "1")).version }
+        assertTrue(error.message.orEmpty().contains("policy.version"), "${error.message}")
+    }
+
+    @Test
+    fun `래칫 세 축은 0 을 거부한다 — 키가 있으면서 축을 무력화하는 자리다`() {
+        // 0 은 키가 **있으므로** 「래칫 키가 없다」 검사를 통과하고 그 축만 조용히 꺼진다.
+        for (axis in listOf("score.min-percent", "mutations.min", "classes.min")) {
+            val error =
+                assertFailsWith<IllegalArgumentException> {
+                    policy(extra = mapOf("ratchet.qualification.$axis" to "0")).ratchet("qualification")
+                }
+            assertTrue(error.message.orEmpty().contains(axis), "$axis: ${error.message}")
+        }
+    }
 }
