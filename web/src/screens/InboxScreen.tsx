@@ -18,6 +18,7 @@ import {
   NOTIFICATION_DETAIL_DISPLAY,
   NOTIFICATION_KIND_DISPLAY,
   groupNotifications,
+  notificationItemTestId,
   type NotificationGroup,
 } from '../display/notificationDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -97,15 +98,6 @@ function sameGroupOrdinal(groups: readonly NotificationGroup[], index: number): 
 }
 
 /**
- * 항목의 신원은 **묶음 + 알림 종류**다(합성 id 가 없다) — testId 도 그 넷으로 짓는다.
- * 투찰 종류가 빠지면 같은 공고의 서면·실투찰 두 행이 **같은 locator** 가 되고, strict locator
- * 가 모호해지는 것으로 끝나지 않는다: React key 도 겹쳐 두 행이 서로의 자리에 그려진다.
- */
-function itemTestId(item: NotificationItem): string {
-  return `notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}-${item.bidKind}`;
-}
-
-/**
  * 쓰기 뒤 **포커스를 돌려놓을 자리**(r2 CR M-1). 누른 버튼으로는 못 돌아간다 — 읽은 뒤 그
  * 버튼은 `disabled` 이고, 포커스된 요소가 `disabled` 가 되면 브라우저가 그것을 blur 한다
  * (HTML 의 unfocusing steps). 그래서 **행·묶음 자체**를 받을 자리로 두고 `tabIndex={-1}` 로
@@ -133,7 +125,7 @@ function NotificationRow({
     <li
       ref={focusTarget}
       tabIndex={-1}
-      data-testid={itemTestId(item)}
+      data-testid={notificationItemTestId(item)}
       className="flex flex-wrap items-center gap-2 border-t border-line py-2 focus:outline focus:outline-2"
     >
       <StateBadge display={displayOrUnknown(NOTIFICATION_KIND_DISPLAY, item.kind)} />
@@ -243,7 +235,7 @@ function NotificationGroupBlock({
       <ul className="mt-2 flex flex-col">
         {group.items.map((item) => (
           <NotificationRow
-            key={itemTestId(item)}
+            key={notificationItemTestId(item)}
             item={item}
             disabled={disabled}
             onRead={(focus) =>

@@ -84,6 +84,30 @@ export interface NotificationGroup {
 }
 
 /**
+ * 항목 행의 `data-testid` — **신원 넷을 그대로 짓는다**(묶음 + 알림 종류).
+ *
+ * **이 저장소에서 이 꼴을 적는 자리는 여기 하나다.** 화면과 여정 e2e 가 **같은 함수**를 부른다 —
+ * 앞 판은 양쪽이 각자 템플릿을 적고 있었고, 이 slice 가 축을 더하면서 화면만 고쳐 여정의
+ * 정확 일치 조회(`getByTestId(string)` 은 exact)가 **아무 행도 못 찾게** 됐다(v H-1). 축을 또
+ * 더하는 날 같은 일이 반복되지 않게 하려면 사본을 줄이는 것이 아니라 **없애야** 한다.
+ *
+ * 인자를 생성 타입이 아니라 **네 문자열 칸의 구조 타입**으로 받는 이유: 여정 e2e 는 응답을
+ * 자기 손 타입으로 읽는 wire probe 이고(그 독립성이 그 test 의 요점이다) 생성 타입의 union 을
+ * 요구하면 그 독립성이 깨진다. 칸이 하나 늘면 e2e 의 손 타입도 그 칸을 들어야 한다.
+ */
+export function notificationItemTestId(parts: NotificationTestIdParts): string {
+  return `notification-${parts.kind}-${parts.noticeNumber}-${parts.noticeRound}-${parts.bidKind}`;
+}
+
+/** [notificationItemTestId] 가 읽는 칸 넷 — 항목의 신원 그대로다. */
+export interface NotificationTestIdParts {
+  readonly kind: string;
+  readonly noticeNumber: string;
+  readonly noticeRound: string;
+  readonly bidKind: string;
+}
+
+/**
  * 묶음 접기 — **연속 접기이고 정렬이 아니다.** 계약이 「정렬이 묶음을 연속시키므로
  * 클라이언트가 재정렬할 필요가 없다」고 둔 자리라, 화면이 다시 정렬하면 서버가 정한 최신순이
  * 무너진다.

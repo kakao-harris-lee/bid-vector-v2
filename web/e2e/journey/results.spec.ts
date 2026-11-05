@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { notificationItemTestId } from '../../src/display/notificationDisplay';
+
 import {
   ABSENT,
   AMOUNT_CURRENCY_LABEL,
@@ -418,10 +420,18 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
+/**
+ * 응답 항목을 **손 타입으로** 읽는다 — 이 test 는 wire probe 이고 그 독립성이 요점이다(생성
+ * 타입을 쓰면 「문서가 그렇다고 하니 그렇다」가 된다).
+ *
+ * `bidKind` 는 M9/paper-bid 가 더한 **신원의 한 칸**이다. 이 칸이 없으면 아래 행 조회가 짓는
+ * testId 에 `undefined` 가 들어가 아무 행도 못 찾는다 — 축이 또 늘면 같은 자리가 다시 말한다.
+ */
 type InboxItem = {
   readonly kind: string;
   readonly noticeNumber: string;
   readonly noticeRound: string;
+  readonly bidKind: string;
   readonly read: boolean;
 };
 
@@ -477,10 +487,11 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
 
   // **개수는 응답에서 온다** — 화면이 센 수가 아니라 서버가 보낸 항목 수와 같아야 한다.
   await expect(rows).toHaveCount(items.length);
+  // **testId 를 이 파일이 짓지 않는다**(v H-1). 화면과 **같은 함수**를 부른다 —
+  // `getByTestId(string)` 은 정확 일치라, 사본을 두면 화면이 축을 더하는 날 이 조회가 조용히
+  // 아무 행도 못 찾는다(이 slice 가 실제로 그렇게 만들었다).
   for (const item of mine) {
-    await expect(
-      page.getByTestId(`notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(notificationItemTestId(item))).toBeVisible();
   }
 
   /**

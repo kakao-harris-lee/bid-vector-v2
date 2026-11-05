@@ -7,6 +7,7 @@ import {
   NOTIFICATION_DETAIL_DISPLAY,
   NOTIFICATION_KIND_DISPLAY,
   groupNotifications,
+  notificationItemTestId,
   type NotificationBidKind,
   type NotificationDetail,
   type NotificationKind,
@@ -107,6 +108,32 @@ describe('알림 종류·부가 사실의 표', () => {
    */
   it('서면 연습과 실투찰이 다른 문면이다', () => {
     expect(NOTIFICATION_BID_KIND_DISPLAY.PAPER.label).not.toBe(NOTIFICATION_BID_KIND_DISPLAY.REAL.label);
+  });
+});
+
+describe('항목 행의 testId — 이 꼴을 적는 자리는 하나다 (v H-1)', () => {
+  /**
+   * **신원 넷이 전부 들어간다.** 화면과 여정 e2e 가 이 함수를 같이 부르므로, 축이 빠지면 둘이
+   * **함께** 붉다 — 앞 판은 양쪽이 각자 템플릿을 적어 화면만 고치고 여정이 조용히 아무 행도
+   * 못 찾았다(`getByTestId(string)` 은 정확 일치다).
+   */
+  it('항목 testId 가 종류·공고 쌍·투찰 종류 넷을 담는다', () => {
+    expect(
+      notificationItemTestId({
+        kind: 'AWARD_DECIDED',
+        noticeNumber: 'SYN-1',
+        noticeRound: '007',
+        bidKind: 'PAPER',
+      }),
+    ).toBe('notification-AWARD_DECIDED-SYN-1-007-PAPER');
+  });
+
+  /** 투찰 종류만 다른 두 행은 **다른** testId 다 — 같으면 strict locator 가 모호해진다. */
+  it('투찰 종류만 달라도 testId 가 갈린다', () => {
+    const real = notificationItemTestId(item({ bidKind: 'REAL' }));
+    const paper = notificationItemTestId(item({ bidKind: 'PAPER' }));
+
+    expect(real).not.toBe(paper);
   });
 });
 
