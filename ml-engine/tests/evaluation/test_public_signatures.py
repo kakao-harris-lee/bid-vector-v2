@@ -8,22 +8,20 @@ from __future__ import annotations
 import inspect
 
 import ml_engine.evaluation as evaluation_module
+from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
 
-_FORBIDDEN_PARAMETER_NAMES = frozenset(
-    {
-        "threshold",
-        "paired_t_threshold",
-        "maturity_threshold",
-        "min_evaluation_rows",
-        "max_origins",
-        "agency_baseline_min_count",
-        "stability_seeds",
-        "seeds",
-        "amount_band_edges",
-        "gate_stratum",
-        "stratum",
-    }
+_POLICY_ALIASES = frozenset({"threshold", "seeds", "stratum"})
+"""정책 키의 짧은 별칭 — 키 이름 그대로가 아니어도 같은 값을 낱개로 받는 자리들."""
+
+_FORBIDDEN_PARAMETER_NAMES = (
+    frozenset(_SCALAR_KEYS) | frozenset(_INDEXED_LIST_PREFIXES) | _POLICY_ALIASES
 )
+"""**열거가 아니라 생성이다**(cr M-3). 앞 판은 손 열거였고, 이 slice 가 `_SCALAR_KEYS` 에
+`effective_date` 를 더하면서 그 열거는 갱신되지 않았다 — `def f(*, effective_date: date, …)`
+를 `evaluation.__all__` 에 더하는 길이 이 게이트를 그대로 지나갔다(`gate_baseline`·
+`gate_model`·`segment_axes` 누락은 이 slice 전부터 있던 틈이다). 이제 정책 키를 더하면 이
+게이트의 감시 범위가 **같은 커밋에서** 자란다 — 같은 slice 가 새 게이트(완화 경로 넷)에
+적용한 규율을 옆자리에도 적용한 것이다."""
 
 # 순수 산식·구조 유틸리티 — 정책을 모른 채(policy 매개변수 없이) 값을 그대로 받는다.
 # 완화 표면이 아니다: 게이트 진입점(`gate_outcome`·`passes_gate`·
@@ -40,6 +38,11 @@ _POLICY_UNAWARE_UTILITIES = frozenset(
         "required_row_count",  # threshold: 위와 같음
     }
 )
+
+_NON_POLICY_PARAMETER_NAMES = frozenset({"version"})
+"""정책 키와 **이름이 같지만** 임계가 아닌 인자 — `version` 은 정책 키이면서 식별자이고,
+`policy_epoch`·`policy_checksum` 류가 그것을 낱개로 받는 일은 없지만 모집단을 생성으로
+바꾸면 이름이 겹칠 수 있는 자리라 **명시 허용**으로 둔다(열거가 아니라 예외 선언)."""
 
 
 def _public_callables() -> list[tuple[str, object]]:
@@ -69,6 +72,8 @@ def test_no_evaluation_public_function_takes_bare_threshold_or_seed_parameters()
             continue
         signature = inspect.signature(func)
         for parameter_name in signature.parameters:
+            if parameter_name in _NON_POLICY_PARAMETER_NAMES:
+                continue
             if parameter_name in _FORBIDDEN_PARAMETER_NAMES:
                 violations.append(f"{name}({parameter_name})")
     assert not violations, (
@@ -92,7 +97,10 @@ def test_policy_unaware_utilities_allowlist_has_no_stale_entries() -> None:
     names_with_forbidden_params = set()
     for name, func in _public_callables():
         signature = inspect.signature(func)
-        if any(p in _FORBIDDEN_PARAMETER_NAMES for p in signature.parameters):
+        if any(
+            p in _FORBIDDEN_PARAMETER_NAMES and p not in _NON_POLICY_PARAMETER_NAMES
+            for p in signature.parameters
+        ):
             names_with_forbidden_params.add(name)
     stale = _POLICY_UNAWARE_UTILITIES - names_with_forbidden_params
     assert not stale, f"허용 목록에 더 이상 해당하지 않는 항목이 있다: {stale}"
@@ -103,3 +111,11 @@ def test_load_evaluation_policy_is_the_only_way_to_construct_shipped_values() ->
     추가 매개변수가 없다(ML-07 acceptance ④)."""
     signature = inspect.signature(evaluation_module.load_evaluation_policy)
     assert list(signature.parameters) == ["path"]
+
+
+def test_forbidden_parameter_names_track_the_policy_schema() -> None:
+    """cr M-3 — 모집단이 스키마에서 나온다. 정책 키를 더하고 이 게이트를 잊는 길이 닫혔다."""
+    assert frozenset(_SCALAR_KEYS) <= _FORBIDDEN_PARAMETER_NAMES
+    assert frozenset(_INDEXED_LIST_PREFIXES) <= _FORBIDDEN_PARAMETER_NAMES
+    assert "effective_date" in _FORBIDDEN_PARAMETER_NAMES
+    assert _POLICY_ALIASES <= _FORBIDDEN_PARAMETER_NAMES
