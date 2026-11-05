@@ -396,12 +396,27 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
     분류를 늘리는 날 두 자리가 어긋난다. **pitest 자신의 `mutationThreshold` 는 쓰지 않는다**:
     같은 수를 두 자리에 두지 않는 관례(`sizeGate` 가 detekt `LongMethod` 를 끈 자리와 같다)이고,
     도구 옵션 하나를 0 으로 돌리는 것이 게이트를 끄는 길이 되어서도 안 된다.
+    **리포트는 task 지문에 들어간다**(부재를 허용하는 파일 컬렉션으로) — 앞 판은 그 선언이 없어
+    「main 산출물·정책은 그대로이고 test 만 약해진」 경우, 즉 래칫이 존재하는 이유 그 자체에
+    UP-TO-DATE 로 건너뛰고 exit 0 이 됐다(리뷰 라운드에서 리포트 15/73 으로 재현). `upToDateWhen
+    { false }` 로도 막히지만 그쪽은 근거가 그대로일 때도 매 빌드 다시 돌린다 — 래칫이 원하는 것은
+    「항상 재실행」이 아니라 「근거가 바뀌면 재실행」이고 그 차이를 음성 대조가 잠근다.
   - `mutationCoverageGate`(루트) — 정책의 대상 집합과 **실제로 convention 을 적용한 집합**의
-    양방향 등식. 모듈에서 적용을 빼면 래칫 task 자체가 사라져 아무것도 실패하지 않기 때문이다
-    (`conventionCoverageGate` 와 같은 자리·사유). 판정하는 두 값(대상 집합·모듈별 래칫)은
-    구성 단계가 아니라 **실행 시점에 `@InputFile` 로** 읽는다 — 구성 단계의 직접 파일 읽기는
-    configuration cache 가 입력으로 추적하지 않아, 정책을 줄인 편집이 낡은 cache 와 함께 조용히
-    통과할 수 있다.
+    양방향 등식, 그리고 그 집합이 `layer.domain` 안인지. 모듈에서 적용을 빼면 래칫 task 자체가
+    사라져 아무것도 실패하지 않기 때문이다(`conventionCoverageGate` 와 같은 자리·사유). 판정하는
+    두 값(대상 집합·모듈별 래칫)은 구성 단계가 아니라 **실행 시점에 `@InputFile` 로** 읽는다 —
+    그래야 warm configuration cache 에서도 **정책만 바꾼 편집이 그 task 를 다시 돌게** 한다
+    (`GateRegistrationGateTask` 가 자기 장부에 쓰는 것과 같은 사유).
+  - CI job 은 **`--max-workers=1`** 로 돈다. 루트 `gradle.properties` 의 `org.gradle.parallel=true`
+    때문에 한 명령이 일곱 모듈의 `pitest` 를 들면 worker 수만큼 PIT JVM 트리가 동시에 뜨는데,
+    비용 실측은 호스트 규율 때문에 **한 모듈씩**이어서 그 합을 아무도 재지 않았다. 러너가 OOM 으로
+    **매 PR 을 비결정적으로** 붉히는 쪽이 느린 쪽보다 비싸다.
+- **`tools/one-command-check.sh` 밖이다 — 정본은 CI `mutation` job.** 그 스크립트는 「한 명령으로
+  도는 완료 조건 1」이고 `check`·`ml-engine`·`web` 세 job 의 명령을 든다. mutation 레인은 **직렬
+  분석만 11분 대**라 로컬 한 방 검사에 넣으면 그 검사 자체가 쓰이지 않게 된다 — 안 돌린 게이트와
+  **아무도 돌리지 않는 검사**는 같은 값이다. 그래서 의도적으로 제외하고 차단력은 CI job 이 진다
+  (`container` job 이 같은 스크립트 밖인 것과 같은 자리다). **이 문장이 그 제외의 근거다** —
+  적어 두지 않으면 다음 독자에게 열거 누락과 구별되지 않는다.
   - mutator 집합은 **도구 기본값**(`DEFAULTS`)이다. 집합도 지어내지 않는다 — CPD 가
     `minimumTokenCount` 를 기본값 50 으로 둔 선례와 같다.
 - **D-3 의 M-1~M-9 와의 관계 — 덮는 것과 덮지 않는 것**: mutation test 가 닿는 것은 **순수
@@ -415,7 +430,7 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   「생존이 0 이다」를 묻는다. 현 실측의 생존은 0 이 아니다(아래 Kotlin junk 가 상수로 섞인다) —
   그 간극의 처리는 사용자 승인 사항이고 구현이 스스로 선언하지 않는다.
 
-#### `OPEN-ADR07-KOTLIN-JUNK` · Kotlin junk 변이 필터
+### `OPEN-ADR07-KOTLIN-JUNK` · Kotlin junk 변이 필터
 
 - **결정 필요 사항**: Kotlin 컴파일러가 만든 변이(`Intrinsics` 널 검사 제거, 컬렉션 overflow
   가드 제거, data class 접근자의 빈 값 반환)를 걸러낼 것인가, 무엇으로 걸러낼 것인가.
@@ -427,7 +442,7 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   방향은 미탐이 아니라 **오탐(fail-loud)** 이라 받아들인다.
 - **소유**: 운영자(비용 승인). 등재만 하고 결정하지 않는다.
 
-#### `OPEN-ADR07-MUTATION-BUDGET` · mutation job 의 CI 시간 예산
+### `OPEN-ADR07-MUTATION-BUDGET` · mutation job 의 CI 시간 예산
 
 - **결정 필요 사항**: 이 job 을 **매 PR**에 두는 현 형태를 유지하는가, 아니면 변경 분 한정
   (`historyInputLocation` 증분)·`threads` 상향·야간 일정으로 옮기는가.
