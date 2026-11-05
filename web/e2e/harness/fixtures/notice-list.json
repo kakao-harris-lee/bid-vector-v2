@@ -33,7 +33,8 @@
     },
     "why_two_notices": "게시 낙찰하한율이 **있는 공고와 없는 공고**를 한 벌에 둔다 — 화면 C 의 `floorRateGroundsState` 가 `USABLE` 과 `ABSENT` 두 상태를 같은 실행에서 보이게 하려는 것이다(DEC-10). 신뢰 밴드는 [0.30, 0.995] 이고 87.745% 는 그 안이다(PUBLISHED_FLOOR_TRUST_POLICY).",
     "why_third_notice": "M7/7E-2 여정 ④(내 입찰함)가 **자기 건**을 가진다. 여정 ③ 의 건(`SYN-7E1-FLOOR-USABLE`)을 쓰면 ④ 가 그 건을 개찰 대기로 밀어 버려 같은 DB 에서 ③ 을 다시 돌릴 때 ③ 의 primary 단언이 깨지고, 401 test 의 건(`SYN-7E1-FLOOR-ABSENT`)을 쓰면 그 test 가 담기 전 상태를 전제하지 못한다. 여정마다 건을 따로 두면 그 결합이 생기지 않는다(설정의 `workers: 1` 아래 한 하네스를 공유하므로 **상태가 전역이다**).",
-    "why_fourth_notice": "M7/7E-3a 여정 ⑤(결과 확인)가 **자기 건**을 가진다. 결과 단계 전이는 **되돌릴 수 없다**(착수 실측: `WON` 에서 `await-opening`·`skip` 둘 다 409 `INVALID_TRANSITION` 이고 `outcome-correction` 만 결과 축 안에서 움직인다). 여정 ④ 의 건(`SYN-7E2-BIDBOX`)을 쓰면 ⑤ 가 그 건을 낙찰까지 밀어 ④ 의 출발 단언(`BID_RECORDED` → 개찰 대기 전이)이 **영구히** 깨진다. 그래서 순서 독립을 되돌림이 아니라 **공고 격리**로 세운다(D-7E3a-9)."
+    "why_fourth_notice": "M7/7E-3a 여정 ⑤(결과 확인)가 **자기 건**을 가진다. 결과 단계 전이는 **되돌릴 수 없다**(착수 실측: `WON` 에서 `await-opening`·`skip` 둘 다 409 `INVALID_TRANSITION` 이고 `outcome-correction` 만 결과 축 안에서 움직인다). 여정 ④ 의 건(`SYN-7E2-BIDBOX`)을 쓰면 ⑤ 가 그 건을 낙찰까지 밀어 ④ 의 출발 단언(`BID_RECORDED` → 개찰 대기 전이)이 **영구히** 깨진다. 그래서 순서 독립을 되돌림이 아니라 **공고 격리**로 세운다(D-7E3a-9).",
+    "why_opening_axis_notices": "M9/opening-harness — `SYN-M9-OPEN-*` 여덟은 **개찰 결과 상태 아홉 전수**를 한 실행에서 세우는 공고들이고, 어느 갈래를 낳는지는 `fixtures/opening-axis.json` 의 설계표에 있다(이 파일에는 **공고 축**만 있다 — 개찰 축 원문의 모양·진행구분은 그 파일이 가진다). 둘은 개찰 축을 **받지 않는** 것이 설계라(`NOT_OPENED_YET`·`NOT_COLLECTED`) 마감 offset 의 부호가 서로 반대다 — 마감 비교가 그 두 갈래를 가르는 축이기 때문이다. 용역 하나(`SYN-M9-OPEN-UNPROMOTED`)를 두는 이유는 승격 범위 밖 공고를 표본 seed 에 기대지 않고 세우려는 것이다(그 파일의 `why_two_divisions`). 기존 여정의 공고는 **검색 질의로만** 집히므로(`shared.ts` 의 `search`) 이 여덟이 그 단언에 섞이지 않는다."
   },
   "items": [
     {
@@ -107,6 +108,158 @@
         "dminsttCd": "7654321",
         "bssamt": "1500000000",
         "presmptPrce": "1400000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-OPENED",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 개찰완료 갈래",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-FAILED-BID",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 유찰 갈래",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-REBID",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 재입찰 갈래",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-PROGRESS-UNKNOWN",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 진행구분 미등재 갈래",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-PROGRESS-NONE",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 진행구분 없음 갈래",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": 5,
+      "openingOffsetDays": 6,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-NOT-OPENED",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 아직 개찰 전 갈래(개찰 축 없음)",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoCnstwk",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-NOT-COLLECTED",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 개찰 자료 없음 갈래(개찰 축 없음)",
+        "bsnsDivNm": "공사",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
+        "sucsfbidLwltRate": "87.745",
+        "sucsfbidMthdNm": "적격심사"
+      }
+    },
+    {
+      "operation": "getBidPblancListInfoServc",
+      "deadlineOffsetDays": -4,
+      "openingOffsetDays": -3,
+      "fields": {
+        "bidNtceNo": "SYN-M9-OPEN-UNPROMOTED",
+        "bidNtceOrd": "000",
+        "bidNtceNm": "합성 공고 — 원문만 적재됨 갈래(승격 범위 밖 업무)",
+        "bsnsDivNm": "용역",
+        "ntceInsttNm": "합성 공고기관",
+        "dminsttNm": "합성 수요기관",
+        "ntceInsttCd": "1234567",
+        "dminsttCd": "7654321",
+        "bssamt": "1234567890",
+        "presmptPrce": "1200000000",
         "sucsfbidLwltRate": "87.745",
         "sucsfbidMthdNm": "적격심사"
       }

@@ -1,0 +1,128 @@
+{
+  "_provenance": {
+    "id": "e2e-journey-opening-axis",
+    "domain": "koneps-opening-collection",
+    "classification": "authoritative",
+    "what_is_authoritative": "개찰 축 응답의 **필드명·형식**과 진행구분 어휘. 값은 합성이다(`SYN-` 접두) — `notice-list.json` 과 같은 규약이다. **오퍼레이션 이름은 이 파일에 없다**: 출하 기본값이 정본이고 하네스 쪽 사본은 `opening-axis.mjs` 하나이며 그 둘은 등식 test 가 묶는다(사본을 셋으로 늘리지 않는다).",
+    "sources": [
+      {
+        "reference": "reports/evidence/m3/3a/policy-values.md §1.5·§1.9·§1.11 (조달청 OpenAPI 참고자료를 인용한 승인 표 — P-1·P-13)",
+        "sha256": "b81e906ef323ed8aefc54783b320bc369a03d56055feec909df6bccba1189fe7",
+        "gives": "개찰결과 목록(progrsDivCdNm·prtcptCnum) · 예비가격 상세(compnoRsrvtnPrceSno·bsisPlnprc·drwtYn·plnprc·rlOpengDt) · 개찰완료(opengRank·prcbdrNm·bidprcAmt·bidprcrt·drwtNo1·drwtNo2) · 기초금액(bssamt·bssamtOpenDt·rsrvtnPrceRngBgnRate·rsrvtnPrceRngEndRate·bidPrceCalclAYn·bssAmtPurcnstcst) · A값 일곱 성분의 이름·형식"
+      },
+      {
+        "reference": "procurement/.../KonepsOpeningAxisFieldContracts.kt · KonepsOpeningCompleteFieldContracts.kt (등재 raw 키의 저장소 내 정본)",
+        "gives": "위 키들이 **등재된 계약 키**임과 각 키의 축(presentIn). 체크섬을 핀으로 박지 않는 이유: 이 축의 등식은 해시가 아니라 수집→승격이 실제로 canonical 을 낳았는가(러너 계수)와 살아 있는 응답(여정 spec)이 진다"
+      },
+      {
+        "reference": "app/src/test/kotlin/bidvector/app/collection/MockOpeningKonepsHttp.kt (6G E2E 가 쓰는 같은 축의 mock)",
+        "gives": "행 수의 선택 — 복수예가 15행 · 투찰 행 셋 · 추첨 순번과 투찰 선택을 **일부러 어긋나게** 두는 판단. 그 mock 은 실 수집 E2E 를 통과하는 모양이다"
+      }
+    ],
+    "time_relative": "일시는 **파일에 값이 없다** — `axisOffsetDays` 로 두고 fake 가 실행 시각에서 만든다(D-7E-2: 출하 Clock 은 SystemClock 하나이고 e2e 는 시각을 조작하지 않는다).",
+    "privacy": {
+      "contains_personal_data": false,
+      "note": "사업자등록번호(`prcbdrBizno`)·대표자명(`prcbdrCeoNm`) 키가 **없다** — 6G mock 은 어댑터 경계가 그 둘을 떨어뜨리는지 재려고 싣지만 이 하네스는 그것을 재지 않으므로 개인 식별 키를 저장소에 두지 않는다(D-7E-6). 상호는 합성 문자열이다."
+    },
+    "why_nine": "`readOpeningResult` 의 상태 **아홉 전수**를 한 실행에서 낳는다(D-7E3a-7 의 후속 `OPEN-7E3A-OPENING-AXIS-HARNESS`). 갈래는 fixture 와의 **관계**로 갈린다 — `notices`(개찰 축 원문이 있다) · `noticeAxisOnly`(공고만 있다) · `uncollected`(어디에도 없다). 그 관계가 곧 갈래이므로 교차 등식 test 가 그것을 잰다.",
+    "why_two_divisions": "`OBSERVED_NOT_PROMOTED` 는 「원문은 있고 canonical 은 없다」인데, 그것을 **결정적으로** 세우는 길은 승격 범위(확정 표본) 밖 공고 하나뿐이다. 표본 크기로 범위를 좁히면 **어느 공고가 빠지는지를 표본 seed 가 정해** 설계가 선언할 수 없다. 업무로 가르면 실행 상태 디렉터리가 둘이 되고 승격은 공사 쪽 하나만 받는다 — 용역 공고는 목록 축 원문을 얻지만 승격 범위 밖이다."
+  },
+  "promotedDivisions": ["construction"],
+  "axisOffsetDays": {
+    "actualOpening": -3,
+    "baseAmountOpen": -5,
+    "noticeAnnounced": -8,
+    "formulaAOpen": -4
+  },
+  "amounts": {
+    "baseAmount": 1234567890,
+    "plannedPrice": 1250000000,
+    "basePlannedPrice": 1240000000,
+    "plannedPriceStep": 1000000,
+    "pureConstructionCost": 900000000,
+    "formulaA": {
+      "npnInsrprm": "100000000",
+      "mrfnHealthInsrprm": "60000000",
+      "odsnLngtrmrcprInsrprm": "8000000",
+      "rtrfundNon": "40000000",
+      "sftyMngcst": "30000000",
+      "sftyChckMngcst": "20000000",
+      "qltyMngcst": "2853707"
+    }
+  },
+  "bidders": [
+    { "rank": 1, "name": "SYN-투찰업체-1", "amountWon": 1100000000, "bidRate": "88.000", "firstDraw": 1, "secondDraw": 2 },
+    { "rank": 2, "name": "SYN-투찰업체-2", "amountWon": 1150000000, "bidRate": "89.000", "firstDraw": 4, "secondDraw": 5 },
+    { "rank": 3, "name": "SYN-투찰업체-3", "amountWon": 1200000000, "bidRate": "90.000", "firstDraw": 6, "secondDraw": 8 }
+  ],
+  "notices": [
+    {
+      "noticeNumber": "SYN-M9-OPEN-OPENED",
+      "division": "construction",
+      "progressDivision": "개찰완료",
+      "expectedOpeningState": "OPENED",
+      "why": "등재 라벨이 개찰완료인 갈래."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-FAILED-BID",
+      "division": "construction",
+      "progressDivision": "유찰",
+      "expectedOpeningState": "FAILED_BID",
+      "why": "유찰을 개찰완료로 접지 않는 것이 이 갈래의 요점이다(정책 KDoc)."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-REBID",
+      "division": "construction",
+      "progressDivision": "재입찰",
+      "expectedOpeningState": "REBID",
+      "why": "등재 셋의 마지막."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-PROGRESS-UNKNOWN",
+      "division": "construction",
+      "progressDivision": "개찰취소",
+      "expectedOpeningState": "PROGRESS_UNRECOGNIZED",
+      "why": "**등재 밖 라벨**이다. 상류 어휘가 늘었을 때 그것이 조용히 개찰완료로 접히지 않는 것을 이 갈래가 잰다."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-PROGRESS-NONE",
+      "division": "construction",
+      "progressDivision": null,
+      "expectedOpeningState": "PROGRESS_ABSENT",
+      "why": "진행구분 **칸이 없다**(빈 문자열이 아니다). 부재와 미등재는 다른 값이다."
+    },
+    {
+      "noticeNumber": "SYN-7E3-RESULT",
+      "division": "construction",
+      "progressDivision": "개찰완료",
+      "expectedOpeningState": "OPENED",
+      "why": "여정 ⑤ 의 건(D-7E3a-9). 이 slice 가 그 여정을 **확정 갈래까지** 민다 — 앞 판은 하네스가 개찰 축을 수집하지 않아 `NOT_OPENED_YET` 에서 멈췄다."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-UNPROMOTED",
+      "division": "service",
+      "progressDivision": "개찰완료",
+      "expectedOpeningState": "OBSERVED_NOT_PROMOTED",
+      "why": "승격 범위 밖 업무다 — 목록 축 원문은 얻지만 canonical 이 서지 않는다. 진행구분이 개찰완료인데도 상태가 개찰완료가 **아닌 것**이 이 갈래의 요점이다(원문 ≠ canonical)."
+    }
+  ],
+  "noticeAxisOnly": [
+    {
+      "noticeNumber": "SYN-M9-OPEN-NOT-OPENED",
+      "expectedOpeningState": "NOT_OPENED_YET",
+      "why": "개찰 축 원문이 없고 **투찰 마감이 아직 뒤**다. 개찰 축이 붙으면 이 갈래가 사라진다."
+    },
+    {
+      "noticeNumber": "SYN-M9-OPEN-NOT-COLLECTED",
+      "expectedOpeningState": "NOT_COLLECTED",
+      "why": "개찰 축 원문이 없고 **마감이 이미 지났다**. 「아직 개찰 전」과 「개찰 자료 없음」을 가르는 것이 마감 비교다."
+    }
+  ],
+  "uncollected": [
+    {
+      "noticeNumber": "SYN-M9-OPEN-NEVER",
+      "expectedOpeningState": "NOTICE_ABSENT",
+      "why": "**어느 fixture 에도 없다** — 공고 행 자체가 없는 갈래이고, 수집되면 이 갈래가 사라진다."
+    }
+  ]
+}

@@ -98,3 +98,7 @@ scripts/display-gate-selectors.test.mjs
 # 마운트 목록은 새 카드가 생길 때 조용히 뒤처지고, r1 에서 실제로 그렇게 됐다(화면 E 카드가
 # 목록 밖이라 그 공백에 위반이 살아 있었다).
 scripts/screen-card-coverage.test.mjs
+# M9/opening-harness — 개찰 축 하네스의 **등식 넷**(설계 집합 == 계약 열거 아홉 · 오퍼레이션
+# 이름 == 출하 기본값 · 진행구분 어휘 == 출하 정책 · fixture 둘의 교차). 「개찰 축을 다룬다」는
+# 선언과 **아홉 갈래를 낳는 것**은 다르고, 그 차이를 잠그는 술어가 이 파일에 있다.
+e2e/harness/opening-axis.test.mjs
