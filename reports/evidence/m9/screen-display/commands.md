@@ -385,3 +385,13 @@
 - exit: 0
 - 핵심 결과: 앞은 **커밋끼리** 대조라 복원 결과를 보지 못하고 `web/**` 가 그대로 나왔다.
   트리 동일성은 **작업 트리**와 맞대야 한다
+
+### 2026-11-05T14:20Z — PR #125 CI (무거운 축의 정본, 팀장 지시)
+- cmd: `gh pr checks 125 --watch --interval 30`
+- exit: 0
+- 핵심 결과: **run 42014417216 · head `2d801d73`** — `check`(S-20·여정 e2e 포함) pass 11m24s ·
+  `web`(W-1~W-13) pass 2m18s · `container` pass 5m54s · `ml-engine` pass 5m34s. **넷 다 pass**
+  (앞 run 41999467076 `dd69fe46` 의 `container` 붉음은 외부 CVE 로 #126 머지로 풀렸다)
+- 범위: 이 run 은 **병합 전** head 를 잰 것이다. 병합 커밋 `ac0f4484` 는 **push 하지 않았다**
+  (팀장이 push 한다) — 그 SHA 의 CI 는 push 뒤에 돈다. 병합이 `web`·`check` job 의 명령을
+  바꾸지 않았고 어느 쪽 본문도 접지 않은 것은 위 두 줄에서 따로 쟀다
