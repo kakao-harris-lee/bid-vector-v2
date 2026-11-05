@@ -38,7 +38,9 @@ _SHIPPED_YAML = Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.
 
 def test_shipped_policy_file_matches_policy_values_md() -> None:
     """policy-values.md §1 의 값을 이 test 에 하드코딩해 실제 YAML 과 대조한다(5A/5B/5C-1
-    과 같은 관행 — 문서를 파싱하지 않는다)."""
+    과 같은 관행 — 문서를 파싱하지 않는다). **열둘**이다 — `effective_date` 가 M9/ml-lifecycle
+    에서 그 표에 등재됐다(cr M-4: 앞 라운드는 YAML·test 만 고쳐 「문서와 일치」라는 이름의
+    test 가 그 문서에 없는 값을 단언했다)."""
     result = load_evaluation_policy(_SHIPPED_YAML)
     assert isinstance(result, EvaluationPolicy)
     assert result.version == SHIPPED_EVALUATION_POLICY_VERSION

@@ -24,6 +24,7 @@
 | `bid_ratio.plausible_min` / `bid_ratio.plausible_max` | `0.5` / `1.5` | `app/ai/predictors/distribution_extraction.py:47-48` |
 | `gbm.min_category_rows` | `40` | 5A 표 #31(하한 1 클램프는 코드 불변식 D-5D-3) |
 | `maturity.window_days` | `7` | `app/domain/settlement_maturity.py:51` |
+| `maturity.time_axis_substitute` | `"NOT_APPROVED"` | **M9/ml-lifecycle 신설**(SET-06 · `OPEN-SET-10`). 개찰 시각 결측 시 마감 시각 대체를 승인된 정책으로 채택할 것인가 — **미결이므로 미승인**이고, 그래서 대체 후보 시각만 있는 행은 조용히 대체되지 않고 사유 있는 시간축 측정 불가로 산출된다(legacy 는 조용히 대체했고 provenance 가 소실됐다). **legacy 대응 상수가 없는 신설 칸이고 값은 「아직 승인하지 않았다」의 기계적 표현이다** — 운영자가 채택하면 `"APPROVED"` 가 된다. bool 이 아니라 닫힌 어휘인 이유: YAML 1.1 이 `yes`·`on`·`y` 를 참으로 읽어 bool 칸은 그 표기로도 승인이 생겼다(verifier L-2 실측) |
 
 ## 이 slice 가 값을 갖지 않는 것
 합성 `confidence` 계수(이식 안 함) · seed·num_threads(5C reproducibility) · 5A 표의 guardrail·가격 15행(Kotlin) · embargo 임계(`OPEN-SET-06`, Kotlin).
