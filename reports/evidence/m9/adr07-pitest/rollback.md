@@ -1,10 +1,22 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `f4a85991`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `41168ed9`**.
 
 **원천이 착수 base 와 같다.** 이 브랜치는 `origin/main` 을 **한 번도 합치지 않았다**
 (`git log --merges df4976cc..HEAD` 가 0 줄) — 그래서 base 에서 복원해도 남의 변경을 지우지
 않는다. 합친 이력이 생기면 원천을 그 병합 커밋의 둘째 부모(고정 SHA)로 옮기고 다시 잰다.
+
+**공유 파일 하나**(`docs/discovery/capability-map.md`, 계약 갱신으로 들어왔다)의 전제를 따로
+쟀다 — 그 파일은 머지된 PR #133 이 112줄 **추가**로 바꾼 자리이기도 하다.
+
+| 전제 | 실측 |
+| --- | --- |
+| 원천에 이 slice 가 없다 | `df4976cc` 판의 그 파일에 `adr07-pitest`·`OPEN-ADR07-` **0 건** |
+| 이 브랜치에 #133 추가분이 **없다** | 원천 판과 HEAD 판의 줄 수가 둘 다 **3858**(내 변경이 1:1 행 교체이므로 같아야 한다). 즉 base 에서 복원해도 #133 의 112줄을 지울 수 없다 — 애초에 이 브랜치에 없다 |
+
+**머지 뒤에는 이 §1 이 쓰이지 않는다.** 머지 뒤 되돌림은 **PR revert** 다(그때는 #133 과 내
+변경이 같은 트리에 있고, base 복원이 남의 112줄을 지운다). 머지 전에 `origin/main` 을 합치는
+라운드가 생기면 원천을 그 병합 커밋의 둘째 부모로 다시 고정하고 ①~③ 을 다시 잰다.
 
 evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
 **그 사이에 되돌림 대상이 움직였는가**이고 그 명령은 §4 다.
@@ -30,15 +42,15 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `f4a85991`
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `41168ed9`
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 내 커밋 경로 **23**(evidence 제외) = 복원 **13**(M) · 삭제 **10**(A) — 기계 목록과 같다 |
+| ② 계수 | 내 커밋 경로 **24**(evidence 제외) = 복원 **14**(M) · 삭제 **10**(A) — 기계 목록과 같다 |
 | ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | 실측 시점에 `reports/evidence/m9/adr07-pitest/scope.md` **하나**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | 실측 시점에 `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
@@ -52,23 +64,39 @@ main(PR #123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그�
 
 ### 표지 계수 — 「내 줄 사라짐」과 「남의 줄 남음」 둘 다
 
-복원 뒤 저장소 전체에서 센 **파일 수**다. 종료 코드가 아니라 이 계수가 완료의 증거다.
+복원 뒤 저장소에서 센 **파일 수**다. 종료 코드가 아니라 이 계수가 완료의 증거다.
 
-| 내 표지(0 이어야 한다) | 복원 뒤 |
+**세는 범위에서 evidence 디렉터리를 뺀다** — 복원이 일부러 건드리지 않는 자리이고(⑦), 그
+파일들이 내 표지 어휘를 **설명하느라** 담고 있다. 앞 라운드에 이 제외 없이 0 이 나온 것은
+그때 남은 evidence 가 `scope.md` 하나였고 그 파일에 우연히 그 어휘가 없었기 때문이다 —
+**건전성의 증거가 아니었다.** 지금 술어는 제외를 명시하고 통제군을 붙인다.
+
+| 내 표지(0 이어야 한다 · evidence 제외) | 복원 뒤 |
 | --- | --- |
-| `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
+| `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `MutationReport` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
+| capability-map 전용 — `닫혔다 — M9/adr07-pitest` | **0** |
+| 같은 행의 **반대 방향** — 취소선 없는 `OPEN-ADR-07` 행(되살아나야 한다) | **1** |
 
-| 남의 표지(남아 있어야 한다) | 복원 뒤 |
+**통제군**: 제외 없이 세면 `mutationCheck` 가 **3 파일**에서 잡히고 그 셋이 전부
+`reports/evidence/m9/adr07-pitest/` 아래다 — 제외가 지우는 것이 evidence 뿐이고 코드·설정에
+남은 자리가 없다는 뜻이다. 제외가 실제 잔존을 가리고 있지 않다.
+
+| 남의 표지(남아 있어야 한다 · 같은 제외) | 복원 뒤 |
 | --- | --- |
 | `pitest-engine`(이 slice 가 **지운** 카탈로그 alias — 되살아나야 한다) | 1 |
 | `conventionCoverageGate`(1A) | 4 |
 | `cpdCheckObserved`(1C) | 6 |
 | `leakPatternGate` | 129 |
 | `OPEN-ADR-16`(같은 ADR 의 다른 절) | 15 |
+| `OPEN-ADR-08`(capability-map 에서 내 행이 본뜬 **선례 행**) | 11 |
 
 표지로 맨 `pitest` 를 쓸 수 없다 — base 의 카탈로그가 이미 그 좌표를 들고 있어 **남의 줄까지
 세게 된다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다. `pitest-engine` 행은 **방향이 반대인
 대조**다: 내가 지운 것이 복원으로 돌아오는지를 본다.
+
+공유 파일 쪽에서는 **줄 수**가 보존의 대조다 — 복원 뒤 `capability-map.md` 는 **3858 줄**로
+원천과 같다(§머리말의 전제 표와 같은 수). 내 변경이 1:1 행 교체였으므로 줄 수가 달라졌다면
+다른 행이 함께 움직였다는 뜻이 된다.
 
 ## 3. 코드를 되돌리지 않고 끄는 법
 
@@ -91,8 +119,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only f4a85991..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..f4a85991 \
+git diff --name-only 41168ed9..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..41168ed9 \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 

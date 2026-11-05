@@ -43,10 +43,15 @@
 
 ## 4. 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
-`git log --no-merges --format= --name-only HEAD ^df4976cc | sort -u` = **23 경로 + evidence**.
+`git log --no-merges --format= --name-only HEAD ^df4976cc | sort -u` = **24 경로 + evidence**.
 전부 계약의 in_scope 안이다 — `gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈
 `build.gradle.kts`(일곱) · `.github/workflows/ci.yml` · `config/quality/**` ·
-`docs/adr/0007-test-pyramid-and-ratchet.md` · evidence. **범위 밖 파일 0.**
+`docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md`(계약 갱신
+2026-11-06) · evidence. **범위 밖 파일 0.**
+
+열넷째 수정 경로가 **계약 갱신으로 들어온 공유 파일**이다. scope.md 의 「계약 갱신」 절이 승인
+사실과 사유를 들고, rollback 쪽은 그 파일만 전제 둘(원천에 이 slice 없음 · 이 브랜치에 머지된
+#133 의 추가분 없음)을 따로 쟀다.
 
 `_workspace/m9-adr07-pitest/` 는 gitignore 아래라 커밋에 들어가지 않는다.
 
@@ -62,10 +67,11 @@
    간극의 처리는 사용자 승인 사항이고 구현이 스스로 선언하지 않는다.
 3. **CI 러너의 실제 소요는 재지 않았다.** 로컬 실측(core 합 11분 24초)에서 상한 45분을 잡았을
    뿐이고, 러너의 단일 코어 속도는 이 호스트와 다르다. 첫 PR CI 가 그 수를 낸다.
-4. **registry 행 하나가 이 slice 밖이다.** `docs/discovery/capability-map.md` §12 의 OPEN 표가
-   `OPEN-ADR-07` 을 아직 활성으로 든다. 그 파일은 계약의 in_scope 가 아니라 팀장에게 계약 갱신을
-   물었고(답을 기다린다), 더하지 않기로 하면 그 한 줄은 후속 slice 의 일이다. ADR 0007 과
-   registry 가 그동안 어긋난다.
+4. ~~registry 행 하나가 이 slice 밖이다~~ — **해소(계약 갱신 2026-11-06, 팀장 승인).**
+   `docs/discovery/capability-map.md` §12 의 `OPEN-ADR-07` 행을 `OPEN-ADR-08` 선례 꼴로 닫았다.
+   **남는 것 하나**: 후속 OPEN 둘(`OPEN-ADR07-KOTLIN-JUNK`·`OPEN-ADR07-MUTATION-BUDGET`)은 그
+   표에 **자기 행을 갖지 않는다** — 승인 범위가 「한 행만」이라 닫는 행이 이름으로 가리키고 전문은
+   ADR 0007 §5 가 든다. 그 둘을 표의 행으로 세우는 것은 장부 slice 의 일이다.
 5. **컴파일 실패 하네스 test 를 변이 분석에서 빼지 않았다.** 그 test 들은 변이를 하나도 죽이지
    못하지만(귀속 계수로 확인) 분석 시간이 분 단위 안이라 그대로 뒀다 — 빼려면 test 이름 패턴을
    정책에 적어야 하고 그 열거가 낡는 쪽 대가가 더 크다.
