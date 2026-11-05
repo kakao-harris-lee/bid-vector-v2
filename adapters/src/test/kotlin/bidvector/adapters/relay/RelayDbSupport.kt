@@ -17,6 +17,8 @@ import bidvector.workflow.event.ConsumerLeasePort
 import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.NotificationRequestedPayload
+import bidvector.workflow.event.OutboxEntryState
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.ChannelRoute
 import bidvector.workflow.notification.DeliveryRequest
@@ -231,17 +233,35 @@ internal fun inboxKeyCount(dataSource: DataSource): Int =
         }
     }
 
+/**
+ * 상태를 강제한다 — **종단으로 옮길 때는 사유도 함께**(M9/OPS-05, V26). 사유 없이 종단으로
+ * 옮기는 갱신은 트리거가 거부하고, 쌍이 어긋나면 CHECK 가 거부한다. 그래서 이 헬퍼가 상태만
+ * 받고 사유를 **유도**한다 — 호출부가 짝을 외우지 않게(그리고 어휘가 바뀌면 여기가 따라 움직인다).
+ */
 internal fun forceOutboxState(
     dataSource: DataSource,
     entryId: String,
     state: String,
 ) = dataSource.connection.use { connection ->
-    connection.prepareStatement("UPDATE outbox SET state = ? WHERE entry_id = ?").use { statement ->
-        statement.setString(1, state)
-        statement.setString(2, entryId)
-        check(statement.executeUpdate() == 1) { "상태 강제 변경이 행을 옮기지 못했다: $entryId" }
-    }
+    val reason = OutboxTerminalReason.entries.firstOrNull { it.terminalState.token() == state }?.name
+    connection
+        .prepareStatement("UPDATE outbox SET state = ?, terminal_reason = ? WHERE entry_id = ?")
+        .use { statement ->
+            statement.setString(1, state)
+            statement.setString(2, reason)
+            statement.setString(3, entryId)
+            check(statement.executeUpdate() == 1) { "상태 강제 변경이 행을 옮기지 못했다: $entryId" }
+        }
 }
+
+private fun OutboxEntryState.token(): String =
+    when (this) {
+        OutboxEntryState.Pending -> "PENDING"
+        OutboxEntryState.Claimed -> "CLAIMED"
+        OutboxEntryState.Delivered -> "DELIVERED"
+        OutboxEntryState.Failed -> "FAILED"
+        OutboxEntryState.Isolated -> "ISOLATED"
+    }
 
 /** 상태를 지정해 행을 심는다 — 고아(`CLAIMED`) 상황을 만들 때 쓴다. */
 internal fun insertClaimedStrategyRow(

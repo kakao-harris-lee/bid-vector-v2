@@ -108,21 +108,29 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
                     "WHERE table_schema = 'public' AND table_name = '$table' AND column_name = 'observation_key'",
             ) shouldBe "NO"
         }
-        referencingTablesOfRawObservation() shouldContainExactlyInAnyOrder joined
+        // **열 쌍까지** 본다 — 표 단위로만 재면 「어느 열이 `raw_observation` 을 가리키는가」가
+        // 잠기지 않아, `observation_key` 가 아닌 다른 열의 FK 로도 이 단언이 초록이 된다.
+        referencingColumnsOfRawObservation() shouldContainExactlyInAnyOrder
+            joined.map { "$it.observation_key -> raw_observation.observation_key" }
         selectOne(
             "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' " +
                 "AND table_name = 'raw_observation' AND column_name = 'release_sha'",
         ) shouldBe "NO"
     }
 
-    private fun referencingTablesOfRawObservation(): List<String> {
+    /** `자식표.열 -> raw_observation.열` 문장 — 표 이름만이 아니라 **열 쌍**을 낸다. */
+    private fun referencingColumnsOfRawObservation(): List<String> {
         val tables = mutableListOf<String>()
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "SELECT DISTINCT child.relname FROM pg_constraint c " +
+                    "SELECT DISTINCT child.relname || '.' || ca.attname || ' -> raw_observation.' || pa.attname " +
+                        "FROM pg_constraint c " +
                         "JOIN pg_class child ON child.oid = c.conrelid " +
                         "JOIN pg_class parent ON parent.oid = c.confrelid " +
+                        "JOIN unnest(c.conkey, c.confkey) AS k(child_att, parent_att) ON true " +
+                        "JOIN pg_attribute ca ON ca.attrelid = c.conrelid AND ca.attnum = k.child_att " +
+                        "JOIN pg_attribute pa ON pa.attrelid = c.confrelid AND pa.attnum = k.parent_att " +
                         "WHERE c.contype = 'f' AND parent.relname = 'raw_observation'",
                 ).use { statement ->
                     statement.executeQuery().use { rs ->
