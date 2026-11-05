@@ -222,7 +222,7 @@ internal val COMPANY_NAME_FIXTURE_KEYS: List<String> = rawNamesOfConcepts(COMPAN
 /** 업체명 자리값 — 마스킹 뒤 이 문자열이 남아 있으면 업체명이 남은 것이다. */
 internal const val COMPANY_NAME_FIXTURE_VALUE = "COMPANY-NAME-FIXTURE"
 
-/** M9/OPS-10 — 보존 fixture 가 심는 실행 행의 릴리스 식별자. V28 트리거가 부재를 거부한다. */
+/** M9/OPS-10 — 보존 fixture 가 심는 실행 행의 릴리스 식별자. V27 트리거가 부재를 거부한다. */
 private const val RETENTION_FIXTURE_RELEASE = "retention-fixture-release"
 
 /** 계약 등재 키 둘(공고 식별자) — 마스킹 뒤에도 남아야 하는 축. */

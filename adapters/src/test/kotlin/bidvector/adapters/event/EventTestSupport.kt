@@ -47,7 +47,7 @@ internal fun insertPendingOutboxRow(
 ) {
     connection
         .prepareStatement(
-            // M9/OPS-10 — V28 트리거가 릴리스 없는 새 행을 거부한다. 원시 INSERT 도 production
+            // M9/OPS-10 — V27 트리거가 릴리스 없는 새 행을 거부한다. 원시 INSERT 도 production
             // 과 같은 값을 싣는다(헬퍼가 트리거를 우회하지 않는다).
             "INSERT INTO outbox (entry_id, event_id, aggregate_id, aggregate_version, occurred_at, " +
                 "correlation_id, causation_id, idempotency_key, actor_kind, actor_detail, " +

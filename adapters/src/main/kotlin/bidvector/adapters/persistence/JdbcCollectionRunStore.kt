@@ -57,7 +57,7 @@ class JdbcCollectionRunStore(
                 statement.setInt(index++, accounting.quotaExceeded)
                 statement.setInt(index++, accounting.backoffSkipped)
                 // OPS-10 — 이 회계 행을 만든 릴리스. 이 표에는 관측을 가리키는 열이 없어
-                // 조인으로 되짚을 길이 없다(V28 머리말).
+                // 조인으로 되짚을 길이 없다(V27 머리말).
                 statement.setString(index, release.value)
                 statement.executeUpdate()
             }

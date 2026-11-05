@@ -55,7 +55,7 @@ internal object EventSql {
     const val MARK_CLAIMED = "UPDATE outbox SET state = 'CLAIMED' WHERE entry_id = ? AND state = 'PENDING'"
 
     // 종단 셋은 **상태와 사유를 한 UPDATE 로** 적는다(M9 OPS-05) — 사유를 따로 쓰는 문이
-    // 없으므로 「상태는 옮겼는데 사유가 비었다」가 생길 자리가 없다(V27 트리거도 그 조합을
+    // 없으므로 「상태는 옮겼는데 사유가 비었다」가 생길 자리가 없다(V26 트리거도 그 조합을
     // 거부한다). 첫 인자가 사유, 둘째가 entry_id 다.
     const val MARK_DELIVERED =
         "UPDATE outbox SET state = 'DELIVERED', terminal_reason = ? WHERE entry_id = ? AND state = 'CLAIMED'"

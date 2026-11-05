@@ -58,11 +58,11 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             // 개찰완료 축 부모 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
             TriggerSpec("opening_result", "guard_opening_result_opening_rank_one"),
             TriggerSpec("opening_result", "guard_opening_result_draw_numbers"),
-            // M9/ops-migrations(OPS-05, V27) — 종단 사유 관문. 「새로 종단에 닿는 INSERT·UPDATE 는
+            // M9/ops-migrations(OPS-05, V26) — 종단 사유 관문. 「새로 종단에 닿는 INSERT·UPDATE 는
             // 사유를 요구하고, 적힌 사유는 바꿀 수 없다」를 이 트리거가 진다(CHECK 로는 기존
-            // 종단 행 때문에 「종단이면 사유가 있다」를 적을 수 없다 — V27 머리말).
+            // 종단 행 때문에 「종단이면 사유가 있다」를 적을 수 없다 — V26 머리말).
             TriggerSpec("outbox", "outbox_terminal_reason_required"),
-            // M9/ops-migrations(OPS-10, V28) — 릴리스 관문 둘. 「새 행은 식별자를 요구하고 적힌
+            // M9/ops-migrations(OPS-10, V27) — 릴리스 관문 둘. 「새 행은 식별자를 요구하고 적힌
             // 식별자는 지울 수 없다」가 여기 산다(CHECK 로는 기존 행 때문에 NOT NULL 을 못 적는다).
             TriggerSpec("outbox", "outbox_release_sha_required"),
             TriggerSpec("collection_run", "collection_run_release_sha_required"),

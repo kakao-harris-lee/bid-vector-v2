@@ -10,7 +10,7 @@ package bidvector.workflow.event
  *
  * [terminalState] 는 **사유가 목표 상태를 정한다**는 사실이다. 명령과 상태를 따로 받으면
  * 어긋난 조합(`Fail` + [ORPHANED_CLAIM])이 성립하므로 [OutboxCommand.Terminate] 는 사유만
- * 받는다. 저장 층은 이 사상을 V27 의 `(state, terminal_reason)` CHECK 로 다시 선언한다.
+ * 받는다. 저장 층은 이 사상을 V26 의 `(state, terminal_reason)` CHECK 로 다시 선언한다.
  */
 enum class OutboxTerminalReason(
     val terminalState: OutboxEntryState,

@@ -40,7 +40,7 @@ private fun strategyUpdated(revision: Int) =
 class JdbcOutboxPortTest : PersistenceTestSupport() {
     /**
      * M9/OPS-10 — 등록 경로가 **자기 릴리스를 싣는다**. 이 표에는 관측을 가리키는 열이 없어
-     * 조인으로 되짚을 길이 없고, 그래서 열이 생겼다(V28).
+     * 조인으로 되짚을 길이 없고, 그래서 열이 생겼다(V27).
      */
     @Test
     fun `register 는 이 프로세스의 릴리스를 함께 싣는다`() {

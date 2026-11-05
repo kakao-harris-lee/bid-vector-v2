@@ -110,7 +110,7 @@ class JdbcOutboxPort(
         connections.withConnection { connection ->
             connection.prepareStatement(sql).use { statement ->
                 // 사유는 통로가 나른 값의 이름 그대로다 — 어댑터가 어휘를 짓지 않는다(SQL
-                // 리터럴 0, V27 CHECK 가 같은 집합을 저장 층에서 다시 선언한다).
+                // 리터럴 0, V26 CHECK 가 같은 집합을 저장 층에서 다시 선언한다).
                 statement.setString(1, transition.reason.name)
                 statement.setString(2, entryId.value)
                 val updated = statement.executeUpdate()

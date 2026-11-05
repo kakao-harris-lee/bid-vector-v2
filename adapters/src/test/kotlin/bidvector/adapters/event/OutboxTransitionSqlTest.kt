@@ -17,7 +17,7 @@ import java.sql.SQLException
  * 거부(잘못된 이전 상태에서는 영향 행 0, 상태 불변)를 잰다.
  *
  * **M9/OPS-05 — 종단 셋은 사유를 함께 싣는다.** 같은 상수가 이제 인자 둘(사유·entry_id)을
- * 받고, V27 의 CHECK·트리거가 「사유 없는 종단」·「상태와 어긋난 사유」·「사유 바꿔치기」를
+ * 받고, V26 의 CHECK·트리거가 「사유 없는 종단」·「상태와 어긋난 사유」·「사유 바꿔치기」를
  * 거부한다. 어휘 전수는 [OutboxTerminalReason] 에서 받아 돈다 — 값 목록을 베끼지 않는다.
  */
 class OutboxTransitionSqlTest : PersistenceTestSupport() {

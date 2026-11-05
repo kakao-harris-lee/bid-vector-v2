@@ -17,12 +17,12 @@ import java.time.LocalDate
  * M9/OPS-10 — 「모든 수집·실행 행이 자기를 만든 릴리스 식별자를 갖는다」를 실 DB 로 잰다.
  *
  * **두 갈래를 함께 잰다.**
- * - `collection_run`·`outbox` 는 **자기 열**로 답한다(V28) — 그 둘에는 관측을 가리키는 열이
+ * - `collection_run`·`outbox` 는 **자기 열**로 답한다(V27) — 그 둘에는 관측을 가리키는 열이
  *   없어 되짚을 경로가 아예 없었다. 쓰기 경로가 값을 싣는지, 싣지 않은 새 행이 거부되는지,
  *   적힌 값을 지울 수 없는지를 잰다.
  * - `notice`·`opening_result`·`qualification_text`·`opening_reserve_price` 는 **조인**으로
  *   답한다 — `observation_key`(NOT NULL FK) → `raw_observation.release_sha`(NOT NULL). 그래서
- *   열을 베끼지 않았고(V28 머리말), 그 결정이 성립하는 **구조적 전제**를 아래 test 가 고정한다:
+ *   열을 베끼지 않았고(V27 머리말), 그 결정이 성립하는 **구조적 전제**를 아래 test 가 고정한다:
  *   전제가 깨지면(열이 nullable 로 바뀌거나 FK 가 사라지거나) 이 test 가 먼저 붉어진다.
  */
 class ExecutionRowReleaseTest : PersistenceTestSupport() {
@@ -92,7 +92,7 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
     /**
      * 조인 갈래의 **구조적 전제** — 네 canonical 표가 릴리스를 조인으로 답할 수 있다는 것은
      * ① `observation_key` 가 NOT NULL 이고 ② 그 열이 `raw_observation` 을 가리키는 FK 이고
-     * ③ `raw_observation.release_sha` 가 NOT NULL 이라는 세 사실이다. 하나라도 깨지면 V28 이
+     * ③ `raw_observation.release_sha` 가 NOT NULL 이라는 세 사실이다. 하나라도 깨지면 V27 이
      * 열을 베끼지 않은 결정의 근거가 사라진다.
      */
     @Test
