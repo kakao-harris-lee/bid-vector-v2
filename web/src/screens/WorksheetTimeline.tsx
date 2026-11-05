@@ -2,6 +2,9 @@ import type { BidTimelineEntry } from '../api/queries';
 import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, TIMELINE_ACTOR_DISPLAY, type BidCaseState } from '../display/caseDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { instantDisplayOf } from '../display/timeDisplay';
+
+import { InstantText } from './InstantText';
 
 /**
  * 상태 문면은 상태 표에서 찾는다. **타임라인의 `toState` 는 계약이 `type: string`** 이라
@@ -30,9 +33,7 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
               {entry.retroactive ? <span className="text-xs text-unjudged-ink">소급</span> : null}
             </p>
             <p className="text-xs text-ink-soft">
-              <time dateTime={entry.occurredAt} className="font-numeric">
-                {entry.occurredAt}
-              </time>
+              <InstantText display={instantDisplayOf(entry.occurredAt)} />
               {' · '}
               {entry.command}
               {entry.fromState === null || entry.fromState === undefined
