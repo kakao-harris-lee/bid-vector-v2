@@ -51,9 +51,9 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
      * 각 항목이 **자기 축의** 계수를 싣는지 본다 — 창 파티션에서 그 축이 빠지면 세 항목이 모두
      * `itemCount = 3` 을 싣고, 화면은 두 블록 각각에 「항목 3」을 보이면서 행은 둘·하나만 그린다.
      *
-     * **정렬도 같은 자리에서 잰다**: 두 축의 항목이 **연속**해야 한다(화면의 묶음 접기가 연속에
-     * 기댄다 — 섞이면 한 묶음이 여럿으로 쪼개진다). `ORDER BY` 에서 축이 빠지면 같은 공고의 세
-     * 항목이 사실 시각 역순으로 섞여 이 등식이 붉어진다.
+     * 정렬 축은 **따로 잰다**(아래 test) — 이 모양에서는 두 축의 묶음 최신 시각이 달라
+     * `group_recent` 가 이미 둘을 갈라 놓으므로, 여기서 연속을 단언해도 `ORDER BY` 의 축을
+     * 지우는 변이가 **초록이다**(실측).
      */
     @Test
     fun `묶음 계수와 정렬의 축에 투찰 종류가 든다`() {
@@ -67,8 +67,32 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
 
         items.filter { it.group.bidKind == PAPER }.forEach { it.groupCounts.itemCount shouldBe 2 }
         items.single { it.group.bidKind == REAL }.groupCounts.itemCount shouldBe 1
-        // **연속**이다 — 같은 축의 항목이 끊기지 않는다(묶음의 최신 사실 시각이 PAPER 쪽이 늦다).
-        items.map { it.group.bidKind } shouldContainExactly listOf(PAPER, PAPER, REAL)
+    }
+
+    /**
+     * **정렬이 두 축의 묶음을 연속시킨다**(M9/paper-bid). 화면의 묶음 접기는 연속 접기라, 섞이면
+     * 한 묶음이 여럿으로 쪼개지고 서버가 정한 최신순이 화면에서 무너진다.
+     *
+     * **두 축의 묶음 최신 시각을 같게 둔다** — 그러지 않으면 `group_recent DESC` 가 이미 둘을
+     * 갈라 놓아 `ORDER BY` 의 축을 지워도 연속이 유지된다(그 모양에서 변이가 초록인 것을
+     * 실측했다). 같으면 다음 축이 사실 시각이 되어 네 항목이 **축을 넘나들며** 선다:
+     * `PAPER·REAL·REAL·PAPER`. 축이 들어 있으면 `PAPER·PAPER·REAL·REAL` 이다.
+     *
+     * 종류를 넷 다르게 두는 것은 **같은 시각의 동점을 없애려는** 것이다 — 동점이 남으면 마지막
+     * 축(종류 이름)이 순서를 정하고 그 답이 변이와 무관하게 흔들린다.
+     */
+    @Test
+    fun `정렬이 두 축의 묶음을 연속시킨다 — 묶음 최신 시각이 같을 때도`() {
+        val account = insertAccount("group-order")
+        val notice = unknownNotice("N-1")
+        inbox().record(record(account, notice, NotificationFact.BidDeadlineImminent, LATER, PAPER))
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT, PAPER))
+        inbox().record(record(account, notice, NotificationFact.BidDeadlineToday, LATER, REAL))
+        inbox().record(record(account, notice, NotificationFact.DocumentDeadlineImminent, MIDDLE, REAL))
+
+        val items = store().list(account, page()).items
+
+        items.map { it.group.bidKind } shouldContainExactly listOf(PAPER, PAPER, REAL, REAL)
     }
 
     /**
@@ -313,5 +337,8 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         val PAPER = NotificationBidKind.PAPER
 
         val DEADLINE: Instant = Instant.parse("2026-11-01T05:00:00Z")
+
+        /** `OBSERVED_AT` 과 `LATER` **사이**의 사실 시각 — 정렬 test 가 축을 넘나드는 모양을 만든다. */
+        val MIDDLE: Instant = Instant.parse("2026-10-23T18:00:00Z")
     }
 }
