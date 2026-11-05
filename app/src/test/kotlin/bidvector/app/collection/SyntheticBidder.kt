@@ -1,8 +1,9 @@
 package bidvector.app.collection
 
 /**
- * 개찰 축 E2E 의 **합성 투찰 표본** — `MockOpeningKonepsHttp` 에서 갈라낸 파일이다(sizeGate 500,
- * `NoticeListCorpus` 와 같은 근거): **표본이 무엇인가**와 **그 표본을 어느 축으로 내는가**는 따로 바뀐다.
+ * 개찰 축 E2E 의 합성 투찰자 한 행 — 이 파일은 그 **표본 전체**(고정 셋·참가 많은 판·복수예가 행 수·
+ * 대표자명)를 담는다. `MockOpeningKonepsHttp` 에서 갈라냈고(sizeGate 500, `NoticeListCorpus` 와 같은
+ * 근거) 가른 선은 **표본이 무엇인가**와 **그 표본을 어느 축으로 내는가**다 — 둘은 따로 바뀐다.
  */
 internal class SyntheticBidder(
     val rank: Int,

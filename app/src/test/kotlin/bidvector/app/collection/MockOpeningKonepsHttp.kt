@@ -117,28 +117,62 @@ internal class MockOpeningKonepsHttp(
         // 429·5xx 로 끊는 요청도 센다 — 「배선이 준 값」은 응답이 무엇이든 그 요청에 실려 나갔다.
         requestedRows += RequestedRows(operation, requested)
         val route = mockKonepsRouteOf(operation)
-        if (route == null) {
-            unroutedCalls += operation
-            exchange.sendResponseHeaders(HTTP_NOT_FOUND, -1)
-            exchange.close()
-            return
-        }
-        if (operation in throttleOnce && throttled.addIfAbsent(operation)) {
-            exchange.sendResponseHeaders(HTTP_TOO_MANY_REQUESTS, -1)
-            exchange.close()
-            return
-        }
         val page = paramOf(query, "pageNo")?.toIntOrNull() ?: 1
-        if (isPagedOpeningComplete(route) && page > 1 && secondPageFailurePending.compareAndSet(true, false)) {
-            exchange.sendResponseHeaders(HTTP_SERVER_ERROR, -1)
-            exchange.close()
-            return
+        when (val refusal = refusalFor(operation, route, page)) {
+            null -> writeItems(exchange, operation, requireNotNull(route), query, requested, page)
+            else -> refuse(exchange, refusal)
         }
+    }
+
+    /** 본문 없는 거절 — 상태 코드만 보낸다(404·429·5xx 가 같은 자리를 지난다). */
+    private fun refuse(
+        exchange: HttpExchange,
+        status: Int,
+    ) {
+        exchange.sendResponseHeaders(status, -1)
+        exchange.close()
+    }
+
+    /**
+     * 본문 없이 거절할 상태 코드 — 거절하지 않으면 `null`(그때만 [route] 가 있다). **훑는 순서가 뜻을
+     * 가진다**: 표에 없는 이름이 속도 한도보다 앞이어야 미등재 호출이 429 하나에 가려지지 않고, 쪽 실패는
+     * 맨 뒤여야 「받은 쪽 1, 나간 호출 2」 판이 그대로 선다.
+     */
+    private fun refusalFor(
+        operation: String,
+        route: MockKonepsRoute?,
+        page: Int,
+    ): Int? =
+        when {
+            route == null -> HTTP_NOT_FOUND.also { unroutedCalls += operation }
+            throttlesOnce(operation) -> HTTP_TOO_MANY_REQUESTS
+            failsSecondPage(route, page) -> HTTP_SERVER_ERROR
+            else -> null
+        }
+
+    /** 이 오퍼레이션의 **첫 호출**만 429 — 속도 한도는 재시도 대상이라 한 번 더 나간다(D-6G-45). */
+    private fun throttlesOnce(operation: String): Boolean =
+        operation in throttleOnce && throttled.addIfAbsent(operation)
+
+    /** 개찰완료 **2쪽의 첫 요청만** 5xx — 1쪽만 받고 끊긴 축을 만든다. */
+    private fun failsSecondPage(
+        route: MockKonepsRoute,
+        page: Int,
+    ): Boolean = isPagedOpeningComplete(route) && page > 1 && secondPageFailurePending.compareAndSet(true, false)
+
+    private fun writeItems(
+        exchange: HttpExchange,
+        operation: String,
+        route: MockKonepsRoute,
+        query: String,
+        requested: Int?,
+        page: Int,
+    ) {
         val noticeNumber = paramOf(query, "bidNtceNo")
         val all = itemsFor(operation, route, query, noticeNumber)
         val pageSize = pageSizeFor(route, requested)
         val bytes =
-            envelope(pageOf(all, page, pageSize), all.size, page, echoedRowsOf(pageSize))
+            mockKonepsEnvelope(mockPageOf(all, page, pageSize), all.size, page, mockEchoedRowsOf(pageSize))
                 .toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(200, bytes.size.toLong())
@@ -189,23 +223,36 @@ internal class MockOpeningKonepsHttp(
                 listOf(formulaARow(noticeNumber.orEmpty()))
             }
 
-            MockKonepsAxis.NOTICE_LIST -> noticeListItems(operation, divisionOf(route))
+            MockKonepsAxis.NOTICE_LIST -> {
+                noticeListItems(operation, divisionOf(route))
+            }
 
             MockKonepsAxis.OPENING_LIST -> {
-                listCalls += operation
-                val token = divisionOf(route).token
-                (1..noticesPerSlot)
-                    .map { index ->
-                        mapOf(
-                            "bidNtceNo" to noticeNumber(token, index),
-                            "bidNtceOrd" to "000",
-                            // 참가업체수는 **투찰 행 수와 같다** — 실물이 어긋나지 않는 자리다(D-6G-38).
-                            "prtcptCnum" to bidders.size.toString(),
-                            "progrsDivCdNm" to "개찰완료",
-                        )
-                    }.also { require(query.contains("inqryDiv=2")) { "표본틀은 공고일 축으로 걸어야 한다" } }
+                openingListItems(operation, divisionOf(route), query)
             }
         }
+
+    /**
+     * 개찰결과 목록(표본틀) — **공고일 축으로만 걷는다**(D-6G-11). 다른 축으로 걸으면 슬롯의 조회일이
+     * 개찰일이 되어 층(업무 × 공고 주)이 응답 필드 없이는 서지 않으므로, 그 축을 `require` 로 닫는다.
+     */
+    private fun openingListItems(
+        operation: String,
+        division: MockKonepsDivision,
+        query: String,
+    ): List<Map<String, String>> {
+        listCalls += operation
+        require(query.contains("inqryDiv=2")) { "표본틀은 공고일 축으로 걸어야 한다" }
+        return (1..noticesPerSlot).map { index ->
+            mapOf(
+                "bidNtceNo" to noticeNumber(division.token, index),
+                "bidNtceOrd" to "000",
+                // 참가업체수는 **투찰 행 수와 같다** — 실물이 어긋나지 않는 자리다(D-6G-38).
+                "prtcptCnum" to bidders.size.toString(),
+                "progrsDivCdNm" to "개찰완료",
+            )
+        }
+    }
 
     /** 업종별 축은 표식을 반드시 갖는다 — 표가 그렇게 서 있으므로 없으면 표가 깨진 것이다. */
     private fun divisionOf(route: MockKonepsRoute): MockKonepsDivision =
@@ -380,33 +427,10 @@ internal class MockOpeningKonepsHttp(
         requested: Int?,
     ): Int =
         when {
-            paging.respectsRequestedRows -> requested ?: DEFAULT_PAGE_ROWS
+            paging.respectsRequestedRows -> requested ?: MOCK_DEFAULT_PAGE_ROWS
             isPagedOpeningComplete(route) -> openingCompletePageSize
             else -> 0
         }
-
-    /** 쪽으로 나눈 축은 그 쪽의 몫만 낸다 — `totalCount` 는 언제나 전수다(짧은 걷기를 볼 수 있게). */
-    private fun pageOf(
-        all: List<Map<String, String>>,
-        page: Int,
-        pageSize: Int,
-    ): List<Map<String, String>> = if (pageSize > 0) all.drop((page - 1) * pageSize).take(pageSize) else all
-
-    private fun echoedRowsOf(pageSize: Int): Int = if (pageSize > 0) pageSize else DEFAULT_PAGE_ROWS
-
-    private fun envelope(
-        items: List<Map<String, String>>,
-        totalCount: Int,
-        page: Int,
-        rows: Int,
-    ): String {
-        val itemsJson = items.joinToString(",", "[", "]") { fields -> objectJson(fields) }
-        val body = "\"items\":$itemsJson,\"numOfRows\":$rows,\"pageNo\":$page,\"totalCount\":$totalCount"
-        return """{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{$body}}}"""
-    }
-
-    private fun objectJson(fields: Map<String, String>): String =
-        fields.entries.joinToString(",", "{", "}") { (key, value) -> "\"$key\":\"$value\"" }
 }
 
 private fun newNonce(): String =
@@ -421,26 +445,7 @@ private const val NONCE_LENGTH = 8
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val HTTP_NOT_FOUND = 404
 
-private const val DEFAULT_PAGE_ROWS = 100
 private const val HTTP_SERVER_ERROR = 503
-
-/**
- * 쪽 크기 판(D-6G2f-3) — 기본은 요청의 `numOfRows` 를 **무시하는** 기존 판이고, 기존 test 가 재는
- * 것이 그 판이다.
- *
- * [respectsRequestedRows] 를 켜면 요청이 쪽 크기를 정한다 — 배선이 올린 값이 호출 수를 실제로 줄이는지
- * 는 그렇게만 잴 수 있다. [biddersPerNotice] 는 참가가 많은 공고를 짓는다(`null` 이면 고정 셋).
- */
-internal class MockPagingMode(
-    val respectsRequestedRows: Boolean = false,
-    val biddersPerNotice: Int? = null,
-)
-
-/** 받은 요청 한 건의 오퍼레이션과 `numOfRows` — 요청이 그 칸을 싣지 않았으면 `null` 이다. */
-internal class RequestedRows(
-    val operation: String,
-    val numOfRows: Int?,
-)
 
 private const val NO_NOTICE_DATE = 2
 private const val NO_BID_CLOSE = 3
