@@ -42,3 +42,10 @@ bid_ratio.plausible_max: 1.5
 gbm.min_category_rows: 40
 
 maturity.window_days: 7
+# M9/ml-lifecycle — `OPEN-SET-10`(개찰 시각 결측 시 마감 시각 대체를 승인된 정책으로
+# 채택할 것인가). **미결이므로 false** — 대체 후보 시각만 있는 행은 조용히 대체되지 않고
+# 사유 있는 시간축 측정 불가로 산출된다(legacy 는 조용히 대체했고 provenance 가 소실됐다).
+# 운영자가 채택하면 이 한 칸이 true 가 되고, 대체 행 계수와 대체 제외 주별 표가 이미
+# 산출되므로 영향이 그 자리에서 보인다. legacy 근거는 2026-08-13 실측(97.8%가 같은 주)
+# 뿐이고 V2 코퍼스 재확인이 선행 조건이다.
+maturity.time_axis_substitute_approved: false

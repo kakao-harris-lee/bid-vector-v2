@@ -51,6 +51,7 @@ _POLICY = InferencePolicy(
     bid_ratio_plausible_max=Decimal("1.5"),
     gbm_min_category_rows=40,
     maturity_window_days=7,
+    maturity_time_axis_substitute_approved=False,
 )
 
 _SUPPORTED_SCHEMAS = ("award-rate-features-v2",)

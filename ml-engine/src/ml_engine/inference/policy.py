@@ -32,6 +32,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ml_engine.inference.rounding import quantize_bid_rate
+from ml_engine.inference.time_axis import TimeAxisPolicy
 from ml_engine.registry.policy import Policy, PolicyError, PolicyScalar, load_policy
 
 SHIPPED_INFERENCE_POLICY_VERSION = "inference-v1"
@@ -63,6 +64,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "bid_ratio.plausible_max",
         "gbm.min_category_rows",
         "maturity.window_days",
+        "maturity.time_axis_substitute_approved",
     }
 )
 
@@ -115,12 +117,24 @@ class InferencePolicy:
     bid_ratio_plausible_max: Decimal
     gbm_min_category_rows: int
     maturity_window_days: int
+    maturity_time_axis_substitute_approved: bool
+    """`OPEN-SET-10` — 개찰 시각 결측 시 마감 시각 대체를 승인된 정책으로 채택할 것인가
+    (M9/ml-lifecycle, SET-06). 미결이므로 출하값은 `false` 이고, 승인되면 **정책 파일의
+    이 한 칸**이 바뀐다 — 코드에는 승인 목록이 없다."""
 
 
 def _to_decimal(value: PolicyScalar) -> Decimal:
     if isinstance(value, bool):
         raise TypeError(f"bool 은 decimal 정책 값이 될 수 없다: {value!r}")
     return Decimal(str(value))
+
+
+def _to_bool(value: PolicyScalar) -> bool:
+    """YAML bool 만 받는다 — `"true"`/`1` 같은 느슨한 참값을 승인으로 읽지 않는다
+    (승인은 조용히 생기지 않는다)."""
+    if not isinstance(value, bool):
+        raise TypeError(f"bool 정책 값이 아니다: {value!r}")
+    return value
 
 
 def _to_int(value: PolicyScalar) -> int:
@@ -193,6 +207,9 @@ def _coerce_values(
             bid_ratio_plausible_max=_to_decimal(values["bid_ratio.plausible_max"]),
             gbm_min_category_rows=_to_int(values["gbm.min_category_rows"]),
             maturity_window_days=_to_int(values["maturity.window_days"]),
+            maturity_time_axis_substitute_approved=_to_bool(
+                values["maturity.time_axis_substitute_approved"]
+            ),
         )
     except (TypeError, ValueError, InvalidOperation, KeyError) as exc:
         return PolicyRejected(f"정책 값 타입 오류: {exc}")
@@ -299,3 +316,14 @@ def load_inference_policy(path: Path) -> InferencePolicy | PolicyRejected:
         return PolicyRejected(invariant_violation)
 
     return dataclasses.replace(coerced, version=policy.version)
+
+
+def time_axis_policy_of(policy: InferencePolicy) -> TimeAxisPolicy:
+    """성숙도 시간축 정책을 **versioned 정책 객체에서만** 만든다(M9/ml-lifecycle,
+    SET-06 · `OPEN-SET-10`). 유일 생성 경로 — 「대체를 코드에서 승인한다」가 이 함수
+    밖에서는 성립하지 않고, `tests/inference/test_time_axis.py` 가 src 안의 생성 자리
+    전수를 AST 로 세어 그 하나임을 확인한다."""
+    return TimeAxisPolicy(
+        version=policy.version,
+        substitute_approved=policy.maturity_time_axis_substitute_approved,
+    )

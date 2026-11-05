@@ -24,7 +24,11 @@ from ml_engine.app.pipeline import pipeline_factory
 from ml_engine.evaluation.policy import EvaluationPolicy, load_evaluation_policy
 from ml_engine.evaluation.policy import PolicyRejected as EvaluationPolicyRejected
 from ml_engine.features import SUPPORTED_FEATURE_SCHEMAS
-from ml_engine.inference.policy import InferencePolicy, load_inference_policy
+from ml_engine.inference.policy import (
+    InferencePolicy,
+    load_inference_policy,
+    time_axis_policy_of,
+)
 from ml_engine.inference.policy import PolicyRejected as InferencePolicyRejected
 from ml_engine.serving import (
     BidPredictionServicer,
@@ -196,6 +200,7 @@ def _training_pipeline_factory(
         training_policy=preloaded.training,
         evaluation_policy=preloaded.evaluation,
         maturity_window_days=preloaded.inference.maturity_window_days,
+        time_axis_policy=time_axis_policy_of(preloaded.inference),
         trainer=LightGbmTrainer(),
         code_version=CodeVersion(config.code_version),
         artifact_out_dir=config.artifact_out_dir,

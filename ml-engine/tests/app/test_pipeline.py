@@ -16,6 +16,7 @@ from google.protobuf import json_format
 from ml_engine.app.pipeline import build_training_pipeline
 from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.evaluation import EvaluationPolicy
+from ml_engine.inference.time_axis import TimeAxisPolicy
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.holdout import HoldoutCancelled
 from ml_engine.training.jobs.pipeline import (
@@ -28,6 +29,9 @@ from ml_engine.training.jobs.pipeline import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
+
+_TIME_AXIS_POLICY = TimeAxisPolicy(version="test", substitute_approved=False)
+"""조립 근 test 의 시간축 정책 — 출하와 같은 미승인(`OPEN-SET-10` 미결)."""
 
 _TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
 """test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
@@ -195,6 +199,7 @@ def test_pipeline_with_fake_trainer_writes_files_and_returns_matching_refs(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -232,6 +237,7 @@ def test_pipeline_cancelled_before_training_returns_pipeline_cancelled(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -258,6 +264,7 @@ def test_pipeline_dataset_unreadable_without_settlements_file(tmp_path: Path) ->
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -279,6 +286,7 @@ def test_pipeline_with_real_lightgbm_trainer(tmp_path: Path) -> None:
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=LightGbmTrainer(),
         code_version=CodeVersion("sha-test-real"),
         artifact_out_dir=out_dir,
@@ -361,6 +369,7 @@ def _pipeline_with_counters(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=trainer,
         code_version=CodeVersion("sha-boundary-test"),
         artifact_out_dir=out_dir,
@@ -515,6 +524,7 @@ def test_run_holdout_receives_cancel_tokens_is_cancelled_as_should_stop(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -557,6 +567,7 @@ def test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifa
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,

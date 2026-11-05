@@ -28,6 +28,7 @@ from ml_engine.inference.maturity import (
     SettlementObservation,
     build_weekly_maturity,
 )
+from ml_engine.inference.time_axis import TimeAxisPolicy, resolve_time_axis
 from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
 from ml_engine.training.booster import TrainerLike
 from ml_engine.training.dataset import DatasetReference, DatasetRejected, LoadedDataset
@@ -67,6 +68,9 @@ def _week_maturity(window: MaturityWindow) -> WeekMaturity:
     else:
         opened_count = 0
         settled_count = 0
+    # M9/ml-lifecycle 알려진 제한 — 평가 층 타입(`WeekMaturity`)은 시간축 provenance 를
+    # 담지 않는다(import 계약상 evaluation 은 inference 어휘를 알 수 없다). SET-06 의
+    # 리포트는 `MaturityTable` 자신이고, 평가 report 로의 전달은 앱 배선 축과 함께 미룬다.
     return WeekMaturity(
         start=window.start,
         end=window.end,
@@ -81,6 +85,7 @@ class _PipelineDeps:
     training_policy: TrainingPolicy
     evaluation_policy: EvaluationPolicy
     maturity_window_days: int
+    time_axis_policy: TimeAxisPolicy
     trainer: TrainerLike
     code_version: CodeVersion
     artifact_out_dir: Path
@@ -159,14 +164,24 @@ class _ConcreteTrainingPipeline:
         으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
         `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
         (4))."""
+        axis_policy = self._deps.time_axis_policy
         observations = tuple(
-            SettlementObservation(opened_at=row.opened_at, settled=row.settled)
+            SettlementObservation(
+                time_axis=resolve_time_axis(
+                    opened_at=row.opened_at, bid_close_at=None, policy=axis_policy
+                ),
+                settled=row.settled,
+            )
             for row in dataset.settlement_rows
         )
-        windows = build_weekly_maturity(
-            observations, window_days=self._deps.maturity_window_days
+        # `settlements.jsonl` 의 `opened_at` 은 필수라 이 경로의 측정 불가 행은 구조적으로
+        # 0 이다(M9/ml-lifecycle 알려진 제한) — 커널의 측정 불가 갈래는 커널 test 가 잰다.
+        table = build_weekly_maturity(
+            observations,
+            window_days=self._deps.maturity_window_days,
+            policy=axis_policy,
         )
-        maturities = tuple(_week_maturity(window) for window in windows)
+        maturities = tuple(_week_maturity(window) for window in table.windows)
 
         report = run_holdout(
             dataset,
@@ -249,6 +264,7 @@ def build_training_pipeline(
     training_policy: TrainingPolicy,
     evaluation_policy: EvaluationPolicy,
     maturity_window_days: int,
+    time_axis_policy: TimeAxisPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
     artifact_out_dir: Path,
@@ -261,6 +277,7 @@ def build_training_pipeline(
         training_policy=training_policy,
         evaluation_policy=evaluation_policy,
         maturity_window_days=maturity_window_days,
+        time_axis_policy=time_axis_policy,
         trainer=trainer,
         code_version=code_version,
         artifact_out_dir=artifact_out_dir,
@@ -273,6 +290,7 @@ def pipeline_factory(
     training_policy: TrainingPolicy,
     evaluation_policy: EvaluationPolicy,
     maturity_window_days: int,
+    time_axis_policy: TimeAxisPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
     artifact_out_dir: Path,
@@ -286,6 +304,7 @@ def pipeline_factory(
             training_policy=training_policy,
             evaluation_policy=evaluation_policy,
             maturity_window_days=maturity_window_days,
+            time_axis_policy=time_axis_policy,
             trainer=trainer,
             code_version=code_version,
             artifact_out_dir=artifact_out_dir,
