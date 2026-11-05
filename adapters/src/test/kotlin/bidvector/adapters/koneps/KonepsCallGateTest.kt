@@ -4,7 +4,6 @@ import bidvector.procurement.AttemptKind
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.SourceEndpoint
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test

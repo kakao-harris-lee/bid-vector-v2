@@ -1,6 +1,5 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.koneps.KonepsSourceConfig
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
@@ -19,23 +18,16 @@ import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectedAxisStore
-import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.OpeningResultSourcePort
-import bidvector.procurement.dayStartOf
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.CollectOpeningResultsUseCase
 import bidvector.workflow.collection.CollectionRange
-import bidvector.workflow.collection.CollectionRangeOutcome
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.collection.OPENING_COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.OpeningCollectionSource
 import bidvector.workflow.collection.SampleSize
 import bidvector.workflow.collection.SamplingSeed
 import bidvector.workflow.collection.StratifiedSampler
-import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -46,7 +38,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.net.URI
 import java.nio.file.Path
-import java.time.LocalDate
 import javax.sql.DataSource
 
 /** 조립된 개찰 축 소스 목록 — `List` 빈은 Spring 컬렉션 주입과 섞이므로 한 겹 감싼다. */

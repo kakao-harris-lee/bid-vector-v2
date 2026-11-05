@@ -1,7 +1,5 @@
 package bidvector.procurement
 
-import java.time.Instant
-
 /**
  * 어느 한도가 물었는가 — 「멈췄다」만으로는 다음 날 다시 돌려도 되는지를 알 수 없다. 절단 사유가
  * 이 값을 실으므로(`TruncationCause.BudgetExhausted`) 도메인 쪽에 둔다.

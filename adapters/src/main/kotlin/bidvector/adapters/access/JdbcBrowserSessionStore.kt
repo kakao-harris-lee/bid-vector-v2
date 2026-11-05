@@ -6,7 +6,6 @@ import bidvector.workflow.access.BrowserSessionDigest
 import bidvector.workflow.access.BrowserSessionSnapshot
 import bidvector.workflow.access.BrowserSessionStorePort
 import bidvector.workflow.access.CsrfDigest
-import bidvector.workflow.access.NewBrowserSession
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant

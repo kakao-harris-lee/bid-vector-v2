@@ -22,7 +22,6 @@ import bidvector.workflow.collection.PromoteOpeningResultsUseCase
 import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleList
 import bidvector.workflow.collection.SampleListLedger
-import bidvector.workflow.collection.SampleOutcome
 import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
 import bidvector.workflow.retention.RETENTION_POLICY

@@ -1,6 +1,5 @@
 package bidvector.adapters.notificationinbox
 
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
@@ -9,7 +8,6 @@ import bidvector.workflow.notificationinbox.readResetPolicy
 import java.sql.Connection
 import java.sql.SQLException
 import java.sql.Timestamp
-import java.time.Instant
 import javax.sql.DataSource
 
 /**

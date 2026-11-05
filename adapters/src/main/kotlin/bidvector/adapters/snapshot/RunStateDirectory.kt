@@ -1,24 +1,12 @@
 package bidvector.adapters.snapshot
 
-import bidvector.adapters.koneps.JsonValue
-import bidvector.adapters.koneps.KonepsJsonParser
-import bidvector.adapters.koneps.asIntOrNull
-import bidvector.adapters.koneps.asObject
-import bidvector.adapters.koneps.asStringOrNull
-import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
-import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleListLedger
 import bidvector.workflow.collection.hexOf
 import bidvector.workflow.collection.sha256Hex
 import java.nio.file.Files
-import java.nio.file.OpenOption
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.time.Instant
 
 internal const val SAMPLE_LIST_NAME = "sample-list.tsv"
 internal const val ATTEMPT_LEDGER_NAME = "attempts.jsonl"

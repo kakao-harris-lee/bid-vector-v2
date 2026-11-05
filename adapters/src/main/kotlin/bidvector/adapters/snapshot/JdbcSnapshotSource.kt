@@ -3,14 +3,12 @@ package bidvector.adapters.snapshot
 import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
-import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
-import java.math.BigDecimal
 import java.sql.ResultSet
 import java.time.Instant
 import javax.sql.DataSource
