@@ -62,6 +62,10 @@ class OpportunityAnalysis internal constructor(
     private val capacity: CapacityPort,
     // (D-4B7-9) — 경쟁 표본 조회 port. 표본 조회는 예측 요청 조립의 일부다(predictionFacts).
     private val samples: CompetitionSamplePort,
+    // (M9 DEC-08) — 분류 판정의 기록 port. 부작용이 없어야 하는 조립은
+    // [DiscardingBaseAmountClassificationRecordPort] 를 끼운다(기본값을 두지 않는다 —
+    // 「안 끼운 조립」과 「일부러 안 쓰는 조립」이 같은 모양이 되면 안 된다).
+    private val classificationRecords: BaseAmountClassificationRecordPort,
     private val clock: Clock,
     private val opportunityPolicyTable: EffectiveDatedPolicy<OpportunityPolicyData>,
     private val derivationPolicyTable: EffectiveDatedPolicy<DerivationPolicyData>,
@@ -75,6 +79,7 @@ class OpportunityAnalysis internal constructor(
         watchSubjects: WatchSubjectPort,
         capacity: CapacityPort,
         samples: CompetitionSamplePort,
+        classificationRecords: BaseAmountClassificationRecordPort,
         clock: Clock,
     ) : this(
         embed,
@@ -84,6 +89,7 @@ class OpportunityAnalysis internal constructor(
         watchSubjects,
         capacity,
         samples,
+        classificationRecords,
         clock,
         OPPORTUNITY_POLICY,
         DERIVATION_POLICY,
@@ -269,8 +275,20 @@ class OpportunityAnalysis internal constructor(
 
             is CompetitionSampleSupply.Supplied -> {
                 val baseAmount = resolvedBaseAmount.amount
+                // (M9 DEC-08) — 판정을 **봉투로** 받아 기록 port 에 넘기고, 요청에는 라벨만 싣는다.
+                // 대상 공고는 개찰 전이라 `opening = null` 이다(D-4B8-1·2, 두 번째 분류기 금지).
+                val judgement =
+                    provenanceJudgementFor(notice, null, baseAmount, policies.provenancePolicy)
+                classificationRecords.record(notice.id, judgement)
                 val request =
-                    predictionRequestFor(resolvedBaseAmount, notice, policies, correlationId, supply.samples)
+                    predictionRequestFor(
+                        resolvedBaseAmount,
+                        notice,
+                        policies,
+                        correlationId,
+                        supply.samples,
+                        judgement.classification,
+                    )
                 val budget = CallBudget(policies.opportunity.predictionBudget)
                 when (val outcome = prediction.predict(request, budget)) {
                     is BidPredictionOutcome.Unavailable -> {

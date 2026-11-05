@@ -112,6 +112,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // **`read_at >= created_at` 은 없다** — 두 시계를 비교하는 제약이라 시계 틀어짐이 곧
             // 쓰기 실패였다(V23 주석). 그 수를 6 에서 5 로 내린다.
             "notification_inbox" to 5,
+            // M9/ops-migrations(DEC-08, V26) — 신설(추가만). 공고 키 둘(공백·차수 형식) +
+            // 정책 둘(공백·형태) + 라벨 어휘 + 규칙 어휘 + 라벨↔규칙 결속 + 금액 셋(범위·통화·과세) = 10.
+            "base_amount_classification" to 10,
         )
 
     @Test

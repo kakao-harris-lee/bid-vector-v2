@@ -57,6 +57,9 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         sender.sentKeys() shouldContainExactly outboxIdempotencyKeys()
         sender.sentRoutes() shouldContainExactly listOf(E2E_ROUTE.value)
         sender.sentBodies() shouldContainExactly listOf("$PASSING_NOTICE-000")
+        // M9/DEC-08 — 조립이 지난 자리에 **판정 기록**이 남는다(라벨 + 정책 version 두 축).
+        // 출하 조립에는 아직 이 분석이 없어(`UnavailableMlAnalysis` 고정) 이 자리가 측정 자리다.
+        baseAmountClassificationRows() shouldContainExactly listOf("$PASSING_NOTICE|000|CLEAN")
     }
 
     @Test

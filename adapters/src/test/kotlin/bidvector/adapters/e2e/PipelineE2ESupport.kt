@@ -176,6 +176,16 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
 
     protected fun outboxStates(): List<String> = queryStrings("SELECT state FROM outbox ORDER BY inserted_at, entry_id")
 
+    /**
+     * M9/DEC-08 — 판정 기록 행의 요지(공고 키 + 라벨). 정책 두 축이 **비어 있지 않다**는 것도
+     * 같은 질의가 요구한다(`policy_source <> ''`) — 비면 행이 애초에 들어오지 못한다.
+     */
+    protected fun baseAmountClassificationRows(): List<String> =
+        queryStrings(
+            "SELECT notice_number || '|' || notice_round || '|' || classification " +
+                "FROM base_amount_classification WHERE policy_source <> '' ORDER BY notice_number",
+        )
+
     protected fun outboxPayloads(): List<String> = queryStrings("SELECT payload FROM outbox ORDER BY idempotency_key")
 
     /**

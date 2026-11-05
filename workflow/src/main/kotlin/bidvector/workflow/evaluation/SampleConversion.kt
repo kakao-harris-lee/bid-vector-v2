@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.ProvenanceJudgement
 import bidvector.decision.ProvenancePolicyData
 import bidvector.decision.ProvenanceRow
 import bidvector.decision.ProvenanceRules
@@ -96,7 +97,20 @@ internal fun provenanceLabelFor(
     opening: OpeningResult?,
     original: BaseAmount,
     policy: Resolution.Resolved<ProvenancePolicyData>,
-): BaseAmountProvenance {
+): BaseAmountProvenance = provenanceJudgementFor(notice, opening, original, policy).classification
+
+/**
+ * 같은 판정의 **봉투**(M9 DEC-08) — 라벨만 쓰는 호출부는 [provenanceLabelFor] 를 쓰고, 근거를
+ * 저장하는 호출부([BaseAmountClassificationRecordPort])는 이 함수를 쓴다. 분류기를 두 번 두지
+ * 않기 위해 라벨 쪽이 이 함수 위에 선다 — 앞 판은 여기서 `classification` 만 꺼내고 정책
+ * version 을 버렸고, 그래서 저장할 근거가 메모리에만 있었다.
+ */
+internal fun provenanceJudgementFor(
+    notice: Notice,
+    opening: OpeningResult?,
+    original: BaseAmount,
+    policy: Resolution.Resolved<ProvenancePolicyData>,
+): ProvenanceJudgement {
     val budgetEstimate =
         notice.estimatedAmount
             ?.amount
@@ -118,7 +132,7 @@ internal fun provenanceLabelFor(
         )
     // 이 slice는 복구 추정치를 계산하지 않는다(3D 소관) — Absent로 그 사실을 정직하게 나른다.
     val recoveryEstimate = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE)
-    return ProvenanceRules.judgeRow(original, row, recoveryEstimate, policy).classification
+    return ProvenanceRules.judgeRow(original, row, recoveryEstimate, policy)
 }
 
 /**

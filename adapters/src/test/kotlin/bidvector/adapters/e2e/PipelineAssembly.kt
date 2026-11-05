@@ -10,6 +10,7 @@ import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.event.PostgresAdvisoryLockLease
 import bidvector.adapters.ml.GrpcBidPredictionGateway
 import bidvector.adapters.ml.GrpcEmbeddingGateway
+import bidvector.adapters.ml.JdbcBaseAmountClassificationStore
 import bidvector.adapters.ml.JdbcCompetitionSampleSource
 import bidvector.adapters.ml.MlCallPolicyData
 import bidvector.adapters.ml.testEmbeddingCallEffectivePolicy
@@ -101,6 +102,10 @@ internal class PipelineAssembly(
                     JdbcOpeningResultRepository(dataSource),
                     javaClock,
                 ),
+            // M9/DEC-08 — 커밋 경로의 실 기록 port. 출하 조립에는 아직 이 분석 자체가 없다
+            // (`MlAnalysisPort` 가 `UnavailableMlAnalysis` 고정, `OPEN-ML-ANALYSIS-WIRING`) —
+            // 그래서 이 e2e 조립이 판정 기록의 측정 자리다.
+            classificationRecords = JdbcBaseAmountClassificationStore(dataSource),
             clock = clock,
         )
 

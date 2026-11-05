@@ -66,6 +66,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             // 식별자는 지울 수 없다」가 여기 산다(CHECK 로는 기존 행 때문에 NOT NULL 을 못 적는다).
             TriggerSpec("outbox", "outbox_release_sha_required"),
             TriggerSpec("collection_run", "collection_run_release_sha_required"),
+            // M9/ops-migrations(DEC-08, V26) — 판정 이력은 고쳐 쓰지 않는다(GRANT 부재와 두 겹).
+            TriggerSpec("base_amount_classification", "base_amount_classification_append_only"),
             // (D-6B1-8, 등재) — `edit_session`(V8__edit_session.sql)은 트리거가
             // 0개다. session_version 은 애플리케이션이 싣고 DB 는 전제조건으로만 검사한다
             // (D-6B1-3) — 트리거로 값을 정하면 그 전제조건 자체가 무의미해진다. `edit_session`
@@ -111,6 +113,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             TriggerSpec("bid_case_transition", "bid_case_transition_append_only") to "reject_mutation",
             TriggerSpec("bid_draft", "bid_draft_append_only") to "reject_mutation",
             TriggerSpec("bid_record", "bid_record_append_only") to "reject_mutation",
+            // M9/ops-migrations(DEC-08, V26) — 이 slice 가 만든 트리거라 함수 등재에 넣는다.
+            TriggerSpec("base_amount_classification", "base_amount_classification_append_only") to "reject_mutation",
         )
 
     /**
@@ -129,6 +133,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             TriggerSpec("bid_case_transition", "bid_case_transition_append_only") to setOf("UPDATE", "DELETE"),
             TriggerSpec("bid_draft", "bid_draft_append_only") to setOf("UPDATE", "DELETE"),
             TriggerSpec("bid_record", "bid_record_append_only") to setOf("UPDATE", "DELETE"),
+            TriggerSpec("base_amount_classification", "base_amount_classification_append_only") to
+                setOf("UPDATE", "DELETE"),
         )
 
     @Test
