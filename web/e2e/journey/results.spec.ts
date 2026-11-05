@@ -141,6 +141,8 @@ interface OpeningResultBody {
   readonly state: string;
   readonly provisionalRankOneState: string;
   readonly provisionalRankOneBidAmountWon: number | null;
+  readonly provisionalRankOneBidAmountCurrency: string | null;
+  readonly provisionalRankOneBidAmountVatTreatment: string | null;
 }
 
 /** 자릿점·통화를 걷고 **숫자만** 남긴다 — spec 이 화면의 서식 함수를 복제하지 않으려는 것이다. */
@@ -299,17 +301,57 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   // 낙찰가도 온다」는 오해가 여기서 멈춘다.
   await expect(card.getByTestId(`confirmed-award-${caseId}`)).toHaveText(ABSENT);
 
-  // 잠정 1위 축은 개찰완료 상세 축에서 오고 그 축은 **연령 게이트 뒤에만** 불린다 — 공고마다
-  // 갈리므로 두 얼굴을 **응답에서 읽어** 각각 단언한다(리터럴 기대를 적지 않는다).
+  /**
+   * 잠정 1위 축도 **설계가 못박는다**(cr MEDIUM-1). 앞 판은 이 축을 화면이 그린 **같은 응답에서
+   * 읽어** 대조해서, 개찰완료 상세 축이 아예 수집되지 않는 회귀(→ `NOT_OBSERVED` · 금액 null)가
+   * 초록으로 지났다 — 그 단언이 잡는 것은 화면↔API 불일치뿐이었다.
+   *
+   * 「상세 축은 연령 게이트 뒤에만 불려 공고마다 갈린다」가 그 선택의 근거였는데 **출하 코드에서
+   * 성립하지 않는다**: 표본틀이 앵커를 `NotCarriedByFrame` 하나로만 지어 기준 시각이 늘 null 이고
+   * 게이트가 구조적으로 무력이다(cr 실측). 그래서 이 축은 결정적이고 설계가 선언할 수 있다.
+   */
+  expect(openingBody.provisionalRankOneState, `설계: ${designed?.why}`).toBe(
+    designed?.expectedProvisionalState,
+  );
   await expect(card.getByTestId(`provisional-state-${caseId}`)).toContainText(
     PROVISIONAL_STATE_LABEL[openingBody.provisionalRankOneState]!,
   );
+
+  /**
+   * 금액 축은 **세 갈래**다(cr MEDIUM-2) — 금액이 있는데 통화·과세 중 하나가 null 이면 화면은
+   * `INCOMPLETE` 로 숫자를 **그리지 않는다**. 그때 자릿수 비교만 두면 `expected "…" received ""`
+   * 로 붉어져 **원인이 다른 칸의 부재임을 숨긴다**.
+   *
+   * 그래서 「세 칸이 **함께 움직인다**」를 먼저 이름 붙여 단언한다. 그것이 계약의 성질이기도 하다 —
+   * 셋이 한 금액 값에서 직렬화되므로(출하 조립 실측) 「금액만 있고 통화가 없다」는 구조적으로 서지
+   * 않는다. 그 불변이 깨지는 회귀를 이 단언이 **그 이름으로** 잡는다.
+   */
+  const money = [
+    ['금액', openingBody.provisionalRankOneBidAmountWon],
+    ['통화', openingBody.provisionalRankOneBidAmountCurrency],
+    ['과세', openingBody.provisionalRankOneBidAmountVatTreatment],
+  ] as const;
+  const filled = money.filter(([, value]) => value !== null && value !== undefined);
+  expect(
+    [0, money.length],
+    `잠정 1위 금액 세 칸이 함께 움직이지 않았다(채워진 칸: ${filled
+      .map(([name]) => name)
+      .join('·')}) — 그때 화면은 INCOMPLETE 로 숫자를 그리지 않는다`,
+  ).toContain(filled.length);
+
   const provisional = card.getByTestId(`provisional-award-${caseId}`);
-  if (openingBody.provisionalRankOneBidAmountWon === null) {
+  if (filled.length === 0) {
     await expect(provisional).toHaveText(ABSENT);
   } else {
     expect(digitsOf(await provisional.innerText())).toBe(
       String(openingBody.provisionalRankOneBidAmountWon),
+    );
+    // 통화·과세는 **표의 문면**으로 선다(원문 토큰이 아니다 — 같은 파일의 제출 금액과 같은 규율).
+    await expect(provisional).toContainText(
+      AMOUNT_CURRENCY_LABEL[openingBody.provisionalRankOneBidAmountCurrency!]!,
+    );
+    await expect(provisional).toContainText(
+      VAT_LABEL[openingBody.provisionalRankOneBidAmountVatTreatment!]!,
     );
   }
 
@@ -590,6 +632,11 @@ test('개찰 결과 — 하네스가 설계한 갈래 전수를 **살아 있는 
     const body = (await response.json()) as OpeningResultBody;
     // 공고마다 **설계가 선언한 갈래**와 같은가. 어긋나면 그 공고가 왜 그 갈래인지를 함께 낸다.
     expect(body.state, `${one.noticeNumber} — 설계: ${one.why}`).toBe(one.expectedOpeningState);
+    // 잠정 축도 같은 방식으로 — 승격된 공고는 `DETERMINED`, canonical 이 없는 공고는 미관측이다.
+    expect(
+      body.provisionalRankOneState,
+      `${one.noticeNumber} 의 잠정 1위 축 — 설계: ${one.why}`,
+    ).toBe(one.expectedProvisionalState);
     observed.push(body.state);
   }
 

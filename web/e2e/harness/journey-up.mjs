@@ -42,6 +42,7 @@ import {
   openingAxisDesign,
   promotionExpectation,
   runnerLine,
+  shippedDetailAxisCounts,
 } from './opening-axis.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -127,7 +128,18 @@ const MAX_ACTIVE_BIDS = 5;
 const OPENING_DESIGN = openingAxisDesign(
   JSON.parse(readFileSync(resolve(here, 'fixtures', 'opening-axis.json'), 'utf8')),
 );
-const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN);
+/**
+ * 공고 하나가 받는 상세 축의 수를 **출하 본문에서 센다**(cr MEDIUM-1) — 공사 넷·용역 셋의 비대칭을
+ * 리터럴로 두면 이 slice 가 업종 목록에서 닫은 드리프트를 다시 만든다.
+ */
+const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN, {
+  detailAxesPerNotice: shippedDetailAxisCounts(
+    readFileSync(
+      resolve(repoRoot, 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt'),
+      'utf8',
+    ),
+  ),
+});
 
 /**
  * 공고 축 수집이 부를 업종 — **fixture 에서 센다**(리터럴로 적지 않는다). 개찰 축 설계가 다른
@@ -139,9 +151,11 @@ const NOTICE_CATEGORIES = noticeCollectionCategories(
 );
 
 /**
- * 개찰 축 호출 상한 — 설계의 공고 수에서 넉넉히 센다(표본 × 상세 축 넷 + 목록 걷기). 승인 상한을
- * 흉내내는 자리가 아니라 **버릴 fake 를 향한 호출의 울타리**다: 상한을 넘으면 러너가 미완으로
- * 끝나고 아래 계수 등식이 그 사실을 이름 붙여 낸다.
+ * 개찰 축 호출 상한 — 승인 상한을 흉내내는 자리가 아니라 **버릴 fake 를 향한 호출의 울타리**다.
+ * 필요량은 설계에서 나온다(공고 일곱 × 상세 축 넷·셋 + 목록 걷기 ≈ 서른) — 여유를 크게 둔다.
+ *
+ * 상한을 넘으면 러너가 **미완 종료 코드**(`INCOMPLETE=2`)로 끝나고 `runJar` 의 종료 코드 검사가
+ * 출력 전문과 함께 던진다(cr LOW — 앞 주석은 「계수 등식이 낸다」로 적었는데 그보다 **먼저** 멈춘다).
  */
 const OPENING_CALL_BUDGET = 400;
 
@@ -185,7 +199,9 @@ function track(child, name) {
 function runJar(args, label) {
   log(`${label} 시작`);
   const result = spawnSync('java', ['-jar', APP_JAR, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const output = `${result.stdout?.toString() ?? ''}${result.stderr?.toString() ?? ''}`;
+  // **개행으로 잇는다**(cr LOW): 그냥 붙이면 stdout 마지막 조각에 개행이 없을 때 stderr 첫 줄이
+  // 같은 줄로 붙고, 그러면 `runnerLine` 이 앞뒤가 섞인 줄을 집어 계수가 남의 `key=value` 를 읽는다.
+  const output = [result.stdout?.toString() ?? '', result.stderr?.toString() ?? ''].join('\n');
   if (result.status !== 0) {
     process.stderr.write(output);
     throw new Error(`${label} 실패(exit=${result.status})`);
@@ -539,11 +555,14 @@ async function main() {
          * 개찰 축 설계표(M9/opening-harness) — 여정 spec 이 **살아 있는 응답**과 맞댈 기대다.
          * spec 에 베껴 적지 않는 이유: 그러면 설계와 기대가 사본 둘이 되고 한쪽만 고쳐진다.
          */
-        openingAxis: OPENING_DESIGN.all.map(({ noticeNumber, expectedOpeningState, why }) => ({
-          noticeNumber,
-          expectedOpeningState,
-          why,
-        })),
+        openingAxis: OPENING_DESIGN.all.map(
+          ({ noticeNumber, expectedOpeningState, expectedProvisionalState, why }) => ({
+            noticeNumber,
+            expectedOpeningState,
+            expectedProvisionalState,
+            why,
+          }),
+        ),
       },
       null,
       2,

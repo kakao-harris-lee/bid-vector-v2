@@ -25,7 +25,8 @@
       "note": "사업자등록번호(`prcbdrBizno`)·대표자명(`prcbdrCeoNm`) 키가 **없다** — 6G mock 은 어댑터 경계가 그 둘을 떨어뜨리는지 재려고 싣지만 이 하네스는 그것을 재지 않으므로 개인 식별 키를 저장소에 두지 않는다(D-7E-6). 상호는 합성 문자열이다."
     },
     "why_nine": "`readOpeningResult` 의 상태 **아홉 전수**를 한 실행에서 낳는다(D-7E3a-7 의 후속 `OPEN-7E3A-OPENING-AXIS-HARNESS`). 갈래는 fixture 와의 **관계**로 갈린다 — `notices`(개찰 축 원문이 있다) · `noticeAxisOnly`(공고만 있다) · `uncollected`(어디에도 없다). 그 관계가 곧 갈래이므로 교차 등식 test 가 그것을 잰다.",
-    "why_two_divisions": "`OBSERVED_NOT_PROMOTED` 는 「원문은 있고 canonical 은 없다」인데, 그것을 **결정적으로** 세우는 길은 승격 범위(확정 표본) 밖 공고 하나뿐이다. 표본 크기로 범위를 좁히면 **어느 공고가 빠지는지를 표본 seed 가 정해** 설계가 선언할 수 없다. 업무로 가르면 실행 상태 디렉터리가 둘이 되고 승격은 공사 쪽 하나만 받는다 — 용역 공고는 목록 축 원문을 얻지만 승격 범위 밖이다."
+    "why_two_divisions": "`OBSERVED_NOT_PROMOTED` 는 「원문은 있고 canonical 은 없다」인데, 그것을 **결정적으로** 세우는 길은 승격 범위(확정 표본) 밖 공고 하나뿐이다. 표본 크기로 범위를 좁히면 **어느 공고가 빠지는지를 표본 seed 가 정해** 설계가 선언할 수 없다. 업무로 가르면 실행 상태 디렉터리가 둘이 되고 승격은 공사 쪽 하나만 받는다 — 용역 공고는 목록 축 원문을 얻지만 승격 범위 밖이다.",
+    "why_provisional_axis": "잠정 1위 축의 기대도 **선언하고 유도와 대조한다**(cr MEDIUM-1). 앞 판은 이 축을 못박지 않아, 개찰완료 상세 축이 아예 수집되지 않는 회귀가 spec 의 동어반복 단언(화면이 그린 같은 응답에서 읽는다) 아래 초록으로 지났다. 유도는 `bidders` 의 순위 1 계수를 보므로 **동가 1위를 만드는 변이가 선언과 어긋나** 붉어진다 — 「투찰 행 셋에 유일한 순위 1」이 왜 설계인지가 그 자리에 선다. canonical 이 서지 않는 공고(승격 범위 밖·개찰 축 없음·공고 없음)는 조회가 잠정 축을 읽지 않아 `NOT_OBSERVED` 다 — 그 사실은 출하 조립에서 실측했다(조회가 `Observed` 가 아닌 view 에서 잠정 축을 읽지 않는다)."
   },
   "promotedDivisions": [
     "construction"
@@ -84,6 +85,7 @@
       "division": "construction",
       "progressDivision": "개찰완료",
       "expectedOpeningState": "OPENED",
+      "expectedProvisionalState": "DETERMINED",
       "why": "등재 라벨이 개찰완료인 갈래."
     },
     {
@@ -91,6 +93,7 @@
       "division": "construction",
       "progressDivision": "유찰",
       "expectedOpeningState": "FAILED_BID",
+      "expectedProvisionalState": "DETERMINED",
       "why": "유찰을 개찰완료로 접지 않는 것이 이 갈래의 요점이다(정책 KDoc)."
     },
     {
@@ -98,6 +101,7 @@
       "division": "construction",
       "progressDivision": "재입찰",
       "expectedOpeningState": "REBID",
+      "expectedProvisionalState": "DETERMINED",
       "why": "등재 셋의 마지막."
     },
     {
@@ -105,6 +109,7 @@
       "division": "construction",
       "progressDivision": "개찰취소",
       "expectedOpeningState": "PROGRESS_UNRECOGNIZED",
+      "expectedProvisionalState": "DETERMINED",
       "why": "**등재 밖 라벨**이다. 상류 어휘가 늘었을 때 그것이 조용히 개찰완료로 접히지 않는 것을 이 갈래가 잰다."
     },
     {
@@ -112,6 +117,7 @@
       "division": "construction",
       "progressDivision": null,
       "expectedOpeningState": "PROGRESS_ABSENT",
+      "expectedProvisionalState": "DETERMINED",
       "why": "진행구분 **칸이 없다**(빈 문자열이 아니다). 부재와 미등재는 다른 값이다."
     },
     {
@@ -119,6 +125,7 @@
       "division": "construction",
       "progressDivision": "개찰완료",
       "expectedOpeningState": "OPENED",
+      "expectedProvisionalState": "DETERMINED",
       "why": "여정 ⑤ 의 건(D-7E3a-9). 이 slice 가 그 여정을 **확정 갈래까지** 민다 — 앞 판은 하네스가 개찰 축을 수집하지 않아 `NOT_OPENED_YET` 에서 멈췄다."
     },
     {
@@ -126,6 +133,7 @@
       "division": "service",
       "progressDivision": "개찰완료",
       "expectedOpeningState": "OBSERVED_NOT_PROMOTED",
+      "expectedProvisionalState": "NOT_OBSERVED",
       "why": "승격 범위 밖 업무다 — 목록 축 원문은 얻지만 canonical 이 서지 않는다. 진행구분이 개찰완료인데도 상태가 개찰완료가 **아닌 것**이 이 갈래의 요점이다(원문 ≠ canonical)."
     }
   ],
@@ -133,11 +141,13 @@
     {
       "noticeNumber": "SYN-M9-OPEN-NOT-OPENED",
       "expectedOpeningState": "NOT_OPENED_YET",
+      "expectedProvisionalState": "NOT_OBSERVED",
       "why": "개찰 축 원문이 없고 **투찰 마감이 아직 뒤**다. 개찰 축이 붙으면 이 갈래가 사라진다."
     },
     {
       "noticeNumber": "SYN-M9-OPEN-NOT-COLLECTED",
       "expectedOpeningState": "NOT_COLLECTED",
+      "expectedProvisionalState": "NOT_OBSERVED",
       "why": "개찰 축 원문이 없고 **마감이 이미 지났다**. 「아직 개찰 전」과 「개찰 자료 없음」을 가르는 것이 마감 비교다."
     }
   ],
@@ -145,6 +155,7 @@
     {
       "noticeNumber": "SYN-M9-OPEN-NEVER",
       "expectedOpeningState": "NOTICE_ABSENT",
+      "expectedProvisionalState": "NOT_OBSERVED",
       "why": "**어느 fixture 에도 없다** — 공고 행 자체가 없는 갈래이고, 수집되면 이 갈래가 사라진다."
     }
   ]

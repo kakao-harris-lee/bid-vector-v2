@@ -22,6 +22,8 @@ import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
 export interface OpeningAxisDesign {
   readonly noticeNumber: string;
   readonly expectedOpeningState: string;
+  /** 잠정 1위 축의 기대(cr MEDIUM-1) — 그 축을 응답에서 읽어 되비추지 않으려는 자리다. */
+  readonly expectedProvisionalState: string;
   /** 그 공고가 **왜** 그 갈래인가 — 붉어질 때 설계 의도를 읽는 사람에게 함께 준다. */
   readonly why: string;
 }
@@ -70,6 +72,19 @@ function parseContext(raw: string): JourneyContext {
       // **빈 목록도 없는 것으로 본다**: 설계표가 비면 아홉 갈래 등식이 「전부 통과」와 「아무것도
       // 재지 않았다」를 같은 값으로 낸다(여정 레인 판정의 ⓒ 축과 같은 사유).
       ['openingAxis', Array.isArray(candidate.openingAxis) && candidate.openingAxis.length > 0],
+      // **원소 모양까지 본다**(cr LOW): 배열성만 보면 망가진 원소가 「설계: undefined」로 나타나고
+      // 그 붉음은 원인을 말하지 않는다.
+      [
+        'openingAxis 원소(noticeNumber·expectedOpeningState·expectedProvisionalState·why)',
+        Array.isArray(candidate.openingAxis) &&
+          candidate.openingAxis.every(
+            (one) =>
+              typeof one?.noticeNumber === 'string' &&
+              typeof one?.expectedOpeningState === 'string' &&
+              typeof one?.expectedProvisionalState === 'string' &&
+              typeof one?.why === 'string',
+          ),
+      ],
     ] as const
   )
     .filter(([, ok]) => !ok)

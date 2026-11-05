@@ -15,6 +15,7 @@ import {
   runnerLine,
   shippedNoticeListOperations,
   shippedOpeningOperationPaths,
+  shippedDetailAxisCounts,
   shippedProgressLabels,
 } from './opening-axis.mjs';
 
@@ -42,6 +43,9 @@ const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const SHIPPED_ENDPOINTS = 'app/src/main/kotlin/bidvector/app/collection/OpeningCollectionProperties.kt';
 /** 공고 목록 오퍼레이션 표의 정본. */
 const SHIPPED_NOTICE_ENDPOINTS = 'app/src/main/kotlin/bidvector/app/collection/CollectionProperties.kt';
+/** 상세 축 열거의 정본 — 공고 하나가 받는 축 수(공사 넷 · 용역 셋)가 여기서 나온다. */
+const SHIPPED_DETAIL_AXES =
+  'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt';
 /** 진행구분 라벨 → 상태 정책의 정본. */
 const SHIPPED_POLICY = 'workflow/src/main/kotlin/bidvector/workflow/opening/OpeningProgressPolicyData.kt';
 /**
@@ -106,6 +110,74 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   it('출하 기본값을 찾지 못하면 통과가 아니라 거부다', () => {
     expect(() => shippedOpeningOperationPaths('val 아무것도 없다')).toThrow(/출하 기본값/u);
   });
+
+  /**
+   * **v M-1 의 재현을 못박는다.** 앞 판의 추출은 정규식 **첫 일치**를 써서, 출하 경로를 바꾸고 옛
+   * 값을 바로 위 주석에 두면 그 주석을 집어 **등식이 초록으로 지나갔다**(그 축은 조용한 404 로만
+   * 나타난다). 이제 주석을 걷고 일치 수가 하나임을 요구한다.
+   */
+  it('주석이 실제 값을 가리지 못한다 — 가리는 줄이 있어도 주석 쪽을 집지 않는다', () => {
+    const shipped = read(SHIPPED_ENDPOINTS);
+    const shadowed = shipped.replace(
+      'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
+      '// 옛 이름: val openingCompletePath: String = "getOpengResultListInfoOpengCompt"\n' +
+        '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
+    );
+
+    expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
+    // 주석이 아니라 **실제 값**을 집는다 → 하네스 사본과 갈려 등식이 붉어질 값이다.
+    expect(shippedOpeningOperationPaths(shadowed).shared.openingCompletePath).toBe(
+      'getOpengResultListInfoOpengCompt02',
+    );
+    expect(shippedOpeningOperationPaths(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
+  });
+
+  it('같은 선언이 **두 자리에** 있으면 어느 것이 정본인지 서지 않으므로 거부한다', () => {
+    const twice = read(SHIPPED_ENDPOINTS).replace(
+      'val bidPriceFormulaAPath: String =',
+      'val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo"\n' +
+        '    val bidPriceFormulaAPath: String =',
+    );
+
+    expect(() => shippedOpeningOperationPaths(twice)).toThrow(/정확히 하나/u);
+  });
+
+  it('문자열 안의 `//` 는 주석이 아니다 — base URL 에서 줄이 잘리면 추출이 엉뚱한 값을 본다', () => {
+    const shipped = read(SHIPPED_ENDPOINTS);
+
+    expect(shipped, '출하 파일에 base URL 리터럴이 없다 — 이 대조가 공허하다').toContain('https://');
+    expect(shippedOpeningOperationPaths(shipped)).toStrictEqual(OPENING_AXIS_OPERATIONS);
+  });
+});
+
+describe('ⓕ 상세 축 수 == 출하 열거', () => {
+  it('공사가 용역보다 많다 — A값이 공사 전용인 비대칭을 출하 본문에서 센다', () => {
+    const counts = shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES));
+
+    // 손으로 적으면 그 비대칭이 리터럴로 굳는다(업종 목록에서 닫은 드리프트와 같은 꼴).
+    expect(counts.construction).toBeGreaterThan(counts.service);
+    expect(Object.keys(counts).sort()).toStrictEqual(['construction', 'service']);
+  });
+
+  it('열거 함수를 찾지 못하면 통과가 아니라 거부다', () => {
+    expect(() => shippedDetailAxisCounts('아무것도 없다')).toThrow(/상세 축 열거/u);
+  });
+
+  it('수집 걸음의 기대가 그 수에서 나온다 — 상세 축을 **실제로 불렀는가**가 등식 안이다', () => {
+    const counts = shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES));
+    const expectation = promotionExpectation(design, { detailAxesPerNotice: counts });
+
+    for (const [division, one] of Object.entries(expectation.divisions)) {
+      expect(one.detailCalls, `${division} 상세 호출 기대`).toBe(one.frame * counts[division]);
+      // 연령 게이트는 오늘 구조적으로 무력이다(앵커가 늘 `NotCarriedByFrame`) — 0 을 못박아
+      // 그 전제가 바뀌는 날 이 자리가 먼저 붉어지게 한다.
+      expect(one.skippedAgeGate).toBe(0);
+    }
+  });
+
+  it('상세 축 수를 받지 못하면 기대를 지어내지 않는다', () => {
+    expect(() => promotionExpectation(design, { detailAxesPerNotice: {} })).toThrow(/상세 축 수/u);
+  });
 });
 
 describe('ⓒ 진행구분 어휘 == 출하 정책', () => {
@@ -119,6 +191,24 @@ describe('ⓒ 진행구분 어휘 == 출하 정책', () => {
         notice.derivedOpeningState,
       );
     }
+  });
+
+  /**
+   * 잠정 1위 축도 같은 꼴로 본다(cr MEDIUM-1). 유도가 `bidders` 의 순위 1 계수를 보므로 **동가
+   * 1위를 만드는 변이**가 선언과 어긋나 붉어진다 — 「투찰 행 셋에 유일한 순위 1」이 왜 설계인지가
+   * 그 자리에 선다.
+   */
+  it('잠정 1위 축의 선언도 유도와 같다 — 세 묶음 전수', () => {
+    for (const notice of design.all) {
+      expect(
+        notice.expectedProvisionalState,
+        `${notice.noticeNumber} 의 잠정 축 선언과 유도가 어긋난다`,
+      ).toBe(notice.derivedProvisionalState);
+    }
+    // 승격된 공고는 **결정적으로** 잠정 1위가 선다(연령 게이트가 오늘 무력이므로).
+    expect(
+      design.withAxis.filter((one) => one.promoted).map((one) => one.expectedProvisionalState),
+    ).toStrictEqual(design.withAxis.filter((one) => one.promoted).map(() => 'DETERMINED'));
   });
 });
 
@@ -301,7 +391,9 @@ describe('라우팅 표와 행 생성', () => {
 });
 
 describe('러너 계수 등식', () => {
-  const expectation = promotionExpectation(design);
+  const expectation = promotionExpectation(design, {
+    detailAxesPerNotice: shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES)),
+  });
 
   it('업무마다 표본틀·표본 크기가 설계의 공고 수와 같다', () => {
     expect(expectation.divisions.construction.frame).toBe(
