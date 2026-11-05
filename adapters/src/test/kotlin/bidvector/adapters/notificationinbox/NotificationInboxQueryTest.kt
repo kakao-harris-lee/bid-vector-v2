@@ -264,8 +264,6 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         }
 
     private companion object {
-        val LATER: Instant = Instant.parse("2026-10-24T00:00:00Z")
-        val READ_AT: Instant = Instant.parse("2026-10-23T12:00:00Z")
         val DEADLINE: Instant = Instant.parse("2026-11-01T05:00:00Z")
     }
 }

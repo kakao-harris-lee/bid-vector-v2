@@ -101,7 +101,8 @@ REL="rel-$(git rev-parse --short=12 HEAD)"
 ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" --apply
 ```
 
-preflight 가 보는 것: env 파일(저장소 밖 · 0600 · 키 집합) · manifest 와 이미지 ID 등식 · compose ≥ 2.24 ·
+preflight 가 보는 것: env 파일(저장소 밖 · 0600 · 키 집합) · manifest 와 이미지 ID 등식 ·
+**반입 트리가 그 release 를 만든 커밋**(HEAD == manifest `git_sha` · 추적 파일 변경 0) · compose ≥ 2.24 ·
 **프로젝트 이름** · 루프백 포트 · 디스크 · **지금 DB 스키마와 가려는 release 의 마이그레이션 비교**. apply 는
 **반입 직전 DB 백업**(데이터 볼륨이나 postgres 컨테이너가 있으면 — 멈춰 있으면 올려서 뜬다) → `up -d --wait` →
 `tools/prod-health.sh`. 이 단계까지는 public 노출이 없다 — 루프백뿐이다.
@@ -109,6 +110,18 @@ preflight 가 보는 것: env 파일(저장소 밖 · 0600 · 키 집합) · man
 **dry-run 의 DB 줄을 읽는다.** 「데이터 볼륨이 없다(반입 기록은 …)」가 나오면 **멈추고 왜 볼륨이 없는지 먼저
 확인한다** — 첫 반입이 아닌데 볼륨이 없다는 것은 누가 `down -v` 를 돌렸거나 프로젝트 이름이 어긋났다는 뜻이고,
 그대로 진행하면 빈 DB 위에 뜬다.
+
+**반입은 그 release 를 만든 트리에서 돈다.** 이미지는 manifest 의 ID 로 묶이지만 **compose 파일 셋·포트·볼륨
+이름·`mem_limit`·헬스체크와 이 스크립트들 자신은 checkout 에서 읽힌다** — 그래서 preflight 가 HEAD 와 manifest
+의 `git_sha` 등식, 그리고 추적 파일 변경 0 을 함께 본다. §2 의 순서대로면 이미 그 커밋이다. 트리가 움직였으면
+문면이 보여 주는 커밋으로 돌아간 뒤 다시 돌린다:
+
+```bash
+git checkout "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
+```
+
+추적되지 않는 파일은 세지 않는다(§2 의 release 와 같은 규칙) — 재현 가능한 provenance 가 필요하면 §2 처럼
+깨끗한 clone 에서 release 를 만든다.
 
 **반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh` 나 알림 훑기 호출이 바뀌었으면
 `/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서 감시 · §「주기 실행」). 사본은
@@ -302,8 +315,19 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 
 ```bash
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2           # dry-run
+# 머리줄의 「되돌림 <어디서> → <어디로>」를 읽는다. 트리가 그 release 의 커밋이 아니면 dry-run 의
+# 마지막 줄이 필요한 checkout 을 그대로 보여 준다 — 그것을 붙여 넣고 다시 dry-run 한 뒤 apply.
+git checkout <dry-run 이 보여 준 커밋>
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
 ```
+
+**되돌림도 「그 release 의 트리」에서 돈다**(§3 의 마지막 주와 같은 이유 — 배선은 checkout 에서 읽힌다).
+되돌릴 release 의 `git_sha` 가 지금 HEAD 가 아니면 `prod-rollback.sh` 는 **exit 2** 로 멈추고 필요한
+`git checkout` 을 문면에 보인다 — **스크립트가 checkout 을 대신하지 않는다**(무엇이 바뀌는지 보고 사람이 한다).
+dry-run 은 그 커밋 전에도 돌려 머리줄의 from/to 를 먼저 읽을 수 있다. checkout 뒤에는 **그 release 와 함께
+나간 판의 스크립트**가 돈다(그것이 그 release 의 배선이다). 되돌린 뒤 트리는 그 커밋에 머문다 — §9 의 주기
+러너가 `current` 와 같은 커밋을 요구하므로 그래야 타이머가 계속 돈다. forward-fix 로 나올 때 `git switch main`
+으로 돌아간다.
 
 직전 release(`previous`)로 `prod-deploy.sh` 를 다시 부른다 — 같은 preflight·백업·헬스. 그때 「되돌림이 보았던
 떠 있는 release」를 `--expect-running` 으로 함께 넘기고, 반입이 잠금을 다시 쥔 자리에서 대조해 그 사이 다른
@@ -328,7 +352,13 @@ sudo systemctl start bidvector-cert-check.service  # 한 번 즉시 돌려 결�
 > sudo systemctl stop bidvector-notification-sweep               # 멈추면 fd 가 닫히고 잠금이 풀린다
 > ```
 > unit 의 `TimeoutStartSec=`(§9.2)이 상한을 지므로 이 손질이 필요한 경우는 상한 안에서 급한 때뿐이다.
-> 러너를 멈춘 뒤에는 일회 컨테이너가 남았는지 본다(`docker ps --filter name=<프로젝트>-app-run`).
+> 러너를 멈춘 뒤에는 일회 컨테이너가 남았는지 본다 — **멈춘 것까지** 센다.
+> ```bash
+> docker ps -a --filter name=<프로젝트>-app-run
+> docker rm -f <프로젝트>-app-run-sweep   # 남아 있으면
+> ```
+> 러너 자신도 시작 전에 같은 잔존을 세고 0 이 아니면 `exit 3` 으로 돌지 않는다(§9.1) — 치우지 않으면
+> 다음 주기부터 훑기가 멈춘 채로 있다. 신호로 끝난 run 은 자기 일회 컨테이너를 스스로 치운다.
 
 > **두 번째 되돌림의 대상은 「직전」이 아니라 「방금 떠난 쪽」이다.** A→B 뒤 되돌리면 B→A 가 되고
 > `previous` 는 B 가 된다 — 거기서 또 되돌리면 **B 로 간다**(마이그레이션 차이가 없으면 가드도 울지
@@ -344,6 +374,10 @@ release** 다. 그 사이 상태는 `<state>/pending` 에 남는다 — 실패 �
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2           # dry-run
 ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
 ```
+
+여기서도 **돌아갈 release 의 트리**가 필요하다(§7.1) — 반입이 실패한 직후 트리는 새 release 의 커밋이므로,
+dry-run 이 보여 주는 `git checkout` 을 먼저 하고 apply 한다. 급한 순간의 한 단계지만 그것이 없으면 옛 이미지가
+**새 커밋의 배선**으로 뜬다.
 
 되돌림은 `pending` 을 「떠 있는 것」으로 보고 마지막으로 성공한 release 로 간다. **새 release 가
 마이그레이션을 실었으면 여기서도 exit 3 으로 멈춘다**(아래 「DB 를 넘는 경우」) — 그 검사는 `prod-deploy.sh --release <옛것>`
@@ -398,17 +432,34 @@ sudo nginx -t && sudo systemctl reload nginx
 로컬에 없으면 **훑지 않고 `exit 3`** 이다(반입이 막는 것을 러너만 통과시키는 길이 없다). 잠금도 반입과
 같은 둘을 잡는다(§7.1 의 주) — 반입이 도는 중이면 훑지 않고 다음 주기로 미룬다. 훑기는 멱등이라 그래도 된다.
 
+**트리도 같은 release 에 묶인다**(§3 의 마지막 주): HEAD == `<current>` 의 `git_sha` 이고 추적 파일 변경이
+0 이어야 훑는다. 러너는 사본이 아니라 `<저장소>` 에서 직접 도므로, 누가 트리를 옮기면 **반입 한 번이 아니라
+주기마다** 다른 커밋의 배선으로 뜨게 된다. 그래서 되돌림 뒤에는 트리를 그 release 의 커밋에 둔다(§7.1).
+
+**지난 run 의 일회 컨테이너가 남아 있으면 돌지 않는다**(`exit 3`). 러너가 신호로 끝나면 — 아래
+`TimeoutStartSec` 상한이 대표 경우다 — `--rm` 이 돌지 못해 **운영 DB 자격을 받은 컨테이너가 남는다.**
+그 run 은 자기 일회 컨테이너(`<프로젝트>-app-run-sweep` — 이름을 `--name` 으로 고정한다)를 스스로 치우고
+그 신호로 죽는다. 그래도 남는 경우(KILL·docker 쪽 실패)는 사람이 치운다 — 무엇이 왜 남았는지 `docker logs`
+로 보고 나서다. 러너는 **남의 것을 지우지 않는다**: 치우는 대상은 이름이 고정된 자기 것 하나뿐이고,
+운영자가 §12 로 띄운 일회 컨테이너는 손대지 않는다(남아 있으면 위 잔존 검사가 멈추게 하고 사람을 부른다).
+
 **이 스크립트는 사본으로 떼어 둘 수 없다** — compose 파일 셋을 읽으므로 `<저장소>`(§1.4b) 안에서
 돈다. 인증서 감시(§「host nginx 조각」)가 단독 스크립트라 사본으로 떼어 둔 것과 다른 점이다. 그래서
 이 unit 이 실행하는 내용은 **그 저장소에 쓸 수 있는 사람**이 정한다 — 레인들이 브랜치를 바꾸는 작업
 트리를 `<저장소>` 로 쓰지 않는 이유다(§1.4b).
 
-한 번 손으로 확인:
+한 번 손으로 확인 — **unit 을 깐 뒤에는 `systemctl start` 로 돈다**(§9.3). 그래야 같은 unit 의 run 이 하나로
+묶이고, 타이머가 그 사이 발화해도 systemd 가 두 번째를 띄우지 않는다. 셸에서 직접 부르는 것은 unit 을 깔기
+**전**의 확인용이다(그때도 타이머가 없으므로 겹칠 것이 없다):
 
 ```bash
 cd <저장소>
 ./tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
 ```
+
+셸에서 직접 부른 run 이 도는 중에 타이머가 발화하면, 타이머 run 은 잠금에서 `exit 3` 으로 끝난다(훑기는
+멱등이라 다음 주기로 미뤄도 된다) — 그 경로에서 unit 의 `ExecStopPost`(§9.2)가 **남의 컨테이너를 지우지
+않도록** 조건이 붙어 있다.
 
 ### 9.2 주기 — 하루 두세 번
 
@@ -431,6 +482,17 @@ ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector
 # fd 가 닫히며 잠금이 풀린다.
 TimeoutStartSec=15m
 TimeoutStopSec=1m
+# 상한에 걸려 죽은 run 은 **자기 일회 컨테이너를 스스로 치운다**(TERM·INT·HUP trap). 아래 줄은 그래도
+# 남는 경우(KILL 로 trap 이 못 돈 경우)를 위한 겹이고 **조건이 반드시 붙는다.**
+#
+# **조건 없이 두면 남의 run 을 지운다.** 이 unit 밖에서 같은 이름으로 도는 run 이 있으면(§9.1 의 손
+# 실행) 타이머 run 은 잠금에서 `exit 3` 으로 끝나는데, 조건 없는 ExecStopPost 는 그때도 돌아 **진행
+# 중인 남의 컨테이너를 rm -f** 한다. 그래서 ⓐ 성공 종료(`--rm` 이 이미 지웠다)와 ⓑ `exit 3`(전제 실패 —
+# 남의 실행이 있다는 뜻이다)에서는 **아무것도 하지 않는다.** 남는 것은 timeout·신호·그 밖의 실패뿐이다.
+# `$$` 는 systemd 가 아니라 `sh` 가 펼치라는 뜻이고, stderr 를 버려 정상 경로의 「No such container」가
+# journal 에 쌓이지 않게 한다(journal 이 유일한 창구다 — 무해한 오류 줄이 사람을 길들인다).
+# **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep >/dev/null 2>&1 || true'
 ```
 
 ```ini
@@ -465,8 +527,14 @@ journalctl -u bidvector-notification-sweep -n 50
 종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 여기에
 `tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**가 더해진다: env 파일을 읽지 못했다 · compose 판이
 하한 미만이다 · 잠금을 열지 못했거나 반입·되돌림·다른 훑기가 도는 중이다 · 반입 기록이 없거나 손상됐다 ·
-끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · app 설정 통로가 기대와
-다르다. **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
+끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · **트리가 그 release 의
+커밋이 아니거나 추적 파일이 더럽다**(§9.1 — `git checkout` 뒤 다시) · app 설정 통로가 기대와 다르다 ·
+**해석된 프로젝트 이름이 잠금을 잡은 이름과 다르다**(`--project` 에 정규화 전 글자를 준 경우) ·
+**지난 run 의 일회 컨테이너가 남아 있다**(문면의 이름을 `docker logs` 로 보고 `docker rm -f`) ·
+**일회 컨테이너 이름이 전역에서 이미 쓰이고 있다**(이 프로젝트 밖의 컨테이너 — 이름 공간은 전역이다).
+**`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
+신호로 끝난 run 은 `3` 이 아니라 **그 신호**로 끝난다(journal 의 `signal=TERM`) — 그 경로에서 이 run 의
+일회 컨테이너는 스스로 치운다.
 외부 발송이 없으므로 **journal 이 유일한 창구**다. 주기 확인:
 
 ```bash
@@ -534,13 +602,25 @@ app 여유를 더하는 문면.
    시간 초과). host 의 검사 도구는 이 경로를 쓰지 않는다 — `prod-health.sh --public` 과 `prod-cert-check.sh` 는
    `127.0.0.1:443` + SNI 로 붙어 host nginx 까지를 잰다. **공인 경로(DNS → 공유기 → Windows 포워딩 → WSL)는 그
    도구들이 재지 못하므로** 바깥 망(휴대폰 LTE 등)의 브라우저나 `curl -sI https://bidvector.kr/` 로 확인한다.
+12. **반입·되돌림·훑기는 「그 release 의 트리」를 요구하고, 트리를 대신 옮겨 주지는 않는다.** 그래서 되돌림은
+   급한 순간에도 `git checkout` 한 단계를 사람에게 남긴다(§7.1 — 무엇이 바뀌는지 보고 하는 것이 설계다).
+   묶음의 한계는 release 와 같다: **추적되지 않는 파일은 세지 않으므로** `git_sha` 등식이 이미지 내용을 다
+   설명하지는 않는다(§2 의 깨끗한 clone). 또 등식이 보는 것은 **커밋**이라 같은 커밋의 서로 다른 두 checkout
+   (예: 다른 worktree)은 구별되지 않는다 — 러너가 `<저장소>` 하나에서 돈다는 §9.1 의 전제가 그 자리를 지킨다.
+13. **일회 컨테이너가 남으면 다음 주기부터 훑기가 멈춘다**(§9.1 의 `exit 3`). 러너는 자기 것만 치우고 남의
+   것은 손대지 않으므로, KILL 로 죽거나 docker 쪽이 실패해 남은 컨테이너는 사람이 `docker rm -f` 로 치워야
+   한다 — 그때까지 시간 기반 알림이 발화하지 않는다(외부 발송이 없어 journal 이 유일한 창구다, §9.4).
+   잔존 검사의 경계는 **이 프로젝트의 `app` 서비스 일회 컨테이너**다: 같은 프로젝트의 `compose run postgres`·
+   `run ml-serving` 잔존과 compose 밖에서 손으로 띄운 컨테이너는 세지 않는다. 반입(`prod-deploy.sh`)도 이
+   검사를 하지 않는다 — 계약이 주기 러너로 좁힌 선택이고, 남은 일회 컨테이너는 잠금의 대상이 아니라
+   반입 중에도 같은 DB 를 쓸 수 있다.
 
 ## 12. 운영 계정 — 처음 한 번 · 비밀 문구 교체
 
 가입 화면·HTTP endpoint 는 없다. 계정은 **운영자 명령**으로 만든다(M7/7D). 떠 있는 서비스를 내리지 않고 **일회
 컨테이너**를 띄운다. 이 명령은 **DB 소유자 연결**로 쓰므로, 훑기 러너(§9.1)와 **같은 가드**를 같은 함수로 먼저
 지난다 — compose 호출 단일 출처(`tools/prod-env.sh`: 템플릿 키·`COMPOSE_*` unset · 파일 셋 · 프로젝트 고정) ·
-잠금 둘 · 반입 기록 · 끝나지 않은 반입 · manifest 이미지 ID · 설정 통로. 하나라도 어긋나면 `exit 3` 으로 멈추고 아무것도
+잠금 둘 · 반입 기록 · 끝나지 않은 반입 · manifest 이미지 ID · **반입 트리 == 그 release 의 커밋** · 설정 통로. 하나라도 어긋나면 `exit 3` 으로 멈추고 아무것도
 쓰지 않는다(`exit 1` 은 앱이 낸 「계정이 이미 있다」·「계정이 없다」뿐이다). 비밀 문구는 잠금을 잡기 전에 받는다 —
 프롬프트 앞에서 자리를 비워도 반입·되돌림·훑기를 막지 않는다.
 
@@ -563,6 +643,7 @@ cd <저장소>
   _prod_valid_tag "$rel" || { echo "반입 기록이 손상됐다"; exit 3; }
   p="$(cat "$S/pending" 2>/dev/null || true)"; [ -z "$p" ] || [ "$p" = "$rel" ] || { echo "끝나지 않은 반입: $p"; exit 3; }
   _prod_images_match "$S/releases/$rel.manifest" "$rel" || { echo "$_PROD_IMAGE_ERR"; exit 3; }
+  _prod_git_sha_match "$S/releases/$rel.manifest" || { echo "$_PROD_GIT_SHA_ERR"; exit 3; }   # 배선은 이 트리에서 읽힌다(§3)
   export BIDVECTOR_RELEASE_TAG="$rel"
   C=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
   cfg="$("${C[@]}" config --format json 2>/dev/null)" || { echo "운영 compose 를 해석하지 못했다"; exit 3; }
@@ -583,4 +664,7 @@ cd <저장소>
 - `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 은 선택이 아니다 — 끄지 않으면 일회 컨테이너 안에 무인증 `POST /api/session`
   을 포함한 API 표면이 수 초 뜬다(7D checklist 「운영자 명령 사용법」).
 - `--no-deps` 는 postgres 가 이미 떠 있다는 전제다(반입 뒤).
+- **이 명령의 일회 컨테이너가 남으면 다음 훑기가 멈춘다**(§9.1 의 잔존 검사 — 같은 프로젝트의 일회 컨테이너를
+  센다). 러너는 남의 것을 지우지 않으므로 사람이 치운다: `docker ps -a --filter name=<프로젝트>-app-run` →
+  `docker rm -f <이름>`. 정상 종료면 `--rm` 이 이미 지웠다.
 - 로그인 실패·연속 실패 잠금은 응답에서 구분되지 않는다(401 하나).

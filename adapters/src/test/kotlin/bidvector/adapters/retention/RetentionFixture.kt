@@ -11,11 +11,16 @@ import javax.sql.DataSource
 
 /**
  * **test 쪽 앵커다** — `RETENTION_POLICY` 에서 읽지 않는다. 이 값과 출하 정책의 보존 기간이
- * 독립이라야 정책 값을 89·91 로 바꾼 변이가 경계 test 를 RED 로 만든다(P-5 「값이 거동에
+ * 독립이라야 정책 값을 364·366 으로 바꾼 변이가 경계 test 를 RED 로 만든다(P-5 「값이 거동에
  * 닿는가」). 정책에서 읽어 오면 둘이 함께 움직여 어떤 변이도 초록이다.
+ *
+ * 독립이라고 **아무 값이나 되는 것은 아니다**: 이 앵커는 아래 [NOW] 의 날짜로 해소한 출하 정책과
+ * 같은 날 수여야 경계 ±1초가 경계로 선다(갈리면 한 쌍이 모두 사라지거나 모두 남는다). 그
+ * 전제는 `RetentionSweepTest` 가 **등식으로** 잰다 — 그래서 [NOW] 는 보존 기간 개정일
+ * (2026-11-05) 이후여야 한다.
  */
-internal val RETENTION_ANCHOR: Duration = Duration.ofDays(90)
-internal val NOW: Instant = Instant.parse("2026-10-14T00:00:00Z")
+internal val RETENTION_ANCHOR: Duration = Duration.ofDays(365)
+internal val NOW: Instant = Instant.parse("2026-11-05T00:00:00Z")
 internal val JUST_OLDER: Instant = NOW - RETENTION_ANCHOR - Duration.ofSeconds(1)
 internal val JUST_NEWER: Instant = NOW - RETENTION_ANCHOR + Duration.ofSeconds(1)
 

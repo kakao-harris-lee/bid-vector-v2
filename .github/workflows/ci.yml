@@ -660,7 +660,8 @@ jobs:
         if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && steps.build_web_proxy.outcome == 'success' && steps.hygiene_proxy.outcome == 'success' }}
         run: ./tools/vuln-scan-check.sh bidvector/proxy:local proxy config/quality/vuln-policy.properties
 
-      # B-6 — CycloneDX SBOM 보관. 보존 90일은 운영자 보존 결정 2026-09-26 과 같은 값이다.
+      # B-6 — CycloneDX SBOM 보관. artifact 보관 90일은 **데이터 보존 정책과 별개 축**이다
+      # (그 정책은 2026-11-05 부터 1년이고 이 값과 함께 움직이지 않는다).
       # M7/7F-local(D-7F-1) — 담는 이미지가 넷이 됐다(web·proxy 추가). 경로 glob 은 그대로이고
       # 스캔 스크립트가 kind 별 파일 이름을 쓰므로 배선 변경이 없다 — 바뀐 것은 조건의 「어느
       # 스캔이든 돌았는가」에 새 둘이 들어간 것뿐이다.
@@ -1007,3 +1008,19 @@ jobs:
 
       - name: host nginx 조각 — 기존 site 불변 · 새 거동 (대역 host 설정) (S-27c)
         run: ./tools/prod-nginx-check.sh --proxy-image bidvector/proxy:local
+
+      # M9/prod-tools(7F 장부 v r2 L-1·L-2) — 반입·되돌림·주기 러너의 **가드 술어 거동**을 가짜
+      # docker·git 으로 잰다. 컨테이너를 만들지 않고 이미지도 쓰지 않으므로 이 job 에서 가장 싸다.
+      # 자리가 S-27c 뒤인 이유는 위와 같다(앞선 판정이 먼저 다 나온다 · 기존 번호를 재배치하지 않는다).
+      # 한 번만 로컬에서 돌린 검사는 뒤따르는 편집을 아무것도 막지 못하므로 매 PR 에서 돈다.
+      #
+      # `install -d` 는 세 스크립트가 **고정 절대 경로**로 쓰는 잠금 자리를 러너에 미리 만든다
+      # (runbook §1.4 의 tmpfiles.d 한 줄과 같은 것 — 그 자리가 환경변수에서 오면 두 셸이 서로 다른
+      # 파일을 잠근다). **자리의 정본은 `tools/prod-env.sh` 의 `BIDVECTOR_PROD_LOCK_DIR`** 이고 이
+      # 줄은 그 값을 축어로 복사한 것이다 — 정본이 움직이면 이 줄도 함께 본다. 검사는 자리를
+      # **만들지 않으므로**(운영 host 에서 돌 때 소유자가 바뀌지 않게) 없으면 exit 2 로 크게 깨진다.
+      - name: 운영 가드 술어 — 반입 트리↔manifest · 일회 컨테이너 잔존 (S-27d)
+        run: |
+          set -euo pipefail
+          sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" /run/lock/bidvector-v2
+          ./tools/prod-guards-check.sh

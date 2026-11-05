@@ -19,6 +19,8 @@
 #     env 파일에 키를 더해 app 설정(예: 쿠키 Secure)을 바꾸는 길이 없다(7D 제한 6). 키 집합 등식이 그 사실을
 #     눈에 보이게 한다.
 #   · release manifest 존재 · 이미지 넷의 현재 태그 ID == manifest(누가 태그를 옮겼으면 멈춘다).
+#   · **반입 트리 == manifest 의 커밋**(HEAD 등식 + 추적 파일 변경 0) — compose 배선은 이 트리에서
+#     읽히므로 이미지만 묶으면 다른 커밋의 배선으로 뜬다.
 #   · compose ≥ 2.24(`!override`) · 루프백 포트가 비었거나 이 프로젝트의 proxy 가 쥐고 있다 · 디스크 여유.
 #
 # 백업: 판정은 **데이터 볼륨의 존재**로 한다 — 실행 중 컨테이너가 아니다. 볼륨이 있으면 postgres 가
@@ -59,7 +61,8 @@ done
 # 간다 — 쓰기 전에 모양을 본다. 오늘은 뒤의 manifest 읽기가 fail-closed 지만, preflight 순서가 한 번
 # 바뀌면 그 보호가 사라진다(CR L-1). 되돌림이 상태 파일에서 읽어 넘기는 값도 이 자리를 지난다.
 _prod_valid_tag "$REL" || _die "release 태그 모양이 아니다: ${REL}" 2
-for t in docker jq curl stat; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
+# `git` — 반입 트리가 manifest 의 커밋인지 보는 술어가 쓴다(아래 `_prod_git_sha_match`).
+for t in docker jq curl stat git; do command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2; done
 
 COMPOSE=("${BIDVECTOR_PROD_COMPOSE[@]}" --env-file "$ENVF")
 # `prod-env.sh` 가 이미 `-p <운영 이름>` 을 고정했다. 호출자가 `--project` 를 주면 **뒤에 오는 것이
@@ -96,6 +99,13 @@ MAN="$STATE/releases/${REL}.manifest"
 _prod_images_match "$MAN" "$REL" || _die "$_PROD_IMAGE_ERR" 1
 if grep -qx 'vuln=not-run' "$MAN"; then echo "  경고: 이 release 는 취약점 게이트를 돌리지 않았다(vuln=not-run)"; fi
 echo "  manifest: 이미지 ${#BIDVECTOR_PROD_SERVICES[@]}개 ID 등식 · 커밋 $(grep '^git_sha=' "$MAN" | cut -d= -f2 | cut -c1-12)"
+
+# **반입 트리를 manifest 에 묶는다.** 위 ID 등식은 이미지 **바이트**만 묶는다 — compose 파일 셋·포트·
+# 볼륨 이름·`mem_limit`·헬스체크는 이 트리에서 읽히므로, 다른 커밋의 트리에서 반입하면 release 의
+# 이미지가 **다른 커밋의 배선**으로 뜬다(7F 장부 v r2 L-1). 술어는 `tools/prod-env.sh` 에 하나로 두고
+# 되돌림·주기 러너·운영자 명령(runbook §12)이 같은 것을 본다.
+_prod_git_sha_match "$MAN" || _die "$_PROD_GIT_SHA_ERR" 1
+echo "  반입 트리: HEAD == manifest git_sha · 추적 파일 변경 0"
 
 # compose 판 — 문턱은 `tools/prod-env.sh` 가 한 자리로 갖는다(러너도 같은 것을 본다).
 _prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 1

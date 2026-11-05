@@ -5,6 +5,7 @@ import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.retention.RetentionRunner
 import bidvector.workflow.retention.PurgeExpiredData
+import bidvector.workflow.retention.RETENTION_CALENDAR_ZONE
 import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.strategy.Clock
 import org.postgresql.ds.PGSimpleDataSource
@@ -14,7 +15,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.time.LocalDate
-import java.time.ZoneOffset
 
 /**
  * 일회성 보존 배선(M6/6B-3 P-3) — **`bidvector.retention.mode=once` 일 때만** 이 설정 전체가
@@ -58,7 +58,11 @@ open class RetentionWiring {
     ): RetentionRunner {
         // 정책 해소도 **주입된 시계**로 한다(cr L-4) — 러너가 시계를 받으면서 정책만 시스템
         // 시계로 고르면 그 둘이 갈리는 날이 장부 밖이다.
-        val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
+        //
+        // 구역은 **KST**다(D-8) — 날짜 경계가 운영자의 하루와 같아야 한다. UTC 로 고르면 KST 00~09 시가
+        // 어제 날짜로 해소하고, 이 러너의 cron 은 04:10 KST 라 **언제나** 그 창 안이다(개정일 당일 run 이
+        // 옛 값으로 돈다). 사유의 정본은 [RETENTION_CALENDAR_ZONE] KDoc 이다.
+        val referenceDate = LocalDate.ofInstant(clock.now(), RETENTION_CALENDAR_ZONE)
         val policy = resolvedOrFail(RETENTION_POLICY.resolve(referenceDate), "보존 정책")
         // 마스킹이 지울 키는 개념으로 선언되고 계약이 그 개념의 키를 안다. **이 배선은 그 계약
         // 레지스트리도, 기준일도 넘기지 않는다** — 레지스트리는 D-6F8-6 게이트가 닫아 둔 「원문 값
