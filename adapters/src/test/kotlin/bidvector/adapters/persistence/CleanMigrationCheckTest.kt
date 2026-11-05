@@ -1,6 +1,5 @@
 package bidvector.adapters.persistence
 
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -173,10 +172,17 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
      * 통과했고** 개수 축도 표마다 제약 수가 그대로라 함께 초록이었다. 단언의 단위를 스키마에서
      * **표**로 내려 여섯을 각각 고정한다.
      *
-     * 집합 등식이 아니라 이름 지정 본문 등식인 이유: 여섯 표의 CHECK 를 전부 열거하면(합계 수십)
-     * 이 축이 재는 것(`notice_round` 형식)과 무관한 본문이 단언의 대부분을 차지하고, 그 표들의
-     * 다른 축은 각자의 test 가 이미 진다. 제자리 약화는 이름 지정 등식이 그대로 잡고, 제약을
-     * **지우는** 경로는 [queryConstraintDef] 의 0 행 명시 실패가 잡는다.
+     * 표 범위 집합 등식이 아니라 **표→본문 map 등식**인 이유: 여섯 표의 CHECK 를 전부 열거하면
+     * (합계 수십) 이 축이 재는 것(`notice_round` 형식)과 무관한 본문이 단언의 대부분을 차지하고,
+     * 그 표들의 다른 축은 각자의 test 가 이미 진다. 제약을 **지우는** 경로는
+     * [queryConstraintDef] 의 0 행 명시 실패가 잡는다.
+     *
+     * **표마다 `shouldBe` 를 루프로 돌리지 않는다.** kotest hard assertion 은 첫 불일치에서
+     * 멈추므로, 다섯을 약화하는 변이를 돌려도 출력에는 **첫 표 한 줄**만 남아 「여섯이 각각
+     * 잠겼다」와 「첫 표만 잠겼다」가 구별되지 않는다. 보호력은 같아도 **변이 실측의 분해력**이
+     * 없다. map 하나를 비교하면 한 번의 실측으로 **다섯 줄이 동시에** 드러나 이 test 의 논제
+     * (단언 단위를 스키마에서 표로 내렸다)가 그대로 관측된다 — 같은 파일의 개수 축·
+     * `collection_run` 집합 등식과 같은 관용구다.
      */
     @Test
     fun `축8 부가 — notice_round 형식 CHECK 가 여섯 표에서 각각 본문으로 고정된다`() {
@@ -190,11 +196,11 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                 "bid_case",
                 "notification_inbox",
             )
-        tablesWithNoticeRoundCheck.forEach { table ->
-            withClue("notice_round 형식 CHECK: $table") {
-                queryConstraintDef("${table}_notice_round_check") shouldBe expectedBody
-            }
-        }
+
+        val actualByTable =
+            tablesWithNoticeRoundCheck.associateWith { queryConstraintDef("${it}_notice_round_check") }
+
+        actualByTable shouldBe tablesWithNoticeRoundCheck.associateWith { expectedBody }
     }
 
     /**
