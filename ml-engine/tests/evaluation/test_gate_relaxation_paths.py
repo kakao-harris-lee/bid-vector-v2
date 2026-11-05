@@ -14,9 +14,12 @@ test 코드는 대상 밖이다(거부 test 를 쓰려면 직접 생성이 필�
 from __future__ import annotations
 
 import ast
+import dataclasses
+import importlib
 from pathlib import Path
 from typing import Final
 
+import pytest
 from google.protobuf.descriptor import Descriptor, FileDescriptor
 
 from ml_engine.contracts import (
@@ -27,7 +30,16 @@ from ml_engine.contracts import (
     prediction_pb2,
     training_pb2,
 )
-from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
+from ml_engine.evaluation.policy import (
+    _INDEXED_LIST_PREFIXES,
+    _SCALAR_KEYS,
+    EvaluationPolicy,
+    load_evaluation_policy,
+)
+from ml_engine.evaluation.policy_source import (
+    PolicySourceMismatch,
+    verify_policy_source,
+)
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ML_ENGINE_ROOT / "src" / "ml_engine"
@@ -266,3 +278,76 @@ def test_no_wire_contract_field_is_named_after_a_policy_key() -> None:
         f"{name} -> {_matched_keys(name)}" for name in names if _matched_keys(name)
     ]
     assert not violations, f"wire 계약 필드가 정책 키를 받는다: {violations}"
+
+
+# ── ⑤ 완화된 값을 **만드는 형태**를 닫았는가 (v H-1) ──────────────────────────
+# 앞 판의 ④ 축은 「생성 **호출 이름**이 로더 안에 하나」였고 세 형태를 전부 지나갔다
+# (verifier 실측). 아래 셋은 그 형태 각각이 지금 **실패하는지**를 직접 잰다 — 이름 패턴을
+# 넓히는 대신 `InitVar` 생성 토큰이 「기존 객체에서 베껴 올 자리」를 없앤 결과다.
+
+
+def _shipped_policy() -> EvaluationPolicy:
+    loaded = load_evaluation_policy(_SHIPPED_POLICY)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    return loaded
+
+
+def test_dataclasses_replace_cannot_relax_a_threshold() -> None:
+    policy = _shipped_policy()
+    with pytest.raises((ValueError, TypeError)):
+        dataclasses.replace(policy, paired_t_threshold=1.0)
+
+
+def test_rebuilding_from_vars_cannot_relax_a_threshold() -> None:
+    """`type(p)(**{**vars(p), …})` — `InitVar` 는 `vars()` 에 없으므로 토큰이 빠진다."""
+    policy = _shipped_policy()
+    assert "parsed" not in vars(policy)
+    assert "parsed" not in {field.name for field in dataclasses.fields(policy)}
+    with pytest.raises(TypeError):
+        type(policy)(**{**vars(policy), "paired_t_threshold": 1.0})
+
+
+def test_dynamically_imported_class_cannot_relax_a_threshold() -> None:
+    """`getattr(importlib.import_module(…), "Evaluation"+"Policy")(…)` — 이름을 쪼개
+    만들어도 생성에 토큰이 필요하다(AST 가 보지 못하는 경로를 **형태**가 막는다)."""
+    policy = _shipped_policy()
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    constructed = getattr(module, "Evaluation" + "Policy")
+    with pytest.raises(TypeError):
+        constructed(**{**vars(policy), "paired_t_threshold": 1.0})
+
+
+def test_source_verification_catches_a_forged_construction_token() -> None:
+    """토큰 타입 이름을 **동적으로 훔쳐** 위조한 객체도 출처 재검증에서 드러난다 —
+    AST 가 보지 못하는 마지막 경로를 **값 대조**가 막는 자리(겹 둘째)."""
+    policy = _shipped_policy()
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    token = getattr(module, "_Parsed" + "PolicyFile")
+    forged = module.EvaluationPolicy(
+        parsed=token(digest=policy.source.digest),
+        **{**vars(policy), "paired_t_threshold": 1.0},
+    )
+    assert forged.paired_t_threshold == 1.0  # 만들어지기는 한다
+    assert isinstance(verify_policy_source(forged), PolicySourceMismatch)
+    assert isinstance(verify_policy_source(policy), EvaluationPolicy)
+
+
+def test_no_src_module_outside_the_policy_module_imports_its_privates() -> None:
+    """생성 토큰을 **정적으로** 가져가는 길 — `ImportFrom` 의 `name` 은 `as` 별칭과
+    무관하게 원래 이름이라 이 대조는 별칭으로 열리지 않는다. 동적 절취(`getattr`)는 이
+    층이 아니라 위 출처 재검증이 받는다."""
+    violations: list[str] = []
+    for path, tree in _trees():
+        if _key(path) == "evaluation/policy.py":
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            if node.module != "ml_engine.evaluation.policy":
+                continue
+            violations.extend(
+                f"{_key(path)}:{node.lineno} {alias.name}"
+                for alias in node.names
+                if alias.name.startswith("_")
+            )
+    assert not violations, f"정책 모듈의 private 이름을 src 가 가져간다: {violations}"

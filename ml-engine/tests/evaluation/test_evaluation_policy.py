@@ -14,9 +14,24 @@ from ml_engine.evaluation.policy import (
     SHIPPED_EVALUATION_POLICY_VERSION,
     EvaluationPolicy,
     PolicyRejected,
+    PolicySource,
+    _ParsedPolicyFile,
     load_evaluation_policy,
     policy_checksum,
 )
+
+_TEST_SOURCE = PolicySource(
+    path=Path("/does-not-exist/evaluation-v1.yaml"), digest="f" * 64
+)
+"""직접 생성 test 전용 출처 — 이 파일의 세 test 는 **로더가 거부하는 값**으로 `__post_init__`
+불변식을 재므로 파일을 거칠 수 없다(로더를 거치면 그 값에 도달하지 못한다). 출처 재검증은
+제품 경로(`app.pipeline`)에만 있어 이 객체들은 그 겹과 무관하다."""
+
+
+def _token() -> _ParsedPolicyFile:
+    """모듈 private 생성 토큰 — `_TEST_SOURCE` 와 지문이 같아야 `__post_init__` 을 지난다."""
+    return _ParsedPolicyFile(digest=_TEST_SOURCE.digest)
+
 
 _SHIPPED_YAML = Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
 
@@ -50,6 +65,8 @@ def test_policy_checksum_is_deterministic_and_changes_with_value() -> None:
     assert len(first) == 64
 
     mutated = EvaluationPolicy(
+        parsed=_token(),
+        source=_TEST_SOURCE,
         version=result.version,
         effective_date=result.effective_date,
         paired_t_threshold=1.0,
@@ -263,6 +280,8 @@ def test_policy_checksum_never_raises_because_non_finite_cannot_be_constructed()
     확인한다(로더 경유 없이도 비유한 값은 생성 자체가 막힌다)."""
     with pytest.raises(ValueError):
         EvaluationPolicy(
+            parsed=_token(),
+            source=_TEST_SOURCE,
             version="x",
             effective_date=date(2026, 9, 16),
             paired_t_threshold=float("nan"),
@@ -283,6 +302,8 @@ def test_evaluation_policy_direct_construction_enforces_invariants() -> None:
     """직접 생성도 방어선 — Python 가시성 한계는 여전하나 명백한 위반은 막는다."""
     with pytest.raises(ValueError):
         EvaluationPolicy(
+            parsed=_token(),
+            source=_TEST_SOURCE,
             version="x",
             effective_date=date(2026, 9, 16),
             paired_t_threshold=0.0,

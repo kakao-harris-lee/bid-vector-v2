@@ -10,6 +10,7 @@ version 은 조용히 fallback 하지 않고 명시적 오류 계약으로 반�
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,15 @@ class Policy:
 
     version: str
     values: dict[str, PolicyScalar]
+    digest: str
+    """읽은 정책 파일의 sha256 — **같은 읽기에서** 나온다(M9/ml-lifecycle, 수정 라운드
+    v H-1). 호출부가 파일을 다시 읽어 지문을 내면 그 사이에 파일이 바뀔 수 있는 창이
+    생기므로, 지문은 파싱에 쓴 바로 그 텍스트에서 만든다. 값은 UTF-8 바이트의 해시다
+    (유효한 UTF-8 파일에서는 파일 바이트의 해시와 같다).
+
+    쓰는 쪽: `evaluation.policy` 가 이 지문을 `PolicySource` 에 실어 **자기 출처를
+    재검증**한다(「임계 완화 불가」를 이름이 아니라 구조로 닫는 자리). 다른 세 로더는
+    아직 쓰지 않는다 — 필드가 있어도 비용이 0 이고, 쓸 때 같은 자리에서 가져간다."""
 
 
 def load_policy(path: Path, *, known_keys: frozenset[str] = frozenset()) -> Policy:
@@ -44,8 +54,10 @@ def load_policy(path: Path, *, known_keys: frozenset[str] = frozenset()) -> Poli
     앞으로 생길 로더)도 `yaml.YAMLError`를 별도로 잡을 필요가 없다 — 세 번 재발한
     사본(`OPEN-5C-YAML-ERROR-5D`)의 뿌리 처방(`tests/gates/
     test_policy_loaders_fail_closed.py`가 기계 수집으로 회귀를 지킨다)."""
+    raw_text = path.read_text(encoding="utf-8")
+    digest = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = yaml.safe_load(raw_text)
     except yaml.YAMLError as exc:
         raise PolicyError(f"정책 파일 문법 오류: {path}: {exc}") from exc
     if not isinstance(raw, dict):
@@ -61,4 +73,4 @@ def load_policy(path: Path, *, known_keys: frozenset[str] = frozenset()) -> Poli
         raise PolicyError(f"미지 정책 키 {sorted(unknown_keys)}: {path}")
 
     values: dict[str, PolicyScalar] = {key: raw[key] for key in body_keys}
-    return Policy(version=version, values=values)
+    return Policy(version=version, values=values, digest=digest)

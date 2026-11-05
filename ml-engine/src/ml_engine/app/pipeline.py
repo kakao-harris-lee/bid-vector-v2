@@ -20,6 +20,10 @@ from ml_engine.adapters.artifact_files import (
 )
 from ml_engine.adapters.dataset_files import DatasetUnreadable, read_dataset_files
 from ml_engine.evaluation import EvaluationPolicy, EvaluationReportV1, WeekMaturity
+from ml_engine.evaluation.policy_source import (
+    PolicySourceMismatch,
+    verify_policy_source,
+)
 from ml_engine.evaluation.report import canonical_report_bytes, report_checksum
 from ml_engine.features import CanonicalizationRejected
 from ml_engine.inference.maturity import (
@@ -157,13 +161,11 @@ class _ConcreteTrainingPipeline:
             return PipelineFailed(code, detail)
         return trained
 
-    def _run_holdout(
-        self, dataset: LoadedDataset, cancel_token: CancelToken
-    ) -> EvaluationReportV1 | PipelineFailed | PipelineCancelled:
-        """D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
-        으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
-        `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
-        (4))."""
+    def _maturities(self, dataset: LoadedDataset) -> tuple[WeekMaturity, ...]:
+        """정산 행을 K7 성숙도 표로 — 시간축은 versioned 정책으로 해석한다.
+
+        `settlements.jsonl` 의 `opened_at` 은 필수라 이 경로의 측정 불가 행은 구조적으로
+        0 이다(M9/ml-lifecycle 알려진 제한) — 커널의 측정 불가 갈래는 커널 test 가 잰다."""
         axis_policy = self._deps.time_axis_policy
         observations = tuple(
             SettlementObservation(
@@ -174,14 +176,34 @@ class _ConcreteTrainingPipeline:
             )
             for row in dataset.settlement_rows
         )
-        # `settlements.jsonl` 의 `opened_at` 은 필수라 이 경로의 측정 불가 행은 구조적으로
-        # 0 이다(M9/ml-lifecycle 알려진 제한) — 커널의 측정 불가 갈래는 커널 test 가 잰다.
         table = build_weekly_maturity(
             observations,
             window_days=self._deps.maturity_window_days,
             policy=axis_policy,
         )
-        maturities = tuple(_week_maturity(window) for window in table.windows)
+        return tuple(_week_maturity(window) for window in table.windows)
+
+    def _run_holdout(
+        self, dataset: LoadedDataset, cancel_token: CancelToken
+    ) -> EvaluationReportV1 | PipelineFailed | PipelineCancelled:
+        """D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
+        으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
+        `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
+        (4)).
+
+        **정책 출처 재검증이 여기 있다**(M9/ml-lifecycle 수정 라운드, v H-1): 넘어온 평가
+        정책의 값이 자기가 왔다는 파일의 값과 같은지 **파일을 다시 읽어** 본다. 이 겹은
+        객체가 어떻게 만들어졌든 무관하므로, 코드가 임계를 비튼 정책(`replace`·동적 생성·
+        생성 토큰 절취)으로 게이트를 돌리는 경로가 이 자리에서 닫힌다. 조용히 파일 값으로
+        갈아끼우지 않는다 — 그러면 「무엇으로 판정했는가」가 다시 흐려진다. 제품 경로는
+        이것 하나이고, `run_holdout` 자신은 라이브러리 진입점으로 남긴다(그쪽 사유는 그
+        함수 docstring)."""
+        source_check = verify_policy_source(self._deps.evaluation_policy)
+        if isinstance(source_check, PolicySourceMismatch):
+            return PipelineFailed(
+                JobFailureCode.EVALUATION_ERROR, DetailCode.POLICY_SOURCE_MISMATCH
+            )
+        maturities = self._maturities(dataset)
 
         report = run_holdout(
             dataset,

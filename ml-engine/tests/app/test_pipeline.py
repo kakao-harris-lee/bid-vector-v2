@@ -6,8 +6,9 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from ml_engine.training.holdout import HoldoutCancelled
 from ml_engine.training.jobs.pipeline import (
     CancelToken,
     DatasetRefInput,
+    DetailCode,
     PipelineCancelled,
     PipelineFailed,
     PipelineOutcome,
@@ -29,15 +31,10 @@ from ml_engine.training.jobs.pipeline import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
+from tests.policy_fixture import evaluation_policy
 
 _TIME_AXIS_POLICY = TimeAxisPolicy(version="test", substitute_approved=False)
 """조립 근 test 의 시간축 정책 — 출하와 같은 미승인(`OPEN-SET-10` 미결)."""
-
-_TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
-"""test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
-창이 효력 시작 뒤에 있어야 승격 인용이 성립하므로, 여기서는 인용 축을 **상수로 비켜
-두고** 그 축 자체는 `tests/evaluation/test_epoch.py` 와 `test_holdout.py` 의 전용
-test 가 잰다."""
 
 _HYPERPARAMETERS = LightGbmHyperparameters(
     objective="regression",
@@ -72,9 +69,7 @@ def _training_policy() -> TrainingPolicy:
 
 
 def _evaluation_policy() -> EvaluationPolicy:
-    return EvaluationPolicy(
-        version="test",
-        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
+    return evaluation_policy(
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
@@ -83,7 +78,9 @@ def _evaluation_policy() -> EvaluationPolicy:
         min_evaluation_rows=2,
         max_origins=5,
         agency_baseline_min_count=2,
-        stability_seeds=(20260812, 1),
+        # seed 목록을 줄이지 않는다 — 조립 근 test 는 **파일 경유** 정책을 쓰고(출처
+        # 재검증이 그 경로에 있다) 로더는 승인된 다섯 seed 전수를 요구한다. 커널 거동을
+        # 위해 승인 밖 조합이 필요한 test 는 `kernel_policy` 를 쓴다(M9/ml-lifecycle v H-1).
         amount_band_edges=(1e8, 5e8, 1e9, 5e9),
         segment_axes=("category", "amount_band"),
     )
@@ -576,3 +573,56 @@ def test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifa
 
     assert isinstance(outcome, PipelineCancelled)
     assert list(out_dir.iterdir()) == []
+
+
+def test_pipeline_rejects_a_policy_whose_values_differ_from_its_file(
+    tmp_path: Path,
+) -> None:
+    """v H-1 — 제품 경로의 둘째 겹. 임계를 비튼 정책(여기서는 생성 토큰을 동적으로 훔쳐
+    위조한다 — AST 가 보지 못하는 그 경로)으로 게이트를 돌리려 하면 job 이 실패한다.
+    조용히 파일 값으로 갈아끼우지 않는다 — 그러면 「무엇으로 판정했는가」가 다시 흐려진다."""
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    honest = _evaluation_policy()
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    token = getattr(module, "_Parsed" + "PolicyFile")
+    forged = module.EvaluationPolicy(
+        parsed=token(digest=honest.source.digest),
+        **{**vars(honest), "paired_t_threshold": 0.01},
+    )
+    assert forged.paired_t_threshold != honest.paired_t_threshold
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=forged,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    assert isinstance(outcome, PipelineFailed), outcome
+    assert outcome.detail_code == DetailCode.POLICY_SOURCE_MISMATCH
+
+    # 통제군 — 같은 파이프라인이 정직한 정책으로는 끝까지 돈다(실패가 다른 이유가 아니다).
+    honest_out = tmp_path / "artifacts-honest"
+    honest_out.mkdir()
+    honest_pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=honest,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=honest_out,
+    )
+    assert isinstance(
+        honest_pipeline.run(_dataset_ref(dataset_dir), CancelToken()), PipelineOutcome
+    )

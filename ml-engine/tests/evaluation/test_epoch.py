@@ -27,26 +27,13 @@ from ml_engine.evaluation.report import (
 )
 from ml_engine.evaluation.verdict import Passed
 from ml_engine.inference.maturity import week_start_utc
+from tests.policy_fixture import evaluation_policy
 
 _EFFECTIVE = date(2026, 9, 16)
 
 
 def _policy(*, effective_date: date = _EFFECTIVE) -> EvaluationPolicy:
-    return EvaluationPolicy(
-        version="evaluation-v1",
-        effective_date=effective_date,
-        paired_t_threshold=2.58,
-        gate_baseline="category_x_band",
-        gate_model="gbm_all_strata",
-        gate_stratum="clean-base",
-        maturity_threshold=0.70,
-        min_evaluation_rows=100,
-        max_origins=5,
-        agency_baseline_min_count=10,
-        stability_seeds=(20260812, 1, 7, 42, 2026),
-        amount_band_edges=(1e8, 5e8, 1e9, 5e9),
-        segment_axes=("category", "amount_band"),
-    )
+    return evaluation_policy(version="evaluation-v1", effective_date=effective_date)
 
 
 _PASSED = Passed(

@@ -210,6 +210,12 @@ class EvaluationReportV1:
     """판정에 쓴 정책의 effective date(ISO-8601, M9/ml-lifecycle) — canonical JSON 과
     report checksum 에 들어가므로 「언제부터의 규칙으로 판정했는가」가 산출물에 남는다."""
 
+    policy_source_digest: str
+    """판정에 쓴 정책 **파일**의 sha256(M9/ml-lifecycle 수정 라운드, v H-1). `policy_checksum`
+    은 값의 지문이고 이것은 **파일의** 지문이다 — 둘이 함께 있어야 「어느 산출물로
+    판정했는가」가 남는다(완화된 임계가 존재할 수 있는 유일한 모양은 승인 근거를 가진 정책
+    파일이고, 그 파일이 무엇이었는지가 여기로 남는다)."""
+
     training_spec_version: str
     training_spec_checksum: str
     feature_schema_version: str
@@ -422,6 +428,7 @@ def _report_as_json_value(report: EvaluationReportV1) -> _JsonValue:
         "policy_version": report.policy_version,
         "policy_checksum": report.policy_checksum,
         "policy_effective_date": report.policy_effective_date,
+        "policy_source_digest": report.policy_source_digest,
         "training_spec_version": report.training_spec_version,
         "training_spec_checksum": report.training_spec_checksum,
         "feature_schema_version": report.feature_schema_version,

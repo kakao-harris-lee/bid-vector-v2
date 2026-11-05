@@ -12,6 +12,10 @@
 
 **임계를 낱개 인자로 받는 public 함수는 없다**(설계 검토 (1) 첫 행) — `load_evaluation_policy`
 는 `path` 하나만 받고, 이 파일을 편집해야만 값이 바뀐다.
+
+**「완화 불가」는 이름이 아니라 구조로 닫는다** — 겹 둘: ⑴ 아래 `_ParsedPolicyFile` 생성 토큰
+⑵ `evaluation.policy_source` 의 출처 재검증. 앞 판의 「생성 호출 이름이 로더 안에 하나」 술어가
+왜 모자랐는지와 경계(어느 파일을 쓸지는 운영자가 고른다)는 그 모듈 docstring 에 있다.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 from datetime import date
 from enum import StrEnum
 from pathlib import Path
@@ -32,6 +36,23 @@ from ml_engine.registry.policy import PolicyError, PolicyScalar
 from ml_engine.registry.policy import load_policy as _load_raw_policy
 
 SHIPPED_EVALUATION_POLICY_VERSION: Final[str] = "evaluation-v1"
+
+
+@dataclass(frozen=True)
+class PolicySource:
+    """정책이 **어느 파일의 어느 바이트**에서 왔는지. `path` 는 report 에 싣지 않는다
+    (호스트마다 다르다) — 재검증 전용이고, report 에 남는 것은 `digest` 다."""
+
+    path: Path
+    digest: str
+
+
+@dataclass(frozen=True)
+class _ParsedPolicyFile:
+    """**모듈 private 생성 토큰** — `load_evaluation_policy` 안에서만 만들어진다."""
+
+    digest: str
+
 
 # 평탄 인덱스 목록 값의 상한 — 실제 값(seeds 5개·edges 4개·axes 2개)보다 넉넉한 정적
 # 상한이다(5A `known_keys`는 문자열 집합 전수라 가변 길이를 표현할 수 없다). 이 값을
@@ -123,12 +144,14 @@ class EvaluationPolicy:
     """평가 게이트 임계 한 벌 — 값은 `reports/evidence/m5/5c2/policy-values.md` §1 과
     대조된다. 기본값 없음("안 넘겼다"와 "미공시"를 구별, 5C-1 관행 계승)."""
 
+    parsed: InitVar[_ParsedPolicyFile]
+    """생성 토큰 — 기본값 없음, 인스턴스에 저장되지 않는다."""
+    source: PolicySource
     version: str
     effective_date: date
-    """이 정책이 **언제부터의 규칙인가**(ML-07 acceptance ③, M9/ml-lifecycle). 효력 시작
-    전에 시작한 평가 창의 통과는 승격 근거로 인용되지 않는다 — 판정은
-    `ml_engine.evaluation.epoch` 이 내리고, 이 타입은 값만 나른다(날짜를 해석하는 달력은
-    그 모듈 하나다)."""
+    """이 정책이 **언제부터의 규칙인가**(ML-07 acceptance ③). 효력 시작 전에 시작한 평가
+    창의 통과는 승격 근거로 인용되지 않는다 — 판정과 달력 해석은 `evaluation.epoch` 하나가
+    지고 이 타입은 값만 나른다."""
 
     paired_t_threshold: float
     gate_baseline: str
@@ -142,7 +165,15 @@ class EvaluationPolicy:
     amount_band_edges: tuple[float, ...]
     segment_axes: tuple[str, ...]
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, parsed: _ParsedPolicyFile) -> None:
+        if not isinstance(parsed, _ParsedPolicyFile):
+            raise ValueError(
+                "EvaluationPolicy 는 정책 파일 로더만 만들 수 있다(생성 토큰 없음)"
+            )
+        if parsed.digest != self.source.digest:
+            raise ValueError(
+                "생성 토큰의 지문이 source 와 다르다 — 다른 파일의 토큰으로 조립했다"
+            )
         self._validate_scalars()
         self._validate_collections()
 
@@ -252,9 +283,9 @@ def collect_indexed_list(
 
 
 def require_iso_date(values: dict[str, PolicyScalar], key: str) -> date | None:
-    """ISO-8601 날짜 **문자열**만 받는다. 비인용 ISO 날짜는 `yaml.safe_load` 가
-    `datetime.date` 객체로 읽어 `PolicyScalar` 축(문자열·수·bool) 밖이고, 그 값은 여기서
-    `None`(→ `INVALID_VALUE`)이 된다 — 축 밖의 값이 조용히 들어오는 자리를 닫는다."""
+    """ISO-8601 날짜 **문자열**만 받는다. 비인용 ISO 날짜는 `yaml.safe_load` 가 `date`
+    객체로 읽어 `PolicyScalar` 축(문자열·수·bool) 밖이고 여기서 `None`(→ `INVALID_VALUE`)이
+    된다 — 축 밖의 값이 조용히 들어오는 자리를 닫는다."""
     value = values.get(key)
     if not isinstance(value, str) or not value:
         return None
@@ -417,6 +448,8 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
 
     try:
         return EvaluationPolicy(
+            parsed=_ParsedPolicyFile(digest=raw.digest),
+            source=PolicySource(path=path, digest=raw.digest),
             version=raw.version,
             effective_date=parsed.effective_date,
             paired_t_threshold=parsed.paired_t_threshold,
@@ -439,7 +472,11 @@ def policy_checksum(policy: EvaluationPolicy) -> str:
     """sha256 hex(소문자 64자) — 5B `features/manifest.py::canonical_json`·5C-1
     `spec_checksum`과 같은 규칙(키 정렬·구분자 `(",", ":")`·`allow_nan=False`). 값이
     전부 정책 불변식을 통과한 유한값이라 `CanonicalizationRejected` 갈래가 성립하지
-    않는다 — 결과 타입이 아니라 `str` 을 낸다(5C-1 `spec_checksum`과 같은 판단)."""
+    않는다 — 결과 타입이 아니라 `str` 을 낸다(5C-1 `spec_checksum`과 같은 판단).
+
+    **`source` 는 payload 에 넣지 않는다** — `path` 는 호스트마다 다르고 `digest` 는 같은
+    값의 다른 표기(공백·주석)에도 달라져, 섞으면 같은 임계로 판정한 두 실행의 report
+    checksum 이 갈린다. 출처는 `policy_source` 가 따로 재고 report 는 별도 칸에 싣는다."""
     payload = json.dumps(
         {
             "version": policy.version,

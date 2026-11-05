@@ -118,6 +118,7 @@ def _minimal_report(**overrides: object) -> EvaluationReportV1:
         policy_version="evaluation-v1",
         policy_checksum="a" * 64,
         policy_effective_date="2026-09-16",
+        policy_source_digest="d" * 64,
         training_spec_version="award-rate-gbm-training-v1",
         training_spec_checksum="b" * 64,
         feature_schema_version="award-rate-v2",

@@ -43,8 +43,13 @@ from ml_engine.evaluation.policy import (
     EvaluationPolicy,
     PolicyRejected,
     PolicyRejectionReason,
+    PolicySource,
     load_evaluation_policy,
     policy_checksum,
+)
+from ml_engine.evaluation.policy_source import (
+    PolicySourceMismatch,
+    verify_policy_source,
 )
 from ml_engine.evaluation.report import (
     EvaluationReportV1,
@@ -118,6 +123,8 @@ __all__ = [
     "PolicyEpoch",
     "PolicyRejected",
     "PolicyRejectionReason",
+    "PolicySource",
+    "PolicySourceMismatch",
     "Promotable",
     "Promotion",
     "PromotionCitation",
@@ -162,4 +169,5 @@ __all__ = [
     "segment_specs",
     "summarize_stability",
     "unlearned_cells",
+    "verify_policy_source",
 ]

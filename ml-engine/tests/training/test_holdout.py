@@ -5,7 +5,7 @@ award_rate_holdout.py@ed4b06c`). `run_holdout`유일 실행 진입점 — 합성
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
@@ -44,12 +44,7 @@ from ml_engine.training.holdout import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
-
-_TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
-"""test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
-창이 효력 시작 뒤에 있어야 승격 인용이 성립하므로, 여기서는 인용 축을 **상수로 비켜
-두고** 그 축 자체는 `tests/evaluation/test_epoch.py` 와 `test_holdout.py` 의 전용
-test 가 잰다."""
+from tests.policy_fixture import TEST_POLICY_EFFECTIVE_DATE, kernel_policy
 
 _HYPERPARAMETERS = LightGbmHyperparameters(
     objective="regression",
@@ -85,8 +80,6 @@ def _spec(**overrides: object) -> TrainingSpec:
 
 def _policy(**overrides: object) -> EvaluationPolicy:
     base: dict[str, object] = dict(
-        version="test",
-        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
@@ -100,7 +93,7 @@ def _policy(**overrides: object) -> EvaluationPolicy:
         segment_axes=("category", "amount_band"),
     )
     base.update(overrides)
-    return EvaluationPolicy(**base)  # type: ignore[arg-type]
+    return kernel_policy(**base)
 
 
 def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs:
@@ -1241,7 +1234,7 @@ def test_run_holdout_report_carries_policy_effective_date() -> None:
         CodeVersion("sha-1"),
     )
     assert not isinstance(result, HoldoutRejected)
-    assert result.policy_effective_date == _TEST_POLICY_EFFECTIVE_DATE.isoformat()
+    assert result.policy_effective_date == TEST_POLICY_EFFECTIVE_DATE.isoformat()
 
 
 def test_run_holdout_promotion_is_superseded_when_window_predates_policy() -> None:
