@@ -110,13 +110,15 @@ const PROBES = {
       return <span>{pick(at).text}</span>;
     }
   `,
+  // **이름을 바꿔 재수출한다** — 같은 이름으로 재수출하면 호출 지점의 글자가 선언과 같아서
+  // 앞 판의 술어도 그것을 집는다(측정이 둘을 가르지 못한다). 개명이 그 둘을 가른다.
   'reexport.ts': `
-    export { instantDisplayOf } from '../../display/timeDisplay';
+    export { instantDisplayOf as formatInstant } from '../../display/timeDisplay';
   `,
   'viaReexport.tsx': `
-    import { instantDisplayOf } from './reexport';
+    import { formatInstant } from './reexport';
     export function ReexportCard({ at }: { readonly at: string }) {
-      return <span>{instantDisplayOf(at).text}</span>;
+      return <span>{formatInstant(at).text}</span>;
     }
   `,
   'plain.tsx': `
@@ -172,7 +174,7 @@ describe('의무 판정의 양성·음성 대조', () => {
     expect(componentsIn('local.tsx')).toStrictEqual(['LocalCard']);
   });
 
-  it('다른 모듈로 재수출한 것을 부르는 꼴을 집는다', () => {
+  it('이름을 바꿔 재수출한 것을 부르는 꼴을 집는다', () => {
     expect(componentsIn('viaReexport.tsx')).toStrictEqual(['ReexportCard']);
   });
 
