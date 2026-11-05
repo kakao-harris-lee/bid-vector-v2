@@ -6,8 +6,10 @@ import bidvector.adapters.notification.TelegramScript
 import bidvector.adapters.notification.channelSettings
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.workflow.notification.RelayReport
+import bidvector.workflow.notification.RelaySkipReason
 import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RuntimeEnvironment
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -134,7 +136,55 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
             // T1 과 T2 가 둘 다 같은 경계에서 섰다.
             outboxStateOf(dataSource(), "assembly-1") shouldBe "DELIVERED"
             inboxKeyCount(dataSource()) shouldBe 1
-            server.received().single().form.getValue("text") shouldContain "저장된 공고 정보가 없습니다"
+            server
+                .received()
+                .single()
+                .form
+                .getValue("text") shouldContain "저장된 공고 정보가 없습니다"
         }
+    }
+
+    /**
+     * D-7 — 발송 가능 모드가 **아닌** 환경은 채널 설정 없이 뜬다. 가짜 자격을 지어내 조립을 세우지
+     * 않고, 그 run 은 억제 환경의 use case 가 냈을 것과 **같은 값**을 낸다(행을 하나도 만지지 않
+     * 으므로 둘이 같다). 행이 `PENDING` 으로 보존되는 것까지 함께 잰다.
+     */
+    @Test
+    fun `채널 설정이 없는 비-Live 환경의 조립은 억제로 끝나고 행을 만지지 않는다`() {
+        insertPendingNotificationRow(dataSource(), "unconfigured-1")
+        val run =
+            NotificationRelayRun(
+                dataSource = dataSource(),
+                target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
+                environment = RuntimeEnvironment.Staging,
+                policy = relayNotificationPolicy(),
+                channels = null,
+                clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
+            )
+
+        run.relay(RELAY_DB_LIMIT) shouldBe RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
+        outboxStateOf(dataSource(), "unconfigured-1") shouldBe "PENDING"
+    }
+
+    /**
+     * **불변식의 양성 대조** — 발송 가능 모드 환경에서는 채널 설정 없이 조립되지 않는다. 이 칸이
+     * 없으면 위 test 의 「설정 없으면 억제」가 `Live` 환경에서도 성립해, 보낼 수 있는 환경의 relay
+     * 가 **조용히 아무것도 하지 않는** 상태가 된다(배선을 지나지 않는 경로에서).
+     */
+    @Test
+    fun `채널 설정이 없는 Live 환경은 조립 자체가 거부된다`() {
+        val failure =
+            shouldThrow<IllegalArgumentException> {
+                NotificationRelayRun(
+                    dataSource = dataSource(),
+                    target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
+                    environment = RuntimeEnvironment.Production,
+                    policy = relayNotificationPolicy(),
+                    channels = null,
+                    clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
+                )
+            }
+
+        failure.message.orEmpty() shouldContain "채널 설정 없이 조립되지 않는다"
     }
 }

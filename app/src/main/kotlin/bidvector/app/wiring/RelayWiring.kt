@@ -3,6 +3,7 @@ package bidvector.app.wiring
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
+import bidvector.app.relay.NotificationChannelProperties
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayBootDecision
 import bidvector.app.relay.relayBootDecision
@@ -20,6 +21,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import java.time.Clock
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -45,15 +47,16 @@ data class RelayProperties(
  * 올라온다. 속성이 없으면(기본) 러너도, 조립도, 임대 어댑터 생성도 없다 — 평가 endpoint 만
  * 쓰는 배포는 relay 설정 없이 그대로 뜬다(compose 는 `*.mode` 를 설정하지 않는다, D-6A2a-5).
  *
- * **발송 가능(`DeliveryMode.Live`) 모드 환경 설정은 기동을 거부한다(D-6F10-20, 술어는 cr G-1
- * 로 정정).** 이 slice 에는 실 sender 가 없고(`OPEN-STR-12`) 자리지킴 셋은 호출되면 던진다.
- * 그 모드로 뜨면 relay 가 claim 한 뒤 발송 자리에서 터지고 그 행은 다음 run 의 고아 격리가
- * 태운다 — 매 run 이 행을 영구히 잃는다. 그래서 「실 sender 없이 Live 환경」을 **설정 오류**로
- * 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
+ * **발송 가능(`DeliveryMode.Live`) 모드 환경인데 알림 채널 설정이 비면 기동을 거부한다**
+ * (M9/STR12 D-7 — 앞 판의 D-6F10-20 「Live 면 무조건 거부」를 승계해 좁혔다).
+ * 그 모드로 뜨면 relay 가 claim 한 뒤 보낼 곳이 없어 그 행들이 어휘 밖 종단으로 타 버린다 —
+ * 종단 전이는 단방향이라 되돌릴 간선이 없다. 그래서 「Live 인데 채널 설정 결손」을 **설정
+ * 오류**로 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
+ *
+ * **Live 가 아니면 설정 없이 뜬다**(D-7) — 그 환경의 relay 는 claim 조차 하지 않는다(환경 억제).
  *
  * 검사가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다 — 그 판정은
  * [relayBootDecision] 이 값으로 내고(cr R-2), 이 자리는 그 값을 기동 실패로 옮긴다.
- * `OPEN-STR-12` 가 실 sender 를 들이면 그 함수와 자리지킴 셋이 함께 사라진다.
  *
  * 이 클래스가 조립을 직접 하지 않는 이유: outbox 쓰기 타입을 `app` 이 이름으로 볼 수 없다
  * (D-6A3-17(a)③). [NotificationRelayRun](어댑터 조립 경계)만 든다.
@@ -61,19 +64,22 @@ data class RelayProperties(
 @Configuration
 @Import(CollectionTerminationWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.relay", name = ["mode"], havingValue = "once")
-@EnableConfigurationProperties(RelayProperties::class)
+@EnableConfigurationProperties(RelayProperties::class, NotificationChannelProperties::class)
 open class RelayWiring {
     @Bean
     open fun notificationRelayRun(
         dataSource: DataSource,
         properties: RelayProperties,
+        channelProperties: NotificationChannelProperties,
     ): NotificationRelayRun {
         val policy = resolvedNotificationPolicy()
         // 판정은 [relayBootDecision] 이 **값으로** 낸다(cr R-2) — 여기 인라인되어 있던 동안은
         // 정책표를 바꿔 넣은 변이로 직접 칠 수 없었다. 이 자리의 몫은 그 값을 기동 실패로
-        // 옮기는 것뿐이다.
-        require(relayBootDecision(properties.environment, policy) == RelayBootDecision.Allowed) {
-            "실 발송 채널이 없는 동안 relay 는 발송 가능(Live) 모드 환경으로 기동하지 않는다(OPEN-STR-12)"
+        // 옮기는 것뿐이다. 판정이 받는 것은 설정의 **값이 아니라 존재 여부**라 이 메시지가
+        // 자격·chat id 원문을 담을 경로가 없다.
+        val decision = relayBootDecision(properties.environment, policy, channelProperties.presence())
+        require(decision is RelayBootDecision.Allowed) {
+            "발송 가능(Live) 모드 환경인데 알림 채널 설정이 비었다 — 채워야 하는 칸: $decision"
         }
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
         require(properties.claimLimit > 0) { "bidvector.relay.claim-limit 는 1 이상이어야 한다" }
@@ -82,6 +88,8 @@ open class RelayWiring {
             target = RelayTarget(OperatorId(properties.owner), properties.channel),
             environment = properties.environment,
             policy = policy,
+            channels = channelProperties.channelSettings(),
+            clock = Clock.systemUTC(),
         )
     }
 

@@ -435,17 +435,22 @@ class EvaluationCommitRunE2ETest {
 
     /**
      * production relay 조립 — 환경을 `Production` 으로 준다(정책표가 그 환경에 `Live` 를 붙인다).
-     * 배선(`RelayWiring`)은 그 환경을 **거부**하지만 그 거부는 기동 자리의 것이고, 여기서는
-     * 조립을 직접 세워 relay 본문이 claim 까지 가는 경로를 돌린다.
+     *
+     * **claim 뒤 첫 연결에서 끊기는 `DataSource`** 를 준다(M9/STR12). 실 발송 채널이 들어온 뒤로는
+     * production 조립이 claim 뒤에 **스스로 던지지 않는다** — 발송 실패는 예외가 아니라 결과이기
+     * 때문이다(D-4). 그래서 러너의 실패 분기(사유 코드 + 부분 집계)를 재려면 조립 **밖**에서
+     * 끊어야 하고, 그 자리가 이 대역이다. 「발송 전에 DB 가 사라졌다」는 실재하는 실패 모양이다.
      */
     private fun productionRelayRun(): NotificationRelayRun {
         val resolution = NOTIFICATION_DELIVERY_POLICY.resolve(LocalDate.now())
         check(resolution is Resolution.Resolved) { "알림 배달 정책이 해소되지 않았다: $resolution" }
         return NotificationRelayRun(
-            dataSource = dataSource(),
+            dataSource = FailAfterClaimDataSource(dataSource()),
             target = RelayTarget(OperatorId(RELAY_OWNER), Channel.Telegram),
             environment = RuntimeEnvironment.Production,
             policy = resolution.value,
+            channels = relayChannelSettings(),
+            clock = java.time.Clock.systemUTC(),
         )
     }
 }

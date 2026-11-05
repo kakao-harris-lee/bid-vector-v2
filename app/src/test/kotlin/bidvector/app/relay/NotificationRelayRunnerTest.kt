@@ -1,5 +1,10 @@
 package bidvector.app.relay
 
+import bidvector.adapters.notification.NoticeMessageSettings
+import bidvector.adapters.notification.NotificationChannelSettings
+import bidvector.adapters.notification.TelegramBotCredential
+import bidvector.adapters.notification.TelegramChatId
+import bidvector.adapters.notification.TelegramSenderSettings
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -8,6 +13,7 @@ import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
 import bidvector.workflow.notification.RelayTarget
+import bidvector.workflow.notification.RouteKey
 import bidvector.workflow.notification.RuntimeEnvironment
 import bidvector.workflow.strategy.OperatorId
 import io.kotest.matchers.shouldBe
@@ -19,6 +25,8 @@ import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.DefaultApplicationArguments
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.time.Clock
+import java.time.Duration
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -151,6 +159,29 @@ private fun unreachableRelayRun(): NotificationRelayRun =
         target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
         environment = RuntimeEnvironment.Staging,
         policy = relayRunnerTestPolicy(),
+        channels = fakeChannelSettings(),
+        clock = Clock.systemUTC(),
+    )
+
+/**
+ * 가짜 채널 설정 — **발송 축에 닿지 않는** run 들의 조립 입력이다(실 Telegram 호출 0, D-9).
+ * `null` 을 넘기지 않는 이유: 그러면 조립이 use case 를 만들지 않고 스스로 억제 값을 내므로
+ * 이 묶음이 재려는 것(use case 가 던진다 · use case 가 억제한다)이 측정되지 않는다.
+ *
+ * 값은 `adapters` test 의 같은 모양 헬퍼와 겹치지만 **모듈이 달라** 재사용할 수 없다.
+ */
+private fun fakeChannelSettings(): NotificationChannelSettings =
+    NotificationChannelSettings(
+        telegram =
+            TelegramSenderSettings(
+                baseUrl = "http://127.0.0.1:$UNREACHABLE_PORT",
+                botCredential = TelegramBotCredential.of("811122233:FAKErunnerZZQ"),
+                routeKey = RouteKey("telegram-primary"),
+                chatId = TelegramChatId.of("-1000000000001"),
+                connectTimeout = Duration.ofSeconds(1),
+                responseTimeout = Duration.ofSeconds(1),
+            ),
+        message = NoticeMessageSettings("https://bidvector.example"),
     )
 
 /**
@@ -164,6 +195,8 @@ private fun suppressedRelayRun(dataSource: DataSource): NotificationRelayRun =
         target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
         environment = RuntimeEnvironment.Staging,
         policy = relayRunnerTestPolicy(),
+        channels = fakeChannelSettings(),
+        clock = Clock.systemUTC(),
     )
 
 private fun unreachableDataSource(): PGSimpleDataSource =

@@ -11,10 +11,12 @@ import bidvector.adapters.notification.NotificationChannelSettings
 import bidvector.adapters.notification.TelegramNotificationSender
 import bidvector.adapters.notification.telegramHttpClient
 import bidvector.adapters.persistence.TransactionBoundary
+import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.DispatchNotification
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
 import bidvector.workflow.notification.RelayOutboxNotifications
 import bidvector.workflow.notification.RelayReport
+import bidvector.workflow.notification.RelaySkipReason
 import bidvector.workflow.notification.RelayTarget
 import bidvector.workflow.notification.RuntimeEnvironment
 import java.time.Clock
@@ -44,30 +46,48 @@ import javax.sql.DataSource
  * 경계를 못 찾아 `withConnection` 이 실행 시점에 던진다. lease 는 **의도적으로 다른 연결**
  * (`DataSource` 직접)이다: advisory lock 은 세션 범위라 트랜잭션이 끝나도 쥐고 있어야 한다.
  * 렌더러의 연결도 **의도적으로 다르다** — 렌더링은 relay 의 T1·T2 **사이**(경계 밖)에서 일어난다.
+ *
+ * **[channels] 가 `null` 인 경우**(M9/STR12 D-7) — 발송 가능 모드가 **아닌** 환경은 채널 설정 없이
+ * 뜬다. 그때 가짜 자격을 지어내 조립을 세우지 않는다(지어낸 값은 곧 발송 대상이 된다). 대신 use
+ * case 자체를 만들지 않고 [relay] 가 **그 use case 가 냈을 것과 같은 값**을 낸다 — 억제 환경의
+ * relay 는 행을 하나도 만지지 않으므로 둘이 같다.
+ *
+ * 그 둘이 어긋나지 않는 근거는 `init` 의 불변식이다: **`Live` 모드 환경에서는 `null` 로 조립되지
+ * 않는다.** 배선(`RelayWiring`)이 그 조합을 이미 기동 실패로 거부하고, 이 자리는 배선을 지나지
+ * 않는 경로(test·다른 조립)에서도 같은 조합이 서지 않게 한다 — fail-closed.
  */
 class NotificationRelayRun(
     dataSource: DataSource,
     target: RelayTarget,
     environment: RuntimeEnvironment,
     policy: NotificationDeliveryPolicyData,
-    channels: NotificationChannelSettings,
+    channels: NotificationChannelSettings?,
     clock: Clock,
 ) {
     private val boundary = TransactionBoundary(dataSource)
 
-    private val relay =
-        RelayOutboxNotifications(
-            outbox = JdbcOutboxPort(boundary),
-            inbox = JdbcInboxPort(boundary),
-            dispatcher = dispatcherFor(dataSource, target, environment, policy, channels, clock),
-            leases = PostgresAdvisoryLockLease(dataSource),
-            transactions = ConsumerTransactions(boundary),
-            target = target,
-            environment = environment,
-            policy = policy,
-        )
+    private val relay: RelayOutboxNotifications? =
+        channels?.let { settings ->
+            RelayOutboxNotifications(
+                outbox = JdbcOutboxPort(boundary),
+                inbox = JdbcInboxPort(boundary),
+                dispatcher = dispatcherFor(dataSource, target, environment, policy, settings, clock),
+                leases = PostgresAdvisoryLockLease(dataSource),
+                transactions = ConsumerTransactions(boundary),
+                target = target,
+                environment = environment,
+                policy = policy,
+            )
+        }
 
-    fun relay(limit: Int): RelayReport = relay.relay(limit)
+    init {
+        require(channels != null || policy.environmentModes.getValue(environment) != DeliveryMode.Live) {
+            "발송 가능(Live) 모드 환경은 채널 설정 없이 조립되지 않는다 — environment=$environment"
+        }
+    }
+
+    fun relay(limit: Int): RelayReport =
+        relay?.relay(limit) ?: RelayReport.Skipped(RelaySkipReason.EnvironmentSuppressed)
 }
 
 /**
