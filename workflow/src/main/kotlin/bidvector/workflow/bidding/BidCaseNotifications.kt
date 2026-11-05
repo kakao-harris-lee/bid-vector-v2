@@ -4,6 +4,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.NoticeKey
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationFact
 
 /**
@@ -20,10 +21,10 @@ import bidvector.workflow.notificationinbox.NotificationFact
  * 정정이 알림을 갱신하지 못한다. 정정으로 낙찰이 패찰로 바뀌면 **같은 키의 detail 이 바뀌고**,
  * 그때 그 항목은 안읽음으로 돌아온다(7C③ upsert 의 `read_at` 규칙).
  *
- * **유찰(`FailedOrRebid`)은 기록하지 않는다**(D-7C3B-7 ⒝). detail 어휘에 유찰이 없어
- * `NOT_AWARDED`(패찰)로 접으면 「내가 졌다」와 「아무도 못 땄다」가 한 값이 된다. 어휘를 늘리는
- * 것은 CHECK 마이그레이션이라 되돌리기 어려운 경로이고 별도 결정이다
- * (`OPEN-7C3B-FAILED-BID-DETAIL`).
+ * **유찰(`FailedOrRebid`)도 적는다 — 접지 않고**(D-M9-1). 7C③-b 는 detail 어휘에 유찰의 자리가
+ * 없어 기록하지 않았다(`NOT_AWARDED` 로 접으면 「내가 졌다」와 「아무도 못 땄다」가 한 값이
+ * 된다). V24 가 어휘를 넓혀 `FAILED_OR_REBID` 이 자기 값으로 선다 — 운영자의 다음 할 일이
+ * 다르기 때문이다(재입찰 공고를 기다리는 일이다).
  *
  * `when` 이 소진이라 **상태를 더하면 답을 주지 않고는 컴파일되지 않는다** — 새 결과 상태가
  * 조용히 「알림 없음」으로 떨어지지 않는다.
@@ -34,14 +35,14 @@ internal fun reflectedNotificationFact(state: BidState): NotificationFact? =
 
         BidState.OpenedOutOfRank -> NotificationFact.OpeningCompleted(provisionallyFirst = false)
 
-        BidState.Won -> NotificationFact.AwardDecided(awarded = true)
+        BidState.Won -> NotificationFact.AwardDecided(AwardResult.AWARDED)
 
-        BidState.Lost -> NotificationFact.AwardDecided(awarded = false)
+        BidState.Lost -> NotificationFact.AwardDecided(AwardResult.NOT_AWARDED)
 
-        // 아래는 **되비출 사실이 아니다.** 유찰만 사유가 다르다(어휘 부재, 위 KDoc) — 나머지는
-        // 알림함 어휘에 대응하는 종류가 없거나(초안 · 제출함 · 개찰 대기 · 적격심사) 시간 기반
-        // 훑기가 자기 종류로 따로 낸다(마감 지남 계열).
-        BidState.FailedOrRebid,
+        BidState.FailedOrRebid -> NotificationFact.AwardDecided(AwardResult.FAILED_OR_REBID)
+
+        // 아래는 **되비출 사실이 아니다** — 알림함 어휘에 대응하는 종류가 없거나(초안 · 제출함 ·
+        // 개찰 대기 · 적격심사) 시간 기반 훑기가 자기 종류로 따로 낸다(마감 지남 계열).
         BidState.Watching,
         is BidState.Deferred,
         BidState.PriceReceived,

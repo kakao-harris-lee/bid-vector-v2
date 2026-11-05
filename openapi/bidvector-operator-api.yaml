@@ -2466,12 +2466,15 @@ components:
           nullable: true
           description: >-
             종류가 싣는 부가 사실. **`OPENING_COMPLETED` 와 `AWARD_DECIDED` 만** 값을 갖고 나머지
-            여섯은 `null` 이다(짝은 저장 층의 CHECK 가 함께 진다).
+            여섯은 `null` 이다(짝은 저장 층의 CHECK 가 함께 진다). `FAILED_OR_REBID`(유찰·재입찰)은
+            `AWARD_DECIDED` 의 셋째 값이고 `NOT_AWARDED`(패찰)와 **다른 사실**이다 — 「내가 졌다」와
+            「아무도 못 땄다」를 한 값으로 접지 않는다.
           enum:
             - PROVISIONAL_FIRST
             - NOT_PROVISIONAL_FIRST
             - AWARDED
             - NOT_AWARDED
+            - FAILED_OR_REBID
         noticeNumber:
           type: string
           description: 공고번호 — 클릭 → 워크시트의 키 절반이다.

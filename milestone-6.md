@@ -64,7 +64,7 @@ slice 계획을 별도로 받는다).
 **6A-1 의 경계**: endpoint 는 **읽기 하나**뿐이다(D-6A1-4) — 후보평가 use case 는 호출마다 알림 요청을 낳으므로
 승인 문면 없는 외부 effect 를 HTTP 로 열지 않고, 실행 경로는 6A-2 에서 **dry-run 강제**로 시작한다. 토큰은
 환경변수 주입·기본값 없음이고 값을 로그·응답·audit 에 싣지 않으며 실패 사유를 나누지 않는다(D-6A1-6). audit 은
-**추가 전용**이고 요청 본문·토큰을 담지 않는다 — 보존·파기는 6B-3 이고 승인된 기간이 없다(D-6A1-7). OpenAPI 는
+**추가 전용**이고 요청 본문·토큰을 담지 않는다 — 보존·파기는 6B-3 이고 승인된 기간이 없다(D-6A1-7 — **정정 2026-11-05, 「배선 밖 잔여」 절**). OpenAPI 는
 **수작성 단일 출처**이고 test 가 구현과 대조한다(생성 도구 도입 안 함 — 자동 생성하면 단일 출처가 구현이 되어
 계약이 사라진다, D-6A1-8). **병행 레인**: 6B-1 이 `V8` 을 쓰므로 이 slice 는 `V9` 를 쓰고, 병합 순서가 바뀌면
 번호를 다시 붙인다. 리뷰 레인은 `migration-reviewer`·`privacy-gate`·`contract-keeper` 셋이 추가로 붙는다
@@ -81,7 +81,7 @@ slice 계획을 별도로 받는다).
 `m6-6b/2026-09-17`. 정본 `reports/evidence/m6/6b1/scope.md`(D-6B1-1~6). 위 bullet 넷이 성질이 다른 축을
 한 목록에 담고 있어 **넷으로 가른다**(D-6B1-1·2): **6B-1** 스키마·동시성(Kotlin·Postgres·Testcontainers) ·
 **6B-2** 백업·복원·마이그레이션 되돌림 리허설(완료 조건 7, 운영 절차 축) · **6B-3** 데이터 수명·마스킹
-(보존·파기, privacy-gate 축 — **승인된 보존 기간이 없어 결정 선행**) · **6B-4** ML job 영속·큐 상한
+(보존·파기, privacy-gate 축 — **승인된 보존 기간이 없어 결정 선행** — 정정 2026-11-05, 「배선 밖 잔여」 절) · **6B-4** ML job 영속·큐 상한
 (`OPEN-5E-JOB-PERSISTENCE`·`OPEN-5E-JOB-QUEUE-BOUND` — Python·파일 계열, 큐 정책 결정 선행). 근거는
 6C 가 네 축을 한 slice 에 담아 **재작업 3 라운드**를 쓴 실측이다.
 
@@ -248,7 +248,7 @@ writer 가 임시 SQL 이 된다.
 
 **6F-6 이 신설해 인계하는 OPEN 둘**(판정 레인 넷의 결과, 계약 갱신 (1)) — ① **`OPEN-6F6-PROFILE-RETENTION`**:
 프로필 표에 수명 정책이 없다(GRANT 가 `DELETE`·`TRUNCATE` 를 빼 최소권한은 지키지만 「언제 지우는가」가 없다).
-**받는 쪽은 6B-3**(데이터 수명·마스킹 — 승인된 보존 기간이 없어 결정 선행). ② **`OPEN-GATE-REGISTRATION-STALE-INPUT`**:
+**받는 쪽은 6B-3**(데이터 수명·마스킹 — 승인된 보존 기간이 없어 결정 선행 — 정정 2026-11-05, 「배선 밖 잔여」 절). ② **`OPEN-GATE-REGISTRATION-STALE-INPUT`**:
 등재 완결성 게이트 셋(`Profile`·`Evaluation`·`Event`)이 `gate-tests.properties` 를 런타임 `File(...)` 로 읽어
 **Gradle 의 선언된 입력이 아니다** — 증분 빌드에서 등재 행만 지우면 `UP-TO-DATE` 로 건너뛰어 초록이 된다
 (`--rerun-tasks` 면 붉고, CI 는 clean checkout 이라 영향 없다). 6F-2 가 세운 게이트도 같은 구멍이다 —
@@ -724,6 +724,23 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 **운영자 결정 선행**: **6B-3**(데이터 수명·마스킹 — **승인된 보존 기간이 없다**. 6F-6·6F-5-a·6A-1 이 각각
 `OPEN-…-RETENTION` 을 여기로 넘겼다) · **6B-4**(ML job 영속·큐 상한 — **큐 정책 결정**) · **6F-5-b**(요건을
 채우는 LLM 추출 — **실 LLM 호출은 운영자 승인 대상**).
+
+**정정 2026-11-05 — 위 목록의 6B-3 은 그 뒤 열려 닫혔다.** 「승인된 보존 기간이 없다」는 2026-09-23 시점의
+사실이고 오늘은 거짓이다(같은 문면이 「6A-1 의 경계」·6B 분할·6F-6 인계 문단에도 있다 — 전부 이 정정이 덮는다).
+운영자 결정 2026-09-26 ② 가 보존 90일을 주고, **6B-3 은 PR #73 으로 구현·머지됐다**(2026-10-14 — 정본
+`reports/evidence/m6/6b3/scope.md`, 절차 `docs/runbook/m6-6b3-retention.md`). **6F-6·6F-5-a·6F-8** 이 넘긴 셋
+(`OPEN-6F6-PROFILE-RETENTION`·`OPEN-6F5A-RETENTION`·`OPEN-6F8-RAW-PII-RETENTION`)은 그 slice 가 닫았고,
+6A-1 의 몫은 그 셋이 아니라 **`D-6A1-7`(api audit)** 이다(cr L-3 — 원 문면의 느슨한 귀속을 열거로 굳히지 않는다).
+**사용자 결정 2026-11-05: 보존 기간을 1년으로 개정한다**(90일을 대체 — 정책 표의 **날짜 개정 항목**이고 90일
+항목은 그 시대의 값으로 남는다, 소급 없음; 정본 `reports/evidence/m9/retention-1y/scope.md`). 6B-3 이 신설한
+서브 OPEN **여섯**(`OPEN-6B3-OUTBOX-UNSENT-RETENTION` · `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` ·
+`OPEN-6B3-PURGE-LOCK-TIMEOUT` · `OPEN-6B3-FREE-TEXT-PII-AXIS` · `OPEN-6B3-BLOAT-AFTER-FIRST-PURGE` ·
+`OPEN-6B3-INDEX-WINDOW`)은 **처분하지 않고 등재를 유지한다**(cr H-2 — 첫 판이 넷으로 열거해 둘을 빠뜨렸다).
+`-FREE-TEXT-PII-AXIS` 의 「운영 첫 실행 전 실표본 판독」 선행 조건은 그대로이고 runbook 의 알려진 제한이 그
+자리를 든다. **`-BLOAT-AFTER-FIRST-PURGE` 의 전제는 이 개정이 움직였다** — 기간을 늘리면 첫 파기 집합이
+**줄어** 부풀음 우려가 미뤄진다(반대 방향이다). 목록의 나머지 둘 가운데 **6B-4 도 열려 닫혔고**(PR #71,
+2026-10-14) **6F-5-b 만 열리지 않았다**(cr H-1). 6B-4 가 받은 OPEN 둘의 상태는 **아래 M9/budget-clear 정정**이
+적는다 — 이 slice 는 그 처분을 하지 않는다.
 
 **정정 2026-11-05(M9/budget-clear)** — 위 셋 가운데 **6B-4 는 열렸고 머지됐다**(PR #71): 받은 둘의 상태는
 `OPEN-5E-JOB-PERSISTENCE` **닫는 후보** · `OPEN-5E-JOB-QUEUE-BOUND` **부분 종결 후보**(근거는

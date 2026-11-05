@@ -27,6 +27,7 @@ const CONTRACT_DETAILS: readonly NotificationDetail[] = [
   'NOT_PROVISIONAL_FIRST',
   'AWARDED',
   'NOT_AWARDED',
+  'FAILED_OR_REBID',
 ];
 
 function item(overrides: Partial<NotificationItem> = {}): NotificationItem {
@@ -59,7 +60,7 @@ describe('알림 종류·부가 사실의 표', () => {
     expect(new Set(labels).size, `접힌 라벨: ${labels.join(' · ')}`).toBe(CONTRACT_KINDS.length);
   });
 
-  it('부가 사실 표도 계약 전수 넷이고 라벨이 서로 다르다', () => {
+  it('부가 사실 표도 계약 전수 다섯이고 라벨이 서로 다르다', () => {
     expect(Object.keys(NOTIFICATION_DETAIL_DISPLAY).sort()).toStrictEqual([...CONTRACT_DETAILS].sort());
 
     const labels = CONTRACT_DETAILS.map((one) => NOTIFICATION_DETAIL_DISPLAY[one].label);
@@ -74,6 +75,15 @@ describe('알림 종류·부가 사실의 표', () => {
     expect(NOTIFICATION_DETAIL_DISPLAY.NOT_PROVISIONAL_FIRST.label).not.toBe(
       NOTIFICATION_DETAIL_DISPLAY.NOT_AWARDED.label,
     );
+  });
+
+  /**
+   * 「내가 졌다」(패찰)와 「아무도 못 땄다」(유찰)는 **다른 사실**이다(D-M9-1). 위 distinct
+   * 등식도 이것을 재지만, 그 등식은 다섯 중 **어느 둘**이 접혔는지 말하지 않는다 — 이 축은
+   * 접기가 거부된 바로 그 자리라 이름을 들어 따로 단언한다.
+   */
+  it('NOT_AWARDED 와 FAILED_OR_REBID 가 다른 문면이다', () => {
+    expect(NOTIFICATION_DETAIL_DISPLAY.FAILED_OR_REBID.label).not.toBe(NOTIFICATION_DETAIL_DISPLAY.NOT_AWARDED.label);
   });
 });
 
