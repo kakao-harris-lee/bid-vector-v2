@@ -97,7 +97,7 @@ C-2 가 가른 것이 이 라운드의 교정 근거다: 값 단계의 거절에
 | 무엇 | 실측 |
 | --- | --- |
 | `OPEN-6F4-TITLE-INGEST` 는 닫혔나 | **닫혔다** — `reports/evidence/m6/6f8/scope.md` 의 OPEN 표가 「수령·닫음 · D-6F8-2」, 같은 문서 D-6F8-2 가 공고명을 필드 계약 데이터로 옮긴 결정, milestone-6 의 「6F-8 종결 2026-09-24 — PR #45」 |
-| `OPEN-6F10-*` 는 몇인가 | **여덟**(합집합). 두 자리가 **양방향으로** 어긋난다 — 6F-10 「이 slice 가 신설한 OPEN」 표에 일곱 · `milestone-6.md` 종결 문단에 일곱인데 **같은 일곱이 아니다**: 표에만 `CAUSE-CODE-DEDUP`, 문단에만 `STRATEGY-EVENT-CONSUMER`(D-6F10-13 신설) · 교집합 여섯 |
+| `OPEN-6F10-*` 는 몇인가 | **여덟**(합집합). 두 자리가 **양방향으로** 어긋난다 — 6F-10 「이 slice 가 신설한 OPEN」 표에 일곱 · `milestone-6.md` 종결 문단에 일곱인데 **같은 일곱이 아니다**: 표에만 `CAUSE-CODE-DEDUP`(**`milestone-6.md` 전체에서 0 회** — 마일스톤 문서만 읽으면 그 OPEN 이 없는 것으로 보인다), 문단에만 `STRATEGY-EVENT-CONSUMER`(D-6F10-13 신설) · 교집합 여섯. 재현: `sed -n '/6F-10 종결/p' milestone-6.md \| command grep -oE 'OPEN-6F10-[A-Z-]+' \| sort -u` → 일곱 |
 | 그 여덟에 처분이 있나 | **없다** — 닫음어휘 근접 술어의 일치는 **일곱**이고 전부 **종결 문단 한 줄**에서 나온다(그 줄에 식별자 일곱과 종결 어휘가 함께 있다). 여덟째 `CAUSE-CODE-DEDUP` 은 일치 **0 건**이다. §1 이 적은 오탐 꼴이라 판정으로 쓰지 않았다(v r2 L-a — 앞 판이 이 계수를 「여덟 모두」로 적었다) |
 | `OPEN-6F4W-UNAVAILABLE-PRODUCER` | 신설 기록만 있고 처분 기록 0 — 열린 채로 둔다 |
 

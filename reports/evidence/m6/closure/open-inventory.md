@@ -143,6 +143,12 @@ M5 종결(47건)의 네 배가 넘는다.
   `STRATEGY-EVENT-CONSUMER`.
 - **6F-10 「이 slice 가 신설한 OPEN」 표의 6F10 식별자도 일곱**인데 **같은 일곱이 아니다** — 그 표에는
   `STRATEGY-EVENT-CONSUMER` 가 없고 대신 `CAUSE-CODE-DEDUP` 이 있다.
+- `CAUSE-CODE-DEDUP` 은 **`milestone-6.md` 전체에서 0 회**다(그 문단만이 아니라 그 파일 어디에도 없다).
+  그 식별자의 유일한 자리는 6F-10 checklist 의 신설 표이고, 그래서 마일스톤 문서만 읽는 쪽에는 **그 OPEN 이
+  존재하지 않는 것으로 보인다** — 어긋남이 「문단에 빠졌다」보다 한 단 더 깊다.
+- 재현(둘 다 이 문단의 근거다):
+  `sed -n '/6F-10 종결/p' milestone-6.md | command grep -oE 'OPEN-6F10-[A-Z-]+' | sort -u` → **일곱** ·
+  `command grep -c 'OPEN-6F10-CAUSE-CODE-DEDUP' milestone-6.md` → **0**.
 - 그래서 **어긋남은 양방향**이다(§6 은 한 방향만 적었다): 문단에만 있는 것 하나(`STRATEGY-EVENT-CONSUMER`,
   D-6F10-13 신설) · 표에만 있는 것 하나(`CAUSE-CODE-DEDUP`). 합집합 여덟 · 교집합 여섯.
 - **닫음어휘 일치는 일곱이고 `CAUSE-CODE-DEDUP` 은 0 건**이다. 즉 §6 의 「여덟 모두」는 두 번 틀렸다 —
