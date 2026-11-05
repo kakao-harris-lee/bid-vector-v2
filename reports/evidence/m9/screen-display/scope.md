@@ -52,6 +52,7 @@ SHA 뒤에 온다.
 | `web/scripts/display-gate-selectors.test.mjs` | D-4 게이트의 양성·음성 대조. 실제 `eslint.config.js` 를 불러 린트하므로 `eslint`·`node:path` 를 import 하고, 그래서 `web/src/**` 에 둘 수 없다(ADR 0011 D-3 의 경계 — 같은 사유의 선례가 `web/scripts/` 에 있다). **이미 커밋돼 있고 유지한다.** |
 | `web/config/gate-tests.txt` | 새 게이트 test 셋의 W-7 등재. **추가 줄만** 넣고 기존 줄은 무편집이다. |
 | `web/e2e/capture/usecase-captures.mjs` | 알림함 캡처가 막혀 있다(아래 D-6). 양성 표지 한 줄을 고친다. |
+| `web/scripts/screen-card-coverage.{mjs,test.mjs}` | **r1 수정 라운드에서 생겼다**(v M-1 처방 「열거 말고 구조」). DOM 어휘 게이트의 **모집단**을 `src/screens/**` 의 AST 에서 유도해 마운트 목록과 집합 등식을 건다. 앞의 `display-gate-selectors.test.mjs` 와 같은 사유로 `web/scripts/` 에 있다(node 모듈 import — `web/src/**` 에 둘 수 없다). r2 v L-B 로 이 절에 등재한다. |
 
 **경로 정정**: 갱신 전 in_scope 의 `web/e2e/shared.ts` 는 **존재하지 않는 경로**다. 실제 파일은
 `web/e2e/journey/shared.ts` 이고 그것은 이미 `web/e2e/journey/**` 안이다.

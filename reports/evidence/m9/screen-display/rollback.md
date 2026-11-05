@@ -1,6 +1,8 @@
 # M9 / screen-display — rollback
 
-실측 HEAD: `ac0f4484` (병합 커밋 — 이 트리가 판정 대상이다)\n\n복원 원천: `6c38fb32` · 복원 목록 산출: `79f3e5c4..2d801d73`(내 커밋만)
+실측 HEAD: `ac0f4484` (병합 커밋 — 이 트리가 판정 대상이다)
+
+복원 원천: `6c38fb32`(병합 커밋의 둘째 부모) · 복원 목록 산출: `79f3e5c4..2d801d73`(내 커밋만, 병합 제외)
 
 ## 전제
 
@@ -44,7 +46,7 @@ evidence 커밋은 복원 목록 안의 경로를 건드리지 않으므로 실�
 낡게 만들지 않는다(아래 유효성 확인).
 
 ```
-git restore --source=79f3e5c4 --staged --worktree -- \
+git restore --source=6c38fb32 --staged --worktree -- \
   docs/usecase/captures/b-notices-desktop.png \
   docs/usecase/captures/b-notices-mobile.png \
   docs/usecase/captures/c-worksheet-desktop.png \
@@ -61,6 +63,8 @@ git restore --source=79f3e5c4 --staged --worktree -- \
   web/e2e/journey/shared.ts \
   web/eslint.config.js \
   web/scripts/display-gate-selectors.test.mjs \
+  web/scripts/screen-card-coverage.mjs \
+  web/scripts/screen-card-coverage.test.mjs \
   web/src/display/editSessionDisplay.test.ts \
   web/src/display/editSessionDisplay.ts \
   web/src/display/moneyDisplay.test.ts \
@@ -71,6 +75,7 @@ git restore --source=79f3e5c4 --staged --worktree -- \
   web/src/display/timeDisplay.ts \
   web/src/screens/BidBoxCard.tsx \
   web/src/screens/BidBoxScreen.test.tsx \
+  web/src/screens/BidBoxScreen.tsx \
   web/src/screens/InboxScreen.test.tsx \
   web/src/screens/InboxScreen.tsx \
   web/src/screens/InstantText.tsx \
