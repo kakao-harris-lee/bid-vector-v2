@@ -200,6 +200,17 @@ async function editStrategyField(page: Page, field: string, raw: string): Promis
 const HTTP_UNAUTHORIZED = 401;
 
 /**
+ * 전략의 금액대 **두 한계** — 되돌림은 선 것만 비운다. 한쪽만 보면 뒤 라운드가 다른 쪽의 출구를
+ * 「적용」으로 바꿨을 때 **잔류가 생기는데 안전망도 단언도 그것을 못 본다**(cr L-2 · v L-3).
+ */
+const BUDGET_LIMITS = [
+  { field: 'MIN_BUDGET', won: 'minBudgetWon' },
+  { field: 'MAX_BUDGET', won: 'maxBudgetWon' },
+] as const;
+
+type StrategyBudget = Record<(typeof BUDGET_LIMITS)[number]['won'], number | null> & { readonly revision: number };
+
+/**
  * 금액대 되돌림의 **안전망**(M9 D-2) — 본문이 되돌림까지 단언하지만 그 사이에서 터지면 적용된
  * 금액대가 남아 **여정 ②·설정 여정의 출발 단언**이 남의 잔류로 깨진다. 그 실패가 가장 비싼 꼴이라
  * teardown 에서 한 번 더 비운다(이미 비어 있으면 아무것도 보내지 않는다).
@@ -209,47 +220,62 @@ const HTTP_UNAUTHORIZED = 401;
  * 뒤 slice 가 받는다(7E-2b 알려진 제한 ⑥ 과 같은 자리).
  *
  * 되돌리지 못한 사유를 **돌려준다** — 여기서 단언하면 뒤따르는 어휘 되돌림이 돌지 않는다.
+ * 한계마다 **전략을 다시 읽는다**: 앞 비움이 개정을 올려 `seenRevision` 이 낡는다.
  */
 async function clearBudgetIfSet(page: Page): Promise<string | null> {
+  for (const limit of BUDGET_LIMITS) {
+    const why = await clearOneBudget(page, limit.field, limit.won);
+    if (why !== null) {
+      return why;
+    }
+  }
+  return null;
+}
+
+async function clearOneBudget(
+  page: Page,
+  field: string,
+  wonKey: (typeof BUDGET_LIMITS)[number]['won'],
+): Promise<string | null> {
   const read = await page.request.get('/api/strategy');
   if (read.status() === HTTP_UNAUTHORIZED) {
     return null;
   }
   if (!read.ok()) {
-    return `전략을 읽지 못해 금액대를 되돌릴 수 없었다(GET /api/strategy ${read.status()})`;
+    return `전략을 읽지 못해 ${field} 를 되돌릴 수 없었다(GET /api/strategy ${read.status()})`;
   }
-  const strategy = (await read.json()) as { readonly minBudgetWon: number | null; readonly revision: number };
-  if (strategy.minBudgetWon === null) {
+  const strategy = (await read.json()) as StrategyBudget;
+  if (strategy[wonKey] === null) {
     return null;
   }
   const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
   const headers = { 'X-Operator-Csrf': session.csrf };
-  const begin = await page.request.post('/api/strategy/edit-sessions', { headers, data: { field: 'MIN_BUDGET' } });
+  const begin = await page.request.post('/api/strategy/edit-sessions', { headers, data: { field } });
   if (!begin.ok()) {
-    return `편집 세션을 열지 못해 금액대를 되돌릴 수 없었다(POST edit-sessions ${begin.status()})`;
+    return `편집 세션을 열지 못해 ${field} 를 되돌릴 수 없었다(POST edit-sessions ${begin.status()})`;
   }
   const { sessionId } = (await begin.json()) as { readonly sessionId?: string };
   if (sessionId === undefined) {
-    return '편집 세션 응답에 sessionId 가 없어 금액대를 되돌릴 수 없었다';
+    return `편집 세션 응답에 sessionId 가 없어 ${field} 를 되돌릴 수 없었다`;
   }
   const stamp = Date.now();
   const valued = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/value`, {
     headers,
-    data: { commandId: `budget-teardown-value-${stamp}`, field: 'MIN_BUDGET', amountWon: null },
+    data: { commandId: `budget-teardown-value-${field}-${stamp}`, field, amountWon: null },
   });
   if (!valued.ok()) {
     // 세션을 닫아 다음 실행의 `begin` 을 막지 않는다(어휘 되돌림과 같은 규율).
     await page.request.post(`/api/strategy/edit-sessions/${sessionId}/cancel`, {
       headers,
-      data: { commandId: `budget-teardown-cancel-${stamp}` },
+      data: { commandId: `budget-teardown-cancel-${field}-${stamp}` },
     });
-    return `금액대 되돌림 값이 거부됐다(value ${valued.status()})`;
+    return `${field} 되돌림 값이 거부됐다(value ${valued.status()})`;
   }
   const confirmed = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/confirm`, {
     headers,
-    data: { commandId: `budget-teardown-confirm-${stamp}`, seenRevision: strategy.revision },
+    data: { commandId: `budget-teardown-confirm-${field}-${stamp}`, seenRevision: strategy.revision },
   });
-  return confirmed.ok() ? null : `금액대 되돌림 적용이 거부됐다(confirm ${confirmed.status()})`;
+  return confirmed.ok() ? null : `${field} 되돌림 적용이 거부됐다(confirm ${confirmed.status()})`;
 }
 
 test.afterEach(async ({ page }) => {
@@ -272,16 +298,19 @@ test.afterEach(async ({ page }) => {
     return;
   }
   expect(outcome.kind === 'blocked' ? outcome.why : null, '여정 ① 의 전역 감시 조건을 되돌릴 수 없었다').toBeNull();
-  const after = (await (await page.request.get('/api/strategy')).json()) as {
+  const after = (await (await page.request.get('/api/strategy')).json()) as StrategyBudget & {
     readonly focusCategories: readonly string[];
-    readonly minBudgetWon: number | null;
   };
   expect(after.focusCategories, '여정 ① 이 전역 감시 조건을 남겼다').toStrictEqual([]);
   // **서버에서** 센다 — 안전망이 돌았는지가 아니라 남은 것이 0 인지가 뒤 여정의 전제다.
-  expect(
-    after.minBudgetWon,
-    `여정 ① 이 전역 금액대를 남겼다${budgetLeft === null ? '' : ` — ${budgetLeft}`}`,
-  ).toBeNull();
+  // **두 한계 모두** 본다: 본문은 오늘 MAX 를 「그만두기」로만 지나지만, 그 출구가 바뀌는 날
+  // 잔류를 보는 자리가 여기여야 한다(cr L-2 · v L-3).
+  for (const limit of BUDGET_LIMITS) {
+    expect(
+      after[limit.won],
+      `여정 ① 이 전역 금액대(${limit.field})를 남겼다${budgetLeft === null ? '' : ` — ${budgetLeft}`}`,
+    ).toBeNull();
+  }
 });
 
 /** D-7E-6 — 지금 화면에 비밀 문구도 사업자번호 꼴도 없다. 두 자리에서 부른다(채운 뒤·비운 뒤). */
