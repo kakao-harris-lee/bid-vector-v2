@@ -295,12 +295,27 @@ def test_unmeasurable_observation_is_not_silently_dropped() -> None:
 def test_unmeasurable_rows_from_another_policy_version_are_rejected() -> None:
     """cr M-1 재현 — 앞 판은 정책 version 검사가 `KnownTimeAxis` 안에만 있어서, **대체를
     승인한 정책**이 공시된 표가 그 정책으로는 분모에 들어갔어야 할 행을 「측정 불가」로
-    적을 수 있었다(예외 없이 통과했다)."""
+    적을 수 있었다(예외 없이 통과했다).
+
+    두 정책의 **version 이 달라야** 이 test 가 그 축을 잰다 — 모듈 상단의 `_STRICT`·
+    `_PERMISSIVE` 는 승인 칸만 다르고 version 이 같아서(의도: 승인 축만 가른다) 그 둘로는
+    헛돈다. 첫 판이 실제로 그래서 초록이었다."""
+    approving_other_version = TimeAxisPolicy(
+        version="inference-other", substitute_approved=True
+    )
     unapproved_elsewhere = SettlementObservation(
         time_axis=resolve_time_axis(
             opened_at=None, bid_close_at=_WEEK1, policy=_STRICT
         ),
         settled=True,
     )
+    # 양성 대조 — 같은 정책으로 해석한 행은 그 정책에서 통과한다(예외가 version 때문임을
+    # 고정한다).
+    same_policy = build_weekly_maturity(
+        [unapproved_elsewhere], window_days=7, policy=_STRICT
+    )
+    assert same_policy.population_row_count == 1
     with pytest.raises(ValueError, match="정책 version"):
-        build_weekly_maturity([unapproved_elsewhere], window_days=7, policy=_PERMISSIVE)
+        build_weekly_maturity(
+            [unapproved_elsewhere], window_days=7, policy=approving_other_version
+        )
