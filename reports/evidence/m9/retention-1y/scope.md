@@ -64,6 +64,10 @@ evidence 에 **거동 파급**으로 적고 그대로 진행한다(되돌림 항
 날짜로** 해소하고, runbook §2.1 의 04:10 KST cron 은 **언제나** 그 창에 들어 개정일 당일에도 옛 값으로 돈다
 (v L-1 실측). 경계: `2026-11-04T14:59:59Z` → 90 · `2026-11-04T15:00:00Z` → 365.
 
+**D-8 이 in_scope 에 더하는 경로 둘** — `app/src/main/kotlin/bidvector/app/wiring/RetentionWiring.kt`(해소 구역) ·
+`app/src/test/kotlin/bidvector/app/wiring/RetentionWiringTest.kt`(리터럴 앵커·경계). 그래서 복원 목록이
+26 → **28** 이 된다. 그 밖의 경로는 늘지 않았다.
+
 **D-9 — 승격 배선은 고치지 않는다**(v M-1 · cr M-1). 그 창의 기준일은 시계가 아니라 운영자 입력
 `bidvector.opening-promote.reference-date` 다. 그래서 위 「함께 넓어진다」는 **조건부**(그 입력이 개정일 이후일
 때)이고, 같은 정책이 두 시대로 해소될 수 있다는 비대칭과 그 창 확대의 **미측정**을 알려진 제한으로 등재한다.

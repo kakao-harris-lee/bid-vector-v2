@@ -10,7 +10,7 @@
 SHA 에 없다**(`git merge-base --is-ancestor` 비-0). ② 가 성립하므로 그 SHA 에서의 전체 복원이 남의 줄을
 떨어뜨릴 수 없고 커밋 해시 목록(hunk 격리)이 필요 없다.
 
-**실측 HEAD: `c9a953f2`** — **병합 커밋**이고 이 slice 의 마지막 산출물 상태다(병합이 복원 목록의 `ci.yml` 을 움직였으므로 그 뒤에서 다시 쟀다). 그 뒤 커밋은 이 evidence 디렉터리뿐이고
+**실측 HEAD: `4a15aa3c`** — 수정 라운드 1 의 **마지막 산출물 커밋**이다(그 라운드가 코드 셋을 움직였으므로 그 뒤에서 다시 쟀다 — 앞 두 라운드의 측정을 옮기지 않았다). 그 뒤 커밋은 이 evidence 디렉터리뿐이고
 evidence 는 아래 복원 목록 **밖**이다.
 
 **공유 파일에 hunk 격리가 필요 없는 근거**: `milestone-6.md` · `docs/discovery/capability-map.md` ·
@@ -43,7 +43,9 @@ git restore --source=6c38fb32 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/retention/RetentionSweepTest.kt \
   app/src/main/kotlin/bidvector/app/http/NotificationInboxRequests.kt \
   app/src/main/kotlin/bidvector/app/wiring/OpeningPromotionWiring.kt \
+  app/src/main/kotlin/bidvector/app/wiring/RetentionWiring.kt \
   app/src/test/kotlin/bidvector/app/retention/RetentionRunnerTest.kt \
+  app/src/test/kotlin/bidvector/app/wiring/RetentionWiringTest.kt \
   docs/discovery/capability-map.md \
   docs/runbook/m6-6b3-retention.md \
   docs/runbook/m6-6e-operations.md \
@@ -61,15 +63,19 @@ git restore --source=6c38fb32 --staged --worktree -- \
 `git rm -r reports/evidence/m9/retention-1y`(장부층이라 목록 밖이고, 그래서 목록이 자기를 담은 커밋을 가리키지 않는다).
 
 목록은 **기계 산출**이고, 병합 뒤에는 **range 가 아니라 「병합한 main → HEAD」 차이**로 낸다
-(`git diff --name-status 6c38fb32..HEAD` 에서 `reports/evidence/m9/retention-1y/` 제외 — `M` **26** · `A` 0).
+(`git diff --name-status 6c38fb32..<마지막 산출물 커밋>` 에서 `reports/evidence/m9/retention-1y/` 제외 —
+`M` **28** · `A` 0).
 base 부터의 range 로 내면 **main 이 들여온 15 파일이 섞인다**(PR #122·#126) — 그것은 이 slice 의 것이 아니다.
-계약 갱신 라운드가 셋을 더해 23 → 26 이 됐고, 병합 뒤 재산출한 26 은 앞 목록과 **`comm` 양방향 빈 출력**으로
-같다(늘어난 것은 없고 기준만 옮겼다). 라운드마다 파일이 늘거나 main 을 또 들이면 이 절차를 다시 돌린다.
+목록은 라운드마다 늘었다 — 23(착수) → 26(계약 갱신: runbook 둘 + `ci.yml`) → **28**(수정 라운드 1:
+`RetentionWiring.kt`·`RetentionWiringTest.kt`, D-8 로 in_scope 등재). 병합 뒤에는 기준만 옮겼고(26 은
+`comm` 양방향 빈 출력으로 앞 목록과 동일) 수정 라운드가 둘을 더했다. **라운드마다 파일이 늘거나 main 을 또
+들이면 이 절차를 다시 돌린다** — 이 문서의 실측은 그래서 세 번 다시 났다.
 
 ## 되돌린 트리에서 무엇이 꺼지는가
 
-보존 기간이 **90일로 돌아간다**: 정책 표의 개정 항목이 사라져 cutoff 가 `시계 − 90일` 이 되고, 같은 정책을
-읽는 **개찰 승격의 원문 적재 시각 하한**도 90일로 좁아진다. test 앵커도 90 으로 돌아가 경계가 다시 90일에
+보존 기간이 **90일로 돌아간다**: 정책 표의 개정 항목이 사라져 cutoff 가 `시계 − 90일` 이 되고, **개정일 판정
+구역도 UTC 로 돌아간다**(D-8 이 꺼진다). 같은 정책을 읽는 개찰 승격의 하한도 좁아진다 — 그쪽은 운영자가 주는
+기준일을 타므로 그 입력이 개정일 이후였을 때만 달라진다. test 앵커도 90 으로 돌아가 경계가 다시 90일에
 선다. 문서 쪽은 runbook 의 개정 문면·§2.4 와 milestone·재고의 정정 문단이 사라지고, 확장 범위 셋
 (두 운영 runbook 의 파기 시점 문면 · `ci.yml` SBOM 주석의 「별개 축」)이 **90일 서술로 돌아간다** —
 `ci.yml` 의 artifact 보관 일수는 어느 쪽에서도 움직이지 않는다(값을 바꾼 적이 없다).
@@ -85,10 +91,10 @@ base 부터의 range 로 내면 **main 이 들여온 15 파일이 섞인다**(PR
 
 | # | 확인 | 결과 |
 |---|---|---|
-| — | 목록 등식 | 기계 산출 **26**(evidence 제외) · 문서 목록 **26** · 전건 `M` |
+| — | 목록 등식 | 기계 산출 **28**(evidence 제외) · 문서 목록 **28** · 전건 `M` |
 | ① | 복원 명령 | exit **0** |
-| ② | `git status --porcelain` | **`M` 26 · `D` 4**(`D` 는 함께 지운 evidence 네 파일) |
-| ③ | `git diff 6c38fb32 -- <26 경로>` | **0 줄** |
+| ② | `git status --porcelain` | **`M` 28 · `D` 4**(`D` 는 함께 지운 evidence 네 파일) |
+| ③ | `git diff 6c38fb32 -- <28 경로>` | **0 줄** |
 | ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**(「HEAD 초록」이 아니다): 복원 + evidence 제거 뒤 작업 트리의 `git write-tree` 가 **병합한 main 의 트리 해시와 같다**(`22a86039…`) — 되돌린 트리는 `6c38fb32` 와 **같은 트리**이고 그것은 CI 가 통과한 main 이다. 보조 측정 둘: 복원 뒤 `git diff 6c38fb32 --name-only -- '*.kt' …` **0 파일** · **base 대비로 재면 15 파일이 남는다** — 그 15 는 main 이 들여온 **남의 표지**이고, 「내 표지 0 · 남의 표지 보존」의 계수가 그 둘이다 |
 | ⑥ | 이 slice 가 닿는 게이트 | 아래 「⑥ 게이트」 |
 
@@ -102,7 +108,7 @@ base 와 동일해졌다.
 
 | 명령 | 결과 |
 |---|---|
-| `./gradlew --no-daemon -q leakPatternGate`(rb-clone — 복원된 트리 + 이 slice 의 evidence 네 파일) | **exit 0** · 병합 뒤 `c9a953f2` 에서 **재실측**(앞 두 라운드의 측정을 옮기지 않았다 — 되돌림 대상 `ci.yml` 이 병합으로 움직였다) |
+| `./gradlew --no-daemon -q leakPatternGate`(rb-clone — 복원된 트리 + 이 slice 의 evidence 네 파일) | **exit 0** · 수정 라운드 1 의 `4a15aa3c` 에서 **세 번째 재실측**(라운드마다 되돌림 대상이 움직여 앞 측정을 옮기지 않았다) |
 | 참조형 스캔 `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m9/retention-1y/` | **exit 1(매치 0)**. 이 명령의 **양성 대조는 따로 심지 않았다** — 같은 패턴 파일을 산출물 문서(base 에 이미 있던 줄)에 떴을 때 여러 줄이 잡혔으므로 술어가 비어 있지 않다는 것이 그 자리에서 실측됐다 |
 
 **baseline 이 복원으로 함께 돌아간다는 점을 본다**: `config/quality/leak-pattern-baseline.txt` 는 이 slice 도,
@@ -117,8 +123,8 @@ slice 에 없다.
 ## 유효성 확인 (감사자용)
 
 ```bash
-git diff --name-only c9a953f2..<판정 SHA> -- \
-  <위 복원 목록 26 경로>
+git diff --name-only 4a15aa3c..<판정 SHA> -- \
+  <위 복원 목록 28 경로>
 ```
 
 빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.

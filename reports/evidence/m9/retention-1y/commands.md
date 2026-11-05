@@ -60,8 +60,8 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 
 | 확인 | 결과 |
 |---|---|
-| in_scope 대조 | `git log --no-merges --format= --name-only 79f3e5c4..HEAD \| sort -u` → **27 경로**, 전부 계약 in_scope 안(retention 네 묶음 · 「90일 문면」 파일 · 문서 여섯 · `ci.yml` 주석 · 이 evidence). 계약 갱신 2026-11-05 이 들여온 세 경로가 그 늘어난 셋이다 |
-| 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 26 전건 `M`) — 갱신 라운드가 만든 새 파일 **0** |
+| in_scope 대조 | `git diff --name-only 6c38fb32..HEAD` → **32 경로**(산출물 **28** + 이 evidence 넷), 전부 계약 in_scope 안. **열거는 `rollback.md` 의 복원 목록이 정본**이다(계약의 「… 등 — 실제로 고친 경로를 evidence 에 열거」를 그 자리가 충족한다 — v L-2). 산출물 수는 23 → 26(계약 갱신) → **28**(수정 라운드 1 의 `RetentionWiring*`) 으로 늘었다 |
+| 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 28 전건 `M`). 수정 라운드 1 이 **새로 만진** 경로 둘(`RetentionWiring.kt`·`RetentionWiringTest.kt`)은 D-8 로 in_scope 에 등재했다 — 「수정 라운드가 만드는 새 파일 ↔ in_scope 대조」 |
 | 새 test 클래스 | **0** — 기존 네 클래스에 test 를 더했다. 그래서 `config/quality/gate-tests.properties` 편집이 **없고** 「새 클래스 미등재」 함정에 해당하지 않는다 |
 | 마이그레이션 | `git diff --name-only 79f3e5c4..HEAD -- adapters/src/main/resources/db/migration/` **0 파일**(D-4 — 적용된 `V19`·`V23` 의 주석을 고치지 않았다, checksum) |
 | 낡는 좌표 | 이 slice 가 편집하는 파일에 `file:line` **0**. 역방향(편집한 파일 stem 으로 `<stem>:[0-9]` 전수) 유효 참조 **0** — 유일한 매치는 M4 evidence 에 적힌 **grep 명령문 안의 패턴**이고 좌표 참조가 아니다 |
@@ -98,6 +98,22 @@ PR #122 의 S-27d 가 들어간 뒤라 **병합을 먼저** 했다. **자동 병
 
 전건 `check`·`qualityBaseline` 은 이 병합 뒤 HEAD 에서 **돌리지 않았다** — 팀장 지시대로 **draft PR 의 CI 가
 정본**이다(빌드 큐 포화). 위 11(컴파일 입력 0)이 그 생략의 근거이고 그 생략은 PR CI 가 메운다.
+
+## 수정 라운드 1 (v not-ready · cr request_changes @`ebe377b4`)
+
+차단 둘은 코드다 — **v H-1**(배선이 어느 시대로 해소하는지 아무 술어도 재지 않았다)과 **D-8**(개정일을 KST
+달력일로). 나머지는 문면이고 같은 자리에서 처리했다.
+
+| # | 명령·변이 | 결과 |
+|---|---|---|
+| 16 | **RED** `:app:test --tests '…RetentionWiringTest' --rerun`(구역 고치기 전) | **exit 1** · 11 중 **1 FAILED** — 「개정일 첫 순간(KST)」이 `expected:<365> but was:<90>`. UTC 해소라 11-04 로 떨어진다. 리터럴 365 쪽은 그 시점에도 통과한다(그 축의 RED 는 아래 변이 B 다) |
+| 17 | **GREEN** 같은 표적 + `:workflow:test --tests '…retention.*'` | **exit 0** |
+| 18 | **변이 B** — 배선 해소를 개정 앞 시각 고정으로(v 가 **생존**을 실측한 그 변이) | **KILLED · 20 중 2 FAILED** — 리터럴 앵커와 KST 경계 둘 다 `365 → 90`. `-Werror` 가 만드는 가짜 RED 를 피하려 import·`clock` 인자가 계속 쓰이는 모양으로 변이했다 |
+| 19 | **변이 Z** — 개정일 판정 구역을 `UTC` 로(D-8 의 반대) | **KILLED · 11 중 1 FAILED**(KST 경계) |
+| — | 원복 | 변이 둘 다 **사본 복구**(`git checkout --` 금지) · `git status --porcelain -- <두 파일>` **빈 출력** |
+
+전건 `check` 는 이 라운드에서 돌리지 않았다 — **PR CI 가 정본**(계약 갱신 절). 이 라운드가 바꾼 Kotlin 은
+세 파일이고 그 영향 범위를 위 16~19 가 표적으로 덮는다.
 
 ## rollback 실측
 
