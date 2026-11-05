@@ -1272,7 +1272,7 @@ def test_run_holdout_promotion_is_superseded_when_window_predates_policy() -> No
     )
 
 
-def test_window_release_id_changes_with_the_sample_scope(tmp_path: Path) -> None:
+def test_window_release_id_changes_with_the_sample_scope() -> None:
     """v M-1 — ML-05 의 새 축이 **창 경로**에서도 잠긴다. `sample_scope` 만 다른 두
     manifest 로 같은 코퍼스를 돌리면 창의 `release_id` 가 갈린다.
 

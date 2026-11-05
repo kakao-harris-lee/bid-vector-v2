@@ -40,6 +40,12 @@ from ml_engine.evaluation.policy_source import (
     PolicySourceMismatch,
     verify_policy_source,
 )
+from tests.ast_sites import (
+    called_name,
+    construction_sites,
+    src_key,
+    src_trees,
+)
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ML_ENGINE_ROOT / "src" / "ml_engine"
@@ -53,76 +59,8 @@ POLICY_KEY_NAMES: Final[frozenset[str]] = frozenset(_SCALAR_KEYS) | frozenset(
 _ENVIRONMENT_NAMES: Final[frozenset[str]] = frozenset({"environ", "getenv"})
 
 
-def _src_paths() -> list[Path]:
-    return sorted(
-        path for path in _SRC.rglob("*.py") if "__pycache__" not in path.parts
-    )
-
-
-def _key(path: Path) -> str:
-    return path.relative_to(_SRC).as_posix()
-
-
-def _trees() -> list[tuple[Path, ast.Module]]:
-    return [
-        (path, ast.parse(path.read_text(encoding="utf-8"))) for path in _src_paths()
-    ]
-
-
-def _enclosing_functions(tree: ast.Module) -> dict[int, str]:
-    """`id(node) -> 그 노드를 품은 가장 가까운 함수 이름`."""
-    owner: dict[int, str] = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for inner in ast.walk(node):
-            owner.setdefault(id(inner), node.name)
-    return owner
-
-
-def _called_name(node: ast.Call) -> str | None:
-    func = node.func
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    return None
-
-
-def _bound_names(tree: ast.Module, target: str) -> set[str]:
-    """그 모듈 안에서 `target` 타입을 가리키는 이름 전수 — 원래 이름 + `as` 별칭 +
-    `_P = Target` 재대입.
-
-    **측정으로 더한 층이다**(M9/ml-lifecycle 변이 M8b): 호출 이름만 보던 앞 판은
-    `from … import EvaluationPolicy as _P` 뒤 `_P(...)` 를 지나갔다 — 별칭 하나가 문이었다.
-    **남은 한계**(문면에 둔다): 재대입은 **한 단계**만 따라간다(`_A = Target; _B = _A`
-    연쇄는 못 본다). 그 잔여 경로도 src 를 편집해야 성립하고, 새 임계 **값**은 숫자 리터럴
-    게이트가, 새 입력 **경로**는 아래 세 축이 막는다."""
-    names = {target}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            names.update(
-                alias.asname or alias.name
-                for alias in node.names
-                if alias.name == target
-            )
-        elif isinstance(node, ast.Import):
-            names.update(
-                alias.asname or alias.name.rsplit(".", 1)[-1]
-                for alias in node.names
-                if alias.name.rsplit(".", 1)[-1] == target
-            )
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and isinstance(node.value, ast.Name)
-            and node.value.id in names
-        ):
-            names.update(item.id for item in node.targets if isinstance(item, ast.Name))
-    return names
-
-
 def _string_constants(node: ast.AST) -> list[str]:
+    """그 노드 아래의 모든 문자열 상수 — 이 게이트 고유라 공용 보조에 올리지 않는다."""
     return [
         inner.value
         for inner in ast.walk(node)
@@ -141,14 +79,14 @@ def _matched_keys(candidate: str) -> list[str]:
     return sorted(key for key in POLICY_KEY_NAMES if key in normalized)
 
 
-def _environment_reading_trees() -> list[tuple[Path, ast.Module]]:
+def _environment_readingsrc_trees() -> list[tuple[Path, ast.Module]]:
     """환경을 실제로 읽는 모듈만(`os.environ` · `getenv`). 환경 이름 후보를 **그 모듈
     안에서만** 찾는 이유는, 전 소스의 대문자 상수를 환경 이름으로 보면 enum 값
     (`MEASURED_BEFORE_EFFECTIVE_DATE` 등)까지 후보가 되어 술어가 자기 어휘를 고발하기
     때문이다 — 술어가 모든 것을 잡으면 아무것도 잡지 못한다."""
     return [
         (path, tree)
-        for path, tree in _trees()
+        for path, tree in src_trees()
         if any(
             (isinstance(node, ast.Attribute) and node.attr in _ENVIRONMENT_NAMES)
             or (isinstance(node, ast.Name) and node.id in _ENVIRONMENT_NAMES)
@@ -167,24 +105,20 @@ def test_policy_key_population_is_derived_from_the_loader_schema() -> None:
 
 
 def test_evaluation_policy_is_constructed_only_inside_the_loader() -> None:
-    """④ 로더 우회 — 손으로 조립해 임계를 비트는 길."""
-    sites: set[tuple[str, str]] = set()
-    for path, tree in _trees():
-        owner = _enclosing_functions(tree)
-        watched = _bound_names(tree, "EvaluationPolicy")
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and _called_name(node) in watched:
-                sites.add((_key(path), owner.get(id(node), "<module>")))
-    assert sites == {("evaluation/policy.py", "load_evaluation_policy")}, sites
+    """④ 로더 우회 — 손으로 조립해 임계를 비트는 길. 이름 해석(별칭·재대입 한 단계)은
+    공용 보조가 한다(cr M-6 — 두 게이트가 **같은 본문**을 쓴다)."""
+    assert construction_sites("EvaluationPolicy") == {
+        ("evaluation/policy.py", "load_evaluation_policy")
+    }
 
 
 def test_no_cli_argument_is_named_after_a_policy_key() -> None:
     """① CLI — `add_argument` 의 옵션 문자열·`dest` 전수."""
     violations: list[str] = []
     seen = 0
-    for path, tree in _trees():
+    for path, tree in src_trees():
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or _called_name(node) != "add_argument":
+            if not isinstance(node, ast.Call) or called_name(node) != "add_argument":
                 continue
             seen += 1
             candidates = [
@@ -197,7 +131,7 @@ def test_no_cli_argument_is_named_after_a_policy_key() -> None:
                 for value in _string_constants(keyword.value)
             )
             violations.extend(
-                f"{_key(path)}:{node.lineno} {candidate} -> {_matched_keys(candidate)}"
+                f"{src_key(path)}:{node.lineno} {candidate} -> {_matched_keys(candidate)}"
                 for candidate in candidates
                 if _matched_keys(candidate)
             )
@@ -209,7 +143,7 @@ def test_no_environment_variable_is_named_after_a_policy_key() -> None:
     """② 환경변수 — 환경을 읽는 모듈의 환경 이름 꼴(대문자+밑줄) 상수 전수."""
     violations: list[str] = []
     seen = 0
-    trees = _environment_reading_trees()
+    trees = _environment_readingsrc_trees()
     assert trees, "환경을 읽는 모듈을 찾지 못했다 — 스윕이 헛돈다"
     for path, tree in trees:
         for value in _string_constants(tree):
@@ -219,7 +153,7 @@ def test_no_environment_variable_is_named_after_a_policy_key() -> None:
                 continue
             seen += 1
             if _matched_keys(value):
-                violations.append(f"{_key(path)} {value} -> {_matched_keys(value)}")
+                violations.append(f"{src_key(path)} {value} -> {_matched_keys(value)}")
     assert seen, "환경 이름 꼴 상수를 하나도 찾지 못했다 — 스윕이 헛돈다"
     assert not violations, f"환경 변수가 정책 키를 받는다: {violations}"
 
@@ -228,19 +162,19 @@ def test_evaluation_layer_never_reads_the_environment() -> None:
     """②b — `evaluation/**` 은 환경을 **아예** 읽지 않는다. 이름 대조는 「키와 같은
     이름으로」만 막으므로, 판정 층 자체가 환경을 모르는 것을 따로 잠근다."""
     violations: list[str] = []
-    for path, tree in _trees():
-        if not _key(path).startswith("evaluation/"):
+    for path, tree in src_trees():
+        if not src_key(path).startswith("evaluation/"):
             continue
         for node in ast.walk(tree):
             if isinstance(node, ast.Name) and node.id in _ENVIRONMENT_NAMES:
-                violations.append(f"{_key(path)}:{node.lineno} {node.id}")
+                violations.append(f"{src_key(path)}:{node.lineno} {node.id}")
             elif isinstance(node, ast.Attribute) and node.attr in _ENVIRONMENT_NAMES:
-                violations.append(f"{_key(path)}:{node.lineno} .{node.attr}")
+                violations.append(f"{src_key(path)}:{node.lineno} .{node.attr}")
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 names = [alias.name for alias in node.names]
                 root = getattr(node, "module", None) or ""
                 if "os" in names or root == "os":
-                    violations.append(f"{_key(path)}:{node.lineno} import os")
+                    violations.append(f"{src_key(path)}:{node.lineno} import os")
     assert not violations, f"evaluation 층이 환경을 읽는다: {violations}"
 
 
@@ -337,8 +271,8 @@ def test_no_src_module_outside_the_policy_module_imports_its_privates() -> None:
     무관하게 원래 이름이라 이 대조는 별칭으로 열리지 않는다. 동적 절취(`getattr`)는 이
     층이 아니라 위 출처 재검증이 받는다."""
     violations: list[str] = []
-    for path, tree in _trees():
-        if _key(path) == "evaluation/policy.py":
+    for path, tree in src_trees():
+        if src_key(path) == "evaluation/policy.py":
             continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.ImportFrom):
@@ -346,7 +280,7 @@ def test_no_src_module_outside_the_policy_module_imports_its_privates() -> None:
             if node.module != "ml_engine.evaluation.policy":
                 continue
             violations.extend(
-                f"{_key(path)}:{node.lineno} {alias.name}"
+                f"{src_key(path)}:{node.lineno} {alias.name}"
                 for alias in node.names
                 if alias.name.startswith("_")
             )

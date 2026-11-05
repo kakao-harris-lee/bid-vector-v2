@@ -15,7 +15,6 @@ legacy 는 개찰 시각이 없으면 **마감 시각으로 조용히 대체**�
 
 from __future__ import annotations
 
-import ast
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -36,6 +35,7 @@ from ml_engine.inference.time_axis import (
     UnmeasurableTimeAxis,
     resolve_time_axis,
 )
+from tests.ast_sites import construction_sites
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ML_ENGINE_ROOT / "src" / "ml_engine"
@@ -108,95 +108,13 @@ def test_shipped_inference_policy_does_not_approve_substitution() -> None:
     assert axis_policy.version == policy.version
 
 
-def _trees() -> list[tuple[Path, ast.Module]]:
-    return [
-        (path, ast.parse(path.read_text(encoding="utf-8")))
-        for path in sorted(_SRC.rglob("*.py"))
-        if "__pycache__" not in path.parts
-    ]
-
-
-def _bound_names(tree: ast.Module, target: str) -> set[str]:
-    """그 모듈 안에서 `target` 타입을 가리키는 이름 전수 — 원래 이름 + `as` 별칭 +
-    `_P = Target` 재대입.
-
-    **측정으로 더한 층이다**(M9/ml-lifecycle 변이 M8b): 호출 이름만 보던 앞 판은
-    `from … import EvaluationPolicy as _P` 뒤 `_P(...)` 를 지나갔다 — 별칭 하나가 문이었다.
-    **남은 한계**(문면에 둔다): 재대입은 **한 단계**만 따라간다(`_A = Target; _B = _A`
-    연쇄는 못 본다). 그 잔여 경로도 src 를 편집해야 성립하고, 새 임계 **값**은 숫자 리터럴
-    게이트가, 새 입력 **경로**는 아래 세 축이 막는다."""
-    names = {target}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            names.update(
-                alias.asname or alias.name
-                for alias in node.names
-                if alias.name == target
-            )
-        elif isinstance(node, ast.Import):
-            names.update(
-                alias.asname or alias.name.rsplit(".", 1)[-1]
-                for alias in node.names
-                if alias.name.rsplit(".", 1)[-1] == target
-            )
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and isinstance(node.value, ast.Name)
-            and node.value.id in names
-        ):
-            names.update(item.id for item in node.targets if isinstance(item, ast.Name))
-    return names
-
-
-def _enclosing_functions(tree: ast.Module) -> dict[int, str]:
-    owner: dict[int, str] = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for inner in ast.walk(node):
-            owner.setdefault(id(inner), node.name)
-    return owner
-
-
 def test_time_axis_policy_is_constructed_only_from_the_versioned_policy() -> None:
     """「대체를 코드에서 승인한다」를 막는 자리 — src 안에서 `TimeAxisPolicy` 를 짓는 곳이
-    하나이고, 그 하나가 정책 객체에서 값을 읽는 함수다."""
-    sites: set[tuple[str, str]] = set()
-    for path, tree in _trees():
-        owner = _enclosing_functions(tree)
-        watched = _bound_names(tree, "TimeAxisPolicy")
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            name = (
-                func.id
-                if isinstance(func, ast.Name)
-                else func.attr
-                if isinstance(func, ast.Attribute)
-                else None
-            )
-            if name in watched:
-                sites.add(
-                    (
-                        path.relative_to(_SRC).as_posix(),
-                        owner.get(id(node), "<module>"),
-                    )
-                )
-    assert sites == {("inference/policy.py", "time_axis_policy_of")}, sites
-
-
-def test_unmeasurable_axis_carries_the_policy_that_judged_it() -> None:
-    """cr M-1 — 「어느 정책으로 해석해서 측정 불가인가」가 그 판정의 일부다. 금지 사항은
-    시각 값이지 정책 version 이 아니다."""
-    for axis in (
-        resolve_time_axis(opened_at=None, bid_close_at=None, policy=_STRICT),
-        resolve_time_axis(opened_at=None, bid_close_at=_BID_CLOSE_AT, policy=_STRICT),
-    ):
-        assert isinstance(axis, UnmeasurableTimeAxis)
-        assert axis.policy_version == _STRICT.version
-        assert not hasattr(axis, "value")
+    하나이고, 그 하나가 정책 객체에서 값을 읽는 함수다. 이름 해석은 공용 보조가 한다
+    (별칭·재대입 한 단계 포함, cr M-6 — 두 게이트가 **같은 본문**을 쓴다)."""
+    assert construction_sites("TimeAxisPolicy") == {
+        ("inference/policy.py", "time_axis_policy_of")
+    }
 
 
 @pytest.mark.parametrize(
