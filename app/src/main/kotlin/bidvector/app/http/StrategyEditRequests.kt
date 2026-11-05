@@ -30,6 +30,12 @@ internal fun JsonNode.requireKnownKeys(allowed: Set<String>): JsonNode {
     return this
 }
 
+/**
+ * 그 칸이 **`null` 로 적혀 왔는가** — 칸이 없는 것과 가른다(M9 D-1). 「없음」을 뜻으로 받는
+ * 자리가 있으므로 그 둘을 같은 값으로 접지 않는다: 접으면 칸을 빠뜨린 요청이 설정을 지운다.
+ */
+private fun JsonNode.isExplicitNull(key: String): Boolean = get(key)?.isNull == true
+
 internal fun JsonNode.commandId(): CommandId = CommandId(requiredNonBlankText("commandId"))
 
 internal fun JsonNode.field(): EditableField {

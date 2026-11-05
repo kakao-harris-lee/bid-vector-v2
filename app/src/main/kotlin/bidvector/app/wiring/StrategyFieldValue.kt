@@ -78,41 +78,19 @@ private fun WatchRuleId.valueSlot(): EditValueSlot =
     }
 
 /**
- * 그 필드가 **명시적 비움**을 받는가 — 「비움 패치표에 자리가 있는가」와 같은 물음이다. 받는
- * 집합을 두 벌로 두지 않는 이유가 이것이다: 파서가 받아 주는 필드와 실제로 비워지는 필드가
- * 어긋나면 200 을 받은 요청이 아무것도 바꾸지 않거나, 반대로 비울 수 없다고 거절한 필드가
- * 실은 비워진다.
- */
-fun EditableField.acceptsClearing(): Boolean = clearPatch() != null
-
-/**
- * 비움이 **하는 일** — 필드마다 하나씩이고, 받지 않는 필드는 `null` 이다(파서가 그 `null` 을
- * 400 으로 옮긴다).
+ * 그 필드가 **명시적 비움**을 받는가(M9 D-1) — 비울 수 있는 것은 초안에 「없음」 상태가 있는
+ * 칸이고, 오늘 그 집합은 **금액 칸을 읽는 필드**와 같다(예산 한계 둘, `BaseAmount?`). 어휘
+ * 다섯은 빈 목록이 곧 없음이라 비움이 따로 없고(그 길은 `terms: []` 다), 임계 넷과 상한 둘은
+ * 값이 반드시 있다.
  *
- * 비울 수 있는 것은 초안에 **「없음」 상태가 있는 칸**뿐이다 — 예산 한계 둘(`BaseAmount?`).
- * 어휘 다섯은 빈 목록이 곧 없음이라 비움이 따로 없고(그 길은 `terms: []` 다), 임계 넷과 상한
- * 둘은 값이 반드시 있다. 전수 `when` 이라 새 필드가 생기면 「비울 수 있는가」를 답할 때까지
- * 컴파일이 멈춘다.
+ * **손 목록을 두지 않고 칸으로 답한다** — 받는 집합을 따로 열거하면 그 목록이 [valueSlot] 과
+ * 패치표 사이에서 세 번째로 낡는다. 칸으로 답하는 것이 우연이 아닌 이유: 금액 칸의 값 추출
+ * ([amountWonOrNull])이 `Long?` 이라 **비울 수 없는 금액 칸 필드는 그 추출로 패치할 수 없고**
+ * (컴파일이 멈춘다), 금액 밖의 칸에 「없음」이 생기면 이 등식이 깨지는데 그 어긋남은
+ * `EditableFieldVocabularyGateTest` 가 필드 전수를 태워 낸다(받는다고 한 필드는 값을 세운
+ * 초안을 실제로 되돌려야 하고, 받지 않는 필드는 터져야 한다).
  */
-private fun EditableField.clearPatch(): ((StrategyDraft) -> StrategyDraft)? =
-    when (this) {
-        is EditableField.Watch -> id.clearPatch()
-        is EditableField.Threshold -> null
-        EditableField.CandidateLimit, EditableField.MaxActiveBids -> null
-    }
-
-private fun WatchRuleId.clearPatch(): ((StrategyDraft) -> StrategyDraft)? =
-    when (this) {
-        WatchRuleId.MinBudget -> { draft -> draft.copy(minBudget = null) }
-        WatchRuleId.MaxBudget -> { draft -> draft.copy(maxBudget = null) }
-
-        WatchRuleId.FocusCategory,
-        WatchRuleId.FocusRegion,
-        WatchRuleId.ExcludeRegion,
-        WatchRuleId.RequiredKeyword,
-        WatchRuleId.ExcludeKeyword,
-        -> null
-    }
+fun EditableField.acceptsClearing(): Boolean = valueSlot() == EditValueSlot.AMOUNT_WON
 
 /**
  * 현재 전략에서 내보낸 초안([bidvector.strategy.toDraft])의 **한 필드만** 바꾼다
@@ -122,20 +100,10 @@ private fun WatchRuleId.clearPatch(): ((StrategyDraft) -> StrategyDraft)? =
  * [value] 의 갈래가 [valueSlot] 이 정한 칸과 어긋나는 것은 업무 오류가 아니라 이 파일 안의
  * 두 표가 어긋났다는 뜻이다 — 파서가 [valueSlot] 이 이름한 칸만 읽으므로 구성상 일어날 수
  * 없고, 일어나면 `check` 가 크게 실패한다(조용히 다른 값을 쓰지 않는다). 비움도 같은 축이다:
- * 파서는 [acceptsClearing] 이 참인 필드에서만 [EditValue.Cleared] 를 만든다.
+ * 파서는 [acceptsClearing] 이 참인 필드에서만 [EditValue.Cleared] 를 만들고, 그 밖의 필드에
+ * 비움이 오면 아래 칸 추출이 터진다(조용히 다른 값을 쓰지 않는다).
  */
 internal fun StrategyDraft.withFieldValue(
-    field: EditableField,
-    value: EditValue,
-): StrategyDraft =
-    if (value is EditValue.Cleared) {
-        field.clearPatch()?.invoke(this)
-            ?: error("이 필드는 비움을 받지 않는데 비움 값이 왔다(파서가 비움 표를 묻지 않았다)")
-    } else {
-        withSlotValue(field, value)
-    }
-
-private fun StrategyDraft.withSlotValue(
     field: EditableField,
     value: EditValue,
 ): StrategyDraft =
@@ -156,8 +124,8 @@ private fun StrategyDraft.withWatchValue(
         WatchRuleId.ExcludeRegion -> copy(excludeRegionTerms = value.terms())
         WatchRuleId.RequiredKeyword -> copy(requiredKeywordTerms = value.terms())
         WatchRuleId.ExcludeKeyword -> copy(excludeKeywordTerms = value.terms())
-        WatchRuleId.MinBudget -> copy(minBudget = operatorDeclared(value.amountWon()))
-        WatchRuleId.MaxBudget -> copy(maxBudget = operatorDeclared(value.amountWon()))
+        WatchRuleId.MinBudget -> copy(minBudget = value.amountWonOrNull()?.let(::operatorDeclared))
+        WatchRuleId.MaxBudget -> copy(maxBudget = value.amountWonOrNull()?.let(::operatorDeclared))
     }
 
 private fun StrategyDraft.withThresholdValue(
@@ -184,8 +152,17 @@ private fun operatorDeclared(won: Long): BaseAmount =
 private fun EditValue.terms(): List<String> =
     (this as? EditValue.Terms)?.values ?: error("이 필드는 terms 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
 
-private fun EditValue.amountWon(): Long =
-    (this as? EditValue.AmountWon)?.won ?: error("이 필드는 amountWon 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
+/**
+ * 금액 칸의 값 — **비움은 `null`** 이다(M9 D-1). 「없음」을 담을 수 있는 칸이라 이 추출이
+ * 비움을 받는 유일한 자리이고, 그래서 [acceptsClearing] 이 예산 둘만 참이어야 한다(그 짝은
+ * `EditableFieldVocabularyGateTest` 가 잠근다).
+ */
+private fun EditValue.amountWonOrNull(): Long? =
+    when (this) {
+        EditValue.Cleared -> null
+        is EditValue.AmountWon -> won
+        else -> error("이 필드는 amountWon 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
+    }
 
 private fun EditValue.number(): BigDecimal =
     (this as? EditValue.Number)?.value ?: error("이 필드는 number 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
