@@ -50,6 +50,7 @@ class JdbcNotificationInbox(
      */
     private fun Connection.upsert(record: NotificationInboxRecord): NotificationInboxOutcome {
         val occurredAt = Timestamp.from(record.occurredAt)
+        val readResetPolicy = record.fact.kind.readResetPolicy
         return prepareStatement(NotificationInboxSql.UPSERT_ITEM).use { statement ->
             var index = 1
             statement.setLong(index++, record.account.value)
@@ -60,7 +61,7 @@ class JdbcNotificationInbox(
             statement.setTimestamp(index++, occurredAt)
             // 읽음 해제 정책 — **종류 전수 표가 정하고 여기로는 boolean 하나로 내려온다**
             // (D-M9-3). 소진 `when` 이라 정책 어휘가 늘면 이 자리가 컴파일되지 않는다.
-            statement.setBoolean(index, record.fact.kind.readResetPolicy.resetsOnNewerFact())
+            statement.setBoolean(index, readResetPolicy.resetsOnNewerFact())
             // `updated_at` 은 바인딩하지 않는다 — 문장이 `now()` 로 찍는다(SQL 주석의 사유).
             statement.executeQuery().use { rows ->
                 rows.next()
