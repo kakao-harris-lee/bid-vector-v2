@@ -39,8 +39,8 @@
 
 ## 게이트
 
-`~/.local/bin/bv-build.sh ./gradlew --no-daemon leakPatternGate` → **exit 0 세 번** — 산출물 HEAD ·
-evidence HEAD · 계약 갱신 라운드의 HEAD(D-L-1·D-L-2 뒤). evidence 를 고친 커밋마다 그 HEAD 에서 재실측했다.
+`~/.local/bin/bv-build.sh ./gradlew --no-daemon leakPatternGate` → **exit 0 — 라운드마다**(산출물 HEAD ·
+evidence HEAD · 계약 갱신 라운드 · v L-1 라운드). evidence 를 고친 커밋마다 그 HEAD 에서 재실측했다.
 그 task 의 스캔 뿌리는 `reports/evidence` 이고 `scope.md` 는 제외 대상이라, 이 slice 가 더한
 evidence 쪽 세 절(6E-1 추적표 · open-inventory §8 · M7 종결 §6)과 이 디렉터리의 문서가 모두 그 모수 안이다.
 `capability-map.md`·`milestone-*.md` 는 그 뿌리 밖이고 다른 어느 게이트의 입력에도 없다(기계 확인:
@@ -56,3 +56,16 @@ PR 조치 코멘트**이고, 이 절에 그것을 다시 적으려는 시도가 
 | §12 머리의 활성 집계가 움직이지 않았다 | 머리 줄 diff **0** — 두 행은 §14.0 이 「담당만 적는다」고 선언한 표에 섰다 |
 | 식별자 포함 재검 | 내가 더한 줄의 `OPEN-` 전수에서 MISSING **0**(위 표 넷째 줄) |
 | cve-apt 두 OPEN 의 자리 | 그 slice evidence 에 **0 → 2**(출처 `cr MEDIUM-1`·`-2`, 받는 자리 M9/cve-followups PR #131) |
+
+## v L-1 라운드(PR #133, 2026-11-06)
+
+**지적**: open-inventory §8 이 `OPEN-6F4-STR02-REQUIREMENTS-AXIS` 를 §2 「M7 종결이 이미 넘긴 것」 행의
+것으로 귀속했는데 **그 행은 그 식별자를 담지 않는다.** 기계 계수로 확인하고 고쳤다.
+
+| 축 | 결과 |
+| --- | --- |
+| §2 그 행의 식별자 계수 | **아홉** — 7E2B · 7E3B 둘 · 7E3A · `OPEN-7C3B-*` 셋 · 7F 장부 둘. **STR02 는 없다** |
+| 그 식별자의 실제 자리 | **M7 종결 checklist 4** — 그 목록은 **열하나**(§2 행의 아홉 + STR02 + SET01) |
+| 처리 | 귀속을 고치고 **두 자리의 모수가 다르다**(아홉 ↔ 열하나)는 사실을 같은 문장에 적었다 — 수를 다시 세지 않으면 또 틀리는 계열이라(open-inventory §7 의 교훈) 계수를 문면에 박았다 |
+| 같은 오류의 다른 자리 | **없다** — 내가 더한 줄에서 `같은 행` 매치는 둘이고 다른 하나는 내 표를 가리키는 올바른 쓰임이다 |
+| 파급 | §8 머리의 「아홉 가운데 일곱이 닫혔다」와 「남는 둘」은 **바뀌지 않는다**(STR02 는 애초에 그 아홉의 모수 밖이었다) |
