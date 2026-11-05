@@ -1,7 +1,8 @@
 # M9 / budget-clear 완료 점검
 
-정본 계약 `scope.md`(D-1~D-4 + 계약 갱신 2026-11-05 · r2). **판정 대상 SHA `be1026dc`**(PR #124 수정 라운드 —
-앞 라운드는 산출물 `c36a01e1` · 리뷰 대상 head `b988f985`). 명령·변이는 `commands.md`, 되돌림은 `rollback.md`.
+정본 계약 `scope.md`(D-1~D-4 + 계약 갱신 2026-11-05 · r2). **판정 대상 SHA `a8120fb5`**(= PR #124 head, `origin/main` 병합 커밋; 산출물 마지막은 `be1026dc` · 그 앞은 `c36a01e1` · 첫 리뷰 head 는 `b988f985`).
+**acceptance 정본은 PR CI run `42009499386`(네 job 전부 pass)** — 팀장 공지로 전건 재실측을 CI 로 옮겼다.
+명령·변이는 `commands.md`, 되돌림은 `rollback.md`.
 
 ## 산출물과 그 술어 — 공허함을 막는 것이 무엇인가
 
@@ -54,9 +55,10 @@
 6. **여정 ① 이 이제 「미완 0」을 지난다.** D-7E2b-4 의 「다음 행동 하나」를 처음으로 여정이 실제로 걷는다. 그
    대가로 여정이 전역 전략을 더 많이 바꾸므로, 되돌림이 실패하면 뒤 여정이 남의 잔류로 깨진다 — 그래서 안전망을
    두고 서버 값으로 센다.
-7. **`container`·`ml-engine` job 은 이 slice 의 범위 밖이다**(Python·docker·migration 변경 0). PR #124 의
-   `container` 는 붉다 — 이미지 취약점 게이트의 미등재 CVE 둘이고 같은 시각 PR #122·#123 도 같은 단계에서
-   떨어진다(검증 레인 실측). 이 slice 의 변경과 무관한 **환경 부채**이고 별 PR 의 몫이다.
+7. **`container`·`ml-engine` job 은 이 slice 의 범위 밖이다**(Python·docker·migration 변경 0). 앞 head 에서
+   `container` 가 붉었던 것은 이미지 취약점 게이트의 미등재 CVE 였고(같은 시각 PR #122·#123 도 같은 단계에서
+   떨어졌다) **PR #126 이 main 에서 풀었다** — `a8120fb5` 가 그것을 받아 CI run `42009499386` 에서 네 job 전부
+   pass 다. 이 slice 가 고친 것이 아니라 **환경 부채가 별 PR 로 해소된 것**이다.
 8. **HTTP 경계의 거절 probe 는 열하나 가운데 넷이다**(칸 네 종류의 대표). 전수는 `withFieldValue` 층의 게이트
    test 가 태우는데 **두 층은 다른 것을 잰다**(파서는 400, 패치표는 터짐) — 전수 게이트가 HTTP 경계를 갈음하지
    않는다. 후속으로 등재한다(아래).
@@ -74,6 +76,6 @@
 | --- | --- |
 | `OPEN-7E2B-BUDGET-CLEAR` | **닫는다** — 비우는 편집 값이 계약과 구현에 있고 화면·여정이 그 길을 지난다 |
 | `OPEN-6F4-STR02-REQUIREMENTS-AXIS` | **열린 채 상태 갱신** — 6F-5-b LLM 추출이 사용자 결정 2026-11-05 로 보류라 축소 유지. 정본은 capability-map 의 STR-02 절과 그 OPEN 행 |
-| `OPEN-6F-ASSEMBLY` 계열 | **장부만 좁힘** — 닫힌 둘(6A-3f3)과 남은 넷을 `open-inventory.md` 정정 절에 적었다. 남은 넷은 다른 M9 slice |
+| `OPEN-6F-ASSEMBLY` 계열 | **장부만 좁힘** — 닫힌 둘(6A-3f3)을 §5 에 적고, §6 이 그 §5 를 바로잡는다: `OPEN-6F4-TITLE-INGEST` 는 6F-8 이 닫았고(v M-2) 남은 것은 재확인 ④ · `OPEN-6F4W-UNAVAILABLE-PRODUCER` · `OPEN-6F10-*` **여덟**이다. 그 열은 다른 M9 slice 와 §4 후속 ① 의 전수 재고가 받는다 |
 | `OPEN-5E-JOB-PERSISTENCE` · `OPEN-5E-JOB-QUEUE-BOUND` | **장부만 정정** — 6B-4(PR #71)의 처분(닫는 후보 · 부분 종결 후보)을 그대로 옮겼다. 종결 판정은 이 slice 가 하지 않는다 |
 | 신설 | 없다 |

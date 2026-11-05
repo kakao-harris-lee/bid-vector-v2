@@ -1,20 +1,41 @@
 # M9 / budget-clear — 실행한 명령과 핵심 결과
 
-**판정 대상 SHA `be1026dc`** — PR #124 수정 라운드의 마지막 산출물 커밋. 앞 라운드는 산출물 `c36a01e1` ·
-리뷰 대상 head `b988f985`(팀장 계약 갱신)였다(cr L-6 · v L-1 — 그때 이 문서가 `c36a01e1` 로만 적었다).
-base `79f3e5c4`. 명령은 CI 워크플로의 job 명령 그대로이고 Gradle 은 빌드 자리 래퍼(`bv-build.sh`)를 지난다.
-아래 수치는 **수정 라운드의 재실행** 값이다.
+**판정 대상 SHA `a8120fb5`** — `origin/main`(`6c38fb32`)을 이 브랜치로 병합한 커밋이고 PR #124 의 현재
+head 다. 산출물 자체의 마지막 커밋은 `be1026dc`(수정 라운드) · 그 앞은 `c36a01e1` · 첫 리뷰 대상 head 는
+`b988f985` 였다. base `79f3e5c4`, 병합 뒤 비교 원천은 `6c38fb32`(`rollback.md` 「원천이 바뀐 이유」).
 
-## acceptance — CI `check` job
+**acceptance 의 정본은 PR CI 다**(팀장 공지 2026-11-05 — 호스트 빌드 큐 포화로 전건 재실측을 CI 로 옮겼다).
+로컬은 표적·변이만 돌렸다.
+
+## acceptance — PR #124 CI (정본)
+
+**run `42009499386`** · head `a8120fb5feac5415a6add7b102eb291adc4ae86f` · **completed/success**
+(2026-11-05T10:17:38Z → 11:04:20Z). `gh pr checks 124 --watch` 가 낸 네 job 전부 **pass**:
+
+| job | 결과 | 소요 |
+| --- | --- | --- |
+| `check` | **pass** | 46m38s |
+| `web` | **pass** | 3m15s |
+| `container` | **pass** | 5m59s |
+| `ml-engine` | **pass** | 8m53s |
+
+`container` 가 초록으로 돌아온 것은 이 slice 와 무관하다 — PR #126(CVE-2026-109518 apt 하한)이 main 에
+들어오고 그것을 `a8120fb5` 가 받았다. 앞 head `b988f985` 의 run `41994036870` 은 그 CVE 로 `failure` 였다.
+
+**병합 커밋은 내 본문을 하나도 바꾸지 않았다**: `git diff 6c38fb32..a8120fb5` 의 patch-id 가 병합 **전** slice
+diff(`79f3e5c4..34ddda2b`)와 같고(`d3d2ac3c…`) 경로 수 18 도 같다. main 이 바꾼 경로와 내 18 경로의 교집합은
+**0** 이다 — 그래서 아래 로컬 전건(`be1026dc`)과 위 CI 가 **같은 내 코드**를 쟀다.
+
+## acceptance — 로컬 전건(앞 라운드, 참고)
 
 | 명령 | 결과 |
 | --- | --- |
-| `./gradlew --no-daemon check` | **exit 0** (31m50s — 다른 레인의 빌드와 자리를 나눠 썼다). `contractGate`·`sizeGate`·`typeShapeGate`·`gateExecutionGate`·`gateRegistrationGate`·`compatibilitySmoke` 전부 이 실행 안에서 돌았다. 앞 라운드(`c36a01e1`)도 exit 0 — 31m22s · 최근 실행 XML 합 test 4,162 · app test 클래스 121 |
+| `./gradlew --no-daemon check` @`be1026dc` | **exit 0** (31m50s). `contractGate`·`sizeGate`·`typeShapeGate`·`gateExecutionGate`·`gateRegistrationGate`·`compatibilitySmoke` 전부 그 실행 안에서 돌았다. 그 앞 라운드(`c36a01e1`)도 exit 0 — 31m22s · 최근 실행 XML 합 test 4,162 · app test 클래스 121 |
 
 새 test 클래스 `StrategyBudgetClearEndpointTest` 는 **만드는 커밋에서** `config/quality/gate-tests.properties` 의
 `gate.tests.app` 블록에 사전순으로 등재했다 — 등재가 없으면 `gateRegistrationGate` 가 모집단 등식으로 떨어진다.
 
-## acceptance — CI `web` job
+## `web` job 의 step 별 로컬 실행 (앞 라운드, 참고 — 정본은 위 CI `web` pass)
 
 | step | 명령 | 결과 |
 | --- | --- | --- |
@@ -32,7 +53,8 @@ base `79f3e5c4`. 명령은 CI 워크플로의 job 명령 그대로이고 Gradle 
 | W-12 | `./gradlew --no-daemon :app:bootJar` | exit 0 — 이 jar 로 아래 여정이 돈다(판정 SHA 의 main 소스에서 빌드된 것) |
 | W-13 | `npm run test:e2e:journey` | exit 0 — **11 passed · flaky 0 · 건너뜀 0 · spec 4/4**. 여정 ① 이 금액대를 적용하고 되돌리며, 여정 ②③④⑤·설정 여정 셋의 **출발 단언이 그대로다** |
 
-`container`·`ml-engine` job 은 돌리지 않았다 — 이 slice 의 변경에 Python·docker·migration 이 0 이다.
+`container`·`ml-engine` 은 **로컬에서** 돌리지 않았다(이 slice 의 변경에 Python·docker·migration 이 0 이다) —
+병합 뒤 둘 다 위 CI 에서 pass 다.
 
 ## 변이 — 바꿔치우기와 그 RED
 
