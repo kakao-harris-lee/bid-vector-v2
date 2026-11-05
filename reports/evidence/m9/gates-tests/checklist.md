@@ -16,8 +16,10 @@
 | import 없이 전체 한정 좌표로 층 밖 domain 참조 | **막힘** — 이 slice 가 닫은 그 자리(변이 실측, commands) |
 | 허용 루트의 **이름 접두**를 공유하는 이웃 패키지 | 막힘 — 세그먼트 경계 단언 |
 | `Class.forName("bidvector.decision.X")` — **리터럴** 좌표 | 막힘 — 정규식이 점 표기도 본다 |
-| 같은 reflection 인데 이름을 **짜 맞추거나** 바깥에서 받기 | **안 막힘**(v-134 L-3) — 상수 풀에는 조각(`"bidvector."`)만 남아 좌표가 성립하지 않는다. 위 행의 주장은 **리터럴 한정**이다 |
-| 허용된 형제 `adapters.snapshot` 을 **경유**해 층 밖에 닿기 | **안 막힘**(v-134 L-2, 아래 「알려진 제한」) |
+| 같은 reflection 인데 이름을 **짜 맞추거나** 바깥에서 받기 | **안 막힘**(v-134 L-3 · verifier 변이 ⓑ 실측) — 상수 풀에 조각(`"bidvector."`)만 남아 좌표가 성립하지 않는다. 위 행의 주장은 **리터럴 전체 좌표 한정**이고, 가공된 좌표는 경계 문장의 「값이 흐르는 경로 일반」에 속한다 |
+| 허용 루트로 **시작하는** 한 토큰 안에 금지 좌표를 잇기 | **안 막힘**(cr LOW) — 문자 클래스에 `/`·`.` 이 있고 `findAll` 이 비겹침이라 `…persistence.Foo.bidvector.qualification.Bar` 가 한 토큰으로 삼켜진다. **실효 위험은 낮다**(실제 코드 참조는 컴파일러가 `Class`/`Methodref` 항을 따로 내 숨길 수 없다) — 틀린 것은 술어가 아니라 앞 판 문면이었다. 형제 여덟과 공유 |
+| 허용된 형제 `adapters.snapshot` 을 **경유**해 층 밖에 닿기 | **안 막힘**(v-134 L-2 · verifier 변이 ⓒ 실측, 아래 「알려진 제한」) |
+| typealias · 제네릭 상한 · **public inline 함수** 경유 | 막힘 — verifier 변이 실측(inline 은 SMAP·합성 class 로 드러난다) |
 | `const val` 이 호출부로 인라인돼 참조를 남기지 않음 | **안 막힘** — 형제 여덟과 공유하는 등재된 사각(`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`) |
 | 코드를 persistence 밖 새 패키지로 옮겨 거기서 호출 | 이 test 의 모집단 밖 — 형제가 각자 자기 패키지를 보고, 새 패키지는 `packageOwnershipGate` 와 등재가 받는다 |
 | 산출물 디렉터리를 비워 「위반 없음」으로 만들기 | 막힘 — 디렉터리 존재 `check` + 비지 않음 단언 |
@@ -67,29 +69,23 @@
 ## 3. 항목 3 분리 — 처방이 다른 차단과 충돌한다
 
 **정본은 scope.md 의 「계약 갱신 2026-11-06」 절**이다(차단 근거 넷 · `associateWith` 필요성 ·
-영향 16 파일 목록 · 받는 자리). 같은 내용을 두 자리에 두지 않는다.
-
-여기서만 적는 것 하나 — 이 slice 는 그 항목을 **한 줄도 건드리지 않았다**: 내 커밋 경로에
-`qualification/**` 도 `build-logic/**` 도 정책 파일도 없다(§5). `OPEN-VERDICT-CONSTRUCTION-
-VISIBILITY` 가 적은 D-6F5-20 실측(main 생산 지점은 커널 둘뿐)은 재확인 결과 **맞다**.
+영향 16 파일 목록 · 받는 자리). 같은 내용을 두 자리에 두지 않는다. 이 slice 가 그 항목을 한
+줄도 건드리지 않았다는 확인은 §5 가, `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` 가 적은 D-6F5-20
+실측(main 생산 지점은 커널 둘뿐)이 재확인 결과 **맞다**는 것은 verifier ④ 가 받는다.
 
 ## 4. 알려진 제한
 
-- **항목 2 의 미실측은 해소됐다**(v-134 L-4). 처음에는 레인 기본이 container 금지라 기대 본문이
-  정적 유도였고 그것이 이 slice 의 가장 큰 미실측이었다. 팀장 승인으로 `CleanMigrationCheckTest`
-  한 클래스를 로컬에서 **2회**(원판·변이) 돌렸다 — 원판 `11 tests, 0 failed` 로 **유도한 기대
-  본문이 전부 글자까지 맞았고**, 변이에서 새 단언 둘만 붉어지고 **개수 축은 초록**이었다
-  (commands). **verifier 가 저작 레인과 별개로 같은 클래스를 로컬 Testcontainers 로 돌려
-  11/11 통과를 재확인했다**(PR #134 v-134). 남는 한계는 **그 한 클래스만 돌았다**는 것뿐이고,
-  같은 표를 보는 다른 persistence test 와 전건 `check` 는 PR CI 가 받는다.
-- **허용된 형제 패키지를 경유하는 간접 참조는 이 축 밖이다**(v-134 L-2, **OPEN 후보**). 항목 1 의
-  허용 목록은 **패키지 단위**라 허용한 형제의 도달 범위를 그대로 물려받는다. 실측: 허용 루트인
-  `adapters.snapshot` 의 main 은 `bidvector.workflow.collection`·`adapters.koneps` 를 참조하고
-  **자기 의존 게이트가 없다**(그 패키지의 test 셋은 거동·계약 축이다). persistence 가 snapshot
-  헬퍼를 통해 층 밖에 닿으면 persistence 상수 풀에는 `adapters.snapshot` 만 남아 이 게이트는
-  초록이다 — `bidvector.workflow` 를 직접 참조하면 양성 대조가 잡는 그 좌표다. 형제 여덟이
-  **모두** 공유하는 구조적 한계이고 닫으려면 술어를 전이 폐쇄로 바꾸거나 형제 패키지마다
-  게이트를 세워야 한다(다른 결정 — 이 slice 가 만든 것이 아니다).
+- **항목 2 의 미실측은 해소됐다**(v-134 L-4). 기대 본문이 정적 유도였던 것이 이 slice 의 가장
+  큰 미실측이었다. 팀장 승인으로 `CleanMigrationCheckTest` 를 로컬에서 **3회**(원판 · 변이 둘)
+  돌렸고 **verifier 가 별개로 11/11 을 재확인했다**(PR #134 v-134). cr 가 유일한 미측정으로
+  남긴 둘(제약 자동 이름 가정 · 산술 항등식 바깥 괄호)도 그 실행이 닫았다. 남는 한계는 **그 한
+  클래스만 돌았다**는 것뿐 — 다른 persistence test 와 전건 `check` 는 PR CI 가 받는다.
+- **허용된 형제 패키지를 경유하는 간접 참조는 이 축 밖이다**(v-134 L-2, **OPEN 후보**). 허용
+  목록이 **패키지 단위**라 허용한 형제의 도달 범위를 물려받는다. 실측: 허용 루트 `adapters.snapshot`
+  의 main 이 `bidvector.workflow.collection`·`adapters.koneps` 를 참조하고 **자기 의존 게이트가
+  없다**. persistence 가 그 헬퍼로 층 밖에 닿으면 상수 풀에 `adapters.snapshot` 만 남아 초록인데,
+  같은 좌표를 **직접** 참조하면 양성 대조가 잡는다. 형제 여덟이 **모두** 공유하는 구조적 한계로,
+  닫으려면 술어를 전이 폐쇄로 바꾸거나 형제마다 게이트를 세워야 한다(다른 결정).
 - 내 여섯 가운데 `notification_inbox` 하나는 알림함 privacy test 가 이미 고정한다. 단위가
   달라(그쪽은 알림함 한 표의 privacy 축, 이쪽은 여섯 표가 같은 본문을 공유한다는 주장)
   지우지 않았다 — 두 자리가 어긋나면 둘 다 붉어진다.
@@ -102,18 +98,26 @@ VISIBILITY` 가 적은 D-6F5-20 실측(main 생산 지점은 커널 둘뿐)은 �
 - 등재부 문면 정정 하나를 함께 냈다 — 기존 문단이 `PersistenceAdapterDependencyTest` 를
   이미 「바이트코드 상수 풀 게이트」로 적었는데 그때는 소스 텍스트였다. 이제 참이 되고,
   같은 문단이 함께 드는 `EventAdapterDependencyTest` 는 **여전히 소스 텍스트**다(in_scope 밖).
+- **`EvaluationAdapterDependencyTest` 가 483줄로 `sizeGate` 한도(500)에 17줄 남았다**(cr LOW) —
+  이 slice 가 65줄을 더한 결과다. 통과하지만 다음 라운드가 그 파일에 손대면 거의 확실히 걸린다.
+  처방은 `Recording*` 축을 형제 파일로 분리하고 등재부를 같은 커밋에서 갱신하는 것이다
+  (`CleanMigrationTest` → `CleanMigrationCheckTest` 분리가 전례). **다음에 그 파일을 건드리는
+  라운드의 선행 작업**으로 등재한다.
+- **등재만 하는 cr LOW 셋**(cr 가 「지금 고칠 필요 없다」로 판정) — ⓐ 여섯 표가 표마다 JDBC
+  connection 을 연다(`conname = ANY(?)` 로 줄일 수 있으나 지금 헬퍼의 0 행·중복 이름 명시 실패가
+  그 비용보다 값지다) · ⓑ `javap` 를 class 하나당 서브프로세스로 띄우고 reader 를 닫지 않는다
+  (**형제 다섯과 동일 형태** — 이 slice 의 회귀가 아니다) · ⓒ 필드 축 test 가 메서드 축 test 의
+  class 쌍 목록을 되풀이한다(`productionClassFilePair()` 추출이 위 483줄 여유도 함께 늘린다).
+- 항목 4 의 「`Unavailable` 갈래를 지우지 않는다」 판단은 cr 가 **운영자·verifier 몫**으로 남긴
+  열린 질문이다(소비자 둘이 실제 분기를 진다는 전제는 in_scope 밖이라 재확인되지 않았다).
 
 ## 5. in_scope 대조
 
-내 커밋이 건드린 경로 **여섯**(evidence 포함) 전부 in_scope 안이다. 항목 4 의 필드 축을 더한
-파일은 `adapters/src/test/kotlin/**`(계약은 「해당 test」로 적는다) 아래의 **감시 port 게이트
-test** 이고, 계약이 그 port 파일을 「(+test)」로 드는 그 자리다 — 이 읽기는 **팀장 승인**을
-받았다(2026-11-06).
+내 커밋 경로 전부 in_scope 안이다. 항목 4 의 필드 축을 더한 파일은 계약이 그 port 를
+「(+test)」로 드는 **감시 port 게이트 test** 이고 이 읽기는 **팀장 승인**을 받았다(2026-11-06).
+분리된 항목 3 의 흔적이 없음도 같은 목록이 보인다 — `qualification/**`·`build-logic/**`·
+정책 파일이 내 커밋 경로에 **없다**.
 
-분리된 항목 3 의 흔적이 없음도 같은 목록이 보인다: `qualification/**` 도 `build-logic/**` 도
-`config/quality/architecture-policy.properties` 도 내 커밋 경로에 **없다**.
-
-수정 라운드가 새로 만든 파일: **없다**(산출물은 전부 기존 파일 수정, 새 파일은 evidence 넷).
-새 test 클래스도 없어 등재부 추가가 없다 — 기존 class 에 `@Test` 추가와 문면 정정 하나뿐이다
-(새 fixture class 하나는 `@Test` 가 없어 등재 게이트의 모집단 밖이고, 같은 파일의 기존
-fixture 둘이 그 선례다).
+**수정 라운드가 새로 만든 파일: 없다**(전부 기존 파일 수정). 새 test 클래스도 없어 등재부
+추가가 없다 — 기존 class 에 `@Test` 추가와 문면 정정 하나뿐이고, 새 fixture 하나는 `@Test`
+가 없어 등재 게이트 모집단 밖이다(같은 파일의 기존 fixture 둘이 선례).
