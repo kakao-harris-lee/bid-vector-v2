@@ -152,3 +152,29 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: `git restore --source=319fe212 --staged --worktree -- <in_scope 경로 개별 인자, test 리소스 포함>`
 - exit: 0
 - 핵심 결과: D 7 · M 12 · 결과 트리가 `319fe212` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#124 등재 1 · #124 OPEN 행 2 · #125 `shared.ts`). 이 라운드 중 `origin/main` 이 `31551579`(#129)로 또 움직였으나 **병합하지 않았으므로** 원천은 `319fe212` 그대로다.
+
+## 2026-11-06T02:10+09:00 — 머지 직전 main 병합 (`df4976cc`, #129·#123)
+- cmd: `git fetch origin` → `git merge --no-edit df4976cc`(**SHA 를 직접** 준다 — `origin/main` 은 쓰지 않는다)
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합 커밋 `5ffdc1cc`, 둘째 부모 **`df4976cc`** 로 확인. 앞 라운드에서 `fetch` 와 `merge` 사이에 공유 ref 가 움직여 지시받은 SHA 가 아닌 것이 병합됐으므로 이번에는 ref 를 거치지 않았다.
+
+## 2026-11-06T02:15+09:00 — 겹침 둘의 합집합 계수
+- cmd: 세 판(base·내 판·main)의 등재 항목 집합을 `comm` 으로 가르고 줄 수 등식 확인
+- exit: 0
+- 핵심 결과: **gate 등록부** — base 1064 · 내 +4 · main +2 · **공통 추가 1**(`StrategyBudgetClearEndpointTest`: 내 판도 main 도 #124 를 담는다) → 1064+4+2−1 = **1069 = 실제**. 중복 등재 0 · 이어붙임 끊김 0 · 사라진 항목 0 · 내 셋과 #123·#124 등재가 블록 안 사전순 제자리. **capability map** — 양쪽 추가 각 14 · 병합 16(공통 12) · 내 편집 행은 **내 판**, main 이 고친 보존 기한 줄은 **main 판**(서로 다른 줄이라 접힘 아님).
+  「양쪽 추가를 더하면 된다」는 기대는 **틀린다** — 두 판이 이미 같은 PR 을 담고 있으면 그 줄은 한 번만 센다.
+
+## 2026-11-06T02:20+09:00 — 병합 트리 표적 검증
+- cmd: `:app:ktlintCheck :app:detekt :app:sizeGate :adapters:ktlintCheck` · `:app:test`(koneps·wiring 다섯) · `:adapters:test --tests 'bidvector.adapters.koneps.*'`
+- exit: 0 (BUILD SUCCESSFUL 셋)
+- 핵심 결과: 스타일·크기·표적 test 전부 초록.
+
+## 2026-11-06T03:05+09:00 — 병합 트리 게이트 등록부 등식
+- cmd: `./gradlew --no-daemon :app:gateRegistrationGate :adapters:gateRegistrationGate :app:gateExecutionGate`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL in 36m 36s — 합집합된 등록부가 「모집단 ∖ 제외 == 등재」를 양방향으로 만족하고 등재 class 들이 실제로 돌았다(실패·건너뜀 0). `gateExecutionGate` 가 두 모듈 test 전수를 끌어 표적보다 무거웠다.
+
+## 2026-11-06T03:15+09:00 — rollback 재산출 (실측 HEAD `5ffdc1cc`, 원천 `df4976cc`)
+- cmd: `git restore --source=df4976cc --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `df4976cc` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#123 등재 1 · #124 등재 1 · #124 OPEN 행 2 · #129 보존 기한 문면 1 · #125 `shared.ts`). 전제 둘 실측(조상 · 내 첫 산출물 커밋 미포함).
