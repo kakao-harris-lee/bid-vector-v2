@@ -89,6 +89,14 @@ ALTER TABLE notification_inbox
 --    bid_kind)` 이고 이 순서에서 그것이 PK 인덱스의 **접두**가 된다(V23 순서에서는 `account_id`
 --    하나만 접두였다). 목록 질의의 묶음 파티션도 같은 축이다. 그래서 축이 늘면서 질의 하나가
 --    나아지고, 보조 인덱스를 더할 근거가 없다 — 아래 「인덱스를 더하지 않는다」.
+--
+--    **위의 `lock_timeout` 이 묶는 것은 대기이고 재구축이 아니다**(cr LOW). 그 설정은 잠금
+--    **획득**의 상한이고 문장 지속의 상한이 아니다 — 이 `ADD PRIMARY KEY` 는 인덱스를 새로
+--    짓고 ④⑤ 의 `ADD CONSTRAINT … CHECK` 는 전수 검증 스캔을 도는데, 셋 다 ACCESS EXCLUSIVE 를
+--    쥔 채다. 즉 상한을 두어도 **적용 창 자체는 표 크기에 비례한다**. 이 표의 현재 규모에서는
+--    무해하고 V24 선례와 같은 선택이다 — 실가동 표가 커진 뒤 적용될 때만 뜻이 생긴다. 그때의
+--    길은 `CREATE UNIQUE INDEX CONCURRENTLY` + `ADD CONSTRAINT … USING INDEX` 이고, 그것은 이
+--    slice 의 결정 축이 아니다(지금 규모에서 과잉이다).
 ALTER TABLE notification_inbox DROP CONSTRAINT notification_inbox_pkey;
 
 ALTER TABLE notification_inbox
