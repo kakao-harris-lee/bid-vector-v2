@@ -418,9 +418,26 @@
   빗나갔다). 블록을 통째로 다시 내고 「기계 목록 ⊆ 문서 · 문서 ⊆ 기계 목록 · 수 같음」을
   확인한 뒤(42/42, 빠짐 0 · 군더더기 0) 그 명령을 실행했다
 
+### 2026-11-05T15:55Z — 판정 SHA 가 움직여 다시 쟀다
+- cmd: 위와 같은 절차를 **새 마지막 산출물 커밋 `e6254439`** 에서
+- exit: 0
+- 핵심 결과: M-B·M-C·M-A 수정이 복원 목록 안 파일 셋을 만졌으므로 `ac0f4484` 실측은 낡았다.
+  목록 산출식도 **`git log --no-merges … HEAD ^6c38fb32`(내 커밋 전부)** 로 바꿨다 —
+  「병합 전 내 head 까지의 range」는 병합 뒤 붙는 내 커밋을 놓친다(이번에 실제로 그럴 뻔했다;
+  경로 집합은 같은 42 로 확인)
+
 ### 2026-11-05T15:40Z — 복원 트리 실측
 - cmd: 위 실행 뒤 `git diff --name-only 6c38fb32`(작업 트리) · `npx tsc` · `npx vitest run` ·
   `npm run gate:tests` · `npm run lint` (clone/web)
 - exit: 0 / 0 / 0 / 0 / 0
 - 핵심 결과: ② `D` 7 · `M` 35 · ③ **나온 경로가 이 slice 의 evidence 넷뿐** ·
   `674 passed` · 게이트 둘 0 · **내 표지 일곱 0 파일** · 남의 표지 다섯 전부 보존
+
+### 2026-11-05T16:05Z — `e6254439` 기준 복원 실측 (문서대로)
+- cmd: 문서의 명령 블록(42 경로)을 그대로 뽑아 버릴 clone(`e6254439`)에서 실행 뒤
+  `git diff --name-only 6c38fb32`(작업 트리) · `npx tsc` · `npx vitest run` ·
+  `npm run gate:tests` · `npm run lint`
+- exit: 0 / 0 / 0 / 0 / 0
+- 핵심 결과: ② `D` 7 · `M` 35 · ③ **evidence 넷만 다르다** · `674 passed` ·
+  **내 표지 일곱 0 파일 · 남의 표지 다섯 보존**(guards 있음 · 잠금 상수 8 · S-27d 1 ·
+  `app.Dockerfile` 0 줄 차이 · 남의 evidence 4 파일)
