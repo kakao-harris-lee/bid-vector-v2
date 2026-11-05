@@ -20,7 +20,10 @@ import {
   type NoticeGroup,
 } from '../display/notificationDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { instantDisplayOf } from '../display/timeDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
+
+import { InstantText } from './InstantText';
 
 const ABSENT = '값 없음';
 
@@ -118,9 +121,7 @@ function NotificationRow({
       )}
 
       {/* **사실의 시각**이다(알림함에 적재된 시각이 아니다 — 계약). */}
-      <time dateTime={item.occurredAt} className="font-numeric text-xs text-ink-soft">
-        {item.occurredAt}
-      </time>
+      <InstantText display={instantDisplayOf(item.occurredAt)} className="text-xs text-ink-soft" />
 
       {/* 읽음 상태는 **서버가 준 `read`** 다 — 누른 적이 있는지를 화면이 기억하지 않는다. */}
       <span data-testid="read-state" className="text-xs">

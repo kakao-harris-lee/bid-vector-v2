@@ -32,6 +32,109 @@ const NETWORK_MEMBERS = ['fetch', 'XMLHttpRequest', 'sendBeacon', 'EventSource',
 const restrictedMessage =
   '서버 호출은 src/api/client.ts 의 생성 타입 클라이언트(openapi-fetch)로만 한다 — ADR 0011 D-2.';
 
+// ── M9/screen-display D-1·D-4 ─────────────────────────────────────────────────
+// 벽시계를 읽는 자리는 **한 파일**이다(`OPEN-7E-GATE-RESIDUAL` ⑨ 처방 — 7E-2 checklist §3.1).
+// 그 잔여의 실측은 「지남/남음 잠금이 **문면 두 낱말**에 걸려 있다」였다: 카드에 브라우저 시계
+// 판정을 더하면서 낱말만 바꾼 변이가 tsc 0 · vitest 전건 통과였다. 낱말을 더 열거하는 대신
+// **시계 읽기 자체**를 막는다 — 열거가 아니라 구성이다.
+const CLOCK_SITE = 'src/display/timeDisplay.ts';
+
+const clockMessage =
+  '벽시계는 src/display/timeDisplay.ts 의 readClock() 한 자리에서만 읽고 now 를 props 로 내린다 — M9 D-1.';
+
+// **`Date` 전역 축을 막는다**(r1 v L-1). 앞 판의 술어는 식별자 이름 `Date` 에 걸린 호출·생성
+// 꼴만 보았고, 그래서 `Date()` · `globalThis.Date.now()` · `const D = Date; D.now()` ·
+// `Reflect.construct(Date, [])` 가 전부 초록이었다(verifier 실측). 값 참조를 막으면 **그 축의
+// 우회가 닫힌다** — 타입 자리(`now: Date`)는 값 참조가 아니라 그대로 통과한다.
+//
+// **「우회 전부」가 아니다**(r2 v M-C 정정). 이 술어는 `Date` 라는 이름에만 걸린다 — 지금 시각을
+// 얻는 다른 길(`Intl.DateTimeFormat().formatToParts()` · `Temporal.Now` · `performance.timeOrigin`)과
+// **제외 디렉터리를 지나 들어오는 값**은 이 층 밖이다. 그 범위는 `OPEN-M9-CLOCK-LINT-SCOPE` 로
+// 등재돼 있고, 바깥 축을 받는 것은 화면 test 와 DOM 게이트다. 술어를 더 늘리지 않는다 —
+// 열거를 늘리면 그 목록이 다음 어휘에서 또 뒤처진다.
+//
+// 이것이 가능해진 것은 `datetime-local` 변환을 `timeDisplay.localInputToIso` 로 옮겼기
+// 때문이다 — 그 전에는 화면이 `new Date(값)` 을 **정당하게** 써서 금지를 좁힐 수 없었다.
+const CLOCK_SELECTORS = [
+  // `Date.now` — 소유자가 `Date` 인 속성 이름으로 잡는다(호출이 아니라 **접근**을 막는다:
+  // `const n = Date.now; n()` 도 같은 읽기다).
+  { selector: "MemberExpression[object.name='Date'][property.name='now']", message: clockMessage },
+  // 같은 접근의 리터럴 계산 꼴 — `Date['now']` · `Date[`now`]`.
+  { selector: "MemberExpression[computed=true][object.name='Date'][property.value='now']", message: clockMessage },
+  {
+    selector: "MemberExpression[computed=true][object.name='Date'] > TemplateLiteral > TemplateElement[value.raw='now']",
+    message: clockMessage,
+  },
+  // **인자 없는** `new Date()` 만 막는다 — `new Date(millis)` 는 시계 읽기가 아니라 변환이고,
+  // 그것까지 막으면 서식 모듈이 자기 일을 못 한다.
+  { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: clockMessage },
+  // 소유자를 지나 집어 가는 꼴 — `globalThis.Date` · `window.Date` · `globalThis['Date']`.
+  // `no-restricted-globals` 는 **전역 이름 참조**만 보므로 이 꼴이 그 밖에 있었다(실측).
+  // 네트워크 금지와 같은 관례로 **속성 이름**을 본다(소유자를 열거하지 않는다).
+  { selector: "MemberExpression[property.name='Date']", message: clockMessage },
+  { selector: "MemberExpression[computed=true][property.value='Date']", message: clockMessage },
+];
+
+// 「화면 파일이 `*At` 필드를 직접 보간하는 자리 0」(D-4). 두 자리를 막는다 — **글자 자리**
+// (`<time>{entry.occurredAt}</time>`)와 **속성 자리**(`at={view.observedAt}` · `dateTime={…}`).
+// 그러면 모든 `*At` 가 `timeDisplay` 를 지나고, 기계 가독 칸도 **파싱을 통과한 값**만 받는다.
+//
+// **이 층이 무엇인지 적는다**: 직접 자식만 본다. `at={instantDisplayOf(view.observedAt)}` 는
+// 지나야 하기 때문이다(그 호출이 이 slice 가 원하는 꼴이다). 그래서 **중간 변수로 비켜 가는
+// 꼴**(`const at = item.occurredAt; <time>{at}</time>`)은 이 선택자가 막지 못한다 — 그 축을
+// 지는 것은 렌더한 DOM 을 재는 게이트 test 이고, 여기는 **실수로 쓴 보간**을 잡는 보조 층이다.
+const rawInstantMessage =
+  '*At 원문을 화면에 보간하지 않는다 — src/display/timeDisplay.ts 의 instantDisplayOf() 를 지난다 (M9 D-2·D-4).';
+
+const RAW_INSTANT_SELECTORS = [
+  { selector: 'JSXElement > JSXExpressionContainer > MemberExpression[property.name=/At$/]', message: rawInstantMessage },
+  { selector: 'JSXAttribute > JSXExpressionContainer > MemberExpression[property.name=/At$/]', message: rawInstantMessage },
+  // ③ 템플릿 보간 — 앞 둘이 **직접 자식만** 보므로 `value={`${notice.deadlineAt} (D-3)`}` 가
+  //    그대로 지나갔다(이 slice 의 실측: 워크시트의 마감 칸이 바로 그 꼴이었다). 템플릿은
+  //    보간한 값을 **글자로** 만드는 자리라 예외가 없다 — 그래서 자리 깊이를 보지 않는다.
+  //
+  //    **자손을 보는 유일한 선택자라 오탐이 있다**(r1 cr LOW): `At` 로 끝나는 문자열 메서드
+  //    (`charAt`·`codePointAt`)가 시각과 무관하게 걸린다. 그 둘만 음성 조건으로 뺀다 — 열거를
+  //    늘리는 대신, 걸리는 이름이 더 나오면 **변수로 빼는 쪽**이 맞다(`eslint-disable` 을 달면
+  //    그 줄의 진짜 시각 보간까지 함께 덮인다). 이 범위는 게이트 test 가 음성 대조로 잰다.
+  {
+    selector: 'JSXExpressionContainer TemplateLiteral MemberExpression[property.name=/(?<!char|codePoint)At$/]',
+    message: rawInstantMessage,
+  },
+];
+
+// 네트워크 금지의 네 선택자 — 아래 두 블록이 **같은 목록**을 쓴다. flat config 의 규칙 옵션은
+// 뒤 블록이 **덮어쓴다**(이어 붙이지 않는다). 그래서 화면·표시 전용 블록이 자기 선택자만
+// 적으면 그 파일들에서 네트워크 금지가 조용히 사라진다 — 목록을 상수로 두고 둘 다 싣는다.
+// 그 사실 자체를 게이트 test 가 잰다(「화면 파일에서 `window.fetch` 가 여전히 1」).
+const NETWORK_SELECTORS = [
+  // ① 점 접근 — 소유자와 무관하게 **속성 이름**으로 잡는다.
+  ...NETWORK_MEMBERS.map((name) => ({
+    selector: `MemberExpression[property.name='${name}']`,
+    message: restrictedMessage,
+  })),
+  // ② 리터럴 계산 접근 — **소유자를 열거하지 않는다**(verifier r6 L-14). 앞선 판은
+  //    소유자 × 이름이라 목록 밖 소유자(`globalThis.window['fetch']` ·
+  //    `document.defaultView!['fetch']` · `top`·`parent`·`frames`)가 전부 초록이었다(실측).
+  {
+    selector: `MemberExpression[computed=true][property.value=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+    message: restrictedMessage,
+  },
+  // ③ 템플릿 리터럴 형태(`x[\`fetch\`]`) — 같은 접근의 다른 표기.
+  {
+    selector: `MemberExpression[computed=true] > TemplateLiteral > TemplateElement[value.raw=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+    message: restrictedMessage,
+  },
+  // ④ 구조 분해 — `const { fetch: f } = <무엇이든>`. 소유자를 보지 않는다. **키가 식별자일
+  //    때만** 걸린다(verifier r7 L-15 실측) — 따옴표 키 `{ 'fetch': k }` · 계산 키
+  //    `{ ['fetch']: h }` · 템플릿 키는 지나간다. 같은 리터럴의 다른 표기이고, 이 층의
+  //    주장 범위(실수로 쓴 직접 호출)를 넘지 않으므로 알려진 제한에 등재한다.
+  {
+    selector: `ObjectPattern > Property[key.name=/^(${NETWORK_MEMBERS.join('|')})$/]`,
+    message: restrictedMessage,
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -86,34 +189,7 @@ export default tseslint.config(
       // 소유자 열거는 비대칭을 만든다(실측: `self.fetch` 는 있고 `self.XMLHttpRequest` 는 없었다).
       // 아래 두 블록은 **속성 이름**으로 잡는다 — 소유자가 무엇이든(`window`·`self`·`globalThis`·
       // `document.defaultView?.`·지역 별명 `const w = window`) 같은 술어에 걸린다.
-      'no-restricted-syntax': [
-        'error',
-        // ① 점 접근 — 소유자와 무관하게 **속성 이름**으로 잡는다.
-        ...NETWORK_MEMBERS.map((name) => ({
-          selector: `MemberExpression[property.name='${name}']`,
-          message: restrictedMessage,
-        })),
-        // ② 리터럴 계산 접근 — **소유자를 열거하지 않는다**(verifier r6 L-14). 앞선 판은
-        //    소유자 × 이름이라 목록 밖 소유자(`globalThis.window['fetch']` ·
-        //    `document.defaultView!['fetch']` · `top`·`parent`·`frames`)가 전부 초록이었다(실측).
-        {
-          selector: `MemberExpression[computed=true][property.value=/^(${NETWORK_MEMBERS.join('|')})$/]`,
-          message: restrictedMessage,
-        },
-        // ③ 템플릿 리터럴 형태(`x[\`fetch\`]`) — 같은 접근의 다른 표기.
-        {
-          selector: `MemberExpression[computed=true] > TemplateLiteral > TemplateElement[value.raw=/^(${NETWORK_MEMBERS.join('|')})$/]`,
-          message: restrictedMessage,
-        },
-        // ④ 구조 분해 — `const { fetch: f } = <무엇이든>`. 소유자를 보지 않는다. **키가 식별자일
-        //    때만** 걸린다(verifier r7 L-15 실측) — 따옴표 키 `{ 'fetch': k }` · 계산 키
-        //    `{ ['fetch']: h }` · 템플릿 키는 지나간다. 같은 리터럴의 다른 표기이고, 이 층의
-        //    주장 범위(실수로 쓴 직접 호출)를 넘지 않으므로 알려진 제한에 등재한다.
-        {
-          selector: `ObjectPattern > Property[key.name=/^(${NETWORK_MEMBERS.join('|')})$/]`,
-          message: restrictedMessage,
-        },
-      ],
+      'no-restricted-syntax': ['error', ...NETWORK_SELECTORS],
       // `no-restricted-properties`(소유자 × 이름)는 **걷었다**(verifier r6 L-14) — 위 ②③④ 가 소유자를
       // 보지 않으므로 그 열거가 필요 없고, 열거는 목록 밖 소유자를 남겼다.
       'no-restricted-imports': [
@@ -131,6 +207,29 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // M9/screen-display D-1·D-4 — 화면과 표시 모듈의 두 금지. **네트워크 선택자를 함께 싣는다**
+    // (위 블록을 덮어쓰기 때문이다 — 그 사실은 게이트 test 가 잰다).
+    //
+    // `ignores` 가 시계 읽기의 **승인된 한 자리**를 뺀다. 그 파일은 위 블록으로 돌아가므로
+    // 네트워크 금지는 그대로 받는다.
+    // **화면이 그리는 코드 전부**가 대상이다(r1 cr M-2). 앞 판은 `src/screens`·`src/display` 두
+    // 디렉터리뿐이었는데, ⑨ 의 잔여가 말하는 「카드에 브라우저 시계 판정을 더하는」 배지가 살
+    // 가장 자연스러운 자리는 `src/components` 다 — 그 디렉터리가 금지 밖이었다.
+    //
+    // 제외는 **의도를 문면으로 남긴다**: `src/api`·`src/session` 은 서버와 말하는 층이라 시각을
+    // 그리지 않는다(그 둘이 초록인 것도 게이트 test 가 잰다). `CLOCK_SITE` 는 승인된 한 자리다.
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    // **test 는 대상이 아니다**: 고정 시각 fixture(`new Date('2026-…Z')`)를 짓는 것이 그 일이고,
+    // 그 코드는 출하되지 않는다. ⑨ 의 잔여가 말하는 위험은 **카드가 브라우저 시계로 판정하는**
+    // 것이므로 출하 경로만 닫으면 된다. 이 제외가 의도임을 게이트 test 가 잰다.
+    ignores: [CLOCK_SITE, 'src/api/**', 'src/session/**', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...NETWORK_SELECTORS, ...CLOCK_SELECTORS, ...RAW_INSTANT_SELECTORS],
+      // 값으로서의 `Date` 전역 — 위 선택자들이 못 보는 우회 전부를 한 자리에서 닫는다.
+      'no-restricted-globals': ['error', { name: 'Date', message: clockMessage }],
     },
   },
   {

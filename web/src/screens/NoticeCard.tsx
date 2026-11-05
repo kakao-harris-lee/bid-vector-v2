@@ -2,8 +2,9 @@ import { Link } from 'react-router';
 
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
 import { StateBadge, useHint } from '../components/StateBadge';
-import { amountDisplayOf, daysUntil, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
+import { amountDisplayOf, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { dayCountText, daysUntil } from '../display/timeDisplay';
 import { UNJUDGED_AXIS_DISPLAY } from '../display/worksheetDisplay';
 
 /** 워크시트 주소 — 공고번호·차수가 **경로의 두 칸**이다(식별자를 한 문자열로 접지 않는다). */
@@ -11,15 +12,20 @@ export function worksheetPathOf(notice: Pick<NoticeSummary, 'noticeNumber' | 'no
   return `/notices/${encodeURIComponent(notice.noticeNumber)}/${encodeURIComponent(notice.noticeRound)}`;
 }
 
-/** 남은 날 — **숫자만** 낸다. 「마감됨」 같은 상태 말은 만들지 않는다(그것은 `status` 가 한다). */
-function DeadlineBadge({ deadlineAt, now }: { readonly deadlineAt: string | null | undefined; readonly now: Date }) {
-  const days = daysUntil(deadlineAt, now);
-  if (days === null) {
+/**
+ * 남은 날 — **숫자만** 낸다. 「마감됨」 같은 상태 말은 만들지 않는다(그것은 `status` 가 한다).
+ *
+ * **이미 센 날 수를 받는다**(M9 D-4): `*At` 원문이 JSX 를 지나면 게이트가 멈춘다. 세는 일과
+ * 문면을 만드는 일은 둘 다 `timeDisplay` 가 한다 — 이 컴포넌트는 그릴 뿐이다.
+ */
+function DeadlineBadge({ days }: { readonly days: number | null }) {
+  const text = dayCountText(days);
+  if (text === null) {
     return <span className="text-xs text-absent-ink">마감 없음</span>;
   }
   return (
     <span className="font-numeric text-xs" title="마감까지 남은 날(내림)">
-      {days >= 0 ? `D-${days}` : `D+${-days}`}
+      {text}
     </span>
   );
 }
@@ -84,7 +90,7 @@ export function NoticeCard({
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">마감</dt>
           <dd>
-            <DeadlineBadge deadlineAt={notice.deadlineAt} now={now} />
+            <DeadlineBadge days={daysUntil(notice.deadlineAt, now)} />
           </dd>
         </div>
       </dl>
@@ -125,7 +131,7 @@ export function SuggestionCard({
       <p className="mt-2 font-numeric text-sm">{amount.amount}</p>
       <p className="text-xs text-ink-soft">{amount.provenance ?? ''}</p>
       <p className="mt-1">
-        <DeadlineBadge deadlineAt={suggestion.deadlineAt} now={now} />
+        <DeadlineBadge days={daysUntil(suggestion.deadlineAt, now)} />
       </p>
       <p data-testid="suggestion-unjudged" className="mt-2 flex flex-wrap gap-1">
         {suggestion.unjudgedAxes.map((axis) => (
