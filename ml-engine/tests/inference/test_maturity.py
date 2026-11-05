@@ -319,3 +319,77 @@ def test_unmeasurable_rows_from_another_policy_version_are_rejected() -> None:
         build_weekly_maturity(
             [unapproved_elsewhere], window_days=7, policy=approving_other_version
         )
+
+
+def _window_with(
+    *, opened: int, settled: int, sources: tuple[TimeAxisSourceCount, ...]
+) -> MaturityWindow:
+    start = datetime(2026, 9, 13, 15, 0, tzinfo=UTC)
+    return MaturityWindow(
+        start=start,
+        end=start + timedelta(days=7),
+        maturity=resolve_maturity(opened_count=opened, settled_count=settled),
+        time_axis=WindowTimeAxis(
+            policy_version="inference-test", source_counts=sources
+        ),
+    )
+
+
+def test_maturity_table_rejects_source_counts_that_disagree_with_the_denominator() -> (
+    None
+):
+    """cr M-2 ⑵ — provenance 가 분모와 어긋나면 표를 만들 수 없다."""
+    window = _window_with(
+        opened=2,
+        settled=1,
+        sources=(TimeAxisSourceCount(source=TimeAxisSource.OPENED_AT, row_count=5),),
+    )
+    with pytest.raises(ValueError, match="출처별 계수"):
+        MaturityTable(
+            windows=(window,),
+            windows_excluding_substitute=(window,),
+            unmeasurable=(),
+            population_row_count=2,
+            substitute_row_count=0,
+            policy_version="inference-test",
+        )
+
+
+def test_maturity_table_rejects_ghost_rows_on_a_no_observation_window() -> None:
+    """cr M-2 ⑴ — `NoObservation` 창이 출처 계수로 **유령 행**을 들 수 없다(앞 판은
+    개찰 계수 기준으로만 걸러 이 창이 등식에 보이지 않았다)."""
+    window = _window_with(
+        opened=0,
+        settled=0,
+        sources=(TimeAxisSourceCount(source=TimeAxisSource.OPENED_AT, row_count=5),),
+    )
+    with pytest.raises(ValueError, match="출처별 계수"):
+        MaturityTable(
+            windows=(window,),
+            windows_excluding_substitute=(window,),
+            unmeasurable=(),
+            population_row_count=0,
+            substitute_row_count=0,
+            policy_version="inference-test",
+        )
+
+
+def test_maturity_table_rejects_a_substitute_count_that_contradicts_the_windows() -> (
+    None
+):
+    """cr M-2 ⑶ — 「대체가 주 경계를 밀었는데 안 보인다」를 막는 축이 바로 이 값이다.
+    앞 판은 이 값이 창들과 모순이어도 생성이 성공했다."""
+    window = _window_with(
+        opened=1,
+        settled=1,
+        sources=(TimeAxisSourceCount(source=TimeAxisSource.OPENED_AT, row_count=1),),
+    )
+    with pytest.raises(ValueError, match="대체 출처 행 수"):
+        MaturityTable(
+            windows=(window,),
+            windows_excluding_substitute=(window,),
+            unmeasurable=(),
+            population_row_count=1,
+            substitute_row_count=1,
+            policy_version="inference-test",
+        )

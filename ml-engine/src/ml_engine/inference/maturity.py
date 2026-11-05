@@ -113,6 +113,11 @@ class MaturityWindow:
         return self.start <= _ensure_utc(value) < self.end
 
 
+def _opened_count(window: MaturityWindow) -> int:
+    """그 창의 개찰 계수 — `NoObservation` 창은 0(비율이 성립하지 않는 구간)."""
+    return window.maturity.opened_count if isinstance(window.maturity, Observed) else 0
+
+
 @dataclass(frozen=True)
 class TimeAxisUnmeasurableCount:
     """시간축을 정할 수 없던 행의 사유별 계수 — 리포트의 **별도 항목**(SET-06)."""
@@ -139,15 +144,45 @@ class MaturityTable:
     def __post_init__(self) -> None:
         if self.population_row_count < 0 or self.substitute_row_count < 0:
             raise ValueError("행 계수는 음수일 수 없다")
-        counted = sum(
-            window.maturity.opened_count
-            for window in self.windows
-            if isinstance(window.maturity, Observed)
-        ) + sum(item.row_count for item in self.unmeasurable)
+        self._check_population()
+        self._check_provenance()
+
+    def _check_population(self) -> None:
+        """모집단 = 창의 개찰 계수 합 + 사유별 측정 불가 합."""
+        counted = sum(_opened_count(window) for window in self.windows) + sum(
+            item.row_count for item in self.unmeasurable
+        )
         if counted != self.population_row_count:
             raise ValueError(
                 "모집단은 성숙 분모와 시간축 측정 불가의 합이어야 한다 — "
                 f"모집단 {self.population_row_count} != 계수 {counted}"
+            )
+
+    def _check_provenance(self) -> None:
+        """provenance 계수를 **분모와 같은 등식 묶음**에 넣는다(cr M-2).
+
+        앞 판은 모집단 등식 하나뿐이어서 세 자리가 열려 있었다: ⑴ `NoObservation` 창의
+        `source_counts` 는 개찰 계수에 안 잡혀 **유령 행**을 들 수 있었고 ⑵ 창의 출처 계수
+        합이 분모와 어긋나도 표가 섰고 ⑶ `substitute_row_count` 는 **아무 검사도** 받지
+        않았다 — 그런데 그 값이 「대체가 주 경계를 밀었는데 안 보인다」를 막는 축이다."""
+        for window in self.windows:
+            sourced = sum(item.row_count for item in window.time_axis.source_counts)
+            if sourced != _opened_count(window):
+                raise ValueError(
+                    "창의 출처별 계수 합은 그 창의 개찰 계수와 같아야 한다 — "
+                    f"{window.start.isoformat()}: 출처 {sourced} != 개찰 "
+                    f"{_opened_count(window)}"
+                )
+        substituted = sum(
+            item.row_count
+            for window in self.windows
+            for item in window.time_axis.source_counts
+            if item.source is not TimeAxisSource.OPENED_AT
+        )
+        if substituted != self.substitute_row_count:
+            raise ValueError(
+                "대체 출처 행 수는 창들의 대체 출처 계수 합이어야 한다 — "
+                f"공시 {self.substitute_row_count} != 계수 {substituted}"
             )
 
 
@@ -238,7 +273,6 @@ def build_weekly_maturity(
             known.append((axis, observation.settled))
             continue
         unmeasurable[axis.reason] = unmeasurable.get(axis.reason, 0) + 1
-    substituted = [item for item in known if item[0].source != TimeAxisSource.OPENED_AT]
     return MaturityTable(
         windows=_weekly_windows(
             known, window_length=window_length, policy_version=policy.version
@@ -254,6 +288,8 @@ def build_weekly_maturity(
             if reason in unmeasurable
         ),
         population_row_count=len(observations),
-        substitute_row_count=len(substituted),
+        substitute_row_count=sum(
+            1 for axis, _ in known if axis.source is not TimeAxisSource.OPENED_AT
+        ),
         policy_version=policy.version,
     )
