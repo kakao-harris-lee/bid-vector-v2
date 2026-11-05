@@ -1,11 +1,13 @@
 # M9/paper-bid rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `635f05a6`**(판정 SHA).
+착수 base **`df4976cc`** · **복원 원천 `e12c0485`**(이 브랜치가 합친 main 의 **고정 SHA** =
+병합 커밋 `0d15f939` 의 둘째 부모) · **실측 HEAD `4b8c3709`**(판정 SHA).
 
-**원천이 착수 base 와 같다** — 이 브랜치는 `origin/main` 을 **합치지 않았다**. 그래서 inbox-vocab
-이 겪은 「base 에서 복원하면 남의 변경까지 지운다」 함정이 이 slice 에는 아직 없다. **머지 전에
-main 을 합치면 원천이 그 합친 main 의 고정 SHA 로 옮겨간다**(움직이는 `origin/main` 을 쓰지
-않는다) — 그때 아래 ①~③ 과 §4 를 다시 잰다.
+**원천이 착수 base 가 아니다.** 이 브랜치는 머지 직전에 `origin/main` 을 합쳤고(#130~#133),
+base 에서 복원하면 **그 남의 변경까지 지운다**. 그래서 ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서
+산출하고 ⓑ 복원 원천은 합친 main 의 고정 SHA 다 — 움직이는 `origin/main` 을 쓰지 않는다(다음
+머지가 그 ref 를 옮기면 실측이 다른 트리를 가리킨다. inbox-vocab 이 네 번 다시 고정한 자리다).
+**머지 전에 main 이 또 움직이면** 원천을 그 SHA 로 다시 고정하고 아래 ①~③ 과 §4 를 다시 잰다.
 
 evidence 커밋은 실측 뒤에 오므로 이 slice 에서는 「실측 HEAD == 판정 SHA」가 **성립한다**(아직
 evidence 를 커밋하지 않은 자리에서 쟀다). 그래도 대조해야 하는 것은 **그 사이에 되돌림 대상이
@@ -16,7 +18,7 @@ evidence 를 커밋하지 않은 자리에서 쟀다). 그래도 대조해야 �
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-MAIN=df4976cc                                     # 착수 base = 이 브랜치가 갈라져 나온 main
+MAIN=e12c0485                                     # 이 브랜치가 **마지막으로** 합친 main 의 고정 SHA
 EXCL=':(exclude)reports/evidence/m9/paper-bid'    # 자기 자신은 되돌릴 수 없다
 
 mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
@@ -90,14 +92,15 @@ mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **49**(evidence 제외) = 복원 **45**(M) · 삭제 **4**(A) — 기계 목록과 같다 |
-| ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③ 결과 트리 == `e12c0485` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③′ main 의 남의 변경 보존 | **추가 파일 25 전수 존재**(이름으로 세지 않고 목록을 돌며 `-f` 로 물었다 — 없는 것 **0**) · `KonepsEndpointDefaultsTest` 6 · `MockKonepsAxis` 3 · `money-vocab-cross-lang` 2 · #133 의 등재 행 **둘** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/paper-bid/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`df4976cc` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
+복원한 트리는 **`e12c0485` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
+main(#132 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
 돌리는 것은 같은 트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이 **맞다** —
@@ -114,6 +117,7 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 | `NotificationBidKind` · `NotificationGroupKey` · `BidKindAxis` · `bidKindAxis` · `asNotificationBidKind` · `groupNotifications` · `NOTIFICATION_BID_KIND_DISPLAY` · `notificationItemTestId` · 새 test class **셋**의 이름 | **전부 0** |
 | V25 파일 | **0**(마이그레이션 수가 22 로 돌아왔다) |
 | capability map 의 다섯 열 문장 | **0**(네 열 문면으로 돌아왔다) |
+| §14.3 행의 종결 취소선 | **0**(「진행 중」으로 돌아왔다) |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
 | --- | --- |
@@ -137,10 +141,11 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 버릴 clone 에 §2 의 네 걸음을 쏘는 임시 test 하나를 넣고 **버릴 클러스터**에서 돌렸다(공유
 컨테이너를 오염시키지 않는다). 그 test 는 **커밋하지 않았고** 측정 뒤 지웠다.
 
-**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `635f05a6` 다.** 그 사이 V25 가 바뀌었지만
-**주석뿐이다** — `git diff 5ca4f561..635f05a6 -- <V25>` 의 비주석·비공백 줄이 **0** 이다(실측).
-그래서 그 파일이 만드는 스키마가 같고, §2 의 네 걸음이 쏘는 DDL 도 같다. 그 밖에 이 리허설의
-입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
+**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `4b8c3709` 다.** 그 사이 V25 가 바뀐 것은
+**주석뿐이고**(`5ca4f561..635f05a6` 의 비주석·비공백 줄 **0**), main 병합은 V25 를 **아예 만지지
+않았다**(`635f05a6..HEAD` 의 그 파일 diff **0 줄** — main 은 이 범위에서 마이그레이션을 더하지
+않았다). 그래서 그 파일이 만드는 스키마가 같고 §2 의 네 걸음이 쏘는 DDL 도 같다. 그 밖에 이
+리허설의 입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
 
 | 단계 | 실측 |
 | --- | --- |
@@ -176,8 +181,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 갈릴 수 있다. 유효성�
 움직였는가**로 본다:
 
 ```
-git diff --name-only 635f05a6..<HEAD> -- \
-  $(git log --no-merges --format= --name-only df4976cc..635f05a6 \
+git diff --name-only 4b8c3709..<HEAD> -- \
+  $(git log --no-merges --format= --name-only e12c0485..4b8c3709 \
       -- . ':(exclude)reports/evidence/m9/paper-bid' | sort -u)
 ```
 

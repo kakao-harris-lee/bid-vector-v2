@@ -99,8 +99,11 @@ test 가 진다).
 10. **자동 대사는 여전히 서지 않는다** — NOTI-04 · SET-02 의 capability 판정은 이 배선으로
     올라가지 않는다(D-7C3B-7 ③ 그대로). 서면이든 실투찰이든 되비추는 것은 운영자가 기록한
     전이뿐이다.
-11. **`OPEN-7C3B-PAPER-BID-NOTIFICATION` 의 **태그** 종결 등재는 이 slice 가 하지 않았다** —
-    `reports/evidence/m7/**` 쪽 장부는 inbox-vocab 선례대로 **M9 장부 slice** 몫이다. 다만
+11. **`OPEN-7C3B-PAPER-BID-NOTIFICATION` 의 종결은 capability map 에서 **이 slice 가 적었다**.
+    main 병합(#133)이 그 OPEN 을 §14.3 (C) 에 「등재 누락 정정 · 담당 M9/paper-bid(진행 중)」으로
+    세웠고, 이 slice 가 그 담당이라 표의 자기 관례(취소선 + 닫은 주체·날짜)로 행을 닫았다 —
+    등재와 종결이 **같은 날인 행**이 됐다. `reports/evidence/m7/**` 쪽 장부는 inbox-vocab
+    선례대로 여전히 **M9 장부 slice** 몫이다. 다만
     capability map 의 **산문 두 줄**은 이 slice 가 고쳤다(cr MEDIUM — 이연 문장이 OPEN 태그만
     가리켜 산문이 남을 수 있다는 지적). 같은 자리의 **유찰 줄**(`OPEN-7C3B-FAILED-BID-DETAIL`)은
     M9/inbox-vocab 이 닫은 사실이고 **그 레인의 장부 몫**이라 손대지 않았다 — 내 slice 의 주장이
@@ -113,6 +116,7 @@ test 가 진다).
 | `bid_case.bid_kind` CHECK ↔ `bidding.BidKind` 어휘 등식 test 가 없다(cr LOW) | **별 건** | **선행 결함**이고 현재 값은 정확히 같다. 이 slice 가 `BidKind.valueOf(bid_kind)` 의 셋째 소비자를 더하므로 하중이 커진 것은 맞다 — 한쪽만 늘면 `valueOf` 가 던지고 훑기는 후보 전체를 먼저 펼치므로 **한 행이 훑기 전체를 멈춘다**. 처방은 `bid_case` 스키마 가드 test 한 자리이고 그 표는 이 slice 의 in_scope 밖이다 |
 | `web/e2e/capture/usecase-captures.mjs` 의 주석이 testId 꼴을 네 조각으로 적는다 | **보고만** | 그 파일의 조회는 정규식 접두(`/^notification-/`)라 **깨지지 않는다** — 낡은 것은 주석 산문뿐이다. 승인된 확장은 `web/e2e/journey/**` 이고 `capture/` 는 그 밖이다 |
 | capability map 의 유찰 줄 | **M9/inbox-vocab 장부** | 위 10 |
+| `money-vocab-cross-lang` 게이트에 내 축 표를 등재하지 않았다 | **등재 안 함이 결정** | main 병합(#132)이 들여온 게이트다. 그것이 드는 다섯은 **손 복제본**이고 내 표의 키 타입은 생성 타입에서 **파생**된다 — Kotlin → openapi → 생성 타입 → 표가 한 사슬로 닫히고(계약 test · 바이트 등식 · `satisfies`) 같은 성질을 두 기계로 재지 않는다(`commands.md` §6) |
 
 ## 7. Open Questions (cr 등재 — 판정을 가르지 않는다)
 

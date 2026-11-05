@@ -39,7 +39,12 @@ base `df4976cc` · 브랜치 `feature/m9-paper-bid` · 계약 `scope.md`(D-M9P-1
 | 세 모듈 `ktlint{Main,Test}SourceSetCheck` + `detekt` + `leakPatternGate` | 0 | 로컬 |
 | web `lint` · `typecheck` · `test`(vitest) · `api:types:check` · `gate:tests` · `gate:src-tree` | 0 | 로컬 |
 
-판정 SHA 에서 돌린 test 계수: adapters **117** · workflow **132** · app **314** — 실패 0 · skip 0.
+판정 SHA 에서 돌린 test 계수: adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0.
+web: **39 파일 / 827 test**(main 병합이 더한 분 포함 · 내 몫은 그 중 둘이 새 것).
+
+**adapters·app 계수가 병합 전(117·314)보다 작은 것은 회귀가 아니라 표적 집합의 차이다** — 병합 뒤
+실행에서 `--tests "*RetentionSweepTest*"` 와 `--tests "*NotificationSweep*"`(app) 을 뺐다. 빠진
+자리는 그 둘뿐이고 세 모듈의 `check` 전문은 CI 가 돈다.
 | `./gradlew --no-daemon check` · `qualityBaseline` · web job 전문 · container · ml-engine | — | **PR CI 가 정본**(팀장 공지 — 호스트 빌드 큐) |
 
 web 계수: lint **0** · typecheck **0** · vitest **38 파일 / 768 test** · `api:types:check` 바이트
@@ -98,7 +103,34 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 slice 가 그 자리를 둘 고쳤고(정렬 모양 · `PAPER` fixture), 세는 방법도 하나 늘었다: 축을 더한
 뒤에는 **그 축을 상수로 바꾸는 변이**를 각 소비 자리마다 돌린다(화면 둘·판독 둘·질의 넷).
 
-## §6 되돌림 리허설
+## §6 main 병합(`e12c0485`)의 합집합 계수
+
+**충돌 0 이 「접히지 않았다」를 뜻하지 않으므로** 축마다 따로 쟀다(#130~#133).
+
+| 축 | 결과 |
+| --- | --- |
+| 내 경로 ∩ main 변경 경로 | **둘** — `config/quality/gate-tests.properties` · `docs/discovery/capability-map.md` |
+| 마이그레이션 충돌 | **0** — main 은 이 범위에서 마이그레이션을 더하지 않았다(V25 가 그대로 유일하고, 그 파일의 diff 도 0 줄) |
+| 내 나머지 47 경로가 병합 전과 같은가 | 차이 **0 파일** |
+| main 의 74 경로가 `e12c0485` 와 같은가 | 차이 **둘**(겹친 그 둘 — 내 변경을 담으므로 달라야 한다) |
+| `HEAD` vs `e12c0485` 의 차이가 내 경로뿐인가 | 그 밖 **0 파일** |
+| 등재부 양쪽 생존 | 내 등재 **셋** · main 등재 **둘**(Koneps). 충돌 하나는 양쪽이 같은 자리에 넣은 것이고 **사전순 합집합**으로 해소했다 |
+| 등재부 중복 항목 | **0** — 세 ref(`e12c0485`·병합 전·HEAD)에서 모두 0 |
+| 등재부 사전순 위반 | `app` 2 · `decision` 1 · `procurement` 3 — **세 ref 에서 동일**하다(main 의 기존 상태이고 내 병합이 만든 것이 아니다). 내가 등재한 `adapters` 블록은 **0** |
+| capability map 양쪽 생존 | 내 표지 **각 1**(다섯 열 키 문장 · 「제한 셋」) · #133 의 등재 행 **둘** · 중복 제목 **0**(159 중) |
+| capability map 줄 수 | **3971** = `e12c0485` 3971 + 내 순증 0(내 편집이 제자리 치환이다) — 접힌 본문이 없다 |
+
+**의미 겹침을 따로 봤다**(텍스트 겹침 0 인 자리). #132 가 `web/src/display/**`·`web/src/screens/**`
+를 만졌지만 내 네 파일과는 다른 파일이고, 그쪽이 바꾼 `stateDisplay.ts` 의 `displayOf` 는 **맨 색인
+읽기를 `Object.hasOwn` 으로 좁히는** 변경이라 내 표의 소비 방식(알려진 키로 조회)과 어긋나지 않는다.
+#132 가 **새 게이트**를 들여왔다(`money-vocab-cross-lang.test.mjs` — 손으로 복제한 wire 어휘의 키
+집합을 Kotlin 정본과 대조). 내 축 표(`NOTIFICATION_BID_KIND_DISPLAY`)는 **그 모집단이 아니다**: 그
+게이트가 드는 다섯은 **손 복제본**이고, 내 표의 키 타입은 생성 타입에서 **파생된다**
+(`NotificationItem['bidKind']`). 그래서 Kotlin → openapi → 생성 타입 → 표가 한 사슬로 닫힌다 —
+어느 한 자리만 늘리면 계약 test·바이트 등식·`satisfies` 가 각각 붉다. 같은 성질을 두 기계로 재지
+않는 쪽을 골랐고, 이것이 그 게이트에 내 표를 등재하지 **않은** 근거다.
+
+## §7 되돌림 리허설
 
 `rollback.md` — 미적용 DB(파일 삭제 + 경로 한정 복원, 결과 트리 == 원천 트리 0 파일)와 적용
 DB(forward-fix 네 걸음, **서면 행 처분이 순서상 필수**임을 거부로 실측)를 버릴 clone 에서 쟀다.
