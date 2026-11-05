@@ -51,15 +51,24 @@ M5 종결(47건)의 네 배가 넘는다.
 | **M7 종결이 이미 넘긴 것** | `OPEN-7E2B-BUDGET-CLEAR` · `OPEN-7E3B-TIME-DISPLAY` · `OPEN-7E3B-MONEY-WORDING` · `OPEN-7E3A-OPENING-AXIS-HARNESS` · `OPEN-7C3B-*` 셋 · 7F 장부 둘 | `reports/evidence/m7/close/checklist.md` 4. **M6 종결이 다시 세지 않는다** — 두 번 세는 것을 피한다 |
 
 **정정 2026-11-05 — 「운영자 결정 선행 slice 셋」 행의 6B-3 은 틀렸다.** 「셋 다 M6 안에서 열리지 않았다」는
-6B-4·6F-5-b 에만 참이다. **6B-3 은 이 판정의 base 보다 먼저 열려 닫혔다** — 운영자 결정 2026-09-26 ②(보존
+**6F-5-b 에만 참이다**. **6B-3 은 이 판정의 base 보다 먼저 열려 닫혔다** — 운영자 결정 2026-09-26 ②(보존
 90일)를 받아 PR #73 으로 구현·머지됐다(2026-10-14 · 정본 `reports/evidence/m6/6b3/scope.md` · 절차
 `docs/runbook/m6-6b3-retention.md`). 그 행이 「여기로 모인다」고 적은 셋(`OPEN-6F5A-RETENTION` ·
 `OPEN-6F6-PROFILE-RETENTION` · `OPEN-6F8-RAW-PII-RETENTION`)은 **그 slice 가 닫았다**. 받는 자리로 남는 것은
-6B-3 이 신설한 서브 OPEN 넷(`OPEN-6B3-OUTBOX-UNSENT-RETENTION` · `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` ·
-`OPEN-6B3-PURGE-LOCK-TIMEOUT` · `OPEN-6B3-FREE-TEXT-PII-AXIS`)이고 **처분하지 않고 등재를 유지한다** — 마지막
-건의 「운영 첫 실행 전 실표본 판독」 선행 조건도 그대로다. **사용자 결정 2026-11-05 이 보존 기간을 1년으로
+6B-3 이 신설한 서브 OPEN **여섯**(`OPEN-6B3-OUTBOX-UNSENT-RETENTION` · `OPEN-6B3-NOTICE-AUDIT-SNAPSHOT-RETENTION` ·
+`OPEN-6B3-PURGE-LOCK-TIMEOUT` · `OPEN-6B3-FREE-TEXT-PII-AXIS` · `OPEN-6B3-BLOAT-AFTER-FIRST-PURGE` ·
+`OPEN-6B3-INDEX-WINDOW`)이고 **처분하지 않고 등재를 유지한다**. `-FREE-TEXT-PII-AXIS` 의 「운영 첫 실행 전
+실표본 판독」 선행 조건은 그대로다. **`-BLOAT-AFTER-FIRST-PURGE` 는 이 개정이 전제를 건드린 건**이다 — 그
+등재는 「첫 실행이 90일 백로그를 지운 뒤의 부풀음」을 말하는데, 기간을 늘리면 첫 파기 집합이 **줄어** 그
+우려가 미뤄진다(처분이 아니라 전제 변경이다). `-INDEX-WINDOW` 는 이 slice 와 무관하게 등재 유지다. **사용자 결정 2026-11-05 이 보존 기간을 1년으로
 개정**했다(정본 `reports/evidence/m9/retention-1y/scope.md` — 90일 항목은 정책의 날짜 개정 표에 그 시대의
 값으로 남는다, 소급 없음).
+
+**이 문단의 첫 판이 같은 줄의 6B-4 를 틀렸다**(cr H-1, 2026-11-05) — 「6B-4·6F-5-b 에만 참」이라고 적었는데
+**6B-4 도 열려서 닫혔다**(PR #71 「M6/6B-4: ML 학습 job 저널 · 대기 큐 상한」 머지 2026-10-14, 6B-3 의 PR #73
+보다 먼저 · `reports/evidence/m6/6b4/` 존재). 그 처분은 이 slice 범위 밖이지만 **단언은 범위가 없다.** 낡은 한
+줄을 고치는 문단이 같은 줄의 다른 항목에 새 거짓을 만들었고, 그 축은 §1 이 스스로 「내 술어가 보지 못하는
+축」이라고 적은 바로 그 축이다(그 OPEN 을 받을 slice 가 이미 열렸는가).
 
 §1 은 이 「받는 자리」 집합을 「작고 이름이 붙어 있다」며 건별 재고와 달리 신뢰했다. 이 정정은 그 집합도 낡는다는
 **반례**다 — 다만 축이 다르다: 틀린 것은 OPEN 의 상태가 아니라 **그 OPEN 을 받을 slice 가 이미 열렸는가**이고,
