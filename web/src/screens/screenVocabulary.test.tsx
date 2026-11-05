@@ -268,10 +268,18 @@ async function renderAll() {
 /**
  * 토큰이 **홀로 선 자리**만 센다. 단순 포함으로 재면 세 글자 토큰 `BID` 가 다른 식별자의 조각에
  * 걸린다 — 이 게이트의 첫 실행이 타임라인의 `ADD_TO_BID_BOX`(**명령 토큰**, 이 slice 의 축이
- * 아니라 알려진 제한에 등재)에서 그것을 보였다. 그래서 양옆이 식별자 글자가 아닌 경우만 센다.
+ * 아니라 알려진 제한에 등재)에서 그것을 보였다.
+ *
+ * **앞쪽 경계에서 숫자를 뺀다**(r2 v M-B 실측). 처음엔 양옆 모두 `[A-Z0-9_]` 였는데, 화면이
+ * 금액과 통화를 한 요소에 붙이면 글자가 `1,350,000,000KRW` 가 되고 **앞 글자가 숫자라** 그
+ * 자리를 세지 못했다(verifier 변이 둘이 그 꼴로 지나갔다). 앞은 `[A-Z_]` 만 본다 — 그래도
+ * `ADD_TO_BID_BOX` 의 `BID` 는 앞뒤가 `_` 라 그대로 보호된다.
+ *
+ * 뒤쪽은 `[A-Z0-9_]` 로 둔다: 토큰 뒤에 숫자가 붙은 **더 긴 식별자**(`BID2` 꼴)를 조각으로
+ * 세지 않기 위해서다.
  */
 export function standaloneOccurrences(text: string, token: string): number {
-  const matches = text.match(new RegExp(`(?<![A-Z0-9_])${token}(?![A-Z0-9_])`, 'g'));
+  const matches = text.match(new RegExp(`(?<![A-Z_])${token}(?![A-Z0-9_])`, 'g'));
   return matches === null ? 0 : matches.length;
 }
 
@@ -334,6 +342,13 @@ describe('홀로 선 토큰만 센다 — 술어 자신의 대조', () => {
   it('다른 식별자의 조각은 세지 않는다', () => {
     expect(standaloneOccurrences('ADD_TO_BID_BOX', 'BID')).toBe(0);
     expect(standaloneOccurrences('BIDDING', 'BID')).toBe(0);
+    expect(standaloneOccurrences('BID2', 'BID')).toBe(0);
+  });
+
+  /** **숫자에 붙은 토큰은 센다**(r2 v M-B) — 금액과 통화가 한 요소에 붙는 꼴이 그것이다. */
+  it('앞 글자가 숫자여도 센다', () => {
+    expect(standaloneOccurrences('1,350,000,000KRW', 'KRW')).toBe(1);
+    expect(standaloneOccurrences('1,350,000,000KRW부가세 포함', 'KRW')).toBe(1);
   });
 });
 

@@ -21,6 +21,11 @@ import ts from 'typescript';
  * 표시 어휘를 화면에 내는 함수들. 이 가운데 하나라도 부르면 그 컴포넌트는 금액·시각 문면을
  * 그린다는 뜻이고, 따라서 「원문 0」 단언의 대상이다.
  */
+// **이 모집단은 호출 식별자 이름에 걸린다**(r2 v M-A 등재 — `OPEN-M9-SCREEN-COVERAGE-SYMBOL-GRAPH`).
+// 어휘 함수를 **다른 이름으로 재수출하거나 별칭으로 부르면** 이 훑기가 그 컴포넌트를 의무로 세지
+// 않는다. 처방 후보는 호출 이름이 아니라 **TS 심볼 import 그래프**(`checker.getSymbolAtLocation`
+// 으로 해소한 원 선언이 표시 모듈인가)이고, 그것은 이 slice 의 범위 밖이다.
+// **술어를 더 늘리지 않는다** — 이름을 더 열거해도 같은 성질의 구멍이 남는다.
 export const VOCABULARY_CALLS = [
   'instantDisplayOf',
   'amountDisplayOf',

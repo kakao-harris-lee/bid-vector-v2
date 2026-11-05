@@ -42,10 +42,16 @@ const CLOCK_SITE = 'src/display/timeDisplay.ts';
 const clockMessage =
   '벽시계는 src/display/timeDisplay.ts 의 readClock() 한 자리에서만 읽고 now 를 props 로 내린다 — M9 D-1.';
 
-// **`Date` 전역 값 참조 자체를 막는다**(r1 v L-1). 앞 판의 술어는 식별자 이름 `Date` 에 걸린
-// 호출·생성 꼴만 보았고, 그래서 `Date()` · `globalThis.Date.now()` · `const D = Date; D.now()` ·
-// `Reflect.construct(Date, [])` 가 전부 초록이었다(verifier 실측). 값 참조를 막으면 **그 전부가
-// 한 술어로 닫힌다** — 타입 자리(`now: Date`)는 값 참조가 아니라 그대로 통과한다.
+// **`Date` 전역 축을 막는다**(r1 v L-1). 앞 판의 술어는 식별자 이름 `Date` 에 걸린 호출·생성
+// 꼴만 보았고, 그래서 `Date()` · `globalThis.Date.now()` · `const D = Date; D.now()` ·
+// `Reflect.construct(Date, [])` 가 전부 초록이었다(verifier 실측). 값 참조를 막으면 **그 축의
+// 우회가 닫힌다** — 타입 자리(`now: Date`)는 값 참조가 아니라 그대로 통과한다.
+//
+// **「우회 전부」가 아니다**(r2 v M-C 정정). 이 술어는 `Date` 라는 이름에만 걸린다 — 지금 시각을
+// 얻는 다른 길(`Intl.DateTimeFormat().formatToParts()` · `Temporal.Now` · `performance.timeOrigin`)과
+// **제외 디렉터리를 지나 들어오는 값**은 이 층 밖이다. 그 범위는 `OPEN-M9-CLOCK-LINT-SCOPE` 로
+// 등재돼 있고, 바깥 축을 받는 것은 화면 test 와 DOM 게이트다. 술어를 더 늘리지 않는다 —
+// 열거를 늘리면 그 목록이 다음 어휘에서 또 뒤처진다.
 //
 // 이것이 가능해진 것은 `datetime-local` 변환을 `timeDisplay.localInputToIso` 로 옮겼기
 // 때문이다 — 그 전에는 화면이 `new Date(값)` 을 **정당하게** 써서 금지를 좁힐 수 없었다.
