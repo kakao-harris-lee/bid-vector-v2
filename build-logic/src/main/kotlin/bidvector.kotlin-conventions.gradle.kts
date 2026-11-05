@@ -5,6 +5,7 @@ import bidvector.buildlogic.DuplicatePolicy
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.JarContentGateTask
+import bidvector.buildlogic.MigrationOrderGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.PackageOwnershipGateTask
@@ -67,6 +68,12 @@ private val expectedModuleSourceSets =
 private val typeShapeRootPackagePrefix =
     readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
         .requireValue("package.root")
+
+// 마이그레이션 디렉터리의 모듈 기준 상대 경로(`OPEN-MIGRATION-ORDER-GATE`). 관례를 박지 않고 정책
+// 데이터에서 읽는다 — 그 경로가 선언 입력이자 판정 대상의 유일한 자리다.
+private val migrationResourcePath =
+    readPolicy(configDir.file("quality/migration-policy.properties").asFile)
+        .requireValue("migration.resource-path")
 
 // D-6(Phase 3 중 신설) — 타입 멤버 축만 이 source set 집합을 잰다(관례상 `main`). 파일·함수
 // 축은 여전히 전 source set 을 받는다 — 면제는 멤버 축 하나뿐이다.
@@ -422,6 +429,18 @@ val domainApiTypeGate =
         report = layout.buildDirectory.file("reports/domain-api-type/violations.txt")
     }
 
+// 마이그레이션 번호 순서(`OPEN-MIGRATION-ORDER-GATE`) — 규율은 D-6F5-8 이고 그 규율에 자동 게이트가
+// 없다는 사실이 D-6F5-13 으로 등재됐다. 단언 대상 모듈은 정책이 고르고(`migration.module`), 경로도
+// 정책 값이다 — 디렉터리를 옮기면 그 모듈의 입력이 비어 게이트가 붉는다.
+val migrationOrderGate =
+    tasks.register<MigrationOrderGateTask>("migrationOrderGate") {
+        description = "마이그레이션 version 집합이 결번·중복 없이 1..max 와 같은지 잰다(Flyway outOfOrder=false)"
+        policyFile = configDir.file("quality/migration-policy.properties")
+        moduleName = project.name
+        migrationDirectory.from(layout.projectDirectory.dir(migrationResourcePath))
+        report = layout.buildDirectory.file("reports/migration-order/violations.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일·함수·타입 멤버 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -463,6 +482,7 @@ tasks.named("check") {
         packageOwnershipGate,
         sourceLanguageGate,
         jarContentGate,
+        migrationOrderGate,
         sourceSetLayoutGate,
         gateExecutionGate,
         gateRegistrationGate,

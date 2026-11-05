@@ -104,4 +104,18 @@ tasks.withType<Test>().configureEach {
     val allowedFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/allowed")
     inputs.dir(allowedFixtures).withPropertyName("allowedFixtures")
     systemProperty("bidvector.archfixture.allowed", allowedFixtures.absolutePath)
+
+    // `MigrationOrderTest` 의 뒤 둘이 **실제 정책과 실제 디렉터리**를 읽는다. 둘을 입력으로 선언하지
+    // 않으면 결번을 만들거나 은퇴 목록을 넓혀도 UP-TO-DATE 로 통과한다(위 정책 파일들과 같은 이유).
+    // 경로는 그 test 가 `bidvector.architecture.policy` 에서 유도하므로 system property 를 더 넘기지 않는다.
+    val migrationPolicy = repoRoot.resolve("config/quality/migration-policy.properties")
+    inputs.file(migrationPolicy).withPropertyName("migrationPolicy")
+    val migrationValues = Properties().apply { migrationPolicy.reader(Charsets.UTF_8).use(::load) }
+    inputs
+        .dir(
+            repoRoot.resolve(
+                "${migrationValues.getProperty("migration.module")}/" +
+                    migrationValues.getProperty("migration.resource-path"),
+            ),
+        ).withPropertyName("migrationDirectory")
 }
