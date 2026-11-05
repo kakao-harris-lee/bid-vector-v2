@@ -32,3 +32,21 @@
   종단 생성자(PR #127 Telegram 의 relay·sender) — 그쪽 dispatch 결과 → 종단 전이 자리가 사유 인자를
   받아야 한다 ③ `release-sha` 키 제거(PR #128 의 `AwardCollectionProperties` 에 release 키가 있는지
   병합 때 확인) · 운영 env 키 등식(`prod-env-keys-check`)은 표적 확인.
+
+## 계약 갱신 2026-11-06 (팀장, 재전달분 반영)
+
+- 위 절의 ①(DEC-08 제외)·번호 당김은 **`9efabe7a` 에서 이미 반영됐다**(역적용 커밋 `58cb4c26` ·
+  번호 커밋 `8e31b260` · 삭제 반쪽 보정 `41358ce1`). 데이터 사전은 DEC-08 절을 새로 들이지 않았고
+  §4.2 행만 「저장 자리 미정」으로 돌렸다. `OPEN-M9-CLASSIFICATION-RELEASE` 는 **걷었다**(표가 없으면
+  그 질문도 받는 slice 가 저장 자리와 같은 자리에서 정한다).
+- **판단 둘 승인됨**: V27 을 표 둘(`collection_run`·`outbox`)로 한정(조인 경로 근거 +
+  `ExecutionRowReleaseTest`) · 설정 키 `bidvector.release.sha` 통일.
+- **in_scope 밖 넷 승인됨** — 전부 「기본값 제거로 깨지는 배선」이다:
+  | 파일 | 무엇을 |
+  | --- | --- |
+  | `docker/compose.yaml` | app 서비스가 `BIDVECTOR_RELEASE_SHA` 를 받는다(값은 `BIDVECTOR_RELEASE_TAG`) — 운영 compose 는 이 파일을 상속하므로 `compose.prod.yaml` 편집 0 |
+  | `docker/prod.env.template` | `BIDVECTOR_RELEASE_TAG` 안내 문구에 「두 자리에 쓰인다」 — **키 집합 불변**(등식 검사 exit 0, 키 18) |
+  | `tools/local-tls-env.sh` | 로컬 기본값 = `git rev-parse --short HEAD` |
+  | `.github/workflows/ci.yml` | compose 스모크 job env 하나 + 거부 스모크 `-e` 하나 |
+- **적용 DB 되돌림 리허설: 로컬 Testcontainers 1회 허용**(버릴 Postgres · `bv-build` · 실행 전
+  `free -m`). 두 갈래(새 V26·V27)의 실측은 `rollback.md` §5 가 적는다.
