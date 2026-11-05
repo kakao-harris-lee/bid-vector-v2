@@ -197,9 +197,10 @@ M5 종결(47건)의 네 배가 넘는다.
 - `OPEN-7E2B-BUDGET-CLEAR` → PR **#124** 머지 `319fe212`.
 - 7F 장부 v r2 **L-1**·**L-2** → PR **#122** 머지 `6c38fb32`.
 - **남는 둘**: `OPEN-7E3A-OPENING-AXIS-HARNESS`(M9 가 만지지 않았다) · `OPEN-7C3B-PAPER-BID-NOTIFICATION`
-  (#123 의 out_scope — 그 계약이 「이 slice 머지 뒤 별도」로 적었다). 같은 행이 든
+  (#123 의 out_scope — 그 계약이 「이 slice 머지 뒤 별도」로 적었다). **M7 종결 checklist 4 가 함께 넘긴**
   `OPEN-6F4-STR02-REQUIREMENTS-AXIS` 는 #124 가 **열린 채 상태만 갱신**했다(6F-5-b LLM 추출이 사용자 결정
-  2026-11-05 로 보류라 축소 유지).
+  2026-11-05 로 보류라 축소 유지) — **§2 의 그 행은 아홉이고 그 식별자를 담지 않는다**(기계 계수: 7E2B ·
+  7E3B 둘 · 7E3A · `OPEN-7C3B-*` 셋 · 7F 장부 둘). 두 자리의 모수가 다르다 — M7 종결 checklist 4 는 **열하나**다.
 
 **「하네스 레인」 행 — 열둘 가운데 하나가 닫혔다(열하나로 읽는다).**
 `OPEN-GATE-REGISTRATION-STALE-INPUT` 은 **6G-2g 가 구조적으로 닫았다** — 등재 등식을 손으로 건 test
