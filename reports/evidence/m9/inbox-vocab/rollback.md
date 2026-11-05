@@ -1,13 +1,14 @@
 # M9/inbox-vocab rollback
 
-착수 base **`79f3e5c4`** · **복원 원천 `4953d743`**(이 브랜치가 **마지막으로** 합친 main 의
-**고정 SHA** = 병합 커밋 `5c1f0c45` 의 둘째 부모) · **실측 HEAD `f4a97373`**.
+착수 base **`79f3e5c4`** · **복원 원천 `319fe212`**(이 브랜치가 **마지막으로** 합친 main 의
+**고정 SHA** = 병합 커밋 `cddf2c30` 의 둘째 부모) · **실측 HEAD `cddf2c30`**.
 
-**원천이 착수 base 가 아니다.** 이 브랜치는 수정 라운드에서 `origin/main` 을 **두 번** 합쳤고(라운드 2: #122 운영 도구 ·
-#126 CVE apt 하한 / 라운드 3: #125 화면 표시), base 에서 복원하면 **그 남의 변경까지 지운다**(PR #124 verifier 실측). 그래서
+**원천이 착수 base 가 아니다.** 이 브랜치는 수정 라운드에서 `origin/main` 을 합쳤고**세 번** 합쳤고(라운드 2: #122 운영 도구 ·
+#126 CVE apt 하한 / 라운드 3: #125 화면 표시 / 라운드 4: #124 예산 비우기), base 에서 복원하면 **그 남의 변경까지 지운다**(PR #124 verifier 실측). 그래서
 ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서 산출하고 ⓑ 복원 원천은 합친 main 의 고정 SHA 다 —
 움직이는 `origin/main` 을 쓰지 않는다(다음 머지가 그 ref 를 옮기면 실측이 다른 트리를 가리킨다 —
-라운드 3 에서 실제로 옮겨져 원천을 `6c38fb32` 에서 `4953d743` 로 **다시** 고정했다).
+라운드 3·4 에서 실제로 옮겨져 원천을 `6c38fb32` → `4953d743` → `319fe212` 로 **그때마다 다시**
+고정했다).
 
 evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
 **그 사이에 되돌림 대상이 움직였는가**이고, 그 확인 명령은 §5 다.
@@ -17,7 +18,7 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-MAIN=4953d743                                      # 마지막으로 합친 main 의 고정 SHA(= HEAD^2)
+MAIN=319fe212                                      # 마지막으로 합친 main 의 고정 SHA(= HEAD^2)
 EXCL=':(exclude)reports/evidence/m9/inbox-vocab'   # 자기 자신은 되돌릴 수 없다
 
 # 목록은 **내 커밋만** — 병합으로 들어온 남의 커밋을 제외한다
@@ -68,15 +69,15 @@ Kotlin 쪽 순서 제약과 **다른 축**이다.
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **18**(evidence 제외) = 복원 **16**(M) · 삭제 **2**(A) — 기계 목록과 같다 |
-| ③ 결과 트리 == `4953d743` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
-| ③′ main 의 남의 변경 보존 | #122·#126 — Dockerfile 둘 · `prod-guards-check.sh` · `prod-rollback.sh` **있음** · apt 하한 줄 **7** · ci.yml 의 S-27d **1**. #125 — `InstantText.tsx` · `timeDisplay.ts` · `screen-card-coverage.mjs` · 캡처 `manifest.json` **있음** |
+| ③ 결과 트리 == `319fe212` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③′ main 의 남의 변경 보존 | #122·#126 — Dockerfile 둘 · `prod-guards-check.sh` · `prod-rollback.sh` **있음** · apt 하한 줄 **7** · ci.yml 의 S-27d **1**. #125 — `InstantText.tsx` · `timeDisplay.ts` · `screen-card-coverage.mjs` · 캡처 `manifest.json` **있음**. #124(**겹친 파일 셋**) — `StrategyBudgetClearEndpointTest` **3 파일** · openapi·생성 타입의 「명시적 비움」 description **2 파일**(생성 타입 쪽 **1**) |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | **실측 시점(`f4a97373`)에** `reports/evidence/m9/inbox-vocab/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | **실측 시점(`cddf2c30`)에** `reports/evidence/m9/inbox-vocab/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`4953d743` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main(#125 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
+복원한 트리는 **`319fe212` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
+main(#124 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
 돌리는 것은 같은 트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: 위 ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이
@@ -126,8 +127,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only f4a97373..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 4953d743..f4a97373 \
+git diff --name-only cddf2c30..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 319fe212..cddf2c30 \
       -- . ':(exclude)reports/evidence/m9/inbox-vocab' | sort -u)
 ```
 

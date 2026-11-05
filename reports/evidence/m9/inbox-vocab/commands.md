@@ -137,7 +137,38 @@ main 이 다시 움직였다 — `origin/main` **`4953d743`**(#125 화면 표시
 그 원천을 `4953d743` 로 **다시** 옮긴 것이다 — 움직이는 ref 를 쓰지 않는다는 규율이 왜 필요한지
 그 자체가 보인 자리다. **L-2** 는 알려진 제한 3 의 한 줄(두 축의 쓰기 규칙이 다르다).
 
-## §8 재활용 조사가 찾은 이름 충돌
+## §8 수정 라운드 4 — #124 재병합(**겹친 파일 셋**)
+
+`origin/main` **`319fe212`**(#124 예산 비우기) → 병합 커밋 `cddf2c30`. 앞 두 병합과 달리 이번에는
+내 경로와 **겹쳤다**: `openapi/bidvector-operator-api.yaml` · `web/src/api/generated/operator-api.ts` ·
+`config/quality/gate-tests.properties`. 충돌 0 이지만 그것이 「접히지 않았다」를 뜻하지 않으므로
+축마다 따로 쟀다.
+
+**openapi — 병합 함정 검사**
+
+| 축 | 결과 |
+| --- | --- |
+| YAML 파싱 + **중복 키 검출**(`SafeLoader` 에 중복 감지 constructor 를 끼운 로더 — 기본 로더는 중복을 **조용히 마지막 값으로** 접는다) | 파싱 OK · 중복 키 **0** · 스키마 **41** |
+| `NotificationItem.properties` 키 계수 | **13**(접힘 없음) |
+| 내 쪽 생존 | `detail.enum` = 다섯(`FAILED_OR_REBID` 포함) · `description` 있음 · 축어 enum 항 **1** |
+| #124 쪽 생존 | `EditSessionValueRequest.amountWon` 의 `nullable: true` + 「명시적 비움」 `description` 있음 · 축어 **1** |
+| 두 절이 **다른 자리**인가 | 내 절 ~2469 · #124 절 ~3021 — 같은 본문을 공유하지 않는다 |
+
+**생성 타입 — 손 병합하지 않고 재생**: `npm run api:types` 를 돌린 뒤 **diff 0 파일**이었다(병합
+결과가 이미 정확했다는 뜻이고, 그것을 재생으로 **확인**했다). `api:types:check` 바이트 등식 통과
+(**189564 bytes** — #124 의 description 이 늘린 만큼 앞 라운드의 189122 에서 자랐다).
+
+**`gate-tests.properties`**: 병합 결과가 `origin/main` 과 **한 줄** 차이(내 등재)다. 내 등재와
+#124 등재 각각 **1**. 블록 안 사전순은 `adapters`(188 항, 내 등재 포함) **정렬 OK** — 어긋난 블록
+셋(`app`·`decision`·`procurement`)은 **main 에서도 어긋나 있던 기존 상태**이고 이 병합이 만든 것이
+아니다(같은 검사를 `origin/main` 본문에 돌려 확인).
+
+**로컬 게이트**: web lint **0** · typecheck **0** · vitest **38 파일 / 762 test** · `gate:tests` 통과 ·
+`api:types:check` 통과. Kotlin 표적 — `:adapters:test *NotificationInbox*` · `:workflow:test`
+사실·사상 · **`:app:test *OpenApi*`**(계약 게이트 전수) + `NotificationInboxEndpointTest` ·
+세 모듈 `ktlintCheck` → **exit 0**.
+
+## §9 재활용 조사가 찾은 이름 충돌
 
 새 enum 의 첫 이름은 `AwardOutcome` 이었고, 그 이름은 `bidvector.settlement.AwardOutcome` 이
 **다른 개념**으로 이미 쓰고 있다(개찰 대사의 4-state). `workflow` 모듈은 그 타입을 실제로 든다
@@ -148,7 +179,7 @@ main 이 다시 움직였다 — `origin/main` **`4953d743`**(#125 화면 표시
 나왔다. `AwardResult` 로 바꾸고 재활용 조사의 결론(기존 어휘 셋을 보고 쓰지 않은 근거)을
 그 타입의 KDoc 과 `checklist.md` §3 에 남겼다.
 
-## §9 되돌림 리허설
+## §10 되돌림 리허설
 
 `rollback.md` — 두 갈래(미적용 DB = 파일 삭제 / 적용 DB = 새 V 로 원복 + 유찰 행 처분)를 버릴
 clone 에서 실측했다.
