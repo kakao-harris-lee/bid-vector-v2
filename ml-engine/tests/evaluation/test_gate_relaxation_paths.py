@@ -41,6 +41,7 @@ from ml_engine.evaluation.policy_source import (
     verify_policy_source,
 )
 from tests.ast_sites import (
+    bound_names,
     called_name,
     construction_sites,
     src_key,
@@ -84,15 +85,27 @@ def _environment_readingsrc_trees() -> list[tuple[Path, ast.Module]]:
     안에서만** 찾는 이유는, 전 소스의 대문자 상수를 환경 이름으로 보면 enum 값
     (`MEASURED_BEFORE_EFFECTIVE_DATE` 등)까지 후보가 되어 술어가 자기 어휘를 고발하기
     때문이다 — 술어가 모든 것을 잡으면 아무것도 잡지 못한다."""
-    return [
-        (path, tree)
-        for path, tree in src_trees()
-        if any(
-            (isinstance(node, ast.Attribute) and node.attr in _ENVIRONMENT_NAMES)
-            or (isinstance(node, ast.Name) and node.id in _ENVIRONMENT_NAMES)
-            for node in ast.walk(tree)
-        )
-    ]
+    return [(path, tree) for path, tree in src_trees() if _reads_environment(tree)]
+
+
+def _environment_bound_names(tree: ast.Module) -> set[str]:
+    """그 모듈에서 환경 접근을 가리키는 이름 전수 — 원래 이름 + `as` 별칭(cr LOW).
+    `from os import environ as _e` 뒤 `_e[...]` 가 앞 판의 구멍이었다(④ 축에서 M8b 가 닫은
+    바로 그 별칭 구멍이 ② 축에만 남아 있었다)."""
+    names: set[str] = set()
+    for base in _ENVIRONMENT_NAMES:
+        names |= bound_names(tree, base)
+    return names
+
+
+def _reads_environment(tree: ast.Module) -> bool:
+    watched = _environment_bound_names(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in watched:
+            return True
+        if isinstance(node, ast.Name) and node.id in watched:
+            return True
+    return False
 
 
 def test_policy_key_population_is_derived_from_the_loader_schema() -> None:
@@ -165,15 +178,19 @@ def test_evaluation_layer_never_reads_the_environment() -> None:
     for path, tree in src_trees():
         if not src_key(path).startswith("evaluation/"):
             continue
+        watched = _environment_bound_names(tree)
         for node in ast.walk(tree):
-            if isinstance(node, ast.Name) and node.id in _ENVIRONMENT_NAMES:
+            if isinstance(node, ast.Name) and node.id in watched:
                 violations.append(f"{src_key(path)}:{node.lineno} {node.id}")
-            elif isinstance(node, ast.Attribute) and node.attr in _ENVIRONMENT_NAMES:
+            elif isinstance(node, ast.Attribute) and node.attr in watched:
                 violations.append(f"{src_key(path)}:{node.lineno} .{node.attr}")
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                names = [alias.name for alias in node.names]
-                root = getattr(node, "module", None) or ""
-                if "os" in names or root == "os":
+                # **뿌리로 비교한다**(cr LOW) — 앞 판의 `"os" in names or root == "os"` 는
+                # `import os.path`(names=["os.path"])·`from os.path import join`
+                # (root="os.path")를 지나갔다.
+                roots = {alias.name.split(".")[0] for alias in node.names}
+                module = getattr(node, "module", None) or ""
+                if "os" in roots or module.split(".")[0] == "os":
                     violations.append(f"{src_key(path)}:{node.lineno} import os")
     assert not violations, f"evaluation 층이 환경을 읽는다: {violations}"
 

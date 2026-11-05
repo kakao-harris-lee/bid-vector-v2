@@ -17,7 +17,8 @@ V2 의 세 규율:
    필드가 **없다** — 「출처를 모르는데 값은 있다」를 적을 자리가 없으므로, 그 행을 어느
    주에 배정하려면 값을 지어내야 하고, 지어내면 성숙도 표의 모집단 항등식이 어긋난다.
 
-**`inference.availability.UnmeasurableReason` 과 다른 어휘다.** 그쪽은 **예측 응답**의
+**`inference.results.UnmeasurableReason` 과 다른 어휘다**(정의 자리는 `results.py` 이고
+`availability.py` 는 import 만 한다 — 혼동을 막는 문단이 혼동할 좌표를 적지 않게). 그쪽은 **예측 응답**의
 도메인 결과 축(wire 의 `bidvector.ml.v1.UnmeasurableReason` 으로 사상된다)이고, 여기는
 **성숙도 시간축**의 측정 불가다 — 섞으면 응답 어휘에 wire 값이 없는 사유가 생기고
 (`serving.wire` 의 사상 불변식이 깨진다) 두 축의 「측정 불가」가 한 이름이 된다.
