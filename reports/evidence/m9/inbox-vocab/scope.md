@@ -38,3 +38,9 @@ PK·열·GRANT 변경 · 페이퍼 투찰 알림(`OPEN-7C3B-PAPER-BID-NOTIFICATI
 ## 하네스 레인 변경
 
 없음.
+
+## 계약 갱신 2026-11-05 (팀장)
+
+- **D-3′ 승인** — D-3 문면(「같은 키 재기록이면 해제」)은 개정 알림의 원천인 훑기가 같은 개정을 run 마다 다시 기록하므로 배지를 영영 끌 수 없게 만든다(레인 preflight 실측: 사실 시각 = `notice.updated_at`, V2 트리거가 `revision`·`updated_at` 을 함께 올림). 정책 갈래는 `ON_DETAIL_CHANGE`(기본) · `ON_NEWER_FACT`(`NOTICE_REVISED` — `EXCLUDED.occurred_at > notification_inbox.occurred_at` 일 때 해제).
+- acceptance 셋째 줄 대체: 「읽은 `NOTICE_REVISED` 에 **더 늦은 사실 시각**의 재기록 → `read_at` NULL + 안읽음 수 증가, **같은 사실 시각**의 재기록 → 읽음 유지(음성 대조)」.
+- `docs/discovery/data-dictionary.md` 에 알림함 어휘 절이 없어 손대지 않은 것은 정당(in_scope 의 「알림함 어휘 절」은 없는 절). OPEN 두 건의 종결 등재(`reports/evidence/m7/**`·capability map)는 M9 장부 slice 가 받는다.
