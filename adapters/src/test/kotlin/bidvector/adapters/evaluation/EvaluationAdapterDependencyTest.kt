@@ -35,11 +35,20 @@ import java.io.File
  * `assembleKeywordScopeText`·`assembleFullScopeText`(순수 커널)를 불러 감시 텍스트를
  * 조립한다(우회 3 — 어댑터가 이어붙이기를 복제하지 않고 커널을 부른다). `WatchSubject`·
  * `CategoryCode`(strategy 쪽) 타입도 이 축에서 함께 참조된다.
+ *
+ * **`bidvector.workflow.notificationinbox`(M9/ops-code · NOTI-01 신설)** — [EvaluationCommitRun]
+ * 이 가치 게이트를 통과한 후보를 알림함에도 남기려면 쓰기 포트와 청중 포트를 **이름으로** 받아야
+ * 한다. `bidvector.adapters.event` 를 더한 D-6F10-18 ③ 과 **같은 사유·같은 형태**다: 그 조립이
+ * `app` 이 아니라 이 패키지에 사는 이유가 outbox 쓰기 타입이기 때문이고(D-6A3-17(a)③), 알림 축의
+ * 주입도 같은 자리에서 받는다. 넓어진 것은 **포트 둘의 루트**이고 알림함 **어댑터**
+ * (`bidvector.adapters.notificationinbox`)는 이 목록에 **없다** — 조립은 포트만 받고 구현은 배선이
+ * 고른다. 그 어댑터 이름이 이 패키지의 상수 풀에 나타나면 이 게이트가 RED 다.
  */
 private val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
         "bidvector.workflow.event",
+        "bidvector.workflow.notificationinbox",
         "bidvector.workflow.strategy",
         "bidvector.procurement",
         "bidvector.sharedkernel",
@@ -88,12 +97,16 @@ class EvaluationAdapterDependencyTest {
         isDisallowed("bidvector.workflow.ml") shouldBe true
         isDisallowed("bidvector.adapters.ml") shouldBe true
         isDisallowed("bidvector.adapters.relay") shouldBe true
+        // M9/ops-code — 알림 **포트**의 루트는 허용했지만 그 **어댑터**는 아니다. 조립이 구현을
+        // 이름으로 고르는 회귀가 이 한 줄에 걸린다.
+        isDisallowed("bidvector.adapters.notificationinbox") shouldBe true
     }
 
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
         isDisallowed("bidvector.workflow.evaluation") shouldBe false
         isDisallowed("bidvector.workflow.event") shouldBe false
+        isDisallowed("bidvector.workflow.notificationinbox") shouldBe false
         isDisallowed("bidvector.workflow.strategy") shouldBe false
         isDisallowed("bidvector.procurement") shouldBe false
         isDisallowed("bidvector.sharedkernel") shouldBe false

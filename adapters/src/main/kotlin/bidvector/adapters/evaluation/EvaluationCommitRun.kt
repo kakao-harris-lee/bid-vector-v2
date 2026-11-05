@@ -8,10 +8,13 @@ import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
+import bidvector.workflow.evaluation.InboxRecordingNotifications
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import javax.sql.DataSource
@@ -41,6 +44,7 @@ import javax.sql.DataSource
  * `Failed` 는 **버려지지 않는다** — `reach()` 가 그 값을 `CandidateEvaluation.Reached.
  * disposition` 에 실어 돌려주고, 러너가 그 계수로 종료 코드를 정한다.
  */
+@Suppress("LongParameterList")
 class EvaluationCommitRun(
     dataSource: DataSource,
     private val strategies: StrategyRepository,
@@ -52,12 +56,34 @@ class EvaluationCommitRun(
     private val correlationIds: CorrelationIdFactory,
     private val clock: Clock,
     private val analysisBudget: Int?,
+    /**
+     * NOTI-01 — 가치 게이트를 통과한 후보를 운영자 **알림함**에도 남긴다. 둘 다 **기본값이
+     * 없다**: 이 경로가 `NEW_CANDIDATE` 의 유일한 생산자라, 조용히 빠지면 그 값이 production
+     * 에서 다시 0 이 된다. 빠뜨리면 컴파일이 깨진다.
+     *
+     * **dry-run·단건 경로에는 이 짝이 없다.** 그 둘은 `RecordingNotificationRequestPort` 를 쓰고
+     * 알림함에 닿지 않는다 — 「미리보기가 기록을 남긴다」가 술어가 아니라 구조로 불가능하다
+     * (`DryRunCommitSeparationGateTest` 가 재는 그 분리와 같은 축).
+     */
+    private val notificationInbox: NotificationInboxPort,
+    private val audience: NotificationAudiencePort,
 ) {
+    /**
+     * **알림함 기록이 outbox 등록을 감싼다**(NOTI-01 「억제는 채널 억제이지 기록 억제가 아니다」).
+     * 기록이 먼저이므로 outbox 쓰기가 실패해도 알림함 항목은 남는다 — 그 순서가
+     * `InboxRecordingNotifications` 의 계약이고 거기 test 가 양방향으로 잠근다.
+     */
     private val notifications =
-        OutboxNotificationRequestPort(
-            JdbcOutboxPort(OwnTransactionConnectionSource(dataSource)),
-            JdbcEventIdFactory(),
-            clock,
+        InboxRecordingNotifications(
+            channel =
+                OutboxNotificationRequestPort(
+                    JdbcOutboxPort(OwnTransactionConnectionSource(dataSource)),
+                    JdbcEventIdFactory(),
+                    clock,
+                ),
+            inbox = notificationInbox,
+            audience = audience,
+            clock = clock,
         )
 
     suspend fun evaluate(): List<CandidateEvaluation> =

@@ -1,7 +1,9 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.notificationinbox.JdbcNotificationInboxStore
+import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
@@ -57,6 +59,21 @@ open class NotificationInboxWiring {
             }
         }
     }
+
+    /**
+     * 청중 — 체계의 알림이 갈 계정 전수(M9/ops-code · NOTI-01). **읽기 전용이고 알림함 표를
+     * 건드리지 않는다**(`account.id` 만 읽는다).
+     *
+     * 쓰기 빈과 **같은 조립에 둔 이유**: 둘은 한 짝으로만 쓰인다(기록할 사실 + 기록할 대상).
+     * 원천 slice 마다 따로 꽂게 하면 같은 어댑터가 여러 조립에서 생기고, 쓰기 빈을 한 자리로
+     * 모은 판단이 청중에서 무너진다.
+     *
+     * **비활성화 경로**: 이 빈을 빼면 평가 커밋 배선이 서지 않는다(그 조립이 이 타입을 요구한다) —
+     * 알림함 읽기 경로와 다른 트리거들은 그대로 남는다.
+     */
+    @Bean
+    open fun notificationAudiencePort(dataSource: DataSource): NotificationAudiencePort =
+        JdbcNotificationAudience(dataSource)
 
     @Bean
     open fun notificationInboxQuery(
