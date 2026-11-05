@@ -218,18 +218,23 @@ def build_weekly_maturity(
     """관측을 KST 주로 묶어 성숙도 리포트를 만든다. `window_days`는 `InferencePolicy.
     maturity_window_days`(D-5D-8, legacy `MATURITY_WINDOW_LENGTH = 7일`)에서 오고,
     `policy`는 그 행들을 해석한 정책이다 — 행의 provenance 가 그 정책과 다르면
-    `ValueError`(한 표의 모든 행은 같은 정책으로 해석됐어야 한다, 구조적 불변식)."""
+    `ValueError`(한 표의 모든 행은 같은 정책으로 해석됐어야 한다, 구조적 불변식). 그
+    불변식은 **측정 불가 행에도** 걸린다(cr M-1)."""
     window_length = timedelta(days=window_days)
     known: list[tuple[KnownTimeAxis, bool]] = []
     unmeasurable: dict[TimeAxisUnmeasurableReason, int] = {}
     for observation in observations:
         axis = observation.time_axis
+        # 정책 version 검사는 **두 갈래 모두**에 걸린다(cr M-1) — 측정 불가 행도 「어느
+        # 정책으로 해석해서」 그렇게 판정됐는지가 그 판정의 일부다. 한 갈래만 보면, 대체를
+        # 승인한 정책이 공시된 표가 그 정책으로는 분모에 들어갔어야 할 행을 측정 불가로
+        # 적을 수 있다.
+        if axis.policy_version != policy.version:
+            raise ValueError(
+                "성숙도 표의 모든 행은 같은 정책 version 으로 해석됐어야 한다 — "
+                f"{axis.policy_version!r} != {policy.version!r}"
+            )
         if isinstance(axis, KnownTimeAxis):
-            if axis.policy_version != policy.version:
-                raise ValueError(
-                    "성숙도 표의 모든 행은 같은 정책 version 으로 해석됐어야 한다 — "
-                    f"{axis.policy_version!r} != {policy.version!r}"
-                )
             known.append((axis, observation.settled))
             continue
         unmeasurable[axis.reason] = unmeasurable.get(axis.reason, 0) + 1

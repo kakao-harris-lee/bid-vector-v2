@@ -63,9 +63,16 @@ class KnownTimeAxis:
 
 @dataclass(frozen=True)
 class UnmeasurableTimeAxis:
-    """시간축을 정할 수 없다 — **시각 값을 나르지 않는다**(사유만)."""
+    """시간축을 정할 수 없다 — **시각 값을 나르지 않는다**(사유와 정책 version 만).
+
+    `policy_version` 이 여기에도 있는 이유(cr M-1): 「어느 정책으로 해석해서 측정 불가로
+    판정했는가」가 그 판정의 일부다. 같은 행이 대체를 승인한 정책에서는 분모에 들어간다 —
+    그래서 표가 공시하는 정책과 행이 해석된 정책이 다르면, 그 표는 **자기가 측정할 수
+    있었던 행을 측정 불가로** 적는다(이 모듈이 없애려던 provenance 소실과 분모 축소가 같은
+    자리에서 다시 성립한다). 금지 사항은 **시각 값**이지 정책 version 이 아니다."""
 
     reason: TimeAxisUnmeasurableReason
+    policy_version: str
 
 
 type TimeAxis = KnownTimeAxis | UnmeasurableTimeAxis
@@ -97,11 +104,13 @@ def resolve_time_axis(
         )
     if bid_close_at is None:
         return UnmeasurableTimeAxis(
-            reason=TimeAxisUnmeasurableReason.NO_TIME_AXIS_VALUE
+            reason=TimeAxisUnmeasurableReason.NO_TIME_AXIS_VALUE,
+            policy_version=policy.version,
         )
     if not policy.substitute_approved:
         return UnmeasurableTimeAxis(
-            reason=TimeAxisUnmeasurableReason.UNAPPROVED_TIME_AXIS_SOURCE
+            reason=TimeAxisUnmeasurableReason.UNAPPROVED_TIME_AXIS_SOURCE,
+            policy_version=policy.version,
         )
     return KnownTimeAxis(
         value=bid_close_at,

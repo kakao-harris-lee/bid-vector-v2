@@ -290,3 +290,17 @@ def test_unmeasurable_observation_is_not_silently_dropped() -> None:
             reason=TimeAxisUnmeasurableReason.NO_TIME_AXIS_VALUE, row_count=1
         ),
     )
+
+
+def test_unmeasurable_rows_from_another_policy_version_are_rejected() -> None:
+    """cr M-1 재현 — 앞 판은 정책 version 검사가 `KnownTimeAxis` 안에만 있어서, **대체를
+    승인한 정책**이 공시된 표가 그 정책으로는 분모에 들어갔어야 할 행을 「측정 불가」로
+    적을 수 있었다(예외 없이 통과했다)."""
+    unapproved_elsewhere = SettlementObservation(
+        time_axis=resolve_time_axis(
+            opened_at=None, bid_close_at=_WEEK1, policy=_STRICT
+        ),
+        settled=True,
+    )
+    with pytest.raises(ValueError, match="정책 version"):
+        build_weekly_maturity([unapproved_elsewhere], window_days=7, policy=_PERMISSIVE)

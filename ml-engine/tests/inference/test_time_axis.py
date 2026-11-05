@@ -181,3 +181,15 @@ def test_time_axis_policy_is_constructed_only_from_the_versioned_policy() -> Non
                     )
                 )
     assert sites == {("inference/policy.py", "time_axis_policy_of")}, sites
+
+
+def test_unmeasurable_axis_carries_the_policy_that_judged_it() -> None:
+    """cr M-1 — 「어느 정책으로 해석해서 측정 불가인가」가 그 판정의 일부다. 금지 사항은
+    시각 값이지 정책 version 이 아니다."""
+    for axis in (
+        resolve_time_axis(opened_at=None, bid_close_at=None, policy=_STRICT),
+        resolve_time_axis(opened_at=None, bid_close_at=_BID_CLOSE_AT, policy=_STRICT),
+    ):
+        assert isinstance(axis, UnmeasurableTimeAxis)
+        assert axis.policy_version == _STRICT.version
+        assert not hasattr(axis, "value")
