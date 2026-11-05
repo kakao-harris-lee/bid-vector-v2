@@ -51,6 +51,13 @@
 - **알려진 한계**: 리포트를 `touch` 하면 mtime 축은 통과한다(내용 무변). didWork 를 직접 보는 축은
   configuration-cache 아래에서 task 참조를 실행 시점에 들고 있어야 해 쓰지 않았다.
 
+- **구현 뒤 실측 — 1·2 는 닫히지 않았다.** 두 값을 켜도 「구조는 같고 식별자·리터럴이 전부 다른」 블록
+  둘(≈200 토큰)이 탐지되지 않는다. 축어 동일 통제군은 탐지된다(임계·lexer 정상). 사유는 구조적이다 —
+  값은 `CPDConfiguration.setIgnoreIdentifiers` 까지 흐르지만 PMD 7.7.0 의
+  `KotlinLanguageModule.createCpdLexer(LanguagePropertyBundle)` 가 그 번들을 쓰지 않고 인자 없는
+  `KotlinCpdLexer()` 를 만든다(바이트코드 확인). **그 OPEN 의 이름 치환 축은 열린 채로 남는다** —
+  배선과 정책 키는 남기고 정책 주석 첫 문단이 그 사실을 들게 했다. 5(낡은 리포트)는 닫혔다.
+
 ## ③ 배포물 아카이브 사각 (`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`)
 
 - ⓐ **경계**: 「게이트를 통과한 바이트인가」를 **그 모듈이 만드는 Jar 타입 task 전수**에 건다. `jar`
@@ -123,22 +130,27 @@
 - **알려진 한계**: 허용 뿌리 목록이 **두 자리**에 산다(정책 데이터 + 네 test 의 `ALLOWED_ROOTS`).
   어긋나면 두 층의 범위가 갈린다. 정본화(test 가 정책을 읽게)는 adapters test 술어라 out_scope.
 
-## ⑦ legacy 좌표의 상시 소스 축 (M6 종결 checklist §3 ④)
+## ⑦ legacy 좌표의 상시 소스 축 (M6 종결 checklist §3 ④) — **구현하지 않는다(실측 뒤 처분)**
 
-- ⓐ **경계**: 완료 조건 2(「기존 `bid-vector` import·symlink·DB schema 에 runtime dependency 없음」)를
-  **이미지 컨텍스트 밖에서도** 잰다 — 모든 모듈 main 소스가 금지 좌표를 이름으로도, 문자열
-  리터럴로도 담지 않는다.
-- ⓑ **새 public 표면**: 없다(같은 task 의 축 추가). 정책 키 둘(`source.forbidden.coordinates` ·
-  `source.forbidden.literals`).
-- ⓒ **우회**
-  1. legacy 패키지를 import 한다 → 좌표 거부 집합.
-  2. 경로 문자열로 symlink 를 읽는다(`"bid-vector/..."`) → **PSI 문자열 리터럴**을 걸러 본다(파일
-     텍스트 grep 이 아니라 리터럴 노드다 — 주석·KDoc 은 대상이 아니다).
-  3. 리터럴을 쪼개 이어 붙인다(`"bid-" + "vector/"`) → **닫지 못한다.** 알려진 한계.
-  4. 템플릿으로 가린다(`"${'$'}base/bid-vector"`) → 템플릿의 리터럴 조각도 노드라 걸린다.
-  5. test 로 옮긴다 → 이 축은 main 한정이다(production runtime dependency 가 조건 문면이다).
-     test 의 legacy 참조는 조건 2 가 금지하는 것이 아니다 — 범위를 넓히지 않는다.
-  6. 정책 목록을 지워 조용히 끈다 → 키 부재는 정책 오류(`requireList`).
+- ⓐ **경계(의도)**: 완료 조건 2(「기존 `bid-vector` import·symlink·DB schema 에 runtime dependency
+  없음」)를 이미지 컨텍스트 밖에서도 잰다.
+- **실측 셋이 이 처방을 막는다.**
+  1. **Kotlin 쪽 좌표 거부 집합은 비어 있다.** legacy 는 Python 저장소라 Kotlin 이 import 할 수 있는
+     legacy 좌표가 없다. 이미지 정책의 `forbidden.packages`(`sqlalchemy`·`psycopg`·`requests`·`httpx`·
+     `celery`)는 **Python 런타임 의존**이고 그 소스 축은 ml-engine 레인의 몫이다(이 slice 의 in_scope
+     밖이고 Gradle task 가 잴 대상도 아니다). Maven group 축은 `group.forbidden` 이 **이미 상시로**
+     잰다(`moduleDependencyGate`).
+  2. **경로 리터럴 거부는 과잉이다.** V2 소스에서 `bid-vector` 가 나오는 자리는 **여섯**이고 전부
+     **출처 인용**이다 — 다섯은 KDoc(legacy 함수·줄 번호 인용), 하나는 정책 값의 `source` 문자열
+     (`SAMPLE_PROVENANCE_POLICY` — 「이 값이 어디서 왔나」를 나르는 provenance 데이터). 이 저장소는
+     provenance 를 **요구**하므로 그것을 지우게 만드는 게이트는 설계 검토 (3) 의 「과잉」이다.
+  3. **거부 목록의 입력이 없다.** legacy `bid-vector` symlink 가 이 환경에 **더 이상 없다**(확인:
+     저장소와 레인 worktree 양쪽에서 부재). 그래서 legacy 패키지 뿌리·테이블 이름을 전수로 열거할
+     근거가 없다 — 추측으로 적은 거부 목록은 그 자체가 틀린 게이트다.
+- **처분**: 이 축의 게이트를 만들지 않고 위 셋을 OPEN 으로 보고한다(inert 한 정책 키를 남기지
+  않는다 — ② 에서 본 것처럼 「있는데 아무것도 막지 않는 키」가 「닫혔다」로 읽힌다). 오늘 상태에서
+  조건 2 의 Kotlin 축은 `group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate` 가 들고,
+  Python 축은 ml-engine 레인이 받는다.
 
 ## ⑧ 실행 환경 스니핑 0 (OPS-13)
 
