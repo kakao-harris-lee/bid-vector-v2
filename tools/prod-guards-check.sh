@@ -57,7 +57,15 @@ _cleanup() {
 }
 trap _cleanup EXIT
 
-_require_lock_dir "$BIDVECTOR_PROD_LOCK_DIR"
+# **자리 점검은 이 한 줄이고, 자기 검사도 같은 줄을 지난다.** 함수만 따로 시험하면 이 호출이 빠지는
+# 변이가 초록이 된다(v r2 F-2) — 그래서 검사 전용 변수로 **자리만 바꿔** 자식으로 다시 돌리고, 그
+# 경우에는 잠금을 잡지 않고 끝낸다. 운영 스크립트의 잠금 자리는 여전히 환경에서 오지 않는다(이 변수는
+# 이 검사 파일 안에만 있다).
+_require_lock_dir "${BV_GUARDS_SELFTEST_LOCK_DIR:-$BIDVECTOR_PROD_LOCK_DIR}"
+if [ -n "${BV_GUARDS_SELFTEST_LOCK_DIR:-}" ]; then
+  echo "prod-guards-check: 잠금 자리 점검만 하고 끝낸다(자기 검사) — ${BV_GUARDS_SELFTEST_LOCK_DIR}"
+  exit 0
+fi
 # 잠금 자리의 **양성 대조** — 운영 스크립트와 같은 술어로 먼저 잡아 본다(검사 전용 이름으로 잡고 바로 놓는다).
 _prod_project_lock "${PROJ}-probe" || _die "${_PROD_LOCK_ERR} — 이 검사의 전제다(판정 불가)" 2
 _prod_unlock_all
@@ -171,8 +179,12 @@ case "${1:-}" in
       esac
     done
     if [ -n "$namef" ]; then
-      # 전역 이름 조회(`--filter name=^<이름>$`) — 프로젝트 라벨과 무관하다.
-      [ -z "${SHIM_PS_NAME_HIT:-}" ] || printf '%s\n' "$SHIM_PS_NAME_HIT"
+      # 전역 이름 조회(`--filter name=^<이름>$`) — 프로젝트 라벨과 무관하다. **여기서도 `-a` 를 본다**:
+      # 멈춘 동명 컨테이너도 이름을 쥐고 있어 `run` 이 「name already in use」로 죽는다.
+      if [ -n "${SHIM_PS_NAME_HIT:-}" ] \
+         && { [ "$all" = 1 ] || [ "${SHIM_PS_NAME_STATE:-running}" = running ]; }; then
+        printf '%s\n' "$SHIM_PS_NAME_HIT"
+      fi
       exit 0
     fi
     # fixture 행: <프로젝트>|<이름>|<oneoff 라벨>|<상태>. **`-a` 가 없으면 running 만 보인다** —
@@ -255,10 +267,11 @@ _expect_no_log() { # <정규식> <이름>
 }
 
 echo "== 검사 자신의 전제 — 운영 잠금 자리를 만들지 않는다"
-RUN_RC=0
-( _require_lock_dir "$T/no-such-lock-dir" ) > "$T/out" 2> "$T/err" || RUN_RC=$?
+# **호출 경로로 잰다**(함수 직접 호출이 아니라 스크립트 실행) — 그래야 호출 줄이 빠지는 변이가 잡힌다.
+BV_GUARDS_SELFTEST_LOCK_DIR="$T/no-such-lock-dir" _run ./tools/prod-guards-check.sh
 _expect_rc 2 "잠금 자리가 없으면 판정 불가로 끝난다"
 _expect_text '운영 자리를 만들지 않는다' "문면이 사유와 고치는 명령을 보인다"
+_expect_no_text '잠금 자리 점검만 하고 끝낸다' "자리 점검을 건너뛰고 끝나지 않는다"
 if [ -e "$T/no-such-lock-dir" ]; then _bad "그 자리를 만들었다"; else _ok "그 자리를 만들지 않았다"; fi
 
 echo "== L-1 술어 — 반입 트리 ↔ manifest git_sha"
@@ -373,6 +386,10 @@ export SHIM_PS_FILE="$T/ps-clean"
 SHIM_PS_NAME_HIT="deadbeefcafe" _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 3 "일회 컨테이너 이름이 전역에서 이미 쓰이면 훑지 않는다"
 _expect_no_log ' run ' "그 거절이 compose run 앞에서 끝난다"
+# **멈춘** 동명 컨테이너도 이름을 쥔다 — 그래서 충돌 조회는 `-aq` 여야 한다(v r2 F-3).
+SHIM_PS_NAME_HIT="deadbeefcafe" SHIM_PS_NAME_STATE=exited _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 3 "**멈춘** 동명 컨테이너가 있어도 훑지 않는다(docker ps -aq)"
+_expect_no_log ' run ' "그 거절도 compose run 앞에서 끝난다"
 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 0 "양성 — 잔존 0 · 같은 커밋 · 같은 프로젝트면 훑는다"
 _expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-sweep" "일회 컨테이너 이름을 고정해 띄운다"
@@ -409,14 +426,20 @@ _signal_case HUP 129
 echo "== runbook — ExecStopPost 가 조건 없이 돌지 않는가"
 # 문서에는 구조 술어가 없다 — 이 단언은 **텍스트 술어**다(unit 예시가 있는 층이 문서뿐이다). 조건 없는
 # `ExecStopPost=…docker rm -f <고정 이름>` 은 수동 run 이 도는 중에 타이머가 발화하면(그 run 은 잠금에서
-# exit 3) **남의 컨테이너**를 지운다. 조건의 존재를 `SERVICE_RESULT` 로 잠근다.
+# exit 3) **남의 컨테이너**를 지운다.
+#
+# **글자 하나가 아니라 조건식 전문을 잠근다**(v r2 F-1): 조항 셋(성공 건너뜀 · `exit 3` 건너뜀 · 그 뒤의
+# `docker rm -f <…-app-run-sweep>`)과 **`$$` 형태**까지 본다. `SERVICE_RESULT` 글자만 보던 앞 판은
+# 「`|| [ "$$EXIT_STATUS" = 3 ]` 삭제」와 「`${SERVICE_RESULT}`(systemd 가 미리 빈 값으로 펼친다)」가
+# 둘 다 초록이었다 — exit 3 조항은 v M-1 시나리오를 막는 바로 그 조항이다.
 RB=docs/runbook/m7-7f-production.md
+ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| .*docker rm -f [^ ]*-app-run-sweep'
 esp_n="$(grep -cE '^ExecStopPost=' "$RB" || true)"
-esp_cond="$(grep -E '^ExecStopPost=' "$RB" | grep -cE 'SERVICE_RESULT' || true)"
+esp_cond="$(grep -cE "$ESP_WANT" "$RB" || true)"
 if [ "$esp_n" -ge 1 ] && [ "$esp_n" = "$esp_cond" ]; then
-  _ok "runbook 의 ExecStopPost ${esp_n} 줄이 모두 종료 사유 조건을 갖는다"
+  _ok "runbook 의 ExecStopPost ${esp_n} 줄이 모두 조건식 전문과 같다(성공·exit 3 건너뜀 · \$\$ 형태)"
 else
-  _bad "runbook 의 ExecStopPost ${esp_n} 줄 중 ${esp_cond} 만 조건을 갖는다 — 조건 없는 정리는 남의 run 을 지운다"
+  _bad "runbook 의 ExecStopPost ${esp_n} 줄 중 ${esp_cond} 만 조건식 전문과 같다 — 조항이 빠지거나 \$\$ 형태가 아니면 남의 run 을 지우는 길이 다시 열린다"
 fi
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"
