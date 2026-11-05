@@ -68,9 +68,34 @@ LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3a
 # 그래서 올리기는 무제약으로 하고 하한을 **별도 술어로** 단언한다 — 후보가 하한 아래면 그 자리에서
 # 빌드가 비-0 이다(음성 대조 실측: 하한 99 → exit 1). 이 형태는 apk 하한이 「무제약 토큰을 함께
 # 적으면 조용히 무시된다」던 함정(web.Dockerfile 주석)도 갖지 않는다 — 술어가 설치와 별개 줄이다.
+#
+# M9/cve-followups — PR #126 code-review 의 세 지적(`OPEN-CVE-APT-RETRY`)을 받았다.
+#
+# ① **`-o Acquire::Retries=3`** — 이 RUN 이 CI `container` job 의 **다섯째 네트워크 의존**(배포판
+#    아카이브 `deb.debian.org`·`archive.ubuntu.com`)을 만든다. 그 job 은 「네트워크가 한 번 튀는
+#    것으로 CI 가 붉어지지 않게 한다」를 앞선 리뷰로 이미 받아 trivy 설치 step 에 `curl --retry 3
+#    --retry-all-errors` 를 쓴다. 같은 규율을 apt 쪽에도 둔다 — 없으면 미러가 한 번 흔들릴 때
+#    **모든 PR** 의 이미지 빌드가 붉어지고, 그것은 이 RUN 이 애초에 고치려던 상태와 같은 모양이다.
+#    두 호출에 각자 붙인다(이미지에 apt 설정 파일을 심지 않는다 — 설정은 이 RUN 안에서만 산다).
+#    두 베이스 모두 이 키를 **선언하지 않는다**(`apt-config dump` 에 없다) — man 의 거동이
+#    「비-0 일 때만 재시도」라 이 플래그 전까지 재시도가 0 이었다(실측). 주의: `-o` 는 **키 이름을
+#    검사하지 않는다** — 오타 키(`Acquire::Retrie`)는 exit 0 으로 조용히 무시되고(실측) 재시도만
+#    사라진다. 그래서 이 줄을 고칠 때 확인은 `apt-config -o … dump` 의 반영 여부로 한다.
+# ② **`--no-remove`** — `--only-upgrade` 는 「명령줄에 없는 것을 새로 설치하지 않는다」일 뿐
+#    **제거를 막지 않는다**. 장래 아카이브 상태에서 해결기가 비필수 패키지를 지우며 상향을
+#    만족시키면 `-y` 가 그것을 조용히 승인한다(app 쪽은 `required.executables` 가 한 축을 잡지만
+#    이 이미지에는 대응 축이 없다 — 금지 import 와 크기뿐이다). man: 「If any packages are to be
+#    removed apt-get immediately aborts」(Configuration Item `APT::Get::Remove`). 오늘 거동은
+#    바뀌지 않고(제거 대상 0) 경로 하나가 닫힌다 — **플래그만 바꿔치운 실측**: 제거가 필요한
+#    요청에 이 플래그를 붙이면 exit 100 으로 끊기고, 빼면 같은 요청이 exit 0 이다.
+# ③ **`~` 접미 수정판은 거짓 빨강 쪽으로 틀린다.** `dpkg --compare-versions 2.6.2~deb12u1 ge 2.6.2`
+#    은 **거짓**이다(`~` 는 빈 것보다 앞선다 — `2.6.2+deb12u1` 은 참이다, 둘 다 실측). 상류가
+#    수정판을 `~` 형태로 내면 CVE 가 닫혔는데도 이 RUN 이 「닫히지 않는다」는 문면으로 멈춘다.
+#    거짓 초록이 아니라 fail-closed 방향이라 지금 고칠 것은 없다 — 물리면 하한을 그 `~` 판으로
+#    내려 적거나 상류 버전 성분만 비교한다.
 RUN set -eu; \
-    apt-get update -qq; \
-    apt-get install --only-upgrade -y --no-install-recommends apt libapt-pkg6.0; \
+    apt-get -o Acquire::Retries=3 update -qq; \
+    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0; \
     for floor in 'apt 2.6.2' 'libapt-pkg6.0 2.6.2'; do \
         set -- $floor; \
         cur="$(dpkg-query -f '${Version}' -W "$1")"; \
