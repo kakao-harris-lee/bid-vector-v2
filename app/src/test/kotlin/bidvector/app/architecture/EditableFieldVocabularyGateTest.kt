@@ -111,8 +111,11 @@ class EditableFieldVocabularyGateTest {
     @Test
     fun `비움을 받는 필드는 값을 세운 초안을 되돌리고 나머지는 비움을 거부한다`() {
         val base = StrategyDraft()
-        // 받는 필드가 0 이면 아래 첫 갈래가 한 번도 돌지 않는다 — 공허한 초록을 막는다.
+        // **두 갈래가 모두 한 번은 돌아야 한다** — 받는 집합이 0 이면 되돌림 단언이, 받는 집합이
+        // 전부이면 거부 단언이 공허하게 통과한다. 뒤 가드가 없던 판은 그 꼴을 변이에만 기댔고,
+        // 변이는 세션과 함께 죽는다(cr L-3).
         EDITABLE_FIELDS.any { it.acceptsClearing() } shouldBe true
+        EDITABLE_FIELDS.any { !it.acceptsClearing() } shouldBe true
 
         EDITABLE_FIELDS.forEach { field ->
             val set = base.withFieldValue(field, sampleValue(field.valueSlot()))

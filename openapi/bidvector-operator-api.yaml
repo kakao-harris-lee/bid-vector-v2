@@ -3027,11 +3027,22 @@ components:
         # 값이 반드시 있어서, 그 칸들의 `null` 은 400 이다. 「`MIN_BUDGET`·`MAX_BUDGET` 일 때만
         # null」은 이 스키마 형태로 표현할 수 없다(L-3 과 같은 사유 — `oneOf` 는 평탄 게이트에
         # 걸린다). 구현이 엄격하게 강제하고 `StrategyBudgetClearEndpointTest` 가 그 경계를 잰다.
+        #
+        # **그 제약은 아래 `description` 에도 있다**(cr M-1): 이 주석은 발행물에 남지 않는다 —
+        # 생성 타입·Swagger UI·다른 SDK 생성기가 보는 것은 `description` 이고, 주석만 두면
+        # **발행된 계약은 13 필드 전부에 `null` 을 허락하는 것으로 읽힌다**. 두 자리의 문면이
+        # 갈리지 않게, 제약의 정본은 `description` 이고 이 주석은 그 사유(왜 스키마 형태로
+        # 표현할 수 없는가)를 든다.
         amountWon:
           type: integer
           format: int64
           minimum: 0
           nullable: true
+          description: >-
+            null 은 명시적 비움이다 — 비움을 받는 field 는 MIN_BUDGET·MAX_BUDGET 둘뿐이고 그
+            밖의 field 에 null 을 보내면 400(INVALID_REQUEST)이다. 칸을 아예 보내지 않는 것은
+            비움이 아니라 값을 말하지 않은 것이라 역시 400 이고, 비움 요청에 다른 값 칸이나
+            알려지지 않은 키가 함께 오면 그것도 400 이다.
         number:
           type: number
         count:

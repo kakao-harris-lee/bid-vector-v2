@@ -204,6 +204,10 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
     /**
      * 비움을 받는 집합은 **예산 한계 둘**이다. 나머지 열하나는 초안에 「없음」 상태가 없다 — 어휘는
      * 빈 목록이 곧 없음이고, 임계·상한은 값이 반드시 있다. 그 칸의 `null` 은 400 이다.
+     *
+     * 넷은 **칸 네 종류의 대표**다(어휘 · 소수 · 건수 둘). 열하나 전수는 `withFieldValue` 층에서
+     * `EditableFieldVocabularyGateTest` 가 태우는데 **두 층은 다른 것을 잰다**(파서는 400, 패치표는
+     * 터짐) — HTTP 경계의 전수화는 후속으로 등재했다(cr L-4).
      */
     @Test
     fun `비움을 받지 않는 필드의 null 은 400 이다`() {
@@ -221,5 +225,35 @@ class StrategyBudgetClearEndpointTest : HttpIntegrationTestBase() {
             }
 
         statuses shouldBe listOf(400, 400, 400, 400)
+    }
+
+    /**
+     * **비움도 「그 칸 하나만」을 지킨다**(v M-1) — `amountWon: null` 에 **다른 값 칸**이나 **알려지지
+     * 않은 키**가 함께 오면 400 이다.
+     *
+     * 이 단언이 없으면 그 약속은 **코드의 검사 순서로만** 지켜진다: 비움 판정을 칸 배정·알려진 키
+     * 검사보다 앞으로 옮기는 리팩터가 `{"field":"MIN_BUDGET","amountWon":null,"terms":["x"]}` 를
+     * 200(비움)으로 바꾸는데, 그 변이에서 이 slice 의 다른 test 와 `app.http` 전건이 전부 초록이었다
+     * (검증 레인 실측). 그래서 순서가 아니라 **거동**을 잠근다.
+     *
+     * 「다른 칸에 담긴 `null`」(`terms: null` 류)은 칸 배정 진단이 먼저 받는다 — 그 자리는 위 test 다.
+     */
+    @Test
+    fun `비움 요청에 다른 칸이나 미지 키가 함께 오면 400 이다`() {
+        val probes =
+            listOf(
+                """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"terms":["x"]}""",
+                """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"count":1}""",
+                """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"number":0.5}""",
+                """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"note":"왜"}""",
+                """{"commandId":"c1","field":"MIN_BUDGET","amountWon":null,"amountwon":1}""",
+            )
+
+        val outcomes = probes.map { body -> valueResponse("MIN_BUDGET", body) }
+
+        outcomes.map { it.first } shouldBe listOf(400, 400, 400, 400, 400)
+        outcomes.forEach { (_, body) -> body shouldContain ErrorCode.INVALID_REQUEST }
+        // 거절이 **아무것도 쓰지 않았다** — 거절된 비움이 조용히 적용되지 않는다.
+        strategyRepository.strategy.watchRules.budget.min shouldBe null
     }
 }

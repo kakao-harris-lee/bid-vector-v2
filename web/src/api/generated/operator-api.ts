@@ -1029,7 +1029,10 @@ export interface components {
             /** @enum {string} */
             field: "FOCUS_CATEGORY" | "FOCUS_REGION" | "EXCLUDE_REGION" | "REQUIRED_KEYWORD" | "EXCLUDE_KEYWORD" | "MIN_BUDGET" | "MAX_BUDGET" | "MINIMUM_MATCH_SCORE" | "MINIMUM_PROBABILITY_SCORE" | "BID_NOW_THRESHOLD" | "REVIEW_THRESHOLD" | "CANDIDATE_LIMIT" | "MAX_ACTIVE_BIDS";
             terms?: string[];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description null 은 명시적 비움이다 — 비움을 받는 field 는 MIN_BUDGET·MAX_BUDGET 둘뿐이고 그 밖의 field 에 null 을 보내면 400(INVALID_REQUEST)이다. 칸을 아예 보내지 않는 것은 비움이 아니라 값을 말하지 않은 것이라 역시 400 이고, 비움 요청에 다른 값 칸이나 알려지지 않은 키가 함께 오면 그것도 400 이다.
+             */
             amountWon?: number | null;
             number?: number;
             /** Format: int32 */
