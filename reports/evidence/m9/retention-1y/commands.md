@@ -60,7 +60,7 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 
 | 확인 | 결과 |
 |---|---|
-| in_scope 대조 | `git diff --name-only 6c38fb32..HEAD` → **32 경로**(산출물 **28** + 이 evidence 넷), 전부 계약 in_scope 안. **열거는 `rollback.md` 의 복원 목록이 정본**이다(계약의 「… 등 — 실제로 고친 경로를 evidence 에 열거」를 그 자리가 충족한다 — v L-2). 산출물 수는 23 → 26(계약 갱신) → **28**(수정 라운드 1 의 `RetentionWiring*`) 으로 늘었다 |
+| in_scope 대조 | `git diff --name-only 4953d743..HEAD` → **32 경로**(산출물 **28** + 이 evidence 넷), 전부 계약 in_scope 안. **열거는 `rollback.md` 의 복원 목록이 정본**이다(계약의 「… 등 — 실제로 고친 경로를 evidence 에 열거」를 그 자리가 충족한다 — v L-2). 산출물 수는 23 → 26(계약 갱신) → **28**(수정 라운드 1 의 `RetentionWiring*`) 으로 늘었다 |
 | 수정 라운드 새 파일 | 새 파일은 **이 evidence 디렉터리뿐**(산출물 28 전건 `M`). 수정 라운드 1 이 **새로 만진** 경로 둘(`RetentionWiring.kt`·`RetentionWiringTest.kt`)은 D-8 로 in_scope 에 등재했다 — 「수정 라운드가 만드는 새 파일 ↔ in_scope 대조」 |
 | 새 test 클래스 | **0** — 기존 네 클래스에 test 를 더했다. 그래서 `config/quality/gate-tests.properties` 편집이 **없고** 「새 클래스 미등재」 함정에 해당하지 않는다 |
 | 마이그레이션 | `git diff --name-only 79f3e5c4..HEAD -- adapters/src/main/resources/db/migration/` **0 파일**(D-4 — 적용된 `V19`·`V23` 의 주석을 고치지 않았다, checksum) |
@@ -114,6 +114,24 @@ PR #122 의 S-27d 가 들어간 뒤라 **병합을 먼저** 했다. **자동 병
 
 전건 `check` 는 이 라운드에서 돌리지 않았다 — **PR CI 가 정본**(계약 갱신 절). 이 라운드가 바꾼 Kotlin 은
 세 파일이고 그 영향 범위를 위 16~19 가 표적으로 덮는다.
+
+## 라운드 2 (표적 재검증 not-ready @`7742ef45`)
+
+막은 것은 **B-1**(CI `check` 가 `:app:ktlintTestSourceSetCheck` 에서 붉었다 — 「Expected newline before '.'」
+둘)이고, **L-1** 은 구역 변이가 **KST 호스트에서 생존**한다는 지적이다.
+
+| # | 명령·변이 | 결과 |
+|---|---|---|
+| 20 | `:app:ktlintTestSourceSetCheck` `:app:ktlintMainSourceSetCheck` `:app:detekt` + workflow 셋 | **exit 0** · lint·정적분석 task **6** 수행. 체인을 중간 `val` 로 끊어 고쳤다. **앞으로 Kotlin 을 만지면 그 모듈의 ktlint·detekt 를 표적에 항상 포함한다**(이 라운드의 교훈 — 표적 test 만 돌려 CI 를 붉혔다) |
+| 21 | `:app:test --tests '…RetentionWiringTest' --rerun` | **exit 0** · **12 test**(새 구조 술어 포함) · fail 0 · skip 0 |
+| 22 | **변이 TZ** — 해소 구역을 `ZoneId.systemDefault()` 로 | **KILLED · 12 중 1 FAILED** — 붉은 것은 **구조 술어 하나**이고 **경계 test 둘은 통과했다**. 이 호스트가 KST 라 두 식이 **실제로 같은 함수**이기 때문이고, 그것이 「거동으로는 이 축을 닫을 수 없다」의 실측이다(CI 의 UTC 에서는 경계가 붉는다 — 그래서 「내 호스트에서 초록」이 방어의 증거가 아니다) |
+| 23 | 병합 뒤 표적 재검증(`:app:test` retention 전체 + `:workflow:test` retention 전체, `--rerun`) | **exit 0** · 클래스 5 · test **48** · fail 0 · skip 0 |
+| — | 원복 | 사본 복구 · `git status --porcelain -- <정책 파일>` 빈 출력 |
+
+**둘째 main 병합**(`70230cdb`, 들인 main `4953d743` — PR #125): 겹침 **0**(`comm -12`: main 이 바꾼 46 경로 ∩
+내 28 경로 = 빈 출력) · main 이 바꾼 Kotlin·정책·fixture **0 파일**(그래서 Kotlin 결과가 병합으로 달라질 수
+없다) · 병합이 내 28 경로를 **움직이지 않았다**(`git diff 7f44fd9f..HEAD -- <28>` 빈 출력) · main 의 `web/**`
+33 파일이 **그대로 보존**(`git diff 4953d743..HEAD -- 'web/**'` 빈 출력).
 
 ## rollback 실측
 
