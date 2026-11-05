@@ -1,10 +1,10 @@
 # M9/gates-tests rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `2c6dae54`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `25c16d09`**.
 
-**재산출 1회** — 팀장의 계약 갱신 커밋과 DB 실측 반영 커밋이 뒤에 왔으므로 이 절을 그 뒤에서
-다시 쟀다. 복원 목록은 **그대로 5**다(그 두 커밋은 `reports/evidence/m9/gates-tests/**` 만
-건드려 `EXCL` 안에 든다). 앞 실측(`23c2031c`)의 값을 옮겨 적지 않고 전부 다시 돌렸다.
+**재산출 2회** — 라운드마다 다시 쟀고 앞 실측값을 옮겨 적지 않았다. ① `23c2031c` → ② `2c6dae54`
+(팀장 계약 갱신·DB 실측 반영 뒤) → ③ **`25c16d09`**(cr MEDIUM-1 이 `CleanMigrationCheckTest` 를
+바꿔 **산출물이 움직였다**). 복원 목록은 세 번 모두 **같은 5 경로**다.
 
 **원천이 착수 base 와 같다** — 이 브랜치는 수정 라운드에서 `origin/main` 을 **합치지 않았고**,
 그 base 는 PR #123 의 병합 커밋(= main 의 고정 SHA)이다. 그래서 「남의 변경까지 지운다」
@@ -60,7 +60,7 @@ main 이고 CI 가 초록으로 통과한 자리라, 복원 트리에서 `check`
 
 | 내 표지(0 이어야 한다) | 복원 뒤 |
 | --- | --- |
-| `ALLOWED_FIELD_REFERENCES` · `FIELD_REFERENCE_COMMENT` · `UnavailableProducingPortFixture` · `tablesWithNoticeRoundCheck` · 새 persistence test 이름 · 처분 문단 머리 · 등재부의 이 OPEN 식별자 | **전부 0** |
+| `ALLOWED_FIELD_REFERENCES` · `UnavailableProducingPortFixture` · `actualByTable` · `tablesWithNoticeRoundCheck` · 새 persistence test 이름 · 등재부의 이 OPEN 식별자 | **전부 0** |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
 | --- | --- |
@@ -87,8 +87,8 @@ KDoc 한 문단, 등재부 문면 하나다. DB 에 닿는 변경이 0 이라 �
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only 2c6dae54..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..2c6dae54 \
+git diff --name-only 25c16d09..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..25c16d09 \
       -- . ':(exclude)reports/evidence/m9/gates-tests' | sort -u)
 ```
 
