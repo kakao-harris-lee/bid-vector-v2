@@ -1,21 +1,35 @@
 # M9/inbox-vocab rollback
 
-base **`79f3e5c4`**(병합된 main) · **실측 HEAD `0df93d4c`**(이 slice 의 마지막 산출물 커밋).
-evidence 커밋은 언제나 이 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
-**그 사이에 되돌림 대상이 움직였는가**이고, 그 확인 명령은 §4 다.
+착수 base **`79f3e5c4`** · **복원 원천 `6c38fb32`**(이 브랜치가 합친 main 의 **고정 SHA** =
+병합 커밋 `606d764c` 의 둘째 부모) · **실측 HEAD `606d764c`**.
+
+**원천이 착수 base 가 아니다.** 이 브랜치는 수정 라운드에서 `origin/main` 을 합쳤고(#122 운영 도구 ·
+#126 CVE apt 하한), base 에서 복원하면 **그 남의 변경까지 지운다**(PR #124 verifier 실측). 그래서
+ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서 산출하고 ⓑ 복원 원천은 합친 main 의 고정 SHA 다 —
+움직이는 `origin/main` 을 쓰지 않는다(다음 머지가 그 ref 를 옮기면 실측이 다른 트리를 가리킨다).
+
+evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
+**그 사이에 되돌림 대상이 움직였는가**이고, 그 확인 명령은 §5 다.
 
 ## 1. 되돌리는 법 — 미적용 DB(머지 전·CI)
 
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-BASE=79f3e5c4
+MAIN=6c38fb32                                      # 합친 main 의 고정 SHA(= HEAD^2)
 EXCL=':(exclude)reports/evidence/m9/inbox-vocab'   # 자기 자신은 되돌릴 수 없다
-mapfile -t MODIFIED < <(git diff --name-only --diff-filter=M $BASE..HEAD -- . "$EXCL")
-mapfile -t ADDED    < <(git diff --name-only --diff-filter=A $BASE..HEAD -- . "$EXCL")
-git restore --source=$BASE --staged --worktree -- "${MODIFIED[@]}"
+
+# 목록은 **내 커밋만** — 병합으로 들어온 남의 커밋을 제외한다
+mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
+mapfile -t MODIFIED < <(for f in "${MINE[@]}"; do git cat-file -e "$MAIN:$f" 2>/dev/null && echo "$f"; done)
+mapfile -t ADDED    < <(for f in "${MINE[@]}"; do git cat-file -e "$MAIN:$f" 2>/dev/null || echo "$f"; done)
+
+git restore --source=$MAIN --staged --worktree -- "${MODIFIED[@]}"
 git rm -q -f -- "${ADDED[@]}"
 ```
+
+「있음/없음」을 `--diff-filter` 가 아니라 **`git cat-file -e`** 로 가른다: 필터는 범위의 양 끝을
+비교하므로 병합이 끼면 남의 변경을 M 으로 센다. 원천에 그 경로가 있는지만 물으면 병합과 무관하다.
 
 `ADDED` 둘 가운데 하나가 **V24 파일**이다. 미적용 DB 에서는 그 파일이 사라지는 것이 되돌림의
 전부다 — Flyway 이력에 없으므로 흔적이 0 이고, 체크섬 충돌도 생기지 않는다.
@@ -52,16 +66,17 @@ Kotlin 쪽 순서 제약과 **다른 축**이다.
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 복원 **16**(M) · 삭제 **2**(A) — 기계 목록과 같다 |
-| ③ 되돌린 경로의 차이 | 작업 트리 ↔ base **0 파일** · 색인 ↔ base **0 파일** · 미추적 **0** |
+| ② 계수 | 내 커밋 경로 **18**(evidence 제외) = 복원 **16**(M) · 삭제 **2**(A) — 기계 목록과 같다 |
+| ③ 결과 트리 == `6c38fb32` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③′ main 의 남의 변경 보존 | Dockerfile 둘 · `prod-guards-check.sh` · `prod-rollback.sh` **있음** · apt 하한 줄 **7** · ci.yml 의 S-27d **1** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ base 와 남는 차이 | **실측 시점(`0df93d4c`)에** `reports/evidence/m9/inbox-vocab/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | **실측 시점(`606d764c`)에** `reports/evidence/m9/inbox-vocab/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`79f3e5c4` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main 이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시 돌리는 것은 같은
-트리를 다시 재는 일이다.
+복원한 트리는 **`6c38fb32` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
+main(#122 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
+돌리는 것은 같은 트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: 위 ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이
 **맞다** — `LeakPatternGateTask` 가 `reports/evidence` 를 스캔한다. 그 축은 이 slice 의 HEAD
@@ -110,8 +125,9 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 0df93d4c..<판정 SHA> -- \
-  $(git diff --name-only 79f3e5c4..0df93d4c -- . ':(exclude)reports/evidence/m9/inbox-vocab')
+git diff --name-only 606d764c..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 6c38fb32..606d764c \
+      -- . ':(exclude)reports/evidence/m9/inbox-vocab' | sort -u)
 ```
 
 빈 출력이면 이 실측이 유효하고, 한 줄이라도 나오면 **미검증**이다(그때 ①~③ 과 §4 를 다시 잰다).

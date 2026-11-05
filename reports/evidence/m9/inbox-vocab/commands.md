@@ -34,15 +34,28 @@ test 만 넣으면 「바인딩 수가 안 맞는다」가 붉어 **다른 것�
 
 ## §3 acceptance
 
-| 명령 | exit |
-| --- | --- |
-| `./gradlew --no-daemon check` | 0 |
-| `./gradlew --no-daemon qualityBaseline` | 0 |
-| web job W-1~W-13(`npm ci` · lint · typecheck · gate:src-tree · api:types:check · vitest · gate:tests · build · gate:boundary-canary · playwright · 스모크 · `:app:bootJar` · 여정) | 0 |
+| 명령 | exit | 어디서 |
+| --- | --- | --- |
+| `./gradlew --no-daemon check` | 0 | 로컬(착수 라운드 `cfe23214` · 수정 라운드 1 `01ea5da0`) + **CI**(아래) |
+| `./gradlew --no-daemon qualityBaseline` | 0 | 같음 |
+| web job W-1~W-13(`npm ci` · lint · typecheck · gate:src-tree · api:types:check · vitest · gate:tests · build · gate:boundary-canary · playwright · 스모크 · `:app:bootJar` · 여정) | 0 | 로컬(착수 라운드) + **CI** |
 
 수정 라운드 1 뒤 **같은 명령을 다시 돌렸다**(§5). 표적은 `:adapters:test --tests "*NotificationInbox*"`
 로 좁혀 반복하고 전건은 마지막에 한 번이다. web 절은 이 라운드가 `web/` 를 건드리지 않아 그대로다
-(`git diff --name-only 26ff9fe3..HEAD -- web openapi` 빈 출력).
+(`git diff --name-only 26ff9fe3..01ea5da0 -- web openapi` 빈 출력).
+
+**수정 라운드 2(main 병합)의 전건은 CI 가 정본이다**(팀장 공지 2026-11-05 — 호스트 빌드 큐 포화).
+로컬은 표적 `--tests` 와 변이만 돌렸다. 같은 명령이고 job 정의도 그대로다 — 병합이 들여온
+`ci.yml` 변경은 **`container` job 의 S-27d 한 step** 뿐이고 `check`·`web` job 의 명령은 바뀌지
+않았다(`git diff 79f3e5c4..origin/main -- .github/workflows/ci.yml` 의 추가분 전체가 그 step).
+
+| CI run | head | job 결과 |
+| --- | --- | --- |
+| `42014237148` | `01ea5da0`(병합 전) | check **pass** 45m45s · web **pass** 3m45s · container **pass** 7m17s · ml-engine **pass** 9m28s — **네 job 전부 초록** |
+
+`container` 가 초록인 것이 #126(CVE apt 하한)의 효과다 — 앞 라운드의 같은 job 은 그 CVE 로 붉었다.
+**판정 SHA `606d764c`(병합 커밋)의 run 은 push 뒤에 선다** — push 는 팀장이 하므로 그 run id 와
+판정은 팀장 보고·PR 조치 코멘트가 받는다.
 
 `tools/one-command-check.sh`(check job 의 넷째 step)는 **안 돌렸다.** 그 안의 Kotlin 절과 web
 절은 위와 **같은 명령**이고, ml-engine 절은 acceptance 밖이다(이 slice 의 Python 변경 0 —
@@ -88,7 +101,24 @@ finding 별 별도 커밋이고 각각 RED 선행이다.
 바꾼다(어느 종류든 후퇴 없음). 그 값은 목록 정렬 축이기도 해서 단조가 더 맞고, 종류 전수 test 가
 그 성질을 잠근다.
 
-## §6 재활용 조사가 찾은 이름 충돌
+## §6 수정 라운드 2 — main 병합 (팀장 공지 2026-11-05)
+
+`origin/main` **`6c38fb32`**(#122 운영 도구 · #126 CVE apt 하한)을 합쳤다 — 병합 커밋 `606d764c`.
+
+**합집합 함정을 계수로 확인했다**(충돌 0 이 「접히지 않았다」를 뜻하지 않는다):
+
+| 확인 | 결과 |
+| --- | --- |
+| 내 경로 ∩ main 변경 경로 | **빈 집합** — 같은 파일을 양쪽이 만지지 않았다 |
+| 내 23 경로가 병합 전(`01ea5da0`)과 같은가 | 차이 **0 파일** |
+| main 의 15 경로가 `origin/main` 과 같은가 | 차이 **0 파일** |
+| `HEAD` vs `origin/main` 의 차이가 내 경로뿐인가 | 그 밖 **0 파일** |
+| 표적 test(`*NotificationInbox*` · `NotificationFactTest` · `BidCaseNotificationTest`) | exit **0** |
+
+rollback 의 **복원 원천이 바뀌었다** — `rollback.md` §1(착수 base 가 아니라 합친 main 의 고정
+SHA, 목록은 내 커밋만). 그러지 않으면 복원이 #122·#126 까지 지운다.
+
+## §7 재활용 조사가 찾은 이름 충돌
 
 새 enum 의 첫 이름은 `AwardOutcome` 이었고, 그 이름은 `bidvector.settlement.AwardOutcome` 이
 **다른 개념**으로 이미 쓰고 있다(개찰 대사의 4-state). `workflow` 모듈은 그 타입을 실제로 든다
@@ -99,7 +129,7 @@ finding 별 별도 커밋이고 각각 RED 선행이다.
 나왔다. `AwardResult` 로 바꾸고 재활용 조사의 결론(기존 어휘 셋을 보고 쓰지 않은 근거)을
 그 타입의 KDoc 과 `checklist.md` §3 에 남겼다.
 
-## §7 되돌림 리허설
+## §8 되돌림 리허설
 
 `rollback.md` — 두 갈래(미적용 DB = 파일 삭제 / 적용 DB = 새 V 로 원복 + 유찰 행 처분)를 버릴
 clone 에서 실측했다.
