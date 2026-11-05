@@ -58,7 +58,8 @@ open class OpeningPromotionWiring {
             attempts = runState.attempts,
             sampleList = runState.sampleList,
             policyFor = ::collectionPolicyAt,
-            // 승격 대상 원문의 적재 시각 하한 — 「90일」을 이 배선이 다시 적지 않는다(D-7C5P-3).
+            // 승격 대상 원문의 적재 시각 하한 — 보존 기간을 이 배선이 다시 적지 않는다(D-7C5P-3).
+            // 정책이 그 창의 정본이므로 개정(1년)이 이 창도 함께 넓힌다 — 값이 한 자리인 대가다.
             retention = resolvedOrFail(RETENTION_POLICY.resolve(properties.referenceDate), "보존 정책"),
             referenceDate = referenceDate,
             clock = clock,
