@@ -41,6 +41,28 @@ FROM eclipse-temurin:21-jre-noble@sha256:cd35bb33859641c5374415826a5951845104093
 # 파생한 실제 layer 체인과 대조하는 것이다.
 LABEL org.bidvector.baseimage="eclipse-temurin:21-jre-noble@sha256:cd35bb33859641c5374415826a5951845104093eaa401cbe9d3d9023444f1c13"
 
+# chore(2026-11-05) — `CVE-2026-109518`(HIGH, `apt`·`libapt-pkg6.0t64` 2.8.3)이 이 베이스에 새로
+# 잡혀 모든 PR 의 `container` job S-22e 가 붉다. **베이스 상향으로는 닫히지 않는다**: 같은 태그의
+# 최신 index `sha256:0eda5830…`도 `apt` 2.8.3 이다(실측 — 오르는 것은 JDK 21.0.13 뿐이고 ubuntu
+# 24.04 · 패키지 136 은 그대로다). 수정판 **2.8.4ubuntu0.1** 은 `noble-updates`·`noble-security` 에
+# 있으므로 런타임 stage 에서 그 둘만 올린다. 패키지 이름이 ml-serving 쪽과 다르다 — noble 은
+# time_t 전환판 `libapt-pkg6.0t64` 다. allowlist 등재는 하지 않는다(등재 0 유지 관례).
+#
+# 하한을 설치 인자가 아니라 `dpkg --compare-versions` 로 닫는 사유는 `docker/ml-serving.Dockerfile`
+# 의 같은 자리에 적었다(정확 고정은 pocket 이 판을 갈아치우는 날 모든 빌드를 붉힌다).
+#
+# **이 stage 에만 둔다** — builder stage 는 jar 를 푸는 자리이고 그 layer 는 출하 이미지에 없다.
+RUN set -eu; \
+    apt-get update -qq; \
+    apt-get install --only-upgrade -y --no-install-recommends apt libapt-pkg6.0t64; \
+    for floor in 'apt 2.8.4ubuntu0.1' 'libapt-pkg6.0t64 2.8.4ubuntu0.1'; do \
+        set -- $floor; \
+        cur="$(dpkg-query -f '${Version}' -W "$1")"; \
+        dpkg --compare-versions "$cur" ge "$2" \
+            || { echo "$1 $cur 가 하한 $2 미만이다 — CVE-2026-109518 이 닫히지 않는다" >&2; exit 1; }; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
+
 # non-root — 위생 게이트가 `Config.User` 와 **실 ENTRYPOINT 로 띄운 컨테이너의 모든 프로세스
 # uid** 를 정책 하한과 대조한다(ml-serving 과 같은 고정 UID/GID·시스템 계정 범위).
 #
