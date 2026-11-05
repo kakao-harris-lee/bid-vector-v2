@@ -725,6 +725,11 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 `OPEN-…-RETENTION` 을 여기로 넘겼다) · **6B-4**(ML job 영속·큐 상한 — **큐 정책 결정**) · **6F-5-b**(요건을
 채우는 LLM 추출 — **실 LLM 호출은 운영자 승인 대상**).
 
+**정정 2026-11-05(M9/budget-clear)** — 위 셋 가운데 **6B-4 는 열렸고 머지됐다**(PR #71): 받은 둘의 상태는
+`OPEN-5E-JOB-PERSISTENCE` **닫는 후보** · `OPEN-5E-JOB-QUEUE-BOUND` **부분 종결 후보**(근거는
+`reports/evidence/m6/6b4/checklist.md` 의 OPEN 처분 절). 6B-3 은 그대로이고 6F-5-b 는 **사용자 결정
+2026-11-05 로 보류**다.
+
 **배선 뒤**: **6D**(E2E·장애 주입) · **6E**(제품 acceptance·운영 runbook — `OPEN-6A1-CONNECTION-POOL` 이
 여기서 닫혀야 운영 반입이 가능하다).
 

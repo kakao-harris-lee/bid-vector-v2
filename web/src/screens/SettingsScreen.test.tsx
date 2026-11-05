@@ -278,6 +278,30 @@ describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
     expect(sent.textContent).not.toBe('값 없음');
   });
 
+  /**
+   * **설정 화면에서도 금액대를 비울 수 있다**(M9 D-2 · cr L-5). 위 어휘 비움의 짝이고, 금액 칸은
+   * 비우는 표기가 다르다(`terms: []` ↔ `amountWon: null`) — 그래서 **보낸 본문까지** 센다.
+   *
+   * 「값을 안 적었다」(`edit-value-missing`)가 **서지 않는 것**도 함께 본다: 그 얼굴이 서면 운영자는
+   * 비울 수 없고, 금액 칸의 빈 입력이 **뜻을 가진다**는 것이 이 slice 의 변화다.
+   */
+  it('금액대는 빈 칸으로 비운다 — 본문이 amountWon null 이고 거부 얼굴이 서지 않는다', async () => {
+    mocked.readStrategy.mockResolvedValue(strategy({ maxBudgetWon: 900_000_000 }));
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_BUDGET' }));
+    mocked.provideEditSessionValue.mockResolvedValue(session({ state: 'WAITING_FOR_CONFIRMATION' }));
+    renderScreen();
+    await beginEdit('MAX_BUDGET');
+
+    fireEvent.change(screen.getByLabelText(STRATEGY_FIELD_DISPLAY.MAX_BUDGET.label), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '값 보내기' }));
+
+    const sent = await screen.findByTestId('edit-sent-value');
+    expect(sent.textContent).toContain('비움');
+    expect(screen.queryByTestId('edit-value-missing')).toBeNull();
+    const [, body] = mocked.provideEditSessionValue.mock.calls[0]!;
+    expect(body).toStrictEqual({ commandId: expect.any(String), field: 'MAX_BUDGET', amountWon: null });
+  });
+
   it('적용은 운영자가 본 개정을 싣는다', async () => {
     mocked.readStrategy.mockResolvedValue(strategy({ revision: 11 }));
     mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
