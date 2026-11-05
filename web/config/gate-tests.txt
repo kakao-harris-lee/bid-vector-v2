@@ -98,3 +98,7 @@ scripts/display-gate-selectors.test.mjs
 # 마운트 목록은 새 카드가 생길 때 조용히 뒤처지고, r1 에서 실제로 그렇게 됐다(화면 E 카드가
 # 목록 밖이라 그 공백에 위반이 살아 있었다).
 scripts/screen-card-coverage.test.mjs
+# M9/web-followups — wire 어휘를 손으로 복제한 자리(web 표·유니온 · e2e 라벨 표)의 **키 집합**이
+# Kotlin 정본과 같은가. 앞 판은 Kotlin 에 값이 늘어도 web 이 어디서도 붉어지지 않았다
+# (`OPEN-M9-MONEY-VOCAB-CROSS-LANG`). 읽기가 꼴 변화에 **던지는** 성질도 여기서 잰다.
+scripts/money-vocab-cross-lang.test.mjs
