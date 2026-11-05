@@ -118,7 +118,26 @@ finding 별 별도 커밋이고 각각 RED 선행이다.
 rollback 의 **복원 원천이 바뀌었다** — `rollback.md` §1(착수 base 가 아니라 합친 main 의 고정
 SHA, 목록은 내 커밋만). 그러지 않으면 복원이 #122·#126 까지 지운다.
 
-## §7 재활용 조사가 찾은 이름 충돌
+## §7 수정 라운드 3 — main 재병합(#125)과 v-123-r2 두 건
+
+main 이 다시 움직였다 — `origin/main` **`4953d743`**(#125 화면 표시). 병합 커밋 `5c1f0c45`.
+
+| 확인 | 결과 |
+| --- | --- |
+| 내 경로 ∩ `6c38fb32..4953d743` 변경(46 경로) | **빈 집합**. `web/src/display/**` 가 겹칠 수 있었으나 #125 가 만진 것은 `editSession`·`money`·`notice`·`time` 이고 `notificationDisplay` 는 아니다 |
+| 의미 겹침 | `web/src/screens/InboxScreen.tsx`(+test)가 내 표의 **소비자**다. main 의 test 는 `NOTIFICATION_DETAIL_DISPLAY.PROVISIONAL_FIRST.label` 하나만 읽고 표 전수를 단언하지 않아 다섯 키와 호환 |
+| 내 18 경로가 병합 전(`9a913033`)과 같은가 | 차이 **0 파일** |
+| main 의 46 경로가 `origin/main` 과 같은가 | 차이 **0 파일** |
+| 양쪽 표지 계수 | 내 쪽 — 유찰 라벨 **2**(내 표 + `caseDisplay` 의 다른 문면) · `GREATEST(…` **1** · `AwardResult` **8**. #125 쪽 — `InstantText` **7** · `screenVocabulary` **4** · `timeDisplay` **16** · `screen-card-coverage` **3** |
+| 로컬 web 게이트 | lint **0** · typecheck **0** · `api:types:check` **바이트 등식**(189122) · vitest **38 파일 / 758 test** · `gate:tests` 통과 |
+
+`web/package.json`·`package-lock.json` 은 안 바뀌어 `npm ci` 를 다시 돌리지 않았다.
+
+**v-123-r2 L-1** 은 라운드 2 에서 이미 처리했고(복원 원천을 합친 main 의 고정 SHA 로), 라운드 3 은
+그 원천을 `4953d743` 로 **다시** 옮긴 것이다 — 움직이는 ref 를 쓰지 않는다는 규율이 왜 필요한지
+그 자체가 보인 자리다. **L-2** 는 알려진 제한 3 의 한 줄(두 축의 쓰기 규칙이 다르다).
+
+## §8 재활용 조사가 찾은 이름 충돌
 
 새 enum 의 첫 이름은 `AwardOutcome` 이었고, 그 이름은 `bidvector.settlement.AwardOutcome` 이
 **다른 개념**으로 이미 쓰고 있다(개찰 대사의 4-state). `workflow` 모듈은 그 타입을 실제로 든다
@@ -129,7 +148,7 @@ SHA, 목록은 내 커밋만). 그러지 않으면 복원이 #122·#126 까지 �
 나왔다. `AwardResult` 로 바꾸고 재활용 조사의 결론(기존 어휘 셋을 보고 쓰지 않은 근거)을
 그 타입의 KDoc 과 `checklist.md` §3 에 남겼다.
 
-## §8 되돌림 리허설
+## §9 되돌림 리허설
 
 `rollback.md` — 두 갈래(미적용 DB = 파일 삭제 / 적용 DB = 새 V 로 원복 + 유찰 행 처분)를 버릴
 clone 에서 실측했다.
