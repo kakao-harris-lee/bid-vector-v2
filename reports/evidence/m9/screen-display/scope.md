@@ -39,3 +39,28 @@ Kotlin·openapi·generated 클라이언트·`notificationDisplay.ts`·`ci.yml`·
 ## 하네스 레인 변경
 
 없음.
+
+## 계약 갱신 2026-11-05 (팀장)
+
+구현 레인의 보고 셋에 대한 결정이다. 갱신 전 판정 SHA 는 `142b4ec3` 이고, 이 절 뒤의 작업은 그
+SHA 뒤에 온다.
+
+### in_scope 추가 셋
+
+| 경로 | 사유 |
+| --- | --- |
+| `web/scripts/display-gate-selectors.test.mjs` | D-4 게이트의 양성·음성 대조. 실제 `eslint.config.js` 를 불러 린트하므로 `eslint`·`node:path` 를 import 하고, 그래서 `web/src/**` 에 둘 수 없다(ADR 0011 D-3 의 경계 — 같은 사유의 선례가 `web/scripts/` 에 있다). **이미 커밋돼 있고 유지한다.** |
+| `web/config/gate-tests.txt` | 새 게이트 test 셋의 W-7 등재. **추가 줄만** 넣고 기존 줄은 무편집이다. |
+| `web/e2e/capture/usecase-captures.mjs` | 알림함 캡처가 막혀 있다(아래 D-6). 양성 표지 한 줄을 고친다. |
+
+**경로 정정**: 갱신 전 in_scope 의 `web/e2e/shared.ts` 는 **존재하지 않는 경로**다. 실제 파일은
+`web/e2e/journey/shared.ts` 이고 그것은 이미 `web/e2e/journey/**` 안이다.
+
+### 결정 추가
+
+| ID | 결정 |
+| --- | --- |
+| D-1 갱신 | **없는 시각의 표지는 `값 없음` 이다**(`—` 를 쓰지 않는다). 저장소가 그 문면을 하나로 모아 왔고(「같은 뜻에 두 말을 두지 않는다」) 같은 관례가 여섯 자리에 있다 — 시각 칸만 다른 글자를 쓰면 이 slice 가 없애려는 바로 그 불일치를 만든다. **읽지 못한 값은 `알 수 없음` 그대로**다(둘은 여전히 갈린다). |
+| D-5 | 새 게이트 test 셋(`timeDisplay.test.ts` · `screenVocabulary.test.tsx` · `display-gate-selectors.test.mjs`)을 `web/config/gate-tests.txt` 에 등재한다. |
+| D-6 | 캡처 스크립트의 알림함 **양성 표지를 빈 얼굴에서 알림 행 하나로** 바꾼다. 지금 씨앗이 건을 결과까지 밀어 알림을 만들므로 빈 얼굴은 서지 않는다(base 에서도 재현된 선행 결함). 고친 뒤 `capture:usecase` 로 재촬영해 `docs/usecase/**` 를 갱신한다. |
+| D-7 | **타임라인의 명령 토큰 원문**(`ADD_TO_BID_BOX` 꼴)은 이 slice 의 범위 밖이다 — `OPEN-M9-TIMELINE-COMMAND-WORDING` 로 checklist 에 등재만 한다. |
