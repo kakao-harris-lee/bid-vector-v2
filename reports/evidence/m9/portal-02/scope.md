@@ -94,3 +94,16 @@ task 로 잰다.
 
 **main 병합.** `origin/main` `4953d743` 을 이 브랜치에 병합한다(#122·#125·#126). rollback 의 공유 파일
 복원 원천도 그 **고정 SHA** 로 옮긴다 — 움직이는 `origin/main` 을 쓰지 않는다.
+
+### 계약 갱신 2026-11-05 (팀장, 3차) — 되돌림 인자 목록의 자리
+
+**더하는 in_scope 경로**: `app/src/test/resources/rollback/**`.
+
+**사유.** cr H-1 수정의 형태를 팀장이 지정했다 — 「인자 목록을 test 리소스로 두고 runbook 은 그 파일을
+가리키게 하면 사본이 하나 줄어든다」. 그 자리가 `app/src/test/kotlin/**` 밖이라 1·2차 갱신 목록에
+없었다. 목록은 `koneps-portal-02-rollback-args.txt` 하나이고, 이 파일을 읽는 것은 runbook §8-4(문서)와
+`KonepsRollbackArgumentsTest`(거동) 둘이다.
+
+**main 병합 원천은 `319fe212` 에 고정한다.** 이 라운드 중 `origin/main` 이 `31551579`(#129)로 또
+움직였으나 **이 브랜치는 그것을 병합하지 않았다** — 복원 원천은 「실제로 병합한 main」이어야 하므로
+`319fe212` 그대로다. 병합하지 않은 main 커밋에서 복원하면 이 브랜치가 가진 적 없는 내용이 들어온다.
