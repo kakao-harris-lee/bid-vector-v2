@@ -364,11 +364,21 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     expect(button.textContent ?? '').toContain('읽음');
   });
 
-  it('읽음 처리는 종류·공고 쌍·투찰 종류로 보낸다 — 합성 id 가 없다', async () => {
+  /**
+   * **투찰 종류가 그 행의 값으로 실려 나간다**(v M-1). fixture 를 `PAPER` 로 두는 것이 이
+   * test 의 요점이다 — `REAL` 행에서 누르면 축을 `'REAL'` 로 **고정한** 회귀가 그대로
+   * 통과한다(verifier 변이 W3 가 초록이었던 자리). 묶음 경로는 이미 `PAPER` 행에서 재고
+   * 있었고, 단건 경로만 그 축이 열려 있었다.
+   *
+   * 그 회귀가 조용한 이유: 상태 코드는 200 이고 `markedCount` 도 그럴듯하다 — 다만 서버가
+   * **실투찰 항목**을 읽음으로 바꾼다. 서면을 읽으면 실제 소식이 사라지는 꼴이다.
+   */
+  it('읽음 처리는 종류·공고 쌍·그 행의 투찰 종류로 보낸다 — 합성 id 가 없다', async () => {
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    mocked.listNotifications.mockResolvedValue(page([item({ bidKind: 'PAPER' })], 1));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-PAPER');
     fireEvent.click(within(row).getByRole('button', { name: /읽음/u }));
 
     await waitFor(() =>
@@ -376,7 +386,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
         kind: 'OPENING_COMPLETED',
         noticeNumber: 'SYN-7E3-RESULT',
         noticeRound: '000',
-        bidKind: 'REAL',
+        bidKind: 'PAPER',
       }),
     );
   });
