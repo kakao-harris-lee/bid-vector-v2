@@ -179,7 +179,7 @@ def test_no_environment_variable_is_named_after_a_policy_key() -> None:
 
 
 def test_evaluation_layer_never_reads_the_environment() -> None:
-    """②′ — `evaluation/**` 은 환경을 **아예** 읽지 않는다. 이름 대조는 「키와 같은
+    """②b — `evaluation/**` 은 환경을 **아예** 읽지 않는다. 이름 대조는 「키와 같은
     이름으로」만 막으므로, 판정 층 자체가 환경을 모르는 것을 따로 잠근다."""
     violations: list[str] = []
     for path, tree in _trees():

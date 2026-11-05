@@ -21,6 +21,7 @@ import json
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from pathlib import Path
 from typing import Final, cast
@@ -39,6 +40,7 @@ _MAX_INDEXED_LIST_LENGTH: Final[int] = 32
 
 _SCALAR_KEYS: Final[frozenset[str]] = frozenset(
     {
+        "effective_date",
         "paired_t_threshold",
         "gate_baseline",
         "gate_model",
@@ -122,6 +124,12 @@ class EvaluationPolicy:
     대조된다. 기본값 없음("안 넘겼다"와 "미공시"를 구별, 5C-1 관행 계승)."""
 
     version: str
+    effective_date: date
+    """이 정책이 **언제부터의 규칙인가**(ML-07 acceptance ③, M9/ml-lifecycle). 효력 시작
+    전에 시작한 평가 창의 통과는 승격 근거로 인용되지 않는다 — 판정은
+    `ml_engine.evaluation.epoch` 이 내리고, 이 타입은 값만 나른다(날짜를 해석하는 달력은
+    그 모듈 하나다)."""
+
     paired_t_threshold: float
     gate_baseline: str
     gate_model: str
@@ -243,6 +251,19 @@ def collect_indexed_list(
     return tuple(entries[index] for index in sorted(entries))
 
 
+def require_iso_date(values: dict[str, PolicyScalar], key: str) -> date | None:
+    """ISO-8601 날짜 **문자열**만 받는다. 비인용 ISO 날짜는 `yaml.safe_load` 가
+    `datetime.date` 객체로 읽어 `PolicyScalar` 축(문자열·수·bool) 밖이고, 그 값은 여기서
+    `None`(→ `INVALID_VALUE`)이 된다 — 축 밖의 값이 조용히 들어오는 자리를 닫는다."""
+    value = values.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def require_str(values: dict[str, PolicyScalar], key: str) -> str | None:
     value = values.get(key)
     return value if isinstance(value, str) and value else None
@@ -293,6 +314,7 @@ class _ParsedFields:
     """형 검사를 통과한 원시 필드 한 벌 — `EvaluationPolicy.__post_init__`의 값
     불변식은 아직 거치지 않았다."""
 
+    effective_date: date
     paired_t_threshold: float
     gate_baseline: str
     gate_model: str
@@ -310,6 +332,7 @@ def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
     """평탄 인덱스 목록 조립 + 스칼라 형 검사 — 형이 맞지 않으면 `None`(설계 래칫
     함수 길이 한도로 `load_evaluation_policy`에서 분리, L-5 형식)."""
     fields = (
+        require_iso_date(values, "effective_date"),
         require_number(values, "paired_t_threshold"),
         require_str(values, "gate_baseline"),
         require_str(values, "gate_model"),
@@ -329,6 +352,7 @@ def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
 
 def _assemble_parsed_fields(
     fields: tuple[
+        date | None,
         float | None,
         str | None,
         str | None,
@@ -345,6 +369,7 @@ def _assemble_parsed_fields(
     """`_parse_fields`가 `None` 없음을 확인한 뒤에만 부른다 — `cast`는 그 불변식을
     타입에 반영할 뿐 재검증하지 않는다(설계 래칫 함수 길이 한도로 분리)."""
     (
+        effective_date,
         paired_t_threshold,
         gate_baseline,
         gate_model,
@@ -358,6 +383,7 @@ def _assemble_parsed_fields(
         segment_axes,
     ) = fields
     return _ParsedFields(
+        effective_date=cast(date, effective_date),
         paired_t_threshold=cast(float, paired_t_threshold),
         gate_baseline=cast(str, gate_baseline),
         gate_model=cast(str, gate_model),
@@ -392,6 +418,7 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     try:
         return EvaluationPolicy(
             version=raw.version,
+            effective_date=parsed.effective_date,
             paired_t_threshold=parsed.paired_t_threshold,
             gate_baseline=parsed.gate_baseline,
             gate_model=parsed.gate_model,
@@ -416,6 +443,7 @@ def policy_checksum(policy: EvaluationPolicy) -> str:
     payload = json.dumps(
         {
             "version": policy.version,
+            "effective_date": policy.effective_date.isoformat(),
             "paired_t_threshold": policy.paired_t_threshold,
             "gate_baseline": policy.gate_baseline,
             "gate_model": policy.gate_model,

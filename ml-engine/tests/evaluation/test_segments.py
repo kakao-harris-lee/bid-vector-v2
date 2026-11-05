@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import numpy as np
 
 from ml_engine.evaluation.policy import EvaluationPolicy
@@ -14,8 +16,15 @@ from ml_engine.evaluation.segments import (
 )
 from ml_engine.features import FeatureFacts, Present
 
+_TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
+"""test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
+창이 효력 시작 뒤에 있어야 승격 인용이 성립하므로, 여기서는 인용 축을 **상수로 비켜
+두고** 그 축 자체는 `tests/evaluation/test_epoch.py` 와 `test_holdout.py` 의 전용
+test 가 잰다."""
+
 _POLICY = EvaluationPolicy(
     version="test",
+    effective_date=_TEST_POLICY_EFFECTIVE_DATE,
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",
@@ -47,6 +56,7 @@ def test_segment_specs_has_two_axes_from_policy() -> None:
 def test_segment_specs_only_declares_axes_present_in_policy() -> None:
     single_axis_policy = EvaluationPolicy(
         version="test",
+        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",

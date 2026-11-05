@@ -26,6 +26,11 @@ from ml_engine.evaluation.diagnostics import (
     StabilityTrial,
     UnlearnedCell,
 )
+from ml_engine.evaluation.epoch import (
+    CitationRejectionReason,
+    NotCitable,
+    PromotionCitation,
+)
 from ml_engine.evaluation.segments import SegmentScore
 from ml_engine.evaluation.verdict import (
     Failed,
@@ -120,14 +125,40 @@ class PromotionNotEvaluable:
     reason: NotEvaluableReason
 
 
-type Promotion = Promotable | NotPromotable | PromotionNotEvaluable
+@dataclass(frozen=True)
+class PromotionSuperseded:
+    """통과했지만 **그 정책의 근거로 인용할 수 없는** 창이다(M9/ml-lifecycle, ML-07
+    acceptance ③·⑥). 「못 이겼다」(`NotPromotable`)도 「못 쟀다」(`PromotionNotEvaluable`)도
+    아닌 세 번째 사실 — 잰 것은 맞고 이겼지만 **그 정책이 효력을 갖기 전의 창**이다.
+    접으면 그 구별이 사라진다."""
+
+    reason: CitationRejectionReason
+    detail: str
+
+
+type Promotion = (
+    Promotable | NotPromotable | PromotionNotEvaluable | PromotionSuperseded
+)
 
 
 def derive_promotion(
-    latest: GateOutcome | None, *, window_start: str | None
+    latest: GateOutcome | None,
+    *,
+    window_start: str | None,
+    citation: PromotionCitation | None,
 ) -> Promotion:
     """latest-window 하나의 `GateOutcome`에서 승격 측정을 파생한다(D-5C2-6). `latest`가
     `None`이면(성숙 창이 하나도 없었다) `NO_EVALUABLE_WINDOW`.
+
+    `citation`(M9/ml-lifecycle)은 **기본값 없는 키워드**다 — 안 넘기면 mypy 가 거부하므로
+    「인용을 묻지 않는 승격」 경로가 성립하지 않는다. 창이 없을 때만 `None`이다(인용할
+    창 자체가 없다).
+
+    규칙은 **하나**다: 점수가 난 판정(`Passed`·`Failed`)은 인용 가능한 창을 요구한다.
+    `NotEvaluable`은 그보다 앞선다 — 인용할 **판정 자체가 없다**(「못 쟀다」는 데이터의
+    사실이고 정책 효력과 무관하다). `Failed`를 예외로 두지 않는 이유: 「이 게이트를 통과
+    못했다」도 **그 정책에 대한 주장**이고, 정책이 효력을 갖기 전의 창으로는 그 주장도
+    세울 수 없다. 숫자 자체는 사라지지 않는다 — `windows[*].outcome`이 그대로 싣는다.
 
     code-reviewer MEDIUM — `isinstance` 연쇄 + 암묵적 최종 `else`(`Failed`)는
     `GateOutcome`에 네 번째 변형이 추가돼도 mypy 가 경고하지 않는다. `match`로
@@ -138,14 +169,32 @@ def derive_promotion(
     match latest:
         case NotEvaluable(reason=reason):
             return PromotionNotEvaluable(reason)
-        case Passed():
-            if window_start is None:
-                raise ValueError("Passed 판정에는 window_start 가 있어야 합니다.")
-            return Promotable(window_start=window_start)
-        case Failed():
-            return NotPromotable(reasons=("gate_failed",))
+        case Passed() | Failed():
+            return _promotion_for_scored(
+                latest, window_start=window_start, citation=citation
+            )
         case _:
             assert_never(latest)
+
+
+def _promotion_for_scored(
+    outcome: Passed | Failed,
+    *,
+    window_start: str | None,
+    citation: PromotionCitation | None,
+) -> Promotion:
+    """점수가 난 판정의 조립 — `derive_promotion`을 설계 래칫 함수 길이 안에 두려는
+    분리다. 인용이 먼저다(그 창으로 이 정책에 대한 주장을 세울 수 있는가), 그 다음이
+    판정식 결과다."""
+    if citation is None:
+        raise ValueError("점수가 난 판정에는 citation 이 있어야 합니다.")
+    if isinstance(citation, NotCitable):
+        return PromotionSuperseded(reason=citation.reason, detail=citation.detail)
+    if isinstance(outcome, Failed):
+        return NotPromotable(reasons=("gate_failed",))
+    if window_start is None:
+        raise ValueError("Passed 판정에는 window_start 가 있어야 합니다.")
+    return Promotable(window_start=window_start)
 
 
 @dataclass(frozen=True)
@@ -157,6 +206,10 @@ class EvaluationReportV1:
     report_schema_version: str
     policy_version: str
     policy_checksum: str
+    policy_effective_date: str
+    """판정에 쓴 정책의 effective date(ISO-8601, M9/ml-lifecycle) — canonical JSON 과
+    report checksum 에 들어가므로 「언제부터의 규칙으로 판정했는가」가 산출물에 남는다."""
+
     training_spec_version: str
     training_spec_checksum: str
     feature_schema_version: str
@@ -210,11 +263,24 @@ def _gate_outcome_json(outcome: GateOutcome) -> _JsonValue:
 
 
 def _promotion_json(promotion: Promotion) -> _JsonValue:
-    if isinstance(promotion, Promotable):
-        return {"kind": "promotable", "window_start": promotion.window_start}
-    if isinstance(promotion, NotPromotable):
-        return {"kind": "not_promotable", "reasons": list(promotion.reasons)}
-    return {"kind": "not_evaluable", "reason": promotion.reason.value}
+    """네 변형을 `match`로 전부 명시한다 — 앞 판은 `isinstance` 둘 + 암묵적 최종
+    `else`였고, 네 번째 변형이 생겼을 때 그 `else`가 **조용히** 그것을
+    `not_evaluable`로 적었다(mypy 가 경고하지 않는다)."""
+    match promotion:
+        case Promotable():
+            return {"kind": "promotable", "window_start": promotion.window_start}
+        case NotPromotable():
+            return {"kind": "not_promotable", "reasons": list(promotion.reasons)}
+        case PromotionSuperseded():
+            return {
+                "kind": "superseded",
+                "reason": promotion.reason.value,
+                "detail": promotion.detail,
+            }
+        case PromotionNotEvaluable():
+            return {"kind": "not_evaluable", "reason": promotion.reason.value}
+        case _:
+            assert_never(promotion)
 
 
 def _stability_trial_json(trial: StabilityTrial) -> _JsonValue:
@@ -355,6 +421,7 @@ def _report_as_json_value(report: EvaluationReportV1) -> _JsonValue:
         "report_schema_version": report.report_schema_version,
         "policy_version": report.policy_version,
         "policy_checksum": report.policy_checksum,
+        "policy_effective_date": report.policy_effective_date,
         "training_spec_version": report.training_spec_version,
         "training_spec_checksum": report.training_spec_checksum,
         "feature_schema_version": report.feature_schema_version,

@@ -104,9 +104,7 @@ def test_monday_morning_kst_window_is_not_pushed_to_the_previous_day() -> None:
     UTC 날짜로 재면 전날(일요일)로 밀려 거부된다 — 그 판을 이 test 가 거부한다."""
     monday_kst_morning = _kst_day_start(_EFFECTIVE) + timedelta(minutes=30)
     assert monday_kst_morning.astimezone(UTC).date() < _EFFECTIVE  # 함정의 전제
-    citation = cite_promotion_window(
-        policy=_policy(), window_start=monday_kst_morning
-    )
+    citation = cite_promotion_window(policy=_policy(), window_start=monday_kst_morning)
     assert isinstance(citation, Citable)
 
 

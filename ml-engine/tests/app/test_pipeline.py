@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -28,6 +28,12 @@ from ml_engine.training.jobs.pipeline import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
+
+_TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
+"""test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
+창이 효력 시작 뒤에 있어야 승격 인용이 성립하므로, 여기서는 인용 축을 **상수로 비켜
+두고** 그 축 자체는 `tests/evaluation/test_epoch.py` 와 `test_holdout.py` 의 전용
+test 가 잰다."""
 
 _HYPERPARAMETERS = LightGbmHyperparameters(
     objective="regression",
@@ -64,6 +70,7 @@ def _training_policy() -> TrainingPolicy:
 def _evaluation_policy() -> EvaluationPolicy:
     return EvaluationPolicy(
         version="test",
+        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",

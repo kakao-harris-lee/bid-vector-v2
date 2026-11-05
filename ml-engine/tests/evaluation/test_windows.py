@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -19,8 +19,15 @@ from ml_engine.evaluation.windows import (
     plan_evaluation_windows,
 )
 
+_TEST_POLICY_EFFECTIVE_DATE = date(2020, 1, 1)
+"""test 정책의 effective date — 이 파일의 어떤 창보다 앞선 날짜다(M9/ml-lifecycle).
+창이 효력 시작 뒤에 있어야 승격 인용이 성립하므로, 여기서는 인용 축을 **상수로 비켜
+두고** 그 축 자체는 `tests/evaluation/test_epoch.py` 와 `test_holdout.py` 의 전용
+test 가 잰다."""
+
 _POLICY = EvaluationPolicy(
     version="test",
+    effective_date=_TEST_POLICY_EFFECTIVE_DATE,
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",
@@ -142,6 +149,7 @@ def test_plan_evaluation_windows_earliest_reason_wins() -> None:
 def test_plan_evaluation_windows_beyond_max_origins_drops_oldest() -> None:
     policy = EvaluationPolicy(
         version="test",
+        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
@@ -243,6 +251,7 @@ def test_plan_evaluation_windows_uses_policy_min_evaluation_rows_not_literal() -
     2 가 아닐 때도 그 값이 실제로 쓰이는지 확인한다."""
     stricter_policy = EvaluationPolicy(
         version="test",
+        effective_date=_TEST_POLICY_EFFECTIVE_DATE,
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
