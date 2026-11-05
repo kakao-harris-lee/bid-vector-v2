@@ -190,9 +190,16 @@ internal class AwardCollectionE2EHarness {
         val strataByKey = keys.associateWith { SampleCandidate(it, BusinessDivision.CONSTRUCTION, today).stratum }
         val runState = RunStateDirectory(promoteRunStateDir)
         try {
+            val outcome =
+                SampleOutcome(
+                    selected = keys,
+                    strata = emptyMap(),
+                    strataByKey = strataByKey,
+                    requested = keys.size,
+                )
             runState.sampleList.confirm(
                 SampleConfirmation(
-                    SampleOutcome(selected = keys, strata = emptyMap(), strataByKey = strataByKey, requested = keys.size),
+                    outcome,
                     SampleScope(today, today, setOf(BusinessDivision.CONSTRUCTION)),
                 ),
             )

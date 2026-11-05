@@ -118,8 +118,8 @@ class CollectAwardListUseCase(
             stored += sweep.stored
             if (sweep.truncated) truncated++
             val halt = sweep.halt ?: continue
-            val remaining = plan.size - index - 1
-            return AwardCollectionReport(index + 1, received, stored, truncated, halt.copy(notAttemptedSlots = remaining))
+            val halted = halt.copy(notAttemptedSlots = plan.size - index - 1)
+            return AwardCollectionReport(index + 1, received, stored, truncated, halted)
         }
         return AwardCollectionReport(plan.size, received, stored, truncated, halted = null)
     }
