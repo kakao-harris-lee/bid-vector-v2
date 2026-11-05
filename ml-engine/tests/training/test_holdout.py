@@ -151,11 +151,14 @@ def _raw_row_missing_base_amount(
 
 
 def _dataset(
-    rows: tuple[RawTrainingRow, ...], *, dataset_id: str = "ds-holdout"
+    rows: tuple[RawTrainingRow, ...],
+    *,
+    dataset_id: str = "ds-holdout",
+    sample_scope: str = "feed-origin-only",
 ) -> LoadedDataset:
     manifest = DatasetManifestV1(
         dataset_id=dataset_id,
-        sample_scope="feed-origin-only",
+        sample_scope=sample_scope,
         feed_origin_only=True,
         row_count=len(rows),
         rows_checksum="0" * 64,
@@ -1267,3 +1270,41 @@ def test_run_holdout_promotion_is_superseded_when_window_predates_policy() -> No
         late_run.promotion.reason
         == CitationRejectionReason.MEASURED_BEFORE_EFFECTIVE_DATE
     )
+
+
+def test_window_release_id_changes_with_the_sample_scope(tmp_path: Path) -> None:
+    """v M-1 — ML-05 의 새 축이 **창 경로**에서도 잠긴다. `sample_scope` 만 다른 두
+    manifest 로 같은 코퍼스를 돌리면 창의 `release_id` 가 갈린다.
+
+    앞 판은 `_window_release_id` 의 `sample_scope=` 를 상수로 바꿔도 전건이 초록이었다
+    (verifier 변이 R4) — 함수 시그니처 sweep 과 artifact 경로만 잠겨 있었고, 이 slice 가
+    만든 창 경로 자체에는 대응 단언이 없었다. `dataset_id` 는 양쪽 같게 두어 **범위
+    축만** 다르게 한다(창 id 의 dataset 성분에 창 시작이 섞이므로 범위 축을 따로 가른다)."""
+    rows = _many_rows(20, start_day=0) + _many_rows(10, start_day=30)
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=30),
+        end=_EPOCH + timedelta(days=37),
+        opened_count=10,
+        settled_count=9,
+    )
+
+    def _window_ids(scope: str) -> list[str]:
+        result = run_holdout(
+            _dataset(rows, sample_scope=scope),
+            [window],
+            _spec(),
+            _training_policy(min_training_rows=5),
+            _policy(min_evaluation_rows=5),
+            _DeterministicTrainer(base=0.6, slope=0.0),
+            CodeVersion("sha-1"),
+        )
+        assert not isinstance(result, HoldoutRejected), result
+        assert result.windows, "창이 하나도 성공하지 않으면 이 test 는 헛돈다"
+        return [item.release_id for item in result.windows]
+
+    narrow = _window_ids("feed-origin-only")
+    wide = _window_ids("all-strata")
+    assert narrow and len(narrow) == len(wide)
+    assert narrow != wide
+    # 통제군 — 같은 범위를 두 번 돌리면 같다(갈림이 범위 때문임을 고정한다).
+    assert narrow == _window_ids("feed-origin-only")
