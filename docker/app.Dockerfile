@@ -51,10 +51,15 @@ LABEL org.bidvector.baseimage="eclipse-temurin:21-jre-noble@sha256:cd35bb3385964
 # 하한을 설치 인자가 아니라 `dpkg --compare-versions` 로 닫는 사유는 `docker/ml-serving.Dockerfile`
 # 의 같은 자리에 적었다(정확 고정은 pocket 이 판을 갈아치우는 날 모든 빌드를 붉힌다).
 #
+# M9/cve-followups — `-o Acquire::Retries=3`(새 네트워크 의존의 재시도)과 `--no-remove`(`--only-upgrade`
+# 는 제거를 막지 않는다)의 사유도 그 파일의 같은 자리다(`OPEN-CVE-APT-RETRY`). **이쪽 하한의 `~` 접미
+# 실측**: `dpkg --compare-versions 2.8.4ubuntu0.1~24.04.1 ge 2.8.4ubuntu0.1` 은 거짓이다 — noble SRU 가
+# 그 형태로 오면 CVE 가 닫혔는데도 이 RUN 이 멈춘다(fail-closed 방향이라 지금 고치지 않는다).
+#
 # **이 stage 에만 둔다** — builder stage 는 jar 를 푸는 자리이고 그 layer 는 출하 이미지에 없다.
 RUN set -eu; \
-    apt-get update -qq; \
-    apt-get install --only-upgrade -y --no-install-recommends apt libapt-pkg6.0t64; \
+    apt-get -o Acquire::Retries=3 update -qq; \
+    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0t64; \
     for floor in 'apt 2.8.4ubuntu0.1' 'libapt-pkg6.0t64 2.8.4ubuntu0.1'; do \
         set -- $floor; \
         cur="$(dpkg-query -f '${Version}' -W "$1")"; \

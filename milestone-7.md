@@ -165,3 +165,10 @@ OpenAPI 가 고정된 뒤 착수한다(목 서버로 먼저 만들지 않는다 
 ## 7A 가 바꾸는 문서
 
 - ADR 0011(프런트 스택) 신설 · capability map `OPEN-ADR-14` → `BID-01` 등재는 7B.
+
+## M9 처분 (2026-11-06, M9/ledger)
+
+M7 종결이 「M7 밖, 등재 유지」로 넘긴 열하나 가운데 **일곱이 M9 머지분으로 닫혔다**(7E-2b 금액대 비우기 #124 ·
+7E-3b 시각·금액 문면 #125 · 7C③-b 유찰 어휘·개정 재안읽음 #123 · 7F 장부 L-1·L-2 #122). 항목별 처분은
+`reports/evidence/m7/close/checklist.md` §6, 장부 정본은 `docs/discovery/capability-map.md` §12.3 이다.
+남는 넷 가운데 `OPEN-SET01-AWARD-NAME-INGEST` 는 미머지 PR #128 이 받고 있어 **그 머지에서 확인**한다.
