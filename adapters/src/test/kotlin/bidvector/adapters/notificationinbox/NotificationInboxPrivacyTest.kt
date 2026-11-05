@@ -1,9 +1,8 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.PersistenceTestSupport
-import bidvector.workflow.notificationinbox.AwardResult
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationDetail
-import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -29,8 +28,13 @@ import java.sql.Connection
  * 열을 「어휘가 닫힌 열」로 셌다(`kind = ANY` 는 `ind` 를). 이제 `pg_constraint.conkey` 로
  * **제약이 실제로 가두는 열 번호**를 읽는다 — 이름이 겹쳐도 다른 열은 가둬지지 않는다.
  *
- * 함께 어휘 등식 둘을 잰다(우회 ⑨): Kotlin enum 과 DB CHECK 가 **같은 집합**이어야 한다.
- * 한쪽만 늘리면 저장할 수 없는 어휘나 복원할 수 없는 행이 생기고, 둘 다 조용하다.
+ * 함께 어휘 등식 **셋**을 잰다(우회 ⑨): Kotlin enum 과 DB CHECK 가 **같은 집합**이어야 한다
+ * (종류 · detail · 투찰 종류). 한쪽만 늘리면 저장할 수 없는 어휘나 복원할 수 없는 행이 생기고,
+ * 둘 다 조용하다.
+ *
+ * **짝 CHECK 의 전수 교차는 `NotificationInboxPairConstraintTest` 로 갈라 나갔다** — 술어가
+ * 다르다(이 class 는 카탈로그 정의를 **읽고**, 그쪽은 실 DB 에 INSERT 를 **쏜다**). 두 축은
+ * 실제로 따로 열린다: 어휘는 넓히고 짝만 옛 본문으로 두면 이 class 는 **초록**이고 교차만 붉다.
  */
 internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     /**
@@ -180,113 +184,15 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     }
 
     /**
-     * **종류 ↔ detail 짝이 표 층에서도 닫힌다**(심층 방어 · 우회 ⑩). Kotlin 쪽은 sealed 구성이라
-     * 불법 쌍이 표현되지 않지만, 어댑터의 codec 이 어긋나게 쓰면 잡는 것은 이 CHECK 다.
-     *
-     * detail 을 갖는 종류 둘은 **반드시** 자기 어휘를 싣고, 나머지 여섯은 **반드시** NULL 이다.
+     * **투찰 종류 어휘도 같은 집합이다**(M9/paper-bid). 한쪽만 늘리면 저장할 수 없는 어휘나
+     * 복원할 수 없는 행이 생기고 둘 다 조용하다 — 이 축은 PK 의 한 열이라 특히 그렇다
+     * (`valueOf` 가 던지는 것이 목록 질의 전체를 깨뜨린다).
      */
     @Test
-    fun `detail 을 갖지 않는 종류에 detail 을 실으면 DB 가 거부한다`() {
-        val account = insertFixtureAccount()
-        val forbidden =
-            NotificationKind.entries.filterNot { it in DETAIL_BEARING_KINDS }
-
-        forbidden.forEach { kind ->
-            insertFails(account, kind.name, NotificationDetail.AWARDED.name) shouldBe true
-        }
+    fun `투찰 종류 어휘는 Kotlin enum 전수와 같다`() {
+        checkVocabularyOf(TABLE, "bid_kind") shouldContainExactlyInAnyOrder
+            NotificationBidKind.entries.map { it.name }
     }
-
-    @Test
-    fun `detail 을 갖는 종류에 detail 이 없으면 DB 가 거부한다`() {
-        val account = insertFixtureAccount()
-
-        DETAIL_BEARING_KINDS.forEach { kind ->
-            insertFails(account, kind.name, null) shouldBe true
-        }
-    }
-
-    /**
-     * **짝의 전수 교차**(D-M9-1 로 어휘가 넷에서 다섯이 되며 세운 자리) — detail 을 갖는 종류
-     * 둘 × detail 어휘 전수의 **모든 칸**을 재고, 들어가야 하는 칸과 막혀야 하는 칸을 같은
-     * 등식에서 가른다.
-     *
-     * 앞 판은 손으로 고른 짝 다섯(개찰에 낙찰 어휘 둘 · 올바른 짝 셋)이었고, 그 다섯 어디에도
-     * 새 어휘가 없다 — 어휘를 하나 더할 때 **그 값이 어느 종류에 붙는지를 아무 단언도 묻지
-     * 않는다.** 변이로 그 축을 쟀다: V24 의 detail 어휘는 넓히고 **짝 CHECK 만** 옛 어휘로
-     * 두면 아래 「detail 어휘는 Kotlin enum 전수와 같다」가 **초록**이고 이 교차만 붉다.
-     *
-     * 기대 집합은 **사실의 구성에서 짓는다**: 개찰 축은 `Boolean` 둘, 낙찰 축은 결과 전수다.
-     * 손으로 어휘를 다시 적으면 그 목록이 둘째 정본이 되어 구성과 갈린다.
-     *
-     * 음성 대조가 이 등식 **안**에 있다 — 「막혀야 하는 칸」만 재면 전부 막는 술어도 초록이다.
-     */
-    @Test
-    fun `종류 × detail 전수 교차에서 자기 어휘만 들어간다`() {
-        val account = insertFixtureAccount()
-        val expected =
-            mapOf(
-                NotificationKind.OPENING_COMPLETED to
-                    listOf(true, false).mapNotNull { NotificationFact.OpeningCompleted(it).detail },
-                NotificationKind.AWARD_DECIDED to
-                    AwardResult.entries.mapNotNull { NotificationFact.AwardDecided(it).detail },
-            )
-        expected.keys shouldBe DETAIL_BEARING_KINDS
-
-        expected.forEach { (kind, own) ->
-            NotificationDetail.entries.forEach { detail ->
-                insertFails(account, kind.name, detail.name) shouldBe (detail !in own)
-            }
-        }
-    }
-
-    /** 음성 대조 — detail 을 갖지 않는 종류에 `null` 은 실제로 들어간다. */
-    @Test
-    fun `detail 을 갖지 않는 종류에 null 은 들어간다 — 음성 대조`() {
-        val account = insertFixtureAccount()
-
-        insertFails(account, NotificationKind.NOTICE_REVISED.name, null) shouldBe false
-    }
-
-    private fun insertFixtureAccount(): Long =
-        dataSource().connection.use { connection ->
-            connection
-                .createStatement()
-                .use { statement ->
-                    statement
-                        .executeQuery(
-                            "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, " +
-                                " failed_attempts) VALUES ('privacy-probe', 'h', now(), now(), 0) RETURNING id",
-                        ).use { rows ->
-                            rows.next()
-                            rows.getLong("id")
-                        }
-                }
-        }
-
-    /** 삽입이 거부됐는가 — 거부는 성공으로도 실패로도 읽히지 않게 **boolean 으로** 돌려준다. */
-    private fun insertFails(
-        account: Long,
-        kind: String,
-        detail: String?,
-    ): Boolean =
-        runCatching {
-            dataSource().connection.use { connection ->
-                connection
-                    .prepareStatement(
-                        "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                            " detail_code, occurred_at, updated_at) " +
-                            "VALUES (?, ?, ?, '000', ?, now(), now())",
-                    ).use { statement ->
-                        statement.setLong(1, account)
-                        statement.setString(2, kind)
-                        // 키가 겹치지 않게 공고 번호를 짝마다 다르게 둔다(PK 위반을 짝 CHECK 위반으로
-                        // 착각하지 않도록 — 그 둘을 가르지 않으면 이 test 가 공허해진다).
-                        statement.setString(3, "N-$kind-$detail")
-                        statement.setString(4, detail)
-                        statement.executeUpdate()
-                    }
-            }
-        }.isFailure
 
     /** 열 이름 → `information_schema` 자료형. **자료형으로 걸러내지 않는다** — 모집단은 전수다. */
     private fun columnTypesOf(table: String): Map<String, String> =
@@ -418,8 +324,6 @@ internal class NotificationInboxPrivacyTest : PersistenceTestSupport() {
     private companion object {
         const val TABLE = "notification_inbox"
         val NOTICE_KEY_COLUMNS = setOf("notice_number", "notice_round")
-        val DETAIL_BEARING_KINDS: Set<NotificationKind> =
-            setOf(NotificationKind.OPENING_COMPLETED, NotificationKind.AWARD_DECIDED)
         val VOCABULARY_LITERAL = Regex("'([^']*)'")
 
         /**

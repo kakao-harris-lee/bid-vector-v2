@@ -14,10 +14,11 @@ import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import {
+  NOTIFICATION_BID_KIND_DISPLAY,
   NOTIFICATION_DETAIL_DISPLAY,
   NOTIFICATION_KIND_DISPLAY,
-  groupByNotice,
-  type NoticeGroup,
+  groupNotifications,
+  type NotificationGroup,
 } from '../display/notificationDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { instantDisplayOf } from '../display/timeDisplay';
@@ -35,8 +36,19 @@ type ReadRequest = {
   /** 쓰기가 끝난 뒤 포커스를 돌려놓을 **DOM 노드**(행이냐 묶음이냐) — id 가 아니다(r3 CR M-1). */
   readonly focus: FocusTarget;
 } & (
-  | { readonly scope: 'ITEM'; readonly kind: NotificationItem['kind']; readonly noticeNumber: string; readonly noticeRound: string }
-  | { readonly scope: 'NOTICE'; readonly noticeNumber: string; readonly noticeRound: string }
+  | {
+      readonly scope: 'ITEM';
+      readonly kind: NotificationItem['kind'];
+      readonly noticeNumber: string;
+      readonly noticeRound: string;
+      readonly bidKind: NotificationItem['bidKind'];
+    }
+  | {
+      readonly scope: 'NOTICE';
+      readonly noticeNumber: string;
+      readonly noticeRound: string;
+      readonly bidKind: NotificationItem['bidKind'];
+    }
 );
 
 function sendRead(request: ReadRequest): Promise<MarkReadResult> {
@@ -46,11 +58,13 @@ function sendRead(request: ReadRequest): Promise<MarkReadResult> {
         kind: request.kind,
         noticeNumber: request.noticeNumber,
         noticeRound: request.noticeRound,
+        bidKind: request.bidKind,
       });
     case 'NOTICE':
       return markNoticeNotificationsRead({
         noticeNumber: request.noticeNumber,
         noticeRound: request.noticeRound,
+        bidKind: request.bidKind,
       });
     default: {
       const unreachable: never = request;
@@ -65,21 +79,30 @@ const EMPTY_DISPLAY = {
   tone: 'absent',
 } as const;
 
-/** 이 묶음이 **같은 공고의 몇 번째**인가 — key 가 삽입에 흔들리지 않게 하는 자리(r2 CR L-3). */
-function sameNoticeOrdinal(groups: readonly NoticeGroup[], index: number): number {
+/**
+ * 이 묶음이 **같은 키의 몇 번째**인가 — key 가 삽입에 흔들리지 않게 하는 자리(r2 CR L-3).
+ * 키는 번호·차수·**투찰 종류** 셋이다(M9) — 종류를 빼면 서면 묶음과 실투찰 묶음이 같은 차례를
+ * 다투어 key 가 다시 겹친다.
+ */
+function sameGroupOrdinal(groups: readonly NotificationGroup[], index: number): number {
+  const self = groups[index]!;
   let seen = 0;
   for (let i = 0; i < index; i += 1) {
     const one = groups[i]!;
-    if (one.noticeNumber === groups[index]!.noticeNumber && one.noticeRound === groups[index]!.noticeRound) {
+    if (one.noticeNumber === self.noticeNumber && one.noticeRound === self.noticeRound && one.bidKind === self.bidKind) {
       seen += 1;
     }
   }
   return seen;
 }
 
-/** 항목의 신원은 **종류와 공고 쌍**이다(합성 id 가 없다) — testId 도 그 셋으로 짓는다. */
+/**
+ * 항목의 신원은 **묶음 + 알림 종류**다(합성 id 가 없다) — testId 도 그 넷으로 짓는다.
+ * 투찰 종류가 빠지면 같은 공고의 서면·실투찰 두 행이 **같은 locator** 가 되고, strict locator
+ * 가 모호해지는 것으로 끝나지 않는다: React key 도 겹쳐 두 행이 서로의 자리에 그려진다.
+ */
 function itemTestId(item: NotificationItem): string {
-  return `notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}`;
+  return `notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}-${item.bidKind}`;
 }
 
 /**
@@ -88,7 +111,7 @@ function itemTestId(item: NotificationItem): string {
  * (HTML 의 unfocusing steps). 그래서 **행·묶음 자체**를 받을 자리로 두고 `tabIndex={-1}` 로
  * 포커스를 받을 수 있게 한다.
  *
- * **대상은 DOM 노드다 — 문자열 id 가 아니다**(r3 CR M-1·L-5). `groupByNotice` 는 떨어진 같은
+ * **대상은 DOM 노드다 — 문자열 id 가 아니다**(r3 CR M-1·L-5). `groupNotifications` 는 떨어진 같은
  * 공고를 **두 묶음으로 남기는 것이 결정**이라, 번호·차수로 지은 id 는 그때 문서에 둘이 되고
  * `getElementById` 가 **첫째**를 돌려준다 — 둘째 묶음에서 누르면 포커스가 위로 끌려갔다.
  * 노드를 그대로 들면 유일성에 기댈 일이 없다(r2 가 key 를 「DOM 노드의 정체」로 잰 것과 같은 축).
@@ -150,15 +173,15 @@ function NotificationRow({
   );
 }
 
-function NoticeGroupBlock({
+function NotificationGroupBlock({
   group,
   index,
   disabled,
   onRead,
 }: {
-  readonly group: NoticeGroup;
+  readonly group: NotificationGroup;
   /**
-   * 묶음의 **차례**(r1 CR L-3). `groupByNotice` 는 떨어진 같은 공고를 **두 묶음으로 남기는**
+   * 묶음의 **차례**(r1 CR L-3). `groupNotifications` 는 떨어진 같은 묶음을 **둘로 남기는**
    * 것이 결정이라, 번호·차수만으로 짓는 testId·key 는 그때 겹친다(strict locator 가 모호해지고
    * React key 도 「한 공고·한 종류에 항목 하나」라는 **서버 계약**에 기대게 된다). 차례는
    * 그 계약에 기대지 않는다.
@@ -173,12 +196,17 @@ function NoticeGroupBlock({
     <li
       ref={focusTarget}
       tabIndex={-1}
-      data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}`}
+      data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}-${group.bidKind}`}
       className="rounded-lg border border-line bg-card p-4 focus:outline focus:outline-2"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm font-medium">{group.noticeNumber}</span>
         <span className="text-xs text-ink-soft">차수 {group.noticeRound}</span>
+
+        {/* **투찰 종류 축**(M9/paper-bid) — 서면 연습의 소식과 실제 투찰의 소식이 **다른
+            묶음**이고, 그 구분이 화면에 보이지 않으면 갈라 놓은 뜻이 없다. 세 값 전부에 문면이
+            있으므로 「어느 값에 그리는가」를 이 자리가 따로 정하지 않는다. */}
+        <StateBadge display={displayOrUnknown(NOTIFICATION_BID_KIND_DISPLAY, group.bidKind)} />
 
         {/* **「공고 행이 없다」와 「행은 있고 제목이 비었다」는 다른 사실이다**(계약). 전자는
             보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고, 후자는 행이 있다. */}
@@ -203,6 +231,7 @@ function NoticeGroupBlock({
               focus: focusTarget,
               noticeNumber: group.noticeNumber,
               noticeRound: group.noticeRound,
+              bidKind: group.bidKind,
             })
           }
           className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
@@ -224,6 +253,7 @@ function NoticeGroupBlock({
                 kind: item.kind,
                 noticeNumber: item.noticeNumber,
                 noticeRound: item.noticeRound,
+                bidKind: item.bidKind,
               })
             }
           />
@@ -303,7 +333,7 @@ export function InboxScreen() {
     );
   }
 
-  const groups = groupByNotice(inbox.data?.rows ?? []);
+  const groups = groupNotifications(inbox.data?.rows ?? []);
 
   return (
     <section data-testid="screen-inbox" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -351,14 +381,14 @@ export function InboxScreen() {
       {groups.length === 0 ? null : (
         <ul className="flex flex-col gap-3">
           {groups.map((group, index) => (
-            <NoticeGroupBlock
+            <NotificationGroupBlock
               /**
                * **key 는 차례를 쓰지 않는다**(r2 CR L-3): 맨 앞에 묶음이 하나 끼면 뒤 묶음의
                * key 가 전부 밀려 통째로 재마운트되고, 그러면 「버튼이 DOM 에 남는다」도 그
-               * 실행에서는 성립하지 않는다. 같은 공고 안에서의 차례만 붙여 갈라진 두 묶음을
-               * 가른다(testId 는 strict locator 때문에 전체 차례를 그대로 쓴다).
+               * 실행에서는 성립하지 않는다. 같은 **묶음 키** 안에서의 차례만 붙여 갈라진 두
+               * 묶음을 가른다(testId 는 strict locator 때문에 전체 차례를 그대로 쓴다).
                */
-              key={`${group.noticeNumber}-${group.noticeRound}-${sameNoticeOrdinal(groups, index)}`}
+              key={`${group.noticeNumber}-${group.noticeRound}-${group.bidKind}-${sameGroupOrdinal(groups, index)}`}
               group={group}
               index={index}
               disabled={read.isPending}

@@ -11,6 +11,7 @@ import type { StateDisplay } from './stateDisplay';
  */
 export type NotificationKind = NotificationItem['kind'];
 export type NotificationDetail = NonNullable<NotificationItem['detail']>;
+export type NotificationBidKind = NotificationItem['bidKind'];
 
 export const NOTIFICATION_KIND_DISPLAY = {
   NEW_CANDIDATE: { label: '새 후보', why: '자격을 통과한 공고가 생겼다', tone: 'good' },
@@ -40,12 +41,33 @@ export const NOTIFICATION_DETAIL_DISPLAY = {
 } as const satisfies Record<NotificationDetail, StateDisplay>;
 
 /**
- * 한 공고의 묶음. 표시 칸(`notice*`)은 묶음의 **첫 항목**에서 온다 — 같은 공고의 항목이면
- * 서버가 같은 값을 합쳐 싣기 때문이고, 그래서 이 자리는 고르는 것이지 짓는 것이 아니다.
+ * **투찰 종류 축**의 문면 셋(M9/paper-bid). 「서면 연습의 소식」과 「실제 투찰의 소식」이 한
+ * 얼굴이면 운영자가 연습 결과를 실제로 읽는다 — 이 slice 가 항목을 갈라 놓는 이유가 화면에서
+ * 보이지 않으면 갈라 놓은 뜻이 없다.
+ *
+ * `NONE` 은 **건이 아니라 공고에 붙은 소식**이다(투찰가 요청 기록 · 새 후보). 세 값 전부에
+ * 문면을 두고 화면이 **늘 그린다** — 「어느 값에 배지를 그리는가」를 화면이 따로 정하면 그
+ * 규칙이 서버의 짝 규칙과 갈릴 자리가 된다.
  */
-export interface NoticeGroup {
+export const NOTIFICATION_BID_KIND_DISPLAY = {
+  REAL: { label: '실투찰', why: '실제로 투찰한 건의 소식', tone: 'neutral' },
+  PAPER: { label: '서면 연습', why: '가상 연습이고 실제 결과가 아니다', tone: 'absent' },
+  NONE: { label: '공고 소식', why: '건이 아니라 공고에 붙은 소식', tone: 'neutral' },
+} as const satisfies Record<NotificationBidKind, StateDisplay>;
+
+/**
+ * 묶음 하나 — **한 공고 · 한 투찰 종류**다(M9/paper-bid). 표시 칸(`notice*`)은 묶음의 **첫
+ * 항목**에서 온다 — 같은 공고의 항목이면 서버가 같은 값을 합쳐 싣기 때문이고, 그래서 이
+ * 자리는 고르는 것이지 짓는 것이 아니다.
+ *
+ * **이름이 `NoticeGroup` 이 아닌 이유**: 묶음의 키가 공고만이 아니다. 같은 공고에 서면 건과
+ * 실투찰 건이 있으면 묶음이 둘이고, 공고만으로 묶으면 두 연습의 소식이 한 블록에 섞여 계수도
+ * 합쳐진다. `CaseGroup` 도 아닌 이유는 `NONE` 묶음이 **건이 아니라서**다.
+ */
+export interface NotificationGroup {
   readonly noticeNumber: string;
   readonly noticeRound: string;
+  readonly bidKind: NotificationBidKind;
   /** 이 페이지에 온 항목들 — 응답 순서 그대로다. */
   readonly items: readonly NotificationItem[];
   /** 묶음 **전체** 크기(서버 값, 페이지 무관). */
@@ -62,26 +84,32 @@ export interface NoticeGroup {
 }
 
 /**
- * 「건별 묶음」 — **연속 접기이고 정렬이 아니다.** 계약이 「정렬이 묶음을 연속시키므로
+ * 묶음 접기 — **연속 접기이고 정렬이 아니다.** 계약이 「정렬이 묶음을 연속시키므로
  * 클라이언트가 재정렬할 필요가 없다」고 둔 자리라, 화면이 다시 정렬하면 서버가 정한 최신순이
  * 무너진다.
  *
- * 서버가 연속시키지 못한 경우에도 **말없이 합치지 않는다**: 떨어진 같은 공고는 두 묶음으로
+ * 서버가 연속시키지 못한 경우에도 **말없이 합치지 않는다**: 떨어진 같은 묶음은 두 묶음으로
  * 남는다. 합치면 그 항목이 응답에서 있던 자리보다 위로 올라가고 그 이동을 아무도 보지 못한다
  * — 어긋남이 화면에 **보이는** 쪽이 낫다.
  *
- * 묶음의 키는 **번호와 차수 둘 다**이다(번호만으로 묶으면 다른 차수의 소식이 한 묶음에 든다).
+ * 묶음의 키는 **셋 다**다: 번호 · 차수 · **투찰 종류**(M9/paper-bid). 번호만으로 묶으면 다른
+ * 차수의 소식이 한 묶음에 들고, 투찰 종류를 빼면 **서면 연습과 실제 투찰의 소식이 한 블록에
+ * 섞인다** — 계수(`noticeItemCount`·`noticeUnreadCount`)는 서버가 축별로 센 값이라, 섞인 블록은
+ * 자기 항목 수와 맞지 않는 계수를 보이게 된다.
  */
-export function groupByNotice(items: readonly NotificationItem[]): readonly NoticeGroup[] {
-  const groups: NoticeGroup[] = [];
+export function groupNotifications(items: readonly NotificationItem[]): readonly NotificationGroup[] {
+  const groups: NotificationGroup[] = [];
   let current: NotificationItem[] | null = null;
 
   for (const item of items) {
     const last = groups.at(-1);
-    const sameNotice =
-      last !== undefined && last.noticeNumber === item.noticeNumber && last.noticeRound === item.noticeRound;
+    const sameGroup =
+      last !== undefined &&
+      last.noticeNumber === item.noticeNumber &&
+      last.noticeRound === item.noticeRound &&
+      last.bidKind === item.bidKind;
 
-    if (sameNotice && current !== null) {
+    if (sameGroup && current !== null) {
       current.push(item);
       continue;
     }
@@ -89,6 +117,7 @@ export function groupByNotice(items: readonly NotificationItem[]): readonly Noti
     groups.push({
       noticeNumber: item.noticeNumber,
       noticeRound: item.noticeRound,
+      bidKind: item.bidKind,
       items: current,
       // **계수는 서버 값이다**(D-7E3a-6) — 이 페이지의 행을 세면 묶음이 페이지 경계에 걸릴 때
       // 「더 있다」를 말할 수 없다.

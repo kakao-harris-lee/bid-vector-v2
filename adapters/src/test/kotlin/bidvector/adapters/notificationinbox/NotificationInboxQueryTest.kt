@@ -1,8 +1,8 @@
 package bidvector.adapters.notificationinbox
 
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxLimits
-import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
 import io.kotest.matchers.collections.shouldContainExactly
@@ -34,16 +34,41 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         inbox().record(record(account, grouped, NotificationFact.BidDeadlineImminent))
         inbox().record(record(account, grouped, NotificationFact.BidDeadlineToday))
         inbox().record(record(account, grouped, NotificationFact.NoticeRevised))
-        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, grouped), READ_AT)
+        store().markRead(account, itemKey(NotificationKind.NOTICE_REVISED, grouped), READ_AT)
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
         val items = store().list(account, page()).items
 
         items.filter { it.notice.number.value == "N-1" }.forEach { item ->
-            item.group.itemCount shouldBe 3
-            item.group.unreadCount shouldBe 2
+            item.groupCounts.itemCount shouldBe 3
+            item.groupCounts.unreadCount shouldBe 2
         }
-        items.single { it.notice.number.value == "N-2" }.group.itemCount shouldBe 1
+        items.single { it.notice.number.value == "N-2" }.groupCounts.itemCount shouldBe 1
+    }
+
+    /**
+     * **투찰 종류가 묶음 계수의 축이다**(M9/paper-bid). 같은 공고에 서면 둘 · 실투찰 하나를 심고
+     * 각 항목이 **자기 축의** 계수를 싣는지 본다 — 창 파티션에서 그 축이 빠지면 세 항목이 모두
+     * `itemCount = 3` 을 싣고, 화면은 두 블록 각각에 「항목 3」을 보이면서 행은 둘·하나만 그린다.
+     *
+     * **정렬도 같은 자리에서 잰다**: 두 축의 항목이 **연속**해야 한다(화면의 묶음 접기가 연속에
+     * 기댄다 — 섞이면 한 묶음이 여럿으로 쪼개진다). `ORDER BY` 에서 축이 빠지면 같은 공고의 세
+     * 항목이 사실 시각 역순으로 섞여 이 등식이 붉어진다.
+     */
+    @Test
+    fun `묶음 계수와 정렬의 축에 투찰 종류가 든다`() {
+        val account = insertAccount("group-bid-kinds")
+        val notice = unknownNotice("N-1")
+        inbox().record(record(account, notice, NotificationFact.BidDeadlineImminent, bidKind = PAPER))
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER, bidKind = PAPER))
+        inbox().record(record(account, notice, NotificationFact.BidDeadlineToday, bidKind = REAL))
+
+        val items = store().list(account, page()).items
+
+        items.filter { it.group.bidKind == PAPER }.forEach { it.groupCounts.itemCount shouldBe 2 }
+        items.single { it.group.bidKind == REAL }.groupCounts.itemCount shouldBe 1
+        // **연속**이다 — 같은 축의 항목이 끊기지 않는다(묶음의 최신 사실 시각이 PAPER 쪽이 늦다).
+        items.map { it.group.bidKind } shouldContainExactly listOf(PAPER, PAPER, REAL)
     }
 
     /**
@@ -59,7 +84,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         inbox().record(record(account, notice, NotificationFact.BidDeadlineToday))
         store().markRead(
             account,
-            NotificationItemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
+            itemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
             READ_AT,
         )
 
@@ -68,14 +93,33 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         page.items.size shouldBe 1
         page.items
             .single()
-            .group.itemCount shouldBe 2
+            .groupCounts.itemCount shouldBe 2
         page.items
             .single()
-            .group.unreadCount shouldBe 1
+            .groupCounts.unreadCount shouldBe 1
         // 전체 건수는 **필터를 지난 집합**의 수다(페이지 계산의 분모).
         page.totalCount shouldBe 1L
         // 안읽음 계수는 필터와 무관한 계정 전수다 — 여기서는 둘이 같지만 아래 test 가 가른다.
         page.unreadCount shouldBe 1L
+    }
+
+    /**
+     * **배지는 투찰 종류를 합쳐 센다**(M9/paper-bid 의 알려진 제한). 계정 안읽음 전수는 한 수이고
+     * 서면 연습의 안읽음도 그 수에 **든다** — 축별로 가르지 않는 것이 결정이라, 「서면은 세지
+     * 않는다」로 조용히 바뀌는 것을 이 등식이 막는다. 축의 구분은 묶음 계수와 묶음 라벨이 진다.
+     */
+    @Test
+    fun `안읽음 전수는 투찰 종류 둘을 합쳐 센다`() {
+        val account = insertAccount("badge-bid-kinds")
+        val notice = unknownNotice("N-1")
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, bidKind = REAL))
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, bidKind = PAPER))
+
+        store().list(account, page()).unreadCount shouldBe 2L
+
+        store().markNoticeRead(account, groupKey(notice, PAPER), READ_AT)
+
+        store().list(account, page()).unreadCount shouldBe 1L
     }
 
     @Test
@@ -86,7 +130,7 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         inbox().record(record(account, notice, NotificationFact.BidDeadlineToday))
         store().markRead(
             account,
-            NotificationItemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
+            itemKey(NotificationKind.BID_DEADLINE_IMMINENT, notice),
             READ_AT,
         )
 
@@ -264,6 +308,10 @@ internal class NotificationInboxQueryTest : NotificationInboxTestSupport() {
         }
 
     private companion object {
+        /** 축 어휘 둘의 짧은 이름 — 투찰 종류 test 들이 한 줄에 서게 한다. */
+        val REAL = NotificationBidKind.REAL
+        val PAPER = NotificationBidKind.PAPER
+
         val DEADLINE: Instant = Instant.parse("2026-11-01T05:00:00Z")
     }
 }

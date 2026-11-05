@@ -23,7 +23,9 @@ import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.NoticeByIdPort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
@@ -135,13 +137,24 @@ class BidPriceRequestFactory(
      * **사실은 하나로 고정이다**(`BidPriceRequestRecorded`). 요청이 종류를 고를 자리가 없으므로
      * 이 표면으로는 다른 종류의 알림을 위조할 수 없다 — 쓰기 포트 자체는 controller 가 받을 수
      * 없고(`app.http.denied-types`) 이 좁은 메서드만 지난다.
+     *
+     * **투찰 종류 축이 `NONE` 이다**(M9/paper-bid · D-M9P-1). 이 사실은 건이 아니라 **공고**에
+     * 붙는다 — 이 경로에는 건이 없고(운영자가 공고 하나를 지목해 투찰가를 요청했다) 그래서
+     * 지어낼 투찰 종류도 없다. `REAL` 로 적으면 공고 소식이 실투찰 연습의 소식으로 라벨된다.
+     * 그 짝은 [NotificationInboxRecord] 의 `init` 와 저장 층의 짝 CHECK 가 함께 막으므로, 이
+     * 자리가 틀리면 **조용히 지나가지 않는다**.
      */
     fun recordInbox(
         account: AccountId,
         notice: NoticeId,
     ): NotificationInboxOutcome =
         notificationInbox.record(
-            NotificationInboxRecord(account, notice, NotificationFact.BidPriceRequestRecorded, clock.now()),
+            NotificationInboxRecord(
+                account,
+                NotificationGroupKey(notice, NotificationBidKind.NONE),
+                NotificationFact.BidPriceRequestRecorded,
+                clock.now(),
+            ),
         )
 
     fun forRequest(

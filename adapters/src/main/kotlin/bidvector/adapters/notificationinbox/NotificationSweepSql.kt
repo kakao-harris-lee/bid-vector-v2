@@ -26,9 +26,15 @@ internal object NotificationSweepSql {
     /**
      * 후보 셋을 한 문장으로 — 마감 창 · 서류 기한 창 · 공고 개정이다.
      *
-     * **실투찰만이다**(`bid_kind = 'REAL'`). 알림함의 중복 억제 키에 투찰 종류 축이 없어서, 같은
-     * 공고의 페이퍼 건과 실투찰 건이 한 항목을 덮어쓴다 — 가상 연습이 실제 마감 알림을 가리지
-     * 않게 한다(되비춤 쪽도 같은 선택이다).
+     * **투찰 종류를 거르지 않는다 — 실어 나른다**(M9/paper-bid · D-M9P-2). 앞 판은
+     * `bid_kind = 'REAL'` 로 서면 건을 **버렸다**: 알림함의 중복 억제 키에 투찰 종류 축이 없어
+     * 같은 공고의 두 건이 한 항목을 덮어썼고, 가상 연습이 실제 마감 알림을 가리는 것보다 서면
+     * 운영자가 알림을 못 받는 쪽을 골랐기 때문이다. V25 가 그 축을 키에 넣어 **덮어쓸 자리가
+     * 없어졌으므로** 거를 이유도 없어졌다 — 건의 종류는 `c.bid_kind` 로 결과에 실려 나가고 순수
+     * 함수가 그것을 알림의 묶음 키에 넣는다.
+     *
+     * 그래서 이 문장에 투찰 종류 **리터럴이 없다**. 그 부재는 문자열이 아니라 **거동**으로
+     * 재진다 — 서면 건 하나와 실투찰 건 하나를 심고 후보 집합이 **둘 다** 담는지 본다.
      *
      * **공백뿐인 공고번호를 거른다**(`btrim(…) <> ''`). V1·V21 의 CHECK 는 `<> ''` 라 공백 한 칸을
      * 허용하고, 그런 행에서는 `NoticeKey` 가 서지 않아 **한 행이 훑기 전체를 멈춘다**. 요청 경로로는
@@ -39,12 +45,13 @@ internal object NotificationSweepSql {
      * ⑤ 개정 축의 마감 하한(now — 지난 공고의 개정은 할 일을 바꾸지 않는다).
      */
     const val SELECT_SWEEP_CANDIDATES =
-        "SELECT c.account_id, c.notice_number, c.notice_round, c.state, c.created_at, c.document_due_at, " +
+        "SELECT c.account_id, c.notice_number, c.notice_round, c.bid_kind, c.state, c.created_at, " +
+            "c.document_due_at, " +
             "$EFFECTIVE_DEADLINE AS effective_deadline_at, n.revision AS notice_revision, " +
             "n.updated_at AS notice_updated_at " +
             "FROM bid_case c LEFT JOIN notice n " +
             "ON n.notice_number = c.notice_number AND n.notice_round = c.notice_round " +
-            "WHERE c.bid_kind = 'REAL' AND btrim(c.notice_number) <> '' AND (" +
+            "WHERE btrim(c.notice_number) <> '' AND (" +
             "$EFFECTIVE_DEADLINE BETWEEN ? AND ? " +
             "OR c.document_due_at BETWEEN ? AND ? " +
             "OR (n.revision > 1 AND n.updated_at > c.created_at AND $EFFECTIVE_DEADLINE >= ?)" +
