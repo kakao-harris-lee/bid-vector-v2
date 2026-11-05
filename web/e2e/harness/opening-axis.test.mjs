@@ -8,6 +8,7 @@ import {
   assertRunnerCounts,
   OPENING_AXIS_OPERATIONS,
   OPENING_PROGRESS_LABELS,
+  noticeCollectionCategories,
   openingAxisDesign,
   openingAxisRouteTable,
   promotionExpectation,
@@ -159,6 +160,22 @@ describe('ⓓ fixture 둘의 교차 등식', () => {
     for (const notice of design.withAxis) {
       expect(shipped[notice.division]).toBe(notice.noticeListOperation);
     }
+  });
+
+  it('공고 축 수집이 부를 업종이 fixture 에서 나온다 — 설계가 쓰는 업무가 모두 든다', () => {
+    const categories = noticeCollectionCategories(noticeList);
+
+    // fixture 에 공고가 **있는 것**과 수집이 그 오퍼레이션을 **부르는 것**은 다르다. 리터럴로
+    // 적힌 업종 목록은 fixture 가 늘어도 따라오지 않아 새 공고가 `NOTICE_ABSENT` 가 된다.
+    for (const notice of design.withAxis) {
+      expect(
+        categories,
+        `업무 ${notice.division} 를 수집이 부르지 않으면 ${notice.noticeNumber} 는 NOTICE_ABSENT 다`,
+      ).toContain(notice.division);
+    }
+    expect(() =>
+      noticeCollectionCategories({ items: [{ operation: 'getBidPblancListInfoCnstwk02' }] }),
+    ).toThrow(/등재 밖 오퍼레이션/u);
   });
 
   it('수집되지 않는 갈래의 공고는 **어느 fixture 에도** 없다', () => {

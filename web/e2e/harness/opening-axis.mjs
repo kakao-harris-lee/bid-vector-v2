@@ -340,6 +340,28 @@ export function promotionExpectation(design) {
 }
 
 /**
+ * 공고 축 수집이 요청해야 하는 업종 — **fixture 가 정한다.**
+ *
+ * 하네스에 리터럴로 적으면 fixture 에 다른 업무의 공고를 더해도 수집이 그 업종을 부르지 않아 그
+ * 공고가 `NOTICE_ABSENT` 가 된다. 그것은 교차 등식 test 가 **보지 못하는 사각**이다: fixture 에
+ * 공고가 있는 것과 수집이 그 오퍼레이션을 **부르는 것**은 다르다(이 구멍을 한 번 밟았다).
+ */
+export function noticeCollectionCategories(noticeListFixture) {
+  const divisionOf = new Map(
+    Object.entries(NOTICE_LIST_OPERATIONS).map(([division, operation]) => [operation, division]),
+  );
+  const categories = new Set();
+  for (const operation of noticeListFixture.items.map((item) => item.operation)) {
+    const division = divisionOf.get(operation);
+    if (division === undefined) {
+      throw new Error(`공고 축 fixture 에 등재 밖 오퍼레이션이 있다: ${operation}`);
+    }
+    categories.add(division);
+  }
+  return [...categories].sort();
+}
+
+/**
  * 러너 출력에서 그 줄 **하나**를 집는다. 출력 전체를 그냥 넘기면 `key=value` 가 여러 줄에 있어
  * 계수가 뒤 줄의 값으로 덮인다 — 줄을 먼저 좁히지 않으면 등식이 **다른 줄을 재면서** 초록일 수 있다.
  */

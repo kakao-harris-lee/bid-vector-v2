@@ -34,6 +34,7 @@ import {
 } from './container-marker.mjs';
 import {
   assertRunnerCounts,
+  noticeCollectionCategories,
   openingAxisDesign,
   promotionExpectation,
   runnerLine,
@@ -123,6 +124,15 @@ const OPENING_DESIGN = openingAxisDesign(
   JSON.parse(readFileSync(resolve(here, 'fixtures', 'opening-axis.json'), 'utf8')),
 );
 const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN);
+
+/**
+ * 공고 축 수집이 부를 업종 — **fixture 에서 센다**(리터럴로 적지 않는다). 개찰 축 설계가 다른
+ * 업무의 공고를 쓰는데 수집이 그 업종을 부르지 않으면 그 공고는 공고 행이 없어 설계가 선언한
+ * 갈래 대신 `NOTICE_ABSENT` 가 된다 — 그 꼴을 한 번 밟았고, 두 자리를 fixture 하나로 묶어 닫는다.
+ */
+const NOTICE_CATEGORIES = noticeCollectionCategories(
+  JSON.parse(readFileSync(resolve(here, 'fixtures', 'notice-list.json'), 'utf8')),
+);
 
 /**
  * 개찰 축 호출 상한 — 설계의 공고 수에서 넉넉히 센다(표본 × 상세 축 넷 + 목록 걷기). 승인 상한을
@@ -312,7 +322,7 @@ async function main() {
       '--bidvector.collection.mode=once',
       `--bidvector.collection.from=${today}`,
       `--bidvector.collection.to=${today}`,
-      '--bidvector.collection.categories=construction',
+      `--bidvector.collection.categories=${NOTICE_CATEGORIES.join(',')}`,
       '--bidvector.collection.calls-per-day=100',
       '--bidvector.collection.calls-total=100',
       `--bidvector.collection.run-state-dir=${runStateDir}`,
@@ -363,14 +373,28 @@ async function main() {
     );
   }
 
-  // ①c 개찰 결과 승격 — **공사 쪽 디렉터리 하나만** 받는다(외부 호출 0 · 원문 쓰기 0).
+  // ①c 개찰 결과 승격 — **실행 상태 디렉터리 하나만** 받는다(외부 호출 0 · 원문 쓰기 0).
   //     계수가 닫힌 등식이다: 읽은 묶음 == 승격 + 범위 밖.
+  //
+  //     어느 디렉터리인지는 설계표가 정한다. 승격 받는 업무가 둘 이상이면 **걸음이 그만큼 늘어야
+  //     하고 계수 등식도 갈라야** 하므로 조용히 하나만 돌리지 않고 멈춘다.
+  const [promotedDivision, ...alsoPromoted] = OPENING_DESIGN.promotedDivisions;
+  if (alsoPromoted.length > 0) {
+    throw new Error(
+      `승격 받는 업무가 둘 이상이다(${OPENING_DESIGN.promotedDivisions.join(', ')}) — ` +
+        '승격 러너는 실행 상태 디렉터리 하나를 받으므로 걸음과 계수 등식을 함께 갈라야 한다',
+    );
+  }
+  const promotedRunStateDir = openingRunStateDirs[promotedDivision];
+  if (promotedRunStateDir === undefined) {
+    throw new Error(`승격 대상 업무 ${promotedDivision} 의 개찰 축 수집이 돌지 않았다 — 설계표를 보십시오`);
+  }
   const promotion = runJar(
     [
       writeSecrets('promote', []),
       '--server.port=0',
       '--bidvector.opening-promote.mode=once',
-      `--bidvector.opening-promote.run-state-dir=${openingRunStateDirs.construction}`,
+      `--bidvector.opening-promote.run-state-dir=${promotedRunStateDir}`,
       `--bidvector.opening-promote.reference-date=${today}`,
     ],
     '개찰 결과 승격(bidvector.opening-promote.mode=once)',
