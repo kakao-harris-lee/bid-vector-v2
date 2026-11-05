@@ -143,7 +143,7 @@
 | `document.timeline.currentTime` · `event.timeStamp` · `new File([], 'x').lastModified` · `document.lastModified` | **시계가 아닌 표면이 나르는 시각**. 이름 목록에 없다 |
 | 반사 API — `Object.getOwnPropertyDescriptor(globalThis, 'Date')` · 계산으로 만든 이름(`globalThis['Da'+'te']`) | 네트워크 금지의 같은 제한과 **같은 부류**다(그쪽에도 축어로 등재돼 있다) |
 | 구조 분해의 **따옴표·계산·템플릿 키** | 같은 리터럴의 다른 표기. 네트워크 쪽 ④ 와 같은 범위(키가 식별자일 때만) |
-| `void 0` 처럼 다른 글자로 적은 빈 인자 | `undefined` 식별자와 spread 둘만 본다 |
+| **빈 값을 다른 글자로 적은 인자** — `void 0` · TS 문법으로 감싼 `undefined`(`undefined as never` · `undefined!` · `undefined satisfies undefined`) | 첫 인자 꼴 선택자는 `undefined` **식별자**와 spread 둘만 본다. 감싼 꼴은 노드가 `AsExpression`·`NonNullExpression`·`SatisfiesExpression` 이라 지나간다(v-132-r2 L-1). **표기를 열거하지 않는다** — 다음 문법에서 그 목록이 또 뒤처지고, 이 층은 「실수로 쓴 직접 호출」을 잡는 보조 층이다 |
 | test 파일 | 고정 fixture 를 짓는 것이 그 일이고 **출하되지 않는다** — 제외가 의도임을 게이트 test 가 잰다 |
 | **출하 파일이 test 파일을 import 하는 길**(v L-2) | `src/display/x.test.ts` 가 `new Date()` 를 내보내고 화면이 import 하면 제외를 지난다. 「test 는 출하되지 않는다」는 전제를 **지키는 게이트가 없다** — 번들 경계는 `web/src` 안이면 통과한다 |
 

@@ -1,9 +1,13 @@
 # M9 / web-followups — checklist
 
-판정 SHA `68834ea2` · base `df4976cc` · 계약 `scope.md` · 설계 검토 `design-review.md`
+판정 SHA `bb2f1bae` · base `df4976cc` · 계약 `scope.md` · 설계 검토 `design-review.md`
 
 PR #132 수정 라운드(v `ready-for-review` · cr `approve` @`7506085e`)를 반영했다 — 팀장이 지시한
 일곱 자리를 고치고 나머지는 경계 문장을 사실에 맞게 좁혀 등재했다(§3·§5).
+
+표적 재검증(v-132-r2 `ready-for-review` @`68834ea2`)의 마지막 둘도 받았다: **L-2** 고아가 된
+JSDoc 자리 바로잡기(산출물 한 커밋 — 글자 변화 없이 자리만 바뀐다) · **L-1** TS 문법으로 감싼
+`undefined` 를 `void 0` 과 **같은 계열**로 §3 ③ 에 등재(술어는 늘리지 않는다).
 
 ## 1. 대상 다섯의 처리
 
@@ -52,7 +56,7 @@ PR #132 수정 라운드(v `ready-for-review` · cr `approve` @`7506085e`)를 �
 ② **시계 금지 밖에 남는 표면이 있다.** 전수는 `design-review.md` §④ 「남는 자리」 표다 — 시계가
 아닌 표면이 나르는 시각(`document.timeline`·`event.timeStamp`·`File.lastModified`·
 `document.lastModified`) · 반사 API 와 계산으로 만든 이름 · 구조 분해의 따옴표·계산·템플릿 키 ·
-`void 0` 꼴의 빈 인자 · test 파일.
+**빈 값을 다른 글자로 적은 인자**(`void 0` · TS 문법으로 감싼 `undefined` — 아래 ③) · test 파일.
 
 **가장 큰 잔여는 「출하 파일이 test 파일을 import 하는 길」**(PR #132 v L-2): `src/display/x.test.ts`
 가 시계를 내보내고 화면이 import 하면 제외를 지나고, 「test 는 출하되지 않는다」는 전제를 **지키는
@@ -66,7 +70,14 @@ PR #132 수정 라운드(v `ready-for-review` · cr `approve` @`7506085e`)를 �
 앞 판은 「인자를 받은 `format` 은 지금을 읽는 꼴이 아니다」를 근거로 적었는데 **한 입력에서
 거짓**이다: `format(undefined)` 은 인자가 하나인데 **지금**을 서식한다. 그 꼴과 spread 꼴을
 선택자로 닫았으므로, 남는 것은 **값을 실제로 주는 호출**(`format(someDate)` — 지금을 읽지 않는다)과
-`void 0` 처럼 다른 글자로 적은 빈 인자(등재된 잔여)다.
+**빈 값을 다른 글자로 적은 꼴**이다.
+
+그 「다른 글자」 계열은 둘이고 **같은 성질**이다(v-132-r2 L-1 로 전수를 적는다): ⓐ 식별자가
+아닌 표현식(`void 0`) ⓑ **TS 문법으로 감싼 `undefined`** — `undefined as never` · `undefined!` ·
+`undefined satisfies undefined`. ⓑ 는 노드가 `Identifier` 가 아니라 `AsExpression`·
+`NonNullExpression`·`SatisfiesExpression` 이라 첫 인자 꼴 선택자를 지난다. **술어를 더 늘리지
+않는다** — 표기를 열거하면 그 목록이 다음 문법에서 또 뒤처지고, 이 층은 처음부터 「실수로 쓴
+직접 호출」을 잡는 보조 층이다(의도적 우회는 리뷰 소관이라는 네트워크 쪽 문장과 같은 자리다).
 
 ③b **시계 선택자의 오탐 비용**(PR #132 cr L-5). 속성 이름으로 잡으므로 시계와 무관한 멤버도
 걸린다 — `metrics.performance`(실적·성능) · `row.Date` · 인자 없는 `builder.format()`. 특히

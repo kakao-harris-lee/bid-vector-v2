@@ -1,9 +1,9 @@
 # M9 / web-followups — commands
 
-base `df4976cc` · 브랜치 `feature/m9-web-followups` · 판정 SHA `68834ea2`(마지막 산출물 커밋)
+base `df4976cc` · 브랜치 `feature/m9-web-followups` · 판정 SHA `bb2f1bae`(마지막 산출물 커밋)
 
-앞 라운드의 판정 SHA 는 `50bc35c0` 이었고 **PR #132 수정 라운드**가 그 뒤에 온다(아래 절).
-「게이트」 표는 **지금 판정 SHA** 의 수치다.
+판정 SHA 는 라운드마다 뒤로 간다 — `50bc35c0`(첫 판) → `68834ea2`(PR #132 수정 라운드) →
+`bb2f1bae`(표적 재검증 L-2). 「게이트」 표는 **지금 판정 SHA** 의 수치다.
 
 로컬에서 돌리는 것은 **web 레인 게이트와 표적 변이뿐**이다(공통 규율) — 전건 Kotlin `check` ·
 컨테이너 · S-20 · Playwright 여정은 **PR CI 가 정본**이고 같은 명령이다.
@@ -127,6 +127,16 @@ v `ready-for-review` @`50bc35c0` · cr `approve` @`7506085e`, 둘 다 blocker/hi
 호출**에 걸린다(없는 경로를 읽은 값이 그 글자와 같다고 쳐진다). 실측 — `format(1200)` ·
 `format(o.d)` · `format(new Date(1))` · 인자 0 개가 전부 1 회. `[arguments.0.type='Identifier']`
 를 함께 두면 넷이 전부 0 이 된다. 그래서 선택자를 그 꼴로 적었다.
+
+## 표적 재검증(v-132-r2)의 마지막 둘
+
+| 자리 | 한 것 | 확인 |
+| --- | --- | --- |
+| L-2 고아 JSDoc | 앞 라운드가 설명 문면 상수와 그 JSDoc 을 **배지 컴포넌트의 JSDoc 과 함수 사이에** 끼워 넣어 기존 JSDoc 이 어느 선언에도 붙지 않았다. 상수를 그 JSDoc **앞**으로 옮긴다 | `lint` 0 · `typecheck` 0 · `test` 0(`39 files · 821 passed`) — 글자 변화가 없어 변이는 두지 않는다 |
+| L-1 등재 | TS 문법으로 감싼 `undefined`(`as never` · `!` · `satisfies`)를 `void 0` 과 **같은 계열**로 §3 ③ 과 design-review §④ 표에 적는다 | 술어 추가 **없음** |
+
+같은 꼴(연달아 선 JSDoc 둘)이 `src/screens/BidBoxScreen.tsx` 에도 하나 있는데 **base 의 자리**이고
+이 브랜치의 변경 목록 밖이라 건드리지 않았다 — 그 파일을 만지는 slice 가 받는다.
 
 ### 등재만 한 것
 
