@@ -35,7 +35,7 @@ class RetentionRegistrySchemaEqualityTest : PersistenceTestSupport() {
 
     /**
      * 기준 시각 열이 **NOT NULL 이어야 한다** — nullable 이면 `< cutoff` 술어가 NULL 행을
-     * 조용히 건너뛰어 그 행은 영원히 남는다(「90일이 지나면 사라진다」가 거짓이 된다).
+     * 조용히 건너뛰어 그 행은 영원히 남는다(「기한이 지나면 사라진다」가 거짓이 된다).
      */
     @Test
     fun `파기·마스킹 대상의 기준 시각 열은 실존하고 NOT NULL 인 TIMESTAMPTZ 다`() {
