@@ -3583,7 +3583,7 @@ M6 종결이 `OPEN-M6-RESIDUAL-OPS` 로 묶어 넘긴 **15** 가운데, M7·M9 �
 올리고(모집단 = 컴파일된 `@Test` 류 클래스 **전수**), 그 task 가 정책 파일을 `@InputFile` 로 **선언한다**.
 D-6G2g-12 가 「task 가 초록이 된 **뒤** 같은 slice 에서 기존 등식 test 를 삭제」를 정해 두 벌을 금지했고,
 그 레인은 **입력 선언을 제거하면 등재 삭제가 UP-TO-DATE 초록이 되는 거짓 초록**을 실측으로 남겼다.
-근거: PR **#60**(6G-2g 종결 2026-10-05, `milestone-6.md` 그 문단) · 계약 `reports/evidence/m6/6g2g/scope.md`
+근거: PR **#60** 머지 `e922dc7b`(2026-10-04 UTC · 6G-2g 종결 문단은 `milestone-6.md`) · 계약 `reports/evidence/m6/6g2g/scope.md`
 D-6G2g-12·D-15·D-17. 오늘의 기계 대조 — test 소스에 `…GateRegistrationTest` 류 클래스 **0**(남은 언급은
 build-logic·등록부·evidence 문면뿐), task 의 정책 파일 `@InputFile` 선언 **있음**. **6G-2g 의 「닫은 OPEN 여덟」 목록에 이 식별자가 없다**(그 레인은 수령한 일곱만 열거했다) —
 그래서 이 종결은 **이 절이 처음 등재하는 것**이고, 함께 닫힌 `OPEN-6G2G-REGISTRATION-PACKAGE-COVER`
