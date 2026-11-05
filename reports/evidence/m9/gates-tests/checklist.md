@@ -57,12 +57,12 @@
 | OPEN | 처분 |
 | --- | --- |
 | `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | **닫힘 후보** — 술어를 상수 풀 허용 목록으로 이식, 변이로 양쪽 실측 |
-| `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | **닫힘 후보(CI 초록 전제)** — 존재 단언 셋이 사라졌고 `any { contains }` 형태가 그 파일에 0 이다. 함께 받은 0 행 자리도 명시 실패로 |
+| `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | **닫힘 후보** — 존재 단언 셋이 사라졌고 `any { contains }` 형태가 그 파일에 0 이다. 함께 받은 0 행 자리도 명시 실패로. 실 Postgres 원판·변이 둘 다 실측됐다(§4) |
 | `OPEN-6F4W-UNAVAILABLE-PRODUCER` | **닫힘 후보 — 「불가」 처분**. 순수 전(total) 매퍼라 이 어댑터가 그 갈래를 낼 길이 없다(D-6F4W-3). 갈래 자체는 **지우지 않는다**: port 의 어휘이고 소비자 둘(후보 탈락·분석 정지)이 실제 분기를 진다. 대신 「낼 수 없다」를 산문에서 **구조**로 옮겼다 |
-| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 미착수**. §3 |
+| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 계약 갱신으로 이 slice 에서 분리**(팀장 결정 2026-11-06 ①). 받는 자리는 **testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행). 근거와 영향 14 파일 목록은 scope.md 계약 갱신 절 · §3 |
 | 신설 OPEN | 없음 |
 
-## 3. 항목 3 미착수 — 처방이 다른 차단과 충돌한다
+## 3. 항목 3 분리 — 처방이 다른 차단과 충돌한다
 
 계약의 처방은 「`LicenseVerdict` subtype 생성자를 `internal` + `@ConsistentCopyVisibility`,
 test 조립은 **testFixtures factory** 로」다. `java-test-fixtures` 는 **전 모듈에서 차단**돼 있고
@@ -77,23 +77,22 @@ testFixtures 컴파일에서도 **안 보인다**(module = compilation) — 처�
 main 과 묶는 배선까지 필요하다. main 생산 지점이 커널 둘뿐이라는 D-6F5-20 실측은 **맞다**.
 
 그래서 ADR + 빌드 규약 + 정책 파일 + 14 test 가 한 묶음이고, 전부 이 slice 의 in_scope 밖이다.
-팀장에게 ① 별도 slice 로 분리(추천) ② 범위 확대 승인 중 하나를 요청했다 — 그 판단 전에는
-이 항목을 건드리지 않는다.
+**팀장 결정(2026-11-06): ① 별도 slice 로 분리.** ADR 없이 여는 것은 `OPEN-1BC-TESTFIXTURES-GATE`
+자신의 우회라는 것이 근거다. 이 slice 는 이 항목을 **한 줄도 건드리지 않았다**(내 커밋 경로에
+`qualification/**` 가 없다 — §5).
 
 ## 4. 알려진 제한
 
-- **항목 2 의 DB 단언은 이 레인에서 한 번도 실행되지 않았다.** 그 test 는 Testcontainers
-  Postgres 를 띄우고 레인 규율이 container 를 로컬에서 금지한다. 기대 본문 문자열의 근거는
-  ⓐ 교체 대상 존재 단언 둘의 축어(COL-06·H-3 — 그 둘은 실제 출력의 부분 문자열이었다)와
-  ⓑ 같은 파일에서 이미 통과하는 일곱 본문의 정규화 형태다. **첫 실측은 PR CI 다.**
-  보정 대조로 **저장소 전체의 `pg_get_constraintdef` 축어를 전수 수집**해 가장 덜 확실했던 두
-  꼴을 독립 근거로 확인했다 — 알림함 privacy test(별 패키지, CI 통과 중)가 `notice_round`
-  형식 CHECK 본문을 **내 기대와 글자까지 같게** 고정하고 있고(그 KDoc 이 「PostgreSQL 16.4 가
-  돌려준 그대로」라고 적는다) 같은 test 가 `<> ''::text` 꼴도 고정한다(내 `source_endpoint`
-  항의 근거). 남은 미확인은 `collection_run` 집합의 산술 항등식 바깥 괄호뿐이다.
-- 그 겹침의 다른 쪽 면 — 내 여섯 가운데 `notification_inbox` 하나는 그 privacy test 가 이미
-  고정한다. 단위가 달라(그쪽은 알림함 한 표의 privacy 축, 이쪽은 여섯 표가 같은 본문을
-  공유한다는 주장) 지우지 않았다. 두 자리가 어긋나면 둘 다 붉어진다.
+- **항목 2 의 미실측은 해소됐다.** 처음에는 레인 기본이 container 금지라 기대 본문이 정적
+  유도였고 그것이 이 slice 의 가장 큰 미실측이었다(보정 대조로 가장 덜 확실한 두 꼴만 다른
+  test 의 축어로 확인한 상태). 팀장 승인으로 `CleanMigrationCheckTest` 한 클래스를 로컬에서
+  **2회**(원판·변이) 돌렸다 — 원판 `11 tests, 0 failed` 로 **유도한 기대 본문이 전부 글자까지
+  맞았고**, 변이에서 새 단언 둘만 붉어지고 **개수 축은 초록**이었다(commands).
+  **남는 한계는 「이 한 클래스만 돌았다」**는 것이다: 같은 표를 보는 다른 persistence test 와
+  전건 `check` 는 여전히 PR CI 가 처음 받는다.
+- 내 여섯 가운데 `notification_inbox` 하나는 알림함 privacy test 가 이미 고정한다. 단위가
+  달라(그쪽은 알림함 한 표의 privacy 축, 이쪽은 여섯 표가 같은 본문을 공유한다는 주장)
+  지우지 않았다 — 두 자리가 어긋나면 둘 다 붉어진다.
 - 항목 1 의 `const val` 인라인 사각은 형제 여덟과 공유하는 등재된 OPEN 이고 이 slice 가
   새로 만든 것이 아니다. 앞 판의 소스 텍스트 축이 그 자리를 **덮고 있었던 것도 아니다**
   (그 축도 import 문만 봤다).
@@ -106,8 +105,15 @@ main 과 묶는 배선까지 필요하다. main 생산 지점이 커널 둘뿐�
 
 ## 5. in_scope 대조
 
-내 커밋이 건드린 경로 **여섯** 전부 in_scope 안이다(evidence 둘 포함). 한 자리는 계약 문면의
-읽기에 달려 있다 — 항목 4 의 필드 축을 더한 파일은 `adapters/src/test/kotlin/**`(계약은
-「해당 test」로 적는다) 아래의 **감시 port 게이트 test** 다. 계약이 그 port 파일을 「(+test)」로
-들고, 그 test 가 이 항목의 주장을 지는 자리라 그 읽기로 진행했다 — **팀장 확인 대상**으로
-보고에 올렸다.
+내 커밋이 건드린 경로 **여섯**(evidence 포함) 전부 in_scope 안이다. 항목 4 의 필드 축을 더한
+파일은 `adapters/src/test/kotlin/**`(계약은 「해당 test」로 적는다) 아래의 **감시 port 게이트
+test** 이고, 계약이 그 port 파일을 「(+test)」로 드는 그 자리다 — 이 읽기는 **팀장 승인**을
+받았다(2026-11-06).
+
+분리된 항목 3 의 흔적이 없음도 같은 목록이 보인다: `qualification/**` 도 `build-logic/**` 도
+`config/quality/architecture-policy.properties` 도 내 커밋 경로에 **없다**.
+
+수정 라운드가 새로 만든 파일: **없다**(산출물은 전부 기존 파일 수정, 새 파일은 evidence 넷).
+새 test 클래스도 없어 등재부 추가가 없다 — 기존 class 에 `@Test` 추가와 문면 정정 하나뿐이다
+(새 fixture class 하나는 `@Test` 가 없어 등재 게이트의 모집단 밖이고, 같은 파일의 기존
+fixture 둘이 그 선례다).

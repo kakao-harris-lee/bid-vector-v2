@@ -20,4 +20,9 @@
 
 - **항목 3(`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`)은 이 slice 에서 뺀다(①).** 처방 「test 조립은 testFixtures factory 로」가 저장소 전역 차단과 충돌한다 — build-logic conventions 가 `java-test-fixtures` 를 전 모듈에서 거부하고 그 자리가 `OPEN-1BC-TESTFIXTURES-GATE`(「면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다」)를 가리킨다 · `module.expected-source-sets=main,test` · `sourceSetLayoutGate` 의 compile task 집합 · `TestFixturesGateTest`. 그리고 `internal` 은 testFixtures source set 에서도 보이지 않아 `associateWith` 배선이 필요하다. 생성자를 `internal` 로 내리면 모듈 밖 test 14 파일(app 10 · workflow 4)이 컴파일되지 않는다. ADR 없이 여는 것은 그 OPEN 의 우회다.
 - 받는 자리: **testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행) — ADR + build-logic + 정책 + 14 test 가 한 묶음. capability map 의 OPEN 행 갱신은 M9 장부 후속이 받는다.
-- 항목 4 의 필드 축을 `EvaluationAdapterDependencyTest` 에 둔 것은 in_scope 「(+test)」 읽기로 승인. 항목 2 의 DB 단언 첫 실측은 PR CI.
+- 항목 4 의 필드 축을 `EvaluationAdapterDependencyTest` 에 둔 것은 in_scope 「(+test)」 읽기로 승인.
+- **영향 14 test 파일**(구현 레인 실측, `git grep -ln 'LicenseVerdict\.\(Eligible\|Ineligible\|Uncertain\)(' -- 'app/src/test/**/*.kt' 'workflow/src/test/**/*.kt'`) — 받는 slice 가 이 목록을 입력으로 쓴다.
+  - `app/src/test` **열**: `evaluation/`{`DryRunCommitParityTest`·`FloorExclusionTallyTest`} · `http/`{`BidPriceRequestResponseTest`·`BidPriceRequestTestSupport`·`HttpTestSupport`·`OpenApiBidPriceVocabularyTest`·`OpenApiSuggestionContractTest`·`StrategyBudgetClearEndpointTest`·`SuggestionEndpointTest`} · `wiring/EvaluationCommitWiringTest`
+  - `workflow/src/test` **넷**: `evaluation/`{`EvaluateCandidatesScreeningCharacterizationTest`·`EvaluateCandidatesUseCaseTest`·`EvaluationTestFixtures`} · `suggestion/ListSuggestionsUseCaseTest`
+  - 모듈 안이라 **고치지 않아도 되는 둘**: `qualification/src/test` 의 둘(`internal` 이 보인다). in_scope 안이라 받는 slice 밖인 둘: `adapters/src/test` 의 `ml/UnavailableMlAnalysisTest`·`qualification/StoredRequirementLicenseGateTest`.
+- 항목 2 의 DB 단언은 **팀장 승인(2026-11-06)으로 로컬 Testcontainers 를 `CleanMigrationCheckTest` 한 클래스에 한해 실행**해 실측했다(앞 줄의 「첫 실측은 PR CI」를 그 승인이 대체한다) — 결과는 commands.md.
