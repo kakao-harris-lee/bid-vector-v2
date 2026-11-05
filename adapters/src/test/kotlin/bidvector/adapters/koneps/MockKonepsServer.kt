@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 이 mock 이 서는 오퍼레이션 — 공고 목록 용역이다. **리터럴인 이유**: `adapters` 는 `app` 의 설정
  * 기본 표를 보지 못한다(의존 방향). 문면 자체는 `KonepsEndpointDefaultsTest` 가 잠근다.
  */
-private const val NOTICE_LIST_OPERATION = "getBidPblancListInfoServc"
+private const val NOTICE_LIST_OPERATION = "getBidPblancListInfoServc02"
 
 private const val HTTP_NOT_FOUND = 404
 

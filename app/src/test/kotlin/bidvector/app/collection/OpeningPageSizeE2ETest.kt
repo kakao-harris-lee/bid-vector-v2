@@ -170,29 +170,23 @@ class OpeningPageSizeE2ETest {
         )
 
     /**
-     * 개찰 축 다섯의 이름 — mock 이 쓰는 것과 같은 기준(오퍼레이션 경로의 접미)으로 가른다.
+     * 개찰 축 다섯의 이름 — mock 이 쓰는 것과 **같은 정확 일치 표**로 축을 얻고(M9/portal-02 D-3) 그
+     * 축에 이름표를 붙인다. 앞 판은 접미 넷 + 접두 하나의 술어였고, 조달청이 오퍼레이션명 뒤에 `02` 를
+     * 붙이자 기초금액·산식 A 가 「그 밖」으로 조용히 떨어져 **그 두 축의 단언이 공집합에서 참**이 됐다.
      *
-     * **개찰 목록 접두는 상세 축 둘의 머리이기도 하다**(`getOpengResultListInfoOpengCompt` ·
-     * `…ServcPreparPcDetail`). 그래서 접미 넷을 먼저 가르고 접두는 **남은 것**만 받는다 — 분기 순서가
-     * 아니라 구조가 그 포함 관계를 처리하므로, 절을 옮겨도 답이 바뀌지 않는다(cr L-2).
+     * `when` 이 열거를 소진하므로 축이 생기면 컴파일이 깨진다 — 새 축이 「그 밖」으로 흘러들지 않는다.
      */
     private fun axisOf(operation: String): String =
-        DETAIL_AXIS_BY_SUFFIX.entries
-            .firstOrNull { (suffix, _) -> operation.endsWith(suffix) }
-            ?.value
-            ?: if (operation.startsWith(OPENING_LIST_PREFIX)) OPENING_LIST_AXIS else OTHER_AXIS
+        when (mockKonepsRouteOf(operation)?.axis) {
+            MockKonepsAxis.OPENING_LIST -> OPENING_LIST_AXIS
+            MockKonepsAxis.OPENING_COMPLETE -> "개찰완료"
+            MockKonepsAxis.RESERVE_PRICE -> "예비가격 상세"
+            MockKonepsAxis.BASE_AMOUNT -> "기초금액"
+            MockKonepsAxis.FORMULA_A -> FORMULA_A_AXIS
+            MockKonepsAxis.NOTICE_LIST, null -> OTHER_AXIS
+        }
 }
 
-/** 상세 축 넷 — 접미가 서로 겹치지 않아 훑는 순서가 답을 바꾸지 않는다. */
-private val DETAIL_AXIS_BY_SUFFIX =
-    mapOf(
-        "PreparPcDetail" to "예비가격 상세",
-        "OpengCompt" to "개찰완료",
-        "BsisAmount" to "기초금액",
-        "BidPrceCalclAInfo" to "산식 A",
-    )
-
-private const val OPENING_LIST_PREFIX = "getOpengResultListInfo"
 private const val OPENING_LIST_AXIS = "개찰 목록"
 private const val OTHER_AXIS = "그 밖"
 

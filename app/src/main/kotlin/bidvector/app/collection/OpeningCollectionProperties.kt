@@ -73,26 +73,30 @@ data class KonepsOpeningOperationProperties(
  *
  * 개찰완료·A값은 업무 접미가 **없는 단일 오퍼레이션**이라 경로가 하나다(P-1 §1.5).
  * 기본 표는 공사·용역 둘이다 — 물품은 이 slice 가 검증하지 않아 짓지 않는다.
+ *
+ * **`02` 는 입찰공고정보서비스 축에만 붙는다**(M9/portal-02 D-1) — 2026-11-03 개편 공지
+ * (NOTICE_0000000005128)의 대상이 그 서비스뿐이다. 낙찰정보서비스 경로에 같이 붙이면 그 절반이
+ * 404 가 된다. 두 서비스의 경계는 `KonepsEndpointDefaultsTest` 가 집합으로 잠근다.
  */
 @ConfigurationProperties(prefix = "bidvector.koneps.opening")
 data class KonepsOpeningEndpointProperties(
     val scsbidBaseUrl: String = DEFAULT_SCSBID_BASE_URL,
     val openingCompletePath: String = "getOpengResultListInfoOpengCompt",
-    val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo",
+    val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo02",
     val operations: Map<String, KonepsOpeningOperationProperties> =
         mapOf(
             "construction" to
                 KonepsOpeningOperationProperties(
                     openingResultListPath = "getOpengResultListInfoCnstwk",
                     reservePriceDetailPath = "getOpengResultListInfoCnstwkPreparPcDetail",
-                    baseAmountPath = "getBidPblancListInfoCnstwkBsisAmount",
+                    baseAmountPath = "getBidPblancListInfoCnstwkBsisAmount02",
                     division = BusinessDivision.CONSTRUCTION,
                 ),
             "service" to
                 KonepsOpeningOperationProperties(
                     openingResultListPath = "getOpengResultListInfoServc",
                     reservePriceDetailPath = "getOpengResultListInfoServcPreparPcDetail",
-                    baseAmountPath = "getBidPblancListInfoServcBsisAmount",
+                    baseAmountPath = "getBidPblancListInfoServcBsisAmount02",
                     division = BusinessDivision.SERVICE,
                 ),
         ),
