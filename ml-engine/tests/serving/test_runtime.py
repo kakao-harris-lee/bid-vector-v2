@@ -10,6 +10,7 @@ import pytest
 
 from ml_engine.contracts import prediction_pb2
 from ml_engine.inference.policy import InferencePolicy
+from ml_engine.inference.time_axis import TimeAxisSubstitute
 from ml_engine.serving.runtime import (
     PredictionRuntime,
     build_derived_release,
@@ -39,7 +40,7 @@ _POLICY = InferencePolicy(
     bid_ratio_plausible_max=Decimal("1.5"),
     gbm_min_category_rows=40,
     maturity_window_days=7,
-    maturity_time_axis_substitute_approved=False,
+    maturity_time_axis_substitute=TimeAxisSubstitute.NOT_APPROVED,
 )
 
 
