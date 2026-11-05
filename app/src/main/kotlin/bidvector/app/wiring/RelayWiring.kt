@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -67,6 +68,7 @@ open class RelayWiring {
     open fun notificationRelayRun(
         dataSource: DataSource,
         properties: RelayProperties,
+        release: ReleaseIdentifier,
     ): NotificationRelayRun {
         val policy = resolvedNotificationPolicy()
         // 판정은 [relayBootDecision] 이 **값으로** 낸다(cr R-2) — 여기 인라인되어 있던 동안은
@@ -82,6 +84,7 @@ open class RelayWiring {
             target = RelayTarget(OperatorId(properties.owner), properties.channel),
             environment = properties.environment,
             policy = policy,
+            release = release,
         )
     }
 

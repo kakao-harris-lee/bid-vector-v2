@@ -1,6 +1,7 @@
 package bidvector.adapters.event
 
 import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.workflow.event.AggregateId
 import bidvector.workflow.event.AggregateVersion
 import bidvector.workflow.event.CausationId
@@ -33,6 +34,7 @@ import java.util.UUID
  */
 class JdbcOutboxPort(
     private val connections: ConnectionSource,
+    private val release: ReleaseIdentifier,
 ) : OutboxPort {
     override fun register(envelope: EventEnvelope<*>): OutboxEntryId {
         val entryId = OutboxEntryId(UUID.randomUUID().toString())
@@ -171,7 +173,10 @@ class JdbcOutboxPort(
         statement.setString(index++, ActorCodec.kindOf(envelope.actor))
         statement.setString(index++, ActorCodec.detailOf(envelope.actor))
         statement.setString(index++, OutboxPayloadCodec.payloadTypeOf(envelope.payload))
-        statement.setString(index, OutboxPayloadCodec.encode(envelope.payload))
+        statement.setString(index++, OutboxPayloadCodec.encode(envelope.payload))
+        // OPS-10 — 이 행을 등록한 릴리스. 봉투가 나르는 값이 아니라 **쓰는 프로세스**의
+        // 사실이라 어댑터가 싣는다(도메인 타입을 늘리지 않는다).
+        statement.setString(index, release.value)
     }
 }
 

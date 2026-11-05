@@ -4,9 +4,6 @@ import bidvector.procurement.BusinessDivision
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.LocalDate
 
-/** 원문 저장 행의 출처 표식 기본값 — 빌드 식별자를 모르는 로컬 실행이 값을 지어내지 않고 「모름」을 그대로 적는다. */
-private const val UNVERSIONED_RELEASE = "unversioned"
-
 /**
  * 일회성 수집 러너의 입력(D-6F8-3) — `bidvector.collection.mode=once` 일 때만 바인딩된다(러너 배선이
  * 꺼져 있으면 이 값들은 아무도 읽지 않는다). 범위 상한·미래 금지는 여기서 자르지 않고 배선이 기동 실패로
@@ -32,7 +29,6 @@ data class CollectionProperties(
      * 잠금이 막는다.
      */
     val runStateDir: String,
-    val releaseSha: String = UNVERSIONED_RELEASE,
 )
 
 private const val DEFAULT_KONEPS_BASE_URL = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService"

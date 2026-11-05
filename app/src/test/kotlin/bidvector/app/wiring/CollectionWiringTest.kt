@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
@@ -35,6 +36,9 @@ import java.time.LocalDate
 import java.util.function.Supplier
 import javax.sql.DataSource
 
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
+
 /**
  * D-6F8-3 — 수집 러너 배선의 켜짐 조건과 기동 실패. 러너는 `bidvector.collection.mode=once` 일 때만
  * 빈이고(기본 꺼짐), 켜졌을 때의 설정 오류는 전부 기동 실패다. 꺼져 있으면 서비스 키가 없어도 뜬다.
@@ -60,6 +64,8 @@ class CollectionWiringTest {
         context.register(CollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { now } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         val failure = runCatching { context.refresh() }.exceptionOrNull()
         return Booted(context, failure)
     }
@@ -126,6 +132,8 @@ class CollectionWiringTest {
         context.register(CollectionWiring::class.java, OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
 
         val failure = runCatching { context.refresh() }.exceptionOrNull()
 

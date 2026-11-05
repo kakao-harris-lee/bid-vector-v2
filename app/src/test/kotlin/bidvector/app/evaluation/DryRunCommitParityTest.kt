@@ -1,5 +1,6 @@
 package bidvector.app.evaluation
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.adminDataSource
 import bidvector.app.http.SequentialCorrelationIdFactory
 import bidvector.app.http.TestStrategyRepository
@@ -181,6 +182,7 @@ class DryRunCommitParityTest {
             correlationIdFactory = SequentialCorrelationIdFactory(),
             clock = clock,
             commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
+            release = ReleaseIdentifier("parity-test"),
         )
 }
 

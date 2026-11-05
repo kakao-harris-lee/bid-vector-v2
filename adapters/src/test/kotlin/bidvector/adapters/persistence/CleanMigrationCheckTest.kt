@@ -33,7 +33,8 @@ import org.junit.jupiter.api.Test
 class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
         mapOf(
-            "collection_run" to 13,
+            // M9/ops-migrations(OPS-10, V28) — 릴리스 칸의 공백 거부 CHECK 하나 추가 → 14.
+            "collection_run" to 14,
             // D-6F4-1·8 — 신규(추가만). `notice_title`이 감시 키워드 매칭 입력이라
             // (기관 열 넷과 달리) 빈 문자열이 조용히 성립하지 않도록 CHECK 하나를 더 얹는다.
             // D-6F9-3 — 업무구분 새 칸 셋(V17, 추가만): 대분류 어휘 1 + 용역구분·주공종 공백류 2 → 16.
@@ -48,8 +49,8 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "raw_observation" to 5,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
-            // 신규(추가만, D-4C2-2). M9/ops-migrations(OPS-05, V27) — 사유↔상태 쌍 CHECK 하나 추가 → 12.
-            "outbox" to 12,
+            // 신규(추가만, D-4C2-2). M9/ops-migrations — 사유↔상태 쌍(V27)·릴리스 공백 거부(V28) 둘 추가 → 13.
+            "outbox" to 13,
             "inbox" to 1,
             // 신규(추가만, D-6B1-8). V8__edit_session.sql: id<>''·operator_id<>''·
             // state enum·session_version>=0·(state=EXPIRED)=(state_payload IS NULL) 짝 — 5.

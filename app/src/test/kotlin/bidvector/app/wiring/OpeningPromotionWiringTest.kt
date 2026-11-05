@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.OpeningPromotionRunner
 import bidvector.workflow.collection.PromoteOpeningResultsUseCase
 import bidvector.workflow.strategy.Clock
@@ -17,6 +18,9 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 private const val CANONICAL_OPENING_REPOSITORY = "bidvector.adapters.persistence.JdbcOpeningResultRepository"
 private const val OPENING_RAW_AXIS_SOURCE = "bidvector.adapters.persistence.JdbcOpeningRawAxisSource"
@@ -86,6 +90,8 @@ class OpeningPromotionWiringTest {
         context.registerBean(Clock::class.java, Supplier { Clock { Instant.EPOCH } })
         // 연결하지 않는다 — 배선은 조립만 하고 질의는 러너가 돌린다(형제 배선 test 의 같은 관례).
         context.registerBean(DataSource::class.java, Supplier { unconnectedDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.register(OpeningPromotionWiring::class.java)
         context.refresh()
 

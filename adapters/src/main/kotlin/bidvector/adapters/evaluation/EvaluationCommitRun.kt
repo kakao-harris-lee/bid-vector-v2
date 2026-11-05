@@ -3,6 +3,7 @@ package bidvector.adapters.evaluation
 import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort
@@ -52,10 +53,11 @@ class EvaluationCommitRun(
     private val correlationIds: CorrelationIdFactory,
     private val clock: Clock,
     private val analysisBudget: Int?,
+    release: ReleaseIdentifier,
 ) {
     private val notifications =
         OutboxNotificationRequestPort(
-            JdbcOutboxPort(OwnTransactionConnectionSource(dataSource)),
+            JdbcOutboxPort(OwnTransactionConnectionSource(dataSource), release),
             JdbcEventIdFactory(),
             clock,
         )

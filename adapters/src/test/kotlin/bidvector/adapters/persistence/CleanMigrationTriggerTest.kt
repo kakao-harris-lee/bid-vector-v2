@@ -62,6 +62,10 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             // 사유를 요구하고, 적힌 사유는 바꿀 수 없다」를 이 트리거가 진다(CHECK 로는 기존
             // 종단 행 때문에 「종단이면 사유가 있다」를 적을 수 없다 — V27 머리말).
             TriggerSpec("outbox", "outbox_terminal_reason_required"),
+            // M9/ops-migrations(OPS-10, V28) — 릴리스 관문 둘. 「새 행은 식별자를 요구하고 적힌
+            // 식별자는 지울 수 없다」가 여기 산다(CHECK 로는 기존 행 때문에 NOT NULL 을 못 적는다).
+            TriggerSpec("outbox", "outbox_release_sha_required"),
+            TriggerSpec("collection_run", "collection_run_release_sha_required"),
             // (D-6B1-8, 등재) — `edit_session`(V8__edit_session.sql)은 트리거가
             // 0개다. session_version 은 애플리케이션이 싣고 DB 는 전제조건으로만 검사한다
             // (D-6B1-3) — 트리거로 값을 정하면 그 전제조건 자체가 무의미해진다. `edit_session`

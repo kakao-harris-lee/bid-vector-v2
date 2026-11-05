@@ -76,10 +76,11 @@
 | `bidvector.persistence` | `jdbc-url` · `username` · `credential` |
 | `bidvector.evaluation` | `candidate-cap` · `mode` |
 | `bidvector.evaluation.commit` | `current-active-bids` |
-| `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` · `release-sha` |
+| `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` |
 | `bidvector.koneps` | `base-url` · `service-key` · `operations.<업종>.path` · `operations.<업종>.division` |
 | `bidvector.koneps.opening` | `scsbid-base-url` · `opening-complete-path` · `bid-price-formula-a-path` · `rows-per-page` · `operations.<업종>.{opening-result-list-path,reserve-price-detail-path,base-amount-path,division}` |
-| `bidvector.opening-collection` | `mode` · `from` · `to` · `categories` · `sampling-seed` · `sample-size` · `calls-per-day` · `calls-total` · `run-state-dir` · `release-sha` |
+| `bidvector.opening-collection` | `mode` · `from` · `to` · `categories` · `sampling-seed` · `sample-size` · `calls-per-day` · `calls-total` · `run-state-dir` |
+| `bidvector.release` | `sha` — **모드와 무관하게 필수**(M9/OPS-10). 이 프로세스가 쓰는 실행 행에 찍히는 릴리스 식별자이고 기본값이 없다(없으면 기동 실패). 앞 판의 `bidvector.collection.release-sha`·`bidvector.opening-collection.release-sha` 둘을 대체한다 |
 | `bidvector.snapshot-extract` | `mode` · `from` · `to` · `output-dir` · `snapshot-id` · `run-state-dir` |
 | `bidvector.relay` | `mode` · `environment` · `owner` · `channel` · `claim-limit` |
 | `bidvector.retention` | `mode` |

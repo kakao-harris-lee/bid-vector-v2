@@ -25,6 +25,7 @@ private fun CollectionDropReason.label(): String =
  */
 class JdbcCollectionRunStore(
     private val dataSource: DataSource,
+    private val release: ReleaseIdentifier,
 ) : CollectionRunStore {
     override fun record(
         accounting: CollectionAccounting,
@@ -54,7 +55,10 @@ class JdbcCollectionRunStore(
                 statement.setInt(index++, accounting.unknownFields)
                 statement.setString(index++, accounting.truncationCause?.let { it::class.simpleName })
                 statement.setInt(index++, accounting.quotaExceeded)
-                statement.setInt(index, accounting.backoffSkipped)
+                statement.setInt(index++, accounting.backoffSkipped)
+                // OPS-10 — 이 회계 행을 만든 릴리스. 이 표에는 관측을 가리키는 열이 없어
+                // 조인으로 되짚을 길이 없다(V28 머리말).
+                statement.setString(index, release.value)
                 statement.executeUpdate()
             }
         }

@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcOpeningResultRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.adminDataSource
@@ -44,6 +45,11 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값) — 속성과 저장소가 같은 값을 쓴다. */
+private const val TEST_RELEASE_LABEL = "opening-result-production-e2e-release"
+
+private val TEST_RELEASE_ID = ReleaseIdentifier(TEST_RELEASE_LABEL)
 
 /** 저장소에만 있고 응답에는 절대 없어야 하는 표지 상호(D-7C5-3) — 값 수준 단언의 대상이다. */
 private const val SENTINEL_COMPANY = "SENTINEL-WINNER-DO-NOT-EXPORT"
@@ -94,6 +100,9 @@ class OpeningResultProductionE2ETest {
                             mapOf(
                                 "server.port" to "0",
                                 "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                                // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                                // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                                "bidvector.release.sha" to TEST_RELEASE_LABEL,
                                 "bidvector.persistence.username" to postgres.username,
                                 "bidvector.persistence.credential" to postgres.password,
                                 "operator.credential.value" to TEST_CREDENTIAL_VALUE,
@@ -143,7 +152,7 @@ class OpeningResultProductionE2ETest {
     private fun appendRaw(observation: RawNoticeObservation): ObservationKey {
         val contracts =
             (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 10, 22)) as Resolution.Resolved).value.fieldContracts
-        return JdbcRawObservationStore(dataSource(), contracts, "e2e-release").append(observation)
+        return JdbcRawObservationStore(dataSource(), contracts, TEST_RELEASE_ID).append(observation)
     }
 
     private fun seedNotice() {

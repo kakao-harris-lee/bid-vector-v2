@@ -32,8 +32,6 @@ data class OpeningCollectionProperties(
      * 시작하고 표본이 다시 뽑힌다. 기본값도 두지 않는다 — 어느 실행의 상태인지를 실행자가 매번 댄다.
      */
     val runStateDir: String,
-    /** 원문 저장 행의 출처 표식 — 빌드 식별자를 모르는 로컬 실행이 값을 지어내지 않고 「모름」을 적는다. */
-    val releaseSha: String = "unversioned",
 )
 
 private const val DEFAULT_SCSBID_BASE_URL = "https://apis.data.go.kr/1230000/as/ScsbidInfoService"

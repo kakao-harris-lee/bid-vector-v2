@@ -1,5 +1,6 @@
 package bidvector.adapters.event
 
+import bidvector.adapters.persistence.TEST_RELEASE_SHA
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyEvent
@@ -46,10 +47,12 @@ internal fun insertPendingOutboxRow(
 ) {
     connection
         .prepareStatement(
+            // M9/OPS-10 — V28 트리거가 릴리스 없는 새 행을 거부한다. 원시 INSERT 도 production
+            // 과 같은 값을 싣는다(헬퍼가 트리거를 우회하지 않는다).
             "INSERT INTO outbox (entry_id, event_id, aggregate_id, aggregate_version, occurred_at, " +
                 "correlation_id, causation_id, idempotency_key, actor_kind, actor_detail, " +
-                "payload_type, payload, state) " +
-                "VALUES (?, ?, 'operator-strategy', 1, now(), ?, NULL, ?, NULL, NULL, ?, ?, 'PENDING')",
+                "payload_type, payload, state, release_sha) " +
+                "VALUES (?, ?, 'operator-strategy', 1, now(), ?, NULL, ?, NULL, NULL, ?, ?, 'PENDING', ?)",
         ).use { statement ->
             statement.setString(1, entryId)
             statement.setString(2, "evt-$entryId")
@@ -57,9 +60,22 @@ internal fun insertPendingOutboxRow(
             statement.setString(4, idempotencyKey)
             statement.setString(5, payloadType)
             statement.setString(6, payload)
+            statement.setString(7, TEST_RELEASE_SHA)
             statement.executeUpdate()
         }
 }
+
+/** 릴리스 식별자 전수(M9 OPS-10) — 열 추가 전 행은 `null` 이라 목록으로 본다. */
+internal fun outboxReleaseShaValues(dataSource: DataSource): List<String?> =
+    dataSource.connection.use { connection ->
+        connection.prepareStatement("SELECT release_sha FROM outbox ORDER BY inserted_at").use { statement ->
+            statement.executeQuery().use { rs ->
+                val values = mutableListOf<String?>()
+                while (rs.next()) values += rs.getString(1)
+                values
+            }
+        }
+    }
 
 /** 종단 사유(M9 OPS-05) — 비종단 행과 열 추가 전에 종단한 행은 `null` 이다. */
 internal fun outboxTerminalReasonOf(

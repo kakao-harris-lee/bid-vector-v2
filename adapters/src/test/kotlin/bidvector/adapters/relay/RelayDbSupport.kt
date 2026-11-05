@@ -6,6 +6,7 @@ import bidvector.adapters.event.JdbcInboxPort
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.event.OutboxPayloadCodec
 import bidvector.adapters.event.PostgresAdvisoryLockLease
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
@@ -70,7 +71,7 @@ internal class RelayHarness(
 
     val relay =
         RelayOutboxNotifications(
-            outbox = JdbcOutboxPort(boundary),
+            outbox = JdbcOutboxPort(boundary, TEST_RELEASE),
             inbox = JdbcInboxPort(boundary),
             dispatcher =
                 DispatchNotification(

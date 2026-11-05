@@ -23,7 +23,7 @@
 3. **저장소 밖 디렉터리**(자동 생성되지 않는다, 둘 다 **WSL 내부 ext4** — DrvFs/9p 는 디렉터리 fsync 가 실패해 경고가 난다):
    - 실행 상태: `~/.local/bid-vector-run-state/m6-6g/`(공고 목록 갈래와 개찰 갈래가 **같은 디렉터리**를 쓴다 — 상한 회계가 하나다)
    - 스냅숏: `~/.local/bid-vector-snapshots/` · 판정: `~/.local/bid-vector-verdicts/` · **로그: `~/.local/bid-vector-logs/m6-6g/`** — 실행 상태 디렉터리 **안**에는 아무것도 더 두지 않는다(로그·메모 포함): 무결성 검사가 장부 밖 파일을 보면 「장부가 모르는 파일이 있다」로 기동을 거부한다(2026-10-02 실측 — 첫 기동은 빈 디렉터리라 통과했고 둘째부터 거부)
-4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.*.release-sha` 에도 넣는다). 아래 명령 블록의 `<jar SHA>` 는 **손으로 돌릴 때의 리터럴 예시**다 — 세션 cron 으로 거는 실행기는 그 값을 같은 명령으로 **계산해** 넘기므로, jar 를 바꾸면 인자를 고치지 않아도 원장의 값이 바뀐다.
+4. **jar**: `./gradlew --no-daemon :app:bootJar` → `app/build/libs/app.jar`. 빌드 SHA 를 적는다(`git rev-parse --short HEAD`, `bidvector.release.sha` 에도 넣는다 — 갈래마다 다른 키가 아니라 **한 키**다, M9/OPS-10). 아래 명령 블록의 `<jar SHA>` 는 **손으로 돌릴 때의 리터럴 예시**다 — 세션 cron 으로 거는 실행기는 그 값을 같은 명령으로 **계산해** 넘기므로, jar 를 바꾸면 인자를 고치지 않아도 원장의 값이 바뀐다.
 5. **키**: 별도 파일을 만들지 않는다 — 6F-8 과 같이 legacy `../bid-vector/.env` 의 **원문형** `KONEPS_OPENAPI_SERVICE_KEY` 를 **서브셸에서 읽어 그 프로세스 환경에만** 넘긴다(명령 문자열·argv·history·transcript 어디에도 값이 나타나지 않는 형태 — 치환 전 식만 기록에 남는다). 형태 확인은 `grep -c` 같은 계수만. `ServiceKey` 가 스스로 URL 인코딩하므로 인코딩형을 넣으면 이중 인코딩이다.
 
 ## 2. 실행 — 세 갈래, 순서 고정
@@ -49,7 +49,7 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.collection.categories=construction,service \
     --bidvector.collection.calls-per-day=20000 --bidvector.collection.calls-total=80000 \
     --bidvector.collection.run-state-dir=$HOME/.local/bid-vector-run-state/m6-6g \
-    --bidvector.collection.release-sha=<jar SHA> \
+    --bidvector.release.sha=<jar SHA> \
     <공통 인자> )
 ```
 - 기간(A-1): 국가 공사 2026-01-30 · 용역 2026-05 이후 ~ 현재, 최대 16주. **공고 목록 갈래는 한 실행이 31일 이하**여야 한다(`SPAN_TOO_LONG`) — 31일 창을 **순서대로 여러 번** 돌린다(멱등, 같은 실행 상태 디렉터리 — 이 갈래는 표본을 고정하지 않는다).
@@ -65,11 +65,11 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.opening-collection.sample-size=24000 \
     --bidvector.opening-collection.calls-per-day=20000 --bidvector.opening-collection.calls-total=80000 \
     --bidvector.opening-collection.run-state-dir=$HOME/.local/bid-vector-run-state/m6-6g \
-    --bidvector.opening-collection.release-sha=<jar SHA> \
+    --bidvector.release.sha=<jar SHA> \
     <공통 인자> )
 ```
 - **페이지 크기는 기본 999** 다(`bidvector.koneps.opening.rows-per-page`, D-6G2f-1) — 인자를 주지 않으면 그 값이고, 다섯 축(개찰 목록·개찰완료·예비가격 상세·기초금액·산식 A)이 그 값 하나를 쓴다. 999 수용은 **operation 별로** 실측해야 한다(두 축은 다른 서비스다) — 일곱의 결과 표와 미실측 하나는 §7 0항에 있고, 그 표가 채워지기 전에는 배포하지 않는다. 1..999 밖의 값은 기동 거부이고, 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이).
-- `release-sha` 는 위 블록에서 리터럴로 보이지만 **실행기는 계산값을 넘긴다**(§1 4단계) — 원장의 그 칸이 안 바뀌면 새 jar 가 실행되지 않은 것이다.
+- `bidvector.release.sha` 는 위 블록에서 리터럴로 보이지만 **실행기는 계산값을 넘긴다**(§1 4단계) — 원장의 그 칸이 안 바뀌면 새 jar 가 실행되지 않은 것이다.
 - **이 갈래의 from/to 는 120일까지**다(D-6G2e-1, A-1 승인 2026-10-02 — 개찰 갈래 전용 정책이고 공고 목록 갈래의 31일과 다른 값이다). 넘으면 기동 거부(`SPAN_TOO_LONG`)이고, 그 상한은 설정 실수를 실 호출 전에 잡는 자리다. **창을 쪼개 돌리지 않는다** — 확정 표본이 from/to·업무를 고정하므로 조각난 창은 「표본틀 범위가 지금 설정과 다르다」로 거부된다(D-6G2e-2). A-1 기간을 **한 창으로** 준다.
 - 첫 실행이 표본을 **뽑고 확정**한다(`sample-list.tsv` · `sample-scope.json`, 장부 해시). 이후 실행은 같은 seed 라도 다시 뽑지 않는다 — 확정된 목록이 정본.
 - **표본틀 걷기는 매 기동 다시 돈다**(`OPEN-6G2D-FRAME-REWALK`). 비용은 행 수가 아니라 **슬롯 수**가 정한다 — 슬롯 = 공고일 × 업무이고 슬롯마다 최소 1 호출이다. A-1 창(공고일 113일) × 업무 둘이면 **하한 226**이고, 페이지 999 에서는 슬롯당 1 쪽으로 끝나므로 기대는 **약 240**이다(쪽 100 에서는 행이 100 을 넘는 슬롯마다 쪽이 늘어 더 크다). 행 수를 쪽 크기로 나눈 수(65,064 ÷ 999)는 이 축의 비용이 아니다.
@@ -155,7 +155,7 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
   언제나 0** 이다(이 갈래가 개찰 일시를 싣지 못한다 — 별 slice 소관) — 0 이 아닌 값을 보면 그 자리가 바뀐 것이다.
 - 「정착했으나 0 행」·빈 번호·소수 금액·반쪽 A 는 기존 사유로 떨어지고 계수로 공시(`OPEN-6G2D-EMPTY-AXIS-REASON`).
 - **KONEPS 쿼터는 operation 별이다(2026-10-02 실측, 10-03 진단으로 보강 — 위 셋째 항목이 정본).** 개찰완료 조회(`getOpengResultListInfoOpengCompt`)는 이 키로 하루 1,000 건에서 HTTP 429 가 오고, 실행기는 호출 하나의 전송 재시도(`maxAttempts 4`) 뒤 `REFUSED:QUOTA_EXHAUSTED` 로 멈춘다(exit 2, `truncation=QuotaExhausted`; 이 거부는 축 재호출 상한 N=3 에 세지 않는다 — D-6G2d-16). 하루 처리량은 쪽 999 뒤 약 950 공고(day3~day5 실측 971·976·950) — 일 상한 20,000 보다 이 쿼터가 먼저 닫는다. **운영자 결정 2026-10-03 이 10-02 의 「증량 신청」을 대체했다**: 운영계정·증량 신청은 M7 뒤, 그때까지 1,000/operation 안에서 자정 뒤 재실행을 이어 간다(표본·상한 회계·디렉터리 불변).
-- `OPEN-6G-RELEASE-SHA-LABEL`(release-sha 라벨 = main HEAD, jar 내용 SHA 아님 — §2-2 의 「그 칸이 안 바뀌면 새 jar 가 아니다」는 라벨 변화만으로는 jar 변화를 뜻하지 않는다; 프로브 생략 판단은 `*/src/main/**` diff 로) · `OPEN-6G-MODE-FAIL-FAST`(`mode` 가 알려진 값 밖이면 조용히 미기동·exit 0) · `OPEN-6G-EVALUATION-PROPERTIES-BINDING`(수집 모드가 `candidate-cap` 더미 값을 요구) — PR #56 리뷰, `reports/evidence/m6/6g/commands.md` 참조.
+- `OPEN-6G-RELEASE-SHA-LABEL`(릴리스 라벨 = main HEAD, jar 내용 SHA 아님 — §2-2 의 「그 칸이 안 바뀌면 새 jar 가 아니다」는 라벨 변화만으로는 jar 변화를 뜻하지 않는다; 프로브 생략 판단은 `*/src/main/**` diff 로) · `OPEN-6G-MODE-FAIL-FAST`(`mode` 가 알려진 값 밖이면 조용히 미기동·exit 0) · `OPEN-6G-EVALUATION-PROPERTIES-BINDING`(수집 모드가 `candidate-cap` 더미 값을 요구) — PR #56 리뷰, `reports/evidence/m6/6g/commands.md` 참조.
 
 ## 6. 검증 기록
 
@@ -164,7 +164,7 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 ## 7. 배포 — 개찰 축 페이지 크기 999 교체 (6G-2f, 머지 뒤 자정 사전 확인을 거쳐 1회)
 
 수집 캠페인 중, **실행이 없는 창**에서 jar 를 바꾸는 절차다. 페이지 크기 인자를 새로 주지 않으므로
-(기본 999) 교체는 새 jar 를 놓는 것이고, `release-sha` 는 실행기가 계산해 넘기므로 새 값이 간다.
+(기본 999) 교체는 새 jar 를 놓는 것이고, `bidvector.release.sha` 는 실행기가 계산해 넘기므로 새 값이 간다.
 
 **되돌림이 싸다는 것은 「아직 거부를 만나지 않은 실행」에만 참이다.** 게이트웨이가 `numOfRows=999` 를
 거부하면 그 응답은 미지 코드가 아니라 **분류된 코드**로 온다 — `10`·`11` 은 `INPUT_ERROR`, `12`·`20`·
@@ -197,6 +197,6 @@ cd ml-engine && uv run python -m ml_engine.app.backtest_cli \
 
 1. 수집 실행이 돌지 않는 창(`pgrep -af 'java -jar .*app.jar'` 빈 출력)에서, 호스트 3단 점검을 **별도 호출**로 본 뒤 `main` 체크아웃에서 `./gradlew --no-daemon :app:bootJar`.
 2. **첫 기동은 노출을 묶는다** — `--bidvector.opening-collection.calls-per-day=200` 으로 띄우고, 멈춘 뒤 원장의 AXIS 결말에 `INPUT_ERROR` 와 `NOT_RETRYABLE` 이 **0** 임을 확인한다(`grep -c` 로 계수만). 하나라도 있으면 즉시 멈추고 `--bidvector.koneps.opening.rows-per-page=100` 으로만 이어 돈다 — 그 축들은 이미 영구 정착이라 보고 대상이다.
-3. 0 을 확인한 뒤 같은 디렉터리로 전량(`calls-per-day=20000`) 재기동한다. 페이지 크기 인자는 주지 않는다(기본 999). **`release-sha` 는 인자 무변경이 아니다**: 실행기가 `git rev-parse --short HEAD` 로 계산해 넘기므로 새 jar 와 함께 새 값이 원장에 간다(그 값이 안 바뀌면 교체가 반영되지 않은 것이다). 재실행을 거는 자리는 OS crontab 이 아니라 **세션 cron(00:41, 7일 만료)** 이므로 만료 뒤에는 손으로 다시 걸어야 한다.
+3. 0 을 확인한 뒤 같은 디렉터리로 전량(`calls-per-day=20000`) 재기동한다. 페이지 크기 인자는 주지 않는다(기본 999). **`bidvector.release.sha` 는 인자 무변경이 아니다**: 실행기가 `git rev-parse --short HEAD` 로 계산해 넘기므로 새 jar 와 함께 새 값이 원장에 간다(그 값이 안 바뀌면 교체가 반영되지 않은 것이다). 재실행을 거는 자리는 OS crontab 이 아니라 **세션 cron(00:41, 7일 만료)** 이므로 만료 뒤에는 손으로 다시 걸어야 한다.
 4. 첫 전량 실행 뒤 evidence 표에 셋을 적는다 — **개찰완료 HTTP 줄 수 ≈ 정착 공고 수**(「공고당 1 호출」의 실측) · **산식 A 의 HTTP 줄 수**(그 축도 업무 공통 단일 operation 이라 각각 1,000/일에 닿을 수 있다) · **표본틀 걷기 호출 수 ≈ 240**(슬롯 = 공고일 × 업무, 슬롯당 1 쪽 — §2-2).
 5. 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이). 확정된 표본은 쪽 크기와 무관하므로 이 되돌림이 `sample-list.tsv` 를 건드리지 않는다. 다만 위 문단대로 **이미 `FinalFailure` 로 정착한 축은 이 인자로 복구되지 않는다**. **그 인자를 쓴 날과 값을 evidence 에 적는다** — 원장·판정문이 쪽 크기를 싣지 않아 한 디렉터리에 두 확정 제외 문턱이 섞일 수 있다(`OPEN-6G2F-MAX-PAGES-PROVENANCE`).

@@ -13,6 +13,7 @@ import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
 import bidvector.adapters.profile.JdbcOperatorProfileWriter
 import bidvector.adapters.qualification.JdbcRequirementStore
@@ -89,9 +90,9 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
             )
         val useCase =
             CollectNoticesUseCase(
-                rawObservations = JdbcRawObservationStore(dataSource(), testFieldContracts(), E2E_RELEASE_SHA),
+                rawObservations = JdbcRawObservationStore(dataSource(), testFieldContracts(), E2E_RELEASE),
                 notices = JdbcNoticeRepository(dataSource()),
-                runs = JdbcCollectionRunStore(dataSource()),
+                runs = JdbcCollectionRunStore(dataSource(), E2E_RELEASE),
                 policyFor = ::resolvedCollectionPolicy,
                 clock = fixedClock(E2E_NOW),
             )
@@ -276,6 +277,9 @@ internal val E2E_NOW: Instant = Instant.parse("2026-09-24T03:00:00Z")
 internal val E2E_DATE: LocalDate = LocalDate.ofInstant(E2E_NOW, ZoneOffset.UTC)
 internal val E2E_SOURCE_NAME: CollectionSourceName = checkNotNull(CollectionSourceName.of("service"))
 internal const val E2E_RELEASE_SHA = "e2e-6d1"
+
+/** M9/OPS-10 — e2e 조립이 쓰는 릴리스 식별자. 값은 위 한 자리에서 온다. */
+internal val E2E_RELEASE = ReleaseIdentifier(E2E_RELEASE_SHA)
 internal const val E2E_BASE_AMOUNT = "1000000"
 internal const val E2E_CLOSING = "2026-12-31 10:00:00"
 internal const val E2E_LICENSE = "정보통신공사업"

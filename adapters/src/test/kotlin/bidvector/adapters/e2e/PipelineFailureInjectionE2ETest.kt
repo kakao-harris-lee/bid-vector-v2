@@ -1,6 +1,7 @@
 package bidvector.adapters.e2e
 
 import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.event.NotificationEvidencePayload
 import bidvector.workflow.event.OutboxConsumerKind
@@ -184,7 +185,8 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
     ) {
         try {
             boundary.inTransaction<Unit> {
-                JdbcOutboxPort(boundary).claim(1, OutboxConsumerKind.NotificationRequested) shouldHaveSize 1
+                val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
+                outbox.claim(1, OutboxConsumerKind.NotificationRequested) shouldHaveSize 1
                 held.countDown()
                 releasedInTime.set(release.await(E2E_HOLD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 throw WorkerDiedHoldingRow()
@@ -199,7 +201,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
 
     private fun claimEntryIds(boundary: TransactionBoundary): List<String> =
         boundary
-            .inTransaction { JdbcOutboxPort(boundary).claim(1, OutboxConsumerKind.NotificationRequested) }
+            .inTransaction { JdbcOutboxPort(boundary, TEST_RELEASE).claim(1, OutboxConsumerKind.NotificationRequested) }
             .map { it.entryId.value }
 
     private fun assembly(

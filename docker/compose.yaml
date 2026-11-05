@@ -89,6 +89,11 @@ services:
       BIDVECTOR_PERSISTENCE_CREDENTIAL: ${BIDVECTOR_PG_PASSWORD:?BIDVECTOR_PG_PASSWORD 환경변수가 필요합니다}
       OPERATOR_CREDENTIAL_VALUE: ${BIDVECTOR_APP_OPERATOR_CREDENTIAL:?BIDVECTOR_APP_OPERATOR_CREDENTIAL 환경변수가 필요합니다}
       BIDVECTOR_EVALUATION_CANDIDATECAP: ${BIDVECTOR_APP_CANDIDATE_CAP:?BIDVECTOR_APP_CANDIDATE_CAP 환경변수가 필요합니다}
+      # M9/OPS-10 — 이 프로세스가 쓰는 실행 행(`collection_run`·`outbox`)에 찍히는 릴리스 식별자.
+      # **기본값이 없다**(`ReleaseWiring`) — 값이 없으면 앱이 뜨지 않는다. 운영에서는 반입
+      # 스크립트가 만든 release 태그가 그 값이다(이미지 태그와 같은 값 = 「어느 릴리스가
+      # 이 행을 만들었는가」). 로컬은 `tools/local-tls-env.sh` 가 HEAD 의 짧은 SHA 를 넣는다.
+      BIDVECTOR_RELEASE_SHA: ${BIDVECTOR_RELEASE_TAG:?BIDVECTOR_RELEASE_TAG 환경변수가 필요합니다 — 실행 행에 찍히는 릴리스 식별자다}
       # **수집 변수를 두지 않는다**(D-6A2a-5, 우회 6) — `bidvector.collection.mode` 가 없으면
       # `CollectionWiring` 전체가 올라오지 않아 KONEPS 서비스 키 바인딩도, 수집 어댑터 생성도
       # 일어나지 않는다(`@ConditionalOnProperty havingValue=once`). compose 기동이 실 외부

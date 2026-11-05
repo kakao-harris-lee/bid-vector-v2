@@ -19,8 +19,8 @@ internal object EventSql {
         INSERT INTO outbox (
             entry_id, event_id, aggregate_id, aggregate_version, occurred_at,
             correlation_id, causation_id, idempotency_key, actor_kind, actor_detail,
-            payload_type, payload, state
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            payload_type, payload, state, release_sha
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
         """
 
     // claim(⑫scope.md ④, 설계 검토 (4)-④) — `FOR UPDATE SKIP LOCKED`가 경쟁 창을 막고,
