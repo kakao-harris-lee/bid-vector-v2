@@ -30,7 +30,10 @@ import {
   CONTAINER_PREFIX,
   processStartToken,
 } from './container-marker.mjs';
-import { FAKE_KONEPS_IDENTITY_HEADER } from './fake-koneps.mjs';
+import {
+  FAKE_KONEPS_IDENTITY_HEADER,
+  FAKE_KONEPS_SERVED_HEADER,
+} from './fake-koneps.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -294,6 +297,22 @@ async function main() {
     ],
     '수집 러너(bidvector.collection.mode=once)',
   );
+
+  // **수집이 실제로 공고를 받았는가**(cr M-1) — 러너의 `exit=0` 은 「0건 수집」과 구별되지 않는다.
+  // 출하 기본 오퍼레이션 이름과 fixture 의 `operation` 값은 **사본 둘**이고 둘을 묶는 기계 등식이
+  // 없다. 갈리면 fake 가 전부 404 를 내고 공고가 0건인데 러너는 조용히 0 으로 끝나, 붉음이 한참
+  // 뒤 「공고 카드 없음」으로, 원인을 말하지 않는 문면으로 나타난다. 그 사본 둘을 여기서 잇는다.
+  const servedProbe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+  const servedOperations = (servedProbe.headers.get(FAKE_KONEPS_SERVED_HEADER) ?? '')
+    .split(',')
+    .filter((name) => name.length > 0);
+  if (servedOperations.length === 0) {
+    throw new Error(
+      'fake KONEPS 가 응답한 오퍼레이션이 없다 — 수집이 0건이다. ' +
+        'fixture 의 operation 값이 출하 기본 표와 갈렸을 가능성이 가장 크다',
+    );
+  }
+  log(`수집이 받은 오퍼레이션 ${servedOperations.length}종(${servedOperations.join(', ')})`);
 
   // ② 로그인 계정 — 출하 운영자 명령(가입 화면·endpoint 는 없다).
   runJar(
