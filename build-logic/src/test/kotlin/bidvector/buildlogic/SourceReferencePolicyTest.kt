@@ -61,6 +61,64 @@ class SourceReferencePolicyTest {
         assertFalse(policy.isDomain("app"))
     }
 
+    // ---- 패키지 범위 축(`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`) ----
+
+    @Test
+    fun `네 adapters 축의 패키지는 범위 축에 든다`() {
+        assertTrue(policy.scopeOf("bidvector.adapters.audit") != null)
+        assertTrue(policy.scopeOf("bidvector.adapters.evaluation") != null)
+        assertTrue(policy.scopeOf("bidvector.adapters.profile") != null)
+        assertTrue(policy.scopeOf("bidvector.adapters.qualification") != null)
+    }
+
+    @Test
+    fun `범위 축 밖 패키지는 판정 대상이 아니다`() {
+        assertTrue(policy.scopeOf("bidvector.adapters.persistence") == null)
+        assertTrue(policy.scopeOf("bidvector.workflow.evaluation") == null)
+    }
+
+    @Test
+    fun `audit 축은 자기 패키지만 허용한다 — 형제 좌표도 거부다`() {
+        val roots = policy.scopeOf("bidvector.adapters.audit") ?: error("축이 없다")
+
+        assertTrue(policy.admitsInScope("bidvector.adapters.audit.ApiAuditSql", roots))
+        assertFalse(policy.admitsInScope("bidvector.adapters.persistence.Sql", roots))
+        assertFalse(policy.admitsInScope("bidvector.decision.Verdict", roots))
+    }
+
+    @Test
+    fun `자기 저장소 좌표만 범위 축의 대상이다 — 외부 좌표는 다른 축이 든다`() {
+        assertTrue(policy.isSelfNamespace("bidvector.decision.Verdict"))
+        assertFalse(policy.isSelfNamespace("java.math.BigDecimal"))
+        assertFalse(policy.isSelfNamespace("bidvectorish.Thing"))
+    }
+
+    // ---- 환경 스니핑 축(OPS-13, 임계 0) ----
+
+    @Test
+    fun `환경 질의 쌍을 잡는다 — 수신자는 마지막 세그먼트로 견준다`() {
+        assertTrue(policy.isEnvSniff(call("System", "getenv")))
+        assertTrue(policy.isEnvSniff(call("System", "getProperty")))
+    }
+
+    @Test
+    fun `별표 수신자는 어떤 수신자든 잡는다 — Spring Environment 처럼 지역 이름인 축`() {
+        assertTrue(policy.isEnvSniff(call("environment", "getActiveProfiles")))
+        assertTrue(policy.isEnvSniff(call("env", "acceptsProfiles")))
+    }
+
+    @Test
+    fun `환경 질의가 아닌 쌍은 잡지 않는다`() {
+        assertFalse(policy.isEnvSniff(call("System", "currentTimeMillis")))
+        assertFalse(policy.isEnvSniff(call("properties", "getProperty2")))
+        assertFalse(policy.isEnvSniff(call("clock", "instant")))
+    }
+
+    private fun call(
+        receiver: String,
+        member: String,
+    ) = SourceMemberCall("Probe.kt", 1, receiver, member)
+
     private companion object {
         val REAL_POLICY: String =
             System.getProperty("bidvector.architecture.policy")
