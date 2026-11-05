@@ -238,3 +238,30 @@
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m9/screen-display/`
 - exit: 1(매치 없음)
 - 핵심 결과: 매치 0
+
+### 2026-11-05T10:35Z — S-20 재실측 (수정 뒤)
+- cmd: `~/.local/bin/bv-build.sh ./tools/one-command-check.sh`
+- exit: 0
+- 핵심 결과: 「완료 — Kotlin 전건 + Python 전건 + web 전건 통과」
+
+### 2026-11-05T10:40Z — 변이 ⑤ 없음 표지를 옛 글자로 되돌림 (D-1 갱신의 바꿔치우기)
+- cmd: `npx vitest run` (web)
+- exit: 1
+- 핵심 결과: `3 failed` — 모듈의 축어 단언 하나와 화면 E 의 두 칸. 상수끼리 맞대던 앞 판
+  단언이었다면 **이 변이가 초록으로 지나간다**(그래서 축어로 바꿨다)
+
+### 2026-11-05T10:45Z — 변이 ①b 재확인 (lint 가 못 보는 꼴)
+- cmd: `npx eslint . --max-warnings 0` / `npx tsc --noEmit -p tsconfig.json` / `npx vitest run` (web)
+- exit: 0 / 0 / 1
+- 핵심 결과: **lint 0 · tsc 0 인데 DOM 게이트 `2 failed`** — 계약 갱신 뒤에도 두 층이 서로를
+  대신하지 않는다
+
+### 2026-11-05T10:50Z — 변이 ② 재확인 (표 한 행 삭제)
+- cmd: `npx tsc --noEmit -p tsconfig.json` / `npx vitest run` (web)
+- exit: 2 / 1
+- 핵심 결과: `satisfies` 가 컴파일에서 멈추고 vitest `7 failed`
+
+### 2026-11-05T10:52Z — 변이 원복 확인
+- cmd: `git status --porcelain --untracked-files=all`
+- exit: 0
+- 핵심 결과: 빈 출력 — 변이 파일 셋이 전부 HEAD 상태
