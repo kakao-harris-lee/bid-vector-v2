@@ -1,6 +1,6 @@
 import type { components } from '../api/generated/operator-api';
 
-import type { StateDisplay } from './stateDisplay';
+import { displayOrUnknown, type StateDisplay } from './stateDisplay';
 
 type BidCase = components['schemas']['BidCase'];
 export type BidCaseState = BidCase['state'];
@@ -53,6 +53,73 @@ export const TIMELINE_ACTOR_DISPLAY = {
   USER: { label: '나', tone: 'neutral' },
   SYSTEM: { label: '시스템', why: '사람 이름이 아니라 경로의 이름이다', tone: 'neutral' },
 } as const satisfies Record<components['schemas']['BidTimelineEntry']['actorKind'], StateDisplay>;
+
+/**
+ * 타임라인에 남는 **명령 어휘**(`OPEN-M9-TIMELINE-COMMAND-WORDING`). 앞 판은 이 칸만 서버가 준
+ * 토큰 원문이었다 — 상태·주체·부가 사실은 이미 표를 지났고 명령이 마지막 원문 축이었다.
+ *
+ * **계약이 이 칸을 `string` 으로 선언하므로**(`BidTimelineEntry.command`) 생성 타입에서 유니온을
+ * 끌어올 수 없다 — `moneyDisplay` 의 basis·provenance 와 같은 자리다. 그래서 어휘를 여기
+ * 선언하고 `satisfies` 로 전수를 잠그되, 그 유니온이 **Kotlin 정본과 어긋나는 것**은
+ * `scripts/money-vocab-cross-lang.test.mjs` 의 집합 등식이 잡는다(유니온까지 함께 줄이는 변이가
+ * `satisfies` 를 지나가기 때문이다).
+ *
+ * 열다섯 = 전이표의 열 키 열넷 + **건을 여는 명령 하나**. 여는 명령은 출발 상태가 없어 전이표의
+ * 행이 될 수 없고, 타임라인에는 `fromState = null` 인 생성 전이로 남는다.
+ */
+export type BidCommandToken =
+  | 'ADD_TO_BID_BOX'
+  | 'DEFER'
+  | 'RESUME'
+  | 'RECEIVE_PRICE_MENU'
+  | 'DRAFT_BID'
+  | 'RECORD_BID'
+  | 'AWAIT_OPENING'
+  | 'RECORD_OPENING_FIRST'
+  | 'RECORD_OPENING_OUT_OF_RANK'
+  | 'ENTER_QUALIFICATION_REVIEW'
+  | 'RECORD_OUTCOME'
+  | 'CORRECT_OUTCOME'
+  | 'SKIP'
+  | 'MARK_DEADLINE_PASSED'
+  | 'REVOKE_DEADLINE_PASSED';
+
+export const BID_COMMAND_DISPLAY = {
+  ADD_TO_BID_BOX: { label: '입찰함에 담음', why: '건이 열린 전이라 출발 상태가 없다', tone: 'neutral' },
+  DEFER: { label: '나중에로 미룸', tone: 'neutral' },
+  RESUME: { label: '나중에 해제', tone: 'neutral' },
+  RECEIVE_PRICE_MENU: { label: '투찰가 메뉴 받음', tone: 'neutral' },
+  // 도메인이 명령을 **상태별로 쪼개지 않는다** — 초안 만들기와 수정이 한 명령이고, 무엇이
+  // 달랐는지는 같은 줄의 출발 상태가 적는다. 그 사실을 아래층에 둔다.
+  DRAFT_BID: { label: '투찰 예정 초안', why: '초안 수정도 같은 명령이다 — 무엇이 달랐는지는 출발 상태가 적는다', tone: 'neutral' },
+  RECORD_BID: {
+    label: '투찰 기록',
+    why: '「제출함」 확인 · 기록 갱신 · 소급 확인이 모두 이 하나다',
+    tone: 'neutral',
+  },
+  AWAIT_OPENING: { label: '개찰 대기로 넘김', tone: 'neutral' },
+  // 잠정 1위와 순위 밖을 한 문구로 접지 않는다(SET-02 와 같은 축).
+  RECORD_OPENING_FIRST: { label: '개찰 결과 기록 — 잠정 1위', tone: 'neutral' },
+  RECORD_OPENING_OUT_OF_RANK: { label: '개찰 결과 기록 — 순위 밖', tone: 'neutral' },
+  ENTER_QUALIFICATION_REVIEW: { label: '적격심사 진입', tone: 'neutral' },
+  RECORD_OUTCOME: { label: '결과 기록', tone: 'neutral' },
+  CORRECT_OUTCOME: { label: '결과 정정', why: '원본을 덮지 않는다 — 이전 결과는 출발 상태로 남는다', tone: 'neutral' },
+  SKIP: { label: '건너뜀 처리', tone: 'neutral' },
+  MARK_DEADLINE_PASSED: { label: '마감 지남 표시', why: '시스템이 시각으로 세운 판정이다', tone: 'neutral' },
+  REVOKE_DEADLINE_PASSED: {
+    label: '마감 지남 판정 거둠',
+    why: '유효 마감이 다시 미래가 되어 시스템이 거뒀다',
+    tone: 'neutral',
+  },
+} as const satisfies Record<BidCommandToken, StateDisplay>;
+
+/**
+ * 명령 칸을 읽는 **한 자리**. 계약이 `string` 이라 키 좁힘을 여기 한 번만 둔다 — 표 밖 값은
+ * `displayOrUnknown` 이 **보이게** 낸다(`moneyDisplay` 의 네 조회와 같은 관례).
+ */
+export function commandDisplayOf(token: string): StateDisplay {
+  return displayOrUnknown<string>(BID_COMMAND_DISPLAY, token);
+}
 
 /** 다음 행동 하나의 종류 — 화면이 어느 전이를 부를지 고르는 자리다. */
 export type NextActionKind = 'REQUEST_PRICE' | 'DRAFT_BID' | 'RECORD_BID' | 'RESUME';
