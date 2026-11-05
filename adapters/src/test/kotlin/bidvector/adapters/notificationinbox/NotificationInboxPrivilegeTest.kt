@@ -44,7 +44,7 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
 
     /**
      * **적재 시각을 밀어 파기를 피하는 길이 권한 층에서 막힌다.** 이 열이 보존 cutoff 의 기준이라
-     * 앱 역할이 바꿀 수 있으면 「90일이면 사라진다」가 앱 프로세스의 선의에 의존한다.
+     * 앱 역할이 바꿀 수 있으면 「기한이 지나면 사라진다」가 앱 프로세스의 선의에 의존한다.
      */
     @Test
     fun `앱 역할은 적재 시각을 바꿀 수 없다`() {

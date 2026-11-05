@@ -10,8 +10,13 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 private val NOW = Instant.parse("2026-10-13T00:00:00Z")
-private val CUTOFF_AT_90_DAYS = Instant.parse("2026-07-15T00:00:00Z")
+private val CUTOFF_AT_FAKE_RETENTION = Instant.parse("2026-07-15T00:00:00Z")
 
+/**
+ * **출하 정책 값이 아니다** — 이 test 는 use case 가 **받은** 값을 그대로 쓰는지만 재므로 일부러
+ * 승인된 값(2026-11-05 부터 365)과 다른 수를 둔다. 같게 두면 「받은 값을 쓴다」와 「아는 값을 쓴다」가
+ * 구별되지 않는다. 값→거동은 `RetentionSweepTest` 가 출하 정책으로 잰다.
+ */
 private fun policy(batchSize: Int = 10) = RetentionPolicyData(retentionDays = 90, batchSize = batchSize)
 
 /**
@@ -203,9 +208,9 @@ class PurgeExpiredDataTest {
 
         val outcome = PurgeExpiredData(store, Clock { NOW }, policy()).run()
 
-        store.purgeCalls shouldContainExactly listOf("notice" to CUTOFF_AT_90_DAYS)
-        store.maskCalls shouldContainExactly listOf("raw_observation" to CUTOFF_AT_90_DAYS)
-        outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report.cutoff shouldBe CUTOFF_AT_90_DAYS
+        store.purgeCalls shouldContainExactly listOf("notice" to CUTOFF_AT_FAKE_RETENTION)
+        store.maskCalls shouldContainExactly listOf("raw_observation" to CUTOFF_AT_FAKE_RETENTION)
+        outcome.shouldBeInstanceOf<RetentionOutcome.Completed>().report.cutoff shouldBe CUTOFF_AT_FAKE_RETENTION
     }
 
     @Test
@@ -339,7 +344,7 @@ class PurgeExpiredDataTest {
         val partial = aborted.partial
         partial.purgedTotal shouldBe 10
         partial.tallies.getValue("notice").purged shouldBe 10
-        partial.cutoff shouldBe CUTOFF_AT_90_DAYS
+        partial.cutoff shouldBe CUTOFF_AT_FAKE_RETENTION
     }
 
     /** 앞 표가 끝나고 **다음 작업**에서 죽은 run — 앞 표의 계수가 사라지지 않는다. */

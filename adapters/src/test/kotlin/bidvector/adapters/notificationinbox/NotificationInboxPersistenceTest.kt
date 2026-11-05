@@ -54,7 +54,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
 
         // 사실의 시각은 **호출자의 시계**가 정한다.
         second.occurredAt shouldBe LATER
-        // **적재 시각은 보존 cutoff 의 기준**이다 — 재기록으로 밀리면 90일 약속이 거짓이 된다.
+        // **적재 시각은 보존 cutoff 의 기준**이다 — 재기록으로 밀리면 보존 기간 약속이 거짓이 된다.
         second.createdAt shouldBe first.createdAt
     }
 
