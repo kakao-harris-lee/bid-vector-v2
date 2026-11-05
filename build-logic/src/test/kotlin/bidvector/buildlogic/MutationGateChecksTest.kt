@@ -203,13 +203,19 @@ class MutationGateChecksTest {
     fun `정책이 도메인 밖 모듈을 대상으로 들면 한 걸음에 그 사유로 위반이다`() {
         // 이 축이 없으면 「convention 을 적용하지 않았다」로 붉고, 그 문면을 따라 적용하면 구성
         // 단계에서 다른 예외가 난다 — 두 걸음이라 읽는 사람이 엉뚱한 고침을 한다.
+        //
+        // **줄이 하나여야 한다.** 도메인 밖 모듈은 convention 을 적용할 수 없으므로(구성 단계
+        // 가드가 던진다) 「적용하지 않았다」 축에 함께 세우면 같은 오기가 두 줄로 나오고, 먼저
+        // 읽히는 줄이 엉뚱한 고침(적용해 보기)을 유도한다 — 첫 실측에서 실제로 그렇게 나왔다.
         val violations =
             mutationModuleCoverageViolations(
                 expected = setOf("qualification", "workflow"),
-                registered = setOf("qualification", "workflow"),
+                registered = setOf("qualification"),
                 domainModules = DOMAIN,
             )
-        assertTrue(violations.any { it.contains("순수 도메인 밖") && it.contains("workflow") }, "$violations")
+        assertEquals(1, violations.size, "줄이 하나가 아니다: $violations")
+        assertTrue(violations.single().contains("순수 도메인 밖"), "$violations")
+        assertTrue(violations.single().contains("workflow"), "$violations")
     }
 
     private companion object {

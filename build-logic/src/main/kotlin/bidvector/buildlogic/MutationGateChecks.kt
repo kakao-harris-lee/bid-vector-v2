@@ -74,14 +74,21 @@ internal fun mutationModuleCoverageViolations(
     expected: Set<String>,
     registered: Set<String>,
     domainModules: Set<String>,
-): List<String> =
-    listOfNotNull(
-        "정책이 대상으로 든 모듈이 pitest convention 을 적용하지 않았다: ${(expected - registered).sorted()}"
-            .takeIf { (expected - registered).isNotEmpty() },
-        "정책 밖 모듈이 pitest convention 을 적용했다: ${(registered - expected).sorted()}"
-            .takeIf { (registered - expected).isNotEmpty() },
+): List<String> {
+    val nonDomain = expected - domainModules
+    // 도메인 밖 모듈은 convention 을 **적용할 수 없다**(구성 단계 가드가 던진다). 그러니 그
+    // 모듈을 「적용하지 않았다」 축에도 세우면 같은 하나의 오기가 **두 줄**로 나오고, 먼저 읽히는
+    // 줄이 엉뚱한 고침(적용해 보기)을 유도한다 — 그것이 이 축을 더한 이유 그 자체다.
+    val missing = expected - registered - nonDomain
+    val unexpected = registered - expected
+    return listOfNotNull(
         (
-            "정책이 순수 도메인 밖 모듈을 대상으로 들었다: ${(expected - domainModules).sorted()} — " +
+            "정책이 순수 도메인 밖 모듈을 대상으로 들었다: ${nonDomain.sorted()} — " +
                 "mutation 대상은 layer.domain 안에서만 고른다(ADR 0007 OPEN-ADR-07 D-1)"
-        ).takeIf { (expected - domainModules).isNotEmpty() },
+        ).takeIf { nonDomain.isNotEmpty() },
+        "정책이 대상으로 든 모듈이 pitest convention 을 적용하지 않았다: ${missing.sorted()}"
+            .takeIf { missing.isNotEmpty() },
+        "정책 밖 모듈이 pitest convention 을 적용했다: ${unexpected.sorted()}"
+            .takeIf { unexpected.isNotEmpty() },
     )
+}
