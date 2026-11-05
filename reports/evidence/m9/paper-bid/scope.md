@@ -62,3 +62,19 @@ M9 장부 slice 몫).
   `NONE` 축을 실어야 하고, 축이 필수 인자라 **나중에 머지되는 쪽**이 컴파일에서 걸려 맞춘다.
 - **ops-migrations**: V26~V28 로 같은 `CleanMigration*` 래칫을 만진다 — 같은 파일 다른 행이라 병합 시
   계수로 합친다. 이 slice 의 CHECK 수 5→7 이 그 레인의 기준선이다.
+
+## 계약 갱신 2026-11-06 (팀장) — 수정 라운드 1
+
+verifier **not-ready**(차단 v H-1) · code-reviewer **approve** 뒤의 라운드. 승인된 확장 둘.
+
+| 경로 | 왜 |
+| --- | --- |
+| `web/e2e/journey/**` | **v H-1(차단)**: 행 testId 가 다섯 조각이 됐는데 여정 e2e 가 넷을 **정확 일치**로 찾아 CI `web-journey` 가 붉는다. 한 줄 고치는 대신 testId 를 짓는 자리를 **하나로** 묶었다(화면과 여정이 같은 함수를 부른다) — 축을 또 더하는 날 같은 일이 반복되지 않는다 |
+| `docs/discovery/capability-map.md` (NOTI-10 의 두 줄) | **cr MEDIUM**: 「구현」 줄이 중복 억제 키를 네 열로 적고 「남는 제한 넷」에 페이퍼 투찰이 남아 있었다. 장부 slice 로 이연하면 이연 문장이 OPEN 태그만 가리켜 **산문이 남는다** |
+
+같은 라운드에서 `app/src/test/kotlin/bidvector/app/wiring/NotificationInboxWiringTest.kt` 를
+만들었다(cr LOW — 그 production 파일이 ⓑ 확장 안이고 「그 test」가 없었다).
+
+**이 라운드가 손대지 않은 것**: `bid_case.bid_kind` 어휘 등식 test(선행 결함 · 별 건) ·
+`web/e2e/capture/**` 의 낡은 주석(조회는 정규식이라 깨지지 않는다 · 승인 범위 밖) ·
+capability map 의 유찰 줄(M9/inbox-vocab 장부 몫). `checklist.md` §6 에 등재.
