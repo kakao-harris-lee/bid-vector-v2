@@ -234,6 +234,9 @@ private fun isResumable(cause: TruncationCause): Boolean =
         TruncationCause.NotRetryable,
         TruncationCause.Unclassified,
         TruncationCause.InputError,
+        // 차단(OPS-09)은 「입력·구성 자체가 틀렸다」 축이다 — 같은 자격으로 같은 자리를 이어
+        // 걸으면 같은 403 이 온다. 다시 받을 수 있는지는 등록이 바뀐 **다음 실행**이 묻는다.
+        TruncationCause.AccessBlocked,
         -> false
     }
 

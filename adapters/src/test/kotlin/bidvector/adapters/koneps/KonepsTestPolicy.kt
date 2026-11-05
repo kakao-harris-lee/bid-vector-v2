@@ -16,6 +16,9 @@ internal fun testKonepsHttpPolicy(
     maxPages: Int = 5,
     requestTimeout: Duration = Duration.ofMillis(200),
     maxJsonDepth: Int = 32,
+    // 상태 처분 표는 **운영 표 그대로**다 — 좁힐 값이 없고(시간이 아니라 분류다), 시나리오
+    // test 가 운영과 다른 표 위에서 돌면 재는 것이 운영 거동이 아니게 된다.
+    statusRules: List<KonepsStatusRule> = KONEPS_STATUS_RULES,
 ): KonepsHttpPolicyData =
     KonepsHttpPolicyData(
         requestTimeout = requestTimeout,
@@ -26,6 +29,7 @@ internal fun testKonepsHttpPolicy(
         rateLimiterWait = Duration.ofSeconds(2),
         maxPages = maxPages,
         maxJsonDepth = maxJsonDepth,
+        statusRules = statusRules,
     )
 
 /** 3A 운영 정책을 그대로 resolve — 3B 는 필드 계약·resultCode 범주표를 재선언하지 않는다. */

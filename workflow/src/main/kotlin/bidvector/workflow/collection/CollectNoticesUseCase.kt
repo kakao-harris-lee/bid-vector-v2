@@ -28,6 +28,11 @@ private fun TruncationCause.directive(): WalkDirective =
 
         is TruncationCause.BudgetExhausted -> WalkDirective.HALT_RUN
 
+        // 차단(OPS-09)도 **실행을 멈춘다.** 401·403 은 슬롯의 사실이 아니라 자격의 사실이라
+        // 다음 슬롯도 같은 답을 받는다 — 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내고
+        // 승인 상한만 태운다(쿼터가 실행을 멈추는 D-6G-47 과 같은 근거).
+        TruncationCause.AccessBlocked -> WalkDirective.HALT_RUN
+
         TruncationCause.RepeatedPage,
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,

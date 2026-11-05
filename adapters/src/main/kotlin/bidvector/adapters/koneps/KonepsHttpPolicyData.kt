@@ -23,9 +23,28 @@ data class KonepsHttpPolicyData(
     // 삼켜 StructureFailure 로 접는다(오늘도 봉쇄는 되지만 정공법이 아니다) — 명시 상한을
     // 두면 실제 JVM 스택 한계에 닿기 훨씬 전에 통제된 `JsonParseException` 으로 끝난다.
     val maxJsonDepth: Int,
+    /**
+     * 상태 코드 축의 재시도 처분 표(OPS-09) — **기본값이 없다.** 표가 비면 모든 수신 응답이
+     * 봉투 해석으로 가고(앞 판의 거동) 차단 응답이 봉투 분류에 따라 재시도된다. 그 빠뜨림을
+     * 「빈 표」로 조용히 허용하지 않으려고 이 자리를 필수로 둔다.
+     */
+    val statusRules: List<KonepsStatusRule>,
 ) {
+    /**
+     * 그 상태 코드의 처분 — 표에 없으면 봉투로 간다([KONEPS_STATUS_RULES] 의 사유).
+     *
+     * 조회가 **정책 데이터 위에서** 도니 처분을 바꾸는 길이 표 한 줄이다. 어댑터의 분기를 고쳐
+     * 돌아가려 하면 [KonepsStatusDisposition] 을 소진하는 `when` 들이 함께 깨진다.
+     */
+    fun dispositionFor(status: Int): KonepsStatusDisposition =
+        statusRules.firstOrNull { it.status == status }?.disposition
+            ?: KonepsStatusDisposition.INTERPRET_ENVELOPE
+
     init {
         require(maxAttempts >= 1) { "maxAttempts는 1 이상이어야 한다: $maxAttempts" }
+        require(statusRules.map(KonepsStatusRule::status).toSet().size == statusRules.size) {
+            "statusRules 에 같은 상태 코드가 두 번 있다 — 어느 줄이 이기는지가 목록 순서에 숨는다"
+        }
         require(retryBackoff.size == maxAttempts - 1) {
             "retryBackoff 길이(${retryBackoff.size})는 maxAttempts-1(${maxAttempts - 1})과 같아야 한다 — 시도별 대기"
         }
@@ -63,6 +82,7 @@ val KONEPS_HTTP_POLICY: EffectiveDatedPolicy<KonepsHttpPolicyData> =
                         // (`policy-values.md` §1.6 봉투 키 표) — 32 는 그 위에 넉넉한 여유를
                         // 두면서도 실제 JVM 스택 한계(수천~수만)와는 자릿수가 다르다(M-4).
                         maxJsonDepth = 32,
+                        statusRules = KONEPS_STATUS_RULES,
                     ),
             ),
     )
