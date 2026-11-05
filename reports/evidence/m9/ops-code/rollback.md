@@ -23,9 +23,10 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 
 ```
 BASE=df4976cc
+EXCL=':(exclude)reports/evidence/m9/ops-code'   # 자기 자신은 되돌릴 수 없다
 
 # 목록은 **내 커밋만** — 병합이 0 이라 diff 와 같지만 등식을 전제로 두지 않는다
-mapfile -t MINE < <(git log --no-merges --format= --name-only $BASE..HEAD | sort -u)
+mapfile -t MINE < <(git log --no-merges --format= --name-only $BASE..HEAD -- . "$EXCL" | sort -u)
 mapfile -t MODIFIED < <(for f in "${MINE[@]}"; do git cat-file -e "$BASE:$f" 2>/dev/null && echo "$f"; done)
 mapfile -t ADDED    < <(for f in "${MINE[@]}"; do git cat-file -e "$BASE:$f" 2>/dev/null || echo "$f"; done)
 
@@ -43,25 +44,27 @@ git rm -q -f -- "${ADDED[@]}"
 
 | 단계 | 실측 |
 | --- | --- |
-| ① 명령 종료 코드 | `restore` **0** |
-| ② 계수 | 경로 **34** = 복원 **22**(M) · 삭제 **12**(A) — 기계 목록과 같다 |
+| ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
+| ② 계수 | 내 커밋 경로 **30**(evidence 제외) = 복원 **22**(M) · 삭제 **8**(A) — 기계 목록과 같다 |
 | ③ base 와의 diff | 복원 경로 전부에서 **빈 출력** |
+| ③′ 작업 트리·색인·미추적 | base 와 다른 파일이 `reports/evidence/m9/ops-code/**` **넷**뿐 · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | **실측 시점(`fe17d7d6`)에 0** — 이 slice 가 만진 전부가 복원 목록 안이다 |
+| ⑦ 원천과 남는 차이 | 위 넷(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 실측은 clone 에서 `fe17d7d6`(마지막 산출물 커밋)을 체크아웃한 뒤 돌렸다.
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 **작업 트리 전체의 해시가 `df4976cc` 의 트리 해시와 같다**(둘 다
-`29e4039d9bcf2dd592894b1a8bb95527c4420942`). 파일 단위 비교가 아니라 트리 객체의 동일성이므로
-「빠뜨린 파일」이 있을 수 없다. `df4976cc` 는 병합된 main 이고 CI 가 초록으로 통과한 자리라,
-복원 트리에서 `check` 를 다시 돌리는 것은 같은 트리를 다시 재는 일이다.
+**evidence 를 **포함해** 복원하면 작업 트리 전체의 해시가 `df4976cc` 의 트리 해시와 같다**(둘 다
+`29e4039d9bcf2dd592894b1a8bb95527c4420942` — 같은 clone 에서 경로 34 로 한 번 더 실측했다). 파일
+단위 비교가 아니라 트리 객체의 동일성이므로 「빠뜨린 파일」이 있을 수 없다. `df4976cc` 는 병합된
+main 이고 CI 가 초록으로 통과한 자리라, 복원 트리에서 `check` 를 다시 돌리는 것은 같은 트리를
+다시 재는 일이다.
 
-**같지 않은 입력이 없다**(⑦ 이 0 이다). 그 뒤의 evidence 커밋은 §4 의 술어가 되돌림 대상에서
-빠져 있는지로 유효성을 본다 — evidence 는 빌드 입력이 **맞다**(누출 게이트가 `reports/evidence`
-를 스캔한다). 그 축은 이 slice 의 HEAD(그 파일들을 **포함한** 상위집합)에서 그 게이트가 초록임을
-실측해 두었다(`commands.md` §6).
+실제 되돌림(§1)은 evidence 를 **남기므로** 그 트리는 base 트리 + 이 디렉터리 넷이다. **같지 않은
+입력을 이름 붙인다**: 그 넷이고, 빌드 입력이 **맞다**(누출 게이트가 `reports/evidence` 를 스캔
+한다). 그 축은 이 slice 의 HEAD(그 파일들을 **포함한** 상위집합)에서 게이트가 초록임을 실측해
+두었다(`commands.md` §6).
 
 ### 표지 계수 — 「내 줄 사라짐」과 「남의 줄 남음」 둘 다
 
@@ -89,8 +92,9 @@ git rm -q -f -- "${ADDED[@]}"
 | `NotificationInboxStore`(7C③) | **9** |
 | `EvaluationCommitRunE2ETest`(6F-10) | **3** |
 
-공유 파일 둘(등록부·장부)이 복원 목록 안이라 **그 둘을 다시 만지면 재측정이다** — §4 가 그
-술어를 든다.
+공유 파일 둘(`config/quality/gate-tests.properties` 등록부 · `reports/evidence/m6/6e1/acceptance-trace.md`
+장부)이 복원 목록 안이라 **그 둘을 다시 만지면 재측정이다** — §4 가 그 술어를 든다. 새 test 클래스
+한 줄도 그렇다.
 
 ## 3. 코드를 되돌리지 않고 끄는 법
 
@@ -109,14 +113,21 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 
 ```
 git diff --name-only fe17d7d6..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..fe17d7d6 | sort -u)
+  $(git log --no-merges --format= --name-only df4976cc..fe17d7d6 \
+      -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
-빈 출력이면 이 실측이 유효하고, 한 줄이라도 나오면 **미검증**이다(그때 ①~③ 과 표지 계수를 다시
+빈 출력이면 이 실측이 유효하고, 한 줄이라도 나오면 **미검증**이다(그때 ①~③′ 과 표지 계수를 다시
 잰다). 동결 보고가 그 확인 결과를 적는다.
 
+**제외가 왜 술어의 일부인가**: evidence 는 실측 **뒤에** 커밋되고 그 파일들 자신이 내 커밋 경로
+집합에 들어 있다. 제외하지 않으면 evidence 를 쓰는 행위가 매번 자기 실측을 무효로 만들어 술어가
+영원히 참이 되지 못한다(첫 시도에서 실제로 그렇게 나왔다 — 그래서 제외를 세웠다). 제외는
+evidence 가 **되돌림 대상이 아니라는** 사실의 표기이고, 되돌림 대상(산출물 30 경로)은 그대로
+술어 안에 있다.
+
 **앞 라운드 실측을 옮기지 않았다.** 첫 제출(evidence `8aa35d79`)의 실측 HEAD 는 `d5f8c0b6` 였고
-NOTI-01 배선이 들어오며 무효가 됐다(복원 경로가 21 → 34 로 늘었다) — 이 절의 수는 **다시 잰**
+NOTI-01 배선이 들어오며 무효가 됐다(복원 경로가 21 → 30 으로 늘었다) — 이 절의 수는 **다시 잰**
 것이다.
 
 ## 하네스 레인 변경
