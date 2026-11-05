@@ -39,3 +39,28 @@
 ## 하네스 레인 변경
 
 없음.
+
+## 계약 갱신 2026-11-05 (팀장)
+
+**더하는 in_scope 경로**
+
+- `web/e2e/harness/fixtures/notice-list.json` — `operation` 값 넷을 `…02` 로.
+- `web/e2e/harness/fake-koneps.mjs` — **필요하면**(기존 정확 일치 라우팅을 유지하고 옛 이름은 404 그대로).
+
+**사유.** D-1 의 이름 전환이 **web 여정 e2e 를 붉힌다.** `fake-koneps.mjs` 는 요청 경로의 오퍼레이션
+이름을 이 fixture 의 `operation` 값과 **정확 일치**로 라우팅하고 모르는 이름에 404 를 낸다. 그런데
+`journey-up.mjs` 의 수집 단계는 `bidvector.koneps.base-url` 만 덮고 **오퍼레이션 경로는 출하 기본값**을
+쓴다. 그래서 `02` 기본값에서 수집 요청이 전부 404 가 되고 공고가 한 건도 적재되지 않아 여정 단언이
+무너진다. 그 명령이 도는 자리는 둘 — CI `web` job 의 W-13 과 **`check` job 의 S-20**
+(`tools/one-command-check.sh` 가 web 전건을 품는다). 즉 `./gradlew --no-daemon check` 는 초록인데
+CI 의 `check` job 은 붉다. 고치는 자리가 `web/**` 뿐이라 착수 계약의 in_scope 로는 닫을 수 없었다.
+
+**범위 한정.** 여정은 `bidvector.collection.mode=once` · `categories=construction` 하나만 돌리므로
+이 fixture 에 필요한 이름은 **공고 목록 공사 하나**다(개찰 축 A값·기초금액은 이 여정이 부르지 않는다 —
+`journey-up.mjs` 에 `opening-collection` 언급 0). `_provenance.sources[].sha256` 은 **출처 문서**를
+핀하고 이 fixture 자신의 내용을 핀하지 않으므로(그 값을 재산출하는 스크립트도 없다) `operation` 치환이
+그 블록을 무효화하지 않는다.
+
+**acceptance 보강.** 전건 acceptance 의 정본은 **PR CI 의 `check`·`web` job**(같은 명령)이다 — 호스트
+빌드 큐 포화로 전건을 로컬에서 반복하지 않는다(팀장 결정 2026-11-05). 변이와 rollback ④⑤⑥ 은 표적
+task 로 잰다.
