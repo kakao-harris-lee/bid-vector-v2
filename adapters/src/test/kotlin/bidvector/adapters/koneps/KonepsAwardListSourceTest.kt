@@ -48,7 +48,7 @@ class KonepsAwardListSourceTest {
                 numOfRows = 100,
             )
         MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
-            val batch = awardSource(server).fetchAwardList(AWARD_REFERENCE_DATE, null)
+            val batch = awardSource(server).fetchNotices(AWARD_REFERENCE_DATE, null)
 
             batch.items.size shouldBe 1
             batch.items.single().sourceEndpoint shouldBe SourceEndpoint.OPENING_AWARD_LIST
@@ -80,7 +80,7 @@ class KonepsAwardListSourceTest {
                 numOfRows = 100,
             )
         MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
-            val observation = awardSource(server).fetchAwardList(AWARD_REFERENCE_DATE, null).items.single()
+            val observation = awardSource(server).fetchNotices(AWARD_REFERENCE_DATE, null).items.single()
 
             val keys = observation.keys
             // 양성 대조 — 계약 등재 키는 남는다(부재 단언이 빈 관측을 보고 초록이 되지 않는다).

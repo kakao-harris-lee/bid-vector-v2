@@ -19,7 +19,7 @@
 
 | 표면 | 모듈 | 값 획득 | 닫는 자리 |
 | --- | --- | --- | --- |
-| `AwardListSourcePort`(fun interface, 메서드 하나) | workflow | 원문 `SourceBatch` 를 통과만 시킨다 | 상세 축 메서드가 **없다** — 이 포트로는 공고당 호출을 낼 수 없다 |
+| 수집 포트(**새 표면 아님** — 도메인의 `NoticeSourcePort` 재사용) | procurement(기존) | 원문 `SourceBatch` 를 통과만 시킨다 | 메서드가 목록 걷기 하나뿐 — 이 포트로는 공고당 호출을 낼 수 없다. workflow 에 새 포트를 두려던 첫 판은 어댑터 의존 게이트가 거부했다(「domain 이 의존하는 port 는 domain 안에」) |
 | `AwardCollectionSource`(이름+포트) | workflow | 없음 | — |
 | `CollectAwardListUseCase.collect(range, sources)` | workflow | 원문을 `append` 로만 넘긴다(필드를 읽지 않는다) | 원문 키 접근 게이트(raw-access)가 `workflow` 뿌리 전체를 이미 닫는다 |
 | `AwardCollectionReport`·`AwardCollectionHalt` | workflow | 계수·열거값만 | 로그 줄의 입력 타입이 식별자를 나르지 않는다 |
@@ -35,7 +35,7 @@
 
 | # | 우회 | 무엇이 막는가 |
 | --- | --- | --- |
-| ① | 낙찰 목록 포트에 상세 축 메서드를 꽂아 공고당 호출을 낸다 | 포트에 그 메서드가 없다(컴파일) |
+| ① | 낙찰 목록 포트에 상세 축 메서드를 꽂아 공고당 호출을 낸다 | 포트에 그 메서드가 없다(컴파일) — 대가는 타입이 공고 목록 갈래와 같아진 것이고, 그 조합은 묶음 타입과 배선이 막는다(알려진 제한) |
 | ② | 승인 상한을 보지 않는 전송으로 호출한다 | 관문(`KonepsCallGate`)만 클라이언트를 쥔다 — 전송 표면 (클래스, 타입) 쌍 등식이 새 클래스를 등재 없이 거부 |
 | ③ | 기간 창·상한을 코드 기본값으로 지어 미설정 기동을 허용한다 | properties 에 기본값 없음 + 범위 정책 위반은 기동 실패 |
 | ④ | 다른 일회 러너와 함께 켜 상한 회계를 둘로 쪼갠다 | 러너 빈 정의 2개 → 기동 실패 · 같은 실행 상태 디렉터리 잠금 |

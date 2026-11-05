@@ -4,6 +4,7 @@ import bidvector.procurement.BudgetLimit
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
+import bidvector.procurement.NoticeSourcePort
 import bidvector.procurement.PageCursor
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.RawObservationStore
@@ -16,23 +17,26 @@ import bidvector.workflow.strategy.Clock
 import java.time.LocalDate
 
 /**
- * 낙찰 목록 한 걷기(M9/award-ingest D-1) — **목록 하나뿐이다.**
+ * 업무 하나의 낙찰 목록 소스(M9/award-ingest D-1) — 어느 오퍼레이션인지는 [port] 구현이 안다
+ * (이 타입은 이름만 붙인다).
  *
- * 이 포트에는 공고 단위 상세 축이 없다. 그것이 이 갈래의 호출 상한을 지키는 첫 번째 자리다:
- * 낙찰 목록 수집은 개찰일 창을 걷는 호출만 내고, 공고당 호출(예비가격·개찰완료 등)을 내려면
- * **다른 포트**를 쥐어야 하므로 이 갈래의 배선으로는 그런 경로를 만들 수 없다.
+ * 포트는 **도메인이 이미 가진 [NoticeSourcePort]** 다 — 새로 짓지 않는다. 그 계약이 이 갈래가 필요한
+ * 전부이고(조회일 하나의 쪽을 걷어 원문과 회계를 낸다) **메서드가 하나뿐**이라는 것이 호출 상한을
+ * 지키는 첫 자리다: 공고당 호출(예비가격·개찰완료 등)을 내려면 다른 포트를 쥐어야 하므로 이 배선으로는
+ * 그런 경로가 생기지 않는다. 낙찰 목록은 **한 행 = 한 공고**라 포트 이름과도 맞다.
+ *
+ * 포트를 이 모듈에 새로 선언하지 않는 이유는 규약이다 — 「domain 이 의존하는 port 는 domain 안에
+ * 선다」(ADR 0005 D-10.1 · ADR 0006 D-2). 어댑터가 application 타입을 참조하지 않는다는 것은
+ * `KonepsAdapterDependencyTest` 가 잰다(그 게이트가 workflow 에 포트를 둔 첫 판을 거부했다).
+ *
+ * **남는 위험**: 타입이 같으므로 낙찰 목록 소스를 공고 목록 use case 에 꽂는 조합이 타입으로는 막히지
+ * 않는다(그쪽은 canonical `notice` 를 쓴다). 두 갈래의 묶음 타입이 다르고([CollectionSource] 대 이
+ * 타입) 배선이 각자 자기 설정에서 만들어 출하 경로에는 그 조합이 없다 — 타입이 아니라 **묶음 타입과
+ * 배선**이 그 자리를 막는다(알려진 제한에 등재).
  */
-fun interface AwardListSourcePort {
-    fun fetchAwardList(
-        referenceDate: CollectionReferenceDate,
-        cursor: PageCursor?,
-    ): SourceBatch<RawNoticeObservation>
-}
-
-/** 업무 하나의 낙찰 목록 소스 — 어느 오퍼레이션인지는 [port] 구현이 안다(이 타입은 이름만 붙인다). */
 class AwardCollectionSource(
     val name: CollectionSourceName,
-    val port: AwardListSourcePort,
+    val port: NoticeSourcePort,
 )
 
 /**
@@ -139,7 +143,7 @@ class CollectAwardListUseCase(
         var cursor: PageCursor? = null
         var halt: AwardCollectionHalt?
         do {
-            val batch = source.port.fetchAwardList(referenceDate, cursor)
+            val batch = source.port.fetchNotices(referenceDate, cursor)
             tally.absorb(batch.accounting)
             batch.items.forEach { rawObservations.append(it) }
             stored += batch.items.size
@@ -178,5 +182,4 @@ private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
 private fun resumeCursorOf(
     batch: SourceBatch<RawNoticeObservation>,
     previous: PageCursor?,
-): PageCursor? =
-    batch.next?.takeIf { batch.accounting.truncationCause == TruncationCause.MaxPages && it != previous }
+): PageCursor? = batch.next?.takeIf { batch.accounting.truncationCause == TruncationCause.MaxPages && it != previous }

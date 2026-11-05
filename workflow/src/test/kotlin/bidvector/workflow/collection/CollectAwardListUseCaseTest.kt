@@ -2,7 +2,6 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.CollectionAccounting
-import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.PageCursor
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
@@ -31,10 +30,10 @@ class CollectAwardListUseCaseTest {
     fun `개찰일 × 업무마다 한 번 회계를 남기고 항목마다 원문을 한 번씩 적재한다`() {
         val fixture = AwardFixture()
         val a =
-            ScriptedAwardSource { date, _ ->
+            ScriptedSource { date, _ ->
                 awardBatch(listOf(awardObservation("A-$date-1"), awardObservation("A-$date-2")))
             }
-        val b = ScriptedAwardSource { date, _ -> awardBatch(listOf(awardObservation("B-$date-1"))) }
+        val b = ScriptedSource { date, _ -> awardBatch(listOf(awardObservation("B-$date-1"))) }
 
         val report =
             fixture.useCase.collect(
@@ -44,9 +43,13 @@ class CollectAwardListUseCaseTest {
 
         fixture.runs.recorded.map { it.second.referenceDate.date } shouldContainExactly listOf(day1, day1, day2, day2)
         // 적재 endpoint 와 회계 축이 **낙찰 목록**이다 — 다른 토큰으로 적히면 승격 슬롯이 바뀐다.
-        fixture.runs.recorded.map { it.second.source }.toSet() shouldBe setOf(SourceEndpoint.OPENING_AWARD_LIST)
+        fixture.runs.recorded
+            .map { it.second.source }
+            .toSet() shouldBe setOf(SourceEndpoint.OPENING_AWARD_LIST)
         fixture.raw.appended.size shouldBe 6
-        fixture.raw.appended.map { it.sourceEndpoint }.toSet() shouldBe setOf(SourceEndpoint.OPENING_AWARD_LIST)
+        fixture.raw.appended
+            .map { it.sourceEndpoint }
+            .toSet() shouldBe setOf(SourceEndpoint.OPENING_AWARD_LIST)
         report.slots shouldBe 4
         report.stored shouldBe 6
         report.received shouldBe 6
@@ -58,7 +61,7 @@ class CollectAwardListUseCaseTest {
         val fixture = AwardFixture()
         val cursors = mutableListOf<PageCursor?>()
         val source =
-            ScriptedAwardSource { _, cursor ->
+            ScriptedSource { _, cursor ->
                 cursors += cursor
                 if (cursor == null) {
                     awardBatch(
@@ -86,7 +89,7 @@ class CollectAwardListUseCaseTest {
     fun `예산 소진은 실행을 멈추고 남은 슬롯 수를 사유에 싣는다`() {
         val fixture = AwardFixture()
         val source =
-            ScriptedAwardSource { date, _ ->
+            ScriptedSource { date, _ ->
                 if (date == day1) {
                     awardBatch(listOf(awardObservation("D1")))
                 } else {
@@ -119,7 +122,7 @@ class CollectAwardListUseCaseTest {
     fun `쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다`() {
         val fixture = AwardFixture()
         val failing =
-            ScriptedAwardSource { date, _ ->
+            ScriptedSource { date, _ ->
                 if (date == day1) {
                     awardBatch(
                         emptyList(),
@@ -143,7 +146,7 @@ class CollectAwardListUseCaseTest {
 
         val quotaFixture = AwardFixture()
         val quota =
-            ScriptedAwardSource { _, _ ->
+            ScriptedSource { _, _ ->
                 awardBatch(
                     emptyList(),
                     accounting = sourceAccounting(normalized = 0, truncationCause = TruncationCause.QuotaExhausted),
@@ -178,16 +181,6 @@ private fun awardBatch(
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
     next: PageCursor? = null,
 ): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next, COLLECTION_NOW)
-
-/** 호출 기록을 남기는 낙찰 목록 소스 — `script` 가 (개찰일, 커서)마다 배치를 낸다. */
-private class ScriptedAwardSource(
-    private val script: (LocalDate, PageCursor?) -> SourceBatch<RawNoticeObservation>,
-) : AwardListSourcePort {
-    override fun fetchAwardList(
-        referenceDate: CollectionReferenceDate,
-        cursor: PageCursor?,
-    ): SourceBatch<RawNoticeObservation> = script(referenceDate.date, cursor)
-}
 
 private class AwardFixture(
     val raw: RecordingRawStore = RecordingRawStore(),

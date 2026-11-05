@@ -2,12 +2,12 @@ package bidvector.adapters.koneps
 
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.DetailFetchDecision
+import bidvector.procurement.NoticeSourcePort
 import bidvector.procurement.OpeningResultSourcePort
 import bidvector.procurement.PageCursor
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.AwardListSourcePort
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.URI
@@ -234,16 +234,21 @@ internal fun walkKonepsOpeningList(
  * `KonepsOpeningResultSource` 를 쓰지 않는 이유는 그 타입이 상세 축 넷의 엔드포인트를 **필수로**
  * 요구하기 때문이다: 이 갈래는 그 넷을 부르지 않으므로 넘길 참값이 없고, 아무 값이나 넣으면
  * 「부르면 엉뚱한 곳으로 가는 포트」가 생긴다. 포트를 좁히면 그 조합 자체가 표현되지 않는다.
+ *
+ * 구현하는 포트는 도메인의 [NoticeSourcePort] 다 — 메서드가 목록 걷기 하나뿐이라 이 갈래가 필요한
+ * 전부이고, 낙찰 목록은 **한 행 = 한 공고**라 이름과도 맞다. 이 패키지는 `procurement`·`shared-kernel`
+ * 밖의 도메인·application 패키지를 참조할 수 없다(`KonepsAdapterDependencyTest`) — 포트를 새로 지을
+ * 자리는 domain 뿐이고, 이미 맞는 것이 있으므로 짓지 않는다.
  */
 internal class KonepsAwardListSource(
     private val listBaseUri: URI,
     private val config: KonepsSourceConfig,
-) : AwardListSourcePort {
+) : NoticeSourcePort {
     private val retryName = "koneps-award-${SourceEndpoint.OPENING_AWARD_LIST.name.lowercase()}"
     private val retry: Retry = buildKonepsRetry(retryName, config.httpPolicy)
     private val rateLimiter: RateLimiter = buildKonepsRateLimiter(retryName, config.httpPolicy)
 
-    override fun fetchAwardList(
+    override fun fetchNotices(
         referenceDate: CollectionReferenceDate,
         cursor: PageCursor?,
     ): SourceBatch<RawNoticeObservation> =
@@ -267,7 +272,7 @@ internal class KonepsAwardListSource(
 fun konepsAwardListSource(
     listBaseUri: URI,
     config: KonepsSourceConfig,
-): AwardListSourcePort = KonepsAwardListSource(listBaseUri, config)
+): NoticeSourcePort = KonepsAwardListSource(listBaseUri, config)
 
 /**
  * 6G 표본틀 소스 한 벌(M6/6G D-6G-11·19) — 호출부는 **경로만** 준다. `inqryDiv` 축과 행 식별자 같은
