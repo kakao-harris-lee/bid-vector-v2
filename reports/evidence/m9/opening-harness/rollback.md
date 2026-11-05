@@ -1,10 +1,10 @@
 # M9 / opening-harness — 되돌림
 
-- 착수 base `df4976cc` · **실측 HEAD: `9f1a86b0`**(main 병합 커밋 — 이 slice 의 마지막 산출물 자리)
-- **공유 파일 복원 원천: `8b3b610c`**(이 브랜치에 **실제로 병합한** main 커밋, 고정 SHA — PR #130
-  머지). 착수 base `df4976cc` 를 원천으로 두면 **#130 의 줄까지 지운다**. 움직이는 ref
+- 착수 base `df4976cc` · **실측 HEAD: `334d3412`**(main 병합 커밋 — 이 slice 의 마지막 산출물 자리)
+- **공유 파일 복원 원천: `e12c0485`**(이 브랜치에 **실제로 병합한** main 커밋, 고정 SHA — PR #130
+  머지). 착수 base `df4976cc` 나 앞 라운드의 `8b3b610c` 를 원천으로 두면 **남의 줄까지 지운다**. 움직이는 ref
   `origin/main` 은 쓰지 않는다.
-- 전제(둘 다 실측): **①** `8b3b610c` 가 HEAD 의 조상이다 **②** 그 SHA 에 이 slice 의 첫 산출물
+- 전제(둘 다 실측): **①** `e12c0485` 가 HEAD 의 조상이다 **②** 그 SHA 에 이 slice 의 첫 산출물
   커밋(`32f7025e`)이 **없다** — main 으로부터 만든 트리라 남의 줄을 떨어뜨릴 수 없고 커밋 해시
   목록이 필요 없다(뒤에 붙는 커밋까지 덮는다). 머지된 뒤의 되돌림은 이 절차가 아니라 **그 PR 의
   revert** 다(머지 순간 같은 명령은 아무것도 지우지 않으면서 exit 0 이다 — 성공하면서 뜻을 잃는다).
@@ -17,11 +17,11 @@
 
 ## 코드 되돌림 — in_scope 경로 한정
 
-목록은 손으로 쓰지 않는다. `git diff --name-status 8b3b610c..HEAD` 에서 기계로 내고
+목록은 손으로 쓰지 않는다. `git diff --name-status e12c0485..HEAD` 에서 기계로 내고
 (`A` = 삭제 대상, `M` = 원천으로 복원) **라운드마다 다시 낸다**.
 
 ```
-git restore --source=8b3b610c --staged --worktree -- \
+git restore --source=e12c0485 --staged --worktree -- \
   web/config/gate-tests.txt \
   web/e2e/harness \
   web/e2e/journey
@@ -35,17 +35,18 @@ git restore --source=8b3b610c --staged --worktree -- \
 
 **병합 커밋의 해소 줄은 `--no-merges` 목록 밖이다.** 이 slice 의 `02` 사본 갱신과 fixture 모양 검사는
 **병합 커밋 안에만** 있으므로 그 목록만 믿으면 빠진다. 그래서 두 집합을 함께 냈다 —
-`git log --no-merges --format= --name-only HEAD ^8b3b610c`(**14 경로** — 수정 라운드가 새 파일을 만들지 않았다)와
+`git log --no-merges --format= --name-only HEAD ^e12c0485`(**14 경로** — 수정 라운드가 새 파일을 만들지 않았다)와
 `git diff --name-only dcb63891^1 dcb63891 -- web`(**6 경로**)이고, 후자는 전자의 **진부분집합**이라
 위 복원 인자 셋이 둘 다 덮는다. 덮는다는 것은 추론이 아니라 아래 ③ 의 트리 동일성으로 실측했다.
 
-**남의 줄이 같은 파일에 있다 — 그래서 원천이 `8b3b610c` 다.** 내 비-병합 커밋이 만진 경로와 main 이
+**남의 줄이 같은 파일에 있다 — 그래서 원천이 병합한 main SHA 다.** 내 비-병합 커밋이 만진 경로와 main 이
 만진 경로의 교집합은 **셋**이다(`comm -12`): `web/e2e/harness/fake-koneps.mjs` ·
-`web/e2e/harness/fixtures/notice-list.json` · `web/e2e/harness/journey-up.mjs`. 그 셋을 **병합된 main
+`web/e2e/harness/fixtures/notice-list.json` · `web/e2e/harness/journey-up.mjs` · **`web/config/gate-tests.txt`**(#132 가 끝에 한 줄 더했다). 그 넷을 **병합된 main
 SHA 에서 복원**하면 결과가 곧 「이 slice 만 걷어낸 상태」이고 남의 줄은 **구성상** 보존된다 — hunk
 격리처럼 고를 필요가 없고, 병합 커밋의 충돌 해소 줄이 걷히지 않는 함정도 없다.
-`web/config/gate-tests.txt` 와 `web/e2e/journey/**` 는 main 이 이 range 에서 만지지 않았다(#130 이
-만진 게이트 등록부는 Kotlin 쪽 `config/quality/gate-tests.properties` 로 **다른 파일**이다).
+`web/e2e/journey/**` 는 main 이 이 range 에서 만지지 않았다. `web/config/gate-tests.txt` 는 **#132 가
+만졌다** — #130 이 만진 것은 Kotlin 쪽 `config/quality/gate-tests.properties` 로 다른 파일이었고, 이
+라운드에 겹침이 셋에서 **넷**으로 늘었다.
 
 **확인은 두 계수다** — 「내 표지 0」 **그리고** 「남의 표지 보존」. 종료 코드만 보면 반쯤 되돌린
 트리도 exit 0 이다.
@@ -56,10 +57,10 @@ SHA 에서 복원**하면 결과가 곧 「이 slice 만 걷어낸 상태」이�
 | --- | --- |
 | ① 명령 exit | **0** |
 | ② D/M 수 | **D 3 · M 6** (= 내 web 경로 아홉. 새 파일 셋이 삭제, 공유 여섯이 복원) |
-| ③ 결과 트리 동일성 | `git diff 8b3b610c --name-only -- web` **빈 출력**. 저장소 **전체**로도 남는 차이가 이 evidence 다섯뿐 — 되돌린 트리가 병합한 main 과 바이트 동일하다 |
-| 내 표지 계수 | 전부 **0** — 열하나(설계 공고 접두 · 설계 모듈 · 맥락 칸 · 여정 문면 표 · fake 라우팅 변수 · 업종 유도 · 승격 모드 속성 · 계수 등식 함수 · 잠정 축 선언 칸 · 주석 걷기 함수 · 상세 축 수 파서) |
-| 남의 표지 보존 | #130 의 준비 표지 **3** · 섬긴 집합 표지 **2** · `served.add` **1** · 직접 실행만 듣기 **1** · `journey-up` 의 섬긴 집합 탐침 **3** · 공고 축 fixture 의 `…Cnstwk02` 항목 **4**(= 복원 뒤 항목 수 4) |
-| ④ compile · ⑤ test · ⑥ 게이트 | 되돌린 트리에서 **직접 실측**: `npm run lint` exit 0 · `npm run test` **762 passed / 38 files** · `playwright --list` **11 tests / 4 files**(내 추가가 빠진 수). Kotlin `check` 는 이 range 에 **내** Kotlin 변경이 0 이라 대상이 아니다 |
+| ③ 결과 트리 동일성 | `git diff e12c0485 --name-only -- web` **빈 출력**. 저장소 **전체**로도 남는 차이가 이 evidence 다섯뿐 — 되돌린 트리가 병합한 main 과 바이트 동일하다 |
+| 내 표지 계수 | 내 산출물 파일 셋이 **파일째 사라졌고**, 내가 만진 공유 파일 여섯 안에서 표지 아홉이 **전부 0** 이다. **표지를 저장소 전체로 세지 않는다** — `withoutKotlinComments` 가 #132 의 파일에도 있어 전체 계수가 1 로 남았고, 귀속을 파일로 확인해 그것이 남의 것임을 확정했다(아래 절) |
+| 남의 표지 보존 | #130: 준비 표지 **3** · 공고 축 항목 수 **4** · #132: 등록부 등재 **1** · 등록부 항목 **36**(= base 35 + 그들 1, 내 1 이 걷혔다) · 내 spec 안의 `VAT_LABEL` **2**(#132 의 게이트가 보는 자리라 복원 뒤에도 서 있어야 한다) |
+| ④ compile · ⑤ test · ⑥ 게이트 | 되돌린 트리에서 **직접 실측**: `npm run lint` exit 0 · `npm run test` **821 passed / 39 files**(= 내 30 이 빠진 수) · `gate:tests` 통과 · `playwright --list` **11 tests / 4 files**. Kotlin `check` 는 이 range 에 **내** Kotlin 변경이 0 이라 대상이 아니다 |
 
 **「내 여덟이 걷히고 #130 의 넷이 남는다」가 이 라운드의 핵심 계수다** — 같은 파일 안에서 두 slice 의
 줄이 섞인 첫 라운드이고, 복원이 그 둘을 가른 것을 **항목 수**로 셌다(종료 코드로는 보이지 않는다).
@@ -76,7 +77,7 @@ verifier 가 볼 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence �
 **실측 HEAD 와 판정 SHA 사이에 되돌림 대상이 움직였는가**다:
 
 ```
-git diff --name-only 9f1a86b0..<판정 SHA> -- web/config/gate-tests.txt web/e2e/harness web/e2e/journey
+git diff --name-only 334d3412..<판정 SHA> -- web/config/gate-tests.txt web/e2e/harness web/e2e/journey
 ```
 
 빈 출력이면 유효하고, 한 줄이라도 나오면 미검증이다. 이 slice 는 실측 뒤 **이 evidence 디렉터리의

@@ -1,7 +1,7 @@
 # M9 / opening-harness — 개찰 축 여정 하네스 (OPEN-7E3A-OPENING-AXIS-HARNESS)
 - base: main `df4976cc` · 공통 규율: `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/b843a5c1-93ae-42d9-82cf-0a5222fc9820/scratchpad/m9-lane-rules.md`
 - 사용자 지시 2026-11-06: 「남은 묶음도 지금 같이 병렬로」(2026-11-05 「남은 항목이 없도록 전체 병렬」의 연속). 결정 지점은 추천안으로 진행(전역 규칙), 외부 비용·운영 결정이 필요한 축은 만들지 않고 등재.
-- rollback: 공통 규율대로(원천은 **이 브랜치가 실제로 병합한 main 의 고정 SHA** — 착수 시 `df4976cc`, 2026-11-06 PR #130 병합 뒤 **`8b3b610c`**. 움직이는 `origin/main` 은 쓰지 않는다. 내 커밋만, 결과 트리 동일성). 하네스 레인 변경: 계약이 명시한 것 외 없음.
+- rollback: 공통 규율대로(원천은 **이 브랜치가 실제로 병합한 main 의 고정 SHA** — 착수 시 `df4976cc`, 2026-11-06 PR #130 병합 뒤 `8b3b610c`, PR #132 병합 뒤 **`e12c0485`**. 움직이는 `origin/main` 은 쓰지 않는다. 내 커밋만, 결과 트리 동일성). 하네스 레인 변경: 계약이 명시한 것 외 없음.
 - 근거: `reports/evidence/m7/7e3a/scope.md` D-7E3a-7 · M7 종결 §4. 하네스가 개찰 축을 수집하지 않아 `readOpeningResult` 아홉 갈래 중 셋만 낸다.
 
 ## 결정

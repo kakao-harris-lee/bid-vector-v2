@@ -1,8 +1,9 @@
 # M9 / opening-harness — 명령과 결과
 
-- 판정 SHA: **`9f1a86b0`**(수정 라운드 — v M-1 · cr MEDIUM 둘 · cr LOW 셋)
-- 앞 판정 `dcb63891`(main `8b3b610c` 병합) · 리뷰 판정: v **ready-for-review** · cr **approve**
-- 착수 base `df4976cc` · **병합한 main `8b3b610c`**(PR #130 portal-02) · 병합 커밋 1
+- 판정 SHA: **`334d3412`**(main `e12c0485` 병합 커밋 — PR #132 web-followups)
+- 앞 판정 `9f1a86b0`(수정 라운드 — v M-1 · cr MEDIUM 둘 · cr LOW 셋) · 그 앞 `dcb63891`
+- 리뷰 판정: v **ready-for-review** · cr **approve**(둘 다 `dcb63891`)
+- 착수 base `df4976cc` · 병합한 main **`8b3b610c`**(#130 portal-02) → **`e12c0485`**(#132 web-followups) · 병합 커밋 2
 - acceptance 정본은 PR CI 의 `web` job(W-13 여정 포함)과 `check` job(S-20)이다. **Playwright 여정은
   로컬에서 돌리지 않는다**(공통 규율) — 아래는 로컬에서 설 수 있는 것과 fake 단독 기동뿐이다.
 - Kotlin 은 **내 변경이 0** 이다. 병합으로 들어온 Kotlin 은 #130 이 자기 PR CI 로 검증한 것이라
@@ -14,12 +15,12 @@
 | --- | --- |
 | `npm run lint` | exit 0 |
 | `npm run typecheck` | exit 0 |
-| `npm run test` | **792 passed / 39 files**(착수 762 → 이 slice 의 게이트 test 30) |
+| `npm run test` | **851 passed / 40 files**(내 게이트 test **30** · 나머지는 #130·#132 가 들여온 수) |
 | `npm run gate:tests` | 등록부 기준 전부 통과 · skipped/todo/failed 0 |
 | `npm run gate:src-tree` | 컴파일·번들 경계 전제 성립 |
 | `npm run gate:boundary-canary` | 번들 그래프 경계 활성(메인·워커 두 그래프) |
 | `npm run api:types:check` | 생성 타입이 OpenAPI 와 바이트까지 같다 |
-| `npx playwright test --config=playwright.journey.config.ts --list` | **12 tests / 4 files**(착수 11/4 — spec 파일 집합 불변이라 여정 등록부 갱신이 필요 없다) |
+| `npx playwright test … --list` | **12 tests / 4 files**(착수 11/4 — spec 파일 집합 불변이라 여정 등록부 갱신이 필요 없다) |
 | e2e spec 별도 `tsc`(저장소 밖 설정, `e2e`+`src` 포함) | `e2e/` 오류 **0** — spec 은 `tsconfig.json` 의 프로그램 밖이고 lint 가 타입 인식이 아니라 손으로 한 번 잰다 |
 
 ## fake 단독 기동 (node, 저장소 밖 스크립트 — 병합 뒤)
@@ -100,3 +101,36 @@
   파일 쓰기 함수 그대로** 지난다 — 0600 · 저장소 밖 run-state · 종료 때 디렉터리째 삭제. 민감 값을
   argv 에 싣지 않는 규율(CR L-4)을 새 걸음도 그대로 쓴다(승격 걸음은 애초에 KONEPS 를 부르지 않아
   그 값을 요구하지도 않는다).
+
+## 둘째 병합 라운드 (main `e12c0485` = PR #132 web-followups)
+
+충돌 **하나** — `web/config/gate-tests.txt` 에 **양쪽이 끝에 추가**. 합집합으로 해소하고 계수로 닫았다.
+
+| 축 | 실측 |
+| --- | --- |
+| 등록부 항목 | base **35** + #132 **1** + 내 **1** = **37** · 중복 **0** · 서로 다른 항목 37 |
+| 양쪽 추가 중 빠진 것 | **없음** |
+| base 항목 중 사라진 것 | **없음** |
+| `gate:tests` | 통과(등록부 기준 · skipped/todo/failed 0) |
+| 그 밖 겹침 전수 | **그 한 파일뿐**(`comm -12` 로 내 비-병합 경로 ∩ #132 경로) |
+| 내 등식이 읽는 출하 파일 다섯 | 이 범위에서 **하나도 움직이지 않았다** |
+| 전수 보증 표지 | 살아 있다 — #132 가 `stateDisplay.ts` 를 만졌지만 `StateDisplay` 이름이 그대로다 |
+
+#132 의 새 게이트가 `results.spec.ts` 의 `VAT_LABEL` **키 집합**을 Kotlin 정본과 맞댄다 —
+내 수정 라운드가 그 표를 **쓰기만** 하고 키를 바꾸지 않아 그 등식이 그대로 선다(851 passed 에 포함).
+
+### 실측했는데 **잡히지 않은** 것 하나 (음성 결과)
+
+변이 ⑬ 「등록부에서 내 등재 줄을 지운다」 → `gate:tests` **exit 0**(초록). vitest 등록부는
+**한 방향**이다: 등재된 test 가 돌고 통과했는지는 보지만 「게이트 test 가 등재돼 있는가」는 보지
+않는다. **잔여 위험은 한 겹 더 막혀 있다** — `vite.config.ts` 의 `test.include` 가
+`e2e/harness/**/*.test.mjs` 를 담으므로 등재가 사라져도 그 파일은 `npm run test` 에서
+**계속 돌고 30 passed** 다(실측). 사라지는 것은 그 파일에 대한 등록부의 「passed ≥ 1 · skipped 0」
+보증뿐이다. 양방향으로 만드는 것은 공유 게이트 스크립트 변경이라 이 slice 의 in_scope 밖이다.
+
+### 같은 유틸리티를 두 레인이 따로 썼다
+
+#132 의 `money-vocab-cross-lang.test.mjs` 와 내 `opening-axis.mjs` 가 **같은 이름·같은 목적**의
+Kotlin 주석 걷기 함수를 각각 들고 있다(같은 라운드에 독립으로). rollback 표지 계수에서 그 이름이
+복원된 트리에 **1** 로 남아 처음 드러났고, 귀속을 파일로 확인해 **그것이 #132 의 것**임을 확정했다
+(내 셋은 파일째 사라졌다). 그래서 이 round 의 표지 계수는 **내가 만진 파일 안에서만** 센다.
