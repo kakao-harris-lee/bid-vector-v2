@@ -207,6 +207,10 @@ export const AMOUNT_BASIS_LABEL: Readonly<Record<string, string>> = {
   ALLOCATED_BUDGET: '배정예산',
   AWARD: '낙찰금액',
 };
+/** 통화의 단위 문면 — 금액 글자에 붙는다(M9 D-3 · r1 H-1). */
+export const AMOUNT_CURRENCY_LABEL: Readonly<Record<string, string>> = {
+  KRW: '원',
+};
 export const AMOUNT_PROVENANCE_LABEL: Readonly<Record<string, string>> = {
   PUBLISHED: '공고 게시값',
   DERIVED_FROM_OPENING: '개찰 역산값',

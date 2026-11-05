@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
+  AMOUNT_CURRENCY_LABEL,
   assertOnlyAllowedOperations,
   CASE_STATE_LABEL,
   CASE_TAB_LABEL,
@@ -331,7 +332,12 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   expect(digitsOf(await finalCard.getByTestId(`submitted-amount-${caseId}`).innerText())).toBe(
     String(mineResult!.submittedAmountWon),
   );
-  await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(
+  // 통화도 **표의 문면**이다(r1 H-1) — 앞 판은 이 자리가 응답의 원문 코드를 단언해서, 화면이
+  // 그 코드를 그리는 것을 **잠그고** 있었다. 문면이 있는 것과 원문이 없는 것을 둘 다 잰다.
+  const currencyLabel = AMOUNT_CURRENCY_LABEL[mineResult!.submittedAmountCurrency];
+  expect(currencyLabel, `통화 ${mineResult!.submittedAmountCurrency} 의 문면이 라벨 표에 없다`).toBeDefined();
+  await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).toContainText(currencyLabel!);
+  await expect(finalCard.getByTestId(`submitted-amount-${caseId}`)).not.toContainText(
     mineResult!.submittedAmountCurrency,
   );
   // 과세는 **표의 문면**으로 선다(r1 CR M-1) — 원문 토큰이 아니다.
