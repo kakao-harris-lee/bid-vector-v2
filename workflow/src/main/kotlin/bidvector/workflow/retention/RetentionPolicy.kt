@@ -3,10 +3,11 @@ package bidvector.workflow.retention
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
- * 보존 정책 값(M6/6B-3 P-5) — 「90일」과 일괄 크기가 코드 리터럴로 흩어지지 않게 한 자리에
+ * 보존 정책 값(M6/6B-3 P-5) — 보존 기간과 일괄 크기가 코드 리터럴로 흩어지지 않게 한 자리에
  * 모은다. 값의 정본은 **문서**다(`KONEPS_COLLECTION_POLICY`·`NOTIFICATION_DELIVERY_POLICY`
  * 관례) — 아래 [RETENTION_POLICY]의 `source` 가 그 자리를 가리킨다.
  *
@@ -64,22 +65,50 @@ data class RetentionCutoff internal constructor(
 )
 
 /**
+ * 보존 기간 1년이 선 날 — 그 **앞쪽 기준일은 여전히 90일로 해소된다**(아래 KDoc 의 소급 금지).
+ */
+private val RETENTION_ONE_YEAR_FROM: LocalDate = LocalDate.of(2026, 11, 5)
+
+/**
+ * 일괄 크기는 **개정 축이 아니다** — 두 항목이 같은 값을 쓴다는 것을 한 자리로 만든다(개정이
+ * 조용히 배치 크기를 바꾸는 길이 없다). 왜 운영자 결정이 아닌지는 [RETENTION_POLICY] KDoc 에 있다.
+ */
+private const val RETENTION_BATCH_SIZE = 1_000
+
+/**
  * **승인된 값이다.** 90일은 운영자 결정 2026-09-26 ②(「보존 기간 90일 — 공고·평가 이력·
- * audit」)이고 그 해석(어느 표가 파기·마스킹·제외인가)은 6B-3 운영자 결정 A-1~A-4 다.
+ * audit」)이고, **1년은 사용자 결정 2026-11-05**(그 90일을 대체한다). 그 해석(어느 표가 파기·
+ * 마스킹·제외인가)은 6B-3 운영자 결정 A-1~A-4 이고 개정이 그것을 건드리지 않는다.
  *
- * `batchSize` 는 운영자 결정이 아니라 **한 트랜잭션이 잠그는 행 수의 상한**이다 — 90일 치
+ * **옛 항목을 지우지 않고 날짜 개정으로 쌓는다**(`data-dictionary.md` §4.1 계승 규율 ① — 소급
+ * 금지). 90일 시대의 기준일로 해소하면 그 시대의 값이 서야 한다: 그때 돈 run 의 로그와 감사는
+ * 90일 cutoff 로 지웠고, 표를 덮어쓰면 그 기록을 설명할 값이 코드에서 사라진다. 기간을 **늘리는**
+ * 개정이 이미 지워진 행을 되살리지도 않는다(되돌림은 백업 복원뿐이다 — runbook §1.2).
+ *
+ * **1년을 365일로 읽는다.** 이 축의 단위는 날 수이고 cutoff 는 시각 산술이라(`ChronoUnit.DAYS`)
+ * 윤년 하루는 「무엇이 기한을 넘었나」의 판단을 바꾸지 않는다 — 달력 1년을 쓰면 cutoff 가 해마다
+ * 다른 길이가 되고, 그 차이를 설명할 운영자 결정이 없다.
+ *
+ * `batchSize` 는 운영자 결정이 아니라 **한 트랜잭션이 잠그는 행 수의 상한**이다 — 보존 기간 치
  * 백로그를 한 문장으로 지우면 그 트랜잭션이 도는 동안 같은 표의 쓰기가 막힌다. 값을 바꾸는
  * 것은 거동이 아니라 배치 크기만 바꾼다(파기 집합은 cutoff 가 정한다).
  */
 val RETENTION_POLICY: EffectiveDatedPolicy<RetentionPolicyData> =
     EffectiveDatedPolicy(
-        source = "milestone-6.md 운영자 결정 2026-09-26 ② · reports/evidence/m6/6b3/scope.md A-1~A-4",
+        source =
+            "milestone-6.md 운영자 결정 2026-09-26 ② · reports/evidence/m6/6b3/scope.md A-1~A-4 · " +
+                "1년 개정은 사용자 결정 2026-11-05(reports/evidence/m9/retention-1y/scope.md D-1)",
         entries =
             listOf(
                 EffectiveFrom.Initial to
                     RetentionPolicyData(
                         retentionDays = 90,
-                        batchSize = 1_000,
+                        batchSize = RETENTION_BATCH_SIZE,
+                    ),
+                EffectiveFrom.On(RETENTION_ONE_YEAR_FROM) to
+                    RetentionPolicyData(
+                        retentionDays = 365,
+                        batchSize = RETENTION_BATCH_SIZE,
                     ),
             ),
     )
