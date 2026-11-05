@@ -2,7 +2,7 @@
 
 ## (0) 위협 모델 경계 한 문장
 
-세 축이 막는 것은 **「이 행을 무엇이·어느 정책으로·어느 릴리스가 만들었는가」를 DB 가 답하지
+이 slice 의 축이 막는 것은(계약 갱신으로 **둘**이 됐다 — DEC-08 제외) **「이 행을 무엇이·어느 정책으로·어느 릴리스가 만들었는가」를 DB 가 답하지
 못하는 상태**다 — 악의적 운영자나 외부 침입이 아니라, 사후 감사에서 메모리에만 있던 사실(정책
 version · 종단 사유 · 릴리스)이 영영 사라지는 것이 위협이다. 경계 밖: 값의 진위(릴리스 라벨이
 jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급 복원(없는 사실을 짓지 않는다).
@@ -14,16 +14,31 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 
 | 축 | 코드의 닫힌 집합 | 저장 층 재선언 |
 | --- | --- | --- |
-| DEC-08 | `BaseAmountProvenance` 5 · `ProvenanceRuleId` 4 · `classificationFor` 의 결속 | V26 CHECK 둘(어휘 · 결속 쌍) |
-| OPS-05 | 종단 사유 7 (relay 가 이미 가른 처분, D-6F10-12 해석표) | V27 CHECK 둘(어휘 · 사유→상태 쌍) |
-| OPS-10 | — (식별자, 어휘 아님) | V28 NOT NULL / INSERT 거부 트리거 |
+| ~~DEC-08~~(제외) | `BaseAmountProvenance` 5 · `ProvenanceRuleId` 4 · `classificationFor` 의 결속 | — (표를 들이지 않았다) |
+| OPS-05 | 종단 사유 7 (relay 가 이미 가른 처분, D-6F10-12 해석표) | V26 CHECK 둘(어휘 · 사유→상태 쌍) |
+| OPS-10 | — (식별자, 어휘 아님) | V27 NOT NULL / INSERT 거부 트리거 |
 
 **구성 축은 하나다**: 사유→상태 결속과 라벨→규칙 결속은 쌍의 **곱집합이 아니라 표**다. SQL 에
 손으로 늘어놓지 않고, Kotlin 쪽 전수와의 **집합·사상 등식 test** 로 묶는다(문자열 grep 아님).
 
 ## (2) 우회 — 각 축 ≥5
 
-### DEC-08 (V26 · `base_amount_classification`)
+### DEC-08 — **이 slice 에서 빠졌다**(팀장 결정 2026-11-06, 계약 갱신 ①)
+
+아래 우회 여섯은 **구현되지 않은 축의 기록**이다. 빠진 근거: 출하 조립의 `MlAnalysisPort` 는
+`UnavailableMlAnalysis` 고정이고 의존 게이트(「app.wiring 이 adapters.ml 에서 보는 집합」)가 그
+사실을 잠그므로 `OpportunityAnalysis`·`JdbcCompetitionSampleSource` 가 출하에 생성되지 않는다 —
+**분류가 출하에서 0 회 돈다**. 그 상태로 표를 들이면 우회 ① 「칸만 만들고 아무도 안 쓴다」를
+e2e 조립으로 가린 것이 되고(측정은 서지만 출하 거동은 0), 남는 것은 되돌리기 어려운 스키마다.
+ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 받는 자리는
+`OPEN-ML-ANALYSIS-WIRING` — 저장 자리와 릴리스 칸을 **같은 자리에서** 정한다.
+
+아래 검토가 **남는 값**: 받는 slice 가 다시 세울 때 우회 여섯과 (2b) 표의 표면 둘이 그대로
+입력이다(특히 ②·⑤ — dry-run 분리와 정책 version 마다 새 행).
+
+**— 이하 당시 검토의 기록(구현 없음) —**
+
+#### DEC-08 (판정 표 신설) · 당시 검토
 
 1. **칸만 만들고 아무도 안 쓴다** — 0 행인 표는 저장이 아니다. → 커밋 경로(`EvaluationCommitRun`)
    에 write port 를 꽂고, 커밋 run 뒤 **행 1**을 실 DB test 가 센다.
@@ -39,7 +54,9 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 6. **분류기를 두 번째로 짓는다**(원본 해소 규칙 복제) → 기존 `provenanceLabelFor` 호출부를 그대로
    쓰고 **판정 봉투를 버리지 않게** 바꾼다(새 호출부 0, D-4B8-1 「두 번째 분류기 금지」).
 
-### OPS-05 (V27 · `outbox.terminal_reason`)
+**— 기록 끝 —**
+
+### OPS-05 (V26 · `outbox.terminal_reason`)
 
 1. **사유를 안 주고 종단으로 보낸다** → `OutboxCommand.Fail`·`Isolate`·`Deliver` 가 사유를 **인자로
    요구**한다(생성자). 사유 없는 전이는 **컴파일되지 않는다**.
@@ -55,7 +72,7 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 6. **고아 격리가 사유 없이 남는다** → `ORPHANED_CLAIM`. 「왜 ISOLATED 인가」 셋(미지 payload · 배달
    결과 불명 · 고아)이 DB 에서 갈린다.
 
-### OPS-10 (V28 · 릴리스 칸 넷 + 기본값 제거)
+### OPS-10 (V27 · 릴리스 칸 넷 + 기본값 제거)
 
 1. **기본값이 다른 이름으로 돌아온다**(`"unknown"`·`"local"`·`""`) → 설정 칸에 기본값이 없고
    공백은 값 객체(`ReleaseIdentifier`)가 거부한다. **sentinel version 금지**(data-dictionary §4.1).
@@ -94,7 +111,7 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 **미달 위험**
 1. **커밋 경로 외의 판정은 기록되지 않는다** — bid-price 조회·dry-run 이 쓴 version 은 남지 않는다.
    조회 경로가 쓰면 안 되므로(우회 2) 이것은 **설계된 범위**다. 알려진 제한으로 적는다.
-2. **릴리스 칸이 NULL 인 기존 행** — collection_run·outbox 의 pre-V28 행. 「모름」이 정직한 값이고
+2. **릴리스 칸이 NULL 인 기존 행** — collection_run·outbox 의 pre-V27 행. 「모름」이 정직한 값이고
    트리거가 **이후 행**을 전부 막는다. 알려진 제한으로 적고 계수를 evidence 에 적는다.
 3. **api_request_audit 에는 릴리스 칸이 없다** — 계약이 네 표만 지목했다. OPEN 으로 등재.
 
@@ -102,17 +119,17 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 
 | 마이그레이션 | 표 | 열 | 타입 | NULL | 기존 행 | GRANT | 인덱스 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| V26 | `base_amount_classification`(신설) | 공고 키 2 · 정책 2 · 라벨 · 규칙 · 원본 금액 3 · 릴리스 · 기록 시각 | TEXT·DATE·NUMERIC(20,0)·TIMESTAMPTZ | 규칙만 NULL 허용(= `UNKNOWN` 결속) | 없음(신설) | SELECT, INSERT | PK(공고 2 + 정책 2) |
-| V27 | `outbox` | `terminal_reason` | TEXT | 허용 | **NULL 로 남긴다** — 기존 종단 행의 사유는 진실한 원천이 없다(로그에만 갔다). 「사유가 있으면 종단이다」는 CHECK 로, 「**새** 종단 전이는 사유를 요구한다」는 전이 트리거로 가른다(V18 의 `pii_masked_at` NULL→값 1회 트리거와 같은 형태) — 쌍 CHECK 로 접으면 기존 행이 적용을 막는다 | 변경 0 | 변경 0 |
-| V28 | `notice`·`opening_result` | `release_sha` | TEXT | NOT NULL | `observation_key → raw_observation.release_sha` backfill(전사, FK·NOT NULL 로 결손 불가) | 변경 0(표 단위 INSERT·UPDATE 가 새 열 포함) | 없음 |
-| V28 | `collection_run`·`outbox` | `release_sha` | TEXT | 허용 | NULL(진실한 원천 없음) + INSERT/UPDATE 거부 트리거 | 변경 0 | 없음 |
+| ~~(당시 V26)~~ | ~~`base_amount_classification`(신설)~~ — **제외**, 번호는 OPS-05 가 받았다 | 공고 키 2 · 정책 2 · 라벨 · 규칙 · 원본 금액 3 · 릴리스 · 기록 시각 | TEXT·DATE·NUMERIC(20,0)·TIMESTAMPTZ | 규칙만 NULL 허용(= `UNKNOWN` 결속) | 없음(신설) | SELECT, INSERT | PK(공고 2 + 정책 2) |
+| V26 | `outbox` | `terminal_reason` | TEXT | 허용 | **NULL 로 남긴다** — 기존 종단 행의 사유는 진실한 원천이 없다(로그에만 갔다). 「사유가 있으면 종단이다」는 CHECK 로, 「**새** 종단 전이는 사유를 요구한다」는 전이 트리거로 가른다(V18 의 `pii_masked_at` NULL→값 1회 트리거와 같은 형태) — 쌍 CHECK 로 접으면 기존 행이 적용을 막는다 | 변경 0 | 변경 0 |
+| V27 | `notice`·`opening_result` | `release_sha` | TEXT | NOT NULL | `observation_key → raw_observation.release_sha` backfill(전사, FK·NOT NULL 로 결손 불가) | 변경 0(표 단위 INSERT·UPDATE 가 새 열 포함) | 없음 |
+| V27 | `collection_run`·`outbox` | `release_sha` | TEXT | 허용 | NULL(진실한 원천 없음) + INSERT/UPDATE 거부 트리거 | 변경 0 | 없음 |
 
-**세 표가 같은 모양을 쓴다** — 「기존 행은 NULL(모름), 새 행·새 전이는 구조가 요구」. 지어낸 값으로
+**두 축이 같은 모양을 쓴다** — 「기존 행은 NULL(모름), 새 행·새 전이는 구조가 요구」. 지어낸 값으로
 과거를 채우지 않고, 앞으로의 누락은 CHECK·트리거가 막는다.
 
 ## 구현 중 갱신 (같은 slice, 실측으로 갈린 둘)
 
-1. **V28 의 표가 넷 → 둘.** 위 표는 `notice`·`opening_result` 에 열을 더하고 `observation_key` 로
+1. **V27 의 표가 넷 → 둘.** 위 표는 `notice`·`opening_result` 에 열을 더하고 `observation_key` 로
    backfill 한다고 적었다. 두 사실이 그 계획을 접었다 — ① 그 두 표의 릴리스는 **조인으로 이미
    도달한다**(NOT NULL FK → `raw_observation.release_sha` NOT NULL): 열을 더하면 같은 사실이 두
    자리에 살고 한쪽만 바뀌는 날이 온다 ② backfill 의 `UPDATE` 가 V2 의 **판 번호 증가·감사 행 삽입
@@ -121,5 +138,9 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 2. **`ReleaseIdentifier` 는 `value class` 가 아니다.** 인라인 클래스가 JVM 시그니처에서 `String`
    으로 지워져 Spring 타입 주입이 깨졌다(배선 test 일곱 RED). (2b) 표의 「공백 거부」 축은 그대로다.
 
-**(2b) 표에 더해지는 새 public 표면 둘**: `JdbcBaseAmountClassificationStore`(adapters.ml — 의존
+3. **DEC-08 축 제외**(팀장 결정 ①) — 위 DEC-08 절 머리에 근거를 적었다. 번호를 당겨
+   OPS-05 = V26 · OPS-10 = V27 이고, 그에 따라 (2b) 표의 DEC-08 표면 셋(기록 port · Jdbc store ·
+   기록하지 않는 구현)은 **이 slice 의 표면이 아니다**.
+
+**(당시 기록) (2b) 표에 더해졌던 DEC-08 표면 둘**: `JdbcBaseAmountClassificationStore`(adapters.ml — 의존
 게이트가 정한 자리, `JdbcCompetitionSampleSource` 와 같은 사유) · `DiscardingBaseAmountClassificationRecordPort`(부작용 없는 조립이 끼우는 구현 — 획득자가 할 수 있는 일은 **아무것도 하지 않는 것**뿐).
