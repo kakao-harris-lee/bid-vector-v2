@@ -392,7 +392,9 @@ _signal_case() { # <신호> <기대 종료 코드>
   pg="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')"
   [ -n "$pg" ] || { kill -9 "$pid" 2>/dev/null || true; _die "프로세스 그룹을 읽지 못했다 — 판정 불가" 2; }
   kill -s "$sig" -"$pg" 2>/dev/null || kill -s "$sig" "$pid"
-  wait "$pid" || RUN_RC=$?
+  # `wait` 의 stderr 를 버린다 — 신호로 죽은 배경 작업의 셸 알림(`… Hangup …`)이 검사 출력에 섞이면
+  # CI 로그에서 그것이 결함처럼 보인다. 판정은 아래 `RUN_RC` 와 단언이 한다.
+  wait "$pid" 2>/dev/null || RUN_RC=$?
   _expect_rc "$want" "${sig} 으로 끝나면 그 신호로 죽는다(128+n — 종료 코드를 꾸미지 않는다)"
   _expect_text "일회 컨테이너 ${PROJ}-app-run-sweep 를 치웠다" "${sig} — trap 이 치운 것을 문면에 보인다"
   _expect_log "docker rm -f ${PROJ}-app-run-sweep\$" "${sig} — trap 이 자기 컨테이너 이름 하나만 지운다"

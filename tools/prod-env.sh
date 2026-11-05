@@ -34,8 +34,14 @@ fi
 # dry-run 이 「프로젝트 …-shadow · 데이터 볼륨이 없다」로 exit 0). 이름을 더 적는 처방은 같은 구멍을
 # 다시 여므로 `COMPOSE_` 로 시작하는 것을 전부 비운다(`COMPOSE_FILE`·`COMPOSE_PROFILES`·
 # `COMPOSE_ENV_FILES`·`COMPOSE_IGNORE_ORPHANS` …).
+#
+# **`GIT_*` 도 같은 축이다**(CR M-1 실측): `git -C <트리>` 는 `GIT_DIR` 을 **이기지 못한다** — 그 변수
+# 하나면 아래 `_prod_git_sha_match` 의 HEAD 등식과 더티 검사가 **둘 다** 다른 저장소를 읽는다. git 이
+# hook·`rebase --exec`·`bisect run` 안에서 스스로 내보내는 변수라 사고 경로도 가깝다. 역시 이름을
+# 열거하지 않고 접두로 비운다(`GIT_DIR`·`GIT_WORK_TREE`·`GIT_INDEX_FILE`·`GIT_COMMON_DIR`·
+# `GIT_OBJECT_DIRECTORY`·`GIT_CONFIG_*` …). source 한 **뒤에** 들어온 값은 `_prod_git` 이 막는다.
 while IFS='=' read -r _k _; do
-  case "$_k" in COMPOSE_*) unset "$_k" 2>/dev/null || true ;; esac
+  case "$_k" in COMPOSE_*|GIT_*) unset "$_k" 2>/dev/null || true ;; esac
 done < <(env)
 
 BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml docker/compose.prod.yaml)
@@ -178,6 +184,20 @@ _prod_images_match() {
 #
 # 더티 판정은 `tools/prod-release.sh` 와 **같은 규칙**이다(`--untracked-files=no`) — 그래서 같은 한계를
 # 물려받는다: 추적되지 않는 파일은 세지 않는다(CR L-10).
+
+# 반입 트리의 git — **`GIT_*` 를 비운 채** 부른다. 위 source 시점의 unset 과 **겹 둘**이다: 이 조각을
+# 읽은 뒤에 누가 `GIT_DIR` 을 내보내도(hook·`rebase --exec`·`bisect run` 안이 그런 자리다) 술어가
+# 다른 저장소를 읽지 않는다. 이름을 열거하지 않고 접두로 비운다 — 열거하는 처방은 같은 구멍을 다시 연다.
+_prod_git() {
+  (
+    local _gk
+    while IFS='=' read -r _gk _; do
+      case "$_gk" in GIT_*) unset "$_gk" 2>/dev/null || true ;; esac
+    done < <(env)
+    git -C "$BIDVECTOR_PROD_REPO_ROOT" "$@"
+  )
+}
+
 _prod_git_sha_match() {
   local man="$1" want have dirty
   _PROD_GIT_SHA_ERR=""
@@ -187,7 +207,7 @@ _prod_git_sha_match() {
     _PROD_GIT_SHA_ERR="manifest 에 git_sha 가 없다: ${man}"
     return 1
   fi
-  have="$(git -C "$BIDVECTOR_PROD_REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+  have="$(_prod_git rev-parse HEAD 2>/dev/null || true)"
   if [ -z "$have" ]; then
     _PROD_GIT_SHA_ERR="반입 트리의 커밋을 읽지 못했다(${BIDVECTOR_PROD_REPO_ROOT} — git 이 없거나 저장소가 아니다)"
     return 1
@@ -196,7 +216,7 @@ _prod_git_sha_match() {
     _PROD_GIT_SHA_ERR="반입 트리가 이 release 를 만든 커밋이 아니다(HEAD ${have:0:12} ≠ manifest ${want:0:12}) — compose 배선과 이 스크립트들은 트리에서 읽힌다. 'git -C ${BIDVECTOR_PROD_REPO_ROOT} checkout ${want}' 뒤에 다시 돌린다"
     return 1
   fi
-  dirty="$(git -C "$BIDVECTOR_PROD_REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" || {
+  dirty="$(_prod_git status --porcelain --untracked-files=no 2>/dev/null)" || {
     _PROD_GIT_SHA_ERR="반입 트리의 상태를 읽지 못했다(${BIDVECTOR_PROD_REPO_ROOT})"
     return 1
   }

@@ -448,12 +448,18 @@ sudo nginx -t && sudo systemctl reload nginx
 이 unit 이 실행하는 내용은 **그 저장소에 쓸 수 있는 사람**이 정한다 — 레인들이 브랜치를 바꾸는 작업
 트리를 `<저장소>` 로 쓰지 않는 이유다(§1.4b).
 
-한 번 손으로 확인:
+한 번 손으로 확인 — **unit 을 깐 뒤에는 `systemctl start` 로 돈다**(§9.3). 그래야 같은 unit 의 run 이 하나로
+묶이고, 타이머가 그 사이 발화해도 systemd 가 두 번째를 띄우지 않는다. 셸에서 직접 부르는 것은 unit 을 깔기
+**전**의 확인용이다(그때도 타이머가 없으므로 겹칠 것이 없다):
 
 ```bash
 cd <저장소>
 ./tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
 ```
+
+셸에서 직접 부른 run 이 도는 중에 타이머가 발화하면, 타이머 run 은 잠금에서 `exit 3` 으로 끝난다(훑기는
+멱등이라 다음 주기로 미뤄도 된다) — 그 경로에서 unit 의 `ExecStopPost`(§9.2)가 **남의 컨테이너를 지우지
+않도록** 조건이 붙어 있다.
 
 ### 9.2 주기 — 하루 두세 번
 
@@ -476,11 +482,17 @@ ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector
 # fd 가 닫히며 잠금이 풀린다.
 TimeoutStartSec=15m
 TimeoutStopSec=1m
-# 상한에 걸려 죽은 run 은 **자기 일회 컨테이너를 스스로 치운다**(TERM trap). 이 줄은 그래도 남는 경우를
-# 위한 겹이다 — 이름이 고정이라 지울 대상이 하나로 정해진다. `-` 접두는 「없으면 실패로 세지 않는다」다
-# (정상 종료 뒤에는 `--rm` 이 이미 지웠으므로 이 줄은 대개 아무것도 지우지 않는다).
+# 상한에 걸려 죽은 run 은 **자기 일회 컨테이너를 스스로 치운다**(TERM·INT·HUP trap). 아래 줄은 그래도
+# 남는 경우(KILL 로 trap 이 못 돈 경우)를 위한 겹이고 **조건이 반드시 붙는다.**
+#
+# **조건 없이 두면 남의 run 을 지운다.** 이 unit 밖에서 같은 이름으로 도는 run 이 있으면(§9.1 의 손
+# 실행) 타이머 run 은 잠금에서 `exit 3` 으로 끝나는데, 조건 없는 ExecStopPost 는 그때도 돌아 **진행
+# 중인 남의 컨테이너를 rm -f** 한다. 그래서 ⓐ 성공 종료(`--rm` 이 이미 지웠다)와 ⓑ `exit 3`(전제 실패 —
+# 남의 실행이 있다는 뜻이다)에서는 **아무것도 하지 않는다.** 남는 것은 timeout·신호·그 밖의 실패뿐이다.
+# `$$` 는 systemd 가 아니라 `sh` 가 펼치라는 뜻이고, stderr 를 버려 정상 경로의 「No such container」가
+# journal 에 쌓이지 않게 한다(journal 이 유일한 창구다 — 무해한 오류 줄이 사람을 길들인다).
 # **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
-ExecStopPost=-/usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep >/dev/null 2>&1 || true'
 ```
 
 ```ini
@@ -517,7 +529,9 @@ journalctl -u bidvector-notification-sweep -n 50
 하한 미만이다 · 잠금을 열지 못했거나 반입·되돌림·다른 훑기가 도는 중이다 · 반입 기록이 없거나 손상됐다 ·
 끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · **트리가 그 release 의
 커밋이 아니거나 추적 파일이 더럽다**(§9.1 — `git checkout` 뒤 다시) · app 설정 통로가 기대와 다르다 ·
-**지난 run 의 일회 컨테이너가 남아 있다**(문면의 이름을 `docker logs` 로 보고 `docker rm -f`).
+**해석된 프로젝트 이름이 잠금을 잡은 이름과 다르다**(`--project` 에 정규화 전 글자를 준 경우) ·
+**지난 run 의 일회 컨테이너가 남아 있다**(문면의 이름을 `docker logs` 로 보고 `docker rm -f`) ·
+**일회 컨테이너 이름이 전역에서 이미 쓰이고 있다**(이 프로젝트 밖의 컨테이너 — 이름 공간은 전역이다).
 **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
 신호로 끝난 run 은 `3` 이 아니라 **그 신호**로 끝난다(journal 의 `signal=TERM`) — 그 경로에서 이 run 의
 일회 컨테이너는 스스로 치운다.
@@ -596,6 +610,10 @@ app 여유를 더하는 문면.
 13. **일회 컨테이너가 남으면 다음 주기부터 훑기가 멈춘다**(§9.1 의 `exit 3`). 러너는 자기 것만 치우고 남의
    것은 손대지 않으므로, KILL 로 죽거나 docker 쪽이 실패해 남은 컨테이너는 사람이 `docker rm -f` 로 치워야
    한다 — 그때까지 시간 기반 알림이 발화하지 않는다(외부 발송이 없어 journal 이 유일한 창구다, §9.4).
+   잔존 검사의 경계는 **이 프로젝트의 `app` 서비스 일회 컨테이너**다: 같은 프로젝트의 `compose run postgres`·
+   `run ml-serving` 잔존과 compose 밖에서 손으로 띄운 컨테이너는 세지 않는다. 반입(`prod-deploy.sh`)도 이
+   검사를 하지 않는다 — 계약이 주기 러너로 좁힌 선택이고, 남은 일회 컨테이너는 잠금의 대상이 아니라
+   반입 중에도 같은 DB 를 쓸 수 있다.
 
 ## 12. 운영 계정 — 처음 한 번 · 비밀 문구 교체
 

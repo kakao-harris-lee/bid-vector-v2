@@ -21,7 +21,8 @@
 # 종료 코드: 러너의 것을 그대로 돌려준다(0 완료 · 1 예외 · 2 적지 못한 알림) · 3 이 스크립트의 전제
 # 실패(env 파일 · compose 판 · 잠금 · 반입 기록 없음·손상 · 끝나지 않은 반입 · manifest 부재 ·
 # 태그 ID 불일치 · **반입 트리가 그 release 의 커밋이 아님·추적 파일 더티** · app 설정 통로 ·
-# **지난 run 의 일회 컨테이너 잔존**). runbook §9.4 가 같은 목록을 갖는다. 신호로 끝나면 그 신호로
+# **해석된 프로젝트 이름이 잠금과 다름** · **지난 run 의 일회 컨테이너 잔존** · **일회 컨테이너 이름이
+# 전역에서 이미 쓰임**). runbook §9.4 가 같은 목록을 갖는다. 신호(TERM·INT·HUP)로 끝나면 그 신호로
 # 죽는다(128+n) — 그 경로에서 이 run 의 일회 컨테이너는 trap 이 치운다.
 set -euo pipefail
 
@@ -95,6 +96,11 @@ _prod_config_surface_ok "$cfg" || _die "${_PROD_SURFACE_ERR} — 훑지 않는�
 # 쓰는 이름과 같아야 한다(`--project` 가 있으면 그것이, 없으면 운영 덧쓰기의 `name:` 이 이긴다).
 PROJ="$(printf '%s' "$cfg" | jq -r .name)"
 [ -n "$PROJ" ] && [ "$PROJ" != null ] || _die "해석된 compose 프로젝트 이름을 읽지 못했다" 3
+# **잠금을 잡은 이름과 같아야 한다.** 잠금은 원문(`--project` 또는 운영 `name:`)으로 잡는데 잔존 조회와
+# 일회 컨테이너 이름은 **해석된** 이름으로 간다 — 둘이 갈리면 같은 프로젝트를 서로 다른 잠금으로 돌게
+# 된다. 반입이 같은 자리에서 `proj == EXPECT_PROJECT` 를 단언하는 것과 같은 사유다(v V-2).
+[ "$PROJ" = "$PROJ_FOR_LOCK" ] \
+  || _die "해석된 프로젝트 이름이 잠금을 잡은 이름과 다르다: ${PROJ} ≠ ${PROJ_FOR_LOCK} — 잠금과 잔존·일회 컨테이너 이름이 다른 자리를 본다" 3
 
 # **지난 run 의 일회 컨테이너가 남아 있으면 훑지 않는다**(7F 장부 v r2 L-2). 술어는
 # `tools/prod-env.sh` 에 둔다. 남은 컨테이너는 운영 DB 자격을 받은 채이고, 떠 있으면 다음 run 과
@@ -115,18 +121,28 @@ echo "notification-sweep: release ${rel} · 프로젝트 ${PROJ}"
 # 접두는 운영자가 §12 로 띄운 다른 일회 컨테이너까지 집는다. 이름을 고정하면 trap 이 **자기 것
 # 하나**만 지운다. 같은 이름의 run 이 겹치는 일은 위 잠금 둘이 이미 막는다(겹치면 돌지 않는다).
 ONEOFF_NAME="${PROJ}-app-run-sweep"
-# 신호(TERM·INT)로 끝나면 — systemd 의 `TimeoutStartSec` 상한이 대표 경우다(runbook §9.2) —
-# `--rm` 이 돌지 않아 **운영 DB 자격을 받은 컨테이너가 남는다.** 치우고 **그 신호로 죽는다**
-# (종료 코드를 꾸미지 않는다 — journal 이 「신호로 끝났다」를 그대로 보게 한다).
+# 이름을 고정하면 **컨테이너 이름 공간이 전역**이라는 사실이 새 실패 축이 된다: 같은 이름이 이 프로젝트
+# **밖**에 있으면 아래 `run` 이 「name already in use」로 죽고 그 rc 가 러너의 「1 예외」와 섞인다
+# (v V4-4 가 닫은 혼동 축 — 위 잔존 조회는 프로젝트 라벨로 좁아 그것을 보지 못한다). 전제 실패로 가른다.
+clash="$(docker ps -aq --filter "name=^${ONEOFF_NAME}$" 2>/dev/null)" \
+  || _die "일회 컨테이너 이름 충돌을 세지 못했다(docker ps 실패) — 판정 불가" 3
+[ -z "$clash" ] \
+  || _die "일회 컨테이너 이름 ${ONEOFF_NAME} 를 이미 다른 컨테이너가 쓰고 있다(이 프로젝트 밖일 수 있다) — 'docker ps -a --filter name=^${ONEOFF_NAME}\$' 로 보고 치운 뒤 다시" 3
+
+# 신호(TERM·INT·HUP)로 끝나면 — systemd 의 `TimeoutStartSec` 상한이 대표 경우이고(runbook §9.2),
+# HUP 은 `KillSignal=` 을 바꾼 unit 과 끊긴 ssh 세션의 손 실행이다 — `--rm` 이 돌지 않아 **운영 DB
+# 자격을 받은 컨테이너가 남는다.** 치우고 **그 신호로 죽는다**(종료 코드를 꾸미지 않는다 — journal 이
+# 「신호로 끝났다」를 그대로 보게 한다).
 _sweep_on_signal() {
   local sig="$1"
-  trap - TERM INT
+  trap - TERM INT HUP
   docker rm -f "$ONEOFF_NAME" >/dev/null 2>&1 || true
   echo "notification-sweep: ${sig} 로 끝났다 — 이 run 의 일회 컨테이너 ${ONEOFF_NAME} 를 치웠다" >&2
   kill -s "$sig" $$
 }
 trap '_sweep_on_signal TERM' TERM
 trap '_sweep_on_signal INT' INT
+trap '_sweep_on_signal HUP' HUP
 rc=0
 "${COMPOSE[@]}" run --rm --no-deps --pull never --name "$ONEOFF_NAME" \
   app --bidvector.notification-sweep.mode=once || rc=$?
