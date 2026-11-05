@@ -2,8 +2,14 @@ package bidvector.buildlogic
 
 import java.io.File
 
-/** 백분율의 자리수. 정책 값이 아니라 「퍼센트」의 정의라 정책 데이터에 두지 않는다. */
-internal const val PERCENT_SCALE = 100
+/**
+ * 비율을 백분율로 옮기는 분모. 정책 값이 아니라 「퍼센트」의 정의라 정책 데이터에 두지 않는다.
+ *
+ * **`PERCENT_SCALE…` 로 부르지 않는다** — legacy 의 `PERCENT_SCALE_THRESHOLD` 는 값 크기로
+ * 단위를 되짚는 **금지 경로**의 이름이고(ADR 0002 D-4 · regression ledger), 그 이름을 닮으면
+ * 금지 경로를 찾는 grep 이 이 상수를 집는다.
+ */
+internal const val PERCENT_DENOMINATOR = 100
 
 /** 한 모듈의 mutation 래칫 — 세 축 전부 **실측값**이고, 내리는 것은 명시적 정책 변경이다. */
 internal data class MutationRatchet(
@@ -43,7 +49,7 @@ internal class MutationPolicy(
 
     fun ratchet(module: String): MutationRatchet {
         val score = requireRatchetInt(module, "score.min-percent")
-        require(score in 0..PERCENT_SCALE) {
+        require(score in 0..PERCENT_DENOMINATOR) {
             "정책 키 'ratchet.$module.score.min-percent' 의 값이 백분율 범위를 벗어난다: $score"
         }
         return MutationRatchet(

@@ -50,7 +50,7 @@ internal fun mutationGateViolations(
         (
             "[$moduleName] mutation 점수 ${parsed.detected}/${parsed.total}(${parsed.scorePercent}%) 가 " +
                 "래칫 ${ratchet.minScorePercent}% 밑이다"
-        ).takeIf { parsed.detected * PERCENT_SCALE < ratchet.minScorePercent * parsed.total },
+        ).takeIf { parsed.detected * PERCENT_DENOMINATOR < ratchet.minScorePercent * parsed.total },
         "[$moduleName] 변이가 닿은 클래스 수 ${parsed.mutatedClasses.size} 가 래칫 ${ratchet.minMutatedClasses} 밑이다"
             .takeIf { parsed.mutatedClasses.size < ratchet.minMutatedClasses },
         "[$moduleName] 리포트가 이 모듈 main 산출물 밖의 클래스를 담았다: ${foreign.sorted()}"

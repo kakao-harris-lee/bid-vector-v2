@@ -27,7 +27,7 @@ internal class MutationReport(
     val mutatedClasses: Set<String> get() = outcomes.map { it.mutatedClass }.toSet()
 
     /** 사람이 읽는 백분율. **판정은 이 값으로 하지 않는다** — 내림이 1점 미만의 하락을 가린다. */
-    val scorePercent: Int get() = if (total == 0) 0 else detected * PERCENT_SCALE / total
+    val scorePercent: Int get() = if (total == 0) 0 else detected * PERCENT_DENOMINATOR / total
 
     companion object {
         fun parse(file: File): MutationReport {
