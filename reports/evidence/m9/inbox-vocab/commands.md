@@ -51,11 +51,12 @@ test 만 넣으면 「바인딩 수가 안 맞는다」가 붉어 **다른 것�
 
 | CI run | head | job 결과 |
 | --- | --- | --- |
-| `42014237148` | `01ea5da0`(병합 전) | check **pass** 45m45s · web **pass** 3m45s · container **pass** 7m17s · ml-engine **pass** 9m28s — **네 job 전부 초록** |
+| `42014237148` | `01ea5da0`(라운드 1 head) | check **pass** 45m45s · web **pass** 3m45s · container **pass** 7m17s · ml-engine **pass** 9m28s — **네 job 전부 초록** |
+| `42029858342` | `457f6114`(라운드 4 head · **판정 SHA**) | check **pass** 50m39s · web **pass** 4m0s · container **pass** 5m56s · ml-engine **pass** 9m25s — **네 job 전부 초록** |
 
-`container` 가 초록인 것이 #126(CVE apt 하한)의 효과다 — 앞 라운드의 같은 job 은 그 CVE 로 붉었다.
-**판정 SHA `606d764c`(병합 커밋)의 run 은 push 뒤에 선다** — push 는 팀장이 하므로 그 run id 와
-판정은 팀장 보고·PR 조치 코멘트가 받는다.
+`container` 가 초록인 것이 #126(CVE apt 하한)의 효과다 — 그 앞 라운드의 같은 job 은 그 CVE 로 붉었다.
+라운드 2·3 의 head(`9a913033`·`60c9d1c1`)는 push 가 팀장 몫이어서 레인이 run 을 띄우지 않았고,
+라운드 4 는 push 허가를 받아 그 head 의 run 을 직접 띄워 위 표에 적었다.
 
 `tools/one-command-check.sh`(check job 의 넷째 step)는 **안 돌렸다.** 그 안의 Kotlin 절과 web
 절은 위와 **같은 명령**이고, ml-engine 절은 acceptance 밖이다(이 slice 의 Python 변경 0 —
