@@ -30,6 +30,7 @@ import {
   CONTAINER_PREFIX,
   processStartToken,
 } from './container-marker.mjs';
+import { FAKE_KONEPS_IDENTITY_HEADER } from './fake-koneps.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -233,12 +234,17 @@ async function main() {
     }),
     'fake-koneps',
   );
+  // 준비 판정은 **오퍼레이션 이름과 무관**하다(M9/portal-02) — 묻는 것이 「서버가 응답하는가」이지
+  // 「그 오퍼레이션이 있는가」가 아니다. 앞 판은 경로를 리터럴로 박고 2xx 를 요구해서, 조달청이
+  // 오퍼레이션명 뒤에 `02` 를 붙인 뒤 이 대기가 영구 404 로 30초 만에 죽었다(수집은 시작도 못 했다).
+  // 404 도 서버가 살아 있다는 증거이므로 상태 코드를 보지 않고, 대신 **fake 가 모든 응답에 싣는
+  // 표지**를 본다 — 그 포트를 다른 프로세스가 잡은 경우를 그것이 가른다.
   await waitFor(
     'fake KONEPS',
     async () => {
       try {
-        const probe = await fetch(`http://127.0.0.1:${konepsPort}/getBidPblancListInfoCnstwk`);
-        return probe.ok;
+        const probe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+        return probe.headers.get(FAKE_KONEPS_IDENTITY_HEADER) !== null;
       } catch {
         return false;
       }
