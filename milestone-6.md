@@ -739,7 +739,13 @@ code-reviewer(sonnet), Codex 없음. rollback 의 공유 파일 절차는 이 �
 `-FREE-TEXT-PII-AXIS` 의 「운영 첫 실행 전 실표본 판독」 선행 조건은 그대로이고 runbook 의 알려진 제한이 그
 자리를 든다. **`-BLOAT-AFTER-FIRST-PURGE` 의 전제는 이 개정이 움직였다** — 기간을 늘리면 첫 파기 집합이
 **줄어** 부풀음 우려가 미뤄진다(반대 방향이다). 목록의 나머지 둘 가운데 **6B-4 도 열려 닫혔고**(PR #71,
-2026-10-14) **6F-5-b 만 열리지 않았다** — 둘의 처분은 이 정정의 범위가 아니다(cr H-1).
+2026-10-14) **6F-5-b 만 열리지 않았다**(cr H-1). 6B-4 가 받은 OPEN 둘의 상태는 **아래 M9/budget-clear 정정**이
+적는다 — 이 slice 는 그 처분을 하지 않는다.
+
+**정정 2026-11-05(M9/budget-clear)** — 위 셋 가운데 **6B-4 는 열렸고 머지됐다**(PR #71): 받은 둘의 상태는
+`OPEN-5E-JOB-PERSISTENCE` **닫는 후보** · `OPEN-5E-JOB-QUEUE-BOUND` **부분 종결 후보**(근거는
+`reports/evidence/m6/6b4/checklist.md` 의 OPEN 처분 절). 6B-3 은 그대로이고 6F-5-b 는 **사용자 결정
+2026-11-05 로 보류**다.
 
 **배선 뒤**: **6D**(E2E·장애 주입) · **6E**(제품 acceptance·운영 runbook — `OPEN-6A1-CONNECTION-POOL` 이
 여기서 닫혀야 운영 반입이 가능하다).

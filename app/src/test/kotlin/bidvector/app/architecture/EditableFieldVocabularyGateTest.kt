@@ -5,6 +5,7 @@ import bidvector.app.http.EDITABLE_FIELD_TOKENS
 import bidvector.app.http.EDIT_SESSION_STATE_SAMPLES
 import bidvector.app.wiring.EditValue
 import bidvector.app.wiring.EditValueSlot
+import bidvector.app.wiring.acceptsClearing
 import bidvector.app.wiring.valueSlot
 import bidvector.app.wiring.withFieldValue
 import bidvector.strategy.StrategyDraft
@@ -16,6 +17,7 @@ import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
@@ -96,6 +98,35 @@ class EditableFieldVocabularyGateTest {
 
         changed.forEach { (field, draft) -> withClue(field) { draft shouldNotBe base } }
         changed.size shouldBe EDITABLE_FIELDS.size
+    }
+
+    /**
+     * **비움도 같은 축이다**(M9 D-1) — 「받는가」(파서가 묻는 표)와 「무엇을 하는가」(패치표)가 한
+     * 자리에서 나오므로, 필드 전수를 태워 받는 필드는 **값을 세운 초안을 실제로 되돌리고** 받지
+     * 않는 필드는 터진다는 것을 고정한다.
+     *
+     * 받는 집합을 손 목록으로 적지 않는다: 이 단언은 집합이 늘거나 줄어도 그 자리에서 **뜻**을
+     * 재므로, 받는다고 선언만 해 두고 아무것도 비우지 않는 꼴(200 인데 변화 0)을 잡는다.
+     */
+    @Test
+    fun `비움을 받는 필드는 값을 세운 초안을 되돌리고 나머지는 비움을 거부한다`() {
+        val base = StrategyDraft()
+        // **두 갈래가 모두 한 번은 돌아야 한다** — 받는 집합이 0 이면 되돌림 단언이, 받는 집합이
+        // 전부이면 거부 단언이 공허하게 통과한다. 뒤 가드가 없던 판은 그 꼴을 변이에만 기댔고,
+        // 변이는 세션과 함께 죽는다(cr L-3).
+        EDITABLE_FIELDS.any { it.acceptsClearing() } shouldBe true
+        EDITABLE_FIELDS.any { !it.acceptsClearing() } shouldBe true
+
+        EDITABLE_FIELDS.forEach { field ->
+            val set = base.withFieldValue(field, sampleValue(field.valueSlot()))
+            withClue(field) {
+                if (field.acceptsClearing()) {
+                    set.withFieldValue(field, EditValue.Cleared) shouldBe base
+                } else {
+                    shouldThrow<IllegalStateException> { set.withFieldValue(field, EditValue.Cleared) }
+                }
+            }
+        }
     }
 
     private fun <T> withClue(
