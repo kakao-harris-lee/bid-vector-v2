@@ -109,3 +109,17 @@ jar 내용과 같은가 — `OPEN-6G-RELEASE-SHA-LABEL`) · 기존 행의 소급
 
 **세 표가 같은 모양을 쓴다** — 「기존 행은 NULL(모름), 새 행·새 전이는 구조가 요구」. 지어낸 값으로
 과거를 채우지 않고, 앞으로의 누락은 CHECK·트리거가 막는다.
+
+## 구현 중 갱신 (같은 slice, 실측으로 갈린 둘)
+
+1. **V28 의 표가 넷 → 둘.** 위 표는 `notice`·`opening_result` 에 열을 더하고 `observation_key` 로
+   backfill 한다고 적었다. 두 사실이 그 계획을 접었다 — ① 그 두 표의 릴리스는 **조인으로 이미
+   도달한다**(NOT NULL FK → `raw_observation.release_sha` NOT NULL): 열을 더하면 같은 사실이 두
+   자리에 살고 한쪽만 바뀌는 날이 온다 ② backfill 의 `UPDATE` 가 V2 의 **판 번호 증가·감사 행 삽입
+   트리거를 깨운다** — 되돌림이 아닌 변경을 감사 장부에 쌓는다. 그래서 칸은 되짚을 경로가 **아예
+   없는** 두 표(`collection_run`·`outbox`)에만 두고, 조인 갈래의 전제 셋을 test 로 고정했다.
+2. **`ReleaseIdentifier` 는 `value class` 가 아니다.** 인라인 클래스가 JVM 시그니처에서 `String`
+   으로 지워져 Spring 타입 주입이 깨졌다(배선 test 일곱 RED). (2b) 표의 「공백 거부」 축은 그대로다.
+
+**(2b) 표에 더해지는 새 public 표면 둘**: `JdbcBaseAmountClassificationStore`(adapters.ml — 의존
+게이트가 정한 자리, `JdbcCompetitionSampleSource` 와 같은 사유) · `DiscardingBaseAmountClassificationRecordPort`(부작용 없는 조립이 끼우는 구현 — 획득자가 할 수 있는 일은 **아무것도 하지 않는 것**뿐).
