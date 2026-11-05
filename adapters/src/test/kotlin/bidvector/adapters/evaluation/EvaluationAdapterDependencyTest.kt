@@ -1,5 +1,8 @@
 package bidvector.adapters.evaluation
 
+import bidvector.procurement.Notice
+import bidvector.workflow.evaluation.WatchSubjectOutcome
+import bidvector.workflow.evaluation.WatchSubjectPort
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -191,6 +194,71 @@ class EvaluationAdapterDependencyTest {
     }
 
     /**
+     * `OPEN-6F4W-UNAVAILABLE-PRODUCER` — **메서드 축 허용 목록은 `data object` 반환을 보지
+     * 못한다.** 위 부분집합 검사는 `Methodref`/`InterfaceMethodref` 만 읽는다. `subjectFor` 를
+     * `WatchSubjectOutcome.Unavailable` 반환으로 바꾸면 그 반환은 `getstatic …$Unavailable
+     * .INSTANCE` 하나 — **`Fieldref` 라 그 regex 밖**이고, 사라지는 `Found.<init>` 은 부분집합
+     * 검사가 「없어졌다」로 세지 않는다(부재는 부분집합을 깨지 않는다). 패키지 단위
+     * [ALLOWED_ROOTS] 도 `bidvector.workflow.evaluation` 을 이미 허용한다.
+     *
+     * 그래서 같은 두 class 의 **필드 참조**도 허용 목록으로 좁힌다. 이 축이 지는 주장 둘 —
+     * ① `NoticeWatchSubjectPort` 는 `Unavailable` 을 **낼 수 없다**(D-6F4W-3, 이 OPEN 의 판단) ·
+     * ② `baseAmount` 부재의 사유는 `ReasonCode.EMPTY_INPUT` **고정**이다(D-6F4W-4) — 다른
+     * `ReasonCode` 상수로 갈아치우면 좌표가 바뀌어 이 집합을 벗어난다.
+     */
+    @Test
+    fun `NoticeWatchSubjectPort 의 컴파일된 클래스가 참조하는 필드는 허용 목록의 부분집합이다`() {
+        val classFiles =
+            listOf(
+                File("build/classes/kotlin/main/bidvector/adapters/evaluation/NoticeWatchSubjectPort.class"),
+                File("build/classes/kotlin/main/bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.class"),
+            )
+        classFiles.forEach { classFile ->
+            check(classFile.isFile) {
+                "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+            }
+        }
+
+        val disallowed = classFiles.flatMap(::fieldReferences).toSet() - ALLOWED_FIELD_REFERENCES
+
+        disallowed shouldBe emptySet()
+    }
+
+    /**
+     * 양성 대조 — [UnavailableProducingPortFixture] 는 `subjectFor` 가
+     * `WatchSubjectOutcome.Unavailable` 을 내도록 바꾼 형태다(이 OPEN 이 묻는 그 갈래).
+     * 그 반환이 남기는 `Fieldref` 가 [ALLOWED_FIELD_REFERENCES] 밖이라 필드 축 술어가 실제로
+     * 걸린다 — **메서드 축만으로는 이 표본이 통과한다**(바로 아래 음성 대조가 그것을 잰다).
+     */
+    @Test
+    fun `Unavailable 을 내는 표본은 필드 축 술어에 걸린다 — 양성 대조`() {
+        val disallowed = fieldReferences(unavailableFixtureClassFile()) - ALLOWED_FIELD_REFERENCES
+
+        disallowed shouldBe setOf(UNAVAILABLE_FIELD_REFERENCE)
+    }
+
+    /**
+     * 음성 대조 — 같은 표본이 **메서드 축에서는 걸리지 않는다**. 이 한 줄이 필드 축을 더한
+     * 이유 그 자체다: 축을 더하지 않으면 `Unavailable` 반환은 구조 게이트 전부를 통과하고
+     * 거동 test(`NoticeWatchSubjectPortTest`)만 남는다.
+     */
+    @Test
+    fun `Unavailable 을 내는 표본은 메서드 축 술어에 걸리지 않는다 — 음성 대조`() {
+        val disallowed = methodReferences(unavailableFixtureClassFile()) - ALLOWED_METHOD_REFERENCES
+
+        disallowed shouldBe emptySet()
+    }
+
+    private fun unavailableFixtureClassFile(): File {
+        val classFile =
+            File("build/classes/kotlin/test/bidvector/adapters/evaluation/UnavailableProducingPortFixture.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileTestKotlin 선행 필요"
+        }
+        return classFile
+    }
+
+    /**
      * D-6A3-17(a) — 우회 2 시정. [EvaluationAdapterDependencyTest]
      * 의 `ALLOWED_ROOTS`(패키지 단위 허용)는 `bidvector.adapters.persistence`를 이미 허용하므로
      * (다른 클래스 — `JdbcCandidateSource` 등 — 가 정당하게 그 패키지를 쓴다) `RecordingNotification
@@ -328,6 +396,43 @@ private fun methodReferences(classFile: File): Set<String> =
         .findAll(javapOutput(classFile))
         .map { it.groupValues[1].trim() }
         .toSet()
+
+/**
+ * `OPEN-6F4W-UNAVAILABLE-PRODUCER` — [METHOD_REFERENCE_COMMENT] 의 필드 축 짝. Kotlin 의
+ * `data object` 는 `INSTANCE` **필드**로 컴파일되므로 그 갈래를 내는 일은 메서드 참조를 하나도
+ * 남기지 않는다.
+ */
+private val FIELD_REFERENCE_COMMENT = Regex("""#\d+ = Fieldref\s+#\d+\.#\d+\s*// (.+)""")
+
+private fun fieldReferences(classFile: File): Set<String> =
+    FIELD_REFERENCE_COMMENT
+        .findAll(javapOutput(classFile))
+        .map { it.groupValues[1].trim() }
+        .toSet()
+
+/**
+ * `NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt` 두 class 의 필드 참조 전수(`javap -p -v`
+ * 실측) — **하나뿐이다**. D-6F4W-4 의 고정 사유 상수가 그것이고, 어댑터가 읽는 다른 전역
+ * 상태는 없다.
+ */
+private val ALLOWED_FIELD_REFERENCES =
+    setOf(
+        "bidvector/sharedkernel/ReasonCode.EMPTY_INPUT:Lbidvector/sharedkernel/ReasonCode;",
+    )
+
+/** 양성 대조가 기대하는 좌표 — [UnavailableProducingPortFixture] 가 남기는 `data object` 필드 참조. */
+private const val UNAVAILABLE_FIELD_REFERENCE =
+    "bidvector/workflow/evaluation/WatchSubjectOutcome\$Unavailable.INSTANCE:" +
+        "Lbidvector/workflow/evaluation/WatchSubjectOutcome\$Unavailable;"
+
+/**
+ * [EvaluationAdapterDependencyTest] 의 필드 축 양성·음성 대조 전용 표본 — production 코드가
+ * 아니다. `NoticeWatchSubjectPort` 를 `Unavailable` 반환으로 바꾼 형태를 흉내 낸다
+ * (`OPEN-6F4W-UNAVAILABLE-PRODUCER` 가 묻는 그 갈래).
+ */
+internal class UnavailableProducingPortFixture : WatchSubjectPort {
+    override fun subjectFor(notice: Notice): WatchSubjectOutcome = WatchSubjectOutcome.Unavailable
+}
 
 /**
  * [EvaluationAdapterDependencyTest]의 양성 대조 전용 표본 — production 코드가 아니다.
