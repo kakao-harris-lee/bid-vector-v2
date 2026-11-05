@@ -14,7 +14,7 @@
 -- 「아무도 못 땄다」가 한 값이 되면 운영자의 다음 할 일이 가려진다.
 --
 -- 그 어휘를 넓히는 길이 CHECK 재선언이고, 그것이 이 파일이다. 호출 쪽 어휘(Kotlin
--- `NotificationDetail`·`AwardOutcome`)와 이 CHECK 가 **같은 집합**이라는 등식은
+-- `NotificationDetail`·`AwardResult`)와 이 CHECK 가 **같은 집합**이라는 등식은
 -- `NotificationInboxPrivacyTest` 가 제약 정의에서 어휘를 읽어 잰다 — 한쪽만 늘리면 빌드가 붉다.
 --
 -- **열을 더하지 않는다.** 결과 셋은 detail 어휘 하나로 표현되고, 열을 더하면 V23 이 세운 성질
