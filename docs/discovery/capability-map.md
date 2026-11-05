@@ -493,6 +493,17 @@ pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**�
   - 같은 키워드가 title 또는 requirements에 있으면 후보다.
   - 제외 키워드가 description에만 있으면 후보를 떨어뜨리지 않는다.
   - 중점 지역은 description을 포함한 전체 텍스트에 매칭된다.
+- **승인 문면의 축소 — 요건 축은 아직 없다**(M6/6F-4 결정 A · `OPEN-6F4-STR02-REQUIREMENTS-AXIS`).
+  위 둘째 줄의 뒷절(「또는 requirements」)에 대응할 데이터가 V2 에 없다: V2 `qualification_text` 는
+  면허제한 오퍼레이션 응답(면허명·허용업종·업종분야)이라 업무 키워드가 들어올 자리가 아니고,
+  요건 원문을 싣는 축은 LLM 추출(6F-5-b)과 본문 출처(`OPEN-6F4-NOTICE-BODY-SOURCE`)에 걸려 있다.
+  **사용자 결정 2026-11-05 — 6F-5-b LLM 추출 보류.** 그래서 이 축소는 **그대로 유지**되고 받는
+  자리도 여전히 6F-5-b 다(그 slice 가 열리면 이 줄과 OPEN 행을 함께 다시 본다).
+  지금 상태는 **구조로 닫혀 있다**: 감시 텍스트의 production 생산자가 하나(`NoticeWatchSubjectPort`)
+  이고 그 컴파일된 클래스의 상수 풀이 **허용 목록의 부분집합**이어야 한다
+  (`EvaluationAdapterDependencyTest`, 양성 대조 동반) — 요건 원문을 그 텍스트에 실으려면 게이트
+  자체를 바꿔야 하므로 「조용히 늘어나는」 길이 없다. M9/budget-clear 가 그 단언이 살아 있음을
+  확인했고 코드 변경은 0 이다.
 - **재사용 후보**: `scripts/seed_marine_gate.py:70-79`의 제외 어휘 주석은 하나하나가
   관찰된 오탐 사례다(해양·수산→기관명, 해상→해상보험, 매립→폐기물매립지, 등대→
   등대운영관리, 수중→수중생태조사, 준설→하수관로/저수지 준설). fixture-curator가 회귀
@@ -3742,6 +3753,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-STR-02` | 온보딩 확정 직후 미리보기 노출 창의 실제 크기 | **실행 검증** — M4/M6 · slice 미지목 | 관측 (**미측정**) | **유도** |
 | `OPEN-STR-04` | 실험이 운영자 전략을 무승인 갱신하는 현행이 의도인가 | **M4 4A**(Strategy edit state machine) | **운영자** (legacy 의도 판정) | **유도** |
 | `OPEN-STR-12` | 대화형 채널(Telegram) 전략 편집을 V2 capability로 채택할 것인가 | **M4 4A** | **운영자** (범위) | **유도** |
+| `OPEN-6F4-STR02-REQUIREMENTS-AXIS` (M6/6F-4 결정 A 신설 · **M9/budget-clear 상태 갱신 2026-11-05**) | STR-02 acceptance 둘째 줄의 「또는 requirements」에 대응할 데이터가 V2 에 없어 **승인 문면이 축소된 채**다. 요건 원문을 싣는 축은 LLM 추출과 본문 출처에 걸려 있다 — 짝 OPEN 둘: `OPEN-6F5-EXTRACTION-FILL` · `OPEN-6F4-NOTICE-BODY-SOURCE` | **6F-5-b**(요건을 채우는 LLM 추출) — **사용자 결정 2026-11-05 보류**. 그때까지 축소 유지이고 「요건 원문이 감시 텍스트에 실리는 production 경로 0」은 상수 풀 허용 목록 게이트가 든다(`EvaluationAdapterDependencyTest`) | **운영자**(실 LLM 호출 승인 + 범위) | **유도**. 상세는 위 STR-02 절의 「승인 문면의 축소」 |
 | `OPEN-2A-CANONICAL-FORM` (M2/2A 신설, 2026-09-06) | round-trip 의 canonicalization 방식 — protobuf deterministic serialization 이 canonical 로 충분한가(2A 는 map 필드 0 인 범위에서 실측·제안) | **M2 2D**(게이트 증명 시 확정) | 2D 실측 → 운영자 | **정본**(`reports/evidence/m2/2a/scope.md` OPEN 표) |
 | `OPEN-2A-INCLUDED-BUILD` (M2/2A 신설, 2026-09-06 · **2D 종결 2026-09-07 상태 갱신**) | 게이트 밖 빌드 하나(`ml-contract`, included build)의 존재 — 「그 빌드에 손으로 쓴 소스가 생기지 않는다」를 **2D `contractGate` (f) 가 상시 단언**(`ml-contract/src` 부재 + 최상위 파일 셋, 회귀 실측). `ADR 0006` D-6 에 M2 결정으로 기록. OPEN 은 「게이트가 지킨다」 상태로 남고 닫힘 여부는 `ADR 0006` 모듈 목록 개정 시 운영자 결정 | **게이트가 지킴**(2D) · 잔여는 ADR 0006 모듈 목록 개정 | 운영자 | **정본**(2A scope OPEN 표 · 2D checklist 알려진 제한 6) |
 | ~~`OPEN-2A-RELEASE-CHECK-4D`~~ **닫힘(M4/4D-1, 2026-09-10)** (M2/2A 신설, 2026-09-06) | 제3 변환 금지(`ADR 0010` D-3)의 **client 집행** — `latest_promoted` 응답의 `release_id` 를 `GetModelMetadata.promoted` 와 대조하는 규칙은 M2 에서 fake 위의 test 까지이고 실제 client 는 M4 4D 소유. 4D 착수 계약이 그 test 를 실제 배선에 재사용해야 한다 | ~~M4 4D~~ **M4/4D-1 이 닫음** — `bidvector.adapters.ml.releaseSatisfiesSelector`(2B `PredictionContractTest` 술어 승격) + `GrpcBidPredictionGateway.handleSuccess`가 같은 `predict` 호출 안에서 `GetModelMetadata` 를 부른다(D-4D-4). 증거: `ReleaseCheckTest`·`GrpcBidPredictionGatewayTest` | 4D-1 착수 계약 | **정본**(2A scope OPEN 표) — `reports/evidence/m4/4d/scope.md` D-4D-3·D-4D-4 |
