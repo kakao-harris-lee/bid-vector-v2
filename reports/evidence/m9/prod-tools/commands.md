@@ -82,3 +82,19 @@
 - 원복 뒤 재실행: exit 0 (`통과 57 · 어긋남 0`) · `git status --porcelain` 빈 출력.
 - 운영 자리: 실행 뒤 `/run/lock/bidvector-v2` 에 남은 파일은 운영 것 하나뿐(검사 파일 잔존 0) ·
   디렉터리는 **만들지 않았고** 소유자·권한 그대로.
+
+## 2026-11-05 — 수정 라운드 2 (PR #122 v r2 F-1·F-2·F-3 — 장부층 low 셋)
+
+- cmd: `./tools/prod-guards-check.sh`(단언을 세운 뒤) → exit 0, `통과 60 · 어긋남 0`(57 + 3).
+  **산출물 변경 0** — 셋 다 산출물의 결함이 아니라 「검사가 재지 못한 축」이었다.
+- cmd: `bash -n` 다섯 파일 · `./tools/prod-env-keys-check.sh`(S-27) → exit 0 / 0.
+
+| 변이(앞 라운드엔 전부 초록이었다) | exit | 어긋남 |
+| --- | --- | --- |
+| F-1a runbook 에서 `\|\| [ "$$EXIT_STATUS" = 3 ]` 조항 삭제 | 1 | 1 |
+| F-1b `$$SERVICE_RESULT` → `${SERVICE_RESULT}`(systemd 가 미리 빈 값으로 펼친다) | 1 | 1 |
+| F-2 잠금 자리 점검 **호출 줄** 삭제 | 1 | 3 |
+| F-3 충돌 조회 `docker ps -aq` → `-q` | 1 | 2 |
+
+- 원복 뒤 재실행: exit 0 (`통과 60 · 어긋남 0`) · `git status --porcelain` 빈 출력.
+- rollback: 복원 목록 같은 일곱 경로(재산출) · 임시 clone 재실측 ①~⑥ 통과 — 실측 HEAD 는 `rollback.md`.
