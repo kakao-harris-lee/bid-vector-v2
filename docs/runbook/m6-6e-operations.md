@@ -760,6 +760,19 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
    caddy 판 자체는 상류 릴리스를 따른다 — 상류가 고친 판을 내면 `go get github.com/caddyserver/caddy/v2@<판>`
    과 두 Dockerfile 의 `org.bidvector.caddy` 라벨·`CADDY_VERSION` 을 함께 옮긴다. 두 이미지의 바이너리가
    같은지는 `tools/local-tls-build.sh` 의 sha256 등식이 잡는다.
+   **넷째 갈래 — 베이스가 수정판을 담지 않을 때 런타임 stage 에서 OS 패키지 하한을 직접 올린다**
+   (chore 2026-11-05 부터 app·ml-serving 의 `apt`·`libapt-pkg*`). **조건**: finding 이 OS 패키지인데
+   **같은 태그의 최신 index 가 수정판을 담지 않는다** — 그때는 첫째 갈래(베이스 다이제스트)가 닫는 것이
+   0 이다. 이 조건은 말이 아니라 숫자로 확인한다(최신 index 의 그 패키지 판·배포판 문자열·패키지 수를
+   앞 회차와 대조). **처방**: 그 이미지의 **runtime stage 에서** 지목한 패키지만 `apt-get install
+   --only-upgrade`(`--no-remove` 와 `-o Acquire::Retries=3` 를 함께, 재시도 없는 네트워크 의존을 만들지
+   않는다) 로 올리고, 하한을 **같은 RUN 안의 별개 술어**(`dpkg --compare-versions … ge <하한>`)로
+   단언한다 — 후보가 하한 아래면 그 자리에서 빌드가 비-0 이다. **자리**: `docker/app.Dockerfile` ·
+   `docker/ml-serving.Dockerfile` 의 runtime stage(builder stage 에 넣지 않는다 — 그 layer 는 출하
+   이미지에 없다). 하한을 `pkg=<판>` 정확 고정으로 쓰지 않는다: pocket 이 다음 판으로 갈아치우는 날
+   모든 빌드가 붉어진다. `apt-get upgrade` 로 넓히지도 않는다 — `base-files` 가 움직이면 §8.3.1 의 4
+   가 함께 강제된다. 이 갈래는 **배포판 아카이브에 수정판이 이미 있을 때만** 선다(없으면 둘째 갈래다).
+   베이스가 나중에 수정판을 담으면 이 하한은 조용한 no-op 이 되므로 §8.3.1 의 5 가 그 처분을 맡는다.
 2. **등재한다(유예).** 지금 올릴 수 없으면 사유와 만료일을 적어
    `config/quality/vuln-allowlist.properties` 에 넣는다. 등재는 **면제가 아니라 기한부 유예**다.
 
@@ -777,13 +790,18 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 통째로 바뀌어도 `Name` 이 그대로다(M6/6E-2c 의 앱 베이스 상향이 실제로 그 경우였고, 정책 편집 없이 통과했다).
 그쪽에서 베이스 교체를 잡는 것은 **위생 게이트의 layer 체인**(아래 3)이지 이 축이 아니다.
 
-상향 커밋은 그래서 늘 넷을 함께 움직인다(4 는 해당할 때):
+상향 커밋은 그래서 늘 다섯을 함께 움직인다(4·5 는 해당할 때):
 
 1. Dockerfile 의 `FROM`(stage 마다) — 다이제스트까지
 2. 같은 파일의 `LABEL org.bidvector.baseimage`(보조 정보지만 어긋나면 diff 에서 거짓말을 한다).
    web·proxy 는 라벨이 **둘**이다 — `org.bidvector.caddy` 도 caddy 판을 손으로 적는다(셋째 갈래)
 3. `config/quality/image-hygiene-policy*.properties` 의 `base.image.digest`
 4. 배포판이 바뀌었으면 `config/quality/vuln-policy.properties` 의 `scan.os.*`
+5. **그 이미지에 런타임 stage 패키지 하한(넷째 갈래)이 있으면 치울지 판단한다** — 새 베이스가 그
+   수정판을 담았으면 그 `RUN` 은 조용한 no-op 이 된다(하한 단언은 그때도 참이므로 **어떤 게이트도
+   끊지 않는다**). 판단은 재서 한다: 새 베이스에서 그 패키지의 판이 하한 이상이고 스캔 결과에 그 CVE
+   가 없으면 `RUN` 과 주석을 함께 지운다(네트워크 의존 하나와 빌드 시점 가변 입력 하나가 같이
+   사라진다). 아직 아래면 하한을 그대로 둔다. 남길 때도 지울 때도 그 판단을 상향 커밋 문면에 적는다.
 
 **4 는 기계적으로 옮겨 적지 않는다.** 새 값을 적기 **전에** 둘을 본다 — ⓐ 그 회차의 `findings_total` 이
 앞 회차와 비교해 무너지지 않았는가(크게 줄었는데 나열 수가 그대로면 DB 가 그 배포판을 못 덮는 신호다)
@@ -797,7 +815,8 @@ allowlist 등재 수와 이번에 적용된 수 · 미등재 수.
 **2(LABEL)는 어떤 게이트도 읽지 않는다 — 리뷰가 진다.** `tools/image-hygiene-check.sh` 는 그 라벨을
 요약에 `base-label(보조)=…` 로 찍기만 하고 어떤 비교에도 쓰지 않는다(저장소 전체에서 그 라벨을 읽는
 다른 자리도 없다). 그래서 **라벨만 옛 다이제스트로 남아도 전부 초록**이고, 그 상태의 Dockerfile 은
-자기 `FROM` 에 대해 거짓말을 한다. 2 는 diff 에서 사람이 본다.
+자기 `FROM` 에 대해 거짓말을 한다. 2 는 diff 에서 사람이 본다. **5 도 같은 성질이다** — no-op 이 된
+하한은 초록이라, 치울 기회는 베이스를 올리는 그 커밋에 한 번 온다.
 
 **위생 정책의 실측 주석도 함께 다시 잰다** — 크기 · 의존 layer 항목 수 · 금지/필수 실행 파일. 특히
 `required.executables`(오늘은 `curl`)는 **새 베이스에서 사라질 수 있고**, 그러면 증상은 compose
