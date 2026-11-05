@@ -185,3 +185,56 @@
   `git diff 79f3e5c4..HEAD --numstat -- web/` 의 합
 - exit: 0
 - 핵심 결과: evidence 400 줄 대 산출물 1525 줄 — evidence ≤ 산출물
+
+## 계약 갱신 2026-11-05 뒤 — 추가 실측
+
+### 2026-11-05T08:25Z — D-1 갱신의 RED
+- cmd: `npx vitest run src/display/timeDisplay.test.ts` (web)
+- exit: 1
+- 핵심 결과: 문면을 축어로 바꾼 단언이 `expected '—' to be '값 없음'` 으로 떨어졌다
+
+### 2026-11-05T08:30Z — 등재가 실제로 무는가 (변이 ④, D-5)
+- cmd: 등재한 게이트 test 의 한 `describe` 를 `skip` 으로 바꿔치운 뒤
+  `npx vitest run`(W-6) 과 `npm run gate:tests`(W-7)
+- exit: **0 / 1**
+- 핵심 결과: **W-6 는 초록인데 W-7 이 집었다**(「꺼진 단언이 있다 — skipped 2」). 등재하지
+  않았다면 그 꺼진 단언이 초록인 채 지나간다. 원복 뒤 둘 다 0
+
+### 2026-11-05T08:45Z — 기존 줄 무편집 확인 (D-5)
+- cmd: 등재 전 사본과 등재 뒤 파일의 앞부분을 `diff`
+- exit: 0
+- 핵심 결과: 차이 없음 — **추가 줄만** 들어갔다
+
+### 2026-11-05T08:50Z — 캡처 재촬영 (D-6, 첫 시도)
+- cmd: `npm run capture:usecase` (web)
+- exit: 1
+- 핵심 결과: 12 장은 찍혔고 **manifest 단계에서 거부** — 「`web/` 에 커밋되지 않은 변경이
+  있다」(캡처 스크립트 수정이 아직 미커밋). 계약이 예고한 순서다(커밋 뒤에 촬영)
+
+### 2026-11-05T08:55Z — 캡처 재촬영 (커밋 뒤)
+- cmd: `npm run capture:usecase` (web)
+- exit: 0
+- 핵심 결과: `끝 — 12 장 · 합 1,010,745 바이트`. 여덟 장과 manifest 가 바뀌었다
+  (`a-start` 는 시각·금액을 그리지 않고 `d-bid-box` 는 그 건이 「없음」이라 바이트 동일)
+
+### 2026-11-05T09:00Z — 재촬영 산출물을 눈으로 확인
+- cmd: `docs/usecase/captures/inbox-desktop.png` · `c-worksheet-desktop.png` 열람
+- exit: 0
+- 핵심 결과: 알림함 항목 시각이 `2026-11-05 17:28` 꼴 · 워크시트 기초금액이
+  `1,500,000,000원 (기초금액 · 과세 구분 모름 · 공고 게시값)` · 마감이 `2026-11-13 17:28 (D-7)`
+
+### 2026-11-05T09:20Z — acceptance 재실측 W-1~W-13
+- cmd: CI `web` job 의 명령 그대로
+- exit: 전부 0
+- 핵심 결과: vitest `733 passed (37 파일)` · 셸 스모크 2 · 여정 11(flaky 0 · 건너뜀 0 · spec 4/4)
+
+### 2026-11-05T09:35Z — S-20 재실측 (첫 시도, RED)
+- cmd: `~/.local/bin/bv-build.sh ./tools/one-command-check.sh`
+- exit: 1
+- 핵심 결과: `leakPatternGate` 가 checklist 의 한 줄을 **baseline 밖 새 매치**로 세웠다 —
+  금액 어휘 상수의 이름을 산문에 적은 자리. baseline 에 등재하지 않고 **문장을 고쳤다**
+
+### 2026-11-05T09:40Z — evidence 자기매치 재측정 (참조형)
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m9/screen-display/`
+- exit: 1(매치 없음)
+- 핵심 결과: 매치 0
