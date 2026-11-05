@@ -233,9 +233,13 @@ export function BidBoxCard({
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">시점</dt>
           <dd className="text-sm">
-            <span data-testid={`checkpoint-at-${bidCase.caseId}`}>
-              <InstantText display={instantDisplayOf(bidCase.nextCheckpointAt)} />
-            </span>
+            {/* testId 는 **`InstantText` 자신이 단다**(r1 cr LOW) — 래퍼에 달면 같은 뜻의 칸이
+                DOM 모양 둘이 되고, e2e 가 같은 사실을 두 꼴로 묻게 된다(한 쪽에 래퍼가 생기거나
+                사라지면 조용히 미측정이다). 화면 E 와 같은 꼴로 맞춘다. */}
+            <InstantText
+              display={instantDisplayOf(bidCase.nextCheckpointAt)}
+              testId={`checkpoint-at-${bidCase.caseId}`}
+            />
           </dd>
         </div>
       </dl>

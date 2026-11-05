@@ -157,7 +157,8 @@ describe('화면 D — 카드가 보이는 값은 API 응답의 값이다', () =
     const slot = await screen.findByTestId('checkpoint-at-11');
     expect(slot.textContent).toBe('2099-01-03 09:00');
     expect(slot.textContent, 'ISO 원문이 화면에 남았다').not.toContain('2099-01-03T00:00:00Z');
-    expect(slot.querySelector('time')?.getAttribute('dateTime')).toBe('2099-01-03T00:00:00Z');
+    // testId 가 `<time>` 자신에 붙는다(r1 cr LOW — 화면 E 와 같은 꼴). 래퍼를 찾지 않는다.
+    expect(slot.getAttribute('dateTime')).toBe('2099-01-03T00:00:00Z');
   });
 });
 

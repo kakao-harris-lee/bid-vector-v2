@@ -95,6 +95,49 @@ describe('벽시계 금지는 화면·표시 파일에서 선다 (D-1)', () => {
     expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(1);
   });
 
+  /**
+   * **`Date` 전역 값 참조 자체가 막힌다**(r1 v L-1). 앞 판은 술어가 식별자 이름에 걸린 호출·
+   * 생성 꼴만 보아 아래 전부가 초록이었다(verifier 실측). 값 참조를 막으면 한 술어로 닫힌다.
+   */
+  it('식별자 이름을 비켜 가던 꼴 전부가 RED 다', async () => {
+    const probes = [
+      'export const a = Date();',
+      'export const b = globalThis.Date.now();',
+      'export const c = new globalThis.Date();',
+      'export const d = (() => { const D = Date; return D.now(); })();',
+      'export const e = (() => { const { now } = Date; return now; })();',
+      'export const f = Reflect.construct(Date, []);',
+      'export const g = new Date(...[]);',
+    ];
+    for (const probe of probes) {
+      const [result] = await eslint.lintText(`${probe}\n`, {
+        filePath: resolve(webRoot, 'src/screens/Planted.tsx'),
+      });
+      const hits = result.messages.filter(
+        (one) => one.ruleId === 'no-restricted-globals' || one.ruleId === 'no-restricted-syntax',
+      );
+      expect(hits.length, `${probe} 가 초록이다`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  /** **타입 자리는 값 참조가 아니다** — `now: Date` 를 막으면 화면이 시각을 받지 못한다. */
+  it('타입 자리의 `Date` 는 초록이다', async () => {
+    const [result] = await eslint.lintText('export function f(now: Date): number { return now.getTime(); }\n', {
+      filePath: resolve(webRoot, 'src/screens/Planted.tsx'),
+    });
+
+    expect(result.messages.filter((one) => one.ruleId === 'no-restricted-globals').length).toBe(0);
+  });
+
+  /** test 는 고정 시각 fixture 를 짓는다 — 출하되지 않으므로 대상이 아니다(제외가 의도다). */
+  it('test 파일은 대상이 아니다', async () => {
+    const [result] = await eslint.lintText("export const at = new Date('2026-11-05T00:00:00Z');\n", {
+      filePath: resolve(webRoot, 'src/screens/Planted.test.tsx'),
+    });
+
+    expect(result.messages.filter((one) => one.ruleId === 'no-restricted-globals').length).toBe(0);
+  });
+
   /** API·세션 층은 여전히 대상이 아니다 — 제외가 **의도**임을 여기서 잰다. */
   it('API·세션 층은 대상이 아니다', async () => {
     const session = await lintAs('src/session/planted.ts', 'export const at = new Date();\n');

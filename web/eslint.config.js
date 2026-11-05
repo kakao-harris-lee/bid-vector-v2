@@ -42,6 +42,13 @@ const CLOCK_SITE = 'src/display/timeDisplay.ts';
 const clockMessage =
   '벽시계는 src/display/timeDisplay.ts 의 readClock() 한 자리에서만 읽고 now 를 props 로 내린다 — M9 D-1.';
 
+// **`Date` 전역 값 참조 자체를 막는다**(r1 v L-1). 앞 판의 술어는 식별자 이름 `Date` 에 걸린
+// 호출·생성 꼴만 보았고, 그래서 `Date()` · `globalThis.Date.now()` · `const D = Date; D.now()` ·
+// `Reflect.construct(Date, [])` 가 전부 초록이었다(verifier 실측). 값 참조를 막으면 **그 전부가
+// 한 술어로 닫힌다** — 타입 자리(`now: Date`)는 값 참조가 아니라 그대로 통과한다.
+//
+// 이것이 가능해진 것은 `datetime-local` 변환을 `timeDisplay.localInputToIso` 로 옮겼기
+// 때문이다 — 그 전에는 화면이 `new Date(값)` 을 **정당하게** 써서 금지를 좁힐 수 없었다.
 const CLOCK_SELECTORS = [
   // `Date.now` — 소유자가 `Date` 인 속성 이름으로 잡는다(호출이 아니라 **접근**을 막는다:
   // `const n = Date.now; n()` 도 같은 읽기다).
@@ -55,6 +62,11 @@ const CLOCK_SELECTORS = [
   // **인자 없는** `new Date()` 만 막는다 — `new Date(millis)` 는 시계 읽기가 아니라 변환이고,
   // 그것까지 막으면 서식 모듈이 자기 일을 못 한다.
   { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: clockMessage },
+  // 소유자를 지나 집어 가는 꼴 — `globalThis.Date` · `window.Date` · `globalThis['Date']`.
+  // `no-restricted-globals` 는 **전역 이름 참조**만 보므로 이 꼴이 그 밖에 있었다(실측).
+  // 네트워크 금지와 같은 관례로 **속성 이름**을 본다(소유자를 열거하지 않는다).
+  { selector: "MemberExpression[property.name='Date']", message: clockMessage },
+  { selector: "MemberExpression[computed=true][property.value='Date']", message: clockMessage },
 ];
 
 // 「화면 파일이 `*At` 필드를 직접 보간하는 자리 0」(D-4). 두 자리를 막는다 — **글자 자리**
@@ -204,9 +216,14 @@ export default tseslint.config(
     // 제외는 **의도를 문면으로 남긴다**: `src/api`·`src/session` 은 서버와 말하는 층이라 시각을
     // 그리지 않는다(그 둘이 초록인 것도 게이트 test 가 잰다). `CLOCK_SITE` 는 승인된 한 자리다.
     files: ['src/**/*.ts', 'src/**/*.tsx'],
-    ignores: [CLOCK_SITE, 'src/api/**', 'src/session/**'],
+    // **test 는 대상이 아니다**: 고정 시각 fixture(`new Date('2026-…Z')`)를 짓는 것이 그 일이고,
+    // 그 코드는 출하되지 않는다. ⑨ 의 잔여가 말하는 위험은 **카드가 브라우저 시계로 판정하는**
+    // 것이므로 출하 경로만 닫으면 된다. 이 제외가 의도임을 게이트 test 가 잰다.
+    ignores: [CLOCK_SITE, 'src/api/**', 'src/session/**', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...NETWORK_SELECTORS, ...CLOCK_SELECTORS, ...RAW_INSTANT_SELECTORS],
+      // 값으로서의 `Date` 전역 — 위 선택자들이 못 보는 우회 전부를 한 자리에서 닫는다.
+      'no-restricted-globals': ['error', { name: 'Date', message: clockMessage }],
     },
   },
   {

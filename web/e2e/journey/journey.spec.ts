@@ -309,7 +309,8 @@ async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void>
     // M9 D-1 — 보이는 글자는 **KST 표기**이고 기계 가독 칸이 응답 원문을 든다. 둘 다 잰다:
     // 표기만 보면 원문이 사라진 것을 모르고, 원문만 보면 서식이 틀린 것을 모른다.
     await expect(at).toHaveText(expectedKstText(row.nextCheckpointAt));
-    await expect(at.locator('time')).toHaveAttribute('datetime', row.nextCheckpointAt);
+    // 질의 꼴을 화면 E 와 **하나로** 맞춘다(r1 cr LOW) — testId 가 `<time>` 자신에 붙는다.
+    await expect(at).toHaveAttribute('datetime', row.nextCheckpointAt);
   }
   // 경고는 **서버의 판정 하나**를 따른다 — 있으면 1, 없으면 0 이다(화면이 시각을 비교하지 않는다).
   await expect(card.getByTestId(`overdue-${row.caseId}`)).toHaveCount(row.overdue ? 1 : 0);

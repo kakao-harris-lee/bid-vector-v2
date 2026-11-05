@@ -159,6 +159,21 @@ export function dayCountText(days: number | null): string | null {
 }
 
 /**
+ * 운영자가 `datetime-local` 로 적은 **지역 시각**을 wire 의 ISO 순간으로 바꾼다.
+ *
+ * **여기서는 장비 시간대를 쓰는 것이 맞다** — 운영자가 자기 시계를 보고 적은 값이기 때문이다.
+ * 표시 경로의 [instantDisplayOf] 가 오프셋 없는 값을 **거부**하는 것과 방향이 반대이고, 그래서
+ * 자리가 다르다(한쪽은 서버가 준 순간을 읽고, 한쪽은 사람이 적은 벽시계를 순간으로 만든다).
+ *
+ * 읽히지 않으면 `null` 이다 — 앞 판은 `new Date(…).toISOString()` 이 **RangeError 를 던졌다**
+ * (빈 값·반쯤 적은 값에서). 부르는 자리가 보내지 않는 쪽이 맞다.
+ */
+export function localInputToIso(value: string): string | null {
+  const millis = Date.parse(value);
+  return Number.isNaN(millis) ? null : new Date(millis).toISOString();
+}
+
+/**
  * 지금 — **화면이 벽시계를 읽는 유일한 입구**다. 화면은 이 값을 한 번 받아 props 로 내린다
  * (렌더마다 다시 읽으면 같은 화면의 두 카드가 서로 다른 「지금」으로 날을 센다).
  */

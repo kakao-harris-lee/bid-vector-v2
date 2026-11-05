@@ -16,6 +16,7 @@ import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { bidCasesQueryKey } from '../api/queryKeys';
 import { BID_BOX_TABS, isBidBoxTabId, tabOf, type BidBoxTabId } from '../display/bidBoxDisplay';
+import { localInputToIso } from '../display/timeDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { BidBoxCard, type ActionPayload } from './BidBoxCard';
@@ -48,16 +49,32 @@ interface Sent {
  * 전이 하나를 보낸다 — **행동 종류 전수의 `switch`** 다. 종류가 늘면 `never` 단언이 컴파일에서
  * 멈춘다(기본 분기가 없다). `datetime-local` 값은 브라우저 지역 시각이라 ISO 로 바꿔 싣는다.
  */
+/**
+ * `datetime-local` 값을 wire 의 ISO 로. **변환 자리는 `timeDisplay` 하나**다(M9 D-2 · r1 v L-1)
+ * — 앞 판은 이 파일이 `new Date(...)` 를 직접 불렀고, 그래서 시계 금지를 「`Date` 전역 값 참조
+ * 금지」로 좁히지 못했다.
+ *
+ * 읽히지 않으면 **보내지 않는다**(앞 판은 `RangeError` 를 던졌다 — 쓰기 실패 얼굴이 아니라
+ * 오류 경계로 갔다).
+ */
+function instantOrRefuse(value: string): string {
+  const iso = localInputToIso(value);
+  if (iso === null) {
+    throw new Error('시각을 읽지 못했다 — 날짜와 시각을 다시 적으십시오.');
+  }
+  return iso;
+}
+
 function send({ caseId, payload }: Sent): Promise<BidCase> {
   switch (payload.kind) {
     case 'RESUME':
       return resumeCase(caseId);
     case 'AWAIT_OPENING':
-      return awaitOpening(caseId, { openingAt: new Date(payload.value).toISOString() });
+      return awaitOpening(caseId, { openingAt: instantOrRefuse(payload.value) });
     case 'RECORD_OPENING':
       return recordOpening(caseId, { provisionalFirst: payload.value === 'true' });
     case 'ENTER_QUALIFICATION_REVIEW':
-      return enterQualificationReview(caseId, { documentDueAt: new Date(payload.value).toISOString() });
+      return enterQualificationReview(caseId, { documentDueAt: instantOrRefuse(payload.value) });
     case 'RECORD_OUTCOME':
       // 선택지의 값 타입이 **계약 enum 그대로**라 캐스팅이 없다(CR r1 L-8).
       return recordOutcome(caseId, { outcome: payload.outcome });
