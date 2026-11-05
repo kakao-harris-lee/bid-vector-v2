@@ -17,3 +17,15 @@
 코드 · `milestone-9.md`(팀장이 쓴다) · README.
 ## acceptance
 식별자마다 정의 자리 ↔ 처분 자리 기계 대조(`git grep`) · 「닫힘」 주장은 근거 PR·SHA 를 단다 · `leakPatternGate` 표적 exit 0. 전건 PR CI.
+
+## 계약 갱신 2026-11-06 (팀장) — 판정 SHA `62cdde37` 보고 뒤
+
+레인이 보고한 알려진 제한 1·2(등재 공백 둘)를 팀장이 처분으로 바꿨다. 둘 다 **새 등재**이고 집계 변경이 아니다.
+
+| ID | 결정 |
+| --- | --- |
+| D-L-1 | **`OPEN-7E3A-OPENING-AXIS-HARNESS`·`OPEN-7C3B-PAPER-BID-NOTIFICATION` 을 capability map 의 OPEN 표에 행으로 세운다** — 「사실만 적는다」를 **등재 누락 정정**으로 바꾼다. 받는 자리(담당)는 **「M9/opening-harness · M9/paper-bid (진행 중)」**. 자리는 §14.3 (C) 의 slice 신설 OPEN 표 — 그 표가 담당만 적고 활성 여부를 정하지 않으므로(§14.0) **§12 머리의 활성 집계는 움직이지 않는다**. §12.3 (a) 의 「행을 만들지 않는다」 문단은 이 결정으로 갱신한다 |
+| D-L-2 | **`reports/evidence/chore/cve-apt-109518/checklist.md` 를 in_scope 에 더한다**(확장 승인) — `OPEN-CVE-APT-RETRY`·`OPEN-CVE-APT-RUNBOOK-BRANCH` 의 **출처(PR #126 조치 코멘트)와 받는 자리(M9/cve-followups, PR #131)** 를 날짜 붙은 한 문단으로 덧붙인다. 닫힌 evidence 를 덮지 않는다 |
+| D-L-3 | 나머지는 **그대로 승인**. 순서: 이 계약 갱신 커밋 → D-L-1 → D-L-2 → `leakPatternGate` 표적 → rollback 재산출(복원 목록 **+1 경로**) → evidence 갱신 → 동결·판정 SHA 보고. push 는 팀장 |
+
+in_scope 추가: `reports/evidence/chore/cve-apt-109518/checklist.md`(덧붙이기만).
