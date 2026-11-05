@@ -3541,6 +3541,15 @@ M9 머지분이 닫은 것 · M9 가 신설한 slice 잔여 OPEN · 운영 잔�
 | 7F 장부 v r2 **L-2** — timeout 뒤 일회 컨테이너 확인 | **닫힘** — 훑기 시작 전 자기 프로젝트의 일회 컨테이너 잔존이 0 이 아니면 `exit 3`, 신호 종료는 자기 것만 치운다 | 같은 PR · 같은 evidence D-2. **비대칭은 등재로 남는다**(반입은 잔존을 보지 않는다 — 그 checklist 알려진 제한 5 와 조건식 형태의 후속 후보 10) |
 | 6B-3 보존 기간 | **OPEN 종결이 아니라 정책 날짜 개정** — 90일 → **1년**(`EffectiveFrom.On(2026-11-05)`). 90일은 그 시대의 값으로 정책의 날짜 개정 표에 남는다(소급 없음). 6B-3 이 신설한 서브 OPEN **여섯**은 처분하지 않고 등재 유지 | 사용자 결정 2026-11-05 · PR **#129** 머지 `31551579`(head `493da3ab`) · `reports/evidence/m9/retention-1y/`. 적용된 마이그레이션의 「90일」 SQL **주석**은 checksum 때문에 고치지 않는다(그 slice D-4) |
 
+**M7 종결이 넘긴 열하나 가운데 열린 채 남는 넷**은 `OPEN-SET01-AWARD-NAME-INGEST`(§12 G3 와 §14.3 에 행이
+있다 · 적재 slice 는 PR #128 로 열려 있다) · `OPEN-6F4-STR02-REQUIREMENTS-AXIS`(열린 채 상태 갱신) ·
+`OPEN-7E3A-OPENING-AXIS-HARNESS` · `OPEN-7C3B-PAPER-BID-NOTIFICATION` 이다. **뒤 둘은 이 문서에도
+`milestone-6.md` 에도 없다** — 유일한 자리가 M7 slice 의 evidence 와 M7 종결 checklist 4 이고, 그래서
+**registry 만 읽는 쪽에는 그 OPEN 이 존재하지 않는 것으로 보인다**(`reports/evidence/m6/closure/open-inventory.md`
+§7 이 `OPEN-6F10-CAUSE-CODE-DEDUP` 에서 적은 어긋남과 같은 꼴). 이 절은 **그 사실만 적고 행을 만들지 않는다** —
+행을 세우는 것은 집계·분류에 손대는 일이고 운영자 결정이다. 처분 후보: 그 둘을 받는 slice 가 열릴 때 그
+계약이 §12 에 등재한다.
+
 #### (b) M9 가 신설한 OPEN — slice 잔여
 
 받는 자리는 전부 **다음에 그 자리를 만지는 slice** 이고, 어느 것도 머지를 막지 않는다.
