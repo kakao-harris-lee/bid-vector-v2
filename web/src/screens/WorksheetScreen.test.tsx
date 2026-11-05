@@ -759,4 +759,16 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(timeline.textContent).toContain('관심');
     expect(timeline.textContent).toContain('나');
   });
+
+  /**
+   * 명령 칸은 **표의 문면**이다(`OPEN-M9-TIMELINE-COMMAND-WORDING`). 앞 판은 서버가 준 토큰
+   * 원문이 그대로 섰고, 그것이 타임라인의 마지막 원문 축이었다.
+   */
+  it('타임라인의 명령은 문면으로 서고 토큰 원문이 아니다', async () => {
+    renderScreen();
+
+    const timeline = await screen.findByTestId('timeline');
+    expect(timeline.textContent).toContain('입찰함에 담음');
+    expect(timeline.textContent, '명령 토큰 원문이 그대로 섰다').not.toContain('ADD_TO_BID_BOX');
+  });
 });

@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BID_CASE_STATE_DISPLAY,
+  BID_COMMAND_DISPLAY,
   BID_KIND_DISPLAY,
   NEXT_CHECKPOINT_DISPLAY,
   TIMELINE_ACTOR_DISPLAY,
+  commandDisplayOf,
   nextActionOf,
 } from './caseDisplay';
 import { displayOrUnknown } from './stateDisplay';
@@ -53,6 +55,77 @@ describe('입찰 건 상태 표시 표 — 계약 enum 전수', () => {
 
   it('타임라인 주체 둘이 표에 있다', () => {
     expect(Object.keys(TIMELINE_ACTOR_DISPLAY).sort()).toStrictEqual(['USER', 'SYSTEM'].sort());
+  });
+});
+
+/**
+ * 타임라인 **명령 어휘**의 전수(M9/web-followups, `OPEN-M9-TIMELINE-COMMAND-WORDING`). 앞 판은
+ * 이 칸이 서버가 준 토큰 원문이었다(`ADD_TO_BID_BOX` 꼴) — 상태·주체·부가 사실은 이미 표를
+ * 지나는데 명령만 남았다.
+ *
+ * 전수 열다섯 = 전이표의 열 키 열넷 + **건을 여는 명령 하나**. 여는 명령은 출발 상태가 없어
+ * 전이표의 행이 될 수 없고 타임라인에는 생성 전이로 남는다 — 그 어휘가 `ADD_TO_BID_BOX` 다.
+ */
+describe('타임라인 명령 어휘 — 전수 열다섯', () => {
+  it('전이 명령 열넷과 여는 명령 하나가 전부 표에 있다', () => {
+    expect(Object.keys(BID_COMMAND_DISPLAY).sort()).toStrictEqual(
+      [
+        'ADD_TO_BID_BOX',
+        'DEFER',
+        'RESUME',
+        'RECEIVE_PRICE_MENU',
+        'DRAFT_BID',
+        'RECORD_BID',
+        'AWAIT_OPENING',
+        'RECORD_OPENING_FIRST',
+        'RECORD_OPENING_OUT_OF_RANK',
+        'ENTER_QUALIFICATION_REVIEW',
+        'RECORD_OUTCOME',
+        'CORRECT_OUTCOME',
+        'SKIP',
+        'MARK_DEADLINE_PASSED',
+        'REVOKE_DEADLINE_PASSED',
+      ].sort(),
+    );
+  });
+
+  /** 문면이 **토큰과 다른 글자**여야 이 표에 뜻이 있다 — 같으면 원문을 그린 것과 구별되지 않는다. */
+  it('어느 문면도 토큰 원문이 아니다', () => {
+    for (const [token, display] of Object.entries(BID_COMMAND_DISPLAY)) {
+      expect(display.label, `${token} 의 문면이 토큰 그대로다`).not.toBe(token);
+      expect(display.label).not.toMatch(/[A-Z]{2,}_/u);
+    }
+  });
+
+  /**
+   * **개찰 결과 둘은 다른 말을 쓴다.** 잠정 1위와 순위 밖을 한 문구로 접으면 타임라인이 그
+   * 갈림을 지운다(SET-02 와 같은 축).
+   */
+  it('같은 문면을 두 토큰에 쓰지 않는다', () => {
+    const labels = Object.values(BID_COMMAND_DISPLAY).map((one) => one.label);
+
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  /**
+   * 「제출함」·「기록 갱신」·「소급 확인」은 **한 명령**이고 무엇이 달랐는지는 출발 상태가 적는다
+   * (도메인이 명령을 상태별로 쪼개지 않는다). 그 사실이 문면에 서 있다.
+   */
+  it('한 명령이 여러 동작인 자리는 그 사실을 아래층에 적는다', () => {
+    expect(BID_COMMAND_DISPLAY.RECORD_BID.why).toBeDefined();
+    expect(BID_COMMAND_DISPLAY.DRAFT_BID.why).toBeDefined();
+  });
+
+  /** 계약이 이 칸을 `string` 으로 내므로 키 좁힘은 한 자리다 — 표 밖 값은 **보이게** 낸다. */
+  it('표 밖 토큰은 보이는 미지 상태로 낸다 — 조용한 빈칸이 아니다', () => {
+    const unknown = commandDisplayOf('MINT_MONEY');
+
+    expect(unknown.label).toContain('MINT_MONEY');
+    expect(unknown.tone).toBe('unjudged');
+  });
+
+  it('표 안 토큰은 표의 행을 낸다', () => {
+    expect(commandDisplayOf('ADD_TO_BID_BOX')).toBe(BID_COMMAND_DISPLAY.ADD_TO_BID_BOX);
   });
 });
 

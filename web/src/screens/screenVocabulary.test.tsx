@@ -13,6 +13,12 @@ import type {
   SuggestedNotice,
 } from '../api/queries';
 import {
+  BID_CASE_STATE_DISPLAY,
+  BID_COMMAND_DISPLAY,
+  type BidCaseState,
+  type BidCommandToken,
+} from '../display/caseDisplay';
+import {
   AMOUNT_BASIS_DISPLAY,
   AMOUNT_PROVENANCE_DISPLAY,
   MONEY_TOKENS,
@@ -67,6 +73,11 @@ const RAW_INSTANTS: readonly string[] = [
 const BASIS_VALUES = Object.keys(AMOUNT_BASIS_DISPLAY) as readonly AmountBasis[];
 const PROVENANCE_VALUES = Object.keys(AMOUNT_PROVENANCE_DISPLAY) as readonly AmountProvenance[];
 const VAT_VALUES = Object.keys(VAT_TREATMENT_DISPLAY) as readonly VatTreatment[];
+/**
+ * 명령 어휘도 **표에서 유도한다**(M9/web-followups — `OPEN-M9-TIMELINE-COMMAND-WORDING`). 손으로
+ * 적은 목록은 어휘가 늘 때 조용히 뒤처진다.
+ */
+const COMMAND_VALUES = Object.keys(BID_COMMAND_DISPLAY) as readonly BidCommandToken[];
 
 /**
  * 어휘 전수를 **한 화면에** 올린다 — basis 여섯과 provenance 여섯을 짝지어 여섯 장을 그리고
@@ -113,28 +124,26 @@ function bidCaseRow(): BidCase {
   };
 }
 
+/**
+ * 타임라인 fixture — **명령 어휘 전수를 한 번씩** 그린다(M9/web-followups). 앞 판은 두 줄이었고
+ * 그 둘 가운데 하나는 **명령 토큰을 상태 칸에 넣은 값**이었다(`toState: 'DRAFT_BID'` — 그것은
+ * 상태가 아니라 명령이다). 상태 칸이 표 밖이면 화면이 그 원문을 **보이게** 내므로(의도된 거동)
+ * 금지 단언이 그 자리에서 공허해진다 — 그래서 상태는 상태 어휘에서만 고른다.
+ */
 function timelineRows(): readonly BidTimelineEntry[] {
-  return [
-    {
-      caseVersion: 1,
-      fromState: null,
-      toState: 'WATCHING',
-      command: 'ADD_TO_BID_BOX',
-      actorKind: 'USER',
-      retroactive: false,
-      occurredAt: ISO_OCCURRED,
-    },
-    {
-      caseVersion: 2,
-      fromState: 'WATCHING',
-      toState: 'DRAFT_BID',
-      command: 'DRAFT_BID',
-      actorKind: 'USER',
-      retroactive: false,
-      // **읽히지 않는 값** — `InstantText` 의 셋째 얼굴을 그리게 하는 유일한 자리다(r1 CR LOW).
-      occurredAt: UNREADABLE_AT,
-    },
-  ];
+  const states = Object.keys(BID_CASE_STATE_DISPLAY) as readonly BidCaseState[];
+  const stateAt = (index: number): BidCaseState => states[index % states.length] ?? 'WATCHING';
+  return COMMAND_VALUES.map((command, index) => ({
+    caseVersion: index + 1,
+    // 첫 줄은 **생성 전이**다 — 출발 상태가 없는 자리도 한 번은 그린다.
+    fromState: index === 0 ? null : stateAt(index - 1),
+    toState: stateAt(index),
+    command,
+    actorKind: index % 2 === 0 ? 'USER' : 'SYSTEM',
+    retroactive: false,
+    // **읽히지 않는 값 하나** — `InstantText` 의 셋째 얼굴을 그리게 하는 유일한 자리다(r1 CR LOW).
+    occurredAt: index === 1 ? UNREADABLE_AT : ISO_OCCURRED,
+  }));
 }
 
 /**
@@ -349,6 +358,46 @@ describe('홀로 선 토큰만 센다 — 술어 자신의 대조', () => {
   it('앞 글자가 숫자여도 센다', () => {
     expect(standaloneOccurrences('1,350,000,000KRW', 'KRW')).toBe(1);
     expect(standaloneOccurrences('1,350,000,000KRW부가세 포함', 'KRW')).toBe(1);
+  });
+});
+
+/**
+ * **명령 어휘도 같은 두 술어로 잠근다**(`OPEN-M9-TIMELINE-COMMAND-WORDING`). 이 게이트의 첫
+ * 실행이 타임라인의 `ADD_TO_BID_BOX` 를 드러냈고, 그때는 명령의 표가 없어 알려진 제한으로
+ * 넘겼다. 이제 표가 있으므로 금지 목록이 그 어휘를 받는다.
+ */
+describe('화면이 그린 글자에 명령 토큰 원문이 없다 (OPEN-M9-TIMELINE-COMMAND-WORDING)', () => {
+  it('명령 어휘 전수가 DOM 에 0 번 나온다', async () => {
+    const { container } = await renderAll();
+    const text = container.textContent ?? '';
+
+    expect(COMMAND_VALUES.length).toBe(15);
+    for (const token of COMMAND_VALUES) {
+      expect(standaloneOccurrences(text, token), `${token} 이 화면에 그대로 그려졌다`).toBe(0);
+    }
+    expect(leafTokenHits(container, COMMAND_VALUES), '명령 토큰이 제 칸에 그대로 섰다').toStrictEqual([]);
+  });
+
+  /** **음성 대조** — 토큰이 사라진 것이 「명령 칸을 아예 안 그렸다」가 아님을 잰다. */
+  it('같은 자리에 표의 문면이 그려져 있다', async () => {
+    const { container } = await renderAll();
+    const text = container.textContent ?? '';
+
+    for (const command of COMMAND_VALUES) {
+      expect(text, `${command} 의 문면이 없다`).toContain(BID_COMMAND_DISPLAY[command].label);
+    }
+  });
+
+  /**
+   * 한 명령이 여러 동작인 자리의 **아래층**이 보조기기에 닿는다 — 배지가 `why` 를 sr-only 문면
+   * 으로 함께 둔다(§6.4 2층 라벨). 그 문면이 표에만 있고 화면에 없으면 표의 `why` 가 죽은 칸이다.
+   */
+  it('한 명령이 여러 동작인 자리의 아래층이 화면에 닿는다', async () => {
+    const { container } = await renderAll();
+    const text = container.textContent ?? '';
+
+    expect(text).toContain(BID_COMMAND_DISPLAY.RECORD_BID.why);
+    expect(text).toContain(BID_COMMAND_DISPLAY.DRAFT_BID.why);
   });
 });
 
