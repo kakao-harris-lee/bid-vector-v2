@@ -11,6 +11,8 @@ class DuplicatePolicyTest {
     private fun policy(
         mode: String,
         failSourceSets: String = "main",
+        normalizeIdentifiers: String = "true",
+        normalizeLiterals: String = "true",
     ) = DuplicatePolicy(
         mapOf(
             "language" to "kotlin",
@@ -18,6 +20,8 @@ class DuplicatePolicyTest {
             "toolVersion" to "7.7.0",
             "mode" to mode,
             "fail.source-sets" to failSourceSets,
+            "normalize.identifiers" to normalizeIdentifiers,
+            "normalize.literals" to normalizeLiterals,
         ),
     )
 
@@ -56,5 +60,32 @@ class DuplicatePolicyTest {
         // 함께 비어 실패가 침묵으로 통과했다. 키 부재뿐 아니라 빈 값도 정책 오류다.
         val error = assertFailsWith<IllegalArgumentException> { policy("fail", failSourceSets = "").failSourceSets }
         assertTrue(error.message.orEmpty().contains("fail.source-sets"), "${error.message}")
+    }
+
+    // ---- Type-2 정규화(`OPEN-CPD-GATE-RENAME-BYPASS`) ----
+
+    @Test
+    fun `정규화 두 축을 참·거짓 그대로 낸다`() {
+        assertTrue(policy("fail").ignoreIdentifiers)
+        assertTrue(policy("fail").ignoreLiterals)
+        assertFalse(policy("fail", normalizeIdentifiers = "false").ignoreIdentifiers)
+        assertFalse(policy("fail", normalizeLiterals = "false").ignoreLiterals)
+    }
+
+    @Test
+    fun `참 거짓이 아닌 값은 거부한다 — 거짓으로 읽으면 판정이 조용히 앞 판으로 돌아간다`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                policy("fail", normalizeIdentifiers = "yes").ignoreIdentifiers
+            }
+        assertTrue(error.message.orEmpty().contains("normalize.identifiers"), "${error.message}")
+    }
+
+    @Test
+    fun `정규화 키가 없으면 거부한다 — 기본값으로 조용히 넓어지지 않는다`() {
+        val withoutKeys = DuplicatePolicy(mapOf("mode" to "fail"))
+
+        assertFailsWith<IllegalStateException> { withoutKeys.ignoreIdentifiers }
+        assertFailsWith<IllegalStateException> { withoutKeys.ignoreLiterals }
     }
 }

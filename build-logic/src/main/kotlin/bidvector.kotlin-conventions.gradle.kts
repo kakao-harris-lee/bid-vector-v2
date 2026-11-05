@@ -166,6 +166,12 @@ extensions.configure(de.aaschmid.gradle.plugins.cpd.CpdExtension::class.java) {
     setMinimumTokenCount(duplicatePolicy.minimumTokenCount)
     setToolVersion(duplicatePolicy.toolVersion)
     setIgnoreFailures(duplicatePolicy.ignoreFailures)
+    // Type-2 정규화(`OPEN-CPD-GATE-RENAME-BYPASS`) — 변수명만·리터럴만 바꾼 복사판이 통과하던 자리.
+    // `language`·`minimumTokenCount` 와 **같은 전파 경로**로 두 Cpd task 에 닿는다(위 KDoc 의
+    // decompile 사실: `setupTaskDefaults` 가 모든 Cpd task 에 extension 값을 먼저 얹는다). 같은 값을
+    // task 둘에 다시 적지 않는다.
+    setIgnoreIdentifiers(duplicatePolicy.ignoreIdentifiers)
+    setIgnoreLiterals(duplicatePolicy.ignoreLiterals)
 }
 
 // 리포트 위치를 우리가 직접 정한다 — 플러그인 기본 report 객체의 `outputLocation`을 다른

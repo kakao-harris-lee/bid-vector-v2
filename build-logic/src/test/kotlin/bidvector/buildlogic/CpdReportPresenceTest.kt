@@ -46,4 +46,30 @@ class CpdReportPresenceTest {
         val empty = File(dir, "empty.xml").apply { writeText("") }
         assertNull(cpdReportPresenceViolation(empty, hasExpectedSource = false))
     }
+
+    // ---- 낡은 리포트 축(`OPEN-CPD-GATE-RENAME-BYPASS` 둘째 사각) ----
+
+    @Test
+    fun `리포트가 잴 소스보다 낡으면 위반이다 — 낡은 리포트가 실행 안 함을 가린다`() {
+        val report = File(dir, "cpd.xml").apply { writeText("<pmd-cpd/>") }
+
+        val violation = cpdReportPresenceViolation(report, true, newestSourceModifiedAt = report.lastModified() + 1_000)
+
+        assertTrue(violation != null && violation.contains("낡았다"), "$violation")
+    }
+
+    @Test
+    fun `리포트가 소스와 같거나 새로우면 위반이 아니다 — UP-TO-DATE 가 정당한 자리`() {
+        val report = File(dir, "cpd.xml").apply { writeText("<pmd-cpd/>") }
+
+        assertNull(cpdReportPresenceViolation(report, true, newestSourceModifiedAt = report.lastModified()))
+        assertNull(cpdReportPresenceViolation(report, true, newestSourceModifiedAt = report.lastModified() - 1_000))
+    }
+
+    @Test
+    fun `잴 소스가 원래 없으면 낡음도 위반이 아니다`() {
+        val report = File(dir, "cpd.xml").apply { writeText("<pmd-cpd/>") }
+
+        assertNull(cpdReportPresenceViolation(report, false, newestSourceModifiedAt = report.lastModified() + 1_000))
+    }
 }

@@ -14,6 +14,16 @@ internal class DuplicatePolicy(
     val ignoreFailures: Boolean get() = values.requireValue("mode") == "observe"
 
     /**
+     * **Type-2 정규화**(`OPEN-CPD-GATE-RENAME-BYPASS`) — 중복 판정이 식별자·리터럴 **글자**에
+     * 의존하지 않게 한다. verifier 실측: 축어 복사판은 `cpdCheck` exit 1 인데 **변수명만** 바꿔도 0,
+     * **리터럴만** 바꿔도 0 이었다. 참/거짓만 받는다 — 알 수 없는 값을 거짓으로 읽으면 판정이 조용히
+     * 앞 판으로 돌아간다. 판정식 자체를 바꾼 복제(Type-3)는 이 축이 닫지 못한다(알려진 한계).
+     */
+    val ignoreIdentifiers: Boolean get() = values.requireBoolean("normalize.identifiers")
+
+    val ignoreLiterals: Boolean get() = values.requireBoolean("normalize.literals")
+
+    /**
      * `mode=fail`일 때 **실패로 셀 수 있는** source set 이름(D-6
      * `limit.type.members.source-sets`와 같은 이름 관례). 기본값이 없다 — 키 부재는 정책
      * 오류이지 「전부 관찰」로 조용히 넓어지지 않는다. **빈 값도 같은 정책 오류다** —

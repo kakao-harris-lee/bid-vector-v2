@@ -22,6 +22,14 @@ internal fun Map<String, String>.requireInt(key: String): Int =
     requireValue(key).trim().toIntOrNull()
         ?: error("정책 키 '$key' 의 값이 정수가 아니다")
 
+/** `true`·`false` 외의 값은 정책 오류다 — 알 수 없는 값을 거짓으로 읽으면 게이트가 조용히 느슨해진다. */
+internal fun Map<String, String>.requireBoolean(key: String): Boolean =
+    when (val raw = requireValue(key).trim()) {
+        "true" -> true
+        "false" -> false
+        else -> error("정책 키 '$key' 의 값 '$raw' 이 true 도 false 도 아니다")
+    }
+
 internal fun Map<String, String>.requireList(key: String): List<String> =
     requireValue(key)
         .split(',')
