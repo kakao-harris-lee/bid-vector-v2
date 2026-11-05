@@ -112,6 +112,7 @@ private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
         TruncationCause.QuotaExhausted,
+        TruncationCause.AccessBlocked,
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,
         TruncationCause.ServerError,
