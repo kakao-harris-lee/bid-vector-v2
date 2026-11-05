@@ -1,6 +1,6 @@
 # M9/adr07-pitest checklist
 
-판정 SHA **`eab07b5b`**(수정 라운드 1 뒤) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
+판정 SHA **`d4b43248`**(병합 커밋 — 수정 라운드 1 + main `e12c0485` 병합) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
 `rollback.md`. 앞 라운드가 이 자리에 적은 `f4a85991` 은 그 뒤에 온 산출물 커밋들보다 앞선
 SHA 였다(v L-1) — 아래 §6 이 라운드별로 가른다.
 
@@ -127,6 +127,10 @@ verifier **ready-for-review** · code-reviewer **request_changes**. 아래가 �
 만드는 커밋에서 `gate-tests.properties` 에 사전순 등재됐고, 그 등재 등식을 표적 실행이 아니라
 `buildLogicGateRegistrationGate` 로 확인했다. `tools/workflow-step-refs-check.sh` 는 이 라운드에
 in_scope 로 승인된 경로다(주석만).
+
+**머지 직전 병합(2026-11-06)** — main `e12c0485` 를 합쳤다. 겹친 세 파일의 합집합을 산술로 댔고
+(`commands.md` §10) 표적 게이트 셋이 병합 뒤에도 exit 0 이다. rollback 원천은 그 고정 SHA 로
+옮겼다 — main 이 `gate-tests.properties` 의 다른 블록을 바꿔, base 복원이면 남의 셋을 지운다.
 
 ## 7. 자기 승인 아님
 

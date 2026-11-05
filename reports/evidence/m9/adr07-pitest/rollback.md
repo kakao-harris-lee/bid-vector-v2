@@ -1,22 +1,34 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `eab07b5b`**.
+착수 base **`df4976cc`** · **복원 원천 `e12c0485`**(이 브랜치가 합친 main 의 **고정 SHA** =
+병합 커밋 `d4b43248` 의 둘째 부모) · **실측 HEAD `d4b43248`**.
 
-**원천이 착수 base 와 같다.** 이 브랜치는 `origin/main` 을 **한 번도 합치지 않았다**
-(`git log --merges df4976cc..HEAD` 가 0 줄) — 그래서 base 에서 복원해도 남의 변경을 지우지
-않는다. 합친 이력이 생기면 원천을 그 병합 커밋의 둘째 부모(고정 SHA)로 옮기고 다시 잰다.
+**원천이 착수 base 가 아니다.** 머지 직전에 main `e12c0485`(#130·#131·#132·#133 등)를 합쳤고,
+base 에서 복원하면 **그 남의 변경까지 지운다** — 실물이 있다: main 이 `config/quality/gate-tests.properties`
+의 `app` 블록을 **+3** 했고 그 파일은 내 복원 목록 안에도 있다(내가 `build-logic` 블록을 고쳤다).
+`df4976cc` 에서 복원하면 그 셋이 사라진다. 그래서 ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서
+산출하고 ⓑ 원천은 합친 main 의 고정 SHA 다 — 움직이는 `origin/main` 을 쓰지 않는다.
+다음 라운드에서 또 합치면 원천을 그 병합 커밋의 둘째 부모로 **다시** 고정하고 ①~③ 을 다시 잰다.
 
-**공유 파일 하나**(`docs/discovery/capability-map.md`, 계약 갱신으로 들어왔다)의 전제를 따로
-쟀다 — 그 파일은 머지된 PR #133 이 112줄 **추가**로 바꾼 자리이기도 하다.
+**겹치는 공유 파일 셋**의 합집합을 산술로 댔다 — 「충돌 0」은 본문이 접히지 않았다는 증거가
+아니다(저장소 기억 「병합 합집합 함정」). 세 파일 모두 **base + 양쪽 증분**과 일치했다.
 
-| 전제 | 실측 |
-| --- | --- |
-| 원천에 이 slice 가 없다 | `df4976cc` 판의 그 파일에 `adr07-pitest`·`OPEN-ADR07-` **0 건** |
-| 이 브랜치에 #133 추가분이 **없다** | 원천 판과 HEAD 판의 줄 수가 둘 다 **3858**(내 변경이 1:1 행 교체이므로 같아야 한다). 즉 base 에서 복원해도 #133 의 112줄을 지울 수 없다 — 애초에 이 브랜치에 없다 |
+| 파일 | base | 내 증분 | main 증분 | 병합 뒤 | 기대 |
+| --- | --- | --- | --- | --- | --- |
+| `ci.yml` 줄 | 1026 | +52 | +4 | **1082** | 1082 |
+| `capability-map.md` 줄 | 3858 | +6 | +113 | **3977** | 3977 |
+| `gate-tests` `build-logic` 등재 | 27 | +4 | 0 | **31** | 31 |
+| `gate-tests` `app` 등재 | 121 | 0 | +3 | **124** | 124 |
 
-**머지 뒤에는 이 §1 이 쓰이지 않는다.** 머지 뒤 되돌림은 **PR revert** 다(그때는 #133 과 내
-변경이 같은 트리에 있고, base 복원이 남의 112줄을 지운다). 머지 전에 `origin/main` 을 합치는
-라운드가 생기면 원천을 그 병합 커밋의 둘째 부모로 다시 고정하고 ①~③ 을 다시 잰다.
+형태도 함께 쟀다 — CI job **5**(`mutation` 포함) · step id 15 **중복 0** · 매달린 `steps.<id>`
+**0** · 등록부 **중복 0**, `build-logic` 블록 **사전순** · capability-map G6 행 **10**(base 8 + 내
+2)에 표 파이프 수 **일정** · `### 12.3`(main) 과 `§14.2` 의 내 해소 행이 **둘 다** 있고 취소선 없는
+`OPEN-ADR-07` 행은 **0**.
+
+**집계 머리말은 겹치지 않았다.** main 쪽 hunk 는 3518·3793·3815 이고 내 것은 3218·3376·3607 이라
+세 자리 모두 떨어져 있다. 더구나 main 의 §12.3 은 스스로 *"이 절의 OPEN 은 §12 머리의 활성 집계에
+들어가지 않는다"* 고 선언해 머리의 수를 움직이지 않았다 — 그래서 활성 수는 양쪽 다 **51** 이고
+증감 줄은 내 **+2** 하나만 더해졌다(규약: 각 레인은 자기 증감만, 합산은 머지하는 쪽).
 
 evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」가 아니다 — 대조해야 하는 것은
 **그 사이에 되돌림 대상이 움직였는가**이고 그 명령은 §4 다.
@@ -26,14 +38,14 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-BASE=df4976cc
+MAIN=e12c0485   # 합친 main 의 고정 SHA (= HEAD^2)
 EXCL=':(exclude)reports/evidence/m9/adr07-pitest'   # 자기 자신은 되돌릴 수 없다
 
-mapfile -t MINE < <(git log --no-merges --format= --name-only $BASE..HEAD -- . "$EXCL" | sort -u)
-mapfile -t MODIFIED < <(for f in "${MINE[@]}"; do git cat-file -e "$BASE:$f" 2>/dev/null && echo "$f"; done)
-mapfile -t ADDED    < <(for f in "${MINE[@]}"; do git cat-file -e "$BASE:$f" 2>/dev/null || echo "$f"; done)
+mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
+mapfile -t MODIFIED < <(for f in "${MINE[@]}"; do git cat-file -e "$MAIN:$f" 2>/dev/null && echo "$f"; done)
+mapfile -t ADDED    < <(for f in "${MINE[@]}"; do git cat-file -e "$MAIN:$f" 2>/dev/null || echo "$f"; done)
 
-git restore --source=$BASE --staged --worktree -- "${MODIFIED[@]}"
+git restore --source=$MAIN --staged --worktree -- "${MODIFIED[@]}"
 git rm -q -f -- "${ADDED[@]}"
 ```
 
@@ -42,20 +54,20 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `eab07b5b`
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `d4b43248`(병합 뒤)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **26**(evidence 제외) = 복원 **15**(M) · 삭제 **11**(A) — 기계 목록과 같다. 수정 라운드가 둘을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh`) |
-| ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③ 결과 트리 == `e12c0485` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | 실측 시점에 `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`df4976cc` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main(PR #123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
+복원한 트리는 **`e12c0485` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
+main(PR #132 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
 돌리는 것은 같은 트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이 **맞다** —
@@ -84,6 +96,8 @@ main(PR #123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그�
 
 | 남의 표지(남아 있어야 한다 · 같은 제외) | 복원 뒤 |
 | --- | --- |
+| **main 머지분** — `### 12.3`(#133) · `OPEN-7E3B-TIME-DISPLAY` · `money-vocab-cross-lang`(#132) · `m9/portal-02` · `m9/web-followups` | 1 · 10 · 4 · 5 · 1 |
+| **main 머지분의 등록부 증분** — `gate-tests` `app` 블록 | **124**(내 복원이 같은 파일을 만지는데도 그 셋이 남는다) |
 | `pitest-engine`(이 slice 가 **지운** 카탈로그 alias — 되살아나야 한다) | 1 |
 | `conventionCoverageGate`(1A) | 4 |
 | `cpdCheckObserved`(1C) | 6 |
@@ -122,8 +136,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only eab07b5b..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..eab07b5b \
+git diff --name-only d4b43248..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only e12c0485..d4b43248 \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 
