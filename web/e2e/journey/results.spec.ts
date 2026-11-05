@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
-  ABSENT_INSTANT,
   assertOnlyAllowedOperations,
   CASE_STATE_LABEL,
   CASE_TAB_LABEL,
@@ -240,7 +239,7 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
     CHECKPOINT_LABEL[mine.nextCheckpointKind] ?? mine.nextCheckpointKind,
   );
   if (mine.nextCheckpointAt === null) {
-    await expect(card.getByTestId(`result-checkpoint-at-${caseId}`)).toHaveText(ABSENT_INSTANT);
+    await expect(card.getByTestId(`result-checkpoint-at-${caseId}`)).toHaveText(ABSENT);
   } else {
     // M9 D-1 — 같은 자리의 두 축(보이는 KST 표기 · 기계 가독 원문).
     const at = card.getByTestId(`result-checkpoint-at-${caseId}`);

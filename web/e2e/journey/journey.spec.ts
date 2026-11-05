@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   ABSENT,
-  ABSENT_INSTANT,
   AMOUNT_BASIS_LABEL,
   AMOUNT_PROVENANCE_LABEL,
   assertOnlyAllowedOperations,
@@ -305,7 +304,7 @@ async function assertCardMatchesCase(page: Page, row: BidCaseRow): Promise<void>
   // 「숫자가 있다」만 봐서 표시 시각을 하루 밀어도 통과했다).
   const at = card.getByTestId(`checkpoint-at-${row.caseId}`);
   if (row.nextCheckpointAt === null) {
-    await expect(at).toHaveText(ABSENT_INSTANT);
+    await expect(at).toHaveText(ABSENT);
   } else {
     // M9 D-1 — 보이는 글자는 **KST 표기**이고 기계 가독 칸이 응답 원문을 든다. 둘 다 잰다:
     // 표기만 보면 원문이 사라진 것을 모르고, 원문만 보면 서식이 틀린 것을 모른다.

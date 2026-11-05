@@ -71,14 +71,11 @@ export function sameOrigin(): string {
   return new URL(journeyContext().previewUrl).origin;
 }
 
-/** 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. */
-export const ABSENT = '값 없음';
-
 /**
- * **시각 칸의 없는 값 표지**(M9/screen-display D-1) — 금액·계수 칸의 `ABSENT` 와 다른 글자다.
- * 여정은 두 자리를 가려 대조한다(한 글자로 합치면 어느 칸이 비었는지 여정이 말하지 못한다).
+ * 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. **시각 칸도 같은 말이다**
+ * (M9/screen-display D-1 갱신 2026-11-05) — 그래서 이름이 둘이 아니다.
  */
-export const ABSENT_INSTANT = '—';
+export const ABSENT = '값 없음';
 
 /**
  * 화면이 보일 **KST 표기의 독립 기댓값**(M9 D-1 — `YYYY-MM-DD HH:mm`, 초 이하 절삭).

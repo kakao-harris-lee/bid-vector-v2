@@ -22,7 +22,6 @@ import {
   type OpeningResultState,
 } from '../display/openingResultDisplay';
 import { RESULT_PENDING_SLOTS } from '../display/resultDisplay';
-import { ABSENT_INSTANT } from '../display/timeDisplay';
 
 import { ResultsScreen } from './ResultsScreen';
 
@@ -194,7 +193,8 @@ describe('화면 E — 결과 단계 건만, 서버 상태 그대로', () => {
 
     const kind = await screen.findByTestId('result-checkpoint-kind-51');
     expect(kind.textContent ?? '').toContain(NEXT_CHECKPOINT_DISPLAY.NONE.label);
-    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toBe(ABSENT_INSTANT);
+    // 시각 칸의 없음도 **같은 말**이다(D-1 갱신) — 축어로 적어 글자가 바뀌면 여기가 먼저 틀린다.
+    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toBe('값 없음');
   });
 
   it('시점이 있으면 서버가 준 값 그대로 그린다 — 남은 날을 세지 않는다', async () => {
@@ -896,7 +896,7 @@ describe('개찰 결과의 칸 전수 (r1 CR M-3)', () => {
     renderScreen();
 
     expect((await screen.findByTestId('provisional-duplicate-51')).textContent ?? '').toContain('값 없음');
-    // 시각 칸의 없음 표지는 `timeDisplay` 의 상수다(M9 D-1) — 금액·계수 칸과 글자가 다르다.
-    expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe(ABSENT_INSTANT);
+    // 시각 칸과 금액 칸이 **같은 말**을 쓴다(D-1 갱신 2026-11-05) — 바로 위 줄과 같은 글자다.
+    expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe('값 없음');
   });
 });
