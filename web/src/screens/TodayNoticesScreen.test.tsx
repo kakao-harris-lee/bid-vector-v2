@@ -72,8 +72,13 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
 
-    expect(within(card).getByTestId('notice-amount-provenance').textContent).toContain('BASE_AMOUNT');
-    expect(within(card).getByTestId('notice-amount-provenance').textContent).toContain('PUBLISHED');
+    const provenance = within(card).getByTestId('notice-amount-provenance').textContent ?? '';
+    // M9 D-3 — 세 축이 표의 문면으로 선다(앞 판은 `BASE_AMOUNT · … · PUBLISHED` 였다).
+    expect(provenance).toContain('기초금액');
+    expect(provenance).toContain('공고 게시값');
+    for (const token of ['BASE_AMOUNT', 'PUBLISHED']) {
+      expect(provenance, `${token} 이 화면에 남았다`).not.toContain(token);
+    }
   });
 
   it('금액이 없는 공고는 0 이 아니라 「값 없음」이다', async () => {
