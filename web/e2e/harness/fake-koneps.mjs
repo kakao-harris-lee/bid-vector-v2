@@ -12,6 +12,8 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { openingAxisDesign, openingAxisRouteTable } from './opening-axis.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'notice-list.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -31,6 +33,17 @@ function konepsDateTime(offsetDays) {
   return instant.toISOString().replace('T', ' ').slice(0, 19);
 }
 
+/**
+ * 개찰 축 라우팅(M9/opening-harness) — 표와 행 생성은 `opening-axis.mjs` 하나에 있고 여기서는
+ * **그 표를 꽂을 뿐**이다. 공고 축(`fixture.items`)의 라우팅 구조는 건드리지 않는다: 둘을 한
+ * 표로 합치면 상세 축이 요청의 공고번호로 걸러야 하는 성질(공고 축에 없는 성질)이 공고 축까지
+ * 번진다.
+ */
+const openingDesign = openingAxisDesign(
+  JSON.parse(readFileSync(resolve(here, 'fixtures', 'opening-axis.json'), 'utf8')),
+);
+const openingRoutes = openingAxisRouteTable(openingDesign, { dateTime: konepsDateTime });
+
 function itemsFor(operation) {
   return fixture.items
     .filter((item) => item.operation === operation)
@@ -47,11 +60,18 @@ const server = createServer((request, response) => {
   requestCount += 1;
   const operation = new URL(request.url ?? '/', 'http://127.0.0.1').pathname.replace(/^\//u, '');
   const known = fixture.items.some((item) => item.operation === operation);
-  if (!known) {
+  // 개찰 축 상세는 **요청의 공고번호**로 걸러야 해서 질의를 본다. 위의 `operation` 줄을 고치지
+  // 않고 여기서 한 번 더 푸는 이유는 그 줄이 공고 축 라우팅의 자리이고 이 slice 가 그것을
+  // 바꾸지 않기 때문이다(파싱 한 번의 비용은 fake 에서 재지 않는다).
+  const openingRoute = openingRoutes.get(operation);
+  if (!known && openingRoute === undefined) {
     response.writeHead(404).end();
     return;
   }
-  const items = itemsFor(operation);
+  const items =
+    openingRoute === undefined
+      ? itemsFor(operation)
+      : openingRoute(new URL(request.url ?? '/', 'http://127.0.0.1').searchParams);
   const body = JSON.stringify({
     response: {
       header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },
