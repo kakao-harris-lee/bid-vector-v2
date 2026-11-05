@@ -58,3 +58,20 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
   모아 둔다 — 병합 때 한 줄로 `NONE` 을 싣는다.
 - **PR #128(낙찰 수집)** 의 새 use case·러너가 `TruncationCause` 를 소진 `when` 으로 다룰 수 있다.
   `AccessBlocked` 분기는 **컴파일이 강제**하므로 놓치지 않는다.
+
+## 계약 갱신 2026-11-06 (팀장, 2차) — 수정 라운드 1
+
+**더하는 in_scope 경로**
+
+| 경로 | 사유 |
+| --- | --- |
+| `workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt` · `OpeningSampleFramer.kt` | cr HIGH · v M-1 — 개찰(6G) 경로의 `haltOf`·표본 경계가 `else` 로 `AccessBlocked` 를 삼켜 403 뒤에도 남은 후보마다 호출을 낸다. 계약이 `HALT_RUN` 의 근거로 든 바로 그 해악이므로 **등재가 아니라 코드로 닫는다**(팀장 결정). `else` 를 지워 소진 `when` 으로 바꾸고 차단은 멈춘다 — 그래서 「AccessBlocked 분기는 컴파일이 강제한다」가 이 두 자리에서도 참이 된다 |
+| `workflow/src/test/kotlin/bidvector/workflow/collection/**` | 그 거동의 test(차단 뒤 남은 후보 호출 0 · 통제군 429 는 기존 거동) |
+| `procurement/src/test/kotlin/bidvector/procurement/AxisLastObservedAtTest.kt` | v B-1 — `ALL_TRUNCATION_CAUSES` 가 새 사유를 모른다(`procurement/**` 는 이미 in_scope 이나 사유를 남긴다) |
+
+**사후 등재(v L-2)** — 착수·1차 갱신 표에 없던 채 커밋된 네 경로를 여기서 승인한다:
+`app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt`(커밋 조립에 청중·알림함 포트 `@Import`) ·
+`app/src/test/kotlin/bidvector/app/evaluation/{DryRunCommitParityTest,EvaluationCommitRunE2ETest,EvaluationCommitRunnerTest}.kt`
+(생성자 인자 둘에 따른 조립). `app/…/EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다 — 늦게 머지되는 쪽이 맞춘다.
+
+**H-1 처방(v)** — 출하 정책 `KONEPS_HTTP_POLICY` 를 resolve 한 그 값 위에서 ① 403 한 번이면 호출 1회 ② 연속 호출 간격 ≥ 출하 `minimumCallInterval`(주입 시계)을 잰다. 상수 표로 만든 test 정책 위의 시나리오로 갈음하지 않는다. 변이 `minimumCallInterval=ZERO` · 출하 `statusRules` 에서 403 행 제거가 각각 RED.
