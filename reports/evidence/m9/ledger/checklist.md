@@ -11,6 +11,8 @@
 | 3 운영 잔여 처분 **후보** | capability map **§12.3 (c)** · 6E-1 추적표의 2026-11-06 절 | 다섯 축. 문면은 전부 「후보」이고 **추적표의 판정(ⓒ)·홀더 칸·집계를 바꾸지 않는다** — 분류 변경이 운영자 몫이기 때문 |
 | 4 `OPEN-GATE-REGISTRATION-STALE-INPUT` 종결 + 6G-2c 잔여 열하나 | capability map **§12.3 (d)** · open-inventory §8 · `milestone-6.md` 「처분 2026-11-06」 | 종결은 구조 근거(선언된 입력 + 손 등식 test 삭제)와 PR·머지 커밋으로. 열하나는 **오늘 상태를 기계로 잰 처분 후보표**(재지 못한 다섯은 「재지 않았다」로) |
 | 5 M6 OPEN 204 전수 재고 미실시 | capability map **§12.3 (e)** | M6 종결 결정을 유지하고 그 사실만 적는다. 이 절도 그 재고가 아니라는 한 줄을 함께 |
+| **D-L-1**(계약 갱신 2026-11-06) 등재 누락 둘 | capability map **§14.3 (C)** 의 slice 신설 OPEN 표 + **§12.3 (a)** 문단 갱신 | `OPEN-7E3A-OPENING-AXIS-HARNESS`·`OPEN-7C3B-PAPER-BID-NOTIFICATION` 을 **행으로** 세웠다. 담당 = **M9/opening-harness · M9/paper-bid**(진행 중). §14.0 이 그 표를 「담당만 적고 활성 여부를 정하지 않는다」고 선언하므로 **§12 머리 집계는 불변**이다(diff 0) — 등재와 집계를 가른 것이 이 처분의 요점 |
+| **D-L-2**(같은 갱신) cve-apt 두 OPEN 의 자리 | `reports/evidence/chore/cve-apt-109518/checklist.md` 의 날짜 붙은 절 | 출처(`cr MEDIUM-1`·`-2`)와 받는 자리(**M9/cve-followups**, PR **#131**)를 덧붙였다. 같은 코멘트의 셋째 항목은 **OPEN 이 아니다**(식별자를 받지 않았다)는 것도 적었다 |
 
 ## 이 장부가 공허해지는 길과 막는 것
 
@@ -26,14 +28,13 @@
 
 ## 알려진 제한
 
-1. **`OPEN-CVE-APT-RETRY`·`OPEN-CVE-APT-RUNBOOK-BRANCH` 의 원천이 PR 코멘트뿐이다.** 두 식별자는
-   `reports/evidence/chore/cve-apt-109518/` 에 **없고**(그 checklist·scope 에 `OPEN-` 0건) PR #126 조치
-   코멘트가 유일한 정의 자리였다. 이 slice 가 capability map 에 세워 저장소 안에 자리를 만들었지만,
-   **그 slice 의 evidence 는 `in_scope` 밖**이라 손대지 않았다. 그래서 두 자리가 어긋난 채다 —
-   evidence 만 읽는 쪽에는 그 OPEN 이 없다.
-2. **`OPEN-7E3A-OPENING-AXIS-HARNESS`·`OPEN-7C3B-PAPER-BID-NOTIFICATION` 에 registry 행을 만들지 않았다.**
-   둘은 열린 채인데 capability map 과 `milestone-6.md` 어디에도 없다(기계 대조). 행을 세우는 것은 집계·분류에
-   손대는 일이라 **사실만 적었다**. 이 간격은 등재 공백으로 남는다.
+1. **~~cve-apt 두 OPEN 의 원천이 PR 코멘트뿐~~ → 계약 갱신 D-L-2 로 닫혔다.** 그 slice evidence 에 출처·받는
+   자리가 섰다. **남는 것**: 그 두 OPEN 의 **처방을 실제로 적용하는 slice 는 아직 없다**(받는 자리가 PR #131 로
+   지목됐을 뿐이다). 그리고 이 slice 는 그 처방이 옳은지 재지 않았다 — 적은 것은 자리뿐이다.
+2. **~~registry 행을 만들지 않았다~~ → 계약 갱신 D-L-1 로 닫혔다.** 두 행이 §14.3 에 섰고 식별자 포함
+   재검에서 MISSING 0 이다. **남는 것**: 두 행의 `요지` 는 각 slice evidence 를 가리키는 **포인터**이고
+   이 slice 가 그 내용을 재판정한 것이 아니다. 담당으로 적은 두 slice 는 **아직 열리지 않았다**(이름은 팀장이
+   지었다) — 그 slice 가 열릴 때 계약이 이 행을 수령했는지 확인하는 것이 다음 걸음이다.
 3. **운영 잔여 다섯은 판정이 아니라 후보다.** `OPS-03`·`STR-09`·`OPS-11` 은 빈자리를 채운 것이 실제로
    있는데도 ⓒ 로 남아 있고, 그 재판정은 추적표의 분류 규칙이 할 일이다. 이 slice 는 술어를 돌리지 않았다.
 4. **6G-2c 잔여 열하나 가운데 다섯을 재지 못했다**(harness 우회 중복 실행 · 줄 정의 차이 · Python 중복 계산 ·
