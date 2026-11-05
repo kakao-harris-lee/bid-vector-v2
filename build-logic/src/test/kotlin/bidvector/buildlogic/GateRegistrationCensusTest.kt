@@ -308,7 +308,41 @@ class GateRegistrationCensusTest {
         assertTrue(violations.single().contains("p.GhostTest"), "$violations")
     }
 
+    // ---- 장부 모양 — 블록 안 행 순서와 중복(`OPEN-HARNESS-GATE-TESTS-ORDER`) ----
+
+    @Test
+    fun `사전순 등재 행은 장부 모양 위반이 없다`() {
+        val violations = GateRegistration.ledgerOrderViolations(KEY, listOf("p.AaaTest", "p.BbbTest", "p.CccTest"))
+
+        assertEquals(emptyList<String>(), violations)
+    }
+
+    @Test
+    fun `새 이름을 블록 끝에 붙이면 붉는다 — 집합 등식이 못 보는 축`() {
+        val rows = listOf("p.AaaTest", "p.CccTest", "p.BbbTest")
+
+        val violations = GateRegistration.ledgerOrderViolations(KEY, rows)
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("사전순"), "$violations")
+        assertEquals(rows.toSet(), rows.sorted().toSet(), "집합으로는 같다 — 그래서 등식이 이 축을 못 본다")
+    }
+
+    @Test
+    fun `같은 이름을 두 번 등재하면 붉는다 — 집합이 접어 버리는 축`() {
+        val violations = GateRegistration.ledgerOrderViolations(KEY, listOf("p.AaaTest", "p.AaaTest", "p.BbbTest"))
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.AaaTest"), "$violations")
+    }
+
+    @Test
+    fun `빈 열은 장부 모양 단언 대상이 없다 — test 가 없는 모듈`() {
+        assertEquals(emptyList<String>(), GateRegistration.ledgerOrderViolations(KEY, emptyList()))
+    }
+
     private companion object {
+        const val KEY = "gate.tests.sample"
         const val TEST = "org.junit.jupiter.api.Test"
         const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
         const val ENABLED_IF = "org.junit.jupiter.api.condition.EnabledIfSystemProperty"

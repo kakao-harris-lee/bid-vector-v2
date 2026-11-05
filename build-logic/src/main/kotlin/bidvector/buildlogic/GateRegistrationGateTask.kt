@@ -81,13 +81,19 @@ abstract class GateRegistrationGateTask : DefaultTask() {
                 lookup,
                 lookup::factsOf,
             )
+        val registeredKey = "gate.tests.$module"
+        val excludedKey = "$registeredKey.excluded"
+        val registeredRows = policy.coordinateRows(registeredKey)
+        val excludedRows = policy.coordinateRows(excludedKey)
         val violations =
             GateRegistration.violations(
                 census,
-                registered = policy.coordinates("gate.tests.$module"),
-                declaredExcluded = policy.coordinates("gate.tests.$module.excluded"),
+                registered = registeredRows.toSet(),
+                declaredExcluded = excludedRows.toSet(),
                 hasTestSources = testSources.files.any { it.isFile && it.extension in SOURCE_EXTENSIONS },
-            )
+            ) +
+                GateRegistration.ledgerOrderViolations(registeredKey, registeredRows) +
+                GateRegistration.ledgerOrderViolations(excludedKey, excludedRows)
 
         writeReport(module, census, violations)
         if (violations.isNotEmpty()) {
@@ -122,13 +128,17 @@ abstract class GateRegistrationGateTask : DefaultTask() {
         const val DISCOVERY_ANNOTATIONS = "gate.tests.discovery.annotations"
         const val CONDITION_PACKAGES = "gate.tests.discovery.condition-packages"
 
-        /** 줄이 없는 모듈은 단언 대상이 없다 — 빈 집합이고 오류가 아니다(`settlement` 은 test 가 없다). */
-        fun Map<String, String>.coordinates(key: String): Set<String> =
+        /**
+         * 줄이 없는 모듈은 단언 대상이 없다 — 빈 열이고 오류가 아니다(`settlement` 은 test 가 없다).
+         *
+         * **순서를 지키고 돌려준다** — 등식은 집합으로 세지만 장부 모양 단언
+         * ([GateRegistration.ledgerOrderViolations])은 등재 **행 순서**를 본다.
+         */
+        fun Map<String, String>.coordinateRows(key: String): List<String> =
             this[key]
                 .orEmpty()
                 .split(',')
                 .map(String::trim)
                 .filter(String::isNotEmpty)
-                .toSet()
     }
 }

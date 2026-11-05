@@ -117,6 +117,30 @@ internal object GateRegistration {
     }
 
     /**
+     * 등재 **장부 자신의 모양** — 블록 안 행이 사전순이고 중복이 없다(`OPEN-HARNESS-GATE-TESTS-ORDER`).
+     *
+     * 등식(`모집단 ∖ 제외 == 등재`)은 집합이라 순서와 중복을 보지 못한다. 그런데 새 이름을 블록 **끝**에
+     * 붙이는 것을 세 라운드 연속으로 사람이 잡았다(6F-10 D-6F10-37) — 리뷰가 잡는 것은 게이트가 아니다.
+     * 판정 단위는 줄이 아니라 **쉼표로 가른 값 열**이다: properties 의 `\` 이어달리기가 값에서 줄바꿈을
+     * 지우므로 한 줄에 몰아 써도 같은 열이 된다.
+     */
+    fun ledgerOrderViolations(
+        key: String,
+        rows: List<String>,
+    ): List<String> =
+        rows
+            .groupBy { it }
+            .filterValues { it.size > 1 }
+            .keys
+            .sorted()
+            .map { "'$key' 에 같은 이름이 두 번 등재돼 있다 — 장부가 하나를 두 번 센다: $it" } +
+            if (rows == rows.sorted()) {
+                emptyList()
+            } else {
+                listOf("'$key' 의 등재 행이 사전순이 아니다 — 블록 끝에 붙이는 추가가 보이지 않는다")
+            }
+
+    /**
      * **물려받은** test 메서드까지 센다(cr r1 G-2) — JUnit 은 추상 상위가 선언한 `@Test` 를 구체
      * 하위에서 돌린다. 상위 사슬은 같은 조회 자리에서 푼다(그 모듈의 test 출력 ∪ test 런타임
      * 클래스패스). 풀리지 않는 상위는 그 가지에서 끝나고, 그러면 그 클래스는 모집단 밖이라
