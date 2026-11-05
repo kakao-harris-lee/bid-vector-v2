@@ -30,6 +30,17 @@ internal object NotificationInboxSql {
      *   있어서, 「재기록」이나 `IS DISTINCT FROM` 으로 두면 그 원천 위에서 읽음 처리가 영영
      *   유지되지 않는다(매 run 마다 배지가 다시 선다). 늦게 도착한 **옛** 사실도 해제하지
      *   않는다.
+     *
+     * · `occurred_at` 은 **단조 증가한다**(`GREATEST`). 그 전진 비교가 기대는 불변식이 바로
+     *   이것이고, 앞 판은 같은 문장에서 그 값을 **조건 없이 덮어** 불변식을 깼다(cr M-1 · v L-1
+     *   실측): 옛 사실이 늦게 도착하면 읽음은 유지되지만 저장된 시각이 **후퇴**하고, 그 다음의
+     *   평범한 run 이 같은 개정을 「전진」으로 보아 배지를 다시 세웠다. 겹친 run 과 재시도 replay
+     *   가 그 자리에 닿는다(훑기가 건별 별개 트랜잭션으로 쏜다).
+     *
+     *   `GREATEST` 는 **종류 전수**의 의미를 바꾼다 — 어느 종류든 저장된 사실 시각이 뒤로 가지
+     *   않는다. 그 값은 목록 정렬 축이기도 해서(아래 `SELECT_PAGE`) 단조가 더 맞는다: 후퇴하면
+     *   이미 본 항목이 목록에서 내려갔다 올라오는 흔들림이 생긴다. 두 축을 종류 전수 test 가
+     *   함께 잠근다.
      * · `RETURNING (xmax = 0)` 으로 삽입/갱신을 가른다 — `opening_result` upsert 의 기존 관례다.
      */
     const val UPSERT_ITEM = """
@@ -37,7 +48,7 @@ internal object NotificationInboxSql {
             (account_id, kind, notice_number, notice_round, detail_code, occurred_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, now())
         ON CONFLICT (account_id, kind, notice_number, notice_round) DO UPDATE SET
-            occurred_at = EXCLUDED.occurred_at,
+            occurred_at = GREATEST(notification_inbox.occurred_at, EXCLUDED.occurred_at),
             updated_at = now(),
             detail_code = EXCLUDED.detail_code,
             read_at = CASE

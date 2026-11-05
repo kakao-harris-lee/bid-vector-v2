@@ -150,6 +150,12 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
      * 개정 훑기는 조건이 유지되는 동안 매 run 마다 같은 개정을 다시 적는다.
      *
      * 늦게 도착한 **옛** 사실도 해제하지 않는다(시각 축이 `IS DISTINCT FROM` 이 아니라 `>` 다).
+     *
+     * **걸음이 셋인 이유**(cr M-1 · v L-1): 앞 판은 옛 사실을 적고 거기서 멈췄다. 그 한 쓰기만
+     * 보면 읽음이 유지되지만, 저장된 사실 시각이 **후퇴**하면 그 다음의 평범한 run 이 같은 개정을
+     * 「전진」으로 보고 배지를 다시 세운다 — 정책이 기대는 「저장된 사실 시각은 단조 증가한다」가
+     * 같은 문장의 다른 줄에서 깨져 있었다. 그래서 ② 에서 **시각을 단언**하고 ③ 에서 **다음 run 을
+     * 실제로 적는다.**
      */
     @Test
     fun `같은 개정과 옛 개정의 재기록은 읽음을 유지한다 — 훑기가 run 마다 배지를 세우지 않는다`() {
@@ -158,13 +164,44 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
         store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
+        // ① 같은 개정의 재기록
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
         rawRow(account, "NOTICE_REVISED", "N-1").readAt shouldBe READ_AT
 
+        // ② 늦게 도착한 옛 사실 — 읽음을 유지하고 **워터마크가 후퇴하지 않는다**
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, EARLIER))
+        val afterEarlier = rawRow(account, "NOTICE_REVISED", "N-1")
+        afterEarlier.readAt shouldBe READ_AT
+        afterEarlier.occurredAt shouldBe OBSERVED_AT
+
+        // ③ 그 뒤의 평범한 다음 run(같은 개정) — 배지가 다시 서지 않는다
+        inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
 
         rawRow(account, "NOTICE_REVISED", "N-1").readAt shouldBe READ_AT
         store().list(account, page()).unreadCount shouldBe 0L
+    }
+
+    /**
+     * **워터마크의 단조성은 종류 전수의 성질이다**(cr M-1 의 고침이 모든 종류의 `occurred_at` 을
+     * 단조로 만든다 — 그 의미 변화를 전수에서 잠근다).
+     *
+     * 이 축이 없으면 「`NOTICE_REVISED` 만 단조」로 좁히는 변이가 위 test 하나만 보고 지나간다.
+     * 저장된 사실 시각은 **목록 정렬 축**이기도 하므로(`SELECT_PAGE`), 후퇴가 남으면 이미 본 항목이
+     * 목록에서 아래로 내려갔다 올라오는 흔들림도 함께 생긴다.
+     */
+    @Test
+    fun `종류 전수에서 옛 사실의 재기록은 저장된 사실 시각을 후퇴시키지 않는다`() {
+        val account = insertAccount("watermark")
+
+        NotificationKind.entries.forEach { kind ->
+            val notice = unknownNotice("N-${kind.name}")
+            val fact = factOf(kind)
+            inbox().record(record(account, notice, fact, OBSERVED_AT))
+
+            inbox().record(record(account, notice, fact, EARLIER)) shouldBe NotificationInboxOutcome.Updated
+
+            rawRow(account, kind.name, notice.number.value).occurredAt shouldBe OBSERVED_AT
+        }
     }
 
     /** **사실이 바뀌면 다시 봐야 한다** — 잠정 1위였다가 아니게 된 것은 다른 사실이다. */
