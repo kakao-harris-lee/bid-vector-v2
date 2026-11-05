@@ -68,7 +68,7 @@ DB 경계(앵커 365 ↔ 정책 90)의 RED 는 **변이 ① 과 같은 측정**�
 | 마이그레이션 | `git diff --name-only 79f3e5c4..HEAD -- adapters/src/main/resources/db/migration/` **0 파일**(D-4 — 적용된 `V19`·`V23` 의 주석을 고치지 않았다, checksum) |
 | 낡는 좌표 | 이 slice 가 편집하는 파일에 `file:line` **0**. 역방향(편집한 파일 stem 으로 `<stem>:[0-9]` 전수) 유효 참조 **0** — 유일한 매치는 M4 evidence 에 적힌 **grep 명령문 안의 패턴**이고 좌표 참조가 아니다 |
 | 비밀값 스캔 | 참조형 `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m9/retention-1y/` **exit 1(매치 0)**. 산출물 쪽은 **이 slice 가 추가한 줄 307** 을 같은 패턴 파일로 떠서 **매치 0** — 산출물 파일 전체 스캔이 내는 매치는 전부 base 에 이미 있던 줄이고 `leakPatternGate` baseline 이 덮는다(전건 `check` 에서 그 게이트가 실행돼 통과) |
-| clean tree | `git status --porcelain -- <in_scope 개별 인자>` **빈 출력**. 양성 대조: 변이 ①~③ 이 그 술어로 **잡혔다**(변이 중 `--stat` 1 file changed, 원복 후 빈 출력) — 일부러 건드려 잡히는지 본 것과 같은 측정이다 |
+| clean tree | `git status --porcelain -- <in_scope 개별 인자>` **빈 출력**. **양성 대조**: in_scope 문서 하나에 한 줄을 심고 같은 술어를 돌려 ` M` **1행**을 받았고, **비파괴 절삭**(`head -n <원래 줄수>` 로 덮어쓰기 — `git checkout --` 금지)으로 걷은 뒤 다시 빈 출력이었다(줄수 469 → 470 → 469). 변이 ①~③ 도 같은 술어에 잡혔다 |
 | 외부 effect | 운영·dev DB(55432) 무접촉 · 실 API·LLM·알림 호출 0 · push/PR/머지 0. DB 축은 전부 Testcontainers(이 slice 는 접속 설정을 만지지 않는다) |
 | 마이그레이션 적용 DB | 없음 — 이 slice 는 스키마를 바꾸지 않으므로 적용 창도, forward-fix 도 없다 |
 
