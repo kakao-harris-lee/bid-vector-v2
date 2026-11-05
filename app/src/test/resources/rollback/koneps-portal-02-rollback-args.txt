@@ -1,0 +1,30 @@
+# M9/portal-02 — 재빌드 없는 되돌림 인자 **정본**(14 인자).
+#
+# `docs/runbook/m6-6g-real-collection.md` §8-4 가 이 파일을 가리키고
+# `KonepsRollbackArgumentsTest` 가 이 파일로 배선을 실제로 기동해 「뜨는가」와 「옛 이름으로
+# 돌아왔는가」를 단언한다 — 문서와 test 가 한 소스에서 온다.
+#
+# **행 전수여야 한다.** `operations` 두 축은 값 객체의 Map 이고 행 타입의 칸이 전부 필수다.
+# 한 칸만 주면 Spring 이 그 행을 그 칸만으로 구성해 나머지가 null 이 되고 **프로세스가 뜨지
+# 않는다**(실측: `parameter division` · `parameter openingResultListPath` 가 null). 그래서
+# 낙찰정보서비스 경로 둘도 **같은 값으로 다시** 적는다 — 그 축이 바뀌는 것이 아니라 행 전체가
+# 교체되기 때문이다.
+#
+# 옛 URL 은 공지일(2026-11-03) 기준 90일 — 약 2027-02-01 — 까지만 산다. 그 뒤에는 이 되돌림이
+# 서지 않으므로 runbook §8 의 사전 확인이 그 전에 끝나야 한다.
+#
+# `#` 줄과 빈 줄은 무시한다. 각 줄은 `--` 없이 `키=값` 이고 실행 시 `--` 를 붙여 넘긴다.
+bidvector.koneps.base-url=https://apis.data.go.kr/1230000/ad/BidPublicInfoService
+bidvector.koneps.operations.construction.path=getBidPblancListInfoCnstwk
+bidvector.koneps.operations.construction.division=CONSTRUCTION
+bidvector.koneps.operations.service.path=getBidPblancListInfoServc
+bidvector.koneps.operations.service.division=SERVICE
+bidvector.koneps.opening.bid-price-formula-a-path=getBidPblancListBidPrceCalclAInfo
+bidvector.koneps.opening.operations.construction.opening-result-list-path=getOpengResultListInfoCnstwk
+bidvector.koneps.opening.operations.construction.reserve-price-detail-path=getOpengResultListInfoCnstwkPreparPcDetail
+bidvector.koneps.opening.operations.construction.base-amount-path=getBidPblancListInfoCnstwkBsisAmount
+bidvector.koneps.opening.operations.construction.division=CONSTRUCTION
+bidvector.koneps.opening.operations.service.opening-result-list-path=getOpengResultListInfoServc
+bidvector.koneps.opening.operations.service.reserve-price-detail-path=getOpengResultListInfoServcPreparPcDetail
+bidvector.koneps.opening.operations.service.base-amount-path=getBidPblancListInfoServcBsisAmount
+bidvector.koneps.opening.operations.service.division=SERVICE

@@ -43,3 +43,26 @@
 ## 5. evidence N/A
 
 `differential.json` · `golden-manifest.json` — 문서 slice 라 비교할 산출물·golden 이 없다(코드·fixture 변경 0).
+
+## 6. M9 처분 — M9/ledger (2026-11-06)
+
+이 문서는 2026-11-02 종결 판정의 기록이라 **덮어쓰지 않는다.** 위 **4** 「넘기는 것」의 열하나 가운데
+M9 머지분이 **일곱**을 닫았다. 장부 쪽 정본은 `docs/discovery/capability-map.md` §12.3 (a) 이고 근거 PR·머지
+커밋을 그 절이 든다. **이 절은 재판정하지 않는다** — 각 slice 의 evidence 가 판정 자리다.
+
+| 4 의 항목 | 처분 | 근거 |
+| --- | --- | --- |
+| `OPEN-7E2B-BUDGET-CLEAR` | **닫힘** | PR **#124** 머지 `319fe212` · `reports/evidence/m9/budget-clear/` |
+| `OPEN-7E3B-TIME-DISPLAY` · `OPEN-7E3B-MONEY-WORDING` | **닫힘** | PR **#125** 머지 `4953d743` · `reports/evidence/m9/screen-display/` |
+| `OPEN-7C3B-FAILED-BID-DETAIL` · `OPEN-7C3B-REVISION-REUNREAD` | **닫힘** | PR **#123** 머지 `df4976cc` · `reports/evidence/m9/inbox-vocab/` |
+| 7F 장부 v r2 **L-1**(checkout ↔ manifest `git_sha`) · **L-2**(timeout 뒤 일회 컨테이너) | **닫힘** | PR **#122** 머지 `6c38fb32` · `reports/evidence/m9/prod-tools/` |
+| `OPEN-SET01-AWARD-NAME-INGEST` | **열린 채** — 적재 slice 가 PR **#127** 과 나란히 열려 있다(PR **#128**, 미머지). **그 PR 이 머지되면 처분을 확인한다** | 운영자 결정 2026-10-22 (a) · 착수는 6G 라이브 수집 종료 뒤 |
+| `OPEN-7E3A-OPENING-AXIS-HARNESS` | **열린 채** — M9 가 만지지 않았다 | — |
+| `OPEN-7C3B-PAPER-BID-NOTIFICATION` | **열린 채** — #123 의 out_scope 다(그 계약이 「이 slice 머지 뒤 별도」로 적었다). 알림함 키에 종류 축이 없어 페이퍼 투찰 항목이 실투찰 항목을 덮는 축도 그대로 | `reports/evidence/m9/inbox-vocab/` 알려진 제한 7 |
+| `OPEN-6F4-STR02-REQUIREMENTS-AXIS` | **열린 채 상태 갱신** — 6F-5-b LLM 추출이 사용자 결정 2026-11-05 로 보류라 축소가 유지된다 | PR **#124** · 정본은 capability map 의 STR-02 절과 그 OPEN 행 |
+
+**M9 가 새로 만든 것은 이 문서가 받지 않는다** — 신설 OPEN 일곱(화면 표시 다섯 · CVE apt 둘)은 capability
+map §12.3 (b) 에 섰고, 미머지 PR 둘이 만들 OPEN 둘은 그 PR 이 자기 머지에서 세운다.
+
+**위 2 「M7 완료 조건 대조」는 바뀌지 않는다** — 닫힌 일곱은 전부 조건 **밖**으로 넘긴 항목이고(4 의 정의),
+조건 자체의 근거 칸을 건드리지 않는다. 2 의 `privacy-gate` 판정 부재도 그대로다(이 장비에 그 정의가 없다).
