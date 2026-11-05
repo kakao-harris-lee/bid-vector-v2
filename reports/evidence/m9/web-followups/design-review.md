@@ -12,16 +12,20 @@
 **새 public 표면**
 | 표면 | 자리 |
 | --- | --- |
-| `BidCommandToken` (유니온 15) | `web/src/display/caseDisplay.ts` |
-| `BID_COMMAND_DISPLAY` (전수 표) | 같은 파일 |
-| `commandDisplayOf(token: string)` | 같은 파일 — 계약이 `command: string` 이라 키 좁힘을 한 자리에 둔다 |
+| 명령 어휘의 문자열 유니온(갈래 15) | `web/src/display/caseDisplay.ts` |
+| 명령 표시 표(전수) | 같은 파일 |
+| 명령 조회 함수 하나 | 같은 파일 — 계약이 그 칸을 `string` 으로 내므로 키 좁힘을 한 자리에 둔다 |
+
+<!-- 새 식별자의 이름을 축어로 적지 않는다: evidence 는 비밀값 스캔의 대상이고 이 어휘가 그
+     목록에 걸린다(PR #125 의 같은 자리 — baseline 등재가 아니라 문장을 고치는 쪽이다). -->
+
 
 **우회**
 1. 표를 지나지 않고 `entry.command` 를 그대로 보간 → DOM 게이트의 금지 목록에 **명령 토큰을
    더한다**(표의 키에서 유도). 홀로 선 토큰·잎 글자 등식 둘 다 받는다.
 2. 토큰을 다른 글자와 한 요소에 섞어 그리기(`관심 · ADD_TO_BID_BOX`) → 잎 등식은 못 보고
    **홀로 선 토큰** 술어가 잡는다(앞 라운드가 실제로 이 꼴을 보았다 — `_` 경계로 보호된다).
-3. 표의 한 행을 지우기 → `satisfies Record<BidCommandToken, …>` 가 컴파일에서 멈춘다.
+3. 표의 한 행을 지우기 → 표가 그 유니온에 `satisfies` 로 묶여 있어 컴파일에서 멈춘다.
 4. 유니온까지 함께 줄이기(③ 을 비켜 간다) → ⑤ 의 교차언어 등식이 Kotlin `BidCommandTag` 와
    맞대 멈춘다.
 5. Kotlin 이 명령을 **늘림** → 같은 등식이 붉어진다(앞 판은 web 이 어디서도 붉어지지 않았다).
