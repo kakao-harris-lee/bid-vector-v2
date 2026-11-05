@@ -55,7 +55,12 @@ class RetentionPolicyDataTest {
         (resolution as Resolution.Resolved).value.retentionDays shouldBe DAYS_BEFORE_REVISION
     }
 
-    /** 해소값은 **어느 결정으로 선 값인지**를 함께 낸다 — 값만 맞고 출처가 옛 결정이면 장부가 거짓이다. */
+    /**
+     * 해소값이 **어느 항목으로 섰는지**는 `effectiveFrom` 한 축이 말한다 — 아래 두 단언 가운데 판별자는
+     * 그것이다. `source` 는 **정책 단위 문자열**이라(`EffectiveDatedPolicy.resolve` 가 모든 version 에 같은
+     * 값을 붙인다) 개정 앞쪽 기준일로 해소해도 똑같이 통과한다(cr L-1). 그래서 그 두 줄이 재는 것은
+     * 「정책의 출처가 **두 결정을 모두** 인용한다」까지이고, 항목별 출처는 이 타입이 갖지 않는다.
+     */
     @Test
     fun `개정 항목의 유효 시작일과 출처가 두 결정을 가리킨다`() {
         val version = (RETENTION_POLICY.resolve(REVISION_DATE) as Resolution.Resolved).version

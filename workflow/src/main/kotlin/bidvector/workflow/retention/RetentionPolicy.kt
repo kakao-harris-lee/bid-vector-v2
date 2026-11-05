@@ -4,6 +4,7 @@ import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
@@ -68,6 +69,17 @@ data class RetentionCutoff internal constructor(
  * 보존 기간 1년이 선 날 — 그 **앞쪽 기준일은 여전히 90일로 해소된다**(아래 KDoc 의 소급 금지).
  */
 private val RETENTION_ONE_YEAR_FROM: LocalDate = LocalDate.of(2026, 11, 5)
+
+/**
+ * 개정일을 판정하는 **달력 구역**(D-8) — 날짜 경계가 운영자의 하루와 같아야 한다(KST). 이 저장소의
+ * 다른 날짜 축이 전부 그렇게 하고 각자 구역 상수를 자기 정책 옆에 둔다(증빙 보관 기한·알림 창·
+ * 체크리스트·개찰일).
+ *
+ * UTC 로 고르면 **KST 00~09 시가 어제 날짜로 정책을 해소**한다. 보존에서 그 창은 치명적이다 —
+ * runbook §2.1 의 cron 이 04:10 KST 이고 그 시각은 **언제나** 그 창 안이라, 개정일 당일의 run 이 옛
+ * 값으로 돌면서 로그 어디에도 「어제 날짜로 해소했다」가 남지 않는다(v L-1 실측).
+ */
+val RETENTION_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 /**
  * 일괄 크기는 **개정 축이 아니다** — 두 항목이 같은 값을 쓴다는 것을 한 자리로 만든다(개정이
