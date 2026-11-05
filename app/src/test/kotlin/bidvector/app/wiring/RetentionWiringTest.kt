@@ -44,11 +44,28 @@ private val OWNER_CONNECTION_HOLDERS =
     )
 
 /**
- * 배선이 정책을 고르는 기준일 — 아래 [RetentionWiringTest] 가 띄우는 컨텍스트의 시계가
- * `Instant.EPOCH` 이므로 배선은 그 날로 해소한다(배선이 시스템 시계를 쓰지 않는다는 것이
- * cr L-4 의 조치이고, 이 상수가 그 사실에 기댄다).
+ * 기본 boot 가 정책을 고르는 기준일 — 그 컨텍스트의 시계가 `Instant.EPOCH` 이므로 배선은 그 날로
+ * 해소한다(배선이 시스템 시계를 쓰지 않는다는 것이 cr L-4 의 조치이고, 이 상수가 그 사실에 기댄다).
+ * 구역을 **배선에서 읽어 오지 않는다**(앵커 독립과 같은 이유). 그럴 필요도 없다 — EPOCH 의 날짜는
+ * UTC 와 KST 에서 같은 1970-01-01 이라 이 상수는 어느 쪽으로 계산해도 같은 값이고, 그래서 **이
+ * 등식만으로는 구역 축도, 어느 시대로 해소하는가도 잴 수 없다**. 그 둘은 아래 리터럴 단언과 경계
+ * test 가 잰다.
  */
 private val BOOT_DATE: LocalDate = LocalDate.ofInstant(Instant.EPOCH, ZoneOffset.UTC)
+
+/** 개정일(2026-11-05 KST)의 **직전 1초**. UTC 날짜로 해소하면 11-04 이므로 옛 값이 선다. */
+private val JUST_BEFORE_REVISION_KST: Instant = Instant.parse("2026-11-04T14:59:59Z")
+
+/** 개정일의 **첫 순간**(KST 00:00) — UTC 로는 아직 11-04 다. 이 한 초가 두 값을 가른다. */
+private val FIRST_INSTANT_OF_REVISION_KST: Instant = Instant.parse("2026-11-04T15:00:00Z")
+
+/**
+ * 승인된 두 값을 **리터럴로** 둔다(v H-1). 정책에서 읽어 오면 「배선이 어느 시대로 해소하는가」를
+ * 재는 등식의 양변이 함께 움직여 아무것도 가르지 않는다 — 배선을 옛 날짜 고정으로 바꾼 변이가
+ * 바로 그 모양에서 살아남았다.
+ */
+private const val DAYS_BEFORE_REVISION = 90
+private const val DAYS_FROM_REVISION = 365
 
 /**
  * M6/6B-3 P-3 — 보존 배선의 켜짐 조건과 **표면**.
@@ -64,11 +81,14 @@ class RetentionWiringTest {
         val failure: Throwable?,
     )
 
-    private fun boot(vararg properties: String): Booted {
+    private fun boot(
+        vararg properties: String,
+        now: Instant = Instant.EPOCH,
+    ): Booted {
         val context = AnnotationConfigApplicationContext()
         TestPropertyValues.of(*properties).applyTo(context)
         context.register(RetentionWiring::class.java)
-        context.registerBean(Clock::class.java, Supplier { Clock { Instant.EPOCH } })
+        context.registerBean(Clock::class.java, Supplier { Clock { now } })
         context.registerBean(
             PersistenceProperties::class.java,
             Supplier {
@@ -90,15 +110,22 @@ class RetentionWiringTest {
 
     private fun <T> withBoot(
         vararg properties: String,
+        now: Instant = Instant.EPOCH,
         block: (Booted) -> T,
     ): T {
-        val booted = boot(*properties)
+        val booted = boot(*properties, now = now)
         return try {
             block(booted)
         } finally {
             booted.context.close()
         }
     }
+
+    /** `mode=once` 로 띄운 배선이 러너에 쥐여 준 보존 기간 — 조립을 지난 **그 한 벌**의 값이다. */
+    private fun retentionDaysAt(now: Instant): Int =
+        withBoot("bidvector.retention.mode=once", now = now) { booted ->
+            booted.context.getBean(RetentionRunner::class.java).purge.policy.retentionDays
+        }
 
     @Test
     fun `mode 가 없으면 러너 빈이 없다 — 기본 꺼짐`() {
@@ -147,6 +174,33 @@ class RetentionWiringTest {
 
             runner.purge.policy shouldBe (RETENTION_POLICY.resolve(BOOT_DATE) as Resolution.Resolved).value
         }
+    }
+
+    /**
+     * **v H-1** — 위 등식은 「배선이 주입된 시계로 해소한다」만 재고 **어느 시대로 해소하는가**는 재지
+     * 않는다(기본 boot 의 EPOCH 에서는 양변이 둘 다 90 이다). 그래서 배선의 해소를 개정 앞 날짜로
+     * 고정한 변이가 app test 전건을 초록으로 지났다 — 되돌릴 수 없는 파기 경로의 지배 값에 걸린
+     * 술어가 그 변이를 보지 못했다. 이 test 는 **개정일 이후 시계로 한 번 더 띄우고** 승인된 값을
+     * **리터럴로** 단언한다.
+     */
+    @Test
+    fun `개정일 이후 시계로 띄운 배선은 1년을 쥔다 — 리터럴 앵커`() {
+        retentionDaysAt(Instant.parse("2026-11-05T00:00:00Z")) shouldBe DAYS_FROM_REVISION
+    }
+
+    /**
+     * **D-8** — 개정일은 **KST 달력일**로 판정한다. 이 한 초가 두 값을 가르고, UTC 로 해소하면 둘 다
+     * 90 이 된다(그 판에서는 runbook 의 04:10 KST cron 이 **언제나** 어제 날짜로 해소해 개정일 당일에도
+     * 옛 값으로 돌았다). 두 행이 짝이라 **구역을 UTC 로 되돌리면 아래쪽이 RED** 다.
+     */
+    @Test
+    fun `개정일 직전 1초(KST)는 아직 90일이다`() {
+        retentionDaysAt(JUST_BEFORE_REVISION_KST) shouldBe DAYS_BEFORE_REVISION
+    }
+
+    @Test
+    fun `개정일 첫 순간(KST)부터 1년이다 — UTC 날짜로는 아직 전날이다`() {
+        retentionDaysAt(FIRST_INSTANT_OF_REVISION_KST) shouldBe DAYS_FROM_REVISION
     }
 
     @Test
