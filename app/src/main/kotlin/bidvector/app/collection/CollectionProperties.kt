@@ -35,7 +35,13 @@ data class CollectionProperties(
     val releaseSha: String = UNVERSIONED_RELEASE,
 )
 
-private const val DEFAULT_KONEPS_BASE_URL = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService"
+/**
+ * 입찰공고정보서비스 BASE URL — **`02` 개편판**이다(data.go.kr 공지 2026-11-03 NOTICE_0000000005128
+ * 「[조달청] 조달청_입찰공고정보서비스 OPEN API 서비스 변경안내」). 그 공지가 BASE URL 과 각
+ * 오퍼레이션명 뒤에 `02` 를 붙였고 옛 URL 은 공지일로부터 90일만 산다. 되돌림은 재빌드 없이
+ * `bidvector.koneps.base-url` 하나다.
+ */
+private const val DEFAULT_KONEPS_BASE_URL = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService02"
 
 /**
  * 업종 하나가 부르는 공고 목록 오퍼레이션 — **경로와 업무 대분류를 한 행에 묶는다**(D-6F9-1). 응답에 대분류 필드가
@@ -64,8 +70,8 @@ data class KonepsEndpointProperties(
     val baseUrl: String = DEFAULT_KONEPS_BASE_URL,
     val operations: Map<String, KonepsOperationProperties> =
         mapOf(
-            "construction" to KonepsOperationProperties("getBidPblancListInfoCnstwk", BusinessDivision.CONSTRUCTION),
-            "service" to KonepsOperationProperties("getBidPblancListInfoServc", BusinessDivision.SERVICE),
+            "construction" to KonepsOperationProperties("getBidPblancListInfoCnstwk02", BusinessDivision.CONSTRUCTION),
+            "service" to KonepsOperationProperties("getBidPblancListInfoServc02", BusinessDivision.SERVICE),
         ),
 )
 
