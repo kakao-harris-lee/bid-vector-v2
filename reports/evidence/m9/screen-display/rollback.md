@@ -1,6 +1,6 @@
 # M9 / screen-display — rollback
 
-실측 HEAD: `170af22c` (이 slice 의 **마지막 산출물 커밋** — 뒤의 커밋은 evidence 뿐이다)
+실측 HEAD: `ca84b58a` (이 slice 의 **마지막 산출물 커밋** — 뒤의 커밋은 evidence 뿐이다)
 
 ## 전제
 
@@ -10,7 +10,7 @@
   쓰지 않는다. **머지 뒤**의 되돌림은 이 절차가 아니라 그 PR 의 머지 커밋 revert 다 — 머지 순간
   같은 복원은 아무것도 지우지 않으면서 exit 0 을 낸다(의미가 뒤집힌다).
 - **공유 파일 하나**가 목록에 있다: `web/config/gate-tests.txt` 는 slice 들이 줄을 더해 온
-  등록부다. 다만 `git log --oneline 79f3e5c4..170af22c -- web/config/gate-tests.txt` 의 커밋이
+  등록부다. 다만 `git log --oneline 79f3e5c4..ca84b58a -- web/config/gate-tests.txt` 의 커밋이
   **이 slice 의 하나뿐**이라, base 복원이 지우는 것은 이 slice 가 더한 줄뿐이다(다른 slice 의
   줄은 이 브랜치의 range 에 없다). 그래서 커밋 해시별 hunk 격리가 필요하지 않다.
 - 하네스 레인 변경 **없음**(`git log --oneline 79f3e5c4..HEAD -- CLAUDE.md .claude/` 빈 출력).
@@ -21,13 +21,13 @@
 목록은 손으로 쓰지 않는다:
 
 ```
-git diff --name-status 79f3e5c4..170af22c
+git diff --name-status 79f3e5c4..ca84b58a
 ```
 
 `A` 는 삭제 대상, `M` 은 base 로 복원. `--source` 에 없는 경로는 삭제되므로 신규 파일에 별도
 `git rm` 이 필요 없다. **라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 목록이 낡는 것이 이
-결함의 실제 원인이다. 계약 갱신 2026-11-05 로 경로가 **28 → 39** 로 늘었다(등록부 ·
-캡처 스크립트 · 캡처 산출물 아홉).
+결함의 실제 원인이다. 계약 갱신으로 28 → 39 로, r1 수정 라운드로 **39 → 42** 로 늘었다(모집단 게이트 둘 ·
+캡처 일곱).
 
 **이 slice 의 evidence 디렉터리(`reports/evidence/m9/screen-display/**`)는 되돌리지 않는다** —
 기록은 남긴다. 그래서 목록에서 뺀다. 이 분리가 **실측을 유효하게 유지하는 장치**이기도 하다:
@@ -79,15 +79,15 @@ git restore --source=79f3e5c4 --staged --worktree -- \
 
 ## 임시 clone 실측 — ①~⑥
 
-실측 HEAD `170af22c` 에서 만든 버릴 clone 에서 위 명령을 **실제로** 돌렸다.
+실측 HEAD `ca84b58a` 에서 만든 버릴 clone 에서 위 명령을 **실제로** 돌렸다.
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
 | ① 명령 exit | 위 `git restore` | 0 |
-| ② D/M 수 | `git status --porcelain` 의 첫 칸 계수 | `D` 5 · `M` 34 (목록 39 와 같다) |
+| ② D/M 수 | `git status --porcelain` 의 첫 칸 계수 | `D` 7 · `M` 35 (목록 42 와 같다) |
 | ③ 트리 동일성 | `git diff 79f3e5c4 -- web/` · `-- docs/usecase` | **둘 다 0 줄** — 되돌린 트리가 base 와 바이트까지 같다(갈음은 「HEAD 초록」이 아니라 트리 동일성으로만 본다) |
 | ④ compile | `npx tsc --noEmit -p tsconfig.json` · `npm run build` | 0 · 0 |
-| ⑤ test | `npx vitest run` | `674 passed (674)` · 파일 34 (이 slice 가 더한 test 셋과 단언이 함께 걷혔다 — HEAD 는 733/37) |
+| ⑤ test | `npx vitest run` | `674 passed (674)` · 파일 34 (이 slice 가 더한 test 와 단언이 함께 걷혔다 — HEAD 는 756/38) |
 | ⑥ 게이트 | 이 slice 가 닿은 web 레인 게이트 넷 — `lint`(W-2) · `gate:src-tree`(W-4) · `gate:tests`(W-7) · `gate:boundary-canary`(W-9) | 0 · 0 · 0 · 0 |
 
 **W-7 이 되돌린 트리에서도 0 인 것이 중요하다**: 등록부와 게이트 test 파일이 **함께** 걷히므로
@@ -97,8 +97,8 @@ git restore --source=79f3e5c4 --staged --worktree -- \
 
 | 기준 | 매치 | 뜻 |
 | --- | --- | --- |
-| 실측 HEAD `170af22c` 의 evidence | **1** | 그 시점의 checklist 가 비밀값 스캔 어휘를 한 번 밟고 있었다 — 되돌린 트리에서 `leakPatternGate` 가 붉어진다 |
-| 그 뒤 `3f507eb1` 의 evidence | **0** | 그 문장을 고쳤다(baseline 등재가 아니라 문장 수정). 그 커밋부터 이 조건이 사라진다 |
+| r1 의 실측 HEAD `170af22c` 의 evidence | **1** | 그 시점의 checklist 가 비밀값 스캔 어휘를 한 번 밟고 있었다 — 되돌린 트리에서 `leakPatternGate` 가 붉어진다 |
+| `3f507eb1` 이후(이번 실측 포함) | **0** | 그 문장을 고쳤다(baseline 등재가 아니라 문장 수정). 그 커밋부터 이 조건이 사라진다 |
 
 **되돌릴 때 적용되는 것은 뒤의 값**이다 — 복원은 산출물 경로만 만지고 evidence 는 **그때의
 HEAD 그대로** 남기 때문이다. 그래서 지금 이후의 되돌림에서 이 축은 초록이다. 앞의 값을 함께
@@ -111,16 +111,16 @@ verifier 가 대조하는 것은 「실측 HEAD == 판정 SHA」가 아니다(�
 커밋이 언제나 뒤에 온다). **그 사이에 되돌림 대상이 움직였는가**를 본다:
 
 ```
-git diff --name-only 170af22c..<판정 SHA> -- <위 복원 목록 경로들>
+git diff --name-only ca84b58a..<판정 SHA> -- <위 복원 목록 경로들>
 ```
 
-`170af22c..3f507eb1` 에서 **빈 출력**이다 — 그 뒤 커밋은 evidence 뿐이고 evidence 는 복원 목록
+`ca84b58a..<판정 SHA>` 에서 **빈 출력**이다 — 그 뒤 커밋은 evidence 뿐이고 evidence 는 복원 목록
 밖이다.
 
 ## 되돌린 뒤의 상태
 
 7E-1~7E-3b 의 화면 다섯과 여정 넷은 그대로 선다 — 이 slice 가 더한 것은 **표시 어휘 한 모듈 ·
-금액 표 네 개 · lint 술어 두 묶음 · 게이트 test 둘과 그 등재 · 캡처 표지 한 줄**이고 앞 층을
+금액 표 네 개 · lint 술어 세 묶음 · 게이트 test 셋과 그 등재 · 캡처 표지 한 줄**이고 앞 층을
 치우지 않는다. 되돌리면 화면이 다시 응답의 ISO 원문과 금액 토큰 원문을 그리고
 (`OPEN-7E3B-TIME-DISPLAY`·`OPEN-7E3B-MONEY-WORDING` 가 다시 열린다), `OPEN-7E-GATE-RESIDUAL` ⑨ 의
 처방도 함께 되돌아간다. **캡처는 옛 문면으로 돌아가고 캡처 스크립트의 선행 결함도 되살아난다** —

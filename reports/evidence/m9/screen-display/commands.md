@@ -265,3 +265,78 @@
 - cmd: `git status --porcelain --untracked-files=all`
 - exit: 0
 - 핵심 결과: 빈 출력 — 변이 파일 셋이 전부 HEAD 상태
+
+## r1 수정 라운드 (리뷰 @dd69fe46 — v not-ready · cr request_changes)
+
+### 2026-11-05T09:50Z — H-1 의 RED 선행
+- cmd: `npx vitest run src/screens/ResultsScreen.test.tsx` (web)
+- exit: 1
+- 핵심 결과: 단언을 반대로 바꾼 두 줄이 `expected '1,350,000,000KRW부가세 포함' to contain '원'`
+
+### 2026-11-05T10:05Z — verifier 변이 둘 재현 (게이트 확장 뒤)
+- cmd: `git apply <scratchpad>/mut-RC-green.diff` · `mut-RC-money-green.diff` 각각 뒤
+  `npx eslint .` / `npx tsc --noEmit` / `npx vitest run` (web)
+- exit: 1 / 1
+- 핵심 결과: 시각 변이는 DOM 게이트 `2 failed`, 금액 변이는 `3 failed` — **앞 판은 둘 다
+  lint 0 · tsc 0 · vitest 733/733 초록이었다**
+
+### 2026-11-05T10:15Z — 모집단 게이트의 양성 대조
+- cmd: 마운트 목록에서 화면 E 카드를 뺀 뒤 `npx vitest run scripts/screen-card-coverage.test.mjs`
+- exit: 1
+- 핵심 결과: 「의무: BidBoxCard, NoticeCard, ResultCard, SuggestionCard, WorksheetTimeline」와
+  목록의 집합 등식이 깨졌다. 원복 뒤 8 passed
+
+### 2026-11-05T10:30Z — cr M-3 의 RED 선행과 첫 판의 오류
+- cmd: `npx vitest run src/display/timeDisplay.test.ts` (web)
+- exit: 1 → 1 → 0
+- 핵심 결과: 오프셋 없는 입력은 첫 수정으로 닫혔으나 **굴러가는 날짜가 남았다** — 순간을
+  통째로 왕복시키면 `Date.UTC` 도 같이 굴러 차이가 0 이다(실측). 날짜 **칸**을 맞대는
+  판정으로 바꾼 뒤 26 passed
+
+### 2026-11-05T10:45Z — v L-1 의 우회 일곱
+- cmd: `npx vitest run scripts/display-gate-selectors.test.mjs` (web)
+- exit: 1 → 0
+- 핵심 결과: `globalThis.Date.now()` 꼴이 `no-restricted-globals` 밖이라 처음엔 초록이었다 —
+  **속성 이름** 선택자 둘을 더해 일곱 전부 RED. 타입 자리·test·API·세션은 초록
+
+### 2026-11-05T11:20Z — 캡처 재촬영 (H-1 뒤)
+- cmd: `npm run capture:usecase` (web)
+- exit: 0
+- 핵심 결과: 12 장 · 합 1,010,589 바이트. **화면 E 를 눈으로 확인** — 「1,350,000,000 원
+  부가세 포함」(앞 판은 `… KRW …`)
+
+### 2026-11-05T11:40Z — W-13 이 H-1 의 짝을 잡았다
+- cmd: `npm run test:e2e:journey` (web)
+- exit: 1 → 0
+- 핵심 결과: `results.spec.ts` 가 **응답의 통화 코드가 화면에 있는지** 단언하고 있었다(화면이
+  원문을 그리는 것을 e2e 가 잠그고 있었다). 축어 라벨 표로 바꾼 뒤 11 passed · flaky 0
+
+### 2026-11-05T11:45Z — acceptance 재실측 W-1~W-13
+- cmd: CI `web` job 의 명령 그대로
+- exit: 전부 0
+- 핵심 결과: vitest `753 passed (38 파일)` · 셸 스모크 2 · 여정 11
+
+### 2026-11-05T12:10Z — S-20 재실측 (r1 수정 뒤)
+- cmd: `~/.local/bin/bv-build.sh ./tools/one-command-check.sh`
+- exit: 0
+- 핵심 결과: 「완료 — Kotlin 전건 + Python 전건 + web 전건 통과」
+
+### 2026-11-05T12:20Z — 표적 재검증: 고친 칸 하나를 원문으로 되돌림
+- cmd: `npx eslint .` / `npx vitest run` (web)
+- exit: 0 / 1
+- 핵심 결과: **화면 test 는 RED 인데 DOM 게이트가 지나갔다** — 「홀로 선 토큰」 술어의 경계
+  집합에 숫자가 들어 있어 `…000KRW` 를 세지 못했다. **잎 글자 등식**을 더해 게이트가
+  집게 한 뒤 같은 변이가 `원문 토큰이 제 칸에 그대로 섰다: expected [ 'KRW' ] to strictly equal []`
+
+### 2026-11-05T12:30Z — 변이 다섯 재확인 (잎 등식 추가 뒤)
+- cmd: 각 변이 적용 뒤 `npx tsc --noEmit` / `npx vitest run` (web)
+- exit: 전부 1(표 삭제는 tsc 2)
+- 핵심 결과: `mut-RC-green` 2 failed · `mut-RC-money-green` 1 failed(**DOM 게이트가 집는다** —
+  `OPERATOR_DECLARED 이 화면에 그대로 그려졌다`) · 없음 표지 되돌림 3 failed · 표 한 행 삭제
+  tsc 2 · vitest 7 failed · 고친 칸 되돌림 2 failed. 전부 원복 확인
+
+### 2026-11-05T12:45Z — rollback 재산출·재실측 (실측 HEAD ca84b58a)
+- cmd: 버릴 clone 에서 `git restore --source=79f3e5c4 … -- <복원 목록 42>` 뒤 ①~⑥
+- exit: 0
+- 핵심 결과: ② `D` 7 · `M` 35 · ③ 트리 동일성 `web/` 0 줄 · `docs/usecase` 0 줄 ·
+  ④ 0/0 · ⑤ `674 passed` · ⑥ web 게이트 넷 0 · ⑥b evidence 자기매치 0

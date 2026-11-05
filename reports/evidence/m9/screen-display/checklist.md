@@ -70,6 +70,26 @@ r2 CR M-2 가 막으려던 우회가 다시 열린다).
 다음 확인 시점이 **없음**이라 D-1 갱신 뒤 글자가 앞 판과 같다 — **바이트 동일**이 그 갱신이
 맞았다는 부수 증거다.
 
+## 5. r1 리뷰 대응 (v not-ready · cr request_changes @dd69fe46)
+
+| 지적 | 처리 | 측정 |
+| --- | --- | --- |
+| **H-1 (차단)** 화면 E 두 칸이 원문 `KRW` 를 그린다 | `currencyDisplayOf(...).label` 로. test 두 줄은 **반대로**(`toContain('원')` + `not.toContain('KRW')`) | 바꾸기 전 그 두 단언이 RED 였다(`expected '1,350,000,000KRW…' to contain '원'`) |
+| **v M-1** 화면 E 회귀가 모든 web 게이트를 통과한다 | DOM 게이트가 `ResultCard` 를 마운트한다. fixture 가 **모든 `*At`·금액 부속 칸을 비-null 로** 채운다. 질의 결과는 실제 `useQuery` 로 푼다(캐스팅 없음) | verifier 의 두 변이를 그대로 적용해 **둘 다 RED**: `mut-RC-green.diff` → 2 failed · `mut-RC-money-green.diff` → 3 failed(앞 판은 둘 다 733/733 초록) |
+| **v M-1** 모집단이 손목록이다 | `scripts/screen-card-coverage.{mjs,test.mjs}` 가 `src/screens/**` 를 AST 로 훑어 **표시 어휘를 쓰는 내보낸 카드**를 모아 게이트의 `GATE_MOUNTED_CARDS` 와 **집합 등식**을 건다 | 목록에서 화면 E 카드를 빼면 RED. 양성·음성 대조 넷(선언 꼴·화살표 꼴·어휘 없음·비공개) |
+| **cr M-1** 설정 예산 칸이 「원」을 두 번 | 통화를 부속 칸에서 빼고 **단위 내는 자리를 하나로**(`amountTextOf`) | 「부속 칸이 단위를 되풀이하지 않는다」 단언 둘 |
+| **cr M-2** 시계 금지가 `src/components` 를 안 담는다 | `files` 를 `src/**` 로, `src/api`·`src/session`·test 를 **의도로** 제외 | 공용 컴포넌트 RED · 뿌리 파일 RED · API·세션 초록 · test 초록 |
+| **cr M-3 = v L-4** `Date.parse` 관용 | `parseInstant` 가 꼬리의 오프셋 표기와 **날짜 칸의 굴림**을 본다. `daysUntil` 도 같은 판정 | 오프셋 없는 셋·굴러가는 셋이 `unreadable`, 윤년 2/29 는 `readable` |
+| **v L-1** 시계 술어가 `Date` 이름에 묶임 | **`Date` 전역 값 참조 자체**를 금지(+소유자 경유 꼴 둘). 그러려면 `datetime-local` 변환을 `timeDisplay.localInputToIso` 로 옮겨야 했다 | verifier 가 든 우회 일곱이 전부 RED · 타입 자리는 초록 |
+| **v L-2 = cr L-4** 비-KRW 가 표를 안 지난다 | 같은 `amountTextOf` 로 모았다 — `noticeDisplay` 의 삼항과 `budgetView` 의 박힌 「원」이 함께 사라졌다 | 표 밖 코드는 **띄어 보이게**, 아는 단위는 붙여 |
+| **cr LOW** `*At` 셋째 선택자가 `charAt` 을 집는다 | 음성 조건으로 둘만 뺐다 | `charAt`·`codePointAt` 초록 대조 |
+| **cr LOW** 시각 칸 DOM 모양 둘 | `InstantText` 가 **항상 자기 testId 를 자기 뿌리에** 단다. e2e·단위 test 질의도 하나로 | 입찰함·화면 E 가 같은 꼴 |
+| **cr LOW** 「알 수 없음」 분기가 어디서도 안 그려짐 | 타임라인 fixture 에 읽지 못할 행 하나 | 「표지가 서고 원문이 없고 기계 칸에 안 실린다」 셋 |
+
+**r1 이 남긴 교훈 하나**: 게이트가 초록인데 위반이 살아 있던 이유는 술어가 아니라 **모집단**이었다.
+그래서 이 라운드는 칸을 고치는 것과 **모집단을 소스에서 유도하는 것**을 한 커밋에 묶었다 —
+칸만 고치면 다음 카드에서 같은 일이 반복된다.
+
 ## 5. 알려진 제한
 
 ① **②층이 마운트하는 것은 카드 넷이다**(공고·제안·입찰함·타임라인). 워크시트 머리와 화면 E
@@ -114,3 +134,20 @@ props 로 내린다. React context 로 test 가 시계를 바꿔 끼우는 층�
 
 - `OPEN-M9-TIMELINE-COMMAND-WORDING`(제한 ③) — 타임라인이 그리는 마지막 원문 축이다.
 - 화면 어휘 게이트의 마운트 목록 확장(제한 ①).
+
+⑧ **`OPEN-M9-DDAY-CALENDAR` — `daysUntil` 은 24시간 단위이지 KST 달력일이 아니다**(r1 v L-3).
+지금 23:00 KST, 마감이 이튿날 01:00 KST 면 `D-0` 이다(달력으로는 하루 뒤). 알고리즘은 base 그대로
+옮겼을 뿐이고 요구표가 이 축을 정의하지 않는다 — **거동 변경이라 이 slice 에서 바꾸지 않는다.**
+
+⑨ **`OPEN-M9-MONEY-VOCAB-CROSS-LANG` — 어휘가 세 자리에 손으로 복제돼 있다**(r1 cr LOW).
+정본은 Kotlin(`Basis`·`provenanceLabel`·`Currency`·`VatTreatment`)이고 web 의 유니온·축어
+목록·e2e 라벨 표가 그것을 따라 적는다. **지금은 넷이 정확히 일치한다**(대조함). openapi 가 이
+칸들을 `string` 으로 내므로 생성 타입에서 유니온을 끌 수 없고, Kotlin 에 값이 늘면 web 은
+어디서도 붉어지지 않고 「알 수 없는 상태(…)」로 degrade 한다(보이므로 조용한 결함은 아니다).
+Kotlin·openapi 는 out_scope 라 처방만 적는다: enum 을 openapi 에 열거하거나, Kotlin 쪽에
+「표의 키 == enum 이름」 계약 test 를 둔다.
+
+⑩ **캡처 manifest 의 `head` 는 캡처 커밋의 **앞** 커밋을 가리킨다**(r1 cr 질문). 스크립트가
+dirty `web/` 를 거부하므로 「스크립트 수정 커밋 → 촬영 → PNG 커밋」 순서가 **강제**된다 — 그래서
+manifest 가 자기를 담은 커밋을 가리킬 수 없다. rollback 목록이 자기를 담은 커밋을 가리킬 수 없는
+것과 같은 성질이고, 같은 처방(두 커밋으로 나눈다)을 이미 쓰고 있다.
