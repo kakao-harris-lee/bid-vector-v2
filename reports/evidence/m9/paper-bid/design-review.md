@@ -126,8 +126,9 @@ PK 열은 NOT NULL 이므로 NULL 로 「없음」을 적을 수 없다. 그래�
 
 1. `ADD COLUMN bid_kind TEXT NOT NULL DEFAULT 'REAL'` — 기본값이 있어야 기존 행이 NOT NULL 을
    만족한다(PG 11+ 는 메타데이터 연산이라 표를 다시 쓰지 않는다).
-2. **backfill 두 UPDATE** — 건에서 오지 않는 종류 둘을 `'NONE'` 으로. 나머지는 1 의 기본값이
-   이미 `'REAL'` 이고 그 값은 **추측이 아니라 사실**이다(원천 둘이 가드로 실투찰만 적었다).
+2. **backfill — 기본값 + UPDATE 하나**(v L-2 문면 정정: 「두 UPDATE」가 아니다). 건에서 오지
+   않는 종류 **둘**을 한 UPDATE 로 `'NONE'` 으로 옮기고, 나머지 여섯은 1 의 기본값이 이미
+   `'REAL'` 이다 — 그 값은 **추측이 아니라 사실**이다(원천 둘이 가드로 실투찰만 적었다).
 3. `ALTER COLUMN bid_kind DROP DEFAULT` — 2 뒤에 반드시. 남기면 우회 ⑤ 가 열린다.
 4. 어휘 CHECK + 짝 CHECK **추가**(backfill 뒤라 기존 행 검증을 지난다 — 2 보다 앞서면 실패한다).
 5. `DROP CONSTRAINT notification_inbox_pkey` → `ADD PRIMARY KEY (…)`. `IF EXISTS` 를 **붙이지

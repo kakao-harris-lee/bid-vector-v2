@@ -1,6 +1,6 @@
 # M9/paper-bid rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `5ca4f561`**(판정 SHA).
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `635f05a6`**(판정 SHA).
 
 **원천이 착수 base 와 같다** — 이 브랜치는 `origin/main` 을 **합치지 않았다**. 그래서 inbox-vocab
 이 겪은 「base 에서 복원하면 남의 변경까지 지운다」 함정이 이 slice 에는 아직 없다. **머지 전에
@@ -30,7 +30,7 @@ git rm -q -f -- "${ADDED[@]}"
 「있음/없음」을 `--diff-filter` 가 아니라 **`git cat-file -e`** 로 가른다: 필터는 범위의 양 끝을
 비교하므로 병합이 끼면 남의 변경을 M 으로 센다. 원천에 그 경로가 있는지만 물으면 병합과 무관하다.
 
-`ADDED` 셋 가운데 하나가 **V25 파일**이고 둘은 이 slice 가 만든 test class 다. 미적용 DB 에서는
+`ADDED` 넷 가운데 하나가 **V25 파일**이고 셋은 이 slice 가 만든 test class 다. 미적용 DB 에서는
 그 파일이 사라지는 것이 마이그레이션 되돌림의 전부다 — Flyway 이력에 없으므로 흔적이 0 이고
 체크섬 충돌도 생기지 않는다.
 
@@ -63,6 +63,18 @@ git rm -q -f -- "${ADDED[@]}"
 `validateOnMigrate` 가 「applied migration not resolved locally」로 **기동을 막는다** — 이력에
 남은 적용 기록을 로컬에서 해소할 수 없다. 즉 적용 뒤에는 파일을 지우는 길이 없고 새 V 뿐이다.
 
+**그래서 적용 DB 에서 앱을 되돌릴 때 §1 을 그대로 쓰면 안 된다**(v L-1). §1 의 복원 목록에는
+`adapters/src/main/resources/db/migration/V25__*.sql` 가 **들어 있고**(`ADDED` 셋 중 하나) 그
+경로를 지우는 것이 곧 위의 기동 정지다. 적용 DB 의 앱 되돌림은 **마이그레이션 디렉터리를 §1 의
+복원 대상에서 제외하고**(V25 와 forward-fix V 를 **둘 다 남긴다**) 나머지 경로만 복원한다 —
+Flyway 이력의 두 줄에 로컬 파일 두 개가 그대로 대응해야 validate 가 지난다.
+
+```
+# 적용 DB 갈래의 §1 변형 — 마이그레이션은 건드리지 않는다
+EXCL2=':(exclude)adapters/src/main/resources/db/migration'
+mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" "$EXCL2" | sort -u)
+```
+
 **순서는 forward-fix V 가 앱 되돌림보다 먼저다.** 옛 코드는 투찰 종류 축을 모르므로 그 열이 있는
 표에 `INSERT` 를 쏘면 **NOT NULL 로 거부된다**(그 열은 기본값이 없다 — V25 가 backfill 뒤
 떨어뜨렸다). 즉 앱을 먼저 되돌리면 알림 기록 경로 전체가 멈춘다. 읽기 경로는 그 열을 안 읽으므로
@@ -77,10 +89,10 @@ git rm -q -f -- "${ADDED[@]}"
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 내 커밋 경로 **45**(evidence 제외) = 복원 **42**(M) · 삭제 **3**(A) — 기계 목록과 같다 |
+| ② 계수 | 내 커밋 경로 **49**(evidence 제외) = 복원 **45**(M) · 삭제 **4**(A) — 기계 목록과 같다 |
 | ③ 결과 트리 == `df4976cc` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | `reports/evidence/m9/paper-bid/**` **둘**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | `reports/evidence/m9/paper-bid/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
@@ -99,8 +111,9 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 
 | 내 표지(0 이어야 한다) | 복원 뒤 |
 | --- | --- |
-| `NotificationBidKind` · `NotificationGroupKey` · `BidKindAxis` · `bidKindAxis` · `asNotificationBidKind` · `groupNotifications` · `NOTIFICATION_BID_KIND_DISPLAY` · 새 test class 둘의 이름 | **전부 0** |
+| `NotificationBidKind` · `NotificationGroupKey` · `BidKindAxis` · `bidKindAxis` · `asNotificationBidKind` · `groupNotifications` · `NOTIFICATION_BID_KIND_DISPLAY` · `notificationItemTestId` · 새 test class **셋**의 이름 | **전부 0** |
 | V25 파일 | **0**(마이그레이션 수가 22 로 돌아왔다) |
+| capability map 의 다섯 열 문장 | **0**(네 열 문면으로 돌아왔다) |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
 | --- | --- |
@@ -113,6 +126,8 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 | `BidState.FailedOrRebid`(7B) | 8 |
 | `RetentionPolicyData`(#129) | 26 |
 | V23·V24 마이그레이션 파일 | **둘 다 있음** |
+| `APPROVED_OPERATIONS`(여정 e2e 가 `src` 를 import 하는 기존 선례) | 4 |
+| 여정 e2e 의 **옛** 네 조각 testId 꼴 | **1**(복귀했다 — 내가 바꾼 자리가 원천 모양으로 돌아왔다는 뜻) |
 
 내 표지를 고를 때 `bid_kind`·`PAPER`·`REAL` 은 쓸 수 없다 — V21 의 `bid_case` 와 `BidKind` 가 그
 어휘를 이미 들고 있어 **남의 줄까지 세게 된다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다.
@@ -121,6 +136,11 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 
 버릴 clone 에 §2 의 네 걸음을 쏘는 임시 test 하나를 넣고 **버릴 클러스터**에서 돌렸다(공유
 컨테이너를 오염시키지 않는다). 그 test 는 **커밋하지 않았고** 측정 뒤 지웠다.
+
+**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `635f05a6` 다.** 그 사이 V25 가 바뀌었지만
+**주석뿐이다** — `git diff 5ca4f561..635f05a6 -- <V25>` 의 비주석·비공백 줄이 **0** 이다(실측).
+그래서 그 파일이 만드는 스키마가 같고, §2 의 네 걸음이 쏘는 DDL 도 같다. 그 밖에 이 리허설의
+입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
 
 | 단계 | 실측 |
 | --- | --- |
@@ -136,12 +156,19 @@ main(#123 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 
 test 실행 계수: `tests="1" skipped="0" failures="0" errors="0"`.
 
-**이 리허설이 재지 **않는** 축 하나**: V25 의 **backfill 두 UPDATE** 다. 깨끗한 스키마에
-migrate 하면 기존 행이 없어 그 UPDATE 가 무연산이고, 그래서 전 CI 가 그 줄을 돌리지만 **답을
-묻지 않는다**. 간접 측정은 있다 — 공고 축 종류에 `'REAL'` 을 실은 행이 짝 CHECK 에 **거부되는**
-것을 전수 교차가 재므로, 「backfill 을 빠뜨리면 그 행이 남아 짝 CHECK 추가가 실패한다」는 주장이
-같은 제약 위에 선다. 직접 측정에는 Flyway `target` 으로 V24 까지 migrate → 행 삽입 → V25 적용이
-필요하고, 그 하네스를 이 slice 는 세우지 않았다. 알려진 제한에 등재한다.
+**이 리허설이 재지 **않는** 축 하나 — verifier 가 쟀다**(v L-2): V25 의 backfill(**기본값 +
+UPDATE 하나**, 「두 UPDATE」가 아니다)이다. 깨끗한 스키마에 migrate 하면 기존 행이 없어 그
+UPDATE 가 무연산이고, 전 CI 가 그 줄을 돌리지만 **답을 묻지 않는다**.
+
+verifier 가 Flyway `target=24` 로 V24 까지 migrate → 두 계정 × 종류 여덟 행(읽음 절반) → V25
+적용으로 **직접 측정했다**: 16행에서 공고 축 둘이 `NONE`·나머지 여섯이 `REAL` · 계정과 `read_at`
+보존 · `column_default` NULL · NOT NULL · PK 다섯 열. **음성 대조** — backfill UPDATE 를 지운
+V25 사본은 migrate 가 **23514 로 실패**하고 `bid_kind` 열이 0 으로 롤백된다. 「잊으면 조용하지
+않다」는 주장이 그 자리에서 성립한다.
+
+이 slice 의 CI 안에 그 하네스를 세우지는 않았다 — 회귀 방어는 짝 CHECK 전수 교차가 진다(공고 축
+종류에 `'REAL'` 을 실은 행이 거부되므로, backfill 을 빠뜨린 행이 남으면 `ADD CONSTRAINT` 가
+검증에서 실패한다). 알려진 제한 4 에 그대로 등재한다.
 
 ## 5. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
@@ -149,8 +176,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 갈릴 수 있다. 유효성�
 움직였는가**로 본다:
 
 ```
-git diff --name-only 5ca4f561..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..5ca4f561 \
+git diff --name-only 635f05a6..<HEAD> -- \
+  $(git log --no-merges --format= --name-only df4976cc..635f05a6 \
       -- . ':(exclude)reports/evidence/m9/paper-bid' | sort -u)
 ```
 

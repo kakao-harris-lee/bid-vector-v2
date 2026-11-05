@@ -16,6 +16,9 @@
 | 8 목록의 파티션·정렬에서 축을 빠뜨린다 | 묶음 계수 등식(축별) + **정렬 연속 등식**(두 축의 묶음 최신 시각이 **같은** 모양에서) | 변이 ③ **3**, 변이 ④ — 처음 **초록**이어서 test 를 바꿔치운 뒤 **1** |
 | 8b 묶음 읽음에 축을 빠뜨린다 | 실 DB test(한 축만 읽히고 다른 축은 안읽음) + 허용 키 등식 + 포트에 닿은 값 단언 | 변이 ⑤ **4** |
 | 9 화면이 두 축을 같은 얼굴로 그린다 | 축 표의 키 집합 등식(셋) + 라벨 distinct + 「서면과 실투찰이 다른 문면」 + 묶음 머리 문면 단언 | web vitest(그 셋) |
+| 9b 행 locator 가 축을 빠뜨린다(여정이 아무 행도 못 찾는다) | **testId 를 짓는 자리가 하나다** — 화면과 여정 e2e 가 같은 함수를 부른다 + 그 함수의 네 칸 단언 · 축만 다른 두 행이 다른 id | v H-1 — 수정 라운드(앞 판은 양쪽이 각자 템플릿) |
+| 9c 단건 읽음이 축을 고정값으로 보낸다 | `PAPER` 행에서 눌러 `bidKind: 'PAPER'` 를 단언(고정값과 그 행의 값이 우연히 같지 않게) | v M-1 — verifier 변이 W3 가 **초록**이던 자리, 고친 뒤 **1** 붉다 |
+| 9d 잃은 알림 표지가 두 축을 같은 줄로 적는다 / 계정을 싣는다 | 순수 함수 test 둘(담는 칸 셋 · **담지 않는** 계정) | cr LOW — 변이 둘(축 제거 **2** · 계정 싣기 **1**) |
 | 10 생성 타입을 손으로 고친다 | `api:types:check` 바이트 등식 | 191758 bytes |
 | 11 사상이 새 종류를 조용히 접는다 | 소진 `when`(컴파일) + **1:1 등식**(값이 겹치면 붉다) | 변이 ⑩ **3** |
 | 12 축을 기본값으로 둔다 | `NotificationInboxRecord` 의 축이 **기본값 없는 필수 인자**다 — 새 원천이 컴파일에서 걸린다(팀장 지시: ops-code 레인의 `NEW_CANDIDATE` 생산자가 그 자리에 선다) | 구조(측정 대상 아님) |
@@ -25,6 +28,7 @@
 | 게이트 | 등재 | 근거 |
 | --- | --- | --- |
 | `config/quality/gate-tests.properties` (`gate.tests.adapters`) | `NotificationInboxBidKindTest` · `NotificationInboxPairConstraintTest` | 신설 class 둘 — **만드는 커밋에서** 같이 등재(블록 안 사전순) |
+| 같은 파일 (`gate.tests.app`) | `NotificationInboxWiringTest` | 수정 라운드의 신설 class — 같은 커밋에서 등재(cr LOW) |
 | `config/quality/architecture-policy.properties` (tier2 허용 workflow 타입) | `NotificationBidKind` · `NotificationGroupKey` | 그 목록은 **오늘 실제 참조와 등식**이다 — 죽은 항목이면 아키텍처 게이트가 붉다(초록으로 확인) |
 
 스키마 스냅샷 래칫 **넷**을 갱신했다: 열(+1, 기본값 없음) · PK 열 집합(다섯, 순서 바뀜) ·
@@ -42,13 +46,17 @@ test 가 진다).
 
 ## 4. 수정 라운드가 만든 새 파일 ↔ in_scope
 
-이 slice 가 만든 파일 **셋**이고 전부 in_scope 안이다(계약 갱신 포함).
+이 slice 가 만든 파일 **넷**이고 전부 in_scope 안이다(계약 갱신 둘 포함).
 
 | 새 파일 | in_scope 항 |
 | --- | --- |
 | `adapters/src/main/resources/db/migration/V25__notification_inbox_bid_kind.sql` | `…/db/migration/V25__*.sql` |
 | `adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxBidKindTest.kt` | `adapters/**/notificationinbox/** 와 그 test` |
 | `adapters/src/test/kotlin/bidvector/adapters/notificationinbox/NotificationInboxPairConstraintTest.kt` | 같음 |
+| `app/src/test/kotlin/bidvector/app/wiring/NotificationInboxWiringTest.kt`(수정 라운드) | ⓑ 의 `app/**/wiring/NotificationInboxWiring.kt` 와 그 test — 그 파일의 두 주장을 잠근다(cr LOW) |
+
+**수정 라운드가 in_scope 밖으로 나간 경로 하나**: `web/e2e/journey/results.spec.ts`(v H-1 차단
+지적). 팀장이 `web/e2e/journey/**` 를 확장 승인했고 `scope.md` 의 계약 갱신 절이 그것을 담는다.
 
 두 test class 는 `sizeGate` 500줄이 계기였지만 **경계는 의미가 정했다** — 하나는 「축이 늘어서
 생긴 거동」이고(쓰기·전이 일반과 다른 신호) 다른 하나는 「짝 CHECK 의 전수 교차」다(카탈로그를
@@ -65,11 +73,16 @@ test 가 진다).
 3. **공고 축(`NONE`) 묶음이 화면에 따로 선다.** 같은 공고에 투찰가 요청 기록과 건 기반 소식이
    함께 있으면 블록이 둘이다. 그것이 계수가 섞이지 않게 하는 대가이고, 묶음 머리의 「공고 소식」
    라벨이 그 이유를 말한다. 한 공고의 블록을 접어 보이는 것은 화면 레인·운영자 결정이다.
-4. **V25 의 backfill 두 UPDATE 는 직접 측정이 없다.** 깨끗한 스키마에 migrate 하면 기존 행이 없어
-   무연산이고, 전 CI 가 그 줄을 돌리지만 답을 묻지 않는다. 간접 측정은 짝 CHECK 의 전수 교차다
-   (공고 축 종류에 `'REAL'` 을 실은 행이 거부되므로, backfill 을 빠뜨리면 그 행이 남아 짝 CHECK
-   추가가 실패한다). 직접 측정에는 Flyway `target` 으로 V24 까지 migrate → 행 삽입 → V25 적용하는
-   하네스가 필요하고 이 slice 는 세우지 않았다(`rollback.md` §4).
+4. **V25 의 backfill 은 이 slice 의 test 가 재지 않는다 — verifier 가 직접 쟀다**(v L-2).
+   그 축은 **기본값 + UPDATE 하나**이고(문면 정정: 「두 UPDATE」가 아니다), 깨끗한 스키마에
+   migrate 하면 기존 행이 없어 무연산이라 전 CI 가 그 줄을 돌리지만 답을 묻지 않는다.
+   verifier 가 Flyway `target=24` 로 V24 까지 migrate → 두 계정 × 종류 여덟 행(읽음 절반) →
+   V25 적용으로 **직접 측정했다**: 16행에서 공고 축 둘이 `NONE`·나머지 여섯이 `REAL` ·
+   계정과 `read_at` 보존 · `column_default` NULL · NOT NULL · PK 다섯 열. **음성 대조**도 있다 —
+   backfill UPDATE 를 지운 V25 사본은 migrate 가 **23514 로 실패**하고 열이 0 으로 롤백된다
+   (「잊으면 조용하지 않다」는 주장이 그 자리에서 성립한다). 이 slice 의 CI 안에 그 하네스를
+   세우지는 않았고, 그래서 **회귀 방어는 짝 CHECK 전수 교차가 진다**(backfill 을 빠뜨린 행이
+   남으면 `ADD CONSTRAINT` 가 검증에서 실패한다).
 5. **ops-code 레인의 `NEW_CANDIDATE` 생산자는 이 브랜치에 없다.** 그 record 는 `NONE` 축을
    실어야 하고, 축이 **기본값 없는 필수 인자**라 나중에 머지되는 쪽이 컴파일에서 걸려 맞춘다
    (팀장 공지 2026-11-06). 이 slice 가 그 자리를 미리 만들지 않았다.
@@ -86,5 +99,25 @@ test 가 진다).
 10. **자동 대사는 여전히 서지 않는다** — NOTI-04 · SET-02 의 capability 판정은 이 배선으로
     올라가지 않는다(D-7C3B-7 ③ 그대로). 서면이든 실투찰이든 되비추는 것은 운영자가 기록한
     전이뿐이다.
-11. **`OPEN-7C3B-PAPER-BID-NOTIFICATION` 의 종결 등재는 이 slice 가 하지 않았다** — capability
-    map·`reports/evidence/m7/**` 쪽 장부는 inbox-vocab 선례대로 **M9 장부 slice** 몫이다.
+11. **`OPEN-7C3B-PAPER-BID-NOTIFICATION` 의 **태그** 종결 등재는 이 slice 가 하지 않았다** —
+    `reports/evidence/m7/**` 쪽 장부는 inbox-vocab 선례대로 **M9 장부 slice** 몫이다. 다만
+    capability map 의 **산문 두 줄**은 이 slice 가 고쳤다(cr MEDIUM — 이연 문장이 OPEN 태그만
+    가리켜 산문이 남을 수 있다는 지적). 같은 자리의 **유찰 줄**(`OPEN-7C3B-FAILED-BID-DETAIL`)은
+    M9/inbox-vocab 이 닫은 사실이고 **그 레인의 장부 몫**이라 손대지 않았다 — 내 slice 의 주장이
+    아닌 줄을 고치지 않는다.
+
+## 6. 이연·별 건 등재 (수정 라운드)
+
+| 항목 | 어디로 | 사유 |
+| --- | --- | --- |
+| `bid_case.bid_kind` CHECK ↔ `bidding.BidKind` 어휘 등식 test 가 없다(cr LOW) | **별 건** | **선행 결함**이고 현재 값은 정확히 같다. 이 slice 가 `BidKind.valueOf(bid_kind)` 의 셋째 소비자를 더하므로 하중이 커진 것은 맞다 — 한쪽만 늘면 `valueOf` 가 던지고 훑기는 후보 전체를 먼저 펼치므로 **한 행이 훑기 전체를 멈춘다**. 처방은 `bid_case` 스키마 가드 test 한 자리이고 그 표는 이 slice 의 in_scope 밖이다 |
+| `web/e2e/capture/usecase-captures.mjs` 의 주석이 testId 꼴을 네 조각으로 적는다 | **보고만** | 그 파일의 조회는 정규식 접두(`/^notification-/`)라 **깨지지 않는다** — 낡은 것은 주석 산문뿐이다. 승인된 확장은 `web/e2e/journey/**` 이고 `capture/` 는 그 밖이다 |
+| capability map 의 유찰 줄 | **M9/inbox-vocab 장부** | 위 10 |
+
+## 7. Open Questions (cr 등재 — 판정을 가르지 않는다)
+
+| OQ | 내용 | 이 slice 가 한 판단 |
+| --- | --- | --- |
+| 훑기 모집단에 상한이 없다 | `SELECT_SWEEP_CANDIDATES` 에 LIMIT 이 없고 `run()` 이 후보와 기록을 전부 먼저 펼친다. 이 slice 가 그 입력을 (계정, 공고)마다 최대 **한 행** 늘린다 | 선행 설계이고(상위집합 허용이 그 포트의 규율) 현재 규모의 실측이 없어 바꾸지 않았다. 판단이 필요하면 「한 계정의 건 수」가 아니라 **전 계정 × 창 안의 건**으로 봐야 한다(이 질의는 주체를 받지 않는다) |
+| `init` 의 `require` 가 훑기 한 번 전체를 멈출 수 있다 | 어긋난 짝 하나가 그 run 의 기록 **전부**를 막는다 — `NotificationSweepReport.failed` 가 세는 축과 다르다 | 오늘은 **정적으로 불가능**하다(훑기가 내는 종류 넷은 모두 `PER_BID_CASE` 이고 사상이 전역이다). 조용히 `REAL` 로 접는 쪽이 훨씬 나쁘므로 던지는 선택을 유지했다. 훑기가 공고 축 종류를 내게 되는 날 이 자리를 먼저 본다 |
+| 요청 스키마의 하위 비호환 | `bidKind` 가 두 요청에 **required** 라 옛 본문을 보내는 호출자는 400 이다 | 저장소 안 소비자는 `queries.ts` 하나이고 요청 타입을 생성 스키마에서 파생해 **타입으로 강제**된다. 저장소 밖 호출자(runbook·curl)가 있는지는 이 레인이 알 수 없다 — 운영자 확인이 필요한 축이라 등재만 한다 |

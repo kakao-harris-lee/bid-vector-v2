@@ -23,6 +23,8 @@ base `df4976cc` · 브랜치 `feature/m9-paper-bid` · 계약 `scope.md`(D-M9P-1
 | --- | --- | --- |
 | 화면·계약(구현 전) | `npm run typecheck` | **1** — fixture 에 `bidKind` 가 없어 `NotificationItem` 할당이 거부(이 축을 더하는 일이 wire 계약을 지난다는 신호) |
 | 저장 층(V25 없이) | `:adapters:test --tests "*NotificationInboxPersistenceTest*"` | **25/25** — 축이 아예 없으니 알림함 실 DB test 전건이 붉다 |
+| 단건 읽음의 wire 축 | `npx vitest run src/screens/InboxScreen.test.tsx` + 변이 W3 | **1/30** — fixture 를 `PAPER` 로 바꾼 뒤 「축을 `'REAL'` 로 고정」 변이가 그 test 하나만 붉다(바꾸기 전에는 **초록**이었다) |
+| 잃은 알림 표지 | `:app:test --tests "*NotificationInboxWiringTest*"` + 변이 둘 | **2** / **1** — 축 칸 제거 · 계정 싣기 |
 
 둘째 라운드는 **무딘 RED** 다(열이 없어 전부 붉다) — 「어느 방어막이 무엇을 막는가」는 거동으로
 갈라야 하고, 그 축은 §4 의 변이가 진다. 그래서 RED 의 하중을 변이에 두었다.
@@ -34,12 +36,19 @@ base `df4976cc` · 브랜치 `feature/m9-paper-bid` · 계약 `scope.md`(D-M9P-1
 | `:adapters:test --tests "*NotificationInbox*" --tests "*NotificationSweepCandidatesTest*" --tests "*CleanMigration*" --tests "*RetentionSweepTest*"` | 0 | 로컬 |
 | `:workflow:test --tests "*Notification*" --tests "*BidCase*"` | 0 | 로컬 |
 | `:app:test --tests "*NotificationInbox*" --tests "*OpenApi*" --tests "*NotificationSweep*" --tests "bidvector.app.architecture.*"` | 0 | 로컬 |
-| 세 모듈 `ktlint{Main,Test}SourceSetCheck` + `detekt` | 0 | 로컬 |
+| 세 모듈 `ktlint{Main,Test}SourceSetCheck` + `detekt` + `leakPatternGate` | 0 | 로컬 |
 | web `lint` · `typecheck` · `test`(vitest) · `api:types:check` · `gate:tests` · `gate:src-tree` | 0 | 로컬 |
+
+판정 SHA 에서 돌린 test 계수: adapters **117** · workflow **132** · app **314** — 실패 0 · skip 0.
 | `./gradlew --no-daemon check` · `qualityBaseline` · web job 전문 · container · ml-engine | — | **PR CI 가 정본**(팀장 공지 — 호스트 빌드 큐) |
 
-web 계수: lint **0** · typecheck **0** · vitest **38 파일 / 766 test** · `api:types:check` 바이트
+web 계수: lint **0** · typecheck **0** · vitest **38 파일 / 768 test** · `api:types:check` 바이트
 등식(**191758 bytes**) · `gate:tests` 통과 · `gate:src-tree` 통과.
+
+**여정 e2e 는 로컬에서 돌리지 않는다**(공통 규율) — v H-1 의 처방은 그래서 「고쳐서 통과시킨다」가
+아니라 **사본을 없애는 것**이다: 행 testId 를 짓는 자리가 `notificationItemTestId` 하나이고 화면과
+여정이 그 함수를 부른다. 그 꼴을 vitest 둘이 잠그고(네 칸이 다 들어가는가 · 축만 달라도 갈리는가),
+여정의 실행 판정은 CI 가 낸다.
 
 **전건 `check` 를 로컬에서 돌리지 않았다**(레인 공통 규율 — 같은 명령이 CI 에 있다). 표적은 위
 세 줄이고, 아키텍처 게이트를 따로 든 것은 `config/quality/architecture-policy.properties` 의
@@ -63,11 +72,14 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 | ⑦ 훑기 리터럴 되살림 | 질의에 `bid_kind = 'REAL'` 복귀 | **2** — 후보 집합 · 출하 경로 e2e. **알림함 문장의 축어 진단은 초록**(그 리터럴이 다른 파일에 있다 — 진단이 모집단으로 덮지 못하는 자리이고, 거동이 그것을 받는다) |
 | ⑨ 기본값 남김 | `DROP DEFAULT` 제거 | **1** — 열 래칫의 「기본값 있음」 축(`hasDefault`) |
 | ⑩ 사상 접기 | `BidKind.PAPER -> NotificationBidKind.REAL` | **3** — 1:1 등식 · 서면 되비춤 · 훑기 묶음 |
+| ⑪ 단건 읽음의 축 고정 | 화면이 `bidKind: 'REAL'` 을 보낸다(verifier 변이 W3) | **1** — `PAPER` fixture 로 바꾼 뒤. 바꾸기 전에는 **초록 30/30**(§5) |
+| ⑫ 표지에서 축 제거 | `inboxWriteFailedLine` 의 `bidKind=` 칸 | **2** — 담는 칸 단언 · 두 축이 다른 줄 |
+| ⑬ 표지에 계정 싣기 | 같은 함수에 `account=` 추가 | **1** — 음성 대조만(담는 축 test 는 초록) |
 
 **⑧ backfill 은 변이로 재지 못한다** — 깨끗한 스키마에서는 기존 행이 없어 그 UPDATE 가
 무연산이다. `rollback.md` §4 가 그 사실과 간접 측정을 적는다(알려진 제한 4).
 
-## §5 변이 ④ 가 드러낸 것 — 연속을 단언하면서 그 축을 재지 못했다
+## §5 같은 공백이 두 번 나왔다 — 축을 단언하면서 그 축을 재지 못하는 꼴
 
 변이 ④(`ORDER BY` 에서 축 제거)가 **초록이었다.** 앞 판 단언은 두 축의 묶음 최신 시각이 **다른**
 모양이라 `group_recent DESC` 가 이미 둘을 갈라 놓았고, 그래서 정렬 축을 지워도 연속이 유지됐다.
@@ -76,6 +88,15 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 되어 네 항목이 축을 넘나들며 선다(`PAPER·REAL·REAL·PAPER`), 축이 들어 있으면
 `PAPER·PAPER·REAL·REAL` 이다. 종류를 넷 다르게 둔 것은 동점을 없애 답이 흔들리지 않게 하려는
 것이다. 그 test 를 별 커밋으로 넣고 변이 ④ 를 **다시** 돌려 RED 를 실측했다.
+
+**같은 꼴이 화면에서 한 번 더 나왔다**(verifier 변이 W3 · v M-1). 단건 읽음 test 가 `bidKind` 를
+단언하는데 fixture 가 `REAL` 행이어서, 축을 `'REAL'` 로 **고정하는** 회귀의 값과 그 행의 값이
+우연히 같았다 — 묶음 경로는 이미 `PAPER` 행에서 재고 있었고 단건 경로만 열려 있었다.
+
+**둘의 공통 원인은 「단언한 값이 fixture 의 기본값과 같다」다.** 축을 재는 단언은 그 축이
+**실제로 갈리는 값**에서 세워야 한다 — 기본값으로 세우면 고정·무시·접기가 전부 통과한다. 이
+slice 가 그 자리를 둘 고쳤고(정렬 모양 · `PAPER` fixture), 세는 방법도 하나 늘었다: 축을 더한
+뒤에는 **그 축을 상수로 바꾸는 변이**를 각 소비 자리마다 돌린다(화면 둘·판독 둘·질의 넷).
 
 ## §6 되돌림 리허설
 
