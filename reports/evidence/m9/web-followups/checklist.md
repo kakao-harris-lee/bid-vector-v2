@@ -1,6 +1,7 @@
 # M9 / web-followups — checklist
 
-판정 SHA `bb2f1bae` · base `df4976cc` · 계약 `scope.md` · 설계 검토 `design-review.md`
+판정 SHA `fabc496b`(병합 커밋) · base `df4976cc` · 합친 main `8b3b610c` · 계약 `scope.md` ·
+설계 검토 `design-review.md`
 
 PR #132 수정 라운드(v `ready-for-review` · cr `approve` @`7506085e`)를 반영했다 — 팀장이 지시한
 일곱 자리를 고치고 나머지는 경계 문장을 사실에 맞게 좁혀 등재했다(§3·§5).
@@ -8,6 +9,10 @@ PR #132 수정 라운드(v `ready-for-review` · cr `approve` @`7506085e`)를 �
 표적 재검증(v-132-r2 `ready-for-review` @`68834ea2`)의 마지막 둘도 받았다: **L-2** 고아가 된
 JSDoc 자리 바로잡기(산출물 한 커밋 — 글자 변화 없이 자리만 바뀐다) · **L-1** TS 문법으로 감싼
 `undefined` 를 `void 0` 과 **같은 계열**로 §3 ③ 에 등재(술어는 늘리지 않는다).
+
+그 뒤 팀장 지시로 **PR #130 머지 SHA `8b3b610c` 를 합쳤다**. 내 30 경로와 main 의 45 경로는
+`comm -12` 가 **빈 출력**이라 겹침이 0 이고, 병합은 어느 쪽 본문도 접지 않았다(양쪽 부모 대비
+트리 대조 둘 다 0 줄 차이). rollback 은 원천을 그 SHA 로 바꿔 재산출·재실측했다.
 
 ## 1. 대상 다섯의 처리
 
