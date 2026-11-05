@@ -709,6 +709,15 @@ M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`Outb
 판정은 이 절이 아니라 `capability-map.md` §10의 그 행이 소유한다 — 이 절의 편집은 어휘·
 전이표에 한정된다.
 
+##### 2.2.5-b 실행 행의 릴리스 식별자 (M9/ops-migrations, OPS-10)
+
+> `collection_run.release_sha` · `outbox.release_sha` — **열 추가 전 행은 NULL**(모름)이고, 새 행은
+> 트리거가 요구한다. **지우는 것만 막는다**: 값 → 다른 값 갱신은 허용이다(canonical 행을 새 릴리스가
+> 다시 쓰는 축이 그 형태이고, 이 두 표는 애초에 INSERT 전용이라 그 창이 쓰이지 않는다).
+> 나머지 canonical 표는 칸을 두지 않고 `observation_key` 조인으로 답한다 — 그 조인이 주는 것은
+> 「그 **원문을 수집한** 릴리스」이고 **승격 러너가 쓰는 행에는 「쓴 릴리스」가 아니다**
+> (`capability-map.md` OPS-10 · `OPEN-M9-PROMOTED-ROW-RELEASE`).
+
 ##### 2.2.5-a 종단 사유 — `OutboxTerminalReason` (M9/ops-migrations, OPS-05)
 
 상태 셋은 **왜**를 답하지 못했다 — 「전달 결과 모호」와 「payload 타입을 몰라 시도조차 못 함」이
