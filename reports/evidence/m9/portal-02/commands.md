@@ -122,3 +122,33 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: `gh api .../actions/jobs/127248711530` step 20 시각 · 그 job 의 로그에서 여정 줄
 - exit: 0
 - 핵심 결과: step 20 이 **43초 동안 실행**(12:38:19Z→12:39:02Z, 앞 라운드는 30초 타임아웃 뒤 실패)되고 로그가 「공고 4건 준비」 → 「수집 러너 끝(exit=0)」 → **여정 test 11 passed · flaky 0 · 건너뜀 0 · spec 4/4(등록부와 같다)**. 준비 대기가 더는 타임아웃하지 않고 수집이 실제로 공고를 넣었다.
+
+## 2026-11-05T16:10+09:00 — RED ③ (cr H-1: 문서의 되돌림 인자로 기동)
+- cmd: `…:app:test --tests 'bidvector.app.wiring.KonepsRollbackArgumentsTest'` (리소스에 **문서의 여섯 인자**를 둔 채)
+- exit: 1
+- 핵심 결과: 3 tests, **2 failed** — `Parameter specified as non-null is null: … parameter division` · `… parameter openingResultListPath`. **문서대로는 프로세스가 뜨지 않는다**(cr H-1 실증). 「행의 한 칸만 주면 기동 실패」 test 는 그때도 초록(통제군).
+
+## 2026-11-05T16:25+09:00 — GREEN ③ (행 전수 14 인자)
+- cmd: 위 + `KonepsEndpointDefaultsTest` · `MockKonepsRoutingTest` · `CollectionWiringTest` · `OpeningCollectionWiringTest`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 두 배선이 뜨고 여섯 경로가 옛 이름, 낙찰정보 경로 넷은 같은 값으로 복원된다.
+
+## 2026-11-05T16:40+09:00 — 스타일·크기 (수정 라운드)
+- cmd: `:app:detekt :adapters:detekt :app:sizeGate :adapters:sizeGate :app:ktlintCheck :adapters:ktlintCheck` + 표적 test
+- exit: 0 (앞 한 번은 1 — detekt `MaxLineLength` 121자 한 줄)
+- 핵심 결과: 여섯 게이트 초록.
+
+## 2026-11-05T16:50+09:00 — web 표지 둘 (cr M-1)
+- cmd: `node --check` 둘 · fake 단독 기동 뒤 `served` 표지 판독
+- exit: 0
+- 핵심 결과: 수집 전 `""` → 출하 기본 경로 응답 뒤 `"getBidPblancListInfoCnstwk02"` → **옛 이름 404 뒤에도 불변**(404 는 집합에 들어오지 않는다).
+
+## 2026-11-05T17:00+09:00 — 변이 ⑤⑥⑦ (수정 라운드, 전부 커밋 뒤)
+- cmd: 세 변이를 각각 적용하고 표적 test / node 실측, 변이 파일만 `git restore`
+- exit: 1 · 1 · 0(단언 조건 성립)
+- 핵심 결과: **⑤** 정본 목록에서 `division` 줄 둘을 빼면 `KonepsRollbackArgumentsTest` 2/3 RED — 목록을 줄이는 편집이 잡힌다. **⑥** 표를 `ROUTES[op] ?: ROUTES[op+"02"]` 로 느슨하게 하고 배선을 옛 이름으로 되돌리면 `MockKonepsRoutingTest` 가 **RED**(`expected:<404> but was:<200>`) — verifier 의 M3M2 가 초록이던 자리가 닫혔다. **⑦** fixture 를 옛 이름으로 두면 출하 기본 경로가 404 이고 `served` 집합이 **0** 이라 여정 단언이 멈춘다.
+
+## 2026-11-05T17:20+09:00 — rollback 재산출 (실측 HEAD `9b025e3f`, 원천 `319fe212`)
+- cmd: `git restore --source=319fe212 --staged --worktree -- <in_scope 경로 개별 인자, test 리소스 포함>`
+- exit: 0
+- 핵심 결과: D 7 · M 12 · 결과 트리가 `319fe212` 와 **바이트 동일** · **내 표지 0**(base·라우팅 표·되돌림 인자 리소스·게이트 등재 둘·`served` 표지·license-limit 절) · **남의 표지 보존**(#124 등재 1 · #124 OPEN 행 2 · #125 `shared.ts`). 이 라운드 중 `origin/main` 이 `31551579`(#129)로 또 움직였으나 **병합하지 않았으므로** 원천은 `319fe212` 그대로다.
