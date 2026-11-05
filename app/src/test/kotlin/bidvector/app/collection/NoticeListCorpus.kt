@@ -35,7 +35,9 @@ internal fun noticeListItemsFor(
     day: String,
     firstDay: LocalDate,
 ): List<Map<String, String>> {
-    val category = operation.removePrefix("getBidPblancListInfo")
+    // 오퍼레이션 이름에서 업종을 **잘라내지 않는다**(M9/portal-02 D-3) — `02` 접미가 붙자 그 잘라내기가
+    // `Cnstwk02` 를 내고 어느 분기도 맞지 않는 업종이 조용히 생겼다. 표식은 정확 일치 표에서 온다.
+    val category = mockNoticeListDivisionOf(operation).token
 
     fun item(
         number: String,

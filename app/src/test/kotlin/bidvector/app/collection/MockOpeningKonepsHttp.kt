@@ -13,7 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 개찰 축 KONEPS mock(M6/6G E2E) — loopback in-process(네트워크 0). 경로의 마지막 조각이 오퍼레이션
- * 이름이고, 오퍼레이션마다 어떤 축으로 불렸는지를 목록에 남겨 「표본에 뽑힌 공고만 상세를 불렀는가」를
+ * 이름이고, 그 이름은 [mockKonepsRouteOf] 의 **정확 일치** 표로만 축을 얻는다(M9/portal-02 D-3).
+ * 오퍼레이션마다 어떤 축으로 불렸는지를 목록에 남겨 「표본에 뽑힌 공고만 상세를 불렀는가」를
  * 셀 수 있게 한다.
  *
  * **투찰 행에 상호를 싣는다**(`prcbdrNm`) — 실 응답이 그렇기 때문이고, 그래야 「상호가 로그에 새지
@@ -55,6 +56,9 @@ internal class MockOpeningKonepsHttp(
     val baseAmountNotices = CopyOnWriteArrayList<String>()
     val formulaANotices = CopyOnWriteArrayList<String>()
 
+    /** 라우팅 표에 없는 오퍼레이션으로 온 요청(M9/portal-02 D-3) — [close] 가 비어 있음을 요구한다. */
+    val unroutedCalls = CopyOnWriteArrayList<String>()
+
     /**
      * 받은 요청의 `numOfRows`(D-6G2f-2) — **배선이 준 값이 wire 에 닿았는가**를 재는 자리다.
      * 응답 본문의 에코가 아니라 **요청 URI 의 query** 를 적는다: 에코는 이 mock 이 짓는 값이라
@@ -86,8 +90,15 @@ internal class MockOpeningKonepsHttp(
         server.start()
     }
 
+    /**
+     * 표에 없는 오퍼레이션으로 온 호출은 **닫을 때 실패로 올라온다**(D-3) — 404 만으로는 수집이 그 축을
+     * 실패로 적고 끝나, 「경로 이름이 바뀌었다」가 호출 계수 차이로만 보인다.
+     */
     override fun close() {
         server.stop(0)
+        require(unroutedCalls.isEmpty()) {
+            "라우팅 표에 없는 오퍼레이션이 불렸다 — 기본 경로가 바뀌었는데 표가 따라오지 않았다: $unroutedCalls"
+        }
     }
 
     /**
@@ -105,20 +116,27 @@ internal class MockOpeningKonepsHttp(
         val requested = paramOf(query, "numOfRows")?.toIntOrNull()
         // 429·5xx 로 끊는 요청도 센다 — 「배선이 준 값」은 응답이 무엇이든 그 요청에 실려 나갔다.
         requestedRows += RequestedRows(operation, requested)
+        val route = mockKonepsRouteOf(operation)
+        if (route == null) {
+            unroutedCalls += operation
+            exchange.sendResponseHeaders(HTTP_NOT_FOUND, -1)
+            exchange.close()
+            return
+        }
         if (operation in throttleOnce && throttled.addIfAbsent(operation)) {
             exchange.sendResponseHeaders(HTTP_TOO_MANY_REQUESTS, -1)
             exchange.close()
             return
         }
         val page = paramOf(query, "pageNo")?.toIntOrNull() ?: 1
-        if (isPagedOpeningComplete(operation) && page > 1 && secondPageFailurePending.compareAndSet(true, false)) {
+        if (isPagedOpeningComplete(route) && page > 1 && secondPageFailurePending.compareAndSet(true, false)) {
             exchange.sendResponseHeaders(HTTP_SERVER_ERROR, -1)
             exchange.close()
             return
         }
         val noticeNumber = paramOf(query, "bidNtceNo")
-        val all = itemsFor(operation, query, noticeNumber)
-        val pageSize = pageSizeFor(operation, requested)
+        val all = itemsFor(operation, route, query, noticeNumber)
+        val pageSize = pageSizeFor(route, requested)
         val bytes =
             envelope(pageOf(all, page, pageSize), all.size, page, echoedRowsOf(pageSize))
                 .toByteArray(StandardCharsets.UTF_8)
@@ -129,29 +147,31 @@ internal class MockOpeningKonepsHttp(
 
     private fun itemsFor(
         operation: String,
+        route: MockKonepsRoute,
         query: String,
         noticeNumber: String?,
     ): List<Map<String, String>> =
         // 상세를 **받지 못하는 표본**(D-6G-42) — 호출은 실제로 나가고(그래서 여기서도 센다)
         // 응답만 빈 항목이다. 원문이 한 줄도 적재되지 않아 표본인데 행이 되지 못한다.
-        itemsOf(operation, query, noticeNumber).takeUnless {
-            noticeNumber != null && isDetailOperation(operation) && isDetailless(noticeNumber)
+        itemsOf(operation, route, query, noticeNumber).takeUnless {
+            noticeNumber != null && route.axis.detail && isDetailless(noticeNumber)
         } ?: emptyList()
 
     private fun itemsOf(
         operation: String,
+        route: MockKonepsRoute,
         query: String,
         noticeNumber: String?,
     ): List<Map<String, String>> =
-        when {
-            operation.endsWith("PreparPcDetail") -> {
+        when (route.axis) {
+            MockKonepsAxis.RESERVE_PRICE -> {
                 reservePriceNotices += noticeNumber.orEmpty()
                 // **복수예가 15행 전부.** 하나만 주면 제외 ⑤(예비가격·추첨 결측)가 전 행을 걷어내
                 // golden 에 승인되는 행이 하나도 남지 않는다(D-6G-37).
                 (1..RESERVE_PRICE_ROWS).map { sequence -> reservePriceRow(noticeNumber.orEmpty(), sequence) }
             }
 
-            operation.endsWith("OpengCompt") -> {
+            MockKonepsAxis.OPENING_COMPLETE -> {
                 openingCompleteNotices += noticeNumber.orEmpty()
                 // **투찰자 셋.** 추첨번호의 출처는 예비가격 상세이고(D-6G-38) 이 행들의 선택은
                 // 그것과 일부러 어긋나 있다 — 추출이 틀린 출처에서 읽으면 golden 이 붉어진다.
@@ -159,27 +179,25 @@ internal class MockOpeningKonepsHttp(
                 bidders.map { bidder -> bidderRow(noticeNumber.orEmpty(), bidder) }
             }
 
-            operation.endsWith("BsisAmount") -> {
+            MockKonepsAxis.BASE_AMOUNT -> {
                 baseAmountNotices += noticeNumber.orEmpty()
                 listOf(baseAmountRow(noticeNumber.orEmpty()))
             }
 
-            operation.endsWith("BidPrceCalclAInfo") -> {
+            MockKonepsAxis.FORMULA_A -> {
                 formulaANotices += noticeNumber.orEmpty()
                 listOf(formulaARow(noticeNumber.orEmpty()))
             }
 
-            operation.startsWith("getBidPblancListInfo") && !operation.endsWith("BsisAmount") -> {
-                noticeListItems(operation)
-            }
+            MockKonepsAxis.NOTICE_LIST -> noticeListItems(operation, divisionOf(route))
 
-            else -> {
+            MockKonepsAxis.OPENING_LIST -> {
                 listCalls += operation
-                val suffix = operation.removePrefix("getOpengResultListInfo")
+                val token = divisionOf(route).token
                 (1..noticesPerSlot)
                     .map { index ->
                         mapOf(
-                            "bidNtceNo" to noticeNumber(suffix, index),
+                            "bidNtceNo" to noticeNumber(token, index),
                             "bidNtceOrd" to "000",
                             // 참가업체수는 **투찰 행 수와 같다** — 실물이 어긋나지 않는 자리다(D-6G-38).
                             "prtcptCnum" to bidders.size.toString(),
@@ -189,26 +207,26 @@ internal class MockOpeningKonepsHttp(
             }
         }
 
+    /** 업종별 축은 표식을 반드시 갖는다 — 표가 그렇게 서 있으므로 없으면 표가 깨진 것이다. */
+    private fun divisionOf(route: MockKonepsRoute): MockKonepsDivision =
+        requireNotNull(route.division) { "업종별 축인데 표식이 없다: ${route.axis}" }
+
     /**
      * 공고 목록(다른 서비스·다른 오퍼레이션) — canonical `notice` 를 세우는 갈래가 부른다.
      * **같은 공고번호**를 낸다: 추출이 두 출처를 잇기 때문에 번호가 갈리면 아무것도 안 엮인다.
+     * 두 목록 축이 [MockKonepsDivision.token] 하나를 공유하므로 번호가 갈릴 자리가 없다.
      */
-    private fun noticeListItems(operation: String): List<Map<String, String>> {
+    private fun noticeListItems(
+        operation: String,
+        division: MockKonepsDivision,
+    ): List<Map<String, String>> {
         noticeListCalls += operation
-        val suffix = operation.removePrefix("getBidPblancListInfo")
         // canonical 이 **없는 표본**(D-6G-42) — 개찰 축 목록은 이 공고를 내지만 공고 목록 갈래는
         // 내지 않는다. 상세는 받지만 대분류를 몰라 행이 서지 않는 자리다.
         return (1..noticesPerSlot)
-            .filterNot { index -> suffix == NO_CANONICAL_SUFFIX && index == MISSING_SAMPLE_INDEX }
-            .map { index -> noticeListRow(suffix, index) }
+            .filterNot { index -> division == NO_CANONICAL_DIVISION && index == MISSING_SAMPLE_INDEX }
+            .map { index -> noticeListRow(division.token, index) }
     }
-
-    /** 상세 축 넷 — 목록 축과 가른다(목록은 표본틀을 만든다). */
-    private fun isDetailOperation(operation: String): Boolean =
-        operation.endsWith("PreparPcDetail") ||
-            operation.endsWith("OpengCompt") ||
-            operation.endsWith("BsisAmount") ||
-            operation.endsWith("BidPrceCalclAInfo")
 
     /**
      * 상세 요청의 공고번호는 **canonical**(ASCII 대문자화)이라 원문 접미와 그대로 맞대면 빗나간다 —
@@ -216,7 +234,7 @@ internal class MockOpeningKonepsHttp(
      */
     private fun isDetailless(noticeNumber: String): Boolean =
         indexOf(noticeNumber) == MISSING_SAMPLE_INDEX &&
-            noticeNumber.uppercase().contains("-${DETAILLESS_SUFFIX.uppercase()}-")
+            noticeNumber.uppercase().contains("-${DETAILLESS_DIVISION.token.uppercase()}-")
 
     /**
      * 공고 목록 행 — 대분류·하한율·마감·낙찰방법·**공고일**이 여기서만 온다.
@@ -225,10 +243,10 @@ internal class MockOpeningKonepsHttp(
      * 「한 행의 null 이 전체를 거부하지 않는다」가 바이트로 확인된다. 결측은 칸마다 하나씩이다.
      */
     private fun noticeListRow(
-        suffix: String,
+        token: String,
         index: Int,
     ) = mapOf(
-        "bidNtceNo" to noticeNumber(openingSuffixFor(suffix), index),
+        "bidNtceNo" to noticeNumber(token, index),
         "bidNtceOrd" to "000",
         "bidNtceNm" to "합성 공고 $index",
         "sucsfbidLwltRate" to "87.745",
@@ -248,12 +266,9 @@ internal class MockOpeningKonepsHttp(
         }
 
     private fun noticeNumber(
-        suffix: String,
+        token: String,
         index: Int,
-    ): String = "OPEN-E2E-$nonce-$suffix-%04d".format(index)
-
-    /** 공고 목록 오퍼레이션 접미(`Cnstwk`)와 개찰결과 목록 접미가 같은 업무를 가리킨다. */
-    private fun openingSuffixFor(noticeListSuffix: String): String = noticeListSuffix
+    ): String = "OPEN-E2E-$nonce-$token-%04d".format(index)
 
     private fun reservePriceRow(
         noticeNumber: String,
@@ -344,8 +359,8 @@ internal class MockOpeningKonepsHttp(
             ?.substringAfter('=')
             ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8) }
 
-    private fun isPagedOpeningComplete(operation: String): Boolean =
-        openingCompletePageSize > 0 && operation.endsWith("OpengCompt")
+    private fun isPagedOpeningComplete(route: MockKonepsRoute): Boolean =
+        openingCompletePageSize > 0 && route.axis == MockKonepsAxis.OPENING_COMPLETE
 
     /**
      * 이 응답의 쪽 크기 — `0` 은 「한 쪽에 전부」다.
@@ -361,12 +376,12 @@ internal class MockOpeningKonepsHttp(
      * 쪽으로만 서므로 그 에코는 거동에 영향이 없고, 실 게이트웨이와 다른 자리로 여기 적어 둔다.
      */
     private fun pageSizeFor(
-        operation: String,
+        route: MockKonepsRoute,
         requested: Int?,
     ): Int =
         when {
             paging.respectsRequestedRows -> requested ?: DEFAULT_PAGE_ROWS
-            isPagedOpeningComplete(operation) -> openingCompletePageSize
+            isPagedOpeningComplete(route) -> openingCompletePageSize
             else -> 0
         }
 
@@ -403,16 +418,11 @@ private fun newNonce(): String =
 
 private const val NONCE_LENGTH = 8
 
-/** 실 응답이 상호와 함께 싣는 대표자명 — 스냅숏에 **없어야** 한다(privacy r2 INFO-4). */
-internal const val MOCK_REPRESENTATIVE_NAME = "SYN-대표자"
-
 private const val HTTP_TOO_MANY_REQUESTS = 429
+private const val HTTP_NOT_FOUND = 404
 
-private const val RESERVE_PRICE_ROWS = 15
 private const val DEFAULT_PAGE_ROWS = 100
 private const val HTTP_SERVER_ERROR = 503
-
-private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
 
 /**
  * 쪽 크기 판(D-6G2f-3) — 기본은 요청의 `numOfRows` 를 **무시하는** 기존 판이고, 기존 test 가 재는
@@ -432,43 +442,6 @@ internal class RequestedRows(
     val numOfRows: Int?,
 )
 
-internal class SyntheticBidder(
-    val rank: Int,
-    val amount: String,
-    val firstDraw: String,
-    val secondDraw: String,
-)
-
-/**
- * 참가가 많은 판의 투찰 행(D-6G2f-3 ⓐ) — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않고, 추첨번호는
- * 복수예가 행 범위를 돈다. 고정 셋([BIDDERS])과 달리 **수를 받아** 짓는다: 한 호출에 들어가지 않는
- * 참가 규모가 이 판의 입력이다.
- */
-private fun crowdedBidder(rank: Int) =
-    SyntheticBidder(
-        rank = rank,
-        amount = (CROWDED_BID_AMOUNT + rank * CROWDED_BID_AMOUNT_STEP).toString(),
-        firstDraw = (rank % RESERVE_PRICE_ROWS + 1).toString(),
-        secondDraw = ((rank + 1) % RESERVE_PRICE_ROWS + 1).toString(),
-    )
-
-private const val CROWDED_BID_AMOUNT = 1_100_000_000L
-private const val CROWDED_BID_AMOUNT_STEP = 1_000L
-
-/**
- * 합성 투찰자 셋(D-6G-38) — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않는다.
- *
- * **선택(`drwtNo1`·`drwtNo2`)을 뽑힌 넷([DRAWN_SEQUENCES])과 일부러 다르게 둔다.** r1 의 mock 은 둘을
- * 같게 맞춰 두어, 추출이 **틀린 출처**(투찰자 선택)에서 읽고 있는데도 golden 이 초록이었다. 겹치지
- * 않게 두면 출처가 틀린 순간 golden 이 붉어진다.
- */
-private val BIDDERS =
-    listOf(
-        SyntheticBidder(rank = 1, amount = "1100000000", firstDraw = "1", secondDraw = "2"),
-        SyntheticBidder(rank = 2, amount = "1150000000", firstDraw = "4", secondDraw = "5"),
-        SyntheticBidder(rank = 3, amount = "1200000000", firstDraw = "6", secondDraw = "8"),
-    )
-
 private const val NO_NOTICE_DATE = 2
 private const val NO_BID_CLOSE = 3
 private const val NO_OPENING_DATE = 4
@@ -481,5 +454,5 @@ private const val NO_PLANNED_PRICE = 5
  * 적어도 golden 이 초록이다.
  */
 private const val MISSING_SAMPLE_INDEX = 6
-private const val DETAILLESS_SUFFIX = "Cnstwk"
-private const val NO_CANONICAL_SUFFIX = "Servc"
+private val DETAILLESS_DIVISION = MockKonepsDivision.CONSTRUCTION
+private val NO_CANONICAL_DIVISION = MockKonepsDivision.SERVICE
