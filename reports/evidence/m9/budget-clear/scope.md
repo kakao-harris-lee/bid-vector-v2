@@ -38,3 +38,8 @@ in_scope 경로 한정 `git restore --source=79f3e5c4 …` + 새 파일 삭제; 
 ## 하네스 레인 변경
 
 없음.
+
+## 계약 갱신 2026-11-05 (팀장)
+
+- in_scope 에 `app/src/main/kotlin/bidvector/app/http/JsonValueReaders.kt` 를 더한다 — 첫 판이 거기에 헬퍼를 넣었다가 `c36a01e1` 에서 base 와 같게 되돌렸다(순 diff 0). `--no-merges --name-only` 합집합 술어가 그 경로를 내므로 계약이 받아 둔다. 거동 영향 0.
+- 「비움 = 빈 칸 + 값 보내기」(전용 버튼 없음)는 D-2 의 「비우기 동작」으로 받는다.
