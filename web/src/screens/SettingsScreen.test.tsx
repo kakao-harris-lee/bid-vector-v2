@@ -123,8 +123,9 @@ describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
     renderScreen();
 
     const qualifier = await screen.findByTestId('strategy-qualifier-MIN_BUDGET');
-    // M9 D-3 — 토큰 원문이 아니라 표의 문면이다.
-    expect(qualifier.textContent).toBe('원 · 부가세 별도 · 운영자 선언값');
+    // M9 D-3 — 토큰 원문이 아니라 표의 문면이다. **단위는 금액 글자가 든다**(r1 cr M-1 —
+    // 부속 칸이 통화를 또 내면 「1,200,000,000원 / 원 · …」 이 된다).
+    expect(qualifier.textContent).toBe('부가세 별도 · 운영자 선언값');
     for (const token of ['KRW', 'EXCLUSIVE', 'OPERATOR_DECLARED']) {
       expect(qualifier.textContent ?? '', `${token} 이 화면에 남았다`).not.toContain(token);
     }

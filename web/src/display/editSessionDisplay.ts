@@ -1,6 +1,6 @@
 import type { components } from '../api/generated/operator-api';
 
-import { amountQualifierTextOf } from './moneyDisplay';
+import { amountQualifierTextOf, amountTextOf } from './moneyDisplay';
 import type { StateDisplay } from './stateDisplay';
 
 type EditSessionResponse = components['schemas']['EditSessionResponse'];
@@ -253,9 +253,16 @@ function budgetView(
     return { text: null };
   }
   // 부속 칸은 **표의 문면**이다(M9 D-3) — 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
-  const qualifier = amountQualifierTextOf({ currency, vatTreatment: vat, provenance });
+  //
+  // **통화는 넘기지 않는다**(r1 CR M-1): 아래 `text` 가 이미 단위를 들었으므로 부속 칸이
+  // 통화를 또 내면 `1,200,000,000원 / 원 · …` 이 된다. 같은 관례가 `noticeDisplay` 의
+  // `amountDisplayOf` 에도 있다 — 거기서는 처음부터 넘기지 않았는데 이 자리만 벗었다.
+  // 그래서 **통화만 있고 과세·출처가 없는 값**은 이제 아래 폴백으로 간다(그 쪽이 정직하다 —
+  // 통화는 금액 글자가 이미 말했고, 적히지 않은 것은 과세와 출처다).
+  const qualifier = amountQualifierTextOf({ vatTreatment: vat, provenance });
   return {
-    text: `${won.toLocaleString('ko-KR')}원`,
+    // 단위는 **통화 표가 낸다**(r1 cr M-1 · v L-2) — 앞 판은 통화와 무관하게 「원」을 박았다.
+    text: amountTextOf(won, currency),
     qualifier: qualifier ?? '단위·과세·출처 미기재',
   };
 }

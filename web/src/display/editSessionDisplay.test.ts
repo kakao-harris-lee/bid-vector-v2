@@ -326,10 +326,18 @@ describe('지금 값을 읽는 표', () => {
 
     expect(view.text).toBe('1,200,000,000원');
     // **문면이다 — 원문 토큰이 아니다**(M9 D-3). 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
-    expect(view.qualifier).toBe('원 · 부가세 포함 · 운영자 선언값');
+    expect(view.qualifier).toBe('부가세 포함 · 운영자 선언값');
     for (const token of ['KRW', 'INCLUSIVE', 'OPERATOR_DECLARED']) {
       expect(view.qualifier, `${token} 이 화면 문면에 남았다`).not.toContain(token);
     }
+    /**
+     * **단위를 두 번 적지 않는다**(r1 CR M-1 — 이 slice 가 들인 회귀였다). 금액 글자가 이미
+     * 「원」을 들었는데 부속 칸이 통화를 또 내면 `1,200,000,000원 / 원 · …` 이 된다. 같은
+     * 관례가 `noticeDisplay.amountDisplayOf` 에 주석으로 적혀 있다.
+     */
+    expect(view.text).toContain('원');
+    expect(view.qualifier, '단위를 부속 칸이 되풀이했다').not.toContain('원 ·');
+    expect(view.qualifier?.startsWith('원')).toBe(false);
   });
 
   it('금액만 있고 단위·과세·출처가 없으면 그 사실을 적는다', () => {

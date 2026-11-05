@@ -93,6 +93,46 @@ describe('없는 시각과 읽히지 않는 시각은 다른 얼굴이다 (D-1)'
     expect(instantDisplayOf('').kind).toBe('unreadable');
   });
 
+  /**
+   * **오프셋이 없으면 읽지 않는다**(r1 cr M-3 · v L-4). `Date.parse` 는 오프셋 없는 date-time 을
+   * **장비 지역 시각**으로 읽는다 — 그러면 「+9h 뒤 UTC 칸으로 읽어 장비 시간대를 배제」가
+   * 깨지고, 「알 수 없음」이 아니라 **그럴듯한 틀린 시각**이 선다. 조용한 오답이 이 모듈이
+   * 피하려는 바로 그것이다.
+   */
+  it('오프셋이 없는 값은 읽지 않는다 — 장비 시간대로 추측하지 않는다', () => {
+    for (const naive of ['2026-11-13T17:28', '2026-11-13T17:28:00', '2026-11-13T17:28:00.000']) {
+      expect(instantDisplayOf(naive).kind, `${naive} 을 읽어 버렸다`).toBe('unreadable');
+    }
+  });
+
+  it('Z 와 숫자 오프셋은 둘 다 읽는다', () => {
+    expect(instantDisplayOf('2026-11-05T00:30:00Z').kind).toBe('readable');
+    expect(instantDisplayOf('2026-11-05T09:30:00+09:00').kind).toBe('readable');
+    expect(instantDisplayOf('2026-11-05T09:30:00+0900').kind).toBe('readable');
+    expect(instantDisplayOf('2026-11-04T19:30:00-05:00').kind).toBe('readable');
+  });
+
+  /**
+   * **넘치는 날짜를 조용히 굴리지 않는다**(같은 지적). `Date.parse('2026-02-30T00:00:00Z')` 는
+   * NaN 이 아니라 **3월 2일**이다 — 서버가 어긋난 값을 보낸 사실이 사라진다.
+   */
+  it('달력에 없는 날짜는 읽지 않는다 — 다음 달로 굴리지 않는다', () => {
+    for (const invalid of ['2026-02-30T00:00:00Z', '2026-13-01T00:00:00Z', '2026-11-31T00:00:00Z']) {
+      expect(instantDisplayOf(invalid).kind, `${invalid} 을 굴려 읽었다`).toBe('unreadable');
+    }
+  });
+
+  it('윤년 2월 29일은 읽는다 — 왕복 검사가 참을 거부하지 않는다', () => {
+    expect(instantDisplayOf('2028-02-29T00:00:00Z').kind).toBe('readable');
+  });
+
+  it('`daysUntil` 도 같은 입력을 세지 않는다', () => {
+    const now = new Date('2026-10-29T00:00:00Z');
+
+    expect(daysUntil('2026-11-13T17:28', now)).toBeNull();
+    expect(daysUntil('2026-02-30T00:00:00Z', now)).toBeNull();
+  });
+
   it('두 표지가 서로 다른 글자다', () => {
     expect(UNREADABLE_INSTANT).toBe('알 수 없음');
     expect(ABSENT_INSTANT).not.toBe(UNREADABLE_INSTANT);

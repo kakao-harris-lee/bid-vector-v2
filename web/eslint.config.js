@@ -74,7 +74,15 @@ const RAW_INSTANT_SELECTORS = [
   // ③ 템플릿 보간 — 앞 둘이 **직접 자식만** 보므로 `value={`${notice.deadlineAt} (D-3)`}` 가
   //    그대로 지나갔다(이 slice 의 실측: 워크시트의 마감 칸이 바로 그 꼴이었다). 템플릿은
   //    보간한 값을 **글자로** 만드는 자리라 예외가 없다 — 그래서 자리 깊이를 보지 않는다.
-  { selector: 'JSXExpressionContainer TemplateLiteral MemberExpression[property.name=/At$/]', message: rawInstantMessage },
+  //
+  //    **자손을 보는 유일한 선택자라 오탐이 있다**(r1 cr LOW): `At` 로 끝나는 문자열 메서드
+  //    (`charAt`·`codePointAt`)가 시각과 무관하게 걸린다. 그 둘만 음성 조건으로 뺀다 — 열거를
+  //    늘리는 대신, 걸리는 이름이 더 나오면 **변수로 빼는 쪽**이 맞다(`eslint-disable` 을 달면
+  //    그 줄의 진짜 시각 보간까지 함께 덮인다). 이 범위는 게이트 test 가 음성 대조로 잰다.
+  {
+    selector: 'JSXExpressionContainer TemplateLiteral MemberExpression[property.name=/(?<!char|codePoint)At$/]',
+    message: rawInstantMessage,
+  },
 ];
 
 // 네트워크 금지의 네 선택자 — 아래 두 블록이 **같은 목록**을 쓴다. flat config 의 규칙 옵션은
@@ -189,8 +197,14 @@ export default tseslint.config(
     //
     // `ignores` 가 시계 읽기의 **승인된 한 자리**를 뺀다. 그 파일은 위 블록으로 돌아가므로
     // 네트워크 금지는 그대로 받는다.
-    files: ['src/screens/**/*.ts', 'src/screens/**/*.tsx', 'src/display/**/*.ts', 'src/display/**/*.tsx'],
-    ignores: [CLOCK_SITE],
+    // **화면이 그리는 코드 전부**가 대상이다(r1 cr M-2). 앞 판은 `src/screens`·`src/display` 두
+    // 디렉터리뿐이었는데, ⑨ 의 잔여가 말하는 「카드에 브라우저 시계 판정을 더하는」 배지가 살
+    // 가장 자연스러운 자리는 `src/components` 다 — 그 디렉터리가 금지 밖이었다.
+    //
+    // 제외는 **의도를 문면으로 남긴다**: `src/api`·`src/session` 은 서버와 말하는 층이라 시각을
+    // 그리지 않는다(그 둘이 초록인 것도 게이트 test 가 잰다). `CLOCK_SITE` 는 승인된 한 자리다.
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [CLOCK_SITE, 'src/api/**', 'src/session/**'],
     rules: {
       'no-restricted-syntax': ['error', ...NETWORK_SELECTORS, ...CLOCK_SELECTORS, ...RAW_INSTANT_SELECTORS],
     },

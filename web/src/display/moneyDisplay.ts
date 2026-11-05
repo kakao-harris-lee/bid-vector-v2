@@ -1,6 +1,6 @@
 import type { components } from '../api/generated/operator-api';
 
-import { displayOrUnknown, type StateDisplay } from './stateDisplay';
+import { displayOf, displayOrUnknown, type StateDisplay } from './stateDisplay';
 
 /**
  * 금액 수식어의 표시(M7/7E-3b — r1 CR M-1 · v L-2, 경계는 r2 CR M-3 · v M-2 로 정정).
@@ -103,6 +103,36 @@ export const AMOUNT_CURRENCY_DISPLAY = {
 
 export function currencyDisplayOf(token: string): StateDisplay {
   return displayOrUnknown<string>(AMOUNT_CURRENCY_DISPLAY, token);
+}
+
+/** 금액 글자에 붙는 **단위**와 그 단위를 이 화면이 아는지. */
+export interface CurrencyUnit {
+  readonly text: string;
+  /** 표 안의 통화인가 — 아는 단위는 숫자에 바로 붙고, 모르는 코드는 한 칸 띄어 **보이게** 적는다. */
+  readonly known: boolean;
+}
+
+/**
+ * 금액 글자의 단위를 내는 **한 자리**(r1 v L-2 · cr L-4). 앞 판은 `noticeDisplay` 와
+ * `editSessionDisplay` 가 각자 삼항으로 `'원'` 과 원문 코드를 갈랐다 — 통화 축을 표로 세운
+ * slice 안에서 **같은 축의 두 번째 분기**가 남은 꼴이었다.
+ *
+ * 통화를 **선언하지 않은** 값은 원으로 본다: 이 도메인의 통화는 하나이고(`Currency.KRW`) 금액
+ * 칸은 원 단위 정수다(계약). 표 밖 코드는 지어내지 않고 **그대로** 보인다.
+ */
+export function currencyUnitOf(token: string | null | undefined): CurrencyUnit {
+  if (token === null || token === undefined) {
+    return { text: AMOUNT_CURRENCY_DISPLAY.KRW.label, known: true };
+  }
+  const known = displayOf<string>(AMOUNT_CURRENCY_DISPLAY, token);
+  return known === undefined ? { text: token, known: false } : { text: known.label, known: true };
+}
+
+/** 숫자와 단위를 **한 글자**로 — 아는 단위는 붙이고 모르는 코드는 띄운다. */
+export function amountTextOf(won: number, token: string | null | undefined): string {
+  const unit = currencyUnitOf(token);
+  const formatted = won.toLocaleString('ko-KR');
+  return unit.known ? `${formatted}${unit.text}` : `${formatted} ${unit.text}`;
 }
 
 /**

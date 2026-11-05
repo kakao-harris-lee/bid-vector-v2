@@ -77,11 +77,31 @@ describe('벽시계 금지는 화면·표시 파일에서 선다 (D-1)', () => {
     expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(0);
   });
 
-  /** 화면 파일 밖(세션·API 층)은 이 금지의 대상이 아니다. */
-  it('화면·표시 밖 파일은 대상이 아니다', async () => {
-    const messages = await lintAs('src/session/planted.ts', 'export const at = new Date();\n');
+  /**
+   * **공용 컴포넌트도 대상이다**(r1 cr M-2). ⑨ 의 원래 잔여는 「카드에 브라우저 시계 판정을
+   * 더하면서 낱말만 바꾼 변이」였고, 그 배지가 살 가장 자연스러운 자리가 `src/components` 다 —
+   * 앞 판의 `files` 는 그 디렉터리를 담지 않았다.
+   */
+  it('공용 컴포넌트의 시계 읽기도 RED 다', async () => {
+    const messages = await lintAs('src/components/Planted.tsx', 'export const at = new Date();\n');
 
-    expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(0);
+    expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(1);
+  });
+
+  /** 화면 뿌리의 파일(`src/*.tsx` — 셸·라우트)도 같은 자리다. */
+  it('화면 뿌리 파일의 시계 읽기도 RED 다', async () => {
+    const messages = await lintAs('src/Planted.tsx', 'export const at = Date.now();\n');
+
+    expect(messagesMatching(messages, CLOCK_FRAGMENT).length).toBe(1);
+  });
+
+  /** API·세션 층은 여전히 대상이 아니다 — 제외가 **의도**임을 여기서 잰다. */
+  it('API·세션 층은 대상이 아니다', async () => {
+    const session = await lintAs('src/session/planted.ts', 'export const at = new Date();\n');
+    const api = await lintAs('src/api/planted.ts', 'export const at = new Date();\n');
+
+    expect(messagesMatching(session, CLOCK_FRAGMENT).length).toBe(0);
+    expect(messagesMatching(api, CLOCK_FRAGMENT).length).toBe(0);
   });
 });
 
@@ -121,6 +141,21 @@ describe('`*At` 보간 금지는 세 자리에서 선다 (D-2·D-4)', () => {
    * **음성 대조** — 서식을 지나는 꼴은 초록이어야 한다. 이것이 붉으면 규칙이 산출물을 막으므로
    * 다음 라운드가 규칙을 끈다.
    */
+  /**
+   * **오탐의 범위를 잰다**(r1 cr LOW). 셋째 선택자만 자손을 보므로 `charAt`·`codePointAt` 처럼
+   * `At` 로 끝나는 **문자열 메서드**가 시각과 무관하게 걸린다. 음성 조건으로 그 둘을 뺐고, 그
+   * 사실을 측정으로 남긴다 — 다음 라운드가 `eslint-disable` 로 풀면 그 줄이 진짜 시각 보간까지
+   * 덮는다.
+   */
+  it('문자열 메서드 `charAt`·`codePointAt` 은 초록이다', async () => {
+    const messages = await lintAs(
+      'src/screens/Planted.tsx',
+      'export const E = (s) => <p title={`${s.charAt(0)}${s.codePointAt(1)}`} />;\n',
+    );
+
+    expect(messagesMatching(messages, RAW_INSTANT_FRAGMENT).length).toBe(0);
+  });
+
   it('서식을 지나는 호출은 초록이다', async () => {
     const messages = await lintAs(
       'src/screens/Planted.tsx',

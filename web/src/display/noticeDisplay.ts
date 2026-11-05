@@ -1,6 +1,6 @@
 import type { components, operations } from '../api/generated/operator-api';
 
-import { amountQualifierTextOf } from './moneyDisplay';
+import { amountQualifierTextOf, amountTextOf } from './moneyDisplay';
 import { unknownStateDisplay, type StateDisplay } from './stateDisplay';
 
 /** 화면 B(오늘의 공고)가 소비하는 축의 표시 표(D-7E-4 · D-7E-9). */
@@ -84,9 +84,9 @@ export function amountDisplayOf(fields: AmountFields): AmountDisplay {
   if (won === null || won === undefined) {
     return { present: false, amount: ABSENT_AMOUNT, provenance: null };
   }
-  const currency = fields.baseAmountCurrency;
-  const formatted = won.toLocaleString('ko-KR');
-  const amount = currency === 'KRW' || currency === null || currency === undefined ? `${formatted}원` : `${formatted} ${currency}`;
+  // 단위는 **통화 표가 낸다**(r1 v L-2 · cr L-4) — 앞 판은 이 삼항이 표 밖 코드를 날것으로
+  // 붙여, 통화 축을 표로 세운 이 slice 안에 같은 축의 둘째 분기가 남아 있었다.
+  const amount = amountTextOf(won, fields.baseAmountCurrency);
   // 통화는 **금액 글자가 이미 들었다**(위 줄) — 부속 칸에 다시 적지 않는다.
   const provenance = amountQualifierTextOf({
     basis: fields.baseAmountBasis,

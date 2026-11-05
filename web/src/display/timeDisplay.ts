@@ -66,11 +66,61 @@ export function instantDisplayOf(at: string | null | undefined): InstantDisplay 
   if (at === null || at === undefined) {
     return { kind: 'absent', text: ABSENT_INSTANT, machine: null };
   }
-  const millis = Date.parse(at);
-  if (Number.isNaN(millis)) {
+  const millis = parseInstant(at);
+  if (millis === null) {
     return { kind: 'unreadable', text: UNREADABLE_INSTANT, machine: null };
   }
   return { kind: 'readable', text: kstText(millis), machine: at };
+}
+
+/**
+ * **읽을 수 있는 시각인가** — 한 자리에서 판정한다(r1 cr M-3 · v L-4). `Date.parse` 혼자서는
+ * 둘을 못 막는다:
+ *
+ * ① **오프셋 없는 date-time** 은 명세상 **장비 지역 시각**이다. 그러면 `kstText` 의 「+9h 뒤
+ *    UTC 칸으로 읽어 장비 시간대를 배제」가 깨지고 「알 수 없음」이 아니라 **그럴듯한 틀린
+ *    시각**이 선다 — 조용한 오답이 이 모듈이 피하려는 바로 그것이다.
+ * ② **달력에 없는 날짜**(`2026-02-30`)는 NaN 이 아니라 **다음 달로 굴러간다**. 서버가 어긋난
+ *    값을 보낸 사실이 사라진다.
+ *
+ * ① 은 꼬리의 오프셋 표기로, ② 는 **왕복 검사**로 닫는다 — 읽은 순간을 ISO 로 되돌려 입력의
+ * 날짜·시각 칸과 같은지 본다(굴러간 값은 되돌리면 다른 날짜가 된다).
+ *
+ * 현재 wire 값은 전부 Kotlin `Instant.toString()` 이라 `Z` 가 붙는다 — 이 판정은 그 전제를
+ * **코드로** 적은 것이고, 전제가 깨지는 날 조용한 오답 대신 「알 수 없음」이 선다.
+ */
+const OFFSET_TAIL = /(?:Z|[+-]\d{2}:?\d{2})$/u;
+const DATE_TIME_HEAD = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/u;
+
+function parseInstant(at: string): number | null {
+  if (!OFFSET_TAIL.test(at)) {
+    return null;
+  }
+  const millis = Date.parse(at);
+  if (Number.isNaN(millis)) {
+    return null;
+  }
+  const head = DATE_TIME_HEAD.exec(at);
+  if (head === null) {
+    // 오프셋은 있는데 날짜·시각 꼴이 아니다 — 이 계약의 시각 칸이 아니다.
+    return null;
+  }
+  const [, year, month, day] = head;
+  return isRealDate(Number(year), Number(month), Number(day)) ? millis : null;
+}
+
+/**
+ * 그 **달력 날짜가 실제로 있는가**. `Date` 는 넘치는 칸을 조용히 굴리므로(2월 30일 → 3월 2일)
+ * 되돌려 읽어 같은 칸이 나오는지 본다 — 굴러간 값은 여기서 갈린다.
+ *
+ * 순간을 통째로 왕복시키면 안 된다: `Date.UTC(2026, 1, 30)` 도 **같이 굴러서** 차이가 0 이다
+ * (첫 판의 실측). 굴림을 재려면 **굴러간 쪽의 칸**을 입력과 맞대야 한다.
+ */
+function isRealDate(year: number, month: number, day: number): boolean {
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return (
+    probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day
+  );
 }
 
 const MILLIS_PER_DAY = 86_400_000;
@@ -88,8 +138,9 @@ export function daysUntil(deadlineAt: string | null | undefined, now: Date): num
   if (deadlineAt === null || deadlineAt === undefined) {
     return null;
   }
-  const deadline = Date.parse(deadlineAt);
-  if (Number.isNaN(deadline)) {
+  // 같은 판정을 쓴다(r1 cr M-3) — 그리지 않는 값으로 날을 세면 D-day 만 조용히 틀린다.
+  const deadline = parseInstant(deadlineAt);
+  if (deadline === null) {
     return null;
   }
   const days = (deadline - now.getTime()) / MILLIS_PER_DAY;
