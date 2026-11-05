@@ -107,3 +107,27 @@ M5 종결(47건)의 네 배가 넘는다.
   `OPEN-ML-ANALYSIS-WIRING`, 같은 scope 가 적는다) · `OPEN-6F4W-UNAVAILABLE-PRODUCER` ·
   `OPEN-6F4-TITLE-INGEST` · `OPEN-6F10-*`. 이 slice 는 **장부 문면만** 고치고 그 넷은 다른 M9 slice 가
   받는다(코드 변경 0).
+
+## §6 정정의 정정 — M9/budget-clear (2026-11-05, PR #124 수정 라운드)
+
+§5 도 덮지 않는다. 위 §5 의 둘째 문단에 틀린 것이 하나, 덜 센 것이 하나 있었다 — 검증 레인이 잡았고
+(v M-2) 그 오류는 **slice 계약 D-4 문면에서 옮겨 온 것**이다(계약 쪽 정정은 `reports/evidence/m9/budget-clear/scope.md`
+「계약 갱신 2026-11-05 r2」).
+
+- **`OPEN-6F4-TITLE-INGEST` 는 열린 것이 아니라 닫혔다.** 6F-8 이 수령·닫았다 — 공고명을 필드 계약
+  데이터(`FieldConcept.NOTICE_TITLE`)가 나르게 한 결정이고(`reports/evidence/m6/6f8/scope.md` 의 D-6F8-2 와
+  같은 문서 OPEN 표의 「수령·닫음」 행), milestone-6 의 「6F-8 종결 2026-09-24」 문단이 PR #45 로 적는다.
+  §5 가 그 식별자를 「아직 열린 넷」에 넣은 것은 **실측이 아니라 계약 문면의 복제**였다.
+- **`OPEN-6F10-*` 와일드카드는 실제 식별자로 바꾼다.** 그 계열에서 열린 채인 것은 **여덟**이고 근거 자리는
+  6F-10 의 「이 slice 가 신설한 OPEN」 표(일곱)와 `milestone-6.md` 6F-10 종결 문단의 신설 목록이다 —
+  `OPEN-6F10-CLAIM-OBSERVABILITY` · `OPEN-6F10-CLAIM-INDEX` · `OPEN-6F10-CAPACITY-SOURCE` ·
+  `OPEN-6F10-EVALUATION-DOMAIN-WRITE` · `OPEN-6F10-SCHEDULER` · `OPEN-6F10-CAUSE-CODE-DEDUP` ·
+  `OPEN-6F10-RELAY-BOOT-WIRING-LOCK` · `OPEN-6F10-STRATEGY-EVENT-CONSUMER`(D-6F10-13 이 신설, 그 표에는 없고
+  종결 문단이 든다 — **두 자리가 어긋나 있다**는 사실도 함께 적는다).
+- **그 여덟에 처분을 적은 뒤 slice 는 없다.** 종결 어휘 근접 술어는 여덟 모두에서 「있음」을 냈지만 그
+  일치는 전부 **6F-10 종결 문단 한 줄**이다(한 줄에 식별자 여덟과 종결 어휘가 함께 있다) — §1 이 적은
+  바로 그 오탐 꼴이다. 그래서 이 문단은 「열려 있다」를 6F-10 의 신설 표와 종결 문단으로만 주장하고,
+  건별 재판정은 §4 후속 ① 의 전수 재고에 그대로 넘긴다.
+
+그러므로 §5 둘째 문단의 「아직 열린 것은 넷」은 **재확인 ④(합성 `toString()` 진단 경로) ·
+`OPEN-6F4W-UNAVAILABLE-PRODUCER`(6F-4W 신설 뒤 처분 기록 없음, 실측) · `OPEN-6F10-*` 여덟**으로 읽는다.

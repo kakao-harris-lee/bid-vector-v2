@@ -43,3 +43,17 @@ in_scope 경로 한정 `git restore --source=79f3e5c4 …` + 새 파일 삭제; 
 
 - in_scope 에 `app/src/main/kotlin/bidvector/app/http/JsonValueReaders.kt` 를 더한다 — 첫 판이 거기에 헬퍼를 넣었다가 `c36a01e1` 에서 base 와 같게 되돌렸다(순 diff 0). `--no-merges --name-only` 합집합 술어가 그 경로를 내므로 계약이 받아 둔다. 거동 영향 0.
 - 「비움 = 빈 칸 + 값 보내기」(전용 버튼 없음)는 D-2 의 「비우기 동작」으로 받는다.
+
+## 계약 갱신 2026-11-05 r2 (팀장 — PR #124 수정 라운드)
+
+- **D-4 문면 정정(팀장 실수)**: D-4 가 조립 계열의 잔여로 든 `OPEN-6F4-TITLE-INGEST` 는 **이미 닫혔다** —
+  6F-8 이 수령·닫음(`reports/evidence/m6/6f8/scope.md` OPEN 표 · D-6F8-2 · milestone-6 「6F-8 종결 2026-09-24 —
+  PR #45」). 그 오류가 `open-inventory.md` §5 로 옮겨 갔고, 정정은 같은 문서의 §6(날짜 붙은 덧붙임)이 한다.
+  `OPEN-6F10-*` 와일드카드도 같은 자리에서 실제 식별자로 바꾼다.
+- in_scope 에 test 두 파일을 **이름으로** 등재한다(v L-2 — 그 전에는 「각 test」로만 읽혔다):
+  `app/src/test/kotlin/bidvector/app/architecture/EditableFieldVocabularyGateTest.kt` ·
+  `web/src/display/editSessionDisplay.test.ts`. 수정 라운드가 더하는 셋도 같은 자리로 받는다:
+  `app/src/test/kotlin/bidvector/app/http/StrategyBudgetClearEndpointTest.kt`(신설, 첫 판) ·
+  `web/src/screens/SettingsScreen.test.tsx`(cr L-5 — 설정 화면의 금액 비우기 한 건).
+- `web/src/screens/SettingsScreen.test.tsx` 는 **웹 화면 표시 레인과 겹칠 수 있는 파일**이다. 이 slice 는
+  test 하나를 더하는 것뿐이고 같은 파일의 다른 줄을 건드리지 않는다.
