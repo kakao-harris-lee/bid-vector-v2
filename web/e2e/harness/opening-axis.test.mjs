@@ -76,6 +76,11 @@ const design = openingAxisDesign(
 );
 const noticeList = JSON.parse(readFileSync(resolve(here, 'fixtures', 'notice-list.json'), 'utf8'));
 
+/** 이 하네스가 가진 fixture 전수 — 아래 모양 검사가 **둘 다** 본다. */
+const FIXTURE_NAMES = ['notice-list.json', 'opening-axis.json'];
+
+const canonicalJson = (text) => `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
+
 describe('ⓐ 설계 집합 == 계약 열거 아홉', () => {
   it('하네스가 낳기로 설계한 상태 집합이 계약 열거와 같다', () => {
     const contract = contractStates();
@@ -173,8 +178,14 @@ describe('ⓓ fixture 둘의 교차 등식', () => {
         `업무 ${notice.division} 를 수집이 부르지 않으면 ${notice.noticeNumber} 는 NOTICE_ABSENT 다`,
       ).toContain(notice.division);
     }
+    // **음성 대조 둘.** 앞 판은 이 자리에 `…Cnstwk02` 를 썼는데 `02` 개편이 그것을 **출하 이름으로
+    // 만들어** 대조가 조용히 공허해졌다(이 라운드에서 실제로 붉어져 잡혔다). 그래서 ⓐ 옛 이름
+    // — 개편 뒤 미등재가 된 현실의 드리프트 — 과 ⓑ 어느 개편에서도 이름이 될 수 없는 값을 함께 둔다.
     expect(() =>
-      noticeCollectionCategories({ items: [{ operation: 'getBidPblancListInfoCnstwk02' }] }),
+      noticeCollectionCategories({ items: [{ operation: 'getBidPblancListInfoCnstwk' }] }),
+    ).toThrow(/등재 밖 오퍼레이션/u);
+    expect(() =>
+      noticeCollectionCategories({ items: [{ operation: 'SYN-NOT-AN-OPERATION' }] }),
     ).toThrow(/등재 밖 오퍼레이션/u);
   });
 
@@ -185,6 +196,58 @@ describe('ⓓ fixture 둘의 교차 등식', () => {
       );
       expect(design.withAxis.some((one) => one.noticeNumber === notice.noticeNumber)).toBe(false);
     }
+  });
+});
+
+describe('ⓔ fixture 의 모양 — 병합 합집합이 접은 본문을 잡는다', () => {
+  /**
+   * **왕복 바이트 등식**이 중복 키를 잡는 기제: 중복 키는 `JSON.parse` 가 **조용히 접고**(뒤가
+   * 이긴다) 재직렬화는 한 벌만 내므로 원본보다 짧아진다. 깊이와 무관하고 들여쓰기를 추측하지
+   * 않는다 — `_provenance` 안쪽이든 어디든 잡는다.
+   *
+   * **배열 중복은 이 등식이 잡지 못한다**(실측으로 갈랐다 — 복제된 항목은 파싱에서 살아남아 왕복이
+   * 통과한다). 그 축은 아래 계수 등식이 지고, 둘은 서로를 대신하지 못한다.
+   *
+   * 비용은 **정규 포맷이 래칫이 되는 것**이다 — 한 줄 객체로 손편집하면 그 자체로 붉다. 저장소
+   * 선례(`api:types:check` 의 바이트 등식)와 같은 꼴이고, 처방을 실패 문면에 담는다.
+   */
+  it('두 fixture 가 정규 JSON 과 바이트 동일하다 — 중복 키가 여기서 멈춘다', () => {
+    for (const name of FIXTURE_NAMES) {
+      const raw = readFileSync(resolve(here, 'fixtures', name), 'utf8');
+
+      expect(
+        canonicalJson(raw),
+        `${name} 이 정규 JSON 과 다르다 — 병합이 중복 키를 접었거나 손편집이 포맷을 벗어났다.\n` +
+          '  다시 쓰기(web 에서): node -e \'const f=process.argv[1],fs=require("fs");' +
+          'fs.writeFileSync(f,JSON.stringify(JSON.parse(fs.readFileSync(f,"utf8")),null,2)+"\\n")\' ' +
+          `e2e/harness/fixtures/${name}`,
+      ).toBe(raw);
+    }
+  });
+
+  it('공고 축 fixture 의 항목 수 == 서로 다른 공고번호 수 — 복제된 항목이 멈춘다', () => {
+    const numbers = noticeList.items.map((item) => item.fields.bidNtceNo);
+
+    expect(numbers.length, '공고 축 fixture 가 비었다').toBeGreaterThan(0);
+    expect(new Set(numbers).size, `같은 공고가 두 항목으로 있다: ${numbers.join(', ')}`).toBe(
+      numbers.length,
+    );
+  });
+
+  it('왕복 등식과 계수 등식이 **서로 다른 변이**를 잡는다(술어 자신의 측정)', () => {
+    const raw = readFileSync(resolve(here, 'fixtures', 'notice-list.json'), 'utf8');
+
+    // ① 키 중복 — 왕복이 잡고 계수는 못 잡는다.
+    const dupKey = raw.replace('  "items": [', '  "_provenance": { "x": 1 },\n  "items": [');
+    expect(canonicalJson(dupKey), '키 중복인데 왕복이 통과했다').not.toBe(dupKey);
+
+    // ② 항목 복제 — 왕복은 통과하고 계수가 잡는다.
+    const duplicated = JSON.parse(raw);
+    duplicated.items.push(duplicated.items[0]);
+    const dupItem = `${JSON.stringify(duplicated, null, 2)}\n`;
+    expect(canonicalJson(dupItem), '배열 중복은 파싱에서 살아남으므로 왕복은 통과해야 한다').toBe(dupItem);
+    const numbers = duplicated.items.map((item) => item.fields.bidNtceNo);
+    expect(new Set(numbers).size, '항목 복제인데 계수가 같다').not.toBe(numbers.length);
   });
 });
 

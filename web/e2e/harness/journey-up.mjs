@@ -33,6 +33,10 @@ import {
   processStartToken,
 } from './container-marker.mjs';
 import {
+  FAKE_KONEPS_IDENTITY_HEADER,
+  FAKE_KONEPS_SERVED_HEADER,
+} from './fake-koneps.mjs';
+import {
   assertRunnerCounts,
   noticeCollectionCategories,
   openingAxisDesign,
@@ -275,12 +279,17 @@ async function main() {
     }),
     'fake-koneps',
   );
+  // 준비 판정은 **오퍼레이션 이름과 무관**하다(M9/portal-02) — 묻는 것이 「서버가 응답하는가」이지
+  // 「그 오퍼레이션이 있는가」가 아니다. 앞 판은 경로를 리터럴로 박고 2xx 를 요구해서, 조달청이
+  // 오퍼레이션명 뒤에 `02` 를 붙인 뒤 이 대기가 영구 404 로 30초 만에 죽었다(수집은 시작도 못 했다).
+  // 404 도 서버가 살아 있다는 증거이므로 상태 코드를 보지 않고, 대신 **fake 가 모든 응답에 싣는
+  // 표지**를 본다 — 그 포트를 다른 프로세스가 잡은 경우를 그것이 가른다.
   await waitFor(
     'fake KONEPS',
     async () => {
       try {
-        const probe = await fetch(`http://127.0.0.1:${konepsPort}/getBidPblancListInfoCnstwk`);
-        return probe.ok;
+        const probe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+        return probe.headers.get(FAKE_KONEPS_IDENTITY_HEADER) !== null;
       } catch {
         return false;
       }
@@ -330,6 +339,26 @@ async function main() {
     ],
     '수집 러너(bidvector.collection.mode=once)',
   );
+
+  // **수집이 실제로 공고를 받았는가**(cr M-1) — 러너의 `exit=0` 은 「0건 수집」과 구별되지 않는다.
+  // 출하 기본 오퍼레이션 이름과 fixture 의 `operation` 값은 **사본 둘**이다. 갈리면 fake 가 전부
+  // 404 를 내고 공고가 0건인데 러너는 조용히 0 으로 끝나, 붉음이 한참 뒤 「공고 카드 없음」으로,
+  // 원인을 말하지 않는 문면으로 나타난다.
+  //
+  // 그 사본 둘은 이제 **로컬 등식**이 묶는다(M9/opening-harness — `opening-axis.test.mjs` 가 출하
+  // 속성 파일의 경로 리터럴과 하네스 표를 집합으로 맞댄다). 이 자리는 그 등식이 보지 못하는 층을
+  // 받는다: 이름이 맞는데도 **fake 가 아예 불리지 않은** 실행(포트·base-url·기동 순서)이 그것이다.
+  const servedProbe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+  const servedOperations = (servedProbe.headers.get(FAKE_KONEPS_SERVED_HEADER) ?? '')
+    .split(',')
+    .filter((name) => name.length > 0);
+  if (servedOperations.length === 0) {
+    throw new Error(
+      'fake KONEPS 가 응답한 오퍼레이션이 없다 — 수집이 0건이다. ' +
+        'fixture 의 operation 값이 출하 기본 표와 갈렸을 가능성이 가장 크다',
+    );
+  }
+  log(`수집이 받은 오퍼레이션 ${servedOperations.length}종(${servedOperations.join(', ')})`);
 
   // ①b 개찰 축 수집 — **업무마다 다른 실행 상태 디렉터리**다. 승격은 아래에서 공사 쪽 하나만
   //     받으므로 용역 공고는 목록 축 원문을 얻고도 canonical 이 서지 않는다(`OBSERVED_NOT_PROMOTED`).

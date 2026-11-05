@@ -20,24 +20,31 @@ export const OPENING_AXIS_OPERATIONS = {
   construction: {
     openingResultListPath: 'getOpengResultListInfoCnstwk',
     reservePriceDetailPath: 'getOpengResultListInfoCnstwkPreparPcDetail',
-    baseAmountPath: 'getBidPblancListInfoCnstwkBsisAmount',
+    baseAmountPath: 'getBidPblancListInfoCnstwkBsisAmount02',
   },
   service: {
     openingResultListPath: 'getOpengResultListInfoServc',
     reservePriceDetailPath: 'getOpengResultListInfoServcPreparPcDetail',
-    baseAmountPath: 'getBidPblancListInfoServcBsisAmount',
+    baseAmountPath: 'getBidPblancListInfoServcBsisAmount02',
   },
   /** 업무 접미가 없는 단일 오퍼레이션 둘(P-1 §1.5) — 두 업무가 같은 경로를 쓴다. */
   shared: {
     openingCompletePath: 'getOpengResultListInfoOpengCompt',
-    bidPriceFormulaAPath: 'getBidPblancListBidPrceCalclAInfo',
+    bidPriceFormulaAPath: 'getBidPblancListBidPrceCalclAInfo02',
   },
 };
 
-/** 공고 목록 축의 오퍼레이션 — 개찰 축 설계가 「같은 업무로 수집됐는가」를 볼 때 쓴다. */
+/**
+ * 공고 목록 축의 오퍼레이션 — 개찰 축 설계가 「같은 업무로 수집됐는가」를 볼 때 쓴다.
+ *
+ * **`02` 는 입찰공고정보서비스 축에만 붙는다**(M9/portal-02 D-1): 공고 목록·기초금액·A값이 그
+ * 서비스이고 개찰결과 목록·예비가격 상세·개찰완료는 낙찰정보서비스라 **불변**이다. 위 표에서 접미가
+ * 붙은 것이 셋뿐인 이유가 그것이고, 두 서비스의 경계는 출하 쪽 `KonepsEndpointDefaultsTest` 가
+ * 집합으로 잠근다.
+ */
 export const NOTICE_LIST_OPERATIONS = {
-  construction: 'getBidPblancListInfoCnstwk',
-  service: 'getBidPblancListInfoServc',
+  construction: 'getBidPblancListInfoCnstwk02',
+  service: 'getBidPblancListInfoServc02',
 };
 
 /**

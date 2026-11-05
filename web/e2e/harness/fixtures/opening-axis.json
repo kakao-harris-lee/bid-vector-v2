@@ -27,7 +27,9 @@
     "why_nine": "`readOpeningResult` 의 상태 **아홉 전수**를 한 실행에서 낳는다(D-7E3a-7 의 후속 `OPEN-7E3A-OPENING-AXIS-HARNESS`). 갈래는 fixture 와의 **관계**로 갈린다 — `notices`(개찰 축 원문이 있다) · `noticeAxisOnly`(공고만 있다) · `uncollected`(어디에도 없다). 그 관계가 곧 갈래이므로 교차 등식 test 가 그것을 잰다.",
     "why_two_divisions": "`OBSERVED_NOT_PROMOTED` 는 「원문은 있고 canonical 은 없다」인데, 그것을 **결정적으로** 세우는 길은 승격 범위(확정 표본) 밖 공고 하나뿐이다. 표본 크기로 범위를 좁히면 **어느 공고가 빠지는지를 표본 seed 가 정해** 설계가 선언할 수 없다. 업무로 가르면 실행 상태 디렉터리가 둘이 되고 승격은 공사 쪽 하나만 받는다 — 용역 공고는 목록 축 원문을 얻지만 승격 범위 밖이다."
   },
-  "promotedDivisions": ["construction"],
+  "promotedDivisions": [
+    "construction"
+  ],
   "axisOffsetDays": {
     "actualOpening": -3,
     "baseAmountOpen": -5,
@@ -51,9 +53,30 @@
     }
   },
   "bidders": [
-    { "rank": 1, "name": "SYN-투찰업체-1", "amountWon": 1100000000, "bidRate": "88.000", "firstDraw": 1, "secondDraw": 2 },
-    { "rank": 2, "name": "SYN-투찰업체-2", "amountWon": 1150000000, "bidRate": "89.000", "firstDraw": 4, "secondDraw": 5 },
-    { "rank": 3, "name": "SYN-투찰업체-3", "amountWon": 1200000000, "bidRate": "90.000", "firstDraw": 6, "secondDraw": 8 }
+    {
+      "rank": 1,
+      "name": "SYN-투찰업체-1",
+      "amountWon": 1100000000,
+      "bidRate": "88.000",
+      "firstDraw": 1,
+      "secondDraw": 2
+    },
+    {
+      "rank": 2,
+      "name": "SYN-투찰업체-2",
+      "amountWon": 1150000000,
+      "bidRate": "89.000",
+      "firstDraw": 4,
+      "secondDraw": 5
+    },
+    {
+      "rank": 3,
+      "name": "SYN-투찰업체-3",
+      "amountWon": 1200000000,
+      "bidRate": "90.000",
+      "firstDraw": 6,
+      "secondDraw": 8
+    }
   ],
   "notices": [
     {

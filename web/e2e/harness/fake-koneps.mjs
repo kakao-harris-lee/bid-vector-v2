@@ -18,14 +18,23 @@ const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'notice-list.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 
-const port = Number.parseInt(process.argv[2] ?? '', 10);
-if (Number.isNaN(port)) {
-  process.stderr.write('fake-koneps: 포트를 인자로 주십시오\n');
-  process.exit(64);
-}
-
 const KST_OFFSET_MINUTES = 9 * 60;
 const MILLIS_PER_DAY = 86_400_000;
+
+/**
+ * 준비 대기의 표지(M9/portal-02) — `journey-up.mjs` 가 **오퍼레이션 이름을 모른 채** 「이 포트를 잡은
+ * 것이 fake 인가」를 가르는 데 쓴다. 이름으로 준비를 재면 조달청이 오퍼레이션명을 바꿀 때마다 그
+ * 대기가 영구 404 로 죽는다 — `02` 개편에서 실제로 그랬다.
+ */
+export const FAKE_KONEPS_IDENTITY_HEADER = 'x-fake-koneps';
+
+/**
+ * **실제로 응답한 오퍼레이션 집합**(cr M-1) — 모든 응답에 실린다. 수집이 「조용히 0건」인 경우를
+ * 여정이 이름 붙은 실패로 만드는 자리다: 앞 라운드의 붉음은 「30000ms 안에 기다리지 못했다」였고
+ * 그것은 수집이 아니라 준비 대기였다 — 원인을 말하지 않는 문면이 오진 비용을 만들었다.
+ * 기본 표만 바뀌어 fixture 와 갈리면 이 집합이 **빈 채로** 남는다.
+ */
+export const FAKE_KONEPS_SERVED_HEADER = 'x-fake-koneps-served';
 
 /** KONEPS 일시 형식 — `"YYYY-MM-DD HH:MM:SS"`(KST, offset 표기 없음 — policy-values §1.4). */
 function konepsDateTime(offsetDays) {
@@ -55,6 +64,8 @@ function itemsFor(operation) {
 }
 
 let requestCount = 0;
+/** 표에 있어 **응답을 낸** 오퍼레이션들 — 404 로 끝난 이름은 들어오지 않는다. */
+const served = new Set();
 
 const server = createServer((request, response) => {
   requestCount += 1;
@@ -64,6 +75,13 @@ const server = createServer((request, response) => {
   // 않고 여기서 한 번 더 푸는 이유는 그 줄이 공고 축 라우팅의 자리이고 이 slice 가 그것을
   // 바꾸지 않기 때문이다(파싱 한 번의 비용은 fake 에서 재지 않는다).
   const openingRoute = openingRoutes.get(operation);
+  // 섬긴 집합에는 **개찰 축도 든다** — 그 표지의 뜻이 「실제로 응답한 오퍼레이션」이기 때문이다.
+  if (known || openingRoute !== undefined) {
+    served.add(operation);
+  }
+  // **모든 응답**에 싣는다(404 에도) — 준비 대기가 보는 표지라서 모르는 이름의 응답에도 있어야 한다.
+  response.setHeader(FAKE_KONEPS_IDENTITY_HEADER, 'journey');
+  response.setHeader(FAKE_KONEPS_SERVED_HEADER, [...served].sort().join(','));
   if (!known && openingRoute === undefined) {
     response.writeHead(404).end();
     return;
@@ -85,14 +103,23 @@ const server = createServer((request, response) => {
   response.end(body);
 });
 
-server.listen(port, '127.0.0.1', () => {
-  process.stdout.write(`fake-koneps: 127.0.0.1:${port} 에서 공고 ${fixture.items.length}건 준비\n`);
-});
-
 function shutdown() {
   process.stdout.write(`fake-koneps: 요청 ${requestCount}건 받고 종료\n`);
   server.close(() => process.exit(0));
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// **직접 실행일 때만 듣는다**(M9/portal-02) — `journey-up.mjs` 가 [FAKE_KONEPS_IDENTITY_HEADER] 하나를
+// import 하려면 이 모듈을 불러도 포트를 요구하거나 서버를 띄우지 않아야 한다. 표지 이름을 양쪽에
+// 베껴 적으면 한쪽만 바뀌는 날 준비 대기가 영구 404 로 죽는다 — 이 slice 가 고친 결함과 같은 부류다.
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const port = Number.parseInt(process.argv[2] ?? '', 10);
+  if (Number.isNaN(port)) {
+    process.stderr.write('fake-koneps: 포트를 인자로 주십시오\n');
+    process.exit(64);
+  }
+  server.listen(port, '127.0.0.1', () => {
+    process.stdout.write(`fake-koneps: 127.0.0.1:${port} 에서 공고 ${fixture.items.length}건 준비\n`);
+  });
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+}

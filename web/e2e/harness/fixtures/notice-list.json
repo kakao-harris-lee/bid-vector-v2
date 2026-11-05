@@ -38,7 +38,7 @@
   },
   "items": [
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": 2,
       "openingOffsetDays": 3,
       "fields": {
@@ -57,7 +57,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": 4,
       "openingOffsetDays": 5,
       "fields": {
@@ -75,7 +75,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": 6,
       "openingOffsetDays": 7,
       "fields": {
@@ -94,7 +94,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": 8,
       "openingOffsetDays": 9,
       "fields": {
@@ -113,7 +113,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -132,7 +132,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -151,7 +151,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -170,7 +170,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -189,7 +189,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -208,7 +208,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": 5,
       "openingOffsetDays": 6,
       "fields": {
@@ -227,7 +227,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoCnstwk",
+      "operation": "getBidPblancListInfoCnstwk02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
@@ -246,7 +246,7 @@
       }
     },
     {
-      "operation": "getBidPblancListInfoServc",
+      "operation": "getBidPblancListInfoServc02",
       "deadlineOffsetDays": -4,
       "openingOffsetDays": -3,
       "fields": {
