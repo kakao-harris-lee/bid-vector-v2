@@ -25,6 +25,12 @@ internal class MockAwardKonepsHttp(
     private val winnerName: String,
     /** 0 이면 한 쪽에 전부 — 양수면 그 수로 쪽을 나눈다(여러 쪽 걷기를 만드는 자리). */
     private val pageSize: Int = 0,
+    /**
+     * 2쪽 이후를 이 `resultCode` 로 거절한다(`null` 이면 전부 정상) — 잘린 슬롯을 만드는 자리다.
+     * **비재시도 코드를 쓴다**(`30`): 5xx·429 는 재시도 대상이라 백오프 1+5+15초를 태우고 나서야
+     * 절단이 되므로 E2E 가 느려지고 흔들린다. 거부는 즉시 절단으로 온다.
+     */
+    private val rejectAfterFirstPageWith: String? = null,
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     private val received = AtomicInteger()
@@ -60,7 +66,10 @@ internal class MockAwardKonepsHttp(
         listCalls += operation
         val page = paramOf(query, "pageNo")?.toIntOrNull() ?: 1
         val all = (1..noticesPerSlot).map { index -> awardRow(operation, index) }
-        val bytes = envelope(pageOf(all, page), all.size, page).toByteArray(StandardCharsets.UTF_8)
+        val rejection = rejectAfterFirstPageWith?.takeIf { page > 1 }
+        val bytes =
+            (rejection?.let(::rejectedEnvelope) ?: envelope(pageOf(all, page), all.size, page))
+                .toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(HTTP_OK, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
@@ -103,6 +112,10 @@ internal class MockAwardKonepsHttp(
         val body = "\"items\":$itemsJson,\"numOfRows\":$rows,\"pageNo\":$page,\"totalCount\":$totalCount"
         return """{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{$body}}}"""
     }
+
+    /** 게이트웨이가 거절한 응답 — 항목 없이 코드만 온다(HTTP 200 + 비정상 `resultCode`). */
+    private fun rejectedEnvelope(code: String): String =
+        """{"response":{"header":{"resultCode":"$code","resultMsg":"SERVICE ERROR"},"body":{}}}"""
 
     private fun objectJson(fields: Map<String, String>): String =
         fields.entries.joinToString(",", "{", "}") { (key, value) -> "\"$key\":\"$value\"" }

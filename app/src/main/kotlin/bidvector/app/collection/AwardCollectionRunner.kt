@@ -75,6 +75,19 @@ internal fun awardFinishLine(
     "award-collection finished slots=${report.slots} received=${report.received} stored=${report.stored} " +
         "truncatedSlots=${report.truncatedSlots} halted=${report.halted != null} exit=${exitCode.value}"
 
-/** 멈춤은 미완이다 — 예산이든 쿼터든 창 전체를 걷지 못했다(다음 실행이 그 조각을 다시 걷는다). */
+/**
+ * **절단도 미완이다**(cr H-1) — 멈춤(예산·쿼터)뿐 아니라 **잘린 슬롯이 하나라도 있으면** 미완으로
+ * 끝낸다. 형제 공고 목록 갈래(`exitCodeOf`)와 같은 술어이고, 개찰결과 갈래가 절단을 무시하는 선례를
+ * 물려받지 않는다: 그 갈래에는 확정 표본 원장이 있어 끝나지 않은 축을 다음 실행이 받지만, 이 갈래에는
+ * **슬롯 단위 이어 돌기가 없다**. 종료 코드 0 이 나가면 runbook 의 「0 = 다음 조각」이 운영자를 넘기고
+ * 그 개찰일의 낙찰 원문은 사람이 그 조각을 다시 지목하지 않으면 영영 들어오지 않는다 — 결측이 조용해진다.
+ *
+ * 절단과 멈춤에 **같은 코드**를 쓰는 이유: 운영자의 다음 행동이 같다(그 조각을 다시 돌린다). 갈리는 것은
+ * 「언제」뿐이고 그 사유는 halted 줄과 `truncatedSlots` 계수가 로그에서 말한다(runbook §3 이 둘을 가른다).
+ */
 internal fun awardExitCodeOf(report: AwardCollectionReport): CollectionExitCode =
-    if (report.halted == null) CollectionExitCode.COMPLETE else CollectionExitCode.INCOMPLETE
+    if (report.halted == null && report.truncatedSlots == 0) {
+        CollectionExitCode.COMPLETE
+    } else {
+        CollectionExitCode.INCOMPLETE
+    }

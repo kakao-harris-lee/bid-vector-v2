@@ -234,9 +234,17 @@ internal class AwardCollectionE2EHarness {
         extra: Map<String, String> = emptyMap(),
         noticesPerSlot: Int = AWARD_NOTICES_PER_SLOT,
         pageSize: Int = 0,
+        rejectAfterFirstPageWith: String? = null,
     ): Pair<List<Int>, MockAwardKonepsHttp> =
         captured {
-            val started = MockAwardKonepsHttp(noticesPerSlot, nonce, AWARD_WINNER_NAME, pageSize)
+            val started =
+                MockAwardKonepsHttp(
+                    noticesPerSlot,
+                    nonce,
+                    AWARD_WINNER_NAME,
+                    pageSize,
+                    rejectAfterFirstPageWith,
+                )
             try {
                 boot(awardProperties(started) + extra) to started
             } finally {
