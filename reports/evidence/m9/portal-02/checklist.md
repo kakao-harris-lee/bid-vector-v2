@@ -1,6 +1,8 @@
 # M9 / portal-02 — 점검표
 
-- base: main `79f3e5c4` · 브랜치 `feature/m9-portal-02` · 마지막 산출물 커밋 `a49738d3`
+- base: main `79f3e5c4` · 브랜치 `feature/m9-portal-02` · **마지막 산출물 자리 `7f51bdc0`**(main 병합)
+- 병합한 main: **`319fe212`**(PR #124 머지) — 팀장 지시는 `4953d743` 이었으나 `fetch` 와 `merge` 사이에
+  공유 ref 가 움직였다. 아래 「ref 가 움직였다」 항.
 - 성격: **이름 전환 + mock 라우팅 구조 교체.** 실 조달청 호출 0 · DB 쓰기 0 · 운영 반영 0 · push/PR 0.
 - 계약: 같은 디렉터리의 `scope.md`(D-1~D-5).
 
@@ -22,6 +24,7 @@
 | ① 기본 경로 하나를 옛 이름으로(`…Cnstwk02` → `…Cnstwk`) | RED | 2/5 붉음 — 열거와 경계 양쪽이 잡았다 |
 | ② mock 을 접두 라우팅으로 되돌림(정확 일치 → 접두 일치) | RED | 2/7 붉음 — 기초금액이 공고 목록 축으로 갔고 **E2E 「표본에 뽑힌 공고만 상세를 부른다」도 함께** 붉다 |
 | ③ web fixture 하나를 옛 이름으로 | 404 | 출하 기본 경로 요청이 **404** — W-13 이 붉어지는 기구를 그 자리에서 쟀다(여정 전건은 CI W-13 이 든다, 팀장 결정) |
+| ④ 준비 대기 표지를 안 싣는 서버를 그 포트에 | 준비 판정 false | 표지 없는 남의 `200` → **false**. 준비 술어가 「응답이 왔다」로 느슨해져도 **포트 오점유를 가른다**는 음성 대조다 |
 
 변이 둘 다 **바꿔치우기**다 — 술어를 더한 것이 아니라 그 자리의 술어를 갈았다.
 
@@ -66,22 +69,38 @@
 
 ## PR CI (전건 acceptance 정본)
 
-| job | 명령 | 결과 |
+| 라운드 | HEAD | 결과 |
 | --- | --- | --- |
-| `check` | `./gradlew --no-daemon check` + `tools/one-command-check.sh`(S-20) | PR 열고 기록 |
-| `web` | `npm run test:e2e` · `npm run test:e2e:journey`(W-13) | PR 열고 기록 |
+| 1 (run 42025625713) | `bea3a225` | `container`·`ml-engine` **pass** · `web` **fail**(step 20 W-13 — 준비 대기가 영구 404 로 30초 타임아웃) · `check` 중단 |
+| 2 | `7f51bdc0` | push 뒤 기록 |
 
 로컬에서 web 전건(`npm ci` → playwright → docker 여정)을 반복하지 않는다(팀장 결정 2026-11-05, 호스트
 빌드 큐 포화). 이 레인이 로컬에서 잰 것은 **fake KONEPS 라우팅 한 자리**이고(`commands.md` 「web fake
 KONEPS 라우팅 실측」) 여정 전건은 CI 가 든다. `web/` 에 `node_modules` 가 없어 eslint 는 돌리지 않았다 —
 바꾼 것이 JSON 데이터 값 넷이라 eslint 가 보는 축이 아니고, `python3 -c json.load` 로 파싱만 확인했다.
 
+## ref 가 움직였다 (이 라운드의 사실)
+
+`git fetch origin` 직후 `origin/main` 은 `4953d743` 이었고 팀장 지시도 그 SHA 였다. 그런데
+`git merge origin/main` 이 병합한 둘째 부모는 **`319fe212`**(PR #124 머지)다 — 공유 저장소의 ref 가
+그 사이에 움직였다. **귀결 둘**:
+
+1. **rollback 복원 원천을 `319fe212` 로 바꿨다.** `4953d743` 을 쓰면 #124 의 줄까지 지운다 — 「성공하면서
+   뜻을 잃는 명령」이라 종료 코드로는 안 보인다.
+2. **복원 목록 산출에 `^319fe212` 가 필요하다.** 병합 뒤에는 `79f3e5c4..HEAD` 범위 diff 가 내 경로를
+   내지 못한다. 그 제외를 빼먹은 첫 산출에서 **남의 slice 경로 열아홉**(`m9/budget-clear` 등)이 내 목록에
+   섞여 나왔고, 커밋 목록을 눈으로 보고 잡았다. 이 사실을 남겨 둔다 — 등식이 비지 않은 것이 신호였다.
+
 ## in_scope 대조
 
 `git log --no-merges --format= --name-only 79f3e5c4..HEAD | sort -u` 의 경로가 전부 in_scope 안이다
 (기본값 둘 · `app` test 둘 디렉터리 · `adapters` koneps test · `config/quality` · runbook ·
-capability map · **web 여정 fixture**(계약 갱신분) · 이 evidence 디렉터리). in_scope 에 있으나 손대지
-않은 것은 위 7항 둘과 `web/e2e/harness/fake-koneps.mjs`(계약이 「필요하면」으로 두었고 필요하지 않았다).
+capability map · **web 여정 하네스 셋**(계약 갱신 1·2차) · 이 evidence 디렉터리). 산출은 **`^319fe212`
+를 더한** `git log --no-merges --format= --name-only 79f3e5c4..HEAD ^319fe212 | sort -u` 로 낸다.
+in_scope 에 있으나 손대지 않은 것은 위 7항 둘.
+
+**`fake-koneps.mjs` 는 결국 편집했다** — 계약 1차의 「필요하면」이 2차에서 발동했다. 준비 대기가 쓸
+표지를 내보내고, 그 이름을 양쪽에 베끼지 않으려 모듈을 **import 안전**하게 했다(직접 실행일 때만 듣는다).
 
 **이 slice 가 만든 새 파일 다섯 ↔ in_scope**: `MockKonepsRoutes.kt`·`SyntheticBidder.kt`·
 `MockKonepsEnvelope.kt`·`MockKonepsRoutingTest.kt`(`app/src/test/.../collection/`) ·

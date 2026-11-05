@@ -82,3 +82,33 @@ base `79f3e5c4` · 브랜치 `feature/m9-portal-02` · worktree `bid-vector-v2-m
 - cmd: `git restore --source=79f3e5c4 --staged --worktree -- <in_scope 경로 개별 인자, web fixture 포함>`
 - exit: 0
 - 핵심 결과: D 5 · M 10 · 되돌린 트리의 `git diff 79f3e5c4 -- app adapters config docs web` 빈 출력(= base 와 바이트 동일) · 내 표지 0 · base 의 web fixture 옛 이름 4 복원.
+
+## 2026-11-05T13:05Z — PR CI 라운드 1 (run 42025625713, HEAD `bea3a225`)
+- cmd: `gh pr checks 130` · `gh api .../actions/jobs/127238986505`
+- exit: 1 (`web` fail · `container`·`ml-engine` pass · `check` 중단)
+- 핵심 결과: W-1~W-12 초록, **step 20 「여정 e2e (W-13)」 하나가 붉다** — 로그가 「fake KONEPS 를 30000ms 안에 기다리지 못했다」와 「요청 75건 받고 종료」다. 수집이 아니라 **준비 대기**가 영구 404 로 죽었다(이름 사본 셋째).
+
+## 2026-11-05T14:10+09:00 — 준비 대기 교체 실측 (node, docker·playwright 없이)
+- cmd: fake 단독 기동 뒤 `curl -D -` 로 루트·출하 기본 경로·옛 이름 / `node -e` 로 probe 식 그대로
+- exit: 0
+- 핵심 결과: 루트 `404` + 표지 `x-fake-koneps` → **준비 판정 true** · 출하 기본 경로 `200` · 옛 이름 `404`(표지 있음). **음성 대조**: 표지 없는 남의 서버 `200` → 준비 판정 **false**(포트 오점유를 가른다). `import` 안전 확인도 같은 자리.
+
+## 2026-11-05T14:25+09:00 — main 병합 — **움직이는 ref 가 물었다**
+- cmd: `git fetch origin` → `git log -1 origin/main`(= `4953d743`) → `git merge --no-edit origin/main`
+- exit: 0 (충돌 0)
+- 핵심 결과: 병합된 둘째 부모가 **`319fe212`**(PR #124 머지)다 — fetch 와 merge 사이에 공유 ref `origin/main` 이 `4953d743` → `319fe212` 로 움직였다. 그래서 **rollback 복원 원천은 `4953d743` 이 아니라 실제로 병합한 `319fe212`** 다. 내 표지 계수·줄 수는 병합 전후 동일(probe 2 · setHeader 1 · fixture 4 · 449/91 줄).
+
+## 2026-11-05T14:40+09:00 — 겹침 계수 (합집합 함정)
+- cmd: `comm -12 <내 비-병합 커밋 경로(^319fe212)> <main 이 만진 경로>`
+- exit: 0
+- 핵심 결과: 겹치는 공유 파일 **둘** — `config/quality/gate-tests.properties` · `docs/discovery/capability-map.md`. 내 세 web 하네스 파일을 main 이 만진 커밋은 **0** 이다.
+
+## 2026-11-05T14:50+09:00 — rollback 재산출 (실측 HEAD `7f51bdc0`, 원천 `319fe212`)
+- cmd: `git restore --source=319fe212 --staged --worktree -- <in_scope 경로 개별 인자>`
+- exit: 0
+- 핵심 결과: D 5 · M 12 · 결과 트리가 `319fe212` 와 **바이트 동일**(`git diff 319fe212 -- app adapters config docs web` 빈 출력). **내 표지 0**(기본값·라우팅 표·게이트 등재·OPEN 행·fixture·표지 전부) · **남의 표지 보존**(#124 게이트 등재 1 · #124 OPEN 행 2 · #125 `web/e2e/journey/shared.ts` 있음 · 옛 probe 이름 1 복원).
+
+## 2026-11-05T15:00+09:00 — evidence 점검 (라운드 2)
+- cmd: 참조형 누출 스캔 `grep -rniE -f config/quality/leak-patterns.txt` · 내 비-병합 커밋의 `git show --numstat`
+- exit: 0
+- 핵심 결과: evidence **0건**. 편집한 web 하네스 둘 중 `journey-up.mjs` 는 13건이지만 **병합한 main 쪽도 같은 13건**이라 내가 들인 줄이 아니다(`fake-koneps.mjs` 는 양쪽 0). 크기 게이트: evidence 409줄 대 산출물 866줄.
