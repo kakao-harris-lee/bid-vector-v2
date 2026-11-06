@@ -59,7 +59,16 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 각 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T01:57Z — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T03:5xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③, 라운드 3 재측정)
+- cmd: 라운드 2 와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`)
+- exit: 0
+- 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
+  0 줄 · **evidence 를 뺀 전수 diff 빈 목록** · 내 표지 0(gate-tests 의 내 test 클래스 다섯 합 0 ·
+  incident runbook 의 `award-collection` 0 · capability map 의 `award-ingest` 0 · award 파일 전부 삭제) ·
+  남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
+  되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
+
+## 2026-11-06T04:0xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -156,6 +165,51 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 - cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:ktlintKotlinScriptCheck --rerun :workflow:detekt --rerun`
 - exit: 0
 - 핵심 결과: 네 task 모두 **실행**되고 위반 0
+
+## 수정 라운드 3 (cr r3 H-1 · M-1·M-2·M-3 · L 넷 · v r3 M-1·L-1·L-2)
+
+이 라운드는 **새 파일을 만들지 않았다** — 복원 목록은 22 경로 그대로다(라운드 2 가 들인 공유 incident
+runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」으로 적은 셈은 어긋났다(목록에 선 것은
+둘이고 셋째는 §1 「쪽 걷기(wire)」 행의 문면으로 갔다 — cr r3 L-2). 이력은 되쓰지 않고 여기 한 줄로
+정정한다. workflow lint 는 이 라운드에서도 **강제 실행**으로 돌렸다(위 측정 주의와 같은 자리).
+
+## 2026-11-06T03:37Z — 변이 A: 총수 최댓값을 구판(마지막 배치 총수)으로 되돌림
+- cmd: `tally.toSourceAccounting().copy(sourceTotal = claimedTotal)` → `tally.toSourceAccounting()` 로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 8 중 1 실패이고 그 하나가 「쪽 상한 재개 뒤 총수를 말하지 않는 배치가 와도 앞
+  배치의 총수를 잃지 않는다」다. 나머지 7(짧은 걷기·빈 응답·예산·쿼터·커서·회계 축)은 구판에서도 초록 —
+  이 단언이 **총수 덮어쓰기 축만** 잡는다.
+
+## 2026-11-06T03:38Z — 변이 B: 적재 결측 계수를 구판(싣지 않음)으로 되돌림
+- cmd: 보고 생성의 `duplicates, dropped` → `0, 0` 으로 바꿔치운 뒤 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 8 중 1 실패이고 그 하나가 「받았지만 적재되지 않은 항목은 계수로 서고 미완으로
+  세지 않는다」다. 나머지 7 초록(계수를 0 으로 눌러도 종료 코드 축은 움직이지 않는다 — 그 분리가
+  팀장 결정의 실물이다). 원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T03:4xZ — 수정 라운드 3 표적 실행 ①(workflow lint 강제 · 닿은 게이트 포함)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:detekt --rerun :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt` + 세 모듈 표적 test `--rerun` + `gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 1
+- 핵심 결과: FAILED task **하나** — `:workflow:ktlintTestSourceSetCheck`(`standard:chain-method-continuation`
+  둘, 새 회계 단언의 한 줄 사슬). test·게이트는 전부 초록(게이트 22 task). **강제 실행이 실제로 숨어
+  있던 위반을 잡았다** — 그 모듈의 UP-TO-DATE 가 거짓 초록이라는 두 라운드의 기록이 값을 냈다.
+  구조 분해로 사슬을 끊어 고쳤다(별도 `style` 커밋, 거동 변화 0).
+
+## 2026-11-06T03:54Z — 표적 실행 ②(lint 수정이 닿는 workflow task 강제 재실행)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:detekt --rerun :workflow:test --tests 'bidvector.workflow.collection.*' --rerun`
+- exit: 0
+- 핵심 결과: 네 task 모두 **실행**되고 위반 0 · use case test class 8/0
+
+## 2026-11-06T04:0xZ — 표적 실행 ③(판정 트리에서 adapters·app lint·test 와 게이트 넷)
+- cmd: `./gradlew --no-daemon --continue :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt :adapters:test --tests 'bidvector.adapters.koneps.*' --rerun :app:test --tests 'bidvector.app.collection.*' --tests 'bidvector.app.wiring.*' --tests 'bidvector.app.architecture.*' --rerun gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — `:adapters:test`·`:app:test` 실행(102 · 388, 실패 0) · 게이트 22 task 실행 ·
+  adapters·app lint 은 UP-TO-DATE(실행 ① 에서 **같은 소스로 실행돼** 초록이었고 `style` 커밋이 그 두
+  모듈을 만지지 않았다)
+- 왜 한 번 더 돌렸는가: 실행 ① 은 `style` 커밋 **앞** 트리의 측정이다. 그 커밋이 workflow test 소스
+  2 줄을 바꿨으므로 「입력이 같으니 앞 결과가 덮는다」로 갈음하지 않고 판정 트리에서 다시 쟀다. 크기 축의
+  여유는 함께 실측했다(그 파일 380 줄 / 한도 500 · 가장 긴 함수 43 줄 / 한도 50 · 타입 멤버 축은 `main`
+  전용이라 test 파일을 재지 않는다).
 
 ## acceptance — 전건 `check`
 
