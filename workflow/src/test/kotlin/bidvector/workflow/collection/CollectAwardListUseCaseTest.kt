@@ -260,19 +260,35 @@ class CollectAwardListUseCaseTest {
      * 거절이 오므로 창을 더 걷는 의미가 없다. 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
      * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
      *
-     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc). 모수를 sealed
-     * 계층에서 도출하므로 그 사유는 **자동으로** 이 순회에 들어오고, 기대 집합에 더하지 않으면 이 등식이
-     * 붉어진다 — 컴파일이 `haltOf` 를 가리키고 이 등식이 그 **선택**을 가리킨다.
+     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc).
+     *
+     * **집합이 아니라 사유마다의 결정을 맞춘다**(실측으로 고친 자리) — 「멈춤 집합의 등식」만 두면 새 사유를
+     * **계속 걷기** 쪽에 넣은 판이 초록이다(그 사유가 멈춤 집합에 안 들어오므로 등식이 그대로 성립한다).
+     * 그런데 그 방향이 바로 위험한 방향이다(403 이 조용히 계속 걷는다). 그래서 기대값을 **사유 → 멈추는가**
+     * 의 전수 표로 두고 모수를 sealed 계층에서 도출한다: 새 사유는 키가 하나 늘어 **어느 쪽에 넣어도**
+     * 붉어진다.
      */
     @Test
-    fun `멈추는 절단 사유는 예산과 쿼터 둘뿐이다 — 사유 전수의 등식`() {
-        val halting = ALL_TRUNCATION_CAUSES.filter { cause -> haltedBy(cause) }.toSet()
+    fun `사유마다 멈추는지가 전수 표로 고정된다`() {
+        val decision = ALL_TRUNCATION_CAUSES.associateWith { cause -> haltedBy(cause) }
 
-        halting shouldBe
-            setOf(
-                TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
-                TruncationCause.BudgetExhausted(BudgetLimit.TOTAL),
-                TruncationCause.QuotaExhausted,
+        decision shouldBe
+            mapOf(
+                // 멈춤 — 승인 범위·계정 한도를 다 썼다(더 불러도 같은 거절이 온다).
+                TruncationCause.BudgetExhausted(BudgetLimit.DAILY) to true,
+                TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) to true,
+                TruncationCause.QuotaExhausted to true,
+                // 그 슬롯만 접고 다음 슬롯으로 — 한 날의 실패로 창 전체를 버리지 않는다.
+                TruncationCause.MaxPages to false,
+                TruncationCause.RepeatedPage to false,
+                TruncationCause.Timeout to false,
+                TruncationCause.TransportFailure to false,
+                TruncationCause.ServerError to false,
+                TruncationCause.NotRetryable to false,
+                TruncationCause.InputError to false,
+                TruncationCause.Unclassified to false,
+                TruncationCause.StructureFailure to false,
+                TruncationCause.SelfThrottled to false,
             )
     }
 
