@@ -39,8 +39,18 @@
 이 표가 생긴 이유: 앞 판은 **version 문자열이 내용에 묶여 있지 않았다**. 임계만 완화한 사본을
 같은 `evaluation-v1` 이름으로 로드하면(코드가 써도, `ML_ENGINE_EVALUATION_POLICY` 로 가리켜도)
 모든 게이트가 초록이었다 — verifier 실측(M9/ml-lifecycle 수정 라운드 2, v H-2). 지문은
-`ml_engine.registry.policy_approvals` 의 코드 상수 등록부와 같은 값이고, 뿌리 로더가 「등록된
-version 인데 내용이 다른 파일」을 거부한다.
+`ml_engine.registry.policy_approvals` 의 코드 상수 등록부와 같은 값이다.
+
+**어느 층이 무엇을 막는가**(cr r3 M-2 정정 — 앞 판은 이 거부를 **뿌리 로더**에 귀속했는데
+그 검사는 같은 라운드에 옮겨졌다):
+- **조립 근**(`app.server._preload` → `evaluation.policy_source.load_approved_evaluation_policy`)
+  이 미승인 산출물을 거부한다 — 이름을 유지한 편집 사본과 이름을 바꿔 단 사본 **둘 다**.
+- **게이트 자리**(`evaluation.policy_source.verify_policy_source`, `app.pipeline._run_holdout`
+  가 부른다)가 **다시** 묻는다 — 부팅 뒤에 정책 객체를 바꿔 끼우는 길이 있기 때문이다
+  (수정 라운드 3, v H-3a).
+- **CI** 가 출하 파일 자체를 고치는 길을 막는다 — 아래 지문 등식 test.
+- 뿌리 로더(`registry.policy.load_policy`)는 승인을 **묻지 않는다**(사유는 그 모듈 docstring —
+  승인 밖 조합으로 로더를 검사하는 값 불변식 test 들이 재던 것을 잃는다).
 
 **이 version 의 값을 바꾸려면 세 자리를 같은 커밋에서 바꿔야 한다** — ⑴ §1 표(이 문서)
 ⑵ `ml-engine/policy/evaluation-v1.yaml` ⑶ 등록부 한 줄. 어긋나면 test 가 붉다

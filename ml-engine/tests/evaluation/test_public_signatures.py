@@ -6,8 +6,12 @@ public 함수(`__all__`에 등재된 callable)를 `inspect`로 전수해, 임계
 from __future__ import annotations
 
 import inspect
+import sys
 
 import ml_engine.evaluation as evaluation_module
+import ml_engine.evaluation.policy as evaluation_policy_module
+import ml_engine.evaluation.policy_source as policy_source_module
+import ml_engine.inference.policy as inference_policy_module
 from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
 
 _POLICY_ALIASES = frozenset({"threshold", "seeds", "stratum"})
@@ -39,11 +43,6 @@ _POLICY_UNAWARE_UTILITIES = frozenset(
     }
 )
 
-_NON_POLICY_PARAMETER_NAMES = frozenset({"version"})
-"""정책 키와 **이름이 같지만** 임계가 아닌 인자 — `version` 은 정책 키이면서 식별자이고,
-`policy_epoch`·`policy_checksum` 류가 그것을 낱개로 받는 일은 없지만 모집단을 생성으로
-바꾸면 이름이 겹칠 수 있는 자리라 **명시 허용**으로 둔다(열거가 아니라 예외 선언)."""
-
 
 def _public_callables() -> list[tuple[str, object]]:
     return [
@@ -72,8 +71,6 @@ def test_no_evaluation_public_function_takes_bare_threshold_or_seed_parameters()
             continue
         signature = inspect.signature(func)
         for parameter_name in signature.parameters:
-            if parameter_name in _NON_POLICY_PARAMETER_NAMES:
-                continue
             if parameter_name in _FORBIDDEN_PARAMETER_NAMES:
                 violations.append(f"{name}({parameter_name})")
     assert not violations, (
@@ -97,10 +94,7 @@ def test_policy_unaware_utilities_allowlist_has_no_stale_entries() -> None:
     names_with_forbidden_params = set()
     for name, func in _public_callables():
         signature = inspect.signature(func)
-        if any(
-            p in _FORBIDDEN_PARAMETER_NAMES and p not in _NON_POLICY_PARAMETER_NAMES
-            for p in signature.parameters
-        ):
+        if any(p in _FORBIDDEN_PARAMETER_NAMES for p in signature.parameters):
             names_with_forbidden_params.add(name)
     stale = _POLICY_UNAWARE_UTILITIES - names_with_forbidden_params
     assert not stale, f"허용 목록에 더 이상 해당하지 않는 항목이 있다: {stale}"
@@ -119,3 +113,57 @@ def test_forbidden_parameter_names_track_the_policy_schema() -> None:
     assert frozenset(_INDEXED_LIST_PREFIXES) <= _FORBIDDEN_PARAMETER_NAMES
     assert "effective_date" in _FORBIDDEN_PARAMETER_NAMES
     assert _POLICY_ALIASES <= _FORBIDDEN_PARAMETER_NAMES
+
+
+# ── cr r3 M-4 — **정책을 파일에서 만드는 자리 전수**의 시그니처 ────────────────
+# 위 전수의 모집단은 `evaluation.__all__` 이다. 이 slice 가 만든 조립 근 로더 둘은 그
+# 목록에 없어서(제품 경로의 유일한 입구인데도) 그 전수가 보지 못했다 — `load_approved_
+# evaluation_policy(path, *, require_approval: bool = True)` 를 더하는 길이 모든 게이트를
+# 지나갔다. 이 slice 가 ④ 축에 적용한 규율(「새 public 표면 전수를 센다」)이 자기가 만든
+# 표면에는 걸리지 않은 자리다.
+#
+# 모집단을 **열거가 아니라 구조로** 만든다: 정책 모듈 안에서 「정책류를 돌려주고 `path` 를
+# 받는」 함수 전수. 그 전수가 아래 집합과 **같다**는 등식도 함께 걸어, 새 입구가 생기면
+# 이름이 달라도 이 자리에서 드러난다.
+
+_POLICY_FILE_ENTRY_POINTS = frozenset(
+    {
+        ("ml_engine.evaluation.policy", "load_evaluation_policy"),
+        ("ml_engine.evaluation.policy_source", "load_approved_evaluation_policy"),
+        ("ml_engine.inference.policy", "load_inference_policy"),
+        ("ml_engine.inference.policy", "load_approved_inference_policy"),
+        # 모듈 private 공용 읽기 — 위 추론 로더 둘이 **한 번 읽기**를 공유하는 자리다
+        # (승인 대조와 값 조립이 같은 바이트를 본다). private 도 모집단에 넣는다: 여기에
+        # 추가 매개변수가 생기면 public 래퍼의 시그니처는 그대로여도 주입 자리가 열린다.
+        ("ml_engine.inference.policy", "_read_policy_file"),
+    }
+)
+"""정책을 **파일에서** 만드는 자리 전수. 전부 `path` 하나만 받아야 한다 — 그것이
+「임계를 낱개 인자로 받는 public 함수는 없다」(설계 검토 (1) 첫 행)의 기계적 표현이다."""
+
+
+def _policy_file_entry_points() -> set[tuple[str, str]]:
+    modules = (evaluation_policy_module, policy_source_module, inference_policy_module)
+    found: set[tuple[str, str]] = set()
+    for module in modules:
+        for name, obj in vars(module).items():
+            if not inspect.isfunction(obj) or obj.__module__ != module.__name__:
+                continue
+            signature = inspect.signature(obj)
+            returns_policy = "Policy" in str(signature.return_annotation)
+            if returns_policy and "path" in signature.parameters:
+                found.add((module.__name__, name))
+    return found
+
+
+def test_policy_file_entry_points_are_exactly_the_known_set() -> None:
+    assert _policy_file_entry_points() == _POLICY_FILE_ENTRY_POINTS
+
+
+def test_every_policy_file_entry_point_takes_only_a_path() -> None:
+    """ML-07 acceptance ④ — CLI·env 로 값을 주입하는 추가 매개변수가 없다. 승인 요구 로더
+    둘에도 같은 단언이 걸린다(앞 판은 `load_evaluation_policy` 에만 있었다)."""
+    for module_name, name in sorted(_POLICY_FILE_ENTRY_POINTS):
+        module = sys.modules[module_name]
+        signature = inspect.signature(getattr(module, name))
+        assert list(signature.parameters) == ["path"], (module_name, name)

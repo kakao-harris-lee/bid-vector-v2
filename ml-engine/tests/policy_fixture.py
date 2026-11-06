@@ -9,12 +9,15 @@ production 과 같은 길로 정책을 얻는다 — 임시 YAML 을 쓰고 `loa
 칸이 늘면 이 파일의 표 하나만 고친다.
 
 **임시 파일은 세션 내내 남는다**(`mkdtemp`) — `run_holdout` 이 실행 중 그 파일을 다시 읽기
-때문에 `tmp_path`(함수 스코프)로는 모자란다.
+때문에 `tmp_path`(함수 스코프)로는 모자란다. **세션이 끝나면 `atexit` 가 지운다**(cr r3 L-3 —
+앞 판은 지우는 자리가 없어 pytest 세션마다 디렉터리가 남았다).
 """
 
 from __future__ import annotations
 
+import atexit
 import hashlib
+import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -56,6 +59,7 @@ _INDEXED_KEYS: Final[tuple[str, ...]] = (
 )
 
 _DIRECTORY: Final[Path] = Path(tempfile.mkdtemp(prefix="ml-engine-test-policy-"))
+atexit.register(shutil.rmtree, _DIRECTORY, True)
 
 
 def _yaml_scalar(value: object) -> str:

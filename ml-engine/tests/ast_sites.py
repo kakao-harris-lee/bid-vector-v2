@@ -35,7 +35,12 @@ def src_trees(root: Path = ML_ENGINE_SRC) -> list[tuple[Path, ast.Module]]:
 
 
 def enclosing_functions(tree: ast.Module) -> dict[int, str]:
-    """`id(node) -> 그 노드를 품은 가장 가까운 함수 이름`."""
+    """`id(node) -> 그 노드를 품은 **가장 바깥** 함수 이름`.
+
+    `ast.walk` 는 너비 우선이고 `setdefault` 라 바깥 함수가 먼저 쓴다(cr r3 L-2 — 앞 문면은
+    「가장 가까운」이었다). 그래서 중첩 클로저 안의 호출은 바깥 함수 이름으로 귀속된다:
+    집합 등식의 민감도가 **그만큼** 낮다(같은 함수 안에서 호출을 클로저로 옮기는 변경은
+    집합을 바꾸지 않는다). 자리를 **옮기는** 변경은 여전히 잡힌다."""
     owner: dict[int, str] = {}
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
