@@ -35,11 +35,32 @@ fun interface NotificationInboxPort {
  * 그 거부가 [NotificationInboxOutcome.Failed] 로 조용히 접힌다. 표를 읽으면 그 상태가 애초에
  * 표현되지 않는다.
  *
- * 반환이 **빈 목록일 수 있다**(계정 부트스트랩 전). 그것은 실패가 아니라 「받을 사람이 아직
+ * 반환이 **빈 청중일 수 있다**(계정 부트스트랩 전). 그것은 실패가 아니라 「받을 사람이 아직
  * 없다」는 사실이고, 소비자는 기록 0 건으로 끝낸다.
+ *
+ * **실패를 예외로 내보내지 않는다**(cr r1 MEDIUM · v M-2). 이 질의는 평가 커밋 run 안에서 불리고
+ * 그 run 의 본론은 판정과 outbox 등록이다 — 청중을 못 읽었다는 사실이 예외로 올라가면 **채널
+ * 요청 전에 run 이 멈춰** 그 판정의 흔적까지 함께 사라진다. 알림함 쓰기 포트가
+ * [NotificationInboxOutcome.Failed] 로 접는 것과 같은 갈래이고, 접는 자리도 같다(어댑터).
  */
 fun interface NotificationAudiencePort {
-    fun accounts(): List<AccountId>
+    fun accounts(): NotificationAudience
+}
+
+/**
+ * 청중 질의의 답 — **「받을 사람이 없다」와 「누가 받는지 못 읽었다」를 가른다**(cr r1 MEDIUM).
+ *
+ * 둘을 빈 목록 하나로 접으면 장애가 「알림함이 조용히 0 건」으로 보이고 아무도 모른다. 두 값이
+ * 다르므로 소비자는 소진 `when` 으로 받고, 조립이 [Unavailable] 에만 표지를 남긴다.
+ */
+sealed interface NotificationAudience {
+    /** 받을 계정들 — **빈 목록일 수 있다**(부트스트랩 전). 그것은 사실이고 실패가 아니다. */
+    data class Accounts(
+        val accounts: List<AccountId>,
+    ) : NotificationAudience
+
+    /** 저장 층이 답하지 못했다 — 기록 0 건이지만 그 0 은 **사실의 0 이 아니다**. */
+    data object Unavailable : NotificationAudience
 }
 
 /**

@@ -3,6 +3,7 @@ package bidvector.app.wiring
 import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.notificationinbox.JdbcNotificationInboxStore
+import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
@@ -72,8 +73,17 @@ open class NotificationInboxWiring {
      * 알림함 읽기 경로와 다른 트리거들은 그대로 남는다.
      */
     @Bean
-    open fun notificationAudiencePort(dataSource: DataSource): NotificationAudiencePort =
-        JdbcNotificationAudience(dataSource)
+    open fun notificationAudiencePort(dataSource: DataSource): NotificationAudiencePort {
+        val adapter = JdbcNotificationAudience(dataSource)
+        val logger = LoggerFactory.getLogger(NotificationInboxWiring::class.java)
+        return NotificationAudiencePort {
+            adapter.accounts().also { resolved ->
+                // 청중을 못 읽은 실행은 알림함 기록이 0 건으로 끝난다 — 그 0 이 **사실의 0 이
+                // 아니라는** 표지를 여기서 적는다(쓰기 실패 표지와 같은 자리·같은 사유, D-7C3B-9).
+                if (resolved == NotificationAudience.Unavailable) logger.warn(AUDIENCE_UNAVAILABLE_LINE)
+            }
+        }
+    }
 
     @Bean
     open fun notificationInboxQuery(
@@ -89,3 +99,9 @@ open class NotificationInboxWiring {
 internal fun inboxWriteFailedLine(record: NotificationInboxRecord): String =
     "notification-inbox write failed kind=${record.fact.kind.name} " +
         "notice=${record.notice.number.value}/${record.notice.round.value}"
+
+/**
+ * 청중을 못 읽은 실행의 표지 — **계수도 주체도 싣지 않는다**(읽은 것이 없으니 셀 것도 없고, 저장소
+ * 예외 메시지에는 행 값이 실릴 수 있다). 「이 실행의 알림함 기록 0 건은 사실이 아니다」 한 문장이다.
+ */
+internal const val AUDIENCE_UNAVAILABLE_LINE: String = "notification-inbox audience unavailable — recorded 0 items"

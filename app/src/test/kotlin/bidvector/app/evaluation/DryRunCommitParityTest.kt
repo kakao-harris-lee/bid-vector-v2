@@ -41,6 +41,7 @@ import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -187,7 +188,7 @@ class DryRunCommitParityTest {
             // 쓰기 포트는 **불리면 터지는** 구현이라 「청중이 비었는데 기록이 나간다」는 회귀가
             // 이 자리에서도 잡힌다.
             notificationInboxPort = { error("청중이 비었는데 알림함 쓰기가 불렸다") },
-            notificationAudiencePort = { emptyList() },
+            notificationAudiencePort = { NotificationAudience.Accounts(emptyList()) },
         )
 }
 
