@@ -8,7 +8,7 @@ base `df4976cc`. 계약 `scope.md`, 설계 검토 `design-review.md`, 실측 `co
 | --- | --- | --- |
 | ① `OPEN-MIGRATION-ORDER-GATE` | **닫음** | 새 `migrationOrderGate` + `MigrationOrder` 순수 술어 + `migration-policy.properties` |
 | ② `OPEN-CPD-GATE-RENAME-BYPASS` | **절반** — 낡은 리포트 축 닫음 · 이름 치환 축 **열린 채** | `CpdReportPresenceGateTask` 의 mtime 축 · `duplicate-policy.properties` 의 `normalize.*` 둘(오늘은 효과 없음, 그 사실을 정책 주석이 든다) |
-| ③ `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` | **닫음(사각 둘) · 중첩 jar 축은 남는다**(아래 OPEN) | `jarContentGate` 입력이 Jar 타입 전수 · `jar.class-roots`·`jar.external-class-roots` · 비-공허 단언 |
+| ③ `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` | **닫음(사각 셋)** — 수정 라운드 2 가 중첩 jar 축까지 | `jarContentGate` 입력이 Jar 타입 전수 · `jar.class-roots`·`jar.external-class-roots` · 비-공허 단언 |
 | ④ `OPEN-HARNESS-GATE-TESTS-ORDER` | **닫음** | `GateRegistration.ledgerOrderViolations` + `gate-tests.properties` 블록 셋 정렬 |
 | ⑤ `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` | **닫음** | 새 `unusedImportGate`(모듈·included build·느슨한 스크립트 셋) + `UnusedImports` 순수 술어 |
 | ⑥ `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` | **닫음** | 소스 층 패키지 범위 축 + `source.scoped-*` 정책 키 |
@@ -78,14 +78,11 @@ adapters 의 적용 이력·checksum 이 바뀌어 production 거동 변경이 �
     RELATIVE 이고(이름 변경이 입력 변경), 소유 모듈에서 비면 실패한다.
 12. **전건은 로컬에서 돌리지 않았다** — `check`·`qualityBaseline`·container·S-20·Playwright 는 PR CI 가
     정본이다(레인 공통 규율). 로컬은 표적 test·해당 모듈 lint·게이트·변이만.
-13. **③ bootJar 의 중첩 jar(`BOOT-INF/lib/*.jar`)는 판정되지 않는다 — 새 OPEN**(verifier M-1).
-    술어가 아카이브의 **최상위 `.class` 엔트리**에만 걸려 있어, `bootJar { classpath(files(sneak.jar)) }`
-    로 넣은 jar 는 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 **런타임에 실리는데** 리포트는 심기
-    전과 같다(실측). 이 slice 가 닫은 사각 둘(이름으로 건 `jar` · 빈 입력)과 **다른 축**이다.
-    값싼 닫음 경로가 있다 — `BOOT-INF/lib/*.jar` 이름 집합이 app `runtimeClasspath` 해석 결과의
-    부분집합인가(선언하지 않은 jar 는 그 집합에 없다). 이 라운드에 넣지 않은 이유는 새 입력(해석된
-    configuration)·정책 키·양성 대조가 붙는 축이고 팀장이 「값싸면 닫고 아니면 정직하게 등재」를
-    허용했기 때문이다. **처분: 미구현 · OPEN 등재**(capability map §12.3 (d) 와 open-inventory §9).
+13. **③ 중첩 jar 축은 이름으로 견준다 — 바이트가 아니다.** 중첩 jar 는 아카이브 안에서 다시 압축돼
+    있어 바이트 대조에 원본 파일이 필요하다. 그래서 「선언하지 않은 jar 는 runtime classpath 해석
+    결과에 없다」는 성질에 기댄다 — **선언된 jar 를 그 이름으로 바꿔치우는 경로는 이 축이 닫지 못한다**
+    (그 축은 의존 검증·서명이 받는 일이고 이 slice 밖이다). 면제는 접두 집합 하나이고 그 접두 밑은
+    내용 판정이 없다(`jar.external-class-roots` 의 한계와 같은 꼴).
 14. **② 낡은 리포트 축은 로컬에서 `cp -p` 로 비껴간다**(verifier L-2, 정적 판독). mtime 술어라
     원본 mtime 을 보존한 복제가 `check -x cpdCheck` 에서 지나간다. CI 는 깨끗한 checkout 에서 늘 새
     리포트를 내므로 **로컬 한정**이다.

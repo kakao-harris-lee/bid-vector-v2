@@ -10,6 +10,14 @@
 `gateRegistrationGate` 셋이 든다 — 이 slice 는 그 셋이 초록인 상태에서 통과하는 틈만 다룬다.
 레인 권한 밖: CI 워크플로 편집 · adapters test 술어 · mutation 도구 채택.
 
+## 배선을 나눈 자리 — 왜 새 plugin id 가 아닌가 (수정 라운드 1, 팀장 승인)
+
+`bidvector.kotlin-conventions` 가 파일 500 줄 한도를 넘어 나눠야 했을 때(verifier B-1) 정책 데이터만
+먹는 축 여섯을 **같은 plugin 이 부르는 별 `.kt` 파일**(`PolicyGateWiring.kt`)로 뺐다. precompiled script
+plugin 을 하나 더 만들지 않은 이유는 `conventionCoverageGate` 가 **`qualityBaseline` 등록 집합**으로
+「게이트가 적용된 모듈」을 세기 때문이다 — plugin 을 더하면 **그 plugin 만 빠진 모듈을 세는 축이 없어**
+「게이트의 부재는 조용하다」가 한 겹 더 생긴다. 호출 한 줄이면 그 부재가 diff 에 보인다.
+
 ## ① 마이그레이션 번호 순서 (`OPEN-MIGRATION-ORDER-GATE`)
 
 - ⓐ **경계**: `db/migration` 파일 집합의 version 다중집합이 「1..max 에서 은퇴 번호를 뺀 집합」과
@@ -59,6 +67,17 @@
   배선과 정책 키는 남기고 정책 주석 첫 문단이 그 사실을 들게 했다. 5(낡은 리포트)는 닫혔다.
 
 ## ③ 배포물 아카이브 사각 (`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`)
+
+**수정 라운드 2 — 사각 셋째(중첩 jar)를 닫았다.** 이 절의 첫 판은 사각 둘(이름으로 건 `jar` · 빈 입력)만
+다뤘고, 술어가 아카이브 **최상위 `.class` 엔트리**에만 걸려 있다는 사실을 우회 목록에 넣지 않았다 —
+`bootJar { classpath(files(…)) }` 로 넣은 jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 런타임에
+실리면서 판정되지 않았다(verifier M-1 실측, 재현 확인). 처방은 **`중첩 jar 이름 ⊆ runtimeClasspath 가
+해석한 jar 이름`** 이다. 바이트가 아니라 이름인 근거: 중첩 jar 는 다시 압축돼 있어 바이트 대조에 원본이
+필요한데, **선언하지 않은 jar 는 해석 결과에 아예 없다**. 경로를 보지 않으므로 다른 자리에 넣는 것이
+우회가 되지 않는다. 새 public 표면은 task 입력 하나(`runtimeClasspath`)와 정책 키 하나
+(`jar.external-nested-jars` — 축을 켜자 실측으로 나온 Boot 자신의 도구 jar 면제, 접두 비교).
+
+
 
 - ⓐ **경계**: 「게이트를 통과한 바이트인가」를 **그 모듈이 만드는 Jar 타입 task 전수**에 건다. `jar`
   하나를 보던 하드코딩을 provider 로 바꾼다.

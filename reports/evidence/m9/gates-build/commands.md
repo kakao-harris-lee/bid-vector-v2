@@ -179,3 +179,33 @@ procurement `254/6519` · decision `178/4498`.
 인 입력이 **형제 가지**(`judged == 0`)에 걸려 같은 메시지를 내므로 test 가 통과한다. 함수 전체를
 `null` 로 **대체**하자 둘 다 RED 다 — 더하기·부분 변이는 「방어 있음」과 「측정 못 함」을 같은 값으로
 보여 준다(등재된 교훈과 같은 축).
+
+## 수정 라운드 2 — 중첩 jar 축 · main 둘째 병합
+
+### 사각 재현 → 닫음 (v M-1)
+
+| # | 실측 | 결과 |
+| --- | --- | --- |
+| 1 | 심기 전 사각 재현 — `bootJar { classpath(files(sneak.jar)) }` 심고 `:app:jarContentGate --rerun` | **초록**(`judged=558`, 심기 전과 동일)인데 `BOOT-INF/lib/sneak.jar` 가 아카이브와 `classpath.idx` 에 **둘 다** 있다 |
+| 2 | 새 술어 stub + test | **RED 3/5**(통과한 둘은 빈 목록을 단언하는 음성 대조) |
+| 3 | 구현 뒤 양성 대조(같은 심은 jar) | **FAILED** — 처음엔 **둘**을 지목했고 그중 하나가 Boot 자신의 도구 jar 였다(실측으로 나온 면제 대상) |
+| 4 | 면제 접두 뒤 양성 대조 | **FAILED · `sneak.jar` 하나만** |
+| 5 | 음성 대조(심은 것 제거, 전 모듈) | **BUILD SUCCESSFUL** — app `archives=2 nestedJars=102 runtimeJars=109`, 나머지 아홉 `nestedJars=0` |
+| 6 | 변이(술어 전체를 통과 쪽으로 대체) | 23 중 **4 FAILED** |
+| 7 | Configuration Cache | 문제 계수 **0** — 해석된 configuration 을 입력으로 받는 것이 CC 를 흔들지 않았다(팀장이 지목한 중단 조건) |
+
+중첩 0 은 열 모듈 중 아홉의 정상 상태라 이 축에는 비-공허 단언을 두지 않고 리포트가 중첩 수와 runtime
+수를 함께 센다.
+
+### main 둘째 병합 (`97ed49c4`, PR #134) — 겹침 하나를 계수로 검산
+
+겹친 경로는 `config/quality/gate-tests.properties` 하나다. 충돌 0 자동 병합이라 **계수로** 봤다.
+
+| 검산 | 결과 |
+| --- | --- |
+| 등재 행 집합 | base **521** · 내 쪽 **525**(+4) · main 쪽 **521**(±0) · 병합 **525** — `lost=0 extra=0` |
+| 기대 병합 == 실제 | 기대 525 == 실제 525, 양방향 차집합 빈 출력 |
+| 블록 모양 | 블록 **15** 전부 정렬 + 중복 0 |
+| main 쪽 변경 보존 | main 의 변경은 **주석 문단 하나**였고 병합 트리에 한 번만 있다(접힘 0). 비슷한 옛 문면이 남은 것은 **다른 class 의 문단**이라 접힘이 아니다 |
+| 새 정렬 게이트 실행 | `gateRegistrationGate --rerun` 모듈 **열** 전부 실행 · 실패 0 |
+| 내 쪽 건드림 | `git diff --name-only <병합 전>..HEAD` == main 의 9 경로 |
