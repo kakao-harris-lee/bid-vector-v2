@@ -37,18 +37,21 @@ base `df4976cc` · 브랜치 `feature/m9-paper-bid` · 계약 `scope.md`(D-M9P-1
 | `:workflow:test --tests "*Notification*" --tests "*BidCase*"` | 0 | 로컬 |
 | `:app:test --tests "*NotificationInbox*" --tests "*OpenApi*" --tests "*NotificationSweep*" --tests "bidvector.app.architecture.*"` | 0 | 로컬 |
 | 세 모듈 `ktlint{Main,Test}SourceSetCheck` + `detekt` + `leakPatternGate` | 0 | 로컬 |
-| web `lint` · `typecheck` · `test`(vitest) · `api:types:check` · `gate:tests` · `gate:src-tree` | 0 | 로컬 |
+| web `lint` · `typecheck` · `test`(vitest) · `api:types:check` · `gate:tests` · `gate:src-tree` · `gate:boundary-canary` | 0 | 로컬 |
+| `./gradlew --no-daemon check` · `qualityBaseline` · web job 전문 · container · ml-engine | — | **PR CI 가 정본**(팀장 공지 — 호스트 빌드 큐) |
 
-판정 SHA 에서 돌린 test 계수: adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0.
-web: **39 파일 / 827 test**(main 병합이 더한 분 포함 · 내 몫은 그 중 둘이 새 것).
+판정 SHA 에서 돌린 계수. Kotlin 은 `--rerun-tasks` 로 **강제 실행**했다 — 둘째 병합이 Kotlin 트리를
+바꾸지 않아 같은 명령이 UP-TO-DATE 로 지나가고, **UP-TO-DATE 는 측정이 아니다**(결과 XML 의
+mtime 으로 실제 실행을 확인했다).
+
+adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0 · web lint **0** ·
+typecheck **0** · vitest **40 파일 / 857 test** · `api:types:check` 바이트 등식(**191758 bytes**) ·
+`gate:tests` · `gate:src-tree` · `gate:boundary-canary`(#135 가 번들 그래프 하네스를 만졌다).
+web 계수에는 main 병합 둘이 더한 분이 들어 있고 **내 몫은 그 중 둘이 새 것**이다.
 
 **adapters·app 계수가 병합 전(117·314)보다 작은 것은 회귀가 아니라 표적 집합의 차이다** — 병합 뒤
 실행에서 `--tests "*RetentionSweepTest*"` 와 `--tests "*NotificationSweep*"`(app) 을 뺐다. 빠진
 자리는 그 둘뿐이고 세 모듈의 `check` 전문은 CI 가 돈다.
-| `./gradlew --no-daemon check` · `qualityBaseline` · web job 전문 · container · ml-engine | — | **PR CI 가 정본**(팀장 공지 — 호스트 빌드 큐) |
-
-web 계수: lint **0** · typecheck **0** · vitest **38 파일 / 768 test** · `api:types:check` 바이트
-등식(**191758 bytes**) · `gate:tests` 통과 · `gate:src-tree` 통과.
 
 **여정 e2e 는 로컬에서 돌리지 않는다**(공통 규율) — v H-1 의 처방은 그래서 「고쳐서 통과시킨다」가
 아니라 **사본을 없애는 것**이다: 행 testId 를 짓는 자리가 `notificationItemTestId` 하나이고 화면과
@@ -103,22 +106,32 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 slice 가 그 자리를 둘 고쳤고(정렬 모양 · `PAPER` fixture), 세는 방법도 하나 늘었다: 축을 더한
 뒤에는 **그 축을 상수로 바꾸는 변이**를 각 소비 자리마다 돌린다(화면 둘·판독 둘·질의 넷).
 
-## §6 main 병합(`e12c0485`)의 합집합 계수
+## §6 main 병합의 합집합 계수
 
-**충돌 0 이 「접히지 않았다」를 뜻하지 않으므로** 축마다 따로 쟀다(#130~#133).
+머지 직전에 `origin/main` 을 **두 번** 합쳤다 — `e12c0485`(#130~#133) · `3ad4f3f6`(#135).
+**충돌 0 이 「접히지 않았다」를 뜻하지 않으므로** 병합마다 축을 따로 쟀다.
 
-| 축 | 결과 |
-| --- | --- |
-| 내 경로 ∩ main 변경 경로 | **둘** — `config/quality/gate-tests.properties` · `docs/discovery/capability-map.md` |
-| 마이그레이션 충돌 | **0** — main 은 이 범위에서 마이그레이션을 더하지 않았다(V25 가 그대로 유일하고, 그 파일의 diff 도 0 줄) |
-| 내 나머지 47 경로가 병합 전과 같은가 | 차이 **0 파일** |
-| main 의 74 경로가 `e12c0485` 와 같은가 | 차이 **둘**(겹친 그 둘 — 내 변경을 담으므로 달라야 한다) |
-| `HEAD` vs `e12c0485` 의 차이가 내 경로뿐인가 | 그 밖 **0 파일** |
-| 등재부 양쪽 생존 | 내 등재 **셋** · main 등재 **둘**(Koneps). 충돌 하나는 양쪽이 같은 자리에 넣은 것이고 **사전순 합집합**으로 해소했다 |
-| 등재부 중복 항목 | **0** — 세 ref(`e12c0485`·병합 전·HEAD)에서 모두 0 |
-| 등재부 사전순 위반 | `app` 2 · `decision` 1 · `procurement` 3 — **세 ref 에서 동일**하다(main 의 기존 상태이고 내 병합이 만든 것이 아니다). 내가 등재한 `adapters` 블록은 **0** |
-| capability map 양쪽 생존 | 내 표지 **각 1**(다섯 열 키 문장 · 「제한 셋」) · #133 의 등재 행 **둘** · 중복 제목 **0**(159 중) |
-| capability map 줄 수 | **3971** = `e12c0485` 3971 + 내 순증 0(내 편집이 제자리 치환이다) — 접힌 본문이 없다 |
+| 축 | `e12c0485` | `3ad4f3f6` |
+| --- | --- | --- |
+| 내 경로 ∩ main 변경 경로 | **둘** — 등재부 · capability map | **하나** — `web/e2e/journey/results.spec.ts` |
+| 충돌 | **하나**(등재부 app 블록에 양쪽이 같은 자리) → **사전순 합집합** 셋 | **0**(그래서 아래 계수가 하중을 진다) |
+| 마이그레이션 충돌 | **0** — main 이 더하지 않았다(V25 의 diff 도 0 줄) | **0** — 같음 |
+| 내 나머지 경로가 병합 전과 같은가 | 차이 **0 파일** | 차이 **0 파일** |
+| main 의 변경 경로가 그 SHA 와 같은가 | 74 중 차이 **둘**(겹친 그 둘) | 14 중 차이 **하나**(겹친 그 하나) |
+| `HEAD` vs 그 SHA 의 차이가 내 경로뿐인가 | 그 밖 **0** | 그 밖 **0** |
+| main 추가 파일 전수 존재 | — | **없는 것 0**(목록을 돌며 `-e` 로 물었다) |
+
+**겹친 파일마다 양쪽 생존을 따로 셌다.**
+
+| 겹친 파일 | 내 쪽 | 남의 쪽 | 접힘 검사 |
+| --- | --- | --- | --- |
+| `config/quality/gate-tests.properties` | 등재 **셋** | Koneps 등재 **둘** | 중복 항목 **0**(세 ref 모두) · 사전순 위반 `app` 2·`decision` 1·`procurement` 3 가 **세 ref 에서 동일**(main 기존 상태 — 내가 등재한 `adapters` 블록은 **0**) |
+| `docs/discovery/capability-map.md` | 표지 **각 1**(다섯 열 키 문장 · 「제한 셋」) | #133 의 등재 행 **둘** | 중복 제목 **0**(159 중) · 줄 수 **3971** = `e12c0485` 3971 + 내 순증 0(제자리 치환) |
+| `web/e2e/journey/results.spec.ts` | import **1** · `InboxItem` 의 축 칸 **1** · 공유 함수로 짓는 행 조회 **1** · 옛 네 조각 템플릿 **0** | `provisional-state-` **1** · 개찰 축 하네스 참조 **4** · `test` 선언 **3** | 중복 import **0** · `type InboxItem` 선언 **1** · 충돌 표지 **0** · 줄 수 **661** = `3ad4f3f6` 650 + 내 순증 **11**(= 518 − 507) — **산수가 맞으므로 접힌 본문이 없다** |
+
+`web/config/gate-tests.txt` 는 **내가 손대지 않았다** — #135 가 더한 뒤 그대로다(항목 37 · 중복
+**0** · `3ad4f3f6` 과 diff **0 줄**). 내가 더한 vitest 둘은 **기존 파일 안의 test** 라 그 등록부에
+새 줄이 필요 없다(그 게이트는 파일 단위 등재다).
 
 **의미 겹침을 따로 봤다**(텍스트 겹침 0 인 자리). #132 가 `web/src/display/**`·`web/src/screens/**`
 를 만졌지만 내 네 파일과는 다른 파일이고, 그쪽이 바꾼 `stateDisplay.ts` 의 `displayOf` 는 **맨 색인
