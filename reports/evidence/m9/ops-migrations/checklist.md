@@ -1,17 +1,17 @@
 # M9 / ops-migrations — 계약 대조
 
-마지막 산출물 커밋 **`c11203ba`** · base `df4976cc` · 계약 갱신 2026-11-06 반영(DEC-08 제외 · 번호 V26·V27 ·
+마지막 산출물 커밋 **`a14f07f1`** · 착수 base `df4976cc` · **병합 1**(main `56bd33ea`) · 계약 갱신 2026-11-06 반영(DEC-08 제외 · 번호 V26·V27 ·
 in_scope 밖 다섯 승인).
 
 ## acceptance 줄별 대조
 
 | 계약 문면 | 상태 | 어디서 |
 | --- | --- | --- |
-| 각 마이그레이션 clean-migrate | **로컬 실측**(이 라운드) — `CleanMigration*` 다섯 + `OutboxTransitionSqlTest` + `ExecutionRowReleaseTest` + relay DB 셋 초록. 전건은 PR CI | `commands.md` 라운드 3 표 |
+| 각 마이그레이션 clean-migrate | **병합 뒤 전건 실측** — `:adapters:test` 전체 1323 tests · 0 실패(V25 → V26 → V27 적용 순서를 포함한 clean-migrate 전수). 전건 `check` 는 PR CI | `commands.md` 라운드 6 표 |
 | CHECK·GRANT 등식 | 래칫 갱신 완료 — CHECK 개수(`collection_run` 13+1 · `outbox` 11+1+1, **증분 주석**) · 열 셋 · 트리거 셋. **GRANT 변경 0**(두 축이 열·제약·트리거만 더한다) | `CleanMigration{Check,Column,Trigger}Test` |
 | 되돌림 리허설 두 갈래 | **둘 다 실측** — 미적용(목록 산출 + 트리 동일성) · 적용(버릴 Postgres 에서 forward-fix 를 **Flyway 로** 적용, 장부 기입·음성 대조 포함, 팀장 허용 1회) | `rollback.md` §3 / §5 |
 | 기본값 제거로 깨지는 배선 전수 갱신 | **기동점 전수를 다시 셌다**(v H-1) — 6G runbook 의 스냅숏 추출 갈래가 빠져 있었고, 키를 공통 인자 **한 자리**로 모아 갈래가 늘어도 함께 가게 했다. 배선 test·출하 조립 속성 자리는 로컬 exit 0. **아직 키가 없는 기동점 하나**(`tools/image-hygiene-check.sh` jvm-app `PROBE_ENV`, 오늘 무해)는 `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS` 문면이 든다 | `commands.md` 「in_scope 밖」 표 · capability map 그 OPEN 행 |
-| 변이 RED | **여덟** 로컬 실측 — 사유 바꿔치우기(OPS-05) · 릴리스 결속 상수화(OPS-10) · 생성자 기본값 복귀 + 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) + 라운드 5 의 둘(출하 기동점 default properties 기본값 · env 제거 무력화) + 통제군 | `commands.md` 변이 절 |
+| 변이 RED | **여덟** 로컬 실측(병합 전 라운드들) — 사유 바꿔치우기(OPS-05) · 릴리스 결속 상수화(OPS-10) · 생성자 기본값 복귀 + 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) + 라운드 5 의 둘(출하 기동점 default properties 기본값 · env 제거 무력화) + 통제군 | `commands.md` 변이 절 |
 | 전건 PR CI | **미실행** — push 는 팀장 몫(공통 규율) | — |
 
 ## 설계 검토가 지목한 우회 ↔ 무엇이 막는가
@@ -48,6 +48,11 @@ in_scope 밖 다섯 승인).
 편집도 0 이다(새 test 는 등재된 클래스 둘에 메서드로 들어갔다). 라운드 4 가 새로 건드린 in_scope
 경로 둘은 `config/quality/architecture-policy.properties` 와 `AppHttpDependencyGateTest`(둘 다 계약
 문면 「`config/quality/**`」·「관련 app 코드와 test」 안)이고, 라운드 5 는 새 경로를 더하지 않았다.
+
+**라운드 6(병합)이 만든 새 파일도 0 이다** — main 이 들여온 새 파일은 많지만 내 커밋이 만든 것은
+없고, 내가 고친 것은 병합 결과 둘(`CleanMigrationCheckTest` 의 본문 집합 · 남의 새 배선 test 에
+릴리스 빈)과 내 문면 하나(여정 하네스 주석)다. 복원 목록이 106 → **107** 로 하나 는 것이 그
+배선 test 가 내 경로로 들어온 자리다.
 
 라운드 2 가 **되돌린** 넷(판정 표·Jdbc store·기록 port·그 test)은 HEAD 에 없다 — 되돌림 목록의
 `HISTORY_ONLY` **여섯**이 그 넷과 번호 당김이 남긴 옛 이름 둘이고, `rollback.md` §1 이 그 분류를

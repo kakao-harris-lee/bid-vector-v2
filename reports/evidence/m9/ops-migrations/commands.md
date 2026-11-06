@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`c11203ba`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
+마지막 산출물 커밋 **`a14f07f1`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -117,7 +117,7 @@ HEAD 트리에 마이그레이션이 넷이 됐다. 그 가운데 **버전 27 �
 | `EvaluationCommitRun`(ops-code 레인의 알림함 생산자 포트) | 내 변경은 생성자 **마지막 인자 하나**(`release`)와 `JdbcOutboxPort` 생성 한 줄뿐이다 — 주입 자리가 분리돼 있어 그쪽 포트와 줄이 겹치지 않는다 |
 | `OutboxCommand` 종단 생성자(PR #127 Telegram) | **의도된 컴파일 강제**다 — #127 의 dispatch 결과 → 종단 전이 자리가 사유 인자를 대야 한다. 어휘 일곱 가운데 `DELIVERY_REJECTED`·`DELIVERY_SUPPRESSED`·`DELIVERY_OUTCOME_UNKNOWN` 이 그 자리의 셋이고 새 사유가 필요하면 enum 과 V26 CHECK 를 **같이** 넓혀야 한다(집합 등식 test 가 한쪽만 넓히는 것을 막는다) |
 | `release-sha` 키 제거(PR #128 `AwardCollectionProperties`) | 그 클래스에 release 키·기본값이 있으면 **제거하고 `ReleaseIdentifier` 빈을 주입**받아야 한다(이 slice 의 두 수집 갈래와 같은 모양). 운영 env 키 등식은 표적 실측했다 — `tools/prod-env-keys-check.sh` exit 0, 키 18, **새 키 0**(운영 compose 는 `compose.yaml` 을 상속하므로 `compose.prod.yaml` 편집 0) |
-| `CleanMigration*Test` 래칫(paper-bid V25) | 계수를 **증분 주석**으로 적었다 — `collection_run` 13+1=14 · `outbox` 11+1+1=13. paper-bid 의 `notification_inbox` 5→7 과 다른 행이라 병합은 계수의 합이다 |
+| `CleanMigration*Test` 래칫(paper-bid V25) | **병합으로 확인됨** — 계수는 서로 다른 행이라 합집합으로 접혔다(`collection_run` 14 · `outbox` 13 · `notification_inbox` 7). 예측이 **빗나간 자리는 계수가 아니라 본문 집합**이었다: main 이 같은 라운드에 `collection_run` CHECK **본문 집합 등식**을 새로 세웠고 거기에 V27 의 칸이 없어, 자동 병합 결과가 「개수 14 · 본문 13」으로 어긋났다(라운드 6 표가 적는다) |
 
 ## 라운드 3 — container 표적 실측(팀장 허용분 + verifier 재현)
 
@@ -181,6 +181,44 @@ INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxSt
 **왜 자리 하나를 겨누지 않는가**: 출하 기동점의 환경에는 default properties · ConfigData · 시스템
 속성 · 명령행이 **한 자리에** 쌓인다. 그래서 단언은 「이 환경에 그 키가 있는가」 하나이고, 어느
 층에 기본값을 되살려도 같은 줄이 붉어진다(r2 셋과 r3 가 같은 단언에 걸린다).
+
+## 라운드 6 — main `56bd33ea` 병합(paper-bid V25 뒤)
+
+**자동 병합 충돌 0.** 그래서 접힌 본문을 계수로 찾았다 — 겹침 경로는 **열넷**이다(팀장 공지의
+일곱 + ci.yml · `CleanMigration{Privilege,}Test` · 수집 설정 둘 · runbook 둘. 공지의
+`web/e2e/journey/results.spec.ts` 는 내 쪽 변경이 0 이라 겹침이 아니다).
+
+| 확인 | 결과 |
+| --- | --- |
+| 양쪽 추가줄이 병합본에 있는가 | 내 93 · main 405 줄 전수 있음(없는 줄은 내가 **의도로 고친** KDoc 한 줄뿐) |
+| 양쪽 삭제가 반영됐는가 | 반영됨 — main 이 지운 `queryCheckBodies()` 는 사라지고 `queryConstraintDef` 는 main 의 새 본문(0 행·중복 행 명시 실패)이다 |
+| 줄 수 합집합 등식(`base + main + mine`) | 겹침 열넷 가운데 **열셋이 정확히 일치**, `CleanMigrationCheckTest` 만 +6(손 수정 그대로) |
+| 한쪽만 바꾼 경로가 조용히 되돌아갔는가 | main 만 바꾼 129 경로는 병합본이 main 과 **같고**, 나만 바꾼 97 경로는 내 쪽과 **같다**(차이 0·0) |
+| 마이그레이션 번호 V1..V27 | 파일 25 · 중복 0 · 결번 V10·V11(기존) · V25(paper-bid)·V26·V27 존재 |
+| 등록부·정책 중복 | `gate-tests.properties` 중복 넷은 세 ref 공통(기존) · 조립 tier 36+11+35=**82** = 면제 래칫 |
+| capability map | 줄 수 3858+114+26=**3998** 로 닫힘 · OPEN 행 중복은 세 ref 공통 16 종 |
+| `journey-up.mjs` | main 판(+179/−6, main 자신의 계수와 같다) + 내 네 줄. `COMMON_PROPERTIES` 정의 하나 · `node --check` 통과 · **main 의 새 기동 셋도 `writeSecrets` 를 지나 키를 받는다** |
+| `:adapters:test --rerun`(전체) | exit 0 · **1323 tests · 0 실패** · skip 4(192 클래스). 병합 커밋에서 쟀고 그 뒤 두 커밋은 adapters 를 **건드리지 않는다**(경로 차 0) |
+| `:app:test --rerun`(전체) | exit 0 · **1029 tests · 0 실패**(126 클래스) |
+| `:app:`·`:adapters:`·`:workflow:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | exit 0 |
+| `tools/prod-env-keys-check.sh` | exit 0 — 키 18(병합 뒤에도 등식 불변) |
+| 전건 `check` · web npm | **미실행** — PR CI 가 정본(이 worktree 에 `node_modules` 가 없다) |
+
+### 병합이 잡은 결함 둘 — 둘 다 「계수는 맞는데 거동이 어긋난」 자리
+
+1. **CHECK 본문 집합 ↔ 개수 축의 어긋남.** main 이 이 라운드에 `collection_run` CHECK **본문
+   집합 등식**을 세웠고(`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 처방), 자동 병합은 개수(내 14)와
+   본문(main 의 열셋)을 **각자** 남겼다. 본문 하나를 더해 닫았다 — 두 축이 같은 마이그레이션을
+   각자 세어야 한다.
+2. **남의 새 배선 test 가 릴리스 빈 없이 떴다.** `:app:test` 전건이 둘 붉었다 — main 의
+   `KonepsRollbackArgumentsTest` 가 `CollectionWiring`·`OpeningCollectionWiring` 을 띄우는데 이
+   slice 가 그 배선에 `ReleaseIdentifier` 를 요구하게 만들었다(계약이 적은 **의도된 컴파일
+   강제**의 실현). 다른 배선 test 일곱과 같은 관례로 빈을 꽂았다. **그 파일의 음성 test 는 빈
+   부재로 초록이었다** — 사유가 바뀐 통과이고, 빈을 꽂으면 셋이 자기 사유로 돌아온다.
+
+**내가 더한 문면 하나가 병합으로 거짓이 됐다**(스스로 찾아 고쳤다): 여정 하네스 주석의 「출하
+jar 를 **세 번** 띄운다」 — 개찰 하네스 병합으로 기동이 늘었다. 계수를 지우고 「이 블록을 지나는
+기동 전부」로 구조로 적었다.
 
 ## 등재만 (cr L-5)
 
