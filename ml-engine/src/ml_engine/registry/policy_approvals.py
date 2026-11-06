@@ -14,12 +14,14 @@ version 은 그대로 `evaluation-v1`, 전건 1700 passed, 재검증도 통과).
 **처방은 열거의 방향을 뒤집는 것이다**: 「무엇을 거부하는가」가 아니라 **「무엇이 승인됐는가」**
 를 코드 상수로 적는다. 승인된 version 은 **그 내용의 지문**과 함께만 존재한다.
 
-**이 등록부를 묻는 자리는 셋이다** — 평가 축 둘과 추론 축 하나:
+**이 등록부를 묻는 자리는 셋이다**(역할 기준 — `policy_approval()` **호출**은 넷이고, 게이트
+자리가 「주장」과 「재구성 결과」를 각각 한 번씩 묻는다) — 평가 축 둘과 추론 축 하나:
 
 1. `evaluation.policy_source.load_approved_evaluation_policy` ← `app.server._preload`
    (조립 근, 빨리 실패)
 2. `evaluation.policy_source.verify_policy_source` ← `app.pipeline._run_holdout`
-   (게이트 자리, **도착한 값** — v r3 H-3a)
+   (게이트 자리, **도착한 값** — v r3 H-3a). 여기서 두 번 묻는다: 객체의 **주장**(진단)과
+   **재구성 결과**(안전 성질을 지는 검사 — v r5 H-5).
 3. `inference.policy.load_approved_inference_policy` ← `app.server._preload`
    (조립 근 — v r3 H-3b; 그 축의 `maturity.window_days` 가 평가 창 선택을 바꾼다)
 

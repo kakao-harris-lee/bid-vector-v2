@@ -13,8 +13,19 @@
 승인 등록부에 있는가. 그 비교의 양쪽은 로더가 만든 값(`hexdigest()` 결과와 파싱된 문자열)이라
 **호출자가 손댈 자리가 없다**. 앞의 세 축은 비교의 한쪽이 호출자 객체여서 거동으로 이길 수
 있었다 — 거짓 `__eq__` 를 가진 `str` 하위 클래스(N1) · `read_text` 가 가로채는 경로 하위
-클래스(N2) · 읽을 때마다 달라지는 `source` property(N6). 재구성의 **입력**도 `Path(str(...))`
-로 정규화한다(둘 다 정확 타입을 낸다 — 실측).
+클래스(N2) · 읽을 때마다 달라지는 `source` property(N6). 재구성의 **입력**은 `Path()` 로
+감싸 **정확 `PosixPath`** 로 벗긴다 — 그 객체의 `read_text`·`encode` 가 읽기에 끼어들 수 없다.
+
+**어느 파일을 읽는지는 아직 호출자가 고를 수 있다**(`__fspath__`·`__str__` 류) — 그것을 막지
+않는다. 그 **선택의 결과**를 마지막 승인 검사가 받기 때문이다: 무엇을 읽었든 그 바이트가
+등록부의 승인 내용이 아니면 거부된다(실측 — 경로를 비트는 모양 일곱이 전부 거부되거나 승인
+값으로 돌아온다).
+
+**앞 판은 `Path(str(...))` 였고 `str()` 을 지웠다**(cr r6 M-1): `str()` 은 ⑴ 정확 타입을
+보장하지 않고(`__str__` 이 `str` 하위 클래스를 돌려줄 수 있다 — 실측) ⑵ 오히려 **어느 파일을
+읽을지 호출자의 `__str__` 에 넘긴다(`Path(str(x))` 는 그 반환을 쓰고 `Path(x)` 는 실제 경로를
+쓴다 — 실측). 그리고 그 줄을 지워도 붉어지는 test 가 없었다(변이 GREEN). 더 적은 코드로 더
+좁은 입력이 된다.
 
 세 축을 남겨 둔 이유는 **진단**이다: 어느 축이 어긋났는지 문면으로 갈려야 사고 때 길을 찾고,
 그 역할 분리를 test 의 문면 단언이 지킨다.
@@ -37,7 +48,7 @@ F6·F7·F8). 축을 더 세는 것으로는 닫히지 않는다(직렬화를 보
 그래서 **값의 출처를 바꾼다**: 게이트가 쓰는 객체는 로더가 만든 것이다. 그리고 그 객체가
 승인 산출물인지는 **호출자 객체가 통제할 수 없는 자리**에서 묻는다(v r5 H-5 — 아래).
 
-## 승인을 묻는 자리는 **둘**이다
+## 승인을 묻는 자리는 **둘**이다 (역할 기준 — 호출은 이 모듈 안에서 둘이다)
 
 1. **조립 근** — `load_approved_evaluation_policy` ← `app.server._preload`. 운영자의 선택
    (`ML_ENGINE_EVALUATION_POLICY`)이 들어오는 자리이고, 역할은 **빨리 실패하는 것**이다:
@@ -56,7 +67,7 @@ F6·F7·F8). 축을 더 세는 것으로는 닫히지 않는다(직렬화를 보
 어느 **파일**을 정책으로 쓸지는 운영자가 고르지만 **승인된 산출물 사이에서만**이다. 완화된
 임계는 승인 근거와 version·effective date 를 가진 정책 산출물로만 존재할 수 있고, 그 지문이
 report 에 남는다. 출하 파일 자체를 고치는 길은 런타임이 아니라 **CI**(등록부 ↔ 출하 지문 등식
-test)가 막는다. 위협 모델 경계 문장은 design-review §0.
+test)가 막는다. 위협 모델 경계 문장은 design-review §0a·§0b.
 
 **라이브러리 진입점은 그대로다** — `training.holdout.run_holdout` 은 커널 test 가 승인 밖
 조합(seed 수를 줄인 정책 등)으로도 불러야 하므로 재검증을 그 안에 두지 않는다.
@@ -108,10 +119,8 @@ def verify_policy_source(
         return PolicySourceMismatch(
             f"승인된 정책 산출물이 아니다({approval.reason.value}): {approval.detail}"
         )
-    # 재구성의 **입력**을 정확 타입으로 정규화한다(v r5 H-5): 경로 하위 클래스의
-    # `read_text` 가 읽기에 끼어들 수 있었다(N2 — 완화 텍스트를 주면서 그 텍스트의 `encode`
-    # 로 승인 지문을 만든다). `str()` 과 `Path()` 가 각각 정확 타입을 낸다(실측, test 있음).
-    reloaded = load_evaluation_policy(Path(str(policy.source.path)))
+    # `Path()` 로 호출자 경로 객체의 메서드를 벗긴다 — 사유는 모듈 docstring.
+    reloaded = load_evaluation_policy(Path(policy.source.path))
     if isinstance(reloaded, PolicyRejected):
         return PolicySourceMismatch(
             f"정책 파일을 다시 읽을 수 없다({reloaded.reason.value}): {reloaded.detail}"

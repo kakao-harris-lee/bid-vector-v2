@@ -241,23 +241,33 @@ def _is_policy_type(part: object, policy_types: tuple[type, ...]) -> bool:
 
 
 def _src_functions() -> list[tuple[str, str, object]]:
-    """src 전체의 함수 전수 — 모듈 수준 **과 클래스 멤버**(cr r5 M-1 ⑵).
+    """src 전체의 함수 전수 — 모듈 수준 함수 + **클래스 멤버**(함수·`staticmethod`·
+    `classmethod`).
 
-    앞 판은 `vars(module)` 의 `inspect.isfunction` 만 봤다. 그래서 같은 입구를 클래스의
-    `@staticmethod` 로 두면 모집단에 들어오지 않았다(cr 실측 — 게이트 초록)."""
+    앞 판은 `vars(module)` 의 `inspect.isfunction` 만 봤고(클래스 멤버 전부 밖), 그 다음 판은
+    클래스 멤버를 `inspect.isfunction` 으로 걸러 **`@classmethod` 를 놓쳤다** —
+    `getattr(cls, name)` 이 bound method 를 주기 때문이다(cr 실측: `@staticmethod` 는 RED,
+    `@classmethod` 는 GREEN). `inspect.isroutine` 은 둘을 함께 받고, `__module__` 비교와
+    `get_type_hints` 는 bound method 에도 그대로 돈다.
+
+    **덮지 못하는 모양**(등재): `property` getter(인자를 못 받아 주입 통로로 약하다) · 모듈
+    수준 `lambda` · 중첩 클래스의 멤버. 이 전수가 지는 것은 **유입 층**이라 그 잔여는 리뷰의
+    자리다(파일 머리 참조)."""
     found: list[tuple[str, str, object]] = []
     for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine."):
         module = importlib.import_module(info.name)
         for name, obj in vars(module).items():
-            if inspect.isfunction(obj) and obj.__module__ == module.__name__:
+            if inspect.isroutine(obj) and (
+                getattr(obj, "__module__", None) == module.__name__
+            ):
                 found.append((module.__name__, name, obj))
             elif inspect.isclass(obj) and obj.__module__ == module.__name__:
                 found.extend(
                     (module.__name__, f"{name}.{member_name}", member)
                     for member_name, member in inspect.getmembers(
-                        obj, inspect.isfunction
+                        obj, inspect.isroutine
                     )
-                    if member.__module__ == module.__name__
+                    if getattr(member, "__module__", None) == module.__name__
                     and not member_name.startswith("__")
                 )
     return found
@@ -332,9 +342,31 @@ _POLICY_ENTRY_EXCEPTIONS = frozenset(
 파일 입구도 예외도 아니면 아래 등식이 붉다."""
 
 
+def _resolve(module_name: str, name: str) -> object:
+    """`(모듈, 이름)` 좌표를 객체로 — 이름이 `Class.member` 꼴이면 점으로 쪼갠다.
+
+    cr r6 L-5 — `_src_functions` 가 클래스 멤버를 그 꼴로 좌표화하므로, 입구·예외 집합에
+    클래스 멤버가 들어오는 날 `getattr(module, "Class.member")` 가 `AttributeError` 로
+    죽는다(단언이 아니라 사고다). 지금 열하나는 전부 모듈 수준이라 도달 불가지만, 그
+    도달 불가에 기대지 않는다."""
+    resolved: object = sys.modules[module_name]
+    for part in name.split("."):
+        resolved = getattr(resolved, part)
+    return resolved
+
+
 def test_policy_factories_split_into_file_entry_points_and_derivations() -> None:
-    """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외. 새 입구를 **어느 모듈에
-    두든**, 반환 주석을 **별칭으로 가려도**, 인자를 **개명해도** 이 등식이 먼저 붉다."""
+    """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외.
+
+    **측정한 모양**에 대해 이 등식이 먼저 붉다: 모듈 수준 함수 · 클래스 멤버
+    (`staticmethod`·`classmethod`) · 어느 모듈에 두든 · 반환 주석을 PEP 695 **별칭**으로
+    가려도(해석이 풀고, 자기참조는 가드) · 인자를 **개명**해도 · 반환 타입을
+    `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다).
+
+    **반례도 측정했다**(v r6 L-2): 구식 `TypeVar(bound=…)` 반환 + `# noqa: UP047` 은 이
+    등식을 지나간다(그 noqa 가 없으면 ruff UP047 이 먼저 붉다). 이 전수가 지는 것은
+    **유입 층**이고 방어선이 아니다 — 그 잔여는 리뷰의 자리이고, 미승인 값이 판정에 닿는 것은
+    `evaluation.policy_source` 의 재구성 승인 축이 막는다(파일 머리 참조)."""
     assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_ENTRY_EXCEPTIONS
     assert frozenset() == _POLICY_FILE_ENTRY_POINTS & _POLICY_ENTRY_EXCEPTIONS
 
@@ -342,8 +374,7 @@ def test_policy_factories_split_into_file_entry_points_and_derivations() -> None
 def test_every_policy_file_entry_point_takes_only_a_path() -> None:
     """ML-07 acceptance 4 — CLI·env 로 값을 주입하는 추가 매개변수가 없다."""
     for module_name, name in sorted(_POLICY_FILE_ENTRY_POINTS):
-        module = sys.modules[module_name]
-        signature = inspect.signature(getattr(module, name))
+        signature = inspect.signature(_resolve(module_name, name))
         assert list(signature.parameters) == ["path"], (module_name, name)
 
 
@@ -351,8 +382,7 @@ def test_no_policy_entry_exception_takes_a_threshold_shaped_parameter() -> None:
     """명시 예외 쪽도 **임계 이름**은 받지 않는다 — 예외 선언이 주입 통로가 되지 않게."""
     violations: list[str] = []
     for module_name, name in sorted(_POLICY_ENTRY_EXCEPTIONS):
-        module = sys.modules[module_name]
-        signature = inspect.signature(getattr(module, name))
+        signature = inspect.signature(_resolve(module_name, name))
         violations.extend(
             f"{module_name}.{name}({parameter})"
             for parameter in signature.parameters
