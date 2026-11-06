@@ -46,23 +46,24 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 
 ## rollback
 
-## 2026-11-05T09:33Z — 임시 clone 에서 in_scope 19 경로만 base 로 되돌림(①②③)
-- cmd: `git clone -b feature/m9-award-ingest …` → `git restore --source=79f3e5c4 --staged --worktree -- <19 경로>`
-- exit: 0
-- 핵심 결과: 상태 계수 `D` 11 · `M` 8(기계 산출 목록과 같다) · `git diff 79f3e5c4 -- <19 경로>` 0 줄 ·
-  되돌리지 않기로 한 evidence 둘은 그대로
+둘째 병합으로 원천이 `3ad4f3f6` 으로 옮겨가 목록·계수가 함께 바뀌었다. 아래가 **그 원천 기준의
+재측정**이고, `df4976cc`·`79f3e5c4` 기준의 앞 두 판은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
 
-## 2026-11-05T15:35Z — 병합 뒤 재측정: 원천 `df4976cc`, 목록은 이 slice 의 커밋만(①②③)
-- cmd: `git clone -b feature/m9-award-ingest …` → `git merge-base --is-ancestor` 둘 → `git restore --source=df4976cc --staged --worktree -- <20 경로>`
+## 2026-11-06T00:4xZ — 임시 clone 에서 21 경로를 `3ad4f3f6` 으로 되돌림(①②③)
+- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`
 - exit: 0
-- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 11 · `M` 9(= 기계 산출 20 경로) · `git diff df4976cc -- <20 경로>`
-  0 줄 · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 등록부 둘에서 내 표지 0,
-  main 쪽 표지 1 과 2(남의 줄 보존) · 되돌리지 않은 evidence 다섯 그대로
+- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 9(= 기계 산출 21 경로) · `git diff 3ad4f3f6 -- <21 경로>`
+  0 줄 · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · gate-tests 에서 내 test
+  클래스 다섯 0 · main 쪽 셋 각 1 · capability map 에서 내 표지 0 · main 의 §12.3 머리 1(남의 줄 보존) ·
+  되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T00:3xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T01:02Z — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
-- 핵심 결과: FAILED task 0 — 되돌린 트리가 서고 이 slice 가 닿은 게이트까지 초록이다
+- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 9 유지) 이 slice 가 닿은 게이트
+  22 task 까지 초록이다. `:adapters:test`·`:app:test` 는 실행(100·296, 실패 0), `:workflow:test` 는
+  **FROM-CACHE** — 되돌린 입력이 그 main 트리의 통과 실행과 바이트 동일이라는 뜻이고 이 확인이
+  노리는 트리 동일성과 같은 말이다(XML 101, 실패 0).
 
 ## 병합과 그 뒤
 
@@ -91,6 +92,42 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   의존하는 port 는 domain 안에 선다」). 도메인에 이미 **메서드 하나짜리** `NoticeSourcePort` 가 있어 그것을
   재사용했다 — `procurement/**` 변경은 여전히 0 이고, 포트를 새로 지을 자리가 domain 뿐이라는 규약과
   「상세 축을 꽂을 수 없다」는 성질을 동시에 만족한다(대가는 알려진 제한 6).
+
+## 수정 라운드 (cr H-1 · M-1·M-2 · L-1~L-5·L-7)
+
+## 2026-11-06T00:48Z — H-1 회귀가 **구판에서 RED** 인가(둘째 병합 트리)
+- cmd: 종료 코드 술어만 옛 문면(`halted` 만 본다)으로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :app:test --tests '…AwardExitCodeTest' --tests '…AwardCollectionE2ETest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 8 중 2 실패이고 그 둘이 절단 단언이다(`AwardExitCodeTest` 「잘린 슬롯이 있으면
+  멈추지 않았어도 미완이다」 · E2E 「슬롯이 잘리면 멈추지 않고도 미완으로 끝낸다」). 나머지 여섯(쪽
+  걷기 포함)은 구판에서도 초록 — 절단 축만 잡는다는 음성 대조다. 원복은 그 파일 하나만(porcelain
+  빈 출력).
+
+## 2026-11-06T00:50Z — 둘째 병합 트리 표적 실행(모듈 lint · 닿은 게이트 포함)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintCheck :workflow:detekt :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt :workflow:test --tests 'bidvector.workflow.collection.*' --rerun :adapters:test --tests 'bidvector.adapters.koneps.*' --rerun :app:test --tests 'bidvector.app.collection.*' --tests 'bidvector.app.wiring.*' --tests 'bidvector.app.architecture.*' --rerun gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — test class 73(workflow 105 · adapters 102 · app 386, 실패 0이고 XML 전수가 이
+  실행 것이다) · 세 test task 전부 실행(UP-TO-DATE·FROM-CACHE 아님) · `gateRegistrationGate`·`sizeGate`
+  11 모듈 · `leakPatternGate` · `memberEffectGate` 실행
+- **앞 라운드의 이 자리는 측정이 아니었다** — 호스트 재부팅(2026-11-06 09:00 KST) 전에 빌드 자리를
+  못 잡은 실행의 결과 줄이 미리 적혀 있었다. 위 줄이 그 자리를 실측으로 바꿔치웠다.
+
+## 2026-11-06T01:01Z — workflow ktlint 는 위 실행에서 UP-TO-DATE 였다(강제 실행으로 갈음)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:ktlintKotlinScriptCheck --rerun`
+- exit: 0
+- 핵심 결과: 세 task 모두 **실행**되고 위반 0. 앞 실행에서 이 셋만 UP-TO-DATE 였고 리포트 mtime 이
+  H-1 의 workflow 편집보다 앞서 「그 판정이 현재 소스를 본 것인가」가 열려 있었다 — 강제 실행이 그
+  구멍을 닫는다(CI 전건 `check` 는 깨끗한 checkout 이라 애초에 이 틈이 없다).
+
+## 2026-11-06T00:12Z — `git merge 3ad4f3f6`(둘째 병합) 과 겹침 보존 계수
+- cmd: `git merge 3ad4f3f6` 뒤 등록부 둘의 양쪽 표지 계수 · 중복 행 훑기
+- exit: 0 (충돌 0)
+- 핵심 결과: main 의 다섯 PR(#131 cve · #133 ledger · #130 portal-02 · #132 web-followups ·
+  #135 opening-harness)이 들어왔고 겹치는 경로는 **둘**(`config/quality/gate-tests.properties` ·
+  `docs/discovery/capability-map.md`). gate-tests 는 내 test 클래스 다섯과 main 의 셋이 모두 1 ·
+  capability map 은 main 이 더한 줄이 전부 1 이고 `OPEN-` 행 중복 0 · 충돌 표지 0. capability map §12.3
+  (ledger 레인)이 「PR #128 은 새 식별자를 만들지 않고 `OPEN-SET01-AWARD-NAME-INGEST` 를 수령한다」로
+  적었으므로 이 slice 가 등재를 더할 자리는 없다.
 
 ## acceptance — 전건 `check`
 
