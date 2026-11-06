@@ -55,8 +55,11 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
 | --- | --- |
 | 무엇이 열려 있었나 | D-2b 의 두 겹은 「객체가 자기 **파일**과 같은가」까지만 묻고 「그 파일을 누가 승인했는가」를 묻지 않았다. 그래서 임계만 완화한 사본을 코드가 만들어 쓰거나 `ML_ENGINE_EVALUATION_POLICY` 로 가리키면, version 을 그대로 둔 채 전 게이트가 초록이었다(verifier 실측: `paired_t_threshold` 0.1, 전건 1700 passed, 재검증도 통과). **근원은 version 문자열이 내용에 묶여 있지 않다는 것**이고, 그래서 ML-07 수용 문면 둘이 함께 깨졌다 — 「env 로 값을 주입해도 판정이 달라지지 않는다」와 「version 이 바뀌면 전후 판정이 갈린다」(같은 version 에서 판정이 달랐다). |
 | 처방의 방향 | **열거를 뒤집는다** — 「무엇을 거부하는가」가 아니라 「무엇이 승인됐는가」를 코드 상수로 적는다(`registry.policy_approvals`: 승인 version → 그 파일 내용 sha256). |
-| 묻는 자리 | **조립 근 하나** — `load_approved_evaluation_policy`(← `app.server._preload`). 거기가 운영자의 선택(env)이 들어오는 자리다. 그 한 자리가 두 갈래를 함께 거부한다: 이름을 유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`). 거부는 다른 세 정책 축과 같은 결과 타입으로 떨어지므로 `_preload_outcomes`·pipeline factory·prediction runtime 이 각자 다시 판정하지 않는다. |
-| 사슬의 단일성 | 승인을 한 자리에서만 묻는 것이 충분한 이유는 **게이트에 닿는 정책이 그 자리를 거친 하나**라는 것이고, 그 단일성을 호출 자리 집합 등식 **넷**이 진다 — 승인 미요구 로더(policy_source 안 둘) · `build_training_pipeline`(하나) · `run_holdout`(하나) · `EvaluationPolicy` 생성 자리(로더 안 하나). 사슬: env → 승인 요구 로더 → `_preload` → `pipeline_factory` → `_run_holdout`. |
+| 묻는 자리 **둘** | ⑴ **조립 근**(`load_approved_evaluation_policy`·`load_approved_inference_policy` ← `app.server._preload`) — 운영자의 선택(env)이 들어오는 자리. ⑵ **게이트 자리**(`verify_policy_source` ← `app.pipeline._run_holdout`) — 게이트에 **닿은 값**이 승인된 산출물의 것인지. 각 자리가 두 갈래를 함께 거부한다: 이름을 유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`). 조립 근의 거부는 다른 축과 같은 결과 타입으로 떨어지므로 `_preload_outcomes`·pipeline factory·prediction runtime 이 각자 다시 판정하지 않는다. |
+| **왜 조립 근만으로는 모자랐나**(v r3 H-3a) | 조립 근은 **부팅 때 한 번** 묻는다. 그 뒤에 `copy.copy` + `object.__setattr__` 로 객체를 비틀고, 그 객체가 가리킬 **내용이 일치하는 미승인 사본**을 디스크에 써 두면 재검증의 바이트 축·값 축이 **둘 다 성립한다**(verifier MX1b: 전 게이트 초록, t=0.1 이 게이트에 닿았다). 호출 자리 집합 등식도 보지 못한다 — 그 변이는 호출 자리를 하나도 늘리지 않는다. 「게이트에 닿는 정책은 조립 근을 거친 하나」는 **호출 자리** 단일성만 말하고, 그 자리를 지나는 **값**이 승인된 것이라는 사실은 말하지 않았다. |
+| 재검증의 세 축 | **승인**(객체의 자기 주장 `version`+`source.digest` 가 등록부에 있다) → **파일 바이트**(로드 뒤 그 파일이 안 바뀌었다) → **값**(`policy_checksum` 등식). 승인을 **재로드한 파일**이 아니라 **주장**에 거는 이유는 둘째 축과 역할을 가르기 위해서다 — 그래야 바이트 축 제거 변이가 조용히 초록이 되지 않는다. |
+| 사슬의 단일성 | 호출 자리 집합 등식 **넷**이 진다 — 승인 미요구 로더(policy_source 안 둘) · `build_training_pipeline`(하나) · `run_holdout`(하나) · `EvaluationPolicy` 생성 자리(로더 안 하나). 사슬: env → 승인 요구 로더 → `_preload` → `pipeline_factory` → `_run_holdout` → 재검증. 단일성은 **값 축을 대신하지 않는다**(위 H-3a) — 둘 다 필요하다. |
+| 조립 근 test 의 정책 | 제품 경로 test(`tests/app/test_pipeline.py`)는 **출하 승인 정책 그대로** 쓴다. 앞 판은 작은 데이터셋에 맞춘 파생 정책이었고 게이트 자리의 승인 대조가 들어오자 미승인으로 떨어졌다 — **그것이 올바른 거동이다**. 출하 임계로 바꿔도 그 test 들이 재던 것을 잃지 않는다: 그 데이터셋은 `settlements.jsonl` 이 비어 성숙한 주가 0 이라 평가 창이 선택되지 않고, 그래서 `min_evaluation_rows` 같은 임계가 애초에 물리지 않는다(재는 것은 조립·취소 경계·파일 쓰기다). 승인 밖 조합이 **필요한** 커널 test 는 라이브러리 진입점을 직접 부른다. **test 전용 승인 주입 경로는 만들지 않았다** — src 가 같은 주입을 쓸 수 있는 우회 표면이 된다. |
 | 계약에서 옮긴 자리 둘 | 계약 문면은 「**로더와 재검증**이 둘 다 거부」였다. ⑴ 재검증(`verify_policy_source`)에 넣으면 **조립 근 test 일곱**이 붉어진다 — 그 test 들은 작은 데이터셋을 쓰려고 승인 밖 임계를 파일로 만들어 쓴다. ⑵ 뿌리 로더(`registry.policy.load_policy`)에 넣으면 **32 failed · 79 errors**(11 파일) — 값 불변식 test 들이 파생 정책에 현실적인 version 이름을 쓰고, 출하 추론 정책이 일부러 불완전해서(`agency_sample_threshold` 미선언) 네 helper 가 **placeholder 를 얹은 사본으로만** 로드할 수 있으며, `test_epoch` 하나는 그 이름이 승격 인용 문면에 나오는 것을 단언한다. 둘 다 **실측 뒤 되돌렸다**. 뿌리 검사가 더 막던 것은 「제품 게이트에 닿을 수 없는 경로의 편집 사본」뿐이고, 출하 파일 자체를 고치는 길은 런타임이 아니라 **CI**(등록부 ↔ 출하 지문 등식 test)가 막는다. |
 | 세 자리 등식 | 새 version 을 승인하는 길은 ⑴ `policy/*.yaml` ⑵ 등록부 한 줄 ⑶ 승인 장부(`m5/5c2`·`m5/5d` `policy-values.md` 의 지문 표)를 **같은 커밋에서** 바꾸는 것뿐이다. test 셋이 그 등식을 진다 — 지문 등식 · 장부에 그 지문이 적혀 있음 · 출하 version 전수 == 등록 + 일부러 미등록. |
 | 등록 범위 | 이 slice 가 **값을 바꾼 두 축**(`evaluation-v1`·`inference-v1`)만. `serving-v1`·`training-v1`·`strategy-backtest-v1/v2` 는 일부러 미등록이고 **그 사실을 목록으로 잠근다** — 새 정책 파일이 조용히 어느 쪽도 아닌 상태로 들어오지 못한다(6G 판정 입력인 `strategy-backtest-v2` 를 건드리지 않는 제약과 같은 자리). |
@@ -132,13 +135,23 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
 3c. **운영자가 고르는 정책 파일**: 어느 파일을 쓸지는 환경이 정한다 — 단 **승인된 산출물 사이에서만**이다
    (D-2c). 완화는 승인 근거와 version·effective date 를 가진 정책 산출물로만 가능하고, 그 파일의 지문이
    report 에 남는다. 앞 판 문면(「어느 파일이든 운영자가 고른다」)은 v H-2 가 실측으로 깼다.
-3d. **추론 축의 런타임 승인 요구는 없다**(등재): 조립 근의 승인 요구는 **평가 축**에만 걸었다 —
-   `InferencePolicy` 는 자기 파일의 지문을 들고 있지 않고(`EvaluationPolicy.source` 에 해당하는 칸이 없다),
-   그 칸을 더하면 이 slice 밖의 생성 자리 전수가 함께 움직인다. `inference-v1` 을 **등록부에 둔** 효과는
-   **CI 층**이다: 출하 `inference-v1.yaml` 을 편집하면 등록부 ↔ 출하 지문 등식 test 가 붉고, 대체 승인
-   칸의 출하값은 별도 test 가 `NOT_APPROVED` 로 고정한다. 런타임에 열려 있는 것: 완화·승인 사본으로
-   `ML_ENGINE_INFERENCE_POLICY` 를 돌리는 길 — 그 경우 응답·표의 정책 version·지문이 공시되지만 부팅이
-   막지는 않는다.
+3d. **추론 축도 부팅에서 승인을 묻는다**(v r3 H-3b = cr r3 H-1 로 **닫았다** — 앞 판은 이 자리를
+   「런타임 승인 요구 없음」으로 등재했고 그것이 열린 구멍이었다): `load_approved_inference_policy`
+   (← `_preload`)가 `inference-v1` 의 편집 사본과 이름을 바꿔 단 사본을 거부한다. `InferencePolicy` 에
+   출처 칸을 더하지 않고 닫았다 — 뿌리 로더가 **파싱에 쓴 그 텍스트**의 지문을 들고 오므로 승인 대조와
+   값 조립이 같은 바이트를 본다(생성 자리 전수를 넓히지 않는다). 그 사본이 바꿀 수 있던 값에는
+   **승격 판정 입력**이 있었다 — `maturity.window_days` 는 `build_weekly_maturity` →
+   `plan_evaluation_windows` 로 흘러 평가 창 선택을 바꾼다. **남은 자리**: backtest CLI 의
+   `--inference-policy` 는 승인을 묻지 않는다(평가 게이트가 없는 오프라인 분석 경로이고, 그 축의 판정
+   정책 `strategy-backtest-v2` 는 일부러 미등록이다 — 6G 판정 입력을 건드리지 않는 제약과 같은 자리).
+3f. **거부 사유 어휘가 경계 밖에서 관측되지 않는다**(cr r3 L-4, 등재): 조립 근이
+   `PolicyApprovalRejection` 두 값을 `PolicyRejected(INVALID_VALUE, detail)` 로 접어, 두 사유는 **문면
+   부분 문자열**로만 구별된다(env 축 test 가 「승인된 지문과 다르다」·「승인 등록부에 없는」으로 단언).
+   사유 어휘를 넓히지 않은 근거는 조립 근 로더 docstring 에 있고, 대가는 「문면을 다듬는 날 그 test 들이
+   깨진다」 — 조용한 구멍이 아니라 사람이 볼 신호다.
+3g. **승인 지문은 「파일 바이트」가 아니라 「줄끝 정규화된 텍스트」의 해시다**(cr r3 L-1, 등재):
+   `read_text` 가 universal newline 변환을 하므로 CRLF 사본은 바이트가 달라도 같은 지문이다(실측).
+   보안 영향 0 — 파싱도 같은 정규화 텍스트에서 하므로 지문과 값이 어긋날 자리가 없다.
 3e. **동적 절취는 경계 밖이다**(측정으로 등재): 조립 근이 `getattr(module, "load_" + "evaluation_policy")`
    처럼 이름을 **실행 시점에 만들어** 승인 미요구 로더를 부르면 호출 자리 집합 등식이 보지 못한다(변이
    MH5 — GREEN 실측). 같은 잔여가 H-1 라운드에도 있었고(그쪽은 값 대조가 받았다), 여기서는 받지 못한다 —

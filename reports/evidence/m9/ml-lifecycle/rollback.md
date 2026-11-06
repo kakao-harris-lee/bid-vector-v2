@@ -48,6 +48,7 @@ git restore --source=3ad4f3f6 --staged --worktree -- \
   ml-engine/src/ml_engine/training/release.py \
   ml-engine/tests/app/test_pipeline.py \
   ml-engine/tests/app/test_server.py \
+  ml-engine/tests/app/test_server_prediction.py \
   ml-engine/tests/evaluation/test_baselines.py \
   ml-engine/tests/evaluation/test_evaluation_policy.py \
   ml-engine/tests/evaluation/test_public_signatures.py \
@@ -89,7 +90,7 @@ evidence 디렉터리는 **목록 밖**이다(장부층 — 그래서 이 목록
 
 목록은 **기계 산출**이다 — `git log --no-merges --format= --name-only HEAD ^3ad4f3f6 | sort -u` 에서 이
 slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`git cat-file -e`)로 `M`/`A` 를 갈랐다
-(`M` **36** · `A` **11**). 라운드가 늘면 다시 산출한다.
+(`M` **37** · `A` **11**). 라운드가 늘면 다시 산출한다.
 
 ## 되돌린 트리에서 무엇이 꺼지는가
 
@@ -113,51 +114,50 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 
 예상 복구 시간: 명령 둘(초 단위).
 
-## 실측 (버릴 clone, **실측 HEAD `0e75f29e`** — 이 slice 의 마지막 산출물 커밋 = main 병합 커밋)
+## 실측 (버릴 clone, **실측 HEAD `cb60e7fc`** — 이 slice 의 마지막 산출물 커밋)
 
-**앞 라운드의 실측을 옮기지 않았다 — 이 절은 네 번째 측정이다.** 수정 라운드 2 가 ① 복원 **원천**을 바꿨고
-(`df4976cc` → 병합한 main `3ad4f3f6`) ② 목록을 **35+9 → 36+11** 로 늘렸다(승인 등록부 모듈·그 test·
-`tests/app/test_server.py`). 되돌림 대상이 움직일 때마다 목록을 다시 산출하고 다시 쟀다.
+**앞 라운드의 실측을 옮기지 않았다 — 이 절은 다섯째 측정이다.** 수정 라운드 3 이 복원 목록을
+**36+11 → 37+11** 로 늘렸다(`tests/app/test_server_prediction.py` — 추론 승인 낙진 수정).
+원천은 그대로 `3ad4f3f6`(팀장 지시, main 무이동 — 측정 시 `origin/main` == `3ad4f3f6` 확인).
 
 | # | 확인 | 결과 |
 |---|---|---|
-| — | 목록 등식 | 기계 산출 `M` **36** · `A` **11**(이 slice 의 evidence 제외) · 문서 목록 **36 + 11** |
+| — | 목록 등식 | 기계 산출 `M` **37** · `A` **11**(이 slice 의 evidence 제외) · 문서 목록 **37 + 11**, `comm -3` 빈 출력 |
 | ① | 복원 명령 셋 | `restore` exit **0** · `rm` exit **0** · `rm -r`(evidence) exit **0** |
-| ② | `git status --porcelain` 계수 | **`M` 36 · `D` 16**(= 신규 11 + 함께 지운 evidence 다섯) |
+| ② | `git status --porcelain` 계수 | **`M` 37 · `D` 16**(= 신규 11 + 함께 지운 evidence 다섯) |
 | ③ | `git diff 3ad4f3f6 -- .` | **빈 출력** |
-| ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**(「HEAD 초록」이 아니다): 복원 뒤 작업 트리의 `write-tree` 가 원천 트리 해시와 **같다**(`810cacbd…` 양쪽) — 되돌린 트리는 `3ad4f3f6` 과 **같은 트리**이고 그것은 CI 가 통과한 main 이다 |
+| ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**: 복원 뒤 `write-tree` == 원천 트리 해시(`810cacbd…` 양쪽) — 되돌린 트리는 `3ad4f3f6` 과 **같은 트리**이고 그것은 CI 가 통과한 main 이다 |
 | ⑥ | 이 slice 가 닿는 게이트 | 아래 「⑥ 게이트」 |
 
 ### 「내 표지 0 · 남의 표지 보존」 계수
 
-트리 해시가 같으므로 이 계수는 확인 사살이다. 그래도 **양성 대조와 함께** 센다(세지 않으면 「0 이 방어인지
-미측정인지」가 같은 값이 된다).
+양성 대조와 함께 센다. 라운드 3 의 새 표지 둘을 더했다.
 
 | 표지 | 복원 뒤 | 레인 worktree(양성 대조) |
 |---|---|---|
 | `policy_approvals` · `load_approved_evaluation_policy` | 0 · 0 | 양수 |
+| `load_approved_inference_policy` (라운드 3) | **0** | 6 파일 |
+| `_check_substitute_exclusion` · `_opened_at_counts` (라운드 3) | **0** · **0** | 2 · 4 파일 |
 | `policy_source_digest` | **0** | 8 파일 |
 | `UnmeasurableTimeAxis` · `TimeAxisSubstitute` | **0** · 0 | 8 파일 · 양수 |
-| `_window_release_id` | **0** | 4 파일 |
-| `PromotionSuperseded` | **0** | 양수 |
+| `_window_release_id` · `PromotionSuperseded` | **0** · 0 | 4 파일 · 양수 |
 
-**표지로 쓸 수 없는 어휘 둘을 측정으로 걸러냈다**: `sample_scope`(복원 뒤 **6 파일**)와
-`effective_date`(**2 파일**)는 **상류 어휘**다 — 6G 백테스트가 이미 쓴다. 그 둘을 표지로 썼으면 「0 이
-아니다」가 결함처럼 보였거나(이 경우) 상류가 이름을 채택한 날 조용히 공허해졌을 것이다. 표지는 이 slice 가
-**새로 만든 이름**이어야 한다.
+**표지로 쓸 수 없는 상류 어휘 둘**(앞 라운드에 측정으로 걸러냈다): `sample_scope` ·
+`effective_date` — 6G 백테스트가 이미 쓴다.
 
 | 남의 표지(보존되어야 한다) | 복원 뒤 |
 |---|---|
 | `web/e2e/harness/opening-axis.mjs`(opening-harness 레인) | **있음** |
 | `reports/evidence/m9/{opening-harness,ledger}/scope.md` | **있음** |
-| `docs/discovery/capability-map.md` 줄수 | **3971 == 원천 3971** |
+| `docs/discovery/capability-map.md` 줄수 | **원천과 같다** |
 
 ## ⑥ 게이트
 
-복원으로 트리가 원천과 **바이트 동일**해지므로 ml-engine job 의 열한 단계(S-1~S-11) 입력이 전부 원천과 같다 —
-그 트리는 CI 가 통과한 main 이다. 이 slice 의 evidence 디렉터리를 **남겨 둘 경우** 유일한 차이가 그
-디렉터리이고, 그것을 입력으로 삼는 게이트는 Kotlin `check` job 의 누출 패턴 게이트 하나다. 이 레인은 Gradle 을
-돌리지 않으므로(M9 공통 규율) 그 축은 **PR CI 가 정본**이고, 같은 어휘의 참조형 스캔만 로컬에서 쟀다.
+복원으로 트리가 원천과 **바이트 동일**해지므로 ml-engine job 의 열한 단계 입력이 전부 원천과
+같다 — 그 트리는 CI 가 통과한 main 이다. 이 slice 의 evidence 디렉터리를 **남겨 둘 경우**
+유일한 차이가 그 디렉터리이고, 그것을 입력으로 삼는 게이트는 Kotlin `check` job 의 누출 패턴
+게이트 하나다. 이 레인은 Gradle 을 돌리지 않으므로(M9 공통 규율) 그 축은 **PR CI 가 정본**
+이고, 같은 어휘의 참조형 스캔만 로컬에서 쟀다.
 
 | 명령 | 결과 |
 |---|---|
@@ -166,9 +166,9 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 ## 유효성 확인 (감사자용)
 
 ```bash
-git diff --name-only 0e75f29e..<판정 SHA> -- <위 복원 목록 36 + 신규 11>
+git diff --name-only cb60e7fc..<판정 SHA> -- <위 복원 목록 37 + 신규 11>
 ```
 
-빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도 나오면 미검증이다.
-이 slice 는 실측 뒤 **evidence 만** 커밋했으므로 그 출력이 비어 있어야 한다. **판정 SHA 와 실측 HEAD 가 같은
-커밋인 것**(`0e75f29e`)은 우연이 아니다 — 산출물 커밋을 모두 끝낸 뒤 쟀고 그 뒤에는 evidence 만 커밋한다.
+빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도
+나오면 미검증이다. 이 slice 는 실측 뒤 **evidence 만** 커밋했으므로 그 출력이 비어 있어야 한다 — **판정 SHA
+`cb60e7fc`(= 실측 HEAD)** 와 evidence HEAD 사이의 그 diff 가 **빈 출력**임을 확인했다.
