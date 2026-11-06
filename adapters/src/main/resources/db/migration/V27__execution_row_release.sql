@@ -2,10 +2,16 @@
 --
 -- **표 둘이다.** OPS-10 이 지목한 넷 가운데 `notice`·`opening_result` 는 열을 더하지 않는다 —
 -- 그 두 표는 `observation_key` 가 **NOT NULL FK** 로 `raw_observation` 을 가리키고 그 표의
--- `release_sha` 가 NOT NULL 이므로, 「이 행을 만든 릴리스」가 조인 하나로 이미 답해진다.
--- 베껴 두면 같은 사실이 두 자리에 살고 한쪽만 바뀌는 날이 온다(보존 규칙도 이 조인을 깨지
--- 않는다 — `raw_observation` 은 파기 대상이 아니라 마스킹 대상이다). 그 도달성은 스키마
--- 사실이라 test 가 잠근다(`ExecutionRowReleaseTest` 의 FK·NOT NULL 등식).
+-- `release_sha` 가 NOT NULL 이라, 조인 하나가 「그 **원문을 수집한** 릴리스」를 답한다.
+-- **그 답이 「이 행을 쓴 릴리스」인 표는 `notice` 하나다** — 수집 run 이 원문과 canonical 을
+-- 같은 run 에 쓰기 때문이다. `opening_result`(그리고 `opening_reserve_price`)는 **승격 러너**가
+-- 쓰므로 별 프로세스·다른 릴리스일 수 있고, 조인은 그 질문에 답하지 않는다.
+-- 그래도 이번에 칸을 더하지 않는 이유는 비용이 그대로이기 때문이다 — 승격 경로의 `UPDATE` 가
+-- V2 의 판 번호 증가와 감사 행 삽입 트리거를 깨우고, 베껴 둔 값은 같은 사실이 두 자리에 살아
+-- 한쪽만 바뀌는 날이 온다(보존 규칙은 이 조인을 깨지 않는다 — `raw_observation` 은 파기 대상이
+-- 아니라 마스킹 대상이다). 그 결정과 범위는 `OPEN-M9-PROMOTED-ROW-RELEASE` 가 받는다.
+-- 조인의 **도달성**은 스키마 사실이라 test 가 잠근다(`ExecutionRowReleaseTest` 의 FK·NOT NULL
+-- 등식) — 그 등식이 재는 것은 도달성이고, 「누가 썼는가」와 같지 않다.
 --
 -- `collection_run`·`outbox` 는 그 경로가 **없다** — 관측을 가리키는 열이 없고(회계 행은 배치
 -- 하나를 요약하고, outbox 행은 도메인 write 에서 태어난다) 그래서 이 둘만 칸을 받는다.
