@@ -15,12 +15,27 @@ import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
  * `.spec.ts` 가 **아니다** — Playwright 의 `testMatch` 가 그 꼴만 수집하므로 이 파일은 test 로
  * 집히지 않는다.
  */
+/**
+ * 개찰 결과 갈래 하나의 설계(M9/opening-harness) — **하네스가 적고 spec 이 읽는다.** spec 에
+ * 베껴 적으면 설계와 기대가 사본 둘이 되고 한쪽만 고쳐진다(이 파일 머리 주석의 승인 목록 선례).
+ */
+export interface OpeningAxisDesign {
+  readonly noticeNumber: string;
+  readonly expectedOpeningState: string;
+  /** 잠정 1위 축의 기대(cr MEDIUM-1) — 그 축을 응답에서 읽어 되비추지 않으려는 자리다. */
+  readonly expectedProvisionalState: string;
+  /** 그 공고가 **왜** 그 갈래인가 — 붉어질 때 설계 의도를 읽는 사람에게 함께 준다. */
+  readonly why: string;
+}
+
 interface JourneyContext {
   readonly previewUrl: string;
   readonly loginName: string;
   readonly passphrase: string;
   /** 이 실행의 번들이 낸 자산 경로 전수 — 하네스가 빌드 직후 적는다(v r3 M-2). */
   readonly bundleAssets: readonly string[];
+  /** 개찰 결과 상태 아홉을 낳는 공고 설계표 — 하네스의 수집·승격 걸음이 그것을 세운다. */
+  readonly openingAxis: readonly OpeningAxisDesign[];
 }
 
 const CONTEXT_PATH = resolve(tmpdir(), 'bidvector-7e1-journey-context.json');
@@ -54,6 +69,22 @@ function parseContext(raw: string): JourneyContext {
       ['loginName', typeof candidate.loginName === 'string'],
       ['passphrase', typeof candidate.passphrase === 'string'],
       ['bundleAssets', Array.isArray(candidate.bundleAssets)],
+      // **빈 목록도 없는 것으로 본다**: 설계표가 비면 아홉 갈래 등식이 「전부 통과」와 「아무것도
+      // 재지 않았다」를 같은 값으로 낸다(여정 레인 판정의 ⓒ 축과 같은 사유).
+      ['openingAxis', Array.isArray(candidate.openingAxis) && candidate.openingAxis.length > 0],
+      // **원소 모양까지 본다**(cr LOW): 배열성만 보면 망가진 원소가 「설계: undefined」로 나타나고
+      // 그 붉음은 원인을 말하지 않는다.
+      [
+        'openingAxis 원소(noticeNumber·expectedOpeningState·expectedProvisionalState·why)',
+        Array.isArray(candidate.openingAxis) &&
+          candidate.openingAxis.every(
+            (one) =>
+              typeof one?.noticeNumber === 'string' &&
+              typeof one?.expectedOpeningState === 'string' &&
+              typeof one?.expectedProvisionalState === 'string' &&
+              typeof one?.why === 'string',
+          ),
+      ],
     ] as const
   )
     .filter(([, ok]) => !ok)
