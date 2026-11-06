@@ -117,27 +117,49 @@ def test_time_axis_policy_is_constructed_only_from_the_versioned_policy() -> Non
     }
 
 
+def _policy_text_with_substitute(raw: str) -> str:
+    """출하 정책 **원문**의 대체 승인 한 줄만 `raw` 로 바꾼다 — 따옴표 없이, 적은 그대로.
+
+    v r2 M-2 — 앞 판은 값을 `yaml.safe_dump` 로 썼고, safe_dump 는 `yes` 를 `'yes'` 로
+    **인용한다**. 그래서 실제 공격 벡터(비인용 `yes` → YAML 1.1 이 bool `True` 로 읽는다)가
+    파일에 한 번도 들어가지 않았다 — 그 test 는 문자열 여덟만 재고 있었다."""
+    original = _SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8")
+    replaced = original.replace(
+        'maturity.time_axis_substitute: "NOT_APPROVED"',
+        f"maturity.time_axis_substitute: {raw}",
+    )
+    assert replaced != original, "대체 승인 줄을 찾지 못했다"
+    return replaced
+
+
 @pytest.mark.parametrize(
-    "raw",
+    ("raw", "parses_to_bool"),
     [
-        "yes",  # YAML 1.1 참값 — 앞 판의 bool 칸은 이것을 **승인으로** 읽었다(v L-2)
-        "on",
-        "y",
-        "true",
-        "True",
-        "1",
-        "APPROVED_SOMEDAY",
-        "approved",
+        ("yes", True),  # YAML 1.1 참값 — 앞 판의 bool 칸은 이것을 **승인으로** 읽었다
+        ("on", True),
+        ("y", False),  # YAML 1.2 코어 스키마로 읽는 PyYAML 에서는 문자열이다
+        ("true", True),
+        ("True", True),
+        ("1", False),  # int
+        ("APPROVED_SOMEDAY", False),
+        ("approved", False),
+        ('"yes"', False),  # 인용판 — 앞 판 test 가 실제로 재던 것
     ],
 )
 def test_loose_truthy_spellings_never_become_an_approval(
-    tmp_path: Path, raw: str
+    tmp_path: Path, raw: str, parses_to_bool: bool
 ) -> None:
-    """승인은 닫힌 어휘 두 단어 중 하나를 적어야만 생긴다."""
-    values = dict(yaml.safe_load(_SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8")))
-    values["maturity.time_axis_substitute"] = raw
+    """승인은 닫힌 어휘 두 단어 중 하나를 적어야만 생긴다.
+
+    `parses_to_bool` 은 **입력이 실제로 YAML bool 로 들어갔는지**를 함께 단언한다 — 그
+    단언이 없으면 「bool 을 승인으로 받는」 변이가 이 test 를 지나갈 수 있다(파일에 bool 이
+    한 번도 없으면 그 변이는 아무것도 바꾸지 않는다, 앞 판의 결함)."""
     path = tmp_path / "inference.yaml"
-    path.write_text(yaml.safe_dump(values), encoding="utf-8")
+    path.write_text(_policy_text_with_substitute(raw), encoding="utf-8")
+
+    parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(parsed["maturity.time_axis_substitute"], bool) is parses_to_bool
+
     assert not isinstance(load_inference_policy(path), InferencePolicy), raw
 
 

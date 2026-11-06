@@ -82,7 +82,8 @@ type TimeAxis = KnownTimeAxis | UnmeasurableTimeAxis
 class TimeAxisSubstitute(StrEnum):
     """대체 출처 승인 상태 — **닫힌 어휘**다(v L-2).
 
-    앞 판은 정책 파일의 bool 한 칸이었다. YAML 1.1 은 `yes`·`on`·`y` 를 **참으로 읽으므로**
+    앞 판은 정책 파일의 bool 한 칸이었다. PyYAML 은 `yes`·`Yes`·`YES`·`on`·`On` 을 **bool 로
+    읽으므로**
     `maturity.time_axis_substitute_approved: yes` 가 승인으로 통과했다(실측 — 그 판의 키 이름
     이다) — 로더가 bool
     타입만 보았기 때문이다(`"true"`·`1` 은 거부됐으니 「느슨한 참값을 승인으로 읽지

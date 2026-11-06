@@ -284,6 +284,32 @@ def test_run_holdout_with_no_evaluable_windows_still_produces_report() -> None:
     assert isinstance(result.promotion, PromotionNotEvaluable)
 
 
+def test_report_carries_the_digest_of_the_policy_file_it_judged_with() -> None:
+    """v r2 M-1 — 값 slice 의 **wire 축**. 「어느 파일로 판정했는가」는 report 에 지문으로
+    남아야 하고, 그 배선이 없으면(또는 상수로 채워지면) 산출물이 거짓을 공시한다 — 그런데
+    앞 판에는 그 등식을 재는 test 가 없어 배선을 상수로 바꿔도 전건이 초록이었다."""
+    policy = _policy()
+    result = run_holdout(
+        _dataset(_many_rows(10)),
+        [
+            WeekMaturity(
+                start=_EPOCH + timedelta(days=8),
+                end=_EPOCH + timedelta(days=15),
+                opened_count=10,
+                settled_count=1,
+            )
+        ],
+        _spec(),
+        _training_policy(),
+        policy,
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.policy_source_digest == policy.source.digest
+    assert result.policy_version == policy.version
+
+
 def _selected_window_scenario(
     min_training_rows: int = 5,
 ) -> tuple[LoadedDataset, WeekMaturity]:
