@@ -36,7 +36,9 @@ abstract class MutationReportGateTask : DefaultTask() {
      * 1. **부재를 허용한다.** `@InputFile` 이면 task 실행 전에 Gradle 이 파일 존재를 검증해
      *    "Input file does not exist" 로 죽고, [mutationGateViolations] 의 「존재하지 않는다」
      *    가지가 프로덕션 배선에서 닿지 못하는 죽은 가지가 된다(`cpdReportPresenceGate` 가 같은
-     *    실측으로 같은 선택을 했다). 순서는 배선부의 명시적 `dependsOn(pitest)` 가 진다.
+     *    실측으로 같은 선택을 했다). 순서는 이 입력의 배선이 진다 — 자리를 pitest task 의
+     *    출력 속성에서 파생하므로(`pitestMutationXmlReport`) 게이트가 그 산출물의 소비자로
+     *    선언되고, 배선부의 명시적 `dependsOn(pitest)` 는 그 사실을 눈에 보이게 적어 둔 것이다.
      * 2. **지문이 배선의 둘째 줄에 기대지 않는다.** 앞 판은 지문용 property 를 따로 두고
      *    convention 이 한 값에서 둘을 채웠다 — 그 **한 줄을 지우면** TestKit fixture 는 두
      *    property 를 스스로 묶으므로 test 가 초록인데, 프로덕션 증분 빌드는 「main 산출물·정책은

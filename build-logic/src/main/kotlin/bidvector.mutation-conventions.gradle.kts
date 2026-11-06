@@ -2,6 +2,7 @@ import bidvector.buildlogic.MutationCoverageGateTask
 import bidvector.buildlogic.MutationPolicy
 import bidvector.buildlogic.MutationReportGateTask
 import bidvector.buildlogic.PackageOwnershipPolicy
+import bidvector.buildlogic.pitestMutationXmlReport
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
@@ -46,9 +47,10 @@ if (project.name !in architecturePolicy.requireList("layer.domain").toSet()) {
 val ownedPackage =
     PackageOwnershipPolicy(architecturePolicy.requireValue("package.root")).ownedPackage(project.name)
 
-// 리포트 자리를 우리가 정한다 — 게이트와 도구가 **한 값**을 보게 한다(cpd 관례).
+// 리포트 자리를 우리가 정한다 — 실행마다 바뀌면 게이트가 그 자리를 가리킬 수 없다(cpd 관례).
+// **이 값을 게이트에 다시 적지 않는다**: 게이트는 pitest task 의 속성에서 자리를 받아 간다
+// (`pitestMutationXmlReport`). 같은 경로를 두 자리에 적으면 한쪽만 옮기는 조용한 우회가 생긴다.
 val pitestReportDir = layout.buildDirectory.dir("reports/pitest")
-val pitestXmlReport = pitestReportDir.map { it.file("mutations.xml") }
 
 pitest {
     // 버전은 카탈로그가 정본이다(정책 데이터에 복제하지 않는다). plugin 기본 PIT 는 우리가 고정한
@@ -76,9 +78,9 @@ val mutationReportGate =
         description = "mutation 점수·변이 수·변이 클래스 수의 절대값 래칫(ADR 0007 OPEN-ADR-07)"
         moduleName = project.name
         policyFile = mutationPolicyFile
-        // **한 줄이다** — 같은 선언이 메시지용 경로와 task 지문을 함께 낸다(task KDoc). 지문을
-        // 따로 배선하던 앞 판은 그 둘째 줄이 지워지면 test 가 초록인 채로 거짓 초록으로 돌아갔다.
-        mutationXmlReport.set(pitestXmlReport)
+        // **한 줄이고, 그 값은 도구에서 온다** — 같은 선언이 메시지용 경로와 task 지문을 함께
+        // 내고(task KDoc), 자리는 pitest 자신의 `reportDir` 에서 파생한다(헬퍼 KDoc).
+        mutationXmlReport.set(pitestMutationXmlReport())
         classDirectories.from(provider { sourceSets["main"].output.classesDirs })
         dependsOn(tasks.named("pitest"))
         report = layout.buildDirectory.file("reports/mutation-gate/violations.txt")

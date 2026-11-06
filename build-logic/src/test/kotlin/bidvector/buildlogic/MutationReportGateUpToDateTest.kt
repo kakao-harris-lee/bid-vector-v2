@@ -9,7 +9,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * **래칫의 판정 근거가 task 지문 안에 있는지**를 재는 유일한 실행 증거.
+ * **래칫의 판정 근거가 어디서 와서 지문에 들어가는지**를 재는 유일한 실행 증거 — 축이 둘이다.
+ * 「도구가 실제로 쓴 자리에서 오는가」(마지막 test)와 「그 내용이 바뀌면 다시 도는가」(앞의 셋).
+ * 둘 중 하나가 깨지면 게이트는 **낡은 근거로 조용히 통과**한다.
  *
  * 래칫이 존재하는 이유가 「test 가 약해지는 것」인데, 판정 근거(`mutations.xml`)가 선언 입력
  * 밖에 있으면 바로 그 경우에 게이트가 UP-TO-DATE 로 건너뛰고 exit 0 이 된다 — main 산출물과
@@ -90,13 +92,25 @@ class MutationReportGateUpToDateTest {
         )
     }
 
-    private fun run(expectFailure: Boolean) =
-        GradleRunner
-            .create()
-            .withProjectDir(projectDir)
-            .withPluginClasspath()
-            .withArguments(":mutationReportGate", "--stacktrace")
-            .let { if (expectFailure) it.buildAndFail() else it.build() }
+    /**
+     * `excludePitest` 는 **pitest 자신의 속성에서 파생한** 배선을 쓰는 fixture 에만 쓴다 — 그
+     * 배선은 pitest task 를 게이트의 생산자로 묶으므로(그것이 처방의 요지다) 빼지 않으면 PIT 가
+     * 실제로 뜬다. 여기서 재는 것은 분석이 아니라 **게이트가 어느 파일을 읽는가**다.
+     */
+    private fun run(
+        expectFailure: Boolean,
+        excludePitest: Boolean = false,
+    ) = GradleRunner
+        .create()
+        .withProjectDir(projectDir)
+        .withPluginClasspath()
+        .withArguments(
+            buildList {
+                add(":mutationReportGate")
+                if (excludePitest) addAll(listOf("-x", "pitest"))
+                add("--stacktrace")
+            },
+        ).let { if (expectFailure) it.buildAndFail() else it.build() }
 
     @Test
     fun `리포트만 나빠져도 게이트가 다시 돌아 실패한다 — UP-TO-DATE 로 건너뛰지 않는다`() {
@@ -161,8 +175,101 @@ class MutationReportGateUpToDateTest {
         )
     }
 
+    /**
+     * **pitest 가 리포트를 쓰는 자리를 옮긴** fixture. 실제 plugin 을 적용해 `reportDir` 을
+     * 옮기고, 옛 자리에는 **좋은 낡은 리포트**를 남긴다 — 로컬 증분 빌드의 모양이다.
+     *
+     * 게이트의 배선은 **프로덕션과 같은 한 줄**(`pitestMutationXmlReport()`)이다. 그 자리를
+     * 고정 경로로 바꿔치우면 게이트는 옛 자리를 읽고 아래 둘이 RED 가 된다.
+     */
+    private fun writeMovedReportDirFixture() {
+        File(projectDir, "settings.gradle.kts").writeText("rootProject.name = \"fixture\"\n")
+        File(projectDir, "policy.properties").writeText(
+            """
+            policy.version=1
+            mutation.modules=fixture
+            threads=1
+            output.formats=XML
+            ratchet.fixture.score.min-percent=50
+            ratchet.fixture.mutations.min=$TOTAL_MUTATIONS
+            ratchet.fixture.classes.min=1
+            """.trimIndent() + "\n",
+        )
+        File(projectDir, "classes/a").apply { mkdirs() }
+        File(projectDir, "classes/a/B.class").writeText("")
+        val classpath = pluginClasspath().joinToString(", ") { "\"${it.invariantSeparatorsPath}\"" }
+        File(projectDir, "build.gradle.kts").writeText(
+            """
+            import bidvector.buildlogic.pitestMutationXmlReport
+
+            buildscript { dependencies { classpath(files($classpath)) } }
+
+            apply(plugin = "java")
+            apply(plugin = "info.solidsoft.pitest")
+
+            // 도구가 쓰는 자리를 옮긴다. 옛 자리('$STALE_REPORT_DIR')의 리포트는 그대로 남는다.
+            configure<info.solidsoft.gradle.pitest.PitestPluginExtension> {
+                reportDir.set(layout.projectDirectory.dir("$MOVED_REPORT_DIR"))
+            }
+
+            tasks.register<bidvector.buildlogic.MutationReportGateTask>("mutationReportGate") {
+                moduleName.set("fixture")
+                policyFile.set(layout.projectDirectory.file("policy.properties"))
+                mutationXmlReport.set(pitestMutationXmlReport())
+                classDirectories.from(layout.projectDirectory.dir("classes"))
+                report.set(layout.buildDirectory.file("violations.txt"))
+            }
+            """.trimIndent() + "\n",
+        )
+    }
+
+    private fun writeReport(
+        dir: String,
+        detected: Int,
+    ) = File(projectDir, "$dir/mutations.xml")
+        .apply { parentFile.mkdirs() }
+        .writeText(mutationsXml(detected))
+
+    @Test
+    fun `pitest 가 리포트를 쓰는 자리를 옮기면 게이트도 그 자리를 읽는다 — 낡은 리포트로 통과하지 않는다`() {
+        // 지역 값 하나가 「도구가 쓰는 자리」와 「게이트가 읽는 자리」를 묶고 있던 판에서는, 한쪽만
+        // 옮기고 옛 리포트를 남기면 로컬 증분 빌드가 **좋은 낡은 수**로 통과했다(verifier B5).
+        writeMovedReportDirFixture()
+        writeReport(STALE_REPORT_DIR, detected = TOTAL_MUTATIONS)
+        writeReport(MOVED_REPORT_DIR, detected = 0)
+
+        val result = run(expectFailure = true, excludePitest = true)
+
+        assertEquals(TaskOutcome.FAILED, result.task(":mutationReportGate")?.outcome, result.output)
+        assertTrue(
+            result.output.contains("mutation 점수"),
+            "옮긴 자리의 리포트를 읽지 않았다(부재나 다른 축으로 실패했다):\n${result.output}",
+        )
+    }
+
+    @Test
+    fun `옮긴 자리의 리포트가 좋으면 게이트는 통과한다 — 자리를 따라간다는 양방향 대조`() {
+        // 위 test 의 통제군. 「옮긴 자리를 읽는다」가 실패 방향으로만 성립하면 그것은 자리를
+        // 따라가는 것이 아니라 그냥 붉은 것이다.
+        writeMovedReportDirFixture()
+        writeReport(STALE_REPORT_DIR, detected = 0)
+        writeReport(MOVED_REPORT_DIR, detected = TOTAL_MUTATIONS)
+
+        assertEquals(
+            TaskOutcome.SUCCESS,
+            run(expectFailure = false, excludePitest = true).task(":mutationReportGate")?.outcome,
+            "옮긴 자리의 좋은 리포트로 통과하지 않았다",
+        )
+    }
+
     private companion object {
         /** fixture 의 변이 수. 래칫 `mutations.min` 과 같은 값이라 그 축은 늘 만족한다 — 재는 것은 점수 축이다. */
         const val TOTAL_MUTATIONS = 4
+
+        /** pitest 가 **옮겨 간** 자리 — 게이트가 읽어야 하는 쪽. */
+        const val MOVED_REPORT_DIR = "pitest-moved"
+
+        /** 옛 자리 — 좋은 수를 담은 낡은 리포트가 남아 있는 쪽. */
+        const val STALE_REPORT_DIR = "pitest-stale"
     }
 }
