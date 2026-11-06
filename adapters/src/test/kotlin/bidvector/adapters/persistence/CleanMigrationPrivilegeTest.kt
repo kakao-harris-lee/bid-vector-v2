@@ -346,7 +346,10 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
             //
             // `insert` 가 r1 검토(verifier F5)에서 `true` → `false` 로 바뀌었다: 표 단위 INSERT
             // 는 적재 시각을 **INSERT 때 먼 미래로 지정**하는 길을 열어 두었고(그 행은 보존
-            // cutoff 를 영영 지나지 않는다), 그래서 코드가 실제로 넣는 일곱 열로 좁혔다.
+            // cutoff 를 영영 지나지 않는다), 그래서 코드가 실제로 넣는 열로 좁혔다. **그 수는
+            // 여덟이다** — V23 의 일곱에 M9/paper-bid 가 `bid_kind` 를 더했다(V25 ⑦).
+            // 이 행의 단언은 표 단위 술어라 그 변화에 **흔들리지 않는다**(그래서 주석만
+            // 낡았다 — cr LOW).
             //
             // 이 행에서 읽히는 핵심은 **DELETE·TRUNCATE 가 false** 라는 것이다: 앱 프로세스가
             // 장악돼도 알림을 지울 수 없다(파기는 소유자 연결의 일이다).

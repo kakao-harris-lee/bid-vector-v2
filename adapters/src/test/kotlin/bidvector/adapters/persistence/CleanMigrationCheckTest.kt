@@ -110,7 +110,12 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // detail_code 어휘 1 + 종류↔detail 짝 1 = 5.
             // **`read_at >= created_at` 은 없다** — 두 시계를 비교하는 제약이라 시계 틀어짐이 곧
             // 쓰기 실패였다(V23 주석). 그 수를 6 에서 5 로 내린다.
-            "notification_inbox" to 5,
+            // **M9/paper-bid(V25)가 둘을 더해 7 이다**: bid_kind 어휘 1 + 종류↔bid_kind 짝 1.
+            // 짝 제약이 따로 서는 이유는 어휘만 닫으면 마감 알림이 `NONE` 으로, 투찰가 요청이
+            // `PAPER` 로 들어가기 때문이다(전자는 두 연습을 다시 한 항목으로 합친다).
+            // V25 의 어휘 제약에는 `IS NOT NULL` 갈래가 **없다** — 그 열은 NOT NULL 이라 세 값
+            // 논리가 제약을 열어 줄 자리가 없다(detail 축과 다른 점).
+            "notification_inbox" to 7,
         )
 
     @Test

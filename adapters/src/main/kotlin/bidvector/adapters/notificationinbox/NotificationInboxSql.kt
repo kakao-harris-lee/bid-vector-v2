@@ -42,12 +42,21 @@ internal object NotificationInboxSql {
      *   이미 본 항목이 목록에서 내려갔다 올라오는 흔들림이 생긴다. 두 축을 종류 전수 test 가
      *   함께 잠근다.
      * · `RETURNING (xmax = 0)` 으로 삽입/갱신을 가른다 — `opening_result` upsert 의 기존 관례다.
+     *
+     * **`ON CONFLICT` 키는 PK 열 전수다**(M9/paper-bid · V25 로 다섯이 됐다). 열 집합이 PK 와
+     * 다르면 PostgreSQL 이 「유일 제약이 없다」로 **문장을 거부**하고, 투찰 종류를 빼면 서면과
+     * 실투찰이 다시 한 항목을 덮어쓴다. 그 둘을 **거동 하나**가 함께 잡는다 — 출하 상수를
+     * 그대로 쏘아 ⓐ 같은 다섯 열 키의 재기록이 1 행(멱등)이고 ⓑ 투찰 종류만 다른 재기록이
+     * 2 행임을 잰다(문자열을 파싱하지 않는다).
+     *
+     * 문장의 열 순서가 **PK 열 순서 그대로**다 — 키를 읽는 순서(계정 → 공고 → 투찰 종류 →
+     * 알림 종류)가 문장과 PK 와 `NotificationItemKey` 세 자리에서 같다.
      */
     const val UPSERT_ITEM = """
         INSERT INTO notification_inbox
-            (account_id, kind, notice_number, notice_round, detail_code, occurred_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, now())
-        ON CONFLICT (account_id, kind, notice_number, notice_round) DO UPDATE SET
+            (account_id, notice_number, notice_round, bid_kind, kind, detail_code, occurred_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, now())
+        ON CONFLICT (account_id, notice_number, notice_round, bid_kind, kind) DO UPDATE SET
             occurred_at = GREATEST(notification_inbox.occurred_at, EXCLUDED.occurred_at),
             updated_at = now(),
             detail_code = EXCLUDED.detail_code,
@@ -81,6 +90,7 @@ internal object NotificationInboxSql {
                 i.kind,
                 i.notice_number,
                 i.notice_round,
+                i.bid_kind,
                 i.detail_code,
                 i.occurred_at,
                 i.read_at,
@@ -89,12 +99,13 @@ internal object NotificationInboxSql {
                 max(i.occurred_at) OVER grouped AS group_recent
             FROM notification_inbox i
             WHERE i.account_id = ?
-            WINDOW grouped AS (PARTITION BY i.notice_number, i.notice_round)
+            WINDOW grouped AS (PARTITION BY i.notice_number, i.notice_round, i.bid_kind)
         )
         SELECT
             s.kind,
             s.notice_number,
             s.notice_round,
+            s.bid_kind,
             s.detail_code,
             s.occurred_at,
             s.read_at,
@@ -108,7 +119,8 @@ internal object NotificationInboxSql {
         LEFT JOIN notice n
             ON n.notice_number = s.notice_number AND n.notice_round = s.notice_round
         WHERE (? = FALSE OR s.read_at IS NULL)
-        ORDER BY s.group_recent DESC, s.notice_number, s.notice_round, s.occurred_at DESC, s.kind
+        ORDER BY s.group_recent DESC, s.notice_number, s.notice_round, s.bid_kind,
+                 s.occurred_at DESC, s.kind
         LIMIT ? OFFSET ?
     """
 
@@ -132,18 +144,29 @@ internal object NotificationInboxSql {
     const val MARK_ITEM_READ = """
         UPDATE notification_inbox SET read_at = ?
         WHERE account_id = ?
-          AND kind = ?
           AND notice_number = ?
           AND notice_round = ?
+          AND bid_kind = ?
+          AND kind = ?
           AND read_at IS NULL
     """
 
-    /** 읽음 처리(한 공고의 묶음 전체). 종류 축만 빠진 같은 술어다. */
+    /**
+     * 읽음 처리(**묶음 하나** 전체 — 한 공고 · 한 투찰 종류). 알림 종류 축만 빠진 같은 술어다.
+     *
+     * **투찰 종류는 빠지지 않는다**(M9/paper-bid · D-M9P-3). 빠지면 서면 묶음의 「묶음 전체
+     * 읽음」이 같은 공고의 **실투찰 묶음까지** 읽어, 연습이 실제 소식을 지우는 꼴이 읽음 축에서
+     * 그대로 되살아난다.
+     *
+     * 술어가 새 PK 의 **접두**다(`account_id, notice_number, notice_round, bid_kind`) — V25 가
+     * 열 순서를 그렇게 둔 사유이고, 그래서 이 질의에 보조 인덱스가 필요 없다.
+     */
     const val MARK_NOTICE_READ = """
         UPDATE notification_inbox SET read_at = ?
         WHERE account_id = ?
           AND notice_number = ?
           AND notice_round = ?
+          AND bid_kind = ?
           AND read_at IS NULL
     """
 }

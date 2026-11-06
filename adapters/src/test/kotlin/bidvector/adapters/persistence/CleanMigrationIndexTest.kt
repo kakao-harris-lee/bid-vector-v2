@@ -58,10 +58,15 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("account", "account_login_name_key", "USING btree (login_name)"),
             IndexSpec("browser_session", "browser_session_pkey", "USING btree (session_digest)"),
             // M7/7C③ — **중복 억제 키가 PK 자체**다(파생 열·별도 UNIQUE 를 두지 않는다).
+            // **M9/paper-bid(V25)가 투찰 종류를 더하고 열 순서를 바꾼다**: 공고 쌍을 앞으로
+            // 올리고 알림 종류를 맨 뒤로 보내면 묶음 읽음 처리의 술어
+            // (`account_id, notice_number, notice_round, bid_kind`)가 이 인덱스의 **접두**가
+            // 된다(앞 판에서는 `account_id` 하나만 접두였다). 그래서 축이 늘면서 질의 하나가
+            // 나아지고 보조 인덱스를 더할 근거가 없다 — 아래 둘이 그대로인 이유다.
             IndexSpec(
                 "notification_inbox",
                 "notification_inbox_pkey",
-                "USING btree (account_id, kind, notice_number, notice_round)",
+                "USING btree (account_id, notice_number, notice_round, bid_kind, kind)",
             ),
             IndexSpec("notice_requirement", "notice_requirement_pkey", "USING btree (notice_number, notice_round)"),
             IndexSpec(

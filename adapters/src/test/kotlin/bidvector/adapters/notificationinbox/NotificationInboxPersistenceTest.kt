@@ -1,11 +1,11 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.workflow.notificationinbox.AwardResult
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationDetail
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxLimits
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
-import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
 import bidvector.workflow.notificationinbox.ReadResetPolicy
@@ -116,7 +116,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
             val notice = unknownNotice("N-${kind.name}")
             val fact = factOf(kind)
             inbox().record(record(account, notice, fact))
-            store().markRead(account, NotificationItemKey(kind, notice), READ_AT)
+            store().markRead(account, itemKey(kind, notice), READ_AT)
 
             inbox().record(record(account, notice, fact, LATER)) shouldBe NotificationInboxOutcome.Updated
 
@@ -135,7 +135,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val account = insertAccount("revision-reunread")
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
-        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+        store().markRead(account, itemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, LATER)) shouldBe
             NotificationInboxOutcome.Updated
@@ -162,7 +162,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val account = insertAccount("same-revision")
         val notice = unknownNotice("N-1")
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
-        store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+        store().markRead(account, itemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
         // ① 같은 개정의 재기록
         inbox().record(record(account, notice, NotificationFact.NoticeRevised, OBSERVED_AT))
@@ -209,7 +209,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     fun `detail 이 바뀐 재기록은 읽음을 해제한다`() {
         val account = insertAccount("detail-change")
         val notice = unknownNotice("N-1")
-        val key = NotificationItemKey(NotificationKind.OPENING_COMPLETED, notice)
+        val key = itemKey(NotificationKind.OPENING_COMPLETED, notice)
         inbox().record(record(account, notice, NotificationFact.OpeningCompleted(provisionallyFirst = true)))
         store().markRead(account, key, READ_AT)
 
@@ -234,7 +234,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     fun `유찰 결과가 자기 detail 로 적힌다 — 항목 하나에 새 detail`() {
         val account = insertAccount("failed-bid")
         val notice = unknownNotice("N-1")
-        val key = NotificationItemKey(NotificationKind.AWARD_DECIDED, notice)
+        val key = itemKey(NotificationKind.AWARD_DECIDED, notice)
         inbox().record(record(account, notice, NotificationFact.AwardDecided(AwardResult.AWARDED)))
         store().markRead(account, key, READ_AT)
 
@@ -309,7 +309,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(other, notice, NotificationFact.NoticeRevised))
 
         val outcome =
-            store().markRead(mine, NotificationItemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
+            store().markRead(mine, itemKey(NotificationKind.NOTICE_REVISED, notice), READ_AT)
 
         outcome.markedCount shouldBe 0
         rawRow(other, "NOTICE_REVISED", "N-OTHER").readAt.shouldBeNull()
@@ -322,7 +322,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         val notice = unknownNotice("N-OTHER")
         inbox().record(record(other, notice, NotificationFact.NoticeRevised))
 
-        store().markNoticeRead(mine, notice, READ_AT).markedCount shouldBe 0
+        store().markNoticeRead(mine, groupKey(notice, NotificationBidKind.REAL), READ_AT).markedCount shouldBe 0
         rawRow(other, "NOTICE_REVISED", "N-OTHER").readAt.shouldBeNull()
     }
 
@@ -350,7 +350,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
         val outcome =
-            store().markRead(account, NotificationItemKey(NotificationKind.NOTICE_REVISED, first), READ_AT)
+            store().markRead(account, itemKey(NotificationKind.NOTICE_REVISED, first), READ_AT)
 
         outcome.markedCount shouldBe 1
         outcome.unreadCount shouldBe 1L
@@ -361,7 +361,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
     fun `이미 읽은 항목을 다시 처리하면 아무것도 바뀌지 않는다`() {
         val account = insertAccount("read-twice")
         val notice = unknownNotice("N-1")
-        val key = NotificationItemKey(NotificationKind.NOTICE_REVISED, notice)
+        val key = itemKey(NotificationKind.NOTICE_REVISED, notice)
         inbox().record(record(account, notice, NotificationFact.NoticeRevised))
         store().markRead(account, key, READ_AT)
 
@@ -378,7 +378,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         inbox().record(record(account, target, NotificationFact.BidDeadlineToday))
         inbox().record(record(account, unknownNotice("N-2"), NotificationFact.NoticeRevised))
 
-        val outcome = store().markNoticeRead(account, target, READ_AT)
+        val outcome = store().markNoticeRead(account, groupKey(target, NotificationBidKind.REAL), READ_AT)
 
         outcome.markedCount shouldBe 2
         outcome.unreadCount shouldBe 1L
@@ -392,7 +392,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
         store()
             .markRead(
                 account,
-                NotificationItemKey(NotificationKind.NOTICE_REVISED, unknownNotice("N-NONE")),
+                itemKey(NotificationKind.NOTICE_REVISED, unknownNotice("N-NONE")),
                 READ_AT,
             ).markedCount shouldBe 0
     }
@@ -428,7 +428,7 @@ internal class NotificationInboxPersistenceTest : NotificationInboxTestSupport()
                 store()
                     .markRead(
                         account,
-                        NotificationItemKey(NotificationKind.NOTICE_REVISED, notice),
+                        itemKey(NotificationKind.NOTICE_REVISED, notice),
                         at,
                     ).markedCount shouldBe 1
             }

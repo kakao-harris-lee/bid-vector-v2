@@ -1,9 +1,11 @@
 package bidvector.workflow.bidding
 
+import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
@@ -23,6 +25,12 @@ import java.time.LocalDate
 data class NotificationSweepCase(
     val account: AccountId,
     val notice: NoticeKey,
+    /**
+     * 건의 투찰 종류 — 알림 항목의 **묶음 축**이다(M9/paper-bid · D-M9P-2). 앞 판은 질의가
+     * `bid_kind = 'REAL'` 로 서면 건을 **버렸고**(알림함 키에 그 축이 없어 덮어쓰기가 났다)
+     * 그래서 이 값이 아예 실려 오지 않았다. V25 가 축을 키에 넣은 뒤로는 거르지 않고 **나른다**.
+     */
+    val bidKind: BidKind,
     val state: BidStateTag,
     /** 유효 마감 — 공고 행이 있으면 그 값, 없으면 담을 때의 사본([effectiveDeadline] 과 같은 규칙). */
     val deadlineAt: Instant?,
@@ -110,17 +118,20 @@ fun sweepNotificationsFor(
     now: Instant,
     policy: NotificationWindowPolicyData,
 ): List<NotificationInboxRecord> {
-    val notice = case.notice.asNotificationNoticeId()
+    // **묶음은 건의 공고와 건의 투찰 종류다**(M9/paper-bid) — 한 자리에서 지어 세 기록이 같은
+    // 묶음을 가리킨다. 축을 기록마다 따로 적으면 한 갈래에서만 빠뜨리는 꼴이 생긴다.
+    val group =
+        NotificationGroupKey(case.notice.asNotificationNoticeId(), case.bidKind.asNotificationBidKind())
     val timed =
         listOfNotNull(
             deadlineFactOf(case, now, policy),
             documentFactOf(case, now, policy),
-        ).map { fact -> NotificationInboxRecord(case.account, notice, fact, calendarDayStart(now)) }
+        ).map { fact -> NotificationInboxRecord(case.account, group, fact, calendarDayStart(now)) }
     val revised =
         noticeRevisedAt(case, now)?.let { changedAt ->
             // **사실의 시각은 개정 시각이다**(훑은 시각이 아니다) — 호출자의 시계가 정하는 것은
             // 「언제 일어났나」이고, 공고 개정은 훑기보다 먼저 일어났다.
-            NotificationInboxRecord(case.account, notice, NotificationFact.NoticeRevised, changedAt)
+            NotificationInboxRecord(case.account, group, NotificationFact.NoticeRevised, changedAt)
         }
     return timed + listOfNotNull(revised)
 }
