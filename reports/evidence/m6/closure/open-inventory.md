@@ -217,9 +217,11 @@ D-6G2g-12). **§2 가 이 묶음을 「열둘 전부 어느 문서에도 종결 
 
 **M9 가 신설한 OPEN 일곱**(화면 표시 다섯 · CVE apt 둘)은 이 문서가 아니라 capability map §12.3 (b) 가
 받는다 — 이 문서는 M6 종결의 기록이고 M9 잔여의 registry 가 아니다.
+
 ## §9 하네스 레인 묶음의 처분 — M9/gates-build (2026-11-06, 덧붙임)
 
-§2 「하네스 레인」 행의 열둘 가운데 **build-logic·정책으로 닫히는 축**을 그 slice 가 가져갔다. 정본은
+§2 「하네스 레인」 행의 열둘 가운데 **build-logic·정책으로 닫히는 축**을 그 slice 가 가져갔다. 같은 처분을
+`docs/discovery/capability-map.md` §12.3 (d) 가 장부 쪽에 적는다. 정본은
 `reports/evidence/m9/gates-build/{scope,design-review,commands,checklist}.md` 이고 여기는 처분만 적는다.
 
 | OPEN | 처분 | 무엇이 닫혔나 |
@@ -229,8 +231,8 @@ D-6G2g-12). **§2 가 이 묶음을 「열둘 전부 어느 문서에도 종결 
 | `OPEN-HARNESS-GATE-TESTS-ORDER` | **닫음** | `gateRegistrationGate` 에 「블록 안 행 == 정렬판 · 중복 0」 단언. main 에 이미 어긋나 있던 블록 셋을 같은 커밋에서 정렬 |
 | `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` | **닫음** | 새 `unusedImportGate`(세 트리: 모듈·included build·느슨한 스크립트). 그 게이트가 찾은 **169 줄**을 같은 slice 가 제거했다 |
 | `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` | **닫음** | 소스 층에 패키지 범위 축 추가. **차등 실측**: `const val` 로 끌어온 금지 좌표에 바이트코드 test 는 초록(상수 풀 흔적 0)이고 새 소스 축은 붉다 |
-| `OPEN-CPD-GATE-RENAME-BYPASS` | **절반** | 낡은 리포트 축은 닫았다(리포트 mtime ↔ 잴 소스). **이름 치환 축은 열린 채다** — PMD 7.7.0 의 Kotlin CPD lexer 가 anonymize 속성을 받지 못한다(`createCpdLexer` 가 property bundle 을 쓰지 않는다, 바이트코드 확인). 배선·정책 키는 남기고 정책 주석이 그 사실을 든다 |
-| 완료 조건 2 「소스 축 상시 게이트 부재」(checklist §3 ④) | **미구현 · 되돌려 보냄** | 처방의 입력이 없다 — Kotlin 이 import 할 수 있는 legacy 좌표가 0(legacy 는 Python), 경로 리터럴 거부는 V2 의 **출처 인용 여섯**(KDoc 다섯 + 정책 provenance 하나)을 지우게 만드는 과잉, legacy symlink 가 이 환경에 더 이상 없어 거부 목록을 전수로 열거할 근거가 없다. Kotlin 축은 `group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate` 가 이미 상시로 든다. **Python 소스 축은 ml-engine 레인이 받는다** |
+| `OPEN-CPD-GATE-RENAME-BYPASS` | **절반** | 낡은 리포트 축은 닫았다(리포트 mtime ↔ 잴 소스). **이름 치환 축은 열린 채다** — PMD 7.7.0 의 Kotlin CPD lexer 가 anonymize 속성을 받지 못한다(`createCpdLexer` 가 property bundle 을 쓰지 않는다, 바이트코드 확인). 배선·정책 키는 남기고 정책 주석이 그 사실을 든다. **재개 조건**(팀장 지시 2026-11-06 ⓐ): PMD 가 Kotlin lexer 에 익명화 속성을 잇는 판이 나오면 그 판 상향만으로 이 키가 효과를 내므로, 상향 시 **양성 대조를 재측정**한다(이름만 바꾼 복사판이 붉는지) |
+| 완료 조건 2 「소스 축 상시 게이트 부재」(checklist §3 ④) | **미구현 · 되돌려 보냄** | 처방의 입력이 없다 — Kotlin 이 import 할 수 있는 legacy 좌표가 0(legacy 는 Python), 경로 리터럴 거부는 V2 의 **출처 인용 여섯**(KDoc 다섯 + 정책 provenance 하나)을 지우게 만드는 과잉, legacy symlink 가 이 환경에 더 이상 없어 거부 목록을 전수로 열거할 근거가 없다. **Kotlin 축은 기존 게이트 셋이 상시로 든다**(`group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate`) · Python 소스 축은 ml-engine 레인이 받는다. **처분 후보로 등재하고 OPEN 행은 유지한다**(팀장 승인 2026-11-06) — 입력 없는 정책 키를 남기지 않는 쪽을 골랐다 |
 | OPS-13 「실행 환경 스니핑 0」 | **닫음(임계 0)** | 같은 소스 축에 수신자·멤버 쌍 축 추가(`System.getenv`·`getProperty`·`*.getActiveProfiles`·`*.acceptsProfiles`, 호출 참조 형태 포함). 오늘 모듈 main 소스에서 0 건 |
 
 **남는 여섯**(기계 산출 — §2 열둘 ∖ 위 표): `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` ·
