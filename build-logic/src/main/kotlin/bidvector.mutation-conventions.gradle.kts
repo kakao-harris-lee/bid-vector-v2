@@ -76,9 +76,9 @@ val mutationReportGate =
         description = "mutation 점수·변이 수·변이 클래스 수의 절대값 래칫(ADR 0007 OPEN-ADR-07)"
         moduleName = project.name
         policyFile = mutationPolicyFile
-        // 한 값에서 둘을 채운다 — 메시지용 경로와 **지문**이 같은 파일을 가리켜야 한다.
+        // **한 줄이다** — 같은 선언이 메시지용 경로와 task 지문을 함께 낸다(task KDoc). 지문을
+        // 따로 배선하던 앞 판은 그 둘째 줄이 지워지면 test 가 초록인 채로 거짓 초록으로 돌아갔다.
         mutationXmlReport.set(pitestXmlReport)
-        mutationXmlReportFingerprint.from(pitestXmlReport)
         classDirectories.from(provider { sourceSets["main"].output.classesDirs })
         dependsOn(tasks.named("pitest"))
         report = layout.buildDirectory.file("reports/mutation-gate/violations.txt")

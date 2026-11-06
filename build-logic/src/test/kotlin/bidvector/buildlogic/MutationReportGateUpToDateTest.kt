@@ -19,6 +19,11 @@ import kotlin.test.assertTrue
  * 그래서 이 test 는 **리포트만 바꾼다** — 정책도 class 산출물도 손대지 않는다. 그것이
  * 양성 대조 일곱이 지나지 않았던 경로다(그 일곱은 전부 선언된 입력을 바꿨다).
  *
+ * fixture 는 리포트를 **한 줄로** 배선한다(`mutationXmlReport` 하나). 지문을 별도 property 로
+ * 두었던 판에서는 이 fixture 가 그 둘을 스스로 묶어, convention 에서 지문 배선 한 줄이 사라져도
+ * 세 test 가 초록이었다 — 재는 자리가 프로덕션 배선과 달랐다. 지금은 선언이 하나라 fixture 의
+ * 배선 모양이 프로덕션과 같고, 그 선언에서 지문 annotation 을 떼면 아래 둘이 바로 RED 다.
+ *
  * pitest 를 띄우지 않는다. 재는 것은 변이 분석이 아니라 **Gradle 의 up-to-date 판정**이고,
  * 그 판정에 필요한 것은 리포트 파일 하나와 class 파일의 **이름**뿐이다(게이트는 class 내용을
  * 읽지 않는다 — 위치가 이름이다).
@@ -78,7 +83,6 @@ class MutationReportGateUpToDateTest {
                 moduleName.set("fixture")
                 policyFile.set(layout.projectDirectory.file("policy.properties"))
                 mutationXmlReport.set(layout.projectDirectory.file("mutations.xml"))
-                mutationXmlReportFingerprint.from(layout.projectDirectory.file("mutations.xml"))
                 classDirectories.from(layout.projectDirectory.dir("classes"))
                 report.set(layout.buildDirectory.file("violations.txt"))
             }
