@@ -3,6 +3,8 @@ package bidvector.app.http
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
+import bidvector.workflow.notificationinbox.NotificationBidKind
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
@@ -85,24 +87,41 @@ private fun JsonNode.notificationKind(): NotificationKind {
         ?: rejectInbox("알 수 없는 kind 토큰: $token")
 }
 
-/** 읽음 처리(단건) — 신원은 「종류 + 공고 쌍」이다. 계정·시각 칸은 **허용 키에 없다**. */
-fun JsonNode.parseNotificationReadTarget(): NotificationItemKey {
-    val body = requireInboxObjectBody().requireKnownInboxKeys(ITEM_TARGET_KEYS)
-    return NotificationItemKey(body.notificationKind(), body.noticeId())
+/** 투찰 종류 어휘 밖의 문자열도 거부다 — 종류 축과 같은 술어다(`valueOf` 를 쓰지 않는다). */
+private fun JsonNode.notificationBidKind(): NotificationBidKind {
+    val token = requiredInboxText("bidKind")
+    return NotificationBidKind.entries.firstOrNull { it.name == token }
+        ?: rejectInbox("알 수 없는 bidKind 토큰: $token")
 }
 
-/** 읽음 처리(공고 묶음 전체) — 종류 축만 없는 같은 모양이다. */
-fun JsonNode.parseNoticeReadTarget(): NoticeId {
+/**
+ * 묶음 하나 — 「공고 쌍 + 투찰 종류」다(M9/paper-bid). **종류와 축이 맞지 않는 짝은 거부가
+ * 아니다**: 그 키의 항목이 없으므로 읽음 처리의 영향 행이 0 이고, 그것이 「남의 항목」·「없는
+ * 항목」과 같은 답이다(그 셋을 가르지 않는 것이 이 표면의 관례다).
+ */
+private fun JsonNode.notificationGroup(): NotificationGroupKey = NotificationGroupKey(noticeId(), notificationBidKind())
+
+/** 읽음 처리(단건) — 신원은 「묶음 + 알림 종류」다. 계정·시각 칸은 **허용 키에 없다**. */
+fun JsonNode.parseNotificationReadTarget(): NotificationItemKey {
+    val body = requireInboxObjectBody().requireKnownInboxKeys(ITEM_TARGET_KEYS)
+    return NotificationItemKey(body.notificationGroup(), body.notificationKind())
+}
+
+/**
+ * 읽음 처리(묶음 전체) — 알림 종류 축만 없는 같은 모양이다. **투찰 종류는 있다**: 없으면
+ * 서면 묶음을 읽는 요청이 같은 공고의 실투찰 묶음까지 읽는다(D-M9P-3).
+ */
+fun JsonNode.parseNoticeReadTarget(): NotificationGroupKey {
     val body = requireInboxObjectBody().requireKnownInboxKeys(NOTICE_TARGET_KEYS)
-    return body.noticeId()
+    return body.notificationGroup()
 }
 
 /**
  * 허용 키 — **계정 칸도 시각 칸도 없다**. 소유 경계는 세션이 정하고 읽은 시각은 서버가
  * 정한다. 그 부재를 계약 test 가 어휘로도 잠근다.
  */
-private val ITEM_TARGET_KEYS = setOf("kind", "noticeNumber", "noticeRound")
-private val NOTICE_TARGET_KEYS = setOf("noticeNumber", "noticeRound")
+private val ITEM_TARGET_KEYS = setOf("kind", "noticeNumber", "noticeRound", "bidKind")
+private val NOTICE_TARGET_KEYS = setOf("noticeNumber", "noticeRound", "bidKind")
 
 /**
  * 항목 하나의 응답 — **평탄하다**(D-6A1-20 ⓑ: 속성은 스칼라이거나 스칼라 배열). 그래서 「건별
@@ -124,6 +143,7 @@ data class NotificationItemResponse(
     val detail: String?,
     val noticeNumber: String,
     val noticeRound: String,
+    val bidKind: String,
     val occurredAt: String,
     val read: Boolean,
     val readAt: String?,
@@ -141,11 +161,12 @@ data class NotificationItemResponse(
                 detail = item.fact.detail?.name,
                 noticeNumber = item.notice.number.value,
                 noticeRound = item.notice.round.value,
+                bidKind = item.group.bidKind.name,
                 occurredAt = item.occurredAt.toString(),
                 read = item.read,
                 readAt = item.readAt?.toString(),
-                noticeItemCount = item.group.itemCount,
-                noticeUnreadCount = item.group.unreadCount,
+                noticeItemCount = item.groupCounts.itemCount,
+                noticeUnreadCount = item.groupCounts.unreadCount,
                 noticeKnown = item.display != null,
                 noticeTitle = item.display?.title,
                 noticeStatus = item.display?.status,

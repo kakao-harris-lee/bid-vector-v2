@@ -61,6 +61,86 @@ enum class NotificationKind {
 }
 
 /**
+ * 알림 항목의 **투찰 종류 축**(M9/paper-bid · D-M9P-1) — 중복 억제 키의 한 열이다.
+ *
+ * **왜 `bidvector.bidding.BidKind` 를 쓰지 않는가**(조사 뒤 채택): 알림함의 키 어휘는 저장 층
+ * CHECK 와 **집합 등식**을 이루는 이 패키지의 닫힌 어휘이고, 그것을 `bidding` 의 enum 에 묶으면
+ * 알림함이 입찰 모듈 없이는 서지 않는다(7C③ 이 이 패키지의 의존을 `procurement.NoticeId` ·
+ * `workflow.access.AccountId` 둘로 묶어 둔 사유, [AwardResult] 가 `BidOutcome` 를 재활용하지 않은
+ * 것과 같은 축). 그리고 **두 집합은 실제로 다르다** — 아래 [NONE] 의 자리가 `BidKind` 에는 없다.
+ * 두 벌이 갈리는 것은 사상 함수의 1:1 등식 test 가 막는다(`BidKind` 전수 ↔ 이 어휘의 건 축 전수).
+ *
+ * **`Boolean` 이 아닌 이유**: 값이 셋이다. 건에서 오지 않는 알림에 `false` 를 적으면 그것이
+ * 실투찰과 **같은 값**이 되고, 그 접기가 이 slice 가 없애려는 바로 그 꼴이다.
+ */
+enum class NotificationBidKind {
+    /** 실투찰 건의 소식. */
+    REAL,
+
+    /** 서면(페이퍼) 건의 소식 — 가상 연습이고, 그래서 실투찰 항목과 **다른 항목**이어야 한다. */
+    PAPER,
+
+    /**
+     * 건이 아니라 **공고**에 붙은 소식 — 투찰 종류 축이 없다(투찰가 요청 기록 · 새 후보. 후자는
+     * 건이 생기기 **전**의 소식이다).
+     *
+     * 저장 층의 키 열은 NOT NULL 이라 NULL 로 「축이 없음」을 적을 수 없다. 이 값이 **어느 종류에만
+     * 올 수 있는지**는 [NotificationKind.bidKindAxis] 와 그것을 되비추는 짝 CHECK 가 못박는다.
+     */
+    NONE,
+}
+
+/**
+ * 종류가 **투찰 종류 축을 갖는가** — 종류별 성질이다(D-M9P-1).
+ *
+ * 열거 두 값을 `Boolean` 대신 이름으로 두는 것은 [ReadResetPolicy] 와 같은 자리·같은 사유다:
+ * 파티션 등식이 이름으로 서고, 축이 늘면 사상 자리에서 컴파일이 막힌다.
+ */
+enum class BidKindAxis {
+    /** 원천이 입찰 건이다 — [NotificationBidKind.REAL] 또는 [NotificationBidKind.PAPER]. */
+    PER_BID_CASE,
+
+    /** 원천이 공고다 — [NotificationBidKind.NONE] 뿐이다. */
+    PER_NOTICE,
+}
+
+/**
+ * 종류 **전수 표**(`else` 없는 `when`) — 종류를 더하면 이 축을 정하지 않고는 컴파일되지 않는다.
+ * 어느 종류가 어느 축인지는 `NotificationFactTest` 가 파티션 등식으로 고정하고, 저장 층에서는
+ * 짝 CHECK 가 같은 파티션을 한 겹 더 진다(실 DB 전수 교차가 그 둘이 같은 집합임을 잰다).
+ *
+ * `PER_NOTICE` 가 둘인 이유: 투찰가 요청 기록은 운영자가 **공고 하나**에 대해 요청한 사실이고
+ * (7C② — 그 경로에 건이 없다), 새 후보는 건이 생기기 **전**의 소식이다. 나머지 여섯은 원천이
+ * 건이다 — 되비춤 둘(개찰·낙찰)과 훑기 넷(마감 D-1 · D-0 · 서류 D-2 · 공고 변경).
+ *
+ * **공고 변경이 `PER_BID_CASE` 인 이유**: 그 알림의 관련성은 「이 계정이 **그 건을** 담았다」가
+ * 지고(원천이 훑기의 건 질의다), 서면 연습의 건과 실투찰 건은 각자 그 소식을 받아야 한다.
+ */
+val NotificationKind.bidKindAxis: BidKindAxis
+    get() =
+        when (this) {
+            NotificationKind.NEW_CANDIDATE,
+            NotificationKind.BID_PRICE_REQUEST_RECORDED,
+            -> BidKindAxis.PER_NOTICE
+
+            NotificationKind.BID_DEADLINE_IMMINENT,
+            NotificationKind.BID_DEADLINE_TODAY,
+            NotificationKind.DOCUMENT_DEADLINE_IMMINENT,
+            NotificationKind.OPENING_COMPLETED,
+            NotificationKind.AWARD_DECIDED,
+            NotificationKind.NOTICE_REVISED,
+            -> BidKindAxis.PER_BID_CASE
+        }
+
+/** 이 투찰 종류가 서는 축 — 사상이 전역이라 짝 검사가 **한 비교**로 끝난다. */
+val NotificationBidKind.axis: BidKindAxis
+    get() =
+        when (this) {
+            NotificationBidKind.REAL, NotificationBidKind.PAPER -> BidKindAxis.PER_BID_CASE
+            NotificationBidKind.NONE -> BidKindAxis.PER_NOTICE
+        }
+
+/**
  * detail 어휘 — **닫힌 다섯**이다. 자유 문자열이 아니므로 이 축으로 PII 가 들어올 수 없다.
  * 어느 종류가 어느 값을 갖는지는 [NotificationFact] 의 구성이 정하고, 저장 층의 짝 CHECK 가
  * 같은 규칙을 한 겹 더 진다(심층 방어).
@@ -307,10 +387,22 @@ private fun NotificationFact.WithoutDetail.withoutDetail(detail: NotificationDet
  */
 data class NotificationInboxRecord(
     val account: AccountId,
-    val notice: NoticeId,
+    val group: NotificationGroupKey,
     val fact: NotificationFact,
     val occurredAt: Instant,
-)
+) {
+    init {
+        // **불가능한 짝이다 — 업무 흐름의 분기가 아니다.** 종류 전수 표가 축을 정하므로 어긋난
+        // 짝은 호출자가 축을 지어낸 경우뿐이고(저장 층의 짝 CHECK 가 같은 짝을 한 겹 더 막는다),
+        // 조용히 기본값으로 접으면 「투찰가 요청이 실투찰로 라벨된」 행이 생긴다. `require` 는
+        // 복원 쪽의 같은 자리(`withoutDetail`)와 같은 규율이다.
+        require(fact.kind.bidKindAxis == group.bidKind.axis) {
+            "${fact.kind} 는 ${fact.kind.bidKindAxis} 축이다: ${group.bidKind}"
+        }
+    }
+
+    val notice: NoticeId get() = group.notice
+}
 
 /**
  * 기록의 결과. **예외를 업무 흐름에 쓰지 않는다** — 저장 실패도 값이다
@@ -330,11 +422,33 @@ sealed interface NotificationInboxOutcome {
 }
 
 /**
- * 항목 하나의 신원 — 읽음 처리(단건)가 받는 키다. **합성 id 가 없다**: 신원이 「종류 + 공고
- * 쌍」이고 그 셋은 호출자가 자기 계정의 목록에서 이미 본 값이다. 열거할 불투명 id 가 없으므로
- * 남의 항목을 더듬어 찾을 표면이 그만큼 작다(계정 축은 포트 인자가 따로 진다).
+ * **묶음** 하나의 신원 — 「한 공고 · 한 투찰 종류」다(M9/paper-bid · D-M9P-3).
+ *
+ * 세 자리가 **같은 타입**을 쓴다: 항목의 신원([NotificationItemKey]), 묶음 읽음 처리의 대상
+ * ([NotificationInboxStore.markNoticeRead]), 그리고 목록의 묶음 계수
+ * ([NotificationInboxItem.group]). 셋을 느슨한 인자 둘로 나르면 한 자리에서 축을 빠뜨려도
+ * 컴파일이 막지 않고, 그때 「묶음 전체 읽음」이 **남의 묶음까지** 읽는다(서면을 읽으면 실투찰
+ * 소식이 사라진다 — 이 slice 가 막으려는 바로 그 일의 읽음 축 판본).
+ *
+ * **투찰 종류가 공고보다 **뒤**인 것은 저장 층 PK 열 순서와 같다**(V25) — 읽는 순서가
+ * 계정 → 공고 → 투찰 종류 → 알림 종류다.
+ */
+data class NotificationGroupKey(
+    val notice: NoticeId,
+    val bidKind: NotificationBidKind,
+)
+
+/**
+ * 항목 하나의 신원 — 읽음 처리(단건)가 받는 키다. **합성 id 가 없다**: 신원이 「묶음 + 알림
+ * 종류」이고 그 값들은 호출자가 자기 계정의 목록에서 이미 본 값이다. 열거할 불투명 id 가
+ * 없으므로 남의 항목을 더듬어 찾을 표면이 그만큼 작다(계정 축은 포트 인자가 따로 진다).
+ *
+ * **묶음을 품는다 — 축 둘을 펴 들지 않는다**([NotificationGroupKey] 의 사유). 저장 층의
+ * PK 가 `(계정, 공고 쌍, 투찰 종류, 알림 종류)` 이고 이 타입이 그 꼴 그대로다.
  */
 data class NotificationItemKey(
+    val group: NotificationGroupKey,
     val kind: NotificationKind,
-    val notice: NoticeId,
-)
+) {
+    val notice: NoticeId get() = group.notice
+}

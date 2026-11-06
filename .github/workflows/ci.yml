@@ -378,6 +378,10 @@ jobs:
     # 둘로 잡는다. chore 2026-10-29 — 넷째 의존이 생겼다: web·proxy 빌드가 caddy 를 컴파일하며
     # proxy.golang.org·sum.golang.org 에서 모듈을 받는다(첫 실행 실측: 그 빌드 step 약 72초, job 전체
     # 3분 34초 — main 의 같은 날 3분 38초와 같은 대역이라 상한은 그대로다). 나머지 두 job 은 이 slice 의 범위 밖이라 그대로다(알려진 제한에 등재).
+    # chore 2026-11-05 — **다섯째 의존**이 생겼다: app·ml-serving 의 런타임 stage 가 배포판
+    # 아카이브(`archive.ubuntu.com`·`deb.debian.org`)에서 apt 수정판을 받는다(runbook §8.3 넷째
+    # 갈래). M9/cve-followups 에서 그 두 호출에 `-o Acquire::Retries=3` 을 붙였다 — 두 베이스 모두
+    # 그 키를 선언하지 않아 그때까지 재시도가 0 이었다(실측). 상한은 그대로다(그 RUN 들 실측 10초대).
     timeout-minutes: 30
     env:
       # compose 의 postgres 서비스 전용 — 이 job 안에서만 뜨는 일회성 컨테이너의

@@ -1,5 +1,6 @@
 package bidvector.adapters.notificationinbox
 
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -91,6 +92,27 @@ internal class NotificationInboxSqlPolicyTest : NotificationInboxTestSupport() {
     }
 
     /**
+     * 진단 — **투찰 종류 축어도 없다**(M9/paper-bid). 이 slice 가 걷어낸 것이 바로 그 꼴의
+     * 리터럴(`bid_kind = 'REAL'`)이고, 그것이 알림함 문장으로 **옮겨 오는** 것이 가장 그럴듯한
+     * 회귀다 — 그러면 한 축의 항목만 읽히거나 기록되고 거동 test 는 자기 축만 돌아 초록이다.
+     *
+     * 하중은 실 DB 거동(`NotificationInboxPersistenceTest` 의 종류 × 투찰 종류 교차)이 진다.
+     */
+    @Test
+    fun `알림함 문장 전수에 투찰 종류 축어가 없다 — 진단`() {
+        leakedBidKindsIn(statements).shouldBeEmpty()
+    }
+
+    /** 양성 대조 — 진단 술어가 실제로 투찰 종류 이름을 집는다. */
+    @Test
+    fun `투찰 종류를 담은 문장은 진단에 걸린다 — 양성 대조`() {
+        val planted = "… WHERE bid_kind = '${NotificationBidKind.REAL.name}' …"
+
+        leakedBidKindsIn(mapOf("PLANTED" to planted)) shouldContainExactly
+            listOf("PLANTED" to NotificationBidKind.REAL)
+    }
+
+    /**
      * 양성 대조 — 진단 술어가 실제로 종류 이름을 집는다. 단어 경계 때문에 **부분 문자열로는
      * 걸리지 않는다**는 것도 같은 자리에서 보인다(`NOTICE_REVISEDX` 는 다른 이름이다).
      */
@@ -110,6 +132,13 @@ internal class NotificationInboxSqlPolicyTest : NotificationInboxTestSupport() {
                 .map { name to it }
         }
 
+    private fun leakedBidKindsIn(statements: Map<String, String>): List<Pair<String, NotificationBidKind>> =
+        statements.flatMap { (name, sql) ->
+            NotificationBidKind.entries
+                .filter { Regex("\\b${it.name}\\b").containsMatchIn(sql) }
+                .map { name to it }
+        }
+
     /** 출하 문장을 그대로 쏜다 — 일곱째 bind 가 이 test 의 축이다. */
     private fun upsertDirectly(
         account: Long,
@@ -121,12 +150,15 @@ internal class NotificationInboxSqlPolicyTest : NotificationInboxTestSupport() {
     ) = dataSource().connection.use { connection ->
         connection.prepareStatement(NotificationInboxSql.UPSERT_ITEM).use { statement ->
             statement.setLong(1, account)
-            statement.setString(2, kind.name)
-            statement.setString(3, noticeNumber)
-            statement.setString(4, "000")
-            statement.setString(5, detail)
-            statement.setTimestamp(6, Timestamp.from(occurredAt))
-            statement.setBoolean(7, resetsOnNewerFact)
+            statement.setString(2, noticeNumber)
+            statement.setString(3, "000")
+            // 투찰 종류는 **그 종류의 축에 맞는 값**이다 — 틀리면 짝 CHECK 가 INSERT 를 거부하고
+            // 이 test 가 읽음 해제 축이 아니라 다른 것을 재게 된다.
+            statement.setString(4, defaultBidKindFor(kind).name)
+            statement.setString(5, kind.name)
+            statement.setString(6, detail)
+            statement.setTimestamp(7, Timestamp.from(occurredAt))
+            statement.setBoolean(8, resetsOnNewerFact)
             statement.executeQuery().use { rows -> rows.next() }
         }
     }
@@ -140,9 +172,10 @@ internal class NotificationInboxSqlPolicyTest : NotificationInboxTestSupport() {
         connection.prepareStatement(NotificationInboxSql.MARK_ITEM_READ).use { statement ->
             statement.setTimestamp(1, Timestamp.from(READ_AT))
             statement.setLong(2, account)
-            statement.setString(3, kind.name)
-            statement.setString(4, noticeNumber)
-            statement.setString(5, "000")
+            statement.setString(3, noticeNumber)
+            statement.setString(4, "000")
+            statement.setString(5, defaultBidKindFor(kind).name)
+            statement.setString(6, kind.name)
             statement.executeUpdate() shouldBe 1
         }
     }

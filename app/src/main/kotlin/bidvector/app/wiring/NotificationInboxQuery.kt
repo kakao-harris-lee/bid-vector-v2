@@ -1,8 +1,8 @@
 package bidvector.app.wiring
 
-import bidvector.procurement.NoticeId
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.MarkReadOutcome
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPage
 import bidvector.workflow.notificationinbox.NotificationInboxStore
 import bidvector.workflow.notificationinbox.NotificationItemKey
@@ -42,6 +42,6 @@ class NotificationInboxQuery(
 
     fun markNoticeRead(
         account: AccountId,
-        notice: NoticeId,
-    ): MarkReadOutcome = store.markNoticeRead(account, notice, clock.now())
+        group: NotificationGroupKey,
+    ): MarkReadOutcome = store.markNoticeRead(account, group, clock.now())
 }
