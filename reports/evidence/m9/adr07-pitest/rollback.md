@@ -1,17 +1,21 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `e12c0485`**(이 브랜치가 합친 main 의 **고정 SHA** =
-병합 커밋 `d4b43248` 의 둘째 부모) · **실측 HEAD `d4b43248`**.
+착수 base **`df4976cc`** · **복원 원천 `3ad4f3f6`**(이 브랜치가 마지막으로 합친 main 의
+**고정 SHA** = 병합 커밋 `2fad9b99` 의 둘째 부모) · **실측 HEAD `2fad9b99`**(이 slice 의 마지막
+산출물 커밋).
 
-**원천이 착수 base 가 아니다.** 머지 직전에 main `e12c0485`(#130·#131·#132·#133 등)를 합쳤고,
+**원천이 착수 base 가 아니다.** 두 번 합쳤다 — main `e12c0485`(#130~#133) 뒤 main `3ad4f3f6`(#135).
 base 에서 복원하면 **그 남의 변경까지 지운다** — 실물이 있다: main 이 `config/quality/gate-tests.properties`
 의 `app` 블록을 **+3** 했고 그 파일은 내 복원 목록 안에도 있다(내가 `build-logic` 블록을 고쳤다).
 `df4976cc` 에서 복원하면 그 셋이 사라진다. 그래서 ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서
 산출하고 ⓑ 원천은 합친 main 의 고정 SHA 다 — 움직이는 `origin/main` 을 쓰지 않는다.
-다음 라운드에서 또 합치면 원천을 그 병합 커밋의 둘째 부모로 **다시** 고정하고 ①~③ 을 다시 잰다.
+둘째 병합에서 그 규칙을 그대로 적용해 원천을 `3ad4f3f6` 으로 옮기고 ①~③ 을 **다시** 쟀다.
+또 합치면 또 옮긴다.
 
 **겹치는 공유 파일 셋**의 합집합을 산술로 댔다 — 「충돌 0」은 본문이 접히지 않았다는 증거가
-아니다(저장소 기억 「병합 합집합 함정」). 세 파일 모두 **base + 양쪽 증분**과 일치했다.
+아니다(저장소 기억 「병합 합집합 함정」). **첫 병합**은 세 파일이 겹쳐 base + 양쪽 증분과 댔고
+(아래 표), **둘째 병합**은 겹치는 파일이 **0** 이라 집합 등식 셋으로 댔다(`commands.md` §11.4:
+`HEAD ↔ 3ad4f3f6` 차이 == 내 경로 · main 증분 14 파일 차이 0 · 내 파일 30 의 병합 전후 차이 0).
 
 | 파일 | base | 내 증분 | main 증분 | 병합 뒤 | 기대 |
 | --- | --- | --- | --- | --- | --- |
@@ -38,7 +42,7 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-MAIN=e12c0485   # 합친 main 의 고정 SHA (= HEAD^2)
+MAIN=3ad4f3f6   # 마지막으로 합친 main 의 고정 SHA (= HEAD^2)
 EXCL=':(exclude)reports/evidence/m9/adr07-pitest'   # 자기 자신은 되돌릴 수 없다
 
 mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
@@ -54,21 +58,21 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `d4b43248`(병합 뒤)
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `2fad9b99`(둘째 병합 뒤)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **26**(evidence 제외) = 복원 **15**(M) · 삭제 **11**(A) — 기계 목록과 같다. 수정 라운드가 둘을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh`) |
-| ③ 결과 트리 == `e12c0485` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③ 결과 트리 == `3ad4f3f6` 트리 | 복원 대상 26 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
-| ⑦ 원천과 남는 차이 | 실측 시점에 `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
+| ⑦ 원천과 남는 차이 | `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`e12c0485` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main(PR #132 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
-돌리는 것은 같은 트리를 다시 재는 일이다.
+복원한 트리는 **`3ad4f3f6` 의 트리와 파일 단위로 같다**(③). 그 커밋은 병합된 main(PR #135 머지
+커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시 돌리는 것은 같은
+트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이 **맞다** —
 `LeakPatternGateTask` 가 `reports/evidence` 를 스캔한다. 그 축은 이 slice 의 HEAD(그 파일들을
@@ -86,34 +90,43 @@ main(PR #132 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그�
 | 내 표지(0 이어야 한다 · evidence 제외) | 복원 뒤 |
 | --- | --- |
 | `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
-| 수정 라운드가 들여온 둘 — `MutationReportGateUpToDateTest` · `max-workers=1` | **0** |
+| 수정 라운드 1 이 들여온 둘 — `MutationReportGateUpToDateTest` · `max-workers=1` | **0** |
+| 수정 라운드 2 의 표지 — 게이트 task 의 리포트 property 이름 | **0** |
 | capability-map 전용 — `닫혔다 — M9/adr07-pitest` | **0** |
 | 같은 행의 **반대 방향** — 취소선 없는 `OPEN-ADR-07` 행(되살아나야 한다) | **1** |
 
-**통제군**: 제외 없이 세면 `mutationCheck` 가 **3 파일**에서 잡히고 그 셋이 전부
-`reports/evidence/m9/adr07-pitest/` 아래다 — 제외가 지우는 것이 evidence 뿐이고 코드·설정에
-남은 자리가 없다는 뜻이다. 제외가 실제 잔존을 가리고 있지 않다.
+**표지로 쓸 수 없던 것 하나를 적어 둔다** — 수정 라운드 2 가 쓰는 Gradle 입력 annotation 이름은
+build-logic 의 다른 선언 열넷이 같이 쓰므로 세면 남의 줄까지 센다(`pitest` 를 뺀 것과 같은 사유).
+그래서 이 라운드의 표지는 그 property 이름이다.
+
+**술어 자체를 한 번 틀렸다가 고쳤다.** 계수 명령을 다시 쓰면서 `--`(옵션 끝) 뒤에 제외 옵션을
+두어 grep 이 그것을 **파일 이름으로** 읽었고, 그 판은 내 표지가 「3 파일에 남았다」고 보고했다
+(실제로는 전부 내 evidence 였다). 옵션 순서를 고치고 통제군과 함께 다시 쟀다 — 아래가 그 수다.
+
+**통제군**: 제외 없이 세면 `mutationCheck` 가 **3 파일**에서 잡히고 **그 셋 전부가**
+`reports/evidence/m9/adr07-pitest/` 아래다(그 디렉터리 밖은 **0** 개). 제외가 지우는 것이
+evidence 뿐이고 코드·설정에 남은 자리가 없다는 뜻이다 — 제외가 실제 잔존을 가리고 있지 않다.
 
 | 남의 표지(남아 있어야 한다 · 같은 제외) | 복원 뒤 |
 | --- | --- |
-| **main 머지분** — `### 12.3`(#133) · `OPEN-7E3B-TIME-DISPLAY` · `money-vocab-cross-lang`(#132) · `m9/portal-02` · `m9/web-followups` | 1 · 10 · 4 · 5 · 1 |
-| **main 머지분의 등록부 증분** — `gate-tests` `app` 블록 | **124**(내 복원이 같은 파일을 만지는데도 그 셋이 남는다) |
+| **둘째 병합분**(#135) — `opening-axis` | 8 |
+| **첫 병합분** — `### 12.3`(#133) · `OPEN-7E3B-TIME-DISPLAY` · `money-vocab-cross-lang`(#132) | 1 · 4 · 2 |
+| **main 머지분의 등록부 증분** — `gate-tests` `app` 블록 등재 | **124**(내 복원이 같은 파일을 만지는데도 그 셋이 남는다. 같은 파일의 `build-logic` 블록은 내 **+4** 가 빠져 원천의 **27** 로 돌아간다 — 「내 줄 사라짐 · 남의 줄 남음」이 한 파일 안에서 갈린다) |
+| `web/config/gate-tests.txt`(main 만 만지는 등록부) | 108 줄, 원천과 동일 |
 | `pitest-engine`(이 slice 가 **지운** 카탈로그 alias — 되살아나야 한다) | 1 |
-| `conventionCoverageGate`(1A) | 4 |
-| `cpdCheckObserved`(1C) | 6 |
-| `leakPatternGate` | 129 |
-| `OPEN-ADR-16`(같은 ADR 의 다른 절) | 15 |
+| `conventionCoverageGate`(1A) · `cpdCheckObserved`(1C) · `leakPatternGate` | 1 · 4 · 10 |
+| `OPEN-ADR-16`(같은 ADR 의 다른 절) | 9 |
 | `MIN_JOBS`(`workflow-step-refs-check.sh` — 주석만 고쳤고 하한은 남는다) | 1 |
-| `OPEN-ADR-15`(capability-map G6 의 이웃 행) | 4 |
-| `OPEN-ADR-08`(capability-map 에서 내 행이 본뜬 **선례 행**) | 11 |
+| `OPEN-ADR-15`(capability-map G6 의 이웃 행) · `OPEN-ADR-08`(내 행이 본뜬 **선례 행**) | 1 · 3 |
 
 표지로 맨 `pitest` 를 쓸 수 없다 — base 의 카탈로그가 이미 그 좌표를 들고 있어 **남의 줄까지
 세게 된다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다. `pitest-engine` 행은 **방향이 반대인
 대조**다: 내가 지운 것이 복원으로 돌아오는지를 본다.
 
-공유 파일 쪽에서는 **줄 수**가 보존의 대조다 — HEAD 의 `capability-map.md` 는 원천 **3858** 줄에
-내 **+6**(G6 두 행 + 머리말 증감 네 줄)을 더한 **3864** 줄이고, 복원 뒤 다시 **3858** 이다. 내
-변경이 「1:1 행 교체 + 추가 6」이므로 복원 뒤 수가 3858 이 아니면 다른 행이 함께 움직였다는 뜻이다.
+공유 파일 쪽에서는 **줄 수**가 보존의 대조다 — HEAD 의 `capability-map.md` 는 원천 **3971** 줄에
+내 **+6**(G6 두 행 + 머리말 증감 네 줄)을 더한 **3977** 줄이고, 복원 뒤 다시 **3971** 이다. 내
+변경이 「1:1 행 교체 + 추가 6」이므로 복원 뒤 수가 3971 이 아니면 다른 행이 함께 움직였다는 뜻이다.
+`ci.yml` 도 같다 — HEAD **1082** = 원천 **1030** + 내 **+52**, 복원 뒤 **1030**.
 
 ## 3. 코드를 되돌리지 않고 끄는 법
 
@@ -136,8 +149,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only d4b43248..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only e12c0485..d4b43248 \
+git diff --name-only 2fad9b99..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 3ad4f3f6..2fad9b99 \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 

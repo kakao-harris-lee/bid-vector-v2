@@ -1,8 +1,8 @@
 # M9/adr07-pitest checklist
 
-판정 SHA **`d4b43248`**(병합 커밋 — 수정 라운드 1 + main `e12c0485` 병합) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
+판정 SHA **`2fad9b99`**(병합 커밋 — 수정 라운드 2 + main `3ad4f3f6` 병합) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
 `rollback.md`. 앞 라운드가 이 자리에 적은 `f4a85991` 은 그 뒤에 온 산출물 커밋들보다 앞선
-SHA 였다(v L-1) — 아래 §6 이 라운드별로 가른다.
+SHA 였다(v L-1) — 아래 §6·§7 이 라운드별로 가른다.
 
 ## 1. 계약의 결정 넷
 
@@ -35,7 +35,8 @@ SHA 였다(v L-1) — 아래 §6 이 라운드별로 가른다.
 | 4 `failWhenNoMutations=false` + 대상 0 | `mutations.min`(0/0 을 100% 로 접지 않는다) | 단위 test 「변이가 0 이면 점수를 100 으로 접지 않고 위반으로 낸다」 |
 | 5 도구의 `mutationThreshold` 를 0 으로 둔다 | **쓰지 않는다** — 판정은 리포트에서 재계산 | 배선에 그 키가 없다. C-1 이 도구 임계 없이 실패한다 |
 | 6 `pitest` 없이 낡은 리포트로 통과 | 게이트 `dependsOn(pitest)` + `pitest` `finalizedBy(게이트)` **+ 리포트를 task 지문에 넣는다**(수정 라운드) | C-5 · **R-4/R-5**(회귀 test 셋) |
-| **6′** 리포트가 나빠져도 게이트가 UP-TO-DATE 로 건너뛴다 — **앞 판에서 열려 있었다** | 리포트를 부재 허용 파일 컬렉션으로 지문에 넣는다 | R-4 가 구판에서 RED(초록으로 통과) · R-5 가 처방 뒤 RED 를 낸다. 음성 대조가 「항상 재실행」과 가른다 |
+| **6′** 리포트가 나빠져도 게이트가 UP-TO-DATE 로 건너뛴다 — **앞 판에서 열려 있었다** | 리포트 선언 **하나**가 경로와 지문을 함께 낸다(부재 허용 입력) | R-4·R-7 이 각 구판에서 RED · R-5·R-8 이 처방 뒤 초록. 음성 대조가 「항상 재실행」과 가른다 |
+| **6″** 지문 배선이 **공유 convention 의 한 줄**이라 그 줄만 지우면 test 는 초록 | 지문용 property 를 없앴다 — 지울 둘째 줄이 **없다** | R-7 RED 선행 · 프로덕션 배선 A/B/C · 변이(지문 annotation 바꿔치움 → RED) |
 | 7 XML 을 끄고 HTML 만 낸다 | 정책 해석이 XML 부재를 거부 | 단위 test 「출력 형식에 XML 이 없으면 거부한다」 |
 | 8 CI job 을 지운다 / `continue-on-error` | **막지 않는다** — 워크플로 diff 가시성 | 경계 문장이 선언한 범위 밖 |
 | 9 `threads` 를 올려 점수를 흔든다 | 정책 데이터가 고정 | `TIMED_OUT` 0 개 — 현 설정에서 흔들릴 변이가 없다 |
@@ -52,11 +53,15 @@ SHA 였다(v L-1) — 아래 §6 이 라운드별로 가른다.
 
 ## 4. 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
-`git log --no-merges --format= --name-only HEAD ^df4976cc | sort -u` = **24 경로 + evidence**.
-전부 계약의 in_scope 안이다 — `gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈
+유도 기준은 **이 브랜치가 합친 main 의 고정 SHA**다 — `git log --no-merges --format= --name-only
+HEAD ^3ad4f3f6 | sort -u` = **26 경로 + evidence 넷 = 30**. 착수 base(`^df4976cc`)로 유도하면
+그 사이에 합친 main 의 **남의 커밋 경로까지** 들어와 집합이 부풀고, 같은 목록을 되돌림에 쓰면
+남의 변경을 지운다(그 실물이 `rollback.md` 에 있다).
+
+30 경로 전부 계약의 in_scope 안이다 — `gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈
 `build.gradle.kts`(일곱) · `.github/workflows/ci.yml` · `config/quality/**` ·
 `docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md`(계약 갱신
-2026-11-06) · evidence. **범위 밖 파일 0.**
+2026-11-06) · `tools/workflow-step-refs-check.sh`(주석만) · evidence. **범위 밖 파일 0.**
 
 열넷째 수정 경로가 **계약 갱신으로 들어온 공유 파일**이다. scope.md 의 「계약 갱신」 절이 승인
 사실과 사유를 들고, rollback 쪽은 그 파일만 전제 둘(원천에 이 slice 없음 · 이 브랜치에 머지된
@@ -102,6 +107,11 @@ SHA 였다(v L-1) — 아래 §6 이 라운드별로 가른다.
     이름공간이 있고 `threads`·`output.formats` 는 없다. 바꾸면 정책 키 이름이 변해 `policy.version`
     을 올려야 하므로 값싼 변경이 아니다.
 
+11. **프로덕션 배선의 up-to-date 축을 모듈 하나(settlement)에서만 쟀다**(수정 라운드 2). 일곱
+    모듈이 같은 convention 의 같은 선언을 쓰므로 모양은 같지만 「일곱 전부」를 그 축으로 재지는
+    않았다 — 전건은 CI `mutation` job 이 돈다. 그 측정은 pitest 를 다시 돌리지 않고 앞 라운드가
+    남긴 리포트를 입력으로 썼다(재는 것이 변이 분석이 아니라 up-to-date 판정이므로).
+
 ## 6. 수정 라운드 1 (2026-11-06) — 리뷰 지적의 처리
 
 verifier **ready-for-review** · code-reviewer **request_changes**. 아래가 처리 대응표다.
@@ -122,16 +132,36 @@ verifier **ready-for-review** · code-reviewer **request_changes**. 아래가 �
 | cr L-5·L-7·L-9 · OQ-1·OQ-2 | — | **미조치로 등재** | §5 의 6~10 |
 | v L-1 | 판정 SHA 문면이 실제와 다르다 | 두 문서 머리말을 현 판정 SHA 로 고치고 **어느 수가 어느 SHA 의 것인지 절로 가른다** | `commands.md` 머리말 |
 
-**수정 라운드가 만든 새 파일 ↔ in_scope 대조**: 새 파일 하나
+**수정 라운드 2 는 새 파일을 만들지 않았다.** 편집한 넷(`build-logic` 셋 · ADR 하나)이 전부
+앞 라운드까지의 in_scope 안이고, 지운 것은 task 의 public property 하나와 그와 함께 쓰인 import
+하나다 — 경로 집합이 늘지 않았으므로 계약 갱신 대상도 없다(`git log --no-merges --format=
+--name-only HEAD ^3ad4f3f6 | sort -u` 30 경로, 범위 밖 **0**).
+
+**수정 라운드 1 이 만든 새 파일 ↔ in_scope 대조**: 새 파일 하나
 (`MutationReportGateUpToDateTest.kt`, `build-logic/**` 안)이고 **범위 밖 0**. 그 test 클래스는
 만드는 커밋에서 `gate-tests.properties` 에 사전순 등재됐고, 그 등재 등식을 표적 실행이 아니라
 `buildLogicGateRegistrationGate` 로 확인했다. `tools/workflow-step-refs-check.sh` 는 이 라운드에
 in_scope 로 승인된 경로다(주석만).
 
-**머지 직전 병합(2026-11-06)** — main `e12c0485` 를 합쳤다. 겹친 세 파일의 합집합을 산술로 댔고
+**둘째 병합(2026-11-06, 수정 라운드 2)** — main `3ad4f3f6`(#135)를 합쳤다. 겹치는 파일이
+**0** 이고(내 경로 30 ∩ main 증분 14 = ∅) 합집합을 등식 셋으로 댔다(`commands.md` §11.4).
+rollback 원천은 그 고정 SHA 로 다시 옮겼다.
+
+**첫 병합(2026-11-06)** — main `e12c0485` 를 합쳤다. 겹친 세 파일의 합집합을 산술로 댔고
 (`commands.md` §10) 표적 게이트 셋이 병합 뒤에도 exit 0 이다. rollback 원천은 그 고정 SHA 로
 옮겼다 — main 이 `gate-tests.properties` 의 다른 블록을 바꿔, base 복원이면 남의 셋을 지운다.
 
-## 7. 자기 승인 아님
+## 7. 수정 라운드 2 (2026-11-06) — 지적 하나
+
+| # | 지적 | 처리 | 실측 |
+| --- | --- | --- | --- |
+| v r2 M-1 | 리포트 지문이 공유 convention 의 **배선 한 줄**에 걸려 있다 — 그 줄을 지우면 TestKit 셋은 초록이고(fixture 가 두 property 를 스스로 묶는다) 프로덕션 증분은 거짓 초록으로 돌아간다 | 지문용 property 를 **없애고** 리포트 선언 자체를 부재 허용 입력으로 둔다. 경로와 지문이 같은 선언이라 **반쪽 배선이 성립하지 않는다**. `@InputFile`(존재 검증)로 바꾸지 않는 이유는 그대로다 — 그 검증이 「리포트가 없다」 가지를 죽인다 | `commands.md` §11 — RED 선행(R-7) · 처방 뒤 초록(R-8·R-9) · 프로덕션 배선 A/B/C · 변이 RED |
+
+**이 라운드의 처방은 「술어를 더하는」 것이 아니라 「술어가 걸릴 자리를 하나로 줄이는」 것이다.**
+앞 라운드는 선언을 더해 지문을 만들었고(옳았다) 그 선언이 **배선 한 줄에 의존**했다. 지금은
+선언이 하나라 convention 에서 지울 수 있는 줄이 `mutationXmlReport.set(...)` 뿐이고, 그것을
+지우면 값이 없어 게이트가 **즉시 실패**한다(조용한 통과가 아니다).
+
+## 8. 자기 승인 아님
 
 이 문서는 구현 레인이 쓴 것이고 판정이 아니다. 독립 검증(verifier)과 리뷰는 다른 패스가 한다.

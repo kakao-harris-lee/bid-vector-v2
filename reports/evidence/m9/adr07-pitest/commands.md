@@ -1,13 +1,13 @@
 # M9/adr07-pitest commands
 
-base `df4976cc` · **판정 SHA `d4b43248`**(병합 커밋 — 수정 라운드 1 + main `e12c0485` 병합) · 전 실행
+base `df4976cc` · **판정 SHA `2fad9b99`**(병합 커밋 — 수정 라운드 2 + main `3ad4f3f6` 병합) · 전 실행
 `~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(호스트 빌드 자리 둘 규율). 아래 「결과」는
 핵심 한 줄이고 출력 전문은 싣지 않는다.
 
 **판정 SHA 문면 정정(v L-1)** — 앞 라운드에 이 머리말과 `checklist.md` 가 `f4a85991` 을 적었는데
 그 뒤로 산출물 커밋이 더 왔다(capability-map 행 하나 · 수정 라운드 다섯). §1~§7 은 **첫 라운드**의 실측,
-**§9 는 수정 라운드 1**(`eab07b5b`), **§10 은 병합 뒤**(현 판정 SHA)다 — 어느 수가 어느 SHA 의
-것인지 절로 가른다.
+**§9 는 수정 라운드 1**(`eab07b5b`), **§10 은 첫 병합 뒤**(`d4b43248`), **§11 은 수정 라운드 2**
+(처방 `07ecf5e9` · 병합 `2fad9b99` = 현 판정 SHA)다 — 어느 수가 어느 SHA 의 것인지 절로 가른다.
 
 ## 1. 도구가 이 저장소에서 서는가 — 채택의 전제
 
@@ -212,3 +212,84 @@ ADR·대상 모듈 빌드 스크립트를 건드리지 않았으므로(기계 �
 `gate-tests.properties` 의 `app` 블록을 +3 했고 그 파일은 내 복원 목록 안에도 있다. base 에서
 복원하면 그 셋이 사라진다. 복원 뒤 실측에서 `app` **124** 가 남고 `build-logic` 은 **27**(base)로
 돌아간다 — 「내 줄 사라짐 · 남의 줄 남음」이 같은 파일 안에서 갈린다.
+
+## 11. 수정 라운드 2 — 처방 `07ecf5e9` · 병합 `2fad9b99`
+
+지적은 하나다(v r2 M-1): 리포트 지문이 공유 convention 의 배선 **한 줄**에 걸려 있어 그 줄을
+지우면 TestKit 셋은 초록인 채로 프로덕션 증분이 거짓 초록으로 돌아간다. 처방은 지문용 property
+를 없애고 **리포트 선언 자체**를 부재 허용 입력으로 둔 것이다 — 지울 수 있는 둘째 줄이 없다.
+
+### 11.1 RED 선행 → GREEN
+
+| # | 명령 | 결과 |
+| --- | --- | --- |
+| R-7 | fixture 가 리포트를 **한 줄로만** 배선하게 바꾸고 **구판**에서 회귀 셋 | **RED** — 「리포트 악화」·「리포트 삭제」가 `UnexpectedBuildSuccess`(게이트가 UP-TO-DATE 로 건너뛰어 초록). 음성 대조만 통과 |
+| R-8 | 같은 fixture, 처방 뒤 | 초록 셋 — 음성 대조도 **그대로** 통과 |
+| R-9 | `-p build-logic test --tests 'bidvector.buildlogic.Mutation*' validatePlugins ktlint{Main,Test}SourceSetCheck detekt` | **exit 0.** mutation test **33**(14·10·3·6), 실패·건너뜀 0 |
+
+R-9 의 `validatePlugins` 는 **실행**됐다(UP-TO-DATE 아님) — 리포트를 단수 입력이 아니라 부재
+허용 입력으로 선언한 이 조합이 Gradle 자신의 task 속성 검증을 지난다는 실측이 그 자리다.
+`ktlint{Main,Test}SourceSetCheck` 는 **수집 task** 라 UP-TO-DATE 로 보고된다 — 실제 검사는
+`runKtlintCheckOver{Main,Test}SourceSet` 이고 그 둘이 실행됐다. 초록을 수집 task 의 UP-TO-DATE 로
+읽지 않는다.
+
+### 11.2 프로덕션 배선에서 다시 — fixture 가 아니라 실제 convention
+
+fixture 는 이제 프로덕션과 같은 모양으로 배선하지만(선언이 하나다) 그 동치를 fixture 안에서
+증명할 수는 없다. 그래서 실제 모듈에서 세 번 쟀다. pitest 를 다시 돌리지 않고 앞 라운드가 남긴
+settlement 리포트(61/73)를 입력으로 썼다 — 재는 것은 변이 분석이 아니라 up-to-date 판정이다.
+
+| 단계 | 입력 | 결과 |
+| --- | --- | --- |
+| A | 손대지 않은 리포트 61/73 | 게이트 **실행** · exit 0 |
+| B | 같은 입력으로 다시 | **UP-TO-DATE** · exit 0 — 음성 대조(「항상 재실행」이 아니다) |
+| C | 리포트의 탐지 속성만 전부 거짓으로 **바꿔치움**(0/73) | 게이트 **FAILED** · exit 1 · 래칫 위반 문면 |
+
+정책·class 산출물·빌드 스크립트는 C 에서 손대지 않았다. 측정 뒤 리포트를 원복했다(빌드
+산출물이라 커밋 대상이 아니다). 앞 라운드의 e2e(test 둘을 지워 15/73 을 만든 대조)와 달리 이
+셋은 **같은 리포트 파일만** 움직여 up-to-date 축 하나를 고립시킨다.
+
+### 11.3 변이 — 처방을 바꿔치운다
+
+산출물을 커밋한 뒤 리포트 선언의 지문 annotation 을 `@Internal` 로 **바꿔치우니** 회귀 둘이
+**RED**(3 중 2 실패)이고 음성 대조는 통과. 원복 뒤 `git status --porcelain` 빈 출력.
+표지로 그 annotation 이름 자체를 쓸 수 없다 — build-logic 의 다른 선언 열넷이 같은 것을 쓴다
+(남의 줄까지 센다).
+
+### 11.4 병합 — main `3ad4f3f6`(#135)
+
+겹침을 계수로 먼저 확인했다: 내 경로 **30** · main 증분 **14** · **교집합 0**. 「충돌 0」을 통과로
+읽지 않고(저장소 기억 「병합 합집합 함정」) 합집합을 등식 셋으로 댔다.
+
+| 축 | 결과 |
+| --- | --- |
+| `HEAD ↔ 3ad4f3f6` 차이 집합 == 내 경로 집합 | 양방향 차집합 **0** |
+| main 증분 14 파일 ↔ `3ad4f3f6` | 차이 **0**(접히거나 덮인 본문 없음) |
+| 내 파일 30 ↔ 병합 전 `07ecf5e9` | 차이 **0** |
+
+형태 축 — `ci.yml` 줄 1082 · job **5** · step id 15 · 매달린 참조 **0**
+(`tools/workflow-step-refs-check.sh` exit 0) · 등록부 `build-logic` **31** · `app` **124** ·
+`web/config/gate-tests.txt` 108(main 과 동일, 내가 만지지 않는 파일) · 등재 중복 **0**.
+
+`#135` 는 `web/**` 와 자기 evidence 만 바꿨다 — `build-logic/**`·카탈로그·ADR·대상 모듈 빌드
+스크립트를 건드리지 않았으므로(기계 확인) 변이 분석 축은 재실행 대상이 아니다.
+
+### 11.5 표적 게이트 — 병합 뒤
+
+| 명령 | 결과 |
+| --- | --- |
+| `buildLogicGateRegistrationGate`·`buildLogicGateExecutionGate`·`buildLogicSizeGate`·`buildLogicTypeShapeGate`·`buildLogicTestShapeGate`·`leakPatternGate` | **exit 0** — 여섯 전부 **실행**(UP-TO-DATE 아님). 실행 등식은 `:build-logic:test` **전건**에서 `required` 31 == 결과 XML 31, 등재 등식은 `population` 31 == 장부 31 |
+| `tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · 참조 18 · 매달린 참조 0 |
+
+등재·실행 등식은 `:build-logic:test` **전건**을 물고 돈다 — 표적 `--tests` 가 건너뛰는 자리가
+거기다. 이 라운드는 **import 하나도 지웠고**(지문용 property 와 함께 쓰이던 annotation) 그 축은
+별도 게이트가 아니라 ktlint 의 미사용 import 규칙이 진다(R-9 에서 실행됐다).
+
+**첫 시도는 없는 task 이름으로 죽었다** — 다른 레인이 자기 브랜치에서 만든 import 게이트 이름을
+이 브랜치에서 불렀고 Gradle 이 `Task 'buildLogicUnusedImportGate' not found` 로 끊었다(exit 1,
+게이트 하나도 돌지 않음). 그 실패를 「게이트가 붉었다」로 읽지 않는다 — **선택 단계**의 실패다.
+이 브랜치에 있는 이름으로 다시 돌린 것이 위 줄이다.
+
+`leakPatternGate` 는 참조형 스캔이고 패턴 어휘를 이 파일에 축어로 적지 않는다. 그 측정은 이
+evidence 를 **담은** 작업 트리에서 돌았다 — 그 뒤 이 표의 한 줄이 다시 자라므로, 마지막 HEAD 의
+정본은 verifier 와 PR 조치 코멘트다(하네스 규율).
