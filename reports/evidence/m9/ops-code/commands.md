@@ -1,7 +1,7 @@
 # M9/ops-code commands
 
-base `df4976cc` · **병합한 main `3ad4f3f6`**(복원 원천) · 판정 SHA **`e7912022`**(마지막 산출물
-커밋). 레인 규율대로 push 하지 않았다.
+base `df4976cc` · **병합한 main `97ed49c4`**(복원 원천 — 앞서 `3ad4f3f6` 도 병합했다) · 판정 SHA
+**`908b197a`**(마지막 산출물 커밋 = 둘째 병합 커밋). 레인 규율대로 push 하지 않았다.
 
 로컬은 **표적 `--tests` + 그 모듈 lint·게이트 + 변이**만 돌렸다. 전건 `check`·`qualityBaseline`·
 container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 `~/.local/bin/bv-build.sh ./gradlew
@@ -37,6 +37,8 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | `ec02a75a` | cr r2 low 셋 + v r2 L-2 — 과수면 · 은퇴한 엔트리 · 낡은 문면 넷 |
 | `e54c0d7a` | 장부 OPS-08 — 운반 단계를 재는 자리 |
 | `e7912022` | v r2 M-1 정정 — 벽시계 단언이 계수 축과 섞여 **MW1 을 통과했다**(실측), 두 축으로 가름 |
+| `cfcf315f` | evidence 4차(판정 SHA `e7912022`) |
+| `908b197a` | main `97ed49c4`(#134) 병합 — 겹침 둘, 충돌 해소 줄 0 |
 
 ## 2. 표적 실행 — 핵심 결과 한 줄씩(판정 SHA 기준, 병합 뒤)
 
@@ -46,7 +48,7 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | --- | --- |
 | `:procurement:test --rerun`(전건 — sealed 열거 축) | `tests=317 failures=0` |
 | `:workflow:test --rerun --tests 'bidvector.workflow.collection.*' --tests '…InboxRecordingNotificationsTest'` | `tests=116 failures=0` |
-| `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest'` | `tests=123 failures=0` |
+| `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest' --tests '…EvaluationAdapterDependencyTest'` | `tests=135 failures=0` |
 | `:app:test --rerun --tests 'bidvector.app.architecture.*' --tests '…CollectionWiringTest' --tests '…NotificationAudienceMarkerTest'` | `tests=204 failures=0` |
 | `gateRegistrationGate` — workflow · adapters · app · procurement | 전부 통과(새 test 클래스 넷 등재 포함) |
 | ktlint(main·test)·detekt — workflow · adapters · app · procurement | 전부 BUILD SUCCESSFUL |
@@ -113,6 +115,24 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 변이는 모두 커밋 **뒤에** 적용했고 원복은 변이 파일만 `git restore --source=HEAD --worktree --`
 로 했다(미커밋 산출물을 지우는 `checkout --` 금지). 원복 뒤 작업 트리에 남은 변경이 evidence
 뿐임을 `git status --porcelain` 으로 확인했다.
+
+## 4a. 둘째 병합(main `97ed49c4`) — 겹침을 계수로 본다
+
+충돌 해소 줄이 **0**(`git show --cc` 빈 출력)이라 자동 병합이고, 그래서 **합집합 함정을 계수로
+쟀다**(충돌 0 이 「접히지 않았다」를 뜻하지 않는다).
+
+| 겹친 경로 | 내 변경 / main 변경 | 병합 결과 |
+| --- | --- | --- |
+| `config/quality/gate-tests.properties` | +8 / +8 −2(전부 주석) | 등재 **520 = 내 것 ∪ main**(누락 0 · 초과 0 · 중복 0). main 이 지운 등재는 **없다**(집합 차 빈 것으로 확인) |
+| `adapters/…/evaluation/EvaluationAdapterDependencyTest.kt` | +13 / +105 | `git diff <원천>..HEAD` 가 **내 13 줄만** 낸다(삭제 0) — main 의 105 줄이 그대로 남았고 내 줄이 그 위에 얹혔다 |
+
+그 Kotlin 파일은 **전문을 읽었다**. main 이 더한 것은 `NoticeWatchSubjectPort` 축의 **필드 참조
+허용 목록**과 그 양성·음성 대조이고, 내 줄은 **패키지 단위 허용 루트**(`workflow.notificationinbox`)와
+그 대조 둘이다 — 두 축이 **다른 집합**이라 한쪽이 다른 쪽을 느슨하게 만들지 않는다. 병합 뒤 그
+class 가 `tests=12 failures=0` 이다(앞 판보다 늘어난 수가 main 의 축이다).
+
+`NoticeWatchSubjectPort.kt`(#134 가 바꾼 main 소스)와 persistence test 둘은 **내 경로가 아니다** —
+겹침 목록이 그것을 계수로 말한다.
 
 ## 5. clean-tree 게이트
 
