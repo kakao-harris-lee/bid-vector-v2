@@ -251,6 +251,49 @@ class CollectAwardListUseCaseTest {
         report.halted shouldBe null
     }
 
+    /**
+     * **멈춤 집합의 등식**(ops-code 레인 교차 지적) — 절단 사유마다 「실행을 멈추는가」를 전수로 잠근다.
+     * `haltOf` 가 소진 `when` 이라 새 사유가 생기면 컴파일이 그 자리를 가리키지만, 컴파일은 **어느
+     * 쪽으로** 보낼지 묻지 않는다. 이 등식이 그 선택을 고정한다.
+     *
+     * 멈추는 것은 **승인 범위·계정 한도를 다 쓴** 둘뿐이다(예산·쿼터). 그 둘은 다음 슬롯을 불러도 같은
+     * 거절이 오므로 창을 더 걷는 의미가 없다. 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
+     * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
+     *
+     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc). 그때 이 목록에도
+     * 그 사유가 한 줄 늘어야 한다 — 컴파일이 `haltOf` 를 가리키고, 이 등식이 그 선택을 받는다.
+     */
+    @Test
+    fun `멈추는 절단 사유는 예산과 쿼터 둘뿐이다 — 사유 전수의 등식`() {
+        val halting = ALL_TRUNCATION_CAUSES.filter { cause -> haltedBy(cause) }.toSet()
+
+        halting shouldBe
+            setOf(
+                TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
+                TruncationCause.BudgetExhausted(BudgetLimit.TOTAL),
+                TruncationCause.QuotaExhausted,
+            )
+    }
+
+    /** 그 사유 하나로 끝나는 슬롯이 실행을 멈추는가 — 멈추지 않으면 미완 계수만 올라야 한다. */
+    private fun haltedBy(cause: TruncationCause): Boolean {
+        val fixture = AwardFixture()
+        val source =
+            ScriptedSource { _, _ ->
+                awardBatch(emptyList(), accounting = sourceAccounting(normalized = 0, truncationCause = cause))
+            }
+
+        val report =
+            fixture.useCase.collect(
+                awardRange("2026-09-01", "2026-09-02"),
+                listOf(AwardCollectionSource(construction, source)),
+            )
+
+        // 멈추지 않는 사유는 두 슬롯 다 돌고 둘 다 미완이다(조용히 완료로 세지 않는다).
+        if (report.halted == null) report.unfinishedSlots shouldBe 2
+        return report.halted != null
+    }
+
     @Test
     fun `쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다`() {
         val fixture = AwardFixture()
@@ -296,6 +339,28 @@ class CollectAwardListUseCaseTest {
         quotaReport.halted?.budgetLimit shouldBe null
     }
 }
+
+/**
+ * 오늘의 `TruncationCause` **전수** — 위 등식의 모수다. 손으로 적는 목록이라 새 사유는 자동으로
+ * 들어오지 않는다(그 자리를 강제하는 것은 `haltOf` 의 소진 `when` 이고, 이 목록은 **선택**을 잠근다).
+ * `BudgetExhausted` 는 값을 나르므로 상한 둘을 각각 든다.
+ */
+private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
+    listOf(
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.QuotaExhausted,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        TruncationCause.Unclassified,
+        TruncationCause.StructureFailure,
+        TruncationCause.SelfThrottled,
+        TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
+        TruncationCause.BudgetExhausted(BudgetLimit.TOTAL),
+    )
 
 /** 낙찰 목록 항목 하나 — 계약이 등재한 키로 원문을 만든다(식별자 둘과 낙찰자 상호). */
 private fun awardObservation(number: String): RawNoticeObservation =
