@@ -97,8 +97,10 @@
 
 - ⓐ **경계**: **import 가 들여온 이름이 그 파일 본문에서 이름으로 쓰인다.** 등식은
   `도입 이름 ∖ (본문 참조 이름 ∪ 문법이 쓰는 이름) == ∅`.
-- ⓑ **새 public 표면**: `UnusedImportGateTask` · 정책 키 둘(`source.import.syntax-names` ·
-  `source.import.gate-source-sets`).
+- ⓑ **새 public 표면**: `UnusedImportGateTask` · 정책 키 **하나**(`source.import.syntax-fqns`).
+  **정정(수정 라운드 1, 리뷰 LOW-1)**: 앞 판이 적은 `source.import.gate-source-sets` 는 구현되지
+  않았다 — 이 절이 「새 public 표면」을 실제 표면과 어긋나게 적었다. 면제 키는 같은 라운드에
+  짧은 이름에서 FQN 으로 바뀌었다(리뷰 M-3).
 - ⓒ **우회**
   1. 쓰지 않는 import 를 남긴다 → 등식(이 축의 본문).
   2. 별칭으로 들여와 안 쓴다(`import a.b.C as D`) → 도입 이름은 **별칭**이다.
@@ -156,16 +158,29 @@
 
 - ⓐ **경계**: production(main) 소스가 **자기 실행 환경을 물어** 거동을 가르지 않는다. 억제는 환경
   스니핑이 아니라 명시적 정책 값이어야 한다(OPS-07 (a) 형태).
-- ⓑ **새 public 표면**: 없다(같은 task 의 축). 정책 키 `source.env-sniff.member-pairs`.
+- ⓑ **새 public 표면**: 앞 판은 「없다(같은 task 의 축)」였고 정책 키 하나였다. 수정 라운드 1 에서
+  **task 하나와 정책 키 하나가 늘었다** — `EnvironmentAccessGateTask`(순수 술어 `EnvironmentAccess`) ·
+  `bytecode.env-access.denied-members`. 소스 쌍 축(`source.env-sniff.member-pairs`)은 1 차 그물로
+  남고 `*.getenv` 가 더해졌다.
 - ⓒ **우회**
   1. `System.getenv("CI")` → 수신자 뿌리 이름 + selector 이름 **쌍**을 PSI 에서 본다.
   2. `System.getProperty("…")` → 같은 쌍 집합.
   3. 완전수식(`java.lang.System.getenv`) → 수신자 뿌리의 **마지막 세그먼트**로 견준다.
-  4. 별칭 import(`import java.lang.System as S`) → 별칭도 수신자 뿌리 이름이라 쌍 집합에 별칭을
-     넣어야 피하는데, 그러면 **import 가 원 FQN 을 낸다**(⑥ 축과 겹쳐 걸린다).
+  4. 별칭 import(`import java.lang.System as S`) → **이 판단이 틀렸다**(수정 라운드 1, verifier H-1 ·
+     리뷰 HIGH). 「import 가 원 FQN 을 내므로 ⑥ 축과 겹쳐 걸린다」고 적었지만 ⑥ 축(ⓑ)은
+     `bidvector.*` **자기 저장소 좌표만** 보고 ⓐ 축은 정책이 고른 **domain 모듈에서만** 돈다. 환경
+     스니핑이 실제로 쓰일 자리(`app`·`adapters`·`workflow` 의 배선)에서 그 형태를 받는 축이 **없었다**.
+     정적 import(`import java.lang.System.getenv`)는 수신자가 아예 사라져 쌍이 만들어지지도 않는다.
+     **처분**: 임계 0 의 정본을 바이트코드 층(`environmentAccessGate`)으로 옮겼다 — 소스 표기 넷이
+     컴파일된 참조 하나로 모인다. 같은 probe 로 **차등 실측**: 소스 축 2/6 · 바이트코드 축 6/6.
   5. test 코드로 옮겨 그 값을 main 에 주입한다 → 주입은 명시적 정책 값이고 금지 대상이 아니다
      (경계 문장 그대로).
   6. 리플렉션으로 부른다 → **닫지 못한다.** 알려진 한계(리플렉션 축은 `collection.reflection.*` 가
      따로 든다).
+  7. `System.getProperties().getProperty(…)` 로 한 단 거쳐 간다 → 앞 판 쌍 집합의 `System.getProperty`
+     를 비껴갔다(리뷰 HIGH). 바이트코드 축의 거부 집합이 `#getProperties` 를 든다.
+  8. `ProcessBuilder().environment()` → 같은 자리. 거부 집합이 그 멤버를 든다.
+  9. callable reference(`::getenv`)·정적 import → 소스 표기가 다르고 **컴파일된 참조는 하나**다.
+     이것이 바이트코드 층을 정본으로 고른 이유다 — 우회하려면 게이트 자신을 고쳐야 한다.
 - **main 의 기존 상태**: 모듈 main 소스에서 0 건(측정). build-logic 은 production 모듈이 아니라
   대상 밖이다 — 그 트리의 JDK 판 단언은 빌드 도구의 정당한 질의다.

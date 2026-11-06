@@ -120,3 +120,62 @@ S-20·Playwright 는 **로컬에서 돌리지 않는다 — PR CI 가 정본**�
 커밋까지 세어 **162 경로**가 나오고 그 중 **82 가 내 것이 아니다**(web · usecase · 다른 slice 의
 evidence). 복원 원천이자 경계는 **이 브랜치가 실제로 병합한 main 의 고정 SHA** `3ad4f3f6` 이고, 그
 경계에서 목록은 **80 경로**이며 등식이 양방향으로 빈 출력이다.
+
+## 수정 라운드 1 — 실측 (verifier B-1·H-1·H-2 · 리뷰 HIGH 1 · MEDIUM 6 · LOW 7)
+
+### B-1 — 루트 게이트를 처음으로 돌렸다
+
+앞 라운드의 「게이트 42 task `--rerun` exit 0」은 **모듈 task 만** 셌다. 이 slice 가 루트에 task 둘을
+더했는데도 루트 게이트는 한 번도 돌지 않아, 파일 500 줄 한도를 넘긴 convention plugin 이 PR CI 에서만
+붉었다. 이번 라운드는 루트 게이트 **열**을 표적에 넣었다 — `buildLogicSizeGate` · `scriptSizeGate` ·
+`buildLogicUnusedImportGate` · `scriptUnusedImportGate` · `buildLogicGateRegistrationGate` ·
+`buildLogicTypeShapeGate` · `contractGate` · `memberEffectGate` · `leakPatternGate` ·
+`conventionCoverageGate`. 전부 실행 + `BUILD SUCCESSFUL`.
+
+크기: convention plugin **543 → 474 줄**, 새 배선 파일 129 줄, included build 스크립트 147 줄.
+한도는 올리지 않았다. 함수 축도 같은 게이트가 잡아 두 번 고쳤다(배선 함수 88 줄 → 게이트마다 이름
+붙은 함수, test 람다 57 줄 → 이름 붙은 함수 둘).
+
+### H-1 — 차등 실측: 같은 probe, 두 층
+
+`app` main 에 우회 여섯을 한 파일로 심었다(정적 import · 별칭 import · `getProperties` 경유 ·
+`ProcessBuilder.environment` · Spring 활성 프로파일 · 통제군 `System.getenv`).
+
+| 층 | 결과 |
+| --- | --- |
+| 새 바이트코드 축 `:app:environmentAccessGate --rerun` | **BUILD FAILED · `violations=6`** — 여섯 전부 지목(`types` 266→267 · `accesses` 9460→9475) |
+| 소스 쌍 축 `:app:domainSourceReferenceGate --rerun` | **BUILD FAILED · `violations=2`** — 별칭과 통제군만(`*.getenv` 를 이 라운드에 더해서 둘이다; 앞 판 쌍 집합이면 통제군 하나뿐이다) |
+
+**2/6 대 6/6** 이 이 축을 바이트코드로 옮긴 근거다. 심기 전 전 모듈은 `violations=0` 이고 모집단은
+공허하지 않다 — adapters `types=460 accesses=16608` · app `266/9460` · workflow `682/15650` ·
+procurement `254/6519` · decision `178/4498`.
+
+### H-2 · cr M-1 · cr M-6 — 양성 대조 넷
+
+| 심은 것 | 결과 |
+| --- | --- |
+| `workflow` 에 `V30` (비-소유 모듈) | `:workflow:migrationOrderGate --rerun` **FAILED** — 모듈과 파일을 지목 |
+| `app` 에 `V30` (다른 비-소유 모듈) | **FAILED** — 같은 문면 |
+| `adapters` 에 `V0` | **FAILED** — 「등식의 범위 밖」 |
+| `adapters/…/nested/` 에 `V12` 중복 | **FAILED** — 재귀 열거가 하위 디렉터리를 본다(test 도 같은 열거로 맞췄다) |
+
+### 변이 — 바꿔치우기 여덟, RED 15
+
+커밋 뒤 술어 본문을 **통과 쪽으로 대체**하고 `:build-logic:test --rerun`. 되돌림은 변이 파일만
+(`git restore`, 미커밋 산출물 없음을 먼저 확인).
+
+| 변이 | RED |
+| --- | --- |
+| `EnvironmentAccess` 거부 필터 → 통과 | 7 |
+| `MigrationOrder.ownershipViolations` → 빈 목록 | 1 |
+| `MigrationOrder.emptinessViolations` → 빈 목록 | 1 |
+| `MigrationOrder` 범위 밖 가지 → 빈 목록 | 1 |
+| `UnusedImports.deadSyntaxFqns` → 빈 목록 | 1 |
+| 면제 축을 옛 짧은 이름 의미로 되돌림 | 1 |
+| `GateRegistration` 정렬 단언 → 통과 | 1 |
+| `archiveEmptinessFailure` → `null` | 2 |
+
+**첫 시도의 변이 하나는 초록이었고 그것이 변이의 결함이었다.** `archiveCount == 0` 가지만 끄면 입력 0
+인 입력이 **형제 가지**(`judged == 0`)에 걸려 같은 메시지를 내므로 test 가 통과한다. 함수 전체를
+`null` 로 **대체**하자 둘 다 RED 다 — 더하기·부분 변이는 「방어 있음」과 「측정 못 함」을 같은 값으로
+보여 준다(등재된 교훈과 같은 축).
