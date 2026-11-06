@@ -230,3 +230,84 @@ def test_preload_accepts_an_unedited_approved_policy_from_any_path(
 
     assert not isinstance(loaded, EvaluationPolicyRejected), loaded
     assert loaded.version == "evaluation-v1"
+
+
+# ---- v r3 H-3b = cr r3 H-1 — 추론 정책도 승인된 산출물이어야 한다 ----
+#
+# `inference-v1` 은 등록부에 있지만 **런타임에 그 등록부를 묻는 자리가 없었다**. 그래서
+# `ML_ENGINE_INFERENCE_POLICY` 를 편집 사본으로 돌리면 코드 변경 0 으로 부팅이 통과했다
+# (verifier probe1 S5·S6). `maturity.window_days` 는 `_maturities` → `build_weekly_maturity`
+# → `plan_evaluation_windows` 로 흘러 **평가 창 선택**을, 따라서 승격 판정을 바꾼다.
+
+_SHIPPED_INFERENCE_POLICY = (
+    Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
+)
+
+
+def _env_with_inference(inference_policy: Path) -> dict[str, str]:
+    env = dict(_FULL_ENV)
+    env["ML_ENGINE_INFERENCE_POLICY"] = str(inference_policy)
+    return env
+
+
+def _edited_inference_copy(path: Path, old: str, new: str) -> Path:
+    text = _SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8")
+    edited = text.replace(old, new)
+    assert edited != text, f"치환이 아무것도 바꾸지 못했다: {old!r}"
+    path.write_text(edited, encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "axis"),
+    [
+        # 평가 창 선택을 바꾼다 — 승격 판정 입력이다
+        ("maturity.window_days: 7", "maturity.window_days: 1", "window_days"),
+        # `OPEN-SET-10` 이 미결인 동안 미승인이어야 하는 칸을 켠다
+        (
+            'maturity.time_axis_substitute: "NOT_APPROVED"',
+            'maturity.time_axis_substitute: "APPROVED"',
+            "substitute",
+        ),
+    ],
+)
+def test_preload_rejects_an_edited_inference_policy(
+    tmp_path: Path, old: str, new: str, axis: str
+) -> None:
+    """이름은 `inference-v1` 그대로다 — 거부를 만드는 것은 **내용 지문**이다."""
+    edited = _edited_inference_copy(tmp_path / "inference-v1.yaml", old, new)
+
+    rejected = _preload(ServerConfig.from_env(_env_with_inference(edited))).inference
+
+    assert isinstance(rejected, InferencePolicyRejected), (axis, rejected)
+    assert "승인된 지문과 다르다" in rejected.reason
+
+
+def test_preload_rejects_an_inference_policy_under_an_unregistered_name(
+    tmp_path: Path,
+) -> None:
+    edited = _edited_inference_copy(
+        tmp_path / "inference-v1-tuned.yaml",
+        "version: inference-v1",
+        "version: inference-v1-tuned",
+    )
+
+    rejected = _preload(ServerConfig.from_env(_env_with_inference(edited))).inference
+
+    assert isinstance(rejected, InferencePolicyRejected), rejected
+    assert "승인 등록부에 없는" in rejected.reason
+
+
+def test_preload_accepts_the_unedited_inference_policy_from_any_path(
+    tmp_path: Path,
+) -> None:
+    """**음성 대조** — 무편집 사본은 경로가 달라도 통과한다."""
+    copied = tmp_path / "elsewhere.yaml"
+    copied.write_text(
+        _SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    loaded = _preload(ServerConfig.from_env(_env_with_inference(copied))).inference
+
+    assert not isinstance(loaded, InferencePolicyRejected), loaded
+    assert loaded.version == "inference-v1"

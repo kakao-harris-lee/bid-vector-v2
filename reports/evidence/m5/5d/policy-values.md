@@ -36,9 +36,22 @@
 | `inference-v1` | `1d8a8cf6d5fbfa495e9503c003029dd29f05fd3b63f924ac5e58dfe35ada3b96` |
 
 사유와 절차는 `reports/evidence/m5/5c2/policy-values.md` §4 와 같다(같은 등록부의 둘째 줄).
-이 축에서 그것이 지키는 것은 **대체 승인 칸**이다 — `maturity.time_axis_substitute` 를
-`"APPROVED"` 로 바꾼 사본을 같은 `inference-v1` 이름으로 로드하는 길이 닫힌다
-(`OPEN-SET-10` 이 미결인 동안 그 칸은 미승인이어야 한다).
+
+**이 지문을 묻는 자리**(M9/ml-lifecycle 수정 라운드 3 에서 추가): 조립 근
+`app.server._preload` 가 `inference.policy.load_approved_inference_policy` 로 읽는다. 그래서
+`ML_ENGINE_INFERENCE_POLICY` 가 가리킬 수 있는 것은 **이 지문의 산출물**뿐이다 — 같은
+`inference-v1` 이름을 단 편집 사본도, 이름을 바꿔 단 사본도 부팅이 거부한다. 출하 파일 자체를
+고치는 길은 **CI** 의 등록부 ↔ 출하 지문 등식 test 가 막는다.
+
+**앞 판 문면 정정**(cr r3 H-1): 이 절은 2026-11-06 첫 판에서 「`APPROVED` 로 바꾼 사본을 같은
+이름으로 로드하는 길이 닫힌다」고 적었는데, 그때는 **런타임에 이 등록부를 묻는 자리가 없었다**
+(등록부의 효과가 CI 층뿐이었다) — 승인 장부가 열린 축을 닫혔다고 적은 거짓 문면이었다. 같은
+라운드에서 그 자리를 만들어 문면이 참이 됐고, 위 두 문단이 「무엇이 어느 층에서 막히는가」를
+적는다.
+
+이 축에서 지키는 값 둘: **대체 승인 칸**(`maturity.time_axis_substitute` — `OPEN-SET-10` 이
+미결인 동안 미승인이어야 한다)과 **`maturity.window_days`** — 뒤쪽은 `build_weekly_maturity`
+→ `plan_evaluation_windows` 로 흘러 **평가 창 선택**, 따라서 승격 판정 입력을 바꾼다.
 
 **값을 바꾸려면 세 자리를 같은 커밋에서** — ⑴ 위 표(이 문서) ⑵
 `ml-engine/policy/inference-v1.yaml` ⑶ `ml_engine.registry.policy_approvals` 한 줄.
