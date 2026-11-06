@@ -25,6 +25,9 @@ import java.time.Instant
 
 private val RECORDED_AT: Instant = Instant.parse("2026-11-06T02:00:00Z")
 
+/** 청중 조회가 저장 층 장애로 끝난 값 — 예외 **클래스 이름만** 나른다(cr r2 MEDIUM). */
+private val AUDIENCE_UNAVAILABLE = NotificationAudience.Unavailable("SQLException")
+
 private class RecordingInbox(
     private val answer: NotificationInboxOutcome = NotificationInboxOutcome.Created,
 ) : NotificationInboxPort {
@@ -184,7 +187,7 @@ class InboxRecordingNotificationsTest {
     fun `청중 조회가 실패를 돌려줘도 기록 0 건에 그치고 채널 요청은 나간다`() {
         val inbox = RecordingInbox()
         val channel = RecordingChannel()
-        val audience = CountingAudience(NotificationAudience.Unavailable)
+        val audience = CountingAudience(AUDIENCE_UNAVAILABLE)
         val recording = InboxRecordingNotifications(channel, inbox, audience, CountingClock())
 
         val outcome = recording.request(requestFor())
@@ -219,6 +222,28 @@ class InboxRecordingNotificationsTest {
         InboxRecordingNotifications(channel, inbox, oneAccount(), CountingClock()).request(requestFor())
 
         seen shouldContainExactly listOf("inbox", "channel")
+    }
+
+    /**
+     * **장애도 run 당 한 번만 묻는다**(cr r2 low) — `Unavailable` 까지 캐시하는 것은 **고른 쪽**이다:
+     * 연결이 고갈된 날 후보마다 다시 물으면 풀의 연결 대기(기본 수십 초)가 후보 수만큼 쌓여 평가 run
+     * 자체가 매달린다. 그 대가로 한 번 깜빡인 연결이 그 run 의 기록을 전부 0 건으로 만든다(알려진
+     * 제한 ⑨). 요청 둘로 그 선택을 고정한다 — 앞 판에는 요청이 하나뿐이라 「캐시한다」와 「다시
+     * 묻는다」가 같은 값이었다.
+     */
+    @Test
+    fun `청중 조회가 실패해도 그 run 에서 다시 묻지 않는다`() {
+        val inbox = RecordingInbox()
+        val channel = RecordingChannel()
+        val audience = CountingAudience(AUDIENCE_UNAVAILABLE)
+        val recording = InboxRecordingNotifications(channel, inbox, audience, CountingClock())
+
+        recording.request(requestFor("M9-NOTI-1"))
+        recording.request(requestFor("M9-NOTI-2"))
+
+        audience.calls shouldBe 1
+        inbox.records.shouldBeEmpty()
+        channel.requested shouldHaveSize 2
     }
 
     /**

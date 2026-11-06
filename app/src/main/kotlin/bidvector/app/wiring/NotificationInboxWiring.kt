@@ -80,7 +80,9 @@ open class NotificationInboxWiring {
             adapter.accounts().also { resolved ->
                 // 청중을 못 읽은 실행은 알림함 기록이 0 건으로 끝난다 — 그 0 이 **사실의 0 이
                 // 아니라는** 표지를 여기서 적는다(쓰기 실패 표지와 같은 자리·같은 사유, D-7C3B-9).
-                if (resolved == NotificationAudience.Unavailable) logger.warn(AUDIENCE_UNAVAILABLE_LINE)
+                if (resolved is NotificationAudience.Unavailable) {
+                    logger.warn(audienceUnavailableLine(resolved.exceptionType))
+                }
             }
         }
     }
@@ -101,7 +103,10 @@ internal fun inboxWriteFailedLine(record: NotificationInboxRecord): String =
         "notice=${record.notice.number.value}/${record.notice.round.value}"
 
 /**
- * 청중을 못 읽은 실행의 표지 — **계수도 주체도 싣지 않는다**(읽은 것이 없으니 셀 것도 없고, 저장소
- * 예외 메시지에는 행 값이 실릴 수 있다). 「이 실행의 알림함 기록 0 건은 사실이 아니다」 한 문장이다.
+ * 청중을 못 읽은 실행의 표지 — **예외 클래스 이름만** 싣는다(cr r2 MEDIUM). 계수도 주체도 메시지도
+ * 없다: 읽은 것이 없으니 셀 것이 없고, 저장소 예외 메시지에는 행 값이 실릴 수 있다. 그 한 토큰이
+ * 「연결 고갈」과 「권한 회수」와 「표 부재」를 가르므로 「이 실행의 알림함 기록 0 건은 사실이 아니다」에
+ * **왜**가 붙는다(전송 축의 `TransportFailed(exceptionType)` 와 같은 타협).
  */
-internal const val AUDIENCE_UNAVAILABLE_LINE: String = "notification-inbox audience unavailable — recorded 0 items"
+internal fun audienceUnavailableLine(exceptionType: String): String =
+    "notification-inbox audience unavailable — recorded 0 items cause=$exceptionType"

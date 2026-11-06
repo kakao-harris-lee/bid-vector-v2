@@ -59,8 +59,17 @@ sealed interface NotificationAudience {
         val accounts: List<AccountId>,
     ) : NotificationAudience
 
-    /** 저장 층이 답하지 못했다 — 기록 0 건이지만 그 0 은 **사실의 0 이 아니다**. */
-    data object Unavailable : NotificationAudience
+    /**
+     * 저장 층이 답하지 못했다 — 기록 0 건이지만 그 0 은 **사실의 0 이 아니다**.
+     *
+     * [exceptionType] 은 **예외 클래스의 단순 이름뿐**이다(cr r2 MEDIUM). 메시지·SQLState 는 계속
+     * 버린다 — 저장소 예외 메시지에는 행 값이 실릴 수 있다. 클래스 이름만 싣는 수법은 전송 축의
+     * `TransportFailed(exceptionType)` 가 같은 사유로 이미 쓰는 것이고, 그 한 토큰이 「연결 고갈」과
+     * 「권한 회수」와 「표 부재」를 가른다(앞 판은 셋이 같은 한 줄이었다).
+     */
+    data class Unavailable(
+        val exceptionType: String,
+    ) : NotificationAudience
 }
 
 /**

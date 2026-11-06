@@ -58,11 +58,10 @@ class JdbcNotificationAudience(
                     connection.rollback()
                 }
             }
-        } catch (
-            @Suppress("SwallowedException") failure: SQLException,
-        ) {
-            // 조용히 삼키지 않는다 — 값이 그 축이고, 표지는 조립이 로그 한 줄로 적는다.
-            NotificationAudience.Unavailable
+        } catch (failure: SQLException) {
+            // 조용히 삼키지 않는다 — 값이 그 축이고, 표지는 조립이 로그 한 줄로 적는다. **클래스
+            // 이름만** 싣는다(메시지·SQLState 에는 행 값이 실릴 수 있다 — `TransportFailed` 와 같은 접기).
+            NotificationAudience.Unavailable(failure.javaClass.simpleName)
         }
 }
 

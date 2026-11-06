@@ -62,7 +62,7 @@ class InboxRecordingNotifications(
             // v M-2). 앞 판은 이 자리에서 예외가 올라가 평가 run 이 멈췄고, 그 판정의 outbox
             // 흔적까지 함께 사라졌다. 표지는 조립이 진다(청중 빈의 로그 한 줄) — workflow 층은
             // 로거를 들지 않고, 기록 실패의 표지가 이미 그 자리에 있다(D-7C3B-9).
-            NotificationAudience.Unavailable -> Unit
+            is NotificationAudience.Unavailable -> Unit
         }
 
     private fun recordFor(
