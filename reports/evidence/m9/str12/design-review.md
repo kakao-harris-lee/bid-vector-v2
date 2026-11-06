@@ -53,7 +53,7 @@ Telegram 자신의 가용성·전달 보장, 메시지 내용의 업무적 옳�
 | 4 | 기동 검사를 지워 토큰 없이 Live 로 뜬다 → relay 가 claim 한 뒤 발송 자리에서 터져 행을 영구히 잃는다 | `RelayBootDecisionTest`(결손 조합 전수) + `RelayWiringTest`(바이트코드로 「배선이 판정 함수를 지난다」) + **변이 ④** RED |
 | 5 | 환경 이름(`Production`)으로 판정해, 정책표가 `Staging -> Live` 가 되는 날 같은 사각을 공유한 채 뚫린다 | `relayBootDecision` 이 정책표를 인자로 받고 이름을 보지 않는다(기존 cr G-1 성질 유지) + 표 변이 test |
 | 6 | 설정에 없는 `RouteKey` 로 chat id 해소 실패를 **조용히 기본 chat 으로** 메운다 | 해소 실패는 네트워크 호출 0 + `Rejected(InvalidTarget)`. 「기본 chat」 경로가 타입에 없다(`Map<RouteKey, TelegramChatId>` 조회 결과가 `null` 이면 그것이 결과다) |
-| 7 | 남의 owner 로 route 를 얻어 남의 chat 으로 보낸다 | `ConfiguredRouteDirectory` 가 설정된 owner 가 아니면 **빈 map** → `TargetMissing` → `Suppressed` → `FAILED`. 발송 0 |
+| 7 | 남의 owner 로 route 를 얻어 남의 chat 으로 보낸다 | **방어하지 않는다(cr M-1 로 정정).** `ConfiguredRouteDirectory` 는 설정된 owner 가 아니면 빈 map 을 내지만, production 에서 그 객체는 `target.owner` 로 세워지고 `routesFor` 도 같은 값으로 불린다 — **그 분기는 운영 경로에서 도달하지 않으므로 이것을 막는 층이라 적는 것은 공허하다.** owner 출처를 둘로 갈라야 살아나는 방어이고, 단일 운영자(`OPEN-STR-07`)에서 그것은 방어가 아니라 오설정 표면이다. 거동은 test 가 정의해 두었고 주장은 내렸다 |
 | 8 | `parse_mode` 를 켜 공고명의 마크업 문자가 Telegram 파서를 깨거나 다른 뜻이 된다 | `parse_mode` 를 **보내지 않는다**(form body 키 둘뿐) + 수신 본문 키 집합 등식 test |
 | 9 | 공고 행이 없을 때 던져 run 전체를 멈추고 남은 행을 좌초시킨다 | 렌더러가 던지지 않는다(아래 (D-6) 결정) + 축약 본문 골든 test |
 | 10 | 응답 본문을 신뢰해 `ok:false` 2xx 를 전달로 읽는다 | 2xx 라도 `ok:true` 가 아니면 `Unknown`. 본문 해독 실패도 `Unknown` |

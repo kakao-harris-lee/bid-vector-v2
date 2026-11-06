@@ -32,11 +32,21 @@ class ConfiguredRouteDirectoryTest {
     }
 
     /**
-     * 다른 owner 에게는 **빈 map** 이다(설계 검토 우회 7) — dispatch 가 그것을 `TargetMissing`
-     * 으로 읽어 억제하므로 남의 chat 으로 가는 경로가 없다. 「아무 route 나 돌려주는」 기본값이 없다.
+     * 다른 owner 에게는 **빈 map** 이다 — dispatch 가 그것을 `TargetMissing` 으로 읽어 억제하므로
+     * 「아무 route 나 돌려주는」 기본값이 없다.
+     *
+     * **이것을 「owner 격리 방어선」으로 주장하지 않는다(cr M-1).** production 에서 이 클래스는
+     * `ConfiguredRouteDirectory(target.owner, …)` 로 세워지고 `routesFor` 를 부르는 것도 같은
+     * `target.owner` 다(`RelayOutboxNotifications` 가 그 값으로 intent 를 짓는다) — 즉 **이 분기는
+     * 운영 경로에서 도달하지 않는다.** 그것을 막는 층이라고 적으면 공허한 주장이다.
+     *
+     * 그래서 이 test 가 재는 것은 **정의된 거동**이다: 뒤에 owner 출처가 둘로 갈리는 변경이
+     * 오면(설정 owner ≠ relay target owner) 그때 이 분기가 살아나고, 그 거동이 미결이 아니다.
+     * 단일 운영자(`OPEN-STR-07`)에서 출처를 둘로 늘리는 것은 방어가 아니라 오설정 표면이라
+     * 이 slice 는 늘리지 않았다 — `checklist.md` 에 등재.
      */
     @Test
-    fun `다른 owner 에게는 경로가 없다`() {
+    fun `다른 owner 에게는 경로가 없다 — 정의된 거동(운영 경로에서는 도달하지 않는다)`() {
         directory.routesFor(OperatorId("someone-else")).shouldBeEmpty()
     }
 }
