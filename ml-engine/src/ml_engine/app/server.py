@@ -21,8 +21,9 @@ from typing import Final, NoReturn
 import grpc
 
 from ml_engine.app.pipeline import pipeline_factory
-from ml_engine.evaluation.policy import EvaluationPolicy, load_evaluation_policy
+from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.evaluation.policy import PolicyRejected as EvaluationPolicyRejected
+from ml_engine.evaluation.policy_source import load_approved_evaluation_policy
 from ml_engine.features import SUPPORTED_FEATURE_SCHEMAS
 from ml_engine.inference.policy import (
     InferencePolicy,
@@ -131,11 +132,18 @@ def _preload(config: ServerConfig) -> _Preloaded:
     뿌리에서 `yaml.YAMLError`를 `PolicyError`로 정규화하므로(D-5E3-1), 호출부의
     별도 정규화가 더 필요 없다. 「호출부 한 곳 정규화」는 임시 방편이었다 —
     다른 호출자가 생기면 재발한다. 문법이 깨진 inference 정책은 여전히
-    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다."""
+    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다.
+
+    **평가 정책은 승인 요구 로더로 읽는다**(M9/ml-lifecycle 수정 라운드 2, v H-2) —
+    `ML_ENGINE_EVALUATION_POLICY` 가 가리킬 수 있는 것은 **승인 등록부에 있는 산출물**
+    뿐이다. 거부는 다른 세 축과 같은 결과 타입으로 떨어지므로 `_preload_outcomes` ·
+    `_training_pipeline_factory` · `_prediction_runtime` 이 각자 다시 판정하지 않는다
+    (같은 기준을 두 곳에서 구현하지 않는다 — R-H1 과 같은 축). 사유와 나머지 겹은
+    `evaluation.policy_source` 모듈 docstring 에 있다."""
     return _Preloaded(
         inference=load_inference_policy(config.inference_policy_path),
         training=load_training_policy(config.training_policy_path),
-        evaluation=load_evaluation_policy(config.evaluation_policy_path),
+        evaluation=load_approved_evaluation_policy(config.evaluation_policy_path),
         serving=load_serving_policy(config.serving_policy_path),
     )
 

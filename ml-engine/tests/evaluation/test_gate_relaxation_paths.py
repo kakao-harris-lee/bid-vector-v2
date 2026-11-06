@@ -17,6 +17,7 @@ import ast
 import dataclasses
 import importlib
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Final
 
 import pytest
@@ -35,6 +36,7 @@ from ml_engine.evaluation.policy import (
     _SCALAR_KEYS,
     EvaluationPolicy,
     load_evaluation_policy,
+    policy_checksum,
 )
 from ml_engine.evaluation.policy_source import (
     PolicySourceMismatch,
@@ -47,6 +49,7 @@ from tests.ast_sites import (
     src_key,
     src_trees,
 )
+from tests.policy_fixture import policy_yaml_text
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ML_ENGINE_ROOT / "src" / "ml_engine"
@@ -302,3 +305,93 @@ def test_no_src_module_outside_the_policy_module_imports_its_privates() -> None:
                 if alias.name.startswith("_")
             )
     assert not violations, f"정책 모듈의 private 이름을 src 가 가져간다: {violations}"
+
+
+# ── ⑥ 승인된 산출물로만 돈다 (v H-2) ────────────────────────────────────────
+# ⑤ 의 두 겹은 「객체가 자기 파일과 같은가」까지만 묻는다. 「그 파일을 누가 승인했는가」는
+# 묻지 않아, 완화한 사본을 파일로 만들어 쓰면 전 게이트가 초록이었다(verifier 실측).
+# 아래 둘은 그 축의 **자리**를 집합 등식으로 잠근다 — 호출 자리가 하나 더 생기면 붉다.
+
+
+def test_the_assembly_root_uses_the_approval_requiring_loader() -> None:
+    """승인을 **묻지 않는** 로더를 부르는 자리 전수 — `evaluation/policy_source.py` 안
+    둘뿐이다(재검증의 재읽기 · 승인 요구 로더 자신). `app/**` 이 그 로더를 직접 부르면
+    운영자가 가리킨 미등록 사본으로 부팅이 서므로 이 등식이 깨진다.
+
+    이름은 모듈마다 `bound_names` 로 해석하므로 `as` 별칭·재대입 한 단계가 함께 잡힌다."""
+    assert construction_sites("load_evaluation_policy") == {
+        ("evaluation/policy_source.py", "verify_policy_source"),
+        ("evaluation/policy_source.py", "load_approved_evaluation_policy"),
+    }
+
+
+def test_the_gate_runs_from_exactly_one_product_site() -> None:
+    """cr/v M-3 — 출처 재검증이 **제품 경로 하나**에 있다는 문면은 그 경로가 하나일 때만
+    참이다. `run_holdout` 을 부르는 src 자리가 하나 더 생기면 재검증 없이 게이트가 돌 수
+    있다 — 그 가능성을 집합 등식으로 닫는다(문면이 아니라 계수)."""
+    assert construction_sites("run_holdout") == {("app/pipeline.py", "_run_holdout")}
+
+
+# ── ⑦ ⑤의 겹 **안쪽 검사 각각**을 잠근다 (v r2 M-1) ─────────────────────────
+# ⑤ 는 「세 형태가 실패한다」를 재고, 그 실패를 **무엇이** 만드는지는 재지 않았다. 그래서
+# 생성 토큰의 두 검사와 재검증의 파일-바이트 축을 각각 무력화해도 전건이 초록이었다
+# (verifier 실측 넷). 아래는 각 검사를 **단독으로** 겨눈다 — 하나를 지우면 하나가 붉다.
+
+_UNREGISTERED_POLICY_VERSION: Final[str] = "test-policy-source-axis-v1"
+"""이 절의 정책 version — 승인 등록부 **밖**이다. 등록된 version 을 쓰면 바이트를 바꾼
+사본이 뿌리 로더에서 먼저 끊겨(승인 지문 불일치) 여기서 재려는 축에 닿지 못한다."""
+
+
+def _written_policy(path: Path, **overrides: object) -> EvaluationPolicy:
+    path.write_text(
+        policy_yaml_text(version=_UNREGISTERED_POLICY_VERSION, **overrides),
+        encoding="utf-8",
+    )
+    loaded = load_evaluation_policy(path)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    return loaded
+
+
+def test_a_token_shaped_object_is_not_a_construction_token(tmp_path: Path) -> None:
+    """검사 1(`isinstance`) — **지문이 맞는** 가짜 토큰을 넘긴다. 지문이 맞으므로 검사 2 는
+    통과하고, 거부를 만드는 것은 타입 검사 하나다."""
+    policy = _written_policy(tmp_path / "policy.yaml")
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    look_alike = SimpleNamespace(digest=policy.source.digest)
+    with pytest.raises(ValueError, match="생성 토큰"):
+        module.EvaluationPolicy(parsed=look_alike, **vars(policy))
+
+
+def test_a_token_from_another_file_is_rejected(tmp_path: Path) -> None:
+    """검사 2(토큰 지문 == source 지문) — **진짜 토큰**을 다른 파일에서 가져온다. 타입
+    검사는 통과하므로 거부를 만드는 것은 지문 등식 하나다."""
+    policy = _written_policy(tmp_path / "policy.yaml")
+    other = _written_policy(tmp_path / "other.yaml", max_origins=7)
+    assert other.source.digest != policy.source.digest
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    token = getattr(module, "_Parsed" + "PolicyFile")
+    with pytest.raises(ValueError, match="다른 파일의 토큰"):
+        module.EvaluationPolicy(
+            parsed=token(digest=other.source.digest), **vars(policy)
+        )
+
+
+def test_source_verification_catches_a_file_changed_after_the_load(
+    tmp_path: Path,
+) -> None:
+    """검사 3(파일 바이트 등식) — 로드 뒤 파일에 **주석 한 줄**을 더한다. 값은 그대로라
+    `policy_checksum` 등식은 성립하고, 거부를 만드는 것은 바이트 축 하나다. 그 축이 없으면
+    실행이 공시한 지문이 더는 그 파일의 것이 아닌데도 통과한다."""
+    path = tmp_path / "policy.yaml"
+    policy = _written_policy(path)
+    path.write_text(
+        f"# 로드 뒤에 더한 줄\n{path.read_text(encoding='utf-8')}", encoding="utf-8"
+    )
+
+    reloaded = load_evaluation_policy(path)
+    assert isinstance(reloaded, EvaluationPolicy), reloaded
+    assert policy_checksum(reloaded) == policy_checksum(policy)  # 값은 같다
+
+    mismatch = verify_policy_source(policy)
+    assert isinstance(mismatch, PolicySourceMismatch), mismatch
+    assert "파일 바이트" in mismatch.detail

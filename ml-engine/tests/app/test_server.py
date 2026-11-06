@@ -152,3 +152,57 @@ def test_preload_malformed_yaml_in_any_of_four_policies_does_not_raise(
         "serving": preloaded.serving,
     }[_REJECTED_TYPE_BY_ENV_KEY[policy_env_key]]
     assert isinstance(result, rejected_type)
+
+
+# ---- v H-2 — **env 가 하는 일은 승인된 산출물 사이에서 고르기**다 ----
+#
+# verifier 가 실측한 구멍의 나머지 절반. 뿌리 로더는 「등록된 version 인데 내용이 다른
+# 파일」을 거부하지만 **미등록 version 은 받는다**(값 불변식 test 가 승인 밖 조합으로
+# 로더를 계속 검사해야 한다 — `tests/registry/test_policy_approvals.py` 가 그 절반을
+# 문면과 함께 잠근다). 그래서 이름을 바꿔 단 완화 사본은 로더를 지난다. **제품 게이트를
+# 그것으로 돌리는 길**이 여기서 닫힌다 — 조립 근이 승인된 산출물만 받는다.
+
+_SHIPPED_EVALUATION_POLICY = (
+    Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
+)
+
+
+def _env_pointing_at(evaluation_policy: Path) -> dict[str, str]:
+    env = dict(_FULL_ENV)
+    env["ML_ENGINE_EVALUATION_POLICY"] = str(evaluation_policy)
+    return env
+
+
+def test_preload_rejects_an_evaluation_policy_that_is_not_an_approved_artifact(
+    tmp_path: Path,
+) -> None:
+    """이름을 바꿔 단 완화 사본 — 자기 파일과 값이 **같고**(출처 재검증을 지난다) 로더도
+    지나지만, 승인 등록부에 없으므로 부팅이 받지 않는다."""
+    renamed = tmp_path / "evaluation-v1-relaxed.yaml"
+    renamed.write_text(
+        _SHIPPED_EVALUATION_POLICY.read_text(encoding="utf-8")
+        .replace("version: evaluation-v1", "version: evaluation-v1-relaxed")
+        .replace("paired_t_threshold: 2.58", "paired_t_threshold: 0.1"),
+        encoding="utf-8",
+    )
+
+    rejected = _preload(ServerConfig.from_env(_env_pointing_at(renamed))).evaluation
+
+    assert isinstance(rejected, EvaluationPolicyRejected), rejected
+    assert "승인 등록부에 없는" in rejected.detail
+
+
+def test_preload_accepts_an_unedited_approved_policy_from_any_path(
+    tmp_path: Path,
+) -> None:
+    """**음성 대조** — 막는 것은 「다른 경로」가 아니라 「승인되지 않은 내용」이다.
+    운영자가 승인된 산출물을 어디에 두고 가리키든 부팅은 통과한다."""
+    copy = tmp_path / "somewhere-else.yaml"
+    copy.write_text(
+        _SHIPPED_EVALUATION_POLICY.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    loaded = _preload(ServerConfig.from_env(_env_pointing_at(copy))).evaluation
+
+    assert not isinstance(loaded, EvaluationPolicyRejected), loaded
+    assert loaded.version == "evaluation-v1"

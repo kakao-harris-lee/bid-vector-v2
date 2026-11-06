@@ -30,6 +30,23 @@
 ## §3 불변식(로더가 거부)
 `paired_t_threshold > 0` · `0 < maturity_threshold ≤ 1` · `min_evaluation_rows ≥ 2`(설계 검토 (16) — `paired_t` ddof=1) · `max_origins ≥ 1` · `agency_baseline_min_count ≥ 1` · `stability_seeds` 비어 있지 않음·정수·중복 없음 · `amount_band_edges` 양수·엄격 오름차순 · `segment_axes` ⊆ {category, amount_band}·중복 없음 · `gate_baseline` ∈ 베이스라인 표 이름 · `gate_stratum` 비어 있지 않음 · `effective_date` 는 ISO-8601 날짜 **문자열**(M9/ml-lifecycle).
 
+## §4 승인된 산출물 지문 (M9/ml-lifecycle, 2026-11-06)
+
+| version | 승인된 파일 내용 sha256 |
+| --- | --- |
+| `evaluation-v1` | `fba628efb97b313ff511504e942a11ca5dc709c454a34ff73d84b09ae4670855` |
+
+이 표가 생긴 이유: 앞 판은 **version 문자열이 내용에 묶여 있지 않았다**. 임계만 완화한 사본을
+같은 `evaluation-v1` 이름으로 로드하면(코드가 써도, `ML_ENGINE_EVALUATION_POLICY` 로 가리켜도)
+모든 게이트가 초록이었다 — verifier 실측(M9/ml-lifecycle 수정 라운드 2, v H-2). 지문은
+`ml_engine.registry.policy_approvals` 의 코드 상수 등록부와 같은 값이고, 뿌리 로더가 「등록된
+version 인데 내용이 다른 파일」을 거부한다.
+
+**이 version 의 값을 바꾸려면 세 자리를 같은 커밋에서 바꿔야 한다** — ⑴ §1 표(이 문서)
+⑵ `ml-engine/policy/evaluation-v1.yaml` ⑶ 등록부 한 줄. 어긋나면 test 가 붉다
+(`tests/registry/test_policy_approvals.py`). 지문은 **주석·공백까지 포함한 파일 내용**의
+해시다(그 자리에 근거가 적히므로 의도된 성질이다).
+
 ## change_history
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
