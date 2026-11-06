@@ -7,6 +7,11 @@
 원문에 남는 길 ⓒ 다른 일회 러너와 겹쳐 돌아 상한 회계가 서로의 호출을 못 보는 길이 생기지 않아야 한다.
 막지 않는 것: 조달청이 주는 값의 진실성, 승격 범위(확정 표본) 자체의 적정성, 보존 창 값.
 
+**넷째 축을 수정 라운드가 들였다**(cr r1 H-1 · cr r2 H-2) — ⓓ **받지 못한 것을 받았다고 적는 길**이다.
+이 갈래에는 슬롯 단위 이어 돌기가 없으므로 종료 코드 0 이 곧 「그 개찰일은 끝났다」는 선언이고, 그것이
+틀리면 사람이 그 조각을 다시 지목하지 않는 한 그 날의 낙찰 원문은 영영 들어오지 않는다. 원 검토는 이
+축을 묻지 않았다(아래 ⑨).
+
 ## 1. 열거인가 구성인가
 
 - **구성**: 개인정보 제거는 기존 allow-list 반전(계약 등재 키만 담는다)이다 — 새 식별자 키가 응답에
@@ -22,7 +27,7 @@
 | 수집 포트(**새 표면 아님** — 도메인의 `NoticeSourcePort` 재사용) | procurement(기존) | 원문 `SourceBatch` 를 통과만 시킨다 | 메서드가 목록 걷기 하나뿐 — 이 포트로는 공고당 호출을 낼 수 없다. workflow 에 새 포트를 두려던 첫 판은 어댑터 의존 게이트가 거부했다(「domain 이 의존하는 port 는 domain 안에」) |
 | `AwardCollectionSource`(이름+포트) | workflow | 없음 | — |
 | `CollectAwardListUseCase.collect(range, sources)` | workflow | 원문을 `append` 로만 넘긴다(필드를 읽지 않는다) | 원문 키 접근 게이트(raw-access)가 `workflow` 뿌리 전체를 이미 닫는다 |
-| `AwardCollectionReport`·`AwardCollectionHalt` | workflow | 계수·열거값만 | 로그 줄의 입력 타입이 식별자를 나르지 않는다 |
+| `AwardCollectionReport`(계수 칸 `unfinishedSlots` 포함)·`AwardCollectionHalt` | workflow | 계수·열거값만 | 로그 줄의 입력 타입이 식별자를 나르지 않는다. 그 칸의 **뜻**은 `attemptOutcomeOf` 하나가 정한다(cr r2 H-2) |
 | `konepsAwardListSource(listBaseUri, config)` | adapters | 매핑은 masking 통로(`mapMaskedOpeningItem`) 하나 | 원문 item 을 직접 넘기는 경로가 컴파일되지 않는다(기존 타입 게이트) |
 | `AwardCollectionProperties`·`KonepsAwardEndpointProperties` | app | 설정 값 | 기간·상한·키는 기본값 없음 → 미설정 기동 실패 |
 | `AwardCollectionRunner`(ApplicationRunner) | app | 없음(use case 만 부른다) | 러너 참조 장부 + 일회 러너 guard |
@@ -43,6 +48,7 @@
 | ⑥ | 사업자번호·대표자명을 담는다 | 계약 미등재 키는 담는 단계에서 제외(E2E 가 payload 전수에서 부재를 단언) |
 | ⑦ | 실행 상태 디렉터리를 저장소 안으로 두어 상한·표본을 재시작한다 | 기존 저장소 밖 강제 + 디렉터리 부재 거부(기동 시점) |
 | ⑧ | HTTP·이벤트 리스너로 새 use case 를 부른다 | use case 참조자 집합 게이트를 **낙찰 목록 use case 까지** 넓힌다(아래 4) |
+| ⑨ | 걷기가 **사유를 남기지 않고** 멈춰 미완이 완료로 적힌다(빈 쪽·`NoData`) | 「다 받았는가」를 저장소 **단일 출처**(`attemptOutcomeOf`)로 묻는다 — 절단 사유와 짧은 걷기(총수 미달)를 한 술어가 센다. 사유 어휘가 늘어도 이 자리는 바뀌지 않는다(그 함수의 소진 `when` 이 컴파일로 가리킨다). 회귀 셋(use case 둘 · wire E2E 하나)과 구판 술어 변이가 잠근다. **이 우회는 r1 설계 검토가 보지 못했다** — ①~⑧ 이 「누가 호출을 내는가」만 보고 「받지 못한 것을 받았다고 적는가」를 묻지 않았다(cr r2 H-2) |
 
 ## 4. 과잉·미달
 

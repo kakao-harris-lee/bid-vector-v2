@@ -1,6 +1,6 @@
 # M9 / award-ingest — rollback
 
-실측 HEAD: `856a52f1`
+실측 HEAD: `8f971fd2`
 
 ## 끄는 법(되돌리지 않고)
 
@@ -12,9 +12,14 @@
 
 원천은 **이 브랜치에 병합한 main 커밋 `3ad4f3f6`** 다(움직이는 `origin/main` 이 아니다). 목록은 손으로
 쓰지 않고 `git log --no-merges --format= --name-only HEAD ^3ad4f3f6 | sort -u` 에서 내며
-(= 이 slice 의 커밋만), evidence 디렉터리를 뺀 **21 경로**다(복원 뒤 D 12 · M 9). **라운드마다 다시
-산출한다** — 병합으로 base 가 움직이면 목록 재산출의 기준도 함께 움직인다(둘째 병합이 원천을
-`df4976cc` 에서 옮기고 H-1 회귀 test 하나가 목록에 들어왔다).
+(= 이 slice 의 커밋만), evidence 디렉터리를 뺀 **22 경로**다(복원 뒤 D 12 · M 10). **라운드마다 다시
+산출한다** — 원천이 움직이거나 라운드가 파일을 더하면 목록도 함께 움직인다: 둘째 병합이 원천을
+`df4976cc` 에서 옮겼고, 수정 라운드 1 이 회귀 test 하나를, 라운드 2 가 **공유 incident runbook**
+(`docs/runbook/m6-6e-operations.md` — 팀장 승인 in_scope 확장)을 들였다.
+
+그 공유 문서는 **다른 레인도 만지는 자리**다. 원천 `3ad4f3f6` 에 이 slice 의 문단이 없고 남의 §3.3 이
+있으므로 단일 복원이 남의 줄을 지우지 않는다 — 아래 ③c 가 양쪽을 센다. 이 파일이 main 에서 또 움직이면
+다음 병합 뒤 목록·계수를 다시 산출한다.
 
 ```
 git restore --source=3ad4f3f6 --staged --worktree -- \
@@ -36,6 +41,7 @@ git restore --source=3ad4f3f6 --staged --worktree -- \
   config/quality/architecture-policy.properties \
   config/quality/gate-tests.properties \
   docs/discovery/capability-map.md \
+  docs/runbook/m6-6e-operations.md \
   docs/runbook/m9-award-collection.md \
   workflow/src/main/kotlin/bidvector/workflow/collection/CollectAwardListUseCase.kt \
   workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTest.kt
@@ -57,15 +63,15 @@ evidence 디렉터리(`reports/evidence/m9/award-ingest/**`). evidence 를 남�
 | 단계 | 결과 |
 | --- | --- |
 | ① `git restore …` 종료 코드 | 0 |
-| ② 상태 계수 | `D` 12 · `M` 9 — 기계 산출 21 경로와 같다 |
-| ③ `git diff 3ad4f3f6 -- <21 경로>` 줄 수 | 0 |
+| ② 상태 계수 | `D` 12 · `M` 10 — 기계 산출 22 경로와 같다 |
+| ③ `git diff 3ad4f3f6 -- <22 경로>` 줄 수 | 0 |
 | ③b 결과 트리 == 그 main 트리 | evidence 를 뺀 **전수** diff 가 빈 목록 |
-| ③c 내 표지 0 · 남의 표지 보존 | gate-tests 에서 내 test 클래스 다섯이 0 · main 쪽 셋이 각 1 · capability map 에서 내 표지 0 · main 의 §12.3 머리 1 |
+| ③c 내 표지 0 · 남의 표지 보존 | 내 표지 0 — gate-tests 의 내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`. 남의 표지 보존 — gate-tests 의 main 쪽 셋이 각 1 · incident runbook §3.3 머리 1 · capability map §12.3 머리 1 |
 | ④ 세 모듈 `compileTestKotlin` | `commands.md` 의 rollback 줄 |
 | ⑤⑥ 영향 test 와 이 slice 가 닿은 게이트 | `commands.md` 의 rollback 줄 |
 
 **⑥ 를 전건 `check` 로 재지 않은 이유**: 호스트 빌드 큐 포화로 팀장이 전건 acceptance 를 PR CI 로
-옮겼다(2026-11-05 공지). 되돌린 트리의 21 경로는 그 main 커밋과 **바이트 동일**(③ 0 줄)이므로 그 트리에
+옮겼다(2026-11-05 공지). 되돌린 트리의 22 경로는 그 main 커밋과 **바이트 동일**(③ 0 줄)이므로 그 트리에
 남는 차이는 되돌리지 않기로 한 evidence 문서 다섯뿐이고, 여기서는 **이 slice 가 닿은 게이트**
 (`gateRegistrationGate`·`leakPatternGate`·`sizeGate`·`memberEffectGate` 와 architecture 게이트 test)와
 영향 test 를 표적으로 돌렸다. `gateExecutionGate`(등재 class 가 실제로 돌았는가)는 전건 test 실행을

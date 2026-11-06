@@ -46,24 +46,26 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 
 ## rollback
 
-둘째 병합으로 원천이 `3ad4f3f6` 으로 옮겨가 목록·계수가 함께 바뀌었다. 아래가 **그 원천 기준의
-재측정**이고, `df4976cc`·`79f3e5c4` 기준의 앞 두 판은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
+원천은 이 브랜치가 병합한 main 의 고정 SHA `3ad4f3f6` 이고, 라운드마다 목록을 다시 산출한다. 아래가
+현재 판이며 앞 판들(`df4976cc`·`79f3e5c4` 기준)은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
 
-## 2026-11-06T00:4xZ — 임시 clone 에서 21 경로를 `3ad4f3f6` 으로 되돌림(①②③)
+## 2026-11-06T01:5xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③)
 - cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`
 - exit: 0
-- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 9(= 기계 산출 21 경로) · `git diff 3ad4f3f6 -- <21 경로>`
-  0 줄 · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · gate-tests 에서 내 test
-  클래스 다섯 0 · main 쪽 셋 각 1 · capability map 에서 내 표지 0 · main 의 §12.3 머리 1(남의 줄 보존) ·
+- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로 — 수정 라운드 2 가 공유
+  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 3ad4f3f6 -- <22 경로>` 0 줄 ·
+  **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의 내 test
+  클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
+  남의 표지 보존(gate-tests 의 main 쪽 셋 각 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T01:02Z — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T01:57Z — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
-- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 9 유지) 이 slice 가 닿은 게이트
-  22 task 까지 초록이다. `:adapters:test`·`:app:test` 는 실행(100·296, 실패 0), `:workflow:test` 는
-  **FROM-CACHE** — 되돌린 입력이 그 main 트리의 통과 실행과 바이트 동일이라는 뜻이고 이 확인이
-  노리는 트리 동일성과 같은 말이다(XML 101, 실패 0).
+- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
+  22 task 까지 초록이다. `:adapters:test`·`:app:test` 는 실행, `:workflow:test` 는 **FROM-CACHE** —
+  되돌린 입력이 그 main 트리의 통과 실행과 바이트 동일이라는 뜻이고, 이 확인이 노리는 트리 동일성과
+  같은 말이다.
 
 ## 병합과 그 뒤
 
@@ -128,6 +130,32 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   capability map 은 main 이 더한 줄이 전부 1 이고 `OPEN-` 행 중복 0 · 충돌 표지 0. capability map §12.3
   (ledger 레인)이 「PR #128 은 새 식별자를 만들지 않고 `OPEN-SET01-AWARD-NAME-INGEST` 를 수령한다」로
   적었으므로 이 slice 가 등재를 더할 자리는 없다.
+
+## 수정 라운드 2 (cr r2 H-1·H-2 · M-1·M-2 · L 다섯 · v r2 M-1·M-2·L-1·L-2)
+
+## 2026-11-06T01:44Z — H-2 회귀가 **구판 술어에서 RED** 인가(통제군 포함)
+- cmd: 「다 받았는가」를 구판(`accounting.truncationCause == null`)으로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun :app:test --tests '…AwardExitCodeTest' --tests '…AwardCollectionE2ETest' --rerun`
+- exit: 1
+- 핵심 결과: **RED 둘** — use case 6 중 1(「총수를 말한 원천에서 덜 받고 끝난 슬롯은 사유가 없어도
+  미완이다」) · app 9 중 1(E2E 「총수에 못 미치고 곱게 멈춘 슬롯도 미완으로 끝낸다」). **통제군 13 은
+  전부 초록** — 절단 E2E · 종료 코드 test 셋 · 「낙찰이 없는 날의 빈 응답은 끝낸 것이다」가 구판에서도
+  통과해, 새 단언이 **짧은 걷기 축만** 잡고 빈 응답을 미완으로 돌리는 과잉이 아님을 함께 보인다.
+  원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T01:50Z — 수정 라운드 2 표적 실행(모듈 lint · 닿은 게이트 포함)
+- cmd: 라운드 1 과 같은 표적 집합(세 모듈 `ktlintCheck`·`detekt` + 표적 test `--rerun` + `gateRegistrationGate leakPatternGate sizeGate memberEffectGate`)
+- exit: 0
+- 핵심 결과: FAILED 0 — test class 73(workflow 107 · adapters 102 · app 387, 실패 0이고 XML 전수가 이
+  실행 것이다) · 세 test task 전부 실행 · 게이트 22 task 실행
+- **측정 주의**: `:workflow:ktlint*` 가 이 실행에서 UP-TO-DATE 로 건너뛰었다 — 이 라운드가 그 모듈의
+  main·test 소스를 고쳤는데도다(리포트 mtime 이 그 편집보다 앞선다). 그래서 그 모듈의 로컬 ktlint 초록은
+  근거로 쓰지 않고 아래 줄의 강제 실행으로 갈음한다. 깨끗한 checkout 에서 도는 CI 전건 `check` 에는 이
+  틈이 없다(라운드 1 에서도 같은 자리였다).
+
+## 2026-11-06T01:56Z — workflow lint 강제 실행(위 UP-TO-DATE 갈음)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:ktlintKotlinScriptCheck --rerun :workflow:detekt --rerun`
+- exit: 0
+- 핵심 결과: 네 task 모두 **실행**되고 위반 0
 
 ## acceptance — 전건 `check`
 
