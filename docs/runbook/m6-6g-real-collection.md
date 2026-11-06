@@ -36,7 +36,10 @@
 --bidvector.persistence.username=bidvector
 --bidvector.koneps.base-url=...(기본값, 생략 가능)
 --bidvector.evaluation.candidate-cap=10   # 평가 endpoint 속성이 모드와 무관하게 필수 — 수집 모드에서는 쓰이지 않는 부팅 요건(6F-8 과 같은 값; 2026-10-02 첫 기동이 이 누락으로 거부됨)
+--bidvector.release.sha=<jar SHA>         # M9/OPS-10 — **기본값이 없다.** 조립이 조건 없어 모드와 무관하게 요구되고, 주지 않으면 세 갈래가 모두 바인딩에서 거부된다. 값은 §1 4단계가 정한다
 ```
+**릴리스 식별자는 이 블록 한 자리에만 적는다**(M9/OPS-10). 갈래마다 따로 적으면 한 호스트가 두 값을 적을 수 있고, 새 갈래를 들일 때 그 줄을 빠뜨린 채 돌린다 — 이 runbook 의 §2-3 이 실제로 그랬다(갈래 둘에만 적혀 있었다). 갈래별 블록의 `<공통 인자>` 가 이 줄을 함께 가져간다.
+
 DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CREDENTIAL_VALUE` — `BidVectorApplication` 이 모드와 무관하게 **항상** 바인딩하므로 세 갈래 모두 필수)도 키와 같은 방식으로 환경에만.
 
 ### 2-1. 공고 목록 갈래 (표본틀) — 1회
@@ -49,7 +52,6 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.collection.categories=construction,service \
     --bidvector.collection.calls-per-day=20000 --bidvector.collection.calls-total=80000 \
     --bidvector.collection.run-state-dir=$HOME/.local/bid-vector-run-state/m6-6g \
-    --bidvector.release.sha=<jar SHA> \
     <공통 인자> )
 ```
 - 기간(A-1): 국가 공사 2026-01-30 · 용역 2026-05 이후 ~ 현재, 최대 16주. **공고 목록 갈래는 한 실행이 31일 이하**여야 한다(`SPAN_TOO_LONG`) — 31일 창을 **순서대로 여러 번** 돌린다(멱등, 같은 실행 상태 디렉터리 — 이 갈래는 표본을 고정하지 않는다).
@@ -65,11 +67,10 @@ DB 자격(`BIDVECTOR_PERSISTENCE_CREDENTIAL`)과 운영자 토큰(`OPERATOR_CRED
     --bidvector.opening-collection.sample-size=24000 \
     --bidvector.opening-collection.calls-per-day=20000 --bidvector.opening-collection.calls-total=80000 \
     --bidvector.opening-collection.run-state-dir=$HOME/.local/bid-vector-run-state/m6-6g \
-    --bidvector.release.sha=<jar SHA> \
     <공통 인자> )
 ```
 - **페이지 크기는 기본 999** 다(`bidvector.koneps.opening.rows-per-page`, D-6G2f-1) — 인자를 주지 않으면 그 값이고, 다섯 축(개찰 목록·개찰완료·예비가격 상세·기초금액·산식 A)이 그 값 하나를 쓴다. 999 수용은 **operation 별로** 실측해야 한다(두 축은 다른 서비스다) — 일곱의 결과 표와 미실측 하나는 §7 0항에 있고, 그 표가 채워지기 전에는 배포하지 않는다. 1..999 밖의 값은 기동 거부이고, 되돌림은 `--bidvector.koneps.opening.rows-per-page=100` 인자 하나다(재빌드 없이).
-- `bidvector.release.sha` 는 위 블록에서 리터럴로 보이지만 **실행기는 계산값을 넘긴다**(§1 4단계) — 원장의 그 칸이 안 바뀌면 새 jar 가 실행되지 않은 것이다.
+- `bidvector.release.sha` 는 공통 인자 블록에서 리터럴로 보이지만 **실행기는 계산값을 넘긴다**(§1 4단계) — 원장의 그 칸이 안 바뀌면 새 jar 가 실행되지 않은 것이다.
 - **이 갈래의 from/to 는 120일까지**다(D-6G2e-1, A-1 승인 2026-10-02 — 개찰 갈래 전용 정책이고 공고 목록 갈래의 31일과 다른 값이다). 넘으면 기동 거부(`SPAN_TOO_LONG`)이고, 그 상한은 설정 실수를 실 호출 전에 잡는 자리다. **창을 쪼개 돌리지 않는다** — 확정 표본이 from/to·업무를 고정하므로 조각난 창은 「표본틀 범위가 지금 설정과 다르다」로 거부된다(D-6G2e-2). A-1 기간을 **한 창으로** 준다.
 - 첫 실행이 표본을 **뽑고 확정**한다(`sample-list.tsv` · `sample-scope.json`, 장부 해시). 이후 실행은 같은 seed 라도 다시 뽑지 않는다 — 확정된 목록이 정본.
 - **표본틀 걷기는 매 기동 다시 돈다**(`OPEN-6G2D-FRAME-REWALK`). 비용은 행 수가 아니라 **슬롯 수**가 정한다 — 슬롯 = 공고일 × 업무이고 슬롯마다 최소 1 호출이다. A-1 창(공고일 113일) × 업무 둘이면 **하한 226**이고, 페이지 999 에서는 슬롯당 1 쪽으로 끝나므로 기대는 **약 240**이다(쪽 100 에서는 행이 100 을 넘는 슬롯마다 쪽이 늘어 더 크다). 행 수를 쪽 크기로 나눈 수(65,064 ÷ 999)는 이 축의 비용이 아니다.
