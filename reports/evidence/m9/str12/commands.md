@@ -258,7 +258,7 @@ git status --porcelain -- adapters app config docs reports/evidence/m9/str12
 
 | 파일 | 자동 병합 | 확인 |
 | --- | --- | --- |
-| `gate-tests.properties` | **충돌** | 내 `notification.*` 아홉과 main 의 `notificationinbox.NotificationInboxBidKindTest` 하나가 같은 자리에서 갈렸다 — 한쪽을 고르면 다른 쪽이 사라진다. **합집합 + 사전순**으로 두었다(`notification.` 의 `.` 가 `notificationinbox` 의 `i` 보다 앞이다). 항목 **538 = 내 535 ∪ main 527**, `comm -3` 양방향 빈 출력, 새 중복 0, adapters 블록 200 항목의 **순서 위반 0** |
+| `gate-tests.properties` | **충돌** | 내 `notification.*` 아홉과 main 이 더한 `notificationinbox` 쪽 새 test 클래스 하나가 같은 자리에서 갈렸다 — 한쪽을 고르면 다른 쪽이 사라진다. (그 클래스 이름을 **축어로 적지 않는다** — rollback 의 「남의 표지」 술어가 세는 이름이라, 적으면 이 문서가 그 표지를 한 번 더 들어 계수가 자기 참조로 흔들린다. 같은 사고를 앞 라운드에 한 번 겪었다.) **합집합 + 사전순**으로 두었다(`notification.` 의 `.` 가 `notificationinbox` 의 `i` 보다 앞이다). 항목 **538 = 내 535 ∪ main 527**, `comm -3` 양방향 빈 출력, 새 중복 0, adapters 블록 200 항목의 **순서 위반 0** |
 | `architecture-policy.properties` | 충돌 0 | **키별 집합 등식**으로 봤다 — 140 키 전부에서 병합본 = (내 집합 ∪ main 집합), 불일치 **0** |
 | `capability-map.md` | 충돌 0 | 양쪽 추가 줄(각 5)이 **모두** 병합본에 있다(누락 0·0). 행 id 계수도 의도대로다 |
 
