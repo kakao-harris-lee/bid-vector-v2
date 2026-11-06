@@ -114,11 +114,12 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 
 예상 복구 시간: 명령 둘(초 단위).
 
-## 실측 (버릴 clone, **실측 HEAD `cb60e7fc`** — 이 slice 의 마지막 산출물 커밋)
+## 실측 (버릴 clone, **실측 HEAD `027b3fb7`** — 이 slice 의 마지막 산출물 커밋)
 
-**앞 라운드의 실측을 옮기지 않았다 — 이 절은 다섯째 측정이다.** 수정 라운드 3 이 복원 목록을
-**36+11 → 37+11** 로 늘렸다(`tests/app/test_server_prediction.py` — 추론 승인 낙진 수정).
-원천은 그대로 `3ad4f3f6`(팀장 지시, main 무이동 — 측정 시 `origin/main` == `3ad4f3f6` 확인).
+**앞 라운드의 실측을 옮기지 않았다 — 이 절은 여섯째 측정이다.** 수정 라운드 4 는 **기존
+파일만 편집**해서 목록이 `M` 37 · `A` 11 로 **그대로**이지만(r3 과 `diff` 빈 출력), 되돌림
+대상 파일들이 움직였으므로 다시 쟀다. 원천은 그대로 `3ad4f3f6`(팀장 지시, main 무이동 —
+측정 시 `origin/main` == `3ad4f3f6` 확인).
 
 | # | 확인 | 결과 |
 |---|---|---|
@@ -136,7 +137,9 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 | 표지 | 복원 뒤 | 레인 worktree(양성 대조) |
 |---|---|---|
 | `policy_approvals` · `load_approved_evaluation_policy` | 0 · 0 | 양수 |
-| `load_approved_inference_policy` (라운드 3) | **0** | 6 파일 |
+| `load_approved_inference_policy` (라운드 3) | **0** | 8 파일 |
+| `_check_exclusion_denominators` · `_flatten_annotation` · `_POLICY_ENTRY_EXCEPTIONS` (라운드 4) | **0** · **0** · **0** | 2 · 2 · 2 파일 |
+| `approved_policy`(게이트 배선, 라운드 4) | **0** | 4 파일 |
 | `_check_substitute_exclusion` · `_opened_at_counts` (라운드 3) | **0** · **0** | 2 · 4 파일 |
 | `policy_source_digest` | **0** | 8 파일 |
 | `UnmeasurableTimeAxis` · `TimeAxisSubstitute` | **0** · 0 | 8 파일 · 양수 |
@@ -166,9 +169,9 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 ## 유효성 확인 (감사자용)
 
 ```bash
-git diff --name-only cb60e7fc..<판정 SHA> -- <위 복원 목록 37 + 신규 11>
+git diff --name-only 027b3fb7..<판정 SHA> -- <위 복원 목록 37 + 신규 11>
 ```
 
 빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도
 나오면 미검증이다. 이 slice 는 실측 뒤 **evidence 만** 커밋했으므로 그 출력이 비어 있어야 한다 — **판정 SHA
-`cb60e7fc`(= 실측 HEAD)** 와 evidence HEAD 사이의 그 diff 가 **빈 출력**임을 확인했다.
+`027b3fb7`(= 실측 HEAD)** 와 evidence HEAD 사이의 그 diff 가 **빈 출력**임을 확인했다.
