@@ -16,11 +16,17 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.AwardResult
+import bidvector.workflow.notificationinbox.BidKindAxis
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
+import bidvector.workflow.notificationinbox.axis
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
@@ -129,6 +135,7 @@ class BidCaseNotificationTest {
         record.notice.number shouldBe NoticeNumber.of(notice.noticeNumber)
         record.notice.round shouldBe notice.noticeRound
         record.fact shouldBe NotificationFact.OpeningCompleted(provisionallyFirst = true)
+        record.group.bidKind shouldBe NotificationBidKind.REAL
         record.occurredAt shouldBe now
     }
 
@@ -153,20 +160,49 @@ class BidCaseNotificationTest {
     }
 
     /**
-     * **페이퍼는 되비추지 않는다** — 알림 키에 투찰 종류 축이 없어서, 같은 공고의 페이퍼 건과
-     * 실투찰 건이 한 항목을 덮어쓴다. 가상 연습이 실제 결과를 가리지 않게 한다.
+     * **페이퍼도 되비춘다 — 그리고 실투찰과 다른 묶음이다**(M9/paper-bid · D-M9P-2).
+     *
+     * 앞 판은 `asReal()` 로 걸러 **버렸고** 이 자리의 test 가 「서지 않는다」를 잠그고 있었다.
+     * 그 주장이 바뀐 것이지 자리가 없어진 것이 아니다 — 가드를 걷으면서 **같은 자리에서 반대
+     * 주장을 잰다**. 재는 것 둘: ⓐ 페이퍼 전이가 항목을 남긴다 ⓑ 같은 공고·같은 사실의 두 건이
+     * **다른 묶음 키**를 가리킨다(같으면 저장 층에서 다시 덮어쓴다).
      */
     @Test
-    fun `페이퍼 건의 결과는 알림함에 서지 않는다`() {
+    fun `페이퍼 건의 결과도 알림함에 서고 실투찰과 다른 묶음이다`() {
         val store = FakeBidCaseStore()
         val inbox = RecordingInbox()
-        val case = store.seed(mine, notice, BidKind.PAPER, BidState.AwaitingOpening(now.plusSeconds(60)))
+        val paper = store.seed(mine, notice, BidKind.PAPER, BidState.AwaitingOpening(now.plusSeconds(60)))
+        val real = store.seed(mine, notice, BidKind.REAL, BidState.AwaitingOpening(now.plusSeconds(60)))
+        val flow = workflow(store, inbox)
 
-        val result = workflow(store, inbox).command(mine, case.id, BidCommand.RecordOpeningFirst, BidActor.User(mine))
+        flow.command(mine, paper.id, BidCommand.RecordOpeningFirst, BidActor.User(mine)).shouldBeProcessed()
+        flow.command(mine, real.id, BidCommand.RecordOpeningFirst, BidActor.User(mine)).shouldBeProcessed()
 
-        result.shouldBeProcessed()
-        store.stateOf(case.id) shouldBe BidState.OpenedProvisionalFirst
-        inbox.records.shouldBeEmpty()
+        store.stateOf(paper.id) shouldBe BidState.OpenedProvisionalFirst
+        val groups = inbox.records.map { it.group }
+        val facts = inbox.records.map { it.fact }
+        groups.map { it.bidKind } shouldBe listOf(NotificationBidKind.PAPER, NotificationBidKind.REAL)
+        // 같은 사실이고 같은 공고다 — 갈리는 것은 **키의 축 하나**뿐이다.
+        facts.distinct() shouldHaveSize 1
+        groups.map { it.notice }.distinct() shouldHaveSize 1
+        groups.distinct() shouldHaveSize 2
+    }
+
+    /**
+     * **두 어휘가 1:1 이다** — 입찰 쪽 종류 전수와 알림함의 **건 축** 어휘 전수가 같은 수의
+     * 서로 다른 값으로 대응한다. 사상이 소진 `when` 이라 입찰에 종류가 생기면 컴파일이 막지만,
+     * 그때 「아무 값이나 골라 통과시키는」 수정(예: 둘을 같은 값으로)은 컴파일로는 걸리지 않는다 —
+     * 그러면 두 연습의 소식이 다시 한 항목으로 합쳐진다.
+     */
+    @Test
+    fun `입찰 종류 전수가 알림함의 건 축 어휘와 1대1 로 대응한다`() {
+        val mapped = BidKind.entries.map { it.asNotificationBidKind() }
+
+        mapped.distinct() shouldBe mapped
+        mapped shouldContainExactlyInAnyOrder
+            NotificationBidKind.entries.filter { it.axis == BidKindAxis.PER_BID_CASE }
+        // 건 축의 사상은 `NONE` 을 내지 않는다 — 그 값은 건이 아닌 원천의 것이다.
+        mapped.shouldNotContain(NotificationBidKind.NONE)
     }
 
     @Test

@@ -8,7 +8,9 @@ import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.MarkReadOutcome
 import bidvector.workflow.notificationinbox.NoticeDisplay
 import bidvector.workflow.notificationinbox.NoticeGroupCounts
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationDetail
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationInboxPage
 import bidvector.workflow.notificationinbox.NotificationInboxStore
@@ -17,6 +19,7 @@ import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
 import bidvector.workflow.notificationinbox.notificationFactOf
 import java.sql.Connection
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
@@ -71,9 +74,11 @@ class JdbcNotificationInboxStore(
                     prepareStatement(NotificationInboxSql.MARK_ITEM_READ).use { statement ->
                         statement.setTimestamp(1, Timestamp.from(at))
                         statement.setLong(2, account.value)
-                        statement.setString(3, item.kind.name)
-                        statement.setString(4, item.notice.number.value)
-                        statement.setString(5, item.notice.round.value)
+                        // 묶음 세 열을 먼저 묶고 **그 다음 자리**를 받는다 — 부수효과가 있는
+                        // 호출을 인자 자리에 두면 `kind` 가 몇 번인지 알려면 `bindGroup` 의
+                        // 원소 수를 먼저 세야 하고, 문장을 읽는 순서가 SQL 순서와 달라진다.
+                        val kindIndex = statement.bindGroup(3, item.group)
+                        statement.setString(kindIndex, item.kind.name)
                         statement.executeUpdate()
                     }
                 MarkReadOutcome(marked, readCounts(account).unread)
@@ -82,7 +87,7 @@ class JdbcNotificationInboxStore(
 
     override fun markNoticeRead(
         account: AccountId,
-        notice: NoticeId,
+        group: NotificationGroupKey,
         at: Instant,
     ): MarkReadOutcome =
         dataSource.connection.use { connection ->
@@ -91,8 +96,7 @@ class JdbcNotificationInboxStore(
                     prepareStatement(NotificationInboxSql.MARK_NOTICE_READ).use { statement ->
                         statement.setTimestamp(1, Timestamp.from(at))
                         statement.setLong(2, account.value)
-                        statement.setString(3, notice.number.value)
-                        statement.setString(4, notice.round.value)
+                        statement.bindGroup(3, group)
                         statement.executeUpdate()
                     }
                 MarkReadOutcome(marked, readCounts(account).unread)
@@ -132,6 +136,24 @@ private data class InboxCounts(
 )
 
 /**
+ * 묶음 키 세 열을 **한 자리에서** 묶고 다음 자리 번호를 돌려준다(M9/paper-bid).
+ *
+ * 읽음 처리 두 문장이 같은 접두를 쓰므로, 자리를 따로 적으면 한쪽에서만 투찰 종류를 빠뜨리는
+ * 꼴이 생긴다 — 그리고 그 꼴은 **영향 행이 늘어나는** 방향이라 조용하다(읽음 처리가 남의 묶음
+ * 까지 읽는다). 번호를 돌려주는 것은 다음 자리를 손으로 세지 않기 위해서다.
+ */
+private fun PreparedStatement.bindGroup(
+    from: Int,
+    group: NotificationGroupKey,
+): Int {
+    var index = from
+    setString(index++, group.notice.number.value)
+    setString(index++, group.notice.round.value)
+    setString(index++, group.bidKind.name)
+    return index
+}
+
+/**
  * 행 하나 → 항목. 저장된 `(종류, detail)` 짝은 **사실로 복원한다** — 두 값을 따로 들고 가면
  * 어긋난 짝이 응답까지 흘러간다(저장 층의 짝 CHECK 가 막는 상태이지만, 복원 자리에서 한 번 더
  * 닫는 것이 공짜다).
@@ -147,7 +169,13 @@ private fun ResultSet.toItem(): NotificationInboxItem {
             round = NoticeRound(getString("notice_round")),
         )
     return NotificationInboxItem(
-        notice = notice,
+        // 투찰 종류도 `valueOf` 로 복원한다 — 어휘가 코드와 DB CHECK 양쪽에 있고 갈렸다면
+        // **불가능한 상태**라 조용히 기본값으로 접지 않는다(종류·detail 축과 같은 관례).
+        group =
+            NotificationGroupKey(
+                notice = notice,
+                bidKind = NotificationBidKind.valueOf(getString("bid_kind")),
+            ),
         fact =
             notificationFactOf(
                 kind = NotificationKind.valueOf(getString("kind")),
@@ -155,7 +183,7 @@ private fun ResultSet.toItem(): NotificationInboxItem {
             ),
         occurredAt = getTimestamp("occurred_at").toInstant(),
         readAt = getTimestamp("read_at")?.toInstant(),
-        group =
+        groupCounts =
             NoticeGroupCounts(
                 itemCount = getInt("group_item_count"),
                 unreadCount = getInt("group_unread_count"),

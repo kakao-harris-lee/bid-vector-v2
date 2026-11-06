@@ -1,6 +1,7 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
@@ -35,8 +36,8 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
                     }
                 statement.execute(
                     "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                        " occurred_at, updated_at) " +
-                        "VALUES ($accountId, 'NOTICE_REVISED', 'N-PRIV', '000', now(), now())",
+                        " bid_kind, occurred_at, updated_at) " +
+                        "VALUES ($accountId, 'NOTICE_REVISED', 'N-PRIV', '000', 'REAL', now(), now())",
                 )
             }
         }
@@ -68,9 +69,24 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
         appUpdateFails("notice_round = '001'") shouldBe true
     }
 
+    /**
+     * **투찰 종류도 바꿀 수 없다**(M9/paper-bid — 이제 그 열이 PK 의 한 열이다). 바꿀 수 있으면
+     * ⓐ 한 사실을 두 축으로 옮겨 **중복 억제를 우회**하고 ⓑ 서면 연습의 항목을 **실투찰로 바꿔**
+     * 쓸 수 있다. V23 이 계정·종류·공고 키를 UPDATE 밖에 둔 것과 같은 사유다.
+     *
+     * 음성 대조는 아래 「네 열만 갱신할 수 있다」다 — 같은 역할이 그 넷은 실제로 바꾼다.
+     */
+    @Test
+    fun `앱 역할은 투찰 종류를 바꿀 수 없다`() {
+        appUpdateFails("bid_kind = 'PAPER'") shouldBe true
+        // 같은 값으로 쓰는 것도 UPDATE 권한을 요구한다 — 「값이 그대로면 통과」가 아니다.
+        appUpdateFails("bid_kind = bid_kind") shouldBe true
+    }
+
     /** 요청 경로가 실제로 필요한 네 열 — 음성 대조(위 금지가 전부를 막는 것이 아님을 보인다). */
     @Test
     fun `앱 역할은 detail·사실 시각·갱신 시각·읽음 시각만 갱신할 수 있다`() {
+        // 음성 대조 — 위 금지들이 「권한이 전혀 없다」가 아니라 **그 열이 범위 밖**이라는 뜻이다.
         appUpdateFails("read_at = now()") shouldBe false
         appUpdateFails("occurred_at = now()") shouldBe false
         appUpdateFails("updated_at = now()") shouldBe false
@@ -89,8 +105,8 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
         appStatementFails("SELECT count(*) FROM notification_inbox") shouldBe false
         appStatementFails(
             "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                " occurred_at, updated_at) " +
-                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-INSERT', '000', now(), now())",
+                " bid_kind, occurred_at, updated_at) " +
+                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-INSERT', '000', 'NONE', now(), now())",
         ) shouldBe false
     }
 
@@ -107,15 +123,19 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
     fun `앱 역할은 출하 upsert 상수를 그대로 돌릴 수 있다`() {
         appPreparedFails(NotificationInboxSql.UPSERT_ITEM) { statement ->
             statement.setLong(1, accountId)
-            statement.setString(2, NotificationKind.NOTICE_REVISED.name)
-            statement.setString(3, "N-PRIV")
-            statement.setString(4, "000")
-            statement.setString(5, null)
-            statement.setTimestamp(6, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
+            statement.setString(2, "N-PRIV")
+            statement.setString(3, "000")
+            // 투찰 종류 — INSERT 열 권한에 **있고** UPDATE 열 권한에는 **없다**. 이 문장이
+            // 그 조합으로 실제로 도는지가 여기서 갈린다(`ON CONFLICT DO UPDATE` 는 갱신하는
+            // 열의 권한만 요구하므로, 키 열을 `SET` 에 넣는 순간 이 test 가 붉어진다).
+            statement.setString(4, NotificationBidKind.REAL.name)
+            statement.setString(5, NotificationKind.NOTICE_REVISED.name)
+            statement.setString(6, null)
+            statement.setTimestamp(7, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
             // 읽음 해제 정책 축(D-M9-3). **값은 어느 쪽이어도 같은 문장**이고, 이 test 가 재는
             // 것은 그 문장이 요구하는 권한이다 — PostgreSQL 은 충돌이 없어도 `DO UPDATE SET` 의
             // 열 권한을 본다.
-            statement.setBoolean(7, true)
+            statement.setBoolean(8, true)
         } shouldBe false
     }
 
@@ -125,9 +145,10 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
         appPreparedFails(NotificationInboxSql.MARK_ITEM_READ) { statement ->
             statement.setTimestamp(1, Timestamp.from(NotificationInboxTestSupport.OBSERVED_AT))
             statement.setLong(2, accountId)
-            statement.setString(3, NotificationKind.NOTICE_REVISED.name)
-            statement.setString(4, "N-PRIV")
-            statement.setString(5, "000")
+            statement.setString(3, "N-PRIV")
+            statement.setString(4, "000")
+            statement.setString(5, NotificationBidKind.REAL.name)
+            statement.setString(6, NotificationKind.NOTICE_REVISED.name)
         } shouldBe false
 
         appPreparedFails(NotificationInboxSql.MARK_NOTICE_READ) { statement ->
@@ -135,6 +156,7 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
             statement.setLong(2, accountId)
             statement.setString(3, "N-PRIV")
             statement.setString(4, "000")
+            statement.setString(5, NotificationBidKind.REAL.name)
         } shouldBe false
     }
 
@@ -151,16 +173,16 @@ internal class NotificationInboxPrivilegeTest : PersistenceTestSupport() {
     fun `앱 역할은 적재 시각을 지정해 넣을 수 없다`() {
         appStatementFails(
             "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                " occurred_at, updated_at, created_at) " +
-                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-CREATED', '000', now(), now(), " +
+                " bid_kind, occurred_at, updated_at, created_at) " +
+                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-CREATED', '000', 'NONE', now(), now(), " +
                 " now() + interval '100 years')",
         ) shouldBe true
 
         // 읽음 시각도 같다 — 읽음은 처리 경로의 UPDATE 로만 움직인다.
         appStatementFails(
             "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                " occurred_at, updated_at, read_at) " +
-                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-READ', '000', now(), now(), now())",
+                " bid_kind, occurred_at, updated_at, read_at) " +
+                "VALUES ($accountId, 'NEW_CANDIDATE', 'N-READ', '000', 'NONE', now(), now(), now())",
         ) shouldBe true
     }
 

@@ -320,6 +320,11 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notification_inbox", "kind", "text", false),
             ColumnSpec("notification_inbox", "notice_number", "text", false),
             ColumnSpec("notification_inbox", "notice_round", "text", false),
+            // M9/paper-bid(V25) — 투찰 종류 축. **`hasDefault` 가 `false` 다**: V25 는 기존 행의
+            // NOT NULL 을 채우려고 `DEFAULT 'REAL'` 로 열을 더한 뒤 backfill 끝에 그 기본값을
+            // 떨어뜨린다. 남겨 두면 `bid_kind` 를 빠뜨린 INSERT 가 조용히 실투찰로 들어가고,
+            // 값을 지어내는 것이 코드가 아니라 DDL 이 된다 — 이 칸이 그 회귀를 잡는 자리다.
+            ColumnSpec("notification_inbox", "bid_kind", "text", false),
             ColumnSpec("notification_inbox", "detail_code", "text", true),
             ColumnSpec("notification_inbox", "occurred_at", "timestamp with time zone", false),
             ColumnSpec("notification_inbox", "created_at", "timestamp with time zone", false, true),
