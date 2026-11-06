@@ -59,6 +59,18 @@ class Observed:
             raise ValueError(
                 "Observed.opened_count 는 0보다 커야 한다 — 0/0 은 NoObservation 이다"
             )
+        # cr r4 L-3 — 정산은 개찰의 부분집합이라 비율이 1 을 넘을 수 없다. 앞 판은 분모만
+        # 보아 `settled 2 / opened 1`(비율 2.0)이 섰다. 생산자 출력에는 거짓 양성을 낼 수
+        # 없다(`resolve_maturity` 가 같은 관측 집합에서 둘을 센다).
+        if self.settled_count > self.opened_count:
+            raise ValueError(
+                "Observed.settled_count 는 개찰 수를 넘을 수 없다 — "
+                f"정산 {self.settled_count} > 개찰 {self.opened_count}"
+            )
+        if self.settled_count < 0:
+            raise ValueError(
+                f"Observed.settled_count 는 음수일 수 없다: {self.settled_count}"
+            )
 
     @property
     def ratio(self) -> float:
@@ -226,11 +238,40 @@ class MaturityTable:
             raise ValueError(
                 "대체 행이 없으면 두 표는 같아야 한다 — 대체 계수 0 인데 표가 다르다"
             )
+        self._check_exclusion_denominators()
+
+    def _check_exclusion_denominators(self) -> None:
+        """제외 표의 **분자·분모**를 묶는다(cr r4 M-1).
+
+        앞 판의 등식 3 은 `substitute_row_count == 0` 가드 안에 있어 대체 행이 **없을 때만**
+        발화했다. 그런데 두 표의 대조가 뜻을 갖는 경우는 대체 행이 **있을 때**다 — 그때
+        제외 표의 `maturity`(SET-06 이 보는 비율)가 아무 등식에도 들어가지 않았다
+        (`_check_population`·`_check_provenance` 는 `self.windows` 만 순회한다).
+
+        여기서 보는 것은 창별 출처 합 == 그 창의 개찰 계수(본 표에 거는 것과 같은 등식)
+        **하나**다. cr 이 함께 요청한 `settled_count <= opened_count` 는 **더 강한 자리**로
+        올렸다 — `Observed.__post_init__`(cr r4 L-3). 거기 있으면 두 표와 모든 창에 걸리고,
+        여기에 같은 검사를 두면 도달 불가 분기가 된다(그 입력은 `Observed` 가 먼저 거부한다).
+        """
+        for window in self.windows_excluding_substitute:
+            sourced = sum(item.row_count for item in window.time_axis.source_counts)
+            opened = _opened_count(window)
+            if sourced != opened:
+                raise ValueError(
+                    "제외 표의 창별 출처 계수 합은 그 창의 개찰 계수와 같아야 한다 — "
+                    f"{window.start.isoformat()}: 출처 {sourced} != 개찰 {opened}"
+                )
 
     @staticmethod
-    def _opened_at_counts(windows: tuple[MaturityWindow, ...]) -> dict[str, int]:
-        """창 시작 → 그 창의 개찰 출처 행 수(0 인 창은 넣지 않는다)."""
-        counts: dict[str, int] = {}
+    def _opened_at_counts(
+        windows: tuple[MaturityWindow, ...],
+    ) -> tuple[tuple[str, int], ...]:
+        """(창 시작, 그 창의 개찰 출처 행 수) 정렬 **다중집합**(0 인 창은 넣지 않는다).
+
+        dict 가 아니라 tuple 인 이유(cr r4 L-4): 키가 창 시작이면 시작이 같은 창 둘이
+        **접혀** 뒤가 앞을 덮고 계수가 조용히 사라진다. 생산자(`_weekly_windows`)에서는
+        도달 불가지만, 등식의 민감도를 구현 세부에 의존시키지 않는다."""
+        counts: list[tuple[str, int]] = []
         for window in windows:
             opened = sum(
                 item.row_count
@@ -238,8 +279,8 @@ class MaturityTable:
                 if item.source is TimeAxisSource.OPENED_AT
             )
             if opened:
-                counts[window.start.isoformat()] = opened
-        return counts
+                counts.append((window.start.isoformat(), opened))
+        return tuple(sorted(counts))
 
 
 def _ensure_utc(value: datetime) -> datetime:

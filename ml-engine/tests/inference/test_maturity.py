@@ -482,3 +482,63 @@ def test_the_producer_satisfies_the_substitute_exclusion_equalities() -> None:
     )
     assert without.substitute_row_count == 0
     assert without.windows_excluding_substitute == without.windows
+
+
+# ── cr r4 M-1 — 대체 행이 **있을 때** 제외 표의 분자·분모를 묶는다 ────────────
+# 앞 라운드 등식 3 은 `substitute_row_count == 0` 가드 안에 있어 **대체 행이 없을 때만**
+# 발화한다. 그런데 두 표의 대조가 뜻을 갖는 경우는 대체 행이 **있을 때**다. 등식 1·2 는
+# 출처 계수만 보고, `_check_population`·`_check_provenance` 는 `self.windows` 만 순회하므로
+# 대체 행이 있으면 제외 표의 `maturity`(SET-06 이 보는 바로 그 비율)가 아무 것에도 묶이지
+# 않았다(cr probe: 제외 표 분자·분모를 지어낸 표가 생성 성공).
+
+
+def test_exclusion_table_window_sources_must_agree_with_its_own_denominator() -> None:
+    """창별 출처 등식을 **제외 표에도** 돌린다 — 대체 행이 있어도 발화한다."""
+    with pytest.raises(ValueError, match="제외 표의 창"):
+        MaturityTable(
+            windows=(
+                _window_with(
+                    opened=2, settled=1, sources=(_OPENED_ONE, _SUBSTITUTED_ONE)
+                ),
+            ),
+            # 출처 계수는 개찰 1 인데 분모를 9 로 지어냈다
+            windows_excluding_substitute=(
+                _window_with(opened=9, settled=9, sources=(_OPENED_ONE,)),
+            ),
+            unmeasurable=(),
+            population_row_count=2,
+            substitute_row_count=1,
+            policy_version="inference-test",
+        )
+
+
+def test_exclusion_table_cannot_carry_the_substituted_settlement() -> None:
+    """제외 표가 **대체 행의 정산**을 그대로 들면 비율이 1 을 넘는다. 그 모양은 표 등식이
+    아니라 **`Observed` 생성**에서 거부된다(cr r4 L-3 — 더 강한 자리로 올렸다): 창을 **짓는
+    것 자체**가 불가능하므로 두 표와 모든 창에 걸린다."""
+    with pytest.raises(ValueError, match="개찰 수를 넘을 수 없다"):
+        _window_with(opened=1, settled=2, sources=(_OPENED_ONE,))
+
+
+def test_the_producer_satisfies_the_exclusion_denominator_equalities() -> None:
+    """**양성 대조** — 대체 행이 있는 생산자 출력이 위 둘을 통과한다."""
+    table = build_weekly_maturity(
+        [
+            _opened(_WEEK1, settled=True),
+            _substituted(_WEEK1 + timedelta(hours=2), settled=True),
+        ],
+        window_days=7,
+        policy=_PERMISSIVE,
+    )
+    assert table.substitute_row_count == 1
+    excluded = table.windows_excluding_substitute[0]
+    assert excluded.maturity == Observed(settled_count=1, opened_count=1)
+
+
+def test_observed_rejects_a_ratio_above_one() -> None:
+    """cr r4 L-3 — 정산은 개찰의 부분집합이다. 앞 판은 분모만 보아 비율 2.0 이 섰다."""
+    with pytest.raises(ValueError, match="개찰 수를 넘을 수 없다"):
+        Observed(settled_count=2, opened_count=1)
+    with pytest.raises(ValueError, match="음수일 수 없다"):
+        Observed(settled_count=-1, opened_count=1)
+    assert Observed(settled_count=1, opened_count=1).ratio == 1.0  # 양성 대조
