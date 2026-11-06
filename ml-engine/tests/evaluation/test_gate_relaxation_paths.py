@@ -411,9 +411,12 @@ def test_source_verification_catches_a_file_changed_after_the_load(
 
 
 def test_the_gate_policy_is_injected_from_exactly_one_assembly_site() -> None:
-    """승인이 **조립 근 하나**에서만 물어지므로, 그 근을 거치지 않고 파이프라인에 정책을
-    넣는 자리가 있으면 승인 축이 비어 버린다. 사슬 전체를 집합 등식으로 닫는다:
-    env → 승인 요구 로더 → `_preload` → 이 한 자리 → `run_holdout` 한 자리."""
+    """이 등식이 지는 것은 **배선의 유일성**이다 — 승인 축이 아니다(cr r5 L-2).
+
+    자리 단일성은 값 축을 대신하지 않는다(설계 검토 §7·§8): 승인은 조립 근·게이트 자리 둘에서
+    묻고, 게이트가 쓰는 값은 승인 파일에서 재구성한다. 그래도 배선이 하나인 것은 읽는 사람이
+    사슬을 따라갈 수 있게 하고(env → 승인 요구 로더 → `_preload` → 이 자리 → `run_holdout`),
+    새 주입 자리가 생기면 **그 사실이** 여기서 드러난다."""
     assert construction_sites("build_training_pipeline") == {
         ("app/pipeline.py", "pipeline_factory")
     }

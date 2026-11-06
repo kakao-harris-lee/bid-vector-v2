@@ -62,14 +62,16 @@ class Observed:
         # cr r4 L-3 — 정산은 개찰의 부분집합이라 비율이 1 을 넘을 수 없다. 앞 판은 분모만
         # 보아 `settled 2 / opened 1`(비율 2.0)이 섰다. 생산자 출력에는 거짓 양성을 낼 수
         # 없다(`resolve_maturity` 가 같은 관측 집합에서 둘을 센다).
+        # 순서는 **음수 → 상한**이다(cr r5 L-6): 두 가드가 독립이라는 것이 읽는 순서로
+        # 드러나야 한다(상한을 먼저 보면 `settled=-1` 이 상한을 통과해 들어온다).
+        if self.settled_count < 0:
+            raise ValueError(
+                f"Observed.settled_count 는 음수일 수 없다: {self.settled_count}"
+            )
         if self.settled_count > self.opened_count:
             raise ValueError(
                 "Observed.settled_count 는 개찰 수를 넘을 수 없다 — "
                 f"정산 {self.settled_count} > 개찰 {self.opened_count}"
-            )
-        if self.settled_count < 0:
-            raise ValueError(
-                f"Observed.settled_count 는 음수일 수 없다: {self.settled_count}"
             )
 
     @property
@@ -86,7 +88,10 @@ type Maturity = Observed | NoObservation
 
 
 def resolve_maturity(*, opened_count: int, settled_count: int) -> Maturity:
-    """`(opened_count, settled_count)` → `Maturity` — `opened_count <= 0`이면
+    """`(opened_count, settled_count)` → `Maturity`. **결과 셋**: `NoObservation` ·
+    `Observed` · `ValueError`(분자가 분모를 넘거나 음수 — `Observed` 불변식, cr r5 L-4).
+
+    `opened_count <= 0`이면
     `NoObservation`(legacy `0/0 → 0.0` 접힘의 대체, data-dictionary.md §6.4)."""
     if opened_count <= 0:
         return NoObservation()
@@ -142,7 +147,10 @@ class TimeAxisUnmeasurableCount:
 class MaturityTable:
     """성숙도 리포트 한 벌. `build_weekly_maturity` 가 유일 생성 경로이지만, 손으로
     조립해도 **항등식**이 생성에서 강제된다 — 모집단 등식 · 창별 출처 등식 · 대체 계수 ·
-    **대체 제외 표 등식 셋**(아래 세 `_check_*`)."""
+    대체 제외 표의 **출처·분모** 등식(아래 세 `_check_*`).
+
+    **제외 표의 분자는 등식 밖이다**(대체 행이 있는 표에서) — 사유는
+    `_check_exclusion_denominators` docstring."""
 
     windows: tuple[MaturityWindow, ...]
     windows_excluding_substitute: tuple[MaturityWindow, ...]
@@ -241,7 +249,13 @@ class MaturityTable:
         self._check_exclusion_denominators()
 
     def _check_exclusion_denominators(self) -> None:
-        """제외 표의 **분자·분모**를 묶는다(cr r4 M-1).
+        """제외 표의 **분모**를 본 표와 같은 등식으로 묶는다(cr r4 M-1 · r5 M-2 로 문면 정정).
+
+        **분자는 잠겨 있지 않다**(등재): 대체 행이 있는 표에서 제외 표의 `settled_count` 는
+        `[0, opened]` 안의 아무 값이나 될 수 있다 — 상한만 `Observed` 가 지고(비율 ≤ 1),
+        「대체 행 중 몇이 정산됐는가」를 표가 들고 있지 않아 등식으로 묶을 데이터가 없다
+        (출처별 정산 계수가 없다). 닫으려면 `WindowTimeAxis` 에 그 계수를 더해야 하고 이
+        slice 밖이다. 지금 생산자는 두 표를 같은 집계로 만들어 바르고, 출하 대체 행은 0 이다.
 
         앞 판의 등식 3 은 `substitute_row_count == 0` 가드 안에 있어 대체 행이 **없을 때만**
         발화했다. 그런데 두 표의 대조가 뜻을 갖는 경우는 대체 행이 **있을 때**다 — 그때
@@ -249,7 +263,7 @@ class MaturityTable:
         (`_check_population`·`_check_provenance` 는 `self.windows` 만 순회한다).
 
         여기서 보는 것은 창별 출처 합 == 그 창의 개찰 계수(본 표에 거는 것과 같은 등식)
-        **하나**다. cr 이 함께 요청한 `settled_count <= opened_count` 는 **더 강한 자리**로
+        **하나**이고, 그것이 **분모** 축이다. cr 이 함께 요청한 `settled_count <= opened_count` 는 **더 강한 자리**로
         올렸다 — `Observed.__post_init__`(cr r4 L-3). 거기 있으면 두 표와 모든 창에 걸리고,
         여기에 같은 검사를 두면 도달 불가 분기가 된다(그 입력은 `Observed` 가 먼저 거부한다).
         """

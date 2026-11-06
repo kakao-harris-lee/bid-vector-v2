@@ -542,3 +542,10 @@ def test_observed_rejects_a_ratio_above_one() -> None:
     with pytest.raises(ValueError, match="음수일 수 없다"):
         Observed(settled_count=-1, opened_count=1)
     assert Observed(settled_count=1, opened_count=1).ratio == 1.0  # 양성 대조
+
+
+def test_observed_rejects_a_negative_numerator_before_the_upper_bound() -> None:
+    """cr r5 L-6 — 두 가드는 독립이다. `settled=-1, opened=1` 은 상한을 통과하므로 음수
+    가드가 **먼저** 보지 않으면 그 독립성이 읽는 순서로 드러나지 않는다."""
+    with pytest.raises(ValueError, match="음수일 수 없다"):
+        Observed(settled_count=-1, opened_count=1)

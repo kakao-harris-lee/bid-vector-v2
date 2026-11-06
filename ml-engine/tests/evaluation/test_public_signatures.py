@@ -129,6 +129,13 @@ def test_forbidden_parameter_names_track_the_policy_schema() -> None:
 #
 # 모집단은 평가·추론·serving·training·registry **축 전부**를 함께 센다(cr r4 L-5 — 파일이
 # `tests/evaluation/` 에 있지만 범위는 그 디렉터리가 아니다).
+#
+# **이 test 는 src 전 모듈을 in-process 로 import 한다**(cr r5 L-5). 지금 `sys.modules` 를
+# 보는 게이트는 `tests/gates/test_serving_purity.py` 하나이고 **서브프로세스 격리**라 영향이
+# 0 이다. in-process 로 `sys.modules` 를 보는 게이트를 새로 만들면 같은 격리를 쓸 것.
+#
+# **이 전수가 지는 것은 유입 층이다**(§0 — 리뷰의 자리). 방어선이 아니다: 미승인 값이 판정에
+# 닿는 것은 `evaluation.policy_source` 의 재구성 승인 축이 막는다.
 
 
 _POLICY_TYPE_NAMES: Final[tuple[tuple[str, str], ...]] = (
@@ -177,40 +184,115 @@ def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
     return leaves
 
 
-def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
+_UNRESOLVABLE_ANNOTATIONS: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("ml_engine.features.encoding", "_accumulate"),
+        ("ml_engine.features.schema", "require_declared"),
+        ("ml_engine.serving.prediction", "_validate_selector"),
+        ("ml_engine.training.jobs.servicer", "_fill_failure"),
+        ("ml_engine.training.jobs.servicer", "_fill_store_unavailable"),
+        (
+            "ml_engine.training.jobs.servicer",
+            "TrainingJobServicer._validate_get_or_cancel",
+        ),
+    }
+)
+"""`typing.get_type_hints` 가 해석하지 못하는 함수 전수 — **등식으로 잠근다**(cr r5 M-1).
+
+집합 등식은 **발견된 것**만 비교하므로, 모집단에서 빠지는 함수는 등식을 붉히지 않는다
+(없는 것과 같은 값이다). 그래서 해석 실패를 「모집단 밖」으로 조용히 흘리지 않고 **이 목록과
+같은지** 본다. 우회가 쓰는 길이 바로 그것이었다: 반환 타입을 `if TYPE_CHECKING:` 에서만
+import 하면(이 저장소는 전 모듈이 `from __future__ import annotations`) `NameError` 가 나고
+그 입구가 조용히 모집단에서 빠진다 — `paired_t_threshold` 를 낱개로 받는 public 입구를
+더해도 게이트가 초록이었다(cr 실측)."""
+
+
+def _resolved_hints(func: object) -> dict[str, object] | None:
+    """해석된 주석, 해석 불가면 `None`."""
     try:
-        hints = typing.get_type_hints(func)  # type: ignore[arg-type]
+        return typing.get_type_hints(func)  # type: ignore[arg-type]
     except (NameError, TypeError, AttributeError):
-        # 해석 불가 주석은 모집단 밖이다. 좁혀 잡는 이유: `except Exception` 이면 새로
-        # 생긴 해석 오류를 **조용히** 모집단에서 빼 게이트가 비어 간다.
+        return None
+
+
+def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
+    hints = _resolved_hints(func)
+    if hints is None:
         return False
     returned = hints.get("return")
     if returned is None:
         return False
     return any(
-        isinstance(part, type) and issubclass(part, policy_types)
-        for part in _flatten_annotation(returned)
+        _is_policy_type(part, policy_types) for part in _flatten_annotation(returned)
+    )
+
+
+def _is_policy_type(part: object, policy_types: tuple[type, ...]) -> bool:
+    """정책 타입 판정 — **동일성에 기대지 않는다**(cr r5 M-1 ⑶).
+
+    `issubclass` 는 class **객체 동일성**을 보므로, 모듈 캐시가 갈린 상태에서 해석된 주석이
+    **옛 class** 를 가리키면 거짓이 된다(`tests/training/conftest.py` 가 `ml_engine.training.*`
+    를 지운다). 그래서 `(모듈, 이름)` 좌표로도 함께 본다 — 캐시 상태와 무관해진다."""
+    if not isinstance(part, type):
+        return False
+    if issubclass(part, policy_types):
+        return True
+    return (part.__module__, part.__name__) in _POLICY_TYPE_NAMES
+
+
+def _src_functions() -> list[tuple[str, str, object]]:
+    """src 전체의 함수 전수 — 모듈 수준 **과 클래스 멤버**(cr r5 M-1 ⑵).
+
+    앞 판은 `vars(module)` 의 `inspect.isfunction` 만 봤다. 그래서 같은 입구를 클래스의
+    `@staticmethod` 로 두면 모집단에 들어오지 않았다(cr 실측 — 게이트 초록)."""
+    found: list[tuple[str, str, object]] = []
+    for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine."):
+        module = importlib.import_module(info.name)
+        for name, obj in vars(module).items():
+            if inspect.isfunction(obj) and obj.__module__ == module.__name__:
+                found.append((module.__name__, name, obj))
+            elif inspect.isclass(obj) and obj.__module__ == module.__name__:
+                found.extend(
+                    (module.__name__, f"{name}.{member_name}", member)
+                    for member_name, member in inspect.getmembers(
+                        obj, inspect.isfunction
+                    )
+                    if member.__module__ == module.__name__
+                    and not member_name.startswith("__")
+                )
+    return found
+
+
+def _policy_types_now() -> tuple[type, ...]:
+    return tuple(
+        getattr(importlib.import_module(module_name), type_name)
+        for module_name, type_name in _POLICY_TYPE_NAMES
     )
 
 
 def _policy_factories() -> set[tuple[str, str]]:
     """src 전체에서 「정책류를 돌려주는 함수」 전수 — `(모듈, 이름)`."""
-    modules = {
-        info.name: importlib.import_module(info.name)
-        for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine.")
+    functions = _src_functions()
+    policy_types = _policy_types_now()
+    return {
+        (module_name, name)
+        for module_name, name, func in functions
+        if _returns_a_policy(func, policy_types)
     }
-    policy_types = tuple(
-        getattr(modules[module_name], type_name)
-        for module_name, type_name in _POLICY_TYPE_NAMES
-    )
-    found: set[tuple[str, str]] = set()
-    for module in modules.values():
-        for name, obj in vars(module).items():
-            if not inspect.isfunction(obj) or obj.__module__ != module.__name__:
-                continue
-            if _returns_a_policy(obj, policy_types):
-                found.add((module.__name__, name))
-    return found
+
+
+def _unresolvable_annotations() -> set[tuple[str, str]]:
+    return {
+        (module_name, name)
+        for module_name, name, func in _src_functions()
+        if _resolved_hints(func) is None
+    }
+
+
+def test_annotation_resolution_failures_are_exactly_the_declared_ones() -> None:
+    """해석 실패가 **늘면 붉다**(cr r5 M-1 ⑴). 이것이 없으면 「반환 타입을 TYPE_CHECKING
+    에서만 import 한 입구」가 조용히 모집단에서 빠진다 — 집합 등식은 발견된 것만 비교한다."""
+    assert _unresolvable_annotations() == _UNRESOLVABLE_ANNOTATIONS
 
 
 _POLICY_FILE_ENTRY_POINTS = frozenset(
@@ -231,7 +313,8 @@ _POLICY_FILE_ENTRY_POINTS = frozenset(
 
 _POLICY_ENTRY_EXCEPTIONS = frozenset(
     {
-        # 파일이 아니라 **이미 로드된 것**에서 파생한다 — 그래서 `path` 를 받지 않는다.
+        # 경로를 **인자로** 받지 않는다 — 검사 대상 객체가 들고 온 경로에서 재구성한다
+        # (cr r5 L-1 — 「이미 로드된 것에서 파생한다」는 r4 뒤 거짓이 됐다).
         ("ml_engine.evaluation.policy_source", "verify_policy_source"),
         ("ml_engine.inference.policy", "_coerce_values"),
         ("ml_engine.inference.policy", "_inference_policy_of"),
