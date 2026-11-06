@@ -156,11 +156,10 @@ def test_preload_malformed_yaml_in_any_of_four_policies_does_not_raise(
 
 # ---- v H-2 — **env 가 하는 일은 승인된 산출물 사이에서 고르기**다 ----
 #
-# verifier 가 실측한 구멍의 나머지 절반. 뿌리 로더는 「등록된 version 인데 내용이 다른
-# 파일」을 거부하지만 **미등록 version 은 받는다**(값 불변식 test 가 승인 밖 조합으로
-# 로더를 계속 검사해야 한다 — `tests/registry/test_policy_approvals.py` 가 그 절반을
-# 문면과 함께 잠근다). 그래서 이름을 바꿔 단 완화 사본은 로더를 지난다. **제품 게이트를
-# 그것으로 돌리는 길**이 여기서 닫힌다 — 조립 근이 승인된 산출물만 받는다.
+# verifier 가 실측한 구멍: 완화한 정책 사본을 코드가 만들어 쓰거나
+# `ML_ENGINE_EVALUATION_POLICY` 로 가리키면 전 게이트가 초록이었다. 승인을 묻는 자리는
+# **운영자의 선택이 들어오는 자리**, 곧 이 부팅이다. 아래 셋이 그 자리의 세 갈래를 잰다 —
+# 이름을 유지한 편집 사본 · 이름을 바꿔 단 사본 · 무편집 사본(음성 대조).
 
 _SHIPPED_EVALUATION_POLICY = (
     Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
@@ -173,6 +172,29 @@ def _env_pointing_at(evaluation_policy: Path) -> dict[str, str]:
     return env
 
 
+def _relaxed(text: str) -> str:
+    relaxed = text.replace("paired_t_threshold: 2.58", "paired_t_threshold: 0.1")
+    assert relaxed != text, "완화 치환이 아무것도 바꾸지 못했다"
+    return relaxed
+
+
+def test_preload_rejects_an_edited_copy_that_keeps_the_approved_version(
+    tmp_path: Path,
+) -> None:
+    """verifier 가 실측한 그 경로 — 임계만 바꾸고 이름은 `evaluation-v1` 로 남긴 사본.
+    내용 지문이 승인된 것과 다르므로 부팅이 받지 않는다."""
+    edited = tmp_path / "evaluation-v1.yaml"
+    edited.write_text(
+        _relaxed(_SHIPPED_EVALUATION_POLICY.read_text(encoding="utf-8")),
+        encoding="utf-8",
+    )
+
+    rejected = _preload(ServerConfig.from_env(_env_pointing_at(edited))).evaluation
+
+    assert isinstance(rejected, EvaluationPolicyRejected), rejected
+    assert "승인된 지문과 다르다" in rejected.detail
+
+
 def test_preload_rejects_an_evaluation_policy_that_is_not_an_approved_artifact(
     tmp_path: Path,
 ) -> None:
@@ -180,9 +202,11 @@ def test_preload_rejects_an_evaluation_policy_that_is_not_an_approved_artifact(
     지나지만, 승인 등록부에 없으므로 부팅이 받지 않는다."""
     renamed = tmp_path / "evaluation-v1-relaxed.yaml"
     renamed.write_text(
-        _SHIPPED_EVALUATION_POLICY.read_text(encoding="utf-8")
-        .replace("version: evaluation-v1", "version: evaluation-v1-relaxed")
-        .replace("paired_t_threshold: 2.58", "paired_t_threshold: 0.1"),
+        _relaxed(
+            _SHIPPED_EVALUATION_POLICY.read_text(encoding="utf-8").replace(
+                "version: evaluation-v1", "version: evaluation-v1-relaxed"
+            )
+        ),
         encoding="utf-8",
     )
 

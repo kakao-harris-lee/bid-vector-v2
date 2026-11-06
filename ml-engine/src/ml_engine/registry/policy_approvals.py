@@ -14,15 +14,21 @@ version 은 그대로 `evaluation-v1`, 전건 1700 passed, 재검증도 통과).
 **처방은 열거의 방향을 뒤집는 것이다**: 「무엇을 거부하는가」가 아니라 **「무엇이 승인됐는가」**
 를 코드 상수로 적는다. 승인된 version 은 **그 내용의 지문**과 함께만 존재한다.
 
-겹 둘로 쓴다(둘 다 이 저장소의 기존 두 층 규율대로 — 뿌리에서 거부, 제품 경로에서 거부):
+**묻는 자리는 조립 근 하나다** — `evaluation.policy_source.load_approved_evaluation_policy`
+(← `app.server._preload`). 거기가 **운영자의 선택이 들어오는 자리**이고, 그래서 env 가 하는
+일은 **승인된 산출물 사이에서 고르기**다. 그 한 자리가 두 갈래를 함께 거부한다 — 이름을
+유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`).
 
-1. **로더(뿌리, `registry.policy.load_policy`)** — 등록된 version 인데 내용 지문이 다르면
-   `PolicyError`. 편집 사본은 version 을 그대로 두는 것이 공격의 전제이므로 이 한 줄이
-   그 전제를 깬다. **미등록 version 은 로더가 받는다** — 그래야 값 불변식 test 가
-   (승인 밖 조합으로) 로더를 계속 검사할 수 있다.
-2. **제품 경로(`evaluation.policy_source.verify_policy_source`)** — 미등록 version 도
-   거부한다. 게이트 판정은 **승인된 산출물로만** 돈다. env 가 하는 일은 승인된 산출물
-   **사이에서 고르기**이고, 그것이 이 slice 의 경계 문면이다.
+**왜 뿌리 로더가 아닌가**(실측으로 정한 자리): 뿌리(`registry.policy.load_policy`)에서 물으면
+승인 밖 조합으로 로더를 검사하는 값 불변식 test 들이 재던 것을 잃는다 — **32 failed · 79
+errors**(11 파일). 그 test 들은 파생 정책에 현실적인 version 이름을 쓰고, 하나는 그 이름이
+승격 인용 문면에 나오는 것을 단언한다. 뿌리 검사가 더 막는 것은 「제품 게이트에 닿을 수 없는
+경로에서의 편집 사본」뿐이다 — 제품 게이트에 닿는 정책은 조립 근을 거친 것 하나이고, 그
+단일성은 호출 자리 집합 등식 넷이 진다(승인 미요구 로더 · `build_training_pipeline` ·
+`run_holdout` · `EvaluationPolicy` 생성 자리).
+
+**출하 파일 자체를 편집하는 길**은 런타임이 아니라 **CI** 가 막는다: 아래 등록부 상수와 출하
+파일의 지문 등식 test 가 붉어진다.
 
 **새 version 을 승인하는 길은 세 자리를 같은 커밋에서 바꾸는 것뿐이다** — ⑴ `policy/*.yaml`
 ⑵ 아래 등록부 한 줄 ⑶ 승인 장부(`reports/evidence/m5/5c2/policy-values.md` ·

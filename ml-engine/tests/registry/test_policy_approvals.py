@@ -10,10 +10,14 @@ verifier 가 실측한 구멍: 완화한 정책 사본을 코드가 만들어 �
 2. **출하 version 전수의 분할** — 등록 + 미등록 == 출하 정책 전수(새 정책 파일이 조용히
    어느 쪽도 아닌 상태로 들어올 수 없다).
 3. **등록부 ↔ 승인 장부** — 승인된 지문이 그 version 의 승인 기록 문서에 적혀 있다.
-4. **로더 거동** — 등록된 version 의 편집 사본은 거부, 무편집 사본은 경로가 달라도 통과.
+4. **승인 대조 자체** — 두 거부 사유와 통과 조건, 그리고 등록부가 실행 중 늘어나지 않음.
 
 축 1~3 이 걸려 있으므로 새 version 을 승인하는 길은 **세 자리를 같은 커밋에서** 바꾸는 것
 뿐이다(yaml · 등록부 한 줄 · 승인 장부).
+
+**승인을 요구하는 자리는 조립 근이다** — 그 거동(편집 사본 거부 · 이름 바꾼 사본 거부 ·
+무편집 사본은 경로가 달라도 통과)은 `tests/app/test_server.py` 가 env 축에서 잰다. 여기서는
+**대조 함수**와 **세 자리 등식**만 본다.
 """
 
 from __future__ import annotations
@@ -25,12 +29,6 @@ from typing import Final
 import pytest
 import yaml
 
-from ml_engine.evaluation.policy import (
-    EvaluationPolicy,
-    PolicyRejected,
-    load_evaluation_policy,
-)
-from ml_engine.registry.policy import PolicyError, load_policy
 from ml_engine.registry.policy_approvals import (
     APPROVED_POLICY_DIGESTS,
     PolicyApprovalRejection,
@@ -128,66 +126,14 @@ def test_the_approved_digest_is_written_in_its_approval_ledger(version: str) -> 
     )
 
 
-# ── 축 4 — 로더 거동 ────────────────────────────────────────────────────────
-
-
-def _relaxed_copy(destination: Path) -> Path:
-    """출하 평가 정책의 **임계만 완화한** 사본 — version 은 그대로 둔다(그것이 공격의
-    전제다)."""
-    original = (_POLICY_DIR / "evaluation-v1.yaml").read_text(encoding="utf-8")
-    relaxed = original.replace("paired_t_threshold: 2.58", "paired_t_threshold: 0.1")
-    assert relaxed != original, "완화 치환이 아무것도 바꾸지 못했다"
-    destination.write_text(relaxed, encoding="utf-8")
-    return destination
-
-
-def test_an_edited_copy_of_an_approved_version_is_rejected(tmp_path: Path) -> None:
-    rejected = load_evaluation_policy(_relaxed_copy(tmp_path / "evaluation-v1.yaml"))
-    assert isinstance(rejected, PolicyRejected), rejected
-    assert "승인된 지문과 다르다" in rejected.detail
-    assert APPROVED_POLICY_DIGESTS["evaluation-v1"] in rejected.detail
-
-
-def test_an_unedited_copy_at_another_path_still_loads(tmp_path: Path) -> None:
-    """**음성 대조** — 막는 것은 「다른 경로」가 아니라 「다른 내용」이다. 운영자가
-    승인된 산출물을 어디에 두고 가리키든 통과한다."""
-    copy = tmp_path / "somewhere-else.yaml"
-    copy.write_text(
-        (_POLICY_DIR / "evaluation-v1.yaml").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-    loaded = load_evaluation_policy(copy)
-    assert isinstance(loaded, EvaluationPolicy), loaded
-    assert loaded.source.digest == APPROVED_POLICY_DIGESTS["evaluation-v1"]
-
-
-def test_the_root_loader_rejects_an_edited_copy_whatever_the_known_keys(
-    tmp_path: Path,
-) -> None:
-    """거부는 **뿌리 로더**에 있다 — 소비 로더의 `known_keys` 와 무관하게, 등록된
-    version 을 내건 다른 내용이면 거기서 끊긴다."""
-    with pytest.raises(PolicyError, match="승인된 지문과 다르다"):
-        load_policy(_relaxed_copy(tmp_path / "evaluation-v1.yaml"))
-
-
-def test_an_unregistered_version_is_not_blocked_by_the_loader(tmp_path: Path) -> None:
-    """**일부러 남긴 절반** — 미등록 version 은 뿌리 로더가 받는다. 값 불변식 test 가
-    승인 밖 조합(seed 를 줄인 정책 등)으로 로더를 계속 검사해야 하기 때문이다. 미등록
-    version 으로 **제품 게이트를 돌리는** 길은 조립 근이 막는다
-    (`tests/app/test_server.py` 의 승인 산출물 축)."""
-    path = tmp_path / "not-approved.yaml"
-    path.write_text('version: "made-up-v9"\n', encoding="utf-8")
-    loaded = load_policy(path)
-    assert loaded.version == "made-up-v9"
-    assert approved_digest("made-up-v9") is None
-
-
-# ── 승인 대조 자체 ──────────────────────────────────────────────────────────
+# ── 축 4 — 승인 대조 자체 ──────────────────────────────────────────────────────────
 
 
 def test_policy_approval_reports_the_two_rejection_reasons() -> None:
     approved = "evaluation-v1"
     digest = APPROVED_POLICY_DIGESTS[approved]
+    assert approved_digest(approved) == digest
+    assert approved_digest("made-up-v9") is None
     assert policy_approval(version=approved, digest=digest) is None
 
     mismatch = policy_approval(version=approved, digest="0" * len(digest))

@@ -395,3 +395,12 @@ def test_source_verification_catches_a_file_changed_after_the_load(
     mismatch = verify_policy_source(policy)
     assert isinstance(mismatch, PolicySourceMismatch), mismatch
     assert "파일 바이트" in mismatch.detail
+
+
+def test_the_gate_policy_is_injected_from_exactly_one_assembly_site() -> None:
+    """승인이 **조립 근 하나**에서만 물어지므로, 그 근을 거치지 않고 파이프라인에 정책을
+    넣는 자리가 있으면 승인 축이 비어 버린다. 사슬 전체를 집합 등식으로 닫는다:
+    env → 승인 요구 로더 → `_preload` → 이 한 자리 → `run_holdout` 한 자리."""
+    assert construction_sites("build_training_pipeline") == {
+        ("app/pipeline.py", "pipeline_factory")
+    }

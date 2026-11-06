@@ -25,21 +25,14 @@ effective date 를 가진 **정책 산출물**로만 존재할 수 있다(그 �
 
 **승인 축(v H-2)** — 위 두 겹은 「객체가 자기 파일과 같은가」를 묻고 **「그 파일을 누가
 승인했는가」는 묻지 않는다**. 그래서 완화한 사본을 파일로 만들어 쓰면 전 게이트가 초록이었다
-(verifier 실측). 그 축은 따로, 겹 둘로 닫는다:
+(verifier 실측). 그 축을 닫는 자리는 아래 `load_approved_evaluation_policy` 하나다 —
+`app.server._preload` 가 부르고, 거기가 **운영자의 선택(env)이 들어오는 자리**다. 사유와
+등록부는 `registry.policy_approvals` 모듈 docstring.
 
-1. **뿌리 로더**(`registry.policy.load_policy`) — 등록된 version 인데 내용 지문이 다른 파일을
-   거부한다. 편집 사본이 version 을 그대로 두는 것이 공격의 전제이므로 그 전제가 깨진다.
-   **미등록 version 은 받는다** — 값 불변식 test 가 승인 밖 조합으로 로더를 계속 검사해야
-   한다.
-2. **조립 근**(아래 `load_approved_evaluation_policy`, `app.server._preload` 가 부른다) —
-   미등록 version 도 거부한다. 그래서 `ML_ENGINE_EVALUATION_POLICY` 가 하는 일은 **승인된
-   산출물 사이에서 고르기**다.
-
-**왜 재검증이 아니라 부팅에서 승인을 묻는가**: 재검증이 있는 제품 경로는 조립 근 test 들도
+**왜 재검증(`verify_policy_source`)이 아닌가**: 재검증이 있는 제품 경로는 조립 근 test 들도
 탄다. 그 test 들은 작은 데이터셋으로 돌려고 출하와 다른 **승인 밖** 임계(`min_evaluation_rows`
 등)를 파일로 만들어 쓴다. 승인 요구를 재검증에 넣으면 그 test 들이 전부 「미승인」으로 떨어져
-**재던 것을 잃는다**(실측: 조립 근 test 일곱이 붉어졌다). 승인은 운영자의 선택이 들어오는
-자리에서 물어야 하고 그 자리는 env 를 읽는 부팅이다.
+**재던 것을 잃는다**(실측: 조립 근 test 일곱이 붉어졌다).
 """
 
 from __future__ import annotations

@@ -15,11 +15,6 @@ from pathlib import Path
 
 import yaml
 
-from ml_engine.registry.policy_approvals import (
-    PolicyApprovalRejection,
-    policy_approval,
-)
-
 PolicyScalar = str | int | float | bool
 
 
@@ -51,8 +46,13 @@ def load_policy(path: Path, *, known_keys: frozenset[str] = frozenset()) -> Poli
     - 최상위가 매핑이 아니면 거부.
     - `version`이 없거나 빈 문자열이면 거부.
     - `version` 밖의 키가 `known_keys`에 없으면 거부(미지 키 = fail-closed).
-    - **승인 등록부에 있는 `version` 인데 내용 지문이 다르면 거부**(M9 수정 라운드 2,
-      v H-2 — `policy_approvals` 모듈 docstring 이 사유와 두 겹을 적는다).
+
+    **승인 대조는 여기 없다**(M9/ml-lifecycle 수정 라운드 2, v H-2). 「이 version 을 누가
+    승인했는가」는 `registry.policy_approvals` 가 들고, 그것을 **묻는 자리**는 운영자의
+    선택이 들어오는 조립 근이다(`evaluation.policy_source.load_approved_evaluation_policy`
+    ← `app.server._preload`). 이 뿌리에서 물으면 승인 밖 조합으로 로더를 검사하는 값
+    불변식 test 들이 재던 것을 잃는다(실측: 32 failed · 79 errors — 그 test 들은 현실적인
+    version 이름으로 파생 정책을 쓰고, 하나는 그 이름이 인용 문면에 나오는 것을 단언한다).
 
     D-5E3-1 — `yaml.safe_load`가 던지는 `yaml.YAMLError`(문법이 깨진 YAML,
     예: 닫히지 않은 flow sequence·탭 들여쓰기·미정의 anchor 참조)를 이 자리에서
@@ -73,17 +73,6 @@ def load_policy(path: Path, *, known_keys: frozenset[str] = frozenset()) -> Poli
     version = raw.get("version")
     if not isinstance(version, str) or not version:
         raise PolicyError(f"정책 파일에 'version' 문자열이 필요합니다: {path}")
-
-    # M9/ml-lifecycle 수정 라운드 2(v H-2) — **등록된 version 은 내용에 묶인다**. 편집
-    # 사본은 version 을 그대로 두는 것이 공격의 전제이므로 여기서 그 전제가 깨진다.
-    # 미등록 version 은 받는다(값 불변식 test 가 승인 밖 조합으로 로더를 계속 검사한다) —
-    # 그쪽은 제품 경로가 거부한다(`evaluation.policy_source`).
-    approval = policy_approval(version=version, digest=digest)
-    if (
-        approval is not None
-        and approval.reason is PolicyApprovalRejection.DIGEST_MISMATCH
-    ):
-        raise PolicyError(f"{approval.detail}: {path}")
 
     body_keys = set(raw) - {"version"}
     unknown_keys = body_keys - known_keys
