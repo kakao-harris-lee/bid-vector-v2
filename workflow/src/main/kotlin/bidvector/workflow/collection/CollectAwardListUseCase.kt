@@ -270,8 +270,11 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
 private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
     when (cause) {
         null -> null
+
         is TruncationCause.BudgetExhausted -> AwardCollectionHalt(cause.limit, null)
+
         TruncationCause.QuotaExhausted -> AwardCollectionHalt(null, cause)
+
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
         TruncationCause.Timeout,
