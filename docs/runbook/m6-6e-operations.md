@@ -482,7 +482,7 @@ ml-serving 을 「다시 올리는」 명령은 이 저장소에 **없다**. `to
 
 | `bidvector.relay.environment` | `DeliveryMode` | relay 가 claim 하는가 | 행의 운명 | 기동 | run 종료 코드 |
 |---|---|---|---|---|---|
-| `Production` | `Live` | **예** | 발송 결과에 따라 `DELIVERED`·`FAILED`·`ISOLATED` | 설정 완비면 뜨고 **결손이면 거부** (§5.2) | `0` 또는 `2`(집었는데 전달 0) |
+| `Production` | `Live` | **예** | 발송 결과에 따라 `DELIVERED`·`FAILED`·`ISOLATED` | 설정 완비면 뜨고 **결손이면 거부** (§5.2) | `0` 또는 `2`(집었는데 전달 0). 그 밖에 임대 축의 `3` `LEASE_BUSY`(§3.7)와 `LeaseLost`·러너 예외의 `1` 도 이 행에서 난다 |
 | `Staging` | `DryRun` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
 | `Development` | `DryRun` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
 | `Test` | `Blocked` | **아니오** | `PENDING` 보존 | 뜬다 | `4` `ENV_SUPPRESSED` |
@@ -499,10 +499,17 @@ ml-serving 을 「다시 올리는」 명령은 이 저장소에 **없다**. `to
 자리지킴 sender 가 호출되면 던지고, 그 행은 다음 run 의 고아 격리가 태워 **매 run 이 행을 영구히
 잃었기** 때문이다.
 
-**지금**(M9/STR12): Telegram 발송 채널이 들어와 그 자리지킴이 사라졌다. 거부 사유가 **설정 결손**으로
-좁아졌다 — 정책표가 그 환경에 `Live` 를 붙였는데 알림 채널 설정(봇 자격 · chat id · 공고 링크 도메인)이
-하나라도 비면 `RelayBootDecision` 이 `RefusedMissingChannelConfig` 를 내고 러너가 기동하지 않는다.
-거부 메시지는 **채워야 하는 칸의 이름**을 말하고 값은 말하지 않는다.
+**지금**(M9/STR12): Telegram 발송 채널이 들어와 그 자리지킴이 사라졌다. 거부 사유가 **설정 축**으로
+좁아졌고 **셋**이다 — 어느 것도 메시지에 값을 담지 않는다(칸 이름 · 채널 이름 · 길이뿐).
+
+| 거부 | 언제 | 메시지가 말하는 것 |
+|---|---|---|
+| `RefusedMissingChannelConfig` | 정책표가 그 환경에 `Live` 를 붙였는데 알림 채널 설정(봇 자격 · chat id · 공고 링크 도메인)이 하나라도 비었다 | **채워야 하는 칸의 이름** |
+| `RefusedChannelWithoutActiveRoute` | 설정은 다 찼는데 `bidvector.relay.channel` 이 **활성 경로가 없는 채널**이다(Email 은 `enabled=false`) | **채널 이름** |
+| 자격 모양 거부 | 봇 자격이 `<봇 id>:<비밀 조각>` 모양이 아니다 — 그대로 뜨면 요청 URI 조립이 던지고 그 실패가 **모호**로 기록돼 행이 `ISOLATED` 로 탄다 | 모양 위반 사실과 **길이** |
+
+둘째 거부가 없으면 채널 오설정이 기동을 통과하고, relay 가 집은 행이 전부 억제 → `FAILED` 로 탄다
+(종단 전이는 단방향이다). 그 거부가 **행을 지키는 것**이다.
 
 > 설정이 빈 채로 뜨면 relay 가 claim 한 뒤 보낼 곳이 없어 그 행들이 어휘 밖 종단으로 타 버린다 —
 > 종단 전이는 단방향이라 되돌릴 간선이 없다.
