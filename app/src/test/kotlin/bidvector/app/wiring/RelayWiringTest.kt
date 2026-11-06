@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.app.relay.HttpClientLogProperty
 import bidvector.app.relay.NotificationRelayRunner
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -175,6 +176,78 @@ class RelayWiringTest {
         ) { booted ->
             booted.failure shouldNotBe null
             booted.failure!!.stackTraceToString() shouldContain "RefusedChannelWithoutActiveRoute"
+        }
+    }
+
+    /**
+     * **v N-2** — JDK HttpClient 의 내부 로그 속성이 켜져 있으면 Live 기동을 거부한다. 켜 두면 발송마다
+     * 요청 URL 이 stderr 로 나가고 그 URL 은 경로에 봇 자격을 싣는다.
+     *
+     * 전역 상태를 건드리므로 **되돌림까지 단언한다** — 되돌리지 않으면 같은 JVM 의 뒤 test 가 이
+     * 속성을 물려받아 무관한 이유로 붉어진다.
+     */
+    @Test
+    fun `로그 속성이 켜져 있으면 Live 기동을 거부한다`() {
+        HttpClientLogProperty.entries.forEach { property ->
+            val before = System.getProperty(property.propertyName)
+            try {
+                System.setProperty(property.propertyName, "requests")
+                withBoot(*validProperties(environment = "production"), *channelProperties()) { booted ->
+                    booted.failure shouldNotBe null
+                    booted.failure!!.stackTraceToString() shouldContain "RefusedHttpClientLogging"
+                }
+            } finally {
+                if (before == null) {
+                    System.clearProperty(property.propertyName)
+                } else {
+                    System.setProperty(property.propertyName, before)
+                }
+            }
+            System.getProperty(property.propertyName) shouldBe before
+        }
+    }
+
+    /**
+     * **cr L-6** — 모양이 틀린 자격은 **비-Live 환경의 기동을 막지 않는다.** D-7 의 문면은 「Live 가
+     * 아니면 설정 **없이** 뜬다」이고 그것은 부재를 말한다 — 모양 위반까지 기동 실패로 만들면
+     * 자리지킴 값(`changeme` 류)을 둔 비-prod 배포가 앞 판에서는 claim 0 으로 떴다가 이제 뜨지 않는다.
+     *
+     * 배선이 Live 판정을 **먼저** 묻고 그때만 설정 값 객체를 짓기 때문에 이 거동이 선다. 그 순서가
+     * 뒤바뀌면 이 test 가 붉어진다.
+     */
+    @Test
+    fun `비-Live 환경은 자격 모양이 틀려도 기동한다`() {
+        val malformed =
+            channelProperties().map {
+                if (it.startsWith("bidvector.notification.telegram.bot-credential")) {
+                    "bidvector.notification.telegram.bot-credential=not-a-bot-credential"
+                } else {
+                    it
+                }
+            }
+
+        listOf("staging", "development", "test").forEach { environment ->
+            withBoot(*validProperties(environment = environment), *malformed.toTypedArray()) { booted ->
+                booted.failure shouldBe null
+            }
+        }
+    }
+
+    /** 같은 자격이 **Live 에서는** 기동을 막는다 — 위 test 가 「모양 검사가 사라졌다」를 뜻하지 않는다. */
+    @Test
+    fun `Live 환경은 자격 모양이 틀리면 기동에 실패한다`() {
+        val malformed =
+            channelProperties().map {
+                if (it.startsWith("bidvector.notification.telegram.bot-credential")) {
+                    "bidvector.notification.telegram.bot-credential=not-a-bot-credential"
+                } else {
+                    it
+                }
+            }
+
+        withBoot(*validProperties(environment = "production"), *malformed.toTypedArray()) { booted ->
+            booted.failure shouldNotBe null
+            booted.failure!!.stackTraceToString() shouldContain "Bot API 모양"
         }
     }
 

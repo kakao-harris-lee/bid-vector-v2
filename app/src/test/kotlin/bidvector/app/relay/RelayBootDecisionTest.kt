@@ -35,9 +35,23 @@ class RelayBootDecisionTest {
     fun `표가 Staging 에 Live 를 붙이면 Staging 도 설정을 요구한다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Staging, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
-        relayBootDecision(RuntimeEnvironment.Staging, mutated, fullyConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            mutated,
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -49,7 +63,14 @@ class RelayBootDecisionTest {
     fun `표에 Live 가 있어도 그 환경이 아니면 설정 없이 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Development, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Development,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -58,7 +79,14 @@ class RelayBootDecisionTest {
     fun `표가 Production 에서 Live 를 떼면 설정이 비어도 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Production to DeliveryMode.DryRun)
 
-        relayBootDecision(RuntimeEnvironment.Production, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -70,11 +98,32 @@ class RelayBootDecisionTest {
     fun `승인된 표에서는 Production 만 설정을 요구한다`() {
         val approved = approvedPolicy()
 
-        relayBootDecision(RuntimeEnvironment.Production, approved, fullyConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approved,
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.Allowed
-        relayBootDecision(RuntimeEnvironment.Production, approved, nothingConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approved,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
-        relayBootDecision(RuntimeEnvironment.Staging, approved, nothingConfigured(), Channel.Telegram, true) shouldBe
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            approved,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -115,6 +164,7 @@ class RelayBootDecisionTest {
             fullyConfigured(),
             Channel.Email,
             activeRoute = false,
+            httpClientLogging = noLogging(),
         ) shouldBe RelayBootDecision.RefusedChannelWithoutActiveRoute(Channel.Email)
     }
 
@@ -130,6 +180,7 @@ class RelayBootDecisionTest {
             nothingConfigured(),
             Channel.Email,
             activeRoute = false,
+            httpClientLogging = noLogging(),
         ) shouldBe RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
     }
 
@@ -142,7 +193,80 @@ class RelayBootDecisionTest {
             nothingConfigured(),
             Channel.Email,
             activeRoute = false,
+            httpClientLogging = noLogging(),
         ) shouldBe RelayBootDecision.Allowed
+    }
+
+    /**
+     * **v N-2** — JDK HttpClient 의 내부 로그가 켜져 있으면 Live 기동을 거부한다. 그대로 뜨면 발송마다
+     * 요청 URL 이 stderr 로 나가고 그 URL 은 경로에 봇 자격을 싣는다 — 「이 패키지는 로거를 쥐지
+     * 않는다」는 바이트코드 게이트가 덮지 못하는 축이다(찍는 주체가 JDK 다).
+     */
+    @Test
+    fun `로그 속성이 켜져 있으면 Live 기동을 거부한다`() {
+        HttpClientLogProperty.entries.forEach { property ->
+            relayBootDecision(
+                RuntimeEnvironment.Production,
+                approvedPolicy(),
+                fullyConfigured(),
+                Channel.Telegram,
+                activeRoute = true,
+                httpClientLogging = setOf(property),
+            ) shouldBe RelayBootDecision.RefusedHttpClientLogging(setOf(property))
+        }
+    }
+
+    /**
+     * **설정 축이 로그 속성보다 먼저다**(첫 위반 승). ①② 상태에서는 발송이 0 이라 **찍힐 자격도
+     * 없으므로** 로그 속성을 먼저 말하면 운영자를 덜 급한 곳으로 보낸다. 이 칸이 없으면 세 사유의
+     * 순서가 미결이다.
+     */
+    @Test
+    fun `설정 결손과 로그 속성이 함께면 설정 결손을 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+    }
+
+    /** route 부재도 로그 속성보다 먼저다 — 같은 이유다(발송 0). */
+    @Test
+    fun `route 부재와 로그 속성이 함께면 route 부재를 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Email,
+            activeRoute = false,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.RefusedChannelWithoutActiveRoute(Channel.Email)
+    }
+
+    /**
+     * **Live 가 아니면 로그 속성도 거부 사유가 아니다**(cr L-6 와 같은 축) — 보내지 않으므로 찍힐
+     * 자격이 없다. 거기서 거부하면 개발자가 HTTP 를 들여다보는 일을 막는다.
+     */
+    @Test
+    fun `Live 가 아니면 로그 속성이 켜져 있어도 허용이다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Development,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.Allowed
+    }
+
+    /** 속성 이름 어휘가 닫혀 있다 — 새 속성을 조용히 더하는 길을 막는다(칸마다 이름을 못박는다). */
+    @Test
+    fun `로그 속성 어휘는 둘이고 이름이 고정이다`() {
+        HttpClientLogProperty.entries.map { it.propertyName } shouldBe
+            listOf("jdk.httpclient.HttpClient.log", "jdk.internal.httpclient.debug")
     }
 
     private fun refusalFor(
@@ -150,7 +274,14 @@ class RelayBootDecisionTest {
         presence: ChannelConfigPresence,
     ): Set<ChannelConfigField> {
         val decision =
-            relayBootDecision(RuntimeEnvironment.Production, policy, presence, Channel.Telegram, activeRoute = true)
+            relayBootDecision(
+                RuntimeEnvironment.Production,
+                policy,
+                presence,
+                Channel.Telegram,
+                activeRoute = true,
+                httpClientLogging = noLogging(),
+            )
         return (decision as RelayBootDecision.RefusedMissingChannelConfig).missing
     }
 }
@@ -174,3 +305,5 @@ private fun approvedPolicy(): NotificationDeliveryPolicyData {
     check(resolution is Resolution.Resolved) { "NOTIFICATION_DELIVERY_POLICY 가 해소되지 않았다: $resolution" }
     return resolution.value
 }
+
+private fun noLogging(): Set<HttpClientLogProperty> = emptySet()

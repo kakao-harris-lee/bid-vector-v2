@@ -4,10 +4,12 @@ import bidvector.adapters.notification.ConfiguredRouteDirectory
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
+import bidvector.app.relay.HttpClientLogProperty
 import bidvector.app.relay.NotificationChannelProperties
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayBootDecision
 import bidvector.app.relay.relayBootDecision
+import bidvector.app.relay.relayDeliveryIsLive
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
@@ -81,30 +83,50 @@ open class RelayWiring {
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
         require(properties.claimLimit > 0) { "bidvector.relay.claim-limit 는 1 이상이어야 한다" }
         val owner = OperatorId(properties.owner)
+        // `live &&` 의 단축 평가가 **설정 값 객체를 짓는 시점**을 Live 뒤로 미룬다(cr L-6<r2>) —
+        // 자격 모양 검사는 그 생성 시점에 있으므로, 미루지 않으면 모양 위반이 비-Live 환경까지
+        // 기동 실패로 만든다. D-7 의 문면은 **부재**를 말하고 모양 위반은 말하지 않았다.
+        val live = relayDeliveryIsLive(properties.environment, policy)
         val decision =
             relayBootDecision(
                 environment = properties.environment,
                 policy = policy,
                 channels = channelProperties.presence(),
                 deliveryChannel = properties.channel,
-                activeRoute = hasActiveRoute(owner, channelProperties, properties.channel),
+                activeRoute = !live || hasActiveRoute(owner, channelProperties, properties.channel),
+                httpClientLogging = enabledHttpClientLogProperties(),
             )
-        // 판정 객체를 그대로 싣는다(cr L-6 의 처분 「`decision.missing`」을 **택하지 않았다**):
-        // 거부가 둘이 된 뒤로 운영자가 먼저 알아야 하는 것은 칸 목록이 아니라 **어느 거부인가**이고,
-        // 그 타입 이름이 runbook §13.6 의 행 키다. 두 타입이 나르는 것은 칸 이름과 채널 이름뿐이라
-        // 이 문장에 값이 들어올 경로는 여전히 없다.
+        // 판정 객체를 그대로 싣는다(cr L-6<r1> 의 처분 「`decision.missing`」을 **택하지 않았다**):
+        // 거부가 여럿이 된 뒤로 운영자가 먼저 알아야 하는 것은 칸 목록이 아니라 **어느 거부인가**이고,
+        // 그 타입 이름이 runbook §13.6 의 행 키다. 세 타입이 나르는 것은 칸 이름·채널 이름·속성
+        // 이름뿐이라 이 문장에 값이 들어올 경로는 없다.
+        //
+        // 앞 문구는 **사유 중립**이다(cr L-5<r2>) — 「알림 채널 설정을 고쳐야 한다」로 적으면
+        // `RefusedChannelWithoutActiveRoute`(고칠 것은 `bidvector.relay.channel`)와
+        // `RefusedHttpClientLogging`(고칠 것은 JVM 옵션)에서 **다른 설정 묶음을 가리킨다.**
         require(decision is RelayBootDecision.Allowed) {
-            "relay 기동 거부 — 발송 가능(Live) 모드 환경의 알림 채널 설정을 고쳐야 한다: $decision"
+            "relay 기동 거부 — 아래 사유 타입이 어느 설정을 고쳐야 하는지 말한다(runbook §13.6): $decision"
         }
         return NotificationRelayRun(
             dataSource = dataSource,
             target = RelayTarget(owner, properties.channel),
             environment = properties.environment,
             policy = policy,
-            channels = channelProperties.channelSettings(),
+            channels = if (live) channelProperties.channelSettings() else null,
             clock = Clock.systemUTC(),
         )
     }
+
+    /**
+     * 켜진 JDK HttpClient 로그 속성 — **이름만** 본다(v N-2). `JAVA_TOOL_OPTIONS` 로 켜도 JVM 시스템
+     * 속성이 되므로 이 한 자리에서 보인다. 값은 읽지 않는다: 어떤 값이든 켜진 것이고, 값에는 로그
+     * 수준·대상이 들어와 거부를 읽는 데 쓸모가 없다.
+     *
+     * 빈 문자열도 **켜진 것으로 센다** — `-Djdk.httpclient.HttpClient.log=` 는 속성을 존재하게 만들고,
+     * JDK 가 그것을 어떻게 해석하는지는 이 자리의 몫이 아니다. 「있으면 거부」가 fail-closed 다.
+     */
+    private fun enabledHttpClientLogProperties(): Set<HttpClientLogProperty> =
+        HttpClientLogProperty.entries.filterTo(mutableSetOf()) { System.getProperty(it.propertyName) != null }
 
     /**
      * **relay 가 실제로 쓸 그 객체에 묻는다**(cr M-2) — 활성 route 의 정의를 배선이 따로 적으면
