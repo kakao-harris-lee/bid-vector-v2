@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import importlib
 import json
@@ -16,7 +17,13 @@ from google.protobuf import json_format
 
 from ml_engine.app.pipeline import build_training_pipeline
 from ml_engine.contracts import common_pb2, features_pb2
-from ml_engine.evaluation import EvaluationPolicy, load_evaluation_policy
+from ml_engine.evaluation import (
+    EvaluationPolicy,
+    EvaluationReportV1,
+    PromotionNotEvaluable,
+    load_evaluation_policy,
+    policy_checksum,
+)
 from ml_engine.inference.time_axis import TimeAxisPolicy
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.holdout import HoldoutCancelled
@@ -633,3 +640,121 @@ def test_pipeline_rejects_a_policy_whose_values_differ_from_its_file(
     assert isinstance(
         honest_pipeline.run(_dataset_ref(dataset_dir), CancelToken()), PipelineOutcome
     )
+
+
+# ---- v r4 H-4 — 게이트에 **넘기는** 객체가 재검증이 재구성한 것인가 ----
+#
+# 재검증이 승인 파일에서 다시 만든 객체를 돌려주더라도, 부르는 자리가 그 **반환값을 쓰지
+# 않고** 자기가 들고 있던 객체를 다시 넘기면 처방이 비어 있다(검사와 사용의 분리).
+
+
+class _LenientThreshold(float):
+    """직렬화는 승인값, 부정은 완화값 — 게이트가 쓰는 연산만 갈라 놓는다(verifier F7)."""
+
+    def __neg__(self) -> float:
+        return -0.1
+
+
+def test_run_holdout_receives_the_policy_rebuilt_by_verification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """파이프라인에 **거동이 위조된** 정책을 주입하고, `run_holdout` 이 받는 정책을 잡아
+    그것이 승인값으로 **거동**하는지 본다. 반환값을 무시하는 배선이면 위조 객체가 그대로
+    넘어가 `-t` 가 -0.1 이다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    honest = _evaluation_policy()
+    forged = copy.copy(honest)
+    object.__setattr__(
+        forged, "paired_t_threshold", _LenientThreshold(honest.paired_t_threshold)
+    )
+    # 전제 — 위조는 세 직렬화 축을 전부 통과한다(그래서 이 축이 따로 필요하다).
+    assert policy_checksum(forged) == policy_checksum(honest)
+    assert -forged.paired_t_threshold == -0.1
+
+    seen: list[EvaluationPolicy] = []
+    original = pipeline_module.run_holdout
+
+    def capturing(*args: object, **kwargs: object) -> object:
+        seen.extend(a for a in args if isinstance(a, EvaluationPolicy))
+        return original(*args, **kwargs)  # type: ignore[misc]
+
+    monkeypatch.setattr(pipeline_module, "run_holdout", capturing)  # type: ignore[attr-defined]
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=forged,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    assert isinstance(outcome, PipelineOutcome), outcome
+
+    assert len(seen) == 1, seen
+    # 지역 변수로 받는다 — pytest 는 단항 연산을 **문면으로** 설명해서
+    # (`-` + 피연산자 repr) 실패 메시지가 실제 비교값을 가린다.
+    behaviour = -seen[0].paired_t_threshold
+    assert behaviour == -2.58  # 승인값으로 거동한다
+    assert type(seen[0].paired_t_threshold) is float
+
+
+def test_the_shipped_policy_premise_holds_for_this_files_dataset(
+    tmp_path: Path,
+) -> None:
+    """cr r4 L-2 — 이 파일의 test 들이 **출하 승인 정책**을 쓸 수 있는 전제를 단언으로
+    잠근다: `_write_dataset` 은 `settlements.jsonl` 을 비워 두므로 성숙한 주가 **0** 이고,
+    평가 창이 선택되지 않아 출하 임계(`min_evaluation_rows: 100` 등)가 **물리지 않는다**.
+
+    그 전제는 지금까지 fixture 의 성질이기만 했다 — 그 바이트가 비지 않게 되는 날 다른
+    test 들의 뜻이 **조용히** 바뀐다(출하 임계가 갑자기 물린다). 여기서 report 를 직접 보고
+    「창 0 · 승격 인용 불가」를 단언해 그 변화가 **이 자리에서** 드러나게 한다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    reports: list[object] = []  # run_holdout 의 반환은 report 또는 거부/취소다
+    original = pipeline_module.run_holdout
+
+    def capturing(*args: object, **kwargs: object) -> object:
+        result = original(*args, **kwargs)  # type: ignore[misc]
+        reports.append(result)
+        return result
+
+    monkeypatch_free_policy = _evaluation_policy()
+    assert monkeypatch_free_policy.min_evaluation_rows == 100  # 출하값이다
+    pipeline_module.run_holdout = capturing  # type: ignore[attr-defined]
+    try:
+        pipeline = build_training_pipeline(
+            _spec(),
+            training_policy=_training_policy(),
+            evaluation_policy=monkeypatch_free_policy,
+            maturity_window_days=7,
+            time_axis_policy=_TIME_AXIS_POLICY,
+            trainer=_FakeTrainer(),
+            code_version=CodeVersion("sha-premise"),
+            artifact_out_dir=out_dir,
+        )
+        outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    finally:
+        pipeline_module.run_holdout = original  # type: ignore[attr-defined]
+    assert isinstance(outcome, PipelineOutcome), outcome
+
+    assert len(reports) == 1
+    report = reports[0]
+    assert isinstance(report, EvaluationReportV1), report
+    assert report.windows == ()  # 평가 창 0 — 임계가 물리지 않는다
+    assert isinstance(report.promotion, PromotionNotEvaluable)

@@ -191,15 +191,19 @@ class _ConcreteTrainingPipeline:
         `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
         (4)).
 
-        **정책 출처 재검증이 여기 있다**(M9/ml-lifecycle 수정 라운드, v H-1): 넘어온 평가
-        정책의 값이 자기가 왔다는 파일의 값과 같은지 **파일을 다시 읽어** 본다. 이 겹은
-        객체가 어떻게 만들어졌든 무관하므로, 코드가 임계를 비튼 정책(`replace`·동적 생성·
-        생성 토큰 절취)으로 게이트를 돌리는 경로가 이 자리에서 닫힌다. 조용히 파일 값으로
-        갈아끼우지 않는다 — 그러면 「무엇으로 판정했는가」가 다시 흐려진다. 제품 경로는
-        이것 하나이고, `run_holdout` 자신은 라이브러리 진입점으로 남긴다(그쪽 사유는 그
-        함수 docstring)."""
-        source_check = verify_policy_source(self._deps.evaluation_policy)
-        if isinstance(source_check, PolicySourceMismatch):
+        **정책 출처 재검증이 여기 있다**(M9/ml-lifecycle 수정 라운드 v H-1 · r3 H-3a ·
+        r4 H-4). 축이 **셋**이다 — **승인**(이 자리에 도착한 값의 출처가 승인 등록부에 있는
+        산출물인가, r3 H-3a) · **파일 바이트** · **값**. 그리고 게이트에 넘기는 것은
+        `self._deps.evaluation_policy` 가 **아니라 재검증의 반환값**이다: 로더가 승인
+        바이트에서 **다시 만든** 정책이다(r4 H-4 — 직렬화는 승인값이고 거동은 완화값인
+        객체가 세 축을 전부 지나갔다). 검사와 사용이 갈리면 처방이 비어 있으므로 둘을
+        한 값으로 묶는다.
+
+        어긋나면 `DetailCode.POLICY_SOURCE_MISMATCH` 로 job 을 실패시킨다. 제품 경로는 이것
+        하나이고 `run_holdout` 자신은 라이브러리 진입점으로 남긴다 — 사유와 세 축의 역할
+        분담은 `evaluation.policy_source` 모듈 docstring 에 있다."""
+        approved_policy = verify_policy_source(self._deps.evaluation_policy)
+        if isinstance(approved_policy, PolicySourceMismatch):
             return PipelineFailed(
                 JobFailureCode.EVALUATION_ERROR, DetailCode.POLICY_SOURCE_MISMATCH
             )
@@ -210,7 +214,7 @@ class _ConcreteTrainingPipeline:
             maturities,
             self._deps.spec,
             self._deps.training_policy,
-            self._deps.evaluation_policy,
+            approved_policy,
             self._deps.trainer,
             self._deps.code_version,
             should_stop=cancel_token.is_cancelled,

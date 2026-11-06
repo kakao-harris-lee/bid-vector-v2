@@ -1,38 +1,56 @@
-"""`ml_engine.evaluation.policy_source` — 정책 출처 재검증(M9/ml-lifecycle 수정 라운드,
-verifier H-1 처방 둘째 겹).
+"""`ml_engine.evaluation.policy_source` — **게이트가 판정에 쓰는 정책의 출처를 승인 파일로
+고정하는 자리**(M9/ml-lifecycle 수정 라운드 v H-1 → r3 H-3a → r4 H-4).
 
-앞 판의 ④ 축은 「`EvaluationPolicy` 를 짓는 **호출 이름**이 로더 안에 하나」를 AST 로 셌고, 그
-술어는 세 경로를 전부 지나갔다(verifier 실측): `dataclasses.replace(p, paired_t_threshold=…)` ·
-`type(p)(**{**vars(p), …})` · `getattr(importlib.import_module(…), "Evaluation"+"Policy")(…)`.
-`evaluation.policy` 의 생성 토큰이 그 셋을 형태로 막지만(실측), 토큰 타입 이름을 **동적으로
-훔치는** 길(`getattr(module, "_…")`)은 어떤 AST 게이트도 보지 못한다. 그 잔여를 **값 대조**로
-닫는다 — 객체가 어떻게 만들어졌든 자기가 왔다는 파일과 값이 다르면 여기서 드러난다.
+세 라운드가 이 모듈의 역할을 세 번 넓혔다. 지금 형태와 **그렇게 된 사유**를 함께 적는다.
 
-**경계**: 어느 **파일**을 정책으로 쓸지는 운영자가 고른다(`ML_ENGINE_EVALUATION_POLICY`) — 이
-두 겹이 막는 것은 「코드가 값을 지어내거나 비트는 것」이고, 완화된 임계는 승인 근거와 version·
-effective date 를 가진 **정책 산출물**로만 존재할 수 있다(그 지문이 report 에 남는다).
+## 무엇을 하는가
 
-두 축을 함께 본다: **값**(`policy_checksum` 등식)과 **파일 바이트**(`digest` 등식). 뒤쪽이
-없으면 「로드 뒤 파일이 바뀐 실행」이 통과한다 — 값은 같을 수 있어도 그 실행이 공시한 지문이
-더는 그 파일의 것이 아니다.
+`verify_policy_source` 가 축 셋을 보고, 통과하면 **로더가 승인 파일에서 다시 만든 정책**을
+돌려준다. 제품 경로(`app.pipeline._run_holdout`)는 그 **반환값**을 게이트에 넘긴다.
+
+| 축 | 묻는 것 | 없으면 열리는 것 |
+| --- | --- | --- |
+| **승인** | 객체의 **자기 주장**(`version` + `source.digest`)이 승인 등록부에 있는가 | 내용이 일치하는 **미승인 사본**(r3 H-3a — 전 게이트 초록으로 t=0.1 이 게이트에 닿았다) |
+| **파일 바이트** | 로드 뒤 그 파일이 바뀌지 않았는가 | 「로드 뒤 파일이 바뀐 실행」 — 값은 같아도 공시한 지문이 더는 그 파일의 것이 아니다 |
+| **값** | 객체의 값이 그 파일의 값인가(`policy_checksum` 등식) | 로더를 거치지 않고 비튼 객체(`replace`·동적 생성·토큰 절취 — `evaluation.policy` 의 생성 토큰이 앞에서 막고, 토큰 이름을 **동적으로 훔치는** 길의 잔여를 이 축이 받는다) |
+
+**승인을 「재로드한 파일」이 아니라 「자기 주장」에 거는 이유**: 재로드에 걸면 승인 축이 바이트
+축이 잡던 경우를 대신 거부해 **두 검사가 한 검사로 접힌다**. 주장에 걸면 셋이 각각 다른 것을
+본다(그 분리를 지키는 것은 바이트 축 test 의 **문면 단언**이라는 것도 변이로 실측했다).
+
+**축 셋으로도 모자랐던 이유, 그리고 반환값을 바꾼 이유**(r4 H-4): 세 축은 객체의 **직렬화**를
+한 시점에 비교하고 게이트는 그 값을 **거동**으로 소비한다. 둘을 갈라 놓으면 세 축이 전부
+통과한다 — `policy_checksum` 프레임 안에서만 승인값을 돌려주는 property · `repr`·json·`==` 는
+승인값이고 `__neg__` 는 완화값인 **float 하위 클래스** · 통과 **뒤** 제자리 변경(verifier
+F6·F7·F8). 축을 더 세는 것으로는 닫히지 않는다(직렬화를 보는 축은 몇 개든 같은 틈을 공유한다).
+그래서 **값의 출처를 바꾼다**: 게이트가 쓰는 객체는 로더가 승인 바이트에서 만든 것이다.
+
+## 승인을 묻는 자리는 **둘**이다
+
+1. **조립 근** — `load_approved_evaluation_policy` ← `app.server._preload`. 운영자의 선택
+   (`ML_ENGINE_EVALUATION_POLICY`)이 들어오는 자리이고, 역할은 **빨리 실패하는 것**이다:
+   미승인 정책을 가리킨 부팅은 job 을 받기 전에 `NOT_READY` 로 서야 한다.
+2. **게이트 자리** — `verify_policy_source` ← `app.pipeline._run_holdout`. 부팅 승인은 **한 번**
+   묻고 끝나므로 그 뒤에 값을 바꿔 끼우는 길이 있다. 여기가 **도착한 값**을 묻는다.
+
+**앞 판에 「재검증에는 넣을 수 없다」고 적었던 사유는 해소됐다**: 그때 붉어진 조립 근 test
+일곱은 작은 데이터셋에 맞춘 **파생(미승인) 정책**을 쓰고 있었고, r3 에서 **출하 승인 정책**으로
+바꿨다. 그 데이터셋은 성숙한 주가 0 이라 평가 창이 선택되지 않아 임계가 애초에 물리지 않는다
+(근거는 `reports/evidence/m9/ml-lifecycle/design-review.md` §7). test 전용 승인 주입 경로는
+만들지 않았다 — src 가 같은 주입을 쓸 수 있는 우회 표면이 된다.
+
+## 경계
+
+어느 **파일**을 정책으로 쓸지는 운영자가 고르지만 **승인된 산출물 사이에서만**이다. 완화된
+임계는 승인 근거와 version·effective date 를 가진 정책 산출물로만 존재할 수 있고, 그 지문이
+report 에 남는다. 출하 파일 자체를 고치는 길은 런타임이 아니라 **CI**(등록부 ↔ 출하 지문 등식
+test)가 막는다. 위협 모델 경계 문장은 design-review §0.
+
+**라이브러리 진입점은 그대로다** — `training.holdout.run_holdout` 은 커널 test 가 승인 밖
+조합(seed 수를 줄인 정책 등)으로도 불러야 하므로 재검증을 그 안에 두지 않는다.
 
 이 모듈을 `policy.py` 에서 분리한 이유는 설계 래칫의 파일 크기 한도다(그 파일이 500 줄을
 넘었다). 의존은 한 방향(`policy_source` → `policy`)이고 그래서 순환이 없다.
-
-**부르는 자리는 제품 경로 하나**(`app.pipeline._run_holdout`) — `training.holdout.run_holdout`
-은 라이브러리 진입점이라 커널 test 가 승인 밖 조합(seed 수를 줄인 정책 등)으로도 불러야
-하고, 그런 정책은 로더가 거부하므로 거기서 재검증하면 그 test 들이 재는 것을 잃는다.
-
-**승인 축(v H-2)** — 위 두 겹은 「객체가 자기 파일과 같은가」를 묻고 **「그 파일을 누가
-승인했는가」는 묻지 않는다**. 그래서 완화한 사본을 파일로 만들어 쓰면 전 게이트가 초록이었다
-(verifier 실측). 그 축을 닫는 자리는 아래 `load_approved_evaluation_policy` 하나다 —
-`app.server._preload` 가 부르고, 거기가 **운영자의 선택(env)이 들어오는 자리**다. 사유와
-등록부는 `registry.policy_approvals` 모듈 docstring.
-
-**왜 재검증(`verify_policy_source`)이 아닌가**: 재검증이 있는 제품 경로는 조립 근 test 들도
-탄다. 그 test 들은 작은 데이터셋으로 돌려고 출하와 다른 **승인 밖** 임계(`min_evaluation_rows`
-등)를 파일로 만들어 쓴다. 승인 요구를 재검증에 넣으면 그 test 들이 전부 「미승인」으로 떨어져
-**재던 것을 잃는다**(실측: 조립 근 test 일곱이 붉어졌다).
 """
 
 from __future__ import annotations
@@ -60,25 +78,13 @@ class PolicySourceMismatch:
 def verify_policy_source(
     policy: EvaluationPolicy,
 ) -> EvaluationPolicy | PolicySourceMismatch:
-    """게이트에 **닿은 값**이 승인된 산출물의 것인지 본다. 통과하면 받은 정책을 그대로
-    돌려준다 — 조용히 파일 값으로 갈아끼우지 않는다(그러면 「무엇으로 판정했는가」가 다시
-    흐려진다).
+    """축 셋을 보고, 통과하면 **로더가 승인 파일에서 다시 만든 정책**을 돌려준다.
 
-    축 **셋**을 본다. 셋이 함께 말하는 것은 「이 객체의 값은 **승인된 산출물**의 값이고,
-    그 산출물은 지금도 디스크에 그대로 있다」다.
+    부르는 자리는 그 **반환값**을 게이트에 넘겨야 한다 — 받은 객체를 다시 넘기면 직렬화와
+    거동을 갈라 놓은 위조가 게이트에 닿는다(v r4 H-4).
 
-    1. **승인**(v r3 H-3a) — 객체가 **자기 주장**(`version` + `source.digest`)으로 승인
-       등록부에 있는가. 재로드한 파일이 아니라 **주장**에 거는 이유는 아래 2 와 역할을
-       가르기 위해서다: 2 는 「로드 뒤 파일이 바뀌었나」를 묻고, 1 은 「애초에 승인된
-       것을 로드했다고 주장하나」를 묻는다.
-    2. **파일 바이트** — 로드 뒤 그 파일이 바뀌지 않았다.
-    3. **값**(`policy_checksum` 등식) — 객체의 값이 그 파일의 값이다.
-
-    **1 이 없으면 무엇이 열리는가**(verifier MX1b 실측): `copy.copy` + `object.__setattr__`
-    로 승인 정책을 비틀고, 그 객체가 가리킬 **내용이 일치하는 미승인 사본**을 디스크에 써
-    두면 2·3 이 **둘 다 성립한다**. 조립 근의 승인 대조는 부팅에서 한 번뿐이라 그 뒤에
-    값을 바꿔 끼우는 길을 보지 못하고, 호출 자리 집합 등식도 보지 못한다 — 그 변이는 호출
-    자리를 하나도 늘리지 않는다. 그래서 승인은 **게이트에 닿는 자리**에서도 물어야 한다.
+    축 셋의 역할 분담과 「왜 받은 객체를 그대로 돌려주지 않는가」는 **모듈 docstring** 에
+    있다(이 함수가 그 설계의 전부라 사유를 한 자리에만 둔다).
     """
     approval = policy_approval(version=policy.version, digest=policy.source.digest)
     if approval is not None:
@@ -99,7 +105,7 @@ def verify_policy_source(
         return PolicySourceMismatch(
             "정책 값이 그 파일의 값과 다르다 — 로더를 거치지 않고 비튼 객체다"
         )
-    return policy
+    return reloaded
 
 
 def load_approved_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:

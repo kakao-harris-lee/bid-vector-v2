@@ -497,3 +497,90 @@ def test_source_verification_still_accepts_the_approved_artifact(
     loaded = load_evaluation_policy(copy_path)
     assert isinstance(loaded, EvaluationPolicy), loaded
     assert isinstance(verify_policy_source(loaded), EvaluationPolicy)
+
+
+# ── ⑨ 게이트가 **소비하는 값**이 승인 파일에서 나왔는가 (v r4 H-4) ──────────
+# ⑧ 의 세 축은 객체의 **직렬화**(`policy_checksum` = canonical JSON)를 한 시점에 비교한다.
+# 그런데 게이트는 그 값을 **거동**으로 소비한다(`-policy.paired_t_threshold` 같은 산술·비교).
+# 직렬화와 거동을 갈라 놓을 수 있으면 세 축이 전부 통과한다(verifier F6·F7·F8):
+#   F6 `__class__` 교체 — `policy_checksum` 프레임 안에서만 승인값을 돌려주는 property
+#   F7 `float` 하위 클래스 — `repr`·json·`==` 는 2.58, `__neg__` 는 -0.1 (checksum 동일)
+#   F8 verify 통과 **뒤** 같은 객체를 제자리 변경
+# 처방은 축을 더하는 것이 아니라 **값의 출처를 바꾸는 것**이다 — 재검증이 승인 파일에서
+# 로더가 **다시 만든** 객체를 돌려주고, 게이트는 그것을 쓴다.
+
+
+class _LenientThreshold(float):
+    """F7 — 직렬화는 승인값, 부정은 완화값(게이트가 쓰는 연산)."""
+
+    def __neg__(self) -> float:
+        return -0.1
+
+
+def _forged_behavior(policy: EvaluationPolicy) -> EvaluationPolicy:
+    forged = copy.copy(policy)
+    object.__setattr__(
+        forged, "paired_t_threshold", _LenientThreshold(policy.paired_t_threshold)
+    )
+    return forged
+
+
+def test_a_forged_behavior_passes_all_three_serialization_axes() -> None:
+    """전제 고정 — F7 은 세 축을 **전부 통과한다**(승인·바이트·값). 그래서 아래 처방이
+    축을 더하는 것이 아니라 **출처를 바꾸는 것**이어야 한다."""
+    approved = _shipped_policy()
+    forged = _forged_behavior(approved)
+
+    assert policy_checksum(forged) == policy_checksum(approved)  # 값 축 통과
+    assert forged.source.digest == approved.source.digest  # 승인·바이트 축 통과
+    assert repr(forged.paired_t_threshold) == repr(approved.paired_t_threshold)
+    assert -forged.paired_t_threshold == -0.1  # 그런데 거동이 다르다
+    assert -approved.paired_t_threshold == -2.58
+
+
+def test_verification_returns_a_policy_rebuilt_from_the_approved_file() -> None:
+    """처방 — 재검증이 돌려주는 것은 **로더가 승인 파일에서 만든 객체**다. 호출자가 넘긴
+    객체가 아니므로, 직렬화와 거동을 갈라 놓은 위조도 게이트에 닿지 않는다.
+
+    **조용한 갈아끼움이 아니다**: 승인·바이트·값 세 등식이 **성립한 뒤에만** 일어난다 —
+    어긋나면 여전히 fail-closed 다. 즉 판정에 쓰이는 값은 같고, 그 값이 **어디서 왔는지**가
+    고정된다."""
+    approved = _shipped_policy()
+    checked = verify_policy_source(_forged_behavior(approved))
+
+    assert isinstance(checked, EvaluationPolicy), checked
+    assert checked is not approved
+    behaviour = -checked.paired_t_threshold
+    assert behaviour == -2.58  # 거동이 승인값이다
+
+
+def test_the_rebuilt_policy_carries_only_exact_primitive_types() -> None:
+    """재구성 객체가 **정확한 원시 타입**만 담는다 — 하위 클래스가 섞이면 직렬화와 거동이
+    다시 갈릴 수 있다. `type(...) is float` 로 본다(`isinstance` 는 하위 클래스를 받는다)."""
+    checked = verify_policy_source(_forged_behavior(_shipped_policy()))
+    assert isinstance(checked, EvaluationPolicy), checked
+
+    assert type(checked.paired_t_threshold) is float
+    assert type(checked.maturity_threshold) is float
+    assert type(checked.min_evaluation_rows) is int
+    assert type(checked.max_origins) is int
+    assert type(checked.agency_baseline_min_count) is int
+    assert type(checked.version) is str
+    assert all(type(seed) is int for seed in checked.stability_seeds)
+    assert all(type(edge) is float for edge in checked.amount_band_edges)
+    assert all(type(axis) is str for axis in checked.segment_axes)
+
+
+def test_mutating_the_callers_object_after_verification_does_not_reach_the_gate() -> (
+    None
+):
+    """F8 — verify 뒤 호출자 객체를 제자리 변경해도 재구성 객체는 영향받지 않는다."""
+    approved = _shipped_policy()
+    caller_object = copy.copy(approved)
+    checked = verify_policy_source(caller_object)
+    assert isinstance(checked, EvaluationPolicy), checked
+
+    object.__setattr__(caller_object, "paired_t_threshold", 0.1)
+
+    assert caller_object.paired_t_threshold == 0.1
+    assert checked.paired_t_threshold == 2.58
