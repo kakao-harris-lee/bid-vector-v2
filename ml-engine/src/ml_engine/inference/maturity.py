@@ -129,7 +129,8 @@ class TimeAxisUnmeasurableCount:
 @dataclass(frozen=True)
 class MaturityTable:
     """성숙도 리포트 한 벌. `build_weekly_maturity` 가 유일 생성 경로이지만, 손으로
-    조립해도 **항등식**이 생성에서 강제된다."""
+    조립해도 **항등식**이 생성에서 강제된다 — 모집단 등식 · 창별 출처 등식 · 대체 계수 ·
+    **대체 제외 표 등식 셋**(아래 세 `_check_*`)."""
 
     windows: tuple[MaturityWindow, ...]
     windows_excluding_substitute: tuple[MaturityWindow, ...]
@@ -146,6 +147,7 @@ class MaturityTable:
             raise ValueError("행 계수는 음수일 수 없다")
         self._check_population()
         self._check_provenance()
+        self._check_substitute_exclusion()
 
     def _check_population(self) -> None:
         """모집단 = 창의 개찰 계수 합 + 사유별 측정 불가 합."""
@@ -161,10 +163,13 @@ class MaturityTable:
     def _check_provenance(self) -> None:
         """provenance 계수를 **분모와 같은 등식 묶음**에 넣는다(cr M-2).
 
-        앞 판은 모집단 등식 하나뿐이어서 세 자리가 열려 있었다: ⑴ `NoObservation` 창의
+        앞 판은 모집단 등식 하나뿐이어서 **네** 자리가 열려 있었다: ⑴ `NoObservation` 창의
         `source_counts` 는 개찰 계수에 안 잡혀 **유령 행**을 들 수 있었고 ⑵ 창의 출처 계수
-        합이 분모와 어긋나도 표가 섰고 ⑶ `substitute_row_count` 는 **아무 검사도** 받지
-        않았다 — 그런데 그 값이 「대체가 주 경계를 밀었는데 안 보인다」를 막는 축이다."""
+        합이 분모와 어긋나도 표가 섰고 ⑶ `substitute_row_count` 와 ⑷
+        `windows_excluding_substitute` 가 **아무 검사도** 받지 않았다 — 그 둘이 「대체가 주
+        경계를 밀었는데 안 보인다」를 막는 축이다. 이 함수는 ⑴~⑶ 을 지고, ⑷ 는
+        `_check_substitute_exclusion` 이 진다(cr r3 M-3 — 앞 판이 ⑷ 를 문면에서 빼
+        닫힌 것처럼 읽혔다)."""
         for window in self.windows:
             sourced = sum(item.row_count for item in window.time_axis.source_counts)
             if sourced != _opened_count(window):
@@ -184,6 +189,57 @@ class MaturityTable:
                 "대체 출처 행 수는 창들의 대체 출처 계수 합이어야 한다 — "
                 f"공시 {self.substitute_row_count} != 계수 {substituted}"
             )
+
+    def _check_substitute_exclusion(self) -> None:
+        """**대체 제외 표**가 실제로 「대체를 뺀 같은 표」인가(cr r3 M-3).
+
+        이 표는 SET-06 의 「대체가 주 경계를 밀었는데 안 보인다」를 막는 축이고, 그 축은
+        **두 표의 대조**로만 성립한다. 앞 판은 이 표를 읽지 않아 대체 행이 1 인데 두 표가
+        **동일한** 표가 섰다(cr 실측) — 그러면 대조가 아무것도 말하지 않는다.
+
+        등식 셋이고 각각 다른 것을 본다:
+        1. 제외 표에 **대체 출처 행이 없다**(이름이 참이다).
+        2. 두 표의 **창별 개찰-출처 계수**가 같다(대체를 빼는 것이 개찰 행을 함께 지우거나
+           주를 옮기지 않았다). 개찰 행이 0 인 창은 제외 표에서 사라지므로 **0 이 아닌
+           계수만** 비교한다.
+        3. 대체 행이 **없으면** 두 표가 같다. 1·2 는 출처 계수만 보므로 `settled_count` 가
+           갈린 표를 통과시킨다 — 그 틈을 이 등식이 닫는다."""
+        for window in self.windows_excluding_substitute:
+            for item in window.time_axis.source_counts:
+                if item.source is not TimeAxisSource.OPENED_AT and item.row_count:
+                    raise ValueError(
+                        "대체 제외 표에 대체 출처 행이 있다 — "
+                        f"{window.start.isoformat()}: {item.source.value} "
+                        f"{item.row_count}행"
+                    )
+        if self._opened_at_counts(self.windows) != self._opened_at_counts(
+            self.windows_excluding_substitute
+        ):
+            raise ValueError(
+                "두 표의 창별 개찰 출처 계수가 같아야 한다 — "
+                f"본 표 {self._opened_at_counts(self.windows)} != 대체 제외 표 "
+                f"{self._opened_at_counts(self.windows_excluding_substitute)}"
+            )
+        if self.substitute_row_count == 0 and (
+            self.windows_excluding_substitute != self.windows
+        ):
+            raise ValueError(
+                "대체 행이 없으면 두 표는 같아야 한다 — 대체 계수 0 인데 표가 다르다"
+            )
+
+    @staticmethod
+    def _opened_at_counts(windows: tuple[MaturityWindow, ...]) -> dict[str, int]:
+        """창 시작 → 그 창의 개찰 출처 행 수(0 인 창은 넣지 않는다)."""
+        counts: dict[str, int] = {}
+        for window in windows:
+            opened = sum(
+                item.row_count
+                for item in window.time_axis.source_counts
+                if item.source is TimeAxisSource.OPENED_AT
+            )
+            if opened:
+                counts[window.start.isoformat()] = opened
+        return counts
 
 
 def _ensure_utc(value: datetime) -> datetime:

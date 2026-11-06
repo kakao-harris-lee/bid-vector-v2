@@ -393,3 +393,92 @@ def test_maturity_table_rejects_a_substitute_count_that_contradicts_the_windows(
             substitute_row_count=1,
             policy_version="inference-test",
         )
+
+
+# ── cr r3 M-3 — 대체 제외 표도 등식 묶음에 든다 ──────────────────────────────
+# 앞 라운드는 `substitute_row_count` 만 닫고 `windows_excluding_substitute` 는 읽지 않았다.
+# 그런데 「대체가 주 경계를 밀었는데 안 보인다」(설계 검토 우회 7)를 막는 축이 **두 표의
+# 대조**다 — 검사가 없으면 대체 행이 1 인데 두 표가 동일한 표가 섰다(cr 실측).
+#
+# 아래 셋은 검사 **각각을 단독으로** 겨눈다(입력을 깎아, 거부를 만들 수 있는 검사가 하나만
+# 남게 한다). 넷째는 생산자 출력의 양성 대조다.
+
+_OPENED_ONE = TimeAxisSourceCount(source=TimeAxisSource.OPENED_AT, row_count=1)
+_SUBSTITUTED_ONE = TimeAxisSourceCount(source=TimeAxisSource.BID_CLOSE_AT, row_count=1)
+
+
+def test_substitute_exclusion_table_may_not_contain_substitute_rows() -> None:
+    """검사 1 — 「대체를 뺀 표」가 대체 출처 행을 들고 있으면 그 이름이 거짓이다."""
+    with pytest.raises(ValueError, match="대체 출처 행"):
+        MaturityTable(
+            windows=(
+                _window_with(
+                    opened=2, settled=1, sources=(_OPENED_ONE, _SUBSTITUTED_ONE)
+                ),
+            ),
+            windows_excluding_substitute=(
+                _window_with(opened=1, settled=1, sources=(_SUBSTITUTED_ONE,)),
+            ),
+            unmeasurable=(),
+            population_row_count=2,
+            substitute_row_count=1,
+            policy_version="inference-test",
+        )
+
+
+def test_substitute_exclusion_table_keeps_the_opened_at_counts() -> None:
+    """검사 2 — 두 표의 **창별 개찰-출처 계수**는 같아야 한다. 대체를 빼는 것이 개찰 행을
+    함께 지우거나 주를 옮기면 그 자리에서 드러난다(검사 1 은 통과하는 입력이다 — 제외 표에
+    대체 출처 행이 없다)."""
+    with pytest.raises(ValueError, match="개찰 출처 계수"):
+        MaturityTable(
+            windows=(
+                _window_with(
+                    opened=2, settled=1, sources=(_OPENED_ONE, _SUBSTITUTED_ONE)
+                ),
+            ),
+            windows_excluding_substitute=(
+                _window_with(opened=0, settled=0, sources=()),
+            ),
+            unmeasurable=(),
+            population_row_count=2,
+            substitute_row_count=1,
+            policy_version="inference-test",
+        )
+
+
+def test_without_substitute_rows_the_two_tables_must_be_identical() -> None:
+    """검사 3 — 대체 행이 **없으면** 두 표는 같아야 한다. 검사 1·2 는 출처 계수만 보므로
+    `settled_count` 가 갈린 표를 통과시킨다 — 그 틈을 이 등식이 닫는다."""
+    with pytest.raises(ValueError, match="대체 행이 없으면"):
+        MaturityTable(
+            windows=(_window_with(opened=1, settled=1, sources=(_OPENED_ONE,)),),
+            windows_excluding_substitute=(
+                _window_with(opened=1, settled=0, sources=(_OPENED_ONE,)),
+            ),
+            unmeasurable=(),
+            population_row_count=1,
+            substitute_row_count=0,
+            policy_version="inference-test",
+        )
+
+
+def test_the_producer_satisfies_the_substitute_exclusion_equalities() -> None:
+    """**양성 대조** — 실제 생산자의 출력이 위 등식들을 통과한다(거짓 양성 0). 대체 행이
+    있는 표와 없는 표 둘 다 본다."""
+    with_substitute = build_weekly_maturity(
+        [
+            _opened(_WEEK1, settled=True),
+            _substituted(_WEEK1 + timedelta(hours=2), settled=False),
+        ],
+        window_days=7,
+        policy=_PERMISSIVE,
+    )
+    assert with_substitute.substitute_row_count == 1
+    assert with_substitute.windows_excluding_substitute != with_substitute.windows
+
+    without = build_weekly_maturity(
+        [_opened(_WEEK1, settled=True)], window_days=7, policy=_PERMISSIVE
+    )
+    assert without.substitute_row_count == 0
+    assert without.windows_excluding_substitute == without.windows
