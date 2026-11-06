@@ -56,7 +56,7 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
 | 무엇이 열려 있었나 | 관측이 `datetime` 하나를 들었다 — 「이 시각이 어디서 왔는가」와 「시각을 모른다」를 적을 자리가 없었다. legacy 는 개찰 시각 결측 시 마감 시각으로 **조용히 대체**했고 대체 사실이 결과에 남지 않았다. |
 | 구조로 닫은 것 | `TimeAxis = KnownTimeAxis(값·출처·정책 version) \| UnmeasurableTimeAxis(사유)`. 측정 불가 쪽에는 **시각 필드가 없다** — 「출처를 모르는데 값은 있다」를 적을 자리가 없으므로 그 행을 어느 주에 배정하려면 값을 지어내야 하고, 지어내면 아래 항등식이 어긋난다. |
 | 항등식 | **모집단 = 창의 개찰 계수 합 + 사유별 측정 불가 합**. `MaturityTable` 의 **생성 불변식**이라, 사유 없이 분모에서 사라지는 행이 있으면 표를 **만들 수 없다**. |
-| 대체 승인 자리 | versioned 정책 파일의 한 칸(`maturity.time_axis_substitute_approved`, 출하 **false**) — 코드에 승인 목록이 없다. `OPEN-SET-10` 미결의 기계적 표현이고, 결정되면 그 한 칸이 바뀐다. bool 만 받는다(`"true"`·`1` 같은 느슨한 참값을 승인으로 읽지 않는다). |
+| 대체 승인 자리 | versioned 정책 파일의 한 칸(`maturity.time_axis_substitute`, 출하 **`NOT_APPROVED`**) — 코드에 승인 목록이 없다. `OPEN-SET-10` 미결의 기계적 표현이고, 결정되면 그 한 칸이 `APPROVED` 가 된다. **닫힌 어휘 두 값만** 받는다 — bool 칸이었던 앞 판은 YAML 1.1 의 `yes`·`on`·`y` 를 승인으로 읽었다(v L-2 실측). |
 | 대체의 영향 | 대체 행 계수와 **대체 제외 주별 표**를 함께 낸다 — 승인되는 날 측정이 **그 자리에 이미 있다**(그때 새로 만드는 것이 아니다). 지금은 대체 행이 0 이라 두 표가 같다. |
 | 섞임 방지 | 한 표의 모든 행은 같은 정책 version 으로 해석됐어야 한다(provenance 를 손으로 지어 다른 version 을 섞으면 `ValueError`). |
 | 어휘 충돌 | `inference.availability.UnmeasurableReason`(예측 응답의 도메인 결과 축, wire enum 으로 사상)과 **다른 어휘**다. 섞으면 응답 어휘에 wire 값 없는 사유가 생겨 `serving.wire` 의 사상 불변식이 깨지고 두 축의 「측정 불가」가 한 이름이 된다 — 그래서 `TimeAxisUnmeasurableReason` 으로 따로 둔다. |

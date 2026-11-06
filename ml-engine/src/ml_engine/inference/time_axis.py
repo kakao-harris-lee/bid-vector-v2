@@ -10,7 +10,7 @@ legacy 는 개찰 시각(공고별 최솟값)이 없으면 **마감 시각으로
 
 V2 의 세 규율:
 1. 대체는 **승인된 정책으로만** 허용한다. 승인 여부는 versioned 정책 파일의 한 칸
-   (`maturity.time_axis_substitute_approved`)이고 코드에는 승인 목록이 없다 —
+   (`maturity.time_axis_substitute`, 닫힌 어휘)이고 코드에는 승인 목록이 없다 —
    `OPEN-SET-10` 이 미결이므로 출하값은 미승인이다.
 2. 쓰인 **시각 종류와 정책 version** 을 결과에 보존한다(`KnownTimeAxis`).
 3. 대체 불가 행은 **사유 있는 측정 불가**다(`UnmeasurableTimeAxis`). 이 타입에는 시각
@@ -83,7 +83,8 @@ class TimeAxisSubstitute(StrEnum):
     """대체 출처 승인 상태 — **닫힌 어휘**다(v L-2).
 
     앞 판은 정책 파일의 bool 한 칸이었다. YAML 1.1 은 `yes`·`on`·`y` 를 **참으로 읽으므로**
-    `maturity.time_axis_substitute_approved: yes` 가 승인으로 통과했다(실측) — 로더가 bool
+    `maturity.time_axis_substitute_approved: yes` 가 승인으로 통과했다(실측 — 그 판의 키 이름
+    이다) — 로더가 bool
     타입만 보았기 때문이다(`"true"`·`1` 은 거부됐으니 「느슨한 참값을 승인으로 읽지
     않는다」는 문면이 절반만 참이었다). 어휘를 문자열 두 값으로 닫으면 YAML 의 참값 표기가
     **전부** 미지 값이 된다 — 승인은 그 두 단어 중 하나를 적어야만 생긴다."""

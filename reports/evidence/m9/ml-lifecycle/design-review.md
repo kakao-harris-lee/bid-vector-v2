@@ -16,8 +16,9 @@
 - **구성**: 시간축은 `KnownTimeAxis(value, source, policy_version) | UnknownTimeAxis(reason)`
   **합 타입**이다. 「출처를 모르는데 값은 있다」가 타입으로 표현되지 않는다(그 상태를 적을 자리가
   없다) — legacy 의 조용한 대체가 형태로 불가능해진다.
-- **구성**: 승인된 시간축 출처는 **정책 파일의 bool 한 칸**(`maturity.time_axis_substitute_approved`)
-  이 정하고, 코드에는 승인 목록 리터럴이 없다. `OPEN-SET-10` 이 결정되면 **그 한 칸**이 바뀐다.
+- **구성**: 승인된 시간축 출처는 **정책 파일의 한 칸**(`maturity.time_axis_substitute`, 닫힌 어휘
+  두 값)이 정하고, 코드에는 승인 목록 리터럴이 없다. `OPEN-SET-10` 이 결정되면 **그 한 칸**이
+  바뀐다. bool 이 아닌 이유는 수정 라운드 v L-2 — YAML 1.1 참값 표기가 승인을 만들었다.
 - **열거**: `UnmeasurableReason` 둘·`TimeAxisSource` 둘은 어휘라 열거다. 그 열거가 「분모에서
   사라진 행 전수」와 같은 집합이라는 **항등식**(모집단 = 성숙 분모 + 측정 불가)이 `MaturityTable`
   생성 자리에서 돈다 — 새 사유를 더하고 계수에 넣지 않으면 항등식이 깨진다.
@@ -36,7 +37,7 @@
 | `TimeAxisSource` · `UnmeasurableReason` · `TimeAxis` · `resolve_time_axis` | 관측 행의 두 시각 후보 + 정책 | 승인 밖 출처는 값이 있어도 `UnknownTimeAxis` · 조용한 주 배정 경로 없음 |
 | `MaturityTable`(+`UnmeasurableCount`) | `build_weekly_maturity` 하나 | `__post_init__` 항등식 — 모집단 ≠ 분모 + 측정 불가면 생성 자체가 실패 |
 | `MaturityWindow.time_axis` | 창을 만드는 집계 한 자리 | 창마다 출처별 계수 + 정책 version 이 함께 산다(provenance 소실 자리 없음) |
-| `InferencePolicy.maturity_time_axis_substitute_approved` | `policy/inference-v1.yaml` 한 자리 | known_keys 전수 로더 · 미선언은 `PolicyRejected` |
+| `InferencePolicy.maturity_time_axis_substitute` | `policy/inference-v1.yaml` 한 자리 | known_keys 전수 로더 · 미선언은 `PolicyRejected` · 닫힌 어휘 밖 값은 거부(v L-2) |
 | `derive_release_id(… sample_scope)` | `TrainedArtifact` 하나(호출자 인자 경로 없음) | 시그니처 전수 민감도 test(파라미터를 더하고 해시에 넣지 않으면 붉다) |
 
 **「경계로 처리」 행 없음** — 위 전부 실측 대상이다.
@@ -62,8 +63,9 @@
 5. **측정 불가 행을 어느 주에 배정해 분모를 채운다**(legacy 의 조용한 대체) — `UnknownTimeAxis`
    에는 시각 값이 **없다**(타입에 필드가 없다). 주를 고르려면 값을 지어내야 하고, 지어내면
    항등식의 모집단 계수가 어긋난다.
-6. **대체 출처를 코드에서 승인한다** — 승인은 정책 파일 bool 한 칸이고 코드에는 목록이 없다.
-   출하값이 `false` 임을 test 가 잠근다(= `OPEN-SET-10` 미결 상태의 기계적 표현).
+6. **대체 출처를 코드에서 승인한다** — 승인은 정책 파일의 **닫힌 어휘 한 칸**이고 코드에는
+   목록이 없다. 출하값이 `NOT_APPROVED` 임을 test 가 잠근다(= `OPEN-SET-10` 미결 상태의
+   기계적 표현). 어휘가 bool 이 아닌 이유는 v L-2 — YAML 1.1 참값 표기가 승인을 만들었다.
 7. **대체가 주 경계를 밀었는데 안 보인다** — 대체 행 계수와 **대체 제외 주별 성숙도**를 함께
    산출한다(둘이 갈리면 표에서 보인다). 지금은 승인 밖이라 대체 행이 0 이고, 승인되는 날
    같은 측정이 그대로 돈다.
