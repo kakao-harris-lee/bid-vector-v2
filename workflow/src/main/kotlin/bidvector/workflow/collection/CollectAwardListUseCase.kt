@@ -85,14 +85,28 @@ data class AwardCollectionHalt(
  * 한 실행의 계수 — 건수와 열거값뿐이다(공고 식별자·상호를 나르지 않아 로그 줄이 구조적으로 안전하다).
  *
  * [stored] 는 원문으로 적재된 항목 수, [received] 는 소스에서 받은 항목 수다. 둘이 갈리는 것은
- * **원문으로 올라오지 못한 항목이 있다**는 뜻이다 — 공고 식별자 부재뿐 아니라 계약 필수 키 부재
- * (낙찰자 상호는 `REQUIRED` 다)와 치환 실패도 같은 차이를 만든다. 그 차이를 한 칸으로 접으면 조용한
- * 결측이 된다(사유별 계수는 슬롯 회계가 든다).
+ * **원문으로 올라오지 못한 항목이 있다**는 뜻이고, 그 차이는 등식으로 닫힌다 —
+ * `received − stored = duplicates + dropped`. 이 갈래에서 드롭 사유는 **공고번호·차수 부재** 하나다
+ * (cr r3 M-2). 계약 필수 키(낙찰자 상호)의 부재는 **원문 적재를 막지 않는다** — 그 요구는 승격 축의
+ * 것이다. 치환 실패도 막지 않는다(그쪽은 따로 세어진다).
+ *
+ * 그래서 [duplicates]·[dropped] 를 **따로 싣는다**(cr r3 M-1): 차이를 한 칸으로 접으면 조용한 결측이
+ * 되고, 그 결측은 **재실행으로 풀리지 않는다**(원천이 같은 응답을 준다). 그래서 종료 코드는 이 둘을
+ * 보지 않고 [unfinishedSlots] 만 본다 — 대신 마침 줄이 계수를 들어 운영자를 원천 응답으로 보낸다
+ * (팀장 결정 2026-11-06: 드롭·중복을 미완으로 세지 않는다).
  */
 data class AwardCollectionReport(
     val slots: Int,
     val received: Int,
+    /**
+     * 원문 적재를 **시도한** 항목 수 — 적재는 멱등이라(`ON CONFLICT DO NOTHING`) 같은 조각을 다시
+     * 돌리면 새 행이 0 이어도 이 수는 꽉 찬다(cr r3 L-3). 실제 행 수를 재는 자리는 DB 질의다.
+     */
     val stored: Int,
+    /** 같은 식별자가 두 번 와서 원문을 쓰지 않은 항목 수 — 쪽 밀림의 신호다. */
+    val duplicates: Int,
+    /** 공고번호·차수가 비어 담는 단계에서 떨어진 항목 수 — 재실행으로 풀리지 않는다. */
+    val dropped: Int,
     /**
      * **끝내지 못한** 슬롯 수 — 「잘린」이 아니다(cr r2 H-2). 절단 사유를 남긴 슬롯과 **사유 없이 짧게
      * 끝난** 슬롯(원천이 총수를 말했는데 그만큼 받지 못했다)을 함께 센다. 둘을 가르는 것은 사유가
@@ -126,20 +140,13 @@ class CollectAwardListUseCase(
         require(sources.isNotEmpty()) { "낙찰 목록 소스가 하나도 없다" }
         require(sources.map { it.name }.toSet().size == sources.size) { "업종 이름은 서로 달라야 한다" }
         val plan = range.dates.flatMap { date -> sources.map { date to it } }
-        var received = 0
-        var stored = 0
-        var unfinished = 0
+        val totals = AwardTotals()
         for ((index, slot) in plan.withIndex()) {
             val (date, source) = slot
-            val sweep = sweepSlot(date, source)
-            received += sweep.received
-            stored += sweep.stored
-            if (!sweep.finished) unfinished++
-            val halt = sweep.halt ?: continue
-            val halted = halt.copy(notAttemptedSlots = plan.size - index - 1)
-            return AwardCollectionReport(index + 1, received, stored, unfinished, halted)
+            val halt = totals.add(sweepSlot(date, source)) ?: continue
+            return totals.reportOf(index + 1, halt.copy(notAttemptedSlots = plan.size - index - 1))
         }
-        return AwardCollectionReport(plan.size, received, stored, unfinished, halted = null)
+        return totals.reportOf(plan.size, halted = null)
     }
 
     /**
@@ -167,32 +174,77 @@ class CollectAwardListUseCase(
         val startedAt = clock.now()
         val tally = SourceAccountingTally()
         var stored = 0
+        var claimedTotal: Int? = null
         var cursor: PageCursor? = null
         var halt: AwardCollectionHalt?
         do {
             val batch = source.port.fetchNotices(referenceDate, cursor)
             tally.absorb(batch.accounting)
+            claimedTotal = widerTotalOf(claimedTotal, batch.accounting.sourceTotal)
             batch.items.forEach { rawObservations.append(it) }
             stored += batch.items.size
             halt = haltOf(batch.accounting.truncationCause)
             cursor = resumeCursorOf(batch, cursor)
         } while (halt == null && cursor != null)
-        val accounting = tally.toSourceAccounting()
+        val accounting = tally.toSourceAccounting().copy(sourceTotal = claimedTotal)
         runs.record(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_AWARD_LIST, startedAt, clock.now()),
         )
-        return SlotSweep(accounting.received, stored, finishedWith(accounting), halt)
+        return SlotSweep(accounting, stored, finishedWith(accounting), halt)
     }
 }
 
-/** 슬롯 하나의 끝 — 계수 둘과 「다 받았는가」, 그리고 멈춰야 하면 사유. */
+/** 슬롯 하나의 끝 — 그 슬롯의 소스 회계와 적재 시도 수, 「다 받았는가」, 그리고 멈춰야 하면 사유. */
 private class SlotSweep(
-    val received: Int,
+    val accounting: CollectionAccounting,
     val stored: Int,
     val finished: Boolean,
     val halt: AwardCollectionHalt?,
 )
+
+/** 실행 전체의 누적 — 슬롯마다 더하고 끝에 보고를 낸다(계수가 늘어도 호출부의 지역 변수가 늘지 않는다). */
+private class AwardTotals {
+    private var received = 0
+    private var stored = 0
+    private var duplicates = 0
+    private var dropped = 0
+    private var unfinished = 0
+
+    /** 그 슬롯을 더하고, 실행을 멈춰야 하면 사유를 돌려준다. */
+    fun add(sweep: SlotSweep): AwardCollectionHalt? {
+        received += sweep.accounting.received
+        stored += sweep.stored
+        duplicates += sweep.accounting.duplicate
+        dropped += sweep.accounting.dropped
+        if (!sweep.finished) unfinished++
+        return sweep.halt
+    }
+
+    fun reportOf(
+        slots: Int,
+        halted: AwardCollectionHalt?,
+    ): AwardCollectionReport = AwardCollectionReport(slots, received, stored, duplicates, dropped, unfinished, halted)
+}
+
+/**
+ * **원천이 한 번 말한 총수는 뒤 쪽이 지우지 못한다**(v r3 L-1) — 쪽 상한으로 이어 돌 때 공유 누산기는
+ * 마지막 배치의 총수를 쓰는데(`source.sourceTotal ?: sourceTotal`), 어댑터는 배치마다 새 누산기라
+ * 재개 첫 쪽이 `NoData` 면 총수 **0** 을 낸다. 그러면 「받은 수 ≥ 총수」가 되어 덜 받은 슬롯이 완료로
+ * 적힌다. 최댓값을 쥐면 그 자리도, 원천이 뒤 쪽에서 총수를 **줄이는** 판도 함께 닫힌다.
+ *
+ * 공유 누산기를 고치지 않는 이유는 범위다 — 그 타입은 형제 공고 목록 갈래도 쓰고 이 slice 의
+ * in_scope 밖이다(그 갈래의 거동을 바꾸지 않는다).
+ */
+private fun widerTotalOf(
+    seen: Int?,
+    batch: Int?,
+): Int? =
+    when {
+        seen == null -> batch
+        batch == null -> seen
+        else -> maxOf(seen, batch)
+    }
 
 /** 그 슬롯이 다 받았는가 — 저장소 단일 출처([attemptOutcomeOf])의 정착 결말 둘만 참이다. */
 private fun finishedWith(accounting: CollectionAccounting): Boolean =

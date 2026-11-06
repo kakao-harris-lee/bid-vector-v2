@@ -73,6 +73,7 @@ internal fun awardFinishLine(
     exitCode: CollectionExitCode,
 ): String =
     "award-collection finished slots=${report.slots} received=${report.received} stored=${report.stored} " +
+        "duplicates=${report.duplicates} dropped=${report.dropped} " +
         "unfinishedSlots=${report.unfinishedSlots} halted=${report.halted != null} exit=${exitCode.value}"
 
 /**
@@ -86,6 +87,11 @@ internal fun awardFinishLine(
  * 세 사유에 **같은 코드**를 쓰는 이유: 운영자의 다음 행동이 같다(그 조각을 다시 돌린다). 갈리는 것은
  * 「언제」와 「고칠 자리가 설정·정책인가」뿐이고, 그 갈림은 halted 줄과 `unfinishedSlots` 계수, 그리고
  * 수집 회계 행의 사유·총수가 말한다(runbook §3 이 그 셋을 가른다).
+ *
+ * **드롭·중복은 보지 않는다**(팀장 결정 2026-11-06, cr r3 M-1·OQ) — 다 받고도 덜 적재한 슬롯은 있지만
+ * 그 결측은 **재실행으로 풀리지 않으므로**(원천이 같은 응답을 준다) 미완으로 세면 exit 2 가 상주해
+ * 「같은 조각을 다시 돌린다」가 되돌이가 된다. 그 축은 종료 코드가 아니라 마침 줄의
+ * `duplicates`·`dropped` 계수와 runbook §3.1 의 판독이 든다.
  */
 internal fun awardExitCodeOf(report: AwardCollectionReport): CollectionExitCode =
     if (report.halted == null && report.unfinishedSlots == 0) {

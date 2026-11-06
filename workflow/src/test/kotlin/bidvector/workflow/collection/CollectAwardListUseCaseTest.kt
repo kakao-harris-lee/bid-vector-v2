@@ -2,6 +2,7 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.CollectionAccounting
+import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.PageCursor
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
@@ -178,6 +179,77 @@ class CollectAwardListUseCaseTest {
         report.stored shouldBe 0
     }
 
+    /**
+     * v r3 L-1 회귀 — **재개 배치가 총수를 0 으로 덮지 못한다.** 쪽 상한으로 이어 돌 때 공유 누산기는
+     * 마지막 배치의 총수를 쓰는데(`source.sourceTotal ?: sourceTotal`), 어댑터는 배치마다 새 누산기라
+     * 재개 첫 쪽이 「없음」이면 총수 **0** 을 낸다. 그러면 「받은 2 ≥ 0」이 되어 다섯 중 둘만 받은
+     * 슬롯이 완료로 적힌다. use case 가 배치마다 본 총수의 **최댓값**을 쥐어 그 자리를 닫는다.
+     */
+    @Test
+    fun `쪽 상한 재개 뒤 총수를 말하지 않는 배치가 와도 앞 배치의 총수를 잃지 않는다`() {
+        val fixture = AwardFixture()
+        val source =
+            ScriptedSource { _, cursor ->
+                if (cursor == null) {
+                    awardBatch(
+                        listOf(awardObservation("R1"), awardObservation("R2")),
+                        accounting =
+                            shortWalkAccounting(
+                                received = 2,
+                                sourceTotal = 5,
+                                truncationCause = TruncationCause.MaxPages,
+                            ),
+                        next = PageCursor("51"),
+                    )
+                } else {
+                    awardBatch(emptyList(), accounting = shortWalkAccounting(received = 0, sourceTotal = 0))
+                }
+            }
+
+        val report =
+            fixture.useCase.collect(
+                awardRange("2026-09-01", "2026-09-01"),
+                listOf(AwardCollectionSource(construction, source)),
+            )
+
+        report.received shouldBe 2
+        report.unfinishedSlots shouldBe 1
+        // 회계 행에도 **넓은 쪽**이 남아야 runbook 의 `received < source_total` 판독이 선다.
+        fixture.runs.recorded.single().first.sourceTotal shouldBe 5
+    }
+
+    /**
+     * cr r3 M-1·M-2 — **다 받고도 덜 적재한 슬롯**의 계수가 보고에 선다. 종료 코드는 움직이지 않는다
+     * (팀장 결정: 재실행으로 풀리지 않는 결측이라 미완으로 세지 않는다) — 대신 `duplicates`·`dropped`
+     * 가 그 자리를 들고 `received − stored = duplicates + dropped` 등식이 성립한다.
+     */
+    @Test
+    fun `받았지만 적재되지 않은 항목은 계수로 서고 미완으로 세지 않는다`() {
+        val fixture = AwardFixture()
+        val source =
+            ScriptedSource { _, _ ->
+                awardBatch(
+                    listOf(awardObservation("K1"), awardObservation("K2")),
+                    accounting = partialStoreAccounting(normalized = 2, duplicate = 1, dropped = 1),
+                )
+            }
+
+        val report =
+            fixture.useCase.collect(
+                awardRange("2026-09-01", "2026-09-01"),
+                listOf(AwardCollectionSource(construction, source)),
+            )
+
+        report.received shouldBe 4
+        report.stored shouldBe 2
+        report.duplicates shouldBe 1
+        report.dropped shouldBe 1
+        report.received - report.stored shouldBe report.duplicates + report.dropped
+        // 원천이 말한 총수를 다 받았으므로 **끝낸** 슬롯이다 — 결측은 적재 단계의 것이고 재실행이 풀지 않는다.
+        report.unfinishedSlots shouldBe 0
+        report.halted shouldBe null
+    }
+
     @Test
     fun `쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다`() {
         val fixture = AwardFixture()
@@ -249,6 +321,7 @@ private fun awardBatch(
 private fun shortWalkAccounting(
     received: Int,
     sourceTotal: Int,
+    truncationCause: TruncationCause? = null,
 ): CollectionAccounting =
     CollectionAccounting(
         received = received,
@@ -258,10 +331,34 @@ private fun shortWalkAccounting(
         dropReasons = emptyMap(),
         sourceTotal = sourceTotal,
         pagesFetched = 1,
+        truncated = truncationCause != null,
+        unknownFields = 0,
+        truncationCause = truncationCause,
+    )
+
+/**
+ * **다 받고도 덜 적재한** 회계 — 총수는 받은 수와 같고(끝낸 슬롯이다) 그 안에서 중복·드롭이 갈린다.
+ * 공유 helper 는 `normalized = received` 라 이 모양을 지을 수 없다.
+ */
+private fun partialStoreAccounting(
+    normalized: Int,
+    duplicate: Int,
+    dropped: Int,
+): CollectionAccounting {
+    val received = normalized + duplicate + dropped
+    return CollectionAccounting(
+        received = received,
+        normalized = normalized,
+        duplicate = duplicate,
+        dropped = dropped,
+        dropReasons = mapOf(CollectionDropReason.CollectionMissingNoticeNumber to dropped),
+        sourceTotal = received,
+        pagesFetched = 1,
         truncated = false,
         unknownFields = 0,
         truncationCause = null,
     )
+}
 
 private class AwardFixture(
     val raw: RecordingRawStore = RecordingRawStore(),

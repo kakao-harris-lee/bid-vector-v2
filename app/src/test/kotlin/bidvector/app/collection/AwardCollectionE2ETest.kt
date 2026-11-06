@@ -18,7 +18,8 @@ import org.junit.jupiter.api.Test
  * 식별자(사업자번호·대표자명)가 원문에 남지 않는다 ③ 승격이 같은 공고의 낙찰자 상호·낙찰금액·
  * 낙찰률을 채운다 ④ 그 값으로 SET-01 대사가 `WINNER_NAME_NOT_PUBLISHED` 를 벗어난다 ⑤ 승인 상한을
  * 다 쓰면 멈추고 미완을 낸다 ⑥ 로그·실행 상태에 서비스 키도 상호도 없다 ⑦ 쪽을 나눠 걷되 같은 쪽을
- * 다시 부르지 않는다 ⑧ 슬롯을 끝내지 못하면 미완으로 끝난다 — 절단과 **사유 없는 짧은 걷기** 둘 다.
+ * 다시 부르지 않는다 ⑧ 슬롯을 끝내지 못하면 미완으로 끝난다 — 절단과 **사유 없는 짧은 걷기** 둘 다
+ * ⑨ 마침 줄이 적재 단계의 결측 계수(`duplicates`·`dropped`)를 든다.
  */
 class AwardCollectionE2ETest {
     companion object {
@@ -53,6 +54,9 @@ class AwardCollectionE2ETest {
         stored shouldNotContain MOCK_WINNER_REPRESENTATIVE
 
         e2e.capturedLog() shouldContain "award-collection finished"
+        // 마침 줄이 적재 단계의 결측 계수를 든다 — 정상 판은 둘 다 0 이고, 그 칸이 없으면 「받았지만
+        // 적재되지 않은 항목」을 로그만 보는 운영자가 가릴 수 없다(cr r3 M-1).
+        e2e.capturedLog() shouldContain "duplicates=0 dropped=0"
         e2e.capturedEverything() shouldNotContain e2e.serviceKeySentinel
         e2e.capturedEverything() shouldNotContain AWARD_WINNER_NAME
         e2e.runStateText() shouldNotContain e2e.serviceKeySentinel

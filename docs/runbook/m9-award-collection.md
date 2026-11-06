@@ -62,53 +62,87 @@ java -jar app.jar \
 
 | 코드 | 뜻 | 처방 |
 | --- | --- | --- |
-| 0 | 조각의 **모든 슬롯을 끝까지 받았다**(`unfinishedSlots=0`) | 다음 조각 |
+| 0 | 조각의 모든 슬롯이 **원천이 말한 만큼** 받았다(`unfinishedSlots=0`) | 다음 조각. 단 마침 줄의 `duplicates`·`dropped` 가 0 인지 보고(§3.1 ③), 원천 총수를 믿을 수 없는 판은 §3.2 |
 | 2 + `halted …` 줄 있음 | 멈췄다(예산 또는 쿼터) | 예산이면 다음 날 **같은 조각**부터, 쿼터면 계정 한도를 본 뒤 같은 조각 |
 | 2 + `halted` 줄 없음, `unfinishedSlots>0` | 일부 슬롯을 **끝내지 못했다** — 절단이거나 **사유 없는 짧은 걷기**(총수를 말한 원천에서 덜 받고 끝났다) | **그 조각을 다시 돌린다.** 이 갈래에는 슬롯 단위 이어 돌기가 없어 다음 조각으로 넘어가면 그 개찰일의 낙찰 원문이 영영 빠진다. 다시 돌려도 같은 수가 나오면 아래 §3.1 로 사유를 가린다 |
 | 3 | 다른 실행이 잠금을 쥐고 있다 | 그 실행이 끝난 뒤 다시 |
 | 4 | 잠금을 걸 수 없다 | 디렉터리 경로·권한을 고친다(기다려도 풀리지 않는다) |
-| 1 | 실패 | `collection failed cause=…` 토큰으로 원인을 가린다 |
+| 1 | 실패 | `collection failed cause=…` 토큰으로 원인을 가린다. **이 줄만 `award-collection` 접두가 없다** — 일회 러너 다섯이 공유하는 줄이라 귀속은 앞선 `award-collection start` 줄이 준다 |
 
 로그 한 줄에는 건수·날짜·업종 이름·열거값만 실린다 — 공고번호도 낙찰자 상호도 서비스 키도 없다.
-**슬롯 단위 줄은 이 갈래에 없다**(마침 줄의 계수뿐이다) — 어느 개찰일이 미완인지와 그 사유는 §3.1 의
-두 자리에 남는다.
+**슬롯 단위 줄은 이 갈래에 없다**(마침 줄의 계수뿐이다) — 어느 개찰일이 미완인지는 §3.1 의 회계 행이
+말한다.
+
+마침 줄의 계수 둘을 함께 본다 — `duplicates>0` 또는 `dropped>0` 이면 **받았지만 적재되지 않은 항목**이
+있다(§3.1 ③). 그 판은 종료 코드가 0 일 수도 있다.
 
 ### 3.1 미완 슬롯의 사유를 어디서 읽는가
 
-로그는 실행 하나의 계수만 든다. 슬롯별 사유는 둘 중 한 자리에 있다.
+로그는 실행 하나의 계수만 든다. **슬롯별 사유의 자리는 수집 회계 행 하나**다 — 슬롯마다 한 행이고,
+절단 사유·총수·받은 수·적재되지 않은 수를 함께 든다.
 
-1. **수집 회계 행**(DB) — 슬롯마다 한 행이다. 절단 사유와 총수·받은 수를 함께 든다.
+```sql
+SELECT reference_date, started_at, received, source_total, pages_fetched,
+       truncation_cause, dropped, drop_reasons
+FROM collection_run
+WHERE source_endpoint = 'OPENING_AWARD_LIST'
+  AND reference_date BETWEEN '<from>' AND '<to>'
+ORDER BY reference_date, started_at;
+```
 
-   ```sql
-   SELECT reference_date, received, source_total, pages_fetched, truncation_cause
-   FROM collection_run
-   WHERE source_endpoint = 'OPENING_AWARD_LIST'
-     AND reference_date BETWEEN '<from>' AND '<to>'
-   ORDER BY reference_date;
-   ```
+`started_at` 을 **싣고 정렬한다**: 이 표는 INSERT 전용이라 같은 조각을 다시 돌리면 같은 `reference_date`
+에 행이 쌓이고(업무 둘이 각자 한 행이라 한 날짜에 라운드마다 두 행), 그것을 가리지 않으면 「다시 돌려도
+같은 수가 나왔는가」를 판단할 수 없다. 이번 실행만 보려면 `AND started_at >= '<이번 실행 시작>'`.
 
-   - `truncation_cause` 가 **있으면** 절단이다. 토큰은 닫힌 어휘(`truncationCodeOf`)이고 자주 보이는
-     것은 `TRANSPORT_FAILURE`·`SERVER_ERROR`·`TIMEOUT`·`NOT_RETRYABLE`·`REPEATED_PAGE`·`MAX_PAGES`·
-     `INPUT_ERROR`·`STRUCTURE_FAILURE`·`SELF_THROTTLED`·`UNCLASSIFIED` 다(전수는 그 함수가 정본이고
-     여기 열거는 그 부분집합이 아니라 **그 함수의 오늘 전수에서 예산·쿼터 둘을 뺀 것**이다 — 그 둘은
-     `halted` 줄로 간다).
-   - `truncation_cause` 가 **비었는데** `received < source_total` 이면 **짧은 걷기**다(빈 쪽·`NoData`
-     로 곱게 멈췄다). 사유 토큰이 없는 것이 정상이고, 그 차이가 결측의 크기다.
-   - 둘 다 아니면(`received = source_total`) 그 슬롯은 끝난 것이다.
+**열 값은 사유 타입의 단순 이름**이다(`truncationCodeOf` 토큰이 아니다 — 적는 자리가
+`it::class.simpleName` 이다). 대응은 이렇다.
 
-2. **시도 원장**(실행 상태 디렉터리의 파일) — 호출 단위다. 그 개찰일의 줄에 `FAILED:<CODE>` 가
-   남으므로 회계 행이 없는 판(예외로 끝난 슬롯)에도 사유가 있다.
+| `truncation_cause` 열 값 | 사유 토큰 | 다시 돌리면 |
+| --- | --- | --- |
+| `TransportFailure` · `ServerError` · `Timeout` · `StructureFailure` · `RepeatedPage` · `Unclassified` | `TRANSPORT_FAILURE` · `SERVER_ERROR` · `TIMEOUT` · `STRUCTURE_FAILURE` · `REPEATED_PAGE` · `UNCLASSIFIED` | **일시** — 같은 조각 재실행이 맞는 처방 |
+| `MaxPages` · `NotRetryable` · `InputError` | `MAX_PAGES` · `NOT_RETRYABLE` · `INPUT_ERROR` | **같은 답** — 쪽 상한·서비스 키 승인 상태·요청 파라미터를 고친다 |
+| `SelfThrottled` | `SELF_THROTTLED` | **같은 답** — 우리 속도 보호가 거부했다(호출이 나가지 않았다). 조각을 더 작게 나누거나 속도 정책을 고친다 |
+| `BudgetExhausted` · `QuotaExhausted` | `BUDGET_EXHAUSTED_*` · `QUOTA_EXHAUSTED` | 멈춤이라 `halted` 줄이 먼저 말한다(회계 행에도 남는다) |
 
-**다시 돌려도 같은 답이 나오는 축**은 따로다 — `MAX_PAGES`·`NOT_RETRYABLE`·`INPUT_ERROR` 셋과
-`SELF_THROTTLED`. 앞 셋은 저장소가 **확정 실패**로 가른 축이고(`attemptOutcomeOf`), 고칠 자리는 쪽
-상한·서비스 키 승인 상태·요청 파라미터다. `SELF_THROTTLED` 는 우리 속도 보호가 거부한 것이라 호출이
-나가지도 않았다 — 조각을 더 작게 나누거나 속도 정책을 고친다. 넷 다 같은 조각을 되돌이로 돌리면 승인
-호출만 태운다.
+판독은 셋이다.
 
-그 밖(`TRANSPORT_FAILURE`·`SERVER_ERROR`·`TIMEOUT`·`STRUCTURE_FAILURE`·`REPEATED_PAGE`·`UNCLASSIFIED`)은
-**일시**로 분류된 축이라 같은 조각 재실행이 맞는 처방이다. `UNCLASSIFIED` 가 반복되면 그 응답 형태가
-아직 어휘에 없다는 뜻이므로 재실행을 되돌이로 만들지 말고 그 사유를 올린다(분류를 더하는 일이다).
-짧은 걷기도 일시 축이다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
+1. `truncation_cause` 가 **있으면** 절단이다 — 위 표가 처방을 가른다. `Unclassified` 가 반복되면 그 응답
+   형태가 아직 어휘에 없다는 뜻이므로, 재실행을 되돌이로 만들지 말고 그 사유를 올린다(분류를 더하는 일).
+2. `truncation_cause` 가 **비었는데** `received < source_total` 이면 **짧은 걷기**다(빈 쪽·`NoData` 로
+   곱게 멈췄다). 사유 토큰이 없는 것이 정상이고, 그 차이가 결측의 크기다. 일시 축이라 같은 조각
+   재실행이 처방이다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
+3. `received = source_total` 인데 **`dropped > 0`** 이거나 마침 줄의 `stored < received` 면 **받았지만
+   적재되지 않은 항목**이 있다. 사유는 `drop_reasons`(공고번호·차수 부재)와 **같은 식별자의 중복**
+   (마침 줄 `duplicates`)이고, **같은 조각 재실행으로 풀리지 않는다** — 원천이 같은 응답을 준다.
+   원천 응답을 확인할 자리이고, 중복이 보이면 쪽 밀림을 의심한다. 이 축은 종료 코드를 움직이지
+   않는다(되돌이를 만들지 않으려는 결정이다).
+
+세 판독 어디에도 걸리지 않으면 그 슬롯은 끝난 것이다. 단 **원천 총수를 믿을 수 없는 판**은 이 판독
+밖이다 — 아래 §3.2.
+
+**회계 행이 없는 판**(예외로 끝난 슬롯)의 사유는 위 표 1 행의 `collection failed cause=<토큰>` 줄이다.
+예외는 `runs.record` 에 닿기 전에 나가므로 그 슬롯의 회계 행 자체가 없다.
+
+**시도 원장**(실행 상태 디렉터리)은 사유를 가리는 자리가 **아니다**. 호출 단위이고 개찰일 칸이 없으며
+(목록 축은 공고 단위가 아니라 `notice_key_hash` 가 비어 있다), 결말은 전송층의 것뿐이라
+`FAILED:HTTP_*`·`TIMEOUT`·`TRANSPORT` 만 남는다 — 비재시도 코드·구조 오류·짧은 걷기는 HTTP 200 봉투로
+오므로 그 줄에는 `SUCCEEDED` 로 적힌다. 쪽 수·호출 수(상한 회계)를 세는 자리다.
+
+### 3.2 원천 총수를 믿을 수 없는 판 — 남는 사각
+
+위 판독 2 는 `source_total` 을 믿는다. 그 값이 거짓이거나 없으면 **덜 받고도 종료 코드 0** 이 나간다.
+오늘 남아 있는 세 판이다.
+
+- **총수를 아예 주지 않는다**: 비교할 값이 없어 판정 불가다. 쪽 수(`pages_fetched`)와 다른 날의 행 수로만
+  어림한다.
+- **뒤 쪽에서 총수를 줄인다**: 이 갈래는 배치마다 본 총수의 **최댓값**을 쥐므로(v r3 L-1 수정) 줄여도
+  판독 2 가 선다. 다만 원천이 **첫 쪽부터** 작은 값을 주면 그 값이 최댓값이다.
+- **쪽 밀림으로 앞 행이 다시 온다**: 중복도 「받은 수」에 들어가 총수를 채운다. 그 판의 신호는
+  `received ≠ stored`(마침 줄의 `duplicates`)뿐이므로 판독 3 이 그 자리다.
+
+셋 다 원천 응답을 확인하는 수밖에 없다 — 결측의 **방향**은 안전하지 않으므로(조용히 0 이 나간다),
+실 수집 캠페인에서 `received = source_total` 성립률과 `dropped`·`duplicates` 분포를 함께 재는 것이
+다음 과제다(알려진 제한).
 
 ## 4. 승격(낙찰 칸 채우기)
 

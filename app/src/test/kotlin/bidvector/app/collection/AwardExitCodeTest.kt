@@ -5,6 +5,7 @@ import bidvector.procurement.TruncationCause
 import bidvector.workflow.collection.AwardCollectionHalt
 import bidvector.workflow.collection.AwardCollectionReport
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -44,15 +45,35 @@ class AwardExitCodeTest {
         awardExitCodeOf(reportOf(unfinishedSlots = 0, halted = quota)) shouldBe CollectionExitCode.INCOMPLETE
     }
 
+    /**
+     * **드롭·중복은 종료 코드를 움직이지 않는다**(팀장 결정 2026-11-06 · cr r3 M-1·OQ). 다 받고도 덜
+     * 적재한 슬롯은 있지만 그 결측은 재실행으로 풀리지 않으므로, 미완으로 세면 exit 2 가 상주해
+     * 「같은 조각을 다시 돌린다」가 되돌이가 된다. 그 축은 마침 줄의 계수와 runbook §3.1 이 든다.
+     *
+     * 이 단언이 그 결정을 **잠근다** — 뒤 라운드가 그 축을 종료 코드로 끌어올리려면 이 test 를 먼저
+     * 고쳐야 하고, 그러면 되돌이의 대가를 같이 보게 된다.
+     */
+    @Test
+    fun `드롭과 중복이 있어도 끝까지 걸은 실행은 0 이다 — 계수는 줄이 든다`() {
+        val report = reportOf(unfinishedSlots = 0, halted = null, duplicates = 1, dropped = 2)
+
+        awardExitCodeOf(report) shouldBe CollectionExitCode.COMPLETE
+        awardFinishLine(report, CollectionExitCode.COMPLETE) shouldContain "duplicates=1 dropped=2"
+    }
+
     /** 줄에 실리는 계수들 — 종료 코드가 보는 두 칸(`unfinishedSlots`·`halted`)만 호출부가 정한다. */
     private fun reportOf(
         unfinishedSlots: Int,
         halted: AwardCollectionHalt?,
+        duplicates: Int = 0,
+        dropped: Int = 0,
     ): AwardCollectionReport =
         AwardCollectionReport(
             slots = 2,
             received = 6,
-            stored = 6,
+            stored = 6 - duplicates - dropped,
+            duplicates = duplicates,
+            dropped = dropped,
             unfinishedSlots = unfinishedSlots,
             halted = halted,
         )
