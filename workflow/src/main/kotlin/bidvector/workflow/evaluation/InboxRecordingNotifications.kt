@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import bidvector.workflow.notificationinbox.NotificationFact
@@ -53,31 +54,30 @@ class InboxRecordingNotifications(
         return channel.request(notification)
     }
 
-    private fun recordFor(notification: NotificationRequest) {
+    private fun recordFor(notification: NotificationRequest) =
         when (val resolved = resolvedAudience) {
-            is NotificationAudience.Accounts -> {
-                // 시각을 **한 번** 읽는다 — 계정이 여럿이면 각자 다른 시각을 받게 되고, 그 차이는
-                // 같은 사실의 시각이 계정마다 다르다는 뜻이 되어 아무것도 설명하지 못한다.
-                val occurredAt = clock.now()
-                resolved.accounts.forEach { account ->
-                    // `NotificationInboxRecord` 를 **만드는 단 한 자리**다 — paper-bid(V25)가 그
-                    // 타입에 투찰 종류 필수 인자를 더하는 중이라 병합 때 한 줄로 그 값을 싣는다.
-                    inbox.record(
-                        NotificationInboxRecord(
-                            account,
-                            notification.noticeId,
-                            NotificationFact.NewCandidate,
-                            occurredAt,
-                        ),
-                    )
-                }
-            }
+            is NotificationAudience.Accounts -> recordFor(notification, resolved.accounts)
 
             // 청중을 못 읽었다 — **기록 0 건으로 끝내고 채널 요청은 그대로 간다**(cr r1 MEDIUM ·
             // v M-2). 앞 판은 이 자리에서 예외가 올라가 평가 run 이 멈췄고, 그 판정의 outbox
             // 흔적까지 함께 사라졌다. 표지는 조립이 진다(청중 빈의 로그 한 줄) — workflow 층은
             // 로거를 들지 않고, 기록 실패의 표지가 이미 그 자리에 있다(D-7C3B-9).
             NotificationAudience.Unavailable -> Unit
+        }
+
+    private fun recordFor(
+        notification: NotificationRequest,
+        accounts: List<AccountId>,
+    ) {
+        // 시각을 **한 번** 읽는다 — 계정이 여럿이면 각자 다른 시각을 받게 되고, 그 차이는 같은
+        // 사실의 시각이 계정마다 다르다는 뜻이 되어 아무것도 설명하지 못한다.
+        val occurredAt = clock.now()
+        accounts.forEach { account ->
+            // `NotificationInboxRecord` 를 **만드는 단 한 자리**다 — paper-bid(V25)가 그 타입에
+            // 투찰 종류 필수 인자를 더하는 중이라 병합 때 한 줄로 그 값을 싣는다.
+            inbox.record(
+                NotificationInboxRecord(account, notification.noticeId, NotificationFact.NewCandidate, occurredAt),
+            )
         }
     }
 }
