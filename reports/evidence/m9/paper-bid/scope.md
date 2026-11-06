@@ -78,3 +78,12 @@ verifier **not-ready**(차단 v H-1) · code-reviewer **approve** 뒤의 라운�
 **이 라운드가 손대지 않은 것**: `bid_case.bid_kind` 어휘 등식 test(선행 결함 · 별 건) ·
 `web/e2e/capture/**` 의 낡은 주석(조회는 정규식이라 깨지지 않는다 · 승인 범위 밖) ·
 capability map 의 유찰 줄(M9/inbox-vocab 장부 몫). `checklist.md` §6 에 등재.
+
+## 계약 갱신 2026-11-06 (팀장) — 승인 전 일괄 라운드
+
+cr M-2 · v L-1 에 대한 팀장 결정은 **(b) — 편집을 유지한다**. 승인 문장은 아래 한 줄이다.
+
+계약 갱신 2026-11-06 (팀장): capability map §14.3 (C) 머리 산문과 OPEN 행 종결 표시(`4b8c3709`)를 이 slice 가 집행하는 것을 승인한다 — NOTI-10 의 「레지스트리 행 종결 표시는 팀장이 집행한다」를 이 승인으로 갈음한다. M9 장부 slice(#133)는 이미 머지돼 그 몫이 남지 않았다.
+
+(b) 의 나머지 절반으로 그 OPEN 행에 **이웃 행과 같은 유보 문장**을 붙였다 — 종결 조건은 verifier
+ready-for-review + 사용자 승인이고, 행이 그 승인을 주장하지 않는다는 문장이다.
