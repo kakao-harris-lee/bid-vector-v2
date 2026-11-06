@@ -469,10 +469,14 @@ class AppHttpDependencyGateTest {
  * 이름 합집합을 기계로** 셌다: 35 + 11 + 35 = **81**(중복 0). 그 수가 76 + 5 와 같다는 것은 계산이
  * 아니라 **검산**이고, 아래 등식이 관측과 다시 대조한다.
  *
- * **M9/STR12 — 다섯이 늘어 86 이다**(기계 재계산: 38 + 11 + 37 = 86, 중복 0). 늘어난 것은 알림 채널
+ * **M9/STR12 — 다섯이 늘어 86 이었다**(기계 재계산: 38 + 11 + 37 = 86, 중복 0). 늘어난 것은 알림 채널
  * 설정·기동 판정 값 타입이다: tier1 에 `NotificationChannelProperties`·`TelegramChannelProperties`·
  * 그 파일 facade 셋(`RelayProperties` 와 같은 자격 — 조립 층의 설정 타입), tier3 에
  * `ChannelConfigPresence`·`ChannelConfigField` 둘(`RelayBootDecisionKt` 와 같은 자리 — 기동 판정의
  * 값 타입). **이 수를 손으로 올리는 것이 이 래칫의 일이다** — 면제가 눈에 띄지 않게 늘지 않게 한다.
+ *
+ * **승인 전 라운드에서 하나 더 늘어 87 이다**(기계 재계산: 38 + 11 + 38 = 87, 중복 0). 늘어난 것은
+ * `HttpClientLogProperty` 하나다 — JDK HttpClient 의 내부 로그 속성 어휘이고, 기동 판정이 그것을
+ * 거부 사유로 받으므로 `ChannelConfigField` 와 같은 자리(tier3)다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 86
+private const val EXPECTED_EXEMPT_COUNT = 87

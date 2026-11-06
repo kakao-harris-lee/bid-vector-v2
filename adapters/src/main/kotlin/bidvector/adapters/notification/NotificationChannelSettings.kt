@@ -1,6 +1,7 @@
 package bidvector.adapters.notification
 
 import bidvector.workflow.notification.RouteKey
+import java.net.URI
 import java.time.Duration
 
 /**
@@ -21,9 +22,12 @@ data class TelegramSenderSettings(
 ) {
     init {
         require(BASE_URL_SHAPE.matches(baseUrl)) {
-            "Telegram base URL 은 질의·fragment·userinfo 없는 http(s) 주소여야 한다 — 받은 길이 ${baseUrl.length}"
+            "Telegram base URL 은 질의·fragment·userinfo 없는 http(s) 주소여야 한다 — 원문은 담지 않는다"
         }
         require(!baseUrl.endsWith("/")) { "Telegram base URL 은 `/` 로 끝나지 않는다(경로를 두 번 잇지 않는다)" }
+        require(uriAccepts(baseUrl)) {
+            "Telegram base URL 이 URI 로 해독되지 않는다 — 원문은 담지 않는다(runbook §13.6)"
+        }
         require(connectTimeout.isPositive()) { "연결 timeout 은 유한 양수여야 한다: $connectTimeout" }
         require(responseTimeout.isPositive()) { "응답 timeout 은 유한 양수여야 한다: $responseTimeout" }
     }
@@ -35,6 +39,28 @@ data class TelegramSenderSettings(
          * 방어의 본체는 「URI 를 짓는 자리가 하나」라는 구조이고 이것은 그 위의 얕은 층이다.
          */
         val BASE_URL_SHAPE = Regex("""^https?://[^\s@?#]+$""")
+
+        const val MAX_PORT = 65535
+
+        /**
+         * **URI 가 받는지는 URI 만 안다**(v N-1 = cr M-2). 위 정규식은 **문자열 술어**라
+         * `java.net.URI` 가 거부하는 문자(`| \ " { } ^ < > ` ` 와 16진 두 자리가 따르지 않는 `%`)를
+         * 통과시킨다. 그 주소를 받으면 기동은 초록이고, **첫 발송에서** `URI.create` 가 던지고, 그
+         * 예외가 발송 경로의 포괄 `catch` 에 걸려 **`Unknown`(모호)** 으로 기록된다 — 집은 행이 전부
+         * `ISOLATED` 로 탄다(at-most-once 라 재시도도 0). 자격 축을 모양으로 막은 것과 **같은
+         * 처분**(기동 실패)으로 정렬한다.
+         *
+         * 정규식을 늘리는 쪽은 같은 함정을 한 칸 뒤로 미루는 것뿐이라 쓰지 않았다 — 술어를
+         * **문자열이 아니라 구조로** 닫는다.
+         *
+         * `URI` 왕복만으로는 둘이 빠져나간다(실측): `…:abc` 는 **받아들여지지만** authority 가
+         * registry 기반이 되어 `host == null` 이고, `…:99999` 는 포트에 16비트 검사가 없다. 둘 다
+         * 발송 때 요청 조립·연결에서 깨져 같은 `ISOLATED` 처분으로 흘러가므로 함께 막는다.
+         */
+        fun uriAccepts(raw: String): Boolean {
+            val uri = runCatching { URI(raw) }.getOrNull() ?: return false
+            return uri.host != null && uri.port <= MAX_PORT
+        }
     }
 }
 
@@ -44,7 +70,7 @@ data class NoticeMessageSettings(
 ) {
     init {
         require(SITE_SHAPE.matches(siteBaseUrl)) {
-            "공고 상세 링크의 base URL 은 질의·fragment·userinfo 없는 http(s) 주소여야 한다 — 받은 길이 ${siteBaseUrl.length}"
+            "공고 상세 링크의 base URL 은 질의·fragment·userinfo 없는 http(s) 주소여야 한다 — 원문은 담지 않는다"
         }
         require(!siteBaseUrl.endsWith("/")) { "base URL 은 `/` 로 끝나지 않는다(경로를 두 번 잇지 않는다)" }
     }
