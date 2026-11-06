@@ -37,11 +37,11 @@ abstract class UnusedImportGateTask : DefaultTask() {
 
     @TaskAction
     fun gate() {
-        val syntaxNames = readPolicy(policyFile.get().asFile).requireList(SYNTAX_NAMES).toSet()
+        val syntaxFqns = readPolicy(policyFile.get().asFile).requireList(SYNTAX_FQNS).toSet()
         val files = kotlinSources()
         val violations =
             parseKotlinFiles(files) { ktFile, file ->
-                UnusedImports.detectIn(ktFile, file.path, syntaxNames)
+                UnusedImports.detectIn(ktFile, file.path, syntaxFqns)
             }.sortedWith(compareBy({ it.fileName }, { it.line }))
 
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
@@ -71,7 +71,7 @@ abstract class UnusedImportGateTask : DefaultTask() {
             .sortedBy(File::getPath)
 
     private companion object {
-        const val SYNTAX_NAMES = "source.import.syntax-names"
+        const val SYNTAX_FQNS = "source.import.syntax-fqns"
         val SOURCE_EXTENSIONS = setOf("kt", "kts")
     }
 }

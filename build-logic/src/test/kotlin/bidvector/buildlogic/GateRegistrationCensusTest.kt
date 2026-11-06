@@ -1,6 +1,7 @@
 package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -342,6 +343,7 @@ class GateRegistrationCensusTest {
     }
 
     private companion object {
+        const val LEDGER = "gate-tests.properties"
         const val KEY = "gate.tests.sample"
         const val TEST = "org.junit.jupiter.api.Test"
         const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
@@ -378,4 +380,23 @@ class GateRegistrationCensusTest {
             superFacts = { name -> classes.firstOrNull { it.binaryName == name } },
         )
     }
+
+    @Test
+    fun `장부의 모든 열이 정렬돼 있고 중복이 없다 — 모듈 블록 밖의 열까지`() {
+        // 게이트의 모양 단언은 `gate.tests.<module>`·`.excluded` 둘만 본다(리뷰 LOW-7). 같은 파일의
+        // `gate.tests.discovery.*` 는 열 형태인데 그 축이 없었다. 모듈마다 다시 재지 않도록 **저장소를
+        // 읽는 이 자리**가 전수를 진다(`UnusedImportsTest` 의 죽은 면제 단언과 같은 꼴).
+        val policy = readPolicy(ledgerFile())
+        val listKeys = policy.keys.filter { it.startsWith("gate.tests.") && ',' in policy.getValue(it) }
+        assertTrue(listKeys.isNotEmpty(), "열 형태 키가 0 이다 — 비-공허 단언")
+
+        val violations =
+            listKeys.sorted().flatMap { key ->
+                GateRegistration.ledgerOrderViolations(key, GateRegistration.coordinateRows(policy[key]))
+            }
+
+        assertEquals(emptyList<String>(), violations, "장부 열 ${listKeys.size}개를 쟀다")
+    }
+
+    private fun ledgerFile(): File = File(System.getProperty("bidvector.architecture.policy")).resolveSibling(LEDGER)
 }

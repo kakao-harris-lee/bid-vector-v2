@@ -16,8 +16,14 @@ internal data class UnusedImport(
 )
 
 /**
- * **들여온 이름이 본문에서 쓰이는가** — 등식은 `도입 이름 ∖ (본문 식별자 ∪ 문법이 쓰는 이름) == ∅`
+ * **들여온 이름이 본문에서 쓰이는가** — 등식은 `도입 이름 ∖ (본문 식별자 ∪ 문법이 쓰는 import) == ∅`
  * (`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`).
+ *
+ * **면제는 FQN 이다**(수정 라운드 1, 리뷰 M-3). 짧은 이름으로 면제하면 그 이름을 가진 **다른** import 도
+ * 함께 면제된다 — 앞 판의 면제 37 개 가운데 실제로 import 되는 것은 하나였고, 나머지 36 은 대상이 없는
+ * 죽은 면제였다. 죽은 면제는 범위를 조용히 넓힌다(`MigrationOrder` 의 은퇴 목록과 같은 꼴). 그 검출은
+ * [deadSyntaxFqns] 가 맡는다 — 모듈마다 도입 집합이 달라 모듈 task 가 아니라 저장소를 읽는 test 가 그
+ * 자리를 진다.
  *
  * 왜 자체 게이트인가: ktlint 1.8.0 `ktlint_official` 의 `no-unused-imports` 가 **켜져 있는데도** 쓰지
  * 않는 import 두 줄을 보고하지 않았다(그 태스크 단독 재실행으로 exit 0 실측, 운영자 등재 결정
@@ -35,16 +41,32 @@ internal object UnusedImports {
     fun detect(
         fileName: String,
         text: String,
-        syntaxNames: Set<String>,
+        syntaxFqns: Set<String>,
     ): List<UnusedImport> =
         withKotlinPsi { factory ->
-            detectIn(factory.createFile(fileName, text), fileName, syntaxNames)
+            detectIn(factory.createFile(fileName, text), fileName, syntaxFqns)
         }
+
+    /** 그 파일이 **도입한 FQN** 전수(wildcard 는 이름을 열거하지 않아 제외). 죽은 면제 검출의 모집단이다. */
+    fun introducedFqns(ktFile: KtFile): Set<String> =
+        ktFile.importDirectives
+            .filterNot { it.isAllUnder }
+            .mapNotNull { it.importedFqName?.asString() }
+            .toSet()
+
+    /**
+     * **대상이 없는 면제** — `면제 FQN ∖ 저장소 전수의 도입 FQN`. 비어 있지 않으면 그만큼 범위가
+     * 조용히 넓어져 있다.
+     */
+    fun deadSyntaxFqns(
+        introduced: Set<String>,
+        syntaxFqns: Set<String>,
+    ): List<String> = (syntaxFqns - introduced).sorted()
 
     fun detectIn(
         ktFile: KtFile,
         fileName: String,
-        syntaxNames: Set<String>,
+        syntaxFqns: Set<String>,
     ): List<UnusedImport> {
         val referenced = identifiersOutsideImports(ktFile)
         val text = ktFile.text
@@ -53,7 +75,7 @@ internal object UnusedImports {
             val name = directive.aliasName ?: directive.importedFqName?.shortName()?.asString()
             when {
                 directive.isAllUnder || fqn == null || name == null -> null
-                name in referenced || name in syntaxNames -> null
+                name in referenced || fqn in syntaxFqns -> null
                 else -> UnusedImport(fileName, text.lineOf(directive.textRange.startOffset), fqn, name)
             }
         }

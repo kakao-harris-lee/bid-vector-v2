@@ -128,17 +128,7 @@ abstract class GateRegistrationGateTask : DefaultTask() {
         const val DISCOVERY_ANNOTATIONS = "gate.tests.discovery.annotations"
         const val CONDITION_PACKAGES = "gate.tests.discovery.condition-packages"
 
-        /**
-         * 줄이 없는 모듈은 단언 대상이 없다 — 빈 열이고 오류가 아니다(`settlement` 은 test 가 없다).
-         *
-         * **순서를 지키고 돌려준다** — 등식은 집합으로 세지만 장부 모양 단언
-         * ([GateRegistration.ledgerOrderViolations])은 등재 **행 순서**를 본다.
-         */
-        fun Map<String, String>.coordinateRows(key: String): List<String> =
-            this[key]
-                .orEmpty()
-                .split(',')
-                .map(String::trim)
-                .filter(String::isNotEmpty)
+        /** 판독은 [GateRegistration.coordinateRows] 하나가 갖는다 — 게이트와 test 가 같은 열을 보게. */
+        fun Map<String, String>.coordinateRows(key: String) = GateRegistration.coordinateRows(this[key])
     }
 }

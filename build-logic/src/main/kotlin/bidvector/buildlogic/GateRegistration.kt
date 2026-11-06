@@ -141,6 +141,19 @@ internal object GateRegistration {
             }
 
     /**
+     * 정책 값 한 줄을 **쉼표로 가른 값 열**로. properties 의 `\` 이어달리기가 값에서 줄바꿈을 지우므로
+     * 한 줄에 몰아 쓴 것과 여러 줄로 쓴 것이 같은 열이 된다. 줄이 없는 모듈은 빈 열이고 오류가 아니다.
+     *
+     * 술어와 판독이 한 자리에 있어야 **게이트와 test 가 같은 열을 본다**(리뷰 M-6 이 잡은 어긋남과 같은 축).
+     */
+    fun coordinateRows(value: String?): List<String> =
+        value
+            .orEmpty()
+            .split(',')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+
+    /**
      * **물려받은** test 메서드까지 센다(cr r1 G-2) — JUnit 은 추상 상위가 선언한 `@Test` 를 구체
      * 하위에서 돌린다. 상위 사슬은 같은 조회 자리에서 푼다(그 모듈의 test 출력 ∪ test 런타임
      * 클래스패스). 풀리지 않는 상위는 그 가지에서 끝나고, 그러면 그 클래스는 모집단 밖이라
