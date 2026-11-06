@@ -215,7 +215,8 @@ class CollectAwardListUseCaseTest {
         report.received shouldBe 2
         report.unfinishedSlots shouldBe 1
         // 회계 행에도 **넓은 쪽**이 남아야 runbook 의 `received < source_total` 판독이 선다.
-        fixture.runs.recorded.single().first.sourceTotal shouldBe 5
+        val (accounting, _) = fixture.runs.recorded.single()
+        accounting.sourceTotal shouldBe 5
     }
 
     /**
