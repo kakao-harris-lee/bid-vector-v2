@@ -59,7 +59,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 각 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T03:5xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③, 라운드 3 재측정)
+## 2026-11-06T05:0xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③, 마지막 재측정)
 - cmd: 라운드 2 와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`)
 - exit: 0
 - 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
@@ -68,7 +68,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
 
-## 2026-11-06T04:0xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T05:1xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -210,6 +210,36 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   2 줄을 바꿨으므로 「입력이 같으니 앞 결과가 덮는다」로 갈음하지 않고 판정 트리에서 다시 쟀다. 크기 축의
   여유는 함께 실측했다(그 파일 380 줄 / 한도 500 · 가장 긴 함수 43 줄 / 한도 50 · 타입 멤버 축은 `main`
   전용이라 test 파일을 재지 않는다).
+
+## 교차 지적 (ops-code 레인 — `haltOf` 소진 `when`)
+
+거동 변화가 **오늘은 0** 인 변경이라(이 브랜치에 `AccessBlocked` 가 없다) 값으로 잴 RED 가 없다.
+그래서 **게이트가 무는지**를 직접 쟀다 — 버릴 clone 에 13번째 `TruncationCause` 를 심는다.
+
+## 2026-11-06T04:3xZ — 프로브 1판(무효 — 내 자리를 재지 못했다)
+- cmd: clone 에 사유만 심고 `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 1
+- 핵심 결과: 컴파일이 멈춘 자리가 **procurement 의 소진 `when` 둘**(`truncationCodeOf`·`failureOf`)이었다
+  — 그 모듈이 먼저 컴파일되므로 workflow 는 시작도 못 했다. 저장소 전체가 같은 형태로 닫혀 있다는
+  증거이지만 **이 slice 의 자리를 잰 것이 아니다**. 프로브를 고쳐 다시 쟀다(아래).
+
+## 2026-11-06T04:5xZ — 프로브 2판: 사유 + procurement 의 소진 `when` 둘을 채움
+- cmd: 같은 clone 에서 사유를 심고 `truncationCodeOf`·`failureOf` 에 분기를 더한 뒤 `:procurement:compileKotlin` → `:workflow:compileKotlin`
+- exit: 0 과 **1**
+- 핵심 결과: **게이트가 내 자리에서 물었다** — procurement 는 컴파일되고(0) workflow 가 멈추며 지목한
+  자리가 `CollectAwardListUseCase.kt` 의 `haltOf` 다(「'when' expression must be exhaustive. Add the
+  'AccessBlockedProbe' branch or an 'else' branch.」). **음성 대조**: 사유를 심지 않은 같은 clone 의
+  `:workflow:compileKotlin` 은 0 이다.
+- 함께 드러난 사실(교차 보고): 같은 프로브가 **형제 공고 목록 갈래의 `CollectNoticesUseCase` 도** 지목한다
+  — ops-code 의 새 사유는 이 갈래와 그 갈래 **둘**에서 결정을 강제한다(그 자리는 내 범위 밖이다).
+
+## 2026-11-06T05:0xZ — 판정 트리 표적 전부(라운드 3 마지막)
+- cmd: 라운드 3 과 같은 표적 집합(workflow lint 강제 · 세 모듈 표적 test `--rerun` · 게이트 넷)
+- exit: 0
+- 핵심 결과: FAILED 0 — workflow lint·detekt **강제 실행** 초록 · 세 test task 전부 실행 · 게이트 22 task
+- 이 라운드에 ktlint 가 **두 번** 붉었다: 회계 단언의 한 줄 사슬(`chain-method-continuation`)과 소진
+  `when` 의 분기 간 빈 줄(`blank-line-between-when-conditions`). 둘 다 **강제 실행이 잡았고** 각자
+  `style` 커밋으로 고쳤다 — 그 모듈의 UP-TO-DATE 가 거짓 초록이라는 기록이 두 라운드 연속 값을 냈다.
 
 ## acceptance — 전건 `check`
 
