@@ -10,18 +10,11 @@ import inspect
 import pkgutil
 import sys
 import typing
+from typing import Final
 
 import ml_engine
 import ml_engine.evaluation as evaluation_module
-from ml_engine.evaluation.policy import (
-    _INDEXED_LIST_PREFIXES,
-    _SCALAR_KEYS,
-    EvaluationPolicy,
-)
-from ml_engine.inference.policy import InferencePolicy
-from ml_engine.registry.policy import Policy as RegistryPolicy
-from ml_engine.serving.policy import ServingPolicy
-from ml_engine.training.policy import TrainingPolicy
+from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
 
 _POLICY_ALIASES = frozenset({"threshold", "seeds", "stratum"})
 """정책 키의 짧은 별칭 — 키 이름 그대로가 아니어도 같은 값을 낱개로 받는 자리들."""
@@ -138,17 +131,23 @@ def test_forbidden_parameter_names_track_the_policy_schema() -> None:
 # `tests/evaluation/` 에 있지만 범위는 그 디렉터리가 아니다).
 
 
-def _policy_types() -> tuple[type, ...]:
-    return (
-        EvaluationPolicy,
-        InferencePolicy,
-        RegistryPolicy,
-        ServingPolicy,
-        TrainingPolicy,
-    )
+_POLICY_TYPE_NAMES: Final[tuple[tuple[str, str], ...]] = (
+    ("ml_engine.evaluation.policy", "EvaluationPolicy"),
+    ("ml_engine.inference.policy", "InferencePolicy"),
+    ("ml_engine.registry.policy", "Policy"),
+    ("ml_engine.serving.policy", "ServingPolicy"),
+    ("ml_engine.training.policy", "TrainingPolicy"),
+)
+"""정책 클래스는 **이름으로** 적고 타입 객체는 순회와 **같은 import 패스**에서 꺼낸다.
+
+모듈 수준에서 class 를 묶으면 `issubclass` 가 조용히 거짓이 된다 — `tests/training/
+conftest.py` 의 `pytest_collection_finish` 가 `ml_engine.training.*` 를 `sys.modules` 에서
+지우므로, 뒤에 재-import 된 모듈의 class 객체가 **다른 객체**다(이 저장소가 5C-1 에서 처음
+만난 함정이고 `tests/app/test_server.py` 머리말이 같은 것을 적는다). 표적 실행에서는 초록이고
+전건에서만 붉어, 모집단이 조용히 줄어드는 모양이었다 — 실측으로 드러났다."""
 
 
-def _returns_a_policy(func: object) -> bool:
+def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
     try:
         hints = typing.get_type_hints(func)  # type: ignore[arg-type]
     except (NameError, TypeError, AttributeError):
@@ -160,19 +159,26 @@ def _returns_a_policy(func: object) -> bool:
         return False
     parts = typing.get_args(returned) or (returned,)
     return any(
-        isinstance(part, type) and issubclass(part, _policy_types()) for part in parts
+        isinstance(part, type) and issubclass(part, policy_types) for part in parts
     )
 
 
 def _policy_factories() -> set[tuple[str, str]]:
     """src 전체에서 「정책류를 돌려주는 함수」 전수 — `(모듈, 이름)`."""
+    modules = {
+        info.name: importlib.import_module(info.name)
+        for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine.")
+    }
+    policy_types = tuple(
+        getattr(modules[module_name], type_name)
+        for module_name, type_name in _POLICY_TYPE_NAMES
+    )
     found: set[tuple[str, str]] = set()
-    for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine."):
-        module = importlib.import_module(info.name)
+    for module in modules.values():
         for name, obj in vars(module).items():
             if not inspect.isfunction(obj) or obj.__module__ != module.__name__:
                 continue
-            if _returns_a_policy(obj):
+            if _returns_a_policy(obj, policy_types):
                 found.add((module.__name__, name))
     return found
 
