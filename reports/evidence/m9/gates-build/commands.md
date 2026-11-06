@@ -75,3 +75,48 @@ S-20·Playwright 는 **로컬에서 돌리지 않는다 — PR CI 가 정본**�
 
 각 커밋 뒤 `git status --porcelain -- <in_scope 개별 인자>` 빈 출력. 양성 대조 1회: 변이를 심은
 직후 같은 명령이 그 경로를 내는 것을 확인하고(비파괴) 되돌렸다 — `checkout --` 는 쓰지 않았다.
+
+## 병합 해소 검산 — main 두 번 (합집합 등식으로)
+
+이 브랜치는 main 을 두 번 병합했다. `e12c0485`(PR #122~#133) 와 `3ad4f3f6`(PR #135). 둘 다 **합집합
+등식**으로 검산한다 — 충돌 0 자동 병합이 같은 본문을 접는 것은 종료 코드로 보이지 않는다.
+
+| 검산 | 결과 |
+| --- | --- |
+| 둘째 병합이 내 쪽을 건드렸는가 | `git diff --name-only <병합 전>..HEAD` 와 `git diff --name-only e12c0485..3ad4f3f6` 가 **같은 14 경로**(전부 main 쪽) |
+| 둘째 병합이 main 쪽을 보존했는가 | `git diff --stat 3ad4f3f6 HEAD -- web reports/evidence/m9/opening-harness` **빈 출력** |
+| 충돌 표지 잔존 | 소스·정책·문서 전 트리에서 충돌 표지를 담은 파일 **0** |
+| 첫 병합이 실제로 충돌한 경로 | **둘뿐** — `config/quality/gate-tests.properties` · `reports/evidence/m6/closure/open-inventory.md`. import 삭제 40 파일은 main 쪽 변경과 겹치지 않았다 |
+| 등재 장부 합집합 | 블록 15 · 행 **524** = 내 쪽 521 ∪ main 쪽 521, `lost=0 extra=0`. 더한 쪽은 main 3(app) · 나 3(build-logic) |
+| 같은 판독기의 **양성 대조** | `df4976cc` 에서는 어긋난 블록 셋(`app`·`decision`·`procurement`)을 그대로 지목한다 — 「위반 0」이 판독기의 침묵이 아님을 가른다 |
+| `open-inventory.md` 절 계수 | `§1`~`§9` 각 **1**(중복 0). main 이 들여온 §8 과 내 §9 가 나란히 섰고, 병합이 잃은 §9 앞 빈 줄은 되돌렸다 |
+| 마이그레이션 번호 | 병합 트리는 **V1~V24 중 22 개**(결번은 은퇴 둘). 들어오는 V25~V27 은 아직 main 에 없다 |
+
+## 병합 트리에서 게이트 전수 재실측 — **`--rerun` 강제**
+
+첫 재실행에서 전수 소스 주행 게이트 넷이 **UP-TO-DATE** 로 돌아왔다(실행 58 · UP-TO-DATE 145).
+`UP-TO-DATE` 는 측정이 아니므로 **그 넷을 `--rerun` 으로 강제**해 다시 쟀다 — 42 task 전부 실행,
+`BUILD SUCCESSFUL`, 리포트 mtime 이 전부 그 실행 시각이다.
+
+| 게이트 | 병합 트리의 핵심 결과 한 줄 |
+| --- | --- |
+| `unusedImportGate` 외 둘 | 모듈 열 `files` 합 **1189** · build-logic **87** · 느슨한 스크립트 **4** — 전부 `unused=0` |
+| `jarContentGate` | app `archives=2 entries=657 judged=558 exempt=99` · adapters `archives=1 entries=488 judged=488 exempt=0` · `violations=0` |
+| `domainSourceReferenceGate` | adapters `files=154 references=1216 scopedFiles=22 memberCalls=5042 violations=0` |
+| `gateRegistrationGate` | 장부 열하나 전수 exit 0(population 합 519 · adapters `excluded=2`) |
+| `migrationOrderGate` | 소유 모듈 `files=22 violations=0`; 비-소유 아홉은 `files=0` |
+| `cpdCheck`·`cpdReportPresenceGate` | 전 모듈 실행(캐시 아님) · 중복 0 |
+
+**게이트가 main 의 병합분을 실제로 재판하는가**는 수로 보인다 — adapters 의 `memberCalls` 가
+**4994 → 5042** 로 움직였다(main 이 들여온 adapters test 코드만큼). 리포트가 「UP-TO-DATE 라서 옛
+숫자를 재인용」한 것이 아니라는 자리다.
+
+전 모듈 `compileKotlin`·`compileTestKotlin` 과 네 모듈·build-logic 의 ktlint·detekt, `:build-logic:test`
+모두 exit 0 — **import 169 줄 제거가 main 병합분과 함께서도 거동 중립임**의 근거다.
+
+## 복원 원천의 이동 — `df4976cc` → `3ad4f3f6`
+
+착수 때의 `df4976cc` 는 **병합 뒤에는 경계로 쓸 수 없다**. 그 경계로 세면 병합이 들여온 남의 레인
+커밋까지 세어 **162 경로**가 나오고 그 중 **82 가 내 것이 아니다**(web · usecase · 다른 slice 의
+evidence). 복원 원천이자 경계는 **이 브랜치가 실제로 병합한 main 의 고정 SHA** `3ad4f3f6` 이고, 그
+경계에서 목록은 **80 경로**이며 등식이 양방향으로 빈 출력이다.
