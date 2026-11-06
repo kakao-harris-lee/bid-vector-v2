@@ -162,6 +162,22 @@ class RelayWiringTest {
         }
     }
 
+    /**
+     * cr M-2 — 설정이 다 차도 **그 채널에 활성 route 가 없으면** 기동을 거부한다. `channel=email`
+     * 이 오늘 그 상태다(Email route 는 `enabled=false`, D-2). 거부하지 않으면 relay 가 집은 행이
+     * 전부 `Suppressed` → `FAILED` 로 탄다.
+     */
+    @Test
+    fun `활성 route 가 없는 채널은 기동을 거부한다`() {
+        withBoot(
+            *validProperties(environment = "production", channel = "email"),
+            *channelProperties(),
+        ) { booted ->
+            booted.failure shouldNotBe null
+            booted.failure!!.stackTraceToString() shouldContain "RefusedChannelWithoutActiveRoute"
+        }
+    }
+
     /** 자격 값이 공백이면 「있다」로 세지 않는다 — 빈 문자열을 설정으로 받지 않는다. */
     @Test
     fun `채널 설정 값이 공백이면 비어 있는 것으로 센다`() {

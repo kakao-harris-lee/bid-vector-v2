@@ -1,5 +1,6 @@
 package bidvector.app.relay
 
+import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
 import bidvector.workflow.notification.RuntimeEnvironment
@@ -55,6 +56,18 @@ sealed interface RelayBootDecision {
     data class RefusedMissingChannelConfig(
         val missing: Set<ChannelConfigField>,
     ) : RelayBootDecision
+
+    /**
+     * 설정은 다 찼는데 **relay 가 쓰는 채널에 활성 route 가 없다**(cr M-2). 그대로 뜨면 relay 가
+     * 행을 집고 dispatch 가 전부 `Suppressed` 를 내서 **그 run 의 모든 행이 `FAILED` 로 탄다** —
+     * 종단 전이는 단방향이라 되돌릴 간선이 없다. 오늘 이 상태가 되는 길은
+     * `bidvector.relay.channel` 을 `email` 로 두는 것이다(Email route 는 `enabled=false`, D-2).
+     *
+     * 채널 **이름만** 나른다 — 어느 설정을 고쳐야 하는지 말하기에 충분하고 비밀이 아니다.
+     */
+    data class RefusedChannelWithoutActiveRoute(
+        val channel: Channel,
+    ) : RelayBootDecision
 }
 
 /**
@@ -74,12 +87,15 @@ fun relayBootDecision(
     environment: RuntimeEnvironment,
     policy: NotificationDeliveryPolicyData,
     channels: ChannelConfigPresence,
+    deliveryChannel: Channel,
+    activeRoute: Boolean,
 ): RelayBootDecision {
     if (policy.environmentModes.getValue(environment) != DeliveryMode.Live) return RelayBootDecision.Allowed
     val missing = channels.missing()
-    return if (missing.isEmpty()) {
-        RelayBootDecision.Allowed
-    } else {
-        RelayBootDecision.RefusedMissingChannelConfig(missing)
+    // 설정 결손이 먼저다 — 설정이 없으면 route 를 물을 대상 자체가 없다(첫 위반 승).
+    return when {
+        missing.isNotEmpty() -> RelayBootDecision.RefusedMissingChannelConfig(missing)
+        !activeRoute -> RelayBootDecision.RefusedChannelWithoutActiveRoute(deliveryChannel)
+        else -> RelayBootDecision.Allowed
     }
 }

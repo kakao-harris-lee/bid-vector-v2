@@ -1,6 +1,7 @@
 package bidvector.app.relay
 
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
@@ -34,9 +35,9 @@ class RelayBootDecisionTest {
     fun `표가 Staging 에 Live 를 붙이면 Staging 도 설정을 요구한다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Staging, mutated, nothingConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Staging, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
-        relayBootDecision(RuntimeEnvironment.Staging, mutated, fullyConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Staging, mutated, fullyConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -48,7 +49,7 @@ class RelayBootDecisionTest {
     fun `표에 Live 가 있어도 그 환경이 아니면 설정 없이 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Development, mutated, nothingConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Development, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -57,7 +58,7 @@ class RelayBootDecisionTest {
     fun `표가 Production 에서 Live 를 떼면 설정이 비어도 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Production to DeliveryMode.DryRun)
 
-        relayBootDecision(RuntimeEnvironment.Production, mutated, nothingConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Production, mutated, nothingConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -69,11 +70,11 @@ class RelayBootDecisionTest {
     fun `승인된 표에서는 Production 만 설정을 요구한다`() {
         val approved = approvedPolicy()
 
-        relayBootDecision(RuntimeEnvironment.Production, approved, fullyConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Production, approved, fullyConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.Allowed
-        relayBootDecision(RuntimeEnvironment.Production, approved, nothingConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Production, approved, nothingConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
-        relayBootDecision(RuntimeEnvironment.Staging, approved, nothingConfigured()) shouldBe
+        relayBootDecision(RuntimeEnvironment.Staging, approved, nothingConfigured(), Channel.Telegram, true) shouldBe
             RelayBootDecision.Allowed
     }
 
@@ -102,11 +103,54 @@ class RelayBootDecisionTest {
         ChannelConfigField.entries.map { it.name } shouldBe listOf("BotCredential", "ChatId", "SiteBaseUrl")
     }
 
+    /**
+     * cr M-2 — 설정은 다 찼는데 **그 채널에 활성 route 가 없다**. 그대로 뜨면 relay 가 집은 행이
+     * 전부 `Suppressed` → `FAILED` 로 탄다. 오늘 그 상태가 되는 길은 `channel=email` 이다.
+     */
+    @Test
+    fun `설정이 다 차도 활성 route 가 없으면 거부다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Email,
+            activeRoute = false,
+        ) shouldBe RelayBootDecision.RefusedChannelWithoutActiveRoute(Channel.Email)
+    }
+
+    /**
+     * **설정 결손이 route 보다 먼저다**(첫 위반 승) — 설정이 없으면 route 를 물을 대상 자체가
+     * 없다. 이 칸이 없으면 두 사유의 순서가 미결이고, 운영자는 먼저 고칠 것을 모른다.
+     */
+    @Test
+    fun `설정 결손과 route 부재가 함께면 설정 결손을 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Email,
+            activeRoute = false,
+        ) shouldBe RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+    }
+
+    /** Live 가 아니면 route 도 보지 않는다 — 그 환경은 claim 조차 하지 않는다. */
+    @Test
+    fun `Live 가 아니면 활성 route 가 없어도 허용이다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Email,
+            activeRoute = false,
+        ) shouldBe RelayBootDecision.Allowed
+    }
+
     private fun refusalFor(
         policy: NotificationDeliveryPolicyData,
         presence: ChannelConfigPresence,
     ): Set<ChannelConfigField> {
-        val decision = relayBootDecision(RuntimeEnvironment.Production, policy, presence)
+        val decision =
+            relayBootDecision(RuntimeEnvironment.Production, policy, presence, Channel.Telegram, activeRoute = true)
         return (decision as RelayBootDecision.RefusedMissingChannelConfig).missing
     }
 }

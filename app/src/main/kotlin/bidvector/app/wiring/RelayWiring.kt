@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.notification.ConfiguredRouteDirectory
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -77,20 +78,50 @@ open class RelayWiring {
         // 정책표를 바꿔 넣은 변이로 직접 칠 수 없었다. 이 자리의 몫은 그 값을 기동 실패로
         // 옮기는 것뿐이다. 판정이 받는 것은 설정의 **값이 아니라 존재 여부**라 이 메시지가
         // 자격·chat id 원문을 담을 경로가 없다.
-        val decision = relayBootDecision(properties.environment, policy, channelProperties.presence())
-        require(decision is RelayBootDecision.Allowed) {
-            "발송 가능(Live) 모드 환경인데 알림 채널 설정이 비었다 — 채워야 하는 칸: $decision"
-        }
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
         require(properties.claimLimit > 0) { "bidvector.relay.claim-limit 는 1 이상이어야 한다" }
+        val owner = OperatorId(properties.owner)
+        val decision =
+            relayBootDecision(
+                environment = properties.environment,
+                policy = policy,
+                channels = channelProperties.presence(),
+                deliveryChannel = properties.channel,
+                activeRoute = hasActiveRoute(owner, channelProperties, properties.channel),
+            )
+        // 판정 객체를 그대로 싣는다(cr L-6 의 처분 「`decision.missing`」을 **택하지 않았다**):
+        // 거부가 둘이 된 뒤로 운영자가 먼저 알아야 하는 것은 칸 목록이 아니라 **어느 거부인가**이고,
+        // 그 타입 이름이 runbook §13.6 의 행 키다. 두 타입이 나르는 것은 칸 이름과 채널 이름뿐이라
+        // 이 문장에 값이 들어올 경로는 여전히 없다.
+        require(decision is RelayBootDecision.Allowed) {
+            "relay 기동 거부 — 발송 가능(Live) 모드 환경의 알림 채널 설정을 고쳐야 한다: $decision"
+        }
         return NotificationRelayRun(
             dataSource = dataSource,
-            target = RelayTarget(OperatorId(properties.owner), properties.channel),
+            target = RelayTarget(owner, properties.channel),
             environment = properties.environment,
             policy = policy,
             channels = channelProperties.channelSettings(),
             clock = Clock.systemUTC(),
         )
+    }
+
+    /**
+     * **relay 가 실제로 쓸 그 객체에 묻는다**(cr M-2) — 활성 route 의 정의를 배선이 따로 적으면
+     * 그 사본이 [ConfiguredRouteDirectory] 와 갈릴 수 있고, 갈리면 기동 검사가 통과한 채 그 run 의
+     * 전 행이 `FAILED` 로 탄다. 같은 생성자 인자(owner·슬러그)로 같은 클래스를 세워 묻는다.
+     *
+     * 설정이 결손이면 route 를 물을 대상이 없으므로 `false` 다 — 그 경우의 거부 사유는 판정 함수가
+     * 설정 결손으로 먼저 낸다(첫 위반 승).
+     */
+    private fun hasActiveRoute(
+        owner: OperatorId,
+        channelProperties: NotificationChannelProperties,
+        channel: Channel,
+    ): Boolean {
+        val settings = channelProperties.channelSettings() ?: return false
+        val route = ConfiguredRouteDirectory(owner, settings.telegram.routeKey).routesFor(owner)[channel]
+        return route != null && route.enabled && route.key != null
     }
 
     @Bean
