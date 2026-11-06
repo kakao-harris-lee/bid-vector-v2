@@ -299,6 +299,9 @@ val jarContentGate =
         // 클래스(Boot launcher)는 `jar.external-class-roots` 가 면제한다.
         archives.from(provider { tasks.withType(Jar::class.java).filter { it.enabled }.map { it.archiveFile } })
         dependsOn(tasks.withType(Jar::class.java))
+        // 중첩 jar 축의 기준 집합(verifier M-1) — 모듈이 **선언한** runtime 의존의 해석 결과다.
+        // 선언하지 않은 jar 는 이 집합에 없으므로 이름만으로 「누가 넣었는가」가 갈린다.
+        runtimeClasspath.from(configurations.named("runtimeClasspath"))
         verifiedSources.from(sourceSetKotlinFiles)
         // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
         // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다.

@@ -105,3 +105,44 @@ internal fun archiveEmptinessFailure(
             null
         }
     }
+
+/**
+ * **중첩 아카이브 축** — 아카이브가 품는 `.jar` 엔트리는 그 모듈의 runtime classpath 가 해석한 jar 여야
+ * 한다(`nested ⊆ runtime`, 이름 기준).
+ *
+ * 실측된 사각이다: 최상위 `.class` 엔트리만 보던 술어 아래에서 `bootJar { classpath(files(…)) }` 로 넣은
+ * jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 **런타임에 실리는데도** 리포트가 심기 전과 같았다
+ * (verifier M-1). 이 저장소가 막으려던 `jar { from("prebuilt") }` 의 bootJar 판이다.
+ *
+ * 왜 이름으로 견주나 — 중첩 jar 는 아카이브 안에서 다시 압축돼 있어 바이트 대조에 원본 파일이 필요하다.
+ * 반면 **선언하지 않은 jar 는 runtime classpath 해석 결과에 아예 없다**: 이름만으로도 「누가 선언했는가」
+ * 가 갈린다. 경로가 아니라 **파일 이름**으로 견주는 것은 `BOOT-INF/lib/` 밑이든 다른 자리든 같은 판정을
+ * 받게 하기 위해서다(오늘 실측: app 의 중첩 jar 102 개가 전부 그 접두 밑이고 plain jar 는 0 개다).
+ *
+ * 면제는 **접두 집합** 하나다([exemptPrefixes]) — Boot 플러그인이 넣는 자기 도구 jar 는 이 저장소의
+ * 소스가 아니라 대조 집합이 없다(`jar.external-class-roots` 가 launcher 클래스를 면제하는 것과 같은
+ * 사유). 이름에 버전이 붙어 정확 이름으로는 Boot 상향에 어긋나므로 접두로 견준다.
+ *
+ * **비-공허 단언은 두지 않는다** — 중첩 jar 0 은 열 모듈 가운데 아홉에서 **정상 상태**다(배포물이
+ * `bootJar` 인 모듈이 하나뿐이다). 그래서 0 을 위반으로 만들면 아홉이 상시로 붉는다. 대신 리포트가
+ * 중첩 수와 runtime 수를 함께 세어 그 축이 조용해지면 수로 보인다.
+ */
+internal fun nestedArchiveViolations(
+    module: String,
+    nested: Map<String, List<String>>,
+    runtimeJarNames: Set<String>,
+    exemptPrefixes: List<String> = emptyList(),
+): List<String> =
+    nested.entries
+        .sortedBy { it.key }
+        .flatMap { (archive, jars) ->
+            jars
+                .filterNot { it in runtimeJarNames || exemptPrefixes.any(it::startsWith) }
+                .sorted()
+                .map { jar ->
+                    "모듈 '$module' 의 아카이브 '$archive' 가 **선언되지 않은 중첩 jar** 를 품는다 — " +
+                        "runtime classpath 가 해석한 jar 가 아니므로 이 바이트는 어느 게이트도 거치지 않았다. " +
+                        "그런데 배포물 안에 있어 런타임에 실린다: $jar"
+                }
+        }
+
