@@ -14,7 +14,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -30,6 +32,18 @@ import {
   CONTAINER_PREFIX,
   processStartToken,
 } from './container-marker.mjs';
+import {
+  FAKE_KONEPS_IDENTITY_HEADER,
+  FAKE_KONEPS_SERVED_HEADER,
+} from './fake-koneps.mjs';
+import {
+  assertRunnerCounts,
+  noticeCollectionCategories,
+  openingAxisDesign,
+  promotionExpectation,
+  runnerLine,
+  shippedDetailAxisCounts,
+} from './opening-axis.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -106,6 +120,45 @@ const PASSPHRASE = secret();
 /** 전략 여력 상한 — 이 값이 없으면 투찰가 요청이 409 다(Phase 1 실측, D-7E-8). */
 const MAX_ACTIVE_BIDS = 5;
 
+/**
+ * 개찰 축 설계(M9/opening-harness) — 어느 공고가 어느 갈래를 낳는지가 이 표에 있고, 아래 수집·
+ * 승격 걸음의 **계수 기대**가 거기서 나온다. 여정 spec 은 이 표를 맥락 파일로 받아 **살아 있는
+ * 응답**과 맞댄다.
+ */
+const OPENING_DESIGN = openingAxisDesign(
+  JSON.parse(readFileSync(resolve(here, 'fixtures', 'opening-axis.json'), 'utf8')),
+);
+/**
+ * 공고 하나가 받는 상세 축의 수를 **출하 본문에서 센다**(cr MEDIUM-1) — 공사 넷·용역 셋의 비대칭을
+ * 리터럴로 두면 이 slice 가 업종 목록에서 닫은 드리프트를 다시 만든다.
+ */
+const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN, {
+  detailAxesPerNotice: shippedDetailAxisCounts(
+    readFileSync(
+      resolve(repoRoot, 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt'),
+      'utf8',
+    ),
+  ),
+});
+
+/**
+ * 공고 축 수집이 부를 업종 — **fixture 에서 센다**(리터럴로 적지 않는다). 개찰 축 설계가 다른
+ * 업무의 공고를 쓰는데 수집이 그 업종을 부르지 않으면 그 공고는 공고 행이 없어 설계가 선언한
+ * 갈래 대신 `NOTICE_ABSENT` 가 된다 — 그 꼴을 한 번 밟았고, 두 자리를 fixture 하나로 묶어 닫는다.
+ */
+const NOTICE_CATEGORIES = noticeCollectionCategories(
+  JSON.parse(readFileSync(resolve(here, 'fixtures', 'notice-list.json'), 'utf8')),
+);
+
+/**
+ * 개찰 축 호출 상한 — 승인 상한을 흉내내는 자리가 아니라 **버릴 fake 를 향한 호출의 울타리**다.
+ * 필요량은 설계에서 나온다(공고 일곱 × 상세 축 넷·셋 + 목록 걷기 ≈ 서른) — 여유를 크게 둔다.
+ *
+ * 상한을 넘으면 러너가 **미완 종료 코드**(`INCOMPLETE=2`)로 끝나고 `runJar` 의 종료 코드 검사가
+ * 출력 전문과 함께 던진다(cr LOW — 앞 주석은 「계수 등식이 낸다」로 적었는데 그보다 **먼저** 멈춘다).
+ */
+const OPENING_CALL_BUDGET = 400;
+
 const children = [];
 let runStateDir = null;
 let shuttingDown = false;
@@ -136,16 +189,25 @@ function track(child, name) {
   return child;
 }
 
-/** 출하 jar 한 번 돌리고 **끝까지 기다린다** — 일회 러너는 스스로 JVM 을 끝낸다. */
+/**
+ * 출하 jar 한 번 돌리고 **끝까지 기다린다** — 일회 러너는 스스로 JVM 을 끝낸다.
+ *
+ * 출력을 **돌려준다**(M9/opening-harness): 러너의 요약 줄이 「무엇을 실제로 했는가」의 유일한
+ * 공시 자리이고, `exit=0` 은 「0건 수집」과 구별되지 않는다. 그 줄의 계수를 설계와 맞대는 것이
+ * 이 하네스가 조용히 비는 것을 막는 자리다.
+ */
 function runJar(args, label) {
   log(`${label} 시작`);
   const result = spawnSync('java', ['-jar', APP_JAR, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+  // **개행으로 잇는다**(cr LOW): 그냥 붙이면 stdout 마지막 조각에 개행이 없을 때 stderr 첫 줄이
+  // 같은 줄로 붙고, 그러면 `runnerLine` 이 앞뒤가 섞인 줄을 집어 계수가 남의 `key=value` 를 읽는다.
+  const output = [result.stdout?.toString() ?? '', result.stderr?.toString() ?? ''].join('\n');
   if (result.status !== 0) {
-    process.stderr.write(result.stdout?.toString() ?? '');
-    process.stderr.write(result.stderr?.toString() ?? '');
+    process.stderr.write(output);
     throw new Error(`${label} 실패(exit=${result.status})`);
   }
   log(`${label} 끝(exit=0)`);
+  return output;
 }
 
 async function waitFor(label, probe, timeoutMs) {
@@ -233,12 +295,17 @@ async function main() {
     }),
     'fake-koneps',
   );
+  // 준비 판정은 **오퍼레이션 이름과 무관**하다(M9/portal-02) — 묻는 것이 「서버가 응답하는가」이지
+  // 「그 오퍼레이션이 있는가」가 아니다. 앞 판은 경로를 리터럴로 박고 2xx 를 요구해서, 조달청이
+  // 오퍼레이션명 뒤에 `02` 를 붙인 뒤 이 대기가 영구 404 로 30초 만에 죽었다(수집은 시작도 못 했다).
+  // 404 도 서버가 살아 있다는 증거이므로 상태 코드를 보지 않고, 대신 **fake 가 모든 응답에 싣는
+  // 표지**를 본다 — 그 포트를 다른 프로세스가 잡은 경우를 그것이 가른다.
   await waitFor(
     'fake KONEPS',
     async () => {
       try {
-        const probe = await fetch(`http://127.0.0.1:${konepsPort}/getBidPblancListInfoCnstwk`);
-        return probe.ok;
+        const probe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+        return probe.headers.get(FAKE_KONEPS_IDENTITY_HEADER) !== null;
       } catch {
         return false;
       }
@@ -280,13 +347,107 @@ async function main() {
       '--bidvector.collection.mode=once',
       `--bidvector.collection.from=${today}`,
       `--bidvector.collection.to=${today}`,
-      '--bidvector.collection.categories=construction',
+      `--bidvector.collection.categories=${NOTICE_CATEGORIES.join(',')}`,
       '--bidvector.collection.calls-per-day=100',
       '--bidvector.collection.calls-total=100',
       `--bidvector.collection.run-state-dir=${runStateDir}`,
       `--bidvector.koneps.base-url=http://127.0.0.1:${konepsPort}`,
     ],
     '수집 러너(bidvector.collection.mode=once)',
+  );
+
+  // **수집이 실제로 공고를 받았는가**(cr M-1) — 러너의 `exit=0` 은 「0건 수집」과 구별되지 않는다.
+  // 출하 기본 오퍼레이션 이름과 fixture 의 `operation` 값은 **사본 둘**이다. 갈리면 fake 가 전부
+  // 404 를 내고 공고가 0건인데 러너는 조용히 0 으로 끝나, 붉음이 한참 뒤 「공고 카드 없음」으로,
+  // 원인을 말하지 않는 문면으로 나타난다.
+  //
+  // 그 사본 둘은 이제 **로컬 등식**이 묶는다(M9/opening-harness — `opening-axis.test.mjs` 가 출하
+  // 속성 파일의 경로 리터럴과 하네스 표를 집합으로 맞댄다). 이 자리는 그 등식이 보지 못하는 층을
+  // 받는다: 이름이 맞는데도 **fake 가 아예 불리지 않은** 실행(포트·base-url·기동 순서)이 그것이다.
+  const servedProbe = await fetch(`http://127.0.0.1:${konepsPort}/`);
+  const servedOperations = (servedProbe.headers.get(FAKE_KONEPS_SERVED_HEADER) ?? '')
+    .split(',')
+    .filter((name) => name.length > 0);
+  if (servedOperations.length === 0) {
+    throw new Error(
+      'fake KONEPS 가 응답한 오퍼레이션이 없다 — 수집이 0건이다. ' +
+        'fixture 의 operation 값이 출하 기본 표와 갈렸을 가능성이 가장 크다',
+    );
+  }
+  log(`수집이 받은 오퍼레이션 ${servedOperations.length}종(${servedOperations.join(', ')})`);
+
+  // ①b 개찰 축 수집 — **업무마다 다른 실행 상태 디렉터리**다. 승격은 아래에서 공사 쪽 하나만
+  //     받으므로 용역 공고는 목록 축 원문을 얻고도 canonical 이 서지 않는다(`OBSERVED_NOT_PROMOTED`).
+  //     표본 크기로 그 갈래를 만들지 않는 이유는 **어느 공고가 빠지는지를 표본 seed 가 정해**
+  //     설계가 선언할 수 없기 때문이다(설계표 `why_two_divisions`).
+  //
+  //     base 가 **둘**이다: 개찰결과 목록·예비가격 상세·개찰완료는 낙찰정보서비스이고 A값·기초금액은
+  //     입찰공고정보서비스다. fake 는 경로만 보고 가르므로 두 base 가 같은 포트를 가리킨다.
+  const openingRunStateDirs = {};
+  for (const [division, counts] of Object.entries(OPENING_EXPECTATION.divisions)) {
+    // `RunStateDirectory` 는 **디렉터리를 만들지 않는다**(경로 오타 하나로 빈 디렉터리가 생기면
+    // 승인 상한이 0 에서 시작한다) — 하네스가 미리 만든다.
+    const dir = resolve(runStateDir, `opening-${division}`);
+    mkdirSync(dir);
+    openingRunStateDirs[division] = dir;
+
+    const output = runJar(
+      [
+        writeSecrets(`opening-${division}`, [`bidvector.koneps.service-key=${SERVICE_KEY}`]),
+        '--server.port=0',
+        '--bidvector.opening-collection.mode=once',
+        `--bidvector.opening-collection.from=${today}`,
+        `--bidvector.opening-collection.to=${today}`,
+        `--bidvector.opening-collection.categories=${division}`,
+        `--bidvector.opening-collection.sampling-seed=m9-opening-harness-${division}`,
+        `--bidvector.opening-collection.sample-size=${counts.sampled}`,
+        `--bidvector.opening-collection.calls-per-day=${OPENING_CALL_BUDGET}`,
+        `--bidvector.opening-collection.calls-total=${OPENING_CALL_BUDGET}`,
+        `--bidvector.opening-collection.run-state-dir=${dir}`,
+        `--bidvector.koneps.base-url=http://127.0.0.1:${konepsPort}`,
+        `--bidvector.koneps.opening.scsbid-base-url=http://127.0.0.1:${konepsPort}`,
+      ],
+      `개찰 축 수집(${division}, bidvector.opening-collection.mode=once)`,
+    );
+    // **표본틀이 설계의 공고 수와 같은가** — fixture 의 공고 이름이 출하 기본 오퍼레이션 표와
+    // 갈리면 fake 가 404 를 내고 이 수가 0 이 된다(그때 러너는 조용히 끝난다).
+    assertRunnerCounts(
+      runnerLine(output, 'opening-collection finished', `개찰 축 수집(${division})`),
+      counts,
+      `개찰 축 수집(${division})`,
+    );
+  }
+
+  // ①c 개찰 결과 승격 — **실행 상태 디렉터리 하나만** 받는다(외부 호출 0 · 원문 쓰기 0).
+  //     계수가 닫힌 등식이다: 읽은 묶음 == 승격 + 범위 밖.
+  //
+  //     어느 디렉터리인지는 설계표가 정한다. 승격 받는 업무가 둘 이상이면 **걸음이 그만큼 늘어야
+  //     하고 계수 등식도 갈라야** 하므로 조용히 하나만 돌리지 않고 멈춘다.
+  const [promotedDivision, ...alsoPromoted] = OPENING_DESIGN.promotedDivisions;
+  if (alsoPromoted.length > 0) {
+    throw new Error(
+      `승격 받는 업무가 둘 이상이다(${OPENING_DESIGN.promotedDivisions.join(', ')}) — ` +
+        '승격 러너는 실행 상태 디렉터리 하나를 받으므로 걸음과 계수 등식을 함께 갈라야 한다',
+    );
+  }
+  const promotedRunStateDir = openingRunStateDirs[promotedDivision];
+  if (promotedRunStateDir === undefined) {
+    throw new Error(`승격 대상 업무 ${promotedDivision} 의 개찰 축 수집이 돌지 않았다 — 설계표를 보십시오`);
+  }
+  const promotion = runJar(
+    [
+      writeSecrets('promote', []),
+      '--server.port=0',
+      '--bidvector.opening-promote.mode=once',
+      `--bidvector.opening-promote.run-state-dir=${promotedRunStateDir}`,
+      `--bidvector.opening-promote.reference-date=${today}`,
+    ],
+    '개찰 결과 승격(bidvector.opening-promote.mode=once)',
+  );
+  assertRunnerCounts(
+    runnerLine(promotion, 'opening-promote finished', '개찰 결과 승격'),
+    OPENING_EXPECTATION.promotion,
+    '개찰 결과 승격',
   );
 
   // ② 로그인 계정 — 출하 운영자 명령(가입 화면·endpoint 는 없다).
@@ -390,6 +551,18 @@ async function main() {
         passphrase: PASSPHRASE,
         maxActiveBids: MAX_ACTIVE_BIDS,
         bundleAssets,
+        /**
+         * 개찰 축 설계표(M9/opening-harness) — 여정 spec 이 **살아 있는 응답**과 맞댈 기대다.
+         * spec 에 베껴 적지 않는 이유: 그러면 설계와 기대가 사본 둘이 되고 한쪽만 고쳐진다.
+         */
+        openingAxis: OPENING_DESIGN.all.map(
+          ({ noticeNumber, expectedOpeningState, expectedProvisionalState, why }) => ({
+            noticeNumber,
+            expectedOpeningState,
+            expectedProvisionalState,
+            why,
+          }),
+        ),
       },
       null,
       2,

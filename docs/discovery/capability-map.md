@@ -3569,6 +3569,116 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-NOTI-01` | `OPEN-NOTI-02`(전달 의미)와 축이 다르다 — 미전달을 통지 완료로 스탬프하는 것이 의도인가 버그인가는 미결이다 |
 | `OPEN-NOTI-08` | `OPEN-NOTI-02`가 at-most-once로 확정됐으나, **판정이 통지 이후 확정되는 전이에서 재통지할 것인가**는 별개 축이며 미결이다 |
 
+### 12.3 M9 장부 정리 (2026-11-06)
+
+M9 머지분이 닫은 것 · M9 가 신설한 slice 잔여 OPEN · 운영 잔여의 처분 **후보**를 한 자리에 모은다.
+건별 정본은 각 slice 의 evidence 이고 **이 절은 다시 판정하지 않는다** — 적는 것은 「어디서 닫혔는가」와
+「무엇이 남는가」다. 분류 변경(`V2 필수` → `후속` 등)은 운영자 몫이라 이 절은 **후보 문면**으로만 적는다.
+
+**이 절의 OPEN 은 §12 머리의 활성 집계에 들어가지 않는다.** 「M6 잔여·메뉴」 별 칸과 같은 꼴로 slice 가
+신설한 **구현 잔여**이고 G1~G6 의 「결정 필요 사항」이 아니다. 그래서 이 절은 머리의 수를 움직이지 않는다 —
+그 줄은 병렬 레인이 함께 고치는 자리이고, 규약이 「머지 직전 재계산」을 요구하므로 증감을 만들지 않는 쪽이 싸다.
+
+#### (a) 종결 등재 — M9 머지분이 닫은 것
+
+| 무엇 | 처분 | 근거 (PR · 머지 커밋 · 판정 자리) |
+| --- | --- | --- |
+| `OPEN-7C3B-FAILED-BID-DETAIL` | **닫힘** — 유찰이 `AWARD_DECIDED` 의 detail 어휘(`FAILED_OR_REBID`)를 얻었고 V24 가 DB CHECK ↔ Kotlin 어휘 ↔ openapi ↔ 생성 타입 ↔ 화면 표를 같은 집합으로 묶는다 | PR **#123** 머지 `df4976cc`(head `29003fc2`) · `reports/evidence/m9/inbox-vocab/`(D-1·D-2·D-4). 그 계약의 「계약 갱신 2026-11-05」이 이 등재를 장부 slice 로 넘겼다 |
+| `OPEN-7C3B-REVISION-REUNREAD` | **닫힘** — 읽음 해제가 종류별 정책(`ON_DETAIL_CHANGE` 기본 / `NOTICE_REVISED` 는 `ON_NEWER_FACT`)으로 갈리고 사실 시각 워터마크가 `GREATEST` 로 단조다 | 같은 PR · 같은 evidence. 남는 축은 그 checklist 알려진 제한 2·3(개정 번호 열이 없어 동치가 V2 트리거에 기댄다 · 두 축의 쓰기 규칙이 달라 옛 detail + 새 시각이 섞일 수 있다) |
+| `OPEN-7E3B-TIME-DISPLAY` | **닫힘** — 시각 표기가 KST 고정 오프셋 산술 한 자리(`instantDisplayOf`)를 지나고 lint(AST) · 렌더한 DOM 두 층이 되돌림을 잡는다 | PR **#125** 머지 `4953d743`(head `94618307`) · `reports/evidence/m9/screen-display/`(D-1·D-2·D-4) |
+| `OPEN-7E3B-MONEY-WORDING` | **닫힘** — 금액 부속 문면이 네 표에서 나오고(`satisfies Record<…>` 전수) 단위를 내는 자리가 하나다 | 같은 PR · 같은 evidence(D-3) |
+| `OPEN-7E2B-BUDGET-CLEAR` | **닫힘** — 비우는 편집 값이 계약과 구현에 있고 화면·여정이 그 길을 지난다. 비움을 받지 않는 필드는 거절이 전수 게이트와 HTTP probe 두 층으로 선다 | PR **#124** 머지 `319fe212`(판정 SHA `f5cbecba`) · `reports/evidence/m9/budget-clear/checklist.md` 「OPEN 처분」 |
+| 7F 장부 v r2 **L-1** — checkout ↔ manifest `git_sha` 묶기 | **닫힘** — 반입·되돌림·러너가 공용 술어로 지금 checkout 과 manifest 를 대조한다(불일치면 반입 `exit 1` · 러너 `exit 3`) | PR **#122** 머지 `6c38fb32`(head `19b7922c`) · `reports/evidence/m9/prod-tools/` D-1 |
+| 7F 장부 v r2 **L-2** — timeout 뒤 일회 컨테이너 확인 | **닫힘** — 훑기 시작 전 자기 프로젝트의 일회 컨테이너 잔존이 0 이 아니면 `exit 3`, 신호 종료는 자기 것만 치운다 | 같은 PR · 같은 evidence D-2. **비대칭은 등재로 남는다**(반입은 잔존을 보지 않는다 — 그 checklist 알려진 제한 5 와 조건식 형태의 후속 후보 10) |
+| 6B-3 보존 기간 | **OPEN 종결이 아니라 정책 날짜 개정** — 90일 → **1년**(`EffectiveFrom.On(2026-11-05)`). 90일은 그 시대의 값으로 정책의 날짜 개정 표에 남는다(소급 없음). 6B-3 이 신설한 서브 OPEN **여섯**은 처분하지 않고 등재 유지 | 사용자 결정 2026-11-05 · PR **#129** 머지 `31551579`(head `493da3ab`) · `reports/evidence/m9/retention-1y/`. 적용된 마이그레이션의 「90일」 SQL **주석**은 checksum 때문에 고치지 않는다(그 slice D-4) |
+
+**M7 종결이 넘긴 열하나 가운데 열린 채 남는 넷**은 `OPEN-SET01-AWARD-NAME-INGEST`(§12 G3 와 §14.3 에 행이
+있다 · 적재 slice 는 PR #128 로 열려 있다) · `OPEN-6F4-STR02-REQUIREMENTS-AXIS`(열린 채 상태 갱신) ·
+`OPEN-7E3A-OPENING-AXIS-HARNESS` · `OPEN-7C3B-PAPER-BID-NOTIFICATION` 이다. **뒤 둘은 이 문서에도
+`milestone-6.md` 에도 없었다** — 유일한 자리가 M7 slice 의 evidence 와 M7 종결 checklist 4 여서
+**registry 만 읽는 쪽에는 그 OPEN 이 존재하지 않는 것으로 보였다**(`reports/evidence/m6/closure/open-inventory.md`
+§7 이 `OPEN-6F10-CAUSE-CODE-DEDUP` 에서 적은 어긋남과 같은 꼴). **팀장 결정 2026-11-06 이 그 둘을
+「사실 기록」에서 「등재 누락 정정」으로 바꿨다** — §14.3 (C) 의 slice 신설 OPEN 표에 **행으로 세웠고**
+담당은 **M9/opening-harness · M9/paper-bid**(둘 다 진행 중)다. 그 표는 §14.0 대로 **담당만 적고 활성 여부를
+정하지 않으므로 §12 머리의 활성 집계는 움직이지 않는다** — 등재와 집계를 가르는 것이 이 처분의 요점이다.
+
+#### (b) M9 가 신설한 OPEN — slice 잔여
+
+받는 자리는 전부 **다음에 그 자리를 만지는 slice** 이고, 어느 것도 머지를 막지 않는다.
+
+| ID | 무엇 | 신설 근거 |
+| --- | --- | --- |
+| `OPEN-M9-TIMELINE-COMMAND-WORDING` | 타임라인이 명령 토큰을 원문으로 그린다(`ADD_TO_BID_BOX` 꼴) — 명령 어휘의 표가 없다. 상태·주체·부가 사실은 이미 표를 지나므로 남은 원문 축은 이것 하나다 | PR **#125**(D-7 로 범위 밖) · `screen-display/checklist.md` 제한 ③ |
+| `OPEN-M9-DDAY-CALENDAR` | `daysUntil` 이 24시간 단위이지 KST 달력일이 아니다 — 23:00 KST 에 이튿날 01:00 마감이 `D-0` 다. 요구표가 이 축을 정의하지 않고, 바꾸면 거동 변경이다 | 같은 PR(r1 v L-3) · 같은 checklist 제한 ⑧ |
+| `OPEN-M9-SCREEN-COVERAGE-SYMBOL-GRAPH` | 화면 카드 모집단 훑기가 **호출 식별자 이름**에 걸린다 — 어휘 함수를 재수출·별칭으로 부르면 의무 집합에 들지 않는다. 처방 후보는 TS 심볼 import 그래프이고 술어를 더 열거하는 것은 같은 성질의 구멍을 남긴다 | 같은 PR(r2 v M-A) · 같은 checklist 제한 ⑦c |
+| `OPEN-M9-CLOCK-LINT-SCOPE` | 벽시계 lint 가 `Date` 전역 축만 닫는다 — 지금 시각을 얻는 다른 길(`Intl` 서식·`Temporal.Now`·`performance.timeOrigin`)과 제외 디렉터리를 지나 들어오는 값은 그 층 밖이다 | 같은 PR(r2 v M-C 정정) · 같은 checklist 제한 ⑦d |
+| `OPEN-M9-MONEY-VOCAB-CROSS-LANG` | 금액 어휘가 Kotlin(정본)과 web 유니온·축어 목록·e2e 라벨 표 넷에 손으로 복제돼 있다. 오늘 넷이 정확히 일치하지만, openapi 가 그 칸을 `string` 으로 내므로 Kotlin 에 값이 늘면 web 은 어디서도 붉어지지 않고 degrade 한다 | 같은 PR(r1 cr LOW) · 같은 checklist 제한 ⑨ |
+| `OPEN-CVE-APT-RETRY` | 두 런타임 이미지의 apt 하한 상향이 **새 네트워크 의존**을 들였는데 재시도가 없다(`-o Acquire::Retries=3`). `--no-remove`·`~` 접미 판 문면도 같은 자리 | PR **#126** 머지 `5c6ba2c6`(head `9500fe17`) 조치 코멘트(cr MEDIUM-1) |
+| `OPEN-CVE-APT-RUNBOOK-BRANCH` | runbook 의 릴리스 절에 「베이스가 수정판을 안 담을 때 런타임 stage 하한」 갈래가 없고, 「함께 움직이는」 목록에 그 하한 줄이 없다 — 베이스 상향 날 no-op 하한을 치우는 주인이 정해지지 않았다 | 같은 PR 조치 코멘트(cr MEDIUM-2) |
+
+**아직 머지되지 않은 PR 이 만들 OPEN 둘은 이 절이 등재하지 않는다** — 각 PR 이 자기 머지에서 이 문서에
+세우므로 **중복 등재가 더 나쁘다**. `OPEN-STR-12-INTERACTIVE`(PR #127, 알림 실발송 채널) ·
+`OPEN-M9-PORTAL-02-SPLIT-OPERATIONS`(PR #130, 조달청 02 개편) — **그 PR 머지 시 이 문서에 섰는지 확인한다.**
+PR #128(낙찰 목록 일회 수집)은 새 식별자를 만들지 않고 `OPEN-SET01-AWARD-NAME-INGEST` 를 수령한다.
+
+#### (c) 운영 잔여 — 처분 **후보**(이 절은 분류를 바꾸지 않는다)
+
+M6 종결이 `OPEN-M6-RESIDUAL-OPS` 로 묶어 넘긴 **15** 가운데, M7·M9 머지분이 **그 빈자리를 실제로 채웠는지**가
+갈리는 다섯이다. 추적표 쪽 문면은 `reports/evidence/m6/6e1/acceptance-trace.md` 의 2026-11-06 절이 같은 내용을
+그 행 옆에 적는다. **어느 행도 이 절에서 ⓒ 가 ⓐ 로 오르지 않는다** — 재판정은 그 추적표의 술어가 할 일이다.
+
+| 축 | 오늘의 사실 | 처분 후보 |
+| --- | --- | --- |
+| `OPS-03` outbox durable 전달 | 빈자리의 문면은 「놓친 배달이 **앱 알림함에서 조회된다**」를 잴 DB 표가 없다는 것이었다. **그 표는 M7/7C③ 이 세웠고**(알림함 표 — `inbox`(V6) 재사용을 명시적으로 거절한 별 표) M7/7C③-b 가 트리거를 배선했다. 전달 의미는 `OPEN-NOTI-02` 가 **at-most-once** 로 확정했고(§12.2) 그 결정이 내구성 요구를 채널에서 앱 알림함으로 옮겼다 | **빈자리를 재서술한다** — 남는 것은 「최대 시도를 소진한 행」(시도 계수 칸이 없어 한 번 claim 뒤 종단으로 구현) 하나이고, 그것은 at-most-once 의 **귀결**이라 미구현이 아니다. 홀더를 `OPEN-6F3-BID-RECORD` 에 두는 것이 맞는지부터 다시 본다 |
+| `STR-09` 주기 자동 감시 · `OPS-11` 재수집/수동 운영 액션 | 둘 다 빈자리가 「두 번째 트리거(예약)가 존재하지 않는다」 하나였다. **M7/7F 가 외부 cron·systemd 타이머로 그 트리거를 세웠다** — 알림 훑기 07:30·13:30 KST 와 인증서 감시 09:00 KST 가 운영자 sudo 로 등록됐고(M7 종결 기록), 러너는 그대로 `mode=once` 다 | **「충족」 후보 — 단 in-process 스케줄러로서는 아니다.** 홀더 `OPEN-6F10-SCHEDULER` 는 **같은 프로세스 안의 스케줄**을 묻는 축이라 닫히지 않는다. 그래서 후보는 「capability 는 외부 cron 으로 충족, OPEN 은 유지」의 **분리**이고 그 분리는 운영자 결정이다 |
+| `STR-10` 명시적 재계산 요청과 신선도 표시 | 빈자리는 「재계산 요청 표면·진행/실패 상태·고아 running 회수가 없다」였다. 그런데 **`STR-07` 이 같은 전제를 이미 기각했다** — 팀장 결정 D-7C1B-1 Q2 가 「**스냅샷 없는 설계**에서는 조회가 곧 재계산이라 stale 을 표시할 대상이 없다」로 정하고, acceptance 의 의도 둘(저장 뒤 옛 결과 안 보임 · 계산 중 저장된 결과 미채택)을 재는 test 로 판정했다 | **재정의 또는 폐기 후보.** 같은 술어를 `STR-10` 에 적용하면 「신선도 표시」는 잴 대상이 없고 「명시적 재계산 요청」은 조회와 같은 것이 된다. 남는 진짜 축은 **고아 running 회수**뿐이고 그것은 `OPS-05` 가 이미 소유한다. 홀더가 「없음 — 신설 필요」인 채라 이 판정이 선행이다 |
+| `OPS-04` 큐 깊이 배압 관측 | 관측자가 없어 세 값·중립 표현·검출 지연이 전부 공허하다. 그 축의 입력은 **부분 확정**됐다 — 「1인 운영」이 확정돼 실시간 경보를 전제하지 않는다(§12.2 「해소되지 않은 인접 항목」의 `OPEN-OPS-03` 행), 구체 임계는 미결 | **보류 유지.** 실시간 경보를 전제하지 않는 운영에서 깊이 관측의 수요가 무엇인지가 먼저이고, 그 물음은 운영 관측 없이 닫히지 않는다. 처분하지 않는다 |
+| `STR-04` 알림 범위 제어 | 범위를 좁히는 전략 필드가 없고 「억제된 후보를 억제 사유와 함께 조회」할 자리도 없다. 사유는 둘 — 채널이 아직 자리지킴이고(`OPEN-STR-12`, PR #127 이 그 자리를 만진다) 단일 운영자 전제에서 범위 제어의 수요가 선언된 적이 없다 | **보류 유지.** 채널이 실제로 서는 PR 이 머지된 **뒤**에 다시 본다 — 그 전에는 「억제」가 무엇을 억제하는지가 정해지지 않는다 |
+
+#### (d) 하네스·6G 잔여
+
+**`OPEN-GATE-REGISTRATION-STALE-INPUT` — 닫힘(구조).** 원 등재는 「등재 완결성 게이트 셋이
+`gate-tests.properties` 를 런타임 `File(...)` 로 읽어 **Gradle 의 선언된 입력이 아니다** — 증분 빌드에서
+등재 행만 지우면 `UP-TO-DATE` 로 건너뛰어 초록이 된다」였다(6F-6 이 신설, 받는 쪽 하네스 레인).
+**6G-2g 가 그 층을 바꿔치웠다** — 등재 등식을 모듈마다 손으로 건 test 여덟에서 build-logic task 하나로
+올리고(모집단 = 컴파일된 `@Test` 류 클래스 **전수**), 그 task 가 정책 파일을 `@InputFile` 로 **선언한다**.
+D-6G2g-12 가 「task 가 초록이 된 **뒤** 같은 slice 에서 기존 등식 test 를 삭제」를 정해 두 벌을 금지했고,
+그 레인은 **입력 선언을 제거하면 등재 삭제가 UP-TO-DATE 초록이 되는 거짓 초록**을 실측으로 남겼다.
+근거: PR **#60** 머지 `e922dc7b`(2026-10-04 UTC · 6G-2g 종결 문단은 `milestone-6.md`) · 계약 `reports/evidence/m6/6g2g/scope.md`
+D-6G2g-12·D-15·D-17. 오늘의 기계 대조 — test 소스에 `…GateRegistrationTest` 류 클래스 **0**(남은 언급은
+build-logic·등록부·evidence 문면뿐), task 의 정책 파일 `@InputFile` 선언 **있음**. **6G-2g 의 「닫은 OPEN 여덟」 목록에 이 식별자가 없다**(그 레인은 수령한 일곱만 열거했다) —
+그래서 이 종결은 **이 절이 처음 등재하는 것**이고, 함께 닫힌 `OPEN-6G2G-REGISTRATION-PACKAGE-COVER`
+(adapters 패키지 덮개 + 입력 선언)와 같은 산출물에서 나왔다.
+
+**`OPEN-6G-REVIEW-FOLLOWUPS` 의 잔여 열하나 — 처분 후보표.** 이 OPEN 은 6G-2c 가 D-6G-75 의 항목만 닫고
+**유지**됐다(PR #59 리뷰 I 의 정정, D-6G2c-42 ③). 남은 열하나는 전부 **코드 0 의 정리 항목**이고 받는 자리로
+지목된 **6G-2c-형식 slice 는 아직 열리지 않았다**(그 evidence 디렉터리가 없다). 라이브 수집은 day28
+(2026-10-29)에 끝나 **오늘 거동 영향이 0** 이므로, 처분 후보는 「형식 slice 를 기다린다」가 아니라
+**「각 항목을 그 자리를 다음에 만지는 slice 로 흩거나, 거동 0 을 근거로 일괄 폐기한다」**이고 그 선택은
+운영자 몫이다. 모수의 정본은 `reports/evidence/m6/6g2c/scope.md` 의 그 OPEN 행이다.
+
+| # | 원 등재 | 오늘 상태(기계 대조) |
+| --- | --- | --- |
+| 1 | 6G-2a ⑤ harness 우회 중복 실행 | 재지 않았다 — 원 등재 그대로 |
+| 2 | 6G-2a ⑥ 평탄 YAML 파서 네 벌 | **중복 여부는 재지 않았다** — 「네 벌」의 모수를 원 등재가 특정하지 않는다. 오늘 `ml_engine` 의 정책 모듈은 **여섯**이고 그중 **넷**이 `yaml` 을 import 한다(나머지 둘은 추론·백테스트 쪽). 「넷」이라는 수는 맞지만 그것이 같은 파서의 네 벌인지는 이 slice 가 판정하지 않는다 |
+| 3 | 6G-2a ⑦ `mkdtemp` 미정리 | **그대로** — 정리 없는 자리 둘(backtest 정책 민감도 · 저널 쓰기 감사 test) |
+| 4 | 6G-2a ⑧ seed `range(5)` 하드코딩 | **그대로** — 그 민감도 test 에 세 자리 |
+| 5 | 6G D-82 ⑥ Python `splitlines()` ↔ Kotlin `quote()` 의 줄 정의(U+0085·2028·2029) | 재지 않았다 — 원 등재 그대로 |
+| 6 | 6G D-82 ⑦ 층 표지 `%d` 의 Locale | **좁아졌다** — Kotlin production 에 `String.format` 호출이 **0** 이다. 그 자리가 사라졌는지 다른 꼴로 옮겼는지는 재지 않았다 |
+| 7 | 6G D-82 ⑨ 죽은 코드(`lineCountOf` · framer `executionDay` · `framePage` · 미사용 import) | **부분 소멸** — `lineCountOf` 는 **소스에 0**(남은 언급은 6G·6G-2e evidence 문면뿐). `executionDay`·`framePage` 는 개찰 표본 framer 에 **그대로**. 미사용 import 축은 재지 않았다 |
+| 8 | 6G D-82 ⑩ Python 판정의 중복 계산 | 재지 않았다 — 원 등재 그대로 |
+| 9 | 6G-2d D-49 ⑦ 원장 이중 파싱 | 재지 않았다 — 원 등재 그대로(값에 닿지 않고, 캐싱이 자기 append 가 끼는 자리를 만든다는 그 판독 그대로) |
+| 10 | 6G-2d D-53 `AxisConclusion.settled` 죽은 코드 | **그대로** — 그 파생 속성의 Kotlin 호출자가 **0** 이다 |
+| 11 | 6G-2d D-53 두 판독기 한 술어 | 재지 않았다 — 원 등재 그대로. 그 등재 자신이 「오늘 그 경로가 **없다**」를 적는다 |
+
+#### (e) M6 범위 `OPEN-` 204 전수 재고 — 하지 않는다(결정 유지)
+
+M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 표로 갈음했다. 그 근거는 추측이 아니라 보정 대조
+실측이다 — 「식별자 주변 창에 종결 어휘가 있는가」 술어가 204 를 73/131 로 갈랐는데, 홀더로 이름이 불리는
+열하나로 대조하니 **아홉이 「종결 어휘 있음」 쪽에 잘못 들어갔다**. 전수 재고는 별 조사 레인으로 남는다
+(`reports/evidence/m6/closure/open-inventory.md` §1 · §4 후속 ①). **이 절도 그 재고가 아니다** — 여기 선
+것은 M9 머지분이 실제로 닫은 것과 M9 가 새로 만든 것뿐이다.
+
 ---
 
 ## 13. 하류 인계
@@ -3844,7 +3954,8 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-3A-AGGREGATE` (M3/3A 신설, 2026-09-07) | D-3A-1 (a) 의 **수집 fact 셋**(`Notice`·`OpeningResult`·`QualificationText`, `NoticeId` 로 묶임)과 `data-dictionary.md` §2.1 aggregate 넷의 문면 정합 — §2.1 은 `Notice` 가 자격 원문을 **소유**한다고 적는다. 3A 의 셋은 **수집 단위**(출처 피드·시점·실패 단위가 다름: COL-03 「공고 1건당 별도 호출」·COL-04 「표적조회 서브콜」)이지 **소유권 재배정이 아니다** — aggregate 조립은 3D(저장 fold)·4B(use case). 문면에 「수집 fact 와 aggregate 의 관계」 한 문단이 없어 등재한다. 개정은 §2.1 을 여는 문서 slice | **`data-dictionary.md` 를 여는 다음 문서 slice** · 조립은 **3D·M4 4B** | 운영자(문면 승인) | **정본**(이 행) |
 | `OPEN-3A-ACCOUNTING-IDENTITY` (M3/3A 신설, 2026-09-07 — `m3-prep.md` §6·3A scope ⑦ 의 신설 후보를 여기 한 자리로) | COL-06 문면의 회계 항등식 `received = normalized + duplicate + dropped` 은 `duplicate` 와 `dropped` 가 **서로소**인 셈이고 **V2 는 그 문면을 그대로 채택**한다(3A ⑦ — `dropReasons` 에 `Duplicate` 없음, 생성자 불변식). legacy 의 `dropped_count` 는 중복을 **포함**해 문면과 다르다(조사 (b)·`_workspace/m345-prep/01_review_r1.md`). **정정 대상은 문면이 아니라 legacy 형태**이며, 이 문서 COL-06 「legacy 형태 처리」 절에 그 차이(legacy 셈 ≠ 문면 셈, V2 채택 = 문면)가 적혀 있지 않아 등재한다 — 개정은 문장 하나 추가 | **`capability-map.md` COL-06 을 여는 다음 문서 slice** | 운영자 | **정본**(이 행) — 3A scope ⑦ 은 포인터 |
 | `OPEN-3C-DOC-FORMATS` (M3/3C 신설, 2026-09-08) | 첨부 문서 형식 분포(PDF 텍스트 층/스캔 PDF/HWP/HWPX/텍스트)와 HWP·HWPX 파서 채택 여부 — D-3C-4 (a) 로 3C 는 플레인 텍스트 + PDF 텍스트 층(pdfbox)만, 그 밖은 `Uncertain(UnsupportedFormat)` 회계로 관측. 분포는 3B-2·운영 수집 회계가 근거 | **관측 뒤 운영자 결정**(M6 이전) | 운영자 | **정본**(3C scope OPEN 표) |
-| `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` (M3/3C 신설, 2026-09-08) | 첨부 URL 필드(`ntceSpecDocUrl1` 계열)의 필드 계약이 3A 정책 값 표(`policy-values.md`)와 `KONEPS_COLLECTION_POLICY` 에 없어 `AttachmentUrl` 을 실제 수집 관측에서 만들 수 없다 — 3C test 는 등재된 계약으로 메커니즘만 증명. 처리: curator 표 추가 행(P-8) + 정책 값 한 커밋(3A 후속 소폭) | **3B-2 또는 M4 4B 착수 전** | curator → 운영자 승인 | **정본**(3C commands 알려진 제한) |
+| `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` (M3/3C 신설, 2026-09-08) | 첨부 URL 필드(`ntceSpecDocUrl1` 계열)의 필드 계약이 3A 정책 값 표(`policy-values.md`)와 `KONEPS_COLLECTION_POLICY` 에 없어 `AttachmentUrl` 을 실제 수집 관측에서 만들 수 없다 — 3C test 는 등재된 계약으로 메커니즘만 증명. 처리: curator 표 추가 행(P-8) + 정책 값 한 커밋(3A 후속 소폭). **M9/portal-02 (2026-11-05) — 이 축이 열릴 때 부를 오퍼레이션이 바뀐다**: 2026-11-03 개편(아래 `OPEN-M9-PORTAL-02-SPLIT-OPERATIONS`)이 첨부파일(공고규격서·현장설명서·표준공고서 URL)을 공고 목록 응답에서 떼어 **별도 오퍼레이션**으로 옮겼다. 따라서 이 행이 닫힐 때 쓸 출처는 `getBidPblancListInfoCnstwk02` 의 응답 항목이 아니라 그 분리된 첨부 오퍼레이션이고, 필드 계약 등재는 그 오퍼레이션의 응답 문면으로 한다 | **3B-2 또는 M4 4B 착수 전** | curator → 운영자 승인 | **정본**(3C commands 알려진 제한) |
+| `OPEN-M9-PORTAL-02-SPLIT-OPERATIONS` (M9/portal-02 신설, 2026-11-05) | **조달청 입찰공고정보서비스 개편이 네 축을 별도 오퍼레이션으로 떼어 갔다** — data.go.kr 공지 2026-11-03 NOTICE_0000000005128 「[조달청] 조달청_입찰공고정보서비스 OPEN API 서비스 변경안내」. BASE URL 은 `…/1230000/ad/BidPublicInfoService02` 이고 각 오퍼레이션명 뒤에 `02` 가 붙었으며, 공동도급의무지역·가산지역·부대공종·첨부파일(공고규격서·현장설명서·표준공고서 URL)이 공고 목록 응답에서 분리됐다. **옛 URL 은 공지일 기준 90일**(≈2027-02-01)만 산다. portal-02 slice 가 한 것은 **이름 전환뿐**이다(D-1): 기본 base·오퍼레이션 경로 다섯이 `02` 판이고 낙찰정보서비스(`as/ScsbidInfoService`)는 불변이다. **분리된 넷은 부르지 않는다**(D-2) — 그 필드를 읽는 production 자리가 **0** 이기 때문이고, 첨부 축은 위 `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`, 지역 의무 축은 자격 판정 축이 열릴 때 그 오퍼레이션을 쓴다. **남은 미지**: 응답 필드가 바뀌었는지는 공지가 적지 않아 **실 호출 없이는 모른다**(D-4) — 운영 반영 전 오퍼레이션별 `numOfRows=1` 호출 다섯으로 봉투 `resultCode` 와 필드 계약 키 존재를 확인한다(절차는 `docs/runbook/m6-6g-real-collection.md` §8). **license-limit 도 같은 서비스다**: `getBidPblancListInfoLicenseLimit`(오퍼레이션 15)은 전환한 다섯에도 분리된 넷에도 들지 않지만 같은 입찰공고정보서비스이므로, 그 port(`KonepsLicenseLimitDocumentSource`, 지금 production 배선 0)가 배선될 때 `…LicenseLimit02` 를 쓴다 — 지금 main source 의 그 이름은 KDoc 문면뿐이고 경로는 호출자가 주는 `baseUri` 라 거동이 없다. **닫히는 조건**: 그 사전 확인이 돌고, 분리된 넷을 읽는 축이 열려 각각의 필드 계약이 등재되는 것(license-limit 은 COL-04 자격 원문 축이 열릴 때) | **운영 반영 전**(사전 확인) · **축이 열릴 때**(분리된 넷) | 운영자 승인 아래 실행 레인 | **정본**(이 행) · runbook §8 과 `reports/evidence/m9/portal-02/scope.md` 는 포인터 |
 | `OPEN-3B2-TARGETED-OPENING-QUERY` (M3/3B-2 신설 → **닫힘 2026-09-08**) | **닫혔다 — 문서가 맞고 legacy 실측 서술이 틀렸다.** 운영자 승인(2026-09-08) 아래 실제 조달청 OpenAPI 를 읽기 전용으로 호출해 확인했다: `getOpengResultListInfoServc` 를 `inqryDiv=4` + `bidNtceNo` 로 부르면 `resultCode=00`·`totalCount=1` 로 **그 공고 한 건만** 돌아온다(날짜창 스윕 불필요). 같은 확인에서 `getOpengResultListInfoOpengCompt` 도 `bidNtceNo` 단건으로 동작했다. 따라서 legacy 의 *"공고번호 표적조회는 불가하다(실측)"* 와 그것을 승계한 **SET-02 의 소스 제약은 폐기**한다 — 그 서술이 어느 오퍼레이션·시점의 관측이었는지는 알 수 없고 이 저장소가 되짚지 않는다(`insufficient-evidence` 로 남긴다). **귀결**: 개찰 결과 수집이 공고당 1콜로 서고 날짜창 스윕 + 클라이언트 매칭이 필요 없다 — 쿼터 압박이 크게 줄고 SET-02 의 「(카테고리, 마감일) 그룹 1콜 묶기」 설계가 불필요해진다. **M4 수집 배선이 이 사실 위에 선다.** 탐침은 값을 저장하지 않았고 서비스 키는 저장소 밖 파일에서만 읽었다 | — | — | **정본**(이 행) · SET-02·`ux-journey-research.md` 는 포인터 |
 | `OPEN-3B2-STORAGE-ROW-KEY-COLLISION` (M3/3B-2 신설 → **M3/3E 가 닫는 중, verifier 판정 대기**) | **행 식별자 없는 복수 행이 저장 층에서 다시 접힐 수 있다.** 3B-2 는 어댑터 dedup 이 부재 행 식별자를 접어 복수예가 15행을 1건으로 잃던 결함을 고쳤고(verifier r2 G-1), 그 행들을 살리며 「dedup 을 적용하지 못했다」를 회계 축으로 드러낸다. 그런데 3D `raw_observation.observation_key` 는 `sourceEndpoint`·페이지당 1회 계산되는 `observedAt`·계약 등재 필드 투영·`sourceText` 로 구성되므로, **행 식별자가 실제로 부재하고**(§1.7.3 이 `compnoRsrvtnPrceSno` 를 옵션으로 선언한다) **나머지 값이 같으면 키가 충돌해 `ON CONFLICT DO NOTHING` 이 둘째 행을 조용히 버린다.** 어댑터가 살린 행이 저장에서 재발하는 경로다. 3D 는 3B-2 범위 밖이라 코드를 고치지 않고 등재만 했다 — **M3 완료 조건의 「retry 후 canonical effect 하나」와 맞물린다**(그 조건은 중복 삽입을 막는 방향이고 이 항목은 서로 다른 행을 같은 것으로 보는 방향이다). 근거 절 `reports/evidence/m3/3b2/checklist.md` 알려진 제한 | **M4 4B 착수 전 또는 3D 후속** | 운영자 → 3D 소관 레인 | **정본**(이 행) · 3B-2 checklist 는 포인터 |
 | `OPEN-3C-ATTACHMENT-SLOT-OVERFLOW` (M3 문서 레인 신설, 2026-09-08) | **첨부 슬롯이 정확히 열이고 초과 시 동작을 문서가 적지 않는다.** 입찰공고정보서비스 참고자료는 `ntceSpecDocUrl1`~`10`·`ntceSpecFileNm1`~`10` 스무 칸만 선언한다(`policy-values.md` §1.10). 첨부가 열한 개인 공고를 어떻게 표현하는지 — 잘리는지, 다른 오퍼레이션이 나머지를 주는지 — **문서에 없다.** 열 칸을 순회하는 구현이 「열 개가 전부다」를 가정하면 열한 번째 첨부가 **조용히** 사라진다(3C 의 자격 원문 추출이 그 문서에 의존할 수 있다). 처리: 3C·M4 는 열 칸을 순회하되 **가정을 주석·test 로 명시**하고, 열 칸이 모두 찬 관측이 나오면 그 자체를 신호로 회계한다. **닫히는 조건**: 열 칸이 모두 찬 공고를 관측해 열한 번째의 유무를 확인하거나 조달청 문의 | **운영 관측 뒤**(M4 4B 또는 M6) | 운영자 | **정본**(이 행) · `policy-values.md` §1.10 은 포인터 |
@@ -3866,6 +3977,8 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-4B5-COMPETITIVENESS` (M4/4B-5 신설, 2026-09-10) | **V2 는 「투찰 시장 평균」 fact 를 수집·정의한 적이 없다.** `deriveCompetitiveness`(scope.md ⑤, legacy `bid_recommendation.py:111-124` 4밴드 .95/.75/.50/.25)가 필요로 하는 `marketAverage` 값도, 그것을 표현할 shared-kernel `Basis` 축도 없다 — 실측: `Basis` enum 여섯종(BASE_AMOUNT·ESTIMATED·YEGA·BID·ALLOCATED_BUDGET·AWARD)에 시장평균 없음 · `Money` 스케일 곱 연산은 `BaseAmount.times(BidRate)` 하나뿐 · `compareKnownVat` 는 같은 타입 쌍만 비교. 4B-5 가 D-4B5-4 「없으면 멈추고 보고」로 멈췄고, 처분(계약 갱신 2026-09-10 #1)은 상수 `competitivenessNotCollected(): Absent(MarketAverageMissing)` — 4B-4 재정규화가 나머지 넷 성분으로 priority 를 세운다. `DerivationPolicyData` 에도 competitiveness 필드를 두지 않았다(소비자 없는 필드 금지) | **시장 평균 fact 의 정의·수집은 M3 후속**(개찰 결과 집계 축) · **shared-kernel `Basis` 확장 결정은 별도 slice** | 운영자 | **정본**(이 행) — `reports/evidence/m4/4b5/scope.md` 「계약 갱신 — 2026-09-10」 절·`checklist.md` 는 포인터 |
 | ~~`OPEN-7C4-AWAITING-CHECKLIST`~~ (M7/7C④-2b 신설, 2026-10-28 → **M7/7C④-3 이 닫았다, 2026-10-30**) | **시작하기 체크리스트 operation 과 `awaiting` 응답을 어떤 모양으로 낼 것인가** — 그 전제는 **평탄 술어의 「깊이 1 object」 확장**이다. 오늘 계약 게이트(`OpenApiContractTest.isFlatPropertyDefinition`)는 속성이 **스칼라 또는 스칼라 배열**일 때만 통과시키므로 짝 배열(`awaiting: [{item, prerequisite}]`)이 거부된다 — 실측: 7C②-a 머지 뒤에도 그 술어가 그대로이고(해당 test diff 0 줄) 병합된 spec 에 깊이 1 object 속성이 0 이다. 선택지는 (a) 평탄 술어를 확장하고 짝 배열로 낸다 (b) 스칼라 배열 둘(`awaitingItems[]` + 같은 순서의 `awaitingPrerequisites[]`)로 낸다 — 짝이 자리로만 묶여 약하다 (c) 체크리스트 operation 자체를 뒤로 미룬다. **(b) 를 먼저 내고 뒤에 (a) 로 옮기는 길은 택하지 않는다**(wire 를 두 번 바꾼다, `D-7C4-8` Q3) | **선택지 (a) 로 닫혔다**(D-7C4C-1) — 평탄 술어를 **깊이 1 object** 까지 확장하고 `awaiting` 을 짝 배열로 낸다. 술어 확장은 `{type, properties, required, description}` 키 허용 목록까지 함께 좁혔고(D-7C4C-6 — nullable object · 미지 어휘가 기본 거부로 떨어진다), 깊이는 열거가 아니라 **호출 그래프**가 닫는다(object 층 술어가 스칼라 층만 부른다). 실측: 확장으로 오늘 spec 에서 **새로 통과하는 모양 0 · 새로 거부되는 모양 0**(속성 정의 241 · 스키마 39) — base `fa5ca096` 와 병합된 main `ea91d753` 두 spec 에서 같은 계수다(그 사이 `87cf6a06` 도 같다). head 에서는 이 slice 의 `awaiting` 하나만 새로 통과한다(속성 246 · 스키마 41). operation 은 **새 뿌리** `GET /api/onboarding-checklist`(D-7C4C-7 — 판정 입력 넷 중 감시 규칙 · 시계가 프로필 밖이다). `D-7C4-8` 은 지켜졌다: 세 상태가 wire 에서 갈라지고 두 상태로 접힌 응답은 없다. **종결 조건은 verifier ready-for-review + 사용자 승인**이고 이 행은 그 승인을 주장하지 않는다 | 운영자 · 7C④-3 | **정본**(이 행) · `reports/evidence/m7/7c4c/` 와 `reports/evidence/m7/7c4/scope.md` 계약 갱신 절은 포인터 |
 | ~~`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`~~ (M4/4C-2 verifier r2 M-3 신설, 2026-09-10 → **M3/3G 종결, 사용자 승인 2026-09-10**) | 3D 의 권한 test 둘(`provenance_authority`·`notice_audit`)이 `information_schema.role_table_grants`(역할 **직접** 부여만)를 술어로 써서 `GRANT ... TO PUBLIC` 경유로 `bidvector_app` 이 실제로 행사할 수 있는 초과 권한을 못 본다(4C-2 verifier r2 실측, `PROBE-PUB … OK rows=1`). **닫는 방법**: M3/3G 가 4C-2 의 `has_table_privilege`(직접·PUBLIC·상속 해소) 술어를 `public` 의 **전 BASE TABLE**로 전수화한 유효 권한 행렬 test 하나로 옛 술어 둘을 대체했다 — 테이블 목록은 DB 에서 발견하고(손으로 적은 목록 순회 금지) 기대 행렬과 키 집합·값을 둘 다 일치시킨다. mutation 넷(PUBLIC 경유 초과·역할 직접 초과·부족·미선언 신규 테이블)으로 게이트가 실제로 낙제함을 실측했고, verifier r1 이 mutation 여섯(신규 테이블은 실 마이그레이션으로 재현)으로 독립 재확인해 `ready-for-review`다. **사용자 승인 2026-09-10 으로 닫혔다.** 잔여는 래칫 밖 표면(`OPEN-3G-NONTABLE-PRIVILEGE-SURFACES` — 시퀀스 셋·VIEW·구체화뷰)이며 **같은 갈래의 별도 항목**으로 산다. 정본은 `reports/evidence/m3/3g/scope.md`·`milestone-3.md` Slice 3G 절 | — | — | **정본**(이 행) · `reports/evidence/m4/4c2/checklist.md` 「인계」는 옛 포인터, `milestone-3.md` Slice 3G 절이 현재 서술 |
+| `OPEN-7E3A-OPENING-AXIS-HARNESS` (M7/7E-3a 신설 · **등재 2026-11-06, M9/ledger**) | **개찰 축의 화면 harness 가 남긴 잔여** — M7 종결이 「M7 밖, 등재 유지」로 넘긴 넷 중 하나다. **이 행이 서기 전까지 이 문서와 `milestone-6.md` 어디에도 없었다**(M9/ledger 기계 대조) — 유일한 자리가 `reports/evidence/m7/7e3a/` 와 M7 종결 checklist 4 여서 **registry 만 읽는 쪽에는 존재하지 않는 것으로 보였다**. 요지의 정본은 그 slice 의 evidence 이고 이 행은 담당만 적는다 | **M9/opening-harness**(진행 중) | 담당 slice | **등재 누락 정정** — 팀장 결정 2026-11-06(M9/ledger 계약 갱신 D-L-1). 활성 여부는 §14.0 대로 정본이 정하고 **§12 머리의 활성 집계는 이 행으로 움직이지 않는다** |
+| `OPEN-7C3B-PAPER-BID-NOTIFICATION` (M7/7C③-b 신설 · **등재 2026-11-06, M9/ledger**) | **페이퍼 투찰 알림이 없다** — 알림함 키에 **종류 축이 없어** 페이퍼 투찰 항목이 실투찰 항목을 덮는다. M9/inbox-vocab(PR #123)이 유찰 어휘·개정 재안읽음을 닫으면서 이 축은 **명시적 out_scope** 로 두고 「이 slice 머지 뒤 별도」로 적었다. 위 행과 같은 사유로 **registry 에 없었다** | **M9/paper-bid**(진행 중) | 담당 slice | **등재 누락 정정** — 같은 결정. `reports/evidence/m9/inbox-vocab/` 알려진 제한 7 이 out_scope 사유의 정본 |
 
 ### 14.4 이월되는 비-`OPEN` 사실
 
