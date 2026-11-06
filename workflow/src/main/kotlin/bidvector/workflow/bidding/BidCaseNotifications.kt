@@ -1,10 +1,12 @@
 package bidvector.workflow.bidding
 
+import bidvector.bidding.BidKind
 import bidvector.bidding.BidState
 import bidvector.bidding.NoticeKey
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.workflow.notificationinbox.AwardResult
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
 
 /**
@@ -73,3 +75,25 @@ internal fun reflectedNotificationFact(state: BidState): NotificationFact? =
  * 그 방어는 행을 읽는 질의가 진다(`NotificationSweepSql`).
  */
 fun NoticeKey.asNotificationNoticeId(): NoticeId = NoticeId(NoticeNumber.of(noticeNumber), noticeRound)
+
+/**
+ * 건의 투찰 종류 → 알림함의 **키 축**(M9/paper-bid · D-M9P-1).
+ *
+ * **왜 사상이 필요한가**: 알림함은 `bidding.BidKind` 를 들지 않는다(그 사유는
+ * [NotificationBidKind] 의 KDoc — 알림함의 키 어휘는 저장 층 CHECK 와 집합 등식을 이루는
+ * 자기 패키지의 닫힌 어휘이고, 두 집합은 실제로 다르다: 알림함 쪽에는 「건에서 오지 않은
+ * 알림」의 자리가 하나 더 있다).
+ *
+ * **전역(total) 이고 소진 `when` 이다** — 입찰 쪽에 종류가 하나 더 생기면 이 자리가 컴파일되지
+ * 않는다. 그것이 요점이다: 새 종류가 조용히 `REAL` 로 접히면 그 연습의 소식이 실제 소식을
+ * 덮어쓰는 상태로 돌아간다. 두 어휘가 **1:1** 이라는 등식은 `BidCaseNotificationTest` 가
+ * 잰다(건 축 어휘 전수 ↔ [BidKind] 전수).
+ *
+ * `NotificationBidKind.NONE` 을 **내지 않는다** — 그 값은 건이 아닌 원천의 것이고, 이 함수의
+ * 정의역은 건이다. 그 배타성이 짝 CHECK 와 같은 규칙이다.
+ */
+fun BidKind.asNotificationBidKind(): NotificationBidKind =
+    when (this) {
+        BidKind.REAL -> NotificationBidKind.REAL
+        BidKind.PAPER -> NotificationBidKind.PAPER
+    }
