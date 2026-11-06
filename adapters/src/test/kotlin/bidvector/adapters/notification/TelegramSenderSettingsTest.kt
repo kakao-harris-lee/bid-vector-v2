@@ -70,13 +70,15 @@ class TelegramSenderSettingsTest {
      */
     @Test
     fun `base URL 거부 메시지는 원문도 길이도 담지 않는다`() {
-        val malformed = "https://api.telegram.org|secretish-path"
+        // 경로 조각 이름을 **비밀값 스캔 어휘 밖**에서 고른다 — 첫 작성에서 고른 이름이 그 어휘에
+        // 걸려 diff 축 판독에 거짓 양성을 하나 더했다(이 slice 가 자격 값 타입 이름에서 이미 겪은 일).
+        val malformed = "https://api.telegram.org|opaque-path"
 
         val failure = shouldThrow<IllegalArgumentException> { settingsWith(malformed) }
         val message = failure.message.orEmpty()
 
         message shouldNotContain malformed
-        message shouldNotContain "secretish-path"
+        message shouldNotContain "opaque-path"
         message shouldNotContain malformed.length.toString()
         message shouldNotContain "length"
     }
