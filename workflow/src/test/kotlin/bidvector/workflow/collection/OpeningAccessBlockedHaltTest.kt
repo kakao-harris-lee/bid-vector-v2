@@ -66,7 +66,9 @@ class OpeningAccessBlockedHaltTest {
         val report = fixture.run()
 
         report.halted shouldBe null
-        (report.detailCalls > 1) shouldBe true
+        // **정확한 수**로 잰다(cr r2 low) — 표본 2 × 용역 축 셋이고 결정적이다. 「계속 가긴 하는데
+        // 중간에 멈춘다」는 회귀가 부등식에서는 초록으로 지나간다.
+        report.detailCalls shouldBe SERVICE_SAMPLE_CALLS
     }
 
     /**
@@ -76,9 +78,14 @@ class OpeningAccessBlockedHaltTest {
      */
     @Test
     fun `원천 거절로 멈추는 사유는 정확히 쿼터와 차단 둘이다`() {
+        val causes = allTruncationCauses()
+        // **모집단을 먼저 잰다**(cr r2 MEDIUM) — 대표값을 짓는 자리가 값 나르는 사유를 다른 사유로
+        // 대체하면 등식이 조용해진다. `AxisLastObservedAtTest` 의 선례와 같은 구조 등식이다.
+        causes.map { it.javaClass }.toSet() shouldBe TruncationCause::class.java.permittedSubclasses.toSet()
+
         val haltingBySource =
-            allTruncationCauses()
-                .filter { it.openingDirective() == OpeningWalkDirective.HALT_SOURCE }
+            causes
+                .filter { it.openingDirective() is OpeningWalkDirective.HaltSource }
                 .map { it::class.simpleName }
 
         haltingBySource.sortedBy { it } shouldContainExactly listOf("AccessBlocked", "QuotaExhausted")
@@ -86,15 +93,22 @@ class OpeningAccessBlockedHaltTest {
 
     @Test
     fun `예산 한도는 자기 갈래이고 사유 부재는 계속이다`() {
+        // 답이 **값을 나른다** — 한도를 다시 꺼내는 캐스트가 소비 자리에 없다(cr r2 MEDIUM).
         TruncationCause.BudgetExhausted(BudgetLimit.DAILY).openingDirective() shouldBe
-            OpeningWalkDirective.HALT_BUDGET
-        null.openingDirective() shouldBe OpeningWalkDirective.CONTINUE
+            OpeningWalkDirective.HaltBudget(BudgetLimit.DAILY)
+        TruncationCause.AccessBlocked.openingDirective() shouldBe
+            OpeningWalkDirective.HaltSource(TruncationCause.AccessBlocked)
+        null.openingDirective() shouldBe OpeningWalkDirective.Continue
     }
 }
 
+/** 표본 2 × 용역 상세 축 셋(예비가격 · 개찰완료 · 기초금액) — A값은 공사만이다(D-6G-12). */
+private const val SERVICE_SAMPLE_CALLS = 6
+
 /**
  * sealed 계층에서 뽑은 전수 — 손으로 적은 목록은 새 사유가 생겨도 조용히 초록이다(그 사유가 목록에
- * 없으니 등식이 **측정하지 않는다**). 값을 나르는 갈래는 `INSTANCE` 가 없어 대표값을 짓는다.
+ * 없으니 등식이 **측정하지 않는다**). 값을 나르는 갈래는 `INSTANCE` 가 없어 대표값을 짓는데, 그
+ * 대체가 모집단을 바꿔치울 수 있으므로 **쓰는 자리가 클래스 집합 등식을 먼저 잰다**(cr r2 MEDIUM).
  */
 private fun allTruncationCauses(): List<TruncationCause> =
     requireNotNull(TruncationCause::class.java.permittedSubclasses) { "TruncationCause 는 sealed 여야 한다" }

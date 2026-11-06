@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
@@ -149,17 +150,17 @@ internal class OpeningSampleFramer(
         }
         val cause = batch.accounting.truncationCause
         val next = batch.next?.takeIf { cause == TruncationCause.MaxPages && it != cursor }
-        return when (cause.openingDirective()) {
+        return when (val directive = cause.openingDirective()) {
             // 상한 거부는 **예산 멈춤**으로 올린다 — 어느 한도였는지가 다음 걸음을 정한다.
-            OpeningWalkDirective.HALT_BUDGET -> {
-                PageWalk.Stop(OpeningCollectionHalt((cause as TruncationCause.BudgetExhausted).limit, null, 0))
+            is OpeningWalkDirective.HaltBudget -> {
+                PageWalk.Stop(OpeningCollectionHalt(directive.limit, null, 0))
             }
 
-            OpeningWalkDirective.HALT_SOURCE -> {
-                PageWalk.Stop(OpeningCollectionHalt(null, cause, 0))
+            is OpeningWalkDirective.HaltSource -> {
+                PageWalk.Stop(OpeningCollectionHalt(null, directive.cause, 0))
             }
 
-            OpeningWalkDirective.CONTINUE -> {
+            OpeningWalkDirective.Continue -> {
                 next?.let(PageWalk::Next) ?: PageWalk.Stop(null)
             }
         }
@@ -181,35 +182,44 @@ internal fun keyOf(id: NoticeId): NoticeKeyHash = NoticeKeyHash.of(id.number.val
  *
  * 이제 표가 **한 자리**이고 [TruncationCause] 를 소진한다 — 새 사유가 생기면 컴파일이 여기를
  * 가리키고, 두 소비 자리는 이 답을 읽을 뿐이라 둘이 갈릴 수 없다.
+ * **답이 값을 나른다**(cr r2 MEDIUM). 앞 판은 이것이 enum 이라 두 소비 자리가 사유를 다시 꺼내야
+ * 했고, 그 꺼냄이 무검사 다운캐스트(`as TruncationCause.BudgetExhausted`)와 「`HALT_SOURCE` 면
+ * `cause` 가 null 이 아니다」는 **자리 밖 관례**였다. 표가 틀리는 날의 모양이 컴파일 실패가 아니라
+ * 운영 중 `ClassCastException`·`require` 였다 — 열거만 닫고 값은 열어 둔 셈이다. 지금은 답이 그
+ * 값을 들고 오므로 두 소비 자리에 캐스트도 null 관례도 없다.
  */
-internal enum class OpeningWalkDirective {
-    /** 우리 승인 상한이 막았다 — 어느 한도였는지가 다음 걸음을 정한다. */
-    HALT_BUDGET,
+internal sealed interface OpeningWalkDirective {
+    /** 우리 승인 상한이 막았다 — **어느 한도였는지**가 다음 걸음을 정한다. */
+    data class HaltBudget(
+        val limit: BudgetLimit,
+    ) : OpeningWalkDirective
 
-    /** 원천이 거절했다(쿼터·차단) — 더 부르면 거절만 쌓인다. */
-    HALT_SOURCE,
+    /** 원천이 거절했다(쿼터·차단) — 더 부르면 거절만 쌓인다. 회계에는 **그 사유**가 실린다. */
+    data class HaltSource(
+        val cause: TruncationCause,
+    ) : OpeningWalkDirective
 
     /** 이 공고·축의 사실이다 — 다음 축·다음 공고로 간다. */
-    CONTINUE,
+    data object Continue : OpeningWalkDirective
 }
 
 /**
  * 소진 `when` — `else` 가 없다.
  *
- * **차단이 [OpeningWalkDirective.HALT_SOURCE] 인 근거**: 401·403 은 그 축의 사실이 아니라 **자격의
+ * **차단이 [OpeningWalkDirective.HaltSource] 인 근거**: 401·403 은 그 축의 사실이 아니라 **자격의
  * 사실**이라 다음 축·다음 공고도 같은 답을 받는다. 공고 갈래에 `HALT_RUN` 을 준 근거와 같고
  * (`CollectNoticesUseCase`), 쿼터와 같은 자리에 두는 것은 둘 다 「원천이 거절했다」이기 때문이다 —
  * 회계에서는 `AccessBlocked` 와 `QuotaExhausted` 가 여전히 다른 값이다(운영자의 다음 할 일이 다르다).
  */
 internal fun TruncationCause?.openingDirective(): OpeningWalkDirective =
     when (this) {
-        null -> OpeningWalkDirective.CONTINUE
+        null -> OpeningWalkDirective.Continue
 
-        is TruncationCause.BudgetExhausted -> OpeningWalkDirective.HALT_BUDGET
+        is TruncationCause.BudgetExhausted -> OpeningWalkDirective.HaltBudget(limit)
 
         TruncationCause.QuotaExhausted,
         TruncationCause.AccessBlocked,
-        -> OpeningWalkDirective.HALT_SOURCE
+        -> OpeningWalkDirective.HaltSource(this)
 
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
@@ -221,5 +231,5 @@ internal fun TruncationCause?.openingDirective(): OpeningWalkDirective =
         TruncationCause.Unclassified,
         TruncationCause.StructureFailure,
         TruncationCause.SelfThrottled,
-        -> OpeningWalkDirective.CONTINUE
+        -> OpeningWalkDirective.Continue
     }
