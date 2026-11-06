@@ -1,0 +1,119 @@
+package bidvector.buildlogic
+
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * OPS-13 환경 스니핑 축의 **바이트코드 술어**. task 배선과 분리해 인라인 접근으로 잰다
+ * (`MigrationOrderTest`·`GateRegistrationCensusTest` 관례).
+ *
+ * 앞 여섯 test 는 **소스 층이 놓친 형태**를 각각 고정한다(verifier H-1 의 넷 + 리뷰 HIGH 의 둘).
+ * 그 형태들이 소스에서는 서로 다른 글자이고 바이트코드에서는 **같은 쌍**이라는 것이 이 축의 근거다 —
+ * 그래서 입력은 쌍 하나이고, 「어느 소스 표기에서 왔는가」는 판정에 들어오지 않는다.
+ */
+class EnvironmentAccessTest {
+    @Test
+    fun `정적 import 로 수신자를 지운 형태도 같은 쌍으로 잡힌다`() {
+        // `import java.lang.System.getenv` 뒤 `getenv("CI")` — 소스에 수신자가 없어 글자 쌍이 만들어지지 않았다.
+        val violations = violations(access("bidvector.app.Probe", "java.lang.System", "getenv"))
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("java.lang.System#getenv"), "$violations")
+    }
+
+    @Test
+    fun `별칭 import 로 수신자를 바꾼 형태도 같은 쌍으로 잡힌다`() {
+        // `import java.lang.System as Sys` 뒤 `Sys.getenv("CI")` — 소스 수신자가 `Sys` 라 쌍이 어긋났다.
+        assertEquals(1, violations(access("bidvector.adapters.Probe", "java.lang.System", "getenv")).size)
+    }
+
+    @Test
+    fun `getProperties 를 거쳐 가는 형태가 잡힌다`() {
+        // `System.getProperties().getProperty(...)` — 앞 판 쌍 집합의 `System.getProperty` 를 비껴갔다.
+        assertEquals(1, violations(access("bidvector.app.Probe", "java.lang.System", "getProperties")).size)
+    }
+
+    @Test
+    fun `ProcessBuilder 의 환경 맵이 잡힌다`() {
+        assertEquals(1, violations(access("bidvector.app.Probe", "java.lang.ProcessBuilder", "environment")).size)
+    }
+
+    @Test
+    fun `Spring Environment 의 활성 프로파일 질의가 잡힌다`() {
+        val owner = "org.springframework.core.env.Environment"
+
+        assertEquals(1, violations(access("bidvector.app.Wiring", owner, "getActiveProfiles")).size)
+    }
+
+    @Test
+    fun `거부 집합 밖의 멤버는 통과한다 — 같은 선언 클래스여도`() {
+        // 같은 `java.lang.System` 의 `currentTimeMillis` 는 환경 질의가 아니다. 클래스 전체를 거부하면
+        // 과잉이고, 그 과잉이 게이트를 끄는 쪽으로 몬다.
+        assertEquals(
+            emptyList<String>(),
+            violations(access("bidvector.app.Probe", "java.lang.System", "currentTimeMillis")),
+        )
+    }
+
+    @Test
+    fun `위반 문면이 호출한 클래스를 지목한다 — 어디를 고칠지가 판정에 들어 있다`() {
+        val violations = violations(access("bidvector.app.wiring.Probe", "java.lang.System", "getenv"))
+
+        assertTrue(violations.single().contains("bidvector.app.wiring.Probe"), "$violations")
+    }
+
+    @Test
+    fun `잴 것이 없으면 위반이다 — 비-공허 단언`() {
+        // 게이트가 「클래스를 하나도 읽지 못했다」와 「읽었고 0 건이다」는 다른 말이다. 앞의 것이
+        // 초록이면 배선이 끊긴 게이트가 영원히 통과한다(이 저장소가 세 자리에 같은 단언을 둔 이유).
+        val violations = EnvironmentAccess.violations(emptyList(), DENIED)
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("읽은 멤버 접근이 없다"), "$violations")
+    }
+
+    @Test
+    fun `거부 집합에 대상이 없는 항목은 위반이 아니다 — 허용 목록과 방향이 반대다`() {
+        // 허용 목록의 죽은 항목은 범위를 넓히므로 위반이다(`MigrationOrder` 의 은퇴 목록). 거부 목록은
+        // 임계가 0 이라 대상 0 이 바라는 상태다. 이 비대칭을 test 로 고정해 둔다.
+        val onlyUnrelated = access("bidvector.app.Probe", "java.lang.System", "currentTimeMillis")
+
+        assertEquals(emptyList<String>(), violations(onlyUnrelated))
+    }
+
+    @Test
+    fun `여러 자리에서 같은 쌍을 불러도 자리마다 센다`() {
+        val violations =
+            EnvironmentAccess.violations(
+                listOf(
+                    ClassMemberAccess("bidvector.app.A", "java.lang.System", "getenv"),
+                    ClassMemberAccess("bidvector.app.B", "java.lang.System", "getenv"),
+                ),
+                DENIED,
+            )
+
+        assertEquals(2, violations.size, "$violations")
+    }
+
+    private fun access(
+        source: String,
+        owner: String,
+        member: String,
+    ) = listOf(ClassMemberAccess(source, owner, member))
+
+    private fun violations(accesses: List<ClassMemberAccess>): List<String> =
+        EnvironmentAccess.violations(accesses, DENIED)
+
+    private companion object {
+        val DENIED =
+            setOf(
+                "java.lang.System#getenv",
+                "java.lang.System#getProperty",
+                "java.lang.System#getProperties",
+                "java.lang.ProcessBuilder#environment",
+                "org.springframework.core.env.Environment#getActiveProfiles",
+                "org.springframework.core.env.Environment#acceptsProfiles",
+            )
+    }
+}
