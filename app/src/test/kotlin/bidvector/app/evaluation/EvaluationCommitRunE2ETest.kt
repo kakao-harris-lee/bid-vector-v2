@@ -60,7 +60,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
@@ -451,7 +450,10 @@ class EvaluationCommitRunE2ETest {
             environment = RuntimeEnvironment.Production,
             policy = resolution.value,
             channels = relayChannelSettings(),
-            clock = Clock.systemUTC(),
+            // 전규정 이름이다(cr L-8 를 되돌렸다) — 이 파일은 도메인 `Clock`
+            // (`bidvector.workflow.strategy.Clock`)을 이미 import 해 쓰고 있어서
+            // `java.time.Clock` 을 import 하면 이름이 모호해져 컴파일이 깨진다(실측).
+            clock = java.time.Clock.systemUTC(),
         )
     }
 }
