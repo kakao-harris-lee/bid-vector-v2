@@ -52,11 +52,19 @@
 - 표적 test(전부 RED 선행 실측을 evidence 한 줄로):
   ① 결과 대응 D-4 전 갈래(2xx·400·401·403·429·5xx·timeout·연결 거부·해독 불가) ② 멱등 계약(같은 key 재호출 시 가짜 서버 수신 1) ③ 비밀값 누출 0 — 실패 갈래마다 예외 메시지·로그·`toString` 에 토큰·chat id 문자열 부재 ④ Live + 설정 결손 → 기동 실패, 비-Live → 설정 없이 기동·claim 0 ⑤ 렌더 문면(금액·시각 표기) 골든 ⑥ E2E 한 줄(DELIVERED 1 · inbox 1 · 가짜 서버 수신 본문이 렌더 결과와 같음).
 - **변이**(바꿔치우기): 결과 대응의 Unknown→Rejected 바꿔치움 · 멱등 기억 제거 · 토큰 마스킹 제거 · 기동 검사 제거 — 각각 RED.
-- `grep -rniE -f config/quality/leak-patterns.txt` 를 diff 에 0.
+- `grep -rniE -f config/quality/leak-patterns.txt` 가 **CI 게이트가 재는 범위**(`reports/evidence/**` —
+  `bidvector.quality-baseline.gradle.kts` 의 `leakPatternGate`)에서 0. **첫 문면은 「diff 에 0」이었고
+  그것은 측정할 수 없는 기준이었다**(cr L-11 로 정정): diff 에는 KDoc·runbook 이 그 축을 **설명하는**
+  어휘와 test 대역의 고정 문자열이 들어오므로 어휘 매치가 0 일 수 없다. 재는 것은 「어휘가 없다」가
+  아니라 **「실제 비밀값이 없다」**이고, 그것은 게이트 범위의 0 과 diff 축 매치의 **판독**(어휘인가
+  값인가)으로 함께 선다 — 판독 결과는 `commands.md` §4.
 
 ## rollback
 
-in_scope 경로 한정 `git restore --source=79f3e5c4 --staged --worktree -- <경로들>` + 새 파일 삭제. 목록은 `git diff --name-status 79f3e5c4..HEAD` 기계 산출을 `rollback.md` 에. 머지 뒤는 PR revert.
+in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <경로들>` + 새 파일 삭제.
+**원천은 slice base 가 아니라 이 브랜치가 실제로 병합한 main 의 고정 SHA** 다(팀장 공지 2026-11-05) —
+base 로 되돌리면 그 사이 main 에 들어간 남의 변경까지 지운다. 목록은 **병합을 제외한 내 커밋**에서
+기계 산출하고, 원천 대비 상태(A/M/D)와 실측은 `rollback.md` 에. 머지 뒤는 PR revert.
 
 ## 리뷰 레인
 
