@@ -426,16 +426,19 @@ private fun haltOf(
     cause: TruncationCause?,
     settledAny: Boolean,
 ): OpeningCollectionHalt? =
-    when (cause) {
-        is TruncationCause.BudgetExhausted -> {
-            OpeningCollectionHalt(cause.limit, null, notAttempted = 0, partialNotice = settledAny)
+    when (cause.openingDirective()) {
+        OpeningWalkDirective.HALT_BUDGET -> {
+            val limit = (cause as TruncationCause.BudgetExhausted).limit
+            OpeningCollectionHalt(limit, null, notAttempted = 0, partialNotice = settledAny)
         }
 
-        TruncationCause.QuotaExhausted -> {
-            OpeningCollectionHalt(null, TruncationCause.QuotaExhausted, notAttempted = 0, partialNotice = settledAny)
+        // 쿼터와 차단이 같은 갈래다 — 둘 다 **원천의 거절**이고 더 부르면 거절만 쌓인다. 회계에
+        // 실리는 사유는 각자 자기 값이라 「다 썼다」와 「차단당했다」가 섞이지 않는다.
+        OpeningWalkDirective.HALT_SOURCE -> {
+            OpeningCollectionHalt(null, cause, notAttempted = 0, partialNotice = settledAny)
         }
 
-        else -> {
+        OpeningWalkDirective.CONTINUE -> {
             null
         }
     }

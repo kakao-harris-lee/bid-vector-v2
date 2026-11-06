@@ -149,15 +149,19 @@ internal class OpeningSampleFramer(
         }
         val cause = batch.accounting.truncationCause
         val next = batch.next?.takeIf { cause == TruncationCause.MaxPages && it != cursor }
-        return when {
+        return when (cause.openingDirective()) {
             // 상한 거부는 **예산 멈춤**으로 올린다 — 어느 한도였는지가 다음 걸음을 정한다.
-            cause is TruncationCause.BudgetExhausted -> PageWalk.Stop(OpeningCollectionHalt(cause.limit, null, 0))
+            OpeningWalkDirective.HALT_BUDGET -> {
+                PageWalk.Stop(OpeningCollectionHalt((cause as TruncationCause.BudgetExhausted).limit, null, 0))
+            }
 
-            cause == TruncationCause.QuotaExhausted -> PageWalk.Stop(OpeningCollectionHalt(null, cause, 0))
+            OpeningWalkDirective.HALT_SOURCE -> {
+                PageWalk.Stop(OpeningCollectionHalt(null, cause, 0))
+            }
 
-            next != null -> PageWalk.Next(next)
-
-            else -> PageWalk.Stop(null)
+            OpeningWalkDirective.CONTINUE -> {
+                next?.let(PageWalk::Next) ?: PageWalk.Stop(null)
+            }
         }
     }
 
@@ -165,3 +169,57 @@ internal class OpeningSampleFramer(
 }
 
 internal fun keyOf(id: NoticeId): NoticeKeyHash = NoticeKeyHash.of(id.number.value, id.round.value)
+
+/**
+ * 개찰 걷기가 절단 사유를 만났을 때의 **다음 걸음**(M9/ops-code · cr HIGH · v M-1).
+ *
+ * 앞 판은 이 판정이 두 자리에 `else` 를 가진 `when {}` 으로 흩어져 있었다 — `BudgetExhausted` 와
+ * `QuotaExhausted` 만 보고 나머지를 전부 「계속」으로 접었다. 그래서 `AccessBlocked` 가 생겨도
+ * **컴파일이 그 두 자리를 가리키지 않았고**, 자격이 끊긴 날(키 만료·IP 차단) 표본 공고 × 축마다
+ * 거절될 호출을 한 번씩 더 내며 공고 갈래와 **공유하는 승인 상한**(D-6G-47)을 태웠다. 개찰 run
+ * 자신은 `halted == null` 이라 COMPLETE(0) 로 끝나 그 소진이 보이지도 않았다.
+ *
+ * 이제 표가 **한 자리**이고 [TruncationCause] 를 소진한다 — 새 사유가 생기면 컴파일이 여기를
+ * 가리키고, 두 소비 자리는 이 답을 읽을 뿐이라 둘이 갈릴 수 없다.
+ */
+internal enum class OpeningWalkDirective {
+    /** 우리 승인 상한이 막았다 — 어느 한도였는지가 다음 걸음을 정한다. */
+    HALT_BUDGET,
+
+    /** 원천이 거절했다(쿼터·차단) — 더 부르면 거절만 쌓인다. */
+    HALT_SOURCE,
+
+    /** 이 공고·축의 사실이다 — 다음 축·다음 공고로 간다. */
+    CONTINUE,
+}
+
+/**
+ * 소진 `when` — `else` 가 없다.
+ *
+ * **차단이 [OpeningWalkDirective.HALT_SOURCE] 인 근거**: 401·403 은 그 축의 사실이 아니라 **자격의
+ * 사실**이라 다음 축·다음 공고도 같은 답을 받는다. 공고 갈래에 `HALT_RUN` 을 준 근거와 같고
+ * (`CollectNoticesUseCase`), 쿼터와 같은 자리에 두는 것은 둘 다 「원천이 거절했다」이기 때문이다 —
+ * 회계에서는 `AccessBlocked` 와 `QuotaExhausted` 가 여전히 다른 값이다(운영자의 다음 할 일이 다르다).
+ */
+internal fun TruncationCause?.openingDirective(): OpeningWalkDirective =
+    when (this) {
+        null -> OpeningWalkDirective.CONTINUE
+
+        is TruncationCause.BudgetExhausted -> OpeningWalkDirective.HALT_BUDGET
+
+        TruncationCause.QuotaExhausted,
+        TruncationCause.AccessBlocked,
+        -> OpeningWalkDirective.HALT_SOURCE
+
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        TruncationCause.Unclassified,
+        TruncationCause.StructureFailure,
+        TruncationCause.SelfThrottled,
+        -> OpeningWalkDirective.CONTINUE
+    }
