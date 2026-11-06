@@ -127,4 +127,23 @@ class JarContentPolicyTest {
         assertEquals(0, verdict.judged)
         assertEquals(emptyList(), verdict.violations)
     }
+
+    @Test
+    fun `아카이브 입력이 없으면 비-공허 단언이 붉는다`() {
+        val failure = archiveEmptinessFailure("app", archiveCount = 0, judged = 0)
+
+        assertTrue(failure != null && failure.contains("app"), "$failure")
+    }
+
+    @Test
+    fun `판정할 class 엔트리가 0 이면 비-공허 단언이 붉는다 — 면제만 남은 아카이브`() {
+        val failure = archiveEmptinessFailure("app", archiveCount = 2, judged = 0)
+
+        assertTrue(failure != null, "면제 엔트리만 남은 아카이브도 같은 공허다")
+    }
+
+    @Test
+    fun `아카이브와 판정 엔트리가 있으면 비-공허 단언은 조용하다`() {
+        assertEquals(null, archiveEmptinessFailure("app", archiveCount = 2, judged = 558))
+    }
 }

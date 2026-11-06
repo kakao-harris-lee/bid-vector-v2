@@ -23,8 +23,11 @@ import java.io.File
  * 디렉터리가 비거나 없으면 **실패한다**: 「잴 것이 없어 통과」는 게이트를 옮기거나 지우는 것과
  * 구별되지 않는다(`jarContentGate` 가 빈 아카이브로 배운 것과 같은 축).
  *
+ * **비-소유 모듈도 읽고 판정한다** — 거기에 파일이 있으면 위반이다([MigrationOrder.ownershipViolations]).
+ * 그 분담이 「소유 모듈만 본다」로는 모자랐던 이유는 소비자가 모듈이 아니라 classpath 이기 때문이다.
+ *
  * 디렉터리는 선언 입력이고 경로 민감도가 RELATIVE 다 — **이름 변경이 입력 변경이다**. `@InputDirectory`
- * 가 아니라 file collection 인 것은 마이그레이션을 갖지 않는 여덟 모듈에 그 디렉터리가 없어서다
+ * 가 아니라 file collection 인 것은 마이그레이션을 갖지 않는 아홉 모듈에 그 디렉터리가 없어서다
  * (`@InputDirectory` 는 부재를 Gradle 자신이 거부해 task 가 돌기 전에 죽는다 —
  * `CpdReportPresenceGateTask` 의 `@Internal` 선택과 같은 이유).
  */
@@ -47,25 +50,23 @@ abstract class MigrationOrderGateTask : DefaultTask() {
     fun gate() {
         val policy = readPolicy(policyFile.get().asFile)
         val module = moduleName.get()
-        if (module != policy.requireValue(MIGRATION_MODULE)) {
-            writeReport(module, emptyList(), emptyList())
-            return
-        }
-
+        val owner = policy.requireValue(MIGRATION_MODULE)
+        // **비-소유 모듈도 읽는다.** 앞 판은 이름이 다르면 디렉터리를 보지도 않고 통과했는데, Flyway 의
+        // 모집단은 모듈이 아니라 classpath 라 다른 모듈에 둔 파일이 적용되면서 재어지지 않았다(H-2).
         val fileNames =
             migrationDirectory.files
                 .filter(File::isDirectory)
                 .flatMap { dir -> dir.walkTopDown().filter(File::isFile).map(File::getName) }
                 .sorted()
-        if (fileNames.isEmpty()) {
-            writeReport(module, fileNames, emptyList())
-            throw GradleException(
-                "마이그레이션을 가진 모듈 '$module' 의 디렉터리가 비어 있다 — 게이트가 아무것도 보지 못했다 " +
-                    "(경로가 옮겨졌는지 'migration.resource-path' 를 본다)",
-            )
-        }
 
-        val violations = MigrationOrder.violations(fileNames, retiredVersions(policy))
+        val violations =
+            if (module == owner) {
+                MigrationOrder.emptinessViolations(module, fileNames) +
+                    MigrationOrder.violations(fileNames, retiredVersions(policy))
+            } else {
+                MigrationOrder.ownershipViolations(module, owner, fileNames)
+            }
+
         writeReport(module, fileNames, violations)
         if (violations.isNotEmpty()) {
             throw GradleException(

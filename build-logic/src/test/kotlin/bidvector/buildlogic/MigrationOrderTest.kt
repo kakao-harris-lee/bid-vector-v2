@@ -72,6 +72,58 @@ class MigrationOrderTest {
     }
 
     @Test
+    fun `V0 은 위반이다 — expected 밖의 번호를 세지 않으면 조용히 건너뛰어진다`() {
+        // `expected = (1..max) ∖ 은퇴` 이므로 1 미만은 어느 가지에도 걸리지 않았다(리뷰 M-1). V24 까지
+        // 적용된 DB 에 V0 을 넣으면 Flyway `outOfOrder=false` 가 조용히 건너뛴다 — 이 게이트가 막으라고
+        // 만들어진 바로 그 침묵이다.
+        val violations = violations("V0__sneak.sql", "V1__a.sql", "V2__b.sql")
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("V0"), "$violations")
+    }
+
+    @Test
+    fun `은퇴 목록은 V0 을 면제하지 못한다 — 은퇴는 1 이상의 자리다`() {
+        val violations = violations("V0__sneak.sql", "V1__a.sql", retired = setOf(0))
+
+        assertTrue(violations.isNotEmpty(), "$violations")
+    }
+
+    @Test
+    fun `비-소유 모듈에 마이그레이션이 있으면 위반이다 — Flyway 는 classpath 로 모은다`() {
+        val violations = MigrationOrder.ownershipViolations("workflow", "adapters", listOf("V30__probe.sql"))
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("workflow"), "$violations")
+    }
+
+    @Test
+    fun `비-소유 모듈이 비어 있으면 위반이 아니다`() {
+        assertEquals(emptyList<String>(), MigrationOrder.ownershipViolations("workflow", "adapters", emptyList()))
+    }
+
+    @Test
+    fun `소유 모듈은 소유 규칙의 대상이 아니다`() {
+        assertEquals(
+            emptyList<String>(),
+            MigrationOrder.ownershipViolations("adapters", "adapters", listOf("V1__a.sql")),
+        )
+    }
+
+    @Test
+    fun `소유 모듈의 디렉터리가 비면 위반이다 — 비-공허 단언`() {
+        val violations = MigrationOrder.emptinessViolations("adapters", emptyList())
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("adapters"), "$violations")
+    }
+
+    @Test
+    fun `소유 모듈에 파일이 있으면 비-공허 단언은 조용하다`() {
+        assertEquals(emptyList<String>(), MigrationOrder.emptinessViolations("adapters", listOf("V1__a.sql")))
+    }
+
+    @Test
     fun `저장소의 마이그레이션 디렉터리는 등식을 지킨다 — 오늘의 main`() {
         val fileNames = migrationFiles().map(File::getName)
         assertTrue(fileNames.isNotEmpty(), "디렉터리가 비었다 — 비-공허 단언")
@@ -106,7 +158,10 @@ class MigrationOrderTest {
             val path = policy.requireValue("migration.resource-path")
             val directory = File(repoRoot(), "$module/$path")
             assertTrue(directory.isDirectory, directory.absolutePath)
-            return directory.listFiles().orEmpty().filter(File::isFile)
+            // 게이트는 `walkTopDown()` 으로 재귀로 훑는다(`MigrationOrderGateTask`). 여기서 1단만 보면
+            // **게이트가 재는 것과 이 test 가 재는 것이 달라진다** — 이 test 의 KDoc 이 존재 이유로 든 바로
+            // 그 어긋남이 실제로 있었다(리뷰 M-6). 하위 디렉터리에 둔 마이그레이션이 그 틈이다.
+            return directory.walkTopDown().filter(File::isFile).toList()
         }
 
         /** 저장소 뿌리는 `architecturePolicy` 주입 경로에서 유도한다 — 작업 디렉터리에 기대지 않는다. */

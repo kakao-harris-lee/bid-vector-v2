@@ -95,7 +95,7 @@ abstract class JarContentGateTask : DefaultTask() {
             .apply { parentFile.mkdirs() }
             .writeText((header + verdict.violations).joinToString(separator = "\n", postfix = "\n"))
 
-        emptinessFailure(module, archiveFiles.size, verdict.judged)?.let { throw GradleException(it) }
+        archiveEmptinessFailure(module, archiveFiles.size, verdict.judged)?.let { throw GradleException(it) }
         if (verdict.violations.isNotEmpty()) {
             throw GradleException(
                 verdict.violations.joinToString(
@@ -105,31 +105,6 @@ abstract class JarContentGateTask : DefaultTask() {
             )
         }
     }
-
-    /**
-     * **비-공허 단언**(`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` 의 사각 둘째) — 빈 입력은 통과가 아니다.
-     *
-     * 실측된 사각이다: `jar` 를 끄면 게이트가 **실행됐는데도** 엔트리 0 으로 exit 0 이었다(두 verifier
-     * 레인이 각각 쟀다). 면제 엔트리만 남은 아카이브도 같은 공허라 **판정한 수**로 센다.
-     */
-    private fun emptinessFailure(
-        module: String,
-        archiveCount: Int,
-        judged: Int,
-    ): String? =
-        when {
-            archiveCount == 0 -> {
-                "모듈 '$module' 의 아카이브 입력이 없다 — 게이트가 아무것도 보지 못했다(Jar task 가 꺼졌는가)"
-            }
-
-            judged == 0 -> {
-                "모듈 '$module' 의 아카이브에 판정할 class 엔트리가 없다 — 빈 입력은 통과가 아니다"
-            }
-
-            else -> {
-                null
-            }
-        }
 
     /** 게이트를 통과한 class output: 클래스 디렉터리 기준 상대 경로 → 내용 해시. */
     private fun verifiedClasses(): Map<String, String> =
