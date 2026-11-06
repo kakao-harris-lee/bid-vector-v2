@@ -53,14 +53,14 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 - cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`
 - exit: 0
 - 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로 — 수정 라운드 2 가 공유
-  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 3ad4f3f6 -- <22 경로>` 0 줄 ·
+  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 97ed49c4 -- <22 경로>` 0 줄 ·
   **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의 내 test
   클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
-  남의 표지 보존(gate-tests 의 main 쪽 셋 각 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
+  남의 표지 보존(gate-tests 항목이 main 과 같은 **512** · main 의 새 주석 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T05:0xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③, 마지막 재측정)
-- cmd: 라운드 2 와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`)
+## 2026-11-06T05:4xZ — 임시 clone 에서 22 경로를 `97ed49c4` 로 되돌림(①②③, 셋째 병합 뒤 재측정)
+- cmd: 앞 라운드와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=97ed49c4 --staged --worktree --`)
 - exit: 0
 - 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
   0 줄 · **evidence 를 뺀 전수 diff 빈 목록** · 내 표지 0(gate-tests 의 내 test 클래스 다섯 합 0 ·
@@ -68,7 +68,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
 
-## 2026-11-06T05:1xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T05:5xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -240,6 +240,37 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 - 이 라운드에 ktlint 가 **두 번** 붉었다: 회계 단언의 한 줄 사슬(`chain-method-continuation`)과 소진
   `when` 의 분기 간 빈 줄(`blank-line-between-when-conditions`). 둘 다 **강제 실행이 잡았고** 각자
   `style` 커밋으로 고쳤다 — 그 모듈의 UP-TO-DATE 가 거짓 초록이라는 기록이 두 라운드 연속 값을 냈다.
+
+## 교차 지적 라운드 2 — 멈춤 집합 등식 · 셋째 병합 (판정 SHA 6aa8dc46)
+
+팀장 지적 ①(「`haltOf` 가 아직 `else` 로 끝난다」)은 **그 시점 기준으로는 이미 반영돼 있었다** —
+`a1f4b80c`(보고한 판정 SHA) 다음의 `4d4d1712`·`c0388ba8` 가 그것이다. 이 라운드가 더한 것은 그
+지적의 **나머지 절반**, 즉 사유마다 선택을 잠그는 등식 test 와 그 변이다.
+
+## 2026-11-06T05:1xZ — `git merge 97ed49c4`(셋째 병합)과 합집합 계수
+- cmd: `git merge 97ed49c4` 뒤 등록부 항목·주석 양쪽 계수
+- exit: 0 (충돌 0)
+- 핵심 결과: #134(gates-tests)가 들어왔고 겹치는 경로는 `config/quality/gate-tests.properties` **하나**다.
+  그 파일에서 main 이 더한 것은 **주석 여덟 줄**이고 등재 항목은 0 — 합집합 계수가 **512 + 5 = 517**,
+  중복 항목 0, 내 다섯이 각 1, main 의 주석 여덟 줄이 각 1, 앞 병합의 main 셋도 각 1, 충돌 표지 0.
+
+## 2026-11-06T05:2xZ — 변이 A: `TransportFailure` 를 멈춤 쪽으로 **옮김**
+- cmd: 계속 걷기 목록에서 빼고 멈춤 분기로 옮긴 뒤(바꿔치우기 — 더하기만 하면 소진 `when` 이 컴파일을 거부한다) `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 9 중 2 실패(등식 test 와 「쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다」).
+  등식이 한 사유의 이동을 잡는다.
+
+## 2026-11-06T05:2xZ — 변이 B: `QuotaExhausted` 를 계속 걷기 쪽으로 **옮김**
+- cmd: 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 9 중 2 실패(같은 둘). 반대 방향의 이동도 잡힌다 — 등식이 한쪽으로만 기울지
+  않았다는 증거다. 원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T05:3xZ — 병합 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 라운드 3 과 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 — workflow·adapters lint·detekt **실행** 초록(app 은 UP-TO-DATE — 그 모듈 소스가
+  이 라운드에 바뀌지 않았다) · 세 test task 전부 실행, 실패 0 · 게이트 22 task
 
 ## acceptance — 전건 `check`
 
