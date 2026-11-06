@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
@@ -8,6 +9,7 @@ import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeViolation
 import bidvector.workflow.collection.CollectionSourceName
@@ -30,10 +32,12 @@ import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.util.function.Supplier
 import javax.sql.DataSource
+import kotlin.system.measureTimeMillis
 
 /**
  * D-6F8-3 — 수집 러너 배선의 켜짐 조건과 기동 실패. 러너는 `bidvector.collection.mode=once` 일 때만
@@ -362,6 +366,47 @@ class CollectionWiringTest {
         }
     }
 
+    /**
+     * **출하 간격이 배선을 타고 실제 대기까지 간다**(v r2 M-1 · cr r1 MEDIUM ② 잔여).
+     *
+     * `KonepsShippedPolicyWireTest` 는 출하 값으로 **자기 pacer 를 만들어** 관문의 기계를 잰다. 그래서
+     * 「표의 값」과 「관문의 거동」은 잠겼지만 **그 사이의 운반 단계**(production 에서 pacer 를 만드는
+     * 단 한 자리가 그 값과 실제로 잠드는 함수를 넘기는가)는 아무 test 도 재지 않았다 — 배선에
+     * `Duration.ZERO` 를 넣는 변이와 기다림 함수를 빈 식으로 바꾸는 변이가 **둘 다 초록**이었다.
+     *
+     * 그래서 여기서는 **배선이 만든 소스로 두 번 부르고 벽시계를 잰다**. 두 측정이 한 자리에서
+     * 닫힌다: 간격이 0 이면 둘째 호출이 곧바로 나가고, 기다림이 식이면 역시 곧바로 나간다. 상한이
+     * 아니라 **하한** 단언이라 느린 호스트에서 흔들리지 않는다(실호출 0 — mock loopback).
+     *
+     * 비용은 이 class 에 출하 간격 하나(현재 1초)다.
+     */
+    @Test
+    fun `배선이 만든 관문은 출하 간격만큼 실제로 기다린다`() {
+        val shipped = shippedMinimumCallInterval()
+        MockKonepsHttp { _, _ -> listOf(mapOf("bidNtceNo" to "SYN-M9-W-1", "bidNtceOrd" to "000")) }.use { mock ->
+            withBoot(
+                *validProperties(categories = "service"),
+                "bidvector.koneps.base-url=${mock.baseUrl}",
+            ) { booted ->
+                withClue(failureText(booted.failure)) { booted.failure shouldBe null }
+                val port =
+                    booted.context
+                        .getBean(CollectionSources::class.java)
+                        .all
+                        .single()
+                        .port
+                val day = CollectionReferenceDate(LocalDate.of(2026, 9, 24))
+
+                port.fetchNotices(day, null)
+                val elapsedMillis = measureTimeMillis { port.fetchNotices(day, null) }
+
+                withClue("출하 최소 간격 $shipped · 둘째 호출에 걸린 시간 ${elapsedMillis}ms") {
+                    (elapsedMillis >= shipped.toMillis()) shouldBe true
+                }
+            }
+        }
+    }
+
     @Test
     fun `업종 행의 대분류 누락·어휘 밖과 빈 경로는 기동 실패다 — 표류도 빈 값도 HTTP 시점까지 미루지 않는다`() {
         listOf(
@@ -387,6 +432,16 @@ class CollectionWiringTest {
         }
     }
 }
+
+/**
+ * 출하 전송 정책의 최소 간격 — **test 가 그 수를 다시 적지 않는다**(두 자리에 같은 수를 두지 않는다).
+ * 값이 바뀌면 단언도 함께 움직인다.
+ */
+private fun shippedMinimumCallInterval(): Duration =
+    when (val resolution = KONEPS_HTTP_POLICY.resolve(LocalDate.of(2026, 9, 24))) {
+        is Resolution.Resolved -> resolution.value.minimumCallInterval
+        else -> error("출하 전송 정책이 적용되지 않는다: $resolution")
+    }
 
 /** 저장소 밖 — 배선은 디렉터리가 있는지만 본다(표본 확정과 시도 기록은 수집이 한다). */
 private val NOTICE_RUN_STATE: Path = Files.createTempDirectory("6g-notice-run-state")
