@@ -1,5 +1,7 @@
 package bidvector.adapters.persistence
 
+import bidvector.adapters.event.OutboxGateValues
+import bidvector.adapters.event.insertOutboxRowDirectly
 import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
@@ -20,10 +22,11 @@ import java.time.LocalDate
  * - `collection_run`·`outbox` 는 **자기 열**로 답한다(V27) — 그 둘에는 관측을 가리키는 열이
  *   없어 되짚을 경로가 아예 없었다. 쓰기 경로가 값을 싣는지, 싣지 않은 새 행이 거부되는지,
  *   적힌 값을 지울 수 없는지를 잰다.
- * - `notice`·`opening_result`·`qualification_text`·`opening_reserve_price` 는 **조인**으로
- *   답한다 — `observation_key`(NOT NULL FK) → `raw_observation.release_sha`(NOT NULL). 그래서
- *   열을 베끼지 않았고(V27 머리말), 그 결정이 성립하는 **구조적 전제**를 아래 test 가 고정한다:
- *   전제가 깨지면(열이 nullable 로 바뀌거나 FK 가 사라지거나) 이 test 가 먼저 붉어진다.
+ * - `notice`·`opening_result`·`qualification_text`·`opening_reserve_price` 는 `observation_key`
+ *   (NOT NULL FK) → `raw_observation.release_sha`(NOT NULL) **조인으로 도달한다**. 아래 test 가
+ *   고정하는 것은 그 **도달성**이고(열이 nullable 로 바뀌거나 FK 가 사라지면 먼저 붉어진다),
+ *   조인이 답하는 것은 「그 **원문을 수집한** 릴리스」다 — 승격 러너가 쓰는 행에서는 그것이
+ *   「이 행을 **쓴** 릴리스」와 다를 수 있다(V27 머리말 · `OPEN-M9-PROMOTED-ROW-RELEASE`).
  */
 class ExecutionRowReleaseTest : PersistenceTestSupport() {
     @Test
@@ -47,6 +50,28 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
 
         failure.message.orEmpty() shouldContain "릴리스 식별자를 요구한다"
         selectOne("SELECT count(*)::text FROM collection_run") shouldBe "0"
+    }
+
+    /**
+     * **outbox 의 INSERT 관문**(verifier M-1) — V27 은 표 둘에 같은 트리거를 걸지만 거부를 재는
+     * 자리는 `collection_run` 하나였다. 출하 경로는 `JdbcOutboxPort.register` 하나라 오늘의 거동
+     * 결함은 아니지만, 재지 않으면 outbox 쪽 트리거를 `BEFORE UPDATE` 로 좁히는 변이가 초록으로
+     * 지나간다(변이 `m9_outbox_rel_updateonly` 실측).
+     */
+    @Test
+    fun `릴리스 없는 새 outbox 행은 트리거가 거부한다`() {
+        val failure =
+            shouldThrow<SQLException> {
+                insertOutboxRowDirectly(
+                    dataSource(),
+                    entryId = "x-outbox-norelease",
+                    idempotencyKey = "x-outbox-norelease-key",
+                    gate = OutboxGateValues(releaseSha = null),
+                )
+            }
+
+        failure.message.orEmpty() shouldContain "릴리스 식별자를 요구한다"
+        selectOne("SELECT count(*)::text FROM outbox") shouldBe "0"
     }
 
     @Test

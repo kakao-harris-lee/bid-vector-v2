@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.workflow.event.OutboxEntryState
 import bidvector.workflow.event.OutboxTerminalReason
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -209,6 +210,46 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
 
         failure.message.orEmpty() shouldContain "종단 전이는 사유를 요구한다"
         outboxStateOf(dataSource(), "t-noreason-1") shouldBe "CLAIMED"
+    }
+
+    /**
+     * **INSERT 갈래의 음성 대조**(verifier M-1). V26 머리말은 「이 표에 다른 경로로 들어오는
+     * INSERT·UPDATE 도 같은 쌍만 쓴다」를 약속하는데, 출하 경로는 `PENDING` 으로만 INSERT 하므로
+     * 그 약속을 재는 자리가 없었다 — 트리거를 `BEFORE UPDATE` 로 좁히거나 INSERT 갈래를 지우거나
+     * 요구 집합에서 `DELIVERED` 를 빼도 adapters 전체가 초록이었다(변이 `gap_all` 실측).
+     *
+     * 종단 셋을 **어휘에서 받아** 전수로 돈다(값 목록을 베끼지 않는다). `DELIVERED` 를 빼고 재면
+     * 요구 집합에서 그 하나만 빠지는 변이가 살아남는다.
+     */
+    @Test
+    fun `사유 없는 종단 INSERT 는 트리거가 거부한다 — 종단 셋 전수`() {
+        val terminalStates = OutboxTerminalReason.entries.map { it.terminalState.dbToken() }.distinct()
+
+        terminalStates shouldHaveSize 3
+        terminalStates.forEachIndexed { index, state ->
+            val rejected = "t-insert-noreason-$index"
+            shouldThrow<SQLException> {
+                insertOutboxRowDirectly(
+                    dataSource(),
+                    entryId = rejected,
+                    idempotencyKey = "t-insert-noreason-key-$index",
+                    gate = OutboxGateValues(state = state),
+                )
+            }.message.orEmpty() shouldContain "종단 전이는 사유를 요구한다"
+            outboxStateOf(dataSource(), rejected) shouldBe null
+
+            // 양성 대조 — 같은 INSERT 가 사유를 싣고 오면 선다(관문이 INSERT 를 늘 막는 것이 아니다).
+            val accepted = "t-insert-reason-$index"
+            val reason = OutboxTerminalReason.entries.first { it.terminalState.dbToken() == state }
+            insertOutboxRowDirectly(
+                dataSource(),
+                entryId = accepted,
+                idempotencyKey = "t-insert-reason-key-$index",
+                gate = OutboxGateValues(state = state, terminalReason = reason.name),
+            )
+            outboxStateOf(dataSource(), accepted) shouldBe state
+            outboxTerminalReasonOf(dataSource(), accepted) shouldBe reason.name
+        }
     }
 
     @Test
