@@ -49,6 +49,18 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
 (`MEASURED_BEFORE_EFFECTIVE_DATE` 등)까지 후보가 되어 술어가 자기 어휘를 고발한다 — 「술어가 모든 것을
 잡으면 아무것도 잡지 못한다」(이 저장소의 숫자 리터럴 게이트가 base 36 을 거부한 것과 같은 자리).
 
+## D-2c (v H-2) — 승인된 version 은 그 내용의 지문과 함께만 존재한다
+
+| 축 | 내용 |
+| --- | --- |
+| 무엇이 열려 있었나 | D-2b 의 두 겹은 「객체가 자기 **파일**과 같은가」까지만 묻고 「그 파일을 누가 승인했는가」를 묻지 않았다. 그래서 임계만 완화한 사본을 코드가 만들어 쓰거나 `ML_ENGINE_EVALUATION_POLICY` 로 가리키면, version 을 그대로 둔 채 전 게이트가 초록이었다(verifier 실측: `paired_t_threshold` 0.1, 전건 1700 passed, 재검증도 통과). **근원은 version 문자열이 내용에 묶여 있지 않다는 것**이고, 그래서 ML-07 수용 문면 둘이 함께 깨졌다 — 「env 로 값을 주입해도 판정이 달라지지 않는다」와 「version 이 바뀌면 전후 판정이 갈린다」(같은 version 에서 판정이 달랐다). |
+| 처방의 방향 | **열거를 뒤집는다** — 「무엇을 거부하는가」가 아니라 「무엇이 승인됐는가」를 코드 상수로 적는다(`registry.policy_approvals`: 승인 version → 그 파일 내용 sha256). |
+| 묻는 자리 | **조립 근 하나** — `load_approved_evaluation_policy`(← `app.server._preload`). 거기가 운영자의 선택(env)이 들어오는 자리다. 그 한 자리가 두 갈래를 함께 거부한다: 이름을 유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`). 거부는 다른 세 정책 축과 같은 결과 타입으로 떨어지므로 `_preload_outcomes`·pipeline factory·prediction runtime 이 각자 다시 판정하지 않는다. |
+| 사슬의 단일성 | 승인을 한 자리에서만 묻는 것이 충분한 이유는 **게이트에 닿는 정책이 그 자리를 거친 하나**라는 것이고, 그 단일성을 호출 자리 집합 등식 **넷**이 진다 — 승인 미요구 로더(policy_source 안 둘) · `build_training_pipeline`(하나) · `run_holdout`(하나) · `EvaluationPolicy` 생성 자리(로더 안 하나). 사슬: env → 승인 요구 로더 → `_preload` → `pipeline_factory` → `_run_holdout`. |
+| 계약에서 옮긴 자리 둘 | 계약 문면은 「**로더와 재검증**이 둘 다 거부」였다. ⑴ 재검증(`verify_policy_source`)에 넣으면 **조립 근 test 일곱**이 붉어진다 — 그 test 들은 작은 데이터셋을 쓰려고 승인 밖 임계를 파일로 만들어 쓴다. ⑵ 뿌리 로더(`registry.policy.load_policy`)에 넣으면 **32 failed · 79 errors**(11 파일) — 값 불변식 test 들이 파생 정책에 현실적인 version 이름을 쓰고, 출하 추론 정책이 일부러 불완전해서(`agency_sample_threshold` 미선언) 네 helper 가 **placeholder 를 얹은 사본으로만** 로드할 수 있으며, `test_epoch` 하나는 그 이름이 승격 인용 문면에 나오는 것을 단언한다. 둘 다 **실측 뒤 되돌렸다**. 뿌리 검사가 더 막던 것은 「제품 게이트에 닿을 수 없는 경로의 편집 사본」뿐이고, 출하 파일 자체를 고치는 길은 런타임이 아니라 **CI**(등록부 ↔ 출하 지문 등식 test)가 막는다. |
+| 세 자리 등식 | 새 version 을 승인하는 길은 ⑴ `policy/*.yaml` ⑵ 등록부 한 줄 ⑶ 승인 장부(`m5/5c2`·`m5/5d` `policy-values.md` 의 지문 표)를 **같은 커밋에서** 바꾸는 것뿐이다. test 셋이 그 등식을 진다 — 지문 등식 · 장부에 그 지문이 적혀 있음 · 출하 version 전수 == 등록 + 일부러 미등록. |
+| 등록 범위 | 이 slice 가 **값을 바꾼 두 축**(`evaluation-v1`·`inference-v1`)만. `serving-v1`·`training-v1`·`strategy-backtest-v1/v2` 는 일부러 미등록이고 **그 사실을 목록으로 잠근다** — 새 정책 파일이 조용히 어느 쪽도 아닌 상태로 들어오지 못한다(6G 판정 입력인 `strategy-backtest-v2` 를 건드리지 않는 제약과 같은 자리). |
+
 ## D-3 (SET-06) — 시간축 provenance 와 `Unmeasurable`
 
 | 축 | 내용 |
@@ -111,8 +123,22 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
    날짜 함수 · `strategy-backtest-v1` 의 `effective.*` 키) — 지금 교집합은 0 이다. 좁히지 **않은** 이유:
    접두·접미를 붙인 완화 이름(`--relax-maturity-threshold`)이 조용히 통과하는 쪽이 더 나쁘고, 지금 형태의
    대가는 「무관한 이름이 정책 키를 담는 날 붉어진다」 — 조용한 구멍이 아니라 사람이 볼 신호다.
-3c. **운영자가 고르는 정책 파일**: 어느 파일을 쓸지는 환경이 정한다 — 그것이 설계다(D-2b 의 경계). 완화는
-   승인 근거와 version·effective date 를 가진 **정책 산출물**로만 가능하고, 그 파일의 지문이 report 에 남는다.
+3c. **운영자가 고르는 정책 파일**: 어느 파일을 쓸지는 환경이 정한다 — 단 **승인된 산출물 사이에서만**이다
+   (D-2c). 완화는 승인 근거와 version·effective date 를 가진 정책 산출물로만 가능하고, 그 파일의 지문이
+   report 에 남는다. 앞 판 문면(「어느 파일이든 운영자가 고른다」)은 v H-2 가 실측으로 깼다.
+3d. **추론 축의 런타임 승인 요구는 없다**(등재): 조립 근의 승인 요구는 **평가 축**에만 걸었다 —
+   `InferencePolicy` 는 자기 파일의 지문을 들고 있지 않고(`EvaluationPolicy.source` 에 해당하는 칸이 없다),
+   그 칸을 더하면 이 slice 밖의 생성 자리 전수가 함께 움직인다. `inference-v1` 을 **등록부에 둔** 효과는
+   **CI 층**이다: 출하 `inference-v1.yaml` 을 편집하면 등록부 ↔ 출하 지문 등식 test 가 붉고, 대체 승인
+   칸의 출하값은 별도 test 가 `NOT_APPROVED` 로 고정한다. 런타임에 열려 있는 것: 완화·승인 사본으로
+   `ML_ENGINE_INFERENCE_POLICY` 를 돌리는 길 — 그 경우 응답·표의 정책 version·지문이 공시되지만 부팅이
+   막지는 않는다.
+3e. **동적 절취는 경계 밖이다**(측정으로 등재): 조립 근이 `getattr(module, "load_" + "evaluation_policy")`
+   처럼 이름을 **실행 시점에 만들어** 승인 미요구 로더를 부르면 호출 자리 집합 등식이 보지 못한다(변이
+   MH5 — GREEN 실측). 같은 잔여가 H-1 라운드에도 있었고(그쪽은 값 대조가 받았다), 여기서는 받지 못한다 —
+   이름을 바꿔 단 사본은 자기 파일과 값이 **같아서** 재검증을 지나기 때문이다. 성립하려면 `app/server.py`
+   를 편집해야 하고, 이 저장소는 같은 종류의 경계(동적 import)를 이미 app 의 HTTP 금지 계약에서 알려진
+   제한으로 적고 있다. **속성 형태**(`__import__(...).load_evaluation_policy(...)`)는 막힌다(MH5c RED).
 4. **effective date 를 과거로 적는 길은 막지 않는다** — 그것이 정책 승인의 뜻이다. 막는 것은 **조용히**
    그러는 길이고, 값이 정책 checksum·report 에 들어가므로 산출물이 달라진다.
 5. **출하 effective date(2026-09-16)는 지금 코퍼스의 창들보다 뒤다.** 즉 그 창들로는 승격이 인용되지 않는다 —
