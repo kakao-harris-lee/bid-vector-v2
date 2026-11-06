@@ -1,13 +1,14 @@
 # M9/adr07-pitest commands
 
-base `df4976cc` · **판정 SHA `2fad9b99`**(병합 커밋 — 수정 라운드 2 + main `3ad4f3f6` 병합) · 전 실행
+base `df4976cc` · **판정 SHA `9fbb1caf`**(수정 라운드 3 — main `3ad4f3f6` 병합은 그 앞 `2fad9b99`) · 전 실행
 `~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(호스트 빌드 자리 둘 규율). 아래 「결과」는
 핵심 한 줄이고 출력 전문은 싣지 않는다.
 
 **판정 SHA 문면 정정(v L-1)** — 앞 라운드에 이 머리말과 `checklist.md` 가 `f4a85991` 을 적었는데
 그 뒤로 산출물 커밋이 더 왔다(capability-map 행 하나 · 수정 라운드 다섯). §1~§7 은 **첫 라운드**의 실측,
 **§9 는 수정 라운드 1**(`eab07b5b`), **§10 은 첫 병합 뒤**(`d4b43248`), **§11 은 수정 라운드 2**
-(처방 `07ecf5e9` · 병합 `2fad9b99` = 현 판정 SHA)다 — 어느 수가 어느 SHA 의 것인지 절로 가른다.
+(처방 `07ecf5e9` · 병합 `2fad9b99`), **§12 는 수정 라운드 3**(`9fbb1caf` = 현 판정 SHA)다 —
+어느 수가 어느 SHA 의 것인지 절로 가른다.
 
 ## 1. 도구가 이 저장소에서 서는가 — 채택의 전제
 
@@ -293,3 +294,50 @@ settlement 리포트(61/73)를 입력으로 썼다 — 재는 것은 변이 분�
 `leakPatternGate` 는 참조형 스캔이고 패턴 어휘를 이 파일에 축어로 적지 않는다. 그 측정은 이
 evidence 를 **담은** 작업 트리에서 돌았다 — 그 뒤 이 표의 한 줄이 다시 자라므로, 마지막 HEAD 의
 정본은 verifier 와 PR 조치 코멘트다(하네스 규율).
+
+## 12. 수정 라운드 3 — 처방 `9fbb1caf`
+
+지적은 하나다(v r3 L-1, 비차단): 게이트가 **읽는** 자리와 pitest 가 **쓰는** 자리를 convention 의
+지역 값 하나가 묶고 있었다. 한쪽만 옮기고 옛 리포트를 남기면 pitest 가 새 자리에 나빠진 수를
+쓰는데도 게이트는 좋은 낡은 수를 읽어 로컬 증분 빌드가 통과한다(verifier B5). 처방은 자리를
+**도구에서 받아오는** 것이다 — `pitestMutationXmlReport()` 가 pitest task 의 `reportDir` 에서
+파생하고 convention 은 그 한 줄만 쓴다. M-1 과 같은 원칙의 둘째 적용이다: 쓰이는 값과 그 값의
+출처가 **같은 것**이어야 한다.
+
+### 12.1 RED 선행 → GREEN
+
+| # | 명령 | 결과 |
+| --- | --- | --- |
+| R-10 | fixture(**실제 pitest plugin 적용** · `reportDir` 은 옮긴 자리 · 옛 자리에 좋은 리포트)에서 게이트를 **옛 자리로 고정**한 구판 꼴 | **RED** — 「옮긴 자리를 읽는다」가 `UnexpectedBuildSuccess`(좋은 낡은 리포트로 통과), 양방향 통제군이 `UnexpectedBuildFailure`. 기존 셋은 그대로 초록(5 중 2 실패) |
+| R-11 | 같은 fixture, 처방 뒤 | 다섯 전부 초록 |
+| R-12 | `-p build-logic test --tests 'bidvector.buildlogic.Mutation*' validatePlugins ktlint{Main,Test}SourceSetCheck detekt` | **exit 0.** mutation test **35**(14·10·5·6), 실패·건너뜀 0. `validatePlugins`·`runKtlintCheckOver{Main,Test}SourceSet`·`detekt` 전부 실행 |
+
+RED 가 **거동**이다 — 구판 꼴 fixture 는 헬퍼를 참조하지 않으므로 컴파일을 지나고, 게이트가
+실제로 옛 파일을 읽어 판정이 뒤집힌다(빌드 실패로 얻은 RED 가 아니다).
+
+### 12.2 프로덕션 배선 — `--rerun` 으로 실제 분석까지
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| A | `:settlement:pitest --rerun` | pitest **실제 실행**(1분 11초) · finalizer 게이트 실행 · **exit 0** · 리포트 61/73 — 파생된 자리에서 읽었다 |
+| B | `:settlement:mutationReportGate -x :settlement:pitest`(입력 불변) | **UP-TO-DATE** · exit 0 |
+| C | 리포트만 0/73 로 바꿔치움 | **FAILED** · exit 1 |
+
+앞 라운드의 A/B/C 는 남아 있던 리포트를 입력으로 썼고 이번 A 는 `--rerun` 으로 **분석부터** 돌려,
+파생 배선에서 pitest 와 게이트가 같은 파일을 보는지까지 실측했다.
+
+### 12.3 변이 — 파생을 고정 경로로 바꿔치운다
+
+커밋 뒤 헬퍼의 파생 한 줄을 고정 경로로 바꿔치우니 새 회귀 둘이 **RED**(35 중 2 실패)이고 나머지
+서른셋은 통과. 원복 뒤 `git status --porcelain` 빈 출력.
+
+### 12.4 표적 게이트
+
+| 명령 | 결과 |
+| --- | --- |
+| `buildLogicGateRegistrationGate`·`buildLogicGateExecutionGate`·`buildLogicSizeGate`·`buildLogicTypeShapeGate`·`buildLogicTestShapeGate` | **exit 0**, 다섯 전부 실행. 실행 등식은 `:build-logic:test` 전건에서 `required` 31 == 결과 XML 31, 등재 등식은 `population` 31 · `excluded` 0 |
+| `tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · 참조 18 · 매달린 0 |
+| `leakPatternGate` | **exit 0** — 실행(UP-TO-DATE 아님). 이 라운드의 evidence 를 담은 트리에서 쟀고, 그 뒤 이 표의 한 줄만 자란다(§11.5 의 같은 단서) |
+
+새 파일 하나(`MutationReportLocation.kt`)는 **main 소스**라 test 등록부와 무관하다 — 새 test
+클래스가 없고(기존 클래스에 둘을 더했다) 등재 등식 31 이 그 사실과 같다.

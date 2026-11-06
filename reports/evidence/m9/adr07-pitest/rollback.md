@@ -1,8 +1,12 @@
 # M9/adr07-pitest rollback
 
 착수 base **`df4976cc`** · **복원 원천 `3ad4f3f6`**(이 브랜치가 마지막으로 합친 main 의
-**고정 SHA** = 병합 커밋 `2fad9b99` 의 둘째 부모) · **실측 HEAD `2fad9b99`**(이 slice 의 마지막
-산출물 커밋).
+**고정 SHA** = 병합 커밋 `2fad9b99` 의 둘째 부모) · **실측 HEAD `9fbb1caf`**(이 slice 의 마지막
+산출물 커밋 = 현 판정 SHA).
+
+**수정 라운드 3 에서 복원 목록이 움직였다** — main 소스 하나(`MutationReportLocation.kt`)가
+늘어 **26 → 27** 경로가 됐다. 그래서 ①~③ 과 표지 계수를 그 커밋에서 **다시** 쟀다. 원천은
+그대로다(그 뒤로 더 합치지 않았다).
 
 **원천이 착수 base 가 아니다.** 두 번 합쳤다 — main `e12c0485`(#130~#133) 뒤 main `3ad4f3f6`(#135).
 base 에서 복원하면 **그 남의 변경까지 지운다** — 실물이 있다: main 이 `config/quality/gate-tests.properties`
@@ -58,13 +62,13 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `2fad9b99`(둘째 병합 뒤)
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `9fbb1caf`(수정 라운드 3)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 내 커밋 경로 **26**(evidence 제외) = 복원 **15**(M) · 삭제 **11**(A) — 기계 목록과 같다. 수정 라운드가 둘을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh`) |
-| ③ 결과 트리 == `3ad4f3f6` 트리 | 복원 대상 26 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
+| ② 계수 | 내 커밋 경로 **27**(evidence 제외) = 복원 **15**(M) · 삭제 **12**(A) — 기계 목록과 같다. 수정 라운드들이 셋을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh` · 리포트 자리 헬퍼) |
+| ③ 결과 트리 == `3ad4f3f6` 트리 | 복원 대상 27 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
@@ -92,6 +96,7 @@ git rm -q -f -- "${ADDED[@]}"
 | `mutation-conventions` · `mutationCheck` · `mutationReportGate` · `mutationCoverageGate` · `MutationPolicy` · `PERCENT_DENOMINATOR` · `OPEN-ADR07-` · `pitest-gradlePlugin` · `pitest-junit5-plugin` · `mutation-policy.properties` | **전부 0** |
 | 수정 라운드 1 이 들여온 둘 — `MutationReportGateUpToDateTest` · `max-workers=1` | **0** |
 | 수정 라운드 2 의 표지 — 게이트 task 의 리포트 property 이름 | **0** |
+| 수정 라운드 3 의 표지 — 리포트 자리 헬퍼의 함수 이름 · 그 파일 이름 | **0** · **0** |
 | capability-map 전용 — `닫혔다 — M9/adr07-pitest` | **0** |
 | 같은 행의 **반대 방향** — 취소선 없는 `OPEN-ADR-07` 행(되살아나야 한다) | **1** |
 
@@ -149,8 +154,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 2fad9b99..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 3ad4f3f6..2fad9b99 \
+git diff --name-only 9fbb1caf..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 3ad4f3f6..9fbb1caf \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 

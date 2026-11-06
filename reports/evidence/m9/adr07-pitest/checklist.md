@@ -1,8 +1,8 @@
 # M9/adr07-pitest checklist
 
-판정 SHA **`2fad9b99`**(병합 커밋 — 수정 라운드 2 + main `3ad4f3f6` 병합) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
+판정 SHA **`9fbb1caf`**(수정 라운드 3 — main `3ad4f3f6` 병합은 그 앞 `2fad9b99`) · base `df4976cc`. 실측은 `commands.md`, 되돌림은
 `rollback.md`. 앞 라운드가 이 자리에 적은 `f4a85991` 은 그 뒤에 온 산출물 커밋들보다 앞선
-SHA 였다(v L-1) — 아래 §6·§7 이 라운드별로 가른다.
+SHA 였다(v L-1) — 아래 §6~§8 이 라운드별로 가른다.
 
 ## 1. 계약의 결정 넷
 
@@ -37,6 +37,7 @@ SHA 였다(v L-1) — 아래 §6·§7 이 라운드별로 가른다.
 | 6 `pitest` 없이 낡은 리포트로 통과 | 게이트 `dependsOn(pitest)` + `pitest` `finalizedBy(게이트)` **+ 리포트를 task 지문에 넣는다**(수정 라운드) | C-5 · **R-4/R-5**(회귀 test 셋) |
 | **6′** 리포트가 나빠져도 게이트가 UP-TO-DATE 로 건너뛴다 — **앞 판에서 열려 있었다** | 리포트 선언 **하나**가 경로와 지문을 함께 낸다(부재 허용 입력) | R-4·R-7 이 각 구판에서 RED · R-5·R-8 이 처방 뒤 초록. 음성 대조가 「항상 재실행」과 가른다 |
 | **6″** 지문 배선이 **공유 convention 의 한 줄**이라 그 줄만 지우면 test 는 초록 | 지문용 property 를 없앴다 — 지울 둘째 줄이 **없다** | R-7 RED 선행 · 프로덕션 배선 A/B/C · 변이(지문 annotation 바꿔치움 → RED) |
+| **6‴** pitest 의 `reportDir` 만 옮기고 **옛 리포트를 남긴다** — 게이트가 좋은 낡은 수를 읽는다 | 게이트의 자리를 pitest task 속성에서 파생한다 — 자리가 **한 값**이고 옮기면 함께 움직인다 | R-10 RED 선행(구판 꼴에서 거짓 초록) · R-11 양방향 통제군 · `--rerun` A/B/C · 변이(파생 → 고정 경로 ⇒ RED) |
 | 7 XML 을 끄고 HTML 만 낸다 | 정책 해석이 XML 부재를 거부 | 단위 test 「출력 형식에 XML 이 없으면 거부한다」 |
 | 8 CI job 을 지운다 / `continue-on-error` | **막지 않는다** — 워크플로 diff 가시성 | 경계 문장이 선언한 범위 밖 |
 | 9 `threads` 를 올려 점수를 흔든다 | 정책 데이터가 고정 | `TIMED_OUT` 0 개 — 현 설정에서 흔들릴 변이가 없다 |
@@ -54,11 +55,11 @@ SHA 였다(v L-1) — 아래 §6·§7 이 라운드별로 가른다.
 ## 4. 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
 유도 기준은 **이 브랜치가 합친 main 의 고정 SHA**다 — `git log --no-merges --format= --name-only
-HEAD ^3ad4f3f6 | sort -u` = **26 경로 + evidence 넷 = 30**. 착수 base(`^df4976cc`)로 유도하면
+HEAD ^3ad4f3f6 | sort -u` = **27 경로 + evidence 넷 = 31**(수정 라운드 3 이 main 소스 하나를 더했다). 착수 base(`^df4976cc`)로 유도하면
 그 사이에 합친 main 의 **남의 커밋 경로까지** 들어와 집합이 부풀고, 같은 목록을 되돌림에 쓰면
 남의 변경을 지운다(그 실물이 `rollback.md` 에 있다).
 
-30 경로 전부 계약의 in_scope 안이다 — `gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈
+31 경로 전부 계약의 in_scope 안이다 — `gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈
 `build.gradle.kts`(일곱) · `.github/workflows/ci.yml` · `config/quality/**` ·
 `docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md`(계약 갱신
 2026-11-06) · `tools/workflow-step-refs-check.sh`(주석만) · evidence. **범위 밖 파일 0.**
@@ -165,6 +166,23 @@ rollback 원천은 그 고정 SHA 로 다시 옮겼다.
 선언이 하나라 convention 에서 지울 수 있는 줄이 `mutationXmlReport.set(...)` 뿐이고, 그것을
 지우면 값이 없어 게이트가 **즉시 실패**한다(조용한 통과가 아니다).
 
-## 8. 자기 승인 아님
+## 8. 수정 라운드 3 (2026-11-06) — 지적 하나
+
+| # | 지적 | 처리 | 실측 |
+| --- | --- | --- | --- |
+| v r3 L-1(low, 비차단) | 게이트가 읽는 자리와 pitest 가 쓰는 자리를 convention 의 **지역 값 하나**가 묶는다 — 한쪽만 옮기고 옛 리포트를 남기면 로컬 증분 빌드가 좋은 낡은 수로 통과한다(B5) | 자리를 **도구에서 받아온다**: `pitestMutationXmlReport()` 가 pitest task 의 `reportDir` 에서 파생하고 convention 은 그 한 줄만 쓴다. Gradle 이 권하는 producer→consumer 배선이라 게이트가 산출물 소비자로 선언되고 자리를 옮기면 양쪽이 함께 움직인다 | `commands.md` §12 — RED 선행(R-10, 거동) · 양방향 통제군 · `--rerun` A/B/C · 변이 RED |
+
+**M-1 과 같은 원칙의 둘째 적용이다** — 쓰이는 값과 그 값의 출처가 같은 것이어야 한다. M-1 은
+「경로와 지문」을 한 선언으로 모았고, L-1 은 「도구가 쓰는 자리와 게이트가 읽는 자리」를 한 값으로
+모았다. 둘 다 **갈라질 수 있는 둘째 자리를 없애는** 처방이고, 남는 우회는 그 한 줄을 일부러
+고쳐 쓰는 것(= diff 에 보이는 편집)뿐이다.
+
+**이 라운드의 회귀 test 는 실제 pitest plugin 을 적용한다** — 앞선 fixture 셋은 plugin 없이 task
+만 등록했고, 그래서 「도구가 쓰는 자리」를 재는 축이 그 안에 없었다. 새 fixture 는 plugin 을
+적용하고 `reportDir` 을 옮긴다. pitest 자체는 돌리지 않는다(`-x pitest`) — 재는 것은 분석이 아니라
+**게이트가 어느 파일을 읽는가**이고, 파생 배선이 게이트를 pitest 의 소비자로 묶으므로 빼지 않으면
+PIT 가 실제로 뜬다.
+
+## 9. 자기 승인 아님
 
 이 문서는 구현 레인이 쓴 것이고 판정이 아니다. 독립 검증(verifier)과 리뷰는 다른 패스가 한다.
