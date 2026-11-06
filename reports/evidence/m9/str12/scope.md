@@ -38,6 +38,12 @@
   500 한도를 넘었다(`:app:sizeGate` 실측). 새 파일에 `@Test` 가 없어 게이트 등재 대상은 아니다.
 - ~~`app/src/main/resources/application*.yml|properties`~~ — **쓰지 않았다.** 이 저장소에는 `application.yml` 이 하나도 없고 설정은 전부 env 다. 환경 기본값(base URL·timeout 둘·route 슬러그)은 **그 저장소 선례 그대로** `@ConfigurationProperties` 클래스의 기본 인자에 둔다(`OpeningCollectionProperties` 의 경로 기본값과 같은 자리) — 새 설정 파일을 하나 들여 기동 경로의 전제를 늘리지 않는다.
 - `config/quality/**` 의 게이트 등재 — 새 test 클래스 `gate-tests.properties` 등재(만드는 커밋에서 같이) **와 `architecture-policy.properties` 의 전송 표면 쌍·멤버 등재**(새 HTTP 클라이언트 보유자가 생기므로 `collection.transport.*` 등식이 그것을 요구한다)
+- **`app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt` — 계약 밖이었고
+  게이트 등재가 강제한 한 자리**(수정 라운드의 in_scope 대조에서 드러났다. 팀장 확인 대상).
+  그 게이트의 면제 수(`EXPECTED_EXEMPT_COUNT`)는 **의도된 래칫**이고 그 상수가 `config/quality/**`
+  가 아니라 이 test 파일에 산다 — app 에 설정·판정 값 타입 다섯이 생기면 tier 목록과 그 수가 함께
+  움직여야 하고, 움직이지 않으면 CI `check` 가 붉다(run 42016726748 에서 실측됐다). 등재를
+  `config/quality/**` 로만 좁히면 **같은 등재의 반쪽이 계약 밖**이 된다.
 - `docs/runbook/m6-6e-operations.md` · `docs/runbook/m7-7f-production.md`. **`docker/prod.env.template` 은 편집하지 않았다** — 그 파일의 키 집합은 `tools/prod-env-keys-check.sh` 가 compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고 그 compose 들은 out_scope 다. relay 는 compose 서비스가 아니라 일회 러너이므로 env 키 이름은 runbook 의 systemd unit 이 든다(§9 선례와 같은 자리).
 - `docs/discovery/capability-map.md` (`OPEN-STR-12` 행: 발송 축 닫음 · `OPEN-STR-12-INTERACTIVE` 분리) · `docs/adr/0005-domain-events-and-outbox.md` (필요하면 §7 addendum 한 단락)
 - `reports/evidence/m9/str12/**`
