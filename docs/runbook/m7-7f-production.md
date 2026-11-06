@@ -752,7 +752,7 @@ EnvironmentFile=/etc/bidvector-v2/relay.env
 #   bidvector.relay.owner=<운영자 id> · bidvector.relay.channel=telegram · bidvector.relay.claim-limit=50
 #     (첫 run 은 이 상한이 아니라 §13.4 ② 를 따른다 — `claim-limit=1`)
 #   SPRING_MAIN_WEB_APPLICATION_TYPE=none
-# **env 파일이 둘이다.** `--env-file` 은 **스택 설정**(§1.3 의 `prod.env` — compose 가 요구하는 키
+# **env 파일이 둘이다.** `--env-file` 은 **스택 설정**(§1 ③ 의 `prod.env` — compose 가 요구하는 키
 # 집합이고 `prod-env-keys-check.sh` 가 등식으로 잰다)이고, `EnvironmentFile` 은 **알림 채널 설정**
 # (§13.2 의 `relay.env` — compose 가 모르는 키라 템플릿에 넣지 않는다)이다. 둘을 한 파일로 합치면
 # 그 등식 검사가 relay 키를 죽은 키로 보고 붉어진다.
