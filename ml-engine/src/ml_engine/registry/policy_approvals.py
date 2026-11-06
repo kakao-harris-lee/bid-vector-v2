@@ -14,18 +14,28 @@ version 은 그대로 `evaluation-v1`, 전건 1700 passed, 재검증도 통과).
 **처방은 열거의 방향을 뒤집는 것이다**: 「무엇을 거부하는가」가 아니라 **「무엇이 승인됐는가」**
 를 코드 상수로 적는다. 승인된 version 은 **그 내용의 지문**과 함께만 존재한다.
 
-**묻는 자리는 조립 근 하나다** — `evaluation.policy_source.load_approved_evaluation_policy`
-(← `app.server._preload`). 거기가 **운영자의 선택이 들어오는 자리**이고, 그래서 env 가 하는
-일은 **승인된 산출물 사이에서 고르기**다. 그 한 자리가 두 갈래를 함께 거부한다 — 이름을
-유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`).
+**이 등록부를 묻는 자리는 셋이다** — 평가 축 둘과 추론 축 하나:
+
+1. `evaluation.policy_source.load_approved_evaluation_policy` ← `app.server._preload`
+   (조립 근, 빨리 실패)
+2. `evaluation.policy_source.verify_policy_source` ← `app.pipeline._run_holdout`
+   (게이트 자리, **도착한 값** — v r3 H-3a)
+3. `inference.policy.load_approved_inference_policy` ← `app.server._preload`
+   (조립 근 — v r3 H-3b; 그 축의 `maturity.window_days` 가 평가 창 선택을 바꾼다)
+
+각 자리가 두 갈래를 함께 거부한다 — 이름을 유지한 편집 사본(`DIGEST_MISMATCH`)과 이름을 바꿔
+단 사본(`UNREGISTERED_VERSION`). 그래서 env 가 하는 일은 **승인된 산출물 사이에서 고르기**다.
 
 **왜 뿌리 로더가 아닌가**(실측으로 정한 자리): 뿌리(`registry.policy.load_policy`)에서 물으면
 승인 밖 조합으로 로더를 검사하는 값 불변식 test 들이 재던 것을 잃는다 — **32 failed · 79
 errors**(11 파일). 그 test 들은 파생 정책에 현실적인 version 이름을 쓰고, 하나는 그 이름이
-승격 인용 문면에 나오는 것을 단언한다. 뿌리 검사가 더 막는 것은 「제품 게이트에 닿을 수 없는
-경로에서의 편집 사본」뿐이다 — 제품 게이트에 닿는 정책은 조립 근을 거친 것 하나이고, 그
-단일성은 호출 자리 집합 등식 넷이 진다(승인 미요구 로더 · `build_training_pipeline` ·
-`run_holdout` · `EvaluationPolicy` 생성 자리).
+승격 인용 문면에 나오는 것을 단언한다.
+
+**자리 단일성에 기대지 않는다**(v r3 H-3a → r4 H-4 에서 배운 것): 앞 판은 「게이트에 닿는
+정책은 조립 근을 거친 하나」를 근거로 승인을 한 자리에서만 물었는데, 호출 자리 집합 등식은
+「누가 부르는가」를 세고 「그 자리를 지나는 **값**」을 세지 않는다. 그래서 게이트 자리에서도
+묻고, 나아가 게이트가 쓰는 객체를 **승인 파일에서 재구성한 것**으로 고정한다(사유는
+`evaluation.policy_source` 모듈 docstring).
 
 **출하 파일 자체를 편집하는 길**은 런타임이 아니라 **CI** 가 막는다: 아래 등록부 상수와 출하
 파일의 지문 등식 test 가 붉어진다.
