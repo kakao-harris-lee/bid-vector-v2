@@ -1,6 +1,6 @@
 # M9/ops-code checklist
 
-판정 SHA **`3ad0d342`**(병합한 main `97ed49c4`). 계약의 acceptance 넷에 대한 대조표다.
+판정 SHA **`0817df3b`**(병합한 main `56bd33ea`). 계약의 acceptance 넷에 대한 대조표다.
 
 ## 1. acceptance 대조
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 403/401 비재시도 | `KonepsStatusDispositionTest` — 본문에 **재시도 가능 코드**를 싣고 상태만 차단인 응답에서 서버 카운터 1. **출하 정책을 resolve 한 값 위에서** 같은 계수를 `KonepsShippedPolicyWireTest` 가 다시 잰다 | 충족 |
 | 간격 위반 없음(주입 시계) | **세 단계를 따로 잰다** — 기계는 `KonepsCallPacerTest`(거동 여덟, 과수면 포함), 출하 값과 상한 뒤 순서는 `KonepsShippedPolicyWireTest`, **배선이 그 값과 잠드는 함수를 넘기는지는** `CollectionWiringTest` 둘 | 충족 |
-| 평가 → 알림함 1건(실 DB) | `EvaluationCommitInboxProductionTest` — 계정·공고를 심고 production 조립을 직접 세워 돌린 뒤 `notification_inbox` 행을 되읽는다 | 충족 |
+| 평가 → 알림함 1건(실 DB) | `EvaluationCommitInboxProductionTest` — 계정·공고를 심고 production 조립을 직접 세워 돌린 뒤 `notification_inbox` 행을 되읽는다. **투찰 종류 열까지 읽는다**(M9/paper-bid V25 병합 — 새 후보는 `NONE`) | 충족 |
 | 각 바꿔치우기 변이 RED | `commands.md` §4 — 변이 **열셋** 전부 RED(통제군 포함). 앞 판의 벽시계 단언은 변이 하나를 **통과했고**(계수 축과 섞였다) 그 사실이 거기 적혀 있다 | 충족 |
 
 ## 2. 왜 이 술어가 문자열이 아니라 구조인가
@@ -27,6 +27,7 @@
 | 처분이 나르는 값 | 걷기 처분이 **값 나르는 sealed** 라 소비 자리에 다운캐스트도 null 관례도 없다 — 표가 틀리면 컴파일이 막고, 운영 중 `ClassCastException` 이 설 자리가 없다 |
 | 사유 모집단 | 전수를 sealed 계층에서 뽑되 **쓰는 자리가 클래스 집합 등식을 먼저 잰다**(대표값 대체가 모집단을 바꿔치우는 것을 막는다 — `AxisLastObservedAtTest` 선례) |
 | 출하 값이 wire 에 닿음 | 처분 표와 간격을 재는 test 가 **출하 정책을 resolve 한 값** 위에서 돈다(`KonepsShippedPolicyWireTest`) — 좁힌 test 정책으로 갈음하지 않는다. 그래서 출하 표에서 403 행을 지우거나 간격을 `ZERO` 로 두는 변이가 **test 를 붉힌다** |
+| 새 후보의 투찰 종류 | **종류 전수 표가 정한다**(#137 `bidKindAxis`: `NEW_CANDIDATE` → `PER_NOTICE` → `NONE` 뿐). 생산자가 그 값을 지어내는 길이 없다 — `NotificationInboxRecord` 의 `require` 와 저장 층 짝 CHECK 가 두 겹이고, 축을 바꾸는 변이는 **생산자를 지나는 test 전부**를 붉힌다(단위 6/9 · 실 DB 2/3) |
 | 청중 장애 ↔ 빈 청중 | 두 사실이 **다른 값**이다(`NotificationAudience.Accounts` ↔ `Unavailable`) — 소비자가 소진 `when` 으로 받으므로 「조용히 0 건」이 표현되지 않고, 어댑터가 좁은 예외만 값으로 접어 평가 run 이 그 장애로 멈추지 않는다 |
 
 ## 3. 우회 — 고안하고 막은 것

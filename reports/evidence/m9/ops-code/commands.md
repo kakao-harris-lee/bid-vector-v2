@@ -1,7 +1,7 @@
 # M9/ops-code commands
 
-base `df4976cc` · **병합한 main `97ed49c4`**(복원 원천 — 앞서 `3ad4f3f6` 도 병합했다) · 판정 SHA
-**`908b197a`**(마지막 산출물 커밋 = 둘째 병합 커밋). 레인 규율대로 push 하지 않았다.
+base `df4976cc` · **병합한 main `56bd33ea`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4` 도 병합했다) ·
+판정 SHA **`0817df3b`**(마지막 산출물 커밋 = 셋째 병합 커밋). 레인 규율대로 push 하지 않았다.
 
 로컬은 **표적 `--tests` + 그 모듈 lint·게이트 + 변이**만 돌렸다. 전건 `check`·`qualityBaseline`·
 container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 `~/.local/bin/bv-build.sh ./gradlew
@@ -41,6 +41,8 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | `908b197a` | main `97ed49c4`(#134) 병합 — 겹침 둘, 충돌 해소 줄 0 |
 | `9286765d` | evidence 5차(판정 SHA `908b197a`) |
 | `3ad0d342` | v r3 M-1 — production 이 넘기는 기다림 함수의 두 고리(거동 · 상수 풀 형태) |
+| `d3aad2aa` | evidence 6차(판정 SHA `3ad0d342`) |
+| `0817df3b` | main `56bd33ea`(#137 paper-bid V25) 병합 — 투찰 종류 축을 `NONE` 으로 싣는다(컴파일이 강제) |
 
 ## 2. 표적 실행 — 핵심 결과 한 줄씩(판정 SHA 기준, 병합 뒤)
 
@@ -51,7 +53,8 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | `:procurement:test --rerun`(전건 — sealed 열거 축) | `tests=317 failures=0` |
 | `:workflow:test --rerun --tests 'bidvector.workflow.collection.*' --tests '…InboxRecordingNotificationsTest'` | `tests=116 failures=0` |
 | `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest' --tests '…EvaluationAdapterDependencyTest'` | `tests=135 failures=0` |
-| `:app:test --rerun --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' --tests '…EvaluationCommitRunnerTest'` | `tests=303 failures=0` |
+| `:app:test --rerun --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*'` | `tests=304 failures=0` |
+| `:adapters:test --rerun --tests 'bidvector.adapters.notificationinbox.*' --tests 'bidvector.adapters.evaluation.*'`(**실 DB** — 팀장 지시) | `tests=241 failures=0`(koneps 포함 합) · `EvaluationCommitInboxProductionTest` 3/0 · `NotificationInboxBidKindTest` 4/0 · `NotificationInboxPairConstraintTest` 5/0 |
 | `gateRegistrationGate` — workflow · adapters · app · procurement | 전부 통과(새 test 클래스 넷 등재 포함) |
 | ktlint(main·test)·detekt — workflow · adapters · app · procurement | 전부 BUILD SUCCESSFUL |
 | `leakPatternGate` | BUILD SUCCESSFUL |
@@ -137,6 +140,29 @@ class 가 `tests=12 failures=0` 이다(앞 판보다 늘어난 수가 main 의 �
 
 `NoticeWatchSubjectPort.kt`(#134 가 바꾼 main 소스)와 persistence test 둘은 **내 경로가 아니다** —
 겹침 목록이 그것을 계수로 말한다.
+
+## 4b. 셋째 병합(main `56bd33ea`, #137 paper-bid V25) — 의미 축이 겹쳤다
+
+**충돌 둘이 났고 양쪽을 보존해 풀었다**(앞 두 병합은 자동이었다).
+
+| 겹친 경로 | 내 변경 / main 변경 | 해소 |
+| --- | --- | --- |
+| `config/quality/gate-tests.properties` | +8 / +3 | 두 쪽이 **같은 사전순 자리**에 넣어 충돌 — 합집합으로. 등재 **523 = 내 것 ∪ main**(누락 0 · 초과 0 · 중복 0) |
+| `app/…/wiring/NotificationInboxWiring.kt` | +38 / +8 −3 | main 의 표지 줄(`bidKind=…`)과 이 레인의 청중 표지 함수가 **같은 꼬리**에 붙어 충돌 — 둘 다 남겼다 |
+| `workflow/…/notificationinbox/NotificationInboxPorts.kt` | +51 / +22 −8 | 자동 병합. 두 쪽 모두 보존(줄 수 189 = main 그대로 + 내 청중 타입) |
+| `config/quality/architecture-policy.properties` | +2 −1 / +2 | 자동 병합. 키 139 개를 합집합과 대조해 **불일치 1** — 그 하나는 내 쪽이 **치환**한 전송 서명이고(낡은 서명이 사라지는 것이 맞다) 양방향 등식 게이트가 초록으로 그것을 확인한다 |
+| `docs/discovery/capability-map.md` | +3 −3 / +5 −4 | 자동 병합. 줄 수 3972 = main 그대로(내 편집은 줄 수 불변 치환) |
+
+**의미 축**: #137 이 알림함 키에 투찰 종류(`NotificationBidKind`, 기본값 없음)를 더했고, 계약의
+「나중에 머지되는 쪽이 맞춘다」가 이 레인이다. **컴파일이 예고한 한 자리에서 멈췄다** — 생산자의
+record 생성 한 줄(「actual type is NoticeId」). 새 후보는 건이 생기기 **전**의 소식이라 축이 없고,
+#137 의 종류 전수 표가 그 자리를 `NONE` 으로 정한다(`NEW_CANDIDATE` → `PER_NOTICE`).
+
+**두 층에서 단언한다**: 커널 test 가 기록된 묶음의 축을, **실 DB test 가 되읽은 `bid_kind` 열**을
+본다. 변이 `NONE` → `REAL` 은 커널 `require` 가 먼저 막아 생산자를 지나는 test 전부를 붉힌다
+(단위 6/9 · 실 DB 2/3) — 통제군으로 #137 자신의 `NotificationInboxBidKindTest` 4/4 가 초록이다
+(그 test 는 이 생산자를 지나지 않는다). 저장 층 짝 CHECK 축은 #137 의
+`NotificationInboxPairConstraintTest` 5/5 가 든다.
 
 ## 5. clean-tree 게이트
 
