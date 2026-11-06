@@ -5,14 +5,23 @@ public 함수(`__all__`에 등재된 callable)를 `inspect`로 전수해, 임계
 
 from __future__ import annotations
 
+import importlib
 import inspect
+import pkgutil
 import sys
+import typing
 
+import ml_engine
 import ml_engine.evaluation as evaluation_module
-import ml_engine.evaluation.policy as evaluation_policy_module
-import ml_engine.evaluation.policy_source as policy_source_module
-import ml_engine.inference.policy as inference_policy_module
-from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
+from ml_engine.evaluation.policy import (
+    _INDEXED_LIST_PREFIXES,
+    _SCALAR_KEYS,
+    EvaluationPolicy,
+)
+from ml_engine.inference.policy import InferencePolicy
+from ml_engine.registry.policy import Policy as RegistryPolicy
+from ml_engine.serving.policy import ServingPolicy
+from ml_engine.training.policy import TrainingPolicy
 
 _POLICY_ALIASES = frozenset({"threshold", "seeds", "stratum"})
 """정책 키의 짧은 별칭 — 키 이름 그대로가 아니어도 같은 값을 낱개로 받는 자리들."""
@@ -115,55 +124,114 @@ def test_forbidden_parameter_names_track_the_policy_schema() -> None:
     assert _POLICY_ALIASES <= _FORBIDDEN_PARAMETER_NAMES
 
 
-# ── cr r3 M-4 — **정책을 파일에서 만드는 자리 전수**의 시그니처 ────────────────
-# 위 전수의 모집단은 `evaluation.__all__` 이다. 이 slice 가 만든 조립 근 로더 둘은 그
-# 목록에 없어서(제품 경로의 유일한 입구인데도) 그 전수가 보지 못했다 — `load_approved_
-# evaluation_policy(path, *, require_approval: bool = True)` 를 더하는 길이 모든 게이트를
-# 지나갔다. 이 slice 가 ④ 축에 적용한 규율(「새 public 표면 전수를 센다」)이 자기가 만든
-# 표면에는 걸리지 않은 자리다.
+# ── cr r4 M-2 · v r4 M-7 — 정책 입구 전수를 **해석된 타입**으로 모은다 ──────
+# 앞 판은 ⑴ 모듈 셋을 **손으로 적고** ⑵ `"Policy" in str(return_annotation)`(주석 문자열
+# 부분 일치)과 `"path" in parameters`(인자 이름)로 모집단을 만들었다. 둘 다 텍스트 술어라
+# 셋이 지나갔다(verifier 실측): 타입 **별칭**으로 반환 주석을 가리기 · 인자를 `source` 로
+# **개명** · 입구를 **넷째 모듈**에 두기. 셋 다 게이트를 바꾸지 않고 통과했다.
 #
-# 모집단을 **열거가 아니라 구조로** 만든다: 정책 모듈 안에서 「정책류를 돌려주고 `path` 를
-# 받는」 함수 전수. 그 전수가 아래 집합과 **같다**는 등식도 함께 걸어, 새 입구가 생기면
-# 이름이 달라도 이 자리에서 드러난다.
+# 이제 모집단은 **src 전체**(`ml_engine.*` 전 모듈 순회)에서 `typing.get_type_hints` 로
+# **해석한** 반환 타입이 정책 클래스를 담는 함수 전수다 — 별칭은 해석되고, 모듈 위치는
+# 무관하고, 인자 이름은 모집단 선정에 쓰이지 않는다.
+#
+# 모집단은 평가·추론·serving·training·registry **축 전부**를 함께 센다(cr r4 L-5 — 파일이
+# `tests/evaluation/` 에 있지만 범위는 그 디렉터리가 아니다).
+
+
+def _policy_types() -> tuple[type, ...]:
+    return (
+        EvaluationPolicy,
+        InferencePolicy,
+        RegistryPolicy,
+        ServingPolicy,
+        TrainingPolicy,
+    )
+
+
+def _returns_a_policy(func: object) -> bool:
+    try:
+        hints = typing.get_type_hints(func)  # type: ignore[arg-type]
+    except (NameError, TypeError, AttributeError):
+        # 해석 불가 주석은 모집단 밖이다. 좁혀 잡는 이유: `except Exception` 이면 새로
+        # 생긴 해석 오류를 **조용히** 모집단에서 빼 게이트가 비어 간다.
+        return False
+    returned = hints.get("return")
+    if returned is None:
+        return False
+    parts = typing.get_args(returned) or (returned,)
+    return any(
+        isinstance(part, type) and issubclass(part, _policy_types()) for part in parts
+    )
+
+
+def _policy_factories() -> set[tuple[str, str]]:
+    """src 전체에서 「정책류를 돌려주는 함수」 전수 — `(모듈, 이름)`."""
+    found: set[tuple[str, str]] = set()
+    for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine."):
+        module = importlib.import_module(info.name)
+        for name, obj in vars(module).items():
+            if not inspect.isfunction(obj) or obj.__module__ != module.__name__:
+                continue
+            if _returns_a_policy(obj):
+                found.add((module.__name__, name))
+    return found
+
 
 _POLICY_FILE_ENTRY_POINTS = frozenset(
     {
         ("ml_engine.evaluation.policy", "load_evaluation_policy"),
         ("ml_engine.evaluation.policy_source", "load_approved_evaluation_policy"),
-        ("ml_engine.inference.policy", "load_inference_policy"),
-        ("ml_engine.inference.policy", "load_approved_inference_policy"),
-        # 모듈 private 공용 읽기 — 위 추론 로더 둘이 **한 번 읽기**를 공유하는 자리다
-        # (승인 대조와 값 조립이 같은 바이트를 본다). private 도 모집단에 넣는다: 여기에
-        # 추가 매개변수가 생기면 public 래퍼의 시그니처는 그대로여도 주입 자리가 열린다.
         ("ml_engine.inference.policy", "_read_policy_file"),
+        ("ml_engine.inference.policy", "load_approved_inference_policy"),
+        ("ml_engine.inference.policy", "load_inference_policy"),
+        ("ml_engine.serving.policy", "load_serving_policy"),
+        ("ml_engine.training.policy", "load_training_policy"),
     }
 )
-"""정책을 **파일에서** 만드는 자리 전수. 전부 `path` 하나만 받아야 한다 — 그것이
-「임계를 낱개 인자로 받는 public 함수는 없다」(설계 검토 (1) 첫 행)의 기계적 표현이다."""
+"""정책을 **파일에서** 만드는 자리 전수 — `path` 하나만 받아야 한다. 그것이 「임계를 낱개
+인자로 받는 public 함수는 없다」(설계 검토 (1) 첫 행)의 기계적 표현이다. 모듈 private
+(`_read_policy_file`)도 넣는다: 거기에 매개변수가 생기면 public 래퍼 시그니처는 그대로여도
+주입 자리가 열린다."""
+
+_POLICY_DERIVATIONS = frozenset(
+    {
+        # 파일이 아니라 **이미 로드된 것**에서 파생한다 — 그래서 `path` 를 받지 않는다.
+        ("ml_engine.evaluation.policy_source", "verify_policy_source"),
+        ("ml_engine.inference.policy", "_coerce_values"),
+        ("ml_engine.inference.policy", "_inference_policy_of"),
+        # 뿌리 로더 — `known_keys`(스키마 전수)를 받는다. 값이 아니라 **어떤 키를 아는가**이고,
+        # 소비 로더가 자기 스키마를 넘기는 자리다(그래서 `== ["path"]` 밖의 유일한 예외).
+        ("ml_engine.registry.policy", "load_policy"),
+    }
+)
+"""`path` 를 받지 않는(또는 받되 스키마 인자가 더 있는) 정책 파생 자리 — **사유와 함께**
+명시 예외로 둔다. 새 함수가 이 둘 중 어느 집합에도 없으면 아래 등식이 붉다."""
 
 
-def _policy_file_entry_points() -> set[tuple[str, str]]:
-    modules = (evaluation_policy_module, policy_source_module, inference_policy_module)
-    found: set[tuple[str, str]] = set()
-    for module in modules:
-        for name, obj in vars(module).items():
-            if not inspect.isfunction(obj) or obj.__module__ != module.__name__:
-                continue
-            signature = inspect.signature(obj)
-            returns_policy = "Policy" in str(signature.return_annotation)
-            if returns_policy and "path" in signature.parameters:
-                found.add((module.__name__, name))
-    return found
-
-
-def test_policy_file_entry_points_are_exactly_the_known_set() -> None:
-    assert _policy_file_entry_points() == _POLICY_FILE_ENTRY_POINTS
+def test_policy_factories_split_into_file_entry_points_and_derivations() -> None:
+    """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외. 새 입구를 **어느 모듈에
+    두든**, 반환 주석을 **별칭으로 가려도**, 인자를 **개명해도** 이 등식이 먼저 붉다."""
+    assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_DERIVATIONS
+    assert frozenset() == _POLICY_FILE_ENTRY_POINTS & _POLICY_DERIVATIONS
 
 
 def test_every_policy_file_entry_point_takes_only_a_path() -> None:
-    """ML-07 acceptance ④ — CLI·env 로 값을 주입하는 추가 매개변수가 없다. 승인 요구 로더
-    둘에도 같은 단언이 걸린다(앞 판은 `load_evaluation_policy` 에만 있었다)."""
+    """ML-07 acceptance 4 — CLI·env 로 값을 주입하는 추가 매개변수가 없다."""
     for module_name, name in sorted(_POLICY_FILE_ENTRY_POINTS):
         module = sys.modules[module_name]
         signature = inspect.signature(getattr(module, name))
         assert list(signature.parameters) == ["path"], (module_name, name)
+
+
+def test_no_policy_derivation_takes_a_threshold_shaped_parameter() -> None:
+    """명시 예외 쪽도 **임계 이름**은 받지 않는다 — 예외 선언이 주입 통로가 되지 않게."""
+    violations: list[str] = []
+    for module_name, name in sorted(_POLICY_DERIVATIONS):
+        module = sys.modules[module_name]
+        signature = inspect.signature(getattr(module, name))
+        violations.extend(
+            f"{module_name}.{name}({parameter})"
+            for parameter in signature.parameters
+            if parameter in _FORBIDDEN_PARAMETER_NAMES
+        )
+    assert not violations, violations
