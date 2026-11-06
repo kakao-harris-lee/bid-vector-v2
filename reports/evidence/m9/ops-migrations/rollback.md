@@ -1,6 +1,7 @@
 # M9 / ops-migrations rollback
 
-착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `04e412c6`**.
+착수 base **`df4976cc`** · **복원 원천 `df4976cc`** · **실측 HEAD `eaa23fe8`**(라운드 4 의 마지막
+산출물 커밋).
 
 **원천이 착수 base 와 같다** — 이 브랜치는 main 을 합치지 않았다(`git log --merges df4976cc..HEAD`
 빈 출력). 합치는 라운드가 생기면 원천을 **그때 합친 main 의 고정 SHA** 로 다시 고정해야 한다
@@ -81,14 +82,14 @@ ALTER TABLE outbox DROP CONSTRAINT outbox_terminal_reason_state_check, DROP COLU
 전이가 `terminal_reason` 을 싣는다). 설정 쪽도 같은 축이다 — `bidvector.release.sha` 를 지우는 것은
 옛 jar 로 돌아간 **뒤**라야 한다(새 jar 는 그 값 없이 못 뜬다).
 
-## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `04e412c6`)
+## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `eaa23fe8`)
 
 | 단계 | 실측 |
 | --- | --- |
-| ① 목록 산출 | 내 커밋 경로 **104**(evidence 제외) = 복원 **91**(M) · 삭제 **7**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 104 로 닫힌다 |
-| ①′ **재측정한 이유** | 처음 `beeefba8` 에서 쟀고 그 뒤 **복원 목록 안의 파일**(장부 둘)을 커밋해 §4 술어가 두 줄을 냈다 — 규율대로 「등록부 한 줄도 재측정」이라 `04e412c6` 에서 ①~③ 을 다시 쟀다. 집합은 같다(장부 둘이 이미 M 안에 있었다) |
-| ② 명령 종료 코드 | `restore` **0** · `git rm` **0** — DEC-08 포함 HEAD(`50ef257a`)에서 잰 값이다. 현 HEAD 에서 그 쌍을 다시 돌리지 못한 것은 이 환경의 안전 검사가 스크립트 안의 `git rm` 을 막기 때문이고(우회하지 않았다), 끝 상태는 ③ 으로 쟀다 |
-| ③ 결과 트리 == `df4976cc` 트리 | `git read-tree -u --reset` exit **0** · `git diff --name-only df4976cc` **0 파일** · 미추적 **0** · V25+ 마이그레이션 **0** |
+| ① 목록 산출 | 내 커밋 경로 **106**(evidence 제외) = 복원 **93**(M) · 삭제 **7**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 106 으로 닫힌다 |
+| ①′ **재측정한 이유** | 라운드 4 가 복원 목록에 경로 **둘**을 더했다(`config/quality/architecture-policy.properties` · `AppHttpDependencyGateTest` — v B-1 등재). 앞 실측(`04e412c6`, 104 경로)을 옮기지 않고 ①~③ 을 이 HEAD 에서 다시 쟀다 |
+| ② 명령 종료 코드 | `restore` **0** · `git rm -f` **0** — 이 라운드는 **둘 다 실행했다**(앞 라운드는 이 환경의 안전 검사가 스크립트 안의 `git rm` 을 막아 끝 상태로만 쟀다. 경로를 명령행 인자로 넘기면 돈다) |
+| ③ 결과 트리 == `df4976cc` 트리 | 복원·삭제만으로 `git diff --name-only df4976cc -- . :(exclude)<evidence>` **0 파일** · 미추적 **0** · V25+ 마이그레이션 **0**. 갈음용 `git read-tree -u --reset` 도 exit **0** · 전체 diff **0 파일** |
 | ③′ 남의 변경 보존 | 이 브랜치는 병합 0 이라 그 축이 없다 — 대신 **남의 표지**를 센다(아래) |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `read-tree` 갈래에서는 **0**(evidence 까지 함께 되돌아간다). §1 의 실제 절차는 evidence 를 `EXCL` 로 빼므로 그 갈래에서는 이 디렉터리의 파일만 남고, §4 의 술어가 그 디렉터리를 대상에서 빼므로 유효성은 흔들리지 않는다 |
@@ -101,22 +102,29 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 
 ### 표지 계수 — 「내 줄 사라짐」과 「남의 줄 남음」 둘 다
 
-복원 뒤 저장소 전체에서 센 **파일 수**다. 종료 코드가 아니라 이 계수가 완료의 증거다.
+복원 뒤 센 **파일 수**다(§1 절차가 복원하지 않는 evidence 디렉터리는 센 대상에서 뺀다 — 그
+디렉터리에는 이 slice 의 어휘가 당연히 남는다). 종료 코드가 아니라 이 계수가 완료의 증거다.
 
 | 내 표지(0 이어야 한다) | 복원 뒤 |
 | --- | --- |
 | `OutboxTerminalReason` · `terminal_reason` · `ReleaseIdentifier` · `bidvector.release.sha` · `release_sha_required` | **전부 0** |
+| `ReleaseWiring`(조립과 그 게이트 등재 — 라운드 4 가 더한 축) | **0** |
 | `journey-e2e-release`(여정 하네스에 더한 줄) | **0** |
 | V26·V27 마이그레이션 파일 | **0** |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
 | --- | --- |
 | `raw_observation.release_sha`(V1 — OPS-10 조인의 원천) | 2 |
-| `OutboxEntryState`(M4/4C-1) | 18 |
+| `OutboxEntryState`(M4/4C-1) | 17 |
 | `BIDVECTOR_RELEASE_TAG`(M7/7F) | 12 |
 | `forceOutboxState`(relay DB 지원 — 내가 **사유를 더한** 함수가 원판으로 돌아왔다) | 5 |
 | `OUTBOX_STATE_VOCABULARY`(보존 fixture — 같은 축) | 3 |
 | `COMMON_PROPERTIES`(여정 하네스 — 파일은 남고 내 한 줄만 사라진다) | 1 |
+| `ProfileWiring`(면제 목록의 남의 이름 — 목록 자체가 원판으로 돌아왔다) | 17 |
+| 면제 계수 래칫 | `EXPECTED_EXEMPT_COUNT = 81`(내 +1 이 사라졌다) |
+
+`OutboxEntryState` 가 앞 라운드 표의 **18** 과 다른 이유는 술어다 — 위 문단대로 evidence
+디렉터리를 뺐고, 그 디렉터리의 파일 둘이 그 이름을 든다(포함해 세면 19). 산출물 쪽 변화가 아니다.
 
 내 표지를 고를 때 `release_sha` 단독은 쓸 수 없다 — V1 의 `raw_observation.release_sha` 가 그
 이름을 이미 들고 있어 **남의 줄까지 센다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다.
@@ -124,8 +132,8 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only 04e412c6..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only df4976cc..04e412c6 \
+git diff --name-only eaa23fe8..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only df4976cc..eaa23fe8 \
       -- . ':(exclude)reports/evidence/m9/ops-migrations' | sort -u)
 ```
 
@@ -140,7 +148,7 @@ git diff --name-only 04e412c6..<판정 SHA> -- \
 | 단계 | 실측 |
 | --- | --- |
 | 되돌림 전 — 열 셋 존재 | `outbox.terminal_reason` · `outbox.release_sha` · `collection_run.release_sha` **있음** |
-| 되돌림 전 — 관문 트리거 셋 | 이름 집합이 기대와 같다. **app 역할 연결에서도 셋이 다 보인다**(`CleanMigrationTriggerTest` 의 모집단과 같은 연결로 확인) |
+| 되돌림 전 — 관문 트리거 셋 | 이름 집합이 기대와 같다(소유자 연결 — `CleanMigrationTriggerTest` 와 같은 모집단). app 역할에서도 셋이 다 보인다는 것은 verifier probe 가 따로 실측했다 |
 | 되돌림 전 — 거부 셋 | 릴리스 없는 outbox INSERT · 사유 없는 종단 UPDATE · 릴리스 없는 회계 INSERT **전부 거부** |
 | forward-fix 적용 | `migrationsExecuted` **1** · 적용 version **28** · `flyway_schema_history` 마지막 **28** |
 | 되돌림 후 — 열·트리거·함수 | 열 셋 **없음** · 관문 트리거 **0** · 함수 둘 **0** |
@@ -151,9 +159,15 @@ test 실행 계수: `tests="1" skipped="0" failures="0" errors="0"`.
 
 **이 리허설이 잡은 것 둘**(둘 다 리허설 자신의 결함이고 산출물 결함이 아니다): ⓐ 첫 라운드에서
 **app 역할 연결**의 `information_schema.triggers` 가 트리거 셋 가운데 둘만 냈다 — 메타데이터
-단언을 admin 연결로 옮기고, 같은 모집단(app 풀)에서도 셋이 보이는지를 **따로** 재는 단언을 더했다
-(`CleanMigrationTriggerTest` 가 app 풀로 세기 때문에 이 축이 CI 판정을 가른다). ⓑ 거부된 INSERT 를
-행 수에 세는 기대 오류 하나.
+단언을 admin 연결로 옮겼다. ⓑ 거부된 INSERT 를 행 수에 세는 기대 오류 하나.
+
+ⓐ 의 **괄호 설명을 정정한다**(v L-1): 「`CleanMigrationTriggerTest` 가 app 풀로 세기 때문에 이
+축이 CI 판정을 가른다」는 **거짓**이다 — 그 test 는 `dataSource()`(= 소유자 연결)로 센다. 「app
+풀에서도 셋이 보인다」는 단언은 커밋되지 않은 리허설 test 에만 있었고, verifier 의 probe 는 `SET
+ROLE bidvector_app` 에서 **새 트리거 셋이 모두 보인다**고 실측했다(앱 권한이 두 표에 I/U 를
+가져 `information_schema.triggers` 의 가시성 조건을 만족한다). 「둘만 보였다」는 재현되지 않았고
+원인 기록도 없다. 커밋된 단언(트리거 이름 셋, 소유자 연결)은 이름 래칫으로 유효하고, 별도의 app
+가시성 단언은 필요 없다.
 
 ## 6. 코드를 되돌리지 않고 끄는 법
 

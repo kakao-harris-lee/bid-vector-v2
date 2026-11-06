@@ -152,5 +152,10 @@ ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 
    칸을 더하지 않고 `OPEN-M9-PROMOTED-ROW-RELEASE` 로 넘긴다 — 갱신 1 의 **근거 ②는 유효하고
    근거 ①이 좁아진** 형태다.
 5. **새 필수 키의 기동점 census 는 이 slice 가 세우지 않는다**(팀장 판단) —
-   `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`. H-1(여정 하네스)이 그 부재의 첫 실현이었고, 이번
-   라운드는 기동점 셋을 손으로 고치고 음성 대조(`ReleaseWiringTest`) 하나를 남겼다.
+   `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`. 그 부재는 **두 번** 실현됐다: cr H-1(여정 하네스)과
+   v H-1(6G runbook 의 스냅숏 추출 갈래 — 키가 갈래 둘에만 적혀 있었다). 손으로 고치는 방식이
+   같은 함정을 반복한다는 뜻이라, 그 runbook 은 키를 **공통 인자 블록 한 자리**로 모아 갈래가
+   늘어도 함께 가게 했다. 음성 대조도 두 층으로 섰다 — 조립 층(`AnnotationConfigApplicationContext`)과
+   **출하 기동 층**(`SpringApplication` + classpath 설정 원천, v M-3). census 가 없으니 남은 자리는
+   문면이 든다: `tools/image-hygiene-check.sh` 의 jvm-app `PROBE_ENV` 하나(v L-4, 오늘 무해 —
+   capability map 의 그 OPEN 행이 적는다).

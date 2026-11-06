@@ -41,13 +41,14 @@
   그 질문도 받는 slice 가 저장 자리와 같은 자리에서 정한다).
 - **판단 둘 승인됨**: V27 을 표 둘(`collection_run`·`outbox`)로 한정(조인 경로 근거 +
   `ExecutionRowReleaseTest`) · 설정 키 `bidvector.release.sha` 통일.
-- **in_scope 밖 넷 승인됨** — 전부 「기본값 제거로 깨지는 배선」이다:
+- **in_scope 밖 다섯 승인됨** — 전부 「기본값 제거로 깨지는 배선」이다:
   | 파일 | 무엇을 |
   | --- | --- |
   | `docker/compose.yaml` | app 서비스가 `BIDVECTOR_RELEASE_SHA` 를 받는다(값은 `BIDVECTOR_RELEASE_TAG`) — 운영 compose 는 이 파일을 상속하므로 `compose.prod.yaml` 편집 0 |
   | `docker/prod.env.template` | `BIDVECTOR_RELEASE_TAG` 안내 문구에 「두 자리에 쓰인다」 — **키 집합 불변**(등식 검사 exit 0, 키 18) |
   | `tools/local-tls-env.sh` | 로컬 기본값 = `git rev-parse --short HEAD` |
   | `.github/workflows/ci.yml` | compose 스모크 job env 하나 + 거부 스모크 `-e` 하나 |
+  | `web/e2e/harness/journey-up.mjs` | `COMMON_PROPERTIES` 한 줄 — 그 하네스가 띄우는 jar 기동 셋(collect·account·server)을 덮는다. **수정 라운드 4 에서 이 표에 올렸다**(앞 판은 아래 머지 순서 문장에만 있어 승인 표에 빠져 있었다 — v L-2) |
 - **적용 DB 되돌림 리허설: 로컬 Testcontainers 1회 허용**(버릴 Postgres · `bv-build` · 실행 전
   `free -m`). 두 갈래(새 V26·V27)의 실측은 `rollback.md` §5 가 적는다.
 

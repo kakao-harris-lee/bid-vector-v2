@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`beeefba8`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
+마지막 산출물 커밋 **`eaa23fe8`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -84,7 +84,11 @@
 | `docker/prod.env.template` | `BIDVECTOR_RELEASE_TAG` 안내에 「두 자리에 쓰인다」 추가. **키 집합 불변**(등식 검사 통과) |
 | `tools/local-tls-env.sh` | 로컬 기본값을 HEAD 짧은 SHA 로 — 로컬도 자기 릴리스를 댄다 |
 | `.github/workflows/ci.yml` | compose 스모크 job env 하나 + 거부 스모크의 `-e` 하나(없으면 기동이 다른 사유로 깨져 스모크가 재는 것이 사라진다) |
-| `docs/runbook/m6-6g-real-collection.md` · `m6-6e-operations.md` | 실행 명령의 키 이름과 속성 표 |
+| `web/e2e/harness/journey-up.mjs` | `COMMON_PROPERTIES` 한 줄 — 그 하네스의 jar 기동 셋을 덮는다 |
+
+**이 표는 다섯이고 `scope.md` 의 승인 표와 같은 집합이다**(v L-2 정정). 앞 판은 여정 하네스를
+빠뜨리고 **in_scope 안인** runbook 둘을 이 표에 넣고 있었다 — runbook 은 계약 in_scope 문면
+(「runbook(릴리스 식별자 주입 …)」) 안이고, `config/quality/**`·`docs/discovery/**` 도 그렇다.
 
 ## 계약 갱신 뒤 다시 잰 것 (2026-11-06 라운드 2)
 
@@ -126,12 +130,39 @@ HEAD 트리에 마이그레이션이 넷이 됐다. 그 가운데 **버전 27 �
 | 세 모듈 `compileTestKotlin` · `ktlint{Main,Test}SourceSetCheck` · `detekt` | exit 0 |
 | `web` npm lint·typecheck | **미실행** — 이 worktree 에 `node_modules` 가 없다(설치는 레인 밖 비용). `journey-up.mjs` 한 줄은 `node --check` 로 문법만 확인했다 · CI `web` job 이 정본 |
 
-### 전수 확인 — outbox 종단 행을 직접 쓰는 test fixture
+### 전수 확인 — outbox 행을 직접 쓰는 test fixture
 
-`command grep -rn "INSERT INTO outbox|UPDATE outbox" adapters/src/test app/src/test web` → **셋**이고
-전부 고쳤다: `EventTestSupport`(라운드 2 에서 릴리스) · `RetentionFixture`(상태별 유효 사유) ·
-`RelayDbSupport.forceOutboxState`(종단 강제 시 사유). 둘은 **verifier 가 먼저 찾았다** — 내 라운드 2
-표적 선택(`RelayVocabularyDatabaseTest` 만)이 그 둘을 지나갔다: **표적을 고르면 고른 만큼만 초록이다.**
+`command grep -rnE "INSERT INTO outbox|UPDATE outbox" adapters/src/test app/src/test web` → **문장
+다섯 · 파일 넷**이고 전부 관문을 지난다: `EventTestSupport` INSERT 하나(라운드 4 에서 **상태·사유·
+릴리스를 받는 한 함수**로 모았다 — test 소스의 유일한 outbox INSERT 다) · `RetentionFixture`
+INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxState` UPDATE(유도 사유) ·
+`OutboxTransitionSqlTest` UPDATE 둘(의도된 음성 하나 + 사유를 싣는 헬퍼 하나).
+
+앞 판이 「셋」이라 적은 것은 **고친 파일 수**였고 문장 전수가 아니었다. 라운드 2 의 표적 선택
+(`RelayVocabularyDatabaseTest` 만)이 그 가운데 둘을 지나갔고 verifier 가 먼저 찾았다 — **표적을
+고르면 고른 만큼만 초록이다.** 같은 함정이 라운드 3 의 app 쪽에서 반복됐다(v B-1).
+
+## 라운드 4 — verifier not-ready(@`41989335`) 재검증
+
+| 명령 | 결과 |
+| --- | --- |
+| `:app:test --rerun`(**전체** — 앞 라운드가 표적만 돌려 놓친 축) | exit 0 · **1014 tests · 0 실패**(앞 판 1012 + 출하 기동 음성·양성 둘) |
+| 재현: `:app:test --tests '…AppHttpDependencyGateTest' --rerun`(고치기 **전**) | **FAILED** — `ReleaseWiring` 참조 다섯이 위반(v B-1 재현) |
+| `:adapters:test --tests '…{event,persistence,relay,retention}.*' --rerun` | exit 0 · **390 tests · 0 실패**(66 클래스 — 헬퍼를 모은 뒤 사용처 전수) |
+| `:adapters:`·`:app:` × `ktlint{Main,Test}SourceSetCheck` · `detekt` | exit 0 |
+| 정적: 6G runbook §2-3 ↔ 공통 인자 | 키가 공통 인자 **한 자리**이고 갈래 셋이 `<공통 인자>` 로 받는다 |
+| 전건 `check` | **미실행** — PR CI 가 정본(공통 규율) |
+
+### 변이 — verifier 가 초록으로 실측한 셋을 겨눈다
+
+| 변이 | 표적 | 결과 |
+| --- | --- | --- |
+| `gap_all`(V26: INSERT 갈래→UPDATE 전용 + 트리거 이벤트 UPDATE 전용 + 요구 집합에서 `DELIVERED` 제거) | `OutboxTransitionSqlTest` | **RED 1** — 새 「종단 셋 전수」 test(앞 판은 adapters 전체 초록) |
+| `m9_outbox_rel_updateonly`(V27 outbox 릴리스 트리거 `BEFORE UPDATE`) | `ExecutionRowReleaseTest` | **RED 1** — 새 「릴리스 없는 새 outbox 행」 test |
+| `r2_resource_default`(`app/src/main/resources/application.properties` 에 `unversioned`) | `ReleaseWiringTest` | **RED 1 · 나머지 넷 초록** — 붉은 것은 ConfigData 를 지나는 새 test 하나다(앞 판 셋은 그 파일을 보지 못한다) |
+| 통제군(원복 뒤 `--rerun`, 결과 XML 삭제 후 재생성 확인) | 위 셋 전부 | 초록 재확인(adapters 22 · app 26) |
+
+변이 파일만 원복했고(산출물은 변이 전에 커밋), `r2` 가 만든 파일은 지웠다 — 작업 트리 미커밋 0.
 
 ## 등재만 (cr L-5)
 
