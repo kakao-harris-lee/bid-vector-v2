@@ -94,10 +94,15 @@ interface NotificationInboxStore {
         at: Instant,
     ): MarkReadOutcome
 
-    /** 한 공고의 묶음 전체를 읽음으로. 안읽음 항목만 바뀐다. */
+    /**
+     * **묶음 하나** 전체를 읽음으로 — 「한 공고 · 한 투찰 종류」다. 안읽음 항목만 바뀐다.
+     *
+     * 대상이 공고 쌍이 아니라 [NotificationGroupKey] 인 것이 M9/paper-bid 의 결정이다
+     * (D-M9P-3): 공고만 받으면 서면 묶음을 읽는 요청이 **실투찰 묶음까지** 읽는다.
+     */
     fun markNoticeRead(
         account: AccountId,
-        notice: NoticeId,
+        group: NotificationGroupKey,
         at: Instant,
     ): MarkReadOutcome
 }
@@ -158,6 +163,10 @@ enum class NotificationPageRejection {
 /**
  * 한 페이지. [totalCount] 는 **페이지 길이와 다른 값**이고 [unreadCount] 는 `unreadOnly`
  * 와 무관하게 **그 계정의 안읽음 전수**다(화면의 배지가 읽는 값이라 필터에 흔들리면 안 된다).
+ *
+ * [unreadCount] 는 **투찰 종류 전수를 함께 센다**(M9/paper-bid) — 서면 연습의 안읽음도 그 수에
+ * 든다. 축별로 가르지 않는 것은 배지가 「운영자가 아직 안 본 소식이 몇 건인가」 하나를 말하는
+ * 자리이기 때문이고, 축의 구분은 묶음 계수와 묶음 라벨이 진다. 알려진 제한에 등재한다.
  */
 data class NotificationInboxPage(
     val items: List<NotificationInboxItem>,
@@ -176,11 +185,11 @@ data class NotificationInboxPage(
  * 실제로 납작해지므로, 그 층에서는 `noticeKnown` boolean 이 이 구분을 들고 간다.
  */
 data class NotificationInboxItem(
-    val notice: NoticeId,
+    val group: NotificationGroupKey,
     val fact: NotificationFact,
     val occurredAt: Instant,
     val readAt: Instant?,
-    val group: NoticeGroupCounts,
+    val groupCounts: NoticeGroupCounts,
     val display: NoticeDisplay?,
 ) {
     /**
@@ -188,15 +197,20 @@ data class NotificationInboxItem(
      * 모른다. 저장된 짝에서 사실을 복원하는 자리가 [notificationFactOf] 하나이므로 이 값은
      * 늘 그 사실과 같은 종류를 가리킨다.
      */
-    val key: NotificationItemKey get() = NotificationItemKey(fact.kind, notice)
+    val key: NotificationItemKey get() = NotificationItemKey(group, fact.kind)
+
+    val notice: NoticeId get() = group.notice
 
     val read: Boolean get() = readAt != null
 }
 
 /**
- * 「건별 묶음」의 계수 — 같은 공고의 항목이 몇 개이고 그 중 몇 개가 안읽음인가. **응답이
- * 평탄해야 해서**(D-6A1-20 ⓑ) 묶음을 중첩으로 실을 수 없으므로, 항목마다 자기 묶음의 계수를
- * 싣고 클라이언트가 공고 쌍으로 묶는다.
+ * 「건별 묶음」의 계수 — **한 묶음**([NotificationGroupKey] — 공고 쌍 + 투찰 종류)의 항목이 몇
+ * 개이고 그 중 몇 개가 안읽음인가. **응답이 평탄해야 해서**(D-6A1-20 ⓑ) 묶음을 중첩으로 실을
+ * 수 없으므로, 항목마다 자기 묶음의 계수를 싣고 클라이언트가 그 키로 묶는다.
+ *
+ * **두 투찰 종류를 합쳐 세지 않는다**(M9/paper-bid): 합치면 「안읽음 2」가 실은 서면 1 + 실투찰
+ * 1 인 상태를 한 수로 보이고, 운영자가 실제로 할 일이 몇 건인지 알 수 없다.
  *
  * [itemCount] 는 **페이지와 무관한 묶음 전체 크기**다 — 묶음이 페이지 경계에 걸쳐도
  * 클라이언트가 「더 있다」를 알 수 있다.

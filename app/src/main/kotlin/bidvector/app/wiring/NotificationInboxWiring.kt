@@ -95,12 +95,17 @@ open class NotificationInboxWiring {
 }
 
 /**
- * 잃은 알림 한 건의 표지 — **종류와 공고 번호만**이다. 계정 주체도, 저장소 예외 메시지도 싣지
- * 않는다(후자에는 행 값이 실릴 수 있다 — 러너들의 `causeCodeOf` 와 같은 판단).
+ * 잃은 알림 한 건의 표지 — **종류와 공고 번호와 투찰 종류만**이다. 계정 주체도, 저장소 예외
+ * 메시지도 싣지 않는다(후자에는 행 값이 실릴 수 있다 — 러너들의 `causeCodeOf` 와 같은 판단).
+ *
+ * **투찰 종류를 싣는다**(M9/paper-bid): 같은 공고의 서면 건과 실투찰 건이 각자의 항목을 가지므로,
+ * 축이 없으면 **다른 두 항목의 실패가 로그에서 같은 줄**이 된다 — 잃은 것이 연습의 소식인지
+ * 실제 소식인지를 가릴 수 없다. 축 어휘는 닫혀 있어 이 줄에 자유 문면이 새지 않는다.
  */
 internal fun inboxWriteFailedLine(record: NotificationInboxRecord): String =
     "notification-inbox write failed kind=${record.fact.kind.name} " +
-        "notice=${record.notice.number.value}/${record.notice.round.value}"
+        "notice=${record.notice.number.value}/${record.notice.round.value} " +
+        "bidKind=${record.group.bidKind.name}"
 
 /**
  * 청중을 못 읽은 실행의 표지 — **예외 클래스 이름만** 싣는다(cr r2 MEDIUM). 계수도 주체도 메시지도

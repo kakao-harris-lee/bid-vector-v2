@@ -1,8 +1,8 @@
 package bidvector.app.http
 
-import bidvector.procurement.NoticeId
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.MarkReadOutcome
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPage
 import bidvector.workflow.notificationinbox.NotificationInboxStore
 import bidvector.workflow.notificationinbox.NotificationItemKey
@@ -48,7 +48,7 @@ class FakeNotificationInboxStore : NotificationInboxStore {
 
     /** 마지막 묶음 읽음 처리 대상 — 같은 축이고, 이쪽은 **종류를 싣지 않는** 것까지 재는 자리다. */
     @Volatile
-    var lastNotice: NoticeId? = null
+    var lastNotice: NotificationGroupKey? = null
 
     override fun list(
         account: AccountId,
@@ -69,10 +69,10 @@ class FakeNotificationInboxStore : NotificationInboxStore {
 
     override fun markNoticeRead(
         account: AccountId,
-        notice: NoticeId,
+        group: NotificationGroupKey,
         at: Instant,
     ): MarkReadOutcome {
-        lastNotice = notice
+        lastNotice = group
         return outcome
     }
 }

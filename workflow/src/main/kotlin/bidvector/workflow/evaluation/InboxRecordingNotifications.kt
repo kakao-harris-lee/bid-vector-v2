@@ -3,7 +3,9 @@ package bidvector.workflow.evaluation
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
@@ -27,8 +29,14 @@ import bidvector.workflow.strategy.Clock
  * 적는다(D-7C3B-9, 7C③-b 가 세운 자리). **알려진 제한**: 그래서 평가 run 의 종료 코드는 알림함
  * 기록 실패를 세지 않는다.
  *
- * 멱등하다 — 같은 `(계정, 종류, 공고)` 재기록은 그 항목을 갱신하고 둘째 행을 만들지 않는다
- * (NOTI-10 의 PK). 그래서 평가를 두 번 돌려도 알림함 행이 늘지 않는다.
+ * 멱등하다 — 같은 `(계정, 종류, 공고, 투찰 종류)` 재기록은 그 항목을 갱신하고 둘째 행을 만들지
+ * 않는다(NOTI-10 의 PK). 그래서 평가를 두 번 돌려도 알림함 행이 늘지 않는다.
+ *
+ * **투찰 종류는 [NotificationBidKind.NONE] 이다**(M9/paper-bid V25 병합). 새 후보는 **건이 생기기
+ * 전의 소식**이고 그 원천이 공고이므로 투찰 종류 축이 없다 — 그 사실을 어휘가 `NONE` 으로 적는다.
+ * 지어낸 값이 아니라 종류 전수 표가 정한 것이다(`NEW_CANDIDATE` 는 `BidKindAxis.PER_NOTICE`):
+ * `NotificationInboxRecord` 의 `require` 와 저장 층의 짝 CHECK 가 다른 짝을 거부한다. 그래서 여기에
+ * `REAL`·`PAPER` 를 적을 길이 없다 — 두 자리가 같은 표를 읽는다.
  */
 class InboxRecordingNotifications(
     private val channel: NotificationRequestPort,
@@ -72,12 +80,12 @@ class InboxRecordingNotifications(
         // 시각을 **한 번** 읽는다 — 계정이 여럿이면 각자 다른 시각을 받게 되고, 그 차이는 같은
         // 사실의 시각이 계정마다 다르다는 뜻이 되어 아무것도 설명하지 못한다.
         val occurredAt = clock.now()
+        val group = NotificationGroupKey(notification.noticeId, NotificationBidKind.NONE)
         accounts.forEach { account ->
             // `NotificationInboxRecord` 를 **만드는 단 한 자리**다 — paper-bid(V25)가 그 타입에
-            // 투찰 종류 필수 인자를 더하는 중이라 병합 때 한 줄로 그 값을 싣는다.
-            inbox.record(
-                NotificationInboxRecord(account, notification.noticeId, NotificationFact.NewCandidate, occurredAt),
-            )
+            // 투찰 종류 필수 인자를 더했고, 계약이 예고한 대로 **병합이 이 한 줄에서 컴파일을
+            // 막았다**(실측: 이 파일 하나, 「actual type is NoticeId」).
+            inbox.record(NotificationInboxRecord(account, group, NotificationFact.NewCandidate, occurredAt))
         }
     }
 }

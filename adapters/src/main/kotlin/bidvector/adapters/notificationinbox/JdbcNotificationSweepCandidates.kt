@@ -2,6 +2,7 @@ package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.DataSourceConnectionSource
+import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
@@ -54,13 +55,15 @@ class JdbcNotificationSweepCandidates(
 }
 
 /**
- * 행 → 값. 상태 꼬리표는 `valueOf` 로 복원한다 — 어휘가 코드와 DB CHECK 양쪽에 있고 그 둘이
- * 갈렸다면 **불가능한 상태**라 조용히 기본값으로 접지 않는다(어댑터의 기존 관례).
+ * 행 → 값. 상태 꼬리표와 **투찰 종류**는 `valueOf` 로 복원한다 — 어휘가 코드와 DB CHECK 양쪽에
+ * 있고 그 둘이 갈렸다면 **불가능한 상태**라 조용히 기본값으로 접지 않는다(어댑터의 기존 관례).
+ * 투찰 종류를 `REAL` 로 접는 기본값을 두면 서면 건의 소식이 실투찰 묶음에 적힌다.
  */
 private fun ResultSet.toSweepCase(): NotificationSweepCase =
     NotificationSweepCase(
         account = AccountId(getLong("account_id")),
         notice = NoticeKey(getString("notice_number"), NoticeRound.of(getString("notice_round"))),
+        bidKind = BidKind.valueOf(getString("bid_kind")),
         state = BidStateTag.valueOf(getString("state")),
         deadlineAt = getTimestamp("effective_deadline_at")?.toInstant(),
         documentDueAt = getTimestamp("document_due_at")?.toInstant(),

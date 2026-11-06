@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
-import { NOTIFICATION_DETAIL_DISPLAY, NOTIFICATION_KIND_DISPLAY } from '../display/notificationDisplay';
+import {
+  NOTIFICATION_BID_KIND_DISPLAY,
+  NOTIFICATION_DETAIL_DISPLAY,
+  NOTIFICATION_KIND_DISPLAY,
+} from '../display/notificationDisplay';
 
 import { InboxScreen } from './InboxScreen';
 
@@ -20,6 +24,7 @@ function item(overrides: Partial<NotificationItem> = {}): NotificationItem {
     detail: null,
     noticeNumber: 'SYN-7E3-RESULT',
     noticeRound: '000',
+    bidKind: 'REAL',
     occurredAt: '2026-11-02T01:00:00Z',
     read: false,
     readAt: null,
@@ -71,7 +76,7 @@ describe('알림함 — 받은편지함 하나', () => {
   it('항목이 종류의 문면과 사실 시각으로 선다', async () => {
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     expect(row.textContent ?? '').toContain(NOTIFICATION_KIND_DISPLAY.OPENING_COMPLETED.label);
     // M9 D-1 — 보이는 글자는 KST 표기다(앞 판은 응답의 ISO 원문이었다).
     expect(row.textContent ?? '').toContain('2026-11-02 10:00');
@@ -82,7 +87,7 @@ describe('알림함 — 받은편지함 하나', () => {
     mocked.listNotifications.mockResolvedValue(page([item({ detail: 'PROVISIONAL_FIRST' })], 1));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     expect(row.textContent ?? '').toContain(NOTIFICATION_DETAIL_DISPLAY.PROVISIONAL_FIRST.label);
   });
 
@@ -105,7 +110,7 @@ describe('알림함 — 받은편지함 하나', () => {
   it('항목이 그 공고의 워크시트로 가는 링크를 가진다', async () => {
     renderScreen();
 
-    const row = within(await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000'));
+    const row = within(await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL'));
     expect(row.getByRole('link').getAttribute('href')).toBe('/notices/SYN-7E3-RESULT/000');
   });
 });
@@ -121,7 +126,7 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
 
     // **목록이 온 뒤에 읽는다**(7E-2b r1 교훈): 적재 중에는 배지가 「값 없음」이라 여기서 바로
     // 읽으면 「본문을 세지 않는다」가 아니라 「아직 모른다」를 재게 된다.
-    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const badge = screen.getByTestId('inbox-unread-badge');
     expect(badge.textContent ?? '').toContain('7');
   });
@@ -132,7 +137,7 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
    */
   it('배지가 live region 이다 — 쓰기 성공이 조용하지 않다', async () => {
     renderScreen();
-    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
 
     const live = screen.getByRole('status');
     expect(live.getAttribute('data-testid'), 'live region 이 배지가 아니다').toBe('inbox-unread-badge');
@@ -143,7 +148,7 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
     mocked.listNotifications.mockResolvedValue(page([item({ read: true, readAt: '2026-11-02T02:00:00Z' })], 0));
     renderScreen();
 
-    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const badge = screen.getByTestId('inbox-unread-badge');
     expect(badge.textContent ?? '').toContain('0');
     expect(badge.textContent ?? '', '적재 중의 「값 없음」을 0 으로 읽지 않았다').not.toContain('값 없음');
@@ -164,7 +169,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     );
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const button = within(row).getByRole('button', { name: /읽음/u });
     expect(within(row).getByTestId('read-state').textContent ?? '').toContain('안읽음');
 
@@ -182,7 +187,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
      */
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
     expect(
-      within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).getByTestId('read-state')
+      within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')).getByTestId('read-state')
         .textContent ?? '',
       '응답 전에 읽음으로 바뀌었다 — 낙관 갱신이다',
     ).toContain('안읽음');
@@ -190,7 +195,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     release({ markedCount: 1, unreadCount: 0 });
     await waitFor(() =>
       expect(
-        within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).getByTestId('read-state')
+        within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')).getByTestId('read-state')
           .textContent ?? '',
       ).toContain('읽음'),
     );
@@ -208,7 +213,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     mocked.listNotifications.mockResolvedValue(
       page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
     );
@@ -218,7 +223,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
       expect(
         document.activeElement,
         '쓰기 뒤 포커스가 행으로 돌아오지 않았다 — 키보드 운영자가 자리를 잃는다',
-      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')),
+      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')),
     );
   });
 
@@ -241,16 +246,16 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     );
     renderScreen();
 
-    const second = await screen.findByTestId('notice-group-2-A-000');
+    const second = await screen.findByTestId('notice-group-2-A-000-REAL');
     fireEvent.click(within(second).getByRole('button', { name: /묶음 전체/u }));
 
     await waitFor(() =>
       expect(
         document.activeElement,
         '첫째 묶음으로 끌려갔다 — 운영자가 조작한 자리가 아니다',
-      ).toBe(screen.getByTestId('notice-group-2-A-000')),
+      ).toBe(screen.getByTestId('notice-group-2-A-000-REAL')),
     );
-    expect(document.activeElement).not.toBe(screen.getByTestId('notice-group-0-A-000'));
+    expect(document.activeElement).not.toBe(screen.getByTestId('notice-group-0-A-000-REAL'));
   });
 
   /**
@@ -262,7 +267,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNotificationRead.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
 
     const failure = await screen.findByTestId('write-failure');
@@ -280,7 +285,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNotificationRead.mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
     const failure = await screen.findByTestId('write-failure');
 
@@ -294,7 +299,7 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
       expect(
         document.activeElement,
         '다시 시도가 성공했는데 포커스가 갈 곳을 잃었다',
-      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')),
+      ).toBe(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')),
     );
   });
 
@@ -306,13 +311,13 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     mocked.listNotifications.mockResolvedValue(
       page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
     );
     fireEvent.click(within(row).getByRole('button', { name: /읽음으로/u }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId(
-      'notification-OPENING_COMPLETED-SYN-7E3-RESULT-000',
+      'notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL',
     )));
 
     // 운영자가 포커스를 다른 데로 옮긴 뒤, 무관한 재조회가 새 데이터를 가져온다.
@@ -333,14 +338,14 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNoticeNotificationsRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
     renderScreen();
 
-    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL');
     mocked.listNotifications.mockResolvedValue(
       page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
     );
     fireEvent.click(within(group).getByRole('button', { name: /묶음 전체/u }));
 
     await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByTestId('notice-group-0-SYN-7E3-RESULT-000')),
+      expect(document.activeElement).toBe(screen.getByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL')),
     );
   });
 
@@ -353,17 +358,27 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     );
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const button = within(row).getByRole('button', { name: /읽음/u });
     expect(button.hasAttribute('disabled'), '읽은 행의 버튼이 열려 있다').toBe(true);
     expect(button.textContent ?? '').toContain('읽음');
   });
 
-  it('읽음 처리는 종류와 공고 쌍으로 보낸다 — 합성 id 가 없다', async () => {
+  /**
+   * **투찰 종류가 그 행의 값으로 실려 나간다**(v M-1). fixture 를 `PAPER` 로 두는 것이 이
+   * test 의 요점이다 — `REAL` 행에서 누르면 축을 `'REAL'` 로 **고정한** 회귀가 그대로
+   * 통과한다(verifier 변이 W3 가 초록이었던 자리). 묶음 경로는 이미 `PAPER` 행에서 재고
+   * 있었고, 단건 경로만 그 축이 열려 있었다.
+   *
+   * 그 회귀가 조용한 이유: 상태 코드는 200 이고 `markedCount` 도 그럴듯하다 — 다만 서버가
+   * **실투찰 항목**을 읽음으로 바꾼다. 서면을 읽으면 실제 소식이 사라지는 꼴이다.
+   */
+  it('읽음 처리는 종류·공고 쌍·그 행의 투찰 종류로 보낸다 — 합성 id 가 없다', async () => {
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    mocked.listNotifications.mockResolvedValue(page([item({ bidKind: 'PAPER' })], 1));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-PAPER');
     fireEvent.click(within(row).getByRole('button', { name: /읽음/u }));
 
     await waitFor(() =>
@@ -371,21 +386,29 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
         kind: 'OPENING_COMPLETED',
         noticeNumber: 'SYN-7E3-RESULT',
         noticeRound: '000',
+        bidKind: 'PAPER',
       }),
     );
   });
 
-  it('묶음 전체 읽음은 공고 쌍만 보낸다', async () => {
+  /**
+   * **묶음 전체 읽음이 투찰 종류를 함께 보낸다**(M9/paper-bid). 공고 쌍만 보내면 서버가 같은
+   * 공고의 **실투찰 묶음까지** 읽어, 연습이 실제 소식을 지우는 꼴이 읽음 축에서 되살아난다.
+   * 그래서 여기서 재는 것은 「서면 묶음에서 눌렀을 때 PAPER 가 실려 나가는가」다.
+   */
+  it('묶음 전체 읽음은 공고 쌍과 그 묶음의 투찰 종류를 보낸다', async () => {
     mocked.markNoticeNotificationsRead.mockResolvedValue({ markedCount: 2, unreadCount: 0 });
+    mocked.listNotifications.mockResolvedValue(page([item({ bidKind: 'PAPER' })], 1));
     renderScreen();
 
-    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-PAPER');
     fireEvent.click(within(group).getByRole('button', { name: /묶음 전체/u }));
 
     await waitFor(() =>
       expect(mocked.markNoticeNotificationsRead).toHaveBeenCalledWith({
         noticeNumber: 'SYN-7E3-RESULT',
         noticeRound: '000',
+        bidKind: 'PAPER',
       }),
     );
   });
@@ -394,12 +417,12 @@ describe('읽음 처리는 서버 응답 뒤에만 보인다 (낙관 갱신 금�
     mocked.markNotificationRead.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();
 
-    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     fireEvent.click(within(row).getByRole('button', { name: /읽음/u }));
 
     expect(await screen.findByTestId('write-failure')).toBeTruthy();
     expect(
-      within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).getByTestId('read-state')
+      within(screen.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')).getByTestId('read-state')
         .textContent ?? '',
     ).toContain('안읽음');
   });
@@ -418,9 +441,40 @@ describe('건별 묶음', () => {
     );
     renderScreen();
 
-    const group = within(await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000'));
-    expect(group.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000')).toBeTruthy();
-    expect(group.getByTestId('notification-AWARD_DECIDED-SYN-7E3-RESULT-000')).toBeTruthy();
+    const group = within(await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL'));
+    expect(group.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')).toBeTruthy();
+    expect(group.getByTestId('notification-AWARD_DECIDED-SYN-7E3-RESULT-000-REAL')).toBeTruthy();
+  });
+
+  /**
+   * **같은 공고의 두 연습이 두 묶음이고 각자의 계수를 보인다**(M9/paper-bid). 한 블록에 섞이면
+   * 서버가 축별로 센 계수가 그 블록의 항목 수와 맞지 않고, 무엇보다 운영자가 연습 결과를
+   * 실제 결과로 읽는다.
+   *
+   * 묶음 머리의 **문면까지** 단언한다 — 행이 둘로 갈려 있어도 어느 쪽이 연습인지 보이지 않으면
+   * 갈라 놓은 뜻이 없다.
+   */
+  it('같은 공고의 서면·실투찰이 두 묶음이고 각자의 문면과 계수를 보인다', async () => {
+    mocked.listNotifications.mockResolvedValue(
+      page(
+        [
+          item({ bidKind: 'REAL', noticeItemCount: 1, noticeUnreadCount: 1 }),
+          item({ bidKind: 'PAPER', noticeItemCount: 2, noticeUnreadCount: 2 }),
+        ],
+        3,
+      ),
+    );
+    renderScreen();
+
+    const real = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL')).textContent ?? '';
+    const paper = screen.getByTestId('notice-group-1-SYN-7E3-RESULT-000-PAPER').textContent ?? '';
+
+    expect(real).toContain(NOTIFICATION_BID_KIND_DISPLAY.REAL.label);
+    expect(real).toContain('항목 1');
+    expect(paper).toContain(NOTIFICATION_BID_KIND_DISPLAY.PAPER.label);
+    expect(paper).toContain('항목 2');
+    // 두 묶음이 서로의 문면을 쓰지 않는다 — 한 얼굴로 접히면 행이 둘이어도 구분이 없다.
+    expect(real).not.toContain(NOTIFICATION_BID_KIND_DISPLAY.PAPER.label);
   });
 
   /** 묶음이 페이지 경계에 걸리면 그 사실을 말한다 — 서버의 전체 크기에서만 안다. */
@@ -430,7 +484,7 @@ describe('건별 묶음', () => {
 
     // **문면 자체를 잰다**(r1 CR M-4): 앞 판은 `'3'` 만 봤고 묶음 머리가 이미 「항목 3」을 적어
     // `hasMoreThanShown` 줄을 통째로 지워도 초록이었다 — 이름이 잰다고 한 것을 재지 않았다.
-    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL');
     expect(group.textContent ?? '').toContain('이 페이지에 다 오지 않았습니다');
   });
 
@@ -447,7 +501,7 @@ describe('건별 묶음', () => {
     );
     renderScreen();
 
-    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000');
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL');
     expect(group.textContent ?? '').not.toContain('이 페이지에 다 오지 않았습니다');
   });
 
@@ -460,7 +514,7 @@ describe('건별 묶음', () => {
     mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 1 });
     mocked.listNotifications.mockResolvedValue(page([item({ noticeNumber: 'B' })], 1));
     renderScreen();
-    const before = await screen.findByTestId('notice-group-0-B-000');
+    const before = await screen.findByTestId('notice-group-0-B-000-REAL');
 
     // 맨 앞에 새 공고의 묶음이 들어온다(새 알림이 그 사이에 오는 꼴) — 읽음 처리의 재조회가
     // 그 새 목록을 받는다.
@@ -469,9 +523,9 @@ describe('건별 묶음', () => {
     );
     fireEvent.click(within(before).getByRole('button', { name: /읽음으로/u }));
 
-    await waitFor(() => expect(screen.queryByTestId('notice-group-0-A-000')).not.toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('notice-group-0-A-000-REAL')).not.toBeNull());
     expect(
-      screen.getByTestId('notice-group-1-B-000'),
+      screen.getByTestId('notice-group-1-B-000-REAL'),
       '앞에 끼어든 묶음 때문에 뒤 묶음이 재마운트됐다',
     ).toBe(before);
   });
@@ -490,8 +544,8 @@ describe('건별 묶음', () => {
     );
     renderScreen();
 
-    expect(await screen.findByTestId('notice-group-0-A-000')).toBeTruthy();
-    expect(screen.getByTestId('notice-group-2-A-000')).toBeTruthy();
+    expect(await screen.findByTestId('notice-group-0-A-000-REAL')).toBeTruthy();
+    expect(screen.getByTestId('notice-group-2-A-000-REAL')).toBeTruthy();
   });
 
   /**
@@ -503,12 +557,12 @@ describe('건별 묶음', () => {
       page([item({ noticeKnown: false, noticeTitle: null, noticeStatus: null, noticeDeadlineAt: null })], 1),
     );
     const unknown = renderScreen();
-    const unknownText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000')).textContent ?? '';
+    const unknownText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL')).textContent ?? '';
     unknown.unmount();
 
     mocked.listNotifications.mockResolvedValue(page([item({ noticeKnown: true, noticeTitle: null })], 1));
     renderScreen();
-    const titlelessText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000')).textContent ?? '';
+    const titlelessText = (await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL')).textContent ?? '';
 
     expect(unknownText).not.toBe(titlelessText);
     expect(unknownText).toContain('공고를 모름');

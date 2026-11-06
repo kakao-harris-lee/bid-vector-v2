@@ -11,6 +11,7 @@ import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
@@ -115,6 +116,10 @@ class InboxRecordingNotificationsTest {
         record.notice.number.value shouldBe "M9-NOTI-1"
         record.fact shouldBe NotificationFact.NewCandidate
         record.occurredAt shouldBe RECORDED_AT
+        // **투찰 종류 축은 `NONE`**(M9/paper-bid V25) — 새 후보는 건이 생기기 전의 소식이라 그
+        // 축이 없고, 그 사실을 어휘가 적는다. 종류 전수 표가 정한 값이라 다른 값을 적을 길이 없다
+        // (`NotificationInboxRecord` 의 `require` 와 저장 층 짝 CHECK 가 같은 짝을 막는다).
+        record.group.bidKind shouldBe NotificationBidKind.NONE
     }
 
     /**

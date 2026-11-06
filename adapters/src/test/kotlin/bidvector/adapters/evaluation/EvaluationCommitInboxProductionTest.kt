@@ -90,7 +90,8 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
         results.single().shouldBeBidNow()
         val rows = inboxRows()
         rows shouldHaveSize 1
-        rows.single() shouldBe InboxRow(account.value, "NEW_CANDIDATE", notice.number.value, detail = null)
+        rows.single() shouldBe
+            InboxRow(account.value, "NEW_CANDIDATE", notice.number.value, detail = null, bidKind = "NONE")
         // 채널 축도 함께 남는다 — 두 축이 **같은 판정 하나**에서 나왔다는 사실이다.
         outboxCount() shouldBe 1
     }
@@ -218,13 +219,19 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
         val kind: String,
         val noticeNumber: String,
         val detail: String?,
+        /**
+         * **투찰 종류 축**(M9/paper-bid V25) — 새 후보는 건이 생기기 **전**의 소식이라 `NONE` 이다.
+         * 열을 읽는 이유: 커널의 `require` 와 저장 층의 짝 CHECK 가 같은 짝을 두 겹으로 막지만,
+         * 「production 경로가 실제로 그 값을 **쓴다**」는 이 열을 되읽어야 나온다.
+         */
+        val bidKind: String,
     )
 
     private fun inboxRows(): List<InboxRow> =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "SELECT account_id, kind, notice_number, detail_code FROM notification_inbox " +
+                    "SELECT account_id, kind, notice_number, detail_code, bid_kind FROM notification_inbox " +
                         "ORDER BY account_id, kind",
                 ).use { statement ->
                     statement.executeQuery().use { rows ->
@@ -236,6 +243,7 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
                                     rows.getString("kind"),
                                     rows.getString("notice_number"),
                                     rows.getString("detail_code"),
+                                    rows.getString("bid_kind"),
                                 )
                         }
                         read
