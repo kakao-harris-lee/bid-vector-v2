@@ -99,6 +99,14 @@ internal fun konepsTransportFor(
     runState: RunStateDirectory,
     budget: CallBudgetLedger,
     clock: Clock,
+    /**
+     * 간격을 **실제로 기다리는 함수**(v r2 M-1) — production 기본값은 [sleepFor] 다. 주입 자리를 둔
+     * 이유는 「배선이 출하 간격을 pacer 에 넘기는가」를 재려면 **요청된 기다림**을 값으로 봐야 하기
+     * 때문이다: 벽시계로는 계수 축(rate limiter 1 permit/1초)이 같은 지연을 만들어 두 축이 섞인다
+     * (실측 — 간격을 0 으로 둔 변이가 벽시계 단언을 통과했다). 기다림 자신이 잠드는지는 [sleepFor]
+     * 를 직접 부르는 test 가 잰다.
+     */
+    sleeper: (Duration) -> Unit = ::sleepFor,
 ): KonepsTransport {
     val httpPolicy = resolvedOrFail(KONEPS_HTTP_POLICY.resolve(on), "KONEPS 전송 정책")
     return KonepsTransport(
@@ -113,7 +121,7 @@ internal fun konepsTransportFor(
                 // OPS-08 — 간격도 **전송 정책**이 정한다(승인 상한처럼 설정에서 오는 값이 아니라
                 // rate limiter 값과 같은 표에서 온다: 둘은 같은 throttle 축의 두 축이다). 기다림이
                 // 주입이라 production 만 실제로 잠들고 test 는 벽시계를 태우지 않는다.
-                pacer = KonepsCallPacer(httpPolicy.minimumCallInterval, clock::now, ::sleepFor),
+                pacer = KonepsCallPacer(httpPolicy.minimumCallInterval, clock::now, sleeper),
             ),
     )
 }
@@ -128,7 +136,7 @@ internal fun konepsTransportFor(
  * `java.util.concurrent` 참조를 들여와 **전송 표면 게이트**가 거부하기 때문이다(실측) — 그 게이트의
  * 허용 집합을 넓히는 쪽이 아니라 `java.lang` 안에서 끝내는 쪽을 택했다.
  */
-private fun sleepFor(duration: Duration) {
+internal fun sleepFor(duration: Duration) {
     Thread.sleep(duration.toMillis(), duration.toNanosPart() % NANOS_PER_MILLI)
 }
 

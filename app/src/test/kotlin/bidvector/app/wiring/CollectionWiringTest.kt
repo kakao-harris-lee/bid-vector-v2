@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
+import bidvector.adapters.koneps.KonepsOpenApiNoticeSource
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
@@ -8,6 +9,8 @@ import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CallBudgetLedger
+import bidvector.procurement.CallSpend
+import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.CollectionRange
@@ -30,6 +33,7 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -367,44 +371,46 @@ class CollectionWiringTest {
     }
 
     /**
-     * **출하 간격이 배선을 타고 실제 대기까지 간다**(v r2 M-1 · cr r1 MEDIUM ② 잔여).
+     * **배선이 출하 간격을 관문의 기다림으로 넘긴다**(v r2 M-1 · cr r1 MEDIUM ② 잔여).
      *
      * `KonepsShippedPolicyWireTest` 는 출하 값으로 **자기 pacer 를 만들어** 관문의 기계를 잰다. 그래서
      * 「표의 값」과 「관문의 거동」은 잠겼지만 **그 사이의 운반 단계**(production 에서 pacer 를 만드는
-     * 단 한 자리가 그 값과 실제로 잠드는 함수를 넘기는가)는 아무 test 도 재지 않았다 — 배선에
-     * `Duration.ZERO` 를 넣는 변이와 기다림 함수를 빈 식으로 바꾸는 변이가 **둘 다 초록**이었다.
+     * 단 한 자리가 그 값을 넘기는가)는 아무 test 도 재지 않았다 — 배선에 `Duration.ZERO` 를 넣는
+     * 변이가 모든 표적에서 초록이었다.
      *
-     * 그래서 여기서는 **배선이 만든 소스로 두 번 부르고 벽시계를 잰다**. 두 측정이 한 자리에서
-     * 닫힌다: 간격이 0 이면 둘째 호출이 곧바로 나가고, 기다림이 식이면 역시 곧바로 나간다. 상한이
-     * 아니라 **하한** 단언이라 느린 호스트에서 흔들리지 않는다(실호출 0 — mock loopback).
-     *
-     * 비용은 이 class 에 출하 간격 하나(현재 1초)다.
+     * **벽시계로 재지 않는다**: 계수 축(rate limiter 1 permit/1초)이 같은 크기의 지연을 만들어
+     * 두 축이 섞인다 — 간격을 0 으로 둔 변이가 「두 호출이 1초 넘게 벌어진다」를 **통과했다**(실측).
+     * 그래서 **요청된 기다림을 값으로** 본다: 배선이 pacer 에 넘기는 기다림 함수를 기록기로 바꿔
+     * 끼우고, 그 기록이 출하 간격과 같은지 잰다(기대값도 출하 정책에서 읽는다 — 수를 다시 적지 않는다).
      */
     @Test
-    fun `배선이 만든 관문은 출하 간격만큼 실제로 기다린다`() {
+    fun `배선은 출하 간격을 관문의 기다림으로 넘긴다`() {
         val shipped = shippedMinimumCallInterval()
+        val requested = mutableListOf<Duration>()
         MockKonepsHttp { _, _ -> listOf(mapOf("bidNtceNo" to "SYN-M9-W-1", "bidNtceOrd" to "000")) }.use { mock ->
-            withBoot(
-                *validProperties(categories = "service"),
-                "bidvector.koneps.base-url=${mock.baseUrl}",
-            ) { booted ->
-                withClue(failureText(booted.failure)) { booted.failure shouldBe null }
-                val port =
-                    booted.context
-                        .getBean(CollectionSources::class.java)
-                        .all
-                        .single()
-                        .port
-                val day = CollectionReferenceDate(LocalDate.of(2026, 9, 24))
+            val source = pacedNoticeSource(mock.baseUrl) { requested += it }
+            val day = CollectionReferenceDate(LocalDate.of(2026, 9, 24))
 
-                port.fetchNotices(day, null)
-                val elapsedMillis = measureTimeMillis { port.fetchNotices(day, null) }
-
-                withClue("출하 최소 간격 $shipped · 둘째 호출에 걸린 시간 ${elapsedMillis}ms") {
-                    (elapsedMillis >= shipped.toMillis()) shouldBe true
-                }
-            }
+            source.fetchNotices(day, null)
+            source.fetchNotices(day, null)
         }
+
+        // 첫 호출은 기다리지 않고 둘째가 간격만큼 기다린다 — 고정 시계라 그 값이 정확히 선언값이다.
+        requested shouldContainExactly listOf(shipped)
+    }
+
+    /**
+     * **배선이 넘긴 그 함수가 실제로 잠근다**(v r2 M-1 의 뒷면). 위 test 는 **값**을 재므로, 기다림을
+     * 빈 식으로 바꾸는 변이는 그 test 를 붉히지 않는다. 그 축을 여기서 짧은 기다림으로 직접 잰다 —
+     * production 이 pacer 에 넘기는 바로 그 함수다(위 test 의 주입 기본값).
+     */
+    @Test
+    fun `배선의 기다림은 실제로 잠든다`() {
+        val requested = Duration.ofMillis(SLEEP_PROBE_MILLIS)
+
+        val elapsed = measureTimeMillis { sleepFor(requested) }
+
+        withClue("요청 $requested · 실제 ${elapsed}ms") { (elapsed >= SLEEP_PROBE_MILLIS) shouldBe true }
     }
 
     @Test
@@ -431,6 +437,42 @@ class CollectionWiringTest {
             }
         }
     }
+}
+
+/** 기다림을 실제로 재는 짧은 값 — 벽시계 하한 단언이라 느린 호스트에서 흔들리지 않는다. */
+private const val SLEEP_PROBE_MILLIS = 40L
+
+/**
+ * **production 조립과 같은 인자로** 세운 공고 소스 — 다른 것은 기다림 함수 하나뿐이다
+ * (`CollectionWiring.sourceFor` 와 같은 인자 여섯). 관문은 `konepsTransportFor` 가 만든 그것이다.
+ */
+private fun pacedNoticeSource(
+    baseUrl: String,
+    sleeper: (Duration) -> Unit,
+): KonepsOpenApiNoticeSource {
+    val day = LocalDate.of(2026, 9, 24)
+    val transport =
+        konepsTransportFor(
+            credential = KonepsCredentialProperties("TRANSPORT-PROBE-KEY"),
+            on = day,
+            runState = RunStateDirectory(Files.createTempDirectory("m9-paced-run-state")),
+            budget =
+                CallBudgetLedger(
+                    CollectionCallBudget(perDay = 10, total = 10),
+                    day,
+                    CallSpend(total = 0, today = 0),
+                ),
+            clock = Clock { Instant.parse("2026-09-24T03:00:00Z") },
+            sleeper = sleeper,
+        )
+    return KonepsOpenApiNoticeSource(
+        gate = transport.gate,
+        baseUri = URI.create("$baseUrl/getBidPblancListInfoServc"),
+        serviceKey = transport.serviceKey,
+        httpPolicy = transport.httpPolicy,
+        collectionPolicyProvider = ::collectionPolicyAt,
+        businessDivision = BusinessDivision.SERVICE,
+    )
 }
 
 /**
