@@ -73,20 +73,22 @@ internal fun awardFinishLine(
     exitCode: CollectionExitCode,
 ): String =
     "award-collection finished slots=${report.slots} received=${report.received} stored=${report.stored} " +
-        "truncatedSlots=${report.truncatedSlots} halted=${report.halted != null} exit=${exitCode.value}"
+        "unfinishedSlots=${report.unfinishedSlots} halted=${report.halted != null} exit=${exitCode.value}"
 
 /**
- * **절단도 미완이다**(cr H-1) — 멈춤(예산·쿼터)뿐 아니라 **잘린 슬롯이 하나라도 있으면** 미완으로
- * 끝낸다. 형제 공고 목록 갈래(`exitCodeOf`)와 같은 술어이고, 개찰결과 갈래가 절단을 무시하는 선례를
- * 물려받지 않는다: 그 갈래에는 확정 표본 원장이 있어 끝나지 않은 축을 다음 실행이 받지만, 이 갈래에는
- * **슬롯 단위 이어 돌기가 없다**. 종료 코드 0 이 나가면 runbook 의 「0 = 다음 조각」이 운영자를 넘기고
- * 그 개찰일의 낙찰 원문은 사람이 그 조각을 다시 지목하지 않으면 영영 들어오지 않는다 — 결측이 조용해진다.
+ * **끝내지 못한 슬롯이 하나라도 있으면 미완이다** — 멈춤(예산·쿼터)뿐 아니라 절단과 **짧은 걷기**까지
+ * 든다(cr r1 H-1 · cr r2 H-2). 형제 공고 목록 갈래(`exitCodeOf`)보다 넓은 술어이고, 개찰결과 갈래가
+ * 절단을 무시하는 선례를 물려받지 않는다: 그 갈래에는 확정 표본 원장이 있어 끝나지 않은 축을 다음
+ * 실행이 받지만, 이 갈래에는 **슬롯 단위 이어 돌기가 없다**. 종료 코드 0 이 나가면 runbook 의
+ * 「0 = 다음 조각」이 운영자를 넘기고 그 개찰일의 낙찰 원문은 사람이 그 조각을 다시 지목하지 않으면
+ * 영영 들어오지 않는다 — 결측이 조용해진다.
  *
- * 절단과 멈춤에 **같은 코드**를 쓰는 이유: 운영자의 다음 행동이 같다(그 조각을 다시 돌린다). 갈리는 것은
- * 「언제」뿐이고 그 사유는 halted 줄과 `truncatedSlots` 계수가 로그에서 말한다(runbook §3 이 둘을 가른다).
+ * 세 사유에 **같은 코드**를 쓰는 이유: 운영자의 다음 행동이 같다(그 조각을 다시 돌린다). 갈리는 것은
+ * 「언제」와 「고칠 자리가 설정·정책인가」뿐이고, 그 갈림은 halted 줄과 `unfinishedSlots` 계수, 그리고
+ * 수집 회계 행의 사유·총수가 말한다(runbook §3 이 그 셋을 가른다).
  */
 internal fun awardExitCodeOf(report: AwardCollectionReport): CollectionExitCode =
-    if (report.halted == null && report.truncatedSlots == 0) {
+    if (report.halted == null && report.unfinishedSlots == 0) {
         CollectionExitCode.COMPLETE
     } else {
         CollectionExitCode.INCOMPLETE

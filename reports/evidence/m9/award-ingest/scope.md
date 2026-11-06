@@ -22,6 +22,7 @@
 - 필요 시 `workflow/src/main/kotlin/bidvector/workflow/collection/**` 새 use case(기존 수정은 멈추고 보고)
 - `app/src/test/kotlin/bidvector/app/**` E2E · `config/quality/**` 게이트 등재
 - 새 runbook `docs/runbook/m9-award-collection.md` · `docs/discovery/capability-map.md`(OPEN 행 종결/갱신) · `reports/evidence/m9/award-ingest/**`
+- **계약 갱신 — 팀장 승인(수정 라운드 2)**: `docs/runbook/m6-6e-operations.md` §3.1·§3.3. incident runbook 이 이 네 번째 수집 갈래를 모르고, 그 `INCOMPLETE` 처방(「다음 실행이 이어 돈다」)이 이 갈래에서 **틀린다**(cr r2 M-1 — 이 갈래는 이어 돌지 않고, `halted` 줄 없는 exit 2 가 그 표에 없다). 더하는 것은 **그 두 절의 포인터와 예외 문단만**이다(다른 절·다른 문서는 범위 밖 — `m6-6g-real-collection.md` §2 의 같은 어긋남은 그 문서를 다음에 만지는 slice 몫으로 남긴다).
 
 ## out_scope
 

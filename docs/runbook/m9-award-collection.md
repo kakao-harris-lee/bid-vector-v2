@@ -62,14 +62,53 @@ java -jar app.jar \
 
 | 코드 | 뜻 | 처방 |
 | --- | --- | --- |
-| 0 | 조각을 끝까지 걸었다(잘린 슬롯 0) | 다음 조각 |
+| 0 | 조각의 **모든 슬롯을 끝까지 받았다**(`unfinishedSlots=0`) | 다음 조각 |
 | 2 + `halted …` 줄 있음 | 멈췄다(예산 또는 쿼터) | 예산이면 다음 날 **같은 조각**부터, 쿼터면 계정 한도를 본 뒤 같은 조각 |
-| 2 + `halted` 줄 없음, `truncatedSlots>0` | 일부 슬롯이 잘렸다(전송 실패·게이트웨이 거절·반복 쪽) | **그 조각을 다시 돌린다.** 이 갈래에는 슬롯 단위 이어 돌기가 없어 다음 조각으로 넘어가면 그 개찰일의 낙찰 원문이 영영 빠진다. 다시 돌려도 같은 수가 나오면 `award-collection slot` 줄의 절단 사유로 원인을 가린다 |
+| 2 + `halted` 줄 없음, `unfinishedSlots>0` | 일부 슬롯을 **끝내지 못했다** — 절단이거나 **사유 없는 짧은 걷기**(총수를 말한 원천에서 덜 받고 끝났다) | **그 조각을 다시 돌린다.** 이 갈래에는 슬롯 단위 이어 돌기가 없어 다음 조각으로 넘어가면 그 개찰일의 낙찰 원문이 영영 빠진다. 다시 돌려도 같은 수가 나오면 아래 §3.1 로 사유를 가린다 |
 | 3 | 다른 실행이 잠금을 쥐고 있다 | 그 실행이 끝난 뒤 다시 |
 | 4 | 잠금을 걸 수 없다 | 디렉터리 경로·권한을 고친다(기다려도 풀리지 않는다) |
-| 1 | 실패 | `award-collection failed cause=…` 토큰으로 원인을 가린다 |
+| 1 | 실패 | `collection failed cause=…` 토큰으로 원인을 가린다 |
 
 로그 한 줄에는 건수·날짜·업종 이름·열거값만 실린다 — 공고번호도 낙찰자 상호도 서비스 키도 없다.
+**슬롯 단위 줄은 이 갈래에 없다**(마침 줄의 계수뿐이다) — 어느 개찰일이 미완인지와 그 사유는 §3.1 의
+두 자리에 남는다.
+
+### 3.1 미완 슬롯의 사유를 어디서 읽는가
+
+로그는 실행 하나의 계수만 든다. 슬롯별 사유는 둘 중 한 자리에 있다.
+
+1. **수집 회계 행**(DB) — 슬롯마다 한 행이다. 절단 사유와 총수·받은 수를 함께 든다.
+
+   ```sql
+   SELECT reference_date, received, source_total, pages_fetched, truncation_cause
+   FROM collection_run
+   WHERE source_endpoint = 'OPENING_AWARD_LIST'
+     AND reference_date BETWEEN '<from>' AND '<to>'
+   ORDER BY reference_date;
+   ```
+
+   - `truncation_cause` 가 **있으면** 절단이다. 토큰은 닫힌 어휘(`truncationCodeOf`)이고 자주 보이는
+     것은 `TRANSPORT_FAILURE`·`SERVER_ERROR`·`TIMEOUT`·`NOT_RETRYABLE`·`REPEATED_PAGE`·`MAX_PAGES`·
+     `INPUT_ERROR`·`STRUCTURE_FAILURE`·`SELF_THROTTLED`·`UNCLASSIFIED` 다(전수는 그 함수가 정본이고
+     여기 열거는 그 부분집합이 아니라 **그 함수의 오늘 전수에서 예산·쿼터 둘을 뺀 것**이다 — 그 둘은
+     `halted` 줄로 간다).
+   - `truncation_cause` 가 **비었는데** `received < source_total` 이면 **짧은 걷기**다(빈 쪽·`NoData`
+     로 곱게 멈췄다). 사유 토큰이 없는 것이 정상이고, 그 차이가 결측의 크기다.
+   - 둘 다 아니면(`received = source_total`) 그 슬롯은 끝난 것이다.
+
+2. **시도 원장**(실행 상태 디렉터리의 파일) — 호출 단위다. 그 개찰일의 줄에 `FAILED:<CODE>` 가
+   남으므로 회계 행이 없는 판(예외로 끝난 슬롯)에도 사유가 있다.
+
+**다시 돌려도 같은 답이 나오는 축**은 따로다 — `MAX_PAGES`·`NOT_RETRYABLE`·`INPUT_ERROR` 셋과
+`SELF_THROTTLED`. 앞 셋은 저장소가 **확정 실패**로 가른 축이고(`attemptOutcomeOf`), 고칠 자리는 쪽
+상한·서비스 키 승인 상태·요청 파라미터다. `SELF_THROTTLED` 는 우리 속도 보호가 거부한 것이라 호출이
+나가지도 않았다 — 조각을 더 작게 나누거나 속도 정책을 고친다. 넷 다 같은 조각을 되돌이로 돌리면 승인
+호출만 태운다.
+
+그 밖(`TRANSPORT_FAILURE`·`SERVER_ERROR`·`TIMEOUT`·`STRUCTURE_FAILURE`·`REPEATED_PAGE`·`UNCLASSIFIED`)은
+**일시**로 분류된 축이라 같은 조각 재실행이 맞는 처방이다. `UNCLASSIFIED` 가 반복되면 그 응답 형태가
+아직 어휘에 없다는 뜻이므로 재실행을 되돌이로 만들지 말고 그 사유를 올린다(분류를 더하는 일이다).
+짧은 걷기도 일시 축이다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
 
 ## 4. 승격(낙찰 칸 채우기)
 

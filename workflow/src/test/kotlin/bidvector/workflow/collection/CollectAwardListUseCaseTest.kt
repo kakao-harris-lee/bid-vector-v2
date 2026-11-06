@@ -18,7 +18,8 @@ import java.time.LocalDate
 /**
  * M9/award-ingest D-1 — 낙찰 목록 수집 use case 의 계약: 개찰일 × 업무마다 목록을 끝까지 걷고 항목마다
  * **원문 적재만** 하며 슬롯마다 `OPENING_AWARD_LIST` 회계를 남긴다. canonical 저장소를 받지 않으므로
- * 승격 경로는 구조적으로 없다. 멈춤은 예산·쿼터 둘뿐이고 그 밖의 절단은 다음 슬롯으로 간다.
+ * 승격 경로는 구조적으로 없다. 멈춤은 예산·쿼터 둘뿐이고 그 밖에 끝내지 못한 슬롯(절단 · **사유 없는
+ * 짧은 걷기**)은 미완 계수만 올리고 다음 슬롯으로 간다.
  */
 class CollectAwardListUseCaseTest {
     private val construction = sourceName("construction")
@@ -118,6 +119,65 @@ class CollectAwardListUseCaseTest {
         report.stored shouldBe 1
     }
 
+    /**
+     * cr r2 H-2 회귀 — **사유 없이 짧게 끝난 걷기도 미완이다.** 원천이 총수를 말한 뒤 빈 쪽이나
+     * `NoData` 로 「곱게」 멈추면 절단 사유가 **없다**(어댑터가 `markTruncated` 를 부르지 않는다).
+     * 앞 판은 사유만 봐서 그 슬롯을 완료로 적었고, 이 갈래에는 슬롯 이어 돌기가 없어 그 개찰일의
+     * 원문이 영영 빠졌다 — 절단과 같은 결말이다.
+     *
+     * 두 문을 함께 잠근다: 첫 슬롯은 **총수 미달로 멈춘 한 쪽**(빈 쪽·`NoData` 가 내는 모양),
+     * 둘째 슬롯은 **총수만큼 받은** 정상 걷기다(그 슬롯이 미완으로 세어지면 과잉이다).
+     */
+    @Test
+    fun `총수를 말한 원천에서 덜 받고 끝난 슬롯은 사유가 없어도 미완이다`() {
+        val fixture = AwardFixture()
+        val source =
+            ScriptedSource { date, _ ->
+                if (date == day1) {
+                    // 총수 3 을 말한 쪽에서 둘만 받고 걷기가 끝났다 — 절단 사유는 없다.
+                    awardBatch(
+                        listOf(awardObservation("S1"), awardObservation("S2")),
+                        accounting = shortWalkAccounting(received = 2, sourceTotal = 3),
+                    )
+                } else {
+                    awardBatch(listOf(awardObservation("F1")))
+                }
+            }
+
+        val report =
+            fixture.useCase.collect(
+                awardRange("2026-09-01", "2026-09-02"),
+                listOf(AwardCollectionSource(construction, source)),
+            )
+
+        // 멈춘 것이 아니다(사유가 없다) — 그래도 끝내지 못한 슬롯 하나다.
+        report.halted shouldBe null
+        report.unfinishedSlots shouldBe 1
+        report.slots shouldBe 2
+        report.stored shouldBe 3
+    }
+
+    /**
+     * 빈 응답은 **오류가 아니다** — 그 개찰일에 낙찰이 없었을 뿐이다(원천 총수도 0). 위 단언이
+     * 「받은 수 < 총수」가 아니라 「0 행」을 미완으로 세게 되면 낙찰 없는 날마다 운영자가 같은
+     * 조각을 영원히 다시 돌린다.
+     */
+    @Test
+    fun `낙찰이 없는 날의 빈 응답은 끝낸 것이다`() {
+        val fixture = AwardFixture()
+        val empty = ScriptedSource { _, _ -> awardBatch(emptyList(), accounting = sourceAccounting(normalized = 0)) }
+
+        val report =
+            fixture.useCase.collect(
+                awardRange("2026-09-01", "2026-09-01"),
+                listOf(AwardCollectionSource(construction, empty)),
+            )
+
+        report.unfinishedSlots shouldBe 0
+        report.halted shouldBe null
+        report.stored shouldBe 0
+    }
+
     @Test
     fun `쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다`() {
         val fixture = AwardFixture()
@@ -141,7 +201,7 @@ class CollectAwardListUseCaseTest {
             )
 
         report.halted shouldBe null
-        report.truncatedSlots shouldBe 1
+        report.unfinishedSlots shouldBe 1
         report.stored shouldBe 1
 
         val quotaFixture = AwardFixture()
@@ -181,6 +241,27 @@ private fun awardBatch(
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
     next: PageCursor? = null,
 ): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next, COLLECTION_NOW)
+
+/**
+ * **총수와 받은 수가 어긋난** 회계 — 공유 helper(`sourceAccounting`)는 총수를 받은 수로 두므로 이
+ * 모양을 지을 수 없다. 짧은 걷기가 사유 **없이** 끝난다는 것이 이 모양의 요점이다.
+ */
+private fun shortWalkAccounting(
+    received: Int,
+    sourceTotal: Int,
+): CollectionAccounting =
+    CollectionAccounting(
+        received = received,
+        normalized = received,
+        duplicate = 0,
+        dropped = 0,
+        dropReasons = emptyMap(),
+        sourceTotal = sourceTotal,
+        pagesFetched = 1,
+        truncated = false,
+        unknownFields = 0,
+        truncationCause = null,
+    )
 
 private class AwardFixture(
     val raw: RecordingRawStore = RecordingRawStore(),

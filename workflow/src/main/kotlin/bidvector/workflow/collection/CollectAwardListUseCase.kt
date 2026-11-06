@@ -1,6 +1,8 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BudgetLimit
+import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -11,6 +13,7 @@ import bidvector.procurement.RawObservationStore
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.procurement.attemptOutcomeOf
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.workflow.strategy.Clock
@@ -45,9 +48,10 @@ class AwardCollectionSource(
  * 이 갈래의 호출 수는 **창 길이 × 오퍼레이션 수**에 비례한다(공고 목록 갈래와 같은 성질이고, 표본
  * 크기에 묶이는 개찰결과 갈래와는 다르다). 한 조각이 **하루 승인 상한 안에서 끝나야** 한다: 일 상한에
  * 걸려 멈춘 스윕은 다음 실행에서 조각의 처음부터 다시 걷으므로(목록 축에는 슬롯 단위 이어 돌기가
- * 없다) 걸치는 조각은 같은 호출을 두 번 쓴다. 제안 일 상한 200 호출에서 60일 × 오퍼레이션 둘 =
- * 상한은 `to - from` 의 **일 수**라 양 끝을 포함하면 조각이 최대 61일이고, 오퍼레이션 둘이면 바닥
- * 호출이 **122**(업무당 최소 한 쪽) + 쪽 수만큼 더다 — 제안 일 상한 200 호출 안이다(scope.md D-4).
+ * 없다) 걸치는 조각은 같은 호출을 두 번 쓴다.
+ *
+ * 조각 상한은 `to - from` 의 **일 수**라 양 끝을 포함하면 최대 61일이고, 오퍼레이션 둘이면 바닥 호출이
+ * **122**(업무당 최소 한 쪽) + 쪽 수만큼 더다 — 제안 일 상한 200 호출 안이다(scope.md D-4).
  *
  * 긴 기간은 조각을 **여러 번** 돌려 덮는다 — 상한을 없애지 않는 이유는 형제 갈래와 같다: 연도 오타
  * 한 글자가 실 호출 전에 기동 단계에서 잡혀야 한다.
@@ -89,7 +93,13 @@ data class AwardCollectionReport(
     val slots: Int,
     val received: Int,
     val stored: Int,
-    val truncatedSlots: Int,
+    /**
+     * **끝내지 못한** 슬롯 수 — 「잘린」이 아니다(cr r2 H-2). 절단 사유를 남긴 슬롯과 **사유 없이 짧게
+     * 끝난** 슬롯(원천이 총수를 말했는데 그만큼 받지 못했다)을 함께 센다. 둘을 가르는 것은 사유가
+     * 로그에 있는지뿐이고, 운영자의 다음 행동(그 조각을 다시 돌린다)과 이 갈래의 피해(그 개찰일의
+     * 원문이 영영 빠진다)는 같다.
+     */
+    val unfinishedSlots: Int,
     val halted: AwardCollectionHalt?,
 )
 
@@ -100,8 +110,9 @@ data class AwardCollectionReport(
  * 러너가 계약 행이 선언한 슬롯을 읽어 채운다 — 이 갈래가 그 경로를 건드리지 않는 것이 「원문이 들어오면
  * 승격은 코드 변경 0 으로 따라온다」의 실물이다.
  *
- * 멈춤은 둘뿐이다(예산·쿼터). 그 밖의 절단은 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의 전송 실패로
- * 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
+ * 멈춤은 둘뿐이다(예산·쿼터). 그 밖에 끝내지 못한 슬롯은 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
+ * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다. 끝내지 못한 슬롯이 하나라도 있으면
+ * 실행은 **미완**으로 끝난다(종료 코드는 러너가 [AwardCollectionReport] 에서 읽는다).
  */
 class CollectAwardListUseCase(
     private val rawObservations: RawObservationStore,
@@ -117,23 +128,33 @@ class CollectAwardListUseCase(
         val plan = range.dates.flatMap { date -> sources.map { date to it } }
         var received = 0
         var stored = 0
-        var truncated = 0
+        var unfinished = 0
         for ((index, slot) in plan.withIndex()) {
             val (date, source) = slot
             val sweep = sweepSlot(date, source)
             received += sweep.received
             stored += sweep.stored
-            if (sweep.truncated) truncated++
+            if (!sweep.finished) unfinished++
             val halt = sweep.halt ?: continue
             val halted = halt.copy(notAttemptedSlots = plan.size - index - 1)
-            return AwardCollectionReport(index + 1, received, stored, truncated, halted)
+            return AwardCollectionReport(index + 1, received, stored, unfinished, halted)
         }
-        return AwardCollectionReport(plan.size, received, stored, truncated, halted = null)
+        return AwardCollectionReport(plan.size, received, stored, unfinished, halted = null)
     }
 
     /**
      * 슬롯 하나를 끝까지 걷는다 — **예산·쿼터·절단으로 그만둔 슬롯도 회계를 남긴다**(「어디까지
      * 읽었는가」가 남아야 다음 실행의 상한 seed 가 그 호출을 본다).
+     *
+     * **「다 받았는가」는 [attemptOutcomeOf] 하나가 답한다**(cr r2 H-2) — 이 저장소에서 그 물음의 단일
+     * 출처이고, 절단 사유뿐 아니라 **짧은 걷기**(총수를 말한 원천에서 그만큼 받지 못한 채 끝났다)까지
+     * 센다. 앞 판은 `truncationCause != null` 만 봤고, 그래서 빈 쪽·`NoData` 로 「곱게」 멈춘 걷기가
+     * 사유를 남기지 않아 **완료로 적혔다**(D-6G-58 ⓒ 가 적은 그 함정이다). 이 갈래에는 슬롯 단위 이어
+     * 돌기가 없으므로 그 침묵의 끝은 「그 개찰일의 낙찰 원문이 영영 들어오지 않는다」로 같다.
+     *
+     * 끝난 것으로 보는 결말은 **둘**이다 — [AttemptOutcome.Succeeded] 와 [AttemptOutcome.Empty].
+     * 빈 응답은 오류가 아니다(그 개찰일에 낙찰이 없었다). 나머지(일시 실패·확정 실패·관문 거부)는
+     * 전부 미완이고, 그중 예산·쿼터만 실행을 멈춘다([haltOf]).
      *
      * **인프라 예외는 전파하고 그 슬롯의 회계는 남지 않는다**(형제 갈래와 같은 거동) — 포트나 원문
      * 저장이 던지면 `runs.record` 에 닿지 못한 채 `collect` 밖으로 나가고 러너가 사유 토큰으로 정제한다.
@@ -161,21 +182,29 @@ class CollectAwardListUseCase(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_AWARD_LIST, startedAt, clock.now()),
         )
-        return SlotSweep(accounting.received, stored, accounting.truncationCause != null, halt)
+        return SlotSweep(accounting.received, stored, finishedWith(accounting), halt)
     }
 }
 
-/** 슬롯 하나의 끝 — 계수 둘과 「끝까지 읽었는가」, 그리고 멈춰야 하면 사유. */
+/** 슬롯 하나의 끝 — 계수 둘과 「다 받았는가」, 그리고 멈춰야 하면 사유. */
 private class SlotSweep(
     val received: Int,
     val stored: Int,
-    val truncated: Boolean,
+    val finished: Boolean,
     val halt: AwardCollectionHalt?,
 )
 
+/** 그 슬롯이 다 받았는가 — 저장소 단일 출처([attemptOutcomeOf])의 정착 결말 둘만 참이다. */
+private fun finishedWith(accounting: CollectionAccounting): Boolean =
+    when (attemptOutcomeOf(accounting)) {
+        AttemptOutcome.Succeeded, AttemptOutcome.Empty -> true
+        else -> false
+    }
+
 /**
  * 멈출 사유인가 — 예산·쿼터만이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
- * 원인으로 남고 실행은 다음 슬롯으로 간다.
+ * 원인으로 남고 실행은 다음 슬롯으로 간다. **짧은 걷기는 여기 오지 않는다** — 사유가 없으므로
+ * 멈춤도 아니고, 미완 계수만 올린다([AwardCollectionReport.unfinishedSlots]).
  */
 private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
     when (cause) {

@@ -26,11 +26,16 @@ internal class MockAwardKonepsHttp(
     /** 0 이면 한 쪽에 전부 — 양수면 그 수로 쪽을 나눈다(여러 쪽 걷기를 만드는 자리). */
     private val pageSize: Int = 0,
     /**
-     * 2쪽 이후를 이 `resultCode` 로 거절한다(`null` 이면 전부 정상) — 잘린 슬롯을 만드는 자리다.
-     * **비재시도 코드를 쓴다**(`30`): 5xx·429 는 재시도 대상이라 백오프 1+5+15초를 태우고 나서야
-     * 절단이 되므로 E2E 가 느려지고 흔들린다. 거부는 즉시 절단으로 온다.
+     * 2쪽 이후를 이 `resultCode` 로 응답한다(`null` 이면 전부 정상) — 슬롯을 끝내지 못하게 만드는
+     * 자리이고, **값에 따라 다른 문**이 열린다.
+     *
+     * - 비재시도 코드(`30` — 3A 표의 `12/20/30/31/32` 계열)는 `NOT_RETRYABLE` **절단**으로 온다.
+     *   5xx·429 를 쓰지 않는 이유: 재시도 대상이라 백오프 1+5+15초를 태우고 나서야 절단이 되므로
+     *   E2E 가 느려지고 흔들린다.
+     * - `03`(NoData)은 **절단 사유를 남기지 않는다** — 어댑터가 「없음」으로 곱게 멈춘다. 1쪽이 말한
+     *   총수에 못 미친 채 끝나므로 cr r2 H-2 의 짧은 걷기가 이 값으로 열린다.
      */
-    private val rejectAfterFirstPageWith: String? = null,
+    private val secondPageResultCode: String? = null,
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     private val received = AtomicInteger()
@@ -66,9 +71,9 @@ internal class MockAwardKonepsHttp(
         listCalls += operation
         val page = paramOf(query, "pageNo")?.toIntOrNull() ?: 1
         val all = (1..noticesPerSlot).map { index -> awardRow(operation, index) }
-        val rejection = rejectAfterFirstPageWith?.takeIf { page > 1 }
+        val nonNormal = secondPageResultCode?.takeIf { page > 1 }
         val bytes =
-            (rejection?.let(::rejectedEnvelope) ?: envelope(pageOf(all, page), all.size, page))
+            (nonNormal?.let(::nonNormalEnvelope) ?: envelope(pageOf(all, page), all.size, page))
                 .toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(HTTP_OK, bytes.size.toLong())
@@ -113,8 +118,12 @@ internal class MockAwardKonepsHttp(
         return """{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{$body}}}"""
     }
 
-    /** 게이트웨이가 거절한 응답 — 항목 없이 코드만 온다(HTTP 200 + 비정상 `resultCode`). */
-    private fun rejectedEnvelope(code: String): String =
+    /**
+     * **비정상 `resultCode` 봉투** — 항목 없이 코드만 온다(HTTP 200 + 정상 아닌 헤더). 게이트웨이
+     * 오류 표면이 **아니다**(그쪽은 `cmmMsgHeader`·`returnReasonCode` 로 따로 온다) — 이 봉투는
+     * 서비스 자신의 결과코드다.
+     */
+    private fun nonNormalEnvelope(code: String): String =
         """{"response":{"header":{"resultCode":"$code","resultMsg":"SERVICE ERROR"},"body":{}}}"""
 
     private fun objectJson(fields: Map<String, String>): String =
