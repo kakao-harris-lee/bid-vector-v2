@@ -23,6 +23,13 @@ import java.time.Instant
  * KDoc 의 사유(계정 주체도 저장소 예외 메시지도 싣지 않는다 — 후자에는 행 값이 실릴 수 있다).
  * 두 주장이 모두 잠겨 있지 않았다(cr LOW — 이 slice 전에도 test 0).
  *
+ * **이 class 가 받는 것은 그 둘 중 앞의 것뿐이다**(cr L-2). 「저장소 예외 메시지를 싣지 않는다」는
+ * 이 함수의 **서명**이 진다 — 인자가 record 하나고 예외 인자가 없어 여기서는 **구조적으로
+ * 불가능**하다. 그 주장이 실제로 깨질 자리는 **호출 모양**이다: `notificationInboxPort` 의
+ * `logger.warn(inboxWriteFailedLine(record))` 가 `logger.warn(line, e)` 로 바뀌면 예외의
+ * 메시지·행 값이 그 줄에 붙는다. 그 자리는 조립 빈이라 이 순수 함수 test 가 닿지 않고 오늘
+ * test 0 이다 — 축을 또 더할 때 함께 본다.
+ *
  * 순수 함수라 조립을 세우지 않고 값만 쓴다.
  */
 internal class NotificationInboxWiringTest {
@@ -56,7 +63,9 @@ internal class NotificationInboxWiringTest {
         val line = inboxWriteFailedLine(record(NotificationBidKind.REAL))
 
         line shouldNotContain ACCOUNT.value.toString()
-        line shouldNotContain "account"
+        // 하중은 **값** 쪽이 진다. 이름 쪽은 열거형 술어라 꼴을 넓혀 둔다 — 대소문자를 접으면
+        // `AccountId(`·`Account=` 도 걸린다(cr L-3: 축어 `"account"` 는 그것들을 지나보냈다).
+        line.lowercase() shouldNotContain "account"
     }
 
     private fun record(bidKind: NotificationBidKind): NotificationInboxRecord =

@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { notificationItemTestId } from '../../src/display/notificationDisplay';
+import {
+  notificationItemTestId,
+  type NotificationTestIdParts,
+} from '../../src/display/notificationDisplay';
 
 import {
   ABSENT,
@@ -520,16 +523,18 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
  * 응답 항목을 **손 타입으로** 읽는다 — 이 test 는 wire probe 이고 그 독립성이 요점이다(생성
  * 타입을 쓰면 「문서가 그렇다고 하니 그렇다」가 된다).
  *
- * `bidKind` 는 M9/paper-bid 가 더한 **신원의 한 칸**이다. 이 칸이 없으면 아래 행 조회가 짓는
- * testId 에 `undefined` 가 들어가 아무 행도 못 찾는다 — 축이 또 늘면 같은 자리가 다시 말한다.
+ * 신원 칸들은 행 조회가 부르는 함수의 인자 타입(`NotificationTestIdParts`)에서 받는다 — 두 벌이
+ * 갈리지 않게 하려는 것이고, **생성 타입을 끌어오지 않으므로** 손 타입의 독립성은 그대로다.
+ *
+ * **이 칸들은 기록이고 래칫이 아니다**(cr M-1 — 앞 판 문면이 그 반대를 주장했다). TS 타입은
+ * 지워지고 `web/e2e/**` 는 `tsconfig` 의 `include`(`src`) 밖이라 타입 검사를 받지 않는다. 칸을
+ * 지워도 오류를 낼 층이 없고 `undefined` 가 들어가지도 않는다 — 행 조회가 부르는 함수는 **응답
+ * 객체에서 wire 칸 이름을 직접 읽는다**.
+ *
+ * **남는 위험은 다음 축이 파생값일 때다** — wire 에 같은 이름으로 없는 값이 id 에 들어가면 e2e 가
+ * 조용히 아무 행도 못 찾는다(H-1 재발). 그 자리는 `notificationItemTestId` 의 KDoc 이 든다.
  */
-type InboxItem = {
-  readonly kind: string;
-  readonly noticeNumber: string;
-  readonly noticeRound: string;
-  readonly bidKind: string;
-  readonly read: boolean;
-};
+type InboxItem = NotificationTestIdParts & { readonly read: boolean };
 
 test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그대로 보인다', async ({ page }) => {
   const watched = watchRequests(page);
