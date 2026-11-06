@@ -25,6 +25,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.time.Duration
 import java.time.LocalDate
+import java.util.concurrent.TimeUnit
 
 /**
  * 두 수집 배선(공고 목록 갈래·개찰결과 갈래)이 함께 쓰는 조립 규칙 — 같은 형태를 두 벌 두면 한쪽만
@@ -121,9 +122,13 @@ internal fun konepsTransportFor(
 /**
  * 간격을 실제로 기다리는 자리 — 관문 경로는 `suspend` 가 아니라 전부 동기이고 수집은 직렬이라
  * 차단 대기가 이 경로의 모양이다(Resilience4j 의 rate limiter 도 같은 경로에서 차단으로 기다린다).
+ *
+ * **나노초로 잠근다**(cr low). `Thread.sleep(toMillis())` 는 ms 아래를 **버려** 1 ms 미만의 간격
+ * 선언이 조용히 「기다리지 않음」이 된다 — 끄는 자리는 `Duration.ZERO` 하나여야 하고 작은 값이
+ * 그것과 같은 뜻이 되면 안 된다.
  */
 private fun sleepFor(duration: Duration) {
-    Thread.sleep(duration.toMillis())
+    TimeUnit.NANOSECONDS.sleep(duration.toNanos())
 }
 
 /**

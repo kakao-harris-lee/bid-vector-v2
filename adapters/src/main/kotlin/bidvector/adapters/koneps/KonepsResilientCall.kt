@@ -71,10 +71,11 @@ internal sealed interface KonepsRawStep {
 
     /**
      * **응답을 받지 못한** 전송 결말 — timeout·전송 실패. 응답을 받은 경우는 상태 처분 표가
-     * 가르므로([KonepsHttpPolicyData.dispositionFor]) 이 자리에 `Received` 가 오지 않는다.
+     * 가르므로([KonepsHttpPolicyData.dispositionFor]) 이 자리에 `Received` 가 **올 수 없다** —
+     * 그 불변식을 인자 타입이 든다([KonepsTransportOutcome.NoResponse]).
      */
     data class TransportStep(
-        val outcome: KonepsTransportOutcome,
+        val outcome: KonepsTransportOutcome.NoResponse,
     ) : KonepsRawStep
 
     /**
@@ -116,7 +117,7 @@ private fun rawStep(
         }
     return when (val transport = sent.transport) {
         is KonepsTransportOutcome.Received -> receivedStep(transport, httpPolicy, collectionPolicy)
-        else -> KonepsRawStep.TransportStep(transport)
+        is KonepsTransportOutcome.NoResponse -> KonepsRawStep.TransportStep(transport)
     }
 }
 
@@ -150,7 +151,6 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
             when (step.outcome) {
                 KonepsTransportOutcome.TimedOut -> true
                 is KonepsTransportOutcome.TransportFailed -> true
-                is KonepsTransportOutcome.Received -> error(RECEIVED_GOES_THROUGH_STATUS_AXIS)
             }
         }
 
@@ -166,8 +166,9 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
 
         // M6/6G D-6G-11 — 봉투가 나르는 quota 초과는 **일 트래픽 한도**다. 백오프 몇 십 ms 로
         // 회복되지 않으므로 재시도는 거부될 호출을 더 낼 뿐이다(한도가 풀리는 것은 날이 바뀔
-        // 때다). 속도 한도(HTTP 429)는 위 TransportStep 분기가 그대로 재시도한다 — legacy
-        // 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고 두 축은 다른 것이다.
+        // 때다). 속도 한도(HTTP 429)는 **상태 처분 표가 먼저 갈라** 위 RateLimitedStep 분기가
+        // 재시도한다(OPS-09) — legacy 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고
+        // 두 축은 다른 것이다. 봉투가 나르는 quota 초과는 그 표를 지나지 않는다(HTTP 200 이다).
         is KonepsRawStep.EnvelopeStep -> {
             (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.RETRYABLE
         }

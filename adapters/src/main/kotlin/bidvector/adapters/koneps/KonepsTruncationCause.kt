@@ -4,14 +4,6 @@ import bidvector.procurement.ResultCodeCategory
 import bidvector.procurement.TruncationCause
 
 /**
- * 받은 응답은 상태 처분 표를 지나 [KonepsRawStep.RateLimitedStep]·[KonepsRawStep.BlockedStep]·
- * [KonepsRawStep.EnvelopeStep] 중 하나가 된다(OPS-09) — [KonepsRawStep.TransportStep] 에 남는
- * 것은 **응답을 받지 못한** 결말뿐이다. 이 문면이 그 불변식의 표기이고, 어기면 그 자리가 멈춘다.
- */
-internal const val RECEIVED_GOES_THROUGH_STATUS_AXIS: String =
-    "받은 응답은 상태 처분 표가 가른다 — TransportStep 으로 오지 않는다"
-
-/**
  * [KonepsRawStep] → [TruncationCause]·사람이 읽는 사유 문자열 변환 —
  * `KonepsResilientCall.kt` 의 detekt `TooManyFunctions`(파일당 함수 상한 11)를 지키려고
  * 분리한 파일이다(로직상 새 관심사는 아니다).
@@ -85,11 +77,12 @@ internal fun causeFor(step: KonepsRawStep): TruncationCause =
             TruncationCause.AccessBlocked
         }
 
+        // 받은 응답은 상태 처분 표가 가르므로 이 자리에 오지 않는다 — 그 불변식은 주석이 아니라
+        // 인자 타입([KonepsTransportOutcome.NoResponse])이 든다.
         is KonepsRawStep.TransportStep -> {
             when (step.outcome) {
                 KonepsTransportOutcome.TimedOut -> TruncationCause.Timeout
                 is KonepsTransportOutcome.TransportFailed -> TruncationCause.TransportFailure
-                is KonepsTransportOutcome.Received -> error(RECEIVED_GOES_THROUGH_STATUS_AXIS)
             }
         }
 

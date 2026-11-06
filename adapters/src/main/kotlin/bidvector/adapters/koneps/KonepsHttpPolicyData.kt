@@ -93,8 +93,12 @@ val KONEPS_HTTP_POLICY: EffectiveDatedPolicy<KonepsHttpPolicyData> =
                         statusRules = KONEPS_STATUS_RULES,
                         // 계수 축이 선언한 속도(1 permit / 1초)와 **같은 속도**를 간격으로도 건다 —
                         // 새 속도를 들여오는 것이 아니라 창 경계에서 두 호출이 붙어 나가는 자리를
-                        // 막는 것이 이 값의 일이다. 그래서 두 축이 겹쳐 대기가 두 배로 쌓이지
-                        // 않는다(계수가 이미 벌려 놓은 호출은 간격을 0 으로 지난다).
+                        // 막는 것이 이 값의 일이다. **한 소스 안에서는** 계수가 이미 벌려 놓은
+                        // 호출이 간격을 0 으로 지나 대기가 두 배로 쌓이지 않는다. 소스가 여럿이면
+                        // 다르다(cr r1 — 앞 문면은 그 판을 무조건으로 적었다): rate limiter 는
+                        // 소스 어댑터마다 하나인데 간격은 관문 하나가 **프로세스 전역**으로 지키니
+                        // 집계 속도가 최대 N/초에서 1/초로 떨어진다. 그 느려짐이 이 값의 비용이고
+                        // 실측은 M9/ops-code evidence 의 알려진 제한에 있다.
                         minimumCallInterval = Duration.ofSeconds(1),
                     ),
             ),
