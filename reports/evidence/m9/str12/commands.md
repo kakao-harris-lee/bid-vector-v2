@@ -172,12 +172,22 @@ private 멤버**를 남겨 `-Werror` 컴파일 실패가 된다 — 그것은 te
 **값**을, ⑥⑧은 **술어**를, ⑦은 두 칸의 **보간 대상**만 바꿔치웠다(⑦은 보조 함수가 남은 한 칸에서
 계속 쓰이게 두었다). ②·③·④ 가 앞 라운드에서 같은 이유로 그 모양을 고른 것과 같다.
 
-### 둘째 main 병합 뒤 재실측 (판정 전 마지막)
+### main 병합 뒤 재실측 — 두 번(판정 전)
 
-main `97ed49c4`(PR #134)을 병합한 뒤 같은 표적을 `--rerun` 으로 다시 돌렸다 — 둘 다 exit 0 이고
-계수가 병합 전과 **같다**(app 19 클래스 244 test · adapters 14 클래스 89 test, fail 0). lint·detekt·
-`sizeGate` 도 0. 변이는 이 라운드에서 기구를 바꾸지 않았으므로(문면 둘 + 등재 0) 다시 걸지 않았고,
-앞 라운드의 열 건과 verifier r3 의 재현 아홉 건이 그 자리를 든다.
+main `97ed49c4`(PR #134)과 `56bd33ea`(PR #137)을 각각 병합한 뒤 같은 표적을 `--rerun` 으로 다시
+돌렸다. **네 번 다 exit 0 이고 계수가 병합 전과 같다**(app 19 클래스 244 test · adapters 14 클래스
+89 test, fail 0, lint·detekt·`sizeGate` 0).
+
+**#137 은 의미 겹침을 볼 이유가 있었다** — 알림 **inbox** 키와 `NotificationSweepSql` 을 바꾸고
+마이그레이션 `V25` 를 들였다. 겹치는지 두 축으로 봤다: ① 경로 — main 이 만진 것은
+`adapters…notificationinbox/**` 이고 이 slice 의 것은 `adapters…notification/**` 로 **다른 패키지**다
+(main 이 내 두 패키지를 만진 파일 0) ② 거동 — 그래도 relay 는 소비자 inbox(`adapters.event` 의
+`JdbcInboxPort`, 멱등 키 축)에 쓰고 발송 E2E 가 그 한 줄을 단언하므로, **DB 를 실제로 쓰는 표적**
+(`PipelineTelegramDeliveryE2ETest` · `Relay*DatabaseTest` 넷)을 `V25` 가 적용된 트리에서 다시 돌렸다 —
+전부 초록이다. 두 inbox 가 같은 이름을 쓰지만 다른 표라는 사실이 거동으로 확인됐다.
+
+변이는 두 병합 라운드에서 다시 걸지 않았다 — 바꾼 것이 문면과 등재뿐이고 기구를 건드리지 않았다.
+그 자리는 앞 라운드의 열 건과 verifier r3 의 재현 아홉 건이 든다.
 
 ## 4. 비밀값 스캔 — 두 축, 참조형으로
 
@@ -241,6 +251,16 @@ git status --porcelain -- adapters app config docs reports/evidence/m9/str12
 - 양성 대조: 되돌리기 **전**에는 같은 술어가 그 파일을 `M` 으로 낸다(적용 표지 `--numstat` 와 짝).
 
 ## 8. main 병합 — 합집합인지 계수로 확인
+
+### 셋째 병합: main `56bd33ea`(PR #137) — **충돌 있음**
+
+겹친 파일 **셋**이고 그중 하나가 충돌했다. 셋 다 계수로 봤다:
+
+| 파일 | 자동 병합 | 확인 |
+| --- | --- | --- |
+| `gate-tests.properties` | **충돌** | 내 `notification.*` 아홉과 main 의 `notificationinbox.NotificationInboxBidKindTest` 하나가 같은 자리에서 갈렸다 — 한쪽을 고르면 다른 쪽이 사라진다. **합집합 + 사전순**으로 두었다(`notification.` 의 `.` 가 `notificationinbox` 의 `i` 보다 앞이다). 항목 **538 = 내 535 ∪ main 527**, `comm -3` 양방향 빈 출력, 새 중복 0, adapters 블록 200 항목의 **순서 위반 0** |
+| `architecture-policy.properties` | 충돌 0 | **키별 집합 등식**으로 봤다 — 140 키 전부에서 병합본 = (내 집합 ∪ main 집합), 불일치 **0** |
+| `capability-map.md` | 충돌 0 | 양쪽 추가 줄(각 5)이 **모두** 병합본에 있다(누락 0·0). 행 id 계수도 의도대로다 |
 
 ### 둘째 병합: main `97ed49c4`(PR #134)
 
