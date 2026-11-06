@@ -3,6 +3,7 @@ package bidvector.adapters.koneps
 import bidvector.procurement.AttemptKind
 import bidvector.procurement.SourceEndpoint
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -97,6 +98,37 @@ class KonepsCallPacerTest {
 
         waiter.waits shouldContainExactly listOf(INTERVAL, INTERVAL)
         sentAt.zipWithNext { a, b -> Duration.between(a, b) } shouldContainExactly listOf(INTERVAL, INTERVAL)
+    }
+
+    /**
+     * **한 번 길어진 기다림이 다음 간격을 줄이지 않는다**(cr r2 low).
+     *
+     * 실제 `Thread.sleep` 은 ms 를 올리고 스케줄러가 더 늦히므로 호출이 하한보다 **뒤에** 나간다.
+     * 그 늦음이 매번 같으면 티가 안 나지만 **한 번만 늦고 다음이 제때면** 두 호출이 서로 가까워진다:
+     * 다음 하한을 「기다리기로 한 시각」에서 세는 판은 그 하한이 이미 지난 과거라 둘째 간격이
+     * 선언값보다 짧아진다(선언이 **최소** 간격이므로 그 방향은 보증 위반이다). 기다림 뒤의 시각에서
+     * 세면 그 오차가 「조금 느리다」로만 남는다.
+     */
+    @Test
+    fun `한 번 길어진 기다림 뒤에도 다음 간격은 선언값 이상이다`() {
+        val waiter = FakeWaiter()
+        var overshoot = Duration.ofMillis(120)
+        val pacer =
+            KonepsCallPacer(INTERVAL, { waiter.now }, { requested ->
+                waiter.waitFor(requested + overshoot)
+                // 늦음은 **한 번뿐**이다 — 다음 기다림은 제때 끝난다.
+                overshoot = Duration.ZERO
+            })
+        val sentAt = mutableListOf<Instant>()
+
+        repeat(3) {
+            pacer.awaitTurn()
+            sentAt += waiter.now
+        }
+
+        sentAt.zipWithNext { a, b -> Duration.between(a, b) }.forEach { gap ->
+            withClue("실측 간격 $gap · 선언 $INTERVAL") { (gap >= INTERVAL) shouldBe true }
+        }
     }
 
     /** 간격 0 은 **끄는 자리**다 — 기다림이 아예 일어나지 않는다(시나리오 test 가 쓰는 값). */

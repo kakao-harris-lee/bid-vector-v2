@@ -68,7 +68,8 @@ class EvaluationCommitRun(
      *
      * **dry-run·단건 경로에는 이 짝이 없다.** 그 둘은 `RecordingNotificationRequestPort` 를 쓰고
      * 알림함에 닿지 않는다 — 「미리보기가 기록을 남긴다」가 술어가 아니라 구조로 불가능하다
-     * (`DryRunCommitSeparationGateTest` 가 재는 그 분리와 같은 축).
+     * (그 분리를 실제로 잡은 게이트는 `AppHttpDependencyGateTest` 와 `ArchitectureGateTest` 다 —
+     * 단건 경로에 알림함 감싸기를 심은 변이를 그 둘이 RED 로 냈다).
      */
     private val notificationInbox: NotificationInboxPort,
     private val audience: NotificationAudiencePort,

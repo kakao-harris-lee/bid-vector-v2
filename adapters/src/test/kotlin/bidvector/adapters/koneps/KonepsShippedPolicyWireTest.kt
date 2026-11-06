@@ -74,6 +74,16 @@ class KonepsShippedPolicyWireTest {
         (SHIPPED.minimumCallInterval > Duration.ZERO) shouldBe true
     }
 
+    /**
+     * **이 파일이 재는 것이 「지금 출하되는 값」이어야 한다**(cr r2 low). 위 [SHIPPED] 는 날짜 하나로
+     * resolve 한 값이라, 날짜 붙은 엔트리가 하나 생기는 날 이 측정은 **은퇴한 행**을 가리키고
+     * production 은 새 행으로 돈다. 그 어긋남을 한 줄로 막는다.
+     */
+    @Test
+    fun `resolve 한 값이 정책 표의 마지막 엔트리와 같다`() {
+        SHIPPED shouldBe KONEPS_HTTP_POLICY.entries.last().second
+    }
+
     @Test
     fun `출하 표는 401·403 을 차단으로, 429 를 속도 한도로 가른다`() {
         SHIPPED.dispositionFor(401) shouldBe KonepsStatusDisposition.ACCESS_BLOCKED
