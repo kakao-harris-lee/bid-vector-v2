@@ -10,11 +10,15 @@ plugins {
 // D-6A1-4 — 이 slice가 처음으로 진입점(main())·controller를 만든다. bootJar를
 // 켠다(disabled로 남겨 둔 자리). **D-6A1-28** — 평범한 jar는 끄지 않는다: Boot Gradle
 // 플러그인은 둘 다 켜져 있으면 plain jar에 `-plain` classifier를 자동으로 붙여(`app-plain.jar`) `bootJar`
-// (`app.jar`)와 공존시킨다. `jar`를 끄면 `jarContentGate`(하드코딩된 `jar` task 산출물
-// 대조)가 빈 아카이브를 보게 되어 게이트가 아무것도 검증하지 않는 채로 초록이 된다
-// (실측 — entries 1→0). 배포물은 `bootJar`이지만 게이트는 `jar`만 본다는
-// 사실은 바뀌지 않으므로(build-logic 하드코딩), `jar`를 켜 두는 것이 이 게이트가 실제로
-// 뭔가를 재게 하는 유일한 방법이다.
+// (`app.jar`)와 공존시킨다. 그 공존이 `jar`를 켜 두는 사유다 — **plain jar도 판정 대상**이라
+// 끄면 판정 집합이 그만큼 줄어든다.
+//
+// **앞 판의 사유 셋은 이제 틀리다**(M9/gates-build가 `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`을
+// 닫았다). `jarContentGate`는 이름으로 건 `jar` 하나가 아니라 모듈의 **Jar 타입 task 전수**를 받고
+// (`bootJar` 포함, `BOOT-INF/classes/` 접두는 정책 값이 벗긴다), 아카이브나 판정 엔트리가 0이면
+// **비-공허 단언이 그 초록을 거부한다**. 그래서 「`jar`를 끄면 게이트가 조용히 초록이 된다」와
+// 「배포물은 `bootJar`인데 게이트는 `jar`만 본다」는 둘 다 더는 사실이 아니다 — 닫힌 사각을 열린
+// 것으로 읽히게 하는 주석은 그 자체가 다음 사람을 틀리게 한다.
 tasks.named<BootJar>("bootJar") { enabled = true }
 tasks.named<Jar>("jar") { enabled = true }
 
