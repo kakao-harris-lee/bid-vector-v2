@@ -60,13 +60,31 @@ class PolicySourceMismatch:
 def verify_policy_source(
     policy: EvaluationPolicy,
 ) -> EvaluationPolicy | PolicySourceMismatch:
-    """정책 파일을 **다시 읽어** 같은 값이 나오는지 본다. 통과하면 받은 정책을 그대로
+    """게이트에 **닿은 값**이 승인된 산출물의 것인지 본다. 통과하면 받은 정책을 그대로
     돌려준다 — 조용히 파일 값으로 갈아끼우지 않는다(그러면 「무엇으로 판정했는가」가 다시
     흐려진다).
 
-    축 둘을 본다: **파일 바이트**(로드 뒤 파일이 바뀌지 않았다)와 **값**(`policy_checksum`
-    등식). 「그 파일이 승인된 산출물인가」는 여기서 묻지 않는다 — 그 축은
-    `load_approved_evaluation_policy` 가 조립 근에서 진다(모듈 docstring 의 사유)."""
+    축 **셋**을 본다. 셋이 함께 말하는 것은 「이 객체의 값은 **승인된 산출물**의 값이고,
+    그 산출물은 지금도 디스크에 그대로 있다」다.
+
+    1. **승인**(v r3 H-3a) — 객체가 **자기 주장**(`version` + `source.digest`)으로 승인
+       등록부에 있는가. 재로드한 파일이 아니라 **주장**에 거는 이유는 아래 2 와 역할을
+       가르기 위해서다: 2 는 「로드 뒤 파일이 바뀌었나」를 묻고, 1 은 「애초에 승인된
+       것을 로드했다고 주장하나」를 묻는다.
+    2. **파일 바이트** — 로드 뒤 그 파일이 바뀌지 않았다.
+    3. **값**(`policy_checksum` 등식) — 객체의 값이 그 파일의 값이다.
+
+    **1 이 없으면 무엇이 열리는가**(verifier MX1b 실측): `copy.copy` + `object.__setattr__`
+    로 승인 정책을 비틀고, 그 객체가 가리킬 **내용이 일치하는 미승인 사본**을 디스크에 써
+    두면 2·3 이 **둘 다 성립한다**. 조립 근의 승인 대조는 부팅에서 한 번뿐이라 그 뒤에
+    값을 바꿔 끼우는 길을 보지 못하고, 호출 자리 집합 등식도 보지 못한다 — 그 변이는 호출
+    자리를 하나도 늘리지 않는다. 그래서 승인은 **게이트에 닿는 자리**에서도 물어야 한다.
+    """
+    approval = policy_approval(version=policy.version, digest=policy.source.digest)
+    if approval is not None:
+        return PolicySourceMismatch(
+            f"승인된 정책 산출물이 아니다({approval.reason.value}): {approval.detail}"
+        )
     reloaded = load_evaluation_policy(policy.source.path)
     if isinstance(reloaded, PolicyRejected):
         return PolicySourceMismatch(
@@ -87,9 +105,16 @@ def verify_policy_source(
 def load_approved_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     """**조립 근이 쓰는 로더**(v H-2) — 승인 등록부에 있는 산출물만 받는다.
 
-    뿌리 로더는 등록된 version 의 편집 사본을 이미 거부하므로, 여기서 더 막는 것은
-    **이름을 바꿔 단 사본**이다(그쪽은 자기 파일과 값이 같아 출처 재검증도 지난다 —
-    틀린 것은 값이 아니라 「아무도 승인하지 않았다」는 사실이다).
+    **이 자리가 두 갈래를 함께 거부한다**(cr r3 M-1 정정) — 이름을 유지한 편집 사본
+    (`DIGEST_MISMATCH`)과 이름을 바꿔 단 사본(`UNREGISTERED_VERSION`). 뿌리 로더
+    (`registry.policy.load_policy`)는 승인을 **묻지 않는다**(사유는
+    `registry.policy_approvals` docstring). 앞 판 문면이 지문 갈래를 뿌리에 귀속했는데,
+    그 검사는 같은 라운드에 이 자리로 옮겨졌다.
+
+    **부팅에서 묻는 것이 충분하지 않다**(v r3 H-3a) — 부팅 뒤에 객체를 바꿔 끼우는 길이
+    있다. 그래서 `verify_policy_source` 가 게이트 자리에서 다시 묻는다. 이 자리가 남아
+    있는 이유는 **빨리 실패하는 것**이다: 미승인 정책을 가리킨 부팅은 job 을 받기 전에
+    `NOT_READY` 로 서야 한다(게이트까지 가서 실패하면 그 사실이 job 실패로만 보인다).
 
     거부 사유를 `INVALID_VALUE` 로 내는 이유: 거부된 것은 **`version` 값**이다(그 이름의
     승인 기록이 없다). 새 사유 어휘를 더하면 그 어휘를 읽는 모든 자리가 함께 넓어지는데,

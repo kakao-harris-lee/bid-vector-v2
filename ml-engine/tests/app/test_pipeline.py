@@ -16,7 +16,7 @@ from google.protobuf import json_format
 
 from ml_engine.app.pipeline import build_training_pipeline
 from ml_engine.contracts import common_pb2, features_pb2
-from ml_engine.evaluation import EvaluationPolicy
+from ml_engine.evaluation import EvaluationPolicy, load_evaluation_policy
 from ml_engine.inference.time_axis import TimeAxisPolicy
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.holdout import HoldoutCancelled
@@ -31,7 +31,6 @@ from ml_engine.training.jobs.pipeline import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
-from tests.policy_fixture import evaluation_policy
 
 _TIME_AXIS_POLICY = TimeAxisPolicy(version="test", substitute_approved=False)
 """조립 근 test 의 시간축 정책 — 출하와 같은 미승인(`OPEN-SET-10` 미결)."""
@@ -68,22 +67,30 @@ def _training_policy() -> TrainingPolicy:
     return TrainingPolicy(version="test-v1", min_training_rows=4)
 
 
+_SHIPPED_EVALUATION_POLICY = (
+    Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
+)
+
+
 def _evaluation_policy() -> EvaluationPolicy:
-    return evaluation_policy(
-        paired_t_threshold=2.58,
-        gate_baseline="category_x_band",
-        gate_model="gbm_all_strata",
-        gate_stratum="clean-base",
-        maturity_threshold=0.70,
-        min_evaluation_rows=2,
-        max_origins=5,
-        agency_baseline_min_count=2,
-        # seed 목록을 줄이지 않는다 — 조립 근 test 는 **파일 경유** 정책을 쓰고(출처
-        # 재검증이 그 경로에 있다) 로더는 승인된 다섯 seed 전수를 요구한다. 커널 거동을
-        # 위해 승인 밖 조합이 필요한 test 는 `kernel_policy` 를 쓴다(M9/ml-lifecycle v H-1).
-        amount_band_edges=(1e8, 5e8, 1e9, 5e9),
-        segment_axes=("category", "amount_band"),
-    )
+    """**출하 승인 정책 그대로**(v r3 H-3a).
+
+    앞 판은 작은 데이터셋에 맞춘 임계(`min_evaluation_rows=2` 등)의 파생 정책을 썼다.
+    게이트 자리의 승인 대조가 들어온 뒤 그 정책은 **미승인**이라 제품 경로가 거부한다 —
+    그리고 그것이 올바른 거동이다(승인 밖 임계로 게이트를 돌릴 수 없다).
+
+    **출하 임계로 바꿔도 이 test 들이 재던 것을 잃지 않는다**: 이 파일의 데이터셋은
+    `settlements.jsonl` 이 비어 있어 성숙한 주가 **0** 이고, 그래서 평가 창이 선택되지
+    않는다(report 는 `windows == ()` · `PromotionNotEvaluable`). 즉 `min_evaluation_rows`
+    같은 임계는 애초에 물리지 않는다 — 이 test 들이 재는 것은 **조립·취소 경계·파일
+    쓰기**이고 그 축은 임계와 무관하다.
+
+    승인 밖 조합이 **필요한** 커널 test 는 라이브러리 진입점(`run_holdout`)을 직접 부르고
+    `tests/policy_fixture.kernel_policy` 를 쓴다 — 그 경로에는 재검증이 없다(그 사유는
+    `evaluation.policy_source` 모듈 docstring)."""
+    loaded = load_evaluation_policy(_SHIPPED_EVALUATION_POLICY)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    return loaded
 
 
 def _feature_inputs_json(*, category: str, agency: str) -> dict[str, object]:

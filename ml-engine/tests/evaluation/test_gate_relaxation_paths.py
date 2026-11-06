@@ -14,7 +14,9 @@ test 코드는 대상 밖이다(거부 test 를 쓰려면 직접 생성이 필�
 from __future__ import annotations
 
 import ast
+import copy
 import dataclasses
+import hashlib
 import importlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,6 +37,7 @@ from ml_engine.evaluation.policy import (
     _INDEXED_LIST_PREFIXES,
     _SCALAR_KEYS,
     EvaluationPolicy,
+    PolicySource,
     load_evaluation_policy,
     policy_checksum,
 )
@@ -338,8 +341,12 @@ def test_the_gate_runs_from_exactly_one_product_site() -> None:
 # (verifier 실측 넷). 아래는 각 검사를 **단독으로** 겨눈다 — 하나를 지우면 하나가 붉다.
 
 _UNREGISTERED_POLICY_VERSION: Final[str] = "test-policy-source-axis-v1"
-"""이 절의 정책 version — 승인 등록부 **밖**이다. 등록된 version 을 쓰면 바이트를 바꾼
-사본이 뿌리 로더에서 먼저 끊겨(승인 지문 불일치) 여기서 재려는 축에 닿지 못한다."""
+"""이 절의 정책 version — 승인 등록부 **밖**이다.
+
+생성 토큰의 두 검사(아래 둘)는 `EvaluationPolicy.__post_init__` 에 있고 승인과 무관하므로
+미등록 version 으로 재는 것이 맞다 — 등록 version 을 쓰면 토큰 축을 재려는 입력이 승인
+축과 뒤섞인다. **재검증의 바이트 축**은 반대로 승인된 산출물이 필요하고(그 test 가 따로
+사유를 적는다), 그 차이가 이 상수를 쓰는 자리와 쓰지 않는 자리를 가른다."""
 
 
 def _written_policy(path: Path, **overrides: object) -> EvaluationPolicy:
@@ -381,9 +388,15 @@ def test_source_verification_catches_a_file_changed_after_the_load(
 ) -> None:
     """검사 3(파일 바이트 등식) — 로드 뒤 파일에 **주석 한 줄**을 더한다. 값은 그대로라
     `policy_checksum` 등식은 성립하고, 거부를 만드는 것은 바이트 축 하나다. 그 축이 없으면
-    실행이 공시한 지문이 더는 그 파일의 것이 아닌데도 통과한다."""
-    path = tmp_path / "policy.yaml"
-    policy = _written_policy(path)
+    실행이 공시한 지문이 더는 그 파일의 것이 아닌데도 통과한다.
+
+    입력은 **승인된 산출물의 무편집 사본**이다(v r3 H-3a 뒤): 정책의 **자기 주장**이
+    승인돼 있어야 승인 축이 통과하고, 그래야 이 test 가 재는 것이 바이트 축 하나로 남는다.
+    미승인 정책을 쓰면 승인 축이 먼저 거부해 바이트 축 제거 변이가 조용히 초록이 된다."""
+    path = tmp_path / "evaluation-v1.yaml"
+    path.write_text(_SHIPPED_POLICY.read_text(encoding="utf-8"), encoding="utf-8")
+    policy = load_evaluation_policy(path)
+    assert isinstance(policy, EvaluationPolicy), policy
     path.write_text(
         f"# 로드 뒤에 더한 줄\n{path.read_text(encoding='utf-8')}", encoding="utf-8"
     )
@@ -404,3 +417,83 @@ def test_the_gate_policy_is_injected_from_exactly_one_assembly_site() -> None:
     assert construction_sites("build_training_pipeline") == {
         ("app/pipeline.py", "pipeline_factory")
     }
+
+
+# ── ⑧ 게이트에 **닿은 값**이 승인된 산출물의 것인가 (v r3 H-3a) ──────────────
+# ⑥ 은 승인을 조립 근에서 한 번 물었고, ⑦ 의 재검증은 「객체 == 자기 파일」만 물었다.
+# 그래서 부팅 **뒤에** 객체를 바꿔 끼우고 그 객체가 가리킬 **내용이 일치하는 미승인 사본**을
+# 디스크에 만들어 두면 두 겹이 다 열렸다(verifier MX1b: 전 게이트 초록, t=0.1 이 게이트에 닿음).
+# 호출 자리 집합 등식은 이것을 보지 못한다 — MX1b 는 호출 자리를 하나도 늘리지 않는다.
+
+
+def _tuned_copy_on_disk(directory: Path, *, version: str, threshold: str) -> Path:
+    """출하 정책의 **임계와 이름을 바꾼 사본**을 디스크에 둔다 — 자기 자신과는 일치한다."""
+    text = (
+        _SHIPPED_POLICY.read_text(encoding="utf-8")
+        .replace("paired_t_threshold: 2.58", f"paired_t_threshold: {threshold}")
+        .replace("version: evaluation-v1", f"version: {version}")
+    )
+    path = directory / "tuned.yaml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _forged_pointing_at(policy: EvaluationPolicy, path: Path) -> EvaluationPolicy:
+    """`copy.copy` + `object.__setattr__` — frozen dataclass 도 이렇게는 바뀐다. 생성 토큰을
+    거치지 않으므로 `__post_init__` 이 돌지 않는다."""
+    text = path.read_text(encoding="utf-8")
+    loaded = load_evaluation_policy(path)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    forged = copy.copy(policy)
+    object.__setattr__(forged, "paired_t_threshold", loaded.paired_t_threshold)
+    object.__setattr__(forged, "version", loaded.version)
+    object.__setattr__(
+        forged,
+        "source",
+        PolicySource(
+            path=path, digest=hashlib.sha256(text.encode("utf-8")).hexdigest()
+        ),
+    )
+    return forged
+
+
+def test_source_verification_rejects_a_consistent_but_unapproved_copy(
+    tmp_path: Path,
+) -> None:
+    """MX1b — 객체와 파일이 **서로 일치하는데** 그 파일을 아무도 승인하지 않았다. 값 등식과
+    바이트 등식이 둘 다 성립하므로(아래 두 단언) 거부를 만들 수 있는 것은 **승인 축**뿐이다."""
+    tuned_path = _tuned_copy_on_disk(
+        tmp_path, version="evaluation-v1-tuned", threshold="0.1"
+    )
+    forged = _forged_pointing_at(_shipped_policy(), tuned_path)
+    reloaded = load_evaluation_policy(tuned_path)
+    assert isinstance(reloaded, EvaluationPolicy), reloaded
+
+    assert forged.paired_t_threshold == 0.1  # 완화가 실제로 들어 있다
+    assert reloaded.source.digest == forged.source.digest  # 바이트 등식 성립
+    assert policy_checksum(reloaded) == policy_checksum(forged)  # 값 등식 성립
+
+    assert isinstance(verify_policy_source(forged), PolicySourceMismatch)
+
+
+def test_source_verification_rejects_a_tuned_copy_that_keeps_the_approved_name(
+    tmp_path: Path,
+) -> None:
+    """같은 공격의 다른 꼴 — 이름을 `evaluation-v1` 로 남긴다. 그러면 version 은 등록돼 있고
+    거부를 만드는 것은 **지문 불일치**다(같은 승인 축의 둘째 갈래)."""
+    tuned_path = _tuned_copy_on_disk(tmp_path, version="evaluation-v1", threshold="0.1")
+    forged = _forged_pointing_at(_shipped_policy(), tuned_path)
+    assert forged.version == "evaluation-v1"
+    assert isinstance(verify_policy_source(forged), PolicySourceMismatch)
+
+
+def test_source_verification_still_accepts_the_approved_artifact(
+    tmp_path: Path,
+) -> None:
+    """**음성 대조** — 승인된 산출물은 경로가 달라도 통과한다(막는 것은 「미승인」이지
+    「사본」이 아니다)."""
+    copy_path = tmp_path / "elsewhere.yaml"
+    copy_path.write_text(_SHIPPED_POLICY.read_text(encoding="utf-8"), encoding="utf-8")
+    loaded = load_evaluation_policy(copy_path)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    assert isinstance(verify_policy_source(loaded), EvaluationPolicy)
