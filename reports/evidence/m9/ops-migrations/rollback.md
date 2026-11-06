@@ -4,7 +4,9 @@
 산출물 커밋).
 
 **원천을 병합한 main 으로 다시 고정했다**(라운드 6) — 이 브랜치는 paper-bid(V25)가 들어간
-main `56bd33ea` 를 합쳤다(`git log --merges df4976cc..HEAD` 한 줄). 원천은 **그때 합친 main 의
+main `56bd33ea` 를 합쳤다 — **내가 만든 병합은 하나**다(`git log --merges 56bd33ea..HEAD` 한 줄.
+착수 base 부터 세면 21 이고 그 가운데 20 은 main 자신의 PR 병합이다 — 세는 구간을 원천으로
+잡아야 「내 병합」이 나온다). 원천은 **그때 합친 main 의
 고정 SHA** 이고 움직이는 `origin/main` 을 쓰지 않는다. 전제도 함께 쟀다 — 이 slice 의 첫 산출물
 커밋은 `56bd33ea` 의 조상이 **아니다**(그 SHA 에 이 slice 가 없다).
 
