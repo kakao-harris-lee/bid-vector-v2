@@ -147,6 +147,36 @@ conftest.py` 의 `pytest_collection_finish` 가 `ml_engine.training.*` 를 `sys.
 전건에서만 붉어, 모집단이 조용히 줄어드는 모양이었다 — 실측으로 드러났다."""
 
 
+def _flatten_annotation(annotation: object) -> list[object]:
+    """주석을 **끝까지 펴서** 잎 노드 목록으로.
+
+    `typing.get_type_hints` 는 `type X = …`(PEP 695) **별칭을 풀지 않는다** — 반환값이
+    `TypeAliasType` 이고 `get_args` 는 빈 tuple 이다(실측). 그래서 앞 판은 별칭으로 가린
+    입구를 모집단에서 놓쳤다(변이 O4 가 GREEN 으로 그것을 잡았다). 별칭은 `__value__` 로
+    한 겹 풀고, 합 타입은 `get_args` 로 풀고, **재귀**한다(별칭의 별칭도 풀린다)."""
+    return _flatten_with_guard(annotation, set())
+
+
+def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
+    """`_flatten_annotation` 의 본체 — **재귀 별칭 가드**가 있다.
+
+    이 저장소에는 자기를 참조하는 합 타입 별칭이 있어(실측: 가드 없이 `RecursionError`),
+    이미 지난 노드를 `id` 로 기억한다. 가드가 **잎을 버리지는 않는다**: 같은 노드를 두 번째로
+    만났을 때만 멈추므로 처음 만난 모든 잎이 결과에 들어간다."""
+    if id(annotation) in seen:
+        return []
+    seen.add(id(annotation))
+    if isinstance(annotation, typing.TypeAliasType):
+        return _flatten_with_guard(annotation.__value__, seen)
+    args = typing.get_args(annotation)
+    if not args:
+        return [annotation]
+    leaves: list[object] = []
+    for arg in args:
+        leaves.extend(_flatten_with_guard(arg, seen))
+    return leaves
+
+
 def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
     try:
         hints = typing.get_type_hints(func)  # type: ignore[arg-type]
@@ -157,9 +187,9 @@ def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
     returned = hints.get("return")
     if returned is None:
         return False
-    parts = typing.get_args(returned) or (returned,)
     return any(
-        isinstance(part, type) and issubclass(part, policy_types) for part in parts
+        isinstance(part, type) and issubclass(part, policy_types)
+        for part in _flatten_annotation(returned)
     )
 
 
@@ -199,26 +229,31 @@ _POLICY_FILE_ENTRY_POINTS = frozenset(
 (`_read_policy_file`)도 넣는다: 거기에 매개변수가 생기면 public 래퍼 시그니처는 그대로여도
 주입 자리가 열린다."""
 
-_POLICY_DERIVATIONS = frozenset(
+_POLICY_ENTRY_EXCEPTIONS = frozenset(
     {
         # 파일이 아니라 **이미 로드된 것**에서 파생한다 — 그래서 `path` 를 받지 않는다.
         ("ml_engine.evaluation.policy_source", "verify_policy_source"),
         ("ml_engine.inference.policy", "_coerce_values"),
         ("ml_engine.inference.policy", "_inference_policy_of"),
         # 뿌리 로더 — `known_keys`(스키마 전수)를 받는다. 값이 아니라 **어떤 키를 아는가**이고,
-        # 소비 로더가 자기 스키마를 넘기는 자리다(그래서 `== ["path"]` 밖의 유일한 예외).
+        # 소비 로더가 자기 스키마를 넘기는 자리다.
         ("ml_engine.registry.policy", "load_policy"),
+        # backtest CLI 의 합성 로더 — 경로 **둘**(판정 정책 + 추론 정책)을 받는다. 오프라인
+        # 분석 경로이고 **승격 판정에 닿지 않는다**(verifier r4 실측: `evaluation/backtest/**`
+        # 와 `app/backtest_*.py` 에 `run_holdout`·`EvaluationPolicy`·promotion 참조 0).
+        # 그 축의 판정 정책 `strategy-backtest-v2` 는 일부러 미등록이다(6G 판정 입력 불간섭).
+        ("ml_engine.app.backtest_job", "_load_policies"),
     }
 )
-"""`path` 를 받지 않는(또는 받되 스키마 인자가 더 있는) 정책 파생 자리 — **사유와 함께**
-명시 예외로 둔다. 새 함수가 이 둘 중 어느 집합에도 없으면 아래 등식이 붉다."""
+"""`path` 하나만 받는 모양이 아닌 정책 자리 — **사유와 함께** 명시 예외로 둔다. 새 함수가
+파일 입구도 예외도 아니면 아래 등식이 붉다."""
 
 
 def test_policy_factories_split_into_file_entry_points_and_derivations() -> None:
     """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외. 새 입구를 **어느 모듈에
     두든**, 반환 주석을 **별칭으로 가려도**, 인자를 **개명해도** 이 등식이 먼저 붉다."""
-    assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_DERIVATIONS
-    assert frozenset() == _POLICY_FILE_ENTRY_POINTS & _POLICY_DERIVATIONS
+    assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_ENTRY_EXCEPTIONS
+    assert frozenset() == _POLICY_FILE_ENTRY_POINTS & _POLICY_ENTRY_EXCEPTIONS
 
 
 def test_every_policy_file_entry_point_takes_only_a_path() -> None:
@@ -229,10 +264,10 @@ def test_every_policy_file_entry_point_takes_only_a_path() -> None:
         assert list(signature.parameters) == ["path"], (module_name, name)
 
 
-def test_no_policy_derivation_takes_a_threshold_shaped_parameter() -> None:
+def test_no_policy_entry_exception_takes_a_threshold_shaped_parameter() -> None:
     """명시 예외 쪽도 **임계 이름**은 받지 않는다 — 예외 선언이 주입 통로가 되지 않게."""
     violations: list[str] = []
-    for module_name, name in sorted(_POLICY_DERIVATIONS):
+    for module_name, name in sorted(_POLICY_ENTRY_EXCEPTIONS):
         module = sys.modules[module_name]
         signature = inspect.signature(getattr(module, name))
         violations.extend(
