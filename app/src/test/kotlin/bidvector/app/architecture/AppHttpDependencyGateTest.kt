@@ -468,5 +468,12 @@ class AppHttpDependencyGateTest {
  * 하나가 조용히 사라진다. 위 둘째 재계산과 같은 방식으로 **숫자를 옮기지 않고 세 tier 목록의 항목
  * 이름 합집합을 기계로** 셌다: 35 + 11 + 35 = **81**(중복 0). 그 수가 76 + 5 와 같다는 것은 계산이
  * 아니라 **검산**이고, 아래 등식이 관측과 다시 대조한다.
+ *
+ * **M9/ops-migrations — 하나 더해 82.** ① 층에 `app.wiring.ReleaseWiring` 하나(릴리스 식별자 속성을
+ * 바인딩해 `adapters.persistence.ReleaseIdentifier` 빈을 세우는 `@Configuration` — 어댑터를 쥐어
+ * 꽂는 자리라 다른 배선들과 같은 tier1 이다). **설정 타입 `ReleaseProperties` 는 넣지 않았다** —
+ * 어댑터도 workflow 타입도 쥐지 않아 제한 층에서 그대로 초록이고(게이트가 낸 위반 다섯은 전부
+ * `ReleaseWiring` 것이었다), 면제를 필요 이상 넓히면 이 게이트가 그만큼 약해진다(7C⑤-0 의 같은
+ * 판단). 수는 세 tier 목록의 **항목 이름 합집합**을 센 값이다: 36 + 11 + 35.
  */
-private const val EXPECTED_EXEMPT_COUNT = 81
+private const val EXPECTED_EXEMPT_COUNT = 82
