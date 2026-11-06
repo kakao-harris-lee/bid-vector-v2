@@ -1,21 +1,22 @@
 # M9/paper-bid rollback
 
-착수 base **`df4976cc`** · **복원 원천 `3ad4f3f6`**(이 브랜치가 **마지막으로** 합친 main 의
-**고정 SHA** = 병합 커밋 `1f34e3fc` 의 둘째 부모) · **실측 HEAD `b5da4a2d`**(판정 SHA =
-승인 전 일괄 라운드의 마지막 산출물 커밋).
+착수 base **`df4976cc`** · **복원 원천 `97ed49c4`**(이 브랜치가 **마지막으로** 합친 main 의
+**고정 SHA** = 병합 커밋 `b4d9e924` 의 둘째 부모) · **실측 HEAD `b4d9e924`**(판정 SHA).
 
-**그 라운드에서 다시 쟀다.** 복원 목록 안 경로 **넷**이 움직였기 때문이다 — §5 의 술어가 네 줄을
-냈다(`notificationDisplay.ts` · `results.spec.ts` · `NotificationInboxWiringTest.kt` ·
-`capability-map.md`). 앞 실측을 옮기지 않고 판정 SHA 에서 ①~③ 과 표지 계수를 **전부 다시** 냈다.
-**원천은 그대로다** — 그 라운드에 main 병합이 없었다.
+**라운드마다 다시 쟀다.** 승인 전 일괄 라운드는 복원 목록 안 경로 **넷**을 움직였고(§5 술어가 네
+줄), `97ed49c4`(#134) 병합은 **원천 자체**를 옮겼다. 두 번 모두 앞 실측을 옮기지 않고 그 라운드의
+판정 SHA 에서 ①~③ 과 표지 계수를 **전부 다시** 냈다. **원천을 옮긴 뒤에도 복원 목록은 49 로
+같다** — #134 가 겹친 둘은 이미 내 목록 안이던 파일이고, 그 slice 가 새로 더한 파일은 내 커밋에
+없다.
 
-**원천이 착수 base 가 아니다.** 이 브랜치는 머지 직전에 `origin/main` 을 **두 번** 합쳤다
-(`e12c0485` = #130~#133 · `3ad4f3f6` = #135). base 에서 복원하면 **그 남의 변경까지 지운다**.
+**원천이 착수 base 가 아니다.** 이 브랜치는 머지 직전에 `origin/main` 을 **세 번** 합쳤다
+(`e12c0485` = #130~#133 · `3ad4f3f6` = #135 · `97ed49c4` = #134). base 에서 복원하면 **그 남의
+변경까지 지운다**.
 그래서 ⓐ 복원 목록은 **내 커밋만**(병합 제외)에서 산출하고 ⓑ 복원 원천은 **마지막으로** 합친
 main 의 고정 SHA 다 — 움직이는 `origin/main` 을 쓰지 않는다(다음 머지가 그 ref 를 옮기면 실측이
 다른 트리를 가리킨다. inbox-vocab 이 네 번 다시 고정한 자리이고 이 slice 도 `df4976cc` →
-`e12c0485` → `3ad4f3f6` 으로 두 번 옮겼다). **머지 전에 main 이 또 움직이면** 원천을 그 SHA 로
-다시 고정하고 아래 ①~③ 과 §4 를 다시 잰다.
+`e12c0485` → `3ad4f3f6` → `97ed49c4` 으로 **세 번** 옮겼다). **머지 전에 main 이 또 움직이면**
+원천을 그 SHA 로 다시 고정하고 아래 ①~③ 과 §4 를 다시 잰다.
 
 evidence 커밋은 실측 뒤에 오므로 이 slice 에서는 「실측 HEAD == 판정 SHA」가 **성립한다**(아직
 evidence 를 커밋하지 않은 자리에서 쟀다). 그래도 대조해야 하는 것은 **그 사이에 되돌림 대상이
@@ -26,7 +27,7 @@ evidence 를 커밋하지 않은 자리에서 쟀다). 그래도 대조해야 �
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-MAIN=3ad4f3f6                                     # 이 브랜치가 **마지막으로** 합친 main 의 고정 SHA
+MAIN=97ed49c4                                     # 이 브랜치가 **마지막으로** 합친 main 의 고정 SHA
 EXCL=':(exclude)reports/evidence/m9/paper-bid'    # 자기 자신은 되돌릴 수 없다
 
 mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
@@ -100,16 +101,17 @@ mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **49**(evidence 제외) = 복원 **45**(M) · 삭제 **4**(A) — 기계 목록과 같다 |
-| ③ 결과 트리 == `3ad4f3f6` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
-| ③′ main 의 남의 변경 보존 | **추가 파일 전수 존재**(이름으로 세지 않고 목록을 돌며 `-e` 로 물었다 — 없는 것 **0**) · `KonepsEndpointDefaultsTest` 7 · `NotificationInboxStore` 11 · `AwardResult` 8 · `RetentionPolicyData` 26 · `APPROVED_OPERATIONS` 4 · **#135**: `provisional-state-` 3 · `opening-axis` 8 |
+| ③ 결과 트리 == `97ed49c4` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
+| ③′ main 의 남의 변경 보존 | **추가 파일 전수 존재**(이름으로 세지 않고 목록을 돌며 `-e` 로 물었다 — 없는 것 **0**) · `KonepsEndpointDefaultsTest` 7 · `RetentionPolicyData` 26 · **#135**: `provisional-state-` 3 · `opening-axis` 8 · **#134**: `NoticeWatchSubjectPort` 19 · `EvaluationAdapterDependencyTest` 12 · `PersistenceAdapterDependencyTest` 12 · 그 slice 의 새 test 둘·제약 가드 **각 1** · evidence 디렉터리 **4 파일** |
 | ③″ 내 표지 **0** | 열 표지 전부 0(이 라운드가 더한 `NotificationTestIdParts` 까지) · V25 파일 0(마이그레이션 수 **22** 로 복귀) · capability map 다섯 열 문장 0 · §14.3 종결 취소선 0 |
+| ③‴ 겹친 래칫이 **남의 값으로** 돌아갔는가 | `CleanMigrationCheckTest` 의 `notification_inbox` CHECK 수가 내 **7** 에서 #134 의 **5** 로 복귀(각 1·0) — 「내 줄 사라짐」을 이름이 아니라 **값**으로 본 자리다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/paper-bid/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`3ad4f3f6` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
-main(#135 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
+복원한 트리는 **`97ed49c4` 의 트리와 파일 단위로 같다**(③ 의 0 파일 셋). 그 커밋은 병합된
+main(#134 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시
 돌리는 것은 같은 트리를 다시 재는 일이다.
 
 **같지 않은 입력을 이름 붙인다**: ⑦ 의 evidence 파일들이다. 그것들은 빌드 입력이 **맞다** —
@@ -158,11 +160,12 @@ main(#135 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 버릴 clone 에 §2 의 네 걸음을 쏘는 임시 test 하나를 넣고 **버릴 클러스터**에서 돌렸다(공유
 컨테이너를 오염시키지 않는다). 그 test 는 **커밋하지 않았고** 측정 뒤 지웠다.
 
-**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `b5da4a2d` 다.** 그 사이 V25 가 바뀐 것은
+**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `b4d9e924` 다.** 그 사이 V25 가 바뀐 것은
 **주석뿐이고**(`5ca4f561..635f05a6` 의 비주석·비공백 줄 **0**), main 병합 **둘 다** V25 를 **아예
 만지지 않았다**(`635f05a6..HEAD` 의 그 파일 diff **0 줄** — main 은 두 범위 모두에서
 마이그레이션을 더하지 않았다). **승인 전 일괄 라운드도 마이그레이션 디렉터리를 만지지 않았다**
-(`1f34e3fc..b5da4a2d` 의 그 디렉터리 변경 **0 파일** — 그 라운드는 산문·타입·test 술어뿐이다).
+(`1f34e3fc..b4d9e924` 의 그 디렉터리 변경 **0 파일** — 그 라운드는 산문·타입·test 술어뿐이고,
+#134 는 마이그레이션을 더하지 않았다).
 그래서 그 파일이 만드는 스키마가 같고 §2 의 네 걸음이 쏘는 DDL 도 같다. 그 밖에 이 리허설의
 입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
 
@@ -200,8 +203,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 갈릴 수 있다. 유효성�
 움직였는가**로 본다:
 
 ```
-git diff --name-only b5da4a2d..<HEAD> -- \
-  $(git log --no-merges --format= --name-only 3ad4f3f6..b5da4a2d \
+git diff --name-only b4d9e924..<HEAD> -- \
+  $(git log --no-merges --format= --name-only 97ed49c4..b4d9e924 \
       -- . ':(exclude)reports/evidence/m9/paper-bid' | sort -u)
 ```
 

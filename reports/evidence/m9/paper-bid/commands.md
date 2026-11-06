@@ -46,7 +46,12 @@ XML 의 mtime 으로 실행을 확인했다.
 - adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0. 이 셋은 둘째 병합 커밋에서
   쟀고, **승인 전 일괄 라운드는 그 뒤 두 모듈을 만지지 않았다**(실측: 그 범위에서
   `adapters/`·`workflow/` 변경 **0 파일** — 바뀐 것은 app test 한 class · web 둘 · 문서다).
-- 그 바뀐 `NotificationInboxWiringTest` 는 **판정 SHA 에서 다시 돌렸다** — **3/3**, 실패 0.
+- 그 바뀐 `NotificationInboxWiringTest` 는 **3/3**, 실패 0(`--rerun`).
+- `97ed49c4` 병합 뒤 **판정 SHA 에서** persistence·evaluation 표적을 `--rerun` 으로 돌렸다 —
+  class **40** · test **232**, 실패 0 · skip 0. 겹친 `CleanMigrationCheckTest` 와 #134 가 만진
+  나머지 셋이 모두 그 안이다. adapters ktlint(2)·detekt exit 0.
+- **`gateRegistrationGate` 는 별 호출로 돌렸다** — exit 0. 표적 `--tests` 와 같은 호출에 두면
+  collection 선택이 그 게이트의 모집단을 흔든다(하네스 규율: 서브프로세스 격리).
 - 세 모듈 ktlint·detekt exit 0 · `leakPatternGate` 는 **evidence HEAD** 에서 exit 0 — 그 task 의
   `scanRoot` 가 `reports/evidence` 를 **선언 입력**으로 들어 evidence 커밋마다 out-of-date 가
   되고, 보고 파일 mtime 으로 실행을 확인했다.
@@ -125,30 +130,41 @@ slice 가 그 자리를 둘 고쳤고(정렬 모양 · `PAPER` fixture), 세는 
 
 ## §6 main 병합의 합집합 계수
 
-머지 직전에 `origin/main` 을 **두 번** 합쳤다 — `e12c0485`(#130~#133) · `3ad4f3f6`(#135).
-**충돌 0 이 「접히지 않았다」를 뜻하지 않으므로** 병합마다 축을 따로 쟀다.
+머지 직전에 `origin/main` 을 **세 번** 합쳤다 — `e12c0485`(#130~#133) · `3ad4f3f6`(#135) ·
+`97ed49c4`(#134 gates-tests). **충돌 0 이 「접히지 않았다」를 뜻하지 않으므로** 병합마다 축을
+따로 쟀다.
 
-| 축 | `e12c0485` | `3ad4f3f6` |
-| --- | --- | --- |
-| 내 경로 ∩ main 변경 경로 | **둘** — 등재부 · capability map | **하나** — `web/e2e/journey/results.spec.ts` |
-| 충돌 | **하나**(등재부 app 블록에 양쪽이 같은 자리) → **사전순 합집합** 셋 | **0**(그래서 아래 계수가 하중을 진다) |
-| 마이그레이션 충돌 | **0** — main 이 더하지 않았다(V25 의 diff 도 0 줄) | **0** — 같음 |
-| 내 나머지 경로가 병합 전과 같은가 | 차이 **0 파일** | 차이 **0 파일** |
-| main 의 변경 경로가 그 SHA 와 같은가 | 74 중 차이 **둘**(겹친 그 둘) | 14 중 차이 **하나**(겹친 그 하나) |
-| `HEAD` vs 그 SHA 의 차이가 내 경로뿐인가 | 그 밖 **0** | 그 밖 **0** |
-| main 추가 파일 전수 존재 | — | **없는 것 0**(목록을 돌며 `-e` 로 물었다) |
+| 축 | `e12c0485` | `3ad4f3f6` | `97ed49c4` |
+| --- | --- | --- | --- |
+| 내 경로 ∩ main 변경 경로 | **둘** — 등재부 · capability map | **하나** — `web/e2e/journey/results.spec.ts` | **둘** — 등재부 · `CleanMigrationCheckTest.kt` |
+| 충돌 | **하나**(등재부 app 블록에 양쪽이 같은 자리) → **사전순 합집합** 셋 | **0**(그래서 아래 계수가 하중을 진다) | **0** — 같음 |
+| 마이그레이션 충돌 | **0** — main 이 더하지 않았다(V25 의 diff 도 0 줄) | **0** — 같음 | **0** — 같음 |
+| 내 나머지 경로가 병합 전과 같은가 | 차이 **0 파일** | 차이 **0 파일** | 차이 **0 파일** |
+| main 의 변경 경로가 그 SHA 와 같은가 | 74 중 차이 **둘**(겹친 그 둘) | 14 중 차이 **하나**(겹친 그 하나) | 9 중 차이 **둘**(겹친 그 둘) |
+| `HEAD` vs 그 SHA 의 차이가 내 경로뿐인가 | 그 밖 **0** | 그 밖 **0** | 그 밖 **0** |
+| main 추가 파일 전수 존재 | — | **없는 것 0**(목록을 돌며 `-e` 로 물었다) | **없는 것 0**(#134 의 evidence 넷) |
 
 **겹친 파일마다 양쪽 생존을 따로 셌다.**
 
 | 겹친 파일 | 내 쪽 | 남의 쪽 | 접힘 검사 |
 | --- | --- | --- | --- |
-| `config/quality/gate-tests.properties` | 등재 **셋** | Koneps 등재 **둘** | 중복 항목 **0**(세 ref 모두) · 사전순 위반 `app` 2·`decision` 1·`procurement` 3 가 **세 ref 에서 동일**(main 기존 상태 — 내가 등재한 `adapters` 블록은 **0**) |
+| `config/quality/gate-tests.properties` | 등재 **셋** | Koneps 등재 **둘**(`e12c0485`) · #134 는 **항목 0**(주석만 — `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` 문단) | 중복 항목 **0**(네 ref 모두) · 사전순 위반 `app` 2·`decision` 1·`procurement` 3 가 **네 ref 에서 동일**(main 기존 상태 — 내가 등재한 `adapters` 블록은 **0**) · `97ed49c4` 병합 뒤 **항목 518 = base 515 + 내 셋**이고 **12 키 전부에서 「병합 후 == 내 것 ∪ main 것」 집합 등식**이 선다(어긋난 키 0) |
+| `adapters/**/persistence/CleanMigrationCheckTest.kt`(#134) | `notification_inbox` CHECK 수 래칫 **5 → 7** 한 줄 + 사유 주석 | 옛 `any { contains }` test 하나를 **집합 등식 + 표마다의 본문 등식 둘**로 바꾸고 `queryCheckBodies()` 헬퍼를 지웠다 · `queryConstraintDef` 에 0 행·2 행 가드 | 내 `to 7` **1** · 옛 `to 5` **0** · main 의 새 test **각 1** · 지워진 헬퍼·옛 단언 **각 0** · `@Test` **11**(= main 11, 내 쪽은 test 를 더하지 않는다) · 줄 수 **416** = base 343 + main 순증 **68** + 내 순증 **5** — **산수가 맞으므로 접힌 본문이 없다** |
 | `docs/discovery/capability-map.md` | 표지 **각 1**(다섯 열 키 문장 · 「제한 셋」) | #133 의 등재 행 **둘** | 중복 제목 **0**(159 중) · 줄 수 **3971** = `e12c0485` 3971 + 내 순증 0(제자리 치환) |
 | `web/e2e/journey/results.spec.ts` | import **1** · `InboxItem` 의 축 칸 **1** · 공유 함수로 짓는 행 조회 **1** · 옛 네 조각 템플릿 **0** | `provisional-state-` **1** · 개찰 축 하네스 참조 **4** · `test` 선언 **3** | 중복 import **0** · `type InboxItem` 선언 **1** · 충돌 표지 **0** · 줄 수 **661** = `3ad4f3f6` 650 + 내 순증 **11**(= 518 − 507) — **산수가 맞으므로 접힌 본문이 없다** |
 
 `web/config/gate-tests.txt` 는 **내가 손대지 않았다** — #135 가 더한 뒤 그대로다(항목 37 · 중복
 **0** · `3ad4f3f6` 과 diff **0 줄**). 내가 더한 vitest 둘은 **기존 파일 안의 test** 라 그 등록부에
 새 줄이 필요 없다(그 게이트는 파일 단위 등재다).
+
+**#134 의 의미 겹침은 텍스트 겹침보다 넓었다.** 그 slice 의 새 test 는 `notice_round` 형식 CHECK 를
+**여섯 표에서 각각** 고정하고 그 목록에 **`notification_inbox` 이 있다** — 이 slice 가 바로 그 표의
+PK 를 갈아 끼우므로 병합 전에 물어야 했다. **V25 는 그 제약을 건드리지 않는다**(실측: V25 에
+`notice_round` 제약 언급 0 · V25 가 만드는 제약은 `…_bid_kind_check`·`…_bid_kind_pair_check` 둘,
+떨어뜨리는 것은 `…_pkey` 하나). 그래서 그 표의 `…_notice_round_check` 본문이 그대로이고 #134 의
+단언이 내 트리에서도 선다. **이름 충돌도 없다** — #134 가 `queryConstraintDef` 에 더한 「같은 이름의
+제약이 둘 이상」 가드가 V25 의 새 이름 둘과 부딪히지 않는다(둘 다 그 표에만 있다). 병합 뒤 그
+test 를 실제로 돌려 확인했다(§3 의 persistence 표적).
 
 **의미 겹침을 따로 봤다**(텍스트 겹침 0 인 자리). #132 가 `web/src/display/**`·`web/src/screens/**`
 를 만졌지만 내 네 파일과는 다른 파일이고, 그쪽이 바꾼 `stateDisplay.ts` 의 `displayOf` 는 **맨 색인
