@@ -1,23 +1,19 @@
 import bidvector.buildlogic.CpdReportPresenceGateTask
-import bidvector.buildlogic.DomainApiTypeGateTask
-import bidvector.buildlogic.DomainSourceReferenceGateTask
 import bidvector.buildlogic.DuplicatePolicy
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.JarContentGateTask
-import bidvector.buildlogic.MigrationOrderGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.PackageOwnershipGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
-import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
-import bidvector.buildlogic.UnusedImportGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
+import bidvector.buildlogic.registerPolicyGates
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
 import bidvector.buildlogic.sourceSetLayoutFacts
@@ -69,12 +65,6 @@ private val expectedModuleSourceSets =
 private val typeShapeRootPackagePrefix =
     readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
         .requireValue("package.root")
-
-// 마이그레이션 디렉터리의 모듈 기준 상대 경로(`OPEN-MIGRATION-ORDER-GATE`). 관례를 박지 않고 정책
-// 데이터에서 읽는다 — 그 경로가 선언 입력이자 판정 대상의 유일한 자리다.
-private val migrationResourcePath =
-    readPolicy(configDir.file("quality/migration-policy.properties").asFile)
-        .requireValue("migration.resource-path")
 
 // D-6(Phase 3 중 신설) — 타입 멤버 축만 이 source set 집합을 잰다(관례상 `main`). 파일·함수
 // 축은 여전히 전 source set 을 받는다 — 면제는 멤버 축 하나뿐이다.
@@ -227,6 +217,10 @@ val cpdReportPresenceGateObserved =
         dependsOn(cpdCheckObserved)
     }
 
+// 정책 데이터만 먹는 축은 `PolicyGateWiring.kt` 가 배선한다 — 이 파일이 500 줄 한도를 넘어
+// `buildLogicSizeGate` 가 붉었다(verifier B-1). 한도를 올리는 것은 게이트를 끄는 것과 같다.
+val policyGates = registerPolicyGates(configDir)
+
 // 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
 // 역방향 선언이 1차에서 통과한다 — 층 규칙은 domain 전용이 아니다(ADR 0006 D-3).
 val moduleDependencyGate =
@@ -292,28 +286,6 @@ val packageOwnershipGate =
 //  경로는 잡았다 — 다만 그 사실에 기대지 않는 편이 옳다.)
 val conventionSourceDirectories =
     provider { sourceSets.map { layout.projectDirectory.dir("src/${it.name}/kotlin").asFile } }
-
-val sourceLanguageGate =
-    tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
-        description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
-        sourceDirectories.from(layout.projectDirectory.dir("src"))
-        excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
-        // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
-        // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
-        allowedExtensions = setOf("kt", "kts", "md")
-        report = layout.buildDirectory.file("reports/source-language-gate/offenders.txt")
-    }
-
-// 쓰이지 않는 import(`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`) — ktlint 의 `no-unused-imports` 가 켜져
-// 있는데도 조용했던 축이다(실측, 운영자 등재 결정 2026-09-26). 도구가 조용한 축은 도구로 덮지 않는다.
-// `sourceLanguageGate` 와 같은 이유로 **관례 트리를 직접** 걸고 source set 에서 파생시키지 않는다.
-val unusedImportGate =
-    tasks.register<UnusedImportGateTask>("unusedImportGate") {
-        description = "import 가 들여온 이름이 그 파일 본문에서 쓰이는지 잰다 — ktlint 가 조용한 축"
-        policyFile = configDir.file("quality/architecture-policy.properties")
-        sources.from(layout.projectDirectory.dir("src"), layout.projectDirectory.file("build.gradle.kts"))
-        report = layout.buildDirectory.file("reports/unused-import/violations.txt")
-    }
 
 val jarContentGate =
     tasks.register<JarContentGateTask>("jarContentGate") {
@@ -428,43 +400,6 @@ val testShapeGate =
         report = layout.buildDirectory.file("reports/test-shape-gate/test-shape-gate.txt")
     }
 
-// 바이트코드 층(ArchUnit)과 의존 그래프 층이 함께 놓치는 자리 — 컴파일 시 인라인되는 상수와
-// class literal 은 domain 소스가 **이름으로** 부르지만 산출물에 타입 참조를 남기지 않는다
-// (알려진 제한 7·11). 소스 자체를 걸어 그 사각을 덮는다.
-val domainSourceReferenceGate =
-    tasks.register<DomainSourceReferenceGateTask>("domainSourceReferenceGate") {
-        description = "domain main 소스가 허용 목록 밖 좌표를 이름으로 부르는지 잰다"
-        policyFile = configDir.file("quality/architecture-policy.properties")
-        moduleName = project.name
-        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
-        report = layout.buildDirectory.file("reports/domain-source-reference/references.txt")
-    }
-
-// public domain API 의 타입 표면에 raw 부동소수가 없는지 잰다 — milestone-1.md 「완료 조건」의
-// 강제 장치(설계 검토 부록 「요구의 귀속」 — 내용은 1B, 장치는 1A). 소스 참조 게이트와 축이
-// 달라(이름 참조 대 타입 표면) 별도 task 로 둔다.
-val domainApiTypeGate =
-    tasks.register<DomainApiTypeGateTask>("domainApiTypeGate") {
-        description = "domain main 의 public(+protected) API 타입 표면에 raw 부동소수가 없는지 잰다"
-        policyFile = configDir.file("quality/architecture-policy.properties")
-        apiPolicyFile = configDir.file("quality/api-type-policy.properties")
-        moduleName = project.name
-        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
-        report = layout.buildDirectory.file("reports/domain-api-type/violations.txt")
-    }
-
-// 마이그레이션 번호 순서(`OPEN-MIGRATION-ORDER-GATE`) — 규율은 D-6F5-8 이고 그 규율에 자동 게이트가
-// 없다는 사실이 D-6F5-13 으로 등재됐다. 단언 대상 모듈은 정책이 고르고(`migration.module`), 경로도
-// 정책 값이다 — 디렉터리를 옮기면 그 모듈의 입력이 비어 게이트가 붉는다.
-val migrationOrderGate =
-    tasks.register<MigrationOrderGateTask>("migrationOrderGate") {
-        description = "마이그레이션 version 집합이 결번·중복 없이 1..max 와 같은지 잰다(Flyway outOfOrder=false)"
-        policyFile = configDir.file("quality/migration-policy.properties")
-        moduleName = project.name
-        migrationDirectory.from(layout.projectDirectory.dir(migrationResourcePath))
-        report = layout.buildDirectory.file("reports/migration-order/violations.txt")
-    }
-
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일·함수·타입 멤버 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -500,20 +435,16 @@ val typeShapeGate =
 // 「배선했다」와 「측정한다」는 다르다. XML 은 기계가, HTML 은 사람이 읽는다.
 tasks.named("check") {
     dependsOn(
+        policyGates,
         sizeGate,
         typeShapeGate,
         moduleDependencyGate,
         packageOwnershipGate,
-        sourceLanguageGate,
         jarContentGate,
-        migrationOrderGate,
-        unusedImportGate,
         sourceSetLayoutGate,
         gateExecutionGate,
         gateRegistrationGate,
         testShapeGate,
-        domainSourceReferenceGate,
-        domainApiTypeGate,
         cpdReportPresenceGate,
         cpdReportPresenceGateObserved,
         tasks.named("koverXmlReport"),
