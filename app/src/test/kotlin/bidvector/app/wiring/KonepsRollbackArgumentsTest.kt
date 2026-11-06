@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.KonepsOpeningEndpointProperties
 import bidvector.procurement.BusinessDivision
@@ -19,6 +20,17 @@ import java.nio.file.Path
 import java.time.Instant
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/**
+ * M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다).
+ * 다른 배선 test 일곱과 같은 관례다. 출하에서는 `ReleaseWiring` 이 이 빈을 세우고, 「기본값이
+ * 없으면 뜨지 않는다」를 지는 자리는 `ReleaseWiringTest` 다 — 여기서 그 축을 다시 재지 않는다.
+ *
+ * **이 빈이 없으면 이 파일의 세 test 가 각자 다른 이유로 거짓이 된다**(병합이 만든 자리):
+ * 양성 둘은 「목록이 틀렸다」가 아니라 빈 부재로 붉고, 음성 하나는 「행의 한 칸만 줬다」가 아니라
+ * 빈 부재로 초록이다 — 사유가 바뀐 통과다.
+ */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 /** 배선은 이 port 를 요구할 뿐 쓰지 않는다 — 기동 **조건**만 재므로 빈 응답으로 족하다. */
 private object RollbackAxisStore : CollectedAxisStore {
@@ -149,6 +161,7 @@ class KonepsRollbackArgumentsTest {
         context.registerBean(CollectedAxisStore::class.java, Supplier { RollbackAxisStore })
         context.register(wiring)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
         val failure = runCatching { context.refresh() }.exceptionOrNull()
         return Booted(context, failure)
