@@ -61,6 +61,21 @@ class AwardExitCodeTest {
         awardFinishLine(report, CollectionExitCode.COMPLETE) shouldContain "duplicates=1 dropped=2"
     }
 
+    /**
+     * **멈춤 줄의 사유는 닫힌 어휘다**(cr r4 L-2) — 타입 `toString()` 이면 `QuotaExhausted` 가 실리고,
+     * 값을 나르는 사유가 오는 날에는 그 필드값까지 줄에 실린다. 운영자가 회계 행·원장의 토큰과 맞춰
+     * 보려면 `truncationCodeOf` 의 어휘여야 한다. `haltOf` 가 **다음 사유를 이 칸으로 보내기로 사전
+     * 결정**했으므로 그 자리가 먼저 맞아야 한다.
+     */
+    @Test
+    fun `멈춤 줄의 사유는 닫힌 어휘로 적는다`() {
+        val quota = AwardCollectionHalt(null, TruncationCause.QuotaExhausted, notAttemptedSlots = 1)
+
+        awardHaltLine(quota) shouldContain "truncation=QUOTA_EXHAUSTED"
+        // 예산 멈춤은 사유 칸이 비고 상한 칸이 그 자리를 든다.
+        awardHaltLine(AwardCollectionHalt(BudgetLimit.TOTAL, null)) shouldContain "truncation=none"
+    }
+
     /** 줄에 실리는 계수들 — 종료 코드가 보는 두 칸(`unfinishedSlots`·`halted`)만 호출부가 정한다. */
     private fun reportOf(
         unfinishedSlots: Int,

@@ -3564,6 +3564,7 @@ M9 머지분이 닫은 것 · M9 가 신설한 slice 잔여 OPEN · 운영 잔�
 | `OPEN-M9-MONEY-VOCAB-CROSS-LANG` | 금액 어휘가 Kotlin(정본)과 web 유니온·축어 목록·e2e 라벨 표 넷에 손으로 복제돼 있다. 오늘 넷이 정확히 일치하지만, openapi 가 그 칸을 `string` 으로 내므로 Kotlin 에 값이 늘면 web 은 어디서도 붉어지지 않고 degrade 한다 | 같은 PR(r1 cr LOW) · 같은 checklist 제한 ⑨ |
 | `OPEN-CVE-APT-RETRY` | 두 런타임 이미지의 apt 하한 상향이 **새 네트워크 의존**을 들였는데 재시도가 없다(`-o Acquire::Retries=3`). `--no-remove`·`~` 접미 판 문면도 같은 자리 | PR **#126** 머지 `5c6ba2c6`(head `9500fe17`) 조치 코멘트(cr MEDIUM-1) |
 | `OPEN-CVE-APT-RUNBOOK-BRANCH` | runbook 의 릴리스 절에 「베이스가 수정판을 안 담을 때 런타임 stage 하한」 갈래가 없고, 「함께 움직이는」 목록에 그 하한 줄이 없다 — 베이스 상향 날 no-op 하한을 치우는 주인이 정해지지 않았다 | 같은 PR 조치 코멘트(cr MEDIUM-2) |
+| `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` | **형제 공고 목록 갈래(`CollectNoticesUseCase`)도 같은 재개 루프와 같은 공유 누산기를 쓰고 총수 최댓값 보호가 없다** — 쪽 상한 재개의 첫 쪽이 「없음」이면 그 갈래의 `collection_run.source_total` 에도 **0** 이 적힌다. 그 갈래는 완료 판정에 `attemptOutcomeOf` 를 쓰지 않아(`exitCodeOf` 가 다른 술어다) 오늘 거동 피해는 없고 **장부 품질** 문제다. 고치는 자리는 둘 중 하나 — 그 use case 쪽 한 자리(이 slice 가 한 것과 같은 모양) 또는 공유 누산기를 최댓값으로(그쪽은 두 갈래 거동을 함께 바꾼다). 받는 자리는 그 갈래나 공유 누산기를 다음에 만지는 slice 다 | M9/award-ingest r4 신설 — PR #128 의 cr open question · 팀장 결정 2026-11-06(이 slice 는 고치지 않고 등재한다 — 그 파일은 in_scope 밖) |
 
 **아직 머지되지 않은 PR 이 만들 OPEN 둘은 이 절이 등재하지 않는다** — 각 PR 이 자기 머지에서 이 문서에
 세우므로 **중복 등재가 더 나쁘다**. `OPEN-STR-12-INTERACTIVE`(PR #127, 알림 실발송 채널) ·

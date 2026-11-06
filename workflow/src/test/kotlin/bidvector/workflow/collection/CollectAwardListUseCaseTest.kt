@@ -260,8 +260,9 @@ class CollectAwardListUseCaseTest {
      * 거절이 오므로 창을 더 걷는 의미가 없다. 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
      * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
      *
-     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc). 그때 이 목록에도
-     * 그 사유가 한 줄 늘어야 한다 — 컴파일이 `haltOf` 를 가리키고, 이 등식이 그 선택을 받는다.
+     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc). 모수를 sealed
+     * 계층에서 도출하므로 그 사유는 **자동으로** 이 순회에 들어오고, 기대 집합에 더하지 않으면 이 등식이
+     * 붉어진다 — 컴파일이 `haltOf` 를 가리키고 이 등식이 그 **선택**을 가리킨다.
      */
     @Test
     fun `멈추는 절단 사유는 예산과 쿼터 둘뿐이다 — 사유 전수의 등식`() {
@@ -341,26 +342,22 @@ class CollectAwardListUseCaseTest {
 }
 
 /**
- * 오늘의 `TruncationCause` **전수** — 위 등식의 모수다. 손으로 적는 목록이라 새 사유는 자동으로
- * 들어오지 않는다(그 자리를 강제하는 것은 `haltOf` 의 소진 `when` 이고, 이 목록은 **선택**을 잠근다).
- * `BudgetExhausted` 는 값을 나르므로 상한 둘을 각각 든다.
+ * `TruncationCause` **전수** — 위 등식의 모수이고 **sealed 계층에서 도출한다**(cr r4 M-2 · 같은 패키지
+ * `CollectNoticesUseCaseTest` 와 `AxisLastObservedAtTest` 의 선례).
+ *
+ * 손으로 적던 앞 판은 **새 사유에 조용히 초록**이었다 — 사유를 더하고 이 목록에 넣지 않으면 등식이 그
+ * 선택을 아예 **측정하지 않는다**(D-6G2d-30 이 적은 그 실패 모양이다). 모수가 구조이면 그 길이 없다:
+ * 컴파일이 `haltOf` 를 가리키고 이 목록이 **선택**을 가리킨다.
+ *
+ * 값을 나르는 사유(`BudgetExhausted`)는 `INSTANCE` 가 없어 상한마다 한 인스턴스를 짓는다 — 그 축도
+ * 열거가 아니라 `BudgetLimit.entries` 에서 온다.
  */
 private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
-    listOf(
-        TruncationCause.MaxPages,
-        TruncationCause.RepeatedPage,
-        TruncationCause.QuotaExhausted,
-        TruncationCause.Timeout,
-        TruncationCause.TransportFailure,
-        TruncationCause.ServerError,
-        TruncationCause.NotRetryable,
-        TruncationCause.InputError,
-        TruncationCause.Unclassified,
-        TruncationCause.StructureFailure,
-        TruncationCause.SelfThrottled,
-        TruncationCause.BudgetExhausted(BudgetLimit.DAILY),
-        TruncationCause.BudgetExhausted(BudgetLimit.TOTAL),
-    )
+    requireNotNull(TruncationCause::class.java.permittedSubclasses) { "TruncationCause 는 sealed 여야 한다" }
+        .flatMap { subclass ->
+            runCatching { listOf(subclass.getField("INSTANCE").get(null) as TruncationCause) }
+                .getOrElse { BudgetLimit.entries.map { limit -> TruncationCause.BudgetExhausted(limit) } }
+        }
 
 /** 낙찰 목록 항목 하나 — 계약이 등재한 키로 원문을 만든다(식별자 둘과 낙찰자 상호). */
 private fun awardObservation(number: String): RawNoticeObservation =

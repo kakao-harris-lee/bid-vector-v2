@@ -1,6 +1,7 @@
 package bidvector.app.collection
 
 import bidvector.adapters.snapshot.RunStateDirectory
+import bidvector.procurement.truncationCodeOf
 import bidvector.workflow.collection.AwardCollectionHalt
 import bidvector.workflow.collection.AwardCollectionReport
 import bidvector.workflow.collection.AwardCollectionSource
@@ -64,9 +65,16 @@ internal fun awardStartLine(
     "award-collection start openingFrom=${range.from} openingTo=${range.to} " +
         "sources=${sources.joinToString(",") { it.name.value }}"
 
+/**
+ * 멈춤 줄 — 사유는 **닫힌 어휘**([truncationCodeOf])로 적는다(cr r4 L-2). 타입 `toString()` 을 쓰면 값을
+ * 나르는 사유가 올 때 그 필드값이 줄에 실리고, 운영자가 회계 행·원장의 토큰과 맞춰 볼 수도 없다.
+ * `haltOf` 가 **다음 사유(403 차단)를 이 칸으로 보내기로 사전 결정**했으므로 그때 이 자리가 먼저 맞아야
+ * 한다.
+ */
 internal fun awardHaltLine(halt: AwardCollectionHalt): String =
     "award-collection halted budgetLimit=${halt.budgetLimit ?: "none"} " +
-        "truncation=${halt.truncationCause ?: "none"} notAttemptedSlots=${halt.notAttemptedSlots}"
+        "truncation=${halt.truncationCause?.let(::truncationCodeOf) ?: "none"} " +
+        "notAttemptedSlots=${halt.notAttemptedSlots}"
 
 internal fun awardFinishLine(
     report: AwardCollectionReport,

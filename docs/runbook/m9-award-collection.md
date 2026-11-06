@@ -82,8 +82,8 @@ java -jar app.jar \
 절단 사유·총수·받은 수·적재되지 않은 수를 함께 든다.
 
 ```sql
-SELECT reference_date, started_at, received, source_total, pages_fetched,
-       truncation_cause, dropped, drop_reasons
+SELECT reference_date, started_at, received, normalized, duplicate, dropped,
+       source_total, pages_fetched, truncation_cause, drop_reasons
 FROM collection_run
 WHERE source_endpoint = 'OPENING_AWARD_LIST'
   AND reference_date BETWEEN '<from>' AND '<to>'
@@ -111,17 +111,22 @@ ORDER BY reference_date, started_at;
 2. `truncation_cause` 가 **비었는데** `received < source_total` 이면 **짧은 걷기**다(빈 쪽·`NoData` 로
    곱게 멈췄다). 사유 토큰이 없는 것이 정상이고, 그 차이가 결측의 크기다. 일시 축이라 같은 조각
    재실행이 처방이다 — 원천이 총수를 말했으므로 다시 걸으면 받을 수 있다.
-3. `received = source_total` 인데 **`dropped > 0`** 이거나 마침 줄의 `stored < received` 면 **받았지만
-   적재되지 않은 항목**이 있다. 사유는 `drop_reasons`(공고번호·차수 부재)와 **같은 식별자의 중복**
-   (마침 줄 `duplicates`)이고, **같은 조각 재실행으로 풀리지 않는다** — 원천이 같은 응답을 준다.
-   원천 응답을 확인할 자리이고, 중복이 보이면 쪽 밀림을 의심한다. 이 축은 종료 코드를 움직이지
-   않는다(되돌이를 만들지 않으려는 결정이다).
+3. `received = source_total` 인데 **`dropped > 0` 또는 `duplicate > 0`** 이면 **받았지만 적재되지 않은
+   항목**이 있다 — 그 슬롯의 행이 둘 다 든다(실행 전체의 요약은 마침 줄의 `dropped`·`duplicates` 다).
+   한 슬롯 안에서 네 칸은 DB 가 등식으로 닫는다: `received = normalized + duplicate + dropped`
+   (`collection_run` 의 CHECK). **`normalized` 가 그 슬롯이 적재를 시도한 수**이므로 `normalized <
+   received` 와 「`duplicate > 0` 또는 `dropped > 0`」은 같은 말이고, 빠진 수가 곧 그 둘의 합이다.
+   사유는 `drop_reasons`(이 경로에서는 공고번호·차수 부재 하나)와 **같은 식별자의 중복**(`duplicate`)이고,
+   **같은 조각 재실행으로 풀리지 않는다** — 원천이 같은 응답을 준다. 원천 응답을 확인할 자리이고,
+   `duplicate > 0` 이면 쪽 밀림을 의심한다. 이 축은 종료 코드를 움직이지 않는다(되돌이를 만들지 않으려는
+   결정이다).
 
 세 판독 어디에도 걸리지 않으면 그 슬롯은 끝난 것이다. 단 **원천 총수를 믿을 수 없는 판**은 이 판독
 밖이다 — 아래 §3.2.
 
-**회계 행이 없는 판**(예외로 끝난 슬롯)의 사유는 위 표 1 행의 `collection failed cause=<토큰>` 줄이다.
-예외는 `runs.record` 에 닿기 전에 나가므로 그 슬롯의 회계 행 자체가 없다.
+**회계 행이 없는 판**(예외로 끝난 슬롯)의 사유는 **§3 종료 코드 표의 `1` 행**이 가리키는
+`collection failed cause=<토큰>` 줄이다. 예외가 나면 `runs.record` 가 끝나지 않으므로 그 슬롯의 회계
+행 자체가 없다.
 
 **시도 원장**(실행 상태 디렉터리)은 사유를 가리는 자리가 **아니다**. 호출 단위이고 개찰일 칸이 없으며
 (목록 축은 공고 단위가 아니라 `notice_key_hash` 가 비어 있다), 결말은 전송층의 것뿐이라
@@ -135,13 +140,22 @@ ORDER BY reference_date, started_at;
 
 - **총수를 아예 주지 않는다**: 비교할 값이 없어 판정 불가다. 쪽 수(`pages_fetched`)와 다른 날의 행 수로만
   어림한다.
-- **뒤 쪽에서 총수를 줄인다**: 이 갈래는 배치마다 본 총수의 **최댓값**을 쥐므로(v r3 L-1 수정) 줄여도
-  판독 2 가 선다. 다만 원천이 **첫 쪽부터** 작은 값을 주면 그 값이 최댓값이다.
-- **쪽 밀림으로 앞 행이 다시 온다**: 중복도 「받은 수」에 들어가 총수를 채운다. 그 판의 신호는
-  `received ≠ stored`(마침 줄의 `duplicates`)뿐이므로 판독 3 이 그 자리다.
+- **총수를 줄인다**: 이 갈래가 쥐는 최댓값은 **쪽 상한 재개의 배치 경계에서만** 선다(v r3 L-1 수정은
+  배치 **사이**를 닫았다). **한 배치 안**에서 뒤 쪽이 총수를 줄이면 어댑터 누산기가 **마지막 값**을
+  쥐므로 그 값이 그대로 회계에 들어가고 판독 2 가 서지 않는다 — 쪽 상한 50 을 넘지 않는 정상 슬롯은
+  배치가 하나이므로 **그쪽이 흔한 판**이다. 그 누산기는 공유(형제 갈래도 쓴다)라 이 slice 의 범위 밖이다.
+  원천이 **첫 쪽부터** 작은 값을 주는 판도 같다(그 값이 최댓값이다).
+  **신호**: 회계 행에 `received > source_total` 이 보이면 원천이 총수를 줄인 것이다.
+- **쪽 밀림으로 앞 행이 다시 온다**: 중복도 「받은 수」에 들어가 총수를 채운다. 신호가 있는 판과 **없는
+  판**이 갈린다.
+  - **한 걷기(배치) 안**의 밀림은 `duplicate` 가 센다 — 판독 3 이 그 자리다.
+  - **쪽 상한 재개 경계를 건너는** 밀림은 **신호가 없다**. dedup 집합이 배치마다 새로 서므로 1 배치에서
+    이미 받은 행이 재개 2 배치에 다시 와도 `duplicate = 0` 이고 `normalized = received` 다. 적재는
+    멱등이라(`ON CONFLICT DO NOTHING`) 실제 행은 늘지 않는데 부풀린 `received` 가 총수를 채워 판독 2 도
+    지나고 **exit 0** 이 나간다 — 두 신호가 다 0 이므로 **그 판은 회계로 가릴 수 없다**(원천 응답 확인뿐).
 
-셋 다 원천 응답을 확인하는 수밖에 없다 — 결측의 **방향**은 안전하지 않으므로(조용히 0 이 나간다),
-실 수집 캠페인에서 `received = source_total` 성립률과 `dropped`·`duplicates` 분포를 함께 재는 것이
+넷 다 원천 응답을 확인하는 수밖에 없다 — 결측의 **방향**은 안전하지 않으므로(조용히 0 이 나간다),
+실 수집 캠페인에서 `received = source_total` 성립률과 `dropped`·`duplicate` 분포를 함께 재는 것이
 다음 과제다(알려진 제한).
 
 ## 4. 승격(낙찰 칸 채우기)
