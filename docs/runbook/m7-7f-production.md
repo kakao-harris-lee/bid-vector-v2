@@ -800,11 +800,17 @@ WantedBy=timers.target
 `production` 러너가 §13.2 를 채웠는데도 `RefusedMissingChannelConfig` 로 기동 실패한다.
 
 **금지되는 JVM 옵션 — 전제이고 선택이 아니다.** 이 러너의 JVM 에 JDK HttpClient 의 내부 로그 속성
-(`jdk.httpclient.HttpClient.log` · `jdk.internal.httpclient.debug`)을 **켜지 않는다**. 켜면 요청 URL 이
-stderr 로 나가고, 그 URL 은 **경로에 봇 자격을 싣는다** — 발송 어댑터가 로거를 쥐지 않는다는 보증은
-그 축을 덮지 못한다(JDK 자신의 로그다). `JAVA_TOOL_OPTIONS` 로도 켜지므로 그 환경 변수까지 본다.
-러너는 그 둘이 켜진 채로는 **기동하지 않는다**(`RefusedHttpClientLogging` — 아래 §13.6) — 문면이
-아니라 기동 판정이 그 전제를 진다.
+(`jdk.httpclient.HttpClient.log` · `jdk.internal.httpclient.debug`)을 **지정하지 않는다**. 켜면 요청
+URL 이 stderr 로 나가고, 그 URL 은 **경로에 봇 자격을 싣는다** — 발송 어댑터가 로거를 쥐지 않는다는
+보증은 그 축을 덮지 못한다(JDK 자신의 로그다). `JAVA_TOOL_OPTIONS` 로도 켜지므로 그 환경 변수까지
+본다. 러너는 그 둘이 지정된 채로는 **기동하지 않는다**(`RefusedHttpClientLogging` — 아래 §13.6) —
+문면이 아니라 기동 판정이 그 전제를 진다.
+
+**「켜지 않는다」가 아니라 「지정하지 않는다」다.** 판정은 속성의 **존재**만 본다 — `=false` 나 빈 값
+(`-Djdk.internal.httpclient.debug=false`·`-Djdk.httpclient.HttpClient.log=`)처럼 JDK 가 실제로는
+아무것도 찍지 않는 값도 **거부된다.** 값마다 JDK 의 해석을 이 자리에서 흉내 내지 않는 쪽이
+fail-closed 라 그렇게 두었다. 그 옵션을 디버깅에 쓰려면 **비-Live 환경에서** 쓴다(거기서는 거부하지
+않는다 — 보낼 자격도 찍힐 URL 도 없다).
 
 ### 13.4 첫 발송 확인
 
@@ -839,7 +845,7 @@ systemctl list-timers bidvector-notification-relay.timer   # 비어 있어야 �
 | 기동 실패, 「봇 자격이 Bot API 모양이 아니다」 | 자격에 공백·줄바꿈이 섞였거나 `<봇 id>:<비밀 조각>` 모양이 아니다(복사 사고) | §13.1 ① 에서 받은 값을 그대로 다시 넣는다. 메시지는 **칸 이름만** 말하고 원문도 길이도 말하지 않는다 |
 | 기동 실패, 「Telegram base URL 이 URI 로 해독되지 않는다」 | `…_TELEGRAM_BASE_URL` 을 덮어썼고 그 주소가 `java.net.URI` 가 받지 않는 모양이다(`\| \ " { } ^` · 16진 두 자리가 없는 `%` · 숫자 아닌 포트 · 65535 초과 포트) | 그 값을 지워 기본값(`https://api.telegram.org`)으로 되돌린다. **이 거부가 행을 지킨다** — 그대로 떴으면 첫 발송이 모호로 기록되고 집은 행이 전부 `ISOLATED` 로 탔다 |
 | 기동 실패, `RefusedChannelWithoutActiveRoute(channel=Email)` | `bidvector.relay.channel` 이 활성 경로가 없는 채널이다(Email 은 `enabled=false`) | `channel=telegram` 으로 고친다. 이 거부가 **행을 지킨다** — 그대로 떴으면 집은 행이 전부 `FAILED` 로 탔다 |
-| 기동 실패, `RefusedHttpClientLogging(enabled=…)` | JVM 에 JDK HttpClient 내부 로그 속성이 켜져 있다(`JAVA_TOOL_OPTIONS` 로도 켜진다) | 그 속성을 끈다 — 켜 두면 **요청 URL 이 stderr 로 나가고 그 URL 에 자격이 들어 있다**(§13.1 ①). 운영에서 이 속성은 금지다 |
+| 기동 실패, `RefusedHttpClientLogging(enabled=…)` | JVM 에 JDK HttpClient 내부 로그 속성이 **지정돼** 있다(`JAVA_TOOL_OPTIONS` 로도 들어온다) | 그 속성을 **지운다**(값을 `false`·빈 값으로 두는 것으로는 풀리지 않는다 — 판정은 존재만 본다, §13.3). 지정해 두면 **요청 URL 이 stderr 로 나가고 그 URL 에 자격이 들어 있다**(§13.1 ①). 운영에서 이 속성은 금지다 |
 | 종료 코드 `4` | 그 환경이 발송 가능 모드가 아니다 | `environment=production` 인지 본다(§5 사상표) |
 | 마침 줄 `failed>0` | Telegram 이 **확정 거부**했다 — chat id 가 틀렸거나(400) 봇이 차단됐거나(403) 자격이 무효(401) | §13.1 ②③ 를 다시 본다. 본문 길이는 사유가 **아니다**(발송 어댑터가 4096자 상한에서 자르고 표지를 남긴다). 그 행은 되살아나지 않는다 — 설정을 고치면 **다음** 판정이 새 행을 낳는다 |
 | 메시지 끝에 「이하 생략」 | 본문이 Bot API 의 4096자 상한을 넘어 잘렸다 | 정상 거동이다(알림을 잃지 않는다). 뒷부분은 알림함·공고 상세에서 본다 |

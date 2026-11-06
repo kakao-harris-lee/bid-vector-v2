@@ -262,9 +262,20 @@ class RelayBootDecisionTest {
         ) shouldBe RelayBootDecision.Allowed
     }
 
-    /** 속성 이름 어휘가 닫혀 있다 — 새 속성을 조용히 더하는 길을 막는다(칸마다 이름을 못박는다). */
+    /**
+     * **JDK 가 읽는 이름 철자를 잠그는 유일한 칸이다**(v N-3<r3> L-1 로 문면 정정).
+     *
+     * 앞 문면은 「새 속성을 조용히 더하는 길을 막는다」였는데 그것은 이 test 가 하는 일이 아니다 —
+     * 어휘에 속성을 더하면 거부가 **늘어날** 뿐이라 막을 이유가 없다.
+     *
+     * 실제로 이 칸이 없으면 **철자 오타가 조용히 지나간다**: `RelayWiringTest` 는 enum 값으로
+     * `setProperty` 하고 production 도 같은 enum 값으로 `getProperty` 하므로, 이름이 틀려도 둘이
+     * 같은 틀린 값을 쓰고 그 test 는 초록이다. 그때 JDK 는 아무것도 안 켜진 것으로 보고 운영에서는
+     * **거부가 발화하지 않는다.** 그래서 이 test 는 「그 값이 wire 에 닿는가」 축을 재는 자리다
+     * (verifier 실측: 이름 오타 변이는 이 test **하나**만 붉힌다).
+     */
     @Test
-    fun `로그 속성 어휘는 둘이고 이름이 고정이다`() {
+    fun `로그 속성 어휘는 둘이고 이름이 고정이다 — JDK 가 읽는 철자를 잠근다`() {
         HttpClientLogProperty.entries.map { it.propertyName } shouldBe
             listOf("jdk.httpclient.HttpClient.log", "jdk.internal.httpclient.debug")
     }
